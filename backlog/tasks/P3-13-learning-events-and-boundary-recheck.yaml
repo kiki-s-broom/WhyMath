@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: docs
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,11 +18,12 @@ acceptance:
   - "[ARCH-66 ⑥ 2026-09-24] 학생 참여 과정 12/31 이후 연기 결정 — ①의 '실제 학생 세션'은 12/31 전까지 테스트용 학생 계정(내부 계정) 세션으로 충족한다. 실제 학생 세션 확인은 게이트 G-student-work-after-internal-completion 판정 이후로 미루며, 판정문에 '테스트 계정 기준'임을 명시한다(실사용자 검증으로 계상 금지)."
 artifacts:
   - "판정 문서 docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md (판정 기준 main 594ce16b) — ①②③ 충족(테스트 계정·로컬 기준) · ④ CI RED 미실증(PR 필요) · 후속 P3-27"
+  - "PR #1572 (https://github.com/kiki-s-broom/WhyMath/pull/1572) — 판정 문서 docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md · ①②③ 충족(테스트 계정 기준) · ④ CI RED 실증(run 37917610534: backend Import contracts·infra-contracts tests/infra 스텝 실패, 원복 후 src 순 차이 0) · 후속 P3-27"
 paths:
   - tests/backend/scenarios/test_gate_d_event_role_census.py
   - scripts/ops/verify_gate_de_discrimination.py
   - docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md
   - tests/infra/test_gate_harness_marker_reach_wiring.py
-session: claude/p3-13-fuiky8
-notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [13]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측·신규 사유] 경계 축은 다른 태스크가 이미 소유하며 **타 세션이 진행 중**이라 amend 하지 않는다(남의 in-flight 작업에 범위를 얹는 것이 되므로). 대신 선행으로 걸어 그 산출을 입력으로 쓴다. 이벤트 8종 축은 별개이며, 이 태스크를 등재한 3회차 대조표 §13-1 이 8/8 역할 대응(이름 일치 6·상이 2)으로 이미 판정했다 — 이 회차의 실질은 '만들기'가 아니라 **실세션 기록 확인**이다.\n\n[정정 2026-09-24] ARCH-66 ⑥: 실학생 세션 확인 연기\n\n[정정 2026-10-09] paths [] → ['tests/backend/scenarios/test_gate_d_event_role_census.py', 'scripts/ops/verify_gate_de_discrimination.py', 'docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md', 'tests/infra/test_gate_harness_marker_reach_wiring.py']: 착수 시 paths 미선언 경고 해소(겹침 검사 포함) + 산출물 위치 기록"
+session: null
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [13]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측·신규 사유] 경계 축은 다른 태스크가 이미 소유하며 **타 세션이 진행 중**이라 amend 하지 않는다(남의 in-flight 작업에 범위를 얹는 것이 되므로). 대신 선행으로 걸어 그 산출을 입력으로 쓴다. 이벤트 8종 축은 별개이며, 이 태스크를 등재한 3회차 대조표 §13-1 이 8/8 역할 대응(이름 일치 6·상이 2)으로 이미 판정했다 — 이 회차의 실질은 '만들기'가 아니라 **실세션 기록 확인**이다.\n\n[정정 2026-09-24] ARCH-66 ⑥: 실학생 세션 확인 연기\n\n[정정 2026-10-09] paths [] → ['tests/backend/scenarios/test_gate_d_event_role_census.py', 'scripts/ops/verify_gate_de_discrimination.py', 'docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md', 'tests/infra/test_gate_harness_marker_reach_wiring.py']: 착수 시 paths 미선언 경고 해소(겹침 검사 포함) + 산출물 위치 기록\n\n[미러 면제 2026-10-09] ci_mirror.py 미실행 — backend·backend-migrations·infra-contracts·harness-integrity·policy-guard 스텝을 CI YAML에서 직접 재현해 PR #1572 본문에 수치 기록(src 순 변경 0줄)"
 updated: 2026-10-09
