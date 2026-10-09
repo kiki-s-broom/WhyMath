@@ -51,7 +51,7 @@ from typing import ClassVar, Final, Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.l3.equivalent.p3_diff_expr import anchor_curve_function
 from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     ShortcutProbe,
@@ -344,8 +344,13 @@ def probe_of(standard_code: str, item: DiffItem) -> ShortcutProbe:
 _ITEM_CACHE: dict[tuple[type, str], tuple[DiffItem, ...]] = {}
 
 
+@deterministic_generator
 class P3DiffSlotGenerator:
     """개념 1개 × 슬롯 1개를 담당하는 결정론 생성기 베이스(`EquivalentProblemGenerator` 좌석).
+
+    저작 서명(PB-17): `generate`는 이 베이스 본문에만 있으므로 데코레이터도 여기에 단다 — 7개
+    개념 생성기가 낸 후보는 모두 `deterministic:p3_diff_skeleton_base`로 서명된다(서명은 모듈
+    단위라는 `deterministic_generator_name` 규약). 개념은 `unit_codes`·`slug`가 따로 식별한다.
 
     하위 클래스가 채울 것(클래스 변수 + `_slot_items`):
       · `standard_code`·`concept_src_id`·`unit_code`·`slug_prefix` — 개념 식별.
