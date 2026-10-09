@@ -44,6 +44,8 @@ from whymath_backend.schema.enums import StepType
 
 __all__ = [
     "SolutionVerificationResult",
+    "aggregate_transitions",
+    "plan_transitions",
     "verify_solution",
 ]
 
@@ -156,6 +158,25 @@ def verify_solution(
     범위 밖(후속): 텍스트 → 단계 분해(L5)·coach 파이프라인 결선·PRM 가중치·단원별 verify
     커버리지 ≥70% 게이팅.
     """
+    plan = plan_transitions(steps, step_types)
+    results = [verify_step(before, after, step_type=step_type) for before, after, step_type in plan]
+    return aggregate_transitions(results)
+
+
+def plan_transitions(
+    steps: Sequence[str],
+    step_types: Sequence[StepType | None] | None = None,
+) -> list[tuple[str, str, StepType | None]]:
+    """연쇄 전이 계획 — `(before, after, step_type)` 목록(전이 순서·길이 = `max(0, len(steps)-1)`).
+
+    `step_types` 길이 규약(전이당 하나)을 여기서 검사하고 불일치는 `ValueError`로 거부한다 —
+    조용한 패딩은 전이와 타입을 어긋나게 해 비대수 단계를 대수로(또는 그 반대로) 오판할 위험이
+    있다(정확성 #1). 전이 0개면 빈 목록(에러 아님).
+
+    `verify_solution`에서 *분리*한 이유(OPS-96): 호출부가 전이를 **하나씩** 이벤트 루프 밖에서
+    시간 상한과 함께 돌릴 수 있게 하기 위해서다. 체인 전체를 한 번에 돌리면 느린 전이 1개가
+    다른 전이의 정상 판정까지 판정 불가로 지운다. 판정 로직은 여전히 `verify_step` 하나뿐이다.
+    """
     n_transitions = max(0, len(steps) - 1)
 
     # step_types 길이 규약 — 전이당 하나. 불일치는 조용한 패딩 대신 명시 거부(거짓 판정 회피).
@@ -165,23 +186,28 @@ def verify_solution(
             f"— 받은 길이 {len(step_types)} ≠ 전이 {n_transitions}."
         )
 
-    # 전이 0개(steps 길이 < 2·빈 리스트) → 정직한 빈 집계(에러 아님).
+    return [
+        (steps[i], steps[i + 1], step_types[i] if step_types is not None else None)
+        for i in range(n_transitions)
+    ]
+
+
+def aggregate_transitions(results: Sequence[VerifyStepResult]) -> SolutionVerificationResult:
+    """전이별 `verify_step` 결과를 순서 보존해 집계 — 판정 재구현 0(카운트·비율·첫 incorrect만).
+
+    전이 0개면 정직한 빈 집계다(에러 아님).
+    """
+    n_transitions = len(results)
     if n_transitions == 0:
         return _empty_result()
 
-    # 연쇄 전이 검증 — 각 전이를 verify_step에 위임(판정 재구현 금지·결과만 집계).
-    results: list[VerifyStepResult] = []
     n_correct = 0
     n_incorrect = 0
     n_unverifiable = 0
     unverifiable_by_reason: dict[VerifyStepReasonCode, int] = {}
     first_incorrect_index: int | None = None
 
-    for i in range(n_transitions):
-        step_type = step_types[i] if step_types is not None else None
-        result = verify_step(steps[i], steps[i + 1], step_type=step_type)
-        results.append(result)
-
+    for i, result in enumerate(results):
         if result.state == VerifyStepState.correct:
             n_correct += 1
         elif result.state == VerifyStepState.incorrect:
@@ -202,7 +228,7 @@ def verify_solution(
     unverified_ratio = n_unverifiable / n_transitions
 
     return SolutionVerificationResult(
-        steps=results,
+        steps=list(results),
         n_correct=n_correct,
         n_incorrect=n_incorrect,
         n_unverifiable=n_unverifiable,
