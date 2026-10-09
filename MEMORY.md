@@ -12158,6 +12158,14 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **사람 소유(이관)**: 라벨 2종 생성·룰셋 required 등록 = 게이트 `G-release-freeze-labels-and-required`(11/30 전). 그 전까지 검사는 빨간 체크만 보이고 머지를 막지 못한다.
 - **한계(명시)**: 라벨 부착자를 검사가 모른다(승인의 증거가 아니라 가시화 표지). 동결 경로(특히 `data/`)는 기본값이며 11/30 전 Kiki 확정 필요. 날짜는 UTC 기준. `tests/infra` 로컬 8건 실패는 `sqlalchemy` 부재 환경 문제(무관).
 
+### 2026-10-08 — PB-10: 난이도 보정 루프 스케줄 좌석 확정 + 도달 관측 리포트 + 실행 로그 계약
+
+- **결정(스케줄 좌석)**: `l2/calibrate_items.py`를 부르는 곳이 저장소 안에 0건이던 상태를 `docker-compose.prod.yml`의 `item-calibration` 서비스(24h 루프·`retention-purge` SEC-12 동형·app 이미지 재사용·DB URL만 주입)로 해소했다. 기각: GitHub Actions cron(prod DB에 닿지 못함 — `weekly-metrics.yml` 헤더의 같은 판정), Phaiakes9 systemd(개발 DB 5433 쪽이라 prod 스택 `db`와 다르다).
+- **관측**: `harness/item_calibration_reach_report.py` 신설(게이트 아님·exit 0/2). 채움률(`irt_difficulty_b`·`irt_a`)·응답 규모·보정 제외 사유(5회 미만)와 루프 5상태 판정(`NO_RESPONSES`/`NO_ELIGIBLE_ITEMS`/`LOOP_DORMANT`/`LOOP_STALE`/`LOOP_CAUGHT_UP`)을 낸다. 판정은 날짜 없이 "자격 문항 중 b NULL 수"로 성립한다.
+- **마지막 보정 시각은 DB에 저장 좌석이 없다**: `Problem.calibrated_at` 부재, `updated_at`은 `onupdate`가 없어 보정 UPDATE로 갱신되지 않는다(모델 사실을 테스트가 묶음). 리포트는 `last_calibration_at=unrecorded`로 "모른다"를 명시하고, 시각은 CLI가 실행마다 남기는 `calibration_run ... finished_at=...` 로그 한 줄에만 있다. 영속 좌석(마이그레이션)은 별도 태스크 몫.
+- **실행 로그 계약**: 응답 0행은 `status=noop_no_responses`(정상 no-op), 자격 문항 0건은 `noop_no_eligible_items`, 실제 보정은 `calibrated`, 예외는 `failed error_type=<타입명>` 후 재발생. stdout 첫 줄 `calibrated_items=N` 하위호환은 불변.
+- **검증**: 단위·배선·통합 테스트 신설. 배선 테스트 뮤테이션 10종·SQL 뮤테이션 8종 전건 RED(주입 적용·원복 바이트 동일 단언). 실 PG16+pgvector 로컬 DB에서 보정 `--dry-run`의 `calibrated_b`와 리포트 자격 문항 수 일치, 실제 보정 전후 판정 `LOOP_DORMANT → LOOP_CAUGHT_UP` 확인. CI 재현: backend 잡(ruff·black·mypy --strict·lint-imports) 종료 0, `tests/infra` 2783 passed/1 skipped, 미배선 감사·정책 가드·헌법 래칫(차단 0건) 종료 0.
+- **한계(명시)**: 운영 DB(5433)에는 닿지 못했다 — 2026-09-29 실측(응답 80건·1명·5회 이상 문항 0건)이 그대로면 현재 판정은 `NO_ELIGIBLE_ITEMS`일 것이나 이 세션이 확인한 값은 아니다. 라이브 스택에서 `item-calibration`이 실제로 뜨는지는 미확인(Kiki 배포 몫 — 런북 `deployment_cd_runbook.md` §5d). 후속: EOS-154(a 첫 채택 신호)가 이제 착수 가능하다.
 ### 2026-10-08 — PB-17 결정론 생성기 저작 서명 + 코퍼스 백필 + 선언 덮어쓰기 차단
 - **서명**: 결정론 생성기 60종 클래스에 `@deterministic_generator`(`l3/equivalent/generator.py`)를 부착 — 후보가 `deterministic:<생성기>` 서명을 갖는다. 전수 가드(`test_deterministic_author_stamp.py`)가 `generate(self, spec)` 보유 클래스를 역할 기반으로 발견해 미서명 0건·스캔 하한을 동결한다.
 - **백필**: `harness/problem_corpus_author_backfill.py`(기본/`--dry-run`/`--check`, 멱등). 37개 디렉터리·14,034건 중 13,609건(35개 디렉터리) 서명, 425건 미백필 — `problem_bank_rephrased_v0`(421건, LLM 발문 다양화·저작 모델 id 미기록이라 `llm:` 서명도 지어내지 않음)와 `problem_bank_v1`(4건, 사람 시드). 도출 근거는 `_provenance.json`의 `generation_method`가 지목한 생성기 파일(30개 디렉터리), 파일명이 없는 5개 디렉터리는 `LLM 0` 선언 + 코드의 `CORPUS_DIR_NAME` 배치 모듈 임포트로 도출(코드 사실 추가), `generated_v0`는 생성기 8종이라 배치 모듈명으로 서명.
