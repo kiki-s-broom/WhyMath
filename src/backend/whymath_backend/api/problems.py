@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
@@ -82,6 +83,13 @@ from whymath_backend.schema.enums import (
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import ProblemRelation as ProblemRelationSchema
 from whymath_backend.schema.problem import PublicProblem, PublicProblemStep
+from whymath_backend.schema.review_transition import (
+    IllegalReviewStatusChange,
+    QuarantineReasonRequired,
+    QuarantineRecordLocked,
+    ReviewTransitionAction,
+    plan_review_field_change,
+)
 
 router = APIRouter(prefix="/v1/problems", tags=["problem"])
 
@@ -418,6 +426,57 @@ async def list_problem_relations(
     return [row.to_schema() for row in result.scalars().all()]
 
 
+def _as_review_status(value: ReviewStatus | str | None) -> ReviewStatus | None:
+    """스키마(문자열)·ORM(enum) 어느 쪽 값이든 `ReviewStatus | None`으로 모은다."""
+    return None if value is None else ReviewStatus(value)
+
+
+def _review_patch_refusal(
+    exc: IllegalReviewStatusChange | QuarantineReasonRequired | QuarantineRecordLocked,
+    *,
+    problem_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    current: ReviewStatus | None,
+    target: ReviewStatus | None,
+) -> HTTPException:
+    """검수 상태 변경 거부를 HTTP로 옮긴다 — 응답 모양은 `POST …/transitions`의 409와 같은 축이다.
+
+    거부는 **기록 없이 끝나지 않는다**: 우회 시도는 보안 신호라 WARNING으로 남긴다(행위자·문항·
+    상태·코드만 — 사유 본문 등 자유 텍스트는 싣지 않는다). `privacy_audit`에 행을 쓰지는 않는다 —
+    그 테이블의 `content_mutation`은 "변경이 일어났다"는 사실의 기록이고(루프 KPI ④ '운영자 수동
+    개입' 계수가 이 행 수를 센다), 거부된 시도는 변경이 아니다. 거부를 변경으로 적으면 감사 원장이
+    일어나지 않은 일을 말하게 된다.
+    """
+    _logger.warning(
+        "검수 상태 변경 거부(ADMIN-16) — PATCH 우회 시도: actor=%s problem_id=%s current=%s "
+        "requested=%s code=%s",
+        actor_id,
+        problem_id,
+        current.value if current is not None else None,
+        target.value if target is not None else None,
+        exc.code,
+    )
+    if isinstance(exc, IllegalReviewStatusChange):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.code,
+                "message": "현재 상태에서 허용되지 않는 전이입니다.",
+                "current_status": current.value if current is not None else None,
+                "requested_status": target.value if target is not None else None,
+            },
+        )
+    if isinstance(exc, QuarantineReasonRequired):
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": exc.code, "message": str(exc)},
+        )
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={"code": exc.code, "message": str(exc)},
+    )
+
+
 @router.patch("/{problem_id}", response_model=ProblemSchema, summary="문제 부분 수정")
 async def patch_problem(
     problem_id: uuid.UUID,
@@ -436,15 +495,36 @@ async def patch_problem(
     ETag를 주므로 여기서도 같은 기준으로 비교해야 If-Match 흐름이 정합한다).
 
     SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다.
+
+    **검수 상태 변경은 전이표를 거친다(ADMIN-16)**: 병합 결과가 `review_status`를 *바꾸면*
+    `schema/review_transition.py`의 표(`plan_review_field_change`)로 판정한다 — 표에 없는 변경
+    (rejected→approved · 미설정→무엇이든 등)은 409 `illegal_transition`, 격리(`approved→
+    quarantined`)에 *이번 요청의* `quarantine_reason`이 없으면 422 `reason_required`, 격리가 아닌
+    전이가 격리 기록을 함께 바꾸려 하면 409 `quarantine_record_immutable`이며 어느 경우든 쓰기도
+    감사도 없다. 합법 변경은 감사 행 1개의 동작이 `update`가 아니라 **전이 액션**(approve/reject/
+    quarantine/release)이 되고, 격리 시각은 클라이언트 값이 아니라 **서버 시각**이 기록된다
+    (`POST …/transitions`와 같은 의미 — 시계가 클라이언트 소유면 격리를 소급할 수 있다). 상태를
+    바꾸려는 요청(본문에 `review_status` 포함)은 전이 라우트와 같은 `SELECT … FOR UPDATE`로
+    행을 잠그고 최신 값으로 판정한다. 상태가 그대로인 요청(GET 본문을 되돌려 보내는 왕복 포함)은
+    전이가 아니라 기존 `update` 경로다.
     """
-    existing = await session.get(Problem, problem_id)
+    # 상태를 바꾸려는 요청이면 행을 잠가 최신 값으로 판정한다 — 전이 라우트가 FOR UPDATE로
+    # 직렬화하는 것과 같은 이유다(잠그지 않으면 두 표면이 같은 낡은 상태를 보고 각자 합법이라
+    # 판정해 전이가 이중 기록된다). 상태를 건드리지 않는 요청은 종전과 같은 읽기를 유지한다.
+    if "review_status" in body:
+        existing = await session.get(
+            Problem, problem_id, with_for_update=True, populate_existing=True
+        )
+    else:
+        existing = await session.get(Problem, problem_id)
     if existing is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"문제를 찾을 수 없습니다: {problem_id}",
         )
-    ensure_if_match(if_match, etag_for(PublicProblem.from_problem(existing.to_schema())))
-    merged = existing.to_schema().model_dump()
+    current_schema = existing.to_schema()
+    ensure_if_match(if_match, etag_for(PublicProblem.from_problem(current_schema)))
+    merged = current_schema.model_dump()
     merged.update(body)
     merged["problem_id"] = problem_id  # PK는 경로 고정
     try:
@@ -457,6 +537,37 @@ async def patch_problem(
                 "errors": [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()],
             },
         ) from exc
+
+    current_status = _as_review_status(current_schema.review_status)
+    target_status = _as_review_status(validated.review_status)
+    reason_in_body = body.get("quarantine_reason")
+    try:
+        plan = plan_review_field_change(
+            current_status=current_status,
+            target_status=target_status,
+            reason_in_request=reason_in_body if isinstance(reason_in_body, str) else None,
+            quarantine_record_changed=(
+                validated.quarantine_reason != current_schema.quarantine_reason
+                or validated.quarantined_at != current_schema.quarantined_at
+            ),
+        )
+    except (IllegalReviewStatusChange, QuarantineReasonRequired, QuarantineRecordLocked) as exc:
+        raise _review_patch_refusal(
+            exc,
+            problem_id=problem_id,
+            actor_id=admin.user_id,
+            current=current_status,
+            target=target_status,
+        ) from exc
+    if plan.action is ReviewTransitionAction.quarantine:
+        # 격리 기록은 상태와 함께, 시각은 서버가 쓴다(격리 계약 §3). 클라이언트가 보낸 시각은
+        # 응답 본문에 실제 기록값이 나오므로 덮어쓴 사실이 관측된다.
+        validated = validated.model_copy(
+            update={
+                "quarantine_reason": plan.quarantine_reason,
+                "quarantined_at": datetime.now(UTC),
+            }
+        )
     updated = await session.merge(Problem.from_schema(validated))
     settings = get_settings()
     record_content_mutation_audit(
@@ -464,7 +575,11 @@ async def patch_problem(
         actor_user_id=admin.user_id,
         resource_type=PrivacyAuditResourceType.problem,
         resource_id=problem_id,
-        action=PrivacyAuditAction.update,
+        action=(
+            PrivacyAuditAction(plan.action.value)
+            if plan.action is not None
+            else PrivacyAuditAction.update
+        ),
         ip=_client_ip(request, settings=settings),
         settings=settings,
     )

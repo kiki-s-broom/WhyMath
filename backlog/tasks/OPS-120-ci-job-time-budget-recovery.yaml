@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-120-ci-job-time-budget-recovery
+title: "CI 잡 시간 예산 회복 — OPS-100 첫 실측에서 여유 30% 미만 4잡(backend 9.4%·backend-migrations 8.7%·backend-serial-nightly 26.3%·data-pipeline 상한 도달 1회)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-100-ci-job-timeout-headroom-watch
+requires_gates: []
+acceptance:
+  - "① 처방 판정 — 4개 잡 각각이 (a) 서서히 느려졌는가(처방: 상한 상향 또는 분할) (b) 한 번 멈췄는가(처방: 스텝 타임아웃)를 measure_ci_job_timeout_headroom.py의 비고 열(완주 표본 최대)과 --jsonl 증거로 판정해 잡별로 기록한다. data-pipeline은 2026-10-06 push 실행 37488429913이 setup-python 스텝의 캐시 복원(Failed to restore: The server is busy)에서 멈춰 10분을 다 썼고 완주 표본 최대는 3.07분이라 (b)로 보이나, 이는 읽어서 그렇게 보이는 것이므로 판정 근거를 남긴다.\n② backend(상한 35분, 최대 31.72분, 중앙 29.08분, 여유 9.4%) — 여유를 30% 이상으로 되돌리는 조치(분할 또는 상한 조정)와 그 근거. 상한만 올리는 경우 OPS-47·OPS-69가 이미 같은 방식으로 끝났음을 명시하고 분할 대안을 기각한 근거를 적는다.\n③ backend-migrations(상한 15분, 최대 13.70분, 중앙 12.35분, 여유 8.7%)와 backend-serial-nightly(상한 45분, 최대 33.15분, 여유 26.3%)도 같은 판정을 내린다.\n④ 조치 후 ci-timeout-headroom 워크플로를 workflow_dispatch로 실행해 종료 코드 0을 확인한다. 잔존 LOW를 남기는 잡은 이 태스크에 사유와 재확인 시점을 적는다 — 만료 없는 유예 금지.\n⑤ 상한을 바꾼 잡마다 정적 하한 동결 테스트를 둔다(tests/infra/test_ci_harness_integrity_timeout.py 선례). 실행 이력이 필요한 상시 감시는 OPS-100이 맡는다."
+artifacts: []
+paths:
+  - ".github/workflows/ci.yml"
+  - "tests/infra/test_ci_*timeout*.py"
+session: null
+notes: "OPS-100(CI 잡별 타임아웃 여유 상시 감시)의 첫 실측(2026-10-08, 이벤트별 최근 20건, push·merge_group·schedule)에서 나온 후속이다. 도구 오판이 아님을 확인했다: data-pipeline의 상한 도달 1건은 체크런 주석 The job has exceeded the maximum execution time of 10m0s로 실제 타임아웃이었다. 이 태스크가 끝나기 전에는 ci-timeout-headroom 워크플로가 매일 적색이다 — 그것이 의도된 신호이며 경고를 끄는 것으로 해소하지 않는다. 기준 바로 위에 있어 차기 후보인 잡: harness-integrity(상한 12분, 최대 8.28분, 여유 31.0%)·infra-contracts(상한 10분, 최대 6.62분, 여유 33.8%). 실측 표는 PR 본문과 OPS-100 PR의 실행 기록에 있다."
+updated: 2026-10-08

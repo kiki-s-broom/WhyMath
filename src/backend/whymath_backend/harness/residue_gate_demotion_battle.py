@@ -83,12 +83,14 @@ from whymath_backend.l3.cross_verify import (
     MISSING_CONDITION_PERSPECTIVES,
     MULTIPLE_VALID_ANSWERS_PERSPECTIVES,
     PROBABILITY_PERSPECTIVES,
+    AuthorDeclarationConflictError,
     CrossVerificationResult,
     CrossVerifier,
     Perspective,
     PerspectiveVerdict,
     ResidueSubject,
     _aggregate,
+    resolve_author_signature,
 )
 from whymath_backend.l3.finite_probability import (
     FiniteProbabilityError,
@@ -128,6 +130,7 @@ __all__ = [
 
 _EXIT_OK = 0
 _EXIT_GATE_FAIL = 1
+_EXIT_BAD_DECLARATION = 2  # 저작 선언이 코퍼스 기록과 충돌(PB-17) — 측정 시작 전 거부.
 
 # 결함류 Literal — 튜닝 4종(D7 명세: 발문 조건 결측·등확률 미명시·중의성·복수 정답)에
 # **홀드아웃 1종**(`contradictory_condition`)이 더해진다.
@@ -603,7 +606,7 @@ def run_residue_demotion_battle(
             subject = _build_subject(
                 item.record,
                 question_text=item.mutated_question_text,
-                authored_by=authored_by or item.record.authored_by,
+                authored_by=resolve_author_signature(item.record.authored_by, authored_by),
             )
             if isinstance(subject, str):
                 model_failures.append(subject)
@@ -649,7 +652,7 @@ def run_residue_demotion_battle(
         subject = _build_subject(
             record,
             question_text=record.question_text,
-            authored_by=authored_by or record.authored_by,
+            authored_by=resolve_author_signature(record.authored_by, authored_by),
         )
         if isinstance(subject, str):
             clean_model_failures.append(subject)
@@ -1409,7 +1412,8 @@ def main(argv: list[str] | None = None) -> int:
         "--authored-by",
         default=None,
         help=(
-            "생성자 서명 선언(서명 기록이 없는 구 코퍼스용·레코드 값을 덮어씀) — "
+            "생성자 서명 선언(서명 기록이 **없는** 레코드만 채움·기록이 있으면 덮어쓰지 않고 "
+            "충돌 시 거부) — "
             "'llm:<모델 id>' 또는 'deterministic:<생성기>'. 실제 저작 주체를 적는다: 거짓 선언은 "
             "생성자≠검증자 가드를 무력화해 측정을 무효로 만든다(가드 회피용 스위치가 아니다)."
         ),
@@ -1440,6 +1444,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     records = load_pilot_records(args.corpus)
+    # 저작 선언은 기록 없음만 채운다(PB-17) — 기록과 충돌하면 측정 시작 전에 멈춘다.
+    try:
+        for record in records:
+            resolve_author_signature(record.authored_by, args.authored_by)
+    except AuthorDeclarationConflictError as exc:
+        sys.stderr.write(f"저작 선언 거부: {exc}\n")
+        return _EXIT_BAD_DECLARATION
     battery = build_residue_seeded_set(records)
     # 실 provider는 지연 연결(구성만으로 네트워크 0) — 실제 호출은 verify() 시점에 일어난다.
     # 이 모듈은 provider를 **조립만** 하고 `.generate()`를 직접 부르지 않는다(호출은

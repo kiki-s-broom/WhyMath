@@ -37,7 +37,7 @@ from typing import Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -145,6 +145,7 @@ def _sum_product_explanation(skeleton: _SumProductSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class SumProductPrincipleSkeletonGenerator:
     """합·곱의 법칙 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -285,6 +286,7 @@ def _permutation_explanation(skeleton: _PermutationSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class PermutationSkeletonGenerator:
     """순열 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

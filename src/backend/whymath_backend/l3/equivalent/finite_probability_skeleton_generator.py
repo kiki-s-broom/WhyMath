@@ -31,7 +31,7 @@ from typing import Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -213,6 +213,7 @@ def _build_pool() -> tuple[_Skeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class FiniteProbabilitySkeletonGenerator:
     """유한 확률·경우의 수 생성기 — `EquivalentProblemGenerator` 좌석 구현(결정론·LLM 0).
 

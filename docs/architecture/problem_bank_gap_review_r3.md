@@ -546,7 +546,7 @@ grep -c 'variant-identity' backlog/gates.yaml ; echo "EXIT=$?"                  
 | **G1** 저작 11,446문 고립 | 🔴 **유효** | `trjg5x` 원격 존재 · `S4-30`~`S4-51` main **0건** · main 코퍼스 여전히 **7종** · `PB-06` todo |
 | **G2** 유형 태깅 제외 | ✅ **해소** | `PB-07` done(#797)이 `EXCLUDED_CORPORA`를 **빈 dict + `ExclusionEntry` 만료 계약**으로 교체하고 계보 분류 축(`LINEAGE_CORPORA`)을 신설 → 유형 태깅 **2,638/2,638(100%)** |
 | **G3** 공개 카탈로그 무게이트 | 🔴 **유효** | `api/problems.py:119` `select(Problem)` 그대로 · `PB-08` todo |
-| **G4** 난이도 루프 호출자 0 | 🔴 **유효** | `calibrate_items` 호출자 `.github/`·`infra/`·compose **0건** · `PB-10` todo |
+| **G4** 난이도 루프 호출자 0 | 🟡 **구현됨·미머지(PB-10 PR 진행 중, 2026-10-08)** | 판정 시점 main에서는 `calibrate_items` 호출자 `.github/`·`infra/`·compose **0건**으로 여전히 유효. PB-10 브랜치가 `docker-compose.prod.yml`의 `item-calibration` 서비스 + `harness/item_calibration_reach_report.py`를 추가 — **머지 전에는 해소로 세지 않는다** |
 | **G5** 변형 3종 부재 | 🔴 **유효** | 조건·난이도계열·역문제 코드 0 · `PB-09` todo |
 | **G6** 메타 4필드 미영속 | 🔴 유효(의도) | ORM 매핑 여전히 0 — 재논쟁 없음 |
 | **G7** `problem_step` writer 0 | ⚠️ **성격 변화** | `S4-09` done(`SOL-01` #801)로 **`SolutionPath`/`SolutionStep` 좌석은 살아났으나** `problem_step`은 writer 0 유지 → **두 좌석 병존**. `SOL-03`이 이 축을 더 정밀하게 추적한다(problem_step 행수 + *"생성 경로 자체가 없음"* vs *"경로는 있으나 미호출"* 구분 · `ReasoningType` 소비 0) → **`SOL-03` 승계, 중복 등재 금지** |

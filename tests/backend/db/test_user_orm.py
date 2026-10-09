@@ -139,15 +139,21 @@ def test_user_school_type_enum_values() -> None:
 
 
 def test_user_role_column_ddl_and_enum_values() -> None:
-    """role 컬럼(SEC-07 D1) — NOT NULL·server_default='student'·role_enum 2값(멤버명≠값이므로
-    values_callable이 실제 *값*을 썼는지 확인 — `_pg_enum` `_orm_enum.py` 규약)."""
+    """role 컬럼(SEC-07 D1) — NOT NULL·server_default='student'·role_enum 5값(P3-12가 CMS 3값을
+    더했다). 멤버명≠값이므로 values_callable이 실제 *값*을 썼는지 확인한다(`_orm_enum.py` 규약)."""
     ddl = _pg_ddl(OrmUserProfile.__table__)
     assert "role_enum" in ddl
     assert "NOT NULL" in ddl
     assert "'student'" in ddl
     enums = OrmUserProfile.__table__.c.role.type.enums  # type: ignore[attr-defined]
     # 값(멤버명 아님)이 들어가야 한다 — Role.STUDENT="student"(멤버명 STUDENT와 다름).
-    assert set(enums) == {"student", "content_admin"}
+    assert set(enums) == {
+        "student",
+        "content_admin",
+        "content_editor",
+        "content_reviewer",
+        "content_publisher",
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────
