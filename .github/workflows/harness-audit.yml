@@ -213,7 +213,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install deps
-        run: pip install "pyyaml>=6.0.1,<7"
+        run: python3 -m pip install "pyyaml>=6.0.1,<7"
 
       # 원격 브랜치 전수를 봐야 한다 — checkout은 기본 브랜치 ref만 remote-tracking으로 둔다.
       - name: 원격 브랜치 동기화
