@@ -872,6 +872,14 @@ _OFFLINE_REPORT = (
     "by-design:빌드타임 관측 리포트(게이트 아님) — 수치를 보려고 사람이 돌린다. exit 0/2로 "
     "머지를 막는 판정기가 아니므로 CI 상시 배선 대상이 아니다"
 )
+_OBSERVED_BY_RUNNER = (
+    "by-design:관측 러너(OPS-19) 실행 대상 — `ops.observation_report_runner`가 서브프로세스로 "
+    "정기 실행한다(ci 부류=harness-integrity 잡 · db 부류=docker-compose.prod.yml "
+    "observation-reports 서비스). `ci_executed_modules()`는 서브프로세스 호출을 보지 못해 이 "
+    "축에서는 미도달로 보일 뿐 실제 미배선이 아니다(ops.weekly_metrics_report와 같은 스캔 범위 "
+    "한계). 이 문구가 사실임은 tests/infra/test_observation_report_runner_wiring.py가 러너 "
+    "목록과 양방향 대조로 동결한다"
+)
 _OPERATIONS_BATCH = (
     "by-design:운영 집계 배치 — 일 1회 크론/수동 실행이 설계 확정값이고(COLLAB-03 acceptance ⑥) "
     "새 스케줄러 도입은 같은 태스크가 금지했다. 실 PG 왕복이라 CI 상시 실행 대상도 아니다"
@@ -1319,24 +1327,25 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # QUAL-01(2026-08-10): 코퍼스 JSONL만 읽는 빌드타임 관측 리포트(DB 0) — problem_bank_
         # coverage와 동일 취급. 실중복이 나와도 exit 1을 내지 않는 게이트 아님 원칙도 동일.
         "harness.problem_duplication_audit": _OFFLINE_REPORT,
-        "harness.visualization_reach_report": _OFFLINE_REPORT,
-        "harness.concept_reach_report": _OFFLINE_REPORT,
+        "harness.visualization_reach_report": _OBSERVED_BY_RUNNER,
+        "harness.concept_reach_report": _OBSERVED_BY_RUNNER,
         # KG-03(2026-08-11): 공식 축 도달 관측 — concept_reach_report와 동일 성격(정적 스캔·
         # DB 0·게이트 아님). 판정 소비처는 tests/backend/harness/test_formula_reach_report.py
         # (backend 잡 testpaths가 수집)이며 전용 CI 잡은 의도적으로 신설하지 않았다 —
         # concept-reach(OPS-23)와 달리 mobile-only PR 회귀 가드가 아니라 관측 리포트다.
-        "harness.formula_reach_report": _OFFLINE_REPORT,
-        "harness.assessment_seat_reach_report": _OFFLINE_REPORT,
+        "harness.formula_reach_report": _OBSERVED_BY_RUNNER,
+        "harness.assessment_seat_reach_report": _OBSERVED_BY_RUNNER,
         # PB-10(2026-10-08): 문항 난이도 보정 루프 도달 관측 — assessment_seat_reach_report와
         # 동일 성격
         # (DB 읽기 전용 관측 · 게이트 아님 · exit 0/2). 보정 배치 자체는 docker-compose.prod.yml의
-        # item-calibration 서비스가 부른다(tests/infra/test_item_calibration_wiring.py가 동결).
-        "harness.item_calibration_reach_report": _OFFLINE_REPORT,
-        "harness.recommendation_outcome_report": _OFFLINE_REPORT,
-        "harness.learning_path_orderability_report": _OFFLINE_REPORT,
+        # item-calibration 서비스가 부른다(tests/infra/test_item_calibration_wiring.py가 동결한다).
+        # OPS-19: 이 리포트 자체는 관측 러너(db 부류)가 정기 실행한다.
+        "harness.item_calibration_reach_report": _OBSERVED_BY_RUNNER,
+        "harness.recommendation_outcome_report": _OBSERVED_BY_RUNNER,
+        "harness.learning_path_orderability_report": _OBSERVED_BY_RUNNER,
         "harness.rephrased_corpus_hygiene": _OFFLINE_REPORT,
         "harness.pedagogy_policy_eval": _OFFLINE_REPORT,
-        "harness.curriculum_revision_crosswalk_report": _OFFLINE_REPORT,
+        "harness.curriculum_revision_crosswalk_report": _OBSERVED_BY_RUNNER,
         "harness.objective_coverage": _OFFLINE_REPORT,
         "harness.concept_assessment_index": _OFFLINE_REPORT,
         "harness.concept_content_audit": _OFFLINE_REPORT,
@@ -1353,13 +1362,13 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # ASM-09(2026-08-11): distractor_map 오개념 신호 사장 규모 관측 — assessment_seat_
         # reach_report와 동형(DB 실측·게이트 아님·exit 0/2). 사장 규모가 얼마든 머지를 막지
         # 않으므로 CI 상시 배선 비대상.
-        "harness.distractor_signal_dormancy_report": _OFFLINE_REPORT,
-        "ops.recommendation_reach_report": _OFFLINE_REPORT,
+        "harness.distractor_signal_dormancy_report": _OBSERVED_BY_RUNNER,
+        "ops.recommendation_reach_report": _OBSERVED_BY_RUNNER,
         # REC-06(2026-08-11): 반복 추천 진도 폭·집중도 관측 — recommendation_reach_report와
         # 동형(실 DB 조회·게이트 아님·exit 0/2). 진도 폭이 1이어도 머지를 막지 않으므로 CI
         # 상시 배선 비대상이고, 실 PG 왕복이라 CI에서 원리적으로 돌지도 않는다.
-        "ops.repeat_recommendation_report": _OFFLINE_REPORT,
-        "ops.pedagogy_content_slot_reach_report": _OFFLINE_REPORT,
+        "ops.repeat_recommendation_report": _OBSERVED_BY_RUNNER,
+        "ops.pedagogy_content_slot_reach_report": _OBSERVED_BY_RUNNER,
         "ops.role_grant_cli": _PRIVILEGE_ESCALATION_CLI,
         # ADMIN-11(2026-08-31): 좌석 발급 경로의 *계정* 절반. role_grant_cli와 같은 봉인에
         # 속한다 — 좌석을 줄 대상(user_profile)이 0행이라 grant가 성립하지 않던 구멍을 메운다.
