@@ -19,6 +19,10 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/statistical_claim.py
   - tests/backend/l3/test_statistical_claim.py
+  - docs/architecture/verifier_v2_domains.md
 session: claude/youthful-lamport-one9om
-notes: S4-58 인수 기준 6 에서 분리한 승계 항목. 설계 근거와 수정 전 실측은 docs/architecture/verifier_v2_domains.md 3.7 절의 알려진 한계에 있다.
+notes: |-
+  S4-58 인수 기준 6 에서 분리한 승계 항목. 설계 근거와 수정 전 실측은 docs/architecture/verifier_v2_domains.md 3.7 절의 알려진 한계에 있다.
+
+  [정정 2026-10-09] paths ['src/backend/whymath_backend/l3/statistical_claim.py', 'tests/backend/l3/test_statistical_claim.py'] → ['src/backend/whymath_backend/l3/statistical_claim.py', 'tests/backend/l3/test_statistical_claim.py', 'docs/architecture/verifier_v2_domains.md']: 3.7절 알려진 한계가 n=1 보존을 서술하고 있어 같은 변경에서 정정(문서가 코드와 모순되는 상태 방지)
 updated: 2026-10-09
