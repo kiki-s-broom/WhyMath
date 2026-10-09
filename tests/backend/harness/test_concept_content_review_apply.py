@@ -28,7 +28,9 @@ class _FakeStore:
     def __init__(self) -> None:
         self.calls: list[tuple[tuple[str, ...], str]] = []
 
-    def mark_review_status(self, codes: tuple[str, ...], status: str) -> int:
+    def mark_review_status(
+        self, codes: tuple[str, ...], status: str, *, conflicts: list[str] | None = None
+    ) -> int:
         self.calls.append((codes, status))
         return len(codes)
 

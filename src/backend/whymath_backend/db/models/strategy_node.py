@@ -66,6 +66,13 @@ class StrategyNode(Base):
         sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
 
+    # CMS 편집 표지(P3-25) — NULL=사람이 고친 적 없음(적재가 소유), 값=CMS가 마지막으로 고친 시각.
+    # 적재(`populate`)는 이 값이 있는 행을 건너뛰어 충돌로 보고한다. server_default·백필 금지.
+    # 규약 정본: `db/cms_edit_marker.py` · `docs/standards/cms_edit_vs_loader_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     __table_args__ = (
         # family(전략 family 그룹) 보조 인덱스(검색·집계).
         sa.Index("ix_strategy_node_family", "family"),

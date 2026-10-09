@@ -28,6 +28,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from whymath_backend.db.cms_edit_marker import add_overwrite_argument
 from whymath_backend.db.session import get_sessionmaker
 from whymath_backend.l4.hint_content.gates import (
     GATE_ANSWER_LEAKAGE,
@@ -137,6 +138,7 @@ class GenerationReport:
                     "updated": self.writes.updated,
                     "unchanged": self.writes.unchanged,
                     "retired": self.writes.retired,
+                    "cms_edit_conflicts": sorted(self.writes.cms_edit_conflicts),
                 }
                 if self.writes is not None
                 else None
@@ -191,7 +193,7 @@ def summarize(
     )
 
 
-async def run(*, apply: bool) -> GenerationReport:
+async def run(*, apply: bool, overwrite_cms_edits: bool = False) -> GenerationReport:
     """DB glue — 원천 로드 → 순수 생성 → (apply면) 한 트랜잭션 적재."""
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
@@ -203,6 +205,7 @@ async def run(*, apply: bool) -> GenerationReport:
                 session,
                 [hint for result in results for hint in result.hints],
                 processed_path_ids=[path.solution_path_id for path in inputs],
+                overwrite_cms_edits=overwrite_cms_edits,
             )
     return report
 
@@ -218,8 +221,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="hints 테이블에 실제로 적재한다(기본은 dry-run — 적재 없이 리포트만).",
     )
+    add_overwrite_argument(parser)
     args = parser.parse_args(list(argv) if argv is not None else None)
-    report = asyncio.run(run(apply=bool(args.apply)))
+    report = asyncio.run(
+        run(apply=bool(args.apply), overwrite_cms_edits=bool(args.overwrite_cms_edits))
+    )
     print(json.dumps(report.to_json(), ensure_ascii=False, sort_keys=True))
     if report.load.paths_seen == 0:
         print(
