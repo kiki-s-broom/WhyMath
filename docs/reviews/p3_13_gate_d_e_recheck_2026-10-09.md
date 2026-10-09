@@ -9,8 +9,7 @@
 ## 0. 결론 (한 문단)
 
 **Gate D(이벤트)**: 8개 역할 모두 테스트 계정의 실세션에서 시간선에 **실제 행으로 기록**된다. 다만 8번째 `concept_viewed`는 대응 이벤트 2종 중 1종(`content_viewed`)이 생산자 0건이라 **`concept_selected`만으로 충족**되고, 그 이벤트도 개념 id를 싣지 않는다. 추적 필드 6종 중 `content_version`은 **어느 이벤트에도 없다**(원천이 없다 — `EOS-47` 소유).
-**Gate E(경계)**: Core→Adapter 직접 import **0건**, Core 안 과목 리터럴 비교 **0건**, Phase 3 직전(2026-09-23 `9ec7c3ca`) 대비 증가 0. 위반을 주입하면 지목한 가드가 **로컬에서** RED였다.
-**미충족 1건**: acceptance ④의 "**CI에서** RED"는 이 세션에서 증명하지 못했다 — PR을 열어 실 CI가 해당 스텝을 실행해야 성립한다(§7).
+**Gate E(경계)**: Core→Adapter 직접 import **0건**, Core 안 과목 리터럴 비교 **0건**, Phase 3 직전(2026-09-23 `9ec7c3ca`) 대비 증가 0. 위반을 주입하면 지목한 가드가 로컬에서도, **실 CI에서도** RED였다(§6-5 — PR #1572 위의 주입 커밋 `9388ec12`, run `37917610534`).
 
 ## 1. 판정표
 
@@ -19,7 +18,7 @@
 | ① 이벤트 8종이 실제 학생 세션에서 기록되는가 | **충족(테스트 계정 기준) · 단서 2** | §2. 8/8 역할 기록, `concept_viewed`는 약함(§4 F2), 실사용자 검증 아님 |
 | ② 이름 대조가 아니라 역할 대조인가 | **충족** | §2-1 매핑표를 코드로 동결(`GATE_D_ROLES`) — 이름 grep이면 0건이던 2종을 역할로 찾았다 |
 | ③ Core에 Math 로직 침투 0건 + AST 가드에 위반 주입해 RED | **충족(로컬)** | §5. 스캔 대상 0건 아님(753개 파일·826개 파일/6,914 의존), 주입 2종 지목 가드 RED |
-| ④ 경계 위반 주입이 **CI에서** RED | **미충족(미실증)** | §7. 가드의 소유 잡은 특정했으나 이번 주입을 실 CI에 올리지 않았다 |
+| ④ 경계 위반 주입이 **CI에서** RED | **충족** | §6-5. 두 소유 잡의 가드 스텝이 실제 실행되어 실패했고 앞 스텝은 성공이었다(skipped 아님) |
 
 ## 2. Gate D — 이벤트 8종
 
@@ -162,9 +161,23 @@ census 테스트를 `tests/infra/test_gate_harness_marker_reach_wiring.py`의 `G
 
 **첫 시도의 실패와 원인**: 백엔드 전체 pytest 첫 실행이 종료 코드 1(수집 오류 9건)이었다. 9건 전부 `No module named 'data_pipeline'` — CI의 `backend` 잡은 설치 스텝에서 `pip install -e ../data-pipeline`을 하는데 내 환경이 빠뜨렸다(제 변경과 무관). 설치 후 전체를 다시 돌려 위 결과를 얻었다. 첫 실행의 "18,044 passed"는 9개 모듈이 빠진 수치이므로 근거로 쓰지 않는다.
 
+### 6-5. CI에서 RED — 실증 (acceptance ④)
+
+PR #1572 위에 주입 커밋 `9388ec12`를 올리고(바로 다음 커밋이 `cp` 백업 바이트로 원복 — 원복 후 `src`의 순 차이 0줄), 실 CI run `37917610534`의 **스텝 단위** 결과를 읽었다. 주입은 `ruff`·`black`·`mypy --strict`를 통과하도록 만들었다 — 앞 스텝이 먼저 실패하면 가드 스텝이 skipped가 되어 "RED 확인"이 성립하지 않기 때문이다(로컬에서 먼저 확인).
+
+| 잡 | 스텝 | 결과 | 확인한 로그 |
+|---|---|---|---|
+| `backend` | Ruff · Black · Mypy | **success** | — |
+| `backend` | **Import contracts (import-linter)** | **failure** (실제 실행·종료 코드 1) | `whymath_backend.api.me -> whymath_backend.l4.subject_adapter_math (l.209)` · "Contracts: 3 kept, 1 broken" |
+| `backend` | 이후 Pytest 등 19개 | skipped | 이 스텝의 실패가 뒤를 막은 것(정상) |
+| `infra-contracts` | Ruff · Black · 게이트 3종 | **success** | — |
+| `infra-contracts` | **Pytest (tests/infra)** | **failure** (6분 32초 실행) | "5 failed, 2951 passed, 6 skipped" · `subject == 'math'`가 `l2.mastery_tracking` 408행에서 지목됨 |
+
+두 주입은 **서로 다른 잡**이 각각 잡았다: Core→Adapter import는 `backend` 잡의 `lint-imports`가, 과목 리터럴 비교는 `infra-contracts` 잡의 `tests/infra`가 잡는다(§5-1이 로컬에서 확인한 "리터럴 비교는 `lint-imports`가 못 본다"와 일치). `import-linter` 로그 시각이 같은 초인 것은 스텝이 즉시 끝났기 때문이며, 로그가 실제 계약 위반 내용을 담고 있어 "명령이 즉시 죽은 거짓 RED"가 아님을 확인했다.
+
 ## 7. 미이행과 한계 (숨기지 않는다)
 
-1. **"CI에서 RED"(acceptance ④) 미실증.** 위 §6은 전부 **로컬 실행**이다. CI는 `pull_request`·`main` push·merge queue에서만 도는데 이 세션은 PR을 열지 않았다. 따라서 이번 census 테스트와 새 하네스가 실 CI에서 도는지·주입이 그 스텝에서 RED가 되는지는 **확인하지 않았다.** 가드 자체의 CI RED는 선행 `EOS-117`이 PR #1215로 실측했다(위반 주입 run `35421591228` · 원복 run `35421783017`) — 그 증거를 이번 주입의 증거로 읽지 않는다.
+1. **"CI에서 RED"는 두 가드에 대해 실증했다(§6-5).** 단 증명 대상은 *Core→Adapter 직접 import*와 *과목 리터럴 비교* 두 위반 형태뿐이다. 선행 `EOS-117`의 증거(run `35421591228`)는 이번 주입의 증거로 읽지 않았고, 이번에 새로 얻었다. 새 census 테스트·하네스 자체가 실 CI에서 도는지는 원복 후 헤드의 `backend-migrations` 잡 결과(PR 본문에 기록)로 본다.
 2. **Python 3.13.16으로 측정했다.** CI는 3.12다. 이 변경은 런타임 코드를 0줄 바꾸고(`src` 무변경) 테스트·스크립트만 추가했으나 인터프리터 차이는 존재한다.
 3. **테스트 계정 기준.** 실사용자·실기기 세션이 아니다. 판정문에 이 사실을 유지한다.
 4. **C09는 간접 검출**(§6-1). `problem_attempted`는 다른 이벤트의 전제라 끊으면 여정이 먼저 무너진다 — 역할 부재로 잡히지 않는다.
