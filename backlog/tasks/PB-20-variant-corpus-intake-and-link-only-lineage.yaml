@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-20-variant-corpus-intake-and-link-only-lineage
+title: "변형 코퍼스 편입 결정과 중복 구조의 계보만 걸기 — PB-09 산출물의 노출 게이트 분석"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - PB-19-cat-sibling-filter-relation-type-policy
+requires_gates: []
+acceptance:
+  - "① 노출 경로 조사 — data/corpus/problem_bank_*/problems.jsonl 전수 글롭을 읽는 소비처(populate 적재·QA 파이프라인·CAT 후보 선정·크로스링크 분석 등)를 열거하고, 검수되지 않은 변형 문항이 각 경로에서 학생에게 닿는지를 소비처별로 판정한다(review_status 와 is_published 의 실제 게이트를 코드로 확인).\n② 편입 결정 — PB-09 가 만든 변형 코퍼스(problem_corpus_variants CLI 산출)를 커밋할지, 어떤 디렉터리·메타(problem_type_codes·persona_fit·review_status)로 둘지 결정하고 근거를 남긴다. 편입 시 검수 표본 감사(Wilson 게이트)를 거치기 전에는 노출되지 않아야 한다.\n③ 계보만 걸기 — PB-09 리포트에서 이미 코퍼스에 같은 구조가 있어 중복으로 걸린 자식(난이도 계열·선택 뒤집기)을 새로 낳지 않고 기존 문항 사이에 problem_relation 만 거는 경로를 설계한다. 신규 콘텐츠 0 으로 계열을 늘리는 방안이며 방향 규약(부모에서 자식)과 anti-explosion 상한을 지킨다.\n④ 집행 지점(정본화와 별항) — 편입 결정이 실제 서빙 경로의 게이트를 경유함을 테스트로 동결한다.\n⑤ 선행 — PB-19(관계 유형별 형제 소비 정책) 결정 후에만 계보가 CAT 에 닿도록 한다."
+artifacts: []
+paths:
+  - "data/corpus/**"
+  - src/backend/whymath_backend/harness/problem_corpus_variants.py
+  - "tests/backend/harness/**"
+session: null
+notes: "PB-09 발견 사항. 근거 문서 docs/architecture/problem_bank_variants_pb09.md 4절·5절. PB-09 는 의도적으로 코퍼스를 커밋하지 않았다(전수 글롭 소비처 때문)."
+updated: 2026-10-08
