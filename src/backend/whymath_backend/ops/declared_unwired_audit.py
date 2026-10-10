@@ -1038,6 +1038,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.elementary_rounding_batch": _BATCH_GENERATOR,
         "harness.elementary_volume_measure_batch": _BATCH_GENERATOR,
         "harness.highschool_quotient_rule_batch": _BATCH_GENERATOR,
+        "harness.p3_calculus1_diff_batch": _BATCH_GENERATOR,
         "harness.linear_inequality_system_batch": _BATCH_GENERATOR,
         "harness.matrix_ops_batch": _BATCH_GENERATOR,
         "harness.measurement_unit_conversion_batch": _BATCH_GENERATOR,
@@ -1092,6 +1093,17 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 검수 세션(EOS-78) — 판정을 받으며 HIT 타이머를 생산한다. `reviewer_sample_package`
         # (표본 *제시*)와 달리 사람의 판정을 되받는 대면 도구라 배치 사유를 빌려 쓰지 않는다.
         "harness.review_session": _HUMAN_REVIEW_TOOL,
+        # P3-03(2026-10-08): 미분 은행 감사자 자격 측정(결함 주입 강등전). score·s5의 입력은
+        # 저장소 밖에서 만든 LLM 판정자 라벨이라(판정자는 저장소에 접근하면 안 된다 — 블라인드)
+        # CI가 원리적으로 못 돈다. emit·machine의 재현성(커밋된 시험지·기계 라벨과 바이트 대조)은
+        # corpus_authoring 테스트 2건이 같은 CLI 진입점을 in-process로 돌려 corpus-authoring 잡에서
+        # 검사한다. backend 잡에 직접 배선하지 않는 이유: 판정기·스캐너가 바뀌는 무관한 PR이 측정
+        # 기록(시험지)을 다시 만들게 강제하면 이미 받은 판정자 라벨과의 비교가 깨진다.
+        "harness.p3_audit_qualification": (
+            "by-design:감사자 자격 측정 CLI(P3-03) — score·s5 입력이 저장소 밖 LLM 판정자 "
+            "라벨이라 CI가 원리적으로 못 돈다. emit·machine 재현성은 corpus_authoring 테스트가 "
+            "같은 진입점으로 검사한다"
+        ),
         # MP-05(2026-09-07): 카나리 구간 절단 — 입력이 *특정 회차의 사이드카 4종*(대장·genlog·
         # 코퍼스·검수 큐)이라 상주 입력이 없다. 회차를 돌려야 생기는 파일들이고(레포에
         # 상주하지 않는다), 산출은 그 회차를 검수하려는 사람의 큐다. CI가 매 커밋마다 돌릴

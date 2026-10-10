@@ -63,7 +63,9 @@ a₃)와 `GeometricSequenceSkeletonGenerator`(첫째항 1·공비 2의 제3항)�
 -----------------------------------------------
 발문 공간 겹침이 1쌍이라도 나오면 **exit 1**이다. 오탐률이 0으로 측정됐고 진양성 검출이 양성
 대조군으로 증명됐으므로 차단해도 사람이 게이트를 끄게 되지 않는다. 종료 코드: 0=겹침 없음 /
-1=겹침 발견 / 2=입력·측정 오류(측정 실패가 "0건 통과"로 위장되지 않게 분리).
+1=겹침 발견 / 2=입력·측정 오류(측정 실패가 "0건 통과"로 위장되지 않게 분리). 측정 오류에는
+**측정하지 못한 클래스**와 **풀 소진 실패(상한에서 잘림)**도 든다 — 그 구성의 "겹침 0"은 전수 판정이
+아니기 때문이다(겹침이 따로 발견되면 그 발견이 앞서 1).
 
 계층 메모(CLAUDE.md 7계층): L3 생성기를 *호출만* 하는 빌드타임 도구다(hermetic — DB·네트워크·
 LLM 0, 고정 스펙). 생성기를 수정하지 않고 코퍼스를 읽지도 쓰지도 않는다.
@@ -392,9 +394,22 @@ def render_report(report: SpaceOverlapReport) -> str:
         lines.append(f"    · [{pair.shared}건] {pair.left}  ×  {pair.right}")
     lines.append("")
     lines.append("## 4. 판정")
-    verdict = "✅ 발문 공간 겹침 없음 (exit 0)" if report.ok else "❌ 발문 공간 겹침 발견 (exit 1)"
+    if not report.ok:
+        verdict = "❌ 발문 공간 겹침 발견 (exit 1)"
+    elif _measurement_incomplete(report):
+        verdict = (
+            f"⚠ 측정 불완전 — 미측정 {len(report.unmeasured)}개 · 풀 소진 실패 "
+            f"{len(report.truncated)}개라 '겹침 없음'을 전수 판정으로 읽을 수 없다 (exit 2)"
+        )
+    else:
+        verdict = "✅ 발문 공간 겹침 없음 (exit 0)"
     lines.append(f"- {verdict}")
     return "\n".join(lines)
+
+
+def _measurement_incomplete(report: SpaceOverlapReport) -> bool:
+    """미측정 클래스나 잘린 풀이 있으면 '겹침 0'은 표본의 0이다 — 게이트는 통과로 접지 않는다."""
+    return bool(report.unmeasured or report.truncated)
 
 
 def _report_payload(report: SpaceOverlapReport) -> dict[str, object]:
@@ -434,7 +449,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json_path:
         with open(args.json_path, "w", encoding="utf-8") as handle:
             json.dump(_report_payload(report), handle, ensure_ascii=False, indent=2)
-    return 0 if report.ok else 1
+    if not report.ok:
+        return 1
+    return 2 if _measurement_incomplete(report) else 0
 
 
 if __name__ == "__main__":  # pragma: no cover — CLI 진입점

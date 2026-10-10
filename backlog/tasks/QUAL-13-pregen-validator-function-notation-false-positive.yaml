@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-13-pregen-validator-function-notation-false-positive
+title: "위생 검증기가 함수 표기 f(1)·f'(2)를 거짓 산술로 오탐 — 미분 문항 73건 거부(P3-03 부수 발견)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 동결 — 위생 검증기(src/backend/whymath_backend/l3/pregenerate/validator.py의 산술·해 주장 검사)가 함수 표기 문장을 거짓 산술로 오판정하는 사례를 RED 테스트로 먼저 고정한다. 실측 사례(P3-03 2회차 교정 중, 2026-10-07): \"f'(2) = 5\"를 '(2) = 5'라는 거짓 등식으로, \"f(1) = -7\"을 f·1에 대한 해 주장으로 읽어 미분 은행 재생성에서 73건이 거부됐다.\n② 수정 — 함수 적용 표기(f(a), f'(a), g''(t), x(t) 등)를 곱셈·괄호 산술과 구별한다. 함수 기호 뒤 괄호는 피연산자로 분해하지 않는다.\n③ 변별력 — 수정 뒤에도 진짜 거짓 산술(예: 2 + 3 = 6, (2) = 5 단독)은 계속 거부하는지 대조군으로 확인하고, 함수 표기 판별 절을 지우는 뮤테이션이 RED가 되는지 확인한다(mutated != original 단언).\n④ 회피 표기 정리 — P3-03 생성기(l3/equivalent/p3_diff_*)가 이 오탐을 피하려고 바꾼 문면(\"f'(2)의 값은 5\", \"x = 1에서 극솟값 -7\")은 그대로 둬도 되지만, 수정 뒤 원래 표기를 쓰는 문항이 거부되지 않음을 은행 재생성으로 확인한다.\n⑤ 확인 범위 — 백엔드 소스를 건드리므로 전체 스위트와 CI 잡 전체 기준으로 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/pregenerate/validator.py
+session: null
+notes: "P3-03 2회차 감사 교정 중 발견. 검증기는 고치지 않고 생성기 문면 표기를 바꿔 회피했다(범위 밖 별건)."
+updated: 2026-10-07

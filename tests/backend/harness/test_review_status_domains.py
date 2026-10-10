@@ -9,7 +9,7 @@
 
 이 파일은 세 가지를 붙든다:
   ① 부류 판정(`classify_corpus`) 5종과 두 도구의 거부 술어 — 각 부류를 실제로 만들어 확인한다.
-  ② CI 드리프트 가드(`--all --check`)가 회차 코퍼스를 **오판하지 않는다** — 순회 대상(고정 7종)이
+  ② CI 드리프트 가드(`--all --check`)가 회차 코퍼스를 **오판하지 않는다** — 순회 대상(고정 8종)이
      전부 `fixed`이고, 회차 코퍼스가 목록에 끼어들면 "미백필"이 아니라 exit 2로 빨개진다.
   ③ 계약 문서(`docs/standards/review_status_stamping_contract.md`)와 코드가 어긋나지 않는다 — 문서가
      이름 붙인 함수가 실재하고, 문서의 표 수치가 코드로 다시 계산된다.
@@ -185,7 +185,7 @@ class TestCorpusLevelBackfillCli:
         '미백필'(exit 1)로 읽으면 운영자는 코퍼스 단위 백필을 돌리라는 안내를 받고, 그 순간
         그 회차의 사람 판정은 영영 각인될 수 없다(먼저 채운 쪽이 이긴다).
         """
-        monkeypatch.chdir(_REPO_ROOT)  # 나머지 고정 7종은 실제 레포 경로로 해석된다
+        monkeypatch.chdir(_REPO_ROOT)  # 나머지 고정 8종은 실제 레포 경로로 해석된다
         injected = _write_corpus(tmp_path / "acc.jsonl", ledger=True)
         monkeypatch.setitem(KNOWN_CORPORA, "round_misregistered", injected)
         _arm_write_explosives(monkeypatch)
@@ -201,11 +201,11 @@ class TestCiDriftGuardDoesNotMisjudgeRoundCorpora:
     def test_every_fixed_corpus_in_the_repo_classifies_as_fixed(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """가드가 순회하는 7종은 전부 `fixed` — 회차 대장이 붙은 것이 없다(순회 대상 = 고정 코퍼스)."""
+        """가드가 순회하는 8종은 전부 `fixed` — 회차 대장이 붙은 것이 없다(순회 대상 = 고정 코퍼스)."""
         monkeypatch.chdir(_REPO_ROOT)
         kinds = {key: domains.classify_corpus(path)[0] for key, path in KNOWN_CORPORA.items()}
         assert kinds == {key: "fixed" for key in KNOWN_CORPORA}
-        assert len(kinds) == 7
+        assert len(kinds) == 8
 
     def test_real_guard_passes_with_the_domain_check_wired(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -216,7 +216,7 @@ class TestCiDriftGuardDoesNotMisjudgeRoundCorpora:
         code = review_cli.main(["--all", "--check"])
         captured = capsys.readouterr()
         assert code == 0, captured.err
-        assert len(json.loads(captured.out)) == 7
+        assert len(json.loads(captured.out)) == 8
 
 
 @pytest.fixture(scope="module")

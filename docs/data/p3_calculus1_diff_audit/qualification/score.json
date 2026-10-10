@@ -1,0 +1,270 @@
+{
+  "scope": "protocol",
+  "passed": true,
+  "criteria": {
+    "n_defective": 120,
+    "n_clean": 120,
+    "min_defects_per_class": 15,
+    "confidence": 0.95,
+    "min_detection_lower": 0.9,
+    "min_class_detection_point": 0.8,
+    "max_false_alarm_upper": 0.1,
+    "min_llm_judges": 2,
+    "s5_bank_size": 504,
+    "s5_max_corrected_upper": 0.02
+  },
+  "blind_sha256": "395df8fe0656bdc7af7029503d4cb1210fb7f945dbd579410bb2b4bf376703dc",
+  "answer_key_sha256": "f8ab0a965fbf375d732d749ca370b81c8b9c9db89f36f85a2a34554706dee7bc",
+  "n_llm_judges": 2,
+  "components": {
+    "기계 단독": {
+      "detected": 53,
+      "n_defective": 120,
+      "detection_lower": 0.3692040023014012,
+      "false_alarm": 0,
+      "n_clean": 120,
+      "false_alarm_upper": 0.02204907274712951,
+      "per_class": {
+        "answer_error": [
+          14,
+          18
+        ],
+        "ambiguous_solution": [
+          8,
+          17
+        ],
+        "derivative_shortcut": [
+          10,
+          17
+        ],
+        "wording_notation": [
+          12,
+          17
+        ],
+        "explanation_defect": [
+          9,
+          17
+        ],
+        "distractor_misattribution": [
+          0,
+          17
+        ],
+        "statement_mismatch": [
+          0,
+          17
+        ]
+      },
+      "passed": false,
+      "failures": [
+        "전체 검출률 Wilson 하한 0.3692 < 0.9",
+        "answer_error 검출률 0.778 < 0.8",
+        "ambiguous_solution 검출률 0.471 < 0.8",
+        "derivative_shortcut 검출률 0.588 < 0.8",
+        "wording_notation 검출률 0.706 < 0.8",
+        "explanation_defect 검출률 0.529 < 0.8",
+        "distractor_misattribution 검출률 0.000 < 0.8",
+        "statement_mismatch 검출률 0.000 < 0.8"
+      ]
+    },
+    "LLM 단독(판정자 합집합)": {
+      "detected": 120,
+      "n_defective": 120,
+      "detection_lower": 0.9779509272528707,
+      "false_alarm": 6,
+      "n_clean": 120,
+      "false_alarm_upper": 0.0937714354820558,
+      "per_class": {
+        "answer_error": [
+          18,
+          18
+        ],
+        "ambiguous_solution": [
+          17,
+          17
+        ],
+        "derivative_shortcut": [
+          17,
+          17
+        ],
+        "wording_notation": [
+          17,
+          17
+        ],
+        "explanation_defect": [
+          17,
+          17
+        ],
+        "distractor_misattribution": [
+          17,
+          17
+        ],
+        "statement_mismatch": [
+          17,
+          17
+        ]
+      },
+      "passed": true,
+      "failures": []
+    },
+    "프로토콜(기계 ∪ LLM)": {
+      "detected": 120,
+      "n_defective": 120,
+      "detection_lower": 0.9779509272528707,
+      "false_alarm": 6,
+      "n_clean": 120,
+      "false_alarm_upper": 0.0937714354820558,
+      "per_class": {
+        "answer_error": [
+          18,
+          18
+        ],
+        "ambiguous_solution": [
+          17,
+          17
+        ],
+        "derivative_shortcut": [
+          17,
+          17
+        ],
+        "wording_notation": [
+          17,
+          17
+        ],
+        "explanation_defect": [
+          17,
+          17
+        ],
+        "distractor_misattribution": [
+          17,
+          17
+        ],
+        "statement_mismatch": [
+          17,
+          17
+        ]
+      },
+      "passed": true,
+      "failures": []
+    },
+    "판정자 rater_A.jsonl": {
+      "detected": 120,
+      "n_defective": 120,
+      "detection_lower": 0.9779509272528707,
+      "false_alarm": 6,
+      "n_clean": 120,
+      "false_alarm_upper": 0.0937714354820558,
+      "per_class": {
+        "answer_error": [
+          18,
+          18
+        ],
+        "ambiguous_solution": [
+          17,
+          17
+        ],
+        "derivative_shortcut": [
+          17,
+          17
+        ],
+        "wording_notation": [
+          17,
+          17
+        ],
+        "explanation_defect": [
+          17,
+          17
+        ],
+        "distractor_misattribution": [
+          17,
+          17
+        ],
+        "statement_mismatch": [
+          17,
+          17
+        ]
+      },
+      "passed": true,
+      "failures": []
+    },
+    "판정자 rater_B.jsonl": {
+      "detected": 118,
+      "n_defective": 120,
+      "detection_lower": 0.9508833340909498,
+      "false_alarm": 5,
+      "n_clean": 120,
+      "false_alarm_upper": 0.08311829559578723,
+      "per_class": {
+        "answer_error": [
+          18,
+          18
+        ],
+        "ambiguous_solution": [
+          17,
+          17
+        ],
+        "derivative_shortcut": [
+          15,
+          17
+        ],
+        "wording_notation": [
+          17,
+          17
+        ],
+        "explanation_defect": [
+          17,
+          17
+        ],
+        "distractor_misattribution": [
+          17,
+          17
+        ],
+        "statement_mismatch": [
+          17,
+          17
+        ]
+      },
+      "passed": true,
+      "failures": []
+    }
+  },
+  "protocol": {
+    "detected": 120,
+    "n_defective": 120,
+    "detection_lower": 0.9779509272528707,
+    "false_alarm": 6,
+    "n_clean": 120,
+    "false_alarm_upper": 0.0937714354820558,
+    "per_class": {
+      "answer_error": [
+        18,
+        18
+      ],
+      "ambiguous_solution": [
+        17,
+        17
+      ],
+      "derivative_shortcut": [
+        17,
+        17
+      ],
+      "wording_notation": [
+        17,
+        17
+      ],
+      "explanation_defect": [
+        17,
+        17
+      ],
+      "distractor_misattribution": [
+        17,
+        17
+      ],
+      "statement_mismatch": [
+        17,
+        17
+      ]
+    },
+    "passed": true,
+    "failures": []
+  }
+}
