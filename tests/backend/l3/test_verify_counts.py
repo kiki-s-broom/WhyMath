@@ -312,3 +312,33 @@ class TestInequalityDirection:
 
     def test_non_binary_claim_unverifiable(self) -> None:
         assert verify_inequality_direction("-2*x < 6", "2").state == "unverifiable"
+
+
+class TestRealRootCountInInterval:
+    """실근 개수 + 범위(P3-03 6회차 은행 감사 — '구간 [a, b]에서 평균값 정리를 만족시키는 c의 개수')."""
+
+    _EQ = "3*x**2 - 2*x - 16 = 0"  # 근 -2, 8/3
+
+    def test_bounds_restrict_the_count(self) -> None:
+        assert verify_real_root_count([self._EQ, "x > 1", "x < 4"], "1").state == "pass"
+        assert verify_real_root_count([self._EQ, "x > 1", "x < 4"], "2").state == "fail"
+        assert verify_real_root_count([self._EQ, "x > -3", "x < 4"], "2").state == "pass"
+        assert verify_real_root_count([self._EQ, "x >= 3"], "0").state == "pass"
+
+    def test_single_condition_still_counts_every_real_root(self) -> None:
+        # 종전 계약 그대로 — 범위가 없으면 실수 전체의 근(-2·8/3)을 센다.
+        assert verify_real_root_count(self._EQ, "2").state == "pass"
+        assert verify_real_root_count([self._EQ], "2").state == "pass"
+
+    def test_root_on_a_strict_boundary_is_unverifiable(self) -> None:
+        # 근 -2가 엄격 경계에 걸리면 안이냐 밖이냐 판정이 모호하다 — 통과·실패로 위장하지 않는다.
+        assert verify_real_root_count([self._EQ, "x > -2"], "1").state == "unverifiable"
+        # 경계를 포함하는 범위는 근을 센다.
+        assert verify_real_root_count([self._EQ, "x >= -2", "x < 0"], "1").state == "pass"
+
+    def test_malformed_bounds_are_unverifiable(self) -> None:
+        # 둘째 등식·다른 변수·비선형 범위는 범위 계약 밖이다(보수적 회피).
+        assert verify_real_root_count([self._EQ, "x = 1"], "1").state == "unverifiable"
+        assert verify_real_root_count([self._EQ, "y > 1"], "1").state == "unverifiable"
+        assert verify_real_root_count([self._EQ, "x**2 > 1"], "1").state == "unverifiable"
+        assert verify_real_root_count([], "1").state == "unverifiable"
