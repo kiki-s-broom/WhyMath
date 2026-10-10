@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-128-chain-deadline-bounds-worker-ready-wait
+title: "검증 체인 총 예산이 워커 재기동 대기를 묶지 못함 — 마감 직전 전이가 요청을 재기동 1회(최악 60초)만큼 늘린다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 고정 — POST /v1/verify-solution의 체인 마감(api/verify.py · deadline = monotonic + cap × _CHAIN_BUDGET_FACTOR)은 각 전이에 min(상한, 남은 예산)을 계산 상한으로 넘기지만, l3/isolated_call.py의 _roundtrip은 워커 준비 대기(_wait_ready)와 복원 단계 대기를 계산 상한 밖에서 최대 _STARTUP_TIMEOUT_S(60초)까지 기다린다. 그래서 마감 직전에 시작한 전이는 요청을 예산보다 재기동 1회만큼(실측 0.6~1.7초, 최악 60초) 늘린다. verify.py 주석 '체인 시간이 예산을 넘지 않게'는 현행 코드에서 거짓이다. 이 상태를 먼저 실패 테스트로 고정한다(느린 기동 워커를 주입해 요청 시간이 예산 + 여유를 넘는 것을 RED로).\n② 해법 — 체인 호출에서는 준비·복원 대기도 남은 예산 안으로 묶는다(예: run에 마감 시각을 넘겨 대기 상한 = min(기동 상한, 남은 예산)). 마감을 넘긴 대기는 판정 불가(BudgetExceededError)로 접혀야 하며 통과·오답으로 새는 경로가 없어야 한다(CLAUDE.md 검증 권위 — 협상 대상 아님). 단건 엔드포인트(verify-step·verify-answer)의 기존 동작(기동 시간은 상한 밖)은 바꾸지 않는다 — 바꾸려면 근거와 함께 별항으로 적는다.\n③ 변별력 — 마감 대기를 되돌린 뮤테이션에서 ①의 테스트가 RED, 원복에서 GREEN. 주입 적용·원복 바이트 동일 단언.\n④ OPS-127의 벽시계 상한(설계상 초과분을 덮는 값)을 이 수정 뒤 다시 좁힐 수 있는지 실측하고 결과를 적는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/verify.py
+  - src/backend/whymath_backend/l3/isolated_call.py
+  - tests/backend/l3/test_isolated_call.py
+session: null
+notes: "출처: OPS-127(PR #1512 CI 불안정 조사) 실측에서 발견. 정상 체인 요청 2.21~3.69초 — 예산 2.0초를 넘는 분량이 상한 초과 횟수(재기동 횟수)와 함께 움직였다. 소유 영역 OPS-96(원격 claim TTL 초과)·OPS-123(done). 학생 영향은 정확성이 아니라 지연이다(넘친 전이도 판정 불가로 접힌다) — 다만 워커 기동이 멈추면 한 요청이 60초까지 묶일 수 있다."
+updated: 2026-10-09
