@@ -27,6 +27,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from enum import Enum
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal, NamedTuple
 
@@ -55,7 +56,7 @@ from whymath_backend.api._crypto import (
     resolve_dialogue_image_analysis,
     resolve_dialogue_image_uri,
 )
-from whymath_backend.api._isolated_call import isolated
+from whymath_backend.api._isolated_call import CHAIN_BUDGET_FACTOR, isolated
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
 )
@@ -715,6 +716,7 @@ def _build_response_payload(
     grade: int | None = None,
     standard_code: str | None = None,
     step_chain_verifier: StepChainVerifier | None = None,
+    chain_verification: ChainVerificationCounts | None = None,
 ) -> tuple[
     PedagogyDecision,
     list[MisconceptionMatch],
@@ -760,6 +762,13 @@ def _build_response_payload(
     해당 분기 주석).
     주입값이 실제로 쓰이는지는 `tests/backend/api/test_coach.py`의
     `TestStepChainVerifierInjection`이 가짜 verifier를 app.state에 올려 동결한다.
+
+    **OPS-125** `chain_verification`: 세 핸들러가 `_verify_chain_isolated`로 *먼저* 계산한 연쇄 검증
+    결과(이벤트 루프 밖 워커·시간 상한 포함). 주면 L4는 `step_chain_verifier`를 부르지 않는다 —
+    이 함수가 동기라 호출부에서 `await`로 감쌀 수 없어, 계산을 함수 *앞*으로 빼는 분리를 택했다
+    (함수 전체를 워커에서 돌리는 대안은 pack·가설 등 비직렬화 인자와 비SymPy 작업까지 프로세스
+    경계를 넘겨야 해서 기각). 미주입(None)이면 종전대로 `step_chain_verifier` 동기 호출 —
+    직접 호출 단위테스트 하위호환 좌석이다.
 
     **S4-19(2026-08-10)**: 반환이 7-튜플로 확장됐다 — `_StepVerificationCarry`(게이트 *이전*
     단계 검증 운반값·적재 전용)를 끝이 아닌 위치에 삽입해 **마지막 원소=solution_coaching
@@ -842,6 +851,9 @@ def _build_response_payload(
         # COMP-01: 단계 연쇄 검증 능력을 **명시 주입**한다 — 미주입이면 L4가 합성 루트를
         # 지연 조회(pull)하므로, 이 한 줄이 "Core는 인터페이스만 안다"는 주장의 집행 지점이다.
         verifier=step_chain_verifier,
+        # OPS-125: 핸들러가 격리 호출로 미리 계산한 연쇄 검증 결과 — 있으면 L4는 SymPy를 돌리지
+        # 않는다(이 함수는 동기라 여기서 직접 검증하면 이벤트 루프를 막는다).
+        chain_verification=chain_verification,
     )
     # slice 73: 노출은 *불일치 신호만* — 계산오류 verify(기존·arithmetic_error) + BKT↔θ 불일치
     # (consolidate·retrieval). 합의(foundation/advance)는 LTHC가 담당·한쪽 신호만(diagnose)은
@@ -1161,6 +1173,84 @@ class _BudgetExceededOutcome:
 
 
 _BUDGET_EXCEEDED_OUTCOME = _BudgetExceededOutcome()
+
+
+class _BudgetReason(str, Enum):
+    """계산 시간 상한 초과의 사유 코드 — 값은 수학 어댑터의 `undecidable`과 같은 문자열이다.
+
+    상한 초과를 "증명도 반증도 못 했다"로 접는 것은 단계 하나짜리 경로(`verify_step`의
+    `budget_exceeded_result`)와 같은 판정이다. 같은 문자열을 써야 이벤트 적재(`unverifiable_by_
+    reason`)와 분포 로그의 닫힌 어휘 7종이 늘지 않는다. Core라 어댑터 enum은 import하지 않는다.
+    """
+
+    undecidable = "undecidable"
+
+
+class _StepUnverifiable(BaseModel):
+    """판정 불가 전이 하나 — `StepOutcome`이 읽는 `state`만 가진다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: VerificationOutcome = VerificationOutcome.unverifiable
+
+
+class _BudgetExceededChain(BaseModel):
+    """연쇄 검증이 시간 상한을 넘었을 때의 중립 결과 — **전 전이 판정 불가**(OPS-125).
+
+    통과로 접으면 검증 우회고(풀이가 맞다고 말하게 된다) 오답으로 접으면 학생에게 부당한 부정
+    피드백이다(교수학 금기). 그래서 `n_incorrect=0`·`first_incorrect_index=None`·`unverified_ratio=
+    1.0`이다 — 코치는 이를 "검산 신호 없음"으로 읽어 단계 자가검산 코칭을 내지 않는다.
+    `ChainVerificationCounts` 구조를 만족하고 pydantic이라 `SolutionCoaching.solution_verification`
+    (`Any`)으로 실려 나가도 직렬화된다. 합 보존: n_correct + n_incorrect + n_unverifiable ==
+    n_transitions, 사유 건수 합 == n_unverifiable.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    steps: tuple[_StepUnverifiable, ...]
+    first_incorrect_index: int | None = None
+    n_transitions: int
+    n_correct: int = 0
+    n_incorrect: int = 0
+    n_unverifiable: int
+    unverified_ratio: float = 1.0
+    unverifiable_by_reason: dict[_BudgetReason, int]
+
+
+def _budget_exceeded_chain(n_transitions: int) -> _BudgetExceededChain:
+    """전이 `n_transitions`개가 전부 판정 불가인 중립 연쇄 결과(전이 0개는 호출되지 않는다)."""
+    return _BudgetExceededChain(
+        steps=tuple(_StepUnverifiable() for _ in range(n_transitions)),
+        n_transitions=n_transitions,
+        n_unverifiable=n_transitions,
+        unverifiable_by_reason={_BudgetReason.undecidable: n_transitions},
+    )
+
+
+async def _verify_chain_isolated(
+    body: CoachRequest, verifier: StepChainVerifier
+) -> ChainVerificationCounts | None:
+    """풀이 단계 연쇄 검증을 이벤트 루프 밖 워커에서 시간 상한과 함께 계산한다(OPS-125).
+
+    `_build_response_payload`(동기)가 L4를 거쳐 SymPy를 부르기 *전에* 핸들러가 이 함수로 결과를
+    만들어 `chain_verification=`으로 넘긴다. 단계가 2개 미만이면 검증할 전이가 없어 None이다
+    (L4도 같은 조건으로 건너뛴다). 상한은 `sympy_isolation_timeout_s × CHAIN_BUDGET_FACTOR` —
+    `/v1/verify-solution`의 체인 총 예산과 같은 값이다(전이를 하나씩 끊는 그쪽과 달리 이 능력은
+    체인 전체가 한 호출이라, 병리적 전이 하나가 체인 전체를 판정 불가로 접는다 — 접히는 방향은
+    언제나 "모른다"이고 통과·오답이 아니다). 초과 시 사유·한도는 `isolated`가 로그에 남긴다.
+    """
+    steps = body.solution_steps
+    if steps is None or len(steps) < 2:
+        return None
+    n_transitions = len(steps) - 1
+    step_types = body.solution_step_types
+    return await isolated(
+        verifier.verify_chain,
+        list(steps),
+        list(step_types) if step_types is not None else None,
+        on_budget_exceeded=lambda: _budget_exceeded_chain(n_transitions),
+        timeout_s=get_settings().sympy_isolation_timeout_s * CHAIN_BUDGET_FACTOR,
+    )
 
 
 def _problem_snapshot(problem: Any) -> Any:
@@ -3020,11 +3110,14 @@ async def coach_decide(
     )
     # S4-19: carry(게이트 이전 단계 검증 운반값)는 stateless 경로에선 미소비(DB 무접근 계약 —
     # 적재 좌석 없음). 마지막 원소=solution_coaching 불변식은 유지된다.
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     decision, matches, intervention, lthc, entry_category, _step_carry, solution_coaching = (
         _build_response_payload(
             body,
             matches=outcome.matches,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     return CoachResponse(
@@ -3204,6 +3297,8 @@ async def create_session(
     # 개념의 성취기준 고시코드) — 둘 다 비노출 개인화 슬롯(_grade_for/_standard_code_for docstring).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, body.problem_id)
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: step_carry = 게이트 이전 단계 검증 운반값(아래 _log_verify_event 적재 전용·비노출).
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
         _build_response_payload(
@@ -3220,6 +3315,7 @@ async def create_session(
             grade=grade,
             standard_code=standard_code,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     intervention = _intervention_from_hypotheses_or(active_hypotheses, intervention)
@@ -3630,6 +3726,8 @@ async def append_turns(
     # problem_id 출처(append 규약과 정합·expected_answer/server_mastery와 같은 출처 패턴).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, dialogue.problem_id)
+    # OPS-125: create_session과 동형 — 연쇄 검증을 이벤트 루프 밖에서 먼저 계산해 주입한다.
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: create_session과 동형 — step_carry(게이트 이전 운반값)는 verify 적재 전용·비노출.
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
         _build_response_payload(
@@ -3647,6 +3745,7 @@ async def append_turns(
             grade=grade,
             standard_code=standard_code,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     intervention = _intervention_from_hypotheses_or(active_hypotheses, intervention)
