@@ -12309,3 +12309,14 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
+
+## 2026-10-12 OPS-28 — 선언≠배선 감사기 사각 3종 해소 · import 는 도달이 아니다 · 배포 스택 실행 표면 편입
+
+- **CLI 축 전 패키지 확장**: 비재귀 `("harness","ops")` glob → 패키지 트리 전체에서 `def main` 보유 모듈 수집. 신규 편입 48종(태스크 문면의 "약 30종"은 과소 — l1 20·l4 15·l3 5·whs 4·privacy 3·l2 1)이 전건 3분류 강제 대상이 됐다. 공급 140 → 188.
+- **도달 = main() 실행**: CI/배포 스택 직접 실행 ∪ `main` 참조 전이(AST). 단순 import 는 `library_only` 로 가르고 도달이 아니다. 근거 = P3-14 가 실측한 `phase3_metrics → validation_scorecard` import 폐포 5종의 경보 소멸. 걷었던 5건 유예 복원, 각각 유예 제거 시 exit 1 임을 주입으로 동결(`TestRealRepositoryOps28`). 현재 도달 28 · library_only 16.
+- **계획에 없던 발견 — 배포 스택 실행 표면**: `docker-compose.prod.yml` 이 `privacy.retention_purge_cli`·`l2.calibrate_items` 를 24h 루프로 실행 중인데 감사기는 `ci.yml` 만 봐 둘을 미도달로 볼 뻔했다. `compose_executed_modules` 로 편입 — 이제 유예 없이 `reached`, compose 배선이 빠지면 경보.
+- **HTTP 서버/클라 분리 컬럼**: `server_test_reached`·`client_reached` 관측 컬럼 + 리포트 요약(클라 22 · 서버 테스트로만 130). `reached` 판정은 합집합 그대로(data_platform_module_gap_review §2 의도적 결정 불변). `POST /v1/generate`·`GET /v1/jobs` 가 서버 테스트만 도달임을 실측 동결.
+- **② 호출자 0 실측 2건 확정**: `judge_shadow_harvest` 는 생산자(`api/coach.py` 의 `observe_misconception_judge_shadow`, 플래그 `misconception_judge_shadow`)가 배선돼 있고 CLI 는 운영이 모은 JSONL 의 소비 쪽 → by-design. `crosslink_triage` 는 봉인된 검수 큐를 읽는 advisory → by-design.
+- **④ 자기 선언 한계**: dart 리터럴 매칭(`verify_api.dart` 는 `POST /v1/verify-solution` 리터럴이 있으나 `lib/` 소비처 0·소비자는 `test/` 뿐), `def main` 없는 `__main__` 모듈(`l1.atom_graph.populate`·`crosslink_candidates`), `main` 이름 한정, 서브프로세스 문자열 실행 미추적, 실행 표면은 ci.yml+compose 한정.
+- **검증**: 감사기 테스트 109건, 인접 infra/ops 117건 통과, ruff·black·`mypy --strict`·`lint-imports` exit 0. 뮤테이션 6종 중 최초 2종 생존(M2 compose 무시 — 테스트가 build_report 배선을 우회, M5 미사용 import 도 참조 — 픽스처에 Store 컨텍스트 이름이 없음) → 반례 2건 추가 후 6/6 검출. **백엔드 전체 스위트는 돌리지 않았다**(감사기·테스트 외 소스 무변경, CI 가 최종 판정).
+- **별건 승계**: `OPS-132` — 감사기가 의도(by-design)만 보고 동작은 못 보므로, 테스트·CI 어디서도 `main()` 이 실행되지 않는 16종(`main_references` 를 tests 트리에 적용해 산출)의 진입점 스모크.

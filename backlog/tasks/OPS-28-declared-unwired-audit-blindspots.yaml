@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -21,6 +21,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
   - "tests/backend/ops/**"
-session: null
+session: claude/funny-mayer-wuwir4
 notes: "ai_integration_gap_review.md D5(2026-08-10). dead-write 테이블 사각(dsl_integration_gap_review.md·PED-16 notes가 관찰)은 별개 4축째 — 본 태스크 범위 밖(PED-16 판정 결과에 따라 후속). 감사기 자신이 '최소 6회 반복' 사고 계열의 방어 장치이므로 사각 확장은 우선 방어선 보강.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-10-09] P3-14 가 발견한 감사기 한계(import 와 CLI 실행 미구분)로 걷힌 유예 5건의 복원 경로를 이 태스크가 소유하게 한다 — 새 태스크 신설은 중복"
-updated: 2026-10-09
+updated: 2026-10-12
