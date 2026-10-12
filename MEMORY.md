@@ -338,14 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
-### 2026-10-09 (구현·EOS-47): **`problem_attempt`에 문항 판(`problem_version_id`)과 채점 환경(`evaluation_context`) 고정 좌석을 착지했다 — 단 지금 실제로 값이 채워지는 곳은 일부뿐이며, 출처 없는 키는 지어내지 않고 `None`(모름)으로 둔다** (claude 집행) — 판정 기준 main `594ce16b`
-- **무엇을**: 리비전 `d6a2f8c4b1e7`(nullable FK + JSONB, 백필 없음). 세 적재 경로(`me.submit_attempt`·`coach._complete_problem`·`coach._record_first_wrong_submission`)가 `l2/attempt_version_pin.resolve_attempt_version_pin`으로 접수 시점의 `problem.problem_version_id` 포인터와 교육과정 라벨을 복사한다. 설계 정본 `docs/architecture/eos47_attempt_version_pinning.md`.
-- **실측 판정 1 — 5키 중 출처가 있는 것은 1개**: `curriculum_version`(문항 행의 개정 라벨)뿐. `concept_graph_version`·`grading_policy_version`·`notation_contract_version`·`normalizer_version`은 코드베이스에 값을 만드는 곳이 없다(grep 0건·28번 문서의 notation 계약은 테스트만 읽는 JSON). 임의 상수는 "버전을 기록했다"는 외양만 남기므로 `None`으로 두고 `EVALUATION_CONTEXT_SOURCES` 표에 출처 유무를 정본화했다. 연결은 `EOS-192`.
-- **실측 판정 2 — `problem_version_id`는 지금 전부 NULL**: `problem_version`에 행을 쓰는 운영 writer가 없다(ARCH-31 §5). 헬퍼는 정확히 동작하지만 효과는 `EOS-190`(발행 경로) 착지 뒤부터 나타난다. 로그 `outcome=pinned|no_version`이 작동 비율을 센다(`EOS-193` 리포트).
-- **한계(명시)**: 접수 시점 ≠ 출제 시점 — 푸는 동안 새 판이 발행되면 학생이 본 판이 아니라 새 판이 박힌다(`EOS-191`).
-- **집행 장치**: 세 경로 AST 전수 배선 검사(값이 헬퍼 결과에서 오는지까지) + 실 PG 재현성 통합 테스트(문항 수정 뒤에도 시도가 v1·새 시도는 v2·포인터 조인은 v2 대조군) + 뮤테이션 8종 전건 RED.
-- **파급**: 기존 테스트 가짜 세션 4종에 `get` 추가, 문항 스텁 1종에 속성 2개, `test_activity_orm`의 FK 개수 3→4, 데이터 접근 baseline에 `l2/attempt_version_pin.py` 등재(PK 조회 1건·쓰기 0).
-- **검증(로컬, py3.12 + 임시 PG16.15 + pgvector)**: ruff·black·`mypy --strict`(755 파일)·`lint-imports`(4 kept) exit 0, `alembic upgrade head`·`downgrade base→upgrade head` 왕복 exit 0, `tests/infra` 전체·api 묶음 375건·신규 통합 6건 통과. 백엔드 **전체 pytest 스위트**와 `backend-migrations`의 통합 전체는 이 항목 작성 시점에 아직이다(아래 PR 본문에 결과 기록).
+### 2026-10-09 (결정·구현 · P3-27): **`concept_viewed`는 (나) 세션 writer가 첫 확인 개념을 싣는 안으로 실체화하고(새 컬럼 0), 숙달 변경은 시도에 귀속 투영했다 — 콘텐츠 열람 로그(`P3-29`)와 코치 이벤트 세션 귀속(`P3-30`)은 스키마가 필요해 이월했다** (claude 판정·구현, 테스트 계정 기준) — 판정 기준 main `713512bc`
+
+**무엇/왜**: P3-13 실측에서 `concept_viewed` 역할은 `content_viewed` 생산자 0건 + `concept_selected`가 개념을 싣지 않아 "어느 개념을 봤는가"를 시간선이 말하지 못했다. 판정 문서 = `docs/reviews/p3_27_concept_viewed_and_trace_fields_2026-10-09.md`.
+**결정 3건**: ① (나) 채택 — `learning_session.target_concept_id`(DDL §6.1부터 있던 컬럼)를 문항의 대표 개념(`get_primary_concept_id`)으로 **NULL→값 한 방향만** 채운다(덮어쓰기 금지). 값의 의미는 '목표 개념'이 아니라 **'묶음에서 처음 확인된 개념'**이다. 추천 조회는 문항 선택 전에 세션을 이으므로 의도적으로 제외(NULL, 날조 금지). ② 숙달 변경의 `session_id`·`problem_id`·`attempt_id`는 `attempt_id` 조인으로 투영(실측 채움 0/20→20/20, 값이 해당 시도와 같은지까지 대조). 코치 힌트 요청·응답 지연은 시도 포인터 실측 0/1로 원천이 없어 보강하지 않았다. ③ (가)와 코치 이벤트 귀속은 새 테이블·컬럼이 필요하고 Gate D는 이미 충족이라 Release Blocker가 아니다 → `P3-29`·`P3-30`(P2)으로 이월.
+**소비처 영향**: `target_concept_id`를 읽는 곳은 일일 롤업 `concepts_practiced`뿐이다. 종전 항상 비어 있던 값이 세션당 최대 1개(첫 확인 개념)로 채워지므로 '연습한 개념의 완전한 목록'으로 읽으면 과소 집계다.
+**검증**: census 승격 단언 + 기록·귀속 차단 주입 14종(C01~C14) 전건 RED(새 5종은 승격한 단언의 메시지로 RED), writer 통합 뮤테이션 7종·호출처 `problem_id` 제거 5종 전건 RED. 실 PG 로컬 재현(pgvector 설치).
+**검증 중 찾은 공백(고친 것)**: 기존 주입 `C03`이 새 코드 원문과 어긋남 · 해석 실패 로그 침묵을 내 테스트가 못 봄(뮤테이션 생존 `W5`) · 경합 합류 분기 미검증(`W7`) · census가 호출처 6곳 중 1곳만 밟아 코치 4곳의 `problem_id=` 누락이 무검출 · **전체 스위트에서야 드러난 가짜 행 1파일**(`api/test_me_learning_trace.py` 8건 — 부분 실행으로는 안 보였다).
+**정직한 공백**: 코치 호출처 4곳 중 동작(HTTP→개념)까지 본 것은 `create_session` 하나이고 나머지 셋은 AST 전달 확인뿐이다. 전건 RED는 커버리지의 증거가 아니다. 이 판정은 테스트 계정·로컬 기준이며 CI 결과는 PR 이후에 성립한다.
+
 ### 2026-10-08 (착지 · PB-09): **변형 3종(난이도 계열·조건변형·역문제)을 계보와 함께 낳는 경로를 열었다 — 630번 시도에서 316건 저장(작동률 50.2%), `VARIANT_*` 3종과 `심화`·`선수`·`변형`·`대조`가 처음 실사용됐다. 코퍼스는 커밋하지 않았다** (claude 구현) — 판정 기준 작업 브랜치 `ec1f9dc7`
 
 **무엇/왜**: R3 G5가 "발화 조건(D4 재고 부족 + D8 계보 좌석)이 충족됐는데 방치"라 판정한 3종을 `l3/equivalent/variants.py`(부모 코퍼스 행에서 근·선택 복원 → 기존 `_Skeleton` 조립 경로로 자식 생성)와 `harness/problem_corpus_variants.py`(게이트·구조 signature dedup·계보 부여·리포트)로 구현했다. 신규 생성기·enum·필드 0. 방향은 부모→자식이며 `기초`는 enum에 없어 방향을 뒤집은 `선수`로 표현한다. 설계·실측표 = `docs/architecture/problem_bank_variants_pb09.md`.
@@ -366,6 +367,14 @@
 **실측이 설계를 고친 1건**: 건너뜀 판정을 `rowcount == 0`으로 시작했는데 psycopg3의 `INSERT … ON CONFLICT`는 삽입·갱신·건너뜀 모두 `rowcount=-1`이라 변별력이 0이었다. 가짜 엔진 테스트는 통과했고 실 DB에서 처음 드러났다 — "알 수 없으면 예외"로 둔 덕에 조용히 오분류되지 않았고, `RETURNING` 빈 결과 판정으로 교체했다.
 
 **한계(사실 기록)**: 보호는 DB 편집만 지키고 코퍼스 파일로 역기록하지 않는다(정본 파일은 DB와 달라진 채 남는다). 행 단위 보호라 코퍼스의 정당한 변경도 충돌로 보고된다. 문항은 검수 큐 승인도 표지를 채워 이후 재적재 시 충돌 보고가 늘 수 있다. 통합 테스트는 `backend-migrations` 잡에서만 실제 실행된다(그 잡은 이 세션에서 pgvector 부재로 재현하지 못했다 — 마이그레이션은 임시 PG에서 `upgrade`/`downgrade` 왕복을 직접 검증).
+### 2026-10-09 (구현·EOS-47): **`problem_attempt`에 문항 판(`problem_version_id`)과 채점 환경(`evaluation_context`) 고정 좌석을 착지했다 — 단 지금 실제로 값이 채워지는 곳은 일부뿐이며, 출처 없는 키는 지어내지 않고 `None`(모름)으로 둔다** (claude 집행) — 판정 기준 main `594ce16b`
+- **무엇을**: 리비전 `d6a2f8c4b1e7`(nullable FK + JSONB, 백필 없음). 세 적재 경로(`me.submit_attempt`·`coach._complete_problem`·`coach._record_first_wrong_submission`)가 `l2/attempt_version_pin.resolve_attempt_version_pin`으로 접수 시점의 `problem.problem_version_id` 포인터와 교육과정 라벨을 복사한다. 설계 정본 `docs/architecture/eos47_attempt_version_pinning.md`.
+- **실측 판정 1 — 5키 중 출처가 있는 것은 1개**: `curriculum_version`(문항 행의 개정 라벨)뿐. `concept_graph_version`·`grading_policy_version`·`notation_contract_version`·`normalizer_version`은 코드베이스에 값을 만드는 곳이 없다(grep 0건·28번 문서의 notation 계약은 테스트만 읽는 JSON). 임의 상수는 "버전을 기록했다"는 외양만 남기므로 `None`으로 두고 `EVALUATION_CONTEXT_SOURCES` 표에 출처 유무를 정본화했다. 연결은 `EOS-192`.
+- **실측 판정 2 — `problem_version_id`는 지금 전부 NULL**: `problem_version`에 행을 쓰는 운영 writer가 없다(ARCH-31 §5). 헬퍼는 정확히 동작하지만 효과는 `EOS-190`(발행 경로) 착지 뒤부터 나타난다. 로그 `outcome=pinned|no_version`이 작동 비율을 센다(`EOS-193` 리포트).
+- **한계(명시)**: 접수 시점 ≠ 출제 시점 — 푸는 동안 새 판이 발행되면 학생이 본 판이 아니라 새 판이 박힌다(`EOS-191`).
+- **집행 장치**: 세 경로 AST 전수 배선 검사(값이 헬퍼 결과에서 오는지까지) + 실 PG 재현성 통합 테스트(문항 수정 뒤에도 시도가 v1·새 시도는 v2·포인터 조인은 v2 대조군) + 뮤테이션 8종 전건 RED.
+- **파급**: 기존 테스트 가짜 세션 4종에 `get` 추가, 문항 스텁 1종에 속성 2개, `test_activity_orm`의 FK 개수 3→4, 데이터 접근 baseline에 `l2/attempt_version_pin.py` 등재(PK 조회 1건·쓰기 0).
+- **검증(로컬, py3.12 + 임시 PG16.15 + pgvector)**: ruff·black·`mypy --strict`(755 파일)·`lint-imports`(4 kept) exit 0, `alembic upgrade head`·`downgrade base→upgrade head` 왕복 exit 0, `tests/infra` 전체·api 묶음 375건·신규 통합 6건 통과. 백엔드 **전체 pytest 스위트**와 `backend-migrations`의 통합 전체는 이 항목 작성 시점에 아직이다(아래 PR 본문에 결과 기록).
 ### 2026-10-09 (결정 · OPS-121): **CI의 의존 해석을 제약 파일로 고정한다 — 선언 범위 안의 신규 릴리스는 이 파일을 바꾸는 갱신 PR을 거쳐서만 main·머지 큐에 닿는다** (Kiki 결정·claude 집행) — 판정 기준 main `594ce16b`
 
 - **결정(Kiki 승인 2026-10-09)**: 3안 중 **A(제약 파일 고정)** 채택. B(정기 canary)는 따로 만들지 않는다 — A의 갱신 PR이 전체 CI를 도므로 canary의 탐지 기능을 흡수한다. C(마이너 단위 상한)는 현행을 유지하되 새로 늘리지 않는다. 갱신 주기는 **주 1회(월요일) + 긴급 당일(영업일 1일 이내)**, 어떤 핀도 **30일** 넘게 방치하지 않는다(야간 센서가 강제). 비교표·근거 = `docs/reviews/ops121_ci_dependency_resolution_options_2026-10-09.md`.
