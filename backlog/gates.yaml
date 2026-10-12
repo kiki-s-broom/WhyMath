@@ -231,11 +231,11 @@ gates:
     title: "3중 '헌법' 문서의 서열 확정 — 코딩 헌법(constitution/CONSTITUTION.md 제2조 '최고 규범')과 CLAUDE.md(마스터 가이드 · '충돌 시 CLAUDE.md 우선' 373행) · dev_constitution.md(경량 요약) · AGENTS.md가 서로 최우선을 선언한다. 3택: ① 코딩 헌법 최상위(A0001 제2조 원문대로 — 기본값·권고) ② CLAUDE.md 최상위·헌법은 코딩 구조 규범에 한정 ③ 범위 분할(법령·아키텍처·검증=CLAUDE.md / 코딩 구조·파이프라인·변경·검증 독립=헌법, 같은 주제 충돌 시 헌법). 판정 재료 = docs/standards/coding_constitution_transplant.md §1 관계 선언 + 충돌 문장 12곳 목록(crosswalk 문서). evidence에 선택지 번호와 정정 커밋 해시."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-27
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "선택지 1 코딩 헌법 최상위 확정 (2026-10-12 Kiki). 정정 커밋 dd0afd0758ddafeae058a8b242f63128453a1b3d (브랜치 claude/compassionate-brahmagupta-siey7n)"
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
@@ -919,6 +919,7 @@ gates:
       - "[2026-09-22] title: 'P3-G1 — Week 1 Gate 판정 (11/1). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' → 'P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' — Kiki 결정 2026-09-22 — 일정은 달력이 아니라 선행 완료로 움직인다(가능하면 앞당긴다). 원 계획 날짜는 고정일이 아니라 상한이므로 문면을 그렇게 고친다. 대장은 이미 이 결정과 정합한다: P3 태스크에 날짜 필드가 없고 착수 조건이 전적으로 depends_on + 게이트다. 부수로 11/22 ↔ 저장소 G3 일정 충돌이 해소된다 — 11/22 는 Phase 3 의 상한일 뿐 판정 예정일이 아니다."
       - "[2026-09-22] remind_after_days: 60 → 40 — acceptance 7 전수 재측정. 이 게이트의 제목은 판정 상한을 11/1 로 명시하는데 독촉은 60일(2026-11-21)이라, 상한을 넘긴 뒤에야 경고가 뜨거나(G1~G3) 상한과 어긋난다(G4). 독촉을 상한 그 날에 맞춘다 — 상한이므로 Kiki 지시 1에 따라 판정은 선행 완료 즉시 더 앞당겨 할 수 있고, 이 값은 늦었을 때 울리는 상한선일 뿐이다."
       - "[2026-09-25] depends_on +P3-15-week1-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 판정 회차 분리 집행을 소유할 태스크가 없어 신규 등재했다(acceptance v2-9 지정)"
+      - "[2026-10-12] verdict PASS · inputs: P3-15-week1-gate-judgment · evidence: P3-G1 Week 1 Gate 판정 PASS — 판정문 docs/reviews/p3_g1_week1_gate_judgment_2026-10-12.md · 판정 기준 main f34d7b7664902b179da3867f6aecf4e01f8da2ed · PR #1584. 명세 동결(로더 exit 0, 동결 후 변경은 probe_note 3필드뿐) · Content Coverage 10/10=100% (P3-02 CLI, 종료 코드는 1 — Concept Completeness 0/10 때문이며 게이트 조건 아님·P3-04 선행 순환) · 금지 변경 0건(엔티티 19 to 19, 마이그레이션 파괴 연산 0). 공급 가능 커버리지 0/10은 PASS가 덮지 않는 잔여. clear는 Kiki 소유 — 해석 의존 2곳(조사 창 09-29 시작, Hint 좌석을 신규 Entity로 보지 않음) 확인 요청. — done P3-15-week1-gate-judgment 인계"
     depends_on:
       - P3-15-week1-gate-judgment
   - id: G-p3-g2-week2

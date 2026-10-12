@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._isolated_call import isolated
 from whymath_backend.config import get_settings
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
@@ -128,8 +129,16 @@ async def scan_attempt_misconceptions(
             # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를
             # 이름으로 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
             try:
-                result = detector.scan_attempt_answer(
-                    question_text=question_text, student_answer=answer
+                # OPS-125: 답안 훑기는 SymPy로 거짓 항등식을 읽는다 — 이벤트 루프 밖 워커에서 시간
+                # 상한과 함께 돈다. 상한 초과는 **훑지 못했다**(`NOT_RUN`)로 접는다: "후보 없음"
+                # (`RAN_NO_CANDIDATE`)으로 접으면 측정 못 한 것을 측정된 0으로 읽게 된다(이 모듈의
+                # 3상태가 존재하는 이유). 코치 경로(EOS-146)와 `/v1/me/attempts` 두 채점 경로가 이
+                # 한 곳을 공유하므로 둘 다 격리된다.
+                result = await isolated(
+                    detector.scan_attempt_answer,
+                    question_text=question_text,
+                    student_answer=answer,
+                    on_budget_exceeded=lambda: NOT_SCANNED,
                 )
             except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
                 # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로

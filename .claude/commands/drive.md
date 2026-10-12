@@ -122,9 +122,14 @@ python3 scripts/harness/ci_mirror.py run          # 변경이 닿는 잡을 자�
 - **머지는 하지 않는다.** CI green 후 SQUASH 머지는 `"pr"` 지시 또는 Kiki 판단.
 - 예외 4종이면 건너뛰되 **어느 예외인지 보고에 1줄로 적는다**:
   조사·계획 전용 / 미완·게이트 대기 / CI red / Kiki 명시 보류
-- **푸시 전에 미러부터** (HARN-209): `git push`·PR 생성 직전에 훅이 "이 커밋은 로컬 CI 미러를 안 거쳤다"를
-  고지한다(막지는 않는다). 고지가 나오면 푸시 전에 `python3 scripts/harness/ci_mirror.py run`을 돌린다.
-  `done` 게이트는 완료 선언만 막으므로 red 푸시 자체는 이 고지가 유일한 앞선 신호다.
+- **푸시 전에 미러부터** (HARN-209 → 푸시는 HARN-308부터 차단): 코드가 든 `git push`는 **이 HEAD가 필수
+  상시 잡 전부의 로컬 미러를 거쳤을 때만** 나간다. 아니면 훅이 종료 코드 2로 거부하고 이유와 다음 명령을
+  낸다 — 같은 푸시를 되풀이해도 풀리지 않는다. 푸시 전에 `python3 scripts/harness/ci_mirror.py run`을
+  돌리고(통과 또는 미실행), 미리 보려면 `python3 scripts/harness/push_mirror_notice.py gate`(차단이면 1).
+  커밋과 푸시를 한 명령에 묶지 않는다(아직 없는 커밋은 미러를 거칠 수 없어 거부된다). PR 생성은 여전히
+  고지만 한다. 로컬에서 재현할 수 없는 환경이면 `push_mirror_notice.py waive --reason '<사유>'`로 우회한다 —
+  사유는 이벤트 대장(`push_mirror_waiver`)에 남고 그 HEAD의 내용에만 유효하다. `done` 게이트는 완료 선언만
+  막으므로 red 푸시를 막는 것은 이 차단이다.
 - **PR 본문에 `## CI 도달 잡` 섹션을 싣는다** (HARN-209): 변경이 닿는 잡 목록은 사람이 추측하지 않고
   `python3 scripts/harness/push_mirror_notice.py pr-section`의 출력을 본문에 붙인다(PR 생성 훅이
   섹션이 없으면 붙여 넣을 블록을 같이 낸다). 로컬 재현 불가 잡은 "CI가 판정"으로 표기된다.
