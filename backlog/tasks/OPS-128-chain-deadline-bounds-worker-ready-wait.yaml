@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - src/backend/whymath_backend/api/verify.py
   - src/backend/whymath_backend/l3/isolated_call.py
   - tests/backend/l3/test_isolated_call.py
-session: null
+session: claude/loving-sagan-kdi2r4
 notes: "출처: OPS-127(PR #1512 CI 불안정 조사) 실측에서 발견. 정상 체인 요청 2.21~3.69초 — 예산 2.0초를 넘는 분량이 상한 초과 횟수(재기동 횟수)와 함께 움직였다. 소유 영역 OPS-96(원격 claim TTL 초과)·OPS-123(done). 학생 영향은 정확성이 아니라 지연이다(넘친 전이도 판정 불가로 접힌다) — 다만 워커 기동이 멈추면 한 요청이 60초까지 묶일 수 있다."
-updated: 2026-10-09
+updated: 2026-10-12
