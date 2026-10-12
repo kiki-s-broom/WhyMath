@@ -989,6 +989,21 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
+  - id: G-p314-phase3-metric-targets
+    title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-09
+    remind_after_days: 14
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-10-09] input done · P3-14-phase3-metrics-cli · 판정 무관: 이 태스크는 게이트 G-p314-phase3-metric-targets 의 판정 결과를 내지 않는다 — 목표 수치(95·98·99%) 확정은 Kiki 의 사람 판정이다. P3-14 가 낸 것은 판정 재료(7종 CLI와 오늘 기준선: Curriculum 3/10·Concept Completeness 0/10·Problem Coverage 6/8·Graph Connectivity 0/10)까지이고 게이트는 P3-10 기준선을 기다리며 pending 으로 남는다 — done P3-14-phase3-metrics-cli 인계"
+    depends_on:
+      - P3-14-phase3-metrics-cli
+      - P3-10-ai-quality-eval-suite
   - id: G-p303-human-sample-review
     title: "P3-03 미분 문항 은행 사람 표본 검수 240건 — 검수 페이지 https://claude.ai/artifact/GHRd2VNjVpTjqDa5j5iGD3 에서 사전 등록 순서대로 240건 전부 통과/결함 판정(결함은 종류+근거 메모). 승인 기준 n=240·Wilson 95% 단측 결함률 상한 ≤ 0.02 → 결함 1건 이하. 표본 등록 docs/data/p3_calculus1_diff_audit/human_review/sample_240.json(은행 sha256 cc7e953974185ac4…, 시드 20261007). 표본 크기는 시작 전에 고정 — 중간에 멈추거나 늘리지 않는다. 검수가 끝나면 세션이 판정을 감사 라벨 파일로 옮겨 KNOWN_CORPORA·AUDIT_LABEL_MAP 편입과 approved 각인을 진행한다. 결함 2건 이상이면 승인되지 않으며 교정 후 처리는 그때 다시 정한다. 근거 docs/data/p3_calculus1_diff_audit/README.md(LLM 감사 4회 불합격 → Kiki 결정 2026-10-07 사람 검수 전환)"
     kind: human
@@ -1260,6 +1275,19 @@ gates:
     cleared_by: claude
     notes: ""
     corrections: []
+  - id: G-s464-university-cells-populate
+    title: "S4-64 대학 원자 KR 셀 prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(curriculum.populate 1회 실행, S4-64 PR 병합 후). 배경: S4-62가 대학 셀 유도 함수만 추가해 호출처가 0건이었고 S4-64가 populate CLI에 --atom-graph 인자로 배선했다. 이 게이트는 그 CLI를 prod에서 1회 실행해 대학 원자 512건(학년 13~16, required_depth는 cognitive_type 도출: conceptual 360·procedural 108·NULL 44)을 curriculum_entry에 멱등 적재한다. 부수 효과 주의: 같은 CLI가 canonical 437건·원자 1311건도 함께 멱등 재적재한다(신규 행 생성이 아니라 upsert 갱신·created_at 보존). 기대 총 2260건. 런북은 쓰기 블록이 선행 판정(입력 동등성·플래그 착지·테이블·KR_NC_2022 프레임워크 행)을 스스로 재검사해 거부한다. 런북: docs/ops/s4_64_university_cells_populate_runbook.md"
+    kind: human
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-09
+    remind_after_days: 7
+    evidence: "판정 기준: main 5b561e31 (S4-64 PR #1568 머지 커밋). Kiki가 Phaiakes9 PowerShell에서 런북 docs/ops/s4_64_university_cells_populate_runbook.md [0]~[E]를 2026-10-12에 실행한 화면을 근거로 한다. 실측: CLONE_HAS_S464=True, DOCKER_OK=True, PATHS_MATCH_MAIN=True, TABLE_EXISTS=t, FRAMEWORK_EXISTS=1, BEFORE_UNIV=0, BEFORE_TOTAL=0, HAS_ATOM_GRAPH_FLAG=True, REACH_EXIT=0(REACHABLE), 가드 PATHS_OK/FLAG_OK/TABLE_OK/FRAMEWORK_OK 전부 True, POPULATE_EXIT=0, CLI 보고 줄 '교육과정 Overlay(KR) 적재 완료: 2260건 (canonical 437건 + 원자 1311건 + 대학 512건)', AFTER_UNIV=512, AFTER_TOTAL=2260, 대학 깊이 분포 conceptual 360 / NULL 44 / procedural 108 (mastery 0건), JUDGED_AGAINST_MAIN=5b561e31. CLI의 대학 N건(512)과 DB 카운트 AFTER_UNIV(512)가 서로 다른 경로에서 일치하고 기대 분포와 정확히 같다. 한계: prod에서 1회 실행한 결과이며 멱등 재실행(2회차)은 prod에서 확인하지 않았다(스크래치 PG에서만 확인). L6 깊이정렬이 대학 문항 선택에서 실제로 좋아지는지는 이 실행으로 증명되지 않는다."
+    cleared_by: claude
+    notes: ""
+    corrections: []
+    depends_on:
+      - S4-64-university-cells-populate-wiring
   - id: G-s5-subject-expansion
     title: "S5 타과목 확장 게이트 — E축 착수 판정 체크리스트 전부 충족 (e_axis_v1 §5)"
     kind: decision
