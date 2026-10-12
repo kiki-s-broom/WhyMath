@@ -71,6 +71,12 @@ from whymath_backend.api._growth_evidence_state import (
     get_growth_evidence_counters,
     set_growth_evidence_counters,
 )
+from whymath_backend.api._isolated_call import (
+    IsolationServedSnapshot,
+)
+from whymath_backend.api._isolated_call import (
+    isolation_served_snapshot as _isolation_served_snapshot,
+)
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
 )
@@ -643,6 +649,46 @@ class SolutionSegmentationBody(BaseModel):
     )
 
 
+class SympyIsolationBody(BaseModel):
+    """/health/ready SymPy 격리 *작동 비율* 섹션(OPS-126) — `isolation_stats()` 소비면.
+
+    정상 응답 200은 격리가 일했다는 증거가 아니다(CLAUDE.md "작동한 비율" 원칙). 격리 경로에 들어온
+    시도(`attempts`)는 `served`(워커 안에서 끝까지 계산)·`folded_*`(상한 초과 등으로 **판정 불가로
+    접힘**)·`fallbacks`(pickle 불가로 스레드 실행 — **격리·시간 상한 없음**) 중 정확히 하나로
+    끝나므로 `served_ratio + folded_ratio + fallback_ratio = 1`이다. 비율은 분모(`attempts`)가
+    0이거나 격리가 꺼져 있으면 **null**이다(0.0이 아니라 '모름').
+    """
+
+    scope: str = Field(
+        ...,
+        description=(
+            "카운터의 범위 — 항상 'per_process'. 서버 워커(프로세스)가 여럿이면 이 값은 응답을 낸 "
+            "그 프로세스의 것이고 합산이 아니다. 재시작하면 0으로 돌아간다."
+        ),
+    )
+    enabled: bool = Field(
+        ..., description="sympy_isolation_enabled — False면 인라인 실행이라 카운터가 서지 않는다"
+    )
+    pool_started: bool = Field(..., description="워커 풀이 만들어졌는가(첫 격리 호출 전이면 False)")
+    attempts: int = Field(..., description="격리 경로 시도 수(= 격리 실행 + 폴백)")
+    served: int = Field(
+        ..., description="워커 안에서 끝까지 계산된 호출 수(진행 중 호출 포함·동시성 한도 내 오차)"
+    )
+    folded_timeout: int = Field(..., description="계산 시간 상한 초과 → 워커 kill·판정 불가")
+    folded_queue_wait: int = Field(..., description="워커가 모두 바빠 대기 상한 초과 → 판정 불가")
+    folded_worker_died: int = Field(..., description="워커 기동 실패·도중 사망 → 판정 불가")
+    fallbacks: int = Field(
+        ..., description="pickle 불가로 스레드 실행된 호출 수(격리 미적용·시간 상한 없음)"
+    )
+    served_ratio: float | None = Field(..., description="served / attempts — 격리가 작동한 비율")
+    folded_ratio: float | None = Field(
+        ..., description="(folded_* 합) / attempts — 정상 입력이 판정 불가로 떨어졌을 수 있는 비율"
+    )
+    fallback_ratio: float | None = Field(
+        ..., description="fallbacks / attempts — 0이 아니면 격리를 우회한 호출 지점이 있다"
+    )
+
+
 class ReadyBody(BaseModel):
     """GET /health/ready 응답 — 딥체크·인프로세스 계측·알림(이중 회계의 HTTP 노출면)."""
 
@@ -676,6 +722,10 @@ class ReadyBody(BaseModel):
     l6_mode_reach: L6ModeReachBody = Field(
         ...,
         description="L6 응용 모드 6종 도달 관측(PB-04) — /v1/gating/* 6개 엔드포인트별 카운터.",
+    )
+    sympy_isolation: SympyIsolationBody = Field(
+        ...,
+        description="SymPy 격리 작동 비율(OPS-126) — 격리 실행·판정 불가로 접힘·폴백의 비율.",
     )
 
 
@@ -735,6 +785,24 @@ def _l6_mode_reach_body(snapshot: L6ModeReachSnapshot) -> L6ModeReachBody:
         thinking=snapshot.thinking,
         metacognition=snapshot.metacognition,
         gifted=snapshot.gifted,
+    )
+
+
+def _sympy_isolation_body(snapshot: IsolationServedSnapshot) -> SympyIsolationBody:
+    """IsolationServedSnapshot(도메인) → SympyIsolationBody(HTTP 스키마) 변환(OPS-126)."""
+    return SympyIsolationBody(
+        scope="per_process",
+        enabled=snapshot.enabled,
+        pool_started=snapshot.pool_started,
+        attempts=snapshot.attempts,
+        served=snapshot.served,
+        folded_timeout=snapshot.folded_timeout,
+        folded_queue_wait=snapshot.folded_queue_wait,
+        folded_worker_died=snapshot.folded_worker_died,
+        fallbacks=snapshot.fallbacks,
+        served_ratio=snapshot.served_ratio,
+        folded_ratio=snapshot.folded_ratio,
+        fallback_ratio=snapshot.fallback_ratio,
     )
 
 
@@ -1330,6 +1398,7 @@ def create_app(
                 growth_evidence_exposure_counters.snapshot()
             ),
             l6_mode_reach=_l6_mode_reach_body(l6_mode_reach_counters.snapshot()),
+            sympy_isolation=_sympy_isolation_body(_isolation_served_snapshot()),
         )
         return JSONResponse(
             status_code=(status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE),

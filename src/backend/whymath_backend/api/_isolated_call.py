@@ -18,12 +18,19 @@ import atexit
 import logging
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from whymath_backend.config import get_settings
 from whymath_backend.l3.isolated_call import BudgetExceededError, IsolatedCallPool
 
-__all__ = ["isolated", "isolation_stats", "reset_pool_for_tests"]
+__all__ = [
+    "IsolationServedSnapshot",
+    "isolated",
+    "isolation_served_snapshot",
+    "isolation_stats",
+    "reset_pool_for_tests",
+]
 
 logger = logging.getLogger("whymath.api.isolated_call")
 
@@ -81,6 +88,80 @@ async def isolated(
 def isolation_stats() -> dict[str, int]:
     """풀의 누적 카운터 — 풀이 아직 없으면 빈 dict. "격리가 실제로 작동한 비율" 관측용."""
     return _pool.stats() if _pool is not None else {}
+
+
+@dataclass(frozen=True, slots=True)
+class IsolationServedSnapshot:
+    """격리가 *작동한 비율*의 불변 스냅샷 — `/health/ready`의 `sympy_isolation` 섹션 원천(OPS-126).
+
+    정상 응답 200은 격리가 일했다는 증거가 아니다(CLAUDE.md "작동한 비율" 원칙). 격리 경로에 들어온
+    시도(`attempts = calls + fallbacks`)는 정확히 셋 중 하나로 끝난다:
+      - `served`    — 워커 프로세스 안에서 끝까지 계산됐다(= `calls - folded`)
+      - `folded`    — 상한 초과·대기열 포화·워커 사망으로 **판정 불가로 접혔다**
+      - `fallbacks` — pickle 불가로 스레드 실행됐다(**격리가 적용되지 않았고 시간 상한도 없다**)
+    그래서 세 비율의 합이 1이다. `folded_ratio`가 오르면 상한이 정상 입력을 판정 불가로 떨어뜨리고
+    있다는 신호이고, `fallback_ratio`가 0이 아니면 격리를 우회한 호출 지점이 있다는 신호다.
+
+    **한계(명시)**
+      - 카운터는 **프로세스별**이다. 서버 워커(uvicorn `--workers`)가 여럿이면 이 값은 응답을 낸 그
+        프로세스의 것이고 합산이 아니다(`ops/service_health.ServiceMetrics`와 같은 전제). 재시작하면
+        0으로 돌아간다.
+      - `served`는 스냅샷 시점에 *진행 중인* 호출을 포함한다(`calls`는 시작 시 오른다). 오차 상한은
+        동시 호출 수(≤ max_workers + 대기열)이므로 표본이 수백 건 이상이면 무시할 수 있다.
+      - `sympy_isolation_enabled=False`면 호출이 인라인으로 돌아 카운터가 서지 않는다 — 비율은
+        `None`이다(0%가 아니라 "이 인스턴스는 격리를 켜지 않았다").
+
+    비율은 **분모가 0이면 `None`** 이다 — 모르면 모른다(0.0으로 접으면 "접힌 적 없음"으로 읽힌다).
+    """
+
+    enabled: bool
+    pool_started: bool
+    attempts: int
+    served: int
+    folded_timeout: int
+    folded_queue_wait: int
+    folded_worker_died: int
+    fallbacks: int
+    served_ratio: float | None
+    folded_ratio: float | None
+    fallback_ratio: float | None
+
+    @property
+    def folded(self) -> int:
+        """판정 불가로 접힌 호출 수 — 사유 3종의 합."""
+        return self.folded_timeout + self.folded_queue_wait + self.folded_worker_died
+
+
+def isolation_served_snapshot() -> IsolationServedSnapshot:
+    """`isolation_stats()`를 읽어 격리가 작동한 비율을 낸다 — 예외를 던지지 않는다.
+
+    풀이 아직 없으면(첫 격리 호출 전) 카운터는 전부 0이고 `pool_started=False`다. 이때 비율은
+    `None`이다 — "아직 시도가 없었다"와 "전부 성공했다"가 같은 화면이 되지 않게 한다.
+    """
+    enabled = get_settings().sympy_isolation_enabled
+    stats = isolation_stats()
+    calls = stats.get("calls", 0)
+    timeouts = stats.get("timeouts", 0)
+    queue_waits = stats.get("queue_waits", 0)
+    worker_deaths = stats.get("worker_deaths", 0)
+    fallbacks = stats.get("fallbacks", 0)
+    folded = timeouts + queue_waits + worker_deaths
+    attempts = calls + fallbacks
+    served = max(calls - folded, 0)
+    measurable = enabled and attempts > 0
+    return IsolationServedSnapshot(
+        enabled=enabled,
+        pool_started=_pool is not None,
+        attempts=attempts,
+        served=served,
+        folded_timeout=timeouts,
+        folded_queue_wait=queue_waits,
+        folded_worker_died=worker_deaths,
+        fallbacks=fallbacks,
+        served_ratio=served / attempts if measurable else None,
+        folded_ratio=folded / attempts if measurable else None,
+        fallback_ratio=fallbacks / attempts if measurable else None,
+    )
 
 
 def reset_pool_for_tests() -> None:

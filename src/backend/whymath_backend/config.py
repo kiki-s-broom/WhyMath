@@ -473,7 +473,8 @@ class Settings(BaseSettings):
             "OPS-96 — SymPy 호출 1건의 계산 시간 상한(초·워커가 일을 받은 순간부터). 기본 5초는 "
             "`safe_parse` 구조 예산을 통과하는 *가장 느린* 입력(차수 20 방정식 ≈3.0초·실측 "
             "2026-10-02)보다 크고, 정상 문항(밀리초대)과는 3자릿수 차이다. 이 값을 낮추면 정상 "
-            "입력이 판정 불가로 떨어질 수 있으니 `sympy_isolation_budget_exceeded` 로그 비율을 "
+            "입력이 판정 불가로 떨어질 수 있으니 `GET /health/ready`의 `sympy_isolation."
+            "folded_ratio`(OPS-126 · 프로세스별 누적)와 `isolation_budget_exceeded` 로그를 "
             "보고 조정한다."
         ),
     )
@@ -491,7 +492,9 @@ class Settings(BaseSettings):
         le=16,
         description=(
             "OPS-96 — SymPy 워커 프로세스 수(= 동시 SymPy 계산 수). 각 워커는 SymPy를 import한 "
-            "상태로 상주한다(메모리 약 100~150MB/개 — 서버 워커 수 × 이 값 만큼 프로세스가 뜬다). "
+            "상태로 상주한다(서버 워커 수 × 이 값 만큼 프로세스가 뜬다). 메모리는 개당 RSS 약 "
+            "76MB·PSS 약 63~65MB(OPS-126 실측 2026-10-12 · Linux·Python 3.13·sympy 프리로드 · "
+            "무거운 계산 12회 뒤 약 80MB로 완만히 증가 — 장기 상한은 미측정). "
             "모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 판정 불가로 떨어진다."
         ),
     )

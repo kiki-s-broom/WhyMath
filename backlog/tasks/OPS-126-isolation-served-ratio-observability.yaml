@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,6 +18,14 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/api/_isolated_call.py
   - scripts/analysis/measure_sympy_isolation_budget.py
-session: null
-notes: "출처: OPS-123(ubp9tw 회수) ⑤ — OPS-96 acceptance 재대조에서 미이행으로 분리. OPS-96의 ⑤(상한값 실측과 정상 문항 판정 불가 비율)는 최종답 경로만 14,034건으로 충족하고 단계 경로는 실서비스 입력 없이는 측정할 수 없어 이 태스크가 승계한다."
-updated: 2026-10-09
+  - src/backend/whymath_backend/app.py
+  - src/backend/whymath_backend/config.py
+  - scripts/analysis/measure_sympy_isolation_workers.py
+  - tests/backend/api/test_isolation_served_ratio_observability.py
+  - docs/reviews/ops126_isolation_served_ratio_2026-10-12.md
+session: claude/wonderful-allen-vhbdra
+notes: |-
+  출처: OPS-123(ubp9tw 회수) ⑤ — OPS-96 acceptance 재대조에서 미이행으로 분리. OPS-96의 ⑤(상한값 실측과 정상 문항 판정 불가 비율)는 최종답 경로만 14,034건으로 충족하고 단계 경로는 실서비스 입력 없이는 측정할 수 없어 이 태스크가 승계한다.
+
+  [정정 2026-10-12] paths ['src/backend/whymath_backend/api/_isolated_call.py', 'scripts/analysis/measure_sympy_isolation_budget.py'] → ['src/backend/whymath_backend/api/_isolated_call.py', 'scripts/analysis/measure_sympy_isolation_budget.py', 'src/backend/whymath_backend/app.py', 'src/backend/whymath_backend/config.py', 'scripts/analysis/measure_sympy_isolation_workers.py', 'tests/backend/api/test_isolation_served_ratio_observability.py', 'docs/reviews/ops126_isolation_served_ratio_2026-10-12.md']: 구현 중 실제로 건드린 파일을 paths에 반영(기존 2개 유지) — /health/ready 섹션(app.py)·설정 주석 정정(config.py)·③ 측정 스크립트·테스트·결과 문서
+updated: 2026-10-12
