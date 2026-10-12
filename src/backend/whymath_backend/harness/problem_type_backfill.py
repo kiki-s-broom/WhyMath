@@ -8,9 +8,9 @@
 CLI는 그 표를 코퍼스 파일들에 적용하는 얇은 조성 층일 뿐이다(harness는 import-linter 계약 밖
 — `problem_corpus_batch`·`problem_corpus_tag` 선례와 동형).
 
-**대상 코퍼스(결정론 순서)** — 두 축이다:
-  1. **직접 분류** `problem_type_mapping.TARGET_CORPORA` 6종 — 생성기 identity가 레코드
-     자체에 남아 `classify_record` 단독으로 분류.
+**대상 코퍼스(결정론 순서)** — 세 축이다:
+  1. **직접 분류** `problem_type_mapping.TARGET_CORPORA` 36종(S3-27 원본 6종 + CONT-09가 편입한
+     `unit_codes` 표 30종) — 생성기 identity가 레코드 자체에 남아 `classify_record` 단독으로 분류.
   2. **계보 분류** `problem_type_mapping.LINEAGE_CORPORA`(`problem_bank_rephrased_v0` 421건)
      — 직접 6종을 먼저 처리하며 구축한 부모 색인(slug → 유도 유형)으로 `relations`의 "변형"
      계보(`parent_slug`)를 따라가 원 생성기(부모)의 유형을 승계(`classify_rephrased_record`).
@@ -18,6 +18,10 @@ CLI는 그 표를 코퍼스 파일들에 적용하는 얇은 조성 층일 뿐�
      (침묵 누락 금지). 구 "S4-14 미착지" 명시 제외는 사유 소멸(S4-14/S4-18 done·계보
      421/421 실측)로 `PB-07`이 해제했다 — `docs/architecture/problem_bank_gap_review_r3.md`
      §3 G2.
+  3. **자가 태깅(읽기 전용)** `problem_type_mapping.SELF_TAGGED_CORPORA` — 생성 시점에 레코드별
+     유형을 직접 기록하는 코퍼스(`problem_bank_p3_calculus1_diff_v0`). 같은 `unit_codes` 안에서도
+     유형이 갈려 표로 분류할 수 없으므로 **백필이 쓰지 않는다**(쓰면 저장된 유형이 지워진다).
+     리포트에는 총량·태깅·미태깅만 읽어 정직하게 싣는다(`self_tagged` 절).
 
 제외 좌석(`problem_type_mapping.EXCLUDED_CORPORA`)은 현재 비어 있으나 리포트의 `excluded` 절
 (정직 회계)은 유지한다 — 향후 항목이 다시 생기면 만료 계약(`ExclusionEntry`·task_id 필수)과
@@ -45,6 +49,7 @@ from typing import Any
 from whymath_backend.harness.problem_type_mapping import (
     EXCLUDED_CORPORA,
     LINEAGE_CORPORA,
+    SELF_TAGGED_CORPORA,
     TARGET_CORPORA,
     classify_record,
     classify_rephrased_record,
@@ -100,6 +105,9 @@ class TypeBackfillReport:
     corpora: tuple[CorpusBackfillReport, ...]
     excluded_corpora: tuple[str, ...]
     excluded_total: int
+    # 자가 태깅 코퍼스의 읽기 전용 회계(`changed`·`written`은 항상 0·None) — 기본값 빈 튜플은
+    # 이 필드 도입 전 호출처(테스트의 직접 생성)를 깨지 않기 위함이다.
+    self_tagged: tuple[CorpusBackfillReport, ...] = ()
 
     @property
     def total_target(self) -> int:
@@ -114,10 +122,19 @@ class TypeBackfillReport:
         return sum(c.untagged for c in self.corpora)
 
     @property
+    def total_self_tagged(self) -> int:
+        return sum(c.total for c in self.self_tagged)
+
+    @property
+    def untagged_self_tagged(self) -> int:
+        """자가 태깅 코퍼스인데 저장된 유형이 비어 있는 행 수 — 0이어야 정상(테스트가 동결)."""
+        return sum(c.untagged for c in self.self_tagged)
+
+    @property
     def grand_total(self) -> int:
-        """대상 + 제외 코퍼스를 합친 전체 코퍼스 행 수(정직 회계 — 2,638건 정합 확인용.
-        2,647→2,638은 QUAL-02(#777) 실중복 9건 은퇴)."""
-        return self.total_target + self.excluded_total
+        """대상 + 자가 태깅 + 제외 코퍼스를 합친 전체 코퍼스 행 수(정직 회계 — 스캔 전체와 정합
+        확인용. 2,647→2,638은 QUAL-02(#777) 실중복 9건 은퇴)."""
+        return self.total_target + self.total_self_tagged + self.excluded_total
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -127,6 +144,9 @@ class TypeBackfillReport:
             "total_target": self.total_target,
             "total_tagged": self.total_tagged,
             "total_untagged_in_target": self.total_untagged_in_target,
+            "self_tagged": [c.to_json() for c in self.self_tagged],
+            "total_self_tagged": self.total_self_tagged,
+            "untagged_self_tagged": self.untagged_self_tagged,
             "grand_total": self.grand_total,
         }
 
@@ -196,6 +216,27 @@ def _backfill_corpus_file(
     )
 
 
+def _read_only_report(path: Path, *, name: str) -> CorpusBackfillReport:
+    """자가 태깅 코퍼스 1개의 읽기 전용 회계 — 파일을 **절대 쓰지 않고** 저장된 유형만 센다.
+
+    파싱 불가 줄은 `json.loads`가 예외로 즉시 실패시킨다(조용한 통과 금지 — 다른 백필 경로와 동일).
+    """
+    if not path.is_file():
+        return CorpusBackfillReport(name=name, total=0, tagged=0, changed=0, written=None)
+    total = 0
+    tagged = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        total += 1
+        data: dict[str, Any] = json.loads(stripped)
+        codes = data.get("problem_type_codes")
+        if isinstance(codes, list) and codes:
+            tagged += 1
+    return CorpusBackfillReport(name=name, total=total, tagged=tagged, changed=0, written=None)
+
+
 def _count_lines(path: Path) -> int:
     """비어있지 않은 JSONL 줄 수(정직 회계용 — 파싱 없이 존재량만 센다)."""
     if not path.is_file():
@@ -237,9 +278,10 @@ def _build_parent_type_index(root: Path) -> dict[str, list[str]]:
 
 
 def run_backfill(*, corpus_root: Path | None = None, write: bool = True) -> TypeBackfillReport:
-    """직접 분류 6종 + 계보 분류 1종(rephrased) 백필 + 제외 좌석 정직 회계(순수 결정론).
+    """직접 분류(`TARGET_CORPORA`) + 계보 분류 1종(rephrased) 백필 + 자가 태깅·제외 좌석의
+    정직 회계(순수 결정론).
 
-    순서 계약: 직접 6종을 먼저 처리하고, 부모 색인(`_build_parent_type_index`)을 구축한 뒤
+    순서 계약: 직접 분류 코퍼스를 먼저 처리하고, 부모 색인(`_build_parent_type_index`)을 구축한 뒤
     계보 코퍼스를 처리한다. 색인은 유도 값 기반이라 직접 코퍼스의 기록(write) 여부와 무관하게
     같은 결과를 낸다(dry-run에서도 계보 통계가 실기록과 동일).
     """
@@ -255,10 +297,16 @@ def run_backfill(*, corpus_root: Path | None = None, write: bool = True) -> Type
         )
         for name in LINEAGE_CORPORA
     )
+    self_tagged = tuple(
+        _read_only_report(root / name / CORPUS_FILE_NAME, name=name) for name in SELF_TAGGED_CORPORA
+    )
     excluded = tuple(sorted(EXCLUDED_CORPORA))
     excluded_total = sum(_count_lines(root / name / CORPUS_FILE_NAME) for name in excluded)
     return TypeBackfillReport(
-        corpora=direct + lineage, excluded_corpora=excluded, excluded_total=excluded_total
+        corpora=direct + lineage,
+        excluded_corpora=excluded,
+        excluded_total=excluded_total,
+        self_tagged=self_tagged,
     )
 
 
@@ -267,8 +315,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.harness.problem_type_backfill",
         description=(
-            "문제 유형(problem_type_codes) 결정론 백필(S3-27·PB-07) — 생성기 identity "
-            "매핑표로 직접 분류 6종 + 계보(부모 유형 승계)로 rephrased 1종을 재분류한다"
+            "문제 유형(problem_type_codes) 결정론 백필(S3-27·PB-07·CONT-09) — 생성기 identity "
+            "매핑표로 직접 분류 코퍼스 + 계보(부모 유형 승계)로 rephrased 1종을 재분류한다"
             "(LLM 0·텍스트 파싱 0·바이트 계약·멱등)."
         ),
     )
