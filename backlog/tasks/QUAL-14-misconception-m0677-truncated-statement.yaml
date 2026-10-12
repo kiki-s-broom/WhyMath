@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 4
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - "data/corpus/misconceptions_v1/**"
-session: null
+session: claude/busy-davinci-h9rgvf
 notes: "P3-03 은행 감사(2026-10-08, docs/data/p3_calculus1_diff_audit/bank_audit/) 부수 발견. LLM 판정자 다수가 02-09 오개념 유발 문항 12건에서 M0677 설명이 \"…관점을 — …관점을 못 쓴다\"로 깨진 문장이라고 지적했다(판정자에게 보이는 설명 = canonical_statement + \" — \" + student_wrong_thinking). P3-03은 은행 쪽 선지 연결을 절차가 적힌 오개념으로 바꿔 우회하므로, 코퍼스 원문 정정은 이 태스크가 소유한다."
-updated: 2026-10-08
+updated: 2026-10-12
