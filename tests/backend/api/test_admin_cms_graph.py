@@ -166,7 +166,11 @@ def _client(user: UserProfile | None, fake: FakeSession) -> TestClient:
     return TestClient(_APP)
 
 
-_A, _B, _C = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+# 결정적 UUID — xdist 워커마다 파라미터 id가 같아야 한다(무작위면 "수집된 테스트가 워커 간 다르다"로
+# 실행이 무효가 된다).
+_A, _B, _C = (uuid.UUID(int=0xA), uuid.UUID(int=0xB), uuid.UUID(int=0xC))
+_EDGE_ID = uuid.UUID(int=0xED)
+_CONCEPT_ID = uuid.UUID(int=0xC0)
 _NAMES = {_A: "A", _B: "B", _C: "C"}
 
 
@@ -219,13 +223,13 @@ _ROUTES: list[tuple[str, str, str, dict[str, Any] | None, set[str]]] = [
         _EDITORS,
     ),
     ("POST", "edge_add", "/v1/admin/cms/edges", _EDGE_BODY, _PUBLISHERS),
-    ("DELETE", "edge_del", f"/v1/admin/cms/edges/{uuid.uuid4()}", None, _PUBLISHERS),
-    ("DELETE", "concept_del", f"/v1/admin/cms/concepts/{uuid.uuid4()}", None, _PUBLISHERS),
+    ("DELETE", "edge_del", f"/v1/admin/cms/edges/{_EDGE_ID}", None, _PUBLISHERS),
+    ("DELETE", "concept_del", f"/v1/admin/cms/concepts/{_CONCEPT_ID}", None, _PUBLISHERS),
 ]
 
 
 @pytest.mark.parametrize(
-    ("method", "name", "path", "body", "allowed"), _ROUTES, ids=lambda v: str(v)[:24]
+    ("method", "name", "path", "body", "allowed"), _ROUTES, ids=[r[1] for r in _ROUTES]
 )
 @pytest.mark.parametrize("who", list(_ALL))
 def test_permission_matrix(
