@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-190-problem-version-publish-writer
+title: "문항 발행 경로 — problem_version 유일 writer와 problem.problem_version_id 포인터 전환 (EOS-47 고정이 NULL만 쓰는 상태 해소)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "문항 발행 경로(problem_version writer): problem_version에 행을 쓰는 운영 코드가 현재 0건이라(ARCH-31 §5) EOS-47의 problem_attempt.problem_version_id가 전부 NULL이다. 이 태스크가 그 유일한 쓰기 자리를 만든다 — DRAFT 버전 생성, 전이 표(schema/version_lifecycle.py) 경유 전이, PUBLISHED 시 problem.problem_version_id 포인터 전환, 게이트 통과 기록(qa). l3/publish_gate.py의 ConceptVersion 방식과 동형으로 한 모듈이 ORM 유일 쓰기 자리가 되고 AST 동결 테스트로 우회 쓰기를 막는다."
+  - "착지 후 실측: 발행된 문항에 대해 submit_attempt가 outcome=pinned를 내고 problem_attempt.problem_version_id가 실제로 채워짐을 실 PG 통합 테스트로 확인(EOS-47 통합 테스트의 pinned 분기를 운영 writer 경유로 재현)."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/**"
+  - "tests/backend/l3/**"
+session: null
+notes: "출처: EOS-47 착지 시 발견. 판 없는 문항에 판을 날조하지 않으므로 EOS-47 헬퍼는 정확히 동작하지만 problem_version 행 writer가 없어 고정 값이 전부 NULL. 문서 docs/architecture/eos47_attempt_version_pinning.md §5-1."
+updated: 2026-10-09
