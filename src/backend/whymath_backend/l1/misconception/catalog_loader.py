@@ -39,6 +39,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import (
+    CMS_EDIT_MARKER,
+    format_conflict,
+    upsert_guard,
+    upsert_skipped,
+)
 
 # ORM·schema 이름 충돌 주의 — ORM은 alias(MisconceptionCatalogORM).
 from whymath_backend.db.models.misconception_catalog import (
@@ -94,8 +100,13 @@ def load_misconceptions(
     engine: Engine | None = None,
     settings: Settings | None = None,
     store: MisconceptionCatalogStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """오개념 Collection JSON을 backend `misconception_catalog`에 멱등 upsert. 반환=적재 행 수.
+
+    `overwrite_cms_edits`·`conflicts`는 CMS 편집 보호(P3-25)다 —
+    `MisconceptionCatalogStore.populate` docstring 참조. 보호로 건너뛴 행은 반환 행 수에서 빠진다.
 
     `load_standards`(성취기준)의 *오개념* 짝이다 — Collection의 `misconceptions` 배열을 행마다
     `schema.MisconceptionCatalog`로 빌드(rename 0)한 뒤 `mis_id` PK 충돌 멱등 upsert한다. 입력 내
@@ -120,7 +131,9 @@ def load_misconceptions(
     mis_store = (
         store if store is not None else MisconceptionCatalogStore(engine=engine, settings=resolved)
     )
-    return mis_store.populate(misconceptions)
+    return mis_store.populate(
+        misconceptions, overwrite_cms_edits=overwrite_cms_edits, conflicts=conflicts
+    )
 
 
 class MisconceptionCatalogStore:
@@ -158,8 +171,18 @@ class MisconceptionCatalogStore:
             self._engine = _build_sync_engine(self._resolved_settings)
         return self._engine
 
-    def populate(self, records: Sequence[MisconceptionCatalog]) -> int:
+    def populate(
+        self,
+        records: Sequence[MisconceptionCatalog],
+        *,
+        overwrite_cms_edits: bool = False,
+        conflicts: list[str] | None = None,
+    ) -> int:
         """오개념 schema 모델들을 `misconception_catalog`에 멱등 upsert. 반환=적재 행 수(dedup 후).
+
+        **CMS 편집 보호(P3-25)**: CMS가 고친 행(`cms_edited_at` 있음)은 건너뛰고 `conflicts`에
+        `misconception_catalog:<mis_id>`로 보고한다 — 반환 행 수에는 포함하지 않는다.
+        `overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다.
 
         ① mis_id PK 기준 *마지막 우선* dedup(단일 배치 ON CONFLICT 중복행 오류 방지) → ② 각 행을
         `ON CONFLICT(mis_id) DO UPDATE`로 적재(나머지 컬럼 갱신·PK는 SET 안 함·보존). 입력 빈 0.
@@ -178,8 +201,11 @@ class MisconceptionCatalogStore:
 
         # PK mis_id를 제외한 갱신 컬럼 집합(ON CONFLICT DO UPDATE SET) — mapper 컬럼키에서 도출.
         all_keys = {col.key for col in sa.inspect(MisconceptionCatalogORM).mapper.column_attrs}
-        update_keys = all_keys - {"mis_id"}
+        # 표지 컬럼은 코퍼스 값이 아니라 보호 규약이 소유한다 — 일반 갱신 집합에서 뺀다.
+        update_keys = all_keys - {"mis_id", CMS_EDIT_MARKER}
+        where, release = upsert_guard(MisconceptionCatalogORM, overwrite=overwrite_cms_edits)
 
+        written = 0
         with self._get_engine().begin() as conn:
             for record in deduped:
                 # 검증된 schema에서 ORM 컬럼 값만 추린다(schema 필드명=ORM 컬럼명).
@@ -187,12 +213,17 @@ class MisconceptionCatalogStore:
                 values = {k: v for k, v in payload.items() if k in all_keys}
                 stmt = pg_insert(MisconceptionCatalogORM).values(**values)
                 # mis_id(PK) 충돌 시 나머지 컬럼 갱신 — PK는 SET하지 않아 보존(멱등).
-                stmt = stmt.on_conflict_do_update(
+                upsert = stmt.on_conflict_do_update(
                     index_elements=[MisconceptionCatalogORM.mis_id],
-                    set_={key: stmt.excluded[key] for key in update_keys},
-                )
-                conn.execute(stmt)
-        return len(deduped)
+                    set_={**{key: stmt.excluded[key] for key in update_keys}, **release},
+                    where=where,
+                ).returning(MisconceptionCatalogORM.mis_id)
+                if upsert_skipped(conn.execute(upsert)):
+                    if conflicts is not None:
+                        conflicts.append(format_conflict("misconception_catalog", record.mis_id))
+                else:
+                    written += 1
+        return written
 
 
 __all__ = [

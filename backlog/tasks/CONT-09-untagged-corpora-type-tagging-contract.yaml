@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONT-09-untagged-corpora-type-tagging-contract
+title: "S3-27 이후 추가 코퍼스 30종 11,396문 유형 태깅 계약 밖 방치 — 0커버 계측기가 전체의 18.8%만 본다"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 전제 확정 — 2026-10-09 CONT-04 실측: 스캔 대상 problem_bank* 코퍼스 14,034문 중 problem_type_codes 보유 2,638문(18.8%). 미태깅 11,396문은 30개 코퍼스에 걸쳐 있고 전량 TARGET_CORPORA·LINEAGE_CORPORA 밖이다(최대: polynomial_arithmetic_v0 1,500·complex_number_arithmetic_v0 900·probability_law_v0 724). S3-27이 '7종 2,647건'을 당시 코퍼스 전체로 보고 태깅 계약을 닫았고 이후 추가 코퍼스는 계약 밖에 방치됐다 — 소유 태스크가 0건임을 backlog 전수 검색으로 확인했다.\n② 계측기 신뢰도 정량화 — problem_bank_coverage.zero_coverage_types()의 현재 판정(9종)이 태깅 18.8%만 본 값임을 전제로, 미태깅 코퍼스를 생성기 identity 매핑으로 태깅했을 때 0커버 집합이 어떻게 변하는지 전후 기록한다. CONT-04 실측에서 재서술 421건 태깅 전후 0커버 집합은 불변(9종 동일)이었으므로, 이 태스크의 가치는 9종 중 실제로 커버되는 유형이 있는지 확정하는 데 있다.\n③ 태깅 방식 판정 — 생성기 identity가 레코드에 남는 코퍼스는 problem_type_mapping 직접 분류 표에 편입하고, 남지 않는 코퍼스는 계보 분류 또는 태깅 불가로 건수·사유를 리포트에 명시한다(LLM 0·문항 텍스트 추론 0·재실행 바이트 결정론 — S3-27·PB-07 동형). 침묵 누락 금지.\n④ 재발 차단 — 새 problem_bank* 코퍼스가 추가될 때 TARGET_CORPORA·LINEAGE_CORPORA·EXCLUDED_CORPORA 어디에도 속하지 않으면 테스트가 red를 내는 거버넌스(전수 귀속)를 둔다. 변별력 검증 의무: 코퍼스 1종을 어느 좌석에도 넣지 않은 상태에서 red, 정상 상태에서 green을 실측한다. 스캔 0건은 실패로 처리한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_type_mapping.py
+  - src/backend/whymath_backend/harness/problem_type_backfill.py
+  - tests/backend/harness/test_problem_type_mapping.py
+session: null
+notes: "CONT-04 실측(2026-10-09)에서 발견: rephrased_v0 429건 상환은 PB-07이 이미 끝냈으나(421/421), 그 상환의 상위 원인인 '코퍼스가 늘어나는 동안 태깅 계약이 따라가지 않는다'는 구조는 그대로 남아 11,396문이 미태깅이다. CONT-04 acceptance ④ 전후 비교에서 재서술 태깅은 0커버 집합을 바꾸지 않았다(9종 동일) — 즉 CONT-04 서두의 '과대 계상' 가설은 재서술 범위에서는 기각됐고, 더 큰 사각은 이 태스크 범위다. 증거: docs/data/problem_type_tagging_rephrased_cont04_2026-10.md."
+updated: 2026-10-09

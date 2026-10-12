@@ -61,6 +61,7 @@ from whymath_backend.api.admin_cms_resources import (
 )
 from whymath_backend.api.admin_module_registry import get_module, require_module_roles
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.concept import Concept, ConceptEdge
 from whymath_backend.db.models.problem import Problem
@@ -1082,6 +1083,10 @@ async def _review_item(
             await session.rollback()
             return CmsReviewResponse(changed=False, review_status=current)
         setattr(row, review_column, target)
+        if spec.loader_protected:
+            # 검수 표시도 사람의 쓰기다 — 적재가 `reviewed`를 정본 값으로 되돌리지 못하게
+            # 표지를 채운다.
+            mark_cms_edited(row)
         assert spec.audit_type is not None  # check_specs가 보장
         record_content_mutation_audit(
             session,

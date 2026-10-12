@@ -173,7 +173,8 @@ PATCH /v1/problems/{problem_id}
 | `tests/backend/api/test_problems_public_projection.py` | 운영 메타 2필드가 공개 투영에 자리 없음(분류 완전성) |
 | `tests/backend/db/test_schema_version_guard.py` | 런타임 스키마 버전 상수(`db/schema_version.py` `KNOWN_REVISIONS`)가 실제 alembic 이력과 일치 — wheel에 `alembic/versions/`가 없어 런타임은 이 상수를 믿는다 |
 | `tests/backend/api/test_problems_patch_review_status.py` | (ADMIN-16) PATCH가 전이표를 거침 — 불허 12쌍 전수 409·합법 4쌍 감사 1행(동작=전이 액션)·격리 사유(이번 요청)·서버 시각·격리 기록 불변·상태 불변 왕복·상태 키 있을 때만 행 잠금·거부 로그의 자유 텍스트 비노출·구조 가드(AST — `Problem.from_schema` 쓰기 API는 `problems.py`뿐·PATCH가 판정기를 병합 앞에서 호출·`api/`에서 `.review_status` 대입은 `admin_bff.py`뿐) |
-| `tests/backend/schema/test_review_transition.py` | 전이표 20칸(정방향)·역해석 20칸을 각각 **손으로 적은 리터럴**로 동결, PATCH 판정 함수의 분기 전수 |
+| `tests/backend/schema/test_review_transition.py` | 전이표 20칸(정방향)·역해석 20칸을 각각 **손으로 적은 리터럴**로 동결, PATCH 판정 함수의 분기 전수, (ADMIN-19) 초기 상태 5칸 리터럴(허용 2·불허 3)·불허 3상태가 전이표의 도착점으로 도달 가능함 |
+| `tests/backend/api/test_problems_create_review_status.py` | (ADMIN-19) `POST /v1/problems`의 초기 상태 제한 — 불허 3상태 전수 422·쓰기/원장/감사/커밋 0 · 허용 2상태(미설정·pending) 값 보존(조용한 재작성 금지)·키 생략 하위호환 · 원장 관문보다 앞선 거부 · 거부 WARNING 로그의 자유 텍스트 비노출 · 구조 가드(AST — 판정기가 `from_schema`·`session.add`·`require_provenance`보다 앞) |
 
 ## 7. 범위 밖 (명시)
 
@@ -194,9 +195,19 @@ PATCH /v1/problems/{problem_id}
   일반 `update`라 막지 않는다. 해제 시 사유에 근거를 덧붙이는 절차(§5 해제 3항)가 이 경로를 쓰므로
   차단하면 그 절차가 깨진다. 막으려면 "덧붙이기만 허용" 같은 별도 규칙이 필요해 이 태스크에서 만들지
   않았다.
-- **생성(`POST /v1/problems`)이 초기 `review_status`를 임의로 정하는 문제 (ADMIN-16이 발견·미해결)** —
-  생성 본문이 `review_status=approved`를 직접 실을 수 있어 `pending→approve` 전이·감사 동작·검수
-  기록 없이 승인 상태로 태어난다. 이 태스크의 범위(PATCH)가 아니라 별도 태스크로 추적한다.
+- **생성(`POST /v1/problems`)이 초기 `review_status`를 임의로 정하는 문제 (ADMIN-16이 발견 · ADMIN-19가
+  종결)** — 생성 본문이 `review_status=approved`를 직접 실을 수 있어 `pending→approve` 전이·감사 동작·
+  검수 기록 없이 승인 상태로 태어났다. 이제 생성은 **미설정 또는 `pending`만** 허용하고 그 외는 DB·원장
+  관문보다 앞에서 422 `illegal_initial_status`다(`schema/review_transition.py::
+  ensure_initial_review_status`가 단일 권위 · `api/problems.py::create_problem`이 HTTP 번역). 호출자
+  전수 조사(2026-10-09): 깨진 곳은 `test_problems_public_projection.py`의 POST 본문 1건뿐이었고
+  모바일·웹앱·`seed_demo.py`·`pipeline.yaml`·`tools/`·`infra/`에는 이 POST의 호출자가 없다. 코퍼스 적재
+  (`l1/problem_bank/populate.py`)는 `pg_insert`로 직접 쓰므로 REST 표면을 거치지 않아 대상이 아니다.
+  - **남긴 한계**: ⓐ `None`으로 태어난 문항은 전이표상 어떤 액션도 불허라(모듈 docstring "모른다 ≠
+    pending") 검수 큐로 들어가려면 상태가 먼저 정해져야 한다 — 생략을 `pending`으로 접는 기본값 변경은
+    하위호환을 깨는 정책 결정이라 이 태스크에서 하지 않았다. ⓑ 생성 본문의 `quarantine_reason`·
+    `quarantined_at`·`review_score`는 아직 막지 않는다(같은 부류이나 노출·승인 효과가 없다 — PATCH는
+    격리 기록을 전이로만 쓰게 잠갔으므로 생성 쪽 잠금은 후속 판단).
 - **감사 도구(`harness/problem_duplication_audit.py`)의 `review_status` 필터** — 2026-08 처분에서
   물리 제거의 직접 근거가 된 바로 그 공백이다. 도구 수정은 이 태스크(서빙 축) 범위 밖이며, 격리 상태값이
   생겼으므로 이제 필터 추가가 의미를 갖는다.

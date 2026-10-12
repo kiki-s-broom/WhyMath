@@ -382,6 +382,8 @@ class TestSeatExistsInAllThreePlaces:
         # problem_version_id + PUBLISHED 불변성 트리거)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-10-08 P3-12] head가 c5e9f3a7b1d4(role_enum에 CMS 역할 3종 — 어휘만 확장)로
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-09 P3-25] head가 e7b2c4d8a1f6(CMS 편집 표지 cms_edited_at 5컬럼)로 전진 —
+        # 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-10-09 EOS-47] head가 d6a2f8c4b1e7(problem_attempt.problem_version_id +
         # evaluation_context)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         assert EXPECTED_ALEMBIC_HEAD == "d6a2f8c4b1e7"

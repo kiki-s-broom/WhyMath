@@ -24,8 +24,8 @@ upgrade: 컬럼 2개 add + FK 1개 create(제약명 결정성을 위해 add_colu
 downgrade: FK drop → 컬럼 2개 drop(역순 대칭).
 
 Revision ID: d6a2f8c4b1e7
-Revises: c5e9f3a7b1d4
-Create Date: 2026-10-09 00:00:00.000000
+Revises: e7b2c4d8a1f6
+Create Date: 2026-10-09 10:00:00.000000
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d6a2f8c4b1e7"
-down_revision: str | None = "c5e9f3a7b1d4"
+down_revision: str | None = "e7b2c4d8a1f6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

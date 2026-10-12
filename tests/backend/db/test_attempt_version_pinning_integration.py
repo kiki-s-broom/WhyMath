@@ -25,7 +25,7 @@ from whymath_backend.config import Settings
 pytestmark = pytest.mark.integration
 
 _REVISION = "d6a2f8c4b1e7"  # 이 슬라이스가 추가한 리비전(head)
-_PREV_REVISION = "c5e9f3a7b1d4"  # 직전 리비전(downgrade -1 도착점)
+_PREV_REVISION = "e7b2c4d8a1f6"  # 직전 리비전(downgrade -1 도착점 — P3-25 cms_edited_at)
 _SENTINEL_UNIT = "U-EOS47-SENTINEL"  # 실 데이터와 충돌하지 않는 고유 단원 코드(식별·정리용)
 
 _BACKEND_DIR = Path(__file__).resolve().parents[3] / "src" / "backend"

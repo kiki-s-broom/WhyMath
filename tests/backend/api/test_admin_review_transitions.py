@@ -230,6 +230,8 @@ def test_transition_success_writes_one_audit_and_commits_once() -> None:
     )
     assert audit.user_id == _ADMIN.user_id and audit.resource_id == _PID
     assert fake.problem is not None and fake.problem.review_status is ReviewStatus.approved
+    # P3-25 — 사람이 바꾼 검수 상태는 다음 CLI 적재가 코퍼스 초기값으로 되돌리면 안 된다.
+    assert fake.problem.cms_edited_at is not None
 
 
 def test_transition_quarantine_writes_reason_and_time_together() -> None:
