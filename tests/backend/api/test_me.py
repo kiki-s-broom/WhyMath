@@ -4902,3 +4902,57 @@ class TestMasteryUpdateNullBoundary:
         values = [row["mastery"] for row in resp.json()]
         assert values.count(None) == 1
         assert [v for v in values if v is not None] == [0.0]
+
+
+# ── EOS-47 — 시도 버전 고정 배선 (submit_attempt) ────────────────────────────────
+
+
+class TestAttemptVersionPinWiring:
+    """EOS-47: `POST /v1/me/attempts`가 접수 시점의 문항 판·채점 환경을 시도 행에 박는다.
+
+    고정 *값을 만드는* 로직은 `tests/backend/l2/test_attempt_version_pin.py`가, 세 적재 경로가 모두
+    헬퍼를 부르는지는 `test_attempt_version_pin_wiring.py`(AST)가 잰다. 여기서는 이 엔드포인트에서
+    헬퍼의 결과가 **그대로** 시도 행에 도달하는지만 본다 — 상수가 아니라 헬퍼 값임을 두 입력으로 구별한다.
+    """
+
+    @staticmethod
+    def _post_with_pin(monkeypatch: pytest.MonkeyPatch, pin: Any) -> Any:
+        async def _resolve(*_args: Any, **_kwargs: Any) -> Any:
+            return pin
+
+        async def _none(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return []
+
+        monkeypatch.setattr(me_module, "resolve_attempt_version_pin", _resolve)
+        monkeypatch.setattr(me_module, "record_problem_attempt_mastery", _none)
+        monkeypatch.setattr(me_module, "record_problem_attempt_skill_mastery", _none)
+        session = _QueueSession([_AQResult([uuid.uuid4()]), _AQResult([]), _AQResult([])])
+        resp = _attempts_client(session).post(
+            "/v1/me/attempts", json={"problem_id": str(uuid.uuid4()), "is_correct": True}
+        )
+        assert resp.status_code == 201, resp.text
+        attempts = [o for o in session.added if type(o).__name__ == "ProblemAttempt"]
+        assert len(attempts) == 1
+        return attempts[0]
+
+    def test_resolved_pin_reaches_the_stored_attempt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from whymath_backend.l2.attempt_version_pin import AttemptVersionPin
+
+        vid = uuid.uuid4()
+        ctx = {"schema_version": "1", "curriculum_version": "2022_REVISION"}
+        attempt = self._post_with_pin(
+            monkeypatch,
+            AttemptVersionPin(outcome="pinned", problem_version_id=vid, evaluation_context=ctx),
+        )
+        assert attempt.problem_version_id == vid
+        assert attempt.evaluation_context == ctx
+
+    def test_unpinned_result_stores_none_not_a_constant(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """대조군 — 헬퍼가 '고정할 것 없음'이면 두 컬럼은 None이다(위 테스트의 값이 상수가 아님을 증명)."""
+        from whymath_backend.l2.attempt_version_pin import AttemptVersionPin
+
+        attempt = self._post_with_pin(monkeypatch, AttemptVersionPin(outcome="problem_missing"))
+        assert attempt.problem_version_id is None
+        assert attempt.evaluation_context is None

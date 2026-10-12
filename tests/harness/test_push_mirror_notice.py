@@ -100,10 +100,12 @@ def _mirror(repo: Path, commit: str, kind: str = "pass") -> None:
     elif kind == "not_executed":
         step = {"name": "s", "status": "not_executed", "reason": "조건 스텝"}
         exit_code = ci_mirror.EXIT_NOT_EXECUTED
+    # HARN-308: 필수 상시 잡 전부가 결과에 있어야 통과로 읽힌다. 워크플로가 없는 저장소는 한 잡이면 된다.
+    names = pmn.required_always_jobs(repo)[0] or ("harness-integrity",)
     payload = {
         "schema": ci_mirror.RESULT_SCHEMA,
         "commit": commit,
-        "jobs": [{"name": "harness-integrity", "exit": job_exit, "steps": [step]}],
+        "jobs": [{"name": name, "exit": job_exit, "steps": [step]} for name in names],
         "not_executed": 1 if kind == "not_executed" else 0,
         "exit": exit_code,
         "tainted": False,  # schema 3(HARN-194): 실행 도중 트리가 안 바뀌었다고 명시된 결과만 믿는다
@@ -381,13 +383,22 @@ def test_refspec_targets_head(
 
 # ── 트리거별 진입점 ──────────────────────────────────────────────────────────────
 class TestNoticeForPush:
-    def test_notifies_with_mirror_command_and_reach(self, repo: Path) -> None:
+    def test_unmirrored_push_is_blocked_with_the_mirror_command(self, repo: Path) -> None:
+        """HARN-308 — 푸시의 미러 부재는 더 이상 "막지 않는 알림"이 아니다. 이유와 다음 명령이 함께 나간다."""
         _commit(repo, "src/app.py", "x = 2\n")
         result = pmn.notice_for_push("git push -u origin feature", repo)
         assert result.text is not None
-        assert "[CI 미러 고지 · 푸시 직전]" in result.text
-        assert "ci_mirror.py run" in result.text and "막지 않는" in result.text
+        assert "[CI 미러 차단 · 푸시 직전]" in result.text
+        assert "ci_mirror.py run" in result.text and "막지 않는" not in result.text
         assert result.assessment.code == pmn.NOTIFY_NO_RESULT
+        assert result.gate is not None and result.gate.blocked
+
+    def test_pr_create_notice_still_does_not_block(self, repo: Path) -> None:
+        """PR 생성은 고지 전용으로 남는다 — 푸시가 이미 이 게이트를 지나왔다."""
+        _commit(repo, "src/app.py", "x = 2\n")
+        result = pmn.notice_for_pr_create(repo, body="요약", head_ref="feature")
+        assert result.text is not None and "[CI 미러 고지 · PR 생성 직전]" in result.text
+        assert "막지 않는" in result.text and result.gate is None
 
     def test_silent_when_mirrored(self, repo: Path) -> None:
         head = _commit(repo, "src/app.py", "x = 2\n")
