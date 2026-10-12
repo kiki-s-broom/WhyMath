@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/pregenerate/validator.py
-session: null
+session: claude/wonderful-planck-48b5ya
 notes: "P3-03 2회차 감사 교정 중 발견. 검증기는 고치지 않고 생성기 문면 표기를 바꿔 회피했다(범위 밖 별건)."
-updated: 2026-10-07
+updated: 2026-10-12
