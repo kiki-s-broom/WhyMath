@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - scripts/harness/ci_mirror.py
-session: null
+session: claude/affectionate-heisenberg-w66ymg
 notes: "출처: P3-03(PR #1512) 승인 각인 푸시. 사고 대장 계열 ci-local-repro-gap 9회차(5·6회차 HARN-173 · 7·8회차 HARN-164). HARN-209(done)가 같은 공백을 '고지'로 막았지만 고지는 차단이 아니라서 이번에도 지나쳤다 — 산문·고지가 2회 이상 뚫리면 코드로 막는다(CLAUDE.md 실수 관리)."
-updated: 2026-10-09
+updated: 2026-10-12
