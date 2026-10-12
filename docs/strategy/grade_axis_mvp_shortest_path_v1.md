@@ -148,7 +148,7 @@ CLAUDE.md 8대 구조 원칙 ⑤ **Curriculum은 Overlay**(개념은 영속, 매
 
 | 항목 | 파일 | 내용 |
 |---|---|---|
-| S-1 해소 | `l1/curriculum/curriculum_loader.py` | 대학 밴드를 2종 맵에 추가. 대학 `RequiredDepth`는 `mastery` 일괄 고정이 아니라 과목 성격별로 두고, 미지 밴드는 기존 `None` 정직 폴백 유지 |
+| S-1 해소 | `l1/curriculum/curriculum_loader.py` | 대학 밴드를 2종 맵에 추가. 대학 `RequiredDepth`는 `mastery` 일괄 고정이 아니라 **`cognitive_type` 기반(원자 단위)**으로 도출한다 — 절차→`procedural`·개념→`conceptual`·표상→`None`(깊이 4단계에 표상 칸이 없어 정직 폴백), mastery는 대학 셀에서 당분간 미사용. 종전 문면 "과목 성격별"은 분류표를 새로 지어야 해 날조 금지에 걸려 **2026-10-09 Kiki 결정으로 대체**(`S4-64` · 임시 휴리스틱 — 인지 수준 원문 주석 확보 시 대체). 미지 밴드는 기존 `None` 정직 폴백 유지 |
 | S-2 해소 | `docs/prompts/socratic_template.md` · `polya_4step.md` | 학년 밴드 register를 파라미터화. **기존 `grade` thread(`prompt_assembler.py:85,122`)를 재사용하고 신규 인자 추가 금지** |
 | 어휘 통일 | `l4/speech/profiles.py` | `SpeechGradeBand`(초등/중등/고등/대학)를 학년축 정본 어휘로 승격. 코퍼스 `school_level`(초등/중학/고등/대학)과의 표기 차이를 매핑 함수 **1개**로 통일 |
 | 동결 | `tests/backend/**` 신설 | **학년축 구조분기 금지 거버넌스 테스트** — `if school_level ==` / `if grade_band ==` 형태의 제어 분기가 L2~L4에 나타나면 CI 실패. `test_embedding_namespace_governance.py` 패턴 답습 |
