@@ -202,6 +202,10 @@ async def post_verify_solution(
                 on_budget_exceeded=partial(budget_exceeded_result, step_type),
                 # 남은 총 예산이 호출 상한보다 작으면 그만큼만 준다 — 체인 시간이 예산을 넘지 않게.
                 timeout_s=min(cap_s, remaining_s),
+                # 계산 상한만으로는 부족하다 — 워커 기동·복원 대기는 계산 상한 밖이라, 마감 직전에
+                # 시작한 전이가 요청을 재기동 1회(최악 60초)만큼 늘렸다. 남은 예산을 호출 전체의
+                # 벽시계 예산으로도 넘겨 그 대기까지 마감 안에 가둔다(OPS-128).
+                budget_s=remaining_s,
             )
         )
     return aggregate_transitions(results)
