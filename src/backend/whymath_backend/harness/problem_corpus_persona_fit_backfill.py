@@ -77,6 +77,12 @@ KNOWN_CORPORA: dict[str, Path] = {
     "rephrased_v0": Path("data/corpus/problem_bank_rephrased_v0/problems.jsonl"),
     "v1": Path("data/corpus/problem_bank_v1/problems.jsonl"),
     "probability_finite_v0": Path("data/corpus/problem_bank_probability_finite_v0/problems.jsonl"),
+    # P3-03 미적분Ⅰ 미분 은행(504건) — 8번째. 자격 통과 프로토콜의 5회차 S5 감사가 승인 근거를
+    # 냈다(`docs/data/p3_calculus1_diff_audit/bank_audit_r5/`). 은행은 결정론 생성기 산출물이라
+    # 이 두 백필이 채운 키(`persona_fit`·`review_status`)를 걷어 낸 바이트가 감사 동결 사본과
+    # 같아야 한다 — 그 결속은 `p3_calculus1_diff_batch.strip_backfill_stamps`와 은행 커버리지
+    # 테스트가 동결한다.
+    "p3_calculus1_diff_v0": Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl"),
 }
 
 _AUDIT_DIR = Path("docs/data/persona_fit_backfill_audit")
