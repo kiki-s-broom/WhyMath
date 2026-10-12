@@ -12309,3 +12309,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
+
+## 2026-10-12: 미머지 브랜치 심층 대조 17회차 — 신규 파일 기준 8개 브랜치 대조 · 회수 태스크 신규 등재 0건 · 이식 금지 3종 확인
+
+판정 기준 main `d873d064`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12.md`(Kiki "완료됐지만 main에 합쳐지지 않은 작업" 조회). 16회차가 "② 추적 중"으로 분류한 고립·PR 닫힘 브랜치 중 신규 파일이 main에 없는 8개를 파일 단위로 대조했다. 전수 감사가 아니라 심층 재검이며 삭제·이식은 하지 않았다.
+
+- **결론: 신규 등재 0건.** 미이식 코드가 남은 곳은 전부 main에 `todo` 소유 태스크가 있다(ADMIN-10·OPS-38·MISC-01/03/05/06·PB-02·PED-14·PATH-03·S4-20·PED-26·OPS-112/113·A11Y-02·ARCH-102). 소유 태스크 25건의 main status를 직접 조회했다.
+- **ID 대조는 고립을 과대 계상한다.** 브랜치의 done 태스크 약 40건이 main에서 todo·부재로 보였으나 대부분 번호가 바뀌어 이식돼 있었다(SEC-13~18→SEC-24, PED-04~12→PED-22~25, ARCH-29·MOB-15→MOB-18, VIZ-04→VIZ-06, S4-19→S4-62, PED-15→PED-37). 같은 번호가 main에서 다른 태스크인 사례(S4-22·OPS-19·PED-04~08)도 확인했다.
+- **이식 금지 3종**: ADMIN-02 마이그레이션(Kiki 판정 폐기·결제 예약 컬럼 드롭) · MISC-02 계열(main cancelled) · `k20m0w`의 출하 자산 번들+거버넌스 테스트(ARCH-12 데모 예외와 충돌·이식 시 즉시 RED·ARCH-102 판정 선행).
+- **정직한 공백**: 수정 파일 쪽 미이식분(PATH-03 `l2/learning_path.py`·S4-20 coverage 생성기·`7n9n72`의 coach/shadow 수정 등)은 이번에 측정하지 않았다. 파일별 판정은 읽기 전용 에이전트 4개의 보고이며 세션이 직접 재확인한 것은 문서 §1 표에 구분했다. 미확정 3건(S3-34·S3-42~48·OPS-21)은 문서 §5.
