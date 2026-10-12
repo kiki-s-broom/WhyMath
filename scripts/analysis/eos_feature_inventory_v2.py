@@ -796,7 +796,9 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.defect_seeder",
        # P3-03 감사자 자격 측정 — 은행 전용 결함 주입기(defect_seeder와 같은 강등전 원리·이 은행의
        # 실제 문항에 7종을 심어 정답지를 구성으로 확정). 소비자는 harness.p3_audit_qualification.
-       "l3.equivalent.p3_diff_defect_seeder"),
+       "l3.equivalent.p3_diff_defect_seeder",
+       # PB-09 변형 3종(난이도 계열·조건변형·역문제) — 코퍼스 행에서 자식을 낳는 결정론 모듈.
+       "l3.equivalent.variants"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
        "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
@@ -1150,7 +1152,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_persona_fit_backfill", "harness.problem_corpus_rephrase",
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
-       "harness.problem_corpus_tag", "harness.binomial_distribution_batch",
+       "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
        "harness.conceptual_count_mc_batch", "harness.conic_section_focus_batch",

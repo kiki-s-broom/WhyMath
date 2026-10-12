@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (착지 · PB-09): **변형 3종(난이도 계열·조건변형·역문제)을 계보와 함께 낳는 경로를 열었다 — 630번 시도에서 316건 저장(작동률 50.2%), `VARIANT_*` 3종과 `심화`·`선수`·`변형`·`대조`가 처음 실사용됐다. 코퍼스는 커밋하지 않았다** (claude 구현) — 판정 기준 작업 브랜치 `ec1f9dc7`
+
+**무엇/왜**: R3 G5가 "발화 조건(D4 재고 부족 + D8 계보 좌석)이 충족됐는데 방치"라 판정한 3종을 `l3/equivalent/variants.py`(부모 코퍼스 행에서 근·선택 복원 → 기존 `_Skeleton` 조립 경로로 자식 생성)와 `harness/problem_corpus_variants.py`(게이트·구조 signature dedup·계보 부여·리포트)로 구현했다. 신규 생성기·enum·필드 0. 방향은 부모→자식이며 `기초`는 enum에 없어 방향을 뒤집은 `선수`로 표현한다. 설계·실측표 = `docs/architecture/problem_bank_variants_pb09.md`.
+**실측(재측정)**: 계보 행 2,128건(`유사` 1,707 · `변형` 421) — R3의 1,024건에서 증가. `generation_type` 14,034건 전량 `FULLY_GENERATED`. 계보 소비처는 `api/me.py:1807`이 아니라 `l2/recommendation_policy.py:817`. 부모 자격 619행 중 126행. 이동별 작동률: `ladder_harder` 59.5% · `ladder_easier` 8.7% · `condition_flip` 74.6% · `condition_sign` 52.4% · `inverse` 55.6%. 수용 게이트 거부 0건이라 게이트 변별력을 대조군 테스트로 따로 봉인했다. 최종 코드 기준 두 실행 산출물 바이트 동일.
+**결정 3건**: ① 코퍼스를 커밋하지 않는다 — `populate`·QA·CAT가 `problem_bank_*`를 전수 글롭해 검수 전 문항이 후보로 흐를 수 있다(`--out` 필수·기본 경로 없음). ② 조건변형·역문제는 난이도를 부모 값으로 계승한다(공식이 모르는 축에 가산하지 않음). ③ 유사도는 `None` — 근거 없는 수치를 날조하지 않는다.
+**집행**: 단위 46건 + 하네스 17건. 깔때기 항등식(`attempted == skipped + derived`)이 깨지면 리포트가 예외를 던지고, 요청 모드 중 저장 0건이면 exit 1. 결함 주입 11종 전건 검출(1종은 첫 시도에서 생존해 `similarity_score` 단언을 추가한 뒤 검출).
+**사고 기록(CI 선행 발견)**: `tests/infra` 전체를 돌리자 신규 모듈 2개가 EOS 기능 인벤토리 어느 행에도 귀속되지 않아 3건 실패·21건 오류였고, `_condition_sign`이 CAS 안전 진입점을 우회한 `sympify` 직접 호출이었다 — 둘 다 로컬 pytest(`tests/backend`)만으로는 안 보이는 `infra-contracts` 잡의 검사다. 같은 PR에서 인벤토리 행(`WM-E-351`·`WM-O-909`) 귀속과 `safe_sympify` 교체로 해소했다. 대책 코드는 기존 `test_eos_feature_inventory_v2.py`·`test_cas_parse_entrypoint_governance.py`가 이미 소유한다(신규 규칙 등재 없음).
+**후속(대장 집행)**: `PB-19` CAT 형제 필터가 관계 유형을 구분하지 않는 문제(심화·선수까지 대칭 형제로 모아 `exclude`에서 쉬운 계열이 빠진다) · `PB-20` 변형 코퍼스 편입 결정과 중복 구조의 계보만 걸기(`PB-19` 선행).
+
 ### 2026-10-09 (구현·P3-25): **CMS로 고친 행을 CLI 적재가 조용히 덮어쓰던 구멍을 `cms_edited_at` 표지로 막았다 — 7종 중 5종이 덮이고 있었고, 문항은 사람이 격리한 상태까지 코퍼스 초기값으로 되돌아갔다** (claude 구현)
 
 **무엇**: 태스크 `P3-25-cms-edit-vs-loader-contract`. 정본 = `docs/standards/cms_edit_vs_loader_contract.md`. 실측(역할 기반 검색): 문항·오개념·교수전략·개념 설명·힌트 5종은 적재가 같은 행을 upsert해 편집을 지우고, 풀이 단계(빈 좌석에만 insert)·교육과정 판(alembic 시드 `DO NOTHING`)은 안 지운다.
