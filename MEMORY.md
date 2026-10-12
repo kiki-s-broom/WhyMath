@@ -12309,3 +12309,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
+
+## 2026-10-12 QUAL-13 — 위생 검증기 함수 표기 오탐 수정: 프라임·첨자 함수 뒤 괄호와 한 글자 함수 적용을 곱셈·독립 수치식으로 읽지 않는다
+
+판정 기준: 브랜치 `claude/wonderful-planck-48b5ya`(미머지) · 코드 변경 `src/backend/whymath_backend/l3/pregenerate/validator.py`, 동결 테스트 `tests/backend/l3/test_pregenerate_function_notation.py`.
+
+- **원인은 두 갈래였다**: ① 산술·부등식·부등 검증기가 `f'(2) = 5`의 `'`를 "더 큰 식의 일부" 신호로 인정하지 않아 `(2) = 5`만 떼어 거짓 등식으로 판정(`_is_standalone`) ② 해 주장 검증기·단계 진단이 암묵 곱셈 파서 때문에 `f(2)`를 `2·f`로 읽어 `f(1) = 3, f(2) = 5`를 "f=3 vs f=5/2"로 판정. 같은 뿌리의 **거짓 음성**도 있었다 — `2x + 1 = 7 이므로 x = 5이고 f'(x) = 2x`에서 `(x) = 2x`가 만든 가짜 방정식(x=0)이 공통 해집합을 비워 진짜 슬립(x=5)의 검출을 가렸다.
+- **수정**: `_follows_function_symbol`(프라임 `' ′ ’ ``을 걷어 낸 앞 글자가 영숫자(한글 제외)이거나 직전이 `}`면 함수 인수 괄호) + `_has_function_application`(한 글자 함수 기호+`(`, **인수 안에 그 글자가 있으면 곱셈**이라 `x(x+1)`·`2x(…)`는 곱셈 해석 유지) + `_is_function_notation_relation`(해 주장 검증기·`detect_step_breaks` 공용 skip). 틀리면 통과하는 방향이라 false-positive 0 보수 원칙과 같은 쪽이다.
+- **검증**: 수정 전 RED 26건(신규 41건 중) → 수정 후 45건·기존 `test_pregenerate.py` 209건 통과. 대조군(`2 + 3 = 6`·단독 `(2) = 5`·인용 `'(2) = 5'`·`x(x+1) = 6`·`2(x+1) = 6`·`2x(1+1) = 8`·중첩 괄호 `x((2+1)x) = 9`)은 수정 뒤에도 거부. 뮤테이션 14종 전건 RED(컴파일 검사·pytest 종료 코드 1만 검출로 계상·원복 sha256 동일).
+- **④ 은행**: 504건 `p3_calculus1_diff_batch --check` 드리프트 없음(생성기·은행 바이트 불변 — 5회차 감사 동결본이라 회피 문면을 되돌리지 않았다). 회피 표기를 원본(`f'(4)의 값은 2` → `f'(4) = 2` 등)으로 되돌린 변형 96개 문면: **구 검증기 49건 거부 → 수정 후 0건**, 현 은행 기준선은 구·신 모두 0건.
+- **하네스 결함 2건(시스템 실수 — 뮤테이션 도구)**: ① 치환 문자열이 들여쓰기를 반쯤 남겨 IndentationError가 났는데 `1 error`가 "검출(RED)"처럼 보였다 — `compile()` 단언 + pytest 종료 코드 1만 검출로 계상하도록 고쳤다. ② 같은 하네스가 처음엔 M11(우변 함수 적용)·M14(중첩 괄호) 생존을 냈다 — 테스트가 그 절을 밟지 않았다(`3 = f(1)`·`x((2+1)x) = 9` 반례 추가 후 14/14).
+- **로컬 CI 재현**: 닿는 잡 전 스텝 통과 — 전체 pytest 19313 passed·커버리지 86.40%·`backend` 후속 게이트 20스텝·`tests/infra` 3035·`tests/harness` 2256·`corpus_authoring` 814 passed·위헌 심사 래칫 차단 0건(기준선 0). `ci_mirror.py run` 6잡(`backend`·`infra-contracts`·`infra-shell`·`policy-guard`·`harness-integrity`·`declared-unwired-audit`) `not_executed: 0`·`tainted: false`. **내 실수 1건**: 백필 드리프트 체크 2건을 `src/backend`에서 돌려 `FileNotFoundError`(CI는 이 두 스텝만 저장소 루트로 되돌린다) — 루트에서 재실행해 exit 0.
+- **미재현(근거)**: `concept-reach-guard`(테스트가 `pregenerate`를 import하지 않음 0건)·`data-pipeline` 계열·`mobile`·`web`·`backend-migrations`(alembic·마이그레이션 무변경)·`docker-build`(도커 없음). 이 판정은 "내가 찾은 방법(grep)으로 0건"이다.
+- **알려진 한계**: 한 글자 함수 `x(2)`처럼 인수에 그 글자가 없는 식은 곱(2x)이 아니라 함수로 보아 해 주장 검증을 건너뛴다(학생이 `x(2+1)`로 3x를 쓰는 일은 드물어 수용). `}` 꼬리는 `\frac{1}{2}(3)` 같은 곱셈도 건너뛴다(보수 방향).
