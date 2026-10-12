@@ -1,0 +1,34 @@
+{
+  "task": "P3-03-coverage-fill",
+  "purpose": "감사자 자격 측정(결함 주입 강등전) 시험지",
+  "seed": 20261008,
+  "bank": "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl",
+  "bank_sha256": "cc7e953974185ac4aa4c1291d3e27e08fc999a76bc5f82b5471d7a31900af16f",
+  "blind_sha256": "395df8fe0656bdc7af7029503d4cb1210fb7f945dbd579410bb2b4bf376703dc",
+  "answer_key_sha256": "f8ab0a965fbf375d732d749ca370b81c8b9c9db89f36f85a2a34554706dee7bc",
+  "n_items": 240,
+  "n_defective": 120,
+  "n_clean": 120,
+  "defect_class_counts": {
+    "answer_error": 18,
+    "ambiguous_solution": 17,
+    "derivative_shortcut": 17,
+    "wording_notation": 17,
+    "explanation_defect": 17,
+    "distractor_misattribution": 17,
+    "statement_mismatch": 17
+  },
+  "criteria": {
+    "n_defective": 120,
+    "n_clean": 120,
+    "min_defects_per_class": 15,
+    "confidence": 0.95,
+    "min_detection_lower": 0.9,
+    "min_class_detection_point": 0.8,
+    "max_false_alarm_upper": 0.1,
+    "min_llm_judges": 2,
+    "s5_bank_size": 504,
+    "s5_max_corrected_upper": 0.02
+  },
+  "generator": "whymath_backend.l3.equivalent.p3_diff_defect_seeder.build_qualification_set"
+}

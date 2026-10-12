@@ -349,6 +349,15 @@
 **핀 갱신(같은 변경에서)**: 정본 엣지 수·경계·고→대를 고정한 테스트와 보고서 핀(2,210→2,234, 경계 20→44, 고→대 0→24, school_link 20→44, 라벨 합 16→40, 순서화 모집단 356→380 등)을 갱신했다. 순서화 보고서의 변화는 병합 전후 in-degree 분포를 독립 계산해 설명 가능함을 확인했다(신규 24건이 서로 다른 대학 노드 24곳에 하나씩 닿아 직접 선수 1개→2개). 형제 제안 `S4-61`(대학 과목간 129건)은 원장 해시 한 줄만 재생성했고(엣지 무변경), 그 테스트의 "대학은 섬이다/단독 도달 0" 주장은 `pre_merge_view`로 보존했다.
 
 **남은 일·한계(정직 고지)**: ①**prod DB(`whymath-pg`)는 아직 2,210건** — 정본→DB 반영은 별도 적재 동작이다(이 병합의 범위 밖). ②`constitution/rules.yaml` 원본 등록부 `version` 문구가 "2,210엣지"라 낡았다 — `constitution/`는 읽기 전용이라 고치지 않았고 Kiki의 다음 개정 때 반영 대상이다. ③검수 자체는 2026-10-08 AI 검수(같은 계열 AI 2인·독립 표본 아님·오류율 미측정 — `ai_review_cross_band_edges_university_v1.md` 정직 고지)이며 이 병합은 그 판정을 그대로 집행했다. 사람 검수가 아니다. ④`S4-61`(129건) 병합은 별건이다 — 같은 `⒞` 결정을 쓰면 되고 원장 해시는 이번 병합 후 정본(`80c783f9…`) 기준으로 이미 맞춰져 있다.
+### 2026-10-08 (착지 · PB-09): **변형 3종(난이도 계열·조건변형·역문제)을 계보와 함께 낳는 경로를 열었다 — 630번 시도에서 316건 저장(작동률 50.2%), `VARIANT_*` 3종과 `심화`·`선수`·`변형`·`대조`가 처음 실사용됐다. 코퍼스는 커밋하지 않았다** (claude 구현) — 판정 기준 작업 브랜치 `ec1f9dc7`
+
+**무엇/왜**: R3 G5가 "발화 조건(D4 재고 부족 + D8 계보 좌석)이 충족됐는데 방치"라 판정한 3종을 `l3/equivalent/variants.py`(부모 코퍼스 행에서 근·선택 복원 → 기존 `_Skeleton` 조립 경로로 자식 생성)와 `harness/problem_corpus_variants.py`(게이트·구조 signature dedup·계보 부여·리포트)로 구현했다. 신규 생성기·enum·필드 0. 방향은 부모→자식이며 `기초`는 enum에 없어 방향을 뒤집은 `선수`로 표현한다. 설계·실측표 = `docs/architecture/problem_bank_variants_pb09.md`.
+**실측(재측정)**: 계보 행 2,128건(`유사` 1,707 · `변형` 421) — R3의 1,024건에서 증가. `generation_type` 14,034건 전량 `FULLY_GENERATED`. 계보 소비처는 `api/me.py:1807`이 아니라 `l2/recommendation_policy.py:817`. 부모 자격 619행 중 126행. 이동별 작동률: `ladder_harder` 59.5% · `ladder_easier` 8.7% · `condition_flip` 74.6% · `condition_sign` 52.4% · `inverse` 55.6%. 수용 게이트 거부 0건이라 게이트 변별력을 대조군 테스트로 따로 봉인했다. 최종 코드 기준 두 실행 산출물 바이트 동일.
+**결정 3건**: ① 코퍼스를 커밋하지 않는다 — `populate`·QA·CAT가 `problem_bank_*`를 전수 글롭해 검수 전 문항이 후보로 흐를 수 있다(`--out` 필수·기본 경로 없음). ② 조건변형·역문제는 난이도를 부모 값으로 계승한다(공식이 모르는 축에 가산하지 않음). ③ 유사도는 `None` — 근거 없는 수치를 날조하지 않는다.
+**집행**: 단위 46건 + 하네스 17건. 깔때기 항등식(`attempted == skipped + derived`)이 깨지면 리포트가 예외를 던지고, 요청 모드 중 저장 0건이면 exit 1. 결함 주입 11종 전건 검출(1종은 첫 시도에서 생존해 `similarity_score` 단언을 추가한 뒤 검출).
+**사고 기록(CI 선행 발견)**: `tests/infra` 전체를 돌리자 신규 모듈 2개가 EOS 기능 인벤토리 어느 행에도 귀속되지 않아 3건 실패·21건 오류였고, `_condition_sign`이 CAS 안전 진입점을 우회한 `sympify` 직접 호출이었다 — 둘 다 로컬 pytest(`tests/backend`)만으로는 안 보이는 `infra-contracts` 잡의 검사다. 같은 PR에서 인벤토리 행(`WM-E-351`·`WM-O-909`) 귀속과 `safe_sympify` 교체로 해소했다. 대책 코드는 기존 `test_eos_feature_inventory_v2.py`·`test_cas_parse_entrypoint_governance.py`가 이미 소유한다(신규 규칙 등재 없음).
+**후속(대장 집행)**: `PB-19` CAT 형제 필터가 관계 유형을 구분하지 않는 문제(심화·선수까지 대칭 형제로 모아 `exclude`에서 쉬운 계열이 빠진다) · `PB-20` 변형 코퍼스 편입 결정과 중복 구조의 계보만 걸기(`PB-19` 선행).
+
 ### 2026-10-09 (구현·P3-25): **CMS로 고친 행을 CLI 적재가 조용히 덮어쓰던 구멍을 `cms_edited_at` 표지로 막았다 — 7종 중 5종이 덮이고 있었고, 문항은 사람이 격리한 상태까지 코퍼스 초기값으로 되돌아갔다** (claude 구현)
 
 **무엇**: 태스크 `P3-25-cms-edit-vs-loader-contract`. 정본 = `docs/standards/cms_edit_vs_loader_contract.md`. 실측(역할 기반 검색): 문항·오개념·교수전략·개념 설명·힌트 5종은 적재가 같은 행을 upsert해 편집을 지우고, 풀이 단계(빈 좌석에만 insert)·교육과정 판(alembic 시드 `DO NOTHING`)은 안 지운다.
@@ -12215,6 +12224,14 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **관측(결론 아님)**: 이 세션 `start`의 원격 CAS claim이 lease 패배로 `error`(`CAS_RETRIES=3`)였고 전 세션 이벤트 대장에 `number_reserve_unavailable` 1건·`claim_remote_unavailable` 1건이 있다. 표본이 이 체크아웃의 main 이벤트뿐이라 상시 경합인지는 판정할 수 없다 — 이 태스크 범위 밖이며 조치 없음.
 - **머지 큐 이탈 실측(`HARN-210` ① '못 본 것'에 대한 첫 관측)**: 이 PR(#1526)이 머지 큐에서 `MERGE_CONFLICT`로 **2회**(2026-10-08 08:25Z·09:24Z) 이탈했다. 두 번 다 로컬 `git merge origin/main`은 충돌 0이었다(`.gitattributes`의 `MEMORY.md merge=union`이 양쪽 추가를 합친다). 두 번째 이탈 직후 상태(내 head `cd78fd77` 대 main)를 **`merge=union` 줄을 지운 임시 작업 트리**에서 병합하자 `MEMORY.md` 1구간만 충돌했다 — 제 결정 로그 블록이 base 파일 끝에 붙어 있어 앞서 착지한 PR들의 끝 추가와 같은 자리를 건드린 것으로 읽힌다. main을 다시 병합해 블록이 base 중간(뒤에 섹션 3개)에 놓인 head `7359edb7`은 같은 시험에서 충돌 0이었고, main 위에 끝 추가 커밋을 합성해도 0이었다(이전 head는 같은 조건에서 충돌 — 대조군). **한계(명시)**: GitHub 서버의 병합 구현이 아니라 'merge driver 없는 로컬 git'으로 근사한 것이다 — 큐가 실제로 그렇게 판정했는지는 이 PR의 다음 큐 결과로만 확인된다. 이 시험은 저장소에 코드로 남기지 않았다(`HARN-211` 서버 병합 프로브가 소유).
 
+### 2026-10-08 — P3-03 승인 경로 정정: 사람 표본 검수 철회 → 결함 주입 강등전으로 감사자 측정
+
+- **경위**: P3-03 미분 은행(504건) 승인 경로로 (가) 감사 라벨 표본 → `KNOWN_CORPORA`·`AUDIT_LABEL_MAP` 편입을 택했고(2026-10-06), LLM 독립 감사 4회가 모두 불합격(결함 74·90·122·88, 4회차 κ 0.412)하자 사람 표본 검수 240건(게이트 `G-p303-human-sample-review`)으로 전환했다(2026-10-07).
+- **Kiki 지적(2026-10-08)**: "whymath는 인간의 검수를 기본으로 하지 않는다고 선언했다." 초인간 검증 기준 v1 §0 — 인간 검수는 오류율 미측정 검출기 하나이며 인간 폴백은 측정 미달·판정 불가 구간만. 사람 판정을 승인의 유일 근거로 삼은 것은 서열 역전이다. 같은 이유로 LLM 감사자도 측정 없이 쓴 것이 근본 결함이었다.
+- **결정**: 사람 검수 게이트 waived(판정 0건 — 시작 전 철회), 검수 페이지 저장 차단. 승인 경로 = §3 결함 주입 강등전 — 정답을 아는 결함을 은행 사본에 심어 LLM 감사자·기계 게이트(우회로 판정기·표기 스캐너·Tier1/Tier2)의 검출률(Wilson 하한)·오경보율(Wilson 상한)을 먼저 재고, 측정을 통과한 감사자의 판정만 S5 근거로 쓴다. S2(반례 ≥10,000)·S3(독립 다관점·생성자≠검증자)도 확인. 사람은 판정 불가 잔여만.
+- **사고 대장**: 계열 `verification-authority-inversion` 1회차(cat K · fix_form task · fix_ref P3-03-coverage-fill).
+- 근거: `docs/data/p3_calculus1_diff_audit/README.md`, PR kiki-s-broom/WhyMath#1512.
+
 ## 2026-10-08: OPS-82 구조화 에러코드 체계 — 학생 대면 API 한정 도입
 - **실측(main 8a5ea4d1)**: 예외 클래스는 등재 당시 34종이 아니라 **57종**, `error_code`는 도입 전 0건. API 에러는 한국어 `detail` 문장뿐이었다.
 - **결정**: 형식 `WM-<계열>-<NNN>`(F1~F8 `GenerationFailureCode`와 형식이 갈라 충돌 불가). 적용 범위는 신규 예외 + 학생 대면 API만, 57종 소급은 `OPS-119`로 분리. 응답은 `detail`을 유지하고 옆에 `error_code`를 더한다(하위 호환).
@@ -12274,6 +12291,15 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - 소스·테스트 변경 0 — 전체 스위트는 돌리지 않았다. `backlog.py validate` exit 0.
 - **사후 갱신(같은 날)**: PR `#1478`이 닫혀 `friendly-dijkstra-230lnm`(`bcc172a3`)이 고립 브랜치가 됐다. main의 같은 게이트가 `kiki` 서명으로 이미 `cleared`라 14차 배치에 추가했다(총 11건). 증적 문구는 글자 그대로 포함되지 않으며 삭제 근거는 내용 대체다(판정 문서 §5).
 
+## 2026-10-09 OPS-30 — 알림의 마지막 1홉(웹훅 sink) + 외부 업타임 프로브 코드 착지 · 가동은 Kiki 런북 대기
+
+- **결정(채널 1종)**: 알림 채널은 **웹훅 1종**이다. 형식은 Slack Incoming Webhook의 `{"text": ...}`이고 Discord는 URL 끝에 `/slack`을 붙이면 같은 형식을 받는다. 푸시·메일·PagerDuty 다중화는 과공학이라 만들지 않았다. URL 자체가 토큰이라 `Settings.ops_alert_webhook_url`은 `SecretStr`이고(`WHYMATH_OPS_ALERT_WEBHOOK_URL`), 로그·`/health/ready`·프로브 기록·`test-notify` 출력 어디에도 URL을 싣지 않는다.
+- **구조**: 전이 판정(진입·해소 계산)은 `AlertLogNotifier` 한 곳에만 남기고, 새 `ops/alert_delivery.py`의 `WebhookAlertSink`가 계산된 전이를 `sinks=[...]`로 받는다(판정 로직 신설 0). 발송은 별도 데몬 스레드라 요청 경로를 막지 않고, 실패는 예외 타입명·`HTTP<코드>`만 카운터와 로그에 남긴다. 채널 미설정(`unset`)·형식 오류(`invalid`)는 기동 경고와 `/health/ready`의 `alert_delivery.config_state`·`dropped_unconfigured`로 드러난다 — "알림이 없었다"와 "알릴 곳이 없어 못 알렸다"가 같은 화면이 되지 않는다.
+- **외부 업타임 프로브**: `ops/uptime_probe.py`(`probe`·`report`·`test-notify`). up은 HTTP 200 + body `ready=true` + `components` 존재일 때만이고 그 외는 `ConnectError`·`HTTP503`·`BadBody` 등 사유 코드로 down이다(pid 파일·`/health/live` 같은 간접 신호는 쓰지 않는다). 알림은 up→down·down→up 전이 때만 나가고, 발송이 실패하거나 채널이 비어 있으면 기록의 `unsent`에 남아 다음 폴링에서 재시도한다. S4는 창(매일 15:00–24:00 KST) 안 표본만 세고 coverage 90% 미만이면 `INSUFFICIENT`(통과 아님·exit 1)로 판정을 보류한다.
+- **실측(2026-10-09, 로컬 수신기 + 실제 uvicorn 프로세스)**: 정상 3회 → 기록 3줄·수신 0건. 서버 `kill -9` 뒤 프로브 2회 → 첫 폴링 `ConnectError`·`down:sent`, 둘째는 조용(수신 1건). 서버 재기동 → `up:sent`와 "다운 시작 <시각>" 문구. 수신기와 서버를 함께 죽이면 `down:failed:ConnectError`·`unsent=down`이 기록되고 수신기만 복구하면 다음 폴링에서 `down:sent`로 재시도됐다. 서버 내부 경로는 `/boom` 500 3회 → breach 진입 알림 1건(`attempted=1 delivered=1`), 채널 미설정 서버는 같은 조건에서 `dropped_unconfigured=1`과 기동 경고가 남았다.
+- **뮤테이션**: 14종(미설정 위장·드롭 미집계·non-2xx 성공 취급·sink 예외 전파·전이 아닌 매번 호출·ready/components 미검사·다운 지속 시 매번 알림·실패 시 `unsent` 소거·창 경계·coverage 가드·app 미배선·미설정 경고 제거·timeout 제거) 전건 RED. 1회차에 `components` 검사 제거(M13)가 생존했다 — 픽스처에 `{"ready": true}`만 있는 200 응답이 없어 그 절을 밟지 않았던 것이라 반례를 추가해 해소했다.
+- **검증 범위**: 백엔드 전체 스위트(`-m "not corpus_authoring" -n 4 --dist loadfile`) 18548 passed·`BACKEND_RC=0`, `tests/infra` 2961 passed·`INFRA_RC=0`, `tests/harness` 2256 passed, ruff·black(`--line-length 100`)·`mypy --strict`·`lint-imports` 통과, `declared_unwired_audit`·`check_runbook_blocks`·`cp949_guard`·`provenance_audit`·`check_provider_seat_contract`·`audit_ratchet`(단계 2·차단 0건) 통과. CI가 처음 잡은 것은 **신규 모듈 2개의 EOS 인벤토리 미귀속**(`WM-O-903`에 귀속)과 **`ops.uptime_probe`의 미도달 의도 선언 부재**(`by-design` 선언)였고 둘 다 해소했다.
+- **정직한 공백(이 태스크가 닫지 않은 것)**: ①웹훅 URL 연결과 작업 스케줄러 등록은 아직 안 했다 — Kiki 런북 `docs/ops/ops30_uptime_probe_runbook.md` [B]~[D]. 그 전에는 S4가 계속 미측정이고 서버가 죽어도 아무도 모른다. ②실제 Slack/Discord 도달은 확인하지 못했다(로컬 HTTP 수신기로 대역 — 2xx 응답까지만 기계 판정, 채널에서 메시지가 보이는지는 [C]에서 눈으로 본다). ③런북의 PowerShell 블록은 Linux 세션에서 실행해 보지 못했다(`check_runbook_blocks.py`는 통과·가드 제거 사본은 위반으로 잡힘). 스케줄러가 User 환경변수를 상속하는지는 [E]의 `LAST_CHANNEL`이 가른다. ④프로브가 서버와 같은 PC에서 돌아 PC가 꺼지면 '다운'이 아니라 '기록 없음'(S4 `INSUFFICIENT`)으로 남는다 — 별도 호스트 프로브는 범위 밖. ⑤`ops/observation_report_runner.py`·`l2/calibrate_items.py`·`deployment_cd_runbook.md`가 "리포트·보정 신호의 채널 전달은 OPS-30 몫"이라 적고 있으나 이 태스크의 acceptance는 서비스 알림·업타임 두 홉이다 — 러너 docstring은 정정했고 나머지 둘의 소유자 재지정은 미처리다(채널 함수 `send_webhook`은 이제 재사용 가능).
 ## 2026-10-09 QUAL-15·OPS-123 회수 — 고립 구현 2건을 main 위에 파일 단위로 이식 · 브랜치 테스트 결함 2건 수정 · 격리 미적용 4곳 승계 등재
 
 판정 기준: main `594ce16b` + 브랜치 `claude/qual-15ops-123-kkj3nz`(미머지). 상세·표·수치는 `docs/reviews/qual15_ops123_recovery_2026-10-09.md`.

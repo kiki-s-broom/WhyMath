@@ -1,0 +1,40 @@
+# 소단원 DSL v0.1 — 미분계수 (미적분Ⅰ · 미분 대단원 · 소단원 1/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 백본이 이 성취기준을 개념/절차/표상 원자 3개로 나눈 것을 따라 목표를 1개씩 둔다
+#   (개념→CONCEPT · 절차→PROCEDURE · 표상→REPRESENT). 근거·예외 = docs/data/units_v1.md §3.
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-01-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-01] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-미분계수"
+unit_version: 1
+api_version: "unit/0.1"
+title: "미분계수"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-01]"]
+concept_nodes: ["12미적Ⅰ-02-01-1", "12미적Ⅰ-02-01-2", "12미적Ⅰ-02-01-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -1(개념). 오개념이 '평균변화율과 순간변화율 혼동'이라 예·비예 대비와
+  # 경계 탐침(CONCEPT 팩)이 맞다 — 정의식을 먼저 주지 않고 '평균'에서 '순간'으로 가는 이유를 묻는다.
+  - suffix: "OBJ-01"
+    statement: "평균변화율에서 구간의 폭을 한없이 줄인 극한으로 미분계수(순간변화율)의 뜻을 이해한다"
+    standard_code: "[12미적Ⅰ-02-01]"
+    source_verb: "이해한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-01-1"]
+  # OBJ-02 절차형 — 원자 -2(절차). 정의식으로 한 점의 미분계수를 계산하는 정해진 절차다.
+  - suffix: "OBJ-02"
+    statement: "미분계수의 정의를 써서 한 점에서의 미분계수를 구한다"
+    standard_code: "[12미적Ⅰ-02-01]"
+    source_verb: "구한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-01-2"]
+  # OBJ-03 표상형 — 원자 -3(표상). 식(평균변화율·미분계수)과 그래프(할선·접선)를 오가는 번역이다.
+  - suffix: "OBJ-03"
+    statement: "평균변화율과 미분계수를 각각 할선과 접선의 기울기로 그래프에서 해석한다"
+    standard_code: "[12미적Ⅰ-02-01]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-01-3"]

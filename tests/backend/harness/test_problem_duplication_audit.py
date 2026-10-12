@@ -862,12 +862,16 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual07() -> No
     demo_pool = pda.demo_pool_corpora()
     report = pda.build_report(loads, demo_pool=demo_pool, demo_pool_status="파일확인됨")
 
-    assert report.total_problems == 14034
-    assert len(report.corpora) == 37
+    # 14,034 → 14,178 · 37 → 38종: P3-03이 `problem_bank_p3_calculus1_diff_v0` 144건을 더했다
+    # (실중복 0쌍 유지 — 아래 T2 단언이 그 증거다).
+    # 14,178 → 14,538: P3-03이 02-05·06·08·09·10 생성기 5종(개념당 72건 = 360건)을 같은 은행에 더했다
+    # (코퍼스 수는 38종 그대로 — 은행 1개에 개념이 늘었다. 실중복 0쌍 유지는 아래 T2 단언이 증거).
+    assert report.total_problems == 14538
+    assert len(report.corpora) == 38
 
     # T1 — 해소됨.
     assert len(report.slug_collisions) == 0
-    assert report.corpus_pairs_scanned == 666  # C(37,2) — PB-13 회수로 7종→37종
+    assert report.corpus_pairs_scanned == 703  # C(38,2) — PB-13 회수로 7종→37종 · P3-03으로 38종
 
     # ── T2 감시 축 2종(QUAL-07이 acceptance ④로 **유지**를 지시한 단언) ─────────────
     # 이 둘은 현재 0쌍 상태에서 **공허 참**이다(빈 목록 위의 전칭·부분집합). 숨기지 않고

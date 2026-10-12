@@ -216,6 +216,11 @@ from whymath_backend.l3.providers.seat_failure import DEGRADE_REASONS
 from whymath_backend.l3.queue import CeleryJobQueue
 from whymath_backend.l3.trace import LangfuseSink
 from whymath_backend.l5.ocr.factory import build_ocr_components
+from whymath_backend.ops.alert_delivery import (
+    CONFIG_CONFIGURED,
+    DeliverySnapshot,
+    WebhookAlertSink,
+)
 from whymath_backend.ops.log_scrubber import install_log_scrubber
 from whymath_backend.ops.service_health import (
     ROUTE_UNMATCHED,
@@ -237,6 +242,7 @@ _SKIP_CACHE_KEY = "skip_cache_on_signal"
 # OPS-01 인프로세스 관측성 키 — 계측·알림·레디니스 probes(테스트가 state로 접근 가능).
 _METRICS_KEY = "service_metrics"
 _ALERT_NOTIFIER_KEY = "service_alert_notifier"
+_ALERT_SINK_KEY = "service_alert_sink"  # OPS-30 — 웹훅 발송 채널(상태를 /health/ready가 노출)
 _READY_PROBES_KEY = "readiness_probes"
 
 # 계측 제외 경로(OPS-01) — 업타임 프로브·운영 폴링 경로는 요청 계측에서 뺀다. 넣으면
@@ -529,6 +535,23 @@ class AlertBody(BaseModel):
     threshold: float = Field(..., description="Settings 임계(초과 시 breach)")
 
 
+class AlertDeliveryBody(BaseModel):
+    """알림 발송 채널 상태(OPS-30) — "알림이 사람에게 도달하는가"를 프로브가 읽는 면.
+
+    `config_state`가 `unset`이면 breach는 로그에만 남는다(`dropped_unconfigured`가 그 횟수) —
+    "알림이 없었다"와 "알릴 곳이 없어 못 알렸다"를 구분하는 유일한 면이다. URL은 노출하지 않는다.
+    """
+
+    config_state: str = Field(..., description="configured·unset(미설정)·invalid(형식 오류)")
+    attempted: int = Field(..., description="발송 시도 횟수(전이 1건 = 1회)")
+    delivered: int = Field(..., description="2xx로 도달 확인된 횟수")
+    failed: int = Field(..., description="발송 실패 횟수(타입명/HTTP 코드만 last_error에)")
+    dropped_unconfigured: int = Field(
+        ..., description="채널 미설정으로 아무에게도 못 알린 전이 횟수"
+    )
+    last_error: str | None = Field(..., description="마지막 실패 사유(예외 타입명 또는 HTTP코드)")
+
+
 class GrowthEvidenceReachBody(BaseModel):
     """/health/ready 성장 증거 도달 관측 섹션(PED-06) — `GET /v1/me/harness-metrics` 도달 카운터.
 
@@ -632,6 +655,9 @@ class ReadyBody(BaseModel):
         ...,
         description="현재 임계 위반 목록 — 외부 프로브가 SaaS 없이 읽는 인프로세스 축",
     )
+    alert_delivery: AlertDeliveryBody = Field(
+        ..., description="알림 발송 채널 상태(OPS-30) — 미설정이면 breach가 로그에만 남는다"
+    )
     ocr: OcrReachBody = Field(
         ...,
         description="OCR 도달 관측(NLP-01) — 활성 의도 + 요청/성공/사유별 503 카운트",
@@ -721,6 +747,18 @@ def _route_latency_body(row: RouteLatency) -> RouteLatencyBody:
         p50_latency_ms=row.p50_latency_ms,
         p75_latency_ms=row.p75_latency_ms,
         p95_latency_ms=row.p95_latency_ms,
+    )
+
+
+def _alert_delivery_body(snapshot: DeliverySnapshot) -> AlertDeliveryBody:
+    """DeliverySnapshot(도메인) → AlertDeliveryBody(HTTP 스키마) 변환."""
+    return AlertDeliveryBody(
+        config_state=snapshot.config_state,
+        attempted=snapshot.attempted,
+        delivered=snapshot.delivered,
+        failed=snapshot.failed,
+        dropped_unconfigured=snapshot.dropped_unconfigured,
+        last_error=snapshot.last_error,
     )
 
 
@@ -1048,7 +1086,19 @@ def create_app(
         if metrics is not None
         else ServiceMetrics(window_size=_settings.ops_metrics_window_size)
     )
-    alert_notifier = AlertLogNotifier()
+    # OPS-30: 알림의 마지막 1홉 — 전이 판정은 AlertLogNotifier 한 곳, 웹훅 sink는 그 결과를 받는다.
+    alert_sink = WebhookAlertSink(
+        _settings.ops_alert_webhook_url.get_secret_value(),
+        timeout_s=_settings.ops_alert_webhook_timeout_s,
+    )
+    if alert_sink.config_state != CONFIG_CONFIGURED:
+        # 무증상 no-op 금지 — 채널이 없다는 사실을 기동 시 한 번 드러낸다(URL은 로그에 안 싣는다).
+        logger.warning(
+            "알림 발송 채널 %s — breach는 로그에만 남고 사람에게 도달하지 않는다 "
+            "(WHYMATH_OPS_ALERT_WEBHOOK_URL 설정 필요)",
+            "미설정" if alert_sink.config_state == "unset" else "형식 오류(http/https 아님)",
+        )
+    alert_notifier = AlertLogNotifier(sinks=[alert_sink])
     resolved_probes = (
         readiness_probes
         if readiness_probes is not None
@@ -1056,6 +1106,7 @@ def create_app(
     )
     app.state.__setattr__(_METRICS_KEY, resolved_metrics)
     app.state.__setattr__(_ALERT_NOTIFIER_KEY, alert_notifier)
+    app.state.__setattr__(_ALERT_SINK_KEY, alert_sink)
     app.state.__setattr__(_READY_PROBES_KEY, resolved_probes)
     # OPS-17: 클라 버전 게이트 — 헤더 부재/파싱 실패("미상") 경량 카운터(신규 SaaS 의존
     # 없음 — Prometheus/StatsD 등은 과공학. 모듈 전역이 아니라 app.state에 둬 앱 인스턴스별
@@ -1240,6 +1291,7 @@ def create_app(
         probes: ReadinessProbes = getattr(request.app.state, _READY_PROBES_KEY)
         svc_metrics: ServiceMetrics = getattr(request.app.state, _METRICS_KEY)
         notifier: AlertLogNotifier = getattr(request.app.state, _ALERT_NOTIFIER_KEY)
+        delivery: WebhookAlertSink = getattr(request.app.state, _ALERT_SINK_KEY)
         growth_evidence_counters = get_growth_evidence_counters(request.app)
         growth_evidence_exposure_counters = get_growth_evidence_counters(
             request.app, key=GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY
@@ -1270,6 +1322,7 @@ def create_app(
                 AlertBody(metric=a.metric, observed=a.observed, threshold=a.threshold)
                 for a in alerts
             ],
+            alert_delivery=_alert_delivery_body(delivery.snapshot()),
             ocr=_ocr_reach_body(_get_ocr_reach_snapshot(request.app)),
             solution_segmentation=_segmentation_body(_get_segmentation_snapshot(request.app)),
             growth_evidence=_growth_evidence_body(growth_evidence_counters.snapshot()),
