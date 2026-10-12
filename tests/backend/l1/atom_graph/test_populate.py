@@ -53,6 +53,10 @@ class _FakeResult:
     def all(self) -> list[object]:
         return self._rows
 
+    def first(self) -> object | None:
+        # `INSERT … ON CONFLICT … RETURNING`(P3-25/26 가드): 행이 있으면 적재됨, 없으면 건너뜀.
+        return self._rows[0] if self._rows else None
+
 
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
@@ -74,6 +78,8 @@ class _FakeConnection:
         compiled = str(statement.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
         if "SELECT" in compiled and "concept.code" in compiled and "INSERT" not in compiled:
             return _FakeResult(self._engine.code_rows)
+        if "INSERT" in compiled:
+            return _FakeResult([_Row("written", uuid.uuid4())])  # RETURNING 1행 = 적재됨
         return _FakeResult([])
 
 

@@ -310,8 +310,12 @@ class BackendConceptStore:
             self._engine = _build_sync_engine(self._resolved_settings)
         return self._engine
 
-    def upsert(self, record: BackendConceptRecord) -> None:
+    def upsert(self, record: BackendConceptRecord, *, overwrite_cms_edits: bool = False) -> bool:
         """단일 개념을 backend `concept`에 upsert (멱등·`code` 충돌 갱신·UUID PK 보존).
+
+        **CMS 소유 보호(P3-26)**: `cms_edited_at`이 채워진 행(CMS가 만든 개념)은 갱신하지 않고
+        False를
+        돌려준다(`overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다).
 
         `INSERT ... ON CONFLICT(code) DO UPDATE` — 런타임 식별 필드(name_ko·source_id·aliases·
         level·intrinsic_difficulty·behavior_skills)를 갱신한다(behavior_skills=concept→skill 참조
@@ -322,6 +326,7 @@ class BackendConceptStore:
         """
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+        from whymath_backend.db.cms_edit_marker import upsert_guard, upsert_skipped
         from whymath_backend.db.models.concept import Concept
 
         stmt = pg_insert(Concept).values(
@@ -334,7 +339,8 @@ class BackendConceptStore:
             behavior_skills=record.behavior_skills,
         )
         # code 충돌 시 갱신 — concept_id(PK)·created_at은 SET하지 않는다(보존·redaction).
-        stmt = stmt.on_conflict_do_update(
+        where, release = upsert_guard(Concept, overwrite=overwrite_cms_edits)
+        upsert = stmt.on_conflict_do_update(
             index_elements=[Concept.code],
             set_={
                 "name_ko": stmt.excluded.name_ko,
@@ -343,10 +349,12 @@ class BackendConceptStore:
                 "level": stmt.excluded.level,
                 "intrinsic_difficulty": stmt.excluded.intrinsic_difficulty,
                 "behavior_skills": stmt.excluded.behavior_skills,
+                **release,
             },
-        )
+            where=where,
+        ).returning(Concept.concept_id)
         with self._get_engine().begin() as conn:
-            conn.execute(stmt)
+            return not upsert_skipped(conn.execute(upsert))
 
 
 def populate_backend_concepts(
@@ -354,18 +362,29 @@ def populate_backend_concepts(
     *,
     settings: Settings | None = None,
     store: BackendConceptStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """개념그래프 개념을 backend `concept` 런타임 엔티티로 멱등 upsert 적재. 반환=적재 행 수.
 
     슬117 `populate_concept_nodes`의 *런타임 엔티티* 짝이다 — 각 레코드를 UC(`code`) 키로 upsert한다
     (403 전량·review_status 포함). 멱등(재실행 시 갱신·UUID 보존). store 미주입 시 슬3 sync 엔진
     재사용 `BackendConceptStore`를 만든다.
+
+    **CMS 소유 보호(P3-26)**: CMS가 만든 개념과 코드가 같은 레코드는 건너뛰고 `conflicts`에
+    `concept:<code>`로 보고한다 — 반환 행 수에는 포함하지 않는다.
     """
+    from whymath_backend.db.cms_edit_marker import format_conflict
+
     resolved = settings if settings is not None else get_settings()
     concept_store = store if store is not None else BackendConceptStore(settings=resolved)
+    written = 0
     for record in records:
-        concept_store.upsert(record)
-    return len(records)
+        if concept_store.upsert(record, overwrite_cms_edits=overwrite_cms_edits):
+            written += 1
+        elif conflicts is not None:
+            conflicts.append(format_conflict("concept", record.code))
+    return written
 
 
 __all__ = [

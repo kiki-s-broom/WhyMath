@@ -463,6 +463,16 @@ CATALOG: tuple[Spec, ...] = (
        "PATCH /concept_content/items/{pk}", "POST /concept_content/items/{pk}/review",
        "GET /hint", "GET /hint/items/{pk}", "PATCH /hint/items/{pk}",
        "GET /skill_node", "GET /skill_node/items/{pk}"),
+    _s("WM-S-057", "관리자 CMS — 신규 개념 제안·선수 관계 쓰기·개념 삭제(개념 그래프 쓰기)", "Admin",
+       "Operations", "P1",
+       "P3-26 — 신규 개념은 살아있는 개념 행을 만들지 않고 제안(DRAFT)→검토→승인→발행을 거치며 "
+       "개념 행은 발행하는 순간 게이트가 만든다. 선수 관계는 서버가 비순환(DAG)을 검사한 뒤에만 쓰고 "
+       "(어드바이저리 잠금으로 동시 요청도 직렬화), graph.json이 소유한 관계·개념은 CMS가 지우지 "
+       "못한다. 발행본이 있는 개념은 삭제 거부. 관계·삭제는 발행 권한, 제안은 편집 권한",
+       "admin_cms_graph",
+       "GET /concept-proposals", "POST /concept-proposals",
+       "POST /concept-proposals/{code}/drafts", "DELETE /concepts/{concept_id}",
+       "POST /edges", "DELETE /edges/{edge_id}"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -786,6 +796,13 @@ CATALOG: tuple[Spec, ...] = (
        "cms_edited_at 표지를 채우고 CLI 적재는 표지 행을 건너뛰어 충돌로 보고한다"
        "(db.cms_edit_marker — 5개 적재기가 공유하는 단일 규약)",
        "api.admin_cms_resources", "db.cms_edit_marker"),
+    _e("WM-E-318", "개념 그래프 쓰기 규칙(선수 엣지 비순환 검사·소유 판정·삭제 가능 판정)"
+       "·적재의 DB 인지 순환 방어", "Admin", "Knowledge Graph", "P1",
+       "P3-26 — 관리 API와 기존 개념 삭제 라우트가 같은 규칙을 쓰고(`api._concept_graph_rules`), "
+       "적재 CLI는 같은 어드바이저리 잠금 안에서 DB의 CMS 관계와 합쳐 순환을 검사한다"
+       "(`l1.concept_graph.prerequisite_guard`) — 파일만 보면 각각은 비순환이어도 합치면 순환일 수 "
+       "있다",
+       "api._concept_graph_rules", "l1.concept_graph.prerequisite_guard"),
     # ════════════════════ E — L3 (Math Adapter) ════════════════════
     _e("WM-E-351", "동등문제 생성 파이프라인(생성·수용 게이트·정규화·rephrase·감사)", "Admin",
        "Math Engine", "P0", "C1·C3·C4 — 앵커 CU 생산 사슬", "l3.equivalent.generator",

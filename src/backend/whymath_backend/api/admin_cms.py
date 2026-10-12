@@ -45,6 +45,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._concept_graph_rules import concept_delete_block
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.api.admin_cms_resources import (
     RESOURCES,
@@ -71,6 +72,7 @@ from whymath_backend.db.session import get_session
 from whymath_backend.l3 import publish_gate as gate
 from whymath_backend.privacy.audit import record_content_mutation_audit
 from whymath_backend.schema.cms_access import (
+    GRAPH_WRITE_CAPABILITY,
     ROLLBACK_CAPABILITY,
     CmsCapability,
     capabilities_of,
@@ -259,14 +261,17 @@ class CmsConceptListResponse(BaseModel):
 
 
 class CmsEdgeRow(BaseModel):
-    """관계 1건 — **읽기 전용**. 원천 정본이 `graph.json`이라 CMS는 DB 엣지를 고치지 않는다."""
+    """관계 1건. 정본이 행마다 다르다(P3-26): `cms_owned=False`면 graph.json이 정본이라
+    CMS가 지울 수 없고, `True`면 CMS가 만든 관계라 DB가 정본이다(쓰기: `api/admin_cms_graph.py`)."""
 
     model_config = ConfigDict(frozen=True)
 
+    edge_id: uuid.UUID
     other_concept_id: uuid.UUID
     other_code: str
     other_name_ko: str
     edge_type: str
+    cms_owned: bool
 
 
 class CmsConceptDetail(BaseModel):
@@ -283,6 +288,17 @@ class CmsConceptDetail(BaseModel):
     incoming: tuple[CmsEdgeRow, ...] = Field(..., description="이 개념을 선행으로 삼는 관계.")
     outgoing: tuple[CmsEdgeRow, ...] = Field(..., description="이 개념이 선행으로 삼는 관계.")
     can_edit: bool
+    # ── P3-26: 개념 그래프 쓰기 ──
+    cms_owned: bool = Field(
+        ..., description="CMS가 만든 개념이면 True(DB가 정본). False면 파일이 정본."
+    )
+    can_write_graph: bool = Field(
+        ..., description="관계 추가·삭제와 개념 삭제를 할 권한(배포 권한)."
+    )
+    delete_blocked_reason: str | None = Field(
+        None, description="이 개념을 지울 수 없는 사유(지울 수 있으면 None) — 서버 판정 그대로."
+    )
+    delete_blocked_code: str | None = Field(None, description="위 사유의 안정 식별자.")
 
 
 class CmsDraftRequest(BaseModel):
@@ -421,10 +437,12 @@ def _summary(version: SchemaConceptVersion, role: Role) -> CmsVersionSummary:
 def _edge_rows(pairs: list[tuple[ConceptEdge, Concept]]) -> tuple[CmsEdgeRow, ...]:
     return tuple(
         CmsEdgeRow(
+            edge_id=edge.edge_id,
             other_concept_id=other.concept_id,
             other_code=other.code,
             other_name_ko=other.name_ko,
             edge_type=str(to_jsonable(edge.edge_type)),
+            cms_owned=edge.cms_edited_at is not None,
         )
         for edge, other in pairs
     )
@@ -527,6 +545,7 @@ async def get_concept_detail(
             .limit(200)
         )
     ).all()
+    block = await concept_delete_block(session, concept)
     return CmsConceptDetail(
         concept_id=concept.concept_id,
         code=concept.code,
@@ -536,6 +555,10 @@ async def get_concept_detail(
         incoming=_edge_rows([(e, c) for e, c in incoming]),
         outgoing=_edge_rows([(e, c) for e, c in outgoing]),
         can_edit=has_capability(role, CmsCapability.EDIT),
+        cms_owned=concept.cms_edited_at is not None,
+        can_write_graph=has_capability(role, GRAPH_WRITE_CAPABILITY),
+        delete_blocked_reason=block.message if block is not None else None,
+        delete_blocked_code=block.code if block is not None else None,
     )
 
 

@@ -384,7 +384,9 @@ class TestSeatExistsInAllThreePlaces:
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
         # [2026-10-09 P3-25] head가 e7b2c4d8a1f6(CMS 편집 표지 cms_edited_at 5컬럼)로 전진 —
         # 위와 같은 이유로 리터럴만 현행화한다.
-        assert EXPECTED_ALEMBIC_HEAD == "e7b2c4d8a1f6"
+        # [2026-10-12 P3-26] head가 a8c4e1f7b3d9(concept·concept_edge CMS 소유 표지 + concept_version
+        # FK 해제 + 무결성 트리거 2종)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        assert EXPECTED_ALEMBIC_HEAD == "a8c4e1f7b3d9"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:

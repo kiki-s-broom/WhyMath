@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import add_overwrite_argument, conflict_summary
 from whymath_backend.l1.atom_graph.atom_backend_concept import (
     AtomBackendConceptStore,
     load_atom_concepts_from_graph_json,
@@ -50,6 +51,7 @@ from whymath_backend.l1.atom_graph.atom_node_projection import (
     load_atom_nodes_from_graph_json,
     populate_atom_nodes,
 )
+from whymath_backend.l1.concept_graph.prerequisite_guard import PrerequisiteCycleError
 from whymath_backend.l1.concept_visual_style import (
     ConceptVisualStyleStore,
     load_concept_visual_style_from_json,
@@ -66,18 +68,18 @@ DEFAULT_VISUAL_STYLE_CORPUS = Path("data/corpus/concept_visual_style_v1/concept_
 DEFAULT_VISUALIZATION_CORPUS = Path("data/corpus/concept_visualization_v1/visualizability.json")
 
 
-class AtomBackboneCycleError(ValueError):
+class AtomBackboneCycleError(PrerequisiteCycleError):
     """선수엣지에 순환(cycle)이 있어 적재를 거부할 때 — 학습 경로 구성 불가.
+
+    `PrerequisiteCycleError`의 하위 타입이다(P3-26): 파일만 본 검사(이 모듈)와 DB의 CMS 관계까지
+    합쳐 본
+    검사(`prerequisite_guard`, 엣지 적재기 안)가 같은 상위 타입으로 잡힌다.
 
     DAG 불변식(`math_dsl_risk_register.md` Q10-②)을 *적재 시점*에 강제하는 방어선이다.
     데이터 파이프라인 `validate.py`가 이미 transform 단계에서 cycle을 hard-error로 막지만,
     backend는 graph.json을 신뢰하고 직접 적재하므로(부분 재적재·손수 편집된 코퍼스 대비)
     여기서도 한 번 더 막는다. `cycle`은 순환 경로(닫힘 노드 반복 포함)다.
     """
-
-    def __init__(self, cycle: list[str]) -> None:
-        self.cycle = cycle
-        super().__init__("순환 선수관계로 적재 거부 — 학습 경로 구성 불가: " + " → ".join(cycle))
 
 
 def _find_prerequisite_cycle_in_records(
@@ -153,6 +155,8 @@ def populate_atom_backbone(
     visualization_store: ConceptVisualizationStore | None = None,
     populate_node_meta: bool = False,
     atom_node_store: AtomNodeStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> AtomBackbonePopulateReport:
     """원자 코퍼스 graph.json을 backend `concept`/`concept_edge`에 멱등 적재(노드→parent→엣지).
 
@@ -173,7 +177,11 @@ def populate_atom_backbone(
 
     concept_records = load_atom_concepts_from_graph_json(graph_path)
     concepts_loaded, parent_skipped = populate_atom_concepts(
-        concept_records, settings=resolved, store=c_store
+        concept_records,
+        settings=resolved,
+        store=c_store,
+        overwrite_cms_edits=overwrite_cms_edits,
+        conflicts=conflicts,
     )
 
     edge_records, _load_skipped = load_atom_edges_from_graph_json(graph_path)
@@ -185,7 +193,13 @@ def populate_atom_backbone(
     if cycle is not None:
         raise AtomBackboneCycleError(cycle)
 
-    edges_loaded = populate_atom_edges(edge_records, settings=resolved, store=e_store)
+    edges_loaded = populate_atom_edges(
+        edge_records,
+        settings=resolved,
+        store=e_store,
+        overwrite_cms_edits=overwrite_cms_edits,
+        conflicts=conflicts,
+    )
 
     # ── VIZ-01 D1 — 시각화 Overlay 2종 적재(opt-in·concept/edge 적재 성공 후) ──────────────
     visual_styles_loaded = 0
@@ -283,7 +297,9 @@ def _main() -> None:
             "부르지 않아 prod에 한 번도 적재된 적이 없었다."
         ),
     )
+    add_overwrite_argument(parser)
     args = parser.parse_args()
+    conflicts: list[str] = []
     visual_style_path = Path(args.visual_style_corpus) if args.visual_style_corpus else None
     visualization_path = Path(args.visualization_corpus) if args.visualization_corpus else None
     report = populate_atom_backbone(
@@ -291,6 +307,8 @@ def _main() -> None:
         visual_style_path=visual_style_path,
         visualization_path=visualization_path,
         populate_node_meta=not args.skip_atom_node,
+        overwrite_cms_edits=args.overwrite_cms_edits,
+        conflicts=conflicts,
     )
     print(
         f"[원자 백본 적재] concepts={report.concepts_loaded} "
@@ -303,6 +321,8 @@ def _main() -> None:
         f"atom_nodes={report.atom_nodes_loaded}"
         f"({'스킵' if args.skip_atom_node else args.graph})"
     )
+    if conflicts:
+        print(conflict_summary(conflicts))
 
 
 if __name__ == "__main__":  # pragma: no cover

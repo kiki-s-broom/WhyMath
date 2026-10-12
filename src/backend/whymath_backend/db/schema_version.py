@@ -179,6 +179,11 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     "e7b2c4d8a1f6",  # P3-25: CMS 편집 표지 cms_edited_at(problem·misconception_catalog·
     # strategy_node·concept_content·hints, nullable·백필 금지) — CLI 적재가 CMS 편집을 덮어쓰지
     # 않게 하는 좌석. 규약 정본: docs/standards/cms_edit_vs_loader_contract.md.
+    "a8c4e1f7b3d9",  # P3-26: concept·concept_edge.cms_edited_at(CMS 소유 표지, nullable·백필 금지)
+    # + concept_version→concept.code FK 해제(신규 개념 제안을 담는다) + 무결성 트리거
+    # 2종(PUBLISHED는
+    # 개념 행 필요·발행본 있는 개념 삭제 거부). 규약 정본:
+    # docs/standards/cms_concept_graph_write_contract.md.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]
