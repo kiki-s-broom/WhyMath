@@ -23,11 +23,18 @@ from typing import Any, TypeVar
 from whymath_backend.config import get_settings
 from whymath_backend.l3.isolated_call import BudgetExceededError, IsolatedCallPool
 
-__all__ = ["isolated", "isolation_stats", "reset_pool_for_tests"]
+__all__ = ["CHAIN_BUDGET_FACTOR", "isolated", "isolation_stats", "reset_pool_for_tests"]
 
 logger = logging.getLogger("whymath.api.isolated_call")
 
 T = TypeVar("T")
+
+CHAIN_BUDGET_FACTOR = 4
+"""풀이 단계 연쇄 한 건의 총 시간 예산 = `sympy_isolation_timeout_s` × 이 값(OPS-96·OPS-125).
+
+`/v1/verify-solution`(전이를 하나씩 끊어 예산을 나눠 쓴다)과 코치 턴의 연쇄 검증(체인 전체를 한
+호출로 돌리고 이 값만큼의 상한을 준다)이 같은 값을 쓴다 — 두 표면이 같은 풀이에 다른 인내심을
+갖지 않게 하는 단일 출처다."""
 
 _pool: IsolatedCallPool | None = None
 _pool_lock = threading.Lock()
@@ -61,15 +68,19 @@ async def isolated(
 
     상한 초과·대기열 포화·워커 사망은 `on_budget_exceeded()`의 반환값(= 호출부의 *판정 불가*
     값)으로 접는다. `fn`이 던진 예외(`ValueError` 등)는 그대로 전파된다 — 호출부의 입력 오류
-    계약(422 변환)이 격리 여부와 무관하게 같다. `timeout_s`는 이 호출의 *계산* 상한을 설정값보다
-    *낮출* 때만 쓴다(체인의 남은 예산 등 — `fn`에는 전달되지 않는다). `budget_s`는 이 호출 *전체*
-    (대기열·워커 기동·복원·계산)의 벽시계 예산이다 — 체인이 자기 마감을 지키려고 남은 예산을 넘긴다
-    (OPS-128: 안 넘기면 기동·복원 대기가 마감 밖이라 요청이 예산을 재기동 1회만큼 넘는다).
+    계약(422 변환)이 격리 여부와 무관하게 같다. `timeout_s`는 이 호출의 *계산* 상한을 설정값과
+    *다르게* 줄 때 쓴다 — 체인의 남은 예산처럼 낮추거나(OPS-96), 체인 전체를 한 호출로 돌릴 때
+    총 예산(`CHAIN_BUDGET_FACTOR`배)으로 높인다(OPS-125). `fn`에는 전달되지 않는다. `budget_s`는
+    이 호출 *전체*(대기열·워커 기동·복원·계산)의 벽시계 예산이다 — 체인이 자기 마감을 지키려고
+    남은 예산을 넘긴다(OPS-128: 안 넘기면 기동·복원 대기가 마감 밖이라 요청이 예산을 재기동 1회만큼
+    넘는다).
     """
     if not get_settings().sympy_isolation_enabled:
         return fn(*args, **kwargs)
+    # `budget_s`는 체인 호출만 쓴다 — 없으면 풀 호출 모양을 종전 그대로 둔다(단건·코치 경로 불변).
+    pool_extra: dict[str, float] = {} if budget_s is None else {"budget_s": budget_s}
     try:
-        return await _get_pool().run(fn, *args, timeout_s=timeout_s, budget_s=budget_s, **kwargs)
+        return await _get_pool().run(fn, *args, timeout_s=timeout_s, **pool_extra, **kwargs)
     except BudgetExceededError as exc:
         # 침묵 실패 금지 — 사유 코드(타입명 포함)를 남긴다. 호출 인자(학생 입력)는 싣지 않는다.
         logger.warning(

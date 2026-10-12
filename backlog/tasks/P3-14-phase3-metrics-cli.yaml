@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: docs
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -15,8 +15,16 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 지표 7종을 **한 명령**으로 산출한다 — Curriculum Coverage · Concept Completeness · Problem Coverage · Solution QA Pass · Learning Loop Success · Critical Defect · Graph Connectivity Coverage.\n② 각 지표가 **위반 주입에 반응**하는지 확인한다. 전 항목 초록은 증거가 아니다.\n③ 기존 KPI 정본 12종과 **2평면으로 분리**한다 — 저 12종은 생산 공정(CU당 시간·비용·오류율), 이 7종은 제품 완성도다. 정본이 셋이 되지 않게 이름·문서에 평면을 명시한다(Kiki 수용 2026-09-22).\n④ 중복 2종은 신설하지 않는다 — Solution QA Pass 는 저장소 '수학적 오류율 ≤0.5%'(=99.5%)가 더 엄격하고, Critical Defect 0 은 Hard Gate F-Ⅰ~F-Ⅴ 와 같은 뜻이다. 둘은 기존을 흡수해 표기한다.\n⑤ Concept Completeness 는 원 문서 정의 그대로 쓰지 않는다 — 필드 채움 검사는 반증력 0 으로 이미 기각된 방식이다. 재설계 근거를 적는다.\n⑥ 목표 수치(95%·98%·99%)는 원 문서의 '목표 예시'다 — P3-02·P3-10 실측 기준선을 본 뒤 Kiki 가 확정한다(지시문 주의 5).\n⑦ 완료 판정 — 7종이 한 명령으로 산출되고 각각 위반 주입에 반응."
-artifacts: []
-paths: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1581"
+paths:
+  - src/backend/whymath_backend/ops/phase3_metrics.py
+  - tests/backend/ops/test_phase3_metrics.py
+  - tests/infra/test_phase3_metrics_wiring.py
+  - docs/standards/phase3_metrics_contract.md
+  - docs/reviews/p3_14_phase3_metrics_2026-10-09.md
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
 session: null
-notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [14]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] KPI 12종 스코어카드 CLI 가 이미 있고(ops/validation_scorecard.py · Hard Gate F-Ⅰ~Ⅴ + KPI 12종), 그 산출 패턴을 재사용한다. 측정 평면이 다르므로 대체가 아니라 병존이며, ③④⑤ 가 그 경계를 먼저 판정하게 한다. P3-02 가 4종(①②③⑦)을 먼저 만들므로 이 회차는 그 위에 ④⑤⑥ 를 얹어 7종을 한 명령으로 묶는 것이다."
-updated: 2026-09-22
+notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [14]. 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md (sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차 등재. 등재는 착수가 아니다.\n\n[중복 실측] KPI 12종 스코어카드 CLI 가 이미 있고(ops/validation_scorecard.py · Hard Gate F-Ⅰ~Ⅴ + KPI 12종), 그 산출 패턴을 재사용한다. 측정 평면이 다르므로 대체가 아니라 병존이며, ③④⑤ 가 그 경계를 먼저 판정하게 한다. P3-02 가 4종(①②③⑦)을 먼저 만들므로 이 회차는 그 위에 ④⑤⑥ 를 얹어 7종을 한 명령으로 묶는 것이다.\n\n[정정 2026-10-09] paths [] → ['src/backend/whymath_backend/ops/phase3_metrics.py', 'tests/backend/ops/test_phase3_metrics.py', 'tests/infra/test_phase3_metrics_wiring.py', 'docs/standards/phase3_metrics_contract.md', 'docs/reviews/p3_14_phase3_metrics_2026-10-09.md', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py']: 착수 시 paths 미선언 경고 해소(겹침 검사 포함) + 산출물 위치 기록\n\n[미러 면제 2026-10-09] ci_mirror 는 커밋 2655a3ae 에서 4잡(infra-contracts·harness-integrity·declared-unwired-audit·concept-reach-guard) 통과 33스텝·실패 0·건너뜀 0 으로 측정했고, 이후 HEAD 는 대장 파일 4개 변경과 main 5커밋 병합만 더해졌다. 병합 트리에서 ruff·black·mypy strict·lint-imports·declared_unwired_audit·self-check·관련 pytest 149·tests/infra 135 를 직접 재실행해 전부 통과했다. 전체 백엔드 pytest 는 병합 전 2655a3ae 에서 18585 passed 로 측정했고 병합 후 전수는 CI 가 판정한다"
+updated: 2026-10-09

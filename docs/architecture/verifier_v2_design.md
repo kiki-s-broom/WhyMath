@@ -173,7 +173,7 @@ class VerificationTier(str, Enum):
     # NOTE: v1 이름이지만 의미는 "유한 전수 열거"에 한정. SymPy 증명/데이터 전수를
     # 포함하는 상위 alias로 확대하지 않는다(Codex P2 피드백).
     MACHINE_EXHAUSTIVE = "machine_exhaustive"   # FINITE_EXHAUSTIVE의 legacy alias
-    MACHINE_SAMPLED = "machine_sampled"           # numeric_sampling + statistical_estimate legacy alias
+    MACHINE_SAMPLED = "machine_sampled"           # NUMERIC_SAMPLING의 legacy alias(단일 매핑 — STATISTICAL_ESTIMATE는 alias 대상이 아님)
 
     # 신규 — 기계 증명/결정론
     FINITE_EXHAUSTIVE = "finite_exhaustive"     # 유한 집합 전수 열거(확률·기하 이산·통계 자료)
@@ -191,9 +191,9 @@ class VerificationTier(str, Enum):
 
 ### 4.2 alias 처리
 
-- `read_verification_tier()`는 `MACHINE_EXHAUSTIVE`를 들어오면 `FINITE_EXHAUSTIVE`로 해석. SymPy 증명/데이터 전수는 별도 등급을 부여받으므로 레거시 값에서 추론하지 않는다.
-- `stamp_verification_tier()`는 신규값만 기록. 기존 코퍼스는 마이그레이션 없이 alias로 그대로 읽힌다.
-- 어떤 값도 "학생 노출 자격"을 단독으로 주지 않는다 — `is_exposable`이 최종 판단.
+- `read_verification_tier()`는 레거시 값을 신규 등급으로 해석한다. 입력이 문자열이든 `VerificationTier` 멤버든 같은 규칙이다(S4-72 이전에는 멤버 입력만 alias를 건너뛰었다): `MACHINE_EXHAUSTIVE` → `FINITE_EXHAUSTIVE`, `MACHINE_SAMPLED` → `NUMERIC_SAMPLING`. 레거시 문자열 1개는 멤버 1개로만 해석되므로 `STATISTICAL_ESTIMATE`는 alias 대상이 아니라 신규 생산자가 직접 각인하는 등급이다. SymPy 증명/데이터 전수는 별도 등급을 부여받으므로 레거시 값에서 추론하지 않는다.
+- `stamp_verification_tier()`는 신규 생산자가 신규값을 찍는다는 전제로 설계됐다(의도). 코드는 이를 강제하지 않고 받은 멤버를 그대로 기록한다 — 레거시 멤버도 거부하지 않는다. 현재 생산자 33개 파일이 레거시 멤버를 직접 찍고 있으며, 신규값으로의 전환은 첫 신규 값 생산자(S4-54·S4-56)의 몫이다. 기존 코퍼스는 마이그레이션 없이 alias로 그대로 읽힌다.
+- 어떤 값도 "학생 노출 자격"을 단독으로 주지 않는다. 노출 판정은 두 독립 축이며 합치지 않는다 — `is_exposable`(`l6/_shared.py`, 저작권 출처 `METADATA_ONLY_SOURCES`만 본다)과 `is_review_cleared`(`l6/_shared.py`, `review_status` 검수 축). 호출부가 각각 독립된 `if`로 확인한다.
 
 ### 4.3 잔여 축 표현
 
