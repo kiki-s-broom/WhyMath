@@ -841,11 +841,11 @@ gates:
     title: "게이트② 라이브 표본 실측 실행 — docs/ops/ops106_gate2_live_sample_runbook.md 를 Phaiakes9 에서 실행해 서빙 계상(COUNTED)·이중 회계(MATCH)·저작 분리(SEPARATED_MATCH) 판정 줄 전체를 세션에 전달 (OPS-106 ①②③)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-05
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main d873d064 (Kiki 클론 HEAD=d873d064 일치, PRE_OK=True) · 2026-10-12 Phaiakes9 실측 · 상세 MEMORY.md 2026-10-12 항목. ② DUAL_ACCOUNTING MATCH (인프로세스 16 = Langfuse probe 16, 오류 2건은 ReadTimeout). ③ AUTHORING_SEPARATION SEPARATED_MATCH (authoring +5, 표본 +0, unlabeled +0). ① SERVING_SAMPLE COUNTED (재시도: serving +43, unlabeled +0, SURFACE_LABELED_RATE 1.0, PRIMARY_RECORDS_P=1). 단서: ① 1차 시도는 NO_PRIMARY_TURN_IN_SERVER_LOG (primary 하네스 TimeoutError 폴백으로 기록 0줄, serving +45), 재시도에서도 15요청 중 14턴이 시간 초과로 primary 성공은 1건뿐 — 이 실측이 증명한 것은 계측 사슬(표지-전송-집계)의 작동까지이며 학생 대면 primary 성공률은 OPS-134가 소유한다. 게이트② 합격(로컬 80% 이상)은 미판정: cost_probe 로컬 100%는 budget0 강등 16건의 결과다. 부수 결함 OPS-133(낡은 데모 DB 진단 부재)."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
@@ -989,6 +989,18 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
+  - id: G-p303-human-sample-review
+    title: "P3-03 미분 문항 은행 사람 표본 검수 240건 — 검수 페이지 https://claude.ai/artifact/GHRd2VNjVpTjqDa5j5iGD3 에서 사전 등록 순서대로 240건 전부 통과/결함 판정(결함은 종류+근거 메모). 승인 기준 n=240·Wilson 95% 단측 결함률 상한 ≤ 0.02 → 결함 1건 이하. 표본 등록 docs/data/p3_calculus1_diff_audit/human_review/sample_240.json(은행 sha256 cc7e953974185ac4…, 시드 20261007). 표본 크기는 시작 전에 고정 — 중간에 멈추거나 늘리지 않는다. 검수가 끝나면 세션이 판정을 감사 라벨 파일로 옮겨 KNOWN_CORPORA·AUDIT_LABEL_MAP 편입과 approved 각인을 진행한다. 결함 2건 이상이면 승인되지 않으며 교정 후 처리는 그때 다시 정한다. 근거 docs/data/p3_calculus1_diff_audit/README.md(LLM 감사 4회 불합격 → Kiki 결정 2026-10-07 사람 검수 전환)"
+    kind: human
+    assignee: kiki
+    status: waived
+    requested: 2026-10-07
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: "철회 — 검증 권위 서열 위반(Kiki 지적 2026-10-08). 사람 표본 240건 판정을 은행 504건 승인의 유일 근거로 삼는 설계는 초인간 검증 기준 v1(docs/standards/superhuman_verification_standard.md §0)의 '인간 검수는 오류율 미측정 검출기 하나 — 최종 권위 아님 · 인간 폴백은 측정 미달·undecidable 구간만'에 어긋난다. 대체 경로 = 결함 주입 강등전(§3)으로 감사자·기계 게이트의 검출률·오경보율을 먼저 측정하고, 측정을 통과한 감사자 판정만 S5 근거로 쓰며, 사람은 판정 불가 잔여만 본다(P3-03 안에서 수행). 검수는 시작 전에 철회되어 사람 판정 0건."
+    corrections: []
+    no_inputs_reason: "표본·검수 페이지가 이미 준비돼 있다(표본 등록 커밋 이후 즉시 수행 가능) — 여는 작업 없음"
   - id: G-p314-phase3-metric-targets
     title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
     kind: decision
@@ -1004,18 +1016,6 @@ gates:
     depends_on:
       - P3-14-phase3-metrics-cli
       - P3-10-ai-quality-eval-suite
-  - id: G-p303-human-sample-review
-    title: "P3-03 미분 문항 은행 사람 표본 검수 240건 — 검수 페이지 https://claude.ai/artifact/GHRd2VNjVpTjqDa5j5iGD3 에서 사전 등록 순서대로 240건 전부 통과/결함 판정(결함은 종류+근거 메모). 승인 기준 n=240·Wilson 95% 단측 결함률 상한 ≤ 0.02 → 결함 1건 이하. 표본 등록 docs/data/p3_calculus1_diff_audit/human_review/sample_240.json(은행 sha256 cc7e953974185ac4…, 시드 20261007). 표본 크기는 시작 전에 고정 — 중간에 멈추거나 늘리지 않는다. 검수가 끝나면 세션이 판정을 감사 라벨 파일로 옮겨 KNOWN_CORPORA·AUDIT_LABEL_MAP 편입과 approved 각인을 진행한다. 결함 2건 이상이면 승인되지 않으며 교정 후 처리는 그때 다시 정한다. 근거 docs/data/p3_calculus1_diff_audit/README.md(LLM 감사 4회 불합격 → Kiki 결정 2026-10-07 사람 검수 전환)"
-    kind: human
-    assignee: kiki
-    status: waived
-    requested: 2026-10-07
-    remind_after_days: 7
-    evidence: null
-    cleared_by: null
-    notes: "철회 — 검증 권위 서열 위반(Kiki 지적 2026-10-08). 사람 표본 240건 판정을 은행 504건 승인의 유일 근거로 삼는 설계는 초인간 검증 기준 v1(docs/standards/superhuman_verification_standard.md §0)의 '인간 검수는 오류율 미측정 검출기 하나 — 최종 권위 아님 · 인간 폴백은 측정 미달·undecidable 구간만'에 어긋난다. 대체 경로 = 결함 주입 강등전(§3)으로 감사자·기계 게이트의 검출률·오경보율을 먼저 측정하고, 측정을 통과한 감사자 판정만 S5 근거로 쓰며, 사람은 판정 불가 잔여만 본다(P3-03 안에서 수행). 검수는 시작 전에 철회되어 사람 판정 0건."
-    corrections: []
-    no_inputs_reason: "표본·검수 페이지가 이미 준비돼 있다(표본 등록 커밋 이후 즉시 수행 가능) — 여는 작업 없음"
   - id: G-p318-calc-02-08-disposition
     title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
     kind: decision
