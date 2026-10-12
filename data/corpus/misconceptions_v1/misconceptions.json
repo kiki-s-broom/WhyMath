@@ -6166,9 +6166,9 @@
     {
       "mis_id": "M0599",
       "canonical_statement": "합의 법칙(또는)과 곱의 법칙(그리고)을 혼동한다. 동시에 일어나는지 여부를 안 따진다.",
-      "student_wrong_thinking": null,
-      "distractor_rule": null,
-      "error_type": null,
+      "student_wrong_thinking": "'또는'(둘 중 하나만 일어남)이면 경우의 수를 더하고 '그리고'(이어서 모두 일어남)이면 곱해야 하는데, 두 일이 동시에 일어나는지를 따지지 않고 덧셈과 곱셈을 바꿔 쓴다.",
+      "distractor_rule": "합의 법칙을 쓸 문항에는 두 경우의 수의 곱을, 곱의 법칙을 쓸 문항에는 두 경우의 수의 합을 오답 보기로 배치",
+      "error_type": "공식혼동",
       "difficulty": "중",
       "correction_point": "경우의 수 세기.",
       "ccss_code": "7.SP.C.8",
@@ -6179,8 +6179,8 @@
       "subunit": "경우의 수",
       "mapping_confidence": "기준(원본)",
       "mapping_score": 1.0,
-      "provenance_note": "distractor 연결됨",
-      "severity": null,
+      "provenance_note": "AI생성-검수필요(MISC-61)",
+      "severity": "local",
       "behavior_skills": [
         "skill.case-analysis"
       ]
@@ -6210,9 +6210,9 @@
     {
       "mis_id": "M0600",
       "canonical_statement": "경우의 수가 많으면 확률도 크다고 단정한다(전체로 나눠야 함). 확률이 1을 넘을 수 있다고 본다.",
-      "student_wrong_thinking": null,
-      "distractor_rule": null,
-      "error_type": null,
+      "student_wrong_thinking": "확률을 (해당 경우의 수) 그 자체로 생각해 전체 경우의 수로 나누는 단계를 빼먹고, 그래서 경우의 수가 많을수록 확률도 크고 1보다 큰 값도 가능하다고 본다.",
+      "distractor_rule": "전체 경우의 수로 나누지 않은 값(해당 경우의 수 그대로)이나 1보다 큰 값을 오답 보기로 배치",
+      "error_type": "공식혼동",
       "difficulty": "중",
       "correction_point": "확률의 개념·성질.",
       "ccss_code": "7.SP.C.5",
@@ -6223,8 +6223,8 @@
       "subunit": "확률",
       "mapping_confidence": "기준(원본)",
       "mapping_score": 1.0,
-      "provenance_note": "distractor 연결됨",
-      "severity": null,
+      "provenance_note": "AI생성-검수필요(MISC-61)",
+      "severity": "local",
       "behavior_skills": [
         "skill.case-analysis"
       ]

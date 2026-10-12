@@ -8,8 +8,12 @@
 from __future__ import annotations
 
 import json
+import logging
+from collections import Counter
 from pathlib import Path
 from typing import Any, TypedDict
+
+logger = logging.getLogger("data_pipeline.misconception.extract")
 
 
 class MisconceptionRecord(TypedDict):
@@ -57,6 +61,26 @@ _STR_FIELDS: dict[str, str] = {
 }
 
 
+# 원천 839행 전부에 값이 있는 공통 메타 열(MISC-61 ① 실측 2026-10-09) — 오개념의 내용을 나르는 키가
+# 아니므로 *의도적으로* 매핑하지 않는다. 이 목록에 없는 미매핑 키에 값이 있으면 경고한다(아래).
+_UNMAPPED_META_KEYS: frozenset[str] = frozenset(
+    {"출처", "원본_영역", "성취기준요약", "매핑개념명_참조", "코드정밀도"}
+)
+# 위 둘 외에 추출기가 읽는 키 — 경고 대상 판정에서 "이미 읽는 키"로 센다.
+_READ_KEYS: frozenset[str] = frozenset(_STR_FIELDS) | {"mis_id", "매핑점수"}
+
+
+def _has_value(value: object) -> bool:
+    """값이 있는가 — None·빈 문자열·공백·빈 리스트/매핑은 '없음'(0·False는 값)."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) > 0
+    return True
+
+
 def _clean_str(value: object) -> str | None:
     """문자열 정제 — 정제 후 빈 값이면 None(미존재로 취급)."""
     if value is None:
@@ -92,10 +116,17 @@ def extract_misconceptions(
 
     각 개념의 `L5_META.오개념` 리스트를 평탄화한다. `mis_id` 없는 레코드는 건너뛰고(PK 결손),
     이미 본 `mis_id`는 *첫 등장 우선*으로 dedup하며 중복 수를 *정직하게* 집계해 반환한다.
+
+    **값을 조용히 버리지 않는다(MISC-61)**: 읽는 키도, 의도적 비매핑 메타 열
+    (`_UNMAPPED_META_KEYS`)도 아닌 키에 값이 있으면 그 *키 이름과 행 수*를 WARNING 한 줄로
+    남긴다(값 본문은 남기지 않는다). 원천에 값이 있는 `오개념_원인` 키를 읽지 않아 `원본` 공란
+    21행이 빈 칸이 됐을 가능성을 사후에야 원천 대조로 규명해야 했던 일(MISC-61)의 재발 방지 —
+    반환값은 바뀌지 않는다. (`distractor 연결됨` 88행은 원천부터 비어 있어 이 경고와 무관하다.)
     """
     records: list[MisconceptionRecord] = []
     seen: set[str] = set()
     duplicates = 0
+    dropped_keys: Counter[str] = Counter()
     for concept in concepts:
         meta = concept.get("L5_META") or {}
         rows = meta.get("오개념") or []
@@ -129,5 +160,17 @@ def extract_misconceptions(
             }
             for src_key, dst_key in _STR_FIELDS.items():
                 record[dst_key] = _clean_str(row.get(src_key))  # type: ignore[literal-required]
+            for src_key, value in row.items():
+                if src_key in _READ_KEYS or src_key in _UNMAPPED_META_KEYS:
+                    continue
+                if _has_value(value):
+                    dropped_keys[str(src_key)] += 1
             records.append(record)
+    if dropped_keys:
+        summary = ", ".join(f"{key}={count}행" for key, count in sorted(dropped_keys.items()))
+        logger.warning(
+            "추출기가 읽지 않는 원천 키에 값이 있어 버렸다(%d종): %s — 키 매핑 확인 필요",
+            len(dropped_keys),
+            summary,
+        )
     return records, duplicates
