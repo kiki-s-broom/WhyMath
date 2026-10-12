@@ -22,11 +22,14 @@
 `False`로, `problem_step`은 `sympy_verified`를 `None`(모름)으로 되돌린다. 반대 방향(검수됨으로
 올림)은 편집으로 일어나지 않고 **검수 권한이 있는 별도 동작**(`POST .../review`)으로만 일어난다.
 
-원천 정본과의 관계 (정직한 한계)
--------------------------------
+원천 정본과의 관계 (P3-25 — CMS 편집 ↔ CLI 적재 계약)
+-----------------------------------------------------
 이 리소스 대부분은 파일 정본(`data/corpus/*`)을 `populate` CLI가 DB로 투영한 것이다. CMS 편집은 DB만
-바꾸므로 **같은 정본을 다시 적재하면 편집이 덮어써질 수 있다.** 이 이원성의 해소(적재가 CMS 편집을
-보존하게 하거나 편집을 정본으로 역기록)는 이 모듈의 범위 밖이며 후속 태스크 소관이다.
+바꾸므로 같은 정본을 다시 적재하면 편집이 덮어써진다 — 이를 막으려고 덮어쓰기가 실측된 5종은
+`loader_protected=True`로 선언하고, CMS가 쓸 때 `cms_edited_at` 표지를 채운다
+(`db/cms_edit_marker.py`). 적재는 표지가 있는 행을 건너뛰고 충돌로 보고한다. **이 이원성의 근본
+해소(편집을 정본 파일로 역기록)는 하지 않는다** — 건너뛴 행의 정본 파일은 DB와 달라진 채로
+남는다(계약 문서 §5 한계). 정본: `docs/standards/cms_edit_vs_loader_contract.md`.
 
 7계층: L5 `api`의 선언. 수학 로직 0.
 """
@@ -45,6 +48,11 @@ from typing import Any, Final, Literal
 
 from pydantic import ValidationError
 
+from whymath_backend.db.cms_edit_marker import (
+    CMS_EDIT_MARKER,
+    CMS_PROTECTED_TABLES,
+    mark_cms_edited,
+)
 from whymath_backend.db.models.concept_content import (
     CONTENT_REVIEW_STATUS_AI_ESTIMATED,
     ConceptContent,
@@ -218,6 +226,10 @@ class ResourceSpec:
     review_column: str | None = None
     edit_guard: EditGuard = "none"
     merged_validator: MergedValidator | None = None
+    #: CLI 적재가 같은 행을 upsert하는 리소스 — CMS 쓰기(편집·검수 표시)가 `cms_edited_at`
+    #: 표지를 채워 적재가 그 행을 건너뛰게 한다(P3-25). `check_specs`가 모델과
+    #: `CMS_PROTECTED_TABLES`를 대조한다.
+    loader_protected: bool = False
 
     @property
     def editable_names(self) -> tuple[str, ...]:
@@ -290,6 +302,7 @@ RESOURCES: Final[tuple[ResourceSpec, ...]] = (
         order_by="problem_id",
         edit_guard="problem_not_approved",
         merged_validator=_validate_problem_merge,
+        loader_protected=True,
     ),
     ResourceSpec(
         key="problem_step",
@@ -351,6 +364,7 @@ RESOURCES: Final[tuple[ResourceSpec, ...]] = (
         ),
         search_column="canonical_statement",
         order_by="mis_id",
+        loader_protected=True,
     ),
     ResourceSpec(
         key="strategy_node",
@@ -377,6 +391,7 @@ RESOURCES: Final[tuple[ResourceSpec, ...]] = (
         order_by="strategy_id",
         reset_on_edit=(("review_status", STRATEGY_REVIEW_STATUS_DEFAULT),),
         review_column="review_status",
+        loader_protected=True,
     ),
     ResourceSpec(
         key="concept_content",
@@ -406,6 +421,7 @@ RESOURCES: Final[tuple[ResourceSpec, ...]] = (
         order_by="code",
         reset_on_edit=(("review_status", REVIEW_STATUS_AI_ESTIMATED),),
         review_column="review_status",
+        loader_protected=True,
     ),
     ResourceSpec(
         key="hint",
@@ -431,6 +447,7 @@ RESOURCES: Final[tuple[ResourceSpec, ...]] = (
         # 고친 힌트는 검증 게이트를 다시 통과해야 서빙된다 — 검증 표지를 내린다(올리는 길은
         # CMS에 없다).
         reset_on_edit=(("verified", False),),
+        loader_protected=True,
     ),
     ResourceSpec(
         key="skill_node",
@@ -550,6 +567,9 @@ def apply_changes(
             if getattr(row, column) != reset_value:
                 setattr(row, column, reset_value)
                 resets.append(column)
+        if spec.loader_protected:
+            # 실제로 바뀐 필드가 있을 때만 — 같은 값을 다시 저장해도 적재 소유권이 넘어가면 안 된다.
+            mark_cms_edited(row)
     return changed, resets
 
 
@@ -587,6 +607,14 @@ def check_specs(specs: tuple[ResourceSpec, ...]) -> None:
             raise RuntimeError(f"{spec.key}: 검수 표지 컬럼이 상세 응답에 없다")
         if spec.edit_guard != "none" and not spec.editable:
             raise RuntimeError(f"{spec.key}: 편집 불가 리소스에 편집 가드가 있다")
+        table_name = spec.model.__tablename__
+        if spec.loader_protected != (table_name in CMS_PROTECTED_TABLES):
+            raise RuntimeError(
+                f"{spec.key}: loader_protected={spec.loader_protected}인데 테이블 {table_name}의 "
+                f"CMS_PROTECTED_TABLES 등재 여부와 다르다"
+            )
+        if spec.loader_protected and CMS_EDIT_MARKER not in columns:
+            raise RuntimeError(f"{spec.key}: 적재 보호 리소스에 {CMS_EDIT_MARKER} 컬럼이 없다")
         writable = bool(spec.editable) or spec.review_column is not None
         if writable and spec.audit_type is None:
             raise RuntimeError(f"{spec.key}: 쓰기가 있는 리소스에 감사 대상이 없다")

@@ -43,6 +43,7 @@ from whymath_backend.api._model_status import collect_model_status
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.api.admin_module_registry import require_module_roles
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
@@ -554,6 +555,9 @@ async def transition_admin_review_item(
 
     occurred_at = datetime.now(UTC)
     problem.review_status = target
+    # 사람이 바꾼 검수·격리 상태 — 다음 CLI 적재가 코퍼스 초기값으로 되돌리지 못하게
+    # 표지를 남긴다(P3-25).
+    mark_cms_edited(problem, at=occurred_at)
     if body.action is ReviewTransitionAction.quarantine:
         # 격리 계약 §3 — 사유·시각을 상태와 함께 쓴다. release/approve/reject는 이 필드를 건드리지
         # 않는다(§5-2: 회수 이력은 해제 후에도 영구 기록).

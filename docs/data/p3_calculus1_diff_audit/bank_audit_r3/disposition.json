@@ -1,0 +1,135 @@
+{
+ "note": "원인 묶음은 결함 판정 뒤의 교정용 분류다 — S5 판정(k=11)에는 쓰이지 않으며 어떤 판정도 바꾸지 않는다(as-found).",
+ "bank_sha256": "b5a33f7ffe867dd04d3157fcfb889eb9bf0aad70313a423a6f468d9455a27b75",
+ "k": 11,
+ "items": [
+  {
+   "problem_id": "0bcf3427-3cbd-53fa-8cfd-f499163a56c7",
+   "standard": "[12미적Ⅰ-02-04]",
+   "slot": "mastery_check",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(x=1 대입·계수만 묻기·임계점에서 평가)"
+  },
+  {
+   "problem_id": "1006bee0-00b7-5b52-a748-3ffe3990711f",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "applied",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차곡선 접선 기울기·평행·수직 → 판별식(중근)으로 접점"
+  },
+  {
+   "problem_id": "30d80000-b3a3-58dd-baba-389640d2f1fd",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "mastery_check",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "위치가 (t-1)^3 꼴 — 가속도 0인 시각에 속도도 0(속도·가속도 혼동이 정답)"
+  },
+  {
+   "problem_id": "4d287bbd-2452-5296-905b-dc17ae6747d3",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "representative",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차곡선 접선 기울기·평행·수직 → 판별식(중근)으로 접점"
+  },
+  {
+   "problem_id": "5209729b-100f-5307-8643-a523a8884c25",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "applied",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "이차곡선 접선 기울기·평행·수직 → 판별식(중근)으로 접점"
+  },
+  {
+   "problem_id": "76a9f5ac-6551-50d8-b88d-6e0bcaeef232",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "representative",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(x=1 대입·계수만 묻기·임계점에서 평가)"
+  },
+  {
+   "problem_id": "ac28058d-5e9b-50a1-888c-bfdf3bd9cebe",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차곡선 접선 기울기·평행·수직 → 판별식(중근)으로 접점"
+  },
+  {
+   "problem_id": "b2d3bc4b-ef50-5fb4-a363-e1051eb800e9",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "해설 문장(v(t) 소개 형식·x(5) 기호 / 증감 문항에 극값 결론)"
+  },
+  {
+   "problem_id": "cbde3ec3-1c42-533e-bd1d-5715bdb36c0a",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(x=1 대입·계수만 묻기·임계점에서 평가)"
+  },
+  {
+   "problem_id": "ee5a4588-c878-57fe-8212-20cc01c0e048",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차곡선 접선 기울기·평행·수직 → 판별식(중근)으로 접점"
+  },
+  {
+   "problem_id": "fb9ec6bc-36d7-5634-bd8e-3d4c936608bb",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "ok",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "해설 문장(v(t) 소개 형식·x(5) 기호 / 증감 문항에 극값 결론)"
+  }
+ ],
+ "cause_counts": {
+  "이차곡선 접선 기울기·평행·수직 → 판별식(중근)으로 접점": 5,
+  "오답 경로가 정답과 일치(x=1 대입·계수만 묻기·임계점에서 평가)": 3,
+  "해설 문장(v(t) 소개 형식·x(5) 기호 / 증감 문항에 극값 결론)": 2,
+  "위치가 (t-1)^3 꼴 — 가속도 0인 시각에 속도도 0(속도·가속도 혼동이 정답)": 1
+ }
+}

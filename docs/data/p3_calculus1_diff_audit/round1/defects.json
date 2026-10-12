@@ -1,0 +1,446 @@
+[
+ {
+  "problem_id": "2555d40a-8cb7-55aa-b5d4-aa6a1b818771",
+  "defect_class": "bad_wording",
+  "detail": "문항 25의 발문 '값이 0가 되는'(해설 포함)에서 조사가 깨짐(0이 맞음). 정답 a=-1은 직접 풂과 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "9a5761f1-22c4-5272-aa8c-504a558f2702",
+  "defect_class": "bad_wording",
+  "detail": "문항 30의 해설 '-10가 되는'에서 조사 오류(발문은 '-10일 때'로 정상). 정답 a=-2 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "9d67ee76-58bf-5420-a28a-cde0617c02fe",
+  "defect_class": "bad_wording",
+  "detail": "문항 31의 발문에 '-1x'(계수 1 명시)가 있어 표기가 부자연스러움. 정답 a=4 일치. 경미하나 보수적으로 올림.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "b33a77c9-d8f0-5165-9609-e9fb66f9c41b",
+  "defect_class": "bad_wording",
+  "detail": "문항 34의 해설 '13가 되는'에서 조사 오류(13이 맞음). 정답 a=4 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "c34a6e94-bd5a-5ee0-828b-d9bd5de97f60",
+  "defect_class": "bad_wording",
+  "detail": "문항 35의 발문 '값이 10가 되도록'에서 조사 오류(10이 맞음). 정답 a=2 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "fd09b186-0a0a-560f-9170-5b9308efa002",
+  "defect_class": "bad_wording",
+  "detail": "문항 36의 해설 '20가 되는'에서 조사 오류. 정답 a=5 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "5cd53e4e-9b2e-5fc8-9dc9-ba9ed5d48776",
+  "defect_class": "bad_wording",
+  "detail": "문항 63의 해설 '20가 되는'에서 조사 오류. 정답 a=5 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "63407aa1-bece-5105-96fa-769d6187d3e4",
+  "defect_class": "bad_wording",
+  "detail": "문항 67의 해설 '16가 되는'에서 조사 오류. 정답 a=3 일치.",
+  "concept": "H:12미적Ⅰ02-04"
+ },
+ {
+  "problem_id": "659e4344-4eee-5c5c-ba54-cc2e4144d12e",
+  "defect_class": "bad_explanation",
+  "detail": "해설 조사 오류 '계수은'(→계수는). 정답 6은 재계산과 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "f644a71b-76b4-56b5-8900-d2feba24dd97",
+  "defect_class": "bad_explanation",
+  "detail": "해설 조사 오류 '지수은'(→지수는). 정답 2 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "eacd9fe7-845b-587e-9d86-769e43932530",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '계수은' 조사 오류. 정답 9 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "915f87c4-90b5-5e94-9521-dc676c9b0c97",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '지수은' 조사 오류. 정답 8 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "c57915eb-c709-50a0-8d85-a5bf1d4d5d6f",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '계수은' 조사 오류. 정답 4 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "76a9f5ac-6551-50d8-b88d-6e0bcaeef232",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '계수은' 조사 오류. 정답 8 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "1179179f-4e70-542f-99ca-1190d1666c9b",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '지수은' 조사 오류. 정답 4 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "2fec7eaa-3178-5555-adc1-ffc3c1d395cd",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '계수은' 조사 오류. 정답 4 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "51eb803f-e2a3-5b95-a4ae-7aa447f36143",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '지수은' 조사 오류. 정답 1 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "419b0df6-dd5b-599f-9eed-2128dc2752c2",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '계수은' 조사 오류. 정답 7 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "98769f84-6b8b-545c-9363-ac4d9f3287b3",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '계수은' 조사 오류. 정답 3 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "069e312e-692c-513a-b092-ab0a3a99fea5",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '지수은' 조사 오류. 정답 6 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "bed1ba0c-22e0-5bc9-a90a-303444766b57",
+  "defect_class": "bad_tag",
+  "detail": "불확실: f(x)=3 상수함수 문항이라 y=x^n의 도함수를 직접 묻지 않음(PRIMARY 태그 적합성 의문). 정답 0은 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "8a6bc617-8f7c-5cdb-8fde-bcc1b129bb27",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '6가 되는'(→6이) 조사 오류. 정답 n=2 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "e2b88365-a826-5c73-a1c6-d02df7a3d21c",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '108가'(→108이) 조사 오류. 정답 6 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "7458ca3c-9e9a-5783-8510-054691909835",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '16가'(→16이) 조사 오류. 정답 4 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "49d9955a-f8f9-5a5f-ac88-ea748e7b6767",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '108가'(→108이) 조사 오류. 정답 3 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "cbc8aed7-3ce2-53f1-a721-27545ade2b15",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '98가'(→98이) 조사 오류. 정답 49 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "ba44c2a7-e962-50a1-b028-02bc502a64d7",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '2187가'(→2187이) 조사 오류. 정답 27 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "b24fafd8-380b-5d9c-8de6-3282a682f441",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '50가'(→50이) 조사 오류. 정답 25 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "3203cf09-b839-5e49-a145-cc61b1992cd9",
+  "defect_class": "bad_explanation",
+  "detail": "해설 '3가'(→3이) 조사 오류. 정답 n=6 일치",
+  "concept": "H:12미적Ⅰ02-03"
+ },
+ {
+  "problem_id": "79eb3015-0e61-5432-9349-bc80b31d4f8f",
+  "defect_class": "bad_wording",
+  "detail": "발문 '점 (a, f(a))'의 f가 어디에도 정의되지 않음(곡선은 y=...로만 제시). 수학 값은 정확: f'(a)=10에서 a=3(양수). 정의 누락만 결함.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "fabc2875-9a7e-56d5-aa2a-66c63089eb13",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. 직접 푼 값 a=4(기울기 6, 양수 해 유일)는 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "e8b74cf0-9ca4-590d-b1eb-cda59db9bd9d",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. 직접 푼 값 a=-6 또는 4, 양수 a=4로 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "3047ca4a-8ee0-5f22-b5ee-6763dd340f31",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. a=±3, 양수 3으로 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "0b239841-0fc4-53b3-965d-99b84e204461",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. 3a^2-2a-40=0에서 a=4 또는 -10/3, 양수 4로 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "32255861-3524-58b8-8936-fbf532d9270e",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. a=1 또는 -7/3, 양수 1로 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "c0bdb239-a6b6-596d-99ea-5185ffda88ca",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. a=-9 또는 3, 양수 3으로 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "afafef93-4ed6-528d-8a1d-3c763c2b4ce9",
+  "defect_class": "bad_wording",
+  "detail": "f(a)의 f 미정의. a=±1, 양수 1로 answer와 일치.",
+  "concept": "H:12미적Ⅰ02-05"
+ },
+ {
+  "problem_id": "20e5cee4-a920-5f48-8762-ea6c692a3523",
+  "defect_class": "bad_wording",
+  "detail": "불확실: 곡선을 y=...로만 주고 P(c, f(c))의 f를 정의하지 않음(기호 미정의). 내 풀이 c=5/3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "e80cfaf5-67b1-5270-a5c9-aae8d28b69d1",
+  "defect_class": "bad_wording",
+  "detail": "불확실: 곡선을 y=...로만 주고 P(c, f(c))의 f를 정의하지 않음. 내 풀이 c=8/3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "6ec56bc7-a4a6-5f5f-8a26-9af437e37a65",
+  "defect_class": "bad_wording",
+  "detail": "불확실: 곡선을 y=...로만 주고 P(c, f(c))의 f를 정의하지 않음. 내 풀이 c=8/3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "762d4fc4-c782-5431-98a6-31987fc9439f",
+  "defect_class": "bad_wording",
+  "detail": "불확실: 곡선을 y=...로만 주고 P(c, f(c))의 f를 정의하지 않음. 내 풀이 c=-5/3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "46e50124-e0d5-5472-b6c3-b4be7079bf1a",
+  "defect_class": "bad_wording",
+  "detail": "불확실: (a, f(a)), (b, f(b))의 f가 미정의(곡선은 y=...로만 제시). 해설의 \"3 + 1k\" 표기도 어색. 내 풀이 k=-3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "db5b24ba-1caf-5822-9e25-f73a63463cea",
+  "defect_class": "bad_wording",
+  "detail": "불확실: f 미정의. 해설의 \"1 + 0k\" 표기도 어색. 내 풀이 k=-1은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "68440f98-0d1e-5af2-9324-344bf5987192",
+  "defect_class": "bad_wording",
+  "detail": "\"출발 후 -1시간부터 4시간까지\"로 출발 이전의 음수 시각을 자동차 이동거리 맥락에 사용(비현실). 내 풀이 c=2는 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "87f54872-db35-5316-ac3f-faa99c762f1c",
+  "defect_class": "bad_explanation",
+  "detail": "불확실: 해설의 \"9 + -3k\" 표기가 깨짐(9-3k가 맞는 표기). 내 풀이 k=-2는 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "490def28-e6c5-5a0e-8b32-8a5c53727a81",
+  "defect_class": "bad_explanation",
+  "detail": "불확실: 해설이 미지수의 답(a=-3)을 넣은 중점식 (-3+1)/2를 먼저 쓰는 순환 서술. 내 풀이 a=-3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "24d7eb97-62eb-5c7d-8d7f-ea121b5aa9ff",
+  "defect_class": "bad_explanation",
+  "detail": "불확실: 해설이 미지수의 답(b=3)을 넣은 중점식 (-3+3)/2를 먼저 쓰는 순환 서술. 내 풀이 b=3은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "db749952-8c07-50e2-bc74-287ab782c854",
+  "defect_class": "bad_explanation",
+  "detail": "불확실: 해설이 미지수의 답(a=-1)을 넣은 중점식 (-1+5)/2를 먼저 쓰는 순환 서술. 내 풀이 a=-1은 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "fff9adc1-e002-52c3-a8a1-a7f77d6440c9",
+  "defect_class": "bad_explanation",
+  "detail": "불확실: 해설이 미지수의 답(b=5)을 넣은 중점식 (2+5)/2를 먼저 쓰는 순환 서술. 내 풀이 b=5는 정답과 일치.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "5b618799-d9d5-54d4-9339-6aac761feec8",
+  "defect_class": "bad_tag",
+  "detail": "PRIMARY 평균값 정리(relevance 0.95)인데 발문은 단순 미분계수 f'(2) 계산이며 평균값 정리·평균변화율 언급 없음. 값 -3은 정답. 진단 선수스킬 슬롯 의도일 수 있어 불확실.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "68f1b922-8684-52c5-a8ff-50294fa6fe21",
+  "defect_class": "bad_tag",
+  "detail": "PRIMARY 평균값 정리인데 발문은 단순 미분계수 f'(-2) 계산이며 평균값 정리와 무관. 값 35는 정답. 진단 슬롯 의도일 수 있어 불확실.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "1401e4a3-b11d-54a4-9120-67bb0367bc94",
+  "defect_class": "bad_tag",
+  "detail": "PRIMARY 평균값 정리인데 발문은 함수·평균변화율 맥락 없는 이차방정식 3x^2-8x-11=0의 근 찾기. 해설은 발문에 없는 f 및 평균변화율 17을 서술해 발문과 불일치. 값 -1은 정답.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "27d3c0dc-1824-5d51-90ca-c0365390bfb8",
+  "defect_class": "bad_tag",
+  "detail": "PRIMARY 평균값 정리인데 발문은 이차방정식 3x^2-4x-15=0의 근 찾기뿐. 해설은 발문에 없는 f 및 평균변화율 18을 서술해 발문과 불일치. 값 -5/3은 정답.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "4173fba7-d4ed-58eb-8920-a81c46c33f5a",
+  "defect_class": "bad_tag",
+  "detail": "불확실: 접선 기울기가 8인 점의 개수(답 2)는 맞으나 평균값 정리·평균변화율 연결이 발문에 없어 PRIMARY 태그가 약함.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "108f203f-e238-5628-84ae-5bfacd659038",
+  "defect_class": "bad_tag",
+  "detail": "불확실: 기울기 29인 점의 개수(답 2)는 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "652971ec-3aeb-5846-aa1a-d93e79316341",
+  "defect_class": "bad_tag",
+  "detail": "불확실: 기울기 26인 점의 개수(답 2)는 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "94fe04f6-a439-508f-8c1c-26af28c86998",
+  "defect_class": "bad_tag",
+  "detail": "불확실: 기울기 44인 점의 개수(답 2)는 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "ddd926ac-3643-5918-8a62-5a530c7f6d7d",
+  "defect_class": "bad_tag",
+  "detail": "불확실: f'(x)=11의 실근 개수(답 2)는 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "6d176fd7-6b7f-512c-a498-71e711a6bdc8",
+  "defect_class": "bad_tag",
+  "detail": "불확실: f'(x)=29의 근의 합(답 2/3)은 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "8b6cfb50-c8d7-5e0a-97cd-a722e7873187",
+  "defect_class": "bad_tag",
+  "detail": "불확실: f'(x)=33의 큰 근(답 3)은 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "a54f0df9-b389-598b-befc-dd926c600696",
+  "defect_class": "bad_tag",
+  "detail": "불확실: f'(x)=21의 근의 합(답 -4/3)은 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "23a6cf53-3068-5391-af73-8aff2028cb6b",
+  "defect_class": "bad_tag",
+  "detail": "불확실: f'(x)=13의 큰 근(답 11/3)은 맞으나 평균값 정리 연결이 발문에 없음.",
+  "concept": "H:12미적Ⅰ02-06"
+ },
+ {
+  "problem_id": "0f3d7dc1-3742-5303-b6b5-11fbf5c9912c",
+  "defect_class": "ambiguous",
+  "detail": "f=x^3+6x^2+9x-5는 [-3,-1]에서 감소(f'<0은 열린구간 (-3,-1)). 문항 정답 -2는 열린구간 해석에서만 유일하고, 교과서식 닫힌구간 [-3,-1]이면 정수 -3,-2,-1 세 개라 '하나뿐'이 거짓. 불확실(구간 개폐 규약 의존).",
+  "concept": "H:12미적Ⅰ02-08"
+ },
+ {
+  "problem_id": "a5d55515-710e-5f06-8b81-a22303d992e5",
+  "defect_class": "ambiguous",
+  "detail": "f=x^3+3x^2+6은 [-2,0]에서 감소; 열린구간이면 정수 -1뿐(문항 값 -1), 닫힌구간이면 -2,-1,0. 개폐 모호. 불확실.",
+  "concept": "H:12미적Ⅰ02-08"
+ },
+ {
+  "problem_id": "146517a0-88d4-546a-9613-c815fa352b6a",
+  "defect_class": "ambiguous",
+  "detail": "f=-x^3+3x+5는 [-1,1]에서 증가; 열린구간이면 0뿐(문항 값 0), 닫힌구간이면 -1,0,1. 개폐 모호. 불확실.",
+  "concept": "H:12미적Ⅰ02-08"
+ },
+ {
+  "problem_id": "0f9504f3-9974-5479-983d-7c62519c0a11",
+  "defect_class": "ambiguous",
+  "detail": "f=-x^3+6x^2-9x+6은 [1,3]에서 증가; 열린구간이면 2뿐(문항 값 2), 닫힌구간이면 1,2,3. 개폐 모호. 불확실.",
+  "concept": "H:12미적Ⅰ02-08"
+ },
+ {
+  "problem_id": "8299853c-d304-56c9-bb55-12a3162d3df0",
+  "defect_class": "ambiguous",
+  "detail": "f=x^3+3x^2-6은 [-2,0]에서 감소; 열린구간이면 -1뿐(문항 값 -1), 닫힌구간이면 -2,-1,0. 개폐 모호. 불확실.",
+  "concept": "H:12미적Ⅰ02-08"
+ },
+ {
+  "problem_id": "b86867c1-7254-5714-9007-346947e28add",
+  "defect_class": "ambiguous",
+  "detail": "f=2x^3+12x^2+18x+6은 [-3,-1]에서 감소; 열린구간이면 -2뿐(문항 값 -2), 닫힌구간이면 -3,-2,-1. 개폐 모호. 불확실.",
+  "concept": "H:12미적Ⅰ02-08"
+ },
+ {
+  "problem_id": "8a330cf0-add7-5644-a9b7-c63e31ad2e19",
+  "defect_class": "ambiguous",
+  "detail": "h(t)=t^3+2t^2+2t (m)에서 t는 던진 지 t초 후인데 높이 -4m를 요구한다. 방정식 t^3+2t^2+2t=-4를 직접 풀면 실근은 t=-2 하나뿐(답 1은 수식상 맞음). 그러나 t는 시간이므로 t>=0이어야 하고, 그러면 h(t)>=0이라 도달 가능한 t가 0개다. 문맥상 정답이 0 또는 1로 갈리고 지하 -4m도 비현실적이다. 발문이 t 범위를 '실수'로 열어 두었지만 시간 맥락과 충돌한다.",
+  "concept": "H:12미적Ⅰ02-09"
+ },
+ {
+  "problem_id": "9ce5a17e-0d53-536a-b565-fcbd283e5c6e",
+  "defect_class": "bad_explanation",
+  "detail": "풀이는 '(x - -3)의 제곱'으로 서술되어 있다. 올바른 표기는 (x+3)^2이다. 정답 -3 자체는 맞다(내가 푼 값 x^2+6x+9=(x+3)^2<=0이면 x=-3). 해설 표기가 학생에게 보이는 깨진 수식이다.",
+  "concept": "H:12미적Ⅰ02-09"
+ },
+ {
+  "problem_id": "557c7727-42bd-5ad2-8d62-234979d91c29",
+  "defect_class": "bad_explanation",
+  "detail": "풀이는 '(x - -5)의 제곱'으로 서술되어 있다. 올바른 표기는 (x+5)^2이다. 정답 -5는 맞다(내가 푼 값 x^2+10x+25=(x+5)^2<=0이면 x=-5). 해설 표기가 학생에게 보이는 깨진 수식이다.",
+  "concept": "H:12미적Ⅰ02-09"
+ },
+ {
+  "problem_id": "4c2de81a-d777-5532-9bee-40c936cd557e",
+  "defect_class": "bad_tag",
+  "detail": "x=t^3+5t^2-t 에서 t=0~3 '위치의 변화량'. 직접 풀면 x(3)-x(0)=69-0=69로 answer 69는 맞다. 그러나 속도·가속도·미분을 전혀 쓰지 않는 단순 함숫값 차이라 [12미적Ⅰ-02-10] 속도와 가속도를 묻는 문항이 아니다. PRIMARY 태그 부적절(확신 중간).",
+  "concept": "H:12미적Ⅰ02-10"
+ },
+ {
+  "problem_id": "21430049-8e51-5430-b191-beff260b40c7",
+  "defect_class": "bad_tag",
+  "detail": "x=t^3-3t^2-2t+4 에서 t=2~3 '위치의 변화량'. 직접 풀면 x(3)-x(2)=-2-(-4)=2로 answer 2는 맞다. 미분이 필요 없는 함숫값 차이라 속도·가속도 개념과 무관하다. PRIMARY 태그 부적절(확신 중간).",
+  "concept": "H:12미적Ⅰ02-10"
+ },
+ {
+  "problem_id": "45f07f18-10a7-5b13-baf9-eba731cb54e7",
+  "defect_class": "bad_explanation",
+  "detail": "x=t^3-6t^2+3t+2 에서 t=3일 때 속도 -6, 가속도 6, 합 0으로 answer 0은 맞다. 해설 문장 '속도 -6와 가속도 6의 합'에서 조사 오류가 있다(-6 뒤에는 '과'가 맞음). 경미한 해설 문장 결함이다.",
+  "concept": "H:12미적Ⅰ02-10"
+ }
+]

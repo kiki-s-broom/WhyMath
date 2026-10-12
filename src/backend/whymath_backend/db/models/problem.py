@@ -41,6 +41,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
+from whymath_backend.db.cms_edit_marker import CMS_EDIT_MARKER
 from whymath_backend.db.models._orm_enum import _pg_enum
 from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.enums import (
@@ -304,6 +305,13 @@ class Problem(Base):
     quarantine_reason: Mapped[str | None] = mapped_column(sa.Text)
     quarantined_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
+    # CMS 편집 표지(P3-25) — NULL=사람이 고친 적 없음(적재가 소유), 값=CMS가 마지막으로 고친 시각.
+    # 적재(`populate`)는 이 값이 있는 행을 건너뛰어 충돌로 보고한다. server_default·백필 금지.
+    # 규약 정본: `db/cms_edit_marker.py` · `docs/standards/cms_edit_vs_loader_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     # ── 인덱스 (§3.1 CREATE INDEX — GIN 4종 포함) ──
     __table_args__ = (
         sa.Index("idx_problem_exam", "exam_type", "exam_year", "exam_month"),
@@ -348,8 +356,9 @@ class Problem(Base):
         구성한다 — ORM은 `extra` 필드(관계 등)가 있을 수 있어 `extra="forbid"`인 schema와
         충돌할 수 있기 때문이다(매핑 컬럼만 추려 깨끗한 dict로 전달).
         """
+        # CMS 편집 표지는 운영 메타라 schema(extra=forbid)에 없다 — 복원 대상에서 뺀다(P3-25).
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
-        data = {key: getattr(self, key) for key in mapped_keys}
+        data = {key: getattr(self, key) for key in mapped_keys if key != CMS_EDIT_MARKER}
         return SchemaProblem.model_validate(
             drop_unset_nulls(data, SchemaProblem, orm_cls=type(self))
         )

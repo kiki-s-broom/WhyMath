@@ -1,0 +1,39 @@
+# 소단원 DSL v0.1 — 접선의 방정식 (미적분Ⅰ · 미분 대단원 · 소단원 5/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 개념/절차/표상 3개 → CONCEPT/PROCEDURE/REPRESENT 목표 1개씩(docs/data/units_v1.md §3).
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-05-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-05] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-접선의방정식"
+unit_version: 1
+api_version: "unit/0.1"
+title: "접선의 방정식"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-05]"]
+concept_nodes: ["12미적Ⅰ-02-05-1", "12미적Ⅰ-02-05-2", "12미적Ⅰ-02-05-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -2(개념). 오개념이 '접선의 기울기를 임의의 x에서 구해 씀'이라, 접점이 아닌
+  # 점에서 잰 기울기(비예)와 대비하는 CONCEPT 팩이 맞다.
+  - suffix: "OBJ-01"
+    statement: "곡선 위의 한 점에서 그은 접선의 기울기가 그 접점에서의 미분계수임을 이해한다"
+    standard_code: "[12미적Ⅰ-02-05]"
+    source_verb: "이해한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-05-2"]
+  # OBJ-02 절차형 — 원자 -1(절차·primary). 조건(접점·기울기·곡선 밖의 점)별 접선 방정식 산출 절차다.
+  - suffix: "OBJ-02"
+    statement: "접점, 기울기, 곡선 밖의 한 점 가운데 주어진 조건으로 곡선의 접선의 방정식을 구한다"
+    standard_code: "[12미적Ⅰ-02-05]"
+    source_verb: "구한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-05-1"]
+  # OBJ-03 표상형 — 원자 -3(표상). 접선 식의 접점 좌표·기울기와 그래프 위 직선을 양방향으로 잇는다.
+  - suffix: "OBJ-03"
+    statement: "접선의 방정식에 들어간 접점의 좌표와 기울기를 그래프 위의 직선과 연결하여 해석한다"
+    standard_code: "[12미적Ⅰ-02-05]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-05-3"]

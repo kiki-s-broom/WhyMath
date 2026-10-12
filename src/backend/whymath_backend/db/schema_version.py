@@ -176,6 +176,9 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # problem_version_id(§6.4·nullable·백필 금지) + PUBLISHED 불변성 트리거(§7)
     "c5e9f3a7b1d4",  # P3-12: role_enum에 CMS 역할 3종(content_editor/reviewer/publisher) 추가
     # — 어휘만 넓힌다. 권한 매핑 정본은 schema/cms_access.py.
+    "e7b2c4d8a1f6",  # P3-25: CMS 편집 표지 cms_edited_at(problem·misconception_catalog·
+    # strategy_node·concept_content·hints, nullable·백필 금지) — CLI 적재가 CMS 편집을 덮어쓰지
+    # 않게 하는 좌석. 규약 정본: docs/standards/cms_edit_vs_loader_contract.md.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P2
 owner: claude
@@ -16,11 +16,12 @@ acceptance:
   - "② 외부 업타임 프로브 — incident_response_slo.md §6이 '죽은 서버는 자기 죽음을 보고하지 못한다'고 자인했고 이것이 SLO S4(학습창 가용성 99%)가 ❌ 미측정인 근본 원인이다. 서버 프로세스 밖에서 /health/ready를 주기 폴링해 결과를 append하는 최소 경로를 만든다(별도 호스트 불요 — 스케줄러 1개로 시작). 산출은 S4를 실제로 계산할 수 있는 형태여야 한다."
   - "③ 변별력 실측(양방향) — 서버를 실제로 내린 상태에서 프로브가 다운을 기록하고 알림이 채널에 도달하는지, 정상 상태에서는 조용한지를 둘 다 실측한다. pid 파일·/health 응답 같은 간접 신호를 성공 근거로 삼지 않는다(CLAUDE.md '간접 신호를 성공 판정으로 쓰는 안내 금지' — 2026-07-17 좀비 uvicorn 사고)."
   - "④ 범위 밖 동결 — 지표 영속화(ClickHouse 적재)·경로별 지연 분해(S5)·다중 워커 합산 스크레이퍼는 포함하지 않는다(incident_response_slo.md §6의 별개 항목·단일 워커 단계에선 무의미). 이 태스크는 '알림이 사람에게 도달하는가'와 '서버 죽음이 관측되는가' 두 홉만 닫는다."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1577 (#1577) · 신규 테스트 85건 · 백엔드 전체 18548 passed · tests/infra 2961 passed · CI 미러 전 잡 통과(MIRROR_RC=0) · 뮤테이션 14/14 RED · 실서버 kill -9 양방향 실측"
 paths:
   - "src/backend/whymath_backend/ops/**"
   - "tests/backend/ops/**"
   - docs/standards/incident_response_slo.md
 session: null
 notes: "정본: docs/architecture/operations_module_gap_review_r3.md §3 D9-1. OPS-01/OPS-04는 done이나 런북 §6이 자인한 공백 11종의 백로그 추적이 0건이었다 — 그중 '사람에게 도달하지 않는 알림'과 'S4 미측정 근본원인' 2종만 실갭으로 등재(나머지는 r3 §4 정직한 공백·§5 트리거).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-09

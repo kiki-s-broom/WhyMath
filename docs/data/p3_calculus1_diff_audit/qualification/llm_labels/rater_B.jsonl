@@ -1,0 +1,240 @@
+{"item_id": "q001", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q002", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q003", "verdict": "ok", "defect_class": ""}
+{"item_id": "q004", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q005", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q006", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q007", "verdict": "ok", "defect_class": ""}
+{"item_id": "q008", "verdict": "ok", "defect_class": ""}
+{"item_id": "q009", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q010", "verdict": "ok", "defect_class": ""}
+{"item_id": "q011", "verdict": "ok", "defect_class": ""}
+{"item_id": "q012", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q013", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q014", "verdict": "ok", "defect_class": ""}
+{"item_id": "q015", "verdict": "ok", "defect_class": ""}
+{"item_id": "q016", "verdict": "ok", "defect_class": ""}
+{"item_id": "q017", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q018", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q019", "verdict": "ok", "defect_class": ""}
+{"item_id": "q020", "verdict": "ok", "defect_class": ""}
+{"item_id": "q021", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q022", "verdict": "ok", "defect_class": ""}
+{"item_id": "q023", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q024", "verdict": "ok", "defect_class": ""}
+{"item_id": "q025", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q026", "verdict": "ok", "defect_class": ""}
+{"item_id": "q027", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q028", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q029", "verdict": "ok", "defect_class": ""}
+{"item_id": "q030", "verdict": "ok", "defect_class": ""}
+{"item_id": "q031", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q032", "verdict": "ok", "defect_class": ""}
+{"item_id": "q033", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q034", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q035", "verdict": "ok", "defect_class": ""}
+{"item_id": "q036", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q037", "verdict": "ok", "defect_class": ""}
+{"item_id": "q038", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q039", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q040", "verdict": "ok", "defect_class": ""}
+{"item_id": "q041", "verdict": "ok", "defect_class": ""}
+{"item_id": "q042", "verdict": "ok", "defect_class": ""}
+{"item_id": "q043", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q044", "verdict": "ok", "defect_class": ""}
+{"item_id": "q045", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q046", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q047", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q048", "verdict": "ok", "defect_class": ""}
+{"item_id": "q049", "verdict": "ok", "defect_class": ""}
+{"item_id": "q050", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q051", "verdict": "ok", "defect_class": ""}
+{"item_id": "q052", "verdict": "ok", "defect_class": ""}
+{"item_id": "q053", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q054", "verdict": "ok", "defect_class": ""}
+{"item_id": "q055", "verdict": "ok", "defect_class": ""}
+{"item_id": "q056", "verdict": "ok", "defect_class": ""}
+{"item_id": "q057", "verdict": "ok", "defect_class": ""}
+{"item_id": "q058", "verdict": "ok", "defect_class": ""}
+{"item_id": "q059", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q060", "verdict": "ok", "defect_class": ""}
+{"item_id": "q061", "verdict": "ok", "defect_class": ""}
+{"item_id": "q062", "verdict": "ok", "defect_class": ""}
+{"item_id": "q063", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q064", "verdict": "ok", "defect_class": ""}
+{"item_id": "q065", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q066", "verdict": "ok", "defect_class": ""}
+{"item_id": "q067", "verdict": "ok", "defect_class": ""}
+{"item_id": "q068", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q069", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q070", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q071", "verdict": "ok", "defect_class": ""}
+{"item_id": "q072", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q073", "verdict": "ok", "defect_class": ""}
+{"item_id": "q074", "verdict": "ok", "defect_class": ""}
+{"item_id": "q075", "verdict": "ok", "defect_class": ""}
+{"item_id": "q076", "verdict": "ok", "defect_class": ""}
+{"item_id": "q077", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q078", "verdict": "ok", "defect_class": ""}
+{"item_id": "q079", "verdict": "ok", "defect_class": ""}
+{"item_id": "q080", "verdict": "ok", "defect_class": ""}
+{"item_id": "q081", "verdict": "ok", "defect_class": ""}
+{"item_id": "q082", "verdict": "ok", "defect_class": ""}
+{"item_id": "q083", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q084", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q085", "verdict": "ok", "defect_class": ""}
+{"item_id": "q086", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q087", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q088", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q089", "verdict": "ok", "defect_class": ""}
+{"item_id": "q090", "verdict": "ok", "defect_class": ""}
+{"item_id": "q091", "verdict": "ok", "defect_class": ""}
+{"item_id": "q092", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q093", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q094", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q095", "verdict": "ok", "defect_class": ""}
+{"item_id": "q096", "verdict": "ok", "defect_class": ""}
+{"item_id": "q097", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q098", "verdict": "ok", "defect_class": ""}
+{"item_id": "q099", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q100", "verdict": "ok", "defect_class": ""}
+{"item_id": "q101", "verdict": "ok", "defect_class": ""}
+{"item_id": "q102", "verdict": "ok", "defect_class": ""}
+{"item_id": "q103", "verdict": "ok", "defect_class": ""}
+{"item_id": "q104", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q105", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q106", "verdict": "ok", "defect_class": ""}
+{"item_id": "q107", "verdict": "ok", "defect_class": ""}
+{"item_id": "q108", "verdict": "ok", "defect_class": ""}
+{"item_id": "q109", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q110", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q111", "verdict": "ok", "defect_class": ""}
+{"item_id": "q112", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q113", "verdict": "ok", "defect_class": ""}
+{"item_id": "q114", "verdict": "ok", "defect_class": ""}
+{"item_id": "q115", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q116", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q117", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q118", "verdict": "ok", "defect_class": ""}
+{"item_id": "q119", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q120", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q121", "verdict": "ok", "defect_class": ""}
+{"item_id": "q122", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q123", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q124", "verdict": "ok", "defect_class": ""}
+{"item_id": "q125", "verdict": "ok", "defect_class": ""}
+{"item_id": "q126", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q127", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q128", "verdict": "ok", "defect_class": ""}
+{"item_id": "q129", "verdict": "ok", "defect_class": ""}
+{"item_id": "q130", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q131", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q132", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q133", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q134", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q135", "verdict": "ok", "defect_class": ""}
+{"item_id": "q136", "verdict": "ok", "defect_class": ""}
+{"item_id": "q137", "verdict": "ok", "defect_class": ""}
+{"item_id": "q138", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q139", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q140", "verdict": "ok", "defect_class": ""}
+{"item_id": "q141", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q142", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q143", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q144", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q145", "verdict": "ok", "defect_class": ""}
+{"item_id": "q146", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q147", "verdict": "ok", "defect_class": ""}
+{"item_id": "q148", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q149", "verdict": "ok", "defect_class": ""}
+{"item_id": "q150", "verdict": "ok", "defect_class": ""}
+{"item_id": "q151", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q152", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q153", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q154", "verdict": "ok", "defect_class": ""}
+{"item_id": "q155", "verdict": "ok", "defect_class": ""}
+{"item_id": "q156", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q157", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q158", "verdict": "ok", "defect_class": ""}
+{"item_id": "q159", "verdict": "ok", "defect_class": ""}
+{"item_id": "q160", "verdict": "ok", "defect_class": ""}
+{"item_id": "q161", "verdict": "ok", "defect_class": ""}
+{"item_id": "q162", "verdict": "ok", "defect_class": ""}
+{"item_id": "q163", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q164", "verdict": "ok", "defect_class": ""}
+{"item_id": "q165", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q166", "verdict": "ok", "defect_class": ""}
+{"item_id": "q167", "verdict": "ok", "defect_class": ""}
+{"item_id": "q168", "verdict": "ok", "defect_class": ""}
+{"item_id": "q169", "verdict": "ok", "defect_class": ""}
+{"item_id": "q170", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q171", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q172", "verdict": "ok", "defect_class": ""}
+{"item_id": "q173", "verdict": "ok", "defect_class": ""}
+{"item_id": "q174", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q175", "verdict": "ok", "defect_class": ""}
+{"item_id": "q176", "verdict": "ok", "defect_class": ""}
+{"item_id": "q177", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q178", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q179", "verdict": "ok", "defect_class": ""}
+{"item_id": "q180", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q181", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q182", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q183", "verdict": "ok", "defect_class": ""}
+{"item_id": "q184", "verdict": "ok", "defect_class": ""}
+{"item_id": "q185", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q186", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q187", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q188", "verdict": "ok", "defect_class": ""}
+{"item_id": "q189", "verdict": "defect", "defect_class": "발문 검산 불일치"}
+{"item_id": "q190", "verdict": "ok", "defect_class": ""}
+{"item_id": "q191", "verdict": "ok", "defect_class": ""}
+{"item_id": "q192", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q193", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q194", "verdict": "ok", "defect_class": ""}
+{"item_id": "q195", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q196", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q197", "verdict": "ok", "defect_class": ""}
+{"item_id": "q198", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q199", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q200", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q201", "verdict": "ok", "defect_class": ""}
+{"item_id": "q202", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q203", "verdict": "ok", "defect_class": ""}
+{"item_id": "q204", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q205", "verdict": "ok", "defect_class": ""}
+{"item_id": "q206", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q207", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q208", "verdict": "ok", "defect_class": ""}
+{"item_id": "q209", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q210", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q211", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q212", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q213", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q214", "verdict": "ok", "defect_class": ""}
+{"item_id": "q215", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q216", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q217", "verdict": "defect", "defect_class": "발문 검산 불일치"}
+{"item_id": "q218", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q219", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q220", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"item_id": "q221", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q222", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q223", "verdict": "ok", "defect_class": ""}
+{"item_id": "q224", "verdict": "ok", "defect_class": ""}
+{"item_id": "q225", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q226", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q227", "verdict": "ok", "defect_class": ""}
+{"item_id": "q228", "verdict": "defect", "defect_class": "문장 표기"}
+{"item_id": "q229", "verdict": "defect", "defect_class": "오개념 연결"}
+{"item_id": "q230", "verdict": "defect", "defect_class": "정답 오류"}
+{"item_id": "q231", "verdict": "ok", "defect_class": ""}
+{"item_id": "q232", "verdict": "ok", "defect_class": ""}
+{"item_id": "q233", "verdict": "defect", "defect_class": "해설"}
+{"item_id": "q234", "verdict": "ok", "defect_class": ""}
+{"item_id": "q235", "verdict": "ok", "defect_class": ""}
+{"item_id": "q236", "verdict": "defect", "defect_class": "발문 검산 불일치"}
+{"item_id": "q237", "verdict": "defect", "defect_class": "해 불명확"}
+{"item_id": "q238", "verdict": "ok", "defect_class": ""}
+{"item_id": "q239", "verdict": "ok", "defect_class": ""}
+{"item_id": "q240", "verdict": "ok", "defect_class": ""}

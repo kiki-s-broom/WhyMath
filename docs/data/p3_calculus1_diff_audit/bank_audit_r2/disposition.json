@@ -1,0 +1,271 @@
+{
+ "note": "원인 묶음은 결함 판정 뒤의 교정용 분류다 — S5 판정(k=23)에는 쓰이지 않으며 어떤 판정도 바꾸지 않는다(as-found).",
+ "bank_sha256": "206b440801de9d6cda6584a4e3a66ffbc045a360fe3a8ccea0cc7c9c5f0700b9",
+ "k": 23,
+ "items": [
+  {
+   "problem_id": "07eefccb-48bc-5373-9e37-67b3e3f7ae59",
+   "standard": "[12미적Ⅰ-02-04]",
+   "slot": "mastery_check",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "오답 경로·비례 짐작이 정답과 일치(x^2 배수 · 대칭 근 ±5)"
+  },
+  {
+   "problem_id": "1db37919-b56b-589f-9e51-5fcc6fbe0e03",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "2cc1e0d6-375e-5273-9fce-686b5fd089b4",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "극값이 0 또는 상수항과 같아 인수분해·부호만으로 실근 개수"
+  },
+  {
+   "problem_id": "4efc709d-136b-59bd-a33f-a934110e1021",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "639e6fc9-d9c5-5eaa-82b8-524e039e66c5",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "representative",
+   "rater_A": "ok",
+   "rater_B": "해설",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "속도 해설에서 v(t) 소개·'속도 = 위치의 도함수' 단계 누락"
+  },
+  {
+   "problem_id": "6fef75c7-f545-56e4-9905-533326e3df67",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "mastery_check",
+   "rater_A": "ok",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "'곡선 … 이 극대가 되는' 용어(함수가 주어여야 함)"
+  },
+  {
+   "problem_id": "7242d6ca-54f1-576f-8877-fbea69026fc4",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "753ab59f-b648-5780-b666-ecb2dedf6e47",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "91a6d932-1022-5fe0-be47-760522a3a81b",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "9a338f4a-0fe1-5d17-a114-ed1b6e4f3fb1",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "속도 해설에서 v(t) 소개·'속도 = 위치의 도함수' 단계 누락"
+  },
+  {
+   "problem_id": "9f4b4a55-b048-567a-92fb-7f6ecbd2f374",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "basic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "극값이 0 또는 상수항과 같아 인수분해·부호만으로 실근 개수"
+  },
+  {
+   "problem_id": "a20154d9-7436-52c3-8133-5b31c1a6d96a",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "a9cd0e68-4811-5efc-98c3-2ba361aee66f",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "bd6f889f-0c73-5777-b59d-5732c542a8b7",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "bdc71cfe-eb6e-5ac3-9d53-feb4971935c7",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "해 불명확",
+   "rater_B": "해 불명확",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "평균속도 객관식에 c 구간 조건 누락(삼차화로 해가 둘)"
+  },
+  {
+   "problem_id": "c32c1d5d-8c9a-5ad9-8947-800db90dd265",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "applied",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로·비례 짐작이 정답과 일치(x^2 배수 · 대칭 근 ±5)"
+  },
+  {
+   "problem_id": "c743fda0-8fb9-580f-ac73-a5daa185d5cb",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "발문 검산 불일치",
+   "rater_B": "ok",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "평균값 정리 c 개수 문항의 verify가 열린구간 제한 없이 실근 전체를 셈"
+  },
+  {
+   "problem_id": "d524ac47-e09c-5ecb-b9ba-025a93ab545b",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "해 불명확",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "평균속도 객관식에 c 구간 조건 누락(삼차화로 해가 둘)"
+  },
+  {
+   "problem_id": "e2d79e3c-0e9f-5bcd-99fd-83eb09823611",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "e51cca1b-db5b-521b-aa22-8eb507f6179b",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "eb3af4c6-cca5-5e19-a695-c76cf184f463",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  },
+  {
+   "problem_id": "ed8cd073-303b-5117-bb21-4beae9d49d66",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "applied",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "속도 해설에서 v(t) 소개·'속도 = 위치의 도함수' 단계 누락"
+  },
+  {
+   "problem_id": "f992dc63-33d4-598e-9160-c97a87c12366",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴"
+  }
+ ],
+ "cause_counts": {
+  "M0615 설명 자기모순('두 개로 단정' vs '(차수만큼 근)') — 연결 선지가 주 절차로 안 나옴": 12,
+  "속도 해설에서 v(t) 소개·'속도 = 위치의 도함수' 단계 누락": 3,
+  "오답 경로·비례 짐작이 정답과 일치(x^2 배수 · 대칭 근 ±5)": 2,
+  "극값이 0 또는 상수항과 같아 인수분해·부호만으로 실근 개수": 2,
+  "평균속도 객관식에 c 구간 조건 누락(삼차화로 해가 둘)": 2,
+  "'곡선 … 이 극대가 되는' 용어(함수가 주어여야 함)": 1,
+  "평균값 정리 c 개수 문항의 verify가 열린구간 제한 없이 실근 전체를 셈": 1
+ }
+}

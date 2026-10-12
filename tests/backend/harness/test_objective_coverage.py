@@ -518,7 +518,7 @@ def test_cli_json_artifact_is_deterministic(tmp_path: Path) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 8. acceptance ① — 실제 저장소 코퍼스 대상 현행 실측 재현(895건 중 1건·0.11%)
+# 8. acceptance ① — 실제 저장소 코퍼스 대상 현행 실측 재현(895건 중 11건·1.23% — 2026-10-07 P3-03)
 # ──────────────────────────────────────────────────────────────────────────
 # tests/backend/harness/test_x.py → parents[3] = repo 루트(harness→backend→tests→root).
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -527,11 +527,16 @@ _REAL_UNITS_ROOT = _REPO_ROOT / "data" / "corpus" / "units_v1"
 
 
 class TestAcceptance1RealCorpusBaseline:
-    """CUR-02 acceptance① — 실제 저장소 코퍼스로 "895건 중 1건(0.11%)" 주장을 재현한다.
+    """CUR-02 acceptance① — 실제 저장소 코퍼스의 목표 커버리지 실측을 재현·동결한다.
 
     이 값이 바뀌면(신규 소단원 반입 등) 이 테스트가 깨진다 — 그것은 회귀가 아니라 *의도된
     진전*이므로, 그 경우 이 골든값을 갱신하는 것이 맞다(problem_bank_coverage의 골든 분포
-    테스트와 동일 관례). 지금은 CUR-02 착수 시점의 실측 베이스라인을 동결한다.
+    테스트와 동일 관례).
+
+    골든값 이력:
+      - CUR-02 착수 시점: 895건 중 1건(0.11%) — 이차함수 파일럿 1편·4목표.
+      - 2026-10-07 P3-03: 미적분Ⅰ '미분' 대단원 초안 10편(`calc1_diff_01…10`)·30목표 반입으로
+        895건 중 11건(1.23%)·11편·34목표. 의도된 데이터 진전이다(docs/data/units_v1.md §3).
     """
 
     @staticmethod
@@ -545,24 +550,41 @@ class TestAcceptance1RealCorpusBaseline:
     def test_standards_record_total_is_895(self, report: oc.CoverageReport) -> None:
         assert report.standards_record_count == 895
 
-    def test_covered_record_count_is_exactly_1(self, report: oc.CoverageReport) -> None:
-        assert report.covered_record_count == 1
-        assert report.covered_codes == ("[10공수1-02-06]",)
+    def test_covered_record_count_is_exactly_11(self, report: oc.CoverageReport) -> None:
+        # 2026-10-07 P3-03: 파일럿 [10공수1-02-06] + 미적분Ⅰ 미분 10건(1 → 11, 의도된 진전).
+        assert report.covered_record_count == 11
+        assert report.covered_codes == (
+            "[10공수1-02-06]",
+            "[12미적Ⅰ-02-01]",
+            "[12미적Ⅰ-02-02]",
+            "[12미적Ⅰ-02-03]",
+            "[12미적Ⅰ-02-04]",
+            "[12미적Ⅰ-02-05]",
+            "[12미적Ⅰ-02-06]",
+            "[12미적Ⅰ-02-07]",
+            "[12미적Ⅰ-02-08]",
+            "[12미적Ⅰ-02-09]",
+            "[12미적Ⅰ-02-10]",
+        )
 
-    def test_coverage_rate_is_0_11_percent(self, report: oc.CoverageReport) -> None:
-        assert report.coverage_rate == pytest.approx(1 / 895)
-        assert f"{report.coverage_rate * 100:.2f}%" == "0.11%"
+    def test_coverage_rate_is_1_23_percent(self, report: oc.CoverageReport) -> None:
+        # 2026-10-07 P3-03: 1/895(0.11%) → 11/895(1.23%).
+        assert report.coverage_rate == pytest.approx(11 / 895)
+        assert f"{report.coverage_rate * 100:.2f}%" == "1.23%"
 
-    def test_only_one_unit_file_with_four_objectives(self, report: oc.CoverageReport) -> None:
-        assert len(report.units) == 1
-        assert report.objectives_total == 4
+    def test_eleven_unit_files_with_thirty_four_objectives(self, report: oc.CoverageReport) -> None:
+        # 2026-10-07 P3-03: 파일럿 1편·4목표 + 미적분Ⅰ 미분 10편·30목표(02-08만 2목표, 02-10은 4목표).
+        assert len(report.units) == 11
+        assert report.objectives_total == 34
 
-    def test_k_type_pilot_is_one_of_each_four_types(self, report: oc.CoverageReport) -> None:
+    def test_k_type_distribution_pilot_plus_calculus_draft(self, report: oc.CoverageReport) -> None:
+        # 2026-10-07 P3-03: 파일럿 1·1·1·1 + 미적분Ⅰ 9·10·10·1(02-08은 CONCEPT 없음 — 원자 02-08-2
+        # 제외, MODELING은 02-10의 '유용성 인식' 목표 1개뿐).
         assert report.k_type_totals == {
-            "CONCEPT": 1,
-            "PROCEDURE": 1,
-            "REPRESENT": 1,
-            "MODELING": 1,
+            "CONCEPT": 10,
+            "PROCEDURE": 11,
+            "REPRESENT": 11,
+            "MODELING": 2,
         }
 
     def test_no_silent_data_quality_issues(self, report: oc.CoverageReport) -> None:
@@ -581,4 +603,5 @@ class TestAcceptance1RealCorpusBaseline:
         out = capsys.readouterr().out
         assert rc == 0
         assert "레코드 **895**" in out
-        assert "커버된 레코드: **1** (0.11%)" in out
+        # 2026-10-07 P3-03: 1건(0.11%) → 11건(1.23%) — 위 골든값 이력과 같은 사유.
+        assert "커버된 레코드: **11** (1.23%)" in out

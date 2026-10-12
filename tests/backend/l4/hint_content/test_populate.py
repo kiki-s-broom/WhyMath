@@ -147,7 +147,9 @@ class TestMain:
     ) -> None:
         """원천 0건을 '0건 생성 성공'으로 보고하지 않는다(측정 실패 ≠ 0건 통과)."""
 
-        async def _run(*, apply: bool) -> populate.GenerationReport:
+        async def _run(
+            *, apply: bool, overwrite_cms_edits: bool = False
+        ) -> populate.GenerationReport:
             return self._report(0)
 
         monkeypatch.setattr(populate, "run", _run)
@@ -161,7 +163,9 @@ class TestMain:
     ) -> None:
         seen: list[bool] = []
 
-        async def _run(*, apply: bool) -> populate.GenerationReport:
+        async def _run(
+            *, apply: bool, overwrite_cms_edits: bool = False
+        ) -> populate.GenerationReport:
             seen.append(apply)
             return self._report(3)
 

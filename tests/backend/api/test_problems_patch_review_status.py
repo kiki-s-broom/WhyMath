@@ -211,6 +211,8 @@ def test_legal_status_change_writes_exactly_one_audit_row_with_the_transition_ac
     assert resp.status_code == 200, resp.text
     assert resp.json()["review_status"] == target.value
     assert len(fake.merged) == 1 and fake.commits == 1 and fake.rollbacks == 0
+    # P3-25 — 사람이 정한 상태는 다음 CLI 적재가 되돌리지 못하게 표지가 붙는다.
+    assert fake.merged[0].cms_edited_at is not None
     assert len(fake.audits) == 1, "합법 전이는 감사 정확히 1행이어야 한다"
     row = fake.audits[0]
     assert row.action == action, "감사 동작이 전이 액션이 아니라 update로 뭉개졌다"
