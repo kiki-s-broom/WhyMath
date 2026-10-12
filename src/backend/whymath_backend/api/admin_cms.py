@@ -4,7 +4,8 @@
 변경이력·배포·롤백)을 하는 서버 쪽이다. 두 갈래로 나뉜다:
 
 **① 개념 — 버전 워크플로우 경유** (`l3/publish_gate.py`가 유일한 쓰기 자리)
-  - GET  /concepts · /concepts/{id}                : 목록·상세(+관계 **읽기 전용**)
+  - GET  /concepts · /concepts/{id}                : 목록·상세(+관계·소유(정본)·삭제 가능 여부)
+  관계 쓰기·신규 개념 제안·개념 삭제는 `api/admin_cms_graph.py`(P3-26)가 소유한다.
   - POST /concepts/{id}/drafts                      : 새 DRAFT 판 생성(편집 = 새 판, 44 §1 원칙 3)
   - GET  /concepts/{id}/versions · /versions/{id}   : 변경이력(판 목록·상세)
   - POST /versions/{id}/transitions                 : 제출·검토·승인·발행·폐기·은퇴(전이표가 정본)
@@ -285,8 +286,12 @@ class CmsConceptDetail(BaseModel):
     # 스캐너는 문법만 보므로, 이름을 달리해 규칙을 면제 없이 그대로 지킨다.
     published_version_id: uuid.UUID | None
     latest_version_no: int | None
-    incoming: tuple[CmsEdgeRow, ...] = Field(..., description="이 개념을 선행으로 삼는 관계.")
-    outgoing: tuple[CmsEdgeRow, ...] = Field(..., description="이 개념이 선행으로 삼는 관계.")
+    incoming: tuple[CmsEdgeRow, ...] = Field(
+        ..., description="이 개념의 **선수**(이 개념을 알려면 먼저 알아야 하는 개념)와의 관계."
+    )
+    outgoing: tuple[CmsEdgeRow, ...] = Field(
+        ..., description="이 개념을 선수로 삼는 **후행** 개념과의 관계."
+    )
     can_edit: bool
     # ── P3-26: 개념 그래프 쓰기 ──
     cms_owned: bool = Field(

@@ -17,6 +17,9 @@ PG 행을 직접 만지지 않고 검증된 Pydantic 모델만 주고받는다.
 하며(검정교과서·EBS 본문 복제 금지) — 이 불변식은 schema.Concept 검수 단계 책임이고 이
 라우터는 이미 검증된 모델을 영속화할 뿐이다.
 
+P3-26: `POST`(직접 생성)는 **폐지(410)**했다 — 신규 개념은 CMS 제안·발행 워크플로우로만
+생기고, `DELETE`는 CMS와 같은 규칙(`_concept_graph_rules.concept_delete_block`)을 쓴다.
+
 인가(SEC-07 D1): POST/PATCH/DELETE 3개는 `RequireContentAdmin`(`Role.CONTENT_ADMIN`)로
 게이팅한다 — 이전엔 인증 의존성이 0건이라 누구나 개념을 생성·수정·삭제할 수 있었다(실측
 `docs/architecture/account_security_gap_review.md` D1). GET(단건·목록·엣지·의미검색)은
