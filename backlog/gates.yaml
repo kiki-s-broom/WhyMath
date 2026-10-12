@@ -1279,11 +1279,11 @@ gates:
     title: "S4-64 대학 원자 KR 셀 prod 적재 실행 — Phaiakes9 whymath-pg 쓰기(curriculum.populate 1회 실행, S4-64 PR 병합 후). 배경: S4-62가 대학 셀 유도 함수만 추가해 호출처가 0건이었고 S4-64가 populate CLI에 --atom-graph 인자로 배선했다. 이 게이트는 그 CLI를 prod에서 1회 실행해 대학 원자 512건(학년 13~16, required_depth는 cognitive_type 도출: conceptual 360·procedural 108·NULL 44)을 curriculum_entry에 멱등 적재한다. 부수 효과 주의: 같은 CLI가 canonical 437건·원자 1311건도 함께 멱등 재적재한다(신규 행 생성이 아니라 upsert 갱신·created_at 보존). 기대 총 2260건. 런북은 쓰기 블록이 선행 판정(입력 동등성·플래그 착지·테이블·KR_NC_2022 프레임워크 행)을 스스로 재검사해 거부한다. 런북: docs/ops/s4_64_university_cells_populate_runbook.md"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-09
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 5b561e31 (S4-64 PR #1568 머지 커밋). Kiki가 Phaiakes9 PowerShell에서 런북 docs/ops/s4_64_university_cells_populate_runbook.md [0]~[E]를 2026-10-12에 실행한 화면을 근거로 한다. 실측: CLONE_HAS_S464=True, DOCKER_OK=True, PATHS_MATCH_MAIN=True, TABLE_EXISTS=t, FRAMEWORK_EXISTS=1, BEFORE_UNIV=0, BEFORE_TOTAL=0, HAS_ATOM_GRAPH_FLAG=True, REACH_EXIT=0(REACHABLE), 가드 PATHS_OK/FLAG_OK/TABLE_OK/FRAMEWORK_OK 전부 True, POPULATE_EXIT=0, CLI 보고 줄 '교육과정 Overlay(KR) 적재 완료: 2260건 (canonical 437건 + 원자 1311건 + 대학 512건)', AFTER_UNIV=512, AFTER_TOTAL=2260, 대학 깊이 분포 conceptual 360 / NULL 44 / procedural 108 (mastery 0건), JUDGED_AGAINST_MAIN=5b561e31. CLI의 대학 N건(512)과 DB 카운트 AFTER_UNIV(512)가 서로 다른 경로에서 일치하고 기대 분포와 정확히 같다. 한계: prod에서 1회 실행한 결과이며 멱등 재실행(2회차)은 prod에서 확인하지 않았다(스크래치 PG에서만 확인). L6 깊이정렬이 대학 문항 선택에서 실제로 좋아지는지는 이 실행으로 증명되지 않는다."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
