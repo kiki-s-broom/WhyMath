@@ -7,7 +7,7 @@
 - 코딩 구조 결함 규범의 정본은 `constitution/CONSTITUTION.md`(조문)와 `constitution/rules.yaml`(규칙·원본 등록부)이다. 해설이 필요하면 `docs/standard-book/`의 해당 장만 읽는다(책 전체를 읽지 않는다).
 - `constitution/` 폴더는 읽기만 한다(제9조). 가드 훅이 편집을 막으며, 막히면 우회하지 않고 멈춘다. 정정이 필요하면 `docs/constitution_proposals/`에 초안으로 두고 반영은 Kiki가 한다.
 - 코드 작업을 시작하기 전에 그 작업이 닿는 규칙을 `constitution/rules.yaml`에서 확인한다.
-- 이 파일과 코딩 헌법의 서열은 게이트 `G-const-precedence-declaration` 결정 전까지 잠정 해석을 따른다. 같은 행위에 다른 답을 주면 더 엄격한 쪽을 따르고, 판단할 수 없으면 멈추고 충돌 조문·규칙 ID를 Kiki에게 보고한다(제2조).
+- **서열(2026-10-12 Kiki 확정 · 게이트 `G-const-precedence-declaration` 선택지 ①)**: 코딩 헌법(`constitution/`) > 이 파일(CLAUDE.md) > `AGENTS.md`·`docs/standards/dev_constitution.md`. 이 파일이 스스로를 "최우선"이라 부르는 문구는 코딩 헌법 아래에서의 정본(심화·법령·아키텍처·검증)이라는 뜻으로 읽는다. 충돌을 발견하면 작업을 멈추고 충돌 조문·규칙 ID를 Kiki에게 보고한다(제2조 ②). 결정 이전의 "더 엄격한 쪽" 잠정 해석은 폐지한다.
 - 위헌 심사는 CI 래칫(`scripts/constitution/audit_ratchet.py`)이 판정한다. 작업 완료 보고에는 그 종료 코드와 차단 건수를 포함한다(제10조).
 - 이식 단계·집행 장치·검증 계획의 정본은 `docs/standards/coding_constitution_transplant.md`다.
 
