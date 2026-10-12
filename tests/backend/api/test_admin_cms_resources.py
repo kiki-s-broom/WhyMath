@@ -293,10 +293,16 @@ class TestValidateChanges:
         assert out == {"content": "새 문구"}
 
 
+class _EditedRow(SimpleNamespace):
+    """ORM 행 흉내 — 적재 보호 표지 컬럼(`cms_edited_at`)이 클래스에 있어야 `mark_cms_edited`가 쓴다."""
+
+    cms_edited_at: Any = None
+
+
 class TestApplyChanges:
     @staticmethod
     def _row(**kw: Any) -> SimpleNamespace:
-        return SimpleNamespace(**kw)
+        return _EditedRow(**kw)
 
     def test_changed_field_is_written_and_marker_is_lowered(self) -> None:
         spec = get_resource("concept_content")

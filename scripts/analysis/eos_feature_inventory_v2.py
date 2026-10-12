@@ -778,11 +778,14 @@ CATALOG: tuple[Spec, ...] = (
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
        "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5)",
        "l3.publish_gate", status="Batch"),
-    _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)",
+    _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
+       "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
        "P3-12 — 개념 외 7종의 제자리 편집 허용 목록. 상태·발행 컬럼은 편집 가능 필드에 들어갈 수 "
-       "없고 선언 오류는 기동 시점에 거부된다",
-       "api.admin_cms_resources"),
+       "없고 선언 오류는 기동 시점에 거부된다. P3-25 — 적재가 덮어쓰는 5종은 CMS 쓰기가 "
+       "cms_edited_at 표지를 채우고 CLI 적재는 표지 행을 건너뛰어 충돌로 보고한다"
+       "(db.cms_edit_marker — 5개 적재기가 공유하는 단일 규약)",
+       "api.admin_cms_resources", "db.cms_edit_marker"),
     # ════════════════════ E — L3 (Math Adapter) ════════════════════
     _e("WM-E-351", "동등문제 생성 파이프라인(생성·수용 게이트·정규화·rephrase·감사)", "Admin",
        "Math Engine", "P0", "C1·C3·C4 — 앵커 CU 생산 사슬", "l3.equivalent.generator",
@@ -790,8 +793,12 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.skeleton_generator", "l3.equivalent.difficulty",
        "l3.equivalent.canonicalize", "l3.equivalent.rephrase", "l3.equivalent.rephrase_hygiene",
        "l3.equivalent.retag", "l3.equivalent.latex_gate", "l3.equivalent.counterexample_fuzz",
-       "l3.equivalent.defect_seeder"),
-    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대)", "Admin", "Math Engine", "P0",
+       "l3.equivalent.defect_seeder",
+       # P3-03 감사자 자격 측정 — 은행 전용 결함 주입기(defect_seeder와 같은 강등전 원리·이 은행의
+       # 실제 문항에 7종을 심어 정답지를 구성으로 확정). 소비자는 harness.p3_audit_qualification.
+       "l3.equivalent.p3_diff_defect_seeder"),
+    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
+       "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
        "l3.equivalent.calculus1_integral_skeleton_generator",
        "l3.equivalent.calculus2_trig_integral_skeleton_generator",
@@ -832,7 +839,25 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.trig_skeleton_generator",
        "l3.equivalent.vector_operations_skeleton_generator",
        "l3.equivalent.conceptual_count_mc_generator",
-       "l3.equivalent.misconception_eval_mc_generator"),
+       "l3.equivalent.misconception_eval_mc_generator",
+       # P3-03 — Phase 3 미적분Ⅰ 미분 대단원 개념별 결정론 생성기(승인 문항 0건이던 개념 채움).
+       # 생성기 7종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
+       # `harness.p3_calculus1_diff_batch.GENERATORS` 한 줄이라 여기 귀속도 같이 늘어난다.
+       "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
+       # 3차 감사 처분 — '선수 계산 우회로' 판정기(생성기 빌드가 문항마다 부르는 fail-loud 게이트).
+       "l3.equivalent.p3_diff_shortcut_guard",
+       # 1·2차 감사 문면 결함 스캐너 — 테스트 안에 있던 판정 함수를 감사자 자격 측정의 기계 게이트가
+       # 쓰도록 승격(규칙 불변·대조군은 test_p3_diff_text_defects가 그대로 봉인).
+       "l3.equivalent.p3_diff_text_scanner",
+       # 풀이 단계(`verify.solution_steps`) 결정론 도출 — 도함수 출발식부터 SymPy 계산(Tier2 계약).
+       "l3.equivalent.p3_diff_solution_steps",
+       "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
+       "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator",
+       "l3.equivalent.p3_diff_tangent_line_skeleton_generator",
+       "l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator",
+       "l3.equivalent.p3_diff_graph_shape_skeleton_generator",
+       "l3.equivalent.p3_diff_equation_application_skeleton_generator",
+       "l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",
@@ -1070,6 +1095,10 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability",
+       # OPS-30: 알림의 마지막 1홉 — AlertLogNotifier가 계산한 전이를 웹훅으로 내보내는 sink와,
+       # 서버 프로세스 밖에서 /health/ready를 폴링해 S4를 계산하는 업타임 프로브. 둘 다
+       # "서비스 헬스 관측"의 같은 축(서버가 알리지 못하는 것까지 알린다)이라 같은 좌석에 귀속한다.
+       "ops.alert_delivery", "ops.uptime_probe",
        # OPS-53: 패키지 임포트 시 CLI stdout/stderr을 UTF-8로 맞추는 헬퍼 — 운영 CLI의 출력 안전.
        "_stdio", status="Production"),
     _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",
@@ -1139,6 +1168,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.root_aggregate_batch", "harness.sample_mean_distribution_batch",
        "harness.sequence_sigma_batch", "harness.university_calc1_batch",
        "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
+       "harness.p3_calculus1_diff_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",
@@ -1170,6 +1200,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.banned_words_pii_eval", "harness.coach_prose_leak_eval",
        "harness.corpus_audit_eval", "harness.crosslink_demotion_eval",
        "harness.defect_detection_eval", "harness.explanation_f7_eval",
+       # P3-03 — 미분 은행 감사자 자격 측정(결함 주입 강등전 · 기계 ∪ LLM 이중 판정 · S5 보정 상한).
+       "harness.p3_audit_qualification",
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",

@@ -22,7 +22,8 @@ HTTP 상태코드로 판정할 **레디니스 축**과, 에러율·지연·가�
 3. **알림 평가·경로(`evaluate_alerts`·`AlertLogNotifier`)** — Settings 임계 초과(breach)를
    ①구조화 warning 로그(*상태 전이 시에만* — 지속 위반의 매 요청 로그는 스팸이라 억제)
    ②`/health/ready` 응답 body의 `alerts` 필드(외부 업타임 프로브가 SaaS 없이 판정치를
-   읽는 상시 노출)로 배선한다.
+   읽는 상시 노출)로 배선한다. ③(OPS-30) 상태 전이를 `AlertSink`(`ops/alert_delivery.py`
+   웹훅)로 사람에게 내보낸다 — 로그만으로는 "보고 있지 않으면 알림이 아니다".
 
 동시성 메모
 -----------
@@ -470,16 +471,30 @@ def evaluate_alerts(
     return alerts
 
 
+class AlertSink(Protocol):
+    """알림 상태 전이를 받는 추가 발송 채널(OPS-30) — 판정은 `AlertLogNotifier`가 이미 끝냈다."""
+
+    def on_transition(self, entered: Sequence[Alert], cleared: Sequence[str]) -> None: ...
+
+
 class AlertLogNotifier:
     """알림 로그 경로 — breach *상태 전이 시에만* 기록한다(스팸 방지).
 
     같은 위반이 지속되는 동안 매 요청 warning을 찍으면 로그가 알림 가치를 잃는다. 직전
     위반 metric 집합을 기억해 *새로 진입한* 위반만 warning(임계·실측치 병기), *해소된*
     위반만 info로 남긴다. 로그에 시크릿·필드값은 없다(metric 이름·수치뿐).
+
+    OPS-30: `sinks`로 실발송 채널(웹훅)을 *옆에* 붙인다. 전이 판정(진입·해소 계산)은 이 클래스
+    한 곳에만 있고, sink는 계산된 전이를 받을 뿐이다. sink 실패는 요청·로그 경로를 깨지 않는다.
     """
 
-    def __init__(self, target_logger: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        target_logger: logging.Logger | None = None,
+        sinks: Sequence[AlertSink] = (),
+    ) -> None:
         self._logger = target_logger if target_logger is not None else logger
+        self._sinks = tuple(sinks)
         self._active: frozenset[str] = frozenset()
 
     def notify(self, alerts: Sequence[Alert]) -> None:
@@ -487,14 +502,27 @@ class AlertLogNotifier:
         current = frozenset(alert.metric for alert in alerts)
         entered = current - self._active
         cleared = self._active - current
-        for alert in alerts:
-            if alert.metric in entered:
-                self._logger.warning(
-                    "서비스 알림 breach 진입 — metric=%s observed=%.4f threshold=%.4f",
-                    alert.metric,
-                    alert.observed,
-                    alert.threshold,
-                )
-        for metric in sorted(cleared):
+        entered_alerts = [alert for alert in alerts if alert.metric in entered]
+        for alert in entered_alerts:
+            self._logger.warning(
+                "서비스 알림 breach 진입 — metric=%s observed=%.4f threshold=%.4f",
+                alert.metric,
+                alert.observed,
+                alert.threshold,
+            )
+        cleared_metrics = sorted(cleared)
+        for metric in cleared_metrics:
             self._logger.info("서비스 알림 해소 — metric=%s", metric)
         self._active = current
+        if entered_alerts or cleared_metrics:
+            self._dispatch_to_sinks(entered_alerts, cleared_metrics)
+
+    def _dispatch_to_sinks(self, entered: list[Alert], cleared: list[str]) -> None:
+        """전이를 각 sink에 넘긴다 — sink 실패가 다른 sink·요청을 깨지 않는다(타입명 로그)."""
+        for sink in self._sinks:
+            try:
+                sink.on_transition(entered, cleared)
+            except Exception as exc:  # noqa: BLE001 — sink 실패 흡수(요청 보호)·타입명 로그 필수
+                self._logger.warning(
+                    "알림 sink 전달 실패(로그 경로는 정상) — 예외 타입: %s", type(exc).__name__
+                )

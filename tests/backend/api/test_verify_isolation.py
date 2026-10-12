@@ -18,6 +18,7 @@ import threading
 import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -37,6 +38,9 @@ from whymath_backend.schema.user import UserProfile as UserProfileSchema
 _SLOW_A = "x^20+x+1=0"
 _SLOW_B = "x^19+x+2=0"
 _CAP_S = 0.5
+# 실 SymPy 체인의 요청 벽시계 상한 — 예산(상한×4=2.0s) + 마감이 묶지 못하는 워커 재기동 1회 + 마지막
+# 전이의 계산. 정상 실측 최대 3.69초(CI 3.45초)와 예산 제거 뮤테이션 최소 11.27초 사이(OPS-127).
+_CHAIN_WALL_BOUND_S = 6.0
 
 
 def _unique_slow(degree: int) -> tuple[str, str]:
@@ -188,10 +192,11 @@ class TestBudgetMeansUnverifiable:
         _warm_worker()
         steps = ["2*(x+1)", "2*x+2", "2*x+2+0", _SLOW_A, _SLOW_B, _SLOW_A, _SLOW_B]
         steps += [_SLOW_A, _SLOW_B, _SLOW_A, _SLOW_B]
-        started = time.perf_counter()
         with TestClient(_app()) as client:
+            # 검증 요청 한 건만 잰다 — 앱 기동·종료(실측 0.02초 안팎)는 이 테스트의 대상이 아니다.
+            started = time.perf_counter()
             resp = client.post("/v1/verify-solution", json={"steps": steps})
-        elapsed = time.perf_counter() - started
+            elapsed = time.perf_counter() - started
         assert resp.status_code == 200, resp.text
         body = resp.json()
         states = [s["state"] for s in body["steps"]]
@@ -199,10 +204,45 @@ class TestBudgetMeansUnverifiable:
         assert all(s == "unverifiable" for s in states[2:])  # 느린 전이는 전부 판정 불가
         assert body["n_correct"] == 2 and body["n_incorrect"] == 0
         assert body["n_unverifiable"] == len(steps) - 1 - 2
-        # 총 예산(2.0s)이 요청 시간을 묶는다 — 예산 없이 전이마다 0.5s 상한만 있었다면 느린 전이 7개가
-        # 워커 재기동(≈0.8s) 포함 9초 안팎을 쓴다. 남은 예산이 상한이 되므로 예산 + 슬랙 안에서 끝난다.
-        assert elapsed < 3.2, f"체인 총 예산 2.0s 기대 — {elapsed:.2f}s"
+        # 총 예산(2.0s)이 요청 시간을 묶는다 — 예산을 없앤 뮤테이션은 느린 전이를 전부 계산해
+        # 11.3~11.6초를 쓴다(OPS-127 실측). 정상은 예산을 *재기동 1회만큼* 넘는다: 마감은 전이마다
+        # 남은 예산을 계산 상한으로 주지만, 마감 직전에 시작한 전이의 워커 재기동 대기(계산 상한 밖)는
+        # 묶지 못한다(제품 쪽 정정 = OPS-128). 그래서 정상은 2.2~3.7초(4코어 단독·4병렬 실측)·CI 부하에서
+        # 3.42~3.45초가 관측됐다 — 옛 상한 3.2초는 그 초과분을 덮지 못해 흔들렸다. 상한은 두 분포
+        # 사이에 둔다. 남은 예산 배분의 *정확성*은 벽시계로 구별되지 않으므로(아래 결정론 테스트가 맡는다)
+        # 여기서는 "예산이 요청을 묶었다"만 본다.
+        assert elapsed < _CHAIN_WALL_BOUND_S, f"체인 총 예산 2.0s 기대 — {elapsed:.2f}s"
         assert _isolated_call.isolation_stats()["timeouts"] < 7, "예산이 전이를 건너뛰지 않았다"
+
+    def test_solution_grants_each_transition_only_the_remaining_budget(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """총 예산 배분을 벽시계 없이 고정한다 — 가짜 시계 + 상한을 끝까지 쓰는 스텁 풀(OPS-127).
+
+        각 호출은 받은 상한만큼 계산하고 워커 재기동(0.3s · 마감 안·계산 상한 밖)을 더 쓴 뒤 초과로 끝난다.
+        예산 2.0s에서: 0.5 → 0.5 → 남은 0.4 → 소진(이후 전이는 계산 없이 판정 불가).
+        남은 예산 대신 상한 전체를 주는 뮤테이션(0.5·0.5·0.5)과 예산을 없앤 뮤테이션(8회 호출)이 둘 다
+        RED다 — 위 실 SymPy 테스트의 벽시계로는 앞의 뮤테이션이 정상과 구별되지 않는다.
+        """
+        from whymath_backend.api import verify as verify_api
+
+        clock = {"now": 1000.0}
+        monkeypatch.setattr(verify_api, "time", SimpleNamespace(monotonic=lambda: clock["now"]))
+        granted: list[float] = []
+
+        class _BurnsItsWholeLimit:
+            async def run(self, fn: Any, *args: Any, timeout_s: float, **kwargs: Any) -> Any:
+                granted.append(timeout_s)
+                clock["now"] += timeout_s + 0.3
+                raise BudgetExceededError("timeout", timeout_s)
+
+        monkeypatch.setattr(_isolated_call, "_get_pool", lambda: _BurnsItsWholeLimit())
+        with TestClient(_app()) as client:
+            body = client.post("/v1/verify-solution", json={"steps": ["x"] * 9}).json()
+        assert granted == pytest.approx([_CAP_S, _CAP_S, 0.4])  # 마지막은 남은 예산만
+        assert sum(granted) <= _CAP_S * verify_api._CHAIN_BUDGET_FACTOR + 1e-9
+        assert body["n_transitions"] == 8
+        assert body["n_unverifiable"] == 8 and body["n_correct"] == 0 and body["n_incorrect"] == 0
 
     def test_step_types_length_error_is_still_422(self) -> None:
         """입력 규약 위반은 격리와 무관하게 422 — 판정 불가로 접히지 않는다."""

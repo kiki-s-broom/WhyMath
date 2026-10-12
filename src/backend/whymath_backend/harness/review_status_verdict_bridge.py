@@ -21,7 +21,7 @@
     함수**다(각인된 판정과 게이트가 본 판정이 갈라지지 않게. started·aborted는 판정이 아니다).
   - 값 변환: `schema/review_timer.review_status_for_verdict` — 판정 → 노출 어휘의 단일 정본.
   - 적용 대상: 회차 코퍼스만(`review_status_domains.verdict_bridge_refusal` — 축적 CLI가 끌 수
-    없게 남기는 회차 대장 사이드카 `<corpus>.rounds.jsonl`이 표식). 고정 코퍼스 7종은 코퍼스 단위
+    없게 남기는 회차 대장 사이드카 `<corpus>.rounds.jsonl`이 표식). 고정 코퍼스 8종은 코퍼스 단위
     백필의 대상이라 거부한다(계약 정본 `docs/standards/review_status_stamping_contract.md`).
 
 각인 규칙 (최신 판정 → 각인값)

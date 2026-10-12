@@ -20,9 +20,12 @@
 
 **유형(17종) 축(S3-27 확장·2026-07-30)**: `Problem`↔`ProblemType` 연결(`problem_type_codes` 필드
 신설·`ai_content_generation_gap_review.md` D3·`problem_bank_gap_review.md` §5-③ 유보 해제)이
-착지해 더 이상 범위 밖이 아니다 — 코퍼스 전체 2,638건 중 2,217건이 결정론 백필로 유형 태깅됐다
-(`harness/problem_type_backfill.py`). 유형×단원 매트릭스와 "17유형 중 0커버 유형 목록"을 §2.5에
-낸다. 유형 카탈로그(`data/corpus/problem_type_graph_v1/problem_types.jsonl`)를 못 읽으면 이 축만
+착지해 더 이상 범위 밖이 아니다 — 결정론 백필(`harness/problem_type_backfill.py`)이 직접 분류 6종
+2,217건 + 계보 분류 `rephrased_v0` 421건(PB-07)을 태깅해 *태깅 대상 코퍼스 7종은 전량* 채워졌다
+(2026-10-09 CONT-04 실측: 스캔 전체 14,034문 중 태깅 2,638문). 나머지 코퍼스(S3-27 이후 추가분)는
+아직 태깅 계약 밖이라 0커버 판정의 분모에 들어 있지 않다 — 이 계측기의 한계다.
+유형×단원 매트릭스와 "17유형 중 0커버 유형 목록"을 §2.5에 낸다.
+유형 카탈로그(`data/corpus/problem_type_graph_v1/problem_types.jsonl`)를 못 읽으면 이 축만
 "카탈로그 미상"으로 정직하게 빠지고(exit 코드에 영향 없음) 나머지 축(성취기준·단원×난이도 등)은
 그대로 낸다 — 유형 축은 관측의 *일부*일 뿐 전체 리포트의 필수 선결 조건이 아니다.
 

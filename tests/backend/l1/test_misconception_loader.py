@@ -73,6 +73,13 @@ def _collection(rows: list[dict[str, Any]]) -> dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────────────
 # 가짜 sync 엔진 — begin() 컨텍스트 + execute() (PG 없이 배선 관찰)
 # ──────────────────────────────────────────────────────────────────────────
+class _FakeResult:
+    """적재 upsert 결과 흉내 — RETURNING이 키 1행을 돌려준 상태(=적재됨). P3-25 보호 판정이 읽는다."""
+
+    def first(self) -> tuple[int]:
+        return (1,)
+
+
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
         self._engine = engine
@@ -88,9 +95,9 @@ class _FakeConnection:
     ) -> None:
         return None
 
-    def execute(self, statement: object) -> None:
+    def execute(self, statement: object) -> _FakeResult:
         self._engine.executed.append(statement)
-        return None
+        return _FakeResult()
 
 
 class _FakeEngine:
@@ -172,7 +179,7 @@ class _RecordingStore:
     def __init__(self) -> None:
         self.received: list[MisconceptionCatalog] | None = None
 
-    def populate(self, records: list[MisconceptionCatalog]) -> int:
+    def populate(self, records: list[MisconceptionCatalog], **_cms: object) -> int:
         self.received = list(records)
         return len(self.received)
 
@@ -281,7 +288,7 @@ class TestPopulateMain:
         src = _touch(tmp_path / "misconceptions.json")
         calls: dict[str, Path] = {}
 
-        def _fake_load(session: Any, path: Path) -> int:
+        def _fake_load(session: Any, path: Path, **_cms: Any) -> int:
             calls["path"] = path
             return 839
 
@@ -293,13 +300,13 @@ class TestPopulateMain:
         assert "839" in out
 
     def test_missing_file_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(populate, "load_misconceptions", lambda _s, _p: 0)
+        monkeypatch.setattr(populate, "load_misconceptions", lambda _s, _p, **_c: 0)
         rc = populate.main(["--misconceptions", str(tmp_path / "nope.json")])
         assert rc == 2
 
     def test_verbose_flag_accepted(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         src = _touch(tmp_path / "misconceptions.json")
-        monkeypatch.setattr(populate, "load_misconceptions", lambda _s, _p: 5)
+        monkeypatch.setattr(populate, "load_misconceptions", lambda _s, _p, **_c: 5)
         rc = populate.main(["--misconceptions", str(src), "--verbose"])
         assert rc == 0
 

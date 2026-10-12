@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-32-core-concept-hint-link
+title: "대표 과정 핵심 개념 10종 hint 연결 — 좌석(P3-04) 신설 뒤 phase3_coverage hint unmeasured 10 → linked 10/10"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-04-problem-metadata-and-slots
+requires_gates: []
+acceptance:
+  - "① 결손 고정 — P3-02 CLI(phase3_coverage) 기준 대표 과정 핵심 개념 10종의 hint 연결이 전부 측정 불가(unmeasured 10)다: 힌트 저장 좌석이 없다(ARCH-39 '영구 부재' 판정 · hint_strategy 좌석은 P3-04 소관). P3-03(PR #1512, 54dc071e) 완료 시 acceptance ②(핵심 개념 5종 연결)의 잔여 축으로 승계받았다(Kiki 결정 2026-10-10).\n② 선행 — P3-04가 Problem 필수 7필드의 hint strategy 좌석을 만든 뒤 착수한다(depends_on). 좌석이 생기면 phase3_coverage의 hint 연결이 unmeasured에서 linked/missing으로 측정 가능해져야 한다 — 측정 불가를 충족으로 세지 않는다.\n③ 채우기 — 핵심 개념 10종의 승인 문항에 hint를 채워 phase3_coverage hint linked 10/10. hint 문안은 정답을 바로 주지 않는 Polya 단계형이어야 하며(CLAUDE.md 교수학 금기), 승인된 내용에 hint를 더하는 것이 승인 근거를 옮기는지(EOS-27 내용 지문 · P3-03 감사 결속 선례)를 먼저 판정한다.\n④ 완료 판정 — 재측정 전후 표(hint 연결 · Concept Completeness)와 다른 연결이 줄지 않음."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-03 완료(2026-10-10) 시 acceptance ② 잔여 승계. 같은 승계의 다른 축(02-02 해설 연결)은 P3-31."
+updated: 2026-10-10

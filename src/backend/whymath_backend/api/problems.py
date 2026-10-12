@@ -61,6 +61,7 @@ from whymath_backend.api._concurrency import (
 )
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.config import get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
 from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
 from whymath_backend.db.session import get_session
@@ -84,10 +85,12 @@ from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import ProblemRelation as ProblemRelationSchema
 from whymath_backend.schema.problem import PublicProblem, PublicProblemStep
 from whymath_backend.schema.review_transition import (
+    IllegalInitialReviewStatus,
     IllegalReviewStatusChange,
     QuarantineReasonRequired,
     QuarantineRecordLocked,
     ReviewTransitionAction,
+    ensure_initial_review_status,
     plan_review_field_change,
 )
 
@@ -211,6 +214,32 @@ class ProblemCreateRequest(ProblemSchema):
     )
 
 
+def _initial_review_status_refusal(
+    exc: IllegalInitialReviewStatus, *, actor_id: uuid.UUID
+) -> HTTPException:
+    """생성 시 초기 검수 상태 거부를 422로 옮긴다(ADMIN-19) — 응답 모양은 PATCH 422와 같은 축이다.
+
+    승인 상태로 태어나려는 시도는 검수 우회 신호라 WARNING으로 남긴다(행위자·요청 상태·코드만 —
+    자유 텍스트는 싣지 않는다). `privacy_audit`에는 쓰지 않는다: 그 테이블의 `content_mutation`은
+    "문항이 만들어졌다"는 사실의 기록이고 거부된 시도는 생성이 아니다(`_review_patch_refusal`과
+    같은 논거 — 감사 원장이 일어나지 않은 일을 말하면 안 된다).
+    """
+    _logger.warning(
+        "초기 검수 상태 거부(ADMIN-19) — 생성 우회 시도: actor=%s requested=%s code=%s",
+        actor_id,
+        exc.requested.value if exc.requested is not None else None,
+        exc.code,
+    )
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail={
+            "code": exc.code,
+            "message": str(exc),
+            "requested_status": exc.requested.value if exc.requested is not None else None,
+        },
+    )
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -240,7 +269,18 @@ async def create_problem(
     원장 FK(`content_provenance.problem_id → problem`)가 문항 행을 요구하므로 문항을 먼저
     flush한 뒤 원장을 add한다 — ORM 간 relationship이 없어 unit-of-work의 INSERT 순서에
     기대지 않는다.
+
+    **초기 검수 상태 제한(ADMIN-19)**: `review_status`는 미설정 또는 `pending`만 허용한다 — 그 외
+    (`approved`·`rejected`·`quarantined`)는 **DB·원장 관문보다 앞에서** 422
+    `illegal_initial_status`다. 상태 전이(승인·거부·격리)는 기존 문항에 대한 `PATCH`·
+    `POST …/transitions`의 몫이며, 생성이 그 상태로 직접 태어나게 하면 전이·감사 동작·검수 기록이
+    모두 건너뛰어진다. 판정은 `schema/review_transition.py::ensure_initial_review_status`가
+    단일 권위다.
     """
+    try:
+        ensure_initial_review_status(_as_review_status(body.review_status))
+    except IllegalInitialReviewStatus as exc:
+        raise _initial_review_status_refusal(exc, actor_id=admin.user_id) from exc
     try:
         gate_result = require_provenance(
             slug=body.slug or str(body.problem_id),
@@ -569,6 +609,8 @@ async def patch_problem(
             }
         )
     updated = await session.merge(Problem.from_schema(validated))
+    # 사람이 고친 행 — 다음 CLI 적재가 덮어쓰지 못하게 표지를 남긴다(P3-25).
+    mark_cms_edited(updated)
     settings = get_settings()
     record_content_mutation_audit(
         session,
