@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/api/_isolated_call.py
   - scripts/analysis/measure_sympy_isolation_budget.py
-session: null
+session: claude/relaxed-keller-4wk0b2
 notes: "출처: OPS-123(ubp9tw 회수) ⑤ — OPS-96 acceptance 재대조에서 미이행으로 분리. OPS-96의 ⑤(상한값 실측과 정상 문항 판정 불가 비율)는 최종답 경로만 14,034건으로 충족하고 단계 경로는 실서비스 입력 없이는 측정할 수 없어 이 태스크가 승계한다."
-updated: 2026-10-09
+updated: 2026-10-12

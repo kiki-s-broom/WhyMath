@@ -12309,3 +12309,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
+
+## 2026-10-12 OPS-126 — SymPy 격리의 "작동한 비율"을 `/health/ready`에 배선 · 상한 5.0초·워커 2 유지 판정 · 실입력 재판정은 OPS-131로 분리
+
+정본: `docs/reviews/ops126_isolation_served_ratio_2026-10-12.md`. 판정 기준 `main d873d064` + `claude/relaxed-keller-4wk0b2`.
+
+- **갭**: `isolation_stats()`는 카운터를 만들지만 읽는 비테스트 코드가 0건이었다. 정상 200은 격리가 일했다는 증거가 아니다(격리를 꺼도·전부 폴백해도 200이 같다) — "작동한 비율" 원칙의 갭.
+- **①이행**: `/health/ready`에 `sympy_isolation` 섹션(기존 좌석 재사용·신규 엔드포인트 0). `isolated_ratio`(풀에서 실제로 돈 비율)·`undecidable_ratio`(판정 불가로 접힌 비율)·사유별 카운터·`process_id`. 분모 0이면 `null`(None-vs-0). 프로세스별 카운터라는 한계를 응답 스키마에 명시. 테스트 16건·뮤테이션 7종 전건 RED.
+- **②부분 이행**: 합성 단계 354건 최대 0.157초, 고차 방정식 16건은 상한 없이도 전부 `unverifiable` → 상한은 판정 정보를 잃지 않는다 → **5.0초 유지**. 합성 대리 분포이지 학생 입력이 아니다 — 실입력 재판정은 `OPS-131`(파일럿 1,000건 이상 후).
+- **③이행**: 배포 형상은 단일 uvicorn(`--workers` 없음)·메모리 제한 미선언 → 컨테이너당 SymPy 워커 2개. 워커 RSS 73~76MB(종전 주석 100~150MB는 과대) → **기본값 2 유지**. 증설 신호 = `queue_waits > 0`. 느린 입력 2건이 풀을 점유하면 정상 요청 대기 p50 5.77초(접힘 0) — 학생 체감 지연으로 기록.
+- **미실측(숨기지 않음)**: Windows·실 배포 이미지 메모리, 실제 학생 입력 분포, 도커 데몬이 없어 `docker-build` 잡 미재현.
