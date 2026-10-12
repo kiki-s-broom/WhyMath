@@ -1006,17 +1006,17 @@ gates:
     title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-09
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "세션 사용자 결정(2026-10-12 · AskUserQuestion 응답을 세션이 중계 기입 — clear 주체 claude): 지표 7종 목표 확정. (가) 이 값으로 확정 = Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95%. 분모가 작아 1~3은 사실상 전부 달성(10/10·10/10·8/8)이 목표임을 인지하고 확정. Critical Defect = Hard Gate F-Ⅱ(수학 오류율)·F-Ⅴ(힌트 정답 누설)만 남기고 F-Ⅰ·Ⅲ·Ⅳ는 생산 공정 신호라 제외(코드 변경 필요 — 후속 태스크). Graph Connectivity Coverage = 95%로 확정(명세 null 해소 — 명세 변경 필요 — 후속 태스크). 후속 반영(scope_spec.yaml 목표 갱신 + phase3_metrics.py 지표 6 정의 축소 + 계약 문서 갱신)은 별도 PR. 판정 기준 main d873d064 · 판정 재료 docs/reviews/p3_14_phase3_metrics_2026-10-09.md 기준선(Curriculum 3/10 · Completeness 0/10 · Problem 6/8 · Graph 0/10). P3-10 기준선은 미착지(todo)라 4·5·6은 P3-10 이후 재조정 가능성을 열어 둔다."
+    cleared_by: claude
     notes: ""
     corrections:
       - "[2026-10-09] input done · P3-14-phase3-metrics-cli · 판정 무관: 이 태스크는 게이트 G-p314-phase3-metric-targets 의 판정 결과를 내지 않는다 — 목표 수치(95·98·99%) 확정은 Kiki 의 사람 판정이다. P3-14 가 낸 것은 판정 재료(7종 CLI와 오늘 기준선: Curriculum 3/10·Concept Completeness 0/10·Problem Coverage 6/8·Graph Connectivity 0/10)까지이고 게이트는 P3-10 기준선을 기다리며 pending 으로 남는다 — done P3-14-phase3-metrics-cli 인계"
+      - "[2026-10-12] depends_on -P3-10-ai-quality-eval-suite — Kiki 결정(2026-10-12): P3-10 기준선 없이 지금 목표를 확정한다고 선택. 이 의존은 판정 재료 대기였고 사람이 대기를 끝냈다. 지표 4·5·6은 P3-10 착지 후 재조정 가능성을 증적에 남긴다."
     depends_on:
       - P3-14-phase3-metrics-cli
-      - P3-10-ai-quality-eval-suite
   - id: G-p318-calc-02-08-disposition
     title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
     kind: decision
