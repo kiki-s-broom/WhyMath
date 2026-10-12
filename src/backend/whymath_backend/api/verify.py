@@ -35,7 +35,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from whymath_backend.api._auth import ConsentedUser
-from whymath_backend.api._isolated_call import isolated
+from whymath_backend.api._isolated_call import CHAIN_BUDGET_FACTOR, isolated
 from whymath_backend.config import get_settings
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
@@ -62,7 +62,7 @@ _MAX_ANSWER_VARS = 50
 
 # OPS-96: verify-solution 체인 전체의 총 시간 예산 = 호출 1건 상한 × 이 배수. 전이마다 상한을 따로
 # 주면 병리적 전이 199개가 한 요청으로 워커를 199×상한 동안 붙잡을 수 있다.
-_CHAIN_BUDGET_FACTOR = 4
+_CHAIN_BUDGET_FACTOR = CHAIN_BUDGET_FACTOR  # OPS-125: 코치 턴과 단일 출처 공유
 
 logger = logging.getLogger("whymath.api.verify")
 

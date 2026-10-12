@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - src/backend/whymath_backend/api/coach.py
   - src/backend/whymath_backend/l4/solution_coaching.py
   - tests/backend/api/test_isolation_call_sites_governance.py
-session: null
+session: claude/wonderful-goldberg-khoyad
 notes: "출처: OPS-123(ubp9tw 회수) ⑤ — OPS-96 acceptance 재대조에서 미이행으로 분리. OPS-96 acceptance ①이 요구한 학생 대면 경로 동기 SymPy 호출 지점 AST 전수 열거 결과 학생 입력 식을 받는 미격리 지점이 이 4곳이다. 서버 생성 콘텐츠 경로(study 단위 생성·장면 생성·시각화 스펙·DSL 컴파일)는 학생 입력이 아니라 이 태스크 범위 밖이며 별도 판정이 필요하면 따로 등재한다."
-updated: 2026-10-09
+updated: 2026-10-12
