@@ -3105,7 +3105,7 @@ async def coach_decide(
     )
     # S4-19: carry(게이트 이전 단계 검증 운반값)는 stateless 경로에선 미소비(DB 무접근 계약 —
     # 적재 좌석 없음). 마지막 원소=solution_coaching 불변식은 유지된다.
-    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안에서 SymPy 금지).
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
     chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     decision, matches, intervention, lthc, entry_category, _step_carry, solution_coaching = (
         _build_response_payload(
@@ -3291,7 +3291,7 @@ async def create_session(
     # 개념의 성취기준 고시코드) — 둘 다 비노출 개인화 슬롯(_grade_for/_standard_code_for docstring).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, body.problem_id)
-    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안에서 SymPy 금지).
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
     chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: step_carry = 게이트 이전 단계 검증 운반값(아래 _log_verify_event 적재 전용·비노출).
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
