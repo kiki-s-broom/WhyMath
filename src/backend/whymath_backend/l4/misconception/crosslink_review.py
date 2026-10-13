@@ -194,7 +194,8 @@ def main(argv: list[str] | None = None) -> int:
     """검수 큐 승인분 승격 CLI — `promote --queue Q.json [--out OUT.json | --load]`.
 
     반환은 종료 코드: 0=성공 · 1=검수 큐 위반(전건 열거 출력) · 2=입력 파일 부재/승인 0건
-    (조용한 무동작 금지) · 3=외래키 대상 누락(HARN-302 — 쓰기 0건·누락 키 전건 열거).
+    (조용한 무동작 금지) · 3=외래키 대상 누락(HARN-302 — 쓰기 0건·누락 키 전건 열거) ·
+    4=적재 후 canonical이 코퍼스 의도와 달라짐(HARN-216 — 라이브 잔존 행과 경쟁·쓰기 0건·전건 열거).
     `--load`는 기존 `load_crosslinks`(l1/crosslink_loader)에 위임해 `misconception_crosslink`
     테이블에 멱등 적재한다(승인→적재 원커맨드).
     """
@@ -237,10 +238,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.load:
         # 지연 import — 로더는 DB 설정(Settings)·sqlalchemy를 끌므로 승격-전용 경로를 hermetic 유지.
         from whymath_backend.l1.fk_precheck import ForeignKeyTargetMissingError
-        from whymath_backend.l1.misconception.crosslink_loader import load_crosslinks
+        from whymath_backend.l1.misconception.crosslink_loader import (
+            CanonicalFlipError,
+            load_crosslinks,
+        )
 
         try:
             count = load_crosslinks(None, payload)
+        except CanonicalFlipError as exc:
+            # canonical 경쟁(HARN-216) — 쓰기 0건. 종료 코드 4 = 라이브에 코퍼스에 없는 행이 남아
+            # 적재해도 정답이 뒤집히거나 미선정이 된다(3과 구분 — 3은 입력 쪽, 4는 라이브 쪽 문제).
+            # 해소는 잔존 행 삭제(사람 확인)뿐이라 재시도로 풀리지 않는다 — 블록은 멈춘다.
+            print(f"적재 거부 — {exc}")
+            return 4
         except ForeignKeyTargetMissingError as exc:
             # 외래키 대상 누락(HARN-302) — 쓰기 0건. 종료 코드 3 = 라이브 DB가 적재 입력을 받을
             # 준비가 안 됨(검수 큐 위반 1·입력 부재 2와 구분). 블록은 이 코드를 보고
