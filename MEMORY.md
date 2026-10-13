@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-13 (구현·EOS-195): **발행된 판이 있는 문항의 제자리 편집을 *차단*으로 처분했고, 입구는 둘이 아니라 셋이었다 — CMS 편집·`PATCH /v1/problems`·코퍼스 재적재. 뮤테이션 16종 전건 RED.**
+
+- **처분 선택(차단 / 자동 새 초안 / 표지만)**: 자동 새 초안은 서빙 원본이 라이브 행이라 초안을 만들어도 드리프트가 그대로 남아 기각. 표지만은 예방이 아니라 가시화라 탐지 통제(리포트)로 분리. 차단은 `live_content_current`가 "라이브 == 판 payload"일 때만 발행을 허용하므로 수정 절차가 폐기 → 수정 → 새 판 발행으로 닫힌다.
+- **입구 3곳**: CMS(`_edit_block_reason`) · `PATCH /v1/problems/{id}`(승인 가드 없이 `session.merge`로 전 컬럼을 씀) · 코퍼스 재적재(`ON CONFLICT DO UPDATE WHERE`). 셋은 `db/published_edit_guard`의 판정을 공유한다(적재기는 SQL이라 같은 컬럼 상수).
+- **발견 2건**: ① `schema.Problem`이 `problem_version_id`를 갖고 있어 PATCH 본문으로 발행 포인터를 게이트 밖에서 바꿀 수 있었다(동적 키라 R2 AST가 못 봄) → `publish_pointer_owned` 409. ② PATCH가 잠금 없이 읽은 낡은 포인터를 `merge`로 되써 동시 발행의 포인터를 덮을 수 있었다 → 모든 PATCH가 행을 잠근다(기존 테스트 계약 1건을 의도적으로 뒤집음).
+- **긴급 정지 유지**: 격리·해제는 서빙 내용이 아니라 노출 축이라 발행 문항에서도 통과한다.
+- **`--overwrite-cms-edits`는 발행 보호를 풀지 못한다**(사람 편집 감수와 판-문항 일치는 다른 축). 건너뜀은 `published_version_conflicts`로 따로 보고.
+- **분모 0 = 측정 불성립**: 운영 포인터는 호출 표면(EOS-194) 전까지 전부 NULL이라 리포트는 "드리프트 없음"이 아니라 "측정 불성립"을 말한다. 판정 불가(판 미독·비발행 판·타 문항 판·라이브 계약 위반)는 일치/어긋남과 별도 계상.
+- **후속**: EOS-194가 이 태스크에 의존하도록 대장에 집행(`depends_on`). 그 표면은 판 폐기 전이도 노출해야 막힌 문항을 고칠 수 있다.
+
 ### 2026-10-13 (구현·EOS-190): **`problem_version`의 유일한 writer(`l3/problem_publish_gate.py`)를 만들고 실제 `POST /v1/me/attempts`가 `outcome=pinned`를 내는 것까지 실 PG로 확인했다 — 단 이 writer를 부르는 운영 호출자는 아직 없어 운영 값은 지금도 NULL이다. 작업 중 코퍼스 재적재가 발행 포인터를 NULL로 되돌리는 두 번째 writer 결함과, `tests/backend/l3` 통합 테스트 9개가 CI에서 수집되지 않는 배선 결함을 발견했다** (claude 구현) — 판정 기준 작업 브랜치 `claude/charming-thompson-n7uldh`(main `dc214a2f` 위)
 
 - **결정**: 개념 판 게이트(`l3/publish_gate.py`)와 같은 전이표를 조회하는 짝 모듈을 새로 두었다(공통화 리팩터는 EOS-50의 뮤테이션·테스트를 건드리므로 하지 않음 — 순수 로직 약 60줄 중복을 감수). RESTORE·rollback은 호출 경로가 없어 **구현하지 않았다**(선언만 된 코드 금지) → `EOS-196`.
