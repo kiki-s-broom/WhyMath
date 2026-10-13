@@ -40,6 +40,9 @@ from whymath_backend.schema.enums import (
     EventType,
     SessionType,
 )
+from whymath_backend.schema.evaluation_context import (
+    EvaluationContext as SchemaEvaluationContext,
+)
 
 
 def _pg_ddl(table: object) -> str:
@@ -87,15 +90,16 @@ def test_learning_session_fk_and_loose_ref() -> None:
 
 
 def test_problem_attempt_ddl_fks_and_jsonb() -> None:
-    """problem_attempt: FK 3개(user_profile·learning_session·problem)
-    ·ocr_result/step_times JSONB."""
+    """problem_attempt: FK 4개(user_profile·learning_session·problem·problem_version)
+    ·ocr_result/step_times/evaluation_context JSONB."""
     ddl = _pg_ddl(OrmProblemAttempt.__table__)
     assert "REFERENCES user_profile" in ddl
     assert "REFERENCES learning_session" in ddl
-    assert "REFERENCES problem" in ddl
-    assert "JSONB" in ddl  # ocr_result·step_times
-    # stuck_at_concept_id는 REFERENCES 없음 → FK 아님(FK는 정확히 3개).
-    assert len(OrmProblemAttempt.__table__.foreign_keys) == 3
+    assert "REFERENCES problem " in ddl or "REFERENCES problem (" in ddl
+    assert "REFERENCES problem_version" in ddl  # EOS-47
+    assert "JSONB" in ddl  # ocr_result·step_times·evaluation_context
+    # stuck_at_concept_id는 REFERENCES 없음 → FK 아님(FK는 정확히 4개 — EOS-47이 problem_version 추가).
+    assert len(OrmProblemAttempt.__table__.foreign_keys) == 4
 
 
 def test_problem_attempt_partial_index() -> None:
@@ -270,3 +274,62 @@ def test_attempt_event_db_assigned_event_id() -> None:
     back = orm.to_schema()
     assert back.event_id is None
     assert back.event_at == at
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-47 — 버전 고정 컬럼 2개(problem_version_id · evaluation_context)
+# ──────────────────────────────────────────────────────────────────────────
+def test_problem_attempt_version_pin_columns_are_nullable_without_default() -> None:
+    """두 컬럼은 nullable·기본값 없음 — 기존 행에 판을 날조하지 않는다(백필 금지 규약)."""
+    cols = OrmProblemAttempt.__table__.c
+    for name in ("problem_version_id", "evaluation_context"):
+        assert cols[name].nullable is True, name
+        assert cols[name].server_default is None, name
+        assert cols[name].default is None, name
+
+
+def test_problem_attempt_version_fk_targets_problem_version_with_stable_name() -> None:
+    """FK는 problem_version.version_id를 가리키고 이름이 마이그레이션과 같다(제약명 결정성)."""
+    fk = next(
+        f for f in OrmProblemAttempt.__table__.foreign_keys if f.parent.name == "problem_version_id"
+    )
+    assert fk.target_fullname == "problem_version.version_id"
+    assert fk.constraint is not None
+    assert fk.constraint.name == "fk_problem_attempt_problem_version_id_problem_version"
+
+
+def test_problem_attempt_evaluation_context_jsonb_uses_none_as_null() -> None:
+    """SEC-06: JSONB는 none_as_null=True — 파이썬 None이 JSON 스칼라 null이 아니라 SQL NULL이 된다."""
+    col_type = OrmProblemAttempt.__table__.c.evaluation_context.type
+    assert getattr(col_type, "none_as_null", False) is True
+
+
+def test_problem_attempt_version_pin_roundtrip() -> None:
+    """판 id와 환경 스냅숏이 schema ↔ ORM 변환을 왕복해도 보존된다(키별 None 포함)."""
+    vid = uuid.uuid4()
+    s = SchemaProblemAttempt(
+        problem_version_id=vid,
+        evaluation_context=SchemaEvaluationContext(curriculum_version="2022_REVISION"),
+    )
+    orm = OrmProblemAttempt.from_schema(s)
+    assert orm.problem_version_id == vid
+    # JSONB에는 평범한 dict가 들어간다(중첩 Pydantic 객체가 아니다).
+    assert isinstance(orm.evaluation_context, dict)
+    assert orm.evaluation_context["curriculum_version"] == "2022_REVISION"
+    assert orm.evaluation_context["grading_policy_version"] is None  # 출처 없는 키는 모름(None)
+
+    back = orm.to_schema()
+    assert back.problem_version_id == vid
+    assert back.evaluation_context is not None
+    assert back.evaluation_context.curriculum_version == "2022_REVISION"
+    assert back.evaluation_context.grading_policy_version is None
+
+
+def test_problem_attempt_version_pin_defaults_to_none() -> None:
+    """미지정(EOS-47 이전 행 호환) → 두 필드 모두 None으로 보존된다(기본값을 지어내지 않는다)."""
+    orm = OrmProblemAttempt.from_schema(SchemaProblemAttempt())
+    assert orm.problem_version_id is None
+    assert orm.evaluation_context is None
+    back = orm.to_schema()
+    assert back.problem_version_id is None
+    assert back.evaluation_context is None
