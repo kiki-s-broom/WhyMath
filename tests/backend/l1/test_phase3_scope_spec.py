@@ -56,7 +56,7 @@ _EXPECTED_TARGETS = {
     "curriculum_coverage": 0.98,
     "concept_completeness": 0.95,
     "problem_coverage_by_skill": 0.95,
-    "graph_connectivity_coverage": None,
+    "graph_connectivity_coverage": 0.95,  # G-p314-phase3-metric-targets (2026-10-12 Kiki 확정 · P3-33)
 }
 
 
@@ -250,9 +250,15 @@ def test_target_value_out_of_range_fails(bad: Any) -> None:
 
 
 def test_null_target_without_a_reason_fails() -> None:
-    """수치가 없다는 사실은 허용하되 왜 없는지가 데이터로 남아야 한다."""
+    """수치가 없다는 사실은 허용하되 왜 없는지가 데이터로 남아야 한다.
+
+    실 명세의 5개 목표가 전부 확정된 뒤에도 '목표 미정' 규칙은 로더의 계약으로 남는다 —
+    확정된 목표 하나를 null 로 되돌리면서 사유를 안 남기는 주입으로 그 규칙을 겨냥한다.
+    """
     with pytest.raises(ps.ScopeSpecError, match="reason"):
-        _mutate(lambda d: d["completeness"]["targets"]["graph_connectivity_coverage"].pop("reason"))
+        _mutate(
+            lambda d: d["completeness"]["targets"]["graph_connectivity_coverage"].update(value=None)
+        )
 
 
 @pytest.mark.parametrize("bad", [0, -1, True, 1.5, "1"])

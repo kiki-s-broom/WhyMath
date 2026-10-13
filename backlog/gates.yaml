@@ -841,15 +841,27 @@ gates:
     title: "게이트② 라이브 표본 실측 실행 — docs/ops/ops106_gate2_live_sample_runbook.md 를 Phaiakes9 에서 실행해 서빙 계상(COUNTED)·이중 회계(MATCH)·저작 분리(SEPARATED_MATCH) 판정 줄 전체를 세션에 전달 (OPS-106 ①②③)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-05
+    remind_after_days: 7
+    evidence: "판정 기준: main d873d064 (Kiki 클론 HEAD=d873d064 일치, PRE_OK=True) · 2026-10-12 Phaiakes9 실측 · 상세 MEMORY.md 2026-10-12 항목. ② DUAL_ACCOUNTING MATCH (인프로세스 16 = Langfuse probe 16, 오류 2건은 ReadTimeout). ③ AUTHORING_SEPARATION SEPARATED_MATCH (authoring +5, 표본 +0, unlabeled +0). ① SERVING_SAMPLE COUNTED (재시도: serving +43, unlabeled +0, SURFACE_LABELED_RATE 1.0, PRIMARY_RECORDS_P=1). 단서: ① 1차 시도는 NO_PRIMARY_TURN_IN_SERVER_LOG (primary 하네스 TimeoutError 폴백으로 기록 0줄, serving +45), 재시도에서도 15요청 중 14턴이 시간 초과로 primary 성공은 1건뿐 — 이 실측이 증명한 것은 계측 사슬(표지-전송-집계)의 작동까지이며 학생 대면 primary 성공률은 OPS-134가 소유한다. 게이트② 합격(로컬 80% 이상)은 미판정: cost_probe 로컬 100%는 budget0 강등 16건의 결과다. 부수 결함 OPS-133(낡은 데모 DB 진단 부재)."
+    cleared_by: claude
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-106-gate2-live-sample-serving-vs-authoring
+  - id: G-ops135-ci-image-source-decision
+    title: "OPS-135 CI 컨테이너 이미지 공급원 선택 — Docker Hub 익명 pull 한도로 머지 queue가 연속 탈락했다(2026-10-09 20:53~21:16Z · PR #1529 queue 실행 4회 중 3회 · 같은 시간대 다른 PR의 pull_request 실행도 같은 단계 실패). 3택: ①ghcr.io 미러(세션 권고 — 외부 계정·장기 시크릿 없이 GitHub 안에서 닫힌다. 단 미러 갱신 절차·digest 고정이 필요하고, neo4j·pgvector 이미지 재배포 라이선스와 패키지 용량 상한은 아직 확인하지 않았다) ②Docker Hub 로그인 pull(가장 작은 변경 — Docker Hub 계정 + 액세스 토큰을 GitHub Secrets에 사람이 등록해야 하고, 한도가 계정 단위로 남는다) ③감수(변경 없음 — 한도가 풀릴 때까지 재시도하고 다음 탈락 때 재판정). 근거 = 태스크 OPS-135 notes 「배경 실측」. 판정 증적(evidence)에는 선택지 번호와 판정 기준 커밋 해시를 적는다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-12
     remind_after_days: 7
     evidence: null
     cleared_by: null
     notes: ""
     corrections: []
-    depends_on:
-      - OPS-106-gate2-live-sample-serving-vs-authoring
+    no_inputs_reason: "Kiki의 공급원 선택(ghcr 미러 / Docker Hub 로그인 pull / 감수)이며 먼저 끝나야 할 태스크가 없다. 구현 태스크 OPS-135가 이 게이트를 기다린다."
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human
