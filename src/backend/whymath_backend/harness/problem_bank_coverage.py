@@ -20,10 +20,13 @@
 
 **유형(17종) 축(S3-27 확장·2026-07-30)**: `Problem`↔`ProblemType` 연결(`problem_type_codes` 필드
 신설·`ai_content_generation_gap_review.md` D3·`problem_bank_gap_review.md` §5-③ 유보 해제)이
-착지해 더 이상 범위 밖이 아니다 — 결정론 백필(`harness/problem_type_backfill.py`)이 직접 분류 6종
-2,217건 + 계보 분류 `rephrased_v0` 421건(PB-07)을 태깅해 *태깅 대상 코퍼스 7종은 전량* 채워졌다
-(2026-10-09 CONT-04 실측: 스캔 전체 14,034문 중 태깅 2,638문). 나머지 코퍼스(S3-27 이후 추가분)는
-아직 태깅 계약 밖이라 0커버 판정의 분모에 들어 있지 않다 — 이 계측기의 한계다.
+착지해 더 이상 범위 밖이 아니다 — 결정론 백필(`harness/problem_type_backfill.py`)이 직접 분류
+(S3-27 6종 + CONT-09 `unit_codes` 표 30종 = 36종 14,034건)와 계보 분류 `rephrased_v0` 421건(PB-07)을
+태깅하고, `p3_calculus1_diff_v0` 504건은 생성 시점에 자가 태깅한다 — *스캔 전체 14,538문이 전량*
+채워졌다(2026-10-12 CONT-09 실측). 이전(2026-10-09 CONT-04 실측)에는 S3-27 이후 추가분 30종
+11,396문이 태깅 계약 밖이라 0커버 판정이 전체의 18.8%만 본 값이었다 — 그 사각은 닫혔고, 새 코퍼스가
+어느 좌석에도 앉지 않으면 `problem_type_mapping.find_corpus_seat_violations`
+(테스트 `TestCorpusSeatContract`)가 RED를 낸다.
 유형×단원 매트릭스와 "17유형 중 0커버 유형 목록"을 §2.5에 낸다.
 유형 카탈로그(`data/corpus/problem_type_graph_v1/problem_types.jsonl`)를 못 읽으면 이 축만
 "카탈로그 미상"으로 정직하게 빠지고(exit 코드에 영향 없음) 나머지 축(성취기준·단원×난이도 등)은
