@@ -12348,3 +12348,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
+
+## 2026-10-12: 미머지 브랜치 전수 감사 17회차 — 16회차가 claim 활성이라 뺀 완성품 4건이 TTL을 넘겨 고립 · 회수 태스크 4건 등재 · 브랜치 전용 태스크 4건 복원 · 삭제 0건 · 대책 HARN-309
+
+- **판정 기준 main `d873d064`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12.md`. 원격 ref 51 − 제외 4 − 열린 PR 22 = 감사 대상 25. 14차 삭제 배치 11건은 전건 집행(잔존 0/11).
+- **사고(반복)**: 서로 다른 세션 4개가 완성 구현을 PR 없이 `review` 상태로 두고 끝났다 — `MATH-06`(`brave-franklin`)·`OPS-34`(`amazing-goldberg`)·`OPS-50`(`happy-turing`)·`PED-26`(`nice-cray`). main 부재 줄 658·590·876·866. 커밋 메시지가 원인을 직접 적는다("PR 미개설"·"PR 대기 — CLAUDE.md 먼저 지시 대기"). 클라우드 세션 기본 지시(PR은 요청 시에만)와 CLAUDE.md 완료·병합(요청 없이 PR 기본값)의 충돌을 세션이 전자로 풀었고, `backlog.py review`가 PR 증적을 묻지 않아 대장상 정상 종료가 됐다. `review`는 원격 claim을 유지하므로 야간 고립 리포트에도 TTL(72h)까지 가려졌다.
+- **대책(코드·태스크)**: `HARN-309` — `review` 전이의 PR 증적 요구 + `check-stop`의 review·PR 미개설 차단. 새 산문 규칙 등재 동결(2026-09-20)에 따라 CLAUDE.md는 수정하지 않았다.
+- **회수 등재**: `MATH-07`·`OPS-129`·`OPS-130`·`PED-45`(파일 단위 이식 · 원 번호 재사용 금지 · 소유 태스크 4건에 `depends_on` 부착). 한계: 소유 태스크는 부착 전에도 claim 때문에 `next` 후보가 아니었으므로 부착 효과는 claim 해제 뒤에야 변별된다.
+- **분실 등재 복원**: `nice-cray`에만 있던 `ARCH-72`·`HARN-304`·`PED-44`·`REND-05`를 원 번호로 CLI 재등재(title·acceptance·paths가 브랜치 원문과 글자 단위 일치 확인). `PED-43`은 빈 acceptance 오등재로 브랜치에서도 취소된 번호라 복원하지 않음. `ARCH-72`·`HARN-304`·`PED-44`는 `add` 당시 원격 예약 push가 실패했다(`number_reserve_unavailable` 3건 · `REND-05`만 성공 · 실패 원인은 재현 못 함 — 2026-10-13 정정: 초안의 "main 최대보다 낮으면 생략" 추정은 틀렸다). 같은 날 `reserve_for`로 재예약해 4건 실재 확인. 예약 TTL 72h라 이 PR이 2026-10-15경까지 착지해야 한다.
+- **삭제 0건**: 내용 소멸 3건(`blissful-lovelace`·`status-f6qz0c`·`stoic-hawking`)은 claim 해제 대기, 3건(`friendly-pascal`·`gracious-cannon`·`status-f9lp65`)은 Kiki 판단 대기. 특히 `friendly-pascal`은 내용이 전량 흡수됐으나(코퍼스 차이는 `authored_by` 필드뿐) 2026-10-09 보존 지시가 main에 도달하지 못한 채 `QUAL-15` done과 충돌한다.
+- **정직한 공백**: 부재 줄 대조는 줄 전체 일치라 이식량의 상한이다. 브랜치 커밋 메시지의 검증 수치는 재현하지 않았다. `claims reap --apply`는 실행하지 않았다.
