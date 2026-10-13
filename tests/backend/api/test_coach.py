@@ -907,6 +907,19 @@ class TestStepChainVerifierInjection:
     # 진짜 수학 구현이면 correct 전이(2*x+4 ≡ 2*(x+2)) → 노출 None. 가짜면 incorrect → verify.
     _STEPS = ["2*x + 4", "2*(x + 2)"]
 
+    @pytest.fixture(autouse=True)
+    def _isolation_off(self, monkeypatch: pytest.MonkeyPatch) -> Any:
+        """격리를 끈다(OPS-125) — 이 클래스는 *주입*을 검증하지 격리를 검증하지 않는다.
+
+        격리가 켜져 있으면 가짜 verifier가 워커 프로세스로 pickle되어 가야 하는데, 테스트 모듈에
+        정의된 클래스는 워커가 import하지 못하고(`ModuleNotFoundError`) 호출 기록(`fake.calls`)도
+        워커 쪽 사본에만 남는다. 격리 쪽 검증은 `test_coach_step_chain_isolation.py`가 한다.
+        """
+        monkeypatch.setenv("WHYMATH_SYMPY_ISOLATION_ENABLED", "false")
+        get_settings.cache_clear()
+        yield
+        get_settings.cache_clear()
+
     def _install(self, client: TestClient) -> _RecordingStepChainVerifier:
         """`create_app`이 올린 진짜 능력을 가짜로 교체(다른 능력·경로는 그대로)."""
         fake = _RecordingStepChainVerifier()
