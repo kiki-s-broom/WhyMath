@@ -12358,6 +12358,18 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
 
+## 2026-10-12 OPS-106 게이트② 라이브 표본 실측 — ② 이중 회계·③ 저작 분리 통과 · ① 서빙 계상 COUNTED(단서 있음) · 재발방지 태스크 2건
+
+판정 기준: main `d873d064` (Kiki 클론 HEAD와 일치 확인 후 실행 · `PRE_OK=True`) · 실행: Phaiakes9, 런북 `docs/ops/ops106_gate2_live_sample_runbook.md`. 게이트 `G-ops106-gate2-live-sample` clear.
+
+- **② 이중 회계 = `MATCH`**: `cost_probe` 18요청 중 성공 16·오류 2(`ReadTimeout` 2건: explain-easy-free·verify-easy-free) = 인프로세스 16 = Langfuse `probe` 증가분 16. 첫 폴링은 11건(`PARTIAL`)이라 수집 지연이 실재하고 두 번째 폴링에서 일치했다.
+- **③ 저작 분리 = `SEPARATED_MATCH`**: rephrase 5콜(provider 오류 0) → `authoring` +5 · 표본(`event_count`) +0 · `unlabeled` +0. 첫 폴링은 `SILENT_ZERO`(0건)였다가 두 번째에서 도착 — 폴링 없이 한 번만 읽었다면 "분리 실패/전멸"로 오진할 수 있는 지연이다.
+- **① 서빙 계상 = `COUNTED`(재시도에서)**: 재시도 `serving` +43 · `unlabeled` +0 · `SURFACE_LABELED_RATE` 1.0 · `SAMPLE_ARITHMETIC_OK` True · `PRIMARY_RECORDS_P`=1. **1차 시도는 `NO_PRIMARY_TURN_IN_SERVER_LOG`**(서버 기록 0줄 · `serving` +45): 서버 stderr `WH-1 primary 하네스 실행 실패(TimeoutError) — 결정론 템플릿 폴백`(`wh1_primary.py` line 189). 코드상 시간 초과 경로는 `emit` 전에 `return None`이라 기록이 남지 않는다(읽어서 확인 · 실행 검증 아님). 우리 트래픽이 이 서버에 닿았음은 접근 로그 `POST /v1/coach` 15건(비2xx 0)·서버 프로세스 시작 22:21:18 ≈ 기록 파일 생성 22:21:19·명령줄의 `--log-config`로 확인했다.
+- **단서(수치 정직성)**: 재시도에서 15요청 중 **14턴이 시간 초과**(`PRIMARY_TIMEOUT_TURNS_THIS_RUN=14`)로 폴백했고 primary 성공은 1건뿐이다. 즉 이번 실측이 증명한 것은 **계측 사슬(표지 → 전송 → 집계)이 살아 있다**까지이며, 학생 대면 primary 성공률이 낮다는 사실은 별건(`OPS-134`)이다. 시간 초과 턴도 LLM 호출은 이미 `serving`으로 전송되므로(요청당 약 3건) 출력이 버려진 호출이 표본·비용 집계에 들어간다. 1차 시도의 시간 초과 턴 수는 집계하지 않았다.
+- **게이트② 합격(로컬 ≥80%)은 이번에 판정하지 않았다(런북 범위 밖)**: `cost_probe`의 로컬 100%·Wilson 하한 85.5% PASS는 라우터의 선택이 아니라 `budget0` 강등 16건(클라우드 예산 0 · ARCH-66 Anthropic API 중단 기간)의 결과다 — 합격 근거로 쓰면 안 된다.
+- **실행 중 만난 도구·절차 결함(시스템 실수로 분류 → 태스크 등재)**: ⓐ Kiki 클론이 main보다 3커밋 뒤처져 `CODE_MATCHES_ORIGIN_MAIN=False`로 런북이 정지했다. 뒤처진 파일이 `coach.py`·`learning_session_writer.py` 등 측정 경로였다(런북 정지는 올바른 판단). 클론은 여러 세션 공유 사본이라 `git merge --ff-only`(자기 거부 가드 포함)로만 따라잡았고 미커밋 변경 12건은 보존됐다. ⓑ `run_demo.ps1` [2/6]이 `Can't locate revision identified by '79de95331710'`로 즉사 — 재기동된 옛 데모 컨테이너의 `alembic_version`이 닫힌 PR #880 브랜치의 `audit_event` 마이그레이션을 가리켰다. `stop_demo.ps1`(데모 컨테이너 `down -v`, 운영 DB 5433 무관)로 초기화 후 정상 기동. 대책 = `OPS-133`(감지·안내 + 런북 §1/§2 보강 + 실패 주입 테스트). 서버 기동 후 `ERR 로그`의 `Redis 캐시 강등 — TimeoutError` 1건은 시간 초과의 원인인지 **미검증 가설**로 `OPS-134` ①에 넘겼다.
+- **후속 태스크**: `OPS-133-run-demo-stale-throwaway-db-diagnosis`(P2) · `OPS-134-wh1-primary-timeout-fallback-accounting`(P1 — 원인 분해·폴백 비율 회계·표본 정합·기본 15초 재판정). 산문 규칙은 추가하지 않는다(등재 동결).
+
 ## 2026-10-12: 미머지 브랜치 전수 감사 17회차 — 16회차가 claim 활성이라 뺀 완성품 4건이 TTL을 넘겨 고립 · 회수 태스크 4건 등재 · 브랜치 전용 태스크 4건 복원 · 삭제 0건 · 대책 HARN-309
 
 - **판정 기준 main `d873d064`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12.md`. 원격 ref 51 − 제외 4 − 열린 PR 22 = 감사 대상 25. 14차 삭제 배치 11건은 전건 집행(잔존 0/11).

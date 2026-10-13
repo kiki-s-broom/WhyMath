@@ -841,11 +841,11 @@ gates:
     title: "게이트② 라이브 표본 실측 실행 — docs/ops/ops106_gate2_live_sample_runbook.md 를 Phaiakes9 에서 실행해 서빙 계상(COUNTED)·이중 회계(MATCH)·저작 분리(SEPARATED_MATCH) 판정 줄 전체를 세션에 전달 (OPS-106 ①②③)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-05
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main d873d064 (Kiki 클론 HEAD=d873d064 일치, PRE_OK=True) · 2026-10-12 Phaiakes9 실측 · 상세 MEMORY.md 2026-10-12 항목. ② DUAL_ACCOUNTING MATCH (인프로세스 16 = Langfuse probe 16, 오류 2건은 ReadTimeout). ③ AUTHORING_SEPARATION SEPARATED_MATCH (authoring +5, 표본 +0, unlabeled +0). ① SERVING_SAMPLE COUNTED (재시도: serving +43, unlabeled +0, SURFACE_LABELED_RATE 1.0, PRIMARY_RECORDS_P=1). 단서: ① 1차 시도는 NO_PRIMARY_TURN_IN_SERVER_LOG (primary 하네스 TimeoutError 폴백으로 기록 0줄, serving +45), 재시도에서도 15요청 중 14턴이 시간 초과로 primary 성공은 1건뿐 — 이 실측이 증명한 것은 계측 사슬(표지-전송-집계)의 작동까지이며 학생 대면 primary 성공률은 OPS-134가 소유한다. 게이트② 합격(로컬 80% 이상)은 미판정: cost_probe 로컬 100%는 budget0 강등 16건의 결과다. 부수 결함 OPS-133(낡은 데모 DB 진단 부재)."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
