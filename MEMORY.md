@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-12 (결정·구현 · PB-19): **CAT 형제 필터가 관계 유형·방향을 구분하게 했다 — `exclude`는 근접 복제본(변형·유사)만 빼고, 쉬운 계열(선수)은 남기며 `include`가 우대하고, 어려운 계열(심화)·대조는 중립이다**
+
+**무엇/왜**: PB-09가 낳는 선수·심화·대조 계보가 코퍼스에 들어오기 전에 소비 정책을 정했다. 종전 `load_sibling_ids`는 유형·방향 없이 상대편 id를 전부 형제로 모았다(소비처 3곳: CAT 정책·수능 정책·정렬 재선택). 변형·유사만 있는 현 코퍼스에선 맞았지만, 선수·심화가 들어오면 `exclude`가 Polya의 "더 쉬운 관련 문제를 먼저"에 필요한 발판을 후보에서 빼고 `include`가 오답 직후 난이도를 올리는 쪽을 우대한다.
+**결정**: 행 방향은 parent(기존)→related(파생)이고(유일한 작성자 `variants.py`), 오답 문항이 parent냐 related냐에 따라 선수·심화의 역할이 뒤집힌다. 대칭=변형·유사 / 쉬운 계열=(W→O 선수)+(O→W 심화) / 어려운 계열=(W→O 심화)+(O→W 선수) / 대조=형제 아님. `exclude`=대칭만 · `include`=대칭+쉬운 계열(기존 `_SIBLING_BOOST` 그대로, 새 수치 0). 대칭이 우선하고, 같은 상대가 쉬운·어려운 양쪽이면(데이터 모순) 중립. 정본 = `docs/architecture/cat_sibling_filter_relation_policy_pb19.md`.
+**집행(별항)**: `classify_relations`(순수) → `RelationRoles.ids_for(모드)` → `load_sibling_ids(…, sibling_filter=)`. 호출처 2곳이 모드를 넘기며 `sibling_filter`는 필수 키워드라 누락이 불가능하다. 쿼리는 여전히 1회(SELECT에 유형 열 하나). 기본값 OFF는 관계 조회 0회로 회귀 0.
+**검증**: 신규 단위 25건 + API 배선 19건 + 실 PG 4건 / 결함 주입 10종 전건 RED(실 PG 테스트에도 M1·M3 주입으로 `변형` 대조군 통과·`선수` RED 확인) / ruff·black·mypy --strict·lint-imports exit 0 / 로컬 PG 16 + pgvector + `alembic upgrade head`에서 통합 테스트를 실제로 실행했다.
+**정직한 공백**: 기본 CI는 통합 테스트를 건너뛴다(실 PG 축의 상시 집행은 통합 잡 경로에 달림). 현 코퍼스에 선수·심화 행이 없어 라이브 동작은 바뀌지 않는다 — 실효는 PB-20 편입 이후. 회귀 0의 증거는 변형·유사 전용 코퍼스에서 두 모드가 과거 구현(테스트에 복원)과 같은 집합이라는 대조다.
+**후속(대장 집행)**: `PB-22` 정답 직후 심화 계열 후보 소비처(이 결정의 "심화는 정답 직후 후보"를 집행할 곳이 아직 없다).
+
 ### 2026-10-09 (구현·S4-60): **고→대 경계 엣지 24건을 정본 `graph.json`에 병합했다 — `rationale`은 정본에 넣지 않고 원장에 남기는 ⒞로 결정했고, 대학 세부개념의 K-12 도달이 0→198/512가 됐다** (claude 집행) — 판정 기준 main `853a4246`
 
 **결정 ③ = ⒞(근거 원장 분리).** 실측 근거: DB 적재 경로(`l1/atom_graph/atom_backend_edge.py`)가 `evidence`를 읽지 않는다 → ⒜(근거를 evidence에 합성)는 소비자 없는 산문을 4.9MB 정본에 얹고 `evidence`의 "출처 태그" 의미를 흐린다. ⒝(모델 필드 추가)는 `AtomEdge`+DB 컬럼(마이그레이션)+적재기+prod 재적재로 번진다. ⒞는 2026-07-28 중복 원자 병합(`dedup_merges_v1.json` 원장 + `_provenance.json` 기록)과 같은 형태. **재검토 조건**: `rationale`을 읽는 소비자(학생 화면 "왜 선수인가" 등)가 생기면 ⒝를 그때 연다.
@@ -12351,3 +12360,13 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **게이트② 합격(로컬 ≥80%)은 이번에 판정하지 않았다(런북 범위 밖)**: `cost_probe`의 로컬 100%·Wilson 하한 85.5% PASS는 라우터의 선택이 아니라 `budget0` 강등 16건(클라우드 예산 0 · ARCH-66 Anthropic API 중단 기간)의 결과다 — 합격 근거로 쓰면 안 된다.
 - **실행 중 만난 도구·절차 결함(시스템 실수로 분류 → 태스크 등재)**: ⓐ Kiki 클론이 main보다 3커밋 뒤처져 `CODE_MATCHES_ORIGIN_MAIN=False`로 런북이 정지했다. 뒤처진 파일이 `coach.py`·`learning_session_writer.py` 등 측정 경로였다(런북 정지는 올바른 판단). 클론은 여러 세션 공유 사본이라 `git merge --ff-only`(자기 거부 가드 포함)로만 따라잡았고 미커밋 변경 12건은 보존됐다. ⓑ `run_demo.ps1` [2/6]이 `Can't locate revision identified by '79de95331710'`로 즉사 — 재기동된 옛 데모 컨테이너의 `alembic_version`이 닫힌 PR #880 브랜치의 `audit_event` 마이그레이션을 가리켰다. `stop_demo.ps1`(데모 컨테이너 `down -v`, 운영 DB 5433 무관)로 초기화 후 정상 기동. 대책 = `OPS-133`(감지·안내 + 런북 §1/§2 보강 + 실패 주입 테스트). 서버 기동 후 `ERR 로그`의 `Redis 캐시 강등 — TimeoutError` 1건은 시간 초과의 원인인지 **미검증 가설**로 `OPS-134` ①에 넘겼다.
 - **후속 태스크**: `OPS-133-run-demo-stale-throwaway-db-diagnosis`(P2) · `OPS-134-wh1-primary-timeout-fallback-accounting`(P1 — 원인 분해·폴백 비율 회계·표본 정합·기본 15초 재판정). 산문 규칙은 추가하지 않는다(등재 동결).
+
+## 2026-10-12: 미머지 브랜치 전수 감사 17회차 — 16회차가 claim 활성이라 뺀 완성품 4건이 TTL을 넘겨 고립 · 회수 태스크 4건 등재 · 브랜치 전용 태스크 4건 복원 · 삭제 0건 · 대책 HARN-309
+
+- **판정 기준 main `d873d064`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12.md`. 원격 ref 51 − 제외 4 − 열린 PR 22 = 감사 대상 25. 14차 삭제 배치 11건은 전건 집행(잔존 0/11).
+- **사고(반복)**: 서로 다른 세션 4개가 완성 구현을 PR 없이 `review` 상태로 두고 끝났다 — `MATH-06`(`brave-franklin`)·`OPS-34`(`amazing-goldberg`)·`OPS-50`(`happy-turing`)·`PED-26`(`nice-cray`). main 부재 줄 658·590·876·866. 커밋 메시지가 원인을 직접 적는다("PR 미개설"·"PR 대기 — CLAUDE.md 먼저 지시 대기"). 클라우드 세션 기본 지시(PR은 요청 시에만)와 CLAUDE.md 완료·병합(요청 없이 PR 기본값)의 충돌을 세션이 전자로 풀었고, `backlog.py review`가 PR 증적을 묻지 않아 대장상 정상 종료가 됐다. `review`는 원격 claim을 유지하므로 야간 고립 리포트에도 TTL(72h)까지 가려졌다.
+- **대책(코드·태스크)**: `HARN-309` — `review` 전이의 PR 증적 요구 + `check-stop`의 review·PR 미개설 차단. 새 산문 규칙 등재 동결(2026-09-20)에 따라 CLAUDE.md는 수정하지 않았다.
+- **회수 등재**: `MATH-07`·`OPS-129`·`OPS-130`·`PED-45`(파일 단위 이식 · 원 번호 재사용 금지 · 소유 태스크 4건에 `depends_on` 부착). 한계: 소유 태스크는 부착 전에도 claim 때문에 `next` 후보가 아니었으므로 부착 효과는 claim 해제 뒤에야 변별된다.
+- **분실 등재 복원**: `nice-cray`에만 있던 `ARCH-72`·`HARN-304`·`PED-44`·`REND-05`를 원 번호로 CLI 재등재(title·acceptance·paths가 브랜치 원문과 글자 단위 일치 확인). `PED-43`은 빈 acceptance 오등재로 브랜치에서도 취소된 번호라 복원하지 않음. `ARCH-72`·`HARN-304`·`PED-44`는 `add` 당시 원격 예약 push가 실패했다(`number_reserve_unavailable` 3건 · `REND-05`만 성공 · 실패 원인은 재현 못 함 — 2026-10-13 정정: 초안의 "main 최대보다 낮으면 생략" 추정은 틀렸다). 같은 날 `reserve_for`로 재예약해 4건 실재 확인. 예약 TTL 72h라 이 PR이 2026-10-15경까지 착지해야 한다.
+- **삭제 0건**: 내용 소멸 3건(`blissful-lovelace`·`status-f6qz0c`·`stoic-hawking`)은 claim 해제 대기, 3건(`friendly-pascal`·`gracious-cannon`·`status-f9lp65`)은 Kiki 판단 대기. 특히 `friendly-pascal`은 내용이 전량 흡수됐으나(코퍼스 차이는 `authored_by` 필드뿐) 2026-10-09 보존 지시가 main에 도달하지 못한 채 `QUAL-15` done과 충돌한다.
+- **정직한 공백**: 부재 줄 대조는 줄 전체 일치라 이식량의 상한이다. 브랜치 커밋 메시지의 검증 수치는 재현하지 않았다. `claims reap --apply`는 실행하지 않았다.

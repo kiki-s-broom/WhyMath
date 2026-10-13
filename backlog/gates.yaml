@@ -850,6 +850,18 @@ gates:
     corrections: []
     depends_on:
       - OPS-106-gate2-live-sample-serving-vs-authoring
+  - id: G-ops135-ci-image-source-decision
+    title: "OPS-135 CI 컨테이너 이미지 공급원 선택 — Docker Hub 익명 pull 한도로 머지 queue가 연속 탈락했다(2026-10-09 20:53~21:16Z · PR #1529 queue 실행 4회 중 3회 · 같은 시간대 다른 PR의 pull_request 실행도 같은 단계 실패). 3택: ①ghcr.io 미러(세션 권고 — 외부 계정·장기 시크릿 없이 GitHub 안에서 닫힌다. 단 미러 갱신 절차·digest 고정이 필요하고, neo4j·pgvector 이미지 재배포 라이선스와 패키지 용량 상한은 아직 확인하지 않았다) ②Docker Hub 로그인 pull(가장 작은 변경 — Docker Hub 계정 + 액세스 토큰을 GitHub Secrets에 사람이 등록해야 하고, 한도가 계정 단위로 남는다) ③감수(변경 없음 — 한도가 풀릴 때까지 재시도하고 다음 탈락 때 재판정). 근거 = 태스크 OPS-135 notes 「배경 실측」. 판정 증적(evidence)에는 선택지 번호와 판정 기준 커밋 해시를 적는다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-12
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "Kiki의 공급원 선택(ghcr 미러 / Docker Hub 로그인 pull / 감수)이며 먼저 끝나야 할 태스크가 없다. 구현 태스크 OPS-135가 이 게이트를 기다린다."
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human
