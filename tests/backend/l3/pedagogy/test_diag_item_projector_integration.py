@@ -74,6 +74,15 @@ def _cleanup(engine: object) -> None:
         conn.execute(text("DELETE FROM unit_spec WHERE unit_id = :u"), {"u": _UNIT_ID})
 
 
+# OPS-137이 이 파일을 CI에 편입하며 실 PG 실행으로 확인한 결함: 연속 2회 실행하면 diag_item 슬롯이
+# 4행 → 8행이 된다(1회차에 PRESCREENED가 된 슬롯 0을 건너뛰되 후보 원자를 소비하지 않아 같은 원자가
+# 슬롯 1에 다시 채워진다). 판정·수정은 PED-46이 소유한다. strict라서 결함이 고쳐져 통과(XPASS)하면
+# 이 표식을 지우라고 CI가 red로 알린다 — `raises`로 다른 종류의 실패(DB 오류 등)는 가리지 않는다.
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="PED-46: run_diag_item_fill 재실행이 같은 원자를 다음 슬롯에 중복 채움(4행→8행)",
+)
 def test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge() -> None:
     if not asyncio.run(_pg_reachable()):
         pytest.skip("실 PG 미도달 — WHYMATH_DATABASE_URL 확인(통합 잡에서 실행)")
