@@ -2,7 +2,7 @@
   "_meta": {
     "generated_by": "scripts/build_cross_band_edges_s4_01.py",
     "task": "S4-01-math-k12-complete",
-    "status": "proposal — 검수 전 정본 미병합",
+    "status": "merged — 정본 병합 완료(S4-60) · 이 파일은 근거(rationale) 원장",
     "edge_count": 24,
     "source_graph_sha256": "1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f"
   },
