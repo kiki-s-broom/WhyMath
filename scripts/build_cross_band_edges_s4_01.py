@@ -39,6 +39,9 @@ EVIDENCE: Final[str] = "S4-01 고→대 경계 저작 v1"
 RELATION: Final[str] = "prerequisite"
 RELATION_SUBTYPE: Final[str] = "학교급간(추정)"
 STRENGTH: Final[float] = 0.8
+#: 원장 상태 표기 — 정본에 태그 엣지가 있으면 병합 완료(S4-60), 없으면 제안.
+STATUS_PROPOSAL: Final[str] = "proposal — AI 검수 통과(2026-10-08) · 정본 미병합"
+STATUS_MERGED: Final[str] = "merged — 정본 병합 완료(S4-60) · 이 파일은 근거(rationale) 원장"
 
 #: 저작 확정 목록 — (from_code=고등 원자, to_code=대학 원자, rationale=교육적 근거).
 #: **교육적 판단은 확정됐다. 이 목록의 추가·삭제·코드 변경·근거 문구 수정은 금지**이며,
@@ -169,13 +172,17 @@ AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (
 )
 
 
-def _sha256(path: Path) -> str:
-    """파일 sha256(제안이 어느 정본 스냅샷을 전제로 하는지 고정 — 정본이 바뀌면 재검수 신호)."""
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _pre_merge_sha256(graph: dict[str, Any]) -> str:
+    """제안이 전제한 *병합 전* 정본의 sha256 — 정본이 바뀌면 재검수 신호가 된다.
+
+    정본 병합(S4-60) 뒤에는 graph.json 파일 자체의 sha가 바뀌므로 파일 sha를 쓰면 이 스크립트의
+    `--check`(바이트 동일 보증)가 병합 즉시 깨진다. 그래서 출처 태그 엣지를 뺀 병합 전 뷰를 정본
+    직렬화로 찍는다. 병합이 끝에 덧붙이기였으므로 병합 전에는 파일 sha와 같은 값이다.
+    """
+    view = dict(graph)
+    view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") != EVIDENCE]
+    text = json.dumps(view, ensure_ascii=False, indent=2) + "\n"
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:
@@ -185,6 +192,8 @@ def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:
     넘어가면 "조회해 채운다"는 규율이 조용히 무너지기 때문이다.
     """
     nodes = {str(c["code"]): c for c in graph.get("concepts", [])}
+    merged = any(e.get("evidence") == EVIDENCE for e in graph.get("edges", []))
+    status = STATUS_MERGED if merged else STATUS_PROPOSAL
     edges: list[dict[str, Any]] = []
     for from_code, to_code, rationale in AUTHORED_EDGES:
         missing = [c for c in (from_code, to_code) if c not in nodes]
@@ -208,7 +217,7 @@ def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:
         "_meta": {
             "generated_by": "scripts/build_cross_band_edges_s4_01.py",
             "task": TASK_ID,
-            "status": "proposal — 검수 전 정본 미병합",
+            "status": status,
             "edge_count": len(edges),
             "source_graph_sha256": graph_sha256,
         },
@@ -224,7 +233,7 @@ def serialize(payload: dict[str, Any]) -> str:
 def run(*, check: bool) -> int:
     """생성(또는 드라이런). 반환값이 그대로 종료 코드."""
     graph: dict[str, Any] = json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
-    text = serialize(build_payload(graph, _sha256(GRAPH_PATH)))
+    text = serialize(build_payload(graph, _pre_merge_sha256(graph)))
 
     if check:
         if not OUTPUT_PATH.exists():

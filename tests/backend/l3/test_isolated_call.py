@@ -149,6 +149,145 @@ class TestBudget:
         assert (await pool.run(verify_step, *_FAST)).state.value == "correct"
 
 
+class _SleepsOnRestore:
+    """워커가 *호출 대상을 복원(unpickle)하는 동안* 잠드는 인자 — 복원 단계 대기를 만든다.
+
+    `__reduce__`가 `time.sleep`을 가리키므로 피클에는 이 테스트 모듈이 안 실린다(자식 프로세스가
+    테스트 모듈을 import할 필요가 없다). 복원된 값은 `time.sleep`의 반환값 `None`이다.
+    """
+
+    def __init__(self, seconds: float) -> None:
+        self._seconds = seconds
+
+    def __reduce__(self) -> tuple[object, tuple[float]]:
+        return (time.sleep, (self._seconds,))
+
+
+@pytest.fixture
+def slow_boot(tmp_path: object, monkeypatch: pytest.MonkeyPatch):
+    """import에 N초 걸리는 모듈을 만들어 `preload`로 쓸 이름을 돌려주는 공장 — 느리게 뜨는 워커 주입.
+
+    spawn 자식은 부모의 `sys.path`를 물려받으므로 `syspath_prepend`만으로 자식이 모듈을 찾는다.
+    """
+    counter = {"n": 0}
+
+    def make(seconds: float) -> str:
+        counter["n"] += 1
+        name = f"ops128_slow_boot_{counter['n']}"
+        (tmp_path / f"{name}.py").write_text(f"import time\ntime.sleep({seconds})\n")  # type: ignore[operator]
+        monkeypatch.syspath_prepend(str(tmp_path))
+        return name
+
+    return make
+
+
+class TestTotalBudget:
+    """OPS-128 — 호출부가 준 총 예산(`budget_s`)이 대기열·기동·복원·계산 전부를 묶는다.
+
+    종전 결함: 기동(`_wait_ready`)·복원 대기가 계산 상한 밖이라, 체인 마감 직전에 시작한 호출이
+    마감을 재기동 1회(최악 60초)만큼 넘겼다. 단계마다 *그 단계의 대기만 길게 만든* 입력으로 고정한다.
+    """
+
+    async def test_slow_boot_is_cut_at_budget_and_the_booting_worker_is_kept(
+        self, slow_boot: object
+    ) -> None:
+        """기동 단계 — 예산 안에 `ready`가 안 오면 `deadline`이고, 뜨는 중인 워커는 죽이지 않는다."""
+        pool = IsolatedCallPool(
+            max_workers=1, timeout_s=0.5, queue_wait_s=0.3, preload=(slow_boot(1.5),)  # type: ignore[operator]
+        )
+        try:
+            started = time.perf_counter()
+            with pytest.raises(BudgetExceededError) as info:
+                await pool.run(repr, "x", budget_s=0.4)
+            elapsed = time.perf_counter() - started
+            assert info.value.reason == "deadline"
+            assert elapsed < 1.0, f"예산 0.4s인데 {elapsed:.2f}s — 기동 대기가 예산 밖이다"
+            stats = pool.stats()
+            assert stats["deadlines"] == 1 and stats["worker_deaths"] == 0
+            # 고장이 아니라 아직 뜨는 중이었다 — 살려 뒀으니 다음 호출이 *그 워커*로 성공한다.
+            # (`_kill`은 `_all`에서 워커를 빼므로, 빈 집합에 대한 `all(...)`은 죽였어도 참이다 —
+            # 반드시 *같은 객체*가 남아 있는지로 본다.)
+            booting = set(pool._all)
+            assert len(booting) == 1 and all(w.process.is_alive() for w in booting)
+            assert await pool.run(repr, "x") == "'x'"
+            assert set(pool._all) == booting, "뜨는 중이던 워커를 버리고 새로 띄웠다"
+        finally:
+            pool.shutdown()
+
+    async def test_without_budget_boot_wait_is_unchanged(self, slow_boot: object) -> None:
+        """대조군 — `budget_s`가 없으면(단건 엔드포인트) 종전처럼 기동을 끝까지 기다려 성공한다."""
+        pool = IsolatedCallPool(
+            max_workers=1, timeout_s=0.5, preload=(slow_boot(1.0),)  # type: ignore[operator]
+        )
+        try:
+            started = time.perf_counter()
+            assert await pool.run(repr, "x") == "'x'"
+            assert (
+                time.perf_counter() - started >= 0.9
+            ), "기동을 기다리지 않았다 — 대조군이 공허하다"
+            assert pool.stats()["deadlines"] == 0
+        finally:
+            pool.shutdown()
+
+    async def test_slow_restore_is_cut_at_budget_and_the_dirty_worker_is_killed(
+        self, pool: IsolatedCallPool
+    ) -> None:
+        """복원 단계 — 일을 받은 채 복원 중인 워커는 상태가 더럽혀져 죽이고, 판정 불가(`deadline`)로 접는다."""
+        assert await pool.run(repr, "warm") == "'warm'"  # 기동은 미리 치른다
+        before = set(pool._all)
+        started = time.perf_counter()
+        with pytest.raises(BudgetExceededError) as info:
+            await pool.run(repr, _SleepsOnRestore(2.0), budget_s=0.5)
+        elapsed = time.perf_counter() - started
+        assert info.value.reason == "deadline"
+        assert elapsed < 1.2, f"예산 0.5s인데 {elapsed:.2f}s — 복원 대기가 예산 밖이다"
+        assert before and all(not w.process.is_alive() for w in before)
+        assert pool.stats()["deadlines"] == 1 and pool.stats()["worker_deaths"] == 0
+        assert await pool.run(repr, "again") == "'again'"  # 교체 워커로 회복
+
+    async def test_compute_limit_is_reclamped_after_boot_spent_the_budget(
+        self, slow_boot: object
+    ) -> None:
+        """계산 시작 — 기동이 예산을 갉아먹은 만큼 계산 상한도 줄어든다(호출 상한 10초여도 예산이 우선)."""
+        pool = IsolatedCallPool(
+            max_workers=1, timeout_s=10.0, preload=(slow_boot(0.8),)  # type: ignore[operator]
+        )
+        try:
+            started = time.perf_counter()
+            with pytest.raises(BudgetExceededError) as info:
+                await pool.run(time.sleep, 8.0, budget_s=2.0)
+            elapsed = time.perf_counter() - started
+            # 부하로 기동이 늦으면 계산에 닿기 전에 `deadline`으로 끝날 수 있다 — 어느 쪽이든 판정 불가.
+            assert info.value.reason in ("timeout", "deadline")
+            assert info.value.limit_s <= 2.0
+            assert (
+                elapsed < 2.0 + 0.8
+            ), f"총 예산 2.0s인데 {elapsed:.2f}s — 계산 상한이 예산에 안 묶였다"
+        finally:
+            pool.shutdown()
+
+    async def test_queue_wait_is_bounded_by_the_budget(self, pool: IsolatedCallPool) -> None:
+        """대기열 — 예산이 대기 상한(0.3s)보다 짧으면 예산이 먼저 끊고, 사유는 `queue_wait`가 아니라 `deadline`."""
+        assert await pool.run(repr, "warm") == "'warm'"
+        busy = asyncio.create_task(pool.run(time.sleep, 3.0, timeout_s=3.0))
+        await asyncio.sleep(0.1)
+        started = time.perf_counter()
+        with pytest.raises(BudgetExceededError) as info:
+            await pool.run(repr, "x", budget_s=0.1)
+        assert time.perf_counter() - started < 0.25
+        assert info.value.reason == "deadline"
+        assert pool.stats()["queue_waits"] == 0 and pool.stats()["deadlines"] == 1
+        busy.cancel()
+        await asyncio.gather(busy, return_exceptions=True)
+
+    async def test_exhausted_budget_touches_no_worker(self, pool: IsolatedCallPool) -> None:
+        """예산이 이미 0 이하면 워커를 띄우지도 않고 `deadline` — 지연 기동 풀이 빈 채로 남는다."""
+        with pytest.raises(BudgetExceededError) as info:
+            await pool.run(repr, "x", budget_s=0.0)
+        assert info.value.reason == "deadline"
+        assert not pool._all, "예산 소진인데 워커를 띄웠다"
+
+
 class TestFallback:
     async def test_unpicklable_callable_falls_back_to_thread_and_counts(
         self, pool: IsolatedCallPool, caplog: pytest.LogCaptureFixture
