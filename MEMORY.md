@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-12 (판정·구현 · QUAL-12): **발문↔정답 의미 불일치는 38개 코퍼스 14,538행에서 0건이었다 — 그러나 0은 "의미 어휘가 3개 코퍼스에만 있다"는 데이터 사실 위에 서 있어, 검사기는 수용 게이트가 아니라 "어휘 트리거 거버넌스"로 만들었다** (claude 구현) — 판정 기준 main `5b561e31`(브랜치 미머지)
+
+**무엇/왜**: QUAL-11(어림 537/600 불일치가 SymPy 검증을 통과)의 사고 구조가 다른 템플릿 코퍼스에도 있는지 전수 측정했다. 슬라이스 5개(초등·대수·미적분·확률/기하/벡터·비결정론)가 생성기를 import하지 않고 발문만 읽어 정답을 독립 재계산했고, 세션이 5종 스크립트를 직접 재실행해 숫자를 확인했다(전부 exit 0). 불일치 0 · 미검증 0 · 모호 57(conceptual 24·misconception_mc 27·rephrased 6) · `is_published=True` 0(파일 필드 기준 — DB 노출은 이 환경에서 미확인).
+**설계 판정**: (b) 수용 게이트 편입 기각 — 기존 `StatementConsistencyAuditor`가 이미 그 형태인데 `tag_auditor=`를 넘기는 곳이 평가 도구 1곳뿐이고 운영 경로(`run_equivalent_generation` 경유 43모듈)에는 연결되지 않았으며, 발문에서 수식을 못 뽑으면 "감사 불가는 통과"라 QUAL-11의 자연어 지시어 발문은 항상 통과했을 것이다. (c) 불필요 기각 — QUAL-11 시점에도 게이트는 전건 통과였다. (a) 채택, 형태는 코퍼스별 테스트의 기계적 템플릿화가 아니라 "의미 어휘 계열이 발문에 나타나는 (코퍼스, 계열) 쌍은 전부 독립 계산 동결 테스트에 등록돼야 한다". QUAL-11형 어휘(자리·올림/버림)는 어림 600행에만, 경계·한정 어휘는 p3_calculus1_diff·probability_finite에만 있었다.
+**집행**: `tests/backend/harness/test_stem_semantic_hook_coverage.py`(거버넌스 — 미등록 유입·낡은 등록·파일 부재·코퍼스 미언급 위장 등록·스캔 규모 하한이 RED) + `test_stem_hook_independent_answers.py`(probability_finite 17행·p3 9행 독립 계산 동결, 파싱 실패 = RED). 집행 지점은 CI `backend` 잡 pytest 스텝(소스·수용 게이트 변경 0). 실제 코퍼스 결함 주입 9종 전건 RED, 매 건 적용 단언·원복 sha256 동일.
+**사고 기록(주입 하네스 결함)**: 첫 M5 주입이 GREEN이었다 — 가드 결함이 아니라 행 선택 조건이 JSON 한 줄 전체(해설 포함)에서 "항상"을 찾아 발문에 그 단어가 없는 엉뚱한 행을 오염시킨 것이었다. 발문 기준 선택으로 재주입해 RED 확인. 같은 세션의 스크립트 경로 상대화에서 `audit_C`가 `Path` 미import `NameError`로 exit 1이 났고(치환이 만든 결함) 재실행 검증으로 잡았다.
+**후속(대장 집행)**: `QUAL-16` 순서 방향어 계열(큰 근·보다 큰·에서 뺀) 동결 확장 · `QUAL-17` 통과했으나 데이터가 분기를 밟지 않은 지점(연립부등식 음수 계수 0행·이차부등식 음수 선행계수 0행·적분 피적분 양수만·몫=나머지 236/400행)과 설계 결함 후보(conceptual 정답 '0' 80%·answer_format 불일치) 처분 판정. 리포트: `docs/reviews/qual12_prompt_condition_semantic_consistency_2026-10-12.md`.
 ### 2026-10-13 (구현·EOS-190): **`problem_version`의 유일한 writer(`l3/problem_publish_gate.py`)를 만들고 실제 `POST /v1/me/attempts`가 `outcome=pinned`를 내는 것까지 실 PG로 확인했다 — 단 이 writer를 부르는 운영 호출자는 아직 없어 운영 값은 지금도 NULL이다. 작업 중 코퍼스 재적재가 발행 포인터를 NULL로 되돌리는 두 번째 writer 결함과, `tests/backend/l3` 통합 테스트 9개가 CI에서 수집되지 않는 배선 결함을 발견했다** (claude 구현) — 판정 기준 작업 브랜치 `claude/charming-thompson-n7uldh`(main `dc214a2f` 위)
 
 - **결정**: 개념 판 게이트(`l3/publish_gate.py`)와 같은 전이표를 조회하는 짝 모듈을 새로 두었다(공통화 리팩터는 EOS-50의 뮤테이션·테스트를 건드리므로 하지 않음 — 순수 로직 약 60줄 중복을 감수). RESTORE·rollback은 호출 경로가 없어 **구현하지 않았다**(선언만 된 코드 금지) → `EOS-196`.
