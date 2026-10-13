@@ -463,10 +463,12 @@ CATALOG: tuple[Spec, ...] = (
        "PATCH /concept_content/items/{pk}", "POST /concept_content/items/{pk}/review",
        "GET /hint", "GET /hint/items/{pk}", "PATCH /hint/items/{pk}",
        "GET /skill_node", "GET /skill_node/items/{pk}"),
-    _s("WM-S-057", "관리자 CMS — 신규 개념 제안·선수 관계 쓰기·개념 삭제(개념 그래프 쓰기)", "Admin",
+    _s("WM-S-057",
+       "관리자 CMS — 신규 개념 제안·선수 관계 쓰기·개념 삭제(개념 그래프 쓰기)", "Admin",
        "Operations", "P1",
        "P3-26 — 신규 개념은 살아있는 개념 행을 만들지 않고 제안(DRAFT)→검토→승인→발행을 거치며 "
-       "개념 행은 발행하는 순간 게이트가 만든다. 선수 관계는 서버가 비순환(DAG)을 검사한 뒤에만 쓰고 "
+       "개념 행은 발행하는 순간 게이트가 만든다. 선수 관계는 서버가 비순환(DAG)을 "
+       "검사한 뒤에만 쓰고 "
        "(어드바이저리 잠금으로 동시 요청도 직렬화), graph.json이 소유한 관계·개념은 CMS가 지우지 "
        "못한다. 발행본이 있는 개념은 삭제 거부. 관계·삭제는 발행 권한, 제안은 편집 권한",
        "admin_cms_graph",
