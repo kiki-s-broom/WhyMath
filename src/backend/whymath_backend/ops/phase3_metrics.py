@@ -26,8 +26,10 @@
   ③ Problem Coverage           **신규 계산** — 대표 과정 스킬 중 승인 문항이 1건 이상인 스킬의 비율
   ④ Solution QA Pass           `harness.corpus_reverify` 재검증 + 임계는 스코어카드에서 흡수
   ⑤ Learning Loop Success      `ops.loop_kpi_gate` 의 LOOP_COMPLETION **그대로**(새 정의 없음)
-  ⑥ Critical Defect            `ops.validation_scorecard.evaluate_hard_gates` 의 F-Ⅰ~Ⅴ **그대로**
-  ⑦ Graph Connectivity Coverage  P3-02 재사용 — 목표는 명세가 null 이면 '목표 미정'(판정 없음)
+  ⑥ Critical Defect            `ops.validation_scorecard.evaluate_hard_gates` 의 **F-Ⅱ·F-Ⅴ 2종만**
+                               그대로 흡수(P3-33 — F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관이라 이 지표 밖)
+  ⑦ Graph Connectivity Coverage  P3-02 재사용 — 목표 0.95 는 명세가 갖는다(P3-33 확정).
+                               명세가 null 이면 '목표 미정'(판정 없음) 경로는 계약으로 남는다
 
 ③의 목표값은 명세 `problem_coverage_by_skill` 에서 **읽는다**(하드코딩 금지). ④의 임계 0.995 는
 스코어카드의 `KpiThreshold("ceiling", 0.005)` 를 import 해 `1 - ceiling` 으로 **흡수**한다(수치 복제
@@ -93,13 +95,16 @@ Concept Completeness 를 필드 채움으로 만들지 않은 이유 (acceptance
 
 한계(정직 표기)
 --------------
-· 목표 수치(95%·98%·99%)는 원 문서의 **목표 예시**다. P3-02·P3-10 실측 기준선을 본 뒤
-  Kiki 가 확정한다.
+· 목표 수치는 2026-10-12 Kiki 가 게이트 G-p314-phase3-metric-targets 로 확정했다(①~⑤ 는 원 문서의
+  예시값 그대로 · ⑦ 은 0.95 · ⑥ 은 F-Ⅱ·Ⅴ 만 — 반영 P3-33). 단 AI 품질 평가 기준선(P3-10) 없이
+  확정했으므로 ④·⑤·⑥ 은 그 결과를 보고 재조정될 수 있다(재조정은 별도 결정).
 · ④는 정답 재검증 통과율이다 — 해설의 질·교수학적 타당성은 보지 않는다. skip(재검증 불가)은 통과로
   세지 않고 '검증 불가 비율'로 따로 낸다. 검증 가능한 문항이 하나도 없으면 측정 실패다.
-· ⑥은 생산 공정 평면의 Hard Gate 를 흡수한 것이다. F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정(HIT·실패 분포·앵커) 신호이고
-  제품 완성도 의미에 가까운 것은 F-Ⅱ·Ⅴ 뿐이다 — 지시문의 'P0/P1 결함' 출처는 저장소에 심각도 필드가
-  없어 채택하지 않았다(문서 §불일치 기록 · Kiki 확인 사항).
+· ⑥은 생산 공정 평면 Hard Gate 5종 중 제품 완성도 의미에 가까운 F-Ⅱ(검수 통과 CU 수학 오류율)·
+  F-Ⅴ(힌트 정답 누설) 2종만 흡수한다(분모 5 → 2). F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정(HIT·실패 분포·앵커)
+  신호라 이 지표에서 판정하지 않는다 — 위반이 나도 ⑥ 은 반응하지 않고, 입력이 없어도 ⑥ 을 측정
+  실패로 만들지 않는다(그 판정은 `ops.validation_scorecard` 가 소유한다). 지시문의 'P0/P1 결함'
+  출처는 저장소에 심각도 필드가 없어 채택하지 않았다(문서 §불일치 기록).
 · 이 CLI 는 ⑥의 입력 payload 수집기를 갖지 않는다(`--hard-gate-input` 으로 받는다).
 """
 
@@ -146,6 +151,7 @@ __all__ = [
     "EXIT_UNMEASURED",
     "EXIT_VIOLATION",
     "METRIC_ORDER",
+    "OUT_OF_PLANE_INJECTIONS",
     "VIOLATION_INJECTIONS",
     "UNMEASURED_INJECTIONS",
     "Bundle",
@@ -204,10 +210,6 @@ _SELF_CHECK_WINDOW: Final = lkg.ObservationWindow(
     start=datetime(2026, 1, 1, tzinfo=UTC), end=datetime(2026, 1, 2, tzinfo=UTC)
 )
 
-#: 자가 점검의 가설 목표 — 실제 명세의 ⑦ 목표는 null 이다. 반응을 보려면 목표가 있어야 해서
-#: **합성 세계 안에서만** 둔다(권고값이 아니다 — 목표 확정은 Kiki 몫).
-_SELF_CHECK_HYPOTHETICAL_GRAPH_TARGET: Final = 0.95
-
 
 class MetricsConfigError(RuntimeError):
     """명세·스코어카드 등 입력 계약이 이 모듈의 가정과 어긋났다 — 조용히 넘기지 않고 던진다."""
@@ -250,7 +252,7 @@ _SOURCE: Final[Mapping[MetricKey, str]] = {
     MetricKey.PROBLEM_COVERAGE: "신규 계산 (명세 skills × 승인 문항 × 문제유형 스킬)",
     MetricKey.SOLUTION_QA_PASS: "harness.corpus_reverify + ops.validation_scorecard 임계 흡수",
     MetricKey.LEARNING_LOOP_SUCCESS: "ops.loop_kpi_gate LOOP_COMPLETION (재사용)",
-    MetricKey.CRITICAL_DEFECT: "ops.validation_scorecard.evaluate_hard_gates F-Ⅰ~Ⅴ (흡수)",
+    MetricKey.CRITICAL_DEFECT: "ops.validation_scorecard.evaluate_hard_gates F-Ⅱ·F-Ⅴ (흡수)",
     MetricKey.GRAPH_CONNECTIVITY: "l1.standards.phase3_coverage (P3-02)",
 }
 
@@ -918,10 +920,15 @@ def _loop_outcome(
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# ⑥ Critical Defect — Hard Gate F-Ⅰ~Ⅴ 흡수
+# ⑥ Critical Defect — Hard Gate F-Ⅱ·F-Ⅴ 흡수 (P3-33: 5종 → 2종)
 # ──────────────────────────────────────────────────────────────────────────
-_DEFECT_SCOPE: Final = "Hard Gate F-Ⅰ~Ⅴ 5종"
-_HARD_GATE_CODES: Final[tuple[str, ...]] = ("F-Ⅰ", "F-Ⅱ", "F-Ⅲ", "F-Ⅳ", "F-Ⅴ")
+#: 스코어카드가 내는 게이트 전체 — 흡수 계약(스코어카드가 게이트를 늘리거나 바꾸면 던진다).
+_SCORECARD_GATE_CODES: Final[tuple[str, ...]] = ("F-Ⅰ", "F-Ⅱ", "F-Ⅲ", "F-Ⅳ", "F-Ⅴ")
+#: ⑥ 이 판정하는 2종 — 제품 완성도 의미에 가까운 것(검수 통과 CU 수학 오류율 · 힌트 정답 누설).
+_ABSORBED_GATE_CODES: Final[tuple[str, ...]] = ("F-Ⅱ", "F-Ⅴ")
+#: 생산 공정 평면 소관(HIT 중앙값 · 실패 유형 분포 · 앵커 미달) — ⑥ 이 판정에 쓰지 않는다.
+_OUT_OF_PLANE_GATE_CODES: Final[tuple[str, ...]] = ("F-Ⅰ", "F-Ⅲ", "F-Ⅳ")
+_DEFECT_SCOPE: Final = "Hard Gate F-Ⅱ·F-Ⅴ 2종 — F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관(이 지표 밖)"
 
 
 def _gate_state(gate: HardGateResult) -> str:
@@ -931,9 +938,11 @@ def _gate_state(gate: HardGateResult) -> str:
 
 
 def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> MetricOutcome:
-    """⑥ — 해당(triggered) 게이트가 있으면 확정 위반, 판정 불가 게이트가 남으면 측정 실패.
+    """⑥ — 흡수한 2종(F-Ⅱ·F-Ⅴ) 중 해당(triggered)이 있으면 확정 위반, 판정 불가가 남으면 측정 실패.
 
     '해당 없음'과 '판정 불가'는 다르다: 입력이 없는 게이트를 해당 없음으로 접으면 0건 통과가 된다.
+    F-Ⅰ·Ⅲ·Ⅳ 는 스코어카드가 함께 계산하지만 여기서는 **버린다** — 그 3종이 해당이어도 ⑥ 은
+    반응하지 않고, 판정 불가여도 ⑥ 을 측정 실패로 만들지 않는다(생산 공정 평면 소관).
     """
     key = MetricKey.CRITICAL_DEFECT
     basis = BASIS_INJECTED if injected else BASIS_MEASURED
@@ -941,8 +950,8 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
         return _unmeasured(
             key,
             _DEFECT_SCOPE,
-            "입력 payload 가 없다 — Hard Gate 5종 전부 판정 불가. 이 CLI 는 payload 수집기를 갖지 "
-            "않는다(--hard-gate-input). 0 이 아니라 '측정 불가'다.",
+            "입력 payload 가 없다 — 흡수한 Hard Gate 2종(F-Ⅱ·F-Ⅴ) 전부 판정 불가. "
+            "이 CLI 는 payload 수집기를 갖지 않는다(--hard-gate-input). 0 이 아니라 '측정 불가'다.",
             unit=Unit.COUNT,
             basis=basis,
         )
@@ -957,17 +966,18 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
             error_type=type(exc).__name__,
             basis=basis,
         )
-    if tuple(g.code for g in gates) != _HARD_GATE_CODES:
+    if tuple(g.code for g in gates) != _SCORECARD_GATE_CODES:
         return _unmeasured(
             key,
             _DEFECT_SCOPE,
-            f"스코어카드가 낸 게이트가 {_HARD_GATE_CODES} 가 아니다 — 흡수 계약이 깨졌다.",
+            f"스코어카드가 낸 게이트가 {_SCORECARD_GATE_CODES} 가 아니다 — 흡수 계약이 깨졌다.",
             unit=Unit.COUNT,
             basis=basis,
         )
-    triggered = [g for g in gates if g.triggered]
-    undecidable = [g for g in gates if not g.measurable]
-    facts = tuple((g.code, f"{_gate_state(g)} · {g.observed}") for g in gates)
+    absorbed = tuple(g for g in gates if g.code in _ABSORBED_GATE_CODES)
+    triggered = [g for g in absorbed if g.triggered]
+    undecidable = [g for g in absorbed if not g.measurable]
+    facts = tuple((g.code, f"{_gate_state(g)} · {g.observed}") for g in absorbed)
     unmet = tuple(f"{g.code}: {g.definition}" for g in triggered)
     if not triggered and undecidable:
         return _unmeasured(
@@ -977,7 +987,7 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
             "'해당 없음'과 '판정 불가'는 다르다. 0건이라고 말할 수 없다.",
             unit=Unit.COUNT,
             numerator=0,
-            denominator=len(gates),
+            denominator=len(absorbed),
             basis=basis,
             facts=facts,
         )
@@ -990,14 +1000,14 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
         key=key,
         state=MetricState.MEASURED,
         scope=_DEFECT_SCOPE,
-        reason=f"Hard Gate {len(triggered)}/{len(gates)}종 해당 (목표 0건){suffix}.",
+        reason=f"Hard Gate {len(triggered)}/{len(absorbed)}종 해당 (목표 0건){suffix}.",
         source=_SOURCE[key],
         unit=Unit.COUNT,
         value=float(len(triggered)),
         target=0.0,
         met=len(triggered) == 0,
         numerator=len(triggered),
-        denominator=len(gates),
+        denominator=len(absorbed),
         basis=basis,
         facts=facts,
         unmet=unmet,
@@ -1256,13 +1266,9 @@ def _synthetic_world(spec: ScopeSpec, index: ReferenceIndex) -> World:
         stub_pack_k_types=frozenset(),
         hint_problem_ids=frozenset(p.problem_id for p in problems),
     )
-    # ⑦ 의 가설 목표 — 실제 명세는 null 이라 반응을 볼 수 없다. 합성 세계 안에서만 둔다.
-    targets = dict(spec.targets)
-    targets["graph_connectivity_coverage"] = Target(
-        value=_SELF_CHECK_HYPOTHETICAL_GRAPH_TARGET, reason=None
-    )
+    # 목표는 5종 전부 실제 명세가 갖는다(⑦ 0.95 는 P3-33 확정) — 합성 세계가 따로 정하지 않는다.
     return World(
-        spec=replace(spec, targets=targets),
+        spec=spec,
         index=index,
         corpus=corpus,
         qa_records=tuple(records),
@@ -1271,7 +1277,12 @@ def _synthetic_world(spec: ScopeSpec, index: ReferenceIndex) -> World:
 
 
 def _control_defect_payload() -> dict[str, Any]:
-    """Hard Gate 5종이 전부 '측정됨 ∧ 해당 없음'인 payload."""
+    """Hard Gate 5종이 전부 '측정됨 ∧ 해당 없음'인 payload.
+
+    ⑥ 이 흡수하는 것은 F-Ⅱ·F-Ⅴ(`content`)뿐이다. 범위 밖 3종(`hit`·`failure_distribution`·
+    `anchors`)의 입력을 대조군에도 정상값으로 남기는 이유는, 그 입력을 망가뜨려도 ⑥ 이 반응하지
+    않음을 위반 주입으로 보이기 위해서다(`OUT_OF_PLANE_INJECTIONS`).
+    """
     return {
         "hit": {"baseline_anchor_median_minutes": {"A3": 5.0, "A4": 6.0}},
         "content": {
@@ -1392,6 +1403,42 @@ def _v_graph(b: Bundle) -> Bundle:
     return _with_corpus(b, crosslinks={})
 
 
+def _defect_payload_of(b: Bundle) -> dict[str, Any]:
+    """대조군 payload 의 사본 — 주입이 원본을 건드리지 않게 한다."""
+    assert b.defect_payload is not None
+    copied: dict[str, Any] = json.loads(json.dumps(b.defect_payload))
+    return copied
+
+
+def _o_f1_hit_median(b: Bundle) -> Bundle:
+    payload = _defect_payload_of(b)
+    payload["hit"]["baseline_anchor_median_minutes"] = {"A3": 13.0, "A4": 6.0}
+    return replace(b, defect_payload=payload)
+
+
+def _o_f3_judgment_share(b: Bundle) -> Bundle:
+    payload = _defect_payload_of(b)
+    payload["failure_distribution"]["judgment_hits"] = 95
+    return replace(b, defect_payload=payload)
+
+
+def _o_f4_three_anchors(b: Bundle) -> Bundle:
+    payload = _defect_payload_of(b)
+    for anchor in ("A1", "A2", "A3"):
+        payload["anchors"][anchor] = False
+    return replace(b, defect_payload=payload)
+
+
+#: 범위 밖 게이트(F-Ⅰ·Ⅲ·Ⅳ)를 해당 상태로 만드는 주입 — **7종 전부가 대조군과 같아야 한다**.
+#: 스코어카드는 이 위반을 NO_GO 로 잡지만 ⑥ 은 생산 공정 평면의 신호를 판정하지 않는다
+#: (P3-33). 반응하면 5종 흡수로 되돌아간 것이다 — `Injection.key` 는 주입이 겨냥한 지표일 뿐이다.
+OUT_OF_PLANE_INJECTIONS: Final[tuple[Injection, ...]] = (
+    Injection("F-Ⅰ HIT 중앙값 13분(범위 밖)", MetricKey.CRITICAL_DEFECT, _o_f1_hit_median),
+    Injection("F-Ⅲ 판단형 실패 95/100(범위 밖)", MetricKey.CRITICAL_DEFECT, _o_f3_judgment_share),
+    Injection("F-Ⅳ 앵커 3개 미달(범위 밖)", MetricKey.CRITICAL_DEFECT, _o_f4_three_anchors),
+)
+
+
 VIOLATION_INJECTIONS: Final[tuple[Injection, ...]] = (
     Injection("개념 없는 교육과정 노드 추가", MetricKey.CURRICULUM_COVERAGE, _v_curriculum),
     Injection("풀이 단계 삭제", MetricKey.CONCEPT_COMPLETENESS, _v_completeness),
@@ -1433,6 +1480,13 @@ def _u_defect(b: Bundle) -> Bundle:
     return replace(b, defect_payload=None)
 
 
+def _u_defect_absorbed_inputs_missing(b: Bundle) -> Bundle:
+    """흡수 2종(F-Ⅱ·F-Ⅴ)의 입력(`content`)만 지운다 — 범위 밖 3종 입력은 멀쩡하다."""
+    payload = _defect_payload_of(b)
+    del payload["content"]
+    return replace(b, defect_payload=payload)
+
+
 def _u_graph(b: Bundle) -> Bundle:
     world = _world_of(b)
     concepts = tuple(replace(c, core=False) for c in world.spec.concepts)
@@ -1446,6 +1500,11 @@ UNMEASURED_INJECTIONS: Final[tuple[Injection, ...]] = (
     Injection("재검증 대상 0건", MetricKey.SOLUTION_QA_PASS, _u_solution_qa),
     Injection("루프 분모 0", MetricKey.LEARNING_LOOP_SUCCESS, _u_loop),
     Injection("Hard Gate payload 없음", MetricKey.CRITICAL_DEFECT, _u_defect),
+    Injection(
+        "흡수 2종 입력 삭제(범위 밖 3종 입력은 정상)",
+        MetricKey.CRITICAL_DEFECT,
+        _u_defect_absorbed_inputs_missing,
+    ),
     Injection("핵심 개념 0건", MetricKey.GRAPH_CONNECTIVITY, _u_graph, isolated=False),
 )
 
@@ -1522,6 +1581,24 @@ def run_self_check(
         if others:
             detail += f" · 함께 변한 지표 {others}"
         rows.append((f"위반 주입 [{inj.key.value}] {inj.name}", ok, detail))
+
+    # ②-b 범위 밖 게이트 위반 — 7종 전부 무반응(⑥ 이 5종 흡수로 되돌아가지 않았다는 증거)
+    for inj in OUT_OF_PLANE_INJECTIONS:
+        try:
+            after = {o.key: o for o in evaluate_bundle(inj.apply(control))}
+        except InjectionNotAppliedError as exc:
+            rows.append((f"범위 밖 주입 [무반응] {inj.name}", False, str(exc)))
+            continue
+        moved = [
+            k.value for k in METRIC_ORDER if _signature(after[k]) != _signature(base_by_key[k])
+        ]
+        rows.append(
+            (
+                f"범위 밖 주입 [무반응] {inj.name}",
+                not moved and compose(tuple(after[k] for k in METRIC_ORDER)) is Composite.ALL_MET,
+                f"반응한 지표 {moved}" if moved else "7종 전부 대조군과 같다",
+            )
+        )
 
     # ③ 미측정 주입 — 그 지표가 측정 불가가 되고 종합이 '측정 실패'(통과로 접히지 않음)
     for inj in UNMEASURED_INJECTIONS:

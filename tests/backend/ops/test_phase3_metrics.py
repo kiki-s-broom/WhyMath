@@ -134,7 +134,7 @@ class TestControl:
         assert got[_K.CURRICULUM_COVERAGE].denominator == len(spec.nodes)
         assert got[_K.CONCEPT_COMPLETENESS].denominator == len(spec.core_concepts)
         assert got[_K.PROBLEM_COVERAGE].denominator == len(spec.skills)
-        assert got[_K.CRITICAL_DEFECT].denominator == 5
+        assert got[_K.CRITICAL_DEFECT].denominator == 2  # F-Ⅱ·F-Ⅴ (P3-33 — 5 에서 축소)
         # 범위가 이름에 박힌다 — CUR-02(분모 895) 와 구별된다.
         assert f"{len(spec.nodes)}노드" in got[_K.CURRICULUM_COVERAGE].scope
         assert "대표 과정" in got[_K.CURRICULUM_COVERAGE].scope
@@ -188,12 +188,44 @@ def _v_loop_point_estimate_equals_target(b: pm.Bundle) -> pm.Bundle:
     return replace(b, loop=_loop(190, 200))
 
 
-def _v_three_anchors_fail(b: pm.Bundle) -> pm.Bundle:
+def _payload_copy(b: pm.Bundle) -> dict[str, Any]:
     assert b.defect_payload is not None
-    payload = json.loads(json.dumps(b.defect_payload))
+    return json.loads(json.dumps(b.defect_payload))
+
+
+def _v_math_errors(b: pm.Bundle) -> pm.Bundle:
+    payload = _payload_copy(b)
+    assert payload["content"]["reviewed_math_errors"] == 0  # 치환 대상 존재
+    payload["content"]["reviewed_math_errors"] = 50  # 50/1000 — F-Ⅱ 해당
+    return replace(b, defect_payload=payload)
+
+
+def _v_hint_leak(b: pm.Bundle) -> pm.Bundle:
+    payload = _payload_copy(b)
+    assert payload["content"]["hint_leak_hits"] == 0  # 치환 대상 존재
+    payload["content"]["hint_leak_hits"] = 30  # 30/100 — F-Ⅴ 해당
+    return replace(b, defect_payload=payload)
+
+
+def _o_hit_median(b: pm.Bundle) -> pm.Bundle:
+    payload = _payload_copy(b)
+    assert payload["hit"]["baseline_anchor_median_minutes"]["A3"] == 5.0  # 치환 대상 존재
+    payload["hit"]["baseline_anchor_median_minutes"] = {"A3": 13.0, "A4": 6.0}  # F-Ⅰ 해당
+    return replace(b, defect_payload=payload)
+
+
+def _o_judgment_share(b: pm.Bundle) -> pm.Bundle:
+    payload = _payload_copy(b)
+    assert payload["failure_distribution"]["judgment_hits"] == 0  # 치환 대상 존재
+    payload["failure_distribution"]["judgment_hits"] = 95  # F-Ⅲ 해당
+    return replace(b, defect_payload=payload)
+
+
+def _o_three_anchors_fail(b: pm.Bundle) -> pm.Bundle:
+    payload = _payload_copy(b)
     assert payload["anchors"]["A1"] is True  # 치환 대상 존재
     for anchor in ("A1", "A2", "A3"):
-        payload["anchors"][anchor] = False
+        payload["anchors"][anchor] = False  # F-Ⅳ 해당
     return replace(b, defect_payload=payload)
 
 
@@ -212,7 +244,8 @@ _INJECTIONS: list[tuple[str, pm.MetricKey, Callable[[pm.Bundle], pm.Bundle]]] = 
         _K.LEARNING_LOOP_SUCCESS,
         _v_loop_point_estimate_equals_target,
     ),
-    ("앵커 3개 미달(F-Ⅳ)", _K.CRITICAL_DEFECT, _v_three_anchors_fail),
+    ("검수 통과 CU 수학 오류 50/1000(F-Ⅱ)", _K.CRITICAL_DEFECT, _v_math_errors),
+    ("힌트 정답 누설 30/100(F-Ⅴ)", _K.CRITICAL_DEFECT, _v_hint_leak),
     ("크로스링크 삭제", _K.GRAPH_CONNECTIVITY, _v_drop_crosslinks),
 ]
 
@@ -388,13 +421,20 @@ class TestNoTarget:
         pending[_K.LEARNING_LOOP_SUCCESS] = bad
         assert pm.compose(tuple(pending[k] for k in pm.METRIC_ORDER)) is pm.Composite.VIOLATION
 
-    def test_real_spec_has_null_graph_target_so_real_run_is_never_all_met(
-        self, spec: ps.ScopeSpec
+    def test_confirmed_target_makes_graph_connectivity_a_verdict_not_pending(
+        self, spec: ps.ScopeSpec, control: pm.Bundle
     ) -> None:
-        """현재 사실의 기록 — 명세가 ⑦ 목표를 정하기 전에는 실 코퍼스 종합이 충족일 수 없다."""
-        if spec.targets["graph_connectivity_coverage"].value is not None:
-            pytest.skip("⑦ 목표가 확정됐다 — 이 사실 기록은 더 이상 유효하지 않다")
-        assert spec.targets["graph_connectivity_coverage"].reason
+        """⑦ 목표 0.95 가 명세에서 확정됐다(P3-33) — 같은 입력이 '판정'이 되고 종합이 충족이다.
+
+        위 null 대조군(`_pending`)과 한 쌍이다: 목표만 null → 0.95 로 바뀌었을 뿐인 같은 세계에서
+        NO_TARGET·TARGET_PENDING 이 사라져야 두 경로가 모두 변별력을 갖는다.
+        """
+        assert spec.targets["graph_connectivity_coverage"].value == 0.95
+        outcomes = pm.evaluate_bundle(control)
+        o = _by_key(outcomes)[_K.GRAPH_CONNECTIVITY]
+        assert o.state is pm.MetricState.MEASURED and o.met is True
+        assert o.target == 0.95
+        assert pm.compose(outcomes) is pm.Composite.ALL_MET
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -754,33 +794,118 @@ class TestLearningLoop:
 # 11. ⑥ Critical Defect — Hard Gate 흡수, '해당 없음'과 '판정 불가'는 다르다
 # ──────────────────────────────────────────────────────────────────────────
 class TestCriticalDefect:
+    """⑥ 은 Hard Gate 5종 중 F-Ⅱ·F-Ⅴ 2종만 판정한다(P3-33 · 분모 5 → 2).
+
+    F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면(HIT·실패 분포·앵커) 신호라 위반이 나도 반응하지 않고 입력이
+    없어도 측정 실패로 만들지 않는다 — 두 방향 모두 따로 겨냥한다.
+    """
+
     def _payload(self, control: pm.Bundle) -> dict[str, Any]:
         assert control.defect_payload is not None
         return json.loads(json.dumps(control.defect_payload))
 
-    def test_control_payload_has_zero_defects_over_five_gates(self, control: pm.Bundle) -> None:
+    def test_control_payload_has_zero_defects_over_the_two_absorbed_gates(
+        self, control: pm.Bundle
+    ) -> None:
         o = pm._critical_defect(control.defect_payload, injected=True)
-        assert (o.numerator, o.denominator, o.met) == (0, 5, True)
-        assert [label for label, _ in o.facts] == list(pm._HARD_GATE_CODES)
+        assert (o.numerator, o.denominator, o.met) == (0, 2, True)
+        assert [label for label, _ in o.facts] == ["F-Ⅱ", "F-Ⅴ"]
 
-    @pytest.mark.parametrize("gate", ["F-Ⅰ", "F-Ⅱ", "F-Ⅲ", "F-Ⅳ", "F-Ⅴ"])
-    def test_each_gate_triggers_exactly_one_defect(self, control: pm.Bundle, gate: str) -> None:
+    def test_scope_says_the_other_three_gates_belong_to_the_production_plane(
+        self, control: pm.Bundle
+    ) -> None:
+        """출력에 '범위 밖 3종은 생산 공정 평면 소관'이 박힌다 — 측정됨·미측정 양쪽 경로 모두."""
+        measured = pm._critical_defect(control.defect_payload, injected=True)
+        unmeasured = pm._critical_defect(None, injected=True)
+        for o in (measured, unmeasured):
+            assert "F-Ⅰ·Ⅲ·Ⅳ" in o.scope and "생산 공정 평면" in o.scope, o.scope
+            assert "F-Ⅱ·F-Ⅴ 2종" in o.scope
+
+    def test_gate_partition_is_two_plus_three_and_covers_the_scorecard(self) -> None:
+        absorbed = set(pm._ABSORBED_GATE_CODES)
+        outside = set(pm._OUT_OF_PLANE_GATE_CODES)
+        assert absorbed == {"F-Ⅱ", "F-Ⅴ"} and outside == {"F-Ⅰ", "F-Ⅲ", "F-Ⅳ"}
+        assert absorbed.isdisjoint(outside)
+        assert absorbed | outside == set(pm._SCORECARD_GATE_CODES)
+
+    @pytest.mark.parametrize("gate", ["F-Ⅱ", "F-Ⅴ"])
+    def test_each_absorbed_gate_triggers_exactly_one_defect(
+        self, control: pm.Bundle, gate: str
+    ) -> None:
         payload = self._payload(control)
-        if gate == "F-Ⅰ":
-            payload["hit"]["baseline_anchor_median_minutes"] = {"A3": 13.0, "A4": 6.0}
-        elif gate == "F-Ⅱ":
+        if gate == "F-Ⅱ":
             payload["content"]["reviewed_math_errors"] = 50
-        elif gate == "F-Ⅲ":
-            payload["failure_distribution"]["judgment_hits"] = 95
-        elif gate == "F-Ⅳ":
-            for a in ("A1", "A2", "A3"):
-                payload["anchors"][a] = False
         else:
             payload["content"]["hint_leak_hits"] = 30
         o = pm._critical_defect(payload, injected=True)
         assert o.state is pm.MetricState.MEASURED and o.met is False
         assert o.numerator == 1, o.unmet
+        assert o.denominator == 2
         assert o.unmet[0].startswith(gate)
+
+    def test_both_absorbed_gates_triggering_counts_two(self, control: pm.Bundle) -> None:
+        payload = self._payload(control)
+        payload["content"]["reviewed_math_errors"] = 50
+        payload["content"]["hint_leak_hits"] = 30
+        o = pm._critical_defect(payload, injected=True)
+        assert (o.numerator, o.denominator, o.met) == (2, 2, False)
+
+    @pytest.mark.parametrize(
+        ("gate", "inject"),
+        [
+            ("F-Ⅰ", _o_hit_median),
+            ("F-Ⅲ", _o_judgment_share),
+            ("F-Ⅳ", _o_three_anchors_fail),
+        ],
+    )
+    def test_out_of_plane_gate_violation_does_not_move_any_metric(
+        self, control: pm.Bundle, gate: str, inject: Callable[[pm.Bundle], pm.Bundle]
+    ) -> None:
+        """범위 밖 3종은 스코어카드가 NO_GO 로 잡을 위반이어도 ⑥ 이 반응하지 않는다.
+
+        대조: 같은 payload 를 스코어카드 쪽에 넣으면 그 게이트가 실제로 해당이다 — 즉 주입이
+        게이트에 닿았는데도 ⑥ 이 무반응이라는 뜻이다(주입이 안 닿은 무반응이 아니다).
+        """
+        injected = inject(control)
+        assert injected != control  # 주입 적용 단언
+        gates = {g.code: g for g in vs.evaluate_hard_gates(dict(injected.defect_payload or {}))}
+        assert gates[gate].triggered is True, "주입이 해당 게이트에 닿지 않았다"
+        before = _by_key(pm.evaluate_bundle(control))
+        after = _by_key(pm.evaluate_bundle(injected))
+        for key in pm.METRIC_ORDER:
+            assert _signature(after[key]) == _signature(before[key]), (gate, key.value)
+        assert after[_K.CRITICAL_DEFECT].numerator == 0
+        assert pm.compose(tuple(after[k] for k in pm.METRIC_ORDER)) is pm.Composite.ALL_MET
+
+    def test_modules_out_of_plane_table_matches_this_files_independent_table(
+        self, control: pm.Bundle
+    ) -> None:
+        """`--self-check` 가 쓰는 범위 밖 표도 같은 성질이어야 한다 — 표가 무반응이면 위장이다."""
+        assert len(pm.OUT_OF_PLANE_INJECTIONS) == 3
+        before = _by_key(pm.evaluate_bundle(control))
+        for inj in pm.OUT_OF_PLANE_INJECTIONS:
+            after = _by_key(pm.evaluate_bundle(inj.apply(control)))
+            for key in pm.METRIC_ORDER:
+                assert _signature(after[key]) == _signature(before[key]), inj.name
+
+    def test_out_of_plane_inputs_missing_does_not_make_it_unmeasured(
+        self, control: pm.Bundle
+    ) -> None:
+        """성공 방향 대조군 — 흡수 2종의 입력만 있으면 범위 밖 3종이 판정 불가여도 측정된다."""
+        payload = {"content": self._payload(control)["content"]}
+        o = pm._critical_defect(payload, injected=True)
+        assert o.state is pm.MetricState.MEASURED
+        assert (o.numerator, o.denominator, o.met) == (0, 2, True)
+
+    def test_only_out_of_plane_inputs_is_still_unmeasured(self, control: pm.Bundle) -> None:
+        """흡수 2종의 입력이 없으면 범위 밖 3종이 전부 측정돼도 ⑥ 은 측정 실패다."""
+        full = self._payload(control)
+        payload = {k: v for k, v in full.items() if k != "content"}
+        assert set(payload) == {"hit", "failure_distribution", "anchors"}
+        o = pm._critical_defect(payload, injected=True)
+        assert o.state is pm.MetricState.UNMEASURED and o.value is None
+        assert "F-Ⅱ" in o.reason and "F-Ⅴ" in o.reason
+        assert "F-Ⅰ" not in o.reason  # 범위 밖 게이트는 판정 불가 사유에 나오지 않는다
 
     def test_empty_payload_is_unmeasured_not_zero_defects(self) -> None:
         o = pm._critical_defect({}, injected=True)
@@ -791,7 +916,7 @@ class TestCriticalDefect:
         assert pm._critical_defect(None, injected=False).state is pm.MetricState.UNMEASURED
 
     def test_partial_payload_without_a_trigger_is_unmeasured(self, control: pm.Bundle) -> None:
-        """F-Ⅱ 만 있고 해당 없음 — 나머지 4게이트는 판정 불가라 '0건'이라 말할 수 없다."""
+        """F-Ⅱ 만 있고 해당 없음 — 나머지 흡수 게이트(F-Ⅴ)가 판정 불가라 '0건'이라 말할 수 없다."""
         full = self._payload(control)
         partial = {
             "content": {
@@ -801,6 +926,7 @@ class TestCriticalDefect:
         o = pm._critical_defect(partial, injected=True)
         assert o.state is pm.MetricState.UNMEASURED
         assert "판정 불가" in o.reason
+        assert "F-Ⅴ" in o.reason and "F-Ⅱ" not in o.reason
 
     def test_partial_payload_with_a_trigger_is_a_confirmed_defect(self, control: pm.Bundle) -> None:
         """해당 1건이면 나머지가 판정 불가여도 확정 위반이다(알 수 없는 것이 확정을 지우지 않는다)."""
@@ -809,6 +935,7 @@ class TestCriticalDefect:
         assert o.state is pm.MetricState.MEASURED and o.met is False and o.numerator == 1
 
     def test_malformed_payload_is_unmeasured_with_the_type_name(self) -> None:
+        """스코어카드가 payload 전체를 읽다 터지면 ⑥ 은 측정 실패다 — 예외 타입명을 남긴다."""
         o = pm._critical_defect({"hit": "문자열"}, injected=True)
         assert o.state is pm.MetricState.UNMEASURED
         assert o.error_type == "AttributeError"
@@ -822,7 +949,7 @@ class TestCriticalDefect:
 
     def test_gate_codes_are_the_scorecards(self, control: pm.Bundle) -> None:
         codes = tuple(g.code for g in vs.evaluate_hard_gates(self._payload(control)))
-        assert codes == pm._HARD_GATE_CODES
+        assert codes == pm._SCORECARD_GATE_CODES
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1201,6 +1328,27 @@ class TestRealCorpusWiring:
         assert got[_K.CRITICAL_DEFECT].state is pm.MetricState.UNMEASURED
         assert pm.compose(outcomes) is pm.Composite.MEASUREMENT_FAILED
         assert got[_K.CURRICULUM_COVERAGE].denominator == len(loaded.spec.nodes)
+
+    def test_real_run_gives_graph_connectivity_a_verdict_not_target_pending(
+        self, loaded: pm.World
+    ) -> None:
+        """⑦ 목표가 명세에서 확정됐으므로(P3-33) 실 코퍼스에서 '목표미정'이 나오지 않는다.
+
+        측정값은 고정하지 않는다(진척에 따라 바뀐다) — 상태·목표가 명세에서 읽혀 왔는지만 본다.
+        """
+        outcomes = pm.evaluate_all(
+            loaded,
+            loop_observation=None, loop_injected=False,
+            defect_payload=None, defect_injected=False,
+            window=pm._SELF_CHECK_WINDOW, run_id="t", sample_basis="live",
+            reverify=_stub(len(loaded.qa_records), 0, 0),
+        )  # fmt: skip
+        o = _by_key(outcomes)[_K.GRAPH_CONNECTIVITY]
+        spec_target = loaded.spec.targets["graph_connectivity_coverage"].value
+        assert spec_target is not None
+        assert o.state is pm.MetricState.MEASURED, o.reason
+        assert o.target == spec_target and o.met is not None
+        assert not any(x.state is pm.MetricState.NO_TARGET for x in outcomes)
 
     def test_unreadable_spec_path_is_a_world_failure_not_an_exception(self, tmp_path: Path) -> None:
         failure = pm.load_world(tmp_path / "missing.yaml")
