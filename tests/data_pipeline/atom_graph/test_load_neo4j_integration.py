@@ -5,7 +5,7 @@
 미설정) ② `importorskip`로 이중 skip된다. 전용 `data-pipeline-neo4j` 잡(실 neo4j:5)에서만
 실제 적재가 돈다. Neo4j 미도달 시에도 graceful skip(concept_graph 통합 선례와 동형).
 
-검증: load_graph가 실 Neo4j에 ① 노드 2683·엣지 2210 적재 ② **멱등**(2회 적재 → 노드·엣지 수
+검증: load_graph가 실 Neo4j에 ① 노드 2683·엣지 2234 적재 ② **멱등**(2회 적재 → 노드·엣지 수
 불변) ③ atom_code_unique 유일 제약 존재. 격리를 위해 적재한 `code` 집합만 시작·종료 시 삭제한다
 (앱 그래프·구 :Concept 그래프를 건드리지 않음).
 """
@@ -103,7 +103,7 @@ def _constraint_exists(driver: "GraphDatabase.driver") -> bool:  # type: ignore[
 
 
 def test_load_is_idempotent_on_live_neo4j() -> None:
-    """실 Neo4j: 2회 적재 → 노드 2683·엣지 2210 불변(멱등) + atom_code_unique 제약 존재."""
+    """실 Neo4j: 2회 적재 → 노드 2683·엣지 2234 불변(멱등) + atom_code_unique 제약 존재."""
     if not _reachable():
         pytest.skip("Neo4j 미도달 — 통합 테스트 건너뜀 (NEO4J_URI/USER/PASSWORD 확인)")
 
@@ -116,10 +116,10 @@ def test_load_is_idempotent_on_live_neo4j() -> None:
         # 1회차 적재
         r1 = load_graph(result, driver=driver)
         assert r1.nodes_merged == 2683
-        assert r1.edges_merged == 2210
+        assert r1.edges_merged == 2234
         assert r1.edges_skipped == 0
         n1, e1 = _count_loaded(driver, codes)
-        assert (n1, e1) == (2683, 2210)
+        assert (n1, e1) == (2683, 2234)
 
         # 제약 존재
         assert _constraint_exists(driver)
@@ -127,7 +127,7 @@ def test_load_is_idempotent_on_live_neo4j() -> None:
         # 2회차 적재 — 멱등(MERGE): 노드·엣지 수 불변
         load_graph(result, driver=driver)
         n2, e2 = _count_loaded(driver, codes)
-        assert (n2, e2) == (2683, 2210), "재적재 후 노드·엣지 수가 변했다(멱등성 위반)"
+        assert (n2, e2) == (2683, 2234), "재적재 후 노드·엣지 수가 변했다(멱등성 위반)"
     finally:
         _cleanup(driver, codes)
         driver.close()

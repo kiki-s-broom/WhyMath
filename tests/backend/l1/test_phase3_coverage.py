@@ -374,13 +374,40 @@ class TestVerdict:
         assert any("Curriculum Coverage" in f and "분모가 0" in f for f in report.failures)
 
     def test_target_less_metric_does_not_change_exit_code(self, spec, index, world) -> None:
-        """Graph Connectivity 는 명세에 목표가 없다 — 떨어져도 exit 은 다른 지표가 정한다."""
+        """목표가 null 인 지표는 떨어져도 exit 을 바꾸지 않는다 — 판정이 없는 지표의 계약.
+
+        실 명세는 Graph Connectivity 목표를 0.95 로 확정했으므로(P3-33) 이 경로는 실 명세로는
+        더 닿지 않는다. 목표를 명시적으로 null 로 둔 명세를 만들어 그 계약을 계속 겨냥한다.
+        """
         _, cut = _drop_crosslinks(spec, index, world)
-        report = pc.evaluate(spec, index, cut)
+        targets = {
+            **spec.targets,
+            "graph_connectivity_coverage": ps.Target(value=None, reason="테스트 — 목표 미정"),
+        }
+        report = pc.evaluate(replace(spec, targets=targets), index, cut)
         connectivity = report.metric("graph_connectivity_coverage")
         assert connectivity.value == 0.0
         assert connectivity.met is None and not connectivity.gated
         assert report.exit_code == 0
+
+    def test_graph_connectivity_is_gated_by_the_confirmed_spec_target(
+        self, spec, index, world
+    ) -> None:
+        """확정된 목표(0.95)가 판정을 만든다 — 크로스링크가 끊기면 미달이고 exit 1 이다.
+
+        위 null 대조군과 한 쌍이다: 같은 위반 입력에서 목표가 null 이면 exit 0, 목표가 있으면
+        exit 1 이어야 둘 다 변별력이 있다.
+        """
+        assert spec.targets["graph_connectivity_coverage"].value == 0.95
+        _, cut = _drop_crosslinks(spec, index, world)
+        report = pc.evaluate(spec, index, cut)
+        connectivity = report.metric("graph_connectivity_coverage")
+        assert connectivity.value == 0.0
+        assert connectivity.gated and connectivity.met is False
+        assert report.exit_code == 1
+        # 성공 방향 대조군 — 위반 없는 세계는 같은 목표에서 충족이다
+        clean = pc.evaluate(spec, index, world).metric("graph_connectivity_coverage")
+        assert clean.gated and clean.met is True
 
     def test_supply_coverage_never_gates(self, spec, index, world) -> None:
         _, demoted = _demote_review_status(spec, index, world)
@@ -621,6 +648,7 @@ class TestSpecAlignment:
         lenient["content_coverage_rate"] = ps.Target(value=0.5, reason=None)
         lenient["curriculum_coverage"] = ps.Target(value=0.5, reason=None)
         lenient["concept_completeness"] = ps.Target(value=0.5, reason=None)
+        lenient["graph_connectivity_coverage"] = ps.Target(value=0.5, reason=None)
         report = pc.evaluate(replace(spec, targets=lenient), index, cut)
         assert report.metric("content_coverage_rate").met is True
         assert report.exit_code == 0
@@ -691,6 +719,7 @@ class TestDefinitionsBite:
             "content_coverage_rate": ps.Target(value=0.9, reason=None),
             "curriculum_coverage": ps.Target(value=0.9, reason=None),
             "concept_completeness": ps.Target(value=0.9, reason=None),
+            "graph_connectivity_coverage": ps.Target(value=0.9, reason=None),
         }
         report = pc.evaluate(replace(spec, targets=exact), index, cut)
         assert report.metric("content_coverage_rate").value == 0.9

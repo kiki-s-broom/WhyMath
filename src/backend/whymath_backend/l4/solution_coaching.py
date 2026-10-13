@@ -181,6 +181,7 @@ def recommend_coaching_for_solution(
     discrepancy_tol: float = 0.2,
     mastery_threshold: float = 0.6,
     verifier: StepChainVerifier | None = None,
+    chain_verification: ChainVerificationCounts | None = None,
 ) -> SolutionCoaching:
     """학생 풀이 + L2 두 신호 → 코칭 처방. L3 결정론 검증을 거쳐 검산 코칭을 우선한다.
 
@@ -207,6 +208,13 @@ def recommend_coaching_for_solution(
     *단계 자가검산* 프레이밍과 자연 정합). 이 bool들을 *그대로* 기존 `recommend_coaching`에
     넘긴다(결정 함수 시그니처·로직 불변). `solution_steps` 미제공·전이 0개면 `verification=None`·
     신호는 기존 텍스트 레벨 그대로 — **모든 기존 동작 완전 불변**(하위호환).
+
+    **OPS-125 선계산 주입**: `chain_verification`이 주어지면 `verifier.verify_chain`을 *부르지
+    않고* 그 값을 연쇄 검증 결과로 쓴다. 이 함수는 동기라 호출부(async 핸들러)가 이벤트 루프
+    안에서 SymPy를 돌리게 되는데, 핸들러가 연쇄 검증을 먼저 격리 호출(`api/_isolated_call.
+    isolated`)로 계산해 이 인자로 넘기면 서빙 중에는 이 함수가 SymPy를 돌리지 않는다.
+    `solution_steps`가 2개 미만이면 이 인자는 무시된다(검증 대상 없음). 미주입이면 종전대로
+    `verifier`(또는 합성 루트 폴백)를 부른다 — 직접 호출 단위테스트 하위호환.
 
     **OCR 신뢰 게이팅(WH-1 1단계)**: `ocr_confidence`(0~1·L5 OCR 인식 신뢰도)가 제공되고
     `_OCR_THRESHOLD`(0.8·match_gate 게이트 ② 임계 공유) 미만이면(`ocr_low`), 분해 단계 텍스트
@@ -266,11 +274,15 @@ def recommend_coaching_for_solution(
     # 직접 의존 제거. composition은 설계된 유일 교체점).
     verification: ChainVerificationCounts | None = None
     if solution_steps is not None and len(solution_steps) >= 2:
-        if verifier is None:
-            from whymath_backend.composition import default_step_chain_verifier
+        if chain_verification is not None:
+            # OPS-125: 호출부가 이미 (격리 경유로) 계산한 결과 — 여기서 다시 계산하지 않는다.
+            verification = chain_verification
+        else:
+            if verifier is None:
+                from whymath_backend.composition import default_step_chain_verifier
 
-            verifier = default_step_chain_verifier()
-        verification = verifier.verify_chain(solution_steps, solution_step_types)
+                verifier = default_step_chain_verifier()
+            verification = verifier.verify_chain(solution_steps, solution_step_types)
 
     # WH-1 1단계 — OCR 신뢰 게이팅. ocr_confidence가 제공되고 임계(0.8·match_gate 공유) 미만이면
     # 분해 단계 텍스트가 OCR 오인식일 수 있어 step 신호를 코칭 결정에서 누그러뜨린다(정확성 #1).

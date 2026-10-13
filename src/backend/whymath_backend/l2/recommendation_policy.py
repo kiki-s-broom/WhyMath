@@ -814,7 +814,9 @@ class CatRecommendationPolicy:
         if self._sibling_filter is not None:
             last_wrong = await last_incorrect_problem_id(session, user_id)
             if last_wrong is not None:
-                sibling_ids = await load_sibling_ids(session, last_wrong)
+                sibling_ids = await load_sibling_ids(
+                    session, last_wrong, sibling_filter=self._sibling_filter
+                )
 
         excluded_ids = sibling_ids if self._sibling_filter == "exclude" else set()
         # EOS-24 — 학습 상태 머신이 오개념 교정(R3)을 결정했으면 추천은 그 결정을 *집행*한다:

@@ -195,6 +195,28 @@ class ProblemAttempt(Base):
         sa.Uuid, sa.ForeignKey("problem.problem_id")
     )
 
+    # ===== 버전 고정 (EOS-47 — 44_eos_version_management.md §10.2) =====
+    # 이 시도가 가리키는 문항의 **판**. 접수 시점의 `problem.problem_version_id` 포인터를 복사해
+    # 넣으므로(`l2/attempt_version_pin`) 문항이 나중에 수정돼 새 판이 서빙 기준이 돼도 이 값은
+    # 바뀌지 않는다 — "그 학생이 푼 문제의 그때 모습"을 가리키는 것이 존재 이유다.
+    # nullable·기본값 없음·**백필 금지**: NULL=고정 안 됨(그 시점에 문항에 판이 없었거나 이 컬럼
+    # 도입 이전 행). 기존 행에 판을 날조해 넣지 않는다(DP-03 `event_uuid`·ARCH-31 규약).
+    # problem → problem_version 단방향 FK라 상호 FK(problem ↔ problem_version) 같은 순환이 없다.
+    problem_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid,
+        sa.ForeignKey(
+            "problem_version.version_id",
+            name="fk_problem_attempt_problem_version_id_problem_version",
+        ),
+        nullable=True,
+    )
+    # 채점 시점의 교육 환경 스냅숏(`schema/evaluation_context.py`가 형상·키별 출처의 정본).
+    # NULL=기록 안 됨(도입 이전 행). JSONB 안의 키별 null은 '기록 불가(모름)'다 — 출처가 없는 키에
+    # 값을 지어내 넣지 않는다. SEC-06: `none_as_null=True`(파이썬 None → SQL NULL).
+    evaluation_context: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+
     # ===== 시간 =====
     # 실측(EOS-48): started_at/ended_at은 *클라이언트 신고* 발생 시각(schema Optional — 클라가
     # 채우는 운영 메타), created_at은 server_default지만 from_schema 경유 덮어쓰기가 가능해
