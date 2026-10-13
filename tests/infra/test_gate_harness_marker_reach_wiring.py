@@ -567,3 +567,312 @@ def test_strict_xfail_checker_discriminates(source: str, expect: list[str]) -> N
     assert len(found) == len(expect), found
     for needle, message in zip(expect, found, strict=True):
         assert needle in message, (needle, message)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# OPS-137 — tests/backend/l3 통합 파일의 CI 수집 장부
+#
+# 결함: 통합 스텝이 `--ignore=../../tests/backend/l3` 디렉터리 일괄이라 l3 하위 integration 마커
+# 파일 9개가 어떤 CI 스텝에서도 수집되지 않았다(같은 명령 --collect-only 0건 실측 2026-10-13). 그중
+# PG만 필요한 3개(EOS-50 Publish Gate 통합 포함)까지 가려졌고, 수집되지 않는 동안 둘은 노후화돼
+# 있었다(orchestrator = 수용 게이트 강화·원자 재연결 이후 후보/시드 불일치, diag_item = 재실행 중복
+# 결함). 디렉터리 일괄 제외가 원인이므로 처방은 **파일 단위 제외 + 사유 장부**다 — 새 l3 통합 파일이
+# 생기면 장부(수집/제외)에 올리기 전까지 이 파일이 red다.
+# ══════════════════════════════════════════════════════════════════════════
+_L3_DIR = "tests/backend/l3"
+
+#: PG(+pgvector)만 필요해 CI 통합 스텝이 **수집해야 하는** l3 통합 파일. 값 = 외부 의존 판정 근거.
+L3_PG_ONLY_COLLECTED: dict[str, str] = {
+    "tests/backend/l3/test_publish_gate_integration.py": (
+        "실 PG + alembic head(concept_version.qa). Ollama·Redis·Langfuse·Anthropic·Celery 참조 0건."
+        " 8건 통과(2026-10-13 실 PG 실측)."
+    ),
+    "tests/backend/l3/equivalent/test_orchestrator_integration.py": (
+        "실 PG + pgvector(FakeEmbeddingProvider = 라이브 모델 불요). 외부 서비스 참조 0건. 편입 전 "
+        "노후화 2건 수정(근 선택 명시 · 원자 재연결 방식 개념 시드/코퍼스 절대경로 주입) 후 통과."
+    ),
+    "tests/backend/l3/pedagogy/test_diag_item_projector_integration.py": (
+        "실 PG + data/corpus 고정물. LLM 0·외부 서비스 참조 0건. 2건 중 1건은 실제 결함으로 "
+        "XFAIL(L3_TRACKED_XFAILS · PED-46), 나머지 1건 통과."
+    ),
+}
+
+#: 라이브 외부 서비스가 필요해 CI 통합 스텝이 **파일 단위로 제외하는** l3 통합 파일. 값 = 제외 사유.
+L3_EXTERNAL_SERVICE_EXCLUSIONS: dict[str, str] = {
+    "tests/backend/l3/test_anthropic_integration.py": (
+        "실제 Anthropic API 호출(WHYMATH_ANTHROPIC_API_KEY) — 유료 호출·CI 시크릿 없음. "
+        "Anthropic API는 2026-12-31까지 사용 중단(ARCH-66)."
+    ),
+    "tests/backend/l3/test_celery_integration.py": "실제 Celery + Redis broker 도달성 단정.",
+    "tests/backend/l3/test_langfuse_integration.py": (
+        "실제 Langfuse 전송(WHYMATH_LANGFUSE_* 키) — CI에 키·인스턴스 없음."
+    ),
+    "tests/backend/l3/test_ollama_integration.py": "실제 Ollama 데몬 도달성 단정(Phaiakes9 전용).",
+    "tests/backend/l3/test_redis_integration.py": "실제 Redis 데몬 ping 도달성 단정(Phaiakes9 전용).",
+    "tests/backend/l3/test_visualization_live.py": (
+        "실 모델·GPU가 필요한 라이브 평가(Ollama 패밀리 비교 · Phaiakes9 전용)."
+    ),
+}
+
+#: 수집되지만 **알려진 결함**으로 strict xfail인 테스트 → 추적 태스크. 값 = 태스크 id 접두.
+#: 키 = (파일, 함수). 태스크가 done/cancelled가 되면 이 장부 항목과 표식이 남아 있는 한 red다.
+L3_TRACKED_XFAILS: dict[tuple[str, str], str] = {
+    (
+        "tests/backend/l3/pedagogy/test_diag_item_projector_integration.py",
+        "test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge",
+    ): "PED-46",
+}
+
+_TASKS_DIR = _REPO_ROOT / "backlog" / "tasks"
+_CLOSED_STATUSES = frozenset({"done", "cancelled"})
+
+
+def l3_integration_files(root: pathlib.Path) -> set[str]:
+    """`tests/backend/l3` 아래에서 `pytest.mark.integration`을 쓰는 파일 — AST로 센다.
+
+    문자열 검색이면 docstring의 "integration 마커" 언급에 걸린다.
+    """
+    found: set[str] = set()
+    for path in sorted((root / _L3_DIR).rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if any(
+            isinstance(node, ast.Attribute) and _is_pytest_attr(node, "mark", "integration")
+            for node in ast.walk(tree)
+        ):
+            found.add(path.relative_to(root).as_posix())
+    return found
+
+
+def l3_ledger_violations(
+    found: set[str], collected: Mapping[str, str], excluded: Mapping[str, str]
+) -> list[str]:
+    """실제 l3 통합 파일 집합과 (수집 ∪ 제외) 장부가 정확히 일치하는가 (순수 함수)."""
+    violations: list[str] = []
+    both = sorted(set(collected) & set(excluded))
+    if both:
+        violations.append(f"수집 장부와 제외 장부에 동시에 있다: {both}")
+    ledger = set(collected) | set(excluded)
+    if not ledger:
+        violations.append("장부가 비어 있다 — 공허한 통과 금지")
+    unclassified = sorted(found - ledger)
+    if unclassified:
+        violations.append(
+            f"장부에 없는 l3 통합 파일(수집/제외를 결정해 올려라 — PG만 필요하면 수집 장부, "
+            f"라이브 서비스가 필요하면 제외 장부 + ci.yml의 --ignore): {unclassified}"
+        )
+    stale = sorted(ledger - found)
+    if stale:
+        violations.append(
+            f"장부에만 있고 실제로는 통합 마커 파일이 아니다(삭제·마커 제거?): {stale}"
+        )
+    blank = sorted(p for p, why in {**collected, **excluded}.items() if not why.strip())
+    if blank:
+        violations.append(f"사유가 비어 있다: {blank}")
+    return violations
+
+
+def ci_collects_path(spec: Mapping[str, Any], path: str) -> bool:
+    """`src/backend` 작업 디렉터리의 마커 수집 pytest 호출이 `path`를 수집하는가 (순수 함수)."""
+    for job in (spec.get("jobs") or {}).values():
+        if not isinstance(job, dict):
+            continue
+        for step in job.get("steps") or []:
+            if not isinstance(step, dict) or not step.get("run"):
+                continue
+            if _workdir_of(job, step) != _BACKEND_WORKDIR:
+                continue
+            for call in _pytest_tokens(str(step["run"])) or []:
+                if _collects_by_marker(call, harness_path=path):
+                    return True
+    return False
+
+
+def _task_status(task_id: str) -> str | None:
+    """`backlog/tasks/<task_id>*.yaml`의 status. 태스크 파일이 없으면 None(= 모른다)."""
+    matches = sorted(_TASKS_DIR.glob(f"{task_id}-*.yaml")) + sorted(
+        _TASKS_DIR.glob(f"{task_id}.yaml")
+    )
+    if not matches:
+        return None
+    data: Any = yaml.safe_load(matches[0].read_text(encoding="utf-8"))
+    return str(data.get("status")) if isinstance(data, dict) else None
+
+
+def tracked_xfail_violations(
+    source: str, *, path: str, func: str, task_id: str, task_status: str | None
+) -> list[str]:
+    """알려진 결함 xfail이 (1) 엄격하고 (2) 추적 태스크를 사유에 달고 (3) 만료되지 않았는가."""
+    tree = ast.parse(source)
+    fn = next(
+        (
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name == func
+        ),
+        None,
+    )
+    if fn is None:
+        return [f"{path}::{func} 가 없다 — 장부 항목이 낡았다"]
+    marks = [
+        d
+        for d in fn.decorator_list
+        if isinstance(d, ast.Call) and _is_pytest_attr(d.func, "mark", "xfail")
+    ]
+    if not marks:
+        return [
+            f"{path}::{func} 에 xfail 표식이 없다 — 장부는 알려진 결함이라 하는데 표식이 사라졌다"
+        ]
+    kw = {k.arg: k.value for k in marks[0].keywords if k.arg}
+    out: list[str] = []
+    strict = kw.get("strict")
+    if not (isinstance(strict, ast.Constant) and strict.value is True):
+        out.append(f"{path}::{func} xfail에 strict=True가 없다 — 결함이 고쳐져도 초록이다")
+    if "raises" not in kw:
+        out.append(f"{path}::{func} xfail에 raises가 없다 — 다른 종류의 실패까지 가린다")
+    reason = kw.get("reason")
+    if not (
+        isinstance(reason, ast.Constant)
+        and isinstance(reason.value, str)
+        and task_id in reason.value
+    ):
+        out.append(f"{path}::{func} xfail reason에 추적 태스크 {task_id}가 없다")
+    if task_status is None:
+        out.append(f"추적 태스크 {task_id} 파일을 찾지 못했다 — 모르는 상태를 통과로 읽지 않는다")
+    elif task_status in _CLOSED_STATUSES:
+        out.append(
+            f"추적 태스크 {task_id}가 {task_status}인데 {path}::{func} 의 xfail 표식과 장부 항목이 "
+            "남아 있다 — 표식을 지우고 장부(L3_TRACKED_XFAILS)에서도 뺀다"
+        )
+    return out
+
+
+# ── 실 저장소·실 워크플로 판정 ────────────────────────────────────────────
+def test_l3_integration_files_are_all_classified() -> None:
+    """l3 통합 파일 전수가 수집/제외 장부에 있다 — 새 파일이 조용히 CI 밖에 놓이지 않는다."""
+    found = l3_integration_files(_REPO_ROOT)
+    assert found, "l3 통합 파일을 하나도 못 찾았다 — 스캔이 위장 통과할 수 없다"
+    violations = l3_ledger_violations(found, L3_PG_ONLY_COLLECTED, L3_EXTERNAL_SERVICE_EXCLUSIONS)
+    assert violations == [], "l3 통합 파일 장부 위반:\n" + "\n".join(f"- {v}" for v in violations)
+
+
+def test_l3_pg_only_integration_files_are_collected_in_ci() -> None:
+    """PG만 필요한 l3 통합 파일은 CI 마커 수집에 실제로 도달한다(스텝·마커·PG 서비스 포함)."""
+    spec = _load_workflow()
+    problems = [
+        v
+        for path in L3_PG_ONLY_COLLECTED
+        for v in marker_reach_violations(spec, harness_paths=(path,))
+    ]
+    assert problems == [], "PG-only l3 통합 파일이 CI에서 수집되지 않는다:\n" + "\n".join(
+        f"- {v}" for v in problems
+    )
+
+
+def test_l3_external_service_files_are_excluded_by_file_in_ci() -> None:
+    """제외 장부의 파일은 CI 명령에서 실제로 제외된다 — 장부가 CI보다 앞서 낡지 않는다.
+
+    제외가 풀리면(= 수집되면) 라이브 서비스 미도달로 CI가 흔들리므로 그쪽도 red여야 한다.
+    """
+    spec = _load_workflow()
+    wrongly_collected = [p for p in L3_EXTERNAL_SERVICE_EXCLUSIONS if ci_collects_path(spec, p)]
+    assert wrongly_collected == [], (
+        f"제외 장부에 있으나 CI가 수집하는 파일: {wrongly_collected} — ci.yml의 --ignore를 "
+        "되돌리거나, 외부 서비스 없이 도는 파일이 됐다면 수집 장부로 옮겨라."
+    )
+
+
+def test_l3_tracked_xfails_are_strict_and_unexpired() -> None:
+    """알려진 결함 xfail은 엄격하고 추적 태스크를 달고 있으며 그 태스크가 닫히면 red가 된다."""
+    assert L3_TRACKED_XFAILS, "추적 장부가 비었다면 이 테스트와 장부를 함께 지워라(공허 통과 금지)"
+    violations: list[str] = []
+    for (rel, func), task_id in L3_TRACKED_XFAILS.items():
+        violations += tracked_xfail_violations(
+            (_REPO_ROOT / rel).read_text(encoding="utf-8"),
+            path=rel,
+            func=func,
+            task_id=task_id,
+            task_status=_task_status(task_id),
+        )
+    assert violations == [], "알려진 결함 xfail 위반:\n" + "\n".join(f"- {v}" for v in violations)
+
+
+# ── 변별력 봉인 — 원 결함·반례를 합성 입력으로 주입한다 ───────────────────
+_DIR_WIDE_RUN = "pytest -m integration --ignore=../../tests/backend/l3"
+_PG_FILE = "tests/backend/l3/test_publish_gate_integration.py"
+_EXT_FILE = "tests/backend/l3/test_redis_integration.py"
+_FILE_LEVEL_RUN = (
+    "pytest -m integration \\\n"
+    "  --ignore=../../tests/backend/l3/test_redis_integration.py \\\n"
+    "  --ignore=../../tests/backend/l3/test_ollama_integration.py"
+)
+
+
+def test_original_defect_directory_wide_ignore_hides_pg_only_file() -> None:
+    """원 결함의 재현 — 디렉터리 일괄 --ignore는 PG-only 파일을 가리고 배선 판정이 red를 낸다."""
+    spec = _synthetic(run=_DIR_WIDE_RUN)
+    assert ci_collects_path(spec, _PG_FILE) is False
+    assert marker_reach_violations(spec, harness_paths=(_PG_FILE,)) != []
+
+
+def test_file_level_ignore_collects_pg_only_and_excludes_external() -> None:
+    """양성 대조 — 파일 단위 제외는 PG-only를 수집하고 제외한 파일만 뺀다(무차별 red/green 아님)."""
+    spec = _synthetic(run=_FILE_LEVEL_RUN)
+    assert ci_collects_path(spec, _PG_FILE) is True
+    assert marker_reach_violations(spec, harness_paths=(_PG_FILE,)) == []
+    assert ci_collects_path(spec, _EXT_FILE) is False
+
+
+def test_ci_collects_path_requires_backend_workdir_and_marker() -> None:
+    """작업 디렉터리·마커 축 반례 — 어느 하나만 틀려도 수집으로 보지 않는다."""
+    assert (
+        ci_collects_path(_synthetic(workdir="src/data-pipeline", run=_FILE_LEVEL_RUN), _PG_FILE)
+        is False
+    )
+    assert (
+        ci_collects_path(_synthetic(run="pytest --ignore=../../tests/backend/api"), _PG_FILE)
+        is False
+    )
+
+
+def test_ledger_detects_unclassified_overlap_stale_and_blank() -> None:
+    """장부 판정의 축마다 반례 — 각 분기를 한 번씩 밟는다."""
+    ok = l3_ledger_violations({"a", "b"}, {"a": "pg"}, {"b": "live"})
+    assert ok == []
+    assert l3_ledger_violations({"a", "b", "new"}, {"a": "pg"}, {"b": "live"}) != []  # 미분류 신규
+    assert l3_ledger_violations({"a"}, {"a": "pg"}, {"a": "live"}) != []  # 양쪽 동시
+    assert l3_ledger_violations({"a"}, {"a": "pg", "gone": "x"}, {}) != []  # 낡은 장부
+    assert l3_ledger_violations({"a"}, {"a": "  "}, {}) != []  # 빈 사유
+    assert l3_ledger_violations(set(), {}, {}) != []  # 공허
+
+
+_XFAIL_OK = (
+    "import pytest\n"
+    "@pytest.mark.xfail(strict=True, raises=AssertionError, reason='PED-46: dup')\n"
+    "def test_x():\n    assert False\n"
+)
+
+
+def _tx(source: str = _XFAIL_OK, status: str | None = "todo", task: str = "PED-46") -> list[str]:
+    return tracked_xfail_violations(
+        source, path="t.py", func="test_x", task_id=task, task_status=status
+    )
+
+
+def test_tracked_xfail_checker_detects_each_axis() -> None:
+    """추적 xfail 판정의 축마다 반례 — 만료 축(태스크 done)이 이 장부의 핵심이다."""
+    assert _tx() == []
+    assert _tx(status="done") != []  # 태스크가 닫혔는데 표식이 남음 → 만료
+    assert _tx(status="cancelled") != []
+    assert _tx(status=None) != []  # 모르는 상태는 통과가 아니다
+    assert _tx(_XFAIL_OK.replace("strict=True, ", "")) != []  # 느슨한 xfail
+    assert _tx(_XFAIL_OK.replace("raises=AssertionError, ", "")) != []  # 다른 실패까지 가림
+    assert _tx(_XFAIL_OK.replace("PED-46", "other")) != []  # 추적 태스크 미표기
+    assert (
+        _tx(
+            _XFAIL_OK.replace(
+                "@pytest.mark.xfail(strict=True, raises=AssertionError, reason='PED-46: dup')\n", ""
+            )
+        )
+        != []
+    )  # 표식 소실
+    assert _tx(_XFAIL_OK.replace("test_x", "test_y")) != []  # 함수 소실
