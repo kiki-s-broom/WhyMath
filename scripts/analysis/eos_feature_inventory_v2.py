@@ -1156,6 +1156,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
        "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.problem_corpus_lineage_links",
        "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
@@ -1211,6 +1212,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
+       # S4-56 — 잔여 축 교차검증 게이트 v2(도메인 플러그인·사전점검·dry-run). v1과 같은 판정 가족.
+       "harness.residue_cross_verify_eval_v2",
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",
