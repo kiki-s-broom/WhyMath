@@ -1064,6 +1064,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.problem_corpus_rephrase_sweep": _BATCH_GENERATOR,
         "harness.problem_corpus_tag": _BATCH_GENERATOR,
         "harness.problem_corpus_variants": _BATCH_GENERATOR,
+        # PB-20 — 계보만 걸기는 사이드 JSONL까지만 낸다. 그것을 problem_relation 으로 올리는
+        # 적재 단계가 PB-23 이라, 그 태스크가 닫히기 전까지는 미도달이 의도다(만료 = 태스크 done).
+        "harness.problem_corpus_lineage_links": (
+            "pending-task:PB-23-variant-lineage-links-populate-apply"
+        ),
         "harness.problem_type_backfill": _BATCH_GENERATOR,
         # ⚠️ 2026-08-10 OPS-24 — 백필 CLI 2종(`problem_corpus_review_status_backfill`·
         # `problem_corpus_persona_fit_backfill`)의 `pending-task` 유예를 해제했다. 판정은

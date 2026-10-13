@@ -1156,6 +1156,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
        "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.problem_corpus_lineage_links",
        "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
