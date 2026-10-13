@@ -1211,6 +1211,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
+       # S4-56 — 잔여 축 교차검증 게이트 v2(도메인 플러그인·사전점검·dry-run). v1과 같은 판정 가족.
+       "harness.residue_cross_verify_eval_v2",
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",

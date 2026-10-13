@@ -263,6 +263,16 @@ class CrossVerifyReport:
 - `backend` 잡에 `python -m whymath_backend.harness.residue_cross_verify_eval_v2 --dry-run` 추가(설계 단계에서는 dry-run).
 - S4-52-1 구현 후 실제 파일럿 코퍼스(30~50문)로 게이트 승격.
 
+### 6.4 구현 기록 (S4-56, 2026-10-13)
+
+- **파일**: `harness/residue_cross_verify_eval_v2.py`. `--domain`은 `finite`(확률+경우의 수 — v1과 같은 로트)·`finite_probability`·`finite_count`·`statistical_claim`·`sequence_induction`을 받는다. 도메인 verifier와 관점 세트는 게이트가 따로 들지 않고 `l3/verifier.py`의 `_VERIFIERS_V2`·`_CROSS_VERIFY_PERSPECTIVES`를 읽는다 — 게이트와 서빙 경로가 같은 심사를 한다. 대상 조립은 공개 함수 `build_residue_subject`로 단일화했다.
+- **`geometric_discrete`는 받지 않는다**: 도메인 verifier·관점 세트가 없는 미착수 도메인이다(`verifier_v2_domains.md` §6.1 — 단계 A는 `statistical_claim`으로 구현됐다). 이름만 받고 exit 2로 거부한다.
+- **기본 임계**: `sample_n` = 결함 0건으로 기본 임계(상한 0.05·신뢰 95%)를 통과할 수 있는 최소 표본(=52, 코드가 `wilson_upper_bound`로 유도). `min_n`도 같은 값. **도메인 간 차등은 두지 않았다** — 차등의 근거가 될 라이브 측정이 없다(칸만 도메인별로 두었다).
+- **LLM 호출 전 거부**: 도달 불가 임계(`THRESHOLD_UNREACHABLE`)·서명 판독 불가(`INDEPENDENCE_UNPROVEN`)·기계 실패는 검증기를 한 번도 부르지 않고 끝난다. 예: 파일럿 34문 + 기본 임계 → 결함 0건 상한이 0.0737이라 `THRESHOLD_UNREACHABLE`(v1은 34건을 다 호출한 뒤 `DEFECT_RATE`로 실패했다).
+- **종료 코드**: 0 = 통과 또는 dry-run 사전점검 통과 · 1 = 게이트 판정 실패 · 2 = 측정 불가(코퍼스 로드 실패·미구현 도메인·인자 오류).
+- **CI**: `backend` 잡에 `--dry-run` 스텝을 배선했다(파일럿 34문·표본 34·임계 0.11 — 도달 가능한 *배선용* 값이며 품질 임계가 아니다). 판정은 `DRY_RUN_OK`이고 `PASS`가 아니다 — 잔여 축은 CI에서 측정하지 않는다.
+- **승격은 이행하지 않았다**: ① 기본 임계로 30~50문은 통과 불가(FC-4, 52건 필요) ② 2026-09-25 Kiki 판정으로 이 게이트는 인간 검수 대체 후보에서 제외됐고 재측정에는 변조기 정답지 수리와 대조군 사람 검수가 선행한다(`docs/standards/residue_gate_demotion_battle_history.md` §6) ③ `statistical_claim`·`sequence_induction`의 코퍼스 소비처는 0건이다. 이 구현이 준 것은 메커니즘과 CI 배선이지 승격이 아니다.
+
 ---
 
 ## 7. 하위 슬라이스 분할안

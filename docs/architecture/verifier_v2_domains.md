@@ -650,7 +650,7 @@ for code in sorted(want):
 | C8 | `verifier.py:137,183`, `test_verifier.py:83` | `residual_axes`는 자유 문자열. 확률 도메인의 `문발↔형식모델 정합`은 오타인데 코드·테스트·설계서(`verifier_v2_design.md:202`)에 고정 | 현재 `residual_axes`를 집계 키로 쓰는 코드는 어댑터 통과 외 확인하지 못했다(내가 찾은 방법으로 0건). 단계 B는 올바른 철자로 신설하고 기존 값은 바꾸지 않는다 — 집계 소비처가 생기면 어휘 등록부를 판정 | 정리(`S4-68`이 필요성만 판정) |
 | C9 | `eos_core_adapter_boundary_scan.py:121-122`, `eos_feature_inventory_v2.py:819` | 신규 `l3.*` 모듈은 ADAPTER 분류와 인벤토리 귀속이 필요(`l3.statistical_claim` 선례) | 이 둘은 pytest가 아니라 CI `infra-contracts` 잡이 검사한다 — 빠뜨리면 pytest가 초록인 채 CI가 적색이다 | 동반 (**`S4-66` 처리**) |
 | C10 | `docs/prompts/l3_cross_verify.md`, `l3/prompt_assets.py` | 프롬프트는 정본 문서의 자산 ID로만 로드되고 없으면 `PromptAssetError`(fail-closed) | 관점마다 `system`·`user` 2개, 도메인당 6개를 정본에 추가해야 `prompt_text`가 통과한다. `prompt_asset_audit` 통과 필요 | 동반 (**`S4-66` 처리** — 감사기 레일 매핑도 함께) |
-| C11 | `residue_cross_verify_eval.py:65` | `_SUPPORTED_KINDS = {finite_probability, finite_count}` | 다른 kind는 `TIER_UNSUPPORTED`로 거부 — `S4-56`의 v2 CLI 이전에는 단계 B 로트 게이트를 돌릴 수 없다 | 후속(`S4-56`) |
+| C11 | `residue_cross_verify_eval.py:65` | `_SUPPORTED_KINDS = {finite_probability, finite_count}` | 다른 kind는 `TIER_UNSUPPORTED`로 거부 — `S4-56`의 v2 CLI 이전에는 단계 B 로트 게이트를 돌릴 수 없다 | 처리(`S4-56`, 2026-10-13) — v2 CLI가 `--domain`으로 kind를 고른다(`verifier_v2_design.md` §6.4). 단 `sequence_induction`·`statistical_claim`의 코퍼스 소비처는 여전히 0건이라 *돌릴 데이터*는 없다 |
 
 ### 8.4 판정
 
