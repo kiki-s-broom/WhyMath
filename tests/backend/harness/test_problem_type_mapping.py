@@ -21,7 +21,9 @@
 
 from __future__ import annotations
 
+import ast
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -404,7 +406,21 @@ class TestCorpusSeatContract:
         # "계측기는 보는데 계약은 모르는" 코퍼스(CONT-09 사고 형태)가 다시 생긴다.
         from whymath_backend.harness import problem_bank_coverage as pbc
 
-        assert ptm._CORPUS_DIR_GLOB == pbc.CORPUS_DIR_GLOB
+        assert ptm._CORPUS_DIR_GLOB is pbc.CORPUS_DIR_GLOB  # 값 복제가 아니라 같은 상수 객체.
+
+        # PB-20 `test_investigation_doc_names_every_glob_consumer`와 같은 AST 규칙: 이 모듈에
+        # `problem_bank`+`*` 문자열 상수가 다시 생기면 조사 문서 소비처 표에 새 행이 필요해진다.
+        tree = ast.parse(Path(ptm.__file__).read_text(encoding="utf-8"))
+        duplicated = [
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and re.fullmatch(r"[\w./*\[\]{}\-]+", node.value)
+            and "problem_bank" in node.value
+            and "*" in node.value
+        ]
+        assert duplicated == [], f"글롭 상수 복제 금지(PB-20): {duplicated}"
 
     def test_real_repo_has_no_seat_violations(self) -> None:
         assert ptm.find_corpus_seat_violations() == []

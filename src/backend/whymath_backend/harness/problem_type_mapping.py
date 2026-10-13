@@ -50,6 +50,8 @@ from pathlib import Path
 
 import yaml
 
+from whymath_backend.harness.problem_bank_coverage import CORPUS_DIR_GLOB
+
 __all__ = [
     "ALL_PROBLEM_TYPE_IDS",
     "CORPUS_CONCEPTUAL_V0",
@@ -403,9 +405,10 @@ def default_corpus_root() -> Path:
     return Path(__file__).resolve().parents[4] / "data" / "corpus"
 
 
-# `problem_bank_coverage.CORPUS_DIR_GLOB`와 같은 탐색 규칙 — 계측기가 읽는 코퍼스 집합과 이 계약이
-# 지키는 집합이 어긋나면 "계측기가 보는데 계약은 모르는" 코퍼스가 생긴다(CONT-09 사고 형태).
-_CORPUS_DIR_GLOB = "problem_bank*"
+# 탐색 규칙은 계측기의 `CORPUS_DIR_GLOB`를 **가져와** 쓴다(복제 금지) — 계측기가 읽는 코퍼스 집합과
+# 이 계약이 지키는 집합이 어긋나면 "계측기가 보는데 계약은 모르는" 코퍼스가 생긴다(CONT-09 사고
+# 형태). 문자열 상수를 여기 다시 두면 PB-20 조사 문서의 글롭 소비처 표에 새 행도 필요해진다.
+_CORPUS_DIR_GLOB = CORPUS_DIR_GLOB
 
 
 def _corpus_seats() -> dict[str, list[str]]:
