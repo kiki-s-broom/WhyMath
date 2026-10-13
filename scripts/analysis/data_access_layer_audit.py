@@ -304,6 +304,13 @@ BASELINE: dict[str, frozenset[str]] = {
             # 트랜잭션·같은 행 잠금 안에 있어야 하므로 저장소 계층으로 분리하지 않았다 — 이
             # 등재가 "이 파일은 DB를 직접 잡는다"의 서면 선언이다.
             "l3/publish_gate.py",
+            # EOS-190 — 문항 판 Publish Gate. 위 개념 판 게이트의 짝으로, `problem_version` 행과
+            # 발행 포인터(`problem.problem_version_id`)를 쓰는 **유일한** 자리다(AST 동결
+            # test_problem_publish_gate_enforcement.py). 같은 이유로 저장소 계층으로
+            # 분리하지 않았다 — PUBLISH 전이는 문항 행 잠금 → 라이브 내용 대조 → 판 행 잠금 →
+            # 포인터 전환이 **한 트랜잭션·한 잠금 순서** 안에 있어야 `live_content_current`
+            # 검사가 의미를 갖는다.
+            "l3/problem_publish_gate.py",
             "l3/solution_path_store.py",
         }
     ),

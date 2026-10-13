@@ -778,8 +778,10 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-316", "콘텐츠 버전 Publish Gate(전이표·검증 파이프라인·Rollback)", "Admin",
        "Versioning", "P1",
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
-       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5)",
-       "l3.publish_gate", status="Batch"),
+       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5). EOS-190 — 문항 판 writer(`l3."
+       "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이나 **운영 호출자"
+       "가 아직 없다**(호출 표면은 후속 태스크) · 시도 버전 고정(EOS-47)만 포인터를 읽는다",
+       "l3.publish_gate", "l3.problem_publish_gate", status="Batch"),
     _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
        "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
