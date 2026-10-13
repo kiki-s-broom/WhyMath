@@ -218,9 +218,10 @@ class TestMainCli:
 class TestKnownCorpora:
     # 원 구현(2026-07-29) 당시 6종이었으나, S3-10을 미병합 브랜치에서 회수하며(2026-07-30)
     # 그 사이 신설된 7번째 코퍼스(`probability_finite_v0` — S4-13 확률 유한 전수형 파일럿)를
-    # 추가했다. 로직 무변경 — 대상 목록만 확장(모듈 docstring 참조).
-    def test_lists_exactly_seven_corpora(self) -> None:
-        assert len(KNOWN_CORPORA) == 7
+    # 추가했다. 로직 무변경 — 대상 목록만 확장(모듈 docstring 참조). 8번째는 P3-03 미분 은행
+    # (`p3_calculus1_diff_v0` — 5회차 S5 감사 승인 뒤 편입, 2026-10-09).
+    def test_lists_exactly_eight_corpora(self) -> None:
+        assert len(KNOWN_CORPORA) == 8
 
     def test_paths_match_expected_layout(self) -> None:
         expected = {
@@ -234,6 +235,9 @@ class TestKnownCorpora:
             "v1": Path("data/corpus/problem_bank_v1/problems.jsonl"),
             "probability_finite_v0": (
                 Path("data/corpus/problem_bank_probability_finite_v0/problems.jsonl")
+            ),
+            "p3_calculus1_diff_v0": (
+                Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl")
             ),
         }
         assert KNOWN_CORPORA == expected

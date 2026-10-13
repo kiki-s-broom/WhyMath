@@ -547,7 +547,7 @@ class TestDomain:
         monkeypatch: pytest.MonkeyPatch,
         with_ledger: bool,
     ) -> None:
-        """고정 코퍼스 7종 경로는 코퍼스 단위 백필의 대상 — 대장이 붙어 있어도 거부한다."""
+        """고정 코퍼스 8종 경로는 코퍼스 단위 백필의 대상 — 대장이 붙어 있어도 거부한다."""
         monkeypatch.chdir(tmp_path)  # KNOWN_CORPORA는 레포 루트 상대경로 — 가짜 루트를 세운다
         fixed_dir = tmp_path / "data" / "corpus" / "problem_bank_v1"
         fixed_dir.mkdir(parents=True)

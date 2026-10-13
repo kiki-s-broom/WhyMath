@@ -649,9 +649,11 @@ CATALOG: tuple[Spec, ...] = (
     # (`evidence_event.session_id → learning_session.user_id`)라 같은 기능의 적재 축이다.
     _e("WM-E-206", "학습 증거 이벤트 적재(attempt·처치·추천 회계·학습 세션)", "Student", "Event",
        "P0",
-       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer",
+       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer · "
+       "EOS-47 시도 접수 시점 문항 판·채점 환경 고정(l2.attempt_version_pin)",
        "l2.evidence_event_store", "l2.attempt_skill_event",
-       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer"),
+       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer",
+       "l2.attempt_version_pin"),
     _e("WM-E-207", "목표 진행 조회 좌석", "Student", "Learning Model", "P2",
        "수능 D-day 축", "l2.target_progress"),
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
@@ -793,8 +795,14 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.skeleton_generator", "l3.equivalent.difficulty",
        "l3.equivalent.canonicalize", "l3.equivalent.rephrase", "l3.equivalent.rephrase_hygiene",
        "l3.equivalent.retag", "l3.equivalent.latex_gate", "l3.equivalent.counterexample_fuzz",
-       "l3.equivalent.defect_seeder"),
-    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대)", "Admin", "Math Engine", "P0",
+       "l3.equivalent.defect_seeder",
+       # P3-03 감사자 자격 측정 — 은행 전용 결함 주입기(defect_seeder와 같은 강등전 원리·이 은행의
+       # 실제 문항에 7종을 심어 정답지를 구성으로 확정). 소비자는 harness.p3_audit_qualification.
+       "l3.equivalent.p3_diff_defect_seeder",
+       # PB-09 변형 3종(난이도 계열·조건변형·역문제) — 코퍼스 행에서 자식을 낳는 결정론 모듈.
+       "l3.equivalent.variants"),
+    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
+       "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
        "l3.equivalent.calculus1_integral_skeleton_generator",
        "l3.equivalent.calculus2_trig_integral_skeleton_generator",
@@ -835,7 +843,25 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.trig_skeleton_generator",
        "l3.equivalent.vector_operations_skeleton_generator",
        "l3.equivalent.conceptual_count_mc_generator",
-       "l3.equivalent.misconception_eval_mc_generator"),
+       "l3.equivalent.misconception_eval_mc_generator",
+       # P3-03 — Phase 3 미적분Ⅰ 미분 대단원 개념별 결정론 생성기(승인 문항 0건이던 개념 채움).
+       # 생성기 7종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
+       # `harness.p3_calculus1_diff_batch.GENERATORS` 한 줄이라 여기 귀속도 같이 늘어난다.
+       "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
+       # 3차 감사 처분 — '선수 계산 우회로' 판정기(생성기 빌드가 문항마다 부르는 fail-loud 게이트).
+       "l3.equivalent.p3_diff_shortcut_guard",
+       # 1·2차 감사 문면 결함 스캐너 — 테스트 안에 있던 판정 함수를 감사자 자격 측정의 기계 게이트가
+       # 쓰도록 승격(규칙 불변·대조군은 test_p3_diff_text_defects가 그대로 봉인).
+       "l3.equivalent.p3_diff_text_scanner",
+       # 풀이 단계(`verify.solution_steps`) 결정론 도출 — 도함수 출발식부터 SymPy 계산(Tier2 계약).
+       "l3.equivalent.p3_diff_solution_steps",
+       "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
+       "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator",
+       "l3.equivalent.p3_diff_tangent_line_skeleton_generator",
+       "l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator",
+       "l3.equivalent.p3_diff_graph_shape_skeleton_generator",
+       "l3.equivalent.p3_diff_equation_application_skeleton_generator",
+       "l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",
@@ -992,7 +1018,8 @@ CATALOG: tuple[Spec, ...] = (
        "schema.cms_access", "schema.concept", "schema.concept_content", "schema.concept_version",
        "schema.corpus_provenance", "schema.curriculum_entry", "schema.curriculum_framework",
        "schema.curriculum_version", "schema.dialogue", "schema.enums",
-       "schema.event_data_contract", "schema.evidence_link", "schema.hint_usage",
+       "schema.evaluation_context", "schema.event_data_contract", "schema.evidence_link",
+       "schema.hint_usage",
        "schema.learning_loop_contract", "schema.learning_state", "schema.mastery_contract",
        "schema.misconception_catalog", "schema.misconception_crosslink",
        "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",
@@ -1073,6 +1100,10 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability",
+       # OPS-30: 알림의 마지막 1홉 — AlertLogNotifier가 계산한 전이를 웹훅으로 내보내는 sink와,
+       # 서버 프로세스 밖에서 /health/ready를 폴링해 S4를 계산하는 업타임 프로브. 둘 다
+       # "서비스 헬스 관측"의 같은 축(서버가 알리지 못하는 것까지 알린다)이라 같은 좌석에 귀속한다.
+       "ops.alert_delivery", "ops.uptime_probe",
        # OPS-53: 패키지 임포트 시 CLI stdout/stderr을 UTF-8로 맞추는 헬퍼 — 운영 CLI의 출력 안전.
        "_stdio", status="Production"),
     _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",
@@ -1124,7 +1155,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_persona_fit_backfill", "harness.problem_corpus_rephrase",
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
-       "harness.problem_corpus_tag", "harness.binomial_distribution_batch",
+       "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
        "harness.conceptual_count_mc_batch", "harness.conic_section_focus_batch",
@@ -1142,6 +1174,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.root_aggregate_batch", "harness.sample_mean_distribution_batch",
        "harness.sequence_sigma_batch", "harness.university_calc1_batch",
        "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
+       "harness.p3_calculus1_diff_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",
@@ -1173,6 +1206,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.banned_words_pii_eval", "harness.coach_prose_leak_eval",
        "harness.corpus_audit_eval", "harness.crosslink_demotion_eval",
        "harness.defect_detection_eval", "harness.explanation_f7_eval",
+       # P3-03 — 미분 은행 감사자 자격 측정(결함 주입 강등전 · 기계 ∪ LLM 이중 판정 · S5 보정 상한).
+       "harness.p3_audit_qualification",
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
@@ -1218,6 +1253,14 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-915", "학습 루프 KPI 게이트 5종(완주·정합·설명가능·수기개입·역추적)", "Admin", "QA",
        "P0", "EOS-15 — 계획서 §19 Phase 2 KPI · 미측정을 통과로 위장하지 않는 판정기",
        "ops.loop_kpi_gate", "ops.loop_kpi_sample_load"),
+    # P3-14 — 제품 완성도 평면(Phase 3 대표 과정) 7종. 생산 공정 12종(WM-O-905)·Phase 2 루프 KPI
+    # 5종(WM-O-915)과 **분모가 다른 세 번째 축**이라 두 행 어디에도 얹지 않고 별도 행으로 둔다
+    # (WM-O-915 주석과 같은 이유 — 한 행에 묶으면 인벤토리에서도 'KPI 17종' 착시가 생긴다).
+    # 이 모듈은 위 두 행의 산출(`evaluate_hard_gates`·LOOP_COMPLETION)을 **흡수만** 하고 새 정의를
+    # 만들지 않는다. 정본 경계: docs/standards/phase3_metrics_contract.md.
+    _o("WM-O-917", "Phase 3 지표 7종 일괄 CLI(제품 완성도 평면·위반 주입 자가 점검)", "Admin", "QA",
+       "P1", "P3-14 — 대표 과정 Coverage·QA·루프·결함 한 명령 · 미측정≠통과 판정기",
+       "ops.phase3_metrics"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),

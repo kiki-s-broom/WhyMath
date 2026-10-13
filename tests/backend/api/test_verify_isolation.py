@@ -38,9 +38,11 @@ from whymath_backend.schema.user import UserProfile as UserProfileSchema
 _SLOW_A = "x^20+x+1=0"
 _SLOW_B = "x^19+x+2=0"
 _CAP_S = 0.5
-# 실 SymPy 체인의 요청 벽시계 상한 — 예산(상한×4=2.0s) + 마감이 묶지 못하는 워커 재기동 1회 + 마지막
-# 전이의 계산. 정상 실측 최대 3.69초(CI 3.45초)와 예산 제거 뮤테이션 최소 11.27초 사이(OPS-127).
-_CHAIN_WALL_BOUND_S = 6.0
+# 실 SymPy 체인의 요청 벽시계 상한 — 예산(상한×4=2.0s) + 마감 직전 kill·스레드 오버헤드. OPS-128로
+# 워커 기동·복원 대기가 마감 안에 묶인 뒤 정상 실측은 2.14~2.58초(10회·4코어 단독)다. 수정 전 정상은
+# 2.21~3.69초(CI 3.45초)라 옛 상한 6.0초가 필요했다(OPS-127). 예산 제거 뮤테이션은 11.27초 이상.
+# 정상 최대의 약 1.5배·뮤테이션 최소의 약 1/3 — CI 부하 여유를 남기려 더 조이지 않는다.
+_CHAIN_WALL_BOUND_S = 4.0
 
 
 def _unique_slow(degree: int) -> tuple[str, str]:
@@ -205,12 +207,10 @@ class TestBudgetMeansUnverifiable:
         assert body["n_correct"] == 2 and body["n_incorrect"] == 0
         assert body["n_unverifiable"] == len(steps) - 1 - 2
         # 총 예산(2.0s)이 요청 시간을 묶는다 — 예산을 없앤 뮤테이션은 느린 전이를 전부 계산해
-        # 11.3~11.6초를 쓴다(OPS-127 실측). 정상은 예산을 *재기동 1회만큼* 넘는다: 마감은 전이마다
-        # 남은 예산을 계산 상한으로 주지만, 마감 직전에 시작한 전이의 워커 재기동 대기(계산 상한 밖)는
-        # 묶지 못한다(제품 쪽 정정 = OPS-128). 그래서 정상은 2.2~3.7초(4코어 단독·4병렬 실측)·CI 부하에서
-        # 3.42~3.45초가 관측됐다 — 옛 상한 3.2초는 그 초과분을 덮지 못해 흔들렸다. 상한은 두 분포
-        # 사이에 둔다. 남은 예산 배분의 *정확성*은 벽시계로 구별되지 않으므로(아래 결정론 테스트가 맡는다)
-        # 여기서는 "예산이 요청을 묶었다"만 본다.
+        # 11.3~11.6초를 쓴다(OPS-127 실측). 종전엔 정상도 예산을 *재기동 1회만큼* 넘었다(마감이 워커
+        # 기동·복원 대기를 못 묶음 — 2.2~3.7초·CI 3.45초) — OPS-128이 그 대기를 마감 안에 가뒀다
+        # (정상 2.14~2.58초). 남은 예산 배분의 *정확성*은 벽시계로 구별되지 않으므로(아래 결정론 테스트가
+        # 맡는다) 여기서는 "예산이 요청을 묶었다"만 본다.
         assert elapsed < _CHAIN_WALL_BOUND_S, f"체인 총 예산 2.0s 기대 — {elapsed:.2f}s"
         assert _isolated_call.isolation_stats()["timeouts"] < 7, "예산이 전이를 건너뛰지 않았다"
 
@@ -229,10 +229,17 @@ class TestBudgetMeansUnverifiable:
         clock = {"now": 1000.0}
         monkeypatch.setattr(verify_api, "time", SimpleNamespace(monotonic=lambda: clock["now"]))
         granted: list[float] = []
+        budgets: list[float] = []
 
         class _BurnsItsWholeLimit:
-            async def run(self, fn: Any, *args: Any, timeout_s: float, **kwargs: Any) -> Any:
+            async def run(
+                self, fn: Any, *args: Any, timeout_s: float, budget_s: float | None, **kwargs: Any
+            ) -> Any:
                 granted.append(timeout_s)
+                assert (
+                    budget_s is not None
+                ), "체인이 총 예산(budget_s)을 풀에 넘기지 않았다(OPS-128)"
+                budgets.append(budget_s)
                 clock["now"] += timeout_s + 0.3
                 raise BudgetExceededError("timeout", timeout_s)
 
@@ -240,9 +247,40 @@ class TestBudgetMeansUnverifiable:
         with TestClient(_app()) as client:
             body = client.post("/v1/verify-solution", json={"steps": ["x"] * 9}).json()
         assert granted == pytest.approx([_CAP_S, _CAP_S, 0.4])  # 마지막은 남은 예산만
+        # OPS-128 — 계산 상한과 별개로, 호출 *전체*(기동·복원 대기 포함)의 벽시계 예산도 남은 예산이다.
+        assert budgets == pytest.approx([2.0, 1.2, 0.4])
         assert sum(granted) <= _CAP_S * verify_api._CHAIN_BUDGET_FACTOR + 1e-9
         assert body["n_transitions"] == 8
         assert body["n_unverifiable"] == 8 and body["n_correct"] == 0 and body["n_incorrect"] == 0
+
+    def test_solution_cold_worker_boot_cannot_outlive_chain_budget(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    ) -> None:
+        """OPS-128 ① — 느리게 뜨는 워커가 체인 총 예산(2.0s)을 넘겨 요청을 붙잡지 못한다.
+
+        워커 기동(`ready`)은 계산 상한 밖이라 종전엔 마감도 묶지 못했다 — 마감 직전에 시작한 전이가
+        기동 대기만큼(최악 60초) 요청을 늘렸다. 여기서는 import에 4초 걸리는 모듈을 워커의 사전
+        import로 주입해 그 상황을 만든다(콜드 풀 — `_warm_worker()`를 일부러 부르지 않는다).
+        예산 안에 `ready`가 오지 않으면 전이는 판정 불가로 접히고 요청은 예산 + 여유 안에 끝나야 한다.
+        """
+        (tmp_path / "ops128_slow_boot.py").write_text("import time\ntime.sleep(4.0)\n")
+        monkeypatch.syspath_prepend(str(tmp_path))  # spawn 자식은 부모의 sys.path를 물려받는다
+        monkeypatch.setenv("WHYMATH_SYMPY_ISOLATION_PRELOAD_MODULES", '["ops128_slow_boot"]')
+        get_settings.cache_clear()
+        _isolated_call.reset_pool_for_tests()
+        budget_s = _CAP_S * 4  # verify_api._CHAIN_BUDGET_FACTOR
+
+        with TestClient(_app()) as client:
+            started = time.perf_counter()
+            resp = client.post("/v1/verify-solution", json={"steps": ["2*x+2", "2*(x+1)", "x+x+2"]})
+            elapsed = time.perf_counter() - started
+        assert resp.status_code == 200, resp.text
+        assert (
+            elapsed < budget_s + 0.75
+        ), f"체인 총 예산 {budget_s}s인데 {elapsed:.2f}s — 워커 기동 대기가 마감 밖이다"
+        body = resp.json()
+        # 기동이 안 끝난 전이는 통과·오답이 아니라 판정 불가다 — 점수가 새지 않는다.
+        assert body["n_unverifiable"] == 2 and body["n_correct"] == 0 and body["n_incorrect"] == 0
 
     def test_step_types_length_error_is_still_422(self) -> None:
         """입력 규약 위반은 격리와 무관하게 422 — 판정 불가로 접히지 않는다."""

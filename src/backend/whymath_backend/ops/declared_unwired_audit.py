@@ -1038,6 +1038,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.elementary_rounding_batch": _BATCH_GENERATOR,
         "harness.elementary_volume_measure_batch": _BATCH_GENERATOR,
         "harness.highschool_quotient_rule_batch": _BATCH_GENERATOR,
+        "harness.p3_calculus1_diff_batch": _BATCH_GENERATOR,
         "harness.linear_inequality_system_batch": _BATCH_GENERATOR,
         "harness.matrix_ops_batch": _BATCH_GENERATOR,
         "harness.measurement_unit_conversion_batch": _BATCH_GENERATOR,
@@ -1062,6 +1063,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.problem_corpus_rephrase_diagnose": _BATCH_GENERATOR,
         "harness.problem_corpus_rephrase_sweep": _BATCH_GENERATOR,
         "harness.problem_corpus_tag": _BATCH_GENERATOR,
+        "harness.problem_corpus_variants": _BATCH_GENERATOR,
         "harness.problem_type_backfill": _BATCH_GENERATOR,
         # ⚠️ 2026-08-10 OPS-24 — 백필 CLI 2종(`problem_corpus_review_status_backfill`·
         # `problem_corpus_persona_fit_backfill`)의 `pending-task` 유예를 해제했다. 판정은
@@ -1088,10 +1090,21 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "CLI, 다른 강등전류(S4-16 등)와 동형으로 상시 CI 대상 아님"
         ),
         "harness.root_aggregate_batch": _BATCH_GENERATOR,
-        "harness.reviewer_sample_package": _BATCH_GENERATOR,
+        # (reviewer_sample_package 유예는 2026-10-09 P3-14 에서 걷었다 — 아래 AXIS_CLI "P3-14" 주석)
         # 검수 세션(EOS-78) — 판정을 받으며 HIT 타이머를 생산한다. `reviewer_sample_package`
         # (표본 *제시*)와 달리 사람의 판정을 되받는 대면 도구라 배치 사유를 빌려 쓰지 않는다.
         "harness.review_session": _HUMAN_REVIEW_TOOL,
+        # P3-03(2026-10-08): 미분 은행 감사자 자격 측정(결함 주입 강등전). score·s5의 입력은
+        # 저장소 밖에서 만든 LLM 판정자 라벨이라(판정자는 저장소에 접근하면 안 된다 — 블라인드)
+        # CI가 원리적으로 못 돈다. emit·machine의 재현성(커밋된 시험지·기계 라벨과 바이트 대조)은
+        # corpus_authoring 테스트 2건이 같은 CLI 진입점을 in-process로 돌려 corpus-authoring 잡에서
+        # 검사한다. backend 잡에 직접 배선하지 않는 이유: 판정기·스캐너가 바뀌는 무관한 PR이 측정
+        # 기록(시험지)을 다시 만들게 강제하면 이미 받은 판정자 라벨과의 비교가 깨진다.
+        "harness.p3_audit_qualification": (
+            "by-design:감사자 자격 측정 CLI(P3-03) — score·s5 입력이 저장소 밖 LLM 판정자 "
+            "라벨이라 CI가 원리적으로 못 돈다. emit·machine 재현성은 corpus_authoring 테스트가 "
+            "같은 진입점으로 검사한다"
+        ),
         # MP-05(2026-09-07): 카나리 구간 절단 — 입력이 *특정 회차의 사이드카 4종*(대장·genlog·
         # 코퍼스·검수 큐)이라 상주 입력이 없다. 회차를 돌려야 생기는 파일들이고(레포에
         # 상주하지 않는다), 산출은 그 회차를 검수하려는 사람의 큐다. CI가 매 커밋마다 돌릴
@@ -1177,11 +1190,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 판정 로직(Hard Gate 우선·F-Ⅳ 3/2 경계·미측정 비통과·단일 점수 금지)은 backend 잡이
         # 수집하는 tests/backend/ops/test_validation_scorecard.py가 상시 검증한다 —
         # "안 도는 코드"가 아니라 "실측이 있을 때 사람이 G5에서 돌리는 판정기"다.
-        "ops.validation_scorecard": (
-            "by-design:12월 검증 결론 판정기(EOS-61) — 입력이 EOS-54/55/60 산출물이라 실측 축적 "
-            "전에는 전 지표 미측정(exit 1)이 설계값. G5(12/31) 판정 시점에 운영자가 "
-            "`--hit-cu-json`·`--qa-matrix-json`으로 생산자 산출을 직접 먹여 돌린다"
-        ),
+        # (ops.validation_scorecard 유예는 2026-10-09 P3-14 에서 걷었다 — 아래 "P3-14" 주석)
         # EOS-08(2026-09-16): Phase 1 구조 지표 5종 리포터 — **판정기가 아니라 리포터**라
         # CI 차단 스텝에 넣지 않는다(넣으면 그 모듈이 스스로 못박은 "지표 값으로 합격을
         # 선언하지 않는다"를 배선이 배신한다 — 두 도구가 서로 다른 합격을 말하면 무엇을
@@ -1194,10 +1203,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "의미가 없고, 반대로 exit 1을 내게 바꾸면 validation_scorecard와 합격 판정이 갈린다. "
             "산출 로직은 tests/backend/ops/test_phase1_structure_report.py가 상시 검증"
         ),
-        "ops.hit_cu_metrics": (
-            "by-design:검수 타이머 실표본 의존 판독기(EOS-54) — 계측 이벤트 축적 전에는 입력 0이 "
-            "측정 실패(exit 1)로 설계돼 CI 상시 실행 비대상. G2/G5 KPI 판정 시점에 운영자가 돌린다"
-        ),
+        # (ops.hit_cu_metrics 유예는 2026-10-09 P3-14 에서 걷었다 — 아래 "P3-14" 주석)
         # EOS-60(2026-08-31): 골든 승격기 + QA 엔진 혼동행렬 — 둘 다 EOS-54 검수 *실이벤트*가
         # 입력이다(별도 라벨링 캠페인 금지 규약의 귀결). 검수 판정이 쌓이기 전에는 승격 0건 =
         # 측정 실패(exit 1)가 설계값이라 hit_cu_metrics와 같은 이유로 CI 상시 배선 비대상 —
@@ -1206,14 +1212,20 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # tests/backend/harness/test_golden_benchmark.py·tests/backend/ops/
         # test_qa_confusion_matrix.py가 상시 검증한다 — "안 도는 코드"가 아니라 "실표본이 있을
         # 때 사람이 돌리는 판독기"다. 계약 정본 = docs/standards/golden_benchmark_contract.md.
-        "harness.golden_benchmark": (
-            "by-design:검수 실이벤트 의존 골든 승격기(EOS-60) — 검수 판정 축적 전에는 승격 0건이 "
-            "측정 실패(exit 1)로 설계돼 CI 상시 실행 비대상. 검수와 함께 운영자가 돌린다"
-        ),
-        "ops.qa_confusion_matrix": (
-            "by-design:골든 실표본 의존 혼동행렬 판독기(EOS-60) — 골든 0건·평가쌍 0건이 측정 "
-            "실패(exit 1)로 설계돼 CI 상시 실행 비대상. G2/G5 KPI 판정 시점에 운영자가 돌린다"
-        ),
+        # (harness.golden_benchmark·ops.qa_confusion_matrix 유예도 같은 날 같은 사유로 걷었다)
+        #
+        # P3-14(2026-10-09): `ops.phase3_metrics --self-check` 가 CI backend 잡에 직접
+        # 배선되고, 그 모듈이 `ops.validation_scorecard`(Hard Gate·임계 표 흡수)를
+        # in-process import 한다. 감사 정의(축 4 ⑶ 전이 import)상 scorecard 와 그 import
+        # 폐포(scorecard → qa_confusion_matrix → golden_benchmark →
+        # hit_cu_metrics·reviewer_sample_package)가 **도달**이 되어 위 5건의 `by-design`
+        # 유예가 `stale-waiver` 로 exit 1 이 됐다 — 걷는 것이 이 게이트의 정본 대응이다.
+        # **사실이 바뀐 것은 아니다**: 이 다섯 CLI 의 `main()` 은 여전히 CI 에서 실행되지
+        # 않으며(입력이 EOS-54/55/60 실산출물이라 실측 축적 전에는 측정 실패 exit 1 이
+        # 설계값, G5 판정 시점에 운영자가 돌린다) 원 사유는 그대로 참이다. 감사기가
+        # '라이브러리로 import 됨'과 'CLI 로 실행됨'을 구분하지 못하는 것은 이 게이트의
+        # 알려진 한계(`reached_clis` docstring ⑶)이며 여기서 고치지 않는다 — 구분하려면
+        # import 문의 사용 형태까지 보는 별도 설계가 필요하다.
         # EOS-64(2026-09-01): 골든 승격 경로 게이트 — 입력이 *승격 제안*(사람이 "이것들을
         # 올리겠다"고 내미는 목록)이라 제안이 없는 시점에는 돌릴 대상 자체가 없다. CI가 매
         # 커밋마다 돌릴 성질이 아니고(제안 파일이 레포에 상주하지 않는다), 승격 판정 시점에
@@ -1309,6 +1321,16 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # docs/standards/incident_response_slo.md §4-1의 실패 유형과 /demo-doctor 카탈로그
         # W1행이 이 CLI를 1차 진단으로 지목한다.
         "ops.db_host_reachability": _LIVE_DEPENDENT,
+        # OPS-30(2026-10-09): 외부 업타임 프로브 — **서버 프로세스 밖**에서 1분마다 /health/ready를
+        # 폴링하는 것이 존재 이유라(죽은 서버는 자기 죽음을 보고하지 못한다) 앱 코드가 부르면
+        # 안 된다. 호출자는 Kiki 머신의 Windows 작업 스케줄러이고, 등록 절차는 사람 경로다 —
+        # docs/ops/ops30_uptime_probe_runbook.md [D]. 판정 로직(up/down 판정·전이 알림·재시도·
+        # S4 창/coverage)은 tests/backend/ops/test_uptime_probe.py가 CI에서 상시 검증하고,
+        # 실서버 kill -9 양방향 실측은 OPS-30 PR 본문에 있다.
+        "ops.uptime_probe": (
+            "by-design:서버 프로세스 밖에서 도는 스케줄러 호출 CLI(OPS-30) — 앱 안에서 부르면 "
+            "서버 사망을 관측할 수 없다. 등록은 Kiki 머신 사람 경로(ops30 런북 [D])"
+        ),
         # EOS-73(2026-09-01): 생성 seed 적재율 리포트 — 분모가 *실제 생성 배치*의 genlog JSONL
         # 이다. CI에는 그 산출물이 없어(LLM 배치를 매 PR마다 돌리지 않는다) 상시 실행하면 전
         # 지표가 "측정 불가(분모 0)"만 난다 — 그렇게 렌더하는 것이 이 리포트의 설계값이지 CI에서

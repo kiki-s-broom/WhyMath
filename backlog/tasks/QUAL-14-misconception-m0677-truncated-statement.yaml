@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-14-misconception-m0677-truncated-statement
+title: "오개념 코퍼스 M0677 canonical_statement 문장 절단(서술어 없음) — 정정 + 절단 레코드 전수 검출 테스트(P3-03 감사 부수 발견)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `data/corpus/misconceptions_v1/misconceptions.json`의 M0677 `canonical_statement`가 \"f(x)=k의 근의 개수를 그래프와 가로선 y=k의 교점으로 보는 관점을\"에서 끊겨 있다(서술어 없음). 원문 출처를 대조해 완결 문장으로 복원하거나, 출처로 복원할 수 없으면 `student_wrong_thinking`과 같은 뜻의 완결 문장으로 정정하고 정정 근거를 데이터 카드에 남긴다. ② 같은 코퍼스에서 `canonical_statement`가 조사·목적격으로 끝나 서술어가 없는 레코드를 전수 검출하는 회귀 테스트를 추가한다(정상 레코드 대조군 포함, 뮤테이션으로 검출 확인). ③ 검출된 다른 손상 레코드도 같은 방식으로 처리하거나 별건으로 등재한다."
+artifacts: []
+paths:
+  - "data/corpus/misconceptions_v1/**"
+session: null
+notes: "P3-03 은행 감사(2026-10-08, docs/data/p3_calculus1_diff_audit/bank_audit/) 부수 발견. LLM 판정자 다수가 02-09 오개념 유발 문항 12건에서 M0677 설명이 \"…관점을 — …관점을 못 쓴다\"로 깨진 문장이라고 지적했다(판정자에게 보이는 설명 = canonical_statement + \" — \" + student_wrong_thinking). P3-03은 은행 쪽 선지 연결을 절차가 적힌 오개념으로 바꿔 우회하므로, 코퍼스 원문 정정은 이 태스크가 소유한다."
+updated: 2026-10-08
