@@ -28,9 +28,10 @@ Lifecycle 불변식 시행(§7):
   생성)가 유일 권위로 강제한다 — ORM에는 가짜 CHECK/이벤트 리스너를 만들지 않는다.
 
 **운영 writer는 `l3/problem_publish_gate.py` 하나다**(EOS-190). 이 ORM의 클래스 import는 이 정의
-파일·`db/models/__init__.py`·그 게이트 모듈에서만 허용되고, `problem.problem_version_id` 포인터 쓰기도
-그 모듈뿐이다(AST 동결 `tests/backend/l3/test_problem_publish_gate_enforcement.py`). 그 모듈을 부르는
-운영 라우트·CLI는 아직 없다(EOS-194) — 그래서 운영 DB의 포인터는 호출 표면이 생기기 전까지 NULL이다.
+파일·`db/models/__init__.py`·그 게이트 모듈에서만 허용되고, `problem.problem_version_id` 포인터
+쓰기도 그 모듈뿐이다(AST 동결 `tests/backend/l3/test_problem_publish_gate_enforcement.py`).
+그 모듈을 부르는 운영 라우트·CLI는 아직 없다(EOS-194) — 그래서 운영 DB의 포인터는 호출 표면이
+생기기 전까지 NULL이다.
 """
 
 from __future__ import annotations
