@@ -188,8 +188,13 @@ nodes:
   # [부분·E2] 개념 버전 발행 게이트 (EOS-50) — 문항 `publish`와 **별개 노드**다(축 판정 docs/reviews/eos50_publish_gate_axis_judgment_2026-09-29.md)
   #   전이표(데이터 선언) src/backend/whymath_backend/schema/version_lifecycle.py · 검증 파이프라인·전이 실행·Rollback l3/publish_gate.py
   #   집행 동결(AST — concept_version·발행 포인터의 유일한 쓰기 자리) tests/backend/l3/test_publish_gate_enforcement.py
-  #   실 PG 왕복 tests/backend/l3/test_publish_gate_integration.py (CI backend-migrations 잡)
+  #   실 PG 왕복 tests/backend/l3/test_publish_gate_integration.py — ※ 2026-10-13 실측 정정: 이 파일은 CI에서 수집되지 않는다
+  #     (backend-migrations 통합 스텝이 `--ignore=../../tests/backend/l3` — 같은 명령 --collect-only 0건, 추적 OPS-137)
   #   미구현: 이 게이트를 부르는 운영 API·CLI는 0건(44 §12 CMS 버전 API 미착수) — 지금 호출자는 테스트뿐이다
+  #   ※ 문항 판 짝(EOS-190): l3/problem_publish_gate.py — problem_version·problem.problem_version_id 의 유일한 쓰기 자리.
+  #     별도 노드를 두지 않는다(이 노드와 같은 "호출자 없는 writer" 상태 · 호출 표면 EOS-194). 집행 동결(AST)
+  #     tests/backend/l3/test_problem_publish_gate_enforcement.py · 실 PG 관통(CI가 수집하는 위치)
+  #     tests/backend/db/test_problem_version_publish_integration.py · 설계 docs/architecture/eos190_problem_publish_writer.md
   concept_version_publish: { needs: [concept_graph] }
 
   # [집행·E2] DB 무결성 게이트 7종(orphan concept/skill/problem·dangling curriculum·duplicate canonical·event schema·발행 포인터)

@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-13 (구현·EOS-190): **`problem_version`의 유일한 writer(`l3/problem_publish_gate.py`)를 만들고 실제 `POST /v1/me/attempts`가 `outcome=pinned`를 내는 것까지 실 PG로 확인했다 — 단 이 writer를 부르는 운영 호출자는 아직 없어 운영 값은 지금도 NULL이다. 작업 중 코퍼스 재적재가 발행 포인터를 NULL로 되돌리는 두 번째 writer 결함과, `tests/backend/l3` 통합 테스트 9개가 CI에서 수집되지 않는 배선 결함을 발견했다** (claude 구현) — 판정 기준 작업 브랜치 `claude/charming-thompson-n7uldh`(main `dc214a2f` 위)
+
+- **결정**: 개념 판 게이트(`l3/publish_gate.py`)와 같은 전이표를 조회하는 짝 모듈을 새로 두었다(공통화 리팩터는 EOS-50의 뮤테이션·테스트를 건드리므로 하지 않음 — 순수 로직 약 60줄 중복을 감수). RESTORE·rollback은 호출 경로가 없어 **구현하지 않았다**(선언만 된 코드 금지) → `EOS-196`.
+- **이 모듈 고유 검사 `live_content_current`**: 문항은 판과 별개로 라이브 행이 서빙되므로, PUBLISH 전이가 "문항 행 잠금 뒤 라이브 스냅숏 해시 == 판 payload 해시"를 요구한다. 대조 못 하면(`None`) 통과가 아니라 실패다(모른다 ≠ 통과). 잠금 뒤 `populate_existing`으로 다시 읽는다.
+- **두 번째 writer 발견**: `l1/problem_bank/populate.py`의 `ON CONFLICT DO UPDATE` 갱신 집합이 `mapper.column_attrs`에서 동적으로 뽑혀 `problem_version_id`를 포함 → 재적재가 발행 포인터를 코퍼스 값(None)으로 덮는다. writer가 0건이던 동안은 무해했다. 수정 전 실 PG에서 RED 재현 후 `PUBLISH_POINTER_COLUMN` 제외(+18/-2). **AST 스캔으로는 안 보이는 부류**(컬럼명이 코드에 없음)라 상수 사용 고정(AST) + 재적재 행동 테스트(실 PG) 두 층으로 동결했다.
+- **AST 동결의 이름 충돌**: `problem_version_id`는 `problem`(발행 포인터)과 `problem_attempt`(EOS-47 고정값) 두 곳에 있다. R2 예외는 이름 하드코딩이 아니라 **`ProblemAttempt` 클래스에서 import된 이름만**(별칭 `ProblemAttemptORM` 추적; 원이름이 다른 별칭은 예외 불가). 첫 실행에서 스캐너가 실제 코드 3곳을 오탐해 이 설계가 나왔다.
+- **검증**: 단위 23 · AST 동결 28 · 실 PG 7 = 58건 통과, 기존 관련 329건 통과. **뮤테이션 19종 전건 검출·생존 0**(하네스가 치환 개수·`mutated != original` 단언, 백업 바이트 대조 원복). 뮤테이션 전에 발견·보강한 빈틈 2건 — 낡은 identity map(테스트마다 새 세션이라 구조적으로 안 보임)과 버전 체인 단언 0개 — 둘 다 보강 후 해당 뮤테이션이 검출됐다.
+- **발견한 시스템 결함(재발방지 등재)**: CI 통합 스텝이 `--ignore=../../tests/backend/l3`라 l3 하위 integration 마커 파일 9개가 어디서도 수집되지 않는다(같은 명령 `--collect-only` 실측 — EOS-50 `test_publish_gate_integration.py` 0건, 신규 통합 테스트 7건 수집). `pipeline.yaml`의 "CI backend-migrations 잡에서 돈다"는 서술과 충돌 → `OPS-137`. 이 때문에 신규 통합 테스트는 CI가 수집하는 `tests/backend/db/`에 두었다. 같은 계열 선례: `OPS-03`(tests/infra 199건 미실행)·`OPS-08`·`OPS-11`.
+- **알려진 한계**: 운영 호출자 없음(`EOS-194`) · 발행 이후 제자리 편집 드리프트(`EOS-195`) · 접수≠출제(`EOS-191`) · `ops/loop_kpi_sample_load.py`의 `merge(from_schema)`는 포인터를 덮을 수 있으나 발행되지 않는 합성 표본이라 미수정. 설계: `docs/architecture/eos190_problem_publish_writer.md`.
+
 ### 2026-10-12 (결정·구현 · PB-19): **CAT 형제 필터가 관계 유형·방향을 구분하게 했다 — `exclude`는 근접 복제본(변형·유사)만 빼고, 쉬운 계열(선수)은 남기며 `include`가 우대하고, 어려운 계열(심화)·대조는 중립이다**
 
 **무엇/왜**: PB-09가 낳는 선수·심화·대조 계보가 코퍼스에 들어오기 전에 소비 정책을 정했다. 종전 `load_sibling_ids`는 유형·방향 없이 상대편 id를 전부 형제로 모았다(소비처 3곳: CAT 정책·수능 정책·정렬 재선택). 변형·유사만 있는 현 코퍼스에선 맞았지만, 선수·심화가 들어오면 `exclude`가 Polya의 "더 쉬운 관련 문제를 먼저"에 필요한 발판을 후보에서 빼고 `include`가 오답 직후 난이도를 올리는 쪽을 우대한다.
