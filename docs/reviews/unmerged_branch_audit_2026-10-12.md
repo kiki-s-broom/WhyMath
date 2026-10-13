@@ -76,8 +76,52 @@ head는 16회차 문서와 동일(전부 불변). "진짜 미이식"은 신규 �
 
 ## 5. 정직한 공백
 
-- **수정 파일 쪽 미이식분을 이번에 측정하지 않았다.** 이번 대조는 "신규 파일" 기준이다. 실제 구현의 상당수는 기존 파일 수정에 들어 있다(예: PATH-03의 `l2/learning_path.py` CTE 함수, S4-20의 `harness/problem_bank_coverage.py` 대학 축 167줄+테스트 187줄, `7n9n72`의 `coach.py`·`shadow.py`·`hypothesis_store.py`·`wh1_evaluation.py`). 16회차의 "줄 전체 일치" 방식으로 별도 조사가 필요하다. 소유 태스크가 있으므로 방치 위험은 낮으나 **완결성은 주장하지 않는다.**
+- **수정 파일 쪽 미이식분은 §6에서 측정했다(2026-10-13).** §2의 대조는 "신규 파일" 기준이었고, 실제 구현의 상당수는 기존 파일 수정에 들어 있다. §6의 측정도 함수·클래스 정의 단위까지만 본다(§6.3 한계).
 - **미확정 3건**: ①`S3-34`(문제별 대화 리셋 코드가 main에 있는지 — grep 키워드 미특정) ②`S3-42~48` 7건의 개별 구현이 S3-32로 흡수됐는지(대조 미실시) ③`OPS-21`을 `OPS-32`가 흡수했다는 대장 기재의 코드 실재(미재확인). `tests/backend/api/test_me_learning_metrics.py`(FakeSession 단위 테스트)가 main에 이름 기준으로 없다는 보고도 단위 갭 여부 미확정이다.
 - **`q8tvcx`의 `test_ci_gate_reachability.py`**: 브랜치 시점 이후 main `ci.yml` 구조가 바뀌었는지, 테스트가 지금 통과하는지는 실행하지 않았다.
 - **범위 밖**: `gdmwhk`·`iws58k`·`6eejrv`·`34zvse`(16회차 판정 승계, HARN-212 소유)와 16회차 이후 새로 나타난 `gracious-cannon-xwn0lh`(3일 전·1커밋·문서 위주)는 이번에 대조하지 않았다.
 - **코드 이식·브랜치 삭제는 하지 않았다.** 이 문서는 판정만 한다.
+
+## 6. 수정 파일 쪽 미이식 측정 (2026-10-13 추가)
+
+> **판정 기준: main `dc214a2f`** (2026-10-13). §0~§5는 `d873d064` 기준이며, 그 사이 main이 14커밋 진행했다. 두 기준의 결론은 달라지지 않았다(§6.2).
+
+### 6.1 방법
+
+16회차와 같은 방식이다. 각 브랜치가 **수정한 파일**(`--diff-filter=M`, `origin/main...origin/<브랜치>`)의 추가 줄을 main의 같은 경로 파일에서 줄 전체 일치로 찾아 없는 줄을 센다. 대장·이벤트·`MEMORY.md`는 제외했다. 줄 수만으로는 main이 그 파일을 다시 쓴 경우도 "부재"로 세므로, 부재 줄 중 **정의 이름(`def`·`class`)이 main 파일 어디에도 없는 것**을 따로 뽑아 기능 단위 부재로 읽었다.
+
+### 6.2 결과
+
+| 브랜치 | 코드 수정 파일 | 추가 줄 | 부재 줄 | 기능 단위 부재 | 판정 |
+|---|---|---|---|---|---|
+| `29ac1b` | 15 | 510 | 376 | 5 — `AuditEvent{ActorType,Severity,Status,Authorization,RetentionPolicy}` (`schema/enums.py`) | `ADMIN-10` 소유 |
+| `q8tvcx` | 2 | 29 | 24 | 0 (`.github/workflows/ci.yml` 16줄) | `OPS-38` 소관으로 보이나 **미확인** |
+| `7n9n72` | 28 | 2095 | 1294 | 17 (아래) | 대부분 소유 태스크 있음 |
+| `trjg5x` | 19 | 1035 | 484 | 6 (아래) | 소유 태스크 있음 / 대체 확인 |
+| `e98dw4` | 17 | 1122 | 275 | 1 — `build_finite_probability_subject` | S4-16(cancelled) 계열 잔여 |
+| `uqyg79` | 16 | 616 | 211 | 0 | 기능 단위 잔여 없음 |
+| `5t5lmv` | 14 | 388 | 282 | 3 — `ClientVersionBody`, `_client_version_body`, `_observe_version_state` (`app.py`) | `OPS-112` 소유 |
+| `k20m0w` | 69 | 3274 | 846 | 3 — `_stuck_depth_from_turn_counts`, `_response_latency_from_values`, `_interaction_diversity_from_kinds` (`wh1_evaluation.py`) | 커밋 `10ef8e7c`(S4-22 소비 배선) → main `S4-22` 소유 |
+
+`7n9n72` 17건의 내역:
+
+| 파일 | 기능 단위 부재 | 판정 |
+|---|---|---|
+| `api/coach.py` | `_similar_problem_for` · `_maybe_visualize` | `MISC-03` · `MISC-01` 소유 |
+| `api/coach.py` | `_final_answer_for_verification` · `_decide_completion_for` · `_apply_completion` | **대체 확인** — main에 `_resolve_completion`·`_complete_problem`·`_final_answer_state`가 있고 `already_completed=dialogue.attempt_id is not None`로 멱등 처리 |
+| `api/coach.py` | `_mastery_level_for` · `_l3_deps_or_default` | **미확인** — 이름이 main에 없으나 대체 구현 여부를 보지 않았다 |
+| `harness/wh1_evaluation.py` | 시간 정규화 4건(`_time_normalized_mastery_gain_metric` 등) | `PED-14` 소유 |
+| `l4/misconception/hypothesis_store.py` | `MisconceptionRecurrenceSignal` · `get_recurrence_signals` · `order_mids_by_recurrence` · `_key` | `MISC-06` 소유 |
+| `l4/misconception/shadow.py` | `MisconceptionVisualizationShadowObservation` · `observe_misconception_visualization_shadow` | `MISC-01` 소유 |
+
+`trjg5x` 6건의 내역: `university_covered_code_count`·`university_coverage_rate`(`harness/problem_bank_coverage.py`) → `S4-20` 소유 · `fetch_ordering_subgraph`·`derive_ordering_edges`(`l2/learning_path.py`) → `PATH-03` 소유 · `_validate_date_window`·`list_my_learning_metrics`(`api/me.py`) → **대체 확인**(main에 `GET /v1/me/learning-metrics`와 `l2.learning_metrics_rollup`이 있다).
+
+**결론: 수정 파일 쪽에서도 소유자 없는 미이식 기능은 발견되지 않았다.** 회수 태스크 신규 등재는 여전히 0건이다.
+
+### 6.3 한계
+
+- **정의 이름 단위까지만 본다.** 상수·SQL·분기 조건·배선 줄처럼 `def`·`class`가 아닌 변경은 기능 단위 열에 잡히지 않는다. 예: `29ac1b`의 `app.py` 18줄·`db/models/audit.py` 71줄, `e98dw4`의 `app.py` 52줄, `uqyg79`의 `conftest.py` 31줄, `5t5lmv`의 `accessibility_test.dart` 96줄(`A11Y-02` 소관 추정)은 이 방법으로는 소유 여부를 가르지 못했다.
+- **이름이 달라진 대체 구현은 "부재"로 오판될 수 있다.** 위 표에서 대체를 직접 확인한 곳은 완료 판정과 학습 지표 엔드포인트 두 군데뿐이다.
+- **미확인 3건**: `q8tvcx`의 `ci.yml` 16줄, `7n9n72`의 `_mastery_level_for`·`_l3_deps_or_default`.
+- **줄 수 자체는 미이식 규모가 아니다.** `7n9n72`의 부재 1,294줄(추가 2,095줄 중)은 `coach.py`·`wh1_evaluation.py`처럼 여러 브랜치가 공통으로 건드린 파일을 main이 크게 다시 쓴 결과를 포함한다.
+- 측정 스크립트는 세션 스크래치패드의 일회용이며 저장소에 넣지 않았다. 재현하려면 위 §6.1 설명대로 `git diff -U0 origin/main...origin/<브랜치> -- <경로>`의 `+` 줄을 main의 같은 경로 파일에서 줄 전체 일치로 찾는다.
