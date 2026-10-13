@@ -345,6 +345,16 @@
 **집행**: `tests/backend/harness/test_stem_semantic_hook_coverage.py`(거버넌스 — 미등록 유입·낡은 등록·파일 부재·코퍼스 미언급 위장 등록·스캔 규모 하한이 RED) + `test_stem_hook_independent_answers.py`(probability_finite 17행·p3 9행 독립 계산 동결, 파싱 실패 = RED). 집행 지점은 CI `backend` 잡 pytest 스텝(소스·수용 게이트 변경 0). 실제 코퍼스 결함 주입 9종 전건 RED, 매 건 적용 단언·원복 sha256 동일.
 **사고 기록(주입 하네스 결함)**: 첫 M5 주입이 GREEN이었다 — 가드 결함이 아니라 행 선택 조건이 JSON 한 줄 전체(해설 포함)에서 "항상"을 찾아 발문에 그 단어가 없는 엉뚱한 행을 오염시킨 것이었다. 발문 기준 선택으로 재주입해 RED 확인. 같은 세션의 스크립트 경로 상대화에서 `audit_C`가 `Path` 미import `NameError`로 exit 1이 났고(치환이 만든 결함) 재실행 검증으로 잡았다.
 **후속(대장 집행)**: `QUAL-16` 순서 방향어 계열(큰 근·보다 큰·에서 뺀) 동결 확장 · `QUAL-17` 통과했으나 데이터가 분기를 밟지 않은 지점(연립부등식 음수 계수 0행·이차부등식 음수 선행계수 0행·적분 피적분 양수만·몫=나머지 236/400행)과 설계 결함 후보(conceptual 정답 '0' 80%·answer_format 불일치) 처분 판정. 리포트: `docs/reviews/qual12_prompt_condition_semantic_consistency_2026-10-12.md`.
+### 2026-10-13 (구현·EOS-190): **`problem_version`의 유일한 writer(`l3/problem_publish_gate.py`)를 만들고 실제 `POST /v1/me/attempts`가 `outcome=pinned`를 내는 것까지 실 PG로 확인했다 — 단 이 writer를 부르는 운영 호출자는 아직 없어 운영 값은 지금도 NULL이다. 작업 중 코퍼스 재적재가 발행 포인터를 NULL로 되돌리는 두 번째 writer 결함과, `tests/backend/l3` 통합 테스트 9개가 CI에서 수집되지 않는 배선 결함을 발견했다** (claude 구현) — 판정 기준 작업 브랜치 `claude/charming-thompson-n7uldh`(main `dc214a2f` 위)
+
+- **결정**: 개념 판 게이트(`l3/publish_gate.py`)와 같은 전이표를 조회하는 짝 모듈을 새로 두었다(공통화 리팩터는 EOS-50의 뮤테이션·테스트를 건드리므로 하지 않음 — 순수 로직 약 60줄 중복을 감수). RESTORE·rollback은 호출 경로가 없어 **구현하지 않았다**(선언만 된 코드 금지) → `EOS-196`.
+- **이 모듈 고유 검사 `live_content_current`**: 문항은 판과 별개로 라이브 행이 서빙되므로, PUBLISH 전이가 "문항 행 잠금 뒤 라이브 스냅숏 해시 == 판 payload 해시"를 요구한다. 대조 못 하면(`None`) 통과가 아니라 실패다(모른다 ≠ 통과). 잠금 뒤 `populate_existing`으로 다시 읽는다.
+- **두 번째 writer 발견**: `l1/problem_bank/populate.py`의 `ON CONFLICT DO UPDATE` 갱신 집합이 `mapper.column_attrs`에서 동적으로 뽑혀 `problem_version_id`를 포함 → 재적재가 발행 포인터를 코퍼스 값(None)으로 덮는다. writer가 0건이던 동안은 무해했다. 수정 전 실 PG에서 RED 재현 후 `PUBLISH_POINTER_COLUMN` 제외(+18/-2). **AST 스캔으로는 안 보이는 부류**(컬럼명이 코드에 없음)라 상수 사용 고정(AST) + 재적재 행동 테스트(실 PG) 두 층으로 동결했다.
+- **AST 동결의 이름 충돌**: `problem_version_id`는 `problem`(발행 포인터)과 `problem_attempt`(EOS-47 고정값) 두 곳에 있다. R2 예외는 이름 하드코딩이 아니라 **`ProblemAttempt` 클래스에서 import된 이름만**(별칭 `ProblemAttemptORM` 추적; 원이름이 다른 별칭은 예외 불가). 첫 실행에서 스캐너가 실제 코드 3곳을 오탐해 이 설계가 나왔다.
+- **검증**: 단위 23 · AST 동결 28 · 실 PG 7 = 58건 통과, 기존 관련 329건 통과. **뮤테이션 19종 전건 검출·생존 0**(하네스가 치환 개수·`mutated != original` 단언, 백업 바이트 대조 원복). 뮤테이션 전에 발견·보강한 빈틈 2건 — 낡은 identity map(테스트마다 새 세션이라 구조적으로 안 보임)과 버전 체인 단언 0개 — 둘 다 보강 후 해당 뮤테이션이 검출됐다.
+- **발견한 시스템 결함(재발방지 등재)**: CI 통합 스텝이 `--ignore=../../tests/backend/l3`라 l3 하위 integration 마커 파일 9개가 어디서도 수집되지 않는다(같은 명령 `--collect-only` 실측 — EOS-50 `test_publish_gate_integration.py` 0건, 신규 통합 테스트 7건 수집). `pipeline.yaml`의 "CI backend-migrations 잡에서 돈다"는 서술과 충돌 → `OPS-137`. 이 때문에 신규 통합 테스트는 CI가 수집하는 `tests/backend/db/`에 두었다. 같은 계열 선례: `OPS-03`(tests/infra 199건 미실행)·`OPS-08`·`OPS-11`.
+- **알려진 한계**: 운영 호출자 없음(`EOS-194`) · 발행 이후 제자리 편집 드리프트(`EOS-195`) · 접수≠출제(`EOS-191`) · `ops/loop_kpi_sample_load.py`의 `merge(from_schema)`는 포인터를 덮을 수 있으나 발행되지 않는 합성 표본이라 미수정. 설계: `docs/architecture/eos190_problem_publish_writer.md`.
+
 ### 2026-10-08 (회수 · OPS-38): **고립 브랜치 `q8tvcx`의 OPS-19(CI 게이트 도달 가능성 계약)를 회수했다 — 원 커밋의 CI 수정 2건은 main이 이미 흡수해 이식하지 않았고, 남은 한 가지(잡 `if`를 *평가*하는 도달 가능성 가드)만 이식했다. 소유자 없던 의존 3종은 `OPS-32`로 편입했다**
 
 **판정 기준**: `origin/main` `ec1f9dc7`. 원 브랜치 head `e1835c0c`, main에 없는 고유 커밋 3건(`ee9df6dc` 문서·`592c961f` 구현·`e1835c0c` 완료 등재) — 나머지는 전부 `(#NNN)` 스쿼시 번호가 붙은 main 커밋이다(shallow 클론이라 merge-base는 직접 못 봄).
@@ -12364,6 +12374,40 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **미이행 분리**: `OPS-125`(코치 `step_chain` 3곳·`attempt_misconception_detector` 1곳이 동기 SymPy — 거버넌스 테스트가 개수를 동결하고 OPS-125가 done이면 스스로 실패해 제거를 강제), `OPS-126`(`isolation_stats()` 소비자 0건 + 단계 입력 기준 상한 재판정 + 운영 용량). OPS-96은 명시 범위는 이행됐으나 코치 `step_chain` 경로의 증상은 OPS-125 전까지 남는다 — 닫는 시점은 사람이 판단한다.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
+
+## 2026-10-12: 미머지 브랜치 심층 대조 17회차 보충 — 신규 파일 기준 8개 브랜치 대조 · 회수 태스크 신규 등재 0건 · 이식 금지 3종 확인
+
+판정 기준 main `d873d064`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12_deepdive.md`(Kiki "완료됐지만 main에 합쳐지지 않은 작업" 조회). 16회차가 "② 추적 중"으로 분류한 고립·PR 닫힘 브랜치 중 신규 파일이 main에 없는 8개를 파일 단위로 대조했다. 전수 감사가 아니라 심층 재검이며 삭제·이식은 하지 않았다.
+
+- **결론: 신규 등재 0건.** 미이식 코드가 남은 곳은 전부 main에 `todo` 소유 태스크가 있다(ADMIN-10·OPS-38·MISC-01/03/05/06·PB-02·PED-14·PATH-03·S4-20·PED-26·OPS-112/113·A11Y-02·ARCH-102). 소유 태스크 25건의 main status를 직접 조회했다.
+- **ID 대조는 고립을 과대 계상한다.** 브랜치의 done 태스크 약 40건이 main에서 todo·부재로 보였으나 대부분 번호가 바뀌어 이식돼 있었다(SEC-13~18→SEC-24, PED-04~12→PED-22~25, ARCH-29·MOB-15→MOB-18, VIZ-04→VIZ-06, S4-19→S4-62, PED-15→PED-37). 같은 번호가 main에서 다른 태스크인 사례(S4-22·OPS-19·PED-04~08)도 확인했다.
+- **이식 금지 3종**: ADMIN-02 마이그레이션(Kiki 판정 폐기·결제 예약 컬럼 드롭) · MISC-02 계열(main cancelled) · `k20m0w`의 출하 자산 번들+거버넌스 테스트(ARCH-12 데모 예외와 충돌·이식 시 즉시 RED·ARCH-102 판정 선행).
+- **정직한 공백**: 수정 파일 쪽 미이식분(PATH-03 `l2/learning_path.py`·S4-20 coverage 생성기·`7n9n72`의 coach/shadow 수정 등)은 이번에 측정하지 않았다. 파일별 판정은 읽기 전용 에이전트 4개의 보고이며 세션이 직접 재확인한 것은 문서 §1 표에 구분했다. 미확정 3건(S3-34·S3-42~48·OPS-21)은 문서 §5.
+
+## 2026-10-13: 17회차 보충 정정 — 수정 파일 쪽 미이식분 측정 완료 · 소유자 없는 기능 0건
+
+판정 기준 main `dc214a2f`. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12_deepdive.md` §6. 위 2026-10-12 항목의 "정직한 공백: 수정 파일 쪽 미이식분 미측정"을 메웠다. 수정 파일의 추가 줄 중 정의 이름(`def`·`class`)이 main에 없는 것을 기능 단위로 뽑아 소유 태스크와 대조한 결과, 소유자 없는 기능은 없었다(ADMIN-10·MISC-01/03/06·PED-14·PATH-03·S4-20·OPS-112·S4-22). 이름만 달라 부재로 잡힌 곳은 직접 확인했다(코치 완료 판정=`_resolve_completion`, 학습 지표=`GET /v1/me/learning-metrics`). 새 한계: 정의가 아닌 변경(상수·SQL·분기·배선)은 이 방법으로 소유 여부를 가르지 못했고, 3건(`q8tvcx` `ci.yml` 16줄 · `_mastery_level_for` · `_l3_deps_or_default`)은 미확인이다.
+
+## 2026-10-13 S4-56 — 잔여 축 교차검증 게이트 v2 CLI 착지(승격 아님) · 도달 불가 임계를 LLM 호출 전에 거부
+
+- **한 일**: `harness/residue_cross_verify_eval_v2.py` 신설. `--domain`(finite·finite_probability·finite_count·statistical_claim·sequence_induction)으로 고르고, 도메인 verifier·관점 세트는 `l3/verifier.py`의 `_VERIFIERS_V2`·`_CROSS_VERIFY_PERSPECTIVES`를 그대로 읽는다(서빙 경로와 같은 심사). 대상 조립은 `build_residue_subject`로 단일화(동작 불변). 종료 코드 0 통과·1 게이트 실패·2 측정 불가.
+- **결정 1 — 도달 불가 임계 사전 거부**: 결함 0건이어도 Wilson 상한이 임계를 넘는 표본(기본 0.05·95%는 n>=52 필요)은 `THRESHOLD_UNREACHABLE`로 LLM 호출 전에 거부한다. 파일럿 34문 + 기본 임계 = 상한 0.0737 → 거부. v1은 34건을 다 호출한 뒤 DEFECT_RATE로 실패했다.
+- **결정 2 — 기본값 도출**: 도메인 기본 sample_n·min_n = 기본 임계를 무결함으로 통과 가능한 최소 표본(52, 코드가 판정 함수로 유도). 도메인 간 차등은 두지 않았다(근거가 될 라이브 측정이 없다).
+- **결정 3 — dry-run은 PASS가 아니다**: `DRY_RUN_OK`(종료 0)는 기계 축 전수 재검산+사전점검만 뜻한다. CI `backend` 잡에 파일럿 34문·표본 34·임계 0.11(도달 가능한 배선용 값)로 배선했다.
+- **미이행(사실 기록)**: ②의 기하 이산 — `geometric_discrete`는 verifier·관점이 없는 미착수 도메인(CLI는 exit 2 거부). ⑤ 파일럿 30~50문 승격 — (가) 기본 임계로 통과 불가(FC-4) (나) 2026-09-25 Kiki 판정으로 이 게이트는 인간 검수 대체 후보 제외(오검출 33/33) (다) statistical_claim·sequence_induction 코퍼스 소비처 0건. 이 두 건의 처분은 Kiki 몫이라 태스크는 done이 아니라 review로 둔다.
+- **부수 정리**: v1 `residue_cross_verify_eval`의 미배선 면제를 지웠다 — v2 dry-run(CI 실행)이 v1 로더·표본 추출을 import해 감사기 정의상 도달했다. v1의 라이브 `main()` 경로는 여전히 CI에서 돌지 않는다.
+- **검증**: 신규 테스트 58건 · 뮤테이션 27종 전건 RED(생존 0·원복 sha256 동일) · ruff/black/mypy --strict/lint-imports exit 0 · `declared_unwired_audit` 위반 0 · `tests/infra` 3053 passed(문서 편집 전 실행분). backend 전체 스위트는 로컬 CI 미러(ci_mirror·HEAD 1f53a4475)에서 완주했다 — Pytest(커버리지) 1243.8s 통과·6개 잡(backend·infra-contracts·infra-shell·policy-guard·harness-integrity·declared-unwired-audit) 전부 exit 0·미실행 0. *(정정: 이 항목을 처음 쓸 때는 미러가 끝나기 전이라 '직접 완주하지 못했다'고 적었다.)* 미러로 재현 못 한 잡(mobile·backend-migrations·docker-build 등)은 GitHub CI가 판정한다.
+## 2026-10-12 OPS-106 게이트② 라이브 표본 실측 — ② 이중 회계·③ 저작 분리 통과 · ① 서빙 계상 COUNTED(단서 있음) · 재발방지 태스크 2건
+
+판정 기준: main `d873d064` (Kiki 클론 HEAD와 일치 확인 후 실행 · `PRE_OK=True`) · 실행: Phaiakes9, 런북 `docs/ops/ops106_gate2_live_sample_runbook.md`. 게이트 `G-ops106-gate2-live-sample` clear.
+
+- **② 이중 회계 = `MATCH`**: `cost_probe` 18요청 중 성공 16·오류 2(`ReadTimeout` 2건: explain-easy-free·verify-easy-free) = 인프로세스 16 = Langfuse `probe` 증가분 16. 첫 폴링은 11건(`PARTIAL`)이라 수집 지연이 실재하고 두 번째 폴링에서 일치했다.
+- **③ 저작 분리 = `SEPARATED_MATCH`**: rephrase 5콜(provider 오류 0) → `authoring` +5 · 표본(`event_count`) +0 · `unlabeled` +0. 첫 폴링은 `SILENT_ZERO`(0건)였다가 두 번째에서 도착 — 폴링 없이 한 번만 읽었다면 "분리 실패/전멸"로 오진할 수 있는 지연이다.
+- **① 서빙 계상 = `COUNTED`(재시도에서)**: 재시도 `serving` +43 · `unlabeled` +0 · `SURFACE_LABELED_RATE` 1.0 · `SAMPLE_ARITHMETIC_OK` True · `PRIMARY_RECORDS_P`=1. **1차 시도는 `NO_PRIMARY_TURN_IN_SERVER_LOG`**(서버 기록 0줄 · `serving` +45): 서버 stderr `WH-1 primary 하네스 실행 실패(TimeoutError) — 결정론 템플릿 폴백`(`wh1_primary.py` line 189). 코드상 시간 초과 경로는 `emit` 전에 `return None`이라 기록이 남지 않는다(읽어서 확인 · 실행 검증 아님). 우리 트래픽이 이 서버에 닿았음은 접근 로그 `POST /v1/coach` 15건(비2xx 0)·서버 프로세스 시작 22:21:18 ≈ 기록 파일 생성 22:21:19·명령줄의 `--log-config`로 확인했다.
+- **단서(수치 정직성)**: 재시도에서 15요청 중 **14턴이 시간 초과**(`PRIMARY_TIMEOUT_TURNS_THIS_RUN=14`)로 폴백했고 primary 성공은 1건뿐이다. 즉 이번 실측이 증명한 것은 **계측 사슬(표지 → 전송 → 집계)이 살아 있다**까지이며, 학생 대면 primary 성공률이 낮다는 사실은 별건(`OPS-134`)이다. 시간 초과 턴도 LLM 호출은 이미 `serving`으로 전송되므로(요청당 약 3건) 출력이 버려진 호출이 표본·비용 집계에 들어간다. 1차 시도의 시간 초과 턴 수는 집계하지 않았다.
+- **게이트② 합격(로컬 ≥80%)은 이번에 판정하지 않았다(런북 범위 밖)**: `cost_probe`의 로컬 100%·Wilson 하한 85.5% PASS는 라우터의 선택이 아니라 `budget0` 강등 16건(클라우드 예산 0 · ARCH-66 Anthropic API 중단 기간)의 결과다 — 합격 근거로 쓰면 안 된다.
+- **실행 중 만난 도구·절차 결함(시스템 실수로 분류 → 태스크 등재)**: ⓐ Kiki 클론이 main보다 3커밋 뒤처져 `CODE_MATCHES_ORIGIN_MAIN=False`로 런북이 정지했다. 뒤처진 파일이 `coach.py`·`learning_session_writer.py` 등 측정 경로였다(런북 정지는 올바른 판단). 클론은 여러 세션 공유 사본이라 `git merge --ff-only`(자기 거부 가드 포함)로만 따라잡았고 미커밋 변경 12건은 보존됐다. ⓑ `run_demo.ps1` [2/6]이 `Can't locate revision identified by '79de95331710'`로 즉사 — 재기동된 옛 데모 컨테이너의 `alembic_version`이 닫힌 PR #880 브랜치의 `audit_event` 마이그레이션을 가리켰다. `stop_demo.ps1`(데모 컨테이너 `down -v`, 운영 DB 5433 무관)로 초기화 후 정상 기동. 대책 = `OPS-133`(감지·안내 + 런북 §1/§2 보강 + 실패 주입 테스트). 서버 기동 후 `ERR 로그`의 `Redis 캐시 강등 — TimeoutError` 1건은 시간 초과의 원인인지 **미검증 가설**로 `OPS-134` ①에 넘겼다.
+- **후속 태스크**: `OPS-133-run-demo-stale-throwaway-db-diagnosis`(P2) · `OPS-134-wh1-primary-timeout-fallback-accounting`(P1 — 원인 분해·폴백 비율 회계·표본 정합·기본 15초 재판정). 산문 규칙은 추가하지 않는다(등재 동결).
 
 ## 2026-10-12: 미머지 브랜치 전수 감사 17회차 — 16회차가 claim 활성이라 뺀 완성품 4건이 TTL을 넘겨 고립 · 회수 태스크 4건 등재 · 브랜치 전용 태스크 4건 복원 · 삭제 0건 · 대책 HARN-309
 

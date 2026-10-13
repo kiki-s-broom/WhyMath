@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,7 +18,12 @@ artifacts: []
 paths:
   - "data/corpus/**"
   - src/backend/whymath_backend/harness/problem_corpus_variants.py
+  - src/backend/whymath_backend/harness/problem_corpus_lineage_links.py
+  - docs/architecture/problem_bank_variant_intake_pb20.md
   - "tests/backend/harness/**"
-session: null
-notes: "PB-09 발견 사항. 근거 문서 docs/architecture/problem_bank_variants_pb09.md 4절·5절. PB-09 는 의도적으로 코퍼스를 커밋하지 않았다(전수 글롭 소비처 때문)."
-updated: 2026-10-08
+session: claude/magical-lovelace-j5gsyf
+notes: |-
+  PB-09 발견 사항. 근거 문서 docs/architecture/problem_bank_variants_pb09.md 4절·5절. PB-09 는 의도적으로 코퍼스를 커밋하지 않았다(전수 글롭 소비처 때문).
+
+  [정정 2026-10-13] paths ['data/corpus/**', 'src/backend/whymath_backend/harness/problem_corpus_variants.py', 'tests/backend/harness/**'] → ['data/corpus/**', 'src/backend/whymath_backend/harness/problem_corpus_variants.py', 'src/backend/whymath_backend/harness/problem_corpus_lineage_links.py', 'docs/architecture/problem_bank_variant_intake_pb20.md', 'tests/backend/harness/**']: 실제 변경 파일 반영 — 계보 링크 모듈·조사 문서 추가(기존 범위 유지, --path는 교체라 전부 재명시·PB-09 선례)
+updated: 2026-10-13

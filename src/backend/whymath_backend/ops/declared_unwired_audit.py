@@ -1064,6 +1064,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.problem_corpus_rephrase_sweep": _BATCH_GENERATOR,
         "harness.problem_corpus_tag": _BATCH_GENERATOR,
         "harness.problem_corpus_variants": _BATCH_GENERATOR,
+        # PB-20 — 계보만 걸기는 사이드 JSONL까지만 낸다. 그것을 problem_relation 으로 올리는
+        # 적재 단계가 PB-23 이라, 그 태스크가 닫히기 전까지는 미도달이 의도다(만료 = 태스크 done).
+        "harness.problem_corpus_lineage_links": (
+            "pending-task:PB-23-variant-lineage-links-populate-apply"
+        ),
         "harness.problem_type_backfill": _BATCH_GENERATOR,
         # ⚠️ 2026-08-10 OPS-24 — 백필 CLI 2종(`problem_corpus_review_status_backfill`·
         # `problem_corpus_persona_fit_backfill`)의 `pending-task` 유예를 해제했다. 판정은
@@ -1162,7 +1167,12 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "ops.dialogue_encryption_preflight": _LIVE_DEPENDENT,
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,
         "harness.wh1_shadow_harvest": _LIVE_DEPENDENT,
-        "harness.residue_cross_verify_eval": _LIVE_DEPENDENT,
+        # (S4-56) `harness.residue_cross_verify_eval`(v1)의 면제는 지웠다 — CI가 직접 실행하는
+        # v2(`--dry-run`·LLM 0)가 v1의 `load_pilot_records`·`select_sample`을 in-process
+        # import해 감사기 정의상(축 4 ⑶ 전이 폐포) v1이 도달했다. **v1의 라이브 `main()` 경로는
+        # 여전히 CI에서 돌지 않는다**(실 provider 필요) — 도달한 것은 코드 재사용이지 라이브
+        # 측정이 아니다. 면제를 지우는 이유는 감사기 규칙(stale-waiver 실패)이지 v1이 배선됐다는
+        # 주장이 아니다.
         # ARCH-49 — DeepSeek/OpenRouter 라이브 프로브. CI에서 원리적으로 못 도는 것이
         # *실측*됐다(2026-09-17 개발 컨테이너: 키 부재 + egress 프록시가
         # api.deepseek.com·openrouter.ai에 CONNECT 403). 이 CLI를 실제로 돌려 3축을
