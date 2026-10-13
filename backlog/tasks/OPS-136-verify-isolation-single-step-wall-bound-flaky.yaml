@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-136-verify-isolation-single-step-wall-bound-flaky
+title: "검증 격리 단건 테스트(느린 식 → 판정 불가)가 머지 큐에서 불안정 — 요청 시간 단언 2.0초가 앱 기동·종료까지 재고 있어, 구간별 실측으로 원인을 가린 뒤 고친다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결함 고정(증거 보존) — main 머지 큐에서 tests/backend/api/test_verify_isolation.py::TestBudgetMeansUnverifiable::test_slow_step_is_unverifiable_not_correct_nor_incorrect 가 실패했다: PR #1565의 큐 실행(run 38249677879 · job 114812476977 · 2026-10-12 13:04Z · 기반 main d873d064)에서 \"상한 0.5s인데 2.07s — 계산이 끊기지 않았다 / assert 2.072813849000113 < 2.0\"(전체 19,268건 중 1건). 이 테스트는 OPS-127(#1582)·OPS-128(#1588)이 다루지 않았고, OPS-127 PR 본문이 과부하에서 흔들린다고 거명한 test_control_without_isolation_blocks_the_loop · test_normal_step_is_unaffected_by_isolation 과도 다른 테스트다. 이 실패를 재현하는 테스트 호출 조건(부하·반복 횟수)을 PR 본문에 적는다.\n② 원인 실측 — 가설을 사실로 쓰지 않는다(OPS-127은 등록 당시 가설 '앱 기동이 측정에 섞인다'를 실측으로 기각한 선례다). 이 테스트의 elapsed는 with TestClient(_app()) 진입 전부터 종료 후까지를 재므로 앱 기동 · 요청 · 앱 종료(풀 shutdown이 워커를 kill하고 join을 최대 2.0초 기다림 — l3/isolated_call.py _kill · shutdown)를 모두 포함한다. 체인 테스트는 OPS-127에서 요청 한 건만 재도록 바뀌었으나 이 테스트는 그대로다. 코드를 읽어 보이는 후보(미실측): (a) 상한 초과 직후 _prewarm_replacement가 교체 워커를 띄우고 그 import(약 0.8초)가 진행 중일 때 with 종료가 그 워커를 kill·join해 종료 구간이 부푼다 (b) 상한 초과 kill 자체의 join (c) CI 러너 부하로 계산 상한 0.5초 밖의 구간이 늘어난다. 구간을 (진입 / 요청 / 종료)로 분해해 단독 10회 이상 + 4병렬 부하에서 재고, 어느 구간이 2.0초 단언을 밀어 올리는지 수치로 적는다. 가설이 틀리면 기각을 그대로 기록한다.\n③ 해법 — ②의 실측을 따르되 판정 의미(상한 초과 = 판정 불가, 통과·오답 아님, 계산이 끊김)는 바꾸지 않는다. 변별력 보존: 이 단언은 격리·상한이 계산을 끊었는지를 보므로, 상한을 없앤 뮤테이션(격리 off 또는 timeout 무제한)에서 반드시 RED여야 한다. 느린 식의 실제 계산 시간(테스트 docstring은 이 환경 약 3초라 적음 — CI 러너 실측치를 따로 적는다)과 정상 최대 사이에 새 경계가 놓임을 수치로 보인다. 정상 최대와 뮤테이션 최소의 간격이 좁으면(예: 2.07초 대 약 3초) 벽시계 단언 대신 시간 비의존 검증(가짜 시계 + 스텁 풀로 계산 상한 0.5초가 전달되고 BudgetExceededError가 판정 불가로 접힘)을 쓴다 — OPS-127의 test_solution_grants_each_transition_only_the_remaining_budget 선례. 원인이 제품 쪽(예: shutdown의 kill·join 대기)이면 OPS-128 선례대로 테스트 범위 밖이므로 별도 태스크로 분리 등재한다.\n④ 같은 파일 시간 단언 전수 — tests/backend/api/test_verify_isolation.py 안에서 time.perf_counter()로 재는 단언 테스트를 전부 열거하고 각각 (측정 구간 · 상한 · 근거 수치 · 정상 분포 · 뮤테이션 최소)를 표로 남긴다. 근거가 없거나 상한이 정상 최대의 1.5배 미만으로 붙은 단언은 같은 PR에서 고치거나 별도 태스크로 등재한다. 다른 파일의 시간 단언 전수는 범위 밖(필요하면 별도 태스크).\n⑤ 검증 — 이 PR이 닿는 CI 잡을 ci_job_coverage.py scope로 열거하고 로컬에서 그 잡의 해당 스텝을 exit code로 판정한다. 같은 파일을 4병렬 × 5회 이상 반복해 실패 0건을 보이되, 수정 전 코드에서 같은 반복이 RED를 내는지 먼저 확인한다 — 재현이 안 되면 재현 못 했음을 PR 본문에 정직하게 적고 머지 큐 실측으로 갈음한다. 뮤테이션 주입은 cp 백업 · mutated != original 단언 · 원복 sha256 일치로만 하며 git checkout/restore/stash로 원복하지 않는다."
+artifacts: []
+paths:
+  - tests/backend/api/test_verify_isolation.py
+session: null
+notes: "출처: S4-72 후속 점검(PR #1563 머지 큐 감시, 2026-10-12)에서 발견. 증거 = PR #1565 큐 실행 run 38249677879의 backend Pytest 스텝 FAILED 줄(위 acceptance ①). 같은 기반(main d873d064)에는 OPS-127(#1582)의 수정이 이미 들어 있었으므로 이 실패는 그 수정으로 닫히지 않은 별개 테스트다. 원인은 코드를 읽어 추정한 것이며 측정하지 않았다(acceptance ② 참조). 학생 영향은 없다 — 테스트 불안정이 머지 큐를 막는 문제다(#1565가 이 테스트로 큐에서 탈락). 파일 범위가 OPS-127(원격 claim claude/ops127-verify-isolation-budget-timing · 대장 상태 in_progress)과 겹친다 — 착수 전에 OPS-127 상태와 원격 claim을 확인하고 필요하면 그 세션과 조율한다. Kiki 지시(2026-10-13): 태스크 등재."
+updated: 2026-10-13
