@@ -338,6 +338,15 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-08 (회수 · OPS-38): **고립 브랜치 `q8tvcx`의 OPS-19(CI 게이트 도달 가능성 계약)를 회수했다 — 원 커밋의 CI 수정 2건은 main이 이미 흡수해 이식하지 않았고, 남은 한 가지(잡 `if`를 *평가*하는 도달 가능성 가드)만 이식했다. 소유자 없던 의존 3종은 `OPS-32`로 편입했다**
+
+**판정 기준**: `origin/main` `ec1f9dc7`. 원 브랜치 head `e1835c0c`, main에 없는 고유 커밋 3건(`ee9df6dc` 문서·`592c961f` 구현·`e1835c0c` 완료 등재) — 나머지는 전부 `(#NNN)` 스쿼시 번호가 붙은 main 커밋이다(shallow 클론이라 merge-base는 직접 못 봄).
+
+- **원 수정은 이식하지 않음**: A1(`data-pipeline` 잡 skip)은 `COLLAB-07`(#817)이 잡 `if`에 `corpus`를 OR 편입해 해소했고, A2(`notation_coverage`)는 같은 PR이 `backend` 필터에 `data/corpus/`를 편입해 해소했다. 원 커밋의 "data-pipeline 잡에 `notation_coverage` 중복 스텝 추가"는 그 상시 스텝과 중복이라 버렸다.
+- **이식한 것**: `tests/infra/test_ci_gate_reachability.py`(14건). 근거는 뮤테이션 실측이다 — `data-pipeline` 잡 `if`의 `||`를 `&&`로 바꾸면(코퍼스 단독 PR에서 잡이 다시 skip되는 원래 결함) main의 기존 가드 `test_no_dead_changes_flag`는 **그대로 통과**(플래그가 문자열로 등장하면 만족)하고, 신규 테스트는 RED. 주입 3종(OR→AND·corpus 가지 제거·미지 어휘) 전건 RED, 원복 바이트 동일, 무뮤테이션 14 passed. 원 코드와 달리 `eval`을 쓰지 않고(재귀하강 파서) 게이트 판정에 쓰이지 않던 "대표 경로 합성" 자기검증은 뺐다.
+- **문서**: 원 `data_platform_module_gap_review_r2.md`는 `OPS-41`이 이미 회수한 `t608mk`의 같은 이름 문서와 별개라 `docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md`로 회수했다(원문 무수정 + 발견별 현황 표). 현황: A1·A2·C1(`SEC-32` done)·C3(`HARN-15` done) 닫힘, A3는 `declared_unwired_audit`가 상시 감시, B1은 `OPS-67`(todo), C2는 `OPS-32`(todo).
+- **소유자 없던 잔여 2건**: ① r2 C2의 6종 중 `pandas`·`polars`·`great-expectations` 3종은 `OPS-32`(3종만 소유)에도 `OPS-37`에도 없어 `OPS-32` acceptance ⑥으로 편입(선언 `pyproject.toml:57-59`·import 0 실측). ② `ops.cost_report`의 CI 미배선은 결함이 아니다 — 입력이 라이브 Langfuse 트레이스인 운영자 수동 계측 도구이고, 감사기는 `status: reached`로 분류(신규 태스크 불필요).
+- **번호 매핑**: `OPS-19 → OPS-38` · `SEC-13 → SEC-32` · `OPS-20 → OPS-67` · `OPS-21 → OPS-32`.
 ### 2026-10-12 (결정·구현 · PB-19): **CAT 형제 필터가 관계 유형·방향을 구분하게 했다 — `exclude`는 근접 복제본(변형·유사)만 빼고, 쉬운 계열(선수)은 남기며 `include`가 우대하고, 어려운 계열(심화)·대조는 중립이다**
 
 **무엇/왜**: PB-09가 낳는 선수·심화·대조 계보가 코퍼스에 들어오기 전에 소비 정책을 정했다. 종전 `load_sibling_ids`는 유형·방향 없이 상대편 id를 전부 형제로 모았다(소비처 3곳: CAT 정책·수능 정책·정렬 재선택). 변형·유사만 있는 현 코퍼스에선 맞았지만, 선수·심화가 들어오면 `exclude`가 Polya의 "더 쉬운 관련 문제를 먼저"에 필요한 발판을 후보에서 빼고 `include`가 오답 직후 난이도를 올리는 쪽을 우대한다.
@@ -12349,18 +12358,18 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
 
-## 2026-10-12 QUAL-13 — 위생 검증기 함수 표기 오탐 수정: 프라임·첨자 함수 뒤 괄호와 한 글자 함수 적용을 곱셈·독립 수치식으로 읽지 않는다
+## 2026-10-12 OPS-106 게이트② 라이브 표본 실측 — ② 이중 회계·③ 저작 분리 통과 · ① 서빙 계상 COUNTED(단서 있음) · 재발방지 태스크 2건
 
-판정 기준: 브랜치 `claude/wonderful-planck-48b5ya`(미머지) · 코드 변경 `src/backend/whymath_backend/l3/pregenerate/validator.py`, 동결 테스트 `tests/backend/l3/test_pregenerate_function_notation.py`.
+판정 기준: main `d873d064` (Kiki 클론 HEAD와 일치 확인 후 실행 · `PRE_OK=True`) · 실행: Phaiakes9, 런북 `docs/ops/ops106_gate2_live_sample_runbook.md`. 게이트 `G-ops106-gate2-live-sample` clear.
 
-- **원인은 두 갈래였다**: ① 산술·부등식·부등 검증기가 `f'(2) = 5`의 `'`를 "더 큰 식의 일부" 신호로 인정하지 않아 `(2) = 5`만 떼어 거짓 등식으로 판정(`_is_standalone`) ② 해 주장 검증기·단계 진단이 암묵 곱셈 파서 때문에 `f(2)`를 `2·f`로 읽어 `f(1) = 3, f(2) = 5`를 "f=3 vs f=5/2"로 판정. 같은 뿌리의 **거짓 음성**도 있었다 — `2x + 1 = 7 이므로 x = 5이고 f'(x) = 2x`에서 `(x) = 2x`가 만든 가짜 방정식(x=0)이 공통 해집합을 비워 진짜 슬립(x=5)의 검출을 가렸다.
-- **수정**: `_follows_function_symbol`(프라임 `' ′ ’ ``을 걷어 낸 앞 글자가 영숫자(한글 제외)이거나 직전이 `}`면 함수 인수 괄호) + `_has_function_application`(한 글자 함수 기호+`(`, **인수 안에 그 글자가 있으면 곱셈**이라 `x(x+1)`·`2x(…)`는 곱셈 해석 유지) + `_is_function_notation_relation`(해 주장 검증기·`detect_step_breaks` 공용 skip). 틀리면 통과하는 방향이라 false-positive 0 보수 원칙과 같은 쪽이다.
-- **검증**: 수정 전 RED 26건(신규 41건 중) → 수정 후 45건·기존 `test_pregenerate.py` 209건 통과. 대조군(`2 + 3 = 6`·단독 `(2) = 5`·인용 `'(2) = 5'`·`x(x+1) = 6`·`2(x+1) = 6`·`2x(1+1) = 8`·중첩 괄호 `x((2+1)x) = 9`)은 수정 뒤에도 거부. 뮤테이션 14종 전건 RED(컴파일 검사·pytest 종료 코드 1만 검출로 계상·원복 sha256 동일).
-- **④ 은행**: 504건 `p3_calculus1_diff_batch --check` 드리프트 없음(생성기·은행 바이트 불변 — 5회차 감사 동결본이라 회피 문면을 되돌리지 않았다). 회피 표기를 원본(`f'(4)의 값은 2` → `f'(4) = 2` 등)으로 되돌린 변형 96개 문면: **구 검증기 49건 거부 → 수정 후 0건**, 현 은행 기준선은 구·신 모두 0건.
-- **하네스 결함 2건(시스템 실수 — 뮤테이션 도구)**: ① 치환 문자열이 들여쓰기를 반쯤 남겨 IndentationError가 났는데 `1 error`가 "검출(RED)"처럼 보였다 — `compile()` 단언 + pytest 종료 코드 1만 검출로 계상하도록 고쳤다. ② 같은 하네스가 처음엔 M11(우변 함수 적용)·M14(중첩 괄호) 생존을 냈다 — 테스트가 그 절을 밟지 않았다(`3 = f(1)`·`x((2+1)x) = 9` 반례 추가 후 14/14).
-- **로컬 CI 재현**: 닿는 잡 전 스텝 통과 — 전체 pytest 19313 passed·커버리지 86.40%·`backend` 후속 게이트 20스텝·`tests/infra` 3035·`tests/harness` 2256·`corpus_authoring` 814 passed·위헌 심사 래칫 차단 0건(기준선 0). `ci_mirror.py run` 6잡(`backend`·`infra-contracts`·`infra-shell`·`policy-guard`·`harness-integrity`·`declared-unwired-audit`) `not_executed: 0`·`tainted: false`. **내 실수 1건**: 백필 드리프트 체크 2건을 `src/backend`에서 돌려 `FileNotFoundError`(CI는 이 두 스텝만 저장소 루트로 되돌린다) — 루트에서 재실행해 exit 0.
-- **미재현(근거)**: ①경로 필터상 닿지만 로컬 재현 불가 — `backend-migrations`(postgres 서비스 컨테이너 필요)·`docker-build`(도커 필요). 이 변경은 alembic·Dockerfile을 건드리지 않지만 판정은 CI 몫이다("무변경이라 해당 없음"이 아니다) ②`concept-reach-guard`(테스트가 `pregenerate`를 import하지 않음 0건)·`data-pipeline` 계열·`mobile`·`web`은 "내가 찾은 방법(grep)으로 0건"을 근거로 재현하지 않았다.
-- **알려진 한계**: 한 글자 함수 `x(2)`처럼 인수에 그 글자가 없는 식은 곱(2x)이 아니라 함수로 보아 해 주장 검증을 건너뛴다(학생이 `x(2+1)`로 3x를 쓰는 일은 드물어 수용). `}` 꼬리는 `\frac{1}{2}(3)` 같은 곱셈도 건너뛴다(보수 방향).
+- **② 이중 회계 = `MATCH`**: `cost_probe` 18요청 중 성공 16·오류 2(`ReadTimeout` 2건: explain-easy-free·verify-easy-free) = 인프로세스 16 = Langfuse `probe` 증가분 16. 첫 폴링은 11건(`PARTIAL`)이라 수집 지연이 실재하고 두 번째 폴링에서 일치했다.
+- **③ 저작 분리 = `SEPARATED_MATCH`**: rephrase 5콜(provider 오류 0) → `authoring` +5 · 표본(`event_count`) +0 · `unlabeled` +0. 첫 폴링은 `SILENT_ZERO`(0건)였다가 두 번째에서 도착 — 폴링 없이 한 번만 읽었다면 "분리 실패/전멸"로 오진할 수 있는 지연이다.
+- **① 서빙 계상 = `COUNTED`(재시도에서)**: 재시도 `serving` +43 · `unlabeled` +0 · `SURFACE_LABELED_RATE` 1.0 · `SAMPLE_ARITHMETIC_OK` True · `PRIMARY_RECORDS_P`=1. **1차 시도는 `NO_PRIMARY_TURN_IN_SERVER_LOG`**(서버 기록 0줄 · `serving` +45): 서버 stderr `WH-1 primary 하네스 실행 실패(TimeoutError) — 결정론 템플릿 폴백`(`wh1_primary.py` line 189). 코드상 시간 초과 경로는 `emit` 전에 `return None`이라 기록이 남지 않는다(읽어서 확인 · 실행 검증 아님). 우리 트래픽이 이 서버에 닿았음은 접근 로그 `POST /v1/coach` 15건(비2xx 0)·서버 프로세스 시작 22:21:18 ≈ 기록 파일 생성 22:21:19·명령줄의 `--log-config`로 확인했다.
+- **단서(수치 정직성)**: 재시도에서 15요청 중 **14턴이 시간 초과**(`PRIMARY_TIMEOUT_TURNS_THIS_RUN=14`)로 폴백했고 primary 성공은 1건뿐이다. 즉 이번 실측이 증명한 것은 **계측 사슬(표지 → 전송 → 집계)이 살아 있다**까지이며, 학생 대면 primary 성공률이 낮다는 사실은 별건(`OPS-134`)이다. 시간 초과 턴도 LLM 호출은 이미 `serving`으로 전송되므로(요청당 약 3건) 출력이 버려진 호출이 표본·비용 집계에 들어간다. 1차 시도의 시간 초과 턴 수는 집계하지 않았다.
+- **게이트② 합격(로컬 ≥80%)은 이번에 판정하지 않았다(런북 범위 밖)**: `cost_probe`의 로컬 100%·Wilson 하한 85.5% PASS는 라우터의 선택이 아니라 `budget0` 강등 16건(클라우드 예산 0 · ARCH-66 Anthropic API 중단 기간)의 결과다 — 합격 근거로 쓰면 안 된다.
+- **실행 중 만난 도구·절차 결함(시스템 실수로 분류 → 태스크 등재)**: ⓐ Kiki 클론이 main보다 3커밋 뒤처져 `CODE_MATCHES_ORIGIN_MAIN=False`로 런북이 정지했다. 뒤처진 파일이 `coach.py`·`learning_session_writer.py` 등 측정 경로였다(런북 정지는 올바른 판단). 클론은 여러 세션 공유 사본이라 `git merge --ff-only`(자기 거부 가드 포함)로만 따라잡았고 미커밋 변경 12건은 보존됐다. ⓑ `run_demo.ps1` [2/6]이 `Can't locate revision identified by '79de95331710'`로 즉사 — 재기동된 옛 데모 컨테이너의 `alembic_version`이 닫힌 PR #880 브랜치의 `audit_event` 마이그레이션을 가리켰다. `stop_demo.ps1`(데모 컨테이너 `down -v`, 운영 DB 5433 무관)로 초기화 후 정상 기동. 대책 = `OPS-133`(감지·안내 + 런북 §1/§2 보강 + 실패 주입 테스트). 서버 기동 후 `ERR 로그`의 `Redis 캐시 강등 — TimeoutError` 1건은 시간 초과의 원인인지 **미검증 가설**로 `OPS-134` ①에 넘겼다.
+- **후속 태스크**: `OPS-133-run-demo-stale-throwaway-db-diagnosis`(P2) · `OPS-134-wh1-primary-timeout-fallback-accounting`(P1 — 원인 분해·폴백 비율 회계·표본 정합·기본 15초 재판정). 산문 규칙은 추가하지 않는다(등재 동결).
+
 ## 2026-10-12: 미머지 브랜치 전수 감사 17회차 — 16회차가 claim 활성이라 뺀 완성품 4건이 TTL을 넘겨 고립 · 회수 태스크 4건 등재 · 브랜치 전용 태스크 4건 복원 · 삭제 0건 · 대책 HARN-309
 
 - **판정 기준 main `d873d064`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12.md`. 원격 ref 51 − 제외 4 − 열린 PR 22 = 감사 대상 25. 14차 삭제 배치 11건은 전건 집행(잔존 0/11).

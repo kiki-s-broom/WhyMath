@@ -17,11 +17,12 @@ acceptance:
   - "③ 게이트 이식 — MOB-08이 Flutter pubspec.yaml에 만든 '선언↔사용 거버넌스 테스트'(미사용 의존 검출·1개 되돌리면 red)를 backend pyproject.toml로 이식한다. 재발명 금지 — MOB-08 구현을 먼저 읽고 같은 판정 규약을 쓴다. 빌드·런타임 전용 의존(직접 import되지 않는 것)은 허용목록에 사유와 함께 명시한다."
   - "④ 변별력 실측(양방향) — 미사용 의존 1개를 되돌려 넣으면 red, 빼면 green을 둘 다 실측한다."
   - "⑤ 착지 위치 택일 — ops/declared_unwired_audit.py의 5번째 축으로 넣을지 tests/infra 독립 테스트로 둘지는 착수 세션이 실측으로 정한다. declared_unwired_audit의 4축(라우트·EventType·타임시리즈·CLI)에 의존성 축이 없어 이 사각이 어느 감사기에도 안 잡혔다는 점이 배경이다."
+  - "⑥ [OPS-38 회수 편입 2026-10-08 — 소유자 없던 잔여] 원 r2 C2(docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md)의 런타임 의존 6종 중 위 ①~⑤가 다루는 것은 opentelemetry-api·opentelemetry-sdk·structlog 3종뿐이다. 나머지 pandas·polars·great-expectations 3종도 src/backend/pyproject.toml:57-59에 선언돼 있고 src/·tests/·scripts/ import 0건이다(2026-10-08 main ec1f9dc7 실측). ③의 선언↔사용 게이트는 이 3종도 미사용으로 검출해야 하며, ②와 같은 규약(제거 vs 배선 판정·근거 기록)으로 처분한다. great-expectations는 data_pipeline/ncic/validate.py가 스스로 미사용을 자인하는 주석을 갖고 있었다(r2 C2). 착수 시 import 0을 현행 main에서 재실측하고 반증되면 범위를 재조정한다. 정상 예외(uvicorn·asyncpg·psycopg)는 근거와 함께 허용목록에 둔다."
 artifacts: []
 paths:
   - src/backend/pyproject.toml
   - "tests/infra/**"
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
 session: null
-notes: "정본: docs/architecture/operations_module_gap_review_r3.md §3 D10. 같은 부류의 결함을 MOB-08이 모바일 축에서 이미 상환했는데 backend 축은 무감사로 남아 있던 비대칭.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "정본: docs/architecture/operations_module_gap_review_r3.md §3 D10. 같은 부류의 결함을 MOB-08이 모바일 축에서 이미 상환했는데 backend 축은 무감사로 남아 있던 비대칭.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-10-08] OPS-38 회수: r2 C2 6종 중 3종(pandas·polars·great-expectations)이 소유 태스크 없이 소실될 상태 — acceptance 편입"
+updated: 2026-10-08
