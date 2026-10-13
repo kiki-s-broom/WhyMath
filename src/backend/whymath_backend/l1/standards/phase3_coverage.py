@@ -852,7 +852,7 @@ def _connectivity(
         target=target,
         met=_judge(value, target),
         unmet=tuple(unmet),
-        note="개념 → 스킬 → 문항 → 오개념 → 교수가 한 줄로 이어짐 (목표는 기준선 실측 후 제안)",
+        note="개념 → 스킬 → 문항 → 오개념 → 교수가 한 줄로 이어짐 (목표는 명세가 갖는다)",
     )
     return result, funnel
 

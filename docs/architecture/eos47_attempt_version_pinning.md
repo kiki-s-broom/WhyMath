@@ -46,14 +46,14 @@
 
 ## 5. 알려진 한계 (정직 기술)
 
-1. **지금 `problem_version_id`는 전부 NULL이다.** `problem_version`에 행을 쓰는 운영 writer(문항 발행 경로)가 없다(ARCH-31 §5). 헬퍼는 판 없는 문항에 판을 날조하지 않으므로 정확한 상태이고, 발행 경로가 포인터를 채우는 순간부터 수정 없이 값이 기록된다. 로그 `outcome=pinned | no_version`이 "작동한 비율"을 센다.
+1. **운영 DB의 `problem_version_id`는 지금도 전부 NULL이다.** 판을 쓰는 writer(`l3/problem_publish_gate.py`, `EOS-190`)는 생겼고, writer 경유로 발행한 문항에서 실제 `POST /v1/me/attempts`가 `outcome=pinned`를 내고 시도 행에 판 id가 박힘을 실 PG로 확인했다(`tests/backend/db/test_problem_version_publish_integration.py`). 그러나 그 writer를 부르는 운영 라우트·CLI가 아직 없어(`EOS-194`) 발행되는 문항이 없다. 헬퍼는 판 없는 문항에 판을 날조하지 않으므로 정확한 상태이고, 문항이 발행되는 순간부터 수정 없이 값이 기록된다. 로그 `outcome=pinned | no_version`이 "작동한 비율"을 센다.
 2. **접수 시점 ≠ 출제 시점.** 학생이 문항을 받은 뒤 푸는 동안 새 판이 발행되면, 학생이 본 판이 아니라 새 판이 박힌다. 정확한 고정은 출제 시점에 판을 확정해야 한다.
 3. `evaluation_context`는 5키 중 1개만 채워진다(§3).
 4. `curriculum_version`은 라벨이다(버전 테이블 id 아님).
 
 ## 6. 후속 (이 변경이 소유하지 않는 것)
 
-- **`EOS-190-problem-version-publish-writer`** (P1) — 문항 발행 경로. `problem_version`에 행을 쓰는 유일한 자리를 만들어 §5-1(전부 NULL)을 해소한다. 이 변경의 효과가 실제로 나타나는 선행 조건이다.
+- **`EOS-190-problem-version-publish-writer`** (P1) — **착지**: 문항 발행 경로(writer)가 `problem_version`에 행을 쓰는 유일한 자리가 됐다. 호출 표면은 `EOS-194`가 소유하며, 그것이 착지해야 §5-1(운영 값 NULL)이 실제로 해소된다.
 - **`EOS-191-serve-time-version-stamping`** (P2, EOS-190 선행) — 출제 시점 판 확정. §5-2(접수 ≠ 출제) 해소.
 - **`EOS-192-evaluation-context-source-wiring`** (P2) — §3에서 `None`인 4키를 정본 소유자가 값을 만든 뒤 키 단위로 연결.
 - **`EOS-193-attempt-version-pin-reach-report`** (P2, EOS-190 선행) — 고정이 실제로 일한 비율 리포트(0%가 정상처럼 보이지 않게).

@@ -67,7 +67,7 @@ async def test_unknown_answer_kind_returns_unverifiable() -> None:
     verdict = await verifier.verify(problem)
     assert verdict.state == "unverifiable"
     assert "not_registered_kind" in (verdict.reason or "")
-    assert verdict.tier == VerificationTier.MACHINE_SAMPLED
+    assert verdict.tier == VerificationTier.NUMERIC_SAMPLING
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_finite_probability_pass_without_cross_verifier_is_unverifiable() 
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "unverifiable"
-    assert verdict.tier == VerificationTier.MACHINE_EXHAUSTIVE
+    assert verdict.tier == VerificationTier.FINITE_EXHAUSTIVE
     assert "유한 표본공간 전수 열거" in verdict.machine_axes
     assert "문발↔형식모델 정합" in verdict.residual_axes
     assert "cross_verifier" in (verdict.reason or "")
@@ -97,7 +97,7 @@ async def test_finite_probability_fail_returns_fail() -> None:
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "fail"
-    assert verdict.tier == VerificationTier.MACHINE_SAMPLED
+    assert verdict.tier == VerificationTier.FINITE_EXHAUSTIVE
     assert "전수 열거 결과" in (verdict.reason or "")
 
 
@@ -201,7 +201,7 @@ async def test_statistical_claim_pass_without_cross_verifier_is_unverifiable() -
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "unverifiable"
-    assert verdict.tier == VerificationTier.MACHINE_EXHAUSTIVE
+    assert verdict.tier == VerificationTier.DETERMINISTIC_DATA
     assert "통계량 전수 결정론 검산" in verdict.machine_axes
     assert "자료↔발문 정합" in verdict.residual_axes
 
@@ -216,7 +216,7 @@ async def test_statistical_claim_fail_returns_fail() -> None:
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "fail"
-    assert verdict.tier == VerificationTier.MACHINE_SAMPLED
+    assert verdict.tier == VerificationTier.DETERMINISTIC_DATA
     assert "불일치" in (verdict.reason or "")
 
 
