@@ -58,6 +58,24 @@ from whymath_backend.schema.assessment_evidence import MisconceptionCandidate, M
 
 pytestmark = pytest.mark.integration
 
+
+@pytest.fixture(autouse=True)
+def _sympy_isolation_off(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """SymPy 격리를 끈다(OPS-125) — 이 파일은 R3 입력 범위를 검증하지 격리를 검증하지 않는다.
+
+    훑기 능력이 격리되면 호출 대상(`_FixedCandidateDetector`)이 워커 프로세스로 pickle되어 가야
+    하는데, 이 파일은 테스트 모듈을 `importlib`로 적재해 정의한 클래스라 워커가 import하지
+    못한다(`ModuleNotFoundError` → 훑기의 never-break 분기가 삼켜 `not_run`이 된다 — CI 실측
+    2026-10-12 PR #1587). 격리 쪽 검증은 `test_coach_step_chain_isolation.py`가 맡는다.
+    """
+    from whymath_backend.config import get_settings
+
+    monkeypatch.setenv("WHYMATH_SYMPY_ISOLATION_ENABLED", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 _WEEK2_PATH = pathlib.Path(__file__).with_name("test_week2_gate_wrong_answer_propagation.py")
 _WEEK2_HELPERS = (
     "_EXPECTED_MISCONCEPTION",

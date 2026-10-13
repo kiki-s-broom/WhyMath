@@ -661,9 +661,11 @@ CATALOG: tuple[Spec, ...] = (
     # (`evidence_event.session_id → learning_session.user_id`)라 같은 기능의 적재 축이다.
     _e("WM-E-206", "학습 증거 이벤트 적재(attempt·처치·추천 회계·학습 세션)", "Student", "Event",
        "P0",
-       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer",
+       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer · "
+       "EOS-47 시도 접수 시점 문항 판·채점 환경 고정(l2.attempt_version_pin)",
        "l2.evidence_event_store", "l2.attempt_skill_event",
-       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer"),
+       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer",
+       "l2.attempt_version_pin"),
     _e("WM-E-207", "목표 진행 조회 좌석", "Student", "Learning Model", "P2",
        "수능 D-day 축", "l2.target_progress"),
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
@@ -788,8 +790,10 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-316", "콘텐츠 버전 Publish Gate(전이표·검증 파이프라인·Rollback)", "Admin",
        "Versioning", "P1",
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
-       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5)",
-       "l3.publish_gate", status="Batch"),
+       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5). EOS-190 — 문항 판 writer(`l3."
+       "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이나 **운영 호출자"
+       "가 아직 없다**(호출 표면은 후속 태스크) · 시도 버전 고정(EOS-47)만 포인터를 읽는다",
+       "l3.publish_gate", "l3.problem_publish_gate", status="Batch"),
     _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
        "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
@@ -1035,7 +1039,8 @@ CATALOG: tuple[Spec, ...] = (
        "schema.cms_access", "schema.concept", "schema.concept_content", "schema.concept_version",
        "schema.corpus_provenance", "schema.curriculum_entry", "schema.curriculum_framework",
        "schema.curriculum_version", "schema.dialogue", "schema.enums",
-       "schema.event_data_contract", "schema.evidence_link", "schema.hint_usage",
+       "schema.evaluation_context", "schema.event_data_contract", "schema.evidence_link",
+       "schema.hint_usage",
        "schema.learning_loop_contract", "schema.learning_state", "schema.mastery_contract",
        "schema.misconception_catalog", "schema.misconception_crosslink",
        "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",
@@ -1172,6 +1177,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
        "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.problem_corpus_lineage_links",
        "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
@@ -1227,6 +1233,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
+       # S4-56 — 잔여 축 교차검증 게이트 v2(도메인 플러그인·사전점검·dry-run). v1과 같은 판정 가족.
+       "harness.residue_cross_verify_eval_v2",
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",

@@ -33,7 +33,7 @@ downgrade: 트리거·함수 제거 → FK 복원 → 컬럼 제거. **FK 복원
 한다(조용히 지우지 않는다: 이력 소실을 downgrade가 몰래 하지 않게).
 
 Revision ID: a8c4e1f7b3d9
-Revises: e7b2c4d8a1f6
+Revises: d6a2f8c4b1e7
 Create Date: 2026-10-12 09:00:00.000000
 """
 
@@ -47,7 +47,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a8c4e1f7b3d9"
-down_revision: str | None = "e7b2c4d8a1f6"
+down_revision: str | None = "d6a2f8c4b1e7"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

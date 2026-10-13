@@ -4,10 +4,11 @@
 > **좌석**: `P3-14-phase3-metrics-cli`
 > **판정 기준**: origin/main `713512bc` (2026-10-09 실측)
 > **명령**: `python -m whymath_backend.ops.phase3_metrics` (자가 점검: `--self-check`)
+> **개정**: 2026-10-13 `P3-33` — 게이트 `G-p314-phase3-metric-targets`(2026-10-12 Kiki 결정) 반영: ⑦ 목표 0.95 확정 · ⑥ 을 F-Ⅱ·F-Ⅴ 2종으로 축소
 
 Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로 산출하고, 각각 **위반 주입에 반응**"하는
 실행기의 계약이다. 이 문서는 ① 이 저장소에 이미 있는 지표 묶음들과의 **평면 구분** ② 7종의 정의·출처·
-흡수 근거 ③ 현재 상태 ④ 목표가 아직 확정되지 않았다는 사실 ⑤ 지시문과 저장소가 어긋난 곳을 고정한다.
+흡수 근거 ③ 현재 상태 ④ 목표 확정 결과 ⑤ 지시문과 저장소가 어긋난 곳을 고정한다.
 
 ---
 
@@ -46,8 +47,8 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
 | ③ | Problem Coverage | 승인 문항이 1건 이상 행사하는 스킬 | 명세 `skills`(8) | **신규 계산**(아래) | 명세 `targets.problem_coverage_by_skill` |
 | ④ | Solution QA Pass | 재검증 통과 문항 | 재검증 통과 + 실패 문항 | `harness.corpus_reverify.reverify_corpus` (승인 ∧ 대표 과정 PRIMARY 문항 전수) | `1 − ` 스코어카드 `수학적 오류율` ceiling (**흡수**) |
 | ⑤ | Learning Loop Success | `loop_kpi_gate` LOOP_COMPLETION 의 분자 | 같은 분모 | `ops.loop_kpi_gate` **그대로 재사용**(새 정의 없음) | `LOOP_KPI_SPECS` 의 임계(Wilson 하한) |
-| ⑥ | Critical Defect | 해당(triggered) Hard Gate 수 | Hard Gate 5종 | `ops.validation_scorecard.evaluate_hard_gates` F-Ⅰ~Ⅴ **그대로 흡수** | 0건 |
-| ⑦ | Graph Connectivity Coverage | Concept → Skill → Problem → Misconception → Pedagogy 가 **한 줄**로 이어지는 핵심 개념 | 핵심 개념(10) | P3-02 **재사용** | 명세 `targets.graph_connectivity_coverage` — **null(목표 미정)** |
+| ⑥ | Critical Defect | 해당(triggered) Hard Gate 수 | Hard Gate **2종**(F-Ⅱ·F-Ⅴ) | `ops.validation_scorecard.evaluate_hard_gates` 의 F-Ⅱ·F-Ⅴ **그대로 흡수**(F-Ⅰ·Ⅲ·Ⅳ 는 범위 밖) | 0건 |
+| ⑦ | Graph Connectivity Coverage | Concept → Skill → Problem → Misconception → Pedagogy 가 **한 줄**로 이어지는 핵심 개념 | 핵심 개념(10) | P3-02 **재사용** | 명세 `targets.graph_connectivity_coverage` — **0.95**(2026-10-12 확정) |
 
 ### ③ Problem Coverage — 신규 계산 (직접 계수)
 대표 과정 `skills` 각각에 대해, 검수 상태가 `approved` 이고 범위 개념에 PRIMARY 로 달린 문항 중 그 스킬을
@@ -75,18 +76,28 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
 `--no-db --input` 은 숫자 **주입**일 뿐 측정이 아니므로 `--sample-basis` 를 **반드시 명시**해야 하고(없으면 exit 3),
 출력에 `기준: 주입값(--input) — 측정이 아니다`와 표본 기준이 각인된다.
 
-### ⑥ Critical Defect — Hard Gate 흡수와 불일치
-acceptance ④ 의 문면대로 "Critical Defect 0" 을 Hard Gate F-Ⅰ~F-Ⅴ 와 같은 뜻으로 보고 흡수한다.
+### ⑥ Critical Defect — Hard Gate F-Ⅱ·F-Ⅴ 흡수 (P3-33 · 분모 5 → 2)
+Hard Gate 5종 중 **제품 완성도 의미에 가까운 2종**만 흡수한다(2026-10-12 Kiki 결정).
+- **흡수(판정함)**: F-Ⅱ(인간 검수를 통과한 CU 의 수학적 오류율 > 2%) · F-Ⅴ(힌트의 의미적 정답 누설 ≥ 10%).
+- **범위 밖(판정하지 않음)**: F-Ⅰ(HIT 중앙값) · F-Ⅲ(실패 유형 분포) · F-Ⅳ(앵커 미달)는 **생산 공정 평면** 소관이다
+  (`ops/validation_scorecard.py` 가 소유). 위반이 나도 ⑥ 은 반응하지 않고, 입력이 없어도 ⑥ 을 측정 실패로 만들지
+  않는다. 이 사실은 출력의 지표 이름 줄(`[Hard Gate F-Ⅱ·F-Ⅴ 2종 — F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관(이 지표 밖)]`)과
+  JSON `scope` 에 박힌다.
+- 구현은 스코어카드 `evaluate_hard_gates` 를 **그대로 호출**하고 그 결과에서 2종을 고른다(정의를 복제하지 않는다).
+  스코어카드가 내는 게이트가 5종(F-Ⅰ~Ⅴ)이 아니면 흡수 계약 파손으로 측정 실패다.
 - 해당 게이트가 1건이라도 있으면 나머지가 판정 불가여도 **확정 위반**이다(알 수 없는 것이 확정을 지우지 않는다).
-- 해당이 0건이어도 **판정 불가 게이트가 남으면 측정 실패**다. "해당 없음"과 "판정 불가"는 다르다 —
+- 해당이 0건이어도 **흡수한 2종 중 판정 불가가 남으면 측정 실패**다. "해당 없음"과 "판정 불가"는 다르다 —
   입력이 없는 게이트를 해당 없음으로 접으면 0건 통과가 된다.
 - 입력 payload 는 스코어카드 `--input` 과 같은 모양을 `--hard-gate-input` 으로 받는다(이 CLI 는 payload 수집기를
-  갖지 않는다). payload 가 없으면 5게이트 전부 판정 불가 → ⑥ 은 `unmeasured`.
-- **불일치는 §6-① 에 기록한다.**
+  갖지 않는다). 읽는 곳은 `content`(F-Ⅱ·F-Ⅴ)뿐이지만 payload 전체를 스코어카드에 넘기므로, 범위 밖 구역의 형식이
+  깨져 있으면 스코어카드가 던져 ⑥ 은 측정 실패(예외 타입명 동반)가 된다. payload 가 없으면 ⑥ 은 `unmeasured`.
+- 결정 경위는 §6 에 기록한다.
 
-### ⑦ Graph Connectivity Coverage — 목표 미정
-명세가 목표를 `null` 로 둔다("지시문 원문에 목표 수치가 없다 — P3-02 가 기준선을 실측한 뒤 제안한다").
-값은 내되 **PASS/FAIL 을 만들지 않는다**(`no_target`). 목표가 확정되기 전에는 종합이 충족일 수 없다(§4).
+### ⑦ Graph Connectivity Coverage — 목표 0.95 확정 (P3-33)
+명세가 목표를 **0.95** 로 갖는다(2026-10-12 Kiki 결정 · `scope_spec.yaml` `completeness.targets.graph_connectivity_coverage`).
+확정 전에는 `null`(목표 미정)이라 PASS/FAIL 을 만들지 않았으나(`no_target`), 이제 측정값 기준으로 충족/미달이 나온다.
+`no_target` 경로 자체는 계약으로 남는다 — 명세가 어떤 목표를 `null` 로 되돌리면(사유 필수) 값은 내되 판정을 만들지
+않고 종합이 충족일 수 없다(§4). 이 경로는 단위 테스트(`TestNoTarget`)와 `--self-check` ⓓ 가 계속 겨냥한다.
 
 ---
 
@@ -129,8 +140,8 @@ acceptance ④ 의 문면대로 "Critical Defect 0" 을 Hard Gate F-Ⅰ~F-Ⅴ �
 측정 실패다(빈 입력은 통과가 아니다).
 
 **오늘의 실 상태에서 종합이 "측정 실패"(exit 2)인 것은 정상 동작이다.** ⑤ 는 DB 가 닿는 환경에서만, ⑥ 은
-`--hard-gate-input` 이 있을 때만 측정되고, ⑦ 은 목표가 정해지기 전까지 판정이 없다. 이를 결함으로 오인해 기본값을
-채우면 이 CLI 가 막으려는 위장(0건 통과)이 된다.
+`--hard-gate-input` 이 있을 때만 측정된다. (⑦ 은 목표가 확정돼 `목표미정` 이 아니라 측정값 기준 충족/미달이 나온다 —
+P3-33.) 이를 결함으로 오인해 기본값을 채우면 이 CLI 가 막으려는 위장(0건 통과)이 된다.
 
 모든 출력(표·JSON·증거 NDJSON)에 `run_id` 와 관측 시각이 박힌다 — 이전 실행의 결과를 이번 것으로 오독하지 않게.
 `--json PATH` 는 `loop_kpi_gate` 와 같은 형태(표는 stdout, JSON 은 파일)다. `--evidence PATH` 는 지표가 끝날 때마다
@@ -144,7 +155,9 @@ acceptance ④ 의 문면대로 "Critical Defect 0" 을 Hard Gate F-Ⅰ~F-Ⅴ �
 
 1. **`--self-check`**(CI `backend` 잡 게이트 스텝 · DB 0·LLM 0·약 4초): 7종 전부 충족하는 합성 대조 세계에서
    ⓐ 대조군이 충족인지 ⓑ 지표마다 위반을 주입해 **그 지표만** 미달로 바뀌는지 ⓒ 미측정 주입이 통과로 접히지 않고
-   종합이 측정 실패가 되는지 ⓓ 목표 미정이 판정을 만들지 않는지 ⓔ 경계(값 == 목표는 충족) ⓕ 종합 규칙을 점검한다.
+   종합이 측정 실패가 되는지 ⓓ 목표 미정이 판정을 만들지 않는지 ⓔ 경계(값 == 목표는 충족) ⓕ 종합 규칙 ⓖ **범위 밖
+   게이트(F-Ⅰ·Ⅲ·Ⅳ) 위반을 주입해도 7종 전부가 무반응인지**(⑥ 이 5종 흡수로 되돌아가지 않았다는 증거 — P3-33)와,
+   흡수 2종의 입력만 지우면 범위 밖 입력이 멀쩡해도 ⑥ 이 측정 실패인지를 점검한다(22건).
    무반응이 하나라도 있으면 exit 1. 주입은 적용 자체를 단언한다(`InjectionNotAppliedError`).
 2. **pytest**(`tests/backend/ops/test_phase3_metrics.py`): 같은 성질을 독립 주입 표로 다시 확인하고, 자가 점검 자신이
    무반응·무변경 주입·미측정→통과 접힘에 exit 1 을 내는지까지 확인한다.
@@ -154,26 +167,30 @@ acceptance ④ 의 문면대로 "Critical Defect 0" 을 Hard Gate F-Ⅰ~F-Ⅴ �
 **CI 배선 판단.** 실 코퍼스 판정(`python -m whymath_backend.ops.phase3_metrics`)은 CI 에 걸지 않는다. 오늘의 실 상태는
 기준선 미달·측정 실패(exit 2)라 걸면 상시 red 가 되어 게이트가 꺼지기 때문이다. CI 에는 `--self-check` 만 걸고
 (`backend` 잡), 그 스텝의 존재와 "실 코퍼스 판정을 걸지 않는다"는 결정은 `tests/infra/test_phase3_metrics_wiring.py` 가
-동결한다. 실 코퍼스 판정을 걸고 싶어졌다면 §6 의 목표 수치(acceptance ⑥)와 ⑦ 의 목표가 확정된 뒤에 그 테스트를
-고치는 것이 올바른 순서다.
+동결한다. 목표 수치는 2026-10-12 에 확정됐지만(§6) 실 코퍼스는 여전히 미달·측정 실패(exit 2)라 걸지 않는다. 실 코퍼스 판정을
+걸고 싶어졌다면 상시 red 가 되지 않는 상태가 된 뒤에 그 테스트를 고치는 것이 올바른 순서다.
 
 ---
 
-## 6. 목표 미확정과 지시문↔저장소 불일치 (Kiki 확인 사항)
+## 6. 목표 확정 결과와 지시문↔저장소 불일치
 
-### 목표 수치는 '목표 예시'다 (acceptance ⑥)
-95%·98%·99% 는 원 문서의 **목표 예시**다. P3-02·P3-10 실측 기준선을 본 뒤 **Kiki 가 확정**한다. 이 CLI 는 목표를
-명세·각 정본에서 읽을 뿐 정하지 않는다. 명세의 목표를 바꾸면 판정이 따라 움직임을 테스트가 확인한다
-(`test_target_is_read_from_the_spec_not_hardcoded`). ⑦ 의 목표는 명세가 null 이며, 자가 점검의 합성 세계 안에서만
-가설 목표를 둔다(권고값 아님).
+### 목표 수치 확정 (게이트 `G-p314-phase3-metric-targets` · 2026-10-12 Kiki · 반영 `P3-33`)
+- 지표 ①~⑤ 목표는 원 문서의 예시값(95%·98%·99.5% 등) **그대로 확정**했다(값 변경 없음).
+- **⑦ Graph Connectivity Coverage 목표 = 0.95** — 명세 `null` 에서 확정(위 ⑦ 절).
+- **⑥ Critical Defect 는 F-Ⅱ·F-Ⅴ 2종만**(위 ⑥ 절).
+- **단서(정직)**: AI 품질 평가 기준선(`P3-10`)이 아직 없는 상태로 확정했다. 그러므로 ④·⑤·⑥ 목표는 그 결과를 본 뒤
+  **재조정될 수 있다** — 재조정은 별도 결정이며 이 확정의 선행이 아니다.
+- 이 CLI 는 목표를 명세·각 정본에서 읽을 뿐 정하지 않는다. 명세의 목표를 바꾸면 판정이 따라 움직임을 테스트가
+  확인한다(`test_target_is_read_from_the_spec_not_hardcoded`). 자가 점검의 합성 세계도 ⑦ 목표를 따로 두지 않고 실제
+  명세에서 읽는다(종전의 '합성 세계 안 가설 목표'는 폐지).
 
 ### 불일치 기록
 ① **Critical Defect 의 출처.** 지시문 [19] 항목 2 는 "백로그·이슈의 P0/P1 분류를 출처로" 하라고 했다. 저장소에는 결함
    심각도 필드가 **없다**(내가 찾은 방법으로는 0건: 백로그 태스크 스키마 `scripts/harness/models.py` 의 `eos_priority`
    P0~P3 는 *태스크의 12월 검증 등급*이지 결함 표지가 아니고, 결함과 기능을 구분하는 필드도 없다). 그래서 채택하지 않고 acceptance ④ 의 지시("Hard Gate F-Ⅰ~F-Ⅴ 와 같은 뜻")를 따랐다. 그러나 F-Ⅰ(HIT 중앙값)·
    F-Ⅲ(실패 유형 분포)·F-Ⅳ(앵커 미달)는 **생산 공정 평면**의 신호이고, 제품 완성도 의미에 가까운 것은 F-Ⅱ(검수 통과 CU 수학
-   오류율)·F-Ⅴ(힌트 정답 누설)뿐이다. 즉 ⑥ 은 이름은 "제품 결함 0"이지만 실체는 생산 공정 게이트의 흡수다.
-   **Kiki 확인 사항**: ⑥ 을 이대로 둘지, F-Ⅱ·Ⅴ 만 남길지, 결함 심각도 필드를 새로 둘지.
+   오류율)·F-Ⅴ(힌트 정답 누설)뿐이다. 즉 ⑥ 은 이름은 "제품 결함 0"이지만 실체는 생산 공정 게이트의 흡수였다.
+   **해소(2026-10-12 Kiki 결정 · P3-33)**: F-Ⅱ·Ⅴ 만 남겼다(결함 심각도 필드를 새로 두는 안은 채택하지 않음).
 ② **Solution QA 임계.** 지시문 원문 ≥ 99%(P3-07) vs 이 CLI 0.995(스코어카드 흡수, acceptance ④). 더 엄격한 쪽을 따랐다.
 ③ **P3-07 미착지.** 지시문은 "P3-02·P3-07·Phase 2 KPI 1 을 재사용"하라고 하나 P3-07 은 `todo` 다. ④ 는 `corpus_reverify` 를
    대리로 쓰며 P3-07 착지 시 출처를 갈아끼운다.
