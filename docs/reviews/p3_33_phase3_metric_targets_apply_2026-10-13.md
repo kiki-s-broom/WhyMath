@@ -61,7 +61,10 @@
 | `data-pipeline` | 닿음(`data/corpus/` 변경이 `corpus` 플래그를 켠다) | ruff·black·mypy 0 · pytest `995 passed, 12 skipped`(커버리지 70 포함) · `qa_pipeline` 0 |
 | `corpus-authoring` | **안 닿음** — 마커 테스트는 `p3_diff_*` 문제 생성기이고 명세·지표 모듈을 읽지 않는다(`phase3_scope`·`scope_spec`·`phase3_metrics` 참조 0건: 내가 찾은 방법 기준) | 미실행 |
 | `concept-reach-guard` | 안 닿음 — 모바일 영역 조건 잡, 대상은 `test_concept_reach_report.py` 단일 파일 | 미실행 |
-| `changes` · `constraints-freshness` · 나머지 12개 | 안 닿음 — 영역 필터·스케줄 센서·모바일/웹/Docker/마이그레이션/DB/야간 잡이며 이 변경은 해당 영역을 건드리지 않는다. 이 중 `backend-serial-nightly`·`e2e-nightly` 는 야간 전용 | 미실행 |
+| `backend-migrations` · `docker-build` | **닿음(정정)** — 초안은 '안 닿음'으로 분류했으나 CI 경로 필터가 이 변경으로 두 잡을 깨운다(PR 생성 시 훅의 `CI 도달 잡` 고지). 서비스 컨테이너(postgres)·docker 빌드가 필요해 로컬 재현 불가 | 미실행 — **CI 판정에 맡김** |
+| `changes` | 경로 필터 계산 잡 — 미러가 같은 정본(filter 스텝)을 읽어 대신함 | 미러가 대신 |
+| `infra-shell` | 상시 잡 | 로컬 CI 미러가 실행해 통과 |
+| `data-pipeline-integration` · `data-pipeline-neo4j` · `mobile` · `web` · `webapp` · `constraints-freshness` · `e2e-nightly` · `backend-serial-nightly` | 안 닿음 — 영역 필터·스케줄 센서·야간 전용 잡이며 이 변경은 해당 영역을 건드리지 않는다(*내가 찾은 방법 기준*) | 미실행 |
 
 ### 돌리지 못한 것
 - `harness-integrity` 중 **네트워크가 필요한 3스텝**(ADR 번호 충돌 검사 · 원격 claim 교차 검증 · 고립 브랜치 관측)은 이 세션에서 돌리지 않았다. 앞의 둘은 PR 시점의 원격 상태를 보는 스텝이다.
