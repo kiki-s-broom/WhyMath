@@ -318,17 +318,18 @@ def test_main_writes_json_artifact(tmp_path: Path) -> None:
 # 7. 실 코퍼스 — acceptance① 재현(회귀 감시·정확 단언)
 # ──────────────────────────────────────────────────────────────────────────
 def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
-    """원자 백본 2,210엣지 중 경계 20·내부 2,190, 고→대 0, school_link 20과 불일치 0.
+    """정본 2,234엣지 중 경계 44·내부 2,190, 고→대 24, school_link 44와 불일치 0.
 
-    S4-01이 경계 엣지를 정본 `graph.json`에 병합하면 이 핀이 의도적으로 깨진다 — 그때 이 수치를
-    갱신하는 것이 '경계 연결 밀도'가 S4-01 acceptance 항목이 된 이유다(acceptance⑤).
+    S4-60(2026-10-09)이 고→대 경계 24건을 정본에 병합해 이 핀이 의도대로 갱신됐다. 병합 전 값은
+    2,210·경계 20·고→대 0·플래그 20이었고, 내부 2,190은 병합 전후 불변이다(병합은 경계 엣지만
+    더했다). 이 갱신이 '경계 연결 밀도'가 S4-01 acceptance 항목이 된 이유다(acceptance⑤).
     """
     payload = json.loads(csc.DEFAULT_CORPUS_PATH.read_text(encoding="utf-8"))
     report = csc.build_report(csc.load_corpus_graph(payload))
 
-    assert report.edge_total == 2210
-    assert report.boundary_edge_total == 20
-    assert report.intra_level_total == 2190
+    assert report.edge_total == 2234
+    assert report.boundary_edge_total == 44  # 20 + 24 → 44/2,234 = 1.97%
+    assert report.intra_level_total == 2190  # 병합 전후 불변(경계 엣지만 더했다)
     assert report.backward_boundary_total == 0
     assert dict(report.level_pair_counts) == {
         ("초등", "초등"): 529,
@@ -336,16 +337,23 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
         ("중학", "중학"): 240,
         ("중학", "고등"): 11,
         ("고등", "고등"): 940,
+        ("고등", "대학"): 24,  # S4-60 병합분 — 병합 전 0
         ("대학", "대학"): 481,
     }
-    assert ("고등", "대학") not in report.level_pair_counts  # 고→대 0
 
-    # 이중 확인: 플래그 20건 = 양끝점 유도 20건(both 20·flag only 0·endpoint only 0).
-    assert (report.flag_both, report.flag_only, report.endpoint_only) == (20, 0, 0)
-    # 코퍼스 내부 라벨 불일치(기록): 학년간 8 + 학교급간(추정) 8 = 16 ≠ 20.
-    assert report.boundary_label_total == 16
+    # 이중 확인: 플래그 44건 = 양끝점 유도 44건(both 44·flag only 0·endpoint only 0).
+    assert (report.flag_both, report.flag_only, report.endpoint_only) == (44, 0, 0)
+    # 코퍼스 내부 라벨 불일치(기록): 병합 전 16(학년간 8 + 학교급간(추정) 8) ≠ 20. 병합분 24건이
+    # 모두 '학교급간(추정)'이라 라벨 합은 40 — 여전히 경계 44와 어긋난다(기존 4건 불일치 그대로).
+    assert report.boundary_label_total == 40
 
     # 하향 도달 — 고등→중학이 핵심 행. 대학은 아무 하위 학교급에도 닿지 못한다.
     core = _cell(report, "고등", "중학")
     assert (core.population, core.reached_within, core.reached_any) == (925, (9, 35, 123), 387)
-    assert all(c.reached_any == 0 for c in report.reach_cells if c.start_level == "대학")
+    # 대학은 더 이상 섬이 아니다: 대학 1,069 중 198이 고등 선수에 닿는다(독립 BFS 실측과 일치).
+    uni_to_high = _cell(report, "대학", "고등")
+    assert (uni_to_high.population, uni_to_high.reached_within, uni_to_high.reached_any) == (
+        1069,
+        (24, 43, 79),
+        198,
+    )

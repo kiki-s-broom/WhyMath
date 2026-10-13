@@ -5,10 +5,14 @@
 (결과 없음·다른 커밋의 결과·실패) 알리고, PR 본문에 `## CI 도달 잡` 섹션이 없으면 붙여 넣을 블록을
 함께 전한다. `done` 게이트(HARN-173)는 완료 선언 시점에만 서므로 red 푸시는 못 막았다(EOS-24).
 
-**막지 않는다**: 이 훅은 어떤 경우에도 도구 호출을 거부하지 않는다(종료 코드는 항상 0). 판정 근거와
+**PR 생성은 막지 않는다. 푸시는 막을 수 있다 (HARN-308)**: 종료 코드는 0(통과)과 2(차단)뿐이다.
+2는 푸시가 필수 상시 잡의 로컬 미러를 거치지 않았다는 증거가 있을 때만 나오며(고지는 한 번만 알려
+무시·재시도가 통과했다 — 2026-10-09 P3-03), 이유와 다음 명령은 stderr에 UTF-8 바이트로 쓴다. 평가
+자체가 실패하면(예외) 막지 않는다 — 훅 고장이 모든 푸시를 막으면 사람이 훅을 끈다. 판정 근거와
 면제 규칙·한계는 `scripts/harness/push_mirror_notice.py`와
-`docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md`가 정본이다. 이 파일은 입력 해독·
-로그·중복 억제·출력만 하는 얇은 껍데기다.
+`docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md`·
+`docs/reviews/harn308_push_block_judgment_2026-10-12.md`가 정본이다. 이 파일은 입력 해독·
+로그·중복 억제·출력·종료 코드만 하는 얇은 껍데기다.
 
 **전달 채널**: 종료 코드 0일 때 stdout·stderr 평문은 PreToolUse에서 모델에게 가지 않는다(공식 훅 문서).
 모델에게 닿는 경로는 stdout JSON의 `hookSpecificOutput.additionalContext`뿐이다. JSON은
@@ -146,9 +150,12 @@ def main() -> int:
         # "push"라는 낱말만 든 명령(grep·로그 조회 등)은 평가 대상이 아니다 — 로그에 남기면 고지 비율의
         # 분모(평가된 푸시)가 부풀어 습관화 감시(판정 문서 §6)가 왜곡된다.
         return 0
+    gate = result.gate
+    blocked = gate is not None and gate.blocked
     key = f"{result.trigger}|{a.head}|{a.code}"
-    deduped = result.text is not None and _already_notified(root, key)
-    notified = result.text is not None and not deduped
+    # 차단은 중복 억제를 따르지 않는다 — 억제하면 첫 시도만 막히고 재시도는 통과한다(P3-03 두 번째 푸시).
+    deduped = not blocked and result.text is not None and _already_notified(root, key)
+    notified = not blocked and result.text is not None and not deduped
     _log(
         root,
         {
@@ -163,8 +170,21 @@ def main() -> int:
             "deduped": deduped,
             "error_type": a.error_type,
             "parse_failed": result.parse_failed,
+            # 차단 판정 — 사유 본문(우회 사유·명령)은 남기지 않고 코드·건수·타입명만 남긴다.
+            "gate": gate.outcome if gate is not None else None,
+            "blocked": blocked,
+            "gate_code": gate.code if gate is not None else None,
+            "missing_jobs": len(gate.missing_jobs) if gate is not None else 0,
+            "required_error": gate.required_error if gate is not None else None,
+            "waiver_error": gate.waiver_error if gate is not None else None,
         },
     )
+    if blocked and result.text is not None:
+        # exit 2 — 도구 호출을 거부한다. 이유는 stderr로만 모델에게 간다(stdout은 무시된다).
+        # 로캘 인코딩(한국어 Windows = cp949)이 아니라 UTF-8 바이트로 쓴다: 받는 쪽이 UTF-8로 읽는다.
+        sys.stderr.buffer.write((result.text + "\n").encode("utf-8"))
+        sys.stderr.buffer.flush()
+        return 2
     if not notified or result.text is None:
         return 0
     _remember(root, key)

@@ -231,11 +231,11 @@ gates:
     title: "3중 '헌법' 문서의 서열 확정 — 코딩 헌법(constitution/CONSTITUTION.md 제2조 '최고 규범')과 CLAUDE.md(마스터 가이드 · '충돌 시 CLAUDE.md 우선' 373행) · dev_constitution.md(경량 요약) · AGENTS.md가 서로 최우선을 선언한다. 3택: ① 코딩 헌법 최상위(A0001 제2조 원문대로 — 기본값·권고) ② CLAUDE.md 최상위·헌법은 코딩 구조 규범에 한정 ③ 범위 분할(법령·아키텍처·검증=CLAUDE.md / 코딩 구조·파이프라인·변경·검증 독립=헌법, 같은 주제 충돌 시 헌법). 판정 재료 = docs/standards/coding_constitution_transplant.md §1 관계 선언 + 충돌 문장 12곳 목록(crosswalk 문서). evidence에 선택지 번호와 정정 커밋 해시."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-27
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "선택지 1 코딩 헌법 최상위 확정 (2026-10-12 Kiki). 정정 커밋 dd0afd0758ddafeae058a8b242f63128453a1b3d (브랜치 claude/compassionate-brahmagupta-siey7n)"
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-09-28] input done · CONST-02-coding-constitution-transplant-stage1-2 · 판정 무관: CONST-02는 판정 재료(개정 초안·채택 도우미·런북·대조표)를 만드는 입력이다. 세 헌법의 서열은 Kiki 결정이며 이 태스크가 대신 확정하지 않는다(코딩 헌법 제9조 ③). 같은 이유로 G-const-a0002-adoption 도 판정을 기록하지 않았다 — Kiki 결정 대기 — done CONST-02-coding-constitution-transplant-stage1-2 인계"
@@ -850,6 +850,18 @@ gates:
     corrections: []
     depends_on:
       - OPS-106-gate2-live-sample-serving-vs-authoring
+  - id: G-ops135-ci-image-source-decision
+    title: "OPS-135 CI 컨테이너 이미지 공급원 선택 — Docker Hub 익명 pull 한도로 머지 queue가 연속 탈락했다(2026-10-09 20:53~21:16Z · PR #1529 queue 실행 4회 중 3회 · 같은 시간대 다른 PR의 pull_request 실행도 같은 단계 실패). 3택: ①ghcr.io 미러(세션 권고 — 외부 계정·장기 시크릿 없이 GitHub 안에서 닫힌다. 단 미러 갱신 절차·digest 고정이 필요하고, neo4j·pgvector 이미지 재배포 라이선스와 패키지 용량 상한은 아직 확인하지 않았다) ②Docker Hub 로그인 pull(가장 작은 변경 — Docker Hub 계정 + 액세스 토큰을 GitHub Secrets에 사람이 등록해야 하고, 한도가 계정 단위로 남는다) ③감수(변경 없음 — 한도가 풀릴 때까지 재시도하고 다음 탈락 때 재판정). 근거 = 태스크 OPS-135 notes 「배경 실측」. 판정 증적(evidence)에는 선택지 번호와 판정 기준 커밋 해시를 적는다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-12
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "Kiki의 공급원 선택(ghcr 미러 / Docker Hub 로그인 pull / 감수)이며 먼저 끝나야 할 태스크가 없다. 구현 태스크 OPS-135가 이 게이트를 기다린다."
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human
@@ -919,6 +931,7 @@ gates:
       - "[2026-09-22] title: 'P3-G1 — Week 1 Gate 판정 (11/1). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' → 'P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' — Kiki 결정 2026-09-22 — 일정은 달력이 아니라 선행 완료로 움직인다(가능하면 앞당긴다). 원 계획 날짜는 고정일이 아니라 상한이므로 문면을 그렇게 고친다. 대장은 이미 이 결정과 정합한다: P3 태스크에 날짜 필드가 없고 착수 조건이 전적으로 depends_on + 게이트다. 부수로 11/22 ↔ 저장소 G3 일정 충돌이 해소된다 — 11/22 는 Phase 3 의 상한일 뿐 판정 예정일이 아니다."
       - "[2026-09-22] remind_after_days: 60 → 40 — acceptance 7 전수 재측정. 이 게이트의 제목은 판정 상한을 11/1 로 명시하는데 독촉은 60일(2026-11-21)이라, 상한을 넘긴 뒤에야 경고가 뜨거나(G1~G3) 상한과 어긋난다(G4). 독촉을 상한 그 날에 맞춘다 — 상한이므로 Kiki 지시 1에 따라 판정은 선행 완료 즉시 더 앞당겨 할 수 있고, 이 값은 늦었을 때 울리는 상한선일 뿐이다."
       - "[2026-09-25] depends_on +P3-15-week1-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 판정 회차 분리 집행을 소유할 태스크가 없어 신규 등재했다(acceptance v2-9 지정)"
+      - "[2026-10-12] verdict PASS · inputs: P3-15-week1-gate-judgment · evidence: P3-G1 Week 1 Gate 판정 PASS — 판정문 docs/reviews/p3_g1_week1_gate_judgment_2026-10-12.md · 판정 기준 main f34d7b7664902b179da3867f6aecf4e01f8da2ed · PR #1584. 명세 동결(로더 exit 0, 동결 후 변경은 probe_note 3필드뿐) · Content Coverage 10/10=100% (P3-02 CLI, 종료 코드는 1 — Concept Completeness 0/10 때문이며 게이트 조건 아님·P3-04 선행 순환) · 금지 변경 0건(엔티티 19 to 19, 마이그레이션 파괴 연산 0). 공급 가능 커버리지 0/10은 PASS가 덮지 않는 잔여. clear는 Kiki 소유 — 해석 의존 2곳(조사 창 09-29 시작, Hint 좌석을 신규 Entity로 보지 않음) 확인 요청. — done P3-15-week1-gate-judgment 인계"
     depends_on:
       - P3-15-week1-gate-judgment
   - id: G-p3-g2-week2
@@ -989,21 +1002,6 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 근거는 docs/reviews/p3_01_scope_candidates_2026-09-30.md(P3-01 acceptance ①② 산출 · 판정 기준 main 3bc9fb2e · 파일 기준과 로컬 PG 적재 기준 53항목 전건 일치). P3-01 acceptance ②가 최종 선택을 Kiki로 못박는다 — AI가 확정하면 이후 모든 Coverage 분모가 흔들린다. 입력 태스크가 아니라 사람 판정이 입력이다. 운영 DB(whymath-pg) 수치와 다를 수 있는 지점은 문서 §5."
-  - id: G-p314-phase3-metric-targets
-    title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
-    kind: decision
-    assignee: kiki
-    status: pending
-    requested: 2026-10-09
-    remind_after_days: 14
-    evidence: null
-    cleared_by: null
-    notes: ""
-    corrections:
-      - "[2026-10-09] input done · P3-14-phase3-metrics-cli · 판정 무관: 이 태스크는 게이트 G-p314-phase3-metric-targets 의 판정 결과를 내지 않는다 — 목표 수치(95·98·99%) 확정은 Kiki 의 사람 판정이다. P3-14 가 낸 것은 판정 재료(7종 CLI와 오늘 기준선: Curriculum 3/10·Concept Completeness 0/10·Problem Coverage 6/8·Graph Connectivity 0/10)까지이고 게이트는 P3-10 기준선을 기다리며 pending 으로 남는다 — done P3-14-phase3-metrics-cli 인계"
-    depends_on:
-      - P3-14-phase3-metrics-cli
-      - P3-10-ai-quality-eval-suite
   - id: G-p303-human-sample-review
     title: "P3-03 미분 문항 은행 사람 표본 검수 240건 — 검수 페이지 https://claude.ai/artifact/GHRd2VNjVpTjqDa5j5iGD3 에서 사전 등록 순서대로 240건 전부 통과/결함 판정(결함은 종류+근거 메모). 승인 기준 n=240·Wilson 95% 단측 결함률 상한 ≤ 0.02 → 결함 1건 이하. 표본 등록 docs/data/p3_calculus1_diff_audit/human_review/sample_240.json(은행 sha256 cc7e953974185ac4…, 시드 20261007). 표본 크기는 시작 전에 고정 — 중간에 멈추거나 늘리지 않는다. 검수가 끝나면 세션이 판정을 감사 라벨 파일로 옮겨 KNOWN_CORPORA·AUDIT_LABEL_MAP 편입과 approved 각인을 진행한다. 결함 2건 이상이면 승인되지 않으며 교정 후 처리는 그때 다시 정한다. 근거 docs/data/p3_calculus1_diff_audit/README.md(LLM 감사 4회 불합격 → Kiki 결정 2026-10-07 사람 검수 전환)"
     kind: human
@@ -1016,6 +1014,21 @@ gates:
     notes: "철회 — 검증 권위 서열 위반(Kiki 지적 2026-10-08). 사람 표본 240건 판정을 은행 504건 승인의 유일 근거로 삼는 설계는 초인간 검증 기준 v1(docs/standards/superhuman_verification_standard.md §0)의 '인간 검수는 오류율 미측정 검출기 하나 — 최종 권위 아님 · 인간 폴백은 측정 미달·undecidable 구간만'에 어긋난다. 대체 경로 = 결함 주입 강등전(§3)으로 감사자·기계 게이트의 검출률·오경보율을 먼저 측정하고, 측정을 통과한 감사자 판정만 S5 근거로 쓰며, 사람은 판정 불가 잔여만 본다(P3-03 안에서 수행). 검수는 시작 전에 철회되어 사람 판정 0건."
     corrections: []
     no_inputs_reason: "표본·검수 페이지가 이미 준비돼 있다(표본 등록 커밋 이후 즉시 수행 가능) — 여는 작업 없음"
+  - id: G-p314-phase3-metric-targets
+    title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-09
+    remind_after_days: 14
+    evidence: "세션 사용자 결정(2026-10-12 · AskUserQuestion 응답을 세션이 중계 기입 — clear 주체 claude): 지표 7종 목표 확정. (가) 이 값으로 확정 = Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95%. 분모가 작아 1~3은 사실상 전부 달성(10/10·10/10·8/8)이 목표임을 인지하고 확정. Critical Defect = Hard Gate F-Ⅱ(수학 오류율)·F-Ⅴ(힌트 정답 누설)만 남기고 F-Ⅰ·Ⅲ·Ⅳ는 생산 공정 신호라 제외(코드 변경 필요 — 후속 태스크). Graph Connectivity Coverage = 95%로 확정(명세 null 해소 — 명세 변경 필요 — 후속 태스크). 후속 반영(scope_spec.yaml 목표 갱신 + phase3_metrics.py 지표 6 정의 축소 + 계약 문서 갱신)은 별도 PR. 판정 기준 main d873d064 · 판정 재료 docs/reviews/p3_14_phase3_metrics_2026-10-09.md 기준선(Curriculum 3/10 · Completeness 0/10 · Problem 6/8 · Graph 0/10). P3-10 기준선은 미착지(todo)라 4·5·6은 P3-10 이후 재조정 가능성을 열어 둔다."
+    cleared_by: claude
+    notes: ""
+    corrections:
+      - "[2026-10-09] input done · P3-14-phase3-metrics-cli · 판정 무관: 이 태스크는 게이트 G-p314-phase3-metric-targets 의 판정 결과를 내지 않는다 — 목표 수치(95·98·99%) 확정은 Kiki 의 사람 판정이다. P3-14 가 낸 것은 판정 재료(7종 CLI와 오늘 기준선: Curriculum 3/10·Concept Completeness 0/10·Problem Coverage 6/8·Graph Connectivity 0/10)까지이고 게이트는 P3-10 기준선을 기다리며 pending 으로 남는다 — done P3-14-phase3-metrics-cli 인계"
+      - "[2026-10-12] depends_on -P3-10-ai-quality-eval-suite — Kiki 결정(2026-10-12): P3-10 기준선 없이 지금 목표를 확정한다고 선택. 이 의존은 판정 재료 대기였고 사람이 대기를 끝냈다. 지표 4·5·6은 P3-10 착지 후 재조정 가능성을 증적에 남긴다."
+    depends_on:
+      - P3-14-phase3-metrics-cli
   - id: G-p318-calc-02-08-disposition
     title: "P3-18 처분 결정 — [12미적Ⅰ-02-08] 그래프 개형은 SymPy 검증 불가(정답·오답 모두 skip). 가: 핵심 개념에서 제외(분모 7→6) / 나: 파생 판정(극값 개수·증감)으로 대체 / 다: 인간 폴백. 보조 판단: -02-05(표본 검증)·-02-06(구간 밖 근 통과)·-02-09(매개변수형 skip) 단서를 일부 가능으로 볼지. 근거 docs/reviews/p3_18_calculus_verifiability_probe_result_2026-10-01.md"
     kind: decision

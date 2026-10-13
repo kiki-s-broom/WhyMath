@@ -1341,6 +1341,101 @@ def test_me_next_problem_sibling_exclude_on_live_pg() -> None:
         asyncio.run(_cleanup_all())
 
 
+@pytest.mark.parametrize(
+    ("relation", "excluded"),
+    [
+        (RelationType.변형, True),  # 대조군 — 근접 복제본은 배제(S4-14 현행 동작)
+        (RelationType.선수, False),  # PB-19 — 쉬운 계열은 배제하지 않는다
+        (RelationType.심화, False),
+        (RelationType.대조, False),
+    ],
+)
+def test_me_next_problem_sibling_exclude_follows_relation_type_on_live_pg(
+    relation: RelationType, excluded: bool
+) -> None:
+    """PB-19 — 실 PG의 `relation_type` enum이 정책 경유로 읽혀 `exclude`가 유형을 구분한다.
+
+    직전 오답 문항(parent) → 유일한 미응답 후보(related)를 유형만 바꿔 건다. `변형`은 후보에서
+    빠져 null, `선수`·`심화`·`대조`는 배제되지 않아 그 후보가 그대로 추천된다.
+    """
+    if not asyncio.run(_pg_reachable()):
+        pytest.skip("PostgreSQL 미도달 — 통합 테스트 건너뜀")
+
+    uid, pid_wrong, pid_related = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    suffix = uid.hex[:8]
+
+    def _problem(pid: uuid.UUID) -> Problem:
+        return Problem.from_schema(
+            ProblemSchema(
+                problem_id=pid,
+                source_type=SourceType.자체생성,
+                review_status=ReviewStatus.approved,
+                curriculum_version=Curriculum.REVISION_2022,
+                valid_from_year=2022,
+                subject=Subject.공통,
+                unit_codes=[f"U-{suffix}"],
+                difficulty_overall=3.0,
+            )
+        )
+
+    async def _setup() -> None:
+        await _add_all(_user(uid))
+        await _add_all(_problem(pid_wrong), _problem(pid_related))
+        await _add_all(
+            ProblemAttempt(
+                attempt_id=uuid.uuid4(), user_id=uid, problem_id=pid_wrong, is_correct=False
+            )
+        )
+        await _add_all(
+            ProblemRelation.from_schema(
+                ProblemRelationSchema(
+                    parent_problem_id=pid_wrong,
+                    related_problem_id=pid_related,
+                    relation_type=relation,
+                )
+            )
+        )
+
+    async def _cleanup_all() -> None:
+        engine = create_async_engine(_settings().database_url)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "DELETE FROM problem_relation WHERE parent_problem_id=:p "
+                        "OR related_problem_id=:p"
+                    ),
+                    {"p": str(pid_wrong)},
+                )
+                await conn.execute(
+                    text("DELETE FROM problem_attempt WHERE user_id=:u"), {"u": str(uid)}
+                )
+                for pid in (pid_wrong, pid_related):
+                    await conn.execute(
+                        text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)}
+                    )
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
+                await conn.execute(
+                    text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
+                )
+        finally:
+            await engine.dispose()
+
+    try:
+        asyncio.run(_setup())
+        token = create_access_token(uid, settings=_settings())
+        auth = {"Authorization": f"Bearer {token}"}
+        with _client() as client:
+            resp = client.get("/v1/me/next-problem?sibling_filter=exclude", headers=auth)
+            assert resp.status_code == 200, resp.text
+            expected = None if excluded else str(pid_related)
+            assert resp.json()["problem_id"] == expected
+    finally:
+        asyncio.run(_cleanup_all())
+
+
 def test_me_next_problem_sibling_include_on_live_pg() -> None:
     """GET /v1/me/next-problem?sibling_filter=include — 형제 후보를 정보량 가중으로 우대.
 
