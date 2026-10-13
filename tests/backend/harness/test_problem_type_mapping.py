@@ -252,6 +252,24 @@ class TestMappingIntegrity:
             untagged = sum(1 for r in records if not ptm.classify_rephrased_record(r, index))
             assert untagged == 0, f"{name}에 계보 추적 불가(미태깅) {untagged}건"
 
+    def test_stored_codes_match_derivation_in_all_target_corpora(self) -> None:
+        # 저장된 problem_type_codes(백필 산출물)가 유도 값과 전건 일치 — 리뷰 지적(CONT-09 PR):
+        # 위 테스트들은 `classify_record` **유도**만 대조해 저장분을 못 본다. 배치 CLI가 코퍼스를
+        # 재생성하면(`problem_type_codes=[]` 기본값) 저장 태그가 조용히 사라지는데 그때 이 테스트만
+        # RED가 된다. 실패 시 어느 코퍼스에 몇 건이 어긋났는지 드러낸다.
+        mismatched: dict[str, int] = {}
+        for name in ptm.TARGET_CORPORA:
+            bad = sum(
+                1
+                for record in _load_corpus_lines(name)
+                if record.get("problem_type_codes") != ptm.classify_record(name, record)
+            )
+            if bad:
+                mismatched[name] = bad
+        assert (
+            mismatched == {}
+        ), f"저장 태그가 유도값과 어긋난 코퍼스: {mismatched} — 백필 재실행 필요"
+
     def test_stored_rephrased_codes_match_lineage_derivation(self) -> None:
         # 저장된 problem_type_codes(PB-07 백필 산출물)가 계보 유도 값과 전건 일치 — 멱등 계약의
         # 저장소 대조판(백필 2회 실행 바이트 동일의 정적 등가물).
@@ -380,6 +398,13 @@ class TestCorpusSeatContract:
         """현재 좌석 전체와 같은 이름의 빈 코퍼스 디렉터리를 `root` 아래 만든다(정상 상태 재현)."""
         for name in ptm._corpus_seats():
             (root / name).mkdir(parents=True)
+
+    def test_seat_glob_equals_coverage_meter_glob(self) -> None:
+        # 이 계약이 지키는 코퍼스 집합과 계측기가 읽는 집합을 묶는다 — 한쪽 glob만 바뀌면
+        # "계측기는 보는데 계약은 모르는" 코퍼스(CONT-09 사고 형태)가 다시 생긴다.
+        from whymath_backend.harness import problem_bank_coverage as pbc
+
+        assert ptm._CORPUS_DIR_GLOB == pbc.CORPUS_DIR_GLOB
 
     def test_real_repo_has_no_seat_violations(self) -> None:
         assert ptm.find_corpus_seat_violations() == []

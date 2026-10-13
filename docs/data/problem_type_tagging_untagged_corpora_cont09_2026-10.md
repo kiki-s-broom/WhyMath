@@ -117,3 +117,20 @@ M4가 1건만 RED인 것은 하네스 결함의 신호가 아니다 — 그 키�
 - `tests/backend/harness/test_problem_type_mapping.py`·`test_problem_type_backfill.py` — 골든 30종·표 정합·전수 귀속·자가 태깅·백필 케이스.
 - `data/corpus/problem_bank_*/problems.jsonl` 30개 — `problem_type_codes` 11,396행.
 - 본 문서.
+
+## 10. 리뷰 반영 (PR 코드 리뷰 후속)
+
+리뷰 7건을 코드와 대조해 판정했다.
+
+**수정한 3건**
+- **저장분 고정 테스트 부재(사실)**: 직접 분류 36종은 유도값(`classify_record`)만 대조했고 *저장된* 태그를 고정하는 테스트가 없었다(계보 코퍼스·자가 태깅만 있었다). 배치 CLI가 코퍼스를 재생성하면 `problem_type_codes=[]`로 돌아가는데 그때 어떤 테스트도 RED가 아니었다. `test_stored_codes_match_derivation_in_all_target_corpora`를 추가했다. 변별력: `radian_conversion_v0`의 태그 144행을 비운 상태에서 이 테스트**만** RED(1 failed·104 passed)이고 `cp`/`cmp` 원복 후 GREEN.
+- **백필의 침묵 덮어쓰기(사실)**: 표가 모르는 행에서 유도값이 빈 리스트이면 기존의 비어 있지 않은 태그를 `[]`로 지웠다(원래 6종에도 있던 동작이 30종으로 넓어졌다). 이제 원문 바이트 그대로 두고 리포트 `preserved` 건수로 드러낸다.
+- **glob 중복(사실)**: `_CORPUS_DIR_GLOB`가 계측기의 `CORPUS_DIR_GLOB`와 같다는 주석뿐이던 것을 `test_seat_glob_equals_coverage_meter_glob`로 묶었다.
+
+**수정하지 않은 4건과 사유**
+- **분류 판단 3군(1,400문)이 발문과 맞지 않는다는 지적**: 이미 §4–5에 대안·민감도와 함께 "사람 검토 필요"로 올렸고 이번 리뷰가 새 반증을 내지는 않았다. 카탈로그 정의는 `condition-satisfaction`을 "판별식·범위 조건형"이라 적고 있어 부등식 범위 판정이 정의 밖이라 단정할 수도 없다. 판단이 갈리는 지점이므로 Kiki/`pedagogy-designer` 검토에 맡긴다. 표를 바꾸면 골든 합계 재산출이 필요하다.
+- **`_build_parent_type_index`가 36종을 읽는다는 지적**: 사실이나 비용은 파일 수십 개 한 번 읽기 수준이고 실코퍼스 slug 충돌은 0건이다(테스트가 동결). 부모 코퍼스를 하드코딩하면 오히려 계보 확장 시 침묵 누락 위험이 생긴다.
+- **CLI exit 0 고정**: 관측·백필 CLI는 의도적으로 게이트가 아니다(모듈 docstring). 판정은 CI의 `TestCorpusSeatContract`·`TestSelfTaggedSeat`가 맡는다.
+- **`RADIAN-CONVERSION`·`BINOMIAL-COEFFICIENT` 일관성**: §4에 이미 근거와 대안을 적었다. 판단 문제이며 검토 대상이다.
+
+**다운스트림 영향(리뷰가 짚은 부분의 실측)**: `problem_type_codes`를 읽는 곳은 `phase3_metrics` ③·`phase3_coverage`·`repeat_recommendation_report`다. 앞의 둘은 `review_status=approved` 문항만 센다. 새로 태깅된 11,396문은 전부 `review_status` 미설정(None)이라 영향이 없다(승인 2,984·보류 158은 기존 태깅 코퍼스). `repeat_recommendation_report`의 유형 집중도 축은 코퍼스 태그를 그대로 읽으므로 풀에 이 문항이 들어오면 `evaluate-expression` 쏠림(77.0%)이 그대로 보고될 것이다 — 관측 축이라 게이트는 아니다.

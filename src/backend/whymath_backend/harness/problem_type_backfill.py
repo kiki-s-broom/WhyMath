@@ -78,6 +78,9 @@ class CorpusBackfillReport:
     tagged: int
     changed: int
     written: int | None
+    # 유도값이 빈 리스트인데 저장분이 비어 있지 않아 **지우지 않고 보존한** 행 수 — 표에 없는
+    # `unit_codes`(신규 밴드 등)에 누군가 올바른 태그를 달아 둔 경우다. 침묵 삭제 대신 센다.
+    preserved: int = 0
 
     @property
     def untagged(self) -> int:
@@ -91,6 +94,7 @@ class CorpusBackfillReport:
             "untagged": self.untagged,
             "changed": self.changed,
             "written": self.written,
+            "preserved": self.preserved,
         }
 
 
@@ -156,8 +160,8 @@ def _retag_line(
     *,
     corpus_name: str,
     parent_types: Mapping[str, list[str]] | None = None,
-) -> tuple[str, list[str]]:
-    """JSONL 한 줄을 재분류 — (산출 줄, 유도된 `problem_type_codes`) 반환.
+) -> tuple[str, list[str], bool]:
+    """JSONL 한 줄을 재분류 — (산출 줄, 결과 `problem_type_codes`, 보존 여부) 반환.
 
     `problem_corpus_tag._retag_line`과 동일 패턴: 유도 결과가 기존과 같으면 원문 줄 그대로
     (바이트 보존), 다르면 `problem_type_codes` 한 키만 교체해 재직렬화한다.
@@ -173,10 +177,14 @@ def _retag_line(
     current_raw = data.get("problem_type_codes", [])
     current = [str(v) for v in current_raw] if isinstance(current_raw, list) else []
     if derived == current:
-        return stripped, derived  # 무변경 — 원문 바이트 그대로.
+        return stripped, derived, False  # 무변경 — 원문 바이트 그대로.
+    if not derived and current:
+        # 표가 모르는 행(유도 빈 리스트)에서 저장된 태그를 빈 리스트로 덮어쓰지 않는다 — 백필이
+        # 데이터를 지우는 도구가 되면 안 된다. 원문 그대로 두고 호출자가 `preserved`로 센다.
+        return stripped, current, True
     updated = dict(data)
     updated["problem_type_codes"] = derived
-    return json.dumps(updated, ensure_ascii=False), derived
+    return json.dumps(updated, ensure_ascii=False), derived, False
 
 
 def _backfill_corpus_file(
@@ -195,16 +203,19 @@ def _backfill_corpus_file(
     total = 0
     changed = 0
     tagged = 0
+    preserved = 0
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
         total += 1
-        out_line, derived = _retag_line(stripped, corpus_name=name, parent_types=parent_types)
+        out_line, derived, kept = _retag_line(stripped, corpus_name=name, parent_types=parent_types)
         if out_line != stripped:
             changed += 1
         if derived:
             tagged += 1
+        if kept:
+            preserved += 1
         out_lines.append(out_line)
 
     written: int | None = None
@@ -212,7 +223,12 @@ def _backfill_corpus_file(
         path.write_text("\n".join(out_lines) + "\n" if out_lines else "", encoding="utf-8")
         written = len(out_lines)
     return CorpusBackfillReport(
-        name=name, total=total, tagged=tagged, changed=changed, written=written
+        name=name,
+        total=total,
+        tagged=tagged,
+        changed=changed,
+        written=written,
+        preserved=preserved,
     )
 
 

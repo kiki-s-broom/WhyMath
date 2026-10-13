@@ -290,6 +290,40 @@ class TestUnitTableCorporaBackfill:
         assert path.read_bytes() == first
         assert {c.name: c for c in second_report.corpora}[self._POLY].changed == 0
 
+    def test_nonempty_stored_tag_is_preserved_when_table_does_not_know_the_row(
+        self, tmp_path: Path
+    ) -> None:
+        # 표에 없는 unit_codes 행에 누군가 올바른 태그를 달아 둔 경우 — 백필이 []로 덮어쓰면 안 된다.
+        root = tmp_path / "corpus"
+        path = root / self._POLY / "problems.jsonl"
+        _write_jsonl(
+            path,
+            [
+                {
+                    "problem_id": "a",
+                    "slug": "s-a",
+                    "unit_codes": ["NEW-BAND-NOT-IN-TABLE"],
+                    "problem_type_codes": ["ptype.count-solutions"],
+                },
+                {"problem_id": "b", "slug": "s-b", "unit_codes": ["POLYNOMIAL-ARITHMETIC"]},
+            ],
+        )
+        before_first_line = path.read_text("utf-8").splitlines()[0]
+        report = run_backfill(corpus_root=root, write=True)
+
+        lines = path.read_text("utf-8").splitlines()
+        assert lines[0] == before_first_line  # 보존 행은 원문 바이트 그대로.
+        assert json.loads(lines[1])["problem_type_codes"] == [PTYPE_EVALUATE_EXPRESSION]
+        poly = {c.name: c for c in report.corpora}[self._POLY]
+        assert poly.preserved == 1  # 침묵 보존이 아니라 건수로 드러난다.
+        assert poly.tagged == 2 and poly.changed == 1
+        assert (
+            report.to_json()["corpora"][[c.name for c in report.corpora].index(self._POLY)][
+                "preserved"
+            ]
+            == 1
+        )
+
     def test_self_tagged_corpus_is_never_rewritten_and_is_accounted(self, tmp_path: Path) -> None:
         # p3는 레코드별 유형을 생성 시점에 직접 기록한다. 백필이 쓰면(`classify_record`는 빈 리스트)
         # 저장된 유형이 지워진다 — 쓰기 모드에서도 바이트 무변경이어야 한다.
