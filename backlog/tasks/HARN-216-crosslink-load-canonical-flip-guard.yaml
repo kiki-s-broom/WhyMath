@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l1/misconception/crosslink_loader.py
   - src/backend/whymath_backend/l1/misconception/crosslink_resolve.py
-session: null
+session: claude/dazzling-hypatia-8p8x7d
 notes: "게이트 G-crosslink-live-drift-disposition 추가 검토(2026-10-07)에서 발견. 적재기 `populate`는 `ON CONFLICT DO UPDATE` 업서트만 하고 코퍼스에 없는 라이브 행을 지우지 않는다. 그래서 코퍼스 68건을 그대로 다시 적재해도 오귀속 4행이 살아남고, 그중 2건은 신뢰도가 더 높아(0.95 > 0.85) 정답을 이기며 2건은 동률이라 canonical이 미선정된다 — 적재가 오류를 고치는 것처럼 보이면서 고치지 못한다. HARN-215(PR #1505 브랜치, 미머지)의 ③은 EXTRA 행을 열거만 하며 이 경쟁 판정은 다루지 않는다 — 두 태스크는 서로 독립이다."
-updated: 2026-10-07
+updated: 2026-10-13
