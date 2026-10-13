@@ -12367,7 +12367,7 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **결정 3 — dry-run은 PASS가 아니다**: `DRY_RUN_OK`(종료 0)는 기계 축 전수 재검산+사전점검만 뜻한다. CI `backend` 잡에 파일럿 34문·표본 34·임계 0.11(도달 가능한 배선용 값)로 배선했다.
 - **미이행(사실 기록)**: ②의 기하 이산 — `geometric_discrete`는 verifier·관점이 없는 미착수 도메인(CLI는 exit 2 거부). ⑤ 파일럿 30~50문 승격 — (가) 기본 임계로 통과 불가(FC-4) (나) 2026-09-25 Kiki 판정으로 이 게이트는 인간 검수 대체 후보 제외(오검출 33/33) (다) statistical_claim·sequence_induction 코퍼스 소비처 0건. 이 두 건의 처분은 Kiki 몫이라 태스크는 done이 아니라 review로 둔다.
 - **부수 정리**: v1 `residue_cross_verify_eval`의 미배선 면제를 지웠다 — v2 dry-run(CI 실행)이 v1 로더·표본 추출을 import해 감사기 정의상 도달했다. v1의 라이브 `main()` 경로는 여전히 CI에서 돌지 않는다.
-- **검증**: 신규 테스트 58건 · 뮤테이션 27종 전건 RED(생존 0·원복 sha256 동일) · ruff/black/mypy --strict/lint-imports exit 0 · `declared_unwired_audit` 위반 0 · `tests/infra` 3053 passed(문서 편집 전 실행분). **backend 전체 스위트는 이 기록 시점에 직접 완주하지 못했다** — 최종 판정은 로컬 CI 미러(ci_mirror)와 GitHub CI.
+- **검증**: 신규 테스트 58건 · 뮤테이션 27종 전건 RED(생존 0·원복 sha256 동일) · ruff/black/mypy --strict/lint-imports exit 0 · `declared_unwired_audit` 위반 0 · `tests/infra` 3053 passed(문서 편집 전 실행분). backend 전체 스위트는 로컬 CI 미러(ci_mirror·HEAD 1f53a4475)에서 완주했다 — Pytest(커버리지) 1243.8s 통과·6개 잡(backend·infra-contracts·infra-shell·policy-guard·harness-integrity·declared-unwired-audit) 전부 exit 0·미실행 0. *(정정: 이 항목을 처음 쓸 때는 미러가 끝나기 전이라 '직접 완주하지 못했다'고 적었다.)* 미러로 재현 못 한 잡(mobile·backend-migrations·docker-build 등)은 GitHub CI가 판정한다.
 ## 2026-10-12: 미머지 브랜치 전수 감사 17회차 — 16회차가 claim 활성이라 뺀 완성품 4건이 TTL을 넘겨 고립 · 회수 태스크 4건 등재 · 브랜치 전용 태스크 4건 복원 · 삭제 0건 · 대책 HARN-309
 
 - **판정 기준 main `d873d064`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-12.md`. 원격 ref 51 − 제외 4 − 열린 PR 22 = 감사 대상 25. 14차 삭제 배치 11건은 전건 집행(잔존 0/11).
