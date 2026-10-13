@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/harness/published_problem_drift_report.py
   - tests/backend/harness/test_published_problem_drift_report.py
-session: null
+session: claude/pensive-cerf-guowbr
 notes: "출처: EOS-190 착지 시 발견. l3/problem_publish_gate 모듈 docstring의 '발행 이후의 제자리 편집을 새 판으로 만들지 않는다' 항목. 선행: EOS-190(대장 depends_on으로 집행)."
 updated: 2026-10-13

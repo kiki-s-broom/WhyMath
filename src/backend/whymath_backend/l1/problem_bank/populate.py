@@ -322,6 +322,14 @@ class ProblemBankPopulateReport:
     본문·검수 상태만 건너뛰고, 개념 태깅·출처 원장·계보는 정상 처리된다(사람이 고치는 대상이
     아니다).
     """
+    published_version_conflicts: list[str] = field(default_factory=list)
+    """발행된 판이 있어 본문 갱신을 건너뛴 slug(EOS-195) — `problem:<slug>` 형식.
+
+    **`--overwrite-cms-edits`로도 풀리지 않는다** — 그 옵션은 "사람이 고친 편집을 감수한다"이고,
+    이 보호는 "발행된 판(EOS-47이 시도에 고정한 판)과 문항이 갈라지지 않게 한다"라서 축이 다르다.
+    `cms_edit_conflicts`와 합치지 않는 이유: 해소 절차가 다르다(그쪽은 덮어쓰기 옵션, 이쪽은 판
+    폐기 → 재적재 → 새 판 발행). 건너뛴 문항도 `problems_loaded`에는 세지 않는다.
+    """
     provenance_rows_loaded: int = 0
     """LIC-03 — 이번 회차에 새로 남긴 `content_provenance` 행 수.
 
@@ -685,6 +693,9 @@ class ProblemBankStore:
         검수·격리 상태(`review_status`·`quarantine_*`)도 코퍼스 초기값으로 되돌아가지 않는다.
         `overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다.
 
+        **발행 판 보호(EOS-195)**: 발행된 판이 있는 문항(`problem_version_id` 있음)은 위 옵션과
+        무관하게 갱신하지 않고 `published_version_conflicts`에 보고한다(판과 문항이 갈라지지 않게).
+
         ① slug 기준 *마지막 우선* dedup(단일 배치 ON CONFLICT 중복행 오류 방지) → ② 크로스워크
         해석 맵(`{src_id: 원자 행 concept_id}`) 단일 구축 → ③ 각 문제를 `ON CONFLICT(slug) DO
         UPDATE ... RETURNING problem_id`로 적재(problem_id·slug·created_at 미-SET·보존)·안정
@@ -732,7 +743,14 @@ class ProblemBankStore:
             PUBLISH_POINTER_COLUMN,
         }
         where, release = upsert_guard(ProblemORM, overwrite=overwrite_cms_edits)
+        # 발행 판 보호(EOS-195) — 덮어쓰기 옵션과 무관하게 **항상** 건다. 발행된 판이 있는 문항의
+        # 본문을 적재가 바꾸면 판 payload와 라이브 행이 갈라져 시도 버전 고정(EOS-47)이 거짓이 된다.
+        # 판정은 upsert 문장 안의 WHERE라 발행 전이(문항 행 잠금)와 경쟁해도 원자적이다.
+        published_pointer = getattr(ProblemORM, PUBLISH_POINTER_COLUMN)
+        published_guard = published_pointer.is_(None)
+        where = published_guard if where is None else sa.and_(where, published_guard)
         cms_conflicts: list[str] = []
+        published_conflicts: list[str] = []
 
         provenance_cols = {col.key for col in sa.inspect(ContentProvenanceORM).mapper.column_attrs}
 
@@ -764,11 +782,17 @@ class ProblemBankStore:
                 returned = conn.execute(problem_stmt).scalar_one_or_none()
                 if returned is None:
                     # 건너뛴 것이지 없는 것이 아니다 — 하위 표(태깅·원장·계보)를 위해 id를 읽는다.
-                    # 행이 정말 없으면 `scalar_one`이 터진다(조용히 넘기지 않는다).
-                    problem_id = conn.execute(
-                        sa.select(ProblemORM.problem_id).where(ProblemORM.slug == record.slug)
-                    ).scalar_one()
-                    cms_conflicts.append(format_conflict("problem", record.slug))
+                    # 행이 정말 없으면 `one`이 터진다(조용히 넘기지 않는다). 건너뜀 사유도 같은
+                    # 조회로 가른다: 발행 포인터가 있으면 덮어쓰기 옵션으로 풀리지 않는 보호다.
+                    problem_id, pointer = conn.execute(
+                        sa.select(ProblemORM.problem_id, published_pointer).where(
+                            ProblemORM.slug == record.slug
+                        )
+                    ).one()
+                    if pointer is not None:
+                        published_conflicts.append(format_conflict("problem", record.slug))
+                    else:
+                        cms_conflicts.append(format_conflict("problem", record.slug))
                 else:
                     problem_id = returned
                     problems_loaded += 1
@@ -915,6 +939,7 @@ class ProblemBankStore:
             problem_relations_skipped=len(relations_skipped),
             provenance_rows_loaded=provenance_rows_loaded,
             cms_edit_conflicts=cms_conflicts,
+            published_version_conflicts=published_conflicts,
         )
 
 
@@ -932,7 +957,8 @@ def populate_problem_bank(
     """문제 코퍼스 JSONL을 backend `problem`/`problem_concept`에 멱등 적재. 반환=적재 리포트.
 
     `overwrite_cms_edits`는 CMS 편집 보호(P3-25)다 — 건너뛴 문항은 리포트
-    `cms_edit_conflicts`에 있다.
+    `cms_edit_conflicts`에 있다. 발행된 판이 있는 문항(EOS-195)은 이 옵션과 무관하게 건너뛰고
+    `published_version_conflicts`에 있다.
 
     `load_problem_bank_records`가 authoring 분리·저작권 위생·Problem 검증을 거친 레코드를 만들고,
     `ProblemBankStore.populate`가 slug 충돌 멱등 upsert·concept 해석·orphan skip을 담당한다. store
@@ -1015,11 +1041,13 @@ def main(argv: list[str] | None = None) -> int:
     total_problems = 0
     total_provenance = 0
     all_conflicts: list[str] = []
+    all_published_conflicts: list[str] = []
     for path in paths:
         report = populate_problem_bank(
             None, problems_path=path, overwrite_cms_edits=args.overwrite_cms_edits
         )
         all_conflicts.extend(report.cms_edit_conflicts)
+        all_published_conflicts.extend(report.published_version_conflicts)
         total_problems += report.problems_loaded
         total_provenance += report.provenance_rows_loaded
         print(
@@ -1050,6 +1078,19 @@ def main(argv: list[str] | None = None) -> int:
         )
     if all_conflicts:
         print(conflict_summary(all_conflicts))
+    if all_published_conflicts:
+        # 덮어쓰기 옵션을 권하지 않는다 — 이 보호는 그 옵션으로 풀리지 않고, 풀리면 안 된다.
+        head = ", ".join(all_published_conflicts[:10])
+        more = (
+            f" 외 {len(all_published_conflicts) - 10}건"
+            if len(all_published_conflicts) > 10
+            else ""
+        )
+        print(
+            f"발행 판 보호로 건너뜀: {len(all_published_conflicts)}건 [{head}{more}] — "
+            "발행된 판이 있는 문항은 재적재로 덮이지 않습니다. 판을 폐기한 뒤 재적재하고 "
+            "새 판으로 다시 발행하세요(--overwrite-cms-edits로도 풀리지 않음)."
+        )
     return 0
 
 

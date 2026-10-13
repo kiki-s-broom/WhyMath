@@ -17,6 +17,10 @@ enforcement.py` — 개념 판):
   C   코퍼스 재적재(`l1/problem_bank/populate.py`)는 발행 포인터를 갱신 대상에서 뺀다 — 이 규칙은
       컬럼 집합을 mapper에서 동적으로 뽑는 코드라 R2의 AST로는 **보이지 않는다**(아래 C 절).
 
+  D   발행 이후 제자리 편집 차단(EOS-195) — `problem` 행의 서빙 내용을 쓰는 운영 문장은 4곳뿐이고(스캔으로
+      전수 확인), 사람이 부르는 입구 셋(CMS·부분 수정·코퍼스 재적재)은 발행 판 보호를 **경유한다**.
+      "가드 함수가 존재한다"가 아니라 "쓰기 앞에서 그 함수를 부른다"를 고정한다(정본화≠집행).
+
 스캐너 자신도 검증한다 — 위반 코드를 주입하면 RED, 대상 0건이면 RED(공허 통과 금지).
 한계(명시): 동적 import·`getattr`·런타임 조립 SQL은 보지 못한다. alembic·테스트는 대상 밖이다.
 """
@@ -28,6 +32,8 @@ import re
 from pathlib import Path
 
 import pytest
+
+from whymath_backend.db.published_edit_guard import SERVED_CONTENT_FIELDS
 
 _PKG = Path(__file__).resolve().parents[3] / "src" / "backend" / "whymath_backend"
 
@@ -382,3 +388,243 @@ def test_loader_excludes_publish_pointer_from_upsert_update_set() -> None:
     assert update_keys is not None, "problem_update_keys 계산을 못 찾았다"
     used = {n.id for n in ast.walk(update_keys.value) if isinstance(n, ast.Name)}
     assert "PUBLISH_POINTER_COLUMN" in used, "갱신 집합 계산이 포인터 상수를 쓰지 않는다"
+
+
+# ── D. 발행 이후 제자리 편집 차단 (EOS-195) ───────────────────────────────────────────
+_ADMIN_CMS = "api/admin_cms.py"
+_PROBLEMS_API = "api/problems.py"
+_CALIBRATION = "l2/item_calibration.py"
+_KPI_SAMPLE_LOADER = "ops/loop_kpi_sample_load.py"
+
+#: `problem` 행을 쓰는 운영 문장이 있는 파일 전수(2026-10-13 스캔) — 각 항목에 왜 괜찮은지가 붙는다.
+#: 새 writer가 생기면 `test_problem_write_sites_are_exactly_the_audited_set`이 빨개져 판정을 강제한다.
+_PROBLEM_WRITERS: dict[str, str] = {
+    _PROBLEMS_API: "부분 수정 merge — 발행 판 보호를 경유(D3)",
+    _POPULATE: "코퍼스 재적재 upsert — WHERE에 발행 포인터 부재 조건(D4)",
+    _CALIBRATION: "IRT 모수(irt_difficulty_b·irt_a)만 쓴다 — 서빙 내용 아님(D5)",
+    _KPI_SAMPLE_LOADER: "합성 부하 — `_kpi_sample` 전용 DB에서만 동작하는 fail-closed 가드(D6)",
+}
+_PROBLEM_CLASS_NAMES = frozenset({"Problem", "ProblemORM"})
+_WRITE_STATEMENT_CTORS = frozenset({"update", "insert", "pg_insert", "delete"})
+
+
+def problem_write_sites(source: str) -> list[str]:
+    """한 파일에서 `problem` 행을 쓰는 문장의 위치 목록(`update(Problem)`·`pg_insert(ProblemORM)`·
+    `merge(Problem.from_schema(...))`). 읽기(`select`)와 풀이 단계(`ProblemStep`)는 대상이 아니다."""
+    sites: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _callee_name(node)
+        if name in _WRITE_STATEMENT_CTORS and node.args:
+            first = node.args[0]
+            if isinstance(first, ast.Name) and first.id in _PROBLEM_CLASS_NAMES:
+                sites.append(f"{name}({first.id})@{node.lineno}")
+        if name == "merge" and node.args:
+            arg = node.args[0]
+            # `Problem.from_schema(...)` 또는 `ProblemORM(...)` — `ProblemStep`·`ProblemConcept`는 제외
+            if isinstance(arg, ast.Call) and (
+                (
+                    isinstance(arg.func, ast.Attribute)
+                    and isinstance(arg.func.value, ast.Name)
+                    and arg.func.value.id in _PROBLEM_CLASS_NAMES
+                )
+                or (isinstance(arg.func, ast.Name) and arg.func.id in _PROBLEM_CLASS_NAMES)
+            ):
+                sites.append(f"merge({ast.unparse(arg.func)})@{node.lineno}")
+    return sites
+
+
+def _func(rel: str, name: str) -> ast.AST:
+    tree = ast.parse((_PKG / rel).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == name:
+            return node
+    raise AssertionError(f"{rel}: {name} 함수가 없다")
+
+
+def _call_lines(scope: ast.AST, callee: str) -> list[int]:
+    return sorted(
+        n.lineno for n in ast.walk(scope) if isinstance(n, ast.Call) and _callee_name(n) == callee
+    )
+
+
+def test_problem_write_sites_are_exactly_the_audited_set() -> None:
+    """D — 서빙 내용을 쓰는 운영 문장의 위치는 감사된 4곳뿐이다. 다섯 번째가 생기면 판정을 강제한다."""
+    found = {rel: problem_write_sites(src) for rel, src in _production_files()}
+    writers = {rel for rel, sites in found.items() if sites}
+    assert writers == set(_PROBLEM_WRITERS), (
+        f"감사 목록과 실제 writer가 다르다: 새로 생김 {sorted(writers - set(_PROBLEM_WRITERS))}, "
+        f"사라짐 {sorted(set(_PROBLEM_WRITERS) - writers)} — 발행 판 보호를 경유하는지 판정하고 "
+        "`_PROBLEM_WRITERS`에 근거와 함께 등재한다"
+    )
+
+
+def test_cms_edit_block_reason_consults_the_published_pointer() -> None:
+    """D1 — 문항 편집 가드가 발행 판 보호 판정(`has_published_version`)을 부른다."""
+    assert _call_lines(
+        _func(_ADMIN_CMS, "_edit_block_reason"), "has_published_version"
+    ), "`_edit_block_reason`이 발행 판 보호를 부르지 않는다 — CMS 편집이 발행본을 제자리 수정한다"
+
+
+def test_cms_patch_runs_the_edit_guard_before_any_write() -> None:
+    """D2 — `_patch_item`은 편집 가드를 `apply_changes`(쓰기) 앞에서 부르고, `apply_changes`를
+    부르는 운영 코드는 이 함수 하나다(가드 없는 두 번째 쓰기 입구 차단)."""
+    patch_item = _func(_ADMIN_CMS, "_patch_item")
+    guard = _call_lines(patch_item, "_edit_block_reason")
+    write = _call_lines(patch_item, "apply_changes")
+    assert guard and write, f"스캔 대상 없음 guard={guard} write={write}"
+    assert guard[0] < write[0], f"가드({guard[0]})가 쓰기({write[0]})보다 뒤에 있다"
+    callers = [
+        rel for rel, src in _production_files() if _call_lines(ast.parse(src), "apply_changes")
+    ]
+    assert callers == [_ADMIN_CMS], f"`apply_changes`를 부르는 곳이 늘었다: {callers}"
+
+
+def test_patch_problem_runs_the_published_guard_before_the_merge() -> None:
+    """D3 — 부분 수정은 ① 행을 잠그고 ② 포인터 소유·서빙 내용 변경을 판정한 뒤 ③ 병합한다."""
+    patch = _func(_PROBLEMS_API, "patch_problem")
+    merge = _call_lines(patch, "merge")
+    assert merge, "patch_problem에서 merge를 못 찾았다 — 스캔 대상 붕괴"
+    for guard in ("has_published_version", "changed_served_fields"):
+        lines = _call_lines(patch, guard)
+        assert lines, f"patch_problem이 {guard}를 부르지 않는다"
+        assert lines[0] < merge[0], f"{guard}({lines[0]})가 merge({merge[0]})보다 뒤에 있다"
+    # 포인터 소유 판정 — merge 앞에서 `problem_version_id`를 읽어 비교한다.
+    pointer_reads = [
+        n.lineno
+        for n in ast.walk(patch)
+        if isinstance(n, ast.Attribute) and n.attr == "problem_version_id"
+    ]
+    assert pointer_reads and min(pointer_reads) < merge[0], "포인터 변조 판정이 merge보다 뒤에 있다"
+    # 잠금 — 첫 `session.get`이 `with_for_update=True`를 쓴다.
+    gets = [n for n in ast.walk(patch) if isinstance(n, ast.Call) and _callee_name(n) == "get"]
+    locked = [
+        g
+        for g in gets
+        if any(
+            kw.arg == "with_for_update"
+            and isinstance(kw.value, ast.Constant)
+            and kw.value.value is True
+            for kw in g.keywords
+        )
+    ]
+    assert locked, "patch_problem의 행 조회가 잠금(with_for_update=True)을 쓰지 않는다"
+
+
+def test_loader_upsert_where_includes_the_publish_pointer_guard() -> None:
+    """D4 — 적재기의 `ON CONFLICT DO UPDATE ... WHERE`가 발행 포인터 부재 조건을 포함한다.
+
+    컬럼을 `getattr(ProblemORM, PUBLISH_POINTER_COLUMN)`로 동적으로 뽑으므로 R2의 AST는 못 본다.
+    실제 행동(발행된 문항이 안 덮인다·덮어쓰기 옵션으로도 안 풀린다)은 실 PG 통합 테스트가 본다.
+    """
+    populate = _func(_POPULATE, "populate")
+    dynamic_pointer = [
+        n
+        for n in ast.walk(populate)
+        if isinstance(n, ast.Call)
+        and _callee_name(n) == "getattr"
+        and len(n.args) == 2
+        and isinstance(n.args[1], ast.Name)
+        and n.args[1].id == "PUBLISH_POINTER_COLUMN"
+    ]
+    assert dynamic_pointer, "populate가 발행 포인터 컬럼을 WHERE 조건으로 쓰지 않는다"
+    assert _call_lines(populate, "and_"), "CMS 보호 조건과 발행 포인터 조건을 결합하지 않는다"
+    upserts = [
+        n
+        for n in ast.walk(populate)
+        if isinstance(n, ast.Call) and _callee_name(n) == "on_conflict_do_update"
+    ]
+    # `on_conflict_do_update(where=where)` — 결합된 변수를 쓴다(원본 `upsert_guard` 결과를 그대로
+    # 쓰면 덮어쓰기 모드에서 조건이 None이 되어 발행된 문항까지 덮는다).
+    problem_upserts = [
+        u
+        for u in upserts
+        if any(kw.arg == "where" and isinstance(kw.value, ast.Name) for kw in u.keywords)
+        and any(kw.arg == "index_elements" and "slug" in ast.unparse(kw.value) for kw in u.keywords)
+    ]
+    assert problem_upserts, "문항 upsert(slug 충돌)의 WHERE를 못 찾았다"
+    # 첫 대입은 `where, release = upsert_guard(...)`(튜플 언패킹), 둘째가 결합 대입이다 — 둘 다 센다.
+    where_assigns = [
+        n
+        for n in ast.walk(populate)
+        if isinstance(n, ast.Assign)
+        and any(
+            (isinstance(t, ast.Name) and t.id == "where")
+            or (
+                isinstance(t, ast.Tuple)
+                and any(isinstance(e, ast.Name) and e.id == "where" for e in t.elts)
+            )
+            for t in n.targets
+        )
+    ]
+    assert len(where_assigns) >= 2, "WHERE가 CMS 보호 조건 하나뿐이다(결합 단계가 없다)"
+
+
+def test_calibration_writes_only_irt_parameters() -> None:
+    """D5 — 난이도 재보정은 서빙 내용이 아닌 IRT 모수만 쓴다. `difficulty_overall`을 쓰는 순간
+    발행된 판과 갈라지므로 키가 늘면 판정을 강제한다."""
+    tree = ast.parse((_PKG / _CALIBRATION).read_text(encoding="utf-8"))
+    keys: set[str] = set()
+    for func in ast.walk(tree):
+        if isinstance(func, ast.AsyncFunctionDef) and any(
+            "update(Problem)" in ast.unparse(n) for n in ast.walk(func) if isinstance(n, ast.Call)
+        ):
+            for n in ast.walk(func):
+                if isinstance(n, ast.Dict):
+                    keys |= {
+                        k.value
+                        for k in n.keys
+                        if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                    }
+    assert keys, "재보정 쓰기 값(dict)을 못 찾았다 — 스캔 대상 붕괴"
+    assert keys <= {"irt_difficulty_b", "irt_a"}, f"재보정이 쓰는 키가 늘었다: {sorted(keys)}"
+    assert not keys & set(SERVED_CONTENT_FIELDS), "재보정이 서빙 내용 필드를 쓴다"
+
+
+def test_kpi_sample_loader_keeps_its_dedicated_database_guard() -> None:
+    """D6 — 합성 부하가 허용 목록에 있는 근거는 '전용 DB가 아니면 거부'다. 그 가드가 사라지면
+    실DB 문항을 덮어쓸 수 있는 writer가 된다."""
+    tree = ast.parse((_PKG / _KPI_SAMPLE_LOADER).read_text(encoding="utf-8"))
+    suffix = next(
+        (
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and n.target.id == "SAMPLE_DB_SUFFIX"
+        ),
+        None,
+    )
+    assert suffix is not None and isinstance(suffix.value, ast.Constant)
+    assert suffix.value.value == "_kpi_sample"
+    classes = {n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
+    assert "DedicatedDatabaseError" in classes
+
+
+# ── D 스캐너 변별력(주입) ─────────────────────────────────────────────────────────────
+_WRITE_INJECTIONS = {
+    "update": "def f(s):\n    return s.execute(update(Problem).values(answer='x'))\n",
+    "pg-insert": "def f():\n    return pg_insert(ProblemORM).values(answer='x')\n",
+    "insert": "def f():\n    return insert(Problem).values(answer='x')\n",
+    "delete": "def f():\n    return delete(Problem)\n",
+    "merge-from-schema": "async def f(s, x):\n    await s.merge(Problem.from_schema(x))\n",
+    "merge-ctor": "async def f(s):\n    await s.merge(ProblemORM(answer='x'))\n",
+}
+
+
+@pytest.mark.parametrize("name", sorted(_WRITE_INJECTIONS))
+def test_write_scanner_detects_injected_problem_write(name: str) -> None:
+    assert problem_write_sites(_WRITE_INJECTIONS[name]), f"{name}: 주입했는데 미검출"
+
+
+def test_write_scanner_ignores_reads_and_other_tables() -> None:
+    """대조군 — 읽기와 풀이 단계·개념 연결 쓰기는 문항 행 쓰기가 아니다(오탐이면 가드를 끈다)."""
+    source = (
+        "async def f(s, x):\n"
+        "    await s.execute(select(Problem))\n"
+        "    await s.merge(ProblemStep.from_schema(x))\n"
+        "    await s.merge(ProblemConcept.from_schema(x))\n"
+        "    return update(ProblemAttempt).values(is_correct=True)\n"
+    )
+    assert problem_write_sites(source) == []
