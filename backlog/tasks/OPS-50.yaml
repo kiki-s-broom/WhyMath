@@ -11,6 +11,7 @@ eos_priority: P1
 owner: claude
 depends_on:
   - OPS-49-router-quality-tier-moe-switch
+  - OPS-130-turing-ops50-moe-parse-recovery
 requires_gates: []
 acceptance:
   - "① OPS-48 감사 JSONL(data/audit/ops-48-moe-accuracy-battle-*.jsonl)에서 후보(qwen3:30b-a3b)의 파싱 실패 16건(결함 50 · 무결함 50 · seed 20260708)을 결함 클래스별로 재분류 — clean 문항 10/50, broken_latex 4/7 등 불균등 패턴 확인"
@@ -24,5 +25,5 @@ paths:
   - src/backend/whymath_backend/l3/providers/ollama.py
   - "data/audit/**"
 session: null
-notes: "docs/ops/amd395_local_llm_performance.md §6.2 후속. QUALITY 티어를 MoE로 교체한 #857 이후 운영 리스크. 속도 5.2배 이득은 이미 확정됐고, 남은 것은 정확도 축의 파싱 안정성. OPS-48 실행기를 재사용하며 프롬프트 변형만 추가한다.\n\n[정정 2026-09-01] eos_priority null → P1: MoE 파싱 실패율 16% — F1 실패분포 직결. EOS-80 일괄 백필\n\n[정정 2026-10-08] OPS-48 종료 대조에서 미분류 처리 민감도(오경보 축 의존)를 발견 — 재판정 기준을 acceptance에 고정"
-updated: 2026-10-08
+notes: "docs/ops/amd395_local_llm_performance.md §6.2 후속. QUALITY 티어를 MoE로 교체한 #857 이후 운영 리스크. 속도 5.2배 이득은 이미 확정됐고, 남은 것은 정확도 축의 파싱 안정성. OPS-48 실행기를 재사용하며 프롬프트 변형만 추가한다.\n\n[정정 2026-09-01] eos_priority null → P1: MoE 파싱 실패율 16% — F1 실패분포 직결. EOS-80 일괄 백필\n\n[정정 2026-10-08] OPS-48 종료 대조에서 미분류 처리 민감도(오경보 축 의존)를 발견 — 재판정 기준을 acceptance에 고정\n\n[정정 2026-10-12] stray-code 17회차: 완성 구현이 claude/happy-turing-kmrd5z에만 있고 원격 claim이 TTL 초과 — 회수(OPS-130-turing-ops50-moe-parse-recovery) 없이 착수하면 같은 구현을 처음부터 반복한다. 선행 부착"
+updated: 2026-10-12
