@@ -85,6 +85,7 @@ __all__ = [
     "ProblemVerifyInput",
     "VerificationVerdict",
     "Verifier",
+    "build_residue_subject",
 ]
 
 
@@ -433,6 +434,32 @@ def _domain_tier(domain_result: _DomainResult) -> VerificationTier:
     return domain_result.tier if domain_result.tier is not None else _FLOOR_TIER
 
 
+def build_residue_subject(
+    problem: ProblemVerifyInput, domain_result: _DomainResult
+) -> ResidueSubject:
+    """기계 검산 결과 + 문항 → 잔여 축 교차검증 대상(`ResidueSubject`) — 조립의 단일 출처.
+
+    `Verifier`(문항 1건 검증)와 로트 게이트(`harness/residue_cross_verify_eval_v2`)가 **같은
+    함수**로 대상을 조립한다. 두 경로가 각자 조립하면 도메인 필드(`machine_value_exact` 등)가
+    늘 때 한쪽만 갱신돼, 게이트가 서빙 경로와 다른 재료로 표본을 심사하는 드리프트가 생긴다.
+    """
+    return ResidueSubject(
+        problem_id=problem.slug,
+        question_text=problem.question_text,
+        answer=problem.answer,
+        answer_explanation=problem.answer_explanation,
+        machine_model_ko=domain_result.machine_model_ko,
+        machine_total=domain_result.machine_total,
+        machine_favorable=domain_result.machine_favorable,
+        machine_value=domain_result.machine_value,
+        machine_exact=domain_result.machine_exact,
+        machine_approx=domain_result.machine_approx,
+        machine_value_exact=domain_result.machine_value_exact,
+        authored_by=problem.authored_by,
+        data=problem.conditions,
+    )
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 통합 Verifier
 # ──────────────────────────────────────────────────────────────────────────
@@ -527,21 +554,7 @@ class Verifier:
                     "(잔여 축을 심사할 수 없어 unverifiable)"
                 ),
             )
-        subject = ResidueSubject(
-            problem_id=problem.slug,
-            question_text=problem.question_text,
-            answer=problem.answer,
-            answer_explanation=problem.answer_explanation,
-            machine_model_ko=domain_result.machine_model_ko,
-            machine_total=domain_result.machine_total,
-            machine_favorable=domain_result.machine_favorable,
-            machine_value=domain_result.machine_value,
-            machine_exact=domain_result.machine_exact,
-            machine_approx=domain_result.machine_approx,
-            machine_value_exact=domain_result.machine_value_exact,
-            authored_by=problem.authored_by,
-            data=problem.conditions,
-        )
+        subject = build_residue_subject(problem, domain_result)
         cross_result = await asyncio.to_thread(self._cross_verifier.verify, subject, perspectives)
         audit_labels = [f"cross_verify:{cross_result.aggregate}"]
 

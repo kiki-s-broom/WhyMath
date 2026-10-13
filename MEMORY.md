@@ -12358,6 +12358,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **로컬 CI 재현**: 닿는 잡 전 스텝 통과(backend 전체 스위트 18240 passed·실 PG 통합 580 passed·infra 2940 passed 등). `docker-build`는 도커 데몬이 없어 **미재현**(대체 스모크: 앱 기동 `/health/live` 200, 격리 풀 지연 기동 확인). 타이밍 단언 테스트는 CI 러너 부하에서 재검증 필요.
 - **PR 미개설**: 이 세션의 정책이 명시 요청 없는 PR 개설을 금지한다 — `backlog.py done --no-pr incomplete`(사람 게이트 대기)로 닫고 PR 개설은 사용자 결정에 남긴다. 원 브랜치 `claude/friendly-pascal-mnmypk`·`claude/blissful-lovelace-ubp9tw`는 머지 전 삭제 금지.
 
+
+## 2026-10-13 S4-56 — 잔여 축 교차검증 게이트 v2 CLI 착지(승격 아님) · 도달 불가 임계를 LLM 호출 전에 거부
+
+- **한 일**: `harness/residue_cross_verify_eval_v2.py` 신설. `--domain`(finite·finite_probability·finite_count·statistical_claim·sequence_induction)으로 고르고, 도메인 verifier·관점 세트는 `l3/verifier.py`의 `_VERIFIERS_V2`·`_CROSS_VERIFY_PERSPECTIVES`를 그대로 읽는다(서빙 경로와 같은 심사). 대상 조립은 `build_residue_subject`로 단일화(동작 불변). 종료 코드 0 통과·1 게이트 실패·2 측정 불가.
+- **결정 1 — 도달 불가 임계 사전 거부**: 결함 0건이어도 Wilson 상한이 임계를 넘는 표본(기본 0.05·95%는 n>=52 필요)은 `THRESHOLD_UNREACHABLE`로 LLM 호출 전에 거부한다. 파일럿 34문 + 기본 임계 = 상한 0.0737 → 거부. v1은 34건을 다 호출한 뒤 DEFECT_RATE로 실패했다.
+- **결정 2 — 기본값 도출**: 도메인 기본 sample_n·min_n = 기본 임계를 무결함으로 통과 가능한 최소 표본(52, 코드가 판정 함수로 유도). 도메인 간 차등은 두지 않았다(근거가 될 라이브 측정이 없다).
+- **결정 3 — dry-run은 PASS가 아니다**: `DRY_RUN_OK`(종료 0)는 기계 축 전수 재검산+사전점검만 뜻한다. CI `backend` 잡에 파일럿 34문·표본 34·임계 0.11(도달 가능한 배선용 값)로 배선했다.
+- **미이행(사실 기록)**: ②의 기하 이산 — `geometric_discrete`는 verifier·관점이 없는 미착수 도메인(CLI는 exit 2 거부). ⑤ 파일럿 30~50문 승격 — (가) 기본 임계로 통과 불가(FC-4) (나) 2026-09-25 Kiki 판정으로 이 게이트는 인간 검수 대체 후보 제외(오검출 33/33) (다) statistical_claim·sequence_induction 코퍼스 소비처 0건. 이 두 건의 처분은 Kiki 몫이라 태스크는 done이 아니라 review로 둔다.
+- **부수 정리**: v1 `residue_cross_verify_eval`의 미배선 면제를 지웠다 — v2 dry-run(CI 실행)이 v1 로더·표본 추출을 import해 감사기 정의상 도달했다. v1의 라이브 `main()` 경로는 여전히 CI에서 돌지 않는다.
+- **검증**: 신규 테스트 58건 · 뮤테이션 27종 전건 RED(생존 0·원복 sha256 동일) · ruff/black/mypy --strict/lint-imports exit 0 · `declared_unwired_audit` 위반 0 · `tests/infra` 3053 passed(문서 편집 전 실행분). backend 전체 스위트는 로컬 CI 미러(ci_mirror·HEAD 1f53a4475)에서 완주했다 — Pytest(커버리지) 1243.8s 통과·6개 잡(backend·infra-contracts·infra-shell·policy-guard·harness-integrity·declared-unwired-audit) 전부 exit 0·미실행 0. *(정정: 이 항목을 처음 쓸 때는 미러가 끝나기 전이라 '직접 완주하지 못했다'고 적었다.)* 미러로 재현 못 한 잡(mobile·backend-migrations·docker-build 등)은 GitHub CI가 판정한다.
 ## 2026-10-12 OPS-106 게이트② 라이브 표본 실측 — ② 이중 회계·③ 저작 분리 통과 · ① 서빙 계상 COUNTED(단서 있음) · 재발방지 태스크 2건
 
 판정 기준: main `d873d064` (Kiki 클론 HEAD와 일치 확인 후 실행 · `PRE_OK=True`) · 실행: Phaiakes9, 런북 `docs/ops/ops106_gate2_live_sample_runbook.md`. 게이트 `G-ops106-gate2-live-sample` clear.
