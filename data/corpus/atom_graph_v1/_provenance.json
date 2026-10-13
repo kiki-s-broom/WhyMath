@@ -17,7 +17,7 @@
     "total": 2683
   },
   "edge_counts": {
-    "atom_id_edges": 2210,
+    "atom_id_edges": 2234,
     "narrative_edges_raw": 1007
   },
   "school_level_university_atoms": 512,
@@ -40,6 +40,10 @@
     {
       "id": "behavior_skills_merge_v1",
       "summary": "[SKB-02 2026-09-11] behavior_skills 병합 — 크로스워크 437행(skip 0) 경유 원자 1311건에 전파(비어있지 않음 1198건). 구 437 코퍼스 concepts.jsonl이 저작 정본."
+    },
+    {
+      "id": "cross_band_edges_university_merge_v1",
+      "summary": "[S4-60 2026-10-09] 고→대 경계 엣지 24건 병합(검수:AI 2026-10-08 · 게이트 G-s401-uni-boundary-edge-review) — 엣지 2210→2234. 노드·기존 엣지 무변경, 끝에 덧붙임. 근거(rationale)는 정본에 넣지 않고 원장 cross_band_edges_university_v1.json에 둔다(AtomEdge extra=forbid · 결정 ⒞). 병합 전 정본 sha256 1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f."
     }
   ],
   "behavior_skills_merge": {

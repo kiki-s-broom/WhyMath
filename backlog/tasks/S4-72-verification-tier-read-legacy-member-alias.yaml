@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-72-verification-tier-read-legacy-member-alias
+title: "verification_tier 읽기 alias 구멍(레거시 enum 멤버 입력) 수정 + 모듈 docstring·설계서 §4.1/§4.2 정정 (S4-55 후속)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-55
+requires_gates: []
+acceptance:
+  - "l3/verification_tier.py의 read_verification_tier()가 입력이 레거시 VerificationTier 멤버(MACHINE_EXHAUSTIVE·MACHINE_SAMPLED)일 때도 문자열 입력과 같은 alias 결과(각각 FINITE_EXHAUSTIVE·NUMERIC_SAMPLING)를 돌려준다. 현재는 isinstance(raw, VerificationTier) 분기가 raw를 그대로 반환해 멤버 경로만 alias를 건너뛴다 — 이 분기를 _resolve_tier(raw.value)로 통일한다(한 줄). 신규 7종 멤버는 자기 자신을 돌려주는 동작을 유지한다. stamp_verification_tier·VerificationTier 정의·_TIER_ALIASES는 바꾸지 않는다"
+  - "테스트(tests/backend/l3/test_verification_tier.py): (a) 레거시 멤버 2종 입력이 alias 결과를 낸다 (b) VerificationTier 전 멤버를 parametrize로 열거해 멤버 입력의 결과와 .value 문자열 입력의 결과가 같다고 단언한다(새 멤버가 추가돼도 자동 편입) (c) 신규 7종 멤버는 자기 자신을 돌려준다. 변별력 증빙: 분기를 원래대로(return raw) 되돌린 뮤테이션에서 (a)(b)가 RED이고 기존 test_read_enum_instance_returns_itself는 GREEN으로 남음을 보인다(기존 테스트가 신규 멤버 SYMBOLIC_PROOF만 써서 이 구멍을 못 봤다는 증거). 주입 적용(mutated != original)과 cp 백업 바이트 동일 원복을 단언하고 git checkout/restore로 원복하지 않는다"
+  - "문서 오기재 정정: l3/verification_tier.py 모듈 docstring 11행과 docs/architecture/verifier_v2_design.md §4.2 셋째 항목(196행)의 \"is_exposable이 최종 판단\"을 사실에 맞게 고친다. 노출 판정은 두 독립 축이다 — is_exposable(l6/_shared.py, 저작권 출처 METADATA_ONLY_SOURCES만 본다)과 is_review_cleared(l6/_shared.py, review_status 검수 축). 두 함수는 합치지 않고 호출부가 각각 독립된 if로 확인한다(is_review_cleared docstring이 명시). \"어떤 등급도 단독으로 노출 자격을 주지 않는다\"는 문장의 뜻은 유지한다"
+  - "설계서 §4.1·§4.2 정합: (a) §4.1 enum 블록의 MACHINE_SAMPLED 주석(\"numeric_sampling + statistical_estimate legacy alias\")과 §4.2 첫 항목을 코드 실제에 맞춘다 — 레거시 문자열 1개는 멤버 1개로만 해석되므로 MACHINE_SAMPLED는 NUMERIC_SAMPLING 단일 매핑, MACHINE_EXHAUSTIVE는 FINITE_EXHAUSTIVE. STATISTICAL_ESTIMATE는 레거시 값의 alias 대상이 아니라 신규 생산자가 직접 각인하는 등급이라고 명시한다(정의 파일 밖 사용 0회) (b) §4.2 둘째 항목 \"stamp는 신규값만 기록\"은 의도(신규 생산자는 신규값을 찍는다)를 유지하되, 코드가 이를 강제하지 않고 레거시 멤버도 그대로 기록한다는 사실과 생산자 전환이 S4-54·S4-56 몫임을 덧붙인다 (c) S4-55 acceptance ③의 \"NUMERIC_SAMPLING/STATISTICAL_ESTIMATE\" 문구는 대장이 append 전용이라 지우지 않고 backlog.py amend S4-55 --acceptance로 정정 항을 덧붙인다(백틱 치환 사고를 피하려고 인용 heredoc 파일로 넘기고, 쓴 뒤 YAML을 읽어 핵심 식별자 보존을 대조한다)"
+  - "범위 경계 — 하지 않는 것: (1) 레거시 이름을 새 멤버로 합치는 구조 변경(MACHINE_* 멤버 폐지·별칭 전용 처리). 생산자 33개 파일(MACHINE_SAMPLED 34회·MACHINE_EXHAUSTIVE 7회)과 코퍼스 테스트가 레거시 멤버에 의존해 Kiki가 보류를 결정했다(2026-10-09). 필요해지면 별도 태스크로 (2) populate._VERIFICATION_TIER_VALUES 동기와 stamp→load 왕복 테스트는 S4-69 소유 (3) read/stamp의 프로덕션 호출처 신설은 첫 신규 값 생산자(S4-54·S4-56)의 몫"
+  - "검증: CI 워크플로의 잡 이름을 전수 열거하고 이 PR이 닿는 잡을 근거와 함께 골라(닿지 않는 잡도 근거를 적는다) 로컬 재현한 종료 코드를 보고한다 — 최소한 ruff·black(--line-length 100)·mypy --strict·lint-imports를 CI backend 잡과 같은 명령으로, 터치한 테스트 파일 직렬 실행, backlog validate·audit-deps, 위헌 심사 래칫. 부분 스위트 통과를 전체 통과로 말하지 않는다(전체 백엔드 스위트를 못 돌리면 명시). PR 생성 및 CI 통과 — 머지는 Kiki 지시 후"
+artifacts:
+  - "kiki-s-broom/WhyMath#1563 (b8e0d71c) — read_verification_tier 레거시 enum 멤버 alias 수정 + verification_tier 문서 정정. CI 미러 6잡 exit 0(not_executed 0·tainted False), PR 단계 CI 실패 0(성공 11·건너뜀 10)"
+paths:
+  - src/backend/whymath_backend/l3/verification_tier.py
+  - tests/backend/l3/test_verification_tier.py
+  - docs/architecture/verifier_v2_design.md
+session: null
+notes: "출처: S4-55 마감 점검(2026-10-08~09, 판정 기준: main a07fa67c). 다른 세션 점검이 보고하고 본 세션이 origin/main에서 재현했다 — read_verification_tier에 레거시 멤버를 넘기면 alias 없이 그대로 반환된다(MACHINE_EXHAUSTIVE→MACHINE_EXHAUSTIVE, MACHINE_SAMPLED→MACHINE_SAMPLED). 한 줄 수정(_resolve_tier(raw.value))을 버리는 임시 사본에 적용해 멤버 입력이 FINITE_EXHAUSTIVE·NUMERIC_SAMPLING으로 풀리고 기존 test_verification_tier.py 10건이 통과함을 확인했다(브랜치에는 적용 전). 기존 test_read_enum_instance_returns_itself는 신규 멤버 SYMBOLIC_PROOF만 써서 이 구멍을 못 봤다. read/stamp의 src/·scripts/ 호출처는 0건이라 영향은 잠재적이다 — 첫 생산자가 레거시 멤버를 read에 넘기는 순간 현실이 된다. Kiki 결정(2026-10-09, 추천안대로): (1) A 수정과 D 문서 정정을 S4-69와 분리해 이 태스크로 등재 (2) 설계서 §4.1과 S4-55 acceptance ③ 문구를 코드(NUMERIC_SAMPLING 단일 매핑)에 맞춘다 (3) 레거시 이름 합치기 구조 변경은 보류. S4-69와 tests/backend/l3/test_verification_tier.py를 공유한다 — 서로 다른 테스트 함수를 추가하는 방식이라 충돌은 병합으로 풀린다."
+updated: 2026-10-09
