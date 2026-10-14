@@ -36,6 +36,15 @@ _QUAL = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "qualification"
 #: 시험지·1회차 감사 묶음을 만든 은행 v0의 동결 사본 — 현 은행은 생성기 교정으로 바뀔 수 있다.
 _BANK = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "bank_audit" / "audited_bank.jsonl"
 
+_M0677_CUT = "f(x)=k의 근의 개수를 그래프와 가로선 y=k의 교점으로 보는 관점을"
+#: 판정자가 시험지·묶음에서 본 오개념 설명 중, 측정 뒤 코퍼스가 정정되어 지금은 달라진 것(오개념 id → 측정
+#: 당시 문구). 시험지·묶음 도구는 설명을 *살아 있는* 코퍼스에서 읽으므로(`_misconception_statements`)
+#: 코퍼스를 고치면 커밋된 시험지·매니페스트와 바이트가 어긋난다. 이미 라벨을 받은 시험지는 조용히
+#: 재생성하지 않는다 — 재현 검사만 측정 당시 문구로 고정해 "시험지는 판정자가 본 그대로"를 계속 증명한다.
+#: QUAL-14(2026-10-12)가 M0677의 절단 문장('…관점을')을 복원했다. 새 시험·새 묶음은 이 고정 없이
+#: 정정된 코퍼스 문구로 만든다(고정은 이 테스트 파일 안에만 산다).
+_AS_JUDGED_STATEMENTS: dict[str, str] = {"M0677": f"{_M0677_CUT} — {_M0677_CUT} 못 쓴다."}
+
 #: 합성 정답지의 종류별 결함 수 — 15건 종류를 두어 0.80 경계(12/15)를 정확히 밟는다.
 _SIZES = dict(zip(BANK_DEFECT_CLASSES, (15, 15, 15, 15, 15, 15, 30), strict=True))
 
@@ -535,12 +544,38 @@ def test_committed_artifacts_are_mutually_consistent() -> None:
     assert [r["item_id"] for r in machine] == ids
 
 
+@pytest.fixture()
+def as_judged_statements(monkeypatch: pytest.MonkeyPatch) -> None:
+    """재현 검사 동안 시험지·묶음 도구가 판정자가 본 문구를 쓰게 한다(코퍼스 정정과 시험지를 분리)."""
+    live = qual._misconception_statements
+
+    def pinned() -> dict[str, str]:
+        return {**live(), **_AS_JUDGED_STATEMENTS}
+
+    monkeypatch.setattr(qual, "_misconception_statements", pinned)
+
+
+def test_as_judged_pins_are_what_the_raters_saw_and_the_corpus_has_moved_on() -> None:
+    """고정한 문구는 ① 판정자가 본 시험지에 실제로 박혀 있고 ② 지금 코퍼스와 실제로 다르다.
+
+    ①이 어긋나면 고정이 지어낸 문구다(재현을 거짓으로 만든다). ②가 어긋나면 고정이 죽었다 — 지운다.
+    둘 다 "고정은 실재하는 드리프트 하나당 하나"라는 전제의 집행이다.
+    """
+    blind = (_QUAL / "blind_240.jsonl").read_text("utf-8")
+    live = qual._misconception_statements()
+    assert _AS_JUDGED_STATEMENTS
+    for mid, text in _AS_JUDGED_STATEMENTS.items():
+        assert json.dumps(text, ensure_ascii=False)[1:-1] in blind, mid
+        assert live[mid] != text, mid
+
+
 @pytest.mark.corpus_authoring
-def test_emit_check_reproduces_the_committed_test() -> None:
+def test_emit_check_reproduces_the_committed_test(as_judged_statements: None) -> None:
     """같은 seed·같은 은행으로 재생성하면 커밋된 시험지·지문·매니페스트와 바이트가 같다.
 
     RED면 시험지를 만드는 코드(주입기·판정기·스캐너)나 은행이 바뀐 것이다. 이미 이 시험지로 판정자
     라벨을 받았다면 조용히 재생성하지 말고 README에 드리프트를 적은 뒤 새 시험으로 다시 잰다.
+    오개념 설명은 코퍼스가 측정 뒤 정정된 몫만 `_AS_JUDGED_STATEMENTS`로 고정한다(QUAL-14).
     """
     assert qual.main(["emit", "--check"]) == 0
 
@@ -623,8 +658,11 @@ def test_bank_sheets_partition_the_bank_with_the_blind_field_set() -> None:
     assert again == sheets  # 결정론
 
 
-def test_bank_sheets_manifest_is_committed_and_reproducible() -> None:
-    """커밋된 매니페스트 = 재생성 결과. RED면 은행·지침·묶음 코드가 판정 뒤에 바뀐 것이다."""
+def test_bank_sheets_manifest_is_committed_and_reproducible(as_judged_statements: None) -> None:
+    """커밋된 매니페스트 = 재생성 결과. RED면 은행·지침·묶음 코드가 판정 뒤에 바뀐 것이다.
+
+    오개념 설명은 코퍼스가 측정 뒤 정정된 몫만 `_AS_JUDGED_STATEMENTS`로 고정한다(QUAL-14).
+    """
     manifest = json.loads((_BANK_AUDIT / "manifest.json").read_text("utf-8"))
     assert manifest["bank_sha256"] == hashlib.sha256(_BANK.read_bytes()).hexdigest()
     protocol = (_QUAL / "rater_protocol.md").read_bytes()
