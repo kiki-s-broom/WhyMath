@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - "docs/ops/**"
   - "scripts/ops/**"
   - src/backend/whymath_backend/config.py
-session: null
+session: claude/dazzling-cori-myd3cw
 notes: "출처: OPS-134(WH-1 primary 폴백 회계)의 acceptance ①④ 승계. OPS-134는 코드로 풀 수 있는 부분(② 폴백 결말 기록·채택률 리포트, ③ 폐기 호출 비중 집계, ① 계측 재료)을 착지했고, 라이브 실측이 필요한 ①④를 이 태스크로 분리했다 — 클라우드 세션에는 Ollama·Redis·로컬 모델이 없다. 판정 기준: OPS-134 PR 브랜치(`claude/wizardly-cerf-n3tur9`)이며 머지 전에는 main에 없다. 학생 대면 영향 범위: 시간 초과 시 결정론 템플릿 폴백으로 서빙은 계속되므로 장애가 아니라 품질 저하(덜 개인화된 코칭)다. 이 태스크가 판정 전까지 기본값은 변경하지 않는다."
 updated: 2026-10-14
