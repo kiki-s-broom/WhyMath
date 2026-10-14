@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -32,6 +33,12 @@ import yaml
 
 from whymath_backend.l1.standards import phase3_coverage as pc
 from whymath_backend.l1.standards import phase3_scope as ps
+from whymath_backend.schema.problem_metadata import (
+    EMPTY_DIFFICULTY,
+    ProblemMetadataField,
+    ProblemSlot,
+    slot_tag,
+)
 
 _REPO = Path(__file__).resolve().parents[3]
 _KEYS = (
@@ -85,6 +92,10 @@ def _world(spec: ps.ScopeSpec, index: ps.ReferenceIndex) -> pc.CoverageCorpus:
                 has_steps=True,
                 problem_type_codes=(f"ptype.syn-{n}",),
                 distractor_ids=(f"syn-kebab-{n}",),
+                # P3-04 — 7필드 축. 대조군은 "전부 연결된 세계"이므로 새 축도 채운다.
+                difficulty=2.0,
+                answer="7",
+                solution_text="거듭제곱의 미분법에 따라 구한다.",
             )
         )
         content[concept.source_id] = "reviewed"
@@ -1112,3 +1123,271 @@ class TestCli:
         monkeypatch.setattr(pc, "load_corpus", boom)
         assert pc.main([]) == 2
         assert "CoverageError" in capsys.readouterr().err
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-04 — Problem 필수 7필드 현황 + 문제 유형 6슬롯 충족
+# ──────────────────────────────────────────────────────────────────────────
+_F = ProblemMetadataField
+_S = ProblemSlot
+
+
+def _slotted(world: pc.CoverageCorpus) -> pc.CoverageCorpus:
+    """핵심 개념마다 6슬롯 문항을 하나씩 — 기본 문항을 복제하고 슬롯 태그만 달리한다(60문항)."""
+    problems = [
+        replace(base, problem_id=f"{base.problem_id}-{slot.value}", tags=(slot_tag(slot),))
+        for base in world.problems
+        for slot in ProblemSlot
+    ]
+    return replace(
+        world,
+        problems=tuple(problems),
+        problems_scanned=len(problems),
+        hint_problem_ids=frozenset(p.problem_id for p in problems),
+    )
+
+
+@pytest.fixture(scope="module")
+def slotted(world: pc.CoverageCorpus) -> pc.CoverageCorpus:
+    return _slotted(world)
+
+
+def _clone_of(corpus: pc.CoverageCorpus, slot: ProblemSlot, nth: int = 0) -> pc.ProblemRef:
+    return [p for p in corpus.problems if p.problem_id.endswith(f"-{slot.value}")][nth]
+
+
+def _swap(
+    corpus: pc.CoverageCorpus, target: pc.ProblemRef, **changes: Any
+) -> tuple[pc.CoverageCorpus, pc.ProblemRef]:
+    """문항 하나를 바꿔 끼운다. 바뀐 문항도 돌려준다 — 주입이 적용됐는지 호출부가 단언한다."""
+    new = replace(target, **changes)
+    assert new != target, "주입이 적용되지 않았다(변경 전후가 같다) — 하네스 결함"
+    problems = tuple(new if p is target else p for p in corpus.problems)
+    return replace(corpus, problems=problems), new
+
+
+class TestProblemMetadataAndSlots:
+    def test_control_every_problem_has_all_seven_fields_and_all_slots_are_filled(
+        self, spec, index, slotted
+    ) -> None:
+        report = pc.evaluate(spec, index, slotted)
+        stats = report.problem_metadata
+        assert stats is not None and report.slots is not None
+        assert (stats.population, stats.complete, stats.without_missing) == (60, 60, 60)
+        assert stats.unmet == () and stats.unmeasured_fields == ()
+        assert all(c["present"] == 60 for c in stats.field_counts.values())
+        assert (report.slots.met_count, report.slots.population) == (60, 60)
+        assert report.slots.unmet == ()
+        assert report.failures == () and report.warnings == () and report.exit_code == 0
+
+    # ── 7필드: 하나씩 비우는 주입 — 그 필드만 비고 CI 가 실패한다 ─────────────────────
+    @pytest.mark.parametrize(
+        "field",
+        [f for f in ProblemMetadataField if f is not ProblemMetadataField.CONCEPT],
+        ids=lambda f: f.value,
+    )
+    def test_blanking_one_field_of_one_problem_is_flagged_and_only_that_field(
+        self, spec, index, slotted, field
+    ) -> None:
+        target = _clone_of(slotted, _S.REPRESENTATIVE)
+        if field is _F.DIFFICULTY:
+            broken, _ = _swap(slotted, target, difficulty=EMPTY_DIFFICULTY)
+        elif field is _F.SKILL:
+            broken, _ = _swap(slotted, target, problem_type_codes=())
+        elif field is _F.SOLUTION:
+            broken, _ = _swap(slotted, target, solution_text="")
+        elif field is _F.ANSWER:
+            broken, _ = _swap(slotted, target, answer="  ")
+        elif field is _F.MISCONCEPTION_SIGNATURE:
+            # 오개념 유발 슬롯 문항에서 문항 자체 연결을 지운다 — 개념 상속으로는 인정되지 않는다.
+            target = _clone_of(slotted, _S.MISCONCEPTION_TRIGGER)
+            broken, _ = _swap(slotted, target, distractor_ids=())
+        else:
+            assert field is _F.HINT_STRATEGY
+            assert slotted.hint_problem_ids is not None
+            hints = slotted.hint_problem_ids - {target.problem_id}
+            broken = replace(slotted, hint_problem_ids=hints)
+            assert broken != slotted
+        report = pc.evaluate(spec, index, broken)
+        stats = report.problem_metadata
+        assert stats is not None
+        counts = {name: c["missing"] for name, c in stats.field_counts.items()}
+        assert counts == {name: int(name == field.value) for name in counts}, counts
+        assert [u.subject for u in stats.unmet] == [target.problem_id]
+        assert stats.unmet[0].missing == (f"{field.value}: 비어 있다",)
+        assert (stats.complete, stats.without_missing) == (59, 59)
+        assert report.exit_code == 1
+        assert any("문제 메타데이터 7필드" in f and "1건" in f for f in report.failures)
+
+    def test_concept_field_cannot_be_blank_for_an_in_scope_problem_it_leaves_the_scope(
+        self, spec, index, slotted
+    ) -> None:
+        """범위 안 문항은 정의상 PRIMARY 개념이 있다 — 그것을 지우면 '결손'이 아니라 범위 밖이 된다.
+
+        그래서 코퍼스 쪽에서 이 필드의 결손은 분모 감소로 나타난다(실 코퍼스 래칫이 분모 하한을 건다).
+        """
+        target = _clone_of(slotted, _S.BASIC)
+        broken, _ = _swap(slotted, target, primary_src_ids=frozenset())
+        stats = pc.evaluate(spec, index, broken).problem_metadata
+        assert stats is not None
+        assert stats.population == 59 and stats.unmet == ()
+
+    def test_unmeasured_hint_is_reported_not_counted_and_not_a_failure(
+        self, spec, index, slotted
+    ) -> None:
+        report = pc.evaluate(spec, index, replace(slotted, hint_problem_ids=None))
+        stats = report.problem_metadata
+        assert stats is not None
+        assert stats.field_counts["hint_strategy"] == {"present": 0, "missing": 0, "unknown": 60}
+        assert stats.unmeasured_fields == ("hint_strategy",)
+        assert (stats.complete, stats.without_missing) == (
+            0,
+            60,
+        ), "측정 불가를 충족으로 세면 안 된다"
+        assert not any("문제 메타데이터" in f for f in report.failures)
+        assert any("측정 불가 필드: hint_strategy" in w for w in report.warnings)
+
+    def test_inherited_only_signature_is_counted_separately(self, spec, index, slotted) -> None:
+        """대조군 — 오개념 유발이 아닌 슬롯은 개념 상속으로 인정되고, 그 비율이 따로 센다."""
+        base = pc.evaluate(spec, index, slotted).problem_metadata
+        assert base is not None
+        target = _clone_of(slotted, _S.REPRESENTATIVE)
+        weaker, _ = _swap(slotted, target, distractor_ids=())
+        stats = pc.evaluate(spec, index, weaker).problem_metadata
+        assert stats is not None
+        assert stats.field_counts["misconception_signature"]["missing"] == 0
+        assert stats.inherited_only == base.inherited_only + 1
+        assert stats.unmet == ()
+
+    # ── 6슬롯: 하나씩 비우는 주입 — 그 칸 하나만 떨어진다 ─────────────────────────────
+    @pytest.mark.parametrize("slot", list(ProblemSlot), ids=lambda s: s.value)
+    def test_removing_one_slot_tag_drops_exactly_one_cell(self, spec, index, slotted, slot) -> None:
+        control = pc.evaluate(spec, index, slotted)
+        target = _clone_of(slotted, slot)
+        broken, _ = _swap(slotted, target, tags=())
+        report = pc.evaluate(spec, index, broken)
+        assert report.slots is not None and control.slots is not None
+        assert report.slots.met_count == control.slots.met_count - 1 == 59
+        assert len(report.slots.unmet) == 1
+        names = {s.id: s.name_ko for s in spec.slots}
+        assert report.slots.unmet[0].missing[0].startswith(f"{names[slot.value]}:")
+        # 다른 네 지표는 그대로 — 슬롯 지표가 독립된 축을 잰다는 증거.
+        assert _values(report) == _values(control)
+        assert not any("Slot" in f for f in report.failures)  # 목표가 없는 지표는 exit 에 불참
+
+    def test_trigger_slot_counts_only_problems_with_their_own_signature(
+        self, spec, index, slotted
+    ) -> None:
+        target = _clone_of(slotted, _S.MISCONCEPTION_TRIGGER)
+        broken, _ = _swap(slotted, target, distractor_ids=())
+        report = pc.evaluate(spec, index, broken)
+        assert report.slots is not None
+        assert report.slots.met_count == 59
+        assert "문항 자체 오개념 연결이 없는 1건은 세지 않는다" in report.slots.unmet[0].missing[0]
+
+    def test_ineligible_problem_does_not_fill_a_slot(self, spec, index, slotted) -> None:
+        target = _clone_of(slotted, _S.APPLIED)
+        broken, _ = _swap(slotted, target, review_status="pending")
+        report = pc.evaluate(spec, index, broken)
+        assert report.slots is not None and report.slots.met_count == 59
+
+    def test_unknown_slot_tag_is_a_failure_and_leaves_the_cell_empty(
+        self, spec, index, slotted
+    ) -> None:
+        """오타(`p3-slot:aplied`)를 조용히 무시하면 그 문항은 슬롯이 없는 것으로 보일 뿐이다."""
+        target = _clone_of(slotted, _S.APPLIED)
+        broken, _ = _swap(slotted, target, tags=("p3-slot:aplied",))
+        report = pc.evaluate(spec, index, broken)
+        assert report.exit_code == 1
+        assert any("알 수 없는 슬롯 태그" in f and "p3-slot:aplied" in f for f in report.failures)
+        assert report.slots is not None and report.slots.met_count == 59
+
+    # ── 정의 정합 — 명세가 다른 필드·슬롯을 말하면 측정을 거부한다 ──────────────────────
+    def test_refuses_to_measure_when_the_spec_names_different_fields(
+        self, spec, index, slotted
+    ) -> None:
+        changed = replace(spec, problem_required_fields=spec.problem_required_fields[:-1])
+        assert changed != spec
+        with pytest.raises(pc.CoverageError, match="problem_required_fields"):
+            pc.evaluate(changed, index, slotted)
+
+    def test_refuses_to_measure_when_the_spec_names_different_slots(
+        self, spec, index, slotted
+    ) -> None:
+        changed = replace(spec, slots=spec.slots[:-1])
+        assert changed != spec
+        with pytest.raises(pc.CoverageError, match="슬롯"):
+            pc.evaluate(changed, index, slotted)
+
+    # ── 출력 ─────────────────────────────────────────────────────────────────────
+    def test_json_and_text_carry_the_new_sections(self, spec, index, slotted) -> None:
+        report = pc.evaluate(spec, index, replace(slotted, hint_problem_ids=None))
+        doc = pc.to_json(report)
+        assert doc["slot_coverage"]["population"] == 60
+        assert doc["problem_metadata"]["field_counts"]["hint_strategy"]["unknown"] == 60
+        assert doc["problem_metadata"]["unmeasured_fields"] == ["hint_strategy"]
+        text = pc.render(report)
+        assert "Concept Slot Coverage(6슬롯)" in text
+        assert "문제 메타데이터 7필드 (적격 문항 60건)" in text
+        assert "측정 불가 필드: hint_strategy" in text
+
+    def test_metric_lookup_finds_the_slot_metric(self, spec, index, slotted) -> None:
+        assert pc.evaluate(spec, index, slotted).metric("slot_coverage").population == 60
+
+
+class TestProblemRowToEvidence:
+    """코퍼스 행 → `ProblemRef` 변환. 실 코퍼스에는 빈 필드가 한 건도 없어서, 이 변환이 "비어 있으면
+    비어 있다"로 읽는지는 실 코퍼스 테스트로 볼 수 없다 — 합성 행으로 직접 잰다."""
+
+    _ROW: dict[str, Any] = {
+        "problem_id": "p-1",
+        "concepts": [{"concept_src_id": "H:x", "role": "PRIMARY"}],
+        "review_status": "approved",
+        "difficulty_overall": 2.5,
+        "answer": "7",
+        "answer_explanation": "지수를 앞으로 내린다.",
+        "tags": ["p3-slot:basic", "unrelated"],
+        "problem_type_codes": ["ptype.a"],
+    }
+
+    def _ref(self, **changes: Any) -> pc.ProblemRef:
+        row = {**self._ROW, **changes}
+        for key in [k for k, v in changes.items() if v is _GONE]:
+            del row[key]
+        ref = pc._problem_from_row(row)
+        assert ref is not None
+        return ref
+
+    def test_complete_row_fills_every_field_axis(self) -> None:
+        ref = self._ref()
+        assert ref.difficulty == 2.5
+        assert (ref.answer, ref.solution_text) == ("7", "지수를 앞으로 내린다.")
+        assert ref.tags == ("p3-slot:basic", "unrelated")
+
+    @pytest.mark.parametrize("key", ["difficulty_overall", "answer", "answer_explanation"])
+    def test_a_row_without_the_key_is_measured_empty_not_unmeasured(self, key: str) -> None:
+        """행을 읽었는데 값이 없다 → "측정했고 비어 있음". None(측정 못함)이면 사유가 틀려진다."""
+        ref = self._ref(**{key: _GONE})
+        if key == "difficulty_overall":
+            assert ref.difficulty is not None and math.isnan(ref.difficulty)
+        elif key == "answer":
+            assert ref.answer == ""
+        else:
+            assert ref.solution_text == ""
+
+    @pytest.mark.parametrize("bad", [True, False, "2.5", None, [2.5]])
+    def test_non_numeric_difficulty_is_measured_empty(self, bad: Any) -> None:
+        ref = self._ref(difficulty_overall=bad)
+        assert ref.difficulty is not None and math.isnan(ref.difficulty)
+
+    def test_numeric_answer_is_kept_as_text_and_non_text_tags_are_dropped(self) -> None:
+        ref = self._ref(answer=7, tags=["p3-slot:applied", 3, None])
+        assert ref.answer == "7"
+        assert ref.tags == ("p3-slot:applied",)
+        assert self._ref(tags="not-a-list").tags == ()
+
+    def test_non_text_explanation_is_empty(self) -> None:
+        assert self._ref(answer_explanation=123).solution_text == ""
+
+
+_GONE = object()  # `_ref` 가 키를 행에서 지우라는 표지
