@@ -225,7 +225,8 @@ def test_schema_orm_field_parity_frozen() -> None:
     schema_fields = set(SchemaConcept.model_fields)
     orm_columns = {col.key for col in sa.inspect(OrmConcept).mapper.column_attrs}
     schema_only = schema_fields - orm_columns
-    orm_only = orm_columns - schema_fields
+    # P3-26: 운영 메타 표지 — `to_schema`가 복원에서 제외하므로 스키마에는 없는 것이 맞다.
+    orm_only = (orm_columns - schema_fields) - {"cms_edited_at"}
     assert schema_only == overlay_backed_schema_only, (
         f"schema↔ORM 필드 드리프트(schema만): {sorted(schema_only)} != "
         f"허용된 Overlay-backed 필드 {sorted(overlay_backed_schema_only)}. "

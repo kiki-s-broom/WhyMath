@@ -4,9 +4,11 @@
 게이트가 CI 기본 skip). PG 미도달 시에도 graceful skip(`test_concepts_integration.py` 패턴 미러).
 
 검증하는 것(ADMIN-01 완료조건 ③·⑤):
-  ① **3상태 왕복**(⑤ — 변별력) — 콘텐츠 CUD 라우터(`POST /v1/concepts`)가 실 STUDENT 사용자에게
-     부여 전 403 → `grant` CLI 실행 후 201 → `revoke` CLI 실행 후 다시 403을 실제로 낸다(같은
-     값 반복이면 위장 — 이 테스트는 세 상태가 실제로 *다름*을 단언한다).
+  ① **3상태 왕복**(⑤ — 변별력) — 콘텐츠 CUD 라우터(`DELETE /v1/concepts/{id}`)가 실 STUDENT
+     사용자에게 부여 전 403 → `grant` CLI 실행 후 404(권한은 통과, 없는 개념) → `revoke` CLI 실행
+     후 다시 403을 실제로 낸다(같은 값 반복이면 위장 — 세 상태가 실제로 *다름*을 단언한다).
+     P3-26 이전에는 `POST /v1/concepts`의 201을 "통과" 신호로 썼으나, 그 경로는 폐지(410)됐다 —
+     404는 인가 체인을 통과해 핸들러까지 갔다는 신호로 같은 변별력을 가진다(403과 다르다).
   ② **트랜잭션 원자성**(③) — 역할 변경 + `privacy_audit.role_change` 감사 적재를 같은 세션에서
      `flush`(DB에 SQL 발사)까지 밀어넣은 뒤 커밋 전에 인위로 예외를 일으켜 롤백하면, 역할도
      감사 행도 *둘 다* 사라짐을 새 세션 재조회로 확인한다(부분 성공 0 증명).
@@ -138,10 +140,9 @@ def _app_with_jwt_settings() -> TestClient:
 
 
 class TestThreeStateRoundTrip:
-    """⑤ 변별력 — 403(부여 전) → 201(grant 후) → 403(revoke 후) 3상태가 실제로 다름을 확인."""
+    """⑤ 변별력 — 403(부여 전) → 404(grant 후·권한 통과) → 403(revoke 후) 3상태가 실제로 다름."""
 
     def test_403_then_201_then_403(self, student_user: uuid.UUID) -> None:
-        suffix = uuid.uuid4().hex[:8]
         token = create_access_token(student_user, settings=_jwt_settings())
         headers = {"Authorization": f"Bearer {token}"}
         created_concept_ids: list[uuid.UUID] = []
@@ -151,33 +152,24 @@ class TestThreeStateRoundTrip:
                 client.headers.update(headers)
 
                 # ── ① 부여 전: CONTENT_ADMIN 0명 상태 재현 — CUD 라우터 403 ──
-                resp_before = client.post(
-                    "/v1/concepts",
-                    json={"code": f"ADM01-A-{suffix}", "name_ko": "부여전", "level": "단원"},
-                )
+                missing = uuid.uuid4()  # 존재하지 않는 개념 — 권한이 있으면 404, 없으면 403
+                resp_before = client.delete(f"/v1/concepts/{missing}")
                 assert resp_before.status_code == 403
 
                 # ── grant CLI 실행(실 프로세스 경로 — cli.main, 기본 DB-backed 함수) ──
                 grant_code = cli.main(["grant", str(student_user), "content_admin"])
                 assert grant_code == 0
 
-                # ── ② 부여 후: 같은 라우터가 201 ──
-                resp_after_grant = client.post(
-                    "/v1/concepts",
-                    json={"code": f"ADM01-B-{suffix}", "name_ko": "부여후", "level": "단원"},
-                )
-                assert resp_after_grant.status_code == 201
-                created_concept_ids.append(uuid.UUID(resp_after_grant.json()["concept_id"]))
+                # ── ② 부여 후: 같은 라우터가 인가를 통과해 404(없는 개념) ──
+                resp_after_grant = client.delete(f"/v1/concepts/{missing}")
+                assert resp_after_grant.status_code == 404
 
                 # ── revoke CLI 실행 ──
                 revoke_code = cli.main(["revoke", str(student_user), "content_admin"])
                 assert revoke_code == 0
 
                 # ── ③ 회수 후: 다시 403(같은 값 반복이 아님 — 세 상태 전부 실제로 다름) ──
-                resp_after_revoke = client.post(
-                    "/v1/concepts",
-                    json={"code": f"ADM01-C-{suffix}", "name_ko": "회수후", "level": "단원"},
-                )
+                resp_after_revoke = client.delete(f"/v1/concepts/{missing}")
                 assert resp_after_revoke.status_code == 403
 
             statuses = [
@@ -185,7 +177,7 @@ class TestThreeStateRoundTrip:
                 resp_after_grant.status_code,
                 resp_after_revoke.status_code,
             ]
-            assert statuses == [403, 201, 403]
+            assert statuses == [403, 404, 403]
         finally:
             asyncio.run(_delete_concepts(created_concept_ids))
 

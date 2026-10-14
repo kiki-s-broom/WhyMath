@@ -338,6 +338,24 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-12 (구현 · P3-26): **CMS가 개념을 새로 제안하고 선수 관계를 쓰고 개념을 지울 수 있게 했다 — 정본은 "행이 어디서 왔는가"로 갈랐고, 개념 행은 발행하는 순간에만 만들어지며, 순환은 서버가 막는다** (claude 구현, 설계 분기 1건은 사용자 결정) — 분기 커밋 `d873d064`
+
+**무엇**: 태스크 `P3-26-cms-concept-create-delete-edge-write`. 정본 = `docs/standards/cms_concept_graph_write_contract.md`. ① 원천 정본: `graph.json`에서 온 개념·관계는 파일이 정본(CMS가 못 지움), CMS가 만든 것은 DB가 정본(적재가 건너뜀). 소유 표지는 P3-25와 같은 `cms_edited_at`을 `concept`·`concept_edge`에 둠(백필·기본값 없음). ② 선수 관계: 서버가 비순환 검사(순환이면 422 + 코드 경로), 어드바이저리 잠금으로 동시 요청 직렬화, 적재 CLI도 같은 잠금 안에서 DB의 CMS 관계와 합쳐 순환 검사. ③ 신규 개념: 제안은 DRAFT만 만들고 발행 시 `publish_gate`가 행 생성. 삭제는 CMS가 만든·발행본 없는·참조 없는 개념만.
+
+**사용자 결정(1건)**: 초안(`concept_version`)이 `concept.code`를 FK로 참조해 행 없이는 초안 불가 → **FK를 풀고 발행 시 행 생성**(A안). FK 자리는 DB 트리거 2종(PUBLISHED 판은 개념 행 필요 / 발행본 있는 개념 삭제 거부)이 대신 지킨다. 마이그레이션 `a8c4e1f7b3d9`.
+
+**닫은 우회로**: `POST /v1/concepts`(검수 없이 행 생성)는 410으로 폐지. `DELETE /v1/concepts`는 CMS와 같은 규칙(`api/_concept_graph_rules.py`)을 쓴다.
+
+**실측으로 드러난 것**: ① P3-12 통합 테스트 docstring의 "CI는 통합 테스트를 건너뛴다"는 사실이 아니다 — `backend-migrations` 잡이 `WHYMATH_RUN_INTEGRATION=1`로 `pytest -m integration`을 실행한다(이 태스크의 docstring은 정정, P3-12 쪽은 건드리지 않음). ② 그 잡 재현에서 `test_role_grant_cli_integration`이 폐지된 `POST /v1/concepts` 201에 기대고 있어 실패 → `DELETE` 404(권한 통과)로 403→404→403 변별을 유지하도록 고침. ③ 첫 전체 스위트 실행은 **무효**였다 — 권한 매트릭스 테스트의 파라미터 id에 무작위 UUID가 들어가 xdist 워커마다 수집 목록이 달랐다(통과·실패가 아니라 실행 거부). 고정 UUID로 바꾸고 해시 시드 3종에서 수집 동일, `-n 3` 통과를 확인. ④ 전체 스위트에서 `test_admin_surface_is_read_only`가 새 쓰기 5개를 잡음 → 닫힌 목록에 의식적으로 등재. ⑤ 기존 화면 문구가 선수/후행을 반대로 설명하고 있었다(백엔드 필드 설명도) → 정정.
+
+**검증(실측)**: 전체 백엔드 스위트(CI 명령 그대로) 19,392 passed·657 skipped·1 failed(위 ④, 수정) / 집계 커버리지 86.4% · 계층 floor 5계층 전부 PASS(api 96.8·l1 90.3·l2 96.4·l3 78.8·l4 96.1) / `tests/infra` 3,035 passed / `tests/harness` 2,256 passed / 헌법 래칫 exit 0·차단 0건 · `tests/constitution` 39 passed / ruff·black(100)·`mypy --strict`(780 파일)·`lint-imports` 4계약 KEPT / 게이트·감사 CLI 19종 전부 exit 0 / 웹 lint·typecheck·거버넌스 110건 exit 0. **CI `backend-migrations` 잡 재현**: upgrade→downgrade base→upgrade, 무결성 게이트·KPI 스모크 exit 0, 통합 pytest 617 passed·1 failed(위 ②, 수정 후 해당 파일 4 passed), 원자 백본 실적재 2회(concepts 2,683·edges 2,210·skip 0, 멱등), traversal 성능 판정 PASS(헤드룸 8.2배).
+
+**보호 장치 검증(결함 주입, 적용·바이트 동일 원복 단언)**: 실 PG 통합 13종 + DB 트리거 직접 끄기 2종 + hermetic 10종 + 구조(AST) 5종 = 30종 전건 RED. 동시 요청 테스트는 직렬화 잠금을 빼면 RED(변별력 증거). 첫 AST 주입 배치는 기준선이 이미 적색(적재기 허용 목록 누락)이어서 RED가 주입 때문인지 알 수 없었다 — 기준선을 초록으로 만든 뒤 재실행했다.
+
+**정직한 공백**: ① 웹 화면은 린트·타입·빌드·거버넌스만 확인했고 **브라우저로 동작을 보지 못했다**(백엔드 서버 없음). ② 수정 후 통합 pytest 전체와 전체 스위트를 처음부터 다시 돌리지는 않았다 — 고친 파일들만 재실행했다. 최종 판정은 PR의 CI. ③ 수정 판은 여전히 개념 행을 바꾸지 않는다(서빙 미연결 F2·B5). ④ 과거 `POST /v1/concepts`로 만든 개념은 표지가 없어 CMS가 못 지운다 — 운영 DB에 있는지는 확인하지 못했다. ⑤ 관계 유형은 `PREREQUISITE`만 연다.
+
+**후속 후보(미등재)**: 적재 소유 개념을 CMS에서 "없앤다"는 요구(파일 쪽 폐기 표시 필요) · 서빙 경로 연결(B5 재판정).
+
 ### 2026-10-12 (정정·구현 · QUAL-14): **오개념 코퍼스 `canonical_statement` 76건(843건의 9.0%)이 문장 중간에서 잘려 있었다 — M0677은 그중 하나였고, `student_wrong_thinking`의 첫 문장으로 복원했다. 시험지가 박은 옛 문구는 건드리지 않고 재현 검사만 측정 당시 문구로 고정했다** (claude 구현, 테스트 계정 기준) — 판정 기준: 작업 브랜치 기점 `d873d064`
 
 **무엇/왜**: P3-03 은행 감사에서 판정자 지적 12건이 "M0677 설명이 '…관점을 — …관점을 못 쓴다'로 깨졌다"였다(판정자에게 보이는 설명 = `canonical_statement + " — " + student_wrong_thinking`). 태스크는 M0677 한 건이었으나 실측해 보니 **같은 결함이 76건**이었다. 원인 둘 — ① 40자 절단 71건(그중 3건 M0436·M0473·M0502는 우연히 `)`·`다`에서 끊겨 *완결형처럼 보였다*) ② 소수점 분할 5건(M0465~M0468·M0511, `3/10을 0`) — 후자는 길이와 무관해 40자 기준으론 안 잡힌다. 정본 = `docs/data/misconception_catalog_v1.md` §8.

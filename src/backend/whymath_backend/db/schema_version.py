@@ -183,6 +183,11 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 금지) + evaluation_context(JSONB·nullable) — 시도가 푼 문항의 판·채점 환경 고정 좌석.
     # 병합 정정(2026-10-09): P3-25(e7b2c4d8a1f6)가 같은 부모(c5e9f3a7b1d4) 위에 먼저 착지해
     # head가 둘이 될 뻔했다 — 이 리비전의 down_revision을 e7b2c4d8a1f6로 재지정해 직렬화했다.
+    "a8c4e1f7b3d9",  # P3-26: concept·concept_edge.cms_edited_at(CMS 소유 표지, nullable·백필 금지)
+    # + concept_version→concept.code FK 해제(신규 개념 제안을 담는다) + 무결성 트리거
+    # 2종(PUBLISHED는
+    # 개념 행 필요·발행본 있는 개념 삭제 거부). 규약 정본:
+    # docs/standards/cms_concept_graph_write_contract.md.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

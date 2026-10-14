@@ -32,7 +32,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
+from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.user import UserProfile
+from whymath_backend.schema.concept import Concept as ConceptSchema
 from whymath_backend.schema.enums import Persona, Role
 from whymath_backend.schema.user import UserProfile as UserProfileSchema
 from whymath_backend.security import create_access_token
@@ -115,6 +118,24 @@ def _app_with_jwt_settings() -> TestClient:
     return TestClient(app)
 
 
+async def _seed_concept(code: str, name_ko: str, level: str, *, cms_owned: bool = False) -> str:
+    """개념 1건을 직접 심는다(적재 CLI가 하듯). `POST /v1/concepts`는 P3-26부터 폐지(410)라 픽스처에 못 쓴다.
+
+    기본은 *적재가 소유한* 행(표지 없음). `cms_owned=True`면 CMS가 만든 행(삭제가 허용되는 유일한 부류).
+    """
+    row = Concept.from_schema(ConceptSchema(code=code, name_ko=name_ko, level=level))
+    if cms_owned:
+        mark_cms_edited(row)
+    engine = create_async_engine(Settings().database_url)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            session.add(row)
+            await session.commit()
+            return str(row.concept_id)
+    finally:
+        await engine.dispose()
+
+
 async def _delete_concept(concept_id: uuid.UUID) -> None:
     """테스트가 만든 행을 독립 엔진으로 정리(잔여 방지)."""
     engine = create_async_engine(Settings().database_url)
@@ -171,14 +192,9 @@ def test_concept_edges_nested_read_on_live_pg(admin_auth: dict[str, str]) -> Non
     try:
         with _app_with_jwt_settings() as client:
             client.headers.update(admin_auth)
-            a = client.post(
-                "/v1/concepts",
-                json={"code": f"CG-A-{suffix}", "name_ko": "가", "level": "단원"},
-            ).json()["concept_id"]
-            b = client.post(
-                "/v1/concepts",
-                json={"code": f"CG-B-{suffix}", "name_ko": "나", "level": "단원"},
-            ).json()["concept_id"]
+            a = asyncio.run(_seed_concept(f"CG-A-{suffix}", "가", "단원"))
+            ids = [a]
+            b = asyncio.run(_seed_concept(f"CG-B-{suffix}", "나", "단원"))
             ids = [a, b]
             asyncio.run(_insert_edge(uuid.UUID(a), uuid.UUID(b)))
 
@@ -200,28 +216,25 @@ def test_concept_edges_nested_read_on_live_pg(admin_auth: dict[str, str]) -> Non
 
 
 def test_concept_crud_roundtrip_on_live_pg(admin_auth: dict[str, str]) -> None:
-    """POST→GET→중복(409)→목록이 실 PG에서 HTTP→get_session→PG로 왕복한다."""
+    """직접 생성 폐지(410)→GET→목록이 실 PG에서 HTTP→get_session→PG로 왕복한다(P3-26)."""
     code = f"TEST-CONCEPT-{uuid.uuid4().hex[:8]}"
     body = {"code": code, "name_ko": "통합테스트 개념", "level": "세부개념"}
     concept_id: str | None = None
     try:
         with _app_with_jwt_settings() as client:
             client.headers.update(admin_auth)
-            # CREATE → 201
+            # CREATE → 410: 살아있는 개념 행을 검수 없이 만드는 길은 닫혔고, 아무 행도 생기지 않는다.
             created = client.post("/v1/concepts", json=body)
-            assert created.status_code == 201, created.text
-            payload = created.json()
-            assert payload["code"] == code
-            concept_id = payload["concept_id"]
+            assert created.status_code == 410, created.text
+            assert created.json()["detail"]["code"] == "concept_create_via_workflow"
+            assert client.get("/v1/concepts?limit=200").status_code == 200
+            assert code not in {i["code"] for i in client.get("/v1/concepts?limit=200").json()}
 
-            # READ → 200, 내용 일치
+            # 적재가 만든 행을 모사해 심고 READ → 200, 내용 일치
+            concept_id = asyncio.run(_seed_concept(code, "통합테스트 개념", "세부개념"))
             got = client.get(f"/v1/concepts/{concept_id}")
             assert got.status_code == 200
             assert got.json()["name_ko"] == "통합테스트 개념"
-
-            # 중복 code POST → 409(UNIQUE 충돌)
-            dup = client.post("/v1/concepts", json=body)
-            assert dup.status_code == 409, dup.text
 
             # LIST → 200, 방금 만든 code 포함
             listed = client.get("/v1/concepts?limit=200")
@@ -240,9 +253,8 @@ def test_concept_patch_delete_roundtrip_on_live_pg(admin_auth: dict[str, str]) -
     try:
         with _app_with_jwt_settings() as client:
             client.headers.update(admin_auth)
-            concept_id = client.post(
-                "/v1/concepts", json={"code": code, "name_ko": "원본", "level": "단원"}
-            ).json()["concept_id"]
+            # CMS가 만든 개념(표지 있음)만 지울 수 있다 — 적재 소유 개념의 삭제 거부는 아래에서 따로 본다.
+            concept_id = asyncio.run(_seed_concept(code, "원본", "단원", cms_owned=True))
 
             # PATCH: name_en만 추가(부분 수정), 병합 재검증
             patched = client.patch(f"/v1/concepts/{concept_id}", json={"name_en": "Patched"})
@@ -269,10 +281,7 @@ def test_concept_optimistic_lock_on_live_pg(admin_auth: dict[str, str]) -> None:
     try:
         with _app_with_jwt_settings() as client:
             client.headers.update(admin_auth)
-            created = client.post(
-                "/v1/concepts", json={"code": code, "name_ko": "원본", "level": "단원"}
-            )
-            concept_id = created.json()["concept_id"]
+            concept_id = asyncio.run(_seed_concept(code, "원본", "단원"))
             etag1 = client.get(f"/v1/concepts/{concept_id}").headers["ETag"]
 
             # 일치 If-Match → 200, ETag가 새 값으로 바뀜
@@ -306,9 +315,7 @@ def test_concept_conditional_get_304_on_live_pg(admin_auth: dict[str, str]) -> N
     try:
         with _app_with_jwt_settings() as client:
             client.headers.update(admin_auth)
-            concept_id = client.post(
-                "/v1/concepts", json={"code": code, "name_ko": "원본", "level": "단원"}
-            ).json()["concept_id"]
+            concept_id = asyncio.run(_seed_concept(code, "원본", "단원"))
             etag = client.get(f"/v1/concepts/{concept_id}").headers["ETag"]
 
             # 변하지 않았으면 304(빈 본문)
@@ -348,9 +355,7 @@ def test_concept_get_without_auth_still_public_on_live_pg(admin_auth: dict[str, 
     try:
         with _app_with_jwt_settings() as client:
             client.headers.update(admin_auth)
-            concept_id = client.post(
-                "/v1/concepts", json={"code": code, "name_ko": "원본", "level": "단원"}
-            ).json()["concept_id"]
+            concept_id = asyncio.run(_seed_concept(code, "원본", "단원"))
 
         # 별도 무인증 client로 GET — 헤더 없이 200이어야 한다. 첫 client의 `with` 블록을
         # 벗어난 뒤 새 TestClient를 연다 — 중첩하면 각자의 anyio 이벤트루프 포탈이 asyncpg
@@ -360,6 +365,23 @@ def test_concept_get_without_auth_still_public_on_live_pg(admin_auth: dict[str, 
             resp = anon_client.get(f"/v1/concepts/{concept_id}")
             assert resp.status_code == 200
             assert resp.json()["code"] == code
+    finally:
+        if concept_id is not None:
+            asyncio.run(_delete_concept(uuid.UUID(concept_id)))
+
+
+def test_delete_of_a_loader_owned_concept_is_refused_on_live_pg(admin_auth: dict[str, str]) -> None:
+    """적재가 소유한 개념(표지 없음)은 지워도 다음 적재가 되살린다 — 레거시 DELETE도 409로 거부한다(P3-26)."""
+    code = f"TEST-FILEOWNED-{uuid.uuid4().hex[:8]}"
+    concept_id: str | None = None
+    try:
+        with _app_with_jwt_settings() as client:
+            client.headers.update(admin_auth)
+            concept_id = asyncio.run(_seed_concept(code, "적재 소유", "단원"))
+            refused = client.delete(f"/v1/concepts/{concept_id}")
+            assert refused.status_code == 409, refused.text
+            assert refused.json()["detail"]["code"] == "file_owned"
+            assert client.get(f"/v1/concepts/{concept_id}").status_code == 200  # 그대로 살아 있다
     finally:
         if concept_id is not None:
             asyncio.run(_delete_concept(uuid.UUID(concept_id)))

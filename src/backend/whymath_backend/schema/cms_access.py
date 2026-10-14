@@ -82,6 +82,13 @@ TRANSITION_CAPABILITY: MappingProxyType[TransitionAction, CmsCapability] = Mappi
 #: 롤백 복합 연산이 요구하는 권한.
 ROLLBACK_CAPABILITY: CmsCapability = _P
 
+#: 개념 그래프 **직접** 쓰기(선수 관계 추가·삭제, 개념 행 삭제)가 요구하는 권한 — P3-26.
+#: 관계에는 초안·검토 단계(버전 테이블)가 없다: 쓰는 순간 학습 경로 추천이 읽는 *살아있는* 데이터가
+#: 바뀐다. 그래서 편집 권한(`EDIT`)이 아니라 **발행 권한**을 요구한다 — 살아있는 데이터를 바꿀 수
+#: 있는
+#: 역할만 쓴다. 신규 개념 제안은 이 권한이 아니라 버전 워크플로우(`EDIT` → 검토 → 발행)를 따른다.
+GRAPH_WRITE_CAPABILITY: CmsCapability = _P
+
 
 def capabilities_of(role: Role) -> frozenset[CmsCapability]:
     """`role`이 가진 권한 — 매핑에 없는 역할은 **빈 집합**(fail-closed)."""
@@ -109,6 +116,7 @@ def required_capability(action: TransitionAction | str) -> CmsCapability | None:
 
 __all__ = [
     "CmsCapability",
+    "GRAPH_WRITE_CAPABILITY",
     "ROLE_CAPABILITIES",
     "TRANSITION_CAPABILITY",
     "ROLLBACK_CAPABILITY",

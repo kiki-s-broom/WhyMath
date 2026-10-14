@@ -1671,6 +1671,10 @@ class PrivacyAuditResourceType(str, Enum):
     hint = "hint"
     """`Hint`(`hints`) — 힌트 문구 수정."""
 
+    # ── P3-26 개념 그래프 쓰기 ──
+    concept_edge = "concept_edge"
+    """`ConceptEdge`(`concept_edge`) — 선수 관계 추가·삭제. `resource_id` = `edge_id`."""
+
 
 class PrivacyAuditAction(str, Enum):
     """`privacy_audit.action` — `event_kind=content_mutation` 전용 동작 택소노미(SEC-29·ADMIN-07)
