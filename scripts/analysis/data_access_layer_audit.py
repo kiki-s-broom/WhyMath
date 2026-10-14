@@ -155,6 +155,12 @@ BASELINE: dict[str, frozenset[str]] = {
             # (쓰기 경계와 쿼리가 한 트랜잭션)로 세션을 직접 쓴다. 개념 행은 만들지 않는다 —
             # 발행하는 순간 `publish_gate`가 만든다.
             "api/admin_cms_graph.py",
+            # EOS-194 — 문항 판 발행 호출 표면. **쿼리는 하지 않는다**(조회·쓰기는 전부 게이트 모듈
+            # `l3/problem_publish_gate.py`의 공개 함수) — 이 파일이 소유하는 것은 **트랜잭션 경계**
+            # (`commit`·`rollback`)뿐이다. 전이 + 감사 1행 + commit 1회가 같은 트랜잭션이어야
+            # 하므로 경계가 라우트 핸들러에 있어야 한다(개념 CMS `api/admin_cms.py`와 같은 이유).
+            # 존재 확인 쿼리는 게이트의 `problem_exists`로 옮겨 이 등재가 경계 소유로만 남게 했다.
+            "api/admin_cms_problem_versions.py",
             "api/auth.py",
             "api/coach.py",
             "api/concepts.py",
