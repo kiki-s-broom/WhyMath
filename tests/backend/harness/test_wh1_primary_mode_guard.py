@@ -1,4 +1,4 @@
-"""WH-1 primary 금지모드 가드 seam 단위테스트 — PED-23 회수(원 PED-07 런타임 배선·04e §9).
+"""WH-1 primary 금지모드 가드 seam 단위테스트 — PED-23 회수(원 PED-07 런타임 배선·04g §9).
 
 `run_wh1_primary_turn`에 교수법 팩을 주입하고 `_FakeProvider`(스크립트 JSON)로 위반/무위반 발화를
 제어해, 가드의 fail-closed 폴백·reason_code 로그·플래그 OFF 비트동일·팩 부재 통과를 실 네트워크

@@ -3,7 +3,7 @@
 `test_e2e_pedagogy_pilot_integration.py`(PED-01 파일럿)의 이차함수 소단원 고정물을 재사용해,
 컴파일된 4목표(CONCEPT/PROCEDURE/REPRESENT/MODELING) 각각의 `concept_nodes`(atom code 1개씩:
 `10공수1-02-06-{1,2,3,2}`)가 실 `atom_probe`(원자 백본 코퍼스에서 적재)와 직접 교집합으로 이어져
-`diag_item` 슬롯이 실제로 채워짐을 증명한다 — 04e §7.2가 가정한 crosswalk 없이도 성립함을 라이브로
+`diag_item` 슬롯이 실제로 채워짐을 증명한다 — 04g §7.2가 가정한 crosswalk 없이도 성립함을 라이브로
 재확인한다(모듈 docstring의 grain 다리 정정).
 
 - **실 PG** — `WHYMATH_DATABASE_URL` 소싱. 미도달이면 skip.

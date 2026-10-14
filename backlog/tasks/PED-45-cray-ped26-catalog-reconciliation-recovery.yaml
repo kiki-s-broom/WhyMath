@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,11 +16,12 @@ acceptance:
   - "② 이식 방식 — 04e→04g 치환은 패치 재적용이 아니라 현행 main 위에서 치환을 재실행해 브랜치 결과와 줄 단위로 대조한다(65커밋 낡았고 치환 대상 파일이 54곳이라 충돌 표면이 넓다). 역사 기록(MEMORY·backlog·docs/reviews)은 당시 번호 그대로 둔다. main의 docs/architecture에는 04e가 두 개(04e_misconception_remediation_design.md · 04e_pedagogy_strategy_catalog.md)이므로 개명 대상이 후자임을 먼저 확인한다. 원 번호 PED-26은 재사용하지 않는다(PED-26이 소유 태스크). 브랜치에만 있던 승계 태스크는 별도로 원 번호 복원됐다(ARCH-72·HARN-304·PED-44·REND-05 — 이 태스크가 선행). PED-43은 빈 acceptance 오등재로 브랜치에서 취소된 번호라 복원하지 않는다"
   - "③ 집행 지점 — tests/infra/test_architecture_doc_numbers.py가 CI의 어느 잡(infra-contracts)에서 수집되는지 실측하고, 접두 중복을 일부러 만든 주입이 RED를 내는지(주입 적용·원복 바이트 동일 단언 포함) 확인한다. 브랜치 §4가 보고한 카탈로그 후보 필터 '작동 비율'(합성 격자 7,680점 · 운영 분포 아님 · k_type=SPATIAL·REPRESENT 필터 공집합 폴백)은 이식 후 main 현행에서 재측정해 수치를 갱신한다 — 브랜치 수치를 그대로 옮기지 않는다"
   - "④ 소유 태스크 PED-26-gdmwhk-catalog-recovery-reconciliation의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적고 PED-26을 닫을 수 있는지 판정한다(브랜치의 acceptance ②③은 stale 판정). PED-26은 이 태스크를 선행으로 부착했다. 닫은 뒤 gdmwhk·uqyg79 잔여 diff(gdmwhk 27파일 · uqyg79 2파일 부재 — 브랜치 정합 문서 기록)를 재열거해 삭제 후보 판정을 새 감사에 넘긴다. 이식 PR은 반드시 연다"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1618"
 paths:
   - docs/architecture/04e_pedagogy_strategy_catalog.md
   - tests/infra/test_architecture_doc_numbers.py
   - docs/reviews/pedagogy_catalog_recovery_reconciliation_2026-10-08.md
 session: null
 notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-① (stray-code 17회차). 소유 태스크 PED-26-gdmwhk-catalog-recovery-reconciliation. 회수 완료 전 원 브랜치 claude/nice-cray-mbg1mq 삭제 금지 — 이 브랜치가 사라지면 gdmwhk·uqyg79 회수의 정합 결과와 승계 태스크 4건 원문이 함께 소실된다. 원격 claim PED-26은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
-updated: 2026-10-12
+updated: 2026-10-14

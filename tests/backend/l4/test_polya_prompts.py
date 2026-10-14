@@ -104,7 +104,7 @@ class TestGradeRegister:
         assert _grade_register(grade) == expected
 
     def test_matches_grade_to_band_ladder_for_every_user_profile_grade(self) -> None:
-        """같은 L4의 `grade_to_band`(04e §4 — 13~14=N수는 '고등')와 1~14 전수 일치.
+        """같은 L4의 `grade_to_band`(04g §4 — 13~14=N수는 '고등')와 1~14 전수 일치.
 
         두 매핑이 따로 놀면 한쪽이 N수를 고등으로, 다른 쪽이 대학으로 부르는 모순이 생긴다
         (이식 직후 실측 회귀 — 로더의 대학 1~2학년=13~14 번호와 겹침). 사다리 정본은 하나다."""
