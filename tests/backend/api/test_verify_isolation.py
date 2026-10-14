@@ -26,6 +26,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from whymath_backend.api import _isolated_call
+from whymath_backend.api import verify as verify_api
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.app import create_app
 from whymath_backend.config import get_settings
@@ -68,18 +69,10 @@ class _FakeSession:
         raise AssertionError("verify 라우터(stateless)는 DB 쿼리하지 않아야 한다.")
 
 
-def _app(entered: dict[str, float] | None = None, signal: threading.Event | None = None) -> Any:
-    """테스트 앱. `entered`·`signal`을 주면 느린 요청이 핸들러 의존성 해석에 도달한 시각을 남긴다."""
+def _app() -> Any:
+    """테스트 앱 — 인증은 고정 사용자, DB는 접근 시 실패하는 가짜 세션."""
     app = create_app()
-
-    def _user_dep() -> UserProfile:
-        # 동기 의존성은 FastAPI가 스레드풀에서 실행한다 — 이벤트 루프가 막혀도 이 기록은 정확하다.
-        if entered is not None and signal is not None:
-            entered["t"] = time.perf_counter()
-            signal.set()
-        return _user()
-
-    app.dependency_overrides[get_consented_user] = _user_dep
+    app.dependency_overrides[get_consented_user] = _user
 
     async def _sess() -> AsyncIterator[_FakeSession]:
         yield _FakeSession()
@@ -114,6 +107,18 @@ def isolation_off(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
 
 
+def _prime_routes(client: TestClient) -> None:
+    """앱의 첫 verify 요청이 치르는 라우트 지연 생성을 측정 창 밖에서 먼저 치른다(OPS-136).
+
+    FastAPI는 앱마다 첫 요청에서 라우트 76개의 의존성·응답 모델(`TypeAdapter` 229개)을 지연 생성한다
+    — 단독 ≈0.15초지만 부모 프로세스의 CPU 일이라 코어를 초과 구독하면 ≈1초까지 부푼다(실측: 측정 창
+    `elapsed`의 `other` 구간). 계산 상한·예산과 무관한 비용이라 벽시계 단언의 창에 섞이면 안 된다.
+    입력 검증에서 끝나는 422 요청이라 풀·워커를 건드리지 않는다 — 콜드 풀을 쓰는 테스트에도 안전하다.
+    """
+    resp = client.post("/v1/verify-solution", json={})
+    assert resp.status_code == 422, resp.text
+
+
 def _warm_worker() -> None:
     """워커 기동(SymPy import ≈1s)을 시간 상한 밖에서 미리 치른다."""
     with TestClient(_app()) as client:
@@ -130,19 +135,25 @@ def _warm_worker() -> None:
 class TestBudgetMeansUnverifiable:
     def test_slow_step_is_unverifiable_not_correct_nor_incorrect(self) -> None:
         _warm_worker()
-        started = time.perf_counter()
         with TestClient(_app()) as client:
             resp = client.post(
                 "/v1/verify-step", json={"expr_before": _SLOW_A, "expr_after": _SLOW_B}
             )
-        elapsed = time.perf_counter() - started
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["state"] == "unverifiable"  # 통과도 오답도 아니다
         assert body["reason_code"] == "undecidable"  # 기존 폐쇄 7종 재사용 — 스키마 불변
         assert "상한" in body["reason"]
         assert body["evidence_weight"] == 0.5
-        assert elapsed < 2.0, f"상한 {_CAP_S}s인데 {elapsed:.2f}s — 계산이 끊기지 않았다"
+        # "상한이 계산을 끊었다"는 벽시계가 아니라 풀의 계상으로 증명한다(OPS-136) — 종전 `elapsed < 2.0`은
+        # 앱 기동·첫 요청의 라우트 지연 생성·종료까지 재서 코어를 초과 구독한 러너(머지 큐 2.07초)에서 깨졌다.
+        # 격리를 끈 뮤테이션은 풀이 없어 계상이 {}고, 상한을 키운 뮤테이션은 `timeouts`가 0이라 둘 다 RED다.
+        stats = _isolated_call.isolation_stats()
+        assert stats.get("timeouts") == 1, f"상한이 계산을 끊지 않았다 — 풀 계상 {stats}"
+        assert stats["calls"] == 2  # 워밍업 + 느린 식, 둘 다 풀 경유(스레드 폴백 아님)
+        assert stats["deadlines"] == stats["worker_deaths"] == stats["queue_waits"] == 0
+        assert stats["fallbacks"] == 0
+        assert _isolated_call._get_pool().timeout_s == _CAP_S  # 끊은 상한이 설정한 0.5초다
 
     def test_normal_step_is_unaffected_by_isolation(self) -> None:
         """정상 문항은 격리 전후 같은 판정 — 정상 입력이 판정 불가로 새지 않는다."""
@@ -195,7 +206,9 @@ class TestBudgetMeansUnverifiable:
         steps = ["2*(x+1)", "2*x+2", "2*x+2+0", _SLOW_A, _SLOW_B, _SLOW_A, _SLOW_B]
         steps += [_SLOW_A, _SLOW_B, _SLOW_A, _SLOW_B]
         with TestClient(_app()) as client:
-            # 검증 요청 한 건만 잰다 — 앱 기동·종료(실측 0.02초 안팎)는 이 테스트의 대상이 아니다.
+            # 검증 요청 한 건만 잰다 — 앱 기동·종료(실측 0.02초 안팎)와 앱 첫 요청의 라우트 지연 생성
+            # (≈0.15초·과부하 ≈1초)은 이 테스트의 대상이 아니라 먼저 치른다(OPS-136).
+            _prime_routes(client)
             started = time.perf_counter()
             resp = client.post("/v1/verify-solution", json={"steps": steps})
             elapsed = time.perf_counter() - started
@@ -224,9 +237,7 @@ class TestBudgetMeansUnverifiable:
         남은 예산 대신 상한 전체를 주는 뮤테이션(0.5·0.5·0.5)과 예산을 없앤 뮤테이션(8회 호출)이 둘 다
         RED다 — 위 실 SymPy 테스트의 벽시계로는 앞의 뮤테이션이 정상과 구별되지 않는다.
         """
-        from whymath_backend.api import verify as verify_api
-
-        clock = {"now": 1000.0}
+        clock ={"now": 1000.0}
         monkeypatch.setattr(verify_api, "time", SimpleNamespace(monotonic=lambda: clock["now"]))
         granted: list[float] = []
         budgets: list[float] = []
@@ -271,6 +282,7 @@ class TestBudgetMeansUnverifiable:
         budget_s = _CAP_S * 4  # verify_api._CHAIN_BUDGET_FACTOR
 
         with TestClient(_app()) as client:
+            _prime_routes(client)  # 풀·워커는 콜드 그대로 — 라우트 지연 생성만 창 밖에서 치른다(OPS-136)
             started = time.perf_counter()
             resp = client.post("/v1/verify-solution", json={"steps": ["2*x+2", "2*(x+1)", "x+x+2"]})
             elapsed = time.perf_counter() - started
@@ -295,7 +307,7 @@ class TestBudgetMeansUnverifiable:
 
 
 async def _light_request_lateness_during_slow_step(
-    slow_pair: tuple[str, str],
+    slow_pair: tuple[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> tuple[float, float]:
     """느린 verify-step이 진행 중일 때 가벼운 `/health` 요청이 *얼마나 늦어졌는가*(초)와 느린 요청 총 시간.
 
@@ -307,12 +319,25 @@ async def _light_request_lateness_during_slow_step(
     SymPy 호출에 진입하는 시각이 첫 요청 준비(미들웨어·의존성·본문 검증)로 0.10~0.33초 사이에서
     흔들려(4코어 샌드박스 실측 2026-10-09) 진입이 0.15초보다 늦으면 *막히기 전에* 가벼운 요청이 먼저
     나가 늦어짐이 0.1초대로 측정됐다(대조군이 "격리 OFF인데 안 막힘"으로 거짓 RED, 격리 ON 쪽은 격리를
-    되돌려도 GREEN이 되는 거짓 통과 위험). 그래서 진입 시각을 의존성 해석 스레드에서 직접 기록하고
-    그 시각 + 0.1초를 목표로 삼는다.
+    되돌려도 GREEN이 되는 거짓 통과 위험). 그래서 진입 시각을 직접 기록하고 그 시각 + 0.1초를 목표로 삼는다.
+
+    **진입 시각은 의존성 해석이 아니라 핸들러가 `isolated(...)`를 부르는 순간이다(OPS-136)** — 직전 판본은
+    의존성 해석 스레드에서 기록했는데, 그 시각과 핸들러 본문이 SymPy를 부르는 시각 사이에 이벤트 루프의
+    한 번 이상 돌아감이 끼어 있다. 코어를 초과 구독하면 이 간격이 0.1초를 넘어(수정 전 판본을 방해
+    프로세스 4~6개 아래서 32회 돌려 대조군이 6회 RED, 늦어짐 0.01초) 가벼운 요청이 *막히기 전에* 먼저
+    나갔다. 핸들러 진입 직후에는 `await` 없이 곧바로 격리 OFF의 동기 계산이 시작되므로 간격이 없다.
     """
     entered: dict[str, float] = {}
     signal = threading.Event()
-    transport = httpx.ASGITransport(app=_app(entered, signal))
+    real_isolated = verify_api.isolated
+
+    async def _isolated_marking_entry(*args: Any, **kwargs: Any) -> Any:
+        entered["t"] = time.perf_counter()
+        signal.set()
+        return await real_isolated(*args, **kwargs)
+
+    monkeypatch.setattr(verify_api, "isolated", _isolated_marking_entry)
+    transport = httpx.ASGITransport(app=_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
         slow_started = time.perf_counter()
         slow = asyncio.create_task(
@@ -322,7 +347,7 @@ async def _light_request_lateness_during_slow_step(
         )
         # 스레드에서 기다린다 — 루프가 막혀 있어도 이 대기와 기록은 영향받지 않는다.
         assert await asyncio.to_thread(signal.wait, 30.0), "느린 요청이 핸들러에 도달하지 못했다"
-        target = entered["t"] + 0.1  # 의존성 해석 → 핸들러 본문 → SymPy 진입의 잔여(ms 단위) 여유
+        target = entered["t"] + 0.1  # 핸들러 진입 → (ON) 워커 디스패치 완료까지의 여유
         delay = target - time.perf_counter()
         if delay > 0:
             await asyncio.sleep(delay)  # 루프가 막혀 있었다면 이미 지나 있어 건너뛴다
@@ -335,21 +360,29 @@ async def _light_request_lateness_during_slow_step(
 
 
 class TestEventLoopNotBlocked:
-    async def test_light_request_is_not_blocked_by_slow_sympy(self, isolation_on: None) -> None:
+    async def test_light_request_is_not_blocked_by_slow_sympy(
+        self, isolation_on: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """④ⓑ 격리 ON — 느린 식(상한 0.5s) 진행 중에도 가벼운 요청이 거의 늦어지지 않는다(< 0.3s)."""
         await asyncio.to_thread(_warm_worker)
         # 고유 입력(차수 14 ≈ 3.7초 > 상한 0.5초) — 격리를 되돌린 뮤테이션에서 앞선 테스트의 SymPy 캐시에
         # 적중해 빠르게 끝나면 이 테스트가 RED가 되지 못한다(뮤테이션 실측으로 확인한 결함).
-        lateness, _ = await _light_request_lateness_during_slow_step(_unique_slow(14))
+        lateness, _ = await _light_request_lateness_during_slow_step(
+            _unique_slow(14), monkeypatch
+        )
         assert lateness < 0.3, f"가벼운 요청이 {lateness:.2f}s 늦어졌다 — 루프 차단"
 
-    async def test_control_without_isolation_blocks_the_loop(self, isolation_off: None) -> None:
+    async def test_control_without_isolation_blocks_the_loop(
+        self, isolation_off: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """대조군 — 격리 OFF(= 격리를 되돌린 뮤테이션)면 같은 가벼운 요청이 느린 식이 끝날 때까지 막힌다.
 
         이 테스트가 GREEN이라는 것은 위 `test_light_request_is_not_blocked...`가 격리 때문에
         통과했다는 증거다(격리가 없어도 통과하는 무의미한 검사가 아님).
         """
         # 고유 입력(차수 12≈2.2초) — 같은 프로세스 SymPy 캐시에 적중하면 빠르게 끝나 변별하지 못한다.
-        lateness, slow_total = await _light_request_lateness_during_slow_step(_unique_slow(12))
+        lateness, slow_total = await _light_request_lateness_during_slow_step(
+            _unique_slow(12), monkeypatch
+        )
         assert lateness > 1.0, f"격리 OFF인데 늦어짐 {lateness:.2f}s — 대조군이 변별하지 못한다"
         assert slow_total > 1.5
