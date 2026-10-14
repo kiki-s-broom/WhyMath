@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-143-measurement-sweep-frozen-input-copy
+title: "장기 측정 스윕이 작업 트리 파일을 매번 import하면 스윕 도중 편집이 표본을 오염시킨다 — 입력 고정 사본 + 지문 기록"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-307-frozen-copy-check-wrapper
+requires_gates: []
+acceptance:
+  - "① 실패 고정 — 장기 측정 스윕(프로세스를 반복 기동하며 매번 작업 트리의 테스트·소스 파일을 import)을 도는 동안 그 파일을 편집하면, 편집 이후에 기동한 프로세스가 편집본을 읽어 같은 스윕 안의 표본이 서로 다른 파일 내용을 측정한다. 이 상태를 재현하는 테스트를 먼저 둔다(스윕 도중 파일 변경 → 이후 표본의 파일 지문이 달라짐이 관측됨).\n② 대책(코드) — 하네스가 제공하는 스윕 실행 경로가 시작 시점에 입력 파일을 고정 사본으로 떠서(내용 해시 이름) 모든 표본이 그 사본을 읽게 하고, 각 표본 출력에 사본 지문을 싣는다. 원본이 도중에 바뀌어도 표본의 지문이 불변임을 ①의 재현으로 보인다(대조군: 원본 직접 import는 지문이 바뀐다).\n③ 집행 지점 — 장기 검사·측정을 돌리는 표준 경로를 하나 정하고(HARN-307의 고정 사본 래퍼 경로와 합칠 수 있으면 합친다), 스윕 종료 시 원본 지문이 시작 때와 다르면 결과에 '원본 변경됨'을 남긴다(침묵 금지). HARN-194(CI 미러 한정)와 HARN-307(검사 래퍼 셸 스크립트 한정)이 닿지 않는 '측정 프로세스가 트리 파일을 import하는' 형태가 이 태스크의 범위다."
+artifacts: []
+paths:
+  - scripts/harness/ci_mirror.py
+session: null
+notes: "출처: OPS-136 조사(2026-10-14)에서 사고 대장 verification-tree-mutation-during-check 5회차 발생. 방해 프로세스를 깔고 측정 스크립트를 프로세스마다 기동하는 스윕이 도는 중에 대상 테스트 파일을 편집했다 — 스크립트가 그 파일을 매번 import하므로 편집 이후 기동한 프로세스는 편집본을 읽는다. 세션이 곧 알아채 수정 전 판본을 git show HEAD:로 뜬 사본(sha256 일치 확인)으로 import 경로를 바꿔 오염을 막았고 측정 로직 차이가 없어 결과는 유효했으나, 막은 것은 장치가 아니라 사람의 사후 알아챔이었다. 기존 상환 HARN-194(ci_mirror 한정)·HARN-307(검사 래퍼 셸 스크립트 한정)은 이 형태(임의 측정 스크립트의 import)를 닿지 못한다 — acceptance ③ 참조. 유실 위험은 없었다."
+updated: 2026-10-14

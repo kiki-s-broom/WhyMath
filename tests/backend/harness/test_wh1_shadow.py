@@ -208,6 +208,13 @@ class TestNoRawLeak:
             "tone_violations",
             "prose_rephrased",
             "prose_reason_code",
+            # OPS-134 — primary 결말(닫힌 어휘 라벨 7종)·소요 ms·LLM 호출 수·호출 소요 합은 전부
+            # 비식별 *정수/라벨*이다. 어떤 학생의 무엇을 했는지가 아니라 한 턴이 얼마나 걸렸는지다.
+            "primary_outcome",
+            "elapsed_ms",
+            "llm_calls",
+            "llm_calls_finished",
+            "llm_ms_total",
             "observed_at",
         }
 

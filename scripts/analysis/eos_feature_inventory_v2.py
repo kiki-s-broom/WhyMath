@@ -802,8 +802,12 @@ CATALOG: tuple[Spec, ...] = (
        "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5). EOS-190 — 문항 판 writer(`l3."
        "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이고 운영 호출자"
        "는 EOS-194의 관리자 CMS 문항 판 표면(WM-S-058)이다 · 시도 버전 고정(EOS-47)만 포인터를 "
-       "읽는다",
-       "l3.publish_gate", "l3.problem_publish_gate", status="Batch"),
+       "읽는다 · "
+       "P3-04 — PUBLISH 게이트가 Problem 필수 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 "
+       "전략)를 요구한다(`l3.problem_metadata_evidence`가 DB에서 증거를 읽는다 · 정의는 "
+       "`schema.problem_metadata`)",
+       "l3.publish_gate", "l3.problem_publish_gate", "l3.problem_metadata_evidence",
+       status="Batch"),
     _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
        "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
@@ -1055,7 +1059,8 @@ CATALOG: tuple[Spec, ...] = (
        "schema.misconception_catalog", "schema.misconception_crosslink",
        "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",
        "schema.parental_consent", "schema.pedagogy_pack", "schema.pedagogy_strategy",
-       "schema.problem", "schema.problem_version", "schema.provenance", "schema.review_timer",
+       "schema.problem", "schema.problem_metadata", "schema.problem_version", "schema.provenance",
+       "schema.review_timer",
        "schema.review_transition", "schema.rights",
        "schema.speech", "schema.standard", "schema.student_solution_step",
        "schema.textbook_mapping", "schema.timeseries", "schema.unit_dsl", "schema.user",

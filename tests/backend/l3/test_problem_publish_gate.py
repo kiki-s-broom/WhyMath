@@ -36,6 +36,12 @@ from whymath_backend.schema.enums import (
     SourceType,
     Subject,
 )
+from whymath_backend.schema.problem_metadata import (
+    FIELD_EVIDENCE,
+    ProblemMetadataEvidence,
+    ProblemMetadataField,
+    ProblemSlot,
+)
 from whymath_backend.schema.problem_version import ProblemVersion, ProblemVersionPayload
 from whymath_backend.schema.version_header import (
     GateKind,
@@ -92,6 +98,26 @@ def _live(version: ProblemVersion) -> str:
     return compute_content_hash(version.payload)
 
 
+def _complete_evidence(**overrides: object) -> ProblemMetadataEvidence:
+    """7필드가 전부 채워진 증거 — 기존 발행 테스트가 **다른 한 가지 원인만** 보게 하는 대조군."""
+    base: dict[str, object] = {
+        "difficulty": 2.0,
+        "answer": "2",
+        "solution_text": "양변에서 1을 뺀다.",
+        "concept_ids": ("c-1",),
+        "skill_ids": ("skill-1",),
+        "own_misconception_ids": ("power-rule-step-omitted",),
+        "concept_misconception_ids": ("M0671",),
+        "verified_hint_count": 1,
+        "slots": frozenset({ProblemSlot.REPRESENTATIVE}),
+    }
+    base.update(overrides)
+    return ProblemMetadataEvidence(**base)  # type: ignore[arg-type]
+
+
+_COMPLETE = _complete_evidence()
+
+
 # ── content_hash ─────────────────────────────────────────────────────────────
 def test_content_hash_is_deterministic_and_content_sensitive() -> None:
     a = compute_content_hash(_payload())
@@ -113,7 +139,12 @@ def test_content_hash_ignores_jsonb_key_order() -> None:
 def test_full_happy_path_records_governance_and_gate_evidence() -> None:
     approved = _approved()
     published = plan_transition(
-        approved, _A.PUBLISH, actor="publisher", live_content_hash=_live(approved), now=_NOW
+        approved,
+        _A.PUBLISH,
+        actor="publisher",
+        live_content_hash=_live(approved),
+        metadata_evidence=_COMPLETE,
+        now=_NOW,
     )
     assert published.status == VersionStatus.PUBLISHED.value
     assert published.published_at == _NOW
@@ -130,6 +161,7 @@ def test_full_happy_path_records_governance_and_gate_evidence() -> None:
     assert last.judged_by == "publisher" and last.judged_at == _NOW and last.bypassed is False
     assert {"content_hash", "governance_complete", "qa_record_bound"} <= set(last.checks)
     assert "live_content_current" in last.checks, "발행 기록에 라이브 대조가 근거로 남아야 한다"
+    assert "problem_metadata_complete" in last.checks, "발행 기록에 7필드 검사가 근거로 남아야 한다"
     assert published.qa.validator_bundle_version == VALIDATOR_BUNDLE_VERSION
     assert published.qa.qa_status == "PASSED"
 
@@ -144,21 +176,35 @@ def test_transitions_never_change_the_payload() -> None:
 def test_publish_without_live_hash_is_refused_not_passed() -> None:
     """모른다 ≠ 통과 — 대조하지 못하면 발행하지 않는다."""
     with pytest.raises(PublishGateError, match="live_content_current: 라이브 문항 내용을 대조하지"):
-        plan_transition(_approved(), _A.PUBLISH, actor="publisher", now=_NOW)
+        plan_transition(
+            _approved(), _A.PUBLISH, actor="publisher", metadata_evidence=_COMPLETE, now=_NOW
+        )
 
 
 def test_publish_refuses_when_live_problem_changed_after_approval() -> None:
     approved = _approved()
     stale = compute_content_hash(_payload("승인 뒤 CMS가 고친 발문"))
     with pytest.raises(PublishGateError, match="live_content_current: 승인 이후 라이브 문항이"):
-        plan_transition(approved, _A.PUBLISH, actor="publisher", live_content_hash=stale, now=_NOW)
+        plan_transition(
+            approved,
+            _A.PUBLISH,
+            actor="publisher",
+            live_content_hash=stale,
+            metadata_evidence=_COMPLETE,
+            now=_NOW,
+        )
 
 
 def test_publish_passes_when_live_problem_matches_control() -> None:
     """대조군 — 같은 승인본이 라이브 해시만 일치하면 통과한다(과잉 거부가 아님)."""
     approved = _approved()
     published = plan_transition(
-        approved, _A.PUBLISH, actor="publisher", live_content_hash=_live(approved), now=_NOW
+        approved,
+        _A.PUBLISH,
+        actor="publisher",
+        live_content_hash=_live(approved),
+        metadata_evidence=_COMPLETE,
+        now=_NOW,
     )
     assert published.status == VersionStatus.PUBLISHED.value
 
@@ -174,7 +220,12 @@ def test_publish_refuses_payload_tampered_after_approval() -> None:
     tampered = approved.model_copy(update={"payload": _payload("승인 뒤 바꿔치기")})
     with pytest.raises(PublishGateError, match="content_hash: 승인 이후 payload가 바뀌었다"):
         plan_transition(
-            tampered, _A.PUBLISH, actor="publisher", live_content_hash=_live(tampered), now=_NOW
+            tampered,
+            _A.PUBLISH,
+            actor="publisher",
+            live_content_hash=_live(tampered),
+            metadata_evidence=_COMPLETE,
+            now=_NOW,
         )
 
 
@@ -184,7 +235,12 @@ def test_publish_refuses_forged_approval_without_qa_record() -> None:
     forged = approved.model_copy(update={"qa": approved.qa.model_copy(update={"records": []})})
     with pytest.raises(PublishGateError, match="qa_record_bound"):
         plan_transition(
-            forged, _A.PUBLISH, actor="publisher", live_content_hash=_live(forged), now=_NOW
+            forged,
+            _A.PUBLISH,
+            actor="publisher",
+            live_content_hash=_live(forged),
+            metadata_evidence=_COMPLETE,
+            now=_NOW,
         )
 
 
@@ -224,6 +280,7 @@ def test_gate_collects_all_failures_in_one_report() -> None:
     joined = " | ".join(info.value.failures)
     assert "content_hash" in joined and "qa_record_bound" in joined
     assert "live_content_current" in joined
+    assert "problem_metadata_complete" in joined, "증거가 없으면 7필드 검사도 실패로 보고된다"
 
 
 def test_gate_other_than_qa_publish_is_not_owned_by_this_module() -> None:
@@ -241,6 +298,7 @@ def test_undefined_and_compound_only_transitions_are_refused() -> None:
         _A.PUBLISH,
         actor="publisher",
         live_content_hash=_live(_approved()),
+        metadata_evidence=_COMPLETE,
         now=_NOW,
     )
     for compound in (_A.ROLLBACK, _A.SUPERSEDE):
@@ -252,6 +310,97 @@ def test_undefined_and_compound_only_transitions_are_refused() -> None:
 def test_blank_actor_is_refused(actor: str) -> None:
     with pytest.raises(ValueError, match="actor가 비었다"):
         plan_transition(_draft(), _A.SUBMIT, actor=actor, now=_NOW)
+
+
+# ── problem_metadata_complete — P3-04 7필드 (PUBLISH 전용) ───────────────────
+def _publish(evidence: ProblemMetadataEvidence | None) -> ProblemVersion:
+    approved = _approved()
+    return plan_transition(
+        approved,
+        _A.PUBLISH,
+        actor="publisher",
+        live_content_hash=_live(approved),
+        metadata_evidence=evidence,
+        now=_NOW,
+    )
+
+
+def _blanked(field: ProblemMetadataField, *, unmeasured: bool) -> ProblemMetadataEvidence:
+    """대조군에서 한 필드의 증거 속성만 비운다 — 다른 필드는 건드리지 않는다."""
+    empty: dict[str, object] = {
+        "difficulty": float("nan"),
+        "answer": "",
+        "solution_text": "",
+        "concept_ids": (),
+        "skill_ids": (),
+        "own_misconception_ids": (),
+        "concept_misconception_ids": (),
+        "verified_hint_count": 0,
+    }
+    changes = {attr: (None if unmeasured else empty[attr]) for attr in FIELD_EVIDENCE[field]}
+    broken = _complete_evidence(**changes)
+    assert broken != _COMPLETE, "주입이 적용되지 않았다 — 대조군과 같은 입력이다"
+    return broken
+
+
+def test_publish_with_all_seven_fields_passes_control() -> None:
+    assert _publish(_COMPLETE).status == VersionStatus.PUBLISHED.value
+
+
+def test_publish_without_metadata_evidence_is_refused_not_passed() -> None:
+    """모른다 ≠ 통과 — 7필드를 측정하지 못했으면 발행하지 않는다."""
+    with pytest.raises(
+        PublishGateError, match="problem_metadata_complete: 7필드를 측정하지 못했다"
+    ):
+        _publish(None)
+
+
+@pytest.mark.parametrize("field", list(ProblemMetadataField), ids=lambda f: f.value)
+def test_publish_refuses_each_blanked_field_and_only_that_field(
+    field: ProblemMetadataField,
+) -> None:
+    """7필드를 하나씩 비운다 → 7건 모두 거부되고, 거부 사유는 그 필드 하나뿐이다."""
+    with pytest.raises(PublishGateError) as info:
+        _publish(_blanked(field, unmeasured=False))
+    assert info.value.failures == (f"problem_metadata_complete: {field.value}: 비어 있다",)
+
+
+@pytest.mark.parametrize("field", list(ProblemMetadataField), ids=lambda f: f.value)
+def test_publish_refuses_each_unmeasured_field_and_only_that_field(
+    field: ProblemMetadataField,
+) -> None:
+    with pytest.raises(PublishGateError) as info:
+        _publish(_blanked(field, unmeasured=True))
+    assert info.value.failures == (f"problem_metadata_complete: {field.value}: 측정하지 못했다",)
+
+
+def test_publish_reports_every_blank_field_in_one_refusal() -> None:
+    both = _complete_evidence(answer="", verified_hint_count=0)
+    with pytest.raises(PublishGateError) as info:
+        _publish(both)
+    assert info.value.failures == (
+        "problem_metadata_complete: answer: 비어 있다",
+        "problem_metadata_complete: hint_strategy: 비어 있다",
+    )
+
+
+def test_trigger_slot_with_only_inherited_misconception_is_refused_at_the_gate() -> None:
+    """같은 증거가 다른 슬롯이면 통과(대조) · 오개념 유발 슬롯이면 거부 — 슬롯 규칙이 게이트까지 온다."""
+    inherited_only = {"own_misconception_ids": (), "concept_misconception_ids": ("M0671",)}
+    assert _publish(_complete_evidence(**inherited_only)).status == VersionStatus.PUBLISHED.value
+    trigger = _complete_evidence(
+        slots=frozenset({ProblemSlot.MISCONCEPTION_TRIGGER}), **inherited_only
+    )
+    with pytest.raises(PublishGateError) as info:
+        _publish(trigger)
+    assert info.value.failures == ("problem_metadata_complete: misconception_signature: 비어 있다",)
+
+
+def test_missing_metadata_does_not_block_earlier_transitions() -> None:
+    """7필드는 발행의 조건이다 — 제출·검토·승인은 증거 없이 진행되고 APPROVED에서 멈춘다."""
+    assert _approved().status == VersionStatus.APPROVED.value
+    with pytest.raises(PublishGateError):
+        _publish(None)
 
 
 # ── snapshot_payload — 라이브 행 → 판 payload ────────────────────────────────

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S5
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,11 +16,12 @@ acceptance:
   - "② 이식 방식 = 파일 단위(통째 머지 금지 — 34커밋 낡음). 원 번호 OPS-50은 재사용하지 않는다(OPS-50은 소유 태스크로 남아 라이브 재측정을 마저 소유한다). run_moe_quality_battle.ps1은 Windows PowerShell 전용이라 이식 후 scripts/ops/check_ps_scripts.py(CI 차단 스텝)가 통과해야 한다 — 로컬에서 그 스크립트를 먼저 돌려 확인한다. 브랜치가 'provider.generate 호출 지점은 _evaluate_one 1곳 유지'를 주장하므로 이식 후 grep으로 재확인한다(LLM 호출은 라우터 경유 — CLAUDE.md)"
   - "③ 집행 지점·변별력 — 이식한 테스트 26건이 CI에서 수집되는 경로(tests/backend/harness)임을 실측하고, 브랜치의 뮤테이션 13종 중 재현 가능한 것을 다시 주입해 RED를 확인하되 주입 적용과 원복 바이트 동일성을 단언한다. 라이브 재측정(OPS-50 ③④)은 이 태스크의 범위가 아니다 — 무엇이 미확인인지 판정 문서에 분리해 적는다"
   - "④ 소유 태스크 OPS-50의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적는다. 미이행분(라이브 재측정)은 OPS-50이 계속 소유하며 닫지 않는다. OPS-50은 이 태스크를 선행으로 부착했다. 이식 PR은 반드시 연다"
-artifacts: []
+artifacts:
+  - "PR #1621 (https://github.com/kiki-s-broom/WhyMath/pull/1621) · docs/reviews/ops130_ops50_moe_parse_recovery_2026-10-14.md · 판정 기준 main 24d8607d · 라이브 재측정(OPS-50 ③④⑤)은 미수행·OPS-50 소유"
 paths:
   - src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py
   - tests/backend/harness/test_quality_tier_prompt_variants_ops50.py
   - scripts/ops/run_moe_quality_battle.ps1
 session: null
 notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-① (stray-code 17회차). 소유 태스크 OPS-50. 회수 완료 전 원 브랜치 claude/happy-turing-kmrd5z 삭제 금지. 원격 claim OPS-50은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
-updated: 2026-10-12
+updated: 2026-10-14
