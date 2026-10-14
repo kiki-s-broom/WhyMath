@@ -338,6 +338,22 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-14 (구현 · P3-04): **Problem 7필드·6슬롯을 발행 게이트에 걸었다 — 7필드가 비거나 측정 못 한 문항은 Published로 못 간다. 새 컬럼·마이그레이션 없음** (claude 구현, 설계 분기 2건은 사용자 결정) — 판정 기준 main `d21e4aeb` 위, 병합 후 HEAD 기준 로컬 CI 재현 6잡 통과
+
+**무엇**: 태스크 `P3-04-problem-metadata-and-slots`. 정본 = `docs/standards/problem_metadata_contract.md`(정의·필드 매핑·판정 규칙), 현황 = `docs/reviews/p3_04_problem_metadata_status_2026-10-14.md`. ① 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 전략)를 기존 컬럼·연결에 매핑(개명 없음). ② 6슬롯은 기존 `problem.tags`의 `p3-slot:<id>` 태그. ③ 집행 지점 = `l3/problem_publish_gate.py`의 PUBLISH 게이트(`problem_metadata_complete`) — Published로 가는 유일한 경로라 우회로가 없다. 증거는 `l3/problem_metadata_evidence.py`가 DB에서 읽는다(잠금 없음). ④ CI 쪽 = 실 코퍼스 래칫(`test_phase3_problem_metadata_ratchet.py`, 하한만 오른다) + P3-02 계측기에 `Concept Slot Coverage(6슬롯)`·7필드 집계 추가.
+
+**판정 규칙**: 3상태(있음·비어 있음·측정 못함). 측정 못함은 통과가 아니다. 증거 `None` = 안 잼, 빈 값 = 잼-비어 있음.
+
+**사용자 결정(2건)**: ① 오개념 서명 = 슬롯별로 다르게 — `misconception_trigger` 슬롯 문항은 문항 자체 연결이 있어야 하고, 나머지 5슬롯·슬롯 없는 문항은 개념에서 상속한 오개념도 인정(슬롯을 모르면 완화 규칙 없음). ② 힌트 전략 = 기존 `hints` 테이블에 `verified=true` 힌트 1개 이상(새 컬럼 없음).
+
+**실측**: 적격(approved) 문항 917건 중 6필드는 전건 있음·비어 있음 0건. `hint_strategy`는 파일 코퍼스로 못 재서 917건 전부 측정 못함 → 7필드 완전 충족 0건(원인 하나). 오개념 서명이 상속만인 문항 681건(74%)·자체 연결 236건. 슬롯 60칸 중 42칸 충족 — `[12미적Ⅰ-02-01]`·`[-02-02]`·`[-02-07]` 3개 개념(적격 413건)에 슬롯 태그가 한 건도 없다. P3-31 병합 뒤에도 수치 동일.
+
+**검증**: 필드 누락 주입 7건 전건 RED(단위·실 PostgreSQL 통합 양쪽) + 대조군, 뮤테이션 30종 전건 검출(주입 실재·원복 바이트 동일 대조). 병합된 HEAD에서 `ci_mirror.py`로 backend·infra-contracts·infra-shell·policy-guard·harness-integrity·declared-unwired-audit 6잡 전건 통과. 통합 테스트 `-m integration --ignore=tests/backend/l3` 636 passed·13 skipped·0 failed(병합 전 기준).
+
+**정직한 공백**: ① `backend-migrations`·`docker-build` 잡은 로컬 재현 불가 — CI가 판정. ② 코퍼스 문항이 운영 DB에 적재돼 있고 힌트가 있는지는 확인하지 못했다(발행 게이트는 DB를 읽는다). ③ `hint_strategy` 코퍼스 측정 = `P3-22`·`P3-32`(전제 정정: 힌트 좌석은 이미 `hints`에 있다). ④ 슬롯 근사 중복 기준 = `P3-05`. ⑤ 발행 이후 편집이 필드를 비우는 경우 = `EOS-195`. ⑥ 발행 거부 사유를 화면에 보이는 표면 = `EOS-194`.
+
+**사고 경위(시스템 실수 없음)**: 이 태스크 착수 전 게이트 `G-p3-g1-week1`이 Kiki 소유라 세션이 못 열었고, 우회하지 않고 넘겨 Kiki가 PR 1614로 해소했다.
+
 ### 2026-10-12 (구현 · P3-26): **CMS가 개념을 새로 제안하고 선수 관계를 쓰고 개념을 지울 수 있게 했다 — 정본은 "행이 어디서 왔는가"로 갈랐고, 개념 행은 발행하는 순간에만 만들어지며, 순환은 서버가 막는다** (claude 구현, 설계 분기 1건은 사용자 결정) — 분기 커밋 `d873d064`
 
 **무엇**: 태스크 `P3-26-cms-concept-create-delete-edge-write`. 정본 = `docs/standards/cms_concept_graph_write_contract.md`. ① 원천 정본: `graph.json`에서 온 개념·관계는 파일이 정본(CMS가 못 지움), CMS가 만든 것은 DB가 정본(적재가 건너뜀). 소유 표지는 P3-25와 같은 `cms_edited_at`을 `concept`·`concept_edge`에 둠(백필·기본값 없음). ② 선수 관계: 서버가 비순환 검사(순환이면 422 + 코드 경로), 어드바이저리 잠금으로 동시 요청 직렬화, 적재 CLI도 같은 잠금 안에서 DB의 CMS 관계와 합쳐 순환 검사. ③ 신규 개념: 제안은 DRAFT만 만들고 발행 시 `publish_gate`가 행 생성. 삭제는 CMS가 만든·발행본 없는·참조 없는 개념만.
