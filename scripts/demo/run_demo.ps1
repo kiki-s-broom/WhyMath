@@ -11,8 +11,19 @@
 #
 # 사용법(리포 루트, PowerShell):  .\scripts\demo\run_demo.ps1
 #   실행정책 오류 시 먼저:        Set-ExecutionPolicy -Scope Process -Bypass
+#
+# 낡은 데모 DB(OPS-133): [2/6]에서 alembic이 "Can't locate revision"으로 실패하면 데모 DB가 main에 없는
+#   리비전을 기억하는 것인지 판정해 원인을 출력한다. 초기화는 자동이 아니다 — 안내된 대로
+#   .\scripts\demo\run_demo.ps1 -ResetStaleDemoDb 를 직접 붙여 다시 실행할 때만 데모 컨테이너를 지운다.
+[CmdletBinding()]
+param(
+  [switch]$ResetStaleDemoDb
+)
 
 $ErrorActionPreference = "Stop"
+
+# 데모 DB 마이그레이션·낡은 DB 진단/초기화 함수(OPS-133). 같은 폴더에서 읽는다.
+. (Join-Path $PSScriptRoot "demo_db_recovery.ps1")
 
 # ── 경로·상수 ────────────────────────────────────────────────────────────────
 $RepoRoot   = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -62,23 +73,14 @@ Write-Host "▶ [1/6] throwaway Postgres 기동…"
 docker compose -f $ComposeFile up -d demo-db
 if ($LASTEXITCODE -ne 0) { throw "docker compose 실패 — Docker Desktop이 실행 중인지 확인." }
 Write-Host "  · PG health 대기…"
-$ok = $false
-for ($i = 0; $i -lt 60; $i++) {
-  docker compose -f $ComposeFile exec -T demo-db pg_isready -U whymath -d whymath *> $null
-  if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-  Start-Sleep -Seconds 1
-}
-if (-not $ok) { throw "PG가 시간 내 준비되지 않음." }
+if (-not (Wait-DemoDbReady -ComposeFile $ComposeFile)) { throw "PG가 시간 내 준비되지 않음." }
 Write-Host "  · PG ready."
 
 Write-Host "▶ [2/6] alembic 스키마 마이그레이션(upgrade head)…"
-Push-Location $BackendDir
-try {
-  alembic -c alembic.ini upgrade head
-  if ($LASTEXITCODE -ne 0) { throw "alembic upgrade 실패." }
-} finally {
-  Pop-Location
-}
+# 실패하면 낡은 데모 DB(main에 없는 리비전 기억)인지 판정해 원인을 출력한다 — 본체는 demo_db_recovery.ps1.
+Invoke-DemoMigration -BackendDir $BackendDir -ComposeFile $ComposeFile `
+  -HelperPath (Join-Path $RepoRoot "scripts\demo\diagnose_stale_demo_db.py") `
+  -DatabaseUrl $env:WHYMATH_DATABASE_URL -ResetStaleDemoDb:$ResetStaleDemoDb
 
 Write-Host "▶ [3/6] 진단 문제 시드(멱등)…"
 python (Join-Path $RepoRoot "scripts\demo\seed_demo.py")
