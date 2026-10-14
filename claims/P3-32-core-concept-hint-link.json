@@ -1,1 +1,1 @@
-{"branch": "claude/great-ride-0j47j7", "harness": "2.0", "task": "P3-32-core-concept-hint-link", "ts": "2026-10-14T21:46:36Z"}
+{"branch": "claude/great-ride-0j47j7", "harness": "2.0", "kind": "block", "reason": "선행 P3-22(측정 배선) 미착지 + 채우기에 DB 필요(클라우드 세션엔 Postgres 없음) — P3-22 done 후 unblock", "task": "P3-32-core-concept-hint-link", "ts": "2026-10-14T21:54:01Z"}
