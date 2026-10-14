@@ -1331,6 +1331,16 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # docs/standards/incident_response_slo.md §4-1의 실패 유형과 /demo-doctor 카탈로그
         # W1행이 이 CLI를 1차 진단으로 지목한다.
         "ops.db_host_reachability": _LIVE_DEPENDENT,
+        # OPS-139(2026-10-14): 원자 백본 정본↔prod DB 패리티 프로브. 입력이 **살아 있는
+        # docker 데몬 +
+        # 실행 중인 prod 컨테이너(whymath-pg)**라 CI에는 둘 다 없다 — 상시 실행하면 전건 UNKNOWN
+        # (exit 2)만 난다(그것이 설계값이지 CI에서 확인할 값이 아니다). **판정 로직은 순수 코어로
+        # 분리돼 있고** tests/backend/ops/test_atom_graph_prod_parity.py가 MATCH/DRIFT(방향 3종)/
+        # UNKNOWN/입력오류를 전건 주입해 CI에서 상시 검증하며, *_mutation.py가 절 19종을 지웠을 때
+        # RED가 되는지를 상시 확인한다. 운영 배선은 사람 경로다 — docs/ops/atom_graph_parity_probe_
+        # runbook.md와 skb03 런북 [E]의 AFTER 판정, 정본 변경 PR 체크리스트가 이 CLI를 부른다
+        # (tests/infra/test_atom_graph_prod_parity_wiring.py가 동결).
+        "ops.atom_graph_prod_parity": _LIVE_DEPENDENT,
         # OPS-30(2026-10-09): 외부 업타임 프로브 — **서버 프로세스 밖**에서 1분마다 /health/ready를
         # 폴링하는 것이 존재 이유라(죽은 서버는 자기 죽음을 보고하지 못한다) 앱 코드가 부르면
         # 안 된다. 호출자는 Kiki 머신의 Windows 작업 스케줄러이고, 등록 절차는 사람 경로다 —
