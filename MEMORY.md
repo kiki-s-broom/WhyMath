@@ -421,6 +421,16 @@
 **검증**: 신규 테스트 49건(등록된 훅 명령 그대로 실행·종료 코드 판정)·기존 고지 테스트 6건을 새 계약에 맞게 정정·뮤테이션 29종 전건 RED. **첫 회차에 2종이 살아남았다**(빈 사유가 호출측 거짓 판정에 가려짐·뒤의 `not blocked` 거부가 같은 종료 코드를 냄) — 절을 직접 밟는 반례로 보강. 구현 전 코드에서 P3-03 재현 테스트가 `assert 0 == 2`로 RED였음을 확인했다.
 
 **실측이 드러낸 인접 사실**: 이 컨테이너는 시스템(Debian) PyYAML·pip를 `pip`가 지우지 못해 미러 설치 스텝이 19초 만에 깨진다 — venv + `--prepend-path`가 필요하다. **한계**: 우회는 같은 세션이 스스로 연다(사람의 승인이 아니다) — 남용은 재평가 조건(2주 내 차단 비율 30%·우회가 차단의 절반 초과 시 스텝 단위/병렬 미러 설계)과 로그·대장으로 감시한다. 임계값은 관측 전 가정이다.
+### 2026-10-12 (결정·구현 · P3-31): **[12미적Ⅰ-02-02] 해설 연결은 기존 승인 문항 24건에 `solution_steps`만 더하는 안((나))으로 풀었고, 승인이 새 내용으로 옮겨 가지 않는다는 문제는 "더한 것은 기계 증명 전수·감사가 본 내용은 지문 핀"으로 해소했다 — Coverage solution 9/10 → 10/10**
+
+**무엇/왜**: P3-03 승인 각인 뒤 Concept Completeness의 solution 연결이 [12미적Ⅰ-02-02]만 missing이었다(`problem_bank_conceptual_v0`의 승인 문항 24건). 실측으로 acceptance ①의 서술을 정정한다 — 해설(`answer_explanation`)은 24건 전부 **있었고** 없던 것은 `verify.solution_steps`뿐이다. 24건은 전부 `|x−a|+c` 한 틀(답 0)이다.
+**결정**: (나) 채택. 생성기(`conceptual_count_mc_generator._is_differentiable_steps`)가 `(Derivative(우가지) − Derivative(좌가지)).doit()` → `1 − (−1)` → `2` 를 결정론으로 만들고, 배치로 재생성한 출력과 대조해 코퍼스에는 24건의 `verify.solution_steps` 한 키만 제자리 삽입했다(나머지 336건·24건의 다른 필드는 바이트 동일).
+**(가)를 택하지 않은 이유**: 02-02를 겨냥한 새 은행은 감사 통과(S5 기준 k ≤ 3 @ 504건 규모·판정자 16명)가 있어야 승인되는데 이 세션에서 닿는 범위를 넘고, 그 사이 24건의 `answer`가 전부 0인 한 틀이라는 문항 품질 문제는 이 태스크가 아니라 별건으로 남는다(아래 공백).
+**승인 이전 문제의 해소**: ① 감사 표본(200/360)이 보증한 내용은 `question_text`·`choices`·`answer`·`answer_explanation`·`distractor_map`·`achievement_standard_codes`·`concepts`·`verify`(단계 제외)이고 그 지문(`9e787871…`)을 단계 추가 **전** 코퍼스로 산출해 테스트에 핀으로 박았다 — 한 글자라도 바뀌면 RED. ② 새로 생긴 단계는 표본이 아니라 기계 증명 전수로 덮는다 — 24건 전부 `verify_solution` 전이 전건 correct. 가지 식이 `Abs(x−a)+c`와 같다는 것은 Tier2가 모르므로 생성기가 `_assert_abs_branches`로 직접 확인한다.
+**측정(phase3_coverage · 같은 명령 전후)**: solution linked 9 → 10, missing 1 → 0. prerequisite 10/10 · misconception 10/10 · pedagogy 10/10 · hint unmeasured 10 은 전후 동일. Content Coverage 1.0 · Curriculum Coverage 1.0 · Graph Connectivity 0.5 불변. Concept Completeness는 0/10 그대로(hint 측정 불가 — P3-32/P3-04 소관). 보조 수치 '측정 가능한 연결만 본 완전 개념' 9 → 10/10.
+**검증**: 뮤테이션 3종(단계 삭제·해설 1글자·마지막 단계 오값) 각각 RED, 원복은 바이트 동일. 로컬 CI 재현 — backend 잡(ruff·black·mypy·lint-imports·전체 pytest·게이트 6종), declared-unwired-audit(백필 드리프트 2종), harness-integrity(validate·audit-deps·tests/harness), infra-contracts(tests/infra) 중 infra에서 `sympify` 직접 호출 1건이 걸려 `safe_sympify`로 교정 후 재통과.
+**정직한 공백**: ① 단계는 우·좌 미분계수 각각이 아니라 그 **차**(2 ≠ 0)를 한 연쇄로 보인다 — 값 −1·+1 자체는 해설 문장이 말하고 식 연쇄는 말하지 않는다 ② 24건은 한 틀·정답 전부 0이라 02-02의 문항 다양성은 여전히 얇다(별건 권고: 미분가능한 함수·합성 문항 확장) ③ 계측기는 풀이의 수학적 정확성을 재검증하지 않는다(`phase3_coverage` 자체 한계) ④ 학생 공급은 여전히 검수 승격 전이라 연결 10/10이어도 공급 가능 0/10.
+
 ### 2026-10-09 (결정·구현 · P3-27): **`concept_viewed`는 (나) 세션 writer가 첫 확인 개념을 싣는 안으로 실체화하고(새 컬럼 0), 숙달 변경은 시도에 귀속 투영했다 — 콘텐츠 열람 로그(`P3-29`)와 코치 이벤트 세션 귀속(`P3-30`)은 스키마가 필요해 이월했다** (claude 판정·구현, 테스트 계정 기준) — 판정 기준 main `713512bc`
 
 **무엇/왜**: P3-13 실측에서 `concept_viewed` 역할은 `content_viewed` 생산자 0건 + `concept_selected`가 개념을 싣지 않아 "어느 개념을 봤는가"를 시간선이 말하지 못했다. 판정 문서 = `docs/reviews/p3_27_concept_viewed_and_trace_fields_2026-10-09.md`.
@@ -12455,3 +12465,8 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **등재 중 내 실수 2건과 정정**: `HARN-311` `paths`에 존재하지 않는 `scripts/harness/claims.py`를 추측으로 적었다(grep으로 `backlog.py` 단독임을 확인하고 `amend --drop-scope`로 정정). `OPS-131` notes의 "acceptance 3항"은 원문이 1항 안의 세 문단이라 `--notes-replace`로 정정. 이전 추측 등재를 `add` 직후 한 번 더 읽어 대조하는 습관이 없었던 것이 원인이며 대장 이벤트에 사유가 남았다.
 - **삭제 0건**: 내용 소멸 3건은 claim 해제 대기, 3건은 Kiki 판단 대기(17회차 판단 요청 3건 미답변). 삭제 목록(주석 제외 48줄)과 현존 원격 브랜치 교집합 0건을 확인해 머지가 no-op임을 실측했다.
 - **정직한 공백**: `OPS-126` 두 구현의 테스트를 실행하지 않았고 커밋 메시지의 검증 수치는 재현하지 않았다. 야간 고립 리포트에 두 브랜치가 없던 이유는 미확인(최근 활동 구간 분류 추정). `claims reap --apply`는 실행하지 않았다.
+### 2026-10-14 — OPS-130: OPS-50 고립 구현 회수 (MoE 파싱 실패 원인 규명·변형 6종·A/B/C 병기 도구가 main에 착지)
+- **회수**: `claude/happy-turing-kmrd5z`(`93861f63`, 분기점 `30848ab4`)의 완성 구현이 PR 없이 5일 고립돼 있었다(stray-code 17회차). 분기점과 main 사이 대상 3파일 변경이 0줄이라 파일 단위로 그대로 이식했다. `MEMORY.md`는 통째 이식하면 main의 257줄이 소실되므로 이 항목만 새로 썼다. 판정 문서 = `docs/reviews/ops130_ops50_moe_parse_recovery_2026-10-14.md`.
+- **원인 규명(2026-10-09 감사 파일 재분류, 라이브 0)**: OPS-48 후보의 미분류 16건은 전부 `output_tokens=512`(=`--num-predict`)에서 `reason`이 끊긴 절단이다. 잘린 응답 16건 전부 `"has_defect": true`로 시작했고 무결함 10건도 그랬다. 파싱만 고치면 A집계 오경보 상한이 ~0.351로 올라 OPS-48 exit 0이 깨질 수 있다.
+- **뮤테이션 검증은 브랜치 주장을 인용하지 않고 새로 했다**: 브랜치는 "13종 전건 검출"이라 했지만 13종 목록이 어디에도 기록돼 있지 않아 재현 불가였다. 15종을 새로 주입(주입 적용·원복 sha256 단언 내장)해 1차에 **4건 생존**(M6 문항 수 검사·M7 정답지 대조·M14 `main()`의 후보 변형 전달·M15 stage_split 1단계 문면)을 발견, 테스트 4건을 보강해 15/15 RED로 만들었다. M7은 "slug는 같고 정답지만 다른" 행을 만드는 픽스처가 없어 그 절을 밟지 않은 유형이었다.
+- **미완(OPS-50 소유)**: ③ 같은 seed 재평가(5% 이하·Wilson 유지)·④ 정착·⑤ 재판정 수치는 Phaiakes9 라이브 측정이 필요해 미수행이다. 그 PowerShell 파라미터 전달도 이 환경(Linux)에서는 실행 검증하지 못했다. OPS-50은 닫지 않는다.

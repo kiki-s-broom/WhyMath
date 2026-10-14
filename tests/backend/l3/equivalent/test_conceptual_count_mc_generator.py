@@ -170,3 +170,62 @@ def test_gate_fails_misconception_count(
         answer_kind=cand.answer_kind,
     )
     assert v.verification == "failed"
+
+
+class TestP331IsDifferentiableSolutionSteps:
+    """P3-31 — is_differentiable 밴드만 풀이 단계(`solution_steps`)를 단다.
+
+    단계는 Phase 3 계측기 'solution' 연결(해설 + 비어 있지 않은 단계)을 위해 붙는다. 다른 14밴드는
+    단계가 없는 그대로여야 한다(승인 내용을 건드리지 않는다).
+    """
+
+    def test_only_the_differentiability_band_carries_steps(self) -> None:
+        for template, kebab, codes in _CASES:
+            cand = _gen(template, kebab).generate(_spec(kebab, codes))
+            assert cand is not None
+            if template == "is_differentiable":
+                assert cand.solution_steps, "is_differentiable 후보에 단계가 없다"
+            else:
+                assert cand.solution_steps is None, f"{template}: 단계가 새어 들어왔다"
+
+    def test_every_pool_item_chain_is_verified_correct_by_tier2(self) -> None:
+        from whymath_backend.l3.equivalent.conceptual_count_mc_generator import (
+            _build_is_differentiable_pool,
+        )
+        from whymath_backend.l3.verify_solution import verify_solution
+
+        pool = _build_is_differentiable_pool()
+        assert len(pool) >= 24
+        for item in pool:
+            assert item.solution_steps is not None
+            result = verify_solution(list(item.solution_steps))
+            assert result.n_transitions == len(item.solution_steps) - 1
+            # 전이 전건 correct — incorrect·unverifiable 0건(모르는 것을 통과로 세지 않는다).
+            assert result.n_correct == result.n_transitions, item.conditions
+            assert not result.has_incorrect
+
+    def test_chain_ends_at_the_nonzero_gap_of_one_sided_derivatives(self) -> None:
+        from whymath_backend.l3.equivalent.conceptual_count_mc_generator import (
+            _is_differentiable_steps,
+        )
+
+        steps = _is_differentiable_steps(3, 2)
+        assert steps[0] == ("(Derivative(x - 3 + 2, x) - Derivative(-(x - 3) + 2, x)).doit()")
+        assert steps[-1] == "2"  # 우미분계수 1 − 좌미분계수 (−1) = 2 ≠ 0 → 미분 불가(정답 0)
+        assert (
+            "Derivative(x - 4, x)" in _is_differentiable_steps(4, 0)[0]
+        )  # c=0 은 '+ 0' 을 쓰지 않는다
+
+    def test_branch_guard_rejects_swapped_or_wrong_branches(self) -> None:
+        import sympy
+
+        from whymath_backend.l3.equivalent.conceptual_count_mc_generator import (
+            _assert_abs_branches,
+        )
+
+        x = sympy.Symbol("x")
+        _assert_abs_branches(2, 1, x - 2 + 1, -(x - 2) + 1)  # 대조군 — 맞는 가지는 통과
+        with pytest.raises(ValueError):
+            _assert_abs_branches(2, 1, -(x - 2) + 1, x - 2 + 1)  # 좌우가 뒤바뀐 가지
+        with pytest.raises(ValueError):
+            _assert_abs_branches(2, 1, x - 2 + 2, -(x - 2) + 1)  # 상수항이 틀린 가지
