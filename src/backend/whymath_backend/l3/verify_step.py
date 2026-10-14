@@ -78,6 +78,7 @@ __all__ = [
     "VerifyStepState",
     "budget_exceeded_result",
     "verify_step",
+    "warm_isolated_worker",
 ]
 
 
@@ -466,3 +467,25 @@ def verify_step(
         ),
         VerifyStepForm.expression,
     )
+
+
+# 격리 워커 웜업용 대표 식 쌍 — 식 *종류*마다 첫 사용에 지연 import되는 SymPy 하위 모듈이 다르다
+# (OPS-142 실측 SymPy 1.14: 덧셈 → combinatorics·tensor 16개, `simplify` → physics 17개,
+# 방정식 → assumptions·sets 2개). 값이 아니라 *경로*를 밟는 게 목적이라 판정 결과는 쓰지 않는다.
+# 경로가 늘면 여기에 더하고, 누락은 `tests/backend/l3/test_isolated_call.py`의 모듈 집합 불변
+# 테스트가 잡는다.
+_WARMUP_STEPS: tuple[tuple[str, str], ...] = (
+    ("2*(x+1)", "2*x+2"),  # 덧셈·분배 빠른 경로
+    ("(a+b)^2", "a^2+2*a*b+b^2"),  # `simplify` 폴백 경로
+    ("x^2-5*x+6=0", "(x-2)*(x-3)=0"),  # 방정식 단계 경로
+)
+
+
+def warm_isolated_worker() -> None:
+    """격리 워커가 `ready` 전에 부르는 웜업 — 대표 식으로 첫 사용 비용(지연 import)을 미리 치른다.
+
+    계산 상한은 `started` 이후만 재므로, 이 비용이 첫 정상 요청의 상한 안에 들어오면 부하에서
+    정상 식이 판정 불가로 샌다(OPS-142). 반환값은 쓰지 않는다 — 밟은 경로가 목적이다.
+    """
+    for before, after in _WARMUP_STEPS:
+        verify_step(before, after)

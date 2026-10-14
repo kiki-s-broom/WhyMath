@@ -485,6 +485,20 @@ class Settings(BaseSettings):
             "요청이 느리다). 격리 장치 자체는 과목 어휘를 모르므로(Core) 이 목록을 설정이 정한다."
         ),
     )
+    sympy_isolation_warmup: list[str] = Field(
+        default_factory=lambda: [
+            "whymath_backend.l3.verify_step:warm_isolated_worker",
+            "whymath_backend.l3.verify_answer:warm_isolated_worker",
+        ],
+        description=(
+            "OPS-142 — SymPy 워커 프로세스가 `ready` 이전에 미리 돌릴 웜업 함수('모듈:함수'·인자 "
+            "없음). 식 종류별 첫 사용이 하위 모듈을 지연 import하는데(`simplify` 첫 호출 ≈68ms·"
+            "워커 CPU 몫 1/8에서 543~742ms — 실측 2026-10-14) 그 시간은 *계산 상한 안*이라, 상한이 "
+            "짧거나 기계가 바쁘면 정상 식이 판정 불가로 샌다. 기동 단계(상한 밖)에서 미리 치르면 "
+            "상한 초과로 kill된 뒤의 교체 워커도 데워진 채 뜬다. 비우면 종전(첫 요청이 비용을 "
+            "치름)이다. 웜업이 실패해도 워커는 뜨고 경고 로그에 예외 타입명이 남는다."
+        ),
+    )
     sympy_isolation_max_workers: int = Field(
         default=2,
         ge=1,

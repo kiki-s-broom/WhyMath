@@ -18,6 +18,13 @@ paths:
   - src/backend/whymath_backend/l3/isolated_call.py
   - src/backend/whymath_backend/api/_isolated_call.py
   - tests/backend/api/test_verify_isolation.py
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/l3/verify_step.py
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - tests/backend/l3/test_isolated_call.py
 session: claude/elegant-galileo-pdhsz1
-notes: "출처: OPS-136 조사(2026-10-14)에서 발견한 별개 결함. 증거 — 수정 전 tests/backend/api/test_verify_isolation.py 를 실제 pytest로 방해 프로세스 4개(20회)·6개(12회) 아래 4병렬로 돌렸다: test_normal_step_is_unaffected_by_isolation 이 3/32 실패('unverifiable' == 'correct'). 코어를 3배 초과 구독(방해 8개)하면 _warm_worker 의 state == 'correct' 단언이 재시도 8회 연속 실패했다 — 상한 초과로 kill되면 교체 워커도 콜드라 재시도해도 같은 비용을 다시 치르기 때문이다. 원인은 코드를 읽어 세운 가설이며 측정하지 않았다(acceptance ① 참조): 워커 안 첫 계산이 SymPy 하위 모듈을 지연 import하는 시간이 계산 상한(started 이후 poll) 안에 들어간다. OPS-136 은 이 건을 범위 밖으로 두고 테스트의 벽시계 단언만 고친다. 파일 범위가 OPS-136(원격 claim claude/keen-gates-8quz6d)과 겹친다 — 착수 전에 그 PR 머지 여부를 확인한다."
+notes: |-
+  출처: OPS-136 조사(2026-10-14)에서 발견한 별개 결함. 증거 — 수정 전 tests/backend/api/test_verify_isolation.py 를 실제 pytest로 방해 프로세스 4개(20회)·6개(12회) 아래 4병렬로 돌렸다: test_normal_step_is_unaffected_by_isolation 이 3/32 실패('unverifiable' == 'correct'). 코어를 3배 초과 구독(방해 8개)하면 _warm_worker 의 state == 'correct' 단언이 재시도 8회 연속 실패했다 — 상한 초과로 kill되면 교체 워커도 콜드라 재시도해도 같은 비용을 다시 치르기 때문이다. 원인은 코드를 읽어 세운 가설이며 측정하지 않았다(acceptance ① 참조): 워커 안 첫 계산이 SymPy 하위 모듈을 지연 import하는 시간이 계산 상한(started 이후 poll) 안에 들어간다. OPS-136 은 이 건을 범위 밖으로 두고 테스트의 벽시계 단언만 고친다. 파일 범위가 OPS-136(원격 claim claude/keen-gates-8quz6d)과 겹친다 — 착수 전에 그 PR 머지 여부를 확인한다.
+
+  [정정 2026-10-14] paths ['src/backend/whymath_backend/l3/isolated_call.py', 'src/backend/whymath_backend/api/_isolated_call.py', 'tests/backend/api/test_verify_isolation.py'] → ['src/backend/whymath_backend/l3/isolated_call.py', 'src/backend/whymath_backend/api/_isolated_call.py', 'tests/backend/api/test_verify_isolation.py', 'src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/l3/verify_step.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'tests/backend/l3/test_isolated_call.py']: OPS-142 설계: 웜업 호출 목록은 설정이 정하고 웜업 함수는 기존 verify 모듈에 둔다(새 모듈 인벤토리 귀속 회피)
 updated: 2026-10-14
