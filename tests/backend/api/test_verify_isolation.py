@@ -8,7 +8,8 @@ acceptance ④의 변별력 증명:
   가르므로 ⓑ가 "아무 때나 통과하는 검사"가 아님이 기계로 보인다.
 
 느린 입력은 합성 sleep이 아니라 실제 SymPy가 느린 식이다(`x^20+x+1=0` → `x^19+x+2=0`·`safe_parse`
-구조 예산 상한 차수의 방정식 단계·이 환경 실측 약 3초).
+구조 예산 상한 차수의 방정식 단계·이 환경 첫 계산 4.2초 — 같은 프로세스 재호출은 SymPy 캐시로 0.2초,
+2026-10-14 실측).
 """
 
 from __future__ import annotations
@@ -40,10 +41,17 @@ _SLOW_A = "x^20+x+1=0"
 _SLOW_B = "x^19+x+2=0"
 _CAP_S = 0.5
 # 실 SymPy 체인의 요청 벽시계 상한 — 예산(상한×4=2.0s) + 마감 직전 kill·스레드 오버헤드. OPS-128로
-# 워커 기동·복원 대기가 마감 안에 묶인 뒤 정상 실측은 2.14~2.58초(10회·4코어 단독)다. 수정 전 정상은
-# 2.21~3.69초(CI 3.45초)라 옛 상한 6.0초가 필요했다(OPS-127). 예산 제거 뮤테이션은 11.27초 이상.
-# 정상 최대의 약 1.5배·뮤테이션 최소의 약 1/3 — CI 부하 여유를 남기려 더 조이지 않는다.
+# 워커 기동·복원 대기가 마감 안에 묶인 뒤 정상 실측은 2.14~2.58초(10회·4코어 단독)였다. OPS-136이
+# 앱 첫 요청의 라우트 지연 생성을 창 밖으로 빼(`_prime_routes`) 정상은 2.006~2.024초로 내려갔다
+# (단독 5회 2.008~2.012 · 방해 프로세스 4개 + 4병렬 9회 2.006~2.024, 2026-10-14 실측) — 예산이 요청 시간을
+# 정확히 묶기 때문이다. 예산 제거 뮤테이션(배수 100)은 단독 28.2초 이상·부하 50.2초 이상(옛 기록 11.27초).
+# 정상 최대의 약 2.0배·뮤테이션 최소의 약 1/7 — 라우트 생성 외 부하 여유를 남기려 더 조이지 않는다.
 _CHAIN_WALL_BOUND_S = 4.0
+# 콜드 워커(기동 4초) 체인의 벽시계 여유 — 예산 2.0초에 더한다. 정상은 예열 후 2.008~2.023초(단독·부하
+# 동일)이고 예열 전엔 2.14~2.83초였다(수정 전 여유 0.75초는 부하에서 3.01~3.20초로 5/32 RED). 예산 제거
+# 뮤테이션은 기동 4초를 그대로 기다려 단독 7.7초 이상·부하 12.5초 이상이다. 정상의 약 1.7배·뮤테이션
+# 최소(7.7초)의 절반 미만.
+_COLD_BOOT_WALL_SLACK_S = 1.5
 
 
 def _unique_slow(degree: int) -> tuple[str, str]:
@@ -237,7 +245,7 @@ class TestBudgetMeansUnverifiable:
         남은 예산 대신 상한 전체를 주는 뮤테이션(0.5·0.5·0.5)과 예산을 없앤 뮤테이션(8회 호출)이 둘 다
         RED다 — 위 실 SymPy 테스트의 벽시계로는 앞의 뮤테이션이 정상과 구별되지 않는다.
         """
-        clock ={"now": 1000.0}
+        clock = {"now": 1000.0}
         monkeypatch.setattr(verify_api, "time", SimpleNamespace(monotonic=lambda: clock["now"]))
         granted: list[float] = []
         budgets: list[float] = []
@@ -282,13 +290,14 @@ class TestBudgetMeansUnverifiable:
         budget_s = _CAP_S * 4  # verify_api._CHAIN_BUDGET_FACTOR
 
         with TestClient(_app()) as client:
-            _prime_routes(client)  # 풀·워커는 콜드 그대로 — 라우트 지연 생성만 창 밖에서 치른다(OPS-136)
+            # 풀·워커는 콜드 그대로 — 라우트 지연 생성만 창 밖에서 치른다(OPS-136)
+            _prime_routes(client)
             started = time.perf_counter()
             resp = client.post("/v1/verify-solution", json={"steps": ["2*x+2", "2*(x+1)", "x+x+2"]})
             elapsed = time.perf_counter() - started
         assert resp.status_code == 200, resp.text
         assert (
-            elapsed < budget_s + 0.75
+            elapsed < budget_s + _COLD_BOOT_WALL_SLACK_S
         ), f"체인 총 예산 {budget_s}s인데 {elapsed:.2f}s — 워커 기동 대기가 마감 밖이다"
         body = resp.json()
         # 기동이 안 끝난 전이는 통과·오답이 아니라 판정 불가다 — 점수가 새지 않는다.
@@ -367,9 +376,7 @@ class TestEventLoopNotBlocked:
         await asyncio.to_thread(_warm_worker)
         # 고유 입력(차수 14 ≈ 3.7초 > 상한 0.5초) — 격리를 되돌린 뮤테이션에서 앞선 테스트의 SymPy 캐시에
         # 적중해 빠르게 끝나면 이 테스트가 RED가 되지 못한다(뮤테이션 실측으로 확인한 결함).
-        lateness, _ = await _light_request_lateness_during_slow_step(
-            _unique_slow(14), monkeypatch
-        )
+        lateness, _ = await _light_request_lateness_during_slow_step(_unique_slow(14), monkeypatch)
         assert lateness < 0.3, f"가벼운 요청이 {lateness:.2f}s 늦어졌다 — 루프 차단"
 
     async def test_control_without_isolation_blocks_the_loop(
