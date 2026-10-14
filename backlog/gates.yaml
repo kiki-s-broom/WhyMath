@@ -700,12 +700,16 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-10-06
-    remind_after_days: 7
+    remind_after_days: 15
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-07] 2026-10-07 Kiki 재판정: 보류 유지. 사유 = 4지선다 귀속 타당 항목을 검증할 재료(student_wrong_thinking·distractor_rule·error_type)가 M0599에 없음. 의미상 매핑 방향은 타당. 승인 가능 조건 = MISC-61이 원 출처에서 세 필드를 보강(카탈로그 kebab 복사 금지 — 순환 검증). 기록 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md. prod DB M0599 행은 Kiki 확인 전 수정 금지."
+    notes: |-
+      [판정 근거 2026-10-07] 2026-10-07 Kiki 재판정: 보류 유지. 사유 = 4지선다 귀속 타당 항목을 검증할 재료(student_wrong_thinking·distractor_rule·error_type)가 M0599에 없음. 의미상 매핑 방향은 타당. 승인 가능 조건 = MISC-61이 원 출처에서 세 필드를 보강(카탈로그 kebab 복사 금지 — 순환 검증). 기록 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md. prod DB M0599 행은 Kiki 확인 전 수정 금지.
+
+      [판정 근거 2026-10-14] [보류 유지 2026-10-14] Kiki 결정 A. 재판정은 MISC-61 머지 후 저작된 세 필드를 직접 읽고 진행. 승인 시 crosslinks.json 서명 적재 절차 별도 필요. 승인 메모에 저작 근거의 독립성 한계(M0599 canonical_statement와 J0405.misconception 동일 문장)를 남길 것. prod DB M0599 행은 Kiki 확인 전 수정 금지.
     corrections:
       - "[2026-10-07] depends_on +MISC-61-a3-thin-misid-source-enrichment · no_inputs_reason: '입력 태스크 없음 - M0599 보류 사유 확인과 승인/반려는 사람 판단이다(검수 큐 행 서명은 사람 전용)' → None (입력 부착으로 해제) · notes +295자 — Kiki 2026-10-07 보류 사유 기록·입력 태스크 연결"
+      - "[2026-10-14] remind_after_days: 7 → 15 · notes +220자 — 2026-10-14 Kiki 결정: 선택지 A 보류 유지 + 독촉 7일 연장(7→15일, 요청일 2026-10-06 기준 2026-10-21 독촉). 사유: MISC-61 저작 근거가 아직 main에 없고(브랜치 claude/peaceful-bell-s7mlg8 미머지), J0405 동일 뿌리라 독립 검증 근거가 약함."
     depends_on:
       - MISC-61-a3-thin-misid-source-enrichment
   - id: G-misc40-deferred-m0671-redecision
