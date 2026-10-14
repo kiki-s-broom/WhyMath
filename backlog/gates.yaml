@@ -921,11 +921,11 @@ gates:
     title: "P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-22
     remind_after_days: 40
-    evidence: null
-    cleared_by: null
+    evidence: "P3-G1 PASS 확정 — 판정문 docs/reviews/p3_g1_week1_gate_judgment_2026-10-12.md · 판정 기준 main f34d7b7664902b179da3867f6aecf4e01f8da2ed · PR #1584 · 해석 2곳(조사 창 09-29 시작 · Hint 좌석 신설을 신규 Entity로 보지 않음) Kiki 확인"
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-09-22] title: 'P3-G1 — Week 1 Gate 판정 (11/1). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' → 'P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' — Kiki 결정 2026-09-22 — 일정은 달력이 아니라 선행 완료로 움직인다(가능하면 앞당긴다). 원 계획 날짜는 고정일이 아니라 상한이므로 문면을 그렇게 고친다. 대장은 이미 이 결정과 정합한다: P3 태스크에 날짜 필드가 없고 착수 조건이 전적으로 depends_on + 게이트다. 부수로 11/22 ↔ 저장소 G3 일정 충돌이 해소된다 — 11/22 는 Phase 3 의 상한일 뿐 판정 예정일이 아니다."
