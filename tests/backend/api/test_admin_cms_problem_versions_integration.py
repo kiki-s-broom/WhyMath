@@ -71,6 +71,32 @@ def _load() -> ModuleType:
 
 _P = _load()
 
+_META_PATH = _ROOT / "tests" / "backend" / "db" / "test_problem_version_publish_integration.py"
+_META_HELPERS = ("_seed_complete_metadata", "_drop_metadata_seed")
+
+
+def _load_meta() -> ModuleType:
+    """P3-04 7필드 시드 헬퍼를 재사용한다 — 복제하면 "발행 가능한 문항"의 정의가 둘이 된다.
+
+    발행 게이트(P3-04)는 문항 필수 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 전략)를
+    요구한다. 이 표면은 게이트를 그대로 부르므로 시드 문항이 7필드를 채우지 못하면 발행이 422로
+    거부된다 — 그 거부가 이 표면의 결함이 아니라 시드의 결함임을 구분하려면 "채워진 문항"의
+    정의가 EOS-190 통합 테스트와 같은 한 곳이어야 한다.
+    """
+    spec = importlib.util.spec_from_file_location("_eos194_meta_seed", _META_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"7필드 시드 헬퍼 스펙 생성 실패: {_META_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    missing = [name for name in _META_HELPERS if not hasattr(module, name)]
+    if missing:
+        raise RuntimeError(f"7필드 시드 헬퍼가 사라졌다: {missing}")
+    return module
+
+
+_M = _load_meta()
+
 
 def _load_runbook_sql() -> str:
     """운영 런북이 싣는 측정 SQL — hermetic 파일의 상수 한 벌(드리프트 가드가 그 파일에 있다)."""
@@ -239,6 +265,9 @@ class _World:
         self.content, _journal = _P._begin("EOS-194")
         cid, _code = _P._seed_concept(self.content, tag, "일차방정식의 풀이")
         self.pids: list[uuid.UUID] = _P._seed_problems(self.content, cid, tag, difficulties)
+        self.meta = _M._seed_complete_metadata(
+            self.content.sfx, tag, cid, self.content.skill_ids[-1], self.pids
+        )
         self.users: dict[str, uuid.UUID] = {}
 
     def staff(self, name: str, role: Role) -> dict[str, str]:
@@ -273,7 +302,10 @@ class _World:
                         {"u": uids},
                     )
             finally:
-                self.content.teardown()  # 학습자(멱등) → 문항 → 개념
+                try:
+                    _M._drop_metadata_seed(self.meta, self.pids)  # 힌트→풀이 경로→오개념 행
+                finally:
+                    self.content.teardown()  # 학습자(멱등) → 문항 → 개념
 
 
 @pytest.fixture
