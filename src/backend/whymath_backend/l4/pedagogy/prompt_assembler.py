@@ -21,7 +21,7 @@ join 없음). 이것이 플래그 OFF·팩 미주입 경로의 회귀 0 계약�
 **계층 위생**: `schema`(팩 계약)에 더해 l4 형제 타입(`MisconceptionHypothesis`·`MasteryLevel`)만
 참조한다(l4→l4는 동일 계층·import-linter 무관, l4→schema는 허용). l1·config에는 의존하지 않는다.
 
-**전략 카드 계층(PED-23 회수 — 정본 `docs/architecture/04e_pedagogy_strategy_catalog.md` §3.2)**:
+**전략 카드 계층(PED-23 회수 — 정본 `docs/architecture/04g_pedagogy_strategy_catalog.md` §3.2)**:
 선택된 교수전략의 카탈로그 카드(name_ko·description·research_basis **요약 1줄만** — attention
 절약)를 기존 프롬프트 *위에 덧붙이는* 독립 계층이다. 4계층 조립(`build_system_prompt`)과
 직교하도록 합성 함수(`attach_strategy_card`)로 분리했다 — 실측된 소비 지점은
@@ -126,7 +126,7 @@ def render_student_state(
 def render_strategy_card(card: PedagogyStrategyCard | None) -> str:
     """전략 카드 계층(PED-23 회수) — 선택된 교수전략의 서술 1블록. 없으면 "".
 
-    카탈로그 9필드 중 **name_ko·description·research_basis[0]만** 주입한다(04e §3.2 소비처
+    카탈로그 9필드 중 **name_ko·description·research_basis[0]만** 주입한다(04g §3.2 소비처
     지정표 — "요약 1줄만 주입, attention 절약". usage_notes는 사람 서술 전용·기계 배선 금지라
     여기서도 넣지 않는다). `research_basis`는 schema 불변식 (b)가 최소 1건을 보장하므로 첫
     항목 접근이 안전하다. 학생-대면 미노출 지시를 동봉한다 — 내부 교수학 메타(전략명·연구
