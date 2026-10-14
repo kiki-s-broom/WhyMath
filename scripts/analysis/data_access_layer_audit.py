@@ -236,6 +236,12 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/standards/alignment_query.py",
             "l1/standards/criteria_loader.py",
             "l1/standards/learning_map.py",
+            # P3-22 — Coverage 계측기의 힌트 입력(`--hints-from-db`). `hints.verified = true` 행의
+            # 문항 ID를 DISTINCT로 읽기만 한다(쓰기 0 · 본문 미조회 · 기본 실행은 DB를 열지 않는다).
+            # 기존 조회 함수로 대체할 수 없다: 힌트 읽기 담당(`l4/hint_content/store.py`)은 L4라
+            # L1 계측기가 import하면 7계층 역방향이고, `find_served_hint`는 문항·레벨 단위 서빙
+            # 조회라 전체 문항 집합을 주지 않는다. 연결을 못 열면 CoverageError(exit 2)로 멈춘다.
+            "l1/standards/phase3_coverage.py",
             "l1/standards/standard_loader.py",
             "l1/strategy_graph/strategy_node_projection.py",
         }

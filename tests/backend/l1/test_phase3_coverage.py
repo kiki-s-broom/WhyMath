@@ -21,9 +21,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import shutil
+import uuid
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -1041,11 +1043,182 @@ class TestRealCorpus:
             for entry in metric.unmet:
                 assert entry.missing, (metric.key, entry.subject)
 
-    def test_hint_is_reported_unmeasured_while_the_seat_is_absent(self, spec, real_report) -> None:
-        """힌트 저장 좌석이 생기면(P3-04) 이 테스트를 갱신한다 — 좌석이 생겼는데 이 단언이 남아
-        있으면 배선 누락을 드러낸다."""
+    def test_hint_is_unmeasured_when_no_hint_input_is_given(self, spec, real_report) -> None:
+        """P3-22 — 좌석(DB `hints.verified`)은 실재한다. 그래서 이 단언이 말하는 것은 '좌석이 없다'가
+        아니라 '이 실행은 힌트를 읽지 않았다'(`--hints-from-db` 미지정)다. 입력이 없을 때 빈 집합으로
+        위장하지 않고 unmeasured 로 남는 것을 동결한다. 좌석을 읽는 경로는 `TestHintSeatWiring`."""
         n = len(spec.core_concepts)
         assert real_report.link_counts["hint"] == {"linked": 0, "missing": 0, "unmeasured": n}
+        assert real_report.hint_seat is None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 힌트 좌석 배선 (P3-22) — DB hints(verified) → hint_problem_ids → Completeness
+# ──────────────────────────────────────────────────────────────────────────
+class _Scalars:
+    def __init__(self, values: list[Any]) -> None:
+        self._values = values
+
+    def all(self) -> list[Any]:
+        return list(self._values)
+
+
+class _Result:
+    def __init__(self, values: list[Any]) -> None:
+        self._values = values
+
+    def scalars(self) -> _Scalars:
+        return _Scalars(self._values)
+
+
+class _FakeHintSession:
+    """실제 문장(SQL)을 기록하고 정해 둔 값을 돌려준다 — 조건을 스스로 보태지 않는다.
+
+    WHERE 를 가짜가 흉내 내면 리더에서 `verified` 조건이 빠져도 초록이므로, 조건의 유무는 컴파일된
+    SQL 문자열로 따로 단언한다(`test_reader_asks_only_for_verified_distinct_problem_ids`).
+    """
+
+    def __init__(self, values: list[Any]) -> None:
+        self.values = values
+        self.sql: list[str] = []
+
+    async def execute(self, stmt: Any) -> _Result:
+        self.sql.append(str(stmt.compile()))
+        return _Result(self.values)
+
+
+def _read(values: list[Any]) -> frozenset[str]:
+    return asyncio.run(pc.fetch_verified_hint_problem_ids(_FakeHintSession(values)))
+
+
+class TestHintSeatWiring:
+    def test_reader_asks_only_for_verified_distinct_problem_ids(self) -> None:
+        session = _FakeHintSession([])
+        asyncio.run(pc.fetch_verified_hint_problem_ids(session))
+        sql = " ".join(session.sql).lower()
+        assert "from hints" in sql
+        assert "hints.verified is true" in sql  # 미검수 힌트는 학생에게 나갈 수 없다
+        assert "distinct" in sql
+        assert "hints.content" not in sql  # 본문은 읽지 않는다
+
+    def test_reader_returns_uuid_as_text_so_it_matches_the_jsonl_bank(self) -> None:
+        pid = uuid.UUID("c944bffa-4308-5c4e-b793-d2cbd8163c48")
+        assert _read([pid, pid]) == frozenset({"c944bffa-4308-5c4e-b793-d2cbd8163c48"})
+
+    def test_reader_with_no_rows_is_an_empty_set_not_none(self) -> None:
+        """읽었는데 없다(missing)와 읽지 않았다(unmeasured)는 다른 사건이다."""
+        assert _read([]) == frozenset()
+
+    def test_db_hints_turn_unmeasured_into_linked(self, spec, index, world) -> None:
+        # 합성 세계의 ID 는 문자열이라 UUID 가 아니다 — 문자열 그대로 읽은 집합을 쓴다.
+        ids = _read([p.problem_id for p in world.problems])
+        report = pc.evaluate(spec, index, replace(world, hint_problem_ids=ids))
+        n = len(spec.core_concepts)
+        assert report.link_counts["hint"] == {"linked": n, "missing": 0, "unmeasured": 0}
+        assert report.metric("concept_completeness").value == 1.0
+
+    def test_deleting_the_hints_from_the_seat_drops_completeness(self, spec, index, world) -> None:
+        """acceptance ② — 좌석에서 힌트를 지우는 주입에 Completeness 가 실제로 떨어진다."""
+        full = _read([p.problem_id for p in world.problems])
+        before = pc.evaluate(spec, index, replace(world, hint_problem_ids=full))
+        cut = _inject(replace(world, hint_problem_ids=full), hint_problem_ids=_read([]))
+        after = pc.evaluate(spec, index, cut)
+        assert before.metric("concept_completeness").value == 1.0
+        assert after.metric("concept_completeness").value == 0.0
+        n = len(spec.core_concepts)
+        # 지운 것은 missing 이지 unmeasured 가 아니다 — 읽었는데 없는 것이다.
+        assert after.link_counts["hint"] == {"linked": 0, "missing": n, "unmeasured": 0}
+        # 힌트를 지워도 나머지 지표는 그대로다(힌트만 재는 연결이다).
+        for key in ("content_coverage_rate", "curriculum_coverage", "graph_connectivity_coverage"):
+            assert after.metric(key).value == before.metric(key).value, key
+
+    def test_one_problem_hint_links_exactly_one_concept(self, spec, index, world) -> None:
+        first = world.problems[0].problem_id
+        report = pc.evaluate(spec, index, replace(world, hint_problem_ids=_read([first])))
+        assert report.link_counts["hint"]["linked"] == 1
+        assert report.link_counts["hint"]["unmeasured"] == 0
+
+    def test_seat_stats_report_overlap_with_the_bank(self, spec, index, world) -> None:
+        ids = frozenset({world.problems[0].problem_id, "db-only-problem"})
+        seat = pc.evaluate(spec, index, replace(world, hint_problem_ids=ids)).hint_seat
+        assert seat == pc.HintSeatStats(
+            hinted_problems=2, in_scope_bank=1, eligible_hinted=1, outside_scope=1
+        )
+
+    def test_id_space_mismatch_is_warned_not_disguised_as_no_hints(
+        self, spec, index, world
+    ) -> None:
+        """DB 힌트가 있는데 은행과 한 건도 안 겹치면 '힌트 0'이 아니라 ID 불일치 경고가 나온다."""
+        ids = frozenset({"uuid-not-in-the-bank-1", "uuid-not-in-the-bank-2"})
+        report = pc.evaluate(spec, index, replace(world, hint_problem_ids=ids))
+        assert report.hint_seat is not None and report.hint_seat.in_scope_bank == 0
+        assert any("ID 공간" in w for w in report.warnings)
+        assert report.link_counts["hint"]["linked"] == 0
+
+    def test_no_mismatch_warning_when_the_ids_overlap(self, spec, index, world) -> None:
+        report = pc.evaluate(
+            spec, index, replace(world, hint_problem_ids=_read([world.problems[0].problem_id]))
+        )
+        assert not any("ID 공간" in w for w in report.warnings)
+
+    def test_json_and_text_carry_the_seat(self, spec, index, world) -> None:
+        with_seat = pc.evaluate(spec, index, world)
+        without = pc.evaluate(spec, index, replace(world, hint_problem_ids=None))
+        assert pc.to_json(with_seat)["hint_seat"]["hinted_problems"] == len(world.problems)
+        assert pc.to_json(without)["hint_seat"] is None
+        assert "힌트 입력: DB 검수 통과" in pc.render(with_seat)
+        assert "힌트 입력: 없음(측정 불가)" in pc.render(without)
+
+
+class TestHintSeatCli:
+    def test_default_run_never_touches_the_db(self, world, monkeypatch, capsys) -> None:
+        def _boom(*a: Any, **k: Any) -> frozenset[str]:
+            raise AssertionError("플래그 없이 DB 를 읽었다")
+
+        monkeypatch.setattr(pc, "read_hint_problem_ids_from_db", _boom)
+        monkeypatch.setattr(pc, "load_corpus", lambda s: world)
+        pc.main([])  # 호출이 일어나면 AssertionError 로 터진다
+        capsys.readouterr()
+
+    def test_flag_passes_the_db_ids_into_the_corpus(self, world, monkeypatch, capsys) -> None:
+        seen: dict[str, Any] = {}
+        ids = frozenset({"p1", "p2"})
+        monkeypatch.setattr(pc, "read_hint_problem_ids_from_db", lambda: ids)
+
+        def _load(s: Any, repo_root: Any = None, *, hint_problem_ids: Any = None) -> Any:
+            seen["ids"] = hint_problem_ids
+            return world
+
+        monkeypatch.setattr(pc, "load_corpus", _load)
+        pc.main(["--hints-from-db"])
+        capsys.readouterr()
+        assert seen["ids"] == ids
+
+    def test_unreadable_db_is_exit_2_with_the_exception_type(self, monkeypatch, capsys) -> None:
+        async def _refuse() -> frozenset[str]:
+            raise ConnectionRefusedError("db down")
+
+        monkeypatch.setattr(pc, "_read_hint_problem_ids", _refuse)
+        assert pc.main(["--hints-from-db"]) == 2
+        err = capsys.readouterr().err
+        assert "적재 실패" in err and "ConnectionRefusedError" in err  # 타입명이 남는다
+
+    def test_hanging_db_times_out_instead_of_hanging_the_measurement(self, monkeypatch) -> None:
+        async def _hang() -> frozenset[str]:
+            await asyncio.sleep(30)
+            return frozenset()
+
+        monkeypatch.setattr(pc, "_read_hint_problem_ids", _hang)
+        with pytest.raises(pc.CoverageError, match="TimeoutError"):
+            pc.read_hint_problem_ids_from_db(timeout_s=0.05)
+
+    def test_unmeasured_hint_is_still_a_failure_without_the_flag(
+        self, world, monkeypatch, capsys
+    ) -> None:
+        """플래그가 없으면 힌트를 못 잰 채 Completeness 가 0 이라 exit 1 이다 — 통과로 위장하지 않는다."""
+        monkeypatch.setattr(pc, "load_corpus", lambda s: replace(world, hint_problem_ids=None))
+        assert pc.main([]) == 1
+        assert "힌트 입력: 없음(측정 불가)" in capsys.readouterr().out
 
 
 # ──────────────────────────────────────────────────────────────────────────
