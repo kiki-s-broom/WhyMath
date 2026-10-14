@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -17,9 +17,9 @@ acceptance:
 artifacts: []
 paths:
   - tests/backend/api/test_verify_isolation.py
-session: null
+session: claude/keen-gates-8quz6d
 notes: |-
   출처: S4-72 후속 점검(PR #1563 머지 큐 감시, 2026-10-12)에서 발견. 증거 = PR #1565 큐 실행 run 38249677879의 backend Pytest 스텝 FAILED 줄(위 acceptance ①). 같은 기반(main d873d064)에는 OPS-127(#1582)의 수정이 이미 들어 있었으므로 이 실패는 그 수정으로 닫히지 않은 별개 테스트다. 원인은 코드를 읽어 추정한 것이며 측정하지 않았다(acceptance ② 참조). 학생 영향은 없다 — 테스트 불안정이 머지 큐를 막는 문제다(#1565가 이 테스트로 큐에서 탈락). 파일 범위가 OPS-127(원격 claim claude/ops127-verify-isolation-budget-timing · 대장 상태 in_progress)과 겹친다 — 착수 전에 OPS-127 상태와 원격 claim을 확인하고 필요하면 그 세션과 조율한다. Kiki 지시(2026-10-13): 태스크 등재.
 
   [정정 2026-10-13] 등재 시 앱 종료가 워커 풀을 닫는다고 코드를 확인하지 않고 적었다 — 풀은 프로세스 전역이고 lifespan이 닫지 않음을 읽어 확인해 원인 후보와 구간 분해를 정정 항으로 대체
-updated: 2026-10-13
+updated: 2026-10-14
