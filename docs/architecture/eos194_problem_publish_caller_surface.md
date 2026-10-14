@@ -97,7 +97,7 @@ if ($Names) {
 - **hermetic(CI 상시)** — `tests/backend/api/test_admin_cms_problem_versions.py`: 역할×전이 32칸 리터럴 매트릭스 · 복합/미정의 전이 422 · 초안 요청이 내용을 받지 않음 · 오류 매핑(404·409·422·예상 밖) · commit 실패 시 rollback · 트랜잭션 경계 뒤 사용자 접근 금지 · AST(ORM import·포인터 쓰기·쓰기 SQL 주입 시 RED / 게이트 공개 함수 5개만 호출 / 권한표 재진술 금지 / DB 직접 접근 금지).
 - **실 PG(`backend-migrations` 잡이 수집)** — `tests/backend/api/test_admin_cms_problem_versions_integration.py` 5건: 발행 관통(위 §5.1) · 권한 거부 시 DB 불변 · 승인 뒤 라이브 변경 → 422 · 재발행/낡은 상태 409/내리기 · 없는 ID 404. `--collect-only`로 CI와 같은 명령에서 5건 수집을 확인했다(`tests/backend/l3` 아래였다면 수집되지 않는다 — EOS-190 §4).
 - **뮤테이션** — 라우트 모듈 28종(권한 제거·약화·감사 제거·리소스 타입 오기·rollback 제거·commit 순서·사용자 접근·extra 허용·payload 입구·존재 확인 제거 등) 전건 검출·생존 0. 처음 한 번 생존한 1종(초안 경로의 예상 밖 오류 rollback)은 테스트를 보강해 잡았다. 통합 테스트의 변별력은 전이 라우트의 `commit` 제거 주입(4건 RED)으로 확인했다. 동등 뮤턴트 1종 — 읽기 라우트의 `VIEW` 검사 제거는 모든 CMS 역할이 `VIEW`를 가져 관찰할 수 없다.
-- **이 작업이 닿은 기존 동결** — `test_admin_cms.py`(CMS 라우트 34→38, 쓰기 12→14) · `test_admin_bff.py`(쓰기 허용 목록 닫힌 목록에 2종 등재) · `eos_feature_inventory_v2.py`(`WM-S-058` 신설, `WM-E-316` 낡은 문구 정정) · `data_access_layer_audit.py`(baseline에 경계 소유로 +1, §8).
+- **이 작업이 닿은 기존 동결** — `test_admin_cms.py`(CMS 라우트 +4·쓰기 +2 — main의 P3-26 병합 뒤 합계 44건·19건) · `test_admin_bff.py`(쓰기 허용 목록 닫힌 목록에 2종 등재) · `eos_feature_inventory_v2.py`(`WM-S-058` 신설, `WM-E-316` 낡은 문구 정정) · `data_access_layer_audit.py`(baseline에 경계 소유로 +1, §8).
 
 ## 7. 알려진 한계
 
