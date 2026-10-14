@@ -1,27 +1,27 @@
 """교수전략 카탈로그(PedagogyStrategyCard) Pydantic 계약 — 카탈로그 YAML의 형식 게이트.
 
-설계 정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §3(전략 카탈로그 — 필드 소비처
+설계 정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §3(전략 카탈로그 — 필드 소비처
 지정표·제거 필드 3종). 오개념(839+원자 전량 카탈로그)·문제 공략 전략(8종 데이터카드)에 비해
 교수전략만 `PedagogyStrategy` enum+docstring인 비대칭을 해소하는 *서술 자산*의 계약이다 —
 `data/corpus/pedagogy_strategies_v1/*.yaml`(전략 10종·enum 1:1)을 레지스트리
 (`l4/pedagogy/strategy_registry.py`)가 적재하기 전에 이 모델이 게이트한다(`pedagogy_pack.py`의
 `PedagogyPack` 시더 계약 선례 미러).
 
-⚠️ 용어 3축 주의(04e §1): 이 카탈로그의 "전략"은 **교수전략**(`PedagogyStrategy` — 교사가 어떻게
+⚠️ 용어 3축 주의(04g §1): 이 카탈로그의 "전략"은 **교수전략**(`PedagogyStrategy` — 교사가 어떻게
 가르칠까)이다. 학생의 문제 공략 전략(`StrategyNode`·`strategy.analogy`=유추)과 같은 영단어·다른
 개념이므로 혼동 금지.
 
 ────────────────────────────────────────────────────────────────────────────
-필드 원칙 — 소비처를 지정 못 하는 필드는 착시·금지 (04e §3.2)
+필드 원칙 — 소비처를 지정 못 하는 필드는 착시·금지 (04g §3.2)
 ────────────────────────────────────────────────────────────────────────────
 StudentSignals가 "항상 None인 필드는 착시"(04d §2.1)라며 필드를 거부한 것과 동형으로, 이 계약의
 9필드는 각각 실재 소비처가 지정되어 있다(각 Field description에 병기). 필드 추가는 소비처 실재
 증명 전제 — 필드셋은 `tests/backend/schema/test_pedagogy_strategy_schema.py`가 리터럴로 동결한다.
 
 ────────────────────────────────────────────────────────────────────────────
-제거 필드 3종 — 정본 이중화 방지 (04e §3.3 — 부재를 테스트로 동결)
+제거 필드 3종 — 정본 이중화 방지 (04g §3.3 — 부재를 테스트로 동결)
 ────────────────────────────────────────────────────────────────────────────
-외부 프레임워크의 다음 3계열은 *의도적으로 없다*(재제안 방지 — 04e §8 영구 기록과 이중 방어):
+외부 프레임워크의 다음 3계열은 *의도적으로 없다*(재제안 방지 — 04g §8 영구 기록과 이중 방어):
   ① AI 추천 점수(ai_score/recommendation_score) — 정적 점수는 bandit 무정보 사전 Beta(1,1)를
      데이터 없이 오염. 학습된 점수의 유일 좌석 = PED-03 posterior.
   ② 기계 판정용 사용/금지 조건(forbidden_conditions) — 허용의 정본은 팩 `forbidden_modes`+
@@ -67,7 +67,7 @@ GRADE_BAND_VOCAB: frozenset[str] = frozenset(
 )
 
 # 문항 난이도 3종 — `difficulty_range` 항목의 통제 어휘. 오개념 카탈로그 `difficulty`('상/중/하')
-# 와 동일 어휘 재사용(04e §3.2 — 새 어휘 축 신설 금지).
+# 와 동일 어휘 재사용(04g §3.2 — 새 어휘 축 신설 금지).
 DIFFICULTY_VOCAB: frozenset[str] = frozenset(
     {
         "상",
@@ -97,12 +97,12 @@ ERROR_TYPE_VOCAB: frozenset[str] = frozenset(
 class PedagogyStrategyCard(BaseModel):
     """교수전략 카탈로그 항목 — 전략 1종의 서술 자산(YAML 파일당 1건·enum 1:1).
 
-    9필드 전부에 소비처가 지정되어 있다(04e §3.2 소비처 지정표 — 각 Field description 병기).
+    9필드 전부에 소비처가 지정되어 있다(04g §3.2 소비처 지정표 — 각 Field description 병기).
     카탈로그는 **서술 자산**이다: 로직(선택·게이트)은 코드(`runtime_selector`)가, 서술(이름·
     근거·적합성·사용 주의)은 이 데이터가 맡는다. 특히 `usage_notes`는 **사람 서술 전용**이며
     기계 배선 금지다 — 기계 판정(허용/금지)의 정본은 팩 `forbidden_modes`+`gate()` 2축이다.
 
-    제거 필드 3종(AI 추천 점수·기계 판정용 금지조건·선행/후속·페이딩)의 부재 근거는 04e §3.3
+    제거 필드 3종(AI 추천 점수·기계 판정용 금지조건·선행/후속·페이딩)의 부재 근거는 04g §3.3
     참조(모듈 docstring 요약) — 부재 자체를 스키마 동결 테스트가 검사한다.
     """
 
@@ -166,7 +166,7 @@ class PedagogyStrategyCard(BaseModel):
         ...,
         description=(
             "사용·금지 조건·기대 효과의 **사람 서술 전용** 필드 — 기계 배선 금지"
-            "(기계 판정 정본은 팩 forbidden_modes+gate() 2축·04e §3.3)"
+            "(기계 판정 정본은 팩 forbidden_modes+gate() 2축·04g §3.3)"
         ),
     )
 

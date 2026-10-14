@@ -1,6 +1,6 @@
 # 04f. EOS 교수전략 라이브러리 갭 설계 — 14/15/16/17 모듈 경계 정리
 
-> **성격**: L4(교수학 엔진) 서브 설계 — `04`(교수학 결정)·`04a`(WH-1 하네스)·`04b/04c`(오개념)·`04d`(교수법 선택·학습)·`04e`(교수전략 카탈로그)에 이어 **외부 EOS ⑭교수전략 라이브러리 검토와 WhyMath 현행 구현을 대조**하고, ⑮설명 방식 선택·⑯힌트 전략·⑰교정 전략의 WhyMath 좌석과 책임 경계를 정리한다.
+> **성격**: L4(교수학 엔진) 서브 설계 — `04`(교수학 결정)·`04a`(WH-1 하네스)·`04b/04c`(오개념)·`04d`(교수법 선택·학습)·`04g`(교수전략 카탈로그)에 이어 **외부 EOS ⑭교수전략 라이브러리 검토와 WhyMath 현행 구현을 대조**하고, ⑮설명 방식 선택·⑯힌트 전략·⑰교정 전략의 WhyMath 좌석과 책임 경계를 정리한다.
 >
 > **한 줄**: ⑭번은 이미 `PedagogyStrategy` enum 10종·YAML 카탈로그·`select→gate→decide` 런타임으로 Phase 1 수준에서 구현됐으나, `StrategyDecision`/`StrategyExecutionPlan`/`StrategyOutcome`, `PedagogicalAction`, `StrategyStep`, 구조화된 `ApplicabilityRule`, Pedagogy Graph, State Machine, Event System 연결 등은 아직 미구현이다.
 >
@@ -76,14 +76,14 @@
 
 > 외부: "어떻게 설명할 것인가?"
 
-WhyMath는 ⑮을 **독립 enum/축으로 만들지 않고** 기존 3축의 사영으로 흡수했다(04e §2.2 판정).
+WhyMath는 ⑮을 **독립 enum/축으로 만들지 않고** 기존 3축의 사영으로 흡수했다(04g §2.2 판정).
 
 | 외부 설명 방식 | WhyMath 좌석 | 책임 계층 |
 |---|---|---|
 | 직접 설명·비유·예시 | `PedagogyStrategy` enum(`DIRECT`·`ANALOGY`·`WORKED_EXAMPLE`) + `PedagogyPack.socratic_prompt` + `prompt_assembler` | L4 결정·L3 생성 |
 | 시각적 설명 | `Visualization`/`LearningScene` 선언적 명세 | L4 장면 조립·L5 렌더 |
 | 단계별 설명 | `SolutionPath` + `StepPanelElement` + 답 미루기 | L3 검증·L4 선택·L5 점층 노출 |
-| 실생활 예시 | `example_generator` 슬롯(04e §6) | L3 콘텐츠 생성 |
+| 실생활 예시 | `example_generator` 슬롯(04g §6) | L3 콘텐츠 생성 |
 
 **경계**: L4는 "어떤 전략"을 결정하고, L3는 "어떻게 생성", L5는 "어떻게 보여줄지"를 담당. ⑮은 L4와 L3 사이의 **렌더 전략 매개체**이지 별도 모듈이 아니다.
 
@@ -236,7 +236,7 @@ Education Event (L2/L4) → StrategyOutcome (L2/L4)
 
 - `docs/architecture/04_pedagogy_engine.md` — Polya·소크라테스·오개념·LTHC
 - `docs/architecture/04d_adaptive_pedagogy_engine.md` — Runtime Pedagogy Selector
-- `docs/architecture/04e_pedagogy_strategy_catalog.md` — 교수전략 카탈로그
+- `docs/architecture/04g_pedagogy_strategy_catalog.md` — 교수전략 카탈로그
 - `docs/architecture/02_learner_model.md` — 학습자 모델 입력
 - `docs/architecture/05_interaction.md` — L5 렌더 경계
 - `docs/architecture/03c_content_strategy_cache.md` — 콘텐츠 전략 캐시
