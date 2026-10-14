@@ -84,5 +84,5 @@ nullable UUID FK → `problem_version.version_id`. 44 §6.4의 `current_publishe
 
 ## 6. 후속 (이 PR이 소유하지 않는 것)
 
-- 문항 발행 게이트 / 전이 writer — `EOS-190`이 착지했다(2026-10-13 정정). 남은 후속: 호출 표면 `EOS-194` · 발행 이후 편집 드리프트 `EOS-195` · Rollback·Restore `EOS-196`.
+- 문항 발행 게이트 / 전이 writer — `EOS-190`이 착지했다(2026-10-13 정정). 남은 후속: 호출 표면 `EOS-194`(2026-10-13 정정: 착지 — `eos194_problem_publish_caller_surface.md`) · 발행 이후 편집 드리프트 `EOS-195` · Rollback·Restore `EOS-196`.
 - `concept.current_published_version_id`(Concept)와 `problem.problem_version_id`(Problem)의 **컬럼명 통일**은 승계 대조표가 이름을 고정해 이 PR에서 바꾸지 않았다. 통일 여부는 사람이 결정할 사안이다.

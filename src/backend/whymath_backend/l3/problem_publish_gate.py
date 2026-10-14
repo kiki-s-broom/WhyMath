@@ -48,8 +48,9 @@ test_problem_publish_gate_enforcement.py`).
 
 ## 이 모듈이 하지 않는 것 (추적: backlog 후속 태스크)
 
-- **운영 호출자 없음.** 이 모듈을 부르는 라우트·CLI는 아직 없다(관리자 CMS의 문항 발행 표면은
-  별도 태스크). 그래서 현재 운영에서 `outcome=pinned` 비율은 이 모듈이 *호출되기 전까지* 0이다.
+- **호출자는 이 모듈의 소유가 아니다.** 운영 호출자는 관리자 CMS의 문항 판 표면
+  (`api/admin_cms_problem_versions.py`, EOS-194)이며, 이 모듈은 그 표면의 권한·감사·HTTP 매핑을
+  모른다. `outcome=pinned` 비율은 운영자가 문항을 실제로 발행한 만큼만 0을 벗어난다.
 - **Rollback·Restore 없음.** 전이표의 복합 전용 간선(rollback·restore)은 호출 경로가 없어
   구현하지 않았다. 필요해지면 이 모듈에 더한다(포인터 쓰기 자리를 하나로 유지).
 - **발행 이후의 제자리 편집을 새 판으로 만들지 않는다.** CMS가 `problem` 행을 직접 고치면 발행된
@@ -382,6 +383,19 @@ async def list_versions(session: AsyncSession, problem_id: uuid.UUID) -> list[Sc
     return [_load_schema(row) for row in rows.scalars()]
 
 
+async def problem_exists(session: AsyncSession, problem_id: uuid.UUID) -> bool:
+    """문항이 있는가 — **읽기 전용**(잠금·엔티티 적재 없음, id 한 컬럼만 읽는다).
+
+    API 계층은 ORM을 직접 잡지 않는다(데이터 접근 baseline) — "없는 문항"(404)과 "판이 0건인 문항"
+    (빈 목록)을 구분하려는 호출자는 이 함수를 거친다. 엔티티를 세션에 올리지 않으므로 호출자의
+    트랜잭션 경계(commit 뒤 만료)에 영향을 주지 않는다.
+    """
+    found = (
+        await session.execute(select(Problem.problem_id).where(Problem.problem_id == problem_id))
+    ).scalar_one_or_none()
+    return found is not None
+
+
 async def get_version(session: AsyncSession, version_id: uuid.UUID) -> SchemaProblemVersion:
     """판 1건 — 없으면 `LookupError`. **읽기 전용**."""
     row = (
@@ -634,5 +648,6 @@ __all__ = [
     "create_draft",
     "list_versions",
     "get_version",
+    "problem_exists",
     "apply_transition",
 ]

@@ -149,6 +149,9 @@ from whymath_backend.api._subject_capability_state import (
 from whymath_backend.api.admin_bff import router as admin_bff_router
 from whymath_backend.api.admin_cms import router as admin_cms_router
 from whymath_backend.api.admin_cms_graph import router as admin_cms_graph_router
+from whymath_backend.api.admin_cms_problem_versions import (
+    router as admin_cms_problem_versions_router,
+)
 from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
@@ -1571,5 +1574,7 @@ def create_app(
     # P3-12: Admin CMS — 개념 버전 워크플로우(초안·검토·발행·롤백) + 개념 외 허용 목록 제자리 편집.
     app.include_router(admin_cms_router)
     app.include_router(admin_cms_graph_router)
+    # EOS-194: 문항 판 발행 호출 표면 — `l3/problem_publish_gate`의 운영 호출자.
+    app.include_router(admin_cms_problem_versions_router)
 
     return app
