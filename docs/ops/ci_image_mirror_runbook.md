@@ -20,10 +20,18 @@
 | 미러 워크플로 | `.github/workflows/mirror-ci-images.yml` | 주 1회·목록 변경 시·수동 실행 |
 | 사본 주소 | `ghcr.io/<소유자>/whymath-ci-mirror/<이름>:<태그>` | CI가 받는 곳 |
 
-**단계 구분 (OPS-135는 2단계로 착지한다)**: 1단계(이 문서가 처음 들어간 PR)는 미러 장치 자체
-(목록·도구·워크플로)다. CI 참조를 사본으로 바꾸는 2단계는 **사본이 실제로 생긴 것을 확인한 뒤**에 따로
-착지한다 — 1단계 머지 시점에는 CI가 아직 Docker Hub를 그대로 쓴다. 2단계가 착지하면 소비처와 이를
-지키는 계약 테스트(`tests/infra/test_ci_image_sources.py`)가 이 절에 추가된다.
+**소비처 (OPS-135 2단계가 사본으로 전환한 곳)**: 계약은 `tests/infra/test_ci_image_sources.py`가
+집행한다 — 워크플로 YAML을 파싱해 서비스 컨테이너·`container:`·`docker run|create|pull`·`uses: docker://`와
+`Dockerfile`의 `FROM`·`# syntax=`를 전수로 읽고, 미러 사본이 아니면 RED다(스캔 0건도 RED).
+
+| 소비처 | 어떻게 사본을 받는가 |
+|---|---|
+| `ci.yml` `backend-migrations` · `data-pipeline-integration` · `e2e-nightly`(PG) · `data-pipeline-neo4j`(Neo4j) | 서비스 `image:` = 사본 주소 + `credentials`(`GITHUB_TOKEN`) + 잡 `permissions: packages: read` |
+| `weekly-metrics.yml` `report`(PG) | 같은 방식, 워크플로 최상위 `packages: read` |
+| `ci.yml` `docker-build` + `Dockerfile` | Dockerfile은 `ARG PYTHON_IMAGE`(기본값 = Docker Hub `python:3.12-slim`)로 받고, CI는 `docker login ghcr.io` 뒤 `--build-arg PYTHON_IMAGE=<사본>`을 넘긴다. `# syntax=` 지시어는 제거했다(그 지시어는 빌드마다 프런트엔드 이미지를 Docker Hub에서 따로 받는다) |
+
+로컬·운영 빌드는 `ARG` 기본값(Docker Hub)을 그대로 쓴다 — 사본이 필요한 곳은 CI뿐이다. 이 경로의 Docker
+Hub 한도는 이 런북이 다루지 않는다(운영 compose의 이미지 참조는 CI가 아니라서 OPS-135 범위 밖이다).
 
 ## 3. 새 이미지를 더하는 순서 (순서를 거꾸로 하면 전 CI가 깨진다)
 
@@ -47,7 +55,7 @@
 |---|---|---|---|
 | ① | **사본이 낡는다** — 업스트림이 보안 패치를 내도 다음 미러 실행 전까지 CI는 옛 이미지를 쓴다. | 최대 7일 지연. CI 전용 이미지(운영 배포와 무관)라 영향이 작다. | 주 1회 갱신. 긴급 패치는 수동 실행. |
 | ② | **미러 자체는 여전히 Docker Hub를 읽는다** — 한도에 걸리면 미러 실행이 실패한다. | 주 1회·목록 변경 시만 읽으므로 모든 CI 실행이 읽던 때보다 훨씬 드물다. 실패해도 CI는 기존 사본으로 계속 돈다. | 지수 백오프 재시도(최대 약 18분) + 전체 예산 40분. |
-| ③ | **사본 패키지의 공개 여부를 아직 확인하지 않았다.** | 비공개면 같은 저장소의 워크플로(`GITHUB_TOKEN`)만 받을 수 있다. 포크 PR에서는 받지 못할 수 있다. | 첫 미러 실행 뒤 §7의 확인을 한다. 서비스 컨테이너는 `credentials`로 로그인하므로 비공개여도 같은 저장소 CI는 동작한다. |
+| ③ | **사본 패키지는 비공개다**(2026-10-14 첫 미러 실행 뒤 실측: 로그인 없이 `imagetools inspect` → 3종 모두 401 `failed to fetch anonymous token`). | 같은 저장소의 워크플로(`GITHUB_TOKEN`)로만 받을 수 있다. 포크 PR·로컬 개발 머신은 받지 못한다. | CI는 서비스 `credentials`·`docker login`으로 받는다(계약 테스트가 집행). 공개 전환은 ④의 라이선스 확인 뒤에만 한다 — 공개하면 이 의존이 사라지지만 재배포가 된다. |
 | ④ | **재배포 라이선스를 확인하지 않았다** — 사본은 업스트림 이미지의 재배포다. | `pgvector/pgvector`(PostgreSQL·pgvector 계열)와 `python`은 허용 범위가 넓다고 알고 있으나 이 저장소에서 검증하지 않았다. `neo4j`는 Community 판 조건(GPL 계열)을 확인하지 못했다. | 사본이 **공개 패키지로 전환되기 전에** 확인한다(비공개 상태에서는 외부 재배포가 아니다). Neo4j만 막히면 `data-pipeline-neo4j` 잡을 분리 판정한다. |
 | ⑤ | **조직·소유자 이관** — 사본 주소에 소유자가 들어간다. | 이관 후 CI 참조(`github.repository_owner`)는 따라가지만 새 소유자 아래 사본이 없다. | 이관 직후 미러를 수동 실행한다. 대문자가 든 소유자는 ghcr 규칙상 쓸 수 없고 도구가 거부한다(종료 코드 2). |
 | ⑥ | **한도 실패가 코드 실패로 읽힌다** — 컨테이너 초기화가 실패하면 그 잡의 뒤 스텝은 실행되지 않아 CI 안에서 원인을 따로 표시할 수 없다. | 사본으로 옮긴 뒤에는 Docker Hub 한도가 CI를 막지 않으므로 이 위험 자체가 줄었다. | 원인 판별은 `Initialize containers` 로그의 pull 오류 문구로 한다(§6). 별도 감시 장치는 만들지 않았다. |
@@ -58,6 +66,7 @@
 
 1. 로그의 오류 문구를 읽는다. `manifest unknown` · `not found`면 **사본이 없거나 이름이 틀린 것**이다 → 미러 워크플로 최근 실행을 본다.
 2. `unauthorized` · `denied`면 **패키지 접근 권한**이다 → §7의 패키지 설정(저장소 접근·공개 여부)을 본다.
+   사본은 비공개이므로 `credentials`·`docker login`·`packages: read`가 빠졌거나, 패키지의 Actions 접근에서 이 저장소가 빠진 경우다(§5 ③). 포크 PR에서만 나면 정상 제약이다.
 3. `toomanyrequests`가 ghcr.io 주소에서 나오면 ghcr 쪽 한도다(드문 경우) → 같은 실행을 한 번 다시 돌리고, 반복되면 태스크로 등재한다.
 4. `toomanyrequests`가 `docker.io`/`registry-1.docker.io`에서 나오면 **Docker Hub 익명 참조가 되돌아온 것**이다 → `tests/infra/test_ci_image_sources.py`가 막았어야 하므로 그 테스트가 왜 통과했는지부터 본다.
 

@@ -38,6 +38,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # 서비스 컨테이너 이미지가 ghcr.io 미러 사본(비공개 패키지)이라 읽기가 필요하다 (OPS-135).
+  packages: read
 
 concurrency:
   # 매주 1회·수동 발화도 드묾 — 취소보다 직렬 대기가 항상 안전(harness-audit과 같은 판단).
@@ -65,7 +67,13 @@ jobs:
       postgres:
         # backend-migrations 잡과 동형(pgvector 프리설치·trust 인증) — 마이그레이션이
         # `CREATE EXTENSION vector`를 성공시켜야 "0건"이 진짜 빈 스키마 판정이 된다.
-        image: pgvector/pgvector:pg16
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: whymath
           POSTGRES_DB: whymath
