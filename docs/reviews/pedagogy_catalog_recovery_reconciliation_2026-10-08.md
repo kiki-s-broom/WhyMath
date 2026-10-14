@@ -327,10 +327,33 @@ gdmwhk와 main의 **내용 차이**(카탈로그 코드·코퍼스·테스트 �
 | `harness-integrity` | **닿음** | `docs/`·`backlog/`·`MEMORY.md` 변경 + `tests/harness` |
 | `policy-guard` | **닿음** | 모든 PR에 도는 금기 패턴·`cp949_guard`·충돌 마커 |
 | `declared-unwired-audit` | 닿음(전수 재현) | 선언≠배선 감사는 소스 변경에 반응 |
-| `backend-migrations` | 안 닿음 | 마이그레이션 변경 0건(alembic은 `04e` 참조를 **보존**했다) — 단 `backend` 플래그라 CI에서는 돌 수 있다 |
-| `data-pipeline`·`data-pipeline-*`·`mobile`·`web`·`webapp`·`concept-reach-guard`·`docker-build`·`infra-shell`·`constraints-freshness` | 안 닿음 | 경로 비접촉 |
-| `corpus-authoring`·`e2e-nightly`·`backend-serial-nightly` | 안 닿음 | 스케줄/작성 전용 |
+| `data-pipeline` | **닿음** | `data/corpus/pedagogy_strategies_v1`(주석) 변경이 `corpus` 플래그를 켜 QA 파이프라인 게이트 스텝도 돈다 |
+| `corpus-authoring` | **닿음** | 경로 필터가 깨운다(`data/corpus/` 변경) |
+| `infra-shell`·`declared-unwired-audit` | 닿음(상시) | 상시 잡 |
+| `backend-migrations` | 닿음 · **로컬 재현 불가** | 경로 필터가 깨운다(`src/backend/`). 실 PG 서비스 컨테이너가 필요하다. 마이그레이션 변경은 0건이고 alembic의 `04e` 참조는 **보존**했다 |
+| `docker-build` | 닿음 · **로컬 재현 불가** | 경로 필터가 깨운다(`src/backend/`). docker 빌드·기동 스텝이 필요하다 |
+| `mobile`·`web`·`webapp`·`concept-reach-guard`·`data-pipeline-*`·`constraints-freshness` | 안 닿음 | 경로 비접촉 |
+| `e2e-nightly`·`backend-serial-nightly` | 안 닿음 | 스케줄 전용 |
+
+> **정정(2026-10-14).** 이 표의 첫 판은 `data-pipeline`·`corpus-authoring`·`docker-build`를 "경로 비접촉"으로 적었다. PR 생성 훅(HARN-209)이 경로 필터가 깨우는 잡 목록을 보여 줘서 틀렸음이 드러났고, 닿는 잡 판정을 "무엇을 검사하는지"가 아니라 내가 떠올린 경로로 했던 탓이다. 재현 가능한 두 잡은 이후 실제로 돌렸다(§7.8).
 
 ### 7.8 검증 결과
 
-(검증 진행 중 — CI 잡 재생 결과는 이 절에 다음 커밋으로 채운다. 이 커밋 시점에는 아직 판정이 없다.)
+판정 기준: 코드 변경 커밋 `948a0436`(별도 워크트리 재생) · 문서·대장 포함 커밋 `e4eda2b1`(CI 미러). 환경은 Python 3.12 venv이고 의존은 CI 제약 파일(`infra/ci/constraints-py312.txt`)로 고정했다. 판정은 종료 코드와 로그의 판정 줄을 함께 읽었다.
+
+| CI 잡 | 재현 방법 | 결과 |
+|---|---|---|
+| `backend` | `ci.yml`의 `run:` 25스텝을 YAML에서 읽어 순서대로 재생(스냅샷 워크트리) | 전 스텝 exit 0 — ruff · black · `mypy --strict` · `lint-imports` · pytest **19955 passed · 684 skipped · 1 xfailed**(29분 49초) · 총 커버리지 86.42% · 계층별 바닥선 PASS · 게이트 CLI 16종 · `tests/constitution` |
+| `infra-contracts` | `ci_mirror.py run` | 통과 — `pytest tests/infra` 656초(신규 가드 4건 포함) · ruff · black · 게이트 4종 |
+| `infra-shell` · `policy-guard` · `declared-unwired-audit` | `ci_mirror.py run` | 통과 |
+| `harness-integrity` | `ci_mirror.py run` | 통과 — `validate`·`audit-deps`·`rules lint`·`jit check`·위헌 심사 래칫·헌법 가드 4종·관측 리포트·ruff·black·`pytest tests/harness` 803초 |
+| `data-pipeline` | `ci_mirror.py run` + `qa_pipeline`을 직접 실행 | ruff · black · `mypy --strict` · pytest 통과. 미러가 평가하지 않은 `qa_pipeline` 게이트 스텝(`corpus` 플래그 조건)은 같은 명령(`python -m whymath_backend.harness.qa_pipeline --json …`)을 직접 돌려 exit 0 |
+| `corpus-authoring` | `ci_mirror.py run` | 통과 — `corpus_authoring` 마커 전량 1230초 |
+
+**첫 미러 시도의 실패는 검사 실패가 아니었다.** 처음 `ci_mirror.py run`은 venv에 `pip`이 없어 설치 스텝이 죽었고 뒤 스텝 30건이 전부 미실행이었다. `pip`을 넣고 다시 돌린 것이 위 결과다. 미실행은 통과가 아니므로 첫 시도는 증거로 쓰지 않았다.
+
+**돌리지 못한 것 — CI를 최종 판정으로 넘긴다.**
+- `backend-migrations`(실 PG 서비스 필요) · `docker-build`(docker 빌드·기동 필요): 이 환경에서 재현 불가. 마이그레이션 변경 0건, Dockerfile·compose 변경 0건.
+- `qa_pipeline`의 `defect_report_intake` 축은 로컬에 DB가 없어 `ConnectionRefusedError`로 측정하지 못했다고 스스로 밝히며 종료했다(exit 0). 이 축의 값은 이 PR이 확인한 것이 아니다.
+- 로컬 `mobile`·`web`·`webapp` 잡은 경로 비접촉이라 돌리지 않았다.
+- `backend` 전체 스위트는 문서·대장 커밋(`e4eda2b1`) **이전** 스냅샷(`948a0436`)에서 돌렸다. 그 뒤 변경은 문서·대장뿐이며, 그것을 읽는 테스트는 `infra-contracts`·`harness-integrity` 미러(`e4eda2b1`)가 덮는다. 이 정합 문서의 §7.7·§7.8 보정 커밋은 위 미러 이후의 문서 변경이라 CI가 최종 판정한다.
