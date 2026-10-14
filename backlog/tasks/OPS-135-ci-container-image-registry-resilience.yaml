@@ -35,4 +35,5 @@ notes: |-
   [사람 행동 구분] 게이트 G-ops135-ci-image-source-decision 이 선택지를 정한다. ②를 고르면 Docker Hub 계정 · 액세스 토큰 발급과 GitHub Actions Secrets 등록은 Kiki가 직접 해야 한다(세션이 대신할 수 없다). ①을 고르면 조직의 패키지 권한 확인이 필요하다.
 
   [사고 기록] 같은 사건은 사고 대장(incident add)에 등재했고 대책 참조가 이 태스크다.
+  [진행 — 2026-10-14] 게이트 G-ops135-ci-image-source-decision을 Kiki가 ①ghcr 미러로 판정했다(채팅 지정). 1단계 PR #1626 머지(a11a1320): 미러 목록·도구·워크플로·런북. 머지 직후 mirror-ci-images 첫 실행 성공(run 38602523083 · 49초 · 3/3건) — 사본 digest 3종이 업스트림 실측과 일치한다(pgvector 7b822b0a · neo4j f1e52d4d · python a6e34c59). **사본 패키지는 비공개다**(로그인 없는 imagetools inspect가 3종 모두 401) → 소비처는 credentials·docker login·packages 읽기 권한이 필요하다. 2단계(CI 참조 전환 + 계약 테스트 tests/infra/test_ci_image_sources.py)는 커밋 b81f41fd이며 로컬 CI 미러 상시 잡 5종이 40스텝 전부 통과했다 — PR 대기. 남은 일: ⑤ 실물 검증(2단계 PR CI·머지 큐 로그에서 사본 pull 줄을 인용 — 익명 폴백과 구분) → 그 뒤에 done. ⑥ 관측 판정은 런북 §5 ⑥에 기록했다(컨테이너 초기화 실패 잡은 뒤 스텝이 안 돌아 CI 안에서 원인을 따로 표시할 수 없다 — 미실측 추론). ⑦ 잔여 위험은 런북 §5로 충족. 미확인으로 남은 것: 사본 공개 전환 여부·neo4j/pgvector 재배포 라이선스·Docker Hub 현행 한도 수치.
 updated: 2026-10-14
