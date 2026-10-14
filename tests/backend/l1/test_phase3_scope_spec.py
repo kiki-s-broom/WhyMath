@@ -136,8 +136,9 @@ def test_required_problem_types_open_the_two_skills_the_first_five_could_not_exe
     """필수 유형이 스킬 8종을 전부 행사할 수 있어야 한다 — 빠지면 두 스킬의 승인 문항은 구조적으로 0건이다."""
     assert scope.problem_types == _FIRST_FIVE + tuple(_ADDED_BY_P3_05)
     # 코퍼스 경로는 하드코딩하지 않고 명세의 sources 에서 읽는다 — 명세가 가리키는 코퍼스와 같아야 한다.
-    repo_root = _SPEC_PATH.parents[3]  # data/corpus/phase3_scope_v1/scope_spec.yaml → 저장소 루트
-    assert (repo_root / "data/corpus").is_dir()  # 계산이 틀리면 경로 오류 대신 여기서 분명히 실패한다
+    # data/corpus/phase3_scope_v1/scope_spec.yaml → 저장소 루트. 계산이 틀리면 경로 오류 대신 아래에서 분명히 실패한다.
+    repo_root = _SPEC_PATH.parents[3]
+    assert (repo_root / "data/corpus").is_dir()
     corpus_path = repo_root / scope.sources["problem_types"]
     rows = {
         json.loads(line)["problem_type_id"]: json.loads(line)
