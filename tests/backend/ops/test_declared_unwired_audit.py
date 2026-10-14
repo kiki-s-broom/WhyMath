@@ -1123,6 +1123,14 @@ class TestRealRepositoryOps28:
             assert key in reach.library_only, key
             assert key not in reach.executed, key
 
+    def test_s4_56_v1_is_imported_by_v2_but_never_executed(self) -> None:
+        """P3-14 와 같은 유형 — v2(CI 직접 실행)가 v1 의 함수를 import 해도 v1 `main()` 은 아니다."""
+        reach = self._real_reach()
+        key = "harness.residue_cross_verify_eval"
+        assert key in reach.library_only
+        assert key not in reach.executed
+        assert dua._MANIFEST[dua.AXIS_CLI][key].startswith("by-design:")
+
     def test_p3_14_five_waivers_are_restored(self) -> None:
         for key in self._P3_14_FIVE:
             assert dua._MANIFEST[dua.AXIS_CLI][key].startswith("by-design:"), key

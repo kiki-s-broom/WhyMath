@@ -1435,12 +1435,13 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "ops.dialogue_encryption_preflight": _LIVE_DEPENDENT,
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,
         "harness.wh1_shadow_harvest": _LIVE_DEPENDENT,
-        # (S4-56) `harness.residue_cross_verify_eval`(v1)의 면제는 지웠다 — CI가 직접 실행하는
-        # v2(`--dry-run`·LLM 0)가 v1의 `load_pilot_records`·`select_sample`을 in-process
-        # import해 감사기 정의상(축 4 ⑶ 전이 폐포) v1이 도달했다. **v1의 라이브 `main()` 경로는
-        # 여전히 CI에서 돌지 않는다**(실 provider 필요) — 도달한 것은 코드 재사용이지 라이브
-        # 측정이 아니다. 면제를 지우는 이유는 감사기 규칙(stale-waiver 실패)이지 v1이 배선됐다는
-        # 주장이 아니다.
+        # S4-56/OPS-28: CI 가 직접 실행하는 v2(`--dry-run`·LLM 0)가 v1 의 `load_pilot_records`·
+        # `select_sample` 을 in-process import 한다. OPS-28 이전 정의(import 전이 = 도달)에서는
+        # v1 이 도달이 되어 S4-56 이 이 유예를 걷었다 — 그러나 **v1 의 라이브 `main()` 은 CI 에서
+        # 한 번도 실행되지 않는다**(실 provider 필요). 걷은 순간 그 미배선 경보만 사라졌다(P3-14 와
+        # 같은 유형). OPS-28 이 import 를 도달에서 갈랐으므로(축 4 블록 주석) 유예를 복원한다.
+        # 도달한 것은 코드 재사용이지 라이브 측정이 아니다.
+        "harness.residue_cross_verify_eval": _LIVE_DEPENDENT,
         # ARCH-49 — DeepSeek/OpenRouter 라이브 프로브. CI에서 원리적으로 못 도는 것이
         # *실측*됐다(2026-09-17 개발 컨테이너: 키 부재 + egress 프록시가
         # api.deepseek.com·openrouter.ai에 CONNECT 403). 이 CLI를 실제로 돌려 3축을
