@@ -434,7 +434,9 @@ _MUTATIONS: list[tuple[str, str, str, set[str]]] = [
     ),
     (
         "M19-payload-shape-error-swallowed",
-        '        raise DbReadError(f"DB 응답의 모양이 기대와 다르다({type(exc).__name__}: {str(exc)[:120]})") from exc',
+        "        raise DbReadError(\n"
+        '            f"DB 응답의 모양이 기대와 다르다({type(exc).__name__}: {str(exc)[:120]})"\n'
+        "        ) from exc",
         "        raise KeyboardInterrupt from exc",
         {"sc_malformed_payload_is_unknown"},
     ),
