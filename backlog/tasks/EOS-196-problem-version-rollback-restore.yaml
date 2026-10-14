@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-196-problem-version-rollback-restore
+title: "문항 판 Rollback·Restore — 복합 전용 전이(rollback·restore)를 문항 게이트에 추가"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-194-problem-publish-caller-surface
+requires_gates: []
+acceptance:
+  - "문항 판 Rollback·Restore: schema/version_lifecycle.py 전이표의 복합 전용 간선(rollback, restore)을 l3/problem_publish_gate에 더한다. 호출 경로가 없어 EOS-190에서 의도적으로 구현하지 않았다(선언만 된 코드를 두지 않기 위함). 개념 판 l3/publish_gate.rollback과 동형으로, 현재 발행본을 RETIRED로 내리고 직전 발행본을 RESTORE 게이트(해시 재검증)를 통과시켜 복원하며 problem.problem_version_id 포인터를 한 번에 옮긴다."
+  - "RESTORE 게이트는 run_gate의 범위에 들어오며 live_content_current 적용 여부(복원본이 현재 라이브와 같아야 하는가)를 근거와 함께 판정한다. 포인터 쓰기 자리는 계속 이 모듈 하나다(AST 동결 R2 유지). 실 PG 통합 테스트로 롤백 뒤 포인터가 가리키는 판의 payload가 복원 대상의 스냅숏과 바이트 단위로 같음을 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/problem_publish_gate.py
+  - tests/backend/l3/test_problem_publish_gate.py
+session: null
+notes: "출처: EOS-190 착지 시 분리. 호출 표면(EOS-194)이 없으면 가치가 없어 depends_on으로 집행한다."
+updated: 2026-10-13

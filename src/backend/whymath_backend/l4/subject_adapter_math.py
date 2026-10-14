@@ -12,7 +12,7 @@
 |---|---|---|
 | `evaluate_answer` | `verify_answer()` | `l3/verify_answer.py:272` |
 | `detect_misconception` | `diagnose()` | `l4/misconception/diagnose.py:136` |
-| `validate_problem` | `Verifier.verify()` | `l3/verifier.py:300` |
+| `validate_problem` | `Verifier.verify()` | `l3/verifier.py` |
 
 ## 경계상의 위치
 
@@ -40,7 +40,7 @@ EOS-69 착수 시점 15건에서 이 배선 이후 실측치로 내려갔다(정
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence, cast
 
 from whymath_backend.l3.equivalent.rephrase import classify_invariance_failure, extract_equation
 from whymath_backend.l3.symbolic_equivalence import identity_status
@@ -89,12 +89,25 @@ class MathSubjectAdapter:
     `Verifier`를 주입할 수 있다(교차검증기 결선 등 호출측 결정). 주입하지 않으면 기본
     `Verifier()`를 쓴다 — 그 경우 잔여 축은 교차검증 없이 `unverifiable`로 회피된다
     (보수적·거짓 pass 금지).
+
+    `author_resolver`는 문항 → 저작 서명(`llm_author`/`deterministic_author`로 조립한 값)을 돌려주는
+    함수다(S4-65). Core 봉투 `ProblemStatement`는 필드가 동결돼 있어 서명 좌석이 없으므로, 서명은
+    **호출측이 어댑터에 넣어 주는** 이 자리로만 들어온다. 주지 않으면 `ProblemVerifyInput`의 기본값
+    (`UNRECORDED_AUTHOR`)이 그대로 쓰이고, 교차검증기가 주입된 `Verifier`는 그 값을 가드로
+    거부한다 — 서명을 지어내 채우지 않는다. 결선 현황·조건은 설계서
+    `docs/architecture/verifier_v2_design.md` §6.4.
     """
 
     subject_id = "math"
 
-    def __init__(self, *, verifier: Verifier | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        verifier: Verifier | None = None,
+        author_resolver: Callable[[ProblemStatement], str] | None = None,
+    ) -> None:
         self._verifier = verifier if verifier is not None else Verifier()
+        self._author_resolver = author_resolver
 
     def evaluate_answer(
         self, problem: ProblemStatement, answer: Mapping[str, str]
@@ -135,6 +148,11 @@ class MathSubjectAdapter:
         중립 봉투 → `ProblemVerifyInput` 변환이 이 메서드의 실질이다. `tier`·`audit_labels`는
         수학 검증 내부 개념이라 계약으로 넘기지 않는다 — 대신 닫힌 축/잔여 축만 넘긴다.
         """
+        # 서명은 resolver가 있을 때만 채운다 — 없으면 키워드 자체를 넘기지 않아 모델 기본값
+        # (`UNRECORDED_AUTHOR`)이 그대로 남고, 어댑터가 서명을 지어내는 길이 없다.
+        authored: dict[str, str] = {}
+        if self._author_resolver is not None:
+            authored["authored_by"] = self._author_resolver(problem)
         verdict = await self._verifier.verify(
             ProblemVerifyInput(
                 slug=problem.problem_ref,
@@ -142,6 +160,7 @@ class MathSubjectAdapter:
                 answer=problem.answer,
                 answer_kind=problem.answer_kind,
                 conditions=problem.conditions,
+                **authored,
             )
         )
         return ProblemValidation(

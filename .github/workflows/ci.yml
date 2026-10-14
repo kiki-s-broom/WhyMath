@@ -504,6 +504,19 @@ jobs:
       - name: 게이트 — 생성기 공간 겹침 (generator_space_overlap·발문 공간 교집합 0)
         run: python -m whymath_backend.harness.generator_space_overlap_audit
 
+      # S4-56: 잔여 축 교차검증 게이트 v2의 **배선 검사**(--dry-run). LLM 0·네트워크 0 — 파일럿
+      # 34문의 기계 축 전수 재검산과 사전점검(임계 도달성·저작 서명)만 돈다. 잔여 축은 측정하지
+      # 않으므로 이 스텝의 초록은 "게이트가 통과했다"가 아니라 "게이트를 돌릴 수 있는 상태다"이다
+      # (판정 DRY_RUN_OK ≠ PASS). 표본 34·임계 0.11은 파일럿에서 *도달 가능한* 배선용 값이다(결함
+      # 0건 상한 0.0737) — 품질 임계가 아니다. 라이브 측정·승격은 S4-16 기각(2026-09-25 Kiki)으로
+      # 이 스텝의 범위 밖이다. 변별력은 harness 테스트가 봉인한다(도달 불가·기계 실패·서명 판독
+      # 불가가 각각 다른 사유로 exit 1, 미구현 도메인·로드 실패는 exit 2).
+      - name: 게이트 배선 — 잔여 축 교차검증 v2 사전점검 (residue_cross_verify_eval_v2 --dry-run·LLM 0)
+        run: |
+          python -m whymath_backend.harness.residue_cross_verify_eval_v2 \
+            ../../data/corpus/problem_bank_probability_finite_v0/problems.jsonl \
+            --domain finite --dry-run --sample-n 34 --min-n 20 --max-defect-upper 0.11
+
       - name: 게이트 — 코치 프로즈 유출 (coach_prose_leak·노출 상한 0.05·오차단 상한 0.2)
         run: |
           python -m whymath_backend.harness.coach_prose_leak_eval \

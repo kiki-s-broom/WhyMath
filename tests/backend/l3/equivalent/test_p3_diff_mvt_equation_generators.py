@@ -18,7 +18,8 @@ P3-03(hermetic·LLM 0). 두 생성기는 아직 등록부(`harness.p3_calculus1_
    않음.
 ⑥ 오개념 연결은 오개념 유발 슬롯에만. 02-06은 명세의 핵심 M-id(M0674 — kebab 좌석이 없어 M-id 그대로 ·
    좌석이 생기면 이 테스트가 신호를 낸다)로, 02-09는 6회차 은행 감사(은행 감사 2회차 · 2026-10-08) 처분으로
-   핵심 M0677(설명 손상 — QUAL-14)·M0615(설명 자기모순) 대신 L4 kebab **extremum-value-vs-point-confused**(극값
+   핵심 M0677(감사 당시 설명 손상 — QUAL-14가 2026-10-12 문장을 복원했으나 '관점을 못 쓴다'라 절차 미기술은
+   그대로)·M0615(설명 자기모순) 대신 L4 kebab **extremum-value-vs-point-confused**(극값
    ·극점 혼동)로 — 극값 자리에 극점 x좌표를 넣어 센 값의 선지만 연결하고 차수·극값 후보 개수 선지는 연결하지
    않는다.
 ⑦ 문제유형 정직성: 개수형(`real_root_count`) ⇔ `ptype.count-solutions`.
@@ -731,7 +732,7 @@ def test_equation_concept_count_forms_do_not_monopolise_a_slot() -> None:
 #: 명세가 개념에 귀속한 핵심 오개념(M-id).
 _CORE = {_MVT: "M0674", _EQ: "M0677"}
 #: 오개념 유발 슬롯이 실제로 연결하는 오개념. 02-09는 6회차 감사 처분으로 핵심 M0677 대신 L4 kebab
-#: '극값·극점 혼동'이다(`test_equation_concept_links_extremum_point_until_m0677_is_repaired`).
+#: '극값·극점 혼동'이다(`test_equation_concept_links_extremum_point_while_m0677_has_no_procedure`).
 _LINKED = {_MVT: "M0674", _EQ: "extremum-value-vs-point-confused"}
 
 
@@ -806,7 +807,7 @@ def _point_confusion_count(function: sympy.Expr, level: sympy.Integer) -> int:
     return hits + sum(1 for p in points if p == level)
 
 
-def test_equation_concept_links_extremum_point_until_m0677_is_repaired() -> None:
+def test_equation_concept_links_extremum_point_while_m0677_has_no_procedure() -> None:
     """02-09 오개념 유발 선지 — '극값·극점 혼동' 절차 값만 연결, 차수·극값 후보 개수는 연결 없음(6회차 처분).
 
     ① 연결 선지의 값이 *그 오개념의 절차*(극값 자리에 극대·극소가 되는 점의 x좌표를 넣고 개수를 센다)로
@@ -814,9 +815,11 @@ def test_equation_concept_links_extremum_point_until_m0677_is_repaired() -> None
     ② 그 값은 정답·차수·극값 후보 개수 어느 것과도 다르다(연결 선지가 다른 오답 경로와 겹치지 않는다).
     ③ 차수·극값 후보(f'(x) = 0의 서로 다른 실근) 개수 선지는 선지에 있되 연결하지 않는다.
     ④ 해설이 그 절차를 한 문장으로 보인다('x좌표 … 극값으로 잘못 넣으면 … N개로 세게 된다').
-    ⑤ stale 가드 — 핵심 M0677의 설명은 아직 서술어 없이 끊겨 있고('…관점을'), 옛 연결 M0615의 설명은 아직
-       두 절차('두 개로 단정'·'차수만큼')를 함께 적는다. 원문이 정정되면 red가 되어 연결을 다시 판정하라는
-       신호를 낸다.
+    ⑤ stale 가드 — 핵심 M0677의 설명은 잘린 문장(QUAL-14 이전 '…관점을')에서 완결 문장('…관점을 못 쓴다')이
+       됐지만 여전히 *관점의 부재*(omission형)라 값을 내는 절차가 적혀 있지 않다. 그래서 연결 정지가 유지된다
+       (QUAL-14 재판정 2026-10-12 — MISC-40이 이미 omission형이라 kebab 좌석을 의도적으로 두지 않았다).
+       설명이 '못 쓴다'형이 아니게 바뀌면(절차가 적히면) red가 되어 연결을 다시 판정하라는 신호를 낸다.
+       옛 연결 M0615의 설명은 아직 두 절차('두 개로 단정'·'차수만큼')를 함께 적는다 — 정정되면 같은 신호다.
     """
     checked = 0
     for item in _EQ.items("misconception_trigger"):
@@ -844,8 +847,8 @@ def test_equation_concept_links_extremum_point_until_m0677_is_repaired() -> None
     assert checked == _EQ.slot_count
     statement = str(_misconception_row("M0677")["canonical_statement"])
     assert statement.endswith(
-        "관점을"
-    ), "M0677 원문이 정정됐다 — 02-09 연결을 다시 판정한다(QUAL-14)"
+        "관점을 못 쓴다"
+    ), "M0677 설명이 '못 쓴다'(관점의 부재)형이 아니게 됐다 — 절차가 적혔다면 02-09 연결을 다시 판정한다"
     m0615 = str(_misconception_row("M0615")["canonical_statement"])
     assert (
         "두 개로" in m0615 and "차수만큼" in m0615

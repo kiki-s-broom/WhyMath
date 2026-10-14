@@ -66,6 +66,8 @@ RETURNING <pk>`. 건너뛴 행은 RETURNING이 비어 있고, 적재 건수에 �
 적재 파이프라인의 저작권·출처·라이선스 레일(`require_provenance`·`content_provenance` 원장 등)의 소관이다. CMS에서 만들면 그
 레일을 우회한다. 이번 계약의 보호도 "고치기"만 다루므로 이 결정과 충돌하지 않는다. 재판정 조건: 신규 작성을 열 때는 그 경로가
 같은 출처 관문을 거치도록 하는 설계가 선행돼야 한다.
+**개념·선수 관계는 예외로 P3-26이 열었다** — 개념 그래프는 저작권 원장이 아니라 구조 데이터이고, 신규 개념은 제안→검토→승인→발행을
+거쳐야만 행이 생긴다. 정본은 `cms_concept_graph_write_contract.md`(행 단위 소유권·`cms_edited_at`을 같은 의미로 `concept`·`concept_edge`에 둔다).
 
 ## 4. 집행 지점 (정본화와 별항 — acceptance ④)
 

@@ -841,11 +841,11 @@ gates:
     title: "게이트② 라이브 표본 실측 실행 — docs/ops/ops106_gate2_live_sample_runbook.md 를 Phaiakes9 에서 실행해 서빙 계상(COUNTED)·이중 회계(MATCH)·저작 분리(SEPARATED_MATCH) 판정 줄 전체를 세션에 전달 (OPS-106 ①②③)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-05
     remind_after_days: 7
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main d873d064 (Kiki 클론 HEAD=d873d064 일치, PRE_OK=True) · 2026-10-12 Phaiakes9 실측 · 상세 MEMORY.md 2026-10-12 항목. ② DUAL_ACCOUNTING MATCH (인프로세스 16 = Langfuse probe 16, 오류 2건은 ReadTimeout). ③ AUTHORING_SEPARATION SEPARATED_MATCH (authoring +5, 표본 +0, unlabeled +0). ① SERVING_SAMPLE COUNTED (재시도: serving +43, unlabeled +0, SURFACE_LABELED_RATE 1.0, PRIMARY_RECORDS_P=1). 단서: ① 1차 시도는 NO_PRIMARY_TURN_IN_SERVER_LOG (primary 하네스 TimeoutError 폴백으로 기록 0줄, serving +45), 재시도에서도 15요청 중 14턴이 시간 초과로 primary 성공은 1건뿐 — 이 실측이 증명한 것은 계측 사슬(표지-전송-집계)의 작동까지이며 학생 대면 primary 성공률은 OPS-134가 소유한다. 게이트② 합격(로컬 80% 이상)은 미판정: cost_probe 로컬 100%는 budget0 강등 16건의 결과다. 부수 결함 OPS-133(낡은 데모 DB 진단 부재)."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
@@ -921,11 +921,11 @@ gates:
     title: "P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-22
     remind_after_days: 40
-    evidence: null
-    cleared_by: null
+    evidence: "P3-G1 PASS 확정 — 판정문 docs/reviews/p3_g1_week1_gate_judgment_2026-10-12.md · 판정 기준 main f34d7b7664902b179da3867f6aecf4e01f8da2ed · PR #1584 · 해석 2곳(조사 창 09-29 시작 · Hint 좌석 신설을 신규 Entity로 보지 않음) Kiki 확인"
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-09-22] title: 'P3-G1 — Week 1 Gate 판정 (11/1). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' → 'P3-G1 — Week 1 Gate 판정 (**상한 11/1 · 선행 완료 즉시 앞당겨 판정**). 대표 과정 명세 동결 + 핵심 Concept Content Coverage 95%+ + 금지 변경 0건. 선행 P3-01~P3-03. 판정 회차이므로 구현 세션과 분리된 새 세션에서 단독 집행한다' — Kiki 결정 2026-09-22 — 일정은 달력이 아니라 선행 완료로 움직인다(가능하면 앞당긴다). 원 계획 날짜는 고정일이 아니라 상한이므로 문면을 그렇게 고친다. 대장은 이미 이 결정과 정합한다: P3 태스크에 날짜 필드가 없고 착수 조건이 전적으로 depends_on + 게이트다. 부수로 11/22 ↔ 저장소 G3 일정 충돌이 해소된다 — 11/22 는 Phase 3 의 상한일 뿐 판정 예정일이 아니다."

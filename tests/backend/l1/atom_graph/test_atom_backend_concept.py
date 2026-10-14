@@ -62,6 +62,10 @@ class _FakeResult:
     def all(self) -> list[object]:
         return self._rows
 
+    def first(self) -> object | None:
+        # `INSERT … ON CONFLICT … RETURNING`(P3-25/26 가드): 행이 있으면 적재됨, 없으면 건너뜀.
+        return self._rows[0] if self._rows else None
+
 
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
@@ -83,11 +87,16 @@ class _FakeConnection:
         compiled = _compile(statement)
         if "SELECT" in compiled and "concept.code" in compiled and "INSERT" not in compiled:
             return _FakeResult(self._engine.code_rows)
+        if "INSERT" in compiled:
+            # RETURNING 1행 = 적재됨 / 0행 = CMS 소유 가드가 건너뜀(P3-26)
+            rows = [_Row("written", uuid.uuid4())] if self._engine.insert_written else []
+            return _FakeResult(rows)
         return _FakeResult([])
 
 
 class _FakeEngine:
     def __init__(self, code_rows: list[object] | None = None) -> None:
+        self.insert_written = True
         self.executed: list[object] = []
         self.code_rows: list[object] = (
             code_rows
@@ -299,6 +308,41 @@ class TestUpsertStatement:
 # ──────────────────────────────────────────────────────────────────────────
 # ④ resolve_parents
 # ──────────────────────────────────────────────────────────────────────────
+class TestCmsOwnership:
+    """P3-26 — CMS가 만든 개념(`cms_edited_at` 있음)은 같은 코드의 파일 레코드가 덮지 못한다."""
+
+    def test_the_upsert_is_guarded_and_overwrite_releases_the_marker(self) -> None:
+        store, engine = _fake_store()
+        store.upsert(_record())
+        sql = _compile(engine.executed[0])
+        assert "cms_edited_at IS NULL" in sql
+        assert "cms_edited_at" not in sql.split("DO UPDATE SET", 1)[1].split("WHERE", 1)[0]
+        store2, engine2 = _fake_store()
+        store2.upsert(_record(), overwrite_cms_edits=True)
+        sql2 = _compile(engine2.executed[0])
+        assert "cms_edited_at IS NULL" not in sql2
+        assert "cms_edited_at" in sql2.split("DO UPDATE SET", 1)[1]
+
+    def test_a_skipped_row_is_reported_and_not_counted(self) -> None:
+        store, engine = _fake_store()
+        engine.insert_written = False
+        conflicts: list[str] = []
+        written, _ = populate_atom_concepts([_record()], store=store, conflicts=conflicts)
+        assert written == 0 and conflicts == [f"concept:{_record().code}"]
+
+    def test_a_written_row_is_not_a_conflict(self) -> None:
+        store, _ = _fake_store()
+        conflicts: list[str] = []
+        written, _ = populate_atom_concepts([_record()], store=store, conflicts=conflicts)
+        assert written == 1 and conflicts == []
+
+    def test_resolving_parents_never_rewrites_a_cms_owned_row(self) -> None:
+        store, engine = _fake_store()
+        store.resolve_parents([_record(parent_code=_UNIT)])
+        updates = [_compile(s) for s in engine.executed if "UPDATE" in _compile(s)]
+        assert updates and all("cms_edited_at IS NULL" in u for u in updates)
+
+
 class TestResolveParents:
     def test_resolves_parent_to_uuid_update(self) -> None:
         store, engine = _fake_store()

@@ -124,6 +124,13 @@ BASELINE: dict[str, frozenset[str]] = {
             # 좌석으로 옮겼다. 이 등재가 리뷰에 보이는 것이 이 가드의 목적이다.
             "api/_attempt_misconception_scan.py",
             "api/_auth.py",
+            # P3-26 — 개념 그래프 쓰기의 **공유 규칙**(선수 엣지 비순환 검사·삭제 가능 판정).
+            # 신규 접근점이지만 기존 조회 함수로 대체할 수 없다: 순환 검사는 선수 엣지 전체를 읽고
+            # 쓰기와 같은 트랜잭션(어드바이저리 잠금)에서 해야 하며, 관리 API(`admin_cms_graph`)와
+            # 기존 개념 삭제 라우트(`concepts.py`)가 **같은 규칙**을 써야
+            # 한쪽이 우회로가 되지 않는다.
+            # 판 상태는 이 파일이 아니라 `publish_gate`가 읽어 준다.
+            "api/_concept_graph_rules.py",
             "api/_concept_orchestration.py",
             # EOS-19 — `api/me.py`의 수능 분기가 정책 구현체로 이동한 것이다(신규 접근점
             # 아님·같은 쿼리). L6 게이팅 + DB를 동시에 쓰는 정책이라 `l2`(l6 import 불가)에도
@@ -144,6 +151,10 @@ BASELINE: dict[str, frozenset[str]] = {
             # 소유한다 — 이 파일은 `ConceptVersion` ORM을 import하지 않는다(AST 동결 R1). 이 등재가
             # 리뷰에 보이는 것이 이 가드의 목적이다.
             "api/admin_cms.py",
+            # P3-26 — 개념 그래프 쓰기 BFF(제안·삭제·선수 관계). `admin_cms.py`와 같은 이유
+            # (쓰기 경계와 쿼리가 한 트랜잭션)로 세션을 직접 쓴다. 개념 행은 만들지 않는다 —
+            # 발행하는 순간 `publish_gate`가 만든다.
+            "api/admin_cms_graph.py",
             "api/auth.py",
             "api/coach.py",
             "api/concepts.py",
@@ -196,6 +207,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/concept_graph/backend_edge.py",
             "l1/concept_graph/embedding.py",
             "l1/concept_graph/node_projection.py",
+            # P3-26 — 적재 트랜잭션 안에서 DB의 선수 엣지를 읽어 순환을 검사하는 가드.
+            # 적재기 두 곳이 같은 가드를 쓰도록 한곳에 두었다
+            # (복제하면 두 적재기의 순환 판정이 갈라진다).
+            "l1/concept_graph/prerequisite_guard.py",
             "l1/concept_visual_style/overlay.py",
             "l1/concept_visualization/overlay.py",
             "l1/curriculum/curriculum_loader.py",
@@ -304,6 +319,13 @@ BASELINE: dict[str, frozenset[str]] = {
             # 트랜잭션·같은 행 잠금 안에 있어야 하므로 저장소 계층으로 분리하지 않았다 — 이
             # 등재가 "이 파일은 DB를 직접 잡는다"의 서면 선언이다.
             "l3/publish_gate.py",
+            # EOS-190 — 문항 판 Publish Gate. 위 개념 판 게이트의 짝으로, `problem_version` 행과
+            # 발행 포인터(`problem.problem_version_id`)를 쓰는 **유일한** 자리다(AST 동결
+            # test_problem_publish_gate_enforcement.py). 같은 이유로 저장소 계층으로
+            # 분리하지 않았다 — PUBLISH 전이는 문항 행 잠금 → 라이브 내용 대조 → 판 행 잠금 →
+            # 포인터 전환이 **한 트랜잭션·한 잠금 순서** 안에 있어야 `live_content_current`
+            # 검사가 의미를 갖는다.
+            "l3/problem_publish_gate.py",
             "l3/solution_path_store.py",
         }
     ),

@@ -463,6 +463,18 @@ CATALOG: tuple[Spec, ...] = (
        "PATCH /concept_content/items/{pk}", "POST /concept_content/items/{pk}/review",
        "GET /hint", "GET /hint/items/{pk}", "PATCH /hint/items/{pk}",
        "GET /skill_node", "GET /skill_node/items/{pk}"),
+    _s("WM-S-057",
+       "관리자 CMS — 신규 개념 제안·선수 관계 쓰기·개념 삭제(개념 그래프 쓰기)", "Admin",
+       "Operations", "P1",
+       "P3-26 — 신규 개념은 살아있는 개념 행을 만들지 않고 제안(DRAFT)→검토→승인→발행을 거치며 "
+       "개념 행은 발행하는 순간 게이트가 만든다. 선수 관계는 서버가 비순환(DAG)을 "
+       "검사한 뒤에만 쓰고 "
+       "(어드바이저리 잠금으로 동시 요청도 직렬화), graph.json이 소유한 관계·개념은 CMS가 지우지 "
+       "못한다. 발행본이 있는 개념은 삭제 거부. 관계·삭제는 발행 권한, 제안은 편집 권한",
+       "admin_cms_graph",
+       "GET /concept-proposals", "POST /concept-proposals",
+       "POST /concept-proposals/{code}/drafts", "DELETE /concepts/{concept_id}",
+       "POST /edges", "DELETE /edges/{edge_id}"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -778,8 +790,10 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-316", "콘텐츠 버전 Publish Gate(전이표·검증 파이프라인·Rollback)", "Admin",
        "Versioning", "P1",
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
-       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5)",
-       "l3.publish_gate", status="Batch"),
+       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5). EOS-190 — 문항 판 writer(`l3."
+       "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이나 **운영 호출자"
+       "가 아직 없다**(호출 표면은 후속 태스크) · 시도 버전 고정(EOS-47)만 포인터를 읽는다",
+       "l3.publish_gate", "l3.problem_publish_gate", status="Batch"),
     _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
        "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
@@ -788,6 +802,13 @@ CATALOG: tuple[Spec, ...] = (
        "cms_edited_at 표지를 채우고 CLI 적재는 표지 행을 건너뛰어 충돌로 보고한다"
        "(db.cms_edit_marker — 5개 적재기가 공유하는 단일 규약)",
        "api.admin_cms_resources", "db.cms_edit_marker"),
+    _e("WM-E-318", "개념 그래프 쓰기 규칙(선수 엣지 비순환 검사·소유 판정·삭제 가능 판정)"
+       "·적재의 DB 인지 순환 방어", "Admin", "Knowledge Graph", "P1",
+       "P3-26 — 관리 API와 기존 개념 삭제 라우트가 같은 규칙을 쓰고(`api._concept_graph_rules`), "
+       "적재 CLI는 같은 어드바이저리 잠금 안에서 DB의 CMS 관계와 합쳐 순환을 검사한다"
+       "(`l1.concept_graph.prerequisite_guard`) — 파일만 보면 각각은 비순환이어도 합치면 순환일 수 "
+       "있다",
+       "api._concept_graph_rules", "l1.concept_graph.prerequisite_guard"),
     # ════════════════════ E — L3 (Math Adapter) ════════════════════
     _e("WM-E-351", "동등문제 생성 파이프라인(생성·수용 게이트·정규화·rephrase·감사)", "Admin",
        "Math Engine", "P0", "C1·C3·C4 — 앵커 CU 생산 사슬", "l3.equivalent.generator",
@@ -1100,6 +1121,9 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability",
+       # OPS-139: 정본(graph.json)↔prod DB 패리티 프로브 — 도달성 진단과 같은 축
+       # (prod DB를 docker exec로 읽기 전용 관측하는 운영자 도구)이라 같은 좌석에 귀속한다.
+       "ops.atom_graph_prod_parity",
        # OPS-30: 알림의 마지막 1홉 — AlertLogNotifier가 계산한 전이를 웹훅으로 내보내는 sink와,
        # 서버 프로세스 밖에서 /health/ready를 폴링해 S4를 계산하는 업타임 프로브. 둘 다
        # "서비스 헬스 관측"의 같은 축(서버가 알리지 못하는 것까지 알린다)이라 같은 좌석에 귀속한다.
@@ -1156,6 +1180,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
        "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.problem_corpus_lineage_links",
        "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
@@ -1211,6 +1236,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
+       # S4-56 — 잔여 축 교차검증 게이트 v2(도메인 플러그인·사전점검·dry-run). v1과 같은 판정 가족.
+       "harness.residue_cross_verify_eval_v2",
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",
