@@ -338,6 +338,29 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-14 (구현 · OPS-134): **WH-1 primary가 폴백한 턴도 기록을 남기게 하고 "채택률"을 정의했다 — LLM이 죽어도 채택으로 세어지던 숨은 경로까지 막았다. 폐기된 턴의 LLM 호출은 학생 대면 표본에서 빼지 않고 비중을 보고한다. 소요 분해 실측과 타임아웃 재판정은 라이브 측정이 필요해 OPS-141로 분리** (claude 구현) — 판정 기준: `origin/main` `24d8607d` 위 브랜치 `claude/wizardly-cerf-n3tur9`(머지 전)
+
+**무엇**: 태스크 `OPS-134-wh1-primary-timeout-fallback-accounting`의 코드로 풀 수 있는 부분(② 폴백 비율 회계 · ③ 표본 정합 · ① 계측 재료)을 착지했다. ① 라이브 소요 분해와 ④ 기본 15초 재판정은 Ollama·Redis·로컬 모델이 있는 Phaiakes9 실측이 필요해 클라우드 세션에서 할 수 없다 → `OPS-141-wh1-primary-timeout-live-decomposition`으로 분리(P1·`depends_on` OPS-134). 이 PR은 기본 타임아웃 15초를 바꾸지 않는다.
+
+**② 폴백 회계 — 원인과 수리**: 2026-10-12 라이브 실측에서 15요청 중 14턴이 시간 초과로 폴백했는데 primary 기록 파일은 1줄이었다. `wh1_primary.py`의 타임아웃·예외 경로가 `emit` 전에 `return None`이라 **폴백은 기록이 0줄**이었다. 관측 레코드(`Wh1HarnessShadowObservation`)에 nullable 필드 5개를 더했다 — `primary_outcome`(닫힌 어휘 8종)·`elapsed_ms`·`llm_calls`·`llm_calls_finished`·`llm_ms_total`. 구판 레코드는 전부 None으로 파싱된다. 하네스가 결과 없이 중단된 턴은 `status="aborted"`·`tool_calls=None`(0으로 위장하지 않는다)이며 예외 **메시지는 싣지 않는다**(학생 발화를 담을 수 있다). 8종 = 채택 `adopted` + 폴백 7종(`fallback_timeout`·`fallback_exception`·`fallback_llm_degraded`·`fallback_budget_exhausted`·`fallback_no_utterance`·`fallback_prose_gate`·`fallback_mode_guard`).
+
+**채택률의 정의(결정)**: 분모 = 결말을 기록한 primary 시도, 분자 = `adopted`. 결말이 없는 **구판 primary 레코드는 분모에서 빼고 따로 센다**(구판을 채택으로 세면 기록이 0줄이던 폴백이 사라진 채 비율이 위조된다). 시도 0건이면 0%가 아니라 None(산출 불가)이다. 수확기 리포트(`wh1_shadow_harvest`)에 「primary 채택률」 절을 신설해 작동한 비율을 리포트가 직접 말한다.
+
+**설계 중 발견한 숨은 오집계 경로**: 정책(`LLMTutorPolicy`)은 provider 실패·파싱 불가를 안전 강등(`_safe_fallback`)으로 흡수해 **정상 `ended` 턴으로 돌려준다**. 처음 설계(타임아웃·예외만 폴백으로 셈)로는 LLM이 전부 죽어도 모든 턴이 `adopted`가 되어 채택률이 100%로 나온다 — 같은 날 `cost_probe`의 ReadTimeout 2건이 정확히 이 경로다. 그래서 정책에 `last_action_degraded`를 두고 **턴을 끝낸 마지막 행동이 강등이면** `fallback_llm_degraded`로 센다. 첫 호출만 실패하고 둘째가 정상 발화한 턴은 LLM 발화이므로 채택이다(앞선 강등 이력은 마지막 호출이 정상이면 지워진다 — 테스트로 양방향 동결).
+
+**기존 분포 불변(결정)**: 중단 턴을 기존 verdict·전이·형태·status 분포에 섞지 않는다. `verify_verdict=None`이라 "verify 미호출 턴"으로, 전이 카운트가 None이라 "구판 레코드"로 오집계되어 사전등록 분모(트리거 ③ 모집단)를 흔든다. 기존 분포는 정상 완료 턴만으로 계산해 변경 전과 같은 값을 유지하고 테스트로 동결했다. 중단 턴은 채택률 절에서만 센다.
+
+**③ 표본 정합 — 처리 방침(결정)**: 폐기된 턴의 LLM 호출은 게이트② 표본에서 **제외하지도, 새 표면 표지를 만들지도 않는다.** 근거 셋. (a) 표지는 호출이 일어나는 순간 싣는데 그 턴이 버려질지는 나중에 정해진다 — 사후 정정하려면 호출-턴 조인 키를 L3 파이프라인에 심어야 하고 L3는 여러 세션이 동시에 만지는 공유 표면이다. (b) 그 호출은 실제로 학생의 대기 시간과 비용을 썼다 — 빼면 학생 대면 비용을 과소 보고한다. (c) 대신 서버 로그만으로 센다 — 레코드의 `llm_calls`를 합산해 수확기가 「폴백 턴이 쓴 LLM 호출 비중」(`fallback_llm_call_share`)을 보고하고, 폴백 호출이 있으면 "Langfuse에 serving 표지로 이미 전송돼 표본에 포함된 호출"이라는 경고를 리포트에 찍는다(Langfuse 단독 회계 금지·이중 회계). **정량의 한계(정직)**: 2026-10-12 실측은 1차 시도의 시간 초과 턴 수를 집계하지 않았고 당시 레코드도 없어, 그 표본의 왜곡은 사후 계산할 수 없다 — 새 레코드가 쌓인 뒤부터 측정 가능하다. **재결정 조건**: 비중이 로컬 비율 등 판정치를 흔들 만큼 높다고 측정되면 호출-턴 조인 키 도입을 별도로 판단한다(임계는 정하지 않았다 — 판정선 없음).
+
+**① 계측 재료(착지)**: `elapsed_ms`(벽시계)·`llm_ms_total`(끝난 호출의 소요 합)·`llm_calls`/`llm_calls_finished`(차이 = 취소 시점 비행 중 호출)로 타임아웃 턴의 소요를 "끝난 LLM 호출 / 그 밖(취소된 호출 + 비LLM 단계)"으로 가른다. **한계**: 서버 로그만으로는 취소된 호출과 비LLM 단계(후보 조립·캐시 대기·도구 실행)의 소요가 갈리지 않는다 — 그걸 가를 계측이 더 필요한지는 OPS-141이 실측 후 판정한다. Redis 가설(`Redis 캐시 강등 — TimeoutError`)은 여전히 **미검증**이다.
+
+**`PED-18`과의 관계**: `PED-18`(todo·미착수) ①「폴백 원장 결손 봉합」이 이 변경과 같은 좌석이다 — 이 PR이 그 좌석을 만들었으므로 ①은 충족된다(`status` 값 공간 확장 대신 nullable 필드를 택했다: 실측: `src` 전체에서 관측 모델을 임포트하는 파일은 `wh1_shadow`·`wh1_primary`·`wh1_shadow_harvest` 3개뿐이고 레코드의 `status`를 읽는 곳은 수확기 `status_counts` 하나였다). `PED-18` ②(⑰ 지표)·③(노출 계층 등재)는 그대로 남는다 — 이 PR은 그쪽 파일을 건드리지 않았다.
+
+**검증(실측, 로컬)**: 신규 테스트 28건(러너 종료 경로 8종·LLM 강등 양방향·수확기 산식·구판 하위호환·리포트 문구) · 영향 범위 129 passed·5 skipped(integration 기본 skip) · **뮤테이션 10종 전건 RED**(주입 적용 `mutated != original`과 바이트 동일 원복을 매번 단언) · `ruff`(src+tests/backend+tests/constitution)·`black --line-length 100`·`mypy --strict`(785 파일)·`lint-imports`(4 kept) 전부 exit 0 · 하네스 무결성 잡 스텝(validate·audit-deps·rules lint/render·jit·헌법 래칫·pipeline_check·selftest_guard·check_amendment·ADR 번호)·`declared_unwired_audit`·`cp949_guard`·충돌 마커 전부 exit 0 · 헌법 래칫 exit 0·차단 0건 ≤ 기준선 0건. 전체 스위트·`tests/infra`·`tests/harness` 결과는 PR 본문에 둔다(CI가 최종 판정).
+
+**실수 기록**: 로컬 검증 첫 pytest를 서브셸 괄호+`tail`로 감싸 `EXIT=0`을 찍었으나 실제는 pytest 모듈 부재였다(출력의 `No module named pytest`로 자가 발견, 피해 0). 래퍼가 종료 코드를 가리는 축의 재발이며 사고 대장에 `check-exitcode-masked-by-wrapper` 계열로 등재했다(대책 소유 = `HARN-129` ③). 이후 모든 검사는 로그 파일 + `$?` 직접 판정으로 했다. 새 산문 규칙은 등재하지 않는다(등재 동결).
+
+**후속**: `OPS-141-wh1-primary-timeout-live-decomposition`(P1) — 소요 분해 라이브 실측(Redis 미기동/기동 대조)·원인 가설 판정·15초 재판정·Kiki 실행 런북+사람 게이트. 착수 시 `OPS-98`(턴 지연 분포·예산 정합)과 acceptance를 대조해 중복을 피한다.
 ### 2026-10-14 (회수·정합 · PED-45 ← PED-26): **고립 브랜치 `claude/nice-cray-mbg1mq`의 교수전략 카탈로그 정합 구현을 main 위에서 재검증해 이식 — 문서번호 `04e`→`04g`, 접두 중복 차단 테스트, 코드·코퍼스 이식 0건** — 판정 기준 main `24d8607d`
 
 **무엇/왜**: `PED-26`(gdmwhk·uqyg79 회수 정합)의 완성 구현이 PR 없이 `review` 상태로 브랜치에만 있었다(head `dbe2e79c`, 2026-10-08, ahead 2). 분기점 `8a5ea4d1` 이후 main이 99커밋 앞서 있어 패치를 그대로 재적용하지 않고 **main 위에서 치환을 재실행해 브랜치 결과와 줄 단위로 대조**했다(불일치 0건). 정합 결과 문서 = `docs/reviews/pedagogy_catalog_recovery_reconciliation_2026-10-08.md`(§1~§6 원 세션 서술 + §7 이식 시점 재검증). 고립 경위·원 세션의 판단은 그 문서와 `docs/reviews/unmerged_branch_audit_2026-10-12.md` §3-①에 있다.
