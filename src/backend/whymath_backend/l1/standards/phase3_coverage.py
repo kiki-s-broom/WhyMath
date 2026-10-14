@@ -112,6 +112,15 @@ from whymath_backend.l1.standards.phase3_scope import (
     load_scope_spec,
     verify_spec,
 )
+from whymath_backend.schema.problem_metadata import (
+    EMPTY_DIFFICULTY,
+    FieldState,
+    ProblemMetadataEvidence,
+    ProblemMetadataField,
+    ProblemSlot,
+    evaluate_metadata,
+    parse_slot_tags,
+)
 
 # l1/standards/phase3_coverage.py → parents[5]가 레포 루트(phase3_scope 와 같은 관용구).
 _REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -172,6 +181,12 @@ class ProblemRef:
     has_steps: bool
     problem_type_codes: tuple[str, ...]
     distractor_ids: tuple[str, ...]
+    # P3-04 — 7필드·슬롯을 읽는 축. 기본값 None 은 "측정하지 않았다"다(합성 입력이 이 축을 안 채워도
+    # 비어 있다고 판정하지 않는다). 실 코퍼스 행은 `_problem_from_row` 가 전부 채운다.
+    difficulty: float | None = None
+    answer: str | None = None
+    solution_text: str | None = None
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -257,6 +272,13 @@ def _problem_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
     for item in row.get("distractor_map") or []:
         if isinstance(item, dict) and isinstance(item.get("misconception_id"), str):
             distractors.append(item["misconception_id"])
+    raw_difficulty = row.get("difficulty_overall")
+    difficulty = (
+        float(raw_difficulty)
+        if isinstance(raw_difficulty, (int, float)) and not isinstance(raw_difficulty, bool)
+        else EMPTY_DIFFICULTY
+    )
+    raw_tags = row.get("tags")
     return ProblemRef(
         problem_id=problem_id,
         primary_src_ids=frozenset(primary),
@@ -265,6 +287,11 @@ def _problem_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
         has_steps=isinstance(steps, list) and len(steps) > 0,
         problem_type_codes=tuple(str(t) for t in types) if isinstance(types, list) else (),
         distractor_ids=tuple(distractors),
+        # 행을 읽었으니 값이 없는 것은 "측정했고 비어 있음"이다(None=측정 못함 과 다르다).
+        difficulty=difficulty,
+        answer="" if row.get("answer") is None else str(row.get("answer")),
+        solution_text=_text(row.get("answer_explanation")) or "",
+        tags=tuple(t for t in raw_tags if isinstance(t, str)) if isinstance(raw_tags, list) else (),
     )
 
 
@@ -560,6 +587,24 @@ class MetricResult:
 
 
 @dataclass(frozen=True)
+class ProblemMetadataStats:
+    """P3-04 — 적격 문항의 7필드 현황. 코퍼스 파일로 잴 수 있는 만큼만 잰다.
+
+    `unmeasured_fields` 는 한 건이라도 측정 불가인 필드다(현재 `hint_strategy` — 파일 코퍼스에
+    문항별 힌트가 없다). 측정 불가는 충족이 아니므로 `complete` 에 들어가지 않는다. 그 필드는
+    저장(발행) 시점 게이트가 DB 의 verified 힌트로 판정한다.
+    """
+
+    population: int
+    field_counts: Mapping[str, Mapping[str, int]]
+    complete: int
+    without_missing: int
+    inherited_only: int
+    unmeasured_fields: tuple[str, ...]
+    unmet: tuple[Unmet, ...]
+
+
+@dataclass(frozen=True)
 class CoverageReport:
     """계측 결과 전체 — 지표 4종 + 보조 수치."""
 
@@ -574,6 +619,9 @@ class CoverageReport:
     problems_scanned: int
     warnings: tuple[str, ...]
     failures: tuple[str, ...]
+    # P3-04 — 기본값 None 은 이 축을 계산하지 않은 보고서다(직접 만든 보고서와의 호환).
+    slots: MetricResult | None = None
+    problem_metadata: ProblemMetadataStats | None = None
 
     @property
     def exit_code(self) -> int:
@@ -581,7 +629,8 @@ class CoverageReport:
         return 1 if self.failures else 0
 
     def metric(self, key: str) -> MetricResult:
-        for result in (*self.metrics, self.supply):
+        extra: tuple[MetricResult, ...] = (self.slots,) if self.slots is not None else ()
+        for result in (*self.metrics, self.supply, *extra):
             if result.key == key:
                 return result
         raise KeyError(key)
@@ -858,6 +907,136 @@ def _connectivity(
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# P3-04 — 문제 유형 6슬롯 충족 + Problem 필수 7필드 현황
+# ──────────────────────────────────────────────────────────────────────────
+def _slot_coverage(
+    spec: ScopeSpec, facts: tuple[ConceptFacts, ...], corpus: CoverageCorpus
+) -> MetricResult:
+    """핵심 개념 × 6슬롯 중 채워진 칸의 비율. 목표 수치가 명세에 없어 판정하지 않는다.
+
+    칸(c, s)이 채워졌다 = 적격 문항(c) 중 슬롯 태그 s 가 달린 문항이 명세의 슬롯당 최소 수 이상.
+    오개념 유발 슬롯은 **문항 자체의 오개념 연결이 있는 문항만 센다**(명세 counting_rules ·
+    지시문 [08] ③). 개수는 고유 문면이 아니라 문항 수다 — 근사 중복 기준은 P3-05 가 정한다.
+    """
+    names = {slot.id: slot.name_ko for slot in spec.slots}
+    minimum = spec.min_distinct_per_slot
+    filled = 0
+    cells = 0
+    unmet: list[Unmet] = []
+    for fact in facts:
+        gaps: list[str] = []
+        for slot in ProblemSlot:
+            cells += 1
+            tagged = [p for p in fact.eligible if slot in parse_slot_tags(p.tags).slots]
+            counted = tagged
+            if slot is ProblemSlot.MISCONCEPTION_TRIGGER:
+                counted = [p for p in tagged if _reached_misconceptions(p, corpus)]
+            if len(counted) >= minimum:
+                filled += 1
+                continue
+            why = f"{names[slot.value]}: 유효 {len(counted)}건 < 최소 {minimum}건"
+            if slot is ProblemSlot.MISCONCEPTION_TRIGGER and len(tagged) > len(counted):
+                why += (
+                    f" (태그 {len(tagged)}건 중 문항 자체 오개념 연결이 없는 "
+                    f"{len(tagged) - len(counted)}건은 세지 않는다)"
+                )
+            gaps.append(why)
+        if gaps:
+            unmet.append(Unmet(fact.concept.code, tuple(gaps)))
+    return MetricResult(
+        key="slot_coverage",
+        name_ko="Concept Slot Coverage(6슬롯)",
+        met_count=filled,
+        population=cells,
+        value=_ratio(filled, cells),
+        target=None,
+        met=None,
+        unmet=tuple(unmet),
+        note="목표 없음 — 핵심 Concept 6슬롯 충족은 P3-05 의 완료 판정이다",
+    )
+
+
+def _problem_metadata(
+    spec: ScopeSpec,
+    index: ReferenceIndex,
+    corpus: CoverageCorpus,
+    facts: tuple[ConceptFacts, ...],
+) -> ProblemMetadataStats:
+    """적격 문항 전체에 7필드 판정을 건다 — 정의는 `schema/problem_metadata.py` 한 곳이다.
+
+    증거는 코퍼스 파일에서 잰다. 문항 자체 오개념은 P3-02 의 `_reached_misconceptions`(오답 보기가
+    크로스링크로 닿는 M-id)와 같은 기준이고, 소속 개념 오개념은 오개념 코퍼스가 그 개념의 성취기준에
+    귀속한 M-id 전부다. 힌트는 `hint_problem_ids` 입력을 읽고, 입력이 None 이면 측정 불가다.
+    """
+    code_by_src = {c.source_id: c.code for c in spec.concepts}
+    mis_by_code: dict[str, set[str]] = {}
+    for mis_id, code in index.misconceptions.items():
+        if code is not None:
+            mis_by_code.setdefault(code, set()).add(mis_id)
+
+    eligible: dict[str, ProblemRef] = {}
+    for fact in facts:
+        for problem in fact.eligible:
+            eligible[problem.problem_id] = problem
+
+    states = {
+        field.value: {"present": 0, "missing": 0, "unknown": 0} for field in ProblemMetadataField
+    }
+    complete = without_missing = inherited_only = 0
+    unmeasured: set[str] = set()
+    unmet: list[Unmet] = []
+    for problem_id in sorted(eligible):
+        problem = eligible[problem_id]
+        codes = {code_by_src[src] for src in problem.primary_src_ids if src in code_by_src}
+        inherited = {m for code in codes for m in mis_by_code.get(code, ())}
+        verdict = evaluate_metadata(
+            ProblemMetadataEvidence(
+                difficulty=problem.difficulty,
+                answer=problem.answer,
+                solution_text=problem.solution_text,
+                concept_ids=tuple(sorted(problem.primary_src_ids)),
+                skill_ids=tuple(sorted(_problem_skills(problem, corpus))),
+                own_misconception_ids=tuple(sorted(_reached_misconceptions(problem, corpus))),
+                concept_misconception_ids=tuple(sorted(inherited)),
+                # 힌트 입력(`hint_problem_ids`)이 None 이면 측정 불가다 — 현재 실 코퍼스에는 문항별
+                # 힌트가 없어 None 이고, P3-22 가 이 입력을 배선하면 이 필드도 같이 측정된다.
+                verified_hint_count=(
+                    None
+                    if corpus.hint_problem_ids is None
+                    else int(problem.problem_id in corpus.hint_problem_ids)
+                ),
+                slots=parse_slot_tags(problem.tags).slots,
+            )
+        )
+        for field, state in verdict.states.items():
+            states[field.value][state.value] += 1
+            if state is FieldState.UNKNOWN:
+                unmeasured.add(field.value)
+        if verdict.complete:
+            complete += 1
+        if not verdict.missing:
+            without_missing += 1
+        else:
+            unmet.append(
+                Unmet(
+                    problem_id,
+                    tuple(line for line in verdict.failures() if line.endswith("비어 있다")),
+                )
+            )
+        if verdict.misconception_source == "concept":
+            inherited_only += 1
+    return ProblemMetadataStats(
+        population=len(eligible),
+        field_counts={k: dict(v) for k, v in states.items()},
+        complete=complete,
+        without_missing=without_missing,
+        inherited_only=inherited_only,
+        unmeasured_fields=tuple(f.value for f in ProblemMetadataField if f.value in unmeasured),
+        unmet=tuple(unmet),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 평가 — 순수 함수(입력은 값 객체뿐이라 합성 코퍼스로 주입 검증이 된다)
 # ──────────────────────────────────────────────────────────────────────────
 def _check_spec_alignment(spec: ScopeSpec) -> None:
@@ -884,6 +1063,18 @@ def _check_spec_alignment(spec: ScopeSpec) -> None:
     ):
         if key not in spec.targets:
             raise CoverageError(f"명세 targets 에 {key!r} 가 없다 — 지표의 목표를 알 수 없다")
+    # P3-04 — 7필드·6슬롯의 정의는 `schema/problem_metadata.py` 한 곳이다. 명세가 다른 목록을 말하면
+    # 이 계측은 명세가 요구하지 않은 것을 재는 셈이라 거부한다.
+    if tuple(spec.problem_required_fields) != tuple(f.value for f in ProblemMetadataField):
+        raise CoverageError(
+            f"명세 problem_required_fields {list(spec.problem_required_fields)} 가 계측기 정의 "
+            f"{[f.value for f in ProblemMetadataField]} 와 다르다"
+        )
+    if tuple(slot.id for slot in spec.slots) != tuple(slot.value for slot in ProblemSlot):
+        raise CoverageError(
+            f"명세 슬롯 {[slot.id for slot in spec.slots]} 가 계측기 정의 "
+            f"{[slot.value for slot in ProblemSlot]} 와 다르다"
+        )
 
 
 def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> CoverageReport:
@@ -898,6 +1089,8 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
     completeness, link_counts, measurable = _completeness(spec, facts, links_by_code)
     connectivity, funnel = _connectivity(spec, facts, links_by_code)
     metrics = (content, curriculum, completeness, connectivity)
+    slot_metric = _slot_coverage(spec, facts, corpus)
+    metadata = _problem_metadata(spec, index, corpus, facts)
 
     failures: list[str] = []
     for m in metrics:
@@ -910,7 +1103,31 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
                 f"({m.met_count}/{m.population}, 미충족 {len(m.unmet)}건)"
             )
 
+    # P3-04 — 필수 필드가 비어 있는 적격 문항은 발행 게이트(problem_metadata_complete)가 거부한다.
+    # 측정 불가(UNKNOWN)는 여기서 실패로 세지 않는다 — 그 판정은 저장 시점 게이트의 몫이다.
+    if slot_metric.population == 0:
+        failures.append("Concept Slot Coverage(6슬롯): 분모가 0 이다 — 측정 불가(통과가 아니다)")
+    if metadata.population == 0:
+        failures.append("문제 메타데이터 7필드: 적격 문항이 0건이다 — 측정 불가(통과가 아니다)")
+    elif metadata.unmet:
+        failures.append(
+            f"문제 메타데이터 7필드: 적격 문항 {metadata.population}건 중 "
+            f"{len(metadata.unmet)}건이 필수 필드를 비워 두고 있다 — 발행 게이트가 거부할 문항이다"
+        )
+    bad_tags = sorted({t for p in corpus.problems for t in parse_slot_tags(p.tags).unknown})
+    if bad_tags:
+        shown = ", ".join(bad_tags[:5]) + (" …" if len(bad_tags) > 5 else "")
+        failures.append(
+            f"알 수 없는 슬롯 태그 {len(bad_tags)}종: {shown} — 오타면 그 문항은 슬롯이 비어 보인다"
+        )
+
     warnings: list[str] = []
+    if metadata.unmeasured_fields:
+        warnings.append(
+            f"문제 메타데이터 측정 불가 필드: {', '.join(metadata.unmeasured_fields)} — "
+            "파일 코퍼스에 문항별 힌트가 없어 7필드 전부 충족으로 셀 수 없다(측정 불가는 충족이 "
+            "아니다). 판정은 발행 시점 게이트가 DB 의 verified 힌트로 한다"
+        )
     if supply.met_count < content.met_count:
         warnings.append(
             f"연결은 {content.met_count}/{content.population} 이지만 학생 공급 가능은 "
@@ -936,6 +1153,8 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
         problems_scanned=corpus.problems_scanned,
         warnings=tuple(warnings),
         failures=tuple(failures),
+        slots=slot_metric,
+        problem_metadata=metadata,
     )
 
 
@@ -953,6 +1172,20 @@ def _metric_json(m: MetricResult) -> dict[str, Any]:
         "met": m.met,
         "note": m.note,
         "unmet": [{"subject": u.subject, "missing": list(u.missing)} for u in m.unmet],
+    }
+
+
+def _metadata_json(stats: ProblemMetadataStats | None) -> dict[str, Any] | None:
+    if stats is None:
+        return None
+    return {
+        "population": stats.population,
+        "field_counts": {k: dict(v) for k, v in stats.field_counts.items()},
+        "complete": stats.complete,
+        "without_missing": stats.without_missing,
+        "inherited_only": stats.inherited_only,
+        "unmeasured_fields": list(stats.unmeasured_fields),
+        "unmet": [{"subject": u.subject, "missing": list(u.missing)} for u in stats.unmet],
     }
 
 
@@ -974,6 +1207,8 @@ def to_json(report: CoverageReport) -> dict[str, Any]:
         "problems_scanned": report.problems_scanned,
         "warnings": list(report.warnings),
         "failures": list(report.failures),
+        "slot_coverage": None if report.slots is None else _metric_json(report.slots),
+        "problem_metadata": _metadata_json(report.problem_metadata),
     }
 
 
@@ -997,6 +1232,26 @@ def render(report: CoverageReport) -> str:
             f"{m.name_ko:<28}  {m.met_count}/{m.population} = {_pct(m.value):<10}  "
             f"{target:<8}  {verdict}"
         )
+    if report.slots is not None:
+        m = report.slots
+        lines.append(
+            f"{m.name_ko:<28}  {m.met_count}/{m.population} = {_pct(m.value):<10}  "
+            f"{'—':<8}  목표 없음"
+        )
+    stats = report.problem_metadata
+    if stats is not None:
+        lines += ["", f"문제 메타데이터 7필드 (적격 문항 {stats.population}건)"]
+        for name, count in stats.field_counts.items():
+            lines.append(
+                f"  {name:<24} present {count['present']} · missing {count['missing']} · "
+                f"unknown {count['unknown']}"
+            )
+        lines += [
+            f"  7필드 전부 충족: {stats.complete}건 · 결손(missing) 없음: {stats.without_missing}건"
+            f" · 오개념 서명이 개념 상속만인 문항: {stats.inherited_only}건"
+        ]
+        if stats.unmeasured_fields:
+            lines.append(f"  측정 불가 필드: {', '.join(stats.unmeasured_fields)}")
     lines += ["", "연결별 충족 수 (핵심 개념 기준)"]
     for name, count in report.link_counts.items():
         lines.append(
@@ -1012,13 +1267,19 @@ def render(report: CoverageReport) -> str:
         f"  스킬 {funnel['skill']} → 문항 {funnel['problem']} → 오개념 {funnel['misconception']} "
         f"→ 교수 {funnel['pedagogy']}",
     ]
-    for m in (*report.metrics, report.supply):
+    for m in (*report.metrics, report.supply, *([report.slots] if report.slots else [])):
         if not m.unmet:
             continue
         lines += ["", f"[미충족 — {m.name_ko}] {len(m.unmet)}건"]
         for u in m.unmet:
             lines.append(f"  {u.subject}")
             lines += [f"    · {why}" for why in u.missing]
+    if stats is not None and stats.unmet:
+        lines += ["", f"[미충족 — 문제 메타데이터 7필드] {len(stats.unmet)}건 (전체 목록은 --json)"]
+        for u in stats.unmet[:10]:
+            lines.append(f"  {u.subject}: {' · '.join(u.missing)}")
+        if len(stats.unmet) > 10:
+            lines.append(f"  … 외 {len(stats.unmet) - 10}건")
     if report.warnings:
         lines += ["", "경고"]
         lines += [f"  ! {w}" for w in report.warnings]

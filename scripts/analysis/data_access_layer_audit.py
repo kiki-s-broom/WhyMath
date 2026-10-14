@@ -326,6 +326,17 @@ BASELINE: dict[str, frozenset[str]] = {
             # 포인터 전환이 **한 트랜잭션·한 잠금 순서** 안에 있어야 `live_content_current`
             # 검사가 의미를 갖는다.
             "l3/problem_publish_gate.py",
+            # P3-04 — 발행 게이트가 PUBLISH 직전에 부르는 **읽기 전용** 증거 수집기다. 문항 하나의
+            # 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 전략)를 5개 테이블(problem_concept
+            # · concept · skill_node · misconception_catalog/crosslink · hints)에서 읽는다.
+            # 재사용할 기존 조회 함수가 없는 새 접근점이다: `integrity_violations_gate.
+            # skill_coverage`는 전체 집계 SQL이라 문항 1건의 증거를 돌려주지 못하고, 그 모듈은
+            # ops 계층이라 l3이 import할 수도 없다. 세션을 직접 열지 않고 호출자(게이트)의
+            # 트랜잭션 안에서 받은 세션으로만 읽으며 잠금·쓰기가 없다. 게이트 모듈 안에 넣지 않은
+            # 이유는 그 모듈이 "problem_version의 유일한 writer"라는 AST 동결(R1·B1)을 지키는
+            # 좌석이어서 읽기 쿼리 5종을 섞으면 그 경계가 흐려지기 때문이다. 이 등재가 리뷰에
+            # 보이는 것이 이 가드의 목적이다.
+            "l3/problem_metadata_evidence.py",
             "l3/solution_path_store.py",
         }
     ),
