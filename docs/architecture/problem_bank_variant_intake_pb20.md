@@ -104,6 +104,15 @@
 이 PR의 승격 보호(§4)도 루트 기준으로 동결했지만, **가드가 cwd에 따라 침묵으로 꺼진다**는 사실은 별도 태스크로
 등재한다(§6).
 
+**해소 (OPS-138)**: 원인은 `_REPO_CORPUS_DIR` 하나가 아니라 세 지점이었다 — 레포 코퍼스 디렉터리 판정·고정
+코퍼스 식별(`_is_known_fixed`)·제 짝 경로 비교가 모두 cwd에 붙어 있었다(`src/backend`에서 `classify_corpus`가
+고정 코퍼스를 `other`로 분류하는 것까지 실측). 세 지점을 모듈 파일 위치 기준 `_REPO_ROOT`로 앵커했다.
+같은 모양(상대 Path 상수를 cwd 의존 연산에 거는 코드)을 AST로 전수 스캔한 결과는 `src/backend/whymath_backend`·
+`scripts` 907파일에서 **침묵 오작동 0건**이며, 후보 11파일 중 대부분은 이미 `__file__` 기준 앵커이고
+`ci_job_coverage`·`ci_mirror`의 cwd 상대 `--workflow` 기본값은 파일이 없으면 `ScanEmptyError`로 소리 내어
+실패한다. 이 스캔은 별칭·함수 인자로 우회하는 모양은 보지 못하므로 회귀 가드로만 읽는다
+(`tests/backend/harness/test_relative_path_const_cwd_scan.py`).
+
 ## 2. 편입 결정 (acceptance ②)
 
 ### 2.1 결정
