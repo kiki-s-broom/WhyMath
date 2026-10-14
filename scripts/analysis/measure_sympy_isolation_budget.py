@@ -20,14 +20,16 @@
 `safe_parse` 구조 예산을 통과하는 *가장 느린* 부류(고차 방정식 단계)의 차수×계수 소요표를 내서,
 상한이 어느 차수·계수부터 정상 입력을 판정 불가로 접는지(무릎)를 보인다.
 
-**오답·무관 쌍 모드(`--mode slips`, OPS-126 ②의 두 번째 프록시 — wonderful-allen 회수분)** — `steps`가
-"올바른 단계가 상한에 얼마나 여유 있나"를 본다면, 이 모드는 같은 합성 입력에서 **시간 상한과 무관하게
-`unverifiable`이 되는 입력**을 가른다: ①전개식↔인수분해식(올바른 단계) ②전개식의 상수항을 1 틀린
-단계(전형적 오답) ③서로 무관한 방정식 쌍(느린 부류). 결과는 시간 상한으로 접혔을 입력(`over_cap`)과
-구조 예산·보수적 판정으로 즉시 `unverifiable`이 된 입력(`fast_unverifiable`)을 따로 센다 — 둘은 원인이
-다르고, 뒤쪽은 `/health/ready`의 `undecidable_ratio`에 **잡히지 않는다**(풀 접힘이 아니라 검증기의 판정).
+**오답·무관 쌍 모드(`--mode slips`, OPS-126 ②의 두 번째 프록시 — wonderful-allen 회수분)** —
+`steps`가 "올바른 단계가 상한에 얼마나 여유 있나"를 본다면, 이 모드는 같은 합성 입력에서
+**시간 상한과 무관하게 `unverifiable`이 되는 입력**을 가른다: ①전개식↔인수분해식(올바른 단계)
+②전개식의 상수항을 1 틀린 단계(전형적 오답) ③서로 무관한 방정식 쌍(느린 부류). 결과는 시간
+상한으로 접혔을 입력(`over_cap`)과 구조 예산·보수적 판정으로 즉시 `unverifiable`이 된
+입력(`fast_unverifiable`)을 따로 센다 — 둘은 원인이 다르고, 뒤쪽은 `/health/ready`의
+`undecidable_ratio`에 **잡히지 않는다**(풀 접힘이 아니라 검증기의 판정).
 
-사용: `python scripts/analysis/measure_sympy_isolation_budget.py [--mode final|steps|slips] [--json 경로]`
+사용: `python scripts/analysis/measure_sympy_isolation_budget.py`
+`[--mode final|steps|slips] [--json 경로]`
 종료 코드: 0 = 측정 완료, 1 = 측정 대상 0건(공허 통과 금지).
 """
 
