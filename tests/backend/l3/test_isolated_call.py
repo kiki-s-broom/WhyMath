@@ -287,6 +287,18 @@ class TestTotalBudget:
         assert info.value.reason == "deadline"
         assert not pool._all, "예산 소진인데 워커를 띄웠다"
 
+    async def test_exhausted_budget_counts_as_a_folded_call(self, pool: IsolatedCallPool) -> None:
+        """입구 거절도 `calls`에 들어간다 — `deadlines`만 오르면 접힘이 분모를 앞질러 '작동한 비율'이 틀린다(OPS-140).
+
+        다른 접힘 사유(대기 포화 등)는 `calls`를 올린 *뒤* 접힌다 — 호출 하나는 정확히 한 결과로 끝난다.
+        """
+        with pytest.raises(BudgetExceededError):
+            await pool.run(repr, "x", budget_s=0.0)
+        stats = pool.stats()
+        assert stats["calls"] == 1
+        assert stats["deadlines"] == 1
+        assert stats["deadlines"] <= stats["calls"]
+
 
 class TestFallback:
     async def test_unpicklable_callable_falls_back_to_thread_and_counts(

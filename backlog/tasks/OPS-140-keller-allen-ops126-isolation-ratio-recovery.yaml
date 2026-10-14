@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -25,6 +25,6 @@ paths:
   - src/backend/whymath_backend/config.py
   - scripts/analysis/measure_sympy_isolation_budget.py
   - scripts/analysis/measure_sympy_isolation_workers.py
-session: null
+session: claude/dazzling-knuth-wnd8ab
 notes: "출처: stray-code 18회차(docs/reviews/unmerged_branch_audit_2026-10-14.md §3-①). 소유 태스크 OPS-126-isolation-served-ratio-observability. 회수 완료 전 원 브랜치 claude/relaxed-keller-4wk0b2 · claude/wonderful-allen-vhbdra 삭제 금지. 두 브랜치 모두 원격 claim이 없으므로(OPS-126 claim은 release됨) 제3의 세션이 OPS-126을 처음부터 다시 구현할 수 있으므로, 등재 직후 backlog.py amend로 OPS-126의 depends_on에 이 태스크를 붙인다. 이 사고는 17회차 HARN-309(review 전이에 PR 증적 요구)가 막으려는 것과 같은 계열이다: 대장을 done으로 돌리고 --no-pr incomplete로 끝낸 경로."
 updated: 2026-10-14

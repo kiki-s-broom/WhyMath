@@ -215,6 +215,10 @@ class IsolatedCallPool:
         # 마감은 호출 진입 시각 기준 — 호출부의 시계(테스트의 가짜 시계 등)와 결합하지 않는다.
         deadline = None if budget_s is None else time.monotonic() + budget_s
         if budget_s is not None and budget_s <= 0:
+            # 입구 거절도 풀에 맡겨진 호출이다 — `calls`에 넣지 않으면 `deadlines`만 올라 접힘 수가
+            # 분모(`calls`)를 앞지르고 "작동한 비율"이 틀린다(OPS-140). 대기열 포화(`queue_waits`)가
+            # `calls`를 올린 뒤 접히는 것과 같은 회계다 — 호출 하나는 정확히 한 결과로 끝난다.
+            self.calls += 1
             self.deadlines += 1
             raise BudgetExceededError("deadline", budget_s)
         try:
