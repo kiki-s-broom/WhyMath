@@ -12498,6 +12498,16 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **삭제 0건**: 내용 소멸 3건(`blissful-lovelace`·`status-f6qz0c`·`stoic-hawking`)은 claim 해제 대기, 3건(`friendly-pascal`·`gracious-cannon`·`status-f9lp65`)은 Kiki 판단 대기. 특히 `friendly-pascal`은 내용이 전량 흡수됐으나(코퍼스 차이는 `authored_by` 필드뿐) 2026-10-09 보존 지시가 main에 도달하지 못한 채 `QUAL-15` done과 충돌한다.
 - **정직한 공백**: 부재 줄 대조는 줄 전체 일치라 이식량의 상한이다. 브랜치 커밋 메시지의 검증 수치는 재현하지 않았다. `claims reap --apply`는 실행하지 않았다.
 
+## 2026-10-14: 미머지 브랜치 전수 감사 18회차 — OPS-126이 두 세션에 이중 구현된 채 고립 · 회수 태스크 `OPS-140` 등재 · 브랜치 전용 `OPS-131` 복원 · 삭제 0건 · 대책 `HARN-311`·`HARN-309` ⑤
+
+- **판정 기준 main `24d8607d`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-14.md`. 원격 ref 46 − 제외 4 − 열린 PR 14 = 감사 대상 28(유령 PR 0). 17회차 이월 25건 중 23건 head 불변, 소멸 2건(`adoring-goodall`=`QUAL-12` #1589 · `q8tvcx`=16차 배치 집행 잔존 0/1).
+- **사고**: `relaxed-keller-4wk0b2`·`wonderful-allen-vhbdra`가 같은 날 13:09Z에 `OPS-126`(`/health/ready`의 `sympy_isolation` 섹션)을 각자 구현하고 PR 없이 끝났다. main 부재 649·696줄, main `OPS-126`은 `todo`. 두 구현은 같은 파일 5개를 서로 다르게 고쳐 통째 병합 불가(777+/731−).
+- **원인 2종(이벤트 샤드 실측)**: ① `wonderful-allen`은 12:37:59Z에 원격 claim 쓰기가 `error`였는데 `start`가 허용돼(`remote=error+readscan_ok`) 12분 뒤의 `relaxed-keller`(`remote=ok`)가 존재를 볼 수 없었다 — 병렬 중복 구현 **3회차**(`OPS-07` 2026-07-27 · `MP-04` 2026-09-06 · 이번). 실패 원인 자체는 재현 못 함. ② `relaxed-keller`는 `done --no-pr incomplete`로 닫았다(완료+"미완" 사유 공존).
+- **대책(코드·태스크)**: `HARN-311`(claim 쓰기 error 시 fail-open 착수 — 원인 기록·거부/즉시 push 판정·3경우 변별 테스트) · `HARN-309` acceptance ⑤(done 경로의 incomplete 모순). 새 산문 규칙 등재 동결(2026-09-20)에 따라 CLAUDE.md는 수정하지 않았다.
+- **회수 등재**: `OPS-140`(두 브랜치 기준 구현 판정 후 파일 단위 이식 · `OPS-126`에 `depends_on` 부착). **분실 등재 복원**: `relaxed-keller`에만 있던 `OPS-131`을 원 번호·원문으로 재등재(8개 필드 동일 확인).
+- **등재 중 내 실수 2건과 정정**: `HARN-311` `paths`에 존재하지 않는 `scripts/harness/claims.py`를 추측으로 적었다(grep으로 `backlog.py` 단독임을 확인하고 `amend --drop-scope`로 정정). `OPS-131` notes의 "acceptance 3항"은 원문이 1항 안의 세 문단이라 `--notes-replace`로 정정. 이전 추측 등재를 `add` 직후 한 번 더 읽어 대조하는 습관이 없었던 것이 원인이며 대장 이벤트에 사유가 남았다.
+- **삭제 0건**: 내용 소멸 3건은 claim 해제 대기, 3건은 Kiki 판단 대기(17회차 판단 요청 3건 미답변). 삭제 목록(주석 제외 48줄)과 현존 원격 브랜치 교집합 0건을 확인해 머지가 no-op임을 실측했다.
+- **정직한 공백**: `OPS-126` 두 구현의 테스트를 실행하지 않았고 커밋 메시지의 검증 수치는 재현하지 않았다. 야간 고립 리포트에 두 브랜치가 없던 이유는 미확인(최근 활동 구간 분류 추정). `claims reap --apply`는 실행하지 않았다.
 ### 2026-10-14 — OPS-130: OPS-50 고립 구현 회수 (MoE 파싱 실패 원인 규명·변형 6종·A/B/C 병기 도구가 main에 착지)
 - **회수**: `claude/happy-turing-kmrd5z`(`93861f63`, 분기점 `30848ab4`)의 완성 구현이 PR 없이 5일 고립돼 있었다(stray-code 17회차). 분기점과 main 사이 대상 3파일 변경이 0줄이라 파일 단위로 그대로 이식했다. `MEMORY.md`는 통째 이식하면 main의 257줄이 소실되므로 이 항목만 새로 썼다. 판정 문서 = `docs/reviews/ops130_ops50_moe_parse_recovery_2026-10-14.md`.
 - **원인 규명(2026-10-09 감사 파일 재분류, 라이브 0)**: OPS-48 후보의 미분류 16건은 전부 `output_tokens=512`(=`--num-predict`)에서 `reason`이 끊긴 절단이다. 잘린 응답 16건 전부 `"has_defect": true`로 시작했고 무결함 10건도 그랬다. 파싱만 고치면 A집계 오경보 상한이 ~0.351로 올라 OPS-48 exit 0이 깨질 수 있다.
