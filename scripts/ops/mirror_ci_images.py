@@ -138,7 +138,15 @@ Runner = Callable[[Sequence[str], int], "subprocess.CompletedProcess[str]"]
 
 def _run(cmd: Sequence[str], timeout: int) -> subprocess.CompletedProcess[str]:
     """외부 호출 1회. 타임아웃 필수 — 멈춘 호출이 잡을 붙잡지 않게 한다."""
-    return subprocess.run(list(cmd), capture_output=True, text=True, timeout=timeout, check=False)
+    return subprocess.run(
+        list(cmd),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",  # 로케일(cp949 등)로 디코드하면 출력이 깨진다 (HARN-19)
+        errors="replace",
+        timeout=timeout,
+        check=False,
+    )
 
 
 def _imagetools(runner: Runner, *args: str) -> str:
