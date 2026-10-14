@@ -338,16 +338,6 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
-### 2026-10-12 (결정·구현 · P3-31): **[12미적Ⅰ-02-02] 해설 연결은 기존 승인 문항 24건에 `solution_steps`만 더하는 안((나))으로 풀었고, 승인이 새 내용으로 옮겨 가지 않는다는 문제는 "더한 것은 기계 증명 전수·감사가 본 내용은 지문 핀"으로 해소했다 — Coverage solution 9/10 → 10/10**
-
-**무엇/왜**: P3-03 승인 각인 뒤 Concept Completeness의 solution 연결이 [12미적Ⅰ-02-02]만 missing이었다(`problem_bank_conceptual_v0`의 승인 문항 24건). 실측으로 acceptance ①의 서술을 정정한다 — 해설(`answer_explanation`)은 24건 전부 **있었고** 없던 것은 `verify.solution_steps`뿐이다. 24건은 전부 `|x−a|+c` 한 틀(답 0)이다.
-**결정**: (나) 채택. 생성기(`conceptual_count_mc_generator._is_differentiable_steps`)가 `(Derivative(우가지) − Derivative(좌가지)).doit()` → `1 − (−1)` → `2` 를 결정론으로 만들고, 배치로 재생성한 출력과 대조해 코퍼스에는 24건의 `verify.solution_steps` 한 키만 제자리 삽입했다(나머지 336건·24건의 다른 필드는 바이트 동일).
-**(가)를 택하지 않은 이유**: 02-02를 겨냥한 새 은행은 감사 통과(S5 기준 k ≤ 3 @ 504건 규모·판정자 16명)가 있어야 승인되는데 이 세션에서 닿는 범위를 넘고, 그 사이 24건의 `answer`가 전부 0인 한 틀이라는 문항 품질 문제는 이 태스크가 아니라 별건으로 남는다(아래 공백).
-**승인 이전 문제의 해소**: ① 감사 표본(200/360)이 보증한 내용은 `question_text`·`choices`·`answer`·`answer_explanation`·`distractor_map`·`achievement_standard_codes`·`concepts`·`verify`(단계 제외)이고 그 지문(`9e787871…`)을 단계 추가 **전** 코퍼스로 산출해 테스트에 핀으로 박았다 — 한 글자라도 바뀌면 RED. ② 새로 생긴 단계는 표본이 아니라 기계 증명 전수로 덮는다 — 24건 전부 `verify_solution` 전이 전건 correct. 가지 식이 `Abs(x−a)+c`와 같다는 것은 Tier2가 모르므로 생성기가 `_assert_abs_branches`로 직접 확인한다.
-**측정(phase3_coverage · 같은 명령 전후)**: solution linked 9 → 10, missing 1 → 0. prerequisite 10/10 · misconception 10/10 · pedagogy 10/10 · hint unmeasured 10 은 전후 동일. Content Coverage 1.0 · Curriculum Coverage 1.0 · Graph Connectivity 0.5 불변. Concept Completeness는 0/10 그대로(hint 측정 불가 — P3-32/P3-04 소관). 보조 수치 '측정 가능한 연결만 본 완전 개념' 9 → 10/10.
-**검증**: 뮤테이션 3종(단계 삭제·해설 1글자·마지막 단계 오값) 각각 RED, 원복은 바이트 동일. 로컬 CI 재현 — backend 잡(ruff·black·mypy·lint-imports·전체 pytest·게이트 6종), declared-unwired-audit(백필 드리프트 2종), harness-integrity(validate·audit-deps·tests/harness), infra-contracts(tests/infra) 중 infra에서 `sympify` 직접 호출 1건이 걸려 `safe_sympify`로 교정 후 재통과.
-**정직한 공백**: ① 단계는 우·좌 미분계수 각각이 아니라 그 **차**(2 ≠ 0)를 한 연쇄로 보인다 — 값 −1·+1 자체는 해설 문장이 말하고 식 연쇄는 말하지 않는다 ② 24건은 한 틀·정답 전부 0이라 02-02의 문항 다양성은 여전히 얇다(별건 권고: 미분가능한 함수·합성 문항 확장) ③ 계측기는 풀이의 수학적 정확성을 재검증하지 않는다(`phase3_coverage` 자체 한계) ④ 학생 공급은 여전히 검수 승격 전이라 연결 10/10이어도 공급 가능 0/10.
-
 ### 2026-10-12 (정정·구현 · QUAL-14): **오개념 코퍼스 `canonical_statement` 76건(843건의 9.0%)이 문장 중간에서 잘려 있었다 — M0677은 그중 하나였고, `student_wrong_thinking`의 첫 문장으로 복원했다. 시험지가 박은 옛 문구는 건드리지 않고 재현 검사만 측정 당시 문구로 고정했다** (claude 구현, 테스트 계정 기준) — 판정 기준: 작업 브랜치 기점 `d873d064`
 
 **무엇/왜**: P3-03 은행 감사에서 판정자 지적 12건이 "M0677 설명이 '…관점을 — …관점을 못 쓴다'로 깨졌다"였다(판정자에게 보이는 설명 = `canonical_statement + " — " + student_wrong_thinking`). 태스크는 M0677 한 건이었으나 실측해 보니 **같은 결함이 76건**이었다. 원인 둘 — ① 40자 절단 71건(그중 3건 M0436·M0473·M0502는 우연히 `)`·`다`에서 끊겨 *완결형처럼 보였다*) ② 소수점 분할 5건(M0465~M0468·M0511, `3/10을 0`) — 후자는 길이와 무관해 40자 기준으론 안 잡힌다. 정본 = `docs/data/misconception_catalog_v1.md` §8.
@@ -413,6 +403,16 @@
 **검증**: 신규 테스트 49건(등록된 훅 명령 그대로 실행·종료 코드 판정)·기존 고지 테스트 6건을 새 계약에 맞게 정정·뮤테이션 29종 전건 RED. **첫 회차에 2종이 살아남았다**(빈 사유가 호출측 거짓 판정에 가려짐·뒤의 `not blocked` 거부가 같은 종료 코드를 냄) — 절을 직접 밟는 반례로 보강. 구현 전 코드에서 P3-03 재현 테스트가 `assert 0 == 2`로 RED였음을 확인했다.
 
 **실측이 드러낸 인접 사실**: 이 컨테이너는 시스템(Debian) PyYAML·pip를 `pip`가 지우지 못해 미러 설치 스텝이 19초 만에 깨진다 — venv + `--prepend-path`가 필요하다. **한계**: 우회는 같은 세션이 스스로 연다(사람의 승인이 아니다) — 남용은 재평가 조건(2주 내 차단 비율 30%·우회가 차단의 절반 초과 시 스텝 단위/병렬 미러 설계)과 로그·대장으로 감시한다. 임계값은 관측 전 가정이다.
+### 2026-10-12 (결정·구현 · P3-31): **[12미적Ⅰ-02-02] 해설 연결은 기존 승인 문항 24건에 `solution_steps`만 더하는 안((나))으로 풀었고, 승인이 새 내용으로 옮겨 가지 않는다는 문제는 "더한 것은 기계 증명 전수·감사가 본 내용은 지문 핀"으로 해소했다 — Coverage solution 9/10 → 10/10**
+
+**무엇/왜**: P3-03 승인 각인 뒤 Concept Completeness의 solution 연결이 [12미적Ⅰ-02-02]만 missing이었다(`problem_bank_conceptual_v0`의 승인 문항 24건). 실측으로 acceptance ①의 서술을 정정한다 — 해설(`answer_explanation`)은 24건 전부 **있었고** 없던 것은 `verify.solution_steps`뿐이다. 24건은 전부 `|x−a|+c` 한 틀(답 0)이다.
+**결정**: (나) 채택. 생성기(`conceptual_count_mc_generator._is_differentiable_steps`)가 `(Derivative(우가지) − Derivative(좌가지)).doit()` → `1 − (−1)` → `2` 를 결정론으로 만들고, 배치로 재생성한 출력과 대조해 코퍼스에는 24건의 `verify.solution_steps` 한 키만 제자리 삽입했다(나머지 336건·24건의 다른 필드는 바이트 동일).
+**(가)를 택하지 않은 이유**: 02-02를 겨냥한 새 은행은 감사 통과(S5 기준 k ≤ 3 @ 504건 규모·판정자 16명)가 있어야 승인되는데 이 세션에서 닿는 범위를 넘고, 그 사이 24건의 `answer`가 전부 0인 한 틀이라는 문항 품질 문제는 이 태스크가 아니라 별건으로 남는다(아래 공백).
+**승인 이전 문제의 해소**: ① 감사 표본(200/360)이 보증한 내용은 `question_text`·`choices`·`answer`·`answer_explanation`·`distractor_map`·`achievement_standard_codes`·`concepts`·`verify`(단계 제외)이고 그 지문(`9e787871…`)을 단계 추가 **전** 코퍼스로 산출해 테스트에 핀으로 박았다 — 한 글자라도 바뀌면 RED. ② 새로 생긴 단계는 표본이 아니라 기계 증명 전수로 덮는다 — 24건 전부 `verify_solution` 전이 전건 correct. 가지 식이 `Abs(x−a)+c`와 같다는 것은 Tier2가 모르므로 생성기가 `_assert_abs_branches`로 직접 확인한다.
+**측정(phase3_coverage · 같은 명령 전후)**: solution linked 9 → 10, missing 1 → 0. prerequisite 10/10 · misconception 10/10 · pedagogy 10/10 · hint unmeasured 10 은 전후 동일. Content Coverage 1.0 · Curriculum Coverage 1.0 · Graph Connectivity 0.5 불변. Concept Completeness는 0/10 그대로(hint 측정 불가 — P3-32/P3-04 소관). 보조 수치 '측정 가능한 연결만 본 완전 개념' 9 → 10/10.
+**검증**: 뮤테이션 3종(단계 삭제·해설 1글자·마지막 단계 오값) 각각 RED, 원복은 바이트 동일. 로컬 CI 재현 — backend 잡(ruff·black·mypy·lint-imports·전체 pytest·게이트 6종), declared-unwired-audit(백필 드리프트 2종), harness-integrity(validate·audit-deps·tests/harness), infra-contracts(tests/infra) 중 infra에서 `sympify` 직접 호출 1건이 걸려 `safe_sympify`로 교정 후 재통과.
+**정직한 공백**: ① 단계는 우·좌 미분계수 각각이 아니라 그 **차**(2 ≠ 0)를 한 연쇄로 보인다 — 값 −1·+1 자체는 해설 문장이 말하고 식 연쇄는 말하지 않는다 ② 24건은 한 틀·정답 전부 0이라 02-02의 문항 다양성은 여전히 얇다(별건 권고: 미분가능한 함수·합성 문항 확장) ③ 계측기는 풀이의 수학적 정확성을 재검증하지 않는다(`phase3_coverage` 자체 한계) ④ 학생 공급은 여전히 검수 승격 전이라 연결 10/10이어도 공급 가능 0/10.
+
 ### 2026-10-09 (결정·구현 · P3-27): **`concept_viewed`는 (나) 세션 writer가 첫 확인 개념을 싣는 안으로 실체화하고(새 컬럼 0), 숙달 변경은 시도에 귀속 투영했다 — 콘텐츠 열람 로그(`P3-29`)와 코치 이벤트 세션 귀속(`P3-30`)은 스키마가 필요해 이월했다** (claude 판정·구현, 테스트 계정 기준) — 판정 기준 main `713512bc`
 
 **무엇/왜**: P3-13 실측에서 `concept_viewed` 역할은 `content_viewed` 생산자 0건 + `concept_selected`가 개념을 싣지 않아 "어느 개념을 봤는가"를 시간선이 말하지 못했다. 판정 문서 = `docs/reviews/p3_27_concept_viewed_and_trace_fields_2026-10-09.md`.
