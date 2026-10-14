@@ -5,7 +5,7 @@ track: infra-debt
 stage: S5
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py
   - tests/backend/harness/test_quality_tier_prompt_variants_ops50.py
   - scripts/ops/run_moe_quality_battle.ps1
-session: null
+session: claude/funny-edison-26h9wb
 notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-① (stray-code 17회차). 소유 태스크 OPS-50. 회수 완료 전 원 브랜치 claude/happy-turing-kmrd5z 삭제 금지. 원격 claim OPS-50은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
-updated: 2026-10-12
+updated: 2026-10-14

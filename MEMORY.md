@@ -12444,3 +12444,9 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **분실 등재 복원**: `nice-cray`에만 있던 `ARCH-72`·`HARN-304`·`PED-44`·`REND-05`를 원 번호로 CLI 재등재(title·acceptance·paths가 브랜치 원문과 글자 단위 일치 확인). `PED-43`은 빈 acceptance 오등재로 브랜치에서도 취소된 번호라 복원하지 않음. `ARCH-72`·`HARN-304`·`PED-44`는 `add` 당시 원격 예약 push가 실패했다(`number_reserve_unavailable` 3건 · `REND-05`만 성공 · 실패 원인은 재현 못 함 — 2026-10-13 정정: 초안의 "main 최대보다 낮으면 생략" 추정은 틀렸다). 같은 날 `reserve_for`로 재예약해 4건 실재 확인. 예약 TTL 72h라 이 PR이 2026-10-15경까지 착지해야 한다.
 - **삭제 0건**: 내용 소멸 3건(`blissful-lovelace`·`status-f6qz0c`·`stoic-hawking`)은 claim 해제 대기, 3건(`friendly-pascal`·`gracious-cannon`·`status-f9lp65`)은 Kiki 판단 대기. 특히 `friendly-pascal`은 내용이 전량 흡수됐으나(코퍼스 차이는 `authored_by` 필드뿐) 2026-10-09 보존 지시가 main에 도달하지 못한 채 `QUAL-15` done과 충돌한다.
 - **정직한 공백**: 부재 줄 대조는 줄 전체 일치라 이식량의 상한이다. 브랜치 커밋 메시지의 검증 수치는 재현하지 않았다. `claims reap --apply`는 실행하지 않았다.
+
+### 2026-10-14 — OPS-130: OPS-50 고립 구현 회수 (MoE 파싱 실패 원인 규명·변형 6종·A/B/C 병기 도구가 main에 착지)
+- **회수**: `claude/happy-turing-kmrd5z`(`93861f63`, 분기점 `30848ab4`)의 완성 구현이 PR 없이 5일 고립돼 있었다(stray-code 17회차). 분기점과 main 사이 대상 3파일 변경이 0줄이라 파일 단위로 그대로 이식했다. `MEMORY.md`는 통째 이식하면 main의 257줄이 소실되므로 이 항목만 새로 썼다. 판정 문서 = `docs/reviews/ops130_ops50_moe_parse_recovery_2026-10-14.md`.
+- **원인 규명(2026-10-09 감사 파일 재분류, 라이브 0)**: OPS-48 후보의 미분류 16건은 전부 `output_tokens=512`(=`--num-predict`)에서 `reason`이 끊긴 절단이다. 잘린 응답 16건 전부 `"has_defect": true`로 시작했고 무결함 10건도 그랬다. 파싱만 고치면 A집계 오경보 상한이 ~0.351로 올라 OPS-48 exit 0이 깨질 수 있다.
+- **뮤테이션 검증은 브랜치 주장을 인용하지 않고 새로 했다**: 브랜치는 "13종 전건 검출"이라 했지만 13종 목록이 어디에도 기록돼 있지 않아 재현 불가였다. 15종을 새로 주입(주입 적용·원복 sha256 단언 내장)해 1차에 **4건 생존**(M6 문항 수 검사·M7 정답지 대조·M14 `main()`의 후보 변형 전달·M15 stage_split 1단계 문면)을 발견, 테스트 4건을 보강해 15/15 RED로 만들었다. M7은 "slug는 같고 정답지만 다른" 행을 만드는 픽스처가 없어 그 절을 밟지 않은 유형이었다.
+- **미완(OPS-50 소유)**: ③ 같은 seed 재평가(5% 이하·Wilson 유지)·④ 정착·⑤ 재판정 수치는 Phaiakes9 라이브 측정이 필요해 미수행이다. 그 PowerShell 파라미터 전달도 이 환경(Linux)에서는 실행 검증하지 못했다. OPS-50은 닫지 않는다.

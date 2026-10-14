@@ -1,0 +1,18 @@
+[OPS-50 ①] 파싱 실패 재분류 — ops-48-moe-accuracy-battle-20260822_232452.jsonl · candidate · 문항 100건
+미분류 16/100 (16.0%)
+
+[정답지별]
+  answer_error                 0/8  
+  broken_latex                 4/7  
+  clean                       10/50 
+  condition_mismatch           0/7  
+  distractor_misattribution    0/7  
+  explanation_slip             1/7  
+  standard_tag_error           1/7  
+  statement_mismatch           0/7  
+
+[원인별] truncated 16
+
+[잘린 응답 앞부분에서 읽히는 판정 — 파싱 복구(접두 구제) 시 반사실]
+  clean     문항 · has_defect=true       10건
+  defective 문항 · has_defect=true       6건
