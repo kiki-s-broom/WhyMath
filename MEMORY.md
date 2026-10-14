@@ -12444,3 +12444,14 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **분실 등재 복원**: `nice-cray`에만 있던 `ARCH-72`·`HARN-304`·`PED-44`·`REND-05`를 원 번호로 CLI 재등재(title·acceptance·paths가 브랜치 원문과 글자 단위 일치 확인). `PED-43`은 빈 acceptance 오등재로 브랜치에서도 취소된 번호라 복원하지 않음. `ARCH-72`·`HARN-304`·`PED-44`는 `add` 당시 원격 예약 push가 실패했다(`number_reserve_unavailable` 3건 · `REND-05`만 성공 · 실패 원인은 재현 못 함 — 2026-10-13 정정: 초안의 "main 최대보다 낮으면 생략" 추정은 틀렸다). 같은 날 `reserve_for`로 재예약해 4건 실재 확인. 예약 TTL 72h라 이 PR이 2026-10-15경까지 착지해야 한다.
 - **삭제 0건**: 내용 소멸 3건(`blissful-lovelace`·`status-f6qz0c`·`stoic-hawking`)은 claim 해제 대기, 3건(`friendly-pascal`·`gracious-cannon`·`status-f9lp65`)은 Kiki 판단 대기. 특히 `friendly-pascal`은 내용이 전량 흡수됐으나(코퍼스 차이는 `authored_by` 필드뿐) 2026-10-09 보존 지시가 main에 도달하지 못한 채 `QUAL-15` done과 충돌한다.
 - **정직한 공백**: 부재 줄 대조는 줄 전체 일치라 이식량의 상한이다. 브랜치 커밋 메시지의 검증 수치는 재현하지 않았다. `claims reap --apply`는 실행하지 않았다.
+
+## 2026-10-14: 미머지 브랜치 전수 감사 18회차 — OPS-126이 두 세션에 이중 구현된 채 고립 · 회수 태스크 `OPS-140` 등재 · 브랜치 전용 `OPS-131` 복원 · 삭제 0건 · 대책 `HARN-311`·`HARN-309` ⑤
+
+- **판정 기준 main `24d8607d`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-10-14.md`. 원격 ref 46 − 제외 4 − 열린 PR 14 = 감사 대상 28(유령 PR 0). 17회차 이월 25건 중 23건 head 불변, 소멸 2건(`adoring-goodall`=`QUAL-12` #1589 · `q8tvcx`=16차 배치 집행 잔존 0/1).
+- **사고**: `relaxed-keller-4wk0b2`·`wonderful-allen-vhbdra`가 같은 날 13:09Z에 `OPS-126`(`/health/ready`의 `sympy_isolation` 섹션)을 각자 구현하고 PR 없이 끝났다. main 부재 649·696줄, main `OPS-126`은 `todo`. 두 구현은 같은 파일 5개를 서로 다르게 고쳐 통째 병합 불가(777+/731−).
+- **원인 2종(이벤트 샤드 실측)**: ① `wonderful-allen`은 12:37:59Z에 원격 claim 쓰기가 `error`였는데 `start`가 허용돼(`remote=error+readscan_ok`) 12분 뒤의 `relaxed-keller`(`remote=ok`)가 존재를 볼 수 없었다 — 병렬 중복 구현 **3회차**(`OPS-07` 2026-07-27 · `MP-04` 2026-09-06 · 이번). 실패 원인 자체는 재현 못 함. ② `relaxed-keller`는 `done --no-pr incomplete`로 닫았다(완료+"미완" 사유 공존).
+- **대책(코드·태스크)**: `HARN-311`(claim 쓰기 error 시 fail-open 착수 — 원인 기록·거부/즉시 push 판정·3경우 변별 테스트) · `HARN-309` acceptance ⑤(done 경로의 incomplete 모순). 새 산문 규칙 등재 동결(2026-09-20)에 따라 CLAUDE.md는 수정하지 않았다.
+- **회수 등재**: `OPS-140`(두 브랜치 기준 구현 판정 후 파일 단위 이식 · `OPS-126`에 `depends_on` 부착). **분실 등재 복원**: `relaxed-keller`에만 있던 `OPS-131`을 원 번호·원문으로 재등재(8개 필드 동일 확인).
+- **등재 중 내 실수 2건과 정정**: `HARN-311` `paths`에 존재하지 않는 `scripts/harness/claims.py`를 추측으로 적었다(grep으로 `backlog.py` 단독임을 확인하고 `amend --drop-scope`로 정정). `OPS-131` notes의 "acceptance 3항"은 원문이 1항 안의 세 문단이라 `--notes-replace`로 정정. 이전 추측 등재를 `add` 직후 한 번 더 읽어 대조하는 습관이 없었던 것이 원인이며 대장 이벤트에 사유가 남았다.
+- **삭제 0건**: 내용 소멸 3건은 claim 해제 대기, 3건은 Kiki 판단 대기(17회차 판단 요청 3건 미답변). 삭제 목록(주석 제외 48줄)과 현존 원격 브랜치 교집합 0건을 확인해 머지가 no-op임을 실측했다.
+- **정직한 공백**: `OPS-126` 두 구현의 테스트를 실행하지 않았고 커밋 메시지의 검증 수치는 재현하지 않았다. 야간 고립 리포트에 두 브랜치가 없던 이유는 미확인(최근 활동 구간 분류 추정). `claims reap --apply`는 실행하지 않았다.
