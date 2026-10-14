@@ -1,13 +1,24 @@
-# 04e. 교수전략 카탈로그와 격차 완결 — 외부 프레임워크 대조 판정 (L4/L3)
+# 04g. 교수전략 카탈로그와 격차 완결 — 외부 프레임워크 대조 판정 (L4/L3)
 
 > **성격**: L4(교수학 엔진)의 서브 설계 — `04`(교수학 결정)·`04a`(WH-1 하네스)·`04b/04c`(오개념)·`04d`(교수법
-> 선택·학습)에 이어 **`04e`(교수전략의 *서술 자산*과 잔여 격차의 완결)**. 04d는 참조하되 개정하지 않는다 —
-> 04d = 전략을 *고르는 메커니즘*, 04e = 전략을 *서술하는 카탈로그* + 외부 대조에서 드러난 공백의 설계.
+> 선택·학습)에 이어 **`04g`(교수전략의 *서술 자산*과 잔여 격차의 완결)**. 04d는 참조하되 개정하지 않는다 —
+> 04d = 전략을 *고르는 메커니즘*, 04g = 전략을 *서술하는 카탈로그* + 외부 대조에서 드러난 공백의 설계.
 >
 > **유래**: Kiki 제공 외부 일반 교수전략 프레임워크(2026-07-28 docx — WhyMath 전용이 아닌 일반 틀. 4기능:
 > ⑭교수전략 라이브러리 ⑮설명 방식 선택 ⑯비유/예시 생성 ⑰질문 생성)를 **전 항목 대조**하여 수용/거부/변형을
 > 판정했다(§2). 외부 틀은 체크리스트로만 쓴다 — WhyMath 방향(구축 플레이북 불변식·7계층·반게임화·reactive
 > 오개념)이 항상 우선한다.
+>
+> **회수·번호 이력**: 이 문서는 2026-07-28 미머지 브랜치 `claude/whymath-pedagogy-review-uqyg79`(PR #675)에서 `04e_pedagogy_strategy_catalog.md`로
+> 처음 쓰였고, 2026-08-11 Kiki가 같은 외부 문서를 **재제출**해 두 번째 브랜치 `claude/whymath-pedagogy-review-gdmwhk`가 04e→04f로
+> 재번호·재판정한 3차본을 만들었다(PR 미오픈). main에는 2026-08-15 `PED-22`·`PED-23`이 uqyg79판을 회수했고(`PED-24`·`PED-25`가 생성기·소액
+> 정정을 잇는다), 2026-10-08 `PED-26`이 gdmwhk판과 **줄 단위로 대조해 병합**했다 — 코드·코퍼스는 main이 상위집합이라 이식 0건이고,
+> 병합된 것은 §10 어댑터 갭 재판정·§12 해제 조건 2행·부록(재측정)과 아래 번호 정리뿐이다.
+>
+> **문서번호 정정(2026-10-08)**: 이 문서의 번호는 **04e → 04g**로 바뀌었다. `04e`는 먼저 쓰인(2026-08-03)
+> `04e_misconception_remediation_design.md`가 갖고, `04f`는 `04f_pedagogy_module_boundaries.md`가 점유한다. 코드·테스트·코퍼스·인접 문서 2건의
+> `04e §N` 약칭 중 이 문서를 뜻하던 118곳을 `04g §N`으로 갱신했다. **역사 기록**(MEMORY·`backlog/`·`docs/reviews/`)은 당시 번호 그대로
+> 두므로, 거기서 `04e_pedagogy_strategy_catalog`를 만나면 이 문서다. 같은 날 확인한 다른 중복 접두는 `03c` 하나(별건 — §11).
 >
 > **한 줄**: 전략은 카탈로그로 서술하고 선택은 규칙·게이트가 하며, 설명방식은 별도 축이 아니다 — 외부 4기능을
 > 기존 3축(전략·슬롯/자산·L5 시각화)으로 분해 흡수한다.
@@ -87,7 +98,7 @@ WhyMath 고유 4종(RETRIEVAL·SPACING·INTERLEAVING·SELF_EXPLANATION — 인�
 | 외부 질문 유형 | 판정 | WhyMath 좌석 |
 |---|---|---|
 | 개념 확인("왜 그렇게 생각했나요?") | ✅ | 소크라테스 CLARIFICATION(명료화) — 6카테고리+선택 알고리즘 기구현 |
-| 예측("결과는 어떻게 될까요?") | ⏸ | `04a §11.3` 도구#10 `elicit_prediction`+Brier 보정 — **설계 좌석 기점유·미구현**. 04e는 참조만(04a 소관 — 중복 등재 금지) |
+| 예측("결과는 어떻게 될까요?") | ⏸ | `04a §11.3` 도구#10 `elicit_prediction`+Brier 보정 — **설계 좌석 기점유·미구현**. 04g는 참조만(04a 소관 — 중복 등재 금지) |
 | 반례("항상 성립할까요?") | ✅ | 오개념 개입 축 — 반례 자산 전량 보유·reactive 개입(`intervene.py` 결정트리) |
 | 비교("두 방법의 차이는?") | ⏸ | PERSPECTIVE(관점) 카테고리+다중 풀이 `comparison` 부산물 — 연결 지점만 기록·실수요 대기 |
 | 확장("조건을 바꾸면?") | ⏸ | IMPLICATION(함의)+LTHC `ExtensionPath` 스케치 — LTHC 심화와 묶어 별도 결정 |
@@ -324,29 +335,30 @@ L4 supply()/발주서 ──"이 개념·이 슬롯이 필요"──▶ l3/pedag
 | 항목 | 처리 | 태스크 |
 |---|---|---|
 | `mode_guard` 런타임 미배선 — `check_forbidden_modes` 프로덕션 호출 0(하네스·테스트만) | coach 응답 경로에 fail-closed 배선(`filter_tone` 앞·위반 시 폴백+reason_code). 플래그 옵트인·OFF 무변경. "검증 장치를 만들고 배선 확인 없이 완료 선언 금지" 반복 사고 유형의 해소 | PED-07 → **PED-23 회수**(main 재적용) |
-| coach·study 경로 분기 — 설계용(팩) 축은 2026-07-27 GA 기배선, **실행용 축**(StudentSignals→decide→처치 기록)은 `/study`만 | ① study의 신호 조립을 공용 좌석으로 추출(101KB coach 직수정 회피 — 최고 위험이라 추출 슬라이스 선행) ② coach 턴에서 `decide()` 소비+`record_pedagogy_treatment` | PED-08 |
-| adaptive policy 미승격(표본 미달 exit 1) | **신규 작업 없음** — 승격 게이트(`pedagogy_policy_eval`)가 정직하게 미달을 표기 중. 규칙표 v1이 정본(04d §3.3). 표본은 PED-08 착지로 자연 축적 | — |
-| `preferred_solution_style` 유령 필드(`02_learner_model.md`·`03_content_generation.md`가 여전히 서술) | 04d §2.1 패턴("항상 None인 필드는 착시")의 실측 부기를 02·03에 확산 | PED-11 |
-| 정본 이중화 — `.claude/agents/pedagogy-designer.md`(413줄)가 `04` 정본(195줄)보다 상세 | 관계 1줄 명시(에이전트 문서는 작업 지침·설계 정본은 `04` 계열). 내용 이관은 별도 결정 | PED-11 |
+| coach·study 경로 분기 — 설계용(팩) 축은 2026-07-27 GA 기배선, **실행용 축**(StudentSignals→decide→처치 기록)은 `/study`만 | ① study의 신호 조립을 공용 좌석으로 추출(101KB coach 직수정 회피 — 최고 위험이라 추출 슬라이스 선행) ② coach 턴에서 `decide()` 소비+`record_pedagogy_treatment` | 구 PED-08(uqyg79 번호) → **PED-44**(2026-10-08 승계 — main의 PED-08은 무관한 done 태스크) |
+| adaptive policy 미승격(표본 미달 exit 1) | **신규 작업 없음** — 승격 게이트(`pedagogy_policy_eval`)가 정직하게 미달을 표기 중. 규칙표 v1이 정본(04d §3.3). 표본은 PED-44(구 PED-08) 착지로 자연 축적 | — |
+| `preferred_solution_style` 유령 필드(`02_learner_model.md`·`03_content_generation.md`가 여전히 서술) | 04d §2.1 패턴("항상 None인 필드는 착시")의 실측 부기를 02·03에 확산 | 구 PED-11 → PED-25 done(02·03·`llm-architect`·`ml-engineer` 부기, 2026-08-15) |
+| 정본 이중화 — `.claude/agents/pedagogy-designer.md`(413줄)가 `04` 정본(195줄)보다 상세 | 관계 1줄 명시(에이전트 문서는 작업 지침·설계 정본은 `04` 계열). 내용 이관은 별도 결정 | 구 PED-11 → PED-26 ⑤(c)(PED-25가 빠뜨린 이 1줄을 2026-10-08 착지) |
 
 ---
 
-## 10. 현 구현 매핑 (편집자 부기 — 2026-07-28)
+## 10. 현 구현 매핑 (편집자 부기 — 2026-07-28 · 어댑터·coach 행은 2026-10-08 PED-26 재판정)
 
 | 설계 요소 | 현 좌석 | 상태 |
 |---|---|---|
 | 전략 enum 10종 | `schema/enums.py::PedagogyStrategy` | ✅ 동결(거버넌스 테스트) |
 | 선택·게이트 | `l4/pedagogy/runtime_selector.py` | ✅ R1~R5+2축 게이트(PED-02 done) |
 | 공급 오케스트레이션 | `l4/content_supply.py::supply()` | ✅ decide 내부 호출 — 게이트 우회 불가 |
-| 렌더 어댑터 | `l3/render/adapters.py` 5종 | ⚠️ 10종 중 5종(RETRIEVAL·SPACING·INTERLEAVING·SELF_EXPLANATION·VISUALIZATION 미구현 — `LookupError` 정직 실패). 어댑터 추가는 REND-01 후속 실수요 시 |
+| 렌더 어댑터 | `l3/render/registry.py::_ADAPTER_FACTORIES` **5종**(DIRECT·SOCRATIC·WORKED_EXAMPLE·PROBLEM_BASED·ANALOGY) | ⚠️ **진짜 갭으로 재판정**(Kiki 2026-08-11 — gdmwhk `REND-05` notes가 기록, 이전 판의 "REND-01 후속 실수요 시"를 승계하지 않음). 10종 중 5종(RETRIEVAL·SPACING·INTERLEAVING·SELF_EXPLANATION·VISUALIZATION) 미구현이고 `selectable_strategies()`가 `registered_strategies()`에 묶여 있으며 `select()` 규칙표(R1~R5)에도 이 5종의 이름이 없어(2026-10-08 grep 0건) **학생 도달 경로가 구조적으로 0**이다. 인지과학 근거가 가장 강한 4종(인출·분산·교차·자기설명)이 여기 들어 있어 의사결정 우선순위 4번("장기 숙달 > 단기 점수")과 직결된다 → `REND-05` (승계 등재 · P2 — 12월 검증 비관여). 등록 없이 어댑터만 만들면 도달 0 그대로이고, SPACING·INTERLEAVING은 세션 간 스케줄 성질이라 렌더 좌석과 스케줄러가 별개 축이다 |
 | 전략 카탈로그 | `schema/pedagogy_strategy.py`·`pedagogy_strategies_v1/` 10건·`strategy_registry.py` | ✅ 착지(PED-05 — 제거 필드 3계열 부재 이중 동결·enum 1:1 거버넌스) |
 | 후보 필터·전략 카드 | `runtime_selector.narrow_candidates`·`prompt_assembler.attach_strategy_card`·`supply()` 생성 폴백 | ✅ 착지(PED-23 회수 — 원 PED-06을 main 위 재적용: 플래그 2종 기본 OFF 캔어리·공집합 3중 폴백 reason_code·gate 카탈로그 부재 동결. grade_band 생산자 배선·난이도는 kwargs 축만(생산자 부재)·R2 정밀화는 error_type 순수 경로 생산자 부재로 보류) |
 | 비유 자산 | `concept_content.metaphor` 846행 | ⚠️ 전량 검수 전 — PED-09가 채움·검수 파이프라인(§6) |
 | 비유·예시 생성기 | — | 🆕 PED-09(`l3/pedagogy/` — slot_generator 형제) |
 | 형성평가 | `l3/pedagogy/diag_item_projector.py`(계획·행 빌드·오케스트레이션) | ✅ 착지(PED-10 — atom_probe↔concept_nodes 직접 code 교집합·crosswalk 불필요(§7.2 실측 정정)·select-vs-generate·표본 0=None) |
 | mode_guard | `l4/pedagogy/mode_guard.py`(검출 1종/7모드) | ✅ 런타임 배선(PED-23 회수 — 원 PED-07을 main 위 재적용: WH-1 primary 톤필터 직전·`mode_guard_runtime_enabled` 옵트인 기본 OFF 캔어리·위반 시 소크라테스 재질문 폴백. PED-16 by-design 미배선 선언은 이 배선으로 해소. GA flip은 측정+사인오프 후 별도) |
+| coach 실행용 축 | `/study`만 — `api/coach.py`는 `StudentSignals`·`decide(StudentSignals)`·`record_pedagogy_treatment`를 부르지 않고 설계용(팩) 축만 경유(2026-10-08 grep) | 🆕 `PED-44`(승계 — 개념그래프 code→원자 code 다리를 **재실측**한 뒤에만 resolver 설계) |
 | 처치·효과 측정 | `l2/pedagogy_evidence.py`·`adaptive/effectiveness.py`(지표 2/4 구현) | ✅ 좌석 가동·표본 축적 중(04d §3) |
-| 예측 질문 | `04a §11.3` 도구#10 | ⏸ 설계만 — WH-1 하네스 소관(04e 범위 밖) |
+| 예측 질문 | `04a §11.3` 도구#10 | ⏸ 설계만 — WH-1 하네스 소관(04g 범위 밖) |
 
 ---
 
@@ -358,9 +370,26 @@ L4 supply()/발주서 ──"이 개념·이 슬롯이 필요"──▶ l3/pedag
   **PED-10**(형성평가 슬롯 채움·done — §7.2 grain 다리 실측 정정 동반)·**PED-11**(문서 부채 정정·done)·
   **PED-12**(adaptive k_type 라벨 맹글링 수정·done)·**PED-13**(coach 목표 해석 다리·신규 — §12 무관·
   §9 배선 갭의 후속).
-- 회수(격리 브랜치 → main 재적용): **PED-22**(카탈로그 정본 — 04e·YAML 10건·schema·registry)·
+- 회수(격리 브랜치 → main 재적용): **PED-22**(카탈로그 정본 — 04g·YAML 10건·schema·registry)·
   **PED-23**(소비 배선 — 원 PED-06/07 capability를 현행 main 위 재적용: 후보 필터·전략 카드·
   mode_guard 런타임 배선. PED-16의 by-design 미배선 선언은 PED-23으로 해소됨).
+- **번호 대응표 (필독 — 출처 번호가 main의 무관한 태스크와 겹친다)**: 이 문서 본문의 `PED-04`~`PED-13`은 uqyg79 브랜치의 번호이고,
+  gdmwhk판은 `PED-18`~`PED-21`·`REND-05`를 썼다. main에서 같은 번호는 **다른 태스크**다(예: main `PED-08` = 성장 증거 서빙 경계 집행·
+  `PED-13` = 결손 복구 리드타임 지표, 둘 다 done). 본문에서 `PED-0x`를 만나면 아래 표로 main 위치를 찾는다.
+
+  | 출처 번호 | 내용 | main 위치 |
+  |---|---|---|
+  | uqyg79 PED-04·05 / gdmwhk PED-18 | 설계 문서 + 카탈로그(schema·YAML 10·registry) | `PED-22` done |
+  | uqyg79 PED-06·07 / gdmwhk PED-18 | 후보 필터·전략 카드 + mode_guard 배선 | `PED-23` done |
+  | uqyg79 PED-09·10 / gdmwhk PED-19·20 | 비유·예시 생성기 + 형성평가 `diag_item` 슬롯 | `PED-24` done |
+  | uqyg79 PED-11·12 | 문서 부채(유령 필드)·adaptive k_type 라벨 맹글링 | `PED-25` done(문서 1줄은 `PED-26` ⑤(c)) |
+  | uqyg79 OPS-15 | WH-1 caplog 순서 플레이크 격리 가드 2종 | `PED-25` ⑤ 의도적 제외 |
+  | uqyg79 PED-08 ② / PED-13 · gdmwhk PED-21 | coach 실행용 축 수렴 + 목표 해석 다리 | `PED-44` (신규 승계) |
+  | gdmwhk REND-05 | 미구현 어댑터 5종 | `REND-05` (같은 번호로 승계) |
+
+  동반 사실: 문서번호 접두 중복은 `04e`(이번에 해소)와 `03c`(`03c_cloud_tier_transition_v2.md`↔`03c_content_strategy_cache.md`)
+  두 건이었다. `03c`는 이 문서의 범위가 아니라 **미해소로 남기며**, 재발·잔존은 `tests/infra/test_architecture_doc_numbers.py`가
+  감시한다(03c는 만료일 있는 유예 — 그 테스트 참조).
 - 교차링크: `04d`(선택·학습 메커니즘 — 상위 정본)·`03c`(전략 enum·렌더·select-vs-generate)·`04a §11`(전략
   레퍼토리·예측 도구)·`04c`(오개념 reactive)·`docs/data/strategy_graph_v1.md` §4(축 구분)·
   `docs/standards/superhuman_verification_standard.md`(결함주입 강등전 규격).
@@ -372,12 +401,12 @@ L4 supply()/발주서 ──"이 개념·이 슬롯이 필요"──▶ l3/pedag
 
 ## 12. ⏸ 보류 항목 해제 조건 (PED-08 후속 정리 — 재제안 방지 §8과 이중 방어)
 
-§2·§10이 남긴 "정직한 공백"(⏸) 6+1건의 **해제 조건**을 명문화한다. §8(비수용)이 "다시 받지 않는다"를
+§2·§10이 남긴 "정직한 공백"(⏸) 6+1건(+2건 — 2026-10-08 PED-26이 gdmwhk판에서 병합)의 **해제 조건**을 명문화한다. §8(비수용)이 "다시 받지 않는다"를
 영구 기록한다면, 이 절은 "지금은 아니지만 이 조건이 충족되면 재검토한다"를 기록한다 — 조건 없이
 재검토하면 매 세션 같은 논쟁이 반복된다(컨텍스트 오염 방어). **구현 아님 — 설계 문서화만**(신규
 태스크·코드 변경 0).
 
-| 항목 | 04e 출처 | 해제 조건 |
+| 항목 | 04g 출처 | 해제 조건 |
 |---|---|---|
 | 예측 질문(`elicit_prediction`) | §2.4 — 04a §11.3 도구#10 참조만(중복 등재 금지) | **04a 소관 유지.** Brier 지표 자체는 이미 MEASURED(`ProblemAttempt.confidence_self_reported` vs `is_correct`)이고 보정 코칭(`l4/calibration_coaching`)도 구현됨 — 남은 것은 verify_step *이전* 확신도 수집 UI/도구 그 자체다. 해제 조건: WH-1 하네스가 도구#9(`log_strategy_event`) 등 같은 계층의 다른 전략 도구를 실제로 GA 배선한 뒤, R16(세션당 2회 상한·UX 마찰) 완화책과 함께 04a 자체 세션에서 논의 |
 | 비교 질문(PERSPECTIVE+다중 풀이) | §2.4 | PERSPECTIVE 카테고리는 이미 실재(`l4/socratic/categories.py`)하므로 즉시 쓸 수 있다. "다중 풀이 `comparison` 부산물"은 **아직 main에 없다** — 병렬 세션 `S4-10-multi-solution-generation`(선례: `solution_module_gap_review.md` D2) 착지가 해제 조건이다. 착지 후 그 산출(복수 접근 `ApproachType`)을 소크라테스 PERSPECTIVE 발문의 소재로 잇는 배선 설계를 별도 세션에서 진행 |
@@ -385,6 +414,8 @@ L4 supply()/발주서 ──"이 개념·이 슬롯이 필요"──▶ l3/pedag
 | 역사적 배경 설명방식 | §5.2 | 자산 0(코퍼스에 역사적 배경 필드·슬롯 없음). 해제 조건: 콘텐츠 저작 로드맵에서 이 축의 실수요가 명시적으로 확인되고(교사·학생 요청 실측 또는 로드맵 결정), 저작 슬롯(`SlotSpec.type` 신규 유형)이 먼저 신설된 뒤 — 표현 방식보다 **콘텐츠 부재**가 선결 조건 |
 | 발견학습(전략) | §2.1 | SOCRATIC·PROBLEM_BASED와 인지 행동 경계가 불명확 — enum은 폐쇄 거버넌스(10종 동결)라 신설 비용이 크다. 해제 조건: 두 기존 전략으로 커버 안 되는 **구체적 실패 사례**(학생 반응 로그·처치 효과 미달 패턴)가 `adaptive/effectiveness.py` 표본으로 실측된 뒤 — 인상이 아니라 측정 근거로 재검토 |
 | CRA 구체물 활용(전략) | §2.1 | 초등 확장(`G-s5-subject-expansion`) 이전 축이라 소비처가 없다(현재 학생군은 고3 MVP — CLAUDE.md 페르소나 우선순위). 해제 조건: 초등 확장이 실제 착수되는 시점(로드맵 Phase 전환) — 그 전에 만들면 콘텐츠 폭발(빈 전략) |
+| `requested_strategy` 학생 옵트인 | §5.3 | 설계만 있고 **코드 좌석 0**(2026-10-08 `src/`·`src/mobile` grep 0건). 해제 조건: L5(Flutter) 쪽에 "이렇게 설명해줘" 선택 UI 좌석이 결정된 뒤 — 서버 파라미터만 먼저 만들면 호출자 0인 죽은 인자가 된다 |
+| R2 정밀화(error_type 대조) | §4 | runtime `misconception_ids`(kebab)에 `error_type`이 없고 DB 조회는 이 순수 함수 계층에서 불가(`runtime_selector.select()` docstring에 보류 사유 상세). 해제 조건: kebab id에서 error_type을 얻는 **DB-free 순수 경로 생산자**가 실재하게 되는 시점 |
 | 게임형 예시·전략·질문 전 축 | §8-② | **해제 없음** — 반게임화는 정체성 조항(CLAUDE.md 절대 금기)이라 재제안 방지 대상. §8과 동일 취급(참고용으로 이 표에 병기하는 이유: "정직한 공백"과 "영구 거부"를 혼동하지 않기 위해) |
 
 **공통 원칙**: 위 표는 미래 세션이 외부 docx를 다시 받아 같은 6항목을 재질문할 때 참조하는 정본이다.
@@ -394,5 +425,48 @@ L4 supply()/발주서 ──"이 개념·이 슬롯이 필요"──▶ l3/pedag
 
 ---
 
-**버전**: 1.1 | **작성**: 2026-07-28 · **개정**: 2026-08-03(§7.2 grain 다리 실측 정정·§10 PED-10
-갱신·§12 신설) | **다음 검토**: PED-13 착수 시점
+## 부록 — 실측 근거 (2026-10-08 재측정 · 읽기 전용 재현 · 판정 기준 main `8a5ea4d1`)
+
+> gdmwhk판 부록(2026-08-11)의 수치를 **옮기지 않고 다시 쟀다** — 그 사이 `mode_guard`가 배선돼(PED-23) ③번이 뒤집혔고,
+> 레지스트리 표 이름이 `_ADAPTERS`에서 `_ADAPTER_FACTORIES`(EOS-89)로 바뀌었다. 낡은 수치를 이식하면 이 문서가 거짓말한다.
+
+```bash
+# ① 비유 자산 충전율 (K-12 437 + 대학 409)
+python3 - <<'PY'
+import json
+for p in ["data/corpus/concept_content_v1/content.json",
+          "data/corpus/concept_content_university_v1/content.json"]:
+    d = json.load(open(p, encoding="utf-8"))
+    rows = d["content"] if isinstance(d, dict) and "content" in d else d
+    n = len(rows); c = sum(1 for x in rows if x.get("metaphor"))
+    print(f"{p}: metaphor {c}/{n} ({c/n*100:.1f}%)")
+PY
+
+# ② 렌더 어댑터 등록 수 — select()가 고를 수 있는 전략의 상한
+python3 - <<'PY'
+import re
+t = open("src/backend/whymath_backend/l3/render/registry.py", encoding="utf-8").read()
+blk = t.split("_ADAPTER_FACTORIES: dict", 1)[1].split("}", 1)[0]
+print(re.findall(r"PedagogyStrategy\.([A-Z_]+):", blk))
+PY
+
+# ③ check_forbidden_modes 호출자 — 서빙 경로 포함 여부
+grep -rn "check_forbidden_modes" src/backend/whymath_backend --include=*.py | grep -v "def check_forbidden_modes"
+
+# ④ 카탈로그 ↔ enum 1:1
+ls data/corpus/pedagogy_strategies_v1/*.yaml | wc -l
+```
+
+| 지표 | 실측값 (main `8a5ea4d1`) | 2026-08-11 gdmwhk판 | 변화 |
+|---|---|---|---|
+| `concept_content.metaphor` 충전 | K-12 437/437 + 대학 409/409 = **846/846 (100%)** | 846/846 | 불변 |
+| `flashcards` 충전 | K-12 105/437 (24.0%) · 대학 409/409 | K-12 105/437 | 불변 |
+| 교수전략 enum / 카탈로그 YAML | **10 / 10** | 10 / 10 | 불변 |
+| 렌더 어댑터 등록 | **5종** — DIRECT·SOCRATIC·WORKED_EXAMPLE·PROBLEM_BASED·ANALOGY | 5종 | 불변(갭 잔존 → `REND-05`) |
+| `check_forbidden_modes` 서빙 경로 호출자 | **1** — `harness/wh1_primary.py`(옵트인 `mode_guard_runtime_enabled`·기본 OFF) | 0 | **뒤집힘**(PED-23) — 그 외 호출은 오프라인 측정 하네스 `pedagogy_pack_fidelity_eval`뿐 |
+
+---
+
+**버전**: 1.2 | **작성**: 2026-07-28 · **개정**: 2026-08-03(§7.2 grain 다리 실측 정정·§10 PED-10
+갱신·§12 신설) · 2026-10-08(PED-26: 번호 04e→04g·gdmwhk판 병합 — §10 어댑터 갭 재판정·§11 번호 대응표·§12 2행·부록) |
+**다음 검토**: `REND-05` 또는 `PED-44` 착수 시점

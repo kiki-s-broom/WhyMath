@@ -1,4 +1,4 @@
-"""교수전략 카탈로그 레지스트리 — 정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §3.
+"""교수전략 카탈로그 레지스트리 — 정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §3.
 
 `pack_registry.py`(교수법 팩 인메모리 레지스트리)의 *교수전략 카탈로그* 짝이다 — 같은 하우스
 스타일(코퍼스 YAML → `yaml.safe_load` + Pydantic 검증 → `@lru_cache(maxsize=1)` 인메모리 dict·
@@ -20,7 +20,7 @@ DB-free)로 `data/corpus/pedagogy_strategies_v1/*.yaml`(전략 10종·`PedagogyS
 
 ⚠️ 범위: 이 모듈은 **카탈로그 자산의 조회까지만** 제공한다. 소비 배선(`runtime_selector`의
 select 후보 필터·`prompt_assembler` 전략 카드)은 **PED-23(회수 — 원 PED-06 재적용)이 착지**
-했고, 카탈로그가 `gate()` 입력에 들어가면 안 된다는 불변식(04e §4 ②)도 같은 태스크의 테스트
+했고, 카탈로그가 `gate()` 입력에 들어가면 안 된다는 불변식(04g §4 ②)도 같은 태스크의 테스트
 (`tests/backend/l4/test_catalog_consumption.py`)가 동결한다.
 """
 
