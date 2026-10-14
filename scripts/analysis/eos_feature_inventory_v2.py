@@ -1121,6 +1121,9 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability",
+       # OPS-139: 정본(graph.json)↔prod DB 패리티 프로브 — 도달성 진단과 같은 축
+       # (prod DB를 docker exec로 읽기 전용 관측하는 운영자 도구)이라 같은 좌석에 귀속한다.
+       "ops.atom_graph_prod_parity",
        # OPS-30: 알림의 마지막 1홉 — AlertLogNotifier가 계산한 전이를 웹훅으로 내보내는 sink와,
        # 서버 프로세스 밖에서 /health/ready를 폴링해 S4를 계산하는 업타임 프로브. 둘 다
        # "서비스 헬스 관측"의 같은 축(서버가 알리지 못하는 것까지 알린다)이라 같은 좌석에 귀속한다.
