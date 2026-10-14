@@ -303,6 +303,7 @@ def _cms_routes() -> list[tuple[str, str]]:
 def _fill(path: str) -> str:
     return (
         path.replace("{concept_id}", str(_CID))
+        .replace("{problem_id}", str(_CID))
         .replace("{version_id}", str(_VID))
         .replace("{pk}", "x1")
     )
@@ -317,6 +318,8 @@ def _call(client: TestClient, method: str, path: str) -> Any:
         body = {"changes": {"x": 1}}
     elif url.endswith("/transitions"):
         body = {"action": "submit", "expected_status": "DRAFT"}
+    elif url.endswith("/drafts"):
+        body = {}
     elif url.endswith("/rollback"):
         body = {"expected_published_version_id": str(_VID)}
     elif url.endswith("/review"):
@@ -329,8 +332,9 @@ _ROUTES = _cms_routes()
 
 def test_route_inventory_is_not_vacuous() -> None:
     """분모 — 라우트가 통째로 사라져도 아래 전수 검사는 공허하게 통과하므로 개수를 고정한다."""
-    assert len(_ROUTES) == 34, f"CMS 라우트 {len(_ROUTES)}건"
-    assert sum(1 for m, _ in _ROUTES if m != "GET") == 12
+    # 34 + EOS-194 문항 판 호출 표면 4(읽기 2 + 쓰기 2) = 38. 쓰기 12 + 2 = 14.
+    assert len(_ROUTES) == 38, f"CMS 라우트 {len(_ROUTES)}건"
+    assert sum(1 for m, _ in _ROUTES if m != "GET") == 14
 
 
 @pytest.mark.parametrize(("method", "path"), _ROUTES, ids=lambda v: str(v))
@@ -1623,6 +1627,12 @@ _CONCEPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/v1/admin/cms/concepts/{concept_id}/rollback"),
         ("GET", "/v1/admin/cms/resources"),
         ("GET", "/v1/admin/cms/audit"),
+        # EOS-194 — 문항 판 발행 호출 표면(`api/admin_cms_problem_versions.py`). 동작 계약은
+        # `test_admin_cms_problem_versions.py`가 소유하고, 여기서는 라우트 목록의 정합만 본다.
+        ("POST", "/v1/admin/cms/problems/{problem_id}/drafts"),
+        ("GET", "/v1/admin/cms/problems/{problem_id}/versions"),
+        ("GET", "/v1/admin/cms/problem-versions/{version_id}"),
+        ("POST", "/v1/admin/cms/problem-versions/{version_id}/transitions"),
     }
 )
 
@@ -1684,4 +1694,4 @@ class TestRouteDeclarationParity:
         derived = {r for r in _expected_resource_routes() if r[0] != "GET"}
         concept_writes = {r for r in _CONCEPT_ROUTES if r[0] != "GET"}
         assert writes == derived | concept_writes
-        assert len(writes) == 12
+        assert len(writes) == 14

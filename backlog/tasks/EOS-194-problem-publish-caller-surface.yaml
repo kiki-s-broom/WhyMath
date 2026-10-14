@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/api/**"
   - "tests/backend/api/**"
-session: null
+session: claude/jolly-fermi-6km81l
 notes: "출처: EOS-190 착지 시 발견. 모듈 docstring의 '운영 호출자 없음' 항목을 이 태스크가 소유한다. docs/architecture/eos190_problem_publish_writer.md 5절."
 updated: 2026-10-13

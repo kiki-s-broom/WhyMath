@@ -192,7 +192,7 @@ nodes:
   #     (backend-migrations 통합 스텝이 `--ignore=../../tests/backend/l3` — 같은 명령 --collect-only 0건, 추적 OPS-137)
   #   미구현: 이 게이트를 부르는 운영 API·CLI는 0건(44 §12 CMS 버전 API 미착수) — 지금 호출자는 테스트뿐이다
   #   ※ 문항 판 짝(EOS-190): l3/problem_publish_gate.py — problem_version·problem.problem_version_id 의 유일한 쓰기 자리.
-  #     별도 노드를 두지 않는다(이 노드와 같은 "호출자 없는 writer" 상태 · 호출 표면 EOS-194). 집행 동결(AST)
+  #     별도 노드를 두지 않는다. 운영 호출자 = 관리자 CMS 문항 판 표면 api/admin_cms_problem_versions.py(EOS-194). 집행 동결(AST)
   #     tests/backend/l3/test_problem_publish_gate_enforcement.py · 실 PG 관통(CI가 수집하는 위치)
   #     tests/backend/db/test_problem_version_publish_integration.py · 설계 docs/architecture/eos190_problem_publish_writer.md
   concept_version_publish: { needs: [concept_graph] }
