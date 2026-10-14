@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -19,7 +19,9 @@ acceptance:
   - "⑤ 변별력 — 정상 상태 GREEN만으로 보호를 선언하지 않는다. 실패 주입으로 각 판정이 실제로 나는지 확인한다: (a) 정상(정본 2,234 = DB 2,234)은 MATCH, (b) DB를 2,210으로 만든 픽스처(S4-60 직전 실제 상태)는 DRIFT·방향 DB<정본, (c) DB가 정본보다 많으면 DRIFT·방향 DB>정본, (d) 총합은 같고 subtype 분포만 다른 픽스처는 DRIFT, (e) DB 값을 못 읽으면 UNKNOWN(종료 2)이지 MATCH가 아니다, (f) graph.json 엣지 0건이면 오류. 뮤테이션(비교 항목 하나 제거·방향 판정 제거·UNKNOWN을 MATCH로 접기)을 하네스에서 주입해 전건 RED를 확인하고, 주입이 실제로 적용됐는지(mutated != original)와 원복이 바이트 동일한지를 단언한다."
   - "⑥ 집행 지점은 정본화와 별항으로 쓴다(정본화를 집행으로 착각한 완료 선언 금지) — 프로브를 만드는 것과 누가 언제 부르는가는 다른 문제다. 최소 두 곳에 배선한다: (a) 정본 적재 런북(docs/ops/ 아래 atom_node·S4-64 populate 계열)의 AFTER 판정 블록이 이 프로브를 부르게 한다 — 수작업 count 쿼리를 대체, (b) 정본 graph.json을 바꾸는 PR의 체크리스트에 적재 후 이 프로브 MATCH를 적재 완료 증적으로 요구한다(S4-61 병합이 첫 소비자). CI에서는 prod DB에 닿을 수 없으므로 CI가 하는 일은 판정 함수 단위 테스트와 배선 동결 테스트(런북이 프로브를 실제로 부른다)까지이고, prod 실행은 Kiki 머신이다 — 이 한계를 산출물에 명시한다."
   - "⑦ 읽기측 폴백(선택 · 판정 후 결정) — prod DB에 닿지 못하는 세션에서도 적재 누락 위험을 볼 수 있게, 적재 실행을 이벤트 대장에 기록하는 방안을 검토한다(정본 graph.json의 마지막 변경 커밋 이후 적재 이벤트가 있는지를 로컬에서 판정). 단 이벤트 기록은 적재자가 부른다는 전제에 기대므로 ⑥(b)의 증적과 중복될 수 있다 — 중복이면 채택하지 않고 이유를 notes에 남긴다."
-artifacts: []
+  - "⑦ 판정(2026-10-14): 채택하지 않음 — 적재 실행의 이벤트 대장 기록은 적재자(populate CLI)가 그것을 부른다는 전제에 기대므로 ⑥(b)의 PR 템플릿 적재 증적(MATCH 출력 + 판정 기준 커밋)과 같은 사실을 중복해서 말한다. 채택하려면 l1 populate CLI를 수정해야 해 이 태스크 범위(ops 프로브·런북·템플릿)를 넘는다. 재론 조건: 정본 변경 PR이 증적 없이 병합되는 사고가 실제로 관측되면 승계 태스크로 등재."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1619 (판정 기준: 브랜치 claude/sweet-ptolemy-fjfkwg 63839478 · 로컬 CI 미러 전 잡 통과 · prod 실측은 Kiki 런북 atom_graph_parity_probe_runbook.md 미실행)"
 paths:
   - "scripts/ops/atom_graph_prod_parity*.py"
   - "src/backend/whymath_backend/ops/atom_graph_prod_parity*.py"
@@ -31,4 +33,6 @@ notes: |-
   무엇이 이미 있고 무엇이 없는가(실측): 스키마 쪽은 scripts/ops/probe_prod_schema_revision.sql(읽기 전용 프로브)과 ops/db_host_reachability(도달성 3신호)가 있다. 데이터 쪽 — 정본 엣지 수 대 DB 엣지 수 대조 — 는 내가 찾은 방법(backlog 전수 grep: 패리티·정본↔DB·canonical drift 등, scripts/ops 목록)으로는 0건이다. 인접 태스크 HARN-216은 오개념 crosslink 적재의 canonical 뒤집힘 판정이라 대상이 다르다(원자 백본 엣지가 아님).
   eos_priority를 P1로 둔 이유: 우회는 가능하나(수작업 count) 우회가 사람의 기억에 의존하고, 정본이 바뀔 때마다 prod 서빙 그래프와 어긋날 수 있다. 과대하다고 판단되면 amend --eos-priority로 P2로 내리면 된다.
   주의: 이 세션은 prod DB에 접속할 수 없다(Kiki 머신 전용) — 구현은 순수 판정 함수와 단위 테스트까지이고 실측 실행은 Kiki 런북으로 넘긴다.
-updated: 2026-10-13
+
+  [정정 2026-10-14] acceptance ⑦ 선택 항의 판정 기록(채택하지 않음·이유·재론 조건)
+updated: 2026-10-14

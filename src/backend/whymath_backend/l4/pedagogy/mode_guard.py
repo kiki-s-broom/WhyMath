@@ -43,7 +43,7 @@ PED-16 당시 이 함수는 라이브 코치 응답 경로 어디에도 배선�
 reason_code 구조화 로그). PED-16의 완화 요인(사전 가드 `runtime_selector.forbids_worked_first`)은
 불변으로 유지되며, 오프라인 결함주입 측정(`pedagogy_pack_fidelity_eval`)도 그대로 CI 상시다.
 상세: `docs/architecture/dsl_integration_gap_review.md` §2-⑤·`docs/architecture/
-04e_pedagogy_strategy_catalog.md` §9.
+04g_pedagogy_strategy_catalog.md` §9.
 """
 
 from __future__ import annotations
@@ -161,7 +161,7 @@ _DEFAULT_FALLBACK_CATEGORY = SocraticCategory.CLARIFICATION
 def fallback_reply_for(mode: str) -> str:
     """위반 모드 → 안전한 소크라테스식 재질문(결정론 템플릿) — 위반 발화의 대체재.
 
-    정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §9(런타임 배선)·04d §2.2
+    정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §9(런타임 배선)·04d §2.2
     (완전예제 차단 시 SOCRATIC 강등 선례). 런타임 가드가 위반을 검출하면 호출자는 그 발화를
     학생에게 보내지 않고(fail-closed) 이 함수의 재질문으로 *대체*한다. 반환값은
     `l4/socratic/categories.py::EXAMPLE_QUESTION`(스펙 정본 예시 질문)의 기존 자산 그대로다 —

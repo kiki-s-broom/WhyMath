@@ -1,7 +1,7 @@
 """수요 실측 CLI(analogy_demand) hermetic 테스트 — 코퍼스 계수·정직한 공백·exit 규약.
 
 실 코퍼스(레포 커밋 자산)를 읽는 hermetic 측정이다(DB·LLM 0). 검증 축:
-  ① 코퍼스 총량·공백 계수 일치(846행 자산 실재 — 04e §6.1 진단의 기계 확인)
+  ① 코퍼스 총량·공백 계수 일치(846행 자산 실재 — 04g §6.1 진단의 기계 확인)
   ② ai_estimated=전량(적재기 상수 각인 규약 정합)
   ③ 발주서 슬롯 계수(유닛 컴파일 — 개념형/숫자형 분해 합 정합)
   ④ 채움(APPROVED)은 DB 미접속 시 None — 0% 위장 금지(정직한 공백)
@@ -25,7 +25,7 @@ from whymath_backend.l3.pedagogy.analogy_demand import (
 
 class TestMetaphorDemand:
     def test_corpus_totals(self) -> None:
-        """자산 846행(K-12 437 + 대학 409) 실재 — 04e §6.1 "비유 0이 아니라 846행" 진단 동결."""
+        """자산 846행(K-12 437 + 대학 409) 실재 — 04g §6.1 "비유 0이 아니라 846행" 진단 동결."""
         records = load_all_content_records()
         assert len(records) == 846
         demand = measure_metaphor_demand(records)

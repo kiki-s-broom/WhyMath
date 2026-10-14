@@ -198,10 +198,19 @@ $After = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT c
 "AFTER_TOTAL=$After"
 $WithSkills = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT count(*) FROM atom_node WHERE behavior_skills <> '{}';"
 "AFTER_WITH_SKILLS=$WithSkills"
+"----- 정본↔prod 패리티 (읽기 전용 · OPS-139) -----"
+& $Py -m whymath_backend.ops.atom_graph_prod_parity
+"PARITY_EXIT=$LASTEXITCODE"
 "JUDGED_AGAINST_MAIN=" + (git rev-parse --short origin/main)
 ```
 
-**확인**: `AFTER_TOTAL=2683`, 그리고 `atom_nodes=N`의 N과 일치.
+**확인**: `AFTER_TOTAL=2683`, 그리고 `atom_nodes=N`의 N과 일치. **`PARITY_EXIT=0`(`STATUS=MATCH`)**.
+
+`PARITY_EXIT`는 수작업 `count(*)`를 대신하는 판정이다(OPS-139): `atom_node`뿐 아니라 이 적재가 함께
+건드린 `concept_edge`·`concept`까지 정본과 같은지 — **총수만이 아니라 `relation_subtype` 분포와
+엣지 집합 지문까지** 본다. `1`(DRIFT)·`2`(UNKNOWN)·`3`(정본 입력 오류)이면 적재가 끝났다고 말하지
+않는다 — 출력 전체를 전달한다. 종료 코드별 해석과 이 프로브의 한계는
+`docs/ops/atom_graph_parity_probe_runbook.md`가 정본이다.
 
 `AFTER_WITH_SKILLS`는 **0이 정상**이다 — `behavior_skills`는 이 CLI가 아니라 크로스워크 이전
 (`concept_atom_crosswalk.populate`)이 채운다. 그 이전은 대상 행이 없어 2026-09-14에 0건으로
@@ -216,7 +225,7 @@ Kiki가 할 일은 위 판정값들을 세션에 전달하는 것까지다. 대�
 
 전달할 값: `DOCKER_OK` · `PATHS_MATCH_MAIN` · `BEFORE_TOTAL` · `HAS_SKIP_FLAG` ·
 `REACH_EXIT` · `POPULATE_EXIT` · CLI의 `[원자 백본 적재]` 줄 · `AFTER_TOTAL` ·
-`AFTER_WITH_SKILLS` · `JUDGED_AGAINST_MAIN`.
+`AFTER_WITH_SKILLS` · 패리티 프로브 출력 전체와 `PARITY_EXIT` · `JUDGED_AGAINST_MAIN`.
 
 ## 8. 이 런북이 답하지 못하는 것 (정직 고지)
 

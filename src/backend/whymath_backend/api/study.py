@@ -169,7 +169,7 @@ async def _build_signals(
     기본치로 채우면 선택기가 근거 없는 판단을 하게 된다(PED-02가 세운 "가짜 통과 금지" 규약).
     Polya 단계·턴 수·힌트는 대화 세션 축이라 여기서는 기본값이다(공급 진입 = 시도 전).
 
-    `grade_band`(PED-23 회수 — 04e §4 카탈로그 후보 필터 축)는 `UserProfile.grade`(10~14 —
+    `grade_band`(PED-23 회수 — 04g §4 카탈로그 후보 필터 축)는 `UserProfile.grade`(10~14 —
     `schema/user.py` 계약)에서 `grade_to_band` 순수 변환으로 파생한다("생산자 먼저" — 04d §2.1).
     프로필 미존재·grade 미기입이면 None으로 두어 필터의 학년 축이 조용히 스킵된다(필수화 금지).
     """
