@@ -47,8 +47,14 @@ from whymath_backend.harness.p3_calculus1_diff_batch import (
     drift_against,
     run_p3_calculus1_diff_batch,
 )
+from whymath_backend.l3.equivalent.p3_diff_differentiability_skeleton_generator import (
+    P3DiffDifferentiabilityGenerator,
+)
 from whymath_backend.l3.equivalent.p3_diff_differential_coefficient_skeleton_generator import (
     P3DiffDifferentialCoefficientGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator import (
+    P3DiffMonotonicityExtremumGenerator,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import P3DiffSlotGenerator
 
@@ -57,7 +63,11 @@ __all__ = ["CORPUS_DIR_NAME", "GENERATORS", "build_provenance", "main", "run_p3_
 CORPUS_DIR_NAME: Final = "problem_bank_p3_fill_v0"
 
 #: 개념별 생성기 등록부 — 새 생성기는 여기에 한 줄을 더한다(순서 = 은행 안 출력 순서).
-GENERATORS: Final[tuple[type[P3DiffSlotGenerator], ...]] = (P3DiffDifferentialCoefficientGenerator,)
+GENERATORS: Final[tuple[type[P3DiffSlotGenerator], ...]] = (
+    P3DiffDifferentialCoefficientGenerator,
+    P3DiffDifferentiabilityGenerator,
+    P3DiffMonotonicityExtremumGenerator,
+)
 
 #: 사이드카 `generated` — 은행이 처음 만들어진 날. 의도적 내용 변경이 아니면 바꾸지 않는다.
 _GENERATED_DATE: Final = "2026-10-15"

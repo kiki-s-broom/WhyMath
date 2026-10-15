@@ -868,7 +868,9 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual07() -> No
     # (코퍼스 수는 38종 그대로 — 은행 1개에 개념이 늘었다. 실중복 0쌍 유지는 아래 T2 단언이 증거).
     # 14,538 → 14,586 · 38 → 39종: P3-05 4단계가 새 은행 `problem_bank_p3_fill_v0` 48건(02-01 미분계수
     # 4슬롯 × 12)을 더했다. 실중복 0쌍 유지는 아래 T2 단언이 증거다.
-    assert report.total_problems == 14586
+    # 14,586 → 14,646: 같은 은행에 02-02 미분가능성 5슬롯 × 12건이 늘었다(종수는 39 그대로).
+    # 14,646 → 14,694: 02-07 증가·감소 4슬롯 × 12건이 더해졌다(같은 은행).
+    assert report.total_problems == 14694
     assert len(report.corpora) == 39
 
     # T1 — 해소됨.
