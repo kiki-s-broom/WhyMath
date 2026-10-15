@@ -128,7 +128,11 @@ def _prime_routes(client: TestClient) -> None:
 
 
 def _warm_worker() -> None:
-    """워커 기동(SymPy import ≈1s)을 시간 상한 밖에서 미리 치른다."""
+    """워커 기동(SymPy import ≈1s + 웜업)을 시간 상한 밖에서 미리 치른다.
+
+    식 종류별 첫 사용의 지연 import(`simplify` → `sympy.physics` ≈68ms)는 이 호출의 입력(`2*(x+1)`)이
+    아니라 워커의 `warmup`(OPS-142)이 기동 단계에서 치른다 — 웜업이 없던 때는 이 호출이 데운 것은
+    덧셈 경로뿐이라, 본문의 첫 `(a+b)^2`가 그 비용을 계산 상한 안에서 치렀다."""
     with TestClient(_app()) as client:
         resp = client.post(
             "/v1/verify-step", json={"expr_before": "2*(x+1)", "expr_after": "2*x+2"}
