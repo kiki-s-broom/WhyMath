@@ -621,6 +621,7 @@ def _git_head() -> str | None:
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
+            encoding="utf-8",  # 로케일(cp949) 디코딩 금지 — HARN-19
             timeout=_GIT_TIMEOUT_S,
             check=False,
         )
