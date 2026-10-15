@@ -68,7 +68,6 @@ from whymath_backend.l3.equivalent.p3_diff_power_derivative_skeleton_generator i
     P3DiffPowerDerivativeGenerator,
 )
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
-    SLOT_IDS,
     SLOT_NAMES_KO,
     P3DiffSlotGenerator,
     skeleton_of,
@@ -146,7 +145,7 @@ def run_p3_calculus1_diff_batch(
     total_requested = 0
     total_stored = 0
     for generator_cls in generators:
-        for slot in SLOT_IDS:
+        for slot in generator_cls.slots:
             spec = generator_cls.spec_for(slot)
             generator = generator_cls(slot=slot, skip_conditions=seen)
             requested = len(generator_cls.items(slot))
@@ -198,9 +197,13 @@ def build_provenance(
     concepts: dict[str, Any] = {}
     total = 0
     for generator_cls in generators:
-        per_slot = {slot: len(generator_cls.items(slot)) for slot in SLOT_IDS}
-        texts = [item.question_text for slot in SLOT_IDS for item in generator_cls.items(slot)]
-        frames = {item.frame_id for slot in SLOT_IDS for item in generator_cls.items(slot)}
+        per_slot = {slot: len(generator_cls.items(slot)) for slot in generator_cls.slots}
+        texts = [
+            item.question_text for slot in generator_cls.slots for item in generator_cls.items(slot)
+        ]
+        frames = {
+            item.frame_id for slot in generator_cls.slots for item in generator_cls.items(slot)
+        }
         records = sum(per_slot.values())
         total += records
         concepts[generator_cls.standard_code] = {
