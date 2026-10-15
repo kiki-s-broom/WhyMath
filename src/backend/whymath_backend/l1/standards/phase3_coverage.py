@@ -6,7 +6,7 @@
 
 사용법
 ------
-    python -m whymath_backend.l1.standards.phase3_coverage [--spec PATH] [--json]
+    python -m whymath_backend.l1.standards.phase3_coverage [--spec PATH] [--json] [--hints-from-db]
 
 종료 코드: 0 = 목표가 있는 지표가 전부 충족 · 1 = 목표 미달 또는 분모 0(측정 불가) ·
 2 = 명세·코퍼스 적재 실패(측정 자체를 못 했다 — 통과로 위장하지 않는다).
@@ -48,7 +48,8 @@ Concept Completeness 를 '필드 채움 검사'로 만들지 않은 이유 (acce
   misconception 명세의 핵심 오개념 중 이 개념에 귀속된 M-id 가 오개념 코퍼스에 실재하고 귀속
                 성취기준이 일치한다.
   solution      적격 문항 중 해설과 풀이 단계가 둘 다 있는 문항이 있다.
-  hint          힌트가 달린 적격 문항이 있다 — 단 힌트의 저장 좌석이 없어 **현재는 측정 불가**다.
+  hint          검수 통과(`hints.verified`) 힌트가 달린 적격 문항이 있다 — 힌트는 DB 에만 있어
+                `--hints-from-db` 를 줄 때만 잰다. 주지 않으면 **측정 불가**다(빈 집합이 아니다).
   pedagogy      이 개념의 원자를 목표로 삼는 단원 DSL 목표가 있고 그 목표의 지식 유형에 stub 이
                 아닌 교수 팩이 있다.
 
@@ -57,10 +58,18 @@ Concept Completeness 를 '필드 채움 검사'로 만들지 않은 이유 (acce
 없는 개념)은 5개 연결 전부 'missing' 으로 나온다 — 필드 채움 검사가 통과시키던 바로 그 대조군이다.
 
 연결 상태는 3가지다: linked · missing · unmeasured. **측정 불가는 충족이 아니다** — 개념은
-5개가 전부 linked 일 때만 완전하다. 그래서 힌트 좌석이 생기기 전에는 Completeness 가 0 이다.
-이것은 결함이 아니라 현재 사실이다(ARCH-39 가 힌트 저장 좌석을 '영구 부재'로 판정했고, 7필드 중
-`hint_strategy` 의 저장 좌석은 P3-04 가 정한다). 진척이 보이도록 연결별 충족 수와 '측정 가능한
-연결만 본 완전 비율'을 **보조 수치**로 함께 내되, 그 수치는 exit code 에 영향을 주지 않는다.
+5개가 전부 linked 일 때만 완전하다. 그래서 힌트 입력이 없는 실행(기본값)에서는 Completeness 가
+0 이다 — 결함이 아니라 '힌트를 잰 적이 없다'는 사실이다.
+
+힌트 좌석(2026-10 정정): 힌트 본문은 S4-11 이 실체화한 `hints` 테이블(`problem_id` FK · `verified`)
+에만 산다(ARCH-39 '영구 부재' 판정은 2026-09-07 에 '미실체화'로 정정됐다). 이 CLI 는 기본적으로
+DB 를 읽지 않으므로 힌트는 측정 불가로 남고, `--hints-from-db` 를 주면 `verified=true` 행의
+문항 집합을 읽어 `hint_problem_ids` 를 채운다. DB 를 못 읽으면 exit 2 다 — 측정 불가로
+조용히 내려가지 않는다.
+JSONL 은행 문항과 DB `problem` 행은 같은 UUID 를 쓴다고 가정하므로, DB 힌트 문항 중 은행에 없는
+것·은행 적격 문항과 겹치는 수를 `hint_seat` 로 함께 보고한다(ID 공간 불일치가 '힌트 0건'으로
+위장되지 않게). 진척이 보이도록 연결별 충족 수와 '측정 가능한 연결만 본 완전 비율'을 **보조
+수치**로 함께 내되, 그 수치는 exit code 에 영향을 주지 않는다.
 
 ────────────────────────────────────────────────────────────────────────────
 CONT-05 판정 — Content Coverage 의 '완전 연결'이 검수 상태를 조건으로 삼는가 (택 ⓑ)
@@ -91,11 +100,12 @@ CONT-05 판정 — Content Coverage 의 '완전 연결'이 검수 상태를 조�
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import re
 import sys
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final, Literal
 
@@ -157,9 +167,9 @@ _MIS_ID_RE: Final = re.compile(r"^M\d{4,}$")
 
 LinkStatus = Literal["linked", "missing", "unmeasured"]
 
-#: 힌트 연결이 측정 불가인 이유 — 좌석이 생겨 `hint_problem_ids` 가 채워지면 사라진다.
+#: 힌트 연결이 측정 불가인 이유 — `hint_problem_ids` 가 채워지면(`--hints-from-db`) 사라진다.
 HINT_UNMEASURED_REASON: Final = (
-    "측정 불가 — 힌트 저장 좌석이 없다(ARCH-39 '영구 부재' 판정 · hint_strategy 좌석은 P3-04 소관)"
+    "측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)"
 )
 
 
@@ -202,8 +212,9 @@ class UnitObjective:
 class CoverageCorpus:
     """지표가 읽는 코퍼스 — 테스트가 합성 코퍼스로 바꿔 끼울 수 있게 값 객체로 둔다.
 
-    `hint_problem_ids` 가 `None` 이면 힌트 좌석이 없는 것이다(측정 불가). 집합이면 그 문항들에
-    힌트가 달려 있다는 측정 결과다 — P3-04 가 좌석을 정하면 이 자리를 채운다.
+    `hint_problem_ids` 가 `None` 이면 힌트를 읽지 않은 것이다(측정 불가). 집합이면 그 문항들에
+    검수 통과 힌트가 달려 있다는 측정 결과다(빈 집합 = '읽었는데 없다' = missing).
+    채우는 길은 `read_hint_problem_ids_from_db` 하나뿐이다.
     """
 
     atom_nodes: frozenset[str]
@@ -468,6 +479,48 @@ def load_corpus(
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# 힌트 좌석 — DB `hints`(verified) 에서만 읽는다 (P3-22)
+# ──────────────────────────────────────────────────────────────────────────
+#: DB 읽기 제한 시간(초) — 연결이 걸려 멈춘 채 측정이 끝나지 않는 것을 막는다.
+HINT_READ_TIMEOUT_S: Final = 30.0
+
+
+async def fetch_verified_hint_problem_ids(session: Any) -> frozenset[str]:
+    """`hints.verified` 가 참인 행의 문항 ID 집합. 본문(`content`)은 읽지 않는다.
+
+    `verified IS true` 조건이 이 함수의 전부다 — 미검수 힌트는 학생에게 나갈 수 없으므로
+    '힌트가 달렸다'로 세지 않는다(`find_served_hint` 와 같은 기준).
+    """
+    from sqlalchemy import select
+
+    from whymath_backend.db.models.hint import Hint as HintORM
+
+    stmt = select(HintORM.problem_id).where(HintORM.verified.is_(True)).distinct()
+    result = await session.execute(stmt)
+    return frozenset(str(pid) for pid in result.scalars().all())
+
+
+async def _read_hint_problem_ids() -> frozenset[str]:
+    from whymath_backend.db.session import get_sessionmaker
+
+    async with get_sessionmaker()() as session:
+        return await fetch_verified_hint_problem_ids(session)
+
+
+def read_hint_problem_ids_from_db(timeout_s: float = HINT_READ_TIMEOUT_S) -> frozenset[str]:
+    """`--hints-from-db` 의 실체. 못 읽으면 `CoverageError` — 측정 불가로 조용히 내려가지 않는다."""
+    try:
+        return asyncio.run(asyncio.wait_for(_read_hint_problem_ids(), timeout=timeout_s))
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 — DB·드라이버·설정 오류를 한 종류로 접는다(원인은 타입명+메시지)
+        raise CoverageError(
+            f"DB 에서 검수 통과 힌트를 읽지 못했다: {type(exc).__name__}: {exc} "
+            "(힌트를 못 읽은 채 측정하지 않는다 — 입력 없이 재려면 --hints-from-db 를 빼라)"
+        ) from exc
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 개념별 사실 — 연결의 정의는 여기(와 `_completeness_links`) 한 곳에만 있다
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass(frozen=True)
@@ -590,9 +643,8 @@ class MetricResult:
 class ProblemMetadataStats:
     """P3-04 — 적격 문항의 7필드 현황. 코퍼스 파일로 잴 수 있는 만큼만 잰다.
 
-    `unmeasured_fields` 는 한 건이라도 측정 불가인 필드다(현재 `hint_strategy` — 파일 코퍼스에
-    문항별 힌트가 없다). 측정 불가는 충족이 아니므로 `complete` 에 들어가지 않는다. 그 필드는
-    저장(발행) 시점 게이트가 DB 의 verified 힌트로 판정한다.
+    `unmeasured_fields` 는 한 건이라도 측정 불가인 필드다(힌트 입력 `hint_problem_ids` 가 None 일
+    때의 `hint_strategy`). 측정 불가는 충족이 아니므로 `complete` 에 들어가지 않는다.
     """
 
     population: int
@@ -602,6 +654,21 @@ class ProblemMetadataStats:
     inherited_only: int
     unmeasured_fields: tuple[str, ...]
     unmet: tuple[Unmet, ...]
+
+
+@dataclass(frozen=True)
+class HintSeatStats:
+    """P3-22 — DB 힌트 입력이 은행 문항에 실제로 닿았는가.
+
+    힌트는 DB `problem` 행(UUID)에 달리고 계측기는 JSONL 은행 문항으로 센다. 두 ID 공간이 어긋나면
+    DB 에 힌트가 아무리 많아도 연결은 0 으로 나온다 — 그 0 이 '힌트가 없다'가 아니라 'ID 가 안
+    맞는다'일 수 있으므로 겹침을 따로 보고한다.
+    """
+
+    hinted_problems: int  # DB 에서 읽은 검수 통과 힌트가 달린 문항 수
+    in_scope_bank: int  # 그중 명세 범위 은행 문항과 ID 가 겹치는 수
+    eligible_hinted: int  # 그중 적격(approved·핵심 개념 PRIMARY) 문항 수
+    outside_scope: int  # 범위 은행에서 못 찾은 수(범위 밖 문항이거나 ID 공간 불일치)
 
 
 @dataclass(frozen=True)
@@ -622,6 +689,8 @@ class CoverageReport:
     # P3-04 — 기본값 None 은 이 축을 계산하지 않은 보고서다(직접 만든 보고서와의 호환).
     slots: MetricResult | None = None
     problem_metadata: ProblemMetadataStats | None = None
+    # P3-22 — None 은 힌트 입력이 없는 실행(측정 불가)이다.
+    hint_seat: HintSeatStats | None = None
 
     @property
     def exit_code(self) -> int:
@@ -998,8 +1067,8 @@ def _problem_metadata(
                 skill_ids=tuple(sorted(_problem_skills(problem, corpus))),
                 own_misconception_ids=tuple(sorted(_reached_misconceptions(problem, corpus))),
                 concept_misconception_ids=tuple(sorted(inherited)),
-                # 힌트 입력(`hint_problem_ids`)이 None 이면 측정 불가다 — 현재 실 코퍼스에는 문항별
-                # 힌트가 없어 None 이고, P3-22 가 이 입력을 배선하면 이 필드도 같이 측정된다.
+                # 힌트 입력(`hint_problem_ids`)이 None 이면 측정 불가다 — `--hints-from-db` 를 주지
+                # 않은 실행이다. 입력이 있으면 이 필드도 Completeness 의 hint 연결과 함께 측정된다.
                 verified_hint_count=(
                     None
                     if corpus.hint_problem_ids is None
@@ -1077,6 +1146,21 @@ def _check_spec_alignment(spec: ScopeSpec) -> None:
         )
 
 
+def _hint_seat(facts: tuple[ConceptFacts, ...], corpus: CoverageCorpus) -> HintSeatStats | None:
+    """힌트 입력이 없으면 None(측정 불가), 있으면 은행 문항과의 겹침."""
+    hinted = corpus.hint_problem_ids
+    if hinted is None:
+        return None
+    in_scope = {p.problem_id for p in corpus.problems} & hinted
+    eligible = {p.problem_id for f in facts for p in f.eligible} & hinted
+    return HintSeatStats(
+        hinted_problems=len(hinted),
+        in_scope_bank=len(in_scope),
+        eligible_hinted=len(eligible),
+        outside_scope=len(hinted - in_scope),
+    )
+
+
 def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> CoverageReport:
     """지표 4종 + 보조 수치를 계산한다. 분모 0 은 실패로 보고한다(통과로 위장하지 않는다)."""
     _check_spec_alignment(spec)
@@ -1125,8 +1209,8 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
     if metadata.unmeasured_fields:
         warnings.append(
             f"문제 메타데이터 측정 불가 필드: {', '.join(metadata.unmeasured_fields)} — "
-            "파일 코퍼스에 문항별 힌트가 없어 7필드 전부 충족으로 셀 수 없다(측정 불가는 충족이 "
-            "아니다). 판정은 발행 시점 게이트가 DB 의 verified 힌트로 한다"
+            "힌트 입력이 없어 7필드 전부 충족으로 셀 수 없다(측정 불가는 충족이 아니다). "
+            "`--hints-from-db` 로 DB 의 verified 힌트를 읽으면 잰다"
         )
     if supply.met_count < content.met_count:
         warnings.append(
@@ -1139,6 +1223,14 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
         warnings.append(
             f"측정 불가 연결: {', '.join(unmeasured)} — Concept Completeness 는 이 연결이 측정될 "
             "때까지 충족될 수 없다(측정 불가는 충족이 아니다)"
+        )
+
+    hint_seat = _hint_seat(facts, corpus)
+    if hint_seat is not None and hint_seat.hinted_problems and not hint_seat.in_scope_bank:
+        warnings.append(
+            f"DB 의 검수 통과 힌트 {hint_seat.hinted_problems}문항 중 명세 범위 은행 문항과 ID 가 "
+            "겹치는 것이 0건이다 — 범위 밖 문항이거나 DB problem 과 JSONL 은행의 ID 공간이 "
+            "어긋난 것이다(힌트 연결 0 은 '힌트 없음'이 아닐 수 있다)"
         )
 
     return CoverageReport(
@@ -1155,6 +1247,7 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
         failures=tuple(failures),
         slots=slot_metric,
         problem_metadata=metadata,
+        hint_seat=hint_seat,
     )
 
 
@@ -1209,6 +1302,7 @@ def to_json(report: CoverageReport) -> dict[str, Any]:
         "failures": list(report.failures),
         "slot_coverage": None if report.slots is None else _metric_json(report.slots),
         "problem_metadata": _metadata_json(report.problem_metadata),
+        "hint_seat": None if report.hint_seat is None else asdict(report.hint_seat),
     }
 
 
@@ -1258,6 +1352,14 @@ def render(report: CoverageReport) -> str:
             f"  {name:<14} linked {count['linked']} · missing {count['missing']} · "
             f"unmeasured {count['unmeasured']}"
         )
+    seat = report.hint_seat
+    if seat is None:
+        lines.append("  힌트 입력: 없음(측정 불가) — --hints-from-db 로 읽는다")
+    else:
+        lines.append(
+            f"  힌트 입력: DB 검수 통과 {seat.hinted_problems}문항 → 범위 은행 {seat.in_scope_bank}"
+            f" · 적격 {seat.eligible_hinted} · 범위 밖/ID 불일치 {seat.outside_scope}"
+        )
     done, total = report.completeness_measurable
     lines.append(f"  측정 가능한 연결만 본 완전 개념(참고·판정 불참여): {done}/{total}")
     funnel = report.chain_funnel
@@ -1294,6 +1396,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--spec", type=Path, default=None, help="범위 명세 YAML 경로")
     parser.add_argument("--json", action="store_true", help="기계 판독 JSON 으로 출력")
+    parser.add_argument(
+        "--hints-from-db",
+        action="store_true",
+        help="DB hints(verified=true)에서 힌트 연결 입력을 읽는다. 주지 않으면 힌트는 측정 불가다.",
+    )
     args = parser.parse_args(argv)
     spec_path = args.spec or default_spec_path()
     try:
@@ -1306,7 +1413,11 @@ def main(argv: list[str] | None = None) -> int:
                 "범위 명세가 코퍼스와 어긋나 있다 — 분모를 신뢰할 수 없어 측정을 거부한다:\n"
                 + "\n".join(f"  - {v}" for v in violations)
             )
-        report = evaluate(spec, index, load_corpus(spec))
+        if args.hints_from_db:
+            corpus = load_corpus(spec, hint_problem_ids=read_hint_problem_ids_from_db())
+        else:
+            corpus = load_corpus(spec)
+        report = evaluate(spec, index, corpus)
     except (ScopeSpecError, CoverageError) as exc:
         print(f"[적재 실패] {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
