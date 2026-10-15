@@ -51,6 +51,7 @@ def _get_pool() -> IsolatedCallPool:
                     max_workers=settings.sympy_isolation_max_workers,
                     timeout_s=settings.sympy_isolation_timeout_s,
                     preload=tuple(settings.sympy_isolation_preload_modules),
+                    warmup=tuple(settings.sympy_isolation_warmup),
                 )
                 atexit.register(_pool.shutdown)
     return _pool
