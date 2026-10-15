@@ -79,7 +79,7 @@ def test_batch_is_byte_deterministic(tmp_path: Path) -> None:
 
 class TestBank:
     def test_scan_is_not_vacuous(self) -> None:
-        assert len(_rows()) >= 48
+        assert len(_rows()) >= 156
 
     def test_the_batch_never_writes_an_approval(self) -> None:
         assert all("review_status" not in row for row in _rows())
@@ -142,7 +142,13 @@ class TestOnlyMissingCellsAreGenerated:
                     code, ""
                 ), f"{code} 의 {names[slot]} 칸은 기존 승인 문항이 이미 채웠다 — 생성하지 않는다"
         assert ProblemSlot.REPRESENTATIVE.value in by_concept["[12미적Ⅰ-02-01]"]
+        assert ProblemSlot.APPLIED.value in by_concept["[12미적Ⅰ-02-02]"]
+        assert ProblemSlot.DIAGNOSTIC.value in by_concept["[12미적Ⅰ-02-07]"]
 
 
-def test_registry_lists_the_differential_coefficient_generator() -> None:
-    assert [g.standard_code for g in batch.GENERATORS][:1] == ["[12미적Ⅰ-02-01]"]
+def test_registry_lists_the_generators_in_bank_order() -> None:
+    assert [g.standard_code for g in batch.GENERATORS][:3] == [
+        "[12미적Ⅰ-02-01]",
+        "[12미적Ⅰ-02-02]",
+        "[12미적Ⅰ-02-07]",
+    ]
