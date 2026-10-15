@@ -1335,6 +1335,95 @@ class TestProblemMetadataAndSlots:
         assert pc.evaluate(spec, index, slotted).metric("slot_coverage").population == 60
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# P3-05 — 슬롯 계수가 "문항 수"가 아니라 "서로 다른 문제 수"를 센다
+# ──────────────────────────────────────────────────────────────────────────
+# 슬롯당 최소가 1건이면 어떤 중복 기준도 칸 수를 바꾸지 못한다(한 건이면 채워진다). 그래서 이 클래스는
+# 슬롯당 최소를 2로 올린 명세에서 본다 — 그때 비로소 "같은 문제 2건"과 "다른 문제 2건"이 갈린다.
+_STEM_A = "함수 f(x) = x^3 - 3x 의 극값의 개수를 구하시오."
+_STEM_B = "함수 f(x) = x^3 - 3x 의 변곡점의 개수를 구하시오."
+
+
+def _with_stems(
+    corpus: pc.CoverageCorpus, slot: ProblemSlot, stems: list[str | None]
+) -> pc.CoverageCorpus:
+    """한 슬롯의 문항 하나를 stems 만큼으로 불려 각자 다른 문면을 단다(첫 칸만, 나머지 칸은 그대로)."""
+    target = _clone_of(corpus, slot)
+    extra = [
+        replace(target, problem_id=f"{target.problem_id}-dup{n}", question_text=text)
+        for n, text in enumerate(stems[1:], start=1)
+    ]
+    first = replace(target, question_text=stems[0])
+    problems = tuple(first if p is target else p for p in corpus.problems) + tuple(extra)
+    return replace(corpus, problems=problems, problems_scanned=len(problems))
+
+
+class TestSlotCountsDistinctProblemsNotProblems:
+    @pytest.fixture(scope="class")
+    def strict_spec(self, spec: ps.ScopeSpec) -> ps.ScopeSpec:
+        changed = replace(spec, min_distinct_per_slot=2, total_min_distinct_problems=120)
+        assert changed != spec
+        return changed
+
+    def test_control_without_stems_every_problem_counts_so_two_problems_fill_a_cell(
+        self, strict_spec, index, slotted
+    ) -> None:
+        """대조군 — 문면을 모르는 문항은 합쳐지지 않는다(모르면서 합치지 않는다). 2건이면 채워진다."""
+        corpus = _with_stems(slotted, _S.BASIC, [None, None])
+        report = pc.evaluate(strict_spec, index, corpus)
+        assert report.slots is not None
+        # 기본 슬롯은 2건이 됐지만 나머지 5칸은 1건뿐이라 최소 2에 못 미친다.
+        names = {s.id: s.name_ko for s in strict_spec.slots}
+        basic_cells = [
+            m for u in report.slots.unmet for m in u.missing if m.startswith(f"{names['basic']}:")
+        ]
+        assert len(basic_cells) == len(strict_spec.core_concepts) - 1, basic_cells
+
+    def test_numbers_only_copies_do_not_fill_a_cell_that_needs_two_distinct_problems(
+        self, strict_spec, index, slotted
+    ) -> None:
+        """핵심 — 숫자만 바꾼 복제 2건은 같은 문제다. 문항은 2건이지만 서로 다른 문제는 1건이다."""
+        same_problem = [_STEM_A.replace("3", "5"), _STEM_A.replace("3", "7")]
+        assert same_problem[0] != same_problem[1]  # 문면 자체는 다르다(숫자가 다르다)
+        corpus = _with_stems(slotted, _S.BASIC, same_problem)
+        report = pc.evaluate(strict_spec, index, corpus)
+        assert report.slots is not None
+        names = {s.id: s.name_ko for s in strict_spec.slots}
+        gaps = [
+            m for u in report.slots.unmet for m in u.missing if m.startswith(f"{names['basic']}:")
+        ]
+        # 복제를 넣은 개념의 기본 칸도 비어 있어야 한다 — 문항 수로 셌다면 채워졌을 것이다.
+        assert len(gaps) == len(strict_spec.core_concepts), gaps
+        assert any("서로 다른 문제 1건" in g and "문항 2건" in g for g in gaps), gaps
+
+    def test_structurally_different_problems_fill_the_cell(
+        self, strict_spec, index, slotted
+    ) -> None:
+        """대조군 — 같은 2건이라도 구조가 다르면 서로 다른 문제 2건이라 채워진다."""
+        corpus = _with_stems(slotted, _S.BASIC, [_STEM_A, _STEM_B])
+        report = pc.evaluate(strict_spec, index, corpus)
+        assert report.slots is not None
+        names = {s.id: s.name_ko for s in strict_spec.slots}
+        gaps = [
+            m for u in report.slots.unmet for m in u.missing if m.startswith(f"{names['basic']}:")
+        ]
+        assert len(gaps) == len(strict_spec.core_concepts) - 1, gaps
+
+    def test_unfolded_count_is_reported_in_the_note(self, spec, index, slotted) -> None:
+        """작동한 비율 — 문면을 몰라 접지 못한 문항이 몇 건인지 지표가 말한다(침묵하지 않는다)."""
+        note = pc.evaluate(spec, index, slotted).metric("slot_coverage").note
+        assert note is not None and "문면 미확인 60건" in note, note
+        known = replace(
+            slotted,
+            problems=tuple(
+                replace(p, question_text=f"문항 {n} 번 문제")
+                for n, p in enumerate(slotted.problems)
+            ),
+        )
+        note_known = pc.evaluate(spec, index, known).metric("slot_coverage").note
+        assert note_known is not None and "문면 미확인 0건" in note_known, note_known
+
+
 class TestProblemRowToEvidence:
     """코퍼스 행 → `ProblemRef` 변환. 실 코퍼스에는 빈 필드가 한 건도 없어서, 이 변환이 "비어 있으면
     비어 있다"로 읽는지는 실 코퍼스 테스트로 볼 수 없다 — 합성 행으로 직접 잰다."""
@@ -1388,6 +1477,21 @@ class TestProblemRowToEvidence:
 
     def test_non_text_explanation_is_empty(self) -> None:
         assert self._ref(answer_explanation=123).solution_text == ""
+
+    # ── P3-05 — 근사 중복 기준이 읽는 문면 ───────────────────────────────────────
+    def test_question_text_is_loaded_from_the_row(self) -> None:
+        """이 경로가 끊기면 모든 문항이 '문면 미확인'이 되어 중복 제거가 조용히 꺼진다.
+
+        합성 `ProblemRef` 로 만든 지표 테스트는 이 변환을 거치지 않으므로 여기서 따로 잰다.
+        """
+        ref = self._ref(question_text="함수 f(x) = x^2 의 값을 구하시오.")
+        assert ref.question_text == "함수 f(x) = x^2 의 값을 구하시오."
+
+    @pytest.mark.parametrize("bad", [None, 7, ["문면"], {"a": 1}])
+    def test_a_missing_or_non_text_stem_is_unknown_not_empty(self, bad: Any) -> None:
+        """문면은 다른 세 필드와 반대다: 모르면 None(합치지 않는다). ''로 바꾸면 의미가 흐려진다."""
+        assert self._ref(question_text=bad).question_text is None
+        assert self._ref(question_text=_GONE).question_text is None
 
 
 _GONE = object()  # `_ref` 가 키를 행에서 지우라는 표지

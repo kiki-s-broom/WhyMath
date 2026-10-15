@@ -112,6 +112,7 @@ from whymath_backend.l1.standards.phase3_scope import (
     load_scope_spec,
     verify_spec,
 )
+from whymath_backend.l1.standards.phase3_stem_fold import distinct_count
 from whymath_backend.schema.problem_metadata import (
     EMPTY_DIFFICULTY,
     FieldState,
@@ -187,6 +188,9 @@ class ProblemRef:
     answer: str | None = None
     solution_text: str | None = None
     tags: tuple[str, ...] = ()
+    # P3-05 — 근사 중복 기준(`phase3_stem_fold`)이 읽는 문면. None 은 "문면을 읽지 못했다"라서
+    # 그 문항은 합쳐지지 않고 각각 1건으로 센다(모르면서 합치지 않는다).
+    question_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -292,6 +296,7 @@ def _problem_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
         answer="" if row.get("answer") is None else str(row.get("answer")),
         solution_text=_text(row.get("answer_explanation")) or "",
         tags=tuple(t for t in raw_tags if isinstance(t, str)) if isinstance(raw_tags, list) else (),
+        question_text=_text(row.get("question_text")),
     )
 
 
@@ -914,14 +919,17 @@ def _slot_coverage(
 ) -> MetricResult:
     """핵심 개념 × 6슬롯 중 채워진 칸의 비율. 목표 수치가 명세에 없어 판정하지 않는다.
 
-    칸(c, s)이 채워졌다 = 적격 문항(c) 중 슬롯 태그 s 가 달린 문항이 명세의 슬롯당 최소 수 이상.
-    오개념 유발 슬롯은 **문항 자체의 오개념 연결이 있는 문항만 센다**(명세 counting_rules ·
-    지시문 [08] ③). 개수는 고유 문면이 아니라 문항 수다 — 근사 중복 기준은 P3-05 가 정한다.
+    칸(c, s)이 채워졌다 = 적격 문항(c) 중 슬롯 태그 s 가 달린 문항의 **서로 다른 문제 수**가 명세의
+    슬롯당 최소 수 이상. 오개념 유발 슬롯은 **문항 자체의 오개념 연결이 있는 문항만 센다**(명세
+    counting_rules · 지시문 [08] ③). "서로 다른"의 정의는 `phase3_stem_fold`(숫자만 다른 문면은
+    같은 문제, P3-05)이고, 문면을 읽지 못한 문항은 합치지 않고 각각 1건으로 센다 — 그 수를 `note`
+    에 낸다.
     """
     names = {slot.id: slot.name_ko for slot in spec.slots}
     minimum = spec.min_distinct_per_slot
     filled = 0
     cells = 0
+    unfolded_cells = 0
     unmet: list[Unmet] = []
     for fact in facts:
         gaps: list[str] = []
@@ -931,10 +939,15 @@ def _slot_coverage(
             counted = tagged
             if slot is ProblemSlot.MISCONCEPTION_TRIGGER:
                 counted = [p for p in tagged if _reached_misconceptions(p, corpus)]
-            if len(counted) >= minimum:
+            tally = distinct_count(p.question_text for p in counted)
+            unfolded_cells += tally.unfolded
+            if tally.distinct >= minimum:
                 filled += 1
                 continue
-            why = f"{names[slot.value]}: 유효 {len(counted)}건 < 최소 {minimum}건"
+            why = (
+                f"{names[slot.value]}: 서로 다른 문제 {tally.distinct}건 < 최소 {minimum}건"
+                f" (문항 {len(counted)}건)"
+            )
             if slot is ProblemSlot.MISCONCEPTION_TRIGGER and len(tagged) > len(counted):
                 why += (
                     f" (태그 {len(tagged)}건 중 문항 자체 오개념 연결이 없는 "
@@ -952,7 +965,11 @@ def _slot_coverage(
         target=None,
         met=None,
         unmet=tuple(unmet),
-        note="목표 없음 — 핵심 Concept 6슬롯 충족은 P3-05 의 완료 판정이다",
+        note=(
+            "목표 없음 — 핵심 Concept 6슬롯 충족은 P3-05 의 완료 판정이다"
+            " · 센 단위 = 서로 다른 문제(숫자만 다른 문면은 하나)"
+            f" · 문면 미확인 {unfolded_cells}건(합치지 않고 각각 1건으로 셈)"
+        ),
     )
 
 
