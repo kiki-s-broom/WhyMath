@@ -96,6 +96,7 @@ __all__ = [
     "verify_root_aggregate",
     "verify_root_selection",
     "verify_series_converges",
+    "warm_isolated_worker",
 ]
 
 
@@ -1644,3 +1645,14 @@ def verify_inequality_direction(
         f"부등식 방향 — 해는 {verdict}이나 주장 {claimed_n}(음수 나눗셈 시 부호 뒤집힘)",
         samples_checked=1,
     )
+
+
+def warm_isolated_worker() -> None:
+    """격리 워커가 `ready` 전에 부르는 웜업 — 답 검산 경로의 첫 사용 비용을 미리 치른다(OPS-142).
+
+    `verify_step` 뒤에서는 새 모듈이 없지만(실측) 워커의 *첫* 호출이 이 경로일 수 있어, 단일 등식·
+    연립·항등식 세 형태를 한 번씩 밟는다. 반환값은 쓰지 않는다.
+    """
+    verify_answer("x**2 - 5*x + 6 = 0", {"x": "3"})
+    verify_answer(["x+y=3", "x-y=1"], {"x": "2", "y": "1"})
+    verify_answer("sin(x)**2 + cos(x)**2 = 1", {"x": "1"})

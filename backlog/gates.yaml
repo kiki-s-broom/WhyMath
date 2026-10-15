@@ -701,12 +701,16 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-10-06
-    remind_after_days: 7
+    remind_after_days: 15
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-07] 2026-10-07 Kiki 재판정: 보류 유지. 사유 = 4지선다 귀속 타당 항목을 검증할 재료(student_wrong_thinking·distractor_rule·error_type)가 M0599에 없음. 의미상 매핑 방향은 타당. 승인 가능 조건 = MISC-61이 원 출처에서 세 필드를 보강(카탈로그 kebab 복사 금지 — 순환 검증). 기록 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md. prod DB M0599 행은 Kiki 확인 전 수정 금지."
+    notes: |-
+      [판정 근거 2026-10-07] 2026-10-07 Kiki 재판정: 보류 유지. 사유 = 4지선다 귀속 타당 항목을 검증할 재료(student_wrong_thinking·distractor_rule·error_type)가 M0599에 없음. 의미상 매핑 방향은 타당. 승인 가능 조건 = MISC-61이 원 출처에서 세 필드를 보강(카탈로그 kebab 복사 금지 — 순환 검증). 기록 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md. prod DB M0599 행은 Kiki 확인 전 수정 금지.
+
+      [판정 근거 2026-10-14] [보류 유지 2026-10-14] Kiki 결정 A. 재판정은 MISC-61 머지 후 저작된 세 필드를 직접 읽고 진행. 승인 시 crosslinks.json 서명 적재 절차 별도 필요. 승인 메모에 저작 근거의 독립성 한계(M0599 canonical_statement와 J0405.misconception 동일 문장)를 남길 것. prod DB M0599 행은 Kiki 확인 전 수정 금지.
     corrections:
       - "[2026-10-07] depends_on +MISC-61-a3-thin-misid-source-enrichment · no_inputs_reason: '입력 태스크 없음 - M0599 보류 사유 확인과 승인/반려는 사람 판단이다(검수 큐 행 서명은 사람 전용)' → None (입력 부착으로 해제) · notes +295자 — Kiki 2026-10-07 보류 사유 기록·입력 태스크 연결"
+      - "[2026-10-14] remind_after_days: 7 → 15 · notes +220자 — 2026-10-14 Kiki 결정: 선택지 A 보류 유지 + 독촉 7일 연장(7→15일, 요청일 2026-10-06 기준 2026-10-21 독촉). 사유: MISC-61 저작 근거가 아직 main에 없고(브랜치 claude/peaceful-bell-s7mlg8 미머지), J0405 동일 뿌리라 독립 검증 근거가 약함."
     depends_on:
       - MISC-61-a3-thin-misid-source-enrichment
   - id: G-misc40-deferred-m0671-redecision
@@ -863,15 +867,28 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "Kiki의 공급원 선택(ghcr 미러 / Docker Hub 로그인 pull / 감수)이며 먼저 끝나야 할 태스크가 없다. 구현 태스크 OPS-135가 이 게이트를 기다린다."
+  - id: G-ops141-wh1-timeout-live-decompose
+    title: "OPS-141 WH-1 primary 시간 초과 소요 분해 실측 실행 — docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md 를 Phaiakes9 에서 §1~§8 순서로 실행하고 §8 요약 출력 전체(R1~R5 각 EXIT 줄·계측 대조·프로바이더 호출 실패 경고 유무 포함)를 세션에 전달. 도구 PR 머지 후에만 실행 가능(§1 이 origin/main 에 도구가 있는지 확인). 기본 타임아웃 15초는 이 게이트에서 바꾸지 않는다 — 값 판정은 승계 태스크가 한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-14
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-141-wh1-primary-timeout-live-decomposition
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-09
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "2026-10-15 Kiki가 Phaiakes9(Windows PowerShell)에서 docs/ops/ops30_uptime_probe_runbook.md [A]~[E]를 실행했다. 판정 기준: OPS-30 PR #1577 · 커밋 d2df5f5e (origin/main 56f4ace3에 포함 · 런북의 두 모듈 main 실재 확인). [A] PROBE_READY=True (IN_MAIN=True SAME_AS_MAIN=True MODULE_IMPORTS=True PYTHONW_EXISTS=True). [B] 웹훅 URL을 User 환경변수에 저장 WEBHOOK_SAVED=True READBACK_LENGTH=81 (URL 값은 어디에도 기록하지 않음). [C] test-notify TEST_NOTIFY_EXIT=0 + Slack 채널에서 '알림 채널 시험' 메시지 육안 확인(15:12). [D] 일반 창은 REGISTER_REFUSED=True(관리자 아님 - 의도된 거부), 관리자 창에서 TASK_REGISTERED=True TASK_STATE=Ready TASK_INTERVAL=PT1M 작업명 WhyMath-UptimeProbe. [E] LOG_EXISTS=True LAST_RECORD_AGE_S=55(<120) LAST_CHANNEL=configured, 서버가 꺼져 있어 LAST_OK=False LAST_ERROR=ConnectError, TASK_LAST_RESULT=1(다운 시 종료코드 1 - 소스 main() 확인). 기록 8건 중 notice 1건: 2026-10-15T06:14:11Z ok=False notice=down:sent unsent=없음 (상태 전이 때만 발송 - 이후 7건은 조용). Slack 채널에서 '[WhyMath] 서버 다운 감지 - 2026-10-15T06:14:11Z /health/ready 사유=ConnectError' 메시지 육안 확인(15:14) = 마지막 1홉 도달. 미확인(명시): 서버를 켠 상태의 LAST_OK=True와 '서버 복구' 알림은 이 실행에서 보지 않았다 - 코드 쪽 양방향(kill -9 다운/복구) 실측은 PR #1577 증적에만 있다. 한계: 프로브가 서버와 같은 PC에서 돌아 PC 정지 시간은 기록 없음(INSUFFICIENT)으로 남는다."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
@@ -1128,11 +1145,16 @@ gates:
     title: "Freeze 라벨 2종 생성 + release-freeze 체크를 룰셋 required에 등록 (Kiki 저장소 설정, 11/30 전)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-08
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: |-
+      판정 기준: main 56f4ace3 (2026-10-15). 저장소 설정은 커밋이 아니라 라이브 상태이므로 Kiki 실행 출력 + 세션 독립 재조회로 근거를 둔다.
+      (1) Kiki 실행(Phaiakes9 PowerShell): gh label create 2건 성공(release-blocker, code-freeze-approved), gh label list 필터 출력에 두 이름 모두 확인.
+      (2) Kiki 실행: 룰셋 16623542에 release-freeze 체크 추가 후 rules/branches/main 응답에서 release-freeze 검색 -> True (등록 전 세션 조회는 포함 False).
+      (3) 세션 독립 재조회(GitHub API): 라벨 2종 실재. required_status_checks 17건 -> 18건, 신규 항목 context=release-freeze — Feature/Code Freeze 라벨 검사, integration_id=15368(GitHub Actions).
+      미해결 후속: 문서 required 목록(.github/branch-protection-setup.md 17건)과 test_required_checks_doc.py(ci.yml만 대조)가 아직 release-freeze를 모른다 - 라이브 18 vs 문서 17 드리프트 상태.
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:

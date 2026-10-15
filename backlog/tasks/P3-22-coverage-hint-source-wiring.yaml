@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,7 +16,8 @@ requires_gates: []
 acceptance:
   - "① P3-04 가 정한 hint_strategy 저장 좌석을 읽어 Coverage 계측기의 힌트 입력(CoverageCorpus.hint_problem_ids)을 채운다. 좌석이 없는 동안은 None(측정 불가)을 유지한다 — 빈 집합으로 채우면 '측정했는데 없다'로 위장된다.\n② 힌트 연결이 linked/missing 으로 측정되고, 좌석에서 힌트를 지우는 주입에 Concept Completeness 가 실제로 떨어진다(정상 입력의 초록은 증거가 아니다).\n③ tests/backend/l1/test_phase3_coverage.py 의 test_hint_is_reported_unmeasured_while_the_seat_is_absent 를 좌석 배선에 맞게 갱신한다 — 좌석이 생겼는데 이 단언이 남아 있으면 배선 누락을 드러내도록 일부러 둔 테스트다.\n④ 실제 코퍼스의 힌트 연결 수치(기준선)를 CLI 출력으로 보고한다. 힌트 본문의 학생 공급 게이트(검수 상태)는 이 태스크의 범위가 아니다."
   - "[정정 2026-10-12 · P3-15 판정 추가 검토 — 전제 재판정을 착수의 첫 단계로 한다] 이 태스크는 힌트 저장 좌석이 없다는 전제(ARCH-39 영구 부재)에 서 있으나 그 판정은 2026-09-07에 미실체화 · S4-11 소유로 정정됐고(MEMORY 2026-09-07, PR #1015), S4-11(PR #1372, 2026-09-29, done)이 hints 테이블(problem_id FK · verified 컬럼)을 이미 실체화했다. 따라서 착수 시 ①hint 연결을 hints.verified 행으로 측정할 수 있는지 먼저 판정한다 — 단 hints.problem_id는 DB problem 행을 가리키므로 JSONL 은행 문항(P3-03 504건)이 DB에 적재돼 있는지는 미확인이다(실측 필요). ②P3-04의 hint_strategy(Problem 7번째 필드)와 hints 본문 좌석은 별개다 — 선행 P3-04가 실제로 필요한지 판정하고 불필요하면 amend --remove-depends로 정정한다. ③phase3_coverage.py의 HINT_UNMEASURED_REASON 문구와 모듈 docstring도 영구 부재를 말하므로 함께 정정한다(측정 불가는 충족이 아니라는 3상태는 유지). 근거: docs/reviews/p3_g1_week1_gate_judgment_2026-10-12.md 정정 절."
-artifacts: []
+artifacts:
+  - "PR #1632 (dd2c55b1) — ①②③ 이행(--hints-from-db · 힌트 삭제 주입 RED · 단언 갱신) · ④ 운영 DB 기준선은 환경 부재로 미이행 → P3-42 승계 · phase3_metrics 배선은 P3-41 승계"
 paths:
   - src/backend/whymath_backend/l1/standards/phase3_coverage.py
   - tests/backend/l1/test_phase3_coverage.py
@@ -25,4 +26,4 @@ notes: |-
   출처: P3-02 구현 중 발견(2026-10-02). 힌트 저장 좌석은 ARCH-39 가 '영구 부재'로 판정했고(재확인 트리거 있음), 지시문 [07] 의 Problem 필수 7필드 중 hint strategy 의 좌석은 P3-04 가 정한다. 그래서 P3-02 의 Concept Completeness 는 힌트 연결을 unmeasured 로 보고하며, unmeasured 는 충족이 아니라 Completeness 가 좌석 전에는 충족될 수 없다. 이 태스크는 좌석이 정해진 뒤 계측기에 그 입력을 배선하는 좌석이다. 등재는 착수가 아니다.
 
   [정정 2026-10-12] P3-15 판정 추가 검토: hint 좌석 부재 전제가 S4-11(hints 테이블 실체화)과 어긋남
-updated: 2026-10-12
+updated: 2026-10-15

@@ -140,7 +140,8 @@ class TestCurrentRealityFrozen:
         갱신을 강제한다 — 문자열 동결이 아니라 기계 대조다(하드코딩 수치의 드리프트 방지).
         """
         files = sorted(_CORPUS_ROOT.glob("problem_bank*/problems.jsonl"))
-        assert len(files) == 38  # r2 부록 A 7파일 + PB-13 회수 30종 + P3-03 미분 은행 1종
+        # r2 부록 A 7파일 + PB-13 회수 30종 + P3-03 미분 은행 1종 + P3-05 빈 칸 채우기 은행 1종
+        assert len(files) == 39
         total = with_choices = with_dmap = both = 0
         for path in files:
             with path.open(encoding="utf-8") as fh:
@@ -157,7 +158,8 @@ class TestCurrentRealityFrozen:
                     both += has_c and has_d
         # 2,638 + PB-13 회수 11,446 (r2의 2,647 대비 -9 = QUAL-02(#777) 은퇴 9건) + P3-03 미분 은행 504
         # (144건 + 02-05·06·08·09·10 생성기 5종 360건)
-        assert total == 14538
+        # + P3-05 빈 칸 채우기 은행 48(전부 단답형 — 선지·오답 귀속 없음)
+        assert total == 14586
         # r2의 1,616 대비 -4(은퇴 9건 중 객관식 4건) + P3-03 객관식 84건(전부 distractor_map 보유 —
         # 개념 7종 × 오개념 유발 슬롯 12건)
         assert with_choices == 1696
