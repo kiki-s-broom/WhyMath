@@ -504,11 +504,11 @@ gates:
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 5586a087 (분류기·런북이 있는 커밋). Kiki가 2026-10-15 Phaiakes9에서 런북 [A][B]를 실행했다: 선행 검사 전건 True(READY=True), 입력 FOUND=WhyMath-eos121 .eos121-out anthropic.review.jsonl SHA256=F94ADEBE...086FF. 분류기는 measured=false·CLASSIFY_EXIT=2로 거부했다(입력이 JSONL이 아니라 마크다운 뷰 — 비어 있지 않은 257줄 전건 JSONDecodeError). 원인=EOS-121 런북이 --out과 --worklist-out을 같은 경로로 지정해 회차 끝 write_text가 큐 정본을 덮어씀(사고 등재, 재발방지 OPS-147). 분류기 JSON은 산출되지 않았으나 Kiki가 같은 파일의 게이트거부 10묶음(30행)을 추출해 회신했고, 세션이 정확한 분수 계산으로 분류했다: ⓑ 표현 불일치 29행(9묶음)·ⓐ 산술 오류 0행·범위 밖 1행(근 선택 unique 위반·조건식 오기재). 결과·한계는 docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md. 한계: 분류기의 실데이터 동작은 미검증(합성 픽스처만), 고유 문제 3개."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "PR #1358(분류기 포함) 머지 후 Kiki가 런북을 실행하는 사람 행동 게이트 — 선행 태스크 없음"

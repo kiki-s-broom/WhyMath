@@ -1,5 +1,7 @@
 # EOS-23 거부 30건 전수 분류 런북 (Phaiakes9 · 읽기 전용)
 
+> **[정정 2026-10-15 — 재실행 불요]** 이 런북은 입력 `anthropic.review.jsonl`이 JSONL 큐 정본이라고 가정했으나, 실파일은 **마크다운 워크리스트 뷰**였다(EOS-121 런북이 `--out`과 `--worklist-out`을 같은 경로로 지정해 회차 끝 쓰기가 정본을 덮어씀). [B]는 `measured: false`·`CLASSIFY_EXIT=2`로 거부했고 분류기 JSON은 산출되지 않았다. 결과는 뷰 기반 수작업 분류로 확정했다 → `docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md`. 아래 §8의 "입력 매체" 서술은 틀렸다. 본문 정정은 `OPS-147`(acceptance ④)이 소유한다.
+
 > **태스크**: `EOS-23-authoring-seat-generation-accuracy` acceptance ②·③(오프라인 축)
 > **전제**: 이 런북의 CLI(`whymath_backend.harness.tier1_rejection_classifier`)가 **main에 머지된 뒤** 실행한다. 머지 전에는 [B]의 코드 출처 검사가 실행을 거부한다.
 > **기대 해시**: [A]의 마지막 줄 `git log -1 --oneline`이 머지 커밋과 같아야 한다 — 머지 후 세션이 이 줄에 해시를 기입한다. 해시를 눈으로 대조하지 못해도 [B]가 `HEAD == origin/main`을 스스로 검사한다.
