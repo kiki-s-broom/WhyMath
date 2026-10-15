@@ -68,6 +68,15 @@ class TestRegeneration:
         assert drift_against(tmp_path, fresh["problems"], fresh["provenance"]) != []
 
 
+def test_batch_is_byte_deterministic(tmp_path: Path) -> None:
+    """한 함수 안에서 두 번 돌린다 — 헌법 R3-01 가드(`tests/test_idempotency.py`)는 공유 픽스처의
+    실행을 세지 않는다(같은 함수 안 진입점 호출 2회 + `==` 단언이 구조 증거다)."""
+    first, second = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    batch.run_p3_fill_batch(out_path=first)
+    batch.run_p3_fill_batch(out_path=second)
+    assert first.read_bytes() == second.read_bytes()
+
+
 class TestBank:
     def test_scan_is_not_vacuous(self) -> None:
         assert len(_rows()) >= 48
