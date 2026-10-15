@@ -1350,6 +1350,15 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # — 실 코퍼스에 `--check`와 같은 계산을 돌려 0건을 요구)가 이미 지킨다. `--check` 스텝을
         # `declared-unwired-audit` 잡에 얹는 것은 OPS-24 선례와 동형의 후속 제안(.github 변경 —
         # 얹히면 이 면제는 `stale-waiver`로 exit 1이 되어 제거 대상).
+        # P3-05 3단계 — 기존 문항 6슬롯 백필 CLI. 일회성 데이터 백필이라 변이형(제자리
+        # 갱신)은 CI 대상이 아니다. 드리프트(규칙이 가리키는데 태그가 안 달린 승인 문항)는
+        # CI backend 잡의 pytest 전수 가드(`test_problem_slot_backfill.py` 의
+        # `TestRealCorpus::test_no_pending_assignment_remains` — 실 코퍼스에 `--check`와
+        # 같은 계산을 돌려 0건을 요구)가 이미 지킨다.
+        "harness.problem_slot_backfill": (
+            "by-design:일회성 슬롯 백필(변이형) — 드리프트는 backend 잡 pytest 전수 가드가 "
+            "실 코퍼스로 지킨다(P3-05)"
+        ),
         "harness.problem_corpus_author_backfill": (
             "by-design:일회성 저작 서명 백필(변이형) — 드리프트는 backend 잡 pytest 전수 가드가 "
             "실 코퍼스로 지킨다(PB-17)"

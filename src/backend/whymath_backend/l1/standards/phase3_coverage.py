@@ -563,6 +563,21 @@ def _reached_misconceptions(problem: ProblemRef, corpus: CoverageCorpus) -> froz
     return frozenset(reached)
 
 
+def reached_misconception_ids(problem: ProblemRef, corpus: CoverageCorpus) -> frozenset[str]:
+    """문항 자체 오개념 연결 — 계측기가 오개념 유발 칸에서 세는 기준과 같은 판정의 공개 창구.
+
+    슬롯 배정 규칙(`phase3_slot_rules`)이 "문항 자체 오개념 연결이 있는가"를
+    계측기와 **같은 계산**으로
+    묻게 하려고 연다 — 두 곳이 따로 계산하면 칸이 채워졌다고 믿는 순간에 안 채워져 있다.
+    """
+    return _reached_misconceptions(problem, corpus)
+
+
+def problem_ref_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
+    """코퍼스 행 → `ProblemRef` 의 공개 창구(백필이 계측기와 같은 변환을 쓰게 한다)."""
+    return _problem_from_row(row)
+
+
 def _facts(
     spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus, concept: ConceptEntry
 ) -> ConceptFacts:
