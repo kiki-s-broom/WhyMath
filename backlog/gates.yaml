@@ -1127,11 +1127,16 @@ gates:
     title: "Freeze 라벨 2종 생성 + release-freeze 체크를 룰셋 required에 등록 (Kiki 저장소 설정, 11/30 전)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-08
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: |-
+      판정 기준: main 56f4ace3 (2026-10-15). 저장소 설정은 커밋이 아니라 라이브 상태이므로 Kiki 실행 출력 + 세션 독립 재조회로 근거를 둔다.
+      (1) Kiki 실행(Phaiakes9 PowerShell): gh label create 2건 성공(release-blocker, code-freeze-approved), gh label list 필터 출력에 두 이름 모두 확인.
+      (2) Kiki 실행: 룰셋 16623542에 release-freeze 체크 추가 후 rules/branches/main 응답에서 release-freeze 검색 -> True (등록 전 세션 조회는 포함 False).
+      (3) 세션 독립 재조회(GitHub API): 라벨 2종 실재. required_status_checks 17건 -> 18건, 신규 항목 context=release-freeze — Feature/Code Freeze 라벨 검사, integration_id=15368(GitHub Actions).
+      미해결 후속: 문서 required 목록(.github/branch-protection-setup.md 17건)과 test_required_checks_doc.py(ci.yml만 대조)가 아직 release-freeze를 모른다 - 라이브 18 vs 문서 17 드리프트 상태.
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
