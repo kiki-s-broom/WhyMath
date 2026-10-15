@@ -18,6 +18,8 @@
 #     [03]·[04]·[07]·[08]·[09]
 #   · 지표 목표 확정: 게이트 G-p314-phase3-metric-targets (2026-10-12 Kiki 결정 — 지표 7
 #     graph_connectivity_coverage 목표 0.95 확정, 나머지 4개는 예시값 그대로). 반영 P3-33
+#   · 필수 문제유형 2종 추가: P3-05 (2026-10-14) — 아래 "판단이 들어간 두 곳" ② 의 추정이 실측으로
+#     틀렸음이 확인돼 변경한다. 근거 docs/reviews/p3_05_triangle_density_design_2026-10-14.md §2
 #
 # 단방향 관례 (CLAUDE.md "YAML=소스 · DB=산출물")
 # ----------------------------------------------
@@ -34,8 +36,12 @@
 # --------------------------------------------------------
 #   ① core_misconceptions 의 선정 규칙(selection_rule) — 규칙은 기계적이지만 "문항에 이미 닿은
 #      것을 우선한다"는 선택 자체는 세션의 제안이다.
-#   ② required_problem_types — 현재 범위 문항이 쓰는 유형 5종이다. 신규 개념의 문항 형태가
-#      이 5종으로 표현된다는 것은 세션의 추정이며 P3-04·P3-05 에서 확인한다.
+#   ② required_problem_types — 처음에는 범위 문항이 쓰는 유형 5종이었고, 신규 개념의 문항 형태가
+#      이 5종으로 표현된다는 것은 세션의 추정이었다. P3-05 가 확인한 결과 **틀렸다**(스킬
+#      pattern-generalization·word-problem-modeling 을 행사하는 유형이 5종 밖에 있어 두 스킬의 승인
+#      문항이 0건) — 그래서 2종을 추가했다(P3-05, 2026-10-14). 이 목록의 소비처는 생성 문항의
+#      허용 유형 집합이다(tests/backend/l3/equivalent/test_p3_diff_*_generators.py). Problem
+#      Coverage 지표는 이 목록이 아니라 문제유형 코퍼스 전체를 읽으므로 이 변경은 지표값을 바꾸지 않는다.
 
 spec_version: 1
 spec_id: phase3-scope-v1
@@ -206,16 +212,21 @@ core_misconceptions:
     - {mis_id: M0678, concept_code: "[12미적Ⅰ-02-10]"}
 
 # ── 항 7. 필수 Problem Type 목록 ────────────────────────────────────────────
-# 현재 범위 문항 413건이 쓰는 문제유형 5종(problem_type_graph_v1 17종 중). 신규 개념의 문항 형태가
-# 이 5종으로 표현된다는 것은 세션의 추정이다 — P3-04·P3-05 에서 확인하고, 모자라면 PR 로 추가한다.
+# problem_type_graph_v1 17종 중 7종. 앞 5종은 기존 범위 문항 413건이 쓰는 유형이고, 뒤 2종은 P3-05 가
+# 추가했다(기존 5종으로는 스킬 pattern-generalization·word-problem-modeling 을 행사할 수 없었다).
+# 개념에서 유형을 고른 근거: 패턴 일반화 ← 개념 02-03(원자 3개 전부), 문장제 모델링 ← 개념 02-09·02-10.
+# 범위 규율상 이 2종 외에는 늘리지 않는다 — ptype.enumerate-cases·ptype.optimize-constrained 는 같은 두
+# 스킬을 가졌지만 위 2종만으로 두 스킬이 덮이므로 넣지 않는다.
 required_problem_types:
-  basis: "범위 문항 413건이 이미 쓰는 유형(optimize-extremum 237 · solve-for-unknown 80 · evaluate-expression 48 · count-solutions 24 · verify-claim 24)"
+  basis: "기존 5종은 범위 문항 413건이 쓰는 유형(optimize-extremum 237 · solve-for-unknown 80 · evaluate-expression 48 · count-solutions 24 · verify-claim 24). 추가 2종(generalize-pattern · model-word-problem)은 P3-05 가 두 스킬을 덮기 위해 더했고 현재 승인 문항은 0건이다"
   items:
     - ptype.evaluate-expression
     - ptype.solve-for-unknown
     - ptype.optimize-extremum
     - ptype.count-solutions
     - ptype.verify-claim
+    - ptype.generalize-pattern
+    - ptype.model-word-problem
 
 # ── 항 8. 문제 수량 목표 ───────────────────────────────────────────────────
 # 6슬롯 원문(지시문 [07] P3-04 ②): 대표 / 기본 / 응용 / 오개념 유발 / 진단 / 숙련도 확인.
