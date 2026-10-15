@@ -369,6 +369,11 @@ class P3DiffSlotGenerator:
     concept_relevance: ClassVar[float] = 0.95
     slot_difficulty: ClassVar[Mapping[str, float]]
     slot_count: ClassVar[int] = 12
+    #: 이 생성기가 담당하는 슬롯 — 기본은 6종 전부(기존 7개 개념 생성기·기존 은행 바이트 불변).
+    #: 기존 문항이 이미 채운 칸을 건너뛰고 *빈 칸만* 만드는 생성기(P3-05 4·5단계)는 부분집합을
+    #: 선언한다. 담당하지 않는 슬롯은 문항이 0건인 생성기로 인스턴스화된다(`items()`가 빈 튜플) —
+    #: 겹침 감사기(QUAL-08)가 `slot` Literal 의 모든 값으로 인스턴스화해도 깨지지 않게 한다.
+    slots: ClassVar[tuple[SlotId, ...]] = SLOT_IDS
 
     def __init__(self, *, slot: SlotId, skip_conditions: AbstractSet[str] | None = None) -> None:
         if slot not in SLOT_IDS:
@@ -388,14 +393,16 @@ class P3DiffSlotGenerator:
     @classmethod
     def items(cls, slot: str) -> tuple[DiffItem, ...]:
         """슬롯의 전 문항(캐시) — 슬롯 불변식을 빌드 시점에 강제한다."""
+        if slot not in cls.slots:
+            return ()  # 담당하지 않는 슬롯 — 빈 생성기(위 `slots` 설명)
         key = (cls, slot)
         cached = _ITEM_CACHE.get(key)
         if cached is not None:
             return cached
-        # 호출 순서와 무관하게 결정론이도록 6슬롯을 SLOT_IDS 순서로 한 번에 빌드한다
+        # 호출 순서와 무관하게 결정론이도록 담당 슬롯을 SLOT_IDS 순서로 한 번에 빌드한다
         # (슬롯 사이 검산 조건 중복 제거를 위해 `claimed`를 공유).
         claimed: set[str] = set()
-        for slot_id in SLOT_IDS:
+        for slot_id in cls.slots:
             built = tuple(cls._slot_items(slot_id, claimed))
             cls._validate_slot(slot_id, built)
             _ITEM_CACHE[(cls, slot_id)] = built
