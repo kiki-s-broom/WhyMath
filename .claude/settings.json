@@ -84,7 +84,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file",
         "hooks": [
           {
             "type": "command",
