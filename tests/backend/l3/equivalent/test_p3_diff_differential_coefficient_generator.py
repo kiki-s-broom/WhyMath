@@ -16,6 +16,9 @@ import sympy
 from whymath_backend.l3.equivalent.p3_diff_differential_coefficient_skeleton_generator import (
     P3DiffDifferentialCoefficientGenerator as Gen,
 )
+from whymath_backend.l3.equivalent.p3_diff_differential_coefficient_skeleton_generator import (
+    _mastery_frames,
+)
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import SLOT_IDS, skeleton_of
 
 _X, _H, _A, _C = sympy.symbols("x h a c")
@@ -69,8 +72,10 @@ def _solve_by_definition(item) -> str:  # type: ignore[no-untyped-def]
         "basic-tangent-slope-at-given-point",
     }:
         f = _function(q)
-        m = re.search(r"x = (-?\d+)일 때", q) or re.search(r"x좌표가 (-?\d+)인", q) or re.search(
-            r"점 \((-?\d+), ", q
+        m = (
+            re.search(r"x = (-?\d+)일 때", q)
+            or re.search(r"x좌표가 (-?\d+)인", q)
+            or re.search(r"점 \((-?\d+), ", q)
         )
         assert m, q
         a = int(m.group(1))
@@ -183,8 +188,50 @@ class TestSlotShape:
             if i.frame_id != "mastery-average-rate-equals-coefficient":
                 continue
             m = re.search(
-                r"f\(x\) = (-?\d*)x\^3.*x의 값이 (-?\d+)에서 (-?\d+)까지.*x = (-?\d+)에서", i.question_text
+                r"f\(x\) = (-?\d*)x\^3.*x의 값이 (-?\d+)에서 (-?\d+)까지.*x = (-?\d+)에서",
+                i.question_text,
             )
             assert m, i.question_text
             keys.append(m.groups())
         assert keys and len(keys) == len(set(keys))
+
+
+class TestGivenPointCoordinates:
+    def test_the_stated_y_coordinate_is_the_function_value_at_that_x(self) -> None:
+        """'점 (a, b)'의 b 가 f(a)가 아니면 학생이 보는 점이 곡선 위에 있지 않다 — 정답만 맞는 불량 문항."""
+        checked = 0
+        for item in Gen.items("basic"):
+            if item.frame_id != "basic-tangent-slope-at-given-point":
+                continue
+            f = _function(item.question_text)
+            m = re.search(r"점 \((-?\d+), (-?\d+)\)", item.question_text)
+            assert m, item.question_text
+            assert f(int(m.group(1))) == int(m.group(2)), item.question_text
+            checked += 1
+        assert checked >= 2, "점 좌표 틀의 문항이 없어 이 검사가 공허하다"
+
+
+class TestAverageRateFrameRejectsDegenerateInputs:
+    """평균변화율 틀의 방어 분기는 기본 파라미터 열에서 밟히지 않는다 — 직접 먹여서 잠근다."""
+
+    @staticmethod
+    def _build(params: tuple[object, ...]):  # type: ignore[no-untyped-def]
+        frame = next(
+            f for f in _mastery_frames() if f.frame_id == "mastery-average-rate-equals-coefficient"
+        )
+        return frame.build(params)
+
+    def test_midpoint_of_the_interval_is_rejected(self) -> None:
+        """(c3, c1, lo, hi, r): r 이 구간의 중점이면 a 가 양변에서 사라진다 — 문항이 되지 않는다."""
+        assert self._build((1, 2, -1, 3, 1)) is None
+
+    def test_a_non_integer_unknown_is_rejected(self) -> None:
+        assert self._build((1, 2, 0, 2, 3)) is None  # a = 23/(-4)
+
+    def test_a_zero_unknown_is_rejected(self) -> None:
+        """a = 0 이면 '상수 a'가 사라져 식이 상수 계수를 갖지 않는다 — 구하는 값이 자명하다."""
+        assert self._build((1, 2, -1, 2, 1)) is None
+
+    def test_a_valid_input_builds_and_has_the_expected_answer(self) -> None:
+        item = self._build((1, 2, -1, 2, 5))
+        assert item is not None and item.answer_text == "-8"

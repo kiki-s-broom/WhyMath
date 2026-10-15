@@ -1,13 +1,15 @@
 """[12미적Ⅰ-02-01] 미분계수 결정론 문항 생성기 — P3-05 4단계(결정론·LLM 0).
 
 개념: `H:12미적Ⅰ02-01`(미분계수의 뜻). 슬롯이 비어 있던 4칸(대표·기본·진단·숙련도 확인)만 채운다 —
-응용·오개념 유발 칸은 기존 승인 문항이 이미 채웠다(`slot_assignment_rules.yaml` · P3-05 3단계). 그래서
+응용·오개념 유발 칸은 기존 승인 문항이 이미 채웠다(`slot_assignment_rules.yaml` ·
+P3-05 3단계). 그래서
 `slots`를 4종으로 좁힌 부분집합 생성기다.
 
 범위(이 개념에 한정)
 --------------------
 미분계수의 **정의**(차분몫의 극한)와 그 해석(접선의 기울기·순간변화율)만 다룬다. 거듭제곱·합·곱의
-미분법으로 도함수를 능숙하게 구하는 일은 `[12미적Ⅰ-02-03]`·`[12미적Ⅰ-02-04]`의 몫이다. 다만 정의로 구한
+미분법으로 도함수를 능숙하게 구하는 일은 `[12미적Ⅰ-02-03]`·`[12미적Ⅰ-02-04]`의 몫이다.
+다만 정의로 구한
 값과 규칙으로 구한 값은 같으므로 정답은 항상 `sympy.diff`로 계산하고, 문면이 정의(극한)를 묻는다.
 극한 기호(→)는 신규 유니코드 글리프라 쓰지 않고 말로 쓴다("h가 0에 한없이 가까워질 때").
 
@@ -16,7 +18,8 @@
   · 대표(2.0) — 정의 그대로: h-꼴 차분몫 · x-꼴 차분몫 · 평균변화율의 극한 · 순간변화율.
   · 기본(2.0) — 값을 구한다: 미분계수 f'(a) · 접선의 기울기(곡선) · 접선의 기울기(점이 주어짐) ·
     변수가 t인 함수.
-  · 진단(2.5) — 차분몫의 **증분과 분모의 관계**만 가려낸다: (f(a+2h) - f(a)) / h = 2f'(a) 처럼 정의와
+  · 진단(2.5) — 차분몫의 **증분과 분모의 관계**만 가려낸다:
+    (f(a+2h) - f(a)) / h = 2f'(a) 처럼 정의와
     닮았지만 값이 달라지는 꼴, 그리고 (f(a+3h) - f(a)) / (3h)·(f(a+h) - f(a-h)) / (2h) 처럼 정의로
     되돌아오는 꼴. 한 틀은 한 가지 관계만 묻는다.
   · 숙련도 확인(3.5) — 미지 상수를 거쳐 값을 구한다: 극한값이 주어진 함수의 계수 · 증분이 스케일된
@@ -24,13 +27,15 @@
 
 검산 재료의 형식 제약
 ---------------------
-Tier1은 미분 평가를 다른 연산과 섞지 못하고(`2*D = y` 불가), 섀도 채점은 자유기호가 정확히 하나일 것을
-요구한다. 그래서 스케일은 *합쳐 한 번에 미분*(`Derivative(2*(식), x)`)으로 표현하고, 모든 문항은 미지수를
+Tier1은 미분 평가를 다른 연산과 섞지 못하고(`2*D = y` 불가), 섀도 채점은 자유기호가 정확히
+하나일 것을 요구한다. 그래서 스케일은 *합쳐 한 번에 미분*(`Derivative(2*(식), x)`)으로
+표현하고, 모든 문항은 미지수를
 정확히 하나만 둔다.
 
 문제유형 정직성
 --------------
-값 계산은 `ptype.evaluate-expression`, 미지 상수·미지 점을 구하는 숙련도 문항은 `ptype.solve-for-unknown`.
+값 계산은 `ptype.evaluate-expression`, 미지 상수를 구하는 숙련도 문항은
+`ptype.solve-for-unknown`.
 """
 
 from __future__ import annotations
@@ -54,7 +59,6 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul
 
 __all__ = ["P3DiffDifferentialCoefficientGenerator"]
 
@@ -152,10 +156,17 @@ def _value_item(
 
 # 함수 풀: 이차·삼차 정수 계수 다항식. 상수항 0·일차항 0도 섞어 정의에 의존하는 풀이를 막는다.
 _QUADRATIC_POOL: Final = tuple(
-    _quadratic(a, b, c) for a in (1, 2, 3, -1, -2) for b in (-5, -3, -2, 1, 2, 4, 6) for c in (-4, 0, 3, 5)
+    _quadratic(a, b, c)
+    for a in (1, 2, 3, -1, -2)
+    for b in (-5, -3, -2, 1, 2, 4, 6)
+    for c in (-4, 0, 3, 5)
 )
 _CUBIC_POOL: Final = tuple(
-    _cubic(a, b, c, d) for a in (1, 2, -1) for b in (-3, 0, 2, 3) for c in (-6, -2, 1, 4) for d in (-2, 0, 5)
+    _cubic(a, b, c, d)
+    for a in (1, 2, -1)
+    for b in (-3, 0, 2, 3)
+    for c in (-6, -2, 1, 4)
+    for d in (-2, 0, 5)
 )
 # 앞에서부터 소비되므로 부호가 번갈아 나오게 둔다(앞 3개만 쓰는 틀도 음수 점에 몰리지 않는다).
 _POINTS: Final = (2, -1, 3, -2, 1, -3)
@@ -214,7 +225,8 @@ def _rep_frames() -> list[Frame]:
             slot="representative",
             frame_id="rep-average-rate-limit",
             text=(
-                f"함수 f(x) = {render_poly(poly)}에서 x의 값이 {a}에서 {_arg(a, 'h')}까지 변할 때의 "
+                f"함수 f(x) = {render_poly(poly)}에서 x의 값이 {a}에서 {_arg(a, 'h')}까지 "
+                "변할 때의 "
                 "평균변화율을 구한 뒤, h가 0에 한없이 가까워질 때의 극한값을 구하시오."
             ),
             poly=poly,
@@ -242,10 +254,26 @@ def _rep_frames() -> list[Frame]:
         )
 
     return [
-        Frame("rep-difference-quotient-in-h", _fn_points("p3c:rep-h", _QUADRATIC_POOL + _CUBIC_POOL), h_form),
-        Frame("rep-difference-quotient-in-x", _fn_points("p3c:rep-x", _QUADRATIC_POOL + _CUBIC_POOL), x_form),
-        Frame("rep-average-rate-limit", _fn_points("p3c:rep-avg", _QUADRATIC_POOL + _CUBIC_POOL), average_rate),
-        Frame("rep-instantaneous-rate", _fn_points("p3c:rep-inst", _QUADRATIC_POOL + _CUBIC_POOL), instantaneous),
+        Frame(
+            "rep-difference-quotient-in-h",
+            _fn_points("p3c:rep-h", _QUADRATIC_POOL + _CUBIC_POOL),
+            h_form,
+        ),
+        Frame(
+            "rep-difference-quotient-in-x",
+            _fn_points("p3c:rep-x", _QUADRATIC_POOL + _CUBIC_POOL),
+            x_form,
+        ),
+        Frame(
+            "rep-average-rate-limit",
+            _fn_points("p3c:rep-avg", _QUADRATIC_POOL + _CUBIC_POOL),
+            average_rate,
+        ),
+        Frame(
+            "rep-instantaneous-rate",
+            _fn_points("p3c:rep-inst", _QUADRATIC_POOL + _CUBIC_POOL),
+            instantaneous,
+        ),
     ]
 
 
@@ -258,7 +286,10 @@ def _basic_frames() -> list[Frame]:
         return _value_item(
             slot="basic",
             frame_id="basic-differential-coefficient",
-            text=f"함수 f(x) = {render_poly(poly)}에서 x = {a}에서의 미분계수 f'({a})의 값을 구하시오.",
+            text=(
+                f"함수 f(x) = {render_poly(poly)}에서 x = {a}에서의 미분계수 "
+                f"f'({a})의 값을 구하시오."
+            ),
             poly=poly,
             point=a,
             lead="도함수를 구하면",
@@ -272,7 +303,8 @@ def _basic_frames() -> list[Frame]:
             slot="basic",
             frame_id="basic-tangent-slope-of-curve",
             question_text=(
-                f"곡선 y = {render_poly(poly)} 위의 x좌표가 {a}인 점에서의 접선의 기울기를 구하시오."
+                f"곡선 y = {render_poly(poly)} 위의 x좌표가 {a}인 점에서의 "
+                "접선의 기울기를 구하시오."
             ),
             answer_text=str(value),
             explanation=(
@@ -321,8 +353,16 @@ def _basic_frames() -> list[Frame]:
         )
 
     return [
-        Frame("basic-differential-coefficient", _fn_points("p3c:basic-coef", _QUADRATIC_POOL), coefficient),
-        Frame("basic-tangent-slope-of-curve", _fn_points("p3c:basic-curve", _CUBIC_POOL), tangent_slope),
+        Frame(
+            "basic-differential-coefficient",
+            _fn_points("p3c:basic-coef", _QUADRATIC_POOL),
+            coefficient,
+        ),
+        Frame(
+            "basic-tangent-slope-of-curve",
+            _fn_points("p3c:basic-curve", _CUBIC_POOL),
+            tangent_slope,
+        ),
         Frame(
             "basic-tangent-slope-at-given-point",
             _fn_points("p3c:basic-point", _QUADRATIC_POOL + _CUBIC_POOL),
@@ -423,7 +463,8 @@ def _mastery_frames() -> list[Frame]:
             frame_id="mastery-coefficient-from-limit-value",
             question_text=(
                 f"함수 f(x) = {with_param(c3, c1)} (a는 상수)에 대하여 h가 0에 한없이 가까워질 때 "
-                f"(f({_arg(point, 'h')}) - f({point})) / h의 극한값이 {value}이다. 상수 a의 값을 구하시오."
+                f"(f({_arg(point, 'h')}) - f({point})) / h의 극한값이 {value}이다. "
+                "상수 a의 값을 구하시오."
             ),
             answer_text=str(a_true),
             explanation=(
@@ -469,8 +510,9 @@ def _mastery_frames() -> list[Frame]:
         )
 
     def average_equals_instantaneous(p: tuple[object, ...]) -> DiffItem | None:
-        """평균변화율 = 미분계수에서 미지 상수 a를 구한다 — c1 항은 양변에서 사라진다(선형 항의 평균변화율은
-        어느 점의 미분계수와도 같으므로). a가 정수이고 구간의 중점에서의 미분계수가 아닐 때만 낸다."""
+        """평균변화율 = 미분계수에서 미지 상수 a를 구한다 — c1 항은 양변에서 사라진다
+        (선형 항의 평균변화율은 어느 점의 미분계수와도 같으므로). a가 정수이고 구간의 중점에서의
+        미분계수가 아닐 때만 낸다."""
         c3, c1, lo, hi, r = (int(str(v)) for v in p)
         slope_gap = hi + lo - 2 * r  # 중점이면 0 — a가 사라져 방정식이 성립하지 않는다
         if slope_gap == 0:

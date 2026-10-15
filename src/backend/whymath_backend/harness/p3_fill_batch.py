@@ -1,24 +1,27 @@
 """Phase 3 6슬롯·Problem Coverage 빈 칸 채우기 문항 은행 배치 — P3-05 4·5단계(순수 결정론·LLM 0).
 
-`slot_assignment_rules.yaml`(3단계)가 기존 문항 재배정으로 채운 뒤에도 비어 있는 칸과, 승인 문항이 0건인
-스킬(패턴 일반화·문장제 모델링)을 채우는 **새 은행** `data/corpus/problem_bank_p3_fill_v0/`를 결정론적으로
-재생성한다. 같은 입력이면 `problems.jsonl`·`_provenance.json` 두 파일 모두 바이트가 같다(`--check`).
+`slot_assignment_rules.yaml`(3단계)가 기존 문항 재배정으로 채운 뒤에도 비어 있는 칸과,
+승인 문항이 0건인 스킬(패턴 일반화·문장제 모델링)을 채우는 **새 은행**
+`data/corpus/problem_bank_p3_fill_v0/`를 결정론적으로 재생성한다. 같은 입력이면
+`problems.jsonl`·`_provenance.json` 두 파일 모두 바이트가 같다(`--check`).
 
 왜 기존 은행(`problem_bank_p3_calculus1_diff_v0`, 504건)에 더하지 않는가
 -----------------------------------------------------------------------
 그 은행은 감사 5회차를 거쳐 **내용이 동결된 사본과 바이트 대조**로 승인이 유효하다. 문항을 더하면
 승인이 옮겨 가지 않아 504건이 전부 무효가 된다. 새 은행은 별도 감사를 받는다 — 승인 판정의 표본 크기
-하한(`_MIN_N = 200`) 때문에 4단계(13칸)와 5단계(패턴 일반화·문장제)를 **한 은행으로 묶는다**(Kiki 결정
-2026-10-15: 204건 = 13칸 × 12 + 02-03 패턴 일반화 24 + 02-10 문장제 24).
+하한(`_MIN_N = 200`) 때문에 4단계(13칸)와 5단계(패턴 일반화·문장제)를 **한 은행으로
+묶는다**(Kiki 결정 2026-10-15: 204건 = 13칸 × 12 + 02-03 패턴 일반화 24 + 02-10 문장제 24).
 
-실행 기반은 기존 배치(`p3_calculus1_diff_batch`)를 그대로 쓴다. 다른 점은 등록부(`GENERATORS`)와 은행
-이름·사이드카 문구, 그리고 생성기가 `slots`로 좁힌 부분집합만 돈다는 것(기존 배치는 6슬롯 전부).
+실행 기반은 기존 배치(`p3_calculus1_diff_batch`)를 그대로 쓴다. 다른 점은 등록부
+(`GENERATORS`)와 은행 이름·사이드카 문구, 그리고 생성기가 `slots`로 좁힌 부분집합만 돈다는 것
+(기존 배치는 6슬롯 전부).
 
 개념을 추가하는 법
 ------------------
 1. `l3/equivalent/p3_diff_<개념>_skeleton_generator.py`에 `P3DiffSlotGenerator` 하위 클래스를 쓰되
    `slots`에 *빈 칸만* 선언한다.
-2. 이 파일의 `GENERATORS`에 한 줄을 더하고 `python -m whymath_backend.harness.p3_fill_batch`로 재생성한다.
+2. 이 파일의 `GENERATORS`에 한 줄을 더하고
+   `python -m whymath_backend.harness.p3_fill_batch`로 재생성한다.
 3. 신규 모듈을 `scripts/analysis/eos_feature_inventory_v2.py`에 귀속시킨다.
 
 **review_status를 쓰지 않는다** — 승인은 감사 표본 경로의 몫이다(기존 배치와 같은 방어).
@@ -96,7 +99,8 @@ def build_provenance(
             "task": "P3-05-triangle-density",
             "approval_status": {
                 "note": (
-                    "이 도구는 review_status를 쓰지 않는다(키 부재). 승인은 자격 통과 프로토콜 감사 "
+                    "이 도구는 review_status를 쓰지 않는다(키 부재). 승인은 자격 통과 프로토콜 "
+                    "감사 "
                     "(n ≥ 200 · Wilson 상한 ≤ 0.02) 뒤 코퍼스 단위 백필이 쓴다."
                 ),
                 "sample_review": "감사 전 — 승인 문항 0건",

@@ -29,9 +29,9 @@ def fresh(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return {
         "report": report,
         "problems": out.read_bytes(),
-        "provenance": (json.dumps(batch.build_provenance(), ensure_ascii=False, indent=2) + "\n").encode(
-            "utf-8"
-        ),
+        "provenance": (
+            json.dumps(batch.build_provenance(), ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8"),
     }
 
 
@@ -55,12 +55,16 @@ class TestRegeneration:
     ) -> None:
         """대조군 — 은행 사본의 한 글자를 바꾸면 같은 비교가 드리프트를 낸다(변별력)."""
         (tmp_path / "problems.jsonl").write_bytes(
-            (_BANK / "problems.jsonl").read_bytes().replace("구하시오".encode(), "구하시요".encode(), 1)
+            (_BANK / "problems.jsonl")
+            .read_bytes()
+            .replace("구하시오".encode(), "구하시요".encode(), 1)
         )
         (tmp_path / "_provenance.json").write_bytes((_BANK / "_provenance.json").read_bytes())
         assert drift_against(tmp_path, fresh["problems"], fresh["provenance"]) != []
 
-    def test_a_missing_bank_is_drift_not_a_pass(self, fresh: dict[str, Any], tmp_path: Path) -> None:
+    def test_a_missing_bank_is_drift_not_a_pass(
+        self, fresh: dict[str, Any], tmp_path: Path
+    ) -> None:
         assert drift_against(tmp_path, fresh["problems"], fresh["provenance"]) != []
 
 
@@ -99,16 +103,19 @@ class TestBank:
 
 
 class TestOnlyMissingCellsAreGenerated:
-    """"재배정 먼저, 모자라는 칸만 생성"(Kiki 결정 ②) — 이 은행의 슬롯은 기존 승인 문항이 못 채운 칸이다."""
+    """ "재배정 먼저, 모자라는 칸만 생성"(Kiki 결정 ②) — 이 은행의 슬롯은 기존 승인 문항이 못 채운 칸이다."""
 
     def test_every_generated_cell_is_empty_without_this_bank(self) -> None:
         spec = ps.load_scope_spec()
         index = ps.load_reference_index(spec)
         corpus = pc.load_corpus(spec)
         mine = {r["problem_id"] for r in _rows()}
-        legacy = pc.CoverageCorpus(**{**corpus.__dict__, "problems": tuple(
-            p for p in corpus.problems if p.problem_id not in mine
-        )})
+        legacy = pc.CoverageCorpus(
+            **{
+                **corpus.__dict__,
+                "problems": tuple(p for p in corpus.problems if p.problem_id not in mine),
+            }
+        )
         report = pc.evaluate(spec, index, legacy)
         assert report.slots is not None
         names = {s.id: s.name_ko for s in spec.slots}
@@ -122,9 +129,9 @@ class TestOnlyMissingCellsAreGenerated:
         assert by_concept, "생성한 칸이 없다"
         for code, slots in by_concept.items():
             for slot in slots:
-                assert names[slot] in unmet.get(code, ""), (
-                    f"{code} 의 {names[slot]} 칸은 기존 승인 문항이 이미 채웠다 — 생성하지 않는다"
-                )
+                assert names[slot] in unmet.get(
+                    code, ""
+                ), f"{code} 의 {names[slot]} 칸은 기존 승인 문항이 이미 채웠다 — 생성하지 않는다"
         assert ProblemSlot.REPRESENTATIVE.value in by_concept["[12미적Ⅰ-02-01]"]
 
 
