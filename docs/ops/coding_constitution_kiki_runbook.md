@@ -1,6 +1,6 @@
-# 코딩 헌법 Kiki 런북 — 원본 등록부 정정(A0003)·이식 2단계·A0002 채택·가드 확인·정밀진단
+# 코딩 헌법 Kiki 런북 — 원본 등록부 정정(A0003)·이식 2단계·A0002·A0005 채택·가드 확인·정밀진단
 
-- 태스크: `CONST-02` · 게이트: `G-const-sources-registry-adopt`(과제 A) · `G-const-a0002-adoption`(과제 B) · `G-const-diagnosis-s00-s10-run`(과제 D)
+- 태스크: `CONST-02`(A~D) · `CONST-15`(E) · 게이트: `G-const-sources-registry-adopt`(과제 A) · `G-const-a0002-adoption`(과제 B) · `G-const-diagnosis-s00-s10-run`(과제 D) · `G-const-a0005-part1-corrections`·`G-const-r4-02-decision`(과제 E)
 - 이식 정본: `docs/standards/coding_constitution_transplant.md` · 초안 보관소: `docs/constitution_proposals/`
 - 판정 기준: 이 런북의 명령은 **CONST-02 PR이 main에 머지된 뒤**의 `origin/main`을 기준으로 한다. 블록마다 그것을 스스로 확인한다(`MAIN_HAS_TOOLS`).
 
@@ -18,6 +18,7 @@
 | B | A0002 채택(파트 II~VII 근거 조문 5개 + 규칙 81건) | 선택 — 결정 게이트. A가 main에 머지된 뒤 | 창② (새 창) | 10분 |
 | C | 헌법 가드가 이 PC(Windows)에서 실제로 막는지 확인 | 권장 — 읽기 전용 | 창③ (새 창) | 3분 |
 | D | 260927 통합정밀진단 S00~S10 진행 | 게이트 — 사람 축 검증 | 별도 (Claude Code) | 9~14시간, 4~5일 분할 |
+| E | A0005 채택(파트 I 집행 장치 정합 정정 + R4-02 문구 개정) | 결정 게이트 — 채택 도우미 미지원이라 `git apply` 경로 | 창④ (새 창) | 10분 |
 
 각 과제가 끝나면 블록이 출력한 `대문자_이름=값` 줄들을 통째로 복사해 세션에 전달한다. **PR 생성과 게이트 기록(`backlog.py gates clear`)은 세션이 가져간다** — Kiki님이 할 일은 반영·커밋·push까지다.
 
@@ -302,8 +303,175 @@ Get-ChildItem C:\Users\kiki\Desktop\__AI -Recurse -Filter "S00_준비_기준선.
 
 ---
 
+## 4-1. 과제 E — A0005 채택 (결정 게이트 · 채택 도우미 미지원 경로)
+
+### 사전 브리핑
+
+1. **과제 명칭**: 코딩 헌법 개정 A0005 채택 — 파트 I 집행 장치 정합 정정(R4-03 경로·R2-04 단계와 실행·머리말 필드 3종 설명)과 R4-02 문구 개정.
+2. **목적**: 규칙 파일(`rules.yaml`)의 검사 경로 몇 개가 실제 저장소와 달라서, 3단계로 심사하면 파트 I(0~4장)에서 "집행 장치 없음"·"예정"으로 남는다. 정정 패치는 현재 main에서 `git apply`로 깨끗이 적용되고, 채택하면 **파트 I의 3단계 준비가 끝난다**(세션 사본 실측: 3단계 차단 47건 → 45건, 파트 I 차단 0건, 남은 45건은 전부 5장 이후 = `CONST-04`~`08`의 몫). **이식 단계(`STAGE`)는 2로 그대로 둔다** — 지금 3으로 올리면 파트 II~VII의 45건이 한꺼번에 판정돼 CI 래칫이 red가 된다. 근거 문서: `docs/constitution_proposals/A0005_part1_corrections_draft.md`.
+3. **구체적 절차**:
+   - [E-1] 준비: 메인 클론은 건드리지 않고 옆 폴더 `WhyMath-const`에 main 기준 작업 사본을 새 브랜치 `kiki/const-a0005`로 만든다. 패치·동기화 테스트가 main에 있는지, A0005 기록이 아직 없는지, 심사가 읽을 백엔드 코드가 **이 작업 사본의 것인지**(편집 설치가 다른 폴더를 가리키는 사고 방지)를 스스로 확인한다(약 40초).
+   - [E-2] 미리보기: 패치가 무엇을 바꾸는지 통계로 보고 초안·패치를 메모장으로 연다. 아무것도 쓰지 않는다.
+   - [E-3a] 동의 입력: `ADOPT`를 직접 타이핑한다.
+   - [E-3b] 반영: 준비·미리보기·동의가 모두 True일 때만 `constitution/rules.yaml`에 패치를 적용하고, 개정 기록 `constitution/amendments/A0005_part1_corrections.md`를 만든다(채택일·서명 자동 기입, UTF-8·LF). 패치가 적용되지 않았으면 기록도 만들지 않는다.
+   - [E-4] 로컬 커밋 → 심사 → 래칫: 커밋을 **먼저** 하는 이유는 R0-02("헌법이 바뀌면 개정 기록 동반")가 커밋된 변경만 보기 때문이다(커밋 전 심사는 변경이 없어 공허하게 통과한다). 2단계 심사·래칫과 3단계 JSON 심사를 돌려 파트 I을 판정한다(약 1~2분).
+   - [E-5] push: 모든 판정이 True일 때만 올린다.
+4. **성공 기준**: `READY=True` → `PREVIEW_OK=True` → `APPLY_OK=True` · `RECORD_OK=True` → `COMMIT_OK=True` → `AUDIT_OK=True` · `RATCHET_OK=True` · `PART1_OK=True` → `PUSH_EXIT=0`. 어느 블록이든 `…_REFUSED=True`·`…_SKIPPED=True`가 나오면 **그 블록은 아무것도 쓰지 않은 것**이다 — 같은 줄에 무엇이 False였는지 찍히므로 그 줄을 세션에 그대로 전달한다. 대처 1개: `SRC_FROM_WORKTREE=False`면 편집 설치가 다른 폴더를 가리키는 것이다 — 세션에 `SRC=` 줄을 전달한다(고치기 전에는 심사를 신뢰하지 않는다).
+5. **실행 환경**: Phaiakes9(이 PC)의 Windows PowerShell. 작업 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath`. 선행 조건: `CONST-15` PR(이 절을 추가한 PR)과 `CONST-14`(동기화 테스트)가 main에 머지됨 · 백엔드 가상환경 `src\backend\.venv`(PyYAML·pytest 포함). Docker·DB·서버는 필요 없다. **Claude Code 세션 안에서 실행하지 않는다** — 이 경로는 채택 도우미의 AI 세션 거부(`CLAUDECODE`)를 거치지 않으므로 블록이 스스로 확인한다(`HUMAN_WINDOW`).
+6. **창 구분**: **새 창(창④)** 에서 E-1 → E-5를 순서대로 붙여넣는다. 앞 블록이 만든 변수(`$Ready`·`$ApplyOk` 등)를 뒤 블록이 재검사하므로 같은 창이어야 한다. 과제 A·B의 창에 이어 붙이지 않는다(그 창의 `$Wt`·`$Py`·판정값이 남아 가드를 거짓으로 통과시킬 수 있다 — E-1이 판정값을 초기화하지만 새 창이 가장 확실하다).
+
+### 읽고 판단할 것 3가지 (E-2의 메모장에서)
+
+채택은 조문 문구의 타당성 판정이라 세션이 대신하지 못한다. 초안과 패치를 읽고 아래 셋을 정한다. **고칠 곳이 있으면 E-2에서 멈추고 세션에 알린다** — 초안·패치를 고쳐 다시 드린다(E-3a부터는 헌법 파일이 바뀐다).
+
+- **R2-04("도장 찍기 조기 경보")를 4단계에서 3단계로 내리는 것이 맞는가.** 3단계에서 CI가 검증하는 것은 경보의 *판정 논리*(`tests/infra/test_review_health.py`)이지 실제 검토 데이터가 아니다. 실제 검토 이벤트는 이 PC에만 있어서, 규칙이 초록이어도 실데이터 경보가 도는 것은 아니다. 이 구분을 규칙 `statement`에 적을지 정한다(패치는 `statement`를 바꾸지 않는다 — 적으려면 패치를 고쳐야 한다).
+- **R4-02는 (나)안(문구 개정)이 맞는가.** 초안은 이미 (나)안으로 정해졌다고 적지만 별개 게이트 `G-const-r4-02-decision`은 아직 대기 중이고, 그 게이트의 선택지는 A·B·C라 (나)안이 없다. A0005를 채택하면 그 게이트도 함께 닫는다.
+- **어긋남 5건(스키마 YAML ↔ 모델 필드)은 2026-12-31에 동결이 만료**되고 그 뒤 CI가 red가 된다. 처분(YAML 갱신 vs 모델 수정)은 이 개정의 범위가 아니며, 채택 뒤 세션이 별도 태스크로 등재한다.
+
+### [E-1] 준비 — main 기준 작업 사본 만들기
+
+```powershell
+# [창④ E-1 준비] Windows PowerShell — Phaiakes9 · 새 창
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Ready = $false; $PreviewOk = $false; $ApplyOk = $false; $RecordOk = $false; $CommitOk = $false; $AuditOk = $false; $RatchetOk = $false; $Part1Ok = $false; $Answer = ""
+$HumanWindow = [string]::IsNullOrEmpty($env:CLAUDECODE)
+"HUMAN_WINDOW=$HumanWindow"
+git fetch origin main
+git cat-file -e origin/main:docs/constitution_proposals/rules_A0005_part1_corrections.patch
+$HasPatch = ($LASTEXITCODE -eq 0)
+git cat-file -e origin/main:tests/constitution/test_schema_model_sync.py
+$HasTest = ($LASTEXITCODE -eq 0)
+$OnMain = @(git ls-tree -r --name-only origin/main constitution/amendments | Select-String "A0005_").Count
+$NoRecord = ($OnMain -eq 0)
+"MAIN_HAS_PATCH=$HasPatch · MAIN_HAS_SYNC_TEST=$HasTest · NO_A0005_ON_MAIN=$NoRecord"
+$Wt = "C:\Users\kiki\Desktop\__AI\WhyMath-const"
+$Br = "kiki/const-a0005"
+if (Test-Path $Wt) { git worktree remove --force $Wt; git worktree prune; "OLD_WORKTREE_REMOVED=" + (-not (Test-Path $Wt)) }
+if ($HasPatch -and $HasTest -and $NoRecord) { git worktree add -B $Br $Wt origin/main } else { "WORKTREE_SKIPPED=True — MAIN_HAS_PATCH=$HasPatch MAIN_HAS_SYNC_TEST=$HasTest NO_A0005_ON_MAIN=$NoRecord · 관련 PR이 아직 머지 전이거나 A0005가 이미 채택됐습니다" }
+"WORKTREE_HEAD=" + (git -C $Wt log -1 --oneline)
+$BaseOk = ((git -C $Wt rev-parse HEAD) -eq (git rev-parse origin/main))
+"BASE_MATCHES_MAIN=$BaseOk"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+$PyOk = Test-Path $Py
+"PY_OK=$PyOk"
+$env:PYTHONPATH = "$Wt\src\backend"
+$Src = & $Py -c "import whymath_backend; print(whymath_backend.__file__)"
+$SrcOk = ([string]$Src -like "$Wt\src\backend\*")
+"SRC_FROM_WORKTREE=$SrcOk · SRC=$Src"
+& $Py -m pytest --version
+$PytestOk = ($LASTEXITCODE -eq 0)
+"PYTEST_OK=$PytestOk"
+$Ready = $HumanWindow -and $HasPatch -and $HasTest -and $NoRecord -and $BaseOk -and $PyOk -and $SrcOk -and $PytestOk
+"READY=$Ready"
+```
+
+**확인**: `HUMAN_WINDOW=True` · `MAIN_HAS_PATCH=True` · `MAIN_HAS_SYNC_TEST=True` · `NO_A0005_ON_MAIN=True` · `BASE_MATCHES_MAIN=True` · `PY_OK=True` · `SRC_FROM_WORKTREE=True`(`SRC=` 경로가 `WhyMath-const\src\backend\…`) · `PYTEST_OK=True` · `READY=True`. `OLD_WORKTREE_REMOVED=False`가 나오면 탐색기에서 `WhyMath-const` 폴더를 직접 지우고 이 블록을 다시 붙여넣는다.
+
+### [E-2] 미리보기 — 아무것도 쓰지 않는다
+
+```powershell
+# [창④ E-2 미리보기] Windows PowerShell — 같은 창 · 읽기 전용
+$Patch = "$Wt\docs\constitution_proposals\rules_A0005_part1_corrections.patch"
+git -C $Wt apply --stat $Patch
+git -C $Wt apply --check $Patch
+$PreviewOk = ($LASTEXITCODE -eq 0)
+"PREVIEW_OK=$PreviewOk"
+notepad "$Wt\docs\constitution_proposals\A0005_part1_corrections_draft.md"
+notepad $Patch
+```
+
+**확인**: `PREVIEW_OK=True`. 통계 줄은 `constitution/rules.yaml | 18 +++++++++++-------` 와 `1 file changed, 11 insertions(+), 7 deletions(-)` 이다(다른 파일이 보이면 중단하고 세션에 알린다). 메모장의 패치에서 `-`로 시작하는 줄이 바뀌기 전, `+`가 바뀐 뒤다. 바뀌는 규칙은 `R2-04`·`R4-02`·`R4-03` 셋과 머리말 주석뿐이다.
+
+### [E-3a] 동의 입력 — 이 한 줄만 붙여넣는다
+
+```powershell
+# [창④ E-3a 동의] Windows PowerShell — 같은 창 · 이 블록은 한 줄뿐이며 입력을 기다린다
+$Answer = Read-Host "A0005를 채택하려면 ADOPT 를 입력하고 Enter"
+```
+
+`ADOPT`를 **직접 타이핑**하고 Enter를 누른다(대문자, 영어). 이 입력이 개정 기록의 서명(`개정자: Kiki`)을 대신한다 — 헌법 제11조의 "사람의 개정" 의사표시다. 다른 것을 입력하면 다음 블록이 반영을 거부한다.
+
+### [E-3b] 반영 — 여기서만 헌법 파일을 바꾼다
+
+이 블록은 E-1·E-2·E-3a의 판정값을 **스스로 재검사하고**, 하나라도 False면 아무것도 쓰지 않고 이유를 출력한다. 개정 기록은 채택 도우미의 `stamp()`·`write()`를 그대로 가져와 쓴다(초안의 상태 줄을 "채택"으로 바꾸고 채택일·서명 칸을 채우며, UTF-8·LF로만 쓴다 — PowerShell `Set-Content`의 BOM·CRLF 사고 방지). 파이썬 코드는 ASCII뿐이다(PowerShell 5.1이 표준입력으로 넘길 때 한글이 깨지는 것을 피한다). 기록 생성기는 **패치가 이미 적용된 `rules.yaml`일 때만** 기록을 쓴다.
+
+```powershell
+# [창④ E-3b 반영] Windows PowerShell — 같은 창 · constitution/ 을 바꾸는 블록
+$StampPy = @'
+import importlib.util, sys
+from datetime import date
+from pathlib import Path
+
+wt = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("adopt_amendment", wt / "scripts" / "constitution" / "adopt_amendment.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+if Path(mod.ROOT).resolve() != wt.resolve():
+    print("RECORD_REFUSED=True - helper ROOT is not the worktree: " + str(mod.ROOT))
+    sys.exit(1)
+if "(A0005)" not in mod.read(mod.RULES):
+    print("RECORD_REFUSED=True - rules.yaml does not carry the A0005 patch yet")
+    sys.exit(1)
+if mod.already_adopted("A0005"):
+    print("RECORD_REFUSED=True - an A0005 record already exists")
+    sys.exit(1)
+draft = mod.PROPOSALS / "A0005_part1_corrections_draft.md"
+target = mod.AMENDMENTS / "A0005_part1_corrections.md"
+text = mod.stamp(mod.read(draft), "Kiki", date.today().isoformat(), [])
+if "____" in text:
+    print("RECORD_REFUSED=True - blank signature fields remain")
+    sys.exit(1)
+mod.write(target, text)
+print("RECORD_WRITTEN=" + target.name)
+print("RECORD_BYTES=" + str(target.stat().st_size))
+'@
+$Consent = ($Answer -ceq "ADOPT")
+"READY=$Ready · PREVIEW_OK=$PreviewOk · CONSENT=$Consent"
+if ($Ready -and $PreviewOk -and $Consent) { git -C $Wt apply $Patch; $ApplyOk = ($LASTEXITCODE -eq 0); "APPLY_OK=$ApplyOk"; $StampPy | & $Py - $Wt; $RecordOk = ($LASTEXITCODE -eq 0); "RECORD_OK=$RecordOk" } else { $ApplyOk = $false; $RecordOk = $false; "WRITE_REFUSED=True — READY=$Ready PREVIEW_OK=$PreviewOk CONSENT=$Consent · 셋 다 True여야 반영합니다" }
+git -C $Wt status --short
+```
+
+**확인**: `APPLY_OK=True` · `RECORD_WRITTEN=A0005_part1_corrections.md` · `RECORD_BYTES=` 8,568 안팎(세션 사본 실측 — 초안을 고쳤다면 달라진다. 0이거나 초안 크기의 절반 이하면 중단) · `RECORD_OK=True`. `git status` 두 줄은 `M constitution/rules.yaml` 과 `?? constitution/amendments/`(한글 파일명이 아니라 ASCII 이름이다).
+
+### [E-4] 로컬 커밋 → 심사 → 래칫
+
+```powershell
+# [창④ E-4 커밋·심사] Windows PowerShell — 같은 창 · 로컬 커밋만 한다(원격에는 올리지 않는다)
+$Json = Join-Path $env:TEMP ("a0005_stage3_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".json")
+if ($ApplyOk -and $RecordOk) { git -C $Wt add constitution; git -C $Wt commit -m "docs(constitution): adopt A0005 - part I enforcement path corrections and R4-02 wording"; $CommitOk = ($LASTEXITCODE -eq 0); "COMMIT_OK=$CommitOk" } else { $CommitOk = $false; "COMMIT_REFUSED=True — APPLY_OK=$ApplyOk RECORD_OK=$RecordOk · 둘 다 True여야 커밋합니다" }
+"LOCAL_HEAD=" + (git -C $Wt log -1 --oneline)
+if ($CommitOk) { & $Py "$Wt\scripts\constitution\audit.py"; $AuditOk = ($LASTEXITCODE -eq 0); "AUDIT_OK=$AuditOk"; & $Py "$Wt\scripts\constitution\audit_ratchet.py"; $RatchetOk = ($LASTEXITCODE -eq 0); "RATCHET_OK=$RatchetOk"; & $Py "$Wt\scripts\constitution\audit.py" --stage 3 --json $Json; "STAGE3_EXIT=$LASTEXITCODE (1이 정상 — 파트 II 이후 차단이 남아 있다)" } else { $AuditOk = $false; $RatchetOk = $false; "AUDIT_SKIPPED=True — COMMIT_OK=$CommitOk · 커밋이 안 됐으므로 심사하지 않습니다" }
+if (Test-Path $Json) { $J = Get-Content $Json -Raw -Encoding UTF8 | ConvertFrom-Json; $P1 = @($J.results | Where-Object { $_.rule_id -match '^R[0-4]-' }); $P1Blocking = @($P1 | Where-Object { $_.blocking }).Count; $Four = @($J.results | Where-Object { $_.rule_id -in 'R0-02','R2-04','R4-02','R4-03' }); $FourBlocking = @($Four | Where-Object { $_.blocking }).Count; $Part1Ok = (($Four.Count -eq 4) -and ($P1.Count -gt 0) -and ($P1Blocking -eq 0) -and ($FourBlocking -eq 0)); "PART1_ROWS=$($P1.Count) · PART1_BLOCKING=$P1Blocking · FOUR_ROWS=$($Four.Count) · FOUR_BLOCKING=$FourBlocking"; "STAGE3_TOTAL_BLOCKING=$($J.blocking)"; "PART1_OK=$Part1Ok" } else { $Part1Ok = $false; "STAGE3_JSON_MISSING=True — 3단계 심사 결과 파일이 없습니다: $Json" }
+```
+
+**확인**: `COMMIT_OK=True` · 심사 표 첫머리에 `차단 사유 0건` · `AUDIT_OK=True` · `✅ 위헌 심사 래칫 통과 — 단계 2 · 차단 0건 ≤ 기준선 0건` · `RATCHET_OK=True` · `STAGE3_EXIT=1` · `PART1_BLOCKING=0` · `FOUR_ROWS=4` · `FOUR_BLOCKING=0` · `PART1_OK=True`. `STAGE3_TOTAL_BLOCKING`은 세션 실측 때 **45**였다(CONST-04~08이 착지하면 줄어드니 45보다 *크면* 이상이다). `FOUR_ROWS`가 4가 아니면 규칙 id가 심사 결과에 없는 것이므로 `PART1_OK`는 의도적으로 False가 된다(대상을 못 찾은 심사는 통과가 아니다).
+
+`R0-02`가 위반이면 개정 기록이 커밋에 없는 것이고, `R4-02`가 위반이면 동기화 테스트의 어긋남 동결이 만료됐거나 `SRC_FROM_WORKTREE`가 어긋난 것이다 — 심사 표의 그 줄 전체를 세션에 전달한다.
+
+### [E-5] push
+
+```powershell
+# [창④ E-5 push] Windows PowerShell — 같은 창 · 원격에 올리는 블록(되돌리려면 PR을 닫으면 된다)
+$AllOk = $CommitOk -and $AuditOk -and $RatchetOk -and $Part1Ok
+"ALL_OK=$AllOk"
+if ($AllOk) { git -C $Wt push -u origin $Br; "PUSH_EXIT=$LASTEXITCODE" } else { "PUSH_REFUSED=True — COMMIT=$CommitOk AUDIT=$AuditOk RATCHET=$RatchetOk PART1=$Part1Ok · 모두 True여야 올립니다" }
+"LOCAL_HEAD=" + (git -C $Wt log -1 --oneline)
+"REMOTE_HEAD=" + (git -C $Wt rev-parse --short "origin/$Br")
+"BRANCH=$Br"
+$env:PYTHONPATH = ""
+"PYTHONPATH_CLEARED=" + [string]::IsNullOrEmpty($env:PYTHONPATH)
+```
+
+**확인**: `ALL_OK=True` · `PUSH_EXIT=0` · `LOCAL_HEAD=`의 해시와 `REMOTE_HEAD=`의 해시가 같다 · `PYTHONPATH_CLEARED=True`. `PUSH_REFUSED=True`면 push는 일어나지 않았고 `REMOTE_HEAD=` 줄은 오류가 날 수 있다(정상).
+
+**세션에 전달**: E-1~E-5의 `대문자_이름=값` 줄 전부 + E-4의 심사 표 첫 5줄 + 읽고 판단할 것 3가지에 대한 답. 세션이 `kiki/const-a0005`로 PR을 열고, CI green·머지 후 ①게이트 `G-const-a0005-part1-corrections`와 `G-const-r4-02-decision`을 기록하고 ②어긋남 5건 처분 태스크를 등재한다.
+
+---
+
 ## 5. 이 런북이 답하지 못하는 것 (정직 고지)
 
 - **Claude Code 런타임이 이 PC에서 훅을 실제로 호출하는지**는 과제 C로도 증명되지 않는다. C는 훅과 같은 방식(표준 입력 JSON → 종료 코드)으로 가드를 직접 실행할 뿐이다. Claude Code가 Windows에서 훅 명령을 어떤 셸(PowerShell·Git Bash)로 돌리는지, 그 셸에서 `python3`가 같은 것으로 풀리는지는 런타임 밖이다. 가드는 차단할 때마다 `.claude/logs/constitution_guard.jsonl`에 한 줄을 남기므로, 실사용 중 그 파일이 생기는지가 사후 증거가 된다.
+- **과제 E(A0005)의 검증 범위**: 블록 E-1~E-5를 리눅스의 PowerShell 7.4.6에서 경로만 치환해 한 세션으로 실제 실행했다(모사 원격 저장소 + `origin/main` 클론 + 작업 사본 + 이 PC와 같은 구조의 `git worktree`). 정상 경로는 `PUSH_EXIT=0`까지 통과했고 확인 문구의 값(`RECORD_BYTES=8568`·`PART1_ROWS=14`·`STAGE3_TOTAL_BLOCKING=45`)이 실측과 같다. 주입 3종 — 동의 `no`·편집 설치가 다른 사본을 가리킴(`SRC_FROM_WORKTREE=False`)·파이썬 기록 생성기의 전제(패치 미적용·기록 중복) — 은 모두 쓰기·커밋·push를 거부했다. **하지 못한 것**: ①Windows PowerShell **5.1**에서의 실행(인코딩 기본값이 다르다 — 표준입력 파이프는 ASCII 코드만 넘기도록 해 두었지만 5.1 실측은 아니다) ②`C:\` 경로·`.venv\Scripts\python.exe` 실재 ③실제 `origin`(CI·머지 큐)에의 push. 어느 하나라도 어긋나면 블록이 `…_REFUSED`/`…=False`로 멈추도록 만들었으므로, 첫 실행에서 멈추는 줄을 그대로 세션에 전달하면 된다.
+- **쓰기 블록 스캐너(`check_runbook_blocks.py`)는 과제 E를 일부만 본다**: `git commit`·`git push`는 쓰기로 인식하지만 E-3b의 `git apply`와 `& $Py -` (변수 경유 실행)는 쓰기로 인식하지 못한다(HARN-214 한계와 같은 계열). 변이 시험에서 E-3b의 가드를 `if ($true)`로 바꿔도 스캐너는 통과했고, E-4의 같은 변이와 E-5의 침묵 `else`도 통과했다. 즉 "스캐너 통과"는 이 절의 안전 근거가 아니다 — 근거는 위의 실제 실행 주입이다.
 - **A0003 정정 경로의 옳고 그름**은 도우미가 판정하지 않는다. 도우미는 "초안대로 정확히 반영됐는가"만 보장한다. 경로가 정본인지는 초안의 근거 표(1차 조사 + 독립 재검증)와 Kiki님의 읽기가 판정한다.
 - **운영 DB 스탬프**(`d6e7f8a9b0c1`)와 코드 기대 스키마(`8c19e8a611e4`)는 정정안 작성 시점 값이다. 이후 마이그레이션이 추가되면 등록부의 판 표기가 낡는다 — 그것을 자동으로 잡는 장치는 아직 없다(후속 CONST-03 범위).
