@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,8 +14,12 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① P3-22 가 phase3_coverage 에 만든 --hints-from-db 를 운영 DB(docker whymath-pg, 호스트 포트 5433)에서 실행해 실제 기준선을 보고한다: DB 검수 통과 힌트 문항 수 · 범위 은행과 겹치는 수 · 적격 문항 수 · hint 연결 linked/missing 개수 · Concept Completeness 값. 출력의 hint_seat 필드(JSON)를 증거로 첨부한다.\n② DB 힌트 문항이 있는데 범위 은행과 겹침이 0이면 ID 공간 불일치(JSONL 은행 problem_id 와 DB problem 행)를 먼저 규명한다 - 힌트 0건으로 보고하지 않는다.\n③ 이 태스크의 실행은 Kiki 머신 작업이다. 런북은 6항목 브리핑·자가검증(DB 응답 확인) 포함, python -m 형태로 안내한다."
+  - "[진행 2026-10-16 · 판정 기준 origin/main 419c4e7c] ③ 이행: 런북 docs/ops/p3_42_coverage_hint_baseline_live_measurement_runbook.md (6항목 브리핑·자가검증·python -m 형태·자리표시자 0개, check_runbook_blocks 위반 0건). ①② 미이행: 운영 DB 실측은 Kiki 머신 실행 대기 - 이 세션은 Postgres 가 없어 DB 수치를 재지 못했다. 수치를 추정해 채우지 않는다. 오프라인으로 확정한 것: JSONL 은행의 problem_id 14,690건은 전부 유일한 UUIDv5 정규형이라 형식 불일치로 겹침 0이 될 구조적 이유는 없다. 계측기 적격 판정은 JSONL review_status가 approved인 행뿐이며 그 수는 전체 14,694행 중 2,984건(범위 은행 1,073문항 중 917)이다. 런북 블록 E가 DB problem 과 JSONL 의 problem_id·slug·review_status 를 대조해 ID 공간 불일치와 상태 좌석 불일치를 가른다. 발견: 계측기 exit 1 은 목표 미달과 크래시를 구분하지 못한다(import 실패도 exit 1) - 런북은 exit code 가 아니라 MEASURED 줄로 판정한다. 완료 조건: Kiki 회신(B·D·E 출력)으로 ①② 를 채운 뒤 done."
 artifacts: []
 paths: []
-session: null
-notes: "출처: P3-22 acceptance ④ 승계(2026-10-14). P3-22 는 코드 배선과 합성 주입 검증까지 착지했으나 구현 세션 환경에는 Postgres 가 없어 실제 DB 수치를 재지 못했다(--hints-from-db 는 ConnectionRefusedError 로 exit 2 - 실패 경로 실측만 확인). 측정을 못 한 것을 통과로 보고하지 않기 위해 별도 좌석으로 둔다."
-updated: 2026-10-14
+session: claude/nifty-meitner-ow1c7c
+notes: |-
+  출처: P3-22 acceptance ④ 승계(2026-10-14). P3-22 는 코드 배선과 합성 주입 검증까지 착지했으나 구현 세션 환경에는 Postgres 가 없어 실제 DB 수치를 재지 못했다(--hints-from-db 는 ConnectionRefusedError 로 exit 2 - 실패 경로 실측만 확인). 측정을 못 한 것을 통과로 보고하지 않기 위해 별도 좌석으로 둔다.
+
+  [정정 2026-10-16] 런북 착지 및 ①② 미이행 상태 기록
+updated: 2026-10-16
