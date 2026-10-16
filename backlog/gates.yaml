@@ -246,11 +246,11 @@ gates:
     title: "헌법 밖 경로 보호(⑦) 방식 결정 — 조직 소유 public 저장소지만 CODEOWNERS 소유자가 전 경로 @doldori7 하나이고 PR 작성자도 같은 계정이라 코드 오너 리뷰 필수는 모든 PR 을 막는다(사람·AI 세션이 같은 신원). 후보: (가) 현상 유지(가드 훅 + R0-02) / (나) 서명 검증 CI 스텝(Kiki 서명 키로 서명된 커밋만 constitution/ 변경 통과) / (다) 별도 계정·봇으로 작성자 분리. 조직 플랜은 세션 프록시가 막아 제공 여부 미확인 — 플랜 의존 기능은 판정하지 않았다. 근거는 docs/standards/coding_constitution_transplant.md 의 CONST-03 P4 절."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-06
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 결정 2026-10-15(추천안 승인): (나) 서명 검증 CI 채택, 단 가드 매처 보강을 선행. 후속 태스크 CONST-16-guard-matcher-mcp-github-write(PR https://github.com/kiki-s-broom/WhyMath/pull/1652, 판정 기준 main 64628f61 · 브랜치 커밋 7a97cad2)과 CONST-17-constitution-signed-commit-ci-check(등재, 구현 전). (다) 별도 계정·봇은 비용 대비 효과가 낮아 보류. 조직 플랜 의존 기능은 제공 여부 미확인이라 판정하지 않음."
+    cleared_by: kiki
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
