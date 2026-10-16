@@ -41,8 +41,6 @@ import functools
 from collections.abc import Callable
 from typing import ClassVar, Final
 
-import sympy
-
 from whymath_backend.l3.equivalent.p3_diff_expr import Poly, poly_to_sympy_str, render_poly
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     DiffItem,
@@ -61,7 +59,6 @@ from whymath_backend.l3.equivalent.p3_diff_velocity_acceleration_skeleton_genera
 __all__ = ["P3DiffMotionWordProblemGenerator"]
 
 _MODEL: Final = "ptype.model-word-problem"
-_X = sympy.Symbol("x")
 _RAIL: Final = "직선 레일 위를 움직이는 장난감 열차가 출발한 지 t초 후, 출발 지점에서 잰 위치는"
 _NOUN: Final = "열차의 위치"
 
@@ -167,7 +164,8 @@ def _turn_reason(a: int, r: int) -> str:
 
 
 def _at(poly: Poly, point: int) -> int:
-    return int(sympy.sympify(poly_to_sympy_str(poly, "x")).subs(_X, point))
+    """위치 다항식의 값 — (지수, 계수) 쌍을 정수로 직접 더한다(문자열 파서를 거치지 않는다)."""
+    return sum(coeff * point**exponent for exponent, coeff in poly)
 
 
 # ──────────────────────────────────────────────────────────────────────────

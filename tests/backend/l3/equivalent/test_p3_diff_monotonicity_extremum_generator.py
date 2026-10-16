@@ -450,7 +450,10 @@ def test_value_items_pin_x_and_match_the_value_at_a_verified_extremum(
         assert deriv_at_r == 0
         checked += 1
     assert checked >= 8
-    assert unknown_coef >= 4 and flat_mixed >= 1, (unknown_coef, flat_mixed)
+    # ⓑ 평평한 임계점형은 은행 감사 1회차(P3-05, 2026-10-15)에서 진단 틀 `diag-increase-to-decrease-x`가
+    # '미분 없이 풀림'으로 지적돼 극대 이후 감소 꼴 삼차 틀로 바뀌며 값형 문항에서 빠졌다(감사받은
+    # 바이트 보존 — 되살리면 새 은행·새 감사다). 그래서 이 분기는 있으면 검증하되 하한은 요구하지 않는다.
+    assert unknown_coef >= 4, (unknown_coef, flat_mixed)
 
 
 def test_interval_items_have_exactly_one_integer_in_the_stated_region(
