@@ -1,0 +1,15 @@
+{
+  "pool": "whymath-original",
+  "source_name": "오개념 교정 전략표 v1 (P3-06 — 반복 오류 사다리 3칸별 교정 내용)",
+  "uploaded": "2026-10-16",
+  "counts": {
+    "rows": 7
+  },
+  "source_citation": "출처: WhyMath 자체 저작 — 오개념(M-id)별 교정 설명·쉬운 문항 선택 조건·선수 개념 기준 개념. 사다리 임계는 l2/remediation_policy.py가 소유하고 이 표는 사본을 갖지 않는다.",
+  "license_notice": "WHYMATH_ORIGINAL — 와이매스 자체 저작물. 교정 설명은 AI가 저작한 초안(authoring_status=draft)이며 사람 검수 전이다. 검정교과서·평가원·EBS 본문·문항·풀이를 포함하지 않는다.",
+  "note": "학생 노출 전 사람 검수가 필요하다(reviewed 행만 노출). 교수전략 필드는 의도적으로 없다 — 전략 선택은 런타임 셀렉터(04d)가 소유한다. 계약 = schema/wrong_answer_remediation.py(RemediationSpec). 소유권 분리 근거는 docs/architecture/04e_misconception_remediation_design.md 정정 2026-10-16.",
+  "post_extraction": [
+    "l4/misconception/remediation_advice.py가 사다리 칸(select_rung)에 맞는 내용을 조회한다.",
+    "쉬운 문항·선수 개념은 id를 박지 않고 선택 조건만 둔다(코퍼스가 바뀌어도 어긋나지 않게)."
+  ]
+}
