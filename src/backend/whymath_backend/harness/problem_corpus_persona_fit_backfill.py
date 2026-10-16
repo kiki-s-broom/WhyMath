@@ -83,6 +83,10 @@ KNOWN_CORPORA: dict[str, Path] = {
     # 같아야 한다 — 그 결속은 `p3_calculus1_diff_batch.strip_backfill_stamps`와 은행 커버리지
     # 테스트가 동결한다.
     "p3_calculus1_diff_v0": Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl"),
+    # P3-05 빈 칸 채우기 은행(204건) — 9번째. 같은 자격 통과 프로토콜의 3회차 S5 감사가 승인 근거를
+    # 냈다(`docs/data/p3_fill_audit/bank_audit_r3/`). 각인 두 키를 걷어 낸 바이트가 감사 동결 사본과
+    # 같아야 한다는 결속은 `tests/backend/l1/test_p3_fill_bank_coverage_link.py`가 동결한다.
+    "p3_fill_v0": Path("data/corpus/problem_bank_p3_fill_v0/problems.jsonl"),
 }
 
 _AUDIT_DIR = Path("docs/data/persona_fit_backfill_audit")

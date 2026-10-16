@@ -870,7 +870,8 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual07() -> No
     # 4슬롯 × 12)을 더했다. 실중복 0쌍 유지는 아래 T2 단언이 증거다.
     # 14,586 → 14,646: 같은 은행에 02-02 미분가능성 5슬롯 × 12건이 늘었다(종수는 39 그대로).
     # 14,646 → 14,694: 02-07 증가·감소 4슬롯 × 12건이 더해졌다(같은 은행).
-    assert report.total_problems == 14694
+    # 14,694 → 14,742: 5단계 02-03 규칙 일반화 24건 + 02-10 문장제 24건(같은 은행).
+    assert report.total_problems == 14742
     assert len(report.corpora) == 39
 
     # T1 — 해소됨.

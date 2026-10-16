@@ -79,10 +79,15 @@ def test_batch_is_byte_deterministic(tmp_path: Path) -> None:
 
 class TestBank:
     def test_scan_is_not_vacuous(self) -> None:
-        assert len(_rows()) >= 156
+        assert len(_rows()) == 204
 
-    def test_the_batch_never_writes_an_approval(self) -> None:
-        assert all("review_status" not in row for row in _rows())
+    def test_the_batch_never_writes_an_approval(self, fresh: dict[str, Any]) -> None:
+        """생성기는 승인을 쓰지 않는다 — 재생성 산출물에는 `review_status`가 없고, 저장소 은행의 전건
+        `approved`는 3회차 S5 감사 뒤 코퍼스 단위 백필이 얹은 각인이다(결속 테스트가 감사 내용에 묶는다)."""
+        fresh_rows = [json.loads(line) for line in fresh["problems"].decode("utf-8").splitlines()]
+        assert len(fresh_rows) == 204
+        assert all("review_status" not in row for row in fresh_rows)
+        assert {row.get("review_status") for row in _rows()} == {"approved"}
 
     def test_each_row_carries_exactly_one_known_slot_tag(self) -> None:
         for row in _rows():
@@ -111,8 +116,43 @@ class TestBank:
                 assert other.get("slug") not in slugs, path
 
 
+#: 5단계 — 슬롯 칸이 아니라 *스킬*을 덮으려고 만든 개념(02-03 규칙 일반화 · 02-10 문장제). 이 개념들의
+#: 6칸은 이미 승인 문항이 채웠으므로 아래 "빈 칸만 생성" 불변식의 대상이 아니다.
+_SKILL_COVERAGE: dict[str, str] = {
+    "[12미적Ⅰ-02-03]": "ptype.generalize-pattern",
+    "[12미적Ⅰ-02-10]": "ptype.model-word-problem",
+}
+
+
+def _code_of(row: dict[str, Any], spec: Any) -> str:
+    src = next(c["concept_src_id"] for c in row["concepts"] if c["role"] == "PRIMARY")
+    return str(next(c.code for c in spec.concepts if c.source_id == src))
+
+
+class TestSkillCoverageItems:
+    """5단계 24건 × 2 — 스킬 pattern-generalization · word-problem-modeling 을 행사하는 문제유형."""
+
+    def test_each_skill_concept_has_24_items_of_its_modeling_type(self) -> None:
+        spec = ps.load_scope_spec()
+        for code, ptype in _SKILL_COVERAGE.items():
+            rows = [r for r in _rows() if _code_of(r, spec) == code]
+            assert len(rows) == 24, (code, len(rows))
+            assert {tuple(r["problem_type_codes"]) for r in rows} == {(ptype,)}, code
+
+    def test_no_other_concept_borrows_a_skill_type(self) -> None:
+        spec = ps.load_scope_spec()
+        skill_types = set(_SKILL_COVERAGE.values())
+        for row in _rows():
+            if _code_of(row, spec) in _SKILL_COVERAGE:
+                continue
+            assert not skill_types & set(row["problem_type_codes"]), row["slug"]
+
+
 class TestOnlyMissingCellsAreGenerated:
-    """ "재배정 먼저, 모자라는 칸만 생성"(Kiki 결정 ②) — 이 은행의 슬롯은 기존 승인 문항이 못 채운 칸이다."""
+    """ "재배정 먼저, 모자라는 칸만 생성"(Kiki 결정 ②) — 이 은행의 슬롯은 기존 승인 문항이 못 채운 칸이다.
+
+    5단계 개념(`_SKILL_COVERAGE`)은 스킬을 덮는 문항이라 이 불변식에서 제외한다.
+    """
 
     def test_every_generated_cell_is_empty_without_this_bank(self) -> None:
         spec = ps.load_scope_spec()
@@ -131,8 +171,9 @@ class TestOnlyMissingCellsAreGenerated:
         unmet = {u.subject: " ".join(u.missing) for u in report.slots.unmet}
         by_concept: dict[str, set[str]] = {}
         for row in _rows():
-            src = next(c["concept_src_id"] for c in row["concepts"] if c["role"] == "PRIMARY")
-            code = next(c.code for c in spec.concepts if c.source_id == src)
+            code = _code_of(row, spec)
+            if code in _SKILL_COVERAGE:
+                continue
             (slot,) = parse_slot_tags(row["tags"]).slots
             by_concept.setdefault(code, set()).add(slot.value)
         assert by_concept, "생성한 칸이 없다"
@@ -147,8 +188,10 @@ class TestOnlyMissingCellsAreGenerated:
 
 
 def test_registry_lists_the_generators_in_bank_order() -> None:
-    assert [g.standard_code for g in batch.GENERATORS][:3] == [
+    assert [g.standard_code for g in batch.GENERATORS] == [
         "[12미적Ⅰ-02-01]",
         "[12미적Ⅰ-02-02]",
         "[12미적Ⅰ-02-07]",
+        "[12미적Ⅰ-02-03]",
+        "[12미적Ⅰ-02-10]",
     ]

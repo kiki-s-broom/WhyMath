@@ -218,6 +218,12 @@ def _diff_of_one_sided(
         return None
     value = _poly_value(right - left, point)
     r_val, l_val = _poly_value(right, point), _poly_value(left, point)
+    # 절댓값 항이 둘 이상이거나 절댓값 안이 이차 이상이면 다른 꺾임점 너머에서는 식이 달라진다 —
+    # 분기 식은 x = point 근처에서만 맞다.
+    absolutes = f_expr.atoms(sympy.Abs)
+    near = len(absolutes) > 1 or any(sympy.degree(a.args[0], _X) > 1 for a in absolutes)
+    right_at = f"x = {point} 가까이에서 x > {point}일 때" if near else f"x > {point}에서"
+    left_at = f"x = {point} 가까이에서 x < {point}일 때" if near else f"x < {point}에서"
     return DiffItem(
         slot=slot,
         frame_id=frame_id,
@@ -227,11 +233,11 @@ def _diff_of_one_sided(
         ),
         answer_text=str(value),
         explanation=(
-            f"x > {point}에서 f(x) = {_render(right)}이므로 "
+            f"{right_at} f(x) = {_render(right)}이므로 "
             f"f'(x) = {_render(sympy.diff(right, _X))}이고 우미분계수는 {r_val}이다. "
-            f"x < {point}에서 f(x) = {_render(left)}이므로 "
+            f"{left_at} f(x) = {_render(left)}이므로 "
             f"f'(x) = {_render(sympy.diff(left, _X))}이고 좌미분계수는 {l_val}이다. "
-            f"따라서 구하는 값은 {r_val} - ({l_val}) = {value}이다."
+            f"따라서 구하는 값은 {r_val} - {f'({l_val})' if l_val < 0 else l_val} = {value}이다."
             + (f" 이 값이 0이므로 x = {point}에서 미분가능하다." if value == 0 else "")
         ),
         conditions=f"Derivative({right} - ({left}), x).doit().subs(x, {point}) = y",

@@ -56,6 +56,12 @@ from whymath_backend.l3.equivalent.p3_diff_differential_coefficient_skeleton_gen
 from whymath_backend.l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator import (
     P3DiffMonotonicityExtremumGenerator,
 )
+from whymath_backend.l3.equivalent.p3_diff_motion_word_problem_skeleton_generator import (
+    P3DiffMotionWordProblemGenerator,
+)
+from whymath_backend.l3.equivalent.p3_diff_power_pattern_skeleton_generator import (
+    P3DiffPowerPatternGenerator,
+)
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import P3DiffSlotGenerator
 
 __all__ = ["CORPUS_DIR_NAME", "GENERATORS", "build_provenance", "main", "run_p3_fill_batch"]
@@ -67,6 +73,9 @@ GENERATORS: Final[tuple[type[P3DiffSlotGenerator], ...]] = (
     P3DiffDifferentialCoefficientGenerator,
     P3DiffDifferentiabilityGenerator,
     P3DiffMonotonicityExtremumGenerator,
+    # 5단계 — 스킬 덮기(규칙 일반화·문장제 모델링). 위 4개와 달리 빈 칸이 아니라 스킬을 채운다.
+    P3DiffPowerPatternGenerator,
+    P3DiffMotionWordProblemGenerator,
 )
 
 #: 사이드카 `generated` — 은행이 처음 만들어진 날. 의도적 내용 변경이 아니면 바꾸지 않는다.
@@ -113,8 +122,15 @@ def build_provenance(
                     "감사 "
                     "(n ≥ 200 · Wilson 상한 ≤ 0.02) 뒤 코퍼스 단위 백필이 쓴다."
                 ),
-                "sample_review": "감사 전 — 승인 문항 0건",
-                "evidence": "docs/data/p3_fill_audit/ (감사 회차 기록 — 감사 시작 시 생성)",
+                "sample_review": (
+                    "204건 전수 — 자격 통과 프로토콜(기계 ∪ LLM 판정자 A ∪ B) 3회차 S5 감사, "
+                    "결함 0건 · 보정 상한 0.01907 ≤ 0.02"
+                ),
+                "evidence": (
+                    "docs/data/p3_fill_audit/bank_audit_r3/ (라벨·동결 사본) · "
+                    "docs/data/corpus_audit_p3_fill_v0.jsonl (코퍼스 단위 라벨) · "
+                    "is_published=False 유지"
+                ),
             },
         }
     )

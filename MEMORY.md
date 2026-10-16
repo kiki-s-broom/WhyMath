@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-15 (구현 · P3-05): **빈 칸 채우기 은행 204건이 3회차 감사(S5)를 통과해 승인 각인됐다 — Problem Coverage 6/8 → 8/8(100%), 핵심 개념 6슬롯 42/60 → 60/60. 1회차 k = 19, 2회차 k = 2, 3회차 k = 0 — n = 204에서는 k = 0만 통과하는 경계라 회차마다 새 은행을 만들었다** (claude 구현, 설계 결정은 사용자) — 판정 기준: PR 3/3 head(머지 전)
+
+**무엇**: 태스크 `P3-05-triangle-density`. 기존 승인 문항이 못 채운 슬롯 13칸(02-01·02-02·02-07)과 승인 문항이 0건이던 두 스킬(규칙 일반화 ← 02-03, 문장제 모델링 ← 02-10)을 새 은행 `problem_bank_p3_fill_v0` 204건(13칸 × 12 + 24 + 24)으로 채웠다. 재배정 5칸은 생성하지 않았다(사용자 결정: 정직형 배정). 승인 경로는 P3-03과 같은 결함 주입 강등전 프로토콜(기계 게이트 ∪ 판정자 A ∪ B)이고, 자격 측정(검출 120/120)을 그대로 쓴다.
+
+**감사 3회차 — 전 회차 as-found**: 1회차 k = 19(미분 없이 풀림 15 · 문장 표기 3 · 해설 1) → 02-03을 "사례 값을 주고 연장하는" 틀에서 "생략된 급수를 직접 미분하는" 틀로, 02-10을 이차식 위치에서 삼차식 위치로 교체. 2회차 k = 2(`|x^2 - 1|` 해설 구간 서술 오류 1 · 교대 급수 세 항만 보여 부호가 하나로 안 읽힘 1) → `near` 절·4항 표시. 3회차 k = 0 · 보정 상한 0.01907 ≤ 0.02. 기록 = `docs/data/p3_fill_audit/`.
+
+**승인 각인**: 감사 라벨 `docs/data/corpus_audit_p3_fill_v0.jsonl`, 코퍼스 키 `p3_fill_v0`를 `KNOWN_CORPORA` 9번째·`AUDIT_LABEL_MAP`에 편입, `persona_fit`·`review_status` 백필(204건 `approved`), 결속 테스트 `tests/backend/l1/test_p3_fill_bank_coverage_link.py`(각인을 걷어 낸 바이트 == 3회차 동결 사본). 측정(`phase3_metrics`·`phase3_coverage`): Problem Coverage 8/8 = 100%, 6슬롯 60/60 = 100%, Solution QA 1121/1121.
+
+**정직한 공백**: ① n = 204는 k = 0만 통과하는 경계다 — 3회차의 0건은 판정자 8명이 같은 지침으로 본 결과이고 1·2회차 판정자 간 겹침이 낮았다(7/19 · 0/2). ② 사전 등록 커밋 없음(매니페스트는 판정 전에 만들었으나 판정 전에 커밋하지 않았다). ③ 판정자는 같은 모델 계열 LLM이다. ④ Concept Completeness 0/10(힌트 측정 불가)·Graph Connectivity 5/10은 이 태스크의 완료 판정(Problem Coverage · 6슬롯)이 아니라 별건(`P3-22`·`P3-32` 등)이다. ⑤ 02-01 '극값의 개수' 24건은 보류(별건 `P3-43`, 개념 매핑 결정 필요).
+
 ### 2026-10-14 (구현 · P3-04): **Problem 7필드·6슬롯을 발행 게이트에 걸었다 — 7필드가 비거나 측정 못 한 문항은 Published로 못 간다. 새 컬럼·마이그레이션 없음** (claude 구현, 설계 분기 2건은 사용자 결정) — 판정 기준 main `d21e4aeb` 위, 병합 후 HEAD 기준 로컬 CI 재현 6잡 통과
 
 **무엇**: 태스크 `P3-04-problem-metadata-and-slots`. 정본 = `docs/standards/problem_metadata_contract.md`(정의·필드 매핑·판정 규칙), 현황 = `docs/reviews/p3_04_problem_metadata_status_2026-10-14.md`. ① 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 전략)를 기존 컬럼·연결에 매핑(개명 없음). ② 6슬롯은 기존 `problem.tags`의 `p3-slot:<id>` 태그. ③ 집행 지점 = `l3/problem_publish_gate.py`의 PUBLISH 게이트(`problem_metadata_complete`) — Published로 가는 유일한 경로라 우회로가 없다. 증거는 `l3/problem_metadata_evidence.py`가 DB에서 읽는다(잠금 없음). ④ CI 쪽 = 실 코퍼스 래칫(`test_phase3_problem_metadata_ratchet.py`, 하한만 오른다) + P3-02 계측기에 `Concept Slot Coverage(6슬롯)`·7필드 집계 추가.
