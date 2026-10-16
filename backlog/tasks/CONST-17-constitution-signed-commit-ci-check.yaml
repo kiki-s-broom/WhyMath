@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: math
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - tests/constitution/test_check_signed_changes.py
   - constitution_signers/
   - ".github/workflows/ci.yml"
-session: null
+session: claude/busy-rubin-cy6l07
 notes: "게이트 G-const-protection-outside-claude 결정의 2단계(2026-10-15 Kiki 승인 · (나)안). 가드 매처 보강 태스크와는 서로 독립이다. 서명 키 등록은 사람 게이트로 분리한다."
-updated: 2026-10-15
+updated: 2026-10-16

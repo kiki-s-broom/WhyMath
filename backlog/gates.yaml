@@ -266,6 +266,19 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
+  - id: G-const-signing-key-register
+    title: "헌법 서명 검증 무장 - Kiki 서명 키를 만들어 공개키를 서명자 목록(constitution_signers/allowed_signers)에 등록하는 PR을 직접 만들고 머지한다. 이 PR이 머지되기 전까지 서명 검증은 미무장이라 어떤 서명 요건도 강제되지 않는다(키 등록 전 부트스트랩 상태). 절차와 음성 시험은 docs/ops/constitution_signing_runbook.md 의 과제 S, T, U. 등록 PR은 AI가 아니라 Kiki가 직접 만든다 - AI가 올린 등록 PR을 내용 확인 없이 승인하면 AI 키가 등록된다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-16
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-17-constitution-signed-commit-ci-check
   - id: G-const-sources-registry-adopt
     title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
     kind: human
