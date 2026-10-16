@@ -1764,6 +1764,18 @@ jobs:
       - name: 헌법 개정 기록 동반 검사 (CONST-03 — 헌법 제11조·R0-02)
         run: python scripts/constitution/check_amendment.py
 
+      # CONST-17 — 헌법 제9조 ① 집행의 2층(훅 밖 경로): constitution/ ·서명자 목록·이 검증기·
+      # 이 스텝 자신(잡 게이팅 사실 포함)을 바꾸는 PR 커밋은 Kiki 의 SSH 서명 키로 서명돼야 한다.
+      # 서명자 목록(constitution_signers/allowed_signers)은 **기준(main) 트리에서** 읽는다 —
+      # PR 이 자기 키를 등록해 스스로 통과하는 길을 막는다. 목록 파일이 아직 없으면 '미무장'으로
+      # 통과하되 경고 주석을 남긴다(게이트 G-const-signing-key-register 가 무장 시점을 추적).
+      # PR 이벤트에서만 판정한다: 머지 큐 스쿼시는 GitHub 서명이라 Kiki 키가 아니며, 그 변경은
+      # PR 시점에 이미 이 스텝을 통과해야 큐에 들어온다. ssh-keygen 은 ubuntu-latest 에 있다.
+      # 변별력은 tests/constitution/test_check_signed_changes.py(실물 SSH 서명 시나리오 22종 +
+      # 변이 주입 5종)가 봉인한다.
+      - name: 헌법 서명 검증 (CONST-17 — 헌법 밖 경로 보호·서명된 변경만)
+        run: python scripts/constitution/check_signed_changes.py
+
       # CONST-03 — 헌법 제4조·R1-02: "노드를 바꿨을 때 다시 돌릴 하류를 명령 한 줄로 구한다"는
       # 약속이 실제로 동작하는지(그래프가 읽히고 노드가 실재하는지) 상시 실행한다. 노드 이름은
       # rules.yaml R1-02 등록 명령(standards)과 같아야 한다.
