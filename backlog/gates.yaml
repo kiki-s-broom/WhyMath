@@ -932,6 +932,32 @@ gates:
     cleared_by: null
     notes: ""
     corrections: []
+  - id: G-p3-44-extremum-retag-approval
+    title: "P3-43 변경 요청서 승인 — 극값의 개수 24건 개념 02-01->02-07 이동 (Graph Connectivity 5/10->4/10 하락 수용 포함)"
+    kind: decision
+    assignee: kiki
+    status: waived
+    requested: 2026-10-16
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: "ID 충돌(타 세션이 P3-44 예약)로 P3-49 번호로 재등재 — 등재 직후 정정, 참조 0건"
+    corrections: []
+    depends_on:
+      - P3-43-extremum-count-items-concept-mapping-review
+  - id: G-p3-49-extremum-retag-approval
+    title: "P3-43 변경 요청서 승인 — 극값의 개수 24건 개념 02-01->02-07 이동 (Graph Connectivity 5/10->4/10 하락 수용 포함)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-16
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-43-extremum-count-items-concept-mapping-review
   - id: G-p3-entry-gate2-pass
     title: "Phase 3 진입 조건 — Phase 2 Gate 2 PASS 판정. 지시문 세트 00_README가 명시한 전제이며, 2026-09-19 EOS-22 판정문(docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md)은 FAIL이다(10조건 충족·무개입 연속 3루프 미충족). 이 게이트가 pending인 동안 P3-01~P3-14 태스크는 selector 착수 후보에서 제외된다 — 등재는 착수가 아니다(EOS-09 §0-2). 재판정은 구현 세션과 분리된 판정 세션에서 한다(지시문 주의 4)"
     kind: decision
