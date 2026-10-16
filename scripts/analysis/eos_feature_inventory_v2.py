@@ -960,7 +960,8 @@ CATALOG: tuple[Spec, ...] = (
        "l4_attempt_misconception_scan_enabled 기본 ON / 오답 선지 역추적 채널 = ASM-06 · "
        "킬스위치 l4_distractor_link_enabled 기본 ON · 두 채점 경로(/v1/me/attempts·코치 서버 "
        "판정 오답 EOS-146)가 같은 스캔 좌석 api._attempt_misconception_scan을 쓴다 · "
-       "미분 오답 서명 독법 = P3-06 derivative_signature, 후보→교정 전략 조회 = remediation_advice)",
+       "미분 오답 서명 독법 = P3-06 derivative_signature, "
+       "후보→교정 전략 조회 = remediation_advice)",
        "l4.misconception.catalog", "l4.misconception.diagnose",
        "l4.misconception.combined", "l4.misconception.models", "l4.misconception.intervene",
        "l4.misconception.match_gate", "l4.misconception.distractor",

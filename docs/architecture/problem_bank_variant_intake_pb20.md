@@ -53,7 +53,7 @@
 이것이 편입 결정의 핵심 전제다. **글롭 안 `other` 부류는 "서빙의 허용목록이 막아 준다"는 가정으로만
 안전한데, 공개 카탈로그가 그 가정 밖이다.** 313건을 거기에 더하면 미검수 문항이 나가는 표면이 313건 늘어난다.
 
-### 1.4 파일 층 — `problem_bank*` 글롭을 쓰는 소스 24개
+### 1.4 파일 층 — `problem_bank*` 글롭을 쓰는 소스 25개
 
 소스·스크립트의 경로형 문자열 상수 전수(AST) 스캔 결과다. 모두 디렉터리명 글롭(`problem_bank_*` 또는
 `problem_bank*`)이라 **디렉터리 이름이 일치하지 않으면 읽지 않는다.** `tests/.../test_variant_intake_pb20.py`가
@@ -81,6 +81,7 @@
 | 측정 | `src/backend/whymath_backend/ops/repeat_recommendation_report.py` | 반복 추천 리포트 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_variants.py` | 변형 파생 — 시드 signature로 코퍼스를 읽는다 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_lineage_links.py` | 계보만 걸기 — 시드 역인덱스로 코퍼스를 읽는다 | 아님 |
+| 측정 | `src/backend/whymath_backend/harness/wrong_answer_remediation_report.py` | 오답→교정 전 구간 계측(P3-06) — **`review_status == approved`만** 읽어 스테이징 문항은 보지 않는다 | 아님 |
 | 분석 스크립트 | `scripts/analysis/answer_form_requirement_scan.py` | 정답 형식 요건 스캔 | 아님 |
 | 분석 스크립트 | `scripts/analysis/eos_anchor_asset_audit.py` | EOS 앵커 자산 감사 | 아님 |
 | 분석 스크립트 | `scripts/analysis/measure_sympy_isolation_budget.py` | SymPy 격리 예산 실측 | 아님 |

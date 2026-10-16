@@ -157,6 +157,12 @@ ELSEWHERE: dict[str, tuple[str, str]] = {
         ".github/workflows/weekly-metrics.yml",
         "whymath_backend.ops.weekly_metrics_report",
     ),
+    # P3-06: 종료 코드로 판정하는 게이트(FAIL 1 · 측정 불가 3)라 관측 러너가 아니라 backend 잡의
+    # 게이트 스텝이 실행한다. 관측 리포트처럼 "항상 0으로 끝나는" 러너에 넣으면 게이트가 꺼진다.
+    "harness.wrong_answer_remediation_report": (
+        ".github/workflows/ci.yml",
+        "whymath_backend.harness.wrong_answer_remediation_report",
+    ),
     "ops.cost_report": ("scripts/fill_live_cost_table.py", "cost_report"),
 }
 
