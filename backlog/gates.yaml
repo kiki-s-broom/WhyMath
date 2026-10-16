@@ -955,7 +955,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-16] verdict PASS · inputs: P3-43-extremum-count-items-concept-mapping-review · evidence: 변경 요청서 완성(판정 기준 main 674a92b1, PR #1660): 24건 02-01->02-07 이동, 요청 5항목, 부작용 Graph Connectivity 5/10->4/10 명시. 입력 완결이며 승인과 지표 하락 수용 여부는 게이트 담당자(Kiki)가 clear 한다 — done P3-43-extremum-count-items-concept-mapping-review 인계"
     depends_on:
       - P3-43-extremum-count-items-concept-mapping-review
   - id: G-p3-entry-gate2-pass
