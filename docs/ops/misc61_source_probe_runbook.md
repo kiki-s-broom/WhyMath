@@ -90,29 +90,30 @@ git worktree prune
 > 대상 태스크: `MISC-61-a3-thin-misid-source-enrichment` acceptance ② (M0418·M0417 경로)
 > **실행 여부는 Kiki가 정한다.** 이 실행 없이도 M0599·M0600은 이미 저작돼 있다 — 이 실행은 A3의 나머지 2건(M0418·M0417)을 채우기 위한 것이다.
 > 선행 조건: 1차 실행으로 원천 파일이 이 PC에 있음이 확인돼 있다(`통합데이터셋\WhyMath_통합데이터셋.json`, sha256 `fcf6d333…187e` 일치 확인됨).
-> **이 옵션(`--dump-key`)은 아직 main에 없다.** 브랜치 `claude/peaceful-bell-s7mlg8`에서 펼친다 — 블록 A가 그 브랜치에 옵션이 실제로 있는지 자가검증한다.
+> **[정정 2026-10-16]** 이 옵션(`--dump-key`)은 1차 이행 PR(#1643)과 함께 **main에 들어갔다.** 종전 판은 "main에 없다, 브랜치 `claude/peaceful-bell-s7mlg8`에서 펼친다"고 적었으나 그 브랜치는 머지 뒤 원격에서 삭제돼(`git ls-remote` 0건) 블록 A의 `git fetch`가 첫 줄에서 실패했다. 지금은 `origin/main`에서 펼치고, 블록 A가 그 트리에 옵션이 실제로 있는지 자가검증한다.
 
 ## 사전 브리핑 (6항목)
 
 1. **과제 명칭** — 원천 7계층 JSON에서 `오개념_원인` 키의 값 전체를 읽어, 코퍼스의 `원본`+세 필드 공란 행과 행 단위로 대조.
 2. **목적** — 1차 실행으로 "원천에 `오개념_원인` 값이 21행 있고, 코퍼스의 `원본` 공란도 21행"까지만 알았다. 그 21행이 **같은 행인지**와 M0418·M0417의 **실제 내용**을 보아야 값을 어느 필드(`student_wrong_thinking`인지 다른 칸인지)로 보낼지 정할 수 있다. 내용을 보지 않고는 정하지 않는다.
-3. **구체적 절차** — (A) 브랜치를 임시 폴더(`git worktree`)에 펼치고 `--dump-key` 옵션이 실제로 있는지 확인 → (B) 원천 파일을 이름·sha256으로 찾음 → (C) 진단을 1회 실행(읽기 전용, 약 1초)하고 결과를 클립보드에 복사 → (D) 세션에 붙여넣고 임시 폴더 삭제. 공유 클론의 브랜치·미커밋 변경은 건드리지 않는다.
+3. **구체적 절차** — (A) `origin/main`을 임시 폴더(`git worktree`)에 펼치고 `--dump-key` 옵션이 실제로 있는지 확인 → (B) 원천 파일을 이름·sha256으로 찾음 → (C) 진단을 1회 실행(읽기 전용, 약 1초)하고 결과를 클립보드에 복사 → (D) 세션에 붙여넣고 임시 폴더 삭제. 공유 클론의 브랜치·미커밋 변경은 건드리지 않는다.
 4. **성공 기준** — 블록 A에서 `DUMP_KEY_OPTION_PRESENT=True`, 블록 B에서 `SOURCE_SHA_MATCHED_PATH=` 뒤에 경로, 블록 C에서 `PROBE_EXIT=0`. 붙여넣은 JSON에 `"dump"`가 있고 `rows_with_value`가 숫자로 나온다. 하나라도 어긋나면 다음 블록을 붙여넣지 않는다(실패 시 대처: 어긋난 줄의 출력을 그대로 세션에 알린다).
 5. **실행 환경** — Windows PowerShell(= Phaiakes9, 별도 접속 불요). 작업 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath`. Docker·서버 불요.
 6. **창 구분** — **새 PowerShell 창 하나**에서 블록 A→B→C→D를 **한 블록씩** 붙여넣는다. 서버를 점유하지 않으므로 이후 조작 가능. 앞 블록의 출력 판정값을 눈으로 확인한 뒤 다음 블록을 붙여넣는다.
 
 **출력 안전**: 이 덤프는 `오개념_원인` 한 키의 값만 낸다. 와이매스 자체 저작 오개념 서술이며 학생 데이터·개인정보가 아니다. 그래도 그 키 하나 외의 본문(오개념 서술 등)은 나오지 않는다.
 
-## 블록 A — 브랜치를 임시 폴더에 펼치고 `--dump-key` 옵션 존재를 확인한다 (읽기 전용)
+## 블록 A — `origin/main`을 임시 폴더에 펼치고 `--dump-key` 옵션 존재를 확인한다 (읽기 전용)
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 새 창 / 작업 디렉터리 = 공유 클론
 Set-Location C:\Users\kiki\Desktop\__AI\WhyMath
-git fetch origin claude/peaceful-bell-s7mlg8
+git fetch origin main
+"FETCH_EXIT=$LASTEXITCODE"
 $Wt = Join-Path $env:TEMP "whymath-misc61-probe2"
 $Stale = Test-Path $Wt
 if ($Stale) { git worktree remove --force $Wt; "STALE_WORKTREE_REMOVED=$Wt" }
-git worktree add --detach $Wt origin/claude/peaceful-bell-s7mlg8
+git worktree add --detach $Wt origin/main
 $Probe = Join-Path $Wt "scripts\ops\misc61_source_key_probe.py"
 $ProbeExists = Test-Path $Probe
 $HasOption = $false
@@ -120,10 +121,10 @@ if ($ProbeExists) { $HasOption = [bool](Select-String -Path $Probe -Pattern "--d
 "WORKTREE_HEAD=" + (git -C $Wt log -1 --oneline)
 "PROBE_SCRIPT_EXISTS=$ProbeExists"
 "DUMP_KEY_OPTION_PRESENT=$HasOption"
-if ($HasOption) { "블록 B로 진행" } else { "OPTION_MISSING — 이 브랜치에 --dump-key가 없다. 블록 B 이후를 붙여넣지 말고 위 세 줄을 세션에 알려라" }
+if ($HasOption) { "블록 B로 진행" } else { "OPTION_MISSING — origin/main에 --dump-key가 없다(fetch 실패로 옛 main이 남았을 수 있다). 블록 B 이후를 붙여넣지 말고 위 네 줄을 세션에 알려라" }
 ```
 
-**자가검증**: `DUMP_KEY_OPTION_PRESENT=True`가 아니면 블록 B 이후를 붙여넣지 않는다. 이 줄은 옵션이 없는 상태(1차 때의 main 스크립트)에서 `False`를 내므로 변별력이 있다.
+**자가검증**: `FETCH_EXIT=0`이고 `DUMP_KEY_OPTION_PRESENT=True`가 아니면 블록 B 이후를 붙여넣지 않는다. 이 줄은 옵션이 없는 상태(1차 이행 PR #1643 이전의 main 스크립트)에서 `False`를 내므로 변별력이 있다 — 세션이 그 이전 커밋의 스크립트에서 `--dump-key` 0건, 이후 커밋에서 3건임을 실측했다.
 
 ## 블록 B — 원천 파일을 찾는다 (이름 + sha256 일치로만 인정한다)
 
