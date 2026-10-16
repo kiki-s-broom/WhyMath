@@ -31,11 +31,12 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-30
-    remind_after_days: 30
+    remind_after_days: 107
     evidence: null
     cleared_by: null
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-10-15] [2026-10-15 Kiki 판단: 12/31 내부 완성 이후로 이월 - 게이트는 닫지 않음] 스토어 배포는 외부 출시(2027년) 작업이고, 12/31 내부 완성 정의(G-internal-completion-2026-12-31: Phase 3 Release Gate A~E, EOS G5 판정, 12월 검증 P0 종결)는 서명키를 요구하지 않는다. 실측 범위: P3-11~17 태스크·PRD에서 스토어 배포/서명키 요구 0건(제가 찾은 방법으로는). 재확인 지점 = 12/31 내부 완성 판정 직후 첫 계획 세션(remind 107일 = 2027-01-15). 그때 판정: 서명키 생성+key.properties 배선(build.gradle은 key.properties 부재 시 debug 폴백) 착수 또는 재이월. 그 전까지 build.gradle의 게이트 ID 주석과 android_release_signing_gate_test.dart가 debug 서명 상태를 계속 추적한다."
+    corrections:
+      - "[2026-10-15] remind_after_days: 30 → 107 · notes +495자 — 12/31 내부 완성 이후 이월 - 외부 출시 전용 작업(Kiki 2026-10-15)"
     no_inputs_reason: "keystore 생성·Play Console 서명키 등록은 Kiki 소유 비밀·계정 행위라 선행 태스크가 없다 — 코드 쪽 추적은 build.gradle 주석과 test/android_release_signing_gate_test.dart(MOB-18)"
   - id: G-arch38-verdict-recheck
     title: "ARCH-38 '혼입 유지' 판정의 재확인 (재확인 지점 = W8 종료 직후 2026-10-26) — 판정 근거 3종 중 정적으로 확정 불가한 ②③ 축을 사람이 확인한다. ②assessment JSONB 5필드에 *갱신* writer가 생겼는가(현행 write-once·하루 1행 idempotency) ③5필드를 값으로 읽어 판단에 쓰는 서빙 reader가 착지했는가(직렬화는 소비 아님·ASM-11 진행 여부). 근거 ①(W8 경로 접촉 0)은 사람이 볼 필요 없다 — tests/backend/db/test_assessment_result_verdict_premise.py가 자동으로 RED를 낸다. 판정 3택: ①판정 유지(트리거 미발동 — 기본값·ARCH-40을 재생성해 감시 지속) ②재판정 착수(canonical_entity_model_v1.md §5 절차) ③영구 확정으로 종결. 근거 = 정본 §3-C · MEMORY 2026-09-06 결정 로그 · PR #997. 등재 이유: Codex P2 지적 수용 — 재확인을 태스크로만 등재하면 selector가 즉시 착수 후보로 계산해(실측: 후보 124건에 포함) 트리거를 기다리지 않는다. G-state-machine-deferral-recheck 선례 동형"
@@ -254,7 +255,7 @@ gates:
     corrections: []
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-r4-02-decision
-    title: "R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). 3택: A 방향 뒤집기(Pydantic→model_json_schema 내보내기+드리프트 검사, 규칙 문장 개정 — 권고) / B 생성기 도입(대·비권고) / C 철회·단계 6 이월. 근거·비용은 A0005 초안 「R4-02」절."
+    title: "R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). [2026-10-15 정정] 등재 시점의 3택(A/B/C)은 낡았다 — 문서 기록상 Kiki 가 2026-10-06 에 (나)안(규칙 문구를 '스키마 YAML 필드 ↔ 모델 필드 일치 검사'로 개정, 어긋남은 만료 2026-12-31 로 동결)으로 결정했고 그 내용은 A0005 패치에 들어 있다. 이 게이트는 A0005 채택(G-const-a0005-part1-corrections) 뒤 audit.py --stage 3 에서 R4-02 가 통과로 바뀐 결과를 evidence 로 닫는다. 근거는 A0005 초안 「R4-02」절."
     kind: decision
     assignee: kiki
     status: pending
@@ -263,7 +264,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-15] title: \"R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). 3택: A 방향 뒤집기(Pydantic→model_json_schema 내보내기+드리프트 검사, 규칙 문장 개정 — 권고) / B 생성기 도입(대·비권고) / C 철회·단계 6 이월. 근거·비용은 A0005 초안 「R4-02」절.\" → \"R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). [2026-10-15 정정] 등재 시점의 3택(A/B/C)은 낡았다 — 문서 기록상 Kiki 가 2026-10-06 에 (나)안(규칙 문구를 '스키마 YAML 필드 ↔ 모델 필드 일치 검사'로 개정, 어긋남은 만료 2026-12-31 로 동결)으로 결정했고 그 내용은 A0005 패치에 들어 있다. 이 게이트는 A0005 채택(G-const-a0005-part1-corrections) 뒤 audit.py --stage 3 에서 R4-02 가 통과로 바뀐 결과를 evidence 로 닫는다. 근거는 A0005 초안 「R4-02」절.\" — 제목이 등재 시점(2026-10-06) 3택을 그대로 담아 실제 결정((나)안)과 어긋남 - 문서 기록 기준으로 정정. 결정 사실 자체는 대장 증거가 없고 coding_constitution_transplant.md 와 A0005 초안의 서술에 의존한다. 판정 기준 main bb8122f4."
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-sources-registry-adopt
     title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
@@ -504,11 +506,11 @@ gates:
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 5586a087 (분류기·런북이 있는 커밋). Kiki가 2026-10-15 Phaiakes9에서 런북 [A][B]를 실행했다: 선행 검사 전건 True(READY=True), 입력 FOUND=WhyMath-eos121 .eos121-out anthropic.review.jsonl SHA256=F94ADEBE...086FF. 분류기는 measured=false·CLASSIFY_EXIT=2로 거부했다(입력이 JSONL이 아니라 마크다운 뷰 — 비어 있지 않은 257줄 전건 JSONDecodeError). 원인=EOS-121 런북이 --out과 --worklist-out을 같은 경로로 지정해 회차 끝 write_text가 큐 정본을 덮어씀(사고 등재, 재발방지 OPS-147). 분류기 JSON은 산출되지 않았으나 Kiki가 같은 파일의 게이트거부 10묶음(30행)을 추출해 회신했고, 세션이 정확한 분수 계산으로 분류했다: ⓑ 표현 불일치 29행(9묶음)·ⓐ 산술 오류 0행·범위 밖 1행(근 선택 unique 위반·조건식 오기재). 결과·한계는 docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md. 한계: 분류기의 실데이터 동작은 미검증(합성 픽스처만), 고유 문제 3개."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "PR #1358(분류기 포함) 머지 후 Kiki가 런북을 실행하는 사람 행동 게이트 — 선행 태스크 없음"
