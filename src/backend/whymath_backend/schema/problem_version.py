@@ -165,9 +165,10 @@ class ProblemVersion(BaseModel):
     (`schema/version_lifecycle.py`)가, PUBLISHED 불변성의 최후 방어는 DB 트리거
     (`db/models/problem_version.py` + alembic)가 맡는다.
 
-    **전이 *실행*(게이트 경유)은 아직 이 도메인에 없다** — `l3/publish_gate.py`는 현재
-    `ConceptVersion`만 안다(문항 발행 경로는 별도 태스크). 그 전까지 `problem_version`에는
-    운영 writer가 없고, 이 계약은 스키마·영속 좌석·불변성 트리거까지다.
+    **전이 *실행*(게이트 경유)은 `l3/problem_publish_gate.py`가 소유한다**(EOS-190) — 이 모듈이
+    `problem_version` 행과 `problem.problem_version_id`를 쓰는 유일한 운영 자리이고, AST 동결
+    테스트가 우회 쓰기를 막는다. 그 모듈의 운영 호출자는 관리자 CMS의 문항 판 표면
+    (`api/admin_cms_problem_versions.py`, EOS-194)이다. 이 파일의 계약은 여전히 스키마까지다.
     """
 
     model_config = ConfigDict(

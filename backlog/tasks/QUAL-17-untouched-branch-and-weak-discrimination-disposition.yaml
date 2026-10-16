@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-17-untouched-branch-and-weak-discrimination-disposition
+title: "통과했으나 데이터가 해석 분기를 밟지 않은 코퍼스 지점·변별력 약한 문항 처분 판정 — QUAL-12 미접촉 분기"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - QUAL-12-prompt-condition-semantic-consistency-audit
+requires_gates: []
+acceptance:
+  - "① QUAL-12 감사가 통과시켰지만 데이터가 해당 분기를 밟지 않은 지점을 코퍼스별로 확정한다: 연립부등식 600행 전부 x 계수 양수(부등호 뒤집힘 0행) · 이차부등식 200행 전부 선행계수 양수 · 적분 코퍼스 넓이/거리 230행 전부 피적분 함수 양수 구간(부호 있는 적분과 넓이, 변위와 거리 해석이 갈리지 않음) · division_remainder 고유 200쌍 중 118쌍이 몫=나머지(236/400행, 몫과 나머지를 바꿔 이해해도 정답이 나옴).\n② 각 지점마다 (가) 생성기에 분기를 밟는 입력을 추가하고 코퍼스를 재생성할지 (나) 해당 해석을 가르는 문항을 별도 템플릿으로 둘지 (다) 현행 유지할지를 교수학 근거와 함께 판정한다. 판정만 하고 생성기·코퍼스 수정은 판정이 (가)/(나)일 때에 한해 코퍼스별 후속 태스크로 분리 등재한다.\n③ 같은 관측 중 설계 결함 후보를 함께 판정한다: conceptual_v0 의 정답 '0' 비율 288/360(80%)과 판정형 264행의 무의미 선지 · coordinate_geometry 200행·vector_operations 196행의 answer_format '실수'인데 정수 문자열 · discrete_ev 28행 answer_format '분수'인데 정수 문자열.\n④ 모든 항목에 is_published 여부와 학생 노출 건수를 적는다(QUAL-12 시점 파일 필드 기준 전량 False)."
+artifacts: []
+paths:
+  - "docs/reviews/**"
+session: null
+notes: "출처: QUAL-12 리포트의 통과이나 미접촉 분기 항목. 불일치가 아니라 변별력 사각이다 — 어휘 해석을 시험하는 데이터가 없어 해당 해석이 틀려도 코퍼스 대조로는 안 걸린다."
+updated: 2026-10-12

@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-22-correct-answer-extension-candidate-consumer
+title: "정답 직후 심화 계열 후보 소비처 — PB-19 결정의 집행 지점이 아직 없다"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - PB-19-cat-sibling-filter-relation-type-policy
+  - PB-20-variant-corpus-intake-and-link-only-lineage
+requires_gates: []
+acceptance:
+  - "① 소비처 — 직전 정답 문항을 기준으로 problem_relation 의 심화(어려운 계열)를 후보로 우대하는 경로를 만든다. PB-19 결정(심화는 정답 직후 후보)의 집행 지점이다. 오답 기준 필터(sibling_filter)와 독립된 손잡이로 두고 기본값은 OFF 로 둔다.\n② 방향 — l2/next_problem_selection.py 의 classify_relations 가 이미 오답 문항 기준 harder 집합을 계산한다. 정답 문항에도 같은 분류를 재사용하고 새 방향 규약을 만들지 않는다.\n③ 집행 지점(정본화와 별항) — 새 손잡이가 CAT 와 수능 두 정책 모두에서 후보 쿼리·가중에 실제로 도달함을 테스트로 동결하고, 기본값 OFF 의 쿼리 0회 증가를 유지한다. 결함 주입으로 RED 를 확인한다.\n④ 스코프 밖 — 심화 행이 코퍼스에 들어오는 것은 PB-20 소관이다. 그 전에는 라이브 동작이 바뀌지 않아야 한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/next_problem_selection.py
+  - src/backend/whymath_backend/l2/recommendation_policy.py
+  - src/backend/whymath_backend/api/_next_problem_policy.py
+  - "tests/backend/l2/**"
+session: null
+notes: PB-19 에서 분리. 근거 문서 docs/architecture/cat_sibling_filter_relation_policy_pb19.md 4절. PB-19 가 정한 소비 정책 표에서 심화는 정답 직후 후보인데 현행 필터는 직전 오답만 기준으로 하므로 이 소비는 아직 어디에도 없다. 심화 행 자체가 코퍼스에 없는 동안은 실효가 없어 PB-20 이후에 착수한다.
+updated: 2026-10-12

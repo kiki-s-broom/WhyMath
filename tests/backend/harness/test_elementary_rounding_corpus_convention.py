@@ -60,6 +60,11 @@ def _corpus_records() -> list[dict]:
 
 
 class TestCorpusMatchesKoreanConvention:
+    def test_target_is_the_registered_corpus(self) -> None:
+        # QUAL-12 어휘 트리거 거버넌스(test_stem_semantic_hook_coverage.py)가 이 파일을
+        # 어림 코퍼스의 동결 테스트로 등록한다 — 대상 이름이 바뀌면 등록이 낡았다는 신호.
+        assert CORPUS_DIR_NAME == "problem_bank_elementary_rounding_v0"
+
     def test_every_answer_matches_independent_convention_calculation(self) -> None:
         mismatches = []
         for record in _corpus_records():

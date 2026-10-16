@@ -42,6 +42,12 @@ from whymath_backend.l1.misconception.crosslink_gate import (
     CrosslinkGateError,
     load_gate_violations,
 )
+from whymath_backend.l1.misconception.crosslink_resolve import (
+    CanonicalLoadVerdict,
+    MisconceptionCrosslinkResolver,
+    ResolvedLink,
+    simulate_load_canonical,
+)
 from whymath_backend.schema.misconception_crosslink import MisconceptionCrosslink
 
 if TYPE_CHECKING:
@@ -68,6 +74,64 @@ def _crosslink_from_row(row: dict[str, Any]) -> MisconceptionCrosslink:
     return MisconceptionCrosslink.model_validate(row)
 
 
+class CanonicalFlipError(Exception):
+    """적재가 라이브 잔존 행과 경쟁해 canonical을 코퍼스 의도와 다르게 만든다 — 쓰기 0건.
+
+    업서트는 코퍼스에 없는 라이브 행을 지우지 못한다(HARN-216). `verdicts`에 `wrong_winner`·`tie`
+    판정 kebab **전건**이 있고 메시지도 전건을 싣는다(일부만 보이면 고치고 다시 돌려 또 걸린다).
+    해소는 라이브 잔존 행을 사람이 확인한 뒤 삭제하는 것뿐이다 — 이 도구에는 우회 인자가 없다.
+    """
+
+    def __init__(self, verdicts: list[CanonicalLoadVerdict]) -> None:
+        self.verdicts = verdicts
+        lines = [
+            f"적재 후 canonical이 코퍼스 의도와 달라지는 kebab {len(verdicts)}건 — "
+            "아무것도 쓰지 않았습니다:"
+        ]
+        for v in verdicts:
+            want = (
+                f"{v.corpus.canonical_mis_id}({v.corpus_confidence})"
+                if v.corpus.canonical_mis_id is not None
+                else f"미선정({v.corpus.reason})"
+            )
+            got = (
+                v.after_load.canonical_mis_id
+                if v.after_load.canonical_mis_id is not None
+                else f"미선정({v.after_load.reason})"
+            )
+            rivals = ", ".join(f"{r.mis_id}({r.confidence})" for r in v.rivals) or "없음"
+            lines.append(
+                f"  · {v.kebab_id} [{v.verdict}]: 코퍼스 의도 {want} → 적재 후 {got} "
+                f"· 라이브 잔존 행 {rivals}"
+            )
+        lines.append(
+            "해소: 위 라이브 잔존 행이 오귀속인지 사람이 확인해 삭제한 뒤 다시 적재하세요"
+            "(우회 인자 없음)."
+        )
+        super().__init__("\n".join(lines))
+
+
+def _incoming_links(crosslinks: Sequence[MisconceptionCrosslink]) -> dict[str, list[ResolvedLink]]:
+    """적재 예정 행 → kebab별 `ResolvedLink`(시뮬 입력). 트리플 중복 접기는 시뮬이 맡는다."""
+    grouped: dict[str, list[ResolvedLink]] = {}
+    for record in crosslinks:
+        grouped.setdefault(record.kebab_id, []).append(
+            ResolvedLink(
+                mis_id=record.mis_id, link_type=record.link_type, confidence=record.confidence
+            )
+        )
+    return grouped
+
+
+def canonical_flip_verdicts(
+    store: MisconceptionCrosslinkStore, crosslinks: Sequence[MisconceptionCrosslink]
+) -> list[CanonicalLoadVerdict]:
+    """라이브 행을 읽어 적재 후 canonical을 시뮬해 **코퍼스와 다른 kebab만** 돌려준다(읽기)."""
+    incoming = _incoming_links(crosslinks)
+    live = store.live_links(list(incoming))
+    return [v for v in simulate_load_canonical(live, incoming) if v.verdict != "ok"]
+
+
 def load_crosslinks(
     session: dict[str, Any] | Path | None,
     collection_json: dict[str, Any] | Path,
@@ -91,6 +155,9 @@ def load_crosslinks(
             쓰기 **전에** 읽기만으로 확인해 누락 키를 전건 열거하고 아무것도 쓰지 않는다.
             `check_fk_targets=False`는 가짜 엔진을 쓰는 hermetic 테스트용 좌석이다
             (실 경로는 항상 켠다).
+        CanonicalFlipError: 적재 후 canonical이 코퍼스 의도와 달라진다(HARN-216) — 라이브 잔존 행이
+            더 높은 신뢰도로 이기거나(wrong_winner) 같은 신뢰도로 동률을 만든다(tie). 쓰기 **전에**
+            읽기만으로 판정하고 아무것도 쓰지 않는다. **끄는 인자가 없다**(`check_fk_targets` 무관).
     """
     del session  # async Session 미사용(sync 엔진 좌석) — 호환 자리표시.
     collection = _as_collection(collection_json)
@@ -115,6 +182,11 @@ def load_crosslinks(
         missing = cl_store.missing_fk_targets(crosslinks)
         if missing:
             raise ForeignKeyTargetMissingError(missing)
+    # canonical 경쟁 사전판정(HARN-216) — 끄는 인자 없음. 코퍼스에 없는 라이브 행은 업서트가 지우지
+    # 못하므로, 적재 후 canonical이 코퍼스 의도와 달라지면 쓰기 전에 전건 열거하고 거부한다.
+    flips = canonical_flip_verdicts(cl_store, crosslinks)
+    if flips:
+        raise CanonicalFlipError(flips)
     return cl_store.populate(crosslinks)
 
 
@@ -161,6 +233,17 @@ class MisconceptionCrosslinkStore:
         with self._get_engine().connect() as conn:
             return missing_fk_targets(conn, table, rows)  # type: ignore[arg-type]
 
+    def live_links(self, kebab_ids: Sequence[str]) -> dict[str, list[ResolvedLink]]:
+        """주어진 kebab들의 라이브 링크 전량(HARN-216 시뮬 입력) — 읽기 전용·쓰기와 다른 트랜잭션.
+
+        조회는 resolver의 단일 조회 경로(`resolve_links_many`)를 그대로 쓴다 — 읽기 진실 원천을
+        하나로 둔다. 확인과 쓰기 사이에 다른 세션이 행을 넣으면 이 판정은 낡는다 —
+        `fk_precheck`의 한계 절과 같은 종류이며, 적재는 운영자 1인의 수동 작업이라
+        수용하고 문서화한다.
+        """
+        resolver = MisconceptionCrosslinkResolver(engine=self._get_engine())
+        return resolver.resolve_links_many(kebab_ids)
+
     def populate(self, records: Sequence[MisconceptionCrosslink]) -> int:
         """crosswalk schema 모델들을 멱등 upsert. 반환=적재 행 수(dedup 후).
 
@@ -203,6 +286,8 @@ class MisconceptionCrosslinkStore:
 
 
 __all__ = [
+    "CanonicalFlipError",
     "MisconceptionCrosslinkStore",
+    "canonical_flip_verdicts",
     "load_crosslinks",
 ]

@@ -38,9 +38,10 @@ def _all_problems() -> list[Problem]:
     return problems
 
 
-def test_eight_corpora_covered() -> None:
+def test_nine_corpora_covered() -> None:
     # 8번째 = P3-03 미분 은행(`p3_calculus1_diff_v0` — 5회차 S5 감사 승인 뒤 편입, 2026-10-09).
-    assert len(KNOWN_CORPORA) == 8
+    # 9번째 = P3-05 빈 칸 채우기 은행(`p3_fill_v0` — 3회차 S5 감사 승인 뒤 편입, 2026-10-15).
+    assert len(KNOWN_CORPORA) == 9
 
 
 def test_no_empty_persona_fit_in_real_corpus() -> None:

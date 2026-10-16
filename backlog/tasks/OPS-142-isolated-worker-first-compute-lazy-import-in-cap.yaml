@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-142-isolated-worker-first-compute-lazy-import-in-cap
+title: "격리 워커 첫 계산의 지연 import가 계산 상한(0.5초) 안에 들어와 부하에서 정상 식이 판정 불가로 샌다 — 실측·제품 영향 판정·웜업"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 구간 실측 — 격리 워커의 첫 계산과 두 번째 계산을 같은 입력·같은 워커에서 나눠 재고(콜드/웜), 첫 계산이 계산 상한(started 이후 poll 창) 안에서 치르는 지연 import가 무엇이고 몇 ms인지 단독 10회 이상 + 코어 초과 구독(방해 프로세스 4~6개) 조건에서 수치로 적는다. 가설을 사실로 쓰지 않는다 — 기각되면 기각을 그대로 기록한다.\n② 제품 영향 판정 — 계산 상한 초과로 워커를 kill하면 교체 워커(_prewarm_replacement)도 콜드라서 같은 비용이 다음 정상 요청에 반복되는지, 그 결과 부하 중 정상 식이 판정 불가로 새는 빈도를 재현 실험으로 보인다. 판정 불가는 통과·오답이 아니므로 안전 방향이지만 학생 가용성 문제인지 여부를 적는다.\n③ 해법 — ①②의 실측을 따르되 판정 의미(상한 초과 = 판정 불가, 통과·오답 아님, 계산이 끊김)는 바꾸지 않는다. 후보: 워커 preload에 해당 모듈 추가 / 교체 워커에 더미 계산으로 웜업 / 계산 상한의 정의 조정. 변별력 보존 — 상한을 없앤 뮤테이션에서 반드시 RED. 뮤테이션 주입은 cp 백업 · mutated != original 단언 · 원복 sha256 일치로만 하며 git checkout/restore/stash로 원복하지 않는다.\n④ 테스트 정합 — tests/backend/api/test_verify_isolation.py 의 _warm_worker 가 워커 기동만 치르고 첫 계산의 지연 import는 안 치른다. 수정 전 파일을 방해 프로세스 4~6개 아래 4병렬로 32회 돌렸을 때 test_normal_step_is_unaffected_by_isolation 이 3회 'unverifiable' == 'correct' 로 실패했다. ③ 이후 같은 반복에서 실패 0건을 보인다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1635"
+paths:
+  - src/backend/whymath_backend/l3/isolated_call.py
+  - src/backend/whymath_backend/api/_isolated_call.py
+  - tests/backend/api/test_verify_isolation.py
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/l3/verify_step.py
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - tests/backend/l3/test_isolated_call.py
+session: null
+notes: |-
+  출처: OPS-136 조사(2026-10-14)에서 발견한 별개 결함. 증거 — 수정 전 tests/backend/api/test_verify_isolation.py 를 실제 pytest로 방해 프로세스 4개(20회)·6개(12회) 아래 4병렬로 돌렸다: test_normal_step_is_unaffected_by_isolation 이 3/32 실패('unverifiable' == 'correct'). 코어를 3배 초과 구독(방해 8개)하면 _warm_worker 의 state == 'correct' 단언이 재시도 8회 연속 실패했다 — 상한 초과로 kill되면 교체 워커도 콜드라 재시도해도 같은 비용을 다시 치르기 때문이다. 원인은 코드를 읽어 세운 가설이며 측정하지 않았다(acceptance ① 참조): 워커 안 첫 계산이 SymPy 하위 모듈을 지연 import하는 시간이 계산 상한(started 이후 poll) 안에 들어간다. OPS-136 은 이 건을 범위 밖으로 두고 테스트의 벽시계 단언만 고친다. 파일 범위가 OPS-136(원격 claim claude/keen-gates-8quz6d)과 겹친다 — 착수 전에 그 PR 머지 여부를 확인한다.
+
+  [정정 2026-10-14] paths ['src/backend/whymath_backend/l3/isolated_call.py', 'src/backend/whymath_backend/api/_isolated_call.py', 'tests/backend/api/test_verify_isolation.py'] → ['src/backend/whymath_backend/l3/isolated_call.py', 'src/backend/whymath_backend/api/_isolated_call.py', 'tests/backend/api/test_verify_isolation.py', 'src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/l3/verify_step.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'tests/backend/l3/test_isolated_call.py']: OPS-142 설계: 웜업 호출 목록은 설정이 정하고 웜업 함수는 기존 verify 모듈에 둔다(새 모듈 인벤토리 귀속 회피)
+updated: 2026-10-14

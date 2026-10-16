@@ -1,11 +1,11 @@
 """비유 생성기(analogy_generator) 단위 테스트 — 라우터 경유·seam 주입·상태기계·착지 가드.
 
 hermetic(라이브 LLM 0 — FakeProvider 주입·이 컨테이너에 로컬 LLM 없음). 검증 축:
-  ① select-vs-generate 표적 계획(공백·결함·탈락분만 — 무결함 기존 비유 발주 금지·04e §6.4)
+  ① select-vs-generate 표적 계획(공백·결함·탈락분만 — 무결함 기존 비유 발주 금지·04g §6.4)
   ② 라우터 경유(RoutingDecision이 provider에 전달·저작 패밀리 GENERAL 스왑)
   ③ DRAFT 산출 → prescreen→review 상태기계 재사용(게임형 산출 REJECTED — 게임형 0 검사)
   ④ MetaphorFillStore SQL 가드(공백·ai_estimated 행만 UPDATE·review_status 'ai_estimated' 유지)
-  ⑤ 실패 폴백(None) — provider 예외·JSON 붕괴·breaks 결측(04e §6.3 계약)
+  ⑤ 실패 폴백(None) — provider 예외·JSON 붕괴·breaks 결측(04g §6.3 계약)
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ class TestPlanTargets:
         assert [(t.code, t.reason) for t in targets] == [("C", "rejected")]
 
     def test_dedup_one_per_concept(self) -> None:
-        """개념당 1건(상한 불변식 04e §6.4) — 중복 레코드는 첫 건만."""
+        """개념당 1건(상한 불변식 04g §6.4) — 중복 레코드는 첫 건만."""
         records = [_Record("A", "가", "수학", None), _Record("A", "가", "수학", None)]
         assert len(plan_analogy_targets(records)) == 1
 
@@ -189,7 +189,7 @@ class TestGenerateDraft:
         assert _generator(FakeProvider(["JSON 아님"])).generate_draft(_TARGET) is None
 
     def test_missing_breaks_returns_none(self) -> None:
-        """breaks(깨짐 명시) 결측은 04e §6.3 생성 계약 위반 — 생성 실패(None)."""
+        """breaks(깨짐 명시) 결측은 04g §6.3 생성 계약 위반 — 생성 실패(None)."""
         no_breaks = json.dumps({"analogy": _GOOD_ANALOGY}, ensure_ascii=False)
         assert _generator(FakeProvider([no_breaks])).generate_draft(_TARGET) is None
 
@@ -309,7 +309,7 @@ class TestMetaphorFillStore:
         assert "review_status" in sql
 
     def test_rejected_outcomes_not_applied(self) -> None:
-        """REJECTED는 착지하지 않는다 — 검수 통과 후 metaphor 채움(04e §6.2)."""
+        """REJECTED는 착지하지 않는다 — 검수 통과 후 metaphor 채움(04g §6.2)."""
         engine = _FakeEngine()
         # 깨짐 신호 어휘가 전무한 본문("한계"라는 낱말 자체도 신호라 피한다) — 확실한 REJECTED.
         row = build_analogy_draft_row(_TARGET, "함수는 자판기와 같다. 그게 전부다.", "없음")

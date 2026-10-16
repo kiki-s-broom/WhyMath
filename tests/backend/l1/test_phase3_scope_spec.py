@@ -56,7 +56,7 @@ _EXPECTED_TARGETS = {
     "curriculum_coverage": 0.98,
     "concept_completeness": 0.95,
     "problem_coverage_by_skill": 0.95,
-    "graph_connectivity_coverage": None,
+    "graph_connectivity_coverage": 0.95,  # G-p314-phase3-metric-targets (2026-10-12 Kiki 확정 · P3-33)
 }
 
 
@@ -111,8 +111,46 @@ def test_frozen_denominators_match_the_plan(scope: ps.ScopeSpec) -> None:
     assert len(scope.concepts) == 10 and len(scope.core_concepts) == 10
     assert len(scope.skills) == 8
     assert len(scope.core_misconceptions) == 12
-    assert len(scope.problem_types) == 5
+    assert len(scope.problem_types) == 7
     assert scope.excluded_domains == ("함수의 극한과 연속", "적분")
+
+
+# P3-05(2026-10-14): 기존 5종으로는 두 스킬을 행사할 수 없어 2종을 더했다. 개수만 보면 엉뚱한 유형 2개를
+# 넣어도 통과하므로 "어느 유형이 어느 스킬을 행사해 이 2종이 필요한가"까지 코퍼스에서 직접 확인한다.
+_ADDED_BY_P3_05 = {
+    "ptype.generalize-pattern": "skill.pattern-generalization",
+    "ptype.model-word-problem": "skill.word-problem-modeling",
+}
+_FIRST_FIVE = (
+    "ptype.evaluate-expression",
+    "ptype.solve-for-unknown",
+    "ptype.optimize-extremum",
+    "ptype.count-solutions",
+    "ptype.verify-claim",
+)
+
+
+def test_required_problem_types_open_the_two_skills_the_first_five_could_not_exercise(
+    scope: ps.ScopeSpec,
+) -> None:
+    """필수 유형이 스킬 8종을 전부 행사할 수 있어야 한다 — 빠지면 두 스킬의 승인 문항은 구조적으로 0건이다."""
+    assert scope.problem_types == _FIRST_FIVE + tuple(_ADDED_BY_P3_05)
+    # 코퍼스 경로는 하드코딩하지 않고 명세의 sources 에서 읽는다 — 명세가 가리키는 코퍼스와 같아야 한다.
+    # data/corpus/phase3_scope_v1/scope_spec.yaml → 저장소 루트. 계산이 틀리면 경로 오류 대신 아래에서 분명히 실패한다.
+    repo_root = _SPEC_PATH.parents[3]
+    assert (repo_root / "data/corpus").is_dir()
+    corpus_path = repo_root / scope.sources["problem_types"]
+    rows = {
+        json.loads(line)["problem_type_id"]: json.loads(line)
+        for line in corpus_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    exercised = {s for t in scope.problem_types for s in rows[t]["behavior_skills"]}
+    assert set(scope.skills) <= exercised, sorted(set(scope.skills) - exercised)
+    for ptype, skill in _ADDED_BY_P3_05.items():
+        assert skill in rows[ptype]["behavior_skills"]
+        # 기존 5종은 이 스킬을 행사하지 못한다 — 추가의 필요성이 코퍼스로 드러나는 부분.
+        assert all(skill not in rows[t]["behavior_skills"] for t in _FIRST_FIVE)
 
 
 def test_slots_fields_links_and_targets_follow_the_plan(scope: ps.ScopeSpec) -> None:
@@ -250,9 +288,15 @@ def test_target_value_out_of_range_fails(bad: Any) -> None:
 
 
 def test_null_target_without_a_reason_fails() -> None:
-    """수치가 없다는 사실은 허용하되 왜 없는지가 데이터로 남아야 한다."""
+    """수치가 없다는 사실은 허용하되 왜 없는지가 데이터로 남아야 한다.
+
+    실 명세의 5개 목표가 전부 확정된 뒤에도 '목표 미정' 규칙은 로더의 계약으로 남는다 —
+    확정된 목표 하나를 null 로 되돌리면서 사유를 안 남기는 주입으로 그 규칙을 겨냥한다.
+    """
     with pytest.raises(ps.ScopeSpecError, match="reason"):
-        _mutate(lambda d: d["completeness"]["targets"]["graph_connectivity_coverage"].pop("reason"))
+        _mutate(
+            lambda d: d["completeness"]["targets"]["graph_connectivity_coverage"].update(value=None)
+        )
 
 
 @pytest.mark.parametrize("bad", [0, -1, True, 1.5, "1"])

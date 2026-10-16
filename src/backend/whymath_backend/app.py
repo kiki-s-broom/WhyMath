@@ -71,6 +71,10 @@ from whymath_backend.api._growth_evidence_state import (
     get_growth_evidence_counters,
     set_growth_evidence_counters,
 )
+from whymath_backend.api._isolated_call import (
+    IsolationSnapshot,
+    isolation_snapshot,
+)
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
 )
@@ -148,6 +152,10 @@ from whymath_backend.api._subject_capability_state import (
 )
 from whymath_backend.api.admin_bff import router as admin_bff_router
 from whymath_backend.api.admin_cms import router as admin_cms_router
+from whymath_backend.api.admin_cms_graph import router as admin_cms_graph_router
+from whymath_backend.api.admin_cms_problem_versions import (
+    router as admin_cms_problem_versions_router,
+)
 from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
@@ -643,6 +651,60 @@ class SolutionSegmentationBody(BaseModel):
     )
 
 
+class SympyIsolationBody(BaseModel):
+    """/health/ready SymPy 격리 *작동한 비율* 섹션(OPS-126) — 정상 200은 격리 작동의 증거가 아니다.
+
+    `api/_isolated_call.py`의 풀 카운터를 읽는 유일한 비테스트 소비자다(그 전에는 카운터를
+    만들기만 하고 읽는 코드가 없었다). 두 비율을 말한다:
+      - `isolated_ratio` — 격리 대상 호출 중 시간 상한이 걸린 프로세스 풀에서 실제로 돈 비율.
+        1.0이 아니면 일부가 상한 없는 스레드 폴백이다.
+      - `undecidable_ratio` — 풀에 맡겨진 호출 중 판정 불가로 접힌 비율(상한 초과·대기열 포화·
+        총 예산 소진·워커 사망). 0이 아니면 `sympy_isolation_timeout_s` 재판정의 입력이다.
+    분모가 0이거나 격리가 꺼져 있으면 비율은 null이다(None-vs-0 — '0건 중 0건'이 아니라
+    측정 대상 없음).
+
+    **프로세스별 카운터** — 서버 워커(uvicorn `--workers`)가 여럿이면 이 응답은 요청을 받은
+    워커 1개의 값이다. `process_id`로 워커를 가리고 합산은 외부 스크레이퍼가 한다.
+    재시작하면 0부터다.
+    """
+
+    scope: str = Field(
+        ...,
+        description=(
+            "카운터의 범위 — 항상 'per_process'. 서버 워커(프로세스)가 여럿이면 이 값은 응답을 낸 "
+            "그 프로세스의 것이고 합산이 아니다(수집 측이 process_id로 구분해 합친다). 재시작하면 "
+            "0으로 돌아간다."
+        ),
+    )
+    enabled: bool = Field(
+        ..., description="격리 활성(sympy_isolation_enabled). False면 인라인 실행이라 비율은 null"
+    )
+    pool_started: bool = Field(
+        ..., description="이 프로세스에서 워커 풀이 이미 만들어졌는가(첫 격리 호출에 지연 기동)"
+    )
+    process_id: int = Field(..., description="응답한 서버 프로세스 pid — 워커별 카운터 구분용")
+    max_workers: int = Field(..., description="설정된 SymPy 워커 프로세스 수(프로세스당)")
+    timeout_s: float = Field(..., description="설정된 계산 시간 상한(초)")
+    calls: int = Field(..., description="풀에 맡겨진 호출 수(분모) — 폴백 제외")
+    timeouts: int = Field(..., description="계산 시간 상한 초과로 워커를 끊은 횟수")
+    queue_waits: int = Field(..., description="워커가 모두 바빠 대기 상한을 넘긴 횟수")
+    deadlines: int = Field(
+        ...,
+        description=(
+            "호출 전체 벽시계 예산(budget_s) 소진으로 접힌 횟수 — 체인 호출만 센다(OPS-128)"
+        ),
+    )
+    worker_deaths: int = Field(..., description="워커 사망·기동 실패로 접힌 횟수")
+    fallbacks: int = Field(..., description="pickle 불가로 스레드 폴백한 횟수(시간 상한 없음)")
+    undecidable: int = Field(..., description="판정 불가로 접힌 호출 수 = 위 네 사유의 합")
+    undecidable_ratio: float | None = Field(
+        ..., description="undecidable / calls — calls가 0이면 null(측정 대상 없음)"
+    )
+    isolated_ratio: float | None = Field(
+        ..., description="calls / (calls + fallbacks) — 둘 다 0이면 null(격리 대상 호출 없음)"
+    )
+
+
 class ReadyBody(BaseModel):
     """GET /health/ready 응답 — 딥체크·인프로세스 계측·알림(이중 회계의 HTTP 노출면)."""
 
@@ -676,6 +738,14 @@ class ReadyBody(BaseModel):
     l6_mode_reach: L6ModeReachBody = Field(
         ...,
         description="L6 응용 모드 6종 도달 관측(PB-04) — /v1/gating/* 6개 엔드포인트별 카운터.",
+    )
+    sympy_isolation: SympyIsolationBody = Field(
+        ...,
+        description=(
+            "SymPy 격리가 작동한 비율(OPS-126) — 풀 호출 수·판정 불가 사유별 카운터·폴백과 "
+            "두 비율. "
+            "프로세스별 카운터(서버 워커가 여럿이면 응답한 워커 1개의 값)."
+        ),
     )
 
 
@@ -724,6 +794,27 @@ def _growth_evidence_exposure_body(
     달라(다른 라우트를 명명하는 별도 docstring) 별도 변환 함수를 둔다.
     """
     return GrowthEvidenceExposureReachBody(requests_total=snapshot.requests_total)
+
+
+def _sympy_isolation_body(snapshot: IsolationSnapshot) -> SympyIsolationBody:
+    """IsolationSnapshot(도메인) → SympyIsolationBody(HTTP 스키마) 변환(OPS-126)."""
+    return SympyIsolationBody(
+        scope="per_process",
+        enabled=snapshot.enabled,
+        pool_started=snapshot.pool_started,
+        process_id=snapshot.process_id,
+        max_workers=snapshot.max_workers,
+        timeout_s=snapshot.timeout_s,
+        calls=snapshot.calls,
+        timeouts=snapshot.timeouts,
+        queue_waits=snapshot.queue_waits,
+        deadlines=snapshot.deadlines,
+        worker_deaths=snapshot.worker_deaths,
+        fallbacks=snapshot.fallbacks,
+        undecidable=snapshot.undecidable,
+        undecidable_ratio=snapshot.undecidable_ratio,
+        isolated_ratio=snapshot.isolated_ratio,
+    )
 
 
 def _l6_mode_reach_body(snapshot: L6ModeReachSnapshot) -> L6ModeReachBody:
@@ -1330,6 +1421,7 @@ def create_app(
                 growth_evidence_exposure_counters.snapshot()
             ),
             l6_mode_reach=_l6_mode_reach_body(l6_mode_reach_counters.snapshot()),
+            sympy_isolation=_sympy_isolation_body(isolation_snapshot()),
         )
         return JSONResponse(
             status_code=(status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE),
@@ -1569,5 +1661,8 @@ def create_app(
     app.include_router(admin_bff_router)
     # P3-12: Admin CMS — 개념 버전 워크플로우(초안·검토·발행·롤백) + 개념 외 허용 목록 제자리 편집.
     app.include_router(admin_cms_router)
+    app.include_router(admin_cms_graph_router)
+    # EOS-194: 문항 판 발행 호출 표면 — `l3/problem_publish_gate`의 운영 호출자.
+    app.include_router(admin_cms_problem_versions_router)
 
     return app

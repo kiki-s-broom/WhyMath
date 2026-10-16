@@ -69,8 +69,9 @@ _KEBAB_OF = {
 #: (MISC-40 미승격) 02-06은 distractor가 계측기의 사슬 정의에 안 걸린다. stale 가드: 사슬이 생기면 red.
 #: 02-09(5회차 감사 2026-10-08 추가): 오답 선지를 핵심 M0677에서 옮겨 사슬이 끊겼다 — 6회차 처분의 연결
 #: '극값·극점 혼동'(→ M0865 · [12미적Ⅰ-02-07])도 명세의 핵심 오개념이 아니다. 종전 사슬은 설명이 손상된(절차
-#: 미기술) M0677 연결이 만든 것이었다(판정자 지적 12건). QUAL-14가 M0677 원문을 정정해 절차가 적히면 다시
-#: 연결할 수 있다(그때 이 항목을 지운다).
+#: 미기술) M0677 연결이 만든 것이었다(판정자 지적 12건). QUAL-14가 2026-10-12 M0677 문장을 복원했으나
+#: ('…관점을 못 쓴다') 관점의 부재라 절차는 적히지 않았다 — 그래서 이 항목은 그대로다. M0677에 값을 내는
+#: 절차가 적히면 다시 연결할 수 있다(그때 이 항목을 지운다).
 _CHAIN_UNREACHED = frozenset(
     {
         "[12미적Ⅰ-02-05]",
@@ -181,7 +182,8 @@ def _tmp_root(tmp_path: Path, *, approved: bool, strip_steps: bool = False) -> P
     root = tmp_path / name
     (root / "data" / "corpus").mkdir(parents=True)
     for entry in _CORPUS.iterdir():
-        if entry.name != CORPUS_DIR_NAME:
+        # P3-05 빈 칸 채우기 은행(승인)도 02-03·02-10 문항을 더하므로, 이 은행 하나의 효과를 보려면 뺀다.
+        if entry.name not in (CORPUS_DIR_NAME, "problem_bank_p3_fill_v0"):
             (root / "data" / "corpus" / entry.name).symlink_to(entry)
     bank = root / "data" / "corpus" / CORPUS_DIR_NAME
     bank.mkdir()

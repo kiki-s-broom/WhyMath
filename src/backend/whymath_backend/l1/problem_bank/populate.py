@@ -97,7 +97,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.cms_edit_marker import (
@@ -138,6 +138,15 @@ _DEFAULT_CROSSWALK = Path("data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl
 # 구 437 개념그래프(다리 concept_id→src_id) 기본 경로 — legacy_snapshot의 *빌드타임* 소비
 # (`test_legacy_snapshot_governance.py` audit 화이트리스트 등재·런타임 read 아님).
 _DEFAULT_CONCEPT_GRAPH = Path("data/corpus/concept_graph_v1/graph.json")
+
+# 문항 발행 포인터(`problem.problem_version_id`) — 코퍼스가 아니라 `l3/problem_publish_gate`가 유일
+# writer다(EOS-190). 코퍼스 레코드는 이 필드를 늘 None으로 들고 있어서, `ON CONFLICT DO UPDATE`
+# 갱신 집합에 두면 재적재가 발행된 문항의 포인터를 NULL로 되돌리고 시도 버전 고정(EOS-47)이 조용히
+# 끊긴다. 갱신 집합을 `mapper.column_attrs`에서 동적으로 뽑기 때문에 컬럼명이 코드에 안 나타나 AST
+# 스캔으로는 보이지 않는다 — 그래서 상수로 이름을 박고 테스트가 그 사용을 고정한다
+# (`test_problem_publish_gate_enforcement.py` C 절 · 행동은
+# `test_problem_version_publish_integration.py`).
+PUBLISH_POINTER_COLUMN: Final[str] = "problem_version_id"
 
 # Problem 스키마 밖 *저작 메타* 키 — Problem.model_validate 전에 분리한다(extra=forbid 대응).
 _AUTHORING_KEYS: frozenset[str] = frozenset(
@@ -715,7 +724,13 @@ class ProblemBankStore:
         # 문제 갱신 컬럼 집합 — 식별자(problem_id·slug)·생성시각(created_at)은 보존(SET 제외).
         problem_cols = {col.key for col in sa.inspect(ProblemORM).mapper.column_attrs}
         # 표지 컬럼은 코퍼스 값이 아니라 보호 규약이 소유한다 — 일반 갱신 집합에서 뺀다.
-        problem_update_keys = problem_cols - {"problem_id", "slug", "created_at", CMS_EDIT_MARKER}
+        problem_update_keys = problem_cols - {
+            "problem_id",
+            "slug",
+            "created_at",
+            CMS_EDIT_MARKER,
+            PUBLISH_POINTER_COLUMN,
+        }
         where, release = upsert_guard(ProblemORM, overwrite=overwrite_cms_edits)
         cms_conflicts: list[str] = []
 

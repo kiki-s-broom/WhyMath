@@ -118,6 +118,10 @@ AUDIT_LABEL_MAP: dict[str, Path | None] = {
     # 이 파일은 그 합집합 라벨을 코퍼스 단위 백필 형식으로 옮긴 것이다
     # (보정 없는 Wilson 상한 0.0088).
     "p3_calculus1_diff_v0": Path("docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl"),
+    # P3-05 빈 칸 채우기 은행 204건 3회차 S5 감사의 전수 라벨 — 결함 0건. 승인의 정본 근거는
+    # 보정 상한 0.01907 ≤ 0.02(`p3_fill_audit/bank_audit_r3/s5_result.txt`)이고, 이 파일은 그 합집합
+    # 라벨을 코퍼스 단위 백필 형식으로 옮긴 것이다.
+    "p3_fill_v0": Path("docs/data/corpus_audit_p3_fill_v0.jsonl"),
     # 감사 라벨 없음 — 미평가 고정(pending). 신규 감사는 범위 밖.
     "probability_finite_v0": None,
     "v1": None,  # KNOWN_CORPORA의 "v1" = problem_bank_v1(4건). 감사 라벨 없음 — pending 고정.

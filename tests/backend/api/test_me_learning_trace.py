@@ -77,6 +77,10 @@ class _MasteryViewRow:
     confidence: float | None
     sample_size: int | None
     mastery_before: float | None
+    # P3-27 ②: `_mastery_stmt`가 시도 조인으로 채우는 귀속 3열(없으면 배치·백필 측정처럼 None).
+    attempt_id: uuid.UUID | None = None
+    attempt_problem_id: uuid.UUID | None = None
+    attempt_session_id: uuid.UUID | None = None
 
 
 class _Scalars:

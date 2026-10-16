@@ -77,12 +77,12 @@ nullable UUID FK → `problem_version.version_id`. 44 §6.4의 `current_publishe
 
 ## 5. 이 PR이 하지 않는 것 (정직 기술)
 
-- **운영 writer 없음.** `problem_version`에 행을 쓰는 운영 코드가 아직 없다. 전이 실행(게이트)은 `l3/publish_gate.py`가 `ConceptVersion`에 대해서만 갖고 있고, 문항 발행 경로는 별도 태스크다. 그래서 불변성은 DB 트리거(최후 방어)까지만 집행되며 *전이 게이트 경유 강제*는 이 PR 범위 밖이다. 게이트가 생기면 그 모듈이 이 ORM의 유일한 쓰기 자리가 되어야 한다(EOS-50 AST 동결과 동형).
+- **운영 writer 없음 → `EOS-190`이 해소했다(2026-10-13 정정).** 이 PR 시점에는 `problem_version`에 행을 쓰는 운영 코드가 없었고 불변성은 DB 트리거(최후 방어)까지만 집행됐다. 현재는 `l3/problem_publish_gate.py`가 `problem_version` 행과 `problem.problem_version_id`를 쓰는 **유일한 운영 자리**이며 전이표 경유·AST 동결이 걸려 있다(`docs/architecture/eos190_problem_publish_writer.md`). 단 그 모듈을 부르는 운영 라우트·CLI는 아직 없다(`EOS-194`).
 - **`problem_attempt` 버전 고정은 `EOS-47` 소관.** 이 PR로 EOS-47의 선행(ARCH-31)이 풀린다. attempt가 어느 판을 풀었는지의 기록·재현성 테스트는 거기서 한다.
 - **기존 `problem` 행 백필 없음.** 판을 만드는 일(v1 스냅숏 생성)은 발행 경로의 책임이다.
 - **`curriculum_version` 컬럼과 무관.** `problem.curriculum_version`(교육과정 개정 구분 enum)은 문항의 본질 속성이고 이 판 관리 축과 이름만 비슷하다 — 건드리지 않는다.
 
 ## 6. 후속 (이 PR이 소유하지 않는 것)
 
-- 문항 발행 게이트 / 전이 writer — 미등재 시 등재 필요(EOS-47 이후 판단).
+- 문항 발행 게이트 / 전이 writer — `EOS-190`이 착지했다(2026-10-13 정정). 남은 후속: 호출 표면 `EOS-194`(2026-10-13 정정: 착지 — `eos194_problem_publish_caller_surface.md`) · 발행 이후 편집 드리프트 `EOS-195` · Rollback·Restore `EOS-196`.
 - `concept.current_published_version_id`(Concept)와 `problem.problem_version_id`(Problem)의 **컬럼명 통일**은 승계 대조표가 이름을 고정해 이 PR에서 바꾸지 않았다. 통일 여부는 사람이 결정할 사안이다.

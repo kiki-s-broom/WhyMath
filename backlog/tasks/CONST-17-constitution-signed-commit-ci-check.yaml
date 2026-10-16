@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-17-constitution-signed-commit-ci-check
+title: "코딩 헌법 서명 검증 CI — constitution/ 및 보호 장치 변경은 Kiki 서명 키 서명 커밋만 통과"
+track: infra-debt
+stage: S4
+subject: math
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① constitution/ 와 헌법 보호 장치 자신(서명자 목록 파일 · 검증 스크립트 · ci.yml 의 해당 스텝)을 바꾸는 PR 은 그 변경 커밋이 Kiki 의 서명 키로 서명됐을 때만 CI 를 통과한다. 검증 기준은 main 이 아니라 PR 헤드 커밋이다(머지 큐 스쿼시가 main 커밋을 GitHub 서명으로 새로 만들기 때문). ② 서명자 공개키 목록은 저장소에 커밋하되 목록이 비었거나 읽을 수 없으면 통과가 아니라 측정 불가(exit 2)다. 대상 변경이 없으면 통과(exit 0), 서명 없는 변경은 exit 1. ③ 검증 스텝·스크립트·서명자 목록도 같은 서명 요건으로 묶는다(AI 가 검증 스텝을 지우는 우회 차단) — 이 자기 보호를 변이 주입으로 증명한다. ④ 변이 주입 전건 RED 확인: 서명 없는 커밋 · 다른 키로 서명 · 서명자 목록 비움 · 검증 스텝 삭제 · 대상 경로 필터 약화. 정상 대조군(Kiki 키 서명)은 GREEN. ⑤ CI 배선 실재: 신설 스텝이 실제 잡에서 도달하는지(skipped 아님) 확인하고 required check 로 올리는 것은 Kiki 키 등록 게이트 이후. ⑥ 범위 밖: 서명 키 생성·공개키 등록(사람 게이트) · 웹 UI 편집 경로의 합법적 개정 절차는 런북으로 안내."
+artifacts:
+  - "PR #1652 https://github.com/kiki-s-broom/WhyMath/pull/1652 (열림 · 실제 CI 22건 중 성공 19 · 야간 전용 3건 skipped · 실패 0 · 헤드 b582caaf · harness-integrity 성공 = 새 스텝 도달)"
+paths:
+  - scripts/constitution/check_signed_changes.py
+  - tests/constitution/test_check_signed_changes.py
+  - constitution_signers/
+  - ".github/workflows/ci.yml"
+session: null
+notes: "게이트 G-const-protection-outside-claude 결정의 2단계(2026-10-15 Kiki 승인 · (나)안). 가드 매처 보강 태스크와는 서로 독립이다. 서명 키 등록은 사람 게이트로 분리한다."
+updated: 2026-10-16

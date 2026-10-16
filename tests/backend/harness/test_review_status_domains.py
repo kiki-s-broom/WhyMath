@@ -9,7 +9,7 @@
 
 이 파일은 세 가지를 붙든다:
   ① 부류 판정(`classify_corpus`) 5종과 두 도구의 거부 술어 — 각 부류를 실제로 만들어 확인한다.
-  ② CI 드리프트 가드(`--all --check`)가 회차 코퍼스를 **오판하지 않는다** — 순회 대상(고정 8종)이
+  ② CI 드리프트 가드(`--all --check`)가 회차 코퍼스를 **오판하지 않는다** — 순회 대상(고정 9종)이
      전부 `fixed`이고, 회차 코퍼스가 목록에 끼어들면 "미백필"이 아니라 exit 2로 빨개진다.
   ③ 계약 문서(`docs/standards/review_status_stamping_contract.md`)와 코드가 어긋나지 않는다 — 문서가
      이름 붙인 함수가 실재하고, 문서의 표 수치가 코드로 다시 계산된다.
@@ -54,8 +54,15 @@ def _write_corpus(path: Path, *, ledger: bool, review_status: str | None = None)
 
 @pytest.fixture
 def fake_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """가짜 레포 루트 — `KNOWN_CORPORA`·`data/corpus`는 레포 루트 상대경로 규약이라 cwd를 옮긴다."""
+    """가짜 레포 루트 — `KNOWN_CORPORA`·`data/corpus`는 레포 루트 기준 경로 규약이다.
+
+    [OPS-138] 가드는 이제 cwd가 아니라 모듈 파일 위치 기준의 `_REPO_ROOT`로 해석하므로 가짜 루트를
+    그 상수에도 끼운다. cwd도 같이 옮기는 것은 백필 CLI가 `KNOWN_CORPORA`의 상대경로를 cwd로 여는
+    경로(`--all`)가 있어서다 — 두 기준이 같은 가짜 루트를 가리켜야 CLI 경유 테스트가 성립한다.
+    """
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(domains, "_REPO_ROOT", tmp_path.resolve())
+    monkeypatch.setattr(domains, "_REPO_CORPUS_DIR", tmp_path.resolve() / "data" / "corpus")
     return tmp_path
 
 
@@ -145,6 +152,89 @@ class TestRefusals:
         assert fixed_refusal is not None and "고정 코퍼스" in fixed_refusal
 
 
+class TestVerdictIsIndependentOfCwd:
+    """[OPS-138] 가드의 판정은 작업 디렉터리에 달려 있지 않다.
+
+    `_REPO_CORPUS_DIR`가 상대경로(`Path("data/corpus")`)였을 때 `corpus_backfill_refusal`은
+    저장소 루트에서는 근거 차용을 거부하고 `src/backend`(CI 백엔드 잡의 cwd)에서는 같은 입력에
+    `None`을 돌려줬다 — 가드가 **에러 없이** 꺼졌다. 판정에 쓰는 세 지점(레포 코퍼스 디렉터리·
+    고정 코퍼스 식별·제 짝 경로) 모두가 같은 기준에서 절대경로여야 하므로 세 지점을 따로 밟는다.
+    """
+
+    # 서로 다른 세 기준 — 저장소 루트 · CI 백엔드 잡의 cwd · 레포와 무관한 임의 디렉터리.
+    _CWDS = ("repo_root", "src_backend", "elsewhere")
+
+    @pytest.fixture(params=_CWDS)
+    def real_cwd(
+        self, request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> Path:
+        cwd = {
+            "repo_root": _REPO_ROOT,
+            "src_backend": _REPO_ROOT / "src" / "backend",
+            "elsewhere": tmp_path,
+        }[request.param]
+        monkeypatch.chdir(cwd)
+        return cwd
+
+    @staticmethod
+    def _real(key: str) -> Path:
+        """`KNOWN_CORPORA[key]`의 실제 레포 절대경로 — cwd와 무관하게 같은 파일을 가리킨다."""
+        return _REPO_ROOT / KNOWN_CORPORA[key]
+
+    def test_repo_batch_corpus_is_refused_for_a_borrowed_key_from_any_cwd(
+        self, real_cwd: Path
+    ) -> None:
+        """지점 ① `_REPO_CORPUS_DIR` — 레포 코퍼스 디렉터리 아래의 비고정 코퍼스에 K의 근거를 쓰는 시도."""
+        batch = _REPO_ROOT / "data" / "corpus" / "problem_bank_batch_v0" / "problems.jsonl"
+        refusal = domains.corpus_backfill_refusal(batch, "generated_v0")
+        assert refusal is not None and "근거 차용" in refusal, f"cwd={real_cwd}"
+
+    def test_fixed_corpus_is_still_classified_fixed_from_any_cwd(self, real_cwd: Path) -> None:
+        """지점 ② `_is_known_fixed` — 고정 코퍼스 식별이 cwd에 따라 `other`로 빠지지 않는다."""
+        assert domains.classify_corpus(self._real("v1")) == ("fixed", None), f"cwd={real_cwd}"
+
+    def test_fixed_corpus_with_a_borrowed_key_is_refused_from_any_cwd(self, real_cwd: Path) -> None:
+        """고정 코퍼스끼리의 근거 차용 — 식별(②)이 빠지면 이 거부도 함께 꺼진다."""
+        refusal = domains.corpus_backfill_refusal(self._real("v1"), "killer_v0")
+        assert refusal is not None and "근거 차용" in refusal, f"cwd={real_cwd}"
+
+    def test_a_corpus_paired_with_its_own_key_passes_from_any_cwd(self, real_cwd: Path) -> None:
+        """지점 ③ `expected.resolve()` — 제 짝이 cwd 때문에 '남의 코퍼스'로 오판되지 않는다(양성 대조).
+
+        ①·②만 절대화하고 ③을 cwd 기준으로 두면 가드가 꺼지는 대신 **정당한 입력을 거부**한다 —
+        과잉 수정이 이 대조군 없이는 초록으로 보인다.
+        """
+        for key in KNOWN_CORPORA:
+            assert (
+                domains.corpus_backfill_refusal(self._real(key), key) is None
+            ), f"cwd={real_cwd} key={key}"
+
+    def test_every_cwd_yields_the_same_verdict_for_the_same_inputs(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """한 프로세스에서 cwd만 바꿔 가며 같은 입력의 판정을 모아 **서로 같음**을 직접 단언한다.
+
+        위 개별 단언은 '기대값과 같다'만 말한다 — 기대값 자체가 틀렸다면 세 cwd가 함께 틀려도
+        초록이다. 이 단언은 '갈리지 않는다'를 독립적으로 붙든다(원 결함의 증상 그대로).
+        """
+        batch = _REPO_ROOT / "data" / "corpus" / "problem_bank_batch_v0" / "problems.jsonl"
+        v1 = self._real("v1")
+        seen: dict[str, tuple[str | None, str | None, str]] = {}
+        for label, cwd in (
+            ("repo_root", _REPO_ROOT),
+            ("src_backend", _REPO_ROOT / "src" / "backend"),
+            ("elsewhere", tmp_path),
+        ):
+            monkeypatch.chdir(cwd)
+            seen[label] = (
+                domains.corpus_backfill_refusal(batch, "generated_v0"),
+                domains.corpus_backfill_refusal(v1, "killer_v0"),
+                domains.classify_corpus(v1)[0],
+            )
+        assert len(set(seen.values())) == 1, seen
+        assert seen["repo_root"][0] is not None  # 한 값으로 모였더라도 '전부 None'이면 위장이다
+
+
 class TestCorpusLevelBackfillCli:
     """코퍼스 단위 백필 CLI가 적용 대상 위반에 exit 2 · 무기록인가(단일 파일·`--all` 둘 다)."""
 
@@ -185,7 +275,7 @@ class TestCorpusLevelBackfillCli:
         '미백필'(exit 1)로 읽으면 운영자는 코퍼스 단위 백필을 돌리라는 안내를 받고, 그 순간
         그 회차의 사람 판정은 영영 각인될 수 없다(먼저 채운 쪽이 이긴다).
         """
-        monkeypatch.chdir(_REPO_ROOT)  # 나머지 고정 8종은 실제 레포 경로로 해석된다
+        monkeypatch.chdir(_REPO_ROOT)  # 나머지 고정 9종은 실제 레포 경로로 해석된다
         injected = _write_corpus(tmp_path / "acc.jsonl", ledger=True)
         monkeypatch.setitem(KNOWN_CORPORA, "round_misregistered", injected)
         _arm_write_explosives(monkeypatch)
@@ -201,11 +291,11 @@ class TestCiDriftGuardDoesNotMisjudgeRoundCorpora:
     def test_every_fixed_corpus_in_the_repo_classifies_as_fixed(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """가드가 순회하는 8종은 전부 `fixed` — 회차 대장이 붙은 것이 없다(순회 대상 = 고정 코퍼스)."""
+        """가드가 순회하는 9종은 전부 `fixed` — 회차 대장이 붙은 것이 없다(순회 대상 = 고정 코퍼스)."""
         monkeypatch.chdir(_REPO_ROOT)
         kinds = {key: domains.classify_corpus(path)[0] for key, path in KNOWN_CORPORA.items()}
         assert kinds == {key: "fixed" for key in KNOWN_CORPORA}
-        assert len(kinds) == 8
+        assert len(kinds) == 9
 
     def test_real_guard_passes_with_the_domain_check_wired(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -216,7 +306,7 @@ class TestCiDriftGuardDoesNotMisjudgeRoundCorpora:
         code = review_cli.main(["--all", "--check"])
         captured = capsys.readouterr()
         assert code == 0, captured.err
-        assert len(json.loads(captured.out)) == 8
+        assert len(json.loads(captured.out)) == 9
 
 
 @pytest.fixture(scope="module")

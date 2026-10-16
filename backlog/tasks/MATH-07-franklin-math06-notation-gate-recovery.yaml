@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MATH-07-franklin-math06-notation-gate-recovery
+title: "franklin 회수 — MATH-06 교육과정 표기 범위 게이트 커버리지 확장(초등 미관측 해소·보조 코퍼스 5종·역삼각/편미분/프라임)을 main 현행 위에서 재검증하며 이식"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/brave-franklin-2999u5 head 70aa404d(2026-10-09 · ahead 2 · behind 47 · 판정 기준 main d873d064). 구현은 완료됐고 태스크가 review 상태로 'PR 미개설' 채 끝났다(커밋 메시지: 뮤테이션 13종 전건 RED·복원 바이트 동일). 산출 = l3/curriculum_notation_gate.py(+351)·tests/backend/l3/test_curriculum_notation_gate.py(+446)·data/curriculum_notation_ranges.json(+33)·harness/curriculum_notation_gate_cli.py(+14)·harness/formula_reach_report.py(+10)·l3/speech.py(+27)·l3/speech_parse.py(+11)·tests/backend/l3/test_speech_profiles.py(+41)·MEMORY.md 결정 로그 9줄. 추가 796줄 중 main 부재 658줄(이벤트 샤드 제외 · 줄 전체 일치 기준 — 서식 차이를 부재로 세는 한계가 있다). MATH-06 원격 claim(2026-10-08T23:12Z)은 TTL 초과"
+  - "② 이식 방식 = 파일 단위(통째 머지 금지 — 브랜치가 main보다 47커밋 낡았다). 특히 l3/curriculum_notation_gate.py·l3/speech.py·speech_parse.py는 main이 그 뒤 진화했을 수 있으므로 파일을 통째 덮지 말고 브랜치 diff의 변경 의도를 main 현행 위에 재적용한다. 원 태스크 번호 MATH-06은 재사용하지 않는다(이 태스크가 회수 단위). 이식 후 브랜치가 건 뮤테이션 13종 중 재현 가능한 것을 다시 주입해 RED를 확인하되 주입 적용(mutated != original)과 원복 바이트 동일성을 단언한다"
+  - "③ 집행 지점 — 확장된 게이트가 실제 호출 경로에서 도달되는지 적는다: 게이트 CLI(curriculum_notation_gate_cli)가 CI 스텝 또는 게이트 CLI 목록에서 실행되는지, data/curriculum_notation_ranges.json이 로드되는지, 학생 경로가 이 모듈을 import하지 않는다는 거버넌스(브랜치 ④ '생성물 회계 전용 유지')가 이식 후에도 GREEN인지. formula_reach_report 제외 목록 등재는 test_formula_reach_report가 코퍼스 회계 읽기를 formula 노드 소비로 오인한 실패의 수습이므로 이식 순서를 함께 검증한다"
+  - "④ 소유 태스크 MATH-06-curriculum-notation-gate-coverage-extension의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적고, 미이행분은 승계 태스크로 분리 등재한 뒤 MATH-06을 닫을 수 있는지 판정한다. MATH-06은 이 태스크를 선행으로 부착했다. 이 태스크는 CLAUDE.md '완료 산출물을 PR 없이 브랜치에 남긴 채 세션 종료 금지'가 막으려던 상태의 사례이므로, 이식 PR은 반드시 연다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/curriculum_notation_gate.py
+  - tests/backend/l3/test_curriculum_notation_gate.py
+  - data/curriculum_notation_ranges.json
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-① (stray-code 17회차). 소유 태스크 MATH-06-curriculum-notation-gate-coverage-extension. 회수 완료 전 원 브랜치 claude/brave-franklin-2999u5 삭제 금지. 원격 claim MATH-06은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
+updated: 2026-10-12

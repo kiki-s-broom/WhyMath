@@ -269,3 +269,85 @@ class TestCurriculumEntryRoundtrip:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:
             _cleanup([_ENTRY_ID])
+
+
+class TestUniversityCellsRoundtrip:
+    """대학 원자 셀(S4-64) — 적재 → DB 행 → resolver 복원 → 멱등을 실 PG로 잠근다.
+
+    required_depth는 고정 mastery가 아니라 원자별 cognitive_type 도출(절차→procedural·개념→
+    conceptual·표상→NULL)이며, NULL은 resolver가 None으로 돌려준다(깊이 신호 없음 — 정직 폴백).
+    """
+
+    # 통합테스트 전용 대학 원자 코드(실 코드계와 충돌하지 않는 ZZ 접두).
+    _CODES = {
+        "ZZ-UNIV-941-P": ("절차", "procedural"),
+        "ZZ-UNIV-941-C": ("개념", "conceptual"),
+        "ZZ-UNIV-941-R": ("표상", None),
+    }
+
+    def _atom_graph(self, tmp_path: Path) -> Path:
+        atoms = [
+            {
+                "code": code,
+                "school_level": "대학",
+                "grade_band": "2학년",
+                "subject_area": "선형대수",
+                "cognitive_type": cognitive,
+            }
+            for code, (cognitive, _depth) in self._CODES.items()
+        ]
+        path = tmp_path / "atom_graph.json"
+        path.write_text(json.dumps({"concepts": atoms}, ensure_ascii=False), encoding="utf-8")
+        return path
+
+    def test_university_cells_land_with_cognitive_type_depth_and_are_idempotent(
+        self, tmp_path: Path
+    ) -> None:
+        _skip_if_unreachable()
+        from sqlalchemy import text
+
+        from whymath_backend.l1.curriculum.curriculum_loader import (
+            load_kr_curriculum_entries_for_university_atoms,
+        )
+        from whymath_backend.l1.curriculum.curriculum_resolve import CurriculumDepthResolver
+
+        entry_ids = [f"{code}:KR" for code in self._CODES]
+        try:
+            for now in (_NOW, _LATER):  # 2회 적재 — 멱등
+                entries = load_kr_curriculum_entries_for_university_atoms(
+                    self._atom_graph(tmp_path), now=now
+                )
+                assert populate_kr_curriculum_entries(entries, settings=Settings()) == 3
+
+            engine = _sync_engine()
+            try:
+                with engine.connect() as conn:  # type: ignore[attr-defined]
+                    rows = {
+                        r.concept_id: r
+                        for r in conn.execute(
+                            text(
+                                "SELECT concept_id, introduced_grade, grade_band, required_depth, "
+                                "created_at, updated_at FROM curriculum_entry "
+                                "WHERE entry_id = ANY(:ids)"
+                            ),
+                            {"ids": entry_ids},
+                        ).all()
+                    }
+            finally:
+                engine.dispose()  # type: ignore[attr-defined]
+            assert set(rows) == set(self._CODES)  # 재적재에도 행 3개(멱등)
+            for code, (_cognitive, depth) in self._CODES.items():
+                assert rows[code].introduced_grade == 14  # 대학 2학년 = 14
+                assert rows[code].grade_band == "2학년"
+                assert rows[code].required_depth == depth
+                assert rows[code].created_at == _NOW  # 최초 생성 시각 보존
+                assert rows[code].updated_at == _LATER
+
+            # read-time — resolver는 깊이가 있는 두 코드만 복원하고 표상(NULL)은 신호 없음.
+            resolved = CurriculumDepthResolver().resolve_many(list(self._CODES), country_code="KR")
+            assert {code: d.value for code, d in resolved.items()} == {
+                "ZZ-UNIV-941-P": "procedural",
+                "ZZ-UNIV-941-C": "conceptual",
+            }
+        finally:
+            _cleanup(entry_ids)

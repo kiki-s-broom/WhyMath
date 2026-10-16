@@ -21,8 +21,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import math
 import shutil
+import uuid
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -32,6 +35,12 @@ import yaml
 
 from whymath_backend.l1.standards import phase3_coverage as pc
 from whymath_backend.l1.standards import phase3_scope as ps
+from whymath_backend.schema.problem_metadata import (
+    EMPTY_DIFFICULTY,
+    ProblemMetadataField,
+    ProblemSlot,
+    slot_tag,
+)
 
 _REPO = Path(__file__).resolve().parents[3]
 _KEYS = (
@@ -85,6 +94,10 @@ def _world(spec: ps.ScopeSpec, index: ps.ReferenceIndex) -> pc.CoverageCorpus:
                 has_steps=True,
                 problem_type_codes=(f"ptype.syn-{n}",),
                 distractor_ids=(f"syn-kebab-{n}",),
+                # P3-04 — 7필드 축. 대조군은 "전부 연결된 세계"이므로 새 축도 채운다.
+                difficulty=2.0,
+                answer="7",
+                solution_text="거듭제곱의 미분법에 따라 구한다.",
             )
         )
         content[concept.source_id] = "reviewed"
@@ -374,13 +387,40 @@ class TestVerdict:
         assert any("Curriculum Coverage" in f and "분모가 0" in f for f in report.failures)
 
     def test_target_less_metric_does_not_change_exit_code(self, spec, index, world) -> None:
-        """Graph Connectivity 는 명세에 목표가 없다 — 떨어져도 exit 은 다른 지표가 정한다."""
+        """목표가 null 인 지표는 떨어져도 exit 을 바꾸지 않는다 — 판정이 없는 지표의 계약.
+
+        실 명세는 Graph Connectivity 목표를 0.95 로 확정했으므로(P3-33) 이 경로는 실 명세로는
+        더 닿지 않는다. 목표를 명시적으로 null 로 둔 명세를 만들어 그 계약을 계속 겨냥한다.
+        """
         _, cut = _drop_crosslinks(spec, index, world)
-        report = pc.evaluate(spec, index, cut)
+        targets = {
+            **spec.targets,
+            "graph_connectivity_coverage": ps.Target(value=None, reason="테스트 — 목표 미정"),
+        }
+        report = pc.evaluate(replace(spec, targets=targets), index, cut)
         connectivity = report.metric("graph_connectivity_coverage")
         assert connectivity.value == 0.0
         assert connectivity.met is None and not connectivity.gated
         assert report.exit_code == 0
+
+    def test_graph_connectivity_is_gated_by_the_confirmed_spec_target(
+        self, spec, index, world
+    ) -> None:
+        """확정된 목표(0.95)가 판정을 만든다 — 크로스링크가 끊기면 미달이고 exit 1 이다.
+
+        위 null 대조군과 한 쌍이다: 같은 위반 입력에서 목표가 null 이면 exit 0, 목표가 있으면
+        exit 1 이어야 둘 다 변별력이 있다.
+        """
+        assert spec.targets["graph_connectivity_coverage"].value == 0.95
+        _, cut = _drop_crosslinks(spec, index, world)
+        report = pc.evaluate(spec, index, cut)
+        connectivity = report.metric("graph_connectivity_coverage")
+        assert connectivity.value == 0.0
+        assert connectivity.gated and connectivity.met is False
+        assert report.exit_code == 1
+        # 성공 방향 대조군 — 위반 없는 세계는 같은 목표에서 충족이다
+        clean = pc.evaluate(spec, index, world).metric("graph_connectivity_coverage")
+        assert clean.gated and clean.met is True
 
     def test_supply_coverage_never_gates(self, spec, index, world) -> None:
         _, demoted = _demote_review_status(spec, index, world)
@@ -621,6 +661,7 @@ class TestSpecAlignment:
         lenient["content_coverage_rate"] = ps.Target(value=0.5, reason=None)
         lenient["curriculum_coverage"] = ps.Target(value=0.5, reason=None)
         lenient["concept_completeness"] = ps.Target(value=0.5, reason=None)
+        lenient["graph_connectivity_coverage"] = ps.Target(value=0.5, reason=None)
         report = pc.evaluate(replace(spec, targets=lenient), index, cut)
         assert report.metric("content_coverage_rate").met is True
         assert report.exit_code == 0
@@ -691,6 +732,7 @@ class TestDefinitionsBite:
             "content_coverage_rate": ps.Target(value=0.9, reason=None),
             "curriculum_coverage": ps.Target(value=0.9, reason=None),
             "concept_completeness": ps.Target(value=0.9, reason=None),
+            "graph_connectivity_coverage": ps.Target(value=0.9, reason=None),
         }
         report = pc.evaluate(replace(spec, targets=exact), index, cut)
         assert report.metric("content_coverage_rate").value == 0.9
@@ -1001,11 +1043,182 @@ class TestRealCorpus:
             for entry in metric.unmet:
                 assert entry.missing, (metric.key, entry.subject)
 
-    def test_hint_is_reported_unmeasured_while_the_seat_is_absent(self, spec, real_report) -> None:
-        """힌트 저장 좌석이 생기면(P3-04) 이 테스트를 갱신한다 — 좌석이 생겼는데 이 단언이 남아
-        있으면 배선 누락을 드러낸다."""
+    def test_hint_is_unmeasured_when_no_hint_input_is_given(self, spec, real_report) -> None:
+        """P3-22 — 좌석(DB `hints.verified`)은 실재한다. 그래서 이 단언이 말하는 것은 '좌석이 없다'가
+        아니라 '이 실행은 힌트를 읽지 않았다'(`--hints-from-db` 미지정)다. 입력이 없을 때 빈 집합으로
+        위장하지 않고 unmeasured 로 남는 것을 동결한다. 좌석을 읽는 경로는 `TestHintSeatWiring`."""
         n = len(spec.core_concepts)
         assert real_report.link_counts["hint"] == {"linked": 0, "missing": 0, "unmeasured": n}
+        assert real_report.hint_seat is None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 힌트 좌석 배선 (P3-22) — DB hints(verified) → hint_problem_ids → Completeness
+# ──────────────────────────────────────────────────────────────────────────
+class _Scalars:
+    def __init__(self, values: list[Any]) -> None:
+        self._values = values
+
+    def all(self) -> list[Any]:
+        return list(self._values)
+
+
+class _Result:
+    def __init__(self, values: list[Any]) -> None:
+        self._values = values
+
+    def scalars(self) -> _Scalars:
+        return _Scalars(self._values)
+
+
+class _FakeHintSession:
+    """실제 문장(SQL)을 기록하고 정해 둔 값을 돌려준다 — 조건을 스스로 보태지 않는다.
+
+    WHERE 를 가짜가 흉내 내면 리더에서 `verified` 조건이 빠져도 초록이므로, 조건의 유무는 컴파일된
+    SQL 문자열로 따로 단언한다(`test_reader_asks_only_for_verified_distinct_problem_ids`).
+    """
+
+    def __init__(self, values: list[Any]) -> None:
+        self.values = values
+        self.sql: list[str] = []
+
+    async def execute(self, stmt: Any) -> _Result:
+        self.sql.append(str(stmt.compile()))
+        return _Result(self.values)
+
+
+def _read(values: list[Any]) -> frozenset[str]:
+    return asyncio.run(pc.fetch_verified_hint_problem_ids(_FakeHintSession(values)))
+
+
+class TestHintSeatWiring:
+    def test_reader_asks_only_for_verified_distinct_problem_ids(self) -> None:
+        session = _FakeHintSession([])
+        asyncio.run(pc.fetch_verified_hint_problem_ids(session))
+        sql = " ".join(session.sql).lower()
+        assert "from hints" in sql
+        assert "hints.verified is true" in sql  # 미검수 힌트는 학생에게 나갈 수 없다
+        assert "distinct" in sql
+        assert "hints.content" not in sql  # 본문은 읽지 않는다
+
+    def test_reader_returns_uuid_as_text_so_it_matches_the_jsonl_bank(self) -> None:
+        pid = uuid.UUID("c944bffa-4308-5c4e-b793-d2cbd8163c48")
+        assert _read([pid, pid]) == frozenset({"c944bffa-4308-5c4e-b793-d2cbd8163c48"})
+
+    def test_reader_with_no_rows_is_an_empty_set_not_none(self) -> None:
+        """읽었는데 없다(missing)와 읽지 않았다(unmeasured)는 다른 사건이다."""
+        assert _read([]) == frozenset()
+
+    def test_db_hints_turn_unmeasured_into_linked(self, spec, index, world) -> None:
+        # 합성 세계의 ID 는 문자열이라 UUID 가 아니다 — 문자열 그대로 읽은 집합을 쓴다.
+        ids = _read([p.problem_id for p in world.problems])
+        report = pc.evaluate(spec, index, replace(world, hint_problem_ids=ids))
+        n = len(spec.core_concepts)
+        assert report.link_counts["hint"] == {"linked": n, "missing": 0, "unmeasured": 0}
+        assert report.metric("concept_completeness").value == 1.0
+
+    def test_deleting_the_hints_from_the_seat_drops_completeness(self, spec, index, world) -> None:
+        """acceptance ② — 좌석에서 힌트를 지우는 주입에 Completeness 가 실제로 떨어진다."""
+        full = _read([p.problem_id for p in world.problems])
+        before = pc.evaluate(spec, index, replace(world, hint_problem_ids=full))
+        cut = _inject(replace(world, hint_problem_ids=full), hint_problem_ids=_read([]))
+        after = pc.evaluate(spec, index, cut)
+        assert before.metric("concept_completeness").value == 1.0
+        assert after.metric("concept_completeness").value == 0.0
+        n = len(spec.core_concepts)
+        # 지운 것은 missing 이지 unmeasured 가 아니다 — 읽었는데 없는 것이다.
+        assert after.link_counts["hint"] == {"linked": 0, "missing": n, "unmeasured": 0}
+        # 힌트를 지워도 나머지 지표는 그대로다(힌트만 재는 연결이다).
+        for key in ("content_coverage_rate", "curriculum_coverage", "graph_connectivity_coverage"):
+            assert after.metric(key).value == before.metric(key).value, key
+
+    def test_one_problem_hint_links_exactly_one_concept(self, spec, index, world) -> None:
+        first = world.problems[0].problem_id
+        report = pc.evaluate(spec, index, replace(world, hint_problem_ids=_read([first])))
+        assert report.link_counts["hint"]["linked"] == 1
+        assert report.link_counts["hint"]["unmeasured"] == 0
+
+    def test_seat_stats_report_overlap_with_the_bank(self, spec, index, world) -> None:
+        ids = frozenset({world.problems[0].problem_id, "db-only-problem"})
+        seat = pc.evaluate(spec, index, replace(world, hint_problem_ids=ids)).hint_seat
+        assert seat == pc.HintSeatStats(
+            hinted_problems=2, in_scope_bank=1, eligible_hinted=1, outside_scope=1
+        )
+
+    def test_id_space_mismatch_is_warned_not_disguised_as_no_hints(
+        self, spec, index, world
+    ) -> None:
+        """DB 힌트가 있는데 은행과 한 건도 안 겹치면 '힌트 0'이 아니라 ID 불일치 경고가 나온다."""
+        ids = frozenset({"uuid-not-in-the-bank-1", "uuid-not-in-the-bank-2"})
+        report = pc.evaluate(spec, index, replace(world, hint_problem_ids=ids))
+        assert report.hint_seat is not None and report.hint_seat.in_scope_bank == 0
+        assert any("ID 공간" in w for w in report.warnings)
+        assert report.link_counts["hint"]["linked"] == 0
+
+    def test_no_mismatch_warning_when_the_ids_overlap(self, spec, index, world) -> None:
+        report = pc.evaluate(
+            spec, index, replace(world, hint_problem_ids=_read([world.problems[0].problem_id]))
+        )
+        assert not any("ID 공간" in w for w in report.warnings)
+
+    def test_json_and_text_carry_the_seat(self, spec, index, world) -> None:
+        with_seat = pc.evaluate(spec, index, world)
+        without = pc.evaluate(spec, index, replace(world, hint_problem_ids=None))
+        assert pc.to_json(with_seat)["hint_seat"]["hinted_problems"] == len(world.problems)
+        assert pc.to_json(without)["hint_seat"] is None
+        assert "힌트 입력: DB 검수 통과" in pc.render(with_seat)
+        assert "힌트 입력: 없음(측정 불가)" in pc.render(without)
+
+
+class TestHintSeatCli:
+    def test_default_run_never_touches_the_db(self, world, monkeypatch, capsys) -> None:
+        def _boom(*a: Any, **k: Any) -> frozenset[str]:
+            raise AssertionError("플래그 없이 DB 를 읽었다")
+
+        monkeypatch.setattr(pc, "read_hint_problem_ids_from_db", _boom)
+        monkeypatch.setattr(pc, "load_corpus", lambda s: world)
+        pc.main([])  # 호출이 일어나면 AssertionError 로 터진다
+        capsys.readouterr()
+
+    def test_flag_passes_the_db_ids_into_the_corpus(self, world, monkeypatch, capsys) -> None:
+        seen: dict[str, Any] = {}
+        ids = frozenset({"p1", "p2"})
+        monkeypatch.setattr(pc, "read_hint_problem_ids_from_db", lambda: ids)
+
+        def _load(s: Any, repo_root: Any = None, *, hint_problem_ids: Any = None) -> Any:
+            seen["ids"] = hint_problem_ids
+            return world
+
+        monkeypatch.setattr(pc, "load_corpus", _load)
+        pc.main(["--hints-from-db"])
+        capsys.readouterr()
+        assert seen["ids"] == ids
+
+    def test_unreadable_db_is_exit_2_with_the_exception_type(self, monkeypatch, capsys) -> None:
+        async def _refuse() -> frozenset[str]:
+            raise ConnectionRefusedError("db down")
+
+        monkeypatch.setattr(pc, "_read_hint_problem_ids", _refuse)
+        assert pc.main(["--hints-from-db"]) == 2
+        err = capsys.readouterr().err
+        assert "적재 실패" in err and "ConnectionRefusedError" in err  # 타입명이 남는다
+
+    def test_hanging_db_times_out_instead_of_hanging_the_measurement(self, monkeypatch) -> None:
+        async def _hang() -> frozenset[str]:
+            await asyncio.sleep(30)
+            return frozenset()
+
+        monkeypatch.setattr(pc, "_read_hint_problem_ids", _hang)
+        with pytest.raises(pc.CoverageError, match="TimeoutError"):
+            pc.read_hint_problem_ids_from_db(timeout_s=0.05)
+
+    def test_unmeasured_hint_is_still_a_failure_without_the_flag(
+        self, world, monkeypatch, capsys
+    ) -> None:
+        """플래그가 없으면 힌트를 못 잰 채 Completeness 가 0 이라 exit 1 이다 — 통과로 위장하지 않는다."""
+        monkeypatch.setattr(pc, "load_corpus", lambda s: replace(world, hint_problem_ids=None))
+        assert pc.main([]) == 1
+        assert "힌트 입력: 없음(측정 불가)" in capsys.readouterr().out
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1083,3 +1296,375 @@ class TestCli:
         monkeypatch.setattr(pc, "load_corpus", boom)
         assert pc.main([]) == 2
         assert "CoverageError" in capsys.readouterr().err
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-04 — Problem 필수 7필드 현황 + 문제 유형 6슬롯 충족
+# ──────────────────────────────────────────────────────────────────────────
+_F = ProblemMetadataField
+_S = ProblemSlot
+
+
+def _slotted(world: pc.CoverageCorpus) -> pc.CoverageCorpus:
+    """핵심 개념마다 6슬롯 문항을 하나씩 — 기본 문항을 복제하고 슬롯 태그만 달리한다(60문항)."""
+    problems = [
+        replace(base, problem_id=f"{base.problem_id}-{slot.value}", tags=(slot_tag(slot),))
+        for base in world.problems
+        for slot in ProblemSlot
+    ]
+    return replace(
+        world,
+        problems=tuple(problems),
+        problems_scanned=len(problems),
+        hint_problem_ids=frozenset(p.problem_id for p in problems),
+    )
+
+
+@pytest.fixture(scope="module")
+def slotted(world: pc.CoverageCorpus) -> pc.CoverageCorpus:
+    return _slotted(world)
+
+
+def _clone_of(corpus: pc.CoverageCorpus, slot: ProblemSlot, nth: int = 0) -> pc.ProblemRef:
+    return [p for p in corpus.problems if p.problem_id.endswith(f"-{slot.value}")][nth]
+
+
+def _swap(
+    corpus: pc.CoverageCorpus, target: pc.ProblemRef, **changes: Any
+) -> tuple[pc.CoverageCorpus, pc.ProblemRef]:
+    """문항 하나를 바꿔 끼운다. 바뀐 문항도 돌려준다 — 주입이 적용됐는지 호출부가 단언한다."""
+    new = replace(target, **changes)
+    assert new != target, "주입이 적용되지 않았다(변경 전후가 같다) — 하네스 결함"
+    problems = tuple(new if p is target else p for p in corpus.problems)
+    return replace(corpus, problems=problems), new
+
+
+class TestProblemMetadataAndSlots:
+    def test_control_every_problem_has_all_seven_fields_and_all_slots_are_filled(
+        self, spec, index, slotted
+    ) -> None:
+        report = pc.evaluate(spec, index, slotted)
+        stats = report.problem_metadata
+        assert stats is not None and report.slots is not None
+        assert (stats.population, stats.complete, stats.without_missing) == (60, 60, 60)
+        assert stats.unmet == () and stats.unmeasured_fields == ()
+        assert all(c["present"] == 60 for c in stats.field_counts.values())
+        assert (report.slots.met_count, report.slots.population) == (60, 60)
+        assert report.slots.unmet == ()
+        assert report.failures == () and report.warnings == () and report.exit_code == 0
+
+    # ── 7필드: 하나씩 비우는 주입 — 그 필드만 비고 CI 가 실패한다 ─────────────────────
+    @pytest.mark.parametrize(
+        "field",
+        [f for f in ProblemMetadataField if f is not ProblemMetadataField.CONCEPT],
+        ids=lambda f: f.value,
+    )
+    def test_blanking_one_field_of_one_problem_is_flagged_and_only_that_field(
+        self, spec, index, slotted, field
+    ) -> None:
+        target = _clone_of(slotted, _S.REPRESENTATIVE)
+        if field is _F.DIFFICULTY:
+            broken, _ = _swap(slotted, target, difficulty=EMPTY_DIFFICULTY)
+        elif field is _F.SKILL:
+            broken, _ = _swap(slotted, target, problem_type_codes=())
+        elif field is _F.SOLUTION:
+            broken, _ = _swap(slotted, target, solution_text="")
+        elif field is _F.ANSWER:
+            broken, _ = _swap(slotted, target, answer="  ")
+        elif field is _F.MISCONCEPTION_SIGNATURE:
+            # 오개념 유발 슬롯 문항에서 문항 자체 연결을 지운다 — 개념 상속으로는 인정되지 않는다.
+            target = _clone_of(slotted, _S.MISCONCEPTION_TRIGGER)
+            broken, _ = _swap(slotted, target, distractor_ids=())
+        else:
+            assert field is _F.HINT_STRATEGY
+            assert slotted.hint_problem_ids is not None
+            hints = slotted.hint_problem_ids - {target.problem_id}
+            broken = replace(slotted, hint_problem_ids=hints)
+            assert broken != slotted
+        report = pc.evaluate(spec, index, broken)
+        stats = report.problem_metadata
+        assert stats is not None
+        counts = {name: c["missing"] for name, c in stats.field_counts.items()}
+        assert counts == {name: int(name == field.value) for name in counts}, counts
+        assert [u.subject for u in stats.unmet] == [target.problem_id]
+        assert stats.unmet[0].missing == (f"{field.value}: 비어 있다",)
+        assert (stats.complete, stats.without_missing) == (59, 59)
+        assert report.exit_code == 1
+        assert any("문제 메타데이터 7필드" in f and "1건" in f for f in report.failures)
+
+    def test_concept_field_cannot_be_blank_for_an_in_scope_problem_it_leaves_the_scope(
+        self, spec, index, slotted
+    ) -> None:
+        """범위 안 문항은 정의상 PRIMARY 개념이 있다 — 그것을 지우면 '결손'이 아니라 범위 밖이 된다.
+
+        그래서 코퍼스 쪽에서 이 필드의 결손은 분모 감소로 나타난다(실 코퍼스 래칫이 분모 하한을 건다).
+        """
+        target = _clone_of(slotted, _S.BASIC)
+        broken, _ = _swap(slotted, target, primary_src_ids=frozenset())
+        stats = pc.evaluate(spec, index, broken).problem_metadata
+        assert stats is not None
+        assert stats.population == 59 and stats.unmet == ()
+
+    def test_unmeasured_hint_is_reported_not_counted_and_not_a_failure(
+        self, spec, index, slotted
+    ) -> None:
+        report = pc.evaluate(spec, index, replace(slotted, hint_problem_ids=None))
+        stats = report.problem_metadata
+        assert stats is not None
+        assert stats.field_counts["hint_strategy"] == {"present": 0, "missing": 0, "unknown": 60}
+        assert stats.unmeasured_fields == ("hint_strategy",)
+        assert (stats.complete, stats.without_missing) == (
+            0,
+            60,
+        ), "측정 불가를 충족으로 세면 안 된다"
+        assert not any("문제 메타데이터" in f for f in report.failures)
+        assert any("측정 불가 필드: hint_strategy" in w for w in report.warnings)
+
+    def test_inherited_only_signature_is_counted_separately(self, spec, index, slotted) -> None:
+        """대조군 — 오개념 유발이 아닌 슬롯은 개념 상속으로 인정되고, 그 비율이 따로 센다."""
+        base = pc.evaluate(spec, index, slotted).problem_metadata
+        assert base is not None
+        target = _clone_of(slotted, _S.REPRESENTATIVE)
+        weaker, _ = _swap(slotted, target, distractor_ids=())
+        stats = pc.evaluate(spec, index, weaker).problem_metadata
+        assert stats is not None
+        assert stats.field_counts["misconception_signature"]["missing"] == 0
+        assert stats.inherited_only == base.inherited_only + 1
+        assert stats.unmet == ()
+
+    # ── 6슬롯: 하나씩 비우는 주입 — 그 칸 하나만 떨어진다 ─────────────────────────────
+    @pytest.mark.parametrize("slot", list(ProblemSlot), ids=lambda s: s.value)
+    def test_removing_one_slot_tag_drops_exactly_one_cell(self, spec, index, slotted, slot) -> None:
+        control = pc.evaluate(spec, index, slotted)
+        target = _clone_of(slotted, slot)
+        broken, _ = _swap(slotted, target, tags=())
+        report = pc.evaluate(spec, index, broken)
+        assert report.slots is not None and control.slots is not None
+        assert report.slots.met_count == control.slots.met_count - 1 == 59
+        assert len(report.slots.unmet) == 1
+        names = {s.id: s.name_ko for s in spec.slots}
+        assert report.slots.unmet[0].missing[0].startswith(f"{names[slot.value]}:")
+        # 다른 네 지표는 그대로 — 슬롯 지표가 독립된 축을 잰다는 증거.
+        assert _values(report) == _values(control)
+        assert not any("Slot" in f for f in report.failures)  # 목표가 없는 지표는 exit 에 불참
+
+    def test_trigger_slot_counts_only_problems_with_their_own_signature(
+        self, spec, index, slotted
+    ) -> None:
+        target = _clone_of(slotted, _S.MISCONCEPTION_TRIGGER)
+        broken, _ = _swap(slotted, target, distractor_ids=())
+        report = pc.evaluate(spec, index, broken)
+        assert report.slots is not None
+        assert report.slots.met_count == 59
+        assert "문항 자체 오개념 연결이 없는 1건은 세지 않는다" in report.slots.unmet[0].missing[0]
+
+    def test_ineligible_problem_does_not_fill_a_slot(self, spec, index, slotted) -> None:
+        target = _clone_of(slotted, _S.APPLIED)
+        broken, _ = _swap(slotted, target, review_status="pending")
+        report = pc.evaluate(spec, index, broken)
+        assert report.slots is not None and report.slots.met_count == 59
+
+    def test_unknown_slot_tag_is_a_failure_and_leaves_the_cell_empty(
+        self, spec, index, slotted
+    ) -> None:
+        """오타(`p3-slot:aplied`)를 조용히 무시하면 그 문항은 슬롯이 없는 것으로 보일 뿐이다."""
+        target = _clone_of(slotted, _S.APPLIED)
+        broken, _ = _swap(slotted, target, tags=("p3-slot:aplied",))
+        report = pc.evaluate(spec, index, broken)
+        assert report.exit_code == 1
+        assert any("알 수 없는 슬롯 태그" in f and "p3-slot:aplied" in f for f in report.failures)
+        assert report.slots is not None and report.slots.met_count == 59
+
+    # ── 정의 정합 — 명세가 다른 필드·슬롯을 말하면 측정을 거부한다 ──────────────────────
+    def test_refuses_to_measure_when_the_spec_names_different_fields(
+        self, spec, index, slotted
+    ) -> None:
+        changed = replace(spec, problem_required_fields=spec.problem_required_fields[:-1])
+        assert changed != spec
+        with pytest.raises(pc.CoverageError, match="problem_required_fields"):
+            pc.evaluate(changed, index, slotted)
+
+    def test_refuses_to_measure_when_the_spec_names_different_slots(
+        self, spec, index, slotted
+    ) -> None:
+        changed = replace(spec, slots=spec.slots[:-1])
+        assert changed != spec
+        with pytest.raises(pc.CoverageError, match="슬롯"):
+            pc.evaluate(changed, index, slotted)
+
+    # ── 출력 ─────────────────────────────────────────────────────────────────────
+    def test_json_and_text_carry_the_new_sections(self, spec, index, slotted) -> None:
+        report = pc.evaluate(spec, index, replace(slotted, hint_problem_ids=None))
+        doc = pc.to_json(report)
+        assert doc["slot_coverage"]["population"] == 60
+        assert doc["problem_metadata"]["field_counts"]["hint_strategy"]["unknown"] == 60
+        assert doc["problem_metadata"]["unmeasured_fields"] == ["hint_strategy"]
+        text = pc.render(report)
+        assert "Concept Slot Coverage(6슬롯)" in text
+        assert "문제 메타데이터 7필드 (적격 문항 60건)" in text
+        assert "측정 불가 필드: hint_strategy" in text
+
+    def test_metric_lookup_finds_the_slot_metric(self, spec, index, slotted) -> None:
+        assert pc.evaluate(spec, index, slotted).metric("slot_coverage").population == 60
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-05 — 슬롯 계수가 "문항 수"가 아니라 "서로 다른 문제 수"를 센다
+# ──────────────────────────────────────────────────────────────────────────
+# 슬롯당 최소가 1건이면 어떤 중복 기준도 칸 수를 바꾸지 못한다(한 건이면 채워진다). 그래서 이 클래스는
+# 슬롯당 최소를 2로 올린 명세에서 본다 — 그때 비로소 "같은 문제 2건"과 "다른 문제 2건"이 갈린다.
+_STEM_A = "함수 f(x) = x^3 - 3x 의 극값의 개수를 구하시오."
+_STEM_B = "함수 f(x) = x^3 - 3x 의 변곡점의 개수를 구하시오."
+
+
+def _with_stems(
+    corpus: pc.CoverageCorpus, slot: ProblemSlot, stems: list[str | None]
+) -> pc.CoverageCorpus:
+    """한 슬롯의 문항 하나를 stems 만큼으로 불려 각자 다른 문면을 단다(첫 칸만, 나머지 칸은 그대로)."""
+    target = _clone_of(corpus, slot)
+    extra = [
+        replace(target, problem_id=f"{target.problem_id}-dup{n}", question_text=text)
+        for n, text in enumerate(stems[1:], start=1)
+    ]
+    first = replace(target, question_text=stems[0])
+    problems = tuple(first if p is target else p for p in corpus.problems) + tuple(extra)
+    return replace(corpus, problems=problems, problems_scanned=len(problems))
+
+
+class TestSlotCountsDistinctProblemsNotProblems:
+    @pytest.fixture(scope="class")
+    def strict_spec(self, spec: ps.ScopeSpec) -> ps.ScopeSpec:
+        changed = replace(spec, min_distinct_per_slot=2, total_min_distinct_problems=120)
+        assert changed != spec
+        return changed
+
+    def test_control_without_stems_every_problem_counts_so_two_problems_fill_a_cell(
+        self, strict_spec, index, slotted
+    ) -> None:
+        """대조군 — 문면을 모르는 문항은 합쳐지지 않는다(모르면서 합치지 않는다). 2건이면 채워진다."""
+        corpus = _with_stems(slotted, _S.BASIC, [None, None])
+        report = pc.evaluate(strict_spec, index, corpus)
+        assert report.slots is not None
+        # 기본 슬롯은 2건이 됐지만 나머지 5칸은 1건뿐이라 최소 2에 못 미친다.
+        names = {s.id: s.name_ko for s in strict_spec.slots}
+        basic_cells = [
+            m for u in report.slots.unmet for m in u.missing if m.startswith(f"{names['basic']}:")
+        ]
+        assert len(basic_cells) == len(strict_spec.core_concepts) - 1, basic_cells
+
+    def test_numbers_only_copies_do_not_fill_a_cell_that_needs_two_distinct_problems(
+        self, strict_spec, index, slotted
+    ) -> None:
+        """핵심 — 숫자만 바꾼 복제 2건은 같은 문제다. 문항은 2건이지만 서로 다른 문제는 1건이다."""
+        same_problem = [_STEM_A.replace("3", "5"), _STEM_A.replace("3", "7")]
+        assert same_problem[0] != same_problem[1]  # 문면 자체는 다르다(숫자가 다르다)
+        corpus = _with_stems(slotted, _S.BASIC, same_problem)
+        report = pc.evaluate(strict_spec, index, corpus)
+        assert report.slots is not None
+        names = {s.id: s.name_ko for s in strict_spec.slots}
+        gaps = [
+            m for u in report.slots.unmet for m in u.missing if m.startswith(f"{names['basic']}:")
+        ]
+        # 복제를 넣은 개념의 기본 칸도 비어 있어야 한다 — 문항 수로 셌다면 채워졌을 것이다.
+        assert len(gaps) == len(strict_spec.core_concepts), gaps
+        assert any("서로 다른 문제 1건" in g and "문항 2건" in g for g in gaps), gaps
+
+    def test_structurally_different_problems_fill_the_cell(
+        self, strict_spec, index, slotted
+    ) -> None:
+        """대조군 — 같은 2건이라도 구조가 다르면 서로 다른 문제 2건이라 채워진다."""
+        corpus = _with_stems(slotted, _S.BASIC, [_STEM_A, _STEM_B])
+        report = pc.evaluate(strict_spec, index, corpus)
+        assert report.slots is not None
+        names = {s.id: s.name_ko for s in strict_spec.slots}
+        gaps = [
+            m for u in report.slots.unmet for m in u.missing if m.startswith(f"{names['basic']}:")
+        ]
+        assert len(gaps) == len(strict_spec.core_concepts) - 1, gaps
+
+    def test_unfolded_count_is_reported_in_the_note(self, spec, index, slotted) -> None:
+        """작동한 비율 — 문면을 몰라 접지 못한 문항이 몇 건인지 지표가 말한다(침묵하지 않는다)."""
+        note = pc.evaluate(spec, index, slotted).metric("slot_coverage").note
+        assert note is not None and "문면 미확인 60건" in note, note
+        known = replace(
+            slotted,
+            problems=tuple(
+                replace(p, question_text=f"문항 {n} 번 문제")
+                for n, p in enumerate(slotted.problems)
+            ),
+        )
+        note_known = pc.evaluate(spec, index, known).metric("slot_coverage").note
+        assert note_known is not None and "문면 미확인 0건" in note_known, note_known
+
+
+class TestProblemRowToEvidence:
+    """코퍼스 행 → `ProblemRef` 변환. 실 코퍼스에는 빈 필드가 한 건도 없어서, 이 변환이 "비어 있으면
+    비어 있다"로 읽는지는 실 코퍼스 테스트로 볼 수 없다 — 합성 행으로 직접 잰다."""
+
+    _ROW: dict[str, Any] = {
+        "problem_id": "p-1",
+        "concepts": [{"concept_src_id": "H:x", "role": "PRIMARY"}],
+        "review_status": "approved",
+        "difficulty_overall": 2.5,
+        "answer": "7",
+        "answer_explanation": "지수를 앞으로 내린다.",
+        "tags": ["p3-slot:basic", "unrelated"],
+        "problem_type_codes": ["ptype.a"],
+    }
+
+    def _ref(self, **changes: Any) -> pc.ProblemRef:
+        row = {**self._ROW, **changes}
+        for key in [k for k, v in changes.items() if v is _GONE]:
+            del row[key]
+        ref = pc._problem_from_row(row)
+        assert ref is not None
+        return ref
+
+    def test_complete_row_fills_every_field_axis(self) -> None:
+        ref = self._ref()
+        assert ref.difficulty == 2.5
+        assert (ref.answer, ref.solution_text) == ("7", "지수를 앞으로 내린다.")
+        assert ref.tags == ("p3-slot:basic", "unrelated")
+
+    @pytest.mark.parametrize("key", ["difficulty_overall", "answer", "answer_explanation"])
+    def test_a_row_without_the_key_is_measured_empty_not_unmeasured(self, key: str) -> None:
+        """행을 읽었는데 값이 없다 → "측정했고 비어 있음". None(측정 못함)이면 사유가 틀려진다."""
+        ref = self._ref(**{key: _GONE})
+        if key == "difficulty_overall":
+            assert ref.difficulty is not None and math.isnan(ref.difficulty)
+        elif key == "answer":
+            assert ref.answer == ""
+        else:
+            assert ref.solution_text == ""
+
+    @pytest.mark.parametrize("bad", [True, False, "2.5", None, [2.5]])
+    def test_non_numeric_difficulty_is_measured_empty(self, bad: Any) -> None:
+        ref = self._ref(difficulty_overall=bad)
+        assert ref.difficulty is not None and math.isnan(ref.difficulty)
+
+    def test_numeric_answer_is_kept_as_text_and_non_text_tags_are_dropped(self) -> None:
+        ref = self._ref(answer=7, tags=["p3-slot:applied", 3, None])
+        assert ref.answer == "7"
+        assert ref.tags == ("p3-slot:applied",)
+        assert self._ref(tags="not-a-list").tags == ()
+
+    def test_non_text_explanation_is_empty(self) -> None:
+        assert self._ref(answer_explanation=123).solution_text == ""
+
+    # ── P3-05 — 근사 중복 기준이 읽는 문면 ───────────────────────────────────────
+    def test_question_text_is_loaded_from_the_row(self) -> None:
+        """이 경로가 끊기면 모든 문항이 '문면 미확인'이 되어 중복 제거가 조용히 꺼진다.
+
+        합성 `ProblemRef` 로 만든 지표 테스트는 이 변환을 거치지 않으므로 여기서 따로 잰다.
+        """
+        ref = self._ref(question_text="함수 f(x) = x^2 의 값을 구하시오.")
+        assert ref.question_text == "함수 f(x) = x^2 의 값을 구하시오."
+
+    @pytest.mark.parametrize("bad", [None, 7, ["문면"], {"a": 1}])
+    def test_a_missing_or_non_text_stem_is_unknown_not_empty(self, bad: Any) -> None:
+        """문면은 다른 세 필드와 반대다: 모르면 None(합치지 않는다). ''로 바꾸면 의미가 흐려진다."""
+        assert self._ref(question_text=bad).question_text is None
+        assert self._ref(question_text=_GONE).question_text is None
+
+
+_GONE = object()  # `_ref` 가 키를 행에서 지우라는 표지

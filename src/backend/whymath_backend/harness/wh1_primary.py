@@ -21,7 +21,7 @@ shadow와 달리 **발화(`outcome.utterance`)를 호출자(coach)에게 돌려�
      예외면 `None`을 반환해 호출자가 결정론 Polya 템플릿으로 안전 폴백하게 한다(가용성 — 앱은
      죽지 않는다). 모든 실패는 예외 *타입명* 포함 WARNING 로그(침묵 실패 금지·CLAUDE.md).
 
-옵트인 추가 계층(PED-23 회수·기본 OFF — 정본 `docs/architecture/04e_pedagogy_strategy_catalog.md`
+옵트인 추가 계층(PED-23 회수·기본 OFF — 정본 `docs/architecture/04g_pedagogy_strategy_catalog.md`
 §9): `mode_guard_runtime_enabled` ∧ 팩 주입 시, 발화 확정 후·톤필터 직전에 교수법 팩 금지모드 가드
 (`l4/pedagogy/mode_guard.py`)를 태운다 — 위반 발화는 서빙하지 않고 소크라테스 재질문(결정론
 템플릿)으로 대체 + reason_code 구조화 로그(fail-closed). OFF/무팩이면 기존 경로와 비트동일.
@@ -51,16 +51,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from whymath_backend.config import get_settings
 from whymath_backend.harness.wh1_llm_policy import LLMTutorPolicy
 from whymath_backend.harness.wh1_loop import TurnOutcome, run_tutoring_turn
 from whymath_backend.harness.wh1_probe_supply import assemble_probe_candidate_pool
 from whymath_backend.harness.wh1_prose import gate_policy_prose, rephrase_coach_utterance
-from whymath_backend.harness.wh1_shadow import _extract_verify_verdict, emit_wh1_observation
+from whymath_backend.harness.wh1_shadow import (
+    PRIMARY_ADOPTED,
+    PrimaryOutcome,
+    _extract_verify_verdict,
+    emit_wh1_aborted_observation,
+    emit_wh1_observation,
+)
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.mode_guard import check_forbidden_modes, fallback_reply_for
@@ -76,12 +83,51 @@ __all__ = ["run_wh1_primary_turn"]
 logger = logging.getLogger("whymath.harness.wh1_primary")
 
 
+class _TurnAccounting(TypedDict):
+    """한 턴의 소요·LLM 호출 회계(OPS-134 ①③) — 레코드의 같은 이름 필드로 그대로 펼쳐진다."""
+
+    elapsed_ms: int
+    llm_calls: int
+    llm_calls_finished: int
+    llm_ms_total: int
+
+
+def _accounting(policy: LLMTutorPolicy | None, started: float) -> _TurnAccounting:
+    """시작 시각과 정책 계수기로 회계를 낸다. 정책 생성 전 실패면 LLM 호출은 실제로 0건이다."""
+    elapsed_ms = round((time.monotonic() - started) * 1000)
+    if policy is None:
+        return _TurnAccounting(
+            elapsed_ms=elapsed_ms, llm_calls=0, llm_calls_finished=0, llm_ms_total=0
+        )
+    return _TurnAccounting(
+        elapsed_ms=elapsed_ms,
+        llm_calls=policy.llm_calls_started,
+        llm_calls_finished=policy.llm_calls_finished,
+        llm_ms_total=policy.llm_ms_total,
+    )
+
+
+def _final_outcome(policy: LLMTutorPolicy | None, *, mode_guard_replaced: bool) -> PrimaryOutcome:
+    """발화가 서빙까지 간 턴의 결말 — 학생이 받은 텍스트가 어디서 왔는가로 가른다.
+
+    우선순위: 금지모드 가드가 대체했으면 그것이 최종 서빙 텍스트의 출처다. 그다음 턴을 끝낸 마지막
+    행동이 정책의 안전 강등이면 LLM이 아니라 결정론 강등의 산물이다. 둘 다 아니면 채택이다.
+    """
+    if mode_guard_replaced:
+        return "fallback_mode_guard"
+    if policy is not None and policy.last_action_degraded:
+        return "fallback_llm_degraded"
+    return PRIMARY_ADOPTED
+
+
 def _safe_emit(
     outcome: TurnOutcome,
     *,
     dialogue_id: str | None,
     turn_index: int,
     problem_id: str | None,
+    primary_outcome: PrimaryOutcome,
+    accounting: _TurnAccounting,
     tone_rewritten: bool = False,
     tone_violations: int = 0,
     prose_rephrased: bool = False,
@@ -99,10 +145,41 @@ def _safe_emit(
             tone_violations=tone_violations,
             prose_rephrased=prose_rephrased,
             prose_reason_code=prose_reason_code,
+            primary_outcome=primary_outcome,
+            **accounting,
         )
     except Exception as exc:  # noqa: BLE001 — 관측 실패는 서빙을 안 깬다(우선순위 #1≫#6).
         logger.warning(
             "WH-1 primary 관측 emit 실패(%s) — 발화 서빙은 계속", type(exc).__name__, exc_info=True
+        )
+
+
+def _safe_emit_aborted(
+    exc: Exception,
+    *,
+    dialogue_id: str | None,
+    turn_index: int,
+    problem_id: str | None,
+    accounting: _TurnAccounting,
+) -> None:
+    """하네스가 결과 없이 중단된 턴(타임아웃·예외)의 기록 — 이 경로만 이전엔 기록이 0줄이었다.
+
+    `TimeoutError`는 `fallback_timeout`, 그 밖은 `fallback_exception`이다. 사유는 이 두 라벨뿐이며
+    예외 메시지는 싣지 않는다(학생 발화를 담을 수 있다 — 타입명은 호출부 WARNING이 이미 남긴다).
+    """
+    try:
+        emit_wh1_aborted_observation(
+            reason="fallback_timeout" if isinstance(exc, TimeoutError) else "fallback_exception",
+            dialogue_id=dialogue_id,
+            turn_index=turn_index,
+            problem_id=problem_id,
+            **accounting,
+        )
+    except Exception as emit_exc:  # noqa: BLE001 — 관측 실패는 서빙을 안 깬다.
+        logger.warning(
+            "WH-1 primary 중단 기록 emit 실패(%s) — 결정론 폴백은 계속",
+            type(emit_exc).__name__,
+            exc_info=True,
         )
 
 
@@ -146,13 +223,15 @@ async def run_wh1_primary_turn(
     (None이면 0.0 — 콜드스타트 폴백)이며, 후보 조립 자체는 **사적 probe 컨텍스트**로만 흐른다
     (오개념 preload 0 불변 — 모듈 docstring·`wh1_probe_supply.py` docstring 참조).
 
-    `pack`(PED-23 회수 — 정본 `docs/architecture/04e_pedagogy_strategy_catalog.md` §9): 호출자
+    `pack`(PED-23 회수 — 정본 `docs/architecture/04g_pedagogy_strategy_catalog.md` §9): 호출자
     (coach)가 문항 PRIMARY 개념으로 해석해 `decide(pack=)`에 이미 주입한 *같은* 교수법 팩 객체.
     `mode_guard_runtime_enabled`(기본 False·옵트인) ∧ pack 주입 시에만, 발화 확정 후·톤필터
     직전에 팩 금지 모드 가드를 태운다 — 위반이면 그 발화를 서빙하지 않고(fail-closed) 안전한
     소크라테스 재질문(결정론 템플릿)으로 대체 + reason_code(위반 모드 토큰) 구조화 로그. 팩
     None(기본·미주입)이거나 플래그 OFF면 가드 블록 전체 미실행 — 기존 경로와 비트동일(회귀 0).
     """
+    started = time.monotonic()
+    policy: LLMTutorPolicy | None = None
     try:
         probe_candidates = await assemble_probe_candidate_pool(
             session,
@@ -202,11 +281,30 @@ async def run_wh1_primary_turn(
             type(exc).__name__,
             exc_info=True,
         )
+        # OPS-134 ② — 결과 없이 끝난 턴도 원장에 남긴다(이전엔 0줄이라 폴백률을 읽을 수 없었다).
+        _safe_emit_aborted(
+            exc,
+            dialogue_id=dialogue_id,
+            turn_index=turn_index,
+            problem_id=problem_id,
+            accounting=_accounting(policy, started),
+        )
         return None
 
     if outcome.status != "ended" or not outcome.utterance:
         # 예산 소진·발화 없음 — 관측은 남기고(원장 연속) 폴백 신호. 발화 원문 없음이라 톤 필드 0.
-        _safe_emit(outcome, dialogue_id=dialogue_id, turn_index=turn_index, problem_id=problem_id)
+        _safe_emit(
+            outcome,
+            dialogue_id=dialogue_id,
+            turn_index=turn_index,
+            problem_id=problem_id,
+            primary_outcome=(
+                "fallback_budget_exhausted"
+                if outcome.status == "budget_exhausted"
+                else "fallback_no_utterance"
+            ),
+            accounting=_accounting(policy, started),
+        )
         logger.warning(
             "WH-1 primary 발화 없음(status=%s·tool_calls=%d) — 결정론 템플릿 폴백",
             outcome.status,
@@ -234,6 +332,8 @@ async def run_wh1_primary_turn(
                     dialogue_id=dialogue_id,
                     turn_index=turn_index,
                     problem_id=problem_id,
+                    primary_outcome="fallback_prose_gate",
+                    accounting=_accounting(policy, started),
                     prose_reason_code=prose_reason,
                 )
                 logger.warning(
@@ -260,11 +360,12 @@ async def run_wh1_primary_turn(
             prose_rephrased = prose_outcome.rephrased
             prose_reason = prose_outcome.reason_code
 
-    # ── 금지모드 가드(PED-23 회수·옵트인 — 정본 04e §9) — 발화 확정 후·톤필터 *직전* 계층.
+    # ── 금지모드 가드(PED-23 회수·옵트인 — 정본 04g §9) — 발화 확정 후·톤필터 *직전* 계층.
     # 팩(coach가 decide에 주입한 같은 객체)이 금지한 교수 모드를 발화가 위반하면 그 발화를
     # 학생에게 보내지 않고(fail-closed) 소크라테스 재질문(결정론 템플릿·기존 자산)으로 대체
     # 한다 — 04d §2.2 "차단 시 SOCRATIC 강등(말하기 대신 묻기)" 선례의 사후 가드판. 플래그
     # OFF(기본)거나 팩 부재(None — 팩 없으면 forbidden_modes도 없음)면 블록 미실행·비트동일.
+    mode_guard_replaced = False
     if settings.mode_guard_runtime_enabled and pack is not None:
         try:
             violated_mode = check_forbidden_modes(pack, utterance)
@@ -287,6 +388,7 @@ async def run_wh1_primary_turn(
                 pack.k_type,
             )
             utterance = fallback_reply_for(violated_mode)
+            mode_guard_replaced = True  # 학생이 받은 것은 하네스 발화가 아니라 결정론 재질문이다.
 
     # 톤필터 라이브 배선(방침 ③·KPI3) — 위반 시 rewritten 텍스트만 노출·위반 사실은 관측 기록.
     filtered, report = filter_tone(utterance)
@@ -302,6 +404,8 @@ async def run_wh1_primary_turn(
         dialogue_id=dialogue_id,
         turn_index=turn_index,
         problem_id=problem_id,
+        primary_outcome=_final_outcome(policy, mode_guard_replaced=mode_guard_replaced),
+        accounting=_accounting(policy, started),
         tone_rewritten=report.rewritten,
         tone_violations=len(report.violations),
         prose_rephrased=prose_rephrased,

@@ -22,10 +22,24 @@
 
 **설계**
   - 워커 `max_workers`개를 `spawn`으로 띄운다(Windows·Linux 공통 — fork는 다중 스레드 서버에서
-    위험하고 Windows에는 없다). 워커는 `preload` 모듈을 import한 뒤 `ready`를 보낸다.
+    위험하고 Windows에는 없다). 워커는 `preload` 모듈을 import하고 `warmup` 호출을 돌린 뒤
+    `ready`를 보낸다.
+  - **웜업(OPS-142)** — 라이브러리 일부는 *입력 종류별로* 첫 사용 때 하위 모듈을 지연 import한다
+    (실측은 호출부 웜업 함수 주석·설정 설명 참조 — 입력 종류마다 단독 ≈20~70ms, 워커 CPU 몫이
+    1/8로 줄면 최대 8배). 이 시간은 *계산 상한 안*이라, 상한이 짧거나 기계가 바쁘면 정상 입력이
+    판정 불가로 샌다. 게다가 상한 초과로 kill된 뒤의 교체 워커도 같은 콜드 상태다. `warmup`은 기동
+    단계(상한 밖)에서 대표 호출을 미리 돌려 그 비용을 `ready` 전에 치른다. 어떤 호출이 대표인지는
+    과목 어휘라 호출부가 정한다.
   - **상한은 계산 시간만 잰다** — 워커 기동과 호출 대상 복원(unpickle, 첫 호출 시 모듈 import
     수백 ms)은 상한 밖이다. 워커가 복원을 끝내고 `started`를 알린 뒤부터 잰다(실측: 이 분리가
     없으면 첫 호출의 정상 입력이 상한 0.5초에 걸려 판정 불가로 샜다).
+  - **총 예산(`budget_s`, OPS-128)** — 위 "상한은 계산 시간만 잰다"는 *호출 하나*의 규약이고,
+    한 요청이 호출을 여러 번 잇는 체인(`/v1/verify-solution`)은 전체에 벽시계 마감이 있다.
+    호출부가 `budget_s`를 주면 그 호출의 대기열·워커 기동·복원·계산이 전부 그 안으로 묶인다.
+    기동·복원 대기는 `min(기동 상한, 남은 예산)`, 계산 상한은 계산이 시작되는 *그 순간의*
+    남은 예산으로 다시 깎는다. 마감을 넘긴 대기는 `reason="deadline"`(계산에 닿지도 못한
+    판정 불가)이고, 계산이 이미 돌다 잘리면 종전대로 `reason="timeout"`이다. `budget_s`를
+    안 주는 호출(단건 엔드포인트)은 종전과 같다.
   - 호출 하나 = 워커 하나 점유. 대기열이 `queue_wait_s`를 넘으면 그것도 `BudgetExceededError`
     (`reason="queue_wait"`)다. 상한 초과 시 워커를 `kill`하고 교체 워커를 *미리* 띄운다.
   - 호출 대상은 `pickle` 가능한 함수·메서드와 인자여야 한다. 불가능하면 *조용히 막지 않고*
@@ -76,11 +90,16 @@ class BudgetExceededError(Exception):
     """시간 상한 초과 또는 대기열 포화 — **판정 불가**다(통과·오답이 아니다).
 
     `reason`은 `"timeout"`(계산이 상한을 넘겨 워커를 끊음)·`"queue_wait"`(워커가 모두 바빠
-    대기 상한을 넘김)·`"worker_died"`(워커가 도중에 죽음) 중 하나다. 호출부는 어느 경우든 같은
-    판정 불가로 접되, 로그·지표에서는 사유를 구분한다.
+    대기 상한을 넘김)·`"worker_died"`(워커가 도중에 죽음)·`"deadline"`(호출부가 준 총 예산
+    `budget_s`가 대기열·기동·복원 단계에서 먼저 소진됨 — 계산은 시작하지 못했다) 중 하나다.
+    호출부는 어느 경우든 같은 판정 불가로 접되, 로그·지표에서는 사유를 구분한다.
     """
 
-    def __init__(self, reason: Literal["timeout", "queue_wait", "worker_died"], limit_s: float):
+    def __init__(
+        self,
+        reason: Literal["timeout", "queue_wait", "worker_died", "deadline"],
+        limit_s: float,
+    ):
         super().__init__(f"isolated call budget exceeded: {reason} (limit {limit_s:g}s)")
         self.reason = reason
         self.limit_s = limit_s
@@ -93,14 +112,39 @@ class WorkerError(RuntimeError):
 # ── 워커 프로세스 쪽 ──────────────────────────────────────────────────────────────
 
 
-def _worker_main(conn: Any, preload: tuple[str, ...]) -> None:
+def _parse_warmup(spec: str) -> tuple[str, str]:
+    """`"모듈:함수"` 웜업 지정을 (모듈, 함수)로 쪼갠다 — 형식이 틀리면 `ValueError`."""
+    module_name, sep, attr = spec.partition(":")
+    if not sep or not module_name or not attr:
+        raise ValueError(f"warmup 항목은 '모듈:함수' 형식이어야 한다: {spec!r}")
+    return module_name, attr
+
+
+def _run_warmup(warmup: tuple[str, ...]) -> None:
+    """`warmup` 호출(인자 없는 함수)을 차례로 돌린다 — 실패해도 워커는 살린다.
+
+    웜업은 최적화일 뿐 정상 동작의 전제가 아니다. 한 항목이 실패(임포트 오류·예외)하면 그 항목만
+    건너뛰고 **예외 타입명을 경고 로그에 남긴다**(침묵 실패 금지·호출 인자는 싣지 않는다).
+    """
+    for spec in warmup:
+        module_name, attr = _parse_warmup(spec)
+        try:
+            getattr(importlib.import_module(module_name), attr)()
+        except Exception as exc:  # noqa: BLE001 — 웜업 실패가 워커 기동을 막으면 안 된다
+            logger.warning("격리 워커 웜업 실패(%s): %s — 건너뜀", type(exc).__name__, spec)
+
+
+def _worker_main(conn: Any, preload: tuple[str, ...], warmup: tuple[str, ...] = ()) -> None:
     """워커 루프 — `(fn, args, kwargs)` pickle을 받아 실행하고 결과·예외를 돌려준다.
 
     `preload` 모듈은 *첫 호출*이 아니라 여기서 미리 import해 `ready` 전에 기동 비용을 치른다.
-    부모가 죽거나 파이프가 닫히면(EOF) 조용히 끝난다 — 고아 워커를 남기지 않는다.
+    `warmup`은 그 뒤에 돌려 식 종류별 지연 import까지 `ready` 전에 치른다(OPS-142 — 교체 워커도
+    같은 `_worker_main`이라 함께 데워진다). 부모가 죽거나 파이프가 닫히면(EOF) 조용히 끝난다 —
+    고아 워커를 남기지 않는다.
     """
     for module_name in preload:
         importlib.import_module(module_name)
+    _run_warmup(warmup)
 
     conn.send(("ready", os.getpid()))
     while True:
@@ -152,13 +196,17 @@ class IsolatedCallPool:
         timeout_s: float = DEFAULT_TIMEOUT_S,
         queue_wait_s: float | None = None,
         preload: tuple[str, ...] = (),
+        warmup: tuple[str, ...] = (),
     ) -> None:
         if max_workers < 1:
             raise ValueError("max_workers는 1 이상이어야 한다.")
+        for spec in warmup:  # 형식 오류는 워커 안에서 조용히 사라지지 않게 부모가 먼저 거른다
+            _parse_warmup(spec)
         if timeout_s <= 0:
             raise ValueError("timeout_s는 0보다 커야 한다.")
         self._max_workers = max_workers
         self._preload = preload
+        self._warmup = warmup
         self.timeout_s = timeout_s
         # 대기열 상한 기본값 = 시간 상한 × 2 — 앞 호출이 상한까지 쓰는 최악을 한 번은 기다린다.
         self.queue_wait_s = queue_wait_s if queue_wait_s is not None else timeout_s * 2
@@ -175,6 +223,7 @@ class IsolatedCallPool:
         self.timeouts = 0
         self.queue_waits = 0
         self.worker_deaths = 0
+        self.deadlines = 0
         self.fallback_count = 0
 
     # -- 공개 API --------------------------------------------------------------
@@ -184,17 +233,30 @@ class IsolatedCallPool:
         fn: Callable[..., T],
         *args: Any,
         timeout_s: float | None = None,
+        budget_s: float | None = None,
         **kwargs: Any,
     ) -> T:
         """`fn(*args, **kwargs)`를 워커 프로세스에서 실행한다.
 
-        상한 초과는 `BudgetExceededError`다.
+        상한 초과는 `BudgetExceededError`다. `timeout_s`는 *계산* 시간 상한(기본: 풀 설정값)이고,
+        `budget_s`는 이 호출 *전체*(대기열·워커 기동·복원·계산)의 벽시계 예산이다 — 체인처럼 한
+        요청이 호출을 여러 번 잇는 호출부가 자기 마감을 넘기려고 쓴다(OPS-128). 안 주면 종전처럼
+        기동·복원 대기는 계산 상한 밖이다.
 
         `fn`·인자·반환값은 pickle 가능해야 한다. 불가능하면 스레드로 폴백한다(모듈 docstring).
         """
         if self._closed:
             raise RuntimeError("IsolatedCallPool이 이미 닫혔다.")
         limit = self.timeout_s if timeout_s is None else timeout_s
+        # 마감은 호출 진입 시각 기준 — 호출부의 시계(테스트의 가짜 시계 등)와 결합하지 않는다.
+        deadline = None if budget_s is None else time.monotonic() + budget_s
+        if budget_s is not None and budget_s <= 0:
+            # 입구 거절도 풀에 맡겨진 호출이다 — `calls`에 넣지 않으면 `deadlines`만 올라 접힘 수가
+            # 분모(`calls`)를 앞지르고 "작동한 비율"이 틀린다(OPS-140). 대기열 포화(`queue_waits`)가
+            # `calls`를 올린 뒤 접히는 것과 같은 회계다 — 호출 하나는 정확히 한 결과로 끝난다.
+            self.calls += 1
+            self.deadlines += 1
+            raise BudgetExceededError("deadline", budget_s)
         try:
             payload = pickle.dumps((fn, args, kwargs))
         except Exception as exc:
@@ -208,15 +270,25 @@ class IsolatedCallPool:
 
         self.calls += 1
         sem = self._semaphore()
+        # 대기열 대기도 총 예산 안이다 — 예산이 더 짧으면 그쪽이 먼저 끊는다.
+        queue_wait_s = self.queue_wait_s
+        if budget_s is not None and budget_s < queue_wait_s:
+            queue_wait_s = budget_s
         try:
-            await asyncio.wait_for(sem.acquire(), timeout=self.queue_wait_s)
+            await asyncio.wait_for(sem.acquire(), timeout=queue_wait_s)
         except TimeoutError:
+            if queue_wait_s < self.queue_wait_s:
+                self.deadlines += 1
+                logger.warning(
+                    "격리 대기열 대기 중 총 예산 소진 — %.1fs(판정 불가로 접힘)", queue_wait_s
+                )
+                raise BudgetExceededError("deadline", queue_wait_s) from None
             self.queue_waits += 1
             logger.warning("격리 대기열 포화 — %.1fs 초과(판정 불가로 접힘)", self.queue_wait_s)
             raise BudgetExceededError("queue_wait", self.queue_wait_s) from None
         try:
             loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(self._io, self._roundtrip, payload, limit)
+            return await loop.run_in_executor(self._io, self._roundtrip, payload, limit, deadline)
         finally:
             sem.release()
 
@@ -232,11 +304,12 @@ class IsolatedCallPool:
         self._io.shutdown(wait=False, cancel_futures=True)
 
     def stats(self) -> dict[str, int]:
-        """누적 카운터 — 호출 수·상한 초과·대기 포화·워커 사망·폴백."""
+        """누적 카운터 — 호출 수·상한 초과·대기 포화·총 예산 소진·워커 사망·폴백."""
         return {
             "calls": self.calls,
             "timeouts": self.timeouts,
             "queue_waits": self.queue_waits,
+            "deadlines": self.deadlines,
             "worker_deaths": self.worker_deaths,
             "fallbacks": self.fallback_count,
         }
@@ -253,7 +326,9 @@ class IsolatedCallPool:
 
     def _spawn(self) -> _Worker:
         parent, child = self._ctx.Pipe(duplex=True)
-        process = self._ctx.Process(target=_worker_main, args=(child, self._preload), daemon=True)
+        process = self._ctx.Process(
+            target=_worker_main, args=(child, self._preload, self._warmup), daemon=True
+        )
         process.start()
         child.close()  # 부모는 자식 쪽 끝을 닫아야 자식 종료 시 EOF를 본다
         worker = _Worker(process=process, conn=parent)
@@ -302,22 +377,55 @@ class IsolatedCallPool:
                 "격리 교체 워커 선기동 실패(%s) — 다음 호출에서 기동", type(exc).__name__
             )
 
-    def _wait_ready(self, worker: _Worker) -> bool:
-        """워커의 `ready`를 기다린다(기동 시간은 상한 밖). 실패하면 False."""
+    @staticmethod
+    def _startup_wait_s(deadline: float | None) -> float:
+        """기동·복원 대기 상한 = min(기동 상한, 남은 예산) — 예산이 없으면 기동 상한 그대로."""
+        if deadline is None:
+            return _STARTUP_TIMEOUT_S
+        return min(_STARTUP_TIMEOUT_S, max(deadline - time.monotonic(), 0.0))
+
+    def _wait_ready(self, worker: _Worker, timeout_s: float) -> Literal["ready", "pending", "dead"]:
+        """워커의 `ready`를 `timeout_s`까지 기다린다(기동 시간은 계산 상한 밖).
+
+        `pending`은 시간 안에 신호가 안 온 것(워커는 아직 뜨는 중일 수 있다), `dead`는 파이프가
+        닫혔거나 엉뚱한 메시지가 온 것이다 — 호출부가 둘을 다르게 다룬다(OPS-128).
+        """
         if worker.ready:
-            return True
+            return "ready"
         try:
-            if worker.conn.poll(_STARTUP_TIMEOUT_S) and worker.conn.recv()[0] == "ready":
+            if not worker.conn.poll(timeout_s):
+                return "pending"
+            if worker.conn.recv()[0] == "ready":
                 worker.ready = True
-                return True
+                return "ready"
         except (EOFError, OSError):
             pass
-        return False
+        return "dead"
 
-    def _roundtrip(self, payload: bytes, limit_s: float) -> Any:
-        """워커에 일을 맡기고 상한까지 기다린다 — I/O 스레드에서 실행(이벤트 루프 밖)."""
+    def _deadline_exceeded(self, stage: str, limit_s: float) -> BudgetExceededError:
+        """총 예산 소진을 계상·로그하고 던질 예외를 만든다 — 단계명만 남기고 입력은 싣지 않는다."""
+        self.deadlines += 1
+        logger.warning("격리 총 예산 소진 — 단계=%s(판정 불가로 접힘)", stage)
+        return BudgetExceededError("deadline", limit_s)
+
+    def _roundtrip(self, payload: bytes, limit_s: float, deadline: float | None = None) -> Any:
+        """워커에 일을 맡기고 상한까지 기다린다 — I/O 스레드에서 실행(이벤트 루프 밖).
+
+        `deadline`(`time.monotonic()` 기준 절대 시각)이 있으면 기동·복원 대기와 계산 상한이 그
+        안으로 묶인다(OPS-128). 없으면 종전과 같다 — 기동·복원 대기는 계산 상한 밖이다.
+        """
+        if deadline is not None and deadline - time.monotonic() <= 0:
+            # 스레드풀 대기 등으로 이미 소진 — 워커를 건드리지 않는다.
+            raise self._deadline_exceeded("assign", 0.0)
         worker = self._acquire()
-        if not self._wait_ready(worker):
+        ready_wait_s = self._startup_wait_s(deadline)
+        ready = self._wait_ready(worker, ready_wait_s)
+        if ready != "ready":
+            if ready == "pending" and ready_wait_s < _STARTUP_TIMEOUT_S:
+                # 마감이 먼저 왔다 — 워커는 고장이 아니라 아직 뜨는 중이다. 죽이면 기동 비용만
+                # 버리므로 대기열로 돌려놓는다(다음 호출이 이어서 기다린다).
+                self._release(worker)
+                raise self._deadline_exceeded("ready", ready_wait_s)
             self._kill(worker)
             self.worker_deaths += 1
             logger.error("격리 워커 기동 실패 — ready 미수신")
@@ -325,10 +433,14 @@ class IsolatedCallPool:
         try:
             worker.conn.send_bytes(payload)
             # 1단계 — 워커가 호출 대상을 복원(unpickle)할 때까지. 모듈 첫 import 비용이 여기
-            # 들어가고 상한 밖이다(계산이 아니다). 단 무한정은 아니다 — 기동 상한을 넘기면
-            # 워커 고장으로 본다.
-            if not worker.conn.poll(_STARTUP_TIMEOUT_S):
-                self._kill(worker)
+            # 들어가고 계산 상한 밖이다(계산이 아니다). 단 무한정은 아니다 — 기동 상한을 넘기면
+            # 워커 고장으로 본다. 총 예산이 있으면 그 안으로 더 좁힌다.
+            restore_wait_s = self._startup_wait_s(deadline)
+            if not worker.conn.poll(restore_wait_s):
+                self._kill(worker)  # 일을 받은 채 복원 중인 워커 — 상태가 더럽혀져 재사용 불가
+                if restore_wait_s < _STARTUP_TIMEOUT_S:
+                    self._prewarm_replacement()
+                    raise self._deadline_exceeded("restore", restore_wait_s)
                 self.worker_deaths += 1
                 logger.error("격리 워커 복원 단계 무응답 — 판정 불가로 접힘")
                 raise BudgetExceededError("worker_died", _STARTUP_TIMEOUT_S)
@@ -337,7 +449,16 @@ class IsolatedCallPool:
                 # 2단계 — 여기부터가 *계산 시간*이다. 상한 초과는 계산을 실제로 끊는다(스레드로는
                 # 못 하는 것). 끊은 워커는 교체된다.
                 started = time.perf_counter()
-                if not worker.conn.poll(limit_s):
+                compute_limit_s = limit_s
+                if deadline is not None:
+                    # 기동·복원에 쓴 만큼 예산이 줄었다 — 계산 상한을 지금 기준으로 다시 깎는다.
+                    left_s = deadline - time.monotonic()
+                    if left_s <= 0:
+                        self._kill(worker)  # 이미 계산을 시작한 워커 — 끊는다
+                        self._prewarm_replacement()
+                        raise self._deadline_exceeded("compute_start", 0.0)
+                    compute_limit_s = min(limit_s, left_s)
+                if not worker.conn.poll(compute_limit_s):
                     self.timeouts += 1
                     logger.warning(
                         "계산 시간 상한 초과 — %.1fs(워커 kill·판정 불가로 접힘)",
@@ -345,7 +466,7 @@ class IsolatedCallPool:
                     )
                     self._kill(worker)
                     self._prewarm_replacement()
-                    raise BudgetExceededError("timeout", limit_s)
+                    raise BudgetExceededError("timeout", compute_limit_s)
                 reply = pickle.loads(worker.conn.recv_bytes())
             # `started` 없이 바로 err/werr면 복원 단계 예외(ImportError 등) — 그대로 되돌린다.
             kind, *rest = reply

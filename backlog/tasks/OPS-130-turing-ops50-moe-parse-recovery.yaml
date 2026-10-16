@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-130-turing-ops50-moe-parse-recovery
+title: "turing 회수 — OPS-50 MoE 파싱 실패 원인 규명(출력 상한 절단 16/16)·프롬프트 변형 6종·A/B/C 병기 측정 도구를 main 현행 위에서 재검증하며 이식"
+track: infra-debt
+stage: S5
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/happy-turing-kmrd5z head 93861f63(2026-10-09 · ahead 1 · behind 34 · 판정 기준 main d873d064). 부분 완료다: 원인 규명과 측정 도구는 있고 라이브 재측정(③④)은 Phaiakes9가 필요해 미수행이다(태스크 in_progress 유지). 산출 = harness/quality_tier_moe_accuracy_battle.py(+610 — --analyze-audit·--prompt-variant 6종·--baseline-audit·--unresolved-policy·--max-unresolved-rate)·tests/backend/harness/test_quality_tier_prompt_variants_ops50.py(474줄·main 부재 · 26건)·scripts/ops/run_moe_quality_battle.ps1(+42)·docs/ops/amd395_local_llm_performance.md(+19)·data/audit/ops-50-parse-failure-reclassification.txt(18줄·main 부재)·MEMORY.md 6줄. 핵심 발견 = 미분류 16건 전부 output_tokens=512 절단(무결함 10건 포함 has_defect=true로 시작). 추가 960줄 중 main 부재 876줄. OPS-50 원격 claim(2026-10-09T05:49Z)은 TTL 초과"
+  - "② 이식 방식 = 파일 단위(통째 머지 금지 — 34커밋 낡음). 원 번호 OPS-50은 재사용하지 않는다(OPS-50은 소유 태스크로 남아 라이브 재측정을 마저 소유한다). run_moe_quality_battle.ps1은 Windows PowerShell 전용이라 이식 후 scripts/ops/check_ps_scripts.py(CI 차단 스텝)가 통과해야 한다 — 로컬에서 그 스크립트를 먼저 돌려 확인한다. 브랜치가 'provider.generate 호출 지점은 _evaluate_one 1곳 유지'를 주장하므로 이식 후 grep으로 재확인한다(LLM 호출은 라우터 경유 — CLAUDE.md)"
+  - "③ 집행 지점·변별력 — 이식한 테스트 26건이 CI에서 수집되는 경로(tests/backend/harness)임을 실측하고, 브랜치의 뮤테이션 13종 중 재현 가능한 것을 다시 주입해 RED를 확인하되 주입 적용과 원복 바이트 동일성을 단언한다. 라이브 재측정(OPS-50 ③④)은 이 태스크의 범위가 아니다 — 무엇이 미확인인지 판정 문서에 분리해 적는다"
+  - "④ 소유 태스크 OPS-50의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적는다. 미이행분(라이브 재측정)은 OPS-50이 계속 소유하며 닫지 않는다. OPS-50은 이 태스크를 선행으로 부착했다. 이식 PR은 반드시 연다"
+artifacts:
+  - "PR #1621 (https://github.com/kiki-s-broom/WhyMath/pull/1621) · docs/reviews/ops130_ops50_moe_parse_recovery_2026-10-14.md · 판정 기준 main 24d8607d · 라이브 재측정(OPS-50 ③④⑤)은 미수행·OPS-50 소유"
+paths:
+  - src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py
+  - tests/backend/harness/test_quality_tier_prompt_variants_ops50.py
+  - scripts/ops/run_moe_quality_battle.ps1
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-① (stray-code 17회차). 소유 태스크 OPS-50. 회수 완료 전 원 브랜치 claude/happy-turing-kmrd5z 삭제 금지. 원격 claim OPS-50은 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
+updated: 2026-10-14
