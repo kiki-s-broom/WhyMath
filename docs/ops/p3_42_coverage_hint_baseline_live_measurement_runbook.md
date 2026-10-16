@@ -38,7 +38,8 @@ P3-22가 계측기에 `--hints-from-db`를 배선했지만, 구현 세션 환경
 |---|---|---|---|
 | A | Docker Desktop 기동 + prod DB 컨테이너 도달 | `DOCKER_OK=True` | ~10초 (꺼져 있으면 최대 3분) |
 | B | 실행 입력이 main과 같은지 판정 + DB 힌트 건수(읽기 전용 SQL 4건) | `PATHS_MATCH_MAIN=True` · `DB_HINTS_VERIFIED=…` | ~20초 |
-| C | 환경 주입 + 호스트→DB 도달성 + 요약/진단 스크립트 생성 | `REACH_EXIT=0` · `PROBE_OK=True` | ~15초 |
+| B2 | (B가 `PATHS_MATCH_MAIN=False`일 때만) 클론을 최신 main으로 fast-forward | `PATHS_MATCH_MAIN=True` | ~10초 |
+| C | 환경 주입 + 호스트→DB 도달성 + 요약/진단 스크립트를 git에서 받아 SHA-256 검증 | `REACH_EXIT=0` · `PROBE_SHA256_OK=True` | ~15초 |
 | D | **계측기 실행** (`--hints-from-db --json`) → 요약 | `MEASURED=True` · `HINT_SEAT=…` | ~10~60초 |
 | E | **ID 공간 진단** — DB 힌트 문항 ↔ JSONL 은행 대조 | `VERDICT=…` | ~10초 |
 
@@ -78,7 +79,8 @@ P3-22가 계측기에 `--hints-from-db`를 배선했지만, 구현 세션 환경
 
 ## 6. 창 구분
 
-**새 PowerShell 창 하나에서 끝난다.** 서버를 띄우지 않으므로 점유되는 창이 없고, 끝난 뒤에도 그
+**새 PowerShell 창 하나에서 끝난다.** 각 블록은 마지막 줄에 `BLOCK_X_DONE=True`를 출력한다 —
+이 줄이 없으면 붙여넣기가 중간에서 끊긴 것이므로 그 블록을 처음부터 다시 붙여넣는다. 서버를 띄우지 않으므로 점유되는 창이 없고, 끝난 뒤에도 그
 창을 계속 써도 된다. 블록 [C]에서 만든 변수(`$Py`·`$Probe` 등)를 [D]·[E]가 쓰므로 **[C]~[E]는
 같은 창**에서 순서대로 붙여넣는다. [D]·[E]는 변수가 없으면 이유를 출력하고 거부한다(아무것도
 읽지 않는다).
@@ -140,6 +142,7 @@ $HintedProblems = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c 
 "DB_HINTED_PROBLEMS=$HintedProblems (rc=$LASTEXITCODE)"
 $ProblemRows = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT count(*) FROM problem;"
 "DB_PROBLEM_ROWS=$ProblemRows (rc=$LASTEXITCODE)"
+"BLOCK_B_DONE=True"
 ```
 
 **확인**: `PATHS_MATCH_MAIN=True` · 네 DB 줄의 `(rc=0)`. 네 DB 값은 **그대로 기록해 회신**한다 —
@@ -148,10 +151,36 @@ $ProblemRows = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SE
 경우(마이그레이션 미적용)가 그렇다. 그 경우 [D]도 exit 2로 끝나므로, 이 출력을 그대로 회신하면
 "힌트 0건"이 아니라 "좌석 부재"로 보고된다.
 
-> `PATHS_MATCH_MAIN=False`면 멈추고 위 `git status` 출력을 회신한다. 이 클론은 여러 세션이
-> 공유하므로 타 세션 브랜치에 있을 수 있다 — 그 상태에서 [D]를 돌려도 [D]가 스스로 거부한다.
+> `PATHS_MATCH_MAIN=False`면 아래 **[B2]**로 간다(미커밋 변경이 있거나 main의 조상이 아니면 [B2]가
+> 거부하므로 그때는 출력을 회신한다). 어느 쪽이든 그 상태에서 [D]를 돌려도 [D]가 스스로 거부한다.
 
-### [C] 환경 주입 + 도달성 + 요약·진단 스크립트 생성
+### [B2] B가 `PATHS_MATCH_MAIN=False`일 때만 — 클론을 최신 main으로 fast-forward
+
+`HEAD_SHA`가 `origin/main`보다 옛 커밋이면(미커밋 변경 0건) 클론이 뒤처진 것이다. 이 블록은
+**미커밋 변경이 0건이고 현재 커밋이 main의 조상일 때만** `git merge --ff-only origin/main`(= 앞으로만
+감기, `git pull`과 같은 효과)을 하고, 아니면 아무것도 바꾸지 않고 이유를 출력한다.
+(2026-10-16 실행: `HEAD 5586a087 → 674a92b1`, `PATHS_MATCH_MAIN=True`로 해소됐다.)
+
+```powershell
+# [Windows PowerShell · Phaiakes9] 같은 창
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Branch = git branch --show-current
+$Dirty = @(git status --porcelain --untracked-files=no).Count
+git merge-base --is-ancestor HEAD origin/main
+$IsAncestor = ($LASTEXITCODE -eq 0)
+"CURRENT_BRANCH=$Branch (빈 값이면 detached HEAD)"
+"TRACKED_DIRTY=$Dirty"
+"HEAD_IS_ANCESTOR_OF_MAIN=$IsAncestor"
+if (($Dirty -eq 0) -and $IsAncestor) { git merge --ff-only origin/main; "FF_EXIT=$LASTEXITCODE"; "HEAD_SHA_AFTER=" + (git rev-parse --short HEAD) } else { "FF_REFUSED=True — TRACKED_DIRTY=$Dirty HEAD_IS_ANCESTOR_OF_MAIN=$IsAncestor. 아무것도 바꾸지 않았습니다. 이 출력을 회신해 주십시오." }
+git diff --quiet origin/main -- "src/backend/whymath_backend" "data/corpus"
+$PathsMatch = ($LASTEXITCODE -eq 0)
+"PATHS_MATCH_MAIN=$PathsMatch"
+"BLOCK_B2_DONE=True"
+```
+
+**확인**: `PATHS_MATCH_MAIN=True` · `BLOCK_B2_DONE=True`. `FF_REFUSED=True`면 멈추고 출력을 회신한다.
+
+### [C] 환경 주입 + 도달성 + 요약·진단 스크립트 받기
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창
@@ -168,133 +197,30 @@ $ReachExit = $LASTEXITCODE
 "REACH_EXIT=$ReachExit"
 $Out = Join-Path $env:TEMP "p3_42"
 $Probe = Join-Path $Out "p3_42_probe.py"
-$ProbePy = @'
-import collections, glob, json, os, subprocess, sys
-
-DB = ["docker", "exec", "-i", "whymath-pg", "psql", "-U", "whymath", "-d", "whymath",
-      "-t", "-A", "-F", "|"]
-
-
-def psql(sql):
-    try:
-        r = subprocess.run(DB + ["-c", sql], capture_output=True, encoding="utf-8",
-                           errors="replace", timeout=60)
-    except subprocess.TimeoutExpired:
-        print("PSQL_FAILED reason=timeout60s")
-        sys.exit(2)
-    if r.returncode != 0:
-        print("PSQL_FAILED rc=%s stderr=%s" % (r.returncode, r.stderr.strip()[:300]))
-        sys.exit(2)
-    return [ln for ln in r.stdout.splitlines() if ln.strip()]
-
-
-def summary(path):
-    with open(path, encoding="utf-8") as f:
-        d = json.load(f)
-    print("MEASURED=%s" % isinstance(d.get("hint_seat"), dict))
-    print("JSON_EXIT_CODE_FIELD=%s" % d.get("exit_code"))
-    print("PROBLEMS_SCANNED=%s" % d.get("problems_scanned"))
-    print("HINT_SEAT=" + json.dumps(d.get("hint_seat")))
-    comp = next((m for m in d.get("metrics", []) if m.get("key") == "concept_completeness"), None)
-    if comp is None:
-        print("COMPLETENESS=MISSING_IN_JSON")
-    if comp is not None:
-        print("COMPLETENESS value=%s met=%s/%s target=%s met_flag=%s" % (
-            comp.get("value"), comp.get("met_count"), comp.get("population"),
-            comp.get("target"), comp.get("met")))
-    print("LINK_COUNTS_HINT=" + json.dumps(d.get("link_counts", {}).get("hint")))
-    print("COMPLETENESS_MEASURABLE=" + json.dumps(d.get("completeness_measurable")))
-    for w in d.get("warnings", []):
-        print("WARNING: " + w)
-
-
-def idspace(repo):
-    n_all = int(psql("SELECT count(*) FROM hints")[0])
-    n_hinted = int(psql("SELECT count(DISTINCT problem_id) FROM hints WHERE verified IS TRUE")[0])
-    rows = [ln.split("|") for ln in psql(
-        "SELECT DISTINCT p.problem_id, p.slug, coalesce(p.review_status::text, 'NULL') FROM hints h "
-        "JOIN problem p ON p.problem_id = h.problem_id WHERE h.verified IS TRUE ORDER BY 1")]
-    by_id, by_slug, scanned = {}, {}, 0
-    pattern = os.path.join(repo, "data", "corpus", "problem_bank_*", "problems.jsonl")
-    for path in sorted(glob.glob(pattern)):
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                row = json.loads(line)
-                scanned += 1
-                pid, slug = row.get("problem_id"), row.get("slug")
-                if isinstance(pid, str):
-                    by_id[pid] = row.get("review_status")
-                if isinstance(slug, str):
-                    by_slug[slug] = pid
-    if scanned == 0:
-        print("BANK_SCANNED=0 - JSONL bank not found under %s" % repo)
-        sys.exit(2)
-    match, drift, absent = [], [], []
-    for pid, slug, db_status in rows:
-        if pid in by_id:
-            match.append((pid, slug, db_status))
-            continue
-        if slug in by_slug:
-            drift.append((pid, slug, by_slug[slug]))
-            continue
-        absent.append((pid, slug))
-    print("DB_HINTS_ALL=%d" % n_all)
-    print("DB_HINTED_PROBLEMS=%d" % n_hinted)
-    print("JOINED_PROBLEM_ROWS=%d" % len(rows))
-    print("BANK_ROWS_SCANNED=%d  BANK_IDS=%d" % (scanned, len(by_id)))
-    print("ID_MATCH=%d" % len(match))
-    print("SLUG_MATCH_BUT_ID_DIFFERS=%d" % len(drift))
-    print("NOT_IN_BANK=%d" % len(absent))
-    print("ID_MATCH_STATUS_DB_VS_JSONL=" + json.dumps(dict(collections.Counter(
-        "%s/%s" % (st, by_id[pid]) for pid, _, st in match))))
-    for pid, slug, bank_pid in drift[:5]:
-        print("  DRIFT_SAMPLE db=%s bank=%s slug=%s" % (pid, bank_pid, slug))
-    for pid, slug in absent[:5]:
-        print("  ABSENT_SAMPLE db=%s slug=%s" % (pid, slug))
-    print("VERDICT=" + verdict_of(n_hinted, len(rows), match, drift))
-
-
-def verdict_of(n_hinted, n_rows, match, drift):
-    if n_hinted == 0:
-        return "NO_VERIFIED_HINTS"
-    if n_rows != n_hinted:
-        return "HINTS_WITHOUT_PROBLEM_ROW"
-    if match:
-        return "OVERLAP_OK"
-    if drift:
-        return "ID_SPACE_DRIFT"
-    return "NOT_IN_BANK"
-
-
-def main(argv):
-    if len(argv) == 3 and argv[1] == "summary":
-        summary(argv[2])
-        return 0
-    if len(argv) == 3 and argv[1] == "idspace":
-        idspace(argv[2])
-        return 0
-    print("usage: p3_42_probe.py summary <json> | idspace <repo>")
-    return 2
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))
-'@
-if ($Py -and (Test-Path $Py)) { New-Item -ItemType Directory -Force -Path $Out | Out-Null; Set-Content -Path $Probe -Value $ProbePy -Encoding UTF8; "PROBE_OK=" + (Test-Path $Probe); "PROBE_LINES=" + @(Get-Content $Probe -Encoding UTF8).Count } else { "WRITE_REFUSED=True — PY=$Py (Test-Path=" + (Test-Path $Py) + "). src\backend\.venv 가 없습니다. 이 출력을 회신해 주십시오. 아무것도 쓰지 않았습니다." }
+$ProbeRef = "origin/claude/nifty-meitner-ow1c7c"
+$ProbeSha = "a9a9bbf165b57466f7eda19d96fa231200d6a6836d8f85bc677649896da3de88"
+if ($Py -and (Test-Path $Py)) { New-Item -ItemType Directory -Force -Path $Out | Out-Null; git fetch origin claude/nifty-meitner-ow1c7c; cmd /c "git show ${ProbeRef}:docs/ops/p3_42_probe.py > $Probe"; $ProbeGot = (Get-FileHash $Probe -Algorithm SHA256).Hash.ToLower(); "PROBE_SHA256=$ProbeGot"; "PROBE_SHA256_OK=" + ($ProbeGot -eq $ProbeSha) } else { "WRITE_REFUSED=True — PY=$Py (Test-Path=" + (Test-Path $Py) + "). src\backend\.venv 가 없습니다. 이 출력을 회신해 주십시오. 아무것도 쓰지 않았습니다." }
+"BLOCK_C_DONE=True"
 ```
 
-**확인**: `PY_OK=True` · `REACH_EXIT=0` · `PROBE_OK=True` · `PROBE_LINES`가 0이 아님.
-`REACH_EXIT`가 0이 아니면 [D]·[E]는 스스로 거부한다.
+**확인**: `PY_OK=True` · `REACH_EXIT=0` · `PROBE_SHA256_OK=True` · 마지막 줄 `BLOCK_C_DONE=True`.
+`REACH_EXIT`가 0이 아니거나 `PROBE_SHA256_OK`가 True가 아니면 [D]·[E]를 붙여넣지 않는다
+(받은 파일이 기대한 내용과 다르다는 뜻이다).
+
+> **왜 스크립트를 붙여넣지 않고 git에서 받는가**: 처음 판은 111줄짜리 Python을 PowerShell 창에
+> 직접 붙여넣게 했고, 2026-10-16 실행에서 붙여넣기가 코드 중간부터 들어가 Python 줄이 전부
+> PowerShell 명령으로 해석됐다(파싱 오류 수십 건). 부수 효과는 없었지만 — 붙여넣기 크기가 클수록
+> 같은 일이 재발한다. 이제 붙여넣는 것은 몇 줄뿐이고, 받은 파일은 **SHA-256으로 내용을 검증**한다.
+> 이 런북 브랜치가 머지된 뒤에는 `$ProbeRef`를 `HEAD`로 바꾸고 `git fetch` 줄을 뺀다.
 
 ### [D] 계측기 실행 (`--hints-from-db --json`) + 요약
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창 — 변수 $PathsMatch(B)·$ReachExit(C)·$Py·$Probe·$Out 필요
 cd C:\Users\kiki\Desktop\__AI\WhyMath
-$Ready = ($PathsMatch -eq $true) -and ($ReachExit -eq 0) -and $Py -and $Probe -and (Test-Path $Probe)
-if ($Ready) { Remove-Item "$Out\coverage.json", "$Out\coverage.err" -ErrorAction SilentlyContinue; cmd /c "$Py -m whymath_backend.l1.standards.phase3_coverage --hints-from-db --json > $Out\coverage.json 2> $Out\coverage.err"; $CliExit = $LASTEXITCODE; "CLI_EXIT=$CliExit"; $JsonBytes = (Get-Item "$Out\coverage.json" -ErrorAction SilentlyContinue).Length; "CLI_JSON_BYTES=$JsonBytes"; "----- stderr -----"; Get-Content "$Out\coverage.err" -Encoding UTF8; if (($CliExit -le 1) -and ($JsonBytes -gt 0)) { & $Py -I $Probe summary "$Out\coverage.json" } else { "CLI_FAILED=True — CLI_EXIT=$CliExit JSON_BYTES=$JsonBytes. 결과 JSON 이 없으면 측정 실패입니다. 위 stderr 를 회신해 주십시오." } } else { "RUN_REFUSED=True — PATHS_MATCH_MAIN=$PathsMatch REACH_EXIT=$ReachExit PY=$Py PROBE=$Probe. False/비어 있는 항목을 해소한 뒤 다시 붙여넣어 주십시오. 아무것도 읽지 않았습니다." }
+$Ready = ($PathsMatch -eq $true) -and ($ReachExit -eq 0) -and $Py -and $Probe -and (Test-Path $Probe) -and ($ProbeGot -eq $ProbeSha)
+if ($Ready) { Remove-Item "$Out\coverage.json", "$Out\coverage.err" -ErrorAction SilentlyContinue; cmd /c "$Py -m whymath_backend.l1.standards.phase3_coverage --hints-from-db --json > $Out\coverage.json 2> $Out\coverage.err"; $CliExit = $LASTEXITCODE; "CLI_EXIT=$CliExit"; $JsonBytes = (Get-Item "$Out\coverage.json" -ErrorAction SilentlyContinue).Length; "CLI_JSON_BYTES=$JsonBytes"; "----- stderr -----"; Get-Content "$Out\coverage.err" -Encoding UTF8; if (($CliExit -le 1) -and ($JsonBytes -gt 0)) { & $Py -I $Probe summary "$Out\coverage.json" } else { "CLI_FAILED=True — CLI_EXIT=$CliExit JSON_BYTES=$JsonBytes. 결과 JSON 이 없으면 측정 실패입니다. 위 stderr 를 회신해 주십시오." } } else { "RUN_REFUSED=True — PATHS_MATCH_MAIN=$PathsMatch REACH_EXIT=$ReachExit PY=$Py PROBE=$Probe PROBE_SHA256=$ProbeGot. False/비어 있는 항목을 해소한 뒤 다시 붙여넣어 주십시오. 아무것도 읽지 않았습니다." }
+"BLOCK_D_DONE=True"
 ```
 
 > **왜 `cmd /c`로 감싸는가**: 결과 JSON에 한국어가 들어갑니다. PowerShell 5.1은 자식 프로세스
@@ -311,7 +237,8 @@ if ($Ready) { Remove-Item "$Out\coverage.json", "$Out\coverage.err" -ErrorAction
 # [Windows PowerShell · Phaiakes9] 같은 창 — 변수 $Py·$Probe 필요
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $RepoPath = (Get-Location).Path
-if ($Py -and $Probe -and (Test-Path $Probe)) { & $Py -I $Probe idspace $RepoPath; "IDSPACE_EXIT=$LASTEXITCODE" } else { "RUN_REFUSED=True — PY=$Py PROBE=$Probe. 블록 [C]를 같은 창에서 먼저 실행해 주십시오. 아무것도 읽지 않았습니다." }
+if ($Py -and $Probe -and (Test-Path $Probe) -and ($ProbeGot -eq $ProbeSha)) { & $Py -I $Probe idspace $RepoPath; "IDSPACE_EXIT=$LASTEXITCODE" } else { "RUN_REFUSED=True — PY=$Py PROBE=$Probe PROBE_SHA256=$ProbeGot. 블록 [C]를 같은 창에서 먼저 실행해 주십시오(PROBE_SHA256_OK=True 여야 합니다). 아무것도 읽지 않았습니다." }
+"BLOCK_E_DONE=True"
 ```
 
 **확인**: `IDSPACE_EXIT=0` + `VERDICT=` 한 줄. 이 블록은 DB `problem`의 `(problem_id, slug)`와
