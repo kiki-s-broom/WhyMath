@@ -531,6 +531,16 @@ jobs:
       - name: 게이트 — 앵커 탐지 채널 변별력 (anchor_detection_channel·검출 하한 0.80·오검출 상한 0.10)
         run: python -m whymath_backend.harness.anchor_detection_channel_eval
 
+      # P3-06: 오답 → 오개념 후보 → 교정 전략 전 구간. 핵심 오개념 중 크로스워크 좌석이 있는 것이
+      # 끝까지 이어지는지(서명·보기 → 후보 → 교정 사다리 3칸 · 오탐 픽스처)를 **실제 서빙 훑기 함수**로
+      # 잰다. FAIL이 하나라도 있으면 종료 1, 측정 불가면 3. 좌석 없는 핵심 오개념(NO_SEAT)은 보고만
+      # 하고 종료 코드를 바꾸지 않는다 — `--require-all`을 여기 달면 처분 대기 게이트
+      # (G-p306-unseated-core-misconceptions)가 닫히기 전까지 CI가 영구 red가 된다. 정답 오탐
+      # 전수 점검(승인 문항 3,188건)은 pytest(test_derivative_signature)가 소유하므로 여기서는
+      # --no-sweep으로 건너뛴다(중복 75초). 이 스텝이 없으면 계측기는 저장소에 존재할 뿐이다.
+      - name: 게이트 — 오답→교정 전 구간 (wrong_answer_remediation_report·FAIL 0)
+        run: python -m whymath_backend.harness.wrong_answer_remediation_report --no-sweep
+
       # PED-01 ③: 교수법 팩 금지모드 가드 결함주입 강등전. 고정 그리드 실측 여유값 —
       # violating/clean 각 72셀 미검출·오검출 0 → Wilson 상한 0.0362 → 게이트 통과.
       # 팩-프롬프트 GA flip(pedagogy_pack_prompt_enabled 기본 ON)의 선결 게이트다.

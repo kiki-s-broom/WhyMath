@@ -578,6 +578,21 @@ def problem_ref_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
     return _problem_from_row(row)
 
 
+def prerequisite_sources_of(
+    spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus, concept_code: str
+) -> tuple[str, ...]:
+    """개념의 원자로 들어오는 선수 간선의 시작 원자 — 계측기가 'prerequisite 연결됨'을 판정하는 것과
+    **같은 계산**이다(P3-06 교정표의 선수 개념 칸이 같은 근거를 쓰게 하는 공개 창구).
+
+    명세에 없는 개념 코드는 빈 튜플이 아니라 `CoverageError`다 — 빈 값은 '선수가 없다'와 구별되지
+    않아 오타를 측정된 0으로 위장한다.
+    """
+    for concept in spec.concepts:
+        if concept.code == concept_code:
+            return _facts(spec, index, corpus, concept).prerequisite_sources
+    raise CoverageError(f"명세에 없는 개념 코드: {concept_code!r}")
+
+
 def _facts(
     spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus, concept: ConceptEntry
 ) -> ConceptFacts:
