@@ -969,7 +969,9 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
        "l4.misconception.answer_signature", "api._attempt_misconception_scan",
        "l4.misconception.derivative_signature", "l4.misconception.remediation_advice",
-       "l1.misconception.wrong_answer_tables", "schema.wrong_answer_remediation"),
+       "l1.misconception.wrong_answer_tables", "schema.wrong_answer_remediation",
+       # P3-06 — 오답→교정 전 구간 계측 CLI(FAIL 0 게이트). 같은 기능의 측정 짝이라 같은 행.
+       "harness.wrong_answer_remediation_report"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
        "l4.misconception.hypothesis",

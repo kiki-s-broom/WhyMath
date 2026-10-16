@@ -78,8 +78,14 @@ CORE_PULL_BASELINE: frozenset[str] = frozenset({"l4.solution_coaching"})
 #   · `app`      — ASGI 앱 팩토리. 부팅 시 능력 5종을 app.state에 등록한다(EOS-89 ①).
 #   · `harness.concept_assessment_index` — 렌더 성공률 측정 CLI(`main()` 보유). 어댑터를 직접
 #     조립하므로 능력이 필요하고, 그 능력을 줄 상류가 없다(프로세스의 시작이 자기 자신이다).
+#   · `harness.wrong_answer_remediation_report` — 오답→교정 전 구간 계측 CLI(`main()` 보유, P3-06).
+#     서빙이 쓰는 검출기를 합성 루트에서 그대로 받아 실제 서빙 함수에 통과시킨다(재구현 0).
 NON_CORE_COMPOSITION_CONSUMERS: frozenset[str] = frozenset(
-    {"app", "harness.concept_assessment_index"}
+    {
+        "app",
+        "harness.concept_assessment_index",
+        "harness.wrong_answer_remediation_report",
+    }
 )
 
 # app.py가 `app.state`에 올려야 하는 과목 능력 키 상수명 — `api/_subject_capability_state.py`가
