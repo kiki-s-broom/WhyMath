@@ -265,3 +265,164 @@ def test_a3_rows_are_targets_even_when_the_corpus_does_not_list_them(tmp_path, c
     assert report["corpus_distractor_linked_empty_rows"] == 0
     assert report["all_targets"]["target_rows_found_in_source"] == 1
     assert report["all_targets"]["verdict"] == "H2_known_key"
+
+
+# ── 공통 메타 열은 판정에서 뺀다 (2026-10-09 정정 — 1차 실행의 verdict 과장) ──────────
+def _controls(n: int, **cols: object) -> list[dict]:
+    """대상 밖 대조군 n행 — 모두 같은 열(cols)에 값이 있다."""
+    return [_row(f"M9{i:03d}", note="원본", **cols) for i in range(n)]
+
+
+def test_universal_meta_column_does_not_make_a_false_h2(tmp_path, capsys):
+    """1차 실행 재현: 대상 행과 대조군 전부에 `출처`가 있고, 세 필드·내용 키는 어디에도 없다.
+
+    정정 전에는 `출처`가 '추출기가 모르는 키의 값'으로 잡혀 H2_unknown_key였다. 정정 후 H1.
+    """
+    rows = [_row("M0001", 출처="공통")] + _controls(probe.MIN_CONTROL_ROWS + 5, 출처="공통")
+    _, out, _ = _run(tmp_path, rows, ["M0001"], capsys)
+    report = json.loads(out)
+    assert report["universal_meta_keys"] == ["출처"]
+    assert report["all_targets"]["verdict"] == "H1_source_empty"
+    # 원시 집계는 그대로 남는다 — 판정에서만 빠진다(1차 보고서 숫자와 비교 가능)
+    assert report["all_targets"]["unknown_key_nonempty_counts"] == {"출처": 1}
+    assert report["all_targets"]["content_unknown_key_nonempty_counts"] == {}
+
+
+def test_content_key_next_to_a_universal_column_still_gives_h2(tmp_path, capsys):
+    """대조군: 공통 열을 빼도 내용 키(대조군의 일부에만 있는 열)는 H2를 낸다."""
+    controls = _controls(probe.MIN_CONTROL_ROWS + 5, 출처="공통")
+    controls[0]["오개념_원인"] = "한 행에만 있다"  # 대조군의 1/25 — 공통 열이 아니다
+    rows = [_row("M0001", 출처="공통", 오개념_원인="원인")] + controls
+    _, out, _ = _run(tmp_path, rows, ["M0001"], capsys)
+    report = json.loads(out)
+    assert report["universal_meta_keys"] == ["출처"]
+    assert report["all_targets"]["verdict"] == "H2_unknown_key"
+    assert report["all_targets"]["content_unknown_key_nonempty_counts"] == {"오개념_원인": 1}
+
+
+def test_a_small_control_group_cannot_declare_a_column_universal(tmp_path, capsys):
+    """표본 가드: 대조군이 MIN_CONTROL_ROWS 미만이면 모든 열이 '공통'으로 보인다 — 인정하지 않는다."""
+    rows = [_row("M0001", 출처="공통")] + _controls(probe.MIN_CONTROL_ROWS - 1, 출처="공통")
+    _, out, _ = _run(tmp_path, rows, ["M0001"], capsys)
+    report = json.loads(out)
+    assert report["universal_meta_keys"] == []
+    assert report["all_targets"]["verdict"] == "H2_unknown_key"  # 보수적: 내용 키일 수 있다
+
+
+def test_universal_threshold_is_a_ratio_not_a_presence(tmp_path, capsys):
+    """경계: 대조군의 90%에 있으면 공통, 그보다 적으면 내용 키 — 비율이 실제로 쓰인다."""
+    n = 30
+    at_threshold = [
+        _row(f"M9{i:03d}", note="원본", 열=("값" if i < 27 else ""))  # 27/30 = 0.9
+        for i in range(n)
+    ]
+    below = [
+        _row(f"M8{i:03d}", note="원본", 열=("값" if i < 26 else ""))  # 26/30 ≈ 0.867
+        for i in range(n)
+    ]
+    assert probe.universal_keys(at_threshold, set()) == frozenset({"열"})
+    assert probe.universal_keys(below, set()) == frozenset()
+
+
+def test_universal_keys_ignore_target_rows_when_measuring(tmp_path):
+    """대상 행은 비율 계산에 넣지 않는다 — 대상 행에만 있는 열이 '공통'으로 둔갑하면 안 된다."""
+    rows = [_row(f"M0{i:03d}", 원인="있다") for i in range(40)]  # 전부 대상, 대조군 0행
+    assert probe.universal_keys(rows, {r["mis_id"] for r in rows}) == frozenset()
+
+
+def test_a3_rows_use_the_same_universal_set(tmp_path, capsys):
+    """A3 개별 판정도 공통 열을 뺀다 — M0599(내용 키 없음)=H1, M0418(오개념_원인)=H2."""
+    rows = [
+        _row("M0599", 출처="공통"),
+        _row("M0418", note="원본", 출처="공통", 오개념_원인="원인"),
+    ] + _controls(probe.MIN_CONTROL_ROWS + 5, 출처="공통")
+    _, out, _ = _run(tmp_path, rows, ["M0599"], capsys)
+    a3 = json.loads(out)["a3"]
+    assert a3["M0599"]["verdict"] == "H1_source_empty"
+    assert a3["M0418"]["verdict"] == "H2_unknown_key"
+
+
+# ── --dump-key: 2차 실행(값을 보고 필드를 정한다) ────────────────────────────
+def _corpus_with_original_rows(tmp_path: Path, original_empty: list[str]) -> Path:
+    corpus = tmp_path / "corpus.json"
+    corpus.write_text(
+        json.dumps(
+            {
+                "misconceptions": [
+                    {"mis_id": mid, "provenance_note": "원본", "error_type": None}
+                    for mid in original_empty
+                ]
+                + [
+                    {
+                        "mis_id": "M7000",
+                        "provenance_note": "원본",
+                        "error_type": "부호오류",
+                    },  # 값 있음
+                    {"mis_id": "M7001", "provenance_note": probe.LINKED_NOTE, "error_type": None},
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return corpus
+
+
+def _dump(tmp_path: Path, rows: list[dict], corpus: Path, capsys, key="오개념_원인"):
+    source = tmp_path / "s.json"
+    source.write_text(
+        json.dumps([{"개념ID": "C", "L5_META": {"오개념": rows}}], ensure_ascii=False),
+        encoding="utf-8",
+    )
+    code = probe.main(["--source", str(source), "--corpus", str(corpus), "--dump-key", key])
+    return code, capsys.readouterr()
+
+
+def test_dump_key_prints_the_values_and_row_level_match(tmp_path, capsys):
+    rows = [
+        _row("M0418", note="원본", 오개념_원인="중복해서 센다"),  # 코퍼스 '원본+공란'에도 있다
+        _row("M0417", note="원본", 오개념_원인="1을 넘게 본다"),
+        _row("M5555", note="원본", 오개념_원인="코퍼스 쪽에는 없다"),  # only_in_source
+        _row("M0600"),  # 값 없음 — 목록에 들어가면 안 된다
+    ]
+    corpus = _corpus_with_original_rows(
+        tmp_path, ["M0418", "M0417", "M6666"]
+    )  # M6666 only_in_corpus
+    code, out = _dump(tmp_path, rows, corpus, capsys)
+    assert code == 0
+    dump = json.loads(out.out)["dump"]
+    assert dump["key"] == "오개념_원인" and dump["rows_with_value"] == 3
+    assert dump["corpus_original_empty_rows"] == 3  # 값 있는 M7000·연결됨 M7001은 세지 않는다
+    assert dump["in_both"] == ["M0417", "M0418"]
+    assert dump["only_in_source"] == ["M5555"]
+    assert dump["only_in_corpus"] == ["M6666"]
+    assert [v["mis_id"] for v in dump["values"]] == ["M0417", "M0418", "M5555"]
+    assert {v["mis_id"]: v["value"] for v in dump["values"]}["M0418"] == "중복해서 센다"
+    assert out.out.isascii(), "dump 모드도 표준 출력은 ASCII 이스케이프여야 한다"
+
+
+def test_without_dump_key_the_report_has_no_dump_and_no_row_text(tmp_path, capsys):
+    """대조군: --dump-key가 없으면 값은 어디에도 나오지 않는다(기본 동작의 안전 계약)."""
+    rows = [_row("M0001", 오개념_원인="새면 안 되는 값")]
+    _, out, _ = _run(tmp_path, rows, ["M0001"], capsys)
+    assert "dump" not in json.loads(out)
+    assert "새면 안 되는 값" not in out
+
+
+def test_dump_key_for_a_missing_key_reports_zero_rows_not_an_error(tmp_path, capsys):
+    rows = [_row("M0418", note="원본")]
+    corpus = _corpus_with_original_rows(tmp_path, ["M0418"])
+    code, out = _dump(tmp_path, rows, corpus, capsys, key="없는_키")
+    dump = json.loads(out.out)["dump"]
+    assert code == 0 and dump["rows_with_value"] == 0
+    assert dump["only_in_corpus"] == ["M0418"]  # 키가 없으면 코퍼스 쪽 21행이 전부 '원천에 없음'
+
+
+def test_dump_key_uses_the_first_occurrence_of_a_duplicated_mis_id(tmp_path, capsys):
+    rows = [
+        _row("M0418", note="원본", 오개념_원인="첫 번째"),
+        _row("M0418", note="원본", 오개념_원인="두 번째"),
+    ]
+    code, out = _dump(tmp_path, rows, _corpus_with_original_rows(tmp_path, ["M0418"]), capsys)
+    values = json.loads(out.out)["dump"]["values"]
+    assert values == [{"mis_id": "M0418", "value": "첫 번째"}]
