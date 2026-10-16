@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-48-derivative-signature-reach-extension
+title: "P3-48 — 미분 오답 서명 독법의 사정거리 확장: 지금 읽지 못하는 질문 형식(역문제·접선 y절편·속도·도함수 계수합)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 현황(P3-06 §4): 서명 단독 재현율이 보기 오라클 대비 power-rule-step-omitted 24/66, product-rule-naive 30/36, extremum-value-vs-point-confused 112/124다. 못 읽는 형식 = f'(a)=상수를 만족시키는 a(역문제) · 접선의 y절편·방정식 값 · 속도·가속도(변수 t) · 도함수의 상수항·모든 계수의 합 · g(t) 등 다른 변수명.\n② 형식마다 추출기와 변환을 규칙표(rules.yaml)와 레지스트리에 더하되, 각 형식은 엔진 정답 = 문항은행 정답 전수 대조(테스트 test_engine_computed_correct_value_equals_the_banks_machine_verified_answer)를 통과해야 한다.\n③ 재현율 래칫(_ORACLE_RECALL_FLOOR)을 올린다. 정답 오탐 전수 점검은 0건을 유지한다.\n④ 새 오개념 추가는 범위 밖이다 — 대표 과정 핵심 오개념의 읽기 범위만 넓힌다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06 §4·§6. 우선순위 P2 — 선지 채널이 이미 보기 제출을 후보로 만들므로 단답 제출의 사각만 줄이는 일이다."
+updated: 2026-10-16

@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-46-coverage-direct-mis-id-reach-vs-serving
+title: "P3-46 — 계측기는 닿았다고 세는데 서빙은 버리는 이음새: 보기가 M-id를 직접 적은 문항(M0674 12건)의 측정 정직화"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현황(2026-10-16 실측): l1/standards/phase3_coverage.py의 오개념 도달 집계는 distractor_map 보기가 M-id 형식이면 그대로 닿았다고 센다. 서빙(l4/misconception/distractor_link.py)은 kebab만 카탈로그에서 해소하므로 M-id 보기를 후보로 만들지 못한다. M0674는 승인 문항 12건이 이 상태다.\n② 둘 중 하나로 정렬한다: (가) 계측기가 서빙이 후보를 낼 수 있는 보기(kebab 좌석 있음)만 닿았다고 센다 (나) 서빙이 M-id 보기를 크로스워크로 해소한다. 선택은 게이트 G-p306-unseated-core-misconceptions의 처분(안 A~D)에 의존하므로 그 처분 뒤에 착수한다.\n③ 변별력: M-id를 직접 적은 보기 문항을 주입했을 때 계측기와 서빙의 결론이 같아짐을 테스트로 고정한다.\n④ Graph Connectivity 지표 수치가 바뀌면 그 변화를 기준선 문서에 기록한다(측정 정직화이지 목표 후퇴가 아니다)."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06 §6 발견 별건. 근거 수치는 docs/reviews/p3_06_wrong_answer_remediation_slice_2026-10-16.md. 계측기 담당 P3-02는 done이므로 재개가 아니라 승계 태스크다. 인접: P3-44(다른 세션 예약)는 같은 5개 개념의 오답 보기를 핵심 오개념에 재연결하는 문항 배선이고, 이 태스크는 도달 집계와 서빙 해소의 불일치다 — 둘 다 크로스링크 서명(Kiki)에 닿으므로 착수 전 서로의 결과를 확인한다."
+updated: 2026-10-16

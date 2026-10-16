@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-45-remediation-strategy-serving-consumption
+title: "P3-45 — 교정 전략 서빙 소비: 반복 오류 사다리 칸(EscalationRung)을 교정표 내용으로 번역해 학생 응답이 실제로 쓰게 한다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① (정본화) P3-06이 닫은 것: 오답 서명 → 후보 → 교정표 조회와 그 전 구간 계측기. 이 태스크의 범위가 아니다.\n② (집행 지점 — 별항) 지금 EscalationRung은 InterventionDecision.escalation_rung과 TurnOutcome 텔레메트리에서 끝난다. 학생에게 나가는 응답(POST /v1/me/attempts 응답의 learning_state 블록 또는 코치 발화)이 remediation_advice.advise 결과를 실제로 쓰는 서빙 코드 경로를 하나 이상 지정해 배선한다. 배선 후 그 경로를 통과하는 실행 증거(테스트)가 있어야 완료다.\n③ 교정 설명 7행은 AI 초안(draft)이다. 학생 노출은 authoring_status가 reviewed인 행만 쓴다 — 소비 경로가 이 조건을 집행한다.\n④ 학생에게 실패 횟수 숫자를 말하지 않는다(CLAUDE.md 교수학 금기: 부정적 피드백의 정서적 강화 금지). 사다리 칸은 내용의 강도로만 드러난다.\n⑤ 정답을 곧바로 주지 않는다 — 교정 설명은 반례와 되묻기로 쓴 형태 그대로 낸다(Polya 4단계 우선).\n⑥ 범위 규율: 새 Entity·대규모 스키마 변경·새 에이전트를 만들지 않는다. 응답 필드 추가가 필요하면 선택 필드로 더하고 사유를 기록한다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06 완료 보고 §6 미이행. 교정표 정본 = data/corpus/misconception_remediation_v1/remediation.yaml · 조회 = l4/misconception/remediation_advice.py. 등재는 착수가 아니다."
+updated: 2026-10-16
