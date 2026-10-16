@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MATH-08-wrong-step-unverifiable-rate
+title: "전형적 오답 단계의 47%가 incorrect가 아니라 unverifiable로 떨어진다 — 합성 프록시 재현·원인 규명·실입력 비율 판정 (OPS-126 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-140-keller-allen-ops126-isolation-ratio-recovery
+requires_gates: []
+acceptance:
+  - "① 합성 프록시 재현 고정 — scripts/analysis/measure_sympy_isolation_budget.py --mode slips (시드 7·194건)가 OPS-140에서 main 위에 재현한 수치: 전개식의 상수항을 1 틀린 전형적 오답 70건(차수 2~8) 중 incorrect 37·unverifiable 33(47%)이고 그중 25건이 0.5초 안에 즉시 unverifiable이다(차수 3은 10건 전부). 올바른 단계(전개식↔인수분해식) 70건은 70건 전부 correct다. 즉 학생의 단순 계산 실수가 incorrect가 아니라 판정 불가로 보일 수 있다.\n② 원인 규명 — 시간 상한이 아니라 검증기의 구조 예산·보수적 판정(거짓 incorrect 회피 설계로 추정)이다. 이 접힘은 /health/ready sympy_isolation의 undecidable_ratio에 잡히지 않는다(풀 접힘이 아니라 verify_step의 판정이기 때문). 소스를 읽고 추정한 것을 사실로 쓰지 않는다 — verify_step 내부에서 어느 분기(예산 초과·부호 불확정 등)가 이 판정을 내는지 입력 부류별로 실측해 적는다.\n③ 영향 판정 — 실제 학생 단계 입력에서의 incorrect 대 unverifiable 비율은 합성으로 알 수 없다. 파일럿의 verify-step 판정 분포(상태별 건수)를 수집해 합성 47%가 실입력에 해당하는지 판정하고, 해당하면 단순 상수·계수 실수를 incorrect로 내릴 수 있는지(거짓 incorrect 위험과의 교환 포함)를 결정한다. 파일럿 데이터가 없으면 이 태스크는 대기 상태로 두고 완료로 닫지 않는다(공허 통과 금지).\n④ 학생 대면 문구 — 판정 불가를 학생에게 어떻게 보이는지(부정 피드백 강화 금지·모른다고 말하기)를 확인하고 필요하면 별도 태스크로 분리한다."
+artifacts: []
+paths:
+  - scripts/analysis/measure_sympy_isolation_budget.py
+  - src/backend/whymath_backend/l3/verify_step.py
+session: null
+notes: "출처: OPS-140(OPS-126 두 고립 구현 회수) — wonderful-allen-vhbdra 판정 문서 2절의 부수 관측을 main 위에서 재현해 승계했다(원 관측은 시간 상한과 무관한 별건이라 OPS-126 범위 밖). 재현 근거: OPS-140 PR의 --mode slips 실행(2026-10-14·main a4942eac 기준). 합성 프록시이므로 실제 비율은 파일럿에서 다시 봐야 한다. eos_priority는 근거 수준(합성)에 맞춰 P2로 두었다 — 파일럿 분포가 실제 문제로 확인되면 amend --eos-priority로 재판정한다."
+updated: 2026-10-14

@@ -442,6 +442,9 @@ _MODULE_REGISTRY: tuple[AdminModule, ...] = (
         "src/backend/whymath_backend/db/models/concept_version.py",
         # EOS-50: 전이표 + Publish Gate 서비스. 운영 API = P3-12 `api/admin_cms.py`.
         "src/backend/whymath_backend/l3/publish_gate.py",
+        # EOS-190/194: 문항 판 짝 — writer(`l3/problem_publish_gate`)와 그 운영 호출자(CMS 라우트).
+        "src/backend/whymath_backend/l3/problem_publish_gate.py",
+        "src/backend/whymath_backend/api/admin_cms_problem_versions.py",
         roles=_CMS_VIEWERS,
     ),
     _module(

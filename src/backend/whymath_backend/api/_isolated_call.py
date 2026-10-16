@@ -16,14 +16,23 @@ from __future__ import annotations
 
 import atexit
 import logging
+import os
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from whymath_backend.config import get_settings
 from whymath_backend.l3.isolated_call import BudgetExceededError, IsolatedCallPool
 
-__all__ = ["CHAIN_BUDGET_FACTOR", "isolated", "isolation_stats", "reset_pool_for_tests"]
+__all__ = [
+    "CHAIN_BUDGET_FACTOR",
+    "IsolationSnapshot",
+    "isolated",
+    "isolation_snapshot",
+    "isolation_stats",
+    "reset_pool_for_tests",
+]
 
 logger = logging.getLogger("whymath.api.isolated_call")
 
@@ -51,6 +60,7 @@ def _get_pool() -> IsolatedCallPool:
                     max_workers=settings.sympy_isolation_max_workers,
                     timeout_s=settings.sympy_isolation_timeout_s,
                     preload=tuple(settings.sympy_isolation_preload_modules),
+                    warmup=tuple(settings.sympy_isolation_warmup),
                 )
                 atexit.register(_pool.shutdown)
     return _pool
@@ -95,6 +105,82 @@ async def isolated(
 def isolation_stats() -> dict[str, int]:
     """풀의 누적 카운터 — 풀이 아직 없으면 빈 dict. "격리가 실제로 작동한 비율" 관측용."""
     return _pool.stats() if _pool is not None else {}
+
+
+@dataclass(frozen=True, slots=True)
+class IsolationSnapshot:
+    """격리가 *작동한 비율*의 불변 스냅샷 — `/health/ready` `sympy_isolation` 섹션의 원천(OPS-126).
+
+    정상 응답 200은 격리가 일했다는 증거가 아니다(CLAUDE.md "작동한 비율" 원칙). 이 스냅샷이 두
+    비율을 말한다:
+      - `isolated_ratio` — 격리 대상 호출 중 **실제로 시간 상한이 걸린 프로세스 풀에서 돈 비율**.
+        1.0이 아니면 일부 호출이 pickle 불가로 스레드 폴백했다는 뜻이다(폴백은 상한이 없다).
+      - `undecidable_ratio` — 풀에 맡겨진 호출 중 **판정 불가로 접힌 비율**(상한 초과·대기열 포화·
+        워커 사망·총 예산 소진). 0이 아니면 그만큼의 정상 입력이 "모른다"로 떨어졌을 수 있다 —
+        상한 재판정(`sympy_isolation_timeout_s`)의 입력이다.
+
+    **None-vs-0** — 분모가 0이면 비율은 `None`이다("0건 중 0건"이 아니라 *측정 대상이 없었다*).
+    `enabled=False`(설정 되돌림)이면 호출이 인라인으로 돌아 카운터가 서지 않으므로, 앞서 쌓인
+    카운터가 남아 있어도 비율은 None이다(지금은 격리하지 않는 인스턴스를 0%로 읽지 않게).
+
+    **한계(명시)** — 카운터는 *프로세스별*이다. 서버 워커(uvicorn `--workers`)가 여럿이면
+    응답한 워커 1개의 값이며 `process_id`가 그 워커를 가린다(합산은 외부 스크레이퍼 몫).
+    재시작하면 0부터다.
+    `undecidable`은 호출 하나당 최대 1건씩 오른다(상한 초과·대기 포화·사망·총 예산 소진 중 하나로
+    끝나므로 — 입구 거절도 `calls`를 올리고 접혀서 이 관계가 유지된다). 취소된 요청(클라이언트
+    끊김)은 `calls`에는 들어가고 접힘으로 세지 않아 `undecidable_ratio`는 하한 쪽으로 기운다.
+
+    **사유 키 목록은 풀 `stats()`와 대조된다** — 풀이 판정 불가 사유를 새로 세기 시작하면
+    (OPS-125·128의 `deadlines`가 그랬다) 여기 합계에 넣지 않는 한 비율이 조용히 틀린다. 그 이탈은
+    `test_sympy_isolation_observability.py`의 사유 키 동결 테스트가 막는다.
+    """
+
+    enabled: bool
+    pool_started: bool
+    process_id: int
+    max_workers: int
+    timeout_s: float
+    calls: int
+    timeouts: int
+    queue_waits: int
+    deadlines: int
+    worker_deaths: int
+    fallbacks: int
+
+    @property
+    def undecidable(self) -> int:
+        """판정 불가로 접힌 호출 수 = 상한 초과 + 대기열 포화 + 총 예산 소진 + 워커 사망."""
+        return self.timeouts + self.queue_waits + self.deadlines + self.worker_deaths
+
+    @property
+    def undecidable_ratio(self) -> float | None:
+        """풀에 맡겨진 호출 중 판정 불가로 접힌 비율 — 격리가 꺼졌거나 맡겨진 호출이 없으면 None."""
+        return self.undecidable / self.calls if self.enabled and self.calls > 0 else None
+
+    @property
+    def isolated_ratio(self) -> float | None:
+        """격리 대상 호출 중 풀에서 실제로 돈 비율 — 격리가 꺼졌거나 대상 호출이 없으면 None."""
+        total = self.calls + self.fallbacks
+        return self.calls / total if self.enabled and total > 0 else None
+
+
+def isolation_snapshot() -> IsolationSnapshot:
+    """현재 프로세스의 격리 작동 스냅샷 — 읽기 전용(풀을 만들지 않는다)."""
+    settings = get_settings()
+    stats = isolation_stats()
+    return IsolationSnapshot(
+        enabled=settings.sympy_isolation_enabled,
+        pool_started=_pool is not None,
+        process_id=os.getpid(),
+        max_workers=settings.sympy_isolation_max_workers,
+        timeout_s=settings.sympy_isolation_timeout_s,
+        calls=stats.get("calls", 0),
+        timeouts=stats.get("timeouts", 0),
+        queue_waits=stats.get("queue_waits", 0),
+        deadlines=stats.get("deadlines", 0),
+        worker_deaths=stats.get("worker_deaths", 0),
+        fallbacks=stats.get("fallbacks", 0),
+    )
 
 
 def reset_pool_for_tests() -> None:

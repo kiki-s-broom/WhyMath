@@ -473,8 +473,12 @@ class Settings(BaseSettings):
             "OPS-96 — SymPy 호출 1건의 계산 시간 상한(초·워커가 일을 받은 순간부터). 기본 5초는 "
             "`safe_parse` 구조 예산을 통과하는 *가장 느린* 입력(차수 20 방정식 ≈3.0초·실측 "
             "2026-10-02)보다 크고, 정상 문항(밀리초대)과는 3자릿수 차이다. 이 값을 낮추면 정상 "
-            "입력이 판정 불가로 떨어질 수 있으니 `sympy_isolation_budget_exceeded` 로그 비율을 "
-            "보고 조정한다."
+            "입력이 판정 불가로 떨어질 수 있으니 `/health/ready`의 `sympy_isolation."
+            "undecidable_ratio`(OPS-126)와 `isolation_budget_exceeded` 로그를 보고 조정한다. "
+            "OPS-126 ② 재판정(2026-10-12·OPS-140 재측정 2026-10-14) — 교육과정 형태 합성 단계 "
+            "354건 최대 0.18초, 고차 방정식 스트레스 16건은 상한 없이도 전부 unverifiable(상한은 "
+            "판정 정보를 잃지 않는다). 합성 대리 분포이며 실 학생 입력 분포는 파일럿 지표 누적 "
+            "뒤 재판정한다(OPS-131)."
         ),
     )
     sympy_isolation_preload_modules: list[str] = Field(
@@ -485,14 +489,32 @@ class Settings(BaseSettings):
             "요청이 느리다). 격리 장치 자체는 과목 어휘를 모르므로(Core) 이 목록을 설정이 정한다."
         ),
     )
+    sympy_isolation_warmup: list[str] = Field(
+        default_factory=lambda: [
+            "whymath_backend.l3.verify_step:warm_isolated_worker",
+            "whymath_backend.l3.verify_answer:warm_isolated_worker",
+        ],
+        description=(
+            "OPS-142 — SymPy 워커 프로세스가 `ready` 이전에 미리 돌릴 웜업 함수('모듈:함수'·인자 "
+            "없음). 식 종류별 첫 사용이 하위 모듈을 지연 import하는데(`simplify` 첫 호출 ≈68ms·"
+            "워커 CPU 몫 1/8에서 543~742ms — 실측 2026-10-14) 그 시간은 *계산 상한 안*이라, 상한이 "
+            "짧거나 기계가 바쁘면 정상 식이 판정 불가로 샌다. 기동 단계(상한 밖)에서 미리 치르면 "
+            "상한 초과로 kill된 뒤의 교체 워커도 데워진 채 뜬다. 비우면 종전(첫 요청이 비용을 "
+            "치름)이다. 웜업이 실패해도 워커는 뜨고 경고 로그에 예외 타입명이 남는다."
+        ),
+    )
     sympy_isolation_max_workers: int = Field(
         default=2,
         ge=1,
         le=16,
         description=(
             "OPS-96 — SymPy 워커 프로세스 수(= 동시 SymPy 계산 수). 각 워커는 SymPy를 import한 "
-            "상태로 상주한다(메모리 약 100~150MB/개 — 서버 워커 수 × 이 값 만큼 프로세스가 뜬다). "
-            "모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 판정 불가로 떨어진다."
+            "상태로 상주한다(실측 2026-10-12·14 OPS-126 ③·OPS-140 — Linux·SymPy 1.14에서 RSS "
+            "73~78MB/개(Python 3.12·3.13)·PSS 약 64~66MB, 무거운 계산 12회 뒤 약 78MB로 완만히 "
+            "증가·장기 상한과 Windows는 미측정이라 100MB 안팎으로 가정 — 서버 워커 수 × 이 값 "
+            "만큼 프로세스가 뜬다). 모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 "
+            "판정 불가로 떨어진다 — 늘릴 신호는 `/health/ready`의 `sympy_isolation.queue_waits > 0`"
+            "이다."
         ),
     )
 

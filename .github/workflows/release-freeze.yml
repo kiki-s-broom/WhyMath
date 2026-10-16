@@ -3,9 +3,9 @@
 # ci.yml과 독립된 파일이다: 이 검사는 날짜가 바뀌는 순간(11/30·12/14) 동작이 달라지는 유일한
 # 잡이라, 일반 CI 잡의 수정 흐름과 섞이면 동결 규칙 변경이 눈에 띄지 않는다.
 #
-# 현재 required check가 아니다(의도적). required 승격은 Kiki의 룰셋 편집이며 게이트
-# `G-release-freeze-labels-and-required`가 소유한다. 승격 시 merge queue(merge_group)에서도
-# 잡이 떠야 하므로 아래 merge_group 분기를 미리 둔다 — 없으면 승격 순간 큐가 영구 대기한다.
+# required check다(2026-10-15 Kiki가 룰셋 16623542에 등록 · 게이트
+# `G-release-freeze-labels-and-required`). merge queue(merge_group)에서도 잡이 떠야 하므로
+# 아래 merge_group 분기를 둔다 — 없으면 큐가 영구 대기한다. 문서 목록은 branch-protection-setup.md.
 name: release-freeze
 
 on:

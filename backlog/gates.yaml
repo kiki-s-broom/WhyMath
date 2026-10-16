@@ -31,11 +31,12 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-30
-    remind_after_days: 30
+    remind_after_days: 107
     evidence: null
     cleared_by: null
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-10-15] [2026-10-15 Kiki 판단: 12/31 내부 완성 이후로 이월 - 게이트는 닫지 않음] 스토어 배포는 외부 출시(2027년) 작업이고, 12/31 내부 완성 정의(G-internal-completion-2026-12-31: Phase 3 Release Gate A~E, EOS G5 판정, 12월 검증 P0 종결)는 서명키를 요구하지 않는다. 실측 범위: P3-11~17 태스크·PRD에서 스토어 배포/서명키 요구 0건(제가 찾은 방법으로는). 재확인 지점 = 12/31 내부 완성 판정 직후 첫 계획 세션(remind 107일 = 2027-01-15). 그때 판정: 서명키 생성+key.properties 배선(build.gradle은 key.properties 부재 시 debug 폴백) 착수 또는 재이월. 그 전까지 build.gradle의 게이트 ID 주석과 android_release_signing_gate_test.dart가 debug 서명 상태를 계속 추적한다."
+    corrections:
+      - "[2026-10-15] remind_after_days: 30 → 107 · notes +495자 — 12/31 내부 완성 이후 이월 - 외부 출시 전용 작업(Kiki 2026-10-15)"
     no_inputs_reason: "keystore 생성·Play Console 서명키 등록은 Kiki 소유 비밀·계정 행위라 선행 태스크가 없다 — 코드 쪽 추적은 build.gradle 주석과 test/android_release_signing_gate_test.dart(MOB-18)"
   - id: G-arch38-verdict-recheck
     title: "ARCH-38 '혼입 유지' 판정의 재확인 (재확인 지점 = W8 종료 직후 2026-10-26) — 판정 근거 3종 중 정적으로 확정 불가한 ②③ 축을 사람이 확인한다. ②assessment JSONB 5필드에 *갱신* writer가 생겼는가(현행 write-once·하루 1행 idempotency) ③5필드를 값으로 읽어 판단에 쓰는 서빙 reader가 착지했는가(직렬화는 소비 아님·ASM-11 진행 여부). 근거 ①(W8 경로 접촉 0)은 사람이 볼 필요 없다 — tests/backend/db/test_assessment_result_verdict_premise.py가 자동으로 RED를 낸다. 판정 3택: ①판정 유지(트리거 미발동 — 기본값·ARCH-40을 재생성해 감시 지속) ②재판정 착수(canonical_entity_model_v1.md §5 절차) ③영구 확정으로 종결. 근거 = 정본 §3-C · MEMORY 2026-09-06 결정 로그 · PR #997. 등재 이유: Codex P2 지적 수용 — 재확인을 태스크로만 등재하면 selector가 즉시 착수 후보로 계산해(실측: 후보 124건에 포함) 트리거를 기다리지 않는다. G-state-machine-deferral-recheck 선례 동형"
@@ -245,16 +246,16 @@ gates:
     title: "헌법 밖 경로 보호(⑦) 방식 결정 — 조직 소유 public 저장소지만 CODEOWNERS 소유자가 전 경로 @doldori7 하나이고 PR 작성자도 같은 계정이라 코드 오너 리뷰 필수는 모든 PR 을 막는다(사람·AI 세션이 같은 신원). 후보: (가) 현상 유지(가드 훅 + R0-02) / (나) 서명 검증 CI 스텝(Kiki 서명 키로 서명된 커밋만 constitution/ 변경 통과) / (다) 별도 계정·봇으로 작성자 분리. 조직 플랜은 세션 프록시가 막아 제공 여부 미확인 — 플랜 의존 기능은 판정하지 않았다. 근거는 docs/standards/coding_constitution_transplant.md 의 CONST-03 P4 절."
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-06
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 결정 2026-10-15(추천안 승인): (나) 서명 검증 CI 채택, 단 가드 매처 보강을 선행. 후속 태스크 CONST-16-guard-matcher-mcp-github-write(PR https://github.com/kiki-s-broom/WhyMath/pull/1652, 판정 기준 main 64628f61 · 브랜치 커밋 7a97cad2)과 CONST-17-constitution-signed-commit-ci-check(등재, 구현 전). (다) 별도 계정·봇은 비용 대비 효과가 낮아 보류. 조직 플랜 의존 기능은 제공 여부 미확인이라 판정하지 않음."
+    cleared_by: kiki
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-r4-02-decision
-    title: "R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). 3택: A 방향 뒤집기(Pydantic→model_json_schema 내보내기+드리프트 검사, 규칙 문장 개정 — 권고) / B 생성기 도입(대·비권고) / C 철회·단계 6 이월. 근거·비용은 A0005 초안 「R4-02」절."
+    title: "R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). [2026-10-15 정정] 등재 시점의 3택(A/B/C)은 낡았다 — 문서 기록상 Kiki 가 2026-10-06 에 (나)안(규칙 문구를 '스키마 YAML 필드 ↔ 모델 필드 일치 검사'로 개정, 어긋남은 만료 2026-12-31 로 동결)으로 결정했고 그 내용은 A0005 패치에 들어 있다. 이 게이트는 A0005 채택(G-const-a0005-part1-corrections) 뒤 audit.py --stage 3 에서 R4-02 가 통과로 바뀐 결과를 evidence 로 닫는다. 근거는 A0005 초안 「R4-02」절."
     kind: decision
     assignee: kiki
     status: pending
@@ -263,8 +264,22 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-15] title: \"R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). 3택: A 방향 뒤집기(Pydantic→model_json_schema 내보내기+드리프트 검사, 규칙 문장 개정 — 권고) / B 생성기 도입(대·비권고) / C 철회·단계 6 이월. 근거·비용은 A0005 초안 「R4-02」절.\" → \"R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). [2026-10-15 정정] 등재 시점의 3택(A/B/C)은 낡았다 — 문서 기록상 Kiki 가 2026-10-06 에 (나)안(규칙 문구를 '스키마 YAML 필드 ↔ 모델 필드 일치 검사'로 개정, 어긋남은 만료 2026-12-31 로 동결)으로 결정했고 그 내용은 A0005 패치에 들어 있다. 이 게이트는 A0005 채택(G-const-a0005-part1-corrections) 뒤 audit.py --stage 3 에서 R4-02 가 통과로 바뀐 결과를 evidence 로 닫는다. 근거는 A0005 초안 「R4-02」절.\" — 제목이 등재 시점(2026-10-06) 3택을 그대로 담아 실제 결정((나)안)과 어긋남 - 문서 기록 기준으로 정정. 결정 사실 자체는 대장 증거가 없고 coding_constitution_transplant.md 와 A0005 초안의 서술에 의존한다. 판정 기준 main bb8122f4."
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
+  - id: G-const-signing-key-register
+    title: "헌법 서명 검증 무장 - Kiki 서명 키를 만들어 공개키를 서명자 목록(constitution_signers/allowed_signers)에 등록하는 PR을 직접 만들고 머지한다. 이 PR이 머지되기 전까지 서명 검증은 미무장이라 어떤 서명 요건도 강제되지 않는다(키 등록 전 부트스트랩 상태). 절차와 음성 시험은 docs/ops/constitution_signing_runbook.md 의 과제 S, T, U. 등록 PR은 AI가 아니라 Kiki가 직접 만든다 - AI가 올린 등록 PR을 내용 확인 없이 승인하면 AI 키가 등록된다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-16
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - CONST-17-constitution-signed-commit-ci-check
   - id: G-const-sources-registry-adopt
     title: "원본 등록부(rules.yaml sources 9건) 실제 경로 정정 채택 + STAGE 2 상향 — 제안 경로 6/9가 저장소에 없어 위헌 심사 R4-01이 차단 6건(패키지 자체 pipeline.yaml 미동봉 시 7건). 세션이 만든 정정안 docs/constitution_proposals/rules_v1.0.1_sources_fixed.yaml 과 개정 초안 A0003을 Kiki가 읽고 constitution/에 직접 반영한다(AI는 constitution/를 쓰지 않는다 — 제9조 · 보호 훅이 막는다). 절차 = docs/ops/coding_constitution_kiki_runbook.md 과제 A. 성공 기준 = python scripts/constitution/audit.py --sources-only 차단 0건 + STAGE 파일 2 + audit_ratchet.py --update-baseline 으로 기준선 하향. evidence에 커밋 해시."
     kind: human
@@ -504,11 +519,11 @@ gates:
     title: "EOS-23 ③ 거부 30건 전수 분류 실행 — PR #1358 머지 후, Kiki 머신에서 런북 docs/ops/eos23_rejected_quad_sum_classification_runbook.md의 [A]·[B] 블록을 실행해 `.eos121-out/anthropic.review.jsonl`(EOS-121 회차 산출물·gitignore)을 읽기 전용 분류기 `python -m whymath_backend.harness.tier1_rejection_classifier`에 넣고, 출력 요약 JSON(ⓐ arithmetic_error / ⓑ representation_mismatch / 판정불가 건수)을 채팅에 회신한다. 쓰기는 --out 결과 파일 하나뿐이고 LLM·DB·네트워크 호출 0건. 회신을 받은 세션이 EOS-23 ③을 판정하고 ④(교락 분리 회차 필요 여부)·⑤(처방 축)를 이어 간다. 입력 파일이 두 위치 모두에 없으면 그 사실 자체를 회신한다(회수 불가 → EOS-23 처분 재판정)."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-28
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 5586a087 (분류기·런북이 있는 커밋). Kiki가 2026-10-15 Phaiakes9에서 런북 [A][B]를 실행했다: 선행 검사 전건 True(READY=True), 입력 FOUND=WhyMath-eos121 .eos121-out anthropic.review.jsonl SHA256=F94ADEBE...086FF. 분류기는 measured=false·CLASSIFY_EXIT=2로 거부했다(입력이 JSONL이 아니라 마크다운 뷰 — 비어 있지 않은 257줄 전건 JSONDecodeError). 원인=EOS-121 런북이 --out과 --worklist-out을 같은 경로로 지정해 회차 끝 write_text가 큐 정본을 덮어씀(사고 등재, 재발방지 OPS-147). 분류기 JSON은 산출되지 않았으나 Kiki가 같은 파일의 게이트거부 10묶음(30행)을 추출해 회신했고, 세션이 정확한 분수 계산으로 분류했다: ⓑ 표현 불일치 29행(9묶음)·ⓐ 산술 오류 0행·범위 밖 1행(근 선택 unique 위반·조건식 오기재). 결과·한계는 docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md. 한계: 분류기의 실데이터 동작은 미검증(합성 픽스처만), 고유 문제 3개."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "PR #1358(분류기 포함) 머지 후 Kiki가 런북을 실행하는 사람 행동 게이트 — 선행 태스크 없음"
@@ -623,12 +638,12 @@ gates:
     depends_on:
       - P3-17-week3-release-gate-judgment
   - id: G-kg02-review-promotion-llm-session
-    title: "KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md"
+    title: "KG-02 검수 승격 회차 — 보류 확정(2026-10-15 Kiki 결정: 사람 대상 내용 검토는 2026-12-31 이후로 미룬다 = 재판정 3택 중 ⓑ 보류 유지). 재판정 시점은 2027-01-01 이후(독촉 102일 = 요청일 2026-09-21 기준 2027-01-01 · 그 전에는 /gates·브리핑에 독촉으로 뜨지 않는다). 이 기간에 사람 서명 승격은 없으므로 학생 /study 공급은 CONT-05 fail-closed 그대로 reviewed 0건이라 개념 콘텐츠가 학생에게 나가지 않는다(의도된 상태). 입력 작업 CONT-05·CONT-06(역조회 · PR 1427)·CONT-08(연결 승인 게이트 · PR 1459) 모두 완료 — 재개 시 선행 작업은 없고 Kiki 서명 회차만 남는다. 재개 때 첫 대상 후보: 파일럿 학습목표가 가리키는 K-12 2행(10기수1-02-05 · HK11 이차함수의 최대·최소), 대학 409는 KG-05 재작성 후순위. 재개 전 확인: 운영 DB에서 학생 요청이 그 2행에 실제로 닿는지(CONT-06 실측은 저장소 코퍼스 기준이고 운영 DB는 미실측). 2026-09-25 정정 사실 3건 유지: ①승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명(LLM 검수 배치는 선별 보조) ②검색 표면 /v1/concepts/search는 atom_node를 읽어 승격에 무반응 — 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작. 이 결정이 닿지 않는 것: LLM 검수 배치 재측정(KG-08 대조군 추가 후 미실시)은 사람 대상이 아니므로 이 이월에 포함하지 않았다. 부수 영향: KG-05(대학 409 기계 패턴 수정)가 KG-02 task를 선행으로 걸고 있어 같은 기간 막힌다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md · docs/reviews/cont06_study_content_lookup_crosswalk_2026-10-02.md · docs/reviews/cont08_review_input_link_visibility_2026-10-03.md"
     kind: human
     assignee: kiki
     status: pending
     requested: 2026-09-21
-    remind_after_days: 35
+    remind_after_days: 102
     evidence: null
     cleared_by: null
     notes: ""
@@ -637,6 +652,7 @@ gates:
       - "[2026-09-25] title: \"KG-02 검수 승격 배치 실행 회차 (Phaiakes9 실 LLM) — concept_content 846건(K-12 437 + 대학 409)의 ai_estimated→reviewed 승격. 목적: KG-01 ③ 관측 축(/concepts/search reviewed_only=true)이 실제로 소비되는 상태를 만드는 것 — 현재 reviewed 행이 0이라 그 축은 배선만 있고 시험된 적이 없다. 배경(차단 사유 실측 2026-09-21): 이 컨테이너에는 backend용 LLM provider가 없다 — ANTHROPIC_API_KEY·OPENAI_API_KEY 부재, .env 부재(.env.prod.example만), Ollama 미설치·127.0.0.1:11434 연결 거부. acceptance ②가 재사용을 명시한 결함주입 강등전 인프라(S4-16)는 2026-08-14 로컬 Ollama 실측에서 전 모델 탈락해(qwen3.5:27b 타임아웃 115~300s/call · qwen2.5:7b 오검출 100% · qwen2-math:7b 검출 58%/오검출 67%) 그 자신이 blocked다. 따라서 재개 경로는 둘 중 하나뿐: ⓐ S4-16이 클라우드 provider로 강등전을 통과해 범용 게이트 패턴이 확정되거나 ⓑ 이 게이트가 Kiki 머신 실 LLM 세션으로 직접 열리거나. 판정 3택: ①보류 유지(기본값 — 이 게이트를 재생성해 감시 지속. KG-02는 blocked 유지) ②실행(Kiki 머신 회차를 연다 — 세션이 실행 전에 6항목 브리핑과 명령 블록을 안내하며, 그 시점에 검수 배치 CLI 경로가 실재하는지·Kiki 체크아웃에 도달했는지 먼저 실측 확인한다. 명령을 지금 적지 않는 이유: 세션이 KG-02를 claim하지 않아 대상 코드를 읽지 않았고, 읽지 않은 경로로 런북을 쓰는 것은 가정 기반 런북 금지에 해당한다) ③스코프 축소(846 전건 대신 K-12 437만, 또는 Wilson min-n 표본만 승격하고 나머지는 ai_estimated 유지). 주의 — AI 자기승인 금지(knowledge_module_gap_review.md 2-③ 협상 불가): 승격 권위는 사람 검수 경유 또는 결함 주입 강등전을 통과한 기계 게이트만이며, 세션이 자체 판단으로 review_status를 각인하는 경로는 어떤 경우에도 열지 않는다. 등재 이유: 재개 조건이 2026-08-11부터 41일간 notes 산문에만 있어 selector도 /gates 화면도 그것을 보지 못했다 — 만료·재확인 지점 없는 유예 상태(CLAUDE.md 만료 없는 유예·제외 금지). blocked 상태는 착수를 막지만 Kiki에게 '내 머신이 필요하다'는 사실을 전달하지 못한다.\" → \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 재판정 조건 = 입력 작업 CONT-05 완료. 등재 시점 전제 3건이 실측으로 바뀌었다(판정 기준 main 3a7a7315): ①재개 경로 ⓐ 소멸 — S4-16이 2026-09-25 기각(cancelled)돼 강등전을 통과한 기계 판정자가 생길 경로가 대장에 없다. review_gate.py 기준 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명이고, LLM 검수 배치(concept_content_review_batch · 로컬 qwen3:30b-a3b)는 선별 보조일 뿐 그 결과로 승격되는 행은 0이다. ②목적 표면 정정 — 등재 문면의 'KG-01 ③ 관측 축(/concepts/search reviewed_only=true)'은 이 승격으로 달성할 수 없다: search는 atom_node(2,683행 전부 ai_estimated 상수)를 읽고, 콘텐츠 846 code 가운데 검색 색인에 있는 것은 0건이다. 실측(로컬 PG16+pgvector, 실제 승격 CLI로 2건 주입): /v1/concepts/content?reviewed_only=true 0→2, /v1/concepts/search reviewed_only=true 0→0(양성 대조: 원자 1건을 reviewed로 바꾸면 1건 반환). ③학생 화면 무변화 — 학생 /study 공급(get_concept_dsl)은 review_status를 읽지 않아 ai_estimated 행도 공급된다(주입 확인). 그 노출 게이트를 판정·집행하는 작업이 CONT-05(이 게이트의 입력)다. 재판정 3택(CONT-05 완료 후): ⓐ공급이 reviewed만 통과시키게 됐다면 사람 검수 회차를 연다 — Kiki 서명·K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)·LLM 배치는 선택 보조 ⓑ공급이 ai_estimated를 허용하기로 했다면 승격은 내부 표면 표기뿐이므로 보류 유지 ⓒKG-02 범위 재설계. 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" · remind_after_days: 14 → 35 · depends_on +CONT-05-concept-content-supply-review-gate · no_inputs_reason: 'Kiki 머신 실 LLM 세션(사람 직접 행동) — 재개 경로 ⓐ의 S4-16은 cancelled라 경로 ⓑ만 남았고, 그 회차를 여는 태스크는 대장에 없다. 검수 배치 CLI의 실재는 게이트 본문 ②대로 실행 전에 실측한다' → None (입력 부착으로 해제) — 2026-09-25 Kiki 판정(보류+대장 정정) 집행 · 판정 기준 main 3a7a7315 — 재개 경로 ⓐ 소멸(S4-16 cancelled)·목적 표면 오지목·학생 공급 무게이트를 주입 실측으로 확인해 문면을 정정하고, 입력 작업 CONT-05를 부착한다(입력 없음 사유는 CLI가 자동 해제). 독촉은 P3 착수일 2026-10-26(35일)로 옮긴다 — HARN-124 재측정이 14일을 유지한 근거('지금 사람이 실행할 수 있는 대기 항목')가 이 판정으로 소멸했다"
       - "[2026-09-27] title: \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 재판정 조건 = 입력 작업 CONT-05 완료. 등재 시점 전제 3건이 실측으로 바뀌었다(판정 기준 main 3a7a7315): ①재개 경로 ⓐ 소멸 — S4-16이 2026-09-25 기각(cancelled)돼 강등전을 통과한 기계 판정자가 생길 경로가 대장에 없다. review_gate.py 기준 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명이고, LLM 검수 배치(concept_content_review_batch · 로컬 qwen3:30b-a3b)는 선별 보조일 뿐 그 결과로 승격되는 행은 0이다. ②목적 표면 정정 — 등재 문면의 'KG-01 ③ 관측 축(/concepts/search reviewed_only=true)'은 이 승격으로 달성할 수 없다: search는 atom_node(2,683행 전부 ai_estimated 상수)를 읽고, 콘텐츠 846 code 가운데 검색 색인에 있는 것은 0건이다. 실측(로컬 PG16+pgvector, 실제 승격 CLI로 2건 주입): /v1/concepts/content?reviewed_only=true 0→2, /v1/concepts/search reviewed_only=true 0→0(양성 대조: 원자 1건을 reviewed로 바꾸면 1건 반환). ③학생 화면 무변화 — 학생 /study 공급(get_concept_dsl)은 review_status를 읽지 않아 ai_estimated 행도 공급된다(주입 확인). 그 노출 게이트를 판정·집행하는 작업이 CONT-05(이 게이트의 입력)다. 재판정 3택(CONT-05 완료 후): ⓐ공급이 reviewed만 통과시키게 됐다면 사람 검수 회차를 연다 — Kiki 서명·K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)·LLM 배치는 선택 보조 ⓑ공급이 ai_estimated를 허용하기로 했다면 승격은 내부 표면 표기뿐이므로 보류 유지 ⓒKG-02 범위 재설계. 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" → \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" — 입력 작업 CONT-05 완료 결과 반영 — ⓐ 채택(승격이 유일한 공급 문)·도달 0(지금 승격해도 학생 화면 변화 0)·K-12 우선 순서 전제 재고. 게이트는 pending 유지(세션은 사람 게이트를 판정하지 않는다)"
       - "[2026-09-27] title: \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" → \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" — 직전 정정이 빠뜨린 참고 사실(LLM 1회차 리허설 강등·KG-08 대조군 후 재측정 없음) 복원"
+      - "[2026-10-15] title: \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" → 'KG-02 검수 승격 회차 — 보류 확정(2026-10-15 Kiki 결정: 사람 대상 내용 검토는 2026-12-31 이후로 미룬다 = 재판정 3택 중 ⓑ 보류 유지). 재판정 시점은 2027-01-01 이후(독촉 102일 = 요청일 2026-09-21 기준 2027-01-01 · 그 전에는 /gates·브리핑에 독촉으로 뜨지 않는다). 이 기간에 사람 서명 승격은 없으므로 학생 /study 공급은 CONT-05 fail-closed 그대로 reviewed 0건이라 개념 콘텐츠가 학생에게 나가지 않는다(의도된 상태). 입력 작업 CONT-05·CONT-06(역조회 · PR 1427)·CONT-08(연결 승인 게이트 · PR 1459) 모두 완료 — 재개 시 선행 작업은 없고 Kiki 서명 회차만 남는다. 재개 때 첫 대상 후보: 파일럿 학습목표가 가리키는 K-12 2행(10기수1-02-05 · HK11 이차함수의 최대·최소), 대학 409는 KG-05 재작성 후순위. 재개 전 확인: 운영 DB에서 학생 요청이 그 2행에 실제로 닿는지(CONT-06 실측은 저장소 코퍼스 기준이고 운영 DB는 미실측). 2026-09-25 정정 사실 3건 유지: ①승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명(LLM 검수 배치는 선별 보조) ②검색 표면 /v1/concepts/search는 atom_node를 읽어 승격에 무반응 — 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작. 이 결정이 닿지 않는 것: LLM 검수 배치 재측정(KG-08 대조군 추가 후 미실시)은 사람 대상이 아니므로 이 이월에 포함하지 않았다. 부수 영향: KG-05(대학 409 기계 패턴 수정)가 KG-02 task를 선행으로 걸고 있어 같은 기간 막힌다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md · docs/reviews/cont06_study_content_lookup_crosswalk_2026-10-02.md · docs/reviews/cont08_review_input_link_visibility_2026-10-03.md' · remind_after_days: 35 → 102 — 2026-10-15 Kiki 결정: 사람 대상 내용 검토는 2026-12-31 이후로 미룬다. 재판정 3택 중 ⓑ 보류 유지에 해당한다. 독촉 35일은 2026-10-26에 울려 결정과 어긋나므로 102일로 늘려 2027-01-01에 울리게 한다."
     depends_on:
       - CONT-05-concept-content-supply-review-gate
   - id: G-kiki-device-demo
@@ -700,12 +716,16 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-10-06
-    remind_after_days: 7
+    remind_after_days: 15
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-07] 2026-10-07 Kiki 재판정: 보류 유지. 사유 = 4지선다 귀속 타당 항목을 검증할 재료(student_wrong_thinking·distractor_rule·error_type)가 M0599에 없음. 의미상 매핑 방향은 타당. 승인 가능 조건 = MISC-61이 원 출처에서 세 필드를 보강(카탈로그 kebab 복사 금지 — 순환 검증). 기록 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md. prod DB M0599 행은 Kiki 확인 전 수정 금지."
+    notes: |-
+      [판정 근거 2026-10-07] 2026-10-07 Kiki 재판정: 보류 유지. 사유 = 4지선다 귀속 타당 항목을 검증할 재료(student_wrong_thinking·distractor_rule·error_type)가 M0599에 없음. 의미상 매핑 방향은 타당. 승인 가능 조건 = MISC-61이 원 출처에서 세 필드를 보강(카탈로그 kebab 복사 금지 — 순환 검증). 기록 docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md. prod DB M0599 행은 Kiki 확인 전 수정 금지.
+
+      [판정 근거 2026-10-14] [보류 유지 2026-10-14] Kiki 결정 A. 재판정은 MISC-61 머지 후 저작된 세 필드를 직접 읽고 진행. 승인 시 crosslinks.json 서명 적재 절차 별도 필요. 승인 메모에 저작 근거의 독립성 한계(M0599 canonical_statement와 J0405.misconception 동일 문장)를 남길 것. prod DB M0599 행은 Kiki 확인 전 수정 금지.
     corrections:
       - "[2026-10-07] depends_on +MISC-61-a3-thin-misid-source-enrichment · no_inputs_reason: '입력 태스크 없음 - M0599 보류 사유 확인과 승인/반려는 사람 판단이다(검수 큐 행 서명은 사람 전용)' → None (입력 부착으로 해제) · notes +295자 — Kiki 2026-10-07 보류 사유 기록·입력 태스크 연결"
+      - "[2026-10-14] remind_after_days: 7 → 15 · notes +220자 — 2026-10-14 Kiki 결정: 선택지 A 보류 유지 + 독촉 7일 연장(7→15일, 요청일 2026-10-06 기준 2026-10-21 독촉). 사유: MISC-61 저작 근거가 아직 main에 없고(브랜치 claude/peaceful-bell-s7mlg8 미머지), J0405 동일 뿌리라 독립 검증 근거가 약함."
     depends_on:
       - MISC-61-a3-thin-misid-source-enrichment
   - id: G-misc40-deferred-m0671-redecision
@@ -862,15 +882,28 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "Kiki의 공급원 선택(ghcr 미러 / Docker Hub 로그인 pull / 감수)이며 먼저 끝나야 할 태스크가 없다. 구현 태스크 OPS-135가 이 게이트를 기다린다."
+  - id: G-ops141-wh1-timeout-live-decompose
+    title: "OPS-141 WH-1 primary 시간 초과 소요 분해 실측 실행 — docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md 를 Phaiakes9 에서 §1~§8 순서로 실행하고 §8 요약 출력 전체(R1~R5 각 EXIT 줄·계측 대조·프로바이더 호출 실패 경고 유무 포함)를 세션에 전달. 도구 PR 머지 후에만 실행 가능(§1 이 origin/main 에 도구가 있는지 확인). 기본 타임아웃 15초는 이 게이트에서 바꾸지 않는다 — 값 판정은 승계 태스크가 한다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-14
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-141-wh1-primary-timeout-live-decomposition
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-09
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "2026-10-15 Kiki가 Phaiakes9(Windows PowerShell)에서 docs/ops/ops30_uptime_probe_runbook.md [A]~[E]를 실행했다. 판정 기준: OPS-30 PR #1577 · 커밋 d2df5f5e (origin/main 56f4ace3에 포함 · 런북의 두 모듈 main 실재 확인). [A] PROBE_READY=True (IN_MAIN=True SAME_AS_MAIN=True MODULE_IMPORTS=True PYTHONW_EXISTS=True). [B] 웹훅 URL을 User 환경변수에 저장 WEBHOOK_SAVED=True READBACK_LENGTH=81 (URL 값은 어디에도 기록하지 않음). [C] test-notify TEST_NOTIFY_EXIT=0 + Slack 채널에서 '알림 채널 시험' 메시지 육안 확인(15:12). [D] 일반 창은 REGISTER_REFUSED=True(관리자 아님 - 의도된 거부), 관리자 창에서 TASK_REGISTERED=True TASK_STATE=Ready TASK_INTERVAL=PT1M 작업명 WhyMath-UptimeProbe. [E] LOG_EXISTS=True LAST_RECORD_AGE_S=55(<120) LAST_CHANNEL=configured, 서버가 꺼져 있어 LAST_OK=False LAST_ERROR=ConnectError, TASK_LAST_RESULT=1(다운 시 종료코드 1 - 소스 main() 확인). 기록 8건 중 notice 1건: 2026-10-15T06:14:11Z ok=False notice=down:sent unsent=없음 (상태 전이 때만 발송 - 이후 7건은 조용). Slack 채널에서 '[WhyMath] 서버 다운 감지 - 2026-10-15T06:14:11Z /health/ready 사유=ConnectError' 메시지 육안 확인(15:14) = 마지막 1홉 도달. 미확인(명시): 서버를 켠 상태의 LAST_OK=True와 '서버 복구' 알림은 이 실행에서 보지 않았다 - 코드 쪽 양방향(kill -9 다운/복구) 실측은 PR #1577 증적에만 있다. 한계: 프로브가 서버와 같은 PC에서 돌아 PC 정지 시간은 기록 없음(INSUFFICIENT)으로 남는다."
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:
@@ -1127,11 +1160,16 @@ gates:
     title: "Freeze 라벨 2종 생성 + release-freeze 체크를 룰셋 required에 등록 (Kiki 저장소 설정, 11/30 전)"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-08
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: |-
+      판정 기준: main 56f4ace3 (2026-10-15). 저장소 설정은 커밋이 아니라 라이브 상태이므로 Kiki 실행 출력 + 세션 독립 재조회로 근거를 둔다.
+      (1) Kiki 실행(Phaiakes9 PowerShell): gh label create 2건 성공(release-blocker, code-freeze-approved), gh label list 필터 출력에 두 이름 모두 확인.
+      (2) Kiki 실행: 룰셋 16623542에 release-freeze 체크 추가 후 rules/branches/main 응답에서 release-freeze 검색 -> True (등록 전 세션 조회는 포함 False).
+      (3) 세션 독립 재조회(GitHub API): 라벨 2종 실재. required_status_checks 17건 -> 18건, 신규 항목 context=release-freeze — Feature/Code Freeze 라벨 검사, integration_id=15368(GitHub Actions).
+      미해결 후속: 문서 required 목록(.github/branch-protection-setup.md 17건)과 test_required_checks_doc.py(ci.yml만 대조)가 아직 release-freeze를 모른다 - 라이브 18 vs 문서 17 드리프트 상태.
+    cleared_by: claude
     notes: ""
     corrections: []
     depends_on:

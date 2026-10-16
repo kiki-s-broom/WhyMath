@@ -88,6 +88,7 @@ Concept Completeness 를 필드 채움으로 만들지 않은 이유 (acceptance
 ────────────────────────────────────────────────────────────────────────────
     python -m whymath_backend.ops.phase3_metrics                       # 실 코퍼스 + DB(⑤)
     python -m whymath_backend.ops.phase3_metrics --no-db --json out/p3_metrics.json
+    python -m whymath_backend.ops.phase3_metrics --hints-from-db       # ② 힌트 연결을 DB 에서
     python -m whymath_backend.ops.phase3_metrics --self-check          # CI 게이트(결정론)
     # 숫자 주입(측정이 아니다 — 표본 기준을 반드시 명시해야 한다):
     python -m whymath_backend.ops.phase3_metrics --no-db --sample-basis synthetic \\
@@ -485,9 +486,18 @@ def _load_qa_records(root: Path, eligible_ids: frozenset[str]) -> tuple[dict[str
 
 
 def load_world(
-    spec_path: Path | None = None, repo_root: Path | None = None
+    spec_path: Path | None = None,
+    repo_root: Path | None = None,
+    *,
+    hints_from_db: bool = False,
 ) -> World | WorldFailure:
-    """명세 → 참조 색인 → 명세 무결성 → 코퍼스 → ④ 원본 행. 어느 단계든 실패하면 `WorldFailure`."""
+    """명세 → 참조 색인 → 명세 무결성 → (힌트) → 코퍼스 → ④ 원본 행. 실패하면 `WorldFailure`.
+
+    `hints_from_db` 가 참이면 DB `hints.verified` 의 문항 집합을 읽어 코퍼스의 `hint_problem_ids` 로
+    넣는다(P3-41 · `phase3_coverage --hints-from-db` 와 같은 읽기 경로). 거짓이면 힌트 입력은
+    `None`(측정 불가)이다 — 빈 집합으로 채우지 않는다. 못 읽으면 `hint_source` 단계 실패이며
+    측정 불가로 조용히 내려가지 않는다.
+    """
     root = repo_root or _repo_root()
     spec: ScopeSpec | None = None
     stage = "spec"
@@ -506,8 +516,13 @@ def load_world(
                 + " | ".join(violations[:5]),
                 spec,
             )
+        hint_ids: frozenset[str] | None = None
+        if hints_from_db:
+            # 코퍼스(약 20초)를 읽기 전에 먼저 — DB 가 죽었으면 빨리 실패한다.
+            stage = "hint_source"
+            hint_ids = p3c.read_hint_problem_ids_from_db()
         stage = "corpus"
-        corpus = p3c.load_corpus(spec, root)
+        corpus = p3c.load_corpus(spec, root, hint_problem_ids=hint_ids)
         stage = "qa_records"
         eligible = [p for p in corpus.problems if p.review_status == p3c.PROBLEM_ELIGIBLE_STATUS]
         records = _load_qa_records(root, frozenset(p.problem_id for p in eligible))
@@ -560,6 +575,15 @@ def _from_p3c_metric(
     )
 
 
+def _hint_seat_line(seat: p3c.HintSeatStats | None) -> str:
+    if seat is None:
+        return "없음(측정 불가) — --hints-from-db 로 읽는다"
+    return (
+        f"DB 검수 통과 {seat.hinted_problems}문항 → 범위 은행 {seat.in_scope_bank}"
+        f" · 적격 {seat.eligible_hinted} · 범위 밖/ID 불일치 {seat.outside_scope}"
+    )
+
+
 def _completeness_outcome(report: p3c.CoverageReport, spec: ScopeSpec, scope: str) -> MetricOutcome:
     """② — 측정 불가 연결(힌트 등)이 남은 개념은 '충족도 미달도 아닌' 구간으로 다룬다.
 
@@ -577,8 +601,16 @@ def _completeness_outcome(report: p3c.CoverageReport, spec: ScopeSpec, scope: st
         ("완전 연결 확정", f"{c}/{n}"),
         ("미달이 확정되지 않은 개념(측정 불가 연결만 남음)", f"{possible - c}/{n}"),
         ("측정 불가 연결", ", ".join(names) or "없음"),
+        ("힌트 입력", _hint_seat_line(report.hint_seat)),
     )
     note = result.note or ""
+    seat = report.hint_seat
+    if seat is not None and seat.hinted_problems and not seat.in_scope_bank:
+        # 힌트 연결 0 이 '힌트 없음'이 아니라 ID 공간 불일치일 수 있다 — 숫자만 보고 오독하지 않게.
+        note += (
+            f" DB 의 검수 통과 힌트 {seat.hinted_problems}문항 중 명세 범위 은행 문항과 ID 가 "
+            "겹치는 것이 0건이다(범위 밖이거나 DB problem 과 JSONL 은행의 ID 공간 불일치)."
+        )
     if n > 0 and target.value is not None and possible > c:
         if judge_ratio(c / n, target.value):
             note += " 측정 불가 연결이 있으나 확정 충족분만으로 목표를 충족한다."
@@ -1714,6 +1746,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="⑤ 수집 타임아웃"
     )
     parser.add_argument("--no-db", action="store_true", help="⑤ DB 수집을 건너뛴다")
+    parser.add_argument(
+        "--hints-from-db",
+        action="store_true",
+        help=(
+            "② DB hints(verified=true)에서 힌트 연결 입력을 읽는다. 주지 않으면 힌트는 측정 "
+            "불가다. 못 읽으면 exit 2(--no-db 와 독립 — 이 플래그는 ⑤ 가 아니라 ② 의 입력이다)."
+        ),
+    )
     parser.add_argument("--input", dest="input_path", default=None, help="⑤ 관측치 JSON(주입)")
     parser.add_argument(
         "--hard-gate-input",
@@ -1818,6 +1858,8 @@ def _run(argv: list[str] | None) -> int:
 
     if args.self_check:
         bad = [n for n in _SELF_CHECK_INCOMPATIBLE if getattr(args, n) is not None]
+        if args.hints_from_db:  # store_true 라 `is not None` 검사에 걸리지 않는다
+            bad.append("hints_from_db")
         if bad or args.no_db:
             print(
                 "[phase3_metrics] --self-check 는 측정 옵션과 함께 쓸 수 없다"
@@ -1902,7 +1944,11 @@ def _run(argv: list[str] | None) -> int:
             evidence.record(kpi=None, phase="input_error", ok=False, error_type="InputUnreadable")
             return EXIT_RUNTIME_ERROR
 
-    world = load_world(args.spec)
+    # 플래그가 없을 때는 종전 호출 형태 그대로 — 힌트 입력은 None(측정 불가)으로 남는다.
+    if args.hints_from_db:
+        world = load_world(args.spec, hints_from_db=True)
+    else:
+        world = load_world(args.spec)
     if isinstance(world, WorldFailure):
         evidence.record(
             kpi=None,

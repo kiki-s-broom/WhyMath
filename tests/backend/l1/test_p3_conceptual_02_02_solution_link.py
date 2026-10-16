@@ -151,7 +151,8 @@ def _tmp_root(tmp_path: Path, *, strip_steps: bool) -> Path:
     root = tmp_path / ("nosteps" if strip_steps else "committed")
     (root / "data" / "corpus").mkdir(parents=True)
     for entry in _CORPUS.iterdir():
-        if entry.name != _BANK_NAME:
+        # P3-05 빈 칸 채우기 은행(승인)도 02-02 문항을 더하므로, 이 은행 하나의 효과를 보려면 뺀다.
+        if entry.name not in (_BANK_NAME, "problem_bank_p3_fill_v0"):
             (root / "data" / "corpus" / entry.name).symlink_to(entry)
     bank = root / "data" / "corpus" / _BANK_NAME
     bank.mkdir()

@@ -475,6 +475,15 @@ CATALOG: tuple[Spec, ...] = (
        "GET /concept-proposals", "POST /concept-proposals",
        "POST /concept-proposals/{code}/drafts", "DELETE /concepts/{concept_id}",
        "POST /edges", "DELETE /edges/{edge_id}"),
+    _s("WM-S-058", "관리자 CMS — 문항 판 발행 호출 표면(초안·제출·검토·승인·발행·내리기)", "Admin",
+       "Versioning", "P1",
+       "EOS-194 — `l3.problem_publish_gate`(EOS-190)의 운영 호출자. 초안은 항상 지금 라이브 문항의 "
+       "스냅숏이고(내용을 호출자가 정하는 입구 없음), 전이는 권한(편집·검수·배포)을 DB 접근 전에 "
+       "검사하며 전이 1건마다 감사 1행을 남긴다. 발행 포인터 전환이 시도 버전 고정(EOS-47)이 읽는 "
+       "값이다 · 롤백은 없다(EOS-196)",
+       "admin_cms_problem_versions",
+       "POST /problems/{problem_id}/drafts", "GET /problems/{problem_id}/versions",
+       "GET /problem-versions/{version_id}", "POST /problem-versions/{version_id}/transitions"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -589,7 +598,9 @@ CATALOG: tuple[Spec, ...] = (
        "Platform", "Curriculum", "P0", "B1·F1 앵커 성취기준 코드셋",
        "l1.standards.alignment_query", "l1.standards.anchor_registry",
        "l1.standards.criteria_loader", "l1.standards.learning_map",
-       "l1.standards.phase3_coverage", "l1.standards.phase3_scope", "l1.standards.populate",
+       "l1.standards.phase3_coverage", "l1.standards.phase3_scope",
+       "l1.standards.phase3_slot_rules", "l1.standards.phase3_stem_fold",
+       "l1.standards.populate",
        "l1.standards.standard_loader",
        pipelines=("ncic", "standards_university")),
     _e("WM-E-107", "오개념 카탈로그·크로스링크 적재·승인 게이트", "Platform", "Pedagogy", "P0",
@@ -791,8 +802,9 @@ CATALOG: tuple[Spec, ...] = (
        "Versioning", "P1",
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
        "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5). EOS-190 — 문항 판 writer(`l3."
-       "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이나 **운영 호출자"
-       "가 아직 없다**(호출 표면은 후속 태스크) · 시도 버전 고정(EOS-47)만 포인터를 읽는다 · "
+       "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이고 운영 호출자"
+       "는 EOS-194의 관리자 CMS 문항 판 표면(WM-S-058)이다 · 시도 버전 고정(EOS-47)만 포인터를 "
+       "읽는다 · "
        "P3-04 — PUBLISH 게이트가 Problem 필수 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 "
        "전략)를 요구한다(`l3.problem_metadata_evidence`가 DB에서 증거를 읽는다 · 정의는 "
        "`schema.problem_metadata`)",
@@ -886,7 +898,14 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator",
        "l3.equivalent.p3_diff_graph_shape_skeleton_generator",
        "l3.equivalent.p3_diff_equation_application_skeleton_generator",
-       "l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator"),
+       "l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator",
+       # P3-05 4·5단계 — 빈 칸 채우기 은행의 개념별 생성기(담당 슬롯만 선언하는 부분집합 생성기).
+       "l3.equivalent.p3_diff_differential_coefficient_skeleton_generator",
+       "l3.equivalent.p3_diff_differentiability_skeleton_generator",
+       "l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator",
+       # P3-05 5단계 — 스킬 덮기(규칙 일반화 · 문장제 모델링) 생성기.
+       "l3.equivalent.p3_diff_power_pattern_skeleton_generator",
+       "l3.equivalent.p3_diff_motion_word_problem_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",
@@ -1205,6 +1224,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.sequence_sigma_batch", "harness.university_calc1_batch",
        "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
        "harness.p3_calculus1_diff_batch",
+       "harness.problem_slot_backfill", "harness.p3_fill_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",

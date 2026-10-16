@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-147-worklist-out-aliases-review-queue-store
+title: "problem_corpus_accumulate: --worklist-out이 검수 큐 정본(<out>.review.jsonl)과 같은 경로여도 통과 — 회차 끝 마크다운 뷰가 JSONL 정본을 덮어씀(EOS-121 사고)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 가드 — 인자 해석 직후·첫 LLM 호출 전에 `--worklist-out`의 해석 경로(절대화·`..` 정규화·Windows 대소문자 무시·samefile 동치)가 큐 정본 `default_review_queue_path(args.out)`와 같으면 exit 2로 거부하고 두 경로를 사유에 쓴다. 거부 시 어떤 파일도 쓰지 않는다(정본에 한 줄도 append되기 전)."
+  - "② 실패 주입 — 가드를 끄면 같은 경로 테스트가 RED가 되는 것을 확인한다(뮤테이션은 `mutated != original` 단언·원복 바이트 동일 단언 포함). 대조군 필수: 기본 워크리스트 경로(`<out>.worklist.md`)와 다른 이름의 `--worklist-out`은 통과한다(과잉 차단 금지). 상대/절대 경로 동치와 대소문자 변형 픽스처를 각각 둔다."
+  - "③ 같은 결함의 전수 확인 — `problem_corpus_batch --worklist-out`은 큐 정본 사이드카가 없는 회차 메모리 뷰라 같은 덮어쓰기가 불가능함을 코드로 확인해 기록한다. `--worklist-out`을 쓰는 다른 런북·스크립트(저장소 전수 grep)에서 `.review.jsonl` 경로를 뷰에 지정한 곳이 있으면 같은 PR에서 정정한다."
+  - "④ 런북 정정 — `docs/ops/eos121_seat_generation_diversity_runbook.md`의 `--worklist-out`(두 좌석 두 곳)을 마크다운 확장자 경로(`.review.md`)로 바꾸고, 회차 직후 정본이 JSONL로 남았는지 보는 자가검증 스텝(첫 비공백 문자가 `{`)을 동봉한다. 그 스텝은 정본이 덮어쓰인 상태에서 실제로 실패 신호를 내는지 확인된 것만 쓴다. `docs/ops/eos23_rejected_quad_sum_classification_runbook.md` §8의 \"입력 매체\" 서술도 정정한다."
+  - "⑤ 피해 범위 고정 — EOS-121 회차(`6ea0b38ab0f840e5b70bae6b1ba7dd77`)에서 anthropic·openrouter 좌석(및 run1-topp·pilot)의 큐 정본 JSONL이 마크다운 뷰로 바뀌었다. 현존 자산으로 복원 가능한 것(수용 행 = `<seat>.jsonl`, 회차 대장 = `<seat>.rounds.jsonl`, 호출 메타 = `<seat>.genlog.jsonl`)과 불가능한 것(비수용 후보의 구조화 payload — 뷰의 문항·정답·해설·검산 조건 요약만 남음)을 이 태스크 notes에 고정한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - tests/backend/harness/test_worklist_out_queue_alias_guard.py
+  - docs/ops/eos121_seat_generation_diversity_runbook.md
+  - docs/ops/eos23_rejected_quad_sum_classification_runbook.md
+session: null
+notes: "등재 경위(2026-10-15): 게이트 G-eos23-rejected-quad-sum-classification 실행 중 Kiki 머신의 anthropic.review.jsonl이 JSONL이 아니라 마크다운 뷰임이 드러났다(분류기 CLASSIFY_EXIT=2 · 257줄 전건 JSONDecodeError). 원인 = EOS-121 런북이 --out anthropic.jsonl과 --worklist-out anthropic.review.jsonl을 같은 경로로 지정(큐 정본 기본 경로 = <out>.review.jsonl)해, 회차 끝 worklist_path.write_text(problem_corpus_accumulate.py)가 정본을 덮어씀. 코드에는 두 경로의 동치를 막는 장치가 없었다. 분류 결과와 한계는 docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md. 정본 소실로 EOS-23 ③은 분류기 대신 뷰 기반 수작업 분류로 판정됐다 — 향후 회차에서 같은 일이 없도록 이 태스크가 코드로 막는다."
+updated: 2026-10-15
