@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-16 (판정·G-misc40-deferred-m0599-redecision): **Kiki가 M0599 보류를 승인으로 재판정했다 — 승인 코퍼스에 직접매핑 0.9로 복귀(68→69건), 앵커 A3 좌석 0→1. 세 필드는 AI 저작인 채로 승인됐고 원 출처 근거는 아니다**
+
+**무엇**: 게이트 `G-misc40-deferred-m0599-redecision`(2026-10-06 요청·10일 경과)에 Kiki가 "M0599 승인"을 지시했다. 판정 재료는 PR #1643(main `8d21c4cc`)이 들여온 `M0599`의 AI 저작 세 필드(`student_wrong_thinking`·`distractor_rule`·`error_type`, 표기 `AI생성-검수필요(MISC-61)`)다. 정본 기록 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §4.
+
+**반영**: `data/corpus/misconception_crosslinks_v1/crosslinks.json`에 `addition-multiplication-rule-confused` ↔ `M0599` 직접매핑 0.9(method manual, note 끝 `검수:kiki 2026-10-16`)를 되돌리고 `_provenance.json`(counts 69·서명 1건·source_of_truth)을 맞췄다. 동결 테스트 2종(`test_approved_crosslinks_corpus`·`test_anchor_seat_gap`)을 새 기대값으로 고쳤다 — 건수 69, A3 좌석 1. 보류 전용 테스트(`test_misc40_deferred_rows_are_not_in_the_approved_corpus`)는 보류 대상이 0건이 되어 공허 통과가 되므로 삭제했다.
+
+**한계(사실 기록)**: ①"원 출처에서 채워지면 재판정"(10-07 보류 조건)은 충족되지 않았다 — 원천이 공란임이 10-09에 확정됐고, 승인은 AI 저작 재료를 인정한 Kiki의 판단이다. 이 사실을 crosslink `note`에 남겼고(`원 출처 근거는 없음`), 지워지면 RED가 되게 동결했다. ②저작 근거 `J0405.misconception`과 `M0599.canonical_statement`가 같은 문장이라 근거의 독립성은 약하다. ③Kiki 머신 prod DB에는 10-06 조회 기준 이 행이 이미 있다(stamp `2026-10-05`). DB는 건드리지 않았고 코퍼스와의 note 차이(10-05↔10-16)는 별도 동기화 몫이다. ④검수 큐 원본(`docs/data/misconception_crosslink_review_queue.json`)은 봉인 유지(전행 pending). ⑤**게이트는 닫지 못했다** — `gates clear`가 `depends_on`의 `MISC-61`(in_progress)을 이유로 exit 1로 거부했다. 거부는 우회하지 않았고(`--remove-depends`·`waive`는 Kiki 판단 사항), 게이트는 pending 그대로다.
+
+**검증**: 관련 테스트 143 passed(crosslink 코퍼스·앵커 좌석·canonical flip 계약·강등전·검수·MISC-61 저작·카탈로그). 주입 2종 — note의 AI 저작 고지 삭제 → RED, M0599 신뢰도 0.9→0.8 → RED — 후 `cmp` 바이트 동일 원복.
+
 ### 2026-10-12 (구현·MISC-61 1차): **A3 얇은 M-id 중 M0599·M0600을 개념 코퍼스(J0405·J0406 수기 검수)에 근거해 AI 저작하고, 추출기가 값을 버릴 때 키 이름을 경고하게 했다 — M0418·M0417은 원천 `오개념_원인`의 내용을 보기 전에는 채우지 않는다**
 
 **무엇**: 태스크 `MISC-61-a3-thin-misid-source-enrichment`(**미완 · in_progress**). 정본 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §2-c. 판정 기준: main `f34d7b76` 위 브랜치 `claude/peaceful-bell-s7mlg8` — **미머지**(PR 없음 · 사유: 미완 + Kiki 2차 실행 대기).
