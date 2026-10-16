@@ -1,0 +1,7 @@
+[사슬] 02-05 현행: 스킬 ('skill.equation-rearrangement', 'skill.graph-sketching') · 승인 문항 72 · 스킬연결 33 · 사슬 0 · 핵심 오개념 ('M0673',)
+  본 설계 (approved·PRIMARY·solve-for-unknown·M0673): 사슬 문항 48 (이 틀 48건)
+  대조 (c): evaluate-expression 유형: 사슬 문항 0 (이 틀 0건)
+  대조 (d): 오개념 M0671(02-03 핵심)로 라벨: 사슬 문항 0 (이 틀 0건)
+  대조 (a): review_status 미승인: 사슬 문항 0 (이 틀 0건)
+  대조 (b): PRIMARY 아님: 사슬 문항 0 (이 틀 0건)
+[사슬 판정] PASS
