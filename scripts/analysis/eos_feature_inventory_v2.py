@@ -902,7 +902,10 @@ CATALOG: tuple[Spec, ...] = (
        # P3-05 4·5단계 — 빈 칸 채우기 은행의 개념별 생성기(담당 슬롯만 선언하는 부분집합 생성기).
        "l3.equivalent.p3_diff_differential_coefficient_skeleton_generator",
        "l3.equivalent.p3_diff_differentiability_skeleton_generator",
-       "l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator"),
+       "l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator",
+       # P3-05 5단계 — 스킬 덮기(규칙 일반화 · 문장제 모델링) 생성기.
+       "l3.equivalent.p3_diff_power_pattern_skeleton_generator",
+       "l3.equivalent.p3_diff_motion_word_problem_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",

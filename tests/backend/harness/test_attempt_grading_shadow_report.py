@@ -905,7 +905,9 @@ class TestCorpusVerifyBlockSupply:
         # 13,865 → 13,925(+60): P3-05 4단계 두 번째 조각이 02-02 미분가능성 5슬롯 × 12건을 더했다(같은 형태).
         # 13,925 → 13,949(+24): 02-07 증가·감소 4슬롯 × 12건 가운데 문자열 조건 1개 + answer_map인
         # 24건만 로더가 읽는다(나머지 24건은 극값의 값·미지 상수형이라 연립 목록 조건 — 로더가 건너뛴다).
-        assert len(blocks) == 13949
+        # 13,949 → 13,987(+38): 5단계 02-03 규칙 일반화 24건(전부 문자열 조건 1개)과 02-10 문장제 24건 가운데
+        # 단일 조건 14건만 로더가 읽는다(02-10의 방향 전환 시각·값형 10건은 연립 목록 조건이라 건너뛴다).
+        assert len(blocks) == 13987
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1138,7 +1140,8 @@ class TestCorpusCeilingReportDiscriminates:
 
         report = build_gradability_ceiling_report(problems)
         # 14,034 + P3-03 미분 은행 504(144 + 360) + P3-05 빈 칸 채우기 은행 156(48 + 60 + 48)
-        assert report.total_problems == 14694
+        # 14,694 → 14,742: 5단계 02-03·02-10 각 24건.
+        assert report.total_problems == 14742
         assert report.bucket_counts["condition_formal_derivable"] > 0
         # 12,268 → 12,373(+105): P3-03 미분 은행 144건 중 객관식 24건은 `selectable_exact_match`로,
         # 문자열 검산 조건을 가진 비객관식 105건이 이 버킷으로 들어왔다(연립 목록 조건 15건은 제외).
@@ -1152,4 +1155,5 @@ class TestCorpusCeilingReportDiscriminates:
         # 12,513 → 12,561(+48): P3-05 4단계 빈 칸 채우기 은행(전부 형식적으로 유도 가능한 단답형 조건).
         # 12,561 → 12,621(+60): 02-02 미분가능성 5슬롯 × 12건도 전부 같은 형태.
         # 12,621 → 12,645(+24): 02-07 중 문자열 조건 24건(연립 목록 조건 24건은 이 버킷이 아니다).
-        assert report.bucket_counts["condition_formal_derivable"] == 12645
+        # 12,645 → 12,683(+38): 5단계 중 문자열 조건 38건(위 블록 +38과 같은 사유).
+        assert report.bucket_counts["condition_formal_derivable"] == 12683

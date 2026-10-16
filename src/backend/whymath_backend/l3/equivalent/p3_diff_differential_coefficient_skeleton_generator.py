@@ -287,7 +287,7 @@ def _basic_frames() -> list[Frame]:
             slot="basic",
             frame_id="basic-differential-coefficient",
             text=(
-                f"함수 f(x) = {render_poly(poly)}에서 x = {a}에서의 미분계수 "
+                f"함수 f(x) = {render_poly(poly)}에 대하여 x = {a}에서의 미분계수 "
                 f"f'({a})의 값을 구하시오."
             ),
             poly=poly,

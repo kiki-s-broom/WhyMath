@@ -681,3 +681,97 @@ def test_bank_sheets_input_errors(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert qual.main(["bank-sheets", "--manifest", str(manifest)]) == 2  # --out-dir 없음
     assert not out.exists() and not manifest.exists()  # 입력 오류에서 아무것도 쓰지 않는다
     assert "입력 오류" in capsys.readouterr().err
+
+
+# ── 빈 칸 채우기 은행(P3-05) — 같은 프로토콜을 다른 은행에 쓰는 일반화 ─────────────
+_FILL_BANK = _ROOT / "data" / "corpus" / "problem_bank_p3_fill_v0" / "problems.jsonl"
+
+
+def _fill_rows() -> list[dict[str, Any]]:
+    return [json.loads(line) for line in _FILL_BANK.read_text("utf-8").splitlines() if line]
+
+
+def test_generator_is_resolved_by_unit_code_not_by_standard_code() -> None:
+    """02-03·02-10은 승인 은행(P3-03)과 빈 칸 채우기 은행에 생성기가 하나씩이다 — 단위 코드가 가른다."""
+    rows = _fill_rows()
+    assert rows
+    for row in rows:
+        assert qual._generator_for(row).unit_code == row["unit_codes"][0]
+    pattern = next(r for r in rows if r["unit_codes"][0] == "P3-CALC1-DIFF-POWER-PATTERN")
+    assert qual._generator_for(pattern).__name__ == "P3DiffPowerPatternGenerator"
+    # 시험지 레코드에는 단위 코드가 없다 — 성취기준 코드로 P3-03 생성기를 찾는 종전 동작을 지킨다.
+    blind = {k: v for k, v in pattern.items() if k != "unit_codes"}
+    assert qual._generator_for(blind).__name__ == "P3DiffPowerDerivativeGenerator"
+    unknown = {"unit_codes": ["NO-SUCH-UNIT"], "achievement_standard_codes": ["[없음]"]}
+    assert qual._generator_for(unknown) is None
+
+
+def test_machine_gates_pass_every_row_of_the_fill_bank() -> None:
+    """빈 칸 채우기 은행 204건에 기계 게이트 전부가 결함을 걸지 않는다(회귀 동결 — 1회차 감사 전 정리)."""
+    flagged = [
+        (row["problem_id"], qual.machine_label(row, row["problem_id"])["reasons"])
+        for row in _fill_rows()
+        if qual.machine_label(row, row["problem_id"])["verdict"] != "ok"
+    ]
+    assert flagged == [], flagged[:3]
+
+
+def test_machine_label_rejects_an_unknown_unit_and_slot() -> None:
+    row = dict(_fill_rows()[0])
+    row["unit_codes"] = ["NO-SUCH-UNIT"]
+    row["achievement_standard_codes"] = ["[없음]"]
+    with pytest.raises(qual.QualificationInputError, match="알 수 없는 개념·슬롯"):
+        qual.machine_label(row, "x")
+
+
+def test_bank_sheets_take_an_explicit_size_task_and_label() -> None:
+    sheets = qual.build_bank_sheets(
+        _FILL_BANK,
+        qual.BANK_AUDIT_SEED,
+        4,
+        expected_size=204,
+        task="P3-05-triangle-density",
+        bank_label="data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
+    )
+    shards = [[json.loads(line) for line in text.splitlines()] for text in sheets.shards]
+    assert [len(s) for s in shards] == [51] * 4
+    ids = [r["item_id"] for s in shards for r in s]
+    assert len(ids) == len(set(ids)) == 204
+    manifest = json.loads(sheets.manifest)
+    assert manifest["task"] == "P3-05-triangle-density"
+    assert manifest["bank"] == "data/corpus/problem_bank_p3_fill_v0/problems.jsonl"
+    assert manifest["n_items"] == 204 and manifest["shard_size"] == 51
+    with pytest.raises(qual.QualificationInputError, match="기준 504건"):
+        qual.build_bank_sheets(_FILL_BANK, qual.BANK_AUDIT_SEED, 4)  # 기본 기준은 P3-03 은행 504건
+    default = json.loads(qual.build_bank_sheets(_BANK, qual.BANK_AUDIT_SEED, 8).manifest)
+    assert default["task"] == "P3-03-coverage-fill"
+    assert default["bank"] == "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl"
+
+
+def test_s5_takes_an_explicit_bank_size_and_label(tmp_path: Path) -> None:
+    """204건 은행에서는 k = 0만 통과한다(0.0191 ≤ 0.02, k = 1은 0.0281) — 규칙 자체는 코드가 계산한다."""
+    ids = [r["problem_id"] for r in _fill_rows()]
+    good = _qualification(tmp_path / "q.json", passed=True)
+
+    def run(defects: set[str]) -> int:
+        machine = _bank_labels(tmp_path / "m.jsonl", ids, set())
+        a = _bank_labels(tmp_path / "a.jsonl", ids, defects)
+        b = _bank_labels(tmp_path / "b.jsonl", ids, set())
+        return qual.main(
+            [
+                "s5",
+                "--bank", str(_FILL_BANK),
+                "--machine", str(machine),
+                "--llm", str(a),
+                "--llm", str(b),
+                "--qualification", str(good),
+                "--expected-size", "204",
+                "--label", "P3-05 빈 칸 채우기 은행",
+            ]
+        )  # fmt: skip
+
+    assert run(set()) == 0
+    assert run({ids[0]}) == 1
+    assert (
+        qual.main(["s5", "--bank", str(_FILL_BANK), "--machine", "x", "--qualification", "y"]) == 2
+    )

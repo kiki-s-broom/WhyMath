@@ -40,7 +40,6 @@ from whymath_backend.l3.equivalent.p3_diff_graph_shape_skeleton_generator import
     _find_b_cubic_frame,
     _find_b_quartic_frame,
     _find_k_other_root_frame,
-    _flat_judged_frame,
     _flat_x_frame,
     _quartic_asym_x_frame,
     _quartic_k_frame,
@@ -192,11 +191,12 @@ def _diagnostic_frames() -> list[Frame]:
             role="turn",
             pick=None,
         ),
-        _flat_judged_frame(
-            "diag-extremum-value-among-critical-points",
-            "사차함수 f(x) = {f}에 대하여 방정식 f'(x) = 0의 실근은 {pins}이다. f(x)의 극값을 "
-            "구하시오.",
+        _cubic_frame(
+            "diag-increase-to-decrease-x",
+            "함수 f(x) = {f}{ga} 증가하다가 감소로 바뀌는 점의 x의 값을 구하시오.",
             f"{_SEED}:dia3",
+            role="max",
+            pick=None,
             slot=slot,
         ),
         _cubic_interval_frame(
