@@ -197,9 +197,9 @@ $ReachExit = $LASTEXITCODE
 "REACH_EXIT=$ReachExit"
 $Out = Join-Path $env:TEMP "p3_42"
 $Probe = Join-Path $Out "p3_42_probe.py"
-$ProbeRef = "origin/claude/nifty-meitner-ow1c7c"
+$ProbeRef = "origin/main"
 $ProbeSha = "a9a9bbf165b57466f7eda19d96fa231200d6a6836d8f85bc677649896da3de88"
-if ($Py -and (Test-Path $Py)) { New-Item -ItemType Directory -Force -Path $Out | Out-Null; git fetch origin claude/nifty-meitner-ow1c7c; cmd /c "git show ${ProbeRef}:docs/ops/p3_42_probe.py > $Probe"; $ProbeGot = (Get-FileHash $Probe -Algorithm SHA256).Hash.ToLower(); "PROBE_SHA256=$ProbeGot"; "PROBE_SHA256_OK=" + ($ProbeGot -eq $ProbeSha) } else { "WRITE_REFUSED=True — PY=$Py (Test-Path=" + (Test-Path $Py) + "). src\backend\.venv 가 없습니다. 이 출력을 회신해 주십시오. 아무것도 쓰지 않았습니다." }
+if ($Py -and (Test-Path $Py)) { New-Item -ItemType Directory -Force -Path $Out | Out-Null; git fetch origin main; cmd /c "git show ${ProbeRef}:docs/ops/p3_42_probe.py > $Probe"; $ProbeGot = (Get-FileHash $Probe -Algorithm SHA256).Hash.ToLower(); "PROBE_SHA256=$ProbeGot"; "PROBE_SHA256_OK=" + ($ProbeGot -eq $ProbeSha) } else { "WRITE_REFUSED=True — PY=$Py (Test-Path=" + (Test-Path $Py) + "). src\backend\.venv 가 없습니다. 이 출력을 회신해 주십시오. 아무것도 쓰지 않았습니다." }
 "BLOCK_C_DONE=True"
 ```
 
@@ -211,7 +211,8 @@ if ($Py -and (Test-Path $Py)) { New-Item -ItemType Directory -Force -Path $Out |
 > 직접 붙여넣게 했고, 2026-10-16 실행에서 붙여넣기가 코드 중간부터 들어가 Python 줄이 전부
 > PowerShell 명령으로 해석됐다(파싱 오류 수십 건). 부수 효과는 없었지만 — 붙여넣기 크기가 클수록
 > 같은 일이 재발한다. 이제 붙여넣는 것은 몇 줄뿐이고, 받은 파일은 **SHA-256으로 내용을 검증**한다.
-> 이 런북 브랜치가 머지된 뒤에는 `$ProbeRef`를 `HEAD`로 바꾸고 `git fetch` 줄을 뺀다.
+> 프로브는 main에 착지했으므로 `origin/main`에서 받는다(첫 실행 때는 아직 머지 전이라 이 런북의 작업 브랜치에서
+> 받았다 — 그 브랜치는 머지 후 삭제되므로 같은 줄을 그대로 두면 재실행이 실패한다. 2026-10-16 정정).
 
 ### [D] 계측기 실행 (`--hints-from-db --json`) + 요약
 
