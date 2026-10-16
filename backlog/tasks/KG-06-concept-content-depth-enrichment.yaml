@@ -9,8 +9,7 @@ status: todo
 priority: 4
 eos_priority: P2
 owner: claude
-depends_on:
-  - KG-02-concept-content-review-promotion
+depends_on: []
 requires_gates: []
 acceptance:
   - "① 현재 깊이 실측 고정: explanation 30자 미만 273/437(62%), 평균 25자, K-12 플래시카드 보유 24%(105/437)·8개 과목 0장, en/ja 로케일 0/437(빈 골격)"
@@ -23,5 +22,5 @@ paths:
   - "data/corpus/concept_content_v1/**"
   - "data/corpus/concept_graph_v1/locales/**"
 session: null
-notes: "2026-08-13 감사 발견. '이유를 묻는 수학' 정체성 대비 이론이 한 줄 요약 수준. KG-02(검수) blocked 해소가 전제 — 물량 846건이라 생성 품질 게이트 없는 양산은 재발 경로.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "2026-08-13 감사 발견. '이유를 묻는 수학' 정체성 대비 이론이 한 줄 요약 수준. KG-02(검수) blocked 해소가 전제 — 물량 846건이라 생성 품질 게이트 없는 양산은 재발 경로.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-10-15] depends_on 제거 1건: 2026-10-15 Kiki 결정(사람 대상 내용 검토를 2026-12-31 이후로 이월)으로 선행 KG-02가 연말까지 막히는데, 이 태스크의 일은 사람 검수 없이 내부에서 끝낼 수 있다. 검수 전 콘텐츠가 학생에게 나가는 위험은 선행 태스크가 아니라 집행 코드가 막는다: 공급 경로는 reviewed가 아니면 UNREVIEWED로 폴백하고(l4/content_supply.py, CONT-05 fail-closed), reviewed를 찍을 수 있는 서명은 사람 한 명뿐이다(review_gate.py HUMAN_REVIEWERS). 또한 재서술을 먼저 하고 검수를 나중에 하면 같은 행을 두 번 검수하지 않는다. 사람 대상 단계는 이 태스크의 완료 조건이 아니라 이월된 게이트의 몫이다."
+updated: 2026-10-15
