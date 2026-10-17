@@ -337,6 +337,25 @@ jobs:
         working-directory: .
         run: python -m whymath_backend.harness.qa_pipeline --json qa_report.json
 
+      # PB-02: 커버리지 리포트(D4 관측 도구·problem_bank_coverage)를 재생성해 커밋본
+      # `docs/data/problem_bank_coverage_2026-08.json`과 diff — 어긋나면 실패. 도구 자체는
+      # 게이트가 아니라 항상 exit 0(모듈 docstring 명시)이라 stale 검출은 이 CI 스텝의 diff가
+      # 전담한다. 새 CI 잡을 만들지 않고 qa_pipeline과 동일한 corpus 트리거에 얹는다 — 코퍼스가
+      # 안 바뀌면 이 스텝도 안 돈다(성취기준·유형 카탈로그만 단독으로 바뀌는 경우는 corpus 플래그
+      # 사각지대로 남지만, 산출물 diff 자체가 최종 방어선이라 다음 코퍼스 변경 PR에서 잡힌다).
+      # working-directory는 qa_pipeline 스텝과 동일하게 레포 루트로 오버라이드한다.
+      # 배선 실재성 동결: tests/infra/test_problem_bank_coverage_ci_wiring.py
+      - name: 게이트 — 문제은행 커버리지 리포트 재생성-diff (코퍼스 변경 시만·stale 방지)
+        if: needs.changes.outputs.corpus == 'true'
+        working-directory: .
+        run: |
+          python -m whymath_backend.harness.problem_bank_coverage \
+            --json /tmp/problem_bank_coverage_regenerated.json > /dev/null
+          if ! diff -u docs/data/problem_bank_coverage_2026-08.json /tmp/problem_bank_coverage_regenerated.json; then
+            echo "::error::문제은행 커버리지 리포트가 stale — 코퍼스/성취기준/유형 카탈로그가 바뀌었는데 docs/data/problem_bank_coverage_2026-08.json을 재생성하지 않았다. 재생성: python -m whymath_backend.harness.problem_bank_coverage --json docs/data/problem_bank_coverage_2026-08.json"
+            exit 1
+          fi
+
   # ─────────────────────────────────────────────────────────────────
   # L3 백엔드 (LLM 라우터 M1.2 — 결정 로직 + 타입 인터페이스)
   # data-pipeline 잡을 미러링. 라이브 서비스·API 키 없이 단위테스트만.
@@ -2130,12 +2149,23 @@ jobs:
       # 초인간 검증 S6(상시성) — 전 코퍼스 verify 재료로 정답을 매일 밤 전수 재검산.
       # 정본 변경·데이터 오염을 야간에 즉시 잡는다(fail 1건이라도 있으면 exit 1). 순수 계산·
       # DB/LLM 0이라 PG 없이도 돌지만 이 잡(야간)에 얹어 상시 재검증을 보장한다.
+      #
+      # PB-02(2026-08 원본 · 2026-10 회수): 과거엔 코퍼스 3종을 하드코딩해 "새 코퍼스가 구조적으로
+      # 누락되는 구조" 자체가 문제였다(당시 7종 중 4종·전체 55.8%가 야간 재검증을 한 번도 받지
+      # 못함). bash 셸 글롭(기본 옵션 — nullglob 불필요: 코퍼스가 하나도 없으면 패턴이 리터럴로
+      # 남아 python이 "파일 없음"으로 즉시 실패하는 편이 침묵 스킵보다 안전)으로
+      # `problem_bank_*/problems.jsonl` 전량을 넘긴다 — qa_pipeline.py의
+      # `corpus_root.glob("problem_bank_*/problems.jsonl")`과 동일 패턴.
+      # `tests/infra/test_corpus_reverify_wiring.py`가 이 글롭 배선을 CI YAML 파싱으로 동결.
+      #
+      # --fuzz(수치 반례)는 아직 배선하지 않는다 — 2026-08-08 실측에서 실행시간(+16초)이 아니라
+      # `problem_bank_rephrased_v0`의 기존 데이터 결함 12건이 새로 드러나기 때문이다. 켜는 순간
+      # 신규 게이트가 상시 실패로 시작해 야간 알림이 습관화된다. 그 결함이 별도 태스크로 해소된
+      # 뒤 이 스텝에 `--fuzz`를 추가한다(2026-10 회수 시점에 이 수치를 재실측하지 않았다).
       - name: 전 코퍼스 재검증 (초인간 검증 S6 상시성)
         run: |
           python -m whymath_backend.harness.corpus_reverify \
-            ../../data/corpus/problem_bank_generated_v0/problems.jsonl \
-            ../../data/corpus/problem_bank_rephrased_v0/problems.jsonl \
-            ../../data/corpus/problem_bank_killer_v0/problems.jsonl
+            ../../data/corpus/problem_bank_*/problems.jsonl
 
       # ── EOS-64 ① — 앵커 A4 생성 E2E 관통의 **상시화**(1회 실증 → 야간 계측) ─────────
       # EOS-58(`docs/reviews/eos_anchor_e2e_a4_2026-08-30.md`)은 생성→SymPy 게이트→dedup→
