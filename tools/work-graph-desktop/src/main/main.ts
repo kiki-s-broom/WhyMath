@@ -80,6 +80,13 @@ function focusMainWindow(): void {
   win.focus();
 }
 
+const refreshLocks = new Map<string, Promise<Snapshot>>();
+
+/** 최신 main 거울 폴더(HARN-306) — 앱 데이터 아래 작업공간별 한 곳. 저장소 안에 두지 않는다 */
+function trunkDirOf(id: string): string {
+  return path.join(app.getPath("userData"), "trunk", wsId(id));
+}
+
 function registerIpc(): void {
   ipcMain.handle("ws:list", () => settings.list());
   ipcMain.handle("ws:pick", async () => {
@@ -100,9 +107,15 @@ function registerIpc(): void {
   ipcMain.handle("snapshot:load", (_e, id: string) => snapshots.load(wsId(id)));
   ipcMain.handle("snapshot:refresh", async (_e, id: string): Promise<Snapshot> => {
     const ws = await workspaceOf(id);
-    const snap = await collectSnapshot(ws, runCommand);
-    await snapshots.save(snap);
-    return snap;
+    // 같은 작업공간의 새로고침이 겹치면 거울 폴더를 두 번 동시에 체크아웃하게 된다 — 차례로 돌린다
+    const prev = refreshLocks.get(ws.id) ?? Promise.resolve();
+    const run = prev.catch(() => undefined).then(async () => {
+      const snap = await collectSnapshot(ws, runCommand, process.platform, trunkDirOf(ws.id));
+      await snapshots.save(snap);
+      return snap;
+    });
+    refreshLocks.set(ws.id, run);
+    try { return await run; } finally { if (refreshLocks.get(ws.id) === run) refreshLocks.delete(ws.id); }
   });
 
   ipcMain.handle("action:run", async (_e, req: ActionRequest) => {
@@ -126,7 +139,9 @@ function registerIpc(): void {
     const m = /^([tg]):([A-Za-z0-9][A-Za-z0-9._-]{0,200})$/.exec(nodeKey);
     if (!m) return { ok: false, reason: "태스크·게이트 창만 원본 파일을 연다" };
     const rel = m[1] === "t" ? path.join("backlog", "tasks", `${m[2]}.yaml`) : path.join("backlog", "gates.yaml");
-    const file = path.join(ws.root, rel);
+    // 그래프를 최신 main 거울에서 그렸으면 그 파일을 연다(작업 사본에는 그 태스크가 아직 없을 수 있다)
+    const mirror = path.join(trunkDirOf(ws.id), rel);
+    const file = ws.options.source !== "worktree" && existsSync(mirror) ? mirror : path.join(ws.root, rel);
     try { await fs.access(file); } catch (e) { return { ok: false, reason: `${(e as Error).name}: ${rel} 없음` }; }
     const err = await shell.openPath(file);
     return err ? { ok: false, reason: err, path: file } : { ok: true, path: file };
@@ -140,6 +155,7 @@ function sanitizeOptions(o: unknown): Partial<WorkspaceOptions> | undefined {
   if (typeof r.remote === "boolean") out.remote = r.remote;
   if (typeof r.github === "boolean") out.github = r.github;
   if (typeof r.python === "string") out.python = r.python.trim() || undefined;
+  if (r.source === "trunk" || r.source === "worktree") out.source = r.source;
   return out;
 }
 

@@ -13,7 +13,7 @@ type ViewName = "map" | "ready" | "human" | "branch" | "list";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const SCAN_NAME: Record<string, string> = { remote_done: "완료분", remote_claim: "claim", stale_branches: "고립" };
-const SOURCE_NAME: Record<string, string> = { harness: "work_graph.py", git: "git", github: "gh" };
+const SOURCE_NAME: Record<string, string> = { trunk: "최신 main", harness: "work_graph.py", git: "git", github: "gh" };
 const GROUP_RANK: Record<Group, number> = { ready: 0, in_progress: 1, gate: 2, human: 3, blocked: 4, waiting: 5, branch: 6 };
 const GROUP_NAME: Record<Group, string> = {
   ready: "처리 가능", in_progress: "진행 중", waiting: "선행 대기", blocked: "차단", human: "사람 작업", gate: "게이트", branch: "미머지 브랜치",
@@ -40,8 +40,12 @@ export function attentionReasons(snap: Snapshot | null): { kind: string; text: s
   for (const [k, s] of Object.entries(snap.sources)) {
     const r = s as SourceResult;
     if (r.status === "ok") continue;
-    if (k === "github" && r.status === "skipped") continue; // 설정으로 끈 것은 실패가 아니다(상태 줄에 따로 보인다)
+    if ((k === "github" || k === "trunk") && r.status === "skipped") continue; // 설정으로 끈 것은 실패가 아니다(상태 줄에 따로 보인다)
     out.push({ kind: "source", text: `${SOURCE_NAME[k] ?? k} ${r.status}${r.tool ? ` (${r.tool})` : ""} — ${r.reason ?? "사유 없음"}` });
+  }
+  const tr = snap.sources.trunk;
+  if (tr?.status === "ok" && tr.data && !tr.data.fetched) {
+    out.push({ kind: "fetch", text: `원격에서 새 커밋을 받지 못했다 — 마지막으로 받아 둔 main(${tr.data.sha.slice(0, 8)})으로 그렸다: ${tr.data.fetchReason ?? "사유 없음"}` });
   }
   if (snap.stale) out.push({ kind: "stale", text: `스냅샷이 24시간을 넘었다 — 수집 시각 ${fmtTime(snap.collectedAt)}. 새로고침하라` });
   const p = snap.payload;
@@ -207,6 +211,16 @@ function renderAttention(): void {
     : '<p class="okline" data-testid="attention-list">확인 필요 0건 — 원격 조회 3종 ok · 어댑터 ok · 스냅샷 24시간 이내 · 정합성 경고 없음</p>';
 }
 
+/** 무엇을 그렸는가(HARN-306) — 최신 main(해시·받은 여부) / 작업 트리 / 옛 스냅샷 */
+export function trunkLine(s: Snapshot): string {
+  const t = s.sources.trunk;
+  if (!t) return '<span data-testid="trunk-line">기준: 저장소 폴더(옛 스냅샷 — 새로고침하면 최신 main으로 그린다)</span>';
+  if (t.status === "skipped") return `<span data-testid="trunk-line">기준: <b>작업 트리</b> — 원격의 새 커밋은 반영되지 않는다</span>`;
+  if (t.status !== "ok" || !t.data) return `<span data-testid="trunk-line" class="stale">기준: 최신 main 준비 실패 — ${esc(t.reason ?? t.status)}</span>`;
+  return `<span data-testid="trunk-line">기준: <b>최신 main ${esc(t.data.sha.slice(0, 8))}</b>`
+    + (t.data.fetched ? ` · 원격에서 받음 ${fmtTime(t.at)}` : ' · <span class="stale">원격 받기 실패 — 이전에 받은 main</span>') + "</span>";
+}
+
 /* ── 상태 줄 ── */
 function renderStatus(): void {
   const s = st.snap;
@@ -214,8 +228,8 @@ function renderStatus(): void {
   if (!st.ws) { el.textContent = "작업공간을 추가하라"; return; }
   if (!s) { el.innerHTML = `<b>${esc(st.ws.name)}</b> · 저장된 스냅샷 없음 — 새로고침으로 수집`; return; }
   const scans = s.payload ? Object.entries(s.payload.scans || {}).map(([k, v]) => `${SCAN_NAME[k] ?? k} ${esc(v.status)}`).join(" · ") : "페이로드 없음";
-  const src = (k: keyof Snapshot["sources"]) => `${SOURCE_NAME[k]} ${esc(s.sources[k].status)}`;
-  el.innerHTML = `저장된 스냅샷 · <b>${fmtTime(s.collectedAt)}</b>${s.stale ? ' · <span class="stale">24시간 초과</span>' : ""}`
+  const src = (k: "harness" | "git" | "github") => `${SOURCE_NAME[k]} ${esc(s.sources[k].status)}`;
+  el.innerHTML = `${trunkLine(s)} · 저장된 스냅샷 · <b>${fmtTime(s.collectedAt)}</b>${s.stale ? ' · <span class="stale">24시간 초과</span>' : ""}`
     + ` · 원격 조회: ${scans} · ${src("harness")} · ${src("git")} · ${src("github")}`
     + (s.payload ? ` · 기준 커밋 ${esc(s.payload.base || "미상")} · 스테이지 ${esc(s.payload.current_stage)}` : "");
   $<HTMLButtonElement>("refresh").disabled = st.busy;
@@ -437,7 +451,10 @@ function openWorkspaceModal(edit: Workspace | null): void {
     ${w ? `<p class="hint">경로 <code>${esc(w.root)}</code> · 종류 ${w.kind === "harness" ? "harness(work_graph.py 있음)" : "git(그래프 없음)"}</p>`
       : `<label>폴더 경로 (scripts/harness/work_graph.py 또는 .git이 있어야 한다)<div class="pathrow"><input type="text" id="f-path" data-testid="f-path" placeholder="C:\\Users\\kiki\\Desktop\\__AI\\WhyMath">${electron ? '<button class="btn" type="button" id="f-pick">폴더 선택…</button>' : ""}</div></label>`}
     <label>이름<input type="text" id="f-name" value="${esc(w?.name ?? "")}" placeholder="비우면 폴더 이름"></label>
-    <label class="row"><input type="checkbox" id="f-remote"${w?.options.remote ? " checked" : ""}> 원격 조회 포함(미머지 done·원격 claim·고립 브랜치 — 느리고 네트워크 필요; 끄면 --no-remote)</label>
+    <label>그릴 대상<select id="f-source" data-testid="f-source">
+      <option value="trunk"${w?.options.source !== "worktree" ? " selected" : ""}>최신 main — 새로고침마다 원격에서 받아 그린다(권장)</option>
+      <option value="worktree"${w?.options.source === "worktree" ? " selected" : ""}>작업 트리 — 이 폴더의 지금 브랜치·파일(원격의 새 커밋은 안 보인다)</option></select></label>
+    <label class="row"><input type="checkbox" id="f-remote"${w ? (w.options.remote ? " checked" : "") : " checked"}> 원격 조회 포함(미머지 done·원격 claim·고립 브랜치 — 느리고 네트워크 필요; 끄면 --no-remote)</label>
     <label class="row"><input type="checkbox" id="f-github"${w?.options.github ? " checked" : ""}> gh로 열린 PR 목록 덧붙이기</label>
     <label>python 실행 파일 (비우면 python3 → python → py -3 순 탐색)<input type="text" id="f-python" value="${esc(w?.options.python ?? "")}"></label>
     <p class="hint">${electron ? "" : "픽스처 모드 — 여기서는 추가·변경이 저장되지 않는다."}</p>
@@ -460,6 +477,7 @@ function openWorkspaceModal(edit: Workspace | null): void {
     const err = box.querySelector("#f-err") as HTMLElement;
     const options = {
       remote: (box.querySelector("#f-remote") as HTMLInputElement).checked,
+      source: (box.querySelector("#f-source") as HTMLSelectElement).value === "worktree" ? "worktree" as const : "trunk" as const,
       github: (box.querySelector("#f-github") as HTMLInputElement).checked,
       python: (box.querySelector("#f-python") as HTMLInputElement).value.trim() || undefined,
     };

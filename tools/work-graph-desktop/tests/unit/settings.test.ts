@@ -37,7 +37,7 @@ describe("SettingsStore", () => {
     if (!r.ok) return;
     expect(r.workspace.kind).toBe("harness");
     expect(r.workspace.name).toBe(path.basename(root));   // 빈 이름 → 폴더 이름
-    expect(r.workspace.options).toEqual({ remote: false, github: true });
+    expect(r.workspace.options).toEqual({ remote: true, github: true, source: "trunk" });
     expect(r.workspace.id).toMatch(/^ws_[0-9a-f]{12}$/);
     const files = await fs.readdir(dir);
     expect(files).toEqual(["settings.json"]);              // 임시 파일이 남지 않는다
@@ -65,7 +65,7 @@ describe("SettingsStore", () => {
     const r = await s.add({ path: await mkRepo("harness") });
     if (!r.ok) throw new Error("add 실패");
     const u = await s.update(r.workspace.id, { name: "이름", options: { remote: true, python: "C:\\py\\python.exe" } });
-    expect(u?.name).toBe("이름"); expect(u?.options).toEqual({ remote: true, github: false, python: "C:\\py\\python.exe" });
+    expect(u?.name).toBe("이름"); expect(u?.options).toEqual({ remote: true, github: false, source: "trunk", python: "C:\\py\\python.exe" });
     expect(await s.update("ws_000000000000", { name: "x" })).toBeNull();
     expect(await s.remove(r.workspace.id)).toBe(true);
     expect(await s.remove(r.workspace.id)).toBe(false);

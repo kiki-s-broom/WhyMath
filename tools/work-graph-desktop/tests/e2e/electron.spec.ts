@@ -1,5 +1,5 @@
 /* Electron 스모크 (HARN-206) — 실제 앱을 띄운다. 실행: npm run e2e:electron (xvfb-run 경유).
-   WORK_GRAPH_WORKSPACE로 저장소를 자동 등록하고, 새로고침(--no-remote)으로 수집해 창 수 > 0을 확인한다. */
+   WORK_GRAPH_WORKSPACE로 저장소를 자동 등록하고, 새로고침(최신 main · 원격 조회 포함)으로 수집해 창 수 > 0을 확인한다. */
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -39,15 +39,19 @@ test("앱 기동 → 작업공간 자동 등록 → 수집 → 창 수 > 0 · �
     await expect(win.locator("#ws-list .ws .nm")).toHaveText(path.basename(WORKSPACE));
     await expect(win.locator("#snap-line")).toContainText("저장된 스냅샷 없음");
     await win.locator("#refresh").click();
-    await expect(win.locator("#refresh")).toHaveText("새로고침", { timeout: 150_000 });
-    await expect(win.locator("#snap-line")).toContainText("work_graph.py ok");
+    // 버튼 글자는 수집 전에도 "새로고침"이라 완료 신호가 못 된다 — 결과 줄 자체를 기다린다(HARN-306: 최신 main을 받느라 수 초~수십 초)
+    await expect(win.locator("#snap-line")).toContainText("work_graph.py ok", { timeout: 200_000 });
+    await expect(win.locator("#refresh")).toHaveText("새로고침");
+    // 그래프는 저장소 폴더가 아니라 원격에서 받은 최신 main에서 그렸다
+    await expect(win.getByTestId("trunk-line")).toContainText(/최신 main [0-9a-f]{8}/);
     await expect(win.locator("#snap-line")).toContainText("git ok");
     const wins = await win.locator(".win").count();
     expect(wins).toBeGreaterThan(0);
     const value = await win.getByTestId("card-ready-value").textContent();
     expect(Number(value)).toBeGreaterThan(0);
-    // --no-remote이므로 원격 조회 3종은 skipped → 확인 필요에 나열된다(은폐 없음)
-    await expect(win.getByTestId("card-attention-value")).toHaveText("3");
+    // 확인 필요 카드는 숫자로 나온다(원격 조회 결과는 실행 환경마다 달라 개수를 고정하지 않는다)
+    const att = Number(await win.getByTestId("card-attention-value").textContent());
+    expect(Number.isInteger(att) && att >= 0).toBe(true);
     // 스냅샷·설정 파일이 userData에 원자적으로 남는다
     expect(await app.evaluate(({ app: a }) => a.getPath("userData"))).toBe(userData);
     expect(existsSync(path.join(userData, "settings.json"))).toBe(true);

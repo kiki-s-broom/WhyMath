@@ -52,3 +52,10 @@ export async function removeFile(file: string): Promise<boolean> {
     throw err;
   }
 }
+
+/** 앱이 소유한 폴더를 비우고 상위 폴더를 만든다(HARN-306 최신 main 거울 재생성용).
+    호출자가 "앱 데이터 아래의 자기 폴더"임을 확인한 뒤에만 부른다. */
+export async function resetOwnedDir(dir: string): Promise<void> {
+  await fs.rm(dir, { recursive: true, force: true });
+  await fs.mkdir(path.dirname(dir), { recursive: true });
+}
