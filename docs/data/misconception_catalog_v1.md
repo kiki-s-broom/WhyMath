@@ -131,7 +131,7 @@ difficulty·ccss_code·mapping_*)는 원천 미보유라 **None**(날조하지 �
 37은 대응 개념이 미매핑이라 `[]`(정직). cross-corpus dangling **0**(`test_misconception_enrichment_
 governance`).
 
-**분포(v1)**: severity blocking 344·local 319·cosmetic 71·None 109. behavior_skills 806/843.
+**분포(v1)**: severity blocking 346·local 321·cosmetic 71·None 105(합 843). behavior_skills 806/843. (MISC-61 1차·2차에서 M0599·M0600·M0417·M0418의 세 필드를 채우며 blocking·local이 늘고 None이 줄었다 — 2026-10-17 코퍼스 실측.)
 
 **재임베딩 0**: `misconception_embedding`은 kebab 탐지 카탈로그를 `catalog_text = name_kr + canonical_
 statement`로 임베딩 — 신규 2필드는 그 텍스트 밖이라 text_hash 불변(별개 체계·decoupled).
