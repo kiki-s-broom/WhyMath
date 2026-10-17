@@ -1094,11 +1094,11 @@ gates:
     title: P3-44 새 틀의 오개념 절차 해석 인정 범위와 보강 은행 규모 결정
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-16
     remind_after_days: 14
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 채팅 승인(2026-10-17, 문면 \"제안 승인\") - 설계 문서 docs/reviews/p3_44_new_frames_design_2026-10-16.md 8절 결정 2건을 제안안대로 확정: (1) 4개 개념의 오개념 절차를 해당 M-id 절차로 인정하고 진행하되 02-08 F3 는 제외, 감사에서 해석 위험이 드러나면 M-id 설명 보강으로 전환 (2) 보강 은행 규모 240(4개념x60). 판정 기준 커밋 05b343d0 (브랜치 claude/gracious-noether-ikmlwq, origin 푸시 완료)."
+    cleared_by: kiki
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료는 이미 저장소에 있다(설계 문서 docs/reviews/p3_44_new_frames_design_2026-10-16.md 의 2.3절·8절). 먼저 끝나야 할 태스크 없음 - 사람 결정"
