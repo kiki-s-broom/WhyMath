@@ -602,3 +602,34 @@ class TestDiscipline:
         )
         assert none_idx.scan.value == "not_run" and no_map.scan.value == "not_run"
         assert right.candidate_ids == () and right.signature is None
+
+
+class TestCli:
+    """`main()` 의 종료 코드 계약 — 막힘이 있으면 1, 입력을 못 읽으면 2(통과로 위장하지 않는다)."""
+
+    def test_exit_code_is_one_while_any_core_misconception_is_unserved(
+        self, capsys: pytest.CaptureFixture[str], base_report: pr.RemediationReport
+    ) -> None:
+        unserved = [
+            r for r in base_report.rows if r.status in (pr.RowStatus.BLOCKED, pr.RowStatus.FAILED)
+        ]
+        rc = pr.main([])
+        out = capsys.readouterr().out
+        assert rc == (1 if unserved else 0)
+        assert "핵심 오개념" in out and "작동한 비율" in out
+
+    def test_json_output_is_machine_readable_and_matches_the_report(
+        self, capsys: pytest.CaptureFixture[str], base_report: pr.RemediationReport
+    ) -> None:
+        rc = pr.main(["--json"])
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["exit_code"] == rc == base_report.exit_code
+        assert payload["total"] == 12 and payload["produced"] == base_report.produced
+        assert [r["mis_id"] for r in payload["rows"]] == [r.mis_id for r in base_report.rows]
+
+    def test_unreadable_data_is_a_measurement_failure_not_a_pass(
+        self, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
+        rc = pr.main(["--data", str(tmp_path / "없는파일.yaml")])
+        assert rc == 2
+        assert "[적재 실패]" in capsys.readouterr().err

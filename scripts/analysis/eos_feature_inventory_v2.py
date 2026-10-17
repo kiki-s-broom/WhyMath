@@ -598,7 +598,8 @@ CATALOG: tuple[Spec, ...] = (
        "Platform", "Curriculum", "P0", "B1·F1 앵커 성취기준 코드셋",
        "l1.standards.alignment_query", "l1.standards.anchor_registry",
        "l1.standards.criteria_loader", "l1.standards.learning_map",
-       "l1.standards.phase3_coverage", "l1.standards.phase3_scope",
+       "l1.standards.phase3_coverage", "l1.standards.phase3_remediation_spec",
+       "l1.standards.phase3_scope",
        "l1.standards.phase3_slot_rules", "l1.standards.phase3_stem_fold",
        "l1.standards.populate",
        "l1.standards.standard_loader",
@@ -965,7 +966,8 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.match_gate", "l4.misconception.distractor",
        "l4.misconception.distractor_link",
        "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
-       "l4.misconception.answer_signature", "api._attempt_misconception_scan"),
+       "l4.misconception.answer_signature", "l4.misconception.remediation_strategy",
+       "api._attempt_misconception_scan"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
        "l4.misconception.hypothesis",
@@ -1313,6 +1315,12 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-917", "Phase 3 지표 7종 일괄 CLI(제품 완성도 평면·위반 주입 자가 점검)", "Admin", "QA",
        "P1", "P3-14 — 대표 과정 Coverage·QA·루프·결함 한 명령 · 미측정≠통과 판정기",
        "ops.phase3_metrics"),
+    # P3-06 — 핵심 오개념 12개에 오답→후보·신뢰도→교정 전략 체인이 실제로 도는지 재는 CLI. 위 지표 7종과
+    # 분모(핵심 오개념)·성격(체인 실행 + 결함 주입)이 달라 별도 행이다. 체인 본체는 WM-E 오개념 행의
+    # `l4.misconception.remediation_strategy`, 데이터 로더는 WM-E-106 에 있다.
+    _o("WM-O-918", "Phase 3 오답→교정 전략 커버리지 CLI(핵심 오개념 12개·체인 실행·막힘 정직 보고)", "Admin", "QA",
+       "P1", "P3-06 — 오답 1건이 교정 전략까지 도달하는지 · 좌석 없음은 막힘으로 표기",
+       "ops.phase3_remediation"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),
