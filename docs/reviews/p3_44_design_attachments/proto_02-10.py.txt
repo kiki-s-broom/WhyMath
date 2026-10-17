@@ -1,0 +1,743 @@
+"""[12미적Ⅰ-02-10] M0678 새 문항 틀 프로토타입 (P3-44 설계 입력) — 저장소 수정 0, 스크래치패드 전용.
+
+실행: cd /home/user/WhyMath/src/backend && python3 <이 파일>
+저장소 코드를 import 해서 `Frame`/`DiffItem`/`build_choices`/`round_robin_items`/`probe_of`/
+`shortcut_violations`/`P3DiffSlotGenerator._validate_slot`(풀이 단계 도출 포함)을 그대로 쓴다.
+
+틀 4종(사슬 기여 = 문제유형이 개념 스킬과 겹침) + 지원 1종(사슬 비기여):
+  TD  (ptype.solve-for-unknown)   '음의 방향 + 속력 k인 시각 t'  — 오개념: v(t) = +k 로 푼다
+  TR  (ptype.model-word-problem)  레일 열차, '오른쪽이 양의 방향, 왼쪽으로 속력 k인 시각'
+  CD  (ptype.solve-for-unknown)   '음의 방향 + 속력 S인 순간의 상수 k' — 오개념: v(T) = +S 로 푼다
+  CR  (ptype.model-word-problem)  레일 열차, 상수 u
+  V   (ptype.evaluate-expression) 지원 — 속도 v(T) < 0, 오개념 선지 |v(T)| (스킬 비중첩이라 사슬 0)
+
+핵심: 오개념 선택지 값은 *오개념 절차*(방향을 무시하고 속력 k 를 그대로 속도로 놓는다 = v = +k)의
+SymPy 산출이다. 이 파일의 `oracle_*` 는 틀 빌더의 공식과 *독립*으로 검산 조건 문자열에서 SymPy 로 다시 푼다.
+"""
+
+from __future__ import annotations
+
+import itertools
+from functools import lru_cache
+from math import isqrt
+import json
+import re
+import sys
+from pathlib import Path
+from typing import ClassVar
+
+import sympy
+
+from whymath_backend.l3.equivalent.p3_diff_expr import (
+    Poly,
+    render_factored,
+    render_poly,
+    with_eul_reul,
+    with_i_ga,
+)
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    ShortcutProbe,
+    parameter_coincidences,
+    shortcut_violations,
+)
+from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
+    ChoiceEntry,
+    DiffItem,
+    Frame,
+    P3DiffSlotGenerator,
+    _condition_key,
+    answer_format_for,
+    build_choices,
+    probe_of,
+    round_robin_items,
+    seeded_order,
+    skeleton_of,
+    steps_of,
+)
+from whymath_backend.l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator import (
+    _V_DEF,
+    P3DiffVelocityAccelerationGenerator,
+    _dv,
+    _poly,
+    _render_with_param,
+    _rt,
+    _vel,
+    _k_affine,
+)
+from whymath_backend.l3.equivalent.p3_diff_motion_word_problem_skeleton_generator import (
+    P3DiffMotionWordProblemGenerator,
+)
+from whymath_backend.l3.safe_parse import safe_sympify
+
+MID = "M0678"  # 핵심 오개념 id — distractor_map 에 M-id 를 직접 적는다(계약 §3 · phase3_coverage 가 그대로 인정)
+STD = "[12미적Ⅰ-02-10]"
+SOLVE = "ptype.solve-for-unknown"
+MODEL = "ptype.model-word-problem"
+EVAL = "ptype.evaluate-expression"
+T = sympy.Symbol("t")
+S = sympy.Symbol("s")
+
+ROOT = Path("/home/user/WhyMath")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 공용
+# ──────────────────────────────────────────────────────────────────────────
+def _txt(v: sympy.Expr | int) -> str:
+    """수 표기 — 정수 'n', 유리수 'p/q'(ASCII)."""
+    r = sympy.Rational(v)
+    return str(r.p) if r.q == 1 else f"{r.p}/{r.q}"
+
+
+def _vel_plus(f: Poly, k: int) -> Poly:
+    """v(t) + k — '속도 = -k' 방정식의 좌변을 0 으로 옮긴 다항식."""
+    return _poly({**{e: c for e, c in _vel(f)}, 0: dict(_vel(f)).get(0, 0) + k})
+
+
+def _vel_minus(f: Poly, k: int) -> Poly:
+    return _poly({**{e: c for e, c in _vel(f)}, 0: dict(_vel(f)).get(0, 0) - k})
+
+
+def _pos_roots_of(poly: Poly) -> list[sympy.Expr]:
+    expr = sum(c * T**e for e, c in poly)
+    return sorted(r for r in sympy.solve(expr, T) if r.is_real and r > 0)
+
+
+def _int_pos(v: sympy.Expr) -> bool:
+    return v.is_rational and sympy.Rational(v).q == 1 and v > 0
+
+
+def _mc(
+    *, frame_id: str, text: str, correct: sympy.Expr, wrong: sympy.Expr, fillers: list[sympy.Expr],
+    conditions: str | tuple[str, ...], symbol: str, explanation: str, ptype: str, seed: str,
+) -> DiffItem | None:
+    """객관식 4지 — 정답 1 + M0678 연결 1 + 미매핑 필러 2."""
+    pool: list[sympy.Expr] = []
+    for f in fillers:
+        if f not in pool and f != correct and f != wrong:
+            pool.append(f)
+    if len(pool) < 2 or correct == wrong:
+        return None
+    entries = [
+        ChoiceEntry(_txt(correct), is_correct=True, sort_key=float(correct)),
+        ChoiceEntry(_txt(wrong), MID, sort_key=float(wrong)),
+        ChoiceEntry(_txt(pool[0]), sort_key=float(pool[0])),
+        ChoiceEntry(_txt(pool[1]), sort_key=float(pool[1])),
+    ]
+    try:
+        choices, answer, distractors = build_choices(entries, shuffle_seed=seed)
+    except ValueError:
+        return None
+    return DiffItem(
+        slot="misconception_trigger",
+        frame_id=frame_id,
+        question_text=text,
+        answer_text=answer,
+        explanation=explanation,
+        conditions=conditions,
+        answer_map=((symbol, _txt(correct)),),
+        problem_type_code=ptype,
+        answer_format=answer_format_for(answer),
+        choices=choices,
+        distractors=distractors,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 시각 문항 TD / TR : v(t) = -k 인 시각 (t > 0)
+# ──────────────────────────────────────────────────────────────────────────
+def _time_cases() -> tuple[tuple[int, int, int, int, int, int], ...]:
+    """(a, b, c, r, s, k) — v(t) = 3a t^2 + 2b t + c, v(r) = -k, v(s) = +k, 양의 근이 각각 유일, 정수 필러 2개 이상.
+
+    정수 산술 탐색 — r 을 고르면 k = -v(r), 'v(t) = k' 의 근은 이차방정식 3a t^2 + 2b t + (c - k) = 0 이다.
+    두 방정식 모두 근의 곱이 음수여야 '양의 근 유일'이다(다른 근 r1·s1 이 음수).
+    """
+    out: list[tuple[int, int, int, int, int, int]] = []
+    for a in (1, 2, 3, -1, -2, -3):
+        for b in range(-25, 26):
+            for c in range(-150, 151):
+                if c == 0:
+                    continue
+                for r in range(1, 15):
+                    k = -(3 * a * r * r + 2 * b * r + c)
+                    if k <= 0 or k > 400:
+                        continue
+                    disc = 4 * b * b - 12 * a * (c - k)
+                    if disc < 0:
+                        continue
+                    root = isqrt(disc)
+                    if root * root != disc:
+                        continue
+                    for sign in (1, -1):
+                        num = -2 * b + sign * root
+                        if num % (6 * a):
+                            continue
+                        s = num // (6 * a)
+                        if s <= 0 or s == r:
+                            continue
+                        # 다른 근의 부호: 두 방정식 모두 곱이 음수
+                        if (c + k) * a >= 0 or (c - k) * a >= 0:
+                            continue
+                        f = _poly({3: a, 2: b, 1: c})
+                        if len(set(_int_fillers(f, a, b, c, k, r, s))) >= 2:
+                            out.append((a, b, c, r, s, k))
+    return tuple(sorted(set(out)))
+
+
+_D_CHOICES = (0, 2, -3, 5, 7, -5, 1, 4)
+
+
+def _int_fillers(f: Poly, a: int, b: int, c: int, k: int, r: int, s: int) -> list[sympy.Expr]:
+    """미매핑 필러 후보(자연스러운 다른 오류) — 양의 정수만(정수 산술).
+
+    ① 속도가 0 인 시각(멈춤과 혼동) ② 가속도가 0 인 시각 ③ 가속도가 -k 인 시각(가속도·속도 혼동)
+    ④ v(t) = -k 의 음수 근의 절댓값(t > 0 조건을 부호만 떼어 처리)
+    """
+    out: list[sympy.Expr] = []
+    # ① 3a t^2 + 2b t + c = 0 의 양의 정수근
+    disc = 4 * b * b - 12 * a * c
+    if disc >= 0 and isqrt(disc) ** 2 == disc:
+        for sign in (1, -1):
+            num = -2 * b + sign * isqrt(disc)
+            if num % (6 * a) == 0 and num // (6 * a) > 0:
+                out.append(sympy.Integer(num // (6 * a)))
+    # ② -b/(3a)
+    if (-b) % (3 * a) == 0:
+        out.append(sympy.Integer(-b // (3 * a)))
+    # ③ (-k - 2b) / (6a)
+    if (-k - 2 * b) % (6 * a) == 0:
+        out.append(sympy.Integer((-k - 2 * b) // (6 * a)))
+    # ④ r1 = -2b/(3a) - r 의 절댓값
+    if (-2 * b) % (3 * a) == 0:
+        out.append(sympy.Integer(abs(-2 * b // (3 * a) - r)))
+    return [x for x in dict.fromkeys(out) if x > 0 and x not in (r, s)]
+
+
+@lru_cache(maxsize=None)
+def _verify_time_case(a: int, b: int, c: int, r: int, s: int, k: int) -> bool:
+    """SymPy 재확인(캐시) — -k 와 +k 의 양의 근이 각각 정확히 r, s 하나."""
+    f = _poly({3: a, 2: b, 1: c})
+    return _pos_roots_of(_vel_plus(f, k)) == [r] and _pos_roots_of(_vel_minus(f, k)) == [s]
+
+
+_TIME_CASES = _time_cases()
+
+
+def _time_item(p: tuple[object, ...], *, rail: bool) -> DiffItem | None:
+    a, b, c, r, s, k, d = (int(str(v)) for v in p)
+    f = _poly({3: a, 2: b, 1: c, 0: d})
+    # SymPy 재확인 — -k 와 +k 의 양의 근이 각각 정확히 r, s 하나.
+    if not _verify_time_case(a, b, c, r, s, k):
+        return None
+    fillers = _int_fillers(f, a, b, c, k, r, s)
+    r1 = sympy.Rational(-2 * b, 3 * a) - r
+    if rail:
+        text = (
+            f"직선 레일 위를 움직이는 장난감 열차가 출발한 지 t초 후, 출발 지점에서 오른쪽으로 잰 "
+            f"위치는 s(t) = {_rt(f)} (cm)이다. 오른쪽을 양의 방향으로 할 때, 열차가 왼쪽으로 "
+            f"움직이면서 속력이 {k} cm/초가 되는 것은 출발한 지 몇 초 후인가? (단, t > 0)"
+        )
+        head = f"속도 v(t)는 열차의 위치 s(t)의 도함수이므로 v(t) = {render_poly(_vel(f), 't')}이다."
+        direction = "왼쪽(음의 방향)으로"
+    else:
+        text = (
+            f"수직선 위를 움직이는 점 P의 시각 t (t > 0)에서의 위치가 x = {_rt(f)}이다. "
+            f"점 P가 음의 방향으로 움직이면서 속력이 {with_i_ga(k)} 되는 시각 t는?"
+        )
+        head = f"{_V_DEF}{render_poly(_vel(f), 't')}이다."
+        direction = "음의 방향으로"
+    explanation = (
+        f"{head} {direction} 움직이면서 속력이 {k}이면 속도는 -{k}이므로 "
+        f"{render_poly(_vel(f), 't')} = -{k}, 즉 {render_factored(_vel_plus(f, k), 't')} = 0에서 "
+        f"t = {_txt(r1)} 또는 t = {r}이고, t > 0이므로 t = {r}이다. 속력 {with_eul_reul(k)} 그대로 "
+        f"속도로 놓고({render_poly(_vel(f), 't')} = {k}) 풀면 t = {with_i_ga(s)} 나오지만, 그 시각의 "
+        f"속도는 {k}이므로 양의 방향으로 움직여 조건에 맞지 않는다."
+    )
+    return _mc(
+        frame_id="mc-m0678-time-rail" if rail else "mc-m0678-time-negative-direction",
+        text=text,
+        correct=sympy.Integer(r),
+        wrong=sympy.Integer(s),
+        fillers=fillers,
+        conditions=(f"{_dv(f, 's')} = -{k}", "s > 0"),
+        symbol="s",
+        explanation=explanation,
+        ptype=MODEL if rail else SOLVE,
+        seed=f"m0678:time:{rail}:{a}:{b}:{c}:{d}:{r}",
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 상수 문항 CD / CR : v(T) = -S 를 만족하는 상수
+# ──────────────────────────────────────────────────────────────────────────
+def _const_cases() -> tuple[tuple[int, int, int, int, int, int], ...]:
+    """(a, c, T, k, S, k_wrong) — x = a t^3 + k t^2 + c t + d, v(T) = 3aT^2 + 2kT + c = -S.
+
+    오개념 절차 v(T) = +S 의 해 k_wrong = k + S/T 도 정수여야 한다(T | S).
+    """
+    out: list[tuple[int, int, int, int, int, int]] = []
+    for a in (1, 2, -1, -2):
+        for c in range(-24, 25):
+            if c == 0:
+                continue
+            for tt in (1, 2, 3, 4, 5):
+                for k in range(-10, 11):
+                    if k == 0:
+                        continue
+                    s_val = -(3 * a * tt * tt + 2 * k * tt + c)
+                    if s_val <= 0 or s_val > 150 or s_val % tt:
+                        continue
+                    out.append((a, c, tt, k, s_val, k + s_val // tt))
+    return tuple(out)
+
+
+_CONST_CASES = _const_cases()
+
+
+@lru_cache(maxsize=None)
+def _verify_const_case(a: int, c: int, tt: int, k: int, s_val: int, k_wrong: int) -> bool:
+    """v(T) = -S 의 해가 k, v(T) = +S 의 해가 k_wrong 하나뿐인가(SymPy)."""
+    unk = sympy.Symbol("kk")
+    vexpr = sympy.diff(a * T**3 + unk * T**2 + c * T, T).subs(T, tt)
+    return sympy.solve(sympy.Eq(vexpr, -s_val), unk) == [k] and sympy.solve(sympy.Eq(vexpr, s_val), unk) == [k_wrong]
+
+
+def _const_item(p: tuple[object, ...], *, rail: bool) -> DiffItem | None:
+    a, c, tt, k, s_val, k_wrong, d = (int(str(v)) for v in p)
+    sym = "u" if rail else "k"
+    base = _poly({3: a, 1: c, 0: d})
+    human, symbolic = _render_with_param(base, 2)
+    human, symbolic = human.replace("k", sym), symbolic.replace("k", sym)
+    # SymPy 재확인 — 정답 방정식(-S)과 오개념 방정식(+S)의 해(캐시: d 와 무관).
+    if not _verify_const_case(a, c, tt, k, s_val, k_wrong):
+        return None
+    # 미매핑 필러: 가속도 조건으로 착각 / 부호 반대 / 속도 0 조건으로 착각 / 위치 조건으로 착각
+    cands: list[sympy.Expr] = [
+        sympy.Rational(-s_val - 6 * a * tt, 2),
+        sympy.Integer(-k),
+        sympy.Rational(-(3 * a * tt * tt + c), 2 * tt),
+        sympy.Rational(-s_val - (a * tt**3 + c * tt + d), tt * tt),
+    ]
+    fillers = [x for x in cands if sympy.Rational(x).q == 1 and x not in (k, k_wrong)]
+    cond = f"Derivative({symbolic}, t).doit().subs(t, {tt}) = -{s_val}"
+    vel_param = _render_with_param(_vel(base), 1, 2)[0].replace("k", sym)
+    affine = render_poly(((1, 2 * tt), (0, sum(cc * tt**e for e, cc in _vel(base)))), sym)
+    if rail:
+        text = (
+            f"직선 레일 위를 움직이는 장난감 열차가 출발한 지 t초 후, 출발 지점에서 오른쪽으로 잰 "
+            f"위치는 s(t) = {human} (cm)이다 ({sym}는 상수). 오른쪽을 양의 방향으로 할 때, 열차가 "
+            f"출발한 지 {tt}초 후에 왼쪽으로 움직이면서 속력이 {s_val} cm/초였다고 하면 {sym}의 값은?"
+        )
+        head = f"속도 v(t)는 열차의 위치 s(t)의 도함수이므로 v(t) = {vel_param}이다."
+        direction = "왼쪽(음의 방향)으로"
+    else:
+        text = (
+            f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {human}이다 ({sym}는 상수). "
+            f"t = {tt}에서 점 P가 음의 방향으로 움직이면서 속력이 {with_i_ga(s_val)} 될 때, "
+            f"{sym}의 값은?"
+        )
+        head = f"{_V_DEF}{vel_param}이다."
+        direction = "음의 방향으로"
+    explanation = (
+        f"{head} {direction} 움직이면서 속력이 {s_val}이면 속도는 -{s_val}이므로 v({tt}) = "
+        f"{affine} = -{s_val}에서 {sym} = {k}이다. 속력 {with_eul_reul(s_val)} 그대로 속도로 놓으면 "
+        f"v({tt}) = {s_val}에서 {sym} = {with_i_ga(k_wrong)} 나오지만, 그 경우 속도는 {s_val}이므로 "
+        f"양의 방향으로 움직여 조건에 맞지 않는다."
+    )
+    return _mc(
+        frame_id="mc-m0678-const-rail" if rail else "mc-m0678-const-negative-direction",
+        text=text,
+        correct=sympy.Integer(k),
+        wrong=sympy.Integer(k_wrong),
+        fillers=fillers,
+        conditions=cond,
+        symbol=sym,
+        explanation=explanation,
+        ptype=MODEL if rail else SOLVE,
+        seed=f"m0678:const:{rail}:{a}:{c}:{tt}:{k}:{d}",
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 지원 V — 속도 값 문항(사슬 비기여: evaluate-expression 은 개념 스킬과 겹치지 않는다)
+# ──────────────────────────────────────────────────────────────────────────
+def _value_item(p: tuple[object, ...]) -> DiffItem | None:
+    a, b, c, d, tt = (int(str(v)) for v in p)
+    f = _poly({3: a, 2: b, 1: c, 0: d})
+    v = sum(cc * tt**e for e, cc in _vel(f))
+    if v >= 0:
+        return None  # 속도가 양수면 |v| 가 정답과 같아 문항이 무의미 — 파라미터 거부
+    acc = sum(cc * tt**e for e, cc in _vel(_vel(f)))
+    pos = sum(cc * tt**e for e, cc in f)
+    fillers = [sympy.Integer(acc), sympy.Integer(pos), sympy.Integer(-acc), sympy.Integer(-pos)]
+    return _mc(
+        frame_id="mc-m0678-value-negative-velocity",
+        text=(
+            f"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = {_rt(f)}일 때, t = {tt}인 순간 "
+            f"점 P의 속도로 알맞은 것은?"
+        ),
+        correct=sympy.Integer(v),
+        wrong=sympy.Integer(abs(v)),
+        fillers=fillers,
+        conditions=f"{_dv(f, str(tt))} = y",
+        symbol="y",
+        explanation=(
+            f"{_V_DEF}{render_poly(_vel(f), 't')}이고, t = {tt}일 때의 속도는 {v}이다. 속도의 "
+            f"부호는 운동 방향을 나타내므로 부호를 떼어 속력 {abs(v)}로 답하면 안 된다."
+        ),
+        ptype=EVAL,
+        seed=f"m0678:val:{a}:{b}:{c}:{d}:{tt}",
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 틀 정의(파라미터 열 → Frame)
+# ──────────────────────────────────────────────────────────────────────────
+def _grid(seed: str, *axes: tuple[object, ...]) -> tuple[tuple[object, ...], ...]:
+    combos: list[tuple[object, ...]] = [tuple()]
+    for axis in axes:
+        combos = [(*cmb, v) for cmb in combos for v in axis]
+    return tuple(seeded_order(seed, combos))
+
+
+def _time_params(seed: str) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (*case, d) for case, d in seeded_order(seed, list(itertools.product(_TIME_CASES, _D_CHOICES)))
+    )
+
+
+def _const_params(seed: str) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (*case, d) for case, d in seeded_order(seed, list(itertools.product(_CONST_CASES, (0, 2, -3, 5, 7, 1))))
+    )
+
+
+def _value_params(seed: str) -> tuple[tuple[object, ...], ...]:
+    combos = [
+        (a, b, c, d, tt)
+        for a in (1, 2, -1)
+        for b in range(-6, 7)
+        for c in range(-8, 9)
+        for d in (0, 3, -2)
+        for tt in (1, 2, 3, 4)
+    ]
+    return tuple(seeded_order(seed, combos))
+
+
+FRAMES_CHAIN = [
+    Frame("mc-m0678-time-negative-direction", _time_params("p3-m0678:td"), lambda p: _time_item(p, rail=False)),
+    Frame("mc-m0678-time-rail", _time_params("p3-m0678:tr"), lambda p: _time_item(p, rail=True)),
+    Frame("mc-m0678-const-negative-direction", _const_params("p3-m0678:cd"), lambda p: _const_item(p, rail=False)),
+    Frame("mc-m0678-const-rail", _const_params("p3-m0678:cr"), lambda p: _const_item(p, rail=True)),
+]
+FRAMES_SUPPORT = [Frame("mc-m0678-value-negative-velocity", _value_params("p3-m0678:v"), _value_item)]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 기존 은행 2종(문면 골격·검산 조건) — 중복 0 확인용
+# ──────────────────────────────────────────────────────────────────────────
+def _bank_records() -> list[dict]:
+    rows: list[dict] = []
+    for d in ("problem_bank_p3_calculus1_diff_v0", "problem_bank_p3_fill_v0"):
+        with open(ROOT / "data/corpus" / d / "problems.jsonl", encoding="utf-8") as fh:
+            rows += [json.loads(line) for line in fh]
+    return rows
+
+
+def _bank_keys(rows: list[dict]) -> tuple[set[str], set[str]]:
+    conds: set[str] = set()
+    stems: set[str] = set()
+    for r in rows:
+        c = r["verify"]["conditions"]
+        conds.add(c if isinstance(c, str) else "&&".join(c))
+        stems.add(skeleton_of(r["question_text"]))
+    return conds, stems
+
+
+BANK = _bank_records()
+BANK_CONDS, BANK_STEMS = _bank_keys(BANK)
+
+
+def _make_gen(name: str, frames: list[Frame], count: int) -> type[P3DiffSlotGenerator]:
+    class _G(P3DiffSlotGenerator):
+        standard_code: ClassVar[str] = STD
+        concept_src_id: ClassVar[str] = "H:12미적Ⅰ02-10"
+        unit_code: ClassVar[str] = "PROTO-M0678"
+        slug_prefix: ClassVar[str] = "proto-m0678"
+        slots: ClassVar[tuple] = ("misconception_trigger",)
+        slot_difficulty: ClassVar[dict[str, float]] = {"misconception_trigger": 3.0}
+        slot_count: ClassVar[int] = count
+
+        @classmethod
+        def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
+            claimed |= BANK_CONDS
+            return round_robin_items(frames, cls.slot_count, claimed=claimed, standard_code=cls.standard_code)
+
+    _G.__name__ = name
+    return _G
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 독립 오라클 — 검산 조건 문자열에서 SymPy 로 정답·오개념 절차 값을 다시 푼다(빌더 공식 미사용)
+# ──────────────────────────────────────────────────────────────────────────
+def _parse_condition(cond: str) -> tuple[sympy.Expr, sympy.Expr]:
+    lhs, rhs = cond.rsplit(" = ", 1)
+    return safe_sympify(lhs), safe_sympify(rhs)
+
+
+def oracle(item: DiffItem) -> tuple[sympy.Expr, sympy.Expr | None]:
+    """(정답, M0678 절차 값). 절차 = '부호를 떼어 속력으로 본다':
+       · 값 문항(rhs 가 y): |v|   · 방정식 문항(rhs 가 음수 -K): 우변을 +K 로 바꿔 푼다(양의 근 필터 유지).
+    """
+    conds = (item.conditions,) if isinstance(item.conditions, str) else item.conditions
+    lhs, rhs = _parse_condition(conds[0])
+    sym, ans = item.answer_map[0]
+    if sym == "y":
+        correct = lhs
+        return correct, abs(correct)
+    unknown = sympy.Symbol(sym)
+    positive = any(c.replace(" ", "") == f"{sym}>0" for c in conds[1:])
+
+    def solve(target: sympy.Expr) -> list[sympy.Expr]:
+        roots = [x for x in sympy.solve(sympy.Eq(lhs, target), unknown) if x.is_real]
+        return [x for x in roots if x > 0] if positive else roots
+
+    right, wrong = solve(rhs), solve(-rhs)
+    assert len(right) == 1 and len(wrong) == 1, (conds, right, wrong)
+    assert str(right[0]) == ans or sympy.Rational(ans) == right[0], (ans, right)
+    return right[0], wrong[0]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 판정기 확장 제안(M-link-procedure 에 M0678 절 추가)의 프로토타입 — 저장소 코드가 아니다
+# ──────────────────────────────────────────────────────────────────────────
+def m0678_link_violations(probe: ShortcutProbe) -> list[str]:
+    """M0678 에 연결된 선지가 '방향을 무시하고 속력을 속도로 놓은' 절차의 값인가.
+
+    · 값 문항(rhs = y): 연결 선지 == |정답| 이고 정답 < 0.
+    · 방정식 문항(rhs = -K, K > 0): 연결 선지가 'lhs = +K' 의 해(양의 근 필터 유지)이고 정답과 다르다.
+      rhs 가 0 이상이면(부호를 떼도 달라지지 않는다) 연결 자체가 위반 — '속도가 양수면 문항이 무의미'.
+    """
+    linked = [(i, m) for i, m in probe.distractors if m == "M0678"]
+    if not linked:
+        return []
+    out: list[str] = []
+    lhs, rhs = _parse_condition(probe.conditions[0])
+    sym = probe.answer_map[0][0]
+    for index, _ in linked:
+        value = sympy.Rational(probe.choices[index])
+        if sym == "y":
+            if not (lhs < 0 and value == -lhs):
+                out.append(f"값 문항: 선지 {value} != |v| = {abs(lhs)} 또는 v >= 0")
+            continue
+        if not rhs.is_negative:
+            out.append(f"방정식 문항: 우변 {rhs} 가 음수가 아니라 부호를 떼도 같은 식")
+            continue
+        unknown = sympy.Symbol(sym)
+        positive = any(c.replace(" ", "") == f"{sym}>0" for c in probe.conditions[1:])
+        roots = [x for x in sympy.solve(sympy.Eq(lhs, -rhs), unknown) if x.is_real and (x > 0 or not positive)]
+        answer = sympy.Rational(probe.answer)
+        if value not in roots or value == answer:
+            out.append(f"방정식 문항: 선지 {value} 는 'lhs = {-rhs}' 의 해 {roots} 가 아니거나 정답과 같다")
+    return out
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 실행
+# ──────────────────────────────────────────────────────────────────────────
+def item_failures(it: DiffItem) -> list[str]:
+    """문항 1건의 단언 묶음 — 실제 문항에는 빈 목록이, 주입된 결함 문항에는 비어 있지 않은 목록이 나와야 한다."""
+    bad: list[str] = []
+    probe = probe_of(STD, it)
+    try:
+        correct, wrong = oracle(it)
+    except AssertionError as exc:
+        return [f"오라클 단언 실패 {exc}"]
+    ans = sympy.Rational(it.answer_text)
+    if ans != correct:
+        bad.append("정답이 SymPy 정답과 다르다")
+    if not it.distractors or any(m != MID for _, m in it.distractors) or len(it.distractors) != 1:
+        bad.append(f"M0678 연결이 정확히 1개가 아니다 {it.distractors}")
+    for index, _ in it.distractors:
+        value = sympy.Rational(it.choices[index])
+        if value != wrong:
+            bad.append(f"[A1] 오개념 선지 {value} != 오개념 절차 산출 {wrong}")
+        if value == ans:
+            bad.append("[A2] 오개념 선지 == 정답")
+    if len(it.choices) != 4 or len(set(it.choices)) != 4:
+        bad.append("[A3] 선지 4개가 서로 다르지 않다")
+    if shortcut_violations(probe):
+        bad.append(f"[A4] 현행 판정기 위반 {[v.rule for v in shortcut_violations(probe)]}")
+    if m0678_link_violations(probe):
+        bad.append(f"[A5] M0678 연결 규칙(제안) 위반 {m0678_link_violations(probe)}")
+    return bad
+
+
+def chain_simulation(chain_items: list[DiffItem], extra_label: str, retype: str | None = None) -> tuple[int, int, bool]:
+    """실제 계측기(`phase3_coverage`)로: 이 문항들이 approved 로 신설 은행에 들어온다고 가정하고 02-10 이 사슬에 드는지.
+
+    반환: (그래프 연결 충족 개념 수, 분모, 02-10 사슬 문항 존재).
+    """
+    from dataclasses import replace
+
+    from whymath_backend.l1.standards import phase3_coverage as cov
+    from whymath_backend.l1.standards.phase3_scope import default_spec_path, load_reference_index, load_scope_spec
+
+    spec = load_scope_spec(default_spec_path())
+    index = load_reference_index(spec)
+    base = cov.load_corpus(spec)
+    refs = tuple(
+        cov.ProblemRef(
+            problem_id=f"proto-{i}",
+            primary_src_ids=frozenset({"H:12미적Ⅰ02-10"}),
+            review_status=cov.PROBLEM_ELIGIBLE_STATUS,
+            has_explanation=True,
+            has_steps=True,
+            problem_type_codes=(retype or it.problem_type_code,),
+            distractor_ids=tuple(m for _, m in it.distractors),
+        )
+        for i, it in enumerate(chain_items)
+    )
+    corpus = replace(base, problems=base.problems + refs)
+    report = cov.evaluate(spec, index, corpus)
+    metric = report.metric("graph_connectivity_coverage")
+    concept = next(c for c in spec.concepts if c.code == STD)
+    facts = cov._facts(spec, index, corpus, concept)
+    return metric.met_count, metric.population, bool(facts.chain_problems)
+
+
+def main() -> int:
+    failures: list[str] = []
+
+    def check(cond: bool, msg: str) -> None:
+        if not cond:
+            failures.append(msg)
+
+    # 1) 사슬용 틀 — 저장소의 슬롯 검증(우회로 판정기 + 풀이 단계 도출)을 그대로 통과시킨다.
+    gen = _make_gen("ProtoChain", FRAMES_CHAIN, 60)
+    items = gen.items("misconception_trigger")  # _validate_slot: 판정기 위반·풀이 단계 실패 시 ValueError
+    print(f"[사슬 틀] 인스턴스 {len(items)}건 (슬롯 검증 통과: 우회로 판정기 위반 0 · 풀이 단계 전이 전건 correct)")
+    by_frame: dict[str, int] = {}
+    for it in items:
+        by_frame[it.frame_id] = by_frame.get(it.frame_id, 0) + 1
+    print("  틀별:", by_frame)
+    check(len(items) >= 40, "인스턴스 40건 미만")
+
+    sup_gen = _make_gen("ProtoSupport", FRAMES_SUPPORT, 24)
+    sup_items = sup_gen.items("misconception_trigger")
+    print(f"[지원 틀 V] 인스턴스 {len(sup_items)}건 (사슬 기여 0 — ptype.evaluate-expression)")
+
+    all_items = list(items) + list(sup_items)
+    n_ok = 0
+    for it in all_items:
+        bad = item_failures(it)
+        check(not bad, f"{it.frame_id}: {bad} :: {it.question_text}")
+        check(it.misconception_ids == frozenset({MID}), "연결 집합 != {M0678}")
+        n_ok += not bad
+    print(f"[단언] {n_ok}/{len(all_items)}건 통과: 정답=SymPy · 오개념 선지=절차 산출 · 오개념≠정답 · 선지 4상이 · 현행 판정기 위반 0 · 제안 규칙 위반 0")
+
+    # 2) 기존 두 은행과 중복 0
+    stems = {skeleton_of(it.question_text) for it in all_items}
+    conds = {_condition_key(it) for it in all_items}
+    dup_stem, dup_cond = stems & BANK_STEMS, conds & BANK_CONDS
+    print(f"[중복] 은행 {len(BANK)}건 대비 문면 골격 겹침 {len(dup_stem)} · 검산 조건 겹침 {len(dup_cond)}")
+    check(not dup_stem and not dup_cond, f"기존 은행과 중복 {dup_stem} {dup_cond}")
+    print(f"  사슬 틀 문면 골격 {len({skeleton_of(i.question_text) for i in items})}종 / {len(items)}건")
+
+    # 3) 문제유형 → 스킬 겹침 (사슬 (c))
+    graph = json.load(open(ROOT / "data/corpus/problem_type_graph_v1/graph.json", encoding="utf-8"))
+    skills_of = {n["problem_type_id"]: set(n["behavior_skills"]) for n in graph["problem_types"]}
+    concept_skills = {"skill.equation-rearrangement", "skill.word-problem-modeling"}
+    for ptype in (SOLVE, MODEL, EVAL):
+        print(f"  {ptype}: 개념 스킬과 겹침 = {sorted(skills_of[ptype] & concept_skills) or '없음'}")
+    check(all(skills_of[i.problem_type_code] & concept_skills for i in items), "사슬 틀 중 스킬 비중첩 유형이 있다")
+    check(not (skills_of[EVAL] & concept_skills), "evaluate-expression 이 겹치면 지원 틀 설명이 틀렸다")
+
+    # 4) 실제 계측기로 사슬 시뮬레이션(approved 로 신설 은행에 들어온다고 가정) + 대조군
+    base_met, pop, base_chain = chain_simulation([], "기준선")
+    sim_met, _, sim_chain = chain_simulation(list(items), "사슬 틀")
+    sup_met, _, sup_chain = chain_simulation(list(sup_items), "지원 V 만")
+    ret_met, _, ret_chain = chain_simulation(list(items), "유형 바꿔치기", retype=EVAL)
+    print(f"[계측기 시뮬레이션] 그래프 연결: 기준선 {base_met}/{pop}(02-10 사슬={base_chain}) → 사슬 틀 추가 {sim_met}/{pop}(02-10 사슬={sim_chain})")
+    print(f"  대조군: V(evaluate)만 추가 {sup_met}/{pop}(사슬={sup_chain}) · 같은 문항의 유형을 evaluate-expression 으로 바꾸면 {ret_met}/{pop}(사슬={ret_chain})")
+    check(not base_chain and sim_chain and not sup_chain and not ret_chain, "사슬 시뮬레이션 기대와 다르다")
+
+    # 5) 변별력 — 오개념 절차 값이 아닌 값을 M0678 로 라벨한 주입을 단언이 잡는가
+    print("[변별 주입] 같은 문항 단언(item_failures)이 주입된 결함 문항을 잡는가 — 현행 판정기만으로는 어떤가")
+    from dataclasses import replace as _rep
+
+    def inject(kind: str, it: DiffItem) -> DiffItem:
+        idx_map = it.distractors[0][0]
+        correct_idx = it.choices.index(it.answer_text)
+        filler_idx = next(i for i in range(4) if i not in (idx_map, correct_idx))
+        if kind == "I1 무관한 오답(필러)을 M0678 로 라벨":
+            return _rep(it, distractors=((filler_idx, MID),))
+        if kind == "I2 정답 선지를 M0678 로 라벨":
+            return _rep(it, distractors=((correct_idx, MID),))
+        if kind == "I3 우변을 양수로(방향이 양의 방향 → 부호를 떼도 같은 식)":
+            lhs, rhs = it.conditions[0].rsplit(" = ", 1) if not isinstance(it.conditions, str) else it.conditions.rsplit(" = ", 1)
+            flipped = lhs + " = " + rhs.lstrip("-")
+            cond = (flipped, *it.conditions[1:]) if not isinstance(it.conditions, str) else flipped
+            return _rep(it, conditions=cond)
+        raise AssertionError(kind)
+
+    kinds = [
+        "I1 무관한 오답(필러)을 M0678 로 라벨",
+        "I2 정답 선지를 M0678 로 라벨",
+        "I3 우변을 양수로(방향이 양의 방향 → 부호를 떼도 같은 식)",
+    ]
+    samples = [it for it in items if it.frame_id.endswith("negative-direction")][:2] + [it for it in items if it.frame_id.endswith("rail")][:2]
+    tally: dict[str, list[int]] = {k: [0, 0, 0, 0] for k in kinds}  # 총, A1~A5 중 하나라도 검출, 제안 규칙 검출, 현행 판정기가 못 잡음
+    for kind in kinds:
+        for it in samples:
+            bad_item = inject(kind, it)
+            fails = item_failures(bad_item)
+            t = tally[kind]
+            t[0] += 1
+            t[1] += bool(fails)
+            t[2] += bool(m0678_link_violations(probe_of(STD, bad_item)))
+            t[3] += not shortcut_violations(probe_of(STD, bad_item))
+    # I4 값 문항: 속도가 양수인데 |v| 를 M0678 로 라벨(= 정답과 같은 값을 오개념 선지로)
+    v_item = sup_items[0]
+    vi = v_item.distractors[0][0]
+    v_bad = _rep(v_item, choices=tuple(v_item.answer_text if i == vi else c for i, c in enumerate(v_item.choices)))
+    pb = probe_of(STD, v_bad)
+    tally["I4 값 문항: 연결 선지 값이 정답과 같음"] = [1, int(bool(item_failures(v_bad))), int(bool(m0678_link_violations(pb))), int(not shortcut_violations(pb))]
+    for kind, (total, caught, by_rule, blind) in tally.items():
+        print(f"  {kind}: {total}건 중 단언 검출 {caught} · 제안 규칙 검출 {by_rule} · 현행 판정기는 통과시킴 {blind}")
+        check(caught == total, f"주입 미검출: {kind}")
+
+    # 6) 용량 — 틀별 서로 다른 인스턴스 수(원료 파라미터 → 통과 인스턴스, 검산 조건 기준 고유)
+    print("[용량] 틀별 가능한 서로 다른 인스턴스(검산 조건 기준 · 우연 일치 거부·기존 은행 중복 제외)")
+    total_distinct: set[str] = set()
+    for fr in FRAMES_CHAIN + FRAMES_SUPPORT:
+        ok_conds: set[str] = set()
+        ok_stems: set[str] = set()
+        for pm in fr.params:
+            it = fr.build(pm)
+            if it is None or parameter_coincidences(probe_of(STD, it)):
+                continue
+            key = _condition_key(it)
+            if key in BANK_CONDS:
+                continue
+            ok_conds.add(key)
+            ok_stems.add(skeleton_of(it.question_text))
+        print(f"  {fr.frame_id}: 원료 파라미터 {len(fr.params)} → 인스턴스 {len(ok_conds)} · 문면 골격 {len(ok_stems)}종")
+        if fr in FRAMES_CHAIN:
+            total_distinct |= ok_conds
+    print(f"  사슬 틀 합계(조건 기준 고유) {len(total_distinct)}  | 수학적으로 다른 케이스(위치함수의 d 항 무시): 시각 {len(_TIME_CASES)}종 · 상수 {len(_CONST_CASES)}종")
+
+    # 7) 샘플 출력
+    print("\n[샘플]")
+    for fid in ("mc-m0678-time-negative-direction", "mc-m0678-time-rail", "mc-m0678-const-negative-direction", "mc-m0678-const-rail"):
+        it = next(i for i in items if i.frame_id == fid)
+        print(f"- {fid} ({it.problem_type_code})\n  Q: {it.question_text}\n  선지: {it.choices} 정답={it.answer_text} 연결={it.distractors}\n  해설: {it.explanation}\n  조건: {it.conditions} {it.answer_map}")
+    it = sup_items[0]
+    print(f"- {it.frame_id} ({it.problem_type_code})\n  Q: {it.question_text}\n  선지: {it.choices} 정답={it.answer_text} 연결={it.distractors}")
+
+    print("\nFAILURES:", failures if failures else "없음")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
