@@ -1,0 +1,88 @@
+# Phase 3 오답 → 교정 전략 슬라이스 데이터 (P3-06) — 오류 서명 픽스처.
+#
+# 이 파일이 담는 것: kebab(런타임 오개념 id) 단위 **오류 서명의 정오답 픽스처**뿐이다.
+# 담지 않는 것(일부러):
+#  · 핵심 오개념 12개 목록 — 분모는 P3-01 범위 명세(phase3_scope_v1)가 소유한다. 복제하지 않는다.
+#  · kebab↔M-id 매핑 — 승인 크로스워크(misconception_crosslinks_v1)가 소유한다. 여기서 만들지 않는다.
+#  · 쉬운 문항·선수 개념 — 틀린 문항의 개념에서 코퍼스를 따라가 해소한다(핀으로 박으면 코퍼스와 어긋난다).
+#
+# 서명의 정체(채널 = choice): 객관식에서 학생이 고른 보기 하나 → 그 문항 distractor_map 의 항목
+# (choice_index → 오개념 kebab[, op_code]). 항목 자체는 승인된 문항에 이미 있고, 이 파일은 그 항목을
+# 근거로 "이 보기를 고르면 이 오개념 후보가 나와야 한다 / 정답 보기를 고르면 나오면 안 된다"를 선언한다.
+#
+# 픽스처 선정 규칙(결정론 — 사람이 임의로 고르지 않는다): 그 kebab 을 가리키는 승인 객관식 문항 중
+# ① 자기 개념 코드를 가진 것 ② 문면 템플릿이 일정한 것(독립 검산 가능) ③ 문면이 서로 다른 것
+# ④ 난이도·문항 ID 오름차순 앞 2건.
+#
+# 범위 밖(P3-06 결정 2026-10-17 Kiki): 단답형 문항(대표 과정의 79%)은 어떤 채널로도 후보가 0건이다 —
+# 숫자 하나를 답하는 문항이라 오류 서명 등식이 만들어지지 않는다. 별건으로 등재했고 여기서 다루지 않는다.
+# 좌석 없는 핵심 오개념 5개(M0673·M0674·M0676·M0677·M0678)도 같은 날 결정으로 "막힘"으로 보고한다 —
+# 행을 만들지 않는다(없는 서명을 있는 것처럼 적지 않는다).
+spec_version: 1
+spec_id: phase3-remediation-v1
+scope_spec_id: phase3-scope-v1
+unseated_decision:
+  gate: G-misc40-unseated-concepts-disposition
+  decided_on: "2026-10-06"
+  by: Kiki
+  summary: 안 E 보류 — P3-02 이후 안 A~D 중 재판정. 2026-10-17 P3-06 은 좌석 있는 오개념만 완성하고 나머지는 막힘으로 보고한다.
+
+signatures:
+  - kebab_id: power-rule-step-omitted
+    channel: choice
+    fixtures:
+      wrong:
+        - {problem_id: "3ad4f5fd-be93-50eb-8afb-1c115d07aa62", choice_index: 0}
+        - {problem_id: "3ad4f5fd-be93-50eb-8afb-1c115d07aa62", choice_index: 3}
+        - {problem_id: "587ca647-6944-53c7-8b10-6605f3e088d6", choice_index: 0}
+        - {problem_id: "587ca647-6944-53c7-8b10-6605f3e088d6", choice_index: 3}
+      correct:
+        - {problem_id: "3ad4f5fd-be93-50eb-8afb-1c115d07aa62", choice_index: 2}
+        - {problem_id: "587ca647-6944-53c7-8b10-6605f3e088d6", choice_index: 2}
+  - kebab_id: product-rule-naive
+    channel: choice
+    fixtures:
+      wrong:
+        - {problem_id: "7e31ac8e-c959-5ee8-b966-a1525c1a9063", choice_index: 0}
+        - {problem_id: "b9409d55-103d-5227-ba6f-8c556649393f", choice_index: 0}
+      correct:
+        - {problem_id: "7e31ac8e-c959-5ee8-b966-a1525c1a9063", choice_index: 1}
+        - {problem_id: "b9409d55-103d-5227-ba6f-8c556649393f", choice_index: 2}
+  - kebab_id: critical-point-implies-extremum
+    channel: choice
+    fixtures:
+      wrong:
+        - {problem_id: "135fbda6-b52f-591e-9f10-0f523df4cebe", choice_index: 1}
+        - {problem_id: "1e924953-5c42-52b4-850a-f3d411e03df9", choice_index: 1}
+      correct:
+        - {problem_id: "135fbda6-b52f-591e-9f10-0f523df4cebe", choice_index: 0}
+        - {problem_id: "1e924953-5c42-52b4-850a-f3d411e03df9", choice_index: 0}
+  - kebab_id: continuity-implies-differentiability
+    channel: choice
+    fixtures:
+      wrong:
+        - {problem_id: "920d9d5e-c36f-5994-b5dd-22600bbe0d83", choice_index: 1}
+        - {problem_id: "0cbf40e1-9e35-5456-a8f4-550f0e638e8e", choice_index: 1}
+      correct:
+        - {problem_id: "920d9d5e-c36f-5994-b5dd-22600bbe0d83", choice_index: 0}
+        - {problem_id: "0cbf40e1-9e35-5456-a8f4-550f0e638e8e", choice_index: 0}
+  - kebab_id: extremum-max-min-confused
+    channel: choice
+    fixtures:
+      wrong:
+        - {problem_id: "666c32aa-0103-57e0-be97-8f34d1524dce", choice_index: 0}
+        - {problem_id: "06b407ee-638c-579f-a0cc-6388a48efe48", choice_index: 0}
+      correct:
+        - {problem_id: "666c32aa-0103-57e0-be97-8f34d1524dce", choice_index: 3}
+        - {problem_id: "06b407ee-638c-579f-a0cc-6388a48efe48", choice_index: 3}
+  - kebab_id: extremum-value-vs-point-confused
+    channel: choice
+    fixtures:
+      wrong:
+        - {problem_id: "666c32aa-0103-57e0-be97-8f34d1524dce", choice_index: 1}
+        - {problem_id: "666c32aa-0103-57e0-be97-8f34d1524dce", choice_index: 2}
+        - {problem_id: "06b407ee-638c-579f-a0cc-6388a48efe48", choice_index: 1}
+        - {problem_id: "06b407ee-638c-579f-a0cc-6388a48efe48", choice_index: 2}
+      correct:
+        - {problem_id: "666c32aa-0103-57e0-be97-8f34d1524dce", choice_index: 3}
+        - {problem_id: "06b407ee-638c-579f-a0cc-6388a48efe48", choice_index: 3}

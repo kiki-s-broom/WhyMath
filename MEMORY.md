@@ -338,6 +338,16 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-17 (구현 · P3-06): **핵심 오개념 12개 중 7개에서 오답 → 후보·신뢰도 → 교정 전략 체인이 돈다 — 5개는 kebab 이름표가 없어 막혔고 이는 Kiki 결정 사항이라 세션이 만들지 않았다. 완료 판정은 미충족(7/12)이다** (claude 구현, 설계 결정 2건은 사용자) — 판정 기준 main `63fe19dd`(브랜치 `claude/p3-06-wrong-answer-remediation-slice`, 머지 전)
+
+**무엇**: 새 탐지기 없이 Phase 2 부품(선지 역추적 → 가설 정책 6칸 표 → `update_hypotheses` → 개입 결정 트리 → P-09 사다리 → 교수 전략 선택기)을 채점 경로와 같은 순서로 조립하는 순수 체인 `l4/misconception/remediation_strategy.py`, 데이터 로더 `l1/standards/phase3_remediation_spec.py`, 12행 커버리지 CLI `ops/phase3_remediation.py`, 픽스처 데이터 `data/corpus/phase3_remediation_v1/`를 더했다. 판정문 = `docs/reviews/p3_06_wrong_answer_remediation_judgment_2026-10-17.md`.
+
+**결정(사용자, 2026-10-17)**: ① 좌석 없는 5개(M0673·M0674·M0676·M0677·M0678)는 이번 항목에서 7개만 완성하고 "막힘"으로 보고 — 2026-10-06 `G-misc40-unseated-concepts-disposition`의 안 E 보류를 승계, kebab·크로스링크 신설은 Kiki 서명 사항. ② 단답형 885문항은 범위 밖 — "예측 오답값 매처"는 새 탐지기 금지에 걸림.
+
+**실측**: 변별력 — 상태 주입 테스트 + 코드 뮤테이션 14종 전건 검출(1차 4종 생존 → 동치 뮤턴트 교체·테스트 보강 후 0). 정답 픽스처 12건 오탐 0. 픽스처 6쌍은 `distractor_map` 라벨과 독립인 SymPy 계산으로 검산. 작동한 비율 — 오답 보기 선택 378건 중 후보 366건, 12건은 raw M-id(`M0674`)라 서빙이 조용히 버리는데 P3-02 계측기는 "닿음"으로 센다(측정과 서빙의 불일치). 교수 전략은 전 오개념 `ANALOGY` — 선택기 R2 규칙이 "가설이 있으면 ANALOGY"이고 오개념별 정밀화는 `P3-23`이 보류 중이라 새 간선을 만들지 않았다.
+
+**정직한 공백**: ① 12개 중 5개 막힘 · M0672는 같은 kebab의 canonical M0075에 가려짐(`P3-59`). ② 단답형 채널 없음(`P3-56`). ③ 계측/서빙 불일치(`P3-57`) · op-code 공백(`P3-58`) · 선지 신뢰도 0.8이 반례 임계(>0.8)에 걸려 첫 오답은 항상 거꾸로 사고(`P3-60`) — 전부 등재만 하고 고치지 않았다(confidence 규칙은 Phase 2 것 그대로). ④ 오답 보기 378건 전수 검산은 하지 않았다. ⑤ `backend-migrations`·`docker-build` 잡은 로컬 재현 불가(변경이 스키마·빌드에 닿지 않음).
+
 ### 2026-10-16 (판정·G-misc40-deferred-m0599-redecision): **Kiki가 M0599 보류를 승인으로 재판정했다 — 승인 코퍼스에 직접매핑 0.9로 복귀(68→69건), 앵커 A3 좌석 0→1. 세 필드는 AI 저작인 채로 승인됐고 원 출처 근거는 아니다**
 
 **무엇**: 게이트 `G-misc40-deferred-m0599-redecision`(2026-10-06 요청·10일 경과)에 Kiki가 "M0599 승인"을 지시했다. 판정 재료는 PR #1643(main `8d21c4cc`)이 들여온 `M0599`의 AI 저작 세 필드(`student_wrong_thinking`·`distractor_rule`·`error_type`, 표기 `AI생성-검수필요(MISC-61)`)다. 정본 기록 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §4.

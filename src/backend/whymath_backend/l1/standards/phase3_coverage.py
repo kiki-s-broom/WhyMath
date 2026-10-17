@@ -573,6 +573,18 @@ def reached_misconception_ids(problem: ProblemRef, corpus: CoverageCorpus) -> fr
     return _reached_misconceptions(problem, corpus)
 
 
+def concept_facts(
+    spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus, concept: ConceptEntry
+) -> ConceptFacts:
+    """개념 1건의 코퍼스 사실 — 계측기가 쓰는 `_facts` 의 공개 창구.
+
+    P3-06 교정 해소기(`ops/phase3_remediation`)가 "선수 개념이 있는가"를 계측기와 **같은 판정**으로
+    묻게 하려고 연다. 두 곳이 따로 계산하면 계측기는 연결됐다고 말하는데 교정은 갈 곳이 없는
+    상태가 조용히 생긴다.
+    """
+    return _facts(spec, index, corpus, concept)
+
+
 def problem_ref_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
     """코퍼스 행 → `ProblemRef` 의 공개 창구(백필이 계측기와 같은 변환을 쓰게 한다)."""
     return _problem_from_row(row)
