@@ -5,16 +5,20 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: blocked
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on:
   - P3-04-problem-metadata-and-slots
+  - P3-22-coverage-hint-source-wiring
+  - P3-42-coverage-hint-baseline-live-measurement
 requires_gates: []
 acceptance:
   - "① 결손 고정 — P3-02 CLI(phase3_coverage) 기준 대표 과정 핵심 개념 10종의 hint 연결이 전부 측정 불가(unmeasured 10)다: 힌트 저장 좌석이 없다(ARCH-39 '영구 부재' 판정 · hint_strategy 좌석은 P3-04 소관). P3-03(PR #1512, 54dc071e) 완료 시 acceptance ②(핵심 개념 5종 연결)의 잔여 축으로 승계받았다(Kiki 결정 2026-10-10).\n② 선행 — P3-04가 Problem 필수 7필드의 hint strategy 좌석을 만든 뒤 착수한다(depends_on). 좌석이 생기면 phase3_coverage의 hint 연결이 unmeasured에서 linked/missing으로 측정 가능해져야 한다 — 측정 불가를 충족으로 세지 않는다.\n③ 채우기 — 핵심 개념 10종의 승인 문항에 hint를 채워 phase3_coverage hint linked 10/10. hint 문안은 정답을 바로 주지 않는 Polya 단계형이어야 하며(CLAUDE.md 교수학 금기), 승인된 내용에 hint를 더하는 것이 승인 근거를 옮기는지(EOS-27 내용 지문 · P3-03 감사 결속 선례)를 먼저 판정한다.\n④ 완료 판정 — 재측정 전후 표(hint 연결 · Concept Completeness)와 다른 연결이 줄지 않음."
   - "[정정 2026-10-12 · P3-15 판정 추가 검토] 이 태스크가 P3-04에 걸린 근거로 적힌 힌트 저장 좌석 부재(ARCH-39 영구 부재)는 2026-09-07에 미실체화 · S4-11 소유로 정정됐고, S4-11(2026-09-29)이 hints 테이블을 실체화했다. P3-04가 정하는 hint_strategy(Problem 7번째 필드)와 hints 본문 좌석은 별개다. 이 태스크의 의존이 P3-04인 것이 맞는지는 P3-22의 정정 항 ①②가 먼저 판정한다. 판정 전에는 P3-04 쪽으로 순서를 단정하지 않는다. 근거: docs/reviews/p3_g1_week1_gate_judgment_2026-10-12.md 정정 절."
+  - "[재판정 2026-10-14 · 착수 세션 실측 · 기준 main a4942eac] ① 재측정 전 기준선(python -m whymath_backend.l1.standards.phase3_coverage, exit 1): Concept Completeness 0/10 · hint unmeasured 10 · 문제 메타 hint_strategy unknown 917(적격 문항 917건) · prerequisite/misconception/solution/pedagogy 각 linked 10/10 · Content Coverage 10/10 · Curriculum Coverage 10/10 · Graph Connectivity 5/10. 완료 판정(④)은 이 표와 비교한다. ② P3-04 의존은 불필요하다 — P3-04는 done이고 hint_strategy(Problem 7번째 필드)와 hints 본문 좌석은 별개다. 실제 선행은 P3-22다: 측정 CLI의 main이 load_corpus를 hint_problem_ids 없이 호출하므로 hints 테이블을 아무리 채워도 hint 연결은 unmeasured로 남는다(배선 없이는 채우기 결과를 볼 수 없다). 그래서 depends_on에 P3-22를 붙였다. ③ 승인 근거 판정: review_content_fingerprint는 최상위 키 블랙리스트 방식이라 문항 JSONL 레코드에 힌트 키를 더하면 지문이 바뀌어 재검수 대상이 된다. 힌트는 hints 테이블(별도 행)에만 두면 레코드 지문은 불변이다 — 문항 JSONL 편집 금지, hints 경유만. ④ 채우기 실행 조건: DB에 problem 행이 적재돼 있고 solution_paths가 승격돼 있어야 한다(whs.path_promotion --apply 후 l4.hint_content.populate --apply). 클라우드 세션에는 Postgres·Docker가 없어 실행할 수 없다 — Kiki 머신의 whymath-pg(5433)에서 실행하며, 적격 917건이 DB에 적재돼 있는지는 아직 미확인이다(P3-22 착수 시 첫 실측)."
+  - "[정정 2026-10-16 · 재확인 · 기준 main 674a92b1] 앞선 2026-10-14 재판정 ②의 \"실제 선행은 P3-22(측정 배선 미착지)\"는 그날 기준으로만 맞았고 지금은 낡았다 — P3-22는 PR #1632(dd2c55b1)로 착지해 phase3_coverage --hints-from-db 가 있고, phase3_metrics 배선은 P3-41(#1653)이 맡았다. 재확인 실측: 기본 실행은 hint unmeasured 10 · Concept Completeness 0/10 · exit 1 로 기준선과 같고, --hints-from-db 는 DB 가 없는 이 환경에서 ConnectionRefusedError 로 exit 2(CoverageError) 하며 측정 불가로 조용히 내려가지 않는다 — 배선은 정상이다. 따라서 이 태스크를 막는 것은 측정 도구가 아니라 운영 DB 사실이다: (a) 적격 917건의 problem_id 가 DB problem 행으로 적재돼 있는지(ID 공간 일치) (b) DB 의 verified 힌트가 지금 몇 문항인지. 둘 다 P3-42(Kiki 머신 · whymath-pg 5433)가 실측하므로 P3-42 를 선행으로 붙인다. P3-42 결과가 '겹침 0'이면 채우기(③) 전에 ID 공간 불일치 규명이 먼저다. 2026-10-14 재판정 ③(힌트는 hints 테이블 경유만 — 문항 JSONL 편집은 내용 지문을 바꿔 재검수 유발)과 ④(채우기는 whs.path_promotion --apply 후 l4.hint_content.populate --apply, Kiki 머신)는 그대로 유효하다."
 artifacts: []
 paths: []
 session: null
@@ -22,4 +26,12 @@ notes: |-
   출처: P3-03 완료(2026-10-10) 시 acceptance ② 잔여 승계. 같은 승계의 다른 축(02-02 해설 연결)은 P3-31.
 
   [정정 2026-10-12] P3-15 판정 추가 검토로 hint 좌석 부재 전제가 정정됨. 의존 필요성 재판정은 P3-22 정정 항이 맡는다
-updated: 2026-10-12
+
+  [정정 2026-10-14] 착수 실측: 측정 배선(P3-22) 없이는 채우기 결과가 unmeasured로 남아 완료 판정 불가 — 선행을 대장에 집행 · P3-04는 이미 done이며 불필요
+
+  [차단 2026-10-14] 선행 P3-22(측정 배선) 미착지 + 채우기에 DB 필요(클라우드 세션엔 Postgres 없음) — P3-22 done 후 unblock
+
+  [정정 2026-10-16] 재확인: P3-22 착지(#1632)로 측정 배선 선행은 해소 — 남은 선행은 운영 DB 기준선 P3-42(ID 공간 일치·verified 힌트 수)
+
+  [차단 2026-10-16] 선행 P3-42(운영 DB 기준선: 문항 ID 공간 일치·verified 힌트 수) 미실측 + 채우기는 Kiki 머신 DB 작업 — 측정 배선(P3-22)은 #1632로 착지해 해소
+updated: 2026-10-16

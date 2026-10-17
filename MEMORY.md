@@ -338,6 +338,28 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-16 (판정·G-misc40-deferred-m0599-redecision): **Kiki가 M0599 보류를 승인으로 재판정했다 — 승인 코퍼스에 직접매핑 0.9로 복귀(68→69건), 앵커 A3 좌석 0→1. 세 필드는 AI 저작인 채로 승인됐고 원 출처 근거는 아니다**
+
+**무엇**: 게이트 `G-misc40-deferred-m0599-redecision`(2026-10-06 요청·10일 경과)에 Kiki가 "M0599 승인"을 지시했다. 판정 재료는 PR #1643(main `8d21c4cc`)이 들여온 `M0599`의 AI 저작 세 필드(`student_wrong_thinking`·`distractor_rule`·`error_type`, 표기 `AI생성-검수필요(MISC-61)`)다. 정본 기록 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §4.
+
+**반영**: `data/corpus/misconception_crosslinks_v1/crosslinks.json`에 `addition-multiplication-rule-confused` ↔ `M0599` 직접매핑 0.9(method manual, note 끝 `검수:kiki 2026-10-16`)를 되돌리고 `_provenance.json`(counts 69·서명 1건·source_of_truth)을 맞췄다. 동결 테스트 2종(`test_approved_crosslinks_corpus`·`test_anchor_seat_gap`)을 새 기대값으로 고쳤다 — 건수 69, A3 좌석 1. 보류 전용 테스트(`test_misc40_deferred_rows_are_not_in_the_approved_corpus`)는 보류 대상이 0건이 되어 공허 통과가 되므로 삭제했다.
+
+**한계(사실 기록)**: ①"원 출처에서 채워지면 재판정"(10-07 보류 조건)은 충족되지 않았다 — 원천이 공란임이 10-09에 확정됐고, 승인은 AI 저작 재료를 인정한 Kiki의 판단이다. 이 사실을 crosslink `note`에 남겼고(`원 출처 근거는 없음`), 지워지면 RED가 되게 동결했다. ②저작 근거 `J0405.misconception`과 `M0599.canonical_statement`가 같은 문장이라 근거의 독립성은 약하다. ③Kiki 머신 prod DB에는 10-06 조회 기준 이 행이 이미 있다(stamp `2026-10-05`). DB는 건드리지 않았고 코퍼스와의 note 차이(10-05↔10-16)는 별도 동기화 몫이다. ④검수 큐 원본(`docs/data/misconception_crosslink_review_queue.json`)은 봉인 유지(전행 pending). ⑤**게이트는 닫지 못했다** — `gates clear`가 `depends_on`의 `MISC-61`(in_progress)을 이유로 exit 1로 거부했다. 거부는 우회하지 않았고(`--remove-depends`·`waive`는 Kiki 판단 사항), 게이트는 pending 그대로다.
+
+**검증**: 관련 테스트 143 passed(crosslink 코퍼스·앵커 좌석·canonical flip 계약·강등전·검수·MISC-61 저작·카탈로그). 주입 2종 — note의 AI 저작 고지 삭제 → RED, M0599 신뢰도 0.9→0.8 → RED — 후 `cmp` 바이트 동일 원복.
+
+### 2026-10-12 (구현·MISC-61 1차): **A3 얇은 M-id 중 M0599·M0600을 개념 코퍼스(J0405·J0406 수기 검수)에 근거해 AI 저작하고, 추출기가 값을 버릴 때 키 이름을 경고하게 했다 — M0418·M0417은 원천 `오개념_원인`의 내용을 보기 전에는 채우지 않는다**
+
+**무엇**: 태스크 `MISC-61-a3-thin-misid-source-enrichment`(**미완 · in_progress**). 정본 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §2-c. 판정 기준: main `f34d7b76` 위 브랜치 `claude/peaceful-bell-s7mlg8` — **미머지**(PR 없음 · 사유: 미완 + Kiki 2차 실행 대기).
+
+**결정**: ①`distractor 연결됨` 88행은 원천부터 비어 있다(2026-10-09 실측) → M0599·M0600은 acceptance ③ 경로로 새로 저작하고 `AI생성-검수필요(MISC-61)`로 표시한다. 근거는 개념 코퍼스 `J0405`·`J0406`(`수기 검수`)의 `metaphor`·`accepted_expressions`와 성취기준 `[9수04-05]`·`[9수04-06]`이다. ②kebab 카탈로그는 열람·복사하지 않았고, 그 주장을 저작자의 말에 맡기지 않도록 기계 가드로 동결했다(최장 공통 부분문자열 14자 미만 — 실측 최대 8자 · 전 kebab 대조군). ③추출기는 읽지 않는 키에 값이 있으면 키 이름·행 수를 집계해 경고한다(공통 메타 5열은 의도적 비매핑). ④진단 스크립트의 `verdict` 과장을 정정하고(대상 밖 행 90% 이상에 값이 있는 열은 공통 메타로 제외) `--dump-key`를 더했다. ⑤완료 조건 ②의 "재추출로 채운다"는 **하지 않는다** — 코퍼스는 추출 이후 열(`severity`·`behavior_skills`)과 수기 추가 행 6건을 가져 재추출이 이를 지운다(실측). 표적 패치로 읽는다.
+
+**검증(실측)**: 보호 장치를 실패 주입으로 확인 — 추출기 경고 6종·진단 스크립트 8종·코퍼스 결함 8종 전건 RED, 원복 바이트 동일. 전체 백엔드 스위트(CI와 같은 명령·커버리지 포함) 19,071 passed · failed 0 · 커버리지 86.29%, 계층별 게이트 전 계층 PASS(626 skip은 PG 필요 통합 테스트). data-pipeline 잡 재현(ruff·black·mypy --strict) exit 0, 코퍼스 변경 시 전용 게이트 `qa_pipeline` exit 0(8개 축 ok), harness-integrity 재현(validate·audit-deps·규칙 인덱스·jit·헌법 래칫) exit 0 · 위헌 심사 차단 0건. 로컬은 Python 3.13이고 CI는 3.12다 — 그 차이는 검증하지 못했다.
+
+**실측이 설계를 고친 3건**: (a)첫 대조군이 `counterexample`이 4글자인 kebab을 골라 "복사해도 안 잡힌다"가 되어 RED가 났다 — 가드의 사각(서술 8자 미만)을 숨기지 않고 전수 대조군 + 통째 포함 검사로 보강했고 사각은 문서에 적었다. (b)공통 열을 비율로 가르면 소표본에서 모든 열이 공통이 되어 H2 판정이 사라진다 — 대조군 20행 미만이면 공통을 인정하지 않는 표본 가드를 넣었다. (c)추출기 docstring에 "88행이 키를 못 읽어 비었다"고 썼으나 88행은 원천 공란이다 — 정정.
+
+**한계(사실 기록)**: M0599·M0600은 AI 저작이라 "원 출처에서 채워졌다"(게이트 §1 문면)는 충족되지 않는다. 인정 여부는 Kiki 몫이다. PowerShell 런북 블록(2차 실행)은 이 환경에 `pwsh`가 없어 **실행·파싱하지 못했다**(정적 가드만 통과). 승계: `MISC-64-remaining-empty-triple-rows-disposition`(잔여 86행·19행 처분).
+푸시 직전 훅이 권한 `ci_mirror.py run`은 이 컨테이너에서 5개 잡 전부 **설치 스텝(exit 1)** 에서 멈춰 뒤 스텝이 미실행으로 남았다(원인 미격리 — `pip install --dry-run`은 성공하므로 시스템 pip 업그레이드 단계 의심, 출력 미저장). 그래서 미러는 판정 근거가 아니며, CI 잡 스텝은 venv에서 손으로 재현했다(data-pipeline·backend·infra-contracts·harness-integrity) — `corpus-authoring`·`policy-guard`·`infra-shell`·`declared-unwired-audit`·`docker-build` 등은 재현하지 않았고 CI가 최종 판정한다.
 ### 2026-10-15 (구현 · P3-05): **빈 칸 채우기 은행 204건이 3회차 감사(S5)를 통과해 승인 각인됐다 — Problem Coverage 6/8 → 8/8(100%), 핵심 개념 6슬롯 42/60 → 60/60. 1회차 k = 19, 2회차 k = 2, 3회차 k = 0 — n = 204에서는 k = 0만 통과하는 경계라 회차마다 새 은행을 만들었다** (claude 구현, 설계 결정은 사용자) — 판정 기준: PR 3/3 head(머지 전)
 
 **무엇**: 태스크 `P3-05-triangle-density`. 기존 승인 문항이 못 채운 슬롯 13칸(02-01·02-02·02-07)과 승인 문항이 0건이던 두 스킬(규칙 일반화 ← 02-03, 문장제 모델링 ← 02-10)을 새 은행 `problem_bank_p3_fill_v0` 204건(13칸 × 12 + 24 + 24)으로 채웠다. 재배정 5칸은 생성하지 않았다(사용자 결정: 정직형 배정). 승인 경로는 P3-03과 같은 결함 주입 강등전 프로토콜(기계 게이트 ∪ 판정자 A ∪ B)이고, 자격 측정(검출 120/120)을 그대로 쓴다.

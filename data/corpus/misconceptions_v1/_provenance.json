@@ -31,9 +31,9 @@
     "quality": "ai_estimated",
     "severity_counts": {
       "blocking": 344,
-      "local": 319,
+      "local": 321,
       "cosmetic": 71,
-      "None": 109
+      "None": 107
     },
     "with_behavior_skills": 806,
     "total": 843,
