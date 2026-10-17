@@ -338,6 +338,18 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-17 (결정 · P3-06 재판정): **좌석 없는 5개 개념 중 4개(M0673·M0674·M0676·M0678)는 안 A — 선지 역추적 전용 kebab 허용으로 재판정. M0677은 제외** (사용자 결정, 세션 기록) — 판정 기준 main `d199205f`(PR #1673 병합 후)
+
+**결정(사용자, 2026-10-17)**: 2026-10-06 `G-misc40-unseated-concepts-disposition`이 안 E(보류, P3-02 이후 재판정)로 닫혔고, P3-02가 착지했으며, P3-06 실측에서 5개가 kebab 이름표 부재로 오답→교정 전략 체인이 막힌 것이 드러나 재판정 시점이 왔다. 선택: **안 A를 4개 개념에 한해 채택** — 본문 신호 없이 오답 보기 선택으로만 후보가 되는 선지 역추적 전용 kebab. 이 선택은 카탈로그 불변식 "signals 1건 이상"을 그 부류에 한해 완화한다.
+
+**제외**: M0677은 게이트 `G-p345-m0677-link-disposition`(P3-52) 소관이라 이 결정에 넣지 않았다.
+
+**왜 안 A인가(세션이 확인한 근거)**: P3-06 실측에서 이 4개 중 M0674가 오답 보기 378건 중 12건에서 raw M-id로 이미 쓰이는데 서빙이 카탈로그에 없다는 이유로 조용히 버린다(P3-57). 본문 신호가 없는 omission형이라 안 B(재저작)보다 보기 경로가 개념의 성격에 맞는다는 MISC-40 판정문 §3·§7의 분류와도 일치한다.
+
+**후속**: 구현은 태스크 `P3-61-choice-trace-only-kebabs`로 등재(문서 선행 → 카탈로그 → 불변식 완화 범위 동결 → 동결 테스트 갱신 → pending 크로스링크 행). 새 kebab의 kebab↔M-id 연결은 pending 행까지만 만들고 승인(서명)은 Kiki 몫이다. 이 결정은 게이트 `G-misc40-unseated-concepts-disposition`의 기록을 고치지 않는다(그 게이트는 안 E로 cleared이고 이 항목이 재판정의 기록이다).
+
+**아직 열려 있는 것**: P3-06은 이 결정이 구현·서명되기 전까지 12/12가 아니다(현재 7/12 — 대장에는 Kiki 지시로 done). 구현 후 CLI를 다시 돌려 몇 개가 served로 바뀌는지 실측해 보고한다. 승인 전에는 served가 아니라 pending이다.
+
 ### 2026-10-17 (구현 · P3-06): **핵심 오개념 12개 중 7개에서 오답 → 후보·신뢰도 → 교정 전략 체인이 돈다 — 5개는 kebab 이름표가 없어 막혔고 이는 Kiki 결정 사항이라 세션이 만들지 않았다. 완료 판정은 미충족(7/12)이다** (claude 구현, 설계 결정 2건은 사용자) — 판정 기준 main `63fe19dd`(브랜치 `claude/p3-06-wrong-answer-remediation-slice`, 머지 전)
 
 **무엇**: 새 탐지기 없이 Phase 2 부품(선지 역추적 → 가설 정책 6칸 표 → `update_hypotheses` → 개입 결정 트리 → P-09 사다리 → 교수 전략 선택기)을 채점 경로와 같은 순서로 조립하는 순수 체인 `l4/misconception/remediation_strategy.py`, 데이터 로더 `l1/standards/phase3_remediation_spec.py`, 12행 커버리지 CLI `ops/phase3_remediation.py`, 픽스처 데이터 `data/corpus/phase3_remediation_v1/`를 더했다. 판정문 = `docs/reviews/p3_06_wrong_answer_remediation_judgment_2026-10-17.md`.
