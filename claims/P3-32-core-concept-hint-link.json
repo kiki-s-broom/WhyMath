@@ -1,1 +1,0 @@
-{"branch": "claude/great-ride-0j47j7", "harness": "2.0", "kind": "block", "reason": "선행 P3-42(운영 DB 기준선: 문항 ID 공간 일치·verified 힌트 수) 미실측 + 채우기는 Kiki 머신 DB 작업 — 측정 배선(P3-22)은 #1632로 착지해 해소", "task": "P3-32-core-concept-hint-link", "ts": "2026-10-16T14:52:48Z"}
