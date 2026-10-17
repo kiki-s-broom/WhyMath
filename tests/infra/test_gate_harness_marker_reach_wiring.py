@@ -85,6 +85,9 @@ GATE_HARNESS_PATHS: tuple[str, ...] = (
     # EOS-142 — 무개입 연속 3루프(§18)의 유일한 상시 증거 · SCENARIO-001~010 회귀 스위트.
     "tests/backend/api/test_e2e_three_consecutive_loops.py",
     "tests/backend/scenarios/test_phase2_scenario_regression_suite.py",
+    # P3-13 — Release Gate D 이벤트 8종 실세션 역할 대조. 같은 마커 수집으로 도는 실 PG 하네스라
+    # 목록에 올려 두지 않으면 마커·--ignore가 바뀔 때 조용히 skip으로 빠져도 아무 가드가 못 본다.
+    "tests/backend/scenarios/test_gate_d_event_role_census.py",
 )
 
 #: EOS-142로 편입된 두 하네스 — 목록에서 **유도하지 않고** 리터럴로 적는다. 유도하면 목록에서

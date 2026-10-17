@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-33-phase3-metric-targets-apply
+title: "P3-33 — Phase 3 지표 목표 확정 반영: 지표 7 목표 0.95 명세 반영 + 지표 6 을 F-Ⅱ·F-Ⅴ 로 축소"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-14-phase3-metrics-cli
+requires_gates: []
+acceptance:
+  - "① 범위 명세 data/corpus/phase3_scope_v1/scope_spec.yaml 의 completeness.targets.graph_connectivity_coverage 를 null 에서 0.95 로 확정한다(나머지 4개 목표는 값 변경 없음 — 게이트 G-p314-phase3-metric-targets 가 확정). 명세 변경 사유를 파일 머리말 동결 근거에 1줄 추가한다.\n② ops/phase3_metrics.py 의 지표 6(Critical Defect)을 Hard Gate F-Ⅱ(검수 통과 CU 수학 오류율)·F-Ⅴ(힌트 정답 누설) 2종만 흡수하도록 줄이고(분모 5에서 2), F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관임을 출력에 적는다. 위반 주입 테스트·--self-check 합성 세계·뮤테이션을 새 정의에 맞춰 갱신하고 지표 6 만 반응함을 다시 확인한다.\n③ docs/standards/phase3_metrics_contract.md 의 지표 6·7 정의와 6절 불일치 기록을 확정 결과로 갱신한다.\n④ 실 코퍼스 판정에서 지표 7 이 target_pending 이 아니라 측정값 기준 PASS/FAIL 로 나오는지 확인한다.\n⑤ CI 잡 목록 전수 열거 후 닿는 잡 전부 재현한다(backend·infra-contracts·declared-unwired-audit·harness-integrity·policy-guard)."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1608 (#1608) · 커밋 6b3fdcdc"
+paths:
+  - data/corpus/phase3_scope_v1/scope_spec.yaml
+  - src/backend/whymath_backend/ops/phase3_metrics.py
+  - tests/backend/ops/test_phase3_metrics.py
+  - docs/standards/phase3_metrics_contract.md
+session: null
+notes: "출처: 게이트 G-p314-phase3-metric-targets 를 Kiki 결정(2026-10-12)으로 clear 하면서 남긴 후속. 결정 내용: 지표 1~5 예시값 그대로 확정, 지표 6 은 F-Ⅱ·F-Ⅴ 만, 지표 7 은 95%. AI 품질 평가 기준선(P3-10)은 아직 없는 상태로 확정했으므로 지표 4·5·6 은 그 결과를 보고 재조정할 수 있다(재조정은 별도 결정이며 이 태스크의 선행이 아니다). 코드 변경은 backend 의존성이 설치된 환경에서 검증해야 한다."
+updated: 2026-10-13

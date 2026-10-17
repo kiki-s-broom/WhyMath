@@ -77,6 +77,7 @@ logger = logging.getLogger("whymath.l3.verify_answer")
 __all__ = [
     "AnswerVerdict",
     "SolvabilityVerdict",
+    "budget_exceeded_verdict",
     "classify_solvability",
     "derive_selected_root",
     "verify_answer",
@@ -95,6 +96,7 @@ __all__ = [
     "verify_root_aggregate",
     "verify_root_selection",
     "verify_series_converges",
+    "warm_isolated_worker",
 ]
 
 
@@ -159,6 +161,11 @@ def _fail(reason: str, samples_checked: int) -> AnswerVerdict:
 def _unverifiable(reason: str, samples_checked: int = 0) -> AnswerVerdict:
     """unverifiable 결과 조립 — 정직 회피의 단일 출구(절대 pass 위장 금지)."""
     return AnswerVerdict(state="unverifiable", reason=reason, samples_checked=samples_checked)
+
+
+def budget_exceeded_verdict() -> AnswerVerdict:
+    """계산 시간 상한 초과(OPS-96)의 *판정 불가* 결과 — pass·fail 어느 쪽도 아니다."""
+    return _unverifiable("SymPy 계산 시간 상한 초과 — 검증 안전 회피")
 
 
 # 부등식·≠ 관계 연산자 — 잔차(lhs-rhs) 진리값 평가 경로에서 쓰는 연산자 집합.
@@ -942,6 +949,41 @@ def _claimed_int(claimed: str, tol: float) -> int | None:
     return rounded if abs(value - rounded) < 1e-6 and rounded >= 0 else None
 
 
+def _count_bounds(
+    conditions: str | Sequence[str],
+) -> tuple[str, list[tuple[sympy.Expr, str]]] | None:
+    """실근 개수 조건 = 등식 1개 + (선택) 같은 변수의 범위 부등식들 → (등식, [(잔차, 연산자)]).
+
+    "열린구간 (-4, 4)에서 … 실수 c의 개수"처럼 *범위 안의* 근만 세는 문항의 검산 재료다
+    (`["6*x**2 - 4*x - 32 = 0", "x > -4", "x < 4"]`). 범위 조건은 변수 하나에 대한 부등식·`!=`
+    (잔차가 그 변수의 일차식)만 받는다 — 그 밖의 형태(둘째 등식·다른 변수·비선형 범위)는 None
+    (보수적 unverifiable). 단일 조건이면 범위 없이 그대로(종전 계약).
+    """
+    if isinstance(conditions, str):
+        return conditions, []
+    items = list(conditions)
+    if not items:
+        return None
+    equation, rest = items[0], items[1:]
+    bounds: list[tuple[sympy.Expr, str]] = []
+    for text in rest:
+        try:
+            residual, op = _parse_condition(text)
+        except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 None
+            logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+            return None
+        if op == "==" or len(residual.free_symbols) != 1:
+            return None
+        (symbol,) = residual.free_symbols
+        try:
+            if sympy.degree(residual, symbol) != 1:
+                return None
+        except sympy.PolynomialError:
+            return None
+        bounds.append((residual, op))
+    return equation, bounds
+
+
 def verify_real_root_count(
     conditions: str | Sequence[str],
     claimed: str,
@@ -953,13 +995,20 @@ def verify_real_root_count(
     "이차방정식 …의 서로 다른 실근의 개수"류 문항의 답은 근이 아니라 *개수*라 verify_answer로는
     검증 못 한다. 이 함수가 다항식의 실근을 중복도까지 구해(`sympy.roots`) 서로 다른 실근 수를
     세고 주장 개수와 대조한다. 판별식 무시("늘 2근") 오개념은 실근 0/1을 2로 답해 fail한다.
-      - pass: 실제 서로 다른 실근 수 == 주장 개수.
+
+    조건이 목록이면 첫 항목이 방정식, 나머지는 **같은 변수의 범위**(`x > -4`·`t >= 0` 등)다 —
+    범위를 모두 만족하는 실근만 센다(P3-03 6회차 감사: "구간 [-4, 4]에서 평균값 정리를 만족시키는
+    c의 개수"의 검산이 실수 전체의 근을 세던 결함). 범위 경계에 근이 걸려 판정이 모호하면
+    unverifiable이다.
+      - pass: 실제 서로 다른 실근 수(범위 안) == 주장 개수.
       - fail: 불일치(오개념).
-      - unverifiable: 단일변수 다항 등식 아님·근을 다 못 구함·주장이 개수 아님(보수적 회피).
+      - unverifiable: 단일변수 다항 등식 아님·근을 다 못 구함·주장이 개수 아님·범위 형식 밖·경계
+        모호(보수적 회피).
     """
-    condition = _single_condition(conditions)
-    if condition is None:
-        return _unverifiable("실근 개수 — 단일 등식이 아님·안전 회피")
+    parsed = _count_bounds(conditions)
+    if parsed is None:
+        return _unverifiable("실근 개수 — 등식 1개 + 같은 변수의 범위 부등식 형태가 아님·안전 회피")
+    condition, bounds = parsed
     try:
         residual, op = _parse_condition(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
@@ -971,6 +1020,8 @@ def verify_real_root_count(
     if len(free) != 1:
         return _unverifiable("실근 개수 — 단일 변수 방정식이 아님·안전 회피")
     var = free[0]
+    if any(b.free_symbols != {var} for b, _ in bounds):
+        return _unverifiable("실근 개수 — 범위 조건의 변수가 방정식의 변수와 다름·안전 회피")
     try:
         poly = sympy.Poly(residual, var)
         root_mult = sympy.roots(poly)
@@ -986,7 +1037,17 @@ def verify_real_root_count(
     if claimed_n is None:
         return _unverifiable("실근 개수 — 주장값이 개수(비음 정수)가 아님·안전 회피")
     real = [rv for r in root_mult if (rv := _real_value(r, tol)) is not None]
-    actual = len(_distinct_values(real, tol))
+    inside: list[float] = []
+    for value in real:
+        verdicts = [
+            _eval_relation(float(bound.subs(var, value)), bound_op, tol)
+            for bound, bound_op in bounds
+        ]
+        if any(v is None for v in verdicts):
+            return _unverifiable("실근 개수 — 근이 범위 경계에 걸려 판정 모호·안전 회피")
+        if all(verdicts):
+            inside.append(value)
+    actual = len(_distinct_values(inside, tol))
     if actual == claimed_n:
         return _pass(samples_checked=actual)
     return _fail(
@@ -1584,3 +1645,14 @@ def verify_inequality_direction(
         f"부등식 방향 — 해는 {verdict}이나 주장 {claimed_n}(음수 나눗셈 시 부호 뒤집힘)",
         samples_checked=1,
     )
+
+
+def warm_isolated_worker() -> None:
+    """격리 워커가 `ready` 전에 부르는 웜업 — 답 검산 경로의 첫 사용 비용을 미리 치른다(OPS-142).
+
+    `verify_step` 뒤에서는 새 모듈이 없지만(실측) 워커의 *첫* 호출이 이 경로일 수 있어, 단일 등식·
+    연립·항등식 세 형태를 한 번씩 밟는다. 반환값은 쓰지 않는다.
+    """
+    verify_answer("x**2 - 5*x + 6 = 0", {"x": "3"})
+    verify_answer(["x+y=3", "x-y=1"], {"x": "2", "y": "1"})
+    verify_answer("sin(x)**2 + cos(x)**2 = 1", {"x": "1"})

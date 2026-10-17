@@ -18,9 +18,11 @@ import {
 import {
   CmsFailureBox,
   CmsNoticeView,
+  actionLabel,
   describeCmsFailure,
   formatTime,
   shortId,
+  statusLabel,
   type CmsNotice,
   type NoteResult,
 } from "./CmsCommon";
@@ -41,36 +43,6 @@ import styles from "./Cms.module.css";
  * ④ 발행·롤백은 학생이 보는 데이터를 바꾸지 않는다(서빙 경로가 이 테이블을 읽지 않는다) — 이 화면의
  *    "발행"은 콘텐츠 버전 대장의 상태다. 이 사실을 화면이 숨기지 않는다.
  */
-
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: "초안",
-  IN_REVIEW: "검토 중",
-  IN_QA: "QA 중",
-  APPROVED: "승인됨",
-  PUBLISHED: "발행됨",
-  DEPRECATED: "폐기 예정",
-  RETIRED: "은퇴",
-};
-
-/** 표시 전용 라벨. 모르는 값은 서버 문자열 그대로(숨기지 않는다). */
-function statusLabel(status: string): string {
-  return STATUS_LABEL[status] ?? status;
-}
-
-const ACTION_LABEL: Record<string, string> = {
-  submit: "검토 제출",
-  request_changes: "보완 요청",
-  pass_review: "검토 통과",
-  fail_qa: "QA 불합격",
-  approve: "승인",
-  publish: "발행",
-  deprecate: "폐기 예정으로 표시",
-  retire: "은퇴",
-};
-
-function actionLabel(action: string): string {
-  return ACTION_LABEL[action] ?? action;
-}
 
 type Loadable<T> = { kind: "loading" } | CmsResult<T>;
 

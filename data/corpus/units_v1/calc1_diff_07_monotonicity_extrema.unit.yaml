@@ -1,0 +1,40 @@
+# 소단원 DSL v0.1 — 함수의 증가·감소, 극대·극소 (미적분Ⅰ · 미분 대단원 · 소단원 7/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 개념/절차/표상 3개 → CONCEPT/PROCEDURE/REPRESENT 목표 1개씩(docs/data/units_v1.md §3).
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-07-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-07] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-증감과극값"
+unit_version: 1
+api_version: "unit/0.1"
+title: "함수의 증가·감소, 극대·극소"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-07]"]
+concept_nodes: ["12미적Ⅰ-02-07-1", "12미적Ⅰ-02-07-2", "12미적Ⅰ-02-07-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -1(개념·primary). 오개념이 'f′(a)=0이면 무조건 극값'이라 변곡점형 반례
+  # (예: x³의 x=0)로 경계를 시험하는 CONCEPT 팩이 맞다.
+  - suffix: "OBJ-01"
+    statement: "미분가능한 함수에서 f′(a)=0이어도 x=a의 좌우에서 f′(x)의 부호가 바뀌지 않으면 극값이 아님을 설명한다"
+    standard_code: "[12미적Ⅰ-02-07]"
+    source_verb: "설명한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-07-1"]
+  # OBJ-02 절차형 — 원자 -2(절차). 도함수 부호 조사 → 증감표 → 판정의 정해진 절차다.
+  - suffix: "OBJ-02"
+    statement: "도함수의 부호를 조사해 증감표를 만들고 함수의 증가와 감소, 극대와 극소를 판정한다"
+    standard_code: "[12미적Ⅰ-02-07]"
+    source_verb: "판정한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-07-2"]
+  # OBJ-03 표상형 — 원자 -3(표상). 증감표(부호)와 그래프 모양을 양방향으로 옮긴다 — 그래프에서
+  # 부호표를 복원하는 역방향 번역을 더 자주 시키는 REPRESENT 팩의 방침과 맞는다.
+  - suffix: "OBJ-03"
+    statement: "증감표에 적힌 도함수의 부호와 함수의 그래프 모양을 서로 옮겨 해석한다"
+    standard_code: "[12미적Ⅰ-02-07]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-07-3"]

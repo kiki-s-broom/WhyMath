@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-#
 # WhyMath 백엔드 프로덕션 이미지 (OPS-03) — FastAPI(uvicorn) 단일 프로세스.
 #
 # ★ 빌드 컨텍스트는 **레포 루트**다: `docker build -f Dockerfile -t whymath-backend:<tag> .`
@@ -15,10 +13,19 @@
 #   `${VAR:?}` fail-closed 계약이 강제한다. CLAUDE.md "API 키·시크릿 코드 하드코딩 금지"의
 #   이미지판이다. 이 계약은 tests/infra/test_deploy_artifacts.py가 동결한다.
 
+# ★ 베이스 이미지는 ARG다(OPS-135): 기본값은 Docker Hub의 python:3.12-slim이라 로컬·운영
+#   빌드는 그대로 동작한다. CI(docker-build 잡)는 --build-arg PYTHON_IMAGE=<ghcr.io 미러 사본>으로
+#   덮어써서 Docker Hub 익명 pull 한도(2026-10-09 머지 큐 연속 탈락)를 피한다. 이 계약은
+#   tests/infra/test_ci_image_sources.py가 동결한다.
+# ★ `# syntax=docker/dockerfile:1` 지시어를 두지 않는다: 그 지시어는 빌드마다 Docker Hub에서
+#   프런트엔드 이미지를 따로 받는다(익명 pull 한도의 또 다른 경로). 이 파일은 내장 프런트엔드로
+#   충분한 기능만 쓴다(heredoc·RUN --mount 없음).
+ARG PYTHON_IMAGE=python:3.12-slim
+
 # ──────────────────────────────────────────────────────────────────────
 # stage 1 — builder: 컴파일 도구·pip 캐시를 여기 가둔다
 # ──────────────────────────────────────────────────────────────────────
-FROM python:3.12-slim AS builder
+FROM ${PYTHON_IMAGE} AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -48,7 +55,7 @@ RUN pip install --upgrade pip \
 # ──────────────────────────────────────────────────────────────────────
 # stage 2 — runtime: venv + 소스 + 데이터만
 # ──────────────────────────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
+FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

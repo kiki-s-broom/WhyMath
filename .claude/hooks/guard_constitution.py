@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""코딩 헌법 보호 가드 — PreToolUse(Edit|Write|MultiEdit|NotebookEdit|Bash) 훅 (CONST-02 · R0-01).
+"""코딩 헌법 보호 가드 — PreToolUse 훅 (CONST-02 · R0-01 · CONST-16).
+
+매처: Edit|Write|MultiEdit|NotebookEdit|Bash + MCP GitHub 쓰기 3종(아래 별도 절).
 
 **무엇을 막는가**: AI 세션이 `constitution/`(코딩 헌법 · 규칙 등록부 · 단계 · 개정 기록 ·
 판례)을 **수정·삭제·이동**하는 것. 헌법 제9조 ①("AI는 constitution/ 폴더를 수정·삭제·
@@ -28,13 +30,22 @@ audit.py`까지 막으면 헌법을 지킬 수 없고, 그러면 사람이 훅�
     따옴표 친 헌법 경로와 쓰기 표지가 함께 있을 때 막는다.
   · `git add constitution/` 은 막지 않는다 — 인덱스 등록은 파일을 바꾸지 않는다.
 
+**MCP GitHub 쓰기 도구 (CONST-16)**: `mcp__github__push_files`(files[].path) ·
+`create_or_update_file`(path) · `delete_file`(path) 는 로컬 파일을 거치지 않고 원격 브랜치에
+바로 쓴다 — 편집 도구·Bash 판정이 보지 못하던 경로다. 경로는 저장소 상대 경로라 cwd 기준이
+아니라 저장소 루트 기준으로 정규화해(`..`·앞 `/`·역슬래시·퍼센트 인코딩·대소문자 흡수) 최상위
+`constitution/` 아래인지 본다. 입력 형식을 읽지 못하면(경로 필드 없음·형식 다름) 통과가 아니라
+차단한다(모른다 ≠ 아니다). 파일 목록이 비어 있는 push_files 는 쓸 것이 없으므로 통과한다.
+
 **모른다 ≠ 아니다**: 명령 파싱(`shlex`)이 실패하면 "변경 없음"으로 읽지 않는다. 명령
 문자열에 헌법 경로와 변경 동사가 **둘 다** 보이면 막고 사유를 말한다. 둘 중 하나라도
 없으면 통과한다(훅이 개발을 볼모로 잡지 않는다 — git_revert_guard와 같은 원칙).
 
 **한계(명시 — 막지 못하는 것을 막는다고 말하지 않는다)**
   · Claude Code의 도구 호출만 본다. Kiki 본인의 편집·GitHub 웹 편집·외부 스크립트는 대상이
-    아니며 그것이 의도다(헌법은 사람만 수정한다).
+    아니며 그것이 의도다(헌법은 사람만 수정한다). 위 MCP 쓰기 도구 3종 밖의 원격 쓰기 경로
+    (다른 MCP 서버·`gh api` 같은 Bash 호출의 URL 인자 등)와 훅 밖 경로는 CONST-17(서명 검증
+    CI)이 닫는다.
   · 변수·`eval`·별칭·스크립트 파일 안에서의 쓰기, 심볼릭 링크를 새로 만들어 우회하는 경로는
     문자열 파싱으로 보이지 않는다. 두 번째 층은 커밋 시점 검사(R0-02 check_amendment ·
     CONST-03)와 settings.json `permissions.deny`(Edit/Write/MultiEdit)다.
@@ -53,17 +64,24 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import shlex
 import sys
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import unquote
 
 #: 보호 대상 폴더 이름 (저장소 최상위 기준)
 PROTECTED_DIRNAME = "constitution"
 
 #: 편집 계열 도구 — tool_input의 경로 필드로 판정한다
 EDIT_TOOLS: frozenset[str] = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
+
+#: 원격 저장소에 파일을 바로 쓰는 MCP GitHub 도구 (CONST-16) — 로컬 파일을 거치지 않는다
+MCP_WRITE_TOOLS: frozenset[str] = frozenset(
+    {"mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file"}
+)
 
 #: 인자 중 헌법 경로가 하나라도 있으면 차단하는 동사
 ANY_ARG_VERBS: frozenset[str] = frozenset(
@@ -144,6 +162,35 @@ def is_protected(path: str, cwd: str, root: str) -> bool:
     target = _norm(full)
     protected = _norm(os.path.join(root, PROTECTED_DIRNAME))
     return target == protected or target.startswith(protected + os.sep.lower())
+
+
+def is_protected_repo_path(path: str) -> bool:
+    """저장소 상대 경로(GitHub API 형식)가 최상위 constitution/ 자신이거나 그 아래인가 (CONST-16).
+
+    `..` 는 저장소 루트에서 멈추게 풀고(`/` 아래로 정규화) 보수적으로 읽는다 — `a/../constitution/x`
+    와 `../constitution/x` 모두 헌법 경로다. `scripts/constitution/` 은 첫 칸이 다르므로 제외.
+    """
+    cleaned = unquote(str(path)).strip().strip("'\"").replace("\\", "/")
+    parts = [p for p in posixpath.normpath("/" + cleaned).lower().split("/") if p]
+    return bool(parts) and parts[0] == PROTECTED_DIRNAME
+
+
+def _mcp_write_paths(tool: str, tool_input: Any) -> list[str] | None:
+    """MCP GitHub 쓰기 도구 입력에서 쓰려는 경로 목록을 꺼낸다. 형식을 못 읽으면 None."""
+    if not isinstance(tool_input, dict):
+        return None
+    if tool == "mcp__github__push_files":
+        files = tool_input.get("files")
+        if not isinstance(files, list):
+            return None
+        paths: list[str] = []
+        for entry in files:
+            if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+                return None
+            paths.append(entry["path"])
+        return paths
+    path = tool_input.get("path")
+    return [path] if isinstance(path, str) and path else None
 
 
 def _arg_paths(token: str) -> list[str]:
@@ -498,6 +545,13 @@ def judge(data: dict[str, Any]) -> str | None:
         return None
     if tool == "Bash":
         return judge_command(str(tool_input.get("command") or ""), cwd, root)
+    if tool in MCP_WRITE_TOOLS:
+        paths = _mcp_write_paths(tool, data.get("tool_input"))
+        if paths is None:
+            return f"{tool} 입력에서 쓰려는 경로를 읽지 못해 보수적으로 차단"
+        for path in paths:
+            if is_protected_repo_path(path):
+                return f"{tool} 대상이 헌법 경로: {path}"
     return None
 
 

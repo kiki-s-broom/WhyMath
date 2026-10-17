@@ -158,7 +158,9 @@ $SpecOk = Test-Path .eos121-out\spec_plan.jsonl
 $Src2 = & $PyExe -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOk2 = $Src2 -like "*WhyMath-eos121*"
 Write-Output "PRECHECK SpecOk=$SpecOk CodeOk=$CodeOk2 Seat=$env:WHYMATH_CLOUD_PROVIDER"
-if ($SpecOk -and $CodeOk2) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\openrouter.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\openrouter.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\openrouter.stdout.txt; Write-Output "OPENROUTER_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk2 · [C]와 [B]를 다시 확인하세요" }
+if ($SpecOk -and $CodeOk2) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\openrouter.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\openrouter.review.md 2>&1 | Tee-Object -FilePath .eos121-out\openrouter.stdout.txt; Write-Output "OPENROUTER_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk2 · [C]와 [B]를 다시 확인하세요" }
+$Qo = ".eos121-out\openrouter.review.jsonl"
+if (Test-Path $Qo) { & $PyExe -c "import pathlib,sys; t=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8').lstrip(); ok=t[:1]=='{'; print('QUEUE_STORE=' + ('JSONL' if ok else 'NOT_JSONL')); raise SystemExit(0 if ok else 1)" $Qo; Write-Output "QUEUE_CHECK_EXIT=$LASTEXITCODE" } else { Write-Output "QUEUE_FILE=absent — 비수용 후보가 0건이면 정상입니다. 수용이 attempted보다 적은데 파일이 없다면 회신해 주세요" }
 ```
 
 **인자 선택의 근거**:
@@ -169,6 +171,8 @@ if ($SpecOk -and $CodeOk2) { & $PyExe -m whymath_backend.harness.problem_corpus_
   Anthropic Messages API는 `temperature`와 `top_p`의 **동시 지정 자체를** 거부하고(모델 제약이 아니라 API 계약이라 Sonnet 4.6도 마찬가지다), 저작 경로는 `temperature=0.9`를 **항상** 싣는다. 그래서 이 좌석에서 top_p는 **구조적으로 통제할 수 없다**. 두 좌석 모두 미전송(= 각 공급사 기본값)으로 도는 것이 유일한 대칭 조건이며, 그것은 **"닫았다"가 아니라 "대칭이되 통제되지 않음"**이다 — 해석 한계는 §8에 적혀 있다.
 
   실수로 `--top-p`를 붙여도 **회차가 시작되지 않는다**: CLI가 anthropic 좌석 + `--top-p` 조합을 **호출 0건에서** exit 2로 거부한다(openrouter 좌석·로컬 회차는 종전대로 허용된다 — 제약은 Anthropic 한정).
+- **`--worklist-out`은 마크다운 뷰 경로이며 `<out>.review.jsonl`이어서는 안 된다(2026-10-15 정정 — OPS-147).** 큐 정본의 경로는 `--out`에서 정해진다(`<out>`의 확장자를 `.review.jsonl`로 치환 — `--out .eos121-out\anthropic.jsonl`이면 `.eos121-out\anthropic.review.jsonl`). 종전 판은 `--worklist-out`에 **같은 경로**를 줬고, 회차 끝의 뷰 쓰기가 파일 전체를 덮어써 JSONL 정본이 마크다운 뷰로 바뀌었다(2026-09-19 회차 — anthropic·openrouter 좌석 모두 해당). 이제 두 경로가 같으면 CLI가 **호출 0건에서 exit 2로 거부**하고 어떤 파일도 쓰지 않는다. 위 블록은 뷰를 `<좌석>.review.md`로 보낸다.
+- **회차 직후 자가검증**(블록 끝 두 줄): 정본이 JSONL로 남았는지 첫 비공백 문자가 `{`인지로 본다. `QUEUE_STORE=JSONL`·`QUEUE_CHECK_EXIT=0`이면 정상, `NOT_JSONL`·`1`이면 정본이 마크다운으로 바뀐 것이니 **다음 단계로 가지 말고** 회신해 주세요. 이 판정은 덮어쓰인 파일(첫 글자 `#`)에서 실제로 `NOT_JSONL`·exit 1을 내는 것을 확인했다. **2026-09-19 사고 회차의 `.eos121-out`을 재사용하면** 마크다운이 된 옛 `*.review.jsonl` 뒤에 JSONL 행이 이어붙어 정본이 섞이므로, 새 폴더를 쓰거나 옛 `*.review.jsonl`을 다른 이름으로 옮긴 뒤 시작한다.
 - `--subscription premium --budget-krw 5000`은 둘 다 있어야 클라우드 티어로 간다(EOS-118과 같은 인자).
 - `--canary 0 --abort-window 0`으로 중단 장치를 끈다. 켜 두면 중복률이 높은 좌석에서 **우리가 재려는 현상 때문에** 회차가 조기 종료돼 표본이 안 찬다. 이 선택은 회차 대장에 값 그대로 기록된다.
 
@@ -184,7 +188,9 @@ $PrevOk = Test-Path .eos121-out\openrouter.jsonl
 $Src3 = & $PyExe -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOk3 = $Src3 -like "*WhyMath-eos121*"
 Write-Output "PRECHECK SpecOk=$SpecOk PrevOk=$PrevOk CodeOk=$CodeOk3 Seat=$env:WHYMATH_CLOUD_PROVIDER"
-if ($SpecOk -and $CodeOk3) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\anthropic.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\anthropic.review.jsonl 2>&1 | Tee-Object -FilePath .eos121-out\anthropic.stdout.txt; Write-Output "ANTHROPIC_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk3 · [C]와 [B]를 다시 확인하세요" }
+if ($SpecOk -and $CodeOk3) { & $PyExe -m whymath_backend.harness.problem_corpus_accumulate --out .eos121-out\anthropic.jsonl --n 90 --spec-file .eos121-out\spec_plan.jsonl --subscription premium --budget-krw 5000 --canary 0 --abort-window 0 --worklist-out .eos121-out\anthropic.review.md 2>&1 | Tee-Object -FilePath .eos121-out\anthropic.stdout.txt; Write-Output "ANTHROPIC_EXIT=$LASTEXITCODE" } else { Write-Output "WRITE_REFUSED=True — SpecOk=$SpecOk CodeOk=$CodeOk3 · [C]와 [B]를 다시 확인하세요" }
+$Qa = ".eos121-out\anthropic.review.jsonl"
+if (Test-Path $Qa) { & $PyExe -c "import pathlib,sys; t=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8').lstrip(); ok=t[:1]=='{'; print('QUEUE_STORE=' + ('JSONL' if ok else 'NOT_JSONL')); raise SystemExit(0 if ok else 1)" $Qa; Write-Output "QUEUE_CHECK_EXIT=$LASTEXITCODE" } else { Write-Output "QUEUE_FILE=absent — 비수용 후보가 0건이면 정상입니다. 수용이 attempted보다 적은데 파일이 없다면 회신해 주세요" }
 ```
 
 **좌석별로 `--out`을 가르는 이유**: 회차 대장(`--out`의 **확장자를 치환**한 사이드카 — `openrouter.jsonl` → `openrouter.rounds.jsonl`. `with_suffix`이므로 덧붙임이 아니다 · `anchor_round_ledger.py:688`)이 좌석별로 분리돼 읽기 쉽고, **두 좌석이 같은 dedup 인덱스를 공유하지 않는다.** 같은 파일에 쌓으면 뒤에 도는 좌석이 앞 좌석의 산출물과도 중복 판정을 받아 비교가 오염된다.

@@ -1653,6 +1653,10 @@ class PrivacyAuditResourceType(str, Enum):
     concept_version = "concept_version"
     """`ConceptVersion` — 초안 생성·검토·승인·발행·롤백(`l3/publish_gate.py` 경유)."""
 
+    problem_version = "problem_version"
+    """`ProblemVersion` — 초안 생성·제출·검토·승인·발행·내리기(`l3/problem_publish_gate.py` 경유 —
+    EOS-194). 라이브 문항 행 자체의 CUD(`problem`)와는 다른 행위라 값을 나눈다."""
+
     curriculum_version = "curriculum_version"
     """`CurriculumVersion` — 교육과정 판 메타(라벨·시행일) 수정."""
 
@@ -1670,6 +1674,10 @@ class PrivacyAuditResourceType(str, Enum):
 
     hint = "hint"
     """`Hint`(`hints`) — 힌트 문구 수정."""
+
+    # ── P3-26 개념 그래프 쓰기 ──
+    concept_edge = "concept_edge"
+    """`ConceptEdge`(`concept_edge`) — 선수 관계 추가·삭제. `resource_id` = `edge_id`."""
 
 
 class PrivacyAuditAction(str, Enum):

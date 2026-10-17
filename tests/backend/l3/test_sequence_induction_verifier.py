@@ -130,7 +130,7 @@ async def test_unverifiable_input_claims_no_machine_axis() -> None:
         assert verdict.state == "unverifiable", conditions
         assert verdict.machine_axes == ()
         assert verdict.residual_axes == ()
-        assert verdict.tier is VerificationTier.MACHINE_SAMPLED  # 종전 상수 — 도메인 등급 아님
+        assert verdict.tier is VerificationTier.NUMERIC_SAMPLING  # 하한 등급 — 닫은 축이 없다
 
 
 def test_domain_result_for_unverifiable_claims_no_axis_at_the_domain_boundary() -> None:
@@ -244,8 +244,8 @@ def test_adapter_contract_is_unchanged() -> None:
 
 
 @pytest.mark.asyncio
-async def test_existing_domains_keep_constant_tiers() -> None:
-    """tier=None 도메인(기존 전부)은 종전 상수 등급 그대로다 — 이 슬라이스가 바꾼 것이 아니다."""
+async def test_statistical_claim_carries_deterministic_data_tier() -> None:
+    """S4-65 — 통계 자료형은 pass·fail 모두 `DETERMINISTIC_DATA`다(종전 레거시 상수에서 전환)."""
     stat = await Verifier().verify(
         ProblemVerifyInput(
             slug="s",
@@ -255,7 +255,7 @@ async def test_existing_domains_keep_constant_tiers() -> None:
             conditions="data=[1,2,3,4,5]; stat=mean",
         )
     )
-    assert stat.tier is VerificationTier.MACHINE_EXHAUSTIVE
+    assert stat.tier is VerificationTier.DETERMINISTIC_DATA
     stat_fail = await Verifier().verify(
         ProblemVerifyInput(
             slug="s",
@@ -265,7 +265,7 @@ async def test_existing_domains_keep_constant_tiers() -> None:
             conditions="data=[1,2,3,4,5]; stat=mean",
         )
     )
-    assert stat_fail.tier is VerificationTier.MACHINE_SAMPLED
+    assert stat_fail.tier is VerificationTier.DETERMINISTIC_DATA
 
 
 # ── ③ 정확 일치 판정기 ───────────────────────────────────────────────
@@ -285,12 +285,16 @@ def _subject(**overrides: object) -> ResidueSubject:
     return ResidueSubject(**base)  # type: ignore[arg-type]
 
 
-def test_reconstruct_judge_is_exact_where_statistical_judge_is_tolerant() -> None:
-    """1073741823 vs 1073741824 — 통계 판정기(isclose)는 ok, 수열 판정기(==)는 defect."""
+def test_reconstruct_judges_both_reject_integer_off_by_one() -> None:
+    """1073741823 vs 1073741824 — 종전엔 통계 판정기(isclose)만 ok 로 통과시켰다(S4-70 이 해소).
+
+    통계 판정기는 이제 정확값 정책이라 float 만 있는 기계값에서도 1 어긋남을 defect 로 잡는다.
+    수열 판정기(==)는 처음부터 exact 이고, 두 판정기는 입력 필드가 달라(`machine_value` /
+    `machine_value_exact`) 따로 유지한다.
+    """
     stat_subject = _subject(machine_value=1073741823.0)
-    assert (
-        _judge_stat_reconstruct(stat_subject, {"value": 1073741824}).verdict == "ok"
-    )  # 결함의 증거
+    assert _judge_stat_reconstruct(stat_subject, {"value": 1073741824}).verdict == "defect"
+    assert _judge_stat_reconstruct(stat_subject, {"value": 1073741823}).verdict == "ok"  # 대조군
     seq_subject = _subject(machine_value_exact="1073741823")
     assert _judge_seq_reconstruct(seq_subject, {"value": 1073741823}).verdict == "ok"
     off_by_one = _judge_seq_reconstruct(seq_subject, {"value": 1073741824})

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,12 +18,14 @@ acceptance:
   - "④ 실행 실패 ≠ 0건: 산출물에서 '리포트가 0을 보고함'과 '리포트가 돌지 못함'이 서로 다른 값으로 구분된다(ops/cost_probe 이중 회계 승계). 관측 전용이므로 수치가 0이어도 exit 0, 실행 오류만 비-0"
   - "⑤ 배선 실재성 동결: tests/infra/test_test_suite_wiring.py의 Wiring/_all_wirings를 import 재사용해 확인한다(새 YAML 파서 금지 — tests/infra/test_pedagogy_content_slot_pipeline_ci_wiring.py:22-25 원칙). '저장소에 존재함'과 '돌아감'은 다르다(OPS-03·08·10·11 계열)"
   - "⑥ 변별력: 성공 판정은 '배선했다'가 아니라 산출물 파일이 실제로 생기고 그 값이 실행 전/후로 달라지는지다. 리포트 1개를 의도적으로 깨뜨렸을 때 '실행 실패'가 보이는지 실측 → 복원해 정상 실측"
-artifacts: []
+  - "[정정 2026-10-08 실측 · 착수 세션] ① 전제 정정: 리포트 CLI는 20개(11/12 아님)이고 러너 보유는 3개(eos_unit_structure_observation_report CI 스텝 · weekly_metrics_report cron · cost_report 수동 스크립트)이며 러너 0건은 17개다. concept_reach_report는 CLI가 아니라 테스트만 CI에서 돌아 러너로 세지 않는다. ③ 부류 분리 기준은 acceptance 문면의 harness/ops 위치가 아니라 완전 실행 환경으로 재정의한다(harness 안에도 DB 필요 리포트가 9개 — DB 없이 17개를 직접 실행한 실측): ci 5개(저장소 체크아웃) · db 10개(실 DB, 이미지 동봉 data만 읽음) · checkout_db 1개 phase1_structure_report(체크아웃과 DB 동시 필요 — 이미지에서 돌리면 파일 부재가 Contract coverage 100에서 66.7로 낮게 읽힘) · 입력 의존 1개 generation_seed_adoption_report(genlog 위치 인자 필수 — 자동 대상 아님). ② 진입점은 ops.observation_report_runner 1개를 부류별로 호출하며 자동 경로는 CI harness-integrity 스텝(ci)과 docker-compose.prod.yml observation-reports 서비스(db)이고 checkout_db는 docs/ops/ops19_observation_reports_runbook.md 사람 실행이다. ⑤ Wiring/_all_wirings 재사용은 신규 테스트 디렉터리의 CI 도달 확인에 적용했고 python -m 스텝과 compose 서비스는 yaml 로드 후 판정한다. 부수 변경: declared_unwired_audit 면제 문구 11건을 _OFFLINE_REPORT에서 _OBSERVED_BY_RUNNER로 정정(양방향 대조 테스트로 동결)하고 EOS 기능 인벤토리 WM-O-907에 러너를 귀속했다. OPS-34 순서 조건은 면제 대상을 걷는 방향이라 충돌하지 않는다."
+artifacts:
+  - "PR #1547 (https://github.com/kiki-s-broom/WhyMath/pull/1547) · 커밋 d12d7d02"
 paths:
   - ".github/workflows/**"
   - "docker-compose*.yml"
   - "tests/infra/**"
   - "infra/**"
 session: null
-notes: "docs/architecture/nlp_module_gap_review_r2.md §3 D5. NLP 축 재점검에서 발견했으나 근본 원인이 횡단이라 모듈별 중복 등재 대신 1건으로 등재(Kiki 결정 2026-08-04). 실측: 리포트 11개 중 러너 보유는 cost_report 1개뿐이고, NLP-02가 만든 attempt_grading_shadow_report(412줄·테스트 488줄·분모 없는 0 금지까지 완비)를 포함해 10개가 실데이터 산출 0회. 운영 런북도 없다(docs/ 전체에서 이 CLI들을 언급하는 것은 그들을 만든 갭 리뷰 3개뿐). CI의 python -m 스텝 6종은 전부 게이트 성격(qa_pipeline·defect_detection_eval·coach_prose_leak_eval·pedagogy_pack_fidelity_eval·notation_coverage·provenance_audit)이고 리포트 실행은 없다. '완비된 소비 경로 + 미도달 공급원' 계열 4회차이며, 앞의 셋과 달리 피해자가 관측 계층 자신이라 다음 회차를 발견할 수단이 사라진다.인접 대조(2026-08-11 병합 시점·nlp_module_gap_review_r2.md §8.11-③): OPS-34(추천 r3 §3 D8·main 신규)와 인접하나 비중복 — OPS-34는 declared_unwired_audit._OFFLINE_REPORT 면제의 수취인·만료 선언이고 이 태스크는 러너 실배선이다. **순서는 OPS-34가 먼저다**: 면제가 정당한지(=사람이 돌리는 것이 맞는지) 먼저 정해야 이 태스크가 배선할 러너의 범위가 정해진다. 거꾸로 하면 면제 대상까지 CI에 넣는다. 또한 리포트 수는 2026-08-11 재측정에서 11개 → 12개로 늘었다(harness/standard_attainment_report.py 신설·ASM-05/S4-19). acceptance ①의 '10/11'은 '11/12'로 갱신해 재확인한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/계측 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/nlp_module_gap_review_r2.md §3 D5. NLP 축 재점검에서 발견했으나 근본 원인이 횡단이라 모듈별 중복 등재 대신 1건으로 등재(Kiki 결정 2026-08-04). 실측: 리포트 11개 중 러너 보유는 cost_report 1개뿐이고, NLP-02가 만든 attempt_grading_shadow_report(412줄·테스트 488줄·분모 없는 0 금지까지 완비)를 포함해 10개가 실데이터 산출 0회. 운영 런북도 없다(docs/ 전체에서 이 CLI들을 언급하는 것은 그들을 만든 갭 리뷰 3개뿐). CI의 python -m 스텝 6종은 전부 게이트 성격(qa_pipeline·defect_detection_eval·coach_prose_leak_eval·pedagogy_pack_fidelity_eval·notation_coverage·provenance_audit)이고 리포트 실행은 없다. '완비된 소비 경로 + 미도달 공급원' 계열 4회차이며, 앞의 셋과 달리 피해자가 관측 계층 자신이라 다음 회차를 발견할 수단이 사라진다.인접 대조(2026-08-11 병합 시점·nlp_module_gap_review_r2.md §8.11-③): OPS-34(추천 r3 §3 D8·main 신규)와 인접하나 비중복 — OPS-34는 declared_unwired_audit._OFFLINE_REPORT 면제의 수취인·만료 선언이고 이 태스크는 러너 실배선이다. **순서는 OPS-34가 먼저다**: 면제가 정당한지(=사람이 돌리는 것이 맞는지) 먼저 정해야 이 태스크가 배선할 러너의 범위가 정해진다. 거꾸로 하면 면제 대상까지 CI에 넣는다. 또한 리포트 수는 2026-08-11 재측정에서 11개 → 12개로 늘었다(harness/standard_attainment_report.py 신설·ASM-05/S4-19). acceptance ①의 '10/11'은 '11/12'로 갱신해 재확인한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/계측 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] 착수 세션 실측으로 전제(10/11)와 부류 분리 기준을 정정 — 리포트 20개·러너 0건 17개"
+updated: 2026-10-08

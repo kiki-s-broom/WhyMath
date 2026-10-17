@@ -51,6 +51,14 @@ concurrency:
   group: harness-audit
   cancel-in-progress: false
 
+# 의존 해석 고정 (OPS-121) — 이 파일의 모든 `pip install`이 제약 파일의 정확한 버전만 고른다.
+# 범위 안의 신규 릴리스(예: 2026-10-08 pydantic 2.14.0)는 제약 파일을 바꾸는 갱신 PR을 거쳐서만
+# main·머지 큐에 닿는다. 잡·스텝 env로 재정의하거나 `pip --isolated`를 쓰면 고정이 풀리므로
+# scripts/ops/ci_constraints.py check가 막는다 (infra-contracts 잡 게이트). 갱신 절차:
+# docs/ops/ci_constraints_refresh_runbook.md. 절대경로인 이유: 잡마다 working-directory가 다르다.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/infra/ci/constraints-py312.txt
+
 jobs:
   claim-reap:
     name: 원격 claim 자동 청소 (확정 사유만)

@@ -50,12 +50,15 @@ from pathlib import Path
 
 import yaml
 
+from whymath_backend.harness.problem_bank_coverage import CORPUS_DIR_GLOB
+
 __all__ = [
     "ALL_PROBLEM_TYPE_IDS",
     "CORPUS_CONCEPTUAL_V0",
     "CORPUS_GENERATED_V0",
     "CORPUS_KILLER_V0",
     "CORPUS_MISCONCEPTION_MC_V0",
+    "CORPUS_P3_CALCULUS1_DIFF_V0",
     "CORPUS_PROBABILITY_FINITE_V0",
     "CORPUS_REPHRASED_V0",
     "CORPUS_V1",
@@ -79,10 +82,14 @@ __all__ = [
     "PTYPE_SOLVE_FOR_UNKNOWN",
     "PTYPE_TRANSFORM_EXPRESSION",
     "PTYPE_VERIFY_CLAIM",
+    "SELF_TAGGED_CORPORA",
     "TARGET_CORPORA",
+    "UNIT_CODE_TABLE_CORPORA",
     "classify_record",
     "classify_rephrased_record",
     "default_backlog_tasks_dir",
+    "default_corpus_root",
+    "find_corpus_seat_violations",
     "find_exclusion_expiry_violations",
     "rephrased_parent_slug",
 ]
@@ -143,10 +150,142 @@ CORPUS_MISCONCEPTION_MC_V0 = "problem_bank_misconception_mc_v0"
 CORPUS_PROBABILITY_FINITE_V0 = "problem_bank_probability_finite_v0"
 CORPUS_REPHRASED_V0 = "problem_bank_rephrased_v0"
 
+CORPUS_P3_CALCULUS1_DIFF_V0 = "problem_bank_p3_calculus1_diff_v0"
+# P3-05 4·5단계 — 빈 칸 채우기 은행. P3-03 은행과 같은 자가 태깅(생성기가 문항마다 유형을 단다).
+CORPUS_P3_FILL_V0 = "problem_bank_p3_fill_v0"
+
+# ──────────────────────────────────────────────────────────────────────────
+# CONT-09 — S3-27 이후 추가된 코퍼스 30종의 `unit_codes` → problem_type_id 표.
+#
+# 이 30종은 코퍼스당 `unit_codes` 값이 1~3개뿐이고 값 하나가 생성기 1종(또는 생성기의 밴드 1개)과
+# 1:1이라, 위 6종처럼 오개념 kebab 같은 우회 키가 필요 없다 — `unit_codes` 튜플 자체가 키다.
+# 값은 전부 사람(에이전트)이 각 코퍼스의 생성기 발문(`l3/equivalent/*_skeleton_generator.py`
+# 산출 `question_text` 샘플)과 `problem_types.jsonl`의 설명·`behavior_skills`를 대조해 판단한
+# 정본이다(LLM 0·런타임 텍스트 파싱 0). 판단 원칙은 기존 6종과 같다 — 문항이 **요구하는 인지
+# 행동**으로 가르고, 정답이 숫자 하나라는 사실(답 형식)로 가르지 않는다.
+#
+# 대다수는 "식·공식에 값을 대입·연산해 값을 낸다" = evaluate-expression이다. 아래 4군(unit_codes
+# 7종)만 다른 인지 행동이라 값이 다르다(이 표에서 사람 판단이 갈릴 수 있는 지점 — CONT-09 리포트
+# `docs/data/problem_type_tagging_untagged_corpora_cont09_2026-10.md` §4에 근거를 명시):
+#   · enumerate-cases   : REPEATED-COMBINATION·SUM-PRODUCT-PRINCIPLE·PERMUTATION (경우의 수를 센다).
+#   · determine-coefficient : LINE-EQUATION (두 점 조건으로 미정계수 a·b를 역으로 결정).
+#   · condition-satisfaction: LINEAR-INEQUALITY-SYSTEM·QUAD-INEQ-BOUNDARY (조건을 성립시키는
+#                              범위를 판정 — 경계값은 그 범위의 끝점).
+#   · transform-expression  : POLYNOMIAL-FACTORING (식을 곱의 꼴로 변형 — 상수항 읽기는 사후 단계).
+# ──────────────────────────────────────────────────────────────────────────
+_UNIT_CODE_TABLES: dict[str, dict[tuple[str, ...], str]] = {
+    # E(X)=np 공식 대입.
+    "problem_bank_binomial_distribution_v0": {
+        ("BINOMIAL-DISTRIBUTION",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 부정적분 구한 뒤 F(0)=c로 적분상수를 맞춰 F(a)를 계산 — 절차 실행(적분 공식 대입).
+    "problem_bank_calculus1_integral_v0": {("CALC1-INTEGRAL",): PTYPE_EVALUATE_EXPRESSION},
+    # 삼각함수 정적분의 값을 계산.
+    "problem_bank_calculus2_trig_integral_v0": {
+        ("CALC2-TRIG-INTEGRAL",): PTYPE_EVALUATE_EXPRESSION
+    },
+    "problem_bank_combination_binomial_v0": {
+        # 중복조합 H(n,r)의 경우의 수를 센다(misconception_mc의 combination-no-denominator와 동형).
+        ("REPEATED-COMBINATION",): PTYPE_ENUMERATE_CASES,
+        # 이항정리 공식 nCr·계수 대입 — 경우의 수를 "세는" 문제가 아니라 공식 실행.
+        ("BINOMIAL-COEFFICIENT",): PTYPE_EVALUATE_EXPRESSION,
+    },
+    # 복소수 덧셈·곱셈 결과의 실수부/허수부를 계산.
+    "problem_bank_complex_number_arithmetic_v0": {
+        ("COMPLEX-NUMBER-ARITHMETIC",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 포물선 y²=4px의 초점 좌표 — 공식 대입.
+    "problem_bank_conic_section_focus_v0": {("CONIC-SECTION-FOCUS",): PTYPE_EVALUATE_EXPRESSION},
+    "problem_bank_coordinate_geometry_v0": {
+        # 두 점 사이 거리 공식 대입.
+        ("POINT-DISTANCE",): PTYPE_EVALUATE_EXPRESSION,
+        # 두 점을 지나는 직선 y=ax+b의 a·b를 역으로 결정(wm-quad-fn-axis와 동형 — 조건→미정계수).
+        ("LINE-EQUATION",): PTYPE_DETERMINE_COEFFICIENT,
+    },
+    # E(X)=Σ x·P(X=x) 공식 대입.
+    "problem_bank_discrete_ev_v0": {("DISCRETE-EXPECTED-VALUE",): PTYPE_EVALUATE_EXPRESSION},
+    # 단위 환산·겉넓이 공식 — 값을 대입·연산.
+    "problem_bank_elementary_area_measure_v0": {
+        ("AREA-UNIT-CONVERSION",): PTYPE_EVALUATE_EXPRESSION,
+        ("RECT-PRISM-SURFACE-AREA",): PTYPE_EVALUATE_EXPRESSION,
+    },
+    "problem_bank_elementary_division_remainder_v0": {
+        ("TWO-DIGIT-DIVISION",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 최대공약수 계산(misconception_mc의 gcd-lcm-confused와 동형).
+    "problem_bank_elementary_gcd_lcm_v0": {("GCD-LCM",): PTYPE_EVALUATE_EXPRESSION},
+    "problem_bank_elementary_rounding_v0": {("ELEMENTARY-ROUNDING",): PTYPE_EVALUATE_EXPRESSION},
+    "problem_bank_elementary_v0": {("ELEM-ADDSUB-2DIGIT",): PTYPE_EVALUATE_EXPRESSION},
+    "problem_bank_elementary_volume_measure_v0": {
+        ("RECT-PRISM-VOLUME",): PTYPE_EVALUATE_EXPRESSION,
+        ("VOLUME-UNIT-CONVERSION",): PTYPE_EVALUATE_EXPRESSION,
+        ("CIRCLE-CIRCUMFERENCE",): PTYPE_EVALUATE_EXPRESSION,
+    },
+    # 몫의 미분법 공식 대입 후 미분계수 계산(misconception_mc의 product-rule-naive와 동형).
+    "problem_bank_highschool_quotient_rule_v0": {
+        ("HS-CALC2-QUOTIENT-RULE",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 연립일차부등식의 해 범위를 판정하고 그 경계값을 읽는다 — 조건을 성립시키는 범위 판정.
+    "problem_bank_linear_inequality_system_v0": {
+        ("LINEAR-INEQUALITY-SYSTEM",): PTYPE_CONDITION_SATISFACTION
+    },
+    "problem_bank_matrix_ops_v0": {("MATRIX-OPS",): PTYPE_EVALUATE_EXPRESSION},
+    "problem_bank_measurement_unit_conversion_v0": {
+        ("MEASUREMENT-UNIT-CONVERSION",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 일차함수 f(a)의 함숫값 — 대입.
+    "problem_bank_middle_function_v0": {("LINEAR-FUNC-VALUE",): PTYPE_EVALUATE_EXPRESSION},
+    # 합의 법칙·순열 — 경우의 수를 센다.
+    "problem_bank_permutation_combination_v0": {
+        ("SUM-PRODUCT-PRINCIPLE",): PTYPE_ENUMERATE_CASES,
+        ("PERMUTATION",): PTYPE_ENUMERATE_CASES,
+    },
+    # 다항식 덧셈·곱셈 결과의 계수 계산(`skill.polynomial-arithmetic`이 evaluate-expression 소속).
+    "problem_bank_polynomial_arithmetic_v0": {
+        ("POLYNOMIAL-ARITHMETIC",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 이차식을 (x+p)(x+q)로 인수분해(`skill.factorization`이 transform-expression 소속).
+    "problem_bank_polynomial_factoring_v0": {("POLYNOMIAL-FACTORING",): PTYPE_TRANSFORM_EXPRESSION},
+    # 확률의 덧셈·여사건·곱셈 정리 공식 대입(finite_v0의 PROB-FINITE-ENUM과 동형).
+    "problem_bank_probability_law_v0": {
+        ("PROBABILITY-ADDITION-LAW",): PTYPE_EVALUATE_EXPRESSION,
+        ("PROBABILITY-COMPLEMENT-LAW",): PTYPE_EVALUATE_EXPRESSION,
+        ("PROBABILITY-MULTIPLICATION-LAW",): PTYPE_EVALUATE_EXPRESSION,
+    },
+    # 이차부등식 해의 범위(두 경계)를 판정 — LINEAR-INEQUALITY-SYSTEM과 같은 인지 행동.
+    "problem_bank_quad_ineq_v0": {("QUAD-INEQ-BOUNDARY",): PTYPE_CONDITION_SATISFACTION},
+    # 육십분법→호도법 환산 — 단위 환산 3종과 같은 인지 행동(상수배 연산)으로 일관시킨다.
+    "problem_bank_radian_conversion_v0": {("RADIAN-CONVERSION",): PTYPE_EVALUATE_EXPRESSION},
+    # 표본평균의 평균 E(X̄)=m 공식 대입.
+    "problem_bank_sample_mean_distribution_v0": {
+        ("SAMPLE-MEAN-DISTRIBUTION",): PTYPE_EVALUATE_EXPRESSION
+    },
+    # 시그마의 선형성·거듭제곱합 공식 대입(generated_v0의 ARITH-SUM과 동형).
+    "problem_bank_sequence_sigma_v0": {
+        ("SIGMA-LINEARITY",): PTYPE_EVALUATE_EXPRESSION,
+        ("POWER-SUM",): PTYPE_EVALUATE_EXPRESSION,
+    },
+    # 몫의 미분법·연쇄법칙 공식 대입 후 미분계수 계산.
+    "problem_bank_university_calc1_chain_quotient_v0": {
+        ("CALC1-QUOTIENT-RULE",): PTYPE_EVALUATE_EXPRESSION,
+        ("CALC1-CHAIN-RULE",): PTYPE_EVALUATE_EXPRESSION,
+    },
+    "problem_bank_university_calc1_v0": {("CALC1-PRODUCT-RULE",): PTYPE_EVALUATE_EXPRESSION},
+    # 벡터 선형결합·위치벡터 성분 계산.
+    "problem_bank_vector_operations_v0": {
+        ("VECTOR-LINEAR-COMBO",): PTYPE_EVALUATE_EXPRESSION,
+        ("POSITION-VECTOR",): PTYPE_EVALUATE_EXPRESSION,
+    },
+}
+
+# `unit_codes` 표로 직접 분류하는 코퍼스(결정론 순서 — 이름 오름차순).
+UNIT_CODE_TABLE_CORPORA: tuple[str, ...] = tuple(sorted(_UNIT_CODE_TABLES))
+
 # 직접 분류 대상(결정론 순서) — 생성기 identity가 *레코드 자체*에 남아 `classify_record`가
-# 단일 레코드로 분류하는 6종. `problem_bank_rephrased_v0`은 여기 없다 — 제외가 아니라
-# **계보 분류**(`LINEAGE_CORPORA`·부모 유형 승계)로 태깅한다(PB-07 — 구 제외 사유였던
-# "S4-14 미착지"는 S4-14/S4-18 done·계보 421/421 실측으로 소멸).
+# 단일 레코드로 분류하는 코퍼스: S3-27 원본 6종 + CONT-09가 편입한 `unit_codes` 표 30종.
+# `problem_bank_rephrased_v0`은 여기 없다 — 제외가 아니라 **계보 분류**(`LINEAGE_CORPORA`·부모
+# 유형 승계)로 태깅한다(PB-07 — 구 제외 사유였던 "S4-14 미착지"는 S4-14/S4-18 done·계보
+# 421/421 실측으로 소멸).
 TARGET_CORPORA: tuple[str, ...] = (
     CORPUS_V1,
     CORPUS_GENERATED_V0,
@@ -154,7 +293,15 @@ TARGET_CORPORA: tuple[str, ...] = (
     CORPUS_KILLER_V0,
     CORPUS_MISCONCEPTION_MC_V0,
     CORPUS_PROBABILITY_FINITE_V0,
+    *UNIT_CODE_TABLE_CORPORA,
 )
+
+# 생성 시점에 레코드별 `problem_type_codes`를 직접 기록하는 코퍼스 — 백필이 **건드리지 않는**
+# 네 번째 좌석. 같은 `unit_codes` 안에서도 템플릿에 따라 유형이 갈려(예: MEAN-VALUE-THEOREM은
+# solve 54·evaluate 12·count 6) `unit_codes` 표로는 분류할 수 없다 — 이 코퍼스를 `TARGET_CORPORA`에
+# 넣으면 백필이 저장된 유형을 빈 리스트로 덮어 지운다. 대신 "저장분이 전량 채워져 있고 카탈로그의
+# 17종 안에 있는가"를 거버넌스 테스트가 상시 대조한다(`test_problem_type_mapping.py`).
+SELF_TAGGED_CORPORA: tuple[str, ...] = (CORPUS_P3_CALCULUS1_DIFF_V0, CORPUS_P3_FILL_V0)
 
 # 계보 분류 대상(결정론 순서) — 자기 레코드의 생성기 흔적이 아니라 "변형" 계보의 부모
 # (원 생성기 산출물) 유형을 승계하는 코퍼스. 단일 레코드 서명(`classify_record`)으로는
@@ -251,6 +398,79 @@ def find_exclusion_expiry_violations(tasks_dir: Path | None = None) -> list[str]
             violations.append(
                 f"{corpus_name}: task_id={entry.task_id!r} 이(가) 이미 done인데 "
                 "EXCLUDED_CORPORA 제외 항목이 방치되어 있다 — 해제 검토 필요."
+            )
+    return violations
+
+
+def default_corpus_root() -> Path:
+    """`data/corpus` 저장소 정본 경로(전수 귀속 검증용 — `default_backlog_tasks_dir` 관용구)."""
+    return Path(__file__).resolve().parents[4] / "data" / "corpus"
+
+
+# 탐색 규칙은 계측기의 `CORPUS_DIR_GLOB`를 **가져와** 쓴다(복제 금지) — 계측기가 읽는 코퍼스 집합과
+# 이 계약이 지키는 집합이 어긋나면 "계측기가 보는데 계약은 모르는" 코퍼스가 생긴다(CONT-09 사고
+# 형태). 문자열 상수를 여기 다시 두면 PB-20 조사 문서의 글롭 소비처 표에 새 행도 필요해진다.
+_CORPUS_DIR_GLOB = CORPUS_DIR_GLOB
+
+
+def _corpus_seats() -> dict[str, list[str]]:
+    """코퍼스명 → 그 코퍼스가 앉아 있는 좌석 이름 목록(모듈 전역을 매번 읽는다 — 테스트 교체용)."""
+    seats: dict[str, list[str]] = {}
+    groups: tuple[tuple[str, Sequence[str]], ...] = (
+        ("TARGET_CORPORA", TARGET_CORPORA),
+        ("LINEAGE_CORPORA", LINEAGE_CORPORA),
+        ("EXCLUDED_CORPORA", tuple(EXCLUDED_CORPORA)),
+        ("SELF_TAGGED_CORPORA", SELF_TAGGED_CORPORA),
+    )
+    for seat_name, names in groups:
+        for name in names:
+            seats.setdefault(name, []).append(seat_name)
+    return seats
+
+
+def find_corpus_seat_violations(corpus_root: Path | None = None) -> list[str]:
+    """코퍼스 전수 귀속 계약 위반 목록(빈 리스트 = 위반 없음) — CONT-09.
+
+    `data/corpus/problem_bank*` 디렉터리 **전부**가 정확히 한 좌석(`TARGET_CORPORA`·
+    `LINEAGE_CORPORA`·`EXCLUDED_CORPORA`·`SELF_TAGGED_CORPORA`)에 앉아야 한다. 새 코퍼스를 만들고
+    어느 좌석에도 안 넣으면 `problem_type_codes`가 영원히 빈 채로 남지만 아무 검사도 빨갛지
+    않았다 — S3-27이 닫은 뒤 30종 11,396문이 계약 밖에 방치된 원인이다. 세 가지를 위반으로 본다.
+
+    ① 어느 좌석에도 없는 코퍼스(신규 추가 누락) ② 두 좌석에 동시에 앉은 코퍼스(분류 주체 모호 —
+    특히 SELF_TAGGED이면서 TARGET이면 백필이 자가 기록을 지운다) ③ 좌석에는 있으나 디렉터리가
+    없는 이름(이름 변경·삭제 후 좌석 방치). 그리고 스캔이 **0건이면 그 자체가 위반**이다 — 대상을
+    하나도 못 찾은 전수 가드는 공허하게 통과한다(루트 경로 오류가 "위반 없음"으로 위장되지 않게).
+    """
+    root = corpus_root if corpus_root is not None else default_corpus_root()
+    found = (
+        sorted(child.name for child in root.glob(_CORPUS_DIR_GLOB) if child.is_dir())
+        if root.is_dir()
+        else []
+    )
+    if not found:
+        return [
+            f"{root}: {_CORPUS_DIR_GLOB} 코퍼스 디렉터리가 0건이다 — 경로 오류이거나 코퍼스가 "
+            "사라졌다(스캔 0건은 통과가 아니라 실패)."
+        ]
+
+    seats = _corpus_seats()
+    violations: list[str] = []
+    for name in found:
+        placed = seats.get(name, [])
+        if not placed:
+            violations.append(
+                f"{name}: 어느 좌석(TARGET/LINEAGE/EXCLUDED/SELF_TAGGED)에도 속하지 않는다 — "
+                "problem_type_codes 태깅 계약 밖. 직접 분류 표에 편입하거나 사유와 함께 "
+                "EXCLUDED_CORPORA에 등재한다."
+            )
+        elif len(placed) > 1:
+            violations.append(f"{name}: 좌석이 {len(placed)}곳({', '.join(placed)})에 중복된다.")
+    found_set = set(found)
+    for name in sorted(seats):
+        if name not in found_set:
+            violations.append(
+                f"{name}: 좌석({', '.join(seats[name])})에는 있으나 {root} 아래에 "
+                "디렉터리가 없다 — 이름 변경·삭제 후 방치된 좌석."
             )
     return violations
 
@@ -500,6 +720,9 @@ def classify_record(corpus_name: str, record: Mapping[str, object]) -> list[str]
     elif corpus_name == CORPUS_V1:
         slug = record.get("slug")
         ptype = _V1_SLUG_TO_TYPE.get(slug) if isinstance(slug, str) else None
+    elif corpus_name in _UNIT_CODE_TABLES:
+        # CONT-09 — `unit_codes` 튜플이 곧 키. 표에 없는 값은 None(미태깅)으로 정직하게 드러낸다.
+        ptype = _UNIT_CODE_TABLES[corpus_name].get(_unit_codes(record))
     else:
         ptype = None
     return [ptype] if ptype is not None else []

@@ -1,0 +1,29 @@
+# CI 컨테이너 이미지 미러 목록 (OPS-135) — 이 파일이 "무엇을 미러하는가"의 단일 진실 원천이다.
+#
+# 왜 있는가: 2026-10-09 Docker Hub 익명 pull 한도(toomanyrequests)로 머지 큐가 연속 탈락했다.
+# CI가 쓰는 Docker Hub 이미지를 ghcr.io(GitHub 안)에 사본으로 두고 CI는 사본만 받는다.
+# 미러 갱신은 .github/workflows/mirror-ci-images.yml 이 이 목록을 읽어 수행한다
+# (구현 = scripts/ops/mirror_ci_images.py).
+#
+# 사본 주소 규칙(코드가 계산한다 — 손으로 적지 않는다):
+#   ghcr.io/<저장소 소유자>/whymath-ci-mirror/<이름>:<태그>
+#   <이름> = source 의 저장소 경로 마지막 토막 (pgvector/pgvector → pgvector · neo4j → neo4j)
+#   <태그> = source 의 태그 그대로 (pg16 · 5 · 3.12-slim)
+#
+# 항목을 더하는 법: source 한 줄을 추가 → 이 파일을 main 에 머지하면 미러 워크플로가 자동으로
+# 돈다(paths 트리거) → 사본이 생긴 뒤에 CI 참조를 사본으로 바꾼다. 순서를 거꾸로 하면 사본이 없는
+# 이미지를 CI 가 받으려다 전 잡이 실패한다.
+#
+# 거버넌스: tests/infra/test_ci_image_sources.py 가 워크플로·Dockerfile 의 이미지 참조가 전부
+# 이 목록의 사본인지 확인한다 — 목록에 없는 사본 참조나 Docker Hub 익명 참조는 RED.
+#
+# 형식 주의: source 는 `저장소[:태그]` 만 허용한다. digest(@sha256:…)·레지스트리 호스트는 넣지 않는다
+# (미러가 실행 시점에 digest 를 해석해 그 digest 로 복사한다).
+
+sources:
+  # 서비스 컨테이너: backend-migrations · data-pipeline-integration · e2e-nightly · weekly-metrics
+  - pgvector/pgvector:pg16
+  # 서비스 컨테이너: data-pipeline-neo4j (옵셔널 적재 실험 경로)
+  - neo4j:5
+  # Dockerfile 의 builder·runtime 두 단계 (docker-build 잡이 build-arg 로 주입)
+  - python:3.12-slim

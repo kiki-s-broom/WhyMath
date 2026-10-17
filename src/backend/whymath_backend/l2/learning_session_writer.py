@@ -31,6 +31,23 @@ surrogate ③ 세션 완주율(`harness/surrogate_baseline_report`), 그리고 �
 유지 — `tests/backend/l2/test_learning_session_writer.py`가 동결).
 
 ────────────────────────────────────────────────────────────────────────────
+개념 채움 — "이 활동 묶음에서 **처음 확인된** 개념" (P3-27)
+────────────────────────────────────────────────────────────────────────────
+트레이스의 `concept_selected`(= Gate D `concept_viewed` 역할의 유일한 생산 이벤트)는 세션 개시를
+투영한 것이라 `learning_session.target_concept_id`가 비어 있으면 "어느 개념을 봤는가"를 말하지
+못했다. 그래서 활동이 문항(`problem_id`)을 실어 오면 그 문항의 **대표 개념**
+(`get_primary_concept_id` — PRIMARY→TESTED 폴백, 재구현 0)을 해석해 세션에 채운다.
+  - **채우기만 하고 덮어쓰지 않는다**: 세션이 이미 개념을 갖고 있으면 그대로 둔다. 값의 의미는
+    "목표 개념"이 아니라 **이 묶음에서 처음 확인된 개념**이다 — 한 묶음(30분)에 여러 개념을 풀 수
+    있고, 이 컬럼은 그중 첫째 하나만 말한다. 학습한 개념의 완전한 집합이 아니다(숙달 변경 이벤트가
+    개념별 사실이다).
+  - **개념을 모르는 활동은 NULL로 둔다**: 추천 조회는 문항을 고르기 *전에* 세션을 잇기 때문에 개념이
+    없고, 문항이 개념에 매핑되지 않은 퇴화 문항도 없다. 날조하지 않는다 — 뒤 활동이 문항을 실어
+    오면 그때 채운다(그래서 NULL→값 한 방향만 있다).
+  - **개념 해석 실패가 세션 결합을 죽이지 않는다**: 해석은 자체 SAVEPOINT 안에서 하고, 실패하면
+    예외 타입명을 로그에 남기고(`failure_count`에 합산) 개념 없이 진행한다.
+
+────────────────────────────────────────────────────────────────────────────
 동시성 — 학생당 열린 세션 1개 (EOS-131 ⑩)
 ────────────────────────────────────────────────────────────────────────────
 같은 학생의 요청 두 건이 거의 동시에 들어오면 둘 다 "열린 세션 없음"을 볼 수 있다. 행 잠금은
@@ -68,6 +85,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.activity import LearningSession
+from whymath_backend.l2.mastery_tracking import get_primary_concept_id
 
 _logger = logging.getLogger("whymath.l2.learning_session_writer")
 
@@ -124,6 +142,39 @@ def _close_values(last_activity_at: datetime, started_at: datetime | None) -> di
     return values
 
 
+def _adopt_concept(row: LearningSession, concept_id: uuid.UUID | None) -> bool:
+    """세션이 아직 개념이 없고 이번 활동이 개념을 알면 채운다 — 바꿨는가를 돌려준다.
+
+    NULL→값 한 방향만 있다. 이미 값이 있으면 건드리지 않는다(첫 확인 개념 유지·덮어쓰기 금지).
+    """
+    if concept_id is None or row.target_concept_id is not None:
+        return False
+    row.target_concept_id = concept_id
+    return True
+
+
+async def _resolve_concept(session: AsyncSession, problem_id: uuid.UUID | None) -> uuid.UUID | None:
+    """활동이 실어 온 문항의 대표 개념 — 모르거나 실패하면 None(세션 결합은 계속된다).
+
+    자체 SAVEPOINT 안에서 돌려 조회 실패가 바깥 트랜잭션·세션 결합을 오염시키지 않는다. 실패는
+    삼키되 예외 타입명을 남기고 `failure_count`에 합산한다(침묵 실패 금지·이중 회계).
+    """
+    global _failure_count
+    if problem_id is None:
+        return None
+    try:
+        async with session.begin_nested():
+            return await get_primary_concept_id(session, problem_id)
+    except Exception as exc:  # noqa: BLE001 — 개념 해석은 부가 정보(타입명 로그·인프로세스 회계)
+        _failure_count += 1
+        _logger.warning(
+            "세션 개념 해석 실패(%s) — 개념 없이 세션에 결합한다 (누적 %d회).",
+            type(exc).__name__,
+            _failure_count,
+        )
+        return None
+
+
 async def _lock_open_session(session: AsyncSession, user_id: uuid.UUID) -> LearningSession | None:
     """그 학생의 열린 서버 세션을 행 잠금과 함께 읽는다(없으면 None).
 
@@ -144,11 +195,15 @@ async def touch_learning_session(
     *,
     user_id: uuid.UUID,
     now: datetime | None = None,
+    concept_id: uuid.UUID | None = None,
 ) -> SessionTouch:
     """학습 활동 1건을 세션에 결합한다 — 잇거나, 닫고 새로 열거나(commit 0·flush만).
 
     커밋 경계는 호출자 책임이다(`recommendation_evidence` 관례). 예외를 삼키지 않는다 — 서빙
     경로는 `record_learning_activity`를 쓴다.
+
+    `concept_id`는 이 활동에서 확인된 개념이다(모르면 None). 새 세션이면 그 값으로 열고, 이어진
+    세션이 아직 개념이 없으면 채운다 — 이미 있는 값은 덮어쓰지 않는다(모듈 docstring 개념 채움).
     """
     moment = now if now is not None else _now()
     if moment.tzinfo is None:
@@ -161,8 +216,11 @@ async def touch_learning_session(
         if moment - last <= IDLE_GAP:
             # 같은 세션을 잇는다. 시계가 뒤로 가도(요청 도착 순서 역전) 마지막 활동을
             # 되돌리지 않는다.
+            changed = _adopt_concept(current, concept_id)
             if moment > last:
                 current.last_activity_at = moment
+                changed = True
+            if changed:
                 await session.flush()
             return SessionTouch(session_id=current.session_id, opened=False)
         # 유휴 초과 — 마지막 활동 시각으로 닫는다.
@@ -179,6 +237,7 @@ async def touch_learning_session(
             user_id=user_id,
             started_at=moment,
             last_activity_at=moment,
+            target_concept_id=concept_id,
         )
         .on_conflict_do_nothing(
             index_elements=[LearningSession.user_id],
@@ -199,8 +258,11 @@ async def touch_learning_session(
             "learning_session 삽입이 충돌했으나 열린 서버 세션을 찾지 못했다 — "
             "부분 유니크 인덱스 술어와 _OPEN_SERVER_SESSION이 어긋났는지 확인하라."
         )
+    changed = _adopt_concept(winner, concept_id)
     if winner.last_activity_at is None or moment > winner.last_activity_at:
         winner.last_activity_at = moment
+        changed = True
+    if changed:
         await session.flush()
     return SessionTouch(session_id=winner.session_id, opened=False, closed_previous=closed)
 
@@ -210,15 +272,21 @@ async def record_learning_activity(
     *,
     user_id: uuid.UUID,
     now: datetime | None = None,
+    problem_id: uuid.UUID | None = None,
 ) -> uuid.UUID | None:
     """서빙 경로용 never-break 래퍼 — 결합된 세션 id, 실패 시 None(예외 타입명 로그).
 
     SAVEPOINT 안에서 돌리므로 실패가 바깥 트랜잭션을 오염시키지 않는다(모듈 docstring 실패 정책).
+    `problem_id`를 주면 그 문항의 대표 개념을 세션에 채운다(P3-27 — 개념 해석 실패는 세션 결합을
+    막지 않는다).
     """
     global _failure_count
     try:
+        concept_id = await _resolve_concept(session, problem_id)
         async with session.begin_nested():
-            touched = await touch_learning_session(session, user_id=user_id, now=now)
+            touched = await touch_learning_session(
+                session, user_id=user_id, now=now, concept_id=concept_id
+            )
         return touched.session_id
     except Exception as exc:  # noqa: BLE001 — 측정 좌석 never-break(타입명 로그·인프로세스 회계)
         _failure_count += 1

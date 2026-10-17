@@ -27,12 +27,16 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import Annotated, Literal, NamedTuple
+from enum import Enum
+from types import SimpleNamespace
+from typing import Annotated, Any, Literal, NamedTuple
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func as sa_func
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api._attempt_misconception_scan import (
@@ -52,6 +56,7 @@ from whymath_backend.api._crypto import (
     resolve_dialogue_image_analysis,
     resolve_dialogue_image_uri,
 )
+from whymath_backend.api._isolated_call import CHAIN_BUDGET_FACTOR, isolated
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
 )
@@ -109,6 +114,7 @@ from whymath_backend.l2 import (
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.attempt_version_pin import resolve_attempt_version_pin
 from whymath_backend.l2.learning_session_writer import record_learning_activity
 from whymath_backend.l2.learning_state_machine import advance_on_graded_attempt
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
@@ -711,6 +717,7 @@ def _build_response_payload(
     grade: int | None = None,
     standard_code: str | None = None,
     step_chain_verifier: StepChainVerifier | None = None,
+    chain_verification: ChainVerificationCounts | None = None,
 ) -> tuple[
     PedagogyDecision,
     list[MisconceptionMatch],
@@ -756,6 +763,13 @@ def _build_response_payload(
     해당 분기 주석).
     주입값이 실제로 쓰이는지는 `tests/backend/api/test_coach.py`의
     `TestStepChainVerifierInjection`이 가짜 verifier를 app.state에 올려 동결한다.
+
+    **OPS-125** `chain_verification`: 세 핸들러가 `_verify_chain_isolated`로 *먼저* 계산한 연쇄 검증
+    결과(이벤트 루프 밖 워커·시간 상한 포함). 주면 L4는 `step_chain_verifier`를 부르지 않는다 —
+    이 함수가 동기라 호출부에서 `await`로 감쌀 수 없어, 계산을 함수 *앞*으로 빼는 분리를 택했다
+    (함수 전체를 워커에서 돌리는 대안은 pack·가설 등 비직렬화 인자와 비SymPy 작업까지 프로세스
+    경계를 넘겨야 해서 기각). 미주입(None)이면 종전대로 `step_chain_verifier` 동기 호출 —
+    직접 호출 단위테스트 하위호환 좌석이다.
 
     **S4-19(2026-08-10)**: 반환이 7-튜플로 확장됐다 — `_StepVerificationCarry`(게이트 *이전*
     단계 검증 운반값·적재 전용)를 끝이 아닌 위치에 삽입해 **마지막 원소=solution_coaching
@@ -838,6 +852,9 @@ def _build_response_payload(
         # COMP-01: 단계 연쇄 검증 능력을 **명시 주입**한다 — 미주입이면 L4가 합성 루트를
         # 지연 조회(pull)하므로, 이 한 줄이 "Core는 인터페이스만 안다"는 주장의 집행 지점이다.
         verifier=step_chain_verifier,
+        # OPS-125: 핸들러가 격리 호출로 미리 계산한 연쇄 검증 결과 — 있으면 L4는 SymPy를 돌리지
+        # 않는다(이 함수는 동기라 여기서 직접 검증하면 이벤트 루프를 막는다).
+        chain_verification=chain_verification,
     )
     # slice 73: 노출은 *불일치 신호만* — 계산오류 verify(기존·arithmetic_error) + BKT↔θ 불일치
     # (consolidate·retrieval). 합의(foundation/advance)는 LTHC가 담당·한쪽 신호만(diagnose)은
@@ -1150,6 +1167,108 @@ def _last_solution_step(body: CoachRequest) -> str | None:
     return last or None
 
 
+class _BudgetExceededOutcome:
+    """계산 시간 상한 초과(OPS-96)의 중립 판정 — 상태 하나만 가진 `FinalAnswerOutcome` 구조."""
+
+    state = VerificationOutcome.unverifiable
+
+
+_BUDGET_EXCEEDED_OUTCOME = _BudgetExceededOutcome()
+
+
+class _BudgetReason(str, Enum):
+    """계산 시간 상한 초과의 사유 코드 — 값은 수학 어댑터의 `undecidable`과 같은 문자열이다.
+
+    상한 초과를 "증명도 반증도 못 했다"로 접는 것은 단계 하나짜리 경로(`verify_step`의
+    `budget_exceeded_result`)와 같은 판정이다. 같은 문자열을 써야 이벤트 적재(`unverifiable_by_
+    reason`)와 분포 로그의 닫힌 어휘 7종이 늘지 않는다. Core라 어댑터 enum은 import하지 않는다.
+    """
+
+    undecidable = "undecidable"
+
+
+class _StepUnverifiable(BaseModel):
+    """판정 불가 전이 하나 — `StepOutcome`이 읽는 `state`만 가진다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: VerificationOutcome = VerificationOutcome.unverifiable
+
+
+class _BudgetExceededChain(BaseModel):
+    """연쇄 검증이 시간 상한을 넘었을 때의 중립 결과 — **전 전이 판정 불가**(OPS-125).
+
+    통과로 접으면 검증 우회고(풀이가 맞다고 말하게 된다) 오답으로 접으면 학생에게 부당한 부정
+    피드백이다(교수학 금기). 그래서 `n_incorrect=0`·`first_incorrect_index=None`·`unverified_ratio=
+    1.0`이다 — 코치는 이를 "검산 신호 없음"으로 읽어 단계 자가검산 코칭을 내지 않는다.
+    `ChainVerificationCounts` 구조를 만족하고 pydantic이라 `SolutionCoaching.solution_verification`
+    (`Any`)으로 실려 나가도 직렬화된다. 합 보존: n_correct + n_incorrect + n_unverifiable ==
+    n_transitions, 사유 건수 합 == n_unverifiable.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    steps: tuple[_StepUnverifiable, ...]
+    first_incorrect_index: int | None = None
+    n_transitions: int
+    n_correct: int = 0
+    n_incorrect: int = 0
+    n_unverifiable: int
+    unverified_ratio: float = 1.0
+    unverifiable_by_reason: dict[_BudgetReason, int]
+
+
+def _budget_exceeded_chain(n_transitions: int) -> _BudgetExceededChain:
+    """전이 `n_transitions`개가 전부 판정 불가인 중립 연쇄 결과(전이 0개는 호출되지 않는다)."""
+    return _BudgetExceededChain(
+        steps=tuple(_StepUnverifiable() for _ in range(n_transitions)),
+        n_transitions=n_transitions,
+        n_unverifiable=n_transitions,
+        unverifiable_by_reason={_BudgetReason.undecidable: n_transitions},
+    )
+
+
+async def _verify_chain_isolated(
+    body: CoachRequest, verifier: StepChainVerifier
+) -> ChainVerificationCounts | None:
+    """풀이 단계 연쇄 검증을 이벤트 루프 밖 워커에서 시간 상한과 함께 계산한다(OPS-125).
+
+    `_build_response_payload`(동기)가 L4를 거쳐 SymPy를 부르기 *전에* 핸들러가 이 함수로 결과를
+    만들어 `chain_verification=`으로 넘긴다. 단계가 2개 미만이면 검증할 전이가 없어 None이다
+    (L4도 같은 조건으로 건너뛴다). 상한은 `sympy_isolation_timeout_s × CHAIN_BUDGET_FACTOR` —
+    `/v1/verify-solution`의 체인 총 예산과 같은 값이다(전이를 하나씩 끊는 그쪽과 달리 이 능력은
+    체인 전체가 한 호출이라, 병리적 전이 하나가 체인 전체를 판정 불가로 접는다 — 접히는 방향은
+    언제나 "모른다"이고 통과·오답이 아니다). 초과 시 사유·한도는 `isolated`가 로그에 남긴다.
+    """
+    steps = body.solution_steps
+    if steps is None or len(steps) < 2:
+        return None
+    n_transitions = len(steps) - 1
+    step_types = body.solution_step_types
+    return await isolated(
+        verifier.verify_chain,
+        list(steps),
+        list(step_types) if step_types is not None else None,
+        on_budget_exceeded=lambda: _budget_exceeded_chain(n_transitions),
+        timeout_s=get_settings().sympy_isolation_timeout_s * CHAIN_BUDGET_FACTOR,
+    )
+
+
+def _problem_snapshot(problem: Any) -> Any:
+    """문항 ORM을 워커 프로세스로 보낼 수 있는 *읽기 전용 스냅샷*으로 바꾼다(OPS-96).
+
+    ORM 인스턴스는 세션 상태를 달고 있어 프로세스 경계를 넘기에 부적합하다. **이미 로드된 컬럼만**
+    복사한다(`inspect(...).dict` — 미로드 속성을 건드리면 async 컨텍스트에서 지연 로드가 터진다).
+    과목 어댑터는 자기가 읽는 필드만 `getattr`로 읽으므로(Protocol `problem: Any`) 구조가 같으면
+    통과한다. ORM이 아닌 객체(테스트 스텁)는 그대로 돌려준다.
+    """
+    try:
+        loaded = sa_inspect(problem).dict
+    except NoInspectionAvailable:
+        return problem
+    return SimpleNamespace(**{k: v for k, v in loaded.items() if not k.startswith("_")})
+
+
 async def _final_answer_state(
     session: AsyncSession,
     problem_id: uuid.UUID | None,
@@ -1178,13 +1297,25 @@ async def _final_answer_state(
     if problem is None:
         # 문항 부재(코퍼스 미적재·신규) → 서버 채점 근거 없음(graceful).
         return None, FormVerdict.not_required
+    # OPS-96: 값 판정은 이벤트 루프 밖 워커 프로세스에서 시간 상한과 함께 돈다. 상한을 넘기면
+    # 계산을 끊고 **판정 불가**(`unverifiable`)로 접는다 — 정답(완료 처리)도 오답(REDIRECT=부정
+    # 피드백)도 아니다. 초과 값은 과목 어댑터를 모르는 중립 타입이다(Core→Adapter 의존 금지).
+    snapshot = _problem_snapshot(problem)
     # EOS-89: 구현을 이름으로 알지 않는 것에 더해, **끌어오지도 않는다** — 능력은 Application이
     # 부팅 시 app.state에 등록한 것을 엔드포인트가 Depends로 받아 여기까지 내려준다.
-    result = capabilities.final_answer.verify_final_answer(last_step, problem)
+    result = await isolated(
+        capabilities.final_answer.verify_final_answer,
+        last_step,
+        snapshot,
+        on_budget_exceeded=lambda: _BUDGET_EXCEEDED_OUTCOME,
+    )
     # EOS-28: 형태 지시 준수는 **값 판정과 나란히·독립으로** 계산한다. 여기서 두 판정이 서로를
     # 참조하지 않는 것이 교수학 계약의 1차 방어다 — 참조하는 순간 형태가 정오에 스며든다.
-    form = capabilities.answer_form.verify_answer_form(
-        last_step, getattr(problem, "answer_constraint", None)
+    form = await isolated(
+        capabilities.answer_form.verify_answer_form,
+        last_step,
+        getattr(snapshot, "answer_constraint", None),
+        on_budget_exceeded=lambda: FormVerdict.unverifiable,
     )
     return result.state, form
 
@@ -1418,7 +1549,10 @@ async def _complete_problem(
     )
     # EOS-131: 완료 확정 attempt도 서버가 학습 세션에 결합한다(submit_attempt와 같은 규칙). 같은
     # 턴 앞에서 이미 세션을 이었으므로 대개 같은 세션을 갱신할 뿐이다. never-break(실패 시 NULL).
-    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    # P3-27: 완료한 문항의 대표 개념을 세션에 채운다(이미 있으면 덮어쓰지 않는다).
+    learning_session_id = await record_learning_activity(
+        session, user_id=user_id, now=received_at, problem_id=problem_id
+    )
     # EOS-133: attempt보다 먼저 판정한다 — used_hint는 attempt 행의 컬럼이다.
     hint_attribution = await _attribute_hints(
         session,
@@ -1428,11 +1562,15 @@ async def _complete_problem(
             session, dialogue_id=dialogue_id, started_at=started_at
         ),
     )
+    # EOS-47: `submit_attempt`와 같은 판·채점 환경 고정(세 적재 경로가 같은 재현 근거를 남긴다).
+    version_pin = await resolve_attempt_version_pin(session, problem_id)
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답·dialogue 링크에 즉시 사용).
         user_id=user_id,
         session_id=learning_session_id,
         problem_id=problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         is_correct=True,  # 서버 권위 판정(turn A correct) — 클라 보고 아님.
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
@@ -1593,12 +1731,18 @@ async def _record_first_wrong_submission(
     student_answer_plain, student_answer_encrypted, student_answer_nonce = encrypt_dialogue_content(
         student_work_cipher, final_answer
     )
-    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    learning_session_id = await record_learning_activity(
+        session, user_id=user_id, now=received_at, problem_id=problem_id
+    )
+    # EOS-47: 판·채점 환경 고정(`_complete_problem`·`submit_attempt`와 같은 호출).
+    version_pin = await resolve_attempt_version_pin(session, problem_id)
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),
         user_id=user_id,
         session_id=learning_session_id,
         problem_id=problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         is_correct=False,  # 서버 권위 판정(final incorrect) — 클라 보고 아님.
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
@@ -2859,7 +3003,7 @@ async def _wh1_primary_decision_or(
     그대로 흐른다 — 호출자가 이미 조회한 `server_theta`·`user.user_id`를 재사용할 뿐 신규 쿼리는
     없다(create_session·append_turns 두 핸들러가 이미 계산해 둔 값).
 
-    `pack`(PED-23 회수 — 04e §9): `_pack_for`가 해석해 `decide(pack=)`에 넣은 *같은* 팩 객체를
+    `pack`(PED-23 회수 — 04g §9): `_pack_for`가 해석해 `decide(pack=)`에 넣은 *같은* 팩 객체를
     러너로 thread한다 — 러너가 톤필터 직전 금지모드 가드(`mode_guard_runtime_enabled` 옵트인·
     기본 OFF)에 재사용(위반 발화 미서빙·소크라테스 재질문 폴백). None(무팩·플래그 OFF 해석)이면
     가드 무관.
@@ -2975,11 +3119,14 @@ async def coach_decide(
     )
     # S4-19: carry(게이트 이전 단계 검증 운반값)는 stateless 경로에선 미소비(DB 무접근 계약 —
     # 적재 좌석 없음). 마지막 원소=solution_coaching 불변식은 유지된다.
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     decision, matches, intervention, lthc, entry_category, _step_carry, solution_coaching = (
         _build_response_payload(
             body,
             matches=outcome.matches,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     return CoachResponse(
@@ -3020,7 +3167,8 @@ async def create_session(
     segmentation_counters.record(body.solution_steps)
     # EOS-131: 코치 턴은 학습 활동이다 — 서버 유휴 규칙으로 학습 세션을 잇거나 연다. never-break
     # (실패해도 코칭은 진행·예외 타입명 로그). 커밋은 이 핸들러의 기존 커밋이 함께 가져간다.
-    await record_learning_activity(session, user_id=user.user_id)
+    # P3-27: 코칭 대상 문항의 대표 개념을 세션에 채운다(문항 없는 대화는 개념 없이 결합).
+    await record_learning_activity(session, user_id=user.user_id, problem_id=body.problem_id)
     # slice 64: 문항 기대정답을 서버 DB에서 조회해 step shadow 진단 맥락으로 주입(비노출 — 응답엔
     # 결코 싣지 않음·정답 누출 차단). 문항 부재/없음이면 None(graceful).
     expected_answer = await _expected_answer_for(session, body.problem_id)
@@ -3158,6 +3306,8 @@ async def create_session(
     # 개념의 성취기준 고시코드) — 둘 다 비노출 개인화 슬롯(_grade_for/_standard_code_for docstring).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, body.problem_id)
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: step_carry = 게이트 이전 단계 검증 운반값(아래 _log_verify_event 적재 전용·비노출).
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
         _build_response_payload(
@@ -3174,6 +3324,7 @@ async def create_session(
             grade=grade,
             standard_code=standard_code,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     intervention = _intervention_from_hypotheses_or(active_hypotheses, intervention)
@@ -3461,7 +3612,8 @@ async def append_turns(
             status_code=status.HTTP_404_NOT_FOUND, detail="대화를 찾을 수 없습니다."
         )
     # EOS-131: 코치 턴 = 학습 활동(소유권 확인 *뒤* — 남의 대화 id로 세션을 갱신하지 않는다).
-    await record_learning_activity(session, user_id=user.user_id)
+    # P3-27: 대화에 실린 문항의 대표 개념을 채운다.
+    await record_learning_activity(session, user_id=user.user_id, problem_id=dialogue.problem_id)
 
     # PED-04 D1·D2: **이번 턴을 적재하기 전에** 직전 턴들의 평문 메타를 읽는다(순서가 계약 —
     # `_turn_meta_rows` docstring 참조). 여기서 Polya 상태를 서버가 파생하고, 발문 회전용
@@ -3583,6 +3735,8 @@ async def append_turns(
     # problem_id 출처(append 규약과 정합·expected_answer/server_mastery와 같은 출처 패턴).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, dialogue.problem_id)
+    # OPS-125: create_session과 동형 — 연쇄 검증을 이벤트 루프 밖에서 먼저 계산해 주입한다.
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: create_session과 동형 — step_carry(게이트 이전 운반값)는 verify 적재 전용·비노출.
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
         _build_response_payload(
@@ -3600,6 +3754,7 @@ async def append_turns(
             grade=grade,
             standard_code=standard_code,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     intervention = _intervention_from_hypotheses_or(active_hypotheses, intervention)

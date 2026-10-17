@@ -88,8 +88,9 @@ class _FakeResult:
 
 
 class _FakeConnection:
-    def __init__(self, engine: _FakeEngine) -> None:
+    def __init__(self, engine: _FakeEngine, *, read_only: bool = False) -> None:
         self._engine = engine
+        self._read_only = read_only
 
     def __enter__(self) -> _FakeConnection:
         return self
@@ -103,20 +104,23 @@ class _FakeConnection:
         return None
 
     def execute(self, statement: object, parameters: object = None) -> _FakeResult:
-        self._engine.executed.append(statement)
+        # 읽기 전용 연결(`connect()`)의 조회는 쓰기 횟수(`executed`)에 섞지 않는다 — 적재 전 사전판정
+        # (FK 확인·HARN-216 canonical 경쟁 판정)의 읽기가 "행마다 upsert 1회" 단언을 흐리지 않게.
+        (self._engine.reads if self._read_only else self._engine.executed).append(statement)
         return _FakeResult(self._engine.rows)
 
 
 class _FakeEngine:
     def __init__(self, rows: list[object] | None = None) -> None:
         self.executed: list[object] = []
+        self.reads: list[object] = []
         self.rows: list[object] = rows or []
 
     def begin(self) -> _FakeConnection:
         return _FakeConnection(self)
 
     def connect(self) -> _FakeConnection:
-        return _FakeConnection(self)
+        return _FakeConnection(self, read_only=True)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -145,7 +149,9 @@ class TestLoader:
                     {
                         "kebab_id": "k2",
                         "mis_id": "M2",
-                        "link_type": "부분매핑",
+                        # 적재 자격(MISC-63): 직접매핑만 적재된다 — 비직접 거부는 게이트 계약 테스트가 동결.
+                        "link_type": "직접매핑",
+                        "confidence": 0.8,
                         "note": "검수:Kiki 2026-07-08",
                     },
                 ]

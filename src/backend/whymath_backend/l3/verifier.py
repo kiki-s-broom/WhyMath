@@ -17,6 +17,25 @@ S4-13 v1이 확률 유한 전수형을 닫았다면, v2는 검증 진입점을 �
   문자열)·`tier`(도메인별 검증 등급)를 추가한다. 둘 다 기본값이 있고 기존 생성처가 전부
   키워드 인자라 소스 호환이다. `tier=None`이면 종전 상수 등급을 그대로 쓴다.
 
+변경 요약(S4-68, 소비 지점 드리프트 해소):
+- 교차검증 관점 조회를 fail-closed로 바꾼다 — 폴백(`PROBABILITY_PERSPECTIVES`)을 없애고
+  `finite_probability`·`finite_count`에 확률 관점을 명시 등록한다. 미등록 kind는 `unverifiable`.
+- 같은 레지스트리를 읽는 다른 소비 지점(`harness/qa_pipeline`·`harness/corpus_reverify`·
+  `l1/problem_bank/populate`)의 어긋남은 각 파일에서 정정했다. 정리 근거는
+  `docs/architecture/verifier_v2_domains.md` §8.5.
+
+변경 요약(S4-65, 등급 부여 배선):
+- 응답 등급(`VerificationVerdict.tier`)에서 레거시 값(`MACHINE_EXHAUSTIVE`·`MACHINE_SAMPLED`)을
+  없앤다. 도메인 verifier가 실제로 쓴 방법에 맞는 신규 등급을 `_DomainResult.tier`에 싣는다 —
+  유한 전수(`finite_*`)=`FINITE_EXHAUSTIVE`, 통계 자료·정확 산술 판정=`DETERMINISTIC_DATA`,
+  SymPy 기호 연산이 결정 단계인 개념형=`SYMBOLIC_PROOF`(표는 `_CONCEPTUAL_TIERS`).
+- 아무 축도 닫지 못한 응답(미등록 kind·`unverifiable`)은 `_FLOOR_TIER`(`NUMERIC_SAMPLING`)다 —
+  레거시 `MACHINE_SAMPLED`를 읽을 때의 해석(`verification_tier._TIER_ALIASES`)과 같은 칸이라 의미가
+  바뀌지 않는다.
+- **`RESIDUE_REVIEWED`·`HUMAN_REVIEWED`는 이 모듈이 절대 찍지 않는다**(Kiki 판정 2026-10-13,
+  설계서 §4.4). 전자는 "로트 단위 Wilson 게이트 통과"의 뜻이라 문항 1건의 교차검증 `ok`가 주장할
+  수 없다. 교차검증 결과는 `audit_labels`와 `residual_axes`로만 흐른다.
+
 계층: L3 지역. L4만 호출한다(import-linter). DB·LLM 0 — 필요한 경우 cross_verify를
 주입받아 잔여 축을 검증.
 """
@@ -26,6 +45,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -65,6 +85,7 @@ __all__ = [
     "ProblemVerifyInput",
     "VerificationVerdict",
     "Verifier",
+    "build_residue_subject",
 ]
 
 
@@ -134,6 +155,8 @@ class _DomainResult:
     machine_favorable: int = 0
     machine_model_ko: str = ""
     machine_value: float | None = None
+    machine_exact: Fraction | None = None
+    machine_approx: Fraction | None = None
     # 정확값 문자열(정수 `73`·유리수 `1/2`·목록 `[1, 3, 6]`) — float로는 2⁵³ 초과 정수와 벡터 답을
     # 무손실로 못 싣는다(S4-66, 설계서 §8.3 C2). 빈 문자열이면 정확값이 없다(기존 도메인 전부).
     machine_value_exact: str = ""
@@ -143,8 +166,20 @@ class _DomainResult:
 
 DomainVerifier = Callable[[str, str], _DomainResult]
 
-# 도메인별 교차검증 관점 — 기본값은 확률 유한 전수형 관점.
+# 닫힌 축이 없는 응답(미등록 kind·`unverifiable`)의 등급 — "증명된 축의 집합"이 비었을 때 앉는 가장
+# 약한 칸이다. 레거시 `MACHINE_SAMPLED`가 읽기 시점에 `NUMERIC_SAMPLING`으로 해석되므로(alias) 종전
+# 응답과 같은 의미다. 이 값으로 *과소 주장*하는 방향이 안전하다(과대 주장이 위험하다).
+_FLOOR_TIER = VerificationTier.NUMERIC_SAMPLING
+
+# 도메인별 교차검증 관점 — **전부 명시 등록**이며 기본값(폴백)은 없다(S4-68).
+#
+# 종전엔 `.get(kind, PROBABILITY_PERSPECTIVES)`로 미등록 kind를 확률 관점으로 조용히 흘렸다.
+# 실측(2026-10-09 재현): 개념형(SymPy) 15종이 `cross_verifier` 주입 시 모두 확률 관점으로 가
+# `pass`가 됐다 — 확률 관점은 "표본공간·등확률" 가정을 묻는 심사라, 실근 개수·극한 같은 문항에는
+# 의미 없는 심사로 `pass`가 찍힌다. 미등록 kind는 `_run_cross_verify`가 `unverifiable`로 닫는다.
 _CROSS_VERIFY_PERSPECTIVES: dict[str, tuple[Perspective, ...]] = {
+    "finite_probability": PROBABILITY_PERSPECTIVES,
+    "finite_count": PROBABILITY_PERSPECTIVES,
     "statistical_claim": STATISTICAL_PERSPECTIVES,
     "sequence_induction": SEQUENCE_PERSPECTIVES,
 }
@@ -179,6 +214,7 @@ def _verify_finite_probability_pair(conditions: str, answer: str) -> _DomainResu
         machine_total=machine_total,
         machine_favorable=machine_favorable,
         machine_model_ko=machine_model_ko,
+        tier=VerificationTier.FINITE_EXHAUSTIVE,
     )
 
 
@@ -207,6 +243,7 @@ def _verify_finite_count_pair(conditions: str, answer: str) -> _DomainResult:
         machine_total=machine_total,
         machine_favorable=machine_favorable,
         machine_model_ko=machine_model_ko,
+        tier=VerificationTier.FINITE_EXHAUSTIVE,
     )
 
 
@@ -218,11 +255,15 @@ def _verify_statistical_claim_pair(conditions: str, answer: str) -> _DomainResul
     verdict, residual_axes, result = verify_statistical_claim(conditions, answer)
     machine_model_ko = ""
     machine_value: float | None = None
+    machine_exact: Fraction | None = None
+    machine_approx: Fraction | None = None
     if verdict.state == "pass":
         try:
             model = parse_statistical_model(conditions)
             machine_model_ko = describe_statistical_model_ko(model, result)
             machine_value = result.value
+            machine_exact = result.exact_value
+            machine_approx = result.approx_value
         except Exception:  # noqa: BLE001 — 교차검증 재료가 없어도 기계 검증 결과는 유효
             machine_model_ko = ""
     return _DomainResult(
@@ -231,6 +272,10 @@ def _verify_statistical_claim_pair(conditions: str, answer: str) -> _DomainResul
         residual_axes=residual_axes,
         machine_model_ko=machine_model_ko,
         machine_value=machine_value,
+        machine_exact=machine_exact,
+        machine_approx=machine_approx,
+        # 주어진 유한 자료에서 정확 유리수로 통계량을 계산한다(난수·추정 없음) — 결정론 자료 검증.
+        tier=VerificationTier.DETERMINISTIC_DATA,
     )
 
 
@@ -274,8 +319,13 @@ def _wrap_conceptual_verifier(
     *,
     machine_axis: str,
     residual_axis: str = "발문↔SymPy 조건 정합",
+    tier: VerificationTier | None = None,
 ) -> DomainVerifier:
-    """SymPy/통계/기하/벡터 판정 함수를 _DomainResult로 래핑."""
+    """SymPy/통계/기하/벡터 판정 함수를 _DomainResult로 래핑.
+
+    `tier`는 이 판정이 실제로 쓴 방법의 등급이다. None이면 `Verifier`가 `_FLOOR_TIER`로 내려
+    과소 주장한다(등급을 정하지 못한 kind가 더 강한 등급을 얻는 일은 없다).
+    """
 
     def _verify(conditions: str, answer: str) -> _DomainResult:
         verdict = fn(conditions, answer)
@@ -283,14 +333,43 @@ def _wrap_conceptual_verifier(
             verdict=verdict,
             machine_axes=(machine_axis,),
             residual_axes=(residual_axis,) if verdict.state == "pass" else (),
+            tier=tier,
         )
 
     return _verify
 
 
+# 개념형 판정의 등급표(S4-65) — kind마다 **결정 단계가 무엇이었는가**로 정한다. 키 집합은
+# `_CONCEPTUAL_VERIFIERS`에서 유한 전수 2종(`finite_*`, 전용 래퍼가 등급을 싣는다)을 뺀 15종과
+# 같아야 하며, 어긋나면 `tests/backend/l3/test_verifier_tier_assignment.py`가 RED다.
+#
+# 알려진 한계(설계서 §4.4): 근의 실수 여부·서로 다른 근 판별은 허용오차(`tol=1e-9`)로 비교한다.
+# `SYMBOLIC_PROOF`는 "결정 단계가 SymPy 기호 연산"이라는 방법의 분류이지, 허용오차 단계까지 형식
+# 증명이라는 주장이 아니다.
+_CONCEPTUAL_TIERS: dict[str, VerificationTier] = {
+    # SymPy 기호 연산(roots·diff·limit·Sum.is_convergent·solveset)이 판정의 결정 단계.
+    "real_root_count": VerificationTier.SYMBOLIC_PROOF,
+    "excluded_point_count": VerificationTier.SYMBOLIC_PROOF,
+    "root_loss_count": VerificationTier.SYMBOLIC_PROOF,
+    "extremum_count": VerificationTier.SYMBOLIC_PROOF,
+    "is_one_to_one": VerificationTier.SYMBOLIC_PROOF,
+    "limit_equals_value": VerificationTier.SYMBOLIC_PROOF,
+    "is_differentiable": VerificationTier.SYMBOLIC_PROOF,
+    "series_converges": VerificationTier.SYMBOLIC_PROOF,
+    "inequality_direction": VerificationTier.SYMBOLIC_PROOF,
+    # 문항이 준 유한 개수의 수치에 대한 결정론 계산 — 정확 산술(simplify == 0) 또는 단일 값 비교.
+    "mean_equals_median": VerificationTier.DETERMINISTIC_DATA,
+    "events_independent": VerificationTier.DETERMINISTIC_DATA,
+    "conditional_equal": VerificationTier.DETERMINISTIC_DATA,
+    "dot_product_scalar": VerificationTier.DETERMINISTIC_DATA,
+    "geometric_convergence": VerificationTier.DETERMINISTIC_DATA,
+    "congruent_by_ratio": VerificationTier.DETERMINISTIC_DATA,
+}
+
+
 # 기존 _CONCEPTUAL_VERIFIERS를 _VERIFIERS_V2 형태로 래핑.
 # machine_axis는 도메인별로 다르게 표현할 수 있지만, S4-54에서는 SymPy 기반/도메인 프리미티브로
-# 구분. S4-55 이후 tier 세분화와 함께 정밀화 가능.
+# 구분. 등급(tier)은 S4-65가 `_CONCEPTUAL_TIERS`로 kind별 부여한다.
 _SYMPTY_BASED_KINDS: frozenset[str] = frozenset(
     {
         "real_root_count",
@@ -338,6 +417,7 @@ def _build_verifiers_v2() -> dict[str, DomainVerifier]:
             verifiers[kind] = _wrap_conceptual_verifier(
                 fn,
                 machine_axis=_machine_axis_for(kind),
+                tier=_CONCEPTUAL_TIERS.get(kind),
             )
     return verifiers
 
@@ -345,9 +425,39 @@ def _build_verifiers_v2() -> dict[str, DomainVerifier]:
 _VERIFIERS_V2: dict[str, DomainVerifier] = _build_verifiers_v2()
 
 
-def _domain_tier(domain_result: _DomainResult, default: VerificationTier) -> VerificationTier:
-    """도메인이 등급을 명시했으면 그것을, 아니면 종전 상수 등급을 쓴다(설계서 §8.3 C3)."""
-    return domain_result.tier if domain_result.tier is not None else default
+def _domain_tier(domain_result: _DomainResult) -> VerificationTier:
+    """도메인이 등급을 명시했으면 그것을, 아니면 `_FLOOR_TIER`를 쓴다(설계서 §8.3 C3·§4.4).
+
+    종전엔 호출처가 레거시 상수를 기본값으로 넘겼다. 등급을 정하지 못한 도메인이
+    `MACHINE_EXHAUSTIVE`를 얻던 그 경로를 없애고, 정하지 못했으면 가장 약한 칸으로 내린다.
+    """
+    return domain_result.tier if domain_result.tier is not None else _FLOOR_TIER
+
+
+def build_residue_subject(
+    problem: ProblemVerifyInput, domain_result: _DomainResult
+) -> ResidueSubject:
+    """기계 검산 결과 + 문항 → 잔여 축 교차검증 대상(`ResidueSubject`) — 조립의 단일 출처.
+
+    `Verifier`(문항 1건 검증)와 로트 게이트(`harness/residue_cross_verify_eval_v2`)가 **같은
+    함수**로 대상을 조립한다. 두 경로가 각자 조립하면 도메인 필드(`machine_value_exact` 등)가
+    늘 때 한쪽만 갱신돼, 게이트가 서빙 경로와 다른 재료로 표본을 심사하는 드리프트가 생긴다.
+    """
+    return ResidueSubject(
+        problem_id=problem.slug,
+        question_text=problem.question_text,
+        answer=problem.answer,
+        answer_explanation=problem.answer_explanation,
+        machine_model_ko=domain_result.machine_model_ko,
+        machine_total=domain_result.machine_total,
+        machine_favorable=domain_result.machine_favorable,
+        machine_value=domain_result.machine_value,
+        machine_exact=domain_result.machine_exact,
+        machine_approx=domain_result.machine_approx,
+        machine_value_exact=domain_result.machine_value_exact,
+        authored_by=problem.authored_by,
+        data=problem.conditions,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -372,7 +482,7 @@ class Verifier:
         if verifier is None:
             return VerificationVerdict(
                 state="unverifiable",
-                tier=VerificationTier.MACHINE_SAMPLED,
+                tier=_FLOOR_TIER,
                 reason=f"answer_kind={problem.answer_kind!r}에 등록된 verifier가 없음(v2 미구현)",
             )
 
@@ -382,7 +492,7 @@ class Verifier:
         if verdict.state == "fail":
             return VerificationVerdict(
                 state="fail",
-                tier=_domain_tier(domain_result, VerificationTier.MACHINE_SAMPLED),
+                tier=_domain_tier(domain_result),
                 machine_axes=domain_result.machine_axes,
                 residual_axes=domain_result.residual_axes,
                 reason=verdict.reason or "기계 검증 실패",
@@ -392,12 +502,12 @@ class Verifier:
             if not domain_result.residual_axes:
                 return VerificationVerdict(
                     state="unverifiable",
-                    tier=VerificationTier.MACHINE_SAMPLED,
+                    tier=_FLOOR_TIER,
                     reason=verdict.reason or "기계 검증 불가",
                 )
             return VerificationVerdict(
                 state="unverifiable",
-                tier=VerificationTier.MACHINE_SAMPLED,
+                tier=_FLOOR_TIER,
                 machine_axes=domain_result.machine_axes,
                 residual_axes=domain_result.residual_axes,
                 reason=verdict.reason or "기계 검증 불가, 잔여 축 남음",
@@ -407,7 +517,7 @@ class Verifier:
         if not domain_result.residual_axes:
             return VerificationVerdict(
                 state="pass",
-                tier=_domain_tier(domain_result, VerificationTier.MACHINE_EXHAUSTIVE),
+                tier=_domain_tier(domain_result),
                 machine_axes=domain_result.machine_axes,
             )
 
@@ -415,7 +525,7 @@ class Verifier:
         if self._cross_verifier is None:
             return VerificationVerdict(
                 state="unverifiable",
-                tier=_domain_tier(domain_result, VerificationTier.MACHINE_EXHAUSTIVE),
+                tier=_domain_tier(domain_result),
                 machine_axes=domain_result.machine_axes,
                 residual_axes=domain_result.residual_axes,
                 reason="잔여 축이 있으나 cross_verifier가 주입되지 않음",
@@ -430,27 +540,28 @@ class Verifier:
         assert (
             self._cross_verifier is not None
         ), "_run_cross_verify는 cross_verifier가 있을 때만 호출"
-        subject = ResidueSubject(
-            problem_id=problem.slug,
-            question_text=problem.question_text,
-            answer=problem.answer,
-            answer_explanation=problem.answer_explanation,
-            machine_model_ko=domain_result.machine_model_ko,
-            machine_total=domain_result.machine_total,
-            machine_favorable=domain_result.machine_favorable,
-            machine_value=domain_result.machine_value,
-            machine_value_exact=domain_result.machine_value_exact,
-            authored_by=problem.authored_by,
-            data=problem.conditions,
-        )
-        perspectives = _CROSS_VERIFY_PERSPECTIVES.get(problem.answer_kind, PROBABILITY_PERSPECTIVES)
+        # fail-closed — 관점이 등록되지 않은 kind는 심사 자체가 성립하지 않는다. 엉뚱한 관점으로
+        # 심사해 pass를 내느니 "못 쟀다"를 사유와 함께 남긴다(모르면 모른다).
+        perspectives = _CROSS_VERIFY_PERSPECTIVES.get(problem.answer_kind)
+        if perspectives is None:
+            return VerificationVerdict(
+                state="unverifiable",
+                tier=_domain_tier(domain_result),
+                machine_axes=domain_result.machine_axes,
+                residual_axes=domain_result.residual_axes,
+                reason=(
+                    f"answer_kind={problem.answer_kind!r}에 등록된 교차검증 관점이 없음"
+                    "(잔여 축을 심사할 수 없어 unverifiable)"
+                ),
+            )
+        subject = build_residue_subject(problem, domain_result)
         cross_result = await asyncio.to_thread(self._cross_verifier.verify, subject, perspectives)
         audit_labels = [f"cross_verify:{cross_result.aggregate}"]
 
         if cross_result.aggregate == "ok":
             return VerificationVerdict(
                 state="pass",
-                tier=_domain_tier(domain_result, VerificationTier.MACHINE_EXHAUSTIVE),
+                tier=_domain_tier(domain_result),
                 machine_axes=domain_result.machine_axes,
                 residual_axes=domain_result.residual_axes,
                 audit_labels=audit_labels,
@@ -458,7 +569,7 @@ class Verifier:
         if cross_result.aggregate == "defect":
             return VerificationVerdict(
                 state="fail",
-                tier=_domain_tier(domain_result, VerificationTier.MACHINE_EXHAUSTIVE),
+                tier=_domain_tier(domain_result),
                 machine_axes=domain_result.machine_axes,
                 residual_axes=domain_result.residual_axes,
                 reason=f"잔여 교차검증 결함: {cross_result.reason}",
@@ -466,7 +577,7 @@ class Verifier:
             )
         return VerificationVerdict(
             state="unverifiable",
-            tier=_domain_tier(domain_result, VerificationTier.MACHINE_EXHAUSTIVE),
+            tier=_domain_tier(domain_result),
             machine_axes=domain_result.machine_axes,
             residual_axes=domain_result.residual_axes,
             reason=f"잔여 교차검증 미결정: {cross_result.reason}",

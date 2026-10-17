@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: review
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,10 +15,11 @@ acceptance:
   - "① ci.yml의 실행기 단독 호출 전건을 python -m 형태로 전환 — 실측 잔여 9건: ruff(229·323)·black(236·330)·mypy(239·333)·alembic(491)·pytest -m integration(506·569·635). e2e-nightly 잡은 PR #956에서 이미 전환됨"
   - "② 집행: tests/infra/test_anchor_e2e_nightly_wiring.py의 _invokes_pytest_via_python_module 검사(PR #956 신설)가 현재 e2e-nightly 잡만 본다 — 워크플로 전 잡으로 범위를 넓히고 실행기 목록도 pytest 외로 확장한다. 규칙이 있는데 절반만 검사하면 나머지 절반은 조용히 되돌아간다"
   - "③ 변별력: 합성 워크플로에 단독 호출을 주입했을 때 검사가 실제로 빨개지는지 확인(양성 대조 = python/python3/python3.12/절대경로 허용)"
-artifacts: []
+artifacts:
+  - "PR #1537 (ee181e8d)"
 paths:
   - ".github/workflows/**"
   - "tests/infra/**"
-session: claude/happy-brown-arwpff
+session: null
 notes: "출처: PR #956(EOS-64) codex P1 ④ 상환 중 실측. 그 지적은 e2e-nightly 스텝 1건에 대한 것이었고 서브에이전트가 그 잡 전체(pytest·pip·alembic)를 맞췄으나, 다른 잡 9건은 범위 밖이라 남겼다. CLAUDE.md 규칙(실행기 단독 호출 금지 — 다중 환경에서 런처가 다른 인터프리터에 결합)은 저장소 전체에 적용된다. 활성 장애는 아니다(GitHub 러너는 단일 venv) — 그래서 이 PR에서 스코프를 넓히는 대신 등재한다. 우선순위 3인 이유도 그것이다.\n\n[정정 2026-09-01] eos_priority null → P1: 하네스 전제 축 — CI 실행기 단독 호출은 다중 환경에서 다른 인터프리터에 결합될 수 있다(2026-07-27 ARCH-16 실측 유형). 12월 검증에 직접 기여하지 않으나 17주치 측정의 재현성을 결정한다. 판정표 작성 이후 등재분이라 EOS-80 계획 산출 시점에는 없었다 — main 병합으로 편입"
-updated: 2026-10-08
+updated: 2026-10-09

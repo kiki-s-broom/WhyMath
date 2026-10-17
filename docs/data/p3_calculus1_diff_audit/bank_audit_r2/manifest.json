@@ -1,0 +1,45 @@
+{
+  "task": "P3-03-coverage-fill",
+  "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+  "seed": 20261008,
+  "bank": "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl",
+  "bank_sha256": "206b440801de9d6cda6584a4e3a66ffbc045a360fe3a8ccea0cc7c9c5f0700b9",
+  "n_items": 504,
+  "n_shards": 8,
+  "shard_size": 63,
+  "shards": [
+    {
+      "file": "shard1.jsonl",
+      "sha256": "dbc31d97356024671bff25a4567d7ef1f600d2a557ccf56fd97391d8a8d3bc33"
+    },
+    {
+      "file": "shard2.jsonl",
+      "sha256": "47528ac089d0efca05a99ac84ac2530c4fc66b71b60b84d36c9ca31a8aa8ae7b"
+    },
+    {
+      "file": "shard3.jsonl",
+      "sha256": "27dc5a23eb6cf5c0cc2d5f7f98e53fd85ed64a57d1d1d0577f80d049ed3d8adb"
+    },
+    {
+      "file": "shard4.jsonl",
+      "sha256": "baf1476d1f31d5a808b2587361235b6e65622607dadbd3354a6e12b89b7d9ab9"
+    },
+    {
+      "file": "shard5.jsonl",
+      "sha256": "994ff8d4e48c88d8e59fe9d91bde02186a02258615abf54908995fee1991b917"
+    },
+    {
+      "file": "shard6.jsonl",
+      "sha256": "eea5953e5a81d3a1b79d7d28f31f15b5eacbed45a72e2490fce492605b16c033"
+    },
+    {
+      "file": "shard7.jsonl",
+      "sha256": "af8ae49da4cc55b3b84454e47956d26e0d014a8e1f989871040f9684153b4779"
+    },
+    {
+      "file": "shard8.jsonl",
+      "sha256": "609c4bcd1f080c3ba221f8fbb2b0bff8d7f947683880e15509f82dbf23a0ea16"
+    }
+  ],
+  "rater_protocol_sha256": "3046a901033ea2eadd7c3aafbc32e2a94c3c241551f7d8e6fa50eb2c606ee27a"
+}

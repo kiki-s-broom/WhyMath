@@ -303,7 +303,10 @@ def _cms_routes() -> list[tuple[str, str]]:
 def _fill(path: str) -> str:
     return (
         path.replace("{concept_id}", str(_CID))
+        .replace("{problem_id}", str(_CID))
         .replace("{version_id}", str(_VID))
+        .replace("{edge_id}", str(_CID))
+        .replace("{code}", "x1")
         .replace("{pk}", "x1")
     )
 
@@ -317,6 +320,8 @@ def _call(client: TestClient, method: str, path: str) -> Any:
         body = {"changes": {"x": 1}}
     elif url.endswith("/transitions"):
         body = {"action": "submit", "expected_status": "DRAFT"}
+    elif url.endswith("/drafts"):
+        body = {}
     elif url.endswith("/rollback"):
         body = {"expected_published_version_id": str(_VID)}
     elif url.endswith("/review"):
@@ -329,8 +334,10 @@ _ROUTES = _cms_routes()
 
 def test_route_inventory_is_not_vacuous() -> None:
     """분모 — 라우트가 통째로 사라져도 아래 전수 검사는 공허하게 통과하므로 개수를 고정한다."""
-    assert len(_ROUTES) == 34, f"CMS 라우트 {len(_ROUTES)}건"
-    assert sum(1 for m, _ in _ROUTES if m != "GET") == 12
+    # 34건(P3-12) + 개념 그래프 쓰기 6건(P3-26: 제안 목록·제안·제안 수정·개념 삭제·관계 추가·관계 삭제)
+    # + EOS-194 문항 판 호출 표면 4건(읽기 2 + 쓰기 2) = 44. 쓰기는 12 + 5 + 2 = 19.
+    assert len(_ROUTES) == 44, f"CMS 라우트 {len(_ROUTES)}건"
+    assert sum(1 for m, _ in _ROUTES if m != "GET") == 19
 
 
 @pytest.mark.parametrize(("method", "path"), _ROUTES, ids=lambda v: str(v))
@@ -862,6 +869,15 @@ class TestConceptAndVersionReads:
             ("CAL-O", "PREREQUISITE")
         ]
         assert body["outgoing"] == []
+        # P3-26: 관계 행마다 id와 소유(정본) 표시가 실린다 — graph.json 소유 관계는 cms_owned=False.
+        assert [(e["edge_id"], e["cms_owned"]) for e in body["incoming"]] == [
+            (str(uuid.UUID(int=0xED6E)), False)
+        ]
+        # 이 개념은 적재가 만든 행(표지 없음)이라 지울 수 없고, 검수자는 관계를 쓸 권한도 없다.
+        assert body["cms_owned"] is False
+        assert body["can_write_graph"] is False
+        assert body["delete_blocked_code"] == "file_owned"
+        assert "graph.json" in body["delete_blocked_reason"]
         # payload 필드만 — 본문 3종·오버레이는 live에 없다(Concept Purity).
         assert set(body["live"]) <= set(ConceptVersionPayload.model_fields)
         assert "description" not in body["live"] and "formal_definition" not in body["live"]
@@ -906,13 +922,15 @@ class TestConceptAndVersionReads:
 
 
 class SimpleNamespaceEdge:
-    """`ConceptEdge` 모사 — `edge_type`만 쓴다.
+    """`ConceptEdge` 모사 — `edge_type`·`edge_id`·소유 표지를 쓴다.
 
     값은 평범한 문자열이 아니라 **실제 열거형 멤버**다. 문자열 "x"를 쓰면 `(str, Enum)` 멤버가
     `'EdgeType.PREREQUISITE'`로 새는 결함을 못 본다(실백엔드 종단 검증에서 발견).
     """
 
     edge_type = EdgeType.PREREQUISITE
+    edge_id = uuid.UUID(int=0xED6E)
+    cms_edited_at = None  # graph.json 적재가 소유한 관계 — CMS가 지울 수 없다(P3-26)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════
@@ -1014,6 +1032,27 @@ class TestInPlaceEdit:
         assert (audit.resource_type, audit.action) == ("concept_content", "update")
         assert audit.resource_id == audit_resource_id(spec, "C-1")
         assert audit.user_id == _EDITOR.user_id
+
+    def test_edit_marks_the_row_so_the_next_load_skips_it(self) -> None:
+        """P3-25 — 편집이 `cms_edited_at`을 채워야 CLI 적재가 그 행을 건너뛴다."""
+        row = _concept_content_row()
+        assert row.cms_edited_at is None
+        fake = FakeSession(results=[_Result(rows=[row]), _Result(rows=[row])])
+        resp = _client(_EDITOR, fake).patch(
+            "/v1/admin/cms/concept_content/items/C-1", json={"changes": {"explanation": "새 설명"}}
+        )
+        assert resp.status_code == 200, resp.text
+        assert row.cms_edited_at is not None
+
+    def test_noop_edit_does_not_take_ownership_from_the_loader(self) -> None:
+        """같은 값 저장은 아무것도 안 바꾼다 — 표지도 채우지 않는다(적재 소유권 유지)."""
+        row = _concept_content_row()
+        fake = FakeSession(results=[_Result(rows=[row]), _Result(rows=[row])])
+        _client(_EDITOR, fake).patch(
+            "/v1/admin/cms/concept_content/items/C-1",
+            json={"changes": {"explanation": row.explanation}},
+        )
+        assert row.cms_edited_at is None
 
     def test_same_value_is_a_noop_keeping_review_and_not_committing(self) -> None:
         row = _concept_content_row()
@@ -1220,6 +1259,20 @@ class TestReviewMark:
         assert row.review_status == "reviewed"
         assert fake.commits == 1
         assert fake.audit_rows[0].action == "approve"
+
+    @pytest.mark.parametrize("decision", ["reviewed", "needs_review"])
+    def test_review_mark_also_marks_the_row_for_the_loader(self, decision: str) -> None:
+        """검수 표시도 사람의 쓰기 — 적재가 `reviewed`를 코퍼스 값으로 되돌리면 안 된다(P3-25)."""
+        start = "ai_estimated" if decision == "reviewed" else "reviewed"
+        row = _concept_content_row(review_status=start)
+        resp, _fake = self._post(_REVIEWER, row, decision)
+        assert resp.status_code == 200, resp.text
+        assert row.cms_edited_at is not None
+
+    def test_noop_review_does_not_mark_the_row(self) -> None:
+        row = _concept_content_row(review_status="reviewed")
+        self._post(_REVIEWER, row, "reviewed")
+        assert row.cms_edited_at is None
 
     def test_reviewer_can_lower_the_mark_with_a_reject_audit(self) -> None:
         row = _concept_content_row(review_status="reviewed")
@@ -1588,6 +1641,19 @@ _CONCEPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/v1/admin/cms/concepts/{concept_id}/rollback"),
         ("GET", "/v1/admin/cms/resources"),
         ("GET", "/v1/admin/cms/audit"),
+        # ── P3-26 개념 그래프 쓰기(`api/admin_cms_graph.py`) ──
+        ("GET", "/v1/admin/cms/concept-proposals"),
+        ("POST", "/v1/admin/cms/concept-proposals"),
+        ("POST", "/v1/admin/cms/concept-proposals/{code}/drafts"),
+        ("DELETE", "/v1/admin/cms/concepts/{concept_id}"),
+        ("POST", "/v1/admin/cms/edges"),
+        ("DELETE", "/v1/admin/cms/edges/{edge_id}"),
+        # EOS-194 — 문항 판 발행 호출 표면(`api/admin_cms_problem_versions.py`). 동작 계약은
+        # `test_admin_cms_problem_versions.py`가 소유하고, 여기서는 라우트 목록의 정합만 본다.
+        ("POST", "/v1/admin/cms/problems/{problem_id}/drafts"),
+        ("GET", "/v1/admin/cms/problems/{problem_id}/versions"),
+        ("GET", "/v1/admin/cms/problem-versions/{version_id}"),
+        ("POST", "/v1/admin/cms/problem-versions/{version_id}/transitions"),
     }
 )
 
@@ -1649,4 +1715,4 @@ class TestRouteDeclarationParity:
         derived = {r for r in _expected_resource_routes() if r[0] != "GET"}
         concept_writes = {r for r in _CONCEPT_ROUTES if r[0] != "GET"}
         assert writes == derived | concept_writes
-        assert len(writes) == 12
+        assert len(writes) == 19

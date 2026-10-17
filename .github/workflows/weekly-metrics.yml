@@ -38,11 +38,21 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # 서비스 컨테이너 이미지가 ghcr.io 미러 사본(비공개 패키지)이라 읽기가 필요하다 (OPS-135).
+  packages: read
 
 concurrency:
   # 매주 1회·수동 발화도 드묾 — 취소보다 직렬 대기가 항상 안전(harness-audit과 같은 판단).
   group: weekly-metrics
   cancel-in-progress: false
+
+# 의존 해석 고정 (OPS-121) — 이 파일의 모든 `pip install`이 제약 파일의 정확한 버전만 고른다.
+# 범위 안의 신규 릴리스(예: 2026-10-08 pydantic 2.14.0)는 제약 파일을 바꾸는 갱신 PR을 거쳐서만
+# main·머지 큐에 닿는다. 잡·스텝 env로 재정의하거나 `pip --isolated`를 쓰면 고정이 풀리므로
+# scripts/ops/ci_constraints.py check가 막는다 (infra-contracts 잡 게이트). 갱신 절차:
+# docs/ops/ci_constraints_refresh_runbook.md. 절대경로인 이유: 잡마다 working-directory가 다르다.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/infra/ci/constraints-py312.txt
 
 jobs:
   report:
@@ -57,7 +67,13 @@ jobs:
       postgres:
         # backend-migrations 잡과 동형(pgvector 프리설치·trust 인증) — 마이그레이션이
         # `CREATE EXTENSION vector`를 성공시켜야 "0건"이 진짜 빈 스키마 판정이 된다.
-        image: pgvector/pgvector:pg16
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: whymath
           POSTGRES_DB: whymath

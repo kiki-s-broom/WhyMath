@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 4
 eos_priority: P1
 owner: claude
@@ -17,11 +17,13 @@ acceptance:
   - "③ 태깅 실행 — 부모 문항의 problem_type_codes를 계보를 따라 상속한다(재서술은 봉인 모델상 수치·정답·선지 불변이므로 인지 행동 유형도 불변이라는 논거를 명문화). LLM 0·문항 텍스트 추론 0·재실행 바이트 결정론(S3-27·S3-10 백필 동형). 상속 불가 잔여분은 건수와 사유를 리포트에 명시 기록한다(침묵 통과 금지 — 부분 커버의 정직 고지 형식은 S3-27 선례 유지)."
   - "④ 계측기 회복 확인 — problem_bank_coverage.zero_coverage_types()는 docstring이 스스로 '§4-① 트리거의 발화 계측기'라고 선언한 도구다. 코퍼스의 16.2%가 미태깅인 채로는 그 계측기의 0커버 판정이 과대 계상된다. 태깅 전후로 zero_coverage_types() 결과가 어떻게 바뀌는지 기록한다 — 이것이 이 태스크의 실제 가치다(태깅 자체가 아니라 계측기 신뢰성)."
   - "⑤ 변별력 검증 — 임의 1건의 계보를 끊은 상태에서 그 건이 '상속 불가'로 정직 계상되는지 실측 후 cp 백업으로 원복(git checkout 금지)."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1561"
+  - docs/data/problem_type_tagging_rephrased_cont04_2026-10.md
 paths:
   - src/backend/whymath_backend/harness/problem_type_mapping.py
   - src/backend/whymath_backend/harness/problem_bank_coverage.py
   - "data/corpus/problem_bank_rephrased_v0/**"
 session: null
 notes: "docs/architecture/ai_content_generation_gap_review_r3.md §2 F3·§3 D10 — 외부 EOS 틀(기능 59 '생성 기준: 유형') 3차 대조. CONT-03(트리거 만료 계약)이 일반 계약이라면 이 태스크는 그 계약이 없어서 생긴 구체적 미상환 1건이다. 부수 정정: S3-27 acceptance ④와 S4-14 notes가 후속을 'S4-18'로 지목하고 있으나 S4-18은 현재 S4-18-review-time-axis(복습 시간축·ai_tutor D5)로 무관한 태스크이며 실제 후속은 S4-21이다 — 참조가 stale하다(태스크 소실이 아니라 번호 재배정, HARN-10/HARN-15 번호 충돌 가드 계열).\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/B7 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-09

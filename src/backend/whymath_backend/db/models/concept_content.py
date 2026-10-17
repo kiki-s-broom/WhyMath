@@ -107,6 +107,13 @@ class ConceptContent(Base):
         sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
 
+    # CMS 편집 표지(P3-25) — NULL=사람이 고친 적 없음(적재가 소유), 값=CMS가 마지막으로 고친 시각.
+    # 적재(`populate`)는 이 값이 있는 행을 건너뛰어 충돌로 보고한다. server_default·백필 금지.
+    # 규약 정본: `db/cms_edit_marker.py` · `docs/standards/cms_edit_vs_loader_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     __table_args__ = (
         # scope(K-12/대학)·subject(과목) 필터 보조 인덱스(콘텐츠 서빙·검수 빈번).
         sa.Index("ix_concept_content_scope", "scope"),

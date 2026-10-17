@@ -25,6 +25,9 @@ crosswalk 매핑(런타임 탐지 kebab-id → 리포트 노출 canonical M-id)�
 1. **행별 판정** — 아래 §5 결정 체크리스트 표(또는 §4 근거)를 보고 각 행을 approve/reject/defer.
    - 직접매핑 승격은 사람 판단으로만. `직접매핑`인데 `confidence < 0.6`이면 **인접 오개념**으로만
      두고 직접매핑 승격 금지(초안 §0.2·승격 규칙 3).
+   - **부분매핑·개념겹침은 승인해도 적재되지 않는다**(MISC-63 · 계약 「적재 자격」). 적재를 원하면
+     해당 행의 `link_type`을 `직접매핑`으로 승격하고 `confidence ≥ 0.6`을 기입한 뒤 재서명한다 — 행별 판단이며
+     그렇지 않은 행은 `pending`/`deferred`/`rejected`로 둔다.
    - 코퍼스 M-id 원문 정합도 병행 확인(코퍼스 자체가 `AI생성-검수필요` — 이중 검수).
 2. **검수 큐 *복사본*에 서명 기입** — 승인 행에 `status=approved` + `reviewer` + `reviewed_on`(ISO
    `YYYY-MM-DD`). 서명 stamp 정본 형식 `검수:{reviewer} {reviewed_on}`(`sign()`이 찍고

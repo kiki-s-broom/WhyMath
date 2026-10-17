@@ -81,7 +81,7 @@ acceptance ②는 "클라이언트가 조회형 3종 좌석을 부르지 않으�
 | `l2/learning_state_evidence.py` | 조립기 인자 `prerequisite_gap_concept_ids` 삭제 · 생산자 배선 표를 4필드로 정정 | 입구 닫기 |
 | `api/me.py` · `l2/learning_state_recommendation.py` · `l2/remediation_policy.py` | "R4 미배선"·"R4가 소유" 문구를 처분 결과로 정정 (코드 동작 변경 0) | 낡은 주석이 가리키는 소유자가 사라졌다 |
 
-**라벨 `POLICY_PREREQUISITE_GAP`을 남긴 이유**: `learning_state_trigger_enum`은 추가 전용 원장(`learning_state_transition`)의 PostgreSQL enum이다. 라벨을 빼려면 타입 재생성 마이그레이션이 필요하고, 그 사이 이 값이 적힌 행이 있다면 읽는 순간 `LookupError`가 난다. R4는 서빙에서 한 번도 발화하지 않았고 클라이언트는 정책 소유 트리거를 적재할 수 없으므로(`_POLICY_OWNED_TRIGGERS`) 그런 행은 없다고 **추론**하지만, 아래 §6-2대로 프로덕션 원장은 이 세션이 **실측하지 못했다.** 지우는 비용(마이그레이션 + 미실측 위험)이 남기는 비용(은퇴 표기 1줄)보다 크다.
+**라벨 `POLICY_PREREQUISITE_GAP`을 남긴 이유**: `learning_state_trigger_enum`은 추가 전용 원장(`learning_state_transition`)의 PostgreSQL enum이다. 라벨을 빼려면 타입 재생성 마이그레이션이 필요하고, 그 사이 이 값이 적힌 행이 있다면 읽는 순간 `LookupError`가 난다. R4는 서빙에서 한 번도 발화하지 않았고 클라이언트는 정책 소유 트리거를 적재할 수 없으므로(`_POLICY_OWNED_TRIGGERS`) 그런 행은 없다고 **추론**했고, 2026-10-09 Kiki가 프로덕션에서 **실측해 0건을 확인했다**(아래 §6-2). 그래도 지우는 비용(타입 재생성 마이그레이션)이 남기는 비용(은퇴 표기 1줄)보다 크다고 판단해 라벨은 남긴다 — 0건이면 향후 enum 정리의 전제는 섰지만, 정리는 별도 판정이다.
 
 **건드리지 않은 것**: `EscalationRung.PREREQUISITE_CONCEPT`(L4 개입 강도 사다리 4칸)는 경로가 아니라 강도 표기라 그대로 둔다(docstring의 소유자 표기만 정정). 조회형 선수 좌석 3종(`/weak-concepts/{id}/prerequisites`·`/coaching`·`/learning-path`)도 그대로다. `constitution/`은 읽기만 했다.
 
@@ -132,8 +132,8 @@ CI 잡: `changes · data-pipeline · backend · backend-migrations · data-pipel
 
 ## §6. 남은 구멍 — 숨기지 않고 적는다
 
-1. **응답 문면 ↔ 추천 불일치(기존 설계 · 이번 변경이 만든 것이 아님).** 선수 결손 상태의 오답 제출 응답은 `learning_state.next_action=PRACTICE_SAME_CONCEPT`(R6)인데 이어지는 `next-problem`은 선수 문항(`practice_prerequisite`)을 낸다. R6의 문면은 "같은 개념 연습"이고 선수 탐침은 EOS-26이 R6 위에 얹은 집행이다. 학생에게 보이는 이름표가 둘로 갈리는 것은 `EOS-124`류의 *정책 축 ↔ 선택 축* 불일치 후보이지만 이번 태스크의 범위(R4 처분)가 아니다. 후속 판정이 필요하면 별도 태스크로 올린다.
-2. **프로덕션 원장은 실측하지 못했다.** `POLICY_PREREQUISITE_GAP` 행이 0건이라는 확인은 추론(발화 경로 없음 · 클라이언트 적재 차단)이지 DB 실측이 아니다. 읽기 전용 확인 한 줄을 Kiki가 prod DB(docker `whymath-pg` · 호스트 포트 5433)에서 돌릴 수 있다(PR 본문 참조). 0이 아니면 라벨 보존 결정이 옳았음이 확인되고, 0이면 향후 enum 정리 마이그레이션의 전제가 선다.
+1. **응답 문면 ↔ 추천 불일치(기존 설계 · 이번 변경이 만든 것이 아님 · 소유 태스크 `EOS-144-r6-probe-next-action-residual-mismatch` — 2026-10-09 추가 검토에서 이미 등재돼 있음을 확인).** 선수 결손 상태의 오답 제출 응답은 `learning_state.next_action=PRACTICE_SAME_CONCEPT`(R6)인데 이어지는 `next-problem`은 선수 문항(`practice_prerequisite`)을 낸다. R6의 문면은 "같은 개념 연습"이고 선수 탐침은 EOS-26이 R6 위에 얹은 집행이다. 학생에게 보이는 이름표가 둘로 갈리는 것은 `EOS-124`류의 *정책 축 ↔ 선택 축* 불일치 후보이지만 이번 태스크의 범위(R4 처분)가 아니다. 후속 판정이 필요하면 별도 태스크로 올린다.
+2. **프로덕션 원장 실측 (2026-10-09 · Kiki 실행): `POLICY_PREREQUISITE_GAP` 행 0건.** prod DB(docker `whymath-pg` · 호스트 포트 5433)에서 읽기 전용 조회 `select count(*) from learning_state_transition where trigger = 'POLICY_PREREQUISITE_GAP'`를 실행해 `POLICY_PREREQUISITE_GAP_ROWS=0`을 얻었다(컨테이너 가동은 `CONTAINER_UP=whymath-pg`로 별도 확인). **이 값이 증명하는 범위**: 조회 시점의 한 스냅샷이 0건이라는 것뿐이다. 과거에 한 번도 적재된 적이 없다는 증명은 아니다 — 삭제권 이행으로 사용자 행과 함께 원장 행이 지워졌을 가능성은 이 한 번의 조회로 배제하지 못한다. 다만 발화 경로가 없다는 코드 사실(§1)과 현재 0건이라는 실측은 서로 모순되지 않는다. 0건이므로 향후 enum 정리 마이그레이션의 전제가 선다(정리 여부는 별도 판정).
 3. **R4a가 다루던 구간은 답을 못 준다.** "측정된 선수 결손 ∧ 교정 저항" 학생은 지금도 R3→R5→(R6/설명) 경로를 탄다. `EOS-138` §7 반례 S-A가 이미 "P를 한 번도 풀지 않은 학생에게는 판정이 답을 주지 못한다"고 인정한 구간이며, 교정 저항 신호는 R5가 받는다. 새로 생긴 구멍이 아니다.
 4. **실제 모바일 앱은 R6에 도달하지 않는다**(`EOS-146` — 앱은 오답을 제출하지 않고 코치 정답 완료만 기록). 따라서 이 처분의 "선수 하강이 일어난다"는 **API 계약 수준**의 사실이다. 앱 학생에게 일어나는 개선이 아니다.
 5. **벤치 한계**: 개념 600개·표본 60회·루프백 연결·4 vCPU 컨테이너다. Phaiakes9 실측이 아니고 p95는 근사치다. 이 판정은 비용으로 결론을 내리지 않았으므로(§3) 한계가 결론을 흔들지 않지만, 훗날 (가)류 배선을 재논의하면 이 표를 근거로 쓰기 전에 재측정해야 한다.

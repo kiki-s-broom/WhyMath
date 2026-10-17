@@ -81,9 +81,10 @@ class TestCliEndToEnd:
         # (bigger-denominator-bigger-fraction·ratio-order-swapped·
         # addition-multiplication-rule-confused)은 아직 문항 코퍼스에 등장하지 않아
         # kebab_standards가 비어 human-only 3건으로 정직 집계된다(좌석만 생겼을 뿐 문항
-        # 연계는 이번 태스크 범위 밖 — MISC-21 acceptance ④). MISC-40의 power-rule-step-omitted도
-        # 같은 이유로 human-only(4건)다.
+        # 연계는 이번 태스크 범위 밖 — MISC-21 acceptance ④). MISC-40의 power-rule-step-omitted는
+        # 한때 같은 이유로 human-only(4건)였으나 P3-03 미분 문항 은행이 그 kebab을 오답 귀인으로
+        # 쓰기 시작해 machine-decidable로 올라왔다 → 커버 65/68·human-only 3건.
         assert report.same_detected == 0
-        assert report.kebabs_decidable == 64 and report.kebabs_total == 68
+        assert report.kebabs_decidable == 65 and report.kebabs_total == 68
         text = ev.format_report(report, confidence=0.95, human_reject_rate=None)
         assert "인간 존치" in text and "machine-decidable" in text

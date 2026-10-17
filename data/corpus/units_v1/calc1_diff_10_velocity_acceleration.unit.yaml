@@ -1,0 +1,50 @@
+# 소단원 DSL v0.1 — 속도와 가속도 (미적분Ⅰ · 미분 대단원 · 소단원 10/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 개념/절차/표상 3개 → CONCEPT/PROCEDURE/REPRESENT 목표 1개씩(docs/data/units_v1.md §3)
+#   + 성취기준의 '유용성 인식' 축을 MODELING 목표 1개로 둔다(이차함수 파일럿 OBJ-04 선례).
+#   MODELING 팩은 stub이라 OBJ-04만으로는 교수 경로 연결로 세지 않는다 — 이 개념의 연결은 OBJ-01~03이 만든다.
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-10-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-10] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-속도와가속도"
+unit_version: 1
+api_version: "unit/0.1"
+title: "속도와 가속도"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-10]"]
+concept_nodes: ["12미적Ⅰ-02-10-1", "12미적Ⅰ-02-10-2", "12미적Ⅰ-02-10-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -1(개념·primary). 오개념이 '위치·속도·가속도 미분 관계 혼동'이라, 세 양을
+  # 순간변화율의 사슬로 세우고 비예(평균속도)와 대비하는 CONCEPT 팩이 맞다.
+  - suffix: "OBJ-01"
+    statement: "수직선 위를 움직이는 점의 속도는 위치의 순간변화율이고 가속도는 속도의 순간변화율임을 이해한다"
+    standard_code: "[12미적Ⅰ-02-10]"
+    source_verb: "이해한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-10-1"]
+  # OBJ-02 절차형 — 원자 -2(절차). 위치 함수를 한 번·두 번 미분하는 정해진 절차다.
+  - suffix: "OBJ-02"
+    statement: "위치를 나타내는 함수를 미분하여 주어진 시각에서의 속도와 가속도를 구한다"
+    standard_code: "[12미적Ⅰ-02-10]"
+    source_verb: "구한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-10-2"]
+  # OBJ-03 표상형 — 원자 -3(표상). 위치-시간 그래프의 기울기(그림)와 속도의 부호·크기(수)를 잇는다.
+  - suffix: "OBJ-03"
+    statement: "위치-시간 그래프에서 접선의 기울기를 속도로 읽고 운동 방향이 바뀌는 시각을 해석한다"
+    standard_code: "[12미적Ⅰ-02-10]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-10-3"]
+  # OBJ-04 모델링형 — 실생활 직선 운동을 함수로 세우고 결과를 맥락에서 해석하는 목표라 MODELING이다.
+  # (stub 팩 — 연결 계측에는 안 잡히며, 그것을 피하려고 k_type을 바꾸지 않는다.) 원자는 파일럿 선례처럼
+  # 맥락에 적용되는 절차 원자 -2를 가리킨다.
+  - suffix: "OBJ-04"
+    statement: "실생활의 직선 운동 상황을 위치의 함수로 나타내고 속도와 가속도로 그 운동을 해석하여 문제를 해결한다"
+    standard_code: "[12미적Ⅰ-02-10]"
+    source_verb: "해결한다"
+    k_type: MODELING
+    concept_nodes: ["12미적Ⅰ-02-10-2"]

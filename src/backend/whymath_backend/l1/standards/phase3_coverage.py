@@ -6,7 +6,7 @@
 
 사용법
 ------
-    python -m whymath_backend.l1.standards.phase3_coverage [--spec PATH] [--json]
+    python -m whymath_backend.l1.standards.phase3_coverage [--spec PATH] [--json] [--hints-from-db]
 
 종료 코드: 0 = 목표가 있는 지표가 전부 충족 · 1 = 목표 미달 또는 분모 0(측정 불가) ·
 2 = 명세·코퍼스 적재 실패(측정 자체를 못 했다 — 통과로 위장하지 않는다).
@@ -48,7 +48,8 @@ Concept Completeness 를 '필드 채움 검사'로 만들지 않은 이유 (acce
   misconception 명세의 핵심 오개념 중 이 개념에 귀속된 M-id 가 오개념 코퍼스에 실재하고 귀속
                 성취기준이 일치한다.
   solution      적격 문항 중 해설과 풀이 단계가 둘 다 있는 문항이 있다.
-  hint          힌트가 달린 적격 문항이 있다 — 단 힌트의 저장 좌석이 없어 **현재는 측정 불가**다.
+  hint          검수 통과(`hints.verified`) 힌트가 달린 적격 문항이 있다 — 힌트는 DB 에만 있어
+                `--hints-from-db` 를 줄 때만 잰다. 주지 않으면 **측정 불가**다(빈 집합이 아니다).
   pedagogy      이 개념의 원자를 목표로 삼는 단원 DSL 목표가 있고 그 목표의 지식 유형에 stub 이
                 아닌 교수 팩이 있다.
 
@@ -57,10 +58,18 @@ Concept Completeness 를 '필드 채움 검사'로 만들지 않은 이유 (acce
 없는 개념)은 5개 연결 전부 'missing' 으로 나온다 — 필드 채움 검사가 통과시키던 바로 그 대조군이다.
 
 연결 상태는 3가지다: linked · missing · unmeasured. **측정 불가는 충족이 아니다** — 개념은
-5개가 전부 linked 일 때만 완전하다. 그래서 힌트 좌석이 생기기 전에는 Completeness 가 0 이다.
-이것은 결함이 아니라 현재 사실이다(ARCH-39 가 힌트 저장 좌석을 '영구 부재'로 판정했고, 7필드 중
-`hint_strategy` 의 저장 좌석은 P3-04 가 정한다). 진척이 보이도록 연결별 충족 수와 '측정 가능한
-연결만 본 완전 비율'을 **보조 수치**로 함께 내되, 그 수치는 exit code 에 영향을 주지 않는다.
+5개가 전부 linked 일 때만 완전하다. 그래서 힌트 입력이 없는 실행(기본값)에서는 Completeness 가
+0 이다 — 결함이 아니라 '힌트를 잰 적이 없다'는 사실이다.
+
+힌트 좌석(2026-10 정정): 힌트 본문은 S4-11 이 실체화한 `hints` 테이블(`problem_id` FK · `verified`)
+에만 산다(ARCH-39 '영구 부재' 판정은 2026-09-07 에 '미실체화'로 정정됐다). 이 CLI 는 기본적으로
+DB 를 읽지 않으므로 힌트는 측정 불가로 남고, `--hints-from-db` 를 주면 `verified=true` 행의
+문항 집합을 읽어 `hint_problem_ids` 를 채운다. DB 를 못 읽으면 exit 2 다 — 측정 불가로
+조용히 내려가지 않는다.
+JSONL 은행 문항과 DB `problem` 행은 같은 UUID 를 쓴다고 가정하므로, DB 힌트 문항 중 은행에 없는
+것·은행 적격 문항과 겹치는 수를 `hint_seat` 로 함께 보고한다(ID 공간 불일치가 '힌트 0건'으로
+위장되지 않게). 진척이 보이도록 연결별 충족 수와 '측정 가능한 연결만 본 완전 비율'을 **보조
+수치**로 함께 내되, 그 수치는 exit code 에 영향을 주지 않는다.
 
 ────────────────────────────────────────────────────────────────────────────
 CONT-05 판정 — Content Coverage 의 '완전 연결'이 검수 상태를 조건으로 삼는가 (택 ⓑ)
@@ -91,11 +100,12 @@ CONT-05 판정 — Content Coverage 의 '완전 연결'이 검수 상태를 조�
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import re
 import sys
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Final, Literal
 
@@ -111,6 +121,16 @@ from whymath_backend.l1.standards.phase3_scope import (
     load_reference_index,
     load_scope_spec,
     verify_spec,
+)
+from whymath_backend.l1.standards.phase3_stem_fold import distinct_count
+from whymath_backend.schema.problem_metadata import (
+    EMPTY_DIFFICULTY,
+    FieldState,
+    ProblemMetadataEvidence,
+    ProblemMetadataField,
+    ProblemSlot,
+    evaluate_metadata,
+    parse_slot_tags,
 )
 
 # l1/standards/phase3_coverage.py → parents[5]가 레포 루트(phase3_scope 와 같은 관용구).
@@ -148,9 +168,9 @@ _MIS_ID_RE: Final = re.compile(r"^M\d{4,}$")
 
 LinkStatus = Literal["linked", "missing", "unmeasured"]
 
-#: 힌트 연결이 측정 불가인 이유 — 좌석이 생겨 `hint_problem_ids` 가 채워지면 사라진다.
+#: 힌트 연결이 측정 불가인 이유 — `hint_problem_ids` 가 채워지면(`--hints-from-db`) 사라진다.
 HINT_UNMEASURED_REASON: Final = (
-    "측정 불가 — 힌트 저장 좌석이 없다(ARCH-39 '영구 부재' 판정 · hint_strategy 좌석은 P3-04 소관)"
+    "측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)"
 )
 
 
@@ -172,6 +192,15 @@ class ProblemRef:
     has_steps: bool
     problem_type_codes: tuple[str, ...]
     distractor_ids: tuple[str, ...]
+    # P3-04 — 7필드·슬롯을 읽는 축. 기본값 None 은 "측정하지 않았다"다(합성 입력이 이 축을 안 채워도
+    # 비어 있다고 판정하지 않는다). 실 코퍼스 행은 `_problem_from_row` 가 전부 채운다.
+    difficulty: float | None = None
+    answer: str | None = None
+    solution_text: str | None = None
+    tags: tuple[str, ...] = ()
+    # P3-05 — 근사 중복 기준(`phase3_stem_fold`)이 읽는 문면. None 은 "문면을 읽지 못했다"라서
+    # 그 문항은 합쳐지지 않고 각각 1건으로 센다(모르면서 합치지 않는다).
+    question_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -187,8 +216,9 @@ class UnitObjective:
 class CoverageCorpus:
     """지표가 읽는 코퍼스 — 테스트가 합성 코퍼스로 바꿔 끼울 수 있게 값 객체로 둔다.
 
-    `hint_problem_ids` 가 `None` 이면 힌트 좌석이 없는 것이다(측정 불가). 집합이면 그 문항들에
-    힌트가 달려 있다는 측정 결과다 — P3-04 가 좌석을 정하면 이 자리를 채운다.
+    `hint_problem_ids` 가 `None` 이면 힌트를 읽지 않은 것이다(측정 불가). 집합이면 그 문항들에
+    검수 통과 힌트가 달려 있다는 측정 결과다(빈 집합 = '읽었는데 없다' = missing).
+    채우는 길은 `read_hint_problem_ids_from_db` 하나뿐이다.
     """
 
     atom_nodes: frozenset[str]
@@ -257,6 +287,13 @@ def _problem_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
     for item in row.get("distractor_map") or []:
         if isinstance(item, dict) and isinstance(item.get("misconception_id"), str):
             distractors.append(item["misconception_id"])
+    raw_difficulty = row.get("difficulty_overall")
+    difficulty = (
+        float(raw_difficulty)
+        if isinstance(raw_difficulty, (int, float)) and not isinstance(raw_difficulty, bool)
+        else EMPTY_DIFFICULTY
+    )
+    raw_tags = row.get("tags")
     return ProblemRef(
         problem_id=problem_id,
         primary_src_ids=frozenset(primary),
@@ -265,6 +302,12 @@ def _problem_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
         has_steps=isinstance(steps, list) and len(steps) > 0,
         problem_type_codes=tuple(str(t) for t in types) if isinstance(types, list) else (),
         distractor_ids=tuple(distractors),
+        # 행을 읽었으니 값이 없는 것은 "측정했고 비어 있음"이다(None=측정 못함 과 다르다).
+        difficulty=difficulty,
+        answer="" if row.get("answer") is None else str(row.get("answer")),
+        solution_text=_text(row.get("answer_explanation")) or "",
+        tags=tuple(t for t in raw_tags if isinstance(t, str)) if isinstance(raw_tags, list) else (),
+        question_text=_text(row.get("question_text")),
     )
 
 
@@ -441,6 +484,48 @@ def load_corpus(
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# 힌트 좌석 — DB `hints`(verified) 에서만 읽는다 (P3-22)
+# ──────────────────────────────────────────────────────────────────────────
+#: DB 읽기 제한 시간(초) — 연결이 걸려 멈춘 채 측정이 끝나지 않는 것을 막는다.
+HINT_READ_TIMEOUT_S: Final = 30.0
+
+
+async def fetch_verified_hint_problem_ids(session: Any) -> frozenset[str]:
+    """`hints.verified` 가 참인 행의 문항 ID 집합. 본문(`content`)은 읽지 않는다.
+
+    `verified IS true` 조건이 이 함수의 전부다 — 미검수 힌트는 학생에게 나갈 수 없으므로
+    '힌트가 달렸다'로 세지 않는다(`find_served_hint` 와 같은 기준).
+    """
+    from sqlalchemy import select
+
+    from whymath_backend.db.models.hint import Hint as HintORM
+
+    stmt = select(HintORM.problem_id).where(HintORM.verified.is_(True)).distinct()
+    result = await session.execute(stmt)
+    return frozenset(str(pid) for pid in result.scalars().all())
+
+
+async def _read_hint_problem_ids() -> frozenset[str]:
+    from whymath_backend.db.session import get_sessionmaker
+
+    async with get_sessionmaker()() as session:
+        return await fetch_verified_hint_problem_ids(session)
+
+
+def read_hint_problem_ids_from_db(timeout_s: float = HINT_READ_TIMEOUT_S) -> frozenset[str]:
+    """`--hints-from-db` 의 실체. 못 읽으면 `CoverageError` — 측정 불가로 조용히 내려가지 않는다."""
+    try:
+        return asyncio.run(asyncio.wait_for(_read_hint_problem_ids(), timeout=timeout_s))
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 — DB·드라이버·설정 오류를 한 종류로 접는다(원인은 타입명+메시지)
+        raise CoverageError(
+            f"DB 에서 검수 통과 힌트를 읽지 못했다: {type(exc).__name__}: {exc} "
+            "(힌트를 못 읽은 채 측정하지 않는다 — 입력 없이 재려면 --hints-from-db 를 빼라)"
+        ) from exc
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 개념별 사실 — 연결의 정의는 여기(와 `_completeness_links`) 한 곳에만 있다
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass(frozen=True)
@@ -476,6 +561,21 @@ def _reached_misconceptions(problem: ProblemRef, corpus: CoverageCorpus) -> froz
         elif _MIS_ID_RE.match(ident):
             reached.add(ident)
     return frozenset(reached)
+
+
+def reached_misconception_ids(problem: ProblemRef, corpus: CoverageCorpus) -> frozenset[str]:
+    """문항 자체 오개념 연결 — 계측기가 오개념 유발 칸에서 세는 기준과 같은 판정의 공개 창구.
+
+    슬롯 배정 규칙(`phase3_slot_rules`)이 "문항 자체 오개념 연결이 있는가"를
+    계측기와 **같은 계산**으로
+    묻게 하려고 연다 — 두 곳이 따로 계산하면 칸이 채워졌다고 믿는 순간에 안 채워져 있다.
+    """
+    return _reached_misconceptions(problem, corpus)
+
+
+def problem_ref_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
+    """코퍼스 행 → `ProblemRef` 의 공개 창구(백필이 계측기와 같은 변환을 쓰게 한다)."""
+    return _problem_from_row(row)
 
 
 def _facts(
@@ -560,6 +660,38 @@ class MetricResult:
 
 
 @dataclass(frozen=True)
+class ProblemMetadataStats:
+    """P3-04 — 적격 문항의 7필드 현황. 코퍼스 파일로 잴 수 있는 만큼만 잰다.
+
+    `unmeasured_fields` 는 한 건이라도 측정 불가인 필드다(힌트 입력 `hint_problem_ids` 가 None 일
+    때의 `hint_strategy`). 측정 불가는 충족이 아니므로 `complete` 에 들어가지 않는다.
+    """
+
+    population: int
+    field_counts: Mapping[str, Mapping[str, int]]
+    complete: int
+    without_missing: int
+    inherited_only: int
+    unmeasured_fields: tuple[str, ...]
+    unmet: tuple[Unmet, ...]
+
+
+@dataclass(frozen=True)
+class HintSeatStats:
+    """P3-22 — DB 힌트 입력이 은행 문항에 실제로 닿았는가.
+
+    힌트는 DB `problem` 행(UUID)에 달리고 계측기는 JSONL 은행 문항으로 센다. 두 ID 공간이 어긋나면
+    DB 에 힌트가 아무리 많아도 연결은 0 으로 나온다 — 그 0 이 '힌트가 없다'가 아니라 'ID 가 안
+    맞는다'일 수 있으므로 겹침을 따로 보고한다.
+    """
+
+    hinted_problems: int  # DB 에서 읽은 검수 통과 힌트가 달린 문항 수
+    in_scope_bank: int  # 그중 명세 범위 은행 문항과 ID 가 겹치는 수
+    eligible_hinted: int  # 그중 적격(approved·핵심 개념 PRIMARY) 문항 수
+    outside_scope: int  # 범위 은행에서 못 찾은 수(범위 밖 문항이거나 ID 공간 불일치)
+
+
+@dataclass(frozen=True)
 class CoverageReport:
     """계측 결과 전체 — 지표 4종 + 보조 수치."""
 
@@ -574,6 +706,11 @@ class CoverageReport:
     problems_scanned: int
     warnings: tuple[str, ...]
     failures: tuple[str, ...]
+    # P3-04 — 기본값 None 은 이 축을 계산하지 않은 보고서다(직접 만든 보고서와의 호환).
+    slots: MetricResult | None = None
+    problem_metadata: ProblemMetadataStats | None = None
+    # P3-22 — None 은 힌트 입력이 없는 실행(측정 불가)이다.
+    hint_seat: HintSeatStats | None = None
 
     @property
     def exit_code(self) -> int:
@@ -581,7 +718,8 @@ class CoverageReport:
         return 1 if self.failures else 0
 
     def metric(self, key: str) -> MetricResult:
-        for result in (*self.metrics, self.supply):
+        extra: tuple[MetricResult, ...] = (self.slots,) if self.slots is not None else ()
+        for result in (*self.metrics, self.supply, *extra):
             if result.key == key:
                 return result
         raise KeyError(key)
@@ -852,9 +990,151 @@ def _connectivity(
         target=target,
         met=_judge(value, target),
         unmet=tuple(unmet),
-        note="개념 → 스킬 → 문항 → 오개념 → 교수가 한 줄로 이어짐 (목표는 기준선 실측 후 제안)",
+        note="개념 → 스킬 → 문항 → 오개념 → 교수가 한 줄로 이어짐 (목표는 명세가 갖는다)",
     )
     return result, funnel
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-04 — 문제 유형 6슬롯 충족 + Problem 필수 7필드 현황
+# ──────────────────────────────────────────────────────────────────────────
+def _slot_coverage(
+    spec: ScopeSpec, facts: tuple[ConceptFacts, ...], corpus: CoverageCorpus
+) -> MetricResult:
+    """핵심 개념 × 6슬롯 중 채워진 칸의 비율. 목표 수치가 명세에 없어 판정하지 않는다.
+
+    칸(c, s)이 채워졌다 = 적격 문항(c) 중 슬롯 태그 s 가 달린 문항의 **서로 다른 문제 수**가 명세의
+    슬롯당 최소 수 이상. 오개념 유발 슬롯은 **문항 자체의 오개념 연결이 있는 문항만 센다**(명세
+    counting_rules · 지시문 [08] ③). "서로 다른"의 정의는 `phase3_stem_fold`(숫자만 다른 문면은
+    같은 문제, P3-05)이고, 문면을 읽지 못한 문항은 합치지 않고 각각 1건으로 센다 — 그 수를 `note`
+    에 낸다.
+    """
+    names = {slot.id: slot.name_ko for slot in spec.slots}
+    minimum = spec.min_distinct_per_slot
+    filled = 0
+    cells = 0
+    unfolded_cells = 0
+    unmet: list[Unmet] = []
+    for fact in facts:
+        gaps: list[str] = []
+        for slot in ProblemSlot:
+            cells += 1
+            tagged = [p for p in fact.eligible if slot in parse_slot_tags(p.tags).slots]
+            counted = tagged
+            if slot is ProblemSlot.MISCONCEPTION_TRIGGER:
+                counted = [p for p in tagged if _reached_misconceptions(p, corpus)]
+            tally = distinct_count(p.question_text for p in counted)
+            unfolded_cells += tally.unfolded
+            if tally.distinct >= minimum:
+                filled += 1
+                continue
+            why = (
+                f"{names[slot.value]}: 서로 다른 문제 {tally.distinct}건 < 최소 {minimum}건"
+                f" (문항 {len(counted)}건)"
+            )
+            if slot is ProblemSlot.MISCONCEPTION_TRIGGER and len(tagged) > len(counted):
+                why += (
+                    f" (태그 {len(tagged)}건 중 문항 자체 오개념 연결이 없는 "
+                    f"{len(tagged) - len(counted)}건은 세지 않는다)"
+                )
+            gaps.append(why)
+        if gaps:
+            unmet.append(Unmet(fact.concept.code, tuple(gaps)))
+    return MetricResult(
+        key="slot_coverage",
+        name_ko="Concept Slot Coverage(6슬롯)",
+        met_count=filled,
+        population=cells,
+        value=_ratio(filled, cells),
+        target=None,
+        met=None,
+        unmet=tuple(unmet),
+        note=(
+            "목표 없음 — 핵심 Concept 6슬롯 충족은 P3-05 의 완료 판정이다"
+            " · 센 단위 = 서로 다른 문제(숫자만 다른 문면은 하나)"
+            f" · 문면 미확인 {unfolded_cells}건(합치지 않고 각각 1건으로 셈)"
+        ),
+    )
+
+
+def _problem_metadata(
+    spec: ScopeSpec,
+    index: ReferenceIndex,
+    corpus: CoverageCorpus,
+    facts: tuple[ConceptFacts, ...],
+) -> ProblemMetadataStats:
+    """적격 문항 전체에 7필드 판정을 건다 — 정의는 `schema/problem_metadata.py` 한 곳이다.
+
+    증거는 코퍼스 파일에서 잰다. 문항 자체 오개념은 P3-02 의 `_reached_misconceptions`(오답 보기가
+    크로스링크로 닿는 M-id)와 같은 기준이고, 소속 개념 오개념은 오개념 코퍼스가 그 개념의 성취기준에
+    귀속한 M-id 전부다. 힌트는 `hint_problem_ids` 입력을 읽고, 입력이 None 이면 측정 불가다.
+    """
+    code_by_src = {c.source_id: c.code for c in spec.concepts}
+    mis_by_code: dict[str, set[str]] = {}
+    for mis_id, code in index.misconceptions.items():
+        if code is not None:
+            mis_by_code.setdefault(code, set()).add(mis_id)
+
+    eligible: dict[str, ProblemRef] = {}
+    for fact in facts:
+        for problem in fact.eligible:
+            eligible[problem.problem_id] = problem
+
+    states = {
+        field.value: {"present": 0, "missing": 0, "unknown": 0} for field in ProblemMetadataField
+    }
+    complete = without_missing = inherited_only = 0
+    unmeasured: set[str] = set()
+    unmet: list[Unmet] = []
+    for problem_id in sorted(eligible):
+        problem = eligible[problem_id]
+        codes = {code_by_src[src] for src in problem.primary_src_ids if src in code_by_src}
+        inherited = {m for code in codes for m in mis_by_code.get(code, ())}
+        verdict = evaluate_metadata(
+            ProblemMetadataEvidence(
+                difficulty=problem.difficulty,
+                answer=problem.answer,
+                solution_text=problem.solution_text,
+                concept_ids=tuple(sorted(problem.primary_src_ids)),
+                skill_ids=tuple(sorted(_problem_skills(problem, corpus))),
+                own_misconception_ids=tuple(sorted(_reached_misconceptions(problem, corpus))),
+                concept_misconception_ids=tuple(sorted(inherited)),
+                # 힌트 입력(`hint_problem_ids`)이 None 이면 측정 불가다 — `--hints-from-db` 를 주지
+                # 않은 실행이다. 입력이 있으면 이 필드도 Completeness 의 hint 연결과 함께 측정된다.
+                verified_hint_count=(
+                    None
+                    if corpus.hint_problem_ids is None
+                    else int(problem.problem_id in corpus.hint_problem_ids)
+                ),
+                slots=parse_slot_tags(problem.tags).slots,
+            )
+        )
+        for field, state in verdict.states.items():
+            states[field.value][state.value] += 1
+            if state is FieldState.UNKNOWN:
+                unmeasured.add(field.value)
+        if verdict.complete:
+            complete += 1
+        if not verdict.missing:
+            without_missing += 1
+        else:
+            unmet.append(
+                Unmet(
+                    problem_id,
+                    tuple(line for line in verdict.failures() if line.endswith("비어 있다")),
+                )
+            )
+        if verdict.misconception_source == "concept":
+            inherited_only += 1
+    return ProblemMetadataStats(
+        population=len(eligible),
+        field_counts={k: dict(v) for k, v in states.items()},
+        complete=complete,
+        without_missing=without_missing,
+        inherited_only=inherited_only,
+        unmeasured_fields=tuple(f.value for f in ProblemMetadataField if f.value in unmeasured),
+        unmet=tuple(unmet),
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -884,6 +1164,33 @@ def _check_spec_alignment(spec: ScopeSpec) -> None:
     ):
         if key not in spec.targets:
             raise CoverageError(f"명세 targets 에 {key!r} 가 없다 — 지표의 목표를 알 수 없다")
+    # P3-04 — 7필드·6슬롯의 정의는 `schema/problem_metadata.py` 한 곳이다. 명세가 다른 목록을 말하면
+    # 이 계측은 명세가 요구하지 않은 것을 재는 셈이라 거부한다.
+    if tuple(spec.problem_required_fields) != tuple(f.value for f in ProblemMetadataField):
+        raise CoverageError(
+            f"명세 problem_required_fields {list(spec.problem_required_fields)} 가 계측기 정의 "
+            f"{[f.value for f in ProblemMetadataField]} 와 다르다"
+        )
+    if tuple(slot.id for slot in spec.slots) != tuple(slot.value for slot in ProblemSlot):
+        raise CoverageError(
+            f"명세 슬롯 {[slot.id for slot in spec.slots]} 가 계측기 정의 "
+            f"{[slot.value for slot in ProblemSlot]} 와 다르다"
+        )
+
+
+def _hint_seat(facts: tuple[ConceptFacts, ...], corpus: CoverageCorpus) -> HintSeatStats | None:
+    """힌트 입력이 없으면 None(측정 불가), 있으면 은행 문항과의 겹침."""
+    hinted = corpus.hint_problem_ids
+    if hinted is None:
+        return None
+    in_scope = {p.problem_id for p in corpus.problems} & hinted
+    eligible = {p.problem_id for f in facts for p in f.eligible} & hinted
+    return HintSeatStats(
+        hinted_problems=len(hinted),
+        in_scope_bank=len(in_scope),
+        eligible_hinted=len(eligible),
+        outside_scope=len(hinted - in_scope),
+    )
 
 
 def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> CoverageReport:
@@ -898,6 +1205,8 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
     completeness, link_counts, measurable = _completeness(spec, facts, links_by_code)
     connectivity, funnel = _connectivity(spec, facts, links_by_code)
     metrics = (content, curriculum, completeness, connectivity)
+    slot_metric = _slot_coverage(spec, facts, corpus)
+    metadata = _problem_metadata(spec, index, corpus, facts)
 
     failures: list[str] = []
     for m in metrics:
@@ -910,7 +1219,31 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
                 f"({m.met_count}/{m.population}, 미충족 {len(m.unmet)}건)"
             )
 
+    # P3-04 — 필수 필드가 비어 있는 적격 문항은 발행 게이트(problem_metadata_complete)가 거부한다.
+    # 측정 불가(UNKNOWN)는 여기서 실패로 세지 않는다 — 그 판정은 저장 시점 게이트의 몫이다.
+    if slot_metric.population == 0:
+        failures.append("Concept Slot Coverage(6슬롯): 분모가 0 이다 — 측정 불가(통과가 아니다)")
+    if metadata.population == 0:
+        failures.append("문제 메타데이터 7필드: 적격 문항이 0건이다 — 측정 불가(통과가 아니다)")
+    elif metadata.unmet:
+        failures.append(
+            f"문제 메타데이터 7필드: 적격 문항 {metadata.population}건 중 "
+            f"{len(metadata.unmet)}건이 필수 필드를 비워 두고 있다 — 발행 게이트가 거부할 문항이다"
+        )
+    bad_tags = sorted({t for p in corpus.problems for t in parse_slot_tags(p.tags).unknown})
+    if bad_tags:
+        shown = ", ".join(bad_tags[:5]) + (" …" if len(bad_tags) > 5 else "")
+        failures.append(
+            f"알 수 없는 슬롯 태그 {len(bad_tags)}종: {shown} — 오타면 그 문항은 슬롯이 비어 보인다"
+        )
+
     warnings: list[str] = []
+    if metadata.unmeasured_fields:
+        warnings.append(
+            f"문제 메타데이터 측정 불가 필드: {', '.join(metadata.unmeasured_fields)} — "
+            "힌트 입력이 없어 7필드 전부 충족으로 셀 수 없다(측정 불가는 충족이 아니다). "
+            "`--hints-from-db` 로 DB 의 verified 힌트를 읽으면 잰다"
+        )
     if supply.met_count < content.met_count:
         warnings.append(
             f"연결은 {content.met_count}/{content.population} 이지만 학생 공급 가능은 "
@@ -922,6 +1255,14 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
         warnings.append(
             f"측정 불가 연결: {', '.join(unmeasured)} — Concept Completeness 는 이 연결이 측정될 "
             "때까지 충족될 수 없다(측정 불가는 충족이 아니다)"
+        )
+
+    hint_seat = _hint_seat(facts, corpus)
+    if hint_seat is not None and hint_seat.hinted_problems and not hint_seat.in_scope_bank:
+        warnings.append(
+            f"DB 의 검수 통과 힌트 {hint_seat.hinted_problems}문항 중 명세 범위 은행 문항과 ID 가 "
+            "겹치는 것이 0건이다 — 범위 밖 문항이거나 DB problem 과 JSONL 은행의 ID 공간이 "
+            "어긋난 것이다(힌트 연결 0 은 '힌트 없음'이 아닐 수 있다)"
         )
 
     return CoverageReport(
@@ -936,6 +1277,9 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
         problems_scanned=corpus.problems_scanned,
         warnings=tuple(warnings),
         failures=tuple(failures),
+        slots=slot_metric,
+        problem_metadata=metadata,
+        hint_seat=hint_seat,
     )
 
 
@@ -953,6 +1297,20 @@ def _metric_json(m: MetricResult) -> dict[str, Any]:
         "met": m.met,
         "note": m.note,
         "unmet": [{"subject": u.subject, "missing": list(u.missing)} for u in m.unmet],
+    }
+
+
+def _metadata_json(stats: ProblemMetadataStats | None) -> dict[str, Any] | None:
+    if stats is None:
+        return None
+    return {
+        "population": stats.population,
+        "field_counts": {k: dict(v) for k, v in stats.field_counts.items()},
+        "complete": stats.complete,
+        "without_missing": stats.without_missing,
+        "inherited_only": stats.inherited_only,
+        "unmeasured_fields": list(stats.unmeasured_fields),
+        "unmet": [{"subject": u.subject, "missing": list(u.missing)} for u in stats.unmet],
     }
 
 
@@ -974,6 +1332,9 @@ def to_json(report: CoverageReport) -> dict[str, Any]:
         "problems_scanned": report.problems_scanned,
         "warnings": list(report.warnings),
         "failures": list(report.failures),
+        "slot_coverage": None if report.slots is None else _metric_json(report.slots),
+        "problem_metadata": _metadata_json(report.problem_metadata),
+        "hint_seat": None if report.hint_seat is None else asdict(report.hint_seat),
     }
 
 
@@ -997,11 +1358,39 @@ def render(report: CoverageReport) -> str:
             f"{m.name_ko:<28}  {m.met_count}/{m.population} = {_pct(m.value):<10}  "
             f"{target:<8}  {verdict}"
         )
+    if report.slots is not None:
+        m = report.slots
+        lines.append(
+            f"{m.name_ko:<28}  {m.met_count}/{m.population} = {_pct(m.value):<10}  "
+            f"{'—':<8}  목표 없음"
+        )
+    stats = report.problem_metadata
+    if stats is not None:
+        lines += ["", f"문제 메타데이터 7필드 (적격 문항 {stats.population}건)"]
+        for name, count in stats.field_counts.items():
+            lines.append(
+                f"  {name:<24} present {count['present']} · missing {count['missing']} · "
+                f"unknown {count['unknown']}"
+            )
+        lines += [
+            f"  7필드 전부 충족: {stats.complete}건 · 결손(missing) 없음: {stats.without_missing}건"
+            f" · 오개념 서명이 개념 상속만인 문항: {stats.inherited_only}건"
+        ]
+        if stats.unmeasured_fields:
+            lines.append(f"  측정 불가 필드: {', '.join(stats.unmeasured_fields)}")
     lines += ["", "연결별 충족 수 (핵심 개념 기준)"]
     for name, count in report.link_counts.items():
         lines.append(
             f"  {name:<14} linked {count['linked']} · missing {count['missing']} · "
             f"unmeasured {count['unmeasured']}"
+        )
+    seat = report.hint_seat
+    if seat is None:
+        lines.append("  힌트 입력: 없음(측정 불가) — --hints-from-db 로 읽는다")
+    else:
+        lines.append(
+            f"  힌트 입력: DB 검수 통과 {seat.hinted_problems}문항 → 범위 은행 {seat.in_scope_bank}"
+            f" · 적격 {seat.eligible_hinted} · 범위 밖/ID 불일치 {seat.outside_scope}"
         )
     done, total = report.completeness_measurable
     lines.append(f"  측정 가능한 연결만 본 완전 개념(참고·판정 불참여): {done}/{total}")
@@ -1012,13 +1401,19 @@ def render(report: CoverageReport) -> str:
         f"  스킬 {funnel['skill']} → 문항 {funnel['problem']} → 오개념 {funnel['misconception']} "
         f"→ 교수 {funnel['pedagogy']}",
     ]
-    for m in (*report.metrics, report.supply):
+    for m in (*report.metrics, report.supply, *([report.slots] if report.slots else [])):
         if not m.unmet:
             continue
         lines += ["", f"[미충족 — {m.name_ko}] {len(m.unmet)}건"]
         for u in m.unmet:
             lines.append(f"  {u.subject}")
             lines += [f"    · {why}" for why in u.missing]
+    if stats is not None and stats.unmet:
+        lines += ["", f"[미충족 — 문제 메타데이터 7필드] {len(stats.unmet)}건 (전체 목록은 --json)"]
+        for u in stats.unmet[:10]:
+            lines.append(f"  {u.subject}: {' · '.join(u.missing)}")
+        if len(stats.unmet) > 10:
+            lines.append(f"  … 외 {len(stats.unmet) - 10}건")
     if report.warnings:
         lines += ["", "경고"]
         lines += [f"  ! {w}" for w in report.warnings]
@@ -1033,6 +1428,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--spec", type=Path, default=None, help="범위 명세 YAML 경로")
     parser.add_argument("--json", action="store_true", help="기계 판독 JSON 으로 출력")
+    parser.add_argument(
+        "--hints-from-db",
+        action="store_true",
+        help="DB hints(verified=true)에서 힌트 연결 입력을 읽는다. 주지 않으면 힌트는 측정 불가다.",
+    )
     args = parser.parse_args(argv)
     spec_path = args.spec or default_spec_path()
     try:
@@ -1045,7 +1445,11 @@ def main(argv: list[str] | None = None) -> int:
                 "범위 명세가 코퍼스와 어긋나 있다 — 분모를 신뢰할 수 없어 측정을 거부한다:\n"
                 + "\n".join(f"  - {v}" for v in violations)
             )
-        report = evaluate(spec, index, load_corpus(spec))
+        if args.hints_from_db:
+            corpus = load_corpus(spec, hint_problem_ids=read_hint_problem_ids_from_db())
+        else:
+            corpus = load_corpus(spec)
+        report = evaluate(spec, index, corpus)
     except (ScopeSpecError, CoverageError) as exc:
         print(f"[적재 실패] {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
