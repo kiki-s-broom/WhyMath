@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-53-week1-gate-rejudgment-2026-10-17
+title: "P3-G1 Week 1 Gate 재판정 회차 (main e35692ef · 판정 전용) — 명세 동결·핵심 Concept Content Coverage 95%+·금지 변경 0건"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판정 기준 — 판정문 상단에 판정 기준 main 커밋 해시를 박고, P3-G1의 세 조건(명세 동결 · 핵심 Concept Content Coverage 95%+ · 금지 변경 0건)을 main 기준으로 재실측한다. 직전 판정(P3-15 · main f34d7b76 · 2026-10-12)과의 차이(커밋 범위·수치 변화)를 표로 적는다.\n② 판정 전용 — 구현 세션과 분리된 세션에서 단독 집행하며 production code를 고치지 않는다. 발견한 결함은 backlog.py add로 등재만 한다.\n③ 최종 한 줄은 PASS 또는 FAIL이다(조건부 PASS 없음). 미충족이면 끊긴 지점 하나를 지목하고 그 지점만 고치는 후속 태스크를 등재한다.\n④ 날짜 한계 명시 — 지시문의 금지 변경 조사 창은 10/26 이후이나 판정일(2026-10-17)은 그 전이다. 창 시작을 어떻게 잡았는지와 10/26 이후 변경은 이 판정이 덮지 못한다는 점을 판정문에 적는다.\n⑤ 정상 입력에서 초록인 것은 증거가 아니다 — 계측기(Coverage CLI)는 막으려는 상태를 주입해 RED를 확인하고 mutated != original을 단언한다. 판정은 exit code로 하며 출력을 자르지 않는다.\n⑥ 산출 — 판정문 docs/reviews 파일 1건과 그 PR. 게이트 G-p3-g1-week1은 이미 cleared이므로 clear/amend를 다시 시도하지 않는다."
+artifacts:
+  - "PR #1668 (kiki-s-broom/WhyMath#1668) — docs/reviews/p3_g1_week1_gate_rejudgment_2026-10-17.md · 판정 기준 main e35692ef"
+paths: []
+session: null
+notes: |-
+  출처: Kiki 지시문 [06] P3-G1 Week 1 Gate 판정 (2026-10-17). P3-15-week1-gate-judgment는 done(종결 상태·PR 1584 · main f34d7b76)이라 재착수가 CLI에서 거부돼 후속 판정 회차로 새로 등재했다. 게이트 G-p3-g1-week1은 cleared 상태다.
+
+  [트리거 면제] 판정 전용 재회차 — 새 규칙·기능 도입 없음
+
+  [미러 면제 2026-10-17] CI 미러 5잡 중 4잡(infra-contracts·infra-shell·policy-guard·declared-unwired-audit) exit 0. harness-integrity는 이 세션 환경에 ssh-keygen이 없어(apt 설치 후보 없음 실측) 헌법 서명 검증 스텝이 측정 불가(exit 2)로 멈췄고 뒤 11스텝이 미실행으로 남았다. 그중 로컬 개별 실행분은 통과(tests/harness 2307 passed exit 0 · ruff exit 0 · black exit 0 · 위 스텝 일부 exit 0). 미실행 잔여는 서명 검증·ADR 번호 충돌·원격 claim 교차·고립 브랜치 관측·관측 리포트 5종(네트워크/서명 도구 필요)이며 CI가 판정한다. 이 PR은 constitution/ 경로를 건드리지 않는다
+updated: 2026-10-17
