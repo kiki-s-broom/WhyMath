@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-305-mutation-window-commit-guard
+title: 뮤테이션 주입 구간에 Stop 훅이 WIP를 커밋해 주입 코드가 HEAD에 들어가는 경로 차단
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "사고(2026-10-09 ADMIN-18): 서브에이전트가 뮤테이션 검증으로 소스에 결함을 주입한 구간에 Stop 훅의 \"미커밋 변경을 커밋하라\" 지시로 WIP 스냅샷이 커밋돼, 주입 한 줄(if False and value is not None)이 HEAD에 들어갔다. 작업 트리는 바이트 동일 복구돼 있어 최종 커밋에서 정정됐으나, 에이전트가 알려 주지 않았다면 CI 이전에는 발견 수단이 없었다. 집행: ①뮤테이션 하네스(에이전트가 쓰는 주입 규약)가 주입 구간을 파일 마커로 표시하고 Stop 훅·커밋 경로가 마커가 있는 동안 커밋을 거부하거나 경고한다 ②또는 커밋 직전 훅이 알려진 주입 패턴(if False and, 상수 반전 등)과 .bak 백업 파일 존재를 탐지한다 ③주입 구간 커밋을 재현하는 테스트로 RED 확인. 변별: 마커 없이 커밋되는 정상 흐름은 막지 않는다(대조군)."
+artifacts: []
+paths: []
+session: null
+notes: ADMIN-18 PR 1551 사고 기록. MEMORY 2026-10-09 참조.
+updated: 2026-10-09
