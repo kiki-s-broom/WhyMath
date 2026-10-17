@@ -181,7 +181,7 @@ def test_independent_completion_keeps_the_ladder_up() -> None:
         meta = asyncio.run(_treatment_meta(rec["problem_id"]))
         assert meta is not None
         assert META_KEY_SELECTION_HELP_COUNT not in meta, meta  # 도움 채널이 닿지 않았다
-        assert meta[META_KEY_POLICY_VERSION] == "cat_v5", meta
+        assert meta[META_KEY_POLICY_VERSION] == "cat_v6", meta
 
     _case("ind", body)
 
@@ -217,7 +217,7 @@ def test_help_completion_lowers_the_target_while_the_estimate_stays() -> None:
         assert meta[META_KEY_THETA] == 4.0, meta  # 기록 theta = 응답 theta(추정 θ)
         assert meta[META_KEY_SELECTION_THETA] == pytest.approx(_SELECTION_HELPED, abs=1e-9), meta
         assert meta[META_KEY_SELECTION_HELP_COUNT] == 1, meta
-        assert meta[META_KEY_POLICY_VERSION] == "cat_v5", meta
+        assert meta[META_KEY_POLICY_VERSION] == "cat_v6", meta
 
     _case("help", body)
 
@@ -295,7 +295,7 @@ def test_a_plain_attempt_has_no_hint_label_and_is_counted_as_unknown_not_as_help
         assert meta is not None
         assert META_KEY_SELECTION_HELP_COUNT not in meta, meta  # 접힌 것이 없다
         assert meta[META_KEY_SELECTION_HINT_UNKNOWN_COUNT] == 1, meta
-        assert meta[META_KEY_POLICY_VERSION] == "cat_v5", meta
+        assert meta[META_KEY_POLICY_VERSION] == "cat_v6", meta
 
         async def _count() -> reach_report.ReachCounts:
             engine = create_async_engine(_P._settings().database_url)

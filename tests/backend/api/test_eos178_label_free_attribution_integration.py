@@ -227,7 +227,7 @@ def test_a_label_only_flow_reaches_the_next_recommendation_without_the_help_fold
     rec, meta = body.result["rec"], body.result["meta"]  # type: ignore[attr-defined]
     assert meta is not None
     assert META_KEY_SELECTION_HELP_COUNT not in meta, meta  # 접힌 문항이 없다
-    assert meta[META_KEY_POLICY_VERSION] == "cat_v5", meta
+    assert meta[META_KEY_POLICY_VERSION] == "cat_v6", meta
     # 오답+정답이 접히지 않고 한 쌍(반반)으로 남아 선택 θ가 추정 θ와 같다 — 표적이 내려가지 않는다.
     assert rec["selection_theta"] == pytest.approx(rec["theta"], abs=1e-9), rec
 

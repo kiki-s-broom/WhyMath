@@ -139,7 +139,7 @@ def test_correct_answers_climb_half_a_logit_at_a_time(weak_first: bool) -> None:
     수정 전 같은 여정은 4.8 → 4.4 → 3.9 → 3.4 → 2.4였다(첫 정답 뒤 곧장 꼭대기). 응답의 `theta`·SE·중단
     규칙은 매번 추정기의 값 그대로이고(첫 SE는 수정 전 실측 7.897과 같다), 달라진 것은 후보를 고른
     θ(`selection_theta`)뿐이다. 첫 회차에는 처치 기록도 함께 본다 — 경계 사실(`theta_boundary`)과
-    정책 식별자(`cat_v5`)가 서빙 경로에서 실제로 남는가.
+    정책 식별자(`cat_v6`)가 서빙 경로에서 실제로 남는가.
 
     **잠정 동작의 동결** — 정답 개수를 반영하지 않는 0.5 단계의 여정이다(이 여정의 완료는 도움 없는
     독립 성공이라 EOS-39 접기가 닿지 않는다). 보정은 `EOS-176`이 소유하므로 이 리터럴은 그
@@ -172,7 +172,7 @@ def test_correct_answers_climb_half_a_logit_at_a_time(weak_first: bool) -> None:
                     assert meta[META_KEY_THETA] == 4.0, meta  # 기록 theta = 응답 theta(추정 θ)
                     assert meta[META_KEY_SELECTION_THETA] == pytest.approx(0.4, abs=1e-9), meta
                     assert meta[META_KEY_THETA_BOUNDARY] == "upper", meta  # 경계 사실이 남는다
-                    assert meta[META_KEY_POLICY_VERSION] == "cat_v5", meta  # 선택 규칙의 판
+                    assert meta[META_KEY_POLICY_VERSION] == "cat_v6", meta  # 선택 규칙의 판
                 _answer(client, auth, rec["problem_id"], correct=True)
     finally:
         content.teardown()
