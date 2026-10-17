@@ -97,6 +97,14 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
     "l3.generation_seed": ("CORE", "생성 재현 seed 정책 — 경로별 지원·값 추출(과목 무관)"),
     "l3.equivalent": ("ADAPTER", "수식 동치 판정·정규화 — doc-100 Adapter 'equation equivalence'"),
     "l3.symbolic_equivalence": ("ADAPTER", "기호 조작 — doc-100 'symbolic manipulation'"),
+    "l3.safe_parse": (
+        "MIXED",
+        "SymPy 파싱 단일 안전 진입점(R22-03·CONST-09) — 예산 골격(길이·문자·중첩·크기 상한)은 "
+        "입력 안전 일반이나 허용 식별자·지수·차수 규칙은 SymPy 전제. 이미 sympy를 직접 쓰던 MIXED "
+        "모듈(l3.dsl·l3.pregenerate)도 호출하므로 ADAPTER로 두면 그 경유 CORE 전이 도달 ~20건이 "
+        "*새로 보인다* — 새 의존이 아니라 기존 sympy 직접 의존의 가시화다. 가르기(과목 중립 예산 ↔ "
+        "SymPy 파서 결합)는 MIXED 해소 경로를 따른다",
+    ),
     "l3.verifier": ("ADAPTER", "모듈 스스로 '통합 *수학* 검증기 v2'로 자인"),
     "l3.verify_answer_form": (
         "ADAPTER",
@@ -112,7 +120,22 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
     "l3.multi_solution": ("ADAPTER", "다중 풀이법 생성 — 수학 접근법 분류(ApproachType)"),
     "l3.finite_probability": ("ADAPTER", "유한 확률 전수 검증"),
     "l3.statistical_claim": ("ADAPTER", "통계 자료형 결정론 검증기"),
+    "l3.exact_value": (
+        "CORE",
+        "정확값(유리수·목록) 문자열 읽기/쓰기 — 수학 도메인 문법을 모르는 과목 무관 파서. "
+        "CORE인 cross_verify가 ADAPTER를 직접 import하지 않도록 sequence_induction에서 분리",
+    ),
+    "l3.sequence_induction": (
+        "ADAPTER",
+        "수열 귀납 점화식 정확 산술 검증기 — 수학 도메인 문법(점화식·수열 질의) 자체가 입력",
+    ),
     "l3.notation_coverage": ("ADAPTER", "수학 표기 커버리지 게이트"),
+    "l3.curriculum_notation_gate": (
+        "ADAPTER",
+        "교육과정 표기 범위 게이트(MATH-04) — 수학 표기 토큰→도입 구조 회계. 표기 어휘를 소유하고 "
+        "notation_coverage(ADAPTER)의 추출기를 재사용한다. l3 기본값(CORE)을 상속하면 ADAPTER를 "
+        "import하는 CORE 모듈이 된다(EOS-28 verify_answer_form 선례)",
+    ),
     "l3.speech": ("ADAPTER", "수식 AST → 한국어 낭독 — doc-100 'mathematical expression parsing'"),
     "l3.speech_parse": ("ADAPTER", "낭독 역파싱"),
     # ── 과목 중립 언어 유틸 (EOS-69) ──

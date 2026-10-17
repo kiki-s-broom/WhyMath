@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-18-adapter-validate-problem-author-seat
+title: "ProblemStatement에 저작 서명 좌석 — 어댑터 validate_problem이 authored_by=unknown으로 호출해 교차검증기 주입 시 전건 거부된다(PB-15 후속·S4-56 선결)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - PB-15-cross-verify-independence-guard-format
+requires_gates: []
+acceptance:
+  - "① 배경(PB-15 후속): l4/subject_adapter_math.py의 validate_problem은 ProblemVerifyInput을 만들 때 authored_by를 넘기지 않아 기본값 unknown(UNRECORDED_AUTHOR)이 들어간다. 중립 봉투 ProblemStatement에 저작 서명 좌석이 없기 때문이다. 현재 프로덕션 어댑터는 Verifier()를 cross_verifier 없이 만들어 이 값이 CrossVerifier.verify까지 도달하지 않지만, S4-56이 교차검증기를 어댑터에 주입하는 순간 PB-15의 fail-closed 가드가 모든 호출을 IndependenceError로 거부한다(의도된 동작이나 배선이 없으면 사용 불가).\n② 처분: ProblemStatement에 선택적 저작 서명 좌석을 추가하고 어댑터가 이를 ProblemVerifyInput.authored_by로 전달한다. 서명이 없는 호출은 지어내지 않고 기존처럼 unknown으로 둔다.\n③ 집행 지점: S4-56이 교차검증기를 주입하기 전에 이 좌석이 닿아 있는지 확인하는 계약 테스트(저작 서명이 있는 문항은 통과·없는 문항은 거부)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/subject_adapter_math.py
+session: null
+notes: "출처: PB-15 착지 시 발견. S4-56과 인접(재사용 전 선결). 지금은 프로덕션 도달 경로가 없어 긴급하지 않다."
+updated: 2026-10-08

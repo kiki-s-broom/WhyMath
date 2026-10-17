@@ -250,7 +250,7 @@ SELF_CONTAINMENT_WAIVERS: tuple[Waiver, ...] = (
     Waiver(path=".claude/commands/demo-doctor.md", until=_WAIVER_UNTIL, count=5),
     Waiver(path=".claude/commands/llm-perf-doctor.md", until=_WAIVER_UNTIL, count=2),
     Waiver(path="docs/architecture/db_backup_dr_runbook.md", until=_WAIVER_UNTIL, count=6),
-    Waiver(path="docs/architecture/deployment_cd_runbook.md", until=_WAIVER_UNTIL, count=7),
+    Waiver(path="docs/architecture/deployment_cd_runbook.md", until=_WAIVER_UNTIL, count=8),
     Waiver(path="docs/architecture/shadow_measurement_runbook.md", until=_WAIVER_UNTIL, count=1),
     Waiver(path="docs/data/license_snapshot_archive.md", until=_WAIVER_UNTIL, count=1),
     Waiver(path="docs/data/ncic.md", until=_WAIVER_UNTIL, count=4),
@@ -262,9 +262,16 @@ SELF_CONTAINMENT_WAIVERS: tuple[Waiver, ...] = (
     Waiver(path="docs/ops/amd395_local_llm_performance.md", until=_WAIVER_UNTIL, count=10),
     Waiver(path="docs/ops/arch55_provider_battle_smoke_runbook.md", until=_WAIVER_UNTIL, count=23),
     Waiver(path="docs/ops/arch57_authoring_openrouter_runbook.md", until=_WAIVER_UNTIL, count=8),
-    Waiver(path="docs/ops/coding_constitution_kiki_runbook.md", until=_WAIVER_UNTIL, count=18),
+    Waiver(
+        path="docs/ops/arch71_student_facing_cloud_mid_live_runbook.md",
+        until=_WAIVER_UNTIL,
+        count=3,
+    ),
+    Waiver(path="docs/ops/atom_graph_parity_probe_runbook.md", until=_WAIVER_UNTIL, count=3),
+    Waiver(path="docs/ops/coding_constitution_kiki_runbook.md", until=_WAIVER_UNTIL, count=27),
+    Waiver(path="docs/ops/constitution_signing_runbook.md", until=_WAIVER_UNTIL, count=7),
     Waiver(path="docs/ops/eos02_prompt_cache_live_runbook.md", until=_WAIVER_UNTIL, count=8),
-    Waiver(path="docs/ops/eos118_seat_signal_live_runbook.md", until=_WAIVER_UNTIL, count=7),
+    Waiver(path="docs/ops/eos118_seat_signal_live_runbook.md", until=_WAIVER_UNTIL, count=2),
     Waiver(
         path="docs/ops/eos121_seat_generation_diversity_runbook.md", until=_WAIVER_UNTIL, count=14
     ),
@@ -279,6 +286,7 @@ SELF_CONTAINMENT_WAIVERS: tuple[Waiver, ...] = (
     ),
     Waiver(path="docs/ops/eos_relevance_triage_gate_runbook.md", until=_WAIVER_UNTIL, count=10),
     Waiver(path="docs/ops/g_admin06_browser_menu_call_runbook.md", until=_WAIVER_UNTIL, count=5),
+    Waiver(path="docs/ops/g_misc40_m0671_note_restore_runbook.md", until=_WAIVER_UNTIL, count=5),
     Waiver(
         path="docs/ops/g_skb01_concept_behavior_skills_populate_runbook.md",
         until=_WAIVER_UNTIL,
@@ -293,10 +301,26 @@ SELF_CONTAINMENT_WAIVERS: tuple[Waiver, ...] = (
     Waiver(path="docs/ops/ip_separation_evidence_gate_runbook.md", until=_WAIVER_UNTIL, count=2),
     Waiver(path="docs/ops/kice_pdf_history_purge_runbook.md", until=_WAIVER_UNTIL, count=1),
     Waiver(path="docs/ops/lic03_provenance_restore_runbook.md", until=_WAIVER_UNTIL, count=6),
+    Waiver(path="docs/ops/misc61_source_probe_runbook.md", until=_WAIVER_UNTIL, count=9),
     Waiver(path="docs/ops/mp03_first_golden_promotion_runbook.md", until=_WAIVER_UNTIL, count=4),
+    Waiver(path="docs/ops/ops106_gate2_live_sample_runbook.md", until=_WAIVER_UNTIL, count=6),
+    Waiver(
+        path="docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md",
+        until=_WAIVER_UNTIL,
+        count=15,
+    ),
+    Waiver(path="docs/ops/ops30_uptime_probe_runbook.md", until=_WAIVER_UNTIL, count=11),
+    Waiver(
+        path="docs/ops/p3_42_coverage_hint_baseline_live_measurement_runbook.md",
+        until=_WAIVER_UNTIL,
+        count=2,
+    ),
     Waiver(path="docs/ops/s3_02_free_use_remeasurement_runbook.md", until=_WAIVER_UNTIL, count=10),
     Waiver(path="docs/ops/s4_16_residue_battle_round2_runbook.md", until=_WAIVER_UNTIL, count=7),
-    Waiver(path="docs/ops/skb03_atom_node_populate_runbook.md", until=_WAIVER_UNTIL, count=6),
+    Waiver(
+        path="docs/ops/s4_64_university_cells_populate_runbook.md", until=_WAIVER_UNTIL, count=6
+    ),
+    Waiver(path="docs/ops/skb03_atom_node_populate_runbook.md", until=_WAIVER_UNTIL, count=8),
     Waiver(path="docs/ops/skb04_concept_content_populate_runbook.md", until=_WAIVER_UNTIL, count=6),
     Waiver(path="docs/ops/windows_utf8_setup.md", until=_WAIVER_UNTIL, count=16),
     Waiver(path="docs/reviews/eos_anchor_e2e_a4_2026-08-30.md", until=_WAIVER_UNTIL, count=1),

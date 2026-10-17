@@ -20,10 +20,14 @@ from whymath_backend.schema.enums import (
     is_review_status_cleared,
 )
 from whymath_backend.schema.review_timer import (
+    CONTENT_FINGERPRINT_PREFIX,
+    REVIEW_FINGERPRINT_EXCLUDED_KEYS,
     VERDICT_APPROVED_WITH_EDIT,
     ReviewTimerEvent,
     ReviewTimerEventType,
     ReviewVerdict,
+    review_content_fingerprint,
+    review_fingerprint_state,
     review_status_for_verdict,
 )
 
@@ -339,3 +343,158 @@ class TestVerdictToReviewStatusBridge:
     def test_review_status_vocabulary_did_not_absorb_the_verdict(self) -> None:
         """`approved_with_edit`는 ReviewStatus에 넣지 않는다 — §13.3 노출 정책 보호."""
         assert VERDICT_APPROVED_WITH_EDIT not in {m.value for m in ReviewStatus}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# EOS-27 — 검수 내용 지문: 정규화 정본 · 3상태 대조 · 이벤트 필드 계약
+# ══════════════════════════════════════════════════════════════════════════
+_RECORD: dict[str, Any] = {
+    "slug": "wm-fp-0001",
+    "question_text": "이차방정식 x^2 - 5x + 6 = 0 의 큰 근을 구하시오.",
+    "answer": "3",
+    "answer_explanation": "(x-2)(x-3)=0 이므로 큰 근은 3.",
+    "verify": {"conditions": "x**2 - 5*x + 6 = 0", "answer_map": {"x": "3"}},
+    "hint": ["인수분해를 떠올려 보세요"],  # 검수 화면이 렌더하지 않는 필드(고지만 한다)
+}
+_FP_A = CONTENT_FINGERPRINT_PREFIX + "a" * 64
+_FP_B = CONTENT_FINGERPRINT_PREFIX + "b" * 64
+
+
+class TestFingerprintNormalization:
+    """지문의 정규화 규칙 — 규칙마다 '같아야 할 때 같고 달라야 할 때 다르다'를 양쪽 실측한다."""
+
+    def test_format_is_prefixed_sha256_hex(self) -> None:
+        fp = review_content_fingerprint(_RECORD)
+        assert fp.startswith(CONTENT_FINGERPRINT_PREFIX)
+        assert len(fp) == len(CONTENT_FINGERPRINT_PREFIX) + 64
+        # 이벤트 필드 패턴이 이 함수의 출력을 그대로 받는다(둘이 따로 놀지 않는다).
+        ReviewTimerEvent.model_validate(_base(content_fingerprint=fp))
+
+    def test_key_order_does_not_change_the_fingerprint(self) -> None:
+        """같은 내용이 직렬화 순서만 달라도 같은 지문 — 거짓 '내용 변경' 방지."""
+        shuffled = dict(reversed(list(_RECORD.items())))
+        assert list(shuffled) != list(_RECORD)
+        assert review_content_fingerprint(shuffled) == review_content_fingerprint(_RECORD)
+
+    @pytest.mark.parametrize(
+        "edit",
+        [
+            {"answer": "2"},  # 정답
+            {"question_text": "이차방정식 x^2 - 5x + 6 = 0 의 작은 근을 구하시오."},  # 문항
+            {"answer_explanation": "(x-2)(x-3)=0 이므로 큰 근은 2."},  # 해설
+            {"verify": {"conditions": "x**2 - 5*x + 6 = 0", "answer_map": {"x": "2"}}},  # 중첩
+            {"hint": ["정답은 3입니다"]},  # 렌더되지 않는 필드
+            {"slug": "wm-fp-0002"},  # 식별자
+        ],
+        ids=["정답", "문항", "해설", "중첩_검산", "미렌더_힌트", "slug"],
+    )
+    def test_any_content_edit_changes_the_fingerprint(self, edit: dict[str, Any]) -> None:
+        """승인 뒤 어떤 내용 편집도 지문을 바꾼다 — 렌더 축만 해시하면 '미렌더_힌트' 행이 빨개진다."""
+        edited = {**_RECORD, **edit}
+        assert review_content_fingerprint(edited) != review_content_fingerprint(_RECORD)
+
+    @pytest.mark.parametrize("key", sorted(REVIEW_FINGERPRINT_EXCLUDED_KEYS))
+    def test_operational_meta_is_excluded(self, key: str) -> None:
+        """검수 뒤 정당한 도구가 쓰는 운영 메타는 지문에 안 든다 — 들어가면 각인 직후 전건이 '변경'."""
+        base = review_content_fingerprint(_RECORD)
+        assert review_content_fingerprint({**_RECORD, key: "approved"}) == base
+
+    def test_excluded_set_is_exactly_the_documented_one(self) -> None:
+        """제외 집합은 좁게 동결 — 키를 더 빼면 그만큼 '승인 뒤 편집 미탐지' 구멍이 생긴다."""
+        assert REVIEW_FINGERPRINT_EXCLUDED_KEYS == {
+            "review_status",
+            "review_score",
+            "quarantine_reason",
+            "quarantined_at",
+            "updated_at",
+        }
+
+    def test_top_level_none_equals_absent_key(self) -> None:
+        assert review_content_fingerprint({**_RECORD, "tags": None}) == review_content_fingerprint(
+            _RECORD
+        )
+
+    def test_empty_value_is_not_absent(self) -> None:
+        """None만 빠지고 빈 문자열·빈 목록은 내용이다 — 둘을 섞으면 '답을 비운 편집'이 안 보인다."""
+        base = review_content_fingerprint(_RECORD)
+        assert review_content_fingerprint({**_RECORD, "answer": ""}) != base
+        assert review_content_fingerprint({**_RECORD, "tags": []}) != base
+
+    def test_nested_none_is_content(self) -> None:
+        """중첩 None은 정규화하지 않는다(최상위만) — 중첩까지 지우면 서로 다른 구조가 같아진다."""
+        a = {**_RECORD, "verify": {"answer_map": {"x": None}}}
+        b = {**_RECORD, "verify": {"answer_map": {}}}
+        assert review_content_fingerprint(a) != review_content_fingerprint(b)
+
+    def test_hangul_is_hashed_as_utf8_not_escaped(self) -> None:
+        """한글을 이스케이프하면 직렬화기마다 지문이 갈린다 — UTF-8 원문 기준으로 동결."""
+        import hashlib
+        import json
+
+        expected = (
+            CONTENT_FINGERPRINT_PREFIX
+            + hashlib.sha256(
+                json.dumps(
+                    {"q": "근"}, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")
+            ).hexdigest()
+        )
+        assert review_content_fingerprint({"q": "근"}) == expected
+
+    def test_unserializable_value_raises_instead_of_being_stringified(self) -> None:
+        """str()로 접으면 서로 다른 객체가 같은 지문을 낸다 — 조용히 접지 않고 TypeError."""
+        with pytest.raises(TypeError):
+            review_content_fingerprint({"slug": "x", "when": datetime(2026, 9, 1, tzinfo=UTC)})
+
+
+class TestFingerprintState:
+    """3상태 대조 — 모름은 일치가 아니다."""
+
+    def test_match_changed_unknown(self) -> None:
+        assert review_fingerprint_state(_FP_A, _FP_A) == "match"
+        assert review_fingerprint_state(_FP_A, _FP_B) == "changed"
+
+    @pytest.mark.parametrize(
+        ("reviewed", "current"),
+        [(None, _FP_A), (_FP_A, None), (None, None)],
+        ids=["이벤트_지문없음", "코퍼스_지문없음", "둘다없음"],
+    )
+    def test_missing_side_is_unknown_never_match(
+        self, reviewed: str | None, current: str | None
+    ) -> None:
+        """None==None 같은 우연한 동치로 'match'가 되지 않는다 — 이 필드가 막으려는 사각 그 자체."""
+        assert review_fingerprint_state(reviewed, current) == "unknown"
+
+
+class TestEventFingerprintField:
+    """이벤트 계약 — started·finished만 싣고, aborted는 못 싣고, 기본은 모름(None)."""
+
+    def test_default_is_none_meaning_unknown(self) -> None:
+        assert ReviewTimerEvent.model_validate(_base()).content_fingerprint is None
+
+    def test_started_and_finished_accept_it(self) -> None:
+        started = ReviewTimerEvent.model_validate(_base(content_fingerprint=_FP_A))
+        finished = ReviewTimerEvent.model_validate(
+            _base(event_type="finished", verdict="approved", content_fingerprint=_FP_A)
+        )
+        assert started.content_fingerprint == finished.content_fingerprint == _FP_A
+
+    def test_aborted_rejects_it(self) -> None:
+        """판정 없는 중단은 내용을 인증하지 않는다 — 실리면 '인증된 내용'으로 오독된다."""
+        with pytest.raises(ValidationError, match="content_fingerprint"):
+            ReviewTimerEvent.model_validate(_base(event_type="aborted", content_fingerprint=_FP_A))
+
+    @pytest.mark.parametrize(
+        "bad",
+        ["", "abc", "sha256:XYZ", "sha256:" + "A" * 64, "md5:" + "a" * 64, "sha256:" + "a" * 63],
+        ids=["빈", "짧은", "비16진", "대문자", "다른접두", "63자"],
+    )
+    def test_malformed_fingerprint_is_rejected(self, bad: str) -> None:
+        with pytest.raises(ValidationError):
+            ReviewTimerEvent.model_validate(_base(content_fingerprint=bad))
+
+    def test_old_event_without_the_field_still_validates(self) -> None:
+        """하위호환 — 지문 키가 없는 옛 JSONL 행이 그대로 읽힌다(그리고 '모름'이 된다)."""
+        row = _base(event_type="finished", verdict="approved")
+        assert "content_fingerprint" not in row
+        assert ReviewTimerEvent.model_validate(row).content_fingerprint is None

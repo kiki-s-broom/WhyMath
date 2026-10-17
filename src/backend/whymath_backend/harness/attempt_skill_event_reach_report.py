@@ -12,9 +12,9 @@
   3. **기록·해소 ≥1**(`skill_ids != []`) — 의도한 상태.
 1과 2를 한 숫자로 뭉개면 "코드가 죽었다"와 "데이터가 비었다"가 같은 글자가 된다.
 
-**경로별 분모**: `event_data.source`(attempt_submit·coach_completion)로 나눠 본다. 한쪽 채점
-경로에만 writer가 남으면 전체 평균에서는 절반의 감소로 희석돼 보이지만 경로별로는 0%로 즉시
-드러난다.
+**경로별 분모**: `event_data.source`(attempt_submit·coach_completion·
+coach_wrong_submission)로 나눠 본다. 한쪽 채점 경로에만 writer가 남으면 전체 평균에서는
+절반의 감소로 희석돼 보이지만 경로별로는 0%로 즉시 드러난다.
 
 **게이트가 아니다**(`assessment_seat_reach_report` 동일 원칙) — 비율이 0%여도 exit 1을 내지
 않는다. 목표는 차단이 아니라 가시화이며, 판정 임계는 실측이 쌓인 뒤에 정한다(측정 없는 게이트
@@ -221,7 +221,7 @@ def build_report(
 ) -> SkillEventReachReport:
     """조회 결과 → 리포트(순수·부작용 0·DB 세션 불요).
 
-    `AttemptSource` 폐쇄 2종을 **전부** 보강한다 — DB에 행이 없는 경로도 0으로 명시한다(조용한
+    `AttemptSource` 폐쇄 3종을 **전부** 보강한다 — DB에 행이 없는 경로도 0으로 명시한다(조용한
     생략 금지: 한 경로의 writer가 통째로 죽으면 그 경로는 group by 결과에서 *사라지므로*, 보강이
     없으면 전멸이 화면에서 안 보인다). DB에만 있는 미지 라벨(구판·오배선)도 버리지 않고 뒤에
     덧붙인다.
@@ -291,7 +291,7 @@ def render_report(report: SkillEventReachReport) -> str:
         f"- **종단 기록률**(해소≥1/attempt): {_pct(report.end_to_end_rate)} "
         f"({counts.events_nonempty_skill_ids}/{counts.attempts_total})",
         "",
-        "## 3. 채점 경로별 (폐쇄 2종 전부 — 행 없는 경로도 0으로 명시)",
+        "## 3. 채점 경로별 (폐쇄 3종 전부 — 행 없는 경로도 0으로 명시)",
         "",
         "| source | 이벤트 | 해소 ≥1 | 해소율 |",
         "|---|---:|---:|---|",

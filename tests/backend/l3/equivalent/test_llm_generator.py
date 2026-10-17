@@ -37,6 +37,7 @@ from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.llm_generator import LLMEquivalentProblemGenerator
 from whymath_backend.l3.equivalent.orchestrator import run_equivalent_generation
 from whymath_backend.l3.models import (
+    CostTier,
     GenerationResult,
     LocalModelTier,
     ModelFamily,
@@ -44,6 +45,7 @@ from whymath_backend.l3.models import (
     Usage,
 )
 from whymath_backend.l3.prompt_assets import prompt_text
+from whymath_backend.l3.router import resolve_model
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.schema.enums import AnswerFormat, LicenseType, SourceType
 
@@ -202,6 +204,38 @@ class TestAssembly:
         assert candidate.answer_selection == "largest"  # 근 선택(S2-i) 파싱
         assert candidate.problem.question_text == json.loads(_HAPPY)["question_text"]
         assert candidate.problem.answer == "3"
+
+    def test_candidate_carries_authoring_model_signature(self) -> None:
+        """PB-15 — 후보가 *어느 모델이 만들었는지* 서명을 들고 나온다(코퍼스 기록의 재료).
+
+        기대값은 provider가 실제로 받은 라우터 결정에서 독립 도출한다(`resolve_model`) — 서명
+        조립 함수 자신으로 기대값을 만들면 어떤 값을 내도 통과하는 동어반복이 된다.
+        """
+        provider = FakeProvider([_HAPPY])
+        candidate = _gen(provider).generate(_spec())
+        assert candidate is not None
+        decision = provider.decisions[0]
+        assert decision.cost_tier == CostTier.LOCAL.value  # 이 픽스처는 로컬 좌석을 밟는다
+        assert (
+            candidate.authored_by
+            == f"llm:{resolve_model(decision.local_family, decision.local_model)}"
+        )
+
+    def test_unresolvable_signature_is_unrecorded_not_a_crash(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """서명 해석이 터져도 저작 배치는 죽지 않고 미기록(None)으로 남는다 — 하류 가드가 거부.
+
+        지어낸 서명을 넣는 것(위장)도, 배치를 죽이는 것도 아닌 세 번째 길이다.
+        """
+
+        def boom(*args: object, **kwargs: object) -> str:
+            raise RuntimeError("좌석 해석 불가(테스트)")
+
+        monkeypatch.setattr(llm_generator, "model_name_for_decision", boom)
+        candidate = _gen(FakeProvider([_HAPPY])).generate(_spec())
+        assert candidate is not None
+        assert candidate.authored_by is None
 
     def test_slug_is_stable_and_deterministic(self) -> None:
         c1 = _gen(FakeProvider([_HAPPY])).generate(_spec())
@@ -726,6 +760,20 @@ class TestOrchestratorWiring:
         assert len(store.calls) == 1
         (records,) = store.calls
         assert records[0].slug is not None and records[0].slug.startswith("wm-gen-")
+
+    def test_authoring_signature_reaches_the_stored_record(self) -> None:
+        # PB-15 — 생성기가 후보에 찍은 서명이 오케스트레이터를 거쳐 *저장 레코드의 저작 메타*까지
+        # 도달한다. 이 전달이 끊기면(생성기는 찍는데 레코드로 안 넘어감) 코퍼스에 서명이 영영
+        # 기록되지 않아 교차검증 가드는 새 LLM 코퍼스에서도 죽은 채로 남는다 — 앞단 테스트가 모두
+        # 초록이어도 이 한 칸이 빠지면 결함이 그대로다.
+        provider = FakeProvider([_HAPPY])
+        store = _FakeStore()
+        run_equivalent_generation(_spec(), _gen(provider), store=store)
+
+        decision = provider.decisions[0]
+        expected = f"llm:{resolve_model(decision.local_family, decision.local_model)}"
+        (records,) = store.calls
+        assert records[0].provenance.authored_by == expected
 
     def test_generation_failure_through_orchestrator(self) -> None:
         # provider 예외 → 생성기 None → 오케스트레이터 generation_failed(정직 처리).

@@ -6,7 +6,7 @@
 
   ① 분모 0을 0%로 위장하지 않는다(측정 불가와 미달은 다른 사실).
   ② writer 미도달(이벤트 없음)과 해소 0건(`[]`)이 다른 칸에 렌더된다.
-  ③ 죽은 채점 경로가 화면에서 *사라지지 않는다*(폐쇄 2종 전부 보강 — group by 결과에 행이
+  ③ 죽은 채점 경로가 화면에서 *사라지지 않는다*(폐쇄 3종 전부 보강 — group by 결과에 행이
      없으면 0%로 보여야지 행 자체가 없어지면 전멸이 안 보인다).
   ④ 게이트가 아니다 — 0%가 exit 1을 내지 않는다.
 """
@@ -83,14 +83,22 @@ class TestSourceBreakdown:
         """③ coach_completion 행이 DB에 0건이어도 표에서 사라지지 않는다.
 
         group by 결과만 렌더하면 한 경로의 writer가 통째로 죽었을 때 그 경로가 화면에서
-        *사라져* 전멸이 안 보인다 — 폐쇄 2종 보강이 그것을 막는다.
+        *사라져* 전멸이 안 보인다 — 폐쇄 3종 보강이 그것을 막는다. 새 경로(EOS-146의
+        `coach_wrong_submission`)도 같은 보강을 받는다 — 앱 오답이 원장에 안 닿는 전멸이
+        이 화면에서 0으로 보여야 한다.
         """
         report = build_report(_counts())
-        assert [b.source for b in report.sources] == ["attempt_submit", "coach_completion"]
+        assert [b.source for b in report.sources] == [
+            "attempt_submit",
+            "coach_completion",
+            "coach_wrong_submission",
+        ]
         dead = next(b for b in report.sources if b.source == "coach_completion")
         assert dead.events == 0
         assert dead.nonempty_rate is None  # 분모 0 → 측정 불가(0%가 아니다)
-        assert "`coach_completion` | 0 |" in render_report(report)
+        rendered = render_report(report)
+        assert "`coach_completion` | 0 |" in rendered
+        assert "`coach_wrong_submission` | 0 |" in rendered
 
     def test_unknown_source_label_is_kept_not_dropped(self) -> None:
         """미지 라벨(구판·오배선)도 버리지 않는다 — 조용한 생략은 사실 은폐다."""
@@ -103,6 +111,7 @@ class TestSourceBreakdown:
         assert [b.source for b in report.sources] == [
             "attempt_submit",
             "coach_completion",
+            "coach_wrong_submission",
             "legacy_path",
         ]
 
@@ -141,6 +150,7 @@ class TestSerialization:
         assert {s["source"] for s in payload["sources"]} == {
             "attempt_submit",
             "coach_completion",
+            "coach_wrong_submission",
         }
         assert dump_json(report).endswith("\n")
 

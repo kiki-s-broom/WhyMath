@@ -7,7 +7,8 @@
     python3 scripts/harness/backlog.py start <id> [--session <branch>]
                                                  [--no-remote | --ignore-remote-claim]
     python3 scripts/harness/backlog.py done <id> --artifact <PR/커밋> [--artifact ...]
-                                                 [--no-pr <예외사유>]
+                                                 [--no-pr <예외사유> [--direct-commit-sha <해시>]]
+                                                 [--no-mirror <사유>]
     python3 scripts/harness/backlog.py block <id> --reason <사유>
     python3 scripts/harness/backlog.py unblock <id>
     python3 scripts/harness/backlog.py review <id>                (in_progress → review)
@@ -47,7 +48,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dep_declaration
+import done_mirror_gate
+import event_leaks
 import incidents as incidents_mod
+import isolation_report
 import jit_rules
 import number_guard
 import pathscope
@@ -334,7 +338,62 @@ NO_PR_REASONS: tuple[str, ...] = (
     "incomplete",  # 미완 또는 사람 게이트 대기 — 아직 열 PR이 아님
     "ci-red",  # CI 적색 — 먼저 고친다
     "kiki-hold",  # Kiki의 명시적 보류 지시
+    "direct-commit",  # PR 없이 trunk에 직접 착지 — --direct-commit-sha가 trunk 조상이어야 함
 )
+
+# `--no-pr direct-commit`의 기계 변별력 (HARN-80). 앞 4종은 "PR을 *안 열었다*"는 자기 신고라
+# 검증할 방법이 없지만, 이 사유는 "이미 main에 *착지했다*"는 주장이라 git으로 실측할 수 있다.
+# 실측 없이 받으면 이 사유는 4종 위에 얹은 다섯 번째 자유 서술일 뿐이다.
+DIRECT_COMMIT_REASON = "direct-commit"
+DIRECT_COMMIT_TRUNK_REF = "origin/main"
+_COMMIT_SHA_RE = re.compile(r"[0-9a-fA-F]{7,40}")
+
+# 3상태 — 접지 않는다(모른다 ≠ 아니다). unmeasurable을 not_ancestor로 접으면 shallow 클론에서
+# 정상 착지분이 오거부되고, ancestor로 접으면 측정 실패가 통과로 위장된다.
+_LANDING_ANCESTOR = "ancestor"
+_LANDING_NOT_ANCESTOR = "not_ancestor"
+_LANDING_UNMEASURABLE = "unmeasurable"
+
+
+def _probe_trunk_landing(root: Path, sha: str) -> tuple[str, str]:
+    """`sha`가 `origin/main`의 조상인지 실측 — (상태, 전체 해시 또는 사유) (HARN-80).
+
+    판정은 `git merge-base --is-ancestor` 하나다. shallow 클론은 조상 관계를 *부분 이력*으로
+    계산하므로 "조상 아님"이 거짓일 수 있다 — 그래서 shallow는 거부(not_ancestor)가 아니라
+    **측정 불가**로 가른다. git 실패·타임아웃·디코드 실패도 같다: 어느 쪽도 통과가 되지 않는다.
+    """
+    try:
+        shallow = remote_claims._git(root, "rev-parse", "--is-shallow-repository", timeout=15)
+        if shallow.returncode != 0:
+            return (
+                _LANDING_UNMEASURABLE,
+                f"git rev-parse --is-shallow-repository rc={shallow.returncode}",
+            )
+        if (shallow.stdout or "").strip() == "true":
+            return _LANDING_UNMEASURABLE, "shallow 클론 — `git fetch --unshallow origin` 후 재실행"
+        trunk = remote_claims._git(
+            root, "rev-parse", "--verify", "--quiet", f"{DIRECT_COMMIT_TRUNK_REF}^{{commit}}"
+        )
+        if trunk.returncode != 0:
+            return _LANDING_UNMEASURABLE, (
+                f"{DIRECT_COMMIT_TRUNK_REF} 를 읽을 수 없다 — `git fetch origin main` 후 재실행"
+            )
+        commit = remote_claims._git(root, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}")
+        full = (commit.stdout or "").strip()
+        if commit.returncode != 0 or not full:
+            return _LANDING_UNMEASURABLE, (
+                f"커밋 {sha} 를 이 클론에서 찾을 수 없다 — fetch 누락이거나 존재하지 않는 해시"
+            )
+        verdict = remote_claims._git(
+            root, "merge-base", "--is-ancestor", full, trunk.stdout.strip()
+        )
+    except (OSError, subprocess.SubprocessError, remote_claims.GitOutputDecodeError) as exc:
+        return _LANDING_UNMEASURABLE, f"exception:{type(exc).__name__}"
+    if verdict.returncode == 0:
+        return _LANDING_ANCESTOR, full
+    if verdict.returncode == 1:
+        return _LANDING_NOT_ANCESTOR, full
+    return _LANDING_UNMEASURABLE, f"git merge-base --is-ancestor rc={verdict.returncode}"
 
 
 def _reason_created_declarations(
@@ -496,6 +555,62 @@ def _remote_claim_map(root: Path, policy, skip: bool = False) -> tuple[dict[str,
     return {c.task_id: (c.branch or "?") for c in claims}, "ok"
 
 
+def _foreign_claim_state(root: Path, task_id: str) -> tuple[str, dict[str, str]]:
+    """대상 태스크의 원격 claim 상태 4상태 (HARN-199) — (상태, 근거).
+
+    - `foreign`: 다른 세션(브랜치)이 이 태스크를 claim 중이다 — 근거 = holder·ts·kind.
+    - `own`    : 이 세션(현재 브랜치)의 claim이다.
+    - `none`   : 조회에 성공했고 claim이 없다(**조회 성공일 때만** 이 상태다).
+    - `unknown`: 조회하지 못했다(비활성·offline·error·메타 파손) — 근거 = reason.
+    '모른다 ≠ 아니다': 조회 실패를 `none`으로 접으면 인프라 장애가 "경고 없음"으로 위장된다.
+    라이브 조회(`list_claims`)만 쓴다 — 낡은 캐시는 07:02 사고처럼 알려진 claim을 모를 수 있다.
+    """
+    policy, _ = store.load_policy(root)
+    if not policy.remote_claims:
+        return "unknown", {"reason": "disabled"}
+    claims, status = remote_claims.list_claims(root)
+    if status != "ok":
+        return "unknown", {"reason": status}
+    mine = store.current_branch(root)
+    holders = [c for c in claims if c.task_id == task_id]
+    if not holders:
+        return "none", {}
+    for c in holders:
+        if not c.branch:
+            # 메타(브랜치) 파손 — 누구의 것인지 모른다. 'own'으로 접으면 타 세션 claim을 놓친다.
+            return "unknown", {"reason": "claim 메타에 브랜치 없음"}
+    for c in holders:
+        if c.branch != mine:
+            return "foreign", {"holder": c.branch, "ts": c.ts or "?", "kind": c.kind}
+    return "own", {}
+
+
+def _warn_foreign_claim(root: Path, task_id: str, verb: str) -> dict[str, object] | None:
+    """타 세션 claim이 있거나 확인 불가면 stderr에 경고하고 이벤트 필드를 돌려준다 (HARN-199).
+
+    **거부하지 않는다** — 대장 정정 경로를 보존한다(차단 여부는 Kiki 판정). 경고는 `foreign`과
+    `unknown`에서만 나고 `own`·`none`은 침묵한다. 반환값은 해당 verb의 이벤트에 얹을 필드다.
+    """
+    state, info = _foreign_claim_state(root, task_id)
+    if state == "foreign":
+        print(
+            f"⚠ {task_id}: 다른 세션이 claim 중 — 보유 브랜치 {info['holder']} "
+            f"(claim {info['ts']}, kind={info['kind']}). {verb}는 계속 진행하지만, 같은 파일을 두 "
+            "세션이 고치면 나중에 병합하는 쪽이 충돌한다.",
+            file=sys.stderr,
+        )
+        return {"foreign_claim": {"state": "foreign", **info}}
+    if state == "unknown":
+        print(
+            f"⚠ {task_id}: 원격 claim 확인 불가({info['reason']}) — "
+            "'다른 세션 claim 없음'이 아니다. "
+            f"다른 세션이 잡고 있을 수 있다. {verb}는 계속 진행한다.",
+            file=sys.stderr,
+        )
+        return {"foreign_claim": {"state": "unknown", **info}}
+    return None
+
+
 def _overlap_block_map(root: Path, backlog, policy) -> dict[str, list[str]] | None:
     """block 모드일 때만 — todo 태스크별 in-flight 겹침 근거 (selector 제외용)."""
     if policy.path_overlap != "block":
@@ -516,6 +631,55 @@ def _overlap_block_map(root: Path, backlog, policy) -> dict[str, list[str]] | No
                 result[task.id] = [other.id, hit.describe()]
                 break
     return result or None
+
+
+def _gate_attach_summary(attached: list[remote_claims.GateAttachedElsewhere]) -> str:
+    """미머지 게이트 부착 발견분을 `브랜치 (게이트, ...); ...` 한 줄로 만든다 (HARN-193)"""
+    by_branch: dict[str, list[str]] = {}
+    for found in attached:
+        by_branch.setdefault(found.branch, []).append(found.gate_id)
+    return "; ".join(
+        f"{branch} ({', '.join(dict.fromkeys(gates))})"
+        for branch, gates in sorted(by_branch.items())
+    )
+
+
+def _sibling_summary(holders: list[remote_claims.SiblingInProgress]) -> str:
+    """형제 진행 중 사본을 한 줄로 — `브랜치(상태·팁 N시간 전)`. 나이를 모르면 그렇게 쓴다."""
+    parts = []
+    for h in holders:
+        age = "팁 시각 불명" if h.tip_age_hours is None else f"팁 {h.tip_age_hours:.1f}시간 전"
+        parts.append(f"{h.branch}({h.status}·{age})")
+    return ", ".join(parts)
+
+
+def _sibling_refusal_message(task_id: str, holders: list[remote_claims.SiblingInProgress]) -> str:
+    """`start` 거부 메시지 — 브랜치를 지목하고 확인 명령·우회 경로를 함께 준다."""
+    return (
+        f"{task_id} 착수 거부 — 미머지 브랜치가 이 태스크를 **진행 중으로 들고 있다**"
+        f"(HARN-198): {_sibling_summary(holders)}\n"
+        "  끝낸 세션의 `done`은 원격 claim을 즉시 걷지만, done을 담은 대장 변경은 그 브랜치에\n"
+        "  push되기 전까지 원격 사본이 in_progress다. 트렁크는 이 태스크를 무주 todo로 보여 준다.\n"
+        "  착수하면 같은 슬라이스를 두 번 구현하게 된다(2026-09-29 S4-11 실측).\n"
+        f"  확인: git show origin/{holders[0].branch}:backlog/tasks/{task_id}.yaml\n"
+        "  그 브랜치의 세션과 조율하거나, 폐기된 브랜치라면: --ignore-remote-claim"
+    )
+
+
+def _report_sibling_skipped(root: Path, task_id: str, scan: remote_claims.SiblingScan) -> None:
+    """과탐 방어로 뺀 형제 사본을 조용히 버리지 않는다 — 무엇을 왜 뺐는지 남긴다(HARN-08 동형)."""
+    if not scan.skipped:
+        return
+    summary = ", ".join(f"{s.branch}:{s.reason}" for s in scan.skipped)
+    print(
+        f"  ↳ 형제 진행 중 사본 {len(scan.skipped)}건 제외(과탐 방어): {summary}", file=sys.stderr
+    )
+    store.append_event(
+        root,
+        "sibling_in_progress_skipped",
+        task_id,
+        skipped=[f"{s.branch}:{s.reason}" for s in scan.skipped],
+    )
 
 
 def cmd_next(root: Path, args: argparse.Namespace) -> int:
@@ -557,6 +721,60 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
             print(
                 f"⚠ 미머지 done 탐지 불가({done_status}) — 완료분이 섞였을 수 있음",
                 file=sys.stderr,
+            )
+        # 미머지 게이트 부착 제외 (HARN-193) — 타 세션이 게이트를 붙이고 claim을 푼 태스크는
+        # 트렁크에서 게이트 없는 무주 todo로 보인다(그 부착은 PR이 머지돼야 트렁크에 실린다).
+        # done 스캔과 같은 이유로 fetch 없이 캐시된 ref만 본다(네트워크 0) — 확정 지점은 start다.
+        if ready:
+            gate_map, gate_status = remote_claims.scan_remote_gate_attachments(
+                root,
+                {t.id: t.requires_gates for t in ready},
+                exclude_branches=[store.current_branch(root)],
+            )
+            for task_id, attached in sorted(gate_map.items()):
+                print(
+                    f"⚠ 후보 제외 {task_id} — 미머지 브랜치가 게이트를 붙여 뒀다: "
+                    f"{_gate_attach_summary(attached)}",
+                    file=sys.stderr,
+                )
+            ready = [t for t in ready if t.id not in gate_map]
+            if gate_status != "ok":
+                # 빈 결과를 '부착 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 미머지 게이트 부착 탐지 불가({gate_status}) — 다른 브랜치가 게이트를 "
+                    f"붙여 둔 태스크가 후보에 섞였을 수 있음",
+                    file=sys.stderr,
+                )
+        # 형제 브랜치의 진행 중 사본 제외 (HARN-198) — 끝낸(또는 진행 중인) 세션의 done/claim이
+        # 아직 트렁크·claim 대장 어디에도 없는 창. 위 두 스캔과 같은 이유로 캐시된 ref만 본다
+        # (네트워크 0) — 확정 지점은 start다.
+        if ready:
+            sibling = remote_claims.scan_sibling_in_progress(
+                root,
+                [t.id for t in ready],
+                session=store.current_branch(root),
+                ttl_hours=policy.claim_ttl_hours,
+                exclude_branches=[store.current_branch(root)],
+            )
+            for task_id, holders in sorted(sibling.found.items()):
+                print(
+                    f"⚠ 후보 제외 {task_id} — 미머지 브랜치가 진행 중으로 들고 있다: "
+                    f"{_sibling_summary(holders)}",
+                    file=sys.stderr,
+                )
+            ready = [t for t in ready if t.id not in sibling.found]
+            if sibling.status not in ("ok", "truncated"):
+                print(
+                    f"⚠ 형제 브랜치 진행 중 탐지 불가({sibling.status}) — 다른 세션이 들고 있는 "
+                    f"태스크가 후보에 섞였을 수 있음",
+                    file=sys.stderr,
+                )
+        # 낡은 로컬 대장 고지 (HARN-54) — 트렁크에서 이미 done/cancelled인 태스크가 후보에 섞였는가.
+        # 위 세 스캔은 트렁크를 보지 않는다(`scan_remote_done`은 트렁크 ref를 의도적으로 제외한다).
+        # **제외하지 않고 고지만 한다** — 로컬에 정당한 후속 작업이 있을 수 있다. ref는 캐시만.
+        if ready:
+            _print_trunk_terminal_notice(
+                root, remote_claims.scan_trunk_terminal(root, [t.id for t in ready])
             )
     # 취소된 선행에 차단된 todo (HARN-67 ②) — 후보 0건 여부·--json 여부와 무관하게 **매번**
     # 경고한다. 차단 자체는 옳을 수 있으나(결정 불가 → 차단 유지) 조용한 차단만은 금지다:
@@ -620,6 +838,93 @@ def cmd_next(root: Path, args: argparse.Namespace) -> int:
     print(hidden_notice)
     _print_gate_waits(backlog, excluded)
     return 0
+
+
+def _trunk_display(ref: str) -> str:
+    """`refs/remotes/origin/main` → `origin/main` (사람이 읽는 표기)."""
+    return ref.removeprefix("refs/remotes/")
+
+
+def _trunk_snapshot_age_line(root: Path) -> str | None:
+    """원격 스냅샷이 낡았으면 그 사실 한 줄, 아니면 None (HARN-54 ③).
+
+    `main에 없음`과 `main을 최근에 못 봤음`은 다른 진술이다 — 낡은 스냅샷으로 '트렁크에서 끝난
+    것 없음'을 말하면 거짓 안심이 된다. 나이는 **전체 브랜치 fetch 스탬프**로 잰다:
+    `remote_refs_age_seconds`는 FETCH_HEAD를 보는데, 이 CLI의 claim 조회(`list_claims`)가
+    매번 그것을 새로 써서 `next` 안에서는 구조적으로 0초에 가깝다(HARN-111 ⑦(다) 실측 — 거짓
+    안심). 판정 불가(스탬프 없음 등)는 침묵한다 — 추측을 출력하지 않는다.
+    """
+    age, _status = number_guard.branch_snapshot_age(root)
+    if age is None or age < _STALE_REFS_SECONDS:
+        return None
+    return (
+        f"⚠ origin 스냅샷이 {_format_age(age)} 지났다(마지막 전체 브랜치 fetch 기준) — "
+        f"트렁크 대조는 그 시점 기준이다. 최근에 끝난 태스크는 못 봤을 수 있다 · "
+        f"갱신: git fetch origin main"
+    )
+
+
+def _print_trunk_terminal_notice(root: Path, result: "remote_claims.TrunkTerminalResult") -> None:
+    """`next` — 후보 중 트렁크에서 이미 종결된 태스크를 고지한다 (HARN-54). 차단·제외 없음."""
+    for tid, hit in sorted(result.found.items()):
+        print(
+            f"⚠ 낡은 로컬 대장 {tid} — {_trunk_display(hit.trunk_ref)}에서는 "
+            f"이미 {hit.trunk_status} (로컬: todo). 후보에는 남기지만 착수하면 "
+            f"중복 구현일 수 있다 · 정정: git fetch origin main && git merge --ff-only origin/main",
+            file=sys.stderr,
+        )
+    if result.status != "ok":
+        # 판정 불가를 '트렁크에서 끝난 것 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+        print(
+            f"⚠ 트렁크 종결 대조 불가({result.status}) — 이미 main에서 끝난 태스크가 "
+            f"후보에 섞였을 수 있음",
+            file=sys.stderr,
+        )
+        return
+    stale = _trunk_snapshot_age_line(root)
+    if stale:
+        print(stale, file=sys.stderr)
+
+
+def _print_trunk_terminal_start(
+    root: Path, task: Task, result: "remote_claims.TrunkTerminalResult | None"
+) -> None:
+    """`start` — 착수 대상이 트렁크에서 이미 종결됐으면 **마지막 출력**으로 눈에 띄게 고지한다.
+
+    사고 당시 경고가 path_overlap 4줄에 묻혀 착수가 그대로 진행됐다(HARN-54 ②) — 그래서
+    착수 확정 출력 *뒤*, 명령의 마지막에 온다. 차단하지 않는다(정당한 후속 작업 가능).
+    `result`가 None이면 대조를 시도하지 않은 경로(원격 claim 비활성·`--no-remote`)다 — 침묵.
+    """
+    if result is None:
+        return
+    hit = result.found.get(task.id)
+    if hit is not None:
+        bar = "!" * 64
+        print(
+            f"\n{bar}\n"
+            f"⚠ {task.id}는 {_trunk_display(hit.trunk_ref)}에서 이미 **{hit.trunk_status}**다 — "
+            f"이 클론의 대장이 낡았다(로컬: todo).\n"
+            f"  착수하면 중복 구현이 될 수 있다. 확인: git show {_trunk_display(hit.trunk_ref)}:"
+            f"backlog/tasks/{task.id}.yaml\n"
+            f"  대장 최신화: git fetch origin main && git merge --ff-only origin/main\n"
+            f"  (정당한 후속 작업이면 그대로 진행해도 된다 — 이 고지는 차단하지 않는다)\n"
+            f"{bar}",
+            file=sys.stderr,
+        )
+        store.append_event(
+            root,
+            "start_trunk_terminal_notice",
+            task.id,
+            trunk_status=hit.trunk_status,
+            trunk_ref=hit.trunk_ref,
+        )
+        return
+    if result.status != "ok":
+        print(
+            f"⚠ 트렁크 종결 대조 불가({result.status}) — {task.id}가 main에서 이미 끝났는지 "
+            f"못 봤다",
+            file=sys.stderr,
+        )
 
 
 def _print_gate_waits(backlog: object, excluded: list) -> None:
@@ -687,6 +992,8 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
     # 원격 claim 스냅샷 — 다른 세션의 in-flight는 로컬 backlog 사본에 안 보이므로
     # (claim은 각 브랜치의 worktree에만 기록) 원격 ref로만 교차 세션 겹침을 알 수 있다
     remote_claimed, _ = _remote_claim_map(root, policy, skip=getattr(args, "no_remote", False))
+    # 트렁크 종결 대조 결과 (HARN-54) — None = 대조를 시도하지 않은 경로(침묵), 마지막에 고지한다.
+    trunk_terminal: remote_claims.TrunkTerminalResult | None = None
 
     # [프리플라이트 0] 미머지 done — 타 세션이 이미 끝냈으나 머지 전인 태스크 (HARN-11).
     # claim 대장은 done 시 release돼 비어 있고 트렁크 사본은 아직 todo라, 다른 어떤
@@ -714,6 +1021,13 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
             # 판정 불가를 '완료분 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
             print(
                 f"⚠ 미머지 done 탐지 불가({done_status}) — 타 세션 완료분을 못 봤을 수 있음",
+                file=sys.stderr,
+            )
+            # 게이트 부착 스캔은 같은 fetch에 편승하므로 fetch가 실패했으면 같이 못 본 것이다.
+            # 위 경고에 묻지 않고 따로 낸다 — 무엇을 못 봤는지가 화면에 남아야 한다 (HARN-193 ⑤).
+            print(
+                f"⚠ 미머지 게이트 부착 탐지 불가({done_status}) — 타 세션이 이 태스크에 게이트를 "
+                f"붙여 뒀는지 못 봤을 수 있음",
                 file=sys.stderr,
             )
 
@@ -758,6 +1072,116 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
                 print(
                     f"⚠ 트렁크 의존·게이트 시차 탐지 불가({drift_result.status}) — "
                     f"트렁크에 새로 착지한 조건을 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+
+        # [프리플라이트 0.6] 트렁크에서 이미 종결된 태스크 (HARN-54) — 0.5는 트렁크의 *조건 강화*만,
+        # 위 done 스캔은 *트렁크 밖* 브랜치만 본다. 낡은 로컬 대장이 main에서 이미 done인 태스크를
+        # todo로 보여 주는 창은 둘 다 못 본다. 위 fetch=True가 ref를 방금 최신화했으므로 편승한다.
+        # fetch가 실패했으면(done_status != ok) 그 사유를 그대로 싣는다 — 못 본 것을 '없음'으로 접지
+        # 않는다.
+        trunk_terminal = (
+            remote_claims.scan_trunk_terminal(root, [task.id])
+            if done_status == "ok"
+            else remote_claims.TrunkTerminalResult(done_status)
+        )
+
+        # [프리플라이트 0.75] 미머지 브랜치의 게이트 부착 (HARN-193) — 트렁크 시차(0.5)의 반대
+        # 방향이다. 0.5는 *트렁크가* 조건을 강화한 경우를 보고, 이 검사는 *미머지 브랜치가*
+        # 강화한 경우를 본다. 게이트를 붙이고 `unblock`한 세션은 원격 claim을 걷고, 그 부착은
+        # PR이 머지되기 전까지 트렁크 어디에도 없어 다른 세션에게 이 태스크는 무주 todo다.
+        # 위 done 스캔이 fetch=True로 ref를 최신화했으므로 같은 fetch에 편승한다(추가 왕복 0).
+        if done_status == "ok":
+            gate_map, gate_status = remote_claims.scan_remote_gate_attachments(
+                root,
+                {task.id: task.requires_gates},
+                refs_fresh=True,  # 위 done 스캔의 fetch=True가 방금 ref를 최신화했다
+                exclude_branches=[session],
+            )
+            attached = gate_map.get(task.id, [])
+            if attached:
+                lines = [
+                    f"  - {a.gate_id} (트렁크: {a.trunk_gate_state or '정의 없음'} · "
+                    f"그 브랜치: {a.branch_gate_state or '정의 안 읽힘'}) ← {a.branch}"
+                    for a in attached
+                ]
+                first_branch = attached[0].branch
+                message = (
+                    f"{task.id} 착수 거부 — 미머지 브랜치가 이 태스크에 **게이트를 붙여 뒀다**"
+                    f"(HARN-193):\n"
+                    + "\n".join(lines)
+                    + "\n  그 부착은 PR이 머지돼야 트렁크에 실린다 — 그 전까지 트렁크 백로그는\n"
+                    "  이 태스크를 게이트 없는 무주 todo로 보여 준다. 착수하면 결정·측정 선행을\n"
+                    "  건너뛴 이중 구현이 된다.\n"
+                    f"  확인: git show origin/{first_branch}:backlog/tasks/{task.id}.yaml\n"
+                    f"  그 브랜치의 세션과 조율하거나, 폐기된 브랜치라면: --ignore-remote-claim"
+                )
+                if getattr(args, "ignore_remote_claim", False):
+                    print(
+                        f"⚠ 미머지 게이트 부착 무시하고 진행 — 결정·측정 선행을 건너뛴 이중 구현 "
+                        f"위험을 감수합니다: {_gate_attach_summary(attached)}",
+                        file=sys.stderr,
+                    )
+                    store.append_event(
+                        root,
+                        "start_ignored_unmerged_gate_attach",
+                        task.id,
+                        attached=[f"{a.branch}:{a.gate_id}" for a in attached],
+                    )
+                else:
+                    return _fail(message)
+            elif gate_status != "ok":
+                # 빈 결과를 '부착 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 미머지 게이트 부착 탐지 불가({gate_status}) — 타 세션이 이 태스크에 "
+                    f"게이트를 붙여 뒀는지 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+
+        # [프리플라이트 0.8] 형제 브랜치의 진행 중 사본 (HARN-198) — 착수 차단 세 겹(원격 claim ·
+        # 트렁크 사본 · 미머지 done)이 **전부 빈 창**을 본다. 끝낸 세션의 `done`은 원격 claim을
+        # 즉시 걷지만 done을 담은 대장 변경은 그 세션의 작업 트리에만 있어, 그 브랜치의 원격
+        # 사본은 push 전까지 `in_progress`다(2026-09-29 실측 46분). 읽기측 탐지(프리플라이트 3)는
+        # CAS가 실패할 때만 돌아 이 창을 못 본다 — 그래서 CAS 결과와 무관하게 항상 본다.
+        # 위 done 스캔이 fetch=True로 ref를 최신화했으므로 같은 fetch에 편승한다(추가 왕복 0).
+        if done_status == "ok":
+            sibling = remote_claims.scan_sibling_in_progress(
+                root,
+                [task.id],
+                session=session,
+                ttl_hours=policy.claim_ttl_hours,
+                refs_fresh=True,
+                exclude_branches=[session],
+            )
+            holders = sibling.found.get(task.id, [])
+            _report_sibling_skipped(root, task.id, sibling)
+            if holders:
+                message = _sibling_refusal_message(task.id, holders)
+                if getattr(args, "ignore_remote_claim", False):
+                    print(
+                        f"⚠ 형제 브랜치의 진행 중 사본 무시하고 진행 — 중복 구현 위험을 "
+                        f"감수합니다: {_sibling_summary(holders)}",
+                        file=sys.stderr,
+                    )
+                    store.append_event(
+                        root,
+                        "start_ignored_sibling_in_progress",
+                        task.id,
+                        holders=[f"{h.branch}:{h.status}" for h in holders],
+                    )
+                else:
+                    return _fail(message)
+            elif sibling.status not in ("ok", "truncated"):
+                # 빈 결과를 '형제 없음'으로 위장하지 않는다 (측정 실패 ≠ 통과)
+                print(
+                    f"⚠ 형제 브랜치 진행 중 탐지 불가({sibling.status}) — 다른 세션이 이 태스크를 "
+                    f"들고 있는지 못 봤을 수 있음",
+                    file=sys.stderr,
+                )
+            elif sibling.status == "truncated":
+                print(
+                    f"⚠ 형제 브랜치 진행 중 탐지: 브랜치 수 상한 도달 — "
+                    f"일부({sibling.scanned_refs}개)만 확인했고 발견 0건은 '없음'이 아니다",
                     file=sys.stderr,
                 )
 
@@ -906,6 +1330,8 @@ def cmd_start(root: Path, args: argparse.Namespace) -> int:
         )
     for warning in task.layer_drift_warnings():
         print(f"  ⚠ {warning}", file=sys.stderr)
+    # 마지막 출력 — 앞의 겹침 경고들에 묻히지 않게 한다 (HARN-54 ②)
+    _print_trunk_terminal_start(root, task, trunk_terminal)
     return 0
 
 
@@ -1269,17 +1695,75 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             f"PR을 열었다면 그 번호를 증적에 담고, 예외라면 사유를 명시하세요: "
             f"--no-pr {{{'|'.join(NO_PR_REASONS)}}} "
             f"(investigation=산출물 없는 조사·계획 / incomplete=미완·게이트 대기 / "
-            f"ci-red=CI 적색 / kiki-hold=Kiki 보류 지시)"
+            f"ci-red=CI 적색 / kiki-hold=Kiki 보류 지시 / "
+            f"direct-commit=PR 없이 main에 직접 착지 — --direct-commit-sha <해시> 필수, "
+            f"origin/main 조상임을 실측)"
         )
-    # CI 미러 프리플라이트 (HARN-119 ②) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
-    # 1단계는 warn이다(측정 없는 도입 없음 — block 승격은 HARN-122 절차). 거부하지 않는
-    # 이유는 이 게이트가 막는 것이 *망각*이지 *위조*가 아니기 때문이다. 다만 침묵하지는
-    # 않는다 — 아무 말 없이 통과시키면 "검증했다"와 "검증 안 했다"가 같은 화면이 된다.
-    _warn_if_ci_mirror_missing(root)
+    # 직접 커밋 착지 검증 (HARN-80) — `--no-pr direct-commit`은 "이미 main에 들어갔다"는 주장이라
+    # 신고를 믿지 않고 git으로 실측한다. 판정만 하고 거부면 아무것도 쓰지 않는다(상태 전이 앞).
+    # exit 1 = 주장이 거짓(조상 아님·인자 오류) / exit 3 = 측정 실패(shallow·git 오류) —
+    # 측정 실패를 0건 통과로 위장하지 않는다.
+    direct_sha = getattr(args, "direct_commit_sha", None)
+    landed_full: str | None = None
+    if direct_sha is not None and no_pr_reason != DIRECT_COMMIT_REASON:
+        return _fail(
+            f"{task.id}: --direct-commit-sha 는 --no-pr {DIRECT_COMMIT_REASON} 와 함께만 쓴다"
+        )
+    if no_pr_reason == DIRECT_COMMIT_REASON:
+        if direct_sha is None or not _COMMIT_SHA_RE.fullmatch(direct_sha):
+            return _fail(
+                f"{task.id}: --no-pr {DIRECT_COMMIT_REASON} 는 "
+                f"--direct-commit-sha <커밋 해시 7~40자 16진> "
+                f"가 필요하다(받은 값: {direct_sha!r})"
+            )
+        landing, detail = _probe_trunk_landing(root, direct_sha)
+        if landing == _LANDING_UNMEASURABLE:
+            print(
+                f"✘ {task.id}: 착지 여부를 측정하지 못했다 — {detail}. 통과시키지 않는다(exit 3).",
+                file=sys.stderr,
+            )
+            return 3
+        if landing == _LANDING_NOT_ANCESTOR:
+            return _fail(
+                f"{task.id}: {detail[:12]} 는 {DIRECT_COMMIT_TRUNK_REF} 의 조상이 아니다 — "
+                f"trunk에 착지하지 않은 커밋(브랜치 전용)이다. "
+                f"PR을 열어 머지한 뒤 PR 참조 증적으로 "
+                f"done 하라"
+            )
+        landed_full = detail
 
     error = _transition(task, "done")
     if error:
         return _fail(error)
+    # CI 미러 게이트 (HARN-119 ② → HARN-173) — 이번 커밋에 대한 로컬 재현 결과가 있는가.
+    # 판정은 done_mirror_gate가 한다: policy `ci_mirror_at_done=block`이면 PR 증적 경로의 claude
+    # 소유 done에서 미러 unknown·fail을 거부하고(미실행은 warn 유지), `--no-mirror '<사유>'`는
+    # 사유를 notes·이벤트에 남기며 통과한다. 상태 전이 전에 판정하므로 거부하면 대장에 아무것도
+    # 쓰지 않는다. 거부하지 않는 경로에서도 침묵하지 않는다 — 종전 경고(아래 헬퍼)가 그대로 난다.
+    mirror_scope = done_mirror_gate.scope_of(task.owner, no_pr_reason)
+    mirror_decision = done_mirror_gate.judge(
+        root,
+        owner=task.owner,
+        no_pr_reason=no_pr_reason,
+        no_mirror_reason=getattr(args, "no_mirror", None),
+    )
+    if mirror_decision.rejected:
+        return _fail(f"{task.id}: {mirror_decision.reject_message}")
+    for notice in mirror_decision.notices:
+        print(notice, file=sys.stderr)
+    if mirror_decision.warn_legacy:
+        _warn_if_ci_mirror_missing(root)
+    # CI 도달 잡 안내 (HARN-173 ⑤) — 변경 파일이 닿는 잡을 한 줄로. 계산 실패는 done을 막지 않는다.
+    ci_reach = (
+        done_mirror_gate.ci_reach(root) if mirror_scope == done_mirror_gate.SCOPE_PR else None
+    )
+    if ci_reach is not None:
+        reach_line = ci_reach.stdout_line()
+        if reach_line:
+            print(reach_line)
+        reach_warning = ci_reach.warning_line()
+        if reach_warning:
+            print(reach_warning, file=sys.stderr)
     prev_session = task.session
     task.status = "done"
     # ── 게이트 판정 인계 (HARN-177 ①) — 판정만 한다. 거부면 아무것도 쓰지 않는다(위 status
@@ -1302,10 +1786,20 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
             )
     task.artifacts = list(dict.fromkeys(task.artifacts + args.artifact))
     task.session = None
-    if no_pr_reason is not None:
+    if landed_full is not None:
+        # 직접 커밋 착지는 '보류'가 아니라 '착지 완료'다 — `PR 보류` 태그를 쓰면 HARN-57의 사후
+        # 해소 로직이 미해소 보류로 오인한다. 별도 태그로 갈라 notes에 해시와 함께 남긴다.
+        task.notes = _append_note(
+            task.notes, f"{DIRECT_COMMIT_REASON} {landed_full} (trunk 조상 실측)", "직접 커밋 착지"
+        )
+    elif no_pr_reason is not None:
         # PR 없이 종결한 사실을 태스크에 남긴다 — 나중에 "왜 이건 PR이 없지"를
         # 브랜치 고고학으로 되짚지 않아도 되게(미병합 고립 4회차의 실제 비용).
         task.notes = _append_note(task.notes, no_pr_reason, "PR 보류")
+    if mirror_decision.note is not None:
+        # `--no-mirror` 사유도 notes에 남긴다(HARN-173) — 이벤트만 있으면 태스크를 읽는 사람이
+        # 왜 미러 없이 닫혔는지 대장 고고학으로 되짚어야 한다. 원 notes는 덮어쓰지 않는다(HARN-20).
+        task.notes = _append_note(task.notes, mirror_decision.note, "미러 면제")
     task.updated = _today()
     store.save_task(root, task)
     done_extra: dict[str, object] = {"artifacts": args.artifact}
@@ -1313,6 +1807,12 @@ def cmd_done(root: Path, args: argparse.Namespace) -> int:
         done_extra["as_owner"] = as_owner
     if no_pr_reason is not None:
         done_extra["no_pr_reason"] = no_pr_reason
+    if landed_full is not None:
+        done_extra["direct_commit_sha"] = landed_full
+    # 미러 판정 상태·우회 사유·CI 도달 잡을 남긴다(HARN-173 ④) — 승격 판정의 사후 감시 근거.
+    done_extra.update(mirror_decision.event_fields)
+    if ci_reach is not None:
+        done_extra.update(ci_reach.event_fields)
     store.append_event(root, "done", task.id, **done_extra)
     if handoff is not None:
         _write_gate_handoff(root, backlog, task, handoff)
@@ -1345,8 +1845,11 @@ def _warn_if_ci_mirror_missing(root: Path) -> None:
 
     미실행(HARN-180)은 실패와 다르게 안내한다 — 다시 돌려도 같은 스텝은 또 돌지 않으므로
     "재현 후 다시 부르라"는 처방이 맞지 않는다. 그래도 통과로 접지는 않는다: 2026-09-27
-    실측에서 이 경고가 건너뛴 검사 2개를 통과로 읽었다. 1단계 warn은 그대로다(승격은
-    HARN-173 소관).
+    실측에서 이 경고가 건너뛴 검사 2개를 통과로 읽었다.
+
+    이 헬퍼는 **경고만** 한다. 거부 판정(HARN-173 — policy `ci_mirror_at_done=block`에서 PR 증적
+    경로의 미러 unknown·fail 거부)은 `done_mirror_gate.judge`가 하고, 거부하지 않는 경로에서
+    이 경고가 종전대로 난다.
     """
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -1458,8 +1961,10 @@ def cmd_review(root: Path, args: argparse.Namespace) -> int:
         return _fail(error)
     task.status = "review"
     task.updated = _today()
+    # HARN-199 — review도 대상 태스크 파일을 쓴다. 다른 세션 claim이면 알린다(거부하지 않는다).
+    foreign_claim = _warn_foreign_claim(root, task.id, "review 전이")
     store.save_task(root, task)
-    store.append_event(root, "review", task.id)
+    store.append_event(root, "review", task.id, **(foreign_claim or {}))
     print(f"👀 {task.id} 검토 대기 (세션: {task.session or '?'})")
     return 0
 
@@ -1818,6 +2323,10 @@ def _cmd_gates_show(args: argparse.Namespace, backlog) -> int:
         print(gate.notes or "(이상 상태 — waived인데 notes 없음)")
     else:
         print("evidence: 없음(아직 결정 전)")
+    # 열린 채 누적된 판정 근거·부분 답변 (HARN-39 ④) — clear 판단자가 못 읽으면 추론으로 닫는다
+    if gate.status != "waived" and gate.notes.strip():
+        print("notes (전문):")
+        print(gate.notes)
     # 여는 작업과 대기 경로 (HARN-174 v2-5) — pending이면 무엇이 끝나야 판정할 수 있는지까지
     print(report.gate_inputs_text(backlog, gate))
     if gate.status == "pending":
@@ -1973,6 +2482,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
     no_inputs = (no_inputs_arg or "").strip() or None
     verdict = getattr(args, "verdict", None)
     named_owners = list(dict.fromkeys(getattr(args, "verdict_owners", None) or []))
+    note_arg = getattr(args, "gate_note", None)
+    note = (note_arg or "").strip() or None
     # --evidence 단독 호출은 "정정할 것이 없다"보다 **먼저** 판정한다 — 순서가 반대면 이 절은
     # 도달 불가능한 코드가 된다(HARN-174 구현 중 실측: 강화한 단언이 잡았다).
     if args.evidence and verdict is None:
@@ -1989,11 +2500,14 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         and not remove_deps
         and no_inputs_arg is None
         and verdict is None
+        and note_arg is None
     ):
         return _fail(
             f"{gate_id}: 정정할 것이 없다 — --title / --remind-after-days / --depends / "
-            "--remove-depends / --no-inputs / --verdict 중 하나 이상 필요"
+            "--remove-depends / --no-inputs / --verdict / --note 중 하나 이상 필요"
         )
+    if note_arg is not None and note is None:
+        return _fail(f"{gate_id}: --note 내용이 비어 있다 — 빈 근거는 기록하지 않는다")
     if no_inputs_arg is not None and no_inputs is None:
         return _fail(f"{gate_id}: --no-inputs 사유가 비어 있다 — 무사유 면제는 없다")
     both = sorted(set(add_deps) & set(remove_deps))
@@ -2051,6 +2565,11 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         except _VerdictRejectedError as exc:
             return _fail(str(exc))
 
+    # 판정 근거·부분 답변 누적 (HARN-39 ④) — status 를 건드리지 않으므로 clear/waive 와 달리
+    # 게이트가 열린 채 근거만 쌓인다. 원 notes 는 지우지 않고 append 한다(HARN-20).
+    if note is not None:
+        changes.append(f"notes +{len(note)}자")
+
     if not changes:
         return _fail(f"{gate_id}: 주어진 값이 현행과 같다 — 정정 없음 (이력만 늘리지 않는다)")
 
@@ -2060,6 +2579,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         gate.title = new_title
     if new_remind is not None:
         gate.remind_after_days = new_remind
+    if note is not None:
+        gate.notes = _append_note(gate.notes, note, "판정 근거")
 
     errors = store.validate_backlog(backlog)
     own_errors = [e for e in errors if gate_id in e]
@@ -2074,6 +2595,8 @@ def _cmd_gates_amend(root: Path, args: argparse.Namespace, backlog) -> int:
         event_extra.update(depends_on=list(gate.depends_on), no_inputs_reason=gate.no_inputs_reason)
     if verdict is not None:
         event_extra.update(verdict=verdict, evidence=args.evidence, owners=named_owners)
+    if note is not None:
+        event_extra.update(note=note)
     store.append_event(
         root, "gate_amend", gate.id, reason=args.reason, changes=" · ".join(changes), **event_extra
     )
@@ -3419,8 +3942,12 @@ def cmd_amend(root: Path, args: argparse.Namespace) -> int:
     if _fail_on_reason_feedback(backlog, task.id, feedback_mask, hint=feedback_hint):
         return 1
 
+    # HARN-199 — 대상 태스크를 다른 세션이 claim 중이면 쓰기 전에 알린다(거부하지 않는다).
+    foreign_claim = _warn_foreign_claim(root, task.id, "정정")
     store.save_task(root, task)
     event_extra: dict[str, object] = {"reason": args.reason, "changed": changed}
+    if foreign_claim:
+        event_extra.update(foreign_claim)
     if track_before is not None:
         # track 축은 field/before/after도 함께 남긴다 — HARN-49가 쓰던 형태를 깨지 않는다.
         event_extra.update(field="track", before=track_before, after=args.track)
@@ -3858,10 +4385,13 @@ def _cmd_incident_add(root: Path, args: argparse.Namespace) -> int:
         print(f"❌ 사고 등재 거부 — {blocked}", file=sys.stderr)
         return 1
 
-    ledger.append(candidate)
-    ledger.sort(key=lambda i: i.date)
-    incidents_mod.save_incidents(root, ledger)
-    nth = incidents_mod.next_nth([i for i in ledger if i is not candidate], candidate)
+    # HARN-130 ③ — 공용 파일을 다시 쓰지 않고 이 세션(=브랜치)의 샤드에 1줄 append한다.
+    # 종전(대장 전체를 날짜순 재기록)은 모든 세션이 같은 파일 끝을 고쳐 머지 큐에서 충돌했다
+    # (2026-09-21 PR #1255). 회차는 날짜로 세므로 파일 순서를 맞출 필요가 없다.
+    shard = incidents_mod.append_incident(
+        root, store.session_shard_name(store.current_branch(root)), candidate
+    )
+    nth = incidents_mod.next_nth(ledger, candidate)
     store.append_event(
         root,
         "incident_add",
@@ -3874,7 +4404,7 @@ def _cmd_incident_add(root: Path, args: argparse.Namespace) -> int:
     )
     where = "계열 미배정" if nth is None else f"계열 {candidate.series_id} {nth}회차"
     print(f"▶ 사고 등재 ({where}) — {candidate.date} [{candidate.cat}] {candidate.title}")
-    print(f"  대장: {incidents_mod.ledger_path(root).relative_to(root)} (총 {len(ledger)}건)")
+    print(f"  샤드: {shard.relative_to(root).as_posix()} (대장 전체 {len(ledger) + 1}건)")
     return 0
 
 
@@ -4057,59 +4587,79 @@ def _cmd_rules_render(root: Path, args: argparse.Namespace) -> int:
 def cmd_jit(root: Path, args: argparse.Namespace) -> int:
     action = args.jit_command
     if action in ("build", "check"):
-        return _cmd_jit_build(root, args, check=(action == "check"))
+        return _cmd_jit_check(root, legacy_build=(action == "build"))
     if action == "show":
         return _cmd_jit_show(root, args)
     return _fail(f"jit: 알 수 없는 하위 명령 '{action}'")
 
 
-def _build_jit_notes(root: Path) -> tuple[list[jit_rules.Note], list[str]]:
-    backlog, _ = _load(root)
+def _build_jit_notes(
+    root: Path, backlog: object | None = None
+) -> tuple[list[jit_rules.Note], list[str]]:
+    """대장 3종 → 적시 주입 후보. 편집 훅과 CLI가 이 한 함수를 쓴다 (HARN-130).
+
+    커밋된 인덱스 파일은 없다 — 대장이 바뀌면 다음 편집이 곧바로 새 후보를 본다.
+    `backlog`를 넘기면 다시 읽지 않는다(편집 훅은 조율 정책 검사와 대장을 공유한다).
+    """
+    if backlog is None:
+        backlog, _ = _load(root)
     rule_list, rule_errors = rules_mod.load_rules(root)
     incident_list, incident_errors = incidents_mod.load_incidents(root)
     errors = rule_errors + incident_errors
     return jit_rules.build_notes(backlog, rule_list, incident_list), errors
 
 
-def _cmd_jit_build(root: Path, args: argparse.Namespace, *, check: bool) -> int:
+def _cmd_jit_check(root: Path, *, legacy_build: bool) -> int:
+    """주입 후보가 대장에서 실제로 계산되는가 — 스키마 위반·0건이면 exit 1 (HARN-130).
+
+    종전 `check`는 커밋된 `backlog/jit_index.json`이 대장과 같은지 봤다. 그 파일이 머지
+    충돌과 재생성 망각 CI red(HARN-179)를 만들어 없앴으므로, 이제 볼 것은 '어긋났는가'가
+    아니라 '계산되는가'다. 0건은 통과가 아니다 — 대장이 비었거나 경로 해소가 전멸한 것이고,
+    그때 훅은 모든 편집에서 침묵해 "사고가 없다"와 구별되지 않는다(스캔 0건은 실패).
+    `build`는 옛 안내(사고 등재 뒤 `jit build`)를 따르는 세션을 위해 남긴 같은 검사다.
+    """
+    if legacy_build:
+        print(
+            "ℹ jit build는 더 이상 파일을 만들지 않는다 — 적시 주입 후보는 편집 시 대장에서 "
+            "계산한다(HARN-130). 사고를 등재한 뒤 따로 돌릴 것이 없다. 아래는 계산 검사다."
+        )
     notes, errors = _build_jit_notes(root)
     if errors:
         print(
-            f"❌ 대장 스키마 위반 {len(errors)}건 — 인덱스를 만들기 전에 고쳐라:", file=sys.stderr
+            f"❌ 대장 스키마 위반 {len(errors)}건 — 적시 주입 후보를 믿을 수 없다:",
+            file=sys.stderr,
         )
         for error in errors[:10]:
             print(f"  · {error}", file=sys.stderr)
         return 1
-    body = jit_rules.dump_index(notes)
-    target = jit_rules.index_path(root)
-    if check:
-        current = target.read_text(encoding="utf-8") if target.exists() else ""
-        if current != body:
-            print(
-                f"❌ {jit_rules.INDEX_NAME} 이 대장과 어긋났다 — "
-                f"`backlog.py jit build`로 재생성하라 (인덱스는 대장의 렌더 결과다)",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"✔ {jit_rules.INDEX_NAME} 가 대장과 일치 (주입 후보 {len(notes)}건)")
-        return 0
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body, encoding="utf-8")
+    if not notes:
+        print(
+            "❌ 적시 주입 후보 0건 — 경로가 해소되는 사고·규칙이 하나도 없다. 대장이 비었거나 "
+            "태스크 paths 해소가 전멸했다(0건은 '사고가 없다'가 아니라 '계산 실패'다)",
+            file=sys.stderr,
+        )
+        return 1
     rules_n = sum(1 for n in notes if n.kind == "rule")
     print(
-        f"▶ {jit_rules.INDEX_NAME} 재생성 — 주입 후보 {len(notes)}건 "
-        f"(규칙 {rules_n} · 사고 {len(notes) - rules_n})"
+        f"✔ 적시 주입 후보 {len(notes)}건 계산됨 (규칙 {rules_n} · 사고 {len(notes) - rules_n})"
+        " — 편집 시 대장에서 계산(커밋 인덱스 없음)"
     )
     return 0
 
 
 def _cmd_jit_show(root: Path, args: argparse.Namespace) -> int:
     """이 경로를 편집하면 무엇이 뜨는지 — 훅을 돌리지 않고 확인하는 경로."""
-    notes = jit_rules.load_index(root)
+    notes, errors = _build_jit_notes(root)
+    if errors:
+        print(
+            f"⚠ 대장 스키마 위반 {len(errors)}건 — 아래 결과는 읽힌 줄만으로 계산했다 "
+            "(`backlog.py jit check`로 확인)",
+            file=sys.stderr,
+        )
     if not notes:
         return _fail(
-            f"{jit_rules.INDEX_NAME} 이 비었거나 없다 — `backlog.py jit build` 먼저 "
-            f"(0건은 침묵이 아니라 미구축이다)"
+            "적시 주입 후보가 0건이다 — 대장에서 경로가 해소되는 사고·규칙이 없다 "
+            "(0건은 침묵이 아니라 계산 실패다)"
         )
     matched = jit_rules.notes_for_path(notes, args.path)
     rendered = jit_rules.render_injection(matched, args.path)
@@ -4170,7 +4720,7 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
     # 장기 미머지 브랜치 경고 (HARN-13 + 2026-08-05 3분류 확장) — SessionStart 1회 비용,
     # 정보성(브리핑을 막지 않음). active_branches는 이미 계산해둔 remote_claimed의 브랜치
     # 집합을 재사용한다 — 새 원격 조회 없이 "타 세션 진행중"을 판별하기 위함.
-    stale_branches: list[tuple[str, float, int, str, str]] = []
+    stale_branches: list[tuple] = []  # report.render_brief 계약 — 길이 5~10 튜플
     stale_branch_status = "ok"
     stale_branch_message = ""
     pr_state_lookup_ok = True
@@ -4194,6 +4744,9 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
                         s.evidence,
                         s.partial_port,
                         s.port_scan_error,
+                        s.impl_new,
+                        s.impl_changed,
+                        s.impl_scan_error,
                     )
                     for s in scan.stale
                 ]
@@ -4203,6 +4756,28 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             stale_branch_message = f"{type(exc).__name__}: {exc}"
     else:
         stale_branch_status = "disabled"
+
+    # 세션 스캔이 shallow면 CI 야간 리포트(harness-reports)로 대체한다 (HARN-28). 모든 CCR 세션
+    # 컨테이너가 shallow라 라이브 스캔은 세션에서 한 번도 목록을 낸 적이 없다. 리포트가 없거나
+    # 손상됐거나 못 읽으면 "고립 0건"이 아니라 "미측정"을 낸다(isolation_report.to_brief).
+    # shallow가 아니면 라이브 스캔이 더 신선하므로 읽지 않는다.
+    isolation_source_line = ""
+    if stale_branch_status == "shallow":
+        try:
+            iso = isolation_report.brief_for_session(
+                root, local_status=stale_branch_status, local_message=stale_branch_message
+            )
+            stale_branches = iso.stale_branches
+            stale_branch_status = iso.status
+            stale_branch_message = iso.message
+            pr_state_lookup_ok = iso.pr_state_lookup_ok
+            pr_state_lookup_error = iso.pr_state_lookup_error
+            isolation_source_line = iso.source_line
+        # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지: 타입명을 남긴다)
+        except Exception as exc:
+            stale_branch_message = (
+                f"{stale_branch_message} · CI 리포트 대체 실패({type(exc).__name__})"
+            )
 
     # 설계 문서 중복 착수 탐지 (HARN-14) — SessionStart 1회 비용, 나이 임계 없음(HARN-13의
     # 3일 임계 아래에서 새는 것이 이 스캔의 존재 이유 — 문서 중복은 착수 당일이 가장 위험).
@@ -4257,6 +4832,61 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
+    # 미머지 게이트 부착 제외 (HARN-193) — 게이트를 붙이고 claim을 푼 태스크가 브리핑의 "다음
+    # 착수 후보"로 노출되는 것이 이 결함이 실제로 연쇄 착수를 낳은 경로다(EOS-137·EOS-146 실측).
+    # 같은 이유로 next의 필터를 브리핑에도 배선한다. **실패는 stdout에 싣는다** — 훅이 stderr를
+    # 버리므로(`2>/dev/null`) render_brief가 반환하는 문자열 안에 있어야 세션이 실제로 본다.
+    gate_attach_excluded: dict[str, list[str]] = {}
+    gate_attach_status = "disabled"
+    try:
+        if policy.remote_claims:
+            ready, _ = selector.candidates(backlog, remote_claimed=remote_claimed)
+            ready = [t for t in ready if t.id not in done_excluded]
+            gate_attach_status = "ok"
+            if ready:
+                gate_map, gate_attach_status = remote_claims.scan_remote_gate_attachments(
+                    root,
+                    {t.id: t.requires_gates for t in ready},
+                    exclude_branches=[store.current_branch(root)],
+                )
+                gate_attach_excluded = {
+                    tid: [f"{a.branch}:{a.gate_id}" for a in attached]
+                    for tid, attached in gate_map.items()
+                }
+    except Exception as exc:  # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지)
+        gate_attach_excluded = {}
+        gate_attach_status = f"error:{type(exc).__name__}"
+
+    # 형제 브랜치의 진행 중 사본 제외 (HARN-198) — 끝낸 세션의 done이 원격 claim을 걷고 done 기록은
+    # 아직 push 전인 창에서 그 태스크가 브리핑 1순위로 노출되는 것이 S4-11 중복 구현의 경로다.
+    # next와 같은 필터를 배선하고, 실패는 위와 같은 이유로 stdout 문자열에 싣는다.
+    sibling_excluded: dict[str, list[str]] = {}
+    sibling_status = "disabled"
+    try:
+        if policy.remote_claims:
+            ready, _ = selector.candidates(backlog, remote_claimed=remote_claimed)
+            ready = [
+                t for t in ready if t.id not in done_excluded and t.id not in gate_attach_excluded
+            ]
+            sibling_status = "ok"
+            if ready:
+                me = store.current_branch(root)
+                sibling_scan = remote_claims.scan_sibling_in_progress(
+                    root,
+                    [t.id for t in ready],
+                    session=me,
+                    ttl_hours=policy.claim_ttl_hours,
+                    exclude_branches=[me],
+                )
+                sibling_status = sibling_scan.status
+                sibling_excluded = {
+                    tid: [f"{h.branch}({h.status})" for h in holders]
+                    for tid, holders in sibling_scan.found.items()
+                }
+    except Exception as exc:  # 훅 진입점 — 어떤 실패도 브리핑을 막지 않는다(fail-open·침묵 금지)
+        sibling_excluded = {}
+        sibling_status = f"error:{type(exc).__name__}"
+
     # 브랜치 보호 라이브 확인 리마인드 (HARN-63 ④ 집행 지점) — 문서·ci.yml 대조는 둘 다
     # 저장소 *안*이라 라이브 설정이 비어도 전부 초록으로 통과한다(3회차 사고의 구조적 원인).
     # 조회는 사람만 할 수 있으므로(관리자 토큰), 기계는 "얼마나 오래 확인하지 않았는가"를 센다.
@@ -4278,13 +4908,28 @@ def cmd_brief(root: Path, args: argparse.Namespace) -> int:
             stale_branch_message=stale_branch_message,
             pr_state_lookup_ok=pr_state_lookup_ok,
             pr_state_lookup_error=pr_state_lookup_error,
+            isolation_source=isolation_source_line,
             done_excluded=done_excluded,
+            gate_attach_excluded=gate_attach_excluded,
+            gate_attach_status=gate_attach_status,
+            sibling_excluded=sibling_excluded,
+            sibling_status=sibling_status,
             doc_series_candidates=doc_series_candidates,
             doc_series_status=doc_series_status,
             ruleset_reminder=ruleset_reminder,
         )
     )
     return 0
+
+
+def _read_hook_stdin() -> str:
+    """훅 입력(UTF-8 JSON)을 읽는다 — 바이트로 읽어 UTF-8 로 직접 해독한다 (HARN-196).
+
+    `sys.stdin.read()` 는 프로세스 로캘 인코딩(한국어 Windows = cp949)으로 해독한다. Claude Code 는
+    UTF-8 로 보내므로 한글·'—' 가 섞이면 `UnicodeDecodeError` 가 나 훅이 트레이스백으로 죽는다.
+    `errors="replace"` 는 깨진 바이트가 있어도 `stop_hook_active` 같은 ASCII 키를 살리기 위함이다.
+    """
+    return sys.stdin.buffer.read().decode("utf-8", errors="replace")
 
 
 def cmd_check_stop(root: Path, args: argparse.Namespace) -> int:
@@ -4294,7 +4939,7 @@ def cmd_check_stop(root: Path, args: argparse.Namespace) -> int:
     판정이 불확실한 모든 경우는 통과(exit 0) — 훅이 개발을 볼모로 잡으면 안 된다.
     """
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        payload = json.loads(_read_hook_stdin() or "{}")
     except json.JSONDecodeError:
         payload = {}
     if payload.get("stop_hook_active"):
@@ -4399,7 +5044,7 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
     판정 불확실·예외는 전부 통과(exit 0) — 훅이 개발을 볼모로 잡으면 안 된다.
     """
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
+        payload = json.loads(_read_hook_stdin() or "{}")
     except json.JSONDecodeError:
         return 0
     file_path = str((payload.get("tool_input") or {}).get("file_path", ""))
@@ -4419,15 +5064,19 @@ def cmd_check_edit(root: Path, args: argparse.Namespace) -> int:
     # HARN-121 ③ 적시 주입 — 이 경로에서 실제로 났던 사고·규칙만 최대 5줄.
     # 정책 검사보다 **먼저** 낸다: 정책 위반이 block이면 아래에서 exit 2로 끝나는데,
     # 그때 정작 도움이 되는 맥락을 못 보여주면 안 된다.
-    _inject_jit_notes(root, file_path)
+    # HARN-130: 주입 후보는 커밋 파일이 아니라 편집 시 대장에서 계산한다. 대장은 한 번만
+    # 읽어 정책 검사에 넘긴다 — 그 검사가 원래 편집마다 대장을 통째로 읽고 있었다.
+    loaded = _inject_jit_notes(root, file_path)
     try:
-        return _check_edit_policy(root, file_path)
+        return _check_edit_policy(root, file_path, loaded)
     except Exception:  # 정책 검사 실패는 무조건 통과 (fail-open)
         return 0
 
 
-def _inject_jit_notes(root: Path, file_path: str) -> None:
+def _inject_jit_notes(root: Path, file_path: str) -> object | None:
     """편집 경로에 걸리는 사고·규칙을 stderr에 주입 — 0건이면 침묵 (HARN-121 ③).
+
+    반환: 읽은 태스크 대장(정책 검사가 다시 읽지 않도록) — 레포 밖·실패면 None.
 
     훅을 절대 볼모로 잡지 않는다: 어떤 실패도 exit code를 바꾸지 않는다. 다만 예외를
     **삼키지는 않는다** — 타입명을 남긴다(CLAUDE.md 침묵 실패 금지). 무타입 경고가
@@ -4435,22 +5084,28 @@ def _inject_jit_notes(root: Path, file_path: str) -> None:
     """
     try:
         if not file_path:
-            return
+            return None
         try:
             rel = str(Path(file_path).resolve().relative_to(root.resolve()))
         except ValueError:
-            return  # 레포 밖 — 관할 아님
+            return None  # 레포 밖 — 관할 아님
         rel = rel.replace("\\", "/")
-        notes = jit_rules.load_index(root)
+        backlog, _ = _load(root)
+        notes, _ = _build_jit_notes(root, backlog)
         rendered = jit_rules.render_injection(jit_rules.notes_for_path(notes, rel), rel)
         if rendered:
             print(rendered, file=sys.stderr)
+        return backlog
     except Exception as exc:  # noqa: BLE001 — 관측성 코드는 개발을 막지 않는다
         print(f"[적시 규칙] 주입 실패 — {type(exc).__name__} (편집은 계속된다)", file=sys.stderr)
+        return None
 
 
-def _check_edit_policy(root: Path, file_path: str) -> int:
-    """비-backlog 파일 편집의 조율 정책 검사 — check-edit ①②③."""
+def _check_edit_policy(root: Path, file_path: str, loaded: object | None = None) -> int:
+    """비-backlog 파일 편집의 조율 정책 검사 — check-edit ①②③.
+
+    `loaded`는 적시 주입이 이미 읽은 태스크 대장이다(없으면 여기서 읽는다).
+    """
     from models import CODE_DOMAIN_PREFIXES
 
     if not file_path:
@@ -4465,7 +5120,7 @@ def _check_edit_policy(root: Path, file_path: str) -> int:
     branch = store.current_branch(root)
     if branch in ("unknown", "main", ""):
         return 0
-    backlog, _ = _load(root)
+    backlog = loaded if loaded is not None else _load(root)[0]
     mine = [t for t in backlog.tasks.values() if t.status == "in_progress" and t.session == branch]
     violations: list[tuple[str, str, str]] = []  # (rule, mode, 메시지)
 
@@ -4611,6 +5266,13 @@ def cmd_claims(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_impl_signal(item: remote_claims.StaleBranch) -> None:
+    """`branches` 출력에 구현 신호(HARN-31)를 덧붙인다 — 문구는 브리핑과 같은 함수를 쓴다."""
+    line = report.impl_signal_line(item.impl_new, item.impl_changed, item.impl_scan_error)
+    if line:
+        print(line)
+
+
 def cmd_branches(root: Path, args: argparse.Namespace) -> int:
     """장기 미머지 브랜치를 고립/PR제출로 갈라 보고한다 (HARN-47).
 
@@ -4699,8 +5361,10 @@ def cmd_branches(root: Path, args: argparse.Namespace) -> int:
         )
     for item in isolated:
         print(f"  [고립] {item.branch} — {item.age_days:.0f}일 전 · trunk 대비 {item.ahead}커밋")
+        _print_impl_signal(item)
     for item in pr_closed:
         print(f"  [PR-닫힘] {item.branch} — {item.evidence} · {item.age_days:.0f}일 전")
+        _print_impl_signal(item)
     for item in pr_filed:
         label_note = ""
         if item.disposal_labels:
@@ -4779,25 +5443,23 @@ def cmd_policy(root: Path, args: argparse.Namespace) -> int:
     # 비교하면 TypeError다. store.parse_event_ts가 레거시 줄에도 오프셋을 붙여 주므로
     # 양쪽 표기가 같은 축에서 비교된다.
     cutoff = datetime.now().astimezone() - timedelta(days=args.days)
+    # HARN-44: 엄격 strptime("%Y-%m-%dT%H:%M:%S") + except ValueError: continue 조합은
+    # 오프셋이 붙은 신규 줄을 **에러 없이 통째로 누락**시킨다(침묵 실패). 두 표기를
+    # 모두 읽는 공용 파서(`event_leaks.read_warn_events` → `store.parse_event_ts`)를 경유한다 —
+    # 레거시 줄의 오프셋은 가정값이라 정렬 위치가 부정확할 수 있고, 그 사실은 아래에서 말한다.
+    warns = event_leaks.read_warn_events(root)
+    # HARN-170 ⑤ — 테스트 누출 묶음은 대장에서 지우지 않고(append 전용) 집계에서만 뺀다.
+    # 판정은 기간 필터 **전** 전체에서 한다: 묶음이 기간 경계에서 잘리면 모양이 깨져 반쪽만 남는다.
+    leaked = event_leaks.leak_keys(record for record, _event, _known in warns)
     collected: list[tuple[datetime, dict, bool]] = []
-    for path in store.event_paths(root):
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("action") != "policy_warn":
-                continue
-            # HARN-44: 엄격 strptime("%Y-%m-%dT%H:%M:%S") + except ValueError: continue 조합은
-            # 오프셋이 붙은 신규 줄을 **에러 없이 통째로 누락**시킨다(침묵 실패). 두 표기를
-            # 모두 읽는 공용 파서를 경유한다 — 레거시 줄의 오프셋은 가정값이라 정렬 위치가
-            # 부정확할 수 있고, 그 사실은 아래 렌더에서 별도로 말한다.
-            moment = store.parse_event_ts(event.get("ts"))
-            if moment is None:
-                continue
-            if moment.moment < cutoff:
-                continue
-            collected.append((moment.moment, event, moment.offset_known))
+    excluded = 0
+    for record, event, offset_known in warns:
+        if record.moment < cutoff:
+            continue
+        if record.key in leaked:
+            excluded += 1
+            continue
+        collected.append((record.moment, event, offset_known))
     collected.sort(key=lambda pair: pair[0])
     by_rule: dict[str, list[dict]] = {}
     total = 0
@@ -4807,7 +5469,17 @@ def cmd_policy(root: Path, args: argparse.Namespace) -> int:
         if not offset_known:
             unknown_offset += 1
         by_rule.setdefault(str(event.get("rule", "?")), []).append(event)
+    # done CI 미러 게이트의 사후 감시 절 (HARN-173 ④) — 통과한 done의 미러 상태·우회 분포.
+    # warn 리포트와 별개의 축이라 제목 앞에 따로 낸다(아래 "(경고 없음)" 줄과 섞이지 않게).
+    for mirror_line in done_mirror_gate.render_report(root, args.days):
+        print(mirror_line)
+    print()
     print(f"조율 정책 warn 리포트 — 최근 {args.days}일, 총 {total}건")
+    # 0건이어도 말한다 — 빼는 장치가 있다는 사실과 그 크기가 늘 보여야 뺄셈이 숨지 않는다.
+    print(
+        f"  테스트 누출 서명 {excluded}건 제외 (HARN-170 — 대장은 append 전용이라 지우지 않고 "
+        "집계에서만 뺀다 · 판별 규칙 scripts/harness/event_leaks.py)"
+    )
     if unknown_offset:
         # 추정 정렬을 실측 정렬인 척하지 않는다(HARN-44 ② — 레거시는 척도 불명).
         print(
@@ -4941,7 +5613,23 @@ def build_parser() -> argparse.ArgumentParser:
         dest="no_pr",
         default=None,
         choices=list(NO_PR_REASONS),
-        help="PR 없이 완료하는 예외 사유 (HARN-23 — 예외 4종만 허용)",
+        help="PR 없이 완료하는 예외 사유 (HARN-23 — 예외 4종 + direct-commit(HARN-80))",
+    )
+    p.add_argument(
+        "--direct-commit-sha",
+        dest="direct_commit_sha",
+        default=None,
+        metavar="SHA",
+        help="--no-pr direct-commit 의 착지 커밋 — origin/main 조상임을 CLI가 git으로 실측한다. "
+        "조상이 아니면 exit 1, shallow·git 오류로 측정 불가면 exit 3 (HARN-80)",
+    )
+    p.add_argument(
+        "--no-mirror",
+        dest="no_mirror",
+        default=None,
+        metavar="<사유>",
+        help="CI 미러 게이트 예외 사유 (HARN-173) — policy ci_mirror_at_done=block에서 미러 결과가 "
+        "없거나 실패여도 통과하는 유일한 경로. 공백뿐인 사유는 거부하며 notes·이벤트에 남는다",
     )
     # ── 게이트 판정 인계 (HARN-177 ①) — pending decision 게이트의 입력 태스크에만 뜻이 있다 ──
     p.add_argument(
@@ -5126,6 +5814,16 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "gates amend --verdict FAIL: 이미 이 게이트의 열린 상류에 있는 미종결 소유 태스크를 "
             "지목 (반복 지정 · HARN-177 ⑥ — 열린 경로에 없으면 거부)"
+        ),
+    )
+    p.add_argument(
+        "--note",
+        dest="gate_note",
+        default=None,
+        metavar="내용",
+        help=(
+            "gates amend: 게이트를 닫지 않고 판정 근거·부분 답변을 notes 에 누적 (append-only · "
+            'HARN-39). 백틱이 든 산문은 인용 heredoc 으로 파일에 쓴 뒤 "$(cat 파일)"로 넘긴다'
         ),
     )
     p.add_argument(
@@ -5356,10 +6054,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.set_defaults(func=cmd_rules)
 
-    p = sub.add_parser("jit", help="적시 규칙 주입 인덱스 — 편집 경로별 사고·규칙 (HARN-121 ③)")
+    p = sub.add_parser(
+        "jit", help="적시 규칙 주입 — 편집 경로별 사고·규칙 (HARN-121 ③ · 편집 시 계산 HARN-130)"
+    )
     jsub = p.add_subparsers(dest="jit_command", required=True)
-    jsub.add_parser("build", help="대장 3종 → backlog/jit_index.json 재생성")
-    jsub.add_parser("check", help="인덱스가 대장과 어긋났는지 검사 (exit 1)")
+    jsub.add_parser(
+        "build", help="(옛 명령) 파일을 만들지 않는다 — 편집 시 계산으로 바뀌었다 · check와 같다"
+    )
+    jsub.add_parser(
+        "check", help="대장에서 주입 후보가 계산되는지 검사 (스키마 위반·0건이면 exit 1)"
+    )
     jp = jsub.add_parser("show", help="이 경로를 편집하면 무엇이 뜨는지 미리보기")
     jp.add_argument("path", help="레포 상대 경로")
     p.set_defaults(func=cmd_jit)
@@ -5457,4 +6161,7 @@ def find_root_for_cli() -> Path:
 
 
 if __name__ == "__main__":
+    import _stdio  # 스크립트 실행이면 이 디렉터리가 sys.path[0]이다 (OPS-53)
+
+    _stdio.ensure_utf8_stdio()
     sys.exit(main())

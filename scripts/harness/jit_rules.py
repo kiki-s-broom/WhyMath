@@ -19,26 +19,36 @@
 나머지 414건은 경로를 모른다 — **모르는 것을 아무 경로에나 붙이지 않는다**. 그러면
 모든 편집에 5줄이 뜨고 위에 적은 소음이 된다.
 
-왜 인덱스를 미리 만드는가
-------------------------
-훅은 매 Edit/Write마다 돈다. 대장 3종을 그때 읽으면 **2.3초**가 든다(실측 — 태스크
-757개 YAML 파싱이 병목). 사람이 2초를 기다리는 훅은 곧 꺼진다. 그래서 빌드 타임에
-`backlog/jit_index.json`으로 접어 두고 훅은 그것만 읽는다. 인덱스가 대장과 어긋나는
-것은 `jit check`가 CI에서 막는다(문서 렌더와 같은 패턴).
+왜 인덱스 파일을 커밋하지 않는가 (HARN-130 — 종전 설계의 정정)
+-----------------------------------------------------------------
+처음(HARN-121 ③)에는 대장 3종을 `backlog/jit_index.json`으로 접어 커밋하고 훅은 그것만
+읽었다. 근거는 "대장을 편집마다 읽으면 2.3초"였고, 어긋남은 CI `jit check`가 막았다.
+
+그 파일이 두 가지 사고를 만들었다.
+  · **머지 충돌** — 사고를 등재하는 PR은 거의 전부 이 파일도 바꿨다(main 실측: 이 파일을
+    바꾼 커밋 26건 중 25건이 사고 대장도 바꿨다). 새 사고 줄은 무게·날짜 순 정렬에서 대개
+    같은 자리에 끼므로, 사고를 등재한 두 PR은 이 파일에서 서로 충돌했다. 사고 대장을
+    세션 샤드로 나눠도(HARN-130) 이 파일이 남으면 충돌도 남는다.
+  · **재생성 망각 → CI red** — 사고를 적고 `jit build`를 안 돌리면 CI가 red였다(HARN-179).
+
+그리고 근거였던 2.3초는 **이미 치르고 있던 비용**이었다. `check-edit`의 조율 정책 검사가
+브랜치 위의 편집마다 태스크 대장을 통째로 읽는다(실측 1.98초). 대장이 메모리에 올라온 뒤
+주입 후보를 계산하는 데는 규칙 1ms + 사고 13ms + 계산 4ms가 든다. 그래서 훅은 대장을 한 번
+읽어 두 검사가 함께 쓰고, 주입 후보는 편집 시 계산한다(`backlog.py`의 `_build_jit_notes`).
+커밋할 파생물이 없으니 충돌도, 낡음도, 재생성 명령도 없다 — 생성 인벤토리를 저장소에서
+뺀 OPS-76과 같은 방향이다. `jit check`는 이제 "대장에서 계산되는가(스키마 위반·0건이면
+실패)"만 본다.
 
 의존성: 표준 라이브러리만.
 """
 
 from __future__ import annotations
 
-import json
 import re
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from dataclasses import dataclass, field
 
 import pathscope
 
-INDEX_NAME = "jit_index.json"
 MAX_NOTES = 5  # 주입 상한 — 보고서 §6 E1
 
 _TASK_REF_RE = re.compile(r"\b([A-Z][A-Z0-9]{1,7}-\d{2,3})\b")
@@ -136,38 +146,6 @@ def build_notes(backlog: object, rules: list, incidents: list) -> list[Note]:
                 weight=_DAMAGE_WEIGHT.get(incident.damage_class, 0),
             )
         )
-    return notes
-
-
-def index_path(root: Path) -> Path:
-    return root / "backlog" / INDEX_NAME
-
-
-def dump_index(notes: list[Note]) -> str:
-    """결정적 직렬화 — 같은 대장이면 같은 바이트(diff 안정·`check`가 성립하려면 필수)."""
-    ordered = sorted(notes, key=lambda n: (-n.weight, n.kind, n.ref, n.text))
-    payload = {"version": 1, "max_notes": MAX_NOTES, "notes": [asdict(n) for n in ordered]}
-    return json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=False) + "\n"
-
-
-def load_index(root: Path) -> list[Note]:
-    """인덱스 읽기 — 없거나 깨졌으면 빈 목록(훅은 절대 개발을 볼모로 잡지 않는다)."""
-    path = index_path(root)
-    if not path.exists():
-        return []
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        raw = payload["notes"]
-    except (OSError, json.JSONDecodeError, KeyError, TypeError):
-        return []
-    notes: list[Note] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        try:
-            notes.append(Note(**item))
-        except TypeError:
-            continue
     return notes
 
 

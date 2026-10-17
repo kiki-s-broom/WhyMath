@@ -1,6 +1,6 @@
-"""비유·예시 수요 실측 CLI — 정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §6.1.
+"""비유·예시 수요 실측 CLI — 정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §6.1.
 
-생성기의 발주 근거(select-vs-generate)를 **실측**한다 — 추론·가정 발주 금지(04e §6.4 사전 대량
+생성기의 발주 근거(select-vs-generate)를 **실측**한다 — 추론·가정 발주 금지(04g §6.4 사전 대량
 생성 금지의 측정 짝). 세 축을 계수한다:
 
   ① **metaphor 공백** — `concept_content` 자산(코퍼스 846행)에서 metaphor가 비어 렌더 불가
@@ -210,7 +210,7 @@ def measure_filled_slots() -> dict[str, int] | None:
 # ──────────────────────────────────────────────────────────────────────────
 def render_report(metaphor: MetaphorDemand, slots: SlotDemand) -> str:
     """사람용 수요 실측 보고 — 발주 근거 3축(공백·저품질·잔여 슬롯)을 한 화면에."""
-    lines = ["=" * 64, "비유·예시 생성 수요 실측 (PED-09 · 04e §6.1)", "=" * 64]
+    lines = ["=" * 64, "비유·예시 생성 수요 실측 (PED-09 · 04g §6.1)", "=" * 64]
     lines.append(f"[① metaphor 공백] {metaphor.blank}건 / 총 {metaphor.total}행")
     lines.append(
         f"[② ai_estimated(저품질)] {metaphor.ai_estimated}건 — 적재 시 전량 상수 각인"

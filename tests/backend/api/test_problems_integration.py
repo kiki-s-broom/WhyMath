@@ -44,6 +44,8 @@ def _body(subject: str = "미적분") -> dict[str, object]:
         "valid_from_year": 2014,
         "subject": subject,
         "unit_codes": ["CAL-INT-DEF"],
+        # LIC-09 — 자체생성 POST는 provenance 좌석 동반 필수(원장 행이 같은 트랜잭션에 남는다).
+        "provenance": {"generation_type": "FULLY_GENERATED", "license": "WHYMATH_GENERATED"},
     }
 
 
@@ -115,6 +117,12 @@ async def _delete_problem(problem_id: uuid.UUID) -> None:
     engine = create_async_engine(Settings().database_url)
     try:
         async with engine.begin() as conn:
+            # LIC-09 — 생성물 POST는 출처 원장 행을 남긴다(FK problem_id → problem). 원장을
+            # 먼저 지우지 않으면 문항 정리가 FK 위반으로 실패한다(테스트 정리 전용 경로).
+            await conn.execute(
+                text("DELETE FROM content_provenance WHERE problem_id = :pid"),
+                {"pid": str(problem_id)},
+            )
             await conn.execute(
                 text("DELETE FROM problem WHERE problem_id = :pid"),
                 {"pid": str(problem_id)},
@@ -208,7 +216,12 @@ def test_problem_steps_nested_read_on_live_pg(admin_auth: dict[str, str]) -> Non
 
 
 def test_problem_patch_delete_roundtrip_on_live_pg(admin_auth: dict[str, str]) -> None:
-    """POST→PATCH→GET→DELETE(204)→GET(404)이 실 PG에서 왕복."""
+    """POST→PATCH→GET→DELETE(409 — 출처 원장 보존)가 실 PG에서 왕복.
+
+    LIC-09: 생성물 POST는 `content_provenance` 행을 같은 트랜잭션에 남기고, DELETE는 cascade가
+    없어(가짜 cascade 금지) 원장이 참조하는 문항 삭제를 409로 거부한다 — 감사 원장을 REST가
+    조용히 지우지 않는다. 비노출이 목적이면 격리(EOS-71)가 비파괴 회수 경로다.
+    """
     problem_id: str | None = None
     deleted = False
     try:
@@ -228,9 +241,9 @@ def test_problem_patch_delete_roundtrip_on_live_pg(admin_auth: dict[str, str]) -
             assert "answer" not in got
             assert got["subject"] == "미적분"  # 본문·메타 카탈로그(D1)는 계속 공개
 
-            assert client.delete(f"/v1/problems/{problem_id}").status_code == 204
-            deleted = True
-            assert client.get(f"/v1/problems/{problem_id}").status_code == 404
+            rejected = client.delete(f"/v1/problems/{problem_id}")
+            assert rejected.status_code == 409, rejected.text
+            assert client.get(f"/v1/problems/{problem_id}").status_code == 200  # 롤백 — 보존
     finally:
         if problem_id is not None and not deleted:
             asyncio.run(_delete_problem(uuid.UUID(problem_id)))

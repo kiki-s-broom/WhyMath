@@ -29,6 +29,7 @@ from whymath_backend.l3.equivalent.acceptance import (
     _CONCEPTUAL_VERIFIERS as _ACCEPTANCE_CONCEPTUAL_VERIFIERS,
 )
 from whymath_backend.l3.equivalent.counterexample_fuzz import fuzz_answer
+from whymath_backend.l3.verifier import _VERIFIERS_V2
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
     verify_answer,
@@ -36,6 +37,7 @@ from whymath_backend.l3.verify_answer import (
     verify_root_selection,
 )
 from whymath_backend.l3.verify_solution import verify_solution
+
 
 # 개념형 검증기 디스패치 — **acceptance의 표를 그대로 쓴다**(EOS-85 ④·사본 금지).
 #
@@ -50,9 +52,45 @@ from whymath_backend.l3.verify_solution import verify_solution
 # 판정 어휘의 단일 원천은 `l3.equivalent.acceptance`이며, 이 모듈은 이미 같은 계층의
 # `l3.verify_answer`·`l3.verify_solution`·`l3.equivalent.counterexample_fuzz`를 쓰고 있어
 # 새 의존이 생기지 않는다.
-_CONCEPTUAL_VERIFIERS: dict[str, Callable[[str | Sequence[str], str], AnswerVerdict]] = (
-    _ACCEPTANCE_CONCEPTUAL_VERIFIERS
-)
+#
+# S4-68 — 그런데 판정 어휘의 원천이 **둘**이었다. `l3/verifier._VERIFIERS_V2`(통합 검증기 v2)는
+# acceptance 표를 감싼 뒤 자기 전용 kind(`statistical_claim`·`sequence_induction`)를 더 얹는다.
+# acceptance 표만 쓰면 그 kind의 레코드는 개념형 분기에 못 들어가 Tier1 경로로 떨어져
+# (`verify_answer`가 통계·수열 DSL을 못 읽어) **unverifiable → skip**으로 조용히 건너뛰어진다.
+# 야간 재검증이 통과하는 척만 하는 구간이다(현재 코퍼스엔 두 kind가 0건이라 미발현).
+#
+# 해소 방향 판정: ⓐ acceptance 표에도 등록하는 안은 **불가**다 — `_build_verifiers_v2`가 중복
+# 키를 import 시점 `ValueError`로 거부한다(이중 등록 가드). ⓑ 그래서 v2 레지스트리를 **정본으로
+# 조회**한다: acceptance 표에 없는 v2 kind만 어댑터로 채우고, 기존 kind의 판정 경로는 그대로 둔다.
+# 순환 import는 없다(`verifier`→`acceptance`, `corpus_reverify`→둘 다 · 역방향 없음).
+def _v2_only_dispatch(
+    kind: str,
+) -> Callable[[str | Sequence[str], str], AnswerVerdict]:
+    """acceptance 표에 없는 v2 kind를 개념형 디스패치 시그니처로 맞춘다."""
+    domain_verifier = _VERIFIERS_V2[kind]
+
+    def _verify(conditions: str | Sequence[str], claimed: str) -> AnswerVerdict:
+        # v2 도메인 검증기는 conditions를 단일 문자열로만 받는다(연립 목록 없음) — 목록이면
+        # 조용히 첫 항만 쓰지 않고 판정 불가로 드러낸다.
+        if not isinstance(conditions, str):
+            return AnswerVerdict(
+                state="unverifiable",
+                reason=f"{kind}: 연립(목록) conditions는 지원하지 않음",
+                samples_checked=0,
+            )
+        return domain_verifier(conditions, claimed).verdict
+
+    return _verify
+
+
+_CONCEPTUAL_VERIFIERS: dict[str, Callable[[str | Sequence[str], str], AnswerVerdict]] = {
+    **_ACCEPTANCE_CONCEPTUAL_VERIFIERS,
+    **{
+        kind: _v2_only_dispatch(kind)
+        for kind in _VERIFIERS_V2
+        if kind not in _ACCEPTANCE_CONCEPTUAL_VERIFIERS
+    },
+}
 
 _EXIT_OK = 0
 _EXIT_FAIL = 1
@@ -95,10 +133,23 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
     verify = record.get("verify")
     if not isinstance(verify, dict):
         return "skip", "verify 재료 없음"
-    conditions = verify.get("conditions")
+    raw_conditions = verify.get("conditions")
     answer_map = verify.get("answer_map")
     selection = verify.get("answer_selection")
-    if not isinstance(conditions, str) or not isinstance(answer_map, dict):
+    # conditions는 문자열 1개 또는 연립(문자열 목록·AND). 목록은 평균값 정리의 c가 열린구간 안인지
+    # 처럼 방정식 밖의 소속 조건을 함께 검산할 때 쓴다(ProblemVerifyMeta도 같은 형태를 받는다).
+    conditions: str | list[str]
+    if isinstance(raw_conditions, str):
+        conditions = raw_conditions
+    elif (
+        isinstance(raw_conditions, list)
+        and raw_conditions
+        and all(isinstance(c, str) for c in raw_conditions)
+    ):
+        conditions = [str(c) for c in raw_conditions]
+    else:
+        return "skip", "conditions/answer_map 형식 부적합"
+    if not isinstance(answer_map, dict):
         return "skip", "conditions/answer_map 형식 부적합"
     amap = {str(k): str(v) for k, v in answer_map.items()}
 
@@ -154,7 +205,8 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
             )
 
     # 수치 반례 fuzz(옵션) — fail만 오염으로 본다.
-    if use_fuzz:
+    # fuzzer는 단변수 등식 1개만 다룬다 — 연립(목록) 조건은 범위 밖이라 건너뛴다.
+    if use_fuzz and isinstance(conditions, str):
         fuzz = fuzz_answer(conditions, amap, selection if isinstance(selection, str) else None)
         if fuzz.state == "fail":
             return "fail", f"수치 반례: {fuzz.reason}"

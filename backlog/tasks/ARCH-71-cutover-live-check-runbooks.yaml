@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,7 +14,8 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① ARCH-64 acceptance ⑤(라이브 대조 1회)의 승계 — ARCH-64는 컨테이너에 OpenRouter 키가 없어 라이브 대조를 수행하지 못했다. 저작 1회차와 학생 대면 1회차를 각각 돌려 `cloud_seat=openrouter`·관측 모델·기록 원가(좌석 단가 약 0.354원)를 확인한다. 실패 회차도 폐기하지 않고 기록한다.\n② 런북 — 저작 경로는 기존 `docs/ops/eos118_seat_signal_live_runbook.md` [C]를 쓰되, 그 문면의 \"대조군 = 기본 좌석(anthropic)\" 전제를 기본값 전환·ARCH-66 차단에 맞게 갱신한다. 학생 대면 경로는 기존 런북이 없다 — `/v1/generate`에 CLOUD_MID로 라우팅되는 본문(premium·requires_reasoning·예산·반출 가능 등급)을 보내는 런북을 새로 쓴다(실제 학생 엔드포인트는 free·0원 기본이라 LOCAL로만 간다는 사실을 런북에 명시). 두 런북 모두 CLAUDE.md Kiki 머신 안내 규칙(6항목 브리핑·자리표시자 0·쓰기 블록 자가 거부·`python -m`)을 따른다.\n③ 실행은 Kiki 머신에서만 가능하므로 게이트로 넘긴다(착수 세션이 게이트를 등재). `seat_primary_success_rate`는 ARCH-63 전까지 코드에 없으므로 이 회차에서는 None(미산출)이 정상이며 그 사실을 판정에 적는다(0으로 접지 않는다)."
-artifacts: []
+artifacts:
+  - "PR #1392 (https://github.com/kiki-s-broom/WhyMath/pull/1392) — 런북 2종(학생 대면 신규·저작 EOS-118 전제 정정) · 판정 기준 브랜치 HEAD 2366014d(main 2b6c6abb 병합) · Kiki 라이브 실행 = 게이트 G-arch71-cutover-live-run"
 paths:
   - docs/ops/eos118_seat_signal_live_runbook.md
   - "docs/ops/arch71_*.md"

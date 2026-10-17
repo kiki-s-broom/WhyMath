@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-31-calc1-02-02-solution-link
+title: "[12미적Ⅰ-02-02] 해설 연결 결손 — 승인 문항 24건(conceptual_v0)에 해설·풀이 단계 없음, Concept Completeness solution 9/10의 유일한 missing"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결손 고정 — P3-02 CLI(phase3_coverage) 기준 [12미적Ⅰ-02-02]의 solution 연결이 missing이다: 그 개념의 승인 문항 24건(전부 data/corpus/problem_bank_conceptual_v0)에 해설 또는 풀이 단계(verify.solution_steps)가 없다(2026-10-09 실측 · P3-03 승인 각인 뒤 solution linked 9/10의 유일한 missing).\n② 해법 선택 근거를 적는다 — (가) 같은 개념의 자체 동등 문항을 해설·풀이 단계와 함께 새로 만들어 감사 경로로 승인 (나) 기존 승인 문항 24건에 해설·단계를 더한다. (나)는 승인된 내용을 바꾸므로 승인 근거(감사 라벨)가 새 내용에 옮겨 가지 않는다는 점(EOS-27 내용 지문 · P3-03의 감사 결속 선례)을 해소해야 한다.\n③ 완료 판정 — phase3_coverage에서 [12미적Ⅰ-02-02] solution linked, 다른 개념의 연결이 줄지 않음(재측정 전후 표).\n④ 대표 과정 범위 밖을 '김에 같이' 채우지 않는다(상시 지시문 S-02)."
+  - "[정정 2026-10-12 — 구현 결과] ① 결손의 실체: 해설(answer_explanation)은 24건 전부 있었고 없던 것은 verify.solution_steps 뿐이었다(계측기 정의 해설 AND 단계). ② 해법: (나) — 생성기 conceptual_count_mc_generator의 is_differentiable 밴드가 단계를 결정론으로 만들고 코퍼스 24건에 verify.solution_steps 한 키만 제자리 삽입. 승인 이전 문제의 해소: 감사가 본 내용은 지문 핀(tests/backend/l1/test_p3_conceptual_02_02_solution_link.py)으로 동결, 새로 생긴 단계는 verify_solution 전이 전건 correct의 기계 증명 전수로 덮음. (가)를 택하지 않은 이유와 공백은 MEMORY 2026-10-12 항. ③ 측정: phase3_coverage solution linked 9 to 10, 다른 연결 불변(전후 표는 MEMORY 항)."
+artifacts:
+  - "PR #1591 · squash 7b4c6aed — 승인 문항 24건에 verify.solution_steps 삽입, Coverage solution 9/10 → 10/10. 재측정(main 57330b05 기준): phase3_coverage solution linked 10·missing 0, prerequisite·misconception·pedagogy 10/10 불변, hint unmeasured 10 불변, Content/Curriculum 100% 불변; pytest 208건 통과(P3-31 산출 테스트·생성기 테스트·phase3_coverage 테스트)"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/conceptual_count_mc_generator.py
+  - data/corpus/problem_bank_conceptual_v0/problems.jsonl
+  - tests/backend/l1/test_p3_conceptual_02_02_solution_link.py
+  - tests/backend/l3/equivalent/test_conceptual_count_mc_generator.py
+session: null
+notes: |-
+  출처: P3-03(PR #1512) 승인 각인 뒤 Coverage 재측정. P3-03 acceptance ②(핵심 개념 5종 연결)의 잔여 2축 중 하나 — 다른 하나인 hint는 저장 좌석 부재(ARCH-39 · P3-04 소관)라 이 태스크 범위가 아니다.
+
+  [정정 2026-10-12] paths [] → ['src/backend/whymath_backend/l3/equivalent/conceptual_count_mc_generator.py', 'data/corpus/problem_bank_conceptual_v0/problems.jsonl', 'tests/backend/l1/test_p3_conceptual_02_02_solution_link.py', 'tests/backend/l3/equivalent/test_conceptual_count_mc_generator.py']: 구현 결과 정정(결손 실체: 단계) + 작업 파일 선언
+updated: 2026-10-14

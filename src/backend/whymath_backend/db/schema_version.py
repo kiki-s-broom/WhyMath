@@ -168,6 +168,26 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # 1~3로 Level 4 표현 불가·verified 게이팅). 생성 writer·게이트·coach 서빙 reader 동반 좌석.
     "9d3e7b1c5a20",  # EOS-50: concept_version_status_enum 'IN_QA' + concept_version.qa(게이트
     # 통과 기록 — §9 QA 연결). 쓰는 곳은 l3/publish_gate 한 곳(AST 동결).
+    "a3f7c9d1e5b2",  # DP-03: attempt_event.event_uuid(재전송 멱등키) + 부분 UNIQUE 인덱스
+    # (NULL=멱등키 미부여·백필 금지). hypertable이면 마이그레이션이 중단한다(ADR-001).
+    "b4d8e2a6c0f3",  # ARCH-32: problem.source_id — source_entity(LIC-01) FK 좌석(nullable·
+    # 백필 금지). source_type/source_detail은 이관 기간 중 유지(점진 이관).
+    "c5e1f9a3b7d2",  # ARCH-31: problem_version 테이블(Problem 좌석 3번째) + problem.
+    # problem_version_id(§6.4·nullable·백필 금지) + PUBLISHED 불변성 트리거(§7)
+    "c5e9f3a7b1d4",  # P3-12: role_enum에 CMS 역할 3종(content_editor/reviewer/publisher) 추가
+    # — 어휘만 넓힌다. 권한 매핑 정본은 schema/cms_access.py.
+    "e7b2c4d8a1f6",  # P3-25: CMS 편집 표지 cms_edited_at(problem·misconception_catalog·
+    # strategy_node·concept_content·hints, nullable·백필 금지) — CLI 적재가 CMS 편집을 덮어쓰지
+    # 않게 하는 좌석. 규약 정본: docs/standards/cms_edit_vs_loader_contract.md.
+    "d6a2f8c4b1e7",  # EOS-47: problem_attempt.problem_version_id(FK→problem_version·nullable·백필
+    # 금지) + evaluation_context(JSONB·nullable) — 시도가 푼 문항의 판·채점 환경 고정 좌석.
+    # 병합 정정(2026-10-09): P3-25(e7b2c4d8a1f6)가 같은 부모(c5e9f3a7b1d4) 위에 먼저 착지해
+    # head가 둘이 될 뻔했다 — 이 리비전의 down_revision을 e7b2c4d8a1f6로 재지정해 직렬화했다.
+    "a8c4e1f7b3d9",  # P3-26: concept·concept_edge.cms_edited_at(CMS 소유 표지, nullable·백필 금지)
+    # + concept_version→concept.code FK 해제(신규 개념 제안을 담는다) + 무결성 트리거
+    # 2종(PUBLISHED는
+    # 개념 행 필요·발행본 있는 개념 삭제 거부). 규약 정본:
+    # docs/standards/cms_concept_graph_write_contract.md.
 )
 
 EXPECTED_ALEMBIC_HEAD: str = KNOWN_REVISIONS[-1]

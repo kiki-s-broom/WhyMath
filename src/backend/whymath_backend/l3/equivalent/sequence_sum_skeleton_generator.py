@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -163,6 +163,7 @@ def _arith_sum_explanation(skeleton: _ArithSumSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class ArithmeticSumSkeletonGenerator:
     """등차수열의 합 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -333,6 +334,7 @@ def _geo_sum_explanation(skeleton: _GeoSumSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class GeometricSumSkeletonGenerator:
     """등비수열의 합 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

@@ -229,6 +229,103 @@ def test_metrics_window_evicts_oldest() -> None:
     assert snapshot.total_5xx == 1
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-95 — 라우트 템플릿 차원(SLO S5): 라우트별 p50/p75/p95·표본 수·에러율.
+# ──────────────────────────────────────────────────────────────────────────
+_COACH_TURN = "/v1/coach/sessions/{dialogue_id}/turns"
+_PROBLEM = "/v1/problems/{problem_id}"
+
+
+def test_route_windows_are_separated_not_mixed() -> None:
+    """느린 코치 턴과 빠른 문제 조회가 한 창에 섞이지 않는다 — S5의 존재 이유.
+
+    전역 p95는 느린 쪽에 끌려가 빠른 라우트를 위장하지만, 라우트별 p95는 각자의 값을 낸다.
+    """
+    metrics = sh.ServiceMetrics(clock=_FakeClock())
+    for _ in range(50):
+        metrics.record(4000.0, 200, _COACH_TURN)
+        metrics.record(20.0, 200, _PROBLEM)
+    by_route = {row.route: row for row in metrics.snapshot().routes}
+    assert by_route[_COACH_TURN].p95_latency_ms == 4000.0
+    assert by_route[_PROBLEM].p95_latency_ms == 20.0
+    assert by_route[_COACH_TURN].count == 50 and by_route[_PROBLEM].count == 50
+    assert (
+        metrics.window_p95_latency_ms() == 4000.0
+    )  # 전역은 섞여 있다(= 라우트 차원이 필요한 이유)
+
+
+def test_route_percentiles_p50_p75_p95_nearest_rank() -> None:
+    """1..100ms 균일 분포 ⇒ nearest-rank p50=50·p75=75·p95=95(전역 p95와 같은 식)."""
+    metrics = sh.ServiceMetrics(window_size=100, clock=_FakeClock())
+    for ms in range(1, 101):
+        metrics.record(float(ms), 200, _PROBLEM)
+    (row,) = metrics.snapshot().routes
+    assert (row.p50_latency_ms, row.p75_latency_ms, row.p95_latency_ms) == (50.0, 75.0, 95.0)
+    assert row.p95_latency_ms == metrics.window_p95_latency_ms()  # 두 표면의 식이 같다
+
+
+def test_route_error_rate_counts_only_5xx_per_route() -> None:
+    """라우트별 에러율 — 5xx만 회계(4xx 제외)하고 다른 라우트에 번지지 않는다."""
+    metrics = sh.ServiceMetrics(clock=_FakeClock())
+    for _ in range(3):
+        metrics.record(10.0, 200, _COACH_TURN)
+    metrics.record(10.0, 500, _COACH_TURN)
+    metrics.record(10.0, 404, _PROBLEM)
+    by_route = {row.route: row for row in metrics.snapshot().routes}
+    assert by_route[_COACH_TURN].error_rate == pytest.approx(0.25)
+    assert by_route[_PROBLEM].error_rate == 0.0
+
+
+def test_route_window_evicts_oldest_per_route() -> None:
+    """라우트별 창도 고정 크기 — 한 라우트의 폭주가 다른 라우트의 표본을 밀어내지 않는다."""
+    metrics = sh.ServiceMetrics(window_size=3, clock=_FakeClock())
+    metrics.record(9999.0, 200, _COACH_TURN)  # 곧 축출될 이상치
+    for _ in range(3):
+        metrics.record(10.0, 200, _COACH_TURN)
+    metrics.record(7.0, 200, _PROBLEM)
+    by_route = {row.route: row for row in metrics.snapshot().routes}
+    assert by_route[_COACH_TURN].count == 3
+    assert by_route[_COACH_TURN].p95_latency_ms == 10.0  # 축출된 9999는 창 밖
+    assert by_route[_PROBLEM].count == 1  # 다른 라우트는 무영향
+
+
+def test_route_none_records_global_only() -> None:
+    """route 미지정(기존 호출자) ⇒ 전역만 기록 — 라우트 표에 이름 없는 행을 날조하지 않는다."""
+    metrics = sh.ServiceMetrics(clock=_FakeClock())
+    metrics.record(10.0, 200)
+    snapshot = metrics.snapshot()
+    assert snapshot.total_requests == 1
+    assert snapshot.routes == ()
+
+
+def test_route_without_samples_is_absent_not_zero() -> None:
+    """표본 0인 라우트는 목록에 없다 — 0.0으로 위장한 행을 만들지 않는다(None-vs-0)."""
+    assert sh.ServiceMetrics(clock=_FakeClock()).snapshot().routes == ()
+
+
+def test_routes_are_sorted_by_name_for_deterministic_output() -> None:
+    """라우트 순서는 이름순 — 기록 순서에 따라 응답이 흔들리지 않는다."""
+    metrics = sh.ServiceMetrics(clock=_FakeClock())
+    for route in ("/v1/zzz", sh.ROUTE_UNMATCHED, "/v1/aaa"):
+        metrics.record(1.0, 200, route)
+    names = [row.route for row in metrics.snapshot().routes]
+    assert names == sorted(names)
+
+
+def test_snapshot_can_skip_route_percentiles_for_per_request_path() -> None:
+    """알림 평가용 스냅샷은 라우트 계산을 건너뛴다(정렬은 조회 시점에만 — OPS-95 ⑤).
+
+    전역 필드는 그대로이고 routes만 비어, 알림 판정(S1·S2)이 비트동일이다.
+    """
+    metrics = sh.ServiceMetrics(clock=_FakeClock())
+    metrics.record(30.0, 500, _COACH_TURN)
+    full = metrics.snapshot()
+    light = metrics.snapshot(include_routes=False)
+    assert full.routes and light.routes == ()
+    assert full.window_p95_latency_ms == light.window_p95_latency_ms
+    assert full.window_error_rate == light.window_error_rate
+
+
 def test_metrics_uptime_uses_clock() -> None:
     """uptime = 계측 시작 이후 경과 초(가짜 시계로 결정론 검증)."""
     clock = _FakeClock(now=100.0)

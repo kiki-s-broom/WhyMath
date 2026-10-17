@@ -35,6 +35,14 @@ concurrency:
 permissions:
   contents: read
 
+# 의존 해석 고정 (OPS-121) — 이 파일의 모든 `pip install`이 제약 파일의 정확한 버전만 고른다.
+# 범위 안의 신규 릴리스(예: 2026-10-08 pydantic 2.14.0)는 제약 파일을 바꾸는 갱신 PR을 거쳐서만
+# main·머지 큐에 닿는다. 잡·스텝 env로 재정의하거나 `pip --isolated`를 쓰면 고정이 풀리므로
+# scripts/ops/ci_constraints.py check가 막는다 (infra-contracts 잡 게이트). 갱신 절차:
+# docs/ops/ci_constraints_refresh_runbook.md. 절대경로인 이유: 잡마다 working-directory가 다르다.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/infra/ci/constraints-py312.txt
+
 jobs:
   # ─────────────────────────────────────────────────────────────────
   # 변경 경로 판별 (슬112·CI 비용 절감) — doc-only PR이면 무거운 잡 skip
@@ -151,10 +159,10 @@ jobs:
           # 의 검사 ⑤⑧이 읽는 입력이다(§2 관계표·§3 귀속표를 파싱해 상수와 1:1 대조). 필터 밖이면
           # 그 문서만 고치는 PR에서 backend 잡이 SKIP돼 **관계표를 조용히 고쳐도 검사 ⑧이 실행되지
           # 않는다**. 위 AST 가드가 그 테스트의 FROZEN_INPUT_PATHS를 읽어 이 편입을 강제한다.
-          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|\.github/workflows/ci\.yml$)'; then
+          if printf '%s\n' "$files" | grep -qE '^(src/backend/|tests/backend/|tests/constitution/|conftest\.py$|data/[^/]+$|data/corpus/|schemas/|docs/standards/eos_verification_design_v1\.md$|backlog/gates\.yaml$|docs/architecture/canonical_entity_model_v1\.md$|docs/architecture/learning_loop_contract_v1\.md$|infra/ci/constraints-py312\.txt$|\.github/workflows/ci\.yml$)'; then
             be=true
           fi
-          if printf '%s\n' "$files" | grep -qE '^(src/data-pipeline/|tests/data_pipeline/|conftest\.py$|\.github/workflows/ci\.yml$)'; then
+          if printf '%s\n' "$files" | grep -qE '^(src/data-pipeline/|tests/data_pipeline/|conftest\.py$|infra/ci/constraints-py312\.txt$|\.github/workflows/ci\.yml$)'; then
             dp=true
           fi
           # schemas/(공유 엔티티·계약 명세) 변경은 클라이언트(mobile/web) 잡도 트리거 —
@@ -171,7 +179,7 @@ jobs:
           # 결함이 아니라 *구조*다. 개별 나열은 backend가 겪은 누락 구조 그 자체이고, 새 계약을
           # mobile이 읽기 시작하는 순간 이 줄을 기억할 사람이 필요해진다. 추가 과트리거 비용은
           # shallow 이력 전체에서 2커밋(access_matrix·visual_style·notation_* 계열)뿐이다.
-          if printf '%s\n' "$files" | grep -qE '^(src/mobile/|schemas/|data/[^/]+$|\.github/workflows/ci\.yml$)'; then
+          if printf '%s\n' "$files" | grep -qE '^(src/mobile/|schemas/|data/[^/]+$|infra/ci/constraints-py312\.txt$|\.github/workflows/ci\.yml$)'; then
             mo=true
           fi
           # web도 backend와 **같은 접두 패턴**을 쓴다(COLLAB-04). 오늘 web 골든이 실제로 읽는
@@ -221,14 +229,14 @@ jobs:
           # 번도 안 돈다 — "검사기가 바뀌어도 안 돌던 구멍"(같은 코퍼스에 다른 판정 로직을
           # 적용하는 변경이 게이트를 건너뛴다). 세 경로를 추가해 검사기 변경도 이 플래그를
           # 깨우게 한다.
-          if printf '%s\n' "$files" | grep -qE '^(data/corpus/|src/backend/whymath_backend/harness/|src/backend/whymath_backend/ops/provenance_audit\.py$|src/backend/whymath_backend/l3/equivalent/|\.github/workflows/ci\.yml$)'; then
+          if printf '%s\n' "$files" | grep -qE '^(data/corpus/|src/backend/whymath_backend/harness/|src/backend/whymath_backend/ops/provenance_audit\.py$|src/backend/whymath_backend/l3/equivalent/|infra/ci/constraints-py312\.txt$|\.github/workflows/ci\.yml$)'; then
             cp=true
           fi
           # PB-13: 결정론 저작 도구(스켈레톤 생성기·적재 배치)와 그 테스트를 건드리면
           # corpus-authoring 잡을 깨운다. 이 잡은 backend 잡에서 분리된 corpus_authoring
           # 마커 테스트(60파일·9분12초)를 돌린다 — 분리가 곧 비활성화가 되지 않도록,
           # **그 테스트가 지키는 코드를 바꾸는 PR에서는 반드시 실행**되게 하는 배선이다.
-          if printf '%s\n' "$files" | grep -qE '^(src/backend/whymath_backend/l3/equivalent/|src/backend/whymath_backend/harness/|tests/backend/l3/equivalent/|tests/backend/harness/|\.github/workflows/ci\.yml$)'; then
+          if printf '%s\n' "$files" | grep -qE '^(src/backend/whymath_backend/l3/equivalent/|src/backend/whymath_backend/harness/|tests/backend/l3/equivalent/|tests/backend/harness/|infra/ci/constraints-py312\.txt$|\.github/workflows/ci\.yml$)'; then
             au=true
           fi
           echo "backend=$be" >> "$GITHUB_OUTPUT"
@@ -271,12 +279,12 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
           # ARCH-21: QA 파이프라인 오케스트레이터(whymath_backend.harness.qa_pipeline)를 이
           # 잡에서 돌리려면 backend 패키지가 필요하다(backend 잡이 역방향으로 이미
           # `pip install -e ../data-pipeline`을 하는 것의 대칭).
-          pip install -e ../backend
+          python -m pip install -e ../backend
 
       # lint(ruff·black)는 src(.)뿐 아니라 tests(../../tests/data_pipeline)도 검사한다
       # (OPS-14 — backend 잡 PR #223 동형). 과거엔 src만 lint해 tests의 포맷 드리프트가
@@ -284,21 +292,21 @@ jobs:
       # ruff는 이 디렉터리의 pyproject 설정으로 tests까지 검사한다(src와 동일 규칙 —
       # E501 포함. 구 per-file-ignore는 config 밖 경로에 매치 불가한 죽은 설정이라 제거).
       - name: Ruff (lint — src + tests)
-        run: ruff check . ../../tests/data_pipeline
+        run: python -m ruff check . ../../tests/data_pipeline
 
       # black은 --line-length 100을 *명시*한다: 두 대상의 공통 조상(레포 루트)에 pyproject가
       # 없어 기본값 88로 폴백하기 때문(backend 잡과 동일 사유). 저장소 표준 root-100이
       # tests/* 배선(backend·infra·harness)의 공통 정본이다 — 2026-07-28 실측에서 src도
       # root-100 컨텍스트로 clean(위반 0)이라 단일 명령으로 통합.
       - name: Black (format check — src + tests)
-        run: black --check --line-length 100 . ../../tests/data_pipeline
+        run: python -m black --check --line-length 100 . ../../tests/data_pipeline
 
       - name: Mypy (strict type check)
-        run: mypy --strict data_pipeline
+        run: python -m mypy --strict data_pipeline
 
       - name: Pytest (with coverage)
         run: |
-          pytest \
+          python -m pytest \
             --cov=data_pipeline \
             --cov-report=term \
             --cov-report=xml \
@@ -345,7 +353,17 @@ jobs:
     # 미채택(여러 축 동시 투입 시 어느 것이 들었는지 판정 불가 — CLAUDE.md 규칙).
     # 재측정(2026-09-10, main push 11표본, scripts/analysis/measure_backend_job_timeout_headroom.py):
     # 소요 최소/중앙/최대 12.7/18.3/19.5분 → 최대 표본 기준 여유 15.5분(44.2%, 목표 30%+ 충족).
-    timeout-minutes: 35
+    # 35→50분(OPS-120 · 2026-10-09 재측정): 위 19.5분은 빠른 러너 표본이었다. 최근 33표본(push·
+    # merge_group)이 15~17분대와 29~32분대의 **이봉**이고 최대 31.93분이라 여유가 8.8%였다.
+    # 원인은 코드 성장이 아니라 러너 속도 편차다 — 같은 커밋·같은 분에 시작한 push/merge_group 쌍이
+    # 30.8분 대 17.3분(10-09 00:20)·17.1분 대 31.0분(06:59)으로 갈렸고, CPU 스텝(Black 1.71배·
+    # mypy 1.73배·pytest 1.80배)만 비례해 느리며 네트워크 스텝(pip 설치)은 1.22배였다. 러너 CPU
+    # 모델은 미확인이라 이것은 '읽어서 그렇게 보이는' 해석이다. 상한은 느린 러너 기준 최대(31.93분)가
+    # 70% 이하가 되는 46분 이상이어야 한다(31.93/0.7=45.6). 분할은 이번엔 채택하지 않는다 — 잡 이름이
+    # 필수 체크 문서·ruleset_drift 계약에 박혀 있어 룰셋 변경(사람 소유)을 동반하고, 커버리지 XML을
+    # 한 파일로 읽는 계층 게이트도 병합이 필요하다. 하한은
+    # tests/infra/test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 50
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
     if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
@@ -365,28 +383,28 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트(tests/backend/l1/test_five_node_connectivity_governance.py)가
           # data_pipeline(L1)을 import한다 → 백엔드 잡에도 설치(수집 ImportError 방지).
-          pip install -e ../data-pipeline
+          python -m pip install -e ../data-pipeline
 
       # lint(ruff·black)는 src(.)뿐 아니라 tests(../../tests/backend)도 검사한다(PR #223).
       # 과거 CI는 src만 lint해 tests의 위반(B905·N817·E501·I001 등)이 검출 없이 머지돼 왔다 —
       # 이 가드가 tests 위반의 재발을 막는다. mypy는 tests로 확장하지 않는다(테스트에 --strict
       # 타입 부담 제외 — 기존 정책 유지).
       - name: Ruff (lint — src + tests)
-        run: ruff check . ../../tests/backend
+        run: python -m ruff check . ../../tests/backend ../../tests/constitution
 
       # black은 --line-length 100을 *명시*한다: tests 경로(../../tests/backend)에는 위로
       # pyproject가 없어(레포 루트에 pyproject 부재) black이 기본값 88로 폴백하기 때문이다.
       # 명시하지 않으면 100으로 포맷된 tests를 88로 검사해 거짓 실패한다(src의 [tool.black]
       # line-length=100과 동일 기준으로 통일).
       - name: Black (format check — src + tests)
-        run: black --check --line-length 100 . ../../tests/backend
+        run: python -m black --check --line-length 100 . ../../tests/backend ../../tests/constitution
 
       - name: Mypy (strict type check)
-        run: mypy --strict whymath_backend
+        run: python -m mypy --strict whymath_backend
 
       - name: Import contracts (import-linter — 7계층 단방향)
         run: lint-imports
@@ -407,7 +425,7 @@ jobs:
       # 틀린 판정을 냈을 자리다.
       - name: Pytest (with coverage)
         run: |
-          pytest \
+          python -m pytest \
             -m "not corpus_authoring" \
             -n auto --dist loadfile \
             --cov=whymath_backend \
@@ -486,6 +504,19 @@ jobs:
       - name: 게이트 — 생성기 공간 겹침 (generator_space_overlap·발문 공간 교집합 0)
         run: python -m whymath_backend.harness.generator_space_overlap_audit
 
+      # S4-56: 잔여 축 교차검증 게이트 v2의 **배선 검사**(--dry-run). LLM 0·네트워크 0 — 파일럿
+      # 34문의 기계 축 전수 재검산과 사전점검(임계 도달성·저작 서명)만 돈다. 잔여 축은 측정하지
+      # 않으므로 이 스텝의 초록은 "게이트가 통과했다"가 아니라 "게이트를 돌릴 수 있는 상태다"이다
+      # (판정 DRY_RUN_OK ≠ PASS). 표본 34·임계 0.11은 파일럿에서 *도달 가능한* 배선용 값이다(결함
+      # 0건 상한 0.0737) — 품질 임계가 아니다. 라이브 측정·승격은 S4-16 기각(2026-09-25 Kiki)으로
+      # 이 스텝의 범위 밖이다. 변별력은 harness 테스트가 봉인한다(도달 불가·기계 실패·서명 판독
+      # 불가가 각각 다른 사유로 exit 1, 미구현 도메인·로드 실패는 exit 2).
+      - name: 게이트 배선 — 잔여 축 교차검증 v2 사전점검 (residue_cross_verify_eval_v2 --dry-run·LLM 0)
+        run: |
+          python -m whymath_backend.harness.residue_cross_verify_eval_v2 \
+            ../../data/corpus/problem_bank_probability_finite_v0/problems.jsonl \
+            --domain finite --dry-run --sample-n 34 --min-n 20 --max-defect-upper 0.11
+
       - name: 게이트 — 코치 프로즈 유출 (coach_prose_leak·노출 상한 0.05·오차단 상한 0.2)
         run: |
           python -m whymath_backend.harness.coach_prose_leak_eval \
@@ -530,6 +561,15 @@ jobs:
       - name: 게이트 — 표기 커버리지 (notation_coverage·코퍼스 표기 ⊆ 지원 표기)
         run: python -m whymath_backend.l3.notation_coverage
 
+      # MATH-04 — 교육과정 표기 범위 게이트: 문항 표기의 구조가 문항 밴드(성취기준 코드→학교급)에
+      # 도입돼 있는지 전수 회계한다. hermetic(LLM 0·DB 0)·결정론. 신규 초과 표기 발견 시 exit 1
+      # (베이스라인 래칫). **생성물 회계 전용** — 학생 입력 거부에 쓰지 않는다(교수학 금기). 변별력
+      # (고등 강제 exit 0 · 초등 강제 exit 1)은 tests/backend/l3/test_curriculum_notation_gate.py가,
+      # 학생 경로 import 금지는 ..._student_path_governance.py가 pytest 상시 회귀로 봉인한다.
+      # 이 CLI는 L4 학년 프로파일을 L3 엔진에 주입하므로 harness에 산다(l3 직접 실행 불가 — 7계층).
+      - name: 게이트 — 교육과정 표기 범위 (curriculum_notation_gate_cli·생성물 회계 전용)
+        run: python -m whymath_backend.harness.curriculum_notation_gate_cli
+
       # ARCH-20: 콘텐츠 출처·라이선스 집행 게이트 — copyright_gradient.md §4.2가 명령한
       # pool 필드 차단을 실제로 CI에 배선(2026-07-29 실측 전 집행 지점 0건 확인 후 신설).
       # 코퍼스 루트는 CLI가 __file__ 기준으로 자가 탐지(cwd=src/backend 무관 — parents[4]).
@@ -571,6 +611,28 @@ jobs:
       - name: 게이트 — L3 생성 프롬프트 레일 (prompt_asset_audit·저작권·봉인·독립성)
         run: python -m whymath_backend.harness.prompt_asset_audit --axis l3
 
+      # P3-14: Phase 3 지표 7종 일괄 CLI의 **위반 주입 반응 자가 점검**. 합성 대조 세계(7종 전부
+      # 충족)에서 지표마다 위반을 주입해 "그 지표만" 미달로 바뀌는지, 미측정 주입이 통과로 접히지
+      # 않는지, 판정 경계·종합 규칙이 맞는지를 확인하고 무반응이 하나라도 있으면 exit 1이다.
+      # hermetic(DB 0·LLM 0·네트워크 0 — SymPy만)·결정론·약 4초.
+      # **실 코퍼스 판정(`python -m whymath_backend.ops.phase3_metrics`)은 이 잡에 걸지 않는다**:
+      # 오늘의 실 상태는 기준선 미달·측정 실패(exit 2)가 정상이라 걸면 상시 red가 되어 게이트가
+      # 꺼진다. 목표 수치는 Kiki가 P3-02·P3-10 기준선을 본 뒤 확정한다(P3-14 acceptance ⑥).
+      # 변별력은 tests/backend/ops/test_phase3_metrics.py(무반응 주입 시 이 CLI가 exit 1을 내는지)가,
+      # 이 스텝의 존재는 tests/infra/test_phase3_metrics_wiring.py가 동결한다.
+      - name: 게이트 — Phase 3 지표 7종 위반 주입 반응 (phase3_metrics --self-check·무반응 0)
+        run: python -m whymath_backend.ops.phase3_metrics --self-check
+
+      # CONST-03 — 헌법 R2-02(후보 문항 사람 판정 독립)·R2-03(게이트 기록 4요건) 집행 테스트.
+      # 왜 이 잡·이 위치인가: 두 테스트가 `whymath_backend`를 import하므로 백엔드 설치가 있는
+      # 이 잡이어야 한다. `tests/constitution`은 pytest testpaths(`../../tests/backend`) 밖이라
+      # 위 전체 Pytest 스텝이 **보지 못한다** — 그래서 별도 스텝이다. 저장소 루트에서 필터 없이
+      # 디렉터리 전체를 돈다(rules.yaml 등록 명령 `pytest -q tests/constitution/<파일>`이 이
+      # 디렉터리에 포함됨 — 연결 판정이 같은 것을 가리킨다).
+      - name: 헌법 집행 테스트 (CONST-03 — R2-02·R2-03)
+        working-directory: .
+        run: python -m pytest -q tests/constitution
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -591,7 +653,20 @@ jobs:
   backend-migrations:
     name: backend — 마이그레이션·통합 (실 PG)
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (OPS-135).
+    permissions:
+      contents: read
+      packages: read
+    # 12→15분(2026-10-06 PED-41 PR 실측): 통합 pytest 스텝 하나가 ~10분이고 잡 전체가 ~11.4분이라
+    # 상한 12분과의 여유가 37초였다(직전 성공 큐 실행 pr-1385: 11분 23초). 그 여유가 소진되자 같은
+    # 마지막 스텝(traversal 실부하 게이트)이 PR 실행·큐 실행 모두에서 시작 ~25초 만에 `cancelled`
+    # (= 잡 시간 초과)로 끊겨 큐에서 CI_FAILURE로 빠졌다. 테스트가 늘 때마다 같은 일이 반복되므로
+    # 상한을 올려 여유를 ~3분으로 둔다. 상한을 넘는 폭주는 여전히 이 값이 잡는다.
+    # 15→22분(OPS-120 · 2026-10-09 재측정): 위 '~3분 여유'가 다시 소진됐다. 최근 39표본이
+    # 8.6~14.1분(중앙 12.6)이고 최대 14.10분이라 여유 6.0%였다. 편차(8.6~14.1)가 같은 입력에서
+    # 나는 러너 속도 차이로 보여(backend 잡과 같은 부류) 여유를 늘 때마다 같은 일이 반복된다.
+    # 14.10/0.7=20.1 → 22분(여유 35.9%). 하한은 test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 22
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
     if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
@@ -604,7 +679,13 @@ jobs:
         # pgvector/pgvector:pg16 = postgres:16 superset(pgvector 프리설치) — 슬105
         # PgVectorIndex 마이그레이션이 `CREATE EXTENSION vector`를 alembic upgrade/왕복에서
         # 성공시키려면 pgvector가 깔린 이미지가 필요하다(드롭인·기존 backend 스키마 무영향).
-        image: pgvector/pgvector:pg16
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: whymath
           POSTGRES_DB: whymath
@@ -633,23 +714,23 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           # 슬112(비용): [embedding](sentence-transformers→torch 수 GB)은 CI에서 설치하지
           # 않는다 — 라이브 bge-m3 통합은 CI에서 *항상 skip*(HF 미도달·Phaiakes9 전용)이라
           # torch 설치가 분당 과금만 태웠다. 슬110의 find_spec 사전체크가 미설치를 깨끗이
           # skip 처리한다. 라이브 측정은 Kiki가 Phaiakes9에서 .[dev,embedding]으로 실행.
-          pip install -e ".[dev]"
+          python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트(tests/backend/l1/test_five_node_connectivity_governance.py)가
           # data_pipeline(L1)을 import한다 → 백엔드 잡에도 설치(수집 ImportError 방지).
-          pip install -e ../data-pipeline
+          python -m pip install -e ../data-pipeline
 
       - name: Alembic upgrade head (fresh DB — 전 마이그레이션 적용)
-        run: alembic upgrade head
+        run: python -m alembic upgrade head
 
       - name: Alembic downgrade base → upgrade head (역적용·재적용 왕복)
         run: |
-          alembic downgrade base
-          alembic upgrade head
+          python -m alembic downgrade base
+          python -m alembic upgrade head
 
       # OPS-55: 데이터 무결성 게이트 — orphan concept/skill/problem·dangling curriculum_ref·
       # duplicate canonical_id·event schema_invalid 6종을 실 PG에서 스캔(0건=exit 0). 마이그레이션
@@ -686,7 +767,7 @@ jobs:
         # `--ignore`에 `api`를 더하거나 마커·testpaths·WHYMATH_RUN_INTEGRATION을 건드리면
         # 6종이 조용히 skip으로 돌아가고 skip은 exit 0이다. 그 회귀를
         # `tests/infra/test_gate_harness_marker_reach_wiring.py`가 기계로 막는다.
-        run: pytest -m integration --ignore=../../tests/backend/l3
+        run: python -m pytest -m integration --ignore=../../tests/backend/l3
 
       # ── S4-01 슬라이스 2 — 개념 그래프 traversal 성능 예산 **실부하** 판정 ──────────────
       # 예산 가드(깊이 2·노드 20·시간 2.0초)는 코드로 있었지만 전 그래프 규모에서 버티는지는
@@ -721,6 +802,10 @@ jobs:
   data-pipeline-integration:
     name: data-pipeline — 적재 통합 (실 PG)
     runs-on: ubuntu-latest
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (OPS-135).
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 10
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
@@ -733,7 +818,13 @@ jobs:
       postgres:
         # pgvector/pgvector:pg16 = postgres:16 superset(드롭인). data-pipeline은 pgvector를
         # 아직 안 쓰지만 두 PG 잡 이미지를 동일하게 맞춰(슬105) 환경 표류를 막는다(무위험).
-        image: pgvector/pgvector:pg16
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: whymath
           POSTGRES_DB: whymath
@@ -762,15 +853,15 @@ jobs:
 
       - name: Install dependencies (editable + dev + postgres extras)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,postgres]"
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev,postgres]"
 
       - name: Pytest (NCIC 적재 통합테스트 — 실 PG)
         env:
           # conftest env 게이트 해제(integration 마크 활성화). [postgres] extra가 설치돼
           # importorskip 통과 + 실 PG 도달 → 적재 왕복 검증.
           WHYMATH_RUN_INTEGRATION: "1"
-        run: pytest -m integration
+        run: python -m pytest -m integration
 
   # ─────────────────────────────────────────────────────────────────
   # data-pipeline 실 Neo4j 적재 통합테스트 (슬113-2) — concept_graph load_graph 경로
@@ -784,6 +875,10 @@ jobs:
   data-pipeline-neo4j:
     name: data-pipeline — 적재 통합 (실 Neo4j)
     runs-on: ubuntu-latest
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (OPS-135).
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 10
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
@@ -796,7 +891,13 @@ jobs:
       neo4j:
         # neo4j:5 — concept_graph.md §6.1 로컬 개발 이미지와 동일 메이저. CONSTRAINT·MERGE
         # (멱등 적재) 검증에 필요. NEO4J_AUTH로 단일 비밀번호 설정(테스트 전용·CI 한정).
-        image: neo4j:5
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/neo4j:5
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           # CI 한정 테스트 자격(실 시크릿 아님·로컬 컨테이너). 적재 코드는 NEO4J_* env만 읽는다.
           NEO4J_AUTH: neo4j/testpassword
@@ -828,15 +929,15 @@ jobs:
 
       - name: Install dependencies (editable + dev + neo4j extras)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,neo4j]"
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev,neo4j]"
 
       - name: Pytest (개념그래프 적재 통합테스트 — 실 Neo4j)
         env:
           # conftest env 게이트 해제(integration 마크 활성화). [neo4j] extra가 설치돼
           # importorskip 통과 + 실 Neo4j 도달 → 멱등 적재(노드 403·엣지 541) 검증.
           WHYMATH_RUN_INTEGRATION: "1"
-        run: pytest -m integration
+        run: python -m pytest -m integration
 
   # ─────────────────────────────────────────────────────────────────
   # L5 모바일 (Flutter 학생 클라이언트 — coach API 통합 + 모델 정합)
@@ -954,8 +1055,8 @@ jobs:
       # data_pipeline을 import하지 않는다). 무거운 backend 전체 대신 이 최소 설치만 한다.
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
 
       # 실제 src/mobile/lib·src/backend/whymath_backend/api를 스캔하는 회귀 스모크를 실행한다.
       # 모바일이 새 `/v1/` 표면을 호출하기 시작하면 이 파일이 깨져 "가시화 리포트가 낡았다"를
@@ -1144,7 +1245,10 @@ jobs:
   infra-contracts:
     name: infra-contracts — 운영 자산 계약 테스트 (tests/infra)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10→12분(OPS-120 · 2026-10-09 재측정): 최근 57표본의 최대가 7.15분(여유 28.5%)이고 야간
+    # 표본은 4.0→6.4분으로 오르는 중이다. 7.15/0.7=10.2 → 12분(여유 40.4%). 하한은
+    # test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 12
 
     steps:
       - name: Checkout
@@ -1161,9 +1265,15 @@ jobs:
       # (상한을 걸어 메이저 변경 시 재검증을 강제).
       # sqlalchemy 상한은 두 pyproject와 같아야 한다(OPS-91 핀·OPS-92 동결 —
       # tests/infra/test_sqlalchemy_upper_bound.py가 전 지점 동일 상한을 검사한다).
+      # pytest·pytest-asyncio·pytest-randomly·pyyaml도 pyproject와 **같은 상한**을 건다(OPS-94).
+      # 무상한 직설치는 PyPI 최신이 그대로 깔리는 구조라, pyproject가 `pytest-randomly<4`로
+      # 묶는 동안 이 잡은 5.0.0 위에서 돌고 있었다(2026-10-02 PR #1419 CI 로그 실측:
+      # `Successfully installed … pytest-randomly-5.0.0` — SQLAlchemy 사고와 같은 모양의 검증
+      # 표면 불일치). 전 지점의 상한 존재·일치는 아래 게이트 스텝이 요구한다.
       - name: Install deps (실측 최소 7종 — 백엔드 전체 설치 불요)
         run: |
-          pip install pytest pytest-asyncio pytest-randomly pyyaml "sqlalchemy>=2.0,<2.1" \
+          python3 -m pip install "pytest>=8.3.3,<10" "pytest-asyncio>=0.24.0,<2" \
+                      "pytest-randomly>=3.15,<4" "pyyaml>=6.0.1,<7" "sqlalchemy>=2.0,<2.1" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
 
       # OPS-11 — `tests/infra`를 lint/format하는 잡이 **하나도 없었다**. backend 잡은
@@ -1177,10 +1287,10 @@ jobs:
       #   · 레포 루트 `conftest.py` — OPS-09의 seed 리포트 훅이 사는 파일
       # 둘 다 실측 결과 이미 clean이라 배선 비용은 0이다(막을 것은 앞으로의 드리프트).
       - name: Ruff (tests/infra + infra + conftest.py)
-        run: python3 -m ruff check tests/infra infra conftest.py
+        run: python3 -m ruff check tests/infra infra conftest.py tests/test_idempotency.py
 
       - name: Black --check (tests/infra + infra + conftest.py)
-        run: python3 -m black --check --line-length 100 tests/infra infra conftest.py
+        run: python3 -m black --check --line-length 100 tests/infra infra conftest.py tests/test_idempotency.py
 
       # HARN-106 — 런북 쓰기 블록 자가거부 가드. 이 잡에 붙이는 이유: 검사 대상이
       # `docs/ops/*runbook*.md`(마크다운)이라 백엔드 설치가 불요하고, 이 잡은
@@ -1206,8 +1316,29 @@ jobs:
       - name: 게이트 — 숙달 단일 쓰기 경로 (EOS-108)
         run: python3 scripts/analysis/mastery_write_path_scan.py
 
+      # OPS-94 — 무상한 의존 pin 차단. 이 잡에 붙이는 이유: 검사기가 pyproject·워크플로를
+      # *텍스트로* 읽고(PyYAML·packaging — 위 Install deps가 이미 깐다) 백엔드 설치가 불요하며,
+      # 이 잡은 `needs: changes` 게이팅이 없어 **어떤 PR에서도 반드시 돈다** — backend 잡은
+      # data-pipeline 전용 PR에서 안 돌 수 있고, 무상한 직설치는 정확히 워크플로만 바뀐 PR에서
+      # 생긴다. 변별력은 `tests/infra/test_dependency_upper_bounds.py`의 결함 주입이 봉인한다
+      # (아래 Pytest 스텝이 그것을 돌린다 — 두 스텝이 서로의 사각을 덮는다).
+      - name: 게이트 — 무상한 의존 pin 차단 (OPS-94)
+        run: python3 scripts/ops/check_dependency_upper_bounds.py
+
+      # 의존 해석 고정 (OPS-121) — 모든 pip install이 제약 파일로 고정되고 핀이 선언과 정합한가.
+      # 네트워크 없이 도는 정적 검사다. 연령(--max-age-days)은 시계에 따라 결과가 바뀌는 입력이라
+      # PR·머지 큐 경로에 넣지 않는다 — 야간 `constraints-freshness` 잡이 센서로 쓴다.
+      - name: 게이트 — CI 의존 해석 고정 제약 파일 (OPS-121)
+        run: python3 scripts/ops/ci_constraints.py check
+
       - name: Pytest (tests/infra — 계약 동결·결함주입)
         run: python3 -m pytest tests/infra -q
+
+      # CONST-03 — 헌법 R3-01: 모든 배치(`harness/*_batch.py`)에 '두 번 실행 테스트'가 있는지 AST
+      # 로 전수 강제한다. 파일을 읽기만 하므로(백엔드 import 0) 이 잡의 최소 설치로 돈다. 루트
+      # `tests/`는 위 `tests/infra`·backend testpaths 어느 쪽에도 안 들어 있어 별도 스텝이다.
+      - name: 배치 두 번 실행 테스트 전수 (CONST-03 — R3-01)
+        run: python3 -m pytest -q tests/test_idempotency.py
 
   # ─────────────────────────────────────────────────────────────────
   # 배포 이미지 빌드 + 컨테이너 기동 스모크 (OPS-03) — **진짜 게이트**
@@ -1229,6 +1360,10 @@ jobs:
   docker-build:
     name: docker-build — 이미지 빌드·기동 스모크(/health/live)
     runs-on: ubuntu-latest
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (OPS-135).
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 25
     # infra-contracts(30초 hermetic)를 선행시켜 계약 위반이면 5분짜리 빌드를 아예 시작하지
     # 않는다(조기 실패). 선행 잡이 실패하면 이 잡은 skip된다.
@@ -1240,10 +1375,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 베이스 이미지는 ghcr.io 미러 사본이다(비공개 패키지) — 받으려면 로그인이 필요하다 (OPS-135).
+      # 토큰은 env로만 넘기고 stdin으로 로그인한다(명령줄 인자는 프로세스 목록에 남는다).
+      - name: ghcr.io 로그인 (미러 사본 pull)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
       # 빌드 컨텍스트는 레포 루트다 — 런타임이 레포 상대 경로(parents[5])로 data/corpus를
       # 읽기 때문(Dockerfile 헤더). src/backend만 컨텍스트로 주면 교수법 팩 로드가 깨진다.
       - name: 이미지 빌드 (컨텍스트 = 레포 루트)
-        run: docker build -f Dockerfile -t whymath-backend:ci-${{ github.sha }} .
+        run: >-
+          docker build -f Dockerfile
+          --build-arg PYTHON_IMAGE=ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/python:3.12-slim
+          -t whymath-backend:ci-${{ github.sha }} .
 
       # 의존성(DB·Redis) 없이 띄운다 — 판정치가 *의존성 0인 라이브니스*라서 그래야 변별력이
       # 생긴다(DB를 붙이면 "DB가 떠서 통과"와 "앱이 떠서 통과"가 구분되지 않는다).
@@ -1521,7 +1666,10 @@ jobs:
     # 머지 큐 실행 2건(#1344·#1341)이 테스트 전건 통과 직후 cancelled됐다 — 상시 잡이라 모든
     # PR의 머지가 막힌다. 12분 = 최대 표본 기준 여유 약 57%(OPS-47 기준 '상한의 30% 이상').
     # 하한은 tests/infra/test_ci_harness_integrity_timeout.py가 동결한다.
-    timeout-minutes: 12
+    # 12→15분(OPS-120 · 2026-10-09 재측정): 테스트가 늘어 최근 59표본의 최대가 9.18분(여유
+    # 23.5%)이 됐다(OPS-69 당시 5.1분). 9.18/0.7=13.1 → 15분(여유 38.8%). 하한 동결은
+    # test_ci_job_timeout_floor.py가 이어받는다.
+    timeout-minutes: 15
 
     steps:
       # fetch-depth: 0 — HARN-47 브랜치 스캔은 trunk 히스토리와 ahead count를 읽는다.
@@ -1543,13 +1691,15 @@ jobs:
       # ruff·black(OPS-12) — 아래 lint 스텝용 검증 도구. 버전 핀은 backend `dev` extra와
       # 같은 정책(상한을 걸어 메이저 변경 시 재검증 강제). 하네스 *런타임*은 여전히
       # stdlib+PyYAML만이다(설계 불변식) — 나머지는 전부 검증 도구.
+      # pyyaml·pytest·pytest-randomly 상한도 pyproject와 같다(OPS-94 — 무상한 직설치는
+      # PyPI 최신이 그대로 깔려 pyproject가 묶은 메이저와 갈라진다).
       - name: Install deps (하네스 런타임은 stdlib+PyYAML — 나머지는 검증 도구)
         run: |
-          pip install pyyaml pytest pytest-randomly \
+          python3 -m pip install "pyyaml>=6.0.1,<7" "pytest>=8.3.3,<10" "pytest-randomly>=3.15,<4" \
                       "ruff>=0.7.0,<0.16" "black>=24.10.0,<27"
           # CUR-09 후속: EOS 단원 구조 관측 리포트가 whymath_backend.harness를 import하므로
           # backend 패키지를 editable 설치한다(dev extra 불요 — CLI는 stdlib+PyYAML만 쓴다).
-          pip install -e src/backend
+          python3 -m pip install -e src/backend
 
       - name: backlog 무결성 검증
         run: python3 scripts/harness/backlog.py validate
@@ -1574,9 +1724,11 @@ jobs:
           python3 scripts/harness/backlog.py rules lint
           python3 scripts/harness/backlog.py rules render --check
 
-      # HARN-121 ③ — 적시 주입 인덱스가 대장과 어긋나면 훅이 낡은 것을 보여준다.
-      # 인덱스는 대장의 렌더 결과이므로 손편집·표류를 여기서 막는다.
-      - name: 적시 주입 인덱스 대조 (HARN-121 ③)
+      # HARN-121 ③ · HARN-130 — 적시 주입 후보는 커밋 파일이 아니라 편집 시 대장에서 계산한다.
+      # 종전의 커밋 인덱스(backlog/jit_index.json)는 사고를 등재한 PR끼리 충돌하고, 재생성을
+      # 잊으면 이 스텝이 red였다(HARN-179). 이제 이 스텝은 "대장에서 계산되는가"를 본다 —
+      # 대장 스키마 위반이나 후보 0건(경로 해소 전멸)이면 red다. 0건은 통과가 아니다.
+      - name: 적시 주입 계산 검사 (HARN-121 ③ · HARN-130)
         run: python3 scripts/harness/backlog.py jit check
 
       # CONST-02 — 코딩 헌법(constitution/) 위헌 심사 래칫. 왜 이 잡인가: 상시 실행(needs:
@@ -1610,6 +1762,32 @@ jobs:
       # 같은 것을 가리킨다(판정 논리 자체의 부분 문자열 한계는 CONST-03 이 고친다).
       - name: 헌법 보호 가드 자가시험 (CONST-02 — 헌법 제9조·R0-01)
         run: python scripts/constitution/selftest_guard.py
+
+      # CONST-03 — 헌법 제11조 ②·R0-02: constitution/ 이 바뀌었으면 같은 변경에 새 개정 기록
+      # (amendments/A####_*.md 추가)이 있어야 한다. 기준은 origin/main 과의 **공통 조상**이라
+      # main 이 분기 뒤 앞서가도 그 변경을 이 브랜치 탓으로 돌리지 않는다. 이 잡의
+      # fetch-depth: 0 이 base ref 를 보장하고, 못 찾으면 exit 2(측정 불가 — 통과로 위장 안 함).
+      # run 문자열은 rules.yaml R0-02 등록 명령과 글자까지 같아야 연결 판정이 같은 것을 가리킨다.
+      - name: 헌법 개정 기록 동반 검사 (CONST-03 — 헌법 제11조·R0-02)
+        run: python scripts/constitution/check_amendment.py
+
+      # CONST-17 — 헌법 제9조 ① 집행의 2층(훅 밖 경로): constitution/ ·서명자 목록·이 검증기·
+      # 이 스텝 자신(잡 게이팅 사실 포함)을 바꾸는 PR 커밋은 Kiki 의 SSH 서명 키로 서명돼야 한다.
+      # 서명자 목록(constitution_signers/allowed_signers)은 **기준(main) 트리에서** 읽는다 —
+      # PR 이 자기 키를 등록해 스스로 통과하는 길을 막는다. 목록 파일이 아직 없으면 '미무장'으로
+      # 통과하되 경고 주석을 남긴다(게이트 G-const-signing-key-register 가 무장 시점을 추적).
+      # PR 이벤트에서만 판정한다: 머지 큐 스쿼시는 GitHub 서명이라 Kiki 키가 아니며, 그 변경은
+      # PR 시점에 이미 이 스텝을 통과해야 큐에 들어온다. ssh-keygen 은 ubuntu-latest 에 있다.
+      # 변별력은 tests/constitution/test_check_signed_changes.py(실물 SSH 서명 시나리오 22종 +
+      # 변이 주입 5종)가 봉인한다.
+      - name: 헌법 서명 검증 (CONST-17 — 헌법 밖 경로 보호·서명된 변경만)
+        run: python scripts/constitution/check_signed_changes.py
+
+      # CONST-03 — 헌법 제4조·R1-02: "노드를 바꿨을 때 다시 돌릴 하류를 명령 한 줄로 구한다"는
+      # 약속이 실제로 동작하는지(그래프가 읽히고 노드가 실재하는지) 상시 실행한다. 노드 이름은
+      # rules.yaml R1-02 등록 명령(standards)과 같아야 한다.
+      - name: 파이프라인 하류 조회 (CONST-03 — 헌법 제4조·R1-02)
+        run: python scripts/constitution/pipeline_check.py --downstream standards
 
       # HARN-66 — ADR 번호 충돌을 **원격 전 브랜치까지** 스캔해 막는다.
       # 작업 트리 `ls docs/architecture/adr/`는 "trunk에 무엇이 있는가"만 말하므로 다음 빈
@@ -1697,6 +1875,39 @@ jobs:
           python -m whymath_backend.harness.eos_unit_structure_observation_report
           python -m whymath_backend.harness.eos_unit_structure_observation_report --json /tmp/eos_unit_structure_observation.json
 
+      # CUR-06: 학교급 경계 선수 연결 밀도 관측 리포트 — 경계 통과 엣지 20/2,210(0.9%)·고→대 0·
+      # 고등→중학 하향 도달 비율을 매 실행 눈에 보이게 한다. 게이트가 아니라 리포트(exit 0/2) —
+      # 밀도가 0이어도 red가 되지 않고, red가 되는 것은 코퍼스를 읽지 못하는 입력 오류(exit 2)뿐이다.
+      # 신규 잡 0: CUR-09 선례대로 이 잡(backend editable 설치 완료)에 편입한다. 판정 회귀는
+      # tests/backend/harness/test_cross_school_connectivity_report.py(backend 잡 testpaths)가 소유.
+      - name: 학교급 경계 선수 연결 밀도 관측 리포트 (CUR-06)
+        working-directory: src/backend
+        run: |
+          python -m whymath_backend.harness.cross_school_connectivity_report
+          python -m whymath_backend.harness.cross_school_connectivity_report --json /tmp/cross_school_connectivity.json
+
+      # OPS-19 — 관측 리포트 CLI 20개 중 러너를 가진 것은 3개뿐이었고 나머지는 산출이 0회였다
+      # ("측정한 적 없음"이 "문제 없음"으로 읽혔다). 이 스텝은 그중 **저장소 체크아웃만으로 도는
+      # 5개**(DB 0·인자 0)를 러너로 돌린다. DB가 필요한 11개는 여기 넣지 않는다 — 이 잡엔 DB가
+      # 없어 넣으면 "접속 실패"가 매 PR마다 나거나, 삼키면 "0건"으로 위장된다(부류 분리 근거는
+      # `ops/observation_report_runner.py` 모듈 docstring). 그쪽은 `docker-compose.prod.yml`의
+      # `observation-reports` 서비스가 돈다.
+      #
+      # 게이트가 아니라 관측이다 — 수치가 나빠도 exit 0이고, **리포트가 돌지 못했을 때만** red다
+      # (`ran_ok`/`run_failed`/`run_timeout`이 manifest.json에서 서로 다른 값으로 남는다).
+      - name: 관측 리포트 실행 — 체크아웃 전용 5종 (OPS-19)
+        run: python -m whymath_backend.ops.observation_report_runner --class ci --out /tmp/observation-reports
+
+      # 실패한 실행의 증거가 가장 필요하므로 `always()`다 — 위 스텝이 red여도 manifest.json의
+      # 원인(stderr 꼬리)과 리포트 본문이 남는다.
+      - name: 관측 리포트 산출물 업로드 (OPS-19)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observation-reports-ci
+          path: /tmp/observation-reports
+          retention-days: 14
+
       # OPS-12 — `tests/harness`·`scripts/harness`를 lint/format하는 잡이 **하나도 없었다**
       # (OPS-11의 harness 판박이). backend 잡은 `../../tests/backend`만, data-pipeline 잡은
       # working-directory `src/data-pipeline`의 `.`만 본다 — 하네스는 대장(backlog)을 판정하는
@@ -1708,11 +1919,11 @@ jobs:
       # 무배선이었다 — "일부만 배선됨"이 같은 디렉터리 안에서 한 번 더 재현된 형태다.
       # lint는 재귀라 `scripts` 하나로 harness까지 덮는다. 잔여 위반은 1파일뿐이었다
       # (`diagnose_atom_orphans.py` black — 이 PR에서 정리. OPS-12가 8파일을 이미 상환한 결과).
-      - name: Ruff (scripts + tests/harness)
-        run: python3 -m ruff check scripts tests/harness
+      - name: Ruff (scripts + tests/harness + tools)
+        run: python3 -m ruff check scripts tests/harness tools
 
-      - name: Black --check (scripts + tests/harness)
-        run: python3 -m black --check --line-length 100 scripts tests/harness
+      - name: Black --check (scripts + tests/harness + tools)
+        run: python3 -m black --check --line-length 100 scripts tests/harness tools
 
       - name: 하네스 테스트
         run: python3 -m pytest tests/harness -q
@@ -1756,8 +1967,8 @@ jobs:
       # PyYAML 등 전부 base dependencies). lint·mypy·pytest는 별도 backend 잡이 이미 검증한다.
       - name: Install dependencies (editable, base only)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e .
 
       - name: 게이트 — 선언≠배선 4축 정적 감사 (declared_unwired_audit)
         run: python -m whymath_backend.ops.declared_unwired_audit
@@ -1830,16 +2041,20 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           python -m pip install -e ".[dev]"
           python -m pip install -e ../data-pipeline
 
       - name: Pytest (corpus_authoring 마커 전량)
-        run: pytest -m corpus_authoring
+        run: python -m pytest -m corpus_authoring
 
   e2e-nightly:
     name: e2e-nightly — 관통 슬라이스 (실 PG·야간)
     runs-on: ubuntu-latest
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (OPS-135).
+    permissions:
+      contents: read
+      packages: read
     timeout-minutes: 12
     if: github.event_name == 'schedule'
     defaults:
@@ -1848,7 +2063,13 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: whymath
           POSTGRES_DB: whymath
@@ -1877,7 +2098,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 백엔드 잡에도 설치.
           python -m pip install -e ../data-pipeline
@@ -1970,7 +2191,11 @@ jobs:
   backend-serial-nightly:
     name: backend — 전체 스위트 직렬 (교차 파일 오염 탐지·야간)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 45→50분(OPS-120 · 2026-10-09 재측정): 야간 완주 17표본의 최대가 33.15분(여유 26.3%)이고
+    # 최근 4회가 31.9~33.1분으로 이전(약 28분)보다 올랐다 — 스위트 성장으로 읽힌다. 33.15/0.7=47.4
+    # → 50분(여유 33.7%). 야간 직렬 잡이라 머지 큐에는 영향이 없다. 하한은
+    # test_ci_job_timeout_floor.py가 동결한다.
+    timeout-minutes: 50
     if: github.event_name == 'schedule'
     defaults:
       run:
@@ -1988,7 +2213,7 @@ jobs:
 
       - name: Install dependencies (editable + dev extras)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<27"
           python -m pip install -e ".[dev]"
           # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 백엔드 잡에도 설치.
           python -m pip install -e ../data-pipeline
@@ -1999,3 +2224,31 @@ jobs:
       # 실행기 단독 호출 금지(CLAUDE.md) — `python -m pytest`로 인터프리터를 못 박는다.
       - name: Pytest (전체 스위트·직렬·단일 프로세스 — 순서 의존 오염 노출)
         run: python -m pytest
+
+  # ─────────────────────────────────────────────────────────────────
+  # 제약 파일 연령 센서 (OPS-121) — 야간 전용.
+  # 제약 파일(infra/ci/constraints-py312.txt)이 30일 넘게 갱신되지 않으면 빨갛게 되어, 고정이 오래돼
+  # 취약한 버전이 굳는 것을 막는다(정기 갱신은 주 1회 · 긴급 갱신은 영업일 1일 이내).
+  # 연령은 시계에 따라 결과가 바뀌는 입력이므로 PR·머지 큐 경로(infra-contracts)에는 넣지 않는다 —
+  # "머지 큐의 입력은 코드뿐이다"가 이 고정의 목적이다. 정적 검사 전체는 infra-contracts가 돈다.
+  # ─────────────────────────────────────────────────────────────────
+  constraints-freshness:
+    name: constraints-freshness — 제약 파일 연령 센서 (야간)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps (게이트 실행에 필요한 최소 — 핀 적용)
+        run: python3 -m pip install "pyyaml>=6.0.1,<7" "packaging>=24,<27"
+
+      - name: 센서 — 제약 파일 연령 ≤ 30일 (OPS-121)
+        run: python3 scripts/ops/ci_constraints.py check --max-age-days 30

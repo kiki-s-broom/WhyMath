@@ -47,8 +47,8 @@
 | **S1** | 학생 트래픽 5xx 에러율 (최근 창) | **≤ 1%** 평상 / **> 5%** = 즉시 조치선 | `/health/ready` → `metrics.window_error_rate` (인프로세스·SaaS 독립) | ✅ **측정 가능** |
 | **S2** | 학생 트래픽 p95 지연 (최근 창) | **≤ 3,000ms** 평상 / **> 5,000ms** = 즉시 조치선 | `/health/ready` → `metrics.window_p95_latency_ms` | ✅ **측정 가능** |
 | **S3** | 레디니스 (트래픽 수용 가능) | `/health/ready` **HTTP 200** | 같은 엔드포인트의 상태코드 | ✅ **측정 가능**(순간값) |
-| **S4** | 학습 창 가용성 (매일 15:00–24:00 KST) | **99%** — 월 허용 다운 약 2.7시간 | 외부 업타임 프로브 **미도입** | ❌ **미측정 목표** |
-| **S5** | 경로별(T1/T2/T3) 지연·에러율 | T1 p95 ≤ 5s / T2 p95 ≤ 1s / T3 p95 ≤ 10s (설계 목표) | 계측이 **경로 차원을 갖지 않음**(`ServiceMetrics`는 전역 창) | ❌ **미측정 목표** |
+| **S4** | 학습 창 가용성 (매일 15:00–24:00 KST) | **99%** — 월 허용 다운 약 2.7시간 | 외부 업타임 프로브 `ops/uptime_probe.py`(서버 밖 1분 폴링 → JSONL) + `report` 서브커맨드(OPS-30) | 🟡 **수단 구현·가동 대기** — 스케줄러 등록([런북](../ops/ops30_uptime_probe_runbook.md)) 뒤 표본이 쌓여야 판정. 표본 부족은 `INSUFFICIENT`(통과 아님) |
+| **S5** | 경로별(T1/T2/T3) 지연·에러율 | T1 p95 ≤ 5s / T2 p95 ≤ 1s / T3 p95 ≤ 10s (설계 목표) | `/health/ready` → `metrics.routes[]` — 라우트 *템플릿*별 최근 창 `p50/p75/p95_latency_ms`·`error_rate`·`count`(OPS-95). 티어 소속은 §1-1 표로 읽는다 | ✅ **측정 가능**(달성 여부는 `count`가 쌓인 뒤에만 주장) |
 | **S6** | LLM 호출 지연·비용 | 동기 즉답 p50 < 2,000ms | Langfuse `l3_routing` + `ops/cost_report.py`, 이중 회계는 `ops/cost_probe.py` | ⚠️ **부분 측정**(라이브 트래픽 축적 대기) |
 
 **수치 근거 (과대 약속 금지)**
@@ -56,7 +56,7 @@
 - **S1 = 1% / 5%**: 5%는 코드 기본 임계(`ops_error_rate_alert_threshold`)로 *즉시 조치선*이다. 평상 목표는 그 1/5인 1%로 둔다 — 창 500요청 기준 **5xx 5건**. 두 선을 벌려 둔 이유: 알림이 울리기 *전에* 품질 저하를 볼 여지를 남기기 위함이다.
 - **S2 = 3,000ms / 5,000ms**: 라우터의 동기 즉답 게이트가 p50 < 2,000ms(`SLA_GATE_MS`)이고, 실측 p50은 로컬 FAST 1,010ms·CLOUD_MID 1,020ms다(SSM 2026-Q3 스모크). p95는 캐시 미스·큐잉·콜드스타트를 포함하므로 p50의 약 3배를 평상 목표로, 5,000ms(코드 기본 임계)를 조치선으로 둔다.
 - **S4 = 99%**: 단일 머신·HA 0·야간 온콜 0(1인 개발)·작업 스케줄러가 로그온 세션에 의존하는 현실에서 **99.9%(월 43분)는 수동 복구로 달성 불가**하므로 선언하지 않는다. 24×7이 아니라 학생이 실제로 쓰는 창(평일 방과후~심야)만 목표로 삼는 것도 같은 정직함이다. 창 밖 시간대는 best-effort이며 목표를 선언하지 않는다.
-- **S5**: 숫자는 *설계 기준*일 뿐이다. 잴 수 없으므로 "달성/미달"을 주장하지 않는다.
+- **S5**: 숫자는 *설계 기준*이다. 이제 라우트별로 **잴 수 있지만**, 라우트 창은 `ops_metrics_window_size`(기본 500)요청이 아니라 *그 라우트의* 최근 표본이라 `count`가 작으면 p95는 신뢰할 수 없다 — "달성/미달"은 `count`를 병기해서만 말한다(표본 없는 라우트는 목록에 아예 없다 = 미측정). 코치 LLM 턴과 가벼운 GET이 한 창에 섞여 서로의 p95를 오염하던 것이 라우트 분리로 풀린다. 라우트에 매칭되지 않은 요청(404 등)은 `(unmatched)` 1개 버킷으로 모인다.
 
 ### 1-3. 오류 예산 (경량 — 과공학 금지)
 
@@ -73,12 +73,15 @@
 | 지표 | 원천 | SaaS 의존 | 비고 |
 |---|---|---|---|
 | `metrics.window_error_rate` · `window_p95_latency_ms` | `/health/ready` body | ❌ 없음(인프로세스) | 최근 `ops_metrics_window_size` 요청 창 |
+| `metrics.routes[]` (`route`·`count`·`error_rate`·`p50/p75/p95_latency_ms`) | 같은 body | ❌ | OPS-95. 키는 FastAPI 라우트 *템플릿*(원시 경로 아님). S5의 측정 원천 |
+| `Server-Timing: app;dur=<ms>` 응답 헤더 | 모든 계측 대상 응답 | ❌ | 서버 처리 구간만. 클라이언트가 체감 시간에서 빼면 네트워크·디코드·렌더가 남는다. 시간 값만 싣는다 |
 | `metrics.total_requests` · `total_5xx` · `latency_max_ms` | 같은 body | ❌ | 프로세스 시작 이후 누적 |
 | `metrics.uptime_seconds` | 같은 body | ❌ | **가용성 이력이 아니다** — 재시작하면 0 |
 | `components.*` (database/redis/llm_router) | 같은 body | ❌ | 실패 시 `error`에 **예외 타입명**만 |
 | LLM 호출 지연·토큰·비용 | Langfuse `l3_routing` | ✅ 있음 | 죽으면 "측정 실패"로 드러나야 함 |
 | 로컬/클라우드 비율·캐시 적중률 | `ops/cost_probe.py`(인프로세스) + `ops/cost_report.py` | ❌/✅ 이중 회계 | |
-| **시간 기준 가용성** | — | — | **없음**(§6 공백) |
+| **시간 기준 가용성** | 외부 업타임 프로브 기록(`uptime.jsonl`) → `uptime_probe report` | ❌ 없음(서버 프로세스 밖) | OPS-30. 서버 생사와 무관하게 기록한다. 프로브가 서버와 같은 PC에서 돌아 PC가 꺼지면 '다운'이 아니라 '기록 없음'으로 남는다(→ coverage로 드러남) |
+| `alert_delivery.config_state` · `delivered`/`failed`/`dropped_unconfigured` | `/health/ready` body | ❌ 없음 | OPS-30. 알림이 **사람에게 도달했는가**의 인프로세스 회계. `unset`이면 breach가 로그에만 남는다 |
 | **경로별 지연·에러율** | — | — | **없음**(§6 공백) |
 
 ### 1-5. [기계 판독] 계약 상수 블록
@@ -91,6 +94,9 @@
 | `ops_latency_p95_alert_ms` | `5000` | `Settings.ops_latency_p95_alert_ms` (config.py) |
 | `ops_metrics_window_size` | `500` | `Settings.ops_metrics_window_size` (config.py) |
 | `l3_sla_gate_ms` | `2000` | `l3.router.SLA_GATE_MS` |
+| `s4_availability_target` | `0.99` | `ops.uptime_probe.S4_AVAILABILITY_TARGET` |
+| `s4_window_start_kst_hour` | `15` | `ops.uptime_probe.S4_WINDOW_START_KST_HOUR` |
+| `s4_window_end_kst_hour` | `24` | `ops.uptime_probe.S4_WINDOW_END_KST_HOUR` |
 
 <!-- SLO-CONTRACT-END -->
 
@@ -126,6 +132,9 @@
 | 로그 `... 해소 — metric=<이름>` (INFO) | breach 해소 | — | 인시던트 종료 판정 보조 |
 | 로그 `... 예외 타입: <타입명>` (계측 실패 WARNING) | **관측 자체가 실패 중** — 지표를 믿지 말 것 | 메타 | §4-4 마지막 항목 |
 | `metrics.window_error_rate = null` | 표본 0 = **미측정**(정상 아님) | 판정 보류 | 학생 트래픽 0인지 먼저 확인 |
+| `alert_delivery.config_state` ≠ `configured` | **알림 채널이 없다** — 위 `alerts[]` breach가 나도 로그에만 남고 아무에게도 안 간다(`dropped_unconfigured`가 그 횟수) | 메타 | [OPS-30 런북](../ops/ops30_uptime_probe_runbook.md) [B]·[C] |
+| `alert_delivery.failed` > 0 | 웹훅 발송이 실패했다(`last_error`=예외 타입명 또는 `HTTP<코드>`). `HTTP404`/`403`=URL 오류·만료 | 메타 | 웹훅 URL 재발급 후 [B]·[C] |
+| 채널 메시지 `서버 다운 감지` / `서버 복구` | 업타임 프로브(서버 밖)가 `/health/ready`의 실패·복구를 관측. 사유 코드: `ConnectError`(포트 미리슨)·`HTTP503`(DB 미도달)·`BadBody`(다른 프로세스가 응답) | SEV-2 | `ConnectError`→§4-9 · `HTTP503`→§4-1 |
 
 ### 2-3. 신호를 읽을 때의 함정 (전부 코드 실측 근거)
 
@@ -428,9 +437,8 @@ SEV: <1~4>   시작: <로그 근거 시각>   종료: <로그 근거 시각>   �
 | 공백 | 지금 무슨 일이 생기는가 | 후속 후보 |
 |---|---|---|
 | **온콜 인원 없음(1인)** | Kiki가 자거나 자리를 비우면 **탐지도 대응도 0**이다. S4 가용성 목표를 학습 창으로 제한한 실질적 이유 | 학습 창 종료 시 1회 수동 확인 습관화 |
-| **외부 업타임 프로브 미도입** | 서버가 죽으면 *아무도 모른다*. 지금의 모든 지표는 **서버가 살아 있을 때만** 나온다 — 죽은 서버는 자기 죽음을 보고하지 못한다. S4가 미측정인 근본 원인 | 별도 호스트/스케줄러에서 `/health/ready` 주기 폴링 + 결과 append |
-| **페이지(호출) 알림 채널 미배선** | breach는 **로그에만** 남는다. 로그를 보고 있지 않으면 알림이 아니다 | breach 시 푸시·메신저 전송(OPS-01 `AlertLogNotifier` 옆에 notifier 추가) |
-| **경로별 지연·에러율 미분해** | 전역 창 지표라 "코치가 느린 건지 전체가 느린 건지" 구분 불가(S5 미측정) | 미들웨어 계측에 라우트 템플릿 차원 추가 |
+| **외부 업타임 프로브 — 코드 구현(OPS-30), 가동은 Kiki 런북 대기** | 프로브(`ops/uptime_probe.py`)는 구현·실측됐으나 **스케줄러에 올리기 전까지 기록이 0**이다 → 등록 전엔 서버가 죽어도 아무도 모른다. 등록 뒤에도 **서버와 같은 PC**에서 돌므로 PC가 꺼지는 시간은 '다운'이 아니라 '기록 없음'(S4 `INSUFFICIENT`)으로 남는다 | [런북 [D]](../ops/ops30_uptime_probe_runbook.md) 등록 + 별도 호스트 프로브(범위 밖·후속 후보) |
+| **알림 채널 — 코드 구현(OPS-30), URL 연결은 Kiki 런북 대기** | 웹훅 sink(`ops/alert_delivery.py`)가 `AlertLogNotifier` 옆에 배선됐다(전이당 1건). **`WHYMATH_OPS_ALERT_WEBHOOK_URL`이 비면 기존처럼 로그에만 남는다** — 그 상태는 기동 경고·`/health/ready`의 `alert_delivery.config_state=unset`로 드러난다. 푸시·전화(페이지) 수준의 호출은 아니다(채널 메시지 1종) | [런북 [B][C]](../ops/ops30_uptime_probe_runbook.md). 수신자가 자는 시간엔 여전히 아무도 못 본다(위 '온콜 없음' 행) |
 | **지표 영속화 없음** | 프로세스 재시작 시 누적치 소멸 → 월간 오류 예산·가용성 집계 불가 | 스크레이퍼 또는 ClickHouse 적재 |
 | **디바이스 무효화 실패 시 등록·폐기 5xx** (OPS-06 이후 남은 함정 ④의 잔여) | 캐시 DEL이 유한 재시도 후에도 실패하면 `revoke`/`register`가 오류를 반환한다. DB 변경은 그 전에 커밋돼 있어 **응답(실패)과 상태(반영됨)가 어긋나 보인다** | 의도된 fail-loud라 '해결'이 아니라 *완화* 대상 — 후속 후보는 ①무효화 실패를 큐에 적재해 백그라운드 재시도 ②`register`의 count 캐시 DEL만 분리해 no-op 강등(그쪽은 신선도 문제지 보안 계약이 아니다) |
 | **Redis 폴백 시 rate limit 분산 정확도 저하** | 인메모리 폴백은 워커별 계수라 다중 워커에서 실효 한도가 최대 워커 수 배까지 느슨해진다(무제한은 아니다). 폴백 중임은 로그·인프로세스 카운터로만 보인다 | `rate_limit_degradation_snapshot()`을 `/health/ready` body에 노출(응답 스키마 변경이라 별도 태스크) |

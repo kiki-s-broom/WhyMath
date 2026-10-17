@@ -208,6 +208,17 @@ def test_empty_run_is_not_silently_passed(tmp_path: Path) -> None:
     proc = _run([sys.executable, "scripts/constitution/audit.py", "--no-run"], root)
     assert re.search(r"\| RX-02 \| L5 \| 📭 집행 장치 없음 \| run 미지정", proc.stdout), proc.stdout
     _mutate(rules, '    run: ""\n', "    run: python scripts/constitution/pipeline_check.py\n")
+    # 대조군: run 이 있어도 CI 가 실행하지 않으면 '미연결'이다(CONST-03 P1 — 연결 판정은 규칙 자신의 단계부터)
+    proc = _run([sys.executable, "scripts/constitution/audit.py", "--no-run"], root)
+    assert re.search(r"\| RX-02 \| L5 \| 🔌 미연결", proc.stdout), proc.stdout
+    # CI 가 그 명령을 실제로 실행하면 통과
+    workflows = root / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "name: ci\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n"
+        "      - run: python scripts/constitution/pipeline_check.py\n",
+        encoding="utf-8",
+    )
     proc = _run([sys.executable, "scripts/constitution/audit.py", "--no-run"], root)
     assert re.search(r"\| RX-02 \| L5 \| ✅ 통과", proc.stdout), proc.stdout
 

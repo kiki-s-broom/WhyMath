@@ -4,8 +4,13 @@
 사전·프로파일 주입은 L4가 한다. 변환은 결정론(LLM 0)이라 `api/visualization.py`의 `/spec`
 라운드트립처럼 *레이트리미터를 적용하지 않는다*(외부 호출·비용 0).
 
-클라(L5 Flutter)는 이 명세를 받아 `flutter_tts`로 합성만 한다(수학 로직 0·슬89). plain_text는
-SSML 미지원 환경의 폴백, ssml은 지원 엔진용, unresolved_symbols는 정직성 신호다.
+클라(L5)는 이 명세를 받아 오디오 합성만 한다(수학 로직 0·슬89). plain_text는 SSML 미지원
+환경의 폴백, ssml은 지원 엔진용, unresolved_symbols는 정직성 신호다.
+
+**클라 소비는 현재 0이다**(2026-08-11 실측) — 유일한 합성 경로였던 `flutter_tts`는 Gradle
+비호환이 실측돼 `src/mobile/pubspec.yaml`에서 *의도적으로 제거*됐다. 즉 이 엔드포인트는
+서버 축만 완비된 상태이고, "클라만 붙이면 된다"가 아니다(재도입은 실기기 Gradle 호환
+재검증이 선행 — `docs/architecture/service_operations_gap_review.md` §5-④ 트리거).
 """
 
 from __future__ import annotations

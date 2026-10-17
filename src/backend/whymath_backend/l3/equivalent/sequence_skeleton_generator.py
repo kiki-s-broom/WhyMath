@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -167,6 +167,7 @@ def _arith_explanation(skeleton: _ArithSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class ArithmeticSequenceSkeletonGenerator:
     """등차수열 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -341,6 +342,7 @@ def _geo_explanation(skeleton: _GeoSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class GeometricSequenceSkeletonGenerator:
     """등비수열 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

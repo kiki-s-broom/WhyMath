@@ -19,7 +19,7 @@ from _external_store_evidence import (
     evidence_for,
 )
 from pydantic import SecretStr, ValidationError
-from sqlalchemy import select, text
+from sqlalchemy import Select, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from whymath_backend.config import Settings
@@ -57,6 +57,16 @@ class _FakeResult:
         self.rowcount = rowcount
 
 
+class _FakeSelectResult:
+    """SEC-40: erase_user가 세션 ID 수집용으로 보내는 SELECT의 빈 결과(수집 대상 0건)."""
+
+    def scalars(self) -> _FakeSelectResult:
+        return self
+
+    def all(self) -> list[Any]:
+        return []
+
+
 class _FakeSession:
     """delete 실행 순서·add(감사)·flush를 캡처(이벤트 로그). execute는 fake rowcount 반환."""
 
@@ -65,7 +75,9 @@ class _FakeSession:
         self.default_rowcount = default_rowcount
         self.flushed = 0
 
-    async def execute(self, stmt: Any) -> _FakeResult:
+    async def execute(self, stmt: Any) -> _FakeResult | _FakeSelectResult:
+        if isinstance(stmt, Select):  # SEC-40: 세션 ID 수집 SELECT — 삭제 순서 로그에 안 싣는다.
+            return _FakeSelectResult()
         self.events.append(("delete", stmt.table.name))
         return _FakeResult(self.default_rowcount)
 
@@ -84,14 +96,18 @@ class TestEraseOrchestration:
     def test_user_profile_deleted_last(self) -> None:
         """user_profile은 모든 자식 삭제 후 *마지막*에 삭제(FK 위반 방지)."""
         session = _FakeSession()
-        asyncio.run(erase_user(cast(AsyncSession, session), user_id=uuid.uuid4()))
+        asyncio.run(
+            erase_user(cast(AsyncSession, session), user_id=uuid.uuid4(), settings=_settings())
+        )
         order = _delete_order(session)
         assert order[-1] == "user_profile"
 
     def test_fk_dependency_order(self) -> None:
         """dialogue→problem_attempt→learning_session 순서(FK 의존 안전)."""
         session = _FakeSession()
-        asyncio.run(erase_user(cast(AsyncSession, session), user_id=uuid.uuid4()))
+        asyncio.run(
+            erase_user(cast(AsyncSession, session), user_id=uuid.uuid4(), settings=_settings())
+        )
         order = _delete_order(session)
         assert order.index("dialogue") < order.index("problem_attempt")
         assert order.index("problem_attempt") < order.index("learning_session")
@@ -99,7 +115,9 @@ class TestEraseOrchestration:
     def test_covers_all_planned_tables(self) -> None:
         """계획된 17개 테이블 전부 + user_profile 삭제(누락 0)."""
         session = _FakeSession()
-        asyncio.run(erase_user(cast(AsyncSession, session), user_id=uuid.uuid4()))
+        asyncio.run(
+            erase_user(cast(AsyncSession, session), user_id=uuid.uuid4(), settings=_settings())
+        )
         order = set(_delete_order(session))
         planned = {m.__tablename__ for m, _ in _ERASURE_PLAN}
         assert planned <= order  # 모든 계획 테이블 포함
@@ -119,7 +137,7 @@ class TestEraseOrchestration:
         """DeletionAudit는 user_profile 삭제 *전* 적재(user_id 살아있을 때·잔존 증빙)."""
         session = _FakeSession()
         uid = uuid.uuid4()
-        asyncio.run(erase_user(cast(AsyncSession, session), user_id=uid))
+        asyncio.run(erase_user(cast(AsyncSession, session), user_id=uid, settings=_settings()))
         add_pos = next(i for i, (k, _) in enumerate(session.events) if k == "add")
         up_pos = next(
             i for i, (k, v) in enumerate(session.events) if k == "delete" and v == "user_profile"
@@ -135,7 +153,9 @@ class TestEraseOrchestration:
         """보고서 — 테이블별 행수·user_profile 행수·총합·flush 1회."""
         session = _FakeSession(default_rowcount=2)
         uid = uuid.uuid4()
-        report = asyncio.run(erase_user(cast(AsyncSession, session), user_id=uid))
+        report = asyncio.run(
+            erase_user(cast(AsyncSession, session), user_id=uid, settings=_settings())
+        )
         assert isinstance(report, ErasureReport)
         assert report.user_id == uid
         assert set(report.deleted_counts) == {m.__tablename__ for m, _ in _ERASURE_PLAN}
@@ -147,7 +167,9 @@ class TestEraseOrchestration:
     def test_idempotent_when_nothing_to_delete(self) -> None:
         """이미 없는 사용자 → 전부 0행·user_profile_deleted=0(무해)·감사는 여전히 적재."""
         session = _FakeSession(default_rowcount=0)
-        report = asyncio.run(erase_user(cast(AsyncSession, session), user_id=uuid.uuid4()))
+        report = asyncio.run(
+            erase_user(cast(AsyncSession, session), user_id=uuid.uuid4(), settings=_settings())
+        )
         assert report.total_rows_deleted == 0
         assert report.user_profile_deleted == 0
 
@@ -207,7 +229,9 @@ class TestExternalErasureManifest:
         """`erase_user` 결과가 외부 store 매니페스트를 담는다(조용한 누락 0)."""
         session = _FakeSession()
         uid = uuid.uuid4()
-        report = asyncio.run(erase_user(cast(AsyncSession, session), user_id=uid))
+        report = asyncio.run(
+            erase_user(cast(AsyncSession, session), user_id=uid, settings=_settings())
+        )
         assert report.pending_external == external_erasure_targets(uid)
         # 개수를 상수로 박지 않는다 — store가 늘고 주는 것은 정상이고, *실재하는가*만이 계약이다.
         assert report.pending_external
@@ -345,7 +369,7 @@ def test_erase_user_removes_all_linked_data_on_live_pg() -> None:
             await _seed(sm)
 
             async with sm() as session:
-                report = await erase_user(session, user_id=uid)
+                report = await erase_user(session, user_id=uid, settings=_settings())
                 await session.commit()  # commit은 호출자
                 assert report.user_profile_deleted == 1
                 assert report.deleted_counts["evidence_links"] == 2

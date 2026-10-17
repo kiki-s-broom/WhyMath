@@ -1,0 +1,33 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-30-elementary-area-measure-corpus
+title: "초등 도형과 측정(넓이 단위 환산·직육면체 겉넓이) 파일럿 코퍼스 (W2 Phase1 #4)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-29-coordinate-geometry-corpus
+requires_gates: []
+acceptance:
+  - "재확인: [6수03-11]·[6수03-13]·[6수03-14](둘레·직사각형/삼각형 등 넓이)는 misconception_eval_mc_generator가 이미 커버 — 계획 문서 작성 시점 대비 커버리지 이동, 중복 착수 회피"
+  - "[6수03-12](넓이 단위 ㎠·㎡·㎢) 0커버 해소 — 단위 환산 생성기(대→소 단위, 항상 정수배)"
+  - "[6수03-17](직육면체 겉넓이) 0커버 해소 — 2(lw+lh+wh) 생성기"
+  - "㎠/㎡/㎢ 등 CJK 제곱단위 글리프 미사용 — cm^2/m^2/km^2 ASCII 캐럿 표기(기존 x^2 관례 계승, 신규 글리프 게이트 회귀 방지)"
+  - "josa 엔진이 알파벳 단위 꼬리(m^2 등)를 못 읽고 기본값(받침 有)으로 폴백함을 실측 확인 — 상수 조사(를/는, 무받침)를 의도적으로 하드코딩(버그 아님, 문서화 필수)"
+  - "전건 Tier1 게이트 통과·is_published=False·coverage 리포트 이동 확인·전체 스위트+4게이트 green"
+artifacts:
+  - 26dc6293
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/elementary_area_measure_skeleton_generator.py
+  - src/backend/whymath_backend/harness/elementary_area_measure_batch.py
+  - tests/backend/l3/equivalent/test_elementary_area_measure_skeleton_generator.py
+  - tests/backend/harness/test_elementary_area_measure_batch.py
+  - data/corpus/problem_bank_elementary_area_measure_v0/problems.jsonl
+session: null
+notes: "w2_content_factory_completion_plan_v1.md §6 Phase 1 우선순위 4위. 원 계획 타깃(둘레·직사각형/삼각형 넓이)이 이미 커버돼 있어 같은 도메인의 진짜 0커버 성취기준(단위 환산·겉넓이)으로 스코프 조정.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-30-elementary-area-measure-corpus 재등재. 원 증적 ['26dc6293']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

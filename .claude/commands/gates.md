@@ -43,6 +43,15 @@ python3 scripts/harness/backlog.py gates add <G-id> --title "..." \
 ```
 등재 후 `backlog.py validate` green 확인.
 
+### 5. amend --note (부분 답변·판정 근거 누적 — 게이트를 닫지 않는다)
+Kiki가 일부만 답했거나 판정 근거가 생겼지만 clear 요건은 아직 미충족일 때, **MEMORY.md에만 적지 말고
+게이트 notes에 기록한다**(clear 판단자는 `gates show`로만 읽는다 — 못 읽으면 추론으로 닫는다):
+```bash
+python3 scripts/harness/backlog.py gates amend <G-id> --note "<부분 답변·근거>" --reason "<사유>"
+python3 scripts/harness/backlog.py gates show <G-id>   # notes 전문 확인
+```
+백틱이 든 산문은 인용 heredoc(`<<'EOF'`)으로 파일에 쓴 뒤 `--note "$(cat 파일)"`로 넘기고, 쓴 뒤 `show`로 읽어 대조한다.
+
 ## 원칙
 - G-s5-subject-expansion(E축 하드락)은 S5 판정 태스크를 거치지 않고 clear/waive 금지
 - 게이트 추가는 `gates add` CLI로만 — backlog/gates.yaml 손편집 금지 (HARN-18 · 2026-08-10 통합점검 정정: 종전 이 줄이 손편집을 안내하고 있었다)

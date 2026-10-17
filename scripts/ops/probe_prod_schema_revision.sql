@@ -31,6 +31,14 @@
 --   'default' - the column's DEFAULT clause (column_default IS NOT NULL). This
 --               covers a revision that only changes an ATTRIBUTE of a column
 --               that already exists, where existence proves nothing.
+--   'enum_value' - one LABEL of a PG enum type (obj_table = the enum TYPE name,
+--               obj_column = the label, looked up in pg_enum under schema
+--               public). This covers a revision whose whole effect is adding
+--               enum labels (ADD VALUE) and that creates no table and no column,
+--               so neither 'object' nor 'default' has anything to look at
+--               (P3-12: role_enum content_editor/reviewer/publisher). A label
+--               added by one revision is all-or-nothing, so the LAST label of
+--               the revision is a sufficient discriminator.
 -- Why 'default' had to exist (SEC-33, 2026-09-08): revision 19149e92d368 only
 -- runs `ALTER COLUMN problem_attempt.ingested_at SET DEFAULT now()`. The column
 -- itself has existed since c9bc2555282e (seq 86), so an 'object' row for it
@@ -112,7 +120,14 @@ WITH expected(seq, revision, obj_table, obj_column, polarity, obj_kind) AS (
         (105, '8e4c2a7f1b93', 'learning_session',    'last_activity_at',         '+', 'object'),
         (106, '8c19e8a611e4', 'privacy_audit',       'token_expires_at',         '+', 'object'),
         (107, '9d3e6b1f4a27', 'hints',               '',                         '+', 'object'),
-        (108, '9d3e7b1c5a20', 'concept_version',     'qa',                       '+', 'object')
+        (108, '9d3e7b1c5a20', 'concept_version',     'qa',                       '+', 'object'),
+        (109, 'a3f7c9d1e5b2', 'attempt_event',       'event_uuid',               '+', 'object'),
+        (110, 'b4d8e2a6c0f3', 'problem',             'source_id',                '+', 'object'),
+        (111, 'c5e1f9a3b7d2', 'problem_version',     '',                         '+', 'object'),
+        (112, 'c5e9f3a7b1d4', 'role_enum',           'content_publisher',        '+', 'enum_value'),
+        (113, 'e7b2c4d8a1f6', 'hints',               'cms_edited_at',            '+', 'object'),
+        (114, 'd6a2f8c4b1e7', 'problem_attempt',     'problem_version_id',       '+', 'object'),
+        (115, 'a8c4e1f7b3d9', 'concept_edge',        'cms_edited_at',            '+', 'object')
 )
 SELECT
     e.seq,
@@ -122,6 +137,7 @@ SELECT
     -- answering "does the column exist" (it does), so label what was asked.
     CASE
         WHEN e.obj_kind = 'default' THEN e.obj_column || ' (default)'
+        WHEN e.obj_kind = 'enum_value' THEN e.obj_column || ' (enum label)'
         WHEN e.obj_column = '' THEN '(table)'
         ELSE e.obj_column
     END AS checked_object,
@@ -138,6 +154,16 @@ SELECT
                   AND c.table_name = e.obj_table
                   AND c.column_name = e.obj_column
                   AND c.column_default IS NOT NULL)
+            -- enum label check: neither a table nor a column exists to look at,
+            -- so ask pg_enum whether the label is on the type. Ordered before the
+            -- generic branches so an enum row can never fall through to them.
+            WHEN e.obj_kind = 'enum_value' THEN EXISTS (
+                SELECT 1 FROM pg_enum pe
+                JOIN pg_type pt ON pt.oid = pe.enumtypid
+                JOIN pg_namespace pn ON pn.oid = pt.typnamespace
+                WHERE pn.nspname = 'public'
+                  AND pt.typname = e.obj_table
+                  AND pe.enumlabel = e.obj_column)
             WHEN e.obj_column = '' THEN EXISTS (
                 SELECT 1 FROM information_schema.tables t
                 WHERE t.table_schema = 'public' AND t.table_name = e.obj_table)

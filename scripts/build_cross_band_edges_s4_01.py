@@ -39,10 +39,15 @@ EVIDENCE: Final[str] = "S4-01 고→대 경계 저작 v1"
 RELATION: Final[str] = "prerequisite"
 RELATION_SUBTYPE: Final[str] = "학교급간(추정)"
 STRENGTH: Final[float] = 0.8
+#: 원장 상태 표기 — 정본에 태그 엣지가 있으면 병합 완료(S4-60), 없으면 제안.
+STATUS_PROPOSAL: Final[str] = "proposal — AI 검수 통과(2026-10-08) · 정본 미병합"
+STATUS_MERGED: Final[str] = "merged — 정본 병합 완료(S4-60) · 이 파일은 근거(rationale) 원장"
 
 #: 저작 확정 목록 — (from_code=고등 원자, to_code=대학 원자, rationale=교육적 근거).
 #: **교육적 판단은 확정됐다. 이 목록의 추가·삭제·코드 변경·근거 문구 수정은 금지**이며,
-#: 변경은 게이트 검수 결과로만 이뤄진다(사람 저작물).
+#: 변경은 게이트 검수 결과로만 이뤄진다. 2026-10-08 게이트 판정(Kiki 지시로 사람 검수를
+#: AI 검수로 대체)에서 출발 원자 4건(E06·E15·E18·E24)이 교체됐다 — 근거 =
+#: `docs/data/ai_review_cross_band_edges_university_v1.md`.
 AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (
     (
         "12미적Ⅰ-01-01-1",
@@ -70,9 +75,9 @@ AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (
         '고등 "미분가능성과 연속성"이 대학 "미분가능이 도함수 연속을 보장하지 않는다"의 선행이다',
     ),
     (
-        "12미적Ⅰ-02-03-2",
+        "12미적Ⅰ-02-01-1",
         "CALC1-C08",
-        '"도함수는 함수다"가 dy/dx를 분수로 오해하지 않는 표기 이해의 선행이다',
+        "dy/dx가 차분몫 Δy/Δx의 극한 기호라는 이해는 미분계수(차분몫의 극한)가 직접 선수다",
     ),
     (
         "12미적Ⅰ-02-04-2",
@@ -115,9 +120,9 @@ AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (
         "평면=점+법선벡터 표현이 대학 평면 방정식 계수의 법선 해석으로 계승된다",
     ),
     (
-        "12기하03-04-2",
+        "12기하02-01-1",
         "CALC2-C06",
-        "직선=점+방향벡터 표현이 공간 직선의 꼬인 위치 판정의 선행이다",
+        "고등 공간 위치 관계(꼬인 위치 포함)가 대학 공간 직선의 꼬인 위치 판정의 직접 선수다",
     ),
     (
         "10공수1-04-02-1",
@@ -130,9 +135,9 @@ AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (
         "연립해가 동시에 참이라는 이해가 해집합 구조(0·1·무한)의 선행이다",
     ),
     (
-        "10공수1-04-01-1",
+        "10공수1-04-02-1",
         "LINA1-R02",
-        "행렬의 행×열 구조가 행렬을 기하변환으로 읽는 표상의 선행이다",
+        "행렬을 격자·도형에 작용시켜 기하변환으로 읽으려면 행렬곱 연산이 실질적 선수다",
     ),
     (
         "10공수2-02-02-1",
@@ -160,20 +165,24 @@ AUTHORED_EDGES: Final[tuple[tuple[str, str, str], ...]] = (
         "수학적 귀납법 두 단계가 대학 귀납법 기저단계 필수성의 선행이다",
     ),
     (
-        "12확통02-01-1",
+        "12확통02-02-1",
         "PROB-C03",
-        "확률의 기본 성질이 콜모고로프 공리(비음·정규·가산가법)의 선행이다",
+        "배반사건의 확률을 더하는 덧셈정리가 콜모고로프 가산가법 공리의 직접 전신이다",
     ),
 )
 
 
-def _sha256(path: Path) -> str:
-    """파일 sha256(제안이 어느 정본 스냅샷을 전제로 하는지 고정 — 정본이 바뀌면 재검수 신호)."""
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _pre_merge_sha256(graph: dict[str, Any]) -> str:
+    """제안이 전제한 *병합 전* 정본의 sha256 — 정본이 바뀌면 재검수 신호가 된다.
+
+    정본 병합(S4-60) 뒤에는 graph.json 파일 자체의 sha가 바뀌므로 파일 sha를 쓰면 이 스크립트의
+    `--check`(바이트 동일 보증)가 병합 즉시 깨진다. 그래서 출처 태그 엣지를 뺀 병합 전 뷰를 정본
+    직렬화로 찍는다. 병합이 끝에 덧붙이기였으므로 병합 전에는 파일 sha와 같은 값이다.
+    """
+    view = dict(graph)
+    view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") != EVIDENCE]
+    text = json.dumps(view, ensure_ascii=False, indent=2) + "\n"
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:
@@ -183,6 +192,8 @@ def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:
     넘어가면 "조회해 채운다"는 규율이 조용히 무너지기 때문이다.
     """
     nodes = {str(c["code"]): c for c in graph.get("concepts", [])}
+    merged = any(e.get("evidence") == EVIDENCE for e in graph.get("edges", []))
+    status = STATUS_MERGED if merged else STATUS_PROPOSAL
     edges: list[dict[str, Any]] = []
     for from_code, to_code, rationale in AUTHORED_EDGES:
         missing = [c for c in (from_code, to_code) if c not in nodes]
@@ -206,7 +217,7 @@ def build_payload(graph: dict[str, Any], graph_sha256: str) -> dict[str, Any]:
         "_meta": {
             "generated_by": "scripts/build_cross_band_edges_s4_01.py",
             "task": TASK_ID,
-            "status": "proposal — 검수 전 정본 미병합",
+            "status": status,
             "edge_count": len(edges),
             "source_graph_sha256": graph_sha256,
         },
@@ -222,7 +233,7 @@ def serialize(payload: dict[str, Any]) -> str:
 def run(*, check: bool) -> int:
     """생성(또는 드라이런). 반환값이 그대로 종료 코드."""
     graph: dict[str, Any] = json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
-    text = serialize(build_payload(graph, _sha256(GRAPH_PATH)))
+    text = serialize(build_payload(graph, _pre_merge_sha256(graph)))
 
     if check:
         if not OUTPUT_PATH.exists():

@@ -15,14 +15,18 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from fractions import Fraction
 
 import pytest
 
+from whymath_backend.config import Settings
 from whymath_backend.l3.cross_verify import (
     MISSING_CONDITION_PERSPECTIVES,
     MULTIPLE_VALID_ANSWERS_PERSPECTIVES,
     PROBABILITY_PERSPECTIVES,
     STATISTICAL_PERSPECTIVES,
+    UNRECORDED_AUTHOR,
+    AuthorDeclarationConflictError,
     CrossVerifier,
     IndependenceError,
     Perspective,
@@ -30,6 +34,10 @@ from whymath_backend.l3.cross_verify import (
     _assert_independent,
     _judge_defect_class,
     _judge_labelled,
+    assert_author_independent,
+    deterministic_author,
+    llm_author,
+    resolve_author_signature,
 )
 from whymath_backend.l3.models import (
     CostTier,
@@ -37,7 +45,10 @@ from whymath_backend.l3.models import (
     LocalModelTier,
     RoutingDecision,
 )
+from whymath_backend.l3.pregenerate.provenance_bridge import model_name_for_decision
 from whymath_backend.l3.prompt_assets import prompt_text
+from whymath_backend.l3.router import Router, resolve_model
+from whymath_backend.l3.statistical_claim import verify_statistical_claim
 
 _SUBJECT = ResidueSubject(
     problem_id="wm-finite-test",
@@ -47,7 +58,9 @@ _SUBJECT = ResidueSubject(
     machine_model_ko="표본공간: 36가지.\n사건 A: 값들의 합이 7과 같다.\n확률 = 6/36.",
     machine_total=36,
     machine_favorable=6,
-    authored_by="corpus:FULLY_GENERATED",
+    # LLM 생성자가 없다는 *명시 선언*(PB-15). 종전 `corpus:FULLY_GENERATED`는 검증자 서명과 형식이
+    # 달라 가드를 영영 비껴갔고, 그래서 이 픽스처가 가드를 한 번도 밟지 못했다.
+    authored_by=deterministic_author("finite_enumerator"),
 )
 
 _RECONSTRUCT_OK = json.dumps({"total": 36, "favorable": 6})
@@ -160,6 +173,122 @@ def test_self_approval_is_refused() -> None:
     subject = replace(_SUBJECT, authored_by=verifier.signature)
     with pytest.raises(IndependenceError, match="자기승인"):
         verifier.verify(subject)
+
+
+# ── ②-b 생성자 서명 3상태 (PB-15) ─────────────────────────────────────
+# 위 `test_self_approval_is_refused`는 `verifier.signature`를 그대로 대입하므로 동어반복이다 —
+# 저작 측이 *다른 함수*로 서명을 조립해 형식이 갈라져도 통과한다. PB-15의 결함이 정확히 그것이었다
+# (코퍼스 `corpus:<유형>` vs 검증자 `llm:<모델>`). 아래는 저작 측 조립 경로로 만든 서명과 **실값**
+# 문자열로 단언한다.
+_PIN = "qwen3:30b-a3b"
+
+
+def test_same_llm_is_self_approval_and_other_llm_is_not() -> None:
+    """절: LLM 서명 동일 비교. 대조군(다른 모델)이 함께 있어야 '전부 거부'하는 수정이 걸린다."""
+    with pytest.raises(IndependenceError, match="자기승인"):
+        assert_author_independent(llm_author(_PIN), llm_author(_PIN))
+    assert_author_independent(llm_author("other-model:7b"), llm_author(_PIN))  # 예외 없음
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "llm:QWEN3:30B-A3B",  # 절: casefold — 사람이 손으로 쓴 대소문자 차이가 가드를 비껴가면 안 된다
+        "llm:qwen3:30b-a3b ",  # 절: strip — 뒤 공백
+    ],
+)
+def test_llm_comparison_ignores_case_and_trailing_space(variant: str) -> None:
+    with pytest.raises(IndependenceError, match="자기승인"):
+        assert_author_independent(variant, llm_author(_PIN))
+
+
+def test_deterministic_declaration_is_never_compared_with_the_verifier() -> None:
+    """절: 결정론 선언은 비교 대상이 아니다 — 검증자가 LLM이어도 통과(LLM 생성자가 없다)."""
+    assert_author_independent(deterministic_author("finite_enumerator"), llm_author(_PIN))
+
+
+@pytest.mark.parametrize(
+    "unreadable",
+    [
+        "",  # 절: 빈 문자열은 '비교 대상 아님'으로 접히지 않는다
+        UNRECORDED_AUTHOR,  # 절: 기록 없음 = 모른다 ≠ 아니다
+        "corpus:FULLY_GENERATED",  # 종전 코퍼스 조립값 — 이 값이 가드를 영영 비껴갔던 장본인
+        "deterministic_enumerator",  # 콜론 없는 비공식 표기는 선언이 아니다
+        "llm:",  # 절: 접두어만 있고 이름이 빈 LLM 서명 — 어떤 검증자와도 '다르다'며 통과하면 안 됨
+        "llm:   ",  # 절: 공백뿐인 이름
+        "deterministic:",  # 절: 이름 없는 결정론 선언
+        "LLM:qwen3:30b-a3b",  # 절: 접두어는 정확 일치 — 대문자 접두어는 판독 불가
+        " llm:qwen3:30b-a3b",  # 절: 앞 공백이 붙은 접두어
+    ],
+)
+def test_unreadable_author_is_refused_fail_closed(unreadable: str) -> None:
+    """기록 없음·판독 불가 서명은 독립성을 입증할 수 없어 거부한다(침묵 통과 금지)."""
+    with pytest.raises(IndependenceError, match="판독할 수 없다"):
+        assert_author_independent(unreadable, llm_author(_PIN))
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_signature_builders_refuse_empty_names(name: str) -> None:
+    """빈 이름으로는 서명을 만들 수 없다 — 빈 값이 서명으로 위장해 가드를 우회하는 길을 막는다."""
+    with pytest.raises(ValueError, match="비었다"):
+        llm_author(name)
+    with pytest.raises(ValueError, match="비었다"):
+        deterministic_author(name)
+
+
+def test_local_verifier_signature_collides_with_authoring_side_signature() -> None:
+    """저작 측 조립 경로(`model_name_for_decision`)로 만든 서명이 검증자 서명과 충돌한다.
+
+    로컬 좌석의 실값은 `llm:` + 라우터 매트릭스 해석 모델 id다 — 함수 자신이 아니라 라우터
+    결정에서 독립 도출한 값으로 단언한다.
+    """
+    verifier = _verifier(ScriptedProvider([_RECONSTRUCT_OK, _LABEL_OK, _LABEL_OK]))
+    decision = Router().route(verifier._routing_request())
+    local_model = resolve_model(decision.local_family, decision.local_model)
+
+    assert verifier.signature == f"llm:{local_model}"
+    authored_by_authoring_side = llm_author(model_name_for_decision(decision))
+    with pytest.raises(IndependenceError, match="자기승인"):
+        verifier.verify(replace(_SUBJECT, authored_by=authored_by_authoring_side))
+
+
+@pytest.mark.parametrize("seat", ["anthropic", "openrouter", "deepseek"])
+def test_cloud_verifier_signature_names_the_pinned_model_not_the_tier(
+    seat: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """클라우드 좌석 — 검증자 서명이 티어명(`llm:cloud_mid`)이 아니라 모델 핀이다.
+
+    종전 판은 클라우드에서 `llm:<티어명>`을 냈고 저작 측은 모델 핀을 기록했다. 코퍼스 쪽 형식만
+    고쳤다면 로컬끼리의 충돌은 잡혀도 *같은 클라우드 모델이 만든 문항을 같은 모델이 검증*하는
+    경우는 여전히 못 잡았을 것이다. 좌석 3종을 모두 밟는다(한 좌석만 고치고 방치하는 형태 차단).
+    """
+    settings = Settings(jwt_secret_key="x" * 32, cloud_provider=seat)  # type: ignore[arg-type]
+    pin = {
+        "anthropic": settings.anthropic_model_mid,
+        "openrouter": settings.openrouter_model_mid,
+        "deepseek": settings.deepseek_model_mid,
+    }[seat]
+    cloud_decision = RoutingDecision(cost_tier=CostTier.CLOUD_MID, est_latency_ms=1000)
+    monkeypatch.setattr(Router, "route", lambda self, request: cloud_decision)
+
+    verifier = _verifier(
+        ScriptedProvider([_RECONSTRUCT_OK, _LABEL_OK, _LABEL_OK]), settings=settings
+    )
+
+    assert verifier.signature == f"llm:{pin}"
+    assert verifier.signature != "llm:cloud_mid", "티어명 서명 — 종전 결함(PB-15) 재발"
+    with pytest.raises(IndependenceError, match="자기승인"):
+        verifier.verify(replace(_SUBJECT, authored_by=llm_author(pin)))
+    # 대조군: 다른 모델이 만든 문항은 통과한다(전부 거부하는 과잉 수정 방지).
+    result = verifier.verify(replace(_SUBJECT, authored_by=llm_author("some-other-model")))
+    assert result.aggregate == "ok"
+
+
+def test_legacy_corpus_corpus_prefix_no_longer_slips_past_the_guard() -> None:
+    """종전 결함의 직접 재현 — `corpus:<유형>` 서명 대상은 이제 검증 단계에서 거부된다."""
+    verifier = _verifier(ScriptedProvider([_RECONSTRUCT_OK, _LABEL_OK, _LABEL_OK]))
+    with pytest.raises(IndependenceError, match="판독할 수 없다"):
+        verifier.verify(replace(_SUBJECT, authored_by="corpus:FULLY_GENERATED"))
 
 
 # ── ③ 정보 은닉 ───────────────────────────────────────────────────────
@@ -504,3 +633,276 @@ def test_sentinel_probe_itself_discriminates() -> None:
         judge=_judge_labelled("honest_declares"),
     )
     assert _actually_exposed(honest) == honest.visible_fields
+
+
+# ── 저작 선언 해석 (PB-17 ③) — 선언은 기록 없음만 채운다 ──────────────────
+def test_declaration_fills_only_unrecorded() -> None:
+    declared = deterministic_author("gen")
+    assert resolve_author_signature(UNRECORDED_AUTHOR, declared) == declared
+    assert resolve_author_signature(UNRECORDED_AUTHOR, None) == UNRECORDED_AUTHOR
+    assert resolve_author_signature(UNRECORDED_AUTHOR, "  ") == UNRECORDED_AUTHOR
+    assert resolve_author_signature(llm_author("m"), None) == llm_author("m")
+
+
+def test_declaration_cannot_flip_a_recorded_llm_to_deterministic() -> None:
+    """LLM 기록을 deterministic 선언으로 뒤집어 가드를 우회하는 길이 닫혀 있다."""
+    with pytest.raises(AuthorDeclarationConflictError):
+        resolve_author_signature(llm_author("qwen3:30b-a3b"), deterministic_author("g"))
+    with pytest.raises(AuthorDeclarationConflictError):
+        resolve_author_signature(deterministic_author("g"), llm_author("m"))
+
+
+def test_declaration_equal_to_record_is_idempotent_and_case_insensitive() -> None:
+    recorded = llm_author("Qwen3:30b-a3b")
+    assert resolve_author_signature(recorded, "llm:qwen3:30B-A3B ") == recorded
+
+
+def test_conflict_error_is_an_independence_error() -> None:
+    """하위 호출부가 `IndependenceError` 하나로 독립성 위반을 잡을 수 있다."""
+    assert issubclass(AuthorDeclarationConflictError, IndependenceError)
+
+
+# ── 통계 독립 재계산 대조 (S4-70) — float isclose 대신 정확값 정책 ─────────────
+_STAT_RECONSTRUCT = STATISTICAL_PERSPECTIVES[0]
+
+
+def _stat_subject(**overrides: object) -> ResidueSubject:
+    base = ResidueSubject(
+        problem_id="wm-stat-test",
+        question_text="자료의 평균은?",
+        answer="3",
+        answer_explanation="",
+        machine_model_ko="평균(n=5) = 3",
+        machine_total=0,
+        machine_favorable=0,
+        authored_by=deterministic_author("stat_generator"),
+        data="data=[1,2,3,4,5]; stat=mean",
+    )
+    return replace(base, **overrides)  # type: ignore[arg-type]
+
+
+def _reconstruct(subject: ResidueSubject, value: object) -> str:
+    assert _STAT_RECONSTRUCT.principle == "statistical_reconstruction"
+    return _STAT_RECONSTRUCT.judge(subject, {"value": value}).verdict
+
+
+_TRILLION = 10**12
+
+
+@pytest.mark.parametrize(
+    "llm_value",
+    [_TRILLION + 1, f"{_TRILLION + 1}", float(_TRILLION + 1)],
+    ids=["int", "str", "float"],
+)
+def test_stat_reconstruct_large_mean_off_by_one_is_a_defect(llm_value: object) -> None:
+    """수정 전에는 평균 10^12에서 1 어긋나도 rel_tol 1e-9 허용 폭(1000)에 들어 ok였다."""
+    subject = _stat_subject(
+        machine_value=float(_TRILLION),
+        machine_exact=Fraction(_TRILLION),
+        machine_approx=Fraction(_TRILLION),
+    )
+    assert _reconstruct(subject, llm_value) == "defect"
+    # 대조군 — 정확히 같은 대값은 통과한다(전건 defect 과잉 수정 방지).
+    assert _reconstruct(subject, _TRILLION) == "ok"
+    assert _reconstruct(subject, f"{_TRILLION}") == "ok"
+
+
+def test_stat_reconstruct_mismatch_reason_names_policy_and_exact_values() -> None:
+    subject = _stat_subject(machine_exact=Fraction(_TRILLION), machine_approx=Fraction(_TRILLION))
+    verdict = _STAT_RECONSTRUCT.judge(subject, {"value": _TRILLION + 1})
+    assert verdict.defect_class == "model_mismatch"
+    assert "exact" in verdict.reason
+    assert str(_TRILLION + 1) in verdict.reason
+
+
+def test_stat_reconstruct_terminating_machine_value_requires_exact_match() -> None:
+    subject = _stat_subject(machine_exact=Fraction(5, 2), machine_approx=Fraction(5, 2))
+    assert _reconstruct(subject, "2.5") == "ok"
+    assert _reconstruct(subject, "5/2") == "ok"
+    assert _reconstruct(subject, 2.5) == "ok"
+    # 유한소수 기계값은 정확 일치 — 1e-10 어긋남도 통과시키지 않는다.
+    assert _reconstruct(subject, "2.5000000001") == "defect"
+
+
+def test_stat_reconstruct_reads_float_by_its_decimal_notation_not_binary_value() -> None:
+    """LLM이 쓴 `0.1`은 십진 1/10이다. 이진 근사(0.1000000000000000055…)로 읽으면 정확 일치가 깨진다."""
+    subject = _stat_subject(machine_exact=Fraction(1, 10), machine_approx=Fraction(1, 10))
+    assert _reconstruct(subject, 0.1) == "ok"
+    assert _reconstruct(subject, "0.1") == "ok"
+    assert (
+        _reconstruct(subject, 0.3 - 0.2) == "defect"
+    )  # 0.09999999999999998 — 부동소수 잡음은 거른다
+
+
+def test_stat_reconstruct_bool_is_never_a_number() -> None:
+    """JSON `true`는 파이썬에서 1과 같다 — 기계값이 1이어도 숫자 1로 통과하면 안 된다."""
+    subject = _stat_subject(machine_exact=Fraction(1), machine_approx=Fraction(1))
+    verdict = _STAT_RECONSTRUCT.judge(subject, {"value": True})
+    assert verdict.verdict == "unclear"
+    assert verdict.defect_class == "value_unparsed"
+    assert _reconstruct(subject, 1) == "ok"  # 대조군
+
+
+def test_stat_reconstruct_non_terminating_machine_value_uses_absolute_tolerance() -> None:
+    subject = _stat_subject(machine_exact=Fraction(7, 3), machine_approx=Fraction(7, 3))
+    assert _reconstruct(subject, "7/3") == "ok"
+    assert _reconstruct(subject, "2.3333333333") == "ok"  # 오차 3.3e-11 <= 1e-9
+    assert _reconstruct(subject, "2.33") == "defect"
+    # 허용 폭 경계 — 오차 1.67e-9 는 10^-9 를 넘는다(폭을 10배 풀면 통과해 버리는 입력)
+    assert _reconstruct(subject, "2.333333335") == "defect"
+    assert _reconstruct(subject, "2.3333333323") == "defect"  # 반대 방향 오차 1.0e-9 초과
+
+
+def test_stat_reconstruct_absolute_tolerance_boundary_is_inclusive() -> None:
+    """오차가 정확히 10^-9 인 재계산은 통과(경계 포함), 그보다 1/3·10^-18 이라도 크면 거절.
+
+    S4-58 의 `abs:` 정책이 경계 포함이므로 교차검증도 같아야 한다 — 패리티 검사의 입력 격자에는
+    오차가 정확히 10^-9 인 값이 없어 이 절을 밟지 못하기에 여기서 직접 건드린다.
+    """
+    subject = _stat_subject(machine_exact=Fraction(1, 3), machine_approx=Fraction(1, 3))
+    on_boundary = Fraction(1, 3) + Fraction(1, 10**9)
+    assert _reconstruct(subject, f"{on_boundary.numerator}/{on_boundary.denominator}") == "ok"
+    over = on_boundary + Fraction(1, 10**18)
+    assert _reconstruct(subject, f"{over.numerator}/{over.denominator}") == "defect"
+    below = Fraction(1, 3) - Fraction(1, 10**9)
+    assert _reconstruct(subject, f"{below.numerator}/{below.denominator}") == "ok"  # 반대 방향
+
+
+def test_stat_reconstruct_irrational_machine_value_uses_approx_only() -> None:
+    """무리수(exact 없음) — 근사만 있어도 절대오차로 대조한다. 정확 일치를 요구하지 않는다."""
+    sqrt2 = Fraction(14142135623730950488, 10**19)
+    subject = _stat_subject(machine_exact=None, machine_approx=sqrt2)
+    assert _reconstruct(subject, "1.41421356237") == "ok"
+    assert _reconstruct(subject, 1.4142135623730951) == "ok"
+    assert _reconstruct(subject, "1.4143") == "defect"
+
+
+def test_stat_reconstruct_keeps_float_only_machine_value_contract() -> None:
+    """exact·approx 필드를 모르는 기존 소비자(float `machine_value`만 채움)도 그대로 동작한다."""
+    third = _stat_subject(machine_value=7 / 3)
+    assert _reconstruct(third, "7/3") == "ok"  # float을 exact로 승격하면 여기서 거부된다
+    assert _reconstruct(third, "2.33") == "defect"
+    assert _reconstruct(_stat_subject(machine_value=3.0), 3) == "ok"
+
+
+def test_stat_reconstruct_exact_fields_take_precedence_over_float() -> None:
+    """정확 필드가 있으면 낡은 float 값이 판정을 흐리지 않는다."""
+    subject = _stat_subject(
+        machine_value=float(_TRILLION),
+        machine_exact=Fraction(_TRILLION + 1),
+        machine_approx=Fraction(_TRILLION + 1),
+    )
+    assert _reconstruct(subject, _TRILLION + 1) == "ok"
+    assert _reconstruct(subject, _TRILLION) == "defect"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        True,
+        "1 000",
+        "abc",
+        float("nan"),
+        float("inf"),
+        "1/0",
+        [3],
+        {"v": 3},
+        "1e999999999",
+        "9" * 70,
+        10**70,
+        "",
+        "   ",
+    ],
+    ids=[
+        "bool",
+        "split-digits",
+        "text",
+        "nan",
+        "inf",
+        "zero-den",
+        "list",
+        "dict",
+        "exponent-bomb",
+        "long-token-str",
+        "long-token-int",
+        "empty",
+        "blank",
+    ],
+)
+def test_stat_reconstruct_unreadable_value_is_unclear_not_ok(raw: object) -> None:
+    subject = _stat_subject(machine_exact=Fraction(3), machine_approx=Fraction(3))
+    verdict = _STAT_RECONSTRUCT.judge(subject, {"value": raw})
+    assert verdict.verdict == "unclear"
+    assert verdict.defect_class == "value_unparsed"
+
+
+def test_stat_reconstruct_without_any_machine_value_is_unclear() -> None:
+    verdict = _STAT_RECONSTRUCT.judge(_stat_subject(), {"value": 3})
+    assert verdict.verdict == "unclear"
+    assert verdict.defect_class == "machine_value_missing"
+    nan_only = _stat_subject(machine_value=float("nan"))
+    assert _STAT_RECONSTRUCT.judge(nan_only, {"value": 3}).defect_class == "machine_value_missing"
+
+
+@pytest.mark.parametrize(
+    "conditions",
+    [
+        "data=[1,2,3,4,5]; stat=mean",  # 3 — 유한소수(정확 일치)
+        "data=[1,2,4]; stat=mean",  # 7/3 — 무한소수(절대오차)
+        "data=[1,2,3,4]; stat=std",  # 무리수(절대오차)
+        f"data=[{_TRILLION},{_TRILLION},{_TRILLION}]; stat=mean",  # 대값
+        f"data=[{_TRILLION},{_TRILLION},{_TRILLION + 1}]; stat=mean",  # 대값 무한소수
+        "data=[1,2]; stat=mean",  # 3/2
+    ],
+)
+@pytest.mark.parametrize(
+    "claimed",
+    [
+        "3", "1.5", "7/3", "2.3333333333", "2.33", "1.2909944487", "1.29", "1.2909944488",
+        str(_TRILLION), str(_TRILLION + 1), "1000000000000.0000000001", "3.0000000001", "2.9999",
+    ],
+)  # fmt: skip
+def test_stat_reconstruct_policy_matches_statistical_claim_default_policy(
+    conditions: str, claimed: str
+) -> None:
+    """패리티 — CORE(cross_verify)는 수학 ADAPTER를 import할 수 없어 정책을 자급한다.
+
+    두 구현이 어긋나면 ADAPTER가 pass로 닫은 문항을 교차검증이 defect로 뒤집거나 그 반대가 된다.
+    선언된 `tolerance` 절이 없는 기본 정책 기준으로, 같은 입력에서 판정이 항상 같아야 한다.
+    """
+    authority, _, result = verify_statistical_claim(conditions, claimed)
+    if authority.state == "unverifiable":
+        pytest.skip("기계가 판정하지 않는 입력(패리티 대상 아님)")
+    subject = _stat_subject(
+        machine_value=result.value,
+        machine_exact=result.exact_value,
+        machine_approx=result.approx_value,
+    )
+    expected = {"pass": "ok", "fail": "defect"}[authority.state]
+    assert _reconstruct(subject, claimed) == expected
+
+
+def test_stat_reconstruct_parity_probe_discriminates() -> None:
+    """패리티 탐침의 변별력 — 두 갈래(ok·defect)와 세 정책이 실제로 모두 밟힌다.
+
+    전부 skip되거나 한쪽 결과만 나오면 위 패리티 검사는 아무것도 말하지 않는 위장이다.
+    """
+    seen: set[tuple[str, str]] = set()
+    for conditions, claimed in [
+        ("data=[1,2,3,4,5]; stat=mean", "3"),  # exact → pass
+        ("data=[1,2,3,4,5]; stat=mean", "3.0000000001"),  # exact → fail
+        ("data=[1,2,4]; stat=mean", "2.3333333333"),  # abs → pass
+        ("data=[1,2,4]; stat=mean", "2.33"),  # abs → fail
+        ("data=[1,2,3,4]; stat=std", "1.2909944487"),  # 무리수 abs → pass
+    ]:
+        authority, _, result = verify_statistical_claim(conditions, claimed)
+        subject = _stat_subject(
+            machine_exact=result.exact_value, machine_approx=result.approx_value
+        )
+        seen.add((result.policy, _reconstruct(subject, claimed)))
+    assert seen == {
+        ("기본→exact", "ok"),
+        ("기본→exact", "defect"),
+        ("기본→abs:0.000000001", "ok"),
+        ("기본→abs:0.000000001", "defect"),
+    }

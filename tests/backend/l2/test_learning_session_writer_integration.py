@@ -6,6 +6,9 @@ hermetic(`test_learning_session_writer.py`)이 계약 모양을 본다면, 이 �
      활동 시각*으로 닫고 새로 연다. 조회 시점 확정(`close_idle_sessions`)이 다시 오지 않는 학생의
      세션을 닫고, 유휴 이내 세션·writer 이전 행은 건드리지 않는다.
   ③ 점수 NULL — writer가 만든 행의 `focus_score`·`engagement_score`는 NULL이다.
+  P3-27 개념 채움 — 세션의 `target_concept_id`는 "이 묶음에서 처음 확인된 개념"이다. 새 세션은 첫
+     활동의 개념으로 열리고, 개념 없이 열린 세션은 뒤 활동이 알려 주면 채워지며(NULL→값), 이미 있는
+     값은 덮어쓰지 않는다. 유휴 초과로 새로 열린 세션은 자기 활동의 개념을 갖는다.
   ⑩ 동시성 — 같은 학생의 요청 2건을 **실제로 동시에**(별도 연결·별도 트랜잭션) 넣어도 열린 세션은
      1개다. 부분 유니크 인덱스가 실제로 걸려 있는지도 직접 주입으로 확인한다.
 """
@@ -13,6 +16,7 @@ hermetic(`test_learning_session_writer.py`)이 계약 모양을 본다면, 이 �
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -89,10 +93,17 @@ async def _sessions(engine: AsyncEngine, uid: uuid.UUID) -> list[LearningSession
         return list(rows.scalars().all())
 
 
-async def _touch(engine: AsyncEngine, uid: uuid.UUID, at: datetime) -> writer.SessionTouch:
+async def _touch(
+    engine: AsyncEngine,
+    uid: uuid.UUID,
+    at: datetime,
+    concept_id: uuid.UUID | None = None,
+) -> writer.SessionTouch:
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
-        touched = await writer.touch_learning_session(db, user_id=uid, now=at)
+        touched = await writer.touch_learning_session(
+            db, user_id=uid, now=at, concept_id=concept_id
+        )
         await db.commit()
         return touched
 
@@ -149,6 +160,124 @@ class TestIdleRule:
         await _touch(engine, user_id, _T0 + timedelta(minutes=9))  # 도착 순서 역전
         (row,) = await _sessions(engine, user_id)
         assert row.last_activity_at == _T0 + timedelta(minutes=10)
+
+
+class TestFirstConfirmedConcept:
+    """P3-27 — `learning_session.target_concept_id` = 묶음 안에서 처음 확인된 개념(덮어쓰기 금지)."""
+
+    _A = uuid.UUID("00000000-0000-4000-8000-0000000000a1")
+    _B = uuid.UUID("00000000-0000-4000-8000-0000000000b2")
+
+    async def test_session_opens_with_the_concept_of_its_first_activity(
+        self, engine: AsyncEngine, user_id: uuid.UUID
+    ) -> None:
+        await _touch(engine, user_id, _T0, concept_id=self._A)
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id == self._A
+
+    async def test_concept_unknown_activity_leaves_null_and_a_later_one_fills_it(
+        self, engine: AsyncEngine, user_id: uuid.UUID
+    ) -> None:
+        # 추천 조회는 문항을 고르기 전에 세션을 잇는다 — 개념을 모른다(날조 금지).
+        await _touch(engine, user_id, _T0)
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id is None
+        # 같은 묶음의 뒤 활동이 개념을 알려 주면 NULL→값으로 채운다.
+        await _touch(engine, user_id, _T0 + timedelta(minutes=3), concept_id=self._A)
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id == self._A
+        assert row.last_activity_at == _T0 + timedelta(minutes=3)
+
+    async def test_an_existing_concept_is_never_overwritten(
+        self, engine: AsyncEngine, user_id: uuid.UUID
+    ) -> None:
+        await _touch(engine, user_id, _T0, concept_id=self._A)
+        await _touch(engine, user_id, _T0 + timedelta(minutes=2), concept_id=self._B)
+        await _touch(engine, user_id, _T0 + timedelta(minutes=4))
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id == self._A  # 첫 확인 개념 유지
+        assert row.last_activity_at == _T0 + timedelta(minutes=4)
+
+    async def test_a_concept_fill_with_an_older_clock_does_not_rewind_last_activity(
+        self, engine: AsyncEngine, user_id: uuid.UUID
+    ) -> None:
+        await _touch(engine, user_id, _T0 + timedelta(minutes=10))
+        await _touch(engine, user_id, _T0 + timedelta(minutes=9), concept_id=self._A)  # 도착 역전
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id == self._A
+        assert row.last_activity_at == _T0 + timedelta(minutes=10)
+
+    async def test_a_session_opened_after_the_idle_gap_gets_its_own_concept(
+        self, engine: AsyncEngine, user_id: uuid.UUID
+    ) -> None:
+        await _touch(engine, user_id, _T0, concept_id=self._A)
+        later = _T0 + timedelta(minutes=31)
+        await _touch(engine, user_id, later, concept_id=self._B)
+        old, new = await _sessions(engine, user_id)
+        assert old.target_concept_id == self._A and old.ended_at == _T0
+        assert new.target_concept_id == self._B
+
+    async def test_record_resolves_the_problem_concept_and_survives_a_resolution_failure(
+        self,
+        engine: AsyncEngine,
+        user_id: uuid.UUID,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """서빙 래퍼 — 문항→대표 개념을 해석해 채우고, 해석이 터져도 세션 결합은 계속된다."""
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        problem = uuid.uuid4()
+
+        async def _found(_session: object, problem_id: uuid.UUID) -> uuid.UUID:
+            assert problem_id == problem  # 활동이 실어 온 문항이 그대로 해석기로 간다
+            return self._A
+
+        monkeypatch.setattr(writer, "get_primary_concept_id", _found)
+        async with maker() as db:
+            sid = await writer.record_learning_activity(
+                db, user_id=user_id, now=_T0, problem_id=problem
+            )
+            await db.commit()
+        (row,) = await _sessions(engine, user_id)
+        assert sid == row.session_id and row.target_concept_id == self._A
+
+        async def _boom(_session: object, _problem_id: uuid.UUID) -> uuid.UUID:
+            raise ConnectionResetError("주입된 개념 조회 실패")
+
+        monkeypatch.setattr(writer, "get_primary_concept_id", _boom)
+        before = writer.failure_count()
+        with caplog.at_level(logging.WARNING, logger="whymath.l2.learning_session_writer"):
+            async with maker() as db:
+                again = await writer.record_learning_activity(
+                    db, user_id=user_id, now=_T0 + timedelta(minutes=1), problem_id=problem
+                )
+                await db.commit()
+        assert again == sid  # 개념을 못 풀어도 세션에는 결합된다(never-break)
+        assert writer.failure_count() == before + 1  # 침묵하지 않는다(이중 회계)
+        # 삼키되 침묵하지 않는다 — 예외 *타입명*이 로그에 남는다(CLAUDE.md 침묵 실패 금지).
+        assert "ConnectionResetError" in caplog.text and "세션 개념 해석 실패" in caplog.text
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id == self._A  # 실패가 기존 값을 지우지 않는다
+        assert row.last_activity_at == _T0 + timedelta(minutes=1)
+
+    async def test_no_problem_means_no_resolution_attempt(
+        self,
+        engine: AsyncEngine,
+        user_id: uuid.UUID,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _must_not_run(*_a: object, **_k: object) -> uuid.UUID:  # pragma: no cover
+            raise AssertionError(
+                "문항이 없는 활동(추천 조회·문항 없는 코치)은 개념을 해석하지 않는다"
+            )
+
+        monkeypatch.setattr(writer, "get_primary_concept_id", _must_not_run)
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as db:
+            sid = await writer.record_learning_activity(db, user_id=user_id, now=_T0)
+            await db.commit()
+        (row,) = await _sessions(engine, user_id)
+        assert sid == row.session_id and row.target_concept_id is None
 
 
 class TestCloseAtQueryTime:
@@ -249,6 +378,41 @@ class TestConcurrency:
         rows = await _sessions(engine, user_id)
         assert len(rows) == 1, f"열린 세션이 {len(rows)}개 — 학생당 1개여야 한다"
         assert rows[0].last_activity_at == _T0 + timedelta(seconds=1)
+
+    async def test_a_losing_activity_fills_the_winners_missing_concept(
+        self, engine: AsyncEngine, user_id: uuid.UUID
+    ) -> None:
+        """P3-27 — 경합에서 진 요청이 개념을 알면, 개념 없이 열린 승자 세션에 NULL→값으로 채운다.
+
+        승자(추천 조회류 — 개념 미상)가 먼저 세션을 열고, 패자(시도류 — 개념 확인)가 충돌 대기 뒤 승자
+        세션에 합류한다. 합류 분기가 개념을 채우지 않으면 세션은 영영 개념 없이 남는다(그 뒤 활동이
+        없으면 트레이스 `concept_selected`가 개념을 못 싣는다).
+        """
+        concept = uuid.UUID("00000000-0000-4000-8000-0000000000c3")
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        winner_inserted = asyncio.Event()
+
+        async def first() -> uuid.UUID:
+            async with maker() as db:
+                touched = await writer.touch_learning_session(db, user_id=user_id, now=_T0)
+                winner_inserted.set()
+                await asyncio.sleep(0.5)  # 패자가 INSERT 충돌 대기에 걸릴 시간
+                await db.commit()
+                return touched.session_id
+
+        async def second() -> uuid.UUID:
+            await winner_inserted.wait()
+            async with maker() as db:
+                touched = await writer.touch_learning_session(
+                    db, user_id=user_id, now=_T0 + timedelta(seconds=1), concept_id=concept
+                )
+                await db.commit()
+                return touched.session_id
+
+        a, b = await asyncio.gather(first(), second())
+        assert a == b, "경합한 두 요청이 서로 다른 세션을 열었다"
+        (row,) = await _sessions(engine, user_id)
+        assert row.target_concept_id == concept, "합류한 패자의 개념이 승자 세션에 채워지지 않았다"
 
     async def test_the_partial_unique_index_actually_rejects_a_second_open_session(
         self, engine: AsyncEngine, user_id: uuid.UUID

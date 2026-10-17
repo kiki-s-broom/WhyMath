@@ -115,6 +115,8 @@ class _FakeSession:
         self._get_map = get_map or {}
         self.added: list[Any] = []
         self.commits = 0
+        # CONT-06 역조회용 — `concept_content` 행 목록(select 대역이 값 대조로 걸러 돌려준다).
+        self.content_rows: list[ConceptContent] = []
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)
@@ -144,9 +146,32 @@ class _FakeSession:
             rows.append(row)
         return rows
 
+    @staticmethod
+    def _selects_concept_content(stmt: Any) -> bool:
+        descriptions = getattr(stmt, "column_descriptions", None) or []
+        return any(desc.get("entity") is ConceptContent for desc in descriptions)
+
+    def _matching_content_rows(self, stmt: Any) -> list[Any]:
+        """역조회 select 대역 — 바인딩 값 중 행의 `atom_codes`에 든 것이 있고 scope가 맞는 행만.
+
+        `ORDER BY`가 stmt에 있을 때만 code 오름차순으로 정렬한다(쿼리가 정렬을 빼면 대역도 어긋남).
+        """
+        params = set(stmt.compile().params.values())
+        sql = str(stmt)
+        rows = [
+            r
+            for r in self.content_rows
+            if ("scope" not in sql or r.scope in params) and params & set(r.atom_codes)
+        ]
+        if "ORDER BY" in sql:
+            rows.sort(key=lambda r: r.code)
+        return rows
+
     async def execute(self, stmt: Any) -> Any:
         if self._selects_evidence_event(stmt):
             return _StagedResult(self._matching_evidence_rows(stmt))
+        if self._selects_concept_content(stmt):
+            return _StagedResult(self._matching_content_rows(stmt))
         return _EmptyResult()
 
     async def get(self, model: Any, pk: Any) -> Any:
@@ -535,6 +560,75 @@ class TestStudyReviewGateReach:
     def test_ai_estimated_content_is_refused(self) -> None:
         """검수 전 행은 공급되지 않는다 — 404 · 처치 행 0건(학생이 본 것이 없으면 처치가 아니다)."""
         client, fake = _content_client("ai_estimated")
+        resp = client.post("/v1/me/objectives/obj-mob13/study", json={})
+        assert resp.status_code == 404, resp.text
+        assert not any(isinstance(row, EvidenceEvent) for row in fake.added)
+
+
+_PILOT_ATOM = (
+    "10공수1-02-06-2"  # 파일럿 소단원 세부개념 원자 — 콘텐츠 PK(구 437 코드)와 겹치지 않는다.
+)
+
+
+def _crosswalk_client(review_status: str) -> tuple[TestClient, _FakeSession]:
+    """역조회로만 닿는 K-12 콘텐츠 1행을 심은 클라이언트 — 목표의 개념은 원자 코드다(CONT-06).
+
+    `get_map`에는 콘텐츠 PK 항목이 **없다**(PK 조회는 비어야 역조회가 일한다). `_content_client`와
+    마찬가지로 `supply()`는 대역으로 바꾸지 않는다.
+    """
+    row = ConceptContent(
+        code="HK11",
+        scope="K-12",
+        name="이차함수의 최대·최소",
+        subject="공통수학1",
+        unit="이차함수",
+        metaphor="산의 정상이나 계곡의 바닥을 찾는 일이다.",
+        misconception="꼭짓점이 항상 최솟값이라고 본다.",
+        formal_definition_internal=None,
+        accepted_expressions="y = a(x-p)^2 + q",
+        explanation=None,
+        standard_codes=[],
+        atom_codes=[_PILOT_ATOM],
+        flashcards=[],
+        review_status=review_status,
+    )
+    get_map: dict[Any, Any] = {
+        _OBJECTIVE_ID: _objective(concept_nodes=[_PILOT_ATOM]),
+        (LearnerStateRecord, _USER_ID): _learner_state(),
+    }
+    fake = _FakeSession(get_map=get_map)
+    fake.content_rows.append(row)
+
+    app = create_app()
+    app.dependency_overrides[get_consented_user] = _user
+
+    async def _sess() -> AsyncIterator[_FakeSession]:
+        yield fake
+
+    app.dependency_overrides[get_session] = _sess
+    return TestClient(app), fake
+
+
+class TestStudyCrosswalkReach:
+    """CONT-06 — 학습목표의 원자 코드가 크로스워크 역조회로 콘텐츠에 **실제로 닿는가**(서빙 경로).
+
+    역조회 전에는 이 목표가 항상 404였다(PK 미스). 같은 목표가 ① reviewed 연결 → 201 ② ai_estimated 연결
+    → 404(CONT-05 게이트가 역조회 경로에도 작동)로 갈린다 — 둘 다 있어야 "역조회가 게이트를 우회한다"와
+    "역조회가 일하지 않는다"를 모두 잡는다.
+    """
+
+    def test_reviewed_crosswalk_content_is_served(self) -> None:
+        client, fake = _crosswalk_client("reviewed")
+        resp = client.post("/v1/me/objectives/obj-mob13/study", json={})
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["content_source"] == "dsl_render"
+        # 처치 귀속은 학습목표의 원자 코드다(서빙 콘텐츠 행 코드가 아니다) — 분석 축을 흐리지 않는다.
+        assert body["concept_code"] == _PILOT_ATOM
+        assert any(isinstance(row, EvidenceEvent) for row in fake.added)
+
+    def test_unreviewed_crosswalk_content_is_refused(self) -> None:
+        client, fake = _crosswalk_client("ai_estimated")
         resp = client.post("/v1/me/objectives/obj-mob13/study", json={})
         assert resp.status_code == 404, resp.text
         assert not any(isinstance(row, EvidenceEvent) for row in fake.added)

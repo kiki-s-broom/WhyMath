@@ -72,6 +72,32 @@ async def _pg_reachable() -> bool:
         await engine.dispose()
 
 
+def _in_scope_link(pid: uuid.UUID, tag: str) -> tuple[Concept, AtomNode, ProblemConcept]:
+    """문항을 수능 출제 범위 안(2022 개정 대수)으로 만드는 연결 행 3개 — 개념·원자 노드·문항↔개념(EOS-31).
+
+    수능 정책은 문항→개념→`atom_node.standard_codes`로 범위를 판정하므로, 개념 연결이 없는 문항은 범위를
+    알 수 없어(`UNKNOWN`) 후보에서 빠진다. persona_fit·시그니처 같은 *신호* 축을 재는 테스트는 문항을
+    범위 안으로 두고 신호만 바꿔야 변별력이 선다 — 범위 밖이어도 "제외됨"이 나오는 테스트는 신호의
+    유무를 증명하지 못한다. 정리는 각 테스트가 `UC.eos31.<tag>` 코드로 직접 한다.
+    """
+    cid = uuid.uuid4()
+    code = f"UC.eos31.{tag}"
+    concept = Concept.from_schema(
+        ConceptSchema(concept_id=cid, code=code, name_ko=code, level=ConceptLevel.세부개념)
+    )
+    atom = AtomNode(
+        code=code,
+        name_ko=code,
+        level="세부개념",
+        standard_codes=["[12대수01-01]"],
+        review_status="ai_estimated",
+    )
+    link = ProblemConcept.from_schema(
+        ProblemConceptSchema(problem_id=pid, concept_id=cid, role=ConceptRole.PRIMARY)
+    )
+    return concept, atom, link
+
+
 async def _add_all(*objs: object) -> None:
     engine = create_async_engine(_settings().database_url)
     try:
@@ -1003,12 +1029,22 @@ def test_me_next_problem_suneung_persona_fit_only_candidate_on_live_pg() -> None
     async def _setup() -> None:
         await _add_all(_user(uid))
         await _add_all(_persona_fit_only_problem())
+        await _add_all(*_in_scope_link(pid, suffix))  # EOS-31 — 범위 안으로 둔다(신호만 변인)
 
     async def _cleanup() -> None:
         engine = create_async_engine(_settings().database_url)
         try:
             async with engine.begin() as conn:
+                await conn.execute(
+                    text("DELETE FROM problem_concept WHERE problem_id=:p"), {"p": str(pid)}
+                )
                 await conn.execute(text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)})
+                await conn.execute(
+                    text("DELETE FROM atom_node WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
+                await conn.execute(
+                    text("DELETE FROM concept WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
                 # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
                 await conn.execute(
                     text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
@@ -1071,12 +1107,22 @@ def test_me_next_problem_suneung_persona_fit_below_threshold_excluded_on_live_pg
     async def _setup() -> None:
         await _add_all(_user(uid))
         await _add_all(_low_fit_problem())
+        await _add_all(*_in_scope_link(pid, suffix))  # EOS-31 — 범위 안으로 둔다(신호만 변인)
 
     async def _cleanup() -> None:
         engine = create_async_engine(_settings().database_url)
         try:
             async with engine.begin() as conn:
+                await conn.execute(
+                    text("DELETE FROM problem_concept WHERE problem_id=:p"), {"p": str(pid)}
+                )
                 await conn.execute(text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)})
+                await conn.execute(
+                    text("DELETE FROM atom_node WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
+                await conn.execute(
+                    text("DELETE FROM concept WHERE code=:c"), {"c": f"UC.eos31.{suffix}"}
+                )
                 # EOS-131: 서버 유휴 규칙 세션(user_profile의 자식) — user 삭제 전에 지운다.
                 await conn.execute(
                     text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
@@ -1291,6 +1337,101 @@ def test_me_next_problem_sibling_exclude_on_live_pg() -> None:
             resp = client.get("/v1/me/next-problem?sibling_filter=exclude", headers=auth)
             assert resp.status_code == 200, resp.text
             assert resp.json()["problem_id"] is None
+    finally:
+        asyncio.run(_cleanup_all())
+
+
+@pytest.mark.parametrize(
+    ("relation", "excluded"),
+    [
+        (RelationType.변형, True),  # 대조군 — 근접 복제본은 배제(S4-14 현행 동작)
+        (RelationType.선수, False),  # PB-19 — 쉬운 계열은 배제하지 않는다
+        (RelationType.심화, False),
+        (RelationType.대조, False),
+    ],
+)
+def test_me_next_problem_sibling_exclude_follows_relation_type_on_live_pg(
+    relation: RelationType, excluded: bool
+) -> None:
+    """PB-19 — 실 PG의 `relation_type` enum이 정책 경유로 읽혀 `exclude`가 유형을 구분한다.
+
+    직전 오답 문항(parent) → 유일한 미응답 후보(related)를 유형만 바꿔 건다. `변형`은 후보에서
+    빠져 null, `선수`·`심화`·`대조`는 배제되지 않아 그 후보가 그대로 추천된다.
+    """
+    if not asyncio.run(_pg_reachable()):
+        pytest.skip("PostgreSQL 미도달 — 통합 테스트 건너뜀")
+
+    uid, pid_wrong, pid_related = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    suffix = uid.hex[:8]
+
+    def _problem(pid: uuid.UUID) -> Problem:
+        return Problem.from_schema(
+            ProblemSchema(
+                problem_id=pid,
+                source_type=SourceType.자체생성,
+                review_status=ReviewStatus.approved,
+                curriculum_version=Curriculum.REVISION_2022,
+                valid_from_year=2022,
+                subject=Subject.공통,
+                unit_codes=[f"U-{suffix}"],
+                difficulty_overall=3.0,
+            )
+        )
+
+    async def _setup() -> None:
+        await _add_all(_user(uid))
+        await _add_all(_problem(pid_wrong), _problem(pid_related))
+        await _add_all(
+            ProblemAttempt(
+                attempt_id=uuid.uuid4(), user_id=uid, problem_id=pid_wrong, is_correct=False
+            )
+        )
+        await _add_all(
+            ProblemRelation.from_schema(
+                ProblemRelationSchema(
+                    parent_problem_id=pid_wrong,
+                    related_problem_id=pid_related,
+                    relation_type=relation,
+                )
+            )
+        )
+
+    async def _cleanup_all() -> None:
+        engine = create_async_engine(_settings().database_url)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "DELETE FROM problem_relation WHERE parent_problem_id=:p "
+                        "OR related_problem_id=:p"
+                    ),
+                    {"p": str(pid_wrong)},
+                )
+                await conn.execute(
+                    text("DELETE FROM problem_attempt WHERE user_id=:u"), {"u": str(uid)}
+                )
+                for pid in (pid_wrong, pid_related):
+                    await conn.execute(
+                        text("DELETE FROM problem WHERE problem_id=:p"), {"p": str(pid)}
+                    )
+                await conn.execute(
+                    text("DELETE FROM learning_session WHERE user_id=:u"), {"u": str(uid)}
+                )
+                await conn.execute(
+                    text("DELETE FROM user_profile WHERE user_id=:u"), {"u": str(uid)}
+                )
+        finally:
+            await engine.dispose()
+
+    try:
+        asyncio.run(_setup())
+        token = create_access_token(uid, settings=_settings())
+        auth = {"Authorization": f"Bearer {token}"}
+        with _client() as client:
+            resp = client.get("/v1/me/next-problem?sibling_filter=exclude", headers=auth)
+            assert resp.status_code == 200, resp.text
+            expected = None if excluded else str(pid_related)
+            assert resp.json()["problem_id"] == expected
     finally:
         asyncio.run(_cleanup_all())
 

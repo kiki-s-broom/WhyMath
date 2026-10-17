@@ -66,12 +66,16 @@ def start_review(
     reviewer_id: str,
     review_session_id: uuid.UUID | None = None,
     problem_id: uuid.UUID | None = None,
+    content_fingerprint: str | None = None,
     occurred_at: datetime | None = None,
 ) -> ReviewTimerEvent:
     """검수 착수 이벤트 생성 — 세션 id를 발급한다(finish/abort가 재사용).
 
     반환 이벤트의 `review_session_id`를 들고 있다가 `finish_review`/`abort_review`에 그대로
     넘겨야 한 앉음(sitting)으로 페어링된다. 판정·경과 필드는 계약상 금지(schema가 강제).
+
+    `content_fingerprint`(EOS-27) — 검수자에게 보일 CU 내용의 지문(`review_content_fingerprint`).
+    생략(None) = "모름"이다 — 지문을 못 만든 상태를 일치로 읽는 소비자는 없다.
     """
     return ReviewTimerEvent(
         review_session_id=review_session_id or uuid4(),
@@ -79,6 +83,7 @@ def start_review(
         problem_id=problem_id,
         reviewer_id=reviewer_id,
         event_type=ReviewTimerEventType.STARTED,
+        content_fingerprint=content_fingerprint,
         occurred_at=occurred_at or _now_utc(),
     )
 
@@ -93,6 +98,7 @@ def finish_review(
     failure_code: GenerationFailureCode | None = None,
     failure_note: str | None = None,
     problem_id: uuid.UUID | None = None,
+    content_fingerprint: str | None = None,
     occurred_at: datetime | None = None,
 ) -> ReviewTimerEvent:
     """검수 종결 이벤트 생성 — 판정 필수·반려는 failure_code(F1~F8) 없이 생성 불가.
@@ -108,6 +114,10 @@ def finish_review(
     `failure_code`가 **선택**이지만(무엇을 고쳤는가) 권장이며, 미기재분은 집계가 분리
     카운트한다. 무손질 승인에 failure_code를 붙이면 거부된다 — 고친 것이 있다면 판정값이
     틀린 것이다.
+
+    `content_fingerprint`(EOS-27) — **판정이 인증한 내용**의 지문. 착수 이벤트와 같은 값을 넘긴다
+    (검수자가 본 것이 곧 판정한 것). 각인 도구·승격 게이트가 이 값을 코퍼스 현재 내용의 지문과
+    대조해 "승인 뒤 내용이 바뀌었는가"를 가린다. None = 모름(통과가 아니다).
     """
     return ReviewTimerEvent(
         review_session_id=review_session_id,
@@ -118,6 +128,7 @@ def finish_review(
         verdict=verdict,
         failure_code=failure_code,
         failure_note=failure_note,
+        content_fingerprint=content_fingerprint,
         elapsed_ms=elapsed_ms,
         occurred_at=occurred_at or _now_utc(),
     )

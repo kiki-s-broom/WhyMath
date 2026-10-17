@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,8 +16,9 @@ requires_gates:
 acceptance:
   - "① 지표 4종을 CLI 로 산출한다 — Content Coverage / Curriculum Coverage / Concept Completeness / Graph Connectivity Coverage. 분모는 P3-01 동결 명세다.\n② **사람이 세지 않는다** — CLI 가 계산하고 exit code 로 판정한다.\n③ 변별력 — 각 지표마다 **연결을 끊는 주입에 수치가 실제로 떨어지는지** 확인한다. 정상 입력에서 값이 나오는 것은 증거가 아니다.\n④ Concept Completeness 는 원 문서 정의(필드 채움 검사) 그대로 만들지 않는다 — ARCH-43(done)이 '필드 채움 검사는 배제 선언한 과목도 통과한다(반증력 0)'로 같은 방식을 이미 기각했다. 반증 가능한 정의로 재설계하고 그 근거를 적는다.\n⑤ 완료 판정 — 지표 4종이 CLI 로 산출되고 각각 주입에 수치가 떨어짐."
   - "[CONT-05 연동 2026-09-27 · 판정 기준 main `0e7b4f6b`] Content Coverage의 '완전 연결' 정의가 콘텐츠의 검수 상태를 조건으로 삼는지 명시 판정한다. 학생 공급은 CONT-05 ⓐ로 `review_status == \"reviewed\"`만 통과하므로(`l4/content_supply.py::resolve_concept_dsl`), 검수 전 콘텐츠를 '연결됨'으로 세면 커버리지 95%인데 학생 공급 0%가 성립한다(현재 콘텐츠 846행 전건 `ai_estimated`). 택1: ⓐ 검수 통과만 센다 ⓑ 연결 커버리지와 공급 가능 커버리지를 별도 지표로 병기 ⓒ 검수 무관으로 세되 그 이유를 명문화. 근거 = `docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md` §2.2"
-artifacts: []
+artifacts:
+  - "PR #1436 (kiki-s-broom/WhyMath#1436, 머지 20b48971) — src/backend/whymath_backend/l1/standards/phase3_coverage.py · tests/backend/l1/test_phase3_coverage.py(100건) · docs/reviews/p3_02_coverage_baseline_2026-10-02.md. 판정 기준: main 20b48971 — CLI 가 지표 4종을 산출(Content 3/10 · Curriculum 3/10 · Completeness 0/10 · Connectivity 0/10 · 공급 가능 0/10, exit 1 = 기준선 미달·정상), 연결 절단 주입 14종이 정확히 해당 지표만 떨어뜨리고 뮤테이션 48종 전건 검출. 목표 달성이 아니라 계측기 완성이다 — 채우기는 P3-03. 후속 P3-22(힌트 입력 배선)·P3-23(오개념-교수 어휘 판정) 등재"
 paths: []
 session: null
 notes: "출처: Kiki 제공 「Phase 3 — Math EOS 과목 완성」 회차별 지시문 세트 [02]. 지시문 원문은 저장소 보존본 docs/strategy/phase3_math_eos_completion_instruction_set.md 에 있다(sha256 f02dcc45e8aff7e8bfa77a3b67504528183af799970311621c3a645efaa7404d). EOS-128 3회차에서 등재. 등재는 착수가 아니다 — 착수 전제는 Phase 2 Gate 2 PASS(게이트 G-p3-entry-gate2-pass)이며 2026-09-19 EOS-22 판정은 FAIL이다.\n\n[중복 실측] 관측 태스크는 여럿 있으나(ARCH-18 문제은행 커버리지·CUR-02 목표 커버리지·ASM-05 성취기준 도달 관측 — 전부 done) **임계를 exit code 로 거는 판정 장치는 0건**이다. EOS-128 2회차 대조표 §12-2 가 ①③⑦ 를 '관측 있음·판정 없음'으로, ②를 '대응 없음'으로 판정한 것과 일치한다. KPI 정본 12종(EOS-61·ops/validation_scorecard.py)과는 **측정 평면이 다르다** — 저 12종은 생산 공정, 이 4종은 제품 완성도다(§12-1). 산출 패턴은 EOS-61 을 재사용한다.\n\n[정정 2026-09-27] CONT-05 ⓐ(공급 reviewed만) 연동 — Content Coverage 정의의 검수 조건 판정 항 추가"
-updated: 2026-09-27
+updated: 2026-10-03

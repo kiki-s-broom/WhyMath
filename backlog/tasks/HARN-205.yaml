@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-205
+title: "위임 산출물 이식의 기준 신선도 판정 — 산출물이 서술하는 코드가 위임 기준 이후 main에서 바뀌었으면 이식 전에 경고"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 도구 `scripts/harness/port_freshness.py`(가칭) — 입력: `--delegate-base <커밋>`(위임 워크트리의 분기점) · `--target <커밋>`(기본 HEAD, PR 직전엔 origin/main) · 이식 산출물 경로 목록. 산출물 본문에서 저장소 경로 참조(백틱 경로·경로 문자열·파일명)를 추출하고 `git diff --name-only <delegate-base>..<target>`과의 교집합을 출력한다. 교집합이 1건 이상이면 exit 1(참조 경로 · 그 경로를 바꾼 커밋 목록), 0건이면 exit 0."
+  - "② 참조 추출 0건은 exit 2(판정 대상 없음) — 스캔 0건 공허 통과 금지. 파일명만 있어 경로가 여럿으로 풀리는 참조는 '모름'으로 따로 세어 출력한다(0으로 접지 않는다)."
+  - "③ 실사례 픽스처: 위임 기준 `ab9f29f2` → 대상 `c13c04ed`, 산출물 = 커밋 `4dc0609f`의 `docs/ops/arch71_student_facing_cloud_mid_live_runbook.md` → `src/backend/whymath_backend/app.py` · `src/backend/whymath_backend/l3/router.py` · `tests/backend/l3/test_cloud_mid_seat_cutover.py` 교집합 검출(exit 1). 대조군: 대상 = 위임 기준이면 exit 0."
+  - "④ 집행 지점(정본화와 별항): 위임 산출물 이식 절차(`.claude/commands/drive.md`의 위임·이식 안내)에 이 명령을 배선한다 — 이식 직후(브랜치 기준) 1회 · PR 직전(origin/main 기준) 1회. 배선을 동결하는 테스트를 둔다."
+  - "⑤ 뮤테이션: 교집합 계산 무력화 · 0건 가드 제거 · 파일명 매칭 제거 · target 기본값을 위임 기준으로 되돌림 — 각각 RED."
+artifacts:
+  - "PR #1398 (https://github.com/kiki-s-broom/WhyMath/pull/1398) — port_freshness.py + drive.md 3a 배선 + 테스트 40건 · 뮤테이션 8/8 RED · 실사례 exit 1(교집합 9건 전부 eb633ee1) · 판정 기준 브랜치 HEAD 5747fdeb(main 85f934a4 위) · 미러 전 잡 exit 0"
+paths:
+  - scripts/harness/port_freshness.py
+  - tests/harness/test_port_freshness.py
+  - ".claude/commands/drive.md"
+  - scripts/harness/verify_port_freshness_discrimination.py
+  - tests/harness/test_port_freshness_mutation_anchors.py
+session: null
+notes: "사고 경위(2026-09-29 · 사고 대장 계열 `delegated-output-stale-base`): ARCH-71 서브에이전트 워크트리가 `ab9f29f2`(ARCH-69 착지 이전)에서 분기해 학생 대면 컷오버 런북을 썼다. 이식 시점 브랜치 기준 `c13c04ed`에는 이미 ARCH-69(`eb633ee1` · 런타임 LOCAL 강등)가 있었다. 이식 검증은 `git diff base..HEAD | git apply` 후 편집 파일의 바이트 동일만 봐서 통과했고, 런북이 서술한 동작(1차 좌석 실패 → 5xx)은 이미 거짓(→ LOCAL 강등 200 + `local_degraded`)이었다. 독립 리뷰 서브에이전트가 PR 전에 잡아 `21599a47`로 정정했다(피해 = 위임 1회 추가). 핵심: 이식 검증이 '내가 옮긴 파일이 같은가'만 묻고 '산출물이 서술하는 코드가 그 사이 바뀌었는가'를 묻지 않았다. 실측: `git diff --name-only ab9f29f2..c13c04ed` 40파일 ∩ 런북 참조 10건 = 4건(`app.py`·`l3/router.py`·`test_cloud_mid_seat_cutover.py`·`CLAUDE.md`) — 단순 경로 추출로도 발화했을 것이다.\n\n[정정 2026-09-30] paths ['scripts/harness/port_freshness.py', 'tests/harness/test_port_freshness.py', '.claude/commands/drive.md'] → ['scripts/harness/port_freshness.py', 'tests/harness/test_port_freshness.py', '.claude/commands/drive.md', 'scripts/harness/verify_port_freshness_discrimination.py', 'tests/harness/test_port_freshness_mutation_anchors.py']: acceptance 5 뮤테이션을 저장소에 재현 가능한 하네스로 남긴다(HARN-174/177/184와 같은 방식 — 러너 재사용 스크립트 + CI에서 도는 앵커 동결 테스트). 앵커 테스트는 RED 출처가 흐려지지 않게 동작 테스트와 분리된 파일이어야 한다"
+updated: 2026-09-30

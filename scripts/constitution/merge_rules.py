@@ -22,6 +22,15 @@ import shutil
 import sys
 from pathlib import Path
 
+# whymath 패치(CONST-12): 파이프에서 stdout·stderr 는 로캘 인코딩(한국어 Windows = cp949)이라
+# 한글이 cp949 로 나가고(⛔ 는 인코딩 불가 → UnicodeEncodeError) 읽는 쪽(채택 도우미)이 UTF-8 로
+# 해독하다 실패한다(PR #1447 실측). PyYAML import 실패 메시지도 같은 경로라 그 앞에서 재구성한다.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):  # 재구성 불가한 스트림은 그대로 둔다
+        pass
+
 try:
     import yaml  # PyYAML (위헌 심사 audit.py와 같은 의존성)
 except ImportError:

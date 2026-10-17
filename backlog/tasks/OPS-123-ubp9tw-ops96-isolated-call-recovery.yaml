@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-123-ubp9tw-ops96-isolated-call-recovery
+title: "ubp9tw 회수 — OPS-96 SymPy 검증 이벤트 루프 격리·시간 상한 WIP(워커 풀·3개 서빙 경로 배선·테스트 23건)를 main 현행 위에 재적용하고 미완 3항 완결"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/blissful-lovelace-ubp9tw head d4e4b432(2026-10-02 · ahead 2 · behind 123). 3fc47aab = OPS-96 WIP(l3/isolated_call.py 315줄: spawn 워커 풀·복원 후 started 신호부터 상한 측정·초과 시 kill+교체·초과는 판정 불가 / api/_isolated_call.py·api/verify.py·api/coach.py·l3/verify_*.py 4종·config.py 배선 / 테스트 23건·격리를 되돌린 뮤테이션 RED 확인), d4e4b432 = 기능 인벤토리에 격리 모듈 2종 귀속(WM-E-355). 커밋 메시지가 스스로 밝힌 미완 = tests/infra 경계 배정·전체 스위트·문서/결정 로그. 판정 기준 main 15220b9f: isolated_call 심볼 main 부재·OPS-96 todo·artifacts 비어 있음·원격 claim TTL 초과. 재현: git diff --stat origin/main...origin/claude/blissful-lovelace-ubp9tw\n② 이식 방식 — 신규 파일(l3/isolated_call.py · api/_isolated_call.py · 테스트 3종)은 파일 단위 이식, main이 그 뒤로 진화한 기존 파일(api/coach.py · api/verify.py · config.py · l3/verify_answer·verify_final_answer·verify_solution·verify_step)은 통째 덮어쓰기·3-way 병합 금지 — 브랜치 변경(부재 줄 합 약 140)을 참고 구현으로 읽고 main 현행 위에 변경 의도만 재적용한다(낡은 줄이 main의 후속 수정을 되돌리는 사고 방지 · NLP-04 선례). config 키는 main 현행 Settings 스키마와 기본값 규약(default OFF/ON)에 맞춘다\n③ 집행 지점(정본화와 별항) — 격리 경로가 실제 서빙 경로를 경유함을 호출 그래프 또는 테스트로 보인다: 검증 엔드포인트들과 코치 턴의 최종답 판정이 격리 호출을 통해서만 SymPy에 닿는다. 변별력은 OPS-96 acceptance ④를 그대로 재실측한다 — 의도적으로 느린 식을 주입해 ⓐ상한 초과 시 판정 불가(통과·오답이 아님) ⓑ그 사이 같은 워커의 가벼운 요청이 막히지 않음 ⓒ격리를 되돌린 뮤테이션에서 ⓑ가 RED. 주입 적용(mutated != original)과 원복 바이트 동일성을 실행 전후에 단언한다\n④ 브랜치가 미완으로 남긴 3항을 이 태스크에서 완결한다: (a) tests/infra 경계 배정과 기능 인벤토리 귀속(신규 모듈을 추가하는 변경이라 인벤토리 전수 귀속·prod 스키마 프로브가 도는 infra-contracts 잡에 반드시 닿는다 — 로컬 재현 전에 워크플로의 잡 이름을 전수 열거하고 각 잡이 이 변경에 닿는지 근거를 적는다) (b) 전체 스위트(부분 스위트 통과를 전체 통과 근거로 쓰지 않는다 — 돌리지 못하면 확인하지 못했다고 명시) (c) 문서·MEMORY 결정 로그\n⑤ 소유 태스크 OPS-96의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적고 미이행분은 승계 태스크로 분리한 뒤 OPS-96을 닫을 수 있는지 판정한다. 상한값(초)은 OPS-96 ⑤가 정한 대로 정상 문항 코퍼스의 SymPy 소요 분포 실측에서 정한다. OPS-96은 이 태스크를 선행으로 부착했다"
+artifacts:
+  - "commit 60698503 · docs/reviews/qual15_ops123_recovery_2026-10-09.md · PR 미개설(사람 게이트 대기)"
+paths:
+  - src/backend/whymath_backend/l3/isolated_call.py
+  - src/backend/whymath_backend/api/_isolated_call.py
+  - src/backend/whymath_backend/api/verify.py
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/config.py
+  - tests/backend/api/test_verify_isolation.py
+  - tests/backend/api/test_coach_final_answer_isolation.py
+  - tests/backend/l3/test_isolated_call.py
+session: null
+notes: |-
+  출처: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-① (stray-code 16회차). 소유 태스크 OPS-96-sympy-event-loop-isolation-cpu-cap. 회수 완료 전 원 브랜치 claude/blissful-lovelace-ubp9tw 삭제 금지. 상한 초과가 통과로 처리되면 SymPy 단일 권위 검증의 우회가 되므로(CLAUDE.md 검증 권위) ③ⓐ는 협상 대상이 아니다. 원격 claim OPS-96은 TTL 초과이나 해제는 이 감사의 범위가 아니다.
+
+  [PR 보류 2026-10-09] incomplete
+updated: 2026-10-09

@@ -84,7 +84,14 @@ _SKIP_DIRS = frozenset(
 # 배선하지 않기로 *의도한* 테스트 디렉터리 → 그 사유. 키는 레포 루트 기준 posix 상대경로.
 # 빈 사유는 무효다(아래 `test_unwired_allowlist_entries_carry_a_reason`가 강제). 여기에 넣는
 # 순간 "이 디렉터리는 CI에서 안 돈다"를 명시적으로 선언하는 것이며, 목록 자체가 리뷰 대상이다.
-_INTENTIONALLY_UNWIRED: dict[str, str] = {}
+_INTENTIONALLY_UNWIRED: dict[str, str] = {
+    "tests": (
+        "루트 직하 테스트 파일은 `test_idempotency.py` 하나(헌법 R3-01 등록 경로)이고 infra-contracts "
+        "잡이 파일 인자(`pytest -q tests/test_idempotency.py`)로 직접 실행한다. 이 판정기는 "
+        "디렉터리 단위라 파일 인자를 디렉터리 배선으로 세지 못해 허용 목록에 둔다 — 루트에 다른 "
+        "테스트 파일이 생기면 `test_tests_root_holds_only_the_wired_idempotency_file`이 실패한다."
+    ),
+}
 
 # 셸 토큰 분해 보조 --------------------------------------------------------------
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -526,6 +533,16 @@ def test_unwired_allowlist_entries_carry_a_reason() -> None:
     """계약 ② — 미배선 허용은 **사유와 함께**여야 한다(빈 사유로 조용히 빠져나가지 못하게)."""
     empty = [name for name, reason in _INTENTIONALLY_UNWIRED.items() if not reason.strip()]
     assert not empty, f"미배선 허용 사유가 비어 있다(무효): {empty}"
+
+
+def test_tests_root_holds_only_the_wired_idempotency_file() -> None:
+    """위 허용 목록의 `tests` 항목이 *다른* 루트 테스트를 조용히 면제하지 못하게 한다."""
+    root_tests = sorted(p.name for p in _TESTS_ROOT.glob("test_*.py") if p.is_file())
+    assert root_tests == ["test_idempotency.py"], root_tests
+    wired_files = {
+        r.name for w in _all_wirings() for r in w.roots if r.is_file() and r.parent == _TESTS_ROOT
+    }
+    assert "test_idempotency.py" in wired_files, "루트 테스트가 파일 인자로도 배선돼 있지 않다"
 
 
 def test_unwired_allowlist_has_no_stale_entries() -> None:

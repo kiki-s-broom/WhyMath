@@ -112,6 +112,11 @@ GATE_STATUSES: tuple[str, ...] = ("pending", "cleared", "waived")
 # 정책 강제 수준 — 단계적 도입(warn 관측 → 측정 → block 승격)의 폐쇄 집합
 POLICY_MODES: tuple[str, ...] = ("off", "warn", "block")
 
+# `done`의 CI 미러 게이트 강제 수준 (HARN-173) — `off`를 두지 않는다. 이 게이트에는 "끄기"가
+# 없고 예외는 기록이 남는 `done --no-mirror <사유>` 하나뿐이다: 끄는 값이 있으면 그 값이
+# 사유도 기록도 없는 탈출구가 된다(남지 않는 탈출구는 게이트를 끄는 것과 같다).
+CI_MIRROR_AT_DONE_MODES: tuple[str, ...] = ("warn", "block")
+
 # 태스크 ID 규칙: <스테이지 또는 접두>-<번호>-<슬러그> (파일명 stem과 동일해야 함)
 #
 # 번호는 2자리(01~99) 또는 3자리(100~999, 선행 0 없음) — HARN-97: 접두당 99개 상한에
@@ -360,6 +365,10 @@ class Policy:
     # 예산 자체가 규칙의 본체다: 교환제만 있고 예산이 없으면 첫 P0부터 교환 대상이 없어
     # 규칙이 성립하지 않고, 예산만 있고 교환이 없으면 예산에 닿는 순간 등재가 영구 봉쇄된다.
     eos_p0_budget: int = 50
+    # `done`의 CI 미러 부재 처분 (HARN-173) — warn = 경고만(종전) · block = PR 증적 경로의 claude
+    # 소유 done에서 미러 결과 없음·다른 커밋·형식 불일치(unknown)와 실패(fail)를 거부한다.
+    # 미실행(not_executed)은 어느 값에서도 거부하지 않는다. 키가 없으면 warn(하위호환).
+    ci_mirror_at_done: str = "warn"
 
     def validate(self) -> list[str]:
         errors: list[str] = []
@@ -380,6 +389,11 @@ class Policy:
             errors.append(f"policy.remote_claims: bool이어야 함 (현재 {self.remote_claims!r})")
         if not isinstance(self.eos_p0_budget, int) or self.eos_p0_budget < 1:
             errors.append(f"policy.eos_p0_budget: 1 이상 정수여야 함 (현재 {self.eos_p0_budget!r})")
+        if self.ci_mirror_at_done not in CI_MIRROR_AT_DONE_MODES:
+            errors.append(
+                f"policy.ci_mirror_at_done: '{self.ci_mirror_at_done}' 미등록 "
+                f"(허용: {list(CI_MIRROR_AT_DONE_MODES)})"
+            )
         return errors
 
 

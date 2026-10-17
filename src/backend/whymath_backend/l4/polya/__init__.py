@@ -11,6 +11,7 @@ from whymath_backend.l4.polya.prompts import (
     BACKTRACK_PROMPT,
     STAGE_PROMPTS,
     StagePrompt,
+    base_system_for_grade,
 )
 from whymath_backend.l4.polya.transitions import should_advance
 
@@ -19,5 +20,6 @@ __all__ = [
     "PolyaCoach",
     "STAGE_PROMPTS",
     "StagePrompt",
+    "base_system_for_grade",
     "should_advance",
 ]

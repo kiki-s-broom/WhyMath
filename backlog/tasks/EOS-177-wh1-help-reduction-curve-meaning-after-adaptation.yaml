@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-177-wh1-help-reduction-curve-meaning-after-adaptation
+title: "WH-1 ⑤ '도움 감소 곡선'의 의미가 추천 적응으로 압축된다 — 성장 지표를 도달 난이도로 옮길지 판정 (EOS-39 독립 비판 #12)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-39-app-help-completion-evidence-in-target-selection
+requires_gates: []
+acceptance:
+  - "① 승계 근거(2026-10-06 · 판정 `docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md` §4-3·§9): 도움 접기는 도움을 쓴 문항 뒤 표적을 쉬운 쪽으로 낮추므로 학생이 성장해도 도움률이 덜 떨어진다(합성 · 빠른 성장 학생의 도움률 첫10 → 끝10 변화가 현행 −0.40 → 접기 −0.16 · 성장 없음 학생은 +0.09 → +0.00). **적응이 도움 지표의 동적 범위를 압축한다.** WH-1 ⑤ \"도움 감소 곡선\"(`docs/architecture/04a_wh1_tutoring_harness.md` 대리 지표)과 게이미피케이션 모듈 성장 증거 후보 ⑤(`gamification_module_gap_review.md`)가 이 지표를 성장 증거로 쓴다."
+  - "② 판정: 성장의 대리 지표를 도움 사용률에서 **도달 난이도**(같은 개념에서 독립 성공이 닿은 난이도)로 옮길지, 병기할지, 현행 유지할지를 정한다. 도움 사용률만으로 학생 우열을 매기는 게임화 금기와 정합해야 한다(CLAUDE.md 교수학 금기). 계산 재료(문항별 도움 여부·난이도)는 `problem_attempt`와 `hint_usage` 조인으로 이미 있다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/wh1_evaluation.py
+session: null
+notes: "출처: EOS-39 독립 비판 #12 (2026-10-06 · 교수학 독립 검토). 등급 P2 근거: 성장 지표의 정의 변경이라 표면(게이미피케이션·학부모 대시보드)을 건드리고 운영 데이터가 선행이다.\n\n[트리거 면제] EOS-39 판정문이 지목한 후속 승계 태스크 — 새 규칙·기능의 도입이 아니라 이월 소유자 등재"
+updated: 2026-10-06

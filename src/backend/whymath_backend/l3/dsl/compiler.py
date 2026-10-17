@@ -7,8 +7,13 @@ DSL을 Runtime이 소비할 수 있는 형태로 변환한다.
 
 from __future__ import annotations
 
+import logging
+
 from whymath_backend.l3.dsl.models import CompiledContent, ProblemDSL
 from whymath_backend.l3.dsl.variable_engine import VariableBinding, VariableEngine
+
+# 침묵 실패 금지(CLAUDE.md) — 폴백 경로는 예외 타입명만 남긴다.
+logger = logging.getLogger("whymath.l3.dsl.compiler")
 
 
 class ContentCompiler:
@@ -67,9 +72,11 @@ class ContentCompiler:
                 from sympy.parsing.sympy_parser import (
                     convert_xor,
                     implicit_multiplication,
-                    parse_expr,
                     standard_transformations,
                 )
+
+                # CONST-09(R22-03): 정답 식은 `/v1/dsl/compile`로 사용자가 보낼 수 있다.
+                from whymath_backend.l3.safe_parse import safe_parse_expr
 
                 transformations = standard_transformations + (
                     convert_xor,
@@ -85,7 +92,7 @@ class ContentCompiler:
                         except ValueError:
                             local_dict[name] = value
 
-                expr = parse_expr(
+                expr = safe_parse_expr(
                     dsl.answer.expression,
                     local_dict=local_dict,
                     transformations=transformations,
@@ -99,8 +106,9 @@ class ContentCompiler:
                 if evaluated == int(evaluated):
                     return str(int(evaluated))
                 return str(float(evaluated))
-            except Exception:
-                # SymPy 평가 실패 시 치환된 원문을 그대로 반환
+            except Exception as exc:  # noqa: BLE001 — 평가 실패·안전 파싱 거부는 원문 폴백
+                # SymPy 평가 실패 시 치환된 원문을 그대로 반환(예외 타입명만 로그 — 침묵 실패 금지)
+                logger.debug("DSL 정답 식 평가 회피: %s", type(exc).__name__)
                 return binding.apply(dsl.answer.expression)
         if dsl.answer.choices is not None:
             return ",".join(dsl.answer.choices)

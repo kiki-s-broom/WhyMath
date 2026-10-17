@@ -1,7 +1,7 @@
 """수요 실측 CLI(analogy_demand) hermetic 테스트 — 코퍼스 계수·정직한 공백·exit 규약.
 
 실 코퍼스(레포 커밋 자산)를 읽는 hermetic 측정이다(DB·LLM 0). 검증 축:
-  ① 코퍼스 총량·공백 계수 일치(846행 자산 실재 — 04e §6.1 진단의 기계 확인)
+  ① 코퍼스 총량·공백 계수 일치(846행 자산 실재 — 04g §6.1 진단의 기계 확인)
   ② ai_estimated=전량(적재기 상수 각인 규약 정합)
   ③ 발주서 슬롯 계수(유닛 컴파일 — 개념형/숫자형 분해 합 정합)
   ④ 채움(APPROVED)은 DB 미접속 시 None — 0% 위장 금지(정직한 공백)
@@ -25,7 +25,7 @@ from whymath_backend.l3.pedagogy.analogy_demand import (
 
 class TestMetaphorDemand:
     def test_corpus_totals(self) -> None:
-        """자산 846행(K-12 437 + 대학 409) 실재 — 04e §6.1 "비유 0이 아니라 846행" 진단 동결."""
+        """자산 846행(K-12 437 + 대학 409) 실재 — 04g §6.1 "비유 0이 아니라 846행" 진단 동결."""
         records = load_all_content_records()
         assert len(records) == 846
         demand = measure_metaphor_demand(records)
@@ -90,16 +90,20 @@ class TestSlotDemand:
         demand = measure_slot_demand()
         assert demand.filled_by_type is None
 
-    def test_pilot_unit_ordered_total(self) -> None:
-        """파일럿 소단원 발주 43점(팩 required_slots × 4목표 + variation 오버라이드) 동결.
+    def test_units_corpus_ordered_total(self) -> None:
+        """units_v1 전 소단원 발주 353점(팩 required_slots × 목표 + variation 오버라이드) 동결.
 
         2026-08-16 PED-30: MODELING 팩 보강(plan_skeleton 2 + result_interpretation 1 추가)으로
         40 → 43. 의도된 데이터 보강이며, 이후 변경은 다시 이 리터럴을 깨 검토를 강제한다.
+        2026-10-07 P3-03: 미적분Ⅰ '미분' 초안 10편·30목표 반입으로 43 → 353(+310 = CONCEPT 9목표×11 +
+        PROCEDURE 10×11 + REPRESENT 10×9 + MODELING 1×11). 의도된 데이터 진전이다.
         """
         demand = measure_slot_demand()
-        assert demand.ordered_total == 43
-        assert demand.ordered_by_type["example_pair"] == 4
-        assert demand.ordered_by_type["problem_variation"] == 3  # OBJ-04 오버라이드 반영
+        assert demand.units == 11
+        assert demand.ordered_total == 353
+        assert demand.ordered_by_type["example_pair"] == 40  # CONCEPT 10목표 × 4
+        # 파일럿 OBJ-04 오버라이드 3 + 미적분Ⅰ 02-10 OBJ-04 팩 기본 2(오버라이드 없음).
+        assert demand.ordered_by_type["problem_variation"] == 5
 
 
 class TestCli:

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-102
+title: "ARCH-29 회수 선행 재판정 — 출하 자산 판정 거버넌스 vs ARCH-12 데모 예외 상충"
+track: infra-debt
+stage: S3
+subject: math
+layer: web
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 학생 도달 실측 — main 웹 번들(현재 해시 파일명)에 남은 퀴즈 모드 문자열 5종(quiz_history·그래프 맞히기·정답 보기·채점하기·당신의 답)이 학생 라우트에서 실제로 도달 가능한지 실측하고, main ARCH-12 결정(2026-07-13 데모 예외 공식화·WHITELIST 2건)의 전제가 아직 참인지 판정문으로 남긴다(판정 기준 main 커밋 해시 명기)"
+  - "② 판정 인계 — 전제가 반증되면 Kiki 결정을 받아 k20m0w 커밋 f2d79807(브랜치 내 ARCH-27→ARCH-29 재개명)의 출하 자산 판정 거버넌스(test_shipped_asset_judgement_governance.py 등 tests/infra 2파일·src/web 4파일)를 파일 단위로 회수한다. 전제가 유지되면 회수하지 않고 사유를 기록한 뒤 k20m0w의 이 몫을 폐기로 확정한다. 그대로 이식하면 main 번들 때문에 즉시 RED다"
+artifacts: []
+paths:
+  - "src/web/**"
+  - "tests/infra/**"
+session: null
+notes: "MOB-18 ⑤(c)에서 분리. 원 브랜치 origin/claude/whymath-issues-review-k20m0w(head 2330a095) — 회수 판정 전 삭제 금지"
+updated: 2026-09-30

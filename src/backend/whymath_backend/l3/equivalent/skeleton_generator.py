@@ -51,7 +51,7 @@ from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
 from whymath_backend.l3.equivalent.difficulty import RootKind, estimate_difficulty
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul, wa_gwa
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -481,6 +481,7 @@ def _build_sqrt_pool() -> tuple[_SqrtSkeleton, ...]:
     return tuple(pool)
 
 
+@deterministic_generator
 class SkeletonEquivalentProblemGenerator:
     """결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(S2-o·LLM 0).
 

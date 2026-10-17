@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-43-sample-mean-distribution-corpus
+title: "고등 표본평균의 평균·분산 파일럿 코퍼스 (W2 Phase3 #4)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "[12확통03-06] 0커버 해소 — kind(mean/variance) 필터 2밴드 결정론 생성기 신설·전량 게이트 통과"
+artifacts:
+  - 1e96cd2a
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/sample_mean_distribution_skeleton_generator.py
+  - src/backend/whymath_backend/harness/sample_mean_distribution_batch.py
+  - "data/corpus/problem_bank_sample_mean_distribution_v0/**"
+  - tests/backend/l3/equivalent/test_sample_mean_distribution_skeleton_generator.py
+  - tests/backend/harness/test_sample_mean_distribution_batch.py
+session: null
+notes: "w2_content_factory_completion_plan_v1.md B급 §6 항목8(통계) — binomial_distribution_skeleton_generator(S4-34) kind(mean/variance) 필터·단일코드 패턴 재사용. E(X-bar)=mu·V(X-bar)=sigma^2/n. concept_src_id: H:12확통03-06 — concept graph 실존 확인.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-43-sample-mean-distribution-corpus 재등재. 원 증적 ['1e96cd2a']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

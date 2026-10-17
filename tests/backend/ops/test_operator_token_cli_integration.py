@@ -223,7 +223,7 @@ class TestRejectionsIssueNothing:
         code, out, err = _run_cli(["issue", str(uid)], capsys)
         assert code == 1
         assert out == ""
-        assert "content_admin 계정에만" in json.loads(err)["error"]
+        assert "계정에만 발급합니다" in json.loads(err)["error"]
         assert asyncio.run(_token_audit_rows(uid)) == []
 
 

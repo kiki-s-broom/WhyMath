@@ -60,6 +60,16 @@ from typing import Literal
 import sympy
 from pydantic import BaseModel, ConfigDict, Field
 
+# CONST-09(코딩 헌법 R22-03): 문자열 → SymPy 파싱은 전부 안전 진입점을 거친다. 이 모듈의 입력은
+# 학생 답(`/v1/verify-answer`·평가 재료 답)·LLM 생성 조건·저작 코퍼스가 섞여 오므로 출처를 가려
+# 신뢰하지 않는다. 거부(`UnsafeExpressionError` ⊂ ValueError)는 아래 기존 except가 받아
+# unverifiable로 보수 처리한다.
+from whymath_backend.l3.safe_parse import (
+    ensure_within_budget,
+    safe_subs,
+    safe_sympify,
+)
+
 # 침묵실패 금지(CLAUDE.md) — 보수 회피(except Exception)는 예외 *타입명*을 debug로 남긴다.
 # 메시지 본문은 학생 답·문항 식이 섞일 수 있어 제외(타입명만으로 계통 장애를 관측).
 logger = logging.getLogger("whymath.l3.verify_answer")
@@ -67,6 +77,7 @@ logger = logging.getLogger("whymath.l3.verify_answer")
 __all__ = [
     "AnswerVerdict",
     "SolvabilityVerdict",
+    "budget_exceeded_verdict",
     "classify_solvability",
     "derive_selected_root",
     "verify_answer",
@@ -85,6 +96,7 @@ __all__ = [
     "verify_root_aggregate",
     "verify_root_selection",
     "verify_series_converges",
+    "warm_isolated_worker",
 ]
 
 
@@ -151,6 +163,11 @@ def _unverifiable(reason: str, samples_checked: int = 0) -> AnswerVerdict:
     return AnswerVerdict(state="unverifiable", reason=reason, samples_checked=samples_checked)
 
 
+def budget_exceeded_verdict() -> AnswerVerdict:
+    """계산 시간 상한 초과(OPS-96)의 *판정 불가* 결과 — pass·fail 어느 쪽도 아니다."""
+    return _unverifiable("SymPy 계산 시간 상한 초과 — 검증 안전 회피")
+
+
 # 부등식·≠ 관계 연산자 — 잔차(lhs-rhs) 진리값 평가 경로에서 쓰는 연산자 집합.
 # 등식("==")은 잔차==0 경로(별도)라 여기 포함하지 않는다.
 _RELATION_OPS: frozenset[str] = frozenset({">", "<", ">=", "<=", "!="})
@@ -174,18 +191,18 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
     # `!=`(≠)는 파이썬 비교라 sympify가 bool로 접어버린다 — SymPy `Ne(lhs, rhs)`로 명시 변환.
     if "!=" in text:
         lhs_text, rhs_text = text.split("!=", 1)
-        lhs = sympy.sympify(lhs_text, convert_xor=True)
-        rhs = sympy.sympify(rhs_text, convert_xor=True)
-        return sympy.sympify(lhs - rhs), "!="
+        lhs = safe_sympify(lhs_text)
+        rhs = safe_sympify(rhs_text)
+        return ensure_within_budget(lhs - rhs), "!="
 
     # `==`(파이썬식 등호)를 등식 잔차로 변환 — sympify가 `==`를 *구조 비교*로 접어 `False`(상수
     # 진리값)로 만들기 전에 문자열에서 직접 분해한다. 실 LLM이 `x**2-1 == 0`처럼 파이썬식 등호를
     # 쓰는 회귀(Phaiakes9 실측·S2-i) — 단일 `=` 경로와 동형이되 `==` 토큰을 별도로 받는다.
     if "==" in text:
         lhs_text, rhs_text = text.split("==", 1)
-        lhs = sympy.sympify(lhs_text, convert_xor=True)
-        rhs = sympy.sympify(rhs_text, convert_xor=True)
-        return sympy.sympify(lhs - rhs), "=="
+        lhs = safe_sympify(lhs_text)
+        rhs = safe_sympify(rhs_text)
+        return ensure_within_budget(lhs - rhs), "=="
 
     # `=`(단일 등호, `==`/`<=`/`>=` 아님)를 등식 잔차로 변환. `==`는 위에서 이미 처리했다.
     if (
@@ -197,18 +214,18 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
         and ">" not in text
     ):
         lhs_text, rhs_text = text.split("=", 1)
-        lhs = sympy.sympify(lhs_text, convert_xor=True)
-        rhs = sympy.sympify(rhs_text, convert_xor=True)
-        return sympy.sympify(lhs - rhs), "=="
+        lhs = safe_sympify(lhs_text)
+        rhs = safe_sympify(rhs_text)
+        return ensure_within_budget(lhs - rhs), "=="
 
-    parsed = sympy.sympify(text, convert_xor=True)
+    parsed = safe_sympify(text)
     if isinstance(parsed, sympy.Equality):
-        return sympy.sympify(parsed.lhs - parsed.rhs), "=="
+        return ensure_within_budget(parsed.lhs - parsed.rhs), "=="
     # 부등식(StrictGreaterThan/GreaterThan/StrictLessThan/LessThan) — 잔차 + 연산자로 환원.
     if isinstance(parsed, sympy.core.relational.Relational):
         rel_op = parsed.rel_op
         if rel_op in _RELATION_OPS:
-            return sympy.sympify(parsed.lhs - parsed.rhs), rel_op
+            return ensure_within_budget(parsed.lhs - parsed.rhs), rel_op
         # 그 외 관계(예상 밖) — 보수적 거부.
         raise ValueError(f"지원하지 않는 관계 연산자: {rel_op}")
     if isinstance(parsed, sympy.logic.boolalg.Boolean):
@@ -372,10 +389,11 @@ def _verify_single(
     # ② answer 치환맵 대입(키·값 모두 sympify). 치환 실패는 보수적 unverifiable.
     try:
         substitutions: dict[sympy.Symbol, sympy.Expr] = {
-            sympy.Symbol(var): sympy.sympify(val_text, convert_xor=True)
-            for var, val_text in answer.items()
+            sympy.Symbol(var): safe_sympify(val_text) for var, val_text in answer.items()
         }
-        substituted = sympy.sympify(residual.subs(substitutions))
+        # 대입은 곧바로 계산한다 — `safe_subs`가 계산 없는 대입으로 먼저 예산을 본다
+        # (조건 `y = 2^x`에 `x = 10^100` 대입이 20초 timeout이던 재현표 항목).
+        substituted = safe_subs(residual, substitutions)
     except Exception as exc:  # noqa: BLE001 — 치환 실패도 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("answer 치환 불가 — 검증 안전 회피")
@@ -433,7 +451,7 @@ def _evaluate_point(
     `abs(...)`를 취해 기존 동작(|잔차|)을 그대로 보존한다.
     """
     try:
-        value = complex(sympy.sympify(expr.subs(substitution)).evalf())
+        value = complex(ensure_within_budget(expr.subs(substitution)).evalf())
     except (TypeError, ValueError, AttributeError, ZeroDivisionError):
         return None  # 특이점(0 나눔 등)·평가 불가 — 유효 샘플 아님.
     if value != value or abs(value.real) == float("inf"):
@@ -604,7 +622,7 @@ def verify_root_selection(
         return _unverifiable(f"근 선택 — answer_map에 변수 {var} 없음·안전 회피")
 
     try:
-        ans_val = _real_value(sympy.sympify(ans_text, convert_xor=True), tol)
+        ans_val = _real_value(safe_sympify(ans_text), tol)
         raw_roots = sympy.solve(sympy.Eq(residual, 0), var)
     except Exception as exc:  # noqa: BLE001 — 풀이/치환 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
@@ -753,7 +771,7 @@ def verify_root_aggregate(
 
     try:
         root_mult = sympy.roots(poly)  # {근: 중복도} — 복소근 포함 정확값.
-        claimed_expr = sympy.sympify(claimed, convert_xor=True)
+        claimed_expr = safe_sympify(claimed)
     except Exception as exc:  # noqa: BLE001 — 풀이/치환 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("근 집계 — 근 계산/주장값 치환 불가·안전 회피")
@@ -924,11 +942,46 @@ def _single_condition(conditions: str | Sequence[str]) -> str | None:
 
 def _claimed_int(claimed: str, tol: float) -> int | None:
     """주장 개수를 정수로 — 실수로 평가해 정수 근방이면 그 정수, 아니면 None(개수 아님)."""
-    value = _real_value(sympy.sympify(claimed, convert_xor=True), tol) if claimed else None
+    value = _real_value(safe_sympify(claimed), tol) if claimed else None
     if value is None:
         return None
     rounded = round(value)
     return rounded if abs(value - rounded) < 1e-6 and rounded >= 0 else None
+
+
+def _count_bounds(
+    conditions: str | Sequence[str],
+) -> tuple[str, list[tuple[sympy.Expr, str]]] | None:
+    """실근 개수 조건 = 등식 1개 + (선택) 같은 변수의 범위 부등식들 → (등식, [(잔차, 연산자)]).
+
+    "열린구간 (-4, 4)에서 … 실수 c의 개수"처럼 *범위 안의* 근만 세는 문항의 검산 재료다
+    (`["6*x**2 - 4*x - 32 = 0", "x > -4", "x < 4"]`). 범위 조건은 변수 하나에 대한 부등식·`!=`
+    (잔차가 그 변수의 일차식)만 받는다 — 그 밖의 형태(둘째 등식·다른 변수·비선형 범위)는 None
+    (보수적 unverifiable). 단일 조건이면 범위 없이 그대로(종전 계약).
+    """
+    if isinstance(conditions, str):
+        return conditions, []
+    items = list(conditions)
+    if not items:
+        return None
+    equation, rest = items[0], items[1:]
+    bounds: list[tuple[sympy.Expr, str]] = []
+    for text in rest:
+        try:
+            residual, op = _parse_condition(text)
+        except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 None
+            logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+            return None
+        if op == "==" or len(residual.free_symbols) != 1:
+            return None
+        (symbol,) = residual.free_symbols
+        try:
+            if sympy.degree(residual, symbol) != 1:
+                return None
+        except sympy.PolynomialError:
+            return None
+        bounds.append((residual, op))
+    return equation, bounds
 
 
 def verify_real_root_count(
@@ -942,13 +995,20 @@ def verify_real_root_count(
     "이차방정식 …의 서로 다른 실근의 개수"류 문항의 답은 근이 아니라 *개수*라 verify_answer로는
     검증 못 한다. 이 함수가 다항식의 실근을 중복도까지 구해(`sympy.roots`) 서로 다른 실근 수를
     세고 주장 개수와 대조한다. 판별식 무시("늘 2근") 오개념은 실근 0/1을 2로 답해 fail한다.
-      - pass: 실제 서로 다른 실근 수 == 주장 개수.
+
+    조건이 목록이면 첫 항목이 방정식, 나머지는 **같은 변수의 범위**(`x > -4`·`t >= 0` 등)다 —
+    범위를 모두 만족하는 실근만 센다(P3-03 6회차 감사: "구간 [-4, 4]에서 평균값 정리를 만족시키는
+    c의 개수"의 검산이 실수 전체의 근을 세던 결함). 범위 경계에 근이 걸려 판정이 모호하면
+    unverifiable이다.
+      - pass: 실제 서로 다른 실근 수(범위 안) == 주장 개수.
       - fail: 불일치(오개념).
-      - unverifiable: 단일변수 다항 등식 아님·근을 다 못 구함·주장이 개수 아님(보수적 회피).
+      - unverifiable: 단일변수 다항 등식 아님·근을 다 못 구함·주장이 개수 아님·범위 형식 밖·경계
+        모호(보수적 회피).
     """
-    condition = _single_condition(conditions)
-    if condition is None:
-        return _unverifiable("실근 개수 — 단일 등식이 아님·안전 회피")
+    parsed = _count_bounds(conditions)
+    if parsed is None:
+        return _unverifiable("실근 개수 — 등식 1개 + 같은 변수의 범위 부등식 형태가 아님·안전 회피")
+    condition, bounds = parsed
     try:
         residual, op = _parse_condition(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
@@ -960,6 +1020,8 @@ def verify_real_root_count(
     if len(free) != 1:
         return _unverifiable("실근 개수 — 단일 변수 방정식이 아님·안전 회피")
     var = free[0]
+    if any(b.free_symbols != {var} for b, _ in bounds):
+        return _unverifiable("실근 개수 — 범위 조건의 변수가 방정식의 변수와 다름·안전 회피")
     try:
         poly = sympy.Poly(residual, var)
         root_mult = sympy.roots(poly)
@@ -975,7 +1037,17 @@ def verify_real_root_count(
     if claimed_n is None:
         return _unverifiable("실근 개수 — 주장값이 개수(비음 정수)가 아님·안전 회피")
     real = [rv for r in root_mult if (rv := _real_value(r, tol)) is not None]
-    actual = len(_distinct_values(real, tol))
+    inside: list[float] = []
+    for value in real:
+        verdicts = [
+            _eval_relation(float(bound.subs(var, value)), bound_op, tol)
+            for bound, bound_op in bounds
+        ]
+        if any(v is None for v in verdicts):
+            return _unverifiable("실근 개수 — 근이 범위 경계에 걸려 판정 모호·안전 회피")
+        if all(verdicts):
+            inside.append(value)
+    actual = len(_distinct_values(inside, tol))
     if actual == claimed_n:
         return _pass(samples_checked=actual)
     return _fail(
@@ -1003,7 +1075,7 @@ def verify_extremum_count(
     if condition is None:
         return _unverifiable("극값 개수 — 단일 식이 아님·안전 회피")
     try:
-        expr = sympy.sympify(condition, convert_xor=True)
+        expr = safe_sympify(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("극값 개수 — 식 파싱 불가·안전 회피")
@@ -1061,7 +1133,7 @@ def verify_is_one_to_one(
     if condition is None:
         return _unverifiable("일대일 — 단일 식이 아님·안전 회피")
     try:
-        expr = sympy.sympify(condition, convert_xor=True)
+        expr = safe_sympify(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("일대일 — 식 파싱 불가·안전 회피")
@@ -1114,7 +1186,7 @@ def verify_geometric_convergence(
     if condition is None:
         return _unverifiable("등비급수 수렴 — 단일 값이 아님·안전 회피")
     try:
-        ratio = _real_value(sympy.sympify(condition, convert_xor=True), tol)
+        ratio = _real_value(safe_sympify(condition), tol)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("등비급수 수렴 — 공비 파싱 불가·안전 회피")
@@ -1152,7 +1224,7 @@ def verify_limit_equals_value(
     if condition is None:
         return _unverifiable("극한=함숫값 — 단일 식이 아님·안전 회피")
     try:
-        expr = sympy.sympify(condition, convert_xor=True)
+        expr = safe_sympify(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("극한=함숫값 — 식 파싱 불가·안전 회피")
@@ -1215,7 +1287,7 @@ def verify_is_differentiable(
     if condition is None:
         return _unverifiable("미분가능 — 단일 식이 아님·안전 회피")
     try:
-        expr = sympy.sympify(condition, convert_xor=True)
+        expr = safe_sympify(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("미분가능 — 식 파싱 불가·안전 회피")
@@ -1286,7 +1358,7 @@ def verify_series_converges(
     if condition is None:
         return _unverifiable("급수 수렴 — 단일 식이 아님·안전 회피")
     try:
-        term = sympy.sympify(condition, convert_xor=True)
+        term = safe_sympify(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("급수 수렴 — 식 파싱 불가·안전 회피")
@@ -1325,7 +1397,7 @@ def _parse_number_list(condition: str) -> list[sympy.Expr] | None:
     values: list[sympy.Expr] = []
     for part in parts:
         try:
-            expr = sympy.sympify(part, convert_xor=True)
+            expr = safe_sympify(part)
         except Exception as exc:  # noqa: BLE001 — 파싱 불가는 목록 전체 무효
             logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
             return None
@@ -1466,7 +1538,7 @@ def verify_congruent_by_ratio(
     if condition is None:
         return _unverifiable("합동(닮음비) — 단일 값이 아님·안전 회피")
     try:
-        ratio = _real_value(sympy.sympify(condition, convert_xor=True), tol)
+        ratio = _real_value(safe_sympify(condition), tol)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("합동(닮음비) — 닮음비 파싱 불가·안전 회피")
@@ -1539,7 +1611,7 @@ def verify_inequality_direction(
     if condition is None:
         return _unverifiable("부등식 방향 — 단일 부등식이 아님·안전 회피")
     try:
-        expr = sympy.sympify(condition, convert_xor=True)
+        expr = safe_sympify(condition)
     except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("부등식 방향 — 부등식 파싱 불가·안전 회피")
@@ -1573,3 +1645,14 @@ def verify_inequality_direction(
         f"부등식 방향 — 해는 {verdict}이나 주장 {claimed_n}(음수 나눗셈 시 부호 뒤집힘)",
         samples_checked=1,
     )
+
+
+def warm_isolated_worker() -> None:
+    """격리 워커가 `ready` 전에 부르는 웜업 — 답 검산 경로의 첫 사용 비용을 미리 치른다(OPS-142).
+
+    `verify_step` 뒤에서는 새 모듈이 없지만(실측) 워커의 *첫* 호출이 이 경로일 수 있어, 단일 등식·
+    연립·항등식 세 형태를 한 번씩 밟는다. 반환값은 쓰지 않는다.
+    """
+    verify_answer("x**2 - 5*x + 6 = 0", {"x": "3"})
+    verify_answer(["x+y=3", "x-y=1"], {"x": "2", "y": "1"})
+    verify_answer("sin(x)**2 + cos(x)**2 = 1", {"x": "1"})

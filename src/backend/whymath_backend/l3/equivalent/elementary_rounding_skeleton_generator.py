@@ -5,6 +5,13 @@
 코퍼스를 확보한다. 개념그래프 매핑: `R2`(어림(올림·버림·반올림)) — legacy 437 공간에
 실존, 세 연산을 한 개념으로 묶어 다룬다(생성기의 `kind` 3분기 설계와 정합).
 
+**발문 해석(QUAL-11)**: 한국 초등 교과서의 정식 표현은 "올림하여 십의 자리까지 나타내기"다 —
+"X의 자리까지"는 X 자리를 *마지막으로 남기는* 해석(배율 N=X의 자리값)이고, "X의 자리에서
+올림"은 *X 자리 숫자를 보고 그 윗자리까지* 나타내는 다른 해석(배율 10N)이다. 정답 계산은
+전자(배율=자리값)이므로 발문도 "X의 자리까지"로 맞춘다(과거 "X의 자리에서"로 쓴 600문은
+537문이 관례와 어긋났다). 어림 자리 아래가 전부 0이라 답이 입력값과 같은 입력은 어림의
+의미가 없어 풀에서 거른다.
+
 `kind`(ceil/floor/round) 필터로 밴드 분리. 자릿수 위치(십·백·천의 자리)는 밴드 내 자유
 파라미터 — 별도 필터 불필요(place가 달라져도 같은 kind 풀 안에서 서로 다른 뼈대이므로
 중복 위험이 없다).
@@ -34,7 +41,7 @@ from typing import Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -58,17 +65,22 @@ _DEFAULT_CONCEPT_TAGS: tuple[ConceptTag, ...] = (
 
 RoundingKind = Literal["ceil", "floor", "round"]
 
-# (자리 이름, 배율 N — "N의 자리에서 어림"은 N의 한 자리 아래 숫자를 보고 N의 배수로 어림).
+# (자리 이름, 배율 N — "N의 자리까지 나타내기"는 N의 한 자리 아래 숫자를 보고 N의 배수로 어림).
 _PLACES: tuple[tuple[str, int], ...] = (("십", 10), ("백", 100), ("천", 1000))
+# 어림 대상(바로 아랫자리) 이름 — 해설에서 "어느 자리 숫자를 보는가"를 밝힌다.
+_LOWER_PLACE: dict[int, str] = {10: "일", 100: "십", 1000: "백"}
 _VALUE_RANGE = range(1000, 100000)
 _POOL_TARGET = 300
 
-_CEIL_TEMPLATES: tuple[str, ...] = ("{value}{josa} {place}의 자리에서 올림하면 얼마인지 구하시오.",)
+# 교과서 정식 표현("~하여 X의 자리까지 나타내면") — 정답 계산(배율=자리값)과 같은 해석.
+_CEIL_TEMPLATES: tuple[str, ...] = (
+    "{value}{josa} 올림하여 {place}의 자리까지 나타내면 얼마인지 구하시오.",
+)
 _FLOOR_TEMPLATES: tuple[str, ...] = (
-    "{value}{josa} {place}의 자리에서 버림하면 얼마인지 구하시오.",
+    "{value}{josa} 버림하여 {place}의 자리까지 나타내면 얼마인지 구하시오.",
 )
 _ROUND_TEMPLATES: tuple[str, ...] = (
-    "{value}{josa} {place}의 자리에서 반올림하면 얼마인지 구하시오.",
+    "{value}{josa} 반올림하여 {place}의 자리까지 나타내면 얼마인지 구하시오.",
 )
 
 
@@ -125,6 +137,8 @@ def _build_pool(kind: RoundingKind | None = None) -> tuple[_RoundingSkeleton, ..
             attempts += 1
             value = rng.choice(_VALUE_RANGE)
             place_name, factor = rng.choice(_PLACES)
+            if value % factor == 0:
+                continue  # 어림 자리 아래가 전부 0 — 답=입력값이라 어림의 의미가 없다(QUAL-11).
             key = (value, factor)
             if key in seen:
                 continue
@@ -138,14 +152,15 @@ def _build_pool(kind: RoundingKind | None = None) -> tuple[_RoundingSkeleton, ..
 
 def _explanation(skeleton: _RoundingSkeleton) -> str:
     """어림 해설 — 연산별 판단 기준을 자연어로 서술(결정론·위생 청정·수치 등식 회피)."""
+    lower = _LOWER_PLACE[skeleton.factor]
     if skeleton.kind == "ceil":
-        rule = "그 아랫자리를 무조건 올려서"
+        rule = f"{lower}의 자리 이하를 무조건 올려서"
     elif skeleton.kind == "floor":
-        rule = "그 아랫자리를 무조건 버려서"
+        rule = f"{lower}의 자리 이하를 무조건 버려서"
     else:
-        rule = "그 아랫자리가 5 이상이면 올리고 5 미만이면 버려서"
+        rule = f"{lower}의 자리 숫자가 5 이상이면 올리고 5 미만이면 버려서"
     return (
-        f"{skeleton.place_name}의 자리에서 어림할 때는 {rule} 나타내므로, "
+        f"{skeleton.place_name}의 자리까지 나타낼 때는 {rule} 나타내므로, "
         f"구하는 값은 {skeleton.answer} 이다."
     )
 
@@ -161,6 +176,7 @@ def _stable_slug(prefix: str, question_text: str, answer: str, codes: Sequence[s
     return f"{prefix}-{digest}"
 
 
+@deterministic_generator
 class RoundingSkeletonGenerator:
     """어림 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

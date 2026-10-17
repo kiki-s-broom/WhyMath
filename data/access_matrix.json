@@ -22,6 +22,21 @@
       "status": "active",
       "note": "콘텐츠 CUD 권한(개념·문제 생성/수정/삭제) — Role.CONTENT_ADMIN(schema/enums.py). PIPA 데이터 뷰어가 아니다(학생 데이터 열람 경로 자체가 아님) — 이 매트릭스의 9항목 전부 해당 없음(none)으로 명시해 '가시성 0'을 코드로도 정직하게 표현한다."
     },
+    "content_editor": {
+      "role_enum_value": "content_editor",
+      "status": "active",
+      "note": "콘텐츠 편집 — Role.CONTENT_EDITOR(schema/enums.py·P3-12). 조회·편집 권한(schema/cms_access.py)만 갖는 CMS 운영 역할이다. PIPA 데이터 뷰어가 아니다(학생 데이터 열람 경로 자체가 아님) — 9항목 전부 none으로 명시한다."
+    },
+    "content_reviewer": {
+      "role_enum_value": "content_reviewer",
+      "status": "active",
+      "note": "콘텐츠 검수 — Role.CONTENT_REVIEWER(schema/enums.py·P3-12). 조회·검수 권한만 갖는 CMS 운영 역할이다. PIPA 데이터 뷰어가 아니다 — 9항목 전부 none으로 명시한다."
+    },
+    "content_publisher": {
+      "role_enum_value": "content_publisher",
+      "status": "active",
+      "note": "콘텐츠 배포 — Role.CONTENT_PUBLISHER(schema/enums.py·P3-12). 조회·배포 권한만 갖는 CMS 운영 역할이다. PIPA 데이터 뷰어가 아니다 — 9항목 전부 none으로 명시한다."
+    },
     "teacher": {
       "role_enum_value": null,
       "status": "planned",
@@ -37,7 +52,7 @@
     "answer_rate": {
       "num": 1,
       "label_ko": "정답률",
-      "resolution": { "student": "full", "teacher": "full", "parent": "summary", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "full", "parent": "summary", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "부모에게는 추세·등급으로. 절대 수치 압박 완화",
       "produced_by": [
         "src/backend/whymath_backend/db/models/activity.py::ProblemAttempt.is_correct — POST /v1/me/attempts 적재(원자료)",
@@ -47,7 +62,7 @@
     "solve_time": {
       "num": 2,
       "label_ko": "풀이 시간",
-      "resolution": { "student": "full", "teacher": "summary", "parent": "summary", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "summary", "parent": "summary", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "교사·부모에게 원자료 노출 시 \"느리다\" 압박 → 요약만",
       "produced_by": [
         "src/backend/whymath_backend/db/models/activity.py::ProblemAttempt.duration_seconds — POST /v1/me/attempts 적재(원자료)",
@@ -57,7 +72,7 @@
     "wrong_answer_pattern": {
       "num": 3,
       "label_ko": "오답 패턴",
-      "resolution": { "student": "full", "teacher": "summary", "parent": "none", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "summary", "parent": "none", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "교사는 지도용 요약. 부모 미공개 — 오답 상세는 정서 위해·낙인 위험",
       "produced_by": [
         "src/backend/whymath_backend/l2/learner_state.py::_get_active_misconception_ids — LearnerState.active_misconceptions(L2 내부 조립, /v1/me/* 직접 노출 엔드포인트는 아직 없음)"
@@ -66,7 +81,7 @@
     "usage_time_of_day": {
       "num": 4,
       "label_ko": "이용 시간대",
-      "resolution": { "student": "full", "teacher": "none", "parent": "summary", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "none", "parent": "summary", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "교사 불필요. 부모는 생활 관리 목적 요약(예: 주로 저녁 학습)",
       "produced_by": [
         "src/backend/whymath_backend/db/models/activity.py::LearningSession.started_at — GET /v1/me/sessions(원자료 타임스탬프, 시간대 집계는 소비측 계산)",
@@ -76,7 +91,7 @@
     "mastered_concepts": {
       "num": 5,
       "label_ko": "숙달 개념",
-      "resolution": { "student": "full", "teacher": "full", "parent": "summary", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "full", "parent": "summary", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "\"잘하는 것\"은 비교적 안전 → 교사 전체, 부모 요약",
       "produced_by": [
         "GET /v1/me/mastery — ConceptMasteryHistory 시계열(api/me.py::list_my_mastery)",
@@ -86,7 +101,7 @@
     "gap_concepts": {
       "num": 6,
       "label_ko": "빈틈 개념",
-      "resolution": { "student": "full", "teacher": "summary", "parent": "summary", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "summary", "parent": "summary", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "\"못하는 것\"은 민감 → 교사·부모 모두 지도/지원용 요약만, 낙인 방지",
       "produced_by": [
         "GET /v1/me/weak-concepts — src/backend/whymath_backend/l2/weak_concept_recommendation.py::recommend_weak_concepts(api/me.py::get_my_weak_concepts)"
@@ -95,7 +110,7 @@
     "tutor_comments": {
       "num": 7,
       "label_ko": "강사 코멘트",
-      "resolution": { "student": "full", "teacher": "full", "parent": "summary", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "full", "parent": "summary", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "학생 본인이 받은 피드백은 전부 봄. 부모는 요약(맥락 없는 노출 방지)",
       "produced_by": [
         "GET /v1/me/dialogues — Dialogue 이력 전체(api/me.py::list_my_dialogues). 턴 상세(AI 응답 본문 DialogueTurn.content)는 현재 이 엔드포인트 범위 밖(docstring: '턴 상세는 범위 밖')"
@@ -104,7 +119,7 @@
     "peer_comparison": {
       "num": 8,
       "label_ko": "또래 비교",
-      "resolution": { "student": "summary", "teacher": "summary", "parent": "none", "content_admin": "none" },
+      "resolution": { "student": "summary", "teacher": "summary", "parent": "none", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "학생 본인도 요약만(과도한 순위 의식 차단). 부모 미공개 — CLAUDE.md \"우열 게임화 금지\"의 직접 적용",
       "produced_by": [
         "GET /v1/me/assessments — src/backend/whymath_backend/schema/assessment.py::AssessmentSchema.estimated_percentile(api/me.py::list_my_assessments)"
@@ -113,7 +128,7 @@
     "hint_usage": {
       "num": 9,
       "label_ko": "힌트 사용",
-      "resolution": { "student": "full", "teacher": "summary", "parent": "none", "content_admin": "none" },
+      "resolution": { "student": "full", "teacher": "summary", "parent": "none", "content_admin": "none", "content_editor": "none", "content_reviewer": "none", "content_publisher": "none" },
       "design_note": "학생은 자기 학습 패턴 인지. 교사 요약. 부모 미공개 — \"힌트 많이 썼다 = 못한다\"는 오해 위험",
       "produced_by": [
         "src/backend/whymath_backend/schema/event_data_contract.py::HintEventData.hint_level — 힌트제공 이벤트(AI 공급 신호)",

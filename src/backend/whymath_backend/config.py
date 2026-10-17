@@ -256,7 +256,9 @@ class Settings(BaseSettings):
             "시에는 플래그와 무관하게 base_system 무변경(옵트인·역호환) — 현재 팩 주입은 "
             "`_pack_for`가 파일럿 목표 개념에 매핑된 문항에서만 팩을 해석하므로 blast radius가 "
             "파일럿 단원으로 한정된다. OFF(킬스위치)면 팩 조립기 미호출로 기존 발문 경로와 "
-            "비트동일(`decision.system`은 `_BASE_SYSTEM` 그대로). WH-1 라이브 측정 경로(`wh1_*`)· "
+            "비트동일 — `decision.system`은 `base_system_for_grade(grade)`(W0 S-2 학년 register·"
+            "결정론 문구 치환, 이 팩 플래그와는 독립) 그대로이고, `grade=None`(미전달) 호출자는 "
+            "그마저 `_BASE_SYSTEM`과 바이트 동일. WH-1 라이브 측정 경로(`wh1_*`)· "
             "톤필터는 무변경. GA 전환 근거: 결함주입 측정(pedagogy_pack_fidelity_eval exit 0·CI "
             "상시) 통과 + Kiki 사인오프(2026-07-27·blast radius 파일럿 1단원 한정 간이 갈음). "
             "주의: forbidden_modes *문면* 가드(`mode_guard`)는 이 플래그와 무관하다 — "
@@ -275,7 +277,7 @@ class Settings(BaseSettings):
         description=(
             "교수법 팩 forbidden_modes 런타임 가드(`mode_guard.check_forbidden_modes`)를 WH-1 "
             "primary 학생-대면 발화 경로의 톤필터 *앞*에 걸지(PED-23 회수 — 정본 "
-            "docs/architecture/04e_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
+            "docs/architecture/04g_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
             "OFF면 가드 블록 미실행으로 기존 서빙 경로와 비트동일(회귀 0·킬스위치). ON이면 팩이 "
             "해석된 턴에서 발화가 팩 금지 모드를 위반할 때 그 발화를 학생에게 보내지 않고 "
             "안전한 소크라테스식 재질문(결정론 템플릿·`fallback_reply_for`)으로 대체하며 "
@@ -296,13 +298,13 @@ class Settings(BaseSettings):
         description=(
             "교수전략 카탈로그(PED-05·PED-22 회수)의 적합성 필드(target_grade_bands·"
             "difficulty_range·target_k_types)를 `runtime_selector.select()`의 **후보 필터**로 "
-            "소비할지(PED-23 회수 — 정본 docs/architecture/04e_pedagogy_strategy_catalog.md §4). "
+            "소비할지(PED-23 회수 — 정본 docs/architecture/04g_pedagogy_strategy_catalog.md §4). "
             "**False(기본·옵트인)** — OFF면 카탈로그 미조회·규칙표 v1(R1~R5) 원판정 그대로(기존 "
             "선택 경로와 비트동일·킬스위치). ON이면 규칙표 적용 전에 후보 집합을 카탈로그 적합성"
             "으로 **좁히기만** 한다: 좁힌 결과가 공집합이거나 규칙표가 후보를 소진하면 필터를 "
             "무시하고 원판정으로 폴백하며 reason_code(CATALOG_FILTER_EMPTY/EXHAUSTED)를 구조화 "
             "로그로 남긴다(조용한 실패 금지). 카탈로그는 select 전용 — `gate()`는 플래그와 "
-            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04e §4 불변식 ②·테스트 동결). "
+            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04g §4 불변식 ②·테스트 동결). "
             "GA flip(기본 True)은 측정+사인오프 후 별도 커밋(mode_guard 캔어리 선례). "
             "WHYMATH_PEDAGOGY_CATALOG_FILTER_ENABLED=false 킬스위치."
         ),
@@ -313,7 +315,7 @@ class Settings(BaseSettings):
         description=(
             "`supply()` 생성 폴백의 system 프롬프트에 선택된 교수전략의 카탈로그 카드"
             "(name_ko·description·research_basis 요약 1줄 — attention 절약)를 얹을지(PED-23 "
-            "회수 — 정본 04e §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
+            "회수 — 정본 04g §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
             "미조회·system 무변경으로 기존 생성 경로와 비트동일(프롬프트-해시 캐시 키도 불변·"
             "킬스위치). ON이면 `decide()`가 고른(게이트 통과 후) 전략의 카드를 조회해 "
             "`attach_strategy_card`로 system 뒤에 1블록을 덧붙인다 — 카드 조회 실패는 예외 "
@@ -398,6 +400,121 @@ class Settings(BaseSettings):
             "**기대정답은 결코 응답에 노출하지 않는다**(verify_final_answer 계약). False면 동작 "
             "완전 불변(정답 감지·돌아보기·완료 적재 전부 inert·완전 되돌리기). "
             "WHYMATH_L4_SOLUTION_COMPLETION_ENABLED=false로 끈다."
+        ),
+    )
+
+    l4_coach_wrong_submission_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-146 — 코치가 서버 검증으로 판정한 **명확한 오답**을 학습 원장에 적재할지"
+            "(정식기능·킬 스위치). True(기본)면 완료 상태머신이 재고 유도(REDIRECT)를 내는 턴 중 "
+            "같은 학생·같은 문항의 **최초 1건**만 ProblemAttempt(is_correct=False)로 적재하고 "
+            "`/v1/me/attempts`와 같은 후처리(답안 오개념 스캔·숙달 전파·스킬 이벤트·학습 상태 "
+            "머신)를 태운다 — 앱 학생의 오답이 R3·R5·R6에 닿는 유일한 경로다. 재제출 오답과 "
+            "판정 불가(unverifiable)는 세지 않는다. "
+            "`l4_solution_completion_enabled`가 상위 게이트다 — 그것이 False면 REDIRECT 자체가 "
+            "없으므로 이 플래그와 무관하게 적재가 없다. 이 플래그는 재고 유도 발화는 그대로 두고 "
+            "**적재만** 끄는 좁은 스위치다(끄면 종전 동작과 비트동일). "
+            "WHYMATH_L4_COACH_WRONG_SUBMISSION_ENABLED=false로 끈다."
+        ),
+    )
+
+    l2_selection_help_fold_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-39 — 추천이 후보를 고르는 **표적 θ**를 만들 때 코치가 도움(힌트 단계 2 이상)을 "
+            "공급한 문항(`problem_attempt.used_hint=True`)을 **실패 응답 1건으로 접을지**"
+            "(정식기능·킬 스위치). True(기본)면 도움 완료가 독립 성공처럼 표적을 올리지 않는다 — "
+            "앱 학생의 추천열이 학생 행동에 반응한다(판정문 "
+            "`docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md`). "
+            "**추정 θ·SE·능력 API·숙달은 어느 쪽이든 불변**이다(표적에만 쓴다). 이 규칙은 "
+            "`used_hint` 라벨의 정확도에 기대는데 그 정확도가 운영에서 미측정이고(라벨은 학생이 "
+            "요청한 것이 아니라 코치가 공급한 단계다 — 숙달 라벨 '초보'도 단계를 올린다), 라벨 "
+            "규칙 자체가 판정 대기(EOS-146 acceptance ⑩)라서 끌 수 있게 둔다: 발동률"
+            "(`selection_help_count`)이 비정상적으로 높거나 강한 학생에게 과하게 쉬운 문항이 "
+            "나가면 끈다. 끄면 종전 동작과 비트동일하다(도움 완료도 정답). "
+            "WHYMATH_L2_SELECTION_HELP_FOLD_ENABLED=false로 끈다."
+        ),
+    )
+
+    l4_hint_attribution_label_free_enabled: bool = Field(
+        default=True,
+        description=(
+            "EOS-178 — 코치 대화의 힌트 귀속(`used_hint`)이 **라벨만으로 올라간 단계**"
+            "(숙달 라벨 '초보'가 학생 신호 없이 1→2로 올린 공급)를 도움으로 세지 않을지"
+            "(정식기능·킬 스위치). True(기본)면 공급 원장 행의 `base_level`(라벨 없이 계산한 "
+            "단계)이 2 미만이고 검수 힌트도 실리지 않은 공급은 세지 않는다 — 학생 신호"
+            "(답 요구·좌절·5회+ 막힘)가 올렸거나 힌트 내용이 실제로 나간 공급만 도움이다"
+            "(판정문 `docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md`). "
+            "구판 행(`base_level` 없음)은 종전대로 센다. False면 EOS-133 규칙(최종 단계 2 "
+            "이상은 전부 도움)으로 완전히 되돌아간다 — 이 규칙의 입력이 EOS-39 선택 θ "
+            "접기이므로, 운영에서 약한 학생의 도움 완료가 독립 성공으로 과다 계상되면"
+            "(라벨-단독 비율·신호 미확인 비율 — 도달 리포트 §7) 끈다. "
+            "WHYMATH_L4_HINT_ATTRIBUTION_LABEL_FREE_ENABLED=false로 끈다."
+        ),
+    )
+
+    sympy_isolation_enabled: bool = Field(
+        default=True,
+        description=(
+            "OPS-96 — 학생 대면 경로의 SymPy 검증(`/v1/verify-step`·`verify-solution`·"
+            "`verify-answer`·코치 턴의 최종답 판정)을 **별도 프로세스 워커**에서 시간 상한과 함께 "
+            "돌릴지. True(기본)면 느린 식 1건이 그 워커의 모든 학생 요청을 멈추지 않고(이벤트 루프 "
+            "격리), 상한을 넘기면 계산을 끊고 **판정 불가(unverifiable)** 로 응답한다(통과·오답 "
+            "아님). False면 종전처럼 핸들러 안에서 동기 실행(상한 없음·완전 되돌리기). "
+            "WHYMATH_SYMPY_ISOLATION_ENABLED=false로 끈다."
+        ),
+    )
+    sympy_isolation_timeout_s: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=60.0,
+        description=(
+            "OPS-96 — SymPy 호출 1건의 계산 시간 상한(초·워커가 일을 받은 순간부터). 기본 5초는 "
+            "`safe_parse` 구조 예산을 통과하는 *가장 느린* 입력(차수 20 방정식 ≈3.0초·실측 "
+            "2026-10-02)보다 크고, 정상 문항(밀리초대)과는 3자릿수 차이다. 이 값을 낮추면 정상 "
+            "입력이 판정 불가로 떨어질 수 있으니 `/health/ready`의 `sympy_isolation."
+            "undecidable_ratio`(OPS-126)와 `isolation_budget_exceeded` 로그를 보고 조정한다. "
+            "OPS-126 ② 재판정(2026-10-12·OPS-140 재측정 2026-10-14) — 교육과정 형태 합성 단계 "
+            "354건 최대 0.18초, 고차 방정식 스트레스 16건은 상한 없이도 전부 unverifiable(상한은 "
+            "판정 정보를 잃지 않는다). 합성 대리 분포이며 실 학생 입력 분포는 파일럿 지표 누적 "
+            "뒤 재판정한다(OPS-131)."
+        ),
+    )
+    sympy_isolation_preload_modules: list[str] = Field(
+        default_factory=lambda: ["sympy"],
+        description=(
+            "OPS-96 — SymPy 워커 프로세스가 `ready` 이전에 미리 import할 모듈. 비우면 첫 호출이 "
+            "import 비용(≈1초)을 치른다(그 시간은 계산 상한 밖이라 판정 불가로 새지는 않지만 첫 "
+            "요청이 느리다). 격리 장치 자체는 과목 어휘를 모르므로(Core) 이 목록을 설정이 정한다."
+        ),
+    )
+    sympy_isolation_warmup: list[str] = Field(
+        default_factory=lambda: [
+            "whymath_backend.l3.verify_step:warm_isolated_worker",
+            "whymath_backend.l3.verify_answer:warm_isolated_worker",
+        ],
+        description=(
+            "OPS-142 — SymPy 워커 프로세스가 `ready` 이전에 미리 돌릴 웜업 함수('모듈:함수'·인자 "
+            "없음). 식 종류별 첫 사용이 하위 모듈을 지연 import하는데(`simplify` 첫 호출 ≈68ms·"
+            "워커 CPU 몫 1/8에서 543~742ms — 실측 2026-10-14) 그 시간은 *계산 상한 안*이라, 상한이 "
+            "짧거나 기계가 바쁘면 정상 식이 판정 불가로 샌다. 기동 단계(상한 밖)에서 미리 치르면 "
+            "상한 초과로 kill된 뒤의 교체 워커도 데워진 채 뜬다. 비우면 종전(첫 요청이 비용을 "
+            "치름)이다. 웜업이 실패해도 워커는 뜨고 경고 로그에 예외 타입명이 남는다."
+        ),
+    )
+    sympy_isolation_max_workers: int = Field(
+        default=2,
+        ge=1,
+        le=16,
+        description=(
+            "OPS-96 — SymPy 워커 프로세스 수(= 동시 SymPy 계산 수). 각 워커는 SymPy를 import한 "
+            "상태로 상주한다(실측 2026-10-12·14 OPS-126 ③·OPS-140 — Linux·SymPy 1.14에서 RSS "
+            "73~78MB/개(Python 3.12·3.13)·PSS 약 64~66MB, 무거운 계산 12회 뒤 약 78MB로 완만히 "
+            "증가·장기 상한과 Windows는 미측정이라 100MB 안팎으로 가정 — 서버 워커 수 × 이 값 "
+            "만큼 프로세스가 뜬다). 모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 "
+            "판정 불가로 떨어진다 — 늘릴 신호는 `/health/ready`의 `sympy_isolation.queue_waits > 0`"
+            "이다."
         ),
     )
 
@@ -568,7 +685,9 @@ class Settings(BaseSettings):
     anthropic_prompt_caching: bool = Field(
         default=False,
         description=(
-            "True면 messages.create에 top-level cache_control(ephemeral) 적용(prefix 캐시). "
+            "True면 system 프롬프트 블록 끝에 cache_control(ephemeral) 브레이크포인트 적용"
+            "(prefix 캐시 — OPS-89: 최상위 자동 캐싱은 가변 user 꼬리에 놓여 적중 0이라 "
+            "system 끝으로 옮겼다). "
             "기본 False(현 동작 유지) — 적중은 라이브 키로만 검증 가능하고 system 프롬프트가 "
             "L4/L5 미확정이라 효과 잠정. 짧은 프리픽스는 최소 토큰 미만이라 무효(silent no-op)."
         ),
@@ -1148,6 +1267,32 @@ class Settings(BaseSettings):
         ge=0,
         description="시각화 생성의 *디바이스 단위* 분당 상한. 0=비활성. 사용자(15)와 IP(30) 사이.",
     )
+    # ── SEC-19: 원시 LLM 생성(`POST /v1/generate`) 전용 rate limit (LLM 비용 보호) ──
+    generate_rate_limit_per_minute: int = Field(
+        default=15,
+        ge=0,
+        description=(
+            "원시 LLM 생성(`POST /v1/generate`)의 *사용자 단위* 분당 상한. 0=비활성. "
+            "인증(`CurrentUser`)과 별개 축 — 인증된 단일 계정의 LLM 비용 남용을 막는다. "
+            "기본값은 같은 비용 등급(LLM 생성)인 시각화 한도(15)와 동일하게 시작했다 — "
+            "실사용 호출 빈도 실측 근거는 아직 없다(운영 로그 확보 후 재조정). "
+            "별 category(`generate`)라 coach·시각화 버킷과 분리."
+        ),
+    )
+    generate_rate_limit_ip_per_minute: int = Field(
+        default=30,
+        ge=0,
+        description=(
+            "원시 LLM 생성의 *IP 단위* 분당 상한. 0=비활성. 공유 NAT 방어(사용자 한도의 2배)."
+        ),
+    )
+    generate_rate_limit_device_per_minute: int = Field(
+        default=22,
+        ge=0,
+        description=(
+            "원시 LLM 생성의 *디바이스 단위* 분당 상한. 0=비활성. 사용자(15)와 IP(30) 사이."
+        ),
+    )
     # ── 슬라이스 27: 디바이스 store 운영 모드(lifespan 결선) ──
     device_store_mode: Literal["none", "pg", "pg_cached"] = Field(
         default="none",
@@ -1659,6 +1804,28 @@ class Settings(BaseSettings):
             "인프로세스 요청 계측의 최근 창 크기(요청 수·고정 deque maxlen). 에러율·p95는 "
             "이 창에서 계산한다 — 전 기간 평균은 최근 악화를 희석하므로 최근 창이 알림 "
             "판정선이다. 기본 500. WHYMATH_OPS_METRICS_WINDOW_SIZE로 조정."
+        ),
+    )
+    # OPS-30: 알림의 마지막 1홉 — breach/다운이 로그가 아니라 사람에게 닿는 채널.
+    # URL 자체가 인증 토큰이라(Slack/Discord 수신 웹훅) SecretStr로 받아 repr·로그 노출을 막는다.
+    ops_alert_webhook_url: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            '알림 수신 웹훅 URL(Slack Incoming Webhook 형식 — `{"text": ...}` POST). '
+            "Discord는 웹훅 URL 끝에 `/slack`을 붙이면 같은 형식을 받는다. 빈 값(기본)이면 "
+            "발송 채널 미설정 — breach는 기존 로그 경로에만 남고, 그 사실을 기동 로그·"
+            "/health/ready `alert_delivery.configured=false`가 드러낸다(무증상 no-op 금지). "
+            "WHYMATH_OPS_ALERT_WEBHOOK_URL로 설정."
+        ),
+    )
+    ops_alert_webhook_timeout_s: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=30.0,
+        description=(
+            "알림 웹훅 POST 제한 시간(초). 발송은 별도 스레드라 요청 경로를 막지 않지만 "
+            "멈춘 소켓이 스레드를 영구 점유하지 않게 반드시 건다. 기본 5. "
+            "WHYMATH_OPS_ALERT_WEBHOOK_TIMEOUT_S로 조정."
         ),
     )
 

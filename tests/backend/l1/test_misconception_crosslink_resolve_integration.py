@@ -24,8 +24,12 @@ import pytest
 
 from whymath_backend.config import Settings
 from whymath_backend.l1.misconception.catalog_loader import load_misconceptions
-from whymath_backend.l1.misconception.crosslink_loader import load_crosslinks
+from whymath_backend.l1.misconception.crosslink_loader import (
+    MisconceptionCrosslinkStore,
+    load_crosslinks,
+)
 from whymath_backend.l1.misconception.crosslink_resolve import MisconceptionCrosslinkResolver
+from whymath_backend.schema.misconception_crosslink import MisconceptionCrosslink
 
 pytestmark = pytest.mark.integration
 
@@ -141,6 +145,18 @@ def _seed_crosslinks(rows: list[dict[str, Any]]) -> None:
     load_crosslinks(None, {"crosslinks": rows}, engine=_sync_engine())
 
 
+def _seed_crosslinks_ungated(rows: list[dict[str, Any]]) -> None:
+    """load 게이트를 거치지 않는 저수준 시딩 — 적재 자격(MISC-63) 이전에 이미 쌓인 비직접 행의 재현용.
+
+    부분매핑·개념겹침은 이제 `load_crosslinks`가 거부한다. 그러나 리졸버의 `no_direct` 분기는 이미
+    테이블에 들어가 있는 비직접 행(정책 이전 적재분·직접 편집)에 대해 여전히 정직해야 하므로, 계약이
+    합성 시딩 좌석으로 명시한 `MisconceptionCrosslinkStore.populate`로 그 상태를 만든다.
+    """
+    MisconceptionCrosslinkStore(engine=_sync_engine()).populate(
+        [MisconceptionCrosslink.model_validate(r) for r in rows]
+    )
+
+
 # ── 테스트: resolve / resolve_many ─────────────────────────────────────────
 def test_resolve_returns_mids_confidence_desc() -> None:
     """한 kebab 3링크(0.95/0.8/NULL) → resolve가 confidence 내림차순·NULL 마지막(실 정렬)."""
@@ -247,7 +263,7 @@ def test_resolve_canonical_no_direct() -> None:
     try:
         _cleanup()
         _seed_catalog(_MIS_A1, _MIS_A2)
-        _seed_crosslinks(
+        _seed_crosslinks_ungated(
             [
                 _link(kebab_id=_KEBAB_A, mis_id=_MIS_A1, link_type="부분매핑", confidence=0.9),
                 _link(kebab_id=_KEBAB_A, mis_id=_MIS_A2, link_type="개념겹침", confidence=0.8),

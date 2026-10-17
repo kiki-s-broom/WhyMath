@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 GUARD = ROOT / ".claude" / "hooks" / "guard_constitution.py"
@@ -26,7 +27,7 @@ BLOCK, ALLOW = 2, 0
 LOG_DIR = tempfile.mkdtemp(prefix="guard_selftest_")
 
 #: (설명, tool_name, tool_input, 기대 종료 코드) — 변별력을 위해 차단·통과를 함께 둔다
-FIXTURES: list[tuple[str, str, dict[str, str], int]] = [
+FIXTURES: list[tuple[str, str, dict[str, Any], int]] = [
     ("Edit 규칙 등록부", "Edit", {"file_path": "constitution/rules.yaml"}, BLOCK),
     ("Write 새 개정 기록", "Write", {"file_path": "constitution/amendments/A0009.md"}, BLOCK),
     ("MultiEdit 헌법 본문", "MultiEdit", {"file_path": "constitution/CONSTITUTION.md"}, BLOCK),
@@ -187,19 +188,158 @@ FIXTURES: list[tuple[str, str, dict[str, str], int]] = [
         },
         ALLOW,
     ),
+    # ── MCP GitHub 쓰기 도구 (CONST-16) — 로컬 파일을 거치지 않고 원격 브랜치에 바로 쓰는 경로 ──
+    (
+        "push_files 헌법 등록부",
+        "mcp__github__push_files",
+        {"files": [{"path": "constitution/rules.yaml", "content": "x"}]},
+        BLOCK,
+    ),
+    (
+        "push_files 일반 파일에 섞인 헌법 개정 기록",
+        "mcp__github__push_files",
+        {
+            "files": [
+                {"path": "docs/x.md", "content": "x"},
+                {"path": "constitution/amendments/A0009_x.md", "content": "x"},
+            ]
+        },
+        BLOCK,
+    ),
+    (
+        "push_files 일반 문서(대조군)",
+        "mcp__github__push_files",
+        {"files": [{"path": "docs/x.md", "content": "x"}]},
+        ALLOW,
+    ),
+    (
+        "push_files 이름만 같은 폴더(대조군)",
+        "mcp__github__push_files",
+        {"files": [{"path": "scripts/constitution/audit.py", "content": "x"}]},
+        ALLOW,
+    ),
+    (
+        "push_files 첫 칸이 다른 접두 폴더(대조군)",
+        "mcp__github__push_files",
+        {"files": [{"path": "constitution_notes/x.md", "content": "x"}]},
+        ALLOW,
+    ),
+    (
+        "push_files 제안 폴더(대조군)",
+        "mcp__github__push_files",
+        {"files": [{"path": "docs/constitution_proposals/A.md", "content": "x"}]},
+        ALLOW,
+    ),
+    ("push_files 빈 목록(쓸 것 없음)", "mcp__github__push_files", {"files": []}, ALLOW),
+    ("push_files files 필드 없음 → 모른다=차단", "mcp__github__push_files", {"branch": "b"}, BLOCK),
+    (
+        "push_files 항목에 path 없음 → 모른다=차단",
+        "mcp__github__push_files",
+        {"files": [{"content": "x"}]},
+        BLOCK,
+    ),
+    (
+        "create_or_update_file 헌법 판례",
+        "mcp__github__create_or_update_file",
+        {"path": "constitution/precedents/P1.md", "content": "x"},
+        BLOCK,
+    ),
+    (
+        "create_or_update_file ./ 와 대소문자 변형",
+        "mcp__github__create_or_update_file",
+        {"path": "./Constitution/STAGE", "content": "x"},
+        BLOCK,
+    ),
+    (
+        "create_or_update_file .. 우회",
+        "mcp__github__create_or_update_file",
+        {"path": "docs/../constitution/STAGE", "content": "x"},
+        BLOCK,
+    ),
+    (
+        "create_or_update_file 앞 슬래시",
+        "mcp__github__create_or_update_file",
+        {"path": "/constitution/STAGE", "content": "x"},
+        BLOCK,
+    ),
+    (
+        "create_or_update_file 퍼센트 인코딩 우회",
+        "mcp__github__create_or_update_file",
+        {"path": "constitution%2FSTAGE", "content": "x"},
+        BLOCK,
+    ),
+    (
+        "create_or_update_file 일반 문서(대조군)",
+        "mcp__github__create_or_update_file",
+        {"path": "docs/x.md", "content": "x"},
+        ALLOW,
+    ),
+    (
+        "create_or_update_file path 없음 → 모른다=차단",
+        "mcp__github__create_or_update_file",
+        {"content": "x"},
+        BLOCK,
+    ),
+    (
+        "delete_file 헌법 본문",
+        "mcp__github__delete_file",
+        {"path": "constitution/CONSTITUTION.md"},
+        BLOCK,
+    ),
+    (
+        "delete_file 역슬래시 경로",
+        "mcp__github__delete_file",
+        {"path": "constitution\\STAGE"},
+        BLOCK,
+    ),
+    ("delete_file 일반 문서(대조군)", "mcp__github__delete_file", {"path": "docs/x.md"}, ALLOW),
 ]
 
 
-def run_fixture(tool: str, tool_input: dict[str, str]) -> int:
-    """가드를 훅처럼 실행해 종료 코드를 돌려준다."""
-    filled = {k: v.replace("{root}", str(ROOT)) for k, v in tool_input.items()}
+#: 차단 안내문에 반드시 실려야 하는 표지 — 조문 인용과 차단 사유 줄 (CONST-12 ③)
+ADVICE_MARKS = ("제9조", "차단 사유")
+
+
+def judge_fixture(expected: int, code: int, stderr: str) -> str | None:
+    """픽스처 1건의 판정. 일치하면 None, 아니면 불일치 설명.
+
+    종료 코드만 보면 안내문이 비거나 깨져도 초록이다 — 차단은 사람(과 에이전트)이 읽을 안내문까지가
+    기능이므로, 차단 픽스처는 stderr 에 조문 인용과 차단 사유가 실렸는지도 단언한다.
+    """
+    if code != expected:
+        return f"기대 {expected} · 실제 {code}"
+    if expected == BLOCK:
+        missing = [m for m in ADVICE_MARKS if m not in stderr]
+        if missing:
+            return f"차단했지만 안내문에 {missing} 이(가) 없다(stderr {len(stderr)}자)"
+    return None
+
+
+def fill_root(value: Any, root: str) -> Any:
+    """픽스처 입력 안의 {root} 를 저장소 경로로 바꾼다 — 중첩 목록·사전(push_files)까지 재귀."""
+    if isinstance(value, str):
+        return value.replace("{root}", root)
+    if isinstance(value, list):
+        return [fill_root(v, root) for v in value]
+    if isinstance(value, dict):
+        return {k: fill_root(v, root) for k, v in value.items()}
+    return value
+
+
+def run_fixture(tool: str, tool_input: dict[str, Any]) -> tuple[int, str]:
+    """가드를 훅처럼 실행해 (종료 코드, stderr 안내문)을 돌려준다.
+
+    출력은 바이트로 받아 **메인 스레드에서** UTF-8 로 엄격 해독한다. subprocess 에 text=True 를
+    맡기면 해독이 reader 스레드 안에서 일어나, 실패가 스레드 트레이스로만 찍히고 출력은 조용히
+    사라진다(2026-10-03 Kiki 머신: 차단 픽스처 28건마다 UnicodeDecodeError 가 찍혔는데 판정은
+    초록이었다). 해독 실패는 호출자(main)가 불일치로 계상한다.
+    """
+    filled = fill_root(tool_input, str(ROOT))
     payload = json.dumps({"tool_name": tool, "tool_input": filled, "cwd": str(ROOT)})
     proc = subprocess.run(
         [sys.executable, str(GUARD)],
-        input=payload,
+        input=payload.encode("utf-8"),
         capture_output=True,
-        text=True,
-        encoding="utf-8",
         # 환경은 상속한다 — Windows 는 SYSTEMROOT 가 없으면 파이썬이 시작조차 못 한다(초판은 PATH 만
         # 남겨 비웠는데, 그러면 Kiki 머신의 위헌 심사 R0-01 이 전건 불일치로 red 가 된다).
         env={
@@ -210,7 +350,7 @@ def run_fixture(tool: str, tool_input: dict[str, str]) -> int:
         },
         timeout=30,
     )
-    return proc.returncode
+    return proc.returncode, proc.stderr.decode("utf-8")
 
 
 def main() -> int:
@@ -224,9 +364,17 @@ def main() -> int:
         return 2
     mismatches = []
     for desc, tool, tool_input, expected in FIXTURES:
-        got = run_fixture(tool, tool_input)
-        if got != expected:
-            mismatches.append(f"{desc}: 기대 {expected} · 실제 {got} · {tool} {tool_input}")
+        try:
+            code, stderr = run_fixture(tool, tool_input)
+        except UnicodeDecodeError as exc:  # 가드가 UTF-8 이 아닌 바이트를 냈다 — 삼키지 않는다
+            mismatches.append(
+                f"{desc}: 가드 stderr 해독 실패({type(exc).__name__} · 위치 {exc.start}) "
+                f"· {tool} {tool_input}"
+            )
+            continue
+        problem = judge_fixture(expected, code, stderr)
+        if problem is not None:
+            mismatches.append(f"{desc}: {problem} · {tool} {tool_input}")
     blocks = sum(1 for f in FIXTURES if f[3] == BLOCK)
     print(
         f"가드 자가시험: 픽스처 {len(FIXTURES)}건"

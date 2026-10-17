@@ -380,6 +380,29 @@ def render_status_json(backlog: Backlog, errors: list[str], today: date) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
+def impl_signal_line(
+    impl_new: int | None, impl_changed: int | None, impl_scan_error: str = ""
+) -> str:
+    """브랜치의 구현 신호 한 줄(HARN-31) — 없으면 빈 문자열(미측정·대상 밖).
+
+    3상태를 **서로 다른 문장**으로 말한다. 0과 판정 불가를 같은 화면으로 내면 측정 실패가
+    "구현 없음"으로 위장된다(CLAUDE.md 3상태 원칙):
+      · 양수 — done 표기가 있든 없든 구현 파일이 있다. 내용을 열어 보라는 행동을 명시한다.
+      · 0 — 문서·원장 위주. 읽을 구현이 없다는 *긍정* 정보이므로 숨기지 않고 보인다.
+      · 사유 있음 — 판정 불가. 삭제 전 수동 확인을 요구한다.
+    """
+    if impl_new is None or impl_changed is None:
+        if impl_scan_error:
+            return f"      ↳ 구현 신호 판정 불가: {impl_scan_error} — 삭제 전 수동 확인 필요"
+        return ""
+    if impl_new + impl_changed > 0:
+        return (
+            f"      ↳ 🧩 구현 신호: 신규 {impl_new}파일 · 수정 {impl_changed}파일 "
+            "(태스크 done 표기와 무관 — 내용을 열어 확인)"
+        )
+    return "      ↳ 구현 신호 없음 (문서·원장 위주)"
+
+
 def render_brief(
     backlog: Backlog,
     errors: list[str],
@@ -392,7 +415,12 @@ def render_brief(
     stale_branch_message: str = "",
     pr_state_lookup_ok: bool = True,
     pr_state_lookup_error: str = "",
+    isolation_source: str = "",
     done_excluded: dict[str, list[str]] | None = None,
+    gate_attach_excluded: dict[str, list[str]] | None = None,
+    gate_attach_status: str = "disabled",
+    sibling_excluded: dict[str, list[str]] | None = None,
+    sibling_status: str = "disabled",
     doc_series_candidates: list[tuple[str, tuple[str, ...], str]] | None = None,
     doc_series_status: str = "ok",
     ruleset_reminder: str | None = None,
@@ -400,7 +428,10 @@ def render_brief(
     """SessionStart 훅용 — 컨텍스트에 주입되는 최소 브리핑.
 
     remote_claimed: task_id → 원격 claim 브랜치 (refs/claims/* 조회 결과, best-effort).
-    stale_branches: (branch, age_days, ahead, status, evidence[, partial_port[, port_scan_error]])
+    stale_branches: (branch, age_days, ahead, status, evidence[, partial_port[, port_scan_error
+        [, impl_new[, impl_changed[, impl_scan_error]]]]]) — 마지막 3개(HARN-31)는 done 표기와
+        무관한 구현 신호다(신규/수정 구현 파일 수·측정 불가 사유). `None`은 미측정 또는
+        판정 불가라 `0`과 다르다 — 0이면 "구현 신호 없음", 사유가 있으면 "판정 불가"로 말한다.
         목록
         (HARN-13 + 2026-08-05
     3분류 확장 · HARN-78 5분류) — 원시 튜플로 받아 이 모듈이 `remote_claims`를 직접
@@ -418,10 +449,26 @@ def render_brief(
     PR에서"(이미 확인됨을 전제)가 아니라 "열림/닫힘을 확인하라"(모른다는 사실을
     명시)로 바뀐다 — 기본값 True는 하위호환(이 두 인자를 안 주는 기존 호출부는
     종전 문구 그대로).
+    isolation_source (HARN-28): `stale_branches`가 세션 스캔이 아니라 **CI 야간 리포트**에서
+    왔을 때의 출처 한 줄(측정 시각·기준 커밋 포함). 비어 있으면 아무것도 내지 않는다 — 라이브
+    스캔 결과의 출력은 종전 그대로다. 있으면 목록이 0건이어도 이 줄은 나온다("리포트가 있고
+    0건이다"와 "리포트가 없다"는 다른 화면이어야 한다).
     done_excluded: task_id → 완료 브랜치 목록(HARN-12) — 타 세션이 이미 끝냈으나 아직
     머지 전인 태스크. `next`(HARN-11)와 동형으로 후보에서 제외해 브리핑이 이미 끝난
     일을 1순위로 추천하는 근접사고를 막는다. 순수 함수 — 원격 조회는 호출부(`cmd_brief`)
     책임이라 여기서는 이미 계산된 결과만 받는다(테스트 용이성·기존 시그니처 하위호환 유지).
+    gate_attach_excluded / gate_attach_status: task_id → `브랜치:게이트` 목록(HARN-193) —
+    미머지 브랜치가 게이트를 붙여 두고 원격 claim을 푼 태스크. done_excluded와 같은 이유로
+    후보에서 빼고, **왜 빠졌는지를 한 줄로 보인다**(사라진 후보를 세션이 다시 조사하지 않게).
+    status가 `ok`·`disabled`가 아니면(`truncated`·`offline`·`error:*`) "부착 없음"이 아니라
+    **판정 보류**로 표시한다 — 훅이 stderr를 버리므로(`2>/dev/null`) 스캔 실패는 이 함수가
+    반환하는 문자열 안에 있어야 실제로 보인다(stale_branch_status와 동형). 기본값
+    `disabled`는 하위호환(인자를 안 주는 기존 호출부는 출력이 그대로다).
+    sibling_excluded / sibling_status: task_id → `브랜치(상태)` 목록(HARN-198) — 미머지 브랜치가
+    in_progress·review로 들고 있는 태스크. 끝낸 세션의 done이 원격 claim을 걷고 done 기록은
+    아직 push 전인 창에서 트렁크는 이 태스크를 무주 todo로 보여 준다. gate_attach_*와 같은
+    규약이다 — 후보에서 빼고 이유를 한 줄로 보이며, status가 `ok`·`truncated`·`disabled`가
+    아니면 "형제 없음"이 아니라 **판정 보류**로 표시한다(훅이 stderr를 버리므로 반환 문자열 안에).
     doc_series_candidates: (branch, files, last_commit_at_iso) 목록(HARN-14) — 나이 임계
     없이 트렁크에 없는 `docs/**/*_review.md`를 추가한 미머지 브랜치 전부. stale_branches와
     같은 결합도 원칙(원시 튜플만 받음). **훅이 stderr를 버리므로**(`.claude/settings.json`
@@ -463,14 +510,24 @@ def render_brief(
     # 장기 미머지 브랜치 (HARN-13 + 2026-08-05 3분류 + HARN-47 고립/PR대기 분리) —
     # 정보성일 뿐 착수를 막지 않는다. **행동이 필요한 축(isolated)만 강조**하고 나머지는
     # 참고로 낮춰, 매 세션 Kiki가 훑어야 하는 줄 수를 실제 조치 대상으로 좁힌다.
+    if isolation_source:
+        lines.append(isolation_source)
     if stale_branches:
         normalized = []
+        impl_lines: dict[str, str] = {}  # 브랜치 → 구현 신호 줄(HARN-31)
         for entry in stale_branches:
             branch_name, age_days_val, ahead_val = entry[0], entry[1], entry[2]
             status_val, evidence_val = entry[3:5] if len(entry) >= 5 else ("unresolved", "")
             # 6번째 원소(부분 착지 단서)는 선택 — 구 호출부 5튜플 호환(HARN-37).
             partial_val = entry[5] if len(entry) >= 6 else ""
             scan_err_val = entry[6] if len(entry) >= 7 else ""
+            impl_line = impl_signal_line(
+                entry[7] if len(entry) >= 8 else None,
+                entry[8] if len(entry) >= 9 else None,
+                entry[9] if len(entry) >= 10 else "",
+            )
+            if impl_line:
+                impl_lines[branch_name] = impl_line
             normalized.append(
                 (
                     branch_name,
@@ -508,6 +565,8 @@ def render_brief(
                     # 흡수 흔적은 있으나 전건은 아니다 — 사람이 같은 조사를 다시 하지
                     # 않게 단서를 잇고, 동시에 '결정 불요'로 숨기지도 않는다(HARN-37).
                     lines.append(f"      ↳ 부분 착지: {partial} — 잔여분 확인 필요")
+                if stale_branch in impl_lines:
+                    lines.append(impl_lines[stale_branch])
         # PR 닫힘(미머지, HARN-78) — PR이 있었다는 사실이 처분 완료를 뜻하지 않는다.
         # isolated와 같은 행동 요구(재작업 또는 폐기 판단)이므로 같은 위계로 강조한다.
         if pr_closed:
@@ -517,6 +576,8 @@ def render_brief(
                     f"  · {stale_branch} — {evidence} · 최종 커밋 {age_days:.0f}일 전 · "
                     f"trunk 대비 {ahead}커밋 앞섬"
                 )
+                if stale_branch in impl_lines:
+                    lines.append(impl_lines[stale_branch])
         # PR 대기 — 작업은 GitHub에 보인다. 열림이 GitHub API로 확인됐으면(pr_state_
         # lookup_ok) Kiki에게 "결정하라"고 다시 묻지 않고 PR 번호를 건넨다. 확인이
         # 안 됐으면(토큰 없음 등) "열림"이라고 단정하지 않고 직접 확인하라고 말한다
@@ -544,6 +605,8 @@ def render_brief(
                     f"  · {stale_branch} — 최종 커밋 {age_days:.0f}일 전 · "
                     f"trunk 대비 {ahead}커밋 앞섬"
                 )
+                if stale_branch in impl_lines:
+                    lines.append(impl_lines[stale_branch])
         if ported:
             lines.append(f"(참고) 이미 포팅됨 — 원본 정리만 필요, 결정 불요 — {len(ported)}건:")
             for stale_branch, _age_days, _ahead, _status, evidence, _partial, _err in ported:
@@ -574,6 +637,30 @@ def render_brief(
     ready, excluded = selector.candidates(backlog, remote_claimed=remote_claimed)
     if done_excluded:
         ready = [t for t in ready if t.id not in done_excluded]
+    if gate_attach_excluded:
+        ready = [t for t in ready if t.id not in gate_attach_excluded]
+        for task_id, attached in sorted(gate_attach_excluded.items()):
+            lines.append(
+                f"⛔ 후보 제외 {task_id} — 미머지 브랜치가 게이트를 붙여 뒀다: "
+                f"{', '.join(attached)}"
+            )
+    if gate_attach_status not in ("ok", "disabled"):
+        lines.append(
+            f"(미머지 게이트 부착 스캔 {gate_attach_status} — 게이트가 붙은 태스크가 후보에 "
+            f"섞였을 수 있음 · 판정 보류)"
+        )
+    if sibling_excluded:
+        ready = [t for t in ready if t.id not in sibling_excluded]
+        for task_id, holders in sorted(sibling_excluded.items()):
+            lines.append(
+                f"⛔ 후보 제외 {task_id} — 미머지 브랜치가 진행 중으로 들고 있다: "
+                f"{', '.join(holders)}"
+            )
+    if sibling_status not in ("ok", "truncated", "disabled"):
+        lines.append(
+            f"(형제 브랜치 진행 중 스캔 {sibling_status} — 다른 세션이 들고 있는 태스크가 후보에 "
+            f"섞였을 수 있음 · 판정 보류)"
+        )
     if ready:
         lines.append("다음 착수 후보:")
         for i, task in enumerate(ready[:3], start=1):

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ADMIN-20-recall-disposition-nonapproved-items
+title: "비승인 문항(pending·미설정·rejected) 결함 회수 경로 결정 — 전이표 변경 vs 공개 GET 정책 vs 현행 유지 (ADMIN-16 영향, Kiki 결정)"
+track: infra-debt
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: kiki
+depends_on: []
+requires_gates: []
+acceptance:
+  - "ADMIN-16이 PATCH를 전이표에 연결한 결과 생긴 능력 변화에 대한 Kiki 결정. 전이표는 approved에서만 격리를 허용하는데, 공개 카탈로그 GET(SEC-07 D1)은 격리 문항만 숨기고 pending·미설정·rejected 문항은 그대로 노출한다. 그래서 pending·rejected·미설정 문항에 결함이 있으면 지금은 어떤 관리자 API로도 공개 카탈로그에서 숨길 수 없다(ADMIN-16 이전에는 PATCH가 어느 상태에서든 quarantined로 보낼 수 있었다). EOS-97 리콜 도구(ops/generation_recall.py)의 격리 대상도 genlog의 새로 생성된 문항이라 approved 이전일 가능성이 높다 — 그 비율을 실측해야 한다. 결정 선택지: (1) 전이표에 pending→quarantined 등을 추가(ADMIN-07 전이 계약 변경) (2) 공개 GET이 approved만 노출하도록 D1 정책 변경(격리 계약 7절 첫 항목 — 회귀 범위 큼) (3) 현행 유지하고 리콜 도구가 비승인 문항은 reject 경로로 안내. 결정 근거와 결과를 계약 문서에 반영하고, 선택한 안에 대한 주입 테스트를 둔다."
+artifacts: []
+paths:
+  - docs/standards/problem_quarantine_contract.md
+session: null
+notes: "owner=kiki — 정책 결정 사안(전이표 변경 또는 D1 공개 정책 변경). 세션이 임의로 정하지 않는다."
+updated: 2026-10-08

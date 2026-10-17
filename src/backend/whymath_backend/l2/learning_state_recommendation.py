@@ -16,8 +16,9 @@
 판정 요지 — 추천은 상태 머신을 **다시 판정하지 않고 집행한다**
 ---------------------------------------------------------------
 "다음에 무엇을 할까"의 결정자는 상태 머신(`l2/learning_state_policy.py::V1_RULES`) 하나다.
-오개념과 선수 결손 중 무엇이 먼저인가는 EOS-138 ③이 상태 머신 순서(R3 > R4)로 판정했고
-MISC-30 경로 표(RT1 > RT2)는 삭제됐다. 추천이 집행만 하므로 순서를 바꾸기로 하면 고칠 곳은
+오개념과 선수 결손 중 무엇이 먼저인가는 EOS-138 ③이 상태 머신 순서(R3 > R4)로 판정했으나 R4는
+EOS-127에서 삭제됐다 — 선수 하강은 이 모듈의 R6 경로(선수 탐침)가 맡는다. MISC-30 경로 표
+(RT1 > RT2)는 삭제됐다. 추천이 집행만 하므로 순서를 바꾸기로 하면 고칠 곳은
 `V1_RULES` 한 곳이다.
 
 집행 대상은 **R3 하나**다(트리거 `POLICY_REMEDIATE_MISCONCEPTION`). R5·R6·R2·R1을 읽지 않는
@@ -172,8 +173,8 @@ POLICY_DECISION_TRIGGERS: Final[frozenset[TransitionTrigger]] = frozenset(
     }
 )
 
-#: 직전 정책 결정이 이 둘 중 하나면 이번 R6는 **연속 두 번째 오답**이다(오답을 낳는 결정은 R3·R4·
-#: R5·R6이고, R4는 서빙에서 발화하지 않으며(EOS-127) R5 뒤에는 R6가 올 수 없다 — 연속 3회 이상이면
+#: 직전 정책 결정이 이 둘 중 하나면 이번 R6는 **연속 두 번째 오답**이다(오답을 낳는 결정은 R3·R5·
+#: R6이고 — R4는 EOS-127에서 삭제됐다 — R5 뒤에는 R6가 올 수 없다 — 연속 3회 이상이면
 #: 계속 R5다). 둘째 오답에서는 탐침하지 않는다: 탐침을 틀리면 셋째가 R5라 그 결과를 쓸 하강이 없다.
 _WRONG_ANSWER_DECISIONS: Final[frozenset[TransitionTrigger]] = frozenset(
     {
@@ -371,7 +372,8 @@ def _evidence_since_previous_attempt(
 
     왜 `turns_since_evidence = 0`만으로는 부족한가(EOS-140 · 실 PG 재현): 그 값은 "가장 최근
     *스캔* 턴에서 매치됐다"이지 "이 응답에서 매치됐다"가 아니다. 응답 제출 경로의 스캔은 답안
-    (또는 선지 인덱스) + 지문이 있을 때만 돈다(`api/me.py::_scan_attempt_misconceptions` — 답안
+    (또는 선지 인덱스) + 지문이 있을 때만 돈다
+    (`api/_attempt_misconception_scan.py::scan_attempt_misconceptions` — 답안
     미제출·지문 부재는 NOT_RUN이고 NOT_RUN이면 가설을 건드리지 않는다 · 정답도 같은 조건으로
     스캔해 후보가 없으면 1턴 감쇠한다(EOS-123)). 그래서 오개념 오답(스캔·tse 0) → 답안 없는
     정답(미스캔) → 다른 개념의 답안 없는 오답(미스캔)이면 첫 가설의

@@ -173,6 +173,49 @@ class HintEventData(_EventPayload):
             "None=미서빙. 식별자일 뿐 본문이 아니다(본문은 이벤트에 싣지 않는다)."
         ),
     )
+    base_level: int | None = Field(
+        default=None,
+        ge=1,
+        le=4,
+        description=(
+            "EOS-178: 같은 입력에서 **능력 라벨 없이** 계산한 단계"
+            "(`decide_base_hint_level`). `hint_level`이 이보다 높으면 라벨('초보')이 그 턴의 "
+            "단계를 올린 것이다. `base_level>=2`는 그 턴에 학생 신호(답 요구·좌절·5회+ 막힘)가 "
+            "있었다는 뜻이고, 힌트 귀속(`used_hint`)은 이것으로 신호가 올린 공급과 라벨만 올린 "
+            "공급을 가른다. None=구판 이벤트(가르지 못한다 — 귀속은 종전대로 `hint_level`만 본다)."
+        ),
+    )
+    ability_level: str | None = Field(
+        default=None,
+        max_length=16,
+        description=(
+            "EOS-178: 그 턴의 단계 결정에 적용된 능력 라벨('초보'|'발전 중'|'숙달'). "
+            "None=라벨 없이 결정됐거나 구판 이벤트. 라벨 정확도 계측(라벨이 예측한 도움 필요와 "
+            "학생 신호의 일치)의 입력이며 사후 백필이 불가능하다 — 라벨은 그 순간의 BKT·θ "
+            "상태에서만 만들어진다."
+        ),
+    )
+    label_source: str | None = Field(
+        default=None,
+        max_length=16,
+        description=(
+            "EOS-179: `ability_level` 라벨의 출처 — 'explicit'(클라가 `mastery_level`을 직접 "
+            "보냄)·'server_bkt'(서버 L2 개념 숙달도 포함)·'server_theta'(서버 θ만)·"
+            "'client_bkt'(클라 제출 bkt 포함 — 서버 미검증 입력). None=라벨 없음 또는 구판 "
+            "이벤트. 라벨 정확도를 출처별로 층화해 읽기 위한 축이며(서버 파생 라벨의 정확도와 "
+            "클라가 정한 라벨의 정확도는 다른 질문이다) 사후 백필이 불가능하다."
+        ),
+    )
+    label_evidence_n: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "EOS-179: `ability_level` 라벨을 만든 서버 개념 숙달도의 관측 수"
+            "(`concept_mastery_history.sample_size`). None=**모름**(서버 숙달도가 라벨에 안 "
+            "들어갔거나 sample_size 미기록·구판 이벤트) — 0과 다르다. 관측이 적은 라벨과 많은 "
+            "라벨을 같은 정확도로 세지 않기 위한 입력이며 사후 백필이 불가능하다."
+        ),
+    )
 
 
 class DemandEventData(_EventPayload):
@@ -261,7 +304,7 @@ class AttemptedEventData(_EventPayload):
     12월 데이터의 소급 불가 축이 자유형에 섞인다. 이 페이로드는 그 컬럼을 *읽을 때 필요한
     맥락*(어느 채점 경로에서·어떤 판정으로 나온 기록인가)만 계약한다.
 
-    `source`는 두 채점 경로를 가르는 폐쇄 라벨(`AttemptSource`)이다 — 한쪽 경로에만 writer가
+    `source`는 채점 경로를 가르는 폐쇄 라벨(`AttemptSource` 3종)이다 — 한쪽 경로에만 writer가
     배선되면 기록률 리포트가 경로별 분모로 그것을 즉시 드러낸다(한 경로 누락이 전체 평균에
     희석돼 보이지 않는 것을 막는다). `is_correct`는 채점 결과 불리언(비식별 — 학생 답안 원문은
     싣지 않는다·S4-19 관측 레코드 규약 동형).
@@ -273,7 +316,8 @@ class AttemptedEventData(_EventPayload):
     source: str = Field(
         ...,
         description="채점 경로 라벨(AttemptSource 값: attempt_submit=자가보고 v1 · "
-        "coach_completion=코치 서버검증). 경로별 기록률 분모.",
+        "coach_completion=코치 서버검증 완료 · coach_wrong_submission=코치 서버 판정 오답 "
+        "최초 제출). 경로별 기록률 분모.",
     )
 
 

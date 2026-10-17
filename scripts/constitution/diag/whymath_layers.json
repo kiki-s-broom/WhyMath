@@ -3,6 +3,7 @@
   "python_roots": ["src/backend", "src/data-pipeline", ""],
   "layers": {
     "adapter_math": [
+      "src/backend/whymath_backend/l3/curriculum_notation_gate.py",
       "src/backend/whymath_backend/l3/equivalent/**",
       "src/backend/whymath_backend/l3/finite_probability.py",
       "src/backend/whymath_backend/l3/multi_solution.py",

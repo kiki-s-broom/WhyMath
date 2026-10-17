@@ -38,15 +38,20 @@ EOS-19 시점의 v1은 문항을 IRT로 고른 *뒤* 그 문항의 개념 숙달
     근거 개념 ≠ 목표. 해소 결과는 `IntentResolution`으로 응답·처치 기록 양쪽에 남는다.
 
 그래서 v1의 아래 제약("추천 결과를 바꾸지 않는다")은 **EOS-19 전환에 한정된 것**이고, EOS-124는
-선수·전진 구간에서 선택을 *의도적으로* 바꾼다. 바뀐 알고리즘은 `policy_version=cat_v2`로 구분돼
-소급 평가가 두 규칙을 섞지 않는다. θ·난이도 밴드·가중 축은 여전히 그대로다(재선택도 같은
-게이트·같은 가중·같은 선택기를 쓴다 — 달라지는 것은 후보 집합뿐이다).
+선수·전진 구간에서 선택을 *의도적으로* 바꾼다. 바뀐 알고리즘은 그 시점에 `policy_version=cat_v2`로
+구분됐다(EOS-147이 이후 `cat_v4`로, EOS-39가 `cat_v5`로 올렸다 — 아래 두 절). 소급 평가가 두
+규칙을 섞지 않는다.
+θ·난이도 밴드·가중 축은 여전히 그대로다(재선택도 같은 게이트·같은 가중·같은 선택기를 쓴다 —
+달라지는 것은 후보 집합뿐이다).
 
-**EOS-33 (`cat_v3`)** — 관계 행위의 **증거 요건**이 붙었다. 전진은 앵커 개념의 채점 응답이 3개
+**EOS-33 (`cat_v6`)** — 관계 행위의 **증거 요건**이 붙었다. 전진은 앵커 개념의 채점 응답이 3개
 이상일 때만 콘텐츠를 옮기고(`IntentResolution.INSUFFICIENT_EVIDENCE`), 선수 복귀의 목표 P는 숙달이
 BKT 사전값(0.3) 미만일 때만 선다(`is_prerequisite_deficit`). 두 방향의 요건이 비대칭인 이유와
 기각된 대칭안의 실측은 판정문 `docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_
-2026-09-29.md`가 정본이다. 규칙이 바뀌었으므로 `policy_version`이 `cat_v3`로 올라간다.
+2026-09-29.md`가 정본이다. 규칙이 바뀌었으므로 `policy_version`이 `cat_v6`으로 올라간다
+(`cat_v3`은 이 태스크용으로 비워 뒀지만 main이 먼저 `cat_v5`까지 올라 있어 단조 증가를 지키려
+`cat_v6`을 쓴다 — 경위는
+`recommendation_evidence.POLICY_VERSION_CAT` 주석).
 
 ────────────────────────────────────────────────────────────────────────────
 **추천 결과를 바꾸지 않는다** (EOS-19 acceptance ④ — 그 전환의 가장 중요한 제약)
@@ -78,6 +83,31 @@ docstring이 정본이다. 지시가 없는 요청은 조회 0건이 추가되�
 제한된 후보에서 같은 선택 연산을 하고 이름표는 EOS-124 갈래가 그대로 붙인다(전달 문항에 대해 그
 이름표가 참이기 때문이다). 단 R6 경로에서는 전진하지 않는다(상태 머신이 방금 오답을 관측했다).
 선수 읽기의 그래프 예산은 이 모듈이 걸어 주입한다(`_read_prerequisites`) — 예산 정의는 여기 하나다.
+
+**EOS-147 — 후보 선택에는 추정 θ가 아니라 *선택 θ*를 쓴다.** 전부 정답 이력에서 추정 θ는 MLE가
+존재하지 않아 상한(4.0)에 붙는 클램프인데, 그것을 표적으로 쓰면 첫 정답 뒤 은행의 가장 어려운
+문항으로 뛴다. `AttemptHistoryState.selection_theta`(전부 정답이면 맞힌 최고 난이도 + 0.5 로짓 —
+잠정값·`EOS-176`이 보정을 소유, 그 외에는 추정 θ와 같다)로 고른다. 추정기·SE·중단 규칙은 그대로다.
+이 변경은 전부 정답 이력의 선택을 바꾸므로 `policy_version`을 `cat_v4`(수능 `suneung_v3`)로
+올렸다(REC-11). 상태 머신 집행 변형(`cat_v1_state_remediation`·`cat_v2_state_undiagnosed`)의
+문자열은 **EOS-147 시점에는** 그대로였다 — 경로 규칙(후보 제한·이름표)이 같고 오답이 있는
+이력에서만 발동한다고 봤기 때문이다 — EOS-39가 그 전제를 깨서 올렸다(아래 절). 예외 하나:
+난이도 라벨이 없는 문항의 오답은 IRT 응답에 없어 이력이 '전부 정답'으로 판정될 수 있다 — 그
+코너의 후보 풀 조회 θ는 선택 θ이고, 처치 기록의 `selection_theta` 키가 그 표지다. 판정문
+`docs/reviews/eos147_*`.
+
+**EOS-39 — 코치가 도움을 공급해 끝낸 문항은 선택 θ의 입력에서 실패 1건으로 접는다.** 앱 학생의
+정답 완료는 `used_hint=True`(코치가 힌트 단계 2 이상을 먼저 공급 — 학생이 요청했는가가 아니다)
+일 수 있고, 추정기는 그것을 독립 성공과 같게 읽어 상한 사다리가 도움 완료마다 표적을 올렸다.
+`selection_evidence`가 문항 단위로 접는다(도움 완료가 하나라도 있으면 그 문항은 오답 행이
+몇이든 응답 1건 = 실패, 미상(NULL)은 정답으로 세되 수를 센다). 접기가 만든 전부 실패에는
+하한 사다리 `max(-4.0, min(0.0, 실패한 최저 b - 0.5))`를 쓰고, 실제 오답만 있는 이력(-4.0)은
+R3·R6 기준선이라 바꾸지 않는다. 추정 θ·SE·숙달은 불변이다. 접힌 문항 수·미상 수가
+`NextProblemOutcome.selection_help_count`·`selection_hint_unknown_count`로 흘러 처치 기록과
+리포트의 '작동한 비율'이 된다. 이 규칙은 오답 행이 있는 이력에서도 선택을 바꾸므로 R3·R6
+변형까지 `policy_version`을 올렸다: `cat_v5` · 수능 `suneung_v4` · `cat_v2_state_remediation` ·
+`cat_v3_state_undiagnosed`. 킬 스위치 `l2_selection_help_fold_enabled`(기본 ON)를 끄면 종전과
+비트동일하다. 판정문 `docs/reviews/eos39_*`.
 
 ────────────────────────────────────────────────────────────────────────────
 개념 그래프 예산 — depth ≤ 2 · nodes ≤ 20 · visited · timeout
@@ -121,6 +151,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.l2.irt import (
     IrtItem,
+    ThetaBoundary,
     item_information,
     learning_band_weight,
     select_weighted_item,
@@ -564,7 +595,48 @@ class NextProblemOutcome(Recommendation):
     응답은 바이트 동일하다.
     """
 
-    theta: float = Field(description="추천에 쓰인 현재 능력 추정 θ(logit). 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "현재 능력 추정 θ(logit) — MLE. 응답 없으면 0. 전부 정답/오답 이력에서는 MLE가 "
+            "존재하지 않아 발산 경계(±4.0)이며 측정값이 아니다(`theta_boundary`). 출제에 실제 쓴 "
+            "θ는 `selection_theta`다(EOS-147)."
+        )
+    )
+    selection_theta: float | None = Field(
+        default=None,
+        description=(
+            "EOS-147 — 후보를 고르는 데 **실제로 쓴** θ. 전부 정답 이력에서만 `theta`와 다르다"
+            "(맞힌 최고 난이도 + 0.5 로짓 · 잠정 · 판정문 §4-2). 두 정책은 항상 채운다. "
+            "None은 이 필드를 모르는 생성자(테스트 스텁 등)뿐이며 `theta`와 같다는 뜻이다."
+        ),
+    )
+    theta_boundary: ThetaBoundary | None = Field(
+        default=None,
+        description=(
+            "EOS-147 — 추정 θ가 MLE 발산 경계에 붙었는가: `upper`=전부 정답 · `lower`=전부 오답 · "
+            "None=경계 아님. `lower`는 관측만 하고 선택은 바꾸지 않는다(판정문 §4-4)."
+        ),
+    )
+    selection_help_count: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "EOS-39 — 코치가 도움(힌트 단계 2 이상)을 공급해 완료한 문항이라 선택용 응답에서 "
+            "실패 1건으로 접힌 문항 수. 0이면 도움 채널이 이 이력에 닿지 않았다(또는 킬 스위치가 "
+            "꺼졌다). 계측 신호이며 학생 화면에 노출하지 않는다 — 학생이 도움을 요청한 횟수가 "
+            "아니다(라벨은 코치가 공급한 단계다 · 판정문 §2-2). 처치 기록으로만 나간다(HTTP 응답 "
+            "불변)."
+        ),
+    )
+    selection_hint_unknown_count: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "EOS-39 — 정답으로 센 완료 중 힌트 귀속(`used_hint`)이 미상(NULL)이라 도움 채널이 "
+            "판정하지 못한 수. 미상은 구조적이라(귀속 창을 모름·EOS-133 이전 행·API 클라이언트) "
+            "이 비율이 높으면 도움 채널의 효과가 줄어든다(판정문 §4-1). 처치 기록으로만 나간다."
+        ),
+    )
     difficulty: float | None = Field(
         default=None, description="추천 문항의 difficulty_overall(전문가 1~5). 없으면 null."
     )
@@ -663,6 +735,10 @@ class PolicyTelemetry(TypedDict):
     """
 
     theta: float
+    selection_theta: float
+    theta_boundary: ThetaBoundary | None
+    selection_help_count: int
+    selection_hint_unknown_count: int
     standard_error: float | None
     measurement_sufficient: bool
     weight_axes_applied: list[str]
@@ -765,14 +841,20 @@ class CatRecommendationPolicy:
         user_id = uuid.UUID(learner_state.student_id)
 
         attempt_state = await load_attempt_history_state(session, user_id)
-        theta = attempt_state.theta
+        # EOS-147 — 이 함수의 `theta`는 **후보 선택에 쓰는 θ**(`selection_theta`)다. 추정 θ
+        # (`attempt_state.theta`)가 아니다: 전부 정답 이력에서 추정 θ는 MLE가 없어 상한(4.0)에
+        # 붙는 클램프이고, 그것을 표적으로 쓰면 은행 꼭대기로 뛴다. 두 값이 갈라지는 것은 그
+        # 이력뿐이며, 응답·SE·중단 규칙에는 계속 추정 θ가 나간다(아래 `common`).
+        theta = attempt_state.selection_theta
 
         # S4-14 — sibling_filter 지정 + 직전 오답 존재 시에만 형제 조회(쿼리 0회 증가 보존 원칙).
         sibling_ids: set[uuid.UUID] = set()
         if self._sibling_filter is not None:
             last_wrong = await last_incorrect_problem_id(session, user_id)
             if last_wrong is not None:
-                sibling_ids = await load_sibling_ids(session, last_wrong)
+                sibling_ids = await load_sibling_ids(
+                    session, last_wrong, sibling_filter=self._sibling_filter
+                )
 
         excluded_ids = sibling_ids if self._sibling_filter == "exclude" else set()
         # EOS-24 — 학습 상태 머신이 오개념 교정(R3)을 결정했으면 추천은 그 결정을 *집행*한다:
@@ -845,7 +927,11 @@ class CatRecommendationPolicy:
         else:
             policy_version = self.policy_version
         common: PolicyTelemetry = {
-            "theta": theta,
+            "theta": attempt_state.theta,
+            "selection_theta": theta,
+            "theta_boundary": attempt_state.theta_boundary,
+            "selection_help_count": attempt_state.selection_help_count,
+            "selection_hint_unknown_count": attempt_state.selection_hint_unknown_count,
             "standard_error": attempt_state.standard_error,
             "measurement_sufficient": attempt_state.measurement_sufficient,
             "weight_axes_applied": weight_axes_applied,

@@ -150,10 +150,11 @@ REFRESH_TOKEN_TTL = timedelta(days=30)
 ## 감사 로그
 
 ```python
-# 감사 대상 4종 (아래 부기 — "모든 PII 접근"이 아니다)
+# 감사 대상 6종 (아래 부기 — "모든 PII 접근"이 아니다; 실제 컬럼명은 event_kind — 아래 동기화 부기)
 class AuditLog:
     user_id: str        # FK 아님 — 계정 삭제 후에도 감사 잔존
     action: str         # 'export_data' | 'consent_change' | 'admin_access' | 'role_change'
+                        # | 'content_mutation' | 'operator_token_issued'
     target: str
     timestamp: datetime
     ip_hash: str        # sha256(salt+ip) — 평문 IP 저장 금지
@@ -200,6 +201,24 @@ class AuditLog:
 > (UPDATE/DELETE 라우터 없음)·`user_id`(행위자) FK 아님은 기존 `deletion_audit` 패턴 답습.
 > `target_user_id`(행위 대상 — 관리자접근에서만 행위자와 다름)·`consent_scope`(동의변경 구분
 > typed 메타)는 `deletion_audit`엔 없는 신규 컬럼.
+
+> **⚠️ 편집자 부기 — 감사 열거값 동기화 (2026-10-08 · ADMIN-16)**: 위 코드블록의 의사 스키마는
+> 이벤트 종류를 `action`이라 부르지만 **실제 컬럼은 둘로 갈라져 있다**. 코드(`schema/enums.py`)가
+> 정본이고 이 문서는 그것을 따른다(값을 늘릴 때 enum과 이 부기를 함께 늘린다).
+> ⑴ **`privacy_audit.event_kind` = `AuditEventKind` 6종** — `export_data` · `consent_change` ·
+> `admin_access` · `role_change`(ADMIN-01) · `content_mutation`(SEC-29) · `operator_token_issued`
+> (ADMIN-15). 위 코드블록 주석이 4종에서 멈춰 있던 것을 6종으로 맞췄다.
+> ⑵ **`privacy_audit.action` = `PrivacyAuditAction` 7종** — `event_kind=content_mutation`일 때만 채운다:
+> CRUD 3값 `create` · `update` · `delete`(SEC-29) + 검수 상태 전이 4값 `approve` · `reject` ·
+> `quarantine` · `release`(ADMIN-07). 전이 4값은 `POST /v1/admin/review-queue/items/{id}/transitions`
+> **그리고** `PATCH /v1/problems/{id}`가 검수 상태를 바꿀 때(ADMIN-16 — 두 표면이 같은 전이표
+> `schema/review_transition.py`를 거친다) 쓴다. 상태가 그대로인 PATCH는 `update`다. 값 길이는
+> `String(16)` 이내이고 DB는 네이티브 enum이 아니라 문자열이라 값 추가에 마이그레이션이 필요 없다.
+> ⑶ **`privacy_audit.resource_type` = `PrivacyAuditResourceType` 2종** — `concept` · `problem`.
+> ⑷ 감사 행에는 **사유·diff 같은 자유 텍스트를 싣지 않는다**(격리 사유의 좌석은
+> `problem.quarantine_reason` 컬럼이다). **거부된 요청은 감사 행을 남기지 않는다** — `content_mutation`
+> 은 변경이 일어났다는 사실의 기록이고 루프 KPI ④(운영자 수동 개입) 계수가 그 행 수를 센다. 거부는
+> 애플리케이션 WARNING 로그로 남는다.
 
 > **⚠️ 편집자 부기 — 감사 2테이블의 보존·파기 정책 (2026-08-06 · ADMIN-03 ·
 > `operations_platform_gap_review.md` §3 D3)**: 위 코드블록의 "보존: 5년 (개인정보보호법)"은

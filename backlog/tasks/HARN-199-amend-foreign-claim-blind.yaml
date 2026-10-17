@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,10 +17,11 @@ acceptance:
   - "③ 범위 전수 — 같은 사각이 대상 태스크를 쓰는 다른 대장 verb(rename · gates 중 태스크를 바꾸는 하위 명령 등)에도 있는지 함수 단위로 확인하고, 없는 곳은 '없음'과 근거를, 있는 곳은 같은 경고를 붙인다. 확인하지 않은 verb는 목록으로 남긴다(안 본 것을 통과로 세지 않는다)."
   - "④ 변별력 — 다른 세션 claim이 있는 태스크 · 자기 claim 태스크 · claim 없는 태스크 · claim 확인 불가의 4상태 각각에서 경고 유무를 단언하는 테스트를 tests/harness에 두고, claim 조회를 제거하는 뮤테이션이 RED가 됨을 확인한다(주입 실재 단언 포함). 경고가 나야 하는 것은 첫째(다른 세션 claim)와 넷째('확인 불가' 문구)뿐이다."
   - "⑤ [정정 2026-09-29] ①의 시각·경위 서술을 이벤트 대장과 claim 기록으로 실측 정정한다. amend 이벤트 시각은 07:02:26Z이다(①의 '07:04Z경'은 폐기한 로컬 커밋 시각 07:04:05Z와 섞은 값이었다). HARN-170 재claim(07:00:48Z)보다 1분 38초 뒤이므로 결함 주장(claim 뒤의 무경고 성공)은 그대로 성립한다. 발견은 '커밋 직후'가 아니라 약 6분 뒤(07:10Z경), 이 태스크 파일을 고친 다른 브랜치가 있는지 찾다가 claim 커밋을 보고서였다. 미확인 1건: 07:02:26Z에 이 세션의 로컬 claim 캐시가 그 claim을 이미 알고 있었는지는 확인하지 못했다. 캐시만 보는 조회는 낡은 캐시에 속을 수 있으므로 ②의 구현은 원격 claim 대장을 먼저 갱신할지도 정해야 한다."
-artifacts: []
+artifacts:
+  - "PR #1449 (kiki-s-broom/WhyMath#1449) — scripts/harness/backlog.py(_foreign_claim_state·_warn_foreign_claim 신설, amend·review 연결) · tests/harness/test_foreign_claim_warning.py(13건). 판정 기준: main 381ec106 위 브랜치 기준(미머지). 4상태(foreign·own·none·unknown) 경고 — 거부하지 않음·이벤트 foreign_claim 필드. 범위 전수: 태스크 YAML 쓰기 verb 10개 중 claim 조회 없던 것은 amend·review 둘뿐(AST 호출 그래프 3단계, 허용 목록 add·seed), 전수 가드 테스트 동결. 뮤테이션 8종 전건 RED·원복 바이트 동일, ci_mirror 7잡 통과·미실행 0"
 paths:
   - scripts/harness/backlog.py
   - "tests/harness/**"
 session: null
 notes: "출처: 2026-09-29 ARCH-68(PR #1357) 머지 뒤, Kiki가 승인한 '추천대로 진행'(HARN-130·HARN-170 우선순위 상향)을 이 세션이 실행하다 발견. HARN-170 amend를 로컬 커밋으로 만든 뒤 다른 세션의 재claim(07:00:48Z)을 알게 되어 푸시하지 않고 폐기했다(패치는 세션 임시 보관). 폐기 근거: 목적(그 태스크가 다뤄지는 것)이 이미 달성됐고, 활동 중인 세션의 태스크 파일과 충돌할 위험만 남았다. 분류: 근접 사고 — 사고 대장에는 올리지 않았다(대장 끝 줄 추가가 머지 충돌 핫스팟이고 그 구조는 HARN-130이 소유). 사고 경위의 정본은 이 notes와 acceptance ①이다. 부수 관측: 이 세션의 amend는 claim이 걸린 태스크에도 종료 코드 0으로 성공했고 출력에도 단서가 없었다.\n\n[개명 2026-09-29] HARN-197-amend-foreign-claim-blind → HARN-199-amend-foreign-claim-blind: 번호 경합 해소 — 다른 세션(fervent-goldberg-s8y8ws)이 HARN-197-start-refuses-second-claim을 같은 번호로 등재했다(이 세션 푸시 07:15Z, 그쪽 커밋 07:17Z · 서로의 push 전에 add가 번호를 배정한 HARN-111 형태의 경합). 양보 근거는 비용 비대칭이다: 이쪽은 대장 참조가 전혀 없고 PR 전이라 개명이 싸다. 그쪽은 태스크 3건을 담은 큰 브랜치 안에 있고, 그쪽 노트가 사고 대장 등재(session-multi-claim 1회차)를 언급한다 — 푸시본(8041da31)의 사고 대장에는 그 줄이 없어 fix_ref가 HARN-197을 가리키는지는 확인하지 못했다(가리킨다면 개명이 HARN-195(fix_ref가 개명을 따라가지 않는 결함)에 걸린다). 198은 다른 세션이 다음 번호로 받기 쉬워 199로 옮긴다.\n\n[정정 2026-09-29] acceptance ①의 시각·경위 서술 실측 정정 — amend 이벤트 07:02:26Z(claim 07:00:48Z 뒤 1분 38초) · 발견은 커밋 약 6분 뒤. 결함 주장은 유지, 로컬 claim 캐시 상태는 미확인으로 명시.\n\n[정정 2026-09-29] notes 치환 — 개명 기록의 근거 문장 정정 — 그쪽 사고 대장 fix_ref가 HARN-197을 가리킨다는 추론을 사실처럼 적었다. 푸시본(8041da31)의 사고 대장은 추가 줄 0건·HARN-197 참조 0건이라 미확인으로 고친다. 양보 결정 자체는 비용 비대칭(이쪽 참조 0·PR 전)으로 성립한다."
-updated: 2026-09-29
+updated: 2026-10-04

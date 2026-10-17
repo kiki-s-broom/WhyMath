@@ -270,6 +270,10 @@ def _record_to_json(record: ProblemBankRecord) -> dict[str, Any]:
     data["generation_type"] = record.provenance.generation_type
     if record.provenance.original_source is not None:
         data["original_source"] = record.provenance.original_source
+    # 저작 서명(PB-15) — 기록이 있을 때만 키를 싣는다. 없는 레코드(결정론 생성기·구 코퍼스)는
+    # 종전과 바이트 동일하다(키 집합 동결 테스트·기존 코퍼스 라운드트립 회귀 0).
+    if record.provenance.authored_by is not None:
+        data["authored_by"] = record.provenance.authored_by
     data["concepts"] = [
         {"concept_src_id": tag.concept_src_id, "role": tag.role, "relevance": tag.relevance}
         for tag in record.concept_tags

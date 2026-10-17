@@ -91,6 +91,19 @@ _STATIC_TIER: dict[str, ExposureTier] = {
     # 말함 금지"). note를 학생에게 흘리는 우회는 택하지 않는다(검수 안 된 내부 문구).
     "misconception_resolution_rate": ExposureTier.PROVISIONAL,
     "self_solve_rate": ExposureTier.STUDENT_VISIBLE,
+    # PED-28 — 아래 3종(PED-04 교수 결정 로그 지표 ⑫⑬⑭)은 `SurrogateMetrics`에 있으면서 이 표에
+    # 미등재라 `classify_metric_exposure`가 판정을 **한 번도 하지 않았다**(루프가 이 표만 순회).
+    # 판정 대상 밖은 "안전"이 아니라 "판정받지 않음"이다. 지표 성격을 보고 정한 계층이며 게이트를
+    # 녹색으로 만들려고 노출 쪽으로 밀지 않았다(안전한 쪽 = 비노출이 기본):
+    #  · ⑫ 발문 전략 다양성·⑬ 연속 반복률 — 학생이 아니라 **튜터의 발문 행태**를 재는 계기판이다
+    #    (⑬은 "단조 발문 회전의 계기판"). 학생 개인 성취가 아니라 학생에게 보이면 해석 불가·낙인
+    #    소지 → 내부 전용.
+    #  · ⑭ 클라 상태 불일치율 — 오류율이 아니라 서버·클라 **동기화 신호**(시스템 품질) → 내부 전용.
+    # 재검토 발화조건: 보호자·교사 대시보드가 튜터 행태 지표를 보여야 한다는 요구가 명시될 때
+    # (그때도 계층 개정은 PED 판정을 거친다 — 이 표를 조용히 올리지 않는다).
+    "strategy_diversity": ExposureTier.INTERNAL_ONLY,
+    "strategy_repeat_rate": ExposureTier.INTERNAL_ONLY,
+    "client_state_mismatch_rate": ExposureTier.INTERNAL_ONLY,
 }
 
 # SurrogateMetrics 필드 순서(정본 순서 — surrogate_baseline_report._METRIC_ROWS와 동일 순서).

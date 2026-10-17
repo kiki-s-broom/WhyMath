@@ -30,6 +30,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.config import get_settings
 from whymath_backend.db.models.activity import ProblemAttempt
 from whymath_backend.db.models.assessment import ConceptMasteryHistory
 from whymath_backend.db.models.concept import Concept, ConceptEdge, ProblemConcept
@@ -40,8 +41,25 @@ from whymath_backend.l2.ability_estimation import (
     resolve_item_difficulty_b,
     resolve_item_discrimination_a,
 )
-from whymath_backend.l2.irt import IrtItem, ability_standard_error, estimate_ability
-from whymath_backend.schema.enums import ASSESSED_ROLES, ConceptRole, EdgeType, ReviewStatus
+from whymath_backend.l2.irt import (
+    IrtItem,
+    SelectionAttempt,
+    SelectionEvidence,
+    ThetaBoundary,
+    ability_boundary,
+    ability_for_help_folded_selection,
+    ability_for_selection,
+    ability_standard_error,
+    estimate_ability,
+    selection_evidence,
+)
+from whymath_backend.schema.enums import (
+    ASSESSED_ROLES,
+    ConceptRole,
+    EdgeType,
+    RelationType,
+    ReviewStatus,
+)
 from whymath_backend.schema.problem import METADATA_ONLY_SOURCES
 
 #: 후보 풀 한 행 — `(problem_id, difficulty_overall, irt_difficulty_b)`.
@@ -65,6 +83,8 @@ __all__ = [
     "candidate_pool_order_by",
     "combine_weights",
     "load_attempt_history_state",
+    "RelationRoles",
+    "classify_relations",
     "load_sibling_ids",
     "load_weak_concept_weights",
     "last_incorrect_problem_id",
@@ -250,22 +270,108 @@ async def last_incorrect_problem_id(session: AsyncSession, user_id: uuid.UUID) -
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
-async def load_sibling_ids(session: AsyncSession, problem_id: uuid.UUID) -> set[uuid.UUID]:
-    """`problem_relation` 양방향(parent/related) 조회 — 변형·유사는 시맨틱상 *대칭 소비*라
-    방향 무관하게 상대편 id를 "형제"로 모은다(자기 자신은 스키마가 이미 금지하나 방어적 제외).
+#: `problem_relation` 행의 방향 규약(PB-09 §2 · 선수/심화 작성자는 `l3/equivalent/variants.py`뿐):
+#: 행은 항상 **parent(기존 문항) → related(파생 문항)** 이다.
+#: - `변형`·`유사`: 방향 없음(대칭) — 서로의 형제.
+#: - `선수`: related가 parent의 **선수**(더 쉬움). 반대편에서 보면 parent는 related의 후속(어려움).
+#: - `심화`: related가 parent의 **심화**(더 어려움). 반대편에서 보면 parent는 related의 기초(쉬움).
+#: - `대조`: 역문제 등 — 난이도 계열도 형제도 아니다(어느 역할에도 넣지 않는다).
+_SYMMETRIC_RELATIONS = frozenset({RelationType.변형, RelationType.유사})
+_PREREQUISITE_RELATION = RelationType.선수
+_EXTENSION_RELATION = RelationType.심화
+#: 어느 소비 역할에도 들어가지 않는 유형 — `RelationType` 전 멤버가 이 셋 중 하나로 명시되어야 한다
+#: (신규 멤버가 생기면 `test_relation_type_policy`의 전수 대조가 RED를 낸다).
+_NEUTRAL_RELATIONS = frozenset({RelationType.대조})
+
+
+@dataclass(frozen=True, slots=True)
+class RelationRoles:
+    """직전 오답 문항 기준으로 본 관계 상대 문항의 **역할** 3종(PB-19).
+
+    `siblings`=대칭 형제(변형·유사)·`easier`=오답 문항보다 쉬운 계열(선수 계보)·`harder`=더 어려운
+    계열(심화 계보). 세 집합은 서로소다 — 모순 데이터는 어느 쪽에도 넣지 않는다.
     """
-    stmt = select(ProblemRelation.parent_problem_id, ProblemRelation.related_problem_id).where(
+
+    siblings: frozenset[uuid.UUID]
+    easier: frozenset[uuid.UUID]
+    harder: frozenset[uuid.UUID]
+
+    def ids_for(self, sibling_filter: str) -> set[uuid.UUID]:
+        """`sibling_filter` 모드가 **소비하는** 문항 id 집합.
+
+        - `exclude`: 대칭 형제만. 쉬운 계열은 배제하지 않는다 — 오답 직후의 더 쉬운 관련 문제는
+          Polya "더 쉬운 관련 문제를 먼저"가 권하는 발판이지 같은 문제의 재노출이 아니다.
+        - `include`: 대칭 형제 + 쉬운 계열(오답 직후 우선 후보). 어려운 계열은 우대하지 않는다 —
+          오답 직후에 난이도를 올리는 쪽으로 가중하지 않는다(정답 직후 후보 소비는 별도 소비처).
+        - `대조`는 어느 모드에서도 소비하지 않는다.
+        """
+        if sibling_filter == "exclude":
+            return set(self.siblings)
+        if sibling_filter == "include":
+            return set(self.siblings | self.easier)
+        raise ValueError(f"알 수 없는 sibling_filter: {sibling_filter!r} (exclude|include)")
+
+
+def classify_relations(
+    problem_id: uuid.UUID,
+    rows: list[tuple[uuid.UUID, uuid.UUID, RelationType | str]],
+) -> RelationRoles:
+    """`problem_relation` 행들을 `problem_id` 기준의 역할(형제·쉬운·어려운)로 분류한다 — 순수 함수.
+
+    입력 행은 `(parent_problem_id, related_problem_id, relation_type)`이며 방향 의미는 위
+    `_SYMMETRIC_RELATIONS` 주석이 정본이다. 우선순위와 모순 처리:
+    - 대칭 관계가 한 번이라도 있으면 그 상대는 `siblings`다(근접 복제본은 어느 방향 행이 더 있어도
+      근접 복제본이다 — 현행 `exclude` 동작 보존).
+    - 같은 상대가 쉬운 쪽과 어려운 쪽 양쪽으로 나오면(데이터 모순) 둘 다에서 뺀다 — 어느 쪽인지
+      *모르는* 상대를 우대하지 않는다(모른다 ≠ 아니다).
+    """
+    siblings: set[uuid.UUID] = set()
+    easier: set[uuid.UUID] = set()
+    harder: set[uuid.UUID] = set()
+    for parent_id, related_id, raw_type in rows:
+        if parent_id == related_id:
+            continue  # 자기 자신과의 관계는 스키마가 금지하나 방어적 제외
+        relation_type = RelationType(raw_type)
+        if relation_type in _SYMMETRIC_RELATIONS:
+            other = related_id if parent_id == problem_id else parent_id
+            siblings.add(other)
+        elif relation_type in (_PREREQUISITE_RELATION, _EXTENSION_RELATION):
+            problem_is_parent = parent_id == problem_id
+            other = related_id if problem_is_parent else parent_id
+            # 선수: related가 쉬움 / 심화: related가 어려움. 오답 문항이 parent면 그대로,
+            # related면 방향이 뒤집힌다(parent가 반대 역할).
+            related_is_easier = relation_type is _PREREQUISITE_RELATION
+            (easier if related_is_easier == problem_is_parent else harder).add(other)
+        elif relation_type not in _NEUTRAL_RELATIONS:
+            raise ValueError(f"관계 유형 {relation_type!r}의 소비 역할이 정해지지 않았다")
+    contradictory = easier & harder
+    easier -= contradictory | siblings
+    harder -= contradictory | siblings
+    return RelationRoles(frozenset(siblings), frozenset(easier), frozenset(harder))
+
+
+async def load_sibling_ids(
+    session: AsyncSession, problem_id: uuid.UUID, *, sibling_filter: str
+) -> set[uuid.UUID]:
+    """`problem_relation` 양방향 조회 → 관계 **유형별 소비 정책**(PB-19)을 적용한 id 집합.
+
+    이전에는 유형과 방향을 보지 않고 상대편 id를 전부 "형제"로 모았다. 변형·유사만 있던 코퍼스에선
+    맞았으나 PB-09가 선수·심화 계보를 낳으면 `exclude`가 쉬운 계열까지 후보에서 빼고 `include`가
+    심화를 우대한다. 정책 정본 = `docs/architecture/cat_sibling_filter_relation_policy_pb19.md`.
+    쿼리는 여전히 1회다(유형 컬럼 하나가 SELECT에 더해졌을 뿐).
+    """
+    stmt = select(
+        ProblemRelation.parent_problem_id,
+        ProblemRelation.related_problem_id,
+        ProblemRelation.relation_type,
+    ).where(
         or_(
             ProblemRelation.parent_problem_id == problem_id,
             ProblemRelation.related_problem_id == problem_id,
         )
     )
-    siblings: set[uuid.UUID] = set()
-    for parent_id, related_id in (await session.execute(stmt)).all():
-        other = related_id if parent_id == problem_id else parent_id
-        if other != problem_id:
-            siblings.add(other)
-    return siblings
+    rows = [(p, r, t) for p, r, t in (await session.execute(stmt)).all()]
+    return classify_relations(problem_id, rows).ids_for(sibling_filter)
 
 
 def sibling_weights(candidate_ids: list[uuid.UUID], sibling_ids: set[uuid.UUID]) -> list[float]:
@@ -309,6 +415,36 @@ class AttemptHistoryState:
     #: "작동한 비율" 원칙 — a 보정이 이 학생의 θ·SE에 얼마나 닿았는지를 소비측이 알 수 있게 한다.
     #: 기본값 0은 a 소비 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
     discrimination_applied_count: int = 0
+    #: EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가 — 전부 정답 `upper` · 전부 오답 `lower` · 그 외
+    #: None. 기본값 None은 이 필드 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
+    theta_boundary: ThetaBoundary | None = None
+    #: EOS-147·EOS-39: 추정 θ와 **다른 선택용 θ** — 값이 다를 때만 채운다(None이면 선택 θ = 추정 θ).
+    #: 다른 경우는 둘이다: 전부 정답 이력의 상한 사다리(EOS-147)와 도움 접기가 일어난 이력(EOS-39).
+    #: (이름은 EOS-147 시점의 `selection_theta_override`에서 넓어졌다.) 직접 읽지 말고
+    #: `selection_theta` 속성을 쓴다.
+    selection_theta_override: float | None = None
+    #: EOS-39: 코치가 도움(힌트 단계 2 이상)을 공급해 완료한 문항이라 선택용 응답에서 **실패 1건으로
+    #: 접힌 문항 수** — 도움 채널이 이 이력에 닿은 정도("작동한 비율" 원칙). 0이면 닿지 않았다(또는
+    #: 킬 스위치가 꺼졌다). 기본값 0은 이 필드 이전 생성자 호출처(테스트 스텁 등)와의 호환용이다.
+    selection_help_count: int = 0
+    #: EOS-39: 정답으로 센 완료 행 중 힌트 귀속이 미상(NULL)이라 도움 채널이 **판정하지 못한** 수.
+    #: 미상은 무작위가 아니라 구조적이다(귀속 창을 모름·판독 불가·EOS-133 이전 행) — 실측 비율이
+    #: 필요해 처치 기록으로 남긴다. 킬 스위치가 꺼졌으면 세지 않는다(0).
+    selection_hint_unknown_count: int = 0
+
+    @property
+    def selection_theta(self) -> float:
+        """추천이 후보를 고를 때 쓰는 θ(EOS-147·EOS-39) — 두 경우에만 `theta`와 다르다.
+
+        ① 전부 정답 이력(상한 사다리 — EOS-147) ② 코치가 도움을 공급해 완료한 문항이 있어 선택용
+        응답에서 실패로 접힌 이력(EOS-39 — 판정문 `eos39_app_help_completion_selection_judgment`).
+        `theta`(추정 θ)는 SE·`measurement_sufficient`·평가 캡처가 읽는 값이고 이 속성과 **다른
+        소비처**를 가진다. 둘을 하나로 접으면 전부 정답 이력에서 클램프(4.0)가 출제 표적이 되거나,
+        표적을 위해 추정기를 바꾸게 된다(EOS-147 판정문 §3).
+        """
+        return (
+            self.theta if self.selection_theta_override is None else self.selection_theta_override
+        )
 
     @property
     def item_cap_reached(self) -> bool:
@@ -324,6 +460,17 @@ class AttemptHistoryState:
         정직하게 표기한다(`api/me.py`의 capture `reason`).
         """
         return self.measurement_sufficient or self.item_cap_reached
+
+
+def _selection_evidence_for(attempts: list[SelectionAttempt]) -> SelectionEvidence:
+    """표적용 응답 — 킬 스위치(`l2_selection_help_fold_enabled`)가 꺼졌으면 도움 접기를 하지 않는다.
+
+    꺼진 상태는 종전과 **비트동일**하다: 원래 응답을 그대로 돌려주고 접힘·미상 수는 0이다(꺼진 동안
+    "미상이 몇 건인가"를 세지 않는다 — 규칙이 일하지 않으면 그 계측도 의미가 없다).
+    """
+    if not get_settings().l2_selection_help_fold_enabled:
+        return SelectionEvidence([(a.item, a.is_correct) for a in attempts], 0, 0)
+    return selection_evidence(attempts)
 
 
 async def load_attempt_history_state(
@@ -349,6 +496,7 @@ async def load_attempt_history_state(
             Problem.difficulty_overall,
             Problem.irt_difficulty_b,
             Problem.irt_a,
+            ProblemAttempt.used_hint,
         )
         .join(Problem, ProblemAttempt.problem_id == Problem.problem_id)
         .where(
@@ -358,16 +506,28 @@ async def load_attempt_history_state(
     )
     attempt_rows = (await session.execute(attempt_stmt)).all()
     responses: list[tuple[IrtItem, bool]] = []
+    selection_attempts: list[SelectionAttempt] = []
     discrimination_applied = 0
-    for _pid, is_correct, difficulty, irt_b, irt_a in attempt_rows:
+    for pid, is_correct, difficulty, irt_b, irt_a, used_hint in attempt_rows:
         b = resolve_item_difficulty_b(irt_b, difficulty)
         if b is not None:
             # EOS-129: 보정 a 우선·없으면 a=1.0(Rasch) — a가 전부 NULL이면 종전과 같은 θ·SE.
             a = resolve_item_discrimination_a(irt_a)
             if a != 1.0:
                 discrimination_applied += 1
-            responses.append((IrtItem(difficulty=b, discrimination=a), bool(is_correct)))
+            item = IrtItem(difficulty=b, discrimination=a)
+            responses.append((item, bool(is_correct)))
+            selection_attempts.append(SelectionAttempt(pid, item, bool(is_correct), used_hint))
     theta = estimate_ability(responses)
+    # EOS-147·EOS-39: 추정 θ는 그대로 두고 **표적 θ**를 따로 낸다. SE·중단 규칙은 아래에서 계속
+    # 추정 θ·원래 응답으로 계산한다(표적 θ로 SE를 재면 MLE가 없는 이력이 정밀해 보인다).
+    evidence = _selection_evidence_for(selection_attempts)
+    if evidence.help_failure_count == 0:
+        # 도움 접기가 이 이력에 닿지 않았다(또는 킬 스위치가 꺼졌다) — EOS-147 규칙 그대로다:
+        # 전부 정답이면 맞힌 최고 난이도 + 0.5(상한 사다리) · 전부 오답은 −4.0 그대로(R3·R6 기준선).
+        selection_theta = ability_for_selection(responses, theta)
+    else:
+        selection_theta = ability_for_help_folded_selection(evidence.responses)
     attempted_ids = {row[0] for row in attempt_rows}
     # slice 15: 응답한 문항(administered) 기준 측정 정밀도 — CAT 중단 규칙 신호.
     administered_items = [item for item, _ in responses]
@@ -381,6 +541,10 @@ async def load_attempt_history_state(
         measurement_sufficient=measurement_sufficient,
         administered_count=len(administered_items),
         discrimination_applied_count=discrimination_applied,
+        theta_boundary=ability_boundary(responses),
+        selection_theta_override=selection_theta if selection_theta != theta else None,
+        selection_help_count=evidence.help_failure_count,
+        selection_hint_unknown_count=evidence.hint_unknown_count,
     )
 
 

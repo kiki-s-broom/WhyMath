@@ -54,6 +54,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings
+from whymath_backend.l3.interfaces import TRAFFIC_SURFACE_FIELD, TrafficSurface
 from whymath_backend.l3.models import CostTier
 
 logger = logging.getLogger("whymath.ops.cost_report")
@@ -176,6 +177,48 @@ class CostReport:
     notes: list[str] = field(default_factory=list)
     """집계 한계·주의(표본 부족·미분류 tier 등)를 사람이 읽도록 남긴다."""
 
+    authoring_excluded_count: int = 0
+    """게이트② 표본에서 뺀 저작 경로 이벤트 수(`traffic_surface="authoring"`·OPS-84 ③).
+
+    저작 rephrase는 오프라인 배치(LOCAL·0원 대량)라 학생 대면 루프당 비용 표본에 섞이면 로컬 비율과
+    토큰 p50이 위장된다. 이 수는 빼되 **숨기지 않는다** — 0이 아니면 notes에도 적힌다. 기본값은
+    직접 조립자(`harness/pilot_kpi_baseline`) 하위호환용(위 `content_source_counts`와 같은 이유)."""
+
+    probe_excluded_count: int = 0
+    """게이트② 표본에서 뺀 프로브 이벤트 수(`traffic_surface="probe"`·OPS-105).
+
+    프리플라이트·비용 프로브는 계측을 위해 일부러 낸 호출이다 — 학생 대면 비용이 아니라 저작과 같은
+    이유로 빼고 건수는 숨기지 않는다."""
+
+    unlabeled_count: int = 0
+    """표면 표지가 없거나 어휘 밖인 이벤트 수(OPS-105). **표지 없음이 서빙이라는 뜻은 아니다.**
+
+    기본(하위호환)은 이 이벤트를 서빙 표본에 남긴다 — 표지를 싣기 전의 구 이벤트와 표지를 싣지 않는
+    경로(비동기 큐 워커·오프라인 생성기)가 전부 여기 있어, 빼면 표본이 통째로 사라진다. 대신 이 수와
+    `surface_labeled_rate`를 보고해 표지가 얼마나 **작동했는지**를 숫자로 드러낸다.
+    `strict_surface=True`이면 표본에서 뺀다(`unlabeled_excluded`)."""
+
+    unlabeled_excluded: bool = False
+    """`strict_surface`로 미표기 이벤트를 표본에서 뺐는가 — 기본(False)은 서빙 표본에 남겼다."""
+
+    surface_counts: dict[str, int] = field(default_factory=dict)
+    """입력 **전체** 이벤트의 표면별 수 — `serving`·`authoring`·`probe`·`unlabeled`(제외 이전).
+
+    표본에서 뺀 것까지 포함하므로 합이 입력 이벤트 수와 같다(`event_count`는 제외 이후 표본 크기).
+    기본값은 직접 조립자 하위호환용이며 빈 dict는 '이 리포트는 표면 축을 모른다'를 뜻한다."""
+
+    @property
+    def surface_labeled_rate(self) -> float | None:
+        """표면 표지가 실린 이벤트 / 입력 전체 — **표지가 작동한 비율**(OPS-105 · 작동한 비율 원칙).
+
+        분모가 0이면 None이다. 낮다는 것은 표본이 '서빙이라고 확인된 것'이 아니라 '표지를 모르는
+        것'으로 채워져 있다는 뜻이다(게이트② 판정을 읽을 때 이 값을 함께 본다).
+        """
+        total = sum(self.surface_counts.values())
+        if total <= 0:
+            return None
+        return (total - self.surface_counts.get(_UNLABELED, 0)) / total
+
     @property
     def data_export_block_rate(self) -> float | None:
         """데이터 등급 게이트 발동률 = 차단/판정 이벤트 (EOS-59 ② "작동한 비율").
@@ -186,6 +229,32 @@ class CostReport:
         if self.data_export_evaluated <= 0:
             return None
         return self.data_export_blocked_count / self.data_export_evaluated
+
+
+_UNLABELED = "unlabeled"
+"""`surface_counts`의 미표기 키 — `TrafficSurface` 어휘와 겹치지 않는다."""
+
+_EXCLUDED_SURFACES: frozenset[TrafficSurface] = frozenset(
+    {TrafficSurface.AUTHORING, TrafficSurface.PROBE}
+)
+"""게이트② 표본(학생 대면 루프당 비용)에서 항상 빼는 표면."""
+
+
+def _surface_of(event: dict[str, object]) -> tuple[TrafficSurface | None, str | None]:
+    """이벤트의 표면 — (표면, 어휘 밖 값). 표지가 없으면 (None, None), 어휘 밖이면 (None, 그 값).
+
+    어휘 밖 값(오타·미래 값)을 서빙으로 읽지 않는다 — 미표기와 같은 집합에 두되 값을 note로 남겨
+    조용히 사라지지 않게 한다.
+    """
+    raw = event.get(TRAFFIC_SURFACE_FIELD)
+    if raw is None:
+        return None, None
+    if isinstance(raw, str):
+        try:
+            return TrafficSurface(raw), None
+        except ValueError:
+            return None, raw
+    return None, repr(raw)
 
 
 def _percentile(sorted_vals: list[float], q: float) -> float | None:
@@ -238,14 +307,73 @@ def _opt_int(value: object) -> int | None:
     return None
 
 
-def aggregate_l3_events(events: list[dict[str, object]]) -> CostReport:
+def aggregate_l3_events(
+    events: list[dict[str, object]], *, strict_surface: bool = False
+) -> CostReport:
     """`l3_routing` 메타데이터 dict 리스트 → 집계 리포트 (순수 함수·I/O 없음).
+
+    `strict_surface`(OPS-105): 게이트② 표본에서 표면 표지가 없는 이벤트를 **미상으로 분리해 뺀다**.
+    기본(False)은 하위호환이다 — 표지가 없는 이벤트(구 이벤트·표지를 싣지 않는 경로)를 서빙 표본에
+    남기되, 그 수와 표지 적용률(`surface_labeled_rate`)을 notes·리포트에 드러낸다. 표지 싣는 경로가
+    충분히 늘어 적용률이 높아지면 strict로 올린다. 저작·프로브 표지는 어느 모드에서나 뺀다.
 
     실측치(input/output_tokens·cost_krw·latency_ms)는 None을 표본에서 제외하고 집계한다
     (캐시 히트·비동기·미계측은 실측이 None — '0'이 아니라 '미상'). cost_tier로 로컬:클라우드
     비율을, cache_hit로 적중률을 낸다. 토큰 p50는 router._EST_ASSUMED_* 튜닝 제안으로 낸다.
     """
     notes: list[str] = []
+
+    # 표면 분리(OPS-84 ③ → OPS-105) — 게이트②는 학생 대면 루프당 비용이다. 저작·프로브 표지가 붙은
+    # 이벤트는 표본에서 빼고 건수만 보고한다. 표지가 없는 이벤트는 기본(하위호환)에서 서빙 표본에
+    # 남기되 **미표기로 따로 세고 적용률을 보고한다**(strict_surface면 미상으로 분리해 뺀다).
+    surface_counts: dict[str, int] = {s.value: 0 for s in TrafficSurface}
+    surface_counts[_UNLABELED] = 0
+    unknown_surface_values: dict[str, int] = {}
+    kept_events: list[dict[str, object]] = []
+    for ev in events:
+        surface, odd_value = _surface_of(ev)
+        surface_counts[surface.value if surface is not None else _UNLABELED] += 1
+        if odd_value is not None:
+            unknown_surface_values[odd_value] = unknown_surface_values.get(odd_value, 0) + 1
+        if surface in _EXCLUDED_SURFACES:
+            continue
+        if surface is None and strict_surface:
+            continue
+        kept_events.append(ev)
+    events = kept_events
+
+    authoring_excluded = surface_counts[TrafficSurface.AUTHORING.value]
+    probe_excluded = surface_counts[TrafficSurface.PROBE.value]
+    unlabeled = surface_counts[_UNLABELED]
+    total_events = sum(surface_counts.values())
+    if authoring_excluded:
+        notes.append(
+            f"저작 경로 이벤트 {authoring_excluded}건은 게이트② 표본에서 제외"
+            "(traffic_surface=authoring — 오프라인 배치가 루프당 비용을 위장하지 않게)."
+        )
+    if probe_excluded:
+        notes.append(
+            f"프로브 이벤트 {probe_excluded}건은 게이트② 표본에서 제외"
+            "(traffic_surface=probe — 계측을 위해 일부러 낸 호출이라 학생 대면 비용이 아니다)."
+        )
+    if unlabeled:
+        labeled_pct = (total_events - unlabeled) / total_events * 100
+        unknown_str = ""
+        if unknown_surface_values:
+            listed = ", ".join(f"{k}×{v}" for k, v in sorted(unknown_surface_values.items()))
+            unknown_str = f" 어휘 밖 표지 값: {listed}(미표기로 센다)."
+        if strict_surface:
+            notes.append(
+                f"표지 없는 이벤트 {unlabeled}건은 미상으로 분리해 게이트② 표본에서 제외"
+                f"(strict_surface). 표지 적용률 {labeled_pct:.1f}%.{unknown_str}"
+            )
+        else:
+            notes.append(
+                f"표지 없는 이벤트 {unlabeled}건은 서빙 표본에 남긴다(하위호환 — 표지 없음이 "
+                f"서빙이라는 뜻이 아니다). 표지 적용률 {labeled_pct:.1f}% — 낮을수록 이 표본은 "
+                f"'서빙으로 확인된 것'이 아니라 '표지를 모르는 것'이다(strict_surface로 제외 가능)."
+                f"{unknown_str}"
+            )
 
     input_vals: list[float] = []
     output_vals: list[float] = []
@@ -392,6 +520,11 @@ def aggregate_l3_events(events: list[dict[str, object]]) -> CostReport:
         suggested_est_output_tokens=sug_out,
         notes=notes,
         tier_stats=tier_stats,
+        authoring_excluded_count=authoring_excluded,
+        probe_excluded_count=probe_excluded,
+        unlabeled_count=unlabeled,
+        unlabeled_excluded=strict_surface and unlabeled > 0,
+        surface_counts=surface_counts,
     )
 
 
@@ -560,6 +693,22 @@ def _render_stdout(report: CostReport) -> str:
     lines.append("WhyMath L3 비용·토큰 판독 — l3_routing 집계(S1 게이트② 실측)")
     lines.append("=" * 64)
     lines.append(f"총 이벤트: {report.event_count}건")
+    if report.surface_counts:
+        sc = report.surface_counts
+        rate = report.surface_labeled_rate
+        lines.append("[트래픽 표면 — 게이트② 표본 분리(OPS-105)]")
+        lines.append(
+            f"  입력 전체: 서빙 {sc.get(TrafficSurface.SERVING.value, 0)} · "
+            f"저작 {sc.get(TrafficSurface.AUTHORING.value, 0)} · "
+            f"프로브 {sc.get(TrafficSurface.PROBE.value, 0)} · 미표기 {sc.get(_UNLABELED, 0)} "
+            f"→ 표지 적용률 {_fmt_ratio(rate)}"
+        )
+        policy = (
+            "서빙만(미표기는 미상으로 제외)"
+            if report.unlabeled_excluded
+            else ("서빙 + 미표기(하위호환)")
+        )
+        lines.append(f"  게이트② 표본 = {policy}")
     lines.append("[분포 — 실측 표본만(None 제외)]")
     lines.append(_dist_line("input_tokens", report.input_tokens, 0))
     lines.append(_dist_line("output_tokens", report.output_tokens, 0))
@@ -654,11 +803,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--json", dest="json_path", default=None, help="JSON 리포트 저장 경로(선택)."
     )
+    parser.add_argument(
+        "--strict-surface",
+        action="store_true",
+        help="표지 없는 이벤트를 미상으로 분리해 게이트② 표본에서 제외(기본: 서빙 표본에 남김).",
+    )
     args = parser.parse_args(argv)
 
     settings = Settings()  # lru_cache 우회 — 방금 주입한 키를 읽는다
     events = fetch_l3_events(days=args.days, limit=args.limit, settings=settings)
-    report = aggregate_l3_events(events)
+    report = aggregate_l3_events(events, strict_surface=args.strict_surface)
 
     print(_render_stdout(report))
     if args.json_path is not None:

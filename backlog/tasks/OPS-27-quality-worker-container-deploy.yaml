@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -15,11 +15,16 @@ acceptance:
   - "① docker-compose.prod.yml에 celery worker 서비스 추가(app 이미지 재사용 — SEC-12 retention-purge 선례·동시성 1 강제=GPU 단일 점유 l3/queue 정본) — 컨테이너 배포에서 QUALITY(qwen3.5:27b) 202 작업이 실제 소비됨. app.py:678이 CeleryJobQueue를 상시 결선하므로 현재는 enqueue만 되고 소비자 0"
   - "② tests/infra/에 compose 정적 파싱 배선 실재성 테스트(SEC-12 패턴 답습) — worker 서비스 제거 시 red가 되는 변별 확인"
   - "③ deployment_cd_runbook.md에 워커 운영 절 추가 + infra/phaiakes9/OPERATIONS_24_7.md systemd 기술과의 이중 진실 해소(컨테이너/네이티브 어느 쪽이 정본인지 지정)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1545"
 paths:
   - docker-compose.prod.yml
   - "tests/infra/**"
   - docs/architecture/deployment_cd_runbook.md
+  - infra/phaiakes9/OPERATIONS_24_7.md
+  - infra/phaiakes9/systemd/whymath-worker.service
+  - src/backend/whymath_backend/l3/queue/celery_app.py
+  - tests/backend/l3/test_celery_worker_app_target.py
 session: null
-notes: "ai_integration_gap_review.md D2(2026-08-10). GET /v1/jobs 폴링(app.py:1031)은 있는데 작업을 완료시킬 워커가 배포에 없다 — '완비된 소비 경로+미도달 공급원' 계열(S4-22·OPS-24 동형)의 배포 축 변형. jobs 무인증·소유권 축은 SEC-15(타 세션 in_progress) 소유 — 본 태스크는 워커 배포만.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C1 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "ai_integration_gap_review.md D2(2026-08-10). GET /v1/jobs 폴링(app.py:1031)은 있는데 작업을 완료시킬 워커가 배포에 없다 — '완비된 소비 경로+미도달 공급원' 계열(S4-22·OPS-24 동형)의 배포 축 변형. jobs 무인증·소유권 축은 SEC-15(타 세션 in_progress) 소유 — 본 태스크는 워커 배포만.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/C1 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-08] paths ['docker-compose.prod.yml', 'tests/infra/**', 'docs/architecture/deployment_cd_runbook.md'] → ['docker-compose.prod.yml', 'tests/infra/**', 'docs/architecture/deployment_cd_runbook.md', 'infra/phaiakes9/OPERATIONS_24_7.md', 'infra/phaiakes9/systemd/whymath-worker.service', 'src/backend/whymath_backend/l3/queue/celery_app.py', 'tests/backend/l3/test_celery_worker_app_target.py']: 실측 결과 반영: 기존 정전 기동 명령(팩토리 -A)이 celery CLI에서 즉사함을 확인해 systemd 유닛 명령과 celery_app docstring도 정정했고 backend 동적 테스트를 추가했으므로 실제 변경 범위로 paths를 확장"
+updated: 2026-10-08

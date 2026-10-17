@@ -9,6 +9,9 @@
 
 from __future__ import annotations
 
-from whymath_backend.l1.concept_content.resolve import get_concept_content
+from whymath_backend.l1.concept_content.resolve import (
+    find_k12_contents_by_atom,
+    get_concept_content,
+)
 
-__all__ = ["get_concept_content"]
+__all__ = ["find_k12_contents_by_atom", "get_concept_content"]

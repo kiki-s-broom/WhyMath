@@ -182,6 +182,9 @@ class TestNoRawLeak:
         # prose_rephrased/prose_reason_code(S4-04)도 비식별 bool·코드 라벨뿐(발화 원문 없음).
         # n_equation_transitions/n_mixed_form_transitions(S3-51)도 비식별 *정수* 개수뿐 —
         # 어느 경로로 판정했는지의 횟수이지 식·원문이 아니다(형태 라벨은 폐쇄 3종 enum).
+        # n_match_raw/n_match_kept(MISC-18)도 비식별 *정수* 개수뿐 — 품질 게이트 전·후 후보 수
+        # 이지 후보 id·학생 원문이 아니다(어느 오개념인지는 이 필드에 없다).
+        # n_match_attribution_unclear(MISC-60)도 비식별 *정수* — 귀속 불명으로 보류한 match 실행 수.
         parsed = json.loads(raw)
         assert set(parsed.keys()) <= {
             "status",
@@ -192,6 +195,9 @@ class TestNoRawLeak:
             "n_unverifiable",
             "n_equation_transitions",
             "n_mixed_form_transitions",
+            "n_match_raw",
+            "n_match_kept",
+            "n_match_attribution_unclear",
             "tool_calls",
             "hypothesis_count",
             "dialogue_id",
@@ -202,6 +208,13 @@ class TestNoRawLeak:
             "tone_violations",
             "prose_rephrased",
             "prose_reason_code",
+            # OPS-134 — primary 결말(닫힌 어휘 라벨 7종)·소요 ms·LLM 호출 수·호출 소요 합은 전부
+            # 비식별 *정수/라벨*이다. 어떤 학생의 무엇을 했는지가 아니라 한 턴이 얼마나 걸렸는지다.
+            "primary_outcome",
+            "elapsed_ms",
+            "llm_calls",
+            "llm_calls_finished",
+            "llm_ms_total",
             "observed_at",
         }
 
@@ -260,7 +273,7 @@ class TestNeverBreak:
             raise RuntimeError("하네스 강제 실패(never-break 테스트)")
 
         monkeypatch.setattr(wh1_shadow, "run_tutoring_turn", _boom)
-        with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        with caplog.at_level(logging.INFO, logger="whymath.harness.wh1_shadow"):
             result = asyncio.run(
                 observe_wh1_harness_shadow(
                     student_solution=_STUDENT_SOLUTION,
@@ -271,6 +284,17 @@ class TestNeverBreak:
             )
         assert result is None  # 예외 전파 0(never-break)
         assert _records(caplog) == []  # 실패라 부분 기록도 0
+        # 침묵 실패 금지(CLAUDE.md) — 타입명은 남기고 예외 메시지·트레이스백은 남기지 않는다
+        # (예외 메시지는 학생 발화·답안을 담을 수 있다 — 미성년자 PII).
+        warnings = [
+            r
+            for r in caplog.records
+            if r.name == "whymath.harness.wh1_shadow" and r.levelno == logging.WARNING
+        ]
+        assert len(warnings) == 1
+        assert "RuntimeError" in warnings[0].getMessage()
+        assert "하네스 강제 실패" not in warnings[0].getMessage()
+        assert warnings[0].exc_info is None
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,10 +15,11 @@ acceptance:
   - "① 재현(수정 전) — 고립 done 대조(브랜치 done vs main done)가 origin/claude/whymath-pedagogy-review-gdmwhk(2915bf4e·코드 10파일+코퍼스 11파일 신규·태스크는 todo)를 후보로 내지 못함을 먼저 재현한다"
   - "② 보조 신호 설계 — 브랜치 고유의 src/tests/data 신규 파일 존재(원장 전용 커밋 배제 로직 재사용)를 고립 후보 신호로 추가. 과보고 허용·과소보고 금지 비대칭(#785 판정) 유지"
   - "③ 변별력 양방향 — 문서 전용 브랜치(신호 없음)와 gdmwhk(신호 있음) 양쪽에서 다른 출력 실측. 브리핑 노출까지 배선 확인"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1462"
 paths:
   - scripts/harness/remote_claims.py
   - "tests/harness/**"
 session: null
 notes: "docs/reviews/unmerged_branch_audit_full_2026-08-11.md §4-1. 인접 좌석과 경계: HARN-25(문서명 접미사 사각)·HARN-28(shallow 보류)·HARN-30(PR 배송 관측 — §4-2는 그 ③이 소유, 중복 등재 안 함)\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/하네스 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-05

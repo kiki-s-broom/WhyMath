@@ -6,7 +6,8 @@
 `signature_patterns`·`persona_fit`·`difficulty_overall`·`source_type`)만 *재사용*하는 순수
 결정 로직이다. 부수효과 없음(I/O·LLM 호출 없음)·결정적(deterministic).
 
-공개 API 4종:
+공개 API 4종(출제 범위 정의는 `scope.py` — 게이트 ②-c와 api의 SQL 사전필터가 같은 접두어 상수를
+읽는다):
   - `is_suneung_eligible(problem, persona, *, min_fit)` — 이 문항을 이 페르소나에게 수능
     모드로 노출해도 되는가(불리언 게이트).
   - `suneung_priority(problem)` — 노출 우선순위 가중치(높을수록 먼저). 교수학 근거 반영.
@@ -41,6 +42,7 @@ from collections.abc import Iterable
 
 from whymath_backend.l6 import _shared
 from whymath_backend.l6._shared import METADATA_ONLY_SOURCES
+from whymath_backend.l6.suneung.scope import ScopeVerdict, suneung_scope_verdict
 from whymath_backend.schema.enums import ExamType, Persona
 from whymath_backend.schema.problem import Problem
 
@@ -109,13 +111,19 @@ def is_suneung_eligible(
       ② 저작권 노출 게이트 — `source_type`이 본문 미보유 출처(평가원/EBS/교과서)면 False.
          학생 노출 불가 본문이므로 *대상 페르소나라도* 막힌다(CLAUDE.md 우선순위 #2 — 법적).
          **수능 모드 특히 중요**: 평가원 기출 본문은 절대 노출 불가 → 자체생성 동등문제만.
+      ②-c 출제 범위 게이트 — 목표 학년도 수능의 출제 범위(`scope.py` · 2028학년도 = 2022 개정
+         대수·미적분Ⅰ·확률과 통계) 안의 성취기준 코드를 하나도 못 가진 문항은 False. 코드를 모르는
+         문항(`UNKNOWN`)도 False다(fail-closed). **신호(③)가 아니라 선결 조건**이다 — 시그니처
+         패턴이나 persona_fit이 높아도 범위 밖 문항은 수능 적격이 아니다(EOS-31: persona_fit은
+         난이도 구간만의 함수라 학년·범위를 가르지 못했다).
       ③ 수능 적합 신호 — 다음 중 *하나라도* 참이면 True, 아니면 False:
            (a) `exam_type ∈ {수능, 모평, 학평}`(권위 있는 기출 유형 문항), **또는**
            (b) `signature_patterns`가 비어 있지 않음(한국 수능 시그니처 패턴 보유), **또는**
            (c) `persona_fit[persona] >= min_fit`(이 페르소나 적합도가 임계 이상).
 
     Args:
-      problem: 후보 문항(L1 `Problem`).
+      problem: 후보 문항(L1 `Problem`). `achievement_standard_codes`(비영속)가 주입돼 있어야 ②-c를
+        통과할 수 있다.
       persona: 노출 대상 페르소나(기본 A_일반고고3 — MVP 정시 정면 대상).
       min_fit: persona_fit 임계값(기본 0.5 — "절반 이상 적합"). 0~1 척도.
 
@@ -137,6 +145,11 @@ def is_suneung_eligible(
 
     # ②-b 검수 노출 게이트 — 저작권 축과 독립(합치지 않음, PB-03). review_status=approved만 통과.
     if not _shared.is_review_cleared(problem):
+        return False
+
+    # ②-c 출제 범위 게이트(EOS-31) — 선결 조건. 성취기준 코드는 비영속 필드라 L5가 주입해야 한다
+    #     (미주입이면 `UNKNOWN`으로 거절되어 "범위를 모르는 문항"이 적격으로 새지 않는다).
+    if suneung_scope_verdict(problem) is not ScopeVerdict.IN_SCOPE:
         return False
 
     # ③ 수능 적합 신호 — 기출 유형 / 시그니처 패턴 / 페르소나 적합도 중 하나라도.

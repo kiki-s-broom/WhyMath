@@ -27,14 +27,22 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import Annotated, Literal, NamedTuple
+from enum import Enum
+from types import SimpleNamespace
+from typing import Annotated, Any, Literal, NamedTuple
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func as sa_func
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
+from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._attempt_misconception_scan import (
+    scan_attempt_misconceptions,
+    this_attempt_misconceptions_from,
+)
 from whymath_backend.api._auth import ConsentedUser
 from whymath_backend.api._concurrency import etag_for, matches_if_none_match
 from whymath_backend.api._crypto import (
@@ -48,6 +56,7 @@ from whymath_backend.api._crypto import (
     resolve_dialogue_image_analysis,
     resolve_dialogue_image_uri,
 )
+from whymath_backend.api._isolated_call import CHAIN_BUDGET_FACTOR, isolated
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
 )
@@ -68,6 +77,7 @@ from whymath_backend.api._segmentation_state import (
 )
 from whymath_backend.api._subject_capability_state import (
     get_answer_form_verifier,
+    get_attempt_misconception_detector,
     get_final_answer_verifier,
     get_step_chain_verifier,
 )
@@ -97,12 +107,14 @@ from whymath_backend.l2 import (
     AbilityReading,
     get_current_ability,
     get_current_mastery,
+    get_current_mastery_sample_size,
     get_current_theta,
     get_primary_concept_id,
     theta_to_mastery_proxy,
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.attempt_version_pin import resolve_attempt_version_pin
 from whymath_backend.l2.learning_session_writer import record_learning_activity
 from whymath_backend.l2.learning_state_machine import advance_on_graded_attempt
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
@@ -139,7 +151,7 @@ from whymath_backend.l4.completion import (
 from whymath_backend.l4.hint_content.models import ServedHint
 from whymath_backend.l4.hint_content.store import find_served_hint, serving_step_order
 from whymath_backend.l4.hint_deferral import (
-    counts_as_hint_usage,
+    counts_as_help_supply,
     is_answer_demand,
     is_stuck_turn_count,
 )
@@ -153,6 +165,10 @@ from whymath_backend.l4.misconception import (
     select_intervention,
     select_intervention_from_hypotheses,
 )
+from whymath_backend.l4.misconception.attempt_hypothesis_policy import (
+    AttemptHypothesisAction,
+    decide_attempt_hypothesis_action,
+)
 from whymath_backend.l4.misconception.catalog import CATALOG, CATALOG_BY_ID
 from whymath_backend.l4.misconception.distractor_link import distractor_link_matches
 from whymath_backend.l4.misconception.evidence_store import (
@@ -160,10 +176,13 @@ from whymath_backend.l4.misconception.evidence_store import (
     log_evidence,
 )
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
-from whymath_backend.l4.misconception.hypothesis_store import curate_hypothesis
+from whymath_backend.l4.misconception.hypothesis_store import apply_candidates, curate_hypothesis
 from whymath_backend.l4.misconception.judge import JudgeProtocol, LLMJudge, judge_filter
 from whymath_backend.l4.misconception.judge_seam import L3JudgeSeam
-from whymath_backend.l4.misconception.match_gate import apply_match_quality_gate
+from whymath_backend.l4.misconception.match_gate import (
+    apply_match_quality_gate,
+    is_verdict_withheld,
+)
 from whymath_backend.l4.misconception.probe_selection import is_exploration_turn
 from whymath_backend.l4.misconception.shadow import (
     _spawn,
@@ -198,6 +217,7 @@ from whymath_backend.schema.hint_usage import HintUsage as HintUsageSchema
 from whymath_backend.schema.pedagogy_pack import PedagogyPack
 from whymath_backend.schema.verification_capabilities import (
     AnswerFormVerifier,
+    AttemptMisconceptionDetector,
     ChainVerificationCounts,
     FinalAnswerVerifier,
     StepChainVerifier,
@@ -630,6 +650,36 @@ def _ability_level(bkt_mastery: float | None, theta: float | None) -> MasteryLev
     return mastery_to_level(sum(parts) / len(parts))
 
 
+def _label_provenance(
+    *,
+    level: MasteryLevel | None,
+    explicit_level: MasteryLevel | None,
+    server_mastery: float | None,
+    client_bkt: float | None,
+    server_evidence_n: int | None,
+) -> tuple[str | None, int | None]:
+    """적용된 능력 라벨의 (출처, 증거 수) — 원장 계측용(EOS-179·재계산 0·비노출).
+
+    출처는 *라벨이 실제로 만들어진 입력*으로 정한다(`_build_response_payload`의 분기와 같은
+    우선순위): 명시 `mastery_level` → 'explicit', 서버 개념 숙달도가 들어갔다 → 'server_bkt',
+    그 밖에 클라 제출 bkt가 들어갔다 → 'client_bkt'(서버가 검증하지 못한 입력), 둘 다 없고
+    라벨이 있다면 서버 θ뿐이다 → 'server_theta'. 라벨이 없으면 (None, None).
+
+    증거 수는 **서버 개념 숙달도가 라벨에 들어간 경우에만** 의미가 있다 — 명시 라벨·클라 bkt·θ
+    단독은 `concept_mastery_history.sample_size`가 그 라벨의 증거가 아니므로 None(모름)이다.
+    `server_evidence_n`이 None이면(sample_size 미기록) 그대로 None — 0으로 접지 않는다.
+    """
+    if level is None:
+        return None, None
+    if explicit_level is not None:
+        return "explicit", None
+    if server_mastery is not None:
+        return "server_bkt", server_evidence_n
+    if client_bkt is not None:
+        return "client_bkt", None
+    return "server_theta", None
+
+
 class _StepVerificationCarry(NamedTuple):
     """S4-19: *게이트 이전* 단계 검증 결과의 적재 전용 운반 컨테이너(노출 아님).
 
@@ -658,6 +708,7 @@ def _build_response_payload(
     expected_answer: str | None = None,
     server_mastery: float | None = None,
     server_theta: float | None = None,
+    server_mastery_evidence: int | None = None,
     matches: list[MisconceptionMatch] | None = None,
     misconception_hypotheses: list[MisconceptionHypothesis] | None = None,
     pack: PedagogyPack | None = None,
@@ -666,6 +717,7 @@ def _build_response_payload(
     grade: int | None = None,
     standard_code: str | None = None,
     step_chain_verifier: StepChainVerifier | None = None,
+    chain_verification: ChainVerificationCounts | None = None,
 ) -> tuple[
     PedagogyDecision,
     list[MisconceptionMatch],
@@ -712,6 +764,13 @@ def _build_response_payload(
     주입값이 실제로 쓰이는지는 `tests/backend/api/test_coach.py`의
     `TestStepChainVerifierInjection`이 가짜 verifier를 app.state에 올려 동결한다.
 
+    **OPS-125** `chain_verification`: 세 핸들러가 `_verify_chain_isolated`로 *먼저* 계산한 연쇄 검증
+    결과(이벤트 루프 밖 워커·시간 상한 포함). 주면 L4는 `step_chain_verifier`를 부르지 않는다 —
+    이 함수가 동기라 호출부에서 `await`로 감쌀 수 없어, 계산을 함수 *앞*으로 빼는 분리를 택했다
+    (함수 전체를 워커에서 돌리는 대안은 pack·가설 등 비직렬화 인자와 비SymPy 작업까지 프로세스
+    경계를 넘겨야 해서 기각). 미주입(None)이면 종전대로 `step_chain_verifier` 동기 호출 —
+    직접 호출 단위테스트 하위호환 좌석이다.
+
     **S4-19(2026-08-10)**: 반환이 7-튜플로 확장됐다 — `_StepVerificationCarry`(게이트 *이전*
     단계 검증 운반값·적재 전용)를 끝이 아닌 위치에 삽입해 **마지막 원소=solution_coaching
     불변식은 보존**한다(S3-32 브랜치가 그 언패킹 전제를 명문화). 노출(payload)은 불변 —
@@ -739,6 +798,19 @@ def _build_response_payload(
         recent_categories=recent_categories,
         grade=grade,
         standard_code=standard_code,
+    )
+    # EOS-179: 라벨의 출처·증거 수를 결정에 실어 원장 적재(`_log_hint_event`)까지 운반한다 — 이미
+    # 위에서 고른 입력(명시 라벨·서버/클라 bkt·θ)의 *분기를 읽을 뿐* 라벨을 다시 계산하지 않는다
+    # (재계산 0). 응답 본문에는 나가지 않는다(`exclude=True`).
+    label_source, label_evidence_n = _label_provenance(
+        level=level,
+        explicit_level=body.mastery_level,
+        server_mastery=server_mastery,
+        client_bkt=body.bkt_mastery,
+        server_evidence_n=server_mastery_evidence,
+    )
+    decision = decision.model_copy(
+        update={"label_source": label_source, "label_evidence_n": label_evidence_n}
     )
     # slice 106: 주입된 결합 matches 우선·미주입(sync 직접호출·게이트 off 경로)이면 substring
     # diagnose 폴백(현행 비트동일). combine_diagnoses가 substr 우선이라 resolved[0]은 substr가
@@ -780,6 +852,9 @@ def _build_response_payload(
         # COMP-01: 단계 연쇄 검증 능력을 **명시 주입**한다 — 미주입이면 L4가 합성 루트를
         # 지연 조회(pull)하므로, 이 한 줄이 "Core는 인터페이스만 안다"는 주장의 집행 지점이다.
         verifier=step_chain_verifier,
+        # OPS-125: 핸들러가 격리 호출로 미리 계산한 연쇄 검증 결과 — 있으면 L4는 SymPy를 돌리지
+        # 않는다(이 함수는 동기라 여기서 직접 검증하면 이벤트 루프를 막는다).
+        chain_verification=chain_verification,
     )
     # slice 73: 노출은 *불일치 신호만* — 계산오류 verify(기존·arithmetic_error) + BKT↔θ 불일치
     # (consolidate·retrieval). 합의(foundation/advance)는 LTHC가 담당·한쪽 신호만(diagnose)은
@@ -818,16 +893,13 @@ class _MatchOutcome(NamedTuple):
     def verdict_withheld(self) -> bool:
         """확신 진단을 **영속 계층에서 보류**해야 하는가 — 게이트 ②·③의 합집합.
 
-        두 게이트는 출처가 다르지만(② 입력 OCR 품질 · ③ 정정 어구의 귀속) 처분이 같다:
-        응답에는 후보를 그대로 싣되 학습자 모델에는 확정 진단으로 넣지 않는다. 응답 플래그는
-        DB 쓰기를 되돌리지 못하기 때문이다(MISC-17의 근거를 MISC-28이 그대로 물려받는다).
-
-        **+1과 −1을 함께 보류하는 것이 핵심이다.** 보류된 매칭을 빈 리스트로 넘기면 하류의
-        `_log_refutation_evidence`가 그것을 "clean 풀이(no-match)"로 읽어 활성 가설을 −1로
-        *반박*한다 — 즉 `모른다`가 `아니다`로 뒤집힌다(CLAUDE.md "모른다 ≠ 아니다"). 귀속
-        불명은 오개념이 없다는 증거가 아니므로 어느 방향으로도 증거를 만들지 않는다.
+        판정은 `l4/misconception/match_gate.is_verdict_withheld`가 소유한다(근거·"+1과 −1을 함께
+        보류" 설명 포함) — WH-1 하네스(`harness/wh1_loop.py`)도 같은 함수를 소비해 두 경로가 같은
+        입력에 같은 처분을 낸다(MISC-60·`test_coach_wh1_convergence_governance.py`가 동결).
         """
-        return self.low_quality or self.attribution_unclear
+        return is_verdict_withheld(
+            low_quality=self.low_quality, attribution_unclear=self.attribution_unclear
+        )
 
 
 class _JudgeSeamDeps(NamedTuple):
@@ -865,7 +937,7 @@ JudgeSeamDeps = Annotated[_JudgeSeamDeps, Depends(_get_judge_seam_deps)]
 
 
 class _SubjectCapabilityDeps(NamedTuple):
-    """이 라우터가 쓰는 **과목 능력 3종** — app.state 등록분(EOS-89·COMP-01).
+    """이 라우터가 쓰는 **과목 능력 4종** — app.state 등록분(EOS-89·COMP-01·EOS-146).
 
     `_JudgeSeamDeps`와 같은 형태다(`request.app.state` 경유라 팩토리 클로저에 의존하지 않아
     TestClient에서도 안전). 다만 **폴백이 없다**: judge seam은 없으면 자기 기본값으로 도는
@@ -880,6 +952,10 @@ class _SubjectCapabilityDeps(NamedTuple):
 
     앞의 둘(완료 상태머신용)과 소비처가 다르지만 좌석을 나누지 않는 이유: 셋 다 *같은 등록
     (push) 규약*으로 app.state에서 오고, 좌석을 쪼개면 핸들러 시그니처가 능력 수만큼 늘어난다."""
+    attempt_misconception_detector: AttemptMisconceptionDetector
+    """오답 답안 → 오개념 후보 검출(EOS-104) — 서버 판정 오답 적재(EOS-146)가 `/v1/me/attempts`와
+    같은 훑기를 돌릴 때 쓴다. 같은 등록(push) 규약이고 폴백이 없다 — 등록 누락은
+    `AttributeError`로 터진다(`_subject_capability_state` 모듈 docstring)."""
 
 
 def _get_subject_capabilities(request: Request) -> _SubjectCapabilityDeps:
@@ -894,6 +970,7 @@ def _get_subject_capabilities(request: Request) -> _SubjectCapabilityDeps:
         final_answer=get_final_answer_verifier(request),
         answer_form=get_answer_form_verifier(request),
         step_chain=get_step_chain_verifier(request),
+        attempt_misconception_detector=get_attempt_misconception_detector(request),
     )
 
 
@@ -1090,6 +1167,108 @@ def _last_solution_step(body: CoachRequest) -> str | None:
     return last or None
 
 
+class _BudgetExceededOutcome:
+    """계산 시간 상한 초과(OPS-96)의 중립 판정 — 상태 하나만 가진 `FinalAnswerOutcome` 구조."""
+
+    state = VerificationOutcome.unverifiable
+
+
+_BUDGET_EXCEEDED_OUTCOME = _BudgetExceededOutcome()
+
+
+class _BudgetReason(str, Enum):
+    """계산 시간 상한 초과의 사유 코드 — 값은 수학 어댑터의 `undecidable`과 같은 문자열이다.
+
+    상한 초과를 "증명도 반증도 못 했다"로 접는 것은 단계 하나짜리 경로(`verify_step`의
+    `budget_exceeded_result`)와 같은 판정이다. 같은 문자열을 써야 이벤트 적재(`unverifiable_by_
+    reason`)와 분포 로그의 닫힌 어휘 7종이 늘지 않는다. Core라 어댑터 enum은 import하지 않는다.
+    """
+
+    undecidable = "undecidable"
+
+
+class _StepUnverifiable(BaseModel):
+    """판정 불가 전이 하나 — `StepOutcome`이 읽는 `state`만 가진다."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: VerificationOutcome = VerificationOutcome.unverifiable
+
+
+class _BudgetExceededChain(BaseModel):
+    """연쇄 검증이 시간 상한을 넘었을 때의 중립 결과 — **전 전이 판정 불가**(OPS-125).
+
+    통과로 접으면 검증 우회고(풀이가 맞다고 말하게 된다) 오답으로 접으면 학생에게 부당한 부정
+    피드백이다(교수학 금기). 그래서 `n_incorrect=0`·`first_incorrect_index=None`·`unverified_ratio=
+    1.0`이다 — 코치는 이를 "검산 신호 없음"으로 읽어 단계 자가검산 코칭을 내지 않는다.
+    `ChainVerificationCounts` 구조를 만족하고 pydantic이라 `SolutionCoaching.solution_verification`
+    (`Any`)으로 실려 나가도 직렬화된다. 합 보존: n_correct + n_incorrect + n_unverifiable ==
+    n_transitions, 사유 건수 합 == n_unverifiable.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    steps: tuple[_StepUnverifiable, ...]
+    first_incorrect_index: int | None = None
+    n_transitions: int
+    n_correct: int = 0
+    n_incorrect: int = 0
+    n_unverifiable: int
+    unverified_ratio: float = 1.0
+    unverifiable_by_reason: dict[_BudgetReason, int]
+
+
+def _budget_exceeded_chain(n_transitions: int) -> _BudgetExceededChain:
+    """전이 `n_transitions`개가 전부 판정 불가인 중립 연쇄 결과(전이 0개는 호출되지 않는다)."""
+    return _BudgetExceededChain(
+        steps=tuple(_StepUnverifiable() for _ in range(n_transitions)),
+        n_transitions=n_transitions,
+        n_unverifiable=n_transitions,
+        unverifiable_by_reason={_BudgetReason.undecidable: n_transitions},
+    )
+
+
+async def _verify_chain_isolated(
+    body: CoachRequest, verifier: StepChainVerifier
+) -> ChainVerificationCounts | None:
+    """풀이 단계 연쇄 검증을 이벤트 루프 밖 워커에서 시간 상한과 함께 계산한다(OPS-125).
+
+    `_build_response_payload`(동기)가 L4를 거쳐 SymPy를 부르기 *전에* 핸들러가 이 함수로 결과를
+    만들어 `chain_verification=`으로 넘긴다. 단계가 2개 미만이면 검증할 전이가 없어 None이다
+    (L4도 같은 조건으로 건너뛴다). 상한은 `sympy_isolation_timeout_s × CHAIN_BUDGET_FACTOR` —
+    `/v1/verify-solution`의 체인 총 예산과 같은 값이다(전이를 하나씩 끊는 그쪽과 달리 이 능력은
+    체인 전체가 한 호출이라, 병리적 전이 하나가 체인 전체를 판정 불가로 접는다 — 접히는 방향은
+    언제나 "모른다"이고 통과·오답이 아니다). 초과 시 사유·한도는 `isolated`가 로그에 남긴다.
+    """
+    steps = body.solution_steps
+    if steps is None or len(steps) < 2:
+        return None
+    n_transitions = len(steps) - 1
+    step_types = body.solution_step_types
+    return await isolated(
+        verifier.verify_chain,
+        list(steps),
+        list(step_types) if step_types is not None else None,
+        on_budget_exceeded=lambda: _budget_exceeded_chain(n_transitions),
+        timeout_s=get_settings().sympy_isolation_timeout_s * CHAIN_BUDGET_FACTOR,
+    )
+
+
+def _problem_snapshot(problem: Any) -> Any:
+    """문항 ORM을 워커 프로세스로 보낼 수 있는 *읽기 전용 스냅샷*으로 바꾼다(OPS-96).
+
+    ORM 인스턴스는 세션 상태를 달고 있어 프로세스 경계를 넘기에 부적합하다. **이미 로드된 컬럼만**
+    복사한다(`inspect(...).dict` — 미로드 속성을 건드리면 async 컨텍스트에서 지연 로드가 터진다).
+    과목 어댑터는 자기가 읽는 필드만 `getattr`로 읽으므로(Protocol `problem: Any`) 구조가 같으면
+    통과한다. ORM이 아닌 객체(테스트 스텁)는 그대로 돌려준다.
+    """
+    try:
+        loaded = sa_inspect(problem).dict
+    except NoInspectionAvailable:
+        return problem
+    return SimpleNamespace(**{k: v for k, v in loaded.items() if not k.startswith("_")})
+
+
 async def _final_answer_state(
     session: AsyncSession,
     problem_id: uuid.UUID | None,
@@ -1118,13 +1297,25 @@ async def _final_answer_state(
     if problem is None:
         # 문항 부재(코퍼스 미적재·신규) → 서버 채점 근거 없음(graceful).
         return None, FormVerdict.not_required
+    # OPS-96: 값 판정은 이벤트 루프 밖 워커 프로세스에서 시간 상한과 함께 돈다. 상한을 넘기면
+    # 계산을 끊고 **판정 불가**(`unverifiable`)로 접는다 — 정답(완료 처리)도 오답(REDIRECT=부정
+    # 피드백)도 아니다. 초과 값은 과목 어댑터를 모르는 중립 타입이다(Core→Adapter 의존 금지).
+    snapshot = _problem_snapshot(problem)
     # EOS-89: 구현을 이름으로 알지 않는 것에 더해, **끌어오지도 않는다** — 능력은 Application이
     # 부팅 시 app.state에 등록한 것을 엔드포인트가 Depends로 받아 여기까지 내려준다.
-    result = capabilities.final_answer.verify_final_answer(last_step, problem)
+    result = await isolated(
+        capabilities.final_answer.verify_final_answer,
+        last_step,
+        snapshot,
+        on_budget_exceeded=lambda: _BUDGET_EXCEEDED_OUTCOME,
+    )
     # EOS-28: 형태 지시 준수는 **값 판정과 나란히·독립으로** 계산한다. 여기서 두 판정이 서로를
     # 참조하지 않는 것이 교수학 계약의 1차 방어다 — 참조하는 순간 형태가 정오에 스며든다.
-    form = capabilities.answer_form.verify_answer_form(
-        last_step, getattr(problem, "answer_constraint", None)
+    form = await isolated(
+        capabilities.answer_form.verify_answer_form,
+        last_step,
+        getattr(snapshot, "answer_constraint", None),
+        on_budget_exceeded=lambda: FormVerdict.unverifiable,
     )
     return result.state, form
 
@@ -1151,9 +1342,13 @@ async def _hint_attribution_window(
     """힌트 귀속 창 `[대화 시작, 정답을 처음 낸 학생 턴의 발화 시각)` — 모르면 None(EOS-133).
 
     상한이 완료 시각이 아니라 **정답 제출 턴**인 이유: 정답을 낸 턴과 돌아보기 턴에서도 핸들러는
-    그 턴의 결정 단계를 공급 원장(`힌트제공`)에 적는다(`_log_hint_event`는 완료 판정 *뒤*에
-    불린다). 그 행들은 학생이 답을 낸 *다음*에 나온 것이라 이 풀이에 쓰였을 수 없다 — 완료
+    (EOS-30 이전) 그 턴의 결정 단계를 공급 원장(`힌트제공`)에 적었다(`_log_hint_event`는 완료 판정
+    *뒤*에 불린다). 그 행들은 학생이 답을 낸 *다음*에 나온 것이라 이 풀이에 쓰였을 수 없다 — 완료
     시각까지 세면 스스로 푼 학생도 돌아보기 턴의 공급 때문에 '힌트 사용'이 된다.
+    **EOS-30 이후**에는 가로챈 턴이 공급 행을 남기지 않아(`_log_hint_event`의 `turn_handled`) 실제
+    흐름에서 이 상한이 걸러 낼 행이 없다. 그래도 상한은 **이중 방어로 유지한다**: 배포 전에 연
+    대화가 배포 뒤에 완료되면 옛 행(백필 없음)이 창 근처에 있을 수 있고, 상한 자체가 "정답 이후의
+    공급은 이 풀이의 것이 아니다"라는 독립된 보증이다.
 
     정답 제출 턴 찾기: 완료 턴의 학생 발화는 아직 적재 전이고, 이미 적재된 학생 턴 중 마지막
     (돌아보기 턴 수 − 1)개가 돌아보기 응답이다 — 턴 수는 상태 머신과 같은 정본
@@ -1197,6 +1392,28 @@ def _supplied_hint_level(payload: object) -> int | None:
     return level
 
 
+def _supplied_base_level(payload: object) -> int | None:
+    """`힌트제공` 페이로드의 라벨 없는 단계(`base_level` 1~4, EOS-178) — 없거나 못 읽으면 None.
+
+    None은 "구판 행이거나 값이 깨졌다"이며 `counts_as_help_supply`가 종전 규칙으로 센다
+    (모른다 ≠ 아니다).
+    """
+    if not isinstance(payload, dict):
+        return None
+    level = payload.get("base_level")
+    if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 4:
+        return None
+    return level
+
+
+def _served_hint_marked(payload: object) -> bool:
+    """그 턴에 검수 힌트가 실제로 실렸는가 — `hint_id`가 비어 있지 않은 문자열이면 참(EOS-178)."""
+    if not isinstance(payload, dict):
+        return False
+    hint_id = payload.get("hint_id")
+    return isinstance(hint_id, str) and bool(hint_id)
+
+
 async def _attribute_hints(
     session: AsyncSession,
     *,
@@ -1206,8 +1423,12 @@ async def _attribute_hints(
 ) -> _HintAttribution:
     """귀속 창 안의 공급 원장(`힌트제공`)에서 '힌트 사용'으로 셀 행을 고른다(EOS-133).
 
-    센다 = 단계가 `counts_as_hint_usage`(2 이상)인 공급이다. 1(방향)은 막힘 신호가 없어도 매 턴
-    나가는 기본 단계라 세지 않는다 — 근거는 정본(`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다.
+    센다 = 단계가 2 이상이고 `counts_as_help_supply`가 도움으로 보는 공급이다. 1(방향)은 막힘
+    신호가 없어도 매 턴 나가는 기본 단계라 세지 않는다 — 근거는 정본
+    (`l4/hint_deferral.HINT_USAGE_MIN_LEVEL`)에 있다. **EOS-178**: 숙달 라벨 '초보'만으로 올라간 2
+    (학생 신호 없음·검수 힌트 미실림)는 세지 않는다 — 원장의 `base_level`(라벨 없이 계산한 단계)이
+    그것을 가른다. 구판 행(`base_level` 없음)은 종전대로 센다. 킬 스위치
+    `l4_hint_attribution_label_free_enabled`를 끄면 EOS-133 규칙 그대로다.
 
     `used_hint` 3상태(CLAUDE.md "모른다 ≠ 아니다"):
       - True  — 셀 행이 1개 이상.
@@ -1215,9 +1436,11 @@ async def _attribute_hints(
       - None  — 창을 모르거나, 셀 행이 0개인데 단계를 못 읽은 공급 행이 섞였다(그 행이 2 이상
         이었을 수 있으므로 "안 썼다"로 확정하지 않는다).
 
-    **한계(명시)**: 공급 원장 기준이다. 완료 상태 머신이 발화를 가로챈 턴(재고 유도 등)에서도
-    핸들러는 그 턴의 결정 단계를 원장에 적으므로, 그 턴의 단계가 2 이상이면 학생이 실제로 받은
-    발화가 재고 템플릿이었어도 여기서 센다. 원장 쪽을 고치는 일은 이 함수의 범위 밖이다.
+    **한계(명시)**: 공급 원장 기준이다. 완료 상태 머신이 발화를 가로챈 턴(재고 유도 등)의 단계를
+    세던 과대 계상은 EOS-30이 원장 쪽에서 없앴다(가로챈 턴은 행을 남기지 않는다 —
+    `_log_hint_event`의 `turn_handled`). 남는 한계: EOS-30 **이전에 적힌 행은 백필하지 않았다**
+    (원장을 소급 수정하지 않는다) — 배포 전에 시작한 대화의 재고 유도 턴 행이 창 안에 있으면 여전히
+    센다.
     """
     if window is None:
         return _HINT_ATTRIBUTION_UNKNOWN
@@ -1237,11 +1460,18 @@ async def _attribute_hints(
     ).all()
     hints: list[tuple[datetime, int]] = []
     unreadable = 0
+    # EOS-178: 라벨 없는 단계를 읽을지 — 끄면 모든 행의 base를 None(구판)으로 보아
+    # EOS-133 규칙 그대로다.
+    label_free = get_settings().l4_hint_attribution_label_free_enabled
     for event_at, payload in rows:
         level = _supplied_hint_level(payload)
         if level is None:
             unreadable += 1
-        elif counts_as_hint_usage(level):
+        elif counts_as_help_supply(
+            hint_level=level,
+            base_level=_supplied_base_level(payload) if label_free else None,
+            served=_served_hint_marked(payload),
+        ):
             hints.append((event_at, level))
     if unreadable:
         # 값은 싣지 않는다(학습 행동 데이터) — 건수와 결과 판정만 남겨 원장 결함을 추적한다.
@@ -1319,7 +1549,10 @@ async def _complete_problem(
     )
     # EOS-131: 완료 확정 attempt도 서버가 학습 세션에 결합한다(submit_attempt와 같은 규칙). 같은
     # 턴 앞에서 이미 세션을 이었으므로 대개 같은 세션을 갱신할 뿐이다. never-break(실패 시 NULL).
-    learning_session_id = await record_learning_activity(session, user_id=user_id, now=received_at)
+    # P3-27: 완료한 문항의 대표 개념을 세션에 채운다(이미 있으면 덮어쓰지 않는다).
+    learning_session_id = await record_learning_activity(
+        session, user_id=user_id, now=received_at, problem_id=problem_id
+    )
     # EOS-133: attempt보다 먼저 판정한다 — used_hint는 attempt 행의 컬럼이다.
     hint_attribution = await _attribute_hints(
         session,
@@ -1329,11 +1562,15 @@ async def _complete_problem(
             session, dialogue_id=dialogue_id, started_at=started_at
         ),
     )
+    # EOS-47: `submit_attempt`와 같은 판·채점 환경 고정(세 적재 경로가 같은 재현 근거를 남긴다).
+    version_pin = await resolve_attempt_version_pin(session, problem_id)
     attempt = ProblemAttemptORM(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답·dialogue 링크에 즉시 사용).
         user_id=user_id,
         session_id=learning_session_id,
         problem_id=problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         is_correct=True,  # 서버 권위 판정(turn A correct) — 클라 보고 아님.
         student_answer=student_answer_plain,
         student_answer_encrypted=student_answer_encrypted,
@@ -1422,6 +1659,181 @@ async def _complete_problem(
     return attempt.attempt_id, completion_evidence
 
 
+async def _record_first_wrong_submission(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    problem_id: uuid.UUID | None,
+    final_answer: str | None,
+    started_at: datetime | None,
+    detector: AttemptMisconceptionDetector,
+) -> uuid.UUID | None:
+    """서버가 판정한 명확한 오답의 **문제당 최초 1건**을 원장에 적재한다(EOS-146).
+
+    적재한 뒤 학습 상태 머신까지 태운다.
+
+    왜 필요한가: 앱 학생의 원장에는 코치 **정답 완료**만 남아 R3(오개념 교정)·R5(반복 실패)·
+    R6(원인 미상 오답)이 앱 학생에게 0회 돌았다. 오답 원천이 없었기 때문이다. 코치는 이미
+    서버 권위로 "명확한 오답"을 판정한다(`_final_answer_state` → `final_incorrect` → REDIRECT).
+    이 함수는 그 판정을 원장으로 옮긴다. 앱·`/v1/me/attempts` 계약은 바뀌지 않는다(정오 판정은
+    서버가 한다).
+
+    **계수 규칙**(결정 2026-09-30 · 게이트 `G-eos146-disposition` (가)): 같은 학생·같은 문항에
+    `is_correct=False` 행이 이미 있으면 적재하지 않는다. 틀린 뒤 스스로 고치는 것은 Polya의
+    정상 경로라, 재제출을 오답 행으로 쌓아 벌점처럼 만들지 않는다. 중간 코치 턴과
+    unverifiable(사변·파싱 불가 — 호출부가 correct·incorrect 둘 다 False로 넘긴다)은 애초에
+    이 함수에 오지 않는다.
+
+    **`dialogue.attempt_id`에 연결하지 않는다.** 그 필드의 존재가 '완료됨' 표지(재완료 가드)라
+    여기서 돌려주는 id를 링크하면 풀던 대화가 완료로 읽힌다. 반환값은 로그·테스트용이다.
+
+    후처리는 `/v1/me/attempts`의 오답 경로와 **같은 순서·같은 함수**다(EOS-134가 세운 대칭):
+    답안 훑기 → 증거 조립 → 가설 갱신 → 숙달 전파(개념·스킬) → 스킬 이벤트 → 상태 머신.
+    R3 입력은 **이번 답안의 스캔**에서만 온다(EOS-138 — 대화 턴의 오개념 매치는 "이 답안의
+    오개념"이 아니므로 쓰지 않는다). 확신도 입력은 코치 경로에 없어 None(미측정)이다.
+
+    실패 정책: attempt 적재(commit)까지는 예외를 전파한다(`_complete_problem`과 같다). 그 뒤
+    후처리는 관측이라 실패가 코치 응답을 깨뜨리지 않는다 — 삼키되 **예외 타입명**을 로그에
+    남긴다(침묵 실패 금지). 킬 스위치 `l4_coach_wrong_submission_enabled`가 꺼져 있으면
+    아무것도 하지 않는다.
+
+    남은 한계(명시): ① 같은 학생·문항 동시 요청이면 조회-삽입 경합으로 2행이 생길 수 있다
+    (잠금·유니크 인덱스는 마이그레이션이라 이 범위 밖). ② 힌트 귀속(`used_hint`)은 판정하지
+    않고 NULL로 둔다 — 귀속 창이 완료 턴 기준으로 정의돼 있어 이 시점에는 정의가 없다
+    (날조 금지).
+    """
+    if problem_id is None or not get_settings().l4_coach_wrong_submission_enabled:
+        return None
+    prior_wrong = (
+        await session.execute(
+            select(ProblemAttemptORM.attempt_id)
+            .where(
+                ProblemAttemptORM.user_id == user_id,
+                ProblemAttemptORM.problem_id == problem_id,
+                ProblemAttemptORM.is_correct.is_(False),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if prior_wrong is not None:
+        # "작동한 비율" — 적재한 것과 생략한 것을 둘 다 센다(한쪽이 0이면 규칙이 안 도는 것이다).
+        logger.info(
+            "코치 오답 제출: 이 학생·문항의 오답이 이미 원장에 있다 — 적재 생략 "
+            "outcome=skipped_duplicate problem_id=%s (EOS-146)",
+            problem_id,
+        )
+        return None
+
+    received_at = datetime.now(timezone.utc)
+    # SEC-31: `_complete_problem`·`submit_attempt`와 같은 봉투 암호화 — 세 적재 경로가 같은
+    # 보호를 받는다.
+    student_work_cipher = require_student_work_cipher(get_settings())
+    student_answer_plain, student_answer_encrypted, student_answer_nonce = encrypt_dialogue_content(
+        student_work_cipher, final_answer
+    )
+    learning_session_id = await record_learning_activity(
+        session, user_id=user_id, now=received_at, problem_id=problem_id
+    )
+    # EOS-47: 판·채점 환경 고정(`_complete_problem`·`submit_attempt`와 같은 호출).
+    version_pin = await resolve_attempt_version_pin(session, problem_id)
+    attempt = ProblemAttemptORM(
+        attempt_id=uuid.uuid4(),
+        user_id=user_id,
+        session_id=learning_session_id,
+        problem_id=problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
+        is_correct=False,  # 서버 권위 판정(final incorrect) — 클라 보고 아님.
+        student_answer=student_answer_plain,
+        student_answer_encrypted=student_answer_encrypted,
+        student_answer_nonce=student_answer_nonce,
+        used_socratic=True,  # 코치 대화로 도달한 제출.
+        used_hint=None,  # 판정하지 않는다(위 한계 ②) — NULL=미판정이지 False가 아니다.
+        # PED-37: 발생 시작 시각은 넘어온 값 그대로 — 없으면 NULL(날조 금지). 대화 생성 턴에는
+        # dialogue가 아직 없어 None이다(보존 파기는 COALESCE(started_at, ingested_at)라 안전).
+        started_at=started_at,
+        ended_at=received_at,
+        ingested_at=received_at,
+    )
+    attempt_id = attempt.attempt_id
+    session.add(attempt)
+    await session.commit()  # attempt 우선 durable(`_complete_problem`·submit_attempt 패턴).
+
+    try:
+        # 후보의 재료가 **이 답안에서만** 나오므로 attempt 귀속이 정의상 성립한다(EOS-104).
+        scan = await scan_attempt_misconceptions(
+            session,
+            detector,
+            problem_id=problem_id,
+            answer=final_answer,
+            selected_choice_index=None,  # 코치 경로에는 보기 탭 인덱스가 없다.
+        )
+        evidence = await collect_assessment_evidence(
+            session,
+            learner_id=user_id,
+            problem_id=problem_id,
+            correct=False,
+            attempt_id=attempt_id,
+            observed_at=received_at,
+            possible_misconceptions=scan.candidates,
+            misconception_scan=scan.scan,
+        )
+        # 가설 반영은 L4 정책이 정한다(EOS-123). 오답에서는 APPLY(훑음) 아니면 NONE(훑지 않음)이다.
+        this_attempt_misconceptions: tuple[tuple[str, float], ...] = ()
+        if (
+            decide_attempt_hypothesis_action(is_correct=False, scan=scan.scan)
+            is AttemptHypothesisAction.APPLY
+        ):
+            active_hypotheses = await apply_candidates(session, user_id, scan.candidates)
+            await session.commit()
+            this_attempt_misconceptions = this_attempt_misconceptions_from(
+                active_hypotheses, scan.candidates
+            )
+        await record_problem_attempt_mastery(session, evidence=evidence)
+        skill_records = await record_problem_attempt_skill_mastery(session, evidence=evidence)
+        await record_attempt_skill_event(
+            session,
+            user_id=user_id,
+            attempt_id=attempt_id,
+            problem_id=problem_id,
+            is_correct=False,
+            skill_ids=[r.skill_id for r in skill_records],
+            source=AttemptSource.coach_wrong_submission,
+        )
+        transition = await advance_on_graded_attempt(
+            session,
+            user_id=user_id,
+            attempt_id=attempt_id,
+            is_correct=False,
+            confidence=None,
+            this_attempt_misconceptions=this_attempt_misconceptions,
+        )
+    except Exception as exc:  # noqa: BLE001 — 관측이 코치 응답을 깨뜨리지 않는다(아래 주석)
+        # **never-break**: attempt는 이미 commit됐다. 후처리는 관측이라 여기서 터져도 학생은
+        # 재고 유도 발화를 받아야 한다. 삼키되 예외 타입명을 반드시 남긴다(침묵 실패 금지).
+        logger.warning(
+            "코치 오답 제출: 후처리 실패 — attempt는 적재됨. exc_type=%s problem_id=%s (EOS-146)",
+            type(exc).__name__,
+            problem_id,
+        )
+        return attempt_id
+    if transition.rejected_transition is not None:
+        logger.warning(
+            "코치 오답 제출: 학습 상태 전이 거부 — %s (EOS-146 · attempt는 적재됨)",
+            transition.rejected_transition,
+        )
+    decision = transition.decision
+    logger.info(
+        "코치 오답 제출 적재 outcome=recorded scan=%s rule_id=%s to_state=%s "
+        "problem_id=%s (EOS-146)",
+        scan.scan.value,
+        decision.rule_id if decision is not None else None,
+        transition.final_state,
+        problem_id,
+    )
+    return attempt_id
+
+
 class _CompletionResult(NamedTuple):
     """`_resolve_completion` 반환 — 완료 상태머신 처리 결과(호출자가 발화·영속·응답에 반영).
 
@@ -1477,6 +1889,8 @@ async def _resolve_completion(
       3. `decide_completion`으로 5전이 결정.
       4. `NONE` → no-op(기존 발화 유지). 그 외 → 결정론 발화로 override(prompt·socratic_category).
       5. `COMPLETE` → `_complete_problem`으로 attempt 적재·숙달 전파(attempt_id 확보).
+      6. `REDIRECT` → `_record_first_wrong_submission`으로 문제당 최초 오답 1건 적재(EOS-146 ·
+         attempt_id는 돌려주지 않는다 — 완료 표지를 건드리지 않는다).
 
     PED-37 `attempt_started_at`: 적재할 attempt의 *발생* 시작 시각. `_complete_problem`이 자체로
     구할 수 없어(이 함수도 dialogue를 모른다) 호출자가 넘긴다 — append_turn은 `dialogue.started_at`,
@@ -1557,6 +1971,18 @@ async def _resolve_completion(
             started_at=attempt_started_at,
             dialogue_id=dialogue_id,
         )
+    elif cd.action is CompletionAction.REDIRECT:
+        # EOS-146: 서버가 명확한 오답으로 판정한 제출의 **문제당 최초 1건**을 원장에 적재한다 — 앱
+        # 학생의 오답이 R3·R5·R6에 닿는 유일한 경로다. `attempt_id`는 None으로 둔다: 이 결과의
+        # attempt_id가 dialogue에 링크되면(호출자가 그렇게 한다) 풀던 대화가 완료로 읽힌다.
+        await _record_first_wrong_submission(
+            session,
+            user_id=user_id,
+            problem_id=problem_id,
+            final_answer=_last_solution_step(body),
+            started_at=attempt_started_at,
+            detector=capabilities.attempt_misconception_detector,
+        )
     return _CompletionResult(
         decision=new_decision,
         problem_complete=cd.problem_complete,
@@ -1585,6 +2011,33 @@ async def _server_mastery_for(
     if concept_id is None:
         return None
     return await get_current_mastery(session, user_id, concept_id)
+
+
+async def _server_mastery_evidence_for(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    problem_id: uuid.UUID | None,
+    *,
+    server_mastery: float | None,
+    explicit_level: str | None,
+) -> int | None:
+    """서버 개념 숙달도가 라벨에 들어간 턴의 **증거 수**(관측 수) — 원장 계측 전용(EOS-179·비노출).
+
+    `_server_mastery_for`와 같은 개념(`get_primary_concept_id`)의 같은 최신 측정 행에서
+    `sample_size`를 읽는다. 서버 숙달도가 없거나(`server_mastery is None`) 명시 `mastery_level`이
+    라벨을 이긴 턴(`explicit_level`)은 증거 수가 그 라벨의 증거가 아니므로 조회하지 않는다 —
+    그래서 이 추가 조회(개념 해석 + 최신 행, 인덱스 단건 2회)는 **서버 숙달도가 실제로 쓰인 턴에만**
+    든다. 반환 None은 "모름"(개념 미해석·sample_size 미기록)이다 — 0이 아니다.
+
+    `_server_mastery_for`의 반환형(float)은 바꾸지 않는다 — 기존 테스트·호출부가 그 float 계약에
+    기댄다. 증거 수를 같은 호출로 묶는 대신 이 조회를 따로 두는 것이 변경 면적이 가장 작다.
+    """
+    if server_mastery is None or explicit_level is not None or problem_id is None:
+        return None
+    concept_id = await get_primary_concept_id(session, problem_id)
+    if concept_id is None:
+        return None
+    return await get_current_mastery_sample_size(session, user_id, concept_id)
 
 
 async def _pack_for(session: AsyncSession, problem_id: uuid.UUID | None) -> PedagogyPack | None:
@@ -1895,7 +2348,12 @@ async def _log_hint_event(
     mode: str | None = None,
     persona: str | None = None,
     client_state_mismatch: bool = False,
+    turn_handled: bool = False,
     served_hint: ServedHint | None = None,
+    base_hint_level: int | None = None,
+    ability_level: str | None = None,
+    label_source: str | None = None,
+    label_evidence_n: int | None = None,
 ) -> None:
     """AI가 제공한 힌트 노출량(hint_level)을 `attempt_event`(event_type=힌트제공)로 1행 적재.
 
@@ -1921,11 +2379,39 @@ async def _log_hint_event(
     **S3-03 mode 태깅**: `_log_verify_event`와 동형으로 `mode`·`persona`(선택)를 event_data에
     실어 ⑤(도움 감소)·⑧(도달 깊이)의 mode-scoped 집계를 가능하게 한다. None(기본)이면 미태깅.
 
+    **EOS-30 가로챈 턴**: `turn_handled=True`면 적재하지 않는다. 완료 상태 머신이 발화를 가로챈
+    턴(돌아보기 진입·계속·완료 인정·재고 유도)에서 학생이 받는 것은 결정론 템플릿이다 — 템플릿으로
+    바뀌는 것은 `decision`의 prompt·socratic_category뿐이고 `hint_level`은 남기 때문에, 예전에는
+    학생이 받지 않은 단계가 '제공'으로 적혔다. 그 행은 ① 다음 턴 사다리 입력(`_prev_hint_level_for`
+    → `decide_hint_level` 규칙 2·3의 `prev+1`)을 부풀려 받지 않은 단계를 건너뛰게 했고 ② WH-1 ⑤⑧
+    ⑮의 표본을 오염시켰으며 ③ EOS-133 힌트 귀속이 재고 유도 턴의 단계를 세게 만들었다. 이 원장의
+    의미는 "AI가 *제공한* 노출량"이므로 제공하지 않은 턴은 행이 없어야 한다(날조 회피 — `hint_level`
+    None과 같은 원칙). 호출부는 반드시 `turn_handled=completion.handled`를 싣는다(AST 가드 동결).
+
+    **정직한 한계**: 이 행은 지표 ⑭(클라 상태 불일치율)의 표본도 겸한다(`client_state_mismatch`
+    태그가 같은 행에 실린다). 그래서 가로챈 턴의 불일치 관측은 함께 사라진다 — ⑭은 이제 코칭이
+    실제로 나간 턴만의 비율이다. 태그만 실은 행을 남기는 길은 계약(`HintEventData.hint_level`
+    필수)을 바꿔야 하고 ⑤⑧⑮가 그 행을 다시 공급으로 세게 되어 택하지 않았다.
+
     **S4-11 reveal_score**: 이 턴에 검수 힌트가 *실제로 서빙됐으면*(`served_hint`) 그 힌트의
     `reveal_score`·`hint_id`를 같은 행에 싣는다 — KPI '도달 깊이 2.5+'의 정밀화 신호(⑧ note가
     읽는다). 미서빙이면 둘 다 None이다(정적 템플릿 턴의 노출을 0으로 날조하지 않는다·재계산 0 —
     서빙 reader가 이미 들고 온 값만 운반).
+
+    **EOS-178 base_level·ability_level**: 결정이 이미 들고 있는 값(`decision.base_hint_level`·
+    `decision.applied_mastery_level`)을 같은 행에 싣는다(재계산 0). `base_level`은 라벨 없이
+    계산한 단계라 `hint_level > base_level`이면 라벨이 올린 턴이고, 힌트 귀속(`_attribute_hints`)이
+    그것으로 "학생 신호가 올린 공급"과 "라벨만 올린 공급"을 가른다. `ability_level`은 그 순간의
+    라벨이며 사후 백필이 불가능해 지금부터 쌓는다(읽는 쪽 = 후속 태스크). 둘 다 None이면
+    구판 행과 같다.
+
+    **EOS-179 label_source·label_evidence_n**: 라벨의 출처('explicit'·'server_bkt'·
+    'server_theta'·'client_bkt')와 그 라벨을 만든 서버 개념 숙달도의 관측 수를 같은 행에 싣는다
+    (결정이 이미 들고 있는 값 — 재계산 0). 증거 수 None은 "모름"이다(0 아님). 라벨 정확도를
+    출처·증거 수로 층화해 읽기 위한 입력이며 사후 백필이 불가능하다.
     """
+    if turn_handled:
+        return  # 가로챈 턴 — 학생은 힌트가 아니라 결정론 템플릿을 받았다(EOS-30).
     if hint_level is None:
         return  # 힌트 레벨 없음(이론적 경계) → 적재 안 함(날조 회피).
 
@@ -1943,6 +2429,10 @@ async def _log_hint_event(
             client_state_mismatch=client_state_mismatch,
             reveal_score=served_hint.reveal_score if served_hint is not None else None,
             hint_id=served_hint.hint_id if served_hint is not None else None,
+            base_level=base_hint_level,
+            ability_level=ability_level,
+            label_source=label_source,
+            label_evidence_n=label_evidence_n,
         ),
     )
     session.add(event)  # commit은 핸들러가 — 같은 트랜잭션에 합류(별도 commit 금지).
@@ -2513,7 +3003,7 @@ async def _wh1_primary_decision_or(
     그대로 흐른다 — 호출자가 이미 조회한 `server_theta`·`user.user_id`를 재사용할 뿐 신규 쿼리는
     없다(create_session·append_turns 두 핸들러가 이미 계산해 둔 값).
 
-    `pack`(PED-23 회수 — 04e §9): `_pack_for`가 해석해 `decide(pack=)`에 넣은 *같은* 팩 객체를
+    `pack`(PED-23 회수 — 04g §9): `_pack_for`가 해석해 `decide(pack=)`에 넣은 *같은* 팩 객체를
     러너로 thread한다 — 러너가 톤필터 직전 금지모드 가드(`mode_guard_runtime_enabled` 옵트인·
     기본 OFF)에 재사용(위반 발화 미서빙·소크라테스 재질문 폴백). None(무팩·플래그 OFF 해석)이면
     가드 무관.
@@ -2629,11 +3119,14 @@ async def coach_decide(
     )
     # S4-19: carry(게이트 이전 단계 검증 운반값)는 stateless 경로에선 미소비(DB 무접근 계약 —
     # 적재 좌석 없음). 마지막 원소=solution_coaching 불변식은 유지된다.
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     decision, matches, intervention, lthc, entry_category, _step_carry, solution_coaching = (
         _build_response_payload(
             body,
             matches=outcome.matches,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     return CoachResponse(
@@ -2674,12 +3167,21 @@ async def create_session(
     segmentation_counters.record(body.solution_steps)
     # EOS-131: 코치 턴은 학습 활동이다 — 서버 유휴 규칙으로 학습 세션을 잇거나 연다. never-break
     # (실패해도 코칭은 진행·예외 타입명 로그). 커밋은 이 핸들러의 기존 커밋이 함께 가져간다.
-    await record_learning_activity(session, user_id=user.user_id)
+    # P3-27: 코칭 대상 문항의 대표 개념을 세션에 채운다(문항 없는 대화는 개념 없이 결합).
+    await record_learning_activity(session, user_id=user.user_id, problem_id=body.problem_id)
     # slice 64: 문항 기대정답을 서버 DB에서 조회해 step shadow 진단 맥락으로 주입(비노출 — 응답엔
     # 결코 싣지 않음·정답 누출 차단). 문항 부재/없음이면 None(graceful).
     expected_answer = await _expected_answer_for(session, body.problem_id)
     # slice 70: 서버 L2 저장소의 실제 숙달도를 조회해 클라 bkt 대체(게이트 ON·비노출).
     server_mastery = await _server_mastery_for(session, user.user_id, body.problem_id)
+    # EOS-179: 라벨 증거 수(원장 계측) — 서버 숙달도가 쓰인 턴에만 조회(비노출).
+    server_mastery_evidence = await _server_mastery_evidence_for(
+        session,
+        user.user_id,
+        body.problem_id,
+        server_mastery=server_mastery,
+        explicit_level=body.mastery_level,
+    )
     # slice 73·74: 서버 L2의 실제 θ도 조회 — BKT↔θ 교차검증(게이트 ON·θ 수치 비노출). slice 74:
     # 문항 개념의 *개념별* θ 우선·없으면 전과목 폴백(_server_theta_for 내부).
     server_theta = await _server_theta_for(session, user.user_id, body.problem_id)
@@ -2804,6 +3306,8 @@ async def create_session(
     # 개념의 성취기준 고시코드) — 둘 다 비노출 개인화 슬롯(_grade_for/_standard_code_for docstring).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, body.problem_id)
+    # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: step_carry = 게이트 이전 단계 검증 운반값(아래 _log_verify_event 적재 전용·비노출).
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
         _build_response_payload(
@@ -2812,6 +3316,7 @@ async def create_session(
             expected_answer=expected_answer,
             server_mastery=server_mastery,
             server_theta=server_theta,
+            server_mastery_evidence=server_mastery_evidence,
             matches=outcome.matches,
             misconception_hypotheses=active_hypotheses,
             pack=pack,
@@ -2819,6 +3324,7 @@ async def create_session(
             grade=grade,
             standard_code=standard_code,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     intervention = _intervention_from_hypotheses_or(active_hypotheses, intervention)
@@ -2929,6 +3435,8 @@ async def create_session(
         solution_steps=body.solution_steps,
         completion_handled=completion.handled,
     )
+    # EOS-30: 완료 상태머신이 발화를 가로챈 턴은 공급 행을 남기지 않는다 — 학생이 받은 것은 힌트가
+    # 아니라 결정론 템플릿이다(`decision.hint_level`은 템플릿으로 바뀌지 않고 남는 값일 뿐).
     await _log_hint_event(
         session,
         user_id=user.user_id,
@@ -2938,7 +3446,12 @@ async def create_session(
         mode=body.mode,
         persona=event_persona,
         client_state_mismatch=bool(mismatch_fields),
+        turn_handled=completion.handled,
         served_hint=served_hint,
+        base_hint_level=decision.base_hint_level,
+        ability_level=decision.applied_mastery_level,
+        label_source=decision.label_source,
+        label_evidence_n=decision.label_evidence_n,
     )
     # PED-04 D1: 교수 결정 메타 조립 — 전부 위에서 *이미 계산된* 값이다(재계산 0).
     target_stage = (
@@ -3099,7 +3612,8 @@ async def append_turns(
             status_code=status.HTTP_404_NOT_FOUND, detail="대화를 찾을 수 없습니다."
         )
     # EOS-131: 코치 턴 = 학습 활동(소유권 확인 *뒤* — 남의 대화 id로 세션을 갱신하지 않는다).
-    await record_learning_activity(session, user_id=user.user_id)
+    # P3-27: 대화에 실린 문항의 대표 개념을 채운다.
+    await record_learning_activity(session, user_id=user.user_id, problem_id=dialogue.problem_id)
 
     # PED-04 D1·D2: **이번 턴을 적재하기 전에** 직전 턴들의 평문 메타를 읽는다(순서가 계약 —
     # `_turn_meta_rows` docstring 참조). 여기서 Polya 상태를 서버가 파생하고, 발문 회전용
@@ -3125,6 +3639,14 @@ async def append_turns(
     expected_answer = await _expected_answer_for(session, dialogue.problem_id)
     # slice 70: 멀티턴도 서버 L2 숙달도 조회(dialogue.problem_id·user 출처)·클라 bkt 대체.
     server_mastery = await _server_mastery_for(session, user.user_id, dialogue.problem_id)
+    # EOS-179: create_session과 동형 — 라벨 증거 수(원장 계측·비노출).
+    server_mastery_evidence = await _server_mastery_evidence_for(
+        session,
+        user.user_id,
+        dialogue.problem_id,
+        server_mastery=server_mastery,
+        explicit_level=body.mastery_level,
+    )
     # slice 73·74: 멀티턴도 서버 L2 θ 조회 — BKT↔θ 교차검증(θ 수치 비노출). slice 74: 개념별 θ
     # 우선(dialogue.problem_id)·없으면 전과목 폴백.
     server_theta = await _server_theta_for(session, user.user_id, dialogue.problem_id)
@@ -3213,6 +3735,8 @@ async def append_turns(
     # problem_id 출처(append 규약과 정합·expected_answer/server_mastery와 같은 출처 패턴).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, dialogue.problem_id)
+    # OPS-125: create_session과 동형 — 연쇄 검증을 이벤트 루프 밖에서 먼저 계산해 주입한다.
+    chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: create_session과 동형 — step_carry(게이트 이전 운반값)는 verify 적재 전용·비노출.
     decision, matches, intervention, lthc, entry_category, step_carry, solution_coaching = (
         _build_response_payload(
@@ -3221,6 +3745,7 @@ async def append_turns(
             expected_answer=expected_answer,
             server_mastery=server_mastery,
             server_theta=server_theta,
+            server_mastery_evidence=server_mastery_evidence,
             matches=outcome.matches,
             misconception_hypotheses=active_hypotheses,
             pack=pack,
@@ -3229,6 +3754,7 @@ async def append_turns(
             grade=grade,
             standard_code=standard_code,
             step_chain_verifier=subject_capabilities.step_chain,
+            chain_verification=chain_verification,
         )
     )
     intervention = _intervention_from_hypotheses_or(active_hypotheses, intervention)
@@ -3326,6 +3852,7 @@ async def append_turns(
         solution_steps=body.solution_steps,
         completion_handled=completion.handled,
     )
+    # EOS-30: create_session과 동형 — 가로챈 턴(돌아보기·인정·재고 유도)은 공급 행을 남기지 않는다.
     await _log_hint_event(
         session,
         user_id=user.user_id,
@@ -3335,7 +3862,12 @@ async def append_turns(
         mode=body.mode,
         persona=event_persona,
         client_state_mismatch=bool(mismatch_fields),
+        turn_handled=completion.handled,
         served_hint=served_hint,
+        base_hint_level=decision.base_hint_level,
+        ability_level=decision.applied_mastery_level,
+        label_source=decision.label_source,
+        label_evidence_n=decision.label_evidence_n,
     )
     # PED-04 D1: 교수 결정 메타 — create_session과 동형. 목표 단계는 *서버 파생* 상태 기준이다
     # (클라 제출 기준이면 D2가 되찾은 진실원천이 다시 클라로 새어 나간다).

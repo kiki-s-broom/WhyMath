@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-102-phase1-report-broken-dep-wrong-root
+title: "Phase 1 구조 리포트의 Broken dependency count가 load_backlog에 저장소 루트 대신 backlog/를 넘겨 태스크 0건으로 읽고, 참값 0 대신 8을 measured=True로 보고한다(로더 오류도 버림)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `_broken_dependency_count`가 저장소 루트(`_REPO_ROOT`)로 대장을 읽는다 — 실제 저장소에서 적재 태스크 수 > 0이고, 값이 같은 대장에 `dep_declaration.find_soft_declaration_violations`를 올바르게 적용한 수와 같다(2026-09-29 실측 참값 0)"
+  - "② 로더가 오류 목록을 돌려주거나(대장 파손·경로 오류) 적재 태스크가 0건이면 `measured=False`·`value=None`으로 보고한다 — 오류를 `_errors`로 버리지 않는다(모듈의 '미측정≠0' 계약 · 스캔 0건은 실패)"
+  - "③ 회귀 테스트 + 변별력: 루트를 `backlog/`로 되돌리는 주입과 오류 무시 주입에서 각각 RED(뮤테이션 확인), 정상 루트에서 GREEN"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/phase1_structure_report.py
+  - tests/backend/ops/test_phase1_structure_report.py
+session: null
+notes: "발견 경위: PR #1375(HARN-130·179·170) 병합 검증 중, `store.load_backlog(Path(\"backlog\"))`가 게이트 0건을 돌려주는 것을 보고 같은 형태의 호출처를 확인했다. 실측(main `0f05876b` 병합 후 트리): 리포트 함수 `_broken_dependency_count()` 직접 호출 결과 measured=True · value=8. 올바른 루트로 읽으면 태스크 940건 · 위반 0건. 8건은 소프트 분류표가 가리키는 태스크 8개가 '백로그에 없다'는 판정이다(태스크를 0건으로 읽었기 때문). 로더는 'backlog/tracks.yaml 없음 (seed 미실행?)' 오류를 냈지만 `_errors`로 버려졌다. 같은 이유로 진짜 위반이 생겨도 값은 그대로 8이다 — 오경보이자 무변별. 도입 커밋은 얕은 클론이라 미확정(파일은 EOS-08 #1175로 신설). 등급은 리포터 EOS-08과 같은 P2로 두었다 — 재판정은 amend --eos-priority."
+updated: 2026-09-29

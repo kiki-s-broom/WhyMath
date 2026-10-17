@@ -196,6 +196,10 @@ __all__ = [
     "EXIT_VIOLATION",
     "OPERATOR_AUDIT_KINDS",
     "LOOP_KPI_SPECS",
+    "SAMPLE_BASES",
+    "SAMPLE_BASIS_LIVE",
+    "SAMPLE_BASIS_SYNTHETIC",
+    "SYNTHETIC_BASIS_NOTE",
     "Direction",
     "EvidenceWriter",
     "KpiOutcome",
@@ -233,6 +237,17 @@ EXIT_OK: Final = 0
 EXIT_VIOLATION: Final = 1
 EXIT_UNMEASURED: Final = 2
 EXIT_RUNTIME_ERROR: Final = 3
+
+#: 판정 표본의 성격 표지(EOS-38). **판정 규칙은 두 값에서 같다** — 표지는 숫자를 바꾸지 않고
+#: 그 숫자가 *무엇 위에서* 나왔는지만 산출물에 각인한다. `synthetic`은 결정론 합성 부하
+#: (`ops/loop_kpi_sample_load`)를 쌓은 전용 DB 위의 측정이며 실사용 검증이 아니다.
+SAMPLE_BASIS_LIVE: Final = "live"
+SAMPLE_BASIS_SYNTHETIC: Final = "synthetic"
+SAMPLE_BASES: Final[tuple[str, ...]] = (SAMPLE_BASIS_LIVE, SAMPLE_BASIS_SYNTHETIC)
+SYNTHETIC_BASIS_NOTE: Final = (
+    "합성 부하 위 측정이다 — 실사용 검증으로 계상하지 않는다(P3-13 ARCH-66 ⑥ 단서). "
+    "이 판정은 '수집기·임계·판정 경로가 충분한 표본에서 설계대로 PASS/FAIL을 내는가'만 말한다."
+)
 
 
 class LoopKpi(str, Enum):
@@ -317,8 +332,11 @@ _COVERAGE_NOTE_INTEGRITY = (
 
 _COVERAGE_NOTE_TRACEABILITY = (
     "근거 기록 개시 전의 추천은 LearnerState 근거가 없어 소급 역추적이 불가능하다 — 분모에서 빼고 "
-    "excluded_pre_basis로 센다. 삭제권 이행으로 세션 행이 지워진 추천은 학습자 결합이 끊겨 "
-    "break_learner_unjoined로 잡힌다(세션 기록 실패 placeholder와 구별할 수 없다)."
+    "excluded_pre_basis로 센다. 삭제권 이행(계정·개별 세션 삭제)은 그 세션의 추천 기록도 같은 "
+    "트랜잭션에서 지우므로(SEC-40·처분 (나)) 삭제된 학습자의 추천은 분자에도 분모에도 나타나지 "
+    "않는다 — 삭제로 관측창이 비면 분모 0 → 미측정이다. 학습자 결합이 끊긴 추천"
+    "(break_learner_unjoined)은 세션 기록 실패 placeholder이거나 SEC-40 착지 이전에 삭제돼 남은 "
+    "잔여이며, 삭제 증거가 없으므로 끊김으로 센다(모른다 ≠ 아니다)."
 )
 
 LOOP_KPI_SPECS: Final[tuple[LoopKpiSpec, ...]] = (
@@ -674,6 +692,8 @@ class LoopKpiReport:
     window: ObservationWindow
     run_id: str
     outcomes: tuple[KpiOutcome, ...]
+    #: 표본 성격 — 판정 규칙은 불변이고 산출물 각인용이다(EOS-38).
+    sample_basis: str = SAMPLE_BASIS_LIVE
 
     @property
     def failed(self) -> tuple[KpiOutcome, ...]:
@@ -696,6 +716,7 @@ class LoopKpiReport:
             "run_id": self.run_id,
             "window": self.window.as_dict(),
             "confidence": CONFIDENCE,
+            "sample_basis": self.sample_basis,
             # 규칙 5 — 판정 경로가 외부 관측 SaaS에 의존하지 않음을 산출물이 스스로 말한다.
             "accounting": {
                 "in_process": True,
@@ -717,8 +738,15 @@ def evaluate(
     *,
     window: ObservationWindow,
     run_id: str,
+    sample_basis: str = SAMPLE_BASIS_LIVE,
 ) -> LoopKpiReport:
-    """관측치 묶음 → 5종 판정. 누락된 KPI는 조용히 빠지지 않고 미측정으로 계상된다."""
+    """관측치 묶음 → 5종 판정. 누락된 KPI는 조용히 빠지지 않고 미측정으로 계상된다.
+
+    `sample_basis`는 판정에 영향이 없다 — 알 수 없는 값은 거부한다(오타가 `live`로 위장되면
+    합성 표본 판정이 실사용 판정으로 읽힌다).
+    """
+    if sample_basis not in SAMPLE_BASES:
+        raise ValueError(f"sample_basis는 {SAMPLE_BASES} 중 하나여야 한다: {sample_basis!r}")
     outcomes: list[KpiOutcome] = []
     for spec in LOOP_KPI_SPECS:
         observation = observations.get(
@@ -732,7 +760,9 @@ def evaluate(
             ),
         )
         outcomes.append(_evaluate_one(observation))
-    return LoopKpiReport(window=window, run_id=run_id, outcomes=tuple(outcomes))
+    return LoopKpiReport(
+        window=window, run_id=run_id, outcomes=tuple(outcomes), sample_basis=sample_basis
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -988,7 +1018,8 @@ class TraceBreak(str, Enum):
 
     LEARNER_UNJOINED = "learner_unjoined"
     """① `evidence_event.session_id → learning_session` 조인 실패(세션 기록 실패 placeholder ·
-    삭제권으로 지워진 세션 — 둘을 구별할 수 없다)."""
+    SEC-40 착지 이전에 삭제돼 남은 잔여). 삭제권 이행은 이제 추천 기록을 함께 지우므로 삭제가
+    이 끊김을 만들지 않는다 — 삭제 증거 없이 끊긴 추천은 계속 끊김으로 센다."""
 
     BASIS_MISSING = "basis_missing"
     """② 근거 기록 개시 **이후**인데 `learner_state_basis` 키가 없다 — 모른다(끊김)."""
@@ -1430,6 +1461,9 @@ def render(report: LoopKpiReport) -> str:
     lines.append(f"  run_id : {report.run_id}")
     lines.append(f"  관측창 : {report.window.start.isoformat()} ~ {report.window.end.isoformat()}")
     lines.append("  회계   : 인프로세스 전량(외부 관측 SaaS 비의존)")
+    lines.append(f"  표본   : {report.sample_basis}")
+    if report.sample_basis == SAMPLE_BASIS_SYNTHETIC:
+        lines.append(f"  ※ {SYNTHETIC_BASIS_NOTE}")
     lines.append("")
     for outcome in report.outcomes:
         spec = spec_for(outcome.kpi)
@@ -1566,6 +1600,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--sample-basis",
+        choices=SAMPLE_BASES,
+        default=SAMPLE_BASIS_LIVE,
+        help=(
+            "표본 성격 표지(기본 live). 결정론 합성 부하 전용 DB 위에서 돌릴 때 synthetic으로 "
+            "준다 — 판정 규칙은 같고 리포트·JSON에 '실사용 검증 아님'이 각인된다(EOS-38)."
+        ),
+    )
+    parser.add_argument(
         "--timeout-seconds",
         type=float,
         default=DEFAULT_TIMEOUT_SECONDS,
@@ -1607,7 +1650,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         return EXIT_RUNTIME_ERROR
 
-    evidence.record(kpi=None, phase="run_start", ok=True, no_db=bool(args.no_db))
+    evidence.record(
+        kpi=None,
+        phase="run_start",
+        ok=True,
+        no_db=bool(args.no_db),
+        sample_basis=args.sample_basis,
+    )
 
     observations: dict[LoopKpi, Observation] = {}
     if not args.no_db:
@@ -1659,7 +1708,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         observations.update(injected)
 
-    report = evaluate(observations, window=window, run_id=run_id)
+    report = evaluate(observations, window=window, run_id=run_id, sample_basis=args.sample_basis)
     for outcome in report.outcomes:
         evidence.record(
             kpi=outcome.kpi,

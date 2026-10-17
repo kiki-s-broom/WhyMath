@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-42-r6-cat-efficiency-measurement
+title: "R3·R5·R6 집행이 진단 CAT 측정 효율에 주는 영향 실측 — 앱 오답 원천(EOS-146) 착지 후 첫 측정(EOS-146 ④ 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-146-app-wrong-answer-event-source
+requires_gates: []
+acceptance:
+  - "① 승계 사유 — EOS-146 ④(EOS-26 독립 비판 발견 10)의 \"지금은 앱 도달 0이라 영향 0이다\"라는 전제가 EOS-146 착지로 **깨진다**. 코치 서버 판정 오답이 앱 학생의 원장에 적재돼 R3·R5·R6이 앱 학생에게 처음 돈다. 오답 뒤 추천이 제한 후보(선수 탐침·같은 개념 연습 — 연습은 학습 밴드)로 바뀌면 정보량 최대 선택에서 벗어나 진단 CAT의 SE 수렴이 늦어질 수 있다. 측정은 오답 원천이 배포돼 데이터가 쌓여야 가능하므로 EOS-146 안에서 끝낼 수 없다."
+  - "② 지표 — ASM-03 capture가 `TARGET_SE`(0.3) 대신 `MAX_ADMINISTERED_ITEMS`(20문항) 상한으로 확정되는 비율(`l2/next_problem_selection.py`)과, 그 학습자들의 R6 제한 문항 비율. 두 값을 R6 제한이 없던 종전 구간(앱 도달 0)과 대조한다. 측정 불가(분모 0)를 0%로 위장하지 않는다."
+  - "③ 처분 판정 선행 — 영향이 실측되면 (가) capture 관측에 R6 제한 문항 비율을 싣는다 (나) 배치 진단 구간에서 R6 제한을 끄는 조건을 둔다 (다) 영향이 무시할 수준이라 현행 유지한다 중 하나를 고른다. 측정 전에는 고르지 않으며, 착수하는 세션이 결정 게이트를 `backlog.py gates add`로 등재한 뒤 멈춘다(산문 선행 금지). 이 결정은 진단 정확도와 학생 부담(문항 수)의 교환이라 교수학·측정 판정이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/next_problem_selection.py
+session: null
+notes: "출처: EOS-146 구현 착지(2026-09-30) — acceptance ④를 승계한다. 등급 P2 근거: 측정은 12월 검증 이후 데이터가 쌓여야 의미가 있고 Release Gate A는 이 측정 없이 성립한다. 재판정은 `amend --eos-priority`."
+updated: 2026-09-30

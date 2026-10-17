@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-43-attempt-event-session-delete-disposition-recheck
+title: "개별 세션 삭제 시 연결 attempt_event 처분 재판정 — SEC-40 '유지' 판정의 KPI 영향 실측과 Kiki 결정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - SEC-40
+requires_gates: []
+acceptance:
+  - "① 처분 재판정: 개별 세션 삭제(DELETE /v1/me/sessions/{id}) 시 problem_attempt CASCADE 전에 attempt_id 연결분 attempt_event 를 모아 함께 지울지를 판정한다. SEC-40 은 '유지'로 판정했다(근거: attempt_event 에 세션 컬럼 없음 · attempt_id NULL 이벤트는 세션 귀속 불가 · 학습 지표 롤업 KPI 영향은 게이트가 다루지 않음). 이 판정을 뒤집을 근거가 있는지 실측한다.\n② 남는 행은 user_id 가 직접 달린 식별 정보이며 '가명 보존이 적법하다'를 가정하지 않는다. 삭제 범위를 넓히는 쪽만 허용한다.\n③ KPI·학습 지표 롤업이 attempt_event 삭제로 받는 영향을 측정으로 적는다(미측정 ≠ 통과). 판정이 '삭제'면 구현(약 6줄 추정)과 재연결 불가 동결 테스트까지.\n④ 결정은 PIPA 삭제권 표면이므로 Kiki 결정 게이트를 거친다 — 세션이 대신 고르지 않는다."
+artifacts: []
+paths:
+  - "docs/reviews/sec43_*.md"
+session: null
+notes: "출처: SEC-40 보고(2026-10-03) attempt_event 처분 판정 '유지'의 재판정 후보. 판정 문서 = docs/reviews/sec40_evidence_event_erasure_wiring_2026-10-03.md §4. 전제 핀 테스트 test_attempt_event_remains_after_session_deletion_and_has_no_session_axis 가 세션 컬럼 생성 또는 판정 변경 시 RED 가 된다."
+updated: 2026-10-03

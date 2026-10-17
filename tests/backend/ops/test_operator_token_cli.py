@@ -130,24 +130,39 @@ class TestRejections:
     async def test_student_role_rejected(self) -> None:
         student = UserProfile(user_id=_UID, role=Role.STUDENT, email_hash=email_hash("s@x.org"))
         session = _FakeSession({_UID: student})
-        with pytest.raises(cli.OperatorTokenError, match="content_admin 계정에만"):
+        with pytest.raises(cli.OperatorTokenError, match="계정에만 발급합니다"):
             await _issue(session)
         assert session.added == []
 
     @pytest.mark.asyncio
-    async def test_every_role_but_content_admin_is_rejected(self) -> None:
-        # Role이 늘어도 허용 집합은 content_admin 하나로 유지된다 — 전수 스캔.
-        for role in Role:
+    async def test_issuance_is_limited_to_the_four_console_roles(self) -> None:
+        # [P3-12] 허용 집합은 content_admin 하나에서 CMS 4역할로 넓어졌다. 새 역할이 의식적 결정
+        # 없이 토큰을 받지 못한다는 ADMIN-15의 의도는 그대로다: 허용 4역할을 **여기에 명시**한다.
+        # 권한표(`schema/cms_access`)에서 파생한 값과 비교만 하면 권한표가 바뀔 때 이 테스트가 같이
+        # 따라 움직여 아무것도 지키지 못한다 — 그래서 기대값을 파생하지 않고 적는다.
+        expected_allowed = {
+            Role.CONTENT_ADMIN,
+            Role.CONTENT_EDITOR,
+            Role.CONTENT_REVIEWER,
+            Role.CONTENT_PUBLISHER,
+        }
+        assert cli._ALLOWED_ROLES == expected_allowed
+        issued_for: set[Role] = set()
+        for role in Role:  # 전수 스캔 — Role에 역할이 더해져도 여기서 판정된다.
             session = _FakeSession(
                 {_UID: UserProfile(user_id=_UID, role=role, email_hash=email_hash("r@x.org"))}
             )
-            if role is Role.CONTENT_ADMIN:
+            if role in expected_allowed:
                 await _issue(session)
                 assert len(session.added) == 1
+                issued_for.add(role)
             else:
                 with pytest.raises(cli.OperatorTokenError):
                     await _issue(session)
                 assert session.added == []
+        assert (
+            issued_for == expected_allowed
+        ), "허용 역할 중 발급이 실제로 일어나지 않은 역할이 있다"
 
 
 # ===========================================================================

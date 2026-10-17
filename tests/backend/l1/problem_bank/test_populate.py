@@ -27,6 +27,7 @@ from whymath_backend.l1.problem_bank.populate import (
     populate_problem_bank,
 )
 from whymath_backend.l1.problem_bank.provenance_gate import ProvenanceMissingError
+from whymath_backend.l3.verification_tier import VerificationTier, stamp_verification_tier
 
 # 원자 code → concept_id(UUID) 맵의 재료(가짜 concept 테이블 — S2-03 재연결 후 태깅은 원자 행).
 # 크로스워크 primary: HK06→10공수1-02-02-1 · HK09→10공수1-02-04-1 · HK10→10공수1-02-05-1 ·
@@ -69,6 +70,9 @@ class _FakeResult:
         return self._rows
 
     def scalar_one(self) -> object:
+        return self._scalar
+
+    def scalar_one_or_none(self) -> object | None:
         return self._scalar
 
     def first(self) -> object | None:
@@ -491,12 +495,59 @@ def test_load_accepts_known_verification_tier(tmp_path: Path) -> None:
     assert records[0].verify.verification_tier == "machine_exhaustive"
 
 
+@pytest.mark.parametrize("tier_value", sorted(t.value for t in VerificationTier))
+def test_load_accepts_every_l3_verification_tier_value(tmp_path: Path, tier_value: str) -> None:
+    # S4-68 — L3가 읽는 9값 전부가 *적재 경로 끝까지*(slug·Problem 검증 포함) 통과한다. 종전엔 레거시 2값만
+    # 허용해 신규 등급(예: finite_exhaustive)을 찍은 레코드가 ProblemCorpusError로 거부됐다.
+    record = _base_record(
+        verify={
+            "conditions": "x**2 - 5*x + 6 = 0",
+            "answer_map": {"x": "3"},
+            "verification_tier": tier_value,
+        }
+    )
+    records = load_problem_bank_records(_write(tmp_path, [record]))
+    assert records[0].verify.verification_tier == tier_value
+
+
+@pytest.mark.parametrize("tier", list(VerificationTier), ids=lambda t: t.value)
+def test_load_roundtrips_every_stamp_verification_tier_output(
+    tmp_path: Path, tier: VerificationTier
+) -> None:
+    # S4-69 — stamp_verification_tier로 찍은 값(레거시 2종 + 신규 7종)이 L1 적재를 통과하고
+    # 원문 그대로 보존된다(alias 해석으로 다른 값이 되지 않는다 — 해석은 읽는 쪽 몫).
+    stamped = stamp_verification_tier(_base_record(), tier)
+    path = _write(tmp_path, [stamped])
+    records = load_problem_bank_records(path)
+    assert records[0].verify.verification_tier == tier.value
+
+
 def test_load_defaults_verification_tier_to_none_when_absent(tmp_path: Path) -> None:
     # 구코퍼스 호환 — verify에 verification_tier가 없으면 None(미각인)으로 남는다.
     record = _base_record()
     path = _write(tmp_path, [record])
     records = load_problem_bank_records(path)
     assert records[0].verify.verification_tier is None
+
+
+def test_load_preserves_authored_by_and_absent_means_none(tmp_path: Path) -> None:
+    # PB-15 — 저작 서명은 불투명 문자열로 보존되고, 키 부재는 None(기록 없음)이다.
+    # 두 방향을 한 파일에서 본다: 기록 있음(값 그대로)·기록 없음(None — 빈 문자열로 접지 않는다).
+    recorded = _base_record(slug="wm-test-author-recorded", authored_by="llm:qwen3:30b-a3b")
+    absent = _base_record(slug="wm-test-author-absent")
+    path = _write(tmp_path, [recorded, absent])
+    by_slug = {r.slug: r for r in load_problem_bank_records(path)}
+    assert by_slug["wm-test-author-recorded"].provenance.authored_by == "llm:qwen3:30b-a3b"
+    assert by_slug["wm-test-author-absent"].provenance.authored_by is None
+
+
+@pytest.mark.parametrize("bad", ["", "   ", 7, ["llm:x"]])
+def test_load_rejects_blank_or_non_string_authored_by(tmp_path: Path, bad: object) -> None:
+    # 키가 있는데 비었거나 문자열이 아니면 저작 단계의 기록 결함이다 — None(기록 없음)으로
+    # 조용히 접으면 "서명이 없다"와 "서명이 깨졌다"가 구분되지 않는다.
+    path = _write(tmp_path, [_base_record(authored_by=bad)])
+    with pytest.raises(ProblemCorpusError, match="authored_by"):
+        load_problem_bank_records(path)
 
 
 def test_load_rejects_unknown_verification_tier(tmp_path: Path) -> None:
@@ -845,7 +896,7 @@ def test_cli_reports_provenance_rows(tmp_path: Path, capsys, monkeypatch) -> Non
     monkeypatch.setattr(
         mod,
         "populate_problem_bank",
-        lambda _s, *, problems_path, store=None: mod.ProblemBankStore.populate(
+        lambda _s, *, problems_path, store=None, overwrite_cms_edits=False: mod.ProblemBankStore.populate(
             _store(engine), mod.load_problem_bank_records(problems_path)
         ),
     )
@@ -868,7 +919,7 @@ def test_cli_distinguishes_zero_provenance_from_silence(
     monkeypatch.setattr(
         mod,
         "populate_problem_bank",
-        lambda _s, *, problems_path, store=None: ProblemBankPopulateReport(
+        lambda _s, *, problems_path, store=None, overwrite_cms_edits=False: ProblemBankPopulateReport(
             problems_loaded=1,
             problem_concepts_loaded=0,
             concepts_skipped=0,
@@ -925,7 +976,11 @@ def test_cli_all_loads_every_corpus_and_totals(tmp_path: Path, capsys, monkeypat
     monkeypatch.setattr(mod, "discover_problem_corpora", lambda root=None: corpora)
 
     def _fake(
-        _s: object, *, problems_path: Path, store: object = None
+        _s: object,
+        *,
+        problems_path: Path,
+        store: object = None,
+        overwrite_cms_edits: bool = False,
     ) -> ProblemBankPopulateReport:
         seen.append(problems_path)
         return ProblemBankPopulateReport(

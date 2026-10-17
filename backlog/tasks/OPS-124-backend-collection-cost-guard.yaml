@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-124-backend-collection-cost-guard
+title: "backend 잡 수집(collection) 비용 가드 — 제외 표지 모듈의 최상단 계산이 xdist 워커마다 반복돼 잡 35분 초과(PR #1512)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 검출기: tests/backend 전 모듈의 수집 비용을 기계로 판정한다. 후보 두 축 중 실측으로 고른다 — (가) CI backend 잡 앞에 `pytest --co -q -m \"not corpus_authoring\"` 소요를 재는 스텝 + 예산(main 실측 15초 대비 넉넉한 상한) (나) AST 거버넌스: `pytestmark = pytest.mark.corpus_authoring` 모듈(및 전 테스트 모듈)의 모듈 최상단 문장에서 생성기·배치 실행(`.items(`·`generate(`·`run_*batch(` 등)을 금지. 판정 근거(오탐·미탐 실측)를 남긴다.\n② 실패 주입: 2026-10-09 사고 형태(`_EXPECTED_TOTAL = sum(len(g.items(s)) ...)` 모듈 상수)를 주입하면 RED, 지연 계산(`functools.cache` 함수)이면 GREEN.\n③ 문서: `corpus_authoring` 마커 설명(pyproject.toml)에 \"표지는 실행을 빼지 수집 비용을 빼지 않는다\"를 병기."
+artifacts: []
+paths:
+  - tests/backend/conftest.py
+  - tests/infra/test_backend_collection_cost.py
+  - src/backend/pyproject.toml
+session: null
+notes: |-
+  사고 경위(2026-10-09): PR #1512 backend 잡이 35분 상한에서 연속 cancelled. 처음엔 저작 측정 테스트를 corpus_authoring 표지로 옮겨 대응했으나 효과가 없었다 — 표지 제외는 수집 뒤에 일어나므로 임포트 비용이 그대로 남는다. 실제 원인은 tests/backend/harness/test_p3_calculus1_diff_batch.py의 모듈 상수가 임포트 때 생성기 전부를 돌린 것(로컬 수집 15초 → 134초). CI에서는 xdist 워커 4개가 커버리지 추적 아래 같은 계산을 반복해 pytest 첫 출력까지 main 72초 vs PR 555초, pytest 단계 14분 vs 32분. 수정 = functools.cache 지연 계산(수집 14.7초 복귀). [정정 2026-10-09] 수집은 증가분의 일부였다 — 수정 뒤 CI에서도 실행 시간이 남아 다시 취소됐다(원인: 은행 전수 측정 7건과 생성기 겹침 감사의 P3 생성기 소진 빌드 · 같은 계열 다음 회차로 사고 대장에 등재 · 대책 HARN-202). 같은 계열 ci-job-timeout-exhausted 3회차 — 앞 두 회의 대책 HARN-202(미러 스텝 시간 회귀)·OPS-100(잡별 여유 감시)은 수집 단계를 따로 보지 않는다.
+  겹침 가능성: 등재 시점(2026-10-09) 타 세션이 번호 OPS-120-ci-job-time-budget-recovery를 원격 예약(claude/charming-darwin-6j2sw5 · 브랜치 미푸시라 내용 미확인)했다. 그쪽이 잡 시간 예산 전반을 다루면 이 태스크의 수집 단계 축과 합칠지 착수 전 확인한다.
+
+  [정정 2026-10-09] notes 치환 — 3회차 원인 서술이 증가분 전부를 수집 비용으로 돌렸던 것을 정정
+updated: 2026-10-09

@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.l3.verify_answer import derive_selected_root
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -189,6 +189,7 @@ def _substitution_check_steps(skeleton: _TrigEqSkeleton) -> list[str]:
     return [f"{skeleton.func}({skeleton.answer}*pi/180)", skeleton.value_expr]
 
 
+@deterministic_generator
 class TrigonometricEquationSkeletonGenerator:
     """삼각방정식 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

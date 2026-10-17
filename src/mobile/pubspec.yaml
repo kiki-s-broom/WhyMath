@@ -31,6 +31,10 @@ dependencies:
   # retrofit_generator도 짝으로 함께 제거(생성 대상이 없어 무의미).
   # 보안
   flutter_secure_storage: ^9.2.0
+  # 기기 단위 비민감 플래그 영속(온보딩 "봤음"·마지막 대화 세션 참조 UUID) — MOB-11 복귀 지원
+  # 최소 착지. 토큰(flutter_secure_storage)과 달리 PII가 아니고 대화 본문은 저장하지 않으므로
+  # OS 보안 저장소가 아닌 shared_preferences로 충분하다(과보안 회피).
+  shared_preferences: ^2.3.0
   # localization — 앱 코드에서 직접 쓰지 않고 flutter_localizations가 전이 의존한다. SDK 버전이
   # 요구하는 intl을 그대로 따르도록 범위를 넓힌다(Flutter 3.24.x=0.19·최신=0.20.2 모두 해소).
   intl: ">=0.19.0 <0.21.0"

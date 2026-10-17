@@ -162,6 +162,8 @@ def run_rephrase_sweep(
             run_rates.append(report.rephrased / report.attempted if report.attempted else 0.0)
             if not reasons:  # 첫 회차 사유 표본만 실어 관측(반복분 중복 방지).
                 reasons = report.unchanged_reason_sample
+        # 온도별 저작 호출의 Langfuse `l3_routing` 배치를 확정(OPS-84 — 짧게 끝나는 CLI).
+        rephraser.flush()
         rate = agg_rephrased / agg_attempted if agg_attempted else 0.0
         rows.append(
             SweepRow(

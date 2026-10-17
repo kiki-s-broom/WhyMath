@@ -49,7 +49,7 @@ from typing import Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -219,6 +219,7 @@ def _natural_answer_format(answer: int) -> AnswerFormat:
     return AnswerFormat.자연수 if answer > 0 else AnswerFormat.실수
 
 
+@deterministic_generator
 class Calculus2TrigIntegralSkeletonGenerator:
     """미적분Ⅱ 삼각함수 적분 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

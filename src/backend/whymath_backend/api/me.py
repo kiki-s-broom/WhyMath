@@ -44,8 +44,6 @@ from __future__ import annotations
 import logging
 import math
 import uuid
-from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal, TypeVar
 
@@ -60,9 +58,13 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from whymath_backend.api._attempt_misconception_scan import (
+    scan_attempt_misconceptions,
+    this_attempt_misconceptions_from,
+)
 from whymath_backend.api._auth import ConsentedUser, CurrentUser, RequireContentAdmin
 from whymath_backend.api._crypto import (
     encrypt_dialogue_content,
@@ -102,6 +104,7 @@ from whymath_backend.db.models.assessment import (
 from whymath_backend.db.models.audit import DeletionAudit, PrivacyAudit
 from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.dialogue import Dialogue
+from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.problem import Problem
 
 # COLLAB-03: 학습시간 통계 좌석의 공급원(l2.learning_metrics_rollup이 적재).
@@ -126,6 +129,7 @@ from whymath_backend.l2.ability_estimation import (
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.attempt_version_pin import resolve_attempt_version_pin
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
     IrtItem,
@@ -211,7 +215,6 @@ from whymath_backend.l4.misconception.attempt_hypothesis_policy import (
     AttemptHypothesisAction,
     decide_attempt_hypothesis_action,
 )
-from whymath_backend.l4.misconception.distractor_link import distractor_link_candidates
 from whymath_backend.l4.misconception.hypothesis_store import (
     apply_candidates,
     get_active_hypotheses,
@@ -244,8 +247,6 @@ from whymath_backend.schema.assessment import (
 from whymath_backend.schema.assessment import StudentAssessment as StudentAssessmentSchema
 from whymath_backend.schema.assessment_evidence import (
     AssessmentEvidence,
-    MisconceptionCandidate,
-    MisconceptionScan,
 )
 from whymath_backend.schema.audit import DeletionAudit as DeletionAuditSchema
 from whymath_backend.schema.audit import PrivacyAudit as PrivacyAuditSchema
@@ -423,13 +424,25 @@ async def _delete_owned_resource(
 ) -> None:
     """본인 소유 리소스 영구 삭제(GDPR) — 204. slice 51/52/53 동형. slice 56: 직속 자식은
     ON DELETE CASCADE로 자동 제거(session→attempt·dialogue→turn)·dialogue.attempt_id는
-    SET NULL. attempt_event(loose ref·FK 아님)는 고아 잔존(설계 한계).
+    SET NULL. attempt_event(loose ref·FK 아님)는 고아 잔존(설계 한계 — SEC-40이 처분을 판정:
+    **유지**. 근거·후속은 `docs/reviews/sec40_evidence_event_erasure_wiring_2026-10-03.md` §4).
+
+    SEC-40: `LearningSession` 삭제는 그 세션의 `evidence_event`(느슨참조·FK 아님 → CASCADE가 못
+    지운다)를 **같은 트랜잭션**으로 함께 지운다. 안 지우면 `deletion_audit`의
+    (user_id, resource_id=세션 ID)와 그 행의 `session_id`를 맞대어 삭제한 세션의 처치 기록을 다시
+    찾을 수 있다(재연결 경로 ⓐ). 증빙 행 삭제가 실패하면 예외가 그대로 올라가 세션 삭제도 커밋되지
+    않는다(부분 삭제 없음). 분기 조건이 `model is LearningSession`이라 이 헬퍼를 쓰는 새 호출자도
+    기본으로 따라온다(호출자가 플래그를 기억해야 하는 구조를 피한다).
 
     slice 57: 삭제와 *동일 트랜잭션*으로 DeletionAudit 1행 적재(GDPR 삭제 증빙·부모만 기록·
     콘텐츠 미저장). user_id=소유자·resource_type/resource_id=대상. 같은 commit이라 삭제↔감사
     원자적(부분 실패 없음).
     """
     row = await _get_owned_or_404(session, model, pk, owner_id, not_found_detail)
+    if model is LearningSession:
+        # SEC-40: 세션 행을 지우기 *전에* 그 세션 ID의 증빙 행을 지운다(소유 확인 뒤 — 타인 세션
+        # ID로 남의 증빙을 지우는 경로가 없다). 같은 트랜잭션이라 아래 commit이 둘을 함께 확정한다.
+        await session.execute(delete(EvidenceEvent).where(EvidenceEvent.session_id == pk))
     await session.delete(row)
     session.add(
         DeletionAudit(
@@ -730,139 +743,6 @@ async def list_my_privacy_audit(
 # 보존기한 회피를 낳는다 — 막아야 할 것은 *무한한* 미래이지 몇 분의 시계 오차가 아니므로,
 # 유계(有界)로 자른다. 5분이면 시계 오차는 흡수하고 보존기한(년 단위)에는 영향이 없다.
 _STARTED_AT_SKEW_TOLERANCE = timedelta(minutes=5)
-
-
-@dataclass(frozen=True)
-class _AttemptMisconceptionScan:
-    """`_scan_attempt_misconceptions`의 결과 — 훑기 3상태 + 게이트 통과 후보.
-
-    능력 구현이 돌려주는 리치 타입을 Core 안에 들이지 않으려는 좌석이다. Core가 읽는 것은
-    `scan`·`candidates` 둘뿐이므로(능력 Protocol이 노출하는 것과 동일) 여기서 그 둘만 고정한다.
-    """
-
-    scan: MisconceptionScan
-    candidates: tuple[MisconceptionCandidate, ...]
-
-
-_NOT_SCANNED = _AttemptMisconceptionScan(scan=MisconceptionScan.NOT_RUN, candidates=())
-"""훑지 않음 — 답안·선지 인덱스 미제출·문항 부재·킬 스위치 OFF. **"오개념 없음"이 아니다.**
-
-정답은 사유가 아니다 — 정답 회차도 오답과 같은 조건으로 훑는다(EOS-123)."""
-
-
-async def _scan_attempt_misconceptions(
-    session: AsyncSession,
-    detector: AttemptMisconceptionDetector,
-    *,
-    problem_id: uuid.UUID,
-    answer: str | None,
-    selected_choice_index: int | None,
-) -> _AttemptMisconceptionScan:
-    """채점 1건에서 오개념 후보를 훑는다 — 재료가 없으면 훑지 않았다고 말한다.
-
-    **독립된 두 채널**을 훑고 결과를 합친다. 둘은 재료도 실패 모드도 다르므로 서로의 실행
-    조건이 되지 않는다 — 한쪽이 못 돌아도 다른 쪽은 돈다:
-
-      ① **텍스트 채널**(EOS-104): 과목 어댑터가 문항 지문 + 제출 답안(자유 텍스트)을 이어
-         오류 서명을 읽는다. 지문이나 답안이 없으면 이 채널은 돌지 않는다.
-      ② **선지 채널**(ASM-06): 학생이 고른 보기 인덱스를 그 문항의 `distractor_map`에
-         대조해 역추적한다(`l4.misconception.distractor_link`). 답안 텍스트도 지문도 필요
-         없다 — 인덱스와 매핑만 있으면 된다. 그래서 "보기만 탭하고 아무것도 쓰지 않은"
-         제출에서 **유일하게** 도는 채널이다(종전엔 그런 제출이 통째로 not_run이었다).
-
-    훑지 않는 조건(두 채널 *모두* 미실행일 때만 `NOT_RUN`): 킬 스위치 OFF ·
-    (텍스트 채널) 답안 미제출·문항 지문 부재(또는 지문에서 식 추출 실패) · (선지 채널) 인덱스
-    미보고·선지 플래그 OFF·매핑 부재. 이들을 빈 후보 리스트로 뭉뚱그리지 않는 이유는, 그러면
-    하류가 *미측정*을 *측정된 0*으로 읽기 때문이다(`MisconceptionScan` 3상태의 존재 이유).
-
-    **정답 회차도 같은 조건으로 훑는다(EOS-123).** 이 함수는 정오답을 받지 않는다. 종전에는
-    정답을 두 채널 모두에서 조기 반환했는데, 그러면 호출자가 정답 회차의 가설을 전혀 움직이지
-    못해 "다르게 틀리면 신뢰가 내려가고 맞히면 그대로"인 역방향 비대칭이 생겼다(페르소나 C
-    0.85 → 0.74 → 0.74). 정답 전용 조건을 따로 두지 않고 조기 반환만 걷은 이유는, 그래야 정답이
-    감쇠를 받는 조건과 오답이 감쇠를 받는 조건이 **이 함수 하나로 같게** 정해지기 때문이다 —
-    정답 쪽 조건이 넓으면 같은 문항에서 오답은 못 내리는데 정답만 내리는 거울상 비대칭이 된다.
-
-    정답 답안은 텍스트 채널의 ⓪ 거짓 등식 가드가 막아 후보가 없는 것이 정상이고(`RAN_NO_CANDIDATE`),
-    정답 선지 인덱스는 `distractor_map`(오답 선지만 담는다)에 없어 역시 후보가 없다. 정답으로
-    보고됐는데 후보가 나오면 그것은 보고와 서버 관측의 **충돌**이다. 훑기 결과를 가설에 어떻게
-    반영할지(충돌이면 보류)는 호출자가 `l4.misconception.attempt_hypothesis_policy`로 정한다 —
-    이 함수는 본 것을 그대로 보고할 뿐이다.
-    """
-    if not get_settings().l4_attempt_misconception_scan_enabled:
-        return _NOT_SCANNED
-
-    # ── 채널 ②(선지) — 텍스트보다 먼저. DB 1회(distractor_map 단일 컬럼)이고, 인덱스를
-    # 보고하지 않았으면 그 조회조차 하지 않는다(reactive retrieval — 카탈로그·다른 오개념을
-    # 미리 싣지 않는다·CLAUDE.md 협상 불가).
-    choice_candidates: tuple[MisconceptionCandidate, ...] = ()
-    choice_ran = False
-    if selected_choice_index is not None and get_settings().l4_distractor_link_enabled:
-        distractor_map = await session.scalar(
-            select(Problem.distractor_map).where(Problem.problem_id == problem_id)
-        )
-        # 매핑이 아예 없는 문항이면 이 채널은 *돌 재료가 없다* — 돌았는데 0건인 것과 구분해
-        # ran으로 세지 않는다(작동한 비율을 부풀리지 않는다).
-        if distractor_map:
-            choice_ran = True
-            choice_candidates = distractor_link_candidates(distractor_map, selected_choice_index)
-
-    # ── 채널 ①(텍스트) — 기존 EOS-104 경로. 조건·폴백·로그 전부 불변.
-    text_candidates: tuple[MisconceptionCandidate, ...] = ()
-    text_scan = MisconceptionScan.NOT_RUN
-    if answer is not None:
-        question_text = await session.scalar(
-            select(Problem.question_text).where(Problem.problem_id == problem_id)
-        )
-        if question_text:
-            # 능력은 **주입받는다**(app.state 등록분·EOS-89 push 형태) — Core가 합성 루트를
-            # 이름으로 알지 않는다. Core가 아는 것은 인터페이스 타입 하나뿐이다.
-            try:
-                result = detector.scan_attempt_answer(
-                    question_text=question_text, student_answer=answer
-                )
-            except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다(아래 주석)
-                # **never-break**: 이 시점에 attempt는 *이미 commit됐다*. 훑기는 관측이므로
-                # 여기서 터지면 기록된 제출이 500으로 돌아가 학생이 다시 풀게 된다 — 관측
-                # 실패가 채점 실패를 만드는 셈. 그래서 삼키되, **예외 타입명을 반드시 남긴다**
-                # (CLAUDE.md 침묵 실패 금지 — 무타입 경고가 langfuse v2 쓰기 8일 무증상 전멸의
-                # 원인이었다). 학생 답안·지문은 로그에 넣지 않는다(PII).
-                _logger.warning(
-                    "오개념 훑기 실패 — 채점은 계속한다(텍스트 채널 not_run). "
-                    "exc_type=%s problem_id=%s",
-                    type(exc).__name__,
-                    problem_id,
-                )
-            else:
-                text_scan = result.scan
-                text_candidates = tuple(result.candidates)
-
-    # ── 합류. 같은 오개념을 두 채널이 함께 지목하면 *더 높은 신뢰도 하나*만 남긴다 — 같은
-    # 사실의 사본 둘이 가설 저장소에서 서로를 덮어쓰는 순서 의존을 만들지 않기 위해서다.
-    merged = _merge_misconception_candidates(choice_candidates, text_candidates)
-    text_ran = text_scan is not MisconceptionScan.NOT_RUN
-    if not choice_ran and not text_ran:
-        return _NOT_SCANNED
-    scan = MisconceptionScan.RAN_WITH_CANDIDATES if merged else MisconceptionScan.RAN_NO_CANDIDATE
-    return _AttemptMisconceptionScan(scan=scan, candidates=merged)
-
-
-def _merge_misconception_candidates(
-    *channels: Sequence[MisconceptionCandidate],
-) -> tuple[MisconceptionCandidate, ...]:
-    """여러 채널의 오개념 후보를 id 기준으로 합친다 — 중복은 신뢰도 높은 쪽만, 순서는 결정론.
-
-    앞 채널의 등장 순서를 보존하고(첫 등장 위치 고정), 같은 id가 뒤에서 더 높은 신뢰도로
-    다시 나오면 *그 자리에서* 값만 교체한다. 정렬을 새로 하지 않는 이유는 각 채널이 이미
-    자기 기준으로 정렬돼 왔고, 여기서 재정렬하면 채널 간 신뢰도 척도가 서로 다른데도 한 줄로
-    비교하는 셈이 되기 때문이다(`semantic_similarity`와 `confidence`를 섞지 않는 것과 동형).
-    """
-    merged: dict[str, MisconceptionCandidate] = {}
-    for channel in channels:
-        for candidate in channel:
-            existing = merged.get(candidate.misconception_id)
-            if existing is None or candidate.confidence > existing.confidence:
-                merged[candidate.misconception_id] = candidate
-    return tuple(merged.values())
 
 
 class AttemptSubmitRequest(BaseModel):
@@ -1233,13 +1113,21 @@ async def submit_attempt(
     # EOS-131: 이 시도가 속한 학습 세션을 **서버가** 정한다(30분 유휴 규칙). 수신 시각을 그대로
     # 넘겨 `last_activity_at == ingested_at`이 되게 한다 — 보존 파기의 세션 기준이 이 값을 쓴다.
     # never-break: 세션 기록이 실패해도 채점 제출은 진행하고(None), 그때만 클라 신고값으로 폴백.
+    # P3-27: 시도가 실어 온 문항의 대표 개념을 세션에 채운다
+    # (트레이스 `concept_selected`가 개념을 싣게).
     learning_session_id = await record_learning_activity(
-        session, user_id=user.user_id, now=received_at
+        session, user_id=user.user_id, now=received_at, problem_id=body.problem_id
     )
+    # EOS-47: 이 시도가 푼 문항의 **판**과 채점 환경을 접수 시점에 고정한다 — 문항이 나중에 수정돼도
+    # 시도는 푼 당시의 판을 가리킨다. 판 포인터가 없는 문항은 None(날조 금지)이고, 이 호출은 실패를
+    # 삼키지 않는다(`l2/attempt_version_pin` 모듈 docstring: 읽기 실패 뒤의 INSERT는 어차피 불가).
+    version_pin = await resolve_attempt_version_pin(session, body.problem_id)
     attempt = ProblemAttempt(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답에 즉시 사용)
         user_id=user.user_id,
         problem_id=body.problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         session_id=learning_session_id if learning_session_id is not None else body.session_id,
         is_correct=body.is_correct,
         student_answer=student_answer_plain,
@@ -1275,7 +1163,7 @@ async def submit_attempt(
     # 귀속(핵심): 후보의 재료가 **이 attempt에서만** 나오므로 attempt 귀속이 정의상 성립한다.
     # 대화 턴의 게이트 매칭을 옮겨 오지 않는 이유가 이것이다 — 그쪽은 *턴* 단위라 옮기면
     # "이 답안의 오개념 후보"가 거짓 주장이 된다(EOS-104 acceptance ③).
-    misconception_scan_result = await _scan_attempt_misconceptions(
+    misconception_scan_result = await scan_attempt_misconceptions(
         session,
         misconception_detector,
         problem_id=body.problem_id,
@@ -1345,13 +1233,8 @@ async def submit_attempt(
         # 오개념이 앞서 쌓였다면 이번 증거로 강화된 값이 교정 경로의 근거가 된다.
         # `apply_candidates`와 같은 조건(`gate_passed`)으로 거른다 — 저장소가 무시한 후보를 여기서
         # 되살리지 않는다(카탈로그 밖 id는 저장소가 이미 뺐으므로 갱신 세트에 나타나지 않는다).
-        scanned_ids = {
-            c.misconception_id for c in misconception_scan_result.candidates if c.gate_passed
-        }
-        this_attempt_misconceptions = tuple(
-            (h.misconception_id, h.confidence)
-            for h in active_hypotheses
-            if h.misconception_id in scanned_ids
+        this_attempt_misconceptions = this_attempt_misconceptions_from(
+            active_hypotheses, misconception_scan_result.candidates
         )
     elif hypothesis_action is AttemptHypothesisAction.DECAY_ONLY:
         # 반환값을 쓰지 않는다 — 정답 회차는 복습 코칭을 만들지 않는다(바로 위 APPLY 분기 주석).
@@ -1412,9 +1295,11 @@ async def submit_attempt(
     # 스캔 후보의 가설 신뢰이기 때문이다(`this_attempt_misconceptions` · EOS-138 ②). 조립기는 가설
     # 테이블을 다시 읽지 않는다: 학생 전체 활성 가설을 읽던 종전 방식이 옛 가설로 R3를 발화시켰다.
     #
-    # 한계(명시): `prerequisite_gap_concept_ids`의 생산자는 이 경로에 배선하지 않았다 —
-    # 개념 그래프 재귀 CTE 순회가 응답 제출마다 돌기엔 무겁다. 따라서 규칙 R4는 이 경로에서
-    # 매치되지 않는다. 숨기지 않고 적어 둔다(`l2/learning_state_evidence.py` 생산자 배선 현황).
+    # 선수 결손 규칙(R4)은 없다(EOS-127): 이 경로는 선수 결손 증거를 만들지 않는다. 선수 하강은
+    # 상태 머신 전이가 아니라 다음 문항 선택이 요청 시점에 한다(R6 선수 탐침 ·
+    # `l2/learning_state_recommendation`). 제출마다 선수 생산자를 돌리면 같은 판단을 이중으로 하고
+    # R6 하강을 가로챈다 — 판정·실측:
+    # `docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md`.
     # 이름 주의: `evidence`는 EOS-12의 `AssessmentEvidence`(응답 필드)가 쓰고 있다. 상태 머신이
     # 읽는 정책 입력(`AttemptEvidence`)은 공용 진입점 안에서 조립되어 이 함수에 이름이 없다.
     transition = await advance_on_graded_attempt(
@@ -1773,7 +1658,13 @@ _CI_Z_95 = 1.96  # 95% 신뢰구간 z값(표준정규 양측 0.025)
 class AbilityResponse(BaseModel):
     """`GET /v1/me/ability` 응답 — IRT 능력 추정(θ + 측정 정밀도)."""
 
-    theta: float = Field(description="IRT 능력 추정 θ(logit). 채점 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "IRT 능력 추정 θ(logit). 채점 응답 없으면 0. 전부 정답(또는 전부 오답)인 이력에서는 "
+            "MLE가 존재하지 않아 ±4.0으로 클램프된 값이며 측정값이 아니다(EOS-147 — "
+            "`/me/next-problem`의 `theta_boundary`가 같은 사실을 표시한다)."
+        )
+    )
     response_count: int = Field(description="추정에 쓰인 채점(is_correct 있는) 풀이 수.")
     standard_error: float | None = Field(
         default=None,
@@ -1952,7 +1843,13 @@ class AbilityHistoryPoint(BaseModel):
     """`GET /v1/me/ability/history`의 한 시점 — k번째 채점 직후 누적 θ."""
 
     as_of: datetime = Field(description="이 지점에 반영된 마지막 채점 시각(created_at).")
-    theta: float = Field(description="이 시점까지 누적 응답으로 추정한 θ(logit).")
+    theta: float = Field(
+        description=(
+            "이 시점까지 누적 응답으로 추정한 θ(logit). 전부 정답(또는 전부 오답)인 이력에서는 "
+            "MLE가 존재하지 않아 ±4.0으로 클램프된 값이며 측정값이 아니다(EOS-147 — "
+            "`/me/next-problem`의 `theta_boundary`가 같은 사실을 표시한다)."
+        )
+    )
     standard_error: float | None = Field(
         default=None, description="이 시점 θ의 표준오차. 측정 불가면 null."
     )
@@ -2603,7 +2500,33 @@ class NextProblemResponse(BaseModel):
         default=None,
         description="추천 문항 id. 후보(미응답·난이도 라벨 보유)가 없으면 null.",
     )
-    theta: float = Field(description="추천에 쓰인 현재 능력 추정 θ(logit). 응답 없으면 0.")
+    theta: float = Field(
+        description=(
+            "현재 능력 추정 θ(logit) — MLE. 응답 없으면 0. 전부 정답/오답 이력에서는 MLE가 "
+            "존재하지 않아 발산 경계(±4.0)이며 **측정값이 아니다**(`theta_boundary`가 그 사실을 "
+            "말한다). 출제 후보를 고르는 데 실제 쓴 θ는 `selection_theta`다(EOS-147 — 종전 설명은 "
+            "'추천에 쓰인'이었으나 전부 정답 이력에서 그렇지 않게 됐다)."
+        )
+    )
+    selection_theta: float = Field(
+        description=(
+            "EOS-147: 후보를 고르는 데 **실제로 쓴** θ(logit). 전부 정답 이력이면 "
+            "`min(4.0, max(0.0, 맞힌 최고 난이도 b + 0.5))`(잠정 — 판정문 §4-2·`EOS-176`이 보정 "
+            "소유)이고, 그 외에는 `theta`와 같다. `theta`와 다르면 경계 규칙이 발동했다는 "
+            "관측이다 — 항상 채워지므로 null을 `theta`와 같다고 추측하지 않는다."
+        )
+    )
+    theta_boundary: Literal["upper", "lower"] | None = Field(
+        default=None,
+        description=(
+            "EOS-147: 추정 θ가 MLE 발산 경계에 붙었는가 — **측정 한계 표지**다. `upper`=전부 "
+            "정답(`theta`=4.0은 측정값이 아니라 클램프 · `selection_theta`가 표적) · "
+            "`lower`=전부 오답(관측만 — 선택은 `theta` 그대로) · null=응답 이력이 경계가 "
+            "아님. null이라고 `theta`가 ±4.0이 아니라는 뜻은 아니다(혼합 이력에서 MLE가 범위를 "
+            "넘어 클램프된 경우도 null이다). 계측 신호이므로 학생 화면에 θ·능력치로 노출하지 "
+            "않는다(REC-10 ④)."
+        ),
+    )
     difficulty: float | None = Field(
         default=None,
         description="추천 문항의 difficulty_overall(전문가 1~5). 없으면 null.",
@@ -2762,6 +2685,13 @@ async def recommend_next_problem(
     `measurement_sufficient` + REC-01/04 정직 표기 5필드 + EOS-14 `reason`. EOS-19 신규 2필드는
     `action`(이 추천이 요구하는 학습 행위)과 `target_concept`(다음에 다뤄야 할 개념)이고,
     EOS-124 신규 1필드는 `intent_resolution`(그 행위가 실제 문항으로 어떻게 해소됐나)이다.
+    EOS-147 신규 2필드는 `selection_theta`(후보를 고르는 데 실제 쓴 θ)와 `theta_boundary`(추정 θ가
+    MLE 발산 경계인가 — 측정 한계 표지이며 학생 화면에 노출하지 않는다)다 — 전부 정답 이력에서
+    `theta`(4.0)는 측정값이 아닌 클램프라 표적으로 쓰지 않고(맞힌 최고 난이도 + 0.5 로짓 · 잠정 ·
+    `EOS-176`이 보정 소유), 그 사실을 이 두 필드가 말한다(`theta`·`standard_error`·
+    `measurement_sufficient`는 불변). 그 이력의 선택이 바뀌므로 `policy_version`은 `cat_v4`(수능
+    `suneung_v3`)였고, EOS-39가 코치 도움 완료를 선택 θ의 입력에서 실패로 접으면서 `cat_v5`(수능
+    `suneung_v4`)로 올렸다 — 응답 필드는 그대로이고 접힌 문항 수·미상 수는 처치 기록에만 남는다.
     두 정책 모두 `target_concept`은 추천 문항의 대표 개념과 같다 — 정책 산출 객체가 생성 시점에
     그 정렬을 검증하므로(`NextProblemOutcome._aligned_when_declared`) 어긋난 응답은 여기까지
     오지 못한다.
@@ -2804,6 +2734,10 @@ async def recommend_next_problem(
             session,
             problem_id=outcome.problem_id,
             theta=outcome.theta,
+            selection_theta=outcome.selection_theta,
+            theta_boundary=outcome.theta_boundary,
+            selection_help_count=outcome.selection_help_count,
+            selection_hint_unknown_count=outcome.selection_hint_unknown_count,
             pool_size=outcome.candidate_pool_size,
             applied_weights=outcome.applied_weights,
             mode=mode,
@@ -2827,6 +2761,11 @@ async def recommend_next_problem(
     return NextProblemResponse(
         problem_id=outcome.problem_id,
         theta=outcome.theta,
+        # EOS-147: 두 정책은 항상 채운다. None은 이 필드를 모르는 생성자뿐이며 추정 θ와 같다.
+        selection_theta=(
+            outcome.selection_theta if outcome.selection_theta is not None else outcome.theta
+        ),
+        theta_boundary=outcome.theta_boundary,
         difficulty=outcome.difficulty,
         standard_error=outcome.standard_error,
         measurement_sufficient=outcome.measurement_sufficient,
@@ -3605,6 +3544,7 @@ async def erase_my_account(
     body: AccountErasureRequest,
     user: CurrentUser,
     session: SessionDep,
+    settings: SettingsDep,
 ) -> AccountErasureResponse:
     """삭제권(R11) — 본인 계정의 *모든* 학생-연결 데이터를 단일 트랜잭션으로 영구 삭제.
 
@@ -3629,7 +3569,8 @@ async def erase_my_account(
         )
     # 삭제 후 user 객체 만료(expire_on_commit)에 대비해 user_id를 먼저 포획.
     user_id = user.user_id
-    report = await erase_user(session, user_id=user_id)
+    # SEC-40: 세션 축 증빙 행의 HMAC 바인딩 일치 삭제에 jwt 비밀키가 필요해 settings를 넘긴다.
+    report = await erase_user(session, user_id=user_id, settings=settings)
     await session.commit()
     # ops 가시화 — RDB 밖 store(Redis·Langfuse)는 이 TX가 못 지운다(report.pending_external).
     # 누락을 조용히 넘기지 않도록 알림(store명·user_id만·키 패턴 미로깅) — 별도 삭제 필요.
@@ -3822,8 +3763,10 @@ class GrowthEvidenceBrierView(BaseModel):
 class GrowthEvidenceResponse(BaseModel):
     """`GET /v1/me/growth-evidence` 응답 — 성장 증거 학생 안전 노출(노출 계약 경유 유일 표면).
 
-    `SurrogateMetrics`의 `STUDENT_VISIBLE` 9지표(`calibration_brier` 제외) + Brier 서술
-    1종만 필드로 존재한다. **내부 전용 2종(② 진단정확도·④ 턴당 토큰 — 시스템 품질/비용
+    `SurrogateMetrics`의 `STUDENT_VISIBLE`·`PROVISIONAL` 10지표(`calibration_brier` 제외) +
+    Brier 서술 1종만 필드로 존재한다(계약 표와의 양방향 일치는
+    `tests/backend/api/test_exposure_contract_serving_crosswalk.py`가 기계로 강제한다 — PED-28).
+    **내부 전용 5종(② 진단정확도·④ 턴당 토큰·⑫⑬⑭ 튜터 행태·동기화 — 시스템 품질/비용
     지표)은 이 스키마 어디에도 필드가 없다** — `INTERNAL_ONLY` 계층이라 런타임에 걸러지는
     것이 아니라 애초에 필드 자체가 없다(구조적 배제 — 필터는 꺼질 수 있으나 부재는 꺼질
     수 없다는 태스크 설계 원칙). R15 결합 판정 원본(교정기 함정 verdict 포함)도 이 스키마에
@@ -3859,6 +3802,11 @@ class GrowthEvidenceResponse(BaseModel):
     mastery_gain_rate: GrowthEvidenceMetricView = Field(description="⑨ BKT 숙달 증가율.")
     misconception_resolution_rate: GrowthEvidenceMetricView = Field(description="⑩ 오개념 해소율.")
     self_solve_rate: GrowthEvidenceMetricView = Field(description="⑪ 스스로 풀이 도달율.")
+    # ⑯ 결손 복구 리드타임(PED-13) — 계약이 STUDENT_VISIBLE로 판정했는데 이 스키마에 자리가 없던
+    # 드리프트를 PED-28이 상환했다(자기 대비 축 — 또래·평균 대비 파생은 계약이 의도적으로 부재).
+    gap_recovery_leadtime_days: GrowthEvidenceMetricView = Field(
+        description="⑯ 결손 복구 리드타임(경과 일수, 자기 대비)."
+    )
     # ② 진단정확도·④ 턴당 토큰 — INTERNAL_ONLY 2종은 여기 필드가 없다(구조적 배제. 값을
     # 넣고 걸러내는 게 아니라 애초에 자리 자체를 만들지 않는다).
 
@@ -3993,6 +3941,9 @@ async def get_my_growth_evidence(
         ),
         self_solve_rate=_render_growth_evidence_metric(
             metrics, "self_solve_rate", exposure_by_field
+        ),
+        gap_recovery_leadtime_days=_render_growth_evidence_metric(
+            metrics, "gap_recovery_leadtime_days", exposure_by_field
         ),
         calibration_brier=GrowthEvidenceBrierView(
             narrative=narrate_calibration_brier(metrics.calibration_brier.value)

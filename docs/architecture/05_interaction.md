@@ -45,7 +45,7 @@
 - 텍스트 대비 4.5:1+
 - 최소 탭 영역 48x48 dp (Android 탭 타깃 가이드라인·실 게이트 `androidTapTargetGuideline` 기준값 — 정본 단일값.
   목표 준수 레벨·현재 달성 현황표는 `docs/design/ui/06_design_system.md` §7 참조)
-- TTS 통합 — **수식 음성화(Math-to-Speech)**: 어려운 본질은 오디오 합성(클라 `flutter_tts`)이
+- TTS 통합 — **수식 음성화(Math-to-Speech)**: 어려운 본질은 오디오 합성(클라 측)이
   아니라 *LaTeX/수식구조 → 모호성 없는·학년 적합 한국어 낭독 문자열 변환*이다(수학 의미 분해가
   필요한 코어 로직). 따라서 `Visualization`·`LearningScene`처럼 **`SpeechSpec`(선언적 낭독 명세)을
   코어가 산출**하고 클라는 합성만 한다(표현≠의미·슬89). 변환은 *결정론 규칙 엔진*(LLM 0·환각 0·
@@ -53,6 +53,9 @@
   `l3/speech_parse.py` · 사전·학년 프로파일 데이터 L4 `l4/speech/` · 오케스트레이션·HTTP L5
   `api/speech.py`(`POST /v1/speech/latex`). 학년(초등/중등/고등/대학)은 같은 구조를 다르게 읽는
   프로파일 파라미터. 미지 기호는 `unresolved_symbols`로 *조용히 버리지 않고* 정직 노출.
+  **현행(2026-08-11 실측): 클라 합성 경로 0** — 유일한 후보였던 `flutter_tts`가 Gradle
+  비호환 실측으로 `src/mobile/pubspec.yaml`에서 제거됐다. 서버 축만 완비이며 "클라만 붙이면
+  된다"가 아니다(재도입 = 실기기 Gradle 호환 재검증 선행 · `06_design_system.md` §7 TTS 행).
 - 색맹 친화
 
 ## 핵심 흐름 — 학생 메시지 1건

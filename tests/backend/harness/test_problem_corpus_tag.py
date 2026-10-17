@@ -63,6 +63,27 @@ class TestRunCorpusTag:
         assert report.pattern_counts == {"CONDITION_LIST": 4, "INDUCTIVE_SEQUENCE": 4}
         assert out.read_bytes() == src.read_bytes()
 
+    def test_corpus_with_recorded_author_is_accepted_and_preserved(self, tmp_path: Path) -> None:
+        # PB-15 — 저작 서명(`authored_by`)이 기록된 코퍼스를 이 도구가 거부하지 않는다.
+        # `Problem`은 extra="forbid"라 `_AUTHORING_KEYS`에 없는 키는 검증에서 터진다 — 서명을
+        # 코퍼스에 싣기 시작하면 이 도구(와 같은 상수를 쓰는 다른 2개 도구)가 깨질 수 있었다.
+        # 서명 키는 시그니처 재유도와 무관하므로 원문 줄이 바이트 그대로 보존돼야 한다.
+        src = tmp_path / "src.jsonl"
+        signed = tmp_path / "signed.jsonl"
+        out = tmp_path / "out.jsonl"
+        _make_corpus(src)
+        lines = []
+        for line in src.read_text(encoding="utf-8").splitlines():
+            data = json.loads(line)
+            data["authored_by"] = "llm:qwen3:30b-a3b"
+            lines.append(json.dumps(data, ensure_ascii=False))
+        signed.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        report = run_corpus_tag(in_path=signed, out_path=out)
+
+        assert report.total == 7 and report.changed == 0
+        assert out.read_bytes() == signed.read_bytes()
+
     def test_retag_stripped_corpus_matches_batch_output(self, tmp_path: Path) -> None:
         # 태깅이 비워진 코퍼스를 재태깅 → 배치 산출물과 바이트 동일(태거=배치 단일 권위 정합).
         src = tmp_path / "src.jsonl"

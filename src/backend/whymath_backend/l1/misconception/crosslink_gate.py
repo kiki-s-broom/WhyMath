@@ -10,9 +10,11 @@ contract.md`와 1:1·`test_crosslink_gate_contract`가 드리프트 동결). 수
 
 **두 게이트(같은 정본)**:
   - **promotion**(l4 승인분): `promotion_violations` — 승인 행 서명(reviewer·reviewed_on) 필수·
-    직접매핑 승인은 confidence ≥ 임계·kebab_id는 카탈로그 실재.
+    직접매핑 승인은 confidence ≥ 임계·kebab_id는 카탈로그 실재·**직접매핑만 승인 가능**
+    (부분매핑·개념겹침은 승인해도 기본 적재 금지 — MISC-63).
   - **load**(l1 로더 경계): `load_gate_violations` — 적재 행은 `method="manual"`이고 note에
-    검수 서명 stamp가 있어야 한다(candidate/embedding·미서명 우회 거부).
+    검수 서명 stamp가 있어야 하며 **link_type은 직접매핑**이어야 한다(candidate/embedding·미서명·
+    비직접매핑 우회 거부).
 
 **계층 규칙**: 이 모듈은 **l1**이라 l1 loader·l4 review가 모두 import한다(l4→l1 허용·역방향 금지).
 카탈로그 멤버십은 **주입**(`known_kebab_ids`)해 계층 무관 순수를 유지한다(l1이 l4 `CATALOG_BY_ID`를
@@ -73,6 +75,15 @@ def is_signed(note: str | None) -> bool:
     return note is not None and SIGNATURE_RE.search(note) is not None
 
 
+def non_direct_load_message(link_type: str) -> str:
+    """비직접매핑 행의 적재 거부 사유 — promote·load 두 게이트가 같은 문구를 쓴다."""
+    return (
+        f"link_type='{link_type}'는 적재 불가 — 부분매핑·개념겹침은 승인해도 적재하지 않는다"
+        f"(MISC-63). 예외 경로: 검수 큐에서 link_type을 '{DIRECT_LINK_TYPE}'으로 승격하고 "
+        f"confidence ≥ {DIRECT_MIN_CONFIDENCE}를 기입한 뒤 재서명"
+    )
+
+
 def promotion_violations(
     *,
     kebab_id: str,
@@ -98,6 +109,9 @@ def promotion_violations(
         return violations
     if reviewer is None or reviewed_on is None:
         violations.append(f"{where}: 승인 행에 검수 서명(reviewer·reviewed_on) 누락")
+    if link_type != DIRECT_LINK_TYPE:
+        # 적재 자격(MISC-63) — 부분매핑·개념겹침은 승인해도 기본 적재 금지. 예외 경로는 하나뿐이다.
+        violations.append(f"{where}: {non_direct_load_message(link_type)}")
     if link_type == DIRECT_LINK_TYPE and (confidence is None or confidence < DIRECT_MIN_CONFIDENCE):
         violations.append(
             f"{where}: 직접매핑 승인은 confidence ≥ {DIRECT_MIN_CONFIDENCE} 필수"
@@ -122,6 +136,9 @@ def load_gate_violations(rows: Sequence[MisconceptionCrosslink]) -> list[str]:
                 f"{where}: method='{row.method}'는 적재 불가 — 검수 승격(promote) 산출물"
                 f"(method='{LOADABLE_METHOD}')만 적재한다(검수 우회 차단)"
             )
+        if row.link_type != DIRECT_LINK_TYPE:
+            # promote를 우회한 손수 만든 crosslinks JSON도 비직접매핑은 적재하지 못한다(MISC-63).
+            violations.append(f"{where}: {non_direct_load_message(row.link_type)}")
         if not is_signed(row.note):
             violations.append(
                 f"{where}: note에 검수 서명(검수:{{reviewer}} {{날짜}}) 없음 — "
@@ -144,6 +161,7 @@ __all__ = [
     "SIGNATURE_RE",
     "is_signed",
     "load_gate_violations",
+    "non_direct_load_message",
     "promotion_violations",
     "sign",
 ]

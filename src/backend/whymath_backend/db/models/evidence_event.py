@@ -25,7 +25,11 @@ B1: 미성년 원문 발화 평문 저장 금지 (CLAUDE.md 절대 금기)
 봉투 암호화(AES-256-GCM) 선례를 미러한다:
   - `payload_encrypted`(LargeBinary·nullable) — 마스터 키(DB 밖·env)로 암호화된 본문.
   - `payload_nonce`(LargeBinary·nullable) — 96-bit nonce. 둘 다 NULL이면 원문 없음(메타만).
-  - `retention_until`(TIMESTAMPTZ·nullable) — 파기 스케줄(privacy/retention.py 소관).
+  - `retention_until`(TIMESTAMPTZ·nullable) — 행별 파기 만료일 *예약 컬럼*. 이 값을 읽는 파기
+    경로도, 채우는 writer도 현재 없다(SEC-41 실측: `EvidenceEvent(...)` writer 3곳 모두 미설정 ·
+    `EvidenceEventStore.log`는 호출처 0건·기본 None). 보존 파기는 `time` 기준 균일 창이다 —
+    `privacy/retention.py`의 `_RETENTION_PLAN`(모듈 docstring ⓐ). 예전 서술("retention.py
+    소관")은 읽는 코드가 없는 상태에서 소관만 선언한 것이었다.
 비민감 메타(문항 ID·유형 등)만 평문 `meta`(JSONB)에 둔다. 암호화-at-write는 handler/헬퍼 층이
 담당하고(순수 seam에 cipher 미주입·dialogue 선례), 이 좌석에는 컬럼만 두고 가짜 CHECK를 만들지
 않는다. **schema/ Pydantic 표면·round-trip seam을 신설하지 않으므로** `dialogue_turn`의
@@ -97,7 +101,8 @@ class EvidenceEvent(Base):
     payload_encrypted: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
     # 96-bit nonce. 둘 다 NULL이면 원문 없음(메타만). 키가 DB 밖이라 dump 단독 복호 불가.
     payload_nonce: Mapped[bytes | None] = mapped_column(sa.LargeBinary)
-    # 파기 스케줄(privacy/retention.py 소관·nullable).
+    # 행별 파기 만료일 예약 컬럼 — 읽는 파기 경로·채우는 writer 모두 없다(위 docstring·SEC-41).
+    # 실제 보존 파기는 `time` 기준(`privacy/retention.py` `_RETENTION_PLAN`).
     retention_until: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
     __table_args__ = (

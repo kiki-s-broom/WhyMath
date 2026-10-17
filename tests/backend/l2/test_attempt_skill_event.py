@@ -121,9 +121,27 @@ async def test_event_at_is_server_time_and_event_time_stays_null() -> None:
     assert event.event_time is None
 
 
-async def test_source_labels_are_closed_two() -> None:
-    """경로 라벨은 폐쇄 2종 — 기록률 리포트의 경로별 분모가 이 집합에 의존한다."""
-    assert {s.value for s in AttemptSource} == {"attempt_submit", "coach_completion"}
+async def test_source_labels_are_closed_three() -> None:
+    """경로 라벨은 폐쇄 3종 — 기록률 리포트의 경로별 분모가 이 집합에 의존한다."""
+    assert {s.value for s in AttemptSource} == {
+        "attempt_submit",
+        "coach_completion",
+        "coach_wrong_submission",
+    }
+
+
+async def test_coach_wrong_submission_records_its_own_label() -> None:
+    """EOS-146 — 코치 서버 판정 오답 제출은 자기 라벨로 남는다(완료 경로 분모와 섞이지 않는다).
+
+    변별력: `coach_completion`으로 적재하면 이 단언이 깨진다 — 완료 경로의 기록률 분모에 오답
+    제출이 섞이는 것이 바로 이 라벨을 따로 둔 이유다.
+    """
+    _, event = await _record(
+        is_correct=False,
+        skill_ids=["skill.a"],
+        source=AttemptSource.coach_wrong_submission,
+    )
+    assert event.event_data == {"is_correct": False, "source": "coach_wrong_submission"}
 
 
 class TestCommitFailureIsAbsorbedButNotSilent:

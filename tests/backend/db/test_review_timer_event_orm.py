@@ -120,11 +120,16 @@ class TestNoStudentAxis:
     def test_not_in_erasure_plan_nor_exemptions(self) -> None:
         """삭제권 계획·허용목록 둘 다 밖(의도) + 스윕 소유 축 미보유 실측(추측 금지).
 
-        완전성 스윕(`test_erasure_plan_completeness`)의 소유 축(SEC-35 이후 *`user_profile.
-        user_id` FK 보유* ∪ *`_ERASURE_PLAN` 파생 컬럼명 보유* — 정본은 그 파일)을 이 테이블이
-        어느 쪽으로도 보유하지 않으므로, 계획에도 허용목록에도 없이 스윕이 green이어야 한다 — 그 스윕 자체는 privacy 스위트가 실행한다
-        (본 테스트는 판정 전제 3축을 지역화: 소유 컬럼 0·계획 밖·허용목록 밖). 학생 축 컬럼을
-        추가하는 순간 위 컬럼 부재 테스트와 완전성 스윕이 **함께** red가 된다(양방향 변별력).
+        완전성 스윕(`test_erasure_plan_completeness`)의 소유 축은 세 갈래의 합집합이다 —
+        (A) *`user_profile.user_id` FK 보유* ∪ (B) *`_ERASURE_PLAN` 파생 컬럼명 보유* ∪ (C) *학생
+        세션 축*(SEC-39 · 정본은 그 파일). 이 테이블은 (A)·(B)를 구조적으로 보유하지 않고,
+        (C)의 이름 절(`*_session_id`)에는 `review_session_id`가 **걸리지만** 검수자 세션 상관 id라
+        그 파일의 `NON_STUDENT_SESSION_COLUMNS`가 사유와 함께 제외한다 — 그래서 계획에도
+        허용목록에도 없이 스윕이 green이어야 한다. 그 스윕 자체는 privacy 스위트가 실행한다
+        (본 테스트는 판정 전제 3축을 지역화: 소유 컬럼 0·계획 밖·허용목록 밖). 아래 `owner_columns`
+        복제본은 (B)의 *종전 고정 3종*일 뿐 (A)·(C)를 보지 못하므로 이 테스트 단독으로는 완전한
+        판정이 아니다 — 완전한 판정은 위 스윕이 한다. 학생 축 컬럼을 추가하는 순간 위 컬럼 부재
+        테스트와 완전성 스윕이 **함께** red가 된다(양방향 변별력).
         """
         from whymath_backend.privacy.erasure import _ERASURE_PLAN, _ERASURE_PLAN_EXEMPTIONS
 
@@ -151,6 +156,19 @@ class TestSchemaOrmRoundTrip:
         assert orm.elapsed_ms == 185_000
         restored = orm.to_schema()
         assert restored == original
+
+    def test_from_schema_refuses_a_fingerprint_instead_of_silently_dropping_it(self) -> None:
+        """EOS-27 — DB에는 지문 컬럼 좌석이 없다. mapper 필터가 조용히 버리면 '저장했다'고 믿는 소비자가
+        생기므로 크게 거부한다(지문은 JSONL 매체에서만 운반된다 — 좌석 신설은 후속 태스크)."""
+        schema = SchemaReviewTimerEvent(
+            review_session_id=uuid.uuid4(),
+            cu_slug="cu-x",
+            reviewer_id="kiki",
+            event_type="started",
+            content_fingerprint="sha256:" + "a" * 64,
+        )
+        with pytest.raises(ValueError, match="content_fingerprint"):
+            ReviewTimerEvent.from_schema(schema)
 
     def test_from_schema_omits_none_recorded_at(self) -> None:
         """recorded_at=None(기본)은 속성 미설정 — server_default 적용(EOS-45 동형)."""

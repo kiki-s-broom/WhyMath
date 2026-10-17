@@ -169,7 +169,7 @@ async def _build_signals(
     기본치로 채우면 선택기가 근거 없는 판단을 하게 된다(PED-02가 세운 "가짜 통과 금지" 규약).
     Polya 단계·턴 수·힌트는 대화 세션 축이라 여기서는 기본값이다(공급 진입 = 시도 전).
 
-    `grade_band`(PED-23 회수 — 04e §4 카탈로그 후보 필터 축)는 `UserProfile.grade`(10~14 —
+    `grade_band`(PED-23 회수 — 04g §4 카탈로그 후보 필터 축)는 `UserProfile.grade`(10~14 —
     `schema/user.py` 계약)에서 `grade_to_band` 순수 변환으로 파생한다("생산자 먼저" — 04d §2.1).
     프로필 미존재·grade 미기입이면 None으로 두어 필터의 학년 축이 조용히 스킵된다(필수화 금지).
     """
@@ -262,9 +262,11 @@ async def post_study_unit(
     # 어댑터별 비율을 함께 실어, 특정 교수법만 학생에게 도달하지 못하는 상태(전건 404)가 전체
     # 평균에 묻히지 않게 한다. 학생 원문·식별자는 싣지 않는다(개념 code·전략·경로만).
     logger.info(
-        "study supply — concept=%s strategy=%s source=%s fallback=%s "
+        "study supply — concept=%s content=%s via=%s strategy=%s source=%s fallback=%s "
         "dsl_render_rate=%s strategy_render_rate=%s",
         concept_code,
+        result.content_code,
+        result.lookup_via,
         result.strategy.value,
         result.content_source,
         result.fallback_reason,

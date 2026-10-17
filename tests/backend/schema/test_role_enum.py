@@ -1,31 +1,72 @@
-"""`Role` enum 동결 테스트 — SEC-07 D1.
+"""`Role` enum 동결 테스트 — SEC-07 D1 · P3-12.
 
-v0 2값(STUDENT/CONTENT_ADMIN)·서열 비교 부재를 동결한다. `docs/architecture/
-account_security_gap_review.md` §2-①이 반증하듯(`docs/legal/pipa_data_matrix.md:33-47` —
-부모의 데이터 가시성은 학생 본인의 *부분집합*이지 상위집합이 아님) 7단 선형 서열은 이 앱의
-데이터 모델과 구조적으로 모순된다. 이 테스트는 미래 세션이 그 서열을 조용히 되살리지
-못하도록 멤버 수와 비교 연산 부재를 고정한다.
+멤버 집합과 서열 비교 부재를 동결한다. `docs/architecture/account_security_gap_review.md`
+§2-①이 반증하듯(`docs/legal/pipa_data_matrix.md:33-47` — 부모의 데이터 가시성은 학생 본인의
+*부분집합*이지 상위집합이 아님) 7단 선형 서열은 이 앱의 데이터 모델과 구조적으로 모순된다. 이
+테스트는 미래 세션이 그 서열을 조용히 되살리지 못하도록 멤버 집합과 비교 연산 부재를 고정한다.
+
+멤버 수는 v0 2값에서 P3-12가 **5값**(CMS 편집자·검수자·배포자 추가)으로 넓혔다. 늘어난 3값은
+좌석(`api/admin_cms.py`)이 있어 "좌석 없는 역할 금지" 방침과 충돌하지 않는다. PARENT/TEACHER/
+SCHOOL_ADMIN은 여전히 없다 — 그 부재가 아래 `test_deferred_roles_stay_absent`로 동결돼 있다.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from enum import Enum, IntEnum
+from pathlib import Path
 
 import pytest
 
 from whymath_backend.schema.enums import Role
 
+_MIGRATION = (
+    Path(__file__).resolve().parents[3]
+    / "src"
+    / "backend"
+    / "alembic"
+    / "versions"
+    / "20261008_1200_c5e9f3a7b1d4_cms_content_roles.py"
+)
 
-class TestExactlyTwoMembers:
-    def test_role_has_exactly_two_members(self) -> None:
-        """v0 확정 — STUDENT·CONTENT_ADMIN 2값뿐(PARENT/TEACHER/SCHOOL_ADMIN 등 미도입)."""
-        assert len(list(Role)) == 2
+_EXPECTED = {
+    "student",
+    "content_admin",
+    "content_editor",
+    "content_reviewer",
+    "content_publisher",
+}
 
-    def test_role_members_are_student_and_content_admin(self) -> None:
-        assert {member.value for member in Role} == {"student", "content_admin"}
+
+class TestExactMemberSet:
+    def test_role_has_exactly_five_members(self) -> None:
+        """P3-12 확정 — 학생 1 + 콘텐츠 운영 4(관리자·편집자·검수자·배포자)."""
+        assert len(list(Role)) == 5
+
+    def test_role_members_are_the_frozen_set(self) -> None:
+        assert {member.value for member in Role} == _EXPECTED
         assert Role.STUDENT.value == "student"
         assert Role.CONTENT_ADMIN.value == "content_admin"
+        assert Role.CONTENT_EDITOR.value == "content_editor"
+        assert Role.CONTENT_REVIEWER.value == "content_reviewer"
+        assert Role.CONTENT_PUBLISHER.value == "content_publisher"
+
+    def test_deferred_roles_stay_absent(self) -> None:
+        """좌석 없는 역할은 여전히 만들지 않는다 — 학부모·교사·학교관리자는 B2B/대시보드 계약 전까지 부재."""
+        names = {member.name for member in Role}
+        assert not names & {"PARENT", "TEACHER", "SCHOOL_ADMIN", "SYSTEM_ADMIN"}
+
+    def test_migration_adds_exactly_the_new_roles(self) -> None:
+        """DB 어휘(`role_enum`)와 코드 어휘가 어긋나지 않는다 — 어긋나면 새 역할 행을 DB가 거부한다.
+
+        마이그레이션의 `ALTER TYPE role_enum ADD VALUE` 라벨 집합이 `Role`에서 원래 2값을 뺀 집합과
+        글자 그대로 같아야 한다. 스캔 0건은 통과가 아니다.
+        """
+        text = _MIGRATION.read_text(encoding="utf-8")
+        added = set(re.findall(r"ALTER TYPE role_enum ADD VALUE IF NOT EXISTS '(\w+)'", text))
+        assert added, "마이그레이션에서 ADD VALUE 문장을 하나도 찾지 못했다"
+        assert added == _EXPECTED - {"student", "content_admin"}
 
 
 class TestNoOrderingSupport:

@@ -2,6 +2,7 @@
 
 엔드포인트(prefix `/v1/problems`):
   - POST   /v1/problems          — 문제 생성(검증된 schema.Problem → ORM → commit). 201.
+                                   생성물이면 provenance 좌석 필수·원장 행 동반(LIC-09).
   - GET    /v1/problems/{id}     — 단건 조회(UUID). 없으면 404.
   - GET    /v1/problems          — 목록(최신순, limit/offset, subject 선택 필터).
 
@@ -43,10 +44,11 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import ColumnElement, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,19 +61,38 @@ from whymath_backend.api._concurrency import (
 )
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.config import get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
+from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
 from whymath_backend.db.session import get_session
+from whymath_backend.l1.problem_bank.provenance_gate import (
+    ProvenanceInput,
+    ProvenanceMissingError,
+    require_provenance,
+)
 from whymath_backend.privacy.audit import record_content_mutation_audit
 from whymath_backend.schema.enums import (
+    GenerationType,
+    LicenseType,
     PrivacyAuditAction,
     PrivacyAuditResourceType,
     ReviewStatus,
+    SourceType,
     Subject,
     is_review_status_quarantined,
 )
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import ProblemRelation as ProblemRelationSchema
 from whymath_backend.schema.problem import PublicProblem, PublicProblemStep
+from whymath_backend.schema.review_transition import (
+    IllegalInitialReviewStatus,
+    IllegalReviewStatusChange,
+    QuarantineReasonRequired,
+    QuarantineRecordLocked,
+    ReviewTransitionAction,
+    ensure_initial_review_status,
+    plan_review_field_change,
+)
 
 router = APIRouter(prefix="/v1/problems", tags=["problem"])
 
@@ -150,6 +171,75 @@ def _reject_if_quarantined(orm: Problem, problem_id: uuid.UUID) -> None:
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# LIC-09 provenance 좌석 — 관리자 REST 생성의 요청 계약
+# ──────────────────────────────────────────────────────────────────────────
+# 코퍼스 적재 경로(LIC-03)는 저작 메타에서 provenance를 싣지만, 이 REST 표면은 요청 본문이
+# `schema.Problem` 그대로라 관문에 넘길 재료 자체가 없었다(= 생성물이 원장 없이 INSERT되던 구멍).
+# 요청 계약에 좌석을 두고, 판정은 **관문 하나**(`require_provenance`)에 맡긴다 — 여기서 필수성·
+# 법적 불변식을 재구현하면 코퍼스 경로와 기준이 갈라진다.
+
+
+class ProblemProvenanceIn(BaseModel):
+    """POST /v1/problems 의 provenance 3축 — `content_provenance` 원장 컬럼과 1:1.
+
+    필드는 전부 Optional로 둔다: *필수성*은 출처(`source_type`)에 따라 달라지고 그 판정은
+    관문이 내린다(생성물이면 generation_type·license 필수). enum 타입이라 미지 값은 여기서
+    422가 되고, 법적 불변식(ORIGINAL·EBS_LICENSED 차단 등)은 관문이 `schema.ContentProvenance`를
+    경유시켜 422로 거부한다.
+    """
+
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    generation_type: GenerationType | None = Field(
+        default=None, description="변형/생성 단계 — VARIANT_*/COMPOSED/FULLY_GENERATED"
+    )
+    license: LicenseType | None = Field(default=None, description="지배 라이선스")
+    original_source: SourceType | None = Field(
+        default=None, description="원본 출처(변형의 경우 — 메타 전용 출처 규칙 적용)"
+    )
+
+
+class ProblemCreateRequest(ProblemSchema):
+    """관리자 문제 생성 요청 — `schema.Problem` + provenance 좌석(LIC-09).
+
+    `source_type=자체생성`(생성물)이면 `provenance`가 **필수**다 — 없으면 422(A4 DoD
+    "provenance 없는 AI 생성물 INSERT 거부"의 REST 축). 메타 전용 출처는 원장 대상이 아니라
+    생략 가능하다(보내도 원장 행을 만들지 않는다 — 관문이 None을 돌려준다).
+    """
+
+    provenance: ProblemProvenanceIn | None = Field(
+        default=None,
+        description="출처 원장 재료 — source_type=자체생성이면 필수(없으면 422)",
+    )
+
+
+def _initial_review_status_refusal(
+    exc: IllegalInitialReviewStatus, *, actor_id: uuid.UUID
+) -> HTTPException:
+    """생성 시 초기 검수 상태 거부를 422로 옮긴다(ADMIN-19) — 응답 모양은 PATCH 422와 같은 축이다.
+
+    승인 상태로 태어나려는 시도는 검수 우회 신호라 WARNING으로 남긴다(행위자·요청 상태·코드만 —
+    자유 텍스트는 싣지 않는다). `privacy_audit`에는 쓰지 않는다: 그 테이블의 `content_mutation`은
+    "문항이 만들어졌다"는 사실의 기록이고 거부된 시도는 생성이 아니다(`_review_patch_refusal`과
+    같은 논거 — 감사 원장이 일어나지 않은 일을 말하면 안 된다).
+    """
+    _logger.warning(
+        "초기 검수 상태 거부(ADMIN-19) — 생성 우회 시도: actor=%s requested=%s code=%s",
+        actor_id,
+        exc.requested.value if exc.requested is not None else None,
+        exc.code,
+    )
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail={
+            "code": exc.code,
+            "message": str(exc),
+            "requested_status": exc.requested.value if exc.requested is not None else None,
+        },
+    )
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -157,7 +247,7 @@ def _reject_if_quarantined(orm: Problem, problem_id: uuid.UUID) -> None:
     summary="문제 생성",
 )
 async def create_problem(
-    body: ProblemSchema,
+    body: ProblemCreateRequest,
     session: SessionDep,
     response: Response,
     admin: RequireContentAdmin,
@@ -172,9 +262,58 @@ async def create_problem(
 
     SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다
     (IntegrityError로 롤백되면 감사 행도 함께 롤백 — 실패한 시도는 감사하지 않는다).
+
+    LIC-09: 생성물(`source_type=자체생성`)은 `provenance_gate.require_provenance`를 경유한다 —
+    재료가 없거나 무효면 **DB를 건드리기 전에** 422. 통과하면 `content_provenance` 행을 문항·
+    감사 행과 **같은 트랜잭션**에 남긴다(문항만 커밋되고 원장이 빠진 상태가 곧 DoD 위반).
+    원장 FK(`content_provenance.problem_id → problem`)가 문항 행을 요구하므로 문항을 먼저
+    flush한 뒤 원장을 add한다 — ORM 간 relationship이 없어 unit-of-work의 INSERT 순서에
+    기대지 않는다.
+
+    **초기 검수 상태 제한(ADMIN-19)**: `review_status`는 미설정 또는 `pending`만 허용한다 — 그 외
+    (`approved`·`rejected`·`quarantined`)는 **DB·원장 관문보다 앞에서** 422
+    `illegal_initial_status`다. 상태 전이(승인·거부·격리)는 기존 문항에 대한 `PATCH`·
+    `POST …/transitions`의 몫이며, 생성이 그 상태로 직접 태어나게 하면 전이·감사 동작·검수 기록이
+    모두 건너뛰어진다. 판정은 `schema/review_transition.py::ensure_initial_review_status`가
+    단일 권위다.
     """
+    try:
+        ensure_initial_review_status(_as_review_status(body.review_status))
+    except IllegalInitialReviewStatus as exc:
+        raise _initial_review_status_refusal(exc, actor_id=admin.user_id) from exc
+    try:
+        gate_result = require_provenance(
+            slug=body.slug or str(body.problem_id),
+            source_type_value=body.source_type,
+            provenance=(
+                ProvenanceInput(
+                    generation_type=body.provenance.generation_type,
+                    license=body.provenance.license,
+                    original_source=body.provenance.original_source,
+                )
+                if body.provenance is not None
+                else None
+            ),
+            problem_id=body.problem_id,
+        )
+    except ProvenanceMissingError as exc:
+        # 침묵 실패 금지 — 관문 사유(어느 축이 비었는지·어느 불변식인지)를 그대로 싣는다.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+
     orm = Problem.from_schema(body)
     session.add(orm)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 존재하는 external_id 또는 slug입니다.",
+        ) from exc
+    if gate_result is not None:
+        session.add(ContentProvenanceORM.from_schema(gate_result))
     settings = get_settings()
     record_content_mutation_audit(
         session,
@@ -327,6 +466,57 @@ async def list_problem_relations(
     return [row.to_schema() for row in result.scalars().all()]
 
 
+def _as_review_status(value: ReviewStatus | str | None) -> ReviewStatus | None:
+    """스키마(문자열)·ORM(enum) 어느 쪽 값이든 `ReviewStatus | None`으로 모은다."""
+    return None if value is None else ReviewStatus(value)
+
+
+def _review_patch_refusal(
+    exc: IllegalReviewStatusChange | QuarantineReasonRequired | QuarantineRecordLocked,
+    *,
+    problem_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    current: ReviewStatus | None,
+    target: ReviewStatus | None,
+) -> HTTPException:
+    """검수 상태 변경 거부를 HTTP로 옮긴다 — 응답 모양은 `POST …/transitions`의 409와 같은 축이다.
+
+    거부는 **기록 없이 끝나지 않는다**: 우회 시도는 보안 신호라 WARNING으로 남긴다(행위자·문항·
+    상태·코드만 — 사유 본문 등 자유 텍스트는 싣지 않는다). `privacy_audit`에 행을 쓰지는 않는다 —
+    그 테이블의 `content_mutation`은 "변경이 일어났다"는 사실의 기록이고(루프 KPI ④ '운영자 수동
+    개입' 계수가 이 행 수를 센다), 거부된 시도는 변경이 아니다. 거부를 변경으로 적으면 감사 원장이
+    일어나지 않은 일을 말하게 된다.
+    """
+    _logger.warning(
+        "검수 상태 변경 거부(ADMIN-16) — PATCH 우회 시도: actor=%s problem_id=%s current=%s "
+        "requested=%s code=%s",
+        actor_id,
+        problem_id,
+        current.value if current is not None else None,
+        target.value if target is not None else None,
+        exc.code,
+    )
+    if isinstance(exc, IllegalReviewStatusChange):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.code,
+                "message": "현재 상태에서 허용되지 않는 전이입니다.",
+                "current_status": current.value if current is not None else None,
+                "requested_status": target.value if target is not None else None,
+            },
+        )
+    if isinstance(exc, QuarantineReasonRequired):
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": exc.code, "message": str(exc)},
+        )
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={"code": exc.code, "message": str(exc)},
+    )
+
+
 @router.patch("/{problem_id}", response_model=ProblemSchema, summary="문제 부분 수정")
 async def patch_problem(
     problem_id: uuid.UUID,
@@ -345,15 +535,36 @@ async def patch_problem(
     ETag를 주므로 여기서도 같은 기준으로 비교해야 If-Match 흐름이 정합한다).
 
     SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다.
+
+    **검수 상태 변경은 전이표를 거친다(ADMIN-16)**: 병합 결과가 `review_status`를 *바꾸면*
+    `schema/review_transition.py`의 표(`plan_review_field_change`)로 판정한다 — 표에 없는 변경
+    (rejected→approved · 미설정→무엇이든 등)은 409 `illegal_transition`, 격리(`approved→
+    quarantined`)에 *이번 요청의* `quarantine_reason`이 없으면 422 `reason_required`, 격리가 아닌
+    전이가 격리 기록을 함께 바꾸려 하면 409 `quarantine_record_immutable`이며 어느 경우든 쓰기도
+    감사도 없다. 합법 변경은 감사 행 1개의 동작이 `update`가 아니라 **전이 액션**(approve/reject/
+    quarantine/release)이 되고, 격리 시각은 클라이언트 값이 아니라 **서버 시각**이 기록된다
+    (`POST …/transitions`와 같은 의미 — 시계가 클라이언트 소유면 격리를 소급할 수 있다). 상태를
+    바꾸려는 요청(본문에 `review_status` 포함)은 전이 라우트와 같은 `SELECT … FOR UPDATE`로
+    행을 잠그고 최신 값으로 판정한다. 상태가 그대로인 요청(GET 본문을 되돌려 보내는 왕복 포함)은
+    전이가 아니라 기존 `update` 경로다.
     """
-    existing = await session.get(Problem, problem_id)
+    # 상태를 바꾸려는 요청이면 행을 잠가 최신 값으로 판정한다 — 전이 라우트가 FOR UPDATE로
+    # 직렬화하는 것과 같은 이유다(잠그지 않으면 두 표면이 같은 낡은 상태를 보고 각자 합법이라
+    # 판정해 전이가 이중 기록된다). 상태를 건드리지 않는 요청은 종전과 같은 읽기를 유지한다.
+    if "review_status" in body:
+        existing = await session.get(
+            Problem, problem_id, with_for_update=True, populate_existing=True
+        )
+    else:
+        existing = await session.get(Problem, problem_id)
     if existing is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"문제를 찾을 수 없습니다: {problem_id}",
         )
-    ensure_if_match(if_match, etag_for(PublicProblem.from_problem(existing.to_schema())))
-    merged = existing.to_schema().model_dump()
+    current_schema = existing.to_schema()
+    ensure_if_match(if_match, etag_for(PublicProblem.from_problem(current_schema)))
+    merged = current_schema.model_dump()
     merged.update(body)
     merged["problem_id"] = problem_id  # PK는 경로 고정
     try:
@@ -366,14 +577,51 @@ async def patch_problem(
                 "errors": [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()],
             },
         ) from exc
+
+    current_status = _as_review_status(current_schema.review_status)
+    target_status = _as_review_status(validated.review_status)
+    reason_in_body = body.get("quarantine_reason")
+    try:
+        plan = plan_review_field_change(
+            current_status=current_status,
+            target_status=target_status,
+            reason_in_request=reason_in_body if isinstance(reason_in_body, str) else None,
+            quarantine_record_changed=(
+                validated.quarantine_reason != current_schema.quarantine_reason
+                or validated.quarantined_at != current_schema.quarantined_at
+            ),
+        )
+    except (IllegalReviewStatusChange, QuarantineReasonRequired, QuarantineRecordLocked) as exc:
+        raise _review_patch_refusal(
+            exc,
+            problem_id=problem_id,
+            actor_id=admin.user_id,
+            current=current_status,
+            target=target_status,
+        ) from exc
+    if plan.action is ReviewTransitionAction.quarantine:
+        # 격리 기록은 상태와 함께, 시각은 서버가 쓴다(격리 계약 §3). 클라이언트가 보낸 시각은
+        # 응답 본문에 실제 기록값이 나오므로 덮어쓴 사실이 관측된다.
+        validated = validated.model_copy(
+            update={
+                "quarantine_reason": plan.quarantine_reason,
+                "quarantined_at": datetime.now(UTC),
+            }
+        )
     updated = await session.merge(Problem.from_schema(validated))
+    # 사람이 고친 행 — 다음 CLI 적재가 덮어쓰지 못하게 표지를 남긴다(P3-25).
+    mark_cms_edited(updated)
     settings = get_settings()
     record_content_mutation_audit(
         session,
         actor_user_id=admin.user_id,
         resource_type=PrivacyAuditResourceType.problem,
         resource_id=problem_id,
-        action=PrivacyAuditAction.update,
+        action=(
+            PrivacyAuditAction(plan.action.value)
+            if plan.action is not None
+            else PrivacyAuditAction.update
+        ),
         ip=_client_ip(request, settings=settings),
         settings=settings,
     )
@@ -398,8 +646,11 @@ async def delete_problem(
     request: Request,
     if_match: Annotated[str | None, Header()] = None,
 ) -> Response:
-    """문제 삭제 — 없으면 404. 풀이단계·관계·시도 등 참조가 있으면 FK 위반 → 409.
+    """문제 삭제 — 없으면 404. 풀이단계·관계·시도·출처 원장 등 참조가 있으면 FK 위반 → 409.
     `Role.CONTENT_ADMIN` 전용.
+
+    LIC-09: 생성물은 생성 시 `content_provenance` 행을 동반하므로 이 경로로는 409가 된다 —
+    감사 원장을 REST 삭제가 조용히 지우지 않는다(비노출은 격리 EOS-71이 비파괴 경로).
 
     cascade를 ORM에 두지 않았으므로 참조가 있으면 삭제를 거부한다(가짜 cascade 금지).
     `If-Match`를 보내면 그사이 변경된 리소스의 삭제를 412로 막는다(조건부 삭제 —
@@ -432,6 +683,9 @@ async def delete_problem(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="이 문제를 참조하는 단계·관계·시도가 있어 삭제할 수 없습니다.",
+            detail=(
+                "이 문제를 참조하는 단계·관계·시도·출처 원장이 있어 삭제할 수 없습니다. "
+                "노출만 끊으려면 격리(quarantined)를 사용하세요."
+            ),
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from whymath_backend.l6.suneung.gating import (
     METADATA_ONLY_SOURCES,
     SUNEUNG_PERSONAS,
@@ -52,6 +54,8 @@ def _problem(**over: object) -> Problem:
         "valid_from_year": 2022,
         "subject": Subject.미적분,
         "unit_codes": ["CAL-INT-DEF"],
+        # EOS-31 — 수능 출제 범위 축(범위 안 코드). 주입이 없으면 게이트가 `UNKNOWN`으로 거절한다.
+        "achievement_standard_codes": ["[12대수01-01]"],
     }
     kwargs.update(over)
     return Problem(**kwargs)  # type: ignore[arg-type]
@@ -368,3 +372,49 @@ class TestSelectSuneungItems:
         )
         selected = select_suneung_items([first, second, third], Persona.A_일반고고3)
         assert [p.slug for p in selected] == ["first", "second", "third"]
+
+
+class TestScopeGate:
+    """EOS-31 — 출제 범위 게이트(②-c): 신호(③)가 아니라 **선결 조건**이다.
+
+    각 시험은 정반대 대조군과 쌍이다. 범위 밖만 단언하면 "전부 거절하는 게이트"가 통과하고, 범위 안만
+    단언하면 "범위를 안 보는 게이트"가 통과한다.
+    """
+
+    _OUT = ["[9수02-01]"]  # 중학교
+    _UNKNOWN: list[str] = []
+
+    @pytest.mark.parametrize(
+        "signal",
+        [
+            {"exam_type": ExamType.수능},
+            {"signature_patterns": [SignaturePattern.COMPOUND_CHOICES]},
+            {"persona_fit": {Persona.A_일반고고3: 0.9}},
+        ],
+        ids=["exam_type", "signature", "persona_fit"],
+    )
+    def test_out_of_scope_item_is_rejected_whatever_the_signal(
+        self, signal: dict[str, object]
+    ) -> None:
+        inside = _problem(**signal)
+        outside = _problem(achievement_standard_codes=self._OUT, **signal)
+        assert is_suneung_eligible(inside, Persona.A_일반고고3) is True  # 대조군
+        assert is_suneung_eligible(outside, Persona.A_일반고고3) is False
+
+    def test_unknown_scope_item_is_rejected_not_passed(self) -> None:
+        """코드를 모르는 문항은 적격이 아니다(fail-closed) — 대조군은 같은 문항에 범위 안 코드를 단 것."""
+        known = _problem(exam_type=ExamType.수능)
+        unknown = _problem(exam_type=ExamType.수능, achievement_standard_codes=self._UNKNOWN)
+        assert is_suneung_eligible(known, Persona.A_일반고고3) is True
+        assert is_suneung_eligible(unknown, Persona.A_일반고고3) is False
+
+    def test_scope_alone_is_not_enough_a_signal_is_still_required(self) -> None:
+        """범위는 선결 조건이지 충분 조건이 아니다 — 범위 안이어도 수능 신호가 없으면 부적격이다."""
+        in_scope_no_signal = _problem()  # 기출·시그니처·적합도 없음
+        assert is_suneung_eligible(in_scope_no_signal, Persona.A_일반고고3) is False
+
+    def test_select_drops_out_of_scope_items(self) -> None:
+        keep = _problem(slug="keep", exam_type=ExamType.수능)
+        drop = _problem(slug="drop", exam_type=ExamType.수능, achievement_standard_codes=self._OUT)
+        selected = select_suneung_items([drop, keep], Persona.A_일반고고3)
+        assert [p.slug for p in selected] == ["keep"]

@@ -28,11 +28,13 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any
 
-from sympy import Float, Integer, Rational, fraction, sympify
+from sympy import Float, Integer, Rational, fraction
 
+from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.symbolic_equivalence import split_relation_chain
 from whymath_backend.schema.answer_form import (
     ExpectedForm,
@@ -41,6 +43,8 @@ from whymath_backend.schema.answer_form import (
 )
 
 __all__ = ["verify_answer_form", "form_verdict_for"]
+
+logger = logging.getLogger("whymath.l3.verify_answer_form")
 
 
 def verify_answer_form(student_answer: str | None, expected: ExpectedForm | None) -> FormVerdict:
@@ -110,10 +114,12 @@ def _check_reduced_fraction(student_answer: str) -> FormVerdict:
       `x/2`(문자식)·파싱 실패 → unverifiable
     """
     try:
-        expr = sympify(student_answer.strip(), evaluate=False)
+        # CONST-09: 학생 원문이 닿는 자리 — 안전 진입점(표면 보존 evaluate=False는 그대로).
+        expr = safe_sympify(student_answer.strip(), evaluate=False)
     except Exception as exc:  # noqa: BLE001 — SymPy는 다양한 예외를 낸다
         # 예외 타입명을 남긴다(무타입 침묵 금지). 값은 학생 원문이라 로그에 싣지 않는다.
-        _ = type(exc).__name__
+        # (종전 `_ = type(exc).__name__`은 타입명을 *계산만* 하고 버렸다 — 로그로 옮긴다.)
+        logger.debug("verify_answer_form 파싱 회피: %s", type(exc).__name__)
         return FormVerdict.unverifiable
 
     if not getattr(expr, "is_number", False):

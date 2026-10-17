@@ -115,6 +115,17 @@ Loop 1 `보정`을 세웠다(`_FROZEN` 주석 · API 계약 수준). 지금은 �
   바뀌어 동결 해제를 강제한다. xfail 대상은 `_FROZEN`에서 유도되므로, 동결표를 올리면 그
   종류는 표식 없이 반드시 통과해야 하는 계약으로 자동 전환된다.
 
+**요청 형태 2종** (PED-40 · 2026-10-03) — 본 관통(변이 = 오답 종류 × 요청 형태)은 모든 추천 요청을
+두 형태로 돈다: `prioritize_weak_concepts=true`를 붙이는 `weak-first`(하네스 전용)와 붙이지 않는
+`app-default`(실제 모바일 앱). 종전 본 관통은 앞 형태로만 재서, 약점 가중(방금 틀린 개념 문항 1.85배)이
+세운 루프를 앱 학생의 루프로 읽을 수 있었다(EOS-26 판정문 §1-2). 동결표 `_FROZEN`은 형태별로 나눈다.
+관통이 보낸 URL은 기록해 형태를 따랐는지 단언한다(`test_three_loops_are_operator_free_and_continuous`).
+실측(main `12242694`): 두 형태 모두 두 오답 종류의 전 마디가 선다 — 형태 사이에서 갈리는 것은 마디
+판정이 아니라 추천의 행위·근거뿐이다(3번째 추천 `practice_prerequisite` ↔ `practice_current`, 둘 다
+문항·target이 선수). **같은 공백이 페르소나 여정 하네스에도 있다** — 그쪽을 앱 형태로 돌리면 페르소나 A
+⑤-a가 깨진다(`advance_next` → `diagnose`). 이 하네스는 행위 이름을 보지 않아 그 차이를 못 본다 —
+소유 태스크 = `PED-41`.
+
 **판정 밖** — 교정 발화·추천 설명의 교수학적 적절성, 추천 품질(θ 근방이 최선인가)은
 보지 않는다. 보는 것은 루프가 **닫히는가**(연결과 방향)뿐이다. 시나리오 뱅크(`PED-36` ①)가
 이 반복을 표현할 수 있는가의 판정은 `docs/reviews/ped36_q12_three_consecutive_loops_2026-09-25.md`.
@@ -281,6 +292,10 @@ class _Journey:
     """3루프 1회 관통의 산출물 — 판정·불변식 근거·단계 기록."""
 
     variant: str
+    #: 요청 형태(`_PROBE_REQUEST_SHAPES`의 키) — 이 관통의 모든 추천 요청이 따른 형태.
+    shape: str
+    #: 이 관통이 `/v1/me/next-problem`에 **실제로 보낸** URL(전부) — 형태가 요청에 실렸는지의 근거.
+    next_problem_urls: list[str]
     loops: list[_Loop]
     #: 이 하네스가 HTTP로 제출한 시도 id(제출 순서).
     submitted_attempts: list[str]
@@ -298,7 +313,9 @@ class _Journey:
     def verdict_line(self) -> str:
         parts = [f"LOOP{lp.number}={'PASS' if lp.holds else 'FAIL'}" for lp in self.loops]
         overall = "PASS" if all(lp.holds for lp in self.loops) else "FAIL"
-        return f"THREE_LOOP_VERDICT[{self.variant}] :: {' '.join(parts)} · §18={overall}"
+        return (
+            f"THREE_LOOP_VERDICT[{self.variant}/{self.shape}] :: {' '.join(parts)} · §18={overall}"
+        )
 
     def as_map(self) -> dict[int, dict[str, bool]]:
         return {lp.number: lp.as_map() for lp in self.loops}
@@ -650,23 +667,31 @@ def _run_diagnosis_probe() -> _DiagnosisProbe:
 # ── 3루프 관통 ──────────────────────────────────────────────────────────────────
 
 
-def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
+def _run_journey(variant: str, shape: str, probe: _DiagnosisProbe) -> _Journey:
     """학습자 1명이 추천을 따라 3루프를 도는 1회 관통 — 판정은 호출측이 한다.
 
     `probe`는 Loop 1 진단 보정 경로의 ⓕ·ⓖ 판정이다(이 관통의 학습자는 밟지 않는 경로).
+    `shape`는 이 관통의 **모든** 추천 요청(`GET /v1/me/next-problem`)이 따르는 요청 형태다 —
+    `prioritize_weak_concepts=true`를 붙이는가(`_PROBE_REQUEST_SHAPES`). 실제 모바일 앱은 붙이지
+    않으므로 한 형태에서만 서는 루프는 하네스 전용 요청의 우연이다(PED-40).
     """
-    content, _journal = _P._begin(f"L3-{variant}")
+    weak_first = _PROBE_REQUEST_SHAPES[shape]
+    content, _journal = _P._begin(f"L3-{variant}-{shape}")
     try:
         # ① 저작 콘텐츠 시딩 — 로그인 *전*에 끝낸다(그 뒤로는 봉인).
         member, cname = _seed_layout(content, _DIFFICULTY_BANDS)
         cids = {tag: uuid.UUID(cid) for cid, tag in cname.items()}
 
         steps: list[str] = []
+        next_problem_urls: list[str] = []
         submitted: list[str] = []
         attempted: set[str] = set()
 
         def mastery(tag: str) -> float | None:
             return _P._mastery_of(client, auth, cids[tag])
+
+        def recommend() -> dict[str, Any]:
+            return _P._next_problem(client, auth, weak_first=weak_first)
 
         def solve(rec: dict[str, Any], *, correct: bool, answer: str) -> dict[str, Any]:
             pid = str(rec["problem_id"])
@@ -685,10 +710,20 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
             auth = _P._login(client)
             learner_before = _user_id(client, auth)
 
+            # 추천 요청 URL 기록 — 관통이 요청 형태를 무시해도 판정은 같게 나오므로, 보낸 것을 직접 센다.
+            real_get = client.get
+
+            def recording_get(url: str, *args: Any, **kwargs: Any) -> Any:
+                if "/v1/me/next-problem" in url:
+                    next_problem_urls.append(url)
+                return real_get(url, *args, **kwargs)
+
+            client.get = recording_get
+
             with _Seal() as seal:
                 # ── Loop 1: 진단 → 문제 → 오답 → 보정 ───────────────────────────────
                 loop1 = _Loop(1)
-                r0 = _P._next_problem(client, auth)
+                r0 = recommend()
                 assert r0["problem_id"] is not None, "진단 문항이 없다 — 루프가 시작되지 않는다."
                 wrong_tag = member.get(str(r0["problem_id"]))
                 assert wrong_tag is not None, "진단 문항이 이 회차가 심은 문항이 아니다(격리 실패)."
@@ -706,7 +741,7 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
                     wrong_body["is_correct"] is False and after_wrong is not None,
                     f"오답 직후 {wrong_tag} 숙달={after_wrong} · 상태={_P._state_of(wrong_body)}",
                 )
-                r1 = _P._next_problem(client, auth)
+                r1 = recommend()
                 loop1.add(
                     "보정",
                     *_remediation_node(
@@ -735,7 +770,7 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
                     if now is not None and now > _ADVANCE_THRESHOLD:
                         crossed = True
                         break
-                    rec = _P._next_problem(client, auth)
+                    rec = recommend()
                 final_wrong = mastery(wrong_tag)
                 loop2.add("문제·정답", used > 0 and all_correct, f"추천을 따라 {used}회 정답")
                 loop2.add(
@@ -757,7 +792,7 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
                     for name in ("다음concept", "문제", "평가", "추천"):
                         loop3.add(name, False, "미진입 — Loop 2가 전진 임계에 닿지 못했다")
                 else:
-                    r3 = _P._next_problem(client, auth)
+                    r3 = recommend()
                     wrong_pids = {p for p, t in member.items() if t == wrong_tag}
                     remaining = wrong_pids - attempted
                     # 변별력 장치 — 남은 문항이 없으면 도달이 선택인지 소진인지 모른다.
@@ -783,7 +818,7 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
                             bool(body3.get("mastery_updates")),
                             f"숙달 갱신 {len(body3.get('mastery_updates') or [])}건",
                         )
-                        r4 = _P._next_problem(client, auth)
+                        r4 = recommend()
                         loop3.add(
                             "추천",
                             r4["problem_id"] is not None and r4["reason"]["type"] != "no_candidate",
@@ -797,6 +832,8 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
         entries = trace.get("entries") or []
         return _Journey(
             variant=variant,
+            shape=shape,
+            next_problem_urls=next_problem_urls,
             loops=[loop1, loop2, loop3],
             submitted_attempts=submitted,
             trace_attempt_ids=[
@@ -817,7 +854,7 @@ def _run_journey(variant: str, probe: _DiagnosisProbe) -> _Journey:
 
 def _dump(journey: _Journey) -> None:
     """판정 근거 표 — 판정은 exit code가, *왜*는 이 표가 말한다."""
-    print(f"\n=== 연속 3루프 [{journey.variant}] — 단계 기록 ===")
+    print(f"\n=== 연속 3루프 [{journey.variant}/{journey.shape}] — 단계 기록 ===")
     for line in journey.steps:
         print(line)
     for lp in journey.loops:
@@ -838,10 +875,21 @@ def diagnosis_probe() -> _DiagnosisProbe:
     return result
 
 
-@pytest.fixture(scope="module", params=sorted(_WRONG_ANSWERS))
+#: 본 관통의 변이 = 오답 종류 × 요청 형태. 진단 보정 프로브(`_PROBE_REQUEST_SHAPES`)와 같은 두
+#: 형태다 — 프로브만 두 형태로 재고 본 관통이 하네스 전용 형태로만 재면, 한 형태에서만 서는 루프를
+#: 앱 학생의 루프로 읽게 된다(PED-40).
+_JOURNEY_VARIANTS: list[tuple[str, str]] = [
+    (variant, shape) for shape in _PROBE_REQUEST_SHAPES for variant in sorted(_WRONG_ANSWERS)
+]
+
+
+@pytest.fixture(
+    scope="module", params=_JOURNEY_VARIANTS, ids=[f"{v}-{sh}" for v, sh in _JOURNEY_VARIANTS]
+)
 def journey(request: pytest.FixtureRequest, diagnosis_probe: _DiagnosisProbe) -> Iterator[_Journey]:
-    """오답 종류별 3루프 관통 1회 — 세 테스트가 같은 관통을 본다(재실행 0)."""
-    result = _run_journey(request.param, diagnosis_probe)
+    """(오답 종류 × 요청 형태)별 3루프 관통 1회 — 세 테스트가 같은 관통을 본다(재실행 0)."""
+    variant, shape = request.param
+    result = _run_journey(variant, shape, diagnosis_probe)
     _dump(result)
     yield result
 
@@ -1064,12 +1112,67 @@ def test_advance_rule_requires_both_axes(rec: dict[str, Any], fires: bool, why: 
     assert got is fires, why
 
 
+class _UrlSpy:
+    """`GET` URL만 기록하는 대역 — 요청 형태가 실제로 쿼리에 실리는지 본다."""
+
+    def __init__(self) -> None:
+        self.urls: list[str] = []
+
+    def get(self, url: str, headers: dict[str, str]) -> Any:
+        self.urls.append(url)
+
+        class _Resp:
+            status_code = 200
+
+            @staticmethod
+            def json() -> dict[str, Any]:
+                return {}
+
+        return _Resp()
+
+
+@pytest.mark.parametrize(("shape", "weak_first"), sorted(_PROBE_REQUEST_SHAPES.items()))
+def test_request_shape_reaches_the_query_string(shape: str, weak_first: bool) -> None:
+    """요청 형태가 쿼리 문자열에 **실제로** 반영되는가 — 관통이 형태를 무시하면 두 변이가 같은
+    요청을 두 번 재고도 "두 형태에서 성립"으로 읽힌다(PED-40). `weak-first`만 파라미터를 싣고
+    `app-default`는 싣지 않아야 실제 앱 요청과 같다."""
+    spy = _UrlSpy()
+    _P._next_problem(spy, {}, weak_first=_PROBE_REQUEST_SHAPES[shape])
+    assert weak_first is _PROBE_REQUEST_SHAPES[shape]
+    (url,) = spy.urls
+    assert ("prioritize_weak_concepts=true" in url) is weak_first, (shape, url)
+
+
+def test_journey_variants_cover_every_shape_and_variant() -> None:
+    """관통 변이가 (오답 종류 × 요청 형태) 전수다 — 한 형태가 조용히 빠지면 PED-40 이전으로 돌아간다."""
+    assert set(_JOURNEY_VARIANTS) == {
+        (variant, shape) for variant in _WRONG_ANSWERS for shape in _PROBE_REQUEST_SHAPES
+    }
+    assert len(_PROBE_REQUEST_SHAPES) == 2 and set(_PROBE_REQUEST_SHAPES.values()) == {True, False}
+    assert set(_FROZEN) == set(_PROBE_REQUEST_SHAPES)
+    for variants in _FROZEN.values():
+        assert set(variants) == set(_WRONG_ANSWERS)
+
+
 # ── 불변식 — 판정과 무관하게 항상 초록 ──────────────────────────────────────────
 
 
 def test_three_loops_are_operator_free_and_continuous(journey: _Journey) -> None:
     """무개입·연속성: 학습자 축의 모든 변화가 이 하네스의 HTTP 제출로 거슬러 올라간다."""
     assert journey.sealed_calls == 0, "학습 도중 DB 직접 쓰기가 시도됐다(봉인 발동)."
+    # 요청 형태 — 이 관통의 추천 요청 **전부**가 자기 형태를 따랐는가. 0건이면 아래 단언이 공허하다.
+    # 최소 건수: 진단·보정·Loop 2 최소 1회·Loop 3·추천 = 5(Loop 3 미진입이면 더 적어 판정 불가).
+    assert len(journey.next_problem_urls) >= 5, journey.next_problem_urls
+    weak_first = _PROBE_REQUEST_SHAPES[journey.shape]
+    wrong_shape = [
+        u
+        for u in journey.next_problem_urls
+        if ("prioritize_weak_concepts=true" in u) is not weak_first
+    ]
+    assert not wrong_shape, (
+        f"관통이 요청 형태({journey.shape})를 따르지 않았다 — 다른 형태로 잰 판정을 이 형태의 "
+        f"판정으로 읽게 된다: {wrong_shape}"
+    )
     assert (
         journey.learner_before == journey.learner_after
     ), "루프 도중 학습자가 바뀌었다 — '연속' 3루프가 아니다."
@@ -1129,23 +1232,35 @@ _FROZEN_LOOP2: dict[str, bool] = {
     "전진임계통과": True,
 }
 _FROZEN_LOOP3: dict[str, bool] = {"다음concept": True, "문제": True, "평가": True, "추천": True}
-_FROZEN: dict[str, dict[int, dict[str, bool]]] = {
-    "misconception": {
+
+
+def _frozen_variant() -> dict[int, dict[str, bool]]:
+    """변이 1개의 동결값 — 호출마다 **새 dict**다. 형태·종류가 한 dict를 공유하면 표를 나눈 것이
+    이름뿐이다(한 칸을 올리면 모든 칸이 같이 올라간다)."""
+    return {
         1: {"진단": True, "문제": True, "오답": True, "보정": True},
-        2: _FROZEN_LOOP2,
-        3: _FROZEN_LOOP3,
-    },
-    "general": {
-        1: {"진단": True, "문제": True, "오답": True, "보정": True},
-        2: _FROZEN_LOOP2,
-        3: _FROZEN_LOOP3,
-    },
+        2: dict(_FROZEN_LOOP2),
+        3: dict(_FROZEN_LOOP3),
+    }
+
+
+#: **PED-40(2026-10-03)**: 동결표를 **요청 형태별로 나눈다**(`_PROBE_REQUEST_SHAPES`). 종전 표는 하네스
+#: 전용 형태(`prioritize_weak_concepts=true`)로만 쟀다 — 실제 모바일 앱은 그 파라미터를 보내지 않는다.
+#: 한 표로 두면 한쪽 형태에서만 올라가는 변경이 다른 형태의 거짓 해소·거짓 회귀가 된다(EOS-24 동결표
+#: 분리와 같은 이유). 실측(main `12242694`): 앱 형태에서도 두 오답 종류 모두 전 마디가 선다 — 형태
+#: 사이에서 갈리는 것은 마디 판정이 아니라 **추천의 행위·근거**뿐이다(3번째 추천이 `weak-first`는
+#: `practice_prerequisite · prerequisite_gap`, `app-default`는 `practice_current · current_concept` —
+#: 둘 다 문항·target이 선수라 `보정`·`다음concept` 규칙은 행위 이름을 보지 않는다). 그래서 두 형태의
+#: 값은 지금 같지만 **같은 값을 두 번 잰 것**이다 — 한 형태가 먼저 깨지면 그 형태 항목만 실패한다.
+_FROZEN: dict[str, dict[str, dict[int, dict[str, bool]]]] = {
+    shape: {variant: _frozen_variant() for variant in sorted(_WRONG_ANSWERS)}
+    for shape in _PROBE_REQUEST_SHAPES
 }
 
 #: 동결된 공백의 소유자 — 해소 신호가 났을 때 메시지가 가리킬 곳(오답 종류별). 마지막 공백
 #: (`general` Loop 1 `보정` — `EOS-26`)이 2026-09-26 해소돼 지금은 비어 있다. 새 공백을 동결하면
 #: 그 마디의 소유 태스크를 여기에 적는다(소유자 없는 공백은 "소유자 미상"으로 드러난다).
-_GAP_OWNERS: dict[tuple[str, int, str], str] = {}
+_GAP_OWNERS: dict[tuple[str, str, int, str], str] = {}
 
 
 def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
@@ -1153,11 +1268,11 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
     observed = journey.as_map()
     improved: list[str] = []
     regressed: list[str] = []
-    assert journey.variant in _FROZEN, (
-        f"동결표에 없는 오답 종류: {journey.variant} — `_WRONG_ANSWERS`에 종류를 추가했다면 "
-        "`_FROZEN`에도 실측값으로 추가한다."
+    assert journey.shape in _FROZEN and journey.variant in _FROZEN[journey.shape], (
+        f"동결표에 없는 변이: {journey.variant}/{journey.shape} — `_WRONG_ANSWERS`·"
+        "`_PROBE_REQUEST_SHAPES`에 항목을 추가했다면 `_FROZEN`에도 실측값으로 추가한다."
     )
-    for number, frozen_nodes in _FROZEN[journey.variant].items():
+    for number, frozen_nodes in _FROZEN[journey.shape][journey.variant].items():
         assert observed.get(number, {}).keys() == frozen_nodes.keys(), (
             f"Loop {number}의 마디 구성이 바뀌었다: {sorted(observed.get(number, {}))} vs "
             f"{sorted(frozen_nodes)} — 판정 규칙을 바꿨다면 동결표를 함께 고친다."
@@ -1165,10 +1280,14 @@ def test_three_loop_verdict_matches_frozen_gap(journey: _Journey) -> None:
         for name, was in frozen_nodes.items():
             now = observed[number][name]
             if now and not was:
-                owner = _GAP_OWNERS.get((journey.variant, number, name), "소유자 미상")
-                improved.append(f"Loop {number} '{name}' False→True (소유자: {owner})")
+                owner = _GAP_OWNERS.get(
+                    (journey.shape, journey.variant, number, name), "소유자 미상"
+                )
+                improved.append(
+                    f"[{journey.shape}] Loop {number} '{name}' False→True (소유자: {owner})"
+                )
             elif was and not now:
-                regressed.append(f"Loop {number} '{name}' True→False")
+                regressed.append(f"[{journey.shape}] Loop {number} '{name}' True→False")
     assert not regressed, (
         "회귀 — 성립하던 마디가 끊겼다. 이 변경이 연속 3루프를 깼다: "
         + " · ".join(regressed)
@@ -1227,8 +1346,8 @@ def test_diagnosis_probe_matches_frozen(diagnosis_probe: _DiagnosisProbe) -> Non
 # ── §18 계약 — 동결 공백이 남은 오답 종류만 XFAIL ──────────────────────────────
 
 
-def _s18_open_variants() -> set[str]:
-    """동결표에서 한 마디라도 False인 오답 종류 — §18 계약이 아직 미충족인 종류.
+def _s18_open_variants() -> set[tuple[str, str]]:
+    """동결표에서 한 마디라도 False인 (요청 형태, 오답 종류) — §18 계약이 아직 미충족인 변이.
 
     xfail 대상을 따로 적지 않고 `_FROZEN`에서 **유도**한다. 따로 적으면 동결표를 올린 뒤 이
     목록을 잊을 수 있고, 그러면 계약이 성립한 종류가 계속 XFAIL로 숨거나(표식이 남음) 아직
@@ -1236,19 +1355,31 @@ def _s18_open_variants() -> set[str]:
     동결표를 읽으면 xfail 대상이 곧 관측된 미충족 종류다.
     """
     return {
-        variant
-        for variant, loops in _FROZEN.items()
+        (shape, variant)
+        for shape, variants in _FROZEN.items()
+        for variant, loops in variants.items()
         if not all(ok for nodes in loops.values() for ok in nodes.values())
     }
 
 
 def test_s18_xfail_scope_is_derived_from_the_frozen_table() -> None:
-    """2026-09-26(EOS-26 착지 후) 기준 — 미충족 오답 종류가 없다. 두 종류 모두 §18 계약이 선다.
+    """2026-10-03(PED-40 착지 후) 기준 — 미충족 변이가 없다. 두 오답 종류 × 두 요청 형태 모두
+    §18 계약이 선다.
 
     이 값이 바뀌면 동결표가 바뀐 것이다. 그때는 이 단언과 판정문을 함께 고친다(조용히 넓어지거나
     좁아지지 않게). 이력: EOS-24·EOS-124 착지 후(2026-09-25)에는 `{"general"}`이었다.
     """
     assert _s18_open_variants() == set()
+
+
+def test_frozen_tables_are_independent_per_shape() -> None:
+    """형태별 동결표가 **서로 다른 객체**다 — 한 형태의 칸을 올려도 다른 형태가 따라 올라가지 않는다
+    (EOS-24 동결표 분리 선례 · PED-40 ②). 같은 dict를 공유하면 이 단언이 깨진다."""
+    shapes = sorted(_FROZEN)
+    for variant in _WRONG_ANSWERS:
+        a, b = (_FROZEN[sh][variant] for sh in shapes)
+        assert a == b and a is not b
+        assert all(a[n] is not b[n] for n in a)
 
 
 def test_plan300_s18_three_consecutive_loops_hold(
@@ -1260,12 +1391,12 @@ def test_plan300_s18_three_consecutive_loops_hold(
     그 종류가 통과해 버리면(XPASS) strict 실패로 바뀌어 동결 해제를 강제한다. 공백이 없는 종류
     (EOS-26 착지 후 두 종류 모두)는 표식 없이 **반드시 통과**해야 한다.
     """
-    if journey.variant in _s18_open_variants():
+    if (journey.shape, journey.variant) in _s18_open_variants():
         request.applymarker(
             pytest.mark.xfail(
                 strict=True,
                 reason=(
-                    f"계획서 300 §18 무개입 연속 3루프 미충족({journey.variant}) — 동결표 `_FROZEN`에 "
+                    f"계획서 300 §18 무개입 연속 3루프 미충족({journey.variant}/{journey.shape}) — 동결표 `_FROZEN`에 "
                     "False 마디가 남아 있다(소유자는 `_GAP_OWNERS`). 해소 시 XPASS가 strict 실패로 "
                     "바뀐다 — _FROZEN을 올리면 이 표식은 자동으로 풀린다."
                 ),

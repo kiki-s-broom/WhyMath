@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-64-remaining-empty-triple-rows-disposition
+title: "코퍼스 세 필드 공란 잔여 행(distractor 연결됨 86행·원본 A3 외 19행)의 처분 판정 — 채움·표기 정정·현상 유지"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - MISC-61-a3-thin-misid-source-enrichment
+requires_gates: []
+acceptance:
+  - "① 처분 판정(Kiki 결정): 코퍼스 `provenance_note = \"distractor 연결됨\"`이면서 세 필드(`student_wrong_thinking`·`distractor_rule`·`error_type`)가 빈 **86행**(원천부터 공란 — MISC-61 ① 2026-10-09 실측)과, `원본`이면서 세 필드가 빈 행 중 A3 외 **19행**(원천 `오개념_원인` 후보 — MISC-61 2차 실행 결과 필요)에 대해 ⓐ채움 ⓑ표기 정정 ⓒ현상 유지 중 택일을 받는다. 세션이 정하지 않는다.\n② ⓐ를 택하면: 이 행들은 원천에 근거가 없으므로 AI 저작이다 — `provenance_note`에 AI 저작 표시와 태스크 ID를 단다. 근거는 행의 개념 코퍼스(`concept_graph_v1`) 서술·성취기준으로 둔다. **카탈로그 kebab(`l4/misconception/catalog.py`)의 서술을 복사하지 않는다** — MISC-61의 가드 `tests/backend/l4/test_misc61_authored_rows.py`(최장 공통 부분문자열 14자 미만 + 전 kebab 대조군)를 대상 행 전체로 일반화한다. 대량 AI 저작은 인간 검수의 대체가 아니다.\n③ ⓑ를 택하면: `distractor 연결됨`은 distractor 필드가 비어 있는 행에 붙은 사실과 다른 표기다. 이 문자열을 읽는 런타임 코드는 없다(2026-10-12 `grep` 실측: 추출기 docstring·진단 스크립트·문서·게이트 문면·코퍼스 데이터뿐) — 단 진단 스크립트 `LINKED_NOTE`와 그 테스트는 표기를 바꾸면 함께 고친다.\n④ 어느 쪽이든 전체 재추출로 처리하지 않는다 — 코퍼스는 추출 이후 열(`severity`·`behavior_skills`)과 수기 추가 행을 가졌다(판정 문서 §2-c). 표적 패치만."
+artifacts: []
+paths:
+  - "data/corpus/misconceptions_v1/**"
+session: null
+notes: "MISC-61 ④의 승계. 왜 별도 태스크인가: A3 4건은 게이트 `G-misc40-deferred-m0599-redecision`의 재료라 급했지만, 나머지 행은 앵커 좌석과 무관하다(앵커 좌석 수는 crosslink 승인에서만 생긴다) — 처분 방향이 제품 판단(AI 저작 대량 투입 여부)이라 Kiki 결정이 선행한다. 12월 검증 이월 등급(P2)으로 등재."
+updated: 2026-10-12

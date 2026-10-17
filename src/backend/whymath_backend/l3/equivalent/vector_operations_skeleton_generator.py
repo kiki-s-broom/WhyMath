@@ -40,7 +40,7 @@ from dataclasses import dataclass
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import euro_ro
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -195,6 +195,7 @@ def _linear_combo_explanation(skeleton: _LinearComboSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class VectorLinearCombinationSkeletonGenerator:
     """벡터 선형결합 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -360,6 +361,7 @@ def _position_vector_explanation(skeleton: _PositionVectorSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class PositionVectorComponentSkeletonGenerator:
     """위치벡터 성분 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

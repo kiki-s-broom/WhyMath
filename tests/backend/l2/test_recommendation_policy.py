@@ -269,10 +269,10 @@ class TestPolicyConformance:
 
     def test_policy_version_is_declared_by_the_policy_not_the_handler(self) -> None:
         """소급 평가는 "어느 정책이 냈는가"를 알아야 한다 — 핸들러가 붙이면 정책과 갈라진다."""
-        # EOS-124: 정렬 재선택으로 선택 규칙이 바뀌었으므로 식별자도 바뀐다(REC-11 규약).
-        # EOS-33: 관계 행위에 증거 요건(전진 하한 · 결손 경계)이 붙어 같은 입력에서 다른 문항이
-        # 나가므로 다시 올린다.
-        assert CatRecommendationPolicy.policy_version == "cat_v3"
+        # 선택 규칙이 바뀔 때마다 식별자도 바뀐다(REC-11 규약): EOS-124 정렬 재선택 → `cat_v2`,
+        # EOS-147 전부 정답 이력의 표적 θ 분리 → `cat_v4`, EOS-39 도움 완료 접기 → `cat_v5`,
+        # EOS-33 관계 행위 증거 요건(전진 하한 · 결손 경계) → `cat_v6`(`cat_v3`은 결번).
+        assert CatRecommendationPolicy.policy_version == "cat_v6"
         assert SuneungRecommendationPolicy.policy_version
 
     def test_learning_context_carries_the_request_axes(self) -> None:
@@ -451,7 +451,7 @@ class TestOutcomeEnforcesAlignment:
             "problem_id": None,
             "reason": no_candidate_reason(),
             "theta": 0.0,
-            "policy_version": "suneung_v1",
+            "policy_version": "suneung_v4",
         }
         if not omit:
             base["intent_resolution"] = None

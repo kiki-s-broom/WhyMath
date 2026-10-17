@@ -1,0 +1,34 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-26-discrete-expected-value-pilot-corpus
+title: "고등 이산확률변수 기댓값 파일럿 코퍼스 (W2) — 통계 영역 0% 최초 착점"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-25-middle-school-function-value-pilot-corpus
+requires_gates: []
+acceptance:
+  - "고등 축 통계 영역([12확통03-01~07] 7코드) 전량 0.0%임을 확인 — [12확통03-02](이산확률변수 기댓값)를 최초 착점으로 선택"
+  - "Tier1이 분수 산술 조건(가중합/분모)도 그대로 처리함을 실측 확인(정수·미분·대입에 이은 5번째 확인 패턴)"
+  - "신규 DiscreteExpectedValueSkeletonGenerator — 개념그래프 legacy 공간 실존 확인(source_id=H:12확통03-02) 후 정상 태깅"
+  - "앞선 4개 생성기가 확립한 함정 회피(위생 게이트 등호 회피·josa.eul_reul·operation 필터 불요 판단·run_equivalent_generation signature_index=None) 재사용 확인"
+  - "problem_bank_discrete_ev_v0 코퍼스 생성 — 전건 Tier1 게이트 통과·is_published=False"
+  - "coverage 리포트 재실행으로 고등 통계 영역 실제 이동 확인(0.0%→상승)"
+  - "단위테스트(생성기·배치) green, ruff·black·mypy --strict clean"
+artifacts:
+  - 33f31cf3
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/discrete_expected_value_skeleton_generator.py
+  - src/backend/whymath_backend/harness/discrete_ev_batch.py
+  - tests/backend/l3/equivalent/test_discrete_expected_value_skeleton_generator.py
+  - tests/backend/harness/test_discrete_ev_batch.py
+  - data/corpus/problem_bank_discrete_ev_v0/problems.jsonl
+session: null
+notes: "학년축 최단경로 계획 §3 W2 다섯 번째 슬라이스 — 고등 통계 영역(집합과 명제·경우의 수와 함께 0% 3대 영역 중 하나이자 수치 검증에 가장 적합) 착점. elementary(S4-22)·matrix(S4-23)·university(S4-24)·middle(S4-25) 확립 패턴 재사용. 집합과 명제는 Tier1 수치 검증과 부적합(명제 논리는 비수치)이라 이 슬라이스 범위 밖으로 의도적 배제.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-26-discrete-expected-value-pilot-corpus 재등재. 원 증적 ['33f31cf3']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

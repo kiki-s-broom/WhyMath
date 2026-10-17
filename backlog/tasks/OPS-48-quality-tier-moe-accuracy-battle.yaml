@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,10 +17,12 @@ acceptance:
   - "③ 채택 조건 3건 충족 확인(CLAUDE.md 2026-08-16): ⑴ 라우터(l3/router.py) 경유 배선 — QUALITY_MODEL_ID 교체이므로 직접 호출 경로가 생기지 않음을 확인 ⑵ 실측 근거 = ①+② ⑶ MEMORY 결정 로그 기재. 검증 계약(SymPy 단일 권위·PRM·Langfuse 추적·미성년자 데이터 정책)은 모델과 무관하게 불변임을 별항으로 확인"
   - "④ 채택 시 후속: QUALITY가 비동기 전용인 전제(LOCAL_LATENCY_MS[QUALITY]=13886ms)가 바뀌는지 판단한다. 2.3초면 동기 승격이 성립할 수 있으나 이는 별도 결정이며 이 태스크에서는 가능성만 기록한다"
   - "⑤ 범위 밖: dense 27B 자체의 튜닝 · 다른 MoE 후보 탐색(qwen3-coder:30b는 코드 특화라 수학 QUALITY 대체군이 아니다) · 라우터 티어 구조 변경"
-artifacts: []
+artifacts:
+  - "#855"
+  - "#857"
 paths:
   - src/backend/whymath_backend/l3/router.py
   - docs/ops/amd395_local_llm_performance.md
 session: null
 notes: "근거 문서 docs/ops/amd395_local_llm_performance.md §2·§5(Phase 1 확정 측정)·§3 L5. 속도 축은 이미 실측 완료 상태로 착수한다 — 남은 것은 정확도 대조뿐이다. LOCAL_LATENCY_MS 보정은 불요로 판정됐다(실측 906/3551/12406ms가 기존 상수 1010/3918/13886ms보다 빨라 상수가 보수적·안전측).\n\n[정정 2026-09-01] eos_priority null → P1: 처리량 30 CU/h·단위비용 250원 KPI에 직접 영향. EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-08

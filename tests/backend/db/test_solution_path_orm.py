@@ -195,8 +195,17 @@ class TestMigrationFileChain:
         # 토큰 발급 감사)를 얹어 head를 다시 이동.
         # S4-11이 그 위에 9d3e6b1f4a27(hints 테이블 — graded 힌트 카탈로그)을 얹어 head를 이동,
         # EOS-50이 다시 그 위에 9d3e7b1c5a20(concept_version_status_enum 'IN_QA' +
-        # concept_version.qa 게이트 기록 좌석)을 얹어 head를 이동.
-        assert heads == {"9d3e7b1c5a20"}
+        # concept_version.qa 게이트 기록 좌석)을 얹어 head를 이동,
+        # DP-03이 그 위에 a3f7c9d1e5b2(attempt_event.event_uuid 멱등키)를 얹어 head를 이동.
+        # ARCH-32가 그 위에 b4d8e2a6c0f3(problem.source_id — source_entity FK 좌석)을 얹어 이동.
+        # ARCH-31이 그 위에 c5e1f9a3b7d2(problem_version 테이블 + problem.problem_version_id +
+        # PUBLISHED 불변성 트리거)를 얹어 head를 이동.
+        # P3-12가 그 위에 c5e9f3a7b1d4(role_enum에 CMS 역할 3종 — 어휘만 확장)를 얹어 이동.
+        # P3-25가 그 위에 e7b2c4d8a1f6(CMS 편집 표지 cms_edited_at 5컬럼)을 얹어 이동.
+        # EOS-47이 그 위에 d6a2f8c4b1e7(problem_attempt 버전 고정 컬럼 2개)를 얹어 이동.
+        # P3-26이 그 위에 a8c4e1f7b3d9(concept·concept_edge CMS 소유 표지 + FK 해제 + 트리거 2종)를
+        # 얹어 이동.
+        assert heads == {"a8c4e1f7b3d9"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

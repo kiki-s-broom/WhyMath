@@ -59,6 +59,7 @@ from whymath_backend.schema.verification_capabilities import VerificationOutcome
 __all__ = [
     "FinalAnswerResult",
     "FinalAnswerState",
+    "budget_exceeded_result",
     "verify_final_answer",
 ]
 
@@ -116,6 +117,15 @@ _NON_EQUALITY_MARKERS: tuple[str, ...] = ("==", "!=", "<=", ">=", "<", ">")
 def _result(state: FinalAnswerState, reason: str | None) -> FinalAnswerResult:
     """결과 조립 헬퍼(단일 출구)."""
     return FinalAnswerResult(state=state, reason=reason)
+
+
+def budget_exceeded_result() -> FinalAnswerResult:
+    """계산 시간 상한 초과(OPS-96)의 *판정 불가* 결과 — 정답·오답 어느 쪽으로도 처리하지 않는다.
+
+    호출부의 `is_correct` 승격은 오직 `correct`에서만 일어나므로 초과가 완료 처리나 REDIRECT(부정
+    피드백)로 새지 않는다. 사유에는 학생 원문도 기대정답도 싣지 않는다.
+    """
+    return _result(FinalAnswerState.unverifiable, "계산 시간 상한 초과 — 서버 검증 불가")
 
 
 def _strip_answer_noise(text: str) -> str:

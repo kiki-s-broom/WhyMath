@@ -16,10 +16,12 @@ from dataclasses import dataclass, field
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from whymath_backend.api.coach import CoachRequest, SessionCreateRequest
 from whymath_backend.l3.verify_step import VerifyStepState, verify_step
 from whymath_backend.ops import wh1_shadow_probe as probe
+from whymath_backend.schema.auth import OAuthCallbackRequest
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -30,6 +32,7 @@ class _Server:
     """가짜 서버 — 요청을 캡처하고 경로별로 스크립트된 응답을 낸다."""
 
     auth_status: int = 200
+    state_status: int = 200
     session_status: int = 201
     turn_status: int = 201
     requests: list[httpx.Request] = field(default_factory=list)
@@ -37,7 +40,17 @@ class _Server:
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         path = request.url.path
+        if path == "/v1/auth/demo/state":
+            return httpx.Response(self.state_status, json={"state": "state-abc"})
         if path == "/v1/auth/demo/callback":
+            # 무조건 200을 돌려주는 대역 금지(OPS-111 ②) — 서버 스키마로 바디를 검증해 거부한다.
+            # SEC-08 이후 state는 필수이고 서버가 발급한 값이어야 한다(미동봉·불일치 → 거부).
+            try:
+                body = OAuthCallbackRequest.model_validate(json.loads(request.content))
+            except ValidationError:
+                return httpx.Response(422, json={"detail": "schema"})
+            if body.state != "state-abc":
+                return httpx.Response(400, json={"detail": "state mismatch"})
             return httpx.Response(
                 self.auth_status,
                 json={"access_token": "demo-token", "refresh_token": "r", "token_type": "bearer"},
@@ -187,6 +200,33 @@ def test_token_auto_issued_via_demo_callback() -> None:
     assert report.token_auto_issued is True
     assert len(server.auth_requests()) == 1
     assert all(r.headers["Authorization"] == "Bearer demo-token" for r in server.coach_requests())
+
+
+def test_token_issue_sends_server_issued_state_in_callback_body() -> None:
+    """OPS-111 ① — state를 먼저 GET으로 받아 콜백 바디에 싣는다(run_demo.ps1과 같은 순서)."""
+    server = _Server()
+    with server.client() as client:
+        assert probe.issue_demo_token(client) == "demo-token"
+    paths = [r.url.path for r in server.requests]
+    assert paths == ["/v1/auth/demo/state", "/v1/auth/demo/callback"]
+    assert _body(server.auth_requests()[0])["state"] == "state-abc"
+
+
+def test_callback_double_rejects_body_without_state() -> None:
+    """OPS-111 ② — 대역이 서버 스키마로 검증한다: state 없는 바디는 422(라이브 실패의 재현)."""
+    server = _Server()
+    with server.client() as client:
+        resp = client.post("/v1/auth/demo/callback", json={"code": "demo", "redirect_uri": "x"})
+    assert resp.status_code == 422
+
+
+def test_state_fetch_failure_raises_clear_guidance() -> None:
+    """state 발급 비200 → 플래그 안내가 달린 ProbeAuthError(콜백은 시도하지 않는다)."""
+    server = _Server(state_status=404)
+    with server.client() as client:
+        with pytest.raises(probe.ProbeAuthError, match="WHYMATH_DEMO_AUTH_ENABLED"):
+            probe.issue_demo_token(client)
+    assert server.auth_requests() == []
 
 
 def test_auth_failure_raises_clear_guidance() -> None:

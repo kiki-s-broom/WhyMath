@@ -907,6 +907,19 @@ class TestStepChainVerifierInjection:
     # 진짜 수학 구현이면 correct 전이(2*x+4 ≡ 2*(x+2)) → 노출 None. 가짜면 incorrect → verify.
     _STEPS = ["2*x + 4", "2*(x + 2)"]
 
+    @pytest.fixture(autouse=True)
+    def _isolation_off(self, monkeypatch: pytest.MonkeyPatch) -> Any:
+        """격리를 끈다(OPS-125) — 이 클래스는 *주입*을 검증하지 격리를 검증하지 않는다.
+
+        격리가 켜져 있으면 가짜 verifier가 워커 프로세스로 pickle되어 가야 하는데, 테스트 모듈에
+        정의된 클래스는 워커가 import하지 못하고(`ModuleNotFoundError`) 호출 기록(`fake.calls`)도
+        워커 쪽 사본에만 남는다. 격리 쪽 검증은 `test_coach_step_chain_isolation.py`가 한다.
+        """
+        monkeypatch.setenv("WHYMATH_SYMPY_ISOLATION_ENABLED", "false")
+        get_settings.cache_clear()
+        yield
+        get_settings.cache_clear()
+
     def _install(self, client: TestClient) -> _RecordingStepChainVerifier:
         """`create_app`이 올린 진짜 능력을 가짜로 교체(다른 능력·경로는 그대로)."""
         fake = _RecordingStepChainVerifier()
@@ -2167,6 +2180,10 @@ class TestRateLimit:
         resp = client.post("/v1/coach", json={"student_input": "음"})
         assert resp.status_code == 429
         assert resp.headers["Retry-After"] == "60"
+        # OPS-82: 종전 detail 문장은 그대로 두고 옆에 안정 코드가 실린다(하위 호환).
+        body = resp.json()
+        assert body["error_code"] == "WM-RATE-001"
+        assert "요청이 너무 많습니다" in body["detail"]
 
     def test_zero_means_disabled(self) -> None:
         # limit=0 → 무제한(기본 테스트 모드)
@@ -4459,6 +4476,12 @@ class TestLogHintEvent:
             # S4-11: served_hint 미지정 → 검수 힌트 미서빙 턴(None·0으로 날조 금지).
             "reveal_score": None,
             "hint_id": None,
+            # EOS-178: 호출부가 라벨 없는 단계·적용된 라벨을 넘기지 않으면 구판 행과 같다(None).
+            "base_level": None,
+            "ability_level": None,
+            # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+            "label_source": None,
+            "label_evidence_n": None,
         }
         assert event.user_id == self._UID
         assert event.problem_id == self._PID
@@ -4487,6 +4510,11 @@ class TestLogHintEvent:
             "client_state_mismatch": False,
             "reveal_score": None,
             "hint_id": None,
+            "base_level": None,
+            "ability_level": None,
+            # EOS-179: 라벨 출처·증거 수 — 미지정이면 구판 행과 같다(None=모름·0 아님).
+            "label_source": None,
+            "label_evidence_n": None,
         }
 
 

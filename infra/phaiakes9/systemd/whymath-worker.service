@@ -9,6 +9,13 @@
 # 로그:
 #   sudo journalctl -u whymath-worker -f
 #
+# ★ 비정본(OPS-27) — compose 스택(docker-compose.prod.yml)을 쓰는 호스트에서는 이 유닛을 설치하지
+#   않는다. 정본 워커는 compose의 quality-worker 컨테이너다(런북 deployment_cd_runbook.md §5c).
+#   이 유닛은 compose 없이 호스트에 직접 설치하는 *네이티브 토폴로지*(api·redis·worker 모두
+#   systemd)용 대안이며, 같은 브로커에 컨테이너 워커와 이 유닛을 함께 띄우면 워커가 둘이 되어
+#   동시성이 2가 된다(GPU 단일 점유 위반). compose의 Redis는 호스트 포트를 공개하지 않으므로
+#   이 유닛은 compose 스택의 큐를 소비할 수도 없다.
+#
 # 주의(OPERATIONS_24_7.md §2·03a §D.3):
 #   - QUALITY 27b는 GPU 단일 점유 → concurrency 1 고정(-c 1). 늘리지 말 것.
 #   - 큐(이 워커)가 미가동이면 /v1/generate QUALITY는 503(QualityQueueUnavailableError·
@@ -26,9 +33,10 @@ User=whymath
 Group=whymath
 WorkingDirectory=/srv/whymath/src/backend
 EnvironmentFile=/etc/whymath/whymath.env
-# 정전(canonical) 기동 명령(celery_app.py docstring): factory 형식 -A module:build_celery_app.
+# 기동 명령(celery_app.py docstring) — -A에는 팩토리 함수가 아니라 모듈 수준 인스턴스를 준다.
+# (팩토리를 -A에 직접 주면 celery CLI가 AttributeError로 기동 즉시 죽는다 — 2026-10-08 실측.)
 ExecStart=/srv/whymath/src/backend/.venv/bin/celery \
-  -A whymath_backend.l3.queue.celery_app:build_celery_app worker -c 1 --loglevel=INFO
+  -A whymath_backend.l3.queue.tasks:quality_celery_app worker -c 1 --loglevel=INFO
 Restart=on-failure
 RestartSec=5
 ProtectSystem=full

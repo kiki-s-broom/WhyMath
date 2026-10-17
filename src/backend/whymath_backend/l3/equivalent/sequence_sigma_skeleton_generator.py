@@ -48,7 +48,7 @@ from typing import Literal
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -174,6 +174,7 @@ def _sigma_explanation(skeleton: _SigmaSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class SigmaLinearitySkeletonGenerator:
     """Σ 선형성 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -370,6 +371,7 @@ def _power_sum_explanation(skeleton: _PowerSumSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class PowerSumSkeletonGenerator:
     """거듭제곱 합 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

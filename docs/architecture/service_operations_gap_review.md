@@ -1,5 +1,16 @@
 # 서비스 운영(Service Operations) 모듈 — 외부 EOS 틀 대조 갭 점검·설계 (2026-08-03)
 
+> **⚠️ 후속 문서 있음 — 이 문서는 v1(2026-08-03)이며 본문은 소급 수정하지 않는다**
+> (완료 태스크 `RPT-01`·`OPS-17`·`A11Y-01`·`OPS-18`·`MOB-08`의 판정 근거 원본이기 때문).
+> 현행 판정은 **[`service_operations_gap_review_r2.md`](../reviews/service_operations_gap_review_r2.md)**
+> (2026-08-11, 2차 델타 재점검)를 읽는다 — v1 설계 D1~D5는 **전건 착지 확인**됐고, r2는
+> ⑴ v1 §정정 9곳 중 **6곳이 미집행**이라는 사실 ⑵ 버전 계약(OPS-17)의 관측 반쪽
+> ⑶ 접근성 커버리지 드리프트를 다룬다.
+>
+> **본문 오기 1건 정정(r2 실측)**: 아래 §3 D1 착지 정정 블록(`:177` 부근)이 API 경로를
+> `POST /v1/defect-reports`로 적었으나 **실제 착지 경로는 `POST /v1/reports/defects`**
+> (`api/reports.py` prefix `/v1/reports` + `@router.post("/defects")`)다.
+
 > **범위**: 외부 참고 문서 『22. 서비스 운영』(핵심 모듈 91~95: 결제·구독·환불 · 접근성
 > (Accessibility) · 푸시 알림 인프라 · 고객지원(CS)·오류 신고 · 앱 배포·업데이트 관리 —
 > **WhyMath 전용이 아닌 일반적 EOS 틀**, Kiki 제공)을 현 코드베이스와 대조해 빠진 부분을

@@ -20,9 +20,14 @@
 2. **전이 계획**(순수 함수): `plan_transition`이 전이표(`schema/version_lifecycle.py`)를 조회해
    도착 상태를 얻고, 거버넌스를 기록하고, 게이트가 붙은 간선이면 파이프라인을 강제 경유시킨다.
    이 함수는 도착 상태를 스스로 고르지 않는다 — 표에 없는 전이는 `UndefinedTransitionError`.
-3. **전이 실행**(DB): `create_draft`·`apply_transition`·`rollback`. 운영 코드에서
-   `concept_version` 행과 `concept.current_published_version_id`를 쓰는 **유일한 자리**다
-   (AST 동결 — `tests/backend/l3/test_publish_gate_enforcement.py`).
+3. **전이 실행**(DB): `create_draft`·`create_proposal`·`revise_proposal`·`apply_transition`·
+   `rollback`. 운영 코드에서 `concept_version` 행과 `concept.current_published_version_id`를 쓰는
+   **유일한 자리**다(AST 동결 — `tests/backend/l3/test_publish_gate_enforcement.py`).
+
+   **신규 개념(P3-26)**: `create_proposal`은 살아있는 `concept` 행 없이 첫 DRAFT 판을 만든다
+   (`change_type="cms_create"`). 개념 행은 그 판이 **발행되는 순간 `apply_transition`이 만든다** —
+   다른 어떤 경로도 CMS 쪽에서 개념 행을 만들지 못한다(검수 없이 학생이 읽는 행이 생기지 않는다).
+   이후 판(수정)은 기존대로 개념 행을 바꾸지 않는다(서빙 경로 미연결 — 판정 문서 F2·B5).
 
 ## 트랜잭션 계약
 
@@ -49,15 +54,19 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal, overload
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import exists, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.concept import Concept
 from whymath_backend.db.models.concept_version import ConceptVersion
 from whymath_backend.schema.concept_version import ConceptVersion as SchemaConceptVersion
 from whymath_backend.schema.concept_version import ConceptVersionPayload
+from whymath_backend.schema.enums import CognitiveType, ConceptLevel
 from whymath_backend.schema.version_header import (
     GateKind,
     GateRecord,
@@ -100,8 +109,54 @@ class PublishGateError(RuntimeError):
         super().__init__(f"게이트 {label} 미통과: {'; '.join(self.failures)}")
 
 
+#: 신규 개념 제안 판의 `change.change_type` — 이 판이 *아직 살아있는 개념 행이 없는* 개념의 첫
+#: 판이며
+#: 발행하는 순간 개념 행이 만들어진다는 표식이다(P3-26). 다른 값의 판은 개념 행 없이 전이할 수 없다.
+CMS_CREATE_CHANGE_TYPE = "cms_create"
+
+
+class CodeTakenError(RuntimeError):
+    """신규 개념 코드를 쓸 수 없다 — 살아있는 개념이 그 코드이거나 그 코드의 판이 이미 있다(P3-26).
+
+    판 이력이 남은 코드는 개념 행이 지워져도 **영구 예약**이다(옛 판이 가리키는 코드를 다른 개념이
+    재사용하면 이력이 거짓이 된다).
+    """
+
+    def __init__(self, code: str, reason: str) -> None:
+        self.code = code
+        self.reason = reason
+        super().__init__(f"개념 코드 사용 불가({code}): {reason}")
+
+
 class RollbackUnavailableError(RuntimeError):
     """롤백할 수 없다 — 현재 발행본이 없거나 복원할 직전 발행본이 없다."""
+
+
+class StalePublishedPointerError(RuntimeError):
+    """호출자가 본 현재 발행본이 잠금 후 실제 발행본과 다르다 — 롤백은 일어나지 않는다(P3-12).
+
+    화면이 "이 판이 발행 중이니 내려라"고 요청했는데 그사이 다른 판이 발행됐다면, 그대로 롤백하면
+    **엉뚱한 판**이 내려간다. `rollback(expected_current_version_id=...)`가 개념 행 잠금 후
+    비교한다.
+    """
+
+    def __init__(self, expected: uuid.UUID, actual: uuid.UUID | None) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(f"발행본 불일치: 기대 {expected} / 실제 {actual}")
+
+
+class StaleStatusError(RuntimeError):
+    """호출자가 본 상태와 잠금 후 실제 상태가 다르다 — 그사이 다른 사람이 전이를 실행했다(P3-12).
+
+    `apply_transition(expected_status=...)`가 **행 잠금을 잡은 뒤** 비교하므로 검사와 전이 사이에
+    틈이 없다(화면이 읽은 상태로 전이를 요청하는 낙관적 동시성). 전이는 일어나지 않는다.
+    """
+
+    def __init__(self, expected: VersionStatus, actual: VersionStatus) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(f"상태 불일치: 기대 {expected.value} / 실제 {actual.value}")
 
 
 @dataclass(frozen=True)
@@ -295,10 +350,37 @@ def _write_back(row: ConceptVersion, planned: SchemaConceptVersion) -> None:
     row.published_at = planned.published_at
 
 
+async def list_versions(session: AsyncSession, concept_code: str) -> list[SchemaConceptVersion]:
+    """한 개념의 모든 판 — 최신(`version_no` 큰 것)부터. **읽기 전용**(잠금·쓰기 없음).
+
+    API 계층은 ORM `ConceptVersion`을 import할 수 없다(AST 동결 R1) — 읽기도 이 모듈을 거친다.
+    저장된 행이 계약을 어기면 그 판은 건너뛰지 않고 `PublishGateError`로 알린다(조용한 누락 금지).
+    """
+    rows = await session.execute(
+        select(ConceptVersion)
+        .where(ConceptVersion.concept_id == concept_code)
+        .order_by(ConceptVersion.version_no.desc())
+    )
+    return [_load_schema(row) for row in rows.scalars()]
+
+
+async def get_version(session: AsyncSession, version_id: uuid.UUID) -> SchemaConceptVersion:
+    """판 1건 — 없으면 `LookupError`. **읽기 전용**."""
+    row = (
+        await session.execute(select(ConceptVersion).where(ConceptVersion.version_id == version_id))
+    ).scalar_one_or_none()
+    if row is None:
+        raise LookupError(f"concept_version {version_id} 없음")
+    return _load_schema(row)
+
+
 async def _lock_version(session: AsyncSession, version_id: uuid.UUID) -> ConceptVersion:
     row = (
         await session.execute(
-            select(ConceptVersion).where(ConceptVersion.version_id == version_id).with_for_update()
+            select(ConceptVersion)
+            .where(ConceptVersion.version_id == version_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
     ).scalar_one_or_none()
     if row is None:
@@ -306,13 +388,126 @@ async def _lock_version(session: AsyncSession, version_id: uuid.UUID) -> Concept
     return row
 
 
-async def _lock_concept(session: AsyncSession, concept_code: str) -> Concept:
+@overload
+async def _lock_concept(
+    session: AsyncSession, concept_code: str, *, allow_missing: Literal[False] = False
+) -> Concept: ...
+
+
+@overload
+async def _lock_concept(
+    session: AsyncSession, concept_code: str, *, allow_missing: Literal[True]
+) -> Concept | None: ...
+
+
+async def _lock_concept(
+    session: AsyncSession, concept_code: str, *, allow_missing: bool = False
+) -> Concept | None:
+    """개념 행을 잠그고 돌려준다. `allow_missing`이면 행이 없어도 예외 없이 `None`을 돌려준다.
+
+    행이 없으면(신규 개념 제안 — P3-26) `FOR UPDATE`를 걸 대상이 없으므로 **코드 해시 어드바이저리
+    잠금**(트랜잭션 수명)으로 같은 코드에 대한 동시 제안·전이를 직렬화한다. 행이 있는 코드는
+    기존처럼
+    행 잠금이 직렬화하므로 어드바이저리 잠금은 행이 없을 때만 쓴다.
+    """
+    # `populate_existing`: 잠금을 잡은 뒤의 값을 **항상 새로 읽는다**. 이미 세션에 올라온 엔티티가
+    # 있으면 `FOR UPDATE`만으로는 속성이 갱신되지 않아, 호출자가 앞서 읽어 둔 낡은 발행 포인터를
+    # 잠금 후 판정(`expected_current_version_id` 비교 등)에 쓰게 된다.
     concept = (
-        await session.execute(select(Concept).where(Concept.code == concept_code).with_for_update())
+        await session.execute(
+            select(Concept)
+            .where(Concept.code == concept_code)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
     ).scalar_one_or_none()
     if concept is None:
-        raise LookupError(f"concept {concept_code!r} 없음")
+        if not allow_missing:
+            raise LookupError(f"concept {concept_code!r} 없음")
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+            {"key": f"whymath.concept_code:{concept_code}"},
+        )
+        # 잠금을 기다리는 사이 다른 트랜잭션이 개념 행을 만들었을 수 있다 — 한 번 더 읽는다.
+        concept = (
+            await session.execute(
+                select(Concept)
+                .where(Concept.code == concept_code)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
     return concept
+
+
+async def has_published_version(session: AsyncSession, concept_code: str) -> bool:
+    """이 개념 코드에 PUBLISHED 판이 하나라도 있는가. **읽기 전용**.
+
+    삭제 가능 여부 판정용이다 — 발행 포인터가 아니라 판 *상태*를 직접 본다(포인터가 비어도 PUBLISHED
+    판이 남아 있는 불일치가 있으면 삭제를 막아야 한다).
+    """
+    found = (
+        await session.execute(
+            select(ConceptVersion.version_id)
+            .where(
+                ConceptVersion.concept_id == concept_code,
+                ConceptVersion.status == VersionStatus.PUBLISHED,
+            )
+            .limit(1)
+        )
+    ).first()
+    return found is not None
+
+
+#: 신규 개념 제안이 "열려 있다"고 보는 상태 — 아직 발행(개념 행 실체화) 전이다.
+_OPEN_PROPOSAL_STATES: tuple[VersionStatus, ...] = (
+    VersionStatus.DRAFT,
+    VersionStatus.IN_REVIEW,
+    VersionStatus.IN_QA,
+    VersionStatus.APPROVED,
+)
+
+
+async def list_open_proposals(
+    session: AsyncSession, *, limit: int = 100
+) -> list[SchemaConceptVersion]:
+    """아직 개념 행이 없는 신규 개념 제안 — 코드별 **최신 판**만, 열린 상태인 것만. **읽기 전용**.
+
+    "개념 행이 없다"만으로는 *삭제된 개념의 판 이력*과 구분되지 않으므로 ① 최신 판이 열린 상태
+    (DRAFT·IN_REVIEW·IN_QA·APPROVED)이고 ② `change_type`이 제안(`cms_create`)인 것으로 좁힌다.
+    삭제된 개념은 발행본을 거쳤으므로 최신 판이 DEPRECATED·RETIRED이거나 수정판(`cms_edit`)이다.
+    """
+    latest = aliased(ConceptVersion)
+    newest_no = (
+        select(func.max(ConceptVersion.version_no))
+        .where(ConceptVersion.concept_id == latest.concept_id)
+        .correlate(latest)
+        .scalar_subquery()
+    )
+    rows = await session.execute(
+        select(latest)
+        .where(
+            ~exists().where(Concept.code == latest.concept_id),
+            latest.version_no == newest_no,
+            latest.status.in_(_OPEN_PROPOSAL_STATES),
+        )
+        .order_by(latest.created_at.desc())
+        .limit(limit)
+    )
+    found = [_load_schema(row) for row in rows.scalars()]
+    return [v for v in found if v.change.change_type == CMS_CREATE_CHANGE_TYPE]
+
+
+async def has_any_version(session: AsyncSession, concept_code: str) -> bool:
+    """이 개념 코드로 만들어진 판이 하나라도 있는가(상태 무관). **읽기 전용**."""
+    found = (
+        await session.execute(
+            select(ConceptVersion.version_id)
+            .where(ConceptVersion.concept_id == concept_code)
+            .limit(1)
+        )
+    ).first()
+    return found is not None
 
 
 async def _published_siblings(
@@ -326,6 +521,7 @@ async def _published_siblings(
             ConceptVersion.version_id != exclude,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     return list(rows.scalars())
 
@@ -358,6 +554,28 @@ async def create_draft(
     if not created_by or not created_by.strip():
         raise ValueError("created_by가 비었다")
     await _lock_concept(session, concept_code)  # 같은 개념의 동시 판 생성 직렬화
+    return await _insert_draft(
+        session,
+        concept_code=concept_code,
+        payload=payload,
+        schema_version=schema_version,
+        created_by=created_by,
+        change=change,
+        source=source,
+    )
+
+
+async def _insert_draft(
+    session: AsyncSession,
+    *,
+    concept_code: str,
+    payload: ConceptVersionPayload,
+    schema_version: str,
+    created_by: str,
+    change: VersionChange | None,
+    source: VersionSource | None,
+) -> SchemaConceptVersion:
+    """잠금을 잡은 호출자가 부른다 — 최신 판을 읽어 다음 번호의 DRAFT 한 줄을 넣는다."""
     latest = (
         await session.execute(
             select(ConceptVersion)
@@ -385,6 +603,127 @@ async def create_draft(
     return schema
 
 
+async def create_proposal(
+    session: AsyncSession,
+    *,
+    concept_code: str,
+    payload: ConceptVersionPayload,
+    schema_version: str,
+    created_by: str,
+    reason: str | None = None,
+    ticket_id: str | None = None,
+) -> SchemaConceptVersion:
+    """**아직 살아있는 개념 행이 없는** 개념의 첫 DRAFT 판을 만든다 — 신규 개념 제안(P3-26).
+
+    살아있는 `concept` 행은 만들지 않는다. 검토·QA·승인을 거쳐 **발행(`apply_transition`)하는 순간**
+    이 모듈이 개념 행을 실체화한다. 코드가 이미 쓰였으면(살아있는 개념이 있거나 그 코드의 판이
+    하나라도 있으면) `CodeTakenError` — 제안은 항상 `version_no=1`로 시작한다.
+    """
+    if not created_by or not created_by.strip():
+        raise ValueError("created_by가 비었다")
+    if await _lock_concept(session, concept_code, allow_missing=True) is not None:
+        raise CodeTakenError(concept_code, "이미 살아있는 개념의 코드입니다")
+    if await has_any_version(session, concept_code):
+        raise CodeTakenError(concept_code, "이미 판 이력이 있는 코드입니다(영구 예약)")
+    return await _insert_draft(
+        session,
+        concept_code=concept_code,
+        payload=payload,
+        schema_version=schema_version,
+        created_by=created_by,
+        change=VersionChange(
+            change_type=CMS_CREATE_CHANGE_TYPE, reason=reason, ticket_id=ticket_id
+        ),
+        source=None,
+    )
+
+
+async def revise_proposal(
+    session: AsyncSession,
+    *,
+    concept_code: str,
+    payload: ConceptVersionPayload,
+    schema_version: str,
+    created_by: str,
+    reason: str | None = None,
+    ticket_id: str | None = None,
+) -> SchemaConceptVersion:
+    """아직 발행되지 않은 신규 개념 제안을 고친다 — 항상 새 DRAFT 판(수정 = 새 판, 44 §1 원칙 3).
+
+    개념 행이 **없고** 그 코드의 최신 판이 제안(`cms_create`)일 때만 허용한다. 개념 행이 있으면(이미
+    발행돼 실체화됨) 일반 `create_draft` 경로다.
+    """
+    if not created_by or not created_by.strip():
+        raise ValueError("created_by가 비었다")
+    if await _lock_concept(session, concept_code, allow_missing=True) is not None:
+        raise CodeTakenError(concept_code, "이미 살아있는 개념입니다 — 일반 초안 경로를 쓰세요")
+    latest = (
+        await session.execute(
+            select(ConceptVersion)
+            .where(ConceptVersion.concept_id == concept_code)
+            .order_by(ConceptVersion.version_no.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if latest is None:
+        raise LookupError(f"제안 {concept_code!r} 없음")
+    if _load_schema(latest).change.change_type != CMS_CREATE_CHANGE_TYPE:
+        raise LookupError(f"{concept_code!r}의 판은 신규 개념 제안이 아니다")
+    return await _insert_draft(
+        session,
+        concept_code=concept_code,
+        payload=payload,
+        schema_version=schema_version,
+        created_by=created_by,
+        change=VersionChange(
+            change_type=CMS_CREATE_CHANGE_TYPE, reason=reason, ticket_id=ticket_id
+        ),
+        source=None,
+    )
+
+
+async def _check_can_realize(session: AsyncSession, planned: SchemaConceptVersion) -> None:
+    """신규 개념을 실체화하기 전 마지막 확인 — 부모가 아직 있는가. 어떤 쓰기보다 먼저 부른다."""
+    parent_id = planned.payload.parent_concept_id
+    if parent_id is None:
+        return
+    found = (
+        await session.execute(select(Concept.concept_id).where(Concept.concept_id == parent_id))
+    ).first()
+    if found is None:
+        raise PublishGateError(
+            GateKind.PUBLISH,
+            [f"parent_exists: 부모 개념 {parent_id}가 없습니다(삭제되었을 수 있음)"],
+        )
+
+
+def _materialize_concept(planned: SchemaConceptVersion) -> Concept:
+    """발행되는 신규 개념 제안 판 → 살아있는 `Concept` 행(CMS 소유 표지 포함).
+
+    payload의 정체성·특성 필드만 옮긴다(본문·오버레이는 payload에 없다). 부모 개념은 제안 때
+    검증됐지만
+    발행까지 시간이 흘렀으므로 호출자가 존재를 다시 확인한다.
+    """
+    p = planned.payload
+    concept = Concept(
+        code=planned.concept_id,
+        name_ko=p.name_ko,
+        name_en=p.name_en,
+        level=ConceptLevel(p.level),
+        parent_concept_id=p.parent_concept_id,
+        aliases=list(p.aliases),
+        is_signature_korean=p.is_signature_korean,
+        cognitive_type=[CognitiveType(c) for c in p.cognitive_type],
+        behavior_skills=list(p.behavior_skills),
+        intrinsic_difficulty=p.intrinsic_difficulty,
+        exam_frequency=p.exam_frequency,
+        weight_in_curriculum=p.weight_in_curriculum,
+    )
+    # CMS가 만든 행 — 적재가 건드리지 않고, 삭제 API가 허용하는 유일한 부류다.
+    mark_cms_edited(concept)
+    return concept
+
+
 async def apply_transition(
     session: AsyncSession,
     version_id: uuid.UUID,
@@ -392,11 +731,14 @@ async def apply_transition(
     *,
     actor: str,
     now: datetime | None = None,
+    expected_status: VersionStatus | None = None,
 ) -> SchemaConceptVersion:
     """직접 호출 가능한 전이 1건을 실행한다(복합 전용 전이는 거부).
 
     - publish: 같은 개념의 다른 발행본을 `supersede`하고 발행 포인터를 이 판으로 옮긴다.
     - deprecate: 발행 포인터가 이 판을 가리키면 포인터를 비운다(발행본 없음).
+    - `expected_status`를 주면 **잠금 후** 실제 상태와 비교해 다르면 `StaleStatusError`로 거부한다
+      (P3-12 — 화면이 읽은 상태가 그사이 바뀌었는데 같은 이름의 다른 전이가 실행되는 것을 막는다).
     """
     moment = now or datetime.now(UTC)
     # 잠금 순서 = 개념 → 판. `create_draft`·`rollback`과 같은 순서로 잡아야 같은 개념에 대한
@@ -408,9 +750,18 @@ async def apply_transition(
     ).scalar_one_or_none()
     if concept_code is None:
         raise LookupError(f"concept_version {version_id} 없음")
-    concept = await _lock_concept(session, concept_code)
+    concept = await _lock_concept(session, concept_code, allow_missing=True)
     row = await _lock_version(session, version_id)
     current = _load_schema(row)
+    # 개념 행이 없는 판은 *신규 개념 제안*(`create_proposal`이 만든 판)일 때만 전이할 수 있다.
+    # 그 밖의 판이 개념 행 없이 있는 것은 깨진 상태라 기존처럼 거부한다.
+    is_proposal = current.change.change_type == CMS_CREATE_CHANGE_TYPE
+    if concept is None and not is_proposal:
+        raise LookupError(f"concept {concept_code!r} 없음")
+    if expected_status is not None and VersionStatus(current.status) is not expected_status:
+        stale = StaleStatusError(expected_status, VersionStatus(current.status))
+        _refuse(stale, action, version_id)
+        raise stale
     try:
         planned = plan_transition(current, action, actor=actor, now=moment)
     except Exception as exc:
@@ -431,13 +782,32 @@ async def apply_transition(
             )
             for sibling in siblings
         ]
+        if concept is None:
+            # 신규 개념 제안의 첫 발행 — 살아있는 개념 행이 만들어지는 **유일한 순간**이다.
+            # 실패할 수 있는 검사는 어떤 쓰기보다 먼저 끝낸다(코드 선점·부모 실재).
+            await _check_can_realize(session, planned)
+            concept = _materialize_concept(planned)
+            session.add(concept)
+            # 개념 행을 **먼저 flush**한다 — 판 행(PUBLISHED)의 DB 트리거가 개념 행을 요구하는데, 이
+            # 둘
+            # 사이에 ORM 관계가 없어 같은 flush에 넣으면 UPDATE 순서를 보장하지 못한다.
+            await session.flush()
+        elif is_proposal and concept.cms_edited_at is None:
+            # 제안이 심사받는 사이 graph.json 적재가 같은 코드의 개념을 만들었다 — 파일이 소유한
+            # 개념에
+            # CMS 제안을 덮어 발행하지 않는다.
+            raise PublishGateError(
+                GateKind.PUBLISH,
+                [f"concept_code_free: {concept_code}는 그사이 적재가 만든 개념의 코드입니다"],
+            )
         for sibling, plan in zip(siblings, superseded, strict=True):
             _write_back(sibling, plan)
         _write_back(row, planned)
         concept.current_published_version_id = row.version_id
     else:
         _write_back(row, planned)
-        if VersionStatus(current.status) is VersionStatus.PUBLISHED:
+        # 개념 행이 없는 판(신규 개념 제안)은 PUBLISHED가 된 적이 없어 정리할 포인터도 없다.
+        if concept is not None and VersionStatus(current.status) is VersionStatus.PUBLISHED:
             if concept.current_published_version_id == row.version_id:
                 concept.current_published_version_id = None
     await session.flush()
@@ -450,8 +820,12 @@ async def rollback(
     *,
     actor: str,
     now: datetime | None = None,
+    expected_current_version_id: uuid.UUID | None = None,
 ) -> RollbackResult:
     """현재 발행본을 내리고 직전 발행본을 복원한다(P3-11 ⑪).
+
+    `expected_current_version_id`를 주면 **개념 행 잠금 후** 실제 발행본과 비교해 다르면
+    `StalePublishedPointerError`로 거부한다(P3-12 — 화면이 본 발행본이 그사이 바뀐 경우).
 
     내려간 판은 RETIRED가 된다(결함 판정 — 전이표 `rollback`). 복원 대상 = 현재 발행본보다
     `version_no`가 작은 판 중, 발행된 적이 있고(`published_at`) 지금 DEPRECATED인 가장 최근 판.
@@ -462,6 +836,15 @@ async def rollback(
     """
     moment = now or datetime.now(UTC)
     concept = await _lock_concept(session, concept_code)
+    if (
+        expected_current_version_id is not None
+        and concept.current_published_version_id != expected_current_version_id
+    ):
+        stale = StalePublishedPointerError(
+            expected_current_version_id, concept.current_published_version_id
+        )
+        _refuse(stale, TransitionAction.ROLLBACK, expected_current_version_id)
+        raise stale
     if concept.current_published_version_id is None:
         raise RollbackUnavailableError(f"{concept_code}: 현재 발행본이 없다")
     current_row = await _lock_version(session, concept.current_published_version_id)
@@ -515,14 +898,25 @@ async def rollback(
 
 
 __all__ = [
+    "CMS_CREATE_CHANGE_TYPE",
     "VALIDATOR_BUNDLE_VERSION",
+    "CodeTakenError",
     "PublishGateError",
     "RollbackUnavailableError",
+    "StaleStatusError",
+    "StalePublishedPointerError",
     "RollbackResult",
     "compute_content_hash",
     "run_gate",
     "plan_transition",
     "create_draft",
+    "create_proposal",
+    "revise_proposal",
+    "has_any_version",
+    "has_published_version",
+    "list_open_proposals",
+    "list_versions",
+    "get_version",
     "apply_transition",
     "rollback",
 ]

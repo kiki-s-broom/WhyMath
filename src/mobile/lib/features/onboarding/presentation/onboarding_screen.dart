@@ -9,8 +9,9 @@
 // 절대 금기: 중독성·게임화·카운트다운·보상 연출을 두지 않는다. 톤은 은근하고 격려하는
 // 한국어이며, 외부 이미지 자산에 의존하지 않고 텍스트+아이콘만으로 구성한다(asset 경고 회피).
 //
-// 범위(정직): 온보딩 1회-노출 영속은 후속(shared_preferences 미도입)이라 현재는 매 진입마다
-// 노출된다. "건너뛰기"는 목표 입력 없이 바로 학습 루프(진단→문제 `/problem`)로 가고, "시작하기"는
+// 완료 지점(건너뛰기·시작하기 공통)은 "온보딩 봤음" 플래그를 영속 저장한다(MOB-11 —
+// `OnboardingSeenController.markSeen`) — 다음 실행부터는 라우터 redirect가 온보딩을 건너뛰고
+// 바로 채팅으로 보낸다("돌아오기 쉽다"·복귀 지원 최소 착지). "건너뛰기"는 목표 입력 없이 바로 학습 루프(진단→문제 `/problem`)로 가고, "시작하기"는
 // 입력을 전송한 뒤(실패해도 graceful) 같은 학습 루프로 이동한다 — 입력은 모두 선택이라 비워도 진행된다.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/router.dart';
 import '../../../theme/spacing.dart';
 import '../application/onboarding_controller.dart';
+import '../application/onboarding_seen_controller.dart';
 
 /// 온보딩 한 페이지의 콘텐츠 모델(아이콘·제목·설명).
 class _OnboardingPage {
@@ -81,10 +83,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  /// 진단→문제제시(S1) 화면으로 이동한다 — 온보딩을 마치면(건너뛰기·시작하기 공통) 학습 루프에
-  /// 진입한다. CAT 추천 문제가 없으면 문제 화면이 코치 대화로 graceful 안내한다(가용성).
-  void _goToLoop() {
-    context.go(AppRoutes.problemPath);
+  /// 온보딩 완료 지점(건너뛰기·시작하기 공통) — "봤음" 플래그를 영속하고 진단→문제제시(S1)
+  /// 학습 루프로 이동한다.
+  ///
+  /// 플래그는 [OnboardingSeenController.markSeen]이 *먼저* 메모리 상태에 반영하므로(동기) 영속
+  /// 저장이 실패해도(graceful) 이번 이동은 막지 않는다(다음 실행부터 재노출될 뿐·MOB-11). CAT
+  /// 추천 문제가 없으면 문제 화면이 코치 대화로 graceful 안내한다(가용성).
+  Future<void> _goToLoop() async {
+    await ref.read(onboardingSeenControllerProvider.notifier).markSeen();
+    if (mounted) {
+      context.go(AppRoutes.problemPath);
+    }
   }
 
   /// 다음 페이지로 부드럽게 넘긴다(마지막 페이지면 호출되지 않음).
@@ -102,7 +111,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _onStart() async {
     await ref.read(onboardingControllerProvider.notifier).submit();
     if (mounted) {
-      _goToLoop();
+      await _goToLoop();
     }
   }
 

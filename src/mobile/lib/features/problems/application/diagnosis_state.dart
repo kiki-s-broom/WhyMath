@@ -17,9 +17,6 @@ abstract class DiagnosisState with _$DiagnosisState {
     /// 로드된 문제 상세·미로드면 null.
     Problem? problem,
 
-    /// 개념 진단 목록(coaching_focus 후보)·기본 빈 리스트.
-    @Default(<ConceptDiagnosisItem>[]) List<ConceptDiagnosisItem> diagnoses,
-
     /// 조회 진행 중인지(로딩 인디케이터·중복 호출 방지).
     @Default(false) bool isLoading,
 

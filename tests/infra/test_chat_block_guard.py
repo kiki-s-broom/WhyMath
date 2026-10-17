@@ -364,3 +364,58 @@ def test_hook_is_wired_as_stop_hook() -> None:
     settings = json.loads(_SETTINGS.read_text(encoding="utf-8"))
     commands = [h["command"] for entry in settings["hooks"]["Stop"] for h in entry["hooks"]]
     assert any(".claude/hooks/chat_block_guard.py" in c for c in commands), commands
+
+
+# ===========================================================================
+# CONST-10 — 훅 입력 해독은 로캘과 무관해야 한다 (UTF-8 원문 · cp949 콘솔)
+# ===========================================================================
+
+
+def _run_utf8(
+    tmp_path: Path, reply: str, *, io_encoding: str
+) -> subprocess.CompletedProcess[bytes]:
+    """UTF-8 **원문** 입력을 넣고 stdin 로캘만 바꿔 돌린다.
+
+    위 `_run` 은 `json.dumps` 기본값(ensure_ascii=True)이라 입력이 순수 ASCII 다 — 로캘 해독
+    결함이 있어도 통과한다(2026-09-29 실측). transcript 파일명에 '—'(UTF-8 E2 80 94)와 한글을
+    넣어 **입력 페이로드 자체**가 cp949 로 해독되지 않게 만든다.
+    """
+    transcript = tmp_path / "t — 한글.jsonl"
+    rows = [
+        {"type": "user", "message": {"content": "해줘"}},
+        {
+            "type": "assistant",
+            "isSidechain": False,
+            "message": {"content": [{"type": "text", "text": reply}]},
+        },
+    ]
+    transcript.write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8"
+    )
+    payload = {"transcript_path": str(transcript), "session_id": "t", "stop_hook_active": False}
+    return subprocess.run(
+        [sys.executable, str(_GUARD)],
+        input=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        capture_output=True,
+        env={
+            "CLAUDE_PROJECT_DIR": str(tmp_path),
+            "PATH": "/usr/bin:/bin",
+            "PYTHONIOENCODING": io_encoding,
+        },
+        check=False,
+    )
+
+
+@pytest.mark.parametrize("io_encoding", ["utf-8", "cp949"])
+def test_hook_blocks_the_incident_under_any_locale(tmp_path: Path, io_encoding: str) -> None:
+    """주입 — 수정 전에는 cp949 에서 입력 해독 실패 → 통과라 사고 블록을 못 막았다."""
+    proc = _run_utf8(tmp_path, INCIDENT, io_encoding=io_encoding)
+    assert proc.returncode == 2, proc.stderr.decode(io_encoding, errors="replace")[:200]
+
+
+@pytest.mark.parametrize("io_encoding", ["utf-8", "cp949"])
+def test_hook_passes_guarded_block_under_any_locale(tmp_path: Path, io_encoding: str) -> None:
+    """대조군 — 통과의 **사유**를 본다(해독 실패로 꺼져서 통과한 것이 아니어야 한다)."""
+    proc = _run_utf8(tmp_path, GOOD_REV_PARSE, io_encoding=io_encoding)
+    assert proc.returncode == 0
+    assert "입력 파싱 실패" not in proc.stderr.decode(io_encoding, errors="replace")

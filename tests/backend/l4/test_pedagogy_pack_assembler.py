@@ -312,10 +312,14 @@ class TestDecideWiring:
         without_kwargs = coach.decide("음", state, pack=concept, grade=None, standard_code=None)
         assert with_kwargs.system == without_kwargs.system
 
-    def test_decide_flag_off_ignores_grade_standard_code(
+    def test_decide_flag_off_ignores_standard_code_but_grade_still_sets_register(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # 플래그 OFF면 grade/standard_code를 줘도 조립기 미호출 → base_system 비트동일(회귀 0).
+        # 플래그 OFF면 pack 4계층 조립(팩 발문·오개념·standard_code)은 여전히 미호출 — 회귀 0.
+        # 단 grade는 W0(S-2)부터 팩 플래그와 *독립*으로 base_system의 register를 바꾼다
+        # (`base_system_for_grade` — 결정론 문구 치환이라 팩 조립기의 fidelity 게이트 대상이
+        # 아님). 이 테스트는 더 이상 "grade도 비트동일"을 주장하지 않는다 — 그 계약은
+        # test_polya_engine.py::TestGradeRegisterWiring이 대신 못 박는다.
         _disable_flag(monkeypatch)
         reset_pack_cache()
         concept = get_pack(_CONCEPT)
@@ -327,7 +331,9 @@ class TestDecideWiring:
             grade=2,
             standard_code="[10공수1-02-06]",
         )
-        assert d.system == STAGE_PROMPTS[PolyaStage.UNDERSTAND].system
+        assert "초등학생" in d.system  # grade=2 → register 반영(팩 플래그와 무관)
+        assert "성취기준" not in d.system  # standard_code는 팩 계층 4 미조립이라 여전히 미노출
+        assert "[10공수1-02-06]" not in d.system
 
     def test_decide_flag_on_with_pack_lands_grade_and_standard_code(
         self, monkeypatch: pytest.MonkeyPatch

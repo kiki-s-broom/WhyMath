@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: A11Y-02-accessibility-coverage-drift-gate
+title: "접근성 커버리지가 AA 선언 직후 고정 — 주 학습 화면 게이트 밖 + 신규 화면 무검출"
+track: infra-debt
+stage: S3
+subject: cross
+layer: mobile
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 커버리지 드리프트 가드 신설 — test/accessibility_test.dart가 실제로 순회하는 대상 목록 ↔ lib/features/*/presentation/의 화면 목록을 대조해, 게이트에 없는 화면은 '사유 주석이 붙은 허용목록'에 등재해야만 통과하게 한다. 근거 없는 포괄 허용 금지(pubspec_dependency_usage_governance_test.dart 허용목록 관용구 답습). 목적은 '지금 전부 검증'이 아니라 '새 화면이 조용히 늘지 않는다'."
+  - "② 주 학습 화면 편입 — chat_screen·problem_screen을 게이트 대상에 넣는다. 06_design_system.md §7이 지목한 '컨트롤러 override 하네스'(활성 문제·메시지가 있는 상태를 만들어야 대비·탭타깃이 실제로 검사됨)를 쓴다 — 빈 초기 상태만 렌더하면 검증이 위장된다."
+  - "③ RPT-01 신고 다이얼로그 축 추가 — defect_report_button.dart의 카테고리 선택 다이얼로그를 기존 라이트/다크 × 배율(1.0/1.3/2.0×) 매트릭스에 편입한다."
+  - "④ 06_design_system.md §7 현황 표 갱신 — 이 태스크가 넓힌 커버리지를 표에 반영하고, 여전히 남는 후속(Semantics 라벨 전면 감사·TTS)은 발화 트리거를 병기한다. 남은 항목은 트리거 또는 태스크 중 하나를 가져야 한다."
+  - "⑤ 변별력 실측(양방향) — 새 *_screen.dart를 추가하고 허용목록에 넣지 않으면 red, 넣으면 green. 그리고 편입된 화면에서 고정 height 위젯을 배율 대상에 두면 red(A11Y-01이 검증한 배율축 변별력을 새 화면에서도 재확인). 판정은 exit code로 한다."
+  - "⑥ 범위 밖 동결 — Semantics 라벨 전면 감사, TTS 재도입, 런타임 고대비·색약 팔레트 토글, accessibility_needs 소비 분기(writer 0), WCAG AAA. 목표 레벨은 A11Y-01이 선언한 WCAG 2.1 AA를 그대로 승계한다."
+  - "⑦ 확인 범위 — Flutter(flutter test·analyze)가 있는 환경에서 mobile 잡 기준으로 확인한다. 못 돌렸으면 'CI가 판정'으로 명시하고 통과로 적지 않는다."
+artifacts: []
+paths:
+  - src/mobile/test/accessibility_coverage_governance_test.dart
+  - src/mobile/test/accessibility_test.dart
+  - docs/design/ui/06_design_system.md
+session: null
+notes: "출처: OPS-40 회수(2026-10-05) — 서비스 운영 r2 문서 G3·D8. 참조 구현 = 고립 브랜치 origin/claude/whymath-service-operations-review-5t5lmv(head dd3e9475). 회수 완료 전 삭제 금지. 커밋 a7a9e9ec(src/mobile/test/accessibility_coverage_governance_test.dart 160줄 · accessibility_test.dart 3축(ChatScreen·ProblemScreen·DefectReport) +159줄 · docs/design/ui/06_design_system.md §7). main 현행 실측(2026-10-05, d0ba970c, 읽기 전용 대조): accessibility_test.dart 대상 5개(Explore·Home·Me·SceneRenderer·CoachSignalCard), chat·problem·DefectReport 참조 0, 드리프트 가드 파일 0, presentation/ 하위 dart 17개 — 착수 시 재측정. Flutter가 있는 환경에서만 검증 가능하다."
+updated: 2026-10-05

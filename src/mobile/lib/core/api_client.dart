@@ -6,6 +6,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/auth/application/auth_controller.dart';
 import 'auth_interceptor.dart';
 import 'env.dart';
 import 'token_refresh_api.dart';
@@ -18,6 +19,10 @@ BaseOptions _baseOptions() => BaseOptions(
   baseUrl: Env.apiUrl,
   connectTimeout: const Duration(seconds: 10),
   receiveTimeout: const Duration(seconds: 30),
+  // MOB-15: 송신 타임아웃 — OCR `/pages` multipart 이미지 업로드가 느린 네트워크에서 무한정
+  // 대기하지 않도록. SEC-17이 합계 50MB 상한을 이미 걸어 뒀으므로 receiveTimeout과 대칭인 30초는
+  // 일반 모바일 업로드 대역폭 기준 합리적 여유다(이 저장소에 별도 상한 근거 없음).
+  sendTimeout: const Duration(seconds: 30),
   // 코어 API는 JSON in/out — 구조(AST/JSON)를 그대로 주고받는다.
   // X-App-Version(OPS-17): 서버 최소버전 계약 게이트(app.py _service_metrics_middleware)가
   // 읽는 클라 버전 신고. Env.appVersion은 컴파일타임 상수라야 이 const 맵에 들어갈 수 있다
@@ -40,9 +45,10 @@ final tokenRefreshApiProvider = Provider<TokenRefreshApi>(
 /// 앱 전역에서 공유하는 Dio 인스턴스 provider.
 ///
 /// - baseUrl: [Env.apiUrl](빌드 타임 주입·시크릿 하드코딩 금지).
-/// - connect/receive 타임아웃: 모바일 네트워크 변동을 견디는 보수적 값.
+/// - connect/receive/send 타임아웃: 모바일 네트워크 변동을 견디는 보수적 값(send는 MOB-15).
 /// - [AuthInterceptor]: 저장된 액세스 토큰을 Bearer로 자동 첨부(OAuth-b·미인증이면 헤더 없이)
-///   + 401 시 리프레시 토큰으로 갱신 후 원요청 1회 재시도(MOB-12·학생 눈에는 무중단).
+///   + 401 시 리프레시 토큰으로 갱신 후 원요청 1회 재시도(MOB-12·학생 눈에는 무중단)
+///   + 갱신마저 실패한 세션 최종 무효 시 로그아웃 전체 정리(MOB-15).
 /// - certificate pinning은 후속 슬라이스.
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(_baseOptions());
@@ -53,6 +59,14 @@ final dioProvider = Provider<Dio>((ref) {
       refreshApi: ref.read(tokenRefreshApiProvider),
       refreshStore: ref.read(refreshTokenStoreProvider),
       retryDio: ref.read(authFreeDioProvider),
+      // MOB-15: 세션 최종 무효(갱신 실패로 원 401을 올림) → `AuthController.logout()` 전체 정리.
+      // 부분 정리(토큰만 삭제)는 앱이 로그인 상태로 남아 학생을 "아무것도 안 되는" 화면에 가둔다.
+      //
+      // 순환 의존 점검: 이 `ref.read`는 dioProvider build 시점이 아니라 **401 발생 시점**의 클로저
+      // 안에서만 실행된다. `AuthController.build()`는 dioProvider를 읽지 않고, `logout()`은
+      // `tokenRefreshApiProvider`(= 인증 인터셉터 없는 authFreeDio)만 쓰므로 이 dio로 다시 요청을
+      // 보내지 않는다 — build-time 사이클도, 401→logout→401 재귀도 없다.
+      onUnauthorized: () => ref.read(authControllerProvider.notifier).logout(),
     ),
   );
   return dio;

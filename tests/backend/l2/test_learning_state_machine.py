@@ -53,6 +53,7 @@ from whymath_backend.schema.learning_state import (
     ALLOWED_TRANSITIONS,
     HIGH_CONFIDENCE_THRESHOLD,
     REPEATED_FAILURE_THRESHOLD,
+    RETIRED_POLICY_TRIGGERS,
     AttemptEvidence,
     LearningState,
     NextActionKind,
@@ -271,19 +272,12 @@ _RULE_COUNTEREXAMPLES: dict[str, AttemptEvidence] = {
         confirmed_misconception_ids=("M-frac-01",),
         consecutive_failures=REPEATED_FAILURE_THRESHOLD,
     ),
-    # R3가 없으면 R4가 가로채 LEARNING(선수 개념)으로 보낸다 — 오개념을 남긴 채.
-    # 선수결손을 **함께** 넣어야 R3↔R4 우선순위를 밟는다.
+    # R3가 없으면 R6가 받아 PRACTICING으로 보낸다 — 확인된 오개념을 교정하지 않은 채 같은 개념 연습.
+    # (선수 결손 규칙 R4는 EOS-127에서 삭제됐다 — 이 자리를 가로채던 규칙은 이제 없다.)
     "R3-wrong-misconception": AttemptEvidence(
         is_correct=False,
         confirmed_misconception_ids=("M-frac-01",),
-        prerequisite_gap_concept_ids=("C-prereq-01",),
         consecutive_failures=REPEATED_FAILURE_THRESHOLD - 1,
-    ),
-    # R4가 없으면 R6가 받아 PRACTICING으로 보낸다 — 결손을 둔 채 같은 개념 연습.
-    "R4-prerequisite-gap": AttemptEvidence(
-        is_correct=False,
-        prerequisite_gap_concept_ids=("C-prereq-01",),
-        consecutive_failures=1,
     ),
     # R1이 없으면 R2가 받아 PRACTICING으로 보낸다 — 진급이 영원히 일어나지 않는다.
     # 경계값 자체(정확히 임계)를 쓴다: `>`와 `>=`를 뒤바꾼 뮤테이션이 여기서 잡힌다.
@@ -395,6 +389,45 @@ def test_policy_triggers_are_distinct_per_rule() -> None:
     """규칙 ↔ 트리거가 1:1이다 — 사후 감사에서 두 규칙이 같은 사유로 보이지 않는다."""
     triggers = [rule.decide(_RULE_COUNTEREXAMPLES[rule.rule_id]).trigger for rule in V1_RULES]
     assert len(set(triggers)) == len(triggers), f"중복 트리거: {triggers}"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EOS-127 — R4 삭제 후 "선언만 있고 발화하지 않는 것"이 다시 생기지 않는다는 동결
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_policy_triggers_are_exactly_rule_triggers_plus_retired() -> None:
+    """`POLICY_*` 트리거 전수 = 규칙이 내는 트리거 ∪ 은퇴 라벨 — 발화하지 않는 라벨은 은퇴 표기뿐이다.
+
+    규칙을 지우고 트리거를 안 지우면(또는 은퇴 표기를 안 하면) 원장 enum에 "선언만 있는" 라벨이
+    조용히 남는다. 반대로 은퇴 라벨을 규칙이 다시 내기 시작하면 RED다.
+    """
+    emitted = {rule.decide(_RULE_COUNTEREXAMPLES[rule.rule_id]).trigger for rule in V1_RULES}
+    declared = {t for t in TransitionTrigger if t.name.startswith("POLICY_")}
+    assert declared == emitted | RETIRED_POLICY_TRIGGERS
+    assert emitted.isdisjoint(RETIRED_POLICY_TRIGGERS), "은퇴한 트리거를 규칙이 내고 있다"
+    assert RETIRED_POLICY_TRIGGERS == {TransitionTrigger.POLICY_PREREQUISITE_GAP}
+
+
+def test_no_declared_assessing_edge_is_dead() -> None:
+    """ASSESSING에서 나가는 전이표 간선은 전부 어떤 규칙의 결정(또는 제출 자기 전이)이 도착하는 곳이다.
+
+    R4가 쓰던 `ASSESSING → LEARNING`이 R4가 사라진 뒤에도 표에 남아 "열려 있으나 아무도 가지 않는
+    문"이 되는 것을 막는다. 간선을 되살리면(뮤테이션) 이 테스트가 RED다.
+    """
+    reached = {rule.decide(_RULE_COUNTEREXAMPLES[rule.rule_id]).next_state for rule in V1_RULES} | {
+        LearningState.ASSESSING
+    }
+    outgoing = {to for (frm, to) in ALLOWED_TRANSITIONS if frm is LearningState.ASSESSING}
+    assert (
+        outgoing == reached
+    ), f"죽은 간선: {outgoing - reached} · 표에 없는 도착지: {reached - outgoing}"
+
+
+def test_removed_prerequisite_action_kind_is_gone() -> None:
+    """선수 하강 행동 종류는 상태 머신 어휘에서 빠졌다 — 선수 하강은 다음 문항 선택이 한다."""
+    assert "GO_TO_PREREQUISITE_CONCEPT" not in {k.value for k in NextActionKind}
+    assert "R4-prerequisite-gap" not in {rule.rule_id for rule in V1_RULES}
 
 
 # ──────────────────────────────────────────────────────────────────────────

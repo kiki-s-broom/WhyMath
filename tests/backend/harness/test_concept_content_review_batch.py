@@ -134,6 +134,29 @@ class TestBatchReviewFakeLLM:
         assert any(json.loads(line).get("injected") for line in lines)
         assert any(json.loads(line).get("passed") for line in lines)
 
+    def test_rerun_with_same_seed_gives_same_rows_modulo_clock_fields(self, tmp_path: Path) -> None:
+        """R3-01 — 같은 인자로 두 번 돌리면 결과가 같다(시계 필드 timestamp·latency_ms만 제외).
+
+        이 배치는 행마다 `datetime.now()`를 찍으므로 바이트 동일은 성립하지 않는다 — 그래서
+        '결과'를 시계가 아닌 내용으로 정의한다. 시계 외 필드가 하나라도 갈리면(난수·순서·집합 반복
+        순서 의존) 재실행 불안정이다.
+        """
+        argv = ["--fake-llm", "--seed", "123", "--threshold", "0.10", "--out"]
+        outs = [tmp_path / "a.jsonl", tmp_path / "b.jsonl"]
+        assert main([*argv, str(outs[0])]) == 0
+        assert main([*argv, str(outs[1])]) == 0
+
+        def stable_rows(path: Path) -> list[dict[str, object]]:
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            for row in rows:
+                row.pop("timestamp", None)
+                row.pop("latency_ms", None)
+            return rows
+
+        first, second = (stable_rows(o) for o in outs)
+        assert len(first) > 0
+        assert first == second
+
     def test_fake_llm_gate_fails_when_threshold_too_low(self, tmp_path: Path) -> None:
         out = tmp_path / "audit.jsonl"
         # threshold 0.0001 → 모든 결함을 초과로 판정, exit 1
@@ -384,9 +407,18 @@ class TestRenderSeparatesDirections:
 class _VerdictProvider:
     """지정한 판정을 그대로 돌려주는 스텁 — rubric 자체가 아니라 *기록 경로*를 시험한다."""
 
-    def __init__(self, *, passed_for_inject: bool, passed_for_control: bool) -> None:
+    def __init__(
+        self,
+        *,
+        passed_for_inject: bool,
+        passed_for_control: bool,
+        link_mode: str = "correct",
+    ) -> None:
         self._inject = passed_for_inject
         self._control = passed_for_control
+        # 연결 적합성(link_ok) 응답 방식 — correct: 엉뚱한 원자만 거절 · approve_all: 전부 승인 ·
+        # reject_all: 전부 거절 · silent: 답하지 않음. 연결 줄이 없는 프롬프트에는 어느 모드든 생략.
+        self._link_mode = link_mode
 
     async def generate(self, prompt: str, system: str, decision: object, **kw: object) -> object:
         from whymath_backend.l3.models import GenerationResult, Usage
@@ -402,12 +434,20 @@ class _VerdictProvider:
             passed = self._control
         else:
             passed = True
-        body = (
-            '{"passed": true, "defects": [], "reason": "ok"}'
-            if passed
-            else '{"passed": false, "defects": ["d"], "reason": "ng"}'
+        payload: dict[str, object] = {
+            "passed": passed,
+            "defects": [] if passed else ["d"],
+            "reason": "ok" if passed else "ng",
+        }
+        if "연결 원자:" in prompt and self._link_mode != "silent":
+            if self._link_mode == "correct":
+                payload["link_ok"] = not code.startswith("__LINK_BAD__")
+            else:
+                payload["link_ok"] = self._link_mode == "approve_all"
+        return GenerationResult(
+            text=json.dumps(payload, ensure_ascii=False),
+            usage=Usage(input_tokens=1, output_tokens=1),
         )
-        return GenerationResult(text=body, usage=Usage(input_tokens=1, output_tokens=1))
 
 
 class TestAssessOneRecordsLlmVerdict:

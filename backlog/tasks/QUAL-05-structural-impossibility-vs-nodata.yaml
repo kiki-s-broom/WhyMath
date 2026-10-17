@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-05-structural-impossibility-vs-nodata
+title: "구조적 불가와 일시적 무데이터의 변별 — 형제 리포트가 같은 죽은 원천을 정반대로 설명"
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① pilot_kpi_baseline.compute_retention의 4지표(returning_user_rate·sessions_per_user·active_days_per_user·return_gap_days_median)가 원천 learning_session writer 영구 미신설(2026-07-29·S3-16 소유)에 의해 '영구 불가'임을 리포트가 명시한다. 기전은 신설하지 않고 형제 모듈 surrogate_baseline_report.py:143 _STRUCTURALLY_IMPOSSIBLE_FIELDS를 재사용한다(신규 개념 0).\n② 현재 NO_DATA note의 '파일럿 사용자가 세션을 열면 리텐션 계측'(pilot_kpi_baseline.py:202-208) 문구를 제거·교체한다 — 그 문장은 '표본이 쌓이면 측정된다'는 거짓 기대를 준다. 실제로는 writer가 없어 표본이 영원히 안 쌓인다.\n③ 변별력 실측 — 구조적 불가(영구)와 일시적 무데이터(표본 대기)가 리포트 출력에서 서로 다른 문자열/상태로 나오는지, 그리고 learning_session writer가 생기면 구조적 불가 표시가 자동으로 걷히는지(또는 걷어야 함이 테스트로 고정되는지)를 확인한다. 만료 없는 유예 금지.\n④ 범위 밖 동결 — learning_session writer 신설(S3-16 소유·영구 미신설 결정을 뒤집는 별건)·퍼널 신설·wh1_evaluation ③ 세션완주율 축은 포함하지 않는다. 이 태스크는 표기 정직성 한 축만 닫는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/pilot_kpi_baseline.py
+  - src/backend/whymath_backend/harness/surrogate_baseline_report.py
+  - "tests/backend/harness/**"
+session: null
+notes: "2026-08-11 data_platform_eos_frame_gap_review_2026-08-11.md D2. 같은 패키지 형제 모듈이 같은 원천(learning_session)을 정반대로 설명한다 — surrogate_baseline_report.py:143은 session_completion_rate를 '구조적 불가'로 고정(근거: writer 영구 미신설)하는데, pilot_kpi_baseline.py:202-208은 같은 테이블을 읽고 '파일럿 사용자가 세션을 열면 계측된다'고 적는다. CLAUDE.md '인프라가 죽으면 측정 실패가 보여야지 0건 통과로 위장되면 안 된다'의 역방향 변형 — 영구 불가가 '아직'으로 위장된다. 해소 기전이 형제 모듈에 이미 있으므로 재사용. [OPS-41 회수] 원 번호 유지(t608mk)."
+updated: 2026-10-05

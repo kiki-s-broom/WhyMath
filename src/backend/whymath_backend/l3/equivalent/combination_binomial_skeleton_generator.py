@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -142,6 +142,7 @@ def _repeated_combination_explanation(skeleton: _RepeatedCombinationSkeleton) ->
     )
 
 
+@deterministic_generator
 class RepeatedCombinationSkeletonGenerator:
     """중복조합 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 
@@ -287,6 +288,7 @@ def _binomial_explanation(skeleton: _BinomialCoefficientSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class BinomialCoefficientSkeletonGenerator:
     """이항정리 계수 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석 구현(LLM 0).
 

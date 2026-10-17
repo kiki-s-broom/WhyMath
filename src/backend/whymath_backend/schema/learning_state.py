@@ -104,7 +104,8 @@ class TransitionTrigger(str, Enum):
     이 값을 함께 적재해 사후 감사(audit)가 성립하게 한다.
 
     `POLICY_*` 계열은 `l2/learning_state_policy.py`의 규칙 id와 1:1로 대응한다 — 규칙이
-    바뀌면 트리거도 함께 바뀌어야 하며, 그 대응은 테스트가 동결한다.
+    바뀌면 트리거도 함께 바뀌어야 하며, 그 대응은 테스트가 동결한다. 단 하나의 예외가
+    `RETIRED_POLICY_TRIGGERS`(아래)다: 규칙은 지웠으나 PG enum 라벨은 원장 호환을 위해 남긴 것.
     """
 
     DIAGNOSIS_STARTED = "DIAGNOSIS_STARTED"
@@ -124,7 +125,13 @@ class TransitionTrigger(str, Enum):
     """정책 R3 — 오답 + 오개념 확인."""
 
     POLICY_PREREQUISITE_GAP = "POLICY_PREREQUISITE_GAP"
-    """정책 R4 — 오답 + 선수 개념 결손."""
+    """**은퇴(EOS-127)** — 정책 R4(오답 + 선수 개념 결손)의 트리거였다. 규칙은 삭제됐고 어떤 규칙도
+    이 값을 내지 않는다(`RETIRED_POLICY_TRIGGERS`).
+
+    라벨을 남기는 이유: `learning_state_trigger_enum`은 **추가 전용 원장**의 PG enum이다. 라벨을
+    빼려면 타입 재생성 마이그레이션이 필요하고, 그동안 이 값이 적힌 행(있다면)을 읽는 순간
+    `LookupError`가 난다 — 지우는 비용이 남기는 비용보다 크다. 은퇴 표기와 "발화 규칙 0건"
+    동결 테스트가 선언-집행 불일치를 막는다."""
 
     POLICY_REPEATED_FAILURE = "POLICY_REPEATED_FAILURE"
     """정책 R5 — 반복 실패(설명·힌트 개입)."""
@@ -134,6 +141,15 @@ class TransitionTrigger(str, Enum):
 
     REMEDIATION_COMPLETED = "REMEDIATION_COMPLETED"
     ADVANCE_COMPLETED = "ADVANCE_COMPLETED"
+
+
+RETIRED_POLICY_TRIGGERS: frozenset[TransitionTrigger] = frozenset(
+    {TransitionTrigger.POLICY_PREREQUISITE_GAP}
+)
+"""은퇴한 정책 트리거 — 규칙이 없으니 새로 적재되지 않는다. 원장 enum 라벨만 남아 있다.
+
+새 `POLICY_*` 트리거를 은퇴시킬 때만 여기에 더한다. "규칙 id ↔ 트리거 1:1" 동결 테스트가 이
+집합을 뺀 나머지에 대해 성립을 요구한다."""
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -188,11 +204,13 @@ ALLOWED_TRANSITIONS: frozenset[tuple[LearningState, LearningState]] = frozenset(
         (LearningState.LEARNING, LearningState.ASSESSING),
         (LearningState.PRACTICING, LearningState.PRACTICING),
         (LearningState.ASSESSING, LearningState.ASSESSING),
-        # ── 평가 결과 분기(정책 규칙 R1~R6가 도착하는 곳) ──
+        # ── 평가 결과 분기(정책 규칙 R1·R2·R3·R5·R6가 도착하는 곳) ──
+        # `ASSESSING → LEARNING`은 R4가 쓰던 간선이었고 R4와 함께 닫았다(EOS-127). 선수 개념으로의
+        # 하강은 상태 전이가 아니라 다음 문항 선택이 한다(`l2/learning_state_recommendation`의
+        # R6 경로).
         (LearningState.ASSESSING, LearningState.ADVANCING),  # R1 정답+높은 확신
         (LearningState.ASSESSING, LearningState.PRACTICING),  # R2 정답+낮은 확신 · R6
         (LearningState.ASSESSING, LearningState.REMEDIATING),  # R3 오개념 · R5 반복 실패
-        (LearningState.ASSESSING, LearningState.LEARNING),  # R4 선수 개념으로 되돌아감
         # ── 교정 이후 ──
         (LearningState.REMEDIATING, LearningState.LEARNING),
         (LearningState.REMEDIATING, LearningState.PRACTICING),
@@ -254,7 +272,7 @@ REPEATED_FAILURE_THRESHOLD: int = 3
 
 같은 개념에서 3연속 틀린 학생에게 "오개념 교정"을 정밀하게 하는 것보다 먼저 막힌 지점을
 풀어 주는 것이 교수학적으로 우선이다(CLAUDE.md 의사결정 우선순위 1 학생 정서 > 3 정확성).
-그래서 R5가 R3·R4보다 먼저 평가된다.
+그래서 R5가 R3보다 먼저 평가된다.
 """
 
 
@@ -289,10 +307,6 @@ class AttemptEvidence(BaseModel):
             "가설 단계 값을 넣으면 R3가 추측으로 학생을 교정 국면에 밀어 넣는다."
         ),
     )
-    prerequisite_gap_concept_ids: tuple[str, ...] = Field(
-        default=(),
-        description="이번 오답의 원인으로 지목된 선수 개념 id(약한 것부터). R4의 입력.",
-    )
     consecutive_failures: int = Field(
         default=0,
         ge=0,
@@ -314,7 +328,6 @@ class NextActionKind(str, Enum):
     ADVANCE_TO_NEXT_CONCEPT = "ADVANCE_TO_NEXT_CONCEPT"
     PRACTICE_SAME_CONCEPT = "PRACTICE_SAME_CONCEPT"
     REMEDIATE_MISCONCEPTION = "REMEDIATE_MISCONCEPTION"
-    GO_TO_PREREQUISITE_CONCEPT = "GO_TO_PREREQUISITE_CONCEPT"
     OFFER_EXPLANATION_OR_HINT = "OFFER_EXPLANATION_OR_HINT"
 
 
@@ -332,8 +345,8 @@ class NextAction(BaseModel):
     target_concept_id: str | None = Field(
         default=None,
         description=(
-            "행동의 대상 개념 id. `GO_TO_PREREQUISITE_CONCEPT`이면 되돌아갈 선수 개념, "
-            "그 외에는 None일 수 있다(현재 개념을 그대로 이어감)."
+            "행동의 대상 개념 id. 현재 v1 규칙은 아무도 채우지 않는다(현재 개념을 그대로 "
+            "이어감) — 선수 하강은 상태 머신이 아니라 다음 문항 선택이 맡는다(EOS-127)."
         ),
     )
     target_misconception_id: str | None = Field(

@@ -16,6 +16,7 @@ acceptance:
   - "② 승격 판정 집행 — `adhoc_edit`(claim 없이 src/·infra/ 편집)은 claim-first 원칙의 집행 지점이므로 정탐률과 무관하게 block 승격(예외 경로 docs/·backlog/). `scope_drift`는 정탐률 ≥50% 또는 예방 사례 ≥1이면 block, 미달이면 기준 재설계를 결정 로그에 남긴다. `path_overlap` 태스크 단위 축은 add/start 시 1회 요약(상위 3건+총수)으로 축약해 소음을 제거한다. 승격 = policy.yaml 1줄 + MEMORY 결정 로그 + policy_promote 이벤트(build_harness.md §3c 절차 그대로)."
   - "③ 결정 잊지 않기 — `policy report`가 승격 기준(2주 또는 30세션) 충족 상태를 감지하면 브리핑에 \"승격 판정 필요\" 1줄을 내고 사람 게이트 1건을 자동 등재한다(보고서 §6 E9). 변별력: 기준 미달 픽스처 → 게이트 0건, 충족 픽스처 → 1건(중복 등재 없음)."
   - "[정정 2026-09-20] ①의 측정 창 — policy.yaml은 2026-07-16(PR #524)에 도입됐으므로 판정 창은 74일이 아니라 66일이다. `--days 74`는 도입 이전까지 포함하는 창이라 결과는 같지만 서술은 \"정책 도입일 이후 전 기간(66일)\"으로 읽는다(반박 검증 지적)."
+  - "[추가 2026-09-29 · HARN-173 구현 중 발견] `backlog.py policy` 서브명령에는 승격 경로가 없다(show·report뿐). §3c는 승격을 \"policy.yaml 1줄 + MEMORY 결정 로그 + `policy_promote` 이벤트\"로 정의하지만 이벤트를 내는 CLI가 없어 손편집(금지) 말고는 방법이 없다. HARN-173이 `ci_mirror_at_done`을 policy.yaml 수정과 MEMORY 결정 로그만으로 승격했고 `policy_promote` 이벤트는 발행하지 못했다. 이 태스크의 ②(승격 판정 집행)가 이벤트 발행 경로 신설을 함께 다룬다 — 새 승격 스위치 `ci_mirror_at_done`도 그 경로의 대상에 포함한다."
 artifacts: []
 paths:
   - backlog/policy.yaml
@@ -23,5 +24,5 @@ paths:
   - scripts/harness/models.py
   - "tests/harness/test_policy*.py"
 session: null
-notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §4 M4·§5 P5. policy_warn 21,019건(이벤트의 89.1%)·전건 warn·승격 0회·측정 74일·330세션 — 승격 조건은 10배 이상 충족됐는데 결정 주체가 없었다. claim 없는 40분 구현 폐기(MP-04)는 adhoc_edit이 block이었다면 첫 편집에서 멈췄다.\n\n[정정 2026-09-20] 반박 검증 지적: 측정 창 74일→66일 정정"
-updated: 2026-09-20
+notes: "근거 = docs/reviews/recurring_failure_taxonomy_2026-09-20.md §4 M4·§5 P5. policy_warn 21,019건(이벤트의 89.1%)·전건 warn·승격 0회·측정 74일·330세션 — 승격 조건은 10배 이상 충족됐는데 결정 주체가 없었다. claim 없는 40분 구현 폐기(MP-04)는 adhoc_edit이 block이었다면 첫 편집에서 멈췄다.\n\n[정정 2026-09-20] 반박 검증 지적: 측정 창 74일→66일 정정\n\n[정정 2026-09-29] HARN-173 구현 중 발견 — policy_promote 이벤트 발행 CLI 부재를 승격 판정 집행의 범위로 명시"
+updated: 2026-09-29

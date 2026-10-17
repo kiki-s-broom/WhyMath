@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-47-polynomial-arithmetic-corpus
+title: "고등 다항식의 덧셈·뺄셈·곱셈 파일럿 코퍼스 (W2 Phase4 #3)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "[10공수1-01-01]/[10기수1-01-01]/[10기수1-01-02] 0커버 해소 — kind 필터 5밴드(2코드 공유) 결정론 생성기 신설·전량 게이트 통과"
+artifacts:
+  - 02b1c9ab
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/polynomial_arithmetic_skeleton_generator.py
+  - src/backend/whymath_backend/harness/polynomial_arithmetic_batch.py
+  - "data/corpus/problem_bank_polynomial_arithmetic_v0/**"
+  - tests/backend/l3/equivalent/test_polynomial_arithmetic_skeleton_generator.py
+  - tests/backend/harness/test_polynomial_arithmetic_batch.py
+session: null
+notes: "다항식 영역 0/6중 3코드 착수(인수분해 2코드는 후속). 일차식 P(x)=ax+b·Q(x)=cx+d의 덧셈/뺄셈/곱셈 후 특정 항 계수를 묻는 순수 정수 산술(SymPy 전개 불요 — 계수 공식 직접 계산). kind→코드: gongsu_add/gongsu_sub->[10공수1-01-01](사칙연산 원문의 add/sub 서브스코프 v1 단순화)·kisu_add/kisu_sub->[10기수1-01-01](정확 일치)·kisu_mul->[10기수1-01-02](곱셈만 v1, 나눗셈 후속). concept_src_id: HK01/10기수1-01-01/10기수1-01-02 — concept graph 실존 확인.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-47-polynomial-arithmetic-corpus 재등재. 원 증적 ['02b1c9ab']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

@@ -32,7 +32,7 @@ from typing import Literal
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul, euro_ro
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -144,6 +144,7 @@ def _stable_slug(prefix: str, question_text: str, answer: str, codes: Sequence[s
     return f"{prefix}-{digest}"
 
 
+@deterministic_generator
 class TwoDigitDivisionSkeletonGenerator:
     """두 자리 나눗셈 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

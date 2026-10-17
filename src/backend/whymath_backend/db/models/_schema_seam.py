@@ -73,8 +73,13 @@ def _unset_null_keys(orm_cls: type, schema_cls: type[BaseModel]) -> frozenset[st
         has_default = field.default_factory is not None or field.default is not PydanticUndefined
         if not has_default:
             continue  # 기본값 없는 required — 메울 값이 없다(모듈 docstring 1).
+        annotation = field.annotation
+        if annotation is None:
+            # pydantic 2.14부터 annotation 타입이 `TypeForm | None`이다. None 주석은 NoneType이라
+            # None을 받아들이므로 종전에도 집합에 넣지 않았다 — 건너뛰어도 판정은 같다.
+            continue
         try:
-            TypeAdapter(field.annotation).validate_python(None)
+            TypeAdapter(annotation).validate_python(None)
         except Exception:  # noqa: BLE001 — 거부하면 어떤 예외든 "None 불가" 판정
             keys.add(name)
     return frozenset(keys)

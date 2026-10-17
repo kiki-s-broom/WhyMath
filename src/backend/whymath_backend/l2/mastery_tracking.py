@@ -115,6 +115,25 @@ async def get_current_mastery(
     return float(row.mastery) if row is not None and row.mastery is not None else None
 
 
+async def get_current_mastery_sample_size(
+    session: AsyncSession, user_id: uuid.UUID, concept_id: uuid.UUID
+) -> int | None:
+    """(user, concept)의 현재 숙달도를 만든 **관측 수** — 최신 측정 1건의 sample_size(읽기 전용).
+
+    `get_current_mastery`와 *같은 행*(`_latest_mastery`)을 읽는다 — 숙달도와 그 증거 수가 서로
+    다른 측정을 가리키지 않게 하려는 것이다(EOS-179 · 코치 라벨의 증거 수 계측 입력). 반환:
+      - 측정 이력이 없다 → None(증거 수를 *말할 대상 자체가* 없다)
+      - 이력은 있는데 `sample_size`가 NULL → None(**모름** — 0으로 접지 않는다. 0은 "관측이
+        0건"이라는 확정 주장이고, NULL은 "기록되지 않았다"는 다른 사실이다)
+      - 그 외 → 관측 수(int)
+
+    그래서 호출자는 None을 "증거 수 미상"으로만 읽는다 — 이력 없음과 NULL을 가를 필요가 있으면
+    `get_current_mastery`가 None인지 먼저 본다(이력이 없으면 숙달도도 None이다).
+    """
+    row = await _latest_mastery(session, user_id, concept_id)
+    return int(row.sample_size) if row is not None and row.sample_size is not None else None
+
+
 def _resolve_estimator(model: BktModel | None) -> MasteryEstimator:
     """이 적재 경로가 쓸 추정기 — **교체 지점은 여기 하나다**(EOS-13 ②).
 
@@ -378,6 +397,7 @@ __all__ = [
     "MasteryRecord",
     "compute_mastery_record",
     "get_current_mastery",
+    "get_current_mastery_sample_size",
     "get_primary_concept_id",
     "record_attempt_mastery",
     "record_problem_attempt_mastery",

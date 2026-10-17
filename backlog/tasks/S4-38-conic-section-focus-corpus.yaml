@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-38-conic-section-focus-corpus
+title: "고등 이차곡선(포물선·타원·쌍곡선) 초점 파일럿 코퍼스 (W2 Phase2 #4)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-37-gcd-lcm-corpus
+requires_gates: []
+acceptance:
+  - "[12기하01-01](포물선)·[12기하01-02](타원)·[12기하01-03](쌍곡선) 0커버 해소 — kind 필터 3밴드, kind가 표준코드도 결정(gcd/lcm 관례 계승)"
+  - "타원 c=sqrt(a^2-b^2)·쌍곡선 c=sqrt(a^2+b^2) 모두 피타고라스 삼조로 구성해 정수 초점 좌표 보장(coordinate_geometry 두 점 거리 생성기 관례 계승)"
+  - "전건 Tier1 게이트 통과·is_published=False·coverage 리포트 이동 확인·전체 스위트+4게이트 green"
+artifacts:
+  - de22b596
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/conic_section_focus_skeleton_generator.py
+  - src/backend/whymath_backend/harness/conic_section_focus_batch.py
+  - tests/backend/l3/equivalent/test_conic_section_focus_skeleton_generator.py
+  - tests/backend/harness/test_conic_section_focus_batch.py
+  - data/corpus/problem_bank_conic_section_focus_v0/problems.jsonl
+session: null
+notes: "W2 Phase2 웨이브1 항목4/5.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-38-conic-section-focus-corpus 재등재. 원 증적 ['de22b596']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

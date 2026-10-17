@@ -16,6 +16,42 @@ _HARNESS_DIR = Path(__file__).resolve().parents[2] / "scripts" / "harness"
 if str(_HARNESS_DIR) not in sys.path:
     sys.path.insert(0, str(_HARNESS_DIR))
 
+import _ledger_guard  # noqa: E402 — 위 sys.path 설정 뒤에 와야 한다(같은 디렉터리 모듈)
+import store  # noqa: E402
+
+# ── HARN-170 — 실제 저장소 대장 격리 (두 겹 · 상세는 _ledger_guard 모듈 docstring) ──
+
+
+@pytest.fixture(autouse=True)
+def real_ledger_sink(monkeypatch) -> list[dict]:
+    """① 쓰기 차단 — 실제 저장소 루트를 겨눈 이벤트를 기록하지 않고 여기에 모은다.
+
+    임시 저장소를 겨눈 호출은 그대로 통과시킨다(그 테스트들이 대장 쓰기 자체를 검증한다).
+    테스트는 이 목록으로 "정책 검사가 실제로 발화했는가"를 단언할 수 있다.
+    """
+    sink: list[dict] = []
+    original = store.append_event
+
+    def guarded(root, action, subject_id, **extra):
+        if _ledger_guard.is_real_root(root):
+            sink.append({"action": action, "id": subject_id, **extra})
+            return None
+        return original(root, action, subject_id, **extra)
+
+    monkeypatch.setattr(store, "append_event", guarded)
+    return sink
+
+
+@pytest.fixture(scope="session", autouse=True)
+def real_ledger_unchanged():
+    """② 세션 전후 대조 — backlog/ 전 파일의 sha256이 실행 전후 같아야 한다.
+
+    실패 시 되돌리지 않는다(실행 중 사람이 대장을 바꿨을 수도 있다) — 무엇이 바뀌었는지
+    말하고 실행을 실패시킨다. 테스트 누출이거나, 검증 도중 트리를 바꾼 것이다(그 경우
+    그 실행 결과 자체가 무효다 — CLAUDE.md '검증이 도는 동안 작업 트리를 바꾸지 않는다').
+    """
+    yield from _ledger_guard.guard_session(fail=lambda message: pytest.fail(message, pytrace=False))
+
 
 @pytest.fixture
 def git_repo(tmp_path: Path) -> Path:

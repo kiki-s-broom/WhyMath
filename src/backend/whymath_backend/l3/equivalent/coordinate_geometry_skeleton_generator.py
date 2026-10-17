@@ -48,7 +48,7 @@ from dataclasses import dataclass
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul, wa_gwa
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -194,6 +194,7 @@ def _distance_explanation(skeleton: _DistanceSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class PointDistanceSkeletonGenerator:
     """두 점 사이의 거리 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -377,6 +378,7 @@ def _line_explanation(skeleton: _LineSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class LineEquationSkeletonGenerator:
     """직선의 방정식 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

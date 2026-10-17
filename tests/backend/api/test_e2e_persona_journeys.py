@@ -223,6 +223,16 @@ def _attempt(
     return body
 
 
+def _general_ability(client: Any, auth: dict[str, str]) -> float | None:
+    """`GET /v1/me/learner-state`의 전과목 θ — 상태 합성 표면이 말하는 값(EOS-125 관측 지점).
+
+    이 표면은 `ability_snapshot` 최신 행을 읽는다. 채점 루프가 그 행을 적재하지 않으면 값은 항상
+    None이라 같은 순간 `/next-problem`(즉석 추정)과 다른 말을 한다 — 그 결함을 지키는 자리다.
+    """
+    value = _get(client, auth, "/v1/me/learner-state")["general_ability"]
+    return None if value is None else float(value)
+
+
 def _mastery_of(client: Any, auth: dict[str, str], cid: uuid.UUID) -> float | None:
     """개념 숙달 현재값 — 미측정이면 None(0.0과 구별한다)."""
     for row in _get(client, auth, "/v1/me/mastery/current"):
@@ -249,7 +259,34 @@ def _hypothesis_confidence(client: Any, auth: dict[str, str], mid: str) -> float
     return None
 
 
-def _next_problem(client: Any, auth: dict[str, str], *, weak_first: bool = True) -> dict[str, Any]:
+#: 추천 요청 형태 2종 — `GET /v1/me/next-problem`에 `prioritize_weak_concepts=true`를 붙이는가.
+#: 하네스는 붙이지만 **실제 모바일 앱은 붙이지 않는다**(`problems_api.dart::getNextProblem` 기본값
+#: false · 유일한 호출부 `problem_screen.dart`가 인자 없이 부른다). 한 형태에서만 서는 여정은 요청
+#: 형태의 우연일 수 있어 5개 테스트 전부를 두 형태로 돈다(`PED-41` · 3루프 하네스 `PED-40`의
+#: `_PROBE_REQUEST_SHAPES`와 같은 두 형태·같은 이름). 형태별로 기대가 다른 자리는 **형태별로 따로
+#: 동결**한다 — 한 표로 두면 한쪽을 올리는 순간 다른 쪽이 거짓 해소가 된다.
+_REQUEST_SHAPES: dict[str, bool] = {"weak-first": True, "app-default": False}
+_ACTIVE_SHAPE: dict[str, str] = {"name": "weak-first"}
+
+
+def _active_shape() -> str:
+    """지금 도는 요청 형태 이름 — fixture가 정한다(기본 `weak-first` = 종전 하네스 동작)."""
+    return _ACTIVE_SHAPE["name"]
+
+
+@pytest.fixture(autouse=True, params=list(_REQUEST_SHAPES))
+def _request_shape(request: pytest.FixtureRequest) -> Any:
+    """모든 테스트를 두 요청 형태로 돌린다. 끝나면 기본 형태로 되돌려 다른 하네스(경로 로딩)를 막지 않는다."""
+    _ACTIVE_SHAPE["name"] = request.param
+    yield request.param
+    _ACTIVE_SHAPE["name"] = "weak-first"
+
+
+def _next_problem(
+    client: Any, auth: dict[str, str], *, weak_first: bool | None = None
+) -> dict[str, Any]:
+    if weak_first is None:
+        weak_first = _REQUEST_SHAPES[_active_shape()]
     suffix = "?prioritize_weak_concepts=true" if weak_first else ""
     body: dict[str, Any] = _get(client, auth, f"/v1/me/next-problem{suffix}")
     return body
@@ -543,6 +580,14 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             )
             assert baseline is not None, "정답 1건 뒤에도 숙달이 미측정이면 전파가 끊긴 것이다."
 
+            # ②-b θ 적재 경계(`EOS-125`) — 응답 1건짜리 θ는 신뢰 하한 미달이라 적재하지 않는다.
+            #      코치의 전과목 θ 폴백이 게이팅 없이 그 값을 읽어 힌트 사다리를 바꾸기 때문이다
+            #      (EOS-133 통합테스트가 잡은 실측 회귀). null은 결함이 아니라 "아직 측정 불가"다.
+            assert _general_ability(client, auth) is None, (
+                "응답 1건에서 general_ability가 적재됐다 — 신뢰 하한(`l4_theta_min_responses`) "
+                "미달 θ가 코치 전과목 폴백에 노출된다."
+            )
+
             # ③ 대부분 정답 — 3문항 중 2정답 1오답(“대부분”이지 전부가 아니다).
             _attempt(client, auth, cur_pids[1], correct=True, answer="정답2")
             wrong = _attempt(client, auth, cur_pids[2], correct=False, answer="오답")
@@ -552,6 +597,13 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             )
             _attempt(client, auth, cur_pids[3], correct=True, answer="정답3")
             last = _attempt(client, auth, cur_pids[4], correct=True, answer="정답4")
+            # ③-b θ 적재 경계(`EOS-125`) — 세션을 닫거나 수동 캡처를 한 적이 없는 루프 학습자도 신뢰
+            #      하한을 넘으면 상태 합성 표면에 θ가 실린다. 종전에는 이 값이 항상 null이었다.
+            assert _general_ability(client, auth) is not None, (
+                "채점 5건을 푼 루프 학습자의 learner-state.general_ability가 null이다 — "
+                "채점 경계의 θ 스냅샷 적재(`l2.ability_snapshot_capture`)가 끊겼거나 신뢰 하한을 "
+                "영영 못 넘는다(`EOS-125` 재발)."
+            )
             mid = _mastery_of(client, auth, c_cur)
             journal.record("③대부분정답", "5회 중 4정답 1오답", 숙달=mid, 상태=_state_of(last))
 
@@ -576,47 +628,106 @@ def test_persona_a_normal_learner_masters_concept_and_advances() -> None:
             )
             assert picked is not None, "다음 문항이 없으면 '다음 concept'을 판정할 수 없다."
 
-            # ⑤-a 정책 축은 이동을 **말한다** — 숙달을 근거로 `advance_next`가 선다.
-            assert advanced["action"] == "advance_next", (
-                f"숙달 {mid}인데 추천 action이 {advanced['action']}이다 — 정책 축이 전진을 "
-                "판정하지 못했다."
-            )
+            if _active_shape() == "weak-first":
+                # ⑤-a 정책 축은 이동을 **말한다** — 숙달을 근거로 `advance_next`가 선다.
+                assert advanced["action"] == "advance_next", (
+                    f"숙달 {mid}인데 추천 action이 {advanced['action']}이다 — 정책 축이 전진을 "
+                    "판정하지 못했다."
+                )
 
-            # ⑤-b 정책·선택 정렬 (`EOS-124` 해소 — 2026-09-19 동결을 승격) — 현재 개념에 미시도
-            #      문항이 **남아 있는데도** 다음 개념 문항을 받는다. 즉 이동은 후보 고갈의 부산물이
-            #      아니라 선택이다. 설명도 그 문항을 가리킨다: target은 다음 개념이고, 근거(reason)는
-            #      "방금 숙달한 현재 개념"이다 — 전진의 이유와 전진의 목적지가 각자 제자리에 있다.
-            assert picked in {str(x) for x in next_pids}, (
-                f"숙달 {mid}인데 추천 문항 {picked}가 다음 개념 것이 아니다 — 정책은 전진을 "
-                "말하는데 콘텐츠는 제자리다(`EOS-124` 재발)."
-            )
-            assert advanced["target_concept"] == str(c_next), (
-                f"advance_next의 target이 {advanced['target_concept']}다 — 다음 개념이 아니면 "
-                "설명이 받은 문항과 어긋난다(`EOS-124` 재발)."
-            )
-            assert advanced["reason"]["concept_id"] == str(c_cur), (
-                "전진의 근거는 숙달한 현재 개념이어야 한다 — 근거가 다른 개념을 가리키면 "
-                "'왜 넘어가는가'에 답하지 못한다."
-            )
-            assert advanced["reason"]["type"] == "next_concept"
-            assert advanced["intent_resolution"] == "served", (
-                f"intent_resolution={advanced['intent_resolution']} — 전진이 문항으로 실렸는데 "
-                "관측값이 그것을 말하지 않으면 '정렬이 일한 비율'을 셀 수 없다."
-            )
-            journal.record(
-                "⑤-b정책·선택정렬",
-                "EOS-124 해소 — action은 전진, 문항·target도 다음 개념",
-                action=advanced["action"],
-                target=("다음개념" if advanced["target_concept"] == str(c_next) else "현재개념"),
-                문항소속=("다음개념" if picked in {str(x) for x in next_pids} else "현재개념"),
-                근거개념=("현재개념" if advanced["reason"]["concept_id"] == str(c_cur) else "기타"),
-                해소=advanced["intent_resolution"],
-            )
+                # ⑤-b 정책·선택 정렬 (`EOS-124` 해소 — 2026-09-19 동결을 승격) — 현재 개념에 미시도
+                #      문항이 **남아 있는데도** 다음 개념 문항을 받는다. 즉 이동은 후보 고갈의 부산물이
+                #      아니라 선택이다. 설명도 그 문항을 가리킨다: target은 다음 개념이고, 근거(reason)는
+                #      "방금 숙달한 현재 개념"이다 — 전진의 이유와 전진의 목적지가 각자 제자리에 있다.
+                assert picked in {str(x) for x in next_pids}, (
+                    f"숙달 {mid}인데 추천 문항 {picked}가 다음 개념 것이 아니다 — 정책은 전진을 "
+                    "말하는데 콘텐츠는 제자리다(`EOS-124` 재발)."
+                )
+                assert advanced["target_concept"] == str(c_next), (
+                    f"advance_next의 target이 {advanced['target_concept']}다 — 다음 개념이 아니면 "
+                    "설명이 받은 문항과 어긋난다(`EOS-124` 재발)."
+                )
+                assert advanced["reason"]["concept_id"] == str(c_cur), (
+                    "전진의 근거는 숙달한 현재 개념이어야 한다 — 근거가 다른 개념을 가리키면 "
+                    "'왜 넘어가는가'에 답하지 못한다."
+                )
+                assert advanced["reason"]["type"] == "next_concept"
+                assert advanced["intent_resolution"] == "served", (
+                    f"intent_resolution={advanced['intent_resolution']} — 전진이 문항으로 실렸는데 "
+                    "관측값이 그것을 말하지 않으면 '정렬이 일한 비율'을 셀 수 없다."
+                )
+                journal.record(
+                    "⑤-b정책·선택정렬",
+                    "EOS-124 해소 — action은 전진, 문항·target도 다음 개념",
+                    action=advanced["action"],
+                    target=(
+                        "다음개념" if advanced["target_concept"] == str(c_next) else "현재개념"
+                    ),
+                    문항소속=("다음개념" if picked in {str(x) for x in next_pids} else "현재개념"),
+                    근거개념=(
+                        "현재개념" if advanced["reason"]["concept_id"] == str(c_cur) else "기타"
+                    ),
+                    해소=advanced["intent_resolution"],
+                )
+
+            else:
+                # ⑤-app 앱 형태(`prioritize_weak_concepts` 미전송) — 약점 가중이 없어 1차 선택이 θ에 맞는
+                #       후보로 **곧장 다음 개념 문항**을 고른다. 그 문항의 앵커 개념은 측정 이력이 없어
+                #       계약 §8(`select_reason_type`: 숙달 `None` → `UNMEASURED`)대로 `diagnose`가
+                #       선다. 이동 자체는 같고(문항·target이 다음 개념) 달라지는 것은 **설명**이다:
+                #       하네스 형태의 "왜 넘어가는가"(근거 = 숙달한 현재 개념)가 앱 형태에서는 없다.
+                #       판정(`PED-41` · 2026-10-06): 결함이 아니라 계약대로의 출력이다 — 전달 문항의
+                #       개념을 가리키는 설명은 참이며(`_aligned_when_declared` 충족), 추천 정책을
+                #       고치는 것은 EOS-124 범위 확장이라 이 태스크가 하지 않는다. 한계는 아래 단언이
+                #       *형태별로* 동결한다 — 정책이 앱 형태에서도 전진을 말하게 되면 이 분기가 실패해
+                #       승격 지점을 가리킨다.
+                assert (
+                    mid is not None and mid > 0.7
+                ), f"숙달 {mid}가 전진 임계(0.7) 이하다 — 앱 형태 divergence 판정의 전제가 아니다."
+                assert picked in {
+                    str(x) for x in next_pids
+                }, f"앱 형태에서 추천 문항 {picked}가 다음 개념 것이 아니다 — 이동이 일어나지 않았다."
+                assert advanced["target_concept"] == str(
+                    c_next
+                ), f"앱 형태 target이 {advanced['target_concept']}다 — 다음 개념이어야 한다."
+                assert advanced["action"] == "diagnose", (
+                    f"앱 형태 action이 {advanced['action']}이다 — 계약 §8상 앵커(다음 개념)가 "
+                    "미측정이면 diagnose다. 이것이 바뀌었다면 정책이 앱 형태에서 전진을 말하게 된 것"
+                    "이므로 이 분기를 하네스 형태와 합치는 승격을 판정하라(`PED-41`)."
+                )
+                assert advanced["reason"]["type"] == "unmeasured"
+                assert advanced["reason"]["concept_id"] == str(c_next), (
+                    "앱 형태의 근거는 앵커(다음 개념) 자신이다 — 숙달한 현재 개념을 가리키면 "
+                    "하네스 형태와 같아진 것이다(승격)."
+                )
+                assert advanced["intent_resolution"] == "direct"
+                journal.record(
+                    "⑤-app앱형태",
+                    "다음 개념 미측정 → diagnose(계약 §8) — 전진의 이유 미서술",
+                    action=advanced["action"],
+                    target=(
+                        "다음개념" if advanced["target_concept"] == str(c_next) else "현재개념"
+                    ),
+                    문항소속=("다음개념" if picked in {str(x) for x in next_pids} else "현재개념"),
+                    근거개념=(
+                        "다음개념" if advanced["reason"]["concept_id"] == str(c_next) else "기타"
+                    ),
+                    해소=advanced["intent_resolution"],
+                )
 
             # ⑥ 완주 — 현재 개념 문항까지 소진한 뒤에도 다음 개념에 머문다. ⑤-b가 이동이
             #    *선택*임을 이미 판정했으므로, 여기서 보는 것은 고갈 경로에서도 목적지가 같은가다
             #    (다음 개념이 미측정이면 진단 문항으로 나간다 — 행위는 diagnose, target은 다음 개념).
             _attempt(client, auth, cur_pids[5], correct=True, answer="정답5")
+            # ⑥-b 적재는 매 채점이 아니라 신뢰 하한 도달 시점 + stride 경계다(`EOS-125`) — 6건
+            #      채점에서 곡선은 하한(3건)을 처음 넘은 시점의 1점뿐이다(다음 점은 그로부터 5건 뒤).
+            #      점이 더 있으면 중복 적재, 없으면 적재 누락이다.
+            curve = _get(client, auth, "/v1/me/ability/snapshots")
+            counts = [pt["response_count"] for pt in curve]
+            assert len(counts) == 1 and counts[0] >= 3, (
+                f"전과목 θ 곡선의 응답 수가 {counts}다 — 신뢰 하한 도달 시점 1점이 아니면 "
+                "적재 판정이 깨졌다(매 채점 적재 또는 적재 누락)."
+            )
             drained = _next_problem(client, auth)
             journal.record(
                 "⑥다음concept도달",

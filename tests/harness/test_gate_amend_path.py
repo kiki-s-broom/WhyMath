@@ -285,3 +285,51 @@ class TestCorrectionsAreAppendOnlyAndSurviveYaml:
         assert len(rows) == 1
         assert rows[0]["reason"] == "표기 정정"
         assert _OLD_TITLE in rows[0]["changes"] and _NEW_TITLE in rows[0]["changes"]
+
+
+class TestNoteAccumulatesWithoutClosing:
+    """HARN-39 ④ — 게이트를 닫지 않고 판정 근거·부분 답변을 notes 에 누적한다.
+
+    clear/waive 는 status 를 바꾼다. 부분 답변은 둘 다 아니므로 이 경로가 없으면 판단자가
+    못 읽는 곳(MEMORY.md)에만 적히고, 읽지 못한 판단자는 추론으로 게이트를 닫는다.
+    """
+
+    def test_note_appends_keeps_status_and_original_notes(self, seeded_repo, capsys):
+        _overdue_gate(seeded_repo)
+        assert (
+            cli.main(["gates", "amend", _GATE, "--note", "1차 답: A안", "--reason", "부분 답"]) == 0
+        )
+        assert cli.main(["gates", "amend", _GATE, "--note", "2차 답: B안", "--reason", "추가"]) == 0
+        capsys.readouterr()
+
+        gate = _gate(seeded_repo)
+        assert gate.status == "pending", "note 는 게이트를 닫으면 안 된다"
+        # 둘 다 남아야 한다 — 덮어쓰기 구현이면 1차 답이 사라진다
+        assert "1차 답: A안" in gate.notes and "2차 답: B안" in gate.notes
+        assert gate.notes.index("1차") < gate.notes.index("2차")
+        assert len(gate.corrections) == 2
+
+    def test_show_prints_accumulated_notes_for_pending_gate(self, seeded_repo, capsys):
+        _overdue_gate(seeded_repo)
+        assert cli.main(["gates", "show", _GATE]) == 0
+        assert "notes (전문)" not in capsys.readouterr().out  # 대조군: 근거 없으면 출력 없음
+
+        assert (
+            cli.main(["gates", "amend", _GATE, "--note", "MP 는 회차 축 한정", "--reason", "r"])
+            == 0
+        )
+        capsys.readouterr()
+        assert cli.main(["gates", "show", _GATE]) == 0
+        assert "MP 는 회차 축 한정" in capsys.readouterr().out
+
+    def test_event_records_note(self, seeded_repo):
+        _overdue_gate(seeded_repo)
+        assert cli.main(["gates", "amend", _GATE, "--note", "근거 X", "--reason", "r"]) == 0
+        rows = [r for r in _events(seeded_repo, "gate_amend") if r.get("note") == "근거 X"]
+        assert len(rows) == 1
+
+    def test_blank_note_is_rejected_and_writes_nothing(self, seeded_repo):
+        _overdue_gate(seeded_repo)
+        before = _gates_bytes(seeded_repo)
+        assert cli.main(["gates", "amend", _GATE, "--note", "   ", "--reason", "r"]) == 1
+        assert _gates_bytes(seeded_repo) == before

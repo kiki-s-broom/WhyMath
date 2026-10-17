@@ -88,6 +88,26 @@ class MatchGateResult(BaseModel):
     )
 
 
+def is_verdict_withheld(*, low_quality: bool, attribution_unclear: bool) -> bool:
+    """확신 진단을 **학습자 모델에 넣지 않고 보류**해야 하는가 — 게이트 ②·③의 합집합 (단일 원천).
+
+    두 게이트는 출처가 다르지만(② 입력 OCR 품질 · ③ 정정 어구의 귀속) 처분이 같다: 응답에는 후보를
+    그대로 싣되 학습자 모델(가설·증거)에는 확정 진단으로 넣지 않는다. 응답 플래그는 DB 쓰기를
+    되돌리지 못하기 때문이다(MISC-17의 근거를 MISC-28이 물려받았다).
+
+    **+1과 −1을 함께 보류하는 것이 핵심이다.** 보류된 매칭을 빈 리스트로 넘기면 하류가 그것을
+    "clean 풀이(no-match)"로 읽어 활성 가설을 −1로 *반박*한다 — `모른다`가 `아니다`로 뒤집힌다
+    (CLAUDE.md "모른다 ≠ 아니다"). 귀속 불명은 오개념이 없다는 증거가 아니므로 어느 방향으로도
+    증거를 만들지 않는다.
+
+    **왜 함수인가(MISC-60)**: 이 술어는 코치(`api/coach.py` `_MatchOutcome.verdict_withheld`)와 WH-1
+    하네스(`harness/wh1_loop.py`)가 *같은 판정*을 내려야 한다. 사본이 둘이면 한쪽만 고쳐질 때 같은
+    입력에 다른 처분이 나간다 — `test_coach_wh1_convergence_governance.py`가 두 모듈이 이 함수를
+    같은 객체로 소비함을 동결한다. 새 임계는 0이다(기존 플래그를 소비할 뿐).
+    """
+    return low_quality or attribution_unclear
+
+
 def apply_match_quality_gate(
     matches: Sequence[MisconceptionMatch],
     *,
@@ -148,4 +168,5 @@ def apply_match_quality_gate(
 __all__ = [
     "MatchGateResult",
     "apply_match_quality_gate",
+    "is_verdict_withheld",
 ]

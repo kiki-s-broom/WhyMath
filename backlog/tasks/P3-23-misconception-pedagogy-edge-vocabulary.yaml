@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-23-misconception-pedagogy-edge-vocabulary
+title: "P3-23 — 오개념 오류 유형 ↔ 교수 전략 적합 오류 유형 어휘 불일치 판정 (간선 필요 여부 · Graph Connectivity 마지막 고리의 단위)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판정 먼저: 오개념의 오류 유형 어휘(예: 순서오류·분배누락·차원혼동·해석오류·조건무시·공식혼동·부호오류·극값변곡혼동)와 교수 전략이 적는 적합 오류 유형 어휘(개념혼동·직관오류·정의·표기오류·절차오류·과잉일반화·역방향오류)가 겹치지 않는 것이 의도된 설계인지, 런타임이 오개념에서 교수 전략을 다른 경로(지식 유형·교수 팩)로 고르는지를 소비 코드(호출측)에서 실측해 적는다.\n② 간선이 필요하다는 판정이면 좌석(키·저장 위치)을 제안한다 — 새 ID 체계를 만들지 않고 기존 오개념 M-id 와 교수 전략 식별자를 잇는 형태로. 간선이 필요 없다는 판정이면 P3-02 계측기의 개념 단위 교수 판정(Misconception 고리 뒤의 Pedagogy 고리를 개념에서 판정)이 충분하다는 근거를 적고 닫는다.\n③ 판정이 '간선 필요'면 Graph Connectivity 계측기의 마지막 고리를 오개념 단위로 바꾸는 후속을 등재한다(여기서 구현하지 않는다)."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-02 구현 중 발견(2026-10-02 실측). 오개념 코퍼스의 error_type 값과 교수 전략 코퍼스의 suitable_error_types 값의 교집합이 0이다. 그래서 P3-02 의 Graph Connectivity 는 Concept → Skill → Problem → Misconception 까지는 한 줄로 잇고 마지막 Pedagogy 고리는 개념 단위로 판정한다. 이 실측은 어휘 문자열 대조뿐이며 런타임 소비 경로는 보지 않았다 — 그래서 결함이 아니라 판정 대상으로 등재한다. 등재는 착수가 아니다."
+updated: 2026-10-02

@@ -1,6 +1,6 @@
 # 빌드 하네스 (Build Harness) — 작업일정 관리·순차 조율 표준
 
-> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.15 (2026-09-29 HARN-111 — **번호 예약·스캔 전 갱신**: `add`·`rename`이 번호를 `harness-claims/reservations/`에 CAS 예약하고(push 전 24초 사각 · EOS-108) 스캔 직전 원격 heads를 갱신한다(19분 사각 · EOS-128). 의미 고지가 claim·예약 full ID를 슬러그로 대조하고, 신선도는 전체 브랜치 fetch 전용 스탬프로 잰다. ⓑ(CI 전 브랜치 스캔) 기각 근거 실측. §3b-1a·§7b 신설 · §7·§7a 갱신. 이전 1.14: 2026-09-28 HARN-77 — **EOS 등급이 착수 순서의 첫 키**: `sort_key`가 (EOS 등급 → stage → priority → 해금 수 → id)가 됐고, 이월 등급(P2·P3)은 `next`·`status`·`brief` 후보에서 기본 숨김(`--all-eos`로 열기 · 숨긴 건수는 0건 포함 항상 고지 · `start`는 경고만). 계획이 12/31 내부 완성으로 바뀐 뒤에도 2027 이월분이 후보 상위를 차지하던 상태(착지 전 실측: 후보 195건 중 상위 10건에 P2 7건·첫 P0 40위)를 해소. `blocked`를 파킹으로 쓰던 우회(CUR-17·CUR-18)도 걷었다. §3 정렬 설명·§3a·§7 갱신. 이전 1.13: 2026-09-28 CONST-02 — **코딩 헌법과의 맞물림**: §2e 신설. 하네스는 `constitution/`에 쓰지 않고(제9조 · 가드 훅), 코딩 헌법 규칙 등록부는 §2d 규칙 인덱스와 다른 대장으로 교차 참조만 한다. CI `harness-integrity`에 위헌 심사 래칫·가드 자가시험·파이프라인 검사 스텝 3개, 이식 추적 = `CONST-*` 태스크 + 사람 게이트 4건, 이식 단계(STAGE 1~6)와 스테이지(S0~E6)의 이름 충돌 고정. 이전 1.12: 2026-09-28 HARN-184 — **게이트 대기 분류 단일화**: 미통과 게이트가 무엇을 기다리는지(`inputs`·`verdict`·`person`)를 `store.gate_wait_kind` 한 곳이 판정하고 작업 흐름 그래프·보드·정지 사유가 이름만 붙인다. HARN-177 ②의 원칙이 acceptance가 열거하지 않은 새 화면(HARN-182)에서 되살아난 것 — 그래프가 판정 결과 미기록 게이트를 '사람 차례'로 그렸다. 사람 차례 문구를 내는 하네스 모듈 전수 등재 검사로 새 화면의 이탈을 막는다. §3e 「게이트 대기 분류」 절 신설 · 변별력·한계 · §4b·§4c 갱신. 이전 1.11: 2026-09-28 HARN-182 — **작업 흐름 그래프**: 열린 작업·사람 작업(사람 소유 태스크·미통과 게이트)·미머지 작업(원격 브랜치의 완료분·claim·고립 판정)을 창(윈도우)과 연결선으로 한 캔버스에 통합하는 읽기 전용 도구 `work_graph.py` 신설. 판정은 board·selector·store·remote_claims를 그대로 호출하고 배치·화면만 새로 만든다. §4c 신설 · §7 갱신. 이전 1.10: 2026-09-26 HARN-177 — **판정 인계**: pending decision 게이트의 입력 태스크를 `done`할 때 그 게이트에 대한 판정(FAIL·PASS·판정 무관)을 같은 호출에서 넘기게 한다. 셋 다 없으면 exit 1 + 대장 무변경. 판정 기록에 입력 스냅샷이 실려 '입력 전부 done인데 그 상태의 판정 기록 없음'을 next·status·gates show가 `(판정 결과 미기록)`으로 낸다(종전 `(사람 판정 대기)`). FAIL 소유 태스크를 이미 열린 상류에 있는 태스크로 `--owner` 지목 가능(⑥). §3e 「판정 인계」 절 신설 · §7·§7a 갱신. 이전 1.9: 2026-09-25 HARN-174 — **게이트를 태스크 그래프의 노드로 편입**: 게이트에 입력 간선(`depends_on`) 또는 입력 없음 사유(`no_inputs_reason`)를 두고, 태스크·게이트 통합 그래프 하나를 validate·모든 쓰기 경로·selector·board가 공유한다. 해금 수가 게이트 너머까지 전이로 세지고, next·status·gates show가 대기 경로를 보인다. §3e 신설 · §3 정렬 설명 · §7·§7a 갱신. 이전 1.8: 2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
+> **정본**: `backlog/` + `scripts/harness/` | **채택**: 2026-07-08 결정로그 | **버전**: 1.17 (2026-10-08 HARN-22 — **번호 제안 경쟁 재현 고정**: 2026-08-11 `OPS-29` 사고(두 세션이 같은 빈 번호를 동시 제안받아 둘 다 수용)를 완화 off/on으로 재생해 갈림을 단언하고, 예약이 닿지 않는 구간의 안전망(`validate` → CI `harness-integrity`)을 동작·배선 양쪽에서 동결했다. 새 메커니즘은 없다 — HARN-111의 번호 예약이 이미 그 구간을 닫았으므로 판정((a)+(c) 채택·(b) 기각)과 by-design 경계 3종을 §3b-1a에 기록했다. 이전 1.16: 2026-09-29 HARN-130 — **사고 대장 세션 샤딩 + 적시 주입 인덱스 비커밋**: `incident add`가 공용 `backlog/incidents.ndjson`을 날짜순으로 통째 다시 쓰던 것을 세션(=브랜치) 샤드 `backlog/incidents/<세션>.ndjson` append로 바꿨다(레거시 파일은 읽기 전용 역사 · 읽기는 합집합). 같은 날 사고를 적은 두 PR이 머지 큐에서 충돌하던 것(2026-09-21 #1255 · 2026-09-28 #1363)의 구조적 제거이며 HARN-46 이벤트 샤딩의 2회차다. 파생 인덱스 `backlog/jit_index.json`도 같은 PR들에서 함께 충돌했으므로 커밋을 중단하고 적시 주입 후보를 편집 시 대장에서 계산한다 — `jit check`는 "어긋났는가"가 아니라 "계산되는가"(0건·스키마 위반 red)를 본다. §2 표 · §2c 「머지 방어」 절 신설. 함께 HARN-170 — 하네스 테스트가 실제 대장에 가짜 policy_warn을 쓰던 누출을 두 겹(쓰기 차단 + 세션 전후 sha256 대조)으로 막고, 이미 커밋된 누출 97묶음은 서명으로 식별해 policy report 집계에서만 뺀다(§3c 「측정을 오염시키던 것」 절 신설). 이전 1.15: 2026-09-29 HARN-111 — **번호 예약·스캔 전 갱신**: `add`·`rename`이 번호를 `harness-claims/reservations/`에 CAS 예약하고(push 전 24초 사각 · EOS-108) 스캔 직전 원격 heads를 갱신한다(19분 사각 · EOS-128). 의미 고지가 claim·예약 full ID를 슬러그로 대조하고, 신선도는 전체 브랜치 fetch 전용 스탬프로 잰다. ⓑ(CI 전 브랜치 스캔) 기각 근거 실측. §3b-1a·§7b 신설 · §7·§7a 갱신. 이전 1.14: 2026-09-28 HARN-77 — **EOS 등급이 착수 순서의 첫 키**: `sort_key`가 (EOS 등급 → stage → priority → 해금 수 → id)가 됐고, 이월 등급(P2·P3)은 `next`·`status`·`brief` 후보에서 기본 숨김(`--all-eos`로 열기 · 숨긴 건수는 0건 포함 항상 고지 · `start`는 경고만). 계획이 12/31 내부 완성으로 바뀐 뒤에도 2027 이월분이 후보 상위를 차지하던 상태(착지 전 실측: 후보 195건 중 상위 10건에 P2 7건·첫 P0 40위)를 해소. `blocked`를 파킹으로 쓰던 우회(CUR-17·CUR-18)도 걷었다. §3 정렬 설명·§3a·§7 갱신. 이전 1.13: 2026-09-28 CONST-02 — **코딩 헌법과의 맞물림**: §2e 신설. 하네스는 `constitution/`에 쓰지 않고(제9조 · 가드 훅), 코딩 헌법 규칙 등록부는 §2d 규칙 인덱스와 다른 대장으로 교차 참조만 한다. CI `harness-integrity`에 위헌 심사 래칫·가드 자가시험·파이프라인 검사 스텝 3개, 이식 추적 = `CONST-*` 태스크 + 사람 게이트 4건, 이식 단계(STAGE 1~6)와 스테이지(S0~E6)의 이름 충돌 고정. 이전 1.12: 2026-09-28 HARN-184 — **게이트 대기 분류 단일화**: 미통과 게이트가 무엇을 기다리는지(`inputs`·`verdict`·`person`)를 `store.gate_wait_kind` 한 곳이 판정하고 작업 흐름 그래프·보드·정지 사유가 이름만 붙인다. HARN-177 ②의 원칙이 acceptance가 열거하지 않은 새 화면(HARN-182)에서 되살아난 것 — 그래프가 판정 결과 미기록 게이트를 '사람 차례'로 그렸다. 사람 차례 문구를 내는 하네스 모듈 전수 등재 검사로 새 화면의 이탈을 막는다. §3e 「게이트 대기 분류」 절 신설 · 변별력·한계 · §4b·§4c 갱신. 이전 1.11: 2026-09-28 HARN-182 — **작업 흐름 그래프**: 열린 작업·사람 작업(사람 소유 태스크·미통과 게이트)·미머지 작업(원격 브랜치의 완료분·claim·고립 판정)을 창(윈도우)과 연결선으로 한 캔버스에 통합하는 읽기 전용 도구 `work_graph.py` 신설. 판정은 board·selector·store·remote_claims를 그대로 호출하고 배치·화면만 새로 만든다. §4c 신설 · §7 갱신. 이전 1.10: 2026-09-26 HARN-177 — **판정 인계**: pending decision 게이트의 입력 태스크를 `done`할 때 그 게이트에 대한 판정(FAIL·PASS·판정 무관)을 같은 호출에서 넘기게 한다. 셋 다 없으면 exit 1 + 대장 무변경. 판정 기록에 입력 스냅샷이 실려 '입력 전부 done인데 그 상태의 판정 기록 없음'을 next·status·gates show가 `(판정 결과 미기록)`으로 낸다(종전 `(사람 판정 대기)`). FAIL 소유 태스크를 이미 열린 상류에 있는 태스크로 `--owner` 지목 가능(⑥). §3e 「판정 인계」 절 신설 · §7·§7a 갱신. 이전 1.9: 2026-09-25 HARN-174 — **게이트를 태스크 그래프의 노드로 편입**: 게이트에 입력 간선(`depends_on`) 또는 입력 없음 사유(`no_inputs_reason`)를 두고, 태스크·게이트 통합 그래프 하나를 validate·모든 쓰기 경로·selector·board가 공유한다. 해금 수가 게이트 너머까지 전이로 세지고, next·status·gates show가 대기 경로를 보인다. §3e 신설 · §3 정렬 설명 · §7·§7a 갱신. 이전 1.8: 2026-09-22 HARN-136 — git 원복 계열 가드 신설: PreToolUse(Bash) 훅이 `checkout --`·`restore`·`stash` 를 **대상 경로에 미커밋 변경이 있을 때만** 막는다. 판정 기준은 명령이 아니라 '잃을 것이 있는가'이며, 깨끗한 트리에서는 발화하지 않는다. §3b-5 추가(한계 명시 — Bash 도구 경유 명령만 본다). 이전 1.7: 2026-09-22 HARN-134 — 차단 홀드의 **교차 세션 해제**: `unblock`이 홀더가 아닌 세션에서도 `kind=block` 홀드를 정상 경로로 걷는다(`claim`은 여전히 `--force` 필수). 해제 실패 시 로컬 전이를 하지 않아 '대장은 blocked · 로컬은 todo' 분기가 구조적으로 생기지 않는다. §3b-4를 수동 절차에서 현행 계약으로 교체. 부수로 의미 중복 고지 pool에 `done` 편입(라벨 `로컬·완료됨`) — 미이행 acceptance를 남긴 완료 태스크의 승계가 그 사각에 있었다. 이전 1.6: 2026-09-22 HARN-124 — `gates amend` 신설: 등재된 게이트의 **제목·독촉 주기 정정 경로**. 종전에는 `--title`·`--remind-after-days`가 `add` 전용이라 틀린 게이트 문면을 고칠 CLI가 0이었고(손편집 금지), 그 제목은 매 세션 브리핑에 노출돼 그대로 틀린 조작을 부른다. 실효값 덮어쓰기 + 옛 값 `corrections[]` append이며 status는 건드리지 않는다(waive와 구분 — waive는 대기 태스크를 해금한다). §7a 표 2행·치트시트 추가. 이전 1.5: 2026-09-11 HARN-92 — `gates show <id>` 신설: 사람에게 게이트를 서술할 때 title(등재 시점 질문·append 전용이라 미갱신)만 인용해 이미 뒤집힌 결정을 재안내하던 사고 재발방지. status별 근거(cleared→evidence, waived→notes, pending→"없음")를 title보다 먼저 전문 출력. 이전 1.4: 2026-09-07 HARN-74 — gates clear·waive 직후 부착 blocked 태스크·산문 참조 출력 + brief/status의 '해소된 게이트를 기다리는 blocked' 줄 · §3d 절 추가. 이전 1.3: 2026-09-07 HARN-67 — amend 정정 경로 3축(depends 제거·gate 탈착·notes 치환)·취소 선행 판정 규칙·§7a 정정 경로 표. 이전 1.2: 2026-08-10 통합점검 — gates add 반영·테스트 수 실측 정정. 1.1 이후 §4 삭제 403 런북(2026-08-06 HARN-16)이 버전 표기 없이 추가돼 있었다)
 >
 > 이 문서의 "빌드 하네스"는 프로젝트 *구축을 관리하는* 레이어다.
 > `src/backend`의 WH-1(튜터링)·WH-S(솔버)는 **제품 런타임 하네스**로 완전히 별개다.
@@ -27,6 +27,8 @@ backlog/gates.yaml            사람 게이트 대장 (Kiki 수동 대기 추적
 backlog/tasks/<id>.yaml       태스크당 1파일 — 병렬 세션 충돌 원천 차단
 backlog/events/<actor>.ndjson append-only 감사 로그 — **세션(=브랜치)당 1샤드** (HARN-46)
 backlog/events.ndjson         레거시 단일 대장 — 읽기 전용 역사 (신규 기록 없음)
+backlog/incidents/<actor>.ndjson 사고 대장 — 이벤트와 같은 세션 샤드 (HARN-130 · §2c)
+backlog/incidents.ndjson      사고 대장 레거시(시드 676건 + 샤딩 이전 등재) — 읽기 전용 역사
 backlog/policy.yaml           조율 정책 — 겹침·ad-hoc 감지 강제 수준 (off|warn|block)
 ```
 
@@ -73,7 +75,9 @@ backlog/policy.yaml           조율 정책 — 겹침·ad-hoc 감지 강제 수
 
 ## 2c. 사고 대장 — 회차를 산문이 아니라 데이터로 센다 (HARN-118)
 
-`backlog/incidents.ndjson` 한 줄이 사고 1건이다. 태스크·게이트와 같은 `backlog/` 대장이며
+NDJSON 한 줄이 사고 1건이다 — 신규 등재는 세션 샤드 `backlog/incidents/<세션>.ndjson`, 과거
+기록은 레거시 `backlog/incidents.ndjson`(읽기 전용)에 있고 읽기는 둘의 합집합이다(아래 「머지
+방어」). 태스크·게이트와 같은 `backlog/` 대장이며
 같은 규칙을 받는다 — **손편집 금지**(`validate`·`check-edit` 훅이 스키마를 검사한다), 등재는
 CLI로만.
 
@@ -89,9 +93,57 @@ CLI로만.
 
 | 축 | 규칙 | 집행 지점 |
 |---|---|---|
-| 회차 계수 | `nth`는 **저장하지 않는다** — `compute_nth`가 같은 `series_id` 안에서 (date, 파일 위치) 순으로 계산한다. 저장하면 진실 원천이 둘이 되고, 과거 사고를 뒤늦게 등재할 때 조용히 어긋난다 | `incidents.compute_nth` |
+| 회차 계수 | `nth`는 **저장하지 않는다** — `compute_nth`가 같은 `series_id` 안에서 (date, 읽기 순서) 순으로 계산한다 — 읽기 순서(레거시 → 샤드 이름순 → 줄 순)는 같은 날짜의 동률만 깬다. 저장하면 진실 원천이 둘이 되고, 과거 사고를 뒤늦게 등재할 때 조용히 어긋난다 | `incidents.compute_nth` |
 | 2회차 코드 착지 | 같은 계열 2회차 이상은 `fix_form`이 `code`·`task`·`rule+code`·`rule+task` 중 하나여야 하고 `fix_ref`(테스트 경로·태스크 ID)가 있어야 한다. 산문(`rule`)뿐이거나 `none`/`unknown`이면 **exit 1** | `incidents.repeat_settlement_error` · `incident add` |
 | 모른다 ≠ 1회차 | `series_id`가 비면 `nth`는 `None`이다. 0도 1도 아니다 — 미배정을 "첫 발생"으로 접으면 2회차 강제가 통째로 무력해진다 | 위와 같음 |
+
+### 머지 방어 — 세션 샤드와 인덱스 비커밋 (HARN-130)
+
+**왜**: 이 대장은 HARN-118로 착지하면서 HARN-46이 이벤트 대장에서 배운 두 방어(`merge=union` ·
+세션 샤딩) 중 어느 것도 받지 못했다. 등재 CLI가 대장 전체를 날짜순으로 다시 썼으므로 같은 날
+사고를 적은 두 PR은 파일 끝의 같은 자리에 서로 다른 줄을 넣어 충돌했다 — 2026-09-21 PR #1255가
+머지 큐에서 `MERGE_CONFLICT`로 이탈했고, 2026-09-28 PR #1363은 재병합 직후 같은 충돌을 한 번 더
+냈다(계열 `incident-ledger-merge-conflict`). union은 로컬 git만 돕는다 — GitHub 서버는 저장소
+merge driver를 적용하지 않는다.
+
+**쓰기**: `incident add`는 현재 브랜치의 샤드(`store.session_shard_name` — 이벤트 대장과 같은
+함수라 한 세션의 기록이 두 대장에서 같은 파일명을 쓴다)에 1줄 append한다. 레거시 파일은 다시
+쓰지 않는다(`incident seed`만 쓴다). 서로 다른 세션은 서로 다른 파일에 쓰므로 충돌이 '해소
+가능'이 아니라 '발생 불가능'하다. `.gitattributes`의 union 두 줄은 같은 actor가 겹치는 잔여
+경우의 로컬 방어일 뿐이다.
+
+**읽기**: `incidents.ledger_paths` = 레거시 → 샤드 이름순. 리포트·계열·회차·2회차 강제·적시 주입이
+전부 이 합집합을 읽는다. 오류 위치는 `backlog/` 기준 상대 경로(`incidents/<세션>.ndjson:2`)로
+적는다. 대장에 시각 필드가 없으므로 같은 날 두 세션이 같은 계열을 등재했을 때 어느 쪽이 먼저였는지는
+모른다 — 이름순은 결정적 동률 깨기일 뿐 선후 주장이 아니다.
+
+**인덱스 축 — 대장만 나누면 끝나지 않았다**: 적시 주입 인덱스 `backlog/jit_index.json`(HARN-121 ③)이
+사고와 함께 바뀌었다(main에서 그 파일을 바꾼 커밋 26건 중 25건이 사고 대장도 바꿨다). 새 사고 줄은
+무게·날짜 순 정렬에서 대개 같은 자리에 끼므로 같은 두 PR이 거기서 다시 충돌했고, 재생성을 잊으면
+CI가 red였다(HARN-179 · 계열 `derived-index-not-rebuilt` 3회). 인덱스를 둔 근거는 "대장을 편집마다
+읽으면 2.3초"였는데, `check-edit`의 조율 정책 검사가 **이미** 브랜치 위의 편집마다 태스크 대장을
+통째로 읽고 있었다(실측 1.98초). 대장이 메모리에 올라온 뒤 후보 계산은 18ms(규칙 1 · 사고 13 ·
+계산 4)다. 그래서 커밋을 중단하고 훅이 대장을 한 번 읽어 주입과 정책 검사가 공유한다 — 생성
+인벤토리를 저장소에서 뺀 OPS-76과 같은 방향이다. main 브랜치에서는 정책 검사가 대장을 읽지 않으므로
+그곳의 편집만 약 2초가 늘어난다(세션은 브랜치에서 일한다).
+
+| 명령 | 이관 전 | 이관 후 |
+|---|---|---|
+| `jit check` (CI `harness-integrity`) | 커밋 파일 == 대장 렌더 결과인가 | 대장에서 후보가 **계산되는가** — 스키마 위반·후보 0건이면 exit 1 |
+| `jit build` | 파일 재생성 | 파일을 만들지 않는다 — 옛 안내를 따르는 세션을 위한 같은 검사 |
+| `jit show <경로>` | 커밋 파일을 읽음 | 대장에서 계산 |
+
+**변별력**(`tests/harness/test_incident_ledger_sharding.py`): 임시 저장소(merge driver 없음 = GitHub
+서버 조건)에서 두 브랜치가 같은 날 사고를 등재하고 실제로 `git merge`한다. **이관 전 배치**(공용 대장
+재기록 + 커밋 인덱스)는 두 파일에서 충돌하고, 이관 후 배치는 충돌 없이 합쳐져 두 사고가 모두 읽히고
+적시 주입에도 뜬다. 앞의 RED 재현이 없으면 뒤의 초록은 '원래 충돌이 안 나는 입력'과 구별되지 않는다.
+절 16개를 하나씩 끊는 뮤테이션 하네스 = `scripts/harness/verify_incident_shard_discrimination.py`
+(대장 10 · 인덱스 6 — 주입 대상 실재는 `test_incident_shard_mutation_anchors.py`가 매 CI 동결).
+
+**한계**: ① 옛 코드로 `backlog/jit_index.json`을 수정한 채 열려 있는 PR은 이 변경을 머지할 때
+modify/delete 충돌이 한 번 난다 — 파일을 지우면 끝난다(`.gitignore`가 재유입을 막는다). ② 같은 브랜치
+이름을 다시 쓰는 세션(재생성 브랜치)은 같은 샤드에 이어 쓴다 — 이벤트 대장과 같은 잔여 경우이며
+union이 로컬 병합만 흡수한다.
 
 ### 시드와 계열 배정의 정직한 한계
 
@@ -485,6 +537,50 @@ PR에만 생긴다는 통설을 실측에서 폐기했다(열린 PR 14건 중 me
 걸려 매 실행 "판정 보류"가 되어 초록인 채 상시 무력이 된다). 배선 실재성은
 `tests/infra/test_stale_branch_scan_ci_wiring.py`가 기계로 동결한다.
 
+### 3b-3a. 세션 shallow 대체 — CI 야간 리포트 (HARN-28)
+
+**문제**: 위 5분류 스캔(`scan_stale_branches`)은 shallow 클론이면 `status=shallow`로 판정을
+포기한다. 모든 CCR 세션 컨테이너가 shallow라 이 탐지기는 **세션에서 한 번도 목록을 낸 적이
+없다**(2026-08-11 실측 — 미측정 규모: 미머지 커밋 392·열린 PR 없는 브랜치 27·최장 고립 8일).
+`--unshallow` 자동 실행은 `unmerged_branch_verdict_2026-08-11.md`가 타당한 사유로 기각했으므로
+그 기각을 뒤집지 않고 **실행 위치를 CI로 옮긴다**.
+
+| 구간 | 구현 | 동결 |
+|---|---|---|
+| 발행(집행 지점) | `harness-audit.yml`의 `isolation-scan` 잡 — 야간 schedule·수동 전용(push(main)에서 안 돈다), `fetch-depth: 0`, `contents: write` | `tests/infra/test_isolation_scan_wiring.py` |
+| 전달 | 전용 orphan 브랜치 `harness-reports` — 루트 커밋 1개(부모 없음)·파일 1개(`isolation.json`) | `tests/harness/test_isolation_report.py` |
+| 소비 | `backlog.py brief`가 **세션 스캔이 `shallow`일 때만** 리포트를 읽어 같은 렌더 경로로 낸다 | 같은 파일의 `TestBriefCommandConsumesReport` |
+
+**설계 규칙** (각각 결함 주입으로 검출 확인 — 뮤테이션 30종 전건):
+- **측정 실패 ≠ 통과.** CI 스캔이 `ok`가 아니면 *발행하지 않고* exit 2로 잡을 red로 만든다.
+  빈 목록을 올리면 소비자가 "고립 0건"으로 읽는다. 거부하면 직전 정상 리포트가 남고 그 생성
+  시각이 브리핑에 항상 보이므로 낡음이 숨지 않는다(36시간 초과 시 경고 — 야간 잡이 멎은 신호).
+- **소비는 4상태를 구분한다.** `ok`/`absent`(브랜치 없음)/`corrupt`/`unreachable`은 서로 다른
+  화면이다. 비-`ok` 셋은 "고립 0건"이 아니라 **"고립 브랜치 미측정"** 이며 처방이 각각 다르다.
+  "리포트가 있고 0건"과 "리포트가 없다"도 다른 화면이다.
+- **`harness-claims`에 얹지 않는다.** 쓰기 주체(야간 CI 1개 vs 세션 N개)·주기·실패 영향이 달라
+  섞으면 서로의 CAS 재시도를 유발한다. (초안은 "`_write_claims()`가 `claims/` 밖 경로를 무증상
+  삭제한다"를 근거로 들었으나 그 결함은 HARN-111 `preserved_root_entries`로 이미 해소됐다 —
+  근거가 사라져도 분리는 위 이유로 여전히 옳다.)
+- **`git fetch --depth`를 쓰지 않는다.** full 클론에 depth를 주면 그 클론이 shallow로 바뀌어
+  이 절이 고치려는 결함을 스스로 만든다. 브랜치가 루트 커밋 1개라 depth 없이도 O(1)이다.
+  추이는 브랜치에 쌓지 않고 워크플로 아티팩트(30일)로 보존한다.
+- **하네스 소유 브랜치는 방치 스캔 대상 밖이다**(`remote_claims.HARNESS_OWNED_BRANCHES` =
+  `harness-claims` + `harness-reports`). 제외가 없으면 야간 잡이 사흘 멎는 순간 리포트 브랜치가
+  orphan이라 trunk 대비 ahead>0 → `isolated`로 "결정 필요"에 뜬다. `flow_health.EXCLUDED`와의
+  동기화도 테스트가 붙든다.
+- **CI 잡이 `ci.yml`이 아니라 `harness-audit.yml`에 있는 이유**: `pull_request` 트리거 부재(쓰기
+  권한이 PR 검증 경로로 새지 않는 구조적 보장)·`cancel-in-progress` 없음(ci.yml은 main push마다
+  야간 잡을 취소한다). `ci.yml`의 `harness-integrity`가 도는 `backlog.py branches`는 판정만
+  CI 로그에 남기고 **세션에 전달하지 않으므로** 이 경로가 그것을 대체하지 않고 보완한다.
+
+**한계(정직한 공백)**: 리포트는 최대 하루 묵은 스냅샷이다 — 측정 이후의 머지·삭제는 반영되지
+않으며 브리핑 출처 줄이 그 사실을 밝힌다. 전체 클론(Kiki 머신)은 라이브 스캔이 더 신선하므로
+리포트를 읽지 않는다. 최초 발행은 `harness-audit`을 `workflow_dispatch`로 한 번 실행해야 한다
+(그 전까지 세션 브리핑은 "미측정 — isolation-scan 잡 실행 필요"를 낸다).
+
+조회·진단: `python3 scripts/harness/isolation_report.py show` (exit 0 정상 · 3 없음 · 4 손상 · 5 조회 불가).
+
 ### 3b-4. 차단 홀드의 교차 세션 해제 (HARN-134 — 착지 완료)
 
 **현행**: `unblock`이 홀더가 아닌 세션에서도 차단 홀드를 **정상 경로로** 걷는다.
@@ -541,6 +637,30 @@ python3 scripts/harness/backlog.py unblock <task-id>
 터미널에서 치는 git 에는 닿지 않는다. 탐지는 명령 문자열 파싱이므로 변수·`eval`·
 별칭으로 감싸면 보이지 않는다. 즉 이것은 *세션이 무심코 치는* 경로를 막는 장치이며,
 뮤테이션 검증에서 `cp` 백업을 뜨는 규율을 대체하지 않는다.
+
+### 3b-6. 낡은 로컬 대장 고지 — 트렁크에서 이미 끝난 태스크 (HARN-54)
+
+`next`·`start`의 기존 스캔은 **트렁크가 이미 끝낸 태스크**를 못 본다. `scan_remote_done`은 트렁크 ref를
+의도적으로 제외하고("트렁크가 done이면 로컬도 done"), `scan_trunk_task_drift`는 의존·게이트의 *강화*만
+본다. 그 전제는 로컬 대장이 트렁크를 따라잡았을 때만 참이다 — 내 클론이 낡았으면 main에서는 done인
+태스크가 로컬에서는 todo라 후보로 나온다(2026-09-24 `EOS-69` 중복 구현).
+
+| 지점 | 동작 | 차단 |
+|---|---|---|
+| `next` | 후보 중 트렁크 사본이 `done`/`cancelled`인 태스크마다 stderr 1줄 + 정정 명령. 후보 목록은 그대로 | 아니오 |
+| `start` | 앞선 `fetch=True` 직후 대조해, 명령의 **마지막 출력**으로 강조 블록(앞의 겹침 경고에 묻히지 않게). 이벤트 `start_trunk_terminal_notice` | 아니오 |
+
+- **고지이지 차단이 아니다** — main이 done이어도 로컬에 정당한 후속 작업이 있을 수 있다(HARN-43 선례).
+- **조회 불가는 침묵하지 않는다** — `트렁크 종결 대조 불가(<사유>)`. `start`에서 fetch가 실패했으면 그
+  사유를 그대로 싣는다(실패를 `ok`로 접으면 낡은 ref로 '끝난 것 없음'을 말하게 된다).
+- **스냅샷 나이** — `next`는 fetch하지 않으므로 마지막 전체 브랜치 fetch로부터 30분 이상이면 그 사실을
+  고지한다(`main에 없음`과 `main을 최근에 못 봤음`은 다른 진술). 나이는 `number_guard.branch_snapshot_age`로
+  잰다 — 종전 `remote_refs_age_seconds`는 FETCH_HEAD를 보는데 claim 조회가 매번 그것을 새로 써서 `next`
+  안에서는 0초에 가깝다(HARN-111 ⑦(다)). 스탬프가 없으면 판정 불가라 침묵한다.
+- 정본 = `remote_claims.scan_trunk_terminal`, 동결 = `tests/harness/test_stale_ledger_vs_trunk.py`
+  (양성·대조군·cancelled·조회 불가·fetch 실패·스냅샷 나이, 뮤테이션 8종 전건 RED).
+- **한계**: 판정은 *내가 마지막으로 본 트렁크* 기준이다. 그 뒤 착지한 완료분은 `next`가 못 본다
+  (확정 지점인 `start`는 fetch 후 본다).
 
 ## 3b-1. 중복 방어의 두 축 — 같은 *이름* vs 같은 *문제* (HARN-51)
 
@@ -616,6 +736,20 @@ ref를 하나도 못 찾으면 `empty` = 판정 불가**다. 네트워크 실패
 드러낸다). 정본·실측 수치는 `scripts/harness/number_guard.py` 모듈 docstring, 동결은
 `tests/harness/test_number_guard.py`·`test_backlog_add_id_collision.py`.
 
+**번호 *제안* 경쟁(HARN-22 · 2026-08-11 `OPS-29` 사고)과 판정** — 두 세션이 각자 거부된 뒤 가드가
+**양쪽에 같은 빈 번호를 제안**해 둘 다 수용한 사고다. 이 구간은 HARN-111의 ⓐ가 닫았고, HARN-22는
+새 메커니즘 없이 **그 판정을 사고 재생으로 고정**했다: (a) 번호 예약 채택(집행 지점 =
+`cmd_add`·`cmd_rename`의 `number_guard.reserve_for`) · (c) 머지 시점 검출 채택(집행 지점 =
+`store._id_number_collisions` → `backlog.py validate` → CI `harness-integrity`) · (b) 세션 오프셋·해시
+분산 기각(충돌 *확률*만 낮출 뿐 예방이 아니고 `_suggest_number`의 연속 번호 규약을 깬다). 같은
+사고를 완화 off/on으로 두 번 재생해 갈림을 단언한다(off: 두 세션 모두 같은 번호 수용 · on: 두 번째
+세션 거부 + 다음 번호). **by design으로 남는 경계**: ① 제안은 예약이 아니다 — 거부 문구의 '다음 빈
+번호 제안'은 읽기 전용이라 예약 전 두 세션이 같은 값을 받는다(막히는 곳은 제안이 아니라 `add`) ②
+예약을 못 남긴 세션(구버전·네트워크 실패)의 충돌은 예방이 아니라 머지 시점 `validate`가 잡는다 —
+개명 비용이 드는 사후 검출이다 ③ 그 `validate` 스텝이 `pull_request`·`merge_group`에서 필터 없이
+도는지는 `tests/infra/test_number_collision_backstop_wiring.py`가 결함 주입으로 동결한다. 동결 =
+`tests/harness/test_id_number_suggestion_race.py`.
+
 ## 3c. 조율 정책 — 단계적 강제 (warn → block)
 
 `backlog/policy.yaml`의 rule 3종 (전부 warn으로 시작 — "측정 없는 도입 없음"):
@@ -634,6 +768,201 @@ ref를 하나도 못 찾으면 `empty` = 판정 불가**다. 네트워크 실패
 - 겹침 판정은 보수적 2단 근사(실파일 교집합 + 정적 프리픽스 포함 — `pathscope.py`).
   과탐이 미탐보다 안전하다는 원칙. 원격 claim conflict는 단계적 도입의 예외로
   **즉시 차단**(신호가 확정적이므로).
+
+### 측정을 오염시키던 것 — 하네스 테스트의 실제 대장 쓰기 (HARN-170)
+
+`policy report`가 승격 판단의 근거라면 그 분모에 **가짜 경고가 없어야** 한다. 그런데
+`tests/harness`가 실제 저장소 루트에서 `check-edit`를 부르면 정책 검사가 실제로 발화해 실행
+세션의 샤드에 가짜 `policy_warn`을 썼다(CLI의 루트는 현재 디렉터리의 git 루트이고, pytest는
+보통 저장소 루트에서 뜬다). claim이 없는 CI 러너에서는 증상이 없어 CI가 구조적으로 못 잡았고,
+세션 종료 훅이 그 줄을 커밋하라고 요구해 main에 쌓였다 — 사고 대장 계열
+`harness-test-live-ledger-write` 15회(2026-09-24~28).
+
+| 겹 | 무엇을 막나 | 집행 지점 |
+|---|---|---|
+| ① 쓰기 차단 | 실제 루트를 겨눈 `store.append_event`를 기록하지 않고 메모리에 모은다 — 삼키지 않고 모으므로 테스트가 "발화했는가"를 단언할 수 있다 | `tests/harness/conftest.py::real_ledger_sink`(autouse) |
+| ② 세션 전후 대조 | `backlog/` 전 파일 sha256이 실행 전후 같아야 한다 — ①이 못 막는 경로(직접 파일 쓰기 등) 검출. 자동 복원은 하지 않는다(실행 중 사람이 대장을 바꿨을 수도 있다) | `conftest.py::real_ledger_unchanged`(session·autouse) → `_ledger_guard.guard_session` |
+| ③ 기커밋분 제외 | 대장은 append 전용이라 지우지 않는다. `policy report`가 서명으로 식별해 **집계에서만** 빼고, 뺀 건수를 0건이어도 항상 출력한다 | `scripts/harness/event_leaks.py` · `backlog.py policy report` |
+
+**서명**(2026-09-29 실측으로 정함 — 상수 주석에 근거 수치): 한 샤드의 경고를 이웃 간격 8초 이하로
+이어 묶었을 때 ①파일이 `scripts/harness/backlog.py`·`README.md`뿐 ②backlog.py가 규칙마다 정확히
+3건 ③README.md는 0~1건·scope_drift뿐 ④묶음 길이 20초 이하이고 앞뒤 30초 안에 다른 경고가 없음
+⑤누출 경로 착지일(2026-09-21) 이후. 판정은 기간 필터 **전** 전체에서 한다(경계에서 잘린 반쪽도
+뺀다). 실측: 97묶음·465건·39샤드(2026-09-21~28 · 전체 30,549건의 1.52%). 간격 6~10초·길이
+12~30초 어디서 끊어도 같은 97묶음이다(고원). 누출 묶음의 고립 거리는 최소 79초, 같은 모양의
+실제 연속 편집 묶음(2026-09-07 한 세션)은 9·12초였다 — ④가 그 둘을 가르고, ⑤는 독립된 두 번째
+울타리다. **한계**: ①~⑤를 모두 통과하는 실제 편집은 집계에서 빠진다(과소 집계 방향).
+
+**변별력**: 위반 3종(scope_drift · 로컬 in-flight path_overlap · 원격 캐시 path_overlap(claim
+없음) · adhoc_edit)을 실제 루트에서 일부러 발화시키고 ⓐ발화 ⓑ실제 샤드 바이트 불변을 함께 본다
+(`test_real_ledger_isolation.py`). 서명은 조건마다 그 조건 하나만 어긋난 반례를 둔다
+(`test_event_leaks.py`). 뮤테이션 하네스 = `scripts/harness/verify_real_ledger_isolation_discrimination.py`
+(격리 6 · 판별 11 — 주입 대상 실재는 `test_real_ledger_isolation_mutation_anchors.py`가 매 CI
+동결). 착지 실측: claim이 걸린 브랜치에서 `tests/harness` 전체(1410 passed)를 돌린 전후로
+`backlog/` 전 파일 sha256이 같았다 — 누출 조건 그대로에서 0줄.
+
+### 3c-1. `done` CI 미러 게이트 — 미러 부재를 block으로 승격한 판정 (HARN-173)
+
+**왜**: `backlog.py done`은 이번 커밋의 CI 미러 결과(`.claude/cache/ci_mirror.json`)가 없어도 경고만 했다
+(HARN-119 ② "1단계 warn"). 실측(2026-09-25 EOS-24 · PR #1316): 세션이 미러를 쓰지 않고 잡 스텝을 손으로
+골라 재현했고 `harness-integrity`의 `ruff check scripts tests/harness` 스텝을 빠뜨려 PR CI가 E501 1건으로
+red가 됐다. 경고는 `done`에서 한 번 떴을 뿐 아무도 멈추지 않았다. 사고 대장 `ci-local-repro-gap` 4회차 —
+1~3회차 대책(HARN-129·HARN-172)은 **도구**를 고쳤고, 이번은 도구가 있는데 **쓰지 않은** 축이다.
+
+**판정**: 승격한다. `backlog/policy.yaml`의 `ci_mirror_at_done`(`warn`|`block`, 키가 없으면 `warn`)이 스위치이고
+이 저장소는 `block`을 선언한다. 판정은 `scripts/harness/done_mirror_gate.py`(순수 함수 + 조회)가 하고 `cmd_done`은
+호출만 한다 — `backlog.py`는 동시에 가장 많이 고쳐지는 파일이라 배선을 몇 줄로 묶었다.
+
+| 미러 상태 | 뜻 | `warn` | `block` |
+|---|---|---|---|
+| `pass` | 이번 HEAD의 결과가 전 잡 통과 | 통과(조용) | 통과(조용) |
+| `not_executed` | 식·조건 스텝이라 원리상 로컬에서 못 돈 검사가 남음(exit 3) | 경고 | **경고 유지 — 거부하지 않는다** |
+| `fail` | 미러가 실패로 끝남 | 경고 | **거부(exit 1 · 대장 무변경)** |
+| `unknown` | 결과 없음·다른 커밋·형식 깨짐·잡 0건 | 경고 | **거부(exit 1 · 대장 무변경)** |
+| `unavailable` | 조회 자체가 실패(미러 모듈 부재·git 없음) | 경고 | 경고 후 통과(fail-open) — **통과로 세지 않고 따로 기록** |
+
+- **적용 범위**: 소유자가 claude이고 PR 증적 경로(`--no-pr` 미지정)인 done만. `--no-pr {investigation|incomplete|ci-red|kiki-hold}`
+  경로와 사람 소유(`--as`) done은 미러 대상이 아니므로 종전 그대로다(경고조차 새로 만들지 않고 정책·미러 조회도 하지 않는다).
+- **미실행을 막지 않는 이유**: HARN-181(미러가 `if: needs.changes.outputs.*` 조건을 평가) 착지 전까지 조건 스텝을 가진 잡은
+  항상 exit 3이다. 3을 막으면 그 잡을 건드리는 모든 done이 막혀 사람이 게이트를 끈다. 다만 통과로 접지도 않는다 — 종전
+  경고("돌지 않은 검사")가 그대로 나고 이벤트에 `not_executed`로 남는다. HARN-181 착지 뒤 재판정 대상이다.
+- **예외 경로 — `done --no-mirror '<사유>'`**: 사유가 비었거나 공백뿐이면 거부한다(무사유 면제 없음 · 상태·경로·정책과 무관하게
+  거부). 사유는 태스크 notes(`[미러 면제 날짜] 사유`)와 이벤트 대장(`no_mirror_reason`) **양쪽**에 남는다 — 남지 않는 탈출구는
+  게이트를 끄는 것과 같다. 거부되지 않을 상태에 준 사유도 기록하되 우회로 세지 않는다(`mirror_outcome`).
+- **판정은 상태 전이 전에**: 거부하면 대장에 아무것도 쓰지 않는다(`--no-pr` 거부와 같은 순서). 거부 문구가 처방을 함께 낸다 —
+  `python3 scripts/harness/ci_mirror.py run [--prepend-path ...]`로 재현하거나, 환경 때문에 못 돌리면 `--no-mirror '<사유>'`.
+- **정책 값이 깨지면 엄격한 쪽**: `policy.yaml`에 오류가 하나라도 있으면(미지 필드 오타·미등록 값·YAML 문법 오류) 값을 믿지 않고
+  `block`으로 취급하고 이유를 거부 문구에 적는다. 오타가 조용히 `warn`으로 떨어지면 "승격했다고 믿는 정책이 실은 꺼진" 상시
+  fail-open이 된다. 출구는 있다 — 정책을 고치거나 `--no-mirror`.
+- **측정(사후 감시 근거)**: `done` 이벤트에 `mirror_scope`(`pr`|`no_pr`|`human`)와, PR 경로에는 `mirror_gate_mode`·`mirror_state`
+  (`pass|not_executed|fail|unknown|unavailable`)·`mirror_commit`·`mirror_outcome`(`pass|warn|bypass`), 사유가 있으면
+  `no_mirror_reason`을 적는다. `backlog.py policy report`가 최근 N일 done을 상태별로 세는 절을 낸다(`unavailable`은 통과에 합산하지
+  않는다). **한계**: 거부된 done은 대장에 아무것도 쓰지 않는 계약이라 **거부 건수는 대장에 남지 않는다** — 통과한 done의 분포
+  (`--no-mirror` 사용률·`unknown` 재시도 뒤 분포)로만 사후 감시한다.
+- **CI 도달 잡 안내(acceptance ⑤)**: PR 경로 done은 트렁크(`origin/main`) 대비 변경 파일이 닿는 잡을
+  `ci_job_coverage.scope`로 계산해 stdout 한 줄로 안내하고 이벤트에 `ci_reach_jobs`·`ci_reach_changed`를 적는다. 계산이 실패해도
+  done을 막지 않고 예외 타입명을 stderr에 낸다(`ci_reach_status: failed` · `ci_reach_error`). 워크플로 파일이 없는 저장소는
+  오류가 아니라 `no_workflow`다. PR 본문의 도달 잡 섹션은 §3c-3(HARN-209)가 PR 생성 훅의 고지로 이어받는다(자동 수정은 아님).
+- **승격 절차의 이행 범위(정직)**: §3c의 "2주/30세션 관찰" 기준은 **채우지 않았다** — 이 게이트의 종전 경고는 stderr만 냈고
+  `policy_warn` 이벤트를 남기지 않아 warn 관측 데이터가 없다. 승격의 근거는 ⓐ실측 사고 1건(위)과 ⓑHARN-122 ②의 선례
+  ("원칙의 집행 지점은 정탐률과 무관하게 block + 예외 경로" — `adhoc_edit`) ⓒ예외 경로가 오탐 비용을 사유 1줄로 상한하는 점이며,
+  측정은 승격 **뒤에** 위 필드로 시작한다. 절차 3요소 중 policy.yaml 1줄과 MEMORY 결정 로그는 이행했으나 **`policy_promote`
+  이벤트는 발행하지 못했다** — `policy` 서브명령에 승격 경로가 없다(show·report뿐이고 이벤트 손편집은 금지).
+  승계 필요: `policy promote` 경로 신설(HARN-122 소관).
+- **푸시 축(acceptance ③) — 미구현·판정만**: 이 게이트는 `done`(완료 선언) 시점에만 선다. `/drive` 순서가 커밋→PR(푸시)→done이라
+  **red 푸시 자체는 막지 못하고 미검증 완료 선언을 막는다.** 푸시 지점(PreToolUse `git push`·PR 생성)에 "미러 결과 커밋 ≠ 푸시
+  대상 HEAD면 고지"를 거는 안은 오탐 비용이 크다 — 대장만 바꾸는 푸시·claim 푸시·이미 재현한 뒤 병합만 하는 푸시가 전부 걸린다.
+  그래서 이번에는 걸지 않고, 위 측정 필드(`unknown` 분포·`--no-mirror` 사용률)가 그 판정의 근거를 만든다.
+  승계 필요: 푸시 시점 미러-HEAD 불일치 고지. → **착지: §3c-3 (HARN-209)**.
+- **변별력**: `tests/harness/test_done_mirror_gate.py` — 상태 5 × 정책 2 × 경로 3의 30셀을 리터럴 표로 동결하고(표를 다시 계산하지
+  않는다), CLI 종단으로 거부·통과·우회·면제·조회 실패·깨진 정책을 각각 밟는다. 판정 표의 각 절·배선·정책 키·집계에 뮤테이션 52종을
+  주입해 전건 RED(대조군 GREEN) — 주입의 실재(`count==1`·`mutated != original`)와 원복 sha256을 하네스가 단언했다.
+
+### 3c-2. CI 미러 실행 도중 작업 트리 변경 감지 — 오염 판정 (HARN-194)
+
+**왜**: 미러는 수 분~수십 분 도는 장기 검증이다. 도는 동안 같은 트리를 고치거나(편집) 옮기면(병합·커밋·체크아웃)
+그 실행의 결과는 *바뀐 뒤의* 트리를 본 스텝과 *바뀌기 전의* 트리를 본 스텝이 섞인 값이 된다. 결과 JSON은 커밋 해시
+하나만 적으므로 그 섞인 값이 원래 커밋의 결과로 기록된다. 런타임에 소스를 읽는 검사(`inspect.getsource` 계약 테스트·
+파일 스캔 가드)는 바뀐 소스를 보고 **거짓 실패**를 내고, 거짓 실패는 없는 회귀를 쫓게 만들어 통과보다 비싸다.
+실측: 2026-09-28 EOS-134에서 전체 미러가 도는 동안 통합 테스트 정리 코드를 고쳐 트리를 바꿨다 — 세션이 스스로 알아채 그
+실행을 폐기했을 뿐 도구는 아무것도 알리지 않았다. 1회차는 2026-09-21 뮤테이션 실행 중 커밋(대책 HARN-126 — 뮤테이션
+하네스를 임시 worktree로)이며, 그 대책은 뮤테이션 축만 덮고 장기 검증 일반은 덮지 않았다.
+
+**판정**: `ci_mirror.py run`이 잡 루프 **바로 앞뒤**에서 트리 지문을 잡아 비교한다.
+
+| 항목 | 내용 |
+|---|---|
+| 지문 | HEAD + `git status --porcelain=v1 -z -uall`에 오른 모든 경로의 (상태 두 글자, 내용 sha256). 상태만 보면 이미 더러운 파일(` M`→` M`)을 더 고쳐도 같은 값이라 **내용 해시가 필요**하다. `-uall`이 없으면 추적 안 된 디렉터리가 `dir/` 한 줄로 접혀 그 안의 편집을 못 본다 |
+| 안정 (`tainted: false`) | HEAD와 모든 경로의 (상태, 내용)이 그대로 — 통과로 읽어도 되는 유일한 값 |
+| 오염 (`tainted: true`) | HEAD가 달라졌거나 어느 경로든 (상태, 내용)이 달라졌다 — 요약 줄에 **바뀐 경로를 열거**(8건까지, 총수는 항상 말한다)하고 종료 코드 **4** |
+| 미확인 (`tainted: null`) | 시작·종료 지문을 못 잡았다(git 실패·타임아웃) — **모르는 것을 안정으로 접지 않는다**. 종료 코드 4, 원인 예외 타입명을 `tree.error_type`에 남긴다 |
+| 우선순위 | 오염이면 스텝이 통과든 실패든 4가 앞선다. 스텝 쪽 판정은 `step_exit`와 마지막 줄의 "참고용 스텝 판정"으로 남아 아무것도 숨기지 않는다 |
+| `commit` | **시작 시점의** HEAD다 — 끝난 뒤의 HEAD를 적으면 도중에 커밋한 실행이 새 커밋의 결과로 둔갑한다 |
+| 제외 | 미러 자신의 산출물(`--result`·`.steps.ndjson`)은 지문에서 뺀다 — 무시되지 않는 경로에 두면 도구가 스스로 트리를 바꾼 것으로 읽혀 *모든* 실행이 오염이 된다. `.gitignore`가 거른 경로(캐시·`__pycache__`)는 git이 안 보여 지문에 없다 |
+
+**소비처 — `done`**: `mirror_verdict`가 `tainted`가 **명시적 `false`가 아니면** 전부 unknown("측정되지 않음")으로 답한다. 키 부재·
+`null`·문자열 `"false"` 같은 모양 이탈도 포함한다. 스텝이 실패였어도 FAIL이 아니라 unknown이다(바뀐 트리의 실패는 거짓 실패일 수
+있어 처방이 "고쳐라"가 아니라 "가만히 두고 다시 돌려라"다). `done_mirror_gate`(block 정책의 거부)와 종전 경고 헬퍼가 모두 이
+verdict를 통해 읽으므로 `backlog.py`는 바꾸지 않았다 — 연결은 `tests/infra/test_ci_mirror_tree_taint.py::TestDonePreflightSeesTaint`와
+`tests/harness/test_done_mirror_gate.py`(오염·미확인 픽스처의 CLI 종단 거부)가 동결한다. 결과 JSON 형식은 schema 3으로 올렸다 —
+트리 판정이 없는 옛 결과는 "형식이 다르다"로 측정되지 않은 것이 된다.
+
+**알려진 부작용 — 오염과 따로 보고 (acceptance ②)**: 도구 자신이 만드는 변경을 오염으로 뭉개면 상시 발화하는 경고가 되어 무력해지고,
+침묵시키면 거짓 기록이 커밋 대상으로 밀려 올라간다(세션 종료 훅이 미커밋 변경의 커밋을 요구한다). 현재 하나다.
+
+| 종류 | 인정 조건 (전부 만족해야 한다) | 보고 |
+|---|---|---|
+| `ledger_policy_warn_leak` (HARN-170) | 경로가 `backlog/events.ndjson` 또는 `backlog/events/<세션>.ndjson` · **덧붙임만** — 시작 때 깨끗했으면 HEAD 내용이, 이미 더러웠으면 시작 시점 (크기, sha256)이 새 내용의 접두와 일치 · 기준선 마지막 줄이 개행으로 닫혀 있음 · 덧붙은 줄이 전부 `action: policy_warn` JSON | 오염이 아니다(종료 코드·`tainted` 불변). 출력에 `ⓘ 알려진 부작용` 블록, 마지막 줄 꼬리, 결과 JSON `tree.known`으로 남는다. 처방은 "추가된 줄만 제거" — 파일 전체를 되돌리면 같은 세션의 정상 이벤트까지 잃는다 |
+
+확인하지 못하는 모든 경우(기준선 조회 실패·접두 불일치·다른 이벤트 종류·HEAD 변경)는 **알려진 부작용으로 인정하지 않는다** — 소음을 줄이려다
+오염을 놓치는 방향이 더 나쁘다. HARN-170의 격리(`tests/harness/conftest.py`)가 착지한 뒤 이 분류가 실제로 발화하는 일은 드물어야 한다 —
+발화하면 격리가 못 막는 새 누출 경로가 있다는 신호다.
+
+**한계 (정직)**: ① 시작과 끝의 **순변화**만 본다 — 실행 도중 바꿨다가 원래대로 되돌린 변경은 못 잡는다. ② `.gitignore`가 거른 경로의 변경은
+보지 않는다. ③ 무시되지 않는 경로에 산출물을 쓰는 스텝은 매번 오염으로 읽힌다 — 그 스텝이 `.gitignore`에 빠진 것이므로 오염 보고가 곧 그
+결함의 신호다. ④ 이 도구는 **감지**이지 예방이 아니다 — 도는 동안 트리를 건드리지 않는 것은 여전히 사람 몫이고(`/drive` 런북 4단계), 건드렸을
+때 침묵하지 않게 하는 것이 이 판정의 일이다.
+
+**변별력**: `tests/infra/test_ci_mirror_tree_taint.py` — 가짜 실행 시나리오 31종(실행 도중 편집·삭제·커밋·새 파일, 안정·무시 경로·자기 산출물 대조군,
+알려진 부작용과 그 반례, verdict 모양 이탈)과 지문 단위 계약을 원본에서 GREEN으로 돌리고, 도구를 깨뜨린 뮤테이션 22종(내용 해시 무시·HEAD 비교 삭제·`-uall` 삭제·자기 산출물 제외 삭제·미확인을 안정으로 접기·
+verdict의 오염 무시·종료 코드 무시·알려진 부작용의 과대/과소 인정·접두 대조 삭제·보고 침묵·`commit`을 끝 시점으로 기록 등)이 지정한 시나리오를
+RED로 만들고 대조 시나리오는 GREEN으로 남기는지 확인한다. 주입의 실재(`count==1`·`mutated != original`)와 원복 바이트 동일성을 하네스가 단언한다.
+첫 실행에서 뮤테이션 2종이 RED가 되지 않아 **하네스 결함 둘**이 드러났다 — (a) 내용 해시 뮤테이션: 픽스처가 파일 *길이*까지 바꿔 크기 비교만으로
+잡혀서 해시 절을 한 번도 밟지 않았다(같은 길이로 고쳐 쓰는 픽스처로 교정), (b) 경로 패턴 뮤테이션: `re.match`가 문자열 맨 앞 기준이라 의도한
+"너무 넓은 패턴"이 아무것도 매치하지 않았다(`.*` 접두로 교정).
+
+### 3c-3. 푸시·PR 생성 시점 미러 고지 — `done` 게이트가 못 막는 red 푸시 축 (HARN-209 · 푸시 차단은 HARN-308)
+
+**왜**: §3c-1의 게이트는 `done`(완료 선언) 시점에만 선다. `/drive` 순서가 커밋→PR(푸시)→`done`이라 **red 푸시 자체는 막지
+못한다**(2026-09-25 EOS-24 · PR #1316). 판정 정본 = `docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md`.
+
+**판정**: 푸시(`git push`)와 PR 생성(`mcp__github__create_pull_request`) **직전**에 PreToolUse 훅이 "이 HEAD는 로컬 CI 미러를
+거치지 않았다"를 고지했다. HARN-209는 처음에 **고지만** 했다 — 푸시 시점 불일치 빈도는 한 번도 기록된 적이 없어(`done` 이벤트는
+게이트가 막은 뒤의 통과분만 본다) 측정 없는 차단은 데이터 공백 위의 강제였다. 대신 평가한 모든 호출을 `.claude/logs/push_mirror_notices.jsonl`에
+남겨 공백을 메웠다. **2026-10-09 P3-03에서 그 고지가 두 번 뚫렸으므로(재시도는 중복 억제로 침묵) 푸시는 HARN-308부터 막는다 — 아래
+"푸시 차단". PR 생성은 여전히 고지 전용이다.**
+
+| 구성 | 위치 |
+|---|---|
+| 판정·문구 (순수 함수 + git 조회) | `scripts/harness/push_mirror_notice.py` |
+| 훅 껍데기 (입력 해독·로그·중복 억제·출력) | `.claude/hooks/push_mirror_notice.py` — `settings.json` PreToolUse `Bash|mcp__github__create_pull_request` |
+| PR 본문 섹션 생성 | `python3 scripts/harness/push_mirror_notice.py pr-section` (`## CI 도달 잡`) |
+
+- **전달 채널**: 종료 코드 0일 때 stdout·stderr 평문은 PreToolUse에서 모델에게 가지 않는다(공식 훅 문서). 모델에 닿는 것은 stdout JSON의
+  `hookSpecificOutput.additionalContext`뿐이며 훅은 `ensure_ascii=True`로 낸다(cp949 콘솔에서도 손상 없음). 권한 결정
+  (`permissionDecision`)·`updatedInput`은 쓰지 않는다 — `allow`를 주면 사용자의 권한 확인을 건너뛴다. **라이브 도달은 실측했다**(2026-10-08 — 미러 결과를
+  치운 상태의 무해한 푸시에 하네스가 `[CI 미러 고지 · 푸시 직전]`을 도구 결과 옆에 주입했다).
+- **무엇이 고지되고 무엇이 침묵하나**: 미러 상태가 `fail`·`unknown`(결과 없음·다른 커밋·형식 깨짐)·`unavailable`이면 고지, `pass`·`not_executed`면
+  침묵(§3c-1과 같은 분류). 같은 (트리거·HEAD·사유)는 한 번만 고지한다.
+- **"코드 없는 푸시"를 가리는 법 — 경로 필터가 아니라 내용**: `ci_job_coverage scope`로는 못 가린다. 상시 잡 6개가 모든 diff에 닿고 원 사고의
+  누락 스텝이 상시 잡 `harness-integrity`에 있었다(13건 중 6건의 PR이 상시 6잡만 도달). 그래서 ⓐ트렁크 대비 기여가 전부 대장 기록
+  (`backlog/events/`·`backlog/tasks/`)이면 침묵 ⓑ미러 커밋 ≠ HEAD여도 두 커밋의 기여(대장 제외)가 **blob까지 같고** 그 결과가 통과/미실행이면
+  침묵(`done` 뒤 대장 커밋·미러 뒤 병합만 한 푸시). **문서는 면제하지 않는다** — 런북 한 장이 상시 잡 `infra-shell`을 깬 실측(2026-10-07)과
+  `docs/**/*.md` 전수 스캔 검사가 있다.
+- **복합 명령**: `git commit … && git push`는 훅 시점에 커밋이 없다. 같은 명령이 HEAD를 옮기면 미커밋 변경을 곧 커밋될 내용으로 겹쳐 본다
+  (대장 기록만이면 면제, 그 밖이면 새 커밋에는 미러 결과가 있을 수 없으므로 고지). `git pull`/`merge` 뒤 푸시는 병합 결과를 미리 알 수 없다.
+- **PR 본문**: PR 생성 훅이 본문에 `## CI 도달 잡` 섹션(표지 주석 `<!-- ci-reach:v1 -->` 또는 제목 줄)이 없으면 붙여 넣을 블록을 고지에 싣는다 —
+  경로 필터가 깨운 잡·상시 잡·로컬 재현 불가 잡("CI가 판정")·미러 상태. 본문을 자동으로 고치지는 않는다.
+- **측정과 재평가**: 로그 한 줄 = 평가 한 건(트리거·사유 코드·미러 상태·변경 건수·고지 여부; 명령 본문은 기록하지 않는다). 재평가 조건(임시 —
+  관측 전 가정): 평가된 푸시 중 고지 비율이 2주 연속 30% 초과면 상시 경고가 된 것이므로 오탐 형태를 규명한다.
+- **변별력·집행**: `tests/harness/test_push_mirror_notice.py`(판정 절별 반례 픽스처)·`test_push_mirror_notice_wiring.py`(등록된 명령 문자열을
+  그대로 실행·호출 사슬 AST·종료 코드 0/2·cp949). 뮤테이션 52종 전건 RED. 차단은 `test_push_mirror_block.py`(49건 — 등록된 훅 명령을 그대로
+  실행해 종료 코드로 판정, P3-03 재현·대조군·우회) · 뮤테이션 29종 전건 RED.
+- **하지 않는 것**: PR 생성 차단 · GitHub API로 직접 커밋하는 도구 · HEAD가 아닌 refspec·`git -C`·`--dry-run`·삭제·태그만.
+  (푸시 차단은 HARN-308로 착지 — 아래.)
+
+**푸시 차단 (HARN-308 · 판정 정본 `docs/reviews/harn308_push_block_judgment_2026-10-12.md`)**:
+
+- **막는 것**: 코드가 든 `git push`에서 이 HEAD의 미러 결과가 없다·다른 커밋의 것이다·형식 불량/오염이다·실패했다·같은 명령이 만드는 새 커밋이다,
+  또는 결과는 통과인데 **필수 상시 잡**(필터와 무관하게 매 PR에서 도는, 로컬 재현 가능한 잡 — 현재 5개) 중 돈 증거(결과에 있음 · 종료 0 ·
+  통과 스텝 ≥1)가 없는 잡이 있다. 훅이 **종료 코드 2**로 거부하고 이유와 다음 명령을 stderr(UTF-8 바이트)로 낸다. 차단은 고지의 중복 억제를 따르지
+  않는다(재시도도 막힌다). 훅 종료 코드는 0·2뿐이고 `permissionDecision`은 쓰지 않는다.
+- **막지 않는 것**: 면제 A·B에 걸린 푸시 · 평가 불가 형태 · 측정 불가(`unavailable`)와 훅 평가 예외(훅 고장이 모든 푸시를 막으면 사람이 훅을 끈다 — 타입명은 남긴다).
+- **우회**: `python3 scripts/harness/push_mirror_notice.py waive --reason '<사유>'` — 무사유 거부 · 이벤트 대장 `push_mirror_waiver`를 쓴 뒤에만 열림 ·
+  현재 세션 샤드만 읽음 · 이 HEAD(같은 기여 포함)에만 유효. 미리 보기 = `push_mirror_notice.py gate`(차단이면 종료 코드 1).
+- **비용 판정**: 상시 5잡 미러 실측 23분 5초(`infra-contracts` 9.1분 · `harness-integrity` 13.4분이 지배), 상시 red는 PR 실행 916건 중 7건·브랜치 4/218.
+  단순 기대값은 불리(≈50배)하나 `/drive` 4단계가 이미 이 미러를 의무로 두어 한계 비용이 0이고, "닿는 상시 잡만" 축소안은 상시 잡이 모든 최상위 경로를 참조해
+  안전하게 정할 수 없어 기각했다. 재평가 조건과 측정 입력은 판정 문서 §4-3.
 
 ## 3d. 의존 선언의 두 종류 — 하드 부착 vs 소프트 분류 (HARN-52 · HARN-53)
 
@@ -1037,6 +1366,7 @@ python3 scripts/harness/work_graph.py --no-remote  # 원격 조회 3종 생략 (
    아니면(offline·shallow·error·skipped) 페이로드·화면 배너·터미널 요약이 전부 그 사실을
    말한다. 빈 결과를 "없음"으로 위장하지 않는다. **shallow 클론**(클라우드 세션 기본)에서는
    고립 브랜치 판정이 `shallow`로 불가하다 — 완료분·claim 축은 그대로 동작한다.
+   브리핑은 이 경우 CI 야간 리포트로 대체한다(§3b-3a · HARN-28).
 5. **읽기 전용** — `backlog/`를 일절 쓰지 않는다(mtime 불변 테스트). 네트워크도 원격 claim
    조회(`list_claims`) 외에는 캐시된 원격 ref만 본다.
 6. **게이트 창은 공용 분류를 따른다** (HARN-184 · `tests/harness/test_gate_wait_kind.py`가 동결) —
@@ -1075,6 +1405,7 @@ python3 scripts/harness/backlog.py start <id> --ignore-remote-claim  # 이 태�
 python3 scripts/harness/backlog.py start <id> --no-remote            # 원격 보호 전체 생략(오프라인·긴급)
 python3 scripts/harness/backlog.py done <id> --artifact "<PR 번호를 담은 증적>"   # 증적·PR 참조 필수
 python3 scripts/harness/backlog.py done <id> --artifact "<커밋>" --no-pr ci-red   # 예외 4종만(HARN-23)
+python3 scripts/harness/backlog.py done <id> --artifact "<PR 증적>" --no-mirror "<사유>"   # CI 미러 게이트 예외(HARN-173 · §3c-1) — 사유가 notes·이벤트에 남는다·공백 사유는 거부
 python3 scripts/harness/backlog.py done <재판정 id> --artifact "#N" --verdict FAIL --evidence "<판정문 · 기준 커밋>" --attach <후속 재판정 id>
 python3 scripts/harness/backlog.py done <재판정 id> --artifact "#N" --verdict PASS --evidence "<판정문 · 기준 커밋>"
 python3 scripts/harness/backlog.py done <수정 id> --artifact "#N" --no-verdict "수정 태스크 — 재판정은 <id>가 한다"
@@ -1251,6 +1582,7 @@ exit code이므로 "출력 억제·잘라내기 판정 금지" 금기(CLAUDE.md 
 - ❌ **태스크 정정을 문서에만 착지시키고 acceptance에 반영하지 않기 (HARN-24)** — "문서가 소유자"라는 우회는 착수 세션이 그 문서를 읽을 때만 성립한다. 태스크 YAML은 *반드시* 읽히지만 참조 문서는 선택이다. 정정은 `amend`로 acceptance에 도달시킨다. (사고 경위: ADMIN-02의 범위 축소 정정이 `operations_platform_gap_review.md`에만 있고 acceptance에 없어, 그 정정을 조상으로 가진 세션이 stale acceptance ②를 그대로 집행해 `subscription_*` 3컬럼까지 드롭 — 커밋 b3a58b02)
 - ❌ 증적(artifact) 없는 done
 - ❌ **PR 참조 없는 done** — 산출물이 있으면 요청 없이 PR을 여는 것이 기본값이다(CLAUDE.md "완료·병합"). 증적에 `#12`·`.../pull/12`가 없으면 CLI가 exit 1로 거부하며, 예외는 `--no-pr {investigation|incomplete|ci-red|kiki-hold}`로만 통과한다(HARN-23). 스쿼시 머지 커밋의 `(#758)` 관례는 그대로 통과 — 기존 증적 표기를 바꿀 필요 없다
+- ❌ **CI 미러 재현 없는 PR 증적 done (HARN-173)** — `ci_mirror_at_done=block`(이 저장소)에서 claude 소유 PR 경로 done은 미러 결과가 없거나(다른 커밋 포함) 실패면 CLI가 exit 1로 거부하고 대장에 아무것도 쓰지 않는다. 미실행(exit 3)은 경고만 하며, 환경 때문에 재현할 수 없으면 `--no-mirror '<사유>'`(사유가 notes·이벤트에 남는다)로만 통과한다. 상세 = §3c-1
 - ❌ evidence 없는 게이트 clear
 - ❌ E축 게이트 우회 착수 (waive는 Kiki 전용 결정)
 - ❌ ROADMAP "현재 위치"를 backlog와 어긋나게 단독 편집

@@ -374,7 +374,21 @@ class TestSeatExistsInAllThreePlaces:
         # [2026-09-29 S4-11] head가 9d3e6b1f4a27(hints 테이블)로, 이어서 [EOS-50] 9d3e7b1c5a20
         # (concept_version_status_enum 'IN_QA' + concept_version.qa 게이트 기록 좌석)으로
         # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
-        assert EXPECTED_ALEMBIC_HEAD == "9d3e7b1c5a20"
+        # [2026-10-02 DP-03] head가 a3f7c9d1e5b2(attempt_event.event_uuid 멱등키)로 전진 —
+        # 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-02 ARCH-32] head가 b4d8e2a6c0f3(problem.source_id — source_entity FK 좌석)로
+        # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-08 ARCH-31] head가 c5e1f9a3b7d2(problem_version 테이블 + problem.
+        # problem_version_id + PUBLISHED 불변성 트리거)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-08 P3-12] head가 c5e9f3a7b1d4(role_enum에 CMS 역할 3종 — 어휘만 확장)로
+        # 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-09 P3-25] head가 e7b2c4d8a1f6(CMS 편집 표지 cms_edited_at 5컬럼)로 전진 —
+        # 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-09 EOS-47] head가 d6a2f8c4b1e7(problem_attempt.problem_version_id +
+        # evaluation_context)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        # [2026-10-12 P3-26] head가 a8c4e1f7b3d9(concept·concept_edge CMS 소유 표지 + concept_version
+        # FK 해제 + 무결성 트리거 2종)로 전진 — 위와 같은 이유로 리터럴만 현행화한다.
+        assert EXPECTED_ALEMBIC_HEAD == "a8c4e1f7b3d9"
         assert len(set(KNOWN_REVISIONS)) == len(KNOWN_REVISIONS), "리비전 중복 등재"
 
     def test_prod_schema_probe_covers_the_revision(self) -> None:

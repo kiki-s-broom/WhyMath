@@ -31,8 +31,11 @@ PowerShell에서 토큰만 변수로 받기(토큰을 화면·파일에 남기�
   - 존재하지 않는 `user_id` → `OperatorTokenError`(exit 1)
   - 데모 계정(`api/admin_module_registry.is_demo_account`) → `OperatorTokenError`(exit 1).
     콘솔 입구(`admin_menu`)가 막는 신원을 이 CLI가 우회로로 열어 주지 않는다
-  - `Role.CONTENT_ADMIN`이 아닌 계정 → `OperatorTokenError`(exit 1). 학생 계정 토큰을 로그인 없이
-    찍어 내는 경로가 되지 않게 하는 것이 이 거부의 목적이다
+  - CMS 조회 권한이 없는 역할의 계정 → `OperatorTokenError`(exit 1). 허용 집합은 권한표
+    (`schema/cms_access.roles_with(VIEW)`)에서 파생한다 — 지금은 `content_admin`·
+    `content_editor`·`content_reviewer`·`content_publisher` 4개다(P3-12가 3개를 더했다).
+    권한표에 등재되지 않은 역할은 `Role`에 있어도 토큰을 받지 못한다(fail-closed). 학생 계정
+    토큰을 로그인 없이 찍어 내는 경로가 되지 않게 하는 것이 이 거부의 목적이다
   - 만료가 상한을 넘음 → argparse 단계 거부(exit 2, `--ttl-minutes`는 1~60) 또는 서버 기본 만료
     (`Settings.jwt_expire_minutes`)보다 긺 → exit 1
   - JWT 시크릿 미설정·스키마 프리플라이트 실패 → exit 1(DB 쓰기 전)
@@ -82,6 +85,7 @@ from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
 from whymath_backend.privacy.audit import record_operator_token_audit
+from whymath_backend.schema.cms_access import CmsCapability, roles_with
 from whymath_backend.schema.enums import Role
 from whymath_backend.security import create_access_token
 
@@ -105,8 +109,10 @@ __all__ = [
 DEFAULT_TTL_MINUTES = 30
 MAX_TTL_MINUTES = 60
 
-# 발급 대상으로 허용하는 유일한 역할. 콘솔(`admin_menu`)을 열어 볼 이유가 있는 역할만 허용한다.
-_ALLOWED_ROLE = Role.CONTENT_ADMIN
+# 발급 대상으로 허용하는 역할 — 콘솔(`admin_menu`)을 열어 볼 이유가 있는 역할만 허용한다. 손으로
+# 적지 않고 CMS 권한표에서 파생한다: 조회 권한이 있는 역할 = 콘솔에 들어올 이유가 있는 역할이다.
+# 권한표에 없는 역할은 빈 집합이라 자동으로 막힌다(새 역할이 의식적 결정 없이 토큰을 받지 못한다).
+_ALLOWED_ROLES: frozenset[Role] = roles_with(CmsCapability.VIEW)
 
 # `issued_by` 형식 — 셸 로그인 *식별자*만 받는다(자유서술 금지 — `PrivacyAudit`의 "자유텍스트
 # 필드 없음" 불변식을 이 컬럼이 깨지 않게 하는 장치). `\w`는 유니코드라 한글 Windows 계정명도
@@ -209,9 +215,10 @@ async def issue_operator_token(
         raise OperatorTokenError(
             f"데모 계정에는 발급하지 않습니다: {user_id} — 관리 콘솔은 실 신원만 허용합니다."
         )
-    if user.role != _ALLOWED_ROLE:
+    if user.role not in _ALLOWED_ROLES:
+        allowed = ", ".join(sorted(role.value for role in _ALLOWED_ROLES))
         raise OperatorTokenError(
-            f"{_ALLOWED_ROLE.value} 계정에만 발급합니다(대상 역할: {user.role.value}) — 좌석은 "
+            f"콘솔 권한 역할({allowed}) 계정에만 발급합니다(대상 역할: {user.role.value}) — 좌석은 "
             "`role_grant_cli grant`로 먼저 부여하세요."
         )
 

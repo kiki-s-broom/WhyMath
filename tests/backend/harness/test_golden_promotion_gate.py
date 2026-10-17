@@ -36,6 +36,11 @@ EOS-136에서 더한 축(각각 음성 대조로 동결):
   ⓔ 손질 승인(`approved_with_edit`)은 ②단 `human_verdict_needs_edit`다 — 지금 내용의 승인이 아니다.
   ⓕ 검수 도구 판정 파일을 감사로그 자리에 넣으면 입력 손상(exit 2) — ②·③단 이중 계상 차단
     (CLI 대조는 `test_review_status_verdict_bridge.py::TestReviewVerdictFileIsNotTheAudit`).
+
+EOS-27에서 더한 축:
+  ⓖ 승인 뒤 내용 편집은 `review_content_changed`, 판정에 지문이 없으면
+    `review_fingerprint_unverifiable`이다 — 모름은 일치가 아니다(`TestContentFingerprintStage`).
+    실 파이프라인 관통 음성 대조는 `test_eos_anchor_e2e_a4.py`.
 """
 
 from __future__ import annotations
@@ -57,6 +62,7 @@ from whymath_backend.harness.golden_promotion_gate import (
     render_gate_report,
 )
 from whymath_backend.harness.wilson import wilson_upper_bound
+from whymath_backend.schema.review_timer import review_content_fingerprint
 
 # 슬러그 200건짜리 배치 — Wilson 상한(기본 임계 0.02)을 통과할 만큼 큰 표본.
 # 작은 배치가 통과 못 하는 것은 설계이므로(모듈 docstring), 양성 대조는 표본을 키워서 만든다.
@@ -454,6 +460,16 @@ class TestReportRendering:
 # ══════════════════════════════════════════════════════════════════════════
 # CLI — exit 코드와 쓰기 경로 부재
 # ══════════════════════════════════════════════════════════════════════════
+def _corpus_row(slug: str) -> dict[str, object]:
+    """게이트 CLI 픽스처의 코퍼스 레코드 — 검수자가 본 내용이자 지문의 입력(EOS-27)."""
+    return {
+        "slug": slug,
+        "question_text": f"{slug} 문항",
+        "answer": "3",
+        "review_status": "approved",
+    }
+
+
 def _fixture_files(
     tmp_path: Path,
     slugs: tuple[str, ...],
@@ -493,6 +509,9 @@ def _fixture_files(
                     "reviewer_id": "kiki",
                     "event_type": "finished",
                     "verdict": "approved",
+                    # 검수 CLI가 실제로 싣는 값 — 검수자가 본 레코드의 지문(EOS-27). 이것이 없는
+                    # 판정은 `review_fingerprint_unverifiable`로 막힌다.
+                    "content_fingerprint": review_content_fingerprint(_corpus_row(slug)),
                 },
                 ensure_ascii=False,
             )
@@ -504,11 +523,7 @@ def _fixture_files(
 
     corpus = tmp_path / "acc.jsonl"
     corpus.write_text(
-        "\n".join(
-            json.dumps({"slug": slug, "review_status": "approved"}, ensure_ascii=False)
-            for slug in slugs
-        )
-        + "\n",
+        "\n".join(json.dumps(_corpus_row(slug), ensure_ascii=False) for slug in slugs) + "\n",
         encoding="utf-8",
     )
 
@@ -677,3 +692,168 @@ class TestNoMachineSubstitutionForHumanReview:
             encoding="utf-8",
         )
         assert main(args) == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# EOS-27 — ②단 내용 지문 대조
+# ══════════════════════════════════════════════════════════════════════════
+_FP_OK = "sha256:" + "a" * 64
+_FP_EDITED = "sha256:" + "b" * 64
+
+
+class TestContentFingerprintStage:
+    """판정이 본 내용과 코퍼스 현재 내용이 같은가 — 순수 단(`evaluate_promotion`) 음성/양성 쌍."""
+
+    @staticmethod
+    def _fps(slugs: tuple[str, ...] = _BATCH, **per_slug: object) -> dict[str, dict[str, object]]:
+        """기본은 전건 일치(리뷰 지문 = 코퍼스 지문). per_slug로 한 건씩만 어긋나게 한다."""
+        review: dict[str, object] = {slug: _FP_OK for slug in slugs}
+        corpus: dict[str, object] = {slug: _FP_OK for slug in slugs}
+        for slug, spec in per_slug.items():
+            key = slug.replace("_", "-")
+            review[key], corpus[key] = spec  # type: ignore[misc]
+        return {"review_fingerprints": review, "corpus_fingerprints": corpus}
+
+    def test_positive_control_matching_fingerprints_stay_on_path(self) -> None:
+        report = _eval(**self._fps())  # type: ignore[arg-type]
+        assert report.fingerprint_checked is True
+        assert report.off_path == [] and report.approved is True
+        assert {v.fingerprint_state for v in report.verdicts} == {"match"}
+
+    def test_content_edited_after_approval_is_blocked_with_its_own_reason(self) -> None:
+        target = _BATCH[7]
+        report = _eval(**self._fps(**{target.replace("-", "_"): (_FP_OK, _FP_EDITED)}))  # type: ignore[arg-type]
+        assert [(v.slug, v.blocked_reason) for v in report.off_path] == [
+            (target, "review_content_changed")
+        ]
+        assert report.approved is False
+        blocked = report.off_path[0]
+        assert (blocked.review_fingerprint, blocked.corpus_fingerprint) == (_FP_OK, _FP_EDITED)
+        assert blocked.fingerprint_state == "changed"
+
+    def test_verdict_without_fingerprint_is_unverifiable_not_a_pass(self) -> None:
+        target = _BATCH[3]
+        report = _eval(**self._fps(**{target.replace("-", "_"): (None, _FP_OK)}))  # type: ignore[arg-type]
+        assert [(v.slug, v.blocked_reason) for v in report.off_path] == [
+            (target, "review_fingerprint_unverifiable")
+        ]
+        assert report.off_path[0].fingerprint_state == "unknown"
+
+    def test_both_sides_missing_is_unknown_never_match(self) -> None:
+        """None == None이 일치로 읽히는 우연을 막는다 — 지문이 아무 데도 없는 판정은 모름이다."""
+        target = _BATCH[0]
+        report = _eval(**self._fps(**{target.replace("-", "_"): (None, None)}))  # type: ignore[arg-type]
+        assert report.off_path[0].blocked_reason == "review_fingerprint_unverifiable"
+
+    def test_unchecked_mode_is_declared_not_silently_passed(self) -> None:
+        """지문 맵을 안 넘기면 대조를 건너뛰되, 건너뛴 사실이 리포트·JSON·렌더에 자백된다."""
+        report = _eval()  # 지문 인자 없음
+        assert report.fingerprint_checked is False
+        assert {v.fingerprint_state for v in report.verdicts} == {"not_checked"}
+        assert report.to_json()["fingerprint_checked"] is False
+        assert "미수행" in render_gate_report(report)
+        checked = _eval(**self._fps())  # type: ignore[arg-type]
+        assert "미수행" not in render_gate_report(checked)
+
+    @pytest.mark.parametrize("only", ["review_fingerprints", "corpus_fingerprints"])
+    def test_half_a_comparison_is_refused(self, only: str) -> None:
+        """한쪽 맵만 오면 대조는 수행될 수 없는데 수행된 것처럼 보인다 — 조용히 건너뛰지 않고 거부."""
+        with pytest.raises(ValueError, match="함께"):
+            _eval(**{only: {slug: _FP_OK for slug in _BATCH}})  # type: ignore[arg-type]
+
+    def test_earlier_stages_keep_precedence(self) -> None:
+        """반려·손질 승인·판정 없음·코퍼스 부재는 지문 사유보다 먼저 보고된다(조치가 다르다)."""
+        rejected, edited = _BATCH[0], _BATCH[1]
+        report = _eval(
+            human_verdicts={
+                **{slug: "approved" for slug in _BATCH},
+                rejected: "rejected",
+                edited: "approved_with_edit",
+            },
+            review_fingerprints={slug: None for slug in _BATCH},  # 전부 '모름'이어도
+            corpus_fingerprints={slug: _FP_OK for slug in _BATCH},
+        )
+        reasons = {v.slug: v.blocked_reason for v in report.verdicts}
+        assert reasons[rejected] == "human_verdict_rejected"
+        assert reasons[edited] == "human_verdict_needs_edit"
+        assert reasons[_BATCH[2]] == "review_fingerprint_unverifiable"
+
+    def test_fingerprint_stage_precedes_the_audit_stages(self) -> None:
+        """내용이 바뀐 건은 ③단(감사로그 대조)이 통과로 보이더라도 막힌다 — 그것이 사각이었다."""
+        target = _BATCH[5]
+        report = _eval(**self._fps(**{target.replace("-", "_"): (_FP_OK, _FP_EDITED)}))  # type: ignore[arg-type]
+        blocked = next(v for v in report.verdicts if v.slug == target)
+        assert blocked.backfill_review_status == "approved"  # ③단 재료는 멀쩡하다
+        assert blocked.corpus_review_status == "approved"
+        assert blocked.blocked_reason == "review_content_changed"
+
+
+class TestContentFingerprintCli:
+    """CLI 관통 — 이벤트 JSONL·코퍼스 JSONL에서 지문을 읽어 exit 코드를 낸다."""
+
+    @staticmethod
+    def _report(tmp_path: Path, args: list[str]) -> tuple[int, dict[str, object]]:
+        report_path = tmp_path / "gate.json"
+        code = main([*args, "--json", str(report_path)])
+        return code, json.loads(report_path.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _reasons(payload: dict[str, object]) -> dict[str, str | None]:
+        return {row["slug"]: row["blocked_reason"] for row in payload["verdicts"]}  # type: ignore[index, union-attr]
+
+    def test_untouched_batch_passes_and_reports_the_check_ran(self, tmp_path: Path) -> None:
+        code, payload = self._report(tmp_path, _fixture_files(tmp_path, _BATCH))
+        assert code == 0 and payload["fingerprint_checked"] is True
+
+    def test_content_edit_after_approval_exits_1_for_that_slug_only(self, tmp_path: Path) -> None:
+        args = _fixture_files(tmp_path, _BATCH)
+        corpus = tmp_path / "acc.jsonl"
+        edited = _BATCH[11]
+        rows = [json.loads(line) for line in corpus.read_text(encoding="utf-8").splitlines()]
+        for row in rows:
+            if row["slug"] == edited:
+                row["answer"] = "999"  # 승인 뒤 정답을 몰래 바꿨다
+        corpus.write_text(
+            "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n",
+            encoding="utf-8",
+        )
+
+        code, payload = self._report(tmp_path, args)
+
+        assert code == 1
+        reasons = self._reasons(payload)
+        assert reasons.pop(edited) == "review_content_changed"
+        assert set(reasons.values()) == {None}  # 나머지 199건은 경로 내(양성 대조)
+
+    def test_events_without_fingerprints_exit_1_as_unverifiable(self, tmp_path: Path) -> None:
+        """옛 이벤트 모사 — 지문 키가 없는 승인 판정은 전건 막힌다(그랜드파더 없음)."""
+        args = _fixture_files(tmp_path, _BATCH)
+        events = tmp_path / "review_timer.jsonl"
+        rows = [json.loads(line) for line in events.read_text(encoding="utf-8").splitlines()]
+        for row in rows:
+            row.pop("content_fingerprint")
+        events.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+        code, payload = self._report(tmp_path, args)
+
+        assert code == 1
+        assert set(self._reasons(payload).values()) == {"review_fingerprint_unverifiable"}
+
+    def test_review_status_edit_alone_is_not_a_content_change(self, tmp_path: Path) -> None:
+        """운영 메타(review_status)만 바뀐 건 내용 변경이 아니다 — ③단의 audit_mismatch가 잡는다.
+        두 사유가 섞이면 조치가 갈리는 두 상황(재검수 vs 변경 이력 조사)이 구분되지 않는다."""
+        args = _fixture_files(tmp_path, _BATCH)
+        corpus = tmp_path / "acc.jsonl"
+        text = corpus.read_text(encoding="utf-8")
+        victim = _BATCH[2]
+        lines = []
+        for line in text.splitlines():
+            row = json.loads(line)
+            if row["slug"] == victim:
+                row["review_status"] = "pending"
+            lines.append(json.dumps(row, ensure_ascii=False))
+        corpus.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        _code, payload = self._report(tmp_path, args)
+
+        assert self._reasons(payload)[victim] == "review_status_audit_mismatch"

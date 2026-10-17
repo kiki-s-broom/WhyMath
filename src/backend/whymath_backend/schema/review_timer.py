@@ -56,10 +56,13 @@ G1(9/27) 차단 조건, `eos_plan52_crosswalk_2026-09.md` §2 후보 #1).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from enum import Enum
-from typing import Literal, Self
+from typing import Any, Literal, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -67,10 +70,15 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from whymath_backend.schema.enums import GenerationFailureCode, ReviewStatus
 
 __all__ = [
+    "CONTENT_FINGERPRINT_PATTERN",
+    "CONTENT_FINGERPRINT_PREFIX",
+    "REVIEW_FINGERPRINT_EXCLUDED_KEYS",
     "VERDICT_APPROVED_WITH_EDIT",
     "ReviewTimerEvent",
     "ReviewTimerEventType",
     "ReviewVerdict",
+    "review_content_fingerprint",
+    "review_fingerprint_state",
     "review_status_for_verdict",
 ]
 
@@ -112,6 +120,75 @@ ReviewVerdict = Literal["approved", "approved_with_edit", "rejected"]
 #: 손질 후 승인 — as-found(검수 전) 상태는 결함이었다는 뜻이다. 하류(골든 승격·실패분포)가
 #: 이 값을 문자열로 탐침하므로 상수로 한 번만 적는다.
 VERDICT_APPROVED_WITH_EDIT = "approved_with_edit"
+
+
+#: 검수 지문 접두 — `l3/publish_gate`의 `content_hash`(`sha256:` + hex)와 같은 표기. 다만 **다른
+#: 물건의 해시**다: 그쪽은 개념 버전 payload(`ConceptVersionPayload`)의 게시 전이 검증이고, 이쪽은
+#: 문항(CU) 코퍼스 레코드의 *검수 시점* 지문이다. 직렬화 레시피(키 정렬·`ensure_ascii=False`·
+#: 최소 구분자·sha256)만 같고 입력 모델이 달라 함수를 공유하지 않는다(EOS-27 판정 문서 §2).
+CONTENT_FINGERPRINT_PREFIX = "sha256:"
+CONTENT_FINGERPRINT_PATTERN = r"^sha256:[0-9a-f]{64}$"
+
+#: 지문에서 **빼는** 최상위 키 = 검수 *이후에* 정당한 도구가 쓰는 운영 메타. 이 집합은 좁게 둔다 —
+#: 넓히면 그만큼 "승인 뒤 손으로 고쳐도 모르는" 구멍이 된다(제외는 비용, 포함이 기본값).
+#:   · `review_status`  — 각인 도구(`review_status_verdict_bridge`)·코퍼스 백필이 검수 뒤에 채운다.
+#:                        이것을 포함하면 각인 직후 모든 레코드가 "내용 변경"으로 보인다.
+#:   · `review_score`   — 검수 점수(Problem 운영 메타 블록).
+#:   · `quarantine_reason`·`quarantined_at` — 격리 도구가 사후 결함 판정으로 채운다(EOS-71).
+#:   · `updated_at`     — 어떤 편집이든 갱신되는 시각 자체. 내용 변경은 내용 키가 잡는다.
+#: `created_at`·`created_by`는 넣지 않는다 — 검수 전에 정해지는 값이라 검수 뒤 바뀌면
+#: 그것은 이상 신호다.
+REVIEW_FINGERPRINT_EXCLUDED_KEYS: frozenset[str] = frozenset(
+    {"review_status", "review_score", "quarantine_reason", "quarantined_at", "updated_at"}
+)
+
+
+def review_content_fingerprint(record: Mapping[str, Any]) -> str:
+    """검수자에게 보인 CU 내용의 지문 — **정규화 규칙의 단일 정본**(EOS-27 ①).
+
+    검수 CLI(기록)·각인 도구(대조)·승격 게이트(대조)가 전부 이 함수 하나로 지문을 만든다. 규칙이
+    둘이 되면 "기록한 지문과 대조한 지문이 같은 물건을 말하는가"를 아무도 보장하지 못한다.
+
+    정규화(순서대로):
+      1. 최상위 키 중 `REVIEW_FINGERPRINT_EXCLUDED_KEYS`(검수 뒤 정당하게 바뀌는 운영 메타)를 뺀다.
+      2. 값이 `None`인 최상위 키를 뺀다 — "키 없음"과 "null"은 같은 내용이다(직렬화기마다 갈린다).
+      3. 키 정렬 · `ensure_ascii=False` · 최소 구분자 JSON → UTF-8 → sha256 → `sha256:` + hex.
+
+    **그 밖은 전부 포함한다**(화이트리스트가 아니라 블랙리스트인 이유): 검수 화면은 본문 10개 축만
+    렌더하고 나머지 키는 이름만 고지한다(`review_session._render_body`). 렌더 축만 해시하면 *안 보인
+    필드*(힌트·검산 조건 등)의 사후 편집이 승인 뒤에도 조용히 통과한다. 지문은 "검수 화면"이 아니라
+    "검수된 레코드"에 건다 — 안 본 필드가 바뀌어도 재검수를 요구하는 쪽이 안전하다.
+
+    JSON으로 직렬화되지 않는 값이 섞이면 `TypeError`가 그대로 올라온다(조용히 `str()`로
+    접지 않는다 — 접으면 서로 다른 객체가 같은 지문을 낼 수 있다). 코퍼스·큐는 JSON에서
+    읽으므로 정상 경로엔 없다.
+    """
+    kept = {
+        key: value
+        for key, value in record.items()
+        if key not in REVIEW_FINGERPRINT_EXCLUDED_KEYS and value is not None
+    }
+    canonical = json.dumps(kept, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return CONTENT_FINGERPRINT_PREFIX + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+FingerprintState = Literal["match", "changed", "unknown"]
+
+
+def review_fingerprint_state(reviewed: str | None, current: str | None) -> FingerprintState:
+    """검수 시점 지문 × 코퍼스 현재 지문 → 3상태(**대조의 단일 정본** — 각인 도구·승격 게이트 공용).
+
+    `match`   — 둘 다 있고 같다: 검수자가 본 내용이 지금도 그대로다.
+    `changed` — 둘 다 있고 다르다: 검수 뒤 내용이 바뀌었다(승인이 인증한 내용이 아니다).
+    `unknown` — 어느 한쪽이라도 없다: **모른다**. `match`가 아니다.
+
+    `unknown`을 `match`로 접는 순간 "지문 없는 옛 이벤트의 승인"이 무조건 통과한다 — 이 필드가
+    막으려는 사각이 그대로 다시 열린다(CLAUDE.md '모른다 ≠ 아니다'). 3상태를 bool로 접지
+    않도록 반환형을 폐쇄 리터럴로 둔다.
+    """
+    if reviewed is None or current is None:
+        return "unknown"
+    return "match" if reviewed == current else "changed"
 
 
 def review_status_for_verdict(verdict: ReviewVerdict | str | None) -> ReviewStatus | None:
@@ -203,6 +280,16 @@ class ReviewTimerEvent(BaseModel):
         "단독 금지·부기만)",
     )
 
+    # ===== 검수 대상 내용 지문 (EOS-27) =====
+    content_fingerprint: str | None = Field(
+        default=None,
+        pattern=CONTENT_FINGERPRINT_PATTERN,
+        description="검수자에게 보인 CU 내용의 지문(`review_content_fingerprint` — sha256). "
+        "started·finished에 싣는다(aborted 금지). **None = 모름**이지 '일치'가 아니다 — "
+        "지문 없는 옛 이벤트·본문을 못 보여준 항목. 각인 도구·승격 게이트는 None을 통과로 "
+        "읽지 않는다(EOS-27 ②③)",
+    )
+
     # ===== 시간·계측 =====
     elapsed_ms: int | None = Field(
         default=None,
@@ -232,6 +319,7 @@ class ReviewTimerEvent(BaseModel):
                      approved_with_edit → failure_code **허용·권장**(선택 — EOS-62 ②)
                      approved           → failure_code 금지(손질이 없었으므로 고칠 결함도 없다)
           aborted  → verdict·failure_code 금지(판정이 있으면 finished다).
+          aborted  → content_fingerprint도 금지(EOS-27 — 판정 없는 중단은 내용을 인증하지 않는다).
           공통     → failure_note는 failure_code 없이 금지(자유 텍스트 단독 금지 — §4).
 
         **왜 손질 승인의 코드는 필수가 아닌가**(부기 규약 — EOS-62 ②): 반려는 "왜 못 쓰는가"가
@@ -258,6 +346,11 @@ class ReviewTimerEvent(BaseModel):
                 raise ValueError("aborted 이벤트에 verdict 금지 — 판정이 있으면 finished다")
             if self.failure_code is not None:
                 raise ValueError("aborted 이벤트에 failure_code 금지 — 반려는 finished+rejected로")
+            if self.content_fingerprint is not None:
+                raise ValueError(
+                    "aborted 이벤트에 content_fingerprint 금지 — 판정이 없는 중단은 내용을 "
+                    "인증하지 않는다(지문은 started·finished에만)"
+                )
         if self.verdict == "rejected" and self.failure_code is None:
             raise ValueError(
                 "반려(rejected)는 failure_code(F1~F8) 필수 — §4 강제 분류(EOS-51 동결)"

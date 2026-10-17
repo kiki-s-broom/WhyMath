@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-122-kuwl7x-ops104-judgment-recovery
+title: "kuwl7x 회수 — OPS-104 cross_verify 캐시 프리픽스 미달 판정 문서·전제 동결 테스트 35건을 main 현행 위에서 재검증하며 이식"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/practical-maxwell-kuwl7x head 187bf271(2026-10-03 · ahead 1 · behind 102). 산출 3종 = 판정 문서 docs/reviews/ops104_cross_verify_cache_prefix_2026-10-03.md(89줄) · 전제 동결 테스트 tests/backend/l3/test_cross_verify_cache_prefix_premise.py(149줄·35건) · 후속 태스크 OPS-108(브랜치에서만 등재 — 이 감사가 같은 번호로 재등재했고 이 태스크를 선행으로 부착). 커밋 메시지 판정: 관점 12종 system ≤970바이트 < 최소 캐시 프리픽스 1024토큰 · verify() 라우팅 16조합 전부 LOCAL로 Anthropic 캐시 경로 미도달 · 운영 코드 변경 없음 · 라이브 count_tokens·cache_read 미수행(ARCH-66). 판정 기준 main 15220b9f: 3산출물 전부 main 부재·OPS-104 todo·artifacts 비어 있음·원격 claim TTL 초과\n② 이식 방식 = 파일 단위(문서 1·테스트 1). 브랜치가 main보다 102커밋 낡았으므로 통째 머지 금지. 이식 전에 판정의 전제가 main 현행에서도 참인지 먼저 재실측한다(관점 system 바이트 상한·라우팅 조합 수). 전제가 변했으면 동결 테스트가 RED로 그 변화를 드러내므로 그 결과를 판정 문서 상단에 기준 커밋 해시와 함께 적는다. OPS-104 YAML의 브랜치 변경(3줄)은 이식하지 않고 backlog.py 경로로만 처분한다\n③ 집행 지점·변별력 — 이식한 전제 동결 테스트가 CI에서 실제로 수집·실행되는 잡·스텝을 확인해 적는다. 프리픽스를 최소 캐시 토큰 이상으로 키우거나 라우팅 한 조합을 클라우드로 바꾸는 주입 2종 이상에서 RED임을 확인하되 주입 적용(mutated != original)과 원복의 바이트 동일성을 단언한다. 라이브 확인이 필요한 범위는 ARCH-66(Anthropic API 2026-12-31까지 중단)의 재개 판정 뒤로 남기고 무엇이 미확인인지 판정 문서에 분리해 적는다\n④ 소유 태스크 OPS-104의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적고, 미이행분은 승계 태스크로 분리 등재한 뒤 OPS-104를 닫을 수 있는지 판정한다. OPS-104는 이 태스크를 선행으로 부착했다"
+artifacts: []
+paths:
+  - docs/reviews/ops104_cross_verify_cache_prefix_2026-10-03.md
+  - tests/backend/l3/test_cross_verify_cache_prefix_premise.py
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-09.md §3-① (stray-code 16회차). 소유 태스크 OPS-104-cross-verify-cache-prefix-below-minimum. 회수 완료 전 원 브랜치 claude/practical-maxwell-kuwl7x 삭제 금지. 후속 OPS-108(CrossVerifier 클라우드 직결 시 LOCAL 결정 거부 의심)은 별건이며 이 태스크가 done이 된 뒤 착수 가능하다."
+updated: 2026-10-09

@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-33-permutation-combination-corpus
+title: "고등 경우의 수(합의 법칙·곱의 법칙·순열) 파일럿 코퍼스 (W2 Phase1 #7)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-32-university-calc1-chain-quotient-corpus
+requires_gates: []
+acceptance:
+  - "[10공수1-03-01](합의 법칙·곱의 법칙) 0커버 해소 — 독립 사건 나열/조합 생성기"
+  - "[10공수1-03-02](순열) 0커버 해소 — nPr = n!/(n-r)! 생성기"
+  - "[10공수1-03-03](조합)·[12확통01-01](여러 가지 순열)은 이미 커버 — 재확인만"
+  - "Tier1 SymPy factorial() 함수 기반 조건식 검증 실측 확인(신규 검증 경로 아님 — 기존 sympify 범용 검산기 재사용)"
+  - "전건 Tier1 게이트 통과·is_published=False·coverage 리포트 이동 확인·전체 스위트+4게이트 green"
+artifacts:
+  - 3de5e416
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/permutation_combination_skeleton_generator.py
+  - src/backend/whymath_backend/harness/permutation_combination_batch.py
+  - tests/backend/l3/equivalent/test_permutation_combination_skeleton_generator.py
+  - tests/backend/harness/test_permutation_combination_batch.py
+  - data/corpus/problem_bank_permutation_combination_v0/problems.jsonl
+session: null
+notes: "w2_content_factory_completion_plan_v1.md §6 Phase 1 우선순위 7위. finite_probability_skeleton_generator와 도메인은 인접하나 검증 방식은 SymPy factorial 표준 경로(quad_ineq 계열) 재사용.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-33-permutation-combination-corpus 재등재. 원 증적 ['3de5e416']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

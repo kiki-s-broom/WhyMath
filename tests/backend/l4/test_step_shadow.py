@@ -117,7 +117,23 @@ class TestObserveStepBreaks:
         try:
             with caplog.at_level(logging.INFO, logger="whymath.l4.step_shadow"):
                 observe_step_breaks(_NONPRESERVING)  # 예외 없이 반환해야
-            assert _shadow_messages(caplog) == []
+            # 관측(INFO) 메시지는 0건 — 실패 경고(WARNING)만 남는다.
+            assert [
+                r
+                for r in caplog.records
+                if r.name == "whymath.l4.step_shadow" and r.levelno == logging.INFO
+            ] == []
+            # 침묵 실패 금지(CLAUDE.md) — 타입명은 남기고 예외 메시지·트레이스백은 남기지 않는다
+            # (예외 메시지는 학생 발화·답안을 담을 수 있다 — 미성년자 PII).
+            warnings = [
+                r
+                for r in caplog.records
+                if r.name == "whymath.l4.step_shadow" and r.levelno == logging.WARNING
+            ]
+            assert len(warnings) == 1
+            assert "RuntimeError" in warnings[0].getMessage()
+            assert "의도적 예외" not in warnings[0].getMessage()
+            assert warnings[0].exc_info is None
         finally:
             get_settings.cache_clear()
 

@@ -1049,6 +1049,7 @@ class TestAppVersionGate:
             resp = client.get("/v1/jobs/j4", headers={"X-App-Version": "0.9.9"})
             assert resp.status_code == 426
             assert "업데이트" in resp.json()["detail"]
+            assert resp.json()["error_code"] == "WM-CLIENT-001"  # OPS-82
         finally:
             get_settings.cache_clear()
 

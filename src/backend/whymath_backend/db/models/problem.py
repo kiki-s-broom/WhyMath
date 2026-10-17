@@ -41,6 +41,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
+from whymath_backend.db.cms_edit_marker import CMS_EDIT_MARKER
 from whymath_backend.db.models._orm_enum import _pg_enum
 from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.enums import (
@@ -97,6 +98,29 @@ class Problem(Base):
         nullable=False,
     )
     source_detail: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    # ARCH-32: 주 출처 엔티티 FK(source_entity, LIC-01). nullable — NULL=미이관(백필 금지).
+    # source_type/source_detail은 이관 기간 중 유지(저작권 불변식·소비처 다수). 상세=
+    # docs/architecture/arch32_source_entity_migration.md.
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid, sa.ForeignKey("source_entity.source_id")
+    )
+
+    # ARCH-31: 현재 서빙 기준 판 포인터(`problem_version.version_id`, 44 §6.4의 current_published
+    # _version_id를 Problem 축에서 부르는 이름 — 태스크 승계 대조표 ①). nullable·기본값 없음 —
+    # NULL=버전 미부여(백필 금지: 기존 행에 판을 날조해 넣지 않는다). 이 컬럼 자체는 어떤 전이
+    # 규칙도 강제하지 않는다 — PUBLISHED 불변은 `problem_version` BEFORE UPDATE 트리거가 강제.
+    # `problem_version.problem_id`와 상호 FK(순환 없이 왕복하는 순서는 마이그레이션 docstring).
+    # 상세=docs/architecture/arch31_problem_version.md.
+    # use_alter=True: 상호 FK 순환(problem ↔ problem_version)을 create_all/정렬에서 ALTER로 푼다 —
+    # 신규 순환 경고(SAWarning)를 만들지 않기 위함(제약명은 마이그레이션과 동일해야 한다).
+    problem_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid,
+        sa.ForeignKey(
+            "problem_version.version_id",
+            use_alter=True,
+            name="fk_problem_problem_version_id_problem_version",
+        ),
+    )
 
     # ===== 시험 컨텍스트 =====
     exam_type: Mapped[ExamType | None] = mapped_column(_pg_enum(ExamType, "exam_type_enum"))
@@ -281,12 +305,20 @@ class Problem(Base):
     quarantine_reason: Mapped[str | None] = mapped_column(sa.Text)
     quarantined_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
+    # CMS 편집 표지(P3-25) — NULL=사람이 고친 적 없음(적재가 소유), 값=CMS가 마지막으로 고친 시각.
+    # 적재(`populate`)는 이 값이 있는 행을 건너뛰어 충돌로 보고한다. server_default·백필 금지.
+    # 규약 정본: `db/cms_edit_marker.py` · `docs/standards/cms_edit_vs_loader_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     # ── 인덱스 (§3.1 CREATE INDEX — GIN 4종 포함) ──
     __table_args__ = (
         sa.Index("idx_problem_exam", "exam_type", "exam_year", "exam_month"),
         sa.Index("idx_problem_subject_unit", "subject", "unit_codes"),
         sa.Index("idx_problem_signature", "signature_patterns", postgresql_using="gin"),
         sa.Index("idx_problem_difficulty", "difficulty_overall"),
+        sa.Index("idx_problem_source_id", "source_id"),
         sa.Index("idx_problem_persona_fit", "persona_fit", postgresql_using="gin"),
         sa.Index("idx_problem_curriculum", "curriculum_version", "valid_from_year"),
         sa.Index("idx_problem_tags", "tags", postgresql_using="gin"),
@@ -324,8 +356,9 @@ class Problem(Base):
         구성한다 — ORM은 `extra` 필드(관계 등)가 있을 수 있어 `extra="forbid"`인 schema와
         충돌할 수 있기 때문이다(매핑 컬럼만 추려 깨끗한 dict로 전달).
         """
+        # CMS 편집 표지는 운영 메타라 schema(extra=forbid)에 없다 — 복원 대상에서 뺀다(P3-25).
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
-        data = {key: getattr(self, key) for key in mapped_keys}
+        data = {key: getattr(self, key) for key in mapped_keys if key != CMS_EDIT_MARKER}
         return SchemaProblem.model_validate(
             drop_unset_nulls(data, SchemaProblem, orm_cls=type(self))
         )

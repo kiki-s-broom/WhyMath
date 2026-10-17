@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: backend
-status: todo
+status: done
 priority: 1
 eos_priority: P2
 owner: claude
@@ -14,7 +14,8 @@ depends_on:
 requires_gates: []
 acceptance:
   - "기존 BIGSERIAL event_id는 내부 키로 유지; event_uuid unique 멱등키 및 occurred/received time 영속화 migration 구현; 재전송이 한 번만 반영됨을 통합 테스트; migration upgrade/downgrade 검증"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1417 (f599dc2f)"
 paths:
   - "src/backend/alembic/versions/**"
   - src/backend/whymath_backend/schema/activity.py
@@ -23,4 +24,4 @@ paths:
   - "tests/backend/db/**"
 session: null
 notes: "EOS #84/#85 수정 계획 P0-3. S3-16 writer 확장과 충돌하지 않도록 공통 영속 계약을 먼저 확정.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+updated: 2026-10-02

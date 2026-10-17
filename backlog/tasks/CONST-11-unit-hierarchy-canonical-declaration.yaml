@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-11-unit-hierarchy-canonical-declaration
+title: "단원·소단원 위계 정본 선언 — 원본 등록부 등재의 선결 결정(원자 백본 vs 평가원 단원 트리 vs 교과서 단원)"
+track: infra-debt
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 위계 4종의 역할을 실측으로 표에 못박는다: atom_graph_v1(단원 217·소단원 643, 우리 원자 백본) · achievement_criteria_v1(평가원 보고서 단원 트리) · units_v1(소단원 명세 시범 1건) · 교과서 단원(출판사 구조 — 구조 메타데이터만, 본문 복제 금지). 각 위계가 무엇을 위해 존재하는지와 서로의 대응 가능 여부를 적는다. 특히 achievement_criteria_v1 한 항목 안에서 unit_hierarchy('(1) 문자와 식')와 achievement_levels_by_unit('(1) 다항식')가 다른 문제를 포함한다.\n② Kiki 결정 안건 정리: 단원·소단원 위계의 정본을 무엇으로 선언할지. 권고안 = 원자 백본(atom_graph_v1)을 정본, 나머지는 교육과정 Overlay(아키텍처 원칙 5). 대안과 각각의 비용도 병기한다. 결정은 사람 몫이다.\n③ 결정 후 A0005(원본 등록부 항목 추가) 초안을 docs/constitution_proposals/ 에 작성한다. 결정 전에는 등록하지 않는다 — 존재하지 않는 정본을 선언하면 심사가 고칠 수 없는 위반을 상시 보고한다.\n④ 기존 CUR-09(EOS 단원 구조 설계 검토)와 curriculum_revision_crosswalk_report 의 결과를 재사용하고 중복 조사하지 않는다.\n⑤ 범위 밖: 위계 데이터의 실제 통합·재적재(결정과 설계가 선행), constitution/ 직접 수정(제9조)."
+artifacts: []
+paths: []
+session: null
+notes: "2026-10-02 A0003 초안 「판단을 Kiki에게 남긴 것」 ③ 추가 검토에서 등재. 같은 검토의 ①(프로젝트 규칙)·②(LLM 모델 핀)은 A0004 초안(docs/constitution_proposals/A0004_sources_registry_additions_draft.md)에 담았고, ③만 정본 미선언이라 등록 보류. 선행 조건 없음(결정 대기)."
+updated: 2026-10-02

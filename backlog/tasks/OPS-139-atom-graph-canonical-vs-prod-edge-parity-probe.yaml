@@ -1,0 +1,38 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-139-atom-graph-canonical-vs-prod-edge-parity-probe
+title: "원자 백본 정본(graph.json)과 prod DB(concept_edge) 엣지 수·분포 불일치를 읽기 전용으로 판정하는 프로브 — S4-60 병합 뒤 prod가 2,210건에 머문 어긋남이 감시가 아니라 사람의 수작업 count로만 드러났다"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판정 함수(순수 함수, DB 없이 단위 검증 가능) — 입력은 정본 쪽 수치(총 엣지 수·relation_subtype별 수·개념 수)와 DB 쪽 수치 같은 항목이고, 출력은 3상태다: MATCH(전 항목 일치) / DRIFT(하나라도 다름 — 방향을 표기: DB<정본이면 미적재·DB>정본이면 코퍼스에 없는 잔존 행) / UNKNOWN(DB 값을 못 읽음). 모른다는 아니다가 아니다 — UNKNOWN을 MATCH나 DRIFT로 접지 않고 종료 코드로 구분한다(MATCH=0·DRIFT=1·UNKNOWN=2). 총합만 비교하지 않는다: 총합이 같아도 subtype 분포가 다르면 DRIFT(상쇄 방지 — 총합 일치는 약한 신호임을 출력에 명시)."
+  - "② 정본 쪽 기대값은 손으로 쓴 상수가 아니라 적재기와 같은 규칙으로 계산한다 — populate가 쓰는 load_atom_edges_from_graph_json과 같은 함수를 재사용해 orphan skip(양끝 개념을 못 찾는 엣지)까지 반영한 적재 예정 수를 낸다(정본 수와 적재 수가 다를 수 있다). 스캔 0건은 실패다(graph.json을 못 읽거나 엣지 0건이면 MATCH가 아니라 오류 — 공허한 통과 금지). 기대값 출처를 출력에 찍는다(정본 파일 경로·sha256 앞 12자)."
+  - "③ DB 쪽 값은 읽기 전용으로만 읽는다 — SELECT 외 DDL·DML 금지(probe_prod_schema_revision.sql 선례). 접속 경로는 호스트 TCP 5433이 아니라 docker exec psql을 1차로 한다: OPS-72 실측에서 호스트 5433이 WinNAT 포트 제외로 닫혀도 컨테이너는 정상이었고, 호스트 도달성에 의존하는 도구는 그 고장 때 UNKNOWN이 되어야 할 자리에서 침묵한다. 비교 대상 3종: concept_edge 총수, concept_edge의 relation_subtype별 수, concept 총수(+atom_node 총수). 한국어 리터럴을 psql 인자로 넘기지 않는다 — Windows cp949 셸이 인자를 깨뜨린다(2026-10-13 S4-60 적재 때 chr() 조합으로 우회한 선례). subtype은 SQL 쪽에서 GROUP BY로 받아 도구 안에서 UTF-8로 디코딩해 대조한다."
+  - "④ 수 비교의 한계를 다음 단계로 메운다 — 같은 수의 다른 엣지는 수 비교가 못 잡는다. 엣지 집합 지문을 비교한다: 정본 쪽은 정렬한 (from_code,to_code,relation_subtype) 목록의 sha256, DB 쪽은 concept와 조인해 같은 3-튜플을 코드로 환원해 같은 방식으로 sha256. 지문이 다르면 차집합 상위 N건을 코드 쌍으로 출력한다(왼쪽에만/오른쪽에만). 이 항이 구현 비용 대비 과하다고 판정되면 의도적 제외로 기록하고 이유를 남긴다(침묵 제외 금지)."
+  - "⑤ 변별력 — 정상 상태 GREEN만으로 보호를 선언하지 않는다. 실패 주입으로 각 판정이 실제로 나는지 확인한다: (a) 정상(정본 2,234 = DB 2,234)은 MATCH, (b) DB를 2,210으로 만든 픽스처(S4-60 직전 실제 상태)는 DRIFT·방향 DB<정본, (c) DB가 정본보다 많으면 DRIFT·방향 DB>정본, (d) 총합은 같고 subtype 분포만 다른 픽스처는 DRIFT, (e) DB 값을 못 읽으면 UNKNOWN(종료 2)이지 MATCH가 아니다, (f) graph.json 엣지 0건이면 오류. 뮤테이션(비교 항목 하나 제거·방향 판정 제거·UNKNOWN을 MATCH로 접기)을 하네스에서 주입해 전건 RED를 확인하고, 주입이 실제로 적용됐는지(mutated != original)와 원복이 바이트 동일한지를 단언한다."
+  - "⑥ 집행 지점은 정본화와 별항으로 쓴다(정본화를 집행으로 착각한 완료 선언 금지) — 프로브를 만드는 것과 누가 언제 부르는가는 다른 문제다. 최소 두 곳에 배선한다: (a) 정본 적재 런북(docs/ops/ 아래 atom_node·S4-64 populate 계열)의 AFTER 판정 블록이 이 프로브를 부르게 한다 — 수작업 count 쿼리를 대체, (b) 정본 graph.json을 바꾸는 PR의 체크리스트에 적재 후 이 프로브 MATCH를 적재 완료 증적으로 요구한다(S4-61 병합이 첫 소비자). CI에서는 prod DB에 닿을 수 없으므로 CI가 하는 일은 판정 함수 단위 테스트와 배선 동결 테스트(런북이 프로브를 실제로 부른다)까지이고, prod 실행은 Kiki 머신이다 — 이 한계를 산출물에 명시한다."
+  - "⑦ 읽기측 폴백(선택 · 판정 후 결정) — prod DB에 닿지 못하는 세션에서도 적재 누락 위험을 볼 수 있게, 적재 실행을 이벤트 대장에 기록하는 방안을 검토한다(정본 graph.json의 마지막 변경 커밋 이후 적재 이벤트가 있는지를 로컬에서 판정). 단 이벤트 기록은 적재자가 부른다는 전제에 기대므로 ⑥(b)의 증적과 중복될 수 있다 — 중복이면 채택하지 않고 이유를 notes에 남긴다."
+  - "⑦ 판정(2026-10-14): 채택하지 않음 — 적재 실행의 이벤트 대장 기록은 적재자(populate CLI)가 그것을 부른다는 전제에 기대므로 ⑥(b)의 PR 템플릿 적재 증적(MATCH 출력 + 판정 기준 커밋)과 같은 사실을 중복해서 말한다. 채택하려면 l1 populate CLI를 수정해야 해 이 태스크 범위(ops 프로브·런북·템플릿)를 넘는다. 재론 조건: 정본 변경 PR이 증적 없이 병합되는 사고가 실제로 관측되면 승계 태스크로 등재."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1619 (판정 기준: 브랜치 claude/sweet-ptolemy-fjfkwg 63839478 · 로컬 CI 미러 전 잡 통과 · prod 실측은 Kiki 런북 atom_graph_parity_probe_runbook.md 미실행)"
+paths:
+  - "scripts/ops/atom_graph_prod_parity*.py"
+  - "src/backend/whymath_backend/ops/atom_graph_prod_parity*.py"
+  - "tests/backend/ops/test_atom_graph_prod_parity*.py"
+  - "tests/infra/test_atom_graph_prod_parity*.py"
+session: null
+notes: |-
+  2026-10-13 Kiki 지시로 등재(S4-60 후속). 계기: S4-60(PR #1558)이 정본 graph.json 엣지를 2,210에서 2,234로 늘렸지만 prod DB(whymath-pg)는 별도 적재 동작이 있을 때까지 2,210에 머물렀다. 그 어긋남은 감시 장치가 아니라 PR 본문의 정직한 공백 항목과 Kiki의 수작업 count 쿼리로만 드러났다. 같은 계열의 선례: SKB-03 — atom_node 적재 구현이 어떤 CLI에서도 호출되지 않아 prod에 한 번도 적재된 적이 없었고, 빈 테이블이 정상 동작처럼 보였다. 정본과 DB는 서로 다른 시점에 바뀌는 두 진실이라 어긋남은 구조적으로 재발한다(S4-61의 129건 병합이 다음 후보).
+  무엇이 이미 있고 무엇이 없는가(실측): 스키마 쪽은 scripts/ops/probe_prod_schema_revision.sql(읽기 전용 프로브)과 ops/db_host_reachability(도달성 3신호)가 있다. 데이터 쪽 — 정본 엣지 수 대 DB 엣지 수 대조 — 는 내가 찾은 방법(backlog 전수 grep: 패리티·정본↔DB·canonical drift 등, scripts/ops 목록)으로는 0건이다. 인접 태스크 HARN-216은 오개념 crosslink 적재의 canonical 뒤집힘 판정이라 대상이 다르다(원자 백본 엣지가 아님).
+  eos_priority를 P1로 둔 이유: 우회는 가능하나(수작업 count) 우회가 사람의 기억에 의존하고, 정본이 바뀔 때마다 prod 서빙 그래프와 어긋날 수 있다. 과대하다고 판단되면 amend --eos-priority로 P2로 내리면 된다.
+  주의: 이 세션은 prod DB에 접속할 수 없다(Kiki 머신 전용) — 구현은 순수 판정 함수와 단위 테스트까지이고 실측 실행은 Kiki 런북으로 넘긴다.
+
+  [정정 2026-10-14] acceptance ⑦ 선택 항의 판정 기록(채택하지 않음·이유·재론 조건)
+updated: 2026-10-14

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-138-backfill-refusal-cwd-relative-guard
+title: "근거 차용 거부 가드가 작업 디렉터리에 따라 침묵으로 꺼진다 — _REPO_CORPUS_DIR 상대경로"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 — harness/review_status_domains.py 의 _REPO_CORPUS_DIR 가 상대경로 Path(\"data/corpus\") 라서 corpus_backfill_refusal 이 작업 디렉터리에 따라 다르게 동작함을 재현 테스트로 고정한다. PB-20 실측: 저장소 루트에서는 근거 차용을 거부하고 src/backend(CI 백엔드 잡의 cwd)에서는 같은 입력에 None 을 돌려준다.\n② 수정 — 레포 코퍼스 디렉터리를 모듈 파일 위치 기준 절대경로로 고정한다. KNOWN_CORPORA(상대경로 사전)와의 비교가 같은 기준에서 일치하는지 함께 확인한다.\n③ 변별력 — 수정 전에는 두 cwd 에서 결과가 갈리고 수정 후에는 같다는 것을 결함 주입(상대경로 복원)으로 RED 확인한다. 정상 입력의 초록을 보호의 증거로 치지 않는다.\n④ 범위 확인 — 같은 패턴(모듈 상수로 들고 있는 Path(\"data/...\") 상대경로를 resolve 해서 비교)이 다른 가드에도 있는지 AST 로 전수 스캔해 목록을 남긴다. 0건이면 스캔이 공허한지 확인한다."
+artifacts:
+  - "PR #1616 https://github.com/kiki-s-broom/WhyMath/pull/1616 · 판정 기준 f438ef5f(미러 5잡 통과) · 전체 pytest 19976 passed · 재현 RED 7건 → 수정 후 통과 · 결함 주입 5종+스캔 2종 전건 RED · AST 전수 스캔 907파일 침묵 오작동 0건"
+paths:
+  - src/backend/whymath_backend/harness/review_status_domains.py
+  - tests/backend/harness/test_review_status_domains.py
+session: null
+notes: PB-20 발견 사항. 근거 문서 docs/architecture/problem_bank_variant_intake_pb20.md 6절. 판정 기준 main dc214a2f.
+updated: 2026-10-14

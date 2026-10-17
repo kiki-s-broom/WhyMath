@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-215-crosslink-load-plan-expect-gate
+title: "crosslink 적재 CLI의 계획 대비 건수 단언 — 쓰기 도구 자신이 변경 범위를 보호한다(드라이런 기본·예상 건수 불일치 시 거부)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - HARN-214-runbook-write-scope-assertion
+requires_gates: []
+acceptance:
+  - "① 계획 계산(순수 함수) — crosslink 적재가 라이브 DB에 대해 무엇을 바꿀지 쓰기 전에 센다: 새로 들어갈 행 수·값이 바뀔 행 수(신뢰도·방법·서명 메모)·그대로인 행 수. 같은 의미 유일키 (kebab_id, mis_id, link_type) 기준이며 DB를 읽기만 한다.\n② 단언 인자 — promote --load 에 예상 건수를 선언하는 인자(예: 신규 N · 변경 M)를 두고, 실제 계획이 다르면 아무것도 쓰지 않고 거부한다(전용 종료 코드·어긋난 항목 전건 열거). 인자를 생략하면 쓰지 않고 계획만 출력한다(드라이런이 기본).\n③ 삭제는 적재가 하지 않는다는 한계를 계획 출력에 명시한다 — 코퍼스에 없는 라이브 행(보류·교체된 매핑)은 EXTRA 로 열거만 하고 지우지 않는다. 삭제는 별도 사람 확인 경로를 둔다.\n④ 변별력 — 예상보다 큰 계획(실사고: 예상 5행·실제 64행)에서 거부되는지, 정확히 맞으면 쓰는지, 인자 생략 시 DB가 변하지 않는지를 실제 PostgreSQL로 검증한다. 뮤테이션으로 각 절의 반례 픽스처를 둔다(주입 적용 단언·원복 바이트 동일).\n⑤ 집행 지점 분리 — 계약(인자 의미)과 집행(CLI가 실제로 그 단언을 경유하는지)을 별항으로 둔다. 런북·dossier의 promote --load 안내가 단언 인자를 쓰도록 갱신한다.\n⑥ 배경 — HARN-214 가 스캐너의 쓰기 인식 사각과 한계를 정리했다(변수 경유 실행·파일 입력 SQL·변경 범위의 의미는 텍스트 스캔으로 볼 수 없다). 변경 범위의 보호는 쓰기 도구 자신의 몫이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/misconception/crosslink_loader.py
+  - src/backend/whymath_backend/l4/misconception/crosslink_review.py
+session: null
+notes: "HARN-214 에서 분리. 사고 계열 guard-effect-assumed-from-code-shape 2회차의 코드 상환 축. 2026-10-07 G-misc40 crosslink 적재 블록: 예상 5행, 라이브 DB 실측 기준 쓰기 64행(신규 38 + 덮어쓰기 26). 사람이 읽기 전용 출력을 보고 중단했다."
+updated: 2026-10-07

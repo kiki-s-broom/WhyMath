@@ -108,7 +108,9 @@ class CoachSignalCard extends StatelessWidget {
         margin: const EdgeInsets.only(top: AppSpacing.hairline, bottom: AppSpacing.xs6, left: AppSpacing.xs),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
+          // 폭만 필요 — `sizeOf`로 size 변화에만 구독한다(MOB-24 ④·버블과 동일 사유: `MediaQuery.of`는 하단 시스템
+          // 인셋이 있는 폰에서 키보드 첫·끝 프레임마다 카드를 다시 빌드시킨다).
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHigh,

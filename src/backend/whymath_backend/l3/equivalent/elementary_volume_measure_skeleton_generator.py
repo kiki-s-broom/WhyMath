@@ -37,7 +37,7 @@ from dataclasses import dataclass
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -151,6 +151,7 @@ def _volume_explanation(skeleton: _VolumeSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class RectangularPrismVolumeSkeletonGenerator:
     """직육면체 부피 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -286,6 +287,7 @@ def _volume_unit_explanation(skeleton: _VolumeUnitSkeleton) -> str:
     return f"m^3를 cm^3로 바꿀 때는 정해진 배율을 곱하므로, 구하는 값은 {skeleton.answer} 이다."
 
 
+@deterministic_generator
 class VolumeUnitConversionSkeletonGenerator:
     """부피 단위 환산 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 
@@ -448,6 +450,7 @@ def _circumference_explanation(skeleton: _CircumferenceSkeleton) -> str:
     )
 
 
+@deterministic_generator
 class CircleCircumferenceSkeletonGenerator:
     """원주 결정론 스켈레톤 생성기 — `EquivalentProblemGenerator` 좌석(LLM 0).
 

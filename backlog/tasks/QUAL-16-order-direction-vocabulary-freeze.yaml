@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: QUAL-16-order-direction-vocabulary-freeze
+title: "순서 방향어 계열(큰 근·보다 큰·에서 뺀) 독립 계산 동결 확장 — QUAL-12 어휘 트리거 범위 밖 항목"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - QUAL-12-prompt-condition-semantic-consistency-audit
+requires_gates: []
+acceptance:
+  - "① QUAL-12가 어휘 트리거에서 뺀 순서 방향어 계열(큰 근/작은 근, ~보다 큰/작은, 더 큰/더 작은, A에서 B를 뺀)이 발문에 나타나는 코퍼스를 실측으로 전수 열거한다(QUAL-12 스캔: elementary_v0 67 · generated_v0 176 · linear_inequality_system 600 · polynomial_factoring 600 · rephrased 86 · v1 2 — 정규식 오탐 가능성이 있으므로 재측정한다).\n② 열거된 (코퍼스, 계열) 쌍마다 생성기 무관 독립 계산 동결 테스트를 만들고 tests/backend/harness/test_stem_semantic_hook_coverage.py 의 HOOK_FAMILIES·REGISTRY에 등록한다. 등록 없이 새 계열 어휘가 유입되면 RED가 되는 상태까지가 완료다.\n③ 결함 주입(방향어 뒤집기·정답 오염)으로 RED를 확인하고, 주입 적용(mutated != original)과 원복 바이트 동일을 단언한다. 파싱 실패·스캔 0건은 실패로 처리한다.\n④ 불일치가 나오면 이 태스크에서 고치지 않고 코퍼스별 처분 태스크로 분리 등재하며 is_published와 학생 노출 건수를 함께 적는다."
+artifacts: []
+paths:
+  - "tests/backend/harness/**"
+session: null
+notes: "출처: QUAL-12 리포트 docs/reviews/qual12_prompt_condition_semantic_consistency_2026-10-12.md 의 범위 밖 항목. QUAL-12 감사(슬라이스 A/B/E)에서 이 계열의 불일치는 0건이었으나 동결 테스트가 없어 회귀 방어가 없다."
+updated: 2026-10-12

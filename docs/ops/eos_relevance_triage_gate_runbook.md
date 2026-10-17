@@ -241,6 +241,15 @@ $env:PYTHONIOENCODING="utf-8"
 > 즉시 적용"판이다. 영구 적용은 `setx PYTHONUTF8 1` + `setx PYTHONIOENCODING utf-8`(새 창부터).
 >
 > 이 환경변수는 **창 단위**다 — 창을 새로 열면 다시 설정해야 한다.
+>
+> **재판정 (OPS-53 · 2026-10-05)**: `scripts/harness/*.py` CLI는 이제 진입점에서 stdout/stderr을
+> 스스로 UTF-8로 재구성하므로(`scripts/harness/_stdio.py`), 위 블록의 `PYTHONUTF8`·`PYTHONIOENCODING`
+> 두 줄은 **필수가 아니라 보험**이다(그 두 줄 없이도 `UnicodeEncodeError`로 죽지 않는다 —
+> `tests/harness/test_cli_stdio_utf8.py`가 cp949 파이프로 동결). 반면 `[Console]::OutputEncoding`
+> 줄은 **여전히 필요**하다 — CLI가 이제 UTF-8을 내보내므로, PowerShell 5.1이 그 파이프를 cp949로
+> 읽으면 한글이 깨져 보인다(죽지는 않는다). 이 보험의 존치 재확인 지점 = **Kiki가 다음에 이 런북을 한국어 Windows에서 실행할 때**(두 줄을 뺀 채
+> 6-2가 통과하는지 본다) — OPS-53은 Linux에서 `PYTHONIOENCODING=cp949`로 파이프를 모사해 검증했을 뿐 한국어 Windows 실물에서
+> 돌려 보지 않았다.
 
 **6-2. 자가검증 — 선행 조건 3종** (실패 상태에서 실제로 실패함을 확인한 검사다)
 

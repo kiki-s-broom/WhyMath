@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-100
+title: "OpenAI 호환 전송기 실패 메시지의 '(시도 N회)'가 실제 시도 수가 아니라 상한을 적는다 — 비재시도 오류(401 등)도 '시도 3회'"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `HttpxChatTransport.post_chat`이 올리는 `SeatHttpError` 메시지의 '(시도 N회)'가 상한(`self._max_attempts`)이 아니라 실제 시도 횟수를 적는다. 비재시도 상태(예: 401)는 '시도 1회', 재시도 소진(예: 429 연속)은 '시도 3회'."
+  - "② 회귀 테스트 2종(비재시도 1회 · 소진 N회)을 `tests/backend/l3/test_openai_compat_transport.py`에 두고, 상한으로 되돌리는 뮤테이션이 RED임을 확인한다."
+  - "③ 문구 소비자 전수 확인 — `seat_failure.py` docstring 예시와 기존 테스트의 '(시도 3회)' 매칭이 재시도 소진 사례에서만 쓰이는지 확인하고, 아니면 정정한다. 강등 분류는 상태코드를 속성(`status_code`)으로 읽으므로 영향이 없음을 기존 강등 테스트 통과로 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/providers/_openai_compat.py
+  - src/backend/whymath_backend/l3/providers/seat_failure.py
+  - tests/backend/l3/test_openai_compat_transport.py
+session: null
+notes: "ARCH-71 런북 작업 중 발견(2026-09-29). `src/backend/whymath_backend/l3/providers/_openai_compat.py` 194행: 비재시도 상태는 attempt 0에서 `break`하는데 메시지는 `(시도 {self._max_attempts}회)`를 적는다. 오진 위험: 키 오류(401)가 '3회 시도'로 보여 일시 장애로 오독될 수 있다. ARCH-71 런북 판정은 상태코드·강등 원인으로 하므로 그 판정에는 영향 없음."
+updated: 2026-09-29

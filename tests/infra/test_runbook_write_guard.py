@@ -116,6 +116,35 @@ docker exec -i whymath-pg psql -U whymath -d whymath -c "DELETE FROM attempt_eve
 "DELETED=$LASTEXITCODE"
 """
 
+# HARN-214 — 2026-10-07 G-misc40 적재 블록이 이 스캐너에서 "쓰기 0개"였다. 아래 셋은 그때 비어
+# 있던 인식 범위(문자열 속 psql · 저장소 적재 CLI · 적재 함수 직접 호출)를 밟는 픽스처다.
+# 각 픽스처는 **그 절이 없으면 통과하는** 형태다 — 가드 없는 쓰기인데 쓰기로 안 보이기 때문이다.
+_WRAPPED_PSQL_DELETE_UNGUARDED = """
+# psql이 cmd /c 문자열 안에 감싸였다 — 마스킹 텍스트는 그 안을 가려 psql도 DELETE도 못 본다.
+cmd /c "docker exec -i whymath-pg psql -U whymath -d whymath -c \\"DELETE FROM misconception_crosslink WHERE mis_id='M0599'\\""
+"DELETE_EXIT=$LASTEXITCODE"
+"""
+
+_LOAD_CLI_UNGUARDED = """
+# 저장소 적재 CLI(`promote --load`)는 DB를 쓴다 — 쓰기 어휘에 없어 가드 없이 통과했던 형태.
+& $Py -m whymath_backend.l4.misconception.crosslink_review promote --queue $Queue --load
+"LOAD_EXIT=$LASTEXITCODE"
+"""
+
+_LOAD_CROSSLINKS_CALL_UNGUARDED = """
+# 적재 함수 직접 호출 — 같은 DB 쓰기를 파이썬 한 줄로 부르는 형태.
+& $Py -c "from whymath_backend.l1.misconception.crosslink_loader import load_crosslinks; print(load_crosslinks(None, '$Corpus'))"
+"LOAD_EXIT=$LASTEXITCODE"
+"""
+
+# 파서 축의 *깊이 0* 절 — 닫힌 if 바로 다음 줄이 `} else {`로 시작하고 그 `}`가 닫을 바깥 가지가
+# 없다. 중첩 정상 형태를 풀어 주는 `depth_before == 0` 조건을 지우면 이것이 통과해 버린다.
+_STRAY_BRACE_ELSE_AT_DEPTH_ZERO = """
+$Ready = $true
+if ($Ready) { "준비됨" }
+} else { "미준비 — Ready=$Ready" }
+"""
+
 # ── green 픽스처 — 이것이 red면 개발 차단기다 ───────────────────────────────
 _SINGLE_LINE_GUARD = """
 # 권장 형태 — 한 줄 `if … { … } else { … }`. 초판이 이것을 오탐했다.
@@ -178,6 +207,41 @@ $Confirm = Read-Host "계속하려면 GO 를 입력하십시오"
 """
 
 
+# 중첩 가드 — 안쪽 `} else { … }`가 한 줄로 끝나고 다음 줄이 바깥 가지를 닫는 `} else { … }`다.
+# 이 형태는 Kiki 머신 PowerShell에서 정상 실행됐다(2026-10-07). 깊이를 안 보던 초판은 앞 줄이
+# `}`로 끝난다는 이유만으로 이것을 위반으로 오탐했다 — 그 절이 없으면 이 픽스처가 red가 된다.
+_NESTED_GUARD_CLOSING = """
+$Ready = $true
+if ($Ready) {
+  & $Py -m whymath_backend.l1.atom_graph.populate
+  $Rc = $LASTEXITCODE
+  if ($Rc -eq 0) {
+    "POPULATE_OK rc=$Rc"
+  } else { "POPULATE_FAILED rc=$Rc" }
+} else { "WRITE_REFUSED=True — Ready=$Ready" }
+"""
+
+# 같은 세 쓰기 형태를 *정당하게* 가드한 대조군 — 이것이 없으면 "새 어휘는 무조건 위반"이라는
+# 과잉 수정이 통과한다.
+_WRAPPED_PSQL_DELETE_GUARDED = """
+$Ready = $true
+if ($Ready) { cmd /c "docker exec -i whymath-pg psql -U whymath -d whymath -c \\"DELETE FROM misconception_crosslink WHERE mis_id='M0599'\\""; "DELETE_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — Ready=$Ready" }
+"""
+
+_LOAD_CLI_GUARDED = """
+$QueueOk = $true
+if ($QueueOk) { & $Py -m whymath_backend.l4.misconception.crosslink_review promote --queue $Queue --load; "LOAD_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — QueueOk=$QueueOk" }
+"""
+
+# 주석 속 SQL·읽기 전용 psql은 쓰기가 아니다 — `_code_text`가 원문을 보게 된 대가로 생길 수 있는
+# 오탐을 막는 대조군이다(주석 줄 제외 절을 지우면 이 픽스처가 red가 된다).
+_COMMENTED_SQL_IS_NOT_A_WRITE = """
+# 아래는 하지 마세요: psql -c "DELETE FROM misconception_crosslink"
+$Before = cmd /c "docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c \\"SELECT count(*) FROM misconception_crosslink\\""
+"BEFORE_TOTAL=$Before"
+"""
+
+
 def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = None) -> int:
     """픽스처 런북 1개를 만들어 스캐너를 돌린다 — 판정은 exit code로만 한다."""
     path = tmp_path / f"{name}_runbook.md"
@@ -206,6 +270,10 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("write_in_else", _WRITE_IN_THE_ELSE_BRANCH),
         ("dangling_else_only", _DANGLING_ELSE_WITHOUT_OTHER_DEFECTS),
         ("interactive_with_setup", _INTERACTIVE_WITH_SETUP),
+        ("wrapped_psql_delete", _WRAPPED_PSQL_DELETE_UNGUARDED),
+        ("load_cli", _LOAD_CLI_UNGUARDED),
+        ("load_crosslinks_call", _LOAD_CROSSLINKS_CALL_UNGUARDED),
+        ("stray_brace_else_depth_zero", _STRAY_BRACE_ELSE_AT_DEPTH_ZERO),
     ],
 )
 def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
@@ -223,6 +291,10 @@ def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
         ("secure_verified", _SECURE_STRING_VERIFIED),
         ("interactive_alone", _INTERACTIVE_ALONE),
         ("read_host_with_setup", _READ_HOST_WITH_SETUP),
+        ("nested_guard_closing", _NESTED_GUARD_CLOSING),
+        ("wrapped_psql_guarded", _WRAPPED_PSQL_DELETE_GUARDED),
+        ("load_cli_guarded", _LOAD_CLI_GUARDED),
+        ("commented_sql", _COMMENTED_SQL_IS_NOT_A_WRITE),
     ],
 )
 def test_legitimate_forms_pass(tmp_path: Path, name: str, body: str) -> None:
@@ -326,3 +398,56 @@ def test_scanner_is_wired_into_ci() -> None:
         "CI 어느 잡도 check_runbook_blocks.py를 부르지 않는다 — "
         "'저장소에 존재함'은 '돌아감'이 아니다."
     )
+
+
+# ── HARN-214 알려진 한계 고정 ────────────────────────────────────────────────
+def _write_hit_count(tmp_path: Path, body: str) -> int:
+    """스캐너 모듈을 직접 불러 한 블록의 쓰기 인식 건수를 센다(서브프로세스 판정과 별개)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_check_runbook_blocks_under_test", _SCANNER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    path = tmp_path / "probe_runbook.md"
+    path.write_text(_runbook(body), encoding="utf-8")
+    blocks = module.parse_runbook(path)
+    assert len(blocks) == 1, "탐침 런북은 블록이 정확히 1개여야 한다"
+    return len(module.write_hits(blocks[0]))
+
+
+@pytest.mark.parametrize(
+    ("name", "body"),
+    [
+        # 사고 블록의 실제 형태 — 변수 경유 적재 스크립트 + 파일 입력 SQL.
+        ("variable_hidden_script", "& $PyExe $LoadPy $Corpus"),
+        (
+            "sql_in_variable",
+            '$q = "DELETE FROM t"\ndocker exec -i whymath-pg psql -U whymath -d whymath -c $q',
+        ),
+        (
+            "sql_from_file",
+            'cmd /c "docker exec -i whymath-pg psql -U whymath -d whymath -At -f - < $SqlDel"',
+        ),
+    ],
+)
+def test_known_blind_spots_stay_pinned(tmp_path: Path, name: str, body: str) -> None:
+    """텍스트 스캔으로 **볼 수 없는** 쓰기는 현재 판정(0건)을 고정한다 — 사고 블록이 이 형태다.
+
+    이 테스트가 깨졌다면 누군가 인식 범위를 넓힌 것이다. 그것은 좋은 일일 수 있으나 같은 변경이
+    정상 패턴(상태를 읽고 → 가드로 판정하고 → 쓴다)의 **가드 앞 읽기**를 위반으로 만들지 않는지
+    먼저 확인하고(HARN-214 시험에서 파일 입력 SQL을 쓰기로 취급했더니 그렇게 됐다) 스캐너
+    docstring의 「알려진 한계」 절을 함께 고쳐라.
+    """
+    assert (
+        _write_hit_count(tmp_path, body) == 0
+    ), f"{name}: 인식 범위가 바뀌었다 — docstring 한계 절 갱신"
+
+
+def test_scanner_documents_its_blind_spots() -> None:
+    """한계가 코드에만 있고 안내문에 없으면 사람은 "스캐너 통과 = 안전"으로 읽는다."""
+    text = _SCANNER.read_text(encoding="utf-8")
+    assert "알려진 한계" in text
+    for marker in ("변수 경유 실행", "변수에 담은 SQL", "파일·표준입력 SQL", "변경 범위의 의미"):
+        assert marker in text, f"한계 절에 `{marker}`가 없다"

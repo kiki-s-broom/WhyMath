@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-114-learning-metrics-rollup-schedule-wiring
+title: "일별 학습지표 롤업 정기 실행 배선 — writer·CLI 완비인데 스케줄 0(SEC-12 결함 재발)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 스케줄 진입점 1개 배선 — SEC-12가 착지시킨 docker-compose.prod.yml:156 retention-purge 패턴(compose 서비스 + 셸 루프)을 그대로 재사용한다. 신규 스케줄러 도입 0(COLLAB-03 acceptance ⑥의 금지와 충돌하지 않음 — SEC-12 해법 자체가 새 스케줄러를 쓰지 않는다)·신규 로직 0(learning_metrics_rollup_cli 호출만).\n② 배선 실재성 테스트 동결 — 스케줄 정의를 지우면 테스트가 깨진다(OPS-03/08/10/11 선례 '존재함 ≠ 돌아감'). tests/infra 평면에 둔다.\n③ '집계 0건'과 '실행 실패'가 구분되는 출력 동결(이중 회계 금기·SEC-12 acceptance ③ 동형). 원천 3종 중 learning_session·problem_attempt가 현재 구조적으로 비어 있으므로(각각 writer 영구 미신설·클라 미배선) 0건이 정상 상태임을 리포트가 말해야 한다 — 침묵 0건 금지.\n④ 범위 밖 동결 — 롤업 로직 변경·원천 writer 신설(learning_session)·클라 attempt 배선(REC-01 축)·ClickHouse 적재는 포함하지 않는다. 이 태스크는 '이미 있는 writer가 실제로 돌게 하는' 한 홉만 닫는다."
+artifacts: []
+paths:
+  - docker-compose.prod.yml
+  - "infra/**"
+  - "tests/infra/**"
+  - src/backend/whymath_backend/harness/learning_metrics_rollup_cli.py
+session: null
+notes: "2026-08-11 data_platform_eos_frame_gap_review_2026-08-11.md D1. 실측: grep -rn 'learning_metrics_rollup' infra/ .github/ docker-compose*.yml scripts/ = 0건, docs/ = 0건. declared_unwired_audit.py:860-863 _OPERATIONS_BATCH 유예 사유가 '일 1회 크론/수동 실행이 설계 확정값'이라고 적었으나 그 크론이 어디에도 설치돼 있지 않고 설치 절차 문서도 없다 — 유예가 실재하지 않는 운영 절차를 전제한다. 결과: timeseries 3테이블 프로덕션 영구 미갱신 → 학생 대면 GET /v1/me/learning-metrics(api/me.py:3382)가 영구 빈 응답(서빙 영향 있음). SEC-12(done·2026-08-03)가 같은 결함 유형을 이미 명명·해소했는데 COLLAB-03(2026-08-10)이 1주 뒤 재생산. [OPS-41 회수] 원 번호 OPS-35(t608mk) → main에 동번호 별건(OPS-35-audit-membership-consumption-detection)이 있어 CLI 재발급 OPS-114."
+updated: 2026-10-05

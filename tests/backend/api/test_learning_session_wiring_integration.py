@@ -8,8 +8,10 @@ acceptance ⑥ "테스트는 대장 문자열이 아니라 실제 writer 경로�
   ③ 그 행의 점수 컬럼은 NULL이다.
   ④ 추천 기록 `evidence_event.session_id`가 placeholder가 아니라 그 세션이고, 시도의
      `problem_attempt.session_id`도 서버가 채운 그 세션이다.
-  ⑤ 열람권 export에 추천 기록이 조인으로 실리고, 삭제권 이행 뒤에는 추천 행은 **남되** 학습자와
-     끊긴다(조인 0) — `evidence_event.session_id`가 FK가 아니라는 성질의 실측.
+  ⑤ 열람권 export에 추천 기록이 조인으로 실리고, 삭제권 이행 뒤에는 그 세션의 추천 행도 **함께
+     지워진다**(SEC-40 (나) — 결정 게이트 G-eos37-erasure-kpi-disposition). 종전(EOS-131)은 "행은
+     남되 학습자와 끊긴다"였으나 `deletion_audit`의 (user_id, 세션 ID)와 HMAC 바인딩으로 재연결할 수
+     있는 경로 2건이 열려 있어 Kiki 결정으로 바뀌었다. 삭제 전 2건이 실제로 있었음은 ④가 확인한다.
   ⑥ 학습 이벤트 시간선에 `concept_selected`·`recommendation_generated`가 실제 건수로 실린다.
   ⑦(나) 파일럿 KPI2 입력(`load_retention_sessions`)이 이 세션 행을 읽어 재방문율 값을 낸다.
 
@@ -153,15 +155,18 @@ def test_serving_paths_open_one_session_and_join_recommendations() -> None:
             assert retention.returning_user_rate.value == 0.0
             assert retention.distinct_users == 1
 
-            # ⑤ 삭제권 — 세션 행이 지워지면 추천은 남되 학습자와 끊긴다(FK 아님).
+            # ⑤ 삭제권 — 세션 행이 지워지면 그 세션의 추천 기록도 함께 지워진다(SEC-40 (나)).
+            #    삭제 전에는 위 ④가 같은 조건의 행 2건을 확인했으므로 0건은 변별력이 있다.
             _P._erase_learner(client)
             assert _rows("SELECT 1 FROM learning_session WHERE session_id = :s", {"s": sid}) == []
-            orphaned = _rows(
+            remaining = _rows(
                 "SELECT count(*) FROM evidence_event WHERE session_id = :s"
                 " AND event_type = 'recommendation_render'",
                 {"s": sid},
             )
-            assert orphaned == [(2,)], "추천 기록 자체는 파기 대상이 아니다(비민감 처치 회계)"
+            assert remaining == [
+                (0,)
+            ], "삭제권 이행 뒤에도 그 세션의 추천 기록이 남아 재연결 경로가 열려 있다"
             rejoined = _rows(
                 "SELECT count(*) FROM evidence_event e"
                 " JOIN learning_session s ON s.session_id = e.session_id WHERE s.user_id = :u",

@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-48-polynomial-factoring-corpus
+title: "고등 다항식 인수분해(모닉 트리노미얼) 파일럿 코퍼스"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "[10공수1-01-03]/[10기수1-01-03] 0커버 해소 — kind 필터 2밴드(1코드씩) 결정론 생성기 신설·전량 게이트 통과"
+artifacts:
+  - 89de17c8
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/polynomial_factoring_skeleton_generator.py
+  - src/backend/whymath_backend/harness/polynomial_factoring_batch.py
+  - tests/backend/l3/equivalent/test_polynomial_factoring_skeleton_generator.py
+  - tests/backend/harness/test_polynomial_factoring_batch.py
+  - data/corpus/problem_bank_polynomial_factoring_v0/problems.jsonl
+session: null
+notes: "S4-47(다항식 사칙연산)의 형제·후속 — 그 모듈이 인수분해를 후속으로 명시해 둠. W2 Phase4 #4.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-48-polynomial-factoring-corpus 재등재. 원 증적 ['89de17c8']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

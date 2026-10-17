@@ -29,6 +29,11 @@ Langfuse·Celery broker가 필요하지 않다(첫 사용 시 연결). LangfuseS
 `functional_security_audit_2026-08-08.md` M6): SEC-07 당시 "범위 밖"으로 남겨졌던 폴링이
 무인증인 채 검증 전 원시 LLM 출력을 반환하고 있었다(짝인 POST는 봉인·폴링만 열림).
 
+레이트리밋(SEC-19): 인증은 *누구냐*만 가린다 — 인증된 단일 계정이 `/v1/generate`를 반복 호출해도
+LLM 비용은 그대로 나간다. 그래서 인증과 별개 축으로 `RateLimitedGenerate`(사용자·IP·기기 3차원,
+`generate` 전용 버킷)를 부착했다. 시각화·장면·코치 LLM 표면은 이미 리미터가 있었고 이 엔드포인트가
+유일한 무제한 표면이었다. 리미터는 동의 게이트를 얹지 않는다(`CurrentUser` 기반 — 접근 의미 불변).
+
 소유권(job↔user) 검사(SEC-27, 48_보안 §P0): `job_ownership` 테이블(`db/models/
 job_ownership.py`)이 `POST /v1/generate`의 큐잉 시점에 (job_id, user_id)를 기록하고,
 `GET /v1/jobs/{id}`가 그 행으로 소유자를 대조해 타 사용자 job 폴링을 404로 거부한다
@@ -58,12 +63,17 @@ from whymath_backend.api._device_store import (
     ping_device_store_health,
     set_device_store,
 )
+from whymath_backend.api._error_codes import CodedHTTPException
 from whymath_backend.api._growth_evidence_state import (
     GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY,
     GrowthEvidenceReachCounters,
     GrowthEvidenceReachSnapshot,
     get_growth_evidence_counters,
     set_growth_evidence_counters,
+)
+from whymath_backend.api._isolated_call import (
+    IsolationSnapshot,
+    isolation_snapshot,
 )
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
@@ -108,6 +118,7 @@ from whymath_backend.api._ocr_state import (
 from whymath_backend.api._ocr_state import (
     get_ocr_reach_snapshot as _get_ocr_reach_snapshot,
 )
+from whymath_backend.api._rate_limit import RateLimitedGenerate
 from whymath_backend.api._segmentation_state import (
     SEGMENTATION_COUNTERS_KEY as _SEGMENTATION_COUNTERS_KEY,
 )
@@ -140,6 +151,11 @@ from whymath_backend.api._subject_capability_state import (
     STEP_CHAIN_VERIFIER_KEY as _STEP_CHAIN_VERIFIER_KEY,
 )
 from whymath_backend.api.admin_bff import router as admin_bff_router
+from whymath_backend.api.admin_cms import router as admin_cms_router
+from whymath_backend.api.admin_cms_graph import router as admin_cms_graph_router
+from whymath_backend.api.admin_cms_problem_versions import (
+    router as admin_cms_problem_versions_router,
+)
 from whymath_backend.api.admin_menu import router as admin_menu_router
 from whymath_backend.api.alignments import router as alignments_router
 from whymath_backend.api.auth import (
@@ -192,6 +208,7 @@ from whymath_backend.l3.interfaces import (
     CacheBackend,
     LLMProvider,
     TraceSink,
+    TrafficSurface,
 )
 from whymath_backend.l3.models import RoutingDecision, RoutingRequest
 from whymath_backend.l3.pipeline import QualityQueueUnavailableError
@@ -207,12 +224,19 @@ from whymath_backend.l3.providers.seat_failure import DEGRADE_REASONS
 from whymath_backend.l3.queue import CeleryJobQueue
 from whymath_backend.l3.trace import LangfuseSink
 from whymath_backend.l5.ocr.factory import build_ocr_components
+from whymath_backend.ops.alert_delivery import (
+    CONFIG_CONFIGURED,
+    DeliverySnapshot,
+    WebhookAlertSink,
+)
 from whymath_backend.ops.log_scrubber import install_log_scrubber
 from whymath_backend.ops.service_health import (
+    ROUTE_UNMATCHED,
     AlertLogNotifier,
     ComponentCheck,
     MetricsSnapshot,
     ReadinessProbes,
+    RouteLatency,
     ServiceMetrics,
     default_readiness_probes,
     evaluate_alerts,
@@ -226,12 +250,17 @@ _SKIP_CACHE_KEY = "skip_cache_on_signal"
 # OPS-01 인프로세스 관측성 키 — 계측·알림·레디니스 probes(테스트가 state로 접근 가능).
 _METRICS_KEY = "service_metrics"
 _ALERT_NOTIFIER_KEY = "service_alert_notifier"
+_ALERT_SINK_KEY = "service_alert_sink"  # OPS-30 — 웹훅 발송 채널(상태를 /health/ready가 노출)
 _READY_PROBES_KEY = "readiness_probes"
 
 # 계측 제외 경로(OPS-01) — 업타임 프로브·운영 폴링 경로는 요청 계측에서 뺀다. 넣으면
 # 프로브 폴링이 표본을 지배하고, 특히 DB 다운 시 /health/ready 503 폭주가 5xx 에러율을
 # *자기증폭*시킨다(관측이 관측을 오염). 학생·API 트래픽만 계측한다.
 _OPS_PROBE_PATHS = frozenset({"/health", "/health/live", "/health/ready", "/status"})
+# OPS-95: 서버 처리 시간 응답 헤더(W3C Server-Timing). 값은 `app;dur=<ms>` 하나뿐이다 — 사용자
+# 식별자·요청 내용·내부 처리 세부는 싣지 않는다(미성년자 데이터 정책). 프로브 경로는 위
+# 상수의 제외 규칙을 그대로 따른다(계측과 같은 경계).
+_SERVER_TIMING_HEADER = "Server-Timing"
 
 # OPS-17: 클라 최소 버전 게이트 — 헤더 이름 + '미상(unknown)' 경량 카운터의 app.state 키.
 # 신규 미들웨어를 만들지 않고 기존 `_service_metrics_middleware`(OPS-01) 좌석에 얹는다(아래
@@ -471,6 +500,20 @@ class ComponentCheckBody(BaseModel):
     )
 
 
+class RouteLatencyBody(BaseModel):
+    """/health/ready 라우트별 최근 창 지연·에러율(OPS-95·SLO S5) — 표본이 있는 라우트만 나온다."""
+
+    route: str = Field(
+        ...,
+        description="FastAPI 라우트 템플릿(원시 경로 아님). 매칭 실패는 '(unmatched)' 1개 버킷",
+    )
+    count: int = Field(..., description="그 라우트 최근 창 표본 수")
+    error_rate: float = Field(..., description="그 라우트 최근 창 5xx 비율")
+    p50_latency_ms: float = Field(..., description="최근 창 p50 지연(ms)")
+    p75_latency_ms: float = Field(..., description="최근 창 p75 지연(ms)")
+    p95_latency_ms: float = Field(..., description="최근 창 p95 지연(ms)")
+
+
 class MetricsSummaryBody(BaseModel):
     """/health/ready 인프로세스 계측 요약 — None 필드는 '미측정'(0과 구분·날조 금지)."""
 
@@ -486,6 +529,10 @@ class MetricsSummaryBody(BaseModel):
     )
     latency_sum_ms: float = Field(..., description="누적 지연 합계(ms)")
     latency_max_ms: float | None = Field(..., description="누적 최대 지연(ms). None=요청 0건")
+    routes: list[RouteLatencyBody] = Field(
+        default_factory=list,
+        description="라우트 템플릿별 최근 창 지연(OPS-95). 표본 없는 라우트는 목록에 없다(미측정)",
+    )
 
 
 class AlertBody(BaseModel):
@@ -494,6 +541,23 @@ class AlertBody(BaseModel):
     metric: str = Field(..., description="위반 지표 이름(error_rate·latency_p95_ms)")
     observed: float = Field(..., description="실측치")
     threshold: float = Field(..., description="Settings 임계(초과 시 breach)")
+
+
+class AlertDeliveryBody(BaseModel):
+    """알림 발송 채널 상태(OPS-30) — "알림이 사람에게 도달하는가"를 프로브가 읽는 면.
+
+    `config_state`가 `unset`이면 breach는 로그에만 남는다(`dropped_unconfigured`가 그 횟수) —
+    "알림이 없었다"와 "알릴 곳이 없어 못 알렸다"를 구분하는 유일한 면이다. URL은 노출하지 않는다.
+    """
+
+    config_state: str = Field(..., description="configured·unset(미설정)·invalid(형식 오류)")
+    attempted: int = Field(..., description="발송 시도 횟수(전이 1건 = 1회)")
+    delivered: int = Field(..., description="2xx로 도달 확인된 횟수")
+    failed: int = Field(..., description="발송 실패 횟수(타입명/HTTP 코드만 last_error에)")
+    dropped_unconfigured: int = Field(
+        ..., description="채널 미설정으로 아무에게도 못 알린 전이 횟수"
+    )
+    last_error: str | None = Field(..., description="마지막 실패 사유(예외 타입명 또는 HTTP코드)")
 
 
 class GrowthEvidenceReachBody(BaseModel):
@@ -587,6 +651,60 @@ class SolutionSegmentationBody(BaseModel):
     )
 
 
+class SympyIsolationBody(BaseModel):
+    """/health/ready SymPy 격리 *작동한 비율* 섹션(OPS-126) — 정상 200은 격리 작동의 증거가 아니다.
+
+    `api/_isolated_call.py`의 풀 카운터를 읽는 유일한 비테스트 소비자다(그 전에는 카운터를
+    만들기만 하고 읽는 코드가 없었다). 두 비율을 말한다:
+      - `isolated_ratio` — 격리 대상 호출 중 시간 상한이 걸린 프로세스 풀에서 실제로 돈 비율.
+        1.0이 아니면 일부가 상한 없는 스레드 폴백이다.
+      - `undecidable_ratio` — 풀에 맡겨진 호출 중 판정 불가로 접힌 비율(상한 초과·대기열 포화·
+        총 예산 소진·워커 사망). 0이 아니면 `sympy_isolation_timeout_s` 재판정의 입력이다.
+    분모가 0이거나 격리가 꺼져 있으면 비율은 null이다(None-vs-0 — '0건 중 0건'이 아니라
+    측정 대상 없음).
+
+    **프로세스별 카운터** — 서버 워커(uvicorn `--workers`)가 여럿이면 이 응답은 요청을 받은
+    워커 1개의 값이다. `process_id`로 워커를 가리고 합산은 외부 스크레이퍼가 한다.
+    재시작하면 0부터다.
+    """
+
+    scope: str = Field(
+        ...,
+        description=(
+            "카운터의 범위 — 항상 'per_process'. 서버 워커(프로세스)가 여럿이면 이 값은 응답을 낸 "
+            "그 프로세스의 것이고 합산이 아니다(수집 측이 process_id로 구분해 합친다). 재시작하면 "
+            "0으로 돌아간다."
+        ),
+    )
+    enabled: bool = Field(
+        ..., description="격리 활성(sympy_isolation_enabled). False면 인라인 실행이라 비율은 null"
+    )
+    pool_started: bool = Field(
+        ..., description="이 프로세스에서 워커 풀이 이미 만들어졌는가(첫 격리 호출에 지연 기동)"
+    )
+    process_id: int = Field(..., description="응답한 서버 프로세스 pid — 워커별 카운터 구분용")
+    max_workers: int = Field(..., description="설정된 SymPy 워커 프로세스 수(프로세스당)")
+    timeout_s: float = Field(..., description="설정된 계산 시간 상한(초)")
+    calls: int = Field(..., description="풀에 맡겨진 호출 수(분모) — 폴백 제외")
+    timeouts: int = Field(..., description="계산 시간 상한 초과로 워커를 끊은 횟수")
+    queue_waits: int = Field(..., description="워커가 모두 바빠 대기 상한을 넘긴 횟수")
+    deadlines: int = Field(
+        ...,
+        description=(
+            "호출 전체 벽시계 예산(budget_s) 소진으로 접힌 횟수 — 체인 호출만 센다(OPS-128)"
+        ),
+    )
+    worker_deaths: int = Field(..., description="워커 사망·기동 실패로 접힌 횟수")
+    fallbacks: int = Field(..., description="pickle 불가로 스레드 폴백한 횟수(시간 상한 없음)")
+    undecidable: int = Field(..., description="판정 불가로 접힌 호출 수 = 위 네 사유의 합")
+    undecidable_ratio: float | None = Field(
+        ..., description="undecidable / calls — calls가 0이면 null(측정 대상 없음)"
+    )
+    isolated_ratio: float | None = Field(
+        ..., description="calls / (calls + fallbacks) — 둘 다 0이면 null(격리 대상 호출 없음)"
+    )
+
+
 class ReadyBody(BaseModel):
     """GET /health/ready 응답 — 딥체크·인프로세스 계측·알림(이중 회계의 HTTP 노출면)."""
 
@@ -598,6 +716,9 @@ class ReadyBody(BaseModel):
     alerts: list[AlertBody] = Field(
         ...,
         description="현재 임계 위반 목록 — 외부 프로브가 SaaS 없이 읽는 인프로세스 축",
+    )
+    alert_delivery: AlertDeliveryBody = Field(
+        ..., description="알림 발송 채널 상태(OPS-30) — 미설정이면 breach가 로그에만 남는다"
     )
     ocr: OcrReachBody = Field(
         ...,
@@ -617,6 +738,14 @@ class ReadyBody(BaseModel):
     l6_mode_reach: L6ModeReachBody = Field(
         ...,
         description="L6 응용 모드 6종 도달 관측(PB-04) — /v1/gating/* 6개 엔드포인트별 카운터.",
+    )
+    sympy_isolation: SympyIsolationBody = Field(
+        ...,
+        description=(
+            "SymPy 격리가 작동한 비율(OPS-126) — 풀 호출 수·판정 불가 사유별 카운터·폴백과 "
+            "두 비율. "
+            "프로세스별 카운터(서버 워커가 여럿이면 응답한 워커 1개의 값)."
+        ),
     )
 
 
@@ -667,6 +796,27 @@ def _growth_evidence_exposure_body(
     return GrowthEvidenceExposureReachBody(requests_total=snapshot.requests_total)
 
 
+def _sympy_isolation_body(snapshot: IsolationSnapshot) -> SympyIsolationBody:
+    """IsolationSnapshot(도메인) → SympyIsolationBody(HTTP 스키마) 변환(OPS-126)."""
+    return SympyIsolationBody(
+        scope="per_process",
+        enabled=snapshot.enabled,
+        pool_started=snapshot.pool_started,
+        process_id=snapshot.process_id,
+        max_workers=snapshot.max_workers,
+        timeout_s=snapshot.timeout_s,
+        calls=snapshot.calls,
+        timeouts=snapshot.timeouts,
+        queue_waits=snapshot.queue_waits,
+        deadlines=snapshot.deadlines,
+        worker_deaths=snapshot.worker_deaths,
+        fallbacks=snapshot.fallbacks,
+        undecidable=snapshot.undecidable,
+        undecidable_ratio=snapshot.undecidable_ratio,
+        isolated_ratio=snapshot.isolated_ratio,
+    )
+
+
 def _l6_mode_reach_body(snapshot: L6ModeReachSnapshot) -> L6ModeReachBody:
     """L6ModeReachSnapshot(도메인) → L6ModeReachBody(HTTP 스키마) 변환(PB-04)."""
     return L6ModeReachBody(
@@ -676,6 +826,30 @@ def _l6_mode_reach_body(snapshot: L6ModeReachSnapshot) -> L6ModeReachBody:
         thinking=snapshot.thinking,
         metacognition=snapshot.metacognition,
         gifted=snapshot.gifted,
+    )
+
+
+def _route_latency_body(row: RouteLatency) -> RouteLatencyBody:
+    """RouteLatency(도메인) → RouteLatencyBody(HTTP 스키마) 변환(OPS-95)."""
+    return RouteLatencyBody(
+        route=row.route,
+        count=row.count,
+        error_rate=row.error_rate,
+        p50_latency_ms=row.p50_latency_ms,
+        p75_latency_ms=row.p75_latency_ms,
+        p95_latency_ms=row.p95_latency_ms,
+    )
+
+
+def _alert_delivery_body(snapshot: DeliverySnapshot) -> AlertDeliveryBody:
+    """DeliverySnapshot(도메인) → AlertDeliveryBody(HTTP 스키마) 변환."""
+    return AlertDeliveryBody(
+        config_state=snapshot.config_state,
+        attempted=snapshot.attempted,
+        delivered=snapshot.delivered,
+        failed=snapshot.failed,
+        dropped_unconfigured=snapshot.dropped_unconfigured,
+        last_error=snapshot.last_error,
     )
 
 
@@ -690,6 +864,7 @@ def _metrics_body(snapshot: MetricsSnapshot) -> MetricsSummaryBody:
         window_p95_latency_ms=snapshot.window_p95_latency_ms,
         latency_sum_ms=snapshot.latency_sum_ms,
         latency_max_ms=snapshot.latency_max_ms,
+        routes=[_route_latency_body(row) for row in snapshot.routes],
     )
 
 
@@ -864,12 +1039,27 @@ def create_app(
         redoc_url=None if _prod_like else "/redoc",
         openapi_url=None if _prod_like else "/openapi.json",
     )
+
     # SEC-26(48_보안 §P0 "CORS/보안 헤더 미들웨어" 갭): TrustedHost → CORS → 보안 헤더 순으로
     # 가장 먼저 건다(등록 순서 = 바깥 래핑 순서 — 나쁜 Host를 가장 먼저 걷어내고, preflight를
     # CORS가 처리하고, 마지막으로 모든 응답에 보안 헤더를 얹는다). 셋 다 *항상* 등록한다 —
     # allowlist가 비어 있으면 각자 안전한 기본 자세로 수렴한다(TrustedHost는 `*`=현재 동작
     # 무회귀, CORS는 deny-by-default=네이티브 앱 미영향). 와일드카드+credentials 조합은
     # `Settings._forbid_cors_wildcard_with_credentials`가 부팅 시점에 이미 막았다.
+    # OPS-82: 코드가 있는 HTTP 에러는 종전 `detail` 옆에 `error_code`를 싣는다(하위 호환 —
+    # `detail`을 그대로 두므로 문자열 detail을 가정하는 클라이언트가 깨지지 않는다). 로그에는
+    # 코드와 예외 타입명만 남긴다 — detail 문장·필드값은 싣지 않는다(CLAUDE.md 침묵 실패 금지).
+    @app.exception_handler(CodedHTTPException)
+    async def _coded_http_exception_handler(
+        request: Request, exc: CodedHTTPException
+    ) -> JSONResponse:
+        logger.info("에러코드 응답 — %s (%s)", exc.error_code, type(exc).__name__)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "error_code": exc.error_code},
+            headers=exc.headers,
+        )
+
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings_for_app.trusted_hosts_list)
     app.add_middleware(
         CORSMiddleware,
@@ -933,7 +1123,13 @@ def create_app(
     # 기본 캐시는 RedisCache(지연 연결) — 구성 시 라이브 Redis 불필요(첫 접근 때 연결).
     app.state.__setattr__(_CACHE_KEY, cache if cache is not None else RedisCache())
     # 기본 트레이스는 LangfuseSink(지연·자기비활성) — 키 미설정 시 영구 no-op(S3).
-    app.state.__setattr__(_TRACE_KEY, trace if trace is not None else LangfuseSink())
+    # 이 싱크는 학생 대면 요청 경로의 것이라 기본 표면이 서빙이다(OPS-105 — 게이트② 표본의 대상).
+    # 저작·프로브는 자기 래퍼가 먼저 표지를 싣고, 먼저 실린 표지가 이긴다(`with_traffic_surface`).
+    # 주입된 싱크는 호출자가 표면을 책임진다(테스트 대역 등).
+    app.state.__setattr__(
+        _TRACE_KEY,
+        trace if trace is not None else LangfuseSink(traffic_surface=TrafficSurface.SERVING),
+    )
     # 기본 큐는 CeleryJobQueue(지연 연결) — 구성 시 broker 불필요(첫 디스패치 때 연결, S4).
     app.state.__setattr__(_QUEUE_KEY, queue if queue is not None else CeleryJobQueue())
     # ── 과목 능력 등록(push) — 계획서 100 §3.8 / EOS-89 ─────────────────────
@@ -981,7 +1177,19 @@ def create_app(
         if metrics is not None
         else ServiceMetrics(window_size=_settings.ops_metrics_window_size)
     )
-    alert_notifier = AlertLogNotifier()
+    # OPS-30: 알림의 마지막 1홉 — 전이 판정은 AlertLogNotifier 한 곳, 웹훅 sink는 그 결과를 받는다.
+    alert_sink = WebhookAlertSink(
+        _settings.ops_alert_webhook_url.get_secret_value(),
+        timeout_s=_settings.ops_alert_webhook_timeout_s,
+    )
+    if alert_sink.config_state != CONFIG_CONFIGURED:
+        # 무증상 no-op 금지 — 채널이 없다는 사실을 기동 시 한 번 드러낸다(URL은 로그에 안 싣는다).
+        logger.warning(
+            "알림 발송 채널 %s — breach는 로그에만 남고 사람에게 도달하지 않는다 "
+            "(WHYMATH_OPS_ALERT_WEBHOOK_URL 설정 필요)",
+            "미설정" if alert_sink.config_state == "unset" else "형식 오류(http/https 아님)",
+        )
+    alert_notifier = AlertLogNotifier(sinks=[alert_sink])
     resolved_probes = (
         readiness_probes
         if readiness_probes is not None
@@ -989,6 +1197,7 @@ def create_app(
     )
     app.state.__setattr__(_METRICS_KEY, resolved_metrics)
     app.state.__setattr__(_ALERT_NOTIFIER_KEY, alert_notifier)
+    app.state.__setattr__(_ALERT_SINK_KEY, alert_sink)
     app.state.__setattr__(_READY_PROBES_KEY, resolved_probes)
     # OPS-17: 클라 버전 게이트 — 헤더 부재/파싱 실패("미상") 경량 카운터(신규 SaaS 의존
     # 없음 — Prometheus/StatsD 등은 과공학. 모듈 전역이 아니라 app.state에 둬 앱 인스턴스별
@@ -1024,7 +1233,17 @@ def create_app(
     # (재시작 시 리셋 — 인프로세스 계측이라 영속 저장 0·growth_evidence와 동형 전제).
     set_l6_mode_reach_counters(app, L6ModeReachCounters())
 
-    def _observe_request(elapsed_ms: float, status_code: int) -> None:
+    def _route_template(request: Request) -> str:
+        """요청이 매칭된 라우트의 *템플릿*(OPS-95) — 매칭 실패는 `ROUTE_UNMATCHED` 단일 버킷.
+
+        `scope["route"]`는 라우터가 매칭한 뒤에야 채워지므로 `call_next` 이후에 읽는다. 원시
+        `request.url.path`를 쓰면 `/v1/problems/123`·`/v1/problems/124`가 각각 키가 돼 카디널리티가
+        폭발한다. 템플릿을 못 읽는 모든 경우(route 없음·path 속성 없음)는 미매칭으로 모은다.
+        """
+        template = getattr(request.scope.get("route"), "path", None)
+        return template if isinstance(template, str) and template else ROUTE_UNMATCHED
+
+    def _observe_request(elapsed_ms: float, status_code: int, route: str) -> None:
         """요청 1건 계측 + 알림 평가 — 계측 실패가 요청을 절대 깨지 않는다.
 
         침묵 실패 금지(CLAUDE.md): 계측은 best-effort라 예외를 삼키되 **무타입 경고
@@ -1032,11 +1251,12 @@ def create_app(
         교훈). 시크릿·필드값은 로그에 싣지 않는다.
         """
         try:
-            resolved_metrics.record(elapsed_ms, status_code)
+            resolved_metrics.record(elapsed_ms, status_code, route)
             observed_settings = get_settings()
             alert_notifier.notify(
                 evaluate_alerts(
-                    resolved_metrics.snapshot(),
+                    # 라우트별 백분위는 정렬이 필요해 요청 경로에서 계산하지 않는다(OPS-95 ⑤).
+                    resolved_metrics.snapshot(include_routes=False),
                     error_rate_threshold=observed_settings.ops_error_rate_alert_threshold,
                     latency_p95_threshold_ms=observed_settings.ops_latency_p95_alert_ms,
                 )
@@ -1079,6 +1299,9 @@ def create_app(
           파싱 불가한 버전 문자열(형식 위반)도 침묵 실패 없이 동일하게 "미상"으로 계상한다.
         - 핸들러의 미처리 예외는 5xx(500)로 회계한 뒤 **그대로 재던진다** — 계측은
           예외를 삼키지 않는다(바깥 ServerErrorMiddleware가 500 응답으로 변환).
+        - **OPS-95**: 라우트 *템플릿* 단위로도 기록하고(`_route_template`), 응답에 `Server-Timing:
+          app;dur=<ms>`를 싣는다. 미처리 예외·426 차단 응답에는 헤더가 없다(응답 객체가 없거나
+          핸들러가 돌지 않아 서버 처리 시간이 아니다).
         - 계측 자체의 실패는 `_observe_request`가 흡수한다(요청 무영향·예외 타입명 로그).
         """
         if request.url.path in _OPS_PROBE_PATHS:
@@ -1104,7 +1327,10 @@ def create_app(
                     # 미달 — 426(401/404/422와 구분되는 전용 사유코드). call_next 미호출.
                     return JSONResponse(
                         status_code=status.HTTP_426_UPGRADE_REQUIRED,
-                        content={"detail": "앱을 최신 버전으로 업데이트해주세요."},
+                        content={
+                            "detail": "앱을 최신 버전으로 업데이트해주세요.",
+                            "error_code": "WM-CLIENT-001",
+                        },
                     )
                 # min_version 파싱 불가(Settings 오구성)면 게이트 자체를 적용하지 않는다
                 # (fail-open — 서버 설정 오류로 전 클라를 차단하는 것이 더 나쁜 실패 모드).
@@ -1113,9 +1339,12 @@ def create_app(
         try:
             response = await call_next(request)
         except Exception:
-            _observe_request((time.monotonic() - started) * 1000.0, 500)
+            _observe_request((time.monotonic() - started) * 1000.0, 500, _route_template(request))
             raise
-        _observe_request((time.monotonic() - started) * 1000.0, response.status_code)
+        elapsed_ms = (time.monotonic() - started) * 1000.0
+        _observe_request(elapsed_ms, response.status_code, _route_template(request))
+        # OPS-95: 클라이언트가 체감 시간에서 서버 구간을 분리할 수 있게 한다(시간 값만 싣는다).
+        response.headers[_SERVER_TIMING_HEADER] = f"app;dur={elapsed_ms:.1f}"
         return response
 
     @app.get("/health", tags=["ops"])
@@ -1153,6 +1382,7 @@ def create_app(
         probes: ReadinessProbes = getattr(request.app.state, _READY_PROBES_KEY)
         svc_metrics: ServiceMetrics = getattr(request.app.state, _METRICS_KEY)
         notifier: AlertLogNotifier = getattr(request.app.state, _ALERT_NOTIFIER_KEY)
+        delivery: WebhookAlertSink = getattr(request.app.state, _ALERT_SINK_KEY)
         growth_evidence_counters = get_growth_evidence_counters(request.app)
         growth_evidence_exposure_counters = get_growth_evidence_counters(
             request.app, key=GROWTH_EVIDENCE_EXPOSURE_COUNTERS_KEY
@@ -1183,6 +1413,7 @@ def create_app(
                 AlertBody(metric=a.metric, observed=a.observed, threshold=a.threshold)
                 for a in alerts
             ],
+            alert_delivery=_alert_delivery_body(delivery.snapshot()),
             ocr=_ocr_reach_body(_get_ocr_reach_snapshot(request.app)),
             solution_segmentation=_segmentation_body(_get_segmentation_snapshot(request.app)),
             growth_evidence=_growth_evidence_body(growth_evidence_counters.snapshot()),
@@ -1190,6 +1421,7 @@ def create_app(
                 growth_evidence_exposure_counters.snapshot()
             ),
             l6_mode_reach=_l6_mode_reach_body(l6_mode_reach_counters.snapshot()),
+            sympy_isolation=_sympy_isolation_body(isolation_snapshot()),
         )
         return JSONResponse(
             status_code=(status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE),
@@ -1239,7 +1471,7 @@ def create_app(
             ),
         )
 
-    @app.post("/v1/generate", tags=["l3"])
+    @app.post("/v1/generate", tags=["l3"], dependencies=[RateLimitedGenerate])
     async def post_generate(
         body: GenerateBody,
         request: Request,
@@ -1248,10 +1480,11 @@ def create_app(
     ) -> JSONResponse:
         """라우팅 → (동기) 캐시·생성 / (비동기 QUALITY) 큐잉. 메타데이터 + 결과 반환.
 
-        인증 필수(`CurrentUser` — SEC-07 D1, 무인증 LLM 비용 남용 표면 봉인). 반환 텍스트
-        (동기·완료)는 *검증 전 원시 출력*이다 — 03 문서 환각 방어 파이프라인을 통과하기
-        전에는 학생에게 직접 노출 금지 (CLAUDE.md 절대 금기). 환각 방어·학생 표면화는 상위
-        계층(L4/L5 오케스트레이터)의 책임이다.
+        인증 필수(`CurrentUser` — SEC-07 D1, 무인증 LLM 비용 남용 표면 봉인). 한도 초과는
+        **429**(`RateLimitedGenerate` — SEC-19, 사용자·IP·기기 3차원·`generate` 전용 버킷).
+        반환 텍스트(동기·완료)는 *검증 전 원시 출력*이다 — 03 문서 환각 방어 파이프라인을
+        통과하기 전에는 학생에게 직접 노출 금지 (CLAUDE.md 절대 금기). 환각 방어·학생 표면화는
+        상위 계층(L4/L5 오케스트레이터)의 책임이다.
 
         AI 모델 학습/개선에 데이터 사용 가능 여부는 `ConsentScope.ai_training` 동의를
         판정해 Langfuse trace 메타데이터로 전달한다(EOS §48·§50). 이 판정은 응답 생성을
@@ -1426,5 +1659,10 @@ def create_app(
     app.include_router(admin_menu_router)
     # ADMIN-05: Admin BFF read-only — 모델 상태·비용·검수 큐·사용자 조회(Phase A).
     app.include_router(admin_bff_router)
+    # P3-12: Admin CMS — 개념 버전 워크플로우(초안·검토·발행·롤백) + 개념 외 허용 목록 제자리 편집.
+    app.include_router(admin_cms_router)
+    app.include_router(admin_cms_graph_router)
+    # EOS-194: 문항 판 발행 호출 표면 — `l3/problem_publish_gate`의 운영 호출자.
+    app.include_router(admin_cms_problem_versions_router)
 
     return app

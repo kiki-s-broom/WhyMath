@@ -1163,7 +1163,7 @@ class TestUndiagnosedPolicyVersion:
 
     def test_wire_value(self) -> None:
         # 리터럴로 못 박는다 — 값을 옛 `cat_v2_state_undiagnosed`로 되돌리면 RED
-        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v3_state_undiagnosed"
+        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v6_state_undiagnosed"
 
     def test_tracks_the_base_cat_version(self) -> None:
         # 기본 CAT이 다음 판으로 올라가면 이 식별자도 함께 올라가야 한다 — 잊으면 여기서 RED

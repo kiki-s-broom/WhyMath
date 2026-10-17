@@ -35,7 +35,7 @@ from dataclasses import dataclass
 
 from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
-from whymath_backend.l3.equivalent.generator import CandidateProblem
+from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
 from whymath_backend.lang.josa import eul_reul
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -181,6 +181,7 @@ def _answer_format(value: int) -> AnswerFormat:
     return AnswerFormat.자연수 if value > 0 else AnswerFormat.실수
 
 
+@deterministic_generator
 class HighschoolQuotientRuleSkeletonGenerator:
     """결정론 스켈레톤 생성기 — 고등 미적분Ⅱ 몫의 미분법(`EquivalentProblemGenerator` 좌석).
 

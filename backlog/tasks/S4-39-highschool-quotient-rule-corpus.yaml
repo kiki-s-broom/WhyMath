@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-39-highschool-quotient-rule-corpus
+title: "고등 미적분Ⅱ 몫의 미분법 파일럿 코퍼스 (W2 Phase2 #5)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - S4-38-conic-section-focus-corpus
+requires_gates: []
+acceptance:
+  - "[12미적Ⅱ-02-04](몫의 미분법·개념 H:12미적Ⅱ02-04) 0커버 해소"
+  - "calculus_chain_quotient_rule_skeleton_generator(S4-32, 대학 CALC1 축)의 몫의 미분법 설계를 K-12 미적분Ⅱ 축으로 재적용 — g(k)=±1 구성으로 정수 답 보장. 이번엔 legacy 437 공간에 개념이 실존해 concept_tags가 비어있지 않음(대학 축과 대비)"
+  - "전건 Tier1 게이트 통과·is_published=False·coverage 리포트 이동 확인·전체 스위트+4게이트 green"
+artifacts:
+  - 72beae3e
+  - "PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식"
+paths:
+  - src/backend/whymath_backend/l3/equivalent/highschool_quotient_rule_skeleton_generator.py
+  - src/backend/whymath_backend/harness/highschool_quotient_rule_batch.py
+  - tests/backend/l3/equivalent/test_highschool_quotient_rule_skeleton_generator.py
+  - tests/backend/harness/test_highschool_quotient_rule_batch.py
+  - data/corpus/problem_bank_highschool_quotient_rule_v0/problems.jsonl
+session: null
+notes: "W2 Phase2 웨이브1 항목5/5(최종). 대학 축 S4-32와 수학 실체 동일 — K-12 미적분Ⅱ 표준코드로 재태깅.\n\n[재등재 2026-10-02 PB-14] 원천 브랜치 claude/whymath-mvp-plan-architecture-trjg5x(c8abbc17)의 S4-39-highschool-quotient-rule-corpus 재등재. 원 증적 ['72beae3e']. 산출물(paths)은 PR #969 (squash 5bb2947b) — PB-13 코퍼스·생성기·테스트 이식으로 main에 이미 실재해 done 기록(③ 본문 대조: paths 전건 main 존재 실측)."
+updated: 2026-10-02

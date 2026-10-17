@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-42-app-shape-advance-reason-missing
+title: "앱 요청 형태에서 전진의 이유(왜 넘어가는가)가 설명에 없다 — 앵커 개념 미측정이면 diagnose·근거=다음 개념(PED-41 판정의 잔여 제품 질문)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - PED-41-persona-journey-request-shape-advance-action
+requires_gates: []
+acceptance:
+  - "① 현상 — 앱 요청 형태(prioritize_weak_concepts 미전송)에서 숙달 0.98인 학습자가 다음 개념으로 이동할 때 추천 설명은 action=diagnose · reason=unmeasured(근거 개념 = 다음 개념)다. 하네스 형태의 \"근거 = 방금 숙달한 현재 개념 · advance_next\"가 앱 형태에서는 없다(PED-41 판정 2026-10-06 · 계약 select_reason_type §8대로의 출력이라 결함이 아니라고 판정). 이동 자체(문항·target이 다음 개념)는 두 형태에서 같다.\n② 판정 대상 — \"전진의 이유(왜 넘어가는가)\"를 앱 형태에서도 설명에 실을지. 안 싣기로 하면 이 태스크를 의도로 닫고 PED-41이 동결한 앱 형태 분기를 정본으로 둔다. 실으려면 추천 정책(EOS-124 의도 판정)이 앵커 개념이 미측정이어도 그 개념이 숙달한 개념의 직접 후행임을 알아보게 확장해야 하며, 이는 reason/action 의미·intent_resolution 관측값·추천 도달 리포트에 영향을 주는 정책 변경이다.\n③ 집행 지점 — 판정이 정책 확장이면 PED-41이 test_e2e_persona_journeys.py에 동결한 앱 형태 분기(app-default ⑤-app)가 실패해 승격 지점을 가리킨다. 그 분기를 하네스 형태 분기와 합치는 승격까지가 완료 조건이다.\n④ 범위 밖 — 추천 선택(θ·가중·밴드) 자체와 계약 §8 임계는 건드리지 않는다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/recommendation_policy.py
+  - tests/backend/api/test_e2e_persona_journeys.py
+session: null
+notes: "출처: PED-41 판정(2026-10-06). 앱 요청 형태에서 페르소나 A ⑤-a가 advance_next가 아니라 diagnose로 나오는 차이를 결함이 아니라 계약대로의 출력으로 판정하고 형태별로 동결했다. 남는 것은 제품 질문 — 앱 학생에게 전진의 이유가 설명에서 사라지는 것을 수용할지. 판정은 교수학·제품 판단이라 PED-41이 정책을 고치지 않았다."
+updated: 2026-10-06

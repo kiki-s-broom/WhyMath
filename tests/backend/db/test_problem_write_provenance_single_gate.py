@@ -46,17 +46,17 @@ _WRITE_METHODS = frozenset({"from_schema"})
 #   False = 면제. 면제는 반드시 승계 태스크 ID를 동반한다(만료 없는 유예 금지 — CLAUDE.md).
 _ALLOWED_WRITERS: dict[Path, bool] = {
     Path("src/backend/whymath_backend/l1/problem_bank/populate.py"): True,
-    # LIC-09 면제 — 관리자 REST POST는 요청 계약에 provenance 좌석이 없어 관문에 넘길 재료가
-    # 없다(`api/problems.py:176-177`). 계약 신설은 LIC-03(집행 지점 결정·배선)의 범위를 넘어
-    # 분리 등재했다. 이 면제는 LIC-09 done 시 `test_exemptions_name_a_live_successor_task`가
-    # RED가 되어 **제거를 강제**한다 — 스스로 만료하는 면제다.
-    Path("src/backend/whymath_backend/api/problems.py"): False,
+    # LIC-09 — 관리자 REST POST. 요청 계약에 provenance 좌석(`ProblemCreateRequest.provenance`)을
+    # 신설하고 관문을 경유시켜 면제를 거뒀다(구 면제는 LIC-09 승계로 스스로 만료하는 형태였다).
+    Path("src/backend/whymath_backend/api/problems.py"): True,
+    # EOS-38 — 루프 KPI 판정 표본 산출 CLI. 전용 DB(`_kpi_sample`)에 합성 문항을 시딩하되 관문을
+    # 경유해 `content_provenance` 원장 행을 함께 남긴다(면제 아님 — 관문 import 강제).
+    Path("src/backend/whymath_backend/ops/loop_kpi_sample_load.py"): True,
 }
 
 # 면제 writer → 승계 태스크 ID. 위 False 항목과 키가 일치해야 한다(아래 테스트가 대조).
-_EXEMPTION_TASKS: dict[Path, str] = {
-    Path("src/backend/whymath_backend/api/problems.py"): "LIC-09",
-}
+# 현재 면제 0건 — 새 면제는 반드시 미완료 승계 태스크를 여기 동반한다.
+_EXEMPTION_TASKS: dict[Path, str] = {}
 
 
 def _python_sources() -> list[Path]:

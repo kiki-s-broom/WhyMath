@@ -47,6 +47,12 @@ backlog/events.ndjson   merge=union
 # 이름이 재생성 브랜치·이름 붕괴 쌍에서 겹치는 잔여 경우의 로컬 방어일 뿐이며,
 # GitHub 서버는 merge driver를 적용하지 않는다는 사실(사고 원인)은 변하지 않는다.
 backlog/events/*.ndjson   merge=union
+# HARN-130: 사고 대장도 같은 축 — 신규 등재는 세션(=브랜치)당 1샤드(backlog/incidents/<actor>.ndjson)로
+# 간다. 레거시 incidents.ndjson은 읽기 전용 역사다. 이 대장만 두 방어 중 어느 것도 못 받은 채
+# 착지해(HARN-118) 2026-09-21 PR #1255가 머지 큐에서 MERGE_CONFLICT로 이탈했다. 아래 union은
+# 위와 같이 로컬 방어일 뿐이다 — 충돌을 없애는 것은 샤딩이다(GitHub 서버는 merge driver 미적용).
+backlog/incidents.ndjson   merge=union
+backlog/incidents/*.ndjson   merge=union
 
 # 라이선스 약관 스냅샷 — **바이트 그대로가 증거다** (변환 금지)
 #

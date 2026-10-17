@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-117-backend-migrations-job-duration-headroom
+title: "backend-migrations 잡 소요가 상한에 근접 — 여유 37초에서 큐 CI_FAILURE(응급 12→15분 상향 후 추세 관측·완화)"
+track: math-completion
+stage: S3
+subject: math
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현상 — backend-migrations 잡(실 PG 통합)의 통합 pytest 스텝이 약 10분이고 잡 전체가 약 11.4분이다. 2026-10-06 상한 12분과의 여유가 37초였고 PED-41의 +26초로 소진돼 PR #1476이 큐에서 CI_FAILURE로 빠졌다(MEMORY 2026-10-06). 상한을 15분으로 올려 여유를 ~3분으로 늘렸지만 소요를 줄인 것이 아니다.\n② 목표 — 이 잡의 소요가 상한에 다가가는 것을 미리 보이게 하고(예: 잡 소요와 상한의 비율 관측·임계 경고), 소요를 구조적으로 줄이는 방안(통합 pytest 분할·병렬화·무거운 테스트의 경량화)을 판정한다.\n③ 집행 지점 — 관측만 만들고 끝내지 않는다: 소요/상한 비율이 임계(예: 80%)를 넘으면 CI가 경고를 내는 장치까지 배선하고 실제로 경고가 나는지 주입으로 확인한다.\n④ 범위 밖 — 테스트 삭제·skip으로 소요를 줄이는 것은 금지(변별력을 줄이는 방향)."
+artifacts: []
+paths:
+  - ".github/workflows/ci.yml"
+session: null
+notes: "출처: PED-41 PR(#1476) 큐 CI_FAILURE 사고(2026-10-06). 잡 timeout-minutes 12 대비 소요 ~11.4분(여유 37초)이 PED-41의 통합 테스트 증가로 소진돼 마지막 스텝이 cancelled로 끊겼다. 응급 조치는 15분 상향. 이 태스크는 상한 상향이 가린 추세(소요 증가)를 관측·완화하는 후속이다."
+updated: 2026-10-06

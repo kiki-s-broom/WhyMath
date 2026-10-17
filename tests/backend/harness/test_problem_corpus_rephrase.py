@@ -193,3 +193,31 @@ class TestCliEntry:
         assert report["total"] == report["unchanged"]
         assert report["rephrased"] == 0
         assert report["unchanged_reason_sample"]  # 사유 관측
+
+
+class TestRephraseAuthorSignature:
+    """PB-17 — LLM 이 다시 쓴 레코드는 소스의 결정론 서명을 승계하지 않는다."""
+
+    def test_rephrased_records_drop_deterministic_signature_unchanged_keep_it(
+        self, tmp_path: Path
+    ) -> None:
+        src = _seed_corpus(tmp_path)
+        lines = [json.loads(x) for x in src.read_text(encoding="utf-8").splitlines() if x.strip()]
+        # 신규 배치는 서명을 찍는다(생성 시점 서명) — 전제 확인.
+        assert all(r["authored_by"].startswith("deterministic:") for r in lines)
+
+        out = tmp_path / "rephrased.jsonl"
+        report = run_corpus_rephrase(
+            in_path=src, out_path=out, rephraser=_rephraser(_EchoRephraseProvider())
+        )
+        assert report.rephrased > 0
+
+        before = {r["slug"]: r for r in lines}
+        after = [json.loads(x) for x in out.read_text(encoding="utf-8").splitlines() if x.strip()]
+        changed = [r for r in after if r["question_text"] != before[r["slug"]]["question_text"]]
+        assert changed, "다양화 성공 레코드가 없다 — 대역/전제 점검"
+        for record in changed:
+            assert "authored_by" not in record, "LLM 재작성분이 결정론 서명을 승계했다"
+        for record in after:
+            if record["question_text"] == before[record["slug"]]["question_text"]:
+                assert record["authored_by"] == before[record["slug"]]["authored_by"]

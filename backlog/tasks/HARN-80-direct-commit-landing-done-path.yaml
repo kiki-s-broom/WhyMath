@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -17,7 +17,8 @@ acceptance:
   - "③ 변별력 양방향: main 조상 sha로는 done 성공, 비조상 sha(브랜치 전용 커밋)로는 거부, 기존 --no-pr 4종의 동작 불변 — 뮤테이션(조상 검사 제거)이 RED를 내는지 실측 후 통과 선언"
   - "④ 집행: CUR-07을 이 경로로 done 전이하고(증적 7b4fb546·session 해제) HARN-34 notes의 '34zvse 고립' 기술을 amend로 정정한다. 그 뒤 34zvse는 코드 잔여 0(§5 실측)이므로 삭제 배치 후보 — 전이 전 삭제 금지"
   - "⑤ 범위 밖: 직접 커밋 자체의 허용 여부(브랜치 보호 룰셋·OPS-08 소관) · HARN-57(done 후 artifacts 정정·PR #1021)과 중복 착수 금지 — 그쪽은 done *이후* 보정, 이쪽은 done *진입* 경로"
-artifacts: []
+artifacts:
+  - "PR #1412 (39b254d7) HARN-80: done --no-pr direct-commit — trunk 조상 실측 경로"
 paths:
   - scripts/harness/backlog.py
   - tests/harness/test_cli.py
@@ -25,4 +26,4 @@ paths:
   - backlog/tasks/HARN-34-lost-bookkeeping-gate-recovery.yaml
 session: null
 notes: "출처: docs/reviews/unmerged_branch_audit_2026-09-07_r2.md §5·§7 (stray-code 8회차 — 34zvse 커버리지 정독). CLAUDE.md '거부의 우회 금지' 처리 순서 ③(CLI 경로 자체가 없는 설계 공백이면 태스크로 등재 — HARN-06 선례). 8회차 세션은 done을 시도해 거부를 실측했고 우회하지 않았다. 코드·데이터 유실 0 — 대장(상태·증적·이벤트) 축만 공백."
-updated: 2026-09-07
+updated: 2026-10-02

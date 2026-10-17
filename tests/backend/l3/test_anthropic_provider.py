@@ -51,7 +51,7 @@ class _FakeMessages:
         *,
         model: str,
         max_tokens: int,
-        system: str,
+        system: str | list[dict[str, Any]],
         messages: list[dict[str, str]],
         **kwargs: Any,
     ) -> Any:
@@ -244,11 +244,16 @@ class TestGenerate:
 # 튜닝 노브 — effort/thinking/caching은 *설정된 경우에만* 전달 (기본 OFF, 03a §H#4)
 # ──────────────────────────────────────────────────────────────────────────
 class TestTuningKnobs:
-    async def _call_kwargs(self, settings: Settings) -> dict[str, Any]:
+    async def _call(self, settings: Settings, system: str = "s") -> dict[str, Any]:
+        """generate 1회의 캡처 전체(model·max_tokens·system·messages·kwargs)."""
         client = FakeAnthropicClient()
         provider = AnthropicProvider(client=client, settings=settings)
-        await provider.generate("p", "s", _cloud_decision(CostTier.CLOUD_MID))
-        kwargs: dict[str, Any] = client.messages.calls[0]["kwargs"]
+        await provider.generate("p", system, _cloud_decision(CostTier.CLOUD_MID))
+        call: dict[str, Any] = client.messages.calls[0]
+        return call
+
+    async def _call_kwargs(self, settings: Settings) -> dict[str, Any]:
+        kwargs: dict[str, Any] = (await self._call(settings))["kwargs"]
         return kwargs
 
     async def test_defaults_omit_all_tuning_args(self) -> None:
@@ -262,6 +267,12 @@ class TestTuningKnobs:
         )
         assert kwargs == {}
 
+    async def test_defaults_send_system_as_plain_string(self) -> None:
+        """캐싱 OFF(기본)면 system은 현행 그대로 *문자열*이다 — 블록 리스트로 바뀌지 않는다(OPS-89 회귀 0)."""
+        call = await self._call(Settings(anthropic_prompt_caching=False), "시스템 문장")
+        assert call["system"] == "시스템 문장"
+        assert call["kwargs"] == {}
+
     async def test_effort_passed_when_set(self) -> None:
         kwargs = await self._call_kwargs(Settings(anthropic_effort="high"))
         assert kwargs["output_config"] == {"effort": "high"}
@@ -273,9 +284,37 @@ class TestTuningKnobs:
         assert kwargs["thinking"] == {"type": "adaptive"}
         assert "output_config" not in kwargs
 
-    async def test_caching_passed_when_enabled(self) -> None:
-        kwargs = await self._call_kwargs(Settings(anthropic_prompt_caching=True))
-        assert kwargs["cache_control"] == {"type": "ephemeral"}
+    async def test_caching_breakpoint_is_on_system_block_not_top_level(self) -> None:
+        """캐싱 ON → system 블록 끝 명시 브레이크포인트(OPS-89).
+
+        종전에는 최상위 `cache_control`(자동 캐싱)을 실었다 — 자동 캐싱은 마지막 캐시 가능 블록,
+        즉 매 호출 달라지는 user 프롬프트 뒤에 브레이크포인트를 놓아 공유 system 프리픽스가
+        적중하지 못했다. 그래서 (a) 최상위 키 없음 (b) system은 단일 텍스트 블록 리스트이고
+        그 블록에 표시 (c) user 메시지에는 표시 없음을 함께 고정한다.
+        """
+        call = await self._call(Settings(anthropic_prompt_caching=True), "공유 시스템 프리픽스")
+        assert "cache_control" not in call["kwargs"]
+        assert call["system"] == [
+            {
+                "type": "text",
+                "text": "공유 시스템 프리픽스",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+        # user 메시지: 문자열 content 그대로(블록·표시 없음) — 가변 꼬리는 브레이크포인트 뒤다.
+        assert call["messages"] == [{"role": "user", "content": "p"}]
+
+    @pytest.mark.parametrize("empty_system", ["", "   ", "\n\t "])
+    async def test_caching_skips_breakpoint_for_empty_system(self, empty_system: str) -> None:
+        """빈/공백 system은 빈 텍스트 블록을 만들지 않는다 — 문자열 그대로, 어디에도 cache_control 없음.
+
+        (빈 텍스트 블록의 API 거부 여부는 라이브 미검증 — 보수적 회피. user에 표시를 옮겨 다는 것은
+        OPS-89가 막으려는 배치라 금지.)
+        """
+        call = await self._call(Settings(anthropic_prompt_caching=True), empty_system)
+        assert call["system"] == empty_system
+        assert "cache_control" not in call["kwargs"]
+        assert call["messages"] == [{"role": "user", "content": "p"}]
 
     async def test_all_three_together(self) -> None:
         kwargs = await self._call_kwargs(
@@ -287,7 +326,8 @@ class TestTuningKnobs:
         )
         assert kwargs["output_config"] == {"effort": "xhigh"}
         assert kwargs["thinking"] == {"type": "adaptive"}
-        assert kwargs["cache_control"] == {"type": "ephemeral"}
+        # 캐싱은 최상위 키가 아니라 system 블록 표시다(OPS-89) — 세 노브가 공존해도 최상위엔 없다.
+        assert "cache_control" not in kwargs
 
     async def test_temperature_omitted_by_default(self) -> None:
         """온도 미지정(기본) → messages.create에 temperature 키를 싣지 않는다(기존 동작)."""

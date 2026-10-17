@@ -691,3 +691,108 @@ class TestActualUsageInstrumentation:
         assert rec["mode"] == "async"
         assert rec["cost_krw"] == 0.0
         assert rec["input_tokens"] is None  # enqueue 시점엔 생성이 없다
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-105 ① — call_site 가 trace 기록까지 실린다 (호출지점 분포의 원천)
+# ──────────────────────────────────────────────────────────────────────────
+def _sync_request_with_call_site(call_site: str | None) -> RoutingRequest:
+    """LOCAL·동기 요청 + 호출지점. call_site 만 다르고 나머지는 같다 — 대조군 짝을 만든다."""
+    return RoutingRequest(
+        task_type="explain",
+        difficulty="easy",
+        requires_reasoning=False,
+        student_subscription="free",
+        sync=True,
+        call_site=call_site,
+    )
+
+
+class TestCallSiteWiring:
+    """`generate`의 세 기록 지점(미스·적중·비동기 enqueue)이 모두 요청의 call_site 를 싣는다.
+
+    종전엔 파이프라인이 `langfuse_fields(...)`에 call_site 를 넘기지 않아 Langfuse `l3_routing` 의
+    call_site 가 전 호출에서 None 이었다(2026-10-02 OPS-84 조사 실측). `langfuse_fields` 는 인자를
+    받는데 호출부가 비워 둔 **배선 누락**이라, 필드 함수 단위 테스트는 통과하고 이 결선 테스트만이
+    잡는다.
+    """
+
+    async def test_miss_path_records_call_site(self) -> None:
+        trace = RecordingTraceSink()
+        await generate(
+            _sync_request_with_call_site("extract"),
+            "프롬프트",
+            "시스템",
+            provider=RecordingProvider(),
+            cache=InMemoryCache(),
+            trace=trace,
+            cache_ttl_s=60,
+        )
+        assert len(trace.records) == 1
+        assert trace.records[0]["cache_hit"] is False
+        assert trace.records[0]["call_site"] == "extract"
+
+    async def test_hit_path_records_call_site(self) -> None:
+        from whymath_backend.l3.router import Router
+
+        req = _sync_request_with_call_site("translate")
+        decision = Router().route(req)
+        cache = InMemoryCache()
+        await cache.set(cache_key_for("프롬프트", "시스템", decision), "캐시된값", 60)
+        trace = RecordingTraceSink()
+
+        result = await generate(
+            req,
+            "프롬프트",
+            "시스템",
+            provider=RecordingProvider(),
+            cache=cache,
+            trace=trace,
+        )
+        assert result.cache_hit is True
+        assert len(trace.records) == 1
+        assert trace.records[0]["cache_hit"] is True
+        assert trace.records[0]["call_site"] == "translate"
+
+    async def test_async_enqueue_path_records_call_site(self) -> None:
+        trace = RecordingTraceSink()
+        await generate(
+            _quality_request(),
+            "검증할 풀이",
+            "시스템",
+            provider=RecordingProvider(),
+            cache=InMemoryCache(),
+            trace=trace,
+            queue=RecordingQueue(),
+        )
+        assert len(trace.records) == 1
+        assert trace.records[0]["call_site"] == "self_verify"
+
+    async def test_call_site_is_data_not_a_constant(self) -> None:
+        """대조군 — 요청이 call_site 를 싣지 않으면 None 이다(상수 'extract' 를 박은 배선이 아니다)."""
+        trace = RecordingTraceSink()
+        await generate(
+            _sync_request_with_call_site(None),
+            "프롬프트",
+            "시스템",
+            provider=RecordingProvider(),
+            cache=InMemoryCache(),
+            trace=trace,
+            cache_ttl_s=60,
+        )
+        assert trace.records[0]["call_site"] is None
+
+    async def test_different_call_sites_are_recorded_distinctly(self) -> None:
+        """두 호출지점이 서로 다른 값으로 남는다 — 분포를 낼 수 있다는 뜻이다."""
+        trace = RecordingTraceSink()
+        for site in ("extract", "match"):
+            await generate(
+                _sync_request_with_call_site(site),
+                f"프롬프트-{site}",
+                "시스템",
+                provider=RecordingProvider(),
+                cache=InMemoryCache(),
+                trace=trace,
+                cache_ttl_s=60,
+            )
+        assert [r["call_site"] for r in trace.records] == ["extract", "match"]

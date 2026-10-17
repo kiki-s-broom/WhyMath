@@ -186,9 +186,14 @@ Write-Output "READY=$Ready"
 
   2026-09-21 실측(PyPI 실물 설치 후 `inspect.signature`): `0.81.0`·`0.82.0` 부재 →
   **`0.83.0`부터 존재**(0.84·0.85·0.90·0.95·0.100·0.117 확인). `output_config`(effort)는
-  `0.80.0`부터. 저장소 pin은 `anthropic>=0.40.0,<1`이라 **없는 구간을 허용한다** —
-  pin 하한 정정은 `OPS-87-anthropic-sdk-pin-floor-surface`가 소유하며, 그때까지 이 검사가
-  Kiki 머신 1대에 대한 방어선이다.
+  `0.80.0`부터. 저장소 pin은 한때 `anthropic>=0.40.0,<1`이라 **없는 구간을 허용했다**.
+  [정정 2026-10-01 · `OPS-87-anthropic-sdk-pin-floor-surface`] pin 하한을 `anthropic>=0.83.0,<1`로
+  올렸다 — 0.40.0~0.90.0의 67개 버전을 다시 실물 설치로 쟀더니 `output_config`는 `0.77.0`부터·
+  `thinking`은 `0.47.0`부터였다(위 `0.80.0`은 "그때 이미 있었다"는 확인값이지 최초 버전이 아니다).
+  새로 설치하는 환경은 이제 부재 구간을 받지 못하고, 이 표면은
+  `tests/backend/l3/test_anthropic_sdk_surface.py`가 CI에서 지킨다. 다만 **이미 만들어진 venv는
+  pip가 알아서 올리지 않으므로** Kiki 머신처럼 오래된 환경에는 이 검사(`SDK_HAS_CACHE_CONTROL`)가
+  여전히 방어선이다.
 - `HAS_ANTHROPIC_KEY` — **환경변수 이름을 보지 않고 `Settings`에 묻는다.** `anthropic_api_key`
   에는 alias가 없어 `WHYMATH_ANTHROPIC_API_KEY`로만 읽히는데(`config.py`), 이름을 추측해
   직접 보면 `.env` 경유 주입을 놓친다. 값은 출력되지 않는다(`SecretStr` + bool 프로퍼티).

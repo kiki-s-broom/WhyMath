@@ -57,7 +57,7 @@ _NO_SEAT_SURFACE = object()
 """provider가 좌석 표면(`cloud_seat`·`seat`)을 아예 노출하지 않음 — '미상(None)'과 구별하는 표지."""
 
 
-def served_cloud_seat(provider: LLMProvider) -> CloudSeat | None:
+def served_cloud_seat(provider: object) -> CloudSeat | None:
     """이 provider로 클라우드 결정을 보내면 **어느 좌석이 받는가** — 원가 기록의 단가 좌석(ARCH-64).
 
     학생 대면 서빙이 `build_cloud_provider()` 경유로 바뀌면서 좌석이 셀렉터를 따라 움직인다.
@@ -311,6 +311,9 @@ async def generate(
             langfuse_fields(
                 decision,
                 cache_hit=False,
+                # OPS-105 ① — 호출지점 분포(03a §F.2)는 요청이 실은 call_site에서 온다. 이 인자를 안
+                # 넘기면 Langfuse의 call_site가 전 호출에서 None이다(2026-10-02 OPS-84 조사 실측).
+                call_site=req.call_site,
                 student_id_hash=student_id_hash,
                 cost_krw=0.0,
                 training_allowed=training_allowed,
@@ -334,6 +337,7 @@ async def generate(
             langfuse_fields(
                 decision,
                 cache_hit=True,
+                call_site=req.call_site,  # OPS-105 ① — 적중도 호출지점 분포에 들어간다
                 student_id_hash=student_id_hash,
                 cost_krw=0.0,
                 # 2층 캐시의 (2) — 프롬프트-해시 적중. 경로는 자기 cache_hit에서 유도한다
@@ -404,9 +408,12 @@ async def generate(
         langfuse_fields(
             decision,
             cache_hit=False,
+            call_site=req.call_site,  # OPS-105 ① — 실제 생성 기록의 호출지점
             student_id_hash=student_id_hash,
             validation_signal=reason,
             # 실측(S1 게이트 ②) — provider가 포착한 usage + 토큰 산정 비용(est_*와 분리).
+            # 관측 모델·재시도 수(ARCH-101)도 이 usage에서 실린다 — 강등(ARCH-69)이면 usage가
+            # 대신 답한 LOCAL 호출의 것이라 `served_model`은 LOCAL 태그, `retries`는 None이다.
             usage=usage,
             cost_krw=actual_krw,
             content_source="generate",  # 2층 캐시의 (3) — 실제 LLM 생성.

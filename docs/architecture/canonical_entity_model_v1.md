@@ -38,6 +38,11 @@ Hint 좌석의 1번째 테이블로 세워 82→83 테이블로 늘었다. §3-B
 뜻을 '좌석 부재'에서 **'본문 좌석 단일'**로 바꿨다 — 힌트 본문은 `hints.content`에만 산다.
 연기 해제 근거(생성 writer·게이트 3종·coach 서빙 reader 동반)는 §3-B 말미 "실체화" 절 참조.
 
+※ [갱신 2026-10-08] `ARCH-31`이 `problem_version` 테이블을 **Problem 좌석의 3번째 테이블**로
+추가해 83→84 테이블로 늘었다(§3-D "판정 2026-09-06"이 이 배정을 예고했다 — 새 엔티티가 아니라 기존
+좌석 편입이며 `ContentVersion` 좌석은 계속 비어 있다) — §2 표·합계·아래 ① 행을 84로 갱신했다.
+설계·`identity_id`(변형 계열)와의 관계는 `docs/architecture/arch31_problem_version.md`.
+
 ---
 
 ## ⚖️ 집행 고지 (정본화 ≠ 집행)
@@ -49,7 +54,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 | # | 검사 | 깨지면 |
 |---|---|---|
-| ① | 81테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
+| ① | 84테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
 | ② | 19종 **좌석 실재** + 엔티티 개수 19 고정 | 좌석 삭제·개명, 20번째 엔티티 추가 시 **RED** |
 | ③ | **좌석 부재 3종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `assessment_result`는 물론 우회 이름으로 좌석을 등재해도 **RED** (Hint는 S4-11이 실체화 — 본문 좌석 단일은 ③-c 컬럼 가드가 동결) |
 | ④ | **문서 ↔ 상수 배정 대조** — §2-A·§2-B 표를 파싱해 1:1 확인 | 배정을 옮기거나(예: `skill_node`를 Skill→Content) 표에서 행이 빠지면 **RED** |
@@ -120,6 +125,9 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
    - *이다*: 자체 코퍼스의 문항. 구조(스키마) + 렌더러-중립 LaTeX 본문.
    - *아니다*: 검정교과서·평가원 기출 **본문 복제가 아니다** — 구조 메타데이터만 인용하고
      본문은 자체 동등문제로 대체한다(절대 금기).
+   - **버전 축**: `problem_version`(3번째 좌석·`ARCH-31`·게이트 `G-eos49-content-version-seat`
+     D안 판정 — 새 엔티티가 아니라 이 좌석의 버전 테이블. §3-D 참조). 변형 계열을 묶는
+     `identity_id`(수평)와 직교하는 수직 축이다 — `arch31_problem_version.md` §2.
 
 9. **Solution** — 한 문항에 대한 **풀이 경로**와 그 검증 산출.
    - *이다*: 접근법 1개 = 경로 1개(한 문항에 다중 경로 허용). 다중 풀이의 본질적 동치성이 이 축.
@@ -196,7 +204,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 > 이 표는 `tests/backend/db/test_canonical_entity_model_freeze.py`의 상수와 **1:1**이며,
 > 검사 ①·④가 둘의 어긋남을 RED로 낸다.
 
-### §2-A. 좌석 배정 — 45테이블
+### §2-A. 좌석 배정 — 46테이블
 
 | # | 핵심 엔티티 | 좌석 테이블 | 좌석 수 |
 |---|---|---|---|
@@ -207,7 +215,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 5 | **Concept** | `concept` · `concept_node` · `atom_node` · `concept_version` | 4 |
 | 6 | **Skill** | `skill_node` | 1 |
 | 7 | **Misconception** | `misconception_catalog` | 1 |
-| 8 | **Problem** | `problem` · `problem_step` | 2 |
+| 8 | **Problem** | `problem` · `problem_step` · `problem_version` | 3 |
 | 9 | **Solution** | `solution_paths` · `solution_nodes` · `verified_solutions` · `verified_lemmas` | 4 |
 | 10 | **Hint** | `hints` | 1 |
 | 11 | **Content** | `concept_content` · `pedagogy_content_slot` | 2 |
@@ -220,7 +228,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 45**
+**좌석 합계 = 46**
 
 ### §2-B. 핵심 외 — 38테이블
 
@@ -269,7 +277,8 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 45 + 38 = **83** ✓(S4-11 `hints`를 Hint 좌석에 추가 — 2026-09-29.
+**핵심-외 합계 = 38** · 46 + 38 = **84** ✓(ARCH-31 `problem_version`을 Problem 좌석에 추가 —
+2026-10-08. 그 이전 45 + 38 = 83은 S4-11 `hints`를 Hint 좌석에 추가 — 2026-09-29.
 그 이전 44 + 38 = 82는 EOS-103 `learner_state` + EOS-105
 `learning_state_transition`을 LearnerState 좌석에 추가 — 둘은 서로 다른 브랜치에서 각각 +1로
 착지해 병합 시 43이 아니라 **44**가 된다. 이전 42 + 38 = 80은 EOS-49 `concept_version` 추가

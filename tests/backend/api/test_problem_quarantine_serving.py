@@ -130,6 +130,7 @@ class FakeSession:
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         self.merged: list[Any] = []
+        self.get_kwargs: list[dict[str, Any]] = []
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)
@@ -147,7 +148,9 @@ class FakeSession:
     async def delete(self, obj: Any) -> None:
         self.deleted.append(obj)
 
-    async def get(self, _model: Any, pk: uuid.UUID) -> Problem | None:
+    async def get(self, _model: Any, pk: uuid.UUID, **kwargs: Any) -> Problem | None:
+        # ADMIN-16: 검수 상태를 바꾸는 PATCH는 `with_for_update` 등 잠금 인자와 함께 부른다.
+        self.get_kwargs.append(kwargs)
         return self._get_map.get(pk)
 
     async def execute(self, stmt: Any) -> _FakeResult:

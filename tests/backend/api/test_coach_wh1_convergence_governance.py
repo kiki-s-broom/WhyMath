@@ -22,6 +22,18 @@ def test_diagnose_single_source() -> None:
     assert coach.diagnose is wh1_loop.diagnose
 
 
+def test_match_quality_gate_single_source() -> None:
+    # 오개념 품질 게이트(MISC-18) — floor 0.65의 단일 원천. 코치와 하네스가 같은 함수 객체를 부른다
+    # (한쪽이 사본을 두면 같은 입력에 다른 후보가 학생에게 닿는다).
+    assert coach.apply_match_quality_gate is wh1_loop.apply_match_quality_gate
+
+
+def test_verdict_withheld_single_source() -> None:
+    # 확신 진단 보류 판정(MISC-60) — 귀속 불명(게이트③)·미확인 전사(게이트②)의 합집합 술어. 코치
+    # `_MatchOutcome.verdict_withheld`와 하네스 `match_withheld`가 같은 함수 객체로 판정한다.
+    assert coach.is_verdict_withheld is wh1_loop.is_verdict_withheld
+
+
 def test_intervention_single_source() -> None:
     # 가설 기반 개입 선택 — 양 경로 동일 원천.
     assert coach.select_intervention_from_hypotheses is wh1_loop.select_intervention_from_hypotheses

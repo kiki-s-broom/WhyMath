@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import store
+from _hook_stdin import set_hook_stdin
 
 import backlog as cli
 
@@ -656,7 +656,7 @@ class TestCheckStop:
         return task_id
 
     def _invoke(self, monkeypatch, stdin_payload: dict) -> int:
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(stdin_payload)))
+        set_hook_stdin(monkeypatch, json.dumps(stdin_payload))
         return cli.main(["check-stop"])
 
     def test_reentry_passes_immediately(self, seeded_repo: Path, monkeypatch, capsys):
@@ -700,7 +700,7 @@ class TestCheckStop:
 class TestCheckEdit:
     def _invoke(self, monkeypatch, file_path: str) -> int:
         payload = {"tool_input": {"file_path": file_path}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         return cli.main(["check-edit"])
 
     def test_non_backlog_file_ignored(self, seeded_repo: Path, monkeypatch):
@@ -986,6 +986,8 @@ class TestReadSideFallback:
         self, bare_remote, monkeypatch, capsys
     ):
         """CAS_실패_타세션이_in_progress면_착수_거부"""
+        import remote_claims
+
         # 사고 그대로의 재현: 두 세션이 같은 태스크를 잡되 CAS는 상시 실패한다
         _, clone = bare_remote
         repo_a = self._seeded_clone(clone, monkeypatch, "session-a")
@@ -994,6 +996,15 @@ class TestReadSideFallback:
 
         repo_b = self._seeded_clone(clone, monkeypatch, "session-b")
         self._force_cas_failure(monkeypatch)
+        # HARN-198: 프리플라이트 0.8(형제 진행 중 사본 스캔)이 이 폴백보다 앞서 같은 상태를 거부한다.
+        # 이 테스트가 고정하는 것은 **그 스캔이 돌 수 없을 때**(fetch 실패·`done_status != ok`)에도
+        # 남는 HARN-07 2선 방어의 문구이므로, 앞단을 중립화해 이 경로를 계속 밟는다. 두 검사가
+        # 겹칠 때 앞단이 먼저 거부한다는 것은 `test_sibling_in_progress_scan.py`가 고정한다.
+        monkeypatch.setattr(
+            remote_claims,
+            "scan_sibling_in_progress",
+            lambda *a, **k: remote_claims.SiblingScan("ok"),
+        )
         capsys.readouterr()
         assert cli.main(["start", self.TASK_ID]) == 1
         err = capsys.readouterr().err
@@ -1534,7 +1545,7 @@ class TestCheckEditPolicy:
 
     def _invoke(self, monkeypatch, file_path: str) -> int:
         payload = {"tool_input": {"file_path": file_path}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         return cli.main(["check-edit"])
 
     def _on_branch(self, repo: Path, name: str) -> None:
@@ -1758,7 +1769,7 @@ class TestCrossSessionOverlap:
         capsys.readouterr()
         # B가 A의 선언 범위(src/backend/**) 안 파일 편집 → path_overlap 경고
         payload = {"tool_input": {"file_path": str(repo_b / "src/backend/api/x.py")}}
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        set_hook_stdin(monkeypatch, json.dumps(payload))
         assert cli.main(["check-edit"]) == 0  # warn 모드
         err = capsys.readouterr().err
         assert "path_overlap" in err

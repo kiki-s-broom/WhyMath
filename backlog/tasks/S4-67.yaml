@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: S4-67
+title: "벡터 내적·크기·평행수직 계산형 코퍼스 밴드 신설 + vector_algebra 발화 재판정 (S4-57 유예의 재확인 지점)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on:
+  - S4-57
+requires_gates: []
+acceptance:
+  - "[12기하03-03](내적) 계산형 밴드를 신설한다 — 내적 값·크기 제곱·평행/수직 판정을 묻는 단답형. 결정론 생성기(LLM 0)로 만들고 원시 파라미터(벡터 성분)를 DSL로 직렬화할 수 있는 형태로 보존한다. 선행 사실: 현재 [12기하03-03] 24건은 전부 problem_bank_conceptual_v0의 dot_product_scalar(내적이 벡터인가를 0/1로 묻는 개념 판정)이고 내적을 계산하는 문항은 0건이다(2026-10-08 실측, main c322bb9cb) — S4-31이 이 성취기준을 이미 커버로 기록한 근거는 계산형이 아니다."
+  - "밴드 크기는 52건 이상으로 한다 — 기본 Wilson 임계(결함율 상한 0.05, 신뢰 95%)에서 결함 0건으로 통과할 수 있는 최소 표본이다(n=51은 상한 0.0504로 불통과, n=52는 0.0495). 52건 미만이면 vector_algebra의 잔여 축 로트 게이트를 기본 임계로 통과시킬 수 없다."
+  - "전건 Tier1 게이트 통과, is_published=False, 발문에 신규 Unicode 글리프 없음(notation_coverage 게이트), 계수 부호 결합 표기 위생(겹부호 방지)을 확인한다. 외적은 교육과정 성취기준 5개([12기하03-01]~[12기하03-05]) 어디에도 없으므로 이 밴드에 넣지 않는다."
+  - "밴드 완료 시 docs/architecture/verifier_v2_domains.md §7.3 재판정을 수행한다 — §7.1 재현 명령으로 FC-1~FC-5를 다시 측정하고 vector_algebra GO/NO-GO를 문서에 기록한다. GO면 구현 태스크를 등재하고(sequence_induction 구현 슬라이스 S4-66을 선례로), NO-GO면 사유와 새 재확인 지점을 문서에 갱신한다. 조건이 충족됐는데 판단 없이 방치하는 것만 금지한다."
+  - "코퍼스 전체 스위트와 게이트 CLI를 CI가 쓰는 명령 그대로 재현해 exit code로 보고하고, CI 잡 목록(backend·corpus-authoring·infra-contracts 포함)을 전수 열거한 뒤 PR을 생성한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/vector_dot_skeleton_generator.py
+  - src/backend/whymath_backend/harness/vector_dot_batch.py
+  - "data/corpus/problem_bank_vector_dot_v0/**"
+  - tests/backend/l3/equivalent/test_vector_dot_skeleton_generator.py
+  - tests/backend/harness/test_vector_dot_batch.py
+session: null
+notes: "S4-57 설계(verifier_v2_domains.md §4·§7)의 결과로 등재. 이 태스크는 vector_algebra 발화 보류(NO-GO)의 재확인 지점이다 — depends_on 체인이 트리거이며 만료 없는 유예를 막는 장치다(CLAUDE.md 만료 없는 유예 금지). 보류 근거(2026-10-08 실측): 벡터 문항 400건([12기하03-01] 200 + [12기하03-02] 200)은 이미 x - (식) = 0 형태로 Tier1 정수 연산 검산을 받고 있어 vector_algebra가 새로 닫는 수치 축이 없고, 내적 계산형 소비처는 0건이다. 외적은 교육과정 밖이다. 재판정 결과가 GO가 아니어도 이 태스크는 done 가능하다(NO-GO 사유와 새 재확인 지점을 문서에 남기는 것이 산출물)."
+updated: 2026-10-08

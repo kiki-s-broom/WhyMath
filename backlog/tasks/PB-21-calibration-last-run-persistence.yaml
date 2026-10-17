@@ -1,0 +1,32 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-21-calibration-last-run-persistence
+title: "난이도 보정 마지막 실행 시각의 영속 좌석 — 로그 한 줄에만 있는 시각을 조회 가능한 기록으로(PB-10 공백)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 좌석 결정을 먼저 기록한다 — 마지막 보정 시각을 (가) Problem.calibrated_at 문항별 컬럼으로 둘지 (나) 배치 실행 단위 원장(run_id·status·finished_at)으로 둘지 정한다. 판단 재료: Problem은 schemas/ JSON Schema에서 파이썬·Dart 모델이 자동 생성되는 경계 계약이라 (가)는 계약 영향·재생성 동반이다(R5-02). (나)는 CLAUDE.md가 요구하는 배치 run_id·요약 구조화 로그(R15-02)와 같은 좌석이라 retention-purge 등 다른 배치도 재사용할 수 있다. 어느 쪽이든 기존 문항·행을 건드리지 않는 expand 전용 마이그레이션이어야 하며 DROP·RENAME은 없다."
+  - "② calibrate_items 배치가 실행 결과를 영속한다 — --dry-run은 UPDATE·기록을 하나도 쓰지 않고(읽기 전용 계약 불변), 실제 실행만 finished_at·status(calibrated/noop_no_responses/noop_no_eligible_items)를 남긴다. 실패 실행은 보정 트랜잭션 롤백에 같이 사라지지 않도록 기록 방식을 정하고(별도 트랜잭션 또는 로그 전용), 결정 근거를 남긴다. stdout 첫 줄 calibrated_items=N 하위호환과 stderr calibration_run 로그 한 줄은 그대로 둔다."
+  - "③ harness/item_calibration_reach_report.py가 last_calibration_at=unrecorded 대신 3상태를 말한다 — 기록 있음(시각), 기록 없음=한 번도 안 돎, 기록 좌석 조회 불가(모른다). 모른다를 한 번도 안 돎으로 접지 않는다(3상태를 truthiness로 2상태로 접는 금지). 기존 5상태 판정(LOOP_DORMANT 등)은 시각 없이 성립하므로 바꾸지 않되, 시각이 생기면 LOOP_STALE에서 마지막 실행 경과를 함께 보인다."
+  - "④ 변경 전제를 묶은 기존 테스트를 새 진실로 갱신한다 — tests/backend/harness/test_item_calibration_reach_report.py의 test_unrecorded_claim_matches_the_problem_model은 Problem에 calibrated_at이 없고 updated_at에 onupdate가 없다는 사실을 일부러 묶어 두었으므로, 좌석이 생기면 이 테스트가 깨져 리포트 문구 갱신을 강제해야 한다(깨짐을 면제로 우회하지 않는다). 런북 deployment_cd_runbook.md §5d의 한계 ① 문구와 MEMORY 결정 로그도 같은 PR에서 정정한다."
+  - "⑤ 검증 — 실 PG 통합 테스트로 (a) 실제 실행이 기록을 남기고 (b) --dry-run은 기록 0건이며 (c) 보정 실패 실행의 기록 정책이 결정대로 동작함을 델타로 확인하고, 기록을 빼거나 dry-run에서도 쓰게 하는 결함 주입이 RED가 됨을 주입 적용·원복 바이트 동일 단언과 함께 보인다. 마이그레이션은 로컬 PG16+pgvector에서 upgrade 후 downgrade 가능 여부까지 실측한다. 신규 모듈·테이블이 생기면 EOS 기능 인벤토리·data_access_layer_audit·declared_unwired_audit 대장 귀속까지 로컬 CI 잡 목록(backend·backend-migrations·infra-contracts·declared-unwired-audit)으로 재현한다."
+  - "⑥ 스코프 밖 — 보정 알고리즘·임계값(5·50·0.3) 변경, 증분 적합, 2PL a 첫 채택 신호(EOS-154 몫), 운영 DB 직접 조회(세션은 닿을 수 없다 — 실측 재실행은 Kiki 몫). 이 태스크의 목적은 PB-10이 의도적으로 남긴 공백 하나, 즉 마지막 보정 시각을 로그 한 줄이 아니라 조회 가능한 기록으로 옮기는 것이다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/calibrate_items.py
+  - src/backend/whymath_backend/harness/item_calibration_reach_report.py
+  - src/backend/alembic/versions
+  - tests/backend/harness/test_item_calibration_reach_report.py
+  - tests/backend/l2/test_calibrate_items.py
+  - tests/backend/db
+  - docs/architecture/deployment_cd_runbook.md
+session: null
+notes: "출처: PB-10(PR #1542) 정직한 공백 — 마지막 보정 시각은 DB에 저장 좌석이 없다. 실측(2026-10-08): Problem에 calibrated_at 컬럼이 없고 updated_at은 server_default만 있고 onupdate가 없어 보정 UPDATE로 갱신되지 않는다. 그래서 도달 리포트가 last_calibration_at=unrecorded로 모른다를 명시하고 시각은 calibration_run 로그 한 줄에만 있다(컨테이너 로그 3x10MB 회전이라 장기 보존 안 됨). 판정 자체는 시각 없이 성립하므로 P2(12월 검증 이후 가능)로 등재한다. 관련: EOS-154(a 첫 채택 신호)가 이 시각을 소비할 수 있으나 의존하지 않는다."
+updated: 2026-10-09

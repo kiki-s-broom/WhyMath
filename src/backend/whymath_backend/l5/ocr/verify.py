@@ -13,11 +13,12 @@ True)` 보수적 파싱 패턴을 그대로 재사용한다(파싱 불가는 절
 
 from __future__ import annotations
 
+import logging
 import re
 
-import sympy
 from pydantic import BaseModel, ConfigDict, Field
 
+from whymath_backend.l3.safe_parse import safe_parse_latex, safe_sympify
 from whymath_backend.l3.symbolic_equivalence import latex_to_plain
 
 __all__ = [
@@ -25,6 +26,9 @@ __all__ = [
     "demote_confidence_if_unparseable",
     "parse_check_latex",
 ]
+
+# 침묵 실패 금지(CLAUDE.md) — 파싱 회피는 예외 타입명만 남긴다(인식 원문은 학생 필기라 제외).
+logger = logging.getLogger("whymath.l5.ocr.verify")
 
 # 인식 신뢰도 강등 계수 — 파싱 불가 LaTeX의 신뢰도에 곱한다(0으로 죽이지 않고 *낮춘다* —
 # 파싱 불가가 곧 오인식은 아니라 보수적). 0.5는 KPI 튜닝 대상(verify_answer 상수 노출 선례).
@@ -88,20 +92,21 @@ def _try_sympify(expr_text: str) -> bool:
     text = expr_text.strip()
     if not text:
         return False
+    # CONST-09(코딩 헌법 R22-03): 인식 결과는 학생 손글씨라 두 경로 모두 안전 진입점을 거친다
+    # (`9^{9^{9}}`가 이 경로에서 20초 timeout이던 재현표 항목). 거부는 아래 except로 접힌다.
     # ① antlr 기반 정식 LaTeX 파서(있으면) — 가장 정확.
     try:
-        from sympy.parsing.latex import parse_latex
-
-        parsed = parse_latex(text)
+        parsed = safe_parse_latex(text, plain=latex_to_plain)
         if parsed is not None:
             return True
-    except Exception:  # noqa: BLE001 — antlr 미설치·파싱 실패 모두 폴백으로 흡수
-        pass
+    except Exception as exc:  # noqa: BLE001 — antlr 미설치·파싱 실패 모두 폴백으로 흡수
+        logger.debug("OCR LaTeX 정식 파서 폴백: %s", type(exc).__name__)
     # ② 폴백: 가벼운 전처리 후 sympify(verify_answer convert_xor 패턴 재사용).
     try:
-        sympy.sympify(latex_to_plain(text), convert_xor=True)
+        safe_sympify(latex_to_plain(text))
         return True
-    except Exception:  # noqa: BLE001 — 파싱 불가는 보수적 False(pass 위장 금지)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 False(pass 위장 금지)
+        logger.debug("OCR 평문 파싱 불가: %s", type(exc).__name__)
         return False
 
 

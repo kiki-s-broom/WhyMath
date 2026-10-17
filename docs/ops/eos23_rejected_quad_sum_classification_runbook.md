@@ -1,5 +1,7 @@
 # EOS-23 거부 30건 전수 분류 런북 (Phaiakes9 · 읽기 전용)
 
+> **[정정 2026-10-15 — 재실행 불요]** 이 런북은 입력 `anthropic.review.jsonl`이 JSONL 큐 정본이라고 가정했으나, 실파일은 **마크다운 워크리스트 뷰**였다(EOS-121 런북이 `--out`과 `--worklist-out`을 같은 경로로 지정해 회차 끝 쓰기가 정본을 덮어씀). [B]는 `measured: false`·`CLASSIFY_EXIT=2`로 거부했고 분류기 JSON은 산출되지 않았다. 결과는 뷰 기반 수작업 분류로 확정했다 → `docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md`. 아래 §8의 "입력 매체" 서술은 틀렸었고 `OPS-147`이 정정했다(정본은 `--out`의 사이드카, `--worklist-out`은 뷰). 이제 두 경로가 같으면 CLI가 exit 2로 거부한다.
+
 > **태스크**: `EOS-23-authoring-seat-generation-accuracy` acceptance ②·③(오프라인 축)
 > **전제**: 이 런북의 CLI(`whymath_backend.harness.tier1_rejection_classifier`)가 **main에 머지된 뒤** 실행한다. 머지 전에는 [B]의 코드 출처 검사가 실행을 거부한다.
 > **기대 해시**: [A]의 마지막 줄 `git log -1 --oneline`이 머지 커밋과 같아야 한다 — 머지 후 세션이 이 줄에 해시를 기입한다. 해시를 눈으로 대조하지 못해도 [B]가 `HEAD == origin/main`을 스스로 검사한다.
@@ -152,7 +154,7 @@ if ($Ready) { New-Item -ItemType Directory -Force -Path (Split-Path $OutFile) | 
 PowerShell 블록은 컨테이너에서 실행할 수 없다. 그래서 **Python CLI 부분만** 실제로 돌려 확인했다.
 
 - 진입점: `python -m whymath_backend.harness.tier1_rejection_classifier <review.jsonl> --spec quad-sum --json --out <파일>` — 모듈의 `main()`이 `if __name__ == "__main__"`으로 연결돼 있다.
-- 입력 매체: `.eos121-out\anthropic.review.jsonl`은 EOS-121 런북 [E]의 `problem_corpus_accumulate --worklist-out`이 쓴다. 그 행은 `problem_corpus_accumulate._queue_entry` → `_to_record` → `_record_to_json`으로 조립되고 `append_review_queue_jsonl`로 기록된다. 분류기는 같은 모듈의 `load_review_queue_jsonl`로 읽는다.
+- 입력 매체: `<out>.review.jsonl`(큐 정본)은 `problem_corpus_accumulate`가 **`--out`의 사이드카로** 쓴다 — `--worklist-out`은 같은 큐를 렌더하는 *마크다운 뷰*의 경로일 뿐 정본이 아니다(2026-10-15 정정 — 종전 서술은 "`--worklist-out`이 쓴다"고 적어 둘을 같은 것으로 읽게 했고, EOS-121 [E]가 두 경로를 같게 줘 정본이 뷰로 덮어쓰였다. 재발 방지 = `OPS-147`). 정본의 행은 `problem_corpus_accumulate._queue_entry` → `_to_record` → `_record_to_json`으로 조립되고 `append_review_queue_jsonl`로 기록된다. 분류기는 같은 모듈의 `load_review_queue_jsonl`로 읽는다.
 - 테스트 픽스처도 **같은 조립·기록 경로**로 만든다. `ScriptedGenerator` 후보를 실제 오케스트레이터(`run_equivalent_generation`)에 흘려 게이트가 실제로 낸 거부 사유를 얻는다(`tests/backend/harness/test_tier1_rejection_classifier.py`의 `TestFixtureFidelity`가 사유 문자열 `Tier1 답 검산 fail: 조건 위반 — 잔차 ≠ 0`을 단언한다).
 - 컨테이너 실측: 위와 같은 방식으로 만든 `.eos121-out/anthropic.review.jsonl` 픽스처(ⓑ·ⓐ·대조군·비대상 행 혼합)에 런북과 같은 인자로 모듈을 실행했다. 결과: 종료 코드 0, stdout은 전부 ASCII이고 `json.loads`로 읽혔으며 행 수는 대상 수와 같았고, `--out` 파일이 생성됐다. 입력 파일을 없는 경로로 주면 종료 코드 2와 `"measured": false`가 나온다.
 

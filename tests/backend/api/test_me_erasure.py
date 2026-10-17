@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from _external_store_evidence import assert_manifest_stores_are_deployed
 from fastapi.testclient import TestClient
+from sqlalchemy import Select
 
 from whymath_backend.api._auth import get_current_user
 from whymath_backend.app import create_app
@@ -39,6 +40,16 @@ class _FakeResult:
         self.rowcount = rowcount
 
 
+class _FakeSelectResult:
+    """SEC-40: erase_user의 세션 ID 수집 SELECT — 수집 대상 0건인 빈 결과."""
+
+    def scalars(self) -> _FakeSelectResult:
+        return self
+
+    def all(self) -> list[Any]:
+        return []
+
+
 class _FakeSession:
     """erase_user가 부르는 execute(delete)·add(audit)·flush + 엔드포인트의 commit 캡처."""
 
@@ -48,7 +59,9 @@ class _FakeSession:
         self.commits = 0
         self.flushes = 0
 
-    async def execute(self, stmt: Any) -> _FakeResult:
+    async def execute(self, stmt: Any) -> _FakeResult | _FakeSelectResult:
+        if isinstance(stmt, Select):
+            return _FakeSelectResult()
         return _FakeResult(self.rowcount)
 
     def add(self, obj: Any) -> None:
@@ -91,11 +104,12 @@ class TestEraseMyAccount:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["user_id"] == str(_UID)
-        # `_ERASURE_PLAN` 24개 테이블(+EOS-32/45/46 3종·SEC-27 job_ownership·EOS-105
-        # learning_state_transition·**SEC-35 learner_state**) + user_profile, 각 2행 = 50.
+        # `_ERASURE_PLAN` 25개 테이블(+EOS-32/45/46 3종·SEC-27 job_ownership·EOS-105
+        # learning_state_transition·SEC-35 learner_state·**SEC-40 evidence_event**) + user_profile,
+        # 각 2행 = 52. (SEC-40 이전 50 — evidence_event가 계획에 편입돼 2행이 더해졌다.)
         # 파생값(`len(_ERASURE_PLAN)`)으로 바꾸지 않는다 — 그러면 계획이 *줄어도* 이 단언이
         # 따라 줄어 조용히 통과한다. 하드코딩이 곧 "계획이 바뀌면 사람이 본다"는 ratchet이다.
-        assert body["total_rows_deleted"] == 50
+        assert body["total_rows_deleted"] == 52
         assert fake.commits == 1  # 엔드포인트가 commit(원자적)
         # DeletionAudit 1행 적재(GDPR 증빙·삭제 전).
         from whymath_backend.db.models.audit import DeletionAudit

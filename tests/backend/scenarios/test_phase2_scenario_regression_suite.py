@@ -21,9 +21,11 @@ skill_node)만 ORM으로 심는다. 읽기 전용 SELECT는 공개 표면이 그
 
 **정직한 공백 동결** — 현행 코드로 성립하지 않는 마디는 `skip`으로 위장하지 않는다. *현행 동작*을
 단언하고, 고쳐지면 그 단언이 실패하며 메시지가 소유 태스크를 가리킨다.
-  - SCENARIO-003 ⓐ `EOS-127` — 상태 머신 R4(선수결손)는 서빙 경로에서 발화하지 않는다.
   - SCENARIO-005 ⓒ 귀속된 힌트를 숙달 갱신이 읽지 않는다(완료 채점 증거에 `hint_used` 축이 없다) —
     `EOS-29-assessment-evidence-hint-axis-producer`.
+  - (해소) SCENARIO-003 ⓐ `EOS-127` — 상태 머신 R4(선수결손)가 서빙 경로에서 발화하지 않던 공백.
+    **R4를 삭제**하는 처분으로 해소했다(선수 하강은 다음 문항 선택의 R6 경로가 이미 수행한다 —
+    ②가 그 증거). 단언은 "선수 결손 상태의 오답은 R6이고 선수 하강은 추천이 한다"로 승격했다.
   - (해소) SCENARIO-005 ⓐ 힌트 귀속 — `EOS-133`이 코치 완료 경로에 `hint_usage`의 첫 writer를
     세워, 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 힌트가 `used_hint=True`·`hint_usage`로
     남는다는 정상 동작 단언으로 승격했다.
@@ -484,8 +486,9 @@ def test_scenario_003_prerequisite_gap() -> None:
       ① 원래 개념 오답만 있을 때: 선수 후보는 보이지만 `weak_only` 결손 목록엔 없다(미측정).
       ② 선수 개념 오답 1건 → 결손으로 분류 · 추천 `action=practice_prerequisite`·
          `target_concept=선수` · 고른 문항이 선수 개념 문항.
-      ③ 정직한 공백 동결(`EOS-127`) — 같은 상황에서 상태 머신 규칙 R4(선수결손)는 발화하지
-         않는다(`prerequisite_gap_concept_ids` 생산자 미배선). 정책 결정은 R6(원인 미상 오답)이다.
+      ③ 선수 하강의 소유자(`EOS-127` 처분) — 같은 상황의 상태 머신 결정은 R6(원인 미상 오답)이며
+         선수 쪽 하강은 상태 전이가 아니라 ②의 다음 문항 선택이 한다. R4(선수결손 규칙)는
+         삭제됐으므로 이 오답이 어떤 선수 지목 결정(`target_concept_id`)도 만들지 않는다.
     """
     content, journal = _begin("SCENARIO-003")
     try:
@@ -524,25 +527,26 @@ def test_scenario_003_prerequisite_gap() -> None:
             assert rec["target_concept"] == str(c_pre), rec
             assert rec["problem_id"] in {str(p) for p in pre_pids}, rec
 
-            # ③ 정직한 공백 동결 (EOS-127) — 결손이 확정된 상태의 원래 개념 오답.
-            #    연속 오답 임계(R5)가 R4보다 앞서므로, 정답 1건으로 연속을 끊은 뒤에 본다 —
-            #    끊지 않으면 3연속 오답이 R5로 가서 "R4가 없어서 R6"과 구별되지 않는다.
+            # ③ 선수 하강의 소유자 (EOS-127) — 결손이 확정된 상태의 원래 개념 오답.
+            #    연속 오답 임계(R5)가 R3·R6보다 앞서므로, 정답 1건으로 연속을 끊은 뒤에 본다 —
+            #    끊지 않으면 3연속 오답이 R5로 가서 "R6이라서 선수를 지목하지 않는다"와 구별되지 않는다.
             _attempt(client, auth, main_pids[1], correct=True, answer="정답")
             body = _attempt(
                 client, auth, main_pids[2], correct=False, answer=_UNMATCHED_WRONG_ANSWER
             )
             ls_block = body["learning_state"]
             journal.record(
-                "③R4미발화",
-                "EOS-127 정직한 공백",
+                "③상태머신결정",
+                "EOS-127 — R4 삭제·선수 하강은 추천(②)이 소유",
                 rule=ls_block["rule_id"],
                 next_action=ls_block["next_action"],
                 target=ls_block["target_concept_id"],
             )
             assert ls_block["rule_id"] == "R6-wrong-undiagnosed", (
-                f"선수 결손 상태의 오답에 규칙 {ls_block['rule_id']}가 발화했다 — `EOS-127`(R4 "
-                "생산자 배선)이 해소된 것으로 보인다. 이 단언을 R4·GO_TO_PREREQUISITE_CONCEPT·"
-                "target=선수 단언으로 승격하고 EOS-127을 닫아라."
+                f"선수 결손 상태의 오답에 규칙 {ls_block['rule_id']}가 발화했다 — `EOS-127`이 R4를 "
+                "삭제하며 선수 하강을 다음 문항 선택(R6 경로)에 맡겼다. 상태 머신이 선수를 지목하는 "
+                "규칙을 되살렸다면 R6 하강(②)을 가로채지 않는지 먼저 판정문을 읽어라: "
+                "docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md."
             )
             assert ls_block["target_concept_id"] is None, ls_block
         journal.dump()
@@ -628,8 +632,9 @@ def test_scenario_005_correct_after_hint() -> None:
       ③ 돌아보기 응답 → 완료 · `problem_attempt` 1행(is_correct=True·used_socratic=True) ·
          숙달이 첫 측정으로 생긴다 · 힌트 이벤트가 그 문항에 묶여 시간선에 남는다.
       ④ⓐ 힌트 귀속(`EOS-133` 해소) — 정답을 처음 낸 턴 *이전*에 받은 단계 2 이상 힌트가 그
-         attempt에 남는다(`used_hint=True` · `hint_usage` 단계 = ①의 공급). ②·③ 턴의 공급은
-         답이 나온 뒤라 세지 않는다.
+         attempt에 남는다(`used_hint=True` · `hint_usage` 단계 = ①의 공급). ②·③ 턴은 완료 상태
+         머신이 발화를 가로채(돌아보기·인정) 공급 원장에 행이 남지 않는다(`EOS-30`) — 시간선의
+         공급은 ①뿐이다.
       ④ⓑ 상태 머신(`EOS-134` 해소) — 코치 완료도 `/v1/me/attempts`와 같은 공용 진입점을 돌아
          `NEW → LEARNING → ASSESSING → PRACTICING`이 된다(R2 — 확신도 미측정 정답은 같은 개념 연습).
       ④ 정직한 공백 동결 1건(ⓒ `EOS-29`):
@@ -722,9 +727,16 @@ def test_scenario_005_correct_after_hint() -> None:
             assert hint_events and all(
                 e["problem_id"] == str(pid) for e in hint_events
             ), hint_events
+            # EOS-30: ②(정답 제출 → 돌아보기 진입)·③(돌아보기 응답 → 완료 인정) 턴은 완료 상태
+            # 머신이 발화를 가로챈 턴이라 학생은 힌트가 아니라 결정론 템플릿을 받았다. 그 턴의
+            # 결정 단계는 원장에 '제공'으로 적히지 않는다 — 시간선의 공급은 ①의 막힘 공급뿐이다.
+            assert _hint_levels(entries) == [hint], (
+                "가로챈 턴(돌아보기·인정)의 단계가 공급 원장에 적혔다 — 학생이 받지 않은 "
+                f"단계가 '제공'으로 남는다: {_hint_levels(entries)} (①의 공급 {hint})"
+            )
 
-            # ④ⓐ 힌트 귀속(EOS-133 해소) — ①의 막힘 공급 하나만 이 attempt에 남는다. ②(정답 제출)·
-            # ③(돌아보기) 턴의 공급은 답이 나온 뒤라 이 풀이에 쓰였을 수 없다(창 상한 = 정답 제출 턴).
+            # ④ⓐ 힌트 귀속(EOS-133 해소) — ①의 막힘 공급 하나만 이 attempt에 남는다. ②·③ 턴은
+            # 공급 행이 없어 셀 것이 없다(EOS-30) — 귀속 창 상한(정답 제출 턴)은 이중 방어로 남았다.
             hint_rows = _read_rows(
                 "SELECT hint_level FROM hint_usage WHERE attempt_id = :aid ORDER BY requested_at",
                 {"aid": attempt_id},
@@ -996,12 +1008,17 @@ def test_scenario_008_move_to_next_concept() -> None:
         c_cur, _ = _seed_concept(content, "s8cur", "일차식의 전개")
         c_next, _ = _seed_concept(content, "s8next", "이차식의 전개")
         asyncio.run(_add_all(_prereq_edge(c_cur, c_next)))
-        # 남겨 둘 현재 개념 문항(cur_pids[5])을 **가장 어렵게** 둔다. 전부 맞힌 학생의 θ는 척도
-        # 상단에 붙으므로 θ 근방 1차 선택은 가장 어려운 문항 — 즉 **현재 개념** 문항을 집는다.
-        # 그런데도 ③에서 다음 개념 문항이 나오면, 이동을 만든 것은 난이도 배치가 아니라 정책의
-        # 정렬 재선택이다(EOS-124). 다음 개념 문항을 더 어렵게 두면 1차 선택이 먼저 그쪽을 집어
-        # 이 변별력이 사라진다(2026-09-24 실측: 다음 개념 4.8/5.0 배치에서 ②·③ 판정 불가).
-        cur_pids = _seed_problems(content, c_cur, "s8c", [2.0, 2.4, 2.8, 3.2, 3.6, 5.0])
+        # 남겨 둘 현재 개념 문항(cur_pids[5])을 **1차 선택의 표적 θ에 가장 가깝게** 둔다(EOS-147).
+        # 전부 맞힌 학생의 추정 θ는 상한 4.0에 붙는 클램프라 추천은 그 값을 표적으로 쓰지 않고 맞힌 최고
+        # 난이도 b + 0.5를 쓴다: 위 다섯 문항의 최고 b는 0.6(라벨 3.6)이므로 표적은 1.1이다. 현재 개념
+        # 문항을 b=1.1(라벨 4.1)에 두면 다음 개념 문항(b=0.0·0.4)보다 표적에 가까워 θ 근방 1차 선택은
+        # **현재 개념** 문항을 집는다(EOS-147 이전에는 표적이 4.0이라 '가장 어려운 문항' — 라벨 5.0 — 이
+        # 그 자리였다). 그런데도 ③에서 다음 개념 문항이 나오면, 이동을 만든 것은 난이도 배치가 아니라
+        # 정책의 정렬 재선택이다(EOS-124). 다음 개념 문항이 표적에 더 가까우면 1차 선택이 먼저 그쪽을
+        # 집어 이 변별력이 사라진다(2026-09-24 실측: 다음 개념 4.8/5.0 배치에서 ②·③ 판정 불가 ·
+        # 2026-09-29 실측: 표적이 1.1이 된 뒤 현재 개념 문항이 라벨 5.0이면 — 표적과의 거리 0.9 > 다음
+        # 개념 b=0.4와의 거리 0.7 — 1차 선택이 다음 개념 문항이 되어 `action=diagnose`로 나간다).
+        cur_pids = _seed_problems(content, c_cur, "s8c", [2.0, 2.4, 2.8, 3.2, 3.6, 4.1])
         next_pids = _seed_problems(content, c_next, "s8n", [3.0, 3.4])
         cur_set = {str(p) for p in cur_pids}
 
@@ -1044,6 +1061,14 @@ def test_scenario_008_move_to_next_concept() -> None:
                 action=advanced["action"],
                 target=("현재" if advanced["target_concept"] == str(c_cur) else "다음"),
                 문항=("현재" if advanced["problem_id"] in cur_set else "다음"),
+            )
+            # 전제 확인(EOS-147) — 1차 선택이 남긴 현재 개념 문항(b=4.1−3.0=1.1)을 집는 배치인가. 응답의
+            # 선택 θ가 그 문항에 다음 개념 문항(b=0.0·0.4)보다 가까워야 ③이 재선택의 변별력을 가진다.
+            # 이 전제가 깨지면 아래 판정이 `diagnose ≠ advance_next` 같은 먼 증상으로 나오므로 먼저 말한다.
+            picked_at = advanced["selection_theta"]
+            assert abs(1.1 - picked_at) < min(abs(0.0 - picked_at), abs(0.4 - picked_at)), (
+                "1차 선택이 남긴 현재 개념 문항을 집는 배치가 아니다 — 선택 θ가 다음 개념 문항에 더 "
+                f"가깝다(픽스처를 표적 θ 규칙에 맞춰 다시 배치하라): {advanced}"
             )
             assert advanced["action"] == "advance_next", advanced
 

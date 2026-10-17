@@ -96,6 +96,7 @@ from whymath_backend.schema.enums import (
     EventType,
     ExamType,
     Persona,
+    RelationType,
     Resolution,
     ReviewStatus,
     SignaturePattern,
@@ -2663,6 +2664,9 @@ class TestNextProblem:
         assert body == {
             "problem_id": None,
             "theta": 0.0,
+            # EOS-147: 가산 2필드 — 이력이 없으면 경계가 아니라 선택 θ는 추정 θ와 같다.
+            "selection_theta": 0.0,
+            "theta_boundary": None,
             "difficulty": None,
             "standard_error": None,
             "measurement_sufficient": False,
@@ -2732,7 +2736,7 @@ class TestNextProblem:
         cand = uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(uuid.uuid4(), True, None, None, None)]),  # b 소스 없음 → 제외
+                _AQResult([(uuid.uuid4(), True, None, None, None, None)]),  # b 소스 없음 → 제외
                 _AQResult([(cand, 3.0, None)]),
             ]
             + _reason_results()
@@ -2745,7 +2749,10 @@ class TestNextProblem:
     def test_high_theta_picks_harder(self) -> None:
         """전부 정답 → θ 상한(4.0). 난이도 3·5 후보 중 b=2(난이도 5)가 정보량 최대."""
         pid_mid, pid_hard = uuid.uuid4(), uuid.uuid4()
-        attempts = [(uuid.uuid4(), True, 5.0, None, None), (uuid.uuid4(), True, 4.0, None, None)]
+        attempts = [
+            (uuid.uuid4(), True, 5.0, None, None, None),
+            (uuid.uuid4(), True, 4.0, None, None, None),
+        ]
         session = _next_problem_session(
             [
                 _AQResult(attempts),
@@ -2764,7 +2771,7 @@ class TestNextProblem:
 
     def test_measurement_sufficient_when_many_responses(self) -> None:
         """난이도3(b=0) 46건 절반 정답 → θ=0·SE=2/√46≈0.295 ≤ 0.3 → 중단 권고."""
-        attempts = [(uuid.uuid4(), i % 2 == 0, 3.0, None, None) for i in range(46)]
+        attempts = [(uuid.uuid4(), i % 2 == 0, 3.0, None, None, None) for i in range(46)]
         cand = uuid.uuid4()
         session = _next_problem_session(
             [_AQResult(attempts), _AQResult([(cand, 3.0, None)])] + _reason_results()
@@ -2991,9 +2998,11 @@ class TestNextProblem:
         pid_sibling, pid_other = uuid.uuid4(), uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(pid_wrong, False, 3.0, None, None)]),  # ① 오답 이력(θ 추정 겸용)
+                _AQResult([(pid_wrong, False, 3.0, None, None, None)]),  # ① 오답 이력(θ 추정 겸용)
                 _AQResult([pid_wrong]),  # ② 직전 오답 문항 id
-                _AQResult([(pid_wrong, pid_sibling)]),  # ③ 형제(parent=오답, related=형제)
+                _AQResult(  # ③ 형제(parent=오답, related=형제, 유형=유사)
+                    [(pid_wrong, pid_sibling, RelationType.유사)]
+                ),
                 _AQResult(  # ④ 후보(동일 난이도)
                     [(pid_other, 3.0, None), (pid_sibling, 3.0, None)]
                 ),
@@ -3014,9 +3023,9 @@ class TestNextProblem:
         c_weak = uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(pid_wrong, False, 3.0, None, None)]),
+                _AQResult([(pid_wrong, False, 3.0, None, None, None)]),
                 _AQResult([pid_wrong]),
-                _AQResult([(pid_wrong, pid_sibling_weak)]),
+                _AQResult([(pid_wrong, pid_sibling_weak, RelationType.변형)]),
                 _AQResult([(pid_plain, 3.0, None), (pid_sibling_weak, 3.0, None)]),
                 _AQResult([(c_weak, 0.0)]),  # 숙달 스냅샷 — 저숙달
                 _AQResult([(pid_sibling_weak, c_weak)]),  # 후보 개념 매핑(pid_plain은 매핑 없음)
@@ -3036,9 +3045,9 @@ class TestNextProblem:
         pid_sibling = uuid.uuid4()
         session = _next_problem_session(
             [
-                _AQResult([(pid_wrong, False, 3.0, None, None)]),
+                _AQResult([(pid_wrong, False, 3.0, None, None, None)]),
                 _AQResult([pid_wrong]),
-                _AQResult([(pid_wrong, pid_sibling)]),
+                _AQResult([(pid_wrong, pid_sibling, RelationType.변형)]),
                 _AQResult([(pid_sibling, 3.0, None)]),
             ]
             + _reason_results()
@@ -3046,6 +3055,108 @@ class TestNextProblem:
         client = _attempts_client(session)
         resp = client.get("/v1/me/next-problem?sibling_filter=exclude")
         assert resp.status_code == 200
+
+
+# ── PB-19: 형제 필터의 관계 유형 정책 — 선수(쉬운 계열)·심화(어려운 계열)·대조는 형제가 아니다 ──────
+def _bound_uuids(stmt: Any) -> set[uuid.UUID]:
+    """컴파일된 stmt의 바인드 값에서 UUID를 전부 모은다 — NOT IN 목록에 어떤 id가 실렸는지 본다."""
+    found: set[uuid.UUID] = set()
+    for value in stmt.compile().params.values():
+        for item in value if isinstance(value, (list, tuple, set, frozenset)) else [value]:
+            if isinstance(item, uuid.UUID):
+                found.add(item)
+    return found
+
+
+class TestSiblingRelationTypePolicy:
+    """`load_sibling_ids` 호출 경로(CAT·수능 두 정책)가 관계 유형·방향 정책을 **실제로** 경유한다.
+
+    순수 분류의 표는 `tests/backend/l2/test_sibling_relation_policy.py`가 맡고, 여기서는 핸들러→정책→
+    `load_sibling_ids`→후보 쿼리/가중까지 한 줄로 이어진 배선을 동결한다. 대조군: 같은 후보를
+    `변형`으로 걸면 우대/배제되고, 정책이 형제로 보지 않는 유형으로 걸면 그렇지 않다.
+    """
+
+    @staticmethod
+    def _include_pick(rows: list[Any], cand: uuid.UUID, other: uuid.UUID, wrong: uuid.UUID) -> str:
+        """include 모드 — `cand`(관계 후보)와 `other`(무관)가 난이도 동률일 때 고른 문항."""
+        session = _next_problem_session(
+            [
+                _AQResult([(wrong, False, 3.0, None, None, None)]),
+                _AQResult([wrong]),
+                _AQResult(rows),
+                _AQResult([(other, 3.0, None), (cand, 3.0, None)]),  # 동률 — 가중만 순서를 깬다
+            ]
+            + _reason_results()
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem?sibling_filter=include").json()
+        return str(body["problem_id"])
+
+    @pytest.mark.parametrize(
+        ("relation", "cand_is_parent", "boosted"),
+        [
+            (RelationType.변형, False, True),  # 대조군 — 대칭 형제는 현행대로 우대
+            (RelationType.유사, True, True),
+            (RelationType.선수, False, True),  # 오답 문항의 선수(쉬운 계열) → 오답 직후 우선 후보
+            (
+                RelationType.심화,
+                True,
+                True,
+            ),  # 후보가 parent이고 오답 문항이 그 심화 → 후보가 더 쉬움
+            (RelationType.심화, False, False),  # 후보가 오답 문항의 심화(더 어려움) → 우대 안 함
+            (RelationType.선수, True, False),  # 오답 문항이 후보의 선수 → 후보가 더 어려움
+            (RelationType.대조, False, False),  # 대조는 형제가 아니다
+            (RelationType.대조, True, False),
+        ],
+    )
+    def test_include_boost_follows_relation_type_and_direction(
+        self, relation: RelationType, cand_is_parent: bool, boosted: bool
+    ) -> None:
+        wrong, cand, other = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        row = (cand, wrong, relation) if cand_is_parent else (wrong, cand, relation)
+        picked = self._include_pick([row], cand, other, wrong)
+        assert picked == str(cand if boosted else other)
+
+    @pytest.mark.parametrize(
+        ("relation", "excluded"),
+        [
+            (RelationType.변형, True),  # 대조군 — 근접 복제본은 현행대로 배제
+            (RelationType.유사, True),
+            (
+                RelationType.선수,
+                False,
+            ),  # 쉬운 계열은 배제하지 않는다(Polya: 더 쉬운 관련 문제 먼저)
+            (RelationType.심화, False),
+            (RelationType.대조, False),
+        ],
+    )
+    @pytest.mark.parametrize("mode", ["cat", "suneung"])
+    def test_exclude_list_follows_relation_type_on_both_policies(
+        self, relation: RelationType, excluded: bool, mode: str
+    ) -> None:
+        """NOT IN 목록에 실린 id가 유형 정책을 따른다 — CAT(`l2`)·수능(`api`) 두 호출처 모두."""
+        wrong, cand = uuid.uuid4(), uuid.uuid4()
+        session = _next_problem_recording_session(
+            [
+                _AQResult([(wrong, False, 3.0, None, None, None)]),  # ① 오답 이력
+                _AQResult([wrong]),  # ② 직전 오답 문항 id
+                _AQResult([(wrong, cand, relation)]),  # ③ 관계 행
+                _AQResult([]),  # ④ 후보 풀(비어도 stmt는 캡처된다)
+            ]
+            + _reason_results()
+        )
+        query = "sibling_filter=exclude" + ("&mode=suneung" if mode == "suneung" else "")
+        assert _attempts_client(session).get(f"/v1/me/next-problem?{query}").status_code == 200
+        assert (cand in _bound_uuids(session.statements[_NP_STMT_BASE + 3])) is excluded
+
+    def test_unset_filter_issues_no_relation_query(self) -> None:
+        """기본값 OFF 회귀 0 — 필터 미지정이면 관계 조회가 아예 없다(유형 정책은 ON일 때만 의미)."""
+        pid = uuid.uuid4()
+        session = _next_problem_recording_session(
+            [_AQResult([]), _AQResult([(pid, 3.0, None)])] + _reason_results()
+        )
+        body = _attempts_client(session).get("/v1/me/next-problem").json()
+        assert body["problem_id"] == str(pid)
+        assert not any("problem_relation" in str(st) for st in session.statements)
 
 
 # ── REC-06: 후보 조회 결정론(정렬 2차 키) + 제외 축 변별력 ──────────────────────────────
@@ -3153,7 +3264,7 @@ class TestCandidatePoolOrdering:
         assert before_id == str(pid_a)
 
         # ② attempt 1건 주입(pid_a 채점) — NOT IN이 SQL에 실리고, 반환 문항이 바뀐다
-        after_id, after_sql = _call([(pid_a, True, 3.0, None, None)], [(pid_b, 3.0, None)])
+        after_id, after_sql = _call([(pid_a, True, 3.0, None, None, None)], [(pid_b, 3.0, None)])
         assert "problem_id NOT IN" in after_sql
         assert after_id == str(pid_b)
         assert after_id != before_id
@@ -3191,6 +3302,24 @@ class _OrmProblemRow:
         return self._problem
 
 
+#: EOS-31 — 수능 출제 범위 안의 성취기준 고시 코드(2022 개정 대수). 이 파일의 수능 시나리오는 *신호*
+#: (시그니처·기출·적합도)와 CAT을 재는 것이라 후보를 모두 범위 안으로 둔다 — 범위 판정 자체는
+#: `tests/backend/l6/suneung/test_scope.py`·`test_eos31_*`가 전담한다.
+_SUNEUNG_IN_SCOPE_CODE = "[12대수01-01]"
+
+
+def _suneung_pool(*problems: SchemaProblem) -> list[_AQResult]:
+    """수능 후보 풀이 소비하는 큐 결과 2건 — ①후보 ORM 행 ②성취기준 원자 축 조인 행(EOS-31).
+
+    정책은 후보 조회 직후 `(problem_id, standard_codes 배열)` 조인으로 비영속 필드를 주입한다. 그
+    조회가 큐의 다음 칸이므로 후보 행 바로 뒤에 둔다 — 순서가 어긋나면 뒤따르는 근거 조회가 한 칸씩 밀린다.
+    """
+    return [
+        _AQResult([_OrmProblemRow(p) for p in problems]),
+        _AQResult([(p.problem_id, [_SUNEUNG_IN_SCOPE_CODE]) for p in problems]),
+    ]
+
+
 class TestNextProblemSuneungMode:
     """S2-06: ?mode=suneung — 수능 게이팅(진실 게이트) × IRT CAT 결합 분기.
 
@@ -3217,7 +3346,7 @@ class TestNextProblemSuneungMode:
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES],
         )
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])] + _reason_results()
+            [_AQResult([]), *_suneung_pool(problem)] + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
@@ -3225,6 +3354,8 @@ class TestNextProblemSuneungMode:
         assert set(body) == {
             "problem_id",
             "theta",
+            "selection_theta",  # EOS-147: 후보를 고르는 데 실제 쓴 θ(가산 — 항상 채워진다)
+            "theta_boundary",  # EOS-147: 추정 θ가 MLE 발산 경계인가(가산 — null=경계 아님)
             "difficulty",
             "standard_error",
             "measurement_sufficient",
@@ -3258,7 +3389,7 @@ class TestNextProblemSuneungMode:
         """REC-03 — 수능 모드 추천도 처치로 기록되며 meta.mode="suneung"이 남는다."""
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])] + _reason_results()
+            [_AQResult([]), *_suneung_pool(problem)] + _reason_results()
         )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?mode=suneung")
@@ -3269,7 +3400,7 @@ class TestNextProblemSuneungMode:
         assert session.commits == 1
 
     def test_recommendation_records_candidates_and_policy_version_suneung(self) -> None:
-        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v1이 실린다.
+        """REC-11 — 수능 모드 처치 기록에 candidates[]·policy_version=suneung_v4가 실린다.
 
         적격(시그니처 보유)·부적격(수능 신호 전무) 후보를 함께 넣어 candidates[]가 부적격을
         빼고 적격만 담는지(진실 게이트 재적용)까지 함께 확인한다.
@@ -3277,8 +3408,7 @@ class TestNextProblemSuneungMode:
         eligible = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         ineligible = _suneung_problem()  # 수능 신호 전무 → is_suneung_eligible=False
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(eligible), _OrmProblemRow(ineligible)])]
-            + _reason_results()
+            [_AQResult([]), *_suneung_pool(eligible, ineligible)] + _reason_results()
         )
         client = _attempts_client(session)
         client.get("/v1/me/next-problem?mode=suneung")
@@ -3300,8 +3430,7 @@ class TestNextProblemSuneungMode:
             signature_patterns=[SignaturePattern.COMPOUND_CHOICES], irt_difficulty_b=band_b
         )
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(mid), _OrmProblemRow(banded)])]
-            + _reason_results()
+            [_AQResult([]), *_suneung_pool(mid, banded)] + _reason_results()
         )
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung&purpose=learning").json()
@@ -3312,12 +3441,15 @@ class TestNextProblemSuneungMode:
         """적격 0 → problem_id null(기본 CAT과 동일한 null 응답 계약)."""
         # 수능 신호 전무(기출 아님·시그니처 없음·적합도 없음) → 진실 게이트에서 탈락.
         no_signal = _suneung_problem()
-        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(no_signal)])])
+        session = _next_problem_session([_AQResult([]), *_suneung_pool(no_signal)])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         assert body == {
             "problem_id": None,
             "theta": 0.0,
+            # EOS-147: 가산 2필드 — 이력이 없으면 경계가 아니라 선택 θ는 추정 θ와 같다.
+            "selection_theta": 0.0,
+            "theta_boundary": None,
             "difficulty": None,
             "standard_error": None,
             "measurement_sufficient": False,
@@ -3346,7 +3478,7 @@ class TestNextProblemSuneungMode:
         수능 모드 핵심 저작권 계약 — 평가원 기출 본문 절대 노출 불가(자체생성 동등문제만).
         """
         blocked = _suneung_problem(source_type=SourceType.평가원, exam_type=ExamType.수능)
-        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(blocked)])])
+        session = _next_problem_session([_AQResult([]), *_suneung_pool(blocked)])
         client = _attempts_client(session)
         body = client.get("/v1/me/next-problem?mode=suneung").json()
         assert body["problem_id"] is None
@@ -3354,7 +3486,7 @@ class TestNextProblemSuneungMode:
     def test_persona_d_blocks_all(self) -> None:
         """persona=D_학종고2(비응시) → 적격 후보가 있어도 전부 차단 → null."""
         eligible = _suneung_problem(exam_type=ExamType.수능)
-        session = _next_problem_session([_AQResult([]), _AQResult([_OrmProblemRow(eligible)])])
+        session = _next_problem_session([_AQResult([]), *_suneung_pool(eligible)])
         client = _attempts_client(session)
         body = client.get(
             "/v1/me/next-problem", params={"mode": "suneung", "persona": "D_학종고2"}
@@ -3372,7 +3504,7 @@ class TestNextProblemSuneungMode:
         session = _next_problem_session(
             [
                 _AQResult([]),  # 채점 이력 없음 → θ=0
-                _AQResult([_OrmProblemRow(strong), _OrmProblemRow(weak)]),  # 동률 후보
+                *_suneung_pool(strong, weak),  # 동률 후보
                 _AQResult([(c_strong, 1.0), (c_weak, 0.0)]),  # 숙달: 강·약
                 _AQResult([(strong.problem_id, c_strong), (weak.problem_id, c_weak)]),  # 개념 매핑
             ]
@@ -3537,7 +3669,7 @@ class TestNextProblemReason:
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         cid = uuid.uuid4()
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])]
+            [_AQResult([]), *_suneung_pool(problem)]
             + _reason_results_measured(cid, _MasteryRow(0.2, 0.75))
         )
         body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
@@ -3611,7 +3743,7 @@ class TestNextProblemReason:
         problem = _suneung_problem(signature_patterns=[SignaturePattern.COMPOUND_CHOICES])
         cid = uuid.uuid4()
         session = _next_problem_session(
-            [_AQResult([]), _AQResult([_OrmProblemRow(problem)])]
+            [_AQResult([]), *_suneung_pool(problem)]
             + _reason_results_measured(cid, _MasteryRow(0.9, 0.6))
         )
         body = _attempts_client(session).get("/v1/me/next-problem?mode=suneung").json()
@@ -4900,3 +5032,57 @@ class TestMasteryUpdateNullBoundary:
         values = [row["mastery"] for row in resp.json()]
         assert values.count(None) == 1
         assert [v for v in values if v is not None] == [0.0]
+
+
+# ── EOS-47 — 시도 버전 고정 배선 (submit_attempt) ────────────────────────────────
+
+
+class TestAttemptVersionPinWiring:
+    """EOS-47: `POST /v1/me/attempts`가 접수 시점의 문항 판·채점 환경을 시도 행에 박는다.
+
+    고정 *값을 만드는* 로직은 `tests/backend/l2/test_attempt_version_pin.py`가, 세 적재 경로가 모두
+    헬퍼를 부르는지는 `test_attempt_version_pin_wiring.py`(AST)가 잰다. 여기서는 이 엔드포인트에서
+    헬퍼의 결과가 **그대로** 시도 행에 도달하는지만 본다 — 상수가 아니라 헬퍼 값임을 두 입력으로 구별한다.
+    """
+
+    @staticmethod
+    def _post_with_pin(monkeypatch: pytest.MonkeyPatch, pin: Any) -> Any:
+        async def _resolve(*_args: Any, **_kwargs: Any) -> Any:
+            return pin
+
+        async def _none(*_args: Any, **_kwargs: Any) -> list[Any]:
+            return []
+
+        monkeypatch.setattr(me_module, "resolve_attempt_version_pin", _resolve)
+        monkeypatch.setattr(me_module, "record_problem_attempt_mastery", _none)
+        monkeypatch.setattr(me_module, "record_problem_attempt_skill_mastery", _none)
+        session = _QueueSession([_AQResult([uuid.uuid4()]), _AQResult([]), _AQResult([])])
+        resp = _attempts_client(session).post(
+            "/v1/me/attempts", json={"problem_id": str(uuid.uuid4()), "is_correct": True}
+        )
+        assert resp.status_code == 201, resp.text
+        attempts = [o for o in session.added if type(o).__name__ == "ProblemAttempt"]
+        assert len(attempts) == 1
+        return attempts[0]
+
+    def test_resolved_pin_reaches_the_stored_attempt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from whymath_backend.l2.attempt_version_pin import AttemptVersionPin
+
+        vid = uuid.uuid4()
+        ctx = {"schema_version": "1", "curriculum_version": "2022_REVISION"}
+        attempt = self._post_with_pin(
+            monkeypatch,
+            AttemptVersionPin(outcome="pinned", problem_version_id=vid, evaluation_context=ctx),
+        )
+        assert attempt.problem_version_id == vid
+        assert attempt.evaluation_context == ctx
+
+    def test_unpinned_result_stores_none_not_a_constant(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """대조군 — 헬퍼가 '고정할 것 없음'이면 두 컬럼은 None이다(위 테스트의 값이 상수가 아님을 증명)."""
+        from whymath_backend.l2.attempt_version_pin import AttemptVersionPin
+
+        attempt = self._post_with_pin(monkeypatch, AttemptVersionPin(outcome="problem_missing"))
+        assert attempt.problem_version_id is None
+        assert attempt.evaluation_context is None

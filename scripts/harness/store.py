@@ -6,6 +6,8 @@
     backlog/tasks/<id>.yaml       태스크당 1파일 (병렬 세션 충돌 원천 차단)
     backlog/events/<actor>.ndjson append-only 상태변경 로그 — **세션(=브랜치)당 1샤드**
     backlog/events.ndjson         레거시 단일 대장 (읽기 전용 역사 — 신규 기록 없음)
+    backlog/incidents/<actor>.ndjson  사고 대장 — 같은 샤딩 (읽기·쓰기는 incidents.py · HARN-130)
+    backlog/incidents.ndjson      사고 대장 레거시(시드) — 읽기 전용 역사
 
 이벤트 샤딩(HARN-46, 2026-08-31): 원래는 events.ndjson 한 파일에 모든 세션이
 append했고 `.gitattributes merge=union`이 병렬 충돌을 흡수한다고 믿었다. 그러나
@@ -87,10 +89,162 @@ def _scalar(value: object) -> str:
         or re.match(r"^\d+$", s) is not None
         or s != s.strip()
     )
-    return json.dumps(s, ensure_ascii=False) if needs_quote else s
+    return _json_quote(s) if needs_quote else s
 
 
-def _dump_mapping(data: dict[str, object], key_order: list[str]) -> str:
+# JSON은 이 문자들을 이스케이프하지 않지만 PyYAML은 날것으로 못 되읽는다(HARN-33 실측):
+# `\x85`(NEL)는 따옴표 안에서도 줄바꿈으로 읽혀 `\n`이 되고, 나머지 C1 제어문자(`\x7f-\x9f`)·
+# 짝 없는 서로게이트·비문자(`\ufffe`/`\uffff`)는 ReaderError, `\u2028`/`\u2029`는 YAML 명세상
+# 줄바꿈이라 다른 파서에서 접힌다. `\uXXXX`는 JSON·YAML 이중 호환 이스케이프다.
+_YAML_UNSAFE_IN_QUOTES_RE = re.compile("[\x7f-\x9f\u2028\u2029\ud800-\udfff\ufffe\uffff]")
+
+
+def _json_quote(s: str) -> str:
+    """JSON 인용 문자열 — 위 문자만 추가로 `\\uXXXX`로 쓴다(그 밖의 바이트는 종전과 동일)."""
+    quoted = json.dumps(s, ensure_ascii=False)
+    return _YAML_UNSAFE_IN_QUOTES_RE.sub(lambda m: f"\\u{ord(m.group()):04x}", quoted)
+
+
+# ── 블록 스칼라 보존 (HARN-33) ───────────────────────────────────────────────
+#
+# 사고(2026-08-21): 사람이 읽는 60줄 런북형 `notes: |`가 `gates add` 1회로 `\n` 이스케이프된
+# 한 줄 문자열이 됐다. 내용은 같지만 가독성이 파손됐고, 대장 손편집 금지 원칙상 사람이 매번
+# 되돌릴 수도 없었다.
+#
+# 직렬화기는 상태가 없어서 "이 필드를 원래 어떻게 썼는지"를 모른다. 그래서 저장 함수가 **기존
+# 파일을 먼저 읽어** 개행을 가진 필드의 표기(block|quoted)를 기억했다가 되쓴다.
+#   · 기존이 block  → block 유지 (사고 재현 방지 — 이 태스크의 본체)
+#   · 기존이 quoted → quoted 유지. 2026-10-08 실측: 현재 대장에는 블록 스칼라가 0건이고 개행
+#     값이 JSON 한 줄로 게이트 26줄·태스크 560필드 실려 있다. "개행이 있으면 무조건 block"은
+#     첫 조작에 이 전부를 바꾼다 — acceptance ④(일괄 재포맷은 사람 판단)가 막는 형태다.
+#   · 기존에 없음(새 값·새 필드·새 파일) → block
+# 블록으로 쓸 수 없는 값(제어문자 등)과 되읽은 값이 원문과 다른 값은 quoted로 물러난다 —
+# 보기 좋은 표기보다 내용 보존이 먼저다.
+
+_StyleKey = tuple[str, str]  # (소유자 id — 태스크 파일은 "", 필드명)
+_Styles = dict[_StyleKey, str]  # 값: "block" | "quoted"
+
+_INDENT_STEP = 2
+# 블록 스칼라 본문에 날것으로 두지 않는 문자: C0 제어(탭·개행 제외)·CR·C1·유니코드 줄바꿈·BOM·
+# 서로게이트·비문자. 이런 값은 YAML 파서마다 해석이 갈리거나 읽기 자체가 실패한다.
+_BLOCK_UNSAFE_RE = re.compile(
+    "[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff\ufeff\ufffe\uffff]"
+)
+
+
+def _scan_multiline_styles(text: str, *, list_key: str | None) -> _Styles:
+    """기존 파일 본문에서 **개행을 가진 문자열**의 표기를 읽는다.
+
+    `list_key=None`이면 최상위 매핑(태스크 파일), 아니면 그 키 아래 시퀀스의 각 매핑을 `id`로
+    구분한다(게이트 대장). PyYAML `compose`를 쓰는 이유: 값을 만들지 않고 노드 `style`만
+    보므로 손으로 쓴 `|`·`>`·따옴표·평문을 정확히 구별한다. 파싱 실패는 빈 결과(기본 표기)로
+    물러나되 예외 타입명을 stderr에 남긴다(침묵 실패 금지).
+    """
+    if yaml is None or not text.strip():
+        return {}
+    try:
+        root = yaml.compose(text)
+    except yaml.YAMLError as exc:
+        print(
+            f"[빌드하네스] 기존 대장 표기 스캔 실패({type(exc).__name__}) — 기본 표기로 씁니다",
+            file=sys.stderr,
+        )
+        return {}
+    if not isinstance(root, yaml.MappingNode):
+        return {}
+
+    def entries(node: object) -> list[tuple[str, object]]:
+        return [(k.value, v) for k, v in node.value if isinstance(k, yaml.ScalarNode)]  # type: ignore[attr-defined]
+
+    owners: list[tuple[str, object]] = []
+    if list_key is None:
+        owners.append(("", root))
+    else:
+        for key, seq in entries(root):
+            if key != list_key or not isinstance(seq, yaml.SequenceNode):
+                continue
+            for item in seq.value:
+                if not isinstance(item, yaml.MappingNode):
+                    continue
+                ids = [
+                    v.value
+                    for k, v in entries(item)
+                    if k == "id" and isinstance(v, yaml.ScalarNode)
+                ]
+                if ids:
+                    owners.append((ids[0], item))
+
+    styles: _Styles = {}
+    for owner, mapping in owners:
+        for key, node in entries(mapping):
+            if isinstance(node, yaml.ScalarNode) and "\n" in node.value:
+                styles.setdefault((owner, key), "block" if node.style in ("|", ">") else "quoted")
+    return styles
+
+
+def _existing_styles(path: Path, *, list_key: str | None) -> _Styles:
+    if not path.exists():
+        return {}
+    return _scan_multiline_styles(path.read_text(encoding="utf-8"), list_key=list_key)
+
+
+def _wants_block(styles: _Styles | None, owner: str, key: str, value: object) -> bool:
+    """개행을 가진 문자열이고, 기존 표기가 '인용'이 아니면 블록으로 쓴다."""
+    if not isinstance(value, str) or "\n" not in value:
+        return False
+    return (styles or {}).get((owner, key)) != "quoted"
+
+
+def _block_lines(first_prefix: str, key: str, value: str, key_col: int) -> list[str] | None:
+    """`key: |` 블록 스칼라 줄들. 못 쓰거나 되읽은 값이 원문과 다르면 None(= 인용으로 물러남).
+
+    `key_col`은 키가 시작하는 열이다(태스크 0, 게이트 4 — `  - ` 접두의 첫 키도 같은 열).
+    본문은 키 열 + 2칸. 후행 개행 수는 chomping(`|`=1개 · `|-`=0개 · `|+`=2개 이상)으로 보존하고,
+    첫 줄이 공백/빈 줄로 시작하면 들여쓰기 지시자(`|2`)를 붙인다(자동 감지가 어긋나는 형태).
+    """
+    if _BLOCK_UNSAFE_RE.search(value) or yaml is None:
+        return None
+    if value.endswith("\n\n"):
+        chomp, body = "+", value[:-1]
+    elif value.endswith("\n"):
+        chomp, body = "", value[:-1]
+    else:
+        chomp, body = "-", value
+    indicator = str(_INDENT_STEP) if body[:1] in (" ", "\n") else ""
+    header = f"|{indicator}{chomp}"
+    pad = " " * (key_col + _INDENT_STEP)
+    lines = [f"{first_prefix}{key}: {header}"]
+    lines.extend(f"{pad}{line}" if line else "" for line in body.split("\n"))
+    # 되읽기 검증 — 이 표기가 어떤 값에서든 내용을 바꾸지 않는다는 보증. 열 0에서 같은 알고리즘의
+    # 출력을 파싱한다(블록 스칼라의 들여쓰기 지시자는 부모 열에 상대적이라 중첩 깊이와 무관).
+    probe_pad = " " * _INDENT_STEP
+    probe = [f"k: {header}"] + [f"{probe_pad}{line}" if line else "" for line in body.split("\n")]
+    try:
+        loaded = yaml.safe_load("\n".join(probe) + "\n")
+    except yaml.YAMLError:
+        return None
+    if not isinstance(loaded, dict) or loaded.get("k") != value:
+        return None
+    return lines
+
+
+def _field_lines(
+    first_prefix: str, key: str, value: object, *, key_col: int, block: bool
+) -> list[str]:
+    if block and isinstance(value, str):
+        lines = _block_lines(first_prefix, key, value, key_col)
+        if lines is not None:
+            return lines
+    return [f"{first_prefix}{key}: {_scalar(value)}"]
+
+
+def _dump_mapping(
+    data: dict[str, object],
+    key_order: list[str],
+    *,
+    owner: str = "",
+    styles: _Styles | None = None,
+) -> str:
     """1단 매핑 + 문자열 리스트를 고정 키 순서로 직렬화."""
     lines: list[str] = []
     for key in key_order:
@@ -104,7 +258,11 @@ def _dump_mapping(data: dict[str, object], key_order: list[str]) -> str:
                 lines.append(f"{key}:")
                 lines.extend(f"  - {_scalar(item)}" for item in value)
         else:
-            lines.append(f"{key}: {_scalar(value)}")
+            lines.extend(
+                _field_lines(
+                    "", key, value, key_col=0, block=_wants_block(styles, owner, key, value)
+                )
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -117,13 +275,13 @@ _GATE_KEY_ORDER = [f.name for f in dc_fields(Gate)]
 _GATE_OMIT_WHEN_EMPTY = frozenset({"depends_on", "no_inputs_reason"})
 
 
-def dump_task(task: Task) -> str:
+def dump_task(task: Task, styles: _Styles | None = None) -> str:
     data = {k: getattr(task, k) for k in _TASK_KEY_ORDER}
     header = "# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장\n"
-    return header + _dump_mapping(data, _TASK_KEY_ORDER)
+    return header + _dump_mapping(data, _TASK_KEY_ORDER, styles=styles)
 
 
-def dump_gates(gates: list[Gate]) -> str:
+def dump_gates(gates: list[Gate], styles: _Styles | None = None) -> str:
     lines = [
         "# 사람 게이트 대장 — clear는 evidence 필수 · 사람이 직접 닫으면 --as <담당자>(HARN-60)",
         "gates:",
@@ -146,7 +304,15 @@ def dump_gates(gates: list[Gate]) -> str:
                     lines.append(f"{prefix}{key}:")
                     lines.extend(f"      - {_scalar(item)}" for item in value)
             else:
-                lines.append(f"{prefix}{key}: {_scalar(value)}")
+                lines.extend(
+                    _field_lines(
+                        prefix,
+                        key,
+                        value,
+                        key_col=4,
+                        block=_wants_block(styles, gate.id, key, value),
+                    )
+                )
             first = False
     return "\n".join(lines) + "\n"
 
@@ -167,11 +333,69 @@ def dump_tracks(stage_order: list[str], tracks: list[Track]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _load_yaml(path: Path) -> dict:
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+def _duplicate_key_loader() -> type:
+    """한 매핑 안의 중복 키를 기록하는 SafeLoader 서브클래스를 만든다(HARN-203).
+
+    `yaml.safe_load`는 같은 매핑에 같은 키가 둘이면 **뒤 값이 이기고 오류를 내지 않는다**
+    (2026-09-29 실측 — title이 둘인 게이트 블록이 뒤 값 하나로 로드됐다). 블록 단위 ID 중복은
+    HARN-192가 잡지만 *블록 안의* 키 중복은 그 검사에 보이지 않는다 — 앞 값이 말없이 사라진다.
+
+    클래스를 모듈 최상위가 아니라 호출 시점에 만드는 이유: PyYAML이 없는 환경(`yaml is None`)에서도
+    이 모듈 import가 깨지지 않아야 한다(위 폴백). 병합 키(`<<`)는 *의도된* 덮어쓰기라 검사에서 뺀다.
+    """
+    assert yaml is not None
+
+    class _Loader(yaml.SafeLoader):  # type: ignore[misc,name-defined]
+        duplicates: list[tuple[str, int, int]]
+
+    def construct_mapping(loader: _Loader, node: object, deep: bool = False) -> object:
+        seen: dict[object, int] = {}
+        for key_node, _ in node.value:  # type: ignore[attr-defined]
+            if key_node.tag == _MERGE_TAG:
+                continue
+            # 생성 실패(미지 태그 등)는 삼키지 않는다 — 아래 PyYAML 본 구성이 같은 오류를 낸다.
+            # 병합 키(`<<`)는 생성기가 없어 여기서 예외가 나므로 위 면제 절이 실제로 필요하다.
+            key = loader.construct_object(key_node, deep=True)
+            try:
+                hash(key)
+            except TypeError:  # 해시 불가 키는 PyYAML 본 구성이 오류를 낸다 — 대신 판정 안 함
+                continue
+            line = key_node.start_mark.line + 1
+            if key in seen:
+                loader.duplicates.append((str(key), seen[key], line))
+            else:
+                seen[key] = line
+        return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)  # type: ignore[arg-type]
+
+    _Loader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_mapping)
+    return _Loader
+
+
+def _load_yaml(path: Path, errors: list[str] | None = None) -> dict:
+    """대장 YAML 로드. `errors`를 주면 한 매핑 안의 중복 키를 거기에 올린다(HARN-203).
+
+    중복이 있어도 로드는 계속한다(뒤 값이 이긴다) — 이 오류가 다른 무결성 검사를 가리면 한 번에
+    하나씩만 고치게 된다(HARN-192와 같은 관례). 호출자가 `errors`를 넘기지 않으면 종전 동작이다.
+    """
     if yaml is None:  # pragma: no cover - 환경 의존
         raise RuntimeError(YAML_MISSING_MSG)
+    loader_cls = _duplicate_key_loader()
     with path.open(encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
+        loader = loader_cls(fh)
+        loader.duplicates = []
+        try:
+            data = loader.get_single_data()
+        finally:
+            loader.dispose()
+    if errors is not None:
+        for key, first_line, line in loader.duplicates:
+            errors.append(
+                f"{path.name}: 같은 매핑 안에서 키 '{key}'가 중복됐다 "
+                f"(줄 {first_line}·{line}) — 앞 값이 조용히 사라진다(HARN-203)"
+            )
     return data or {}
 
 
@@ -207,7 +431,7 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
 
     tracks_path = bdir / "tracks.yaml"
     if tracks_path.exists():
-        raw = _load_yaml(tracks_path)
+        raw = _load_yaml(tracks_path, errors)
         backlog.stage_order = list(raw.get("stage_order") or [])
         for tid, tdata in (raw.get("tracks") or {}).items():
             track = _coerce(Track, {"id": tid, **(tdata or {})}, f"tracks.yaml:{tid}", errors)
@@ -218,16 +442,22 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
 
     gates_path = bdir / "gates.yaml"
     if gates_path.exists():
-        raw = _load_yaml(gates_path)
+        raw = _load_yaml(gates_path, errors)
         for gdata in raw.get("gates") or []:
             gate = _coerce(Gate, gdata or {}, f"gates.yaml:{(gdata or {}).get('id', '?')}", errors)
             if gate:
+                # HARN-192 — 사전 대입은 같은 id의 뒤 정의가 앞 정의를 조용히 덮어쓴다.
+                # 병렬 브랜치가 같은 게이트 ID를 따로 추가하고 충돌을 '둘 다 유지'로 풀면
+                # 여기서만 잡힌다(태스크 ID 중복 검사와 대칭). 로드는 계속한다 — 이 오류가
+                # 다른 무결성 검사를 가리면 한 번에 하나씩만 고치게 된다.
+                if gate.id in backlog.gates:  # type: ignore[union-attr]
+                    errors.append(f"gates.yaml: 게이트 ID 중복 '{gate.id}'")  # type: ignore[union-attr]
                 backlog.gates[gate.id] = gate  # type: ignore[union-attr]
 
     tasks_dir = bdir / "tasks"
     if tasks_dir.is_dir():
         for path in sorted(tasks_dir.glob("*.yaml")):
-            raw = _load_yaml(path)
+            raw = _load_yaml(path, errors)
             task = _coerce(Task, raw, path.name, errors)
             if task is None:
                 continue
@@ -247,14 +477,16 @@ def load_backlog(root: Path) -> tuple[Backlog, list[str]]:
 def save_task(root: Path, task: Task) -> Path:
     path = backlog_dir(root) / "tasks" / f"{task.id}.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(dump_task(task), encoding="utf-8")
+    styles = _existing_styles(path, list_key=None)
+    path.write_text(dump_task(task, styles), encoding="utf-8")
     return path
 
 
 def save_gates(root: Path, gates: list[Gate]) -> Path:
     path = backlog_dir(root) / "gates.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(dump_gates(gates), encoding="utf-8")
+    styles = _existing_styles(path, list_key="gates")
+    path.write_text(dump_gates(gates, styles), encoding="utf-8")
     return path
 
 
@@ -285,7 +517,7 @@ def load_policy(root: Path) -> tuple[Policy, list[str]]:
     path = backlog_dir(root) / "policy.yaml"
     if not path.exists():
         return Policy(), errors
-    raw = _load_yaml(path)
+    raw = _load_yaml(path, errors)  # HARN-203: policy.yaml도 같은 대장 계열 — 중복 키 검출 대상
     policy = _coerce(Policy, raw, "policy.yaml", errors)
     if policy is None:
         return Policy(), errors
@@ -335,6 +567,16 @@ def _event_shard_name(actor: str) -> str:
     """
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", actor).lstrip(".") or "unknown"
     return safe[:120] + ".ndjson"
+
+
+def session_shard_name(actor: str) -> str:
+    """세션(=브랜치) 샤드 파일명 — append-only 대장 전부가 같은 키로 나눈다.
+
+    이벤트 대장(HARN-46)과 사고 대장(HARN-130)이 **같은 함수**로 샤드 이름을 정한다.
+    대장마다 이름 규칙을 따로 두면 한 세션의 기록이 대장마다 다른 파일명으로 흩어지고,
+    경로 탈출 방어도 대장 수만큼 따로 유지해야 한다.
+    """
+    return _event_shard_name(actor)
 
 
 def event_paths(root: Path) -> list[Path]:
@@ -410,7 +652,7 @@ def append_event(root: Path, action: str, subject_id: str, **extra: object) -> N
     공용 단일 파일이 main 착지마다 열린 PR을 dirty로 만들었다(PR #931 실측).
     """
     actor = current_branch(root)
-    path = backlog_dir(root) / "events" / _event_shard_name(actor)
+    path = backlog_dir(root) / "events" / session_shard_name(actor)
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {
         # HARN-44: **오프셋 포함** 표기(`...+09:00`/`...+00:00`). 종전 표기

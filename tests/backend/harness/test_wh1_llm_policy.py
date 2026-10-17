@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Sequence
+
+import pytest
 
 from whymath_backend.harness.wh1_llm_policy import (
     _MAX_CONTEXT_NODES,
@@ -232,12 +235,24 @@ class TestSafeFallback:
         action = _next(policy, _state(has_solution_steps=True, verify_called=False))
         assert isinstance(action, VerifyStepAction)
 
-    def test_provider_error_falls_back(self) -> None:
-        """provider 예외(장애) → 안전 강등(학생 앞 크래시 금지)."""
+    def test_provider_error_falls_back(self, caplog: pytest.LogCaptureFixture) -> None:
+        """provider 예외(장애) → 안전 강등(학생 앞 크래시 금지) + 강등 사실이 타입명과 함께 로그에 남는다."""
         policy = LLMTutorPolicy(RaisingProvider())
-        action = _next(policy, _state())
+        with caplog.at_level(logging.WARNING, logger="whymath.harness.wh1_llm_policy"):
+            action = _next(policy, _state())
         assert isinstance(action, EndTurnAction)
         assert action.action_type == "격려"
+        # 침묵 실패 금지(CLAUDE.md) — 타입명은 남기고 예외 메시지·트레이스백은 남기지 않는다
+        # (예외 메시지는 학생 발화·답안을 담을 수 있다 — 미성년자 PII).
+        warnings = [
+            r
+            for r in caplog.records
+            if r.name == "whymath.harness.wh1_llm_policy" and r.levelno == logging.WARNING
+        ]
+        assert len(warnings) == 1
+        assert "RuntimeError" in warnings[0].getMessage()
+        assert "provider 다운" not in warnings[0].getMessage()
+        assert warnings[0].exc_info is None
 
 
 class TestNoRawLeak:

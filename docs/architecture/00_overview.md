@@ -120,7 +120,7 @@ L7 → L6 → L5 → L4 → L3 → L2 → L1
 | NCIC 크롤러 | L1 | P0 | Phase 1 첫 작업 |
 | 학교알리미 크롤러 | L1 | P0 | 학생별 교과서 매핑 |
 | 검정교과서 목차 DB | L1 | P0 | 본문 X, 목차만 |
-| 개념 연결 그래프 | L1 | P1 | PG 단일 평면(2026-08-03 정정 — Neo4j 런타임 연결 안 함·확정), 실측 원자 백본 2,683노드·2,210엣지 |
+| 개념 연결 그래프 | L1 | P1 | PG 단일 평면(2026-08-03 정정 — Neo4j 런타임 연결 안 함·확정), 실측 원자 백본 2,683노드·2,234엣지 |
 | 다국 커리큘럼 매트릭스 | L1 | P3 | Phase 1은 한국+참고용 미국·IMO만 |
 | 교과서 매핑 파이프라인 | L1 | P1~P2 | 구조 메타데이터만, 12단계(부록 H) |
 | 자동 커리큘럼 정렬 엔진 | L1+L6 | P1 | L1이 입력 보유, L6 모드가 소비 |
@@ -162,17 +162,17 @@ WhyMath 아키텍처는 *서로 직교하는 두 축*으로 본다:
 |---|---|---|---|
 | **Client** | Flutter 단일 학생앱(패드 중심·모드 분기) + 별도 웹(교사·SEO·Phase3+) | L5 일부, L6/L7 UI | 앱: Flutter 3.x+Riverpod·MathLive/three.js WebView · 별도 웹: React/Next |
 | **Backend** | FastAPI + uvicorn | L1 서비스·L2·L3·L4·L5 오케스트레이터·L6 모드 로직 | Python 3.12 + FastAPI |
-| **DB** | 다중 저장소 | L1·L2 자산의 영속 계층 | **현재 운영:** PostgreSQL 16 + pgvector, Redis 7 · **조건부 확장:** TimescaleDB, ClickHouse, S3/MinIO (Neo4j는 2026-08-03 정정 — 런타임 미도입, 개념 그래프는 PG 단일 평면) |
+| **DB** | 다중 저장소 | L1·L2 자산의 영속 계층 | **현재 운영:** PostgreSQL 16 + pgvector, Redis 7 · **조건부 확장:** TimescaleDB, S3/MinIO (Neo4j는 2026-08-03 정정 — 런타임 미도입, 개념 그래프는 PG 단일 평면 · ClickHouse는 2026-08-11 정정 — 런타임 미도입, 행동 로그 정본은 PG+TimescaleDB 단일 평면) |
 | **ML** | 추론·검증 런타임 | L3 모델 호출, L3 도구 검증 | Claude Sonnet/Opus(⏸ 2026-09-24~12-31 Anthropic API 사용 중단 · ARCH-66), Qwen3-Math(Phaiakes9 로컬), SymPy, 임베딩 bge-m3(기본·로컬 — 클라우드 옵션 te-3-large, 정본 = CLAUDE.md 스택 표) |
-| **Content Pipeline** | 배치·ETL | L1 수집·정형화·검증 | Prefect/Airflow, httpx + playwright, PaddleOCR+Qwen3-VL(로컬 OCR — 2026-05-28 Mathpix 대체), pdfplumber |
+| **Content Pipeline** | 배치·ETL | L1 수집·정형화·검증 | ~~Prefect/Airflow~~(미도입 — 저장소 전수 grep 0건 · 실제 실행 형태는 도메인별 `__main__.py` CLI + CI 잡), httpx + playwright, PaddleOCR+Qwen3-VL(로컬 OCR — 2026-05-28 Mathpix 대체), pdfplumber |
 
 ### 블록별 보충 메모
 
 - **Client — Flutter 단일 학생앱 + 별도 웹**: PRD의 3개 앱(학생·학부모·교사) 동시 개발은 Phase 1 부담(MEMORY.md PRD 허점 ③). Phase 1은 *Flutter 학생앱 1개*(패드 중심·학생+학부모 모드 분기 L6)에 집중하고, **교사 대시보드는 별도 웹(React/Next)으로 Phase 3+** (슬라이스 89). 수학 로직은 클라에 두지 않고 독립 코어(L1-L4) API로 소비.
 - **DB — 벡터 저장소 = pgvector(확정·슬98)**: 기존 Postgres 16에 pgvector 확장으로 통합 — 메타데이터(subject·exam_year·difficulty)가 이미 PG 컬럼이라 하이브리드 검색이 단일 SQL·6번째 store 회피·미성년 PII 통제 DB 유지. 대규모/고QPS 시 Qdrant 이관(지연 트리거). ChromaDB는 개발용(SQLite)이라 프로덕션 비채택.
 - **DB — 신규 저장소**: ~~Neo4j(개념 연결 그래프)~~(2026-08-03 정정 — 개념 그래프는 PG 단일
-  평면으로 확정, Neo4j 런타임 도입 안 함), ClickHouse(학습 행동 로그), S3/MinIO(영상·이미지)는
-  PRD 채택으로 추가. 상세 용도는 `01_data_foundation.md` 및 각 계층 문서 참조.
+  평면으로 확정, Neo4j 런타임 도입 안 함), ~~ClickHouse(학습 행동 로그)~~(2026-08-11 정정 — 런타임
+  미도입, 행동 로그는 PG+TimescaleDB 단일 평면), S3/MinIO(영상·이미지)는 PRD 채택으로 추가. 상세 용도는 `01_data_foundation.md` 및 각 계층 문서 참조.
 - **ML — 로컬 우선**: 클라우드 LLM 호출 전 항상 Phaiakes9 로컬(Qwen3-Math) 가능성 검토(CLAUDE.md 절대 원칙). AWS Seoul ↔ Phaiakes9 하이브리드의 동기화 비용은 PRD가 누락한 항목(MEMORY.md PRD 허점 ⑦) — 기존 하이브리드 인식 유지.
 - **Content Pipeline ↔ L1**: 이 블록은 거의 전적으로 L1(data-engineer)의 코드를 실행한다. PRD 신규 자산(개념 그래프·다국 매트릭스·교과서 매핑 12단계)의 수집·정형화가 모두 여기서 돈다.
 
@@ -190,6 +190,7 @@ WhyMath 아키텍처는 *서로 직교하는 두 축*으로 본다:
 - 콘텐츠 전략(교수법-중립 DSL·Rendering Engine·2층 캐시): `03c_content_strategy_cache.md`
 - 문제은행 격차·정합 정본: `problem_bank_gap_review.md` — 코퍼스 6종 현황·외부 틀(18~22) 대조 판정·설계 D1~D9
 - 2단계 교수법·런타임 선택·적응 엔진: `04d_adaptive_pedagogy_engine.md` · 북극성 서사: `../strategy/education_os_positioning_v1.md`
+- 교수전략 카탈로그·격차 완결(외부 프레임워크 대조 판정·비유/예시 생성·용어 3축): `04g_pedagogy_strategy_catalog.md` (구 번호 04e — 04e는 `04e_misconception_remediation_design.md`)
 - 시장 전략: `../strategy/`
 - 코딩 표준: `../standards/`
 - 프롬프트 라이브러리: `../prompts/`

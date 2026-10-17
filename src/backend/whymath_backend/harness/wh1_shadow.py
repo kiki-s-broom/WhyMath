@@ -30,7 +30,7 @@ import re
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,7 +44,14 @@ from whymath_backend.l4.session_recall import SessionRecall
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["Wh1HarnessShadowObservation", "emit_wh1_observation", "observe_wh1_harness_shadow"]
+__all__ = [
+    "PRIMARY_ADOPTED",
+    "PrimaryOutcome",
+    "Wh1HarnessShadowObservation",
+    "emit_wh1_aborted_observation",
+    "emit_wh1_observation",
+    "observe_wh1_harness_shadow",
+]
 
 logger = logging.getLogger("whymath.harness.wh1_shadow")  # judge shadow 네이밍 동형
 # 구조화 레코드 JSON 한 줄(harvest 입력) — 평문 로그와 분리된 자식 로거(shadow.record 미러).
@@ -54,6 +61,30 @@ record_logger = logging.getLogger("whymath.harness.wh1_shadow.record")
 # `last_verdict`를 `TurnOutcome`에 노출하지 않으므로(하네스 무변경 원칙) 트레이스로 관측한다.
 # 'incorrect'가 'correct'를 부분 포함하므로 정규식으로 토큰 경계를 정확히 잡는다.
 _VERIFY_VERDICT_RE = re.compile(r"검증 (correct|incorrect|unverifiable)")
+
+
+PrimaryOutcome = Literal[
+    "adopted",
+    "fallback_timeout",
+    "fallback_exception",
+    "fallback_llm_degraded",
+    "fallback_budget_exhausted",
+    "fallback_no_utterance",
+    "fallback_prose_gate",
+    "fallback_mode_guard",
+]
+"""primary 한 턴의 **결말** 닫힌 어휘(OPS-134 ②) — 학생이 LLM 발화를 받았는가, 왜 못 받았는가.
+
+`adopted` 외는 전부 LLM 발화가 학생에게 닿지 않은 턴이다(결정론 템플릿이 서빙된다).
+`fallback_llm_degraded`는 하네스가 정상 종료했지만 **턴을 끝낸 행동이 정책의 안전 강등**이었던
+경우다 — provider 실패·파싱 불가를 정책이 흡수해 `ended`로 돌려주므로, 이 라벨이 없으면 LLM이
+죽어도 채택으로 센다.
+
+어휘를 닫아 둔 이유: 열린 문자열이면 오타가 새 사유로 집계되고, 분모(시도)와 분자(채택)의 정의가
+호출 지점마다 달라진다."""
+
+PRIMARY_ADOPTED: PrimaryOutcome = "adopted"
+"""채택 = 하네스 발화가 (톤필터만 거쳐) 그대로 서빙된 결말. 채택률의 분자."""
 
 
 class Wh1HarnessShadowObservation(BaseModel):
@@ -103,8 +134,26 @@ class Wh1HarnessShadowObservation(BaseModel):
     등식으로 정렬되지 않음)임을 구분하는 진단 축 — 2026-07-19 실측에서 잔여 원인이 입력 UX로
     이동했다는 결론(S3-05)의 후속 관측이다."""
 
-    tool_calls: int
-    """총 도구 호출 횟수(하네스 트레이스 길이·거동 프로파일)."""
+    n_match_raw: int | None = None
+    """이 턴 match_misconception의 **게이트 전** 후보 수 합(MISC-18·비식별 정수). **None=구판
+    레코드**(게이트 결선 이전 emit)로 "후보 0건"(=0)과 구분한다 — 신판 emit은 항상 기록한다(match
+    미호출 턴도 0). `n_match_raw - n_match_kept`가 품질 게이트(top-1<floor면 후보 비움)가 이 턴에
+    *실제로 걸러낸* 약한 매치 수이며, 게이트가 실사용에서 일했는지는 이 분포로만 알 수 있다
+    (CLAUDE.md '작동한 비율' 원칙). 후보 id·학생 원문은 담지 않는다."""
+
+    n_match_kept: int | None = None
+    """이 턴 match_misconception의 **게이트 통과** 후보 수 합(MISC-18). None=구판 레코드."""
+
+    n_match_attribution_unclear: int | None = None
+    """이 턴 match_misconception 중 top-1이 **귀속 불명**이라 확신 진단을 보류한 실행 수(MISC-60·
+    비식별 정수). 하네스는 OCR 신뢰도를 갖지 않아 게이트②가 dormant이므로 보류 = 귀속 불명이다.
+    **None=구판 레코드**(보류 이전 emit)로 "보류 0회"(=0)와 구분한다 — 신판 emit은 항상 기록한다.
+    이 값이 0보다 큰 턴은 `curate_hypothesis`가 감쇠만 했고 `log_evidence`가 거부된 턴이다 — 보류가
+    실사용에서 얼마나 자주 발동하는지는 이 분포로만 알 수 있다(CLAUDE.md '작동한 비율' 원칙)."""
+
+    tool_calls: int | None
+    """총 도구 호출 횟수(하네스 트레이스 길이·거동 프로파일). **None=턴이 중단돼 알 수 없음**
+    (`status="aborted"` — 타임아웃 취소는 하네스 결과를 남기지 않는다). 0으로 위장하지 않는다."""
 
     hypothesis_count: int
     """턴 종료 시점 활성 오개념 가설 수(id 아님·수만·비식별)."""
@@ -145,6 +194,26 @@ class Wh1HarnessShadowObservation(BaseModel):
 
     None=프로즈 계층 미경유(플래그 OFF·shadow) 또는 승격 성공. 문자열이면 wh1_prose의
     REASON_* 코드(NOT_REPHRASABLE·PROSE_EQUATION 등 — 코드만·발화 원문 미포함)."""
+
+    primary_outcome: PrimaryOutcome | None = None
+    """primary 한 턴의 결말(OPS-134 ②) — **채택률의 단일 분류축**. **None=구판·shadow 레코드**(결말
+    미기록)로 "채택"과 구분한다: 구판 primary 레코드를 채택으로 세면 시간 초과로 기록이 0줄이던
+    턴이 분모에서 빠진 채 비율이 위조된다. 수확기는 None을 분모에서 빼고 따로 센다."""
+
+    elapsed_ms: int | None = None
+    """primary 한 턴이 시작부터 이 레코드를 낼 때까지 걸린 벽시계 시간(ms·OPS-134 ①). 타임아웃으로
+    끊긴 턴은 설정 예산에 가까운 값이 된다. None=구판·shadow(미계측)."""
+
+    llm_calls: int | None = None
+    """이 턴이 시작한 LLM 호출 수(취소로 끝나지 못한 호출 포함·OPS-134 ③). 폐기된 턴이 LLM을 얼마나
+    썼는지 — 서빙 표지가 붙은 호출이 버려진 출력인지 — 를 서버 로그 단독으로 세는 좌석이다."""
+
+    llm_calls_finished: int | None = None
+    """그중 값 또는 예외로 끝난 호출 수. 둘의 차이가 취소 시점에 비행 중이던 호출이다."""
+
+    llm_ms_total: int | None = None
+    """끝난 LLM 호출의 소요 합(ms·OPS-134 ①). `elapsed_ms`와 대조하면 예산이 LLM 안에서 소진됐는지
+    밖(캐시 대기·후보 조립·도구 실행)에서 소진됐는지 가려진다. 취소된 호출 소요는 몰라 제외."""
 
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -207,6 +276,44 @@ def _count_verify_forms(trace: Sequence[ToolResult]) -> tuple[int, int]:
     return equation, mixed
 
 
+def _count_match_gate(trace: Sequence[ToolResult]) -> tuple[int, int]:
+    """트레이스의 match_misconception 게이트 작동량 합 — (게이트 전 후보 수, 통과 후보 수).
+
+    하네스가 이미 계산해 트레이스에 실어 둔 `match_gate_counts`를 **합산만** 한다 — 게이트 판정을
+    재구현하지 않는다(단일 진실원천은 `l4/misconception/match_gate.py`·MISC-18). 구판 ToolResult
+    (필드 None)와 거부된 match(`ok=False`)는 0으로 합산된다. 산출은 비식별 정수 2개뿐이다.
+    """
+    raw = 0
+    kept = 0
+    for result in trace:
+        if result.kind != "match_misconception" or not result.ok:
+            continue
+        counts = result.match_gate_counts
+        if counts is None:
+            continue
+        raw += counts.get("raw", 0)
+        kept += counts.get("kept", 0)
+    return raw, kept
+
+
+def _count_match_attribution_unclear(trace: Sequence[ToolResult]) -> int:
+    """트레이스의 match_misconception 중 귀속 불명(보류)이었던 실행 수의 합(MISC-60).
+
+    `_count_match_gate`의 자매 함수다 — 하네스가 트레이스에 실어 둔 `match_gate_counts`의
+    `attribution_unclear`를 **합산만** 한다(판정 재구현 0). 거부된 match(`ok=False`)·구판 결과
+    (None)·match가 아닌 도구 결과는 0으로 합산된다. 산출은 비식별 정수 1개뿐이다.
+    """
+    total = 0
+    for result in trace:
+        if result.kind != "match_misconception" or not result.ok:
+            continue
+        counts = result.match_gate_counts
+        if counts is None:
+            continue
+        total += counts.get("attribution_unclear", 0)
+    return total
+
+
 def emit_wh1_observation(
     outcome: TurnOutcome,
     *,
@@ -218,6 +325,11 @@ def emit_wh1_observation(
     tone_violations: int = 0,
     prose_rephrased: bool = False,
     prose_reason_code: str | None = None,
+    primary_outcome: PrimaryOutcome | None = None,
+    elapsed_ms: int | None = None,
+    llm_calls: int | None = None,
+    llm_calls_finished: int | None = None,
+    llm_ms_total: int | None = None,
 ) -> None:
     """하네스 한 턴 결과를 관측 레코드로 emit — shadow·primary *공통* 단일 좌석(S1-11).
 
@@ -233,9 +345,14 @@ def emit_wh1_observation(
     n_correct, n_incorrect, n_unverifiable = _count_verify_verdicts(outcome.trace)
     # 전이 *형태* 집계(S3-51) — S3-02 해집합 경로가 이 턴에 몇 번 작동했는지(V3 축).
     n_equation, n_mixed = _count_verify_forms(outcome.trace)
+    # 매치 품질 게이트 작동량(MISC-18) — 게이트가 이 턴에 걸러낸 약한 매치가 몇 건인지(raw−kept).
+    n_match_raw, n_match_kept = _count_match_gate(outcome.trace)
+    # 확신 진단 보류 발동 수(MISC-60) — 이 턴에 귀속 불명으로 가설·증거를 보류한 match 실행 수.
+    n_match_unclear = _count_match_attribution_unclear(outcome.trace)
     logger.info(
         "WH-1 하네스 %s — status=%s action_type=%s verify=%s "
-        "transitions(c/i/u)=%d/%d/%d (tool_calls=%d hypotheses=%d tone_rewritten=%s)",
+        "transitions(c/i/u)=%d/%d/%d match(raw/kept/unclear)=%d/%d/%d "
+        "(tool_calls=%d hypotheses=%d tone_rewritten=%s)",
         "primary" if primary else "shadow(비노출)",
         outcome.status,
         outcome.action_type,
@@ -243,6 +360,9 @@ def emit_wh1_observation(
         n_correct,
         n_incorrect,
         n_unverifiable,
+        n_match_raw,
+        n_match_kept,
+        n_match_unclear,
         outcome.tool_calls,
         len(outcome.hypotheses),
         tone_rewritten,
@@ -257,6 +377,9 @@ def emit_wh1_observation(
             n_unverifiable=n_unverifiable,
             n_equation_transitions=n_equation,
             n_mixed_form_transitions=n_mixed,
+            n_match_raw=n_match_raw,
+            n_match_kept=n_match_kept,
+            n_match_attribution_unclear=n_match_unclear,
             tool_calls=outcome.tool_calls,
             hypothesis_count=len(outcome.hypotheses),
             dialogue_id=dialogue_id,
@@ -267,6 +390,51 @@ def emit_wh1_observation(
             tone_violations=tone_violations,
             prose_rephrased=prose_rephrased,
             prose_reason_code=prose_reason_code,
+            primary_outcome=primary_outcome,
+            elapsed_ms=elapsed_ms,
+            llm_calls=llm_calls,
+            llm_calls_finished=llm_calls_finished,
+            llm_ms_total=llm_ms_total,
+        ).model_dump_json()
+    )
+
+
+def emit_wh1_aborted_observation(
+    *,
+    reason: Literal["fallback_timeout", "fallback_exception"],
+    dialogue_id: str | None = None,
+    turn_index: int = 1,
+    problem_id: str | None = None,
+    elapsed_ms: int | None = None,
+    llm_calls: int | None = None,
+    llm_calls_finished: int | None = None,
+    llm_ms_total: int | None = None,
+) -> None:
+    """하네스가 **결과를 남기지 못하고 중단된** primary 턴의 레코드를 emit한다(OPS-134 ②).
+
+    타임아웃 취소·예외는 `TurnOutcome`을 만들지 못해 `emit_wh1_observation`을 못 부른다 — 그래서
+    이 경로는 이전까지 기록이 0줄이었고, 15턴 중 14턴이 폴백한 라이브 실측(2026-10-12)에서도
+    primary 기록 파일은 1줄이었다. 이 레코드가 그 결손을 메워 "primary가 작동한 비율"의 분모를
+    정직하게 만든다. 결과가 없으므로 status는 `aborted`·action_type/verify는 None·tool_calls는
+    None(0 위장 금지)이다. 원인은 **예외 타입명 수준의 닫힌 어휘**로만 싣는다 — 메시지·트레이스백은
+    학생 발화를 담을 수 있어 레코드에 들어올 자리가 없다(`extra="forbid"`).
+    """
+    record_logger.info(
+        Wh1HarnessShadowObservation(
+            status="aborted",
+            action_type=None,
+            verify_verdict=None,
+            tool_calls=None,
+            hypothesis_count=0,
+            dialogue_id=dialogue_id,
+            turn_index=turn_index,
+            problem_id=problem_id,
+            primary=True,
+            primary_outcome=reason,
+            elapsed_ms=elapsed_ms,
+            llm_calls=llm_calls,
+            llm_calls_finished=llm_calls_finished,
+            llm_ms_total=llm_ms_total,
         ).model_dump_json()
     )
 
@@ -355,5 +523,8 @@ async def observe_wh1_harness_shadow(
             turn_index=turn_index,
             problem_id=problem_id,
         )
-    except Exception:  # noqa: BLE001 — 관측은 본류를 안 깬다(비차단 방어선·shadow.py:244 미러)
+    # 관측 방어선 — 관측은 본류를 안 깬다(비차단 방어선·shadow.py:244 미러)
+    except Exception as exc:  # noqa: BLE001
+        # 침묵 실패 금지 — 타입명만 남긴다(메시지·트레이스백은 학생 발화를 담을 수 있어 제외).
+        logger.warning("WH-1 하네스 shadow 관측 실패: %s", type(exc).__name__)
         return

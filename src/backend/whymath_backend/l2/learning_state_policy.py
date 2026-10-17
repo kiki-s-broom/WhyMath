@@ -23,18 +23,24 @@
 
 규칙 우선순위가 왜 이 순서인가
 ------------------------------
-R5(반복 실패)가 R3(오개념)·R4(선수결손)보다 **앞선다**. 같은 개념에서 연속으로 막힌 학생에게
+R5(반복 실패)가 R3(오개념)보다 **앞선다**. 같은 개념에서 연속으로 막힌 학생에게
 원인 분류를 정밀하게 하는 것보다 먼저 막힌 지점을 풀어 주는 것이 앞선다(CLAUDE.md 의사결정
 우선순위 1 학생 정서·웰빙 > 3 교수학적 정확성). 이 순서를 뒤집으면 3연속 오답 학생이 계속
 오개념 교정만 받고 설명을 못 받는다.
 
-R3(오개념)가 R4(선수결손)보다 앞선다. 오개념은 *틀린 것을 알고 있는* 상태라 선수 개념을
-다시 가르쳐도 그 오개념이 그대로 남는다 — 먼저 지워야 한다.
-
 이 순서가 오답 직후 경로 우선순위의 **유일한 정본**이다. 반대 순서(선수 > 오개념)를 선언하던
 MISC-30 경로 표(`remediation_policy.select_route`)는 EOS-138 ③ 판정으로 삭제됐다 — 근거는
-`docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md`. R4가 R3를 이기는
-조건부 예외(R4a)는 R4 생산자 배선과 함께 `EOS-127`이 소유한다.
+`docs/reviews/eos138_r3_input_scope_and_route_order_judgment_2026-09-28.md`.
+
+선수 개념 결손 규칙(R4)은 없다 (EOS-127)
+----------------------------------------
+이 정책은 선수 결손을 *상태 전이*로 다루지 않는다. 과거 R4(`R4-prerequisite-gap`)는 입력
+(`prerequisite_gap_concept_ids`)의 생산자가 서빙 경로에 한 번도 배선되지 않아 발화한 적이
+없었고, 배선하면 오히려 해롭다고 판정돼 삭제됐다 — 선수 하강은 이미 **다음 문항 선택**이
+요청 시점에 예산(시간·노드·깊이)을 걸고 수행한다(R6 → `l2/learning_state_recommendation`의
+선수 탐침·`KNOWN_PREREQUISITE_DEFICIT`, 실 PG 테스트 있음). 제출 시점에 R4를 또 두면 같은
+판단의 두 번째 진실 원천이 되고, R6보다 먼저 가로채 그 하강을 막는다. 판정·실측 정본:
+`docs/reviews/eos127_r4_prerequisite_gap_disposition_2026-10-03.md`.
 
 미매치는 예외다
 ---------------
@@ -85,7 +91,6 @@ class NoMatchingPolicyRuleError(RuntimeError):
             f"상태 {state.value}의 증거에 매치되는 정책 규칙이 없습니다 "
             f"(is_correct={evidence.is_correct}, confidence={evidence.confidence}, "
             f"misconceptions={len(evidence.confirmed_misconception_ids)}, "
-            f"prereq_gaps={len(evidence.prerequisite_gap_concept_ids)}, "
             f"consecutive_failures={evidence.consecutive_failures}). "
             f"규칙 집합에 구멍이 있습니다 — l2/learning_state_policy.py::V1_RULES 확인."
         )
@@ -151,7 +156,7 @@ V1_RULES: Sequence[PolicyRule] = (
         rule_id="R5-repeated-failure",
         description=(
             "반복 실패 — 같은 개념에서 연속 오답이 임계 이상이면 원인 분류보다 설명·힌트가 "
-            "앞선다. R3·R4보다 먼저 평가되지 않으면 막힌 학생이 계속 교정만 받는다."
+            "앞선다. R3보다 먼저 평가되지 않으면 막힌 학생이 계속 교정만 받는다."
         ),
         matches=lambda e: (
             not e.is_correct and e.consecutive_failures >= REPEATED_FAILURE_THRESHOLD
@@ -167,7 +172,7 @@ V1_RULES: Sequence[PolicyRule] = (
         rule_id="R3-wrong-misconception",
         description=(
             "오답 + 오개념 확인 — 확인된 오개념이 있으면 교정이 먼저다. 오개념을 남긴 채 "
-            "선수 개념을 다시 가르치면 그 오개념이 그대로 따라온다(R4보다 앞서는 이유)."
+            "선수 개념을 다시 가르치면 그 오개념이 그대로 따라온다."
         ),
         matches=lambda e: not e.is_correct and bool(e.confirmed_misconception_ids),
         decide=lambda e: PolicyDecision(
@@ -178,23 +183,6 @@ V1_RULES: Sequence[PolicyRule] = (
             ),
             rule_id="R3-wrong-misconception",
             trigger=TransitionTrigger.POLICY_REMEDIATE_MISCONCEPTION,
-        ),
-    ),
-    PolicyRule(
-        rule_id="R4-prerequisite-gap",
-        description=(
-            "오답 + 선수 개념 결손 — 현재 개념을 더 연습해도 소용없다. 결손 선수 개념의 "
-            "학습(LEARNING)으로 되돌아간다."
-        ),
-        matches=lambda e: not e.is_correct and bool(e.prerequisite_gap_concept_ids),
-        decide=lambda e: PolicyDecision(
-            next_state=LearningState.LEARNING,
-            next_action=NextAction(
-                kind=NextActionKind.GO_TO_PREREQUISITE_CONCEPT,
-                target_concept_id=e.prerequisite_gap_concept_ids[0],
-            ),
-            rule_id="R4-prerequisite-gap",
-            trigger=TransitionTrigger.POLICY_PREREQUISITE_GAP,
         ),
     ),
     PolicyRule(
@@ -225,8 +213,9 @@ V1_RULES: Sequence[PolicyRule] = (
     PolicyRule(
         rule_id="R6-wrong-undiagnosed",
         description=(
-            "오답이나 원인(반복·오개념·선수결손)이 하나도 확인되지 않음 — 추측으로 교정하지 "
-            "않고 같은 개념 연습을 이어 간다. 이 규칙이 없으면 원인 미상 오답이 규칙 구멍으로 "
+            "오답이나 원인(반복·오개념)이 하나도 확인되지 않음 — 추측으로 교정하지 "
+            "않고 같은 개념 연습을 이어 간다(선수 쪽 하강은 다음 문항 선택이 한다). 이 규칙이 "
+            "없으면 원인 미상 오답이 규칙 구멍으로 "
             "떨어져 예외가 된다(그것이 의도한 변별력이다 — 테스트 참조)."
         ),
         matches=lambda e: not e.is_correct,

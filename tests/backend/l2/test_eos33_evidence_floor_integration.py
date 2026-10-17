@@ -245,7 +245,7 @@ def test_thin_advance_keeps_the_first_pass_problem_on_live_pg(anchor_samples: in
         assert outcome.target_concept == ids["c_anchor"]
         assert outcome.reason.mastery == 0.92
         assert outcome.reason.sample_size == anchor_samples
-        assert outcome.policy_version == "cat_v3"
+        assert outcome.policy_version == "cat_v6"
     finally:
         asyncio.run(
             _cleanup([ids["p_anchor"], ids["p_next"]], [ids["c_anchor"], ids["c_next"]], [uid])

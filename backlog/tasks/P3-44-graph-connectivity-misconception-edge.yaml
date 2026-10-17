@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-44-graph-connectivity-misconception-edge
+title: "P3-44 — 삼각의 오개념 변 닫기: 끊긴 개념 5개의 오답 보기를 자기 핵심 오개념에 재연결 (Graph Connectivity 5/10 → 95%, P3-05 결정 ④ 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-05-triangle-density
+requires_gates: []
+acceptance:
+  - "① 기준선 — main 781d68e1 에서 Graph Connectivity Coverage 가 5/10 이다(phase3_coverage 와 phase3_metrics 의 같은 지표). 끊긴 개념은 [12미적Ⅰ-02-05]·[-02-06]·[-02-08]·[-02-09]·[-02-10] 5개이고 사유는 전부 \"problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다\" 이다. 착수 시 현 main 에서 같은 명령으로 다시 재서 기준선을 확정한다(이 수치는 신뢰할 근거가 아니라 출발점이다).\n② 원인 규명이 먼저다 — 설계 메모 docs/reviews/p3_05_triangle_density_design_2026-10-14.md 5절 표가 방향을 보였다: 02-05·02-10 은 오답 보기가 power-rule-step-omitted(→M0671, 02-03 의 핵심 오개념), 02-08 은 critical-point-implies-extremum(→M0080, 02-01 의 핵심), 02-09 는 extremum-value-vs-point-confused(→M0865, 02-07 의 핵심)로 연결돼 있어 자기 개념의 핵심 오개념(M0673·M0676·M0677·M0678)에 닿지 않는다. 단 크로스링크 대조는 kebab 문자열의 첫 일치 행만 읽은 것이라 전수 확인이 아니다. 02-06 은 M0674 를 직접 기입했는데도 미충족으로 나온다 — 원인 미규명이며 이 태스크의 첫 조사 항목이다.\n③ 재연결 — 각 끊긴 개념의 오개념 유발 문항 오답 보기를 자기 개념의 핵심 오개념(명세 core_misconceptions 12개)에 닿게 한다. 재연결 수단은 오답 보기(distractor_map) 쪽을 먼저 쓴다. 크로스링크 신설·변경은 Kiki 서명(검수:kiki)이 필요한 승인 절차이므로 세션이 대신 서명하지 않는다 — 서명이 필요한 항목은 게이트로 분리해 Kiki 행동으로 넘긴다(P3-05 결정 ④ 원문).\n④ 승인 경로 비용을 일정에 넣는다 — 오답 보기를 바꾸면 문항 내용이 바뀐다. 승인된 문항을 제자리 수정하면 감사가 본 내용과 달라지므로(P3-31 지문 핀 선례), 수정본은 승인 경로를 다시 통과해야 지표에 잡힌다. P3-03 은 감사 5회차(68→23→11→5→1건)가 걸렸다. 승인 경로 크기 하한(_MIN_N=200)이 구성을 정한다는 P3-05 4·5단계 결정을 따른다.\n⑤ 변별력 — 재연결 후 오답 보기 하나를 다른 개념의 오개념으로 되돌리는 주입이 해당 개념을 다시 미충족으로 만드는지, 대조군(원본)은 충족인지 확인한다. 정상 입력에서 초록인 것은 증거가 아니다. 주입이 실제 적용됐는지(mutated != original)도 단언한다.\n⑥ 퍼널 잔여 — chain_funnel 에서 오개념 단계 5 와 교수 단계 5 가 같이 낮다. ③ 후에도 교수 단계가 남으면 그 몫이 P3-23(오개념–교수 간선 어휘)인지 확인하고, 아니면 별건으로 등재만 한다. 이 태스크가 교수 단계를 직접 고치지 않는다.\n⑦ 범위 — 대표 과정(미적분Ⅰ 미분) 10개 개념 안에서만 한다. 범위 밖 학년·단원에 오개념을 넣지 않는다. 콘텐츠는 데이터로 두고 소스에 하드코딩하지 않는다.\n⑧ 완료 판정 — Graph Connectivity Coverage ≥ 목표(명세 graph_connectivity_coverage = 0.95, 2026-10-12 확정)를 phase3_coverage 출력의 종료 판정으로 보고한다. 전후 지표를 같은 명령으로 낸다."
+artifacts: []
+paths: []
+session: null
+notes: |-
+  출처: P3-05 결정 ④(Kiki 2026-10-14 채택) — 삼각의 오개념 변(Graph Connectivity)을 완료 판정에 포함하되 일정은 분리하고, 크로스링크 추가는 Kiki 서명이 필요하므로 오답 보기 재연결을 먼저 진행한다. P3-05 는 슬롯 60/60·Problem Coverage 8/8 로 done 처리됐으나 Graph Connectivity 는 5/10 으로 남았고, 분리된 일정을 받는 태스크가 대장에 없었다.
+
+  [부재 판정 범위] 내가 찾은 방법으로는 0건이다 — 이름(graph_connectivity)으로 6개 태스크가 걸렸으나(EOS-128·P3-02·P3-05·P3-14·P3-23·P3-33) 문항 오답 보기→핵심 오개념 재연결을 소유한 것은 없다. 역할 검색(재연결·핵심 오개념에 닿는·problem→misconception)도 0건. 근접 태스크의 경계: P3-06 은 오답→Error Signature→오개념 후보→교정 전략(문항 배선 아님), P3-23 은 오개념–교수 간선 어휘, P3-16 은 Week 2 게이트 판정(조건에 Graph Connectivity 없음).
+
+  [판정 기준] 측정은 main 781d68e1, 대장 조회는 main e00d619f. 근거: docs/reviews/p3_05_triangle_density_design_2026-10-14.md 5절. 등재는 착수가 아니다.
+updated: 2026-10-16

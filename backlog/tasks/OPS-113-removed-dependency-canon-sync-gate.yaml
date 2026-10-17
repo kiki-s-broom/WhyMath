@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-113-removed-dependency-canon-sync-gate
+title: "제거된 의존이 정본에 살아 있음 — 제거↔정본 동기 게이트(MOB-08 선언↔사용의 역방향 짝)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 실측 고정 — pubspec.yaml에서 이미 제거된 의존(flutter_tts·speech_to_text·firebase_messaging·firebase_core 등)이 src/backend/**/*.py 주석·docs/**/*.md 본문에 '현재 그것을 쓴다'는 단정형으로 남아 있는 곳을 전수 목록화한다. 착수 시점 기준 재측정할 것."
+  - "② 게이트 신설 — tests/infra/test_removed_dependency_canon_sync.py. pubspec.yaml의 '제거 사유 주석 블록'에서 의존명을 파싱해 추출하고(하드코딩 목록 금지 — 주석이 단일 진실원천), 그 이름이 src/backend/**/*.py·docs/architecture/**/*.md·docs/standards/**/*.md에 허용목록 밖으로 등장하면 exit 1. 허용목록에는 '제거 이력·사고 경위를 서술하는 위치'만 사유 주석과 함께 등재한다(근거 없는 포괄 허용 금지 — MOB-08 pubspec_dependency_usage_governance_test.dart 허용목록 관용구 답습)."
+  - "③ 변별력 실측(양방향) — 정정된 문장 하나를 stale 표현으로 되돌리면 red, 되돌린 것을 다시 고치면 green을 둘 다 실측한다. 판정은 exit code로 한다(-q·tail로 잘라 눈으로 보고 통과 선언 금지)."
+  - "④ CI 배선 확인 — 이 테스트가 infra-contracts 잡(tests/infra 상시 실행)에서 실제로 도는 것을 확인한 뒤 완료로 친다. 새 테스트·모듈이 EOS 기능 인벤토리 전수 귀속 가드에 걸리지 않는지도 같은 잡에서 확인한다."
+  - "⑤ 범위 밖 동결 — flutter_tts·speech_to_text 재도입, SpeechSpec 클라 배선, firebase/푸시 구현 일체. 이 태스크는 '제거 사실이 정본에 반영되어 있는가'만 기계화한다."
+artifacts: []
+paths:
+  - tests/infra/test_removed_dependency_canon_sync.py
+  - src/mobile/pubspec.yaml
+  - "docs/architecture/**"
+session: null
+notes: "출처: OPS-40 회수(2026-10-05) — 서비스 운영 r2 문서 G1·D6. 고립 브랜치에서는 OPS-34 번호였으나 main의 OPS-34는 다른 태스크(오프라인 리포트 수취인 계약)라 새 번호로 승계했다. 참조 = 고립 브랜치 origin/claude/whymath-service-operations-review-5t5lmv(head dd3e9475). 회수 완료 전 삭제 금지. 설계 YAML은 backlog/tasks/OPS-34-removed-dependency-canon-sync-gate.yaml(브랜치 b6a4d5e0)이며 동등 테스트는 main에 0건이다. OPS-40이 flutter_tts·44dp 정정 7개 파일(api/speech.py·schema/speech.py·05_interaction·system_deep_dive·visualization_module_gap_review·ui/01·ui/02)을 먼저 상환했으므로 ①의 전수 목록화는 착수 시점 재측정 기준이다."
+updated: 2026-10-05

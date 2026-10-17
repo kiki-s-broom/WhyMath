@@ -40,7 +40,9 @@ Protocol을 *프로덕션*으로 구현한다 — 지금까지 두뇌는 `Script
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 from collections.abc import Sequence
 
 from pydantic import ValidationError
@@ -68,6 +70,8 @@ from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.misconception.probe_selection import ProbeCandidate
 from whymath_backend.l4.session_recall import SessionRecall
+
+logger = logging.getLogger("whymath.harness.wh1_llm_policy")
 
 __all__ = ["LLMTutorPolicy"]
 
@@ -186,19 +190,69 @@ class LLMTutorPolicy:
         self._difficulty = difficulty
         self._max_history = max_history
         self._session_recall = session_recall
+        # OPS-134 ② — 이 턴이 LLM을 몇 번 불렀고 얼마나 걸렸는지의 인프로세스 회계. 턴이
+        # 타임아웃으로 끊겨도 정책 객체는 호출자(`wh1_primary`)가 쥐고 있어 읽을 수 있다
+        # (Langfuse 단독 회계 금지).
+        self._llm_calls_started = 0
+        self._llm_calls_finished = 0
+        self._llm_ms_total = 0
+        self._last_action_degraded = False
+
+    @property
+    def llm_calls_started(self) -> int:
+        """이 정책이 `generate`를 시작한 횟수 — 타임아웃 취소로 끝나지 못한 호출을 포함한다."""
+        return self._llm_calls_started
+
+    @property
+    def llm_calls_finished(self) -> int:
+        """`generate`가 값 또는 예외로 끝난 횟수. `started - finished`가 취소 시점 비행 중 호출."""
+        return self._llm_calls_finished
+
+    @property
+    def llm_ms_total(self) -> int:
+        """끝난 호출의 소요 합(ms). 취소된 호출의 소요는 포함하지 않는다(끝나지 않아 알 수 없다)."""
+        return self._llm_ms_total
+
+    @property
+    def last_action_degraded(self) -> bool:
+        """가장 최근 `next_action`이 LLM 선택이 아니라 **안전 강등**(`_safe_fallback`)이었는가.
+
+        턴을 끝낸 행동(마지막 호출)이 강등이면 학생이 받은 발화는 LLM 선택이 아니라 결정론 강등의
+        산물이다. provider 실패는 정책이 흡수해 정상 `ended` 턴으로 돌아오므로 이 표지가 없으면
+        LLM이 죽어도 "채택"으로 세어진다(OPS-134 ②의 숨은 오집계 경로). 앞선 호출의 강등은 마지막
+        호출이 정상이면 지워진다 — 첫 호출만 실패하고 둘째가 정상 발화한 턴은 LLM 발화다.
+        """
+        return self._last_action_degraded
 
     # ── TutorPolicy Protocol ──────────────────────────────────────────
     async def next_action(self, state: TurnState) -> Action:
         """다음 도구를 고른다 — 상태 요약 → L3 provider → 파싱 → 불변식 이중 방어."""
         prompt = self._build_prompt(state)
+        # 이번 호출의 강등 여부만 남긴다(`_safe_fallback`이 세운다).
+        self._last_action_degraded = False
+        self._llm_calls_started += 1
+        started = time.monotonic()
         try:
             # 좌석 경유(OPS-36): 라우터 결정·캐시 조회/적재·Langfuse 기록이 전부 그 안에서
             # 일어난다. 도구 선택은 텍스트만 소비한다(usage는 좌석이 트레이스로 흘렸다).
             raw = await self._seam.generate(self._routing_request(), prompt, _SYSTEM_PROMPT)
-        except Exception:  # noqa: BLE001 — provider 장애 시 학생 앞 크래시 금지·안전 강등.
+            self._note_llm_call_finished(started)
+        except Exception as exc:  # noqa: BLE001 — provider 장애 시 학생 앞 크래시 금지·안전 강등.
+            self._note_llm_call_finished(started)
+            # 침묵 실패 금지 — 강등 사실과 예외 타입명을 남긴다
+            # (메시지는 프롬프트 원문을 담을 수 있어 제외).
+            logger.warning(
+                "LLMTutorPolicy provider 호출 실패 — 안전 강등(결정론 폴백): %s", type(exc).__name__
+            )
             return self._safe_fallback(state)
         action = self._parse_action(raw, state)
         return self._enforce_invariants(action, state)
+
+    def _note_llm_call_finished(self, started: float) -> None:
+        """끝난 호출을 회계한다. `CancelledError`(타임아웃 취소)는 `except Exception`을 지나치므로
+        여기 오지 않는다 — 그래서 취소된 호출은 started에만 잡히고 finished에는 잡히지 않는다."""
+        self._llm_calls_finished += 1
+        self._llm_ms_total += round((time.monotonic() - started) * 1000)
 
     # ── 상태 요약(비민감·Minimal Reasoning Subgraph 예산 적용) ──────────
     def _build_prompt(self, state: TurnState) -> str:
@@ -516,6 +570,7 @@ class LLMTutorPolicy:
 
     def _safe_fallback(self, state: TurnState) -> Action:
         """안전 강등 — 조용한 크래시 금지. verify 의무가 걸리면 verify_step, 아니면 격려 종료."""
+        self._last_action_degraded = True
         if state.has_solution_steps and not state.verify_called:
             return VerifyStepAction(steps=list(self._solution_steps))
         return EndTurnAction(action_type=_ENCOURAGE_TYPE, utterance=None)

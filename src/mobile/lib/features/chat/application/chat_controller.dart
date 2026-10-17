@@ -3,7 +3,8 @@
 // 경계(CLAUDE.md): 수학·교수학 결정은 전부 서버(L4 `POST /v1/coach`)가 내린다. 이 컨트롤러는
 // (1) 학생 입력을 요청으로 옮기고 (2) 받은 [CoachResponse]를 화면 메시지로 *렌더*하며
 // (3) 서버가 내린 단계 전이 결정을 그대로 적용할 뿐이다(표현≠의미·수학 로직 클라 미구현).
-// 부수효과는 [CoachApi] 호출 하나뿐 — 나머지는 순수 상태 전이다.
+// 부수효과는 [CoachApi] 호출과 [DialogueStore] 영속(마지막 대화 이어하기·MOB-11) 정도다 — 나머지는
+// 순수 상태 전이다.
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -11,6 +12,7 @@ import '../../ocr/data/ocr_models.dart';
 import '../../problems/application/active_problem.dart';
 import '../data/coach_api.dart';
 import '../data/coach_models.dart';
+import '../data/dialogue_store.dart';
 import '../data/scene_api.dart';
 import '../domain/chat_message.dart';
 import '../domain/latex_to_plain.dart';
@@ -203,6 +205,10 @@ class ChatController extends _$ChatController {
         // 진단→문제제시에서 넘어온 활성 문제(있으면)에 세션을 묶는다(problem_id 영속).
         result = await api.createSession(request, problemId: activeProblemId);
         dialogueId = result.dialogueId;
+        // 새 세션 ID를 영속한다(MOB-11 — 재시작 시 [restoreLastDialogue]가 이어하기 대상으로
+        // 쓴다). 저장하는 것은 세션 *참조*(UUID)뿐이고 대화 본문은 서버가 보관한다. 저장 실패는
+        // 이 교환을 실패로 만들지 않는다(가용성 — 코치 응답은 이미 받았다).
+        await _persistDialogueId(dialogueId);
       } else {
         result = await api.addTurn(dialogueId, request);
       }
@@ -306,5 +312,73 @@ class ChatController extends _$ChatController {
         error: '학습 장면을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
       );
     }
+  }
+
+  /// 세션 참조 ID 영속(MOB-11) — 실패는 삼키되 예외 타입명을 남긴다(CLAUDE.md 침묵 실패 금지).
+  Future<void> _persistDialogueId(String dialogueId) async {
+    try {
+      await ref.read(dialogueStoreProvider).saveDialogueId(dialogueId);
+    } on Object catch (e) {
+      debugPrint('대화 세션 ID 저장 실패(${e.runtimeType}) — 이번 대화는 이어지고 재실행 복원만 빠진다.');
+    }
+  }
+
+  /// 저장된 마지막 dialogueId가 있으면 세션을 다시 불러와 대화를 이어서 보여준다(MOB-11).
+  ///
+  /// 신규 엔드포인트를 만들지 않는다 — 기존 `GET /v1/coach/sessions/{id}`([CoachApi.getSession])
+  /// 만 재사용한다(서버가 소유권을 검증 — 남의 세션이면 404로 조용히 빈 대화). 복원된 과거 턴은
+  /// role만 보고 단순 텍스트 버블로 낮춘다(소크라테스 배지·검증 신호 카드·완료 신호는 재구성하지
+  /// 않는다 — 이 메서드는 "이어하기"의 최소 착지다).
+  ///
+  /// 이미 이번 실행에서 세션이 시작됐으면(발화로 dialogueId가 잡힘) 되돌아온 과거 세션으로
+  /// 덮지 않는다(비동기 두 지점에서 가드) — 저장소 읽기·세션 조회 실패는 빈 대화로 시작한다
+  /// (가용성). *압박 문구 없음* — 공백 기간을 환기하는 문구는 절대 넣지 않는다(5원칙 원칙 4
+  /// "돌아오기 쉽다"의 정반대·`anti_gamification_governance_test.dart`).
+  Future<void> restoreLastDialogue() async {
+    if (state.dialogueId != null) {
+      return; // 이미 이번 실행에서 세션이 시작됐다.
+    }
+    try {
+      final dialogueId = await ref.read(dialogueStoreProvider).readDialogueId();
+      if (dialogueId == null || dialogueId.isEmpty || state.dialogueId != null) {
+        return;
+      }
+      final snapshot = await ref.read(coachApiProvider).getSession(dialogueId);
+      if (state.dialogueId != null) {
+        return; // 조회 중에 이미 새 세션이 시작됐을 수 있다(방어).
+      }
+      final restored = snapshot.turns
+          .map(_turnToChatMessage)
+          .whereType<ChatMessage>()
+          .toList();
+      state = state.copyWith(
+        dialogueId: snapshot.dialogueId,
+        messages: restored,
+      );
+    } on Object catch (e) {
+      // 저장소 오류·세션 소멸(404)·네트워크 실패 — 이번 실행은 빈 대화로 시작한다(가용성).
+      // 학생 화면에 에러 배너는 띄우지 않되 타입명은 남긴다(본문·세션 ID는 남기지 않는다).
+      debugPrint('마지막 대화 복원 건너뜀(${e.runtimeType}) — 빈 대화로 시작한다.');
+    }
+  }
+}
+
+/// 세션 조회 턴 1건을 화면 버블로 낮춘다(role만 매핑·순수 함수).
+///
+/// `CoachTurn`은 role/content만 있고 `ChatMessage`는 더 풍부한 필드(socraticCategory·
+/// response·scene)를 가진다 — 복원된 과거 턴은 그 필드들을 채우지 않는다(null 유지·최소
+/// 착지). role이 student/assistant가 아니면(system 등) 화면에 그릴 대상이 아니라 null.
+ChatMessage? _turnToChatMessage(CoachTurn turn) {
+  final content = turn.content;
+  if (content == null || content.isEmpty) {
+    return null;
+  }
+  switch (turn.role) {
+    case 'student':
+      return ChatMessage.student(content);
+    case 'assistant':
+      return ChatMessage.coach(content);
+    default:
+      return null;
   }
 }

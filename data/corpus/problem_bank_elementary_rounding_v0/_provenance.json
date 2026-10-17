@@ -17,5 +17,17 @@
     "note": "미검수 — 노출 4단(게이트 통과→코퍼스 편입→노출 적격→실노출) 중 *코퍼스 편입*까지만 도달했다. 표본 검수 미실시이므로 노출 적격이 아니다.",
     "sample_review": "없음(0건)",
     "evidence": "없음 — 검수 전까지 is_published=False 유지"
+  },
+  "regeneration": {
+    "task": "QUAL-11-elementary-rounding-place-interpretation",
+    "recovery_task": "QUAL-15-mnmypk-elementary-rounding-recovery",
+    "source_branch": "claude/friendly-pascal-mnmypk",
+    "source_head": "c229d21c",
+    "date": "2026-10-02",
+    "recovery_date": "2026-10-09",
+    "reason": "발문 'X의 자리에서'와 정답 'X의 자리까지' 해석 불일치(600문 중 537문이 한국 교과 관례와 어긋남·답=입력값 15건) 교정",
+    "change": "발문을 교과서 정식 표현 '~하여 X의 자리까지 나타내면'으로 교체·해설 문구 정합·답=입력값 입력은 생성 풀에서 제외. 정답 계산식(배율=자리값)은 불변.",
+    "regression_freeze": "tests/backend/harness/test_elementary_rounding_corpus_convention.py (Decimal.quantize 독립 계산·600/600 대조)",
+    "cli": "python -m whymath_backend.harness.elementary_rounding_batch --n 200"
   }
 }
