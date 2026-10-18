@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-68-remediation-blocked-reason-stale
+title: "P3-68 - phase3_remediation 의 blocked 사유 문구가 낡았다: 처분된 4개 개념에 재판정 몫이라고 말한다"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-61-choice-trace-only-kebabs
+requires_gates: []
+acceptance:
+  - "① 현상: python -m whymath_backend.ops.phase3_remediation 의 blocked 행 사유는 5건 모두 같은 정적 문장이다 - 좌석 없음 - 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다, 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다. P3-61(PR 1688)로 M0673·M0674·M0676·M0678 은 이미 처분됐고(2026-10-17 Kiki 안 A) 카탈로그 좌석과 검수 큐 pending 행이 있다. 남은 막힘은 서명 대기와 새 kebab 을 가리키는 오답 보기 0건이다. 출력이 낡았다.\n② 사유를 행별로 구분한다: 좌석 없음(kebab 도 없다 - 예 M0677) / kebab 은 카탈로그에 있으나 서명 전(검수 큐 pending) / 서명됐으나 오답 보기가 그 kebab 을 가리키지 않음. 새 RowStatus 를 만들지 판단은 이 태스크가 한다 - 종료 코드 규칙(blocked·failed 면 1)과 JSON 소비자를 먼저 실측한다.\n③ 검수 큐 JSON 을 CLI 가 읽게 할지(승인 로더는 이 파일을 읽지 못하게 설계됨)를 결정한다. 읽지 않는다면 근거 데이터를 어디에 둘지(remediation.yaml 의 unseated 항목 등) 정한다.\n④ 변별력: pending 행을 지우면 사유가 바뀌고, 승인 행을 주입하면 served 또는 다음 단계 사유로 바뀌는지 주입으로 확인한다. 기존 테스트 test_blocked_rows_carry_the_gate_not_a_fabricated_signature 와 충돌하지 않게 갱신한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/phase3_remediation.py
+session: null
+notes: "출처: P3-61(PR 1688) 구현 중 발견. 판정 기준: main d33ab2e4 위 브랜치 claude/tender-brahmagupta-182ks0. 정확성 문제이지 동작 변경이 아니다 - served 판정에는 영향이 없다. 등재는 착수가 아니다."
+updated: 2026-10-18
