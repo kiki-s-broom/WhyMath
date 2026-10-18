@@ -69,16 +69,18 @@ S1은 태스크 ①이 쓴 숫자(9/10)와 사유 문구까지 일치한다. 대
 
 | 개념 | 연결 건수 | 서로 다른 줄기 | 서로 다른 정답 | 연결 유형 |
 |---|---|---|---|---|
-| 02-01 | 116 | 37 | 20 | count-solutions · solve-for-unknown |
+| 02-01 | 92 | 35 | 19 | solve-for-unknown |
 | **02-02** | **24** | **4** | **1** | **verify-claim (단일)** |
 | 02-03 | 49 | 19 | 31 | generalize-pattern · solve-for-unknown |
 | 02-04 | 72 | 61 | 44 | evaluate-expression · solve-for-unknown |
 | 02-05 | 33 | 31 | 18 | solve-for-unknown |
 | 02-06 | 6 | 6 | 1 | count-solutions |
-| 02-07 | 265 | 88 | 106 | optimize-extremum |
+| 02-07 | 289 | 90 | 106 | count-solutions · optimize-extremum |
 | 02-08 | 54 | 53 | 22 | optimize-extremum |
 | 02-09 | 42 | 31 | 2 | count-solutions |
 | 02-10 | 51 | 38 | 22 | model-word-problem · solve-for-unknown |
+
+**재측정 정정(같은 날, main `e3098498` 병합 후)**: 판정 뒤 main에 `P3-49`(#1678: 극값 개수 문항 24건을 02-01 → 02-07로 이동)가 들어와 위 표의 02-01·02-07 두 행을 새 값으로 고쳤다(02-01은 116 · 37 · 20 · 두 유형 → 92 · 35 · 19 · `solve-for-unknown`, 02-07은 265 · 88 · 106 · `optimize-extremum` → 289 · 90 · 106 · 두 유형). 02-02를 포함한 나머지 개념의 수치와 이 판정의 결론은 재측정에서 그대로였고, 승인 문항 중 스킬 비연결 건수(②-3의 2)와 Content 10/10도 같다. 판정 기준 커밋은 본문 머리말의 `d33ab2e4` 그대로 둔다.
 
 02-02의 24건은 줄기가 **4개**뿐이고(`함수 f(x) = |x - #| (+ #) 이 실수 전체에서 미분가능하면 #, 아니면 #을 쓰시오.`의 띄어쓰기·조사 변형 2건/10건/9건/3건), 정답이 **전부 `0`**이다. `|x - a|`는 `x = a`에서 항상 미분불가라 어느 숫자를 넣어도 답이 같다 — 같은 사실 하나를 24번 묻는 문항군이다. 보기 연결(`distractor_map`)도 한 개(`continuity-implies-differentiability`)뿐이다. 이 문항군이 다루는 것은 단원 목표 중 OBJ-01의 "반례(꺾인 점)" 한 면이다.
 
