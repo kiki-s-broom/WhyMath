@@ -137,6 +137,14 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 # 정책(후보생성·선택 알고리즘) 식별자 — REC-11. 알고리즘이 바뀌면 새 문자열을 쓴다(과거
 # 로그는 그대로 두고, 무엇이 바뀌었는지는 이 값으로 구분 — 오프라인 평가가 다른 정책의
 # 로그를 섞어 판정하지 않게 한다).
+#: `cat_v6`(EOS-33): 관계 행위에 **증거 요건**이 붙었다 — 전진은 앵커 개념의 채점 응답 3개 이상,
+#: 선수 복귀의 목표 P는 숙달이 BKT 사전값(0.3) 미만일 때만 콘텐츠를 옮긴다. 같은 학생·같은 1차
+#: 선택에서 `cat_v5`와 다른 문항이 나가므로(응답 1~2개의 전진 · 0.3~0.7 선수로의 복귀가 사라진다)
+#: 새 식별자를 쓴다. 해소 값에 `insufficient_evidence`가 추가됐다. `cat_v5`까지의 규칙
+#: (EOS-147 표적 θ 분리 · EOS-39 도움 접기)은 그대로 포함한다.
+#: 번호 경위: EOS-33은 원래 `cat_v3`을 예약해 뒀지만(아래 EOS-147 주석) main이 먼저 `cat_v5`까지
+#: 올라 있어 `cat_v3`을 쓰면 `cat_v4`·`cat_v5` 규칙을 모두 포함한 판이 더 낮은 번호를 달게 된다.
+#: 번호가 단조 증가해야 '어느 규칙이 더 새것인가'가 번호로 읽히므로 `cat_v6`을 쓴다.
 #: `cat_v5`(EOS-39): 후보를 고르는 표적 θ를 만들 때 코치가 도움(힌트 단계 2 이상)을 공급해 완료한
 #: 문항을 **실패 응답 1건으로 접는다**(`l2.irt.selection_evidence` — 판정문
 #: `docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md`). 도움 완료가 있는
@@ -147,12 +155,13 @@ META_KEY_LEARNER_STATE_BASIS: str = "learner_state_basis"
 #: `cat_v4`(EOS-147): 전부 정답 이력에서 후보를 고르는 표적 θ가 추정 θ(4.0 클램프)가 아니라
 #: `ability_for_selection`의 표적이 된다(첫 정답 뒤 은행 꼭대기로 뛰지 않는다). 그 외 이력의 선택은
 #: `cat_v2`와 같지만, 전부 정답 이력의 로그가 두 규칙 아래 섞여 한 정책으로 읽히므로 올린다.
-#: `cat_v3`은 병렬 태스크 EOS-33이 쓰는 번호라 건너뛴다 — 두 알고리즘이 같은 식별자를 쓰면
-#: 소급 평가가 섞인다.
+#: `cat_v3`은 병렬 태스크 EOS-33용으로 비워 뒀던 번호다 — 두 알고리즘이 같은 식별자를 쓰면
+#: 소급 평가가 섞이기 때문이다. EOS-33은 그 뒤 `cat_v6`으로 착지했고 `cat_v3`은 어느 정책도 쓰지
+#: 않은 결번이다(위 `cat_v6` 주석 참조).
 #: 이전 `cat_v2`(EOS-124): 숙달 구간 규칙이 선수 복귀·전진을 가리키고 그래프가 목표 개념을 내놓으면
 #: 그 개념의 문항으로 **다시 고른다**(정렬 재선택). `cat_v1` 로그와 섞어 평가하면 두 선택 규칙이
 #: 한 정책으로 읽힌다. 전환 시점 이후 기록은 `intent_resolution` 키도 함께 가진다.
-POLICY_VERSION_CAT: str = "cat_v5"
+POLICY_VERSION_CAT: str = "cat_v6"
 """기본 CAT(θ 근방 SQL 축소 + `select_weighted_item` 가중 정보량 최대) — `mode` 미지정."""
 POLICY_VERSION_SUNEUNG: str = "suneung_v4"
 """수능 적응 추천(`recommend_suneung_index` — L6 진실 게이트 × IRT CAT) — `mode=suneung`.
@@ -174,8 +183,9 @@ POLICY_VERSION_SUNEUNG: str = "suneung_v4"
 POLICY_VERSION_CAT_STATE_REMEDIATION: str = "cat_v2_state_remediation"
 """EOS-24 — 상태 머신 R3(오개념 교정)를 집행한 추천: 후보를 교정 대상 개념으로 **제한**하고 학습
 밴드로 고른다. 후보 생성 규칙이 기본 CAT과 다르므로 소급 평가가 둘을 섞지 않게 따로 적는다.
-지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — 현행 `cat_v4`, EOS-124가
-`cat_v2`로·EOS-147이 `cat_v4`로 올렸다)을 따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 —
+지시가 없거나 집행하지 못한 추천은 기본 CAT 규칙(`POLICY_VERSION_CAT` — 현행 `cat_v6`:
+EOS-124가 `cat_v2`로·EOS-147이 `cat_v4`로·EOS-39가 `cat_v5`로·EOS-33이 `cat_v6`으로 올렸다)을
+따른다. 이 식별자의 `v1`은 교정 경로 자신의 규칙 판이다 —
 EOS-124는 교정 경로를 바꾸지 않았으므로(집행 시 정렬 재선택을 돌리지 않는다) 이 값도 바꾸지 않는다.
 
 EOS-147은 이 값을 바꾸지 않았다 — 경로 규칙(후보 제한·이름표)이 그대로이고 두 경로는 오답이 있는
@@ -187,7 +197,7 @@ EOS-147은 이 값을 바꾸지 않았다 — 경로 규칙(후보 제한·이�
 라벨 없는 문항의 오답 코너는 이제 그 코너만의 예외가 아니다.) 하한(−4.0) 대칭은 이 판에서도 R3에
 대해 바꾸지 않았다 — 이월(판정문 §4-4).
 `cat_v1_state_remediation`은 도움 접기 이전 판이다."""
-POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v3_state_undiagnosed"
+POLICY_VERSION_CAT_STATE_UNDIAGNOSED: str = "cat_v6_state_undiagnosed"
 """EOS-26 — 상태 머신 R6(원인 미상 오답)를 집행한 추천: 후보를 오답 개념의 직접 선수(연속 첫
 오답 — 선수 탐침) 또는 방금 틀린 개념(연속 두 번째 · 탐침 불가 폴백)으로 **제한**한다. 후보 생성
 규칙이 기본 CAT과 다르므로 따로 적는다. 이름표·재선택은 기본 CAT의 `cat_v2`(EOS-124) 규칙 그대로라
@@ -198,7 +208,16 @@ EOS-147은 이 값을 바꾸지 않았다(오답 이력에서는 경계 규칙�
 `cat_v2_state_undiagnosed`에서 `cat_v3_state_undiagnosed`로 올렸다**: 도움 접기가 오답 행이 있는
 이력의 선택 θ를 바꾸고 R6 제한 후보의 정렬이 그 θ를 읽는다 — 이유는 R3 판과 같다
 (`POLICY_VERSION_CAT_STATE_REMEDIATION` docstring). `cat_v2_state_undiagnosed`는 도움 접기
-이전 판이다."""
+이전 판이다.
+
+**EOS-33(+EOS-151)이 `cat_v3_state_undiagnosed`에서 `cat_v6_state_undiagnosed`로 올렸다**:
+관계 행위의 증거 요건(`cat_v6`)과 함께 EOS-151이 R6의 "아는 결손" 경계를 EOS-124 (가)와 같은 술어로
+맞췄고(사전값 0.3 · 트립와이어 상시화), 그 결과 R6 제한 후보가 달라진다. 소급 평가가 두 규칙을 한
+식별자로 섞지 않게 올린다. 이 변형의 판 번호는 **기본 CAT을 따른다**(EOS-151 ② —
+`f"{POLICY_VERSION_CAT}_state_undiagnosed"`를 `TestUndiagnosedPolicyVersion`이 동결). 그래서 이전
+EOS-39의 `cat_v3_state_undiagnosed`는 이 계약이 main에 들어오기 전에 붙은 번호였고, 이번에 기본 CAT
+번호와 다시 맞춘다(`cat_v4`·`cat_v5`는 이 변형이 쓴 적 없는 번호라 건너뛴다). R3 교정 경로
+(`cat_v2_state_remediation`)는 EOS-33이 바꾸지 않았다."""
 
 CANDIDATES_META_CAP: int = 10
 """`candidates[]` 상한 — 원 풀(`pool_size`, 최대 50)을 그대로 다 저장하지 않는다. 점수

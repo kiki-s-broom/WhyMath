@@ -854,11 +854,13 @@ class TestPolicyVersionLiterals:
         상수를 읽어 기대값을 만들지 않고 리터럴로 묻는다. **EOS-39가 네 개를 모두 올렸다**: 도움
         완료 접기는 오답 행이 있는 이력의 선택 θ도 바꾸고 R3·R6의 정렬·밴드가 그 θ를 읽는다(EOS-147이
         R3·R6를 올리지 않은 근거 "오답 이력에서는 경계 규칙이 서지 않는다"가 더는 성립하지 않는다).
+        그 뒤 **EOS-33이 기본 CAT(`cat_v6`)과 R6(`cat_v6_state_undiagnosed`)을 다시 올렸다**: 관계 행위의
+        증거 요건과 R6 결손 경계 정합. R3 교정·수능은 올리지 않았다.
         """
-        assert POLICY_VERSION_CAT == "cat_v5"
+        assert POLICY_VERSION_CAT == "cat_v6"
         assert POLICY_VERSION_SUNEUNG == "suneung_v4"
         assert POLICY_VERSION_CAT_STATE_REMEDIATION == "cat_v2_state_remediation"
-        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v3_state_undiagnosed"
+        assert POLICY_VERSION_CAT_STATE_UNDIAGNOSED == "cat_v6_state_undiagnosed"
 
     def test_the_four_identifiers_are_distinct(self) -> None:
         """둘이 같은 글자가 되면 소급 평가가 서로 다른 규칙의 로그를 한 정책으로 읽는다."""

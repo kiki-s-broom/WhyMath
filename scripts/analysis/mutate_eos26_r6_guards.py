@@ -186,7 +186,9 @@ MUTATIONS: list[Mutation] = [
         "M11-blocked-gate-wrong-ceiling",
         LSR,
         _BLOCKED,
-        "    if anchor_mastery >= WEAK_CONCEPT_MASTERY_CEILING:",
+        # 리터럴 — EOS-151 뒤 이 모듈은 WEAK_CONCEPT_MASTERY_CEILING을 import하지 않는다. 이름으로
+        # 두면 NameError로 RED가 나 의미 뮤테이션(막힘 문턱을 0.7로 올림)이 아니게 된다.
+        "    if anchor_mastery >= 0.7:",
         "막힘 문턱(선수 경계 0.4)",
     ),
     Mutation(
@@ -250,12 +252,23 @@ MUTATIONS: list[Mutation] = [
         "    if all(status is _PrerequisiteStatus.WEAK for _row, status in statuses):",
         "아는 결손 우선",
     ),
+    # EOS-151 재앵커 — 분류기가 (가)의 결손 술어를 부른다. 경계 자체(`<` vs `<=` · 0.3)의
+    # 뮤테이션은 술어의 소유자인 EOS-33 하네스(`mutate_eos33_evidence_floor_guards.py`)가 맡고,
+    # 여기서는 분류기가 술어를 **우회**해 자기 경계를 갖는 형태를 주입한다(리터럴 — 이름을 쓰면
+    # import 부재로 RED가 난다).
     Mutation(
-        "M21-weak-boundary-le",
+        "M21-weak-classifier-own-boundary-0.7",
         LSR,
-        "    if mastery < WEAK_CONCEPT_MASTERY_CEILING:\n        return _PrerequisiteStatus.WEAK",
-        "    if mastery <= WEAK_CONCEPT_MASTERY_CEILING:\n        return _PrerequisiteStatus.WEAK",
-        "약점 경계(0.70 · EOS-124 가와 같은 선)",
+        "    if is_prerequisite_deficit(mastery):\n        return _PrerequisiteStatus.WEAK",
+        "    if mastery < 0.7:\n        return _PrerequisiteStatus.WEAK",
+        "결손 술어 공유(0.7 복귀 = EOS-151 정합 이전 · 0.3~0.7을 아는 결손으로)",
+    ),
+    Mutation(
+        "M21b-weak-classifier-own-boundary-le",
+        LSR,
+        "    if is_prerequisite_deficit(mastery):\n        return _PrerequisiteStatus.WEAK",
+        "    if mastery <= 0.3:\n        return _PrerequisiteStatus.WEAK",
+        "결손 술어 공유(자체 경계 `<=` 0.3 — 사전값 자체를 결손으로)",
     ),
     Mutation(
         "M22-unmeasured-status-as-strong",

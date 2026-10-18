@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,10 +13,26 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 실측 고정(판정 기준 main 78a8edff · EOS-25 독립 비판 F2 — 실제 `l2/bkt.py::update_mastery`·기본 파라미터 p_init 0.3·p_transit 0.1·p_slip 0.1·p_guess 0.2로 재계산): 숙달 0.55(현재 개념 구간)에서 **오답 1개면 0.219(선수 복귀 구간)**, **정답 1개면 0.862(전진 구간)**. 0.80에서 오답 1개면 0.400(경계), 2개면 0.169. 미측정(0.30)에서 오답 1개면 0.146이고 그 신뢰도는 1/(1+5)=0.17이다. 즉 관계 행위(선수 복귀·전진)가 응답 1~2개로 발화한다.\n\n② 어느 단계도 신뢰를 보지 않는다 — `l2/recommendation_contract.py::select_reason_type`(숙달만) · `l2/recommendation_policy.py::_prerequisite_intent`(약한 선수 컷) · `_advance_intent`(열린 후행). 기본 CAT(`cat_v2` · EOS-124)은 이 판정으로 **콘텐츠를 옮긴다**(목표 개념 문항 재선택). 수능 모드는 EOS-25에서 재선택을 보류해 설명만 바뀐다.\n\n③ 판정 — 관계 행위(콘텐츠 이동)에 신뢰 하한을 둘지. 둔다면 **새 숫자를 발명하지 말고** 기존 정본을 재사용한다(EOS-24가 R3 집행에 신뢰 하한을 단 선례 · MISC-30 사다리). 미달 시 정직 강등할 해소값(예: 증거 부족)을 신설할지, 기존 값으로 표현할지 함께 정한다. EOS-24 판정문 l.82가 같은 입력(숙달 0.15·신뢰 0.17)을 \"선수 결손의 약한 증거\"로 보고 라우팅에 쓰지 않았다 — 그 판단과 기본 CAT의 현행 동작이 어긋난다.\n\n④ 적용 시 — 기본 CAT의 선택 규칙이 바뀌므로 policy_version을 올리고 페르소나 여정(`tests/backend/api/test_e2e_persona_journeys.py` A⑤·B⑧)과 3루프 하네스를 재검증한다. 수능 가중이 난이도를 가산해 정답률이 떨어지면 BKT가 아래로 편향돼 선수 복귀가 과다해질 수 있다(비판 놓친 것 4) — 수능 모드 재판정 전에 측정한다."
-artifacts: []
+artifacts:
+  - "PR #1377 (https://github.com/kiki-s-broom/WhyMath/pull/1377) · 커밋 4d44c5a7(집행)·5892e518(§11·트립와이어·후속)·2f1bfa3b(사고 대장) · CI 미러 6잡 exit 0 + backend-migrations 8스텝 exit 0 · 뮤테이션 21/21·25/25·15/15·시나리오 10/10"
 paths:
   - src/backend/whymath_backend/l2/recommendation_policy.py
   - src/backend/whymath_backend/l2/recommendation_contract.py
+  - src/backend/whymath_backend/l2/recommendation_reason.py
+  - src/backend/whymath_backend/l2/recommendation_evidence.py
+  - src/backend/whymath_backend/api/me.py
+  - tests/backend/l2/test_recommendation_policy.py
+  - tests/backend/l2/test_recommendation_contract.py
+  - tests/backend/l2/test_recommendation_reason.py
+  - tests/backend/l2/test_recommendation_evidence.py
+  - tests/backend/l2/test_eos33_evidence_floor_integration.py
+  - tests/backend/api/test_me.py
+  - tests/backend/api/test_next_problem_policy_suneung.py
+  - tests/backend/scenarios/test_phase2_scenario_regression_suite.py
+  - scripts/analysis/eos33_relational_evidence_floor_rates.py
+  - scripts/analysis/mutate_eos33_evidence_floor_guards.py
+  - scripts/analysis/mutate_recommendation_policy_guards.py
+  - docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md
 session: null
-notes: "출처: EOS-25 판정 독립 비판 F2(차단)·놓친 것 4. 수능 모드는 이 결함 때문에 관계 재선택을 보류했다(mode_withheld). 기본 CAT에는 같은 입력 결함이 이미 서빙 경로에 있으므로 EOS-25 범위 밖의 별건이다."
-updated: 2026-09-28
+notes: "출처: EOS-25 판정 독립 비판 F2(차단)·놓친 것 4. 수능 모드는 이 결함 때문에 관계 재선택을 보류했다(mode_withheld). 기본 CAT에는 같은 입력 결함이 이미 서빙 경로에 있으므로 EOS-25 범위 밖의 별건이다.\n\n[정정 2026-09-29] paths ['src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/l2/recommendation_contract.py'] → ['src/backend/whymath_backend/l2/recommendation_policy.py', 'src/backend/whymath_backend/l2/recommendation_contract.py', 'src/backend/whymath_backend/l2/recommendation_reason.py', 'src/backend/whymath_backend/l2/recommendation_evidence.py', 'src/backend/whymath_backend/api/me.py', 'tests/backend/l2/test_recommendation_policy.py', 'tests/backend/l2/test_recommendation_contract.py', 'tests/backend/l2/test_recommendation_reason.py', 'tests/backend/l2/test_recommendation_evidence.py', 'tests/backend/l2/test_eos33_evidence_floor_integration.py', 'tests/backend/api/test_me.py', 'tests/backend/api/test_next_problem_policy_suneung.py', 'tests/backend/scenarios/test_phase2_scenario_regression_suite.py', 'scripts/analysis/eos33_relational_evidence_floor_rates.py', 'scripts/analysis/mutate_eos33_evidence_floor_guards.py', 'scripts/analysis/mutate_recommendation_policy_guards.py', 'docs/reviews/eos33_mastery_band_relational_evidence_floor_judgment_2026-09-29.md']: EOS-33 집행이 실제로 닿은 파일로 paths를 넓힌다(기존 2건 유지 + 추가). 편집 훅의 scope_drift 경고 11건이 가리킨 파일 전부와 판정문·분석·뮤테이션 하네스·통합 테스트를 포함한다 — 겹침 검사가 이 태스크의 실제 범위를 보게 하기 위함이다."
+updated: 2026-09-29

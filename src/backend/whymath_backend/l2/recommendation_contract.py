@@ -83,7 +83,11 @@ from typing import Final, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from whymath_backend.l2.bkt import BktParameters
+
 __all__ = [
+    "ADVANCE_EVIDENCE_MIN_RESPONSES",
+    "PREREQUISITE_DEFICIT_CEILING",
     "PREREQUISITE_MASTERY_CEILING",
     "RELATIONAL_ACTIONS",
     "WEAK_CONCEPT_MASTERY_CEILING",
@@ -100,6 +104,8 @@ __all__ = [
     "build_reason",
     "check_intent_alignment",
     "demote_to_current_concept",
+    "has_advance_evidence",
+    "is_prerequisite_deficit",
     "no_candidate_reason",
     "remediation_reason",
     "select_reason_type",
@@ -115,6 +121,27 @@ WEAK_CONCEPT_MASTERY_CEILING: Final = 0.7
 #: `learner_state._DEVELOPING_THRESHOLD`와 값이 같지만 **다른 축**이다(그쪽은 L4 LTHC 밴드의
 #: 미러이고 상한이 0.8이다) — 모듈 docstring의 표 참조. 값이 같다고 합치지 않는다.
 PREREQUISITE_MASTERY_CEILING: Final = 0.4
+
+#: 선수 결손의 **직접 증거** 경계 — 선수 P의 숙달이 이 값 **미만**일 때만 "측정된 선수 결손"이다
+#: (EOS-33). EOS-124 (가)의 재선택 목표와 EOS-26 R6의 "아는 결손"이 **같은 술어**
+#: (`is_prerequisite_deficit`)를 써야 한다 — 경계가 갈리면 한쪽이 결손이라 넘긴 선수를 다른 쪽이
+#: 찾지 못한다. 값은 BKT 사전값(`BktParameters.p_init` 기본값)이다: 적재 경로가 첫 관측을 여기서
+#: 시작하고(`BktModel.initial_mastery`) 망각도 여기로 수렴하므로(`bkt.apply_forgetting`), 그 아래는
+#: "P에서 관측된 증거가 순(−)으로 기울었다"는 뜻이다 — 새 수치가 아니다.
+#: 종전 경계 `WEAK_CONCEPT_MASTERY_CEILING`(0.7)은 정답 1회로 0.69가 된 P를 약점으로 불러, 정답이
+#: 오히려 선수 복귀를 부르는 비단조였다(판정문 `eos33_…_judgment_2026-09-29.md` §3-3).
+PREREQUISITE_DEFICIT_CEILING: Final = BktParameters().p_init
+
+#: 숙달 구간 규칙이 **전진**(콘텐츠를 다음 개념으로 옮김)을 스스로 발화하기 위한 앵커 개념의 최소
+#: 채점 응답 수(EOS-33). **보정 대상 정책 수치**다 — 기존 정본 중 가장 가까운 것은 상태 머신 R5의
+#: `REPEATED_FAILURE_THRESHOLD`(3)로, 한 개념의 상태를 응답 3개로 판정한다는 같은 단위를 쓴다(R5는
+#: 연속 오답 · 여기는 누적 응답이라 질문이 같지는 않다). import로 묶지 않는다: R5를 바꾸는 교수학
+#: 판단이 기본 CAT의 전진을 `policy_version` 변경 없이 조용히 바꾸면 안 된다. 두 값의 동일성은
+#: 거버넌스 테스트가 동결한다(한쪽만 바꾸면 실패해 의식적 결정을 요구한다).
+#: **선수 복귀에는 이 하한을 걸지 않는다** — 선수 결손 때문에 막힌 학생의 하강을 늦추고 거짓
+#: 전진을 두 배로 만든다. 선수 쪽 증거는 목표 P의 경계(`PREREQUISITE_DEFICIT_CEILING`)가 맡는다
+#: (판정문 §3-3 · 독립 비판 F1·F3).
+ADVANCE_EVIDENCE_MIN_RESPONSES: Final = 3
 
 
 class ReasonType(str, Enum):
@@ -192,6 +219,10 @@ class RecommendationReason(BaseModel):
     `confidence`는 *이 근거를 얼마나 믿을 수 있는가*이지 정답 확률이 아니다. 실측 숙달에서
     나온 BKT 신뢰도(표본 수에 따라 커진다)를 그대로 옮기고, 근거가 없으면 **0.0**이다 —
     중간값으로 채우면 "모른다"가 "반쯤 안다"로 읽힌다.
+
+    `sample_size`는 그 숙달이 기반한 채점 응답 수다(EOS-33). 결정(전진 하한)은 신뢰도가 아니라
+    이 값을 읽는다 — 신뢰도는 가산형 추정기의 연속 정답 가산·저장 반올림·망각 때문에 표본 수와
+    어긋날 수 있다.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -204,6 +235,14 @@ class RecommendationReason(BaseModel):
     )
     mastery: float | None = Field(
         default=None, description="그 개념의 실측 숙달. 미측정이면 None(0.0으로 접지 않는다)."
+    )
+    sample_size: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "그 숙달이 기반한 채점 응답 수(`concept_mastery_history.sample_size`). 측정이 없거나 "
+            "알 수 없으면(레거시 행) None — 0으로 접지 않는다. 전진 하한(EOS-33)이 읽는다."
+        ),
     )
 
     @model_validator(mode="after")
@@ -426,11 +465,13 @@ def build_reason(
     concept_id: uuid.UUID | None,
     mastery: float | None,
     confidence: float | None,
+    sample_size: int | None = None,
 ) -> RecommendationReason:
     """선택된 문항의 개념·숙달 → 근거(순수).
 
     세 입력이 각각 없을 때를 **다른 basis로** 가른다 — 전부 "근거 없음"으로 뭉치면 데이터
-    공백(개념 미매핑)과 학생 상태(콜드스타트)가 같은 글자로 보인다.
+    공백(개념 미매핑)과 학생 상태(콜드스타트)가 같은 글자로 보인다. `sample_size`는 실측 숙달
+    근거에만 싣는다(EOS-33) — 측정이 없으면 표본 수도 없다.
     """
     if concept_id is None:
         return RecommendationReason(
@@ -453,6 +494,7 @@ def build_reason(
         basis=ReasonBasis.MEASURED_MASTERY,
         concept_id=concept_id,
         mastery=mastery,
+        sample_size=sample_size,
     )
 
 
@@ -463,6 +505,24 @@ def no_candidate_reason() -> RecommendationReason:
         confidence=0.0,
         basis=ReasonBasis.NO_CANDIDATE_POOL,
     )
+
+
+def is_prerequisite_deficit(mastery: float) -> bool:
+    """선수 P의 측정 숙달이 **결손의 직접 증거**인가 — 사전값 미만(순수 · EOS-33).
+
+    EOS-124 (가)의 재선택 목표와 EOS-26 R6의 "아는 결손" 판정이 이 술어 하나를 쓴다. 미측정 P는
+    여기 오지 않는다(호출부가 측정된 것만 넘긴다 — 모른다 ≠ 결손).
+    """
+    return mastery < PREREQUISITE_DEFICIT_CEILING
+
+
+def has_advance_evidence(reason: RecommendationReason) -> bool:
+    """근거가 전진을 발화할 만큼의 채점 응답에 기반하는가(순수 · EOS-33).
+
+    `sample_size`가 None이면(측정 없음·레거시 행) **아니다** — 모른다 ≠ 충분하다. 신뢰도로 판정하지
+    않는 이유는 `RecommendationReason` docstring과 판정문 §4-2에 있다.
+    """
+    return reason.sample_size is not None and reason.sample_size >= ADVANCE_EVIDENCE_MIN_RESPONSES
 
 
 # ────────────────────────────────────────────────────────────────────────────

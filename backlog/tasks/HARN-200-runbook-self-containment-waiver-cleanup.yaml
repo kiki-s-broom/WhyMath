@@ -1,0 +1,63 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-200-runbook-self-containment-waiver-cleanup
+title: "HARN-115 유예 런북 41파일·299건 자기완결성 정리 — 2026-12-31 만료 전 (만료되면 infra-contracts 잡이 모든 PR에서 red)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - HARN-115-runbook-block-self-containment
+requires_gates: []
+acceptance:
+  - "① 정리: scripts/ops/check_runbook_self_containment.py의 SELF_CONTAINMENT_WAIVERS에 오른 41파일(2026-09-29 기준 위반 299건 — 파일별 건수는 게이트 --suggest-waivers가 산출)을 파일 단위로 정정하고, 고친 파일의 유예 항을 지운다(부분 정정이면 건수를 줄인다). 건수 래칫이 있어 고친 만큼 줄이지 않으면 '유예 과대', 새 위반이 섞이면 '유예 초과'로 exit 1이다. ② 의미 보존: 정정은 블록 분할·블록 안 변수 재정의·라벨·절대 경로 cd·목적지 주입 추가로 한정하고, 실행 명령 자체(도구 호출 줄)는 바꾸지 않는다 — 파일마다 정정 전후 명령 줄 집합이 같음을 대조 스크립트로 확인해 PR에 남긴다. 명령을 바꿔야 하는 블록(예: Read-Host 가드를 기계 판정으로 대체)은 별도 항으로 사유를 적는다. ③ 만료 처리: 2026-12-31 전에 유예 0건이 되거나, 남는 항은 파일별 사유와 새 만료일을 판정 문서에 적고 Kiki 결정을 받는다(만료 없는 연장 금지). ④ 역사 문서 판정: docs/reviews·docs/strategy의 과거 기록 문서(예: live_cost_measurement_2026-07.md)가 더는 실행 대상이 아니면, 정정 대신 실행 블록이 아님을 드러내는 방법(언어 태그 변경 등)이 게이트 판정과 규칙 취지에 맞는지 먼저 판정한다 — 게이트를 피하려는 태그 변경은 금지."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_self_containment.py
+  - ".claude/commands/demo-doctor.md"
+  - ".claude/commands/llm-perf-doctor.md"
+  - docs/architecture/db_backup_dr_runbook.md
+  - docs/architecture/deployment_cd_runbook.md
+  - docs/architecture/shadow_measurement_runbook.md
+  - docs/data/license_snapshot_archive.md
+  - docs/data/ncic.md
+  - docs/legal/export_prediction_disclosure_counsel_brief.md
+  - docs/ops/amd395_local_llm_performance.md
+  - docs/ops/arch55_provider_battle_smoke_runbook.md
+  - docs/ops/arch57_authoring_openrouter_runbook.md
+  - docs/ops/coding_constitution_kiki_runbook.md
+  - docs/ops/eos02_prompt_cache_live_runbook.md
+  - docs/ops/eos118_seat_signal_live_runbook.md
+  - docs/ops/eos121_seat_generation_diversity_runbook.md
+  - docs/ops/eos137_first_eval_runbook.md
+  - docs/ops/eos23_rejected_quad_sum_classification_runbook.md
+  - docs/ops/eos63_skill_event_reach_sample_runbook.md
+  - docs/ops/eos_relevance_triage_gate_runbook.md
+  - docs/ops/g_admin06_browser_menu_call_runbook.md
+  - docs/ops/g_skb01_concept_behavior_skills_populate_runbook.md
+  - docs/ops/g_skb01_skill_node_populate_runbook.md
+  - docs/ops/harn121_constitution_token_measurement_runbook.md
+  - docs/ops/ip_separation_evidence_gate_runbook.md
+  - docs/ops/kice_pdf_history_purge_runbook.md
+  - docs/ops/lic03_provenance_restore_runbook.md
+  - docs/ops/mp03_first_golden_promotion_runbook.md
+  - docs/ops/s3_02_free_use_remeasurement_runbook.md
+  - docs/ops/s4_16_residue_battle_round2_runbook.md
+  - docs/ops/skb03_atom_node_populate_runbook.md
+  - docs/ops/skb04_concept_content_populate_runbook.md
+  - docs/ops/windows_utf8_setup.md
+  - docs/reviews/eos_anchor_e2e_a4_2026-08-30.md
+  - docs/reviews/mp02_canary_review_runbook.md
+  - docs/reviews/mp02_first_llm_authoring_run_runbook.md
+  - docs/reviews/mp02_rerun_runbook.md
+  - docs/standards/dialogue_encryption_deployment_checklist.md
+  - docs/standards/ssm_activation_handoff.md
+  - docs/strategy/domain_partner_handoff_2026-07.md
+  - docs/strategy/live_cost_measurement_2026-07.md
+  - docs/strategy/s3_pilot_briefing.md
+session: null
+notes: "출처: HARN-115(PR #1377) — 자기완결성 게이트를 CI infra-contracts 잡에 차단 스텝으로 배선하면서 기존 위반 41파일 299건을 만료(2026-12-31)+건수 래칫 유예로 두었다(acceptance ④ — 만료 없는 그랜드파더 금지). 만료일이 지나면 게이트가 '유예 만료'로 exit 1을 내 infra-contracts 잡이 모든 PR에서 red가 된다 — 그 전에 이 태스크가 정리를 끝내야 한다. 건수 상위: docs/reviews/mp02_rerun_runbook.md 26 · docs/ops/arch55_provider_battle_smoke_runbook.md 23 · docs/ops/coding_constitution_kiki_runbook.md 18 · docs/ops/windows_utf8_setup.md 16 · docs/standards/ssm_activation_handoff.md 15."
+updated: 2026-09-29
