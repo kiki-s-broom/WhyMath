@@ -28,9 +28,16 @@ on:
     - cron: "0 18 * * *"
 
 # 동일 PR/브랜치에서 새 푸시가 오면 이전 실행 취소 (비용 절감)
+#
+# 그룹 키에 이벤트 이름을 넣는 이유 (OPS-152): schedule 실행의 ref는 refs/heads/main이라
+# main push와 **같은 그룹**이었고, cancel-in-progress가 켜져 있으면 main에 push가 들어올 때마다
+# 진행 중인 야간 안전망(E2E·직렬 전체·제약 신선도)이 취소됐다(최근 야간 실행 #6067·#6032·#5910·
+# #5763 cancelled). 야간 실행은 "새 푸시로 대체되는 낡은 실행"이 아니라 그날 main 전체의
+# 독립 검증이므로 push 트래픽과 그룹을 나누고, schedule 실행은 취소하지 않는다.
+# PR·push·merge_group의 취소 동작은 종전 그대로다(비용 절감 의도 보존).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 permissions:
   contents: read
@@ -622,6 +629,18 @@ jobs:
       # 이 스텝의 존재는 tests/infra/test_phase3_metrics_wiring.py가 동결한다.
       - name: 게이트 — Phase 3 지표 7종 위반 주입 반응 (phase3_metrics --self-check·무반응 0)
         run: python -m whymath_backend.ops.phase3_metrics --self-check
+
+      # P3-07: Solution QA — 대표 과정 승인 문항 전수의 문제·정답·풀이 불일치 기계 검증(C1 정답↔조건 ·
+      # C2 풀이 최종 답 ↔ 정답 · C3 선택지에 정답이 정확히 한 번 · C4 풀이 단계 연쇄 동치).
+      # 판정은 exit code: 0=실패 0건 · 1=실패 문항이 1건이라도 있음(영 허용 — 통과율이 99.5% 위여도 빨갛다.
+      # 456건 중 확정된 불일치 1건은 99.78% 라 비율 판정이면 삼켜진다) · 2=측정 실패(대상 0건·판정 가능 0건·
+      # 세계 적재 실패). 1 과 2 모두 이 스텝을 빨갛게 한다.
+      # 위의 phase3_metrics 실 코퍼스 판정과 달리 **오늘 exit 0 인 상태**라(456/456·검증 불가 665건은 통과도
+      # 실패도 아님) 상시 red 위험이 없어 실 코퍼스에 직접 건다. hermetic(DB 0·LLM 0·네트워크 0 — SymPy만),
+      # 약 50초. 검출기 자체의 변별력(정답·풀이 최종 답·중복 선택지 주입 RED)은 위 전체 Pytest 의
+      # tests/backend/harness/test_solution_qa.py 가, 이 스텝의 존재는 tests/infra/test_solution_qa_wiring.py 가 동결한다.
+      - name: 게이트 — Solution QA (문제·정답·풀이 불일치 · solution_qa 대표 과정 전수)
+        run: python -m whymath_backend.harness.solution_qa
 
       # CONST-03 — 헌법 R2-02(후보 문항 사람 판정 독립)·R2-03(게이트 기록 4요건) 집행 테스트.
       # 왜 이 잡·이 위치인가: 두 테스트가 `whymath_backend`를 import하므로 백엔드 설치가 있는
