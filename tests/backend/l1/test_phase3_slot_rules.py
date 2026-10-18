@@ -168,7 +168,9 @@ class TestParse:
     def test_yaml_round_trip_of_the_real_file_keeps_hold_reason(self) -> None:
         doc = yaml.safe_load(default_rules_path().read_text(encoding="utf-8"))
         holds = [r for r in doc["rules"] if r["slot"] is None]
-        assert holds and all(r.get("reason") for r in holds)
+        # 보류 규칙이 하나도 없을 수 있다(P3-49 가 유일한 보류 규칙을 폐기했다) — 있으면 사유는 필수다.
+        # 보류 메커니즘 자체는 합성 규칙 테스트(hold-count)가 계속 지킨다.
+        assert all(r.get("reason") for r in holds)
 
 
 class TestDecide:

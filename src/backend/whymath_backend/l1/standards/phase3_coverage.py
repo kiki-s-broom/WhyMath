@@ -7,9 +7,18 @@
 사용법
 ------
     python -m whymath_backend.l1.standards.phase3_coverage [--spec PATH] [--json] [--hints-from-db]
+                                                            [--gate GATE_ID]
 
 종료 코드: 0 = 목표가 있는 지표가 전부 충족 · 1 = 목표 미달 또는 분모 0(측정 불가) ·
 2 = 명세·코퍼스 적재 실패(측정 자체를 못 했다 — 통과로 위장하지 않는다).
+
+게이트 단위 판정 (P3-54): 위 종료 코드는 목표가 있는 **모든** 지표의 합이라 게이트 하나의 조건을
+가르지 못한다(Content Coverage 가 10/10 이든 8/10 이든 다른 지표가 미달이면 똑같이 1 이다).
+`--gate P3-G1` 처럼 게이트를 주면 명세 `gate_conditions`(항 10)가 그 게이트의 조건으로 선언한 지표
+**만**으로 종료 코드를 낸다. 어떤 지표가 어떤 게이트의 조건인지는 이 코드가 아니라 명세가 소유한다.
+`--gate` 가 없으면 동작은 이전과 같다. 판정할 수 없는 요청은 0 이 아니라 exit 2 다 — 명세에 선언이
+없는 게이트, 이 계측기에 없는 지표 키, 명세에 목표가 없는 지표(종료 코드가 항상 0 이 된다).
+`--json` 의 `exit_code` 는 항상 전 지표 합산이고 게이트 판정은 `gate.exit_code` 에 따로 실린다.
 
 ────────────────────────────────────────────────────────────────────────────
 '완전 연결'의 정의 — 이 절이 정본이다 (정의를 한 곳에 둬야 지표가 조작되지 않는다)
@@ -114,6 +123,7 @@ import yaml
 from whymath_backend.l1.concept_content.review_gate import is_supply_eligible
 from whymath_backend.l1.standards.phase3_scope import (
     ConceptEntry,
+    GateCondition,
     ReferenceIndex,
     ScopeSpec,
     ScopeSpecError,
@@ -165,6 +175,16 @@ _UNITS_GLOB: Final = "data/corpus/units_v1/*.unit.yaml"
 _PACKS_GLOB: Final = "data/corpus/pedagogy_packs_v1/*.yaml"
 
 _MIS_ID_RE: Final = re.compile(r"^M\d{4,}$")
+
+#: 게이트 조건으로 선언할 수 있는 지표 — 명세에 목표가 있어 종료 코드를 가르는 4종.
+#: 공급 가능 커버리지·슬롯 커버리지는 목표가 없어 종료 코드에 불참하므로 조건이 될 수 없다
+#: (조건으로 두면 종료 코드가 항상 0 이라 상시 통과가 된다).
+GATE_METRIC_KEYS: Final[tuple[str, ...]] = (
+    "content_coverage_rate",
+    "curriculum_coverage",
+    "concept_completeness",
+    "graph_connectivity_coverage",
+)
 
 LinkStatus = Literal["linked", "missing", "unmeasured"]
 
@@ -704,6 +724,20 @@ class HintSeatStats:
 
 
 @dataclass(frozen=True)
+class GateVerdict:
+    """P3-54 — 게이트 하나를 그 조건 지표만으로 판정한 결과.
+
+    `exit_code` 는 0 또는 1 이다. 판정할 수 없는 요청은 객체가 아니라 `CoverageError` 가 된다.
+    """
+
+    gate_id: str
+    metric_keys: tuple[str, ...]
+    basis: str
+    exit_code: int
+    failures: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class CoverageReport:
     """계측 결과 전체 — 지표 4종 + 보조 수치."""
 
@@ -1176,6 +1210,9 @@ def _check_spec_alignment(spec: ScopeSpec) -> None:
     ):
         if key not in spec.targets:
             raise CoverageError(f"명세 targets 에 {key!r} 가 없다 — 지표의 목표를 알 수 없다")
+    # P3-54 — 게이트 조건 선언이 이 계측기에 없는 지표를 가리키면 `--gate` 판정이 거짓이 된다.
+    for gate_id in spec.gate_conditions:
+        _require_gate(spec, gate_id)
     # P3-04 — 7필드·6슬롯의 정의는 `schema/problem_metadata.py` 한 곳이다. 명세가 다른 목록을 말하면
     # 이 계측은 명세가 요구하지 않은 것을 재는 셈이라 거부한다.
     if tuple(spec.problem_required_fields) != tuple(f.value for f in ProblemMetadataField):
@@ -1205,6 +1242,69 @@ def _hint_seat(facts: tuple[ConceptFacts, ...], corpus: CoverageCorpus) -> HintS
     )
 
 
+def _metric_failure(m: MetricResult) -> str | None:
+    """지표 1종의 실패 사유. 충족이거나 목표가 없어 판정하지 않는 지표면 None.
+
+    합산 판정(`evaluate`)과 게이트 판정(`judge_gate`)이 같은 문구·기준을 쓰도록 한 곳에 둔다.
+    """
+    if m.population == 0:
+        return f"{m.name_ko}: 분모가 0 이다 — 측정 불가(통과가 아니다)"
+    if m.gated and m.met is False:
+        assert m.value is not None and m.target is not None
+        return (
+            f"{m.name_ko}: {m.value:.1%} < 목표 {m.target:.1%} "
+            f"({m.met_count}/{m.population}, 미충족 {len(m.unmet)}건)"
+        )
+    return None
+
+
+def _require_gate(spec: ScopeSpec, gate_id: str) -> GateCondition:
+    """게이트 조건 선언을 찾는다. 선언이 없으면 판정을 거부한다(없는 조건을 통과로 접지 않는다)."""
+    condition = spec.gate_conditions.get(gate_id)
+    if condition is None:
+        known = ", ".join(sorted(spec.gate_conditions)) or "없음"
+        raise CoverageError(
+            f"명세에 게이트 {gate_id!r} 의 조건 지표 선언이 없다(선언된 게이트: {known}) — "
+            "이 계측기가 재는 지표로 이 게이트를 판정할 수 없다"
+        )
+    unknown = [k for k in condition.metrics if k not in GATE_METRIC_KEYS]
+    if unknown:
+        raise CoverageError(
+            f"명세 gate_conditions.{gate_id}.metrics 에 목표가 있는 지표가 아닌 키가 있다: "
+            f"{unknown} (유효: {list(GATE_METRIC_KEYS)})"
+        )
+    return condition
+
+
+def judge_gate(spec: ScopeSpec, report: CoverageReport, gate_id: str) -> GateVerdict:
+    """게이트 조건으로 선언된 지표**만**으로 종료 코드를 낸다 (P3-54).
+
+    0 = 선언된 지표가 전부 측정됐고 목표를 충족 · 1 = 하나라도 미달 또는 분모 0(측정 불가).
+    판정할 수 없으면(`CoverageError`) 호출부가 exit 2 로 낸다 — 게이트 선언 부재, 유효하지 않은 키,
+    목표가 없는 지표(목표 없는 지표만으로는 종료 코드가 항상 0 이라 상시 통과가 된다).
+    선언 밖 지표(예: Concept Completeness)의 미달은 이 판정에 영향을 주지 않는다.
+    """
+    condition = _require_gate(spec, gate_id)
+    failures: list[str] = []
+    for key in condition.metrics:
+        metric = report.metric(key)
+        if not metric.gated:
+            raise CoverageError(
+                f"게이트 {gate_id!r} 의 조건 지표 {key!r} 는 명세에 목표가 없다 — "
+                "목표 없는 지표는 종료 코드로 판정할 수 없다(항상 0 이 되어 상시 통과로 위장된다)"
+            )
+        failure = _metric_failure(metric)
+        if failure is not None:
+            failures.append(failure)
+    return GateVerdict(
+        gate_id=gate_id,
+        metric_keys=condition.metrics,
+        basis=condition.basis,
+        exit_code=1 if failures else 0,
+        failures=tuple(failures),
+    )
+
+
 def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> CoverageReport:
     """지표 4종 + 보조 수치를 계산한다. 분모 0 은 실패로 보고한다(통과로 위장하지 않는다)."""
     _check_spec_alignment(spec)
@@ -1222,14 +1322,9 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
 
     failures: list[str] = []
     for m in metrics:
-        if m.population == 0:
-            failures.append(f"{m.name_ko}: 분모가 0 이다 — 측정 불가(통과가 아니다)")
-        elif m.gated and m.met is False:
-            assert m.value is not None and m.target is not None
-            failures.append(
-                f"{m.name_ko}: {m.value:.1%} < 목표 {m.target:.1%} "
-                f"({m.met_count}/{m.population}, 미충족 {len(m.unmet)}건)"
-            )
+        failure = _metric_failure(m)
+        if failure is not None:
+            failures.append(failure)
 
     # P3-04 — 필수 필드가 비어 있는 적격 문항은 발행 게이트(problem_metadata_complete)가 거부한다.
     # 측정 불가(UNKNOWN)는 여기서 실패로 세지 않는다 — 그 판정은 저장 시점 게이트의 몫이다.
@@ -1326,9 +1421,23 @@ def _metadata_json(stats: ProblemMetadataStats | None) -> dict[str, Any] | None:
     }
 
 
-def to_json(report: CoverageReport) -> dict[str, Any]:
-    """기계 판독 출력 — P3-03 이 진척을 이 값으로만 보고한다."""
+def _gate_json(verdict: GateVerdict) -> dict[str, Any]:
     return {
+        "gate_id": verdict.gate_id,
+        "metrics": list(verdict.metric_keys),
+        "basis": verdict.basis,
+        "exit_code": verdict.exit_code,
+        "failures": list(verdict.failures),
+    }
+
+
+def to_json(report: CoverageReport, gate: GateVerdict | None = None) -> dict[str, Any]:
+    """기계 판독 출력 — P3-03 이 진척을 이 값으로만 보고한다.
+
+    `exit_code` 는 항상 전 지표 합산 판정이다. `--gate` 를 준 실행에서만 `gate` 키가 더해지고, 그때
+    프로세스 종료 코드는 `gate.exit_code` 를 따른다(두 값이 다를 수 있다 — 그것이 이 옵션의 용도다).
+    """
+    doc = {
         "spec_id": report.spec_id,
         "frozen_at": report.frozen_at,
         "frozen_by_gate": report.frozen_by_gate,
@@ -1348,14 +1457,17 @@ def to_json(report: CoverageReport) -> dict[str, Any]:
         "problem_metadata": _metadata_json(report.problem_metadata),
         "hint_seat": None if report.hint_seat is None else asdict(report.hint_seat),
     }
+    if gate is not None:
+        doc["gate"] = _gate_json(gate)
+    return doc
 
 
 def _pct(value: float | None) -> str:
     return "측정 불가" if value is None else f"{value:.1%}"
 
 
-def render(report: CoverageReport) -> str:
-    """사람이 읽는 출력 — 지표값 + 미충족 목록(무엇이 빠졌는지)."""
+def render(report: CoverageReport, gate: GateVerdict | None = None) -> str:
+    """사람이 읽는 출력 — 지표값 + 미충족 목록. `gate` 가 있으면 게이트 판정 줄을 더한다."""
     lines = [
         f"Phase 3 Coverage 계측 — {report.spec_id} (동결 {report.frozen_at} · "
         f"게이트 {report.frozen_by_gate})",
@@ -1431,6 +1543,14 @@ def render(report: CoverageReport) -> str:
         lines += [f"  ! {w}" for w in report.warnings]
     lines += ["", "판정: " + ("통과" if report.exit_code == 0 else "미달")]
     lines += [f"  - {f}" for f in report.failures]
+    if gate is not None:
+        lines += [
+            "",
+            f"게이트 {gate.gate_id} 판정: " + ("통과" if gate.exit_code == 0 else "미달"),
+            f"  조건 지표(명세 gate_conditions): {', '.join(gate.metric_keys)}",
+            "  위 '판정'은 목표가 있는 전 지표의 합산이고, 종료 코드는 이 게이트 판정을 따른다",
+        ]
+        lines += [f"  - {f}" for f in gate.failures]
     return "\n".join(lines)
 
 
@@ -1441,6 +1561,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--spec", type=Path, default=None, help="범위 명세 YAML 경로")
     parser.add_argument("--json", action="store_true", help="기계 판독 JSON 으로 출력")
     parser.add_argument(
+        "--gate",
+        metavar="GATE_ID",
+        default=None,
+        help=(
+            "명세 gate_conditions 에 선언된 게이트(예: P3-G1)의 조건 지표만으로 종료 코드를 낸다. "
+            "선언이 없거나 조건 지표에 목표가 없으면 거부한다(exit 2). 생략하면 전 지표 합산."
+        ),
+    )
+    parser.add_argument(
         "--hints-from-db",
         action="store_true",
         help="DB hints(verified=true)에서 힌트 연결 입력을 읽는다. 주지 않으면 힌트는 측정 불가다.",
@@ -1450,6 +1579,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         spec = load_scope_spec(spec_path)
         index = load_reference_index(spec)
+        if args.gate is not None:
+            # 코퍼스 적재(수 초)에 앞서 거부한다 — 판정할 수 없는 게이트로 측정을 돌릴 이유가 없다.
+            _require_gate(spec, args.gate)
         violations = verify_spec(spec, index)
         if violations:
             # 분모(명세)가 오염된 상태에서 잰 수치는 의미가 없다 — 측정을 거부한다.
@@ -1462,14 +1594,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             corpus = load_corpus(spec)
         report = evaluate(spec, index, corpus)
+        verdict = None if args.gate is None else judge_gate(spec, report, args.gate)
     except (ScopeSpecError, CoverageError) as exc:
         print(f"[적재 실패] {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     if args.json:
-        print(json.dumps(to_json(report), ensure_ascii=False, indent=2))
+        print(json.dumps(to_json(report, verdict), ensure_ascii=False, indent=2))
     else:
-        print(render(report))
-    return report.exit_code
+        print(render(report, verdict))
+    return report.exit_code if verdict is None else verdict.exit_code
 
 
 if __name__ == "__main__":
