@@ -30,10 +30,10 @@
     "authored": "2026-07-07",
     "quality": "ai_estimated",
     "severity_counts": {
-      "blocking": 344,
+      "blocking": 346,
       "local": 321,
       "cosmetic": 71,
-      "None": 107
+      "None": 105
     },
     "with_behavior_skills": 806,
     "total": 843,

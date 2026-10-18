@@ -949,11 +949,11 @@ gates:
     title: "P3-43 변경 요청서 승인 — 극값의 개수 24건 개념 02-01->02-07 이동 (Graph Connectivity 5/10->4/10 하락 수용 포함)"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-16
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 승인: 극값의 개수 24건 02-01->02-07 이동, Graph Connectivity 5/10->4/10 하락 수용. 판정 기준 main fc939a22, 변경 요청서 docs/reviews/p3_43_extremum_count_concept_mapping_2026-10-16.md 6절(PR #1660)"
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-10-16] verdict PASS · inputs: P3-43-extremum-count-items-concept-mapping-review · evidence: 변경 요청서 완성(판정 기준 main 674a92b1, PR #1660): 24건 02-01->02-07 이동, 요청 5항목, 부작용 Graph Connectivity 5/10->4/10 명시. 입력 완결이며 승인과 지표 하락 수용 여부는 게이트 담당자(Kiki)가 clear 한다 — done P3-43-extremum-count-items-concept-mapping-review 인계"
