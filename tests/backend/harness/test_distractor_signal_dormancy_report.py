@@ -160,12 +160,14 @@ class TestCurrentRealityFrozen:
         # (144건 + 02-05·06·08·09·10 생성기 5종 360건)
         # + P3-05 빈 칸 채우기 은행 204(02-01 48 + 02-02 60 + 02-07 48 + 5단계 02-03·02-10 각 24 —
         # 전부 단답형, 선지·오답 귀속 없음)
-        assert total == 14742
+        # + P3-51 극값의 개수 양성 예 12(conceptual_v0 · 4지선다 · 오개념 귀속 1건씩)
+        assert total == 14754
         # r2의 1,616 대비 -4(은퇴 9건 중 객관식 4건) + P3-03 객관식 84건(전부 distractor_map 보유 —
         # 개념 7종 × 오개념 유발 슬롯 12건)
-        assert with_choices == 1696
-        assert with_dmap == 1696
-        assert both == 1696  # choices↔distractor_map 동일 집합(불일치 0건)
+        # 1,696 → 1,708: P3-51 양성 예 12건이 전부 선지와 distractor_map 을 함께 가진다.
+        assert with_choices == 1708
+        assert with_dmap == 1708
+        assert both == 1708  # choices↔distractor_map 동일 집합(불일치 0건)
         note = dsdr._CORPUS_REMEASUREMENT_2026_08_11
         assert "2,638" in note
         assert "1,612" in note

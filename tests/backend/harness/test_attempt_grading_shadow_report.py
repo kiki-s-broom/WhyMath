@@ -1141,7 +1141,8 @@ class TestCorpusCeilingReportDiscriminates:
         report = build_gradability_ceiling_report(problems)
         # 14,034 + P3-03 미분 은행 504(144 + 360) + P3-05 빈 칸 채우기 은행 156(48 + 60 + 48)
         # 14,694 → 14,742: 5단계 02-03·02-10 각 24건.
-        assert report.total_problems == 14742
+        # 14,742 → 14,754: P3-51 극값의 개수 양성 예 12건(conceptual_v0 · 객관식 · 검수 pending).
+        assert report.total_problems == 14754
         assert report.bucket_counts["condition_formal_derivable"] > 0
         # 12,268 → 12,373(+105): P3-03 미분 은행 144건 중 객관식 24건은 `selectable_exact_match`로,
         # 문자열 검산 조건을 가진 비객관식 105건이 이 버킷으로 들어왔다(연립 목록 조건 15건은 제외).

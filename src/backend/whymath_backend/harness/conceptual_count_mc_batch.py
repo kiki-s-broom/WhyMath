@@ -32,6 +32,7 @@ from whymath_backend.harness.problem_corpus_batch import (
 )
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.conceptual_count_mc_generator import (
+    EXTREMUM_POSITIVE_COUNT,
     ConceptualCountMCSkeletonGenerator,
     CountTemplateKind,
 )
@@ -51,6 +52,11 @@ class _Band:
     template: CountTemplateKind
     kebab: str
     standard_codes: tuple[str, ...]
+    # `n_per_band` 에 더해 요청하는 건수. 풀 앞쪽 `n_per_band`(=24)건이 승인 문항으로 굳어 있어
+    # 순서를 못 바꾸는 밴드가, 승인 문항 *뒤*에 붙인 신규 문항을 뽑는 데 쓴다(극값 개수 양성 예,
+    # P3-51). n_per_band 가 승인 머리(24)보다 작게 주어지면 신규 문항에는 닿지 않는다(기본 실행만
+    # 의도된 경로).
+    extra: int = 0
 
 
 # 15 서브밴드 — 개념형 개수/판정 MC. 표준 튜플은 각 kebab 후보가 전부 agree하도록 잠금(거짓거부 0).
@@ -68,6 +74,7 @@ _BANDS: tuple[_Band, ...] = (
         "extremum_count",
         "critical-point-implies-extremum",
         ("[12미적Ⅰ-02-01]", "[12미적Ⅰ-02-07]"),
+        extra=EXTREMUM_POSITIVE_COUNT,
     ),
     # invertibility: 후보 M0144·M0859=[10기수2-03-03]·M0644=[10공수2-03-03] 모두 agree.
     _Band(
@@ -189,7 +196,8 @@ def run_conceptual_count_mc_batch(
         )
         index: set[str] = set()
         generator = ConceptualCountMCSkeletonGenerator(band.template, codes, skip_signatures=index)
-        outcomes = run_batch(spec, generator, n_per_band, signature_index=index, store=sink)
+        requested = n_per_band + band.extra
+        outcomes = run_batch(spec, generator, requested, signature_index=index, store=sink)
         stored = sum(1 for o in outcomes if o.status == "accepted_stored")
         failures = [
             reason
@@ -200,7 +208,7 @@ def run_conceptual_count_mc_batch(
         bands.append(
             BandResult(
                 name=band.name,
-                requested=n_per_band,
+                requested=requested,
                 stored=stored,
                 failure_reasons=failures,
             )

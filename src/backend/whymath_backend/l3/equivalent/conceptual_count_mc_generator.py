@@ -49,6 +49,7 @@ from whymath_backend.schema.problem import DistractorEntry, Problem
 from whymath_backend.schema.provenance import ContentProvenance
 
 __all__ = [
+    "EXTREMUM_POSITIVE_COUNT",
     "ConceptualCountMCSkeletonGenerator",
     "CountTemplateKind",
 ]
@@ -157,7 +158,129 @@ def _build_real_root_count_pool() -> tuple[_CountItem, ...]:
     return tuple(pool)
 
 
+# 극값 개수 풀의 앞 24칸은 커밋된 코퍼스의 승인 문항(a=1~4 × c=0~5)이다 — 순서가 바뀌면 같은
+# 배치(n=24)가 다른 문항을 뽑아 승인 근거가 새 문항으로 옮겨 간다. 양성 예(P3-51)는 그 뒤에
+# 붙인다.
+_EXTREMUM_APPROVED_HEAD = 24
+
+# 극값이 있는 문항(P3-51) — f'(x) = 계수 × Π(x - 근)^중복도 꼴을 (계수, ((근, 중복도), ...)) 로
+# 적는다. 중복도 짝수 근은 임계점이나 극값이 아니고(부호 불변), 홀수 근이 극값이다.
+# "임계점 = 극값" 오개념은 임계점 개수를 답하므로 정답(극값 수)과 달라야 거짓 귀속이 아니다 —
+# 아래 두 묶음은 그 조건을 만족한다.
+#   · 사차: 이중근 1 + 단순근 1  → 임계점 2·극값 1 (정답 1·오개념 2)
+#   · 오차: 이중근 1 + 단순근 2  → 임계점 3·극값 2 (정답 2·오개념 3)
+# x³ - 3x 처럼 임계점이 전부 극값(임계점 수 = 극값 수)인 함수는 이 오개념의 오답이 정답과 같아
+# 오답 선지에 이 오개념을 붙일 수 없으므로 뺐다(거짓 귀속 금지).
+_ExtremumSpec = tuple[int, tuple[tuple[int, int], ...]]
+
+_EXTREMUM_POSITIVE_SPECS: tuple[_ExtremumSpec, ...] = (
+    # 사차 — f' = 12(x-p)²(x-q): (p, q)
+    (12, ((0, 2), (1, 1))),
+    (12, ((1, 2), (0, 1))),
+    (12, ((1, 2), (2, 1))),
+    (12, ((2, 2), (1, 1))),
+    (12, ((-1, 2), (1, 1))),
+    (12, ((1, 2), (-1, 1))),
+    # 오차 — f' = 60x²(x-q)(x-r): (q, r)
+    (60, ((0, 2), (1, 1), (-1, 1))),
+    (60, ((0, 2), (1, 1), (2, 1))),
+    (60, ((0, 2), (-1, 1), (-2, 1))),
+    (60, ((0, 2), (1, 1), (-2, 1))),
+    (60, ((0, 2), (2, 1), (-1, 1))),
+    (60, ((0, 2), (2, 1), (3, 1))),
+)
+
+EXTREMUM_POSITIVE_COUNT = len(_EXTREMUM_POSITIVE_SPECS)
+
+_DEGREE_WORD = {4: "사차", 5: "오차"}
+
+
+def _poly_text(expr: sympy.Expr, var: sympy.Symbol) -> str:
+    """다항식 → 발문용 문자열(`3x^4 - 16x^3 + 30x^2 - 24x`) — 기존 문면과 같은 표기."""
+    terms: list[str] = []
+    for (degree,), coeff in sympy.Poly(expr, var).terms():
+        if coeff.q != 1:
+            raise ValueError(f"정수 계수가 아니다: {expr}")
+        magnitude = abs(int(coeff))
+        body = "" if (magnitude == 1 and degree > 0) else str(magnitude)
+        if degree >= 1:
+            body += "x" if degree == 1 else f"x^{degree}"
+        sign = "-" if coeff < 0 else "+"
+        terms.append(f"{sign} {body}")
+    first = terms[0]
+    text = first[2:] if first.startswith("+ ") else "-" + first[2:]
+    return " ".join([text, *terms[1:]])
+
+
+def _factored_text(expr: sympy.Expr) -> str:
+    """인수분해된 도함수 → 해설용 문자열(`12x^2(x - 1)`)."""
+    return str(expr).replace("**", "^").replace("*", "")
+
+
+def _extremum_positive_item(index: int, spec: _ExtremumSpec) -> _CountItem:
+    """f'(x)가 이중근을 품은 다항함수의 극값 개수 문항 하나 — 정답은 극값 수, 오답은 임계점 수.
+
+    스펙(근·중복도)에서 정답을 구조로 세고, 같은 함수를 SymPy로 적분·미분·근 계산해 *독립 경로*로
+    다시 센다. 두 값이 어긋나거나 정답이 0 이거나 임계점 수와 같으면(오개념 오답이 정답과 겹침)
+    조용히 틀린 문항을 내지 않고 ValueError 로 멈춘다.
+    """
+    x = sympy.Symbol("x")
+    scale, roots_with_multiplicity = spec
+    fprime = scale * sympy.Mul(*[(x - root) ** mult for root, mult in roots_with_multiplicity])
+    f = sympy.integrate(sympy.expand(fprime), x)
+
+    extremum = sum(1 for _, mult in roots_with_multiplicity if mult % 2 == 1)
+    critical = len(roots_with_multiplicity)
+
+    # 독립 재계산 — f 에서 출발해 도함수 실근의 중복도 홀수 개수를 센다
+    # (verify_extremum_count 와 같은 정의).
+    root_mult = sympy.roots(sympy.Poly(sympy.diff(f, x), x))
+    if sum(root_mult.values()) != sympy.degree(sympy.diff(f, x), x):
+        raise ValueError(f"도함수 근을 중복도까지 다 못 구했다: {f}")
+    recount_extremum = sum(1 for m in root_mult.values() if m % 2 == 1)
+    recount_critical = len(root_mult)
+    if (extremum, critical) != (recount_extremum, recount_critical):
+        raise ValueError(f"스펙 {spec} 의 극값/임계점 수가 SymPy 재계산과 다르다: {f}")
+    if not 1 <= extremum < critical <= 3:
+        raise ValueError(f"양성 예 조건(1 ≤ 극값 < 임계점 ≤ 3) 위반: {spec}")
+
+    degree = int(sympy.degree(f, x))
+    poly = _poly_text(f, x)
+    odd = sorted(root for root, mult in roots_with_multiplicity if mult % 2 == 1)
+    even = sorted(root for root, mult in roots_with_multiplicity if mult % 2 == 0)
+    return _CountItem(
+        conditions=str(f),
+        answer_kind="extremum_count",
+        answer_str=str(extremum),
+        misc_str=str(critical),
+        question_text=f"{_DEGREE_WORD[degree]}함수 f(x) = {poly} 의 극값의 개수를 구하시오.",
+        answer_explanation=(
+            f"f'(x) = {_factored_text(sympy.factor(sympy.diff(f, x)))} 이므로 f'(x) = 0 인 점"
+            f"(임계점)은 {critical}개다. 중근인 점({', '.join(f'x = {r}' for r in even)})은 "
+            "그 좌우로 f'의 부호가 바뀌지 않아 극값이 아니고, 부호가 바뀌는 점"
+            f"({', '.join(f'x = {r}' for r in odd)})만 극값이다 — 극값은 {extremum}개다. "
+            f"임계점을 곧 극값으로 세면 {critical}{euro_ro(str(critical))} 잘못 답한다."
+        ),
+        difficulty=_difficulty(index),
+    )
+
+
 def _build_extremum_count_pool() -> tuple[_CountItem, ...]:
+    """극값 개수 뼈대 풀 — 앞 24칸은 극값 0개(승인 문항), 그 뒤에 극값이 있는 양성 예(P3-51).
+
+    앞 24칸: 삼차함수 f(x)=(x-a)³+c. f'(x)=3(x-a)²는 x=a에서만 0이나 부호가 안 바뀌어(항상 ≥0)
+    극값이 없다. 정답 0·오개념 오답은 임계점 개수 1. 이것만 돌면 정답이 전부 0 이고 서로 다른
+    문제가 2개뿐이라 진단력이 없다(P3-43 §7) — 그래서 양성 예를 뒤에 붙인다. 순서를 지키는
+    이유는 `_EXTREMUM_APPROVED_HEAD`. 양성 예의 구성·조건은 `_EXTREMUM_POSITIVE_SPECS`·
+    `_extremum_positive_item`.
+    """
+    zeros = _build_extremum_zero_pool()
+    positives = tuple(_extremum_positive_item(i, s) for i, s in enumerate(_EXTREMUM_POSITIVE_SPECS))
+    head = _EXTREMUM_APPROVED_HEAD
+    return zeros[:head] + positives + zeros[head:]
+
+
+def _build_extremum_zero_pool() -> tuple[_CountItem, ...]:
     """삼차함수 f(x)=(x-a)³+c 의 극값 개수 뼈대 풀 — 임계점 1개이나 극값 0개(오개념 정확 표적).
 
     f'(x)=3(x-a)²는 x=a에서만 0이나 부호가 안 바뀌어(항상 ≥0) 극값이 없다. 정답 0·오개념 오답은

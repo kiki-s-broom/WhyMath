@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/equivalent/conceptual_count_mc_generator.py
-session: null
+session: main
 notes: "출처: P3-43 문서 7절. P3-05 발견 1(02-02 의 24건 정답 전부 0)과 같은 결함."
-updated: 2026-10-16
+updated: 2026-10-18
