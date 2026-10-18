@@ -1151,7 +1151,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-18] verdict PASS · inputs: P3-59-m0672-shadowed-by-canonical-m0075 · evidence: 판정문 docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md §5·§6 · 판정 기준 main d33ab2e4 · 커밋 8fa4660c · PR #1680. PASS의 뜻은 결정 입력(선택지 3안의 비용 연쇄·실측 영향 36문항·재판정 조건 2건)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫이다. 세션 의견은 안 3 현상 유지. 분모를 바꾸는 안 2와 신규 kebab 안 1은 세션이 확정하지 않았다(acceptance 3). 신규 발견: M0672를 0.97로 재서명하면 동률로 M0075까지 canonical을 잃는다(select_canonical 실측). — done P3-59-m0672-shadowed-by-canonical-m0075 인계"
     depends_on:
       - P3-59-m0672-shadowed-by-canonical-m0075
   - id: G-path04-learning-path-xlsx
