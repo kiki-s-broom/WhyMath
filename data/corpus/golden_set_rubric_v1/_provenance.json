@@ -1,0 +1,13 @@
+{
+ "pool": "whymath-original",
+ "source_name": "AI 생성 콘텐츠 루브릭 골든셋 v1 (20노드·초7/중8/고5)",
+ "uploaded": "2026-10-18",
+ "counts": {
+  "nodes": 20,
+  "misconception_proposals": 16
+ },
+ "source_citation": "출처: WhyMath 자체 저작. 성취기준 원문은 standards_v1(NCIC·2022 개정)에서 코드로 조인했고, 오개념 M-id는 misconceptions_v1에 실재하는 행만 참조한다(생성기가 검증).",
+ "license_notice": "WHYMATH_ORIGINAL — 검정교과서·평가원·EBS 본문·문항·선지·풀이를 포함하지 않는다.",
+ "review_status": "ai_estimated — 사람 검수 서명 전까지 '골든 후보'",
+ "generator": "scripts/eval/build_golden_set_rubric_v1.py"
+}
