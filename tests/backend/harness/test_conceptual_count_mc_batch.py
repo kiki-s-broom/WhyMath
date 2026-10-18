@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from whymath_backend.harness import corpus_reverify as cr
@@ -128,3 +129,52 @@ def test_committed_corpus_covers_thirteen_kebabs() -> None:
     )
     assert report.kebabs_decidable >= 32
     assert report.positive_false_reject == 0
+
+
+_CONCEPT_02_01 = "H:12미적Ⅰ02-01"
+_CONCEPT_02_07 = "H:12미적Ⅰ02-07"
+
+
+def _committed_conceptual_rows() -> list[dict]:
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "data/corpus/problem_bank_conceptual_v0/problems.jsonl"
+    )
+    rows = [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    assert rows, f"코퍼스를 한 줄도 못 읽었다: {path}"  # 스캔 0건은 공허한 통과다
+    return rows
+
+
+def _primary_concepts(row: dict) -> list[str]:
+    return [c["concept_src_id"] for c in row["concepts"] if c["role"] == "PRIMARY"]
+
+
+def test_committed_extremum_count_items_have_no_02_01_primary() -> None:
+    """P3-49 집행 지점 — 극값의 개수 24건이 02-01 PRIMARY 로 되살아나는 길을 코퍼스 쪽에서 막는다.
+
+    answer_kind(구조)와 발문(표면) 두 축으로 모두 잡는다 — 한쪽만 보면 다른 쪽 표기 변형에서 뚫린다.
+    """
+    rows = _committed_conceptual_rows()
+    by_kind = [r for r in rows if (r.get("verify") or {}).get("answer_kind") == "extremum_count"]
+    by_stem = [r for r in rows if "극값의 개수" in r["question_text"]]
+    assert len(by_kind) == 24 and len(by_stem) == 24  # 대상이 사라지면 가드가 공허해진다
+    for r in by_kind + by_stem:
+        assert _primary_concepts(r) == [_CONCEPT_02_07], r["problem_id"]
+        assert _CONCEPT_02_01 not in _primary_concepts(r)
+
+
+def test_committed_extremum_count_concept_matches_a_fresh_generation(tmp_path: Path) -> None:
+    """커밋 코퍼스가 생성기 표와 따로 놀지 않는다 — 다시 생성해도 같은 문항은 같은 개념이다."""
+    out = tmp_path / "problems.jsonl"
+    run_conceptual_count_mc_batch(n_per_band=24, out_path=out, write=True)
+    fresh = {
+        r["problem_id"]: _primary_concepts(r)
+        for r in map(json.loads, out.read_text(encoding="utf-8").splitlines())
+        if (r.get("verify") or {}).get("answer_kind") == "extremum_count"
+    }
+    committed = {
+        r["problem_id"]: _primary_concepts(r)
+        for r in _committed_conceptual_rows()
+        if (r.get("verify") or {}).get("answer_kind") == "extremum_count"
+    }
+    assert len(fresh) == 24 and fresh == committed
