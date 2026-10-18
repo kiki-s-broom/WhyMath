@@ -22,6 +22,7 @@
       "Bash(docker compose:*)",
       "Bash(psql:*)",
       "Bash(redis-cli:*)",
+      "Bash(gh api repos/kiki-s-broom/whymath/pulls/*/merge *)",
       "Bash(curl:*)",
       "Bash(jq:*)",
       "Bash(rg:*)",
