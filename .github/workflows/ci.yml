@@ -623,6 +623,18 @@ jobs:
       - name: 게이트 — Phase 3 지표 7종 위반 주입 반응 (phase3_metrics --self-check·무반응 0)
         run: python -m whymath_backend.ops.phase3_metrics --self-check
 
+      # P3-07: Solution QA — 대표 과정 승인 문항 전수의 문제·정답·풀이 불일치 기계 검증(C1 정답↔조건 ·
+      # C2 풀이 최종 답 ↔ 정답 · C3 선택지에 정답이 정확히 한 번 · C4 풀이 단계 연쇄 동치).
+      # 판정은 exit code: 0=실패 0건 · 1=실패 문항이 1건이라도 있음(영 허용 — 통과율이 99.5% 위여도 빨갛다.
+      # 456건 중 확정된 불일치 1건은 99.78% 라 비율 판정이면 삼켜진다) · 2=측정 실패(대상 0건·판정 가능 0건·
+      # 세계 적재 실패). 1 과 2 모두 이 스텝을 빨갛게 한다.
+      # 위의 phase3_metrics 실 코퍼스 판정과 달리 **오늘 exit 0 인 상태**라(456/456·검증 불가 665건은 통과도
+      # 실패도 아님) 상시 red 위험이 없어 실 코퍼스에 직접 건다. hermetic(DB 0·LLM 0·네트워크 0 — SymPy만),
+      # 약 50초. 검출기 자체의 변별력(정답·풀이 최종 답·중복 선택지 주입 RED)은 위 전체 Pytest 의
+      # tests/backend/harness/test_solution_qa.py 가, 이 스텝의 존재는 tests/infra/test_solution_qa_wiring.py 가 동결한다.
+      - name: 게이트 — Solution QA (문제·정답·풀이 불일치 · solution_qa 대표 과정 전수)
+        run: python -m whymath_backend.harness.solution_qa
+
       # CONST-03 — 헌법 R2-02(후보 문항 사람 판정 독립)·R2-03(게이트 기록 4요건) 집행 테스트.
       # 왜 이 잡·이 위치인가: 두 테스트가 `whymath_backend`를 import하므로 백엔드 설치가 있는
       # 이 잡이어야 한다. `tests/constitution`은 pytest testpaths(`../../tests/backend`) 밖이라
