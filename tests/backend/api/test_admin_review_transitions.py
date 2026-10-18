@@ -34,10 +34,14 @@ from whymath_backend.db.session import get_session
 from whymath_backend.schema.enums import ReviewStatus, Role, SourceType, Subject
 from whymath_backend.schema.review_timer import ReviewTimerEvent, ReviewTimerEventType
 
-_ADMIN = UserProfile(user_id=uuid.uuid4(), role=Role.CONTENT_ADMIN)
-_STUDENT = UserProfile(user_id=uuid.uuid4(), role=Role.STUDENT)
+_ADMIN = UserProfile(
+    user_id=uuid.UUID("00000000-0000-4000-8000-0000000000a1"), role=Role.CONTENT_ADMIN
+)
+_STUDENT = UserProfile(user_id=uuid.UUID("00000000-0000-4000-8000-0000000000a2"), role=Role.STUDENT)
 _DEMO_ADMIN = UserProfile(
-    user_id=uuid.uuid4(), role=Role.CONTENT_ADMIN, email_hash=email_hash(DEMO_EMAIL)
+    user_id=uuid.UUID("00000000-0000-4000-8000-0000000000a3"),
+    role=Role.CONTENT_ADMIN,
+    email_hash=email_hash(DEMO_EMAIL),
 )
 # parametrize id에 들어가므로 고정값이어야 한다 — 무작위면 xdist 워커마다 수집 목록이 달라 수집 단계에서 실패한다.
 _PID = uuid.UUID("00000000-0000-4000-8000-000000000a07")
