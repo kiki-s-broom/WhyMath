@@ -1141,6 +1141,19 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료는 이미 저장소에 있다(P3-44 조사 문서 5절·p3_diff_shortcut_guard 의 M-link-undescribed). 먼저 끝나야 할 태스크 없음 - 사람 결정"
+  - id: G-p356-signature-engine-approval
+    title: "P3-56 — 미분 오답 서명 독법(예측 오답값 매처)을 구현 항목으로 승격할 것인가: 승인 / 보류 / 반려. 근거 = docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md 와 드래프트 PR. 승인 전에는 머지하지 않는다 (P3-56 ③④)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-56-short-answer-no-misconception-channel
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human

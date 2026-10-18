@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-47-extremum-value-vs-point-distractor-mistag
+title: "P3-47 — extremum-value-vs-point-confused 표시 보기 12건이 방정식 실근 개수 문항에 붙어 있다: 표시 오류 의심 조사"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현황: 문항은행이 이 오개념으로 표시한 오답 보기 124건 중 12건이 방정식의 서로 다른 실근의 개수를 묻는 문항(problem_bank_p3_calculus1_diff_v0)에 있다. M0865의 정의(극점 x좌표를 극값 대신 답함)와 맞지 않아 표시 오류로 의심된다.\n② 읽기 전용 조사: 12건의 생성기 규칙을 확인해 의도된 매핑인지 오표시인지 판정하고 근거를 남긴다. 오표시면 정정 경로(재생성 또는 distractor_map 수정)와 영향 범위(Problem Coverage·삼각 밀도 수치)를 보고한다.\n③ 승인 문항의 distractor_map을 고치는 일은 승인 각인에 영향을 줄 수 있으므로 정정 실행은 사람 게이트를 거친다(자동 수정 금지)."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06 §6 발견 별건. 서명 독법이 이 12건을 읽지 못하는 것(분모 124 중 112 재현)이 단서였다."
+updated: 2026-10-18

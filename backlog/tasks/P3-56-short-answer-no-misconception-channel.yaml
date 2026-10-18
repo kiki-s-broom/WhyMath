@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,8 +14,16 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 단답형 885문항(대표 과정 승인 문항의 79%)에서 오답이 오개념 후보로 이어지는 채널이 지금 0개임을 재확인한다(P3-06 실측: 오답 2,534회 투입 → 후보 0건, 훑기 상태 ran_no_candidate 2,508 · not_run 26).\n② 원인은 설계다 — 오류 서명 채널(answer_signature)은 문항 식 = 학생 답 형태의 등식을 만드는데, 숫자 하나를 답하는 문항은 등식이 되지 않는다.\n③ 선택지를 비교해 적는다: 문항별 '예측 오답값' 매처(SymPy 동치 권위 경유) / 단답형을 객관식 채널에 편입 / 범위 밖 유지. 예측 오답값 매처는 새 탐지기라 마스터 프리앰블이 금지한다 — Kiki의 명시적 허락이 있어야 구현 항목으로 승격한다.\n④ 결정 전에 구현하지 않는다."
+  - "⑤ 후보 구현의 지위(2026-10-18) — 미분 오답 서명 독법(예측 오답값 매처)의 후보 구현이 드래프트 PR로 제출됐다. 이것은 ③의 허락 이전에 만들어진 증거이며 구현 항목 승격이 아니다: 머지는 게이트 G-p356-signature-engine-approval의 Kiki 승인 뒤에만 한다. 증거 문서 docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md (오탐 0/3,188 · 뮤테이션 15종 전건 RED · 단답형 재현율은 측정 불가를 명시). 승인 시 후속 3건(단답 입력 체인 진입점 · 계측기 단답 경로 · 서빙 경로 확인)을 별도 태스크로 연다. 미분 서명 독법의 사정거리 확장(역문제·접선 y절편·속도)은 승인 뒤 별건이다."
 artifacts: []
-paths: []
-session: null
-notes: "출처: P3-06(2026-10-17) 실측. 판정 기준: main 63fe19dd. P3-06 결정 2(Kiki 2026-10-17): 이번 항목은 객관식+기존 채널만, 단답형은 범위 밖으로 명시하고 별건 등재. 측정 도구: python -m whymath_backend.ops.phase3_remediation 의 작동한 비율 절. 등재는 착수가 아니다."
-updated: 2026-10-17
+paths:
+  - src/backend/whymath_backend/l4/misconception/derivative_signature.py
+  - src/backend/whymath_backend/l4/misconception/answer_signature.py
+  - "data/corpus/wrong_answer_signatures_v1/**"
+  - "docs/reviews/p3_56_*.md"
+session: claude/beautiful-gates-fuajv6
+notes: |-
+  출처: P3-06(2026-10-17) 실측. 판정 기준: main 63fe19dd. P3-06 결정 2(Kiki 2026-10-17): 이번 항목은 객관식+기존 채널만, 단답형은 범위 밖으로 명시하고 별건 등재. 측정 도구: python -m whymath_backend.ops.phase3_remediation 의 작동한 비율 절. 등재는 착수가 아니다.
+
+  [정정 2026-10-18] paths [] → ['src/backend/whymath_backend/l4/misconception/derivative_signature.py', 'src/backend/whymath_backend/l4/misconception/answer_signature.py', 'data/corpus/wrong_answer_signatures_v1/**', 'docs/reviews/p3_56_*.md']: P3-06 재구성 — 겹치는 구현은 버리고 단답형 엔진만 P3-56의 결정 증거로 제출. 후보 구현의 지위와 경로를 대장에 남긴다
+updated: 2026-10-18
