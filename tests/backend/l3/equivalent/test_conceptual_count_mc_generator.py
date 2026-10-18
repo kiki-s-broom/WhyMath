@@ -57,6 +57,24 @@ def _gen(template: CountTemplateKind, kebab: str) -> ConceptualCountMCSkeletonGe
     )
 
 
+def test_extremum_count_is_filed_under_02_07_primary() -> None:
+    """P3-49 집행 지점 — 극값의 개수는 02-07(증가·감소, 극대·극소)의 행동이다.
+
+    생성기 표(_TEMPLATE_META)가 02-01 로 돌아가면 24건이 02-01 PRIMARY 로 되살아난다(P3-43 근거 ④).
+    성취기준 코드(02-01·02-07 둘 다)는 spec 이 공급하므로 여기서 건드리지 않는다.
+    """
+    kebab = "critical-point-implies-extremum"
+    gen = _gen("extremum_count", kebab)
+    spec = _spec(kebab, ("[12미적Ⅰ-02-01]", "[12미적Ⅰ-02-07]"))
+    candidates = [gen.generate(spec) for _ in range(24)]
+    assert all(c is not None for c in candidates)  # 0건 스캔은 통과가 아니다
+    for c in candidates:
+        assert c is not None
+        assert [(t.concept_src_id, t.role) for t in c.concept_tags] == [
+            ("H:12미적Ⅰ02-07", "PRIMARY")
+        ]
+
+
 @pytest.mark.parametrize("template,kebab,codes", _CASES)
 def test_yields_and_deterministic(
     template: CountTemplateKind, kebab: str, codes: tuple[str, ...]
