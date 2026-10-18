@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-69-repeat-error-ladder-serving-vs-cli
+title: "P3-69 — 반복 오답 사다리 3·4단계(쉬운 문항·선수 개념)가 HTTP 서빙에서 집행되는지 미확인: P3-06 CLI 투영과 서빙 대조·처분안"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 입력 — P3-G2 판정문 docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md 의 라이브 관측: 같은 오개념 오답을 실 PG·HTTP 로 4회 제출했을 때 누적 가설 신뢰도는 0.80→0.94→0.96→0.97 로 P3-06 CLI(0.80→0.939→0.964→0.968)와 일치하지만, 코칭 문구(misconception_review_coaching)는 4회 모두 글자 그대로 같고, 다음 문항은 1회째 practice_current(misconception_remediation) → 2회째 diagnose(released_after_repeat) → 3·4회째 diagnose(directive 없음), 학습 상태는 R3 에서 R5(OFFER_EXPLANATION_OR_HINT)로 넘어갔다. l4/misconception/intervene.py 모듈 주석은 사다리 등급이 발화에 닿지 않고 등급의 관측 좌석이 HTTP 가 아니라 harness/wh1_loop 라고 적는다.\n② 확인 — HTTP 서빙의 어느 경로가 반복 오답 2·3·4회를 교정 설명·더 쉬운 문항·선수 개념 행동으로 집행하는가. 집행 지점이 있으면 P3-06 CLI(ops/phase3_remediation.py)가 보여 주는 해소 대상(문항 id·원자 코드)과 같은 대상으로 가는지 대조한다. 없으면 없다고 숫자로 적는다(작동한 비율).\n③ 처분 — 집행 지점이 없으면 둘 중 하나를 Kiki 가 고른다: (가) 서빙에 집행 지점을 만든다(별 태스크로 분리) (나) P3-06 CLI 출력과 판정문의 사다리 열을 서빙 미집행인 투영으로 정정한다. 이 태스크는 처분안과 근거를 내고 구현은 하지 않는다.\n④ 변별력 — 같은 오답 N회 제출에서 N별로 서빙 응답이 달라지는지(또는 달라지지 않는지)를 실 PG 로 재현하는 판정 스크립트를 남긴다. 정상 입력에서 초록인 것은 증거가 아니므로 한 단계(예: 3회)를 일부러 막았을 때 대조가 RED 가 되는지 확인한다.\n⑤ 완료 판정 — 서빙 집행 여부가 회차별 표로 남고, 처분안이 Kiki 에게 전달됨."
+  - "[정정 2026-10-18 · 판정 기준 main 9f494454] ①의 마지막 문장 출처를 바로잡는다. 사다리 등급이 발화에 닿지 않는다는 말은 l4/misconception/intervene.py 모듈 주석에서, 등급을 HTTP 응답에 싣지 않고 관측 좌석을 harness/wh1_loop.TurnOutcome.escalation_rung 으로 둔다는 말은 l4/misconception/models.py 의 escalation_rung 필드 설명에서 나온다(PR #1203 — 응답을 누적 증거의 함수로 만들면 동일 입력의 응답 비트동일성이 깨져 shadow ON/OFF 노출 비트동일 단언이 RED 였다). 따라서 등급이 응답에 보이지 않는 것은 결함이 아니라 설계다. 이 태스크가 확인할 대상은 응답 노출이 아니라 등급이 서빙의 다른 경로(next-problem · 상태 머신 R5/R6)를 통해 행동(교정 설명 · 더 쉬운 문항 · 선수 개념)이 되는가이다."
+artifacts: []
+paths: []
+session: null
+notes: |-
+  출처: P3-16 판정 세션(2026-10-18, 판정 기준 main 9f494454)이 라이브 4회 반복 관측에서 발견. P3-G2 의 세 조건 중 어느 것도 이 항목에 달려 있지 않다(조건 3 은 오답 1건). 판정을 막지 않는 잔여라 등재만 한다. 관련: MISC-30(사다리 reader, done), P3-06(CLI 투영, done), P3-60(첫 오답이 항상 거꾸로 사고).
+
+  [정정 2026-10-18] 출처 귀속 정정: 사다리 등급 비노출은 설계(PR #1203)이며 확인 대상은 서빙 경로의 행동화 여부
+updated: 2026-10-18
