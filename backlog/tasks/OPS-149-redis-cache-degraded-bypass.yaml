@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,6 +19,6 @@ paths:
   - src/backend/whymath_backend/l3/cache/redis_cache.py
   - tests/backend/l3/test_redis_cache.py
   - docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md
-session: null
+session: unknown
 notes: "출처: OPS-146 판정(2026-10-18). 게이트 G-ops141-wh1-timeout-live-decompose 증적(판정 기준 origin/main fc939a22). 값(15초)을 늘리는 대신 원인(캐시 대기)을 막는 조치다 — 원인을 두고 예산만 늘리는 것은 증상 처치다. 미확인 사실: 닫힌 포트(127.0.0.1:6379)가 즉시 거부되지 않고 소켓 타임아웃까지 가는 이유는 측정하지 않았다(R2의 연산당 중앙값 2,016ms가 redis_socket_timeout_s=2.0과 같다는 사실만 안다). 운영 구성(docker-compose.prod.yml에 Redis 있음)에서 이 경로가 얼마나 자주 열리는지는 이 측정이 말하지 않는다 — 이 우회는 Redis 장애 때의 방어이고 평시 속도 개선이 아니다."
 updated: 2026-10-18

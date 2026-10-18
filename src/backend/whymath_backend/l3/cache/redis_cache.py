@@ -34,12 +34,39 @@ warning 로그에 남기고(`type(exc).__name__` — 키·값·시크릿은 절�
 캐시 키는 프롬프트 해시라 민감할 수 있다), 강등 횟수를 **인프로세스 카운터**로 센다
 (`CacheDegradationCounter` — 외부 관측 인프라가 죽어도 판정치가 남는 이중 회계,
 `ops/service_health.ServiceMetrics` 선례).
+
+회로 차단 — 강등 중에는 Redis를 아예 부르지 않는다 (OPS-149)
+------------------------------------------------------------
+위의 강등은 *예외를 삼킬 뿐* Redis를 기다리는 비용은 그대로 낸다. OPS-146 실측: Redis가
+없으면 캐시 연산 하나가 소켓 타임아웃(2.0초)까지 매달리고(연산당 중앙값 2,016ms), WH-1 한
+턴이 캐시 연산을 15회 하므로 턴 소요의 94~95%가 캐시 대기였다(R2·R3). 캐시는 성능
+보완재인데 죽은 캐시를 기다리는 비용이 캐시가 아끼는 비용보다 커진 것이다.
+
+그래서 연속 N회(`cache_breaker_failure_threshold`, 기본 3) 실패하면 T초(`cache_breaker_
+open_seconds`, 기본 30)간 get/set이 Redis를 부르지 않고 즉시 미스/no-op으로 강등한다.
+T초가 지나면 첫 호출 1건만 시험(half-open)으로 Redis를 부르고 — 성공하면 닫고 실패하면 다시
+T초 연다. 시험 중 도착한 다른 호출은 계속 우회한다(죽은 Redis에 대기가 쌓이지 않게).
+
+- **건강한 Redis를 오탐 차단하지 않는다**: 연속 실패만 센다(성공 1건이 카운트를 0으로 되돌린다).
+  R4 실측 정상 Redis는 연산 최대 94ms·강등 0회라 타임아웃과 20배 넘게 떨어져 있다.
+- **취소에 안전하다**: WH-1은 15초 예산으로 턴을 취소하므로 시험 호출이 취소될 수 있다.
+  취소된 시험이 슬롯을 반납하지 않으면 우회가 영구히 닫히지 않는다 — 취소도 시험 실패로
+  거두고, 반납이 누락돼도 `cache_breaker_open_seconds` 뒤에는 새 시험을 허용한다.
+- **우회도 강등으로 센다**: 건너뛴 호출은 `degradation_count`에 포함된다. 측정 도구
+  (`scripts/ops/wh1_primary_timeout_decompose.py`)가 그 증가분으로 "강등으로 끝난 연산"을
+  판정하므로, 세지 않으면 우회 구간이 정상으로 분류돼 redis-down 조건 확인이 혼합으로 거부된다.
+- **작동한 비율**: 정상 응답 200은 우회가 일했다는 증거가 아니다. 열린 횟수·건너뛴 호출 수·
+  우회 비율을 `CacheDegradationSnapshot`에 싣고 `/health/ready`의 `cache_degradation`로 노출한다.
+`cache_breaker_failure_threshold=0`이면 우회를 끈다(종전 동작 — 코드 되돌림 없는 철수 수단).
 """
 
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Literal, Protocol, cast, runtime_checkable
 
 from whymath_backend.config import Settings, get_settings
@@ -50,6 +77,19 @@ logger = logging.getLogger(__name__)
 CacheOperation = Literal["get", "set"]
 _OP_GET: CacheOperation = "get"
 _OP_SET: CacheOperation = "set"
+
+# 회로 차단 기본값 — config.py `cache_breaker_*`의 기본값과 같다(근거는 거기 description).
+_DEFAULT_BREAKER_FAILURE_THRESHOLD = 3
+_DEFAULT_BREAKER_OPEN_SECONDS = 30.0
+
+
+class _Admission(Enum):
+    """캐시 연산 1건이 Redis를 부를 수 있는가의 판정 — `CacheDegradationCounter.admit`의 결과."""
+
+    CALL = "call"  # 정상 호출(회로 닫힘 또는 우회 꺼짐)
+    PROBE = "probe"  # 우회 시간이 지난 뒤의 시험 호출(half-open) — 이 한 건만 Redis를 부른다
+    SKIP = "skip"  # 우회 — Redis를 부르지 않고 미스/no-op으로 강등한다
+
 
 # 로그 스팸 방지: 연속 실패가 이어지는 동안 매 요청 warning을 찍으면 로그가 알림 가치를
 # 잃는다(AlertLogNotifier의 '상태 전이 시에만' 원칙). 전이(첫 실패) + 이후 N번째마다만
@@ -112,11 +152,26 @@ class CacheDegradationSnapshot:
     set_failures: int
     consecutive_failures: int
     last_error_type: str | None
+    # ── 회로 차단(OPS-149) "작동한 비율" — 뒤에 기본값으로 붙여 기존 4필드 생성자를 보존한다 ──
+    successes: int = 0  # Redis가 실제로 응답한 연산 수(우회 비율의 분모 일부)
+    breaker_opens: int = 0  # 회로가 닫힘→열림으로 넘어간 횟수(시험 실패 재개방은 세지 않는다)
+    skipped_calls: int = 0  # 우회로 Redis를 부르지 않고 미스/no-op 처리한 연산 수
+    breaker_open: bool = False  # 지금 회로가 열려 있는가(= 다음 연산이 우회될 수 있는가)
 
     @property
     def total_failures(self) -> int:
-        """누적 강등 횟수(get+set) — '이 프로세스가 캐시 없이 버틴 횟수'."""
+        """누적 강등 횟수(get+set) — Redis를 *실제로 불러서* 실패한 횟수. 우회는 포함하지 않는다."""
         return self.get_failures + self.set_failures
+
+    @property
+    def bypass_ratio(self) -> float | None:
+        """우회가 일한 비율 = 건너뛴 연산 / 전체 연산(성공 + 실패 + 건너뜀).
+
+        분모가 0이면 None이다 — '연산 0건 중 0건'이 아니라 *측정 대상이 없다*(None-vs-0).
+        1.0에 가까우면 거의 모든 캐시 연산이 Redis 없이 처리됐다는 뜻이다.
+        """
+        total = self.successes + self.total_failures + self.skipped_calls
+        return self.skipped_calls / total if total else None
 
     @property
     def degraded(self) -> bool:
@@ -139,6 +194,11 @@ class CacheDegradationCounter:
         첫 실패 warning을 낸다.
       - 로그에 **키·값·시크릿은 절대 싣지 않는다**(캐시 키 = 프롬프트 해시 → 민감 가능).
 
+    회로 차단(OPS-149)도 이 객체가 *상태를 쥔다* — 테스트 격리(카운터를 새로 주입하면 회로도
+    새로 시작)와 프로세스 합산(전역 카운터를 쓰는 인스턴스는 한 회로를 공유 — 죽은 Redis를
+    인스턴스마다 3회씩 따로 두드리지 않는다)이 카운터 주입이라는 한 지점으로 묶이기 때문이다.
+    시계는 주입 가능하다(`clock`, 기본 `time.monotonic`) — 시간 경과를 sleep 없이 검증한다.
+
     logger 주입은 테스트 격리용이다(`AlertLogNotifier` 선례).
     """
 
@@ -147,6 +207,9 @@ class CacheDegradationCounter:
         *,
         log_every_n_failures: int = _LOG_EVERY_N_FAILURES,
         target_logger: logging.Logger | None = None,
+        breaker_failure_threshold: int = _DEFAULT_BREAKER_FAILURE_THRESHOLD,
+        breaker_open_seconds: float = _DEFAULT_BREAKER_OPEN_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._logger = target_logger if target_logger is not None else logger
         # 0·음수는 매 실패 로그(스팸)를 뜻하므로 최소 1로 클램프 — 설정 실수 방어.
@@ -155,9 +218,77 @@ class CacheDegradationCounter:
         self._set_failures = 0
         self._consecutive_failures = 0
         self._last_error_type: str | None = None
+        self._successes = 0
+        # 회로 차단 상태. `_open_until is None`이면 닫힘, 아니면 그 시각(clock 기준)까지 열림 —
+        # 시각이 지난 뒤에도 None이 되지 않고 열린 채 시험 호출을 기다린다(half-open).
+        self._clock = clock
+        self._breaker_threshold = breaker_failure_threshold
+        self._breaker_open_seconds = breaker_open_seconds
+        self._open_until: float | None = None
+        self._probe_started_at: float | None = None  # 시험 호출이 나간 시각(None이면 시험 없음)
+        self._breaker_opens = 0
+        self._skipped_calls = 0
 
-    def record_failure(self, operation: CacheOperation, exc: BaseException) -> None:
-        """강등 1건 기록 + 정책에 따라 warning 로그(예외 타입명 포함)."""
+    # ── 회로 차단 ────────────────────────────────────────────────────────────
+    def configure_breaker(self, *, failure_threshold: int, open_seconds: float) -> None:
+        """설정값 반영 — RedisCache가 첫 사용 때 Settings 값으로 부른다(멱등·마지막 값 우선).
+
+        전역 카운터는 import 시점에 만들어져 Settings를 모른다. 같은 프로세스의 모든 인스턴스는
+        같은 Settings를 쓰므로 값이 같고, 달라도 마지막 값이 이긴다(테스트 격리는 카운터 주입).
+        """
+        self._breaker_threshold = failure_threshold
+        self._breaker_open_seconds = open_seconds
+
+    def admit(self) -> _Admission:
+        """이 연산이 Redis를 불러도 되는가 — 우회면 건너뜀을 센다(작동한 비율의 분자).
+
+        - 우회 꺼짐(threshold<=0) 또는 회로 닫힘 → CALL.
+        - 열림 시간 안 → SKIP.
+        - 열림 시간이 지남: 진행 중인 시험이 없으면 이 호출이 시험(PROBE), 있으면 SKIP.
+          단 시험이 `breaker_open_seconds` 넘게 끝나지 않았으면 반납이 누락된 것으로 보고 새
+          시험을 허용한다(영구 우회 방지 안전망 — 취소·예외 경로가 모두 반납하지만 방어선을 둔다).
+        """
+        if self._breaker_threshold <= 0 or self._open_until is None:
+            return _Admission.CALL
+        now = self._clock()
+        if now < self._open_until:
+            self._skipped_calls += 1
+            return _Admission.SKIP
+        if (
+            self._probe_started_at is not None
+            and now - self._probe_started_at < self._breaker_open_seconds
+        ):
+            self._skipped_calls += 1
+            return _Admission.SKIP
+        self._probe_started_at = now
+        return _Admission.PROBE
+
+    def abort_probe(self, admission: _Admission) -> None:
+        """시험 호출이 *성공도 실패도 아닌 채* 끝났을 때(취소 등) 슬롯을 반납하고 재개방한다.
+
+        취소는 Redis가 살아 있다는 증거가 아니므로 닫지 않는다. 시험이 아니면 아무것도 안 한다.
+        """
+        if admission is _Admission.PROBE:
+            self._reopen("시험 호출이 취소됨")
+
+    def _reopen(self, reason: str) -> None:
+        """열림 시간을 지금부터 다시 시작하고 시험 슬롯을 비운다."""
+        self._open_until = self._clock() + self._breaker_open_seconds
+        self._probe_started_at = None
+        self._logger.warning(
+            "Redis 캐시 회로 차단 유지 — %s. %.1f초 뒤 다시 시험합니다.",
+            reason,
+            self._breaker_open_seconds,
+        )
+
+    def record_failure(
+        self,
+        operation: CacheOperation,
+        exc: BaseException,
+        *,
+        admission: _Admission = _Admission.CALL,
+    ) -> None:
+        """강등 1건 기록 + 정책에 따라 warning 로그(예외 타입명 포함) + 회로 개폐 판정."""
         error_type = type(exc).__name__
         if operation == _OP_GET:
             self._get_failures += 1
@@ -174,9 +305,30 @@ class CacheDegradationCounter:
                 self._consecutive_failures,
                 self._get_failures + self._set_failures,
             )
+        if self._breaker_threshold <= 0:
+            return
+        if admission is _Admission.PROBE:
+            # 시험 실패 — 아직 죽어 있다. 열림 횟수는 올리지 않는다(같은 사건의 연장).
+            self._reopen(f"시험 호출 실패(예외 타입: {error_type})")
+        elif self._open_until is None and self._consecutive_failures >= self._breaker_threshold:
+            # 닫힘→열림 전이. 이미 열린 뒤에 도착한 앞선 호출의 실패는 여기로 오지 않는다.
+            self._open_until = self._clock() + self._breaker_open_seconds
+            self._breaker_opens += 1
+            self._logger.warning(
+                "Redis 캐시 회로 차단 열림 — 연속 실패 %d회(마지막 예외 타입: %s). "
+                "%.1f초간 Redis를 부르지 않고 캐시 없이 처리합니다(학생 노출 없음).",
+                self._consecutive_failures,
+                error_type,
+                self._breaker_open_seconds,
+            )
 
-    def record_success(self) -> None:
-        """정상 캐시 연산 1건 관측 — 강등 중이었다면 해소를 info로 남기고 연속을 0으로."""
+    def record_success(self, *, admission: _Admission = _Admission.CALL) -> None:
+        """정상 캐시 연산 1건 관측 — 강등 중이었다면 해소를 info로 남기고 연속을 0으로.
+
+        회로는 *시험 호출의 성공*으로만 닫는다. 열리기 전에 나간 호출이 뒤늦게 성공해도 그것은
+        '지금 Redis가 산다'는 증거가 아니므로 닫지 않는다(연속 실패 카운트만 0으로 돌아간다).
+        """
+        self._successes += 1
         if self._consecutive_failures:
             self._logger.info(
                 "Redis 캐시 강등 해소 — 직전 연속 실패 %d회(마지막 예외 타입: %s)",
@@ -184,6 +336,10 @@ class CacheDegradationCounter:
                 self._last_error_type,
             )
             self._consecutive_failures = 0
+        if admission is _Admission.PROBE:
+            self._open_until = None
+            self._probe_started_at = None
+            self._logger.info("Redis 캐시 회로 차단 닫힘 — 시험 호출이 성공했습니다.")
 
     def snapshot(self) -> CacheDegradationSnapshot:
         """현재 회계의 불변 스냅샷."""
@@ -192,14 +348,23 @@ class CacheDegradationCounter:
             set_failures=self._set_failures,
             consecutive_failures=self._consecutive_failures,
             last_error_type=self._last_error_type,
+            successes=self._successes,
+            breaker_opens=self._breaker_opens,
+            skipped_calls=self._skipped_calls,
+            breaker_open=self._open_until is not None,
         )
 
     def reset(self) -> None:
-        """회계 초기화 — 테스트 격리용(프로덕션 경로는 호출하지 않는다)."""
+        """회계 초기화 — 테스트 격리용(프로덕션 경로는 호출하지 않는다). 회로도 닫는다."""
         self._get_failures = 0
         self._set_failures = 0
         self._consecutive_failures = 0
         self._last_error_type = None
+        self._successes = 0
+        self._open_until = None
+        self._probe_started_at = None
+        self._breaker_opens = 0
+        self._skipped_calls = 0
 
 
 # 프로세스 전역 회계 — RedisCache 인스턴스가 여럿(app.state 기본 캐시·사전적재 CLI 등)이어도
@@ -211,9 +376,9 @@ _PROCESS_DEGRADATION = CacheDegradationCounter()
 def cache_degradation_snapshot() -> CacheDegradationSnapshot:
     """프로세스 전역 캐시 강등 회계 스냅샷 — 운영 노출·진단의 읽기 표면.
 
-    아직 `/health/ready` body에는 싣지 않는다(배선은 후속 — app.py 응답 스키마 변경이
-    이 태스크 범위 밖). 지금은 이 접근자로 인프로세스 판정치가 *존재*하며, 관측 SaaS
-    없이도 읽을 수 있다는 점만 보장한다.
+    `/health/ready` body의 `cache_degradation` 섹션이 이 접근자를 읽는다(OPS-149 — 회로 차단의
+    '작동한 비율'을 정상 200 뒤에 숨기지 않기 위한 배선). 관측 SaaS 없이도 읽을 수 있다.
+    프로세스별 카운터다 — 서버 워커가 여럿이면 응답한 워커 1개의 값이고 재시작하면 0부터다.
     """
     return _PROCESS_DEGRADATION.snapshot()
 
@@ -312,6 +477,19 @@ class RedisCache:
         self._settings = settings
         # 기본은 프로세스 전역 회계(인스턴스가 여럿이어도 합산) — 테스트는 새 카운터 주입.
         self._degradation = degradation if degradation is not None else _PROCESS_DEGRADATION
+        # 회로 차단 설정(Settings → 카운터) 반영 여부 — 첫 연산 때 한 번만(OPS-149).
+        self._breaker_configured = False
+
+    def _admit(self) -> _Admission:
+        """연산 1건의 Redis 호출 허가 판정 — 첫 호출 때 회로 차단 설정을 카운터에 반영한다."""
+        if not self._breaker_configured:
+            settings = self._resolved_settings
+            self._degradation.configure_breaker(
+                failure_threshold=settings.cache_breaker_failure_threshold,
+                open_seconds=settings.cache_breaker_open_seconds,
+            )
+            self._breaker_configured = True
+        return self._degradation.admit()
 
     @property
     def _resolved_settings(self) -> Settings:
@@ -328,8 +506,14 @@ class RedisCache:
 
     @property
     def degradation_count(self) -> int:
-        """이 캐시가 쓰는 회계의 누적 강등 횟수(get+set) — 인프로세스 판정치."""
-        return self._degradation.snapshot().total_failures
+        """이 캐시가 쓰는 회계의 누적 강등 횟수(get+set) — 인프로세스 판정치.
+
+        실패한 Redis 호출 **+ 회로 차단으로 건너뛴 연산**의 합이다(OPS-149). 둘 다 "캐시 없이
+        버틴" 연산이고, 측정 도구가 이 값의 증가로 연산 1건의 강등 여부를 판정하기 때문이다.
+        Redis를 실제로 불러 실패한 횟수만 필요하면 스냅샷의 `total_failures`를 쓴다.
+        """
+        snapshot = self._degradation.snapshot()
+        return snapshot.total_failures + snapshot.skipped_calls
 
     def degradation_snapshot(self) -> CacheDegradationSnapshot:
         """이 캐시가 쓰는 회계의 불변 스냅샷(연산별 실패·연속 실패·마지막 예외 타입)."""
@@ -352,13 +536,22 @@ class RedisCache:
         라이브러리 미설치(생성 단계 RuntimeError)·손상된 값(UnicodeDecodeError)도 결국
         "캐시를 못 쓰는 상태"라 같은 강등으로 다뤄야 학생 경로가 안 깨진다.
         """
+        admission = self._admit()
+        if admission is _Admission.SKIP:
+            # 회로 차단 우회(OPS-149) — Redis를 부르지 않고 미스로 강등(건너뜀은 admit()이 셌다).
+            return None
         try:
             raw = await self._get_client().get(key)
             decoded = _decode(raw)
         except Exception as exc:  # noqa: BLE001 — 캐시 장애를 학생 대면 실패로 전파 금지
-            self._degradation.record_failure(_OP_GET, exc)
+            self._degradation.record_failure(_OP_GET, exc, admission=admission)
             return None
-        self._degradation.record_success()
+        except BaseException:
+            # 취소(asyncio.CancelledError — WH-1 턴 예산 초과 등)는 성공도 실패도 아니다. 시험
+            # 호출이었다면 슬롯을 반납하지 않는 한 우회가 영구히 닫히지 않으므로 거두고 전파한다.
+            self._degradation.abort_probe(admission)
+            raise
+        self._degradation.record_success(admission=admission)
         return decoded
 
     async def set(self, key: str, value: str, ttl_seconds: int) -> None:
@@ -380,6 +573,10 @@ class RedisCache:
         때문에 지금 응답을 이미 만들어 낸 학생 요청을 5xx로 죽이는 것은 우선순위 위반이다
         (#1 학생 ≫ #6 비용). get과 마찬가지로 예외 타입명을 로그·카운터에 남긴다.
         """
+        admission = self._admit()
+        if admission is _Admission.SKIP:
+            # 회로 차단 우회(OPS-149) — 적재를 건너뛴다(no-op). 다음 동일 요청이 재생성할 뿐이다.
+            return
         try:
             client = self._get_client()
             if ttl_seconds <= 0:
@@ -388,9 +585,13 @@ class RedisCache:
             else:
                 await client.set(key, value, ex=ttl_seconds)
         except Exception as exc:  # noqa: BLE001 — 캐시 장애를 학생 대면 실패로 전파 금지
-            self._degradation.record_failure(_OP_SET, exc)
+            self._degradation.record_failure(_OP_SET, exc, admission=admission)
             return
-        self._degradation.record_success()
+        except BaseException:
+            # get과 같은 사유 — 취소된 시험 호출의 슬롯 반납(영구 우회 방지).
+            self._degradation.abort_probe(admission)
+            raise
+        self._degradation.record_success(admission=admission)
 
     async def ping(self) -> bool:
         """Redis 도달성 확인 — 도달 True, 실패 False (예외 흡수).
