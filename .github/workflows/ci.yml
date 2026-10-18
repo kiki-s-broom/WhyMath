@@ -28,9 +28,16 @@ on:
     - cron: "0 18 * * *"
 
 # 동일 PR/브랜치에서 새 푸시가 오면 이전 실행 취소 (비용 절감)
+#
+# 그룹 키에 이벤트 이름을 넣는 이유 (OPS-152): schedule 실행의 ref는 refs/heads/main이라
+# main push와 **같은 그룹**이었고, cancel-in-progress가 켜져 있으면 main에 push가 들어올 때마다
+# 진행 중인 야간 안전망(E2E·직렬 전체·제약 신선도)이 취소됐다(최근 야간 실행 #6067·#6032·#5910·
+# #5763 cancelled). 야간 실행은 "새 푸시로 대체되는 낡은 실행"이 아니라 그날 main 전체의
+# 독립 검증이므로 push 트래픽과 그룹을 나누고, schedule 실행은 취소하지 않는다.
+# PR·push·merge_group의 취소 동작은 종전 그대로다(비용 절감 의도 보존).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 permissions:
   contents: read
