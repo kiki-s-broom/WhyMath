@@ -886,15 +886,28 @@ gates:
     title: "OPS-141 WH-1 primary 시간 초과 소요 분해 실측 실행 — docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md 를 Phaiakes9 에서 §1~§8 순서로 실행하고 §8 요약 출력 전체(R1~R5 각 EXIT 줄·계측 대조·프로바이더 호출 실패 경고 유무 포함)를 세션에 전달. 도구 PR 머지 후에만 실행 가능(§1 이 origin/main 에 도구가 있는지 확인). 기본 타임아웃 15초는 이 게이트에서 바꾸지 않는다 — 값 판정은 승계 태스크가 한다."
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-14
     remind_after_days: 7
+    evidence: "2026-10-18 Kiki가 Phaiakes9(Windows PowerShell)에서 docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md §1~§8을 실행하고 §8 요약 전체를 세션에 전달했다. 판정 기준: origin/main fc939a22 (도구 PR #1637 포함 · 5개 실행 모두 코드 fc939a22로 기록). 첫 §1은 클론이 18커밋 뒤처져 PRE_OK=False(CODE_MATCHES_ORIGIN_MAIN=False)였고 git merge --ff-only로 맞춘 뒤 §1을 처음부터 다시 실행했다. 결과 폴더 C:\\Users\\kiki\\Desktop\\__AI\\ops141-out\\20261018-112342 (summary.txt · decompose.jsonl 보존). 종료 코드: SUMMARIZE_EXIT=0 · R1=0 R2=0 R3=0 R4=0 R5=0. 성공 기준 4항: 각 실행 EXIT 0 충족 · 5개 실행 모두 계측 대조 {OK: 12} 충족(MISMATCH 0) · 요약에 프로바이더 호출 실패 경고 줄 없음 · R1 콜드 확인 True(첫 턴 전 로드 모델 []). 원문 수치(각 12턴, 합성 턴, 모델 qwen2.5:3b): R1 memory 콜드 예산120초 = 턴 중앙값 1,664ms·최대 5,734ms·미채택 0/12·구간 캐시0%/프로바이더99%/나머지1%·턴당 프로바이더 호출 중앙값 7.5(최대 15)·콜드 추정 첫 호출 4,125ms 대 웜 중앙값 188ms(추가분 3,937ms)·15초 초과 0%. R2 redis-down 예산120초 = 캐시 프로브 get 6회 중 강등 6회·연산당 중앙값 2,016ms(TimeoutError)·턴 중앙값 31,797ms·최대 46,734ms·미채택 3/12(fallback_llm_degraded 3)·구간 캐시95%(강등 대기 341,279ms)/프로바이더5%·턴당 캐시 연산 중앙값 15·초과율 10초100%·15초100%·20초92%·30초50%·60초0%. R3 redis-down 예산15초 = 턴 중앙값 15,016ms·미채택 12/12(fallback_timeout 12)·캐시94%/프로바이더6%·턴당 프로바이더 호출 중앙값 4·턴당 캐시 연산 8·취소 시점 진행 구간 provider 1·cache_set 11. R4 redis-up 예산120초 = 캐시 프로브 강등 0회·연산 중앙값 0ms(최대 94ms)·턴 중앙값 1,562ms·최대 3,016ms·미채택 1/12(fallback_llm_degraded 1)·캐시1%/프로바이더99%·15초 초과 0%. R5 redis-up 예산15초 = 턴 중앙값 1,586ms·최대 3,250ms·미채택 0/12(adopted 12)·캐시1%/프로바이더98%·15초 초과 0%. 이 게이트는 측정 수령까지만 판정한다 — 지배 원인 판정(가나다라)과 15초 재판정은 승계 태스크 OPS-146이 한다. 제약 3건: ①합성 턴 12개 x 조건당 1회(반복 없음) ②fallback_llm_degraded(R2 3건·R4 1건)의 원인은 이 요약으로 가려지지 않았다 ③Phaiakes9의 Redis(6379) 부재 상태가 운영 구성을 대표하는지는 이 측정이 말하지 않는다. 기본 타임아웃 15초는 미변경."
+    cleared_by: claude
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-141-wh1-primary-timeout-live-decomposition
+  - id: G-ops149-redis-bypass-r3-remeasure
+    title: "OPS-149 캐시 우회 착지 후 R3 재실측 — Phaiakes9에서 docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md 의 R3(redis-down·실서비스 예산 15초)만 새 코드로 다시 실행하고 §8 요약 전체를 세션에 전달한다. 비교 기준은 2026-10-18 측정(게이트 G-ops141-wh1-timeout-live-decompose 증적): 12/12 fallback_timeout·캐시 대기 94%·턴 중앙값 15,016ms. OPS-149 PR 머지 후에만 실행 가능(런북 §1이 코드 동등성을 확인한다). 기본 타임아웃 15초는 이 게이트에서 바꾸지 않는다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: null
     evidence: null
     cleared_by: null
     notes: ""
     corrections: []
     depends_on:
-      - OPS-141-wh1-primary-timeout-live-decomposition
+      - OPS-149-redis-cache-degraded-bypass
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human
