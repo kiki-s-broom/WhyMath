@@ -29,9 +29,10 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
 갖고 있는지에 따라 진짜 0(이번 주 활동 없음)과 미측정(DB 연결 자체 실패)이 갈린다 —
 후자만 `measured=False`로 낸다.
 
-**환경의 정직한 공백(중요)**: `review_timer_event`는 마이그레이션은 있지만 **쓰기 경로가
-아직 없다**(`ReviewTimerEvent.from_schema()` 호출처 0건 — 검수 UI(ADMIN-07)가 아직 이
-테이블에 쓰지 않는다). 그리고 이 저장소의 CI(GitHub Actions 호스팅 러너)가 붙는 Postgres는
+**환경의 정직한 공백(중요)**: `review_timer_event`의 쓰기 경로는 ADMIN-18이 Admin BFF
+(`POST …/review-sessions`·`POST …/transitions`)에 열었지만, 그 경로가 실제로 운영 DB에 닿아
+행이 쌓이기 전까지는 비어 있다(검수 화면 결선 = 웹 쪽 절반). 그리고 이 저장소의 CI
+(GitHub Actions 호스팅 러너)가 붙는 Postgres는
 `ci.yml`의 다른 실PG 잡들과 마찬가지로 **매 실행 새로 뜨는 빈 컨테이너**이지 Phaiakes9의
 실제 콘텐츠 제작 DB가 아니다 — 원격에서 그 DB로의 네트워크 경로 자체가 없다(비밀값
 `DEPLOY_SSH_*`는 배포 대상 서버용이지 Phaiakes9용이 아니다). 즉 **이 크론이 GitHub
