@@ -1668,3 +1668,231 @@ class TestProblemRowToEvidence:
 
 
 _GONE = object()  # `_ref` 가 키를 행에서 지우라는 표지
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 게이트 단위 종료 코드 (P3-54) — 합산 종료 코드는 게이트 조건을 가르지 못한다
+# ──────────────────────────────────────────────────────────────────────────
+#: 지표마다 "그 지표만" 떨어뜨리는 주입(목표가 있는 4종 안에서). Content 의 주입은 목표가 없는
+#: 공급 가능 커버리지도 함께 떨어뜨리지만 그 지표는 종료 코드에 불참하므로 게이트 4종 안에서는 단독이다.
+_SOLO_INJECTION: dict[str, Callable[..., Any]] = {
+    "content_coverage_rate": _drop_content_row,
+    "curriculum_coverage": _add_node_without_concept,
+    "concept_completeness": _drop_prerequisite,
+    "graph_connectivity_coverage": _drop_crosslinks,
+}
+
+
+def _with_gate(spec: ps.ScopeSpec, key: str) -> ps.ScopeSpec:
+    """`key` 한 지표만 조건으로 선언한 게이트 `T-<key>` 를 얹은 명세."""
+    gates = {f"T-{key}": ps.GateCondition(metrics=(key,), basis="테스트 합성 게이트")}
+    return replace(spec, gate_conditions=gates)
+
+
+def _gate_exit(spec: ps.ScopeSpec, index: ps.ReferenceIndex, w: pc.CoverageCorpus, key: str) -> int:
+    gated = _with_gate(spec, key)
+    return pc.judge_gate(gated, pc.evaluate(gated, index, w), f"T-{key}").exit_code
+
+
+def test_solo_injection_table_really_isolates_each_gated_metric(spec, index, world) -> None:
+    """전제 검증 — 아래 행렬은 이 표가 '정말 그 지표만' 떨어뜨린다는 가정 위에 선다."""
+    before = {k: pc.evaluate(spec, index, world).metric(k).value for k in pc.GATE_METRIC_KEYS}
+    for key, inject in _SOLO_INJECTION.items():
+        spec2, world2 = inject(spec, index, world)
+        after = {k: pc.evaluate(spec2, index, world2).metric(k).value for k in pc.GATE_METRIC_KEYS}
+        fell = {k for k in pc.GATE_METRIC_KEYS if after[k] != before[k]}
+        assert fell == {key}, f"[{key}] 주입이 다른 지표도 건드렸다: {fell}"
+
+
+@pytest.mark.parametrize("selected", pc.GATE_METRIC_KEYS)
+@pytest.mark.parametrize("injected", pc.GATE_METRIC_KEYS)
+def test_gate_exit_is_one_only_for_its_own_metric(spec, index, world, selected, injected) -> None:
+    """acceptance ③ — 선택된 지표를 떨어뜨리는 주입에만 1, 다른 지표만 떨어뜨리는 주입에는 0."""
+    spec2, world2 = _SOLO_INJECTION[injected](spec, index, world)
+    assert _gate_exit(spec2, index, world2, selected) == (1 if selected == injected else 0)
+
+
+@pytest.mark.parametrize("selected", pc.GATE_METRIC_KEYS)
+def test_control_clean_world_passes_every_gate(spec, index, world, selected) -> None:
+    """대조군 — 위반 없는 세계는 어떤 게이트도 0 이다(과잉 반응하는 판정기를 막는다)."""
+    assert _gate_exit(spec, index, world, selected) == 0
+
+
+def test_default_exit_code_cannot_tell_the_gate_condition_but_the_gate_can(
+    spec, index, world
+) -> None:
+    """P3-54 가 겨냥한 결함의 재현 — 다른 지표가 이미 미달인 기준선에서 합산 종료 코드는 변별력이 0 이다.
+
+    2026-10-17 실측과 같은 구조: 기준선(Completeness 미달)과 기준선+Content 하락이 둘 다 합산 1 이다.
+    """
+    spec_a, base = _drop_prerequisite(spec, index, world)  # Completeness 만 이미 미달인 세계
+    spec_b, worse = _drop_content_row(spec_a, index, base)  # 거기에 Content 까지 떨어뜨린다
+    assert worse != base
+    report_a = pc.evaluate(spec_a, index, base)
+    report_b = pc.evaluate(spec_b, index, worse)
+    assert report_a.metric("content_coverage_rate").met is True
+    assert report_b.metric("content_coverage_rate").met is False
+    assert report_a.exit_code == report_b.exit_code == 1  # 합산: 둘을 가르지 못한다
+    assert _gate_exit(spec_a, index, base, "content_coverage_rate") == 0
+    assert _gate_exit(spec_b, index, worse, "content_coverage_rate") == 1
+
+
+def test_injections_leave_the_shared_world_untouched(spec, index, world) -> None:
+    """원복 동일성 — 주입은 새 객체를 만들 뿐 공유 세계를 바꾸지 않는다(다음 테스트가 오염되지 않는다)."""
+    fresh = _world(spec, index)
+    for inject in _SOLO_INJECTION.values():
+        inject(spec, index, world)
+    assert world == fresh
+
+
+def test_measurement_failure_inside_the_gate_is_a_failure_not_a_pass(spec, index, world) -> None:
+    """분모 0(측정 불가)은 게이트 안에서도 통과가 아니다."""
+    empty = replace(spec, concepts=tuple(replace(c, core=False) for c in spec.concepts))
+    gated = _with_gate(empty, "content_coverage_rate")
+    verdict = pc.judge_gate(gated, pc.evaluate(gated, index, world), "T-content_coverage_rate")
+    assert verdict.exit_code == 1
+    assert any("분모가 0" in f for f in verdict.failures)
+
+
+def test_failure_text_is_shared_with_the_default_verdict(spec, index, world) -> None:
+    """게이트 판정의 실패 문구는 합산 판정과 같은 한 곳에서 나온다(문구가 따로 놀지 않는다)."""
+    spec2, broken = _drop_content_row(spec, index, world)
+    gated = _with_gate(spec2, "content_coverage_rate")
+    report = pc.evaluate(gated, index, broken)
+    verdict = pc.judge_gate(gated, report, "T-content_coverage_rate")
+    assert verdict.failures == tuple(f for f in report.failures if "Content Coverage" in f)
+    assert verdict.metric_keys == ("content_coverage_rate",)
+
+
+class TestGateRefusals:
+    """판정할 수 없는 요청은 0 이 아니라 거부다 — 선언이 없다는 사실을 통과로 접지 않는다."""
+
+    def test_undeclared_gate_is_refused(self, spec, index, world) -> None:
+        report = pc.evaluate(spec, index, world)
+        with pytest.raises(pc.CoverageError, match="조건 지표 선언이 없다"):
+            pc.judge_gate(spec, report, "P3-G9")
+
+    def test_spec_without_any_gate_refuses_every_gate(self, spec, index, world) -> None:
+        bare = replace(spec, gate_conditions={})
+        with pytest.raises(pc.CoverageError, match="선언된 게이트: 없음"):
+            pc.judge_gate(bare, pc.evaluate(bare, index, world), "P3-G1")
+
+    @pytest.mark.parametrize("bad", ["supply_coverage", "slot_coverage", "no_such_metric"])
+    def test_non_gate_metric_key_is_refused_at_evaluate_time(self, spec, index, world, bad) -> None:
+        """명세가 이 계측기에 없는(또는 목표 없는) 지표를 가리키면 측정 자체를 거부한다."""
+        lying = replace(
+            spec,
+            gate_conditions={"T-bad": ps.GateCondition(metrics=(bad,), basis="테스트")},
+        )
+        with pytest.raises(pc.CoverageError, match="목표가 있는 지표가 아닌 키"):
+            pc.evaluate(lying, index, world)
+
+    def test_gate_metric_without_a_spec_target_is_refused_not_vacuously_passed(
+        self, spec, index, world
+    ) -> None:
+        """목표가 null 인 지표로는 종료 코드가 항상 0 이다 — 그것을 판정으로 내지 않는다."""
+        targets = {
+            **spec.targets,
+            "graph_connectivity_coverage": ps.Target(value=None, reason="테스트 — 목표 미정"),
+        }
+        gated = replace(_with_gate(spec, "graph_connectivity_coverage"), targets=targets)
+        _, cut = _drop_crosslinks(gated, index, world)  # 위반이 실제로 있어도
+        report = pc.evaluate(gated, index, cut)
+        assert report.metric("graph_connectivity_coverage").value == 0.0
+        with pytest.raises(pc.CoverageError, match="목표가 없다"):
+            pc.judge_gate(gated, report, "T-graph_connectivity_coverage")
+
+    def test_real_spec_declares_only_judgeable_gates(self, spec, index, world) -> None:
+        """실 명세의 모든 게이트 선언이 판정 가능하다(거부 경로가 실 명세에서 닿지 않는다)."""
+        assert "P3-G1" in spec.gate_conditions
+        report = pc.evaluate(spec, index, world)
+        for gate_id in spec.gate_conditions:
+            assert pc.judge_gate(spec, report, gate_id).exit_code in (0, 1)
+        assert set(pc.GATE_METRIC_KEYS) >= {
+            k for c in spec.gate_conditions.values() for k in c.metrics
+        }
+
+
+class TestGateCli:
+    @staticmethod
+    def _failing_completeness_world(spec, index, world):
+        """실 코퍼스의 지금 모습 — Completeness 가 미달이라 합산 종료 코드는 이미 1 이다."""
+        _, base = _drop_prerequisite(spec, index, world)
+        return base
+
+    def test_gate_exit_follows_the_declared_metric_not_the_sum(
+        self, spec, index, world, monkeypatch, capsys
+    ) -> None:
+        base = self._failing_completeness_world(spec, index, world)
+        monkeypatch.setattr(pc, "load_corpus", lambda s: base)
+        assert pc.main([]) == 1  # 합산: 미달
+        capsys.readouterr()
+        assert pc.main(["--gate", "P3-G1"]) == 0  # 게이트 조건(Content)은 충족
+        out = capsys.readouterr().out
+        assert "게이트 P3-G1 판정: 통과" in out
+        assert "판정: 미달" in out  # 합산 판정 줄은 그대로 남아 두 판정이 함께 보인다
+
+    def test_gate_exit_is_one_when_the_declared_metric_misses(
+        self, spec, index, world, monkeypatch, capsys
+    ) -> None:
+        base = self._failing_completeness_world(spec, index, world)
+        _, worse = _drop_content_row(spec, index, base)
+        monkeypatch.setattr(pc, "load_corpus", lambda s: worse)
+        assert pc.main(["--gate", "P3-G1"]) == 1
+        out = capsys.readouterr().out
+        assert "게이트 P3-G1 판정: 미달" in out
+        assert "Content Coverage Rate" in out
+
+    def test_json_keeps_the_full_exit_code_and_adds_the_gate_block(
+        self, spec, index, world, monkeypatch, capsys
+    ) -> None:
+        base = self._failing_completeness_world(spec, index, world)
+        monkeypatch.setattr(pc, "load_corpus", lambda s: base)
+        assert pc.main(["--json", "--gate", "P3-G1"]) == 0
+        doc = json.loads(capsys.readouterr().out)
+        assert doc["exit_code"] == 1  # 전 지표 합산 — 의미를 바꾸지 않는다
+        assert doc["gate"]["exit_code"] == 0
+        assert doc["gate"]["gate_id"] == "P3-G1"
+        assert doc["gate"]["metrics"] == ["content_coverage_rate"]
+        assert doc["gate"]["failures"] == []
+
+    def test_default_run_has_no_gate_block(self, world, monkeypatch, capsys) -> None:
+        """--gate 를 주지 않으면 출력 형태가 이전과 같다(게이트 키·게이트 줄이 없다)."""
+        monkeypatch.setattr(pc, "load_corpus", lambda s: world)
+        assert pc.main(["--json"]) == 0
+        assert "gate" not in json.loads(capsys.readouterr().out)
+        assert pc.main([]) == 0
+        assert "게이트 P3-G1 판정" not in capsys.readouterr().out
+
+    def test_undeclared_gate_is_exit_2_before_the_corpus_is_loaded(
+        self, monkeypatch, capsys
+    ) -> None:
+        def boom(spec: ps.ScopeSpec) -> pc.CoverageCorpus:
+            raise AssertionError("판정할 수 없는 게이트인데 코퍼스를 적재했다")
+
+        monkeypatch.setattr(pc, "load_corpus", boom)
+        assert pc.main(["--gate", "P3-G9"]) == 2
+        err = capsys.readouterr().err
+        assert "적재 실패" in err and "CoverageError" in err and "P3-G9" in err
+
+    def test_gate_on_a_metric_without_target_is_exit_2(
+        self, world, monkeypatch, tmp_path, capsys
+    ) -> None:
+        doc = yaml.safe_load(ps.default_spec_path().read_text("utf-8"))
+        doc["completeness"]["targets"]["content_coverage_rate"] = {
+            "value": None,
+            "reason": "테스트 — 목표 미정",
+        }
+        custom = tmp_path / "no_target.yaml"
+        custom.write_text(yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
+        monkeypatch.setattr(pc, "load_corpus", lambda s: world)
+        assert pc.main(["--spec", str(custom), "--gate", "P3-G1"]) == 2
+        assert "목표가 없다" in capsys.readouterr().err
+
+    def test_real_spec_file_is_byte_identical_after_a_gate_run(self, world, monkeypatch) -> None:
+        """읽기 전용 — 게이트 판정이 명세 파일을 건드리지 않는다."""
+        path = ps.default_spec_path()
+        before = path.read_bytes()
+        monkeypatch.setattr(pc, "load_corpus", lambda s: world)
+        pc.main(["--gate", "P3-G1"])
+        assert path.read_bytes() == before
