@@ -1183,6 +1183,18 @@ gates:
       - "[2026-10-18] verdict PASS · inputs: P3-59-m0672-shadowed-by-canonical-m0075 · evidence: 판정문 docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md §5·§6 · 판정 기준 main d33ab2e4 · 커밋 8fa4660c · PR #1680. PASS의 뜻은 결정 입력(선택지 3안의 비용 연쇄·실측 영향 36문항·재판정 조건 2건)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫이다. 세션 의견은 안 3 현상 유지. 분모를 바꾸는 안 2와 신규 kebab 안 1은 세션이 확정하지 않았다(acceptance 3). 신규 발견: M0672를 0.97로 재서명하면 동률로 M0075까지 canonical을 잃는다(select_canonical 실측). — done P3-59-m0672-shadowed-by-canonical-m0075 인계"
     depends_on:
       - P3-59-m0672-shadowed-by-canonical-m0075
+  - id: G-p361-choice-trace-crosslink-signature
+    title: "선지 역추적 전용 kebab 4종의 crosslink 서명 — 검수 큐 4행(tangent-external-point-as-contact↔M0673 직접매핑 0.8 · mvt-conditions-unchecked↔M0674 0.9 · graph-sketch-few-points-only↔M0676 0.85 · velocity-sign-ignored↔M0678 0.85)을 승인/반려/보류한다. 큐 파일 docs/data/misconception_crosslink_review_queue.json 의 pending 4행(P3-61, PR 1688 머지분). 서명은 사람 전용이다(AI 자가 승인 금지). 주의: M0673 행은 kebab(곡선 밖 점 경우)이 M-id 주 진술보다 좁아 직접매핑 0.8로 올렸고, 부분매핑이면 승인해도 적재되지 않는다(MISC-63) — 범위 차이 근거를 읽고 판정할 것. 서명이 나도 서빙 효과는 오답 보기가 새 kebab을 가리켜야(P3-44·P3-57 소관) 생긴다. 현재 가리키는 보기는 0건이다"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "서명은 Kiki 본인의 사람 전용 행위이며 입력 태스크 P3-61은 PR 1688로 이미 병합됨 — 대기 대상은 검수 큐 4행 판정뿐"
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human
