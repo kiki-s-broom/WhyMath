@@ -17,6 +17,7 @@
  */
 
 import { apiBaseUrl } from "./adminApi";
+import { isReviewFailureCode, type ReviewFailureCode } from "./reviewFailureCodes";
 
 /** 10초 타임아웃 — 느린 백엔드에 무한 대기하지 않는다(CLAUDE.md). */
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -74,6 +75,23 @@ export interface ReviewTransitionDone {
   to_status: string;
   audit_id: string | number;
   occurred_at: string;
+  /** 판정에 쓰인 검수 세션. 세션을 요구하지 않는 격리·해제는 null일 수 있다. */
+  review_session_id: string | null;
+}
+
+/** 착수(started) 세션. 경과 시간은 서버가 이 세션의 시작 시각부터 계산한다 — 클라는 시간을 보내지 않는다. */
+export interface ReviewSession {
+  review_session_id: string;
+  started_at: string;
+}
+
+/** 전이 요청 입력. 세션·반려코드를 한 묶음으로 받아 요청 빌더 한 곳에서 조립한다. */
+export interface ReviewTransitionRequest {
+  action: ReviewAction;
+  expectedStatus: string;
+  reason: string | null;
+  failureCode: ReviewFailureCode | null;
+  sessionId: string | null;
 }
 
 /** 호출 종류와 무관한 실패. 사유마다 운영자가 해야 할 행동이 달라 합치지 않는다. */
@@ -90,9 +108,11 @@ export type ReviewFailure =
 /** 200인데 0건(`empty`)과 불러오지 못함(실패 유니온)을 타입으로 가른다. */
 export type ReviewListResult = { kind: "ok"; data: ReviewList } | { kind: "empty"; data: ReviewList } | ReviewFailure;
 export type ReviewDetailResult = { kind: "ok"; data: ReviewDetail } | ReviewFailure;
+export type ReviewSessionResult = { kind: "ok"; data: ReviewSession } | ReviewFailure;
+export type ReviewConflictCode = "stale_status" | "illegal_transition" | "invalid_review_session";
 export type ReviewTransitionResult =
   | { kind: "ok"; data: ReviewTransitionDone }
-  | { kind: "conflict"; code: "stale_status" | "illegal_transition"; message: string; currentStatus: string }
+  | { kind: "conflict"; code: ReviewConflictCode; message: string; currentStatus: string }
   | ReviewFailure;
 
 // ── 런타임 검증 보조 ─────────────────────────────────────────────────────
@@ -202,20 +222,33 @@ function parseTransition(raw: unknown): ReviewTransitionDone | null {
   if (!isStr(raw.problem_id) || !isStr(raw.from_status) || !isStr(raw.to_status)) return null;
   if (!isStr(raw.occurred_at)) return null;
   if (!isStr(raw.audit_id) && !isInt(raw.audit_id)) return null;
+  // 세션 없이 처리된 전이(격리·해제)는 null — 키가 아예 없는 것도 같은 뜻으로 읽되, 있다면 문자열이어야 한다.
+  const sessionId = raw.review_session_id ?? null;
+  if (!isStrOrNull(sessionId)) return null;
   return {
     problem_id: raw.problem_id,
     from_status: raw.from_status,
     to_status: raw.to_status,
     audit_id: raw.audit_id,
     occurred_at: raw.occurred_at,
+    review_session_id: sessionId,
   };
+}
+
+function parseSession(raw: unknown): ReviewSession | null {
+  if (!isRecord(raw)) return null;
+  if (!isStr(raw.review_session_id) || raw.review_session_id.length === 0) return null;
+  if (!isStr(raw.started_at)) return null;
+  return { review_session_id: raw.review_session_id, started_at: raw.started_at };
 }
 
 /** 409 본문 `{detail:{code,message,current_status}}` → 충돌 결과. 모양이 다르면 null. */
 function parseConflict(raw: unknown): Extract<ReviewTransitionResult, { kind: "conflict" }> | null {
   if (!isRecord(raw) || !isRecord(raw.detail)) return null;
   const { code, message, current_status: currentStatus } = raw.detail;
-  if (code !== "stale_status" && code !== "illegal_transition") return null;
+  if (code !== "stale_status" && code !== "illegal_transition" && code !== "invalid_review_session") {
+    return null;
+  }
   // 검수 상태가 미지정(null)인 문항은 서버가 current_status를 null로 보낸다 — 충돌로 읽되 "unset"으로 표기.
   if (!isStr(message) || !(isStr(currentStatus) || currentStatus === null)) return null;
   return { kind: "conflict", code, message, currentStatus: currentStatus ?? "unset" };
@@ -336,6 +369,53 @@ export async function fetchReviewDetail(
   return { kind: "ok", data };
 }
 
+/** 세션을 반드시 요구하는 액션. 이 둘은 세션 없이 요청 본문 자체를 만들지 않는다(서버도 422로 거부). */
+const SESSION_REQUIRED_ACTIONS: readonly ReviewAction[] = ["approve", "reject"];
+
+/**
+ * 전이 요청 본문 빌더 — 판정 제출 본문이 만들어지는 **유일한 자리**.
+ *
+ * ① 승인·반려는 `review_session_id`가 없으면 본문을 만들지 않는다(null) — UI 상태 설계가 새도
+ *    세션 없는 판정은 여기서 막힌다. 세션이 있으면 격리·해제에도 함께 싣는다.
+ * ② 반려는 서버가 아는 F1~F8 코드가 있어야 하고, `failure_code`는 반려에서만 싣는다
+ *    (다른 액션에 보내면 서버가 422).
+ * ③ 경과 시간은 서버가 세션에서 계산한다 — elapsed 계열 필드를 싣지 않는다.
+ */
+export function buildTransitionBody(req: ReviewTransitionRequest): Record<string, string> | null {
+  if (SESSION_REQUIRED_ACTIONS.includes(req.action) && req.sessionId === null) return null;
+  if (req.action === "reject" && (req.failureCode === null || !isReviewFailureCode(req.failureCode))) {
+    return null;
+  }
+  const body: Record<string, string> = { action: req.action, expected_status: req.expectedStatus };
+  if (req.reason !== null) body.reason = req.reason;
+  if (req.action === "reject" && req.failureCode !== null) body.failure_code = req.failureCode;
+  if (req.sessionId !== null) body.review_session_id = req.sessionId;
+  return body;
+}
+
+/**
+ * 착수(started) 세션 생성. 문항을 열어 판정 작업을 시작하는 시점에 부른다 — 서버가 이 시각부터
+ * 경과 시간을 잰다. 본문은 없다.
+ */
+export async function createReviewSession(
+  token: string,
+  problemId: string,
+): Promise<ReviewSessionResult> {
+  const raw = await request(
+    token,
+    "POST",
+    LIST_PATH + "/" + encodeURIComponent(problemId) + "/review-sessions",
+  );
+  const failure = commonFailure(raw, true);
+  if (failure !== null) return failure;
+  if (raw.tag !== "response") return malformed("내부 상태 오류");
+  if (raw.status === 409) return { kind: "http-error", status: 409 };
+  if (!raw.parsed) return malformed("JSON 파싱 실패");
+  const data = parseSession(raw.payload);
+  if (data === null) return malformed("세션 응답 구조가 계약과 다름");
+  return { kind: "ok", data };
+}
+
 /**
  * 전이 요청. `expectedStatus`는 사용자가 화면에서 **본 상태 그대로** 보낸다 — 낡았는지의
  * 판정(stale)은 서버가 한다. 클라가 "지금도 이 상태겠지"를 추정해 고치지 않는다.
@@ -343,15 +423,16 @@ export async function fetchReviewDetail(
 export async function submitReviewTransition(
   token: string,
   problemId: string,
-  action: ReviewAction,
-  expectedStatus: string,
-  reason: string | null,
+  req: ReviewTransitionRequest,
 ): Promise<ReviewTransitionResult> {
-  const body: { action: ReviewAction; expected_status: string; reason?: string } = {
-    action,
-    expected_status: expectedStatus,
-  };
-  if (reason !== null) body.reason = reason;
+  const body = buildTransitionBody(req);
+  if (body === null) {
+    // 요청을 보내지 않는다 — 세션·반려코드 없는 판정은 어떤 경로로도 나가지 않는다.
+    return {
+      kind: "validation",
+      detail: "검수 세션 또는 반려 코드가 없어 요청을 보내지 않았습니다(클라이언트 사전 차단)",
+    };
+  }
   const raw = await request(
     token,
     "POST",
