@@ -549,7 +549,7 @@ def _qa_world(control: pm.Bundle, n: int) -> pm.World:
 
 
 def _stub(passed: int, failed: int, skipped: int) -> Callable[..., ReverifyReport]:
-    def run(records: list[dict[str, object]], *, use_fuzz: bool) -> ReverifyReport:
+    def run(records: list[dict[str, object]]) -> ReverifyReport:
         failures = tuple((f"f{i}", "사유") for i in range(failed))
         return ReverifyReport(passed=passed, failed=failed, skipped=skipped, failures=failures)
 
@@ -621,7 +621,7 @@ class TestSolutionQa:
         assert pm._solution_qa(w, "scope", _stub(0, 0, 0)).state is pm.MetricState.UNMEASURED
 
     def test_reverify_exception_keeps_the_type_name(self, control: pm.Bundle) -> None:
-        def boom(records: list[dict[str, object]], *, use_fuzz: bool) -> ReverifyReport:
+        def boom(records: list[dict[str, object]]) -> ReverifyReport:
             raise MemoryError("x")
 
         o = pm._solution_qa(_qa_world(control, 10), "scope", boom)

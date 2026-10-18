@@ -441,7 +441,8 @@ CATALOG: tuple[Spec, ...] = (
        "admin_bff", "GET /models", "GET /costs", "GET /review-queue", "GET /users",
        "GET /users/{user_id}", "GET /review-queue/items",
        "GET /review-queue/items/{problem_id}",
-       "POST /review-queue/items/{problem_id}/transitions"),
+       "POST /review-queue/items/{problem_id}/transitions",
+       "POST /review-queue/items/{problem_id}/review-sessions"),
     _s("WM-S-056", "관리자 CMS — 개념 버전 워크플로우·콘텐츠 제자리 편집·변경이력", "Admin",
        "Operations", "P1",
        "P3-12 — 개념 편집은 새 DRAFT 판이고 제출·검토·승인·발행·롤백은 발행 게이트만 경유한다. "
@@ -1268,6 +1269,11 @@ CATALOG: tuple[Spec, ...] = (
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",
+       # P3-07 — 문항별 문제·정답·풀이 불일치 기계 검증(C1~C4)과 Solution QA Pass 산출.
+       # `corpus_reverify`(answer_map 만 검산하는 야간 상시성)와 같은 전수 재검산 가족이되,
+       # 레코드의 `answer` 필드·풀이 최종 답·선택지 유일성까지 보는 별도 판정기라 같은 행에
+       # 귀속한다. 지표 ④ 의 엔진이다(phase3_metrics 가 호출).
+       "harness.solution_qa",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
        # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.

@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-47-undergrad-coaching-mode-without-polya-ladder
+title: "대학 코칭 모드 설계 — Polya 4단계 틀 없이(막힐 때만 사다리) 학부 과정 코칭 + 학교급 입력 계약"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "배경(Kiki 결정 2026-10-09): 대학 학부과정까지 커버하되 Polya 4단계 틀은 학부생에게 기본 적용하지 않는다(전문가 역전 효과 + 3단계 전이 판정이 증명형 문제에서 막힘). 대신 대학 코칭 모드를 설계한다. 완료 조건: ①설계 문서(docs/prompts 또는 docs/architecture 해당 장) — 기본 모드는 4단계 틀을 강제하지 않고 정답 미루기·소크라테스 우선·메타인지 질문·정서 안전·인지부하 관리 원칙만 유지, 학생이 쓴 풀이에 짧은 피드백·반례 제시 위주. 막혔을 때(학생 요청 또는 좌절·반복 막힘 신호)에만 힌트 사다리와 Polya 질문을 꺼내는 전환 규칙. 증명형 문제의 종결 신호를 계산형(등호+결론어)과 구분하는 방안. ②입력 계약: 대학 호출자가 넘기는 학교급 입력(school_level 등)을 UserProfile.grade 정수 계약(10~14, 13~14=N수1·2)과 번호가 겹치지 않게 정한다 — 정하기 전에는 대학 호출자를 base_system_for_grade에 연결하지 않는다. ③l4/polya/prompts.py의 _GRADE_BAND_RANGES 15~16(대학생) 칸과 test_matches_grade_to_band_ladder_for_every_user_profile_grade의 처분(제거 또는 존치 근거) 판정. ④측정 설계: 기본(틀 없음) 대 막힐 때만 틀 두 모드를 해결 시간·포기율로 비교할 수 있게 하는 계측 자리(구현은 후속, 설계에는 지표 정의 포함). ⑤집행 지점(정본화와 분리): 대학 코칭 입력이 Polya 학년 register 경로를 통과하지 않음을 소스 스캔 테스트로 동결. 교수학 독립 비판 1회 필수(pedagogy-designer 위임). CLAUDE.md '모든 학습 경로는 Polya 4단계 매핑' 문장 정정은 Kiki 몫이다 — 이 태스크는 정정 초안만 docs/ 에 둔다."
+artifacts: []
+paths: []
+session: null
+notes: S4-64 정정과 짝. pedagogy-designer 위임. Kiki 결정 2026-10-09.
+updated: 2026-10-09
