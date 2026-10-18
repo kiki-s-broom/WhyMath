@@ -1180,6 +1180,20 @@ gates:
     corrections: []
     depends_on:
       - P3-56-short-answer-no-misconception-channel
+  - id: G-p359-m0672-shadow-disposition
+    title: "M0672가 같은 kebab(product-rule-naive)의 canonical M0075에 가려지는 현상의 처분 — 안 ① M0672 전용 kebab 신설(카탈로그 68→69·크로스링크 서명·문항 distractor_map 36건 재배선) / 안 ② 두 M-id를 한 오개념으로 인정(분모 12→11 또는 M0672를 M0075의 별칭으로 표기) / 안 ③ 현상 유지 + 재판정 조건 2건(런타임 키를 canonical M-id로 전환하는 날 · M0672/M0075 신뢰도 재서명 시 동률 방지). 세션 의견은 ③. 오늘의 해는 0(학생 교정은 kebab 단위)이고 종료 코드 1의 원인은 blocked 5개다. 근거 docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md §5·§6"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: 7
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections:
+      - "[2026-10-18] verdict PASS · inputs: P3-59-m0672-shadowed-by-canonical-m0075 · evidence: 판정문 docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md §5·§6 · 판정 기준 main d33ab2e4 · 커밋 8fa4660c · PR #1680. PASS의 뜻은 결정 입력(선택지 3안의 비용 연쇄·실측 영향 36문항·재판정 조건 2건)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫이다. 세션 의견은 안 3 현상 유지. 분모를 바꾸는 안 2와 신규 kebab 안 1은 세션이 확정하지 않았다(acceptance 3). 신규 발견: M0672를 0.97로 재서명하면 동률로 M0075까지 canonical을 잃는다(select_canonical 실측). — done P3-59-m0672-shadowed-by-canonical-m0075 인계"
+    depends_on:
+      - P3-59-m0672-shadowed-by-canonical-m0075
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human

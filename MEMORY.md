@@ -363,6 +363,18 @@
 **푸시가 막힌 경위(기록)**: 로컬 CI 미러가 `mobile` 잡(컨테이너에 flutter 없음, exit 127)으로 실패해 푸시 훅(HARN-308)이 거부했고, 면제 명령 `push_mirror_notice.py waive`는 자동 권한 분류기가 3회 거부했다(채팅 승인은 권한 규칙이 아니다). 사용자의 명시적 지시로 `.claude/settings.local.json`에 해당 명령 한 줄만 허용하는 규칙을 추가해 면제를 기록했다(파일은 `.git/info/exclude`로 커밋 제외). 면제 사유와 HEAD는 이벤트 대장에 남았다. 이 우회로 먼저 푸시된 8커밋은 지우지 않았다(위 처분 참조).
 
 **재발방지 대책(코드·태스크)**: `HARN-314` — 브리핑이 origin/main에서 done이 됐거나 다른 세션에 인수된 태스크를 "내 진행 중"으로 계속 표시하는 결함. `HARN-311`(claim 쓰기 error 시 fail-open 착수)과 다른 경로다: 여기서는 claim이 `ok`였다가 풀려 인수됐고 소유 세션이 그 사실을 볼 수 없었다. 병렬 중복은 이 저장소에서 OPS-07 · MP-04 · OPS-126에 이어 4회차다.
+### 2026-10-18 (판정·P3-59): **M0672가 M0075에 가려지는 현상의 오늘의 해는 0 — 세션 권고는 현상 유지(안 ③)이며 분모를 바꾸는 안 ②와 신규 kebab 안 ①은 Kiki 결정 게이트로 넘겼다** (claude 판정, 결정은 미정) — 판정 기준 main `d33ab2e4`, 머지 전
+
+**무엇**: 태스크 `P3-59-m0672-shadowed-by-canonical-m0075`. 정본 = `docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md`. 코드·분모·카탈로그·크로스워크는 바꾸지 않았다(acceptance ③).
+
+**실측**: ①`product-rule-naive`의 승인 링크는 M0075 0.97 · M0672 0.85라 `select_canonical`이 M0075만 고른다 — 설계대로 도는 결과이고 기존 테스트가 이미 동결한다. ②학생 대면 교정 체인은 kebab 단위(`distractor_link`·`remediation_strategy`)라 M0672가 가려져도 같은 오답에 같은 교정이 나간다. canonical M-id의 소비처는 P3-06 리포트와 비노출 관측 로그(`crosslink_shadow`)뿐이다(`src/backend`에서 `select_canonical`·`resolve_canonical`·`canonical_mis_id` grep 범위). ③`shadowed`는 "산출"로 세므로 P3-06 종료 코드 1의 원인은 blocked 5개다. ④영향 문항 36건(오답 보기 36항목) — 24건은 문항 자체가 02-01·02-04를 함께 달고 12건은 02-04 단독이다.
+
+**발견(이 판정이 새로 낸 것)**: M0672를 M0075와 같은 0.97로 재서명하면 `select_canonical`이 동률(tie)로 canonical을 잃어 **M0075까지 내려간다**(실측: 0.97/0.97 → canonical 없음·ambiguous). 0.99면 M0672가 대신 canonical이 된다. "공평하게 올려 주자"가 둘 다 가리는 방향이다. 기존 테스트 두 곳이 RED가 되지만 이유를 말해 주지 않는다.
+
+**권고와 재판정 조건**: 안 ③ 현상 유지. 재판정 조건 2건 — 런타임 키를 canonical M-id로 전환하는 변경(`misconception_crosslink_mode`가 shadow를 벗어날 때) 착수 전 / M0672·M0075 신뢰도 재서명 시 동률 방지 확인. 안 ①은 MISC-40 판정문이 이미 기각한 중복 신설이고 연쇄 테스트 5곳(`len(CATALOG)==68` 등)이 따른다. 안 ②는 분모 12→11 또는 별칭 표기로 Kiki 몫이다.
+
+**한계**: 동률 입력으로 P3-06 CLI를 끝까지 돌리지는 않았다(분기 코드를 읽은 추론). 독립 비판(서브에이전트)은 받지 않았다. 환경 사실: 이 세션 컨테이너에는 백엔드 의존성이 없어 스크래치패드 가상환경에 `pip install -e src/backend[dev]`로 설치해 CLI를 돌렸다. 원격 claim push는 상시 403이라 읽기측 폴백으로 착수했다. 결정 게이트 = `G-p359-m0672-shadow-disposition`.
+
 ### 2026-10-18 (판정 · OPS-146): **WH-1 primary 시간 초과의 지배 원인은 Redis 캐시 대기였다 — Redis가 없으면 턴 소요의 94~95%가 캐시 소켓 타임아웃(연산당 2.0초 x 턴당 15회)이고, Redis가 있으면 같은 12턴이 최대 3.25초에 끝난다. 타임아웃 15초는 바꾸지 않는다(예산을 늘려도 Redis 없음은 60초가 돼야 닫힌다 — 증상 처치). 원인을 막는 캐시 우회는 OPS-149로 분리했다** (claude 판정) — 판정 기준: 측정 코드 `origin/main` `fc939a22`(도구 PR #1637 머지 커밋 `23968cd52`), 게이트 `G-ops141-wh1-timeout-live-decompose` clear 증적 = 이 항목의 원문 수치
 
 **무엇**: 승계 태스크 `OPS-146-wh1-primary-timeout-cause-and-default-rejudgement`의 ①수치 수령·②원인 판정·③타임아웃 재판정·④OPS-98 범위 대조를 했다. 코드 변경은 없다(기본값 15초 미변경). 후속 태스크 `OPS-149-redis-cache-degraded-bypass`와 재실측 게이트 `G-ops149-redis-bypass-r3-remeasure`를 등재했고, `OPS-98` notes에 결과를 연결했다.
