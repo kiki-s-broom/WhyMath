@@ -1141,6 +1141,19 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료는 이미 저장소에 있다(P3-44 조사 문서 5절·p3_diff_shortcut_guard 의 M-link-undescribed). 먼저 끝나야 할 태스크 없음 - 사람 결정"
+  - id: G-p357-raw-mid-distractor-disposition
+    title: "P3-57 처분 판정 - 오답 보기 raw M-id 12건(M0674): 계측기는 닿음으로 세고 서빙은 후보 0건으로 버리는 불일치를 어떻게 닫을지. 선택지 A 계측기를 서빙과 같은 규칙으로 정렬(측정 번복 - 슬롯 60/60 -> 59/60, 문항 메타 7필드 12건 서명 비어 있음 표시) / B 서빙이 raw M-id를 크로스워크 역조회로 해소(오늘은 0건 - M0674에 좌석이 없다. P3-61 kebab 신설과 크로스링크 Kiki 서명 뒤에만 12건이 서빙됨) / C 문항 보기를 kebab으로 교체(닫힘 - P3-44 결정 10-1이 기존 504건 은행 제자리 수정을 금지). 세션 권고 = B+A를 한 쌍으로 P3-61 이후에 같은 규칙(M-id는 크로스워크로 kebab에 닿을 때만 닿음/후보)으로 착륙. 대안 = 12건을 살릴 가치가 없다고 보면 A 단독. 판정 전까지는 테스트가 어긋남을 {M0674: 12}로 고정해 신규 어긋남을 막고 P3-61 done 시 RED가 된다(tests/backend/ops/test_phase3_measure_serve_parity.py). 근거 docs/reviews/p3_57_raw_mid_distractor_parity_2026-10-18.md (판정 기준 main d33ab2e4). 판정 후 집행 태스크를 등재하고 위 테스트의 담당 태스크 상수를 그 id로 바꾼다."
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-57-raw-mid-distractor-measure-vs-serve-parity
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human
