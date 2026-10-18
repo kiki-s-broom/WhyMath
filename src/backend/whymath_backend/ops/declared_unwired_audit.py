@@ -1642,6 +1642,16 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # runbook.md와 skb03 런북 [E]의 AFTER 판정, 정본 변경 PR 체크리스트가 이 CLI를 부른다
         # (tests/infra/test_atom_graph_prod_parity_wiring.py가 동결).
         "ops.atom_graph_prod_parity": _LIVE_DEPENDENT,
+        # P3-06(2026-10-17): 핵심 오개념 12개에 오답→교정 전략 체인이 도는지 재는 커버리지 CLI.
+        # 좌석 없는 오개념 5개(Kiki 결정 대기)가 있는 동안 종료 코드가 1이라 CI 스텝으로 걸면
+        # 상시 적색이 된다 — 그래서 직접 배선하지 않는다. 판정 로직(체인·표·종료 코드 계약)은
+        # backend 잡이 수집하는 tests/backend/ops/test_phase3_remediation.py 가 실 코퍼스로 매번
+        # in-process 실행하고, 결함 주입(서명 제거·오탐·사다리 경계 이동 등)이 RED 임을 확인한다.
+        "ops.phase3_remediation": (
+            "by-design:Phase 3 오답→교정 전략 커버리지 CLI(P3-06) — 막힘 5개가 풀리기 전까지 "
+            "종료 코드가 1이라 CI 스텝에 걸면 상시 적색이 된다. 판정 로직은 backend pytest 가 "
+            "실 코퍼스로 상시 실행하며 결함 주입 RED 를 확인한다"
+        ),
         # OPS-30(2026-10-09): 외부 업타임 프로브 — **서버 프로세스 밖**에서 1분마다 /health/ready를
         # 폴링하는 것이 존재 이유라(죽은 서버는 자기 죽음을 보고하지 못한다) 앱 코드가 부르면
         # 안 된다. 호출자는 Kiki 머신의 Windows 작업 스케줄러이고, 등록 절차는 사람 경로다 —

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-56-short-answer-no-misconception-channel
+title: "P3-56 — 단답형 885문항(79%)은 오답→오개념 후보 채널이 없다: 범위 결정과 선택지 정리"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 단답형 885문항(대표 과정 승인 문항의 79%)에서 오답이 오개념 후보로 이어지는 채널이 지금 0개임을 재확인한다(P3-06 실측: 오답 2,534회 투입 → 후보 0건, 훑기 상태 ran_no_candidate 2,508 · not_run 26).\n② 원인은 설계다 — 오류 서명 채널(answer_signature)은 문항 식 = 학생 답 형태의 등식을 만드는데, 숫자 하나를 답하는 문항은 등식이 되지 않는다.\n③ 선택지를 비교해 적는다: 문항별 '예측 오답값' 매처(SymPy 동치 권위 경유) / 단답형을 객관식 채널에 편입 / 범위 밖 유지. 예측 오답값 매처는 새 탐지기라 마스터 프리앰블이 금지한다 — Kiki의 명시적 허락이 있어야 구현 항목으로 승격한다.\n④ 결정 전에 구현하지 않는다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06(2026-10-17) 실측. 판정 기준: main 63fe19dd. P3-06 결정 2(Kiki 2026-10-17): 이번 항목은 객관식+기존 채널만, 단답형은 범위 밖으로 명시하고 별건 등재. 측정 도구: python -m whymath_backend.ops.phase3_remediation 의 작동한 비율 절. 등재는 착수가 아니다."
+updated: 2026-10-17

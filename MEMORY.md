@@ -338,6 +338,38 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-17 (구현·MISC-61 2차): **Kiki 머신 2차 실행으로 M0418·M0417의 원천 `오개념_원인`을 확보 — `student_wrong_thinking`으로 매핑하고 나머지 두 칸은 AI 저작해 A3 4건의 세 필드를 모두 채웠다**
+
+**무엇**: 태스크 `MISC-61-a3-thin-misid-source-enrichment` 2차 이행(브랜치 `claude/fervent-ramanujan-jwdwxj` · 판정 기준 main `ad3cc2d1` · 머지 전). 정본 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §2-d. 앞선 세션 `claude/peaceful-bell-s7mlg8`은 PR #1643 머지 뒤 브랜치가 삭제돼 원격 claim 0건이었고, 하네스의 끊긴 세션 재착수 경로(`unblock`→`start`)로 이 세션이 이어받았다.
+
+**결정**: ①2차 실행(`--dump-key 오개념_원인`, Kiki 머신) 결과 원천 21행과 코퍼스 `원본`+공란 21행이 **같은 행**임이 확정됐다(`sha256_matches_provenance=true`). ②M0417 = `확률 범위 미이해` · M0418 = `배반사건 혼동`은 문장이 아니라 원인 이름표다 → `student_wrong_thinking`으로 매핑(근거: `error_type`은 닫힌 10여 종 어휘라 불가 · `student_wrong_thinking` 736행 중 316행이 15자 이하로 같은 문체 — 예 `M0014` `GCD와 LCM 혼동`). ③나머지 두 칸은 원천에 근거가 없어 acceptance ③ 경로로 AI 저작(근거 `J0405`·`J0406` 수기 검수 + 성취기준)하고 행 단위 표기는 `AI생성-검수필요(MISC-61)`로 둔다. `error_type`은 선례를 따랐다 — M0417 조건무시(`M0088`)·M0418 해석오류(`M0689`), 둘 다 blocking. ④`오개념_원인`→`student_wrong_thinking` 매핑을 **추출기에 넣지 않았다** — 나머지 19행의 값을 보지 않았고, 일괄 규칙은 이름표가 아닌 값이 섞여도 모른다(`MISC-64`가 21행 전체를 보고 정한다).
+
+**한계(사실 기록)**: ①AI 저작 두 칸은 검수가 필요하다 · `error_type`은 다른 선택이 가능하다(M0417 해석오류·M0418 조건무시로 바꿔도 `severity` 불변 · 공식혼동으로 바꾸면 local로 변함). ②행 단위 표기라 원천 유래 칸과 AI 칸의 구분은 판정 문서 §2-d 표로만 가능하다(스키마에 필드 단위 출처 칸 없음). ③prod DB·승인 크로스워크·검수 큐는 건드리지 않았다. ④kebab 카탈로그 서술 본문은 열람하지 않았다(두 M-id가 나오는 주석 1줄의 위치만 기계적으로 확인).
+
+**검증**: 관련 테스트 **291 passed**(exit 0). 처음엔 1건이 실패했다 — `test_measured_invariants`가 `blocking_total==344`와 `len(report.impacts)==344` 두 곳을 고정했고 둘 다 346으로 의도된 갱신이다(첫 어서션이 둘째를 가려, 앞의 검색 패턴이 놓친 둘째는 재실행 때 드러났다). 가드 주입 6종(원천값 변조·`원본` 위장·세 필드 되비움·severity 규칙 위반·kebab 복사·어휘 밖 `error_type`) 전건 기대한 테스트에서 RED, 원복은 `cmp` 바이트 동일. 로컬 CI 미러로 필수 상시 잡을 재현한다.
+
+### 2026-10-17 (결정 · P3-06 재판정): **좌석 없는 5개 개념 중 4개(M0673·M0674·M0676·M0678)는 안 A — 선지 역추적 전용 kebab 허용으로 재판정. M0677은 제외** (사용자 결정, 세션 기록) — 판정 기준 main `d199205f`(PR #1673 병합 후)
+
+**결정(사용자, 2026-10-17)**: 2026-10-06 `G-misc40-unseated-concepts-disposition`이 안 E(보류, P3-02 이후 재판정)로 닫혔고, P3-02가 착지했으며, P3-06 실측에서 5개가 kebab 이름표 부재로 오답→교정 전략 체인이 막힌 것이 드러나 재판정 시점이 왔다. 선택: **안 A를 4개 개념에 한해 채택** — 본문 신호 없이 오답 보기 선택으로만 후보가 되는 선지 역추적 전용 kebab. 이 선택은 카탈로그 불변식 "signals 1건 이상"을 그 부류에 한해 완화한다.
+
+**제외**: M0677은 게이트 `G-p345-m0677-link-disposition`(P3-52) 소관이라 이 결정에 넣지 않았다.
+
+**왜 안 A인가(세션이 확인한 근거)**: P3-06 실측에서 이 4개 중 M0674가 오답 보기 378건 중 12건에서 raw M-id로 이미 쓰이는데 서빙이 카탈로그에 없다는 이유로 조용히 버린다(P3-57). 본문 신호가 없는 omission형이라 안 B(재저작)보다 보기 경로가 개념의 성격에 맞는다는 MISC-40 판정문 §3·§7의 분류와도 일치한다.
+
+**후속**: 구현은 태스크 `P3-61-choice-trace-only-kebabs`로 등재(문서 선행 → 카탈로그 → 불변식 완화 범위 동결 → 동결 테스트 갱신 → pending 크로스링크 행). 새 kebab의 kebab↔M-id 연결은 pending 행까지만 만들고 승인(서명)은 Kiki 몫이다. 이 결정은 게이트 `G-misc40-unseated-concepts-disposition`의 기록을 고치지 않는다(그 게이트는 안 E로 cleared이고 이 항목이 재판정의 기록이다).
+
+**아직 열려 있는 것**: P3-06은 이 결정이 구현·서명되기 전까지 12/12가 아니다(현재 7/12 — 대장에는 Kiki 지시로 done). 구현 후 CLI를 다시 돌려 몇 개가 served로 바뀌는지 실측해 보고한다. 승인 전에는 served가 아니라 pending이다.
+
+### 2026-10-17 (구현 · P3-06): **핵심 오개념 12개 중 7개에서 오답 → 후보·신뢰도 → 교정 전략 체인이 돈다 — 5개는 kebab 이름표가 없어 막혔고 이는 Kiki 결정 사항이라 세션이 만들지 않았다. 완료 판정은 미충족(7/12)이다** (claude 구현, 설계 결정 2건은 사용자) — 판정 기준 main `63fe19dd`(브랜치 `claude/p3-06-wrong-answer-remediation-slice`, 머지 전)
+
+**무엇**: 새 탐지기 없이 Phase 2 부품(선지 역추적 → 가설 정책 6칸 표 → `update_hypotheses` → 개입 결정 트리 → P-09 사다리 → 교수 전략 선택기)을 채점 경로와 같은 순서로 조립하는 순수 체인 `l4/misconception/remediation_strategy.py`, 데이터 로더 `l1/standards/phase3_remediation_spec.py`, 12행 커버리지 CLI `ops/phase3_remediation.py`, 픽스처 데이터 `data/corpus/phase3_remediation_v1/`를 더했다. 판정문 = `docs/reviews/p3_06_wrong_answer_remediation_judgment_2026-10-17.md`.
+
+**결정(사용자, 2026-10-17)**: ① 좌석 없는 5개(M0673·M0674·M0676·M0677·M0678)는 이번 항목에서 7개만 완성하고 "막힘"으로 보고 — 2026-10-06 `G-misc40-unseated-concepts-disposition`의 안 E 보류를 승계, kebab·크로스링크 신설은 Kiki 서명 사항. ② 단답형 885문항은 범위 밖 — "예측 오답값 매처"는 새 탐지기 금지에 걸림.
+
+**실측**: 변별력 — 상태 주입 테스트 + 코드 뮤테이션 14종 전건 검출(1차 4종 생존 → 동치 뮤턴트 교체·테스트 보강 후 0). 정답 픽스처 12건 오탐 0. 픽스처 6쌍은 `distractor_map` 라벨과 독립인 SymPy 계산으로 검산. 작동한 비율 — 오답 보기 선택 378건 중 후보 366건, 12건은 raw M-id(`M0674`)라 서빙이 조용히 버리는데 P3-02 계측기는 "닿음"으로 센다(측정과 서빙의 불일치). 교수 전략은 전 오개념 `ANALOGY` — 선택기 R2 규칙이 "가설이 있으면 ANALOGY"이고 오개념별 정밀화는 `P3-23`이 보류 중이라 새 간선을 만들지 않았다.
+
+**정직한 공백**: ① 12개 중 5개 막힘 · M0672는 같은 kebab의 canonical M0075에 가려짐(`P3-59`). ② 단답형 채널 없음(`P3-56`). ③ 계측/서빙 불일치(`P3-57`) · op-code 공백(`P3-58`) · 선지 신뢰도 0.8이 반례 임계(>0.8)에 걸려 첫 오답은 항상 거꾸로 사고(`P3-60`) — 전부 등재만 하고 고치지 않았다(confidence 규칙은 Phase 2 것 그대로). ④ 오답 보기 378건 전수 검산은 하지 않았다. ⑤ `backend-migrations`·`docker-build` 잡은 로컬 재현 불가(변경이 스키마·빌드에 닿지 않음).
+
 ### 2026-10-16 (판정·G-misc40-deferred-m0599-redecision): **Kiki가 M0599 보류를 승인으로 재판정했다 — 승인 코퍼스에 직접매핑 0.9로 복귀(68→69건), 앵커 A3 좌석 0→1. 세 필드는 AI 저작인 채로 승인됐고 원 출처 근거는 아니다**
 
 **무엇**: 게이트 `G-misc40-deferred-m0599-redecision`(2026-10-06 요청·10일 경과)에 Kiki가 "M0599 승인"을 지시했다. 판정 재료는 PR #1643(main `8d21c4cc`)이 들여온 `M0599`의 AI 저작 세 필드(`student_wrong_thinking`·`distractor_rule`·`error_type`, 표기 `AI생성-검수필요(MISC-61)`)다. 정본 기록 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §4.

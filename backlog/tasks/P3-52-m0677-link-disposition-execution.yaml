@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-52-m0677-link-disposition-execution
+title: "P3-52 — 02-09(M0677) 오개념 변 닫기: Kiki 처분 집행 (P3-44 승계 · Graph Connectivity 9/10 → 10/10)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-44-graph-connectivity-misconception-edge
+requires_gates:
+  - G-p345-m0677-link-disposition
+acceptance:
+  - "① 입력은 P3-44 조사 문서 docs/reviews/p3_44_graph_connectivity_root_cause_2026-10-16.md 이다(판정 기준 main a91ea311). 02-09 의 핵심 오개념 M0677 은 설명에 잘못된 절차가 적히지 않은 omission형이라 p3_diff_shortcut_guard 의 _UNDESCRIBED_MISCONCEPTIONS 가 연결을 금지한다(규칙 M-link-undescribed). 이 태스크는 Kiki 가 게이트에서 고른 처분을 집행한다. ② 처분 후보 4택은 게이트 문면과 같다: (가) M0677 설명에 잘못된 절차를 적는 오개념 코퍼스 정정(QUAL-14 계열) 후 판정기 금지 목록 갱신 (나) 판정기 정책 변경 (다) 동결 명세 scope_spec 의 02-09 핵심 오개념을 절차가 적힌 다른 M-id 로 교체(명세 변경 PR) (라) 보류. ③ 집행 뒤에는 연결을 라벨만이 아니라 선택지 값이 그 절차로 실제로 나오는지 SymPy 로 확인하고(P3-44 ⑩ 와 같은 기준), 신규 문항이 필요하면 P3-44 의 보강 은행 경로를 따른다. ④ 완료 판정은 phase3_coverage 의 Graph Connectivity 가 10/10 인지 전후 지표를 같은 명령으로 보고한다."
+artifacts: []
+paths:
+  - "docs/reviews/p3_52_*"
+session: null
+notes: "출처: P3-44 조사(2026-10-16) 와 Kiki 결정 - 02-09 는 P3-44 범위에서 제외해 이 태스크로 분리한다. 게이트 G-p345-m0677-link-disposition 의 처분 전에는 착수하지 않는다. (게이트 id 의 p345 는 등재 시점 번호 가정의 흔적이며 태스크 번호는 P3-52 다.)"
+updated: 2026-10-16
