@@ -35,7 +35,7 @@ from whymath_backend.l1.embedding_primitives import (
     normalize_embedding_input,
     provider_model_identity,
 )
-from whymath_backend.l4.misconception.catalog import CATALOG
+from whymath_backend.l4.misconception.catalog import CATALOG, body_detectable
 from whymath_backend.l4.misconception.models import Misconception, MisconceptionMatch
 from whymath_backend.l4.misconception.semantic.index import (
     InMemoryVectorIndex,
@@ -105,6 +105,11 @@ class SemanticMatcher:
             )
         self._provider = provider
         self._index: VectorIndex = index if index is not None else InMemoryVectorIndex()
+        # P3-61 — 선지 역추적 전용 항목은 임베딩하지 않는다. 신호가 없어도 `name_kr +
+        # canonical_statement`가 임베딩되므로, 거르지 않으면 학생 본문과의 코사인 유사도만으로
+        # 본문 채널 후보가 된다(가장 실질적인 누수 경로). 호출자가 어떤 카탈로그를 넘기든(전체
+        # CATALOG 기본값 포함) 여기서 한 번 걸러 모든 경로(합의 게이트·pgvector·coach)가 보호된다.
+        catalog = body_detectable(catalog)
         self._catalog = catalog
         # 인덱스 키(misconception.id) → 항목 역참조. *주입된 카탈로그* 기준으로 만든다
         # (전역 CATALOG_BY_ID가 아님 — 커스텀 카탈로그 주입 시에도 해석되도록).
@@ -162,7 +167,9 @@ class SemanticMatcher:
                 # continue하지 않고 break해 의도를 분명히 한다(이후는 전부 미달).
                 break
             misconception = self._by_id.get(hit.key)
-            if misconception is None:  # pragma: no cover — 인덱스 키는 항상 카탈로그 id
+            if misconception is None:
+                # 인덱스 키가 이 매처의 (본문 채널용) 카탈로그에 없다 — 사전 적재 인덱스에
+                # 선지 역추적 전용 행이 섞여 있어도(P3-61) 후보로 내보내지 않는 두 번째 방어선이다.
                 continue
             # confidence는 [0,1] 클램프(MisconceptionMatch 제약). 코사인은 부동소수로
             # 평행 시 1.0을 *미세 초과*(1.0000000000000002)할 수 있어 1.0으로 상한 — 음수는

@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
+from whymath_backend.l4.misconception.catalog import BODY_CATALOG, CATALOG_BY_ID
 from whymath_backend.l4.misconception.diagnose import diagnose
 from whymath_backend.l4.misconception.judge import FakeJudge, JudgeVerdict
 from whymath_backend.l4.misconception.probes import probes_path
@@ -319,11 +319,12 @@ class TestProbeSetStructure:
             assert (p.expected_id is None) != (p.near_id is None)
 
     def test_covers_all_catalog_misconceptions_both_ways(self) -> None:
-        # 카탈로그 32종 전부 recall·FP 프로브를 *둘 다* 보유(전수 커버).
+        # 본문 채널 카탈로그 전부 recall·FP 프로브를 *둘 다* 보유(전수 커버). 선지 역추적 전용(P3-61)은
+        # 의미 매처가 임베딩하지 않으므로(= 측정 대상이 아님) 프로브가 없는 것이 정상이다.
         probes = _load_real_probes()
         recall_ids = {p.expected_id for p in probes if p.is_recall_probe}
         fp_ids = {p.near_id for p in probes if p.is_fp_probe}
-        catalog_ids = set(CATALOG_BY_ID)
+        catalog_ids = {m.id for m in BODY_CATALOG}
         assert recall_ids == catalog_ids
         assert fp_ids == catalog_ids
 

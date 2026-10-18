@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -21,6 +21,6 @@ paths:
   - src/backend/whymath_backend/l4/misconception/catalog.py
   - docs/prompts/misconception_diagnosis.md
   - docs/data/misconception_crosslink_review_queue.json
-session: null
+session: claude/tender-brahmagupta-182ks0
 notes: "출처: P3-06 재판정(2026-10-17 Kiki 안 A). 판정 기준: main d199205f. 관련: P3-58(op-code 공백 - 같은 재생성 결정론 위험), P3-57(raw M-id 계측/서빙 불일치 - M0674 12건), P3-52(M0677). 등재는 착수가 아니다."
-updated: 2026-10-17
+updated: 2026-10-18

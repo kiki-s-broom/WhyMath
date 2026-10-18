@@ -31,7 +31,7 @@ from collections import Counter
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from whymath_backend.l4.misconception.catalog import CATALOG
+from whymath_backend.l4.misconception.catalog import BODY_CATALOG
 from whymath_backend.l4.misconception.models import Misconception, MisconceptionDomain
 
 __all__ = [
@@ -115,7 +115,13 @@ class CatalogAuditReport(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    total: int = Field(description="카탈로그 전체 오개념 수(`len(CATALOG)`).")
+    total: int = Field(
+        description=(
+            "감사 대상 오개념 수(`len(BODY_CATALOG)`) — 본문 채널 항목만이다. 선지 역추적 전용 "
+            "항목(P3-61 `choice_trace_only`)은 신호가 정의상 0이라 신호 포화 비율의 분모를 "
+            "희석하므로 제외한다(`len(CATALOG)`보다 작을 수 있다)."
+        )
+    )
     items: list[CatalogAuditItem] = Field(
         description="오개념별 정의 충족 판정(misconception_id 오름차순 정렬).",
     )
@@ -179,7 +185,8 @@ def _summarize_domain(
 def audit_catalog_coverage() -> CatalogAuditReport:
     """오개념 카탈로그 정의 충족도를 집계한다 — 순수·인자 0·DB 0·결정론(설계 §8.4 0단계 ③).
 
-    `CATALOG`(불변 30종)를 순회해 항목별 정의 충족(`_audit_item`)을 판정하고, 전체 비율과
+    `BODY_CATALOG`(`CATALOG`에서 선지 역추적 전용을 뺀 본문 채널 항목)를 순회해 항목별 정의
+    충족(`_audit_item`)을 판정하고, 전체 비율과
     도메인별 집계를 낸다. 입력(카탈로그)을 변형하지 않으며 같은 카탈로그에 같은 리포트를 낸다.
 
     집계 규약:
@@ -195,7 +202,7 @@ def audit_catalog_coverage() -> CatalogAuditReport:
     """
     # 1) 항목별 판정(id 정렬) — 입력 비변형(정렬은 새 리스트).
     items = sorted(
-        (_audit_item(m) for m in CATALOG),
+        (_audit_item(m) for m in BODY_CATALOG),
         key=lambda it: it.misconception_id,
     )
     total = len(items)
