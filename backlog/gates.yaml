@@ -1084,7 +1084,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-18] input done · P3-07-solution-qa-machine-verification · 판정 무관: G-p307-solution-qa-judgement-rules 는 Kiki 결정 게이트다 — CLI 영 허용 vs 비율 판정·검증 가능 비율 하한·99% vs 99.5% 판정은 사람 소유이며 이 태스크는 판정 입력(실측·보고서)을 만들었을 뿐 판정하지 않는다 — done P3-07-solution-qa-machine-verification 인계"
     depends_on:
       - P3-07-solution-qa-machine-verification
   - id: G-p314-phase3-metric-targets
