@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-50-calc-02-01-misconception-chain-restore
+title: "P3-50 — 02-01 오개념 사슬 복구 (핵심 오개념 M0075·M0080 도달 문항 확보 · M0080 귀속 재검토)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-49-extremum-count-items-retag-to-02-07
+requires_gates: []
+acceptance:
+  - "① 02-01 개념의 핵심 오개념(M0075 곱의 미분 · M0080 극값 판정)에 오답 보기가 닿는 02-01 PRIMARY 문항이 있는지 실측한다. P3-49 이후 02-01 의 Graph Connectivity 사슬(개념->스킬->문항->오개념)을 잇는 문항이 0건이 된다(P3-43 문서 5절).\n② M0080 의 02-01 귀속이 맞는지 판정한다 — 서술이 \"극값 판정\" 두 단어이고 매핑 점수 0.79 인 자동 매핑이며 02-01 소단원에 극값 목표가 없다. 귀속이 틀리면 scope_spec.yaml core_misconceptions 의 02-01 핵심 오개념을 어떻게 바꿀지 요청 형태로 만든다(명세는 동결 문서라 세션이 직접 바꾸지 않는다).\n③ 02-01 에 맞는 오개념 유발 문항(M0075 계열 등)을 보강하거나, 보강이 불가능하면 이유를 적는다. 보강 후 Graph Connectivity 의 02-01 칸이 채워짐을 phase3_coverage 실측으로 보인다.\n④ 타 세션의 P3-44-graph-connectivity-misconception-edge(Graph Connectivity 5/10 -> 95%, 02-05·06·08·09·10 재연결)와 범위가 이어진다 — 그쪽은 현재 끊긴 5개 개념이고, P3-49 이후에는 02-01 이 6번째 끊긴 개념이 된다. 착수 전에 그 태스크의 머지 상태를 확인하고(git log --all --grep=P3-44), 겹치면 한쪽으로 합친다. 같은 문항을 두 세션이 고치지 않는다."
+artifacts: []
+paths:
+  - data/corpus/phase3_scope_v1/scope_spec.yaml
+  - data/corpus/misconceptions_v1/misconceptions.json
+session: null
+notes: "출처: P3-43 문서 5절 부작용. P3-49 가 24건을 02-07 로 옮기면 02-01 사슬을 잇는 문항이 0건이 된다. scope_spec.yaml 은 동결 명세라 변경은 요청 형태로만. 타 세션 P3-44-graph-connectivity-misconception-edge 와 범위 조율 필요(acceptance ④)."
+updated: 2026-10-16
