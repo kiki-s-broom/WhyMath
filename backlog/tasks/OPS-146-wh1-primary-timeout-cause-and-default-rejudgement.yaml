@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - src/backend/whymath_backend/config.py
   - "tests/backend/harness/**"
   - "docs/ops/**"
-session: null
+session: claude/epic-turing-oxbqyd
 notes: "출처: OPS-141 acceptance ②③ 승계. OPS-141 은 측정 도구·실행 런북·사람 게이트(acceptance ④ 와 ① 의 도구 부분)를 착지했고, 라이브 수치가 있어야 하는 ②③ 은 게이트 통과 후의 판정이라 이 태스크로 분리했다. 코드 경로 실측으로 세운 가설(미검증): Redis 미기동 시 LLM 호출 1회가 캐시 연산 2회(get·set)를 부르고 연산마다 최대 redis_socket_timeout_s=2.0초를 기다려, 호출 3회 턴이면 캐시 대기만 최대 12초이다. 또 OPS-134 의 llm_ms_total 은 seam.generate 전체를 감싸 캐시 대기를 포함한다(그래서 기존 리포트로는 (가)(나)와 (다)를 못 가른다). 기본 15초는 이 태스크가 판정하기 전까지 바꾸지 않는다."
-updated: 2026-10-14
+updated: 2026-10-18

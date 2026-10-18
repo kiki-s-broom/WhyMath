@@ -895,6 +895,19 @@ gates:
     corrections: []
     depends_on:
       - OPS-141-wh1-primary-timeout-live-decomposition
+  - id: G-ops149-redis-bypass-r3-remeasure
+    title: "OPS-149 캐시 우회 착지 후 R3 재실측 — Phaiakes9에서 docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md 의 R3(redis-down·실서비스 예산 15초)만 새 코드로 다시 실행하고 §8 요약 전체를 세션에 전달한다. 비교 기준은 2026-10-18 측정(게이트 G-ops141-wh1-timeout-live-decompose 증적): 12/12 fallback_timeout·캐시 대기 94%·턴 중앙값 15,016ms. OPS-149 PR 머지 후에만 실행 가능(런북 §1이 코드 동등성을 확인한다). 기본 타임아웃 15초는 이 게이트에서 바꾸지 않는다."
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-149-redis-cache-degraded-bypass
   - id: G-ops30-uptime-probe-go-live
     title: "OPS-30 업타임 프로브 가동 — 웹훅 URL 연결 + 작업 스케줄러 등록 (Kiki 머신)"
     kind: human

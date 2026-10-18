@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-149-redis-cache-degraded-bypass
+title: "RedisCache 연속 강등 시 Redis 호출 우회(회로 차단) — Redis 없음에서 WH-1 primary 12/12 시간 초과의 원인(캐시 대기 94~95%)을 막는다 (OPS-146 판정 승계)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-141-wh1-primary-timeout-live-decomposition
+requires_gates: []
+acceptance:
+  - "① 설계 판정(코드 전) — RedisCache(l3/cache/redis_cache.py)에는 연속 실패를 세는 회계(CacheDegradationCounter.consecutive_failures)만 있고 강등 중 Redis 호출을 건너뛰는 장치는 내가 찾은 방법(breaker·circuit grep, l3/cache·l3/pipeline.py)으로는 0건이다. 연속 N회 실패하면 T초 동안 get/set이 Redis를 부르지 않고 즉시 미스/no-op으로 강등하고, T초 뒤 1회 시험 호출(half-open)로 복구를 확인하는 방식의 N·T와 경계를 수치 근거와 함께 정한다. 근거 재료: OPS-146 MEMORY 결정 로그(2026-10-18)의 R2/R3 — Redis 없음에서 캐시 연산당 중앙값 2,016ms, 턴당 캐시 연산 중앙값 15회, 턴 소요의 94~95%가 캐시 대기. 정상 Redis 응답은 중앙값 0ms·최대 94ms(R4)라 건강한 Redis를 오탐 차단하지 않는 N·T여야 한다.\n② 구현 + 실패 주입 — 우회가 열린 동안 Redis를 실제로 부르지 않음을(호출 횟수) 가짜 클라이언트로 확인하고, N회 미만 실패·일시 지연 1회로는 열리지 않음(대조군)·복구 시 닫힘을 각각 테스트한다. 뮤테이션으로 우회 조건 제거 시 RED를 확인한다.\n③ 작동한 비율 — 우회 횟수와 우회 중 건너뛴 호출 수를 CacheDegradationSnapshot에 싣는다. 정상 응답 200은 우회가 일했다는 증거가 아니므로 이 수치가 /health/ready 또는 기존 강등 회계 표면에 실제로 노출되는지 확인한다(노출 지점을 적는다).\n④ 호출자 범위 확인 — 같은 redis_socket_timeout_s를 쓰는 api/_rate_limit.py·api/_device_store.py가 같은 연속 강등 비용(요청당 2초 대기)을 지는지 읽어서 확인하고, 지면 이 태스크에 포함할지 별도 등재할지 정한다(확인 전에는 지는지 모른다).\n⑤ 재실측 — 같은 런북 R3(redis-down·실서비스 예산 15초)을 새 코드로 다시 돌려 fallback_timeout 12/12가 어떻게 바뀌는지 본다. Phaiakes9 실행은 Kiki 몫이라 게이트 G-ops149-redis-bypass-r3-remeasure가 소유한다. 도구는 scripts/ops/wh1_primary_timeout_decompose.py를 그대로 재사용한다(중복 구현 금지). 전후 비교는 같은 조건·같은 12턴 시나리오에서만 한다.\n⑥ 타임아웃 15초는 이 태스크에서도 바꾸지 않는다. 우회 착지 후 R3가 임계 안으로 들어오면 값 재판정은 필요 없고, 여전히 폴백이 크면 그 원인을 수치로 다시 가른다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/cache/redis_cache.py
+  - tests/backend/l3/test_redis_cache.py
+  - docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md
+session: null
+notes: "출처: OPS-146 판정(2026-10-18). 게이트 G-ops141-wh1-timeout-live-decompose 증적(판정 기준 origin/main fc939a22). 값(15초)을 늘리는 대신 원인(캐시 대기)을 막는 조치다 — 원인을 두고 예산만 늘리는 것은 증상 처치다. 미확인 사실: 닫힌 포트(127.0.0.1:6379)가 즉시 거부되지 않고 소켓 타임아웃까지 가는 이유는 측정하지 않았다(R2의 연산당 중앙값 2,016ms가 redis_socket_timeout_s=2.0과 같다는 사실만 안다). 운영 구성(docker-compose.prod.yml에 Redis 있음)에서 이 경로가 얼마나 자주 열리는지는 이 측정이 말하지 않는다 — 이 우회는 Redis 장애 때의 방어이고 평시 속도 개선이 아니다."
+updated: 2026-10-18
