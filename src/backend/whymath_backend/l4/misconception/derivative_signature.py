@@ -692,21 +692,29 @@ class DerivativeSignatureResult:
     matches: tuple[MisconceptionMatch, ...]
     applicable: bool
     rules_total: int
+    answer_is_correct: bool | None = None
+    """학생 답이 이 질문의 **정답**과 같은가. `report_correctness=True`로 불렀고 질문을 읽었을 때만
+    True/False이고, 그 밖에는 `None`(모른다 ≠ 아니다). 그림자 관측이 정답 회차와 오답 회차를 가르는
+    데 쓴다 — 정답 회차에서 후보가 나오면 오발화다."""
 
 
 def detect_derivative_signature(
-    question_text: str, student_answer: str
+    question_text: str, student_answer: str, *, report_correctness: bool = False
 ) -> DerivativeSignatureResult:
     """질문과 제출 답에서 미분 오답 서명을 읽어 후보를 낸다 — 순수·결정론·DB 무지.
 
     절차: ① 규칙마다 질문 추출기로 *무엇을 묻는지* 읽는다 ② 함수식을 읽는다 ③ 변환이 오답 값들을
     계산한다(정답과 같은 값은 버린다) ④ 학생 답이 그 값과 동치인지 동치 권위로 대조한다 ⑤ 같은 답이
     서로 다른 kebab 둘 이상에 걸리면 모두 `attribution_unclear`로 표시한다.
+
+    `report_correctness=True`면 학생 답이 정답과 같은지도 대조해 `answer_is_correct`에 싣는다 —
+    동치 호출이 규칙마다 하나 늘어나므로 기본은 끈다(서빙 경로는 필요 없다).
     """
     rules = compile_rules()
     frames: dict[bool, _Frame | None] = {}
     hits: dict[str, MisconceptionMatch] = {}
     applicable = False
+    answer_is_correct: bool | None = None
 
     for compiled in rules:
         rule = compiled.rule
@@ -730,6 +738,8 @@ def detect_derivative_signature(
         if values is None:
             continue
         applicable = True
+        if report_correctness and answer_is_correct is not True:
+            answer_is_correct = _same_value(student_answer, values.correct)
         wrongs = [w for w in values.wrongs if w != values.correct]
         if not any(_same_value(student_answer, w) for w in wrongs):
             continue
@@ -748,5 +758,8 @@ def detect_derivative_signature(
         # 한 답이 서로 다른 오개념 둘 이상의 값과 같다 — 어느 쪽인지 가릴 수 없다.
         ordered = [m.model_copy(update={"attribution_unclear": True}) for m in ordered]
     return DerivativeSignatureResult(
-        matches=tuple(ordered), applicable=applicable, rules_total=len(rules)
+        matches=tuple(ordered),
+        applicable=applicable,
+        rules_total=len(rules),
+        answer_is_correct=answer_is_correct if applicable else None,
     )

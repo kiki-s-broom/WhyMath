@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from collections.abc import Sequence
@@ -42,6 +43,39 @@ __all__ = [
 ]
 
 _logger = logging.getLogger("whymath.api.me")
+
+shadow_record_logger = logging.getLogger("whymath.api.attempt_scan_shadow.record")
+"""어댑터 그림자 관측의 기록 로거(JSON 한 줄). 수확 도구가 이 이름을 참조한다."""
+
+
+def _emit_adapter_shadow_records(problem_id: uuid.UUID, result: object) -> None:
+    """어댑터가 훑기 결과에 실어 보낸 **불투명 관측 문자열**을 해석 없이 기록한다.
+
+    왜 부모에서 기록하나: 훑기는 `isolated(...)`의 **프로세스 풀 워커**에서 돈다. 워커에는 부모의
+    로깅 설정이 없어 거기서 남긴 INFO 로그는 조용히 사라진다(실패해도 아무 신호가 없다). 그래서
+    어댑터가 관측을 결과 객체에 실어 보내고, 로깅이 설정된 이 프로세스가 기록한다. 필수 능력
+    Protocol(`AttemptMisconceptionScan`)은 Core가 읽는 것을 `scan`·`candidates` 둘로 한정하므로
+    멤버를 늘리지 않고, 있으면 읽는 **선택적 확장**으로만 다룬다 — 없으면 아무것도 하지 않는다.
+
+    Core는 문자열의 의미를 모른다(과목 중립) — 문항 id와 함께 그대로 싣는다. 기록 실패는 채점을
+    깨지 않되 **예외 타입명을 남긴다**(침묵 실패 금지·학생 답과 지문은 로그에 넣지 않는다).
+    """
+    try:
+        raw = getattr(result, "shadow_records", ())
+        records = [r for r in raw if isinstance(r, str)]
+        if not records:
+            return
+        shadow_record_logger.info(
+            json.dumps(
+                {"problem_id": str(problem_id), "adapter_records": records}, ensure_ascii=False
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 — 관측이 채점을 깨뜨리지 않는다
+        _logger.warning(
+            "그림자 관측 기록 실패 — 채점은 계속한다. exc_type=%s problem_id=%s",
+            type(exc).__name__,
+            problem_id,
+        )
 
 
 @dataclass(frozen=True)
@@ -155,6 +189,7 @@ async def scan_attempt_misconceptions(
             else:
                 text_scan = result.scan
                 text_candidates = tuple(result.candidates)
+                _emit_adapter_shadow_records(problem_id, result)
 
     # ── 합류. 같은 오개념을 두 채널이 함께 지목하면 *더 높은 신뢰도 하나*만 남긴다 — 같은
     # 사실의 사본 둘이 가설 저장소에서 서로를 덮어쓰는 순서 의존을 만들지 않기 위해서다.

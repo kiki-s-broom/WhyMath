@@ -31,9 +31,14 @@ from typing import Any
 import pytest
 import sympy
 
+from whymath_backend.config import get_settings
 from whymath_backend.l1.misconception import wrong_answer_signature_table as tables
+from whymath_backend.l4.misconception import answer_signature as sig_module
 from whymath_backend.l4.misconception import derivative_signature as ds
-from whymath_backend.l4.misconception.answer_signature import scan_attempt_answer
+from whymath_backend.l4.misconception.answer_signature import (
+    DerivativeShadowRecord,
+    scan_attempt_answer,
+)
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.schema.assessment_evidence import MisconceptionScan
 from whymath_backend.schema.wrong_answer_signature import SignatureRule, SignatureSpec
@@ -601,8 +606,29 @@ def _scan(question: str, answer: str | None) -> Any:
     return scan_attempt_answer(question_text=question, student_answer=answer)
 
 
+@pytest.fixture
+def set_mode(monkeypatch: pytest.MonkeyPatch) -> Callable[[str], None]:
+    """`l4_derivative_signature_mode`를 이 테스트 안에서만 바꾼다.
+
+    `get_settings()`는 프로세스 수명 캐시라 env를 바꾸면 캐시를 비워야 하고, 비운 뒤 env 복원 순서가
+    꼬이면 다음 테스트가 낡은 값을 본다. 그래서 환경이 아니라 이 모듈이 읽는 함수 자체를 바꾼다.
+    """
+
+    def _set(mode: str) -> None:
+        real = get_settings()
+        patched = real.model_copy(update={"l4_derivative_signature_mode": mode})
+        monkeypatch.setattr(sig_module, "get_settings", lambda: patched)
+
+    return _set
+
+
 class TestScanIntegration:
     Q = "함수 f(x) = x^8에 대하여 f'(3)의 값은?"
+
+    @pytest.fixture(autouse=True)
+    def _mode_on(self, set_mode: Callable[[str], None]) -> None:
+        """이 클래스는 합류된 모습(`on`)을 검증한다 — 기본 `off`에서는 독법이 아예 불리지 않는다."""
+        set_mode("on")
 
     def test_wrong_answer_yields_gated_candidate_with_rules_scanned_disclosed(self) -> None:
         result = _scan(self.Q, "52488")
@@ -688,6 +714,241 @@ class TestScanIntegration:
     def test_detection_is_deterministic(self) -> None:
         first = ds.detect_derivative_signature(self.Q, "52488")
         assert all(ds.detect_derivative_signature(self.Q, "52488") == first for _ in range(3))
+
+
+class TestModes:
+    """`off`/`shadow`/`on` — 켜기 전에 실제 학생 오답으로 근거를 모으는 그림자 모드의 계약.
+
+    핵심 약속 둘: ① `shadow`가 학생에게 가는 결과를 `off`와 **똑같이** 둔다 ② 기본(`off`)은 이 독법을
+    **아예 부르지 않는다**(비트동일·SymPy 비용 0). 둘 다 깨지면 "관측만 한다"는 말이 거짓이 된다.
+    """
+
+    Q = "함수 f(x) = x^8에 대하여 f'(3)의 값은?"
+    # 연산자 없는 식 — 기존 채널이 서명을 못 뽑아, 새 독법을 켜야만 읽히는 질문.
+    Q_NEW_ONLY = "함수 f(x) = 3x에 대하여 f'(3)의 값은?"
+
+    @staticmethod
+    def _without_record(result: Any) -> Any:
+        return result.model_copy(update={"shadow_records": ()})
+
+    def test_default_setting_is_off(self) -> None:
+        from whymath_backend.config import Settings
+
+        assert Settings.model_fields["l4_derivative_signature_mode"].default == "off"
+
+    def test_off_never_calls_the_engine(
+        self, set_mode: Callable[[str], None], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        set_mode("off")
+        calls: list[int] = []
+        real = sig_module.detect_derivative_signature
+        monkeypatch.setattr(
+            sig_module,
+            "detect_derivative_signature",
+            lambda *a, **k: calls.append(1) or real(*a, **k),
+        )
+        result = _scan(self.Q, "52488")
+        assert calls == [], "off인데 독법이 불렸다 — 비트동일·비용 0 약속 위반"
+        assert result.candidates == ()
+        assert result.shadow_records == ()
+        assert result.signature_rules_scanned == 0
+
+    def test_off_leaves_new_only_question_as_not_run(self, set_mode: Callable[[str], None]) -> None:
+        set_mode("off")
+        assert _scan(self.Q_NEW_ONLY, "9").scan is MisconceptionScan.NOT_RUN
+
+    @pytest.mark.parametrize(
+        ("question", "answer"),
+        [
+            (Q, "52488"),  # 새 독법이 후보를 내는 오답
+            (Q, "17496"),  # 정답
+            (Q, "123456"),  # 읽었으나 어느 규칙과도 다른 오답
+            (Q_NEW_ONLY, "9"),  # 새 독법만 읽는 질문의 오답
+            ("x를 구하라.", "3"),  # 두 독법 모두 못 읽음
+            ("(x+2)²을 전개하시오.", "x²+4"),  # 기존 채널의 후보
+        ],
+    )
+    def test_shadow_returns_exactly_what_off_returns(
+        self, set_mode: Callable[[str], None], question: str, answer: str
+    ) -> None:
+        set_mode("off")
+        off = _scan(question, answer)
+        set_mode("shadow")
+        shadow = _scan(question, answer)
+        assert self._without_record(shadow) == off, "shadow가 학생에게 가는 결과를 바꿨다"
+        assert shadow.signature_rules_scanned == 0, "shadow는 독법을 노출하지 않는다"
+
+    def test_shadow_record_says_what_turning_it_on_would_change(
+        self, set_mode: Callable[[str], None]
+    ) -> None:
+        set_mode("shadow")
+        wrong = DerivativeShadowRecord.model_validate_json(_scan(self.Q, "52488").shadow_records[0])
+        assert wrong.fired is True
+        assert wrong.added_candidate_ids == ("power-rule-step-omitted",)
+        assert wrong.answer_is_correct is False
+        assert wrong.applicable is True
+        assert wrong.rules_total == len(tables.load_signature_spec().rules)
+        assert wrong.rule_ids == ("sig.power-rule.omit-step.derivative-at",)
+
+        right = DerivativeShadowRecord.model_validate_json(_scan(self.Q, "17496").shadow_records[0])
+        assert right.fired is False and right.answer_is_correct is True
+
+        hidden = DerivativeShadowRecord.model_validate_json(
+            _scan(self.Q_NEW_ONLY, "9").shadow_records[0]
+        )
+        assert hidden.fired is True, "켜야만 읽히는 질문의 발화를 관측이 드러내야 한다"
+        assert _scan(self.Q_NEW_ONLY, "9").scan is MisconceptionScan.NOT_RUN  # 그래도 반환은 off
+
+    def test_shadow_record_for_unreadable_question_is_unknown_not_false(
+        self, set_mode: Callable[[str], None]
+    ) -> None:
+        """질문을 못 읽었으면 정답 여부는 모른다 — False로 접으면 오답 분모를 부풀린다."""
+        set_mode("shadow")
+        record = DerivativeShadowRecord.model_validate_json(
+            _scan("x를 구하라.", "3").shadow_records[0]
+        )
+        assert record.applicable is False
+        assert record.answer_is_correct is None
+        assert record.fired is False
+
+    def test_shadow_record_carries_no_student_text_or_question_text(
+        self, set_mode: Callable[[str], None]
+    ) -> None:
+        set_mode("shadow")
+        raw = _scan(self.Q, "52488").shadow_records[0]
+        for forbidden in ("52488", "17496", "x^8", "f(x)", "대하여"):
+            assert forbidden not in raw, f"관측 레코드에 {forbidden!r}가 새어 들었다(PII 규율)"
+
+    def test_missing_answer_produces_no_record(self, set_mode: Callable[[str], None]) -> None:
+        set_mode("shadow")
+        assert _scan(self.Q, None).shadow_records == ()
+
+    def test_shadow_with_broken_rule_table_is_visible_and_harmless(
+        self,
+        set_mode: Callable[[str], None],
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """규칙표가 깨지면 관측이 '돌지 못했다(rules_total=0)'를 말하고, 반환은 off와 같다."""
+
+        def broken() -> Any:
+            raise FileNotFoundError("rules.yaml")
+
+        monkeypatch.setattr(ds, "load_signature_spec", broken)
+        ds.compile_rules.cache_clear()
+        set_mode("shadow")
+        with caplog.at_level(logging.ERROR, logger="whymath.l4.misconception.answer_signature"):
+            result = _scan("(x+2)²을 전개하시오.", "x²+4")
+        assert [c.misconception_id for c in result.candidates] == ["distribution-over-power"]
+        record = DerivativeShadowRecord.model_validate_json(result.shadow_records[0])
+        assert record.rules_total == 0 and record.fired is False
+        assert "FileNotFoundError" in caplog.text
+
+    def test_record_failure_never_breaks_the_scan_and_names_the_exception(
+        self,
+        set_mode: Callable[[str], None],
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        set_mode("off")
+        off = _scan(self.Q, "52488")
+        set_mode("shadow")
+
+        def boom(*_: Any, **__: Any) -> str:
+            raise KeyError("x")
+
+        monkeypatch.setattr(sig_module, "_shadow_record", boom)
+        with caplog.at_level(logging.ERROR, logger="whymath.l4.misconception.answer_signature"):
+            result = _scan(self.Q, "52488")
+        assert result == off
+        assert result.shadow_records == ()
+        assert "KeyError" in caplog.text, "침묵 실패 금지 — 예외 타입명이 로그에 있어야 한다"
+
+    def test_shadow_record_top1_change_and_old_candidate_are_told_apart(
+        self, set_mode: Callable[[str], None]
+    ) -> None:
+        """기존 채널이 이미 후보를 낸 질문에서 독법이 아무것도 더하지 않으면 fired=False·top1 불변."""
+        set_mode("shadow")
+        old_only = DerivativeShadowRecord.model_validate_json(
+            _scan("(x+2)²을 전개하시오.", "x²+4").shadow_records[0]
+        )
+        assert old_only.fired is False, "기존 후보를 '독법이 더한 것'으로 세면 발화율이 부풀려진다"
+        assert old_only.added_candidate_ids == ()
+        assert old_only.changes_top1 is False
+
+        added = DerivativeShadowRecord.model_validate_json(_scan(self.Q, "52488").shadow_records[0])
+        assert (
+            added.changes_top1 is True
+        ), "기존 후보가 없는 질문에서 독법이 후보를 더하면 top-1이 바뀐다"
+
+    def test_shadow_record_reports_unclear_attribution(
+        self, set_mode: Callable[[str], None], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        base = next(
+            c
+            for c in ds.compile_rules()
+            if c.rule.rule_id.startswith("sig.power-rule.omit-step.derivative")
+        )
+        clone = replace(base, kebab_id="product-rule-naive")
+        monkeypatch.setattr(ds, "compile_rules", lambda: (base, clone))
+        set_mode("shadow")
+        record = DerivativeShadowRecord.model_validate_json(
+            _scan(self.Q, "52488").shadow_records[0]
+        )
+        assert len(record.added_candidate_ids) == 2, "주입 미적용 — 후보가 둘이어야 한다"
+        assert record.attribution_unclear is True
+
+        monkeypatch.setattr(ds, "compile_rules", lambda: (base,))
+        single = DerivativeShadowRecord.model_validate_json(
+            _scan(self.Q, "52488").shadow_records[0]
+        )
+        assert single.attribution_unclear is False, "대조군: 후보가 하나면 귀속이 분명하다"
+
+    def test_correctness_flag_is_not_overwritten_by_a_later_rule(
+        self, set_mode: Callable[[str], None], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """한 규칙에서 정답으로 확인됐으면, 정답 값이 다른 뒤 규칙의 '정답 아님'이 덮어쓰지 않는다.
+
+        같은 질문을 읽는 실제 규칙들은 정답 값이 모두 같아 덮어쓰기가 일어날 수 없다(뮤테이션 N09가
+        그래서 생존했다). 정답이 다르게 나오는 규칙을 주입해 그 절을 직접 밟는다.
+        """
+        base = next(
+            c
+            for c in ds.compile_rules()
+            if c.rule.rule_id.startswith("sig.power-rule.omit-step.derivative")
+        )
+        alt = replace(
+            base, rule=base.rule.model_copy(update={"wrong_transform": "test_alt_correct"})
+        )
+        other = sympy.Integer(1)
+        monkeypatch.setitem(
+            ds.WRONG_TRANSFORMS,
+            "test_alt_correct",
+            (
+                ds.WRONG_TRANSFORMS[base.rule.wrong_transform][0],
+                lambda frame, ask: ds._Values(correct=other, wrongs=(sympy.Integer(2),)),
+            ),
+        )
+        monkeypatch.setattr(ds, "compile_rules", lambda: (base, alt))
+        set_mode("shadow")
+        record = DerivativeShadowRecord.model_validate_json(
+            _scan(self.Q, "17496").shadow_records[0]
+        )
+        assert record.answer_is_correct is True, "뒤 규칙의 다른 정답 값이 확인된 정답을 덮어썼다"
+
+        # 대조군: 어느 규칙의 정답과도 다르면 False다.
+        wrong = DerivativeShadowRecord.model_validate_json(_scan(self.Q, "99999").shadow_records[0])
+        assert wrong.answer_is_correct is False
+
+    def test_on_exposes_the_candidate_off_and_shadow_do_not(
+        self, set_mode: Callable[[str], None]
+    ) -> None:
+        results = {}
+        for mode in ("off", "shadow", "on"):
+            set_mode(mode)
+            results[mode] = _scan(self.Q_NEW_ONLY, "9").candidates
+        assert results["off"] == () and results["shadow"] == ()
+        assert [c.misconception_id for c in results["on"]] == ["power-rule-step-omitted"]
 
 
 def test_sympy_is_the_only_cas_used_and_no_direct_parser_calls() -> None:
