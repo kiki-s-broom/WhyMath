@@ -77,7 +77,9 @@ _COUNT_CHOICES: tuple[str, str, str, str] = ("0", "1", "2", "3")
 # 템플릿별 L1 메타(개념 원천 src_id·단원 코드). 성취기준 코드는 spec이 공급.
 _TEMPLATE_META: dict[CountTemplateKind, tuple[str, str]] = {
     "real_root_count": ("HK07", "DISC-COUNT"),
-    "extremum_count": ("H:12미적Ⅰ02-01", "EXTREMUM-COUNT"),
+    # 극값의 개수는 02-07(증가·감소, 극대·극소)의 행동이다 — P3-43 판정(Kiki 2026-10-16)·P3-49 적용.
+    # 02-01(미분계수)로 되돌리면 24건이 02-01 PRIMARY 로 되살아난다(테스트가 막는다).
+    "extremum_count": ("H:12미적Ⅰ02-07", "EXTREMUM-COUNT"),
     "is_one_to_one": ("10기수2-03-03", "FUNC-INVERSE"),
     "geometric_convergence": ("H:12미적Ⅱ01-05", "GEO-SERIES-CONV"),
     "limit_equals_value": ("H:12미적Ⅰ01-01", "LIMIT-VALUE"),
