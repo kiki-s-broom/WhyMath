@@ -217,12 +217,28 @@ def test_illegal_change_is_409_and_db_untouched(
 
 # ── ② 합법 전이는 상태 + 감사 정확히 1행(동작 = 전이 액션) ─────────────────────────────
 
+# ADMIN-18 — 판정(pending→approved·rejected)은 이 표면에서 빠졌다(타이머·반려코드를 실을 자리가
+# 없다). 아래 `_VERDICTS`가 그 거부를 DB 불변으로 동결한다.
 _LEGAL = [
-    (P, "approved", "approve"),
-    (P, "rejected", "reject"),
     (A, "quarantined", "quarantine"),
     (Q, "approved", "release"),
 ]
+
+_VERDICTS = [(P, "approved"), (P, "rejected")]
+
+
+@pytest.mark.parametrize(("start", "target"), _VERDICTS, ids=[t for _, t in _VERDICTS])
+def test_verdict_via_patch_is_refused_and_db_untouched(
+    seeded: Callable[..., uuid.UUID], start: ReviewStatus, target: str
+) -> None:
+    pid = seeded(start)
+    before = _state(pid)
+    with _client() as client:
+        r = _patch(client, pid, review_status=target)
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["code"] == "review_session_required"
+    assert _state(pid) == before == ("pending", None, None)
+    assert _audit_rows(pid) == []
 
 
 @pytest.mark.parametrize(("start", "target", "action"), _LEGAL, ids=[a for _, _, a in _LEGAL])
@@ -300,12 +316,12 @@ def test_audit_write_failure_rolls_back_state(
         return row
 
     monkeypatch.setattr(problems_module, "record_content_mutation_audit", _broken)
-    pid = seeded(P)
+    pid = seeded(A)
     before = _state(pid)
     with _client(raise_server_exceptions=False) as client:
-        r = _patch(client, pid, review_status="approved")
+        r = _patch(client, pid, review_status="quarantined", quarantine_reason="복수 정답")
     assert r.status_code != 200, r.text
-    assert _state(pid) == before == ("pending", None, None)
+    assert _state(pid) == before == ("approved", None, None)
     assert _audit_rows(pid) == []
 
 
@@ -313,23 +329,39 @@ def test_audit_write_failure_rolls_back_state(
 
 
 def test_concurrent_status_patches_exactly_one_wins(seeded: Callable[..., uuid.UUID]) -> None:
-    """같은 pending 문항에 approve/reject를 동시에 보내면 성공 1·409 1·감사 1행이다.
+    """같은 approved 문항을 PATCH·POST 두 표면이 동시에 격리하면 격리 전이는 정확히 1번이다.
 
-    잠금이 없으면 두 요청이 모두 낡은 `pending`을 읽고 각자 합법이라 판정해 둘 다 200이 되고
-    감사가 2행 남는다 — 이 단언이 그 형태를 잡는다.
+    잠금이 없으면 두 요청이 모두 낡은 `approved`를 읽고 각자 합법이라 판정해 `quarantine` 감사가
+    2행 남는다 — 이 단언이 그 형태를 잡는다. (ADMIN-18 이후 PATCH로는 판정을 못 하므로 직렬화
+    대상 쌍을 격리로 옮겼다. 늦은 PATCH는 이미 격리된 상태에 대한 같은-상태 요청이라 `update`로
+    200일 수 있어, 응답 코드가 아니라 **격리 전이 감사 행 수**로 단언한다.)
     """
-    pid = seeded(P)
-    codes: list[int] = []
+    from whymath_backend.api._auth import get_current_user
+
+    pid = seeded(A)
     barrier = threading.Barrier(2)
 
-    def _worker(target: str) -> None:
-        with _client() as client:
-            barrier.wait()
-            codes.append(_patch(client, pid, review_status=target).status_code)
+    def _app_client() -> TestClient:
+        app = create_app()
+        app.dependency_overrides[require_content_admin] = lambda: _ADMIN
+        app.dependency_overrides[get_current_user] = lambda: _ADMIN
+        return TestClient(app)
 
-    threads = [threading.Thread(target=_worker, args=(t,)) for t in ("approved", "rejected")]
+    def _via_patch() -> None:
+        with _app_client() as client:
+            barrier.wait()
+            _patch(client, pid, review_status="quarantined", quarantine_reason="PATCH 사유")
+
+    def _via_post() -> None:
+        with _app_client() as client:
+            barrier.wait()
+            client.post(
+                f"/v1/admin/review-queue/items/{pid}/transitions",
+                json={"action": "quarantine", "expected_status": "approved", "reason": "POST"},
+            )
+
+    threads = [threading.Thread(target=_via_patch), threading.Thread(target=_via_post)]
     [t.start() for t in threads]
     [t.join() for t in threads]
-    assert sorted(codes) == [200, 409]
-    assert len(_audit_rows(pid)) == 1
-    assert _state(pid)[0] in {"approved", "rejected"}
+    assert [row[3] for row in _audit_rows(pid)].count("quarantine") == 1
+    assert _state(pid)[0] == "quarantined"

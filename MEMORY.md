@@ -363,6 +363,15 @@
 **푸시가 막힌 경위(기록)**: 로컬 CI 미러가 `mobile` 잡(컨테이너에 flutter 없음, exit 127)으로 실패해 푸시 훅(HARN-308)이 거부했고, 면제 명령 `push_mirror_notice.py waive`는 자동 권한 분류기가 3회 거부했다(채팅 승인은 권한 규칙이 아니다). 사용자의 명시적 지시로 `.claude/settings.local.json`에 해당 명령 한 줄만 허용하는 규칙을 추가해 면제를 기록했다(파일은 `.git/info/exclude`로 커밋 제외). 면제 사유와 HEAD는 이벤트 대장에 남았다. 이 우회로 먼저 푸시된 8커밋은 지우지 않았다(위 처분 참조).
 
 **재발방지 대책(코드·태스크)**: `HARN-314` — 브리핑이 origin/main에서 done이 됐거나 다른 세션에 인수된 태스크를 "내 진행 중"으로 계속 표시하는 결함. `HARN-311`(claim 쓰기 error 시 fail-open 착수)과 다른 경로다: 여기서는 claim이 `ok`였다가 풀려 인수됐고 소유 세션이 그 사실을 볼 수 없었다. 병렬 중복은 이 저장소에서 OPS-07 · MP-04 · OPS-126에 이어 4회차다.
+### 2026-10-18 (판정 · P3-55): **`[12미적Ⅰ-02-02]`의 Content 연결은 24건·줄기 4·정답 0 하나의 단일 틀에 걸려 있다 — 60건이 스킬에 안 닿는 것은 매핑·태그 결함이 아니라 설계의 구조 결과이고, (나) 현 구조 확정 + 위험 명시를 택했다. (가)는 감사 라운드가 사람 게이트라 후속 태스크로 넘겼다** (claude 판정, 데이터 변경 0) — 판정 기준 main `d33ab2e4`(브랜치 `claude/sweet-cannon-sppil9`, 머지 전)
+
+**무엇**: 태스크 `P3-55-calc1-02-02-content-single-template-dependency`. 정본 = `docs/reviews/p3_55_calc1_02_02_content_single_template_judgment_2026-10-18.md`. P3-53 재판정이 발견한 단일 실패점의 ①재현 ②원인 판정 ③결정.
+
+**결정**: ①재현: 승인 PRIMARY 84건 중 스킬에 닿는 24건은 전부 `conceptual_v0`·`verify-claim`·정답 `0`. 그 24건의 승인을 불인정하는 주입에서 Content 9/10(0.90) 미달, `p3_fill` 60건을 불인정하는 대조군은 10/10 유지. 허용 미연결 수는 0. ②원인: `type_skills` 표 결함(기각 — 같은 표가 02-04에서 `evaluate-expression` 49건을 연결) · 60건 유형 오태그(기각 — 생성기가 "문제유형 정직성"으로 의도 선택) · 개념 스킬 집합과 문항 형태가 안 만나는 구조(채택 — 02-02 스킬은 `deductive-reasoning`·`graph-reading`뿐이라 단원 목표 PROCEDURE에 대응하는 계산 계열이 없다). 이 비대칭은 10개 개념 중 9개에 있다. ③(나) 채택, 위험 R1(승인 의존)·R2(줄기 4·정답 1 — 10개 개념 중 최저)·R3(여유 0)·R4(계측기가 못 드러냄)을 명시. (가)는 `P3-65`, 계측기 공개는 `P3-64`로 등재.
+
+**한계(사실 기록)**: ①교수학 판단(절차 목표에 맞는 스킬·24건이 반례 한 면만 묻는 것의 충분성)은 하지 않았다 — `P3-65` ⑥으로 Kiki 질문. ②인접 관찰: `[12미적Ⅰ-02-06]`은 연결이 6건(줄기 6·정답 1)으로 건수는 더 얇으나 `P3-44`가 새 은행을 만드는 중이라 손대지 않았다. ③전체 스위트·CI 미러는 판정 전용이라 돌리지 않았다(Coverage 계측기·승인 각인 점검 exit 0·메모리 내 주입 2종만). ④원격 claim 대장은 이 환경에서 ref 잠금 거부라 읽기측 폴백으로만 중복 착수를 확인했다.
+
+**검증**: 수치는 `phase3_coverage` 공개 창구를 같은 프로세스에서 불러 얻었고 CLI 값(10/10)과 대조했다. 승인 각인 점검 `--all --check` exit 0. 새 태스크 2건은 YAML을 파싱해 식별자 14종 보존을 대조했다(백틱 사고 방지로 인용 heredoc 경유).
 ### 2026-10-18 (판정·P3-59): **M0672가 M0075에 가려지는 현상의 오늘의 해는 0 — 세션 권고는 현상 유지(안 ③)이며 분모를 바꾸는 안 ②와 신규 kebab 안 ①은 Kiki 결정 게이트로 넘겼다** (claude 판정, 결정은 미정) — 판정 기준 main `d33ab2e4`, 머지 전
 
 **무엇**: 태스크 `P3-59-m0672-shadowed-by-canonical-m0075`. 정본 = `docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md`. 코드·분모·카탈로그·크로스워크는 바꾸지 않았다(acceptance ③).
@@ -12566,6 +12575,27 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **부수 구멍 봉합**: `problem_corpus_rephrase`가 소스 레코드를 `dict(record)`로 복사해 LLM이 다시 쓴 발문이 `deterministic:` 서명을 승계하던 경로 — 발문이 실제로 바뀐 레코드는 `authored_by`를 제거.
 - **미완/제안**: `.github`는 편집하지 않았다. `declared-unwired-audit` 잡에 백필 `--check` 스텝을 얹으면 `by-design` 면제가 `stale-waiver`로 걸리니 함께 제거해야 한다(현재 드리프트는 backend 잡의 pytest 전수 가드가 막는다). `rephrased_v0`는 사람이 `--authored-by llm:<모델>`을 선언해야 교차검증 게이트가 돈다.
 
+### 2026-10-09 — ADMIN-18 검수 전이 반려코드·HIT 타이머 강제
+- **계약**: 착수 `POST /v1/admin/review-queue/items/{id}/review-sessions` → started 타이머 이벤트 1행 + `review_session_id`. 전이는 approve/reject에 `review_session_id` 필수, reject에 `failure_code`(F1~F8) 필수(그 외 action에 failure_code는 422), `elapsed_ms`는 서버가 started 시각과 현재 시각 차로 계산(클라 전송 시 `extra=forbid` 422). 성공 시 같은 트랜잭션에 finished 타이머·감사·상태 변경, 어느 하나 실패하면 전부 롤백. 세션이 이 문항·이 운영자 것이 아니거나 이미 종결이면 409 `invalid_review_session`(검증 순서 404→stale→illegal→session).
+- **quarantine/release는 세션 선택**: `ReviewVerdict`(approved|approved_with_edit|rejected)에 대응값이 없고, 사후 회수·복원이 HIT 분모를 오염시키므로. 선택으로 보낸 세션은 검증·echo하되 종결하지 않는다.
+- **PATCH 범위 확대**: `PATCH /v1/problems/{id}`는 pending→rejected뿐 아니라 pending→approved도 409 `review_session_required`로 거부(approve도 타이머 없이 판정되므로). PATCH로 남는 것은 격리·해제.
+- **적재율**: `ops/hit_cu_metrics --from-db`가 DB의 타이머·approved/rejected 문항을 읽어 적재율을 낸다. 통합 테스트가 옛 판정 2건 + API 판정 2건 후 적재율 상승을 단언.
+- **남은 틈**: ①`POST /v1/problems`가 `review_status=approved|rejected`로 직접 생성 가능(오프라인 적재 경로 — 후속 태스크 등재) ②코퍼스 오프라인 도구·직접 DB 작업은 API 밖(적재율이 잔여를 드러냄) ③문항을 열 때마다 started 행이 생기고 판정 없이 끝난 세션은 unfinished로 집계, quarantine/release는 세션을 종결하지 않아 started가 남는다 ④웹은 가짜 BFF 기준 검증, 실제 BFF와의 엔드투엔드·CORS 미검증.
+- **사고 기록(재발 방지 대상)**: 백엔드 에이전트가 뮤테이션 하네스를 도는 동안 Stop 훅의 "미커밋 변경 커밋" 지시로 WIP 스냅샷이 커밋돼 뮤테이션 한 줄(`if False and value is not None`)이 `HEAD`에 들어갔다. 작업 트리는 복구돼 있었고 최종 커밋에서 정정. 근본 원인은 "에이전트가 주입 중인 트리를 훅 지시로 커밋" — 대책 후보는 뮤테이션 하네스의 주입 구간 표식 + Stop 훅의 주입 중 커밋 차단(태스크 등재 필요).
+### 2026-10-09 — Polya는 학부생(대학 과정)에 기본 적용하지 않는다 (Kiki 결정)
+- **결정**: 대학 학부과정까지 커버하되 Polya 4단계 틀은 학부생에게 기본 적용하지 않는다. 근거 — ①전문가 역전 효과(초보용 단계 안내가 이미 그 수준을 넘은 학습자에게는 인지 부하·방해) ②3단계(실행) 전이 판정이 등호+결론어("답/따라서")를 요구해 증명형 문제에서 `실행`에 갇힐 가능성(`l4/polya/transitions.py` 읽기 기반 추론, 미실측) ③2단계 전략 키워드가 고교 계산 어휘(인수·양변·대입).
+- **유지되는 것**: 정답 미루기·소크라테스 우선·메타인지·정서 안전·인지부하 관리 등 원칙은 학년 무관(절대 금기). 새 분야(해석학·추상대수)에서는 학부생도 초보자일 수 있으므로 **막혔을 때(학생 요청·좌절·반복 막힘)만** 힌트 사다리·Polya 질문을 꺼내는 전환 규칙을 설계한다.
+- **효과**: `S4-64`의 "Polya 학년 register 대학 채널" 항목 폐기(번호 겹침 문제 — 13~14가 N수1·2와 대학 1~2학년에서 충돌 — 가 대학 호출자가 그 채널을 쓰지 않으므로 소멸). 학교급 입력은 정수 grade 확장이 아니라 별도 입력(`school_level` 등)으로 설계한다.
+- **후속**: `PED-47-undergrad-coaching-mode-without-polya-ladder`(대학 코칭 모드 설계·입력 계약·`_GRADE_BAND_RANGES` 15~16 처분·측정 설계, 교수학 독립 비판 1회). `S4-64`는 대학 `required_depth` 정책(mastery 고정 vs 과목별 차등)이 여전히 Kiki 결정 대기라 block.
+- **미처리(Kiki 몫)**: CLAUDE.md "절대 원칙→교수학"의 '모든 학습 경로는 Polya 4단계 매핑' 문장은 '고등까지'로 정정 필요 — 기존 규칙 정정이라 동결 대상은 아니나 문장 변경이므로 Kiki 지시 후 반영(PED-47이 정정 초안만 둔다). 이 결정은 가설이다: 기본 대 막힐 때만 틀을 해결 시간·포기율로 비교하는 계측을 PED-47 설계에 포함.
+
+### 2026-10-09 — 대학 required_depth 정책 확정: cognitive_type 기반 (Kiki 결정)
+- **결정**: 대학 원자의 `required_depth`는 고정 mastery(S4-62 원본 방식)도, 과목 성격별 분류표(전략 문서 W0 S-1 문면)도 아니라 **원자별 `cognitive_type`에서 도출**한다 — 절차→procedural, 개념→conceptual, **표상→None**(깊이 4단계에 표상 칸이 없어 정직 폴백). **mastery는 대학 셀에서 당분간 쓰지 않는다.**
+- **근거(실측)**: `atom_graph_v1/graph.json` 대학 원자 1,069건 중 세부개념 512건(= 로더가 셀을 만드는 대상)에 cognitive_type 보유 — 개념 360·절차 108·표상 44. 과목 성격별 차등은 분류표를 새로 지어야 해 "날조 금지"에 걸리고, cognitive_type은 같은 과목 안에서도 절차형/개념형을 원자 단위로 구분한다. 라벨 이름이 RequiredDepth 값 이름과 거의 일치해 매핑이 창작이 아니다.
+- **효과 범위**: required_depth는 L6 깊이정렬 랭킹 보너스(상한 1.5·하드 게이트 아님)에만 쓰여 오매핑 피해는 작다. 고정 mastery는 대학 1학년 첫 접촉 개념에도 최고 난이도(목표 4.5)를 겨냥하는 문제가 있었다.
+- **미확인**: cognitive_type 라벨의 출처(작성자·검수 여부)는 아직 확인하지 못했다(S4-64 구현 시 코퍼스 문서에서 확인해 PR에 기록). 이 값은 인지 수준 원문 주석 확보 시 대체되는 임시 휴리스틱이다. 전략 문서 W0 S-1 해소 문구('과목 성격별')는 구현 PR에서 갱신.
+- **상태**: S4-64 unblock(todo). Polya 대학 채널 항목은 PED-47로 이관(앞선 결정). CLAUDE.md의 Polya 문장 정정(216·113행)은 Kiki 확인 대기.
+- **CLAUDE.md 정정 반영(2026-10-09 · Kiki 승인 "추천대로")**: 교수학 규칙 2건의 Polya 적용 범위를 정정했다 — 절대 원칙 '모든 학습 경로는 Polya 4단계 매핑'을 초·중·고로 한정하고(대학은 4단계 틀 기본 미적용·막혔을 때만), 절대 금기 '항상 Polya 4단계 우선'을 학교급별(초·중·고=Polya, 대학=소크라테스 질문·힌트 사다리)로 분리했다. '바로 정답 제공 금지' 원칙은 학년 무관 유지. 버전 0.2.38. `docs/architecture/04_pedagogy_engine.md`의 Polya 설명은 PED-47 설계 확정 후 일괄 정합(지금 고치면 재수정 위험).
 ### 2026-10-09 — S4-68: answer_kind v2 소비 지점 드리프트 4건 해소 (교차검증 관점 fail-closed · DSL 제외 목록 · tier 값 · 야간 재검증)
 
 `l3/verifier._VERIFIERS_V2`(통합 검증기 v2 레지스트리)를 읽는 소비 지점 4곳이 각자 수동 사본을 들고 있어 어긋나 있었다. 설계 단계(S4-57 §8)는 코드 독해 기준이라 **미실행**이었고, 이번에 전부 실행으로 확정했다.

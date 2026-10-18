@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MATH-09-final-answer-unicode-radical
+title: "MATH-09 — verify_final_answer가 유니코드 근호(8√3)를 읽지 못해 판정 불가로 돌린다"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① verify_final_answer가 유니코드 근호를 읽지 못해 보기 '8√3'을 unverifiable로 돌린다(P3-07 실측: 대표 과정 객관식 8건의 보기). 학생이 그 보기를 고르면 오답 판정이 아니라 판정 불가가 된다.\n② 입력 정규화 지점(수식 파싱 단일 진입점 l3.safe_parse 또는 채점기 앞단)에 N√M, √M, √(…) 처리를 두거나, 두지 않을 근거를 남긴다. 파서 허용 문자 집합을 넓히는 변경이므로 R22-03(안전 파싱) 거버넌스를 먼저 읽고 허용목록 규칙과 충돌하지 않게 한다.\n③ 주입: 정답이 '8√3'인 문항에서 '8√3'은 correct, '8'과 '4√3'은 incorrect."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-07 세션(2026-10-18). Solution QA는 비교용 정규화로 우회했고 채점기 본체는 건드리지 않았다."
+updated: 2026-10-18
