@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-70-p3-g2-gate-scoped-exit-code
+title: "P3-70 — P3-G2 게이트 단위 판정 지표 선언 부재: phase3_coverage --gate P3-G2 가 exit 2, 세 조건 판정에 CLI 3개 수동 조합이 필요"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-54-coverage-gate-scoped-exit-code
+  - P3-07-solution-qa-machine-verification
+requires_gates: []
+acceptance:
+  - "① 입력 — P3-16 판정 세션이 실측한 사실: python -m whymath_backend.l1.standards.phase3_coverage --gate P3-G2 는 exit 2(\"명세에 게이트 P3-G2 의 조건 지표 선언이 없다 — 선언된 게이트: P3-G1\")다. 그래서 P3-G2 의 세 조건(Problem Coverage · Solution QA Pass · 오답 1건이 교정 전략까지 도달)은 CLI 세 개(ops.phase3_metrics 의 지표 ③④ · ops.phase3_remediation · 실 PG 라이브 트레이스)를 손으로 조합해야 했고, phase3_coverage 전체 실행의 exit 1 은 P3-G2 조건이 아닌 Concept Completeness·Graph Connectivity 미달에서 왔다.\n② 명세 phase3_scope_v1 의 gate_conditions 에 P3-G2 를 선언한다 — 어떤 지표가 이 게이트의 조건인지는 코드가 아니라 명세가 소유한다(P3-54 가 P3-G1 에 한 방식 그대로). 단 Problem Coverage·Solution QA 는 phase3_coverage 가 재는 지표가 아니라 ops.phase3_metrics 가 재므로, 게이트 단위 종료 코드를 어느 CLI 가 낼지 먼저 정한다(phase3_metrics 에 --gate 를 두는 안 / 두 CLI 를 잇는 얇은 판정기 / 현행 유지하고 판정 절차를 문서로 고정하는 안 — 처분안과 근거를 적고 고른다).\n③ 게이트 단위 종료 코드가 Problem Coverage 미달·Solution QA 실패 1건·교정 전략 미도달 각각의 주입에서 RED 인지, 그리고 조건 밖 지표(Concept Completeness·Graph Connectivity) 미달에는 반응하지 않는지 양쪽을 주입으로 확인한다.\n④ 라이브 트레이스(실 PG·HTTP)는 CLI 범위 밖이다. 판정 세션 절차로 남기되, 이번 판정에서 쓴 스크립트(docs/reviews/p3_g2_week2_gate_evidence_2026-10-18/)를 재사용 가능한 형태로 둘지 판단한다.\n⑤ 완료 판정 — P3-G2 의 세 조건이 한 번의 명령(또는 문서로 고정된 한 절차)으로 재현되고, 조건 안·밖 주입이 각각 RED/무반응임."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-16 판정 세션(2026-10-18, 판정 기준 main 9f494454). 판정을 막지 않는 잔여라 등재만 한다 — 이번 판정은 CLI 세 개 조합으로 성립했다. 명세는 2026-10-02 동결됐고 동결 후 변경 이력이 전부 PR 이다(P3-G1 판정문 조건 1 참조)."
+updated: 2026-10-18
