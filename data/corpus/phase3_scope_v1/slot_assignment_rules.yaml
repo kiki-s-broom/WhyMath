@@ -32,14 +32,10 @@ scope_concepts:
   - "H:12미적Ⅰ02-07"   # 증가·감소, 극대·극소
 
 rules:
-  # 02-01에 PRIMARY로 달려 있지만 실제로는 02-07의 행동(극값의 개수)을 묻는 24건.
-  # 개념 태깅 변경은 승인 경로라 세션이 바꾸지 않고, 02-01의 어느 슬롯도 채우지 않는다.
-  - id: hold-extremum-count-under-02-01
-    when:
-      concept: "H:12미적Ⅰ02-01"
-      folded_stem_contains: "극값의 개수"
-    slot: null
-    reason: "극값의 개수는 02-07의 행동이다 — 개념 매핑 재검토 대상(P3-05 3단계 결정 ③)"
+  # (폐기 2026-10-18 · P3-49) 극값의 개수 24건을 02-01 에서 02-07 로 옮겼다(Kiki 승인
+  # G-p3-49-extremum-retag-approval). 보류 규칙 hold-extremum-count-under-02-01 은 가리키는 문항이
+  # 0건인 죽은 규칙이 되어 지웠다. 24건은 아래 misconception-trigger-by-own-distractor 로 02-07
+  # 오개념 유발 칸에 들어간다.
 
   # 오답 보기마다 특정 오개념이 걸린 객관식. 계측기가 오개념 유발 칸에서 세는 기준과 같다.
   - id: misconception-trigger-by-own-distractor
