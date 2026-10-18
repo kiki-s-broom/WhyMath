@@ -40,7 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -123,8 +123,20 @@ class Target:
 
 
 @dataclass(frozen=True)
+class GateCondition:
+    """항 10 — 게이트 1개의 조건이 되는 계측 지표(P3-54).
+
+    `metrics` 는 계측기(`phase3_coverage`)의 지표 키다. 어떤 키가 유효한지는 계측기가 소유하고
+    (`GATE_METRIC_KEYS`), 이 모듈은 구조만 본다. `basis` 는 그 대응의 근거(게이트 문면의 구절).
+    """
+
+    metrics: tuple[str, ...]
+    basis: str
+
+
+@dataclass(frozen=True)
 class ScopeSpec:
-    """범위 명세 전체 — 9항 + 동결 표지."""
+    """범위 명세 전체 — 9항 + 동결 표지 + 게이트 조건(항 10)."""
 
     spec_id: str
     frozen_at: str
@@ -161,6 +173,8 @@ class ScopeSpec:
     # 코퍼스 소스(레포 루트 기준 경로) + 성취기준 개정 필터
     sources: Mapping[str, str]
     source_path: Path
+    # 항 10 — 선택 항목이다. 없으면 빈 매핑이고, 그때 계측기의 `--gate` 는 모든 게이트를 거부한다.
+    gate_conditions: Mapping[str, GateCondition] = field(default_factory=dict)
 
     @property
     def node_codes(self) -> tuple[str, ...]:
@@ -326,6 +340,25 @@ def _parse_targets(raw: Any, where: str) -> Mapping[str, Target]:
     return targets
 
 
+def _parse_gate_conditions(raw: Any, where: str) -> Mapping[str, GateCondition]:
+    """항 10 — 없거나 null 이면 빈 매핑.
+
+    있으면 게이트마다 지표 목록(비어 있지 않음·중복 없음)과 근거 문구가 필요하다.
+    """
+    if raw is None:
+        return {}
+    block = _mapping(raw, where)
+    conditions: dict[str, GateCondition] = {}
+    for gate_id, item in block.items():
+        w = f"{where}.{gate_id}"
+        row = _mapping(item, w)
+        conditions[str(gate_id)] = GateCondition(
+            metrics=_unique_texts(_require(row, "metrics", w), f"{w}.metrics"),
+            basis=_text(row, "basis", w),
+        )
+    return conditions
+
+
 def parse_scope_spec(doc: Any, source: Path) -> ScopeSpec:
     """YAML 문서 → `ScopeSpec`. 구조 위반은 전부 `ScopeSpecError`."""
     where = str(source)
@@ -418,6 +451,9 @@ def parse_scope_spec(doc: Any, source: Path) -> ScopeSpec:
         ),
         sources=sources,
         source_path=source,
+        gate_conditions=_parse_gate_conditions(
+            top.get("gate_conditions"), f"{where}.gate_conditions"
+        ),
     )
 
 
