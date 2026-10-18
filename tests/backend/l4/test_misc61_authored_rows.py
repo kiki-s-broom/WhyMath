@@ -1,4 +1,4 @@
-"""MISC-61 — 앵커 A3 얇은 M-id 중 신규 저작한 행(M0599·M0600)의 계약 동결.
+"""MISC-61 — 앵커 A3 얇은 M-id 4건(M0599·M0600 1차, M0417·M0418 2차)의 신규 저작 행 계약 동결.
 
 배경: 게이트 `G-misc40-deferred-m0599-redecision`의 보류 사유는 "4지선다 귀속을 검증할 재료(세 필드)가
 없다"였고, 원천 대조(2026-10-09)로 원천부터 비어 있음이 확정돼 새로 저작했다. 이 저작이 검수를
@@ -26,7 +26,11 @@ from whymath_backend.l4.misconception.catalog import CATALOG
 _ROOT = Path(__file__).resolve().parents[3]
 _CORPUS = _ROOT / "data" / "corpus" / "misconceptions_v1" / "misconceptions.json"
 
-AUTHORED_IDS = ("M0599", "M0600")
+AUTHORED_IDS = ("M0599", "M0600", "M0417", "M0418")
+# 2차(2026-10-17): M0417·M0418은 원천 `오개념_원인` 값이 있어 `student_wrong_thinking`만 원천 유래이고
+# `distractor_rule`·`error_type`은 원천에 근거가 없어 AI 저작이다(행 전체가 검수 필요로 표시된다).
+# 값은 Kiki 머신 2차 실행 결과(원천 sha256 fcf6d333…187e · sha256_matches_provenance=true).
+SOURCE_DERIVED_THINKING = {"M0417": "확률 범위 미이해", "M0418": "배반사건 혼동"}
 THREE_FIELDS = ("student_wrong_thinking", "distractor_rule", "error_type")
 AI_NOTE_PREFIX = "AI생성-검수필요"
 PROVENANCE_NOTE_MAX = 32  # db/models/misconception_catalog.py: sa.String(32)
@@ -101,6 +105,21 @@ def test_error_type_and_severity_follow_the_corpus_vocabulary(
     row = rows[mis_id]
     assert row["error_type"] in vocabulary
     assert rule[row["error_type"]] == {row["severity"]}, "다른 행의 규칙과 어긋난 severity"
+
+
+# ── 원천 유래 값은 원천 그대로다 (2차) ─────────────────────────────────────────
+@pytest.mark.parametrize("mis_id", sorted(SOURCE_DERIVED_THINKING))
+def test_second_pass_thinking_is_the_source_value_verbatim(
+    rows: dict[str, dict], mis_id: str
+) -> None:
+    """원천 값을 AI가 다시 쓰지 않았다 — 고쳐 쓰면 '원천 유래'라는 근거가 거짓이 된다."""
+    assert rows[mis_id]["student_wrong_thinking"] == SOURCE_DERIVED_THINKING[mis_id]
+
+
+def test_first_pass_rows_are_not_mistaken_for_source_derived() -> None:
+    """M0599·M0600은 원천이 비어 전부 AI 저작이다 — 원천 유래 목록에 섞이면 근거 표기가 틀어진다."""
+    assert set(SOURCE_DERIVED_THINKING).isdisjoint({"M0599", "M0600"})
+    assert set(SOURCE_DERIVED_THINKING) <= set(AUTHORED_IDS)
 
 
 # ── ② AI 저작이 원본으로 위장하지 않는다 ───────────────────────────────────
