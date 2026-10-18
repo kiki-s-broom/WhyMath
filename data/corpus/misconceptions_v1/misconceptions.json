@@ -6144,9 +6144,9 @@
     {
       "mis_id": "M0418",
       "canonical_statement": "중복 계산",
-      "student_wrong_thinking": null,
-      "distractor_rule": null,
-      "error_type": null,
+      "student_wrong_thinking": "배반사건 혼동",
+      "distractor_rule": "두 경우가 동시에 일어날 수 있는 문항에서, 겹치는 경우를 두 번 센 합(두 경우의 수를 그냥 더한 값)을 오답 보기로 배치",
+      "error_type": "해석오류",
       "difficulty": null,
       "correction_point": null,
       "ccss_code": "7.SP.C.8",
@@ -6157,8 +6157,8 @@
       "subunit": "경우의 수",
       "mapping_confidence": "높음",
       "mapping_score": 0.8,
-      "provenance_note": "원본",
-      "severity": null,
+      "provenance_note": "AI생성-검수필요(MISC-61)",
+      "severity": "blocking",
       "behavior_skills": [
         "skill.case-analysis"
       ]
@@ -6188,9 +6188,9 @@
     {
       "mis_id": "M0417",
       "canonical_statement": "확률 1 초과 가능",
-      "student_wrong_thinking": null,
-      "distractor_rule": null,
-      "error_type": null,
+      "student_wrong_thinking": "확률 범위 미이해",
+      "distractor_rule": "확률의 범위(0 이상 1 이하)를 벗어난 값, 곧 음수이거나 1보다 큰 값을 오답 보기로 배치",
+      "error_type": "조건무시",
       "difficulty": null,
       "correction_point": null,
       "ccss_code": "7.SP.C.5",
@@ -6201,8 +6201,8 @@
       "subunit": "확률",
       "mapping_confidence": "높음",
       "mapping_score": 0.812,
-      "provenance_note": "원본",
-      "severity": null,
+      "provenance_note": "AI생성-검수필요(MISC-61)",
+      "severity": "blocking",
       "behavior_skills": [
         "skill.case-analysis"
       ]
