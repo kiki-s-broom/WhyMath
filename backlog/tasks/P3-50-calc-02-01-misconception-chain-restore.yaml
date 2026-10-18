@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -14,10 +14,15 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 02-01 개념의 핵심 오개념(M0075 곱의 미분 · M0080 극값 판정)에 오답 보기가 닿는 02-01 PRIMARY 문항이 있는지 실측한다. P3-49 이후 02-01 의 Graph Connectivity 사슬(개념->스킬->문항->오개념)을 잇는 문항이 0건이 된다(P3-43 문서 5절).\n② M0080 의 02-01 귀속이 맞는지 판정한다 — 서술이 \"극값 판정\" 두 단어이고 매핑 점수 0.79 인 자동 매핑이며 02-01 소단원에 극값 목표가 없다. 귀속이 틀리면 scope_spec.yaml core_misconceptions 의 02-01 핵심 오개념을 어떻게 바꿀지 요청 형태로 만든다(명세는 동결 문서라 세션이 직접 바꾸지 않는다).\n③ 02-01 에 맞는 오개념 유발 문항(M0075 계열 등)을 보강하거나, 보강이 불가능하면 이유를 적는다. 보강 후 Graph Connectivity 의 02-01 칸이 채워짐을 phase3_coverage 실측으로 보인다.\n④ 타 세션의 P3-44-graph-connectivity-misconception-edge(Graph Connectivity 5/10 -> 95%, 02-05·06·08·09·10 재연결)와 범위가 이어진다 — 그쪽은 현재 끊긴 5개 개념이고, P3-49 이후에는 02-01 이 6번째 끊긴 개념이 된다. 착수 전에 그 태스크의 머지 상태를 확인하고(git log --all --grep=P3-44), 겹치면 한쪽으로 합친다. 같은 문항을 두 세션이 고치지 않는다."
+  - "[정정 2026-10-18 · ①②③ 실측 결과] 정본 docs/reviews/p3_50_02_01_chain_restore_2026-10-18.md (판정 기준 main fb27e49d). (가) ① 전제 정정: 02-01에 M0075에 닿는 승인 문항은 24건 있고(product-rule-naive), 사슬에서는 오개념(d)이 아니라 스킬(c)에서 탈락한다. 오답 보기가 있는 48건은 전부 evaluate-expression이고 스킬 연결 92건은 전부 단답형 solve-for-unknown이라 두 집합이 서로소다. 사슬은 핵심 오개념 하나만 닿으면 통과하므로 M0075와 M0080 둘 다에 닿는 문항은 필요 없다. (나) ② 판정: M0080의 02-01 귀속은 부적절(02-07 소관, M0675와 중복)이고 정의서가 묻지 않은 M0075도 부적절(02-04 소관, M0672와 중복, P3-59 게이트와 묶임)이다. 근거는 성취기준 원문·02-01 원자 3개·귀속 M-id 35개의 정체·M0669~M0678 번호 계열이다. 명세 변경 요청서는 문서 4절에 있다(명세와 코퍼스는 같은 PR에서 바꿔야 측정이 거부되지 않는다). (다) ③ 보강: 이번에 하지 않았다 — 새 객관식 문항은 새 은행(승인 단위 n 200 이상)과 M0669용 kebab 신설(카탈로그 68에서 69, 크로스링크 서명)이 선행하고, raw M-id 직접 기입은 P3-57이 규명한 계측-서빙 불일치를 재생산하므로 금지한다. 이유는 문서 5절. (라) ④ 겹침: P3-44는 02-01 미포함·원격 claim과 브랜치가 없어 실제 진행 여부는 확인하지 못했고, P3-57은 raw M-id 제약으로, P3-61은 kebab 신설 위치 결정으로 연결된다(문서 6절). 결정은 게이트 G-p350-02-01-core-and-route. 10/10 산술(추론): 02-01을 닫아야 Graph Connectivity가 10/10이 된다."
 artifacts: []
 paths:
   - data/corpus/phase3_scope_v1/scope_spec.yaml
   - data/corpus/misconceptions_v1/misconceptions.json
-session: null
-notes: "출처: P3-43 문서 5절 부작용. P3-49 가 24건을 02-07 로 옮기면 02-01 사슬을 잇는 문항이 0건이 된다. scope_spec.yaml 은 동결 명세라 변경은 요청 형태로만. 타 세션 P3-44-graph-connectivity-misconception-edge 와 범위 조율 필요(acceptance ④)."
-updated: 2026-10-16
+  - "docs/reviews/p3_50_*"
+session: claude/p3-50-02-01-chain-restore
+notes: |-
+  출처: P3-43 문서 5절 부작용. P3-49 가 24건을 02-07 로 옮기면 02-01 사슬을 잇는 문항이 0건이 된다. scope_spec.yaml 은 동결 명세라 변경은 요청 형태로만. 타 세션 P3-44-graph-connectivity-misconception-edge 와 범위 조율 필요(acceptance ④).
+
+  [정정 2026-10-18] paths ['data/corpus/phase3_scope_v1/scope_spec.yaml', 'data/corpus/misconceptions_v1/misconceptions.json'] → ['data/corpus/phase3_scope_v1/scope_spec.yaml', 'data/corpus/misconceptions_v1/misconceptions.json', 'docs/reviews/p3_50_*']: 실측 결과 반영 — 정의서 전제 정정(문항은 0건이 아니라 24건이 닿고 스킬 조건에서 탈락)·귀속 판정·겹침 확인·Kiki 결정 게이트 분리
+updated: 2026-10-18

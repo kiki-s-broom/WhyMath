@@ -1154,6 +1154,19 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료는 이미 저장소에 있다(P3-44 조사 문서 5절·p3_diff_shortcut_guard 의 M-link-undescribed). 먼저 끝나야 할 태스크 없음 - 사람 결정"
+  - id: G-p350-02-01-core-and-route
+    title: "02-01 핵심 오개념과 보강 경로 결정 — Q1 02-01 핵심 오개념(가: M0075·M0080을 M0669 한 행으로 교체, 권고 / 나: M0080만 삭제하고 M0075 유지 / 다: 현행 유지, M0075가 걸려 있으므로 G-p359-m0672-shadow-disposition과 함께 정한다) · Q2 보강 경로(A 정직한 재귀속+새 객관식 문항, 권고 / B 스킬 정렬로 기존 24건 인정, 내용이 거짓인 채 숫자만 오르므로 비권고 / C 현상 수용) · Q3 M0669용 선지 역추적 전용 kebab을 P3-61에 5번째로 합칠지 별건으로 둘지(P3-61 범위는 Kiki가 4개로 정했으므로 확장은 승인 필요). 세션 의견은 Q1 가·Q2 A·Q3 합침. 근거 docs/reviews/p3_50_02_01_chain_restore_2026-10-18.md §4~§7 (판정 기준 main fb27e49d)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-18
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-50-calc-02-01-misconception-chain-restore
   - id: G-p359-m0672-shadow-disposition
     title: "M0672가 같은 kebab(product-rule-naive)의 canonical M0075에 가려지는 현상의 처분 — 안 ① M0672 전용 kebab 신설(카탈로그 68→69·크로스링크 서명·문항 distractor_map 36건 재배선) / 안 ② 두 M-id를 한 오개념으로 인정(분모 12→11 또는 M0672를 M0075의 별칭으로 표기) / 안 ③ 현상 유지 + 재판정 조건 2건(런타임 키를 canonical M-id로 전환하는 날 · M0672/M0075 신뢰도 재서명 시 동률 방지). 세션 의견은 ③. 오늘의 해는 0(학생 교정은 kebab 단위)이고 종료 코드 1의 원인은 blocked 5개다. 근거 docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md §5·§6"
     kind: decision
