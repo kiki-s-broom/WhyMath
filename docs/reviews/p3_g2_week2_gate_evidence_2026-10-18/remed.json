@@ -1,0 +1,316 @@
+{
+  "produced": 7,
+  "total": 12,
+  "exit_code": 1,
+  "rows": [
+    {
+      "mis_id": "M0075",
+      "concept_code": "[12미적Ⅰ-02-01]",
+      "status": "served",
+      "kebab_id": "product-rule-naive",
+      "reports_as": "M0075",
+      "reaching_problems": 36,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 2,
+        "correct_checked": 2,
+        "op_code_entries": 0,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": ""
+    },
+    {
+      "mis_id": "M0080",
+      "concept_code": "[12미적Ⅰ-02-01]",
+      "status": "served",
+      "kebab_id": "critical-point-implies-extremum",
+      "reports_as": "M0080",
+      "reaching_problems": 36,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 2,
+        "correct_checked": 2,
+        "op_code_entries": 0,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": ""
+    },
+    {
+      "mis_id": "M0670",
+      "concept_code": "[12미적Ⅰ-02-02]",
+      "status": "served",
+      "kebab_id": "continuity-implies-differentiability",
+      "reports_as": "M0670",
+      "reaching_problems": 24,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 2,
+        "correct_checked": 2,
+        "op_code_entries": 0,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": ""
+    },
+    {
+      "mis_id": "M0671",
+      "concept_code": "[12미적Ⅰ-02-03]",
+      "status": "served",
+      "kebab_id": "power-rule-step-omitted",
+      "reports_as": "M0671",
+      "reaching_problems": 36,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 4,
+        "correct_checked": 2,
+        "op_code_entries": 0,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": ""
+    },
+    {
+      "mis_id": "M0672",
+      "concept_code": "[12미적Ⅰ-02-04]",
+      "status": "shadowed",
+      "kebab_id": "product-rule-naive",
+      "reports_as": "M0075",
+      "reaching_problems": 36,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 2,
+        "correct_checked": 2,
+        "op_code_entries": 0,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": "product-rule-naive 의 canonical 이 M0075 — 리포트에는 그 id 로 나간다(한 kebab 으로는 M0672 와 변별 불가)"
+    },
+    {
+      "mis_id": "M0673",
+      "concept_code": "[12미적Ⅰ-02-05]",
+      "status": "blocked",
+      "kebab_id": null,
+      "reports_as": null,
+      "reaching_problems": 0,
+      "failures": [],
+      "evidence": null,
+      "note": "좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다."
+    },
+    {
+      "mis_id": "M0674",
+      "concept_code": "[12미적Ⅰ-02-06]",
+      "status": "blocked",
+      "kebab_id": null,
+      "reports_as": null,
+      "reaching_problems": 0,
+      "failures": [],
+      "evidence": null,
+      "note": "좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다."
+    },
+    {
+      "mis_id": "M0864",
+      "concept_code": "[12미적Ⅰ-02-07]",
+      "status": "served",
+      "kebab_id": "extremum-max-min-confused",
+      "reports_as": "M0864",
+      "reaching_problems": 56,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 2,
+        "correct_checked": 2,
+        "op_code_entries": 2,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": ""
+    },
+    {
+      "mis_id": "M0865",
+      "concept_code": "[12미적Ⅰ-02-07]",
+      "status": "served",
+      "kebab_id": "extremum-value-vs-point-confused",
+      "reports_as": "M0865",
+      "reaching_problems": 68,
+      "failures": [],
+      "evidence": {
+        "wrong_checked": 4,
+        "correct_checked": 2,
+        "op_code_entries": 4,
+        "first_confidence": 0.8,
+        "ladder": [
+          "none",
+          "corrective_explanation",
+          "easier_problem",
+          "prerequisite_concept"
+        ],
+        "ladder_resolved": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "patterns": [
+          "reverse_reasoning",
+          "counterexample"
+        ],
+        "action": "practice_current",
+        "reason_type": "misconception_remediation",
+        "pedagogy": "ANALOGY"
+      },
+      "note": ""
+    },
+    {
+      "mis_id": "M0676",
+      "concept_code": "[12미적Ⅰ-02-08]",
+      "status": "blocked",
+      "kebab_id": null,
+      "reports_as": null,
+      "reaching_problems": 0,
+      "failures": [],
+      "evidence": null,
+      "note": "좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다."
+    },
+    {
+      "mis_id": "M0677",
+      "concept_code": "[12미적Ⅰ-02-09]",
+      "status": "blocked",
+      "kebab_id": null,
+      "reports_as": null,
+      "reaching_problems": 0,
+      "failures": [],
+      "evidence": null,
+      "note": "좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다."
+    },
+    {
+      "mis_id": "M0678",
+      "concept_code": "[12미적Ⅰ-02-10]",
+      "status": "blocked",
+      "kebab_id": null,
+      "reports_as": null,
+      "reaching_problems": 0,
+      "failures": [],
+      "evidence": null,
+      "note": "좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다."
+    }
+  ],
+  "working": {
+    "wrong_picks": 378,
+    "with_candidate": 366,
+    "dropped_unknown": {
+      "M0674": 12
+    },
+    "dropped_below_floor": 0,
+    "short_answer_problems": 885
+  }
+}

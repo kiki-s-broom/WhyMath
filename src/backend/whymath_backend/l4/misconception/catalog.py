@@ -36,6 +36,8 @@ distribution `(3+4)²=3²+4²`·square-root `√((-3)²)=-3`·fraction `(2+4)/2=
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from whymath_backend.l4.misconception.models import Misconception
 
 #: "0을 근으로 언급했다"의 **단일 정의**(정규형 텍스트 기준 · MISC-07 실측 → MISC-23 공용화).
@@ -765,7 +767,8 @@ _FUNCTION: tuple[Misconception, ...] = (
 )
 
 
-# 미적분 — doc "미적분 영역"(#16-18, #15 재참조·#30, 극값 MC #33-34, MISC-40 #68) (8종·수능 핵심).
+# 미적분 — doc "미적분 영역"(#16-18, #15 재참조·#30, 극값 MC #33-34, MISC-40 #68, P3-61 #69-72)
+# (12종·수능 핵심 — 마지막 4종은 선지 역추적 전용).
 # 주: continuity-implies-differentiability는 doc 함수 슬롯 #15에 상세하나 domain=미적분
 # ([H:12미적Ⅰ02-02] 정착)이라 본 튜플에 둔다(doc 미적분 영역에서 재참조).
 _CALCULUS: tuple[Misconception, ...] = (
@@ -922,6 +925,87 @@ _CALCULUS: tuple[Misconception, ...] = (
         # 않는다. gate-safe.
         correct_form="(x³)′ = 3x²",
     ),
+    # ── P3-61(2026-10-18) 선지 역추적 전용 4종 (#69-72) ───────────────────────────────────────
+    # 게이트 G-misc40-unseated-concepts-disposition의 안 A를 M0673·M0674·M0676·M0678에 한해 채택한
+    # 2026-10-17 Kiki 결정의 집행(M0677은 제외 — G-p345-m0677-link-disposition 소관). 이 4종은
+    # `signals`가 없다 — 본문으로는 후보가 되지 않고 객관식에서 학생이 고른 오답 보기
+    # (`distractor_map`)로만 후보가 된다(`choice_trace_only=True`, 정의·허용 조건·격리 규칙의 정본은
+    # misconception_diagnosis.md §"선지 역추적 전용 항목"). 본문 채널은 `body_detectable()`로 이
+    # 4종을 순회에서 제외한다.
+    #
+    # 각 `counterexample`은 가정 진술을 **실제로 반증**하며 기호 계산 검산이 테스트로 동결돼 있다
+    # (`test_p3_61_choice_trace_only.py`). 개입 발화(`"{canonical_statement}이 항상 맞다고 했지.
+    # 잠깐, {counterexample}일 때는 어떻게 돼?"`)에 그대로 들어가 학생에게 닿을 수 있으므로 올바른
+    # 풀이 절차·정답식은 적지 않는다(MISC-40 #68과 같은 규율).
+    Misconception(
+        id="tangent-external-point-as-contact",
+        name_kr="곡선 밖의 점을 접점으로 사용",
+        domain="미적분",
+        # M0673("접점의 좌표와 기울기를 따로 구하지 않는다. 곡선 밖의 점에서 그은 접선의 접점을
+        # 미지수로 두는 것을 빠뜨린다")의 선지 형태 — 과정의 부재를 그대로 올린 것이 아니라
+        # 그 부재가 선지에서 만드는 구체적 오답(외부 점의 좌표로 기울기를 구한 직선)을 가리킨다.
+        canonical_statement="곡선 밖의 점도 접점처럼 보고, 그 점에서의 기울기로 접선을 정한다",
+        # y=x², 점 (1, -3): f(1)=1≠-3이라 곡선 위의 점이 아니고, f′(1)=2로 그은 y=2x-5는
+        # x²-(2x-5)=x²-2x+5=0의 판별식이 -16(<0)이라 곡선과 만나지 않는다.
+        counterexample=(
+            "곡선 y=x² 밖의 점 (1, −3)에서 x=1의 기울기 2로 그은 직선 y=2x−5는 "
+            "곡선과 만나는 점이 없음(교점 방정식 x²−(2x−5)=0의 판별식 −16)"
+        ),
+        signals=(),
+        choice_trace_only=True,
+    ),
+    Misconception(
+        id="mvt-conditions-unchecked",
+        name_kr="평균값 정리 조건 미확인",
+        domain="미적분",
+        # M0674("연속·미분가능을 확인하지 않고 적용하거나 롤의 정리와 혼동한다")의 선지 형태. 승인
+        # 코퍼스의 02-06 오답 보기 12건은 이 kebab이 아니라 raw `M0674`를 달고 있다(P3-57) — 이
+        # 항목은 그 보기를 받을 수 있는 좌석일 뿐 보기를 바꾸지 않는다.
+        canonical_statement="평균값 정리는 조건을 확인하지 않고 어떤 함수에나 쓸 수 있다",
+        # f=|x|, [-1,1]: (f(1)-f(-1))/2=0이지만 x>0에서 f′=1, x<0에서 f′=-1이고 x=0은 미분
+        # 불가라 열린 구간에 f′(c)=0인 c가 없다.
+        counterexample=(
+            "f(x)=|x|, 구간 [−1, 1]에서 평균변화율은 0인데 "
+            "열린 구간에 f′(c)=0이 되는 c는 없음(x=0에서 미분 불가)"
+        ),
+        signals=(),
+        choice_trace_only=True,
+    ),
+    Misconception(
+        id="graph-sketch-few-points-only",
+        name_kr="몇 점만 찍어 그래프 개형을 그림",
+        domain="미적분",
+        # M0676("증감표 없이 몇 점만 찍어 잇는다. 극값과 변곡점을 구분하지 않는다")의
+        # **첫째 문장**만 담는다. 둘째 문장은 M0675·#30 `critical-point-implies-extremum`과
+        # 같은 계열이라 연결하지 않는다(MISC-40 판정 §4 — 중복 좌석 금지, 약한 연결로 좌석
+        # 수를 부풀리지 않는다).
+        canonical_statement="증감표 없이 함숫값 몇 개를 구해 점을 이으면 그래프의 개형이 된다",
+        # f=x³-3x: f(-2)=-2, f(0)=0, f(2)=2는 모두 y=x 위이지만 f(-1)=2로 x=-1에서 그 직선(값
+        # -1)보다 위에 극댓값이 있다.
+        counterexample=(
+            "f(x)=x³−3x에서 x=−2, 0, 2의 세 점은 모두 직선 y=x 위에 있지만 "
+            "f(−1)=2로 x=−1에서 그 직선보다 위에 극댓값이 있음"
+        ),
+        signals=(),
+        choice_trace_only=True,
+    ),
+    Misconception(
+        id="velocity-sign-ignored",
+        name_kr="속도의 부호를 무시하고 속력으로만 봄",
+        domain="미적분",
+        # M0678("속도의 부호(방향)를 무시하고 속력으로만 본다")의 첫째 문장만 담는다 — 둘째 문장
+        # (위치·속도·가속도의 미분 단계 혼동)은 M-id의 주 진술이 아니라 범위 밖이다(MISC-40 §4).
+        # MISC-40이 이 M-id를 "문항 맥락 종속형"이라 미승격한 근거(`v=3`의 참거짓이 문항의
+        # 위치함수에 달림)는 본문을 읽지 않는 이 부류에서는 성립하지 않는다 — 구조적 사실
+        # (학생이 고른 보기가 그 문항의 속력 선지)만 쓴다.
+        canonical_statement="속도는 부호(방향)와 상관없이 크기인 속력만 보면 된다",
+        # x(t)=t²-4t: v=2t-4이므로 t=1에서 v=-2, |v|=2.
+        counterexample=(
+            "위치 x(t)=t²−4t의 t=1에서 속도는 −2(음의 방향)이고 속력은 2로 같은 값이 아님"
+        ),
+        signals=(),
+        choice_trace_only=True,
+    ),
 )
 
 # 수열 — doc L62-64 (2종·수능 빈출). 슬 추가.
@@ -1011,8 +1095,38 @@ M0673·M0674·M0677 3건은 위 문단이 명시한 omission형(과정·확인·
 않는다)이라 A5와 같은 이유로, M0676·M0678 2건은 틀림 여부가 그 문항의 데이터와 대조해야만 판정되는
 문항 맥락 종속형이라(이 판정이 더한 둘째 근거 — 위 원칙 문구에는 없다) *의도적으로 제외*했다(판정
 근거 상세는 docs/reviews/misc_40_calculus_diff_kebab_seat_judgment_2026-10-02.md).
+
+P3-61(2026-10-18): 위 MISC-40이 제외한 5개 중 M0673·M0674·M0676·M0678 4개 개념에 **선지 역추적
+전용** 4종(tangent-external-point-as-contact·mvt-conditions-unchecked·graph-sketch-few-points-only·
+velocity-sign-ignored)을 추가(68→72종) — 게이트 G-misc40-unseated-concepts-disposition의 안 A를
+이 4개에 한해 채택한 2026-10-17 Kiki 결정의 집행. M0677은 제외(G-p345-m0677-link-disposition).
+위 원칙의 이유절("substring이 오류 부재를 못 잡으므로")은 substring 매처를 전제하는데 객관식
+선지는 매처를 거치지 않으므로, 채널이 다른 이 부류에 한해 `signals ≥ 1` 불변식을 `choice_trace_only`
+플래그 하나로 푼다(models.py 양방향 동결). 이 4종은 `body_detectable()`이 본문 채널 순회에서
+제외한다 — 정의·허용 조건은 misconception_diagnosis.md §"선지 역추적 전용 항목".
 """
 
 
 CATALOG_BY_ID: dict[str, Misconception] = {m.id: m for m in CATALOG}
 """ID로 O(1) 조회 — 진단 결과·텔레메트리에서 misconception_id로 역참조 시."""
+
+
+def body_detectable(catalog: Iterable[Misconception] = CATALOG) -> tuple[Misconception, ...]:
+    """학생 풀이 *본문*을 읽는 채널이 순회해야 할 항목 — `choice_trace_only`를 제외한다(순서 보존).
+
+    `diagnose`(substring·정규식)·의미 매칭(임베딩 코사인)·정정 억제 평가·신호 포화 감사가 부른다.
+    **의미 매칭이 핵심이다** — 신호가 하나도 없어도 `name_kr + canonical_statement`가 임베딩되므로,
+    이 필터가 없으면 선지 역추적 전용 항목이 학생 본문과의 코사인 유사도만으로 후보가 된다.
+
+    id 조회(`CATALOG_BY_ID`)·검수 큐·크로스링크 후보 제안·`distractor_map` 참조 무결성은 이
+    필터를 쓰지 않는다 — 그 항목들은 kebab으로서 정상 존재한다. 원본 순서를 보존하므로 진단
+    동률 정렬(도메인 튜플 합성 순서)과 pgvector 적재 순서 규약은 불변이다.
+    """
+    return tuple(m for m in catalog if not m.choice_trace_only)
+
+
+BODY_CATALOG: tuple[Misconception, ...] = body_detectable(CATALOG)
+"""본문 채널용 카탈로그 — `CATALOG`에서 선지 역추적 전용을 뺀 것(import 시 1회 계산)."""
+
+CHOICE_TRACE_ONLY_IDS: frozenset[str] = frozenset(m.id for m in CATALOG if m.choice_trace_only)
+"""선지 역추적 전용 항목 id — 본문 채널에서 후보로 나오면 안 되는 집합(누수 테스트의 정본)."""

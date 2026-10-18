@@ -22,11 +22,12 @@ from whymath_backend.l4.misconception.match_gate import _DEFAULT_CONFIDENCE_FLOO
 class TestCatalogShape:
     def test_thirty_two_entries_doc_explicit_only(self) -> None:
         # doc 명시·상세화: 대수 37 + 기하 8 + 확률통계 7 + 함수 3
-        #                 + 미적분 8 + 수열 2 + 삼각함수 2 + 벡터 1 = 68
+        #                 + 미적분 12 + 수열 2 + 삼각함수 2 + 벡터 1 = 72
         #                 (Phase 1 30 + S2-p 2 + 극값 MC 2 + 843 트랜치1~4 각 6 + 트랜치5 6
         #                  + MISC-21 3(앵커 A1·A2·A3 좌석 보강 — doc #65-67)
-        #                  + MISC-40 1(미분 대단원 좌석 판정 — 미적분 doc #68))
-        assert len(CATALOG) == 68
+        #                  + MISC-40 1(미분 대단원 좌석 판정 — 미적분 doc #68)
+        #                  + P3-61 4(선지 역추적 전용 — 미적분 doc #69-72))
+        assert len(CATALOG) == 72
 
     def test_all_ids_unique(self) -> None:
         ids = [m.id for m in CATALOG]
@@ -176,8 +177,15 @@ class TestMisc40PowerRuleSeat:
         # 순서 안정성 — 신규 항목은 도메인 기존 항목 *뒤*에 붙인다(진단 동률 정렬 회귀 가드).
         calculus = [m.id for m in CATALOG if m.domain == "미적분"]
         assert calculus[0] == "chain-rule-inner-derivative-omitted"
-        assert calculus[-1] == self._ID
-        assert len(calculus) == 8
+        # P3-61 선지 역추적 전용 4종이 이 항목 *뒤*에 붙는다(같은 순서 규율) — 마지막 자리는 그 4종의 몫.
+        assert calculus.index(self._ID) == 7
+        assert calculus[8:] == [
+            "tangent-external-point-as-contact",
+            "mvt-conditions-unchecked",
+            "graph-sketch-few-points-only",
+            "velocity-sign-ignored",
+        ]
+        assert len(calculus) == 12
 
     def test_counterexample_numbers_are_correct(self) -> None:
         # 반례의 수치(12·4·24)는 손으로 쓴 값이다 — SymPy로 실제 값을 확인해 문자열과 대조한다.
@@ -310,8 +318,14 @@ class TestEntryFields:
             assert m.name_kr
             assert m.canonical_statement
             assert m.counterexample
-            assert m.signals
-            assert len(m.signals) >= 1
+            # `signals ≥ 1` 불변식은 선지 역추적 전용(P3-61) **밖의 모든 항목에 그대로 유효**하다.
+            # 부류 안은 거꾸로 신호가 0이다(양방향 동결 — test_p3_61_choice_trace_only.py가 주입으로
+            # 두 방향 모두 RED임을 확인한다).
+            if m.choice_trace_only:
+                assert m.signals == (), m.id
+            else:
+                assert m.signals, m.id
+                assert len(m.signals) >= 1, m.id
 
     def test_immutable_frozen_pydantic(self) -> None:
         # `frozen=True` — catalog 엔트리 수정 차단(런타임 변경 회귀 가드)
