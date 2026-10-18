@@ -276,6 +276,7 @@ curl.exe -s -o $out -w "HTTP=%{http_code}`n" http://127.0.0.1:8000/health/ready
 ```
 
 - **판독**: `reachable=false`이고 `window_error_rate`가 평상(≤0.01)이면 → 강등·폴백만 일어나는 중, **SEV-3 유지**. 같은 조건에서 `window_error_rate`가 올라가고 있으면 → 강등으로 흡수되지 않는 경로가 실패 중이다. 지금 그 후보는 **디바이스 등록·폐기의 캐시 무효화**(함정 ④)이고, 그 외 상승은 Redis가 아닌 다른 원인을 의심한다. **SEV-2로 격상** 후 §4-4로 로그를 확인한다(`operation=delete` + 예외 타입명).
+- **캐시 회로 차단 확인(OPS-149)**: `cache_degradation.breaker_open=true`면 L3 응답 캐시가 Redis를 부르지 않고 미스/no-op으로 처리하는 중이다(연속 3회 실패 후 30초 창 — 창이 지나면 첫 호출 1건만 시험하고 성공하면 닫힌다). 이 응답은 Redis가 죽어 있어도 200이므로 **우회가 일했는지는 숫자만이 말한다**: `skipped_calls`가 늘고 `bypass_ratio`가 1.0에 가까우면 우회가 대기를 막고 있는 것이고, `breaker_opens`가 계속 오르면 복구와 재장애가 반복되는 것이다. 프로세스(워커)별 값이며 재시작하면 0부터다. 끄려면 `WHYMATH_CACHE_BREAKER_FAILURE_THRESHOLD=0`(종전 동작).
 - **`[조치]`**: Redis 컨테이너를 되살린다(`docker start <이름>`). 즉시 되살릴 수 없으면 **캐시 없이 버티는 편이 낫다** — rate limit 백엔드 기본값은 `memory`(프로세스-로컬)이고, `redis` 백엔드로 운영 중이더라도 실패 시 같은 인메모리 백엔드로 폴백하므로 한도가 통째로 사라지지는 않는다(다만 워커별 계수로 느슨해진다).
 - **폐기가 급한 경우**(분실 기기 등 SEV-1 인접): Redis가 죽어 있으면 폐기 요청이 5xx로 실패할 수 있다. 이때 폐기 자체는 DB에 이미 반영되며 캐시의 잔존 승인은 **TTL(기본 60초) 안에 자연 소멸**한다 — 그래도 확실히 하려면 Redis를 되살린 뒤 폐기를 한 번 더 호출한다(무효화가 재실행된다).
 - **자가검증**: 위 명령 재실행 → `components.redis.reachable` 이 `true`. (변별력: 되살아나지 않으면 이 값이 그대로 `false`이고 `error`에 예외 타입명이 남는다.)
@@ -442,7 +443,7 @@ SEV: <1~4>   시작: <로그 근거 시각>   종료: <로그 근거 시각>   �
 | **지표 영속화 없음** | 프로세스 재시작 시 누적치 소멸 → 월간 오류 예산·가용성 집계 불가 | 스크레이퍼 또는 ClickHouse 적재 |
 | **디바이스 무효화 실패 시 등록·폐기 5xx** (OPS-06 이후 남은 함정 ④의 잔여) | 캐시 DEL이 유한 재시도 후에도 실패하면 `revoke`/`register`가 오류를 반환한다. DB 변경은 그 전에 커밋돼 있어 **응답(실패)과 상태(반영됨)가 어긋나 보인다** | 의도된 fail-loud라 '해결'이 아니라 *완화* 대상 — 후속 후보는 ①무효화 실패를 큐에 적재해 백그라운드 재시도 ②`register`의 count 캐시 DEL만 분리해 no-op 강등(그쪽은 신선도 문제지 보안 계약이 아니다) |
 | **Redis 폴백 시 rate limit 분산 정확도 저하** | 인메모리 폴백은 워커별 계수라 다중 워커에서 실효 한도가 최대 워커 수 배까지 느슨해진다(무제한은 아니다). 폴백 중임은 로그·인프로세스 카운터로만 보인다 | `rate_limit_degradation_snapshot()`을 `/health/ready` body에 노출(응답 스키마 변경이라 별도 태스크) |
-| **강등 회계가 `/health/ready`에 미노출** | 인프로세스 카운터(`cache_degradation_snapshot`·`device_cache_degradation_snapshot`·`rate_limit_degradation_snapshot`)는 존재하나 HTTP로는 못 읽는다 — 지금은 로그로만 판정한다 | 세 스냅샷을 `metrics`에 합류(OPS-05·OPS-06 공통 잔여) |
+| **강등 회계 셋 중 둘이 `/health/ready`에 미노출** | L3 응답 캐시의 회계(`cache_degradation_snapshot`)는 `cache_degradation` 섹션으로 노출된다(OPS-149 — 회로 차단의 열림 여부·건너뛴 연산·우회 비율). 나머지 둘(`device_cache_degradation_snapshot`·`rate_limit_degradation_snapshot`)은 존재하나 HTTP로는 못 읽는다 — 지금은 로그로만 판정한다 | 두 스냅샷을 같은 형태로 노출(OPS-153) |
 | **다중 워커 시 지표 해석 붕괴** | 워커별 독립 계측이라 `/health/ready` 1회 조회 = 워커 1개 표본 | 프로세스 경계 합산 스크레이퍼 |
 | **프로덕션 배포 토폴로지 미확정** | 이 런북의 명령은 전부 *현재의 단일 머신 + Docker Desktop* 전제다. 컨테이너화 배포로 바뀌면 §4의 조치 명령이 달라진다 | **OPS-03**(배포·CD·IaC) 완료 후 이 문서 §4 갱신 |
 
