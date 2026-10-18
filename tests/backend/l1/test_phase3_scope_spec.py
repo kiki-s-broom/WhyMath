@@ -190,6 +190,9 @@ _EMPTY_LIST_INJECTIONS: dict[str, Callable[[dict[str, Any]], None]] = {
     "completeness.problem_required_fields": lambda d: d["completeness"].__setitem__(
         "problem_required_fields", []
     ),
+    "gate_conditions.P3-G1.metrics": lambda d: d["gate_conditions"]["P3-G1"].__setitem__(
+        "metrics", []
+    ),
 }
 
 
@@ -619,3 +622,57 @@ def test_cli_exits_one_when_the_spec_file_is_missing(
 ) -> None:
     assert ps.main(["--spec", str(tmp_path / "nope.yaml")]) == 1
     assert "FileNotFoundError" in capsys.readouterr().err
+
+
+# ── 항 10 · 게이트 조건 지표 (P3-54) ───────────────────────────────────────
+
+
+def test_real_spec_declares_the_p3_g1_condition_as_data(scope: ps.ScopeSpec) -> None:
+    """어떤 지표가 어떤 게이트의 조건인지는 코드가 아니라 명세가 소유한다."""
+    condition = scope.gate_conditions["P3-G1"]
+    assert isinstance(condition, ps.GateCondition)
+    assert condition.metrics == ("content_coverage_rate",)
+    assert condition.basis.strip()
+
+
+def test_every_declared_gate_metric_has_a_spec_target(scope: ps.ScopeSpec) -> None:
+    """목표가 없는 지표를 조건으로 선언하면 계측기가 판정을 거부한다 — 명세가 먼저 그것을 막는다."""
+    for gate_id, condition in scope.gate_conditions.items():
+        for key in condition.metrics:
+            target = scope.targets.get(key)
+            assert target is not None and target.value is not None, (gate_id, key)
+
+
+def test_spec_without_gate_conditions_still_loads_with_an_empty_mapping() -> None:
+    """항 10 은 선택 항목이다 — 없는 명세(과거 사본·임시 명세)를 적재 실패로 만들지 않는다."""
+    spec = _mutate(lambda d: d.pop("gate_conditions"))
+    assert spec.gate_conditions == {}
+
+
+def test_null_gate_conditions_is_the_same_as_absent() -> None:
+    spec = _mutate(lambda d: d.__setitem__("gate_conditions", None))
+    assert spec.gate_conditions == {}
+
+
+def test_duplicate_gate_metric_fails() -> None:
+    with pytest.raises(ps.ScopeSpecError, match="중복"):
+        _mutate(
+            lambda d: d["gate_conditions"]["P3-G1"].__setitem__(
+                "metrics", ["content_coverage_rate", "content_coverage_rate"]
+            )
+        )
+
+
+def test_gate_condition_without_basis_fails() -> None:
+    with pytest.raises(ps.ScopeSpecError, match="basis"):
+        _mutate(lambda d: d["gate_conditions"]["P3-G1"].pop("basis"))
+
+
+def test_gate_condition_without_metrics_fails() -> None:
+    with pytest.raises(ps.ScopeSpecError, match="metrics"):
+        _mutate(lambda d: d["gate_conditions"]["P3-G1"].pop("metrics"))
+
+
+def test_gate_condition_that_is_not_a_mapping_fails() -> None:
+    with pytest.raises(ps.ScopeSpecError, match="매핑이 아니다"):
+        _mutate(lambda d: d["gate_conditions"].__setitem__("P3-G1", ["content_coverage_rate"]))
