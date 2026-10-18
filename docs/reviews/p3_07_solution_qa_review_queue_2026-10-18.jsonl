@@ -1,0 +1,665 @@
+{"ident": "wm-count-mc-cb24cfc6ca52", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-8d7ffb84269b", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-f87be9df8190", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-18f041cc3f5f", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-76da3d67d823", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-7eb29df8efff", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-631b8d6ffca3", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-42ea38481cc6", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-f9668725c9a4", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-3756b759c0e9", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-dc6e715f4a59", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-d3df483480c2", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-d65c997b812e", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-6c0d005be3a1", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-d9177a566bd3", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-7e674cfd9a26", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-4893d2f13d36", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-25a7b96d38ae", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-46a84b73c868", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-7e5531004130", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-4d860b28b388", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-77aaec37f6db", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-08efb9dad61c", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-d8637fcfd4c4", "unit": "EXTREMUM-COUNT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-count-mc-0a17e8bc3575", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-7d2fbfcce738", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-1b2b23f1d77e", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-a9be50488922", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-39a8a38b6f80", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-cf707ebe251d", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-416fc9c32b33", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-8d68f1968df0", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-6470d98b4ef6", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-945ba81ddf86", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-8528a1fcca95", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-3f1ce1fbb757", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-8bc63a0d0f21", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-7ac72b7393a6", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-8c45268eed92", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-adccbf740d68", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-78795252557b", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-d55fd6a4a872", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-b5101c048fc8", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-66e68084c47f", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-ee469e3095ca", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-a8c7175e1458", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-1666f0868455", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-count-mc-37b3aae74ff1", "unit": "DIFFERENTIABILITY", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-bb0738c9788f", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-83f1c86f74a5", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-6acccbead5d3", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-729ae5cf983d", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-139f4f98bdcc", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-8c193941df77", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-921bf10f6940", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-d199c5fdd29b", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-00a76c566dc6", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-87ebbd5cfb65", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ec42f7239643", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-5b3ba7bc4a54", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-fcdddf62b060", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-7a775c313056", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-d69248ab9f5b", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-cfeaef30b964", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-0598394a6ff3", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-33c602d14141", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-54511397f37c", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-c4eed162a220", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ed3a05c9071e", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-c448b24d9cbc", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-38a83f2b1e4d", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-d5e25343b112", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-34ea144e695a", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ea6416ffa632", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-c506a8cea5dc", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-3dcd4f4357bb", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-a677addfed9d", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-e48bb41bdb5d", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-783de36f65d6", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ede0a1159929", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-f22d9eeec986", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-8dd370509464", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-35363f4e2a30", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-3d89d8e00146", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-29845e77d2d6", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-846a6b3b83b5", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-fcf3615d090e", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-662d3f9c62e3", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-d3862f551f4d", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-74d652ed1543", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-53d741adde95", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-99d328120688", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-c599db877753", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-4fd6facd3699", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-e93a485579c5", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-cda28658ce17", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-0f66511a6c1a", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-02f2bf569298", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-97c93f2ec715", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-1681ba16fce1", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-bb9b9903881b", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-a33087001766", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-99db28357220", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-baf70003e7a6", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-976b8010dbb5", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-5e980f9df14c", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-9f7d59dc1c06", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-d96cd9e68134", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-da1f27ee77d8", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-337d18d15827", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-f881d5d5e835", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-7994f0e16285", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-9f94db5eb950", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-362338e0a674", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-290be081e9a4", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-0a02899793c0", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-bb0a0db497ee", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-3bc00875ab7d", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-04a46e7f6ffa", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-bc88b63c5b4e", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-c5d184e00244", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-f881e9460f4f", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-b5c05e6331e8", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-a88e5e2a0172", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-290fc784a150", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-948b3c355bde", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-4264ce1a6acf", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-ba13feaffd7d", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-fc779224ca56", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-3eae62dfa946", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-cd86d461d1b1", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-822223b26c89", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-ad3c4e560894", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-bd68970c82ea", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-07d379e67ade", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8f82815640fd", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-63eb524d2655", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-2dc042e5ab00", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-ca5069175637", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-cf788e51e0fd", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-464c991d5f4e", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-2ea729c9642f", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-0c2ce466bfc6", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8efce1e63b5a", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-25ee5b3efcb8", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8fc0af95c0e6", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-7cc40b69a3f3", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-e32a2915a063", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-e1a31cb3b6de", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-fca5494a067b", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-86393d85acf2", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-eb6ea17090c3", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-42511455a802", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-babd2503edc4", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-b75d75d7c302", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-872a38b56215", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-c81060cda0fc", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-bd21cd8484d2", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-2894b75b7aae", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-ce4d8810499d", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-db5dde872dba", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-bbd706a72ad8", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-e6a3024dc72b", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-01f786ab766c", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-c2ce1da494fa", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8742a8f5d365", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-5c4a86d7a72a", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-70dbb810be5a", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-465d85d35ae5", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-c87d5f5f04d0", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-de4e71f518eb", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-e83a43b4bbb4", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-829f17b06867", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-cd86d461d1b1", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-d455840593c8", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-8fc0433707f2", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-0c9e8d8b0b06", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-1547ee2c5d3d", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-803cec54fad3", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-cf788e51e0fd", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-29126bd4a86a", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-b372dc859175", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-3ccc6c8c3b7c", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-223483894e0f", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-2e23148010b0", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-5b267b4c7886", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-a24fb5c74aa4", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-5af27b145d2b", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-138cb0cd2aba", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-81f6ef54ef34", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-c90db73faac8", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-156e734b8684", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-8481b53c00e2", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-5c4a86d7a72a", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-34abe4cd4c5b", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-bd21cd8484d2", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-588713791a72", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-fefbaa900529", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-0e0d7801c968", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-c86ce1e4fd78", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-112235b3211c", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-f21fc5ecce28", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-595af926046b", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-328922a10e84", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-7c37e0056464", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-22af7a21d5ce", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-b2d196ccac0b", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-8c6a23c8972b", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-2d447d130ae5", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-756b003dd798", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-b862a378871b", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-84a0f993c92c", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-0bddb85423d8", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-02a77eacf755", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-5ac50e0177f9", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-9aeb9d726284", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-2ab78f442266", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-2047a1886cd8", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-8e3378a59eb3", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-d8222cc08b47", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-a93cd2e34587", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-338992127719", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-ce271fdb3771", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-8e1bb8c03fb2", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-dffe3c8e8593", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-c21969c5e025", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-b89a69ba51fd", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extirr-0716f65f4a5e", "unit": "CALC-EXTREMUM-IRR", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-misc-eval-mc-cd82f58e145f", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-5ef1f00bc285", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-fd060a57fe9b", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-ff3d9d21ad6b", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-00302af63862", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-cf6e28ba3f4a", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-a515edfc8a00", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-19e24eb9fe83", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-b3bb65300930", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-47accf44cdde", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-4ed509a782b9", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-888ee9abe651", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-7809f76d51b8", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-acf1b79da89f", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-50ee4d3d0f13", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-ca98c9a2cb0d", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-c763838fd278", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-98cbe327fe85", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-d9f61f96f4d5", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-5326c0311b1f", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-9505004d763d", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-e3fb3fb03720", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-edfa35df1ad8", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-50c154c73079", "unit": "CALC-CHAIN", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-0d20aaf6fd12", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-6205449ff6e1", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-fd5ac974df02", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-8d79b53ae9b6", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-cfbe3218a573", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-244f6db794ff", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-58a4194da09e", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-7f0a47e53b77", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-d8a28b2d116e", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-0192090932f3", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-ca1d067800c2", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-e4d1aa8efa49", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-5ca457d6fe91", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-3c0f538a9cfb", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-86b15d2cde6e", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-48c4c79965c6", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-ca42a4150c26", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-0db76430fd30", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-af3a7f9e5154", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-506b5ef44920", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-e8eec835098d", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-263caac417f2", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-de79c922bb7b", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-misc-eval-mc-30d5061a3302", "unit": "CALC-PRODUCT", "reasons": [{"check": "C2", "code": "C2_NO_STEPS", "detail": null}]}
+{"ident": "wm-p3-diff-power-e45764550690", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-power-6dad147d841f", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-f968ddfbf859", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-9b0824931305", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-10405867bb66", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-power-362ebcc5ccba", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-power-e74d5b9d7ec4", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-372146b5ab1e", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-76d6d9bb0f4c", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-b5978733d6e6", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-e0ac99151866", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-power-91601045ecd8", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-1abbd5f9931c", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-power-4d3f11d10291", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-power-c6dcb9b09d36", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-power-1b1bbc8f6b5e", "unit": "P3-CALC1-DIFF-POWER", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-polyrules-7f6004cdf78b", "unit": "P3-CALC1-DIFF-POLYNOMIAL-RULES", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-polyrules-a64aa0aaf460", "unit": "P3-CALC1-DIFF-POLYNOMIAL-RULES", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-polyrules-1591c706ba85", "unit": "P3-CALC1-DIFF-POLYNOMIAL-RULES", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-polyrules-3571203e1641", "unit": "P3-CALC1-DIFF-POLYNOMIAL-RULES", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-7ad16e30c883", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-8176209efb77", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-05af0797e662", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-e005981d515c", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-d9c253423216", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-6dfe90e619d6", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-08b23cce0bc7", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-2add4de1ed46", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-ec41e384aaee", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-d77ec6c58566", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-4007138358ef", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-b51a621aa98a", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-3fd531248f41", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-71024f295e10", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-4b9896563b12", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-5f558807cb1c", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-048e3592b362", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-tangent-59adc0039fd9", "unit": "P3-CALC1-DIFF-TANGENT-LINE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-ae56bea46e02", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-d80790133ced", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-3f088d38bd90", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-1d7d006d230e", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-85bc570a5817", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-bb9932fbdce9", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-3a812befba0c", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-d2d37451352f", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-101ae51b01b6", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-f97db6d0de85", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-6c373389cd46", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-2547bd500821", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-7890645603f6", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-17094e8abc32", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-8e61a8706ac4", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-cb69d8126049", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-15e1e58181ac", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-46fae66dc250", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-abf393a210e9", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-557d3aa6eabe", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-be152eee32a1", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-153442d39870", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-21761d285592", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-46a0ff9200ae", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-5f14a63490b3", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-mvt-3b8b0af64dca", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-mvt-1e411e7b0385", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-e20de7e32a6b", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-b7b0ec1ca0d6", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-mvt-e4391bef6904", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-mvt-e183edf6029d", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-17792d79a01e", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-32862c196d0b", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-00570ee6e9fc", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-274ac9b6f459", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-6b8fa4ff75ac", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-6223f4533b52", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-fb644d33813a", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-89952c7c3e45", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-8c6033ad5562", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-94a646811cd7", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-1d0f7869f91b", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-fd1020e7d305", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-c6c92bdb173c", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-8a19e8b7a0bf", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-b9ff826457c4", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-4d1d8fa35e15", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-dc96289e41ce", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-49daf9fd1204", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-mvt-6a31ca3082c1", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-0762bde8f584", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-665861d3c556", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-95b6ba953f60", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-mvt-8b3ea9434fef", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-mvt-651f6265a513", "unit": "P3-CALC1-DIFF-MEAN-VALUE-THEOREM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-e6551214a538", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-b6e3b5b9c535", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-cefef08e0ba2", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-d3ac64803ca1", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-4d5e4bd268b8", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-dd1bde6af8be", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-f7069a5d80b7", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-ab57be843ea3", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-193ddbcfa3fc", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-c6adf5eb2b23", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-e2bccabfa446", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-a550c505150d", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-157000e44a8f", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-97c1b549a205", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-b595322dac1a", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-7a5579b14048", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-50fe9719936b", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-38a5e7c59801", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-c96ad736dd6f", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-a77c4bafc464", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-fe747f2bd019", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-452c93815743", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-94985caaa283", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-8f9260fc07b9", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-graphshape-066f49e76f84", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-c1ee42942460", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-e87cd74bdfbf", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-276fae287f0e", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-b52db165fb66", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-117946e51283", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-2bb681625216", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-graphshape-d96ebb877500", "unit": "P3-CALC1-DIFF-GRAPH-SHAPE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-2bedcffed537", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-d4c922d2c126", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-505e4feab304", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-f62a403bc715", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-5abfd9b57f56", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-eb71b6d76570", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-bf1157e02251", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-0a4c31ee6714", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-294d68d9fe2c", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-e0f4e469eef9", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-01d1b1fb588d", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-3a4d67eb1cd9", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-45e0636fbe4c", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-1baf6749c1e3", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-194bf1a00a3c", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-5534885183a3", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-20d47f3a9ac5", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-bbc0ef1e0769", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-4fec1919d79d", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-5ebc94495a51", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-d1548ca48c7f", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-afab83eacfec", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-368ded924257", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-fdaf368b4db0", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-44c9e0691821", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-311d31728bb3", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-b7f1eef2d1da", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-34d1ffa8eca2", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-b0f7b79279c2", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "t"}]}
+{"ident": "wm-p3-diff-eqapp-30c3a3b0c1b5", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-9f3a7739eed0", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-91e7d90412bf", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-3b7bc5d96eb3", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-1261af534e86", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "t"}]}
+{"ident": "wm-p3-diff-eqapp-b90e26bfa726", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-e4da5b821613", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-9d060b5b14c5", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-6cc518eea847", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-ea781220e86c", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-d043c7b8fc04", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-c59341e6abdc", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-c98e8092f470", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-b181bc27e7d0", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-fda1ab8d0f59", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-ea69717581c0", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-023487625e5e", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-dfc730168b8b", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-e7a6e926673d", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-e1c4df512d26", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-cba68c721e5c", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-7fef137243c5", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-dd1823c5f7d6", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-0a7fc9c16151", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-0eed9cefef93", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-03f1ee15fc93", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-71678342d655", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-f38e7b85c513", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-d68c8e2ef6ea", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-0d511d56267f", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-12c5498dd4cd", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-dbcf02d85354", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-870062feef65", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-8bcdb83dada4", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-d3e1f33d6241", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-c1340e3bd882", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-241c8f4ba2a7", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-13b52e9cf765", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-848e6591bcfc", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-6318e46c03e3", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-eqapp-97c0d38df222", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-p3-diff-eqapp-5c83d2717710", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-eqapp-fa6f35513610", "unit": "P3-CALC1-DIFF-EQUATION-APPLICATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 3개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-7452b5a4ac4f", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-ae9dcb6aee74", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-cd321d0ca7ef", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-361a410b07ce", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-ca245e948d2e", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-86e343245daa", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-d3dddd3a14d0", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-02fa2e781ae8", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-8e56bc5ac110", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-3d26d318197c", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-7fa44472c512", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-5d9be01e2eda", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-4d3351b00fc8", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "t"}]}
+{"ident": "wm-p3-diff-velocity-de1d0cb4f62e", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-velocity-bbf9ed1ded54", "unit": "P3-CALC1-DIFF-VELOCITY-ACCELERATION", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "t"}]}
+{"ident": "wm-p3-diff-monotonicity-f520d84c18da", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-e9ac7bb6672b", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-c0d022214edb", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-a63043eea1ec", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-af3c8c4490fd", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-7a0ce1d905cd", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-c83e6ef35cac", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-8219ccb83e06", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-0a6d5f1208ec", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-3c5581515bfa", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-dd6c0ae2ddfa", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-a9963eb6012e", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-2c7b25e6e417", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-bef8f8f1c925", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-406258fb20bb", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-5c015113c243", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-e9bfd2cdcf28", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-7cb322d19caa", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-3a79d645dc5a", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-monotonicity-d17d0dc6192e", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-fe388529c549", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-646a07116d7f", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-4c2214036a2d", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-b494b38c4a5f", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-e2b66d1f9aca", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-1d509ec45dd8", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-31df41b4d552", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-monotonicity-e686ccf4e924", "unit": "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-d5b58305e5ad", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-motion-word-956d29a151db", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-5e65e1d324f5", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-3fe44449ffd5", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-motion-word-c724e692edf0", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-8bfe0f8b8ac4", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-2f0b83e055ad", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-motion-word-974a36ae03d4", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-70f8218f604d", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-591a6e20b2e4", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_ROOT_CHOICE_UNSTRUCTURED", "detail": "후보 2개·선택 규칙 없음"}]}
+{"ident": "wm-p3-diff-motion-word-91e5269a9caf", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-p3-diff-motion-word-83a97131bad1", "unit": "P3-CALC1-DIFF-MOTION-WORD", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR", "detail": "x"}]}
+{"ident": "wm-calc-ext-bb0738c9788f-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-6acccbead5d3-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-729ae5cf983d-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-139f4f98bdcc-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-8c193941df77-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-921bf10f6940-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-d199c5fdd29b-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-00a76c566dc6-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-87ebbd5cfb65-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ec42f7239643-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-5b3ba7bc4a54-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-fcdddf62b060-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-7a775c313056-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-d69248ab9f5b-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-cfeaef30b964-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-0598394a6ff3-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-33c602d14141-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-54511397f37c-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-c4eed162a220-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ed3a05c9071e-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-c448b24d9cbc-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-38a83f2b1e4d-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-d5e25343b112-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-34ea144e695a-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ea6416ffa632-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-c506a8cea5dc-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-3dcd4f4357bb-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-a677addfed9d-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-783de36f65d6-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-ede0a1159929-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-f22d9eeec986-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-8dd370509464-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-35363f4e2a30-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-3d89d8e00146-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-29845e77d2d6-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-846a6b3b83b5-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-ext-fcf3615d090e-rephrased", "unit": "CALC-EXTREMUM", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-d3862f551f4d-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-74d652ed1543-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-53d741adde95-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-99d328120688-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-c599db877753-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-4fd6facd3699-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-e93a485579c5-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-cda28658ce17-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-0f66511a6c1a-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-02f2bf569298-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-97c93f2ec715-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-1681ba16fce1-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-bb9b9903881b-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-a33087001766-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-99db28357220-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-baf70003e7a6-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-976b8010dbb5-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-5e980f9df14c-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-9f7d59dc1c06-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-d96cd9e68134-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-da1f27ee77d8-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-337d18d15827-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-f881d5d5e835-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-7994f0e16285-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-9f94db5eb950-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-362338e0a674-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-290be081e9a4-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-0a02899793c0-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-bb0a0db497ee-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-3bc00875ab7d-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-04a46e7f6ffa-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-bc88b63c5b4e-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-c5d184e00244-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-f881e9460f4f-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-b5c05e6331e8-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-a88e5e2a0172-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-290fc784a150-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-948b3c355bde-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-4264ce1a6acf-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-tan-ba13feaffd7d-rephrased", "unit": "CALC-TANGENT", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-fc779224ca56-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-3eae62dfa946-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-822223b26c89-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-ad3c4e560894-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-bd68970c82ea-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-07d379e67ade-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8f82815640fd-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-63eb524d2655-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-2dc042e5ab00-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-ca5069175637-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-464c991d5f4e-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-2ea729c9642f-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-0c2ce466bfc6-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8efce1e63b5a-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-25ee5b3efcb8-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8fc0af95c0e6-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-7cc40b69a3f3-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-e32a2915a063-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-e1a31cb3b6de-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-fca5494a067b-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-86393d85acf2-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-eb6ea17090c3-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-42511455a802-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-babd2503edc4-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-b75d75d7c302-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-872a38b56215-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-2894b75b7aae-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-ce4d8810499d-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-db5dde872dba-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-bbd706a72ad8-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-01f786ab766c-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-c2ce1da494fa-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-8742a8f5d365-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extv-70dbb810be5a-rephrased", "unit": "CALC-EXTREMUM-VALUE", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-465d85d35ae5-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-c87d5f5f04d0-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-de4e71f518eb-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-e83a43b4bbb4-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-829f17b06867-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-d455840593c8-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-8fc0433707f2-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-0c9e8d8b0b06-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-1547ee2c5d3d-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-803cec54fad3-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-29126bd4a86a-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-b372dc859175-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-3ccc6c8c3b7c-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-223483894e0f-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-2e23148010b0-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-5b267b4c7886-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-a24fb5c74aa4-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-5af27b145d2b-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-138cb0cd2aba-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-81f6ef54ef34-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-c90db73faac8-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-156e734b8684-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-8481b53c00e2-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-34abe4cd4c5b-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-588713791a72-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}
+{"ident": "wm-calc-extmc-fefbaa900529-rephrased", "unit": "CALC-EXTREMUM-MC", "reasons": [{"check": "C2", "code": "C2_FINAL_STEP_NOT_ANSWER_FORM", "detail": null}]}

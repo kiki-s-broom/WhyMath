@@ -24,7 +24,7 @@
   ① Curriculum Coverage        `l1.standards.phase3_coverage` (P3-02) 재사용
   ② Concept Completeness       같은 모듈 재사용 — 필드 채움이 아니라 5연결 재설계본(아래 ARCH-43 절)
   ③ Problem Coverage           **신규 계산** — 대표 과정 스킬 중 승인 문항이 1건 이상인 스킬의 비율
-  ④ Solution QA Pass           `harness.corpus_reverify` 재검증 + 임계는 스코어카드에서 흡수
+  ④ Solution QA Pass           `harness.solution_qa`(P3-07 · C1~C4) + 임계는 스코어카드에서 흡수
   ⑤ Learning Loop Success      `ops.loop_kpi_gate` 의 LOOP_COMPLETION **그대로**(새 정의 없음)
   ⑥ Critical Defect            `ops.validation_scorecard.evaluate_hard_gates` 의 **F-Ⅱ·F-Ⅴ 2종만**
                                그대로 흡수(P3-33 — F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관이라 이 지표 밖)
@@ -121,10 +121,10 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, NoReturn
+from typing import Any, Final, NoReturn, Protocol
 
 from whymath_backend.db.session import dispose_engine, get_sessionmaker
-from whymath_backend.harness.corpus_reverify import ReverifyReport, reverify_corpus
+from whymath_backend.harness.solution_qa import run_solution_qa
 from whymath_backend.l1.standards import phase3_coverage as p3c
 from whymath_backend.l1.standards.phase3_scope import (
     CurriculumNode,
@@ -251,7 +251,7 @@ _SOURCE: Final[Mapping[MetricKey, str]] = {
     MetricKey.CURRICULUM_COVERAGE: "l1.standards.phase3_coverage (P3-02)",
     MetricKey.CONCEPT_COMPLETENESS: "l1.standards.phase3_coverage (P3-02 · 5연결 재설계본)",
     MetricKey.PROBLEM_COVERAGE: "신규 계산 (명세 skills × 승인 문항 × 문제유형 스킬)",
-    MetricKey.SOLUTION_QA_PASS: "harness.corpus_reverify + ops.validation_scorecard 임계 흡수",
+    MetricKey.SOLUTION_QA_PASS: "harness.solution_qa (P3-07) + ops.validation_scorecard 임계 흡수",
     MetricKey.LEARNING_LOOP_SUCCESS: "ops.loop_kpi_gate LOOP_COMPLETION (재사용)",
     MetricKey.CRITICAL_DEFECT: "ops.validation_scorecard.evaluate_hard_gates F-Ⅱ·F-Ⅴ (흡수)",
     MetricKey.GRAPH_CONNECTIVITY: "l1.standards.phase3_coverage (P3-02)",
@@ -690,7 +690,27 @@ def solution_qa_target() -> float:
     return 1.0 - matches[0].value
 
 
-ReverifyFn = Callable[..., ReverifyReport]
+class QaCounts(Protocol):
+    """④ 가 읽는 판정 집계의 최소 모양 — `harness.solution_qa.SolutionQaReport` 가 만족한다.
+
+    `skipped` 는 **검증 불가** 문항 수다(통과도 실패도 아님). 이 이름은 종전 재검증 도구
+    (`corpus_reverify.ReverifyReport`)와의 호환을 위해 남긴다.
+    """
+
+    @property
+    def passed(self) -> int: ...
+    @property
+    def failed(self) -> int: ...
+    @property
+    def skipped(self) -> int: ...
+    @property
+    def total(self) -> int: ...
+    @property
+    def failures(self) -> tuple[tuple[str, str], ...]: ...
+
+
+#: ④ 의 판정 함수 — 기본은 Solution QA 엔진(P3-07). 테스트는 집계만 돌려주는 스텁을 주입한다.
+ReverifyFn = Callable[[list[dict[str, object]]], QaCounts]
 
 
 def _solution_qa(world: World, scope: str, reverify: ReverifyFn) -> MetricOutcome:
@@ -714,7 +734,7 @@ def _solution_qa(world: World, scope: str, reverify: ReverifyFn) -> MetricOutcom
             f"{len(world.qa_records)}건) — 같은 문항을 재검증했다고 말할 수 없다.",
         )
     try:
-        report = reverify(list(world.qa_records), use_fuzz=False)
+        report = reverify(list(world.qa_records))
     except Exception as exc:  # noqa: BLE001 - 한 지표의 실패로 7종 전체를 잃지 않는다
         return _unmeasured(
             key,
@@ -730,7 +750,11 @@ def _solution_qa(world: World, scope: str, reverify: ReverifyFn) -> MetricOutcom
             "검증 불가 비율",
             f"{report.skipped}/{total}" + (f" = {report.skipped / total:.1%}" if total else ""),
         ),
-        ("재검증 도구", "harness.corpus_reverify(Tier1+Tier2·fuzz 미사용)"),
+        (
+            "재검증 도구",
+            "harness.solution_qa(C1 정답↔조건 · C2 풀이 최종 답 · C3 선택지 · C4 단계 연쇄). "
+            "검증 불가 사유·검수 대기 목록: `python -m whymath_backend.harness.solution_qa`",
+        ),
         (
             "모집단 주의",
             "스코어카드 '수학적 오류율'은 골든 항목 FN(독립 모델 심판), 이 값은 대표 과정 "
@@ -1059,7 +1083,7 @@ def evaluate_all(
     window: lkg.ObservationWindow,
     run_id: str,
     sample_basis: str,
-    reverify: ReverifyFn = reverify_corpus,
+    reverify: ReverifyFn = run_solution_qa,
     emit: EmitFn = _noop_emit,
 ) -> tuple[MetricOutcome, ...]:
     """7종 전부를 ①~⑦ 순서로 산출한다. 어느 지표도 조용히 빠지지 않는다.
@@ -1282,7 +1306,12 @@ def _synthetic_world(spec: ScopeSpec, index: ReferenceIndex) -> World:
                 "problem_id": problem_id,
                 "slug": f"syn-qa-{n}",
                 "answer": "2",
-                "verify": {"conditions": f"x + {n} = {n + 2}", "answer_map": {"x": "2"}},
+                "verify": {
+                    "conditions": f"x + {n} = {n + 2}",
+                    "answer_map": {"x": "2"},
+                    # 풀이가 정답 변수의 값으로 끝나야 C2 가 결정된다(P3-07).
+                    "solution_steps": [f"x + {n} = {n + 2}", "x = 2"],
+                },
             }
         )
     corpus = p3c.CoverageCorpus(
@@ -1340,7 +1369,7 @@ def build_control_bundle(spec: ScopeSpec, index: ReferenceIndex) -> Bundle:
 
 
 def evaluate_bundle(
-    bundle: Bundle, *, reverify: ReverifyFn = reverify_corpus
+    bundle: Bundle, *, reverify: ReverifyFn = run_solution_qa
 ) -> tuple[MetricOutcome, ...]:
     return evaluate_all(
         bundle.world,
@@ -1416,6 +1445,24 @@ def _v_solution_qa(b: Bundle) -> Bundle:
     return _with_world(b, qa_records=tuple(records))
 
 
+def _v_solution_qa_answer_field(b: Bundle) -> Bundle:
+    """`answer` 필드만 오답으로 — 검산 재료(answer_map)는 그대로다. 옛 도구는 못 잡던 변조."""
+    records = [dict(r) for r in _world_of(b).qa_records]
+    records[0]["answer"] = "3"
+    return _with_world(b, qa_records=tuple(records))
+
+
+def _v_solution_qa_final_step(b: Bundle) -> Bundle:
+    """풀이의 마지막 단계(최종 답)만 오답으로."""
+    records = [dict(r) for r in _world_of(b).qa_records]
+    verify = records[0]["verify"]
+    assert isinstance(verify, dict)
+    steps = list(verify["solution_steps"])
+    steps[-1] = "x = 3"
+    records[0]["verify"] = {**verify, "solution_steps": steps}
+    return _with_world(b, qa_records=tuple(records))
+
+
 def _v_loop(b: Bundle) -> Bundle:
     return replace(
         b,
@@ -1476,6 +1523,12 @@ VIOLATION_INJECTIONS: Final[tuple[Injection, ...]] = (
     Injection("풀이 단계 삭제", MetricKey.CONCEPT_COMPLETENESS, _v_completeness),
     Injection("승인 문항이 없는 스킬 추가", MetricKey.PROBLEM_COVERAGE, _v_problem_coverage),
     Injection("문항 정답을 오답으로 교체", MetricKey.SOLUTION_QA_PASS, _v_solution_qa),
+    Injection(
+        "answer 필드만 오답으로 교체", MetricKey.SOLUTION_QA_PASS, _v_solution_qa_answer_field
+    ),
+    Injection(
+        "풀이 최종 답을 오답으로 교체", MetricKey.SOLUTION_QA_PASS, _v_solution_qa_final_step
+    ),
     # 190/200: 점추정은 0.95 = 목표지만 Wilson 하한은 목표 아래다 — 점추정 판정 퇴행도 잡는다.
     Injection("루프 완주 200건 중 190건(점추정=목표)", MetricKey.LEARNING_LOOP_SUCCESS, _v_loop),
     Injection("검수 통과 CU 수학 오류 50/1000 (F-Ⅱ)", MetricKey.CRITICAL_DEFECT, _v_defect),
