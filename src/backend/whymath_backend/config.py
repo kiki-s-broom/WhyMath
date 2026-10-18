@@ -127,6 +127,29 @@ class Settings(BaseSettings):
             "주지 않으면 라이브러리 버전 기본값에 종속된다(설치본 8.0.1 실측 5초)"
         ),
     )
+    cache_breaker_failure_threshold: int = Field(
+        default=3,
+        ge=0,
+        description=(
+            "응답 캐시 회로 차단(OPS-149) — Redis 연산이 *연속* 이 횟수만큼 실패하면 우회를 "
+            "연다. 0이면 우회 끔(종전 동작: 매 연산이 소켓 타임아웃을 끝까지 기다린다). 기본 3 "
+            "근거(OPS-146 실측): 건강한 Redis는 연산 최대 94ms·강등 0회(R4)라 타임아웃 "
+            "(redis_socket_timeout_s=2.0초)과 20배 넘게 떨어져 있어 연속 3회 타임아웃이 우연히 "
+            "나지 않는다. 1이면 일시 지연 한 번에 캐시가 통째로 꺼지고, 키울수록 열리기 전 "
+            "대기(N x 타임아웃)가 늘어난다 — 3이면 6초로 WH-1 15초 예산 안이다"
+        ),
+    )
+    cache_breaker_open_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        description=(
+            "응답 캐시 회로 차단(OPS-149) — 우회가 열려 있는 시간(초). 이 시간이 지나면 첫 "
+            "호출 1건만 시험(half-open)으로 Redis를 부르고, 성공하면 닫고 실패하면 다시 이 "
+            "시간만큼 연다. 기본 30초 근거: 시험 호출은 창당 1건이라 최악 2초(타임아웃) 추가가 "
+            "30초에 한 번뿐이고, 복구 감지 지연도 최대 30초다"
+        ),
+    )
+
     cache_ttl_s: int = Field(
         default=3600,
         ge=0,

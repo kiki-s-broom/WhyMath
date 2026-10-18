@@ -338,6 +338,31 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-18 (구현 · OPS-149): **L3 응답 캐시에 회로 차단을 넣었다 — 연속 3회 실패하면 30초간 Redis를 부르지 않고 미스/no-op으로 처리하고, 30초 뒤 첫 호출 1건만 시험해 복구를 확인한다. 우회 횟수·건너뛴 호출 수·우회 비율은 `/health/ready`의 `cache_degradation`에 노출했다. 재실측(게이트 `G-ops149-redis-bypass-r3-remeasure`)은 PR 머지 후 Kiki 몫이라 아직 효과 수치는 없다** (claude 구현) — 판정 기준: main `fbe01ebfd`(브랜치 `claude/ops-149-redis-cache-bypass`, 머지 전)
+
+**무엇**: `l3/cache/redis_cache.py`의 `CacheDegradationCounter`에 회로 차단을 얹었다. 이전에는 강등이 *예외를 삼킬 뿐* 죽은 Redis의 소켓 타임아웃(2.0초)을 매 연산이 끝까지 기다렸고, OPS-146 실측으로 그 대기가 WH-1 한 턴의 94~95%였다. 설정은 `cache_breaker_failure_threshold`(기본 3, 0이면 끔)와 `cache_breaker_open_seconds`(기본 30.0)다.
+
+**① 설계 판정(코드 전, 수치 근거)**
+- **N=3**: R4에서 건강한 Redis는 연산 최대 94ms·강등 0회로 타임아웃(2,000ms)과 20배 넘게 떨어져 있어 *연속* 3회 타임아웃이 우연히 날 수 없다. N=1이면 일시 지연 한 번에 캐시 전체가 꺼지고, N이 커질수록 열리기 전 대기(N x 2초)가 늘어난다. N=3의 열리기 전 비용은 6초(WH-1 예산 15초 안).
+- **T=30초**: 시험 호출은 창당 1건이라 최악 2초 추가가 30초에 한 번(6.7% 이하)이고 복구 감지 지연은 최대 30초.
+- **half-open**: 시험이 나간 동안 도착한 다른 호출은 계속 우회한다(죽은 Redis에 대기가 쌓이지 않게). 시험 성공 → 닫힘, 실패 → T초 재개방(열림 횟수는 올리지 않는다).
+- **취소 안전**: R3에서 15초 예산 취소가 캐시 연산 중간에 일어났다. 취소된 시험이 슬롯을 반납하지 않으면 우회가 영구히 닫히지 않으므로 `BaseException`을 거두어 재개방하고, 반납이 누락돼도 T초 뒤 새 시험을 허용하는 안전망을 둔다.
+- **상태 위치**: 회로 상태는 `CacheDegradationCounter`가 쥔다 — 전역 카운터를 쓰는 인스턴스는 한 회로를 공유하고(죽은 Redis를 인스턴스마다 3회씩 두드리지 않는다), 테스트는 카운터를 새로 주입하면 회로도 새로 시작한다.
+
+**② 구현 + 실패 주입**: 테스트 `tests/backend/l3/test_redis_cache.py`(회로 차단 클래스 4개)·`tests/backend/api/test_cache_degradation_observability.py`·`tests/backend/harness/test_ops141_timeout_decompose.py`. 모든 단정은 응답이 None이라는 사실(강등도 None을 준다)이 아니라 **가짜 클라이언트의 호출 횟수**로 한다. 대조군: 실패 2→성공→실패 2는 열리지 않음 · 건강한 Redis 100연산 우회 0 · 임계 0이면 철수. 경계: 29.5초 우회/30.0초 시험. 뮤테이션 16종(우회 제거·누적/연속·`>=`→`>`·아무 성공이나 닫음·건너뜀 미계수·취소 반납 제거·분실 슬롯 회수 제거·set 미우회·설정 배선 끊김·ready 가짜 스냅샷 등) 전건 검출, 주입 적용(`mutated != original`)과 바이트 동일 원복 단언.
+
+**③ 작동한 비율 노출**: `CacheDegradationSnapshot`에 `successes`·`breaker_opens`·`skipped_calls`·`breaker_open`·`bypass_ratio`를 더했고 `GET /health/ready`의 `cache_degradation`로 노출한다(프로세스별 카운터). 회로가 열려 캐시가 전부 건너뛰어지는 중에도 응답은 200이다 — 테스트가 그 사실을 고정한다. 연산 0건이면 비율은 0.0이 아니라 null이다.
+
+**호환에서 찾은 결함(예방)**: 측정 도구(`scripts/ops/wh1_primary_timeout_decompose.py`)의 캐시 프로브는 `degradation_count`의 증가로 연산마다 강등 여부를 세고 "6회 중 일부만 강등이면 혼합 조건으로 거부"한다. 우회가 건너뛴 연산을 세지 않으면 4~6번째가 정상으로 분류돼 Kiki의 R3 재실측이 도구 단계에서 막힌다. 그래서 `RedisCache.degradation_count`는 실패 + 건너뜀의 합으로 정했고, 호환 테스트(우회 구간도 `redis-down`으로 인식 · `redis-up` 오선언은 여전히 거부)를 도구 테스트 파일에 둔다. 기존 테스트 1건(`test_first_failure_logs_then_suppressed_until_threshold`)이 카운터 로거의 warning 전체를 세다가 새 `회로 차단 열림` 경고를 포함해 3건이 됐고, 이 테스트가 보는 것은 강등 경고의 억제 정책이므로 회로를 끄고(`breaker_failure_threshold=0`) 원래 단정(2건)을 그대로 두었다.
+
+**④ 호출자 범위 확인(코드를 읽어)**: 같은 소켓 타임아웃을 쓰는 두 곳도 **같은 비용을 진다.** `CachedDeviceStore.verify`는 캐시 get(최대 2초) + DB + setex(최대 2초) = 요청당 최대 약 4초, `RedisBackend`(rate limit)는 호출당 최대 2초 후 인메모리 폴백. 단 디바이스 캐시의 무효화(`revoke`)는 강등 금지인 보안 계약이라 우회 대상이 아니다. 보안 인접 경로·폴백 의미론이 달라 이 태스크에 포함하지 않고 `OPS-153-api-redis-callers-circuit-bypass`로 분리했다(`OPS-149` 선행).
+
+**⑤ 재실측**: 게이트 `G-ops149-redis-bypass-r3-remeasure`가 소유(PR 머지 후 런북 R3만 재실행). **⑥ 타임아웃 15초는 바꾸지 않았다.**
+
+**정직한 공백**: ① **효과 수치가 없다** — 우회가 R3의 12/12 `fallback_timeout`을 얼마나 줄이는지는 재실측 전까지 모른다. 위 설계 수치는 OPS-146 실측으로부터의 산술(열리기 전 6초 + 시험 30초당 2초)이다. ② R3 재실측 도구는 캐시 프로브 6연산을 턴 *앞*에서 돌리므로 회로가 **미리 열린 채** 턴이 시작된다 — 실서비스 첫 요청이 치르는 열리기 전 6초는 재실측 수치에 잡히지 않는다(7.6초 = 6초 + 프로바이더 약 1.6초로 예산 15초 안이라 판정은 뒤집히지 않는다고 추정). ③ 회로는 **프로세스(워커)별**이다 — 워커가 W개면 장애 시작 후 각 워커가 한 번씩 열리기 전 대기를 치른다. ④ 실물 redis-py의 연결 거부·타임아웃 동작은 이 테스트가 보지 않는다(가짜 클라이언트) — OPS-146 공백③(닫힌 포트가 즉시 거부되지 않는 이유 미측정)은 그대로이나 회로가 열리면 그 이유와 무관하게 대기가 사라진다. ⑤ rate limit·디바이스 캐시의 Redis 없음 실측 수치는 없다(위 ④는 코드 읽기와 연산당 2,016ms로부터의 추정).
+
+**검증 범위**: CI와 같은 명령으로 `ruff`·`black --check`·`mypy --strict`·`lint-imports` 전부 종료 코드 0. 전체 백엔드 스위트(병합 전 기준 `2e8ebcecb`) `20978 passed, 702 skipped, 1 xfailed` 종료 코드 0 · 계층 커버리지 게이트 PASS · main `fbe01ebfd` 병합 후 재실행 결과는 PR 본문에 적는다(CI가 최종 판정).
+
 ### 2026-10-18 (판정 · P3-55): **`[12미적Ⅰ-02-02]`의 Content 연결은 24건·줄기 4·정답 0 하나의 단일 틀에 걸려 있다 — 60건이 스킬에 안 닿는 것은 매핑·태그 결함이 아니라 설계의 구조 결과이고, (나) 현 구조 확정 + 위험 명시를 택했다. (가)는 감사 라운드가 사람 게이트라 후속 태스크로 넘겼다** (claude 판정, 데이터 변경 0) — 판정 기준 main `d33ab2e4`(브랜치 `claude/sweet-cannon-sppil9`, 머지 전)
 
 **무엇**: 태스크 `P3-55-calc1-02-02-content-single-template-dependency`. 정본 = `docs/reviews/p3_55_calc1_02_02_content_single_template_judgment_2026-10-18.md`. P3-53 재판정이 발견한 단일 실패점의 ①재현 ②원인 판정 ③결정.

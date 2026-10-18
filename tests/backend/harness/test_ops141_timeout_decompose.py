@@ -338,6 +338,53 @@ class TestConditionGate:
         assert tool._condition_matches("memory", None) is None
 
 
+class TestCacheProbeWithCircuitBreaker:
+    """OPS-149 호환 — 회로 차단이 열린 구간도 프로브가 `redis-down`으로 인식해야 한다.
+
+    프로브는 get을 N회 부르고 `degradation_count`의 증가로 연산마다 강등 여부를 센다. 우회가
+    건너뛴 연산이 그 값에 잡히지 않으면 6회 중 4~6번째가 '정상'으로 분류돼 `degraded=3/6`이 되고,
+    조건 확인이 "불안정"으로 거부한다 — 즉 Kiki의 R3 재실측이 도구 단계에서 막힌다.
+    """
+
+    @staticmethod
+    def _dead_cache() -> Any:
+        from whymath_backend.config import Settings
+        from whymath_backend.l3.cache.redis_cache import CacheDegradationCounter, RedisCache
+
+        class _Dead:
+            async def get(self, name: str) -> Any:
+                raise OSError("redis 연결 실패(모사)")
+
+            async def set(self, name: str, value: str, *, ex: int | None = None) -> Any:
+                raise OSError("redis 연결 실패(모사)")
+
+            async def ping(self) -> Any:
+                raise OSError("redis 연결 실패(모사)")
+
+        return RedisCache(
+            client=_Dead(),
+            settings=Settings(cache_breaker_failure_threshold=3),
+            degradation=CacheDegradationCounter(),
+        )
+
+    async def test_bypassed_operations_still_count_as_degraded(self) -> None:
+        cache = self._dead_cache()
+
+        probe = await tool._cache_probe(cache, 6)
+
+        # 앞 3회는 실제 실패, 뒤 3회는 우회 — 전부 '강등으로 끝난 연산'이어야 한다.
+        assert probe["ops"] == 6
+        assert probe["degraded"] == 6
+        assert cache.degradation_snapshot().skipped_calls == 3
+        assert tool._condition_matches("redis-down", probe) is None
+
+    async def test_declaring_redis_up_against_a_bypassed_dead_redis_is_still_rejected(self) -> None:
+        """대조군: 우회 때문에 죽은 Redis가 redis-up으로 통과해서는 안 된다."""
+        probe = await tool._cache_probe(self._dead_cache(), 6)
+
+        assert "응답하지 않는다" in tool._condition_matches("redis-up", probe)
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 기록·집계
 # ──────────────────────────────────────────────────────────────────────────

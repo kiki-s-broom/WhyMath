@@ -1,0 +1,35 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-153-api-redis-callers-circuit-bypass
+title: "api 계층 Redis 소비처(rate limit·디바이스 캐시)에 회로 차단 적용 — Redis 없음에서 요청당 최대 2~4초 대기를 막는다 (OPS-149 ④ 승계 · 무효화 경로는 우회 제외)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-149-redis-cache-degraded-bypass
+requires_gates: []
+acceptance:
+  - "① 설계 판정(코드 전) — OPS-149가 L3 응답 캐시(RedisCache)에 세운 회로 차단(연속 N회 실패 → T초 우회 → 1회 시험 half-open)을 api 계층의 두 Redis 소비처에 적용할지, 적용한다면 어떤 연산까지인지를 정한다. 반드시 지켜야 할 경계: 디바이스 캐시 무효화(_cache_invalidate·revoke 경로)는 보안 계약이라 강등이 금지돼 있어 우회 대상에서 제외한다 — 우회가 무효화를 건너뛰면 폐기된 디바이스의 서명이 TTL까지 캐시에서 통과한다. 근거 재료: 아래 notes의 실측 호출 횟수와 OPS-146 R2의 연산당 2,016ms.\n② rate limit(api/_rate_limit.py RedisBackend) — 우회가 열린 동안 Redis를 부르지 않고 곧바로 인메모리 폴백으로 간다(폴백 의미론은 OPS-06 그대로). 우회 횟수와 건너뛴 호출 수를 DegradationSnapshot에 싣고, 가짜 클라이언트 호출 횟수로 우회가 일했음을 확인하고, N회 미만 실패와 성공 후 리셋을 대조군으로 둔다.\n③ 디바이스 캐시 읽기·적재(api/_device_store.py CachedDeviceStore 의 _cache_get·_cache_get_int·_cache_setex) — 같은 방식으로 우회하되 verify 의 승인이 느슨해지는 방향으로 움직이지 않음을 테스트로 고정한다(캐시는 성공만 담는 positive cache이고 권위는 DB이므로 우회 = DB 직행이어야 한다). 무효화 경로는 우회와 무관하게 종전대로 예외를 전파함을 별도 테스트로 고정한다.\n④ 작동한 비율 노출 — 두 소비처의 우회 회계를 /health/ready 에 싣는다(OPS-149 의 cache_degradation 섹션과 같은 형태 — 정상 200은 우회의 증거가 아니다). 노출 지점을 적는다.\n⑤ 뮤테이션 — 우회 조건 제거, 무효화 경로가 우회에 포함되는 주입(반드시 RED), 임계 배선 끊김을 각각 주입해 RED 를 확인한다. 주입 적용(mutated != original)과 바이트 동일 원복을 단언한다.\n⑥ 설정은 OPS-149 의 cache_breaker_failure_threshold·cache_breaker_open_seconds 를 재사용할지 소비처별로 둘지 판정해 적는다(새 키를 만들기 전에 재사용 가능성을 먼저 본다).\n⑦ 완료 판정 — 두 소비처에서 Redis 없음 조건의 요청당 대기가 우회로 줄어듦이 호출 횟수로 확인되고, 무효화 경로는 우회되지 않음이 테스트로 동결되며, 우회 비율이 /health/ready 에 노출된다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/_rate_limit.py
+  - src/backend/whymath_backend/api/_device_store.py
+  - src/backend/whymath_backend/api/_degradation.py
+  - tests/backend/api/test_redis_degradation.py
+session: null
+notes: |-
+  출처: OPS-149 acceptance ④ 판정(2026-10-18, 코드를 읽어 확인). 확인 전에는 지는지 몰랐고, 읽은 결과 두 곳 모두 같은 비용을 진다.
+
+  [실측: 코드 읽기] Redis 가 죽으면 소켓 타임아웃(redis_socket_timeout_s 기본 2.0초)이 지난 뒤에야 예외가 잡히고 폴백한다. 두 곳 모두 우회 장치가 없어 요청마다 같은 대기를 되풀이한다.
+  - api/_device_store.py CachedDeviceStore.verify: 캐시 get 1회(최대 2초) → DB 위임 → 성공이면 setex 1회(최대 2초) = 요청당 최대 약 4초. 디바이스 서명 검증은 보호 엔드포인트마다 거치는 경로다.
+  - api/_rate_limit.py RedisBackend: hit/hit_both/hit_many 가 Redis 호출 1회(최대 2초) 후 예외를 잡아 인메모리 폴백 — 코치 요청 앞단이다.
+  - 반대로 revoke 의 _cache_invalidate 는 강등을 의도적으로 금지한다(예외 전파) — 우회 대상에서 제외해야 한다.
+
+  [왜 OPS-149 에 포함하지 않았나] 보안 인접 경로(디바이스 서명·요청 제한)를 건드려 리뷰·위험 축이 다르고, 폴백 의미론이 서로 다르다(캐시는 미스, rate limit 은 인메모리 폴백, 디바이스는 DB 직행, 무효화는 전파). OPS-149 의 L3 캐시 우회만으로 WH-1 한 턴의 캐시 대기 94~95% 는 닫힌다.
+
+  [정직한 공백] 이 두 소비처의 Redis 없음 실측 수치는 아직 없다 — 위 대기는 코드와 OPS-146 의 연산당 2,016ms 로부터의 추정이다. 운영 구성(docker-compose.prod.yml)에서 Redis 가 죽는 빈도도 이 판정이 말하지 않는다.
+updated: 2026-10-18

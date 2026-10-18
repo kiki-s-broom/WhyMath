@@ -202,7 +202,11 @@ from whymath_backend.db.models.job_ownership import JobOwnership
 from whymath_backend.db.schema_version import verify_schema_version
 from whymath_backend.db.session import dispose_engine, get_session
 from whymath_backend.l3 import pipeline
-from whymath_backend.l3.cache import RedisCache
+from whymath_backend.l3.cache import (
+    CacheDegradationSnapshot,
+    RedisCache,
+    cache_degradation_snapshot,
+)
 from whymath_backend.l3.interfaces import (
     AsyncJobQueue,
     CacheBackend,
@@ -705,6 +709,49 @@ class SympyIsolationBody(BaseModel):
     )
 
 
+class CacheDegradationBody(BaseModel):
+    """/health/ready 캐시 회로 차단 *작동한 비율* 섹션(OPS-149) — 정상 200은 우회의 증거가 아니다.
+
+    `l3/cache/redis_cache.py`의 프로세스 전역 강등 회계를 읽는 유일한 비테스트 소비자다.
+    Redis가 죽으면 캐시 연산마다 소켓 타임아웃(2초)을 기다려 WH-1 한 턴의 94~95%를 먹는다
+    (OPS-146). 연속 실패 N회 뒤 T초간 Redis를 부르지 않는 우회가 그 대기를 없애는데, 우회가
+    실제로 일했는지는 응답 코드로 알 수 없다 — 아래 카운터와 `bypass_ratio`가 말한다.
+
+    **프로세스별 카운터** — 서버 워커가 여럿이면 이 응답은 요청을 받은 워커 1개의 값이다.
+    재시작하면 0부터다. 이 섹션의 `successes`·`failures`·`skipped_calls`는 L3 응답 캐시
+    (`RedisCache`) 한정이며 rate limit·디바이스 캐시 등 다른 Redis 소비처는 포함하지 않는다.
+    """
+
+    scope: str = Field(
+        ..., description="카운터의 범위 — 항상 'per_process'(응답한 서버 프로세스 1개의 값)"
+    )
+    breaker_open: bool = Field(
+        ..., description="지금 회로가 열려 있는가 — True면 다음 캐시 연산은 Redis를 부르지 않는다"
+    )
+    breaker_opens: int = Field(
+        ..., description="회로가 닫힘→열림으로 넘어간 횟수(시험 호출 실패로 인한 재개방은 제외)"
+    )
+    skipped_calls: int = Field(
+        ..., description="우회로 Redis를 부르지 않고 미스/no-op 처리한 캐시 연산 수(분자)"
+    )
+    failures: int = Field(..., description="Redis를 실제로 불러서 실패한 캐시 연산 수(get+set)")
+    successes: int = Field(..., description="Redis가 실제로 응답한 캐시 연산 수")
+    consecutive_failures: int = Field(
+        ..., description="마지막 성공 이후 연속 실패 수 — 임계(N)에 닿으면 회로가 열린다"
+    )
+    last_error_type: str | None = Field(
+        ..., description="가장 최근 흡수한 예외의 타입명(값·키는 담지 않는다). 실패 없으면 null"
+    )
+    bypass_ratio: float | None = Field(
+        ...,
+        description=(
+            "skipped_calls / (successes + failures + skipped_calls) — 연산이 0건이면 null"
+            "(측정 대상 없음, 0.0과 다르다). 1.0에 가까우면 거의 모든 캐시 연산이 Redis 없이 "
+            "처리됐다는 뜻이다"
+        ),
+    )
+
+
 class ReadyBody(BaseModel):
     """GET /health/ready 응답 — 딥체크·인프로세스 계측·알림(이중 회계의 HTTP 노출면)."""
 
@@ -745,6 +792,13 @@ class ReadyBody(BaseModel):
             "SymPy 격리가 작동한 비율(OPS-126) — 풀 호출 수·판정 불가 사유별 카운터·폴백과 "
             "두 비율. "
             "프로세스별 카운터(서버 워커가 여럿이면 응답한 워커 1개의 값)."
+        ),
+    )
+    cache_degradation: CacheDegradationBody = Field(
+        ...,
+        description=(
+            "L3 응답 캐시 회로 차단이 작동한 비율(OPS-149) — 열림 여부·열린 횟수·건너뛴 연산 수·"
+            "우회 비율. 프로세스별 카운터(서버 워커가 여럿이면 응답한 워커 1개의 값)."
         ),
     )
 
@@ -814,6 +868,21 @@ def _sympy_isolation_body(snapshot: IsolationSnapshot) -> SympyIsolationBody:
         undecidable=snapshot.undecidable,
         undecidable_ratio=snapshot.undecidable_ratio,
         isolated_ratio=snapshot.isolated_ratio,
+    )
+
+
+def _cache_degradation_body(snapshot: CacheDegradationSnapshot) -> CacheDegradationBody:
+    """CacheDegradationSnapshot(도메인, `l3.cache.redis_cache`) → HTTP 스키마 변환(OPS-149)."""
+    return CacheDegradationBody(
+        scope="per_process",
+        breaker_open=snapshot.breaker_open,
+        breaker_opens=snapshot.breaker_opens,
+        skipped_calls=snapshot.skipped_calls,
+        failures=snapshot.total_failures,
+        successes=snapshot.successes,
+        consecutive_failures=snapshot.consecutive_failures,
+        last_error_type=snapshot.last_error_type,
+        bypass_ratio=snapshot.bypass_ratio,
     )
 
 
@@ -1422,6 +1491,7 @@ def create_app(
             ),
             l6_mode_reach=_l6_mode_reach_body(l6_mode_reach_counters.snapshot()),
             sympy_isolation=_sympy_isolation_body(isolation_snapshot()),
+            cache_degradation=_cache_degradation_body(cache_degradation_snapshot()),
         )
         return JSONResponse(
             status_code=(status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE),

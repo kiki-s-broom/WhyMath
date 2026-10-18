@@ -22,6 +22,7 @@ docs/standards/incident_response_slo.md 함정 ④(Redis 장애의 학생 경로
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Iterator
 from typing import Any
@@ -463,7 +464,9 @@ class TestDegradationCounter:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """전이(첫 실패)만 warning, 이후 N번째까지 억제 — 장애 중 매 요청 로그 스팸 방지."""
-        counter = CacheDegradationCounter(log_every_n_failures=5)
+        # 회로 차단은 끈다(OPS-149) — 이 테스트는 *강등 경고의 억제 정책*만 본다. 연속 3회째에
+        # 생기는 '회로 차단 열림' 경고는 별개 사건이며 TestCircuitBreakerOpens가 따로 고정한다.
+        counter = CacheDegradationCounter(log_every_n_failures=5, breaker_failure_threshold=0)
 
         with caplog.at_level(logging.WARNING, logger=_CACHE_LOGGER):
             for _ in range(5):
@@ -628,3 +631,468 @@ class TestPipelineSurvivesRedisOutage:
         snapshot = counter.snapshot()
         assert (snapshot.get_failures, snapshot.set_failures) == (1, 1)
         assert snapshot.last_error_type == "CacheBoomError"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-149 — 회로 차단(우회): 연속 N회 실패하면 T초간 Redis를 부르지 않는다
+#
+# 변별력 설계(CLAUDE.md 「보호 장치를 실패 주입 없이 선언 금지」):
+#   - "우회가 열렸다"는 응답이 None이라는 사실로는 증명되지 않는다(강등도 None을 준다). 그래서
+#     모든 단정은 **가짜 클라이언트의 호출 횟수**로 한다 — 우회가 일했다면 호출 수가 멈춘다.
+#   - 대조군을 쌍으로 둔다: N회 *미만* 실패·성공 뒤 카운트 리셋·건강한 Redis는 열리지 않아야
+#     한다. 열리는 쪽만 보면 "항상 우회"인 고장난 구현도 통과한다.
+#   - 시간은 가짜 시계로 밀어 sleep 없이 경계(29.5초 vs 30.0초)를 직접 찌른다.
+# ──────────────────────────────────────────────────────────────────────────
+class FakeClock:
+    """주입 가능한 시계 — `advance`로 시간을 밀어 열림 시간 경과를 sleep 없이 재현한다."""
+
+    def __init__(self, start: float = 1000.0) -> None:
+        self.now = start
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+class ScriptedRedisClient:
+    """호출 순서대로 결과를 정해 주는 가짜 — 'fail'은 예외, 'ok'는 미스(None), 'block'은 풀어줄 때까지 대기.
+
+    `get_calls`/`set_calls`가 *Redis에 실제로 닿은* 호출 수의 단일 진실이다(우회가 건너뛴 호출은
+    여기에 기록되지 않는다). 스크립트가 바닥나면 마지막 결과를 반복한다.
+    """
+
+    def __init__(self, outcomes: list[str]) -> None:
+        self._outcomes = list(outcomes)
+        self.get_calls: list[str] = []
+        self.set_calls: list[tuple[str, str, int | None]] = []
+        self.release = asyncio.Event()
+
+    def _next(self) -> str:
+        return self._outcomes.pop(0) if len(self._outcomes) > 1 else self._outcomes[0]
+
+    async def get(self, name: str) -> Any:
+        self.get_calls.append(name)
+        outcome = self._next()
+        if outcome == "block":
+            await self.release.wait()
+            return None
+        if outcome == "fail":
+            raise CacheBoomError("redis 타임아웃(모사)")
+        return None
+
+    async def set(self, name: str, value: str, *, ex: int | None = None) -> Any:
+        self.set_calls.append((name, value, ex))
+        outcome = self._next()
+        if outcome == "fail":
+            raise CacheBoomError("redis 타임아웃(모사)")
+        return True
+
+    async def ping(self) -> Any:
+        return True
+
+
+def _breaker_cache(
+    client: Any,
+    *,
+    clock: FakeClock,
+    threshold: int = 3,
+    open_s: float = 30.0,
+    counter: CacheDegradationCounter | None = None,
+) -> tuple[RedisCache, CacheDegradationCounter]:
+    """회로 차단 설정을 Settings로 주입한 캐시 + 그 카운터. 카운터 생성자 기본값과 다른 값도 쓴다."""
+    from whymath_backend.config import Settings
+
+    shared = counter if counter is not None else CacheDegradationCounter(clock=clock)
+    cache = RedisCache(
+        client=client,
+        settings=Settings(
+            cache_breaker_failure_threshold=threshold, cache_breaker_open_seconds=open_s
+        ),
+        degradation=shared,
+    )
+    return cache, shared
+
+
+class TestCircuitBreakerOpens:
+    async def test_opens_after_n_consecutive_failures_and_stops_calling_redis(self) -> None:
+        """연속 3회 실패 뒤에는 get·set이 Redis를 *부르지 않는다*(호출 수가 멈춘다)."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail"])
+        cache, counter = _breaker_cache(client, clock=clock)
+
+        for _ in range(3):
+            assert await cache.get("k") is None
+        assert len(client.get_calls) == 3
+
+        # 우회 구간 — 6건(get 5 + set 1)이 전부 Redis에 닿지 않아야 한다.
+        for _ in range(5):
+            assert await cache.get("k") is None
+        await cache.set("k", "v", ttl_seconds=60)
+
+        assert len(client.get_calls) == 3
+        assert client.set_calls == []
+        snap = counter.snapshot()
+        assert snap.breaker_open is True
+        assert snap.breaker_opens == 1
+        assert snap.skipped_calls == 6
+        # 건너뛴 호출은 '실제로 실패한' 호출이 아니다 — 두 회계가 섞이지 않는다.
+        assert snap.total_failures == 3
+
+    async def test_fewer_than_n_failures_do_not_open(self) -> None:
+        """대조군: 실패 2회 → 성공 → 실패 2회는 연속 3회가 아니므로 열리지 않는다.
+
+        누적(cumulative) 실패로 판정하는 구현은 4번째 호출에서 열려 이 테스트가 RED가 된다.
+        """
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail", "fail", "ok", "fail", "fail", "ok"])
+        cache, counter = _breaker_cache(client, clock=clock)
+
+        for _ in range(6):
+            await cache.get("k")
+
+        assert len(client.get_calls) == 6  # 하나도 건너뛰지 않았다
+        snap = counter.snapshot()
+        assert (snap.breaker_open, snap.breaker_opens, snap.skipped_calls) == (False, 0, 0)
+
+    async def test_healthy_redis_is_never_bypassed(self) -> None:
+        """대조군: 건강한 Redis는 몇 번을 써도 우회되지 않는다(오탐 차단 없음)."""
+        clock = FakeClock()
+        client = FakeRedisClient()
+        cache, counter = _breaker_cache(client, clock=clock)
+
+        for i in range(50):
+            await cache.set(f"k{i}", "v", ttl_seconds=60)
+            await cache.get(f"k{i}")
+
+        assert len(client.get_calls) == 50
+        assert len(client.set_calls) == 50
+        snap = counter.snapshot()
+        assert (snap.breaker_opens, snap.skipped_calls, snap.total_failures) == (0, 0, 0)
+        assert snap.successes == 100
+
+    async def test_get_and_set_failures_count_toward_the_same_streak(self) -> None:
+        """연속 실패는 연산 종류를 가리지 않는다 — get 2회 + set 1회 실패로 열린다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail"])
+        cache, counter = _breaker_cache(client, clock=clock)
+
+        await cache.get("k")
+        await cache.get("k")
+        await cache.set("k", "v", ttl_seconds=60)
+        await cache.get("k")  # 열린 뒤 — 건너뛴다
+
+        assert len(client.get_calls) == 2
+        assert counter.snapshot().breaker_open is True
+
+    async def test_concurrent_in_flight_failures_open_the_circuit_only_once(self) -> None:
+        """열리기 전에 나간 호출 5건이 뒤늦게 전부 실패해도 '열림'은 1번만 센다.
+
+        이미 열린 뒤 도착한 실패가 열림 횟수를 올리거나 열림 시간을 연장하면 안 된다.
+        """
+
+        class _SlowFailClient(ScriptedRedisClient):
+            async def get(self, name: str) -> Any:
+                self.get_calls.append(name)
+                await asyncio.sleep(0)  # 5건이 모두 admit을 통과한 뒤에 실패가 도착하게 한다
+                raise CacheBoomError("redis 타임아웃(모사)")
+
+        clock = FakeClock()
+        client = _SlowFailClient(["fail"])
+        cache, counter = _breaker_cache(client, clock=clock)
+
+        await asyncio.gather(*(cache.get(f"k{i}") for i in range(5)))
+
+        snap = counter.snapshot()
+        assert len(client.get_calls) == 5  # 5건 모두 열리기 전에 admit을 통과했다
+        assert snap.breaker_opens == 1
+        assert snap.consecutive_failures == 5
+
+    async def test_threshold_zero_disables_the_bypass(self) -> None:
+        """철수 수단: 임계 0이면 종전 동작 — 얼마를 실패해도 매번 Redis를 부른다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail"])
+        cache, counter = _breaker_cache(client, clock=clock, threshold=0)
+
+        for _ in range(10):
+            await cache.get("k")
+
+        assert len(client.get_calls) == 10
+        snap = counter.snapshot()
+        assert (snap.breaker_open, snap.breaker_opens, snap.skipped_calls) == (False, 0, 0)
+
+    async def test_opening_is_logged_with_exception_type_name(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """침묵 실패 금지 — 열림이 warning으로 남고 예외 *타입명*이 실린다(키는 싣지 않는다)."""
+        clock = FakeClock()
+        cache, _ = _breaker_cache(ScriptedRedisClient(["fail"]), clock=clock)
+
+        with caplog.at_level(logging.WARNING, logger=_CACHE_LOGGER):
+            for _ in range(3):
+                await cache.get("민감한_캐시키")
+
+        opened = [r for r in caplog.records if "회로 차단 열림" in r.getMessage()]
+        assert len(opened) == 1
+        assert "CacheBoomError" in opened[0].getMessage()
+        assert "민감한_캐시키" not in caplog.text
+
+
+class TestCircuitBreakerRecovery:
+    @staticmethod
+    async def _open(cache: RedisCache) -> None:
+        for _ in range(3):
+            await cache.get("k")
+
+    async def test_probe_after_open_window_closes_the_circuit_on_success(self) -> None:
+        """열림 시간 경계: 29.5초는 여전히 우회, 30.0초부터 첫 호출이 시험 — 성공하면 닫힌다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail", "fail", "fail", "ok"])
+        cache, counter = _breaker_cache(client, clock=clock)
+        await self._open(cache)
+
+        clock.advance(29.5)
+        await cache.get("k")
+        assert len(client.get_calls) == 3  # 아직 우회
+
+        clock.advance(0.5)  # 정확히 열림 시간 경과
+        await cache.get("k")
+        assert len(client.get_calls) == 4  # 시험 호출이 Redis에 닿았다
+        assert counter.snapshot().breaker_open is False
+
+        await cache.get("k")
+        assert len(client.get_calls) == 5  # 닫혔으니 정상 호출
+
+    async def test_failed_probe_reopens_for_another_window_without_a_new_open_count(self) -> None:
+        """시험 실패 → 같은 사건의 연장이다: 다시 T초 우회하고 열림 횟수는 올리지 않는다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail"])
+        cache, counter = _breaker_cache(client, clock=clock)
+        await self._open(cache)
+
+        clock.advance(30.0)
+        await cache.get("k")  # 시험 — 실패
+        assert len(client.get_calls) == 4
+        await cache.get("k")  # 곧바로 — 다시 우회
+        assert len(client.get_calls) == 4
+
+        clock.advance(29.5)
+        await cache.get("k")
+        assert len(client.get_calls) == 4  # 재개방 후 29.5초 — 아직 우회
+
+        clock.advance(0.5)
+        await cache.get("k")  # 다음 시험
+        assert len(client.get_calls) == 5
+        assert counter.snapshot().breaker_opens == 1
+
+    async def test_only_one_probe_is_in_flight_at_a_time(self) -> None:
+        """시험이 진행 중일 때 도착한 호출은 계속 우회한다 — 죽은 Redis에 대기가 쌓이지 않는다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail", "fail", "fail", "block", "ok"])
+        cache, counter = _breaker_cache(client, clock=clock)
+        await self._open(cache)
+        clock.advance(30.0)
+
+        probe = asyncio.create_task(cache.get("probe"))
+        await asyncio.sleep(0)  # 시험이 Redis 호출에 들어가 대기하는 상태
+        assert len(client.get_calls) == 4
+
+        assert await cache.get("other") is None
+        await cache.set("other", "v", ttl_seconds=60)
+        assert len(client.get_calls) == 4  # 두 번째 호출은 Redis에 닿지 않았다
+        assert client.set_calls == []
+
+        client.release.set()
+        await probe
+        assert counter.snapshot().breaker_open is False
+
+    async def test_cancelled_probe_releases_the_slot_and_reopens_from_now(self) -> None:
+        """WH-1 예산 취소가 시험 중에 일어나도 우회가 영구히 닫히지 않는다.
+
+        시험이 10초 매달린 뒤 취소되면 열림 시간은 *취소 시점*부터 다시 T초다(시험 시작 시점
+        기준 안전망이었다면 20초 뒤에 새 시험이 나가 이 단정이 RED가 된다).
+        """
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail", "fail", "fail", "block", "ok"])
+        cache, counter = _breaker_cache(client, clock=clock)
+        await self._open(cache)
+        clock.advance(30.0)
+
+        probe = asyncio.create_task(cache.get("probe"))
+        await asyncio.sleep(0)
+        assert len(client.get_calls) == 4
+        clock.advance(10.0)
+        probe.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await probe  # 취소는 삼키지 않고 전파한다
+
+        clock.advance(25.0)  # 취소 후 25초 — 재개방 창(30초) 안
+        await cache.get("k")
+        assert len(client.get_calls) == 4  # 아직 우회
+
+        clock.advance(5.0)  # 취소 후 정확히 30초
+        await cache.get("k")
+        assert len(client.get_calls) == 5  # 새 시험이 나갔다
+        assert counter.snapshot().breaker_opens == 1
+
+    async def test_lost_probe_slot_is_reclaimed_after_the_open_window(self) -> None:
+        """안전망: 시험이 끝나지도 취소되지도 않고 사라져도 T초 뒤에는 새 시험을 허용한다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail", "fail", "fail", "block", "ok"])
+        cache, _ = _breaker_cache(client, clock=clock)
+        await self._open(cache)
+        clock.advance(30.0)
+
+        stuck = asyncio.create_task(cache.get("stuck"))
+        await asyncio.sleep(0)
+        assert len(client.get_calls) == 4
+
+        clock.advance(29.5)
+        await cache.get("k")
+        assert len(client.get_calls) == 4  # 시험이 아직 진행 중이라 우회
+
+        clock.advance(0.5)
+        await cache.get("k")
+        assert len(client.get_calls) == 5  # 분실된 슬롯을 회수하고 새 시험
+
+        client.release.set()
+        await stuck
+
+    def test_late_success_from_before_the_open_does_not_close_the_circuit(self) -> None:
+        """열리기 전에 나간 호출이 뒤늦게 성공해도 '지금 Redis가 산다'는 증거가 아니다.
+
+        회로는 시험 호출의 성공으로만 닫힌다 — 아무 성공이나 닫으면 열린 뒤에 도착한 낡은 성공
+        하나로 우회가 풀려, 죽은 Redis를 다시 두드리게 된다.
+        """
+        counter = CacheDegradationCounter(clock=FakeClock())
+        in_flight = counter.admit()  # 열리기 전에 나간 호출(아직 응답 대기 중)
+        for _ in range(3):
+            counter.record_failure("get", CacheBoomError("x"), admission=counter.admit())
+        assert counter.snapshot().breaker_open is True
+
+        counter.record_success(admission=in_flight)
+
+        snap = counter.snapshot()
+        assert snap.breaker_open is True
+        assert snap.consecutive_failures == 0  # 연속 실패 카운트만 돌아간다(기존 의미 유지)
+
+
+class TestCircuitBreakerAccounting:
+    """'작동한 비율' — 우회가 일했는지를 정상 응답과 별개로 숫자가 말한다."""
+
+    async def test_degradation_count_includes_bypassed_operations(self) -> None:
+        """측정 도구가 이 값의 증가로 연산 1건의 강등 여부를 판정한다 — 건너뛴 연산도 포함."""
+        clock = FakeClock()
+        cache, counter = _breaker_cache(ScriptedRedisClient(["fail"]), clock=clock)
+
+        for _ in range(3):
+            await cache.get("k")
+        assert cache.degradation_count == 3
+
+        before = cache.degradation_count
+        await cache.get("k")  # 우회로 건너뜀
+        assert cache.degradation_count == before + 1
+        # 실제 Redis 실패와는 별도로 센다.
+        assert counter.snapshot().total_failures == 3
+        assert counter.snapshot().skipped_calls == 1
+
+    async def test_bypass_ratio_is_skipped_over_all_operations(self) -> None:
+        """성공 2 + 실패 3 + 건너뜀 5 → 비율 0.5. 분자·분모가 서로 다른 회계를 섞지 않는다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["ok", "ok", "fail", "fail", "fail"])
+        cache, counter = _breaker_cache(client, clock=clock)
+
+        for _ in range(5):
+            await cache.get("k")
+        for _ in range(5):
+            await cache.get("k")  # 우회
+
+        snap = counter.snapshot()
+        assert (snap.successes, snap.total_failures, snap.skipped_calls) == (2, 3, 5)
+        assert snap.bypass_ratio == pytest.approx(0.5)
+
+    def test_bypass_ratio_is_none_when_there_were_no_operations(self) -> None:
+        """연산 0건은 0.0이 아니라 None — '측정 대상 없음'과 '우회 0%'를 구분한다."""
+        assert CacheDegradationCounter().snapshot().bypass_ratio is None
+
+    async def test_reset_closes_the_circuit_and_clears_the_new_counters(self) -> None:
+        clock = FakeClock()
+        cache, counter = _breaker_cache(ScriptedRedisClient(["fail"]), clock=clock)
+        for _ in range(4):
+            await cache.get("k")
+        assert counter.snapshot().breaker_open is True
+
+        counter.reset()
+
+        snap = counter.snapshot()
+        assert (snap.breaker_open, snap.breaker_opens, snap.skipped_calls, snap.successes) == (
+            False,
+            0,
+            0,
+            0,
+        )
+
+    async def test_instances_sharing_one_counter_share_the_circuit(self) -> None:
+        """전역 카운터를 쓰는 인스턴스들은 한 회로를 공유 — 죽은 Redis를 인스턴스마다 따로 두드리지 않는다."""
+        clock = FakeClock()
+        counter = CacheDegradationCounter(clock=clock)
+        client_a = ScriptedRedisClient(["fail"])
+        client_b = ScriptedRedisClient(["ok"])
+        cache_a, _ = _breaker_cache(client_a, clock=clock, counter=counter)
+        cache_b, _ = _breaker_cache(client_b, clock=clock, counter=counter)
+
+        for _ in range(3):
+            await cache_a.get("k")
+        assert await cache_b.get("k") is None
+
+        assert client_b.get_calls == []  # b는 자기 클라이언트를 부르지 않고 a가 연 우회를 따랐다
+        assert counter.snapshot().skipped_calls == 1
+
+
+class TestCircuitBreakerSettings:
+    async def test_threshold_comes_from_settings_not_the_counter_default(self) -> None:
+        """Settings의 임계(2)가 카운터 생성자 기본값(3)을 이긴다 — 배선이 끊기면 3번째에서야 열린다."""
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail"])
+        cache, _ = _breaker_cache(client, clock=clock, threshold=2)
+
+        for _ in range(5):
+            await cache.get("k")
+
+        assert len(client.get_calls) == 2
+
+    async def test_open_seconds_comes_from_settings(self) -> None:
+        clock = FakeClock()
+        client = ScriptedRedisClient(["fail", "fail", "fail", "ok"])
+        cache, _ = _breaker_cache(client, clock=clock, open_s=5.0)
+        for _ in range(3):
+            await cache.get("k")
+
+        clock.advance(4.5)
+        await cache.get("k")
+        assert len(client.get_calls) == 3  # 5초 창 안 — 우회
+
+        clock.advance(0.5)
+        await cache.get("k")
+        assert len(client.get_calls) == 4  # 5초 경과 — 시험
+
+    def test_defaults_match_the_documented_values(self) -> None:
+        """문서(config description·모듈 docstring)가 적은 기본값 3회·30초와 코드가 같다."""
+        from whymath_backend.config import Settings
+
+        settings = Settings()
+        assert settings.cache_breaker_failure_threshold == 3
+        assert settings.cache_breaker_open_seconds == 30.0
+
+    def test_settings_validation(self) -> None:
+        """임계 0은 '끔'으로 허용하지만 음수는 거부, 열림 시간은 양수여야 한다."""
+        import pydantic
+
+        from whymath_backend.config import Settings
+
+        assert Settings(cache_breaker_failure_threshold=0).cache_breaker_failure_threshold == 0
+        with pytest.raises(pydantic.ValidationError):
+            Settings(cache_breaker_failure_threshold=-1)
+        with pytest.raises(pydantic.ValidationError):
+            Settings(cache_breaker_open_seconds=0)
