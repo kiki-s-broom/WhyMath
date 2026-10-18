@@ -338,6 +338,18 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-18 (판정·P3-59): **M0672가 M0075에 가려지는 현상의 오늘의 해는 0 — 세션 권고는 현상 유지(안 ③)이며 분모를 바꾸는 안 ②와 신규 kebab 안 ①은 Kiki 결정 게이트로 넘겼다** (claude 판정, 결정은 미정) — 판정 기준 main `d33ab2e4`, 머지 전
+
+**무엇**: 태스크 `P3-59-m0672-shadowed-by-canonical-m0075`. 정본 = `docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md`. 코드·분모·카탈로그·크로스워크는 바꾸지 않았다(acceptance ③).
+
+**실측**: ①`product-rule-naive`의 승인 링크는 M0075 0.97 · M0672 0.85라 `select_canonical`이 M0075만 고른다 — 설계대로 도는 결과이고 기존 테스트가 이미 동결한다. ②학생 대면 교정 체인은 kebab 단위(`distractor_link`·`remediation_strategy`)라 M0672가 가려져도 같은 오답에 같은 교정이 나간다. canonical M-id의 소비처는 P3-06 리포트와 비노출 관측 로그(`crosslink_shadow`)뿐이다(`src/backend`에서 `select_canonical`·`resolve_canonical`·`canonical_mis_id` grep 범위). ③`shadowed`는 "산출"로 세므로 P3-06 종료 코드 1의 원인은 blocked 5개다. ④영향 문항 36건(오답 보기 36항목) — 24건은 문항 자체가 02-01·02-04를 함께 달고 12건은 02-04 단독이다.
+
+**발견(이 판정이 새로 낸 것)**: M0672를 M0075와 같은 0.97로 재서명하면 `select_canonical`이 동률(tie)로 canonical을 잃어 **M0075까지 내려간다**(실측: 0.97/0.97 → canonical 없음·ambiguous). 0.99면 M0672가 대신 canonical이 된다. "공평하게 올려 주자"가 둘 다 가리는 방향이다. 기존 테스트 두 곳이 RED가 되지만 이유를 말해 주지 않는다.
+
+**권고와 재판정 조건**: 안 ③ 현상 유지. 재판정 조건 2건 — 런타임 키를 canonical M-id로 전환하는 변경(`misconception_crosslink_mode`가 shadow를 벗어날 때) 착수 전 / M0672·M0075 신뢰도 재서명 시 동률 방지 확인. 안 ①은 MISC-40 판정문이 이미 기각한 중복 신설이고 연쇄 테스트 5곳(`len(CATALOG)==68` 등)이 따른다. 안 ②는 분모 12→11 또는 별칭 표기로 Kiki 몫이다.
+
+**한계**: 동률 입력으로 P3-06 CLI를 끝까지 돌리지는 않았다(분기 코드를 읽은 추론). 독립 비판(서브에이전트)은 받지 않았다. 환경 사실: 이 세션 컨테이너에는 백엔드 의존성이 없어 스크래치패드 가상환경에 `pip install -e src/backend[dev]`로 설치해 CLI를 돌렸다. 원격 claim push는 상시 403이라 읽기측 폴백으로 착수했다. 결정 게이트 = `G-p359-m0672-shadow-disposition`.
+
 ### 2026-10-17 (구현·MISC-61 2차): **Kiki 머신 2차 실행으로 M0418·M0417의 원천 `오개념_원인`을 확보 — `student_wrong_thinking`으로 매핑하고 나머지 두 칸은 AI 저작해 A3 4건의 세 필드를 모두 채웠다**
 
 **무엇**: 태스크 `MISC-61-a3-thin-misid-source-enrichment` 2차 이행(브랜치 `claude/fervent-ramanujan-jwdwxj` · 판정 기준 main `ad3cc2d1` · 머지 전). 정본 = `docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md` §2-d. 앞선 세션 `claude/peaceful-bell-s7mlg8`은 PR #1643 머지 뒤 브랜치가 삭제돼 원격 claim 0건이었고, 하네스의 끊긴 세션 재착수 경로(`unblock`→`start`)로 이 세션이 이어받았다.
