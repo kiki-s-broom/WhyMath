@@ -28,9 +28,12 @@ M-id로의 변환은 crosswalk(`docs/standards/crosswalk_gate_contract.md` · �
 - **재료가 없으면 훑지 않는다.** 답안이 없거나·문항에서 식을 못 뽑으면
   `MisconceptionScan.NOT_RUN`이다. 0건을 "오개념이 없었다"로 읽히게 하지 않는다. 정답은
   재료 부족이 아니다 — 채점 경로는 정답 답안도 넘긴다(EOS-123 · 아래 `scan_attempt_answer`).
-- **탐지 대상은 `canonical_wrong_form`을 가진 오개념뿐**이다(현재 카탈로그 68종 중 2종).
-  나머지 66종은 이 채널로 *잡히지 않으며*, 그 사실을 `scanned_forms`가 자기 기술한다 —
-  "훑었는데 없었다"의 범위를 응답이 스스로 말하게 한다(작동한 비율 원칙).
+- **탐지 대상은 두 독법이 볼 수 있는 오개념뿐**이다. ① `canonical_wrong_form`을 가진 거짓 항등식형
+  (현재 카탈로그 68종 중 2종 — `scanned_forms`) ② 미분 단원 오답 서명 규칙에 걸린 오개념
+  (`derivative_signature` — `signature_rules_scanned`, P3-56 후보). 나머지는 이 채널로
+  *잡히지 않으며*,
+  그 사실을 두 필드가 자기 기술한다 — "훑었는데 없었다"의 범위를 응답이 스스로 말하게 한다
+  (작동한 비율 원칙).
 - **문항 식 추출은 휴리스틱**이다. 그래서 구조 정합이 SymPy로 *증명*되어도 confidence를 1.0이
   아니라 `_STRUCTURAL_MATCH_CONFIDENCE`로 둔다(아래 상수 주석).
 - **학생 원문을 산출물에 담지 않는다**(미성년 PII) — 추상 오개념 id와 신호 라벨만 남긴다.
@@ -40,11 +43,19 @@ M-id로의 변환은 crosswalk(`docs/standards/crosswalk_gate_contract.md` · �
 
 from __future__ import annotations
 
+import logging
 import re
+from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from whymath_backend.config import get_settings
 from whymath_backend.l4.misconception.catalog import CATALOG
+from whymath_backend.l4.misconception.derivative_signature import (
+    DerivativeSignatureResult,
+    detect_derivative_signature,
+)
 from whymath_backend.l4.misconception.match_gate import apply_match_quality_gate
 from whymath_backend.l4.misconception.models import Misconception, MisconceptionMatch
 from whymath_backend.l4.misconception.wrong_form_match import matches_wrong_form
@@ -53,12 +64,15 @@ from whymath_backend.schema.assessment_evidence import (
     MisconceptionScan,
 )
 
+logger = logging.getLogger("whymath.l4.misconception.answer_signature")
+
 __all__ = [
     "ErrorSignature",
     "AttemptMisconceptionScanResult",
     "extract_error_signature",
     "detect_signature_matches",
     "scan_attempt_answer",
+    "DerivativeShadowRecord",
 ]
 
 # 구조 정합이 SymPy로 *증명*돼도 1.0을 주지 않는 이유: 증명된 것은 "이 등식이 그 거짓 규칙의
@@ -116,6 +130,52 @@ class AttemptMisconceptionScanResult(BaseModel):
             "0건 결과를 '카탈로그 전체에 없었다'로 읽지 못하게 범위를 함께 낸다."
         ),
     )
+    signature_rules_scanned: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "미분 오답 서명 규칙(`derivative_signature`) 중 이번에 적재돼 대조 대상이 된 규칙 수. "
+            "0이면 이 독법을 **돌리지 못했다**(규칙표 적재 실패) — 질문을 읽지 못해 빈 결과가 "
+            "나온 것과 다르다. 후자는 규칙 수가 그대로 실리고 후보만 비어 있다. "
+            "모드가 `off`·`shadow`면 독법이 호출자에게 노출되지 않으므로 항상 0이다."
+        ),
+    )
+    shadow_records: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "그림자 모드(`l4_derivative_signature_mode=shadow`)의 관측 레코드 — **불투명 JSON "
+            "문자열**이다. 이 결과는 워커 프로세스에서 만들어져 부모로 돌아오므로, 워커에서 직접 "
+            "로그를 남기면 풀 워커의 로깅 설정이 없어 조용히 사라진다. 그래서 관측을 결과에 실어 "
+            "보내고 부모(API 계층)가 해석 없이 기록한다. 그림자가 아니면 항상 빈 튜플."
+        ),
+    )
+
+
+class DerivativeShadowRecord(BaseModel):
+    """그림자 관측 1건 — **켰다면 무엇이 달라졌을지**만 담는다(학생 답·지문 미포함).
+
+    학생 답과 지문을 담지 않는 이유는 미성년 PII 규율이다. 대신 판정에 필요한 파생 사실만 싣는다:
+    질문을 읽었는가·정답이었는가·켰다면 새로 얹혔을 후보 id·어느 규칙인가. 오귀속률 평가는 이
+    레코드를 문항 id별 **우연 일치 기준선**과 비교하는 방식으로 한다(활성화 게이트 기준 참조).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["1.0.0"] = "1.0.0"
+    channel: Literal["derivative_signature"] = "derivative_signature"
+    rules_total: int = Field(ge=0, description="적재된 규칙 수. 0이면 독법을 돌리지 못했다.")
+    applicable: bool = Field(description="질문에서 함수식과 묻는 양을 읽었는가.")
+    answer_is_correct: bool | None = Field(
+        description="학생 답이 정답과 같은가. 질문을 못 읽었으면 None(모른다 ≠ 아니다)."
+    )
+    fired: bool = Field(description="켰다면 기존에 없던 후보가 게이트를 통과해 얹혔는가.")
+    added_candidate_ids: tuple[str, ...] = Field(description="켰다면 새로 얹혔을 후보 id.")
+    rule_ids: tuple[str, ...] = Field(description="후보를 낸 규칙 id.")
+    changes_top1: bool = Field(description="켜면 top-1 후보가 바뀌는가.")
+    attribution_unclear: bool = Field(
+        description="한 답이 둘 이상의 오개념에 걸려 귀속이 불명한가."
+    )
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 def _wrong_form_catalog() -> tuple[Misconception, ...]:
@@ -170,6 +230,43 @@ def detect_signature_matches(signature: ErrorSignature) -> list[MisconceptionMat
     return matches
 
 
+_INERT_DERIVATIVE = DerivativeSignatureResult(matches=(), applicable=False, rules_total=0)
+"""독법을 부르지 않았을 때의 결과 — `off`와 `shadow`의 반환 조립에 쓴다(후보 0·읽지 못함)."""
+
+
+def _read_derivative_channel(
+    question_text: str, student_answer: str, *, report_correctness: bool = False
+) -> DerivativeSignatureResult:
+    """미분 오답 서명 독법을 돌린다 — 규칙표가 깨져도 기존 거짓형 채널은 죽이지 않는다.
+
+    적재 실패는 **조용히 삼키지 않고** 예외 타입명을 로그에 남기며(시크릿·필드값 제외), 결과의
+    `signature_rules_scanned=0`으로 "이 독법을 돌리지 못했다"가 드러난다. 데이터 결함 자체는 규칙표
+    적재 테스트가 CI에서 막으므로 이 경로는 배포 산출물에서 코퍼스가 빠진 경우의 안전망이다.
+    """
+    try:
+        return detect_derivative_signature(
+            question_text, student_answer, report_correctness=report_correctness
+        )
+    except Exception as exc:  # noqa: BLE001 — 새 독법의 실패가 기존 채널을 죽이지 않게 격리한다
+        logger.error("미분 오답 서명 독법 적재 실패: %s", type(exc).__name__)
+        return _INERT_DERIVATIVE
+
+
+def _merge_matches(
+    first: list[MisconceptionMatch], second: tuple[MisconceptionMatch, ...]
+) -> list[MisconceptionMatch]:
+    """두 독법의 후보를 오개념 id별 최고 신뢰도 하나로 합쳐 신뢰도 내림차순으로 낸다.
+
+    게이트는 입력을 재정렬하지 않고 `matches[0]`을 top-1으로 신뢰하므로 여기서 정렬한다.
+    """
+    best: dict[str, MisconceptionMatch] = {}
+    for match in (*first, *second):
+        current = best.get(match.misconception.id)
+        if current is None or match.confidence > current.confidence:
+            best[match.misconception.id] = match
+    return sorted(best.values(), key=lambda m: m.confidence, reverse=True)
+
+
 def scan_attempt_answer(
     *, question_text: str, student_answer: str | None
 ) -> AttemptMisconceptionScanResult:
@@ -191,18 +288,51 @@ def scan_attempt_answer(
     (`build_assessment_evidence`가 False를 ValueError로 거부한다 — 그 경계를 우회하지 않는다).
     """
     scanned_forms = len(_wrong_form_catalog())
-    if student_answer is None:
+    if student_answer is None or not student_answer.strip():
         return AttemptMisconceptionScanResult(scan=MisconceptionScan.NOT_RUN)
+    mode = get_settings().l4_derivative_signature_mode
     signature = extract_error_signature(question_text, student_answer)
-    if signature is None:
+    old_matches = detect_signature_matches(signature) if signature is not None else []
+
+    # 모드: off=독법을 부르지 않는다(비트동일) · shadow=돌리되 반환은 off와 같다 · on=합류.
+    derivative = (
+        _INERT_DERIVATIVE
+        if mode == "off"
+        else _read_derivative_channel(
+            question_text, student_answer, report_correctness=(mode == "shadow")
+        )
+    )
+    effective = derivative if mode == "on" else _INERT_DERIVATIVE
+    result = _assemble(signature, old_matches, effective, scanned_forms)
+    if mode != "shadow":
+        return result
+    try:
+        record = _shadow_record(old_matches, derivative)
+    except Exception as exc:  # noqa: BLE001 — 관측이 훑기를 깨뜨리지 않는다(예외 타입명만 남김)
+        logger.error("미분 오답 서명 그림자 관측 실패: %s", type(exc).__name__)
+        return result
+    return result.model_copy(update={"shadow_records": (record,)})
+
+
+def _assemble(
+    signature: ErrorSignature | None,
+    old_matches: list[MisconceptionMatch],
+    derivative: DerivativeSignatureResult,
+    scanned_forms: int,
+) -> AttemptMisconceptionScanResult:
+    """두 독법의 결과로 훑기 결과를 조립한다 — `off`·`shadow`·`on`이 같은 조립 경로를 쓴다."""
+    if signature is None and not derivative.applicable:
+        # 두 독법 모두 재료를 못 읽었다 — 0건을 '오개념 없음'으로 읽히게 하지 않는다.
         return AttemptMisconceptionScanResult(scan=MisconceptionScan.NOT_RUN)
 
-    gated = apply_match_quality_gate(detect_signature_matches(signature))
+    merged = _merge_matches(old_matches, derivative.matches)
+    gated = apply_match_quality_gate(merged)
     if not gated.matches:
         return AttemptMisconceptionScanResult(
             scan=MisconceptionScan.RAN_NO_CANDIDATE,
             signature=signature,
             scanned_forms=scanned_forms,
+            signature_rules_scanned=derivative.rules_total,
         )
     return AttemptMisconceptionScanResult(
         scan=MisconceptionScan.RAN_WITH_CANDIDATES,
@@ -218,4 +348,26 @@ def scan_attempt_answer(
         ),
         signature=signature,
         scanned_forms=scanned_forms,
+        signature_rules_scanned=derivative.rules_total,
     )
+
+
+def _shadow_record(
+    old_matches: list[MisconceptionMatch], derivative: DerivativeSignatureResult
+) -> str:
+    """'독법을 켰다면 무엇이 달라졌는가'를 JSON 한 줄로 — 학생 답·지문은 담지 않는다."""
+    off = apply_match_quality_gate(_merge_matches(old_matches, ()))
+    on = apply_match_quality_gate(_merge_matches(old_matches, derivative.matches))
+    ids_off = [m.misconception.id for m in off.matches]
+    ids_on = [m.misconception.id for m in on.matches]
+    added = tuple(i for i in ids_on if i not in ids_off)
+    return DerivativeShadowRecord(
+        rules_total=derivative.rules_total,
+        applicable=derivative.applicable,
+        answer_is_correct=derivative.answer_is_correct,
+        fired=bool(added),
+        added_candidate_ids=added,
+        rule_ids=tuple(sorted({sig for m in derivative.matches for sig in m.matched_signals})),
+        changes_top1=bool(ids_on) and (not ids_off or ids_on[0] != ids_off[0]),
+        attribution_unclear=on.attribution_unclear,
+    ).model_dump_json()

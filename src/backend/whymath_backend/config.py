@@ -375,6 +375,26 @@ class Settings(BaseSettings):
         ),
     )
 
+    l4_derivative_signature_mode: Literal["off", "shadow", "on"] = Field(
+        default="off",
+        description=(
+            "답안 훑기의 **미분 오답 서명 독법**(`l4.misconception.derivative_signature`·"
+            "P3-56 후보 구현)을 어떻게 쓸지. 3값: **`off`(기본·opt-in)** = 이 독법을 아예 "
+            "부르지 않는다 — 훑기는 종전과 비트동일하고 SymPy 비용도 늘지 않는다. "
+            "**`shadow`** = 독법을 *라이브로 돌리되* 학생에게 가는 결과·가설 갱신·교정은 "
+            "`off`와 똑같고, '켰다면 무엇이 달라졌는가'만 관측 레코드로 남긴다"
+            "(`whymath.api.attempt_scan_shadow.record` 로거에 JSON 한 줄·학생 답과 지문 "
+            "미포함·문항 id만). 켜기 전 **실제 학생 오답에서의 발화율을 우연 일치 "
+            "기준선과 비교**하는 근거 수집용이다. **`on`** = 독법의 후보를 기존 후보와 "
+            "합쳐 같은 품질 게이트(0.65)로 노출한다. `on`은 활성화 게이트"
+            "(`G-p356-signature-activation`)가 PASS하기 전에는 켜지 않는다. 모드는 워커 "
+            "프로세스 풀이 상주하므로 **앱 재기동으로** 바뀐다. "
+            "WHYMATH_L4_DERIVATIVE_SIGNATURE_MODE=shadow|on으로 켠다. 상위 킬 스위치 "
+            "`l4_attempt_misconception_scan_enabled`가 False면 이 값과 무관하게 훑기 "
+            "자체가 없다."
+        ),
+    )
+
     l4_server_theta_enabled: bool = Field(
         default=True,
         description=(

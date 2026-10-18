@@ -968,7 +968,10 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.distractor_link",
        "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
        "l4.misconception.answer_signature", "l4.misconception.remediation_strategy",
-       "api._attempt_misconception_scan"),
+       "api._attempt_misconception_scan",
+       # P3-56 후보 — 미분 오답 서명 독법(단답형 오답 → 후보). Kiki 승인 전에는 머지하지 않는다.
+       "l4.misconception.derivative_signature",
+       "l1.misconception.wrong_answer_signature_table", "schema.wrong_answer_signature"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
        "l4.misconception.hypothesis",
