@@ -1376,6 +1376,16 @@ NODES: list[dict] = [
 
 
 def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="골든셋 v1 생성기")
+    ap.add_argument(
+        "--out-dir",
+        type=Path,
+        default=OUT_DIR,
+        help="산출 폴더(기본: 정본 위치 · 테스트는 임시 폴더)",
+    )
+    out_dir = ap.parse_args().out_dir
     standards = json.loads(STANDARDS.read_text(encoding="utf-8"))["standards"]
     by_code_2022 = {s["code"]: s for s in standards if s.get("curriculum_revision") == "2022 개정"}
     mis = json.loads(MISCONCEPTIONS.read_text(encoding="utf-8"))["misconceptions"]
@@ -1440,7 +1450,7 @@ def main() -> int:
             }
         )
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     golden = {
         "golden_version": "rubric_v1",
         "built_on": date.today().isoformat(),
@@ -1465,10 +1475,10 @@ def main() -> int:
     }
     body = json.dumps(golden, ensure_ascii=False, indent=1)
     golden["digest"] = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    (OUT_DIR / "golden.json").write_text(
+    (out_dir / "golden.json").write_text(
         json.dumps(golden, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
     )
-    (OUT_DIR / "_provenance.json").write_text(
+    (out_dir / "_provenance.json").write_text(
         json.dumps(
             {
                 "pool": "whymath-original",
