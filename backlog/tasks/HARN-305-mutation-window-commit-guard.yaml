@@ -19,5 +19,5 @@ session: null
 notes: |-
   ADMIN-18 PR 1551 사고 기록. MEMORY 2026-10-09 참조.
 
-  [차단 2026-10-19] D5 12/31 동결(CLAUDE.md 12/31 내부 검증 기간 규칙 2) — 해제 2027-01-01
+  [차단 2026-10-19] D5 12/31 동결(docs/strategy/internal_verification_period_policy_2026-12-31.md 규칙 2) — 해제 2027-01-01
 updated: 2026-10-19

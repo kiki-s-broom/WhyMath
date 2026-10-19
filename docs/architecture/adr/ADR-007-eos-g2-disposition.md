@@ -1,6 +1,6 @@
 # ADR-007 — EOS 선언 G2·G3·G4의 앵커·CU 조건을 개정한다 (기준 완화 — 삭제·이동·이월 조건을 전부 명시)
 
-- **상태:** **Accepted** — Kiki 결정 D1=(a) 2026-10-19. 독립 검토(2026-10-19) 1·2회차 반영판(v2.1 — G3에 HIT ≤8분 명시).
+- **상태:** **Accepted** — Kiki 결정 D1=(a) 2026-10-19. 독립 검토(2026-10-19) 1~3회차 반영판(v2.2 — G3 HIT ≤8분 명시 · 맥락 표 ② 귀속 정정).
 - **결정일:** 2026-10-19
 - **대상:** `docs/strategy/eos_transition_declaration_2026-08-30.md` §6·부록 B~E의 G2·G3·G4 조건 · `backlog/gates.yaml` `G-eos-g1~g5`(CLI `backlog.py gates add`로 등재)
 - **관련:** 감리보고서 2026-10-19 W-01·W-02·W-06 · `docs/reviews/eos_anchor_asset_audit_2026-09.md` · `docs/reviews/eos_validation_n1_n10_gap_review_2026-08-30.md` · `docs/reviews/eos_phase2_gate2_judgment_2026-09-19.md` · `G-p3-w3-release-merged` · `G-internal-completion-2026-12-31` · EOS-135(G4 학생 표본 → 내부 테스트 계정, 2026-09-24 기확정)
@@ -15,7 +15,7 @@
 |---|---|
 | 선언 G2(10/25) 원문 = 중등 2앵커(A3 중2 확률·A4 중3 이차방정식) 각 60 CU + HIT 중앙값 ≤8분 + 자동검증 ≥70% | 선언 부록 B·E |
 | G1~G5 중 `gates.yaml`에 등재된 것 0건(2026-10-18). 선언 §1.3-2 "직전 주 순차 등재"에 책임자 없음 | `grep 'G-eos-g' backlog/gates.yaml` 0 |
-| G1 원문 3조건의 착지: ①앵커 1개 E2E = EOS-58(#914) ②HIT·실패코드 이벤트 적재 = EOS-54(#909)·N5(#912) ③Core→Math 정적 의존 0 = lint-imports 4계약 KEPT(`src/backend/pyproject.toml`)·`G-required-tier-caller-recheck` cleared; 필수층 Frozen 구현 커밋 `ed3d14da`(2026-09-28)는 호출자 0의 증거 | `eos_validation_n1_n10_gap_review_2026-08-30.md:24,71` |
+| G1 원문 3조건의 착지: ①앵커 1개 E2E = EOS-58(#914) ②HIT·실패코드 이벤트 적재 = EOS-54/N3(#909: `ops/hit_cu_metrics.py`·`review_timer_event`), N5(#912)는 잔여 3축 ③Core→Math 정적 의존 0 = lint-imports 4계약 KEPT(`src/backend/pyproject.toml`)·`G-required-tier-caller-recheck` cleared; 필수층 Frozen 구현 커밋 `ed3d14da`(2026-09-28)는 호출자 0의 증거 | `eos_validation_n1_n10_gap_review_2026-08-30.md:24,71` |
 | A3 문항 0건. A4 691(승인 378, 전부 결정론 생성, LLM 저작 0). A6 693(Phase 3 대표 과정) | 코퍼스 집계 2026-10-18 |
 | 9/22 이후 투입은 전부 Phase 3 대표 과정(`12미적Ⅰ` 02-01~02-10 = 앵커 A6 부분집합) | MEMORY 2026-09-22~10-18 |
 | HIT 유효 실측 0건(카나리 15건은 재입력 세션으로 무효). 주간 KPI cron은 KPI 6종 전부 measured:false | `G-eos-first-run-canary-review` evidence · `ops/weekly-metrics-*` 브랜치 |
