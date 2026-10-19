@@ -338,8 +338,10 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
-### 2026-10-19 (수정 · WP-A 4회차): 3회차 검토 잔여 10건 중 닫힌 것 10건(패킷 열거분 전부) · 남은 것 #14(Kiki 승인 대기)·D4(10/31 결정) — `backlog/gates.yaml`·HARN 3건 태스크를 origin/main으로 되돌리고 G1~G5를 CLI로 재등재(손편집 0), G1은 `--no-inputs` 사후 등재 후 `--as kiki` clear(evidence에 #909 귀속·`ed3d14da`·판정 기준 `fa8d83dd`; #912는 '잔여 3축'으로 정정). ADR-007 v2.2(맥락 표 ② 귀속 정정)·README 소재·방침 예외 목록(HARN-210 추가)·MEMORY 과장 정정. P1 HARN 3건 `block --handover` 재차단(해제 2027-01-01).
+### 2026-10-19 (수정 · WP-A 4회차): 3회차 검토 잔여 10건 중 닫힌 것 10건(패킷 열거분 전부) · 남은 것 #14(Kiki 승인 대기, PR 없음)·D4(10/31 결정) — `backlog/gates.yaml`·HARN 3건 태스크를 origin/main으로 되돌리고 G1~G5를 CLI로 재등재(손편집 0), G1은 `--no-inputs` 사후 등재 후 `--as kiki` clear(evidence에 #909 귀속·`ed3d14da`·판정 기준 `fa8d83dd`; #912는 '잔여 3축'으로 정정). ADR-007 v2.2(맥락 표 ② 귀속 정정)·README 소재·방침 예외 목록(HARN-210 추가)·MEMORY 과장 정정. P1 HARN 3건 `block --handover` 재차단(해제 2027-01-01).
 이벤트 원장(`backlog/events/`)에는 2~4회차의 gate_add·gate_clear·block이 재실행분까지 누적된다 — 되돌림은 YAML만 되돌리고 이벤트는 append-only라, 원장의 건수는 '현재 상태'가 아니라 '시도 이력'으로 읽어야 한다.
+
+2026-10-19 D8=(가) ARCH-103 보류(브랜치 보존). WP-A 4회차 검토 머지 가능 — 잔여 하 1건: G1 evidence 근거 인용 :24,71에 #914 출처(:342) 누락 — cleared evidence는 CLI로 정정 불가라 기록만(2027-01 하네스 안건: cleared 게이트 evidence 정정 경로 부재)
 
 ### 2026-10-19 (수정 · WP-A 3회차): 잔여 9건 중 닫은 것 — G3 제목에 HIT 중앙값 ≤8분 집행(ADR-007 v2.1 동기화) · G1 evidence 정정은 `gates amend --evidence`가 `--verdict FAIL` 전용이라 거부돼 `--note`로 대체(거부 메시지 그대로 보고) · 12/31 내부 검증 기간 절을 `docs/strategy/internal_verification_period_policy_2026-12-31.md`로 이동(D7=(a), CLAUDE.md는 참조 1줄+버전 로그) · 2회차 "삭제 줄 0"·"19건 전부" 과장 정정. 남은 것: #14(Kiki 승인 대기, PR 없음) · 신규 #2·#7(G1 evidence — 4회차에서 대장 재구축으로 처리). lint-imports(UTF-8 재실행): 7계층 단방향 · EOS Core→Math(baseline 0) · EOS Core→Math(baseline 있음) · 데이터 접근 금지 — 4 contracts kept·0 broken(882 files·7,571 dependencies) — cp949 출력 크래시는 `PYTHONIOENCODING=utf-8`로 회피. (사용자 결정, claude 기록)
 
