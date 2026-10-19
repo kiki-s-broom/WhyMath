@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: math
 layer: infra
-status: todo
+status: blocked
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,5 +16,8 @@ acceptance:
 artifacts: []
 paths: []
 session: null
-notes: ADMIN-18 PR 1551 사고 기록. MEMORY 2026-10-09 참조.
-updated: 2026-10-09
+notes: |-
+  ADMIN-18 PR 1551 사고 기록. MEMORY 2026-10-09 참조.
+
+  [차단 2026-10-19] D5 12/31 동결(CLAUDE.md 12/31 내부 검증 기간 규칙 2) — 해제 2027-01-01
+updated: 2026-10-19
