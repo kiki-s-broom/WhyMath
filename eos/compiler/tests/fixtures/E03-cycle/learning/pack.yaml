@@ -1,0 +1,8 @@
+# 테스트 픽스처 — apps 이름은 가명이다(설계 문서 §5 경계 설명에서 지음). 실제 App 설계 시 교체한다.
+schema: eos.pack/v1
+id: learning
+kind: capability
+apps: [lesson, practice, progress, mastery-update, recommend]
+requires: [foundation, knowledge, assessment]
+db_schema: learning
+subject_adapter: required

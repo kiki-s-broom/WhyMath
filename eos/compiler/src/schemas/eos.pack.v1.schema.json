@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://whymath.eos/schemas/eos.pack.v1.schema.json",
+  "title": "EOS Pack 선언 (eos.pack/v1)",
+  "description": "pack.yaml 구조 계약. 설계 문서 §7 ②. 키 7개 고정·미정의 키 금지(v0.1은 구조만 선언하고 논리를 넣지 않는다). kind에서 content를 제외한 것은 Content Pack이 content.yaml(eos.content/v1)로 선언되기 때문(검토 F3 결정).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "kind", "apps", "requires", "db_schema", "subject_adapter"],
+  "properties": {
+    "schema": { "const": "eos.pack/v1" },
+    "id": { "$ref": "#/$defs/kebab" },
+    "kind": { "enum": ["capability", "domain"] },
+    "apps": { "type": "array", "items": { "$ref": "#/$defs/kebab" } },
+    "requires": { "type": "array", "items": { "$ref": "#/$defs/kebab" } },
+    "db_schema": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "subject_adapter": { "enum": ["required", "none"] }
+  },
+  "$defs": {
+    "kebab": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" }
+  }
+}

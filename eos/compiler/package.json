@@ -1,0 +1,23 @@
+{
+  "name": "@whymath/eos-compiler",
+  "private": true,
+  "version": "0.0.0",
+  "description": "EOS Compiler — pack.yaml 선언(eos.pack/v1) 로더·검증기. 설계 정본: EOS 멀티과목 아키텍처 문서(2026-10-08) §7·§8. 이 패키지의 version은 npm 형식 요건일 뿐이며 Pack·App에는 SemVer를 붙이지 않는다(§4).",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "tsx src/cli.ts check",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  }
+}

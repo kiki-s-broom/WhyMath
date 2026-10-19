@@ -1,0 +1,12 @@
+schema: eos.pack/v1
+id: foundation
+kind: capability
+apps:
+  - profile
+  - settings
+  - session
+  - consent
+  - logging
+requires: []
+db_schema: foundation
+subject_adapter: none

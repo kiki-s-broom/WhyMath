@@ -1,0 +1,8 @@
+schema: eos.pack/v2
+id: Bad_Id
+kind: capability
+apps: [a1, a2, a3, a4, a5]
+requires: []
+db_schema: bad
+subject_adapter: none
+flow: [diagnose, teach]

@@ -1,0 +1,9 @@
+schema: eos.pack/v1
+id: assessment
+kind: capability  # capability | domain | content
+apps: [diagnostic, problem-player, answer-input,
+       answer-checker, scoring, assessment-result]
+requires: [foundation, knowledge]  # 의존하는 Pack (순환 금지)
+db_schema: assessment  # PostgreSQL 스키마 이름 = 테이블 소유권
+subject_adapter: required  # 과목 Adapter가 있어야 동작하는가
+flow: [diagnose, teach]

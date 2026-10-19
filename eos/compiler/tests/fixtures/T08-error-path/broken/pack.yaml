@@ -1,0 +1,7 @@
+schema: eos.pack/v1
+id: broken
+kind: capability
+apps: [a1, a2, a3, a4, a5]
+requires: [foundation, "Bad Name"]
+db_schema: broken
+subject_adapter: none

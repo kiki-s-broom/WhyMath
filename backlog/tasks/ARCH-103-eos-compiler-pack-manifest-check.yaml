@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-103-eos-compiler-pack-manifest-check
+title: "EOS Compiler 첫 조각 — pack.yaml(eos.pack/v1) 로더·검증기 + eos check CLI"
+track: infra-debt
+stage: S4
+subject: math
+layer: infra
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "eos/compiler/에 YAML 로더 + JSON Schema(Ajv 2020-12) 구조 검증 + 의미 규칙(중복·자기요구·미존재 requires·순환·capability→domain·db_schema 소유권)이 있고, 같은 입력에 같은 출력(정렬된 진단)을 낸다. LLM·AI SDK import 0건(ARCH-005)."
+  - "vitest 15건(정상 10·잘못된 입력 5) 통과, tsc --noEmit 통과. CLI eos check <dir>는 통과 0·오류 1·사용법 2로 종료한다."
+  - "설계 문서(2026-10-08) §7 ②와 어긋나게 결정한 항목(kind에서 content 제외·subject_adapter none·apps 5~7 경고·PACK_REQUIRES_DOMAIN 추론 규칙)은 스키마 description·코드 주석·TODO_EOS.md에 근거를 남긴다."
+artifacts: []
+paths:
+  - "eos/compiler/**"
+  - TODO_EOS.md
+session: claude/eos-compiler-pack-check
+notes: |-
+  출처: Kiki 지시 '[Pack 매니페스트 DSL 파서 + 검증기]' + 설계 문서 'EOS 멀티과목 수학앱 이상적 아키텍처 — Small App Pack + DSL + Compiler'(2026-10-08). 모노레포(pnpm workspace·Turborepo) 전환과 app/content/product/part 스키마 4종은 후속 태스크. 루트 CI 잡에 eos/compiler 테스트는 아직 미배선.
+
+  [정정 2026-10-19] track subject-expansion → infra-debt: 트랙 오지정 정정: EOS Compiler는 과목 지식이 없는 Factory 인프라(설계 문서 §2 '위 3계층은 과목 독립')이므로 subject-expansion(G-s5 하드락)이 아니라 infra-debt가 맞다
+updated: 2026-10-19
