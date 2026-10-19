@@ -57,6 +57,27 @@
 | **OP_07** | 해석오류 | 문항 요구·정의를 오독(반대쪽 선택, '또는'↔'그리고') | 해석오류 | `select-opposite-root` |
 | **OP_08** | 과잉일반화 | 조건부 규칙의 무조건 적용, 자연수 직관의 분수·음수·허수 전이 | **DB enum 부재 → 신설 제안**(현재 해석오류·미분류로 산재) | (없음) |
 
+### §2.1 원 정의 실사 — EOS-LABS 다섯 저장소 대조 (2026-10-19)
+
+`OP_01~08`의 **열거 정의는 EOS 쪽 저장소 5개에도 없다**(`doldori7/eos-labs-factory`·`eos-orchestrator`·`eos-lab-contracts`·`P001-math-error-lab`·`eos-whymath-governance`, 각 HEAD `029642e`·`ca51dc0`·`0e77a52`·`df87a21`·`622b1e4` 기준 전수 grep). 리터럴 출현은 거버넌스 저장소의 표준서 사본(21장 예시 라벨·24장 "오개념 유형(OP_01~OP_08)")과 진단 프롬프트 S05("오답 선택지의 op-code(OP_01~08)")·S06(자산 인벤토리 "오답 op-code 8 (OP_01~08)")뿐이며 모두 **참조**다. 즉 OP_nn은 설계 전반에서 "8종의 오답 생성 연산 코드"로 **전제**됐지만 어느 문서도 8종을 적지 않았다 — 본 루브릭 §2 표가 첫 열거다.
+
+EOS 쪽의 실질적 오류 분류 원형은 **P001 math-error-lab**의 `errorType` 12종(`docs/ERROR_TAXONOMY.md`·`contracts/misconception.detection-v1.schema.json` enum)과 오개념 코드 `MC-<FAMILY>-NNN` 12패밀리 34종(`data/misconceptions.ts`)이다. 이것은 **풀이 단계 검증기**(식 변형의 첫 오류 단계 탐지)의 분류라 대수 절차 중심이고, 객관식 선지 설계에 필요한 해석오류·대상혼동·과잉일반화 축이 없다. 아래가 세 체계의 대조표다(P001 열은 **역방향 호환** — P001 출력을 OP로 접을 때 쓰며, OP를 P001로 펼칠 수는 없다).
+
+| OP | WhyMath `error_type` | P001 `errorType` | P001 `MC-` 패밀리 | kebab op-code |
+|---|---|---|---|---|
+| OP_00 | — | `ARITHMETIC_ERROR` | `MC-ARITH` | — |
+| OP_01 | 부호오류 | `SIGN_ERROR` | `MC-SIGN` | `inequality-no-sign-flip`·`factor-sign-flip-root` |
+| OP_02 | 분배누락 | `DISTRIBUTIVE_PROPERTY_ERROR` | `MC-DIST` | `power-distributed-no-cross-term`·`chain-rule-omit-inner`·`sine-distributed-over-sum` |
+| OP_03 | 공식혼동 | `FRACTION_OPERATION_ERROR`·`EXPONENT_RULE_ERROR`·`LIKE_TERM_ERROR`·`TRANSFORMATION_ERROR` | `MC-FRAC`·`MC-EXP`·`MC-LIKE`·`MC-TRANS` | — |
+| OP_04 | 조건무시 | `EQUATION_BALANCE_ERROR` | `MC-EQBAL` | `root-loss-divide-by-variable` |
+| OP_05 | 순서오류 | `ORDER_OF_OPERATIONS_ERROR`·`VARIABLE_ISOLATION_ERROR` | `MC-OOO`·`MC-VARISO` | — |
+| OP_06 | 차원혼동·극값/극대극소/값좌표혼동 | (없음) | (없음) | `mean-reported-for-median`·`select-opposite-extremum`·`report-x-coordinate-for-value` |
+| OP_07 | 해석오류 | (없음) | (없음) | `select-opposite-root` |
+| OP_08 | (신설 제안) | (없음) | (없음) | — |
+| 추적 불가 | None(미분류 105건) | `UNSUPPORTED_STEP`·`UNKNOWN_ERROR` | `MC-UNSUP`·`MC-UNKNOWN` | — |
+
+읽는 법: OP_06~08은 WhyMath 객관식 설계에서만 필요한 축이라 P001에 대응이 없는 것이 정상이고, 반대로 P001의 `ARITHMETIC_ERROR`는 오개념이 아닌 계산 실수라 OP_00이다. 두 체계는 **용도가 다르다**(선지 생성 vs 단계 오류 탐지) — 통합하지 말고 이 대조표로 잇는다. P001 쪽 EOS 별칭은 `MIS-<CAT>-<NNN>`(저장 코드 `MC-` 유지 — `docs/EOS_CONTRACT.md`).
+
 **추적 가능성 요건**: 오답 선지마다 ⓐ `op_code` ⓑ `derivation`(정답 절차에 그 연산을 적용하면 이 값이 나온다는 1문장) ⓒ `misconception_id`(DB M-id) 또는 **신설 제안 블록** `misconception_proposal{proposal_id, canonical_statement, student_wrong_thinking, standard_code, error_type}`. OP_00만 ⓒ를 생략할 수 있다.
 
 **골든셋 제작 중 DB 발견(정정 후보)**: `M0509`("분자÷분자, 분모÷분모로 따로 나눈다", `[6수01-11]`)는 **값이 보존되는 올바른 방법**이다(a/b ÷ c/d = (a÷c)/(b÷d)). 오답 선지를 만들 수 없으므로 `distractor_rule`로 쓰면 안 되고, "절차가 어색하나 오류는 아님"으로 재분류하거나 삭제 대상이다. 또 `M0416`(`a+b=c`)·`M0419`(`중앙값=평균`) 등 `error_type: None` 행은 §2 표로 분류 가능하다.
