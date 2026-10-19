@@ -393,6 +393,67 @@ gates:
     cleared_by: null
     notes: ""
     corrections: []
+  - id: G-eos-g1
+    title: "EOS G1(9/27) 계측 가능 파이프라인 — Core→Math 정적 의존 0 (사후 등재, ADR-007)"
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-19
+    remind_after_days: null
+    evidence: "schema/subject_adapter.py 2026-09-27 Frozen(unexercised) + lint-imports 4 KEPT + G-required-tier-caller-recheck cleared"
+    cleared_by: kiki
+    notes: ""
+    corrections: []
+  - id: G-eos-g2
+    title: "EOS G2(10/25→재판정 11/8) — ADR-007 개정: A6 LLM 저작 회차 1회 ≥30 CU 산출물(GenerationLog 포함) 저장소 커밋 + HIT 측정 체계(OPS-90 하한 가드) 착지. 10/25 시점 판정 불능(미등재·미측정) 기록"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 6
+    evidence: null
+    cleared_by: null
+    notes: "원문 조건(A3·A4 각 60 CU·HIT≤8분·자동검증≥70%)은 2027-01 이월 — 기준 완화(ADR-007)"
+    corrections: []
+    depends_on:
+      - OPS-90-hit-lower-bound-implausible-review
+  - id: G-eos-g3
+    title: "EOS G3(11/22) — ADR-007 개정: A6 ≥30 CU + HIT 유효 표본 ≥15 + 자동검증 1차 통과율 산출됨"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 34
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - OPS-90-hit-lower-bound-implausible-review
+  - id: G-eos-g4
+    title: "EOS G4(12/13) — 누적 ≥60 CU(두 번째 앵커 포함) + 자동검증 1차 통과율 ≥70% + 내부 테스트 계정 표본 ≥20(EOS-135) + P0 결함 0"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 55
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 재료는 그 시점의 누적 산출물(WP-F 두 번째 앵커 회차)과 내부 테스트 계정 표본이며, 대장의 단일 선행 태스크가 아니라 Kiki 판정이다 — EOS-135가 내부 테스트 계정 표본 ≥20을 확정했다"
+  - id: G-eos-g5
+    title: "EOS G5(12/27 데이터 동결 → 12/31 Go/Conditional Go/No-Go) — 증거 문서 1장(M1~M8 전부 값·ARCH-67 기록·경계 위반 0·태그). F-Ⅰ~Ⅴ는 선언 원문 그대로 판정"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 73
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "판정 재료는 12/27 데이터 동결 시점의 증거 문서 1장과 선언 부록 B~E의 F-Ⅰ~Ⅴ 원문이며, 대장의 단일 선행 태스크가 아니라 Kiki 판정이다 — WP-G가 증거 문서를 만든다"
   - id: G-eos-ip-separation-evidence
     title: "겸직 IP 귀속 분리 증빙 — ①개인 장비·개인 계정·개인 시간 작업 사실 증빙(커밋 타임스탬프 등) ②재직사 자산·데이터 무사용 확인서 자체 작성·보관 ③신설 법인 설립 시 IP 양도 계약 예정 기록. 12/31 산출물 전체의 귀속 리스크·투자 실사 항목(전환 설계서 §1.1-b, 2h 소요)"
     kind: human
@@ -633,7 +694,7 @@ gates:
     remind_after_days: 94
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[2026-10-19] ③ 교체 D4 결정 대기(10/31) — 후보: WP-C·F 산출물(cu.jsonl·weekly.json) 커밋 존재. G1~G5 등재 완료(ADR-007)"
     corrections: []
     depends_on:
       - P3-17-week3-release-gate-judgment

@@ -65,8 +65,9 @@ python3 scripts/harness/adr_number_check.py
 | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Frozen (unexercised)** (2026-09-27 G1 판정 · 이전 Provisional) | main |
 | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | AI Gateway = L3 라우터 단일 경유 · 3축 라우팅 · 개방 포트폴리오 · 불변 검증 계약 | 채택 (기존 결정의 정본화) | main |
 | [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) | 학습 상태 머신 8상태 채택 · 상태를 저장하지 않고 전이 원장에서 파생 | 채택 (2026-09-03 보류의 번복 · 게이트 판정 ②) | main |
+| [ADR-007](./ADR-007-eos-g2-disposition.md) | EOS G2·G3·G4 조건 개정(기준 완화) | Accepted (Kiki 2026-10-19 · D1=(a)) | 이 PR(미머지) |
 
-**다음 빈 번호: ADR-007** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
+**다음 빈 번호: ADR-008** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
 
 ---
 

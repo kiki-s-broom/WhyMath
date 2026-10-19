@@ -246,6 +246,8 @@ CMS를 지나치게 예쁘게 만들 필요는 없다. **운영 가능성 > UI �
 
 실제 학생 계정에서 다음 전체 과정이 **사람이 DB를 직접 수정하지 않고** 동작해야 한다.
 
+[D2 교체 2026-10-19: '실제 학생 계정' → 내부 테스트 계정 ≥20. 근거 ARCH-66 ⑥(학생 참여 12/31 이후)·EOS-135 동형. 원문 조건은 G-student-work-after-internal-completion으로 이관]
+
 진단 → 추천 → 학습 → 문제 → 답안 → 채점 → 오개념 → Hint/Tutor → Mastery Update → Next Recommendation
 
 ### Gate B — 콘텐츠
