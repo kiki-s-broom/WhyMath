@@ -402,8 +402,9 @@ gates:
     remind_after_days: 1
     evidence: "판정 기준: main fa8d83dd · ①앵커 1개 E2E = EOS-58 PR #914 ②HIT·실패코드 이벤트 적재 = EOS-54 PR #909 · N5 PR #912(ops/hit_cu_metrics.py·review_timer_event) ③Core→Math 정적 의존 0 = schema/subject_adapter.py 2026-09-27 Frozen(unexercised) · lint-imports 4 KEPT · G-required-tier-caller-recheck cleared · 근거 문서 docs/reviews/eos_validation_n1_n10_gap_review_2026-08-30.md:24,71"
     cleared_by: kiki
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-10-19] 판정 기준: main fa8d83dd · ①앵커 1개 E2E = EOS-58 PR #914 ②HIT·실패코드 이벤트 적재 = EOS-54/N3 PR #909(ops/hit_cu_metrics.py·review_timer_event) · N5 PR #912(잔여 3축) ③Core→Math 정적 의존 0 = lint-imports 4계약 KEPT(src/backend/pyproject.toml:230,281,329,493; 실행 출력은 MEMORY 3회차 로그) · G-required-tier-caller-recheck cleared; 필수층 Frozen 구현 커밋 ed3d14da(2026-09-28)는 호출자 0의 증거 · 근거 문서 docs/reviews/eos_validation_n1_n10_gap_review_2026-08-30.md:24,71"
+    corrections:
+      - "[2026-10-19] notes +423자 — 2회차 검토: #912 귀속 오류·날짜→커밋·③ 증거 분리 — amend --evidence 거부로 note 대체"
     no_inputs_reason: "사후 등재 — 선행 작업은 2026-09-27 이전에 종결(EOS-58 #914 · EOS-54 #909 · N5 #912 · ARCH-41)"
   - id: G-eos-g2
     title: "EOS G2(10/25 → 재판정 11/8) — ADR-007 개정: A6 LLM 저작 회차 1회 ≥30 CU 산출물(GenerationLog 포함) 저장소 커밋 + HIT 측정 체계(OPS-90 하한 가드) 착지. 10/25 시점 미측정 기록"
@@ -420,7 +421,7 @@ gates:
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
   - id: G-eos-g3
-    title: "EOS G3(11/22) — ADR-007 개정: A6 ≥30 CU + HIT 유효 표본 ≥15 + 자동검증 1차 통과율 산출됨 + 힌트 의미 누설 0 + 메타 누락 0"
+    title: "EOS G3(11/22) — ADR-007 개정: A6 ≥30 CU + HIT 중앙값 ≤8분(유효 표본 ≥15, G2에서 이동) + 자동검증 1차 통과율 산출됨 + 힌트 의미 누설 0 + 메타 누락 0"
     kind: decision
     assignee: kiki
     status: pending
@@ -431,6 +432,7 @@ gates:
     notes: "[판정 근거 2026-10-19] 원문 조건과 처분: 앵커 전부 60 CU+(폭 확장) → 2027-01 이월(폭 확장 목적 소실) · 4급 중 3급 HIT≤6분 → 2027-01 이월 · 누설 0·메타 누락 0 → 유지. 기준 완화(ADR-007)."
     corrections:
       - "[2026-10-19] notes +121자 — ADR-007 조건 명세 보존"
+      - "[2026-10-19] title: 'EOS G3(11/22) — ADR-007 개정: A6 ≥30 CU + HIT 유효 표본 ≥15 + 자동검증 1차 통과율 산출됨 + 힌트 의미 누설 0 + 메타 누락 0' → 'EOS G3(11/22) — ADR-007 개정: A6 ≥30 CU + HIT 중앙값 ≤8분(유효 표본 ≥15, G2에서 이동) + 자동검증 1차 통과율 산출됨 + 힌트 의미 누설 0 + 메타 누락 0' — 2회차 검토: ADR 명세표(HIT≤8분 → G3)와 제목 불일치 정정"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
   - id: G-eos-g4
