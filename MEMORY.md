@@ -338,6 +338,17 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-19 (수정 · WP-A 4회차): 3회차 검토 잔여 10건 중 닫힌 것 10건(패킷 열거분 전부) · 남은 것 #14(Kiki 승인 대기, PR 없음)·D4(10/31 결정) — `backlog/gates.yaml`·HARN 3건 태스크를 origin/main으로 되돌리고 G1~G5를 CLI로 재등재(손편집 0), G1은 `--no-inputs` 사후 등재 후 `--as kiki` clear(evidence에 #909 귀속·`ed3d14da`·판정 기준 `fa8d83dd`; #912는 '잔여 3축'으로 정정). ADR-007 v2.2(맥락 표 ② 귀속 정정)·README 소재·방침 예외 목록(HARN-210 추가)·MEMORY 과장 정정. P1 HARN 3건 `block --handover` 재차단(해제 2027-01-01).
+이벤트 원장(`backlog/events/`)에는 2~4회차의 gate_add·gate_clear·block이 재실행분까지 누적된다 — 되돌림은 YAML만 되돌리고 이벤트는 append-only라, 원장의 건수는 '현재 상태'가 아니라 '시도 이력'으로 읽어야 한다.
+
+2026-10-19 D8=(가) ARCH-103 보류(브랜치 보존). WP-A 4회차 검토 머지 가능 — 잔여 하 1건: G1 evidence 근거 인용 :24,71에 #914 출처(:342) 누락 — cleared evidence는 CLI로 정정 불가라 기록만(2027-01 하네스 안건: cleared 게이트 evidence 정정 경로 부재)
+
+### 2026-10-19 (수정 · WP-A 3회차): 잔여 9건 중 닫은 것 — G3 제목에 HIT 중앙값 ≤8분 집행(ADR-007 v2.1 동기화) · G1 evidence 정정은 `gates amend --evidence`가 `--verdict FAIL` 전용이라 거부돼 `--note`로 대체(거부 메시지 그대로 보고) · 12/31 내부 검증 기간 절을 `docs/strategy/internal_verification_period_policy_2026-12-31.md`로 이동(D7=(a), CLAUDE.md는 참조 1줄+버전 로그) · 2회차 "삭제 줄 0"·"19건 전부" 과장 정정. 남은 것: #14(Kiki 승인 대기, PR 없음) · 신규 #2·#7(G1 evidence — 4회차에서 대장 재구축으로 처리). lint-imports(UTF-8 재실행): 7계층 단방향 · EOS Core→Math(baseline 0) · EOS Core→Math(baseline 있음) · 데이터 접근 금지 — 4 contracts kept·0 broken(882 files·7,571 dependencies) — cp949 출력 크래시는 `PYTHONIOENCODING=utf-8`로 회피. (사용자 결정, claude 기록)
+
+### 2026-10-19 (수정 · WP-A 2회차): 독립 검토가 낸 1회차 결함 19건 중 17건 닫힘(#9·#14 부분) — `backlog/gates.yaml`을 origin/main으로 되돌린 뒤 G1~G5 전부 `backlog.py gates add`로 재등재(게이트 ID 삭제 0 — amend가 대체한 빈 필드 3줄 제외)하고, ADR-007을 v2로 교체(조건 명세표 12행 — 원문 조건의 삭제·이동·이월 전수 기록). G1은 `--no-inputs`(선행 EOS-58 #914·EOS-54 #909·N5 #912·ARCH-41) 사후 등재 후 `--as kiki` clear — 판정 기준 main `fa8d83dd`. D5 집행: P1 HARN 3건(`HARN-115`·`HARN-305`·`HARN-314`)을 `block --handover`(해제 2027-01-01)로 차단해 `next`의 HARN 노출 0. `policy_warn`(path_overlap: CLAUDE.md = HARN-121, MEMORY.md = HARN-210 — 해당 파일을 건드릴 때마다 1건씩 기록)은 **실제 경고이며 테스트 누출이 아니다** — 두 태스크 소유 파일에 절 1개·로그 5줄만 추가, 내용 충돌 없음(Kiki 확인 요청). (사용자 결정, claude 기록)
+
+### 2026-10-19 (결정 · EOS G2 처분): G2 앵커를 A3·A4(중2 확률·중3 이차방정식)에서 A6(고2 도함수의 활용 = `12미적Ⅰ` 02-01~02-10)로 교체하고 G3·G4 조건을 함께 개정했다 — **기준 완화**다. ADR-007(신설) · G1~G5를 `backlog/gates.yaml`에 등재(G1은 9/27 사후 cleared, G2~G5 pending) · '12/31 내부 검증 기간 규칙'은 방침 문서로 이동(3회차) · Phase 3 Gate A의 '실제 학생 계정'을 '내부 테스트 계정 ≥20'으로 교체(원문 유지+주석, 근거 ARCH-66 ⑥·EOS-135). D4(12/31 조건 ③ 교체)는 10/31까지 미결 — 후보는 WP-C·F 산출물(cu.jsonl·weekly.json) 커밋 존재. D5=(b): 12/31까지 HARN-* 작업·신규 헌법 규칙·신규 decision 게이트 없음(예외: CI 미수집 테스트 결함 — OPS-137류). (사용자 결정, claude 기록) — 판정 기준: main `fa8d83dd`
+
 ### 2026-10-18 (결정 · P3-56): **미분 오답 서명 독법을 조건부 승인했다 — 기본 `off` · 먼저 `shadow`(학생에게 가는 결과는 그대로, 관측만 기록) · `on`은 활성화 게이트 PASS 뒤. 사정거리 확장(P3-48)은 보류** (사용자 결정, claude 구현·측정) — 판정 기준: main `1ab2365b` 이후
 
 **추천의 근거(새로 잰 숫자, 미분 단원 단답형 885건)**: 엔진이 질문을 읽는 문항 218건(24.6%) · 정답을 오개념으로 읽은 건 0 · 정답±30 정수 답 13,080개 중 후보가 붙은 비율 202개(1.54%, 무작위 오답의 우연 일치 크기) · 발화 종류는 `extremum-max-min-confused` 102 · `power-rule-step-omitted` 50 · `extremum-value-vs-point-confused` 33 · `continuity-implies-differentiability` 12 · `critical-point-implies-extremum` 5이고 `product-rule-naive`는 0. 즉 도달 범위가 25%이고 실제 학생 오답 로그가 없어 정밀도는 측정하지 못했다 — 그래서 켜기 전에 실제 오답으로 근거를 모으는 `shadow`가 조건이다.

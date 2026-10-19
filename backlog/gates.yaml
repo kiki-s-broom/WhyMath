@@ -393,6 +393,74 @@ gates:
     cleared_by: null
     notes: ""
     corrections: []
+  - id: G-eos-g1
+    title: "EOS G1(9/27) 계측 가능한 파이프라인 — ①앵커 1개 E2E ②HIT·실패코드 이벤트 적재 ③Core→Math 정적 의존 0 (사후 등재 · ADR-007)"
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-19
+    remind_after_days: 1
+    evidence: "판정 기준: main fa8d83dd · ①앵커 1개 E2E = EOS-58 PR #914 ②HIT·실패코드 이벤트 적재 = EOS-54/N3 PR #909(ops/hit_cu_metrics.py·review_timer_event·alembic 84c782415837); N5 PR #912는 잔여 3축 ③Core→Math 정적 의존 0 = lint-imports 4계약 KEPT(src/backend/pyproject.toml) · G-required-tier-caller-recheck cleared; 필수층 Frozen(unexercised) 구현 커밋 ed3d14da(2026-09-28)는 호출자 0의 증거 · 근거 docs/reviews/eos_validation_n1_n10_gap_review_2026-08-30.md:24,71"
+    cleared_by: kiki
+    notes: ""
+    corrections: []
+    no_inputs_reason: "사후 등재 — 선행 작업은 2026-09-28 이전에 종결(EOS-58 #914 · EOS-54/N3 #909 · N5 #912 · ARCH-41)"
+  - id: G-eos-g2
+    title: "EOS G2(10/25 → 재판정 11/8) — ADR-007 개정: A6 LLM 저작 회차 1회 ≥30 CU 산출물(GenerationLog 포함) 저장소 커밋 + HIT 측정 체계(OPS-90 하한 가드) 착지. 10/25 시점 미측정 기록"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 20
+    evidence: null
+    cleared_by: null
+    notes: "[판정 근거 2026-10-19] 원문 조건과 처분(ADR-007 명세표): A3 60 CU → 2027-01 이월 · A4 60 CU → G4 두 번째 앵커 30 CU로 축소·이동 · HIT≤8분 → G3로 이동(+유효 표본 ≥15) · 자동검증≥70% → G4로 이동. 기준 완화."
+    corrections:
+      - "[2026-10-19] notes +140자 — ADR-007 조건 명세 보존"
+    depends_on:
+      - OPS-90-hit-lower-bound-implausible-review
+  - id: G-eos-g3
+    title: "EOS G3(11/22) — ADR-007 개정: A6 ≥30 CU + HIT 중앙값 ≤8분(유효 표본 ≥15, G2에서 이동) + 자동검증 1차 통과율 산출됨 + 힌트 의미 누설 0 + 메타 누락 0"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 34
+    evidence: null
+    cleared_by: null
+    notes: "[판정 근거 2026-10-19] 원문 조건과 처분: 앵커 전부 60 CU+(폭 확장) → 2027-01 이월(폭 확장 목적 소실) · 4급 중 3급 HIT≤6분 → 2027-01 이월 · 누설 0·메타 누락 0 → 유지. '자동검증 1차 통과율 산출됨'은 원문 외 추가 조건(계측 가능성 확인). 기준 완화(ADR-007)."
+    corrections:
+      - "[2026-10-19] notes +163자 — ADR-007 조건 명세 보존"
+    depends_on:
+      - OPS-90-hit-lower-bound-implausible-review
+  - id: G-eos-g4
+    title: "EOS G4(12/13) — 누적 ≥60 CU(A6 30 + 두 번째 앵커 A4 30) + 자동검증 1차 통과율 ≥70% + A6 깊이앵커 무개입 루프 3연속 + 내부 테스트 계정 표본 ≥20(EOS-135 기확정) + P0 결함 0"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 55
+    evidence: null
+    cleared_by: null
+    notes: "[판정 근거 2026-10-19] 원문 조건과 처분: 무개입 루프 3연속 → 유지(앵커 A6, Phase 3 Gate A와 동일 회차; 2026-09-19 FAIL 이력) · 테스트 계정 ≥20 → 유지(EOS-135, 신규 결정 아님) · P0 0 → 유지. 추가: 누적 60 CU·자동검증≥70%(G2에서 이동). ADR-007."
+    corrections:
+      - "[2026-10-19] notes +167자 — ADR-007 조건 명세 보존"
+    depends_on:
+      - EOS-155-qa-engine-golden-rotation1-defect-sample
+  - id: G-eos-g5
+    title: "G5 동결→판정 (12/27→12/31) — (판정 게이트) Go/Conditional/No-Go + 2027 범위 결정"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-10-19
+    remind_after_days: 69
+    evidence: null
+    cleared_by: null
+    notes: "[판정 근거 2026-10-19] 원문 불변(ADR-007 결정 4). F-Ⅰ~Ⅴ는 원문 그대로 판정. 증거 = docs/reviews/eos_g5_evidence_2026-12-27.md(WP-G)"
+    corrections:
+      - "[2026-10-19] notes +92자 — ADR-007"
+    depends_on:
+      - ARCH-67-required-tier-unexercised-watch-r2
   - id: G-eos-ip-separation-evidence
     title: "겸직 IP 귀속 분리 증빙 — ①개인 장비·개인 계정·개인 시간 작업 사실 증빙(커밋 타임스탬프 등) ②재직사 자산·데이터 무사용 확인서 자체 작성·보관 ③신설 법인 설립 시 IP 양도 계약 예정 기록. 12/31 산출물 전체의 귀속 리스크·투자 실사 항목(전환 설계서 §1.1-b, 2h 소요)"
     kind: human
@@ -633,8 +701,9 @@ gates:
     remind_after_days: 94
     evidence: null
     cleared_by: null
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-10-19] [WP-A] ③ 교체 D4 결정 대기(10/31) — 후보: WP-C·F 산출물(cu.jsonl·weekly.json) 커밋 존재. G1~G5 등재 완료(ADR-007)"
+    corrections:
+      - "[2026-10-19] notes +94자 — WP-A"
     depends_on:
       - P3-17-week3-release-gate-judgment
   - id: G-kg02-review-promotion-llm-session
@@ -1582,10 +1651,11 @@ gates:
     remind_after_days: 98
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-10-19] [D2] Phase 3 Release Gate A 원문 조건('실제 학생 계정' 폐쇄루프 무개입 완주) 이관 — 내부 완성 이후 재개 시 Gate A를 실제 학생으로 재판정"
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '방침 만료 지점(2026-12-31 내부 완성 확인) — 내부 완성은 대장의 단일 태스크가 아니라 Kiki 판정이며 먼저 끝나야 할 태스크가 없다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
       - "[2026-09-28] title: \"학생 참여 과정 재개 판정 (ARCH-66 ⑥ · 2026-12-31 내부 프로젝트 완성 이후) — 2026-09-24 Kiki 결정으로 학생(실사용자)과 함께 해야 하는 모든 과정(파일럿·코호트·베타·사용자 테스트·실사용 KPI 측정·실제 동의 수집)을 12/31 내부 프로젝트 완성 이후로 연기한다. 이 게이트가 부착된 태스크는 selector 착수 후보에서 빠진다. 날짜가 지나도 자동 재개하지 않는다 — 내부 완성 확인 후 이 게이트를 clear해야 풀린다. 부착 = S3-01(파일럿 코호트)·S4-15(실응답 난이도 루프)·E5-01·E6-01(과목 팩 파일럿). 학생 없이 가능한 축은 막지 않는다: ASM-11은 ⑵ ASM-10 분기로, P3-13 ①은 테스트용 학생 계정으로 진행. 판정 3택: ①재개(파일럿 착수) ②연기 연장(새 기한으로 재생성) ③범위 축소 재개(예: 지인 학생 소수 먼저). 함께 판정할 것: EOS 선언 G4(12-13) 차단 조건 '학생 표본 ≥20명'은 이 연기로 12/31 전 충족 불가 — G4 조건 재정의 또는 12/31 이후 이동. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.\" → \"학생 참여 과정 재개 판정 (ARCH-66 ⑥ · 2026-12-31 내부 프로젝트 완성 이후) — 2026-09-24 Kiki 결정으로 학생(실사용자)과 함께 해야 하는 모든 과정(파일럿·코호트·베타·사용자 테스트·실사용 KPI 측정·실제 동의 수집)을 12/31 내부 프로젝트 완성 이후로 연기한다. 이 게이트가 부착된 태스크는 selector 착수 후보에서 빠진다. 날짜가 지나도 자동 재개하지 않는다 — 내부 완성 판정(G-internal-completion-2026-12-31 · 정의: Phase 3 Release PASS + EOS G5 판정 + 12월 검증 P0 전건 종결) 뒤에 이 게이트를 clear해야 풀린다. 부착 = S3-01(파일럿 코호트)·S4-15(실응답 난이도 루프)·E5-01·E6-01(과목 팩 파일럿). 학생 없이 가능한 축은 막지 않는다: ASM-11은 ⑵ ASM-10 분기로, P3-13 ①은 테스트용 학생 계정으로 진행. 판정 3택: ①재개(파일럿 착수) ②연기 연장(새 기한으로 재생성) ③범위 축소 재개(예: 지인 학생 소수 먼저). 이 게이트로 이관된 판정 항목: 실제 학생 표본 ≥20명 — EOS 선언 G4의 원 조건이었고, 2026-09-24 EOS-135(PR #1304)로 G4는 '내부 테스트 계정 표본 ≥20건'으로 교체·판정일 12-13 유지로 종결됐다(종전 문면의 'G4 조건 재정의 또는 이동을 함께 판정할 것'은 이미 결정된 사항이라 2026-09-28 정정). 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.\" — 2026-09-28 정리 — 문면의 G4 미결 문장은 EOS-135로 이미 결정됨 · 내부 완성 정의 게이트 참조 추가. 판정 기준 main 6c880b67"
+      - "[2026-10-19] notes +96자 — D2 이관 기록"
     no_inputs_reason: "방침 만료 지점(2026-12-31 내부 완성 확인) — 내부 완성은 대장의 단일 태스크가 아니라 Kiki 판정이며 먼저 끝나야 할 태스크가 없다"
   - id: G-web01-landing-legal-review
     title: "공개 랜딩 v1 공개 전 변호사 검토 (WEB-01 acceptance ③ · web_strategy.md §3.4) — 기계 대체 금지. 검토 항목 3종: ①광고·마케팅 규제(regulatory_checklist.md §4) — RCT 검증 전 \"성적이 오른다\" 류 효과 단정 금지·비교 광고 자문. 현행 카피는 효과 단정을 피하도록 작성했고 tests/infra/test_webapp_landing_governance.py가 금지 문구를 보조 탐지하지만, 문자열 열거는 표현 변형에서 뚫리므로 최종 판정은 사람이 한다 ②웹접근성 — 지능정보화기본법 §46은 문언상 '웹사이트' 중심이라 웹을 개설하는 순간 적용 범위가 실제로 변동한다(법률 판단 사항). 코드 쪽 선결(lang=\"ko\"·본문 바로가기·대비비 4.5:1 초과·확대 제한 없음·prefers-reduced-motion)은 착지했으나 KWCAG 적합성 판정은 아니다 ③개인정보 — 베타 신청은 v1에서 외부 폼 '링크'만 쓰므로(백엔드 호출 0·랜딩 수집 표면 0) 폼 URL을 채우는 순간 처리위탁 고지 대상이 된다. 현재 NEXT_PUBLIC_BETA_FORM_URL 미설정이라 CTA가 \"준비 중\"으로 렌더되며 링크 자체가 존재하지 않는다. 처리방침·수집 최소화 문구도 함께 검토. 검토 대상 산출물: src/web/webapp/ 랜딩 1페이지 전문(app/(public)/) + 법정 표시 푸터 자리. 판정 3택: ①현행 카피로 공개 승인 ②수정 요구 항목 회신 후 재검토 ③공개 보류. 이 게이트가 pending인 동안 랜딩은 비공개다 — 배포는 WEB-02가 소유하며 이 게이트 통과가 그 선결이다."

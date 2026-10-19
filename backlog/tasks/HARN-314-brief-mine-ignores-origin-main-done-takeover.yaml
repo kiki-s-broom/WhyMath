@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: blocked
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,5 +18,8 @@ paths:
   - scripts/harness/report.py
   - "tests/harness/**"
 session: null
-notes: "출처: 2026-10-18 P3-06 재구성 중 이벤트 대장 실측. HARN-311(claim 쓰기 error 시 fail-open 착수)과 다른 경로 — 여기서는 claim 이 ok 였다가 풀려 인수됐고 소유 세션이 그 사실을 보지 못했다. 관련: HARN-198(done 직후 무주 todo)·HARN-47(고립 브랜치)."
-updated: 2026-10-18
+notes: |-
+  출처: 2026-10-18 P3-06 재구성 중 이벤트 대장 실측. HARN-311(claim 쓰기 error 시 fail-open 착수)과 다른 경로 — 여기서는 claim 이 ok 였다가 풀려 인수됐고 소유 세션이 그 사실을 보지 못했다. 관련: HARN-198(done 직후 무주 todo)·HARN-47(고립 브랜치).
+
+  [차단 2026-10-19] D5 12/31 동결(docs/strategy/internal_verification_period_policy_2026-12-31.md 규칙 2) — 해제 2027-01-01
+updated: 2026-10-19
