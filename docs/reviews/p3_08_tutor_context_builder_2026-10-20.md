@@ -1,179 +1,200 @@
 판정 기준: main f2a7b2ca
 
-# P3-08 — Tutor Context Builder 9종: 누락이 조용히 지나가지 않게 하기 (2026-10-20)
+# P3-08 — 튜터 context 9종의 정직한 매니페스트 (2026-10-20 · PR #1705 검토 반영 개정)
 
-- 태스크: `P3-08-tutor-context-builder` · 브랜치 `claude/p3-08-tutor-context-builder` (claim 6410c374 · 구현 cfe2233c)
+- 태스크: `P3-08-tutor-context-builder` · 브랜치 `claude/p3-08-tutor-context-builder` (claim 6410c374)
+- 커밋: 1차 cfe2233c · 247d26a4 → 검토 반영 2425f7d9 · d83f56f7 · 이 보고서 개정
 - 지시 원문: `docs/strategy/phase3_math_eos_completion_instruction_set.md` [12] P3-08 (1275–1283행)
-- 산출 코드: `src/backend/whymath_backend/harness/wh1_tutor_context.py`(신규) · `api/coach.py` · `harness/wh1_primary.py` · `harness/wh1_llm_policy.py` · `harness/wh1_shadow.py` · `l2/skill_mastery_tracking.py`(공개 래퍼 1개) · `scripts/analysis/eos_feature_inventory_v2.py`(WM-E-704에 모듈 1개 귀속)
-- 테스트: `tests/backend/harness/test_wh1_tutor_context.py` · `tests/backend/api/test_coach_tutor_context.py` · `tests/backend/harness/test_wh1_shadow.py`(레코드 허용 목록에 필드 1개 추가)
-- 새 Entity·스키마·Alembic 변경 0 · 새 Agent 0 · 응답 스키마는 필드 추가만(하위호환)
+- 산출 코드:
+  - `src/backend/whymath_backend/harness/wh1_tutor_context.py`(신규 — 판정기·영수증)
+  - `api/coach.py` · `harness/wh1_primary.py` · `harness/wh1_llm_policy.py` · `harness/wh1_shadow.py`
+  - `l2/skill_mastery_tracking.py`(공개 래퍼 1개)
+  - `scripts/analysis/eos_feature_inventory_v2.py`(WM-E-704에 모듈 귀속)
+- 테스트: `tests/backend/harness/test_wh1_tutor_context.py`(55) · `tests/backend/api/test_coach_tutor_context.py`(53) · `tests/backend/harness/test_wh1_shadow.py`(레코드 허용 목록 +3)
+- 승계 태스크: `P3-72`(슬롯 값 전달) · `P3-73`(Langfuse 기록) · `P3-74`(필수 누락 fallback)
+- 새 Entity·스키마·Alembic 변경 0 · 새 Agent 0 · 응답은 필드 추가만(하위호환)
 
-## 0. 결론
+## 0. 결론 — 부분 충족
 
-**완료 판정 충족.** 코치 세션 두 핸들러(`create_session`·`append_turns`)는 튜터를 부를 때마다 9종을 전부 판정한다. 각 슬롯은 `filled`이거나, `filled=False`와 원인 코드를 함께 가진다. 누락은 응답·로그·튜터 프롬프트·관측 레코드 네 곳에 표기된다. 슬롯을 하나씩 비우는 주입 9건을 두 핸들러에서 돌렸다(18건). 18건 모두 네 곳에 표기됐고 요청은 201로 진행됐다. 표기 코드를 지우는 뮤테이션에서는 18건이 모두 RED였다(§4).
+**부분 충족이다.** acceptance ②④는 충족했다. ①⑤는 "조회·표기"까지만 했고, 튜터에 실제로 실어 보내는 일은 승계 태스크 `P3-72`로 넘겼다.
 
-"9종이 채워진다"는 9종이 늘 **값**으로 채워진다는 뜻이 **아니다**. 다음 상태는 정당하다: 첫 진입이라 학생 답안이 없음, 텍스트 턴이라 풀이 단계가 없음, 문항 없는 대화라 개념이 없음. 그래서 완료 판정을 이렇게 읽었다. 9종의 **판정**은 늘 채워진다(값 또는 원인). 판정이 빈 채로 튜터가 도는 경로는 0이다. 매니페스트 검증자는 "비었는데 원인 없음"과 "누락을 감춘 complete=True"를 구조적으로 거부한다(§4 `TestManifestInvariants`).
+| acceptance | 판정 | 근거 |
+|---|---|---|
+| ① 9종 context가 채워진다 | **조회·표기까지** | 9종 모두 슬롯마다 `resolved`(값을 얻었는가)와 `delivered_to_tutor`(튜터 정책 입력에 실제로 실렸는가)를 따로 판정한다. 튜터에 실제로 실리는 것은 학생 답안·풀이 기록·활성 가설·θ 4종뿐이다. 금지모드 가드가 켜지면 교수법 팩이 더해진다. 개념·스킬·숙달·문제 내용은 얻어도 `not_delivered`로 표기한다. 값 전달은 학생 데이터를 클라우드 LLM에 보내는 문제라 개인정보 판단(Kiki)이 필요하다 → `P3-72` |
+| ② 누락 시 조용히 진행하지 않는다 | **충족** | 응답·로그·튜터 프롬프트 요약·관측 레코드 네 곳에 누락과 미전달이 표기된다. 완비 턴에서도 미전달 5종이 드러난다 |
+| ③ depth ≤ 2·max_nodes·preload 금지 | **충족(기존 가드 동결)** | §5 |
+| ④ 하나씩 비우는 주입 변별력 | **충족** | 주입 9건 × 두 핸들러와 대조군을 테스트했다. 표기를 지우는 뮤테이션 29종은 전부 RED였다(§4) |
+| ⑤ 9종이 채워지고 누락이 무증상으로 지나가지 않음 | **후반만 충족** | 누락·미전달이 무증상으로 지나가는 경로는 0이다. "튜터에 채워짐"은 `P3-72` |
+
+1차 보고(247d26a4)는 "완료 판정 충족"이라고 적었다. 그 근거였던 `filled=True` 표기는 **거짓**이었다. 개념·스킬·숙달·문제 내용·팩(가드는 기본 OFF)은 튜터 정책에 전달되지 않는데도 채워졌다고 표기했다(검토 상1). 이번 개정에서 `resolved`와 `delivered_to_tutor` 두 축으로 나눠 바로잡았다.
 
 ## 1. 9종 실측표 — 변경 전(main f2a7b2ca) 코드 경로별
 
-튜터는 WH-1 primary(`harness/wh1_primary.py::run_wh1_primary_turn`)다. 서빙 경로에서 LLM을 부르는 유일한 튜터 좌석이고, 기본값 ON(`wh1_primary_enabled`)이며, `api/coach.py::_wh1_primary_decision_or`가 부른다. stateless `POST /v1/coach`는 튜터를 부르지 않는다(LLM 0·DB 0). 그래서 이 표의 범위 밖이다.
+튜터 = WH-1 primary(`harness/wh1_primary.py::run_wh1_primary_turn`, 기본 ON). 서빙 경로에서 LLM을 부르는 유일한 튜터 좌석이며, `api/coach.py::_wh1_primary_decision_or`가 호출한다. stateless `POST /v1/coach`는 튜터를 부르지 않으므로(LLM 0·DB 0) 범위 밖이다.
 
-| # | 슬롯 | 핸들러가 이미 조회하던 원천 (create / append) | 튜터 러너에 전달 | 비었을 때(변경 전) |
+| # | 슬롯 | 핸들러가 이미 조회하던 원천 | 튜터 정책 입력 | 비었을 때(변경 전) |
 |---|---|---|---|---|
-| 1 | 학생 상태 | `_server_theta_for`(θ) · `_grade_for`(학년) | θ만 `theta=` | `theta if theta is not None else 0.0` — **콜드스타트 0.0으로 표기 없이 진행** |
-| 2 | 현재 Concept | `get_primary_concept_id` — 숙달·팩·θ·성취기준·선수 조회 안에서 최대 5회 재해석 | ✗ | 미매핑이면 `_standard_code_for` DEBUG 로그뿐 — **표기 없음** |
-| 3 | 현재 Skill | 코치 경로 조회 **0**(스킬 해소는 채점 적재 경로 `_assessed_skill_ids`에만 있음) | ✗ | **조회 자체가 없음** |
-| 4 | 문제 | `body.problem_id` / `dialogue.problem_id` | `problem_id=` | None — 표기 없음 |
-| 5 | 학생 답안 | `body.student_solution or body.student_input` | `student_solution=` | 빈 문자열 — 표기 없음 |
-| 6 | 풀이 기록 | `body.solution_steps or []` | `solution_steps=` | 빈 목록 — 표기 없음 |
-| 7 | 추정 Misconception | `_apply_hypotheses` 반환 가설(이번 턴 매칭 큐레이션) | `active_hypotheses=` | 빈 배열이 프롬프트에 그대로 보임(부분 표기) |
-| 8 | Mastery | `_server_mastery_for` · `body.bkt_mastery` · `body.mastery_level` | ✗ (결정론 `decide`만 소비) | 라벨 None — 힌트 이벤트 `label_source`에만 흔적 |
-| 9 | Pedagogy Policy | `_pack_for`(교수법 팩) | `pack=` (금지모드 가드·옵트인) | None이면 base Polya 발문 — 표기 없음 |
+| 1 | 학생 상태 | `_server_theta_for`(θ) · `_grade_for`(학년) | θ만 | `theta=0.0` 콜드스타트로 표기 없이 진행 |
+| 2 | 현재 Concept | `get_primary_concept_id`(숙달·팩·θ·성취기준·선수 조회 안에서 재해석) | ✗ | DEBUG 로그뿐 |
+| 3 | 현재 Skill | 코치 경로 조회 0 | ✗ | 조회 자체가 없음 |
+| 4 | 문제 | `body.problem_id` / `dialogue.problem_id` | id만 관측 레코드에(내용 ✗) | 표기 없음 |
+| 5 | 학생 답안 | `student_solution or student_input` | ✓ (정책 사적 보유) | 표기 없음 |
+| 6 | 풀이 기록 | `solution_steps` | ✓ (정책 사적 보유) | 표기 없음 |
+| 7 | 추정 Misconception | `_apply_hypotheses` 반환 가설 | ✓ (초기 가설·프롬프트 요약) | 빈 배열만 보임 |
+| 8 | Mastery | `_server_mastery_for` · 클라 `bkt_mastery`·`mastery_level` | ✗ (결정론 `decide`만 소비) | 표기 없음 |
+| 9 | Pedagogy Policy | `_pack_for`(교수법 팩) | 금지모드 가드에만(기본 OFF) | 표기 없음 |
 
-태스크 notes의 "CoachRequest가 9종을 이미 받는다"는 절반만 맞다. 요청 본문이 직접 받는 것은 4(세션 생성 시)·5·6·8(클라 숙달)뿐이다. 1·2·7·9와 서버 숙달은 서버가 조회하고, 3은 코치 경로에서 조회되지 않았다. 실질 공백은 두 가지였다. ⓐ 3(스킬) 조회 부재. ⓑ 9종 **전부**에 대한 누락 표기 부재.
+## 2. 변경 후 — 판정과 집행 지점
 
-### 변경 후 판정 규칙 (`api/coach.py::_tutor_context_for` → `harness/wh1_tutor_context.py::build_tutor_context_manifest`)
+### 2.1 두 축
 
-| # | 판정 | 원인 코드 |
-|---|---|---|
-| 1 | θ가 있으면 filled. 크기는 θ·학년 중 있는 축 수. 학년만 있으면 **비었음**(콜드스타트를 '있음'으로 위장하지 않는다) | `source_disabled`(플래그 OFF) · `unresolved` |
-| 2 | `get_primary_concept_id` 1회. 기존 좌석을 재사용하고 never-break로 감싼다 | `no_problem_context` · `unresolved` · `lookup_failed·<예외타입>` |
-| 3 | `get_concept_skill_ids`(신규 **공개 래퍼**). 채점 적재와 같은 `_assessed_skill_ids` 1홉 규칙이다 | 개념 원인 승계 · `unresolved` · `lookup_failed·<예외타입>` |
-| 4 | 문항 id 유무 | `not_supplied` |
-| 5 | 튜터가 받는 값과 같은 식(`student_solution or student_input`)을 strip해서 판정 | `not_supplied` |
-| 6 | 공백이 아닌 단계 수 | `not_supplied` |
-| 7 | post-apply 가설 수(reactive) | `none_detected` |
-| 8 | 서버 숙달 또는 클라 숙달 신호 | `source_disabled` · `no_problem_context` · `unresolved` |
-| 9 | 교수법 팩 유무. 없으면 base Polya 정책만으로 진행한다는 뜻이다 | `source_disabled` · `no_problem_context` · `unresolved` |
+- **`resolved`** — `api/coach.py::_tutor_context_for` → `build_tutor_context_manifest`가 판정한다(순수 함수, DB 0). 값을 채우지 않는다. 못 얻었으면 원인 코드를 하나 붙인다:
+  - `not_supplied` — 학생이 아직 내지 않음
+  - `no_problem_context` — 문항 없는 대화
+  - `none_detected` — 조회했지만 오개념 의심 없음
+  - `no_history` — 콜드스타트
+  - `coverage_gap` — 미매핑·팩 미보유 단원
+  - `source_disabled` — 플래그 OFF
+  - `lookup_failed` — 조회 예외
+- **`delivered_to_tutor`** — 핸들러가 추정하지 않는다. 러너가 **정책을 만든 뒤** 다음 세 가지에서 계산해 `TutorDeliveryReceipt`로 돌려준다(`wh1_primary._delivered_slots`):
+  - 정책 객체가 실제로 보유한 값(`LLMTutorPolicy.delivered_context_slots` — 사적 `student_text`·단계·θ를 0.0으로 채우지 않고 받았는지)
+  - `run_tutoring_turn`에 넘긴 바로 그 초기 가설 목록
+  - 금지모드 가드에 넘길 팩
+- 정책은 이제 `theta=None`을 받는다. 콜드스타트 0.0은 그대로 쓰되(동작 불변) '모름'을 기록한다.
 
-새 조회는 개념 1건과 스킬 1건뿐이다(인덱스 단건·1홉). 나머지는 핸들러가 이미 조회한 값을 넘겨받는다(재조회 0). 판정기는 순수 함수이고 값을 채우지 않는다.
+### 2.2 표기 네 곳 — 같은 판정에서 나온다
 
-## 2. 표기 지점 (집행 — 정본화와 별항)
+1. **응답** `tutor_context`:
+   - 필드: `tutor_invoked` · 슬롯별 `resolved`/`delivered_to_tutor`/`size`/`cause` · `missing` · `not_delivered` · `complete`
+   - **값은 없다.** 숙달·θ 수치(slice 69/70 비노출), 개념/스킬 id, 답안 길이(`student_answer.size=null`), 예외 타입명(`cause_detail` 좌석 자체를 제거)이 모두 빠진다. 예외 타입명은 조회 좌석의 서버 로그에만 남는다.
+2. **로그** 1줄(`whymath.harness.wh1_tutor_context`):
+   - 형식: `슬롯(원인)` + 미전달 슬롯명
+   - `슬롯=원인` 형식은 루트 PII 스크러버가 `student_answer=…`를 마스킹해 표기가 지워진다(실측). 그래서 괄호 형식으로 쓰고 스크러버 통과를 테스트로 동결했다.
+3. **튜터 프롬프트 요약** — `context_missing`·`context_not_delivered`(슬롯 이름만, 예산 절단 대상 아님). 시스템 프롬프트에 두 키를 설명하는 1줄을 추가했다("아는 것처럼 추측하지 마세요"). 이 때문에 누락 없는 턴의 바이트 동일 원칙은 깨졌다(허용됨). 대신 `coach_prose_leak_eval`·`pedagogy_pack_fidelity_eval` 게이트를 다시 돌려 exit 0을 확인했다(§6).
+4. **관측 레코드** — `context_missing`·`context_not_delivered`·`context_coverage_gap`. None은 구판, `[]`는 0건이다. 정상·예산 소진·프로즈 거부·타임아웃 중단 레코드 모두에 실린다.
 
-같은 매니페스트 객체 하나가 네 곳으로 간다. 판정 원천은 하나다. HTTP 대조군 테스트가 `응답 == 튜터가 받은 것`을 단언한다.
+### 2.3 튜터 미호출 턴(검토 중2)
 
-1. **응답** — `SessionCreateResponse.tutor_context`와 `TurnAppendResponse.tutor_context`.
-   - 필드 추가만 했다(기본값 None, 두 핸들러는 늘 채운다).
-   - 값은 담지 않는다. 슬롯·`filled`·크기·원인·예외 타입명만 있다. 숙달·θ 수치 비노출(slice 69/70)은 유지된다(`test_manifest_carries_no_values`).
-   - stateless `CoachResponse`에는 싣지 않는다. 튜터가 없는 경로라 늘 '누락'인 가짜 계기판이 되기 때문이다(선례: `client_state_mismatch`·`served_hint`).
-2. **로그** — `whymath.harness.wh1_tutor_context`에 1줄을 남긴다. 형식은 `슬롯(원인[·예외타입명])`다.
-   - 등급: 시스템 측 공백(`source_disabled`·`unresolved`·`lookup_failed`)이 하나라도 있으면 WARNING, 학생 측 정상 부재뿐이면 INFO, 완비면 0줄이다. 운영 루트 로거는 WARNING이라 시스템 공백은 반드시 남는다.
-   - 새 조회가 실패하면 `api.coach` 로거에도 타입명이 든 WARNING이 남는다. 예외 메시지(값)는 남기지 않는다.
-   - **실측 결함 1건을 피해 갔다.** 처음 형식 `student_answer=not_supplied`는 루트 PII 스크러버(`ops/log_scrubber.py`의 `student_answer[:=]값` 마스킹)에 걸려 `student_answer=***MASKED***`로 지워졌다. 누락 표기가 로그에서 사라진 것이다. HTTP 테스트가 RED로 잡았고, 괄호 형식으로 바꿨다. 9종을 전부 비운 최악의 경우에도 스크러버를 통과하는지 테스트로 동결했다(뮤테이션 M8 RED).
-3. **튜터 프롬프트** — `LLMTutorPolicy` 상태 요약에 `context_missing: [슬롯명…]`을 싣는다.
-   - 비었을 때만 키가 생긴다. 완비면 프롬프트는 바이트 단위로 기존과 같다.
-   - 토큰 예산 절단 대상이 아니다. 누락 표기가 예산 때문에 지워지면 그 자체가 무증상 누락이다.
-4. **관측 레코드** — `Wh1HarnessShadowObservation.context_missing`.
-   - None은 구판·shadow 레코드, `[]`는 누락 0이다.
-   - 정상 종료·예산 소진·프로즈 거부·타임아웃 중단 레코드 모두에 실린다.
+완료 상태머신이 가로챈 턴(`completion.handled`)과 primary OFF 턴은 `tutor_invoked=false`로 표기하고 전달은 0으로 둔다. 판정은 "튜터가 받을 수 있었던 것"의 기록으로 남기고, **WARNING은 내지 않는다**(INFO 표기만).
 
-## 3. 누락 처리 정책 — "진행하되 표기"(거부·LLM 생략이 아니다)
+### 2.4 로그 등급(검토 중4)
 
-**선택: 누락이 있어도 튜터 호출·코칭을 그대로 진행한다. 대신 누락을 §2의 네 곳에 반드시 표기한다.** 4xx 거부도, "필수 누락 시 LLM 생략·결정론 폴백 강제"도 택하지 않았다. 학생에게 정답을 바로 주지 않는 동작은 바뀌지 않는다.
+**WARNING은 시스템 결함(`source_disabled`·`lookup_failed`)이 있고 튜터를 실제로 부른 턴에만** 낸다. 콜드스타트(`no_history`)와 커버리지 공백(`coverage_gap`)은 INFO다. 이 둘은 운영 턴 대부분에 해당하는 정상 상태이므로 WARNING으로 올리면 상시 경보가 되어 진짜 결함이 묻힌다. 커버리지 공백은 관측 레코드의 `context_coverage_gap`으로 집계한다.
+
+### 2.5 새 조회의 트랜잭션 안전(검토 하7)
+
+개념·스킬 조회 2건은 **SAVEPOINT**(`session.begin_nested()`) 안에서 돈다. 선례는 `l2/learning_session_writer.py`다. DB 예외가 나도 바깥 PG 트랜잭션이 aborted 상태가 되지 않고, never-break로 흡수한 뒤 타입명만 로그에 남긴다. 새로 추가한 경고에는 `exc_info`를 붙이지 않는다(하8).
+
+## 3. 누락 처리 정책 — "진행하되 표기"
+
+**선택: 누락·미전달이 있어도 튜터 호출과 코칭을 그대로 진행하고, §2.2의 네 곳에 반드시 표기한다.** 4xx 거부도, 필수 누락 시 LLM 생략도 택하지 않았다. 학생에게 정답을 바로 주지 않는 동작은 바뀌지 않는다.
 
 근거:
 
-1. **누락의 대부분이 정당한 학생 상태다.** 첫 진입(답안 없음), 텍스트 턴(풀이 단계 없음), 의심 없음(가설 0), 문항 없는 대화가 그렇다. 거부하면 정상 학습 흐름이 깨진다. 폴백을 강제하면 대부분의 턴에서 하네스 발화가 꺼진다. 이 하네스 발화에는 verify 의무·정답 억제 게이트가 포함돼 있다. 결국 폴백 강제는 이 회차가 금지한 "튜터 기능 변경"이다.
-2. **학생 안전 게이트는 슬롯 값에 기대지 않는다.** verify 의무(§3.1)·정답 억제 백스톱(§3.4)·톤필터·금지모드 가드는 슬롯이 비어도 똑같이 강제된다.
-3. **"빈 값을 넣어 LLM을 부르는" 경로가 구조적으로 없다.** LLM 프롬프트에는 슬롯 *값*이 들어가지 않는다. 학생 원문·단계는 정책이 사적으로 보유하고(S1-a), 프롬프트는 비민감 상태 요약뿐이다. 그래서 지시문 3항이 걱정한 상황은 "LLM이 그 context 없이 고른다는 사실을 모른다"로 바뀐다. `context_missing`이 바로 그 공백을 메운다.
-4. **원 지시문 3항("명시적으로 fallback 경로로 보낸다")과의 차이.** 명시적 폴백 경로는 이미 있다. 결정론 Polya 템플릿이고, 튜터 실패·타임아웃·예산 소진 때 그리로 간다. 누락만으로 이 경로를 강제하지 않은 이유는 위 1·2다. 이 선택은 되돌리기 쉽다. 특정 슬롯(예: 학생 상태)을 필수로 올리려면 `_wh1_primary_decision_or` 호출 앞에 `manifest.status_of(...)` 분기 한 줄을 넣으면 된다. 판정이 이미 한 곳에 모여 있기 때문이다.
+1. **누락의 대부분이 정당한 학생 상태다.** 첫 진입·텍스트 턴·의심 없음·문항 없는 대화가 그렇다. 거부하면 정상 학습 흐름이 깨진다.
+2. **안전 게이트는 슬롯 값에 기대지 않는다.** verify 의무·정답 억제 백스톱·톤필터·금지모드 가드는 슬롯이 비어도 그대로 강제된다.
+3. **LLM 프롬프트에는 슬롯 값이 들어가지 않는다.** 그래서 "빈 값을 넣어 LLM을 부르는" 경로가 구조적으로 없다. 남는 문제는 LLM이 무엇이 없는지 모르는 것이고, `context_missing`·`context_not_delivered`가 그 공백을 메운다.
+
+지시문 3항("필수 누락 시 명시 fallback")은 어떤 슬롯을 필수로 볼지라는 정책 선택이 남아 있어 `P3-74`로 넘겼다. 판정 좌석(`manifest.status_of`)은 이미 한 곳에 있다.
 
 ## 4. 주입·뮤테이션 결과 (exit code 판정)
 
-### 4.1 주입 9건 × 2핸들러 — HTTP `test_each_single_slot_injection_is_disclosed_and_proceeds`
+### 4.1 주입 9건 × 2핸들러 (HTTP — 실제 튜터 러너 + 스텁 provider)
 
-주입마다 네 가지를 단언했다.
+주입마다 네 가지를 단언했다. 주입이 실제로 적용됐는지(mutated ≠ original)도 단언했다.
 
-1. 요청이 201로 진행된다.
-2. 응답 `missing`에 그 슬롯(연쇄 포함)이 뜬다.
-3. 로그 1줄에 `슬롯(원인)`이 남는다.
+1. 201로 진행한다.
+2. 응답 `missing`에 해당 슬롯(연쇄 포함)이 있고, 그 슬롯은 `resolved=false`·`delivered=false`·원인 코드를 가진다.
+3. 로그 1줄에 `슬롯(원인)`이 INFO로 남는다.
 4. 튜터 러너가 받은 매니페스트에도 같은 누락이 있다.
 
-주입이 실제로 적용됐는지(mutated ≠ original)도 단언했다.
+| 주입 | 기대 누락 · 원인 | create | append |
+|---|---|---|---|
+| 학생 상태(θ 없음) | learner_state · no_history | GREEN | GREEN |
+| 개념 미매핑 | concept·skill · coverage_gap | GREEN | GREEN |
+| 스킬 미매핑 | skill · coverage_gap | GREEN | GREEN |
+| 문제 없음 | problem(not_supplied)·concept·skill·mastery·pedagogy_policy | GREEN | GREEN |
+| 학생 답안 없음 | student_answer · not_supplied | GREEN | GREEN |
+| 풀이 기록 없음 | solution_record · not_supplied | GREEN | GREEN |
+| 가설 0 | misconception · none_detected | GREEN | GREEN |
+| 숙달 없음 | mastery · no_history | GREEN | GREEN |
+| 팩 없음 | pedagogy_policy · coverage_gap | GREEN | GREEN |
 
-| 주입 | 기대 누락 | create | append | 표기 제거 뮤테이션 시 (create / append) |
-|---|---|---|---|---|
-| 학생 상태(θ None) | learner_state | GREEN | GREEN | RED / RED |
-| 개념(None) | concept·skill | GREEN | GREEN | RED / RED |
-| 스킬([]) | skill | GREEN | GREEN | RED / RED |
-| 문제(problem_id 없음) | problem·concept·skill·mastery·pedagogy_policy | GREEN | GREEN | RED / RED |
-| 학생 답안("") | student_answer | GREEN | GREEN | RED / RED |
-| 풀이 기록(없음) | solution_record | GREEN | GREEN | RED / RED |
-| 오개념(가설 0) | misconception | GREEN | GREEN | RED / RED |
-| 숙달(None) | mastery | GREEN | GREEN | RED / RED |
-| 교수법 정책(팩 None) | pedagogy_policy | GREEN | GREEN | RED / RED |
+대조군(9종 완비)은 두 핸들러 모두 다음과 같았다:
 
-- 정상: 18 passed, exit 0.
-- 뮤테이션(로그 호출 삭제 + 매니페스트를 '완비'로 위장해 응답·튜터에 전달): 18 failed, exit 1. 원복 후 sha256 일치를 확인했다.
-- 대조군(9종 완비): 두 핸들러 모두 `complete=True`, 누락 로그 0줄, 튜터가 받은 매니페스트도 완비였다.
+- `complete=true`, `tutor_invoked=true`
+- 전달 = {학생 상태, 학생 답안, 풀이 기록, 오개념}
+- `not_delivered` = [concept, skill, problem, mastery, pedagogy_policy]
+- INFO 로그 1줄
+- 응답 매니페스트가 러너 영수증과 바이트 단위로 같다
 
-판정기 단위 테스트(`TestManifestDiscrimination`)에도 같은 9건이 있다. 각 주입은 해당 슬롯만 비우고, 주입하지 않은 8종은 채워진 채로 남는지 확인한다. 판정이 '전부 누락'으로 뭉개지지 않는다는 뜻이다.
+### 4.2 뮤테이션 29종 (백업 → 적용 단언 → 실행 → sha256 원복 단언)
 
-### 4.2 표기 코드·가드 뮤테이션 13종 (백업 → 적용 단언 → 실행 → 바이트 원복 단언)
-
-| # | 뮤테이션 | 결과 |
+| 축 | 뮤테이션 | 결과 |
 |---|---|---|
-| M1 | 핸들러의 누락 로그 호출 삭제 | RED |
-| M2 | 응답 `tutor_context` 제거(create) | RED |
-| M3 | 튜터 러너로 매니페스트 미전달 | RED |
-| M4 | 기본값 채우기 — θ 없음을 '학생 상태 있음'으로 판정 | RED |
-| M5 | 공백 답안을 '답안 있음'으로 판정(strip 제거) | RED |
-| M6 | 프롬프트 `context_missing` 제거 | RED |
-| M7 | 관측 레코드 `context_missing` 미전달 | RED |
-| M8 | 로그 형식을 `key=value`로(스크러버가 지움) | RED |
-| M9 | 새 스킬 조회의 never-break 제거 | RED |
-| M10 | 오개념 preload — 웜스타트 표적을 프롬프트 가설로 넣음 | RED |
-| M11 | 선수 traversal depth 1→3 | RED |
-| M12 | 웜스타트 상한 해제(`limit=50`) | RED |
-| M13 | 튜터에 매니페스트 대신 None 전달(응답만 표기) | RED |
+| 배선 A | 답안을 `student_input`만으로 읽음 | RED |
+| 배선 B | 답안을 `student_solution`만으로 읽음 | RED |
+| 배선 C | 개념 조회 예외를 '매핑 없음'으로 뭉갬 | RED |
+| 배선 D·E·F | `theta_enabled`·`mastery_enabled`·`pack_enabled`를 True 상수로 | RED·RED·RED |
+| 배선 G | `mastery_level` 경로 제거 | RED |
+| 전달 H | 정책에 학생 답안을 넘기지 않음(**전달 경로** 뮤테이션) | RED |
+| 전달 I | 전달 판정 위조(개념을 전달됨으로) | RED |
+| 전달 J | θ 콜드스타트를 전달됨으로 셈 | RED |
+| 전달 K | 전달 판정에 다른 가설 객체를 씀 | RED |
+| 전달 L | 가드 OFF인데 팩을 전달됨으로 셈 | RED |
+| 전달 M·N | 미호출 턴에도 영수증 사용 · 응답에 영수증 대신 사전 매니페스트 | RED·RED |
+| 표기 O·P·Q | 프롬프트 `context_not_delivered` 제거 · 프롬프트 공개 호출 제거 · 레코드 미기록 | RED·RED·RED |
+| 등급 R·S·T | 커버리지 공백도 WARNING · 미호출 턴도 WARNING · 콜드스타트를 커버리지 공백으로 | RED·RED·RED |
+| 1차 승계 U·V·W·X | 로그 호출 삭제 · 응답 필드 제거 · θ 없음을 있음으로 · 로그 `key=value` 형식 | RED×4 |
+| 안전 Y·Z | SAVEPOINT 제거 · 새 조회 never-break 제거 | RED·RED |
+| 가드 AA·AB·AC | 오개념 preload · 선수 traversal depth 3 · 웜스타트 상한 해제 | RED×3 |
 
-결과: 13/13 RED. 적용 단언 13/13, 원복 단언 13/13, 하네스 exit 0.
-
-지시문 5항의 3종 RED와의 대응:
-
-- ① 필수 context 누락 → §4.1, M1~M5.
-- ② token budget 초과 → `test_budget_guards_still_hold_with_context_missing`. 가설 30·history 30·누락 9종을 넣어도 ≤3000토큰·≤20노드가 지켜지고 `context_missing`이 살아남는다. 상한 자체는 기존 가드이고, 그 뮤테이션은 `tests/backend/harness/test_wh1_llm_policy.py` Subgraph 예산 테스트군이 소유한다.
-- ③ 오개념 preload → M10.
+- 결과: 29/29 RED. 적용·원복 단언도 29/29 통과했다.
+- 하네스 결함 1건: 첫 실행에서 S의 치환 앵커가 black 재포맷 때문에 0건이 되어 주입이 **미적용**이었다. 하네스가 이를 실패로 셌다. 앵커를 고친 뒤 재실행해 RED를 확인했다.
+- 지시문 5항 3종 RED와의 대응:
+  - ① 필수 context 누락 → §4.1, A~G, U~W
+  - ② token budget 초과 → `test_budget_guards_still_hold_with_disclosure`. 상한 자체의 뮤테이션은 기존 `test_wh1_llm_policy.py` 예산 테스트군이 소유한다.
+  - ③ 오개념 preload → AA
 
 ## 5. depth / max_nodes / preload — 튜터 context 경로의 가드와 동결
 
 | 경로 | 가드(기존) | 이번 동결 |
 |---|---|---|
-| 선수 traversal: `_prerequisite_coaching_for` → `recommend_prerequisite_gaps` → `fetch_prerequisites` 재귀 CTE | `max_depth=1`(재귀 bound) | 서빙 경로가 이 좌석을 실제로 1회 타고, `1 ≤ max_depth ≤ 2`임을 HTTP 테스트로 동결(M11 RED) |
-| 웜스타트 탐색 표적: `assemble_warmstart_probe_hints` | `_DEFAULT_LIMIT=12` | 호출부가 상한을 풀지 않고, `12 ≤ 상한 ≤ 20`임을 동결(M12 RED) |
-| LLM 프롬프트 요약: `LLMTutorPolicy._build_prompt` | `_MAX_CONTEXT_NODES=20`·`_MAX_HISTORY=8`·`_MAX_PROMPT_TOKENS=3000` | `context_missing`이 실려도 세 상한 유지, 누락 표기는 절단하지 않음 |
-| 오개념 preload | 웜스타트 표적·`unresolved_hypothesis_ids`는 사적 probe 좌석 전용 | ⓐ 프롬프트에 웜스타트 표적이 실리지 않음(M10 RED) ⓑ HTTP: 실제 `_apply_hypotheses`를 태워 매칭 0인 턴이면 튜터가 받는 `active_hypotheses == []`, 표적은 `warmstart_outside_mids`로만 감 |
-| 새 개념→스킬 조회 | — | 그래프 순회가 아니라 1홉이다. 값은 프롬프트에 실리지 않고 크기만 매니페스트에 남는다 |
+| 선수 traversal `_prerequisite_coaching_for` → `recommend_prerequisite_gaps` → `fetch_prerequisites` | `max_depth=1` | 서빙 경로가 이 좌석을 1회 타고 `1 ≤ max_depth ≤ 2`인지 확인(AB RED) |
+| 웜스타트 탐색 표적 `assemble_warmstart_probe_hints` | `_DEFAULT_LIMIT=12` | 호출부가 상한을 풀지 않고 `12 ≤ 상한 ≤ 20`인지 확인(AC RED) |
+| LLM 프롬프트 요약 `LLMTutorPolicy._build_prompt` | 노드 ≤ 20 · history ≤ 8 · 토큰 ≤ 3000 | 표기 키가 실려도 상한이 유지되고, 표기 키는 절단되지 않음 |
+| 오개념 preload | 웜스타트 표적은 사적 probe 좌석 전용 | 프롬프트에 실리지 않음(AA RED). HTTP 경로에서 매칭 0이면 튜터가 받는 가설도 0 |
+| 새 개념→스킬 조회 | — | 1홉이며 순회가 아니다. 값은 프롬프트에 실리지 않는다 |
 
-ARCH-11(blocked·subgraph depth guard)의 소유 범위는 건드리지 않았다. 지금 하네스의 `query_curriculum`은 실제로 순회하지 않는다(`wh1_loop.py`가 "노드 조회(기록·내부)"만 반환한다). 그래서 traversal guard는 여전히 "없는 순회에 가짜 가드를 만들지 않는다"(`wh1_llm_policy.py` docstring) 상태다.
+ARCH-11(blocked)의 소유 범위는 건드리지 않았다. `query_curriculum`은 여전히 실제로 순회하지 않는다. 값 전달(`P3-72`)이 실제 순회를 만들면 그때 ARCH-11 가드가 동반돼야 하며, `P3-72` acceptance ③에 명시했다.
 
-## 6. 검증 (전부 exit code로 판정, HEAD cfe2233c 기준)
-
-CI 잡 대조: 이 변경이 닿는 잡은 `backend`(lint·type·test + 게이트 CLI 20종 + 헌법 테스트), `infra-contracts`(인벤토리 v2 전수 귀속 포함), `declared-unwired-audit`, `harness-integrity`(백로그·래칫)다. `backend-migrations`(실 PG)는 로컬에서 돌리지 못했다.
+## 6. 검증 (exit code)
 
 | 검사 | 명령 | exit |
 |---|---|---|
 | Ruff | `python -m ruff check . ../../tests/backend ../../tests/constitution` | 0 |
 | Black | `python -m black --check --line-length 100 . ../../tests/backend ../../tests/constitution` | 0 |
-| Mypy | `python -m mypy --strict whymath_backend` (806 files) | 0 |
-| Import contracts | `lint-imports` (4 kept · 0 broken) | 0 |
-| 백엔드 전체 스위트 | `python -m pytest -m "not corpus_authoring" -n auto --dist loadfile --cov=whymath_backend --cov-fail-under=70` → 21357 passed · 710 skipped · 1 xfailed · 총 커버리지 87.56% | 0 |
-| 계층별 커버리지 | `check_layer_coverage.py coverage.xml` (api 96.9 · l1 90.8 · l2 96.4 · l3 81.6 · l4 95.8) | 0 |
-| backend 게이트 CLI 20종 | defect_detection · selective_grading · explicit_correction_gap · misconception_false_positive · generator_space_overlap · residue_cross_verify_v2 · coach_prose_leak · anchor_detection_channel · pedagogy_pack_fidelity · analogy_fidelity · explanation_f7 · notation_coverage · curriculum_notation_gate · provenance_audit · routing_data_grade · routing_decision_bypass · provider_seat_contract · prompt_asset_audit l3 · phase3_metrics self-check · solution_qa | 전건 0 |
+| Mypy | `python -m mypy --strict whymath_backend` | 0 |
+| Import contracts | `lint-imports` | 0 |
+| 관련 디렉터리 | `pytest tests/backend/harness tests/backend/api tests/backend/l4` (8859 passed · 372 skipped) | 0 |
+| 백엔드 전체 · 계층 커버리지 | 최종 HEAD 재실행 결과는 최종 보고에 기재 | — |
+| backend 게이트 CLI 20종 | coach_prose_leak · pedagogy_pack_fidelity 포함 전건 | 전건 0 |
 | declared-unwired-audit | `python -m whymath_backend.ops.declared_unwired_audit` | 0 |
-| infra-contracts | ruff · black · runbook_blocks · mastery_write_path_scan · dependency_upper_bounds · ci_constraints check · `pytest tests/infra`(3221 passed · 27 skipped) · `pytest tests/test_idempotency.py` | 전건 0 |
-| 헌법 테스트 | `pytest -q tests/constitution` | **1** — `test_check_signed_changes.py` 33건이 `ssh-keygen` 부재로 실패(로컬 환경 결함). 그 파일을 제외하면 39 passed, exit 0. 이번 변경은 그 파일·대상(`constitution/`·서명자 목록)을 건드리지 않았다 |
-| 백로그 | `backlog.py validate` · `backlog.py audit-deps` | 0 · 0 |
-| 위헌 심사 래칫 | `scripts/constitution/audit_ratchet.py` (단계 2 · 차단 0건 ≤ 기준선 0건) | 0 |
-| 주입 매트릭스 | §4.1 정상 18 GREEN(exit 0) / 뮤테이션 18 RED(exit 1) | — |
-| 뮤테이션 하네스 | §4.2 13/13 RED·적용·원복 | 0 |
+| 백로그 | `backlog.py validate` · `audit-deps` | 0 · 0 |
+| 뮤테이션 하네스 | §4.2 29종 | 0(재실행 포함) |
 
 ## 7. 한계·남은 위험
 
-1. **Langfuse에는 기록하지 않았다(지시문 4항 미이행).** 앱 공유 `TraceSink`(`LangfuseSink`) 스트림은 이벤트명이 `l3_routing` 하나뿐이고, `ops/cost_report` 게이트②가 그 스트림을 라우팅 표본으로 센다. 라우팅이 아닌 이벤트를 섞으면 비용 표본이 오염된다. 그래서 같은 요약(누락 슬롯 이름)을 WH-1 관측 레코드(`context_missing`)에 실었다. Langfuse 축이 필요하면 별도 이벤트명과 cost_report 제외 규칙을 함께 만드는 후속 작업이 필요하다.
-2. **슬롯 *값*은 LLM 프롬프트에 넣지 않았다.** 튜터가 받는 것은 판정 결과와 누락 이름이다. 개념 코드·스킬·숙달 값은 프롬프트에 없다. 이유는 프라이버시, "LLM은 학습 상태를 결정하지 않는다" 경계, 튜터 기능 불변이다. 값까지 넣으려면 `query_curriculum`이 실제로 순회해야 하므로 ARCH-11 traversal guard와 함께 다룰 사안이다. P3-09(출력 스키마)와도 맞물린다.
-3. **probe 후보 풀 상한은 200이다**(`wh1_probe_supply._DEFAULT_LIMIT`). 이 풀은 LLM context가 아니라 `plan_probe`의 사적 입력이다. 그래서 max_nodes 예산 대상으로 보지 않았고, 이번에 바꾸지 않았다.
-4. **교수법 정책 슬롯은 교수법 팩을 본다.** base Polya 정책(`PolyaCoach.decide`)은 늘 돌기 때문에 슬롯 판정 대상이 아니다. 팩은 파일럿 단원 문항에서만 해석된다. 따라서 운영 턴 대부분이 `pedagogy_policy(unresolved)` WARNING을 낸다. 스킬·숙달 미매핑도 마찬가지다. 실제 커버리지 공백이므로 표기는 정직하지만 WARNING 로그량은 늘어난다.
-5. **조회가 2건 늘었다**(개념·스킬). 개념 해석은 같은 요청에서 이미 최대 5회 반복되던 seam이다. 반복을 하나로 모으는 리팩터는 범위 밖이라 하지 않았다.
-6. **stateless `/v1/coach`**는 튜터 호출이 없어 범위 밖이다(응답 필드도 없다).
-7. **실 PG 통합 테스트**(`WHYMATH_RUN_INTEGRATION=1` — `test_coach_wh1_primary_flip.py` 등)와 CI `backend-migrations` 잡은 로컬에서 돌리지 못했다. CI가 최종 판정한다. 그 경로에서 `get_concept_skill_ids`가 실 스키마(`Concept.behavior_skills` ∩ `skill_node`)로 도는지도 거기서 처음 확인된다. 다만 SQL은 기존 `_assessed_skill_ids`와 같다.
+1. **튜터 슬롯 값 전달은 미이행이다(`P3-72`).** 개념·스킬·숙달·팩 요약을 프롬프트에 싣는 일이다. 학생 숙달·θ에서 파생된 정보를 클라우드 LLM(openrouter 좌석)에 보낼지는 개인정보 판단이므로 Kiki 결정이 선행 조건이다.
+2. **Langfuse 기록은 미이행이다(`P3-73`).** 보류 사유는 표본 오염 우려가 **아니다**. `cost_report`는 `name="l3_routing"`으로 필터링하므로(`ops/cost_report.py:63·628`) 별도 이벤트명이면 오염되지 않는다. 진짜 사유는 `LangfuseSink`가 이벤트명을 `l3_routing`으로 하드코딩하고 있다는 점이다(`l3/trace/langfuse_sink.py:61`). sink 확장(또는 l3_routing 메타데이터 결선)이 필요하다. 1차 보고의 "오염 우려로 불가"는 잘못된 근거였으므로 정정한다. 같은 요약은 관측 레코드에 이미 있다.
+3. **필수 누락 시 명시 fallback은 미이행이다(`P3-74`).**
+4. **매니페스트 범위 밖 호출자**(`tutor_context` 미전달 — 관측 레코드의 context 필드는 None, 프롬프트 표기 키 없음):
+   - `harness/wh1_shadow.py::observe_wh1_harness_shadow` — 비노출 shadow
+   - `harness/coach_prose_leak_eval.py` — 게이트 측정 하네스
+   - `scripts/demo/wh1_primary_probe.py`·`scripts/ops/wh1_primary_timeout_decompose.py` — 데모·진단 스크립트
+
+   학생에게 서빙되는 경로는 코치 세션 두 핸들러뿐이며, 둘 다 매니페스트를 전달한다.
+5. **WARNING 로그량 위험은 낮췄다.** 콜드스타트와 커버리지 공백은 INFO로 내렸다. 운영에서 WARNING은 플래그 OFF와 조회 실패에만 남는다.
+6. **조회가 2건 늘었다**(개념·스킬, SAVEPOINT 1개). 개념 해석은 같은 요청에서 이미 반복되던 seam이다. 반복을 모으는 리팩터는 범위 밖이다.
+7. **실 PG 경로 미확인.** 실 PG 통합 테스트와 CI `backend-migrations` 잡은 로컬에서 돌리지 못했다. 실 PG에서 SAVEPOINT와 `get_concept_skill_ids`(SQL은 기존 `_assessed_skill_ids`와 동일)가 도는지는 CI가 판정한다.
+8. **헌법 테스트 일부 미판정.** `tests/constitution/test_check_signed_changes.py`는 로컬에 `ssh-keygen`이 없어 판정하지 못했다. 이번 변경과는 무관하다.
