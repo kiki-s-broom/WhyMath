@@ -90,6 +90,8 @@ from whymath_backend.l3.verify_answer import (
     RootSelection,
     classify_solvability,
     condition_relation,
+    has_variable_denominator,
+    is_polynomial_expression,
     satisfies_domain,
     split_equation_domain,
     verify_answer,
@@ -420,9 +422,10 @@ def _relations(verify: Mapping[str, object]) -> list[tuple[str, str, frozenset[s
 
 
 def _defines_other_variable(condition: str, var: str) -> bool:
-    """`w = f(var)` 꼴(한쪽이 다른 변수 하나뿐, 반대쪽은 `var` 만의 식)인가 — 그 조건은 w 를 정할 뿐
-    `var` 를 제약하지 않는다. `x + z > 100`·`x**2 + y**2 = 1` 처럼 `var` 를 함께 묶는 조건은
-    아니다."""
+    """`w = f(var)` 꼴(한쪽이 다른 변수 하나뿐, 반대쪽은 `var` 의 **다항식**)인가 — 그 조건은 w 를
+    정할 뿐 `var` 를 제약하지 않는다. `x + z > 100`·`x**2 + y**2 = 1` 처럼 `var` 를 함께 묶는 조건은
+    아니다. f 가 `log(x)`·`sqrt(x)`·`1/(x - a)` 처럼 암묵 정의역을 가지면 w 가 존재하려면 x 가
+    그 정의역 안이어야 하므로 x 를 제약한다 — 정의로 면제하지 않는다(PR #1703 3차 검토 하2)."""
     if "<" in condition or ">" in condition or "!" in condition:
         return False
     sides = condition.split("=")
@@ -432,7 +435,11 @@ def _defines_other_variable(condition: str, var: str) -> bool:
         name = lone.strip()
         if name.isidentifier() and name != var:
             relation = condition_relation(other)
-            if relation is not None and relation[1] == frozenset({var}):
+            if (
+                relation is not None
+                and relation[1] == frozenset({var})
+                and is_polynomial_expression(other, var) is True
+            ):
                 return True
     return False
 
@@ -471,6 +478,12 @@ def _judge_value(verify: Mapping[str, object], var: str, value: str) -> str:
     if mixed or len(equations) != 1:
         return _UNKNOWN
     if classify_solvability(equations[0]).state not in ("unique", "multiple"):
+        return _UNKNOWN
+    # 분수방정식 — 평가 파싱이 분모를 약분해 무연근이 근처럼 보인다(`x*(x - 2)/(x - 2) = 2` 의
+    # x = 2: 약분하면 `x = 2` 라는 다항 등식이 된다). 원문 구조(비평가 파싱)에 그 변수의 분모가
+    # 하나라도 있으면 증명하지 않는다 — 단조 규칙상 종전 판정이 남는다(PR #1703 3차 검토 상1).
+    # 약분되지 않은 유리식은 위 `classify_solvability` 가 이미 비다항으로 거른다.
+    if has_variable_denominator(equations[0], var) is not False:
         return _UNKNOWN
     selection = verify.get("answer_selection")
     rule = selection if selection in ("largest", "smallest") else "unique"
@@ -584,6 +597,9 @@ def _check_c2_domain(
     if split is None or split[2] != var or not split[1]:
         return None
     equation, domain, _ = split
+    if has_variable_denominator(equation, var) is not False:
+        # 분수방정식 — 약분된 다항식의 실근 개수로는 후보의 완전성을 말할 수 없다(무연근이 섞인다).
+        return None
     for root in roots:
         state = verify_answer(equation, {var: root}).state
         if state == "fail":

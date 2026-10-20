@@ -10,6 +10,9 @@ import pytest
 
 from whymath_backend.l3.verify_answer import (
     condition_relation,
+    denominator_vanishes,
+    has_variable_denominator,
+    is_polynomial_expression,
     satisfies_domain,
     split_equation_domain,
     verify_root_selection,
@@ -131,6 +134,28 @@ class TestRootSelectionWithDomain:
         verdict = verify_root_selection(["x**2 - 1 = 0", "log(x) >= 0"], {"x": "1"}, "unique")
         assert verdict.state == "unverifiable"
 
+    def test_cancelled_rational_equation_with_a_spurious_root_is_unverifiable(self) -> None:
+        """약분하면 `x = 2` 지만 원문 분모가 x = 2 에서 0 — 무연근을 허용 근으로 세지 않는다."""
+        verdict = verify_root_selection(["x*(x - 2)/(x - 2) = 2", "x > 0"], {"x": "2"}, "unique")
+        assert verdict.state == "unverifiable"
+
+    def test_undecidable_denominator_at_a_root_is_unverifiable(self) -> None:
+        """`x/((x-2)/(x-2)) = 2` 는 약분하면 x = 2, 원문 분모는 x = 2 에서 0/0 — 판정 불가로 둔다."""
+        verdict = verify_root_selection(["x/((x-2)/(x-2)) = 2", "x > 0"], {"x": "2"}, "unique")
+        assert verdict.state == "unverifiable"
+
+    def test_denominator_with_an_undecidable_value_at_a_root_is_unverifiable(self) -> None:
+        """`x*sqrt(x - 3)/sqrt(x - 3) = 2` 는 약분하면 x = 2, 원문 분모는 x = 2 에서 허수 — 판정 불가."""
+        verdict = verify_root_selection(
+            ["x*sqrt(x - 3)/sqrt(x - 3) = 2", "x > 0"], {"x": "2"}, "unique"
+        )
+        assert verdict.state == "unverifiable"
+
+    def test_cancelled_rational_equation_without_a_spurious_root_is_still_judged(self) -> None:
+        """대조: 같은 꼴이라도 근(3)에서 분모가 0 이 아니면 판정한다(과잉 거부 없음)."""
+        verdict = verify_root_selection(["x*(x - 2)/(x - 2) = 3", "x > 0"], {"x": "3"}, "unique")
+        assert verdict.state == "pass"
+
     def test_single_element_list_is_unchanged(self) -> None:
         assert verify_root_selection(["x**2 - 10*x + 24 = 0"], {"x": "6"}, "largest").state == (
             "pass"
@@ -168,3 +193,52 @@ class TestSubstitutedValue:
         verdict = verify_substituted_value("y = a*x", {"x": "2"}, "y", "4")
         assert verdict.state == "unverifiable"
         assert "자유변수" in (verdict.reason or "")
+
+
+class TestDenominatorStructure:
+    @pytest.mark.parametrize(
+        "condition",
+        [
+            "x*(x - 2)/(x - 2) = 2",
+            "(x - 2)**3/(x - 2)**2 = 0",
+            "x*(x-2)*(x-2)**-1 = 2",
+            "x/((x-2)/(x-2)) = 2",
+            "1/sqrt(x - 2) = 1",
+        ],
+    )
+    def test_variable_denominator_is_seen_in_the_unevaluated_structure(
+        self, condition: str
+    ) -> None:
+        assert has_variable_denominator(condition, "x") is True
+
+    @pytest.mark.parametrize(
+        "condition", ["x**2 - 4 = 0", "x/2 = 3", "x = ((112) - (4))/((3) - (0))"]
+    )
+    def test_constant_denominators_are_not_variable_denominators(self, condition: str) -> None:
+        assert has_variable_denominator(condition, "x") is False
+
+    def test_denominator_vanishing_is_decided_at_the_value(self) -> None:
+        assert denominator_vanishes("x*(x - 2)/(x - 2) = 2", "x", "2") is True
+        assert denominator_vanishes("x/(x + 5) = 1/3", "x", "5/2") is False  # 대조
+        assert denominator_vanishes("x/(x + 5) = 1/3", "x", "-5") is True
+        assert denominator_vanishes("x**2 = 4", "x", "2") is False  # 분모 없음
+        assert denominator_vanishes("x/((x-2)/(x-2)) = 2", "x", "2") is not False  # 0/0 — 판정 불가
+        # 기호적 0 은 아니지만 수치로 0(허용치 안)인 분모 — 근사 소수 근 √2 에서 x**2 - 2
+        assert (
+            denominator_vanishes("x*(x**2 - 2)/(x**2 - 2) = 1", "x", "1.4142135623730951") is True
+        )
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("2*x**3 - 6*x**2 + 1", True),
+            ("x/2 + sqrt(2)", True),
+            ("log(x)", False),
+            ("sqrt(x)", False),
+            ("1/(x - 3)", False),
+            ("x**2.0", False),
+            ("(((", None),
+        ],
+    )
+    def test_polynomial_expression_structure(self, text: str, expected: bool | None) -> None:
+        assert is_polynomial_expression(text, "x") is expected

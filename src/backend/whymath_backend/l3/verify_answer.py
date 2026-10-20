@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
@@ -80,7 +81,10 @@ __all__ = [
     "budget_exceeded_verdict",
     "classify_solvability",
     "condition_relation",
+    "denominator_vanishes",
     "derive_selected_root",
+    "has_variable_denominator",
+    "is_polynomial_expression",
     "satisfies_domain",
     "split_equation_domain",
     "verify_answer",
@@ -677,6 +681,112 @@ def satisfies_domain(
     return _domain_truth(domain, sympy.Symbol(var), parsed, tol)
 
 
+# 관계 연산자 토큰 — 원문을 양변으로 가른다(긴 토큰 먼저). 비평가 구조 파싱 전용.
+_RELATION_TOKENS: re.Pattern[str] = re.compile(r"==|!=|<=|>=|<|>|=")
+
+
+def _unevaluated_sides(condition: str) -> list[sympy.Expr] | None:
+    """조건 원문의 각 변을 **계산 없이**(`evaluate=False`) 파싱한 나무. 파싱 불가면 None.
+
+    평가 파싱은 `x*(x - 2)/(x - 2)` 를 `x` 로 약분해 분모를 지운다 — 분모를 보려면 원문의 구조를
+    봐야 한다(문자열 정규식이 아니라 구조라서 `x*(x-2)*(x-2)**-1`·`x/((x-2)/(x-2))` 같은 표기
+    변형도 같은 나무 모양 `Pow(밑, 음수)` 로 드러난다).
+    """
+    sides: list[sympy.Expr] = []
+    for part in _RELATION_TOKENS.split(condition):
+        if not part.strip():
+            return None
+        try:
+            sides.append(safe_sympify(part, evaluate=False))
+        except Exception as exc:  # noqa: BLE001 — 파싱 불가는 판정 불가(None)
+            logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+            return None
+    return sides
+
+
+def _variable_denominators(condition: str, var: str) -> list[sympy.Expr] | None:
+    """원문 구조에서 `var` 를 담은 분모(음수 지수 거듭제곱의 밑) 목록. 파싱 불가면 None."""
+    sides = _unevaluated_sides(condition)
+    if sides is None:
+        return None
+    symbol = sympy.Symbol(var)
+    found: list[sympy.Expr] = []
+    for side in sides:
+        for node in sympy.preorder_traversal(side):
+            if (
+                isinstance(node, sympy.Pow)
+                and node.exp.could_extract_minus_sign()
+                and symbol in node.base.free_symbols
+            ):
+                found.append(node.base)
+    return found
+
+
+def has_variable_denominator(condition: str, var: str) -> bool | None:
+    """조건 원문에 `var` 를 담은 분모가 있는가(유리식) — 구조 판정. 파싱 불가면 None."""
+    found = _variable_denominators(condition, var)
+    return None if found is None else bool(found)
+
+
+def denominator_vanishes(condition: str, var: str, value: str, *, tol: float = 1e-9) -> bool | None:
+    """`var = value` 에서 원문의 `var` 분모 중 하나라도 0 이 되는가 — True·False·None(판정 불가).
+
+    분수방정식의 무연근 판정이다: 평가 파싱이 약분한 식에서는 `x*(x - 2)/(x - 2) = 2` 의 x = 2 가
+    근처럼 보이지만 원문에서는 분모가 0 이라 근이 아니다. `var` 분모가 없으면 False.
+    """
+    found = _variable_denominators(condition, var)
+    if found is None:
+        return None
+    if not found:
+        return False
+    try:
+        point = {sympy.Symbol(var): safe_sympify(value)}
+        values = [safe_subs(base, point) for base in found]
+    except Exception as exc:  # noqa: BLE001 — 대입 불가는 판정 불가
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return None
+    unknown = False
+    for at in values:
+        if getattr(at, "is_zero", None) is True:
+            return True
+        magnitude = _real_value(at, tol) if not getattr(at, "free_symbols", None) else None
+        if magnitude is None:
+            unknown = True
+        elif abs(magnitude) <= tol:
+            return True
+    return None if unknown else False
+
+
+def is_polynomial_expression(text: str, var: str) -> bool | None:
+    """식 원문이 구조상 `var` 의 다항식인가(덧셈·곱셈·음 아닌 정수 지수만) — 파싱 불가면 None.
+
+    `log(x)`·`sqrt(x)`(지수 1/2)·`1/(x - a)`(음수 지수)·`x**2.0` 처럼 암묵 정의역이 있거나 다항이
+    아닌 꼴은 False. `var` 가 없는 부분식(상수 `sqrt(2)`·`pi`)은 상수로 본다.
+    """
+    sides = _unevaluated_sides(text)
+    if sides is None or len(sides) != 1:
+        return None
+    symbol = sympy.Symbol(var)
+
+    def polynomial(node: sympy.Basic) -> bool:
+        if symbol not in node.free_symbols:
+            return True
+        if node == symbol:
+            return True
+        if isinstance(node, (sympy.Add, sympy.Mul)):
+            return all(polynomial(arg) for arg in node.args)
+        if isinstance(node, sympy.Pow):
+            exponent = node.exp
+            return (
+                bool(exponent.is_Integer)
+                and not exponent.could_extract_minus_sign()
+                and polynomial(node.base)
+            )
+        return False
+
+    return polynomial(sides[0])
+
+
 def verify_substituted_value(
     condition: str,
     given: Mapping[str, str],
@@ -820,6 +930,16 @@ def verify_root_selection(
         return _unverifiable("근 선택 — 답이 실근 집합에 없음(Tier1 소관)·안전 회피")
 
     if domain:
+        # 평가 파싱은 분모를 약분한다(`x*(x - 2)/(x - 2)` → `x`) — 약분된 다항식의 근에는 원문
+        # 분모를 0 으로 만드는 무연근이 섞일 수 있다. 계산된 실근 중 하나라도 원문 분모를 0 으로
+        # 만들거나 그 판정이 불가하면 근 집합을 믿지 않는다(PR #1703 3차 검토 상1). 무연근이 없으면
+        # 약분된 근 집합이 곧 원래 근 집합이라 그대로 판정한다(`x*(x - 2)/(x - 2) = 3` 의 x = 3 등 —
+        # 약분되지 않는 유리식은 위 다항 가드가 이미 거른다).
+        vanish = [denominator_vanishes(condition, str(var), sympy.sstr(root)) for root, _ in reals]
+        if any(flag is not False for flag in vanish):
+            return _unverifiable(
+                "근 선택 — 원문 분모를 0 으로 만드는 근(무연근) 또는 판정 불가·안전 회피"
+            )
         # 도메인 제약으로 허용 근을 가른다(정확근으로 판정 — 경계 근을 모호로 접지 않는다).
         flags = [_domain_truth(domain, var, root, tol) for root, _ in reals]
         if any(flag is None for flag in flags):

@@ -559,6 +559,38 @@ ADVERSARIAL: dict[str, tuple[Record, qa.Verdict]] = {
         ),
         qa.Verdict.UNVERIFIABLE,
     ),
+    # 3차 검토 상1 — 평가 파싱의 자동 약분으로 무연근이 '다항 등식의 근'처럼 보이는 분수방정식
+    "RF3 약분 무연근 x(x-2)/(x-2)=2": (
+        _rec(["x*(x - 2)/(x - 2) = 2", "y = x + 1"], "3", {"x": "2", "y": "3"}, ["x = 2", "y = 3"]),
+        qa.Verdict.FAIL,
+    ),
+    "RF4 약분 무연근 (x-2)^3/(x-2)^2=0": (
+        _rec(
+            ["(x - 2)**3/(x - 2)**2 = 0", "y = x**2"], "4", {"x": "2", "y": "4"}, ["x = 2", "y = 4"]
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "RF5 음수 지수 표기": (
+        _rec(["x*(x-2)*(x-2)**-1 = 2", "y = x + 1"], "3", {"x": "2", "y": "3"}, ["x = 2", "y = 3"]),
+        qa.Verdict.FAIL,
+    ),
+    "RF6 분모 속 분수 표기": (
+        _rec(["x/((x-2)/(x-2)) = 2", "y = x + 1"], "3", {"x": "2", "y": "3"}, ["x = 2", "y = 3"]),
+        qa.Verdict.FAIL,
+    ),
+    "RF7 같은 꼴·무연근 아닌 값(보수 — 증명하지 않음)": (
+        _rec(["x*(x - 2)/(x - 2) = 3", "y = x + 1"], "4", {"x": "3", "y": "4"}, ["x = 3", "y = 4"]),
+        qa.Verdict.FAIL,
+    ),
+    "RF8 약분 안 되는 분수방정식(대조 — 종전 판정 유지)": (
+        _rec(
+            ["x/(x + 5) = 1/3", "x > 0", "y = 2*x"],
+            "5",
+            {"x": "5/2", "y": "5"},
+            ["x = 5/2", "y = 5"],
+        ),
+        qa.Verdict.FAIL,
+    ),
     # 정당한 판정 확장(main 의 거짓 실패·판정 불가 → 다항 등식으로 증명돼 PASS)
     "DR2 중근 등식 대입": (
         _rec(
@@ -687,6 +719,28 @@ def test_mixed_inequality_does_not_mask_a_definite_domain_violation() -> None:
 
     item = qa.judge_record(_inject(_domain_selection_step(), mutate))
     assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+
+
+def test_c2_domain_does_not_count_roots_of_a_cancelled_rational_equation() -> None:
+    """`(x-2)**2*(x+1)/(x-2) = 0` 은 약분하면 근 2·-1 이지만 2 는 원문 분모를 0 으로 만드는 무연근이다.
+    약분된 근 개수로 완전성을 말하지 않는다 — 도메인 판정을 하지 않고 종전 사유로 돌아간다."""
+    record = _rec(["(x - 2)**2*(x + 1)/(x - 2) = 0", "x > 0"], "2", {"x": "2"}, ["x = -1, x = 2"])
+    assert qa.judge_record(record).checks["C2"].code == "C2_ROOT_CHOICE_UNSTRUCTURED"
+
+
+def test_implicit_domain_definition_is_not_exempted_as_a_definition() -> None:
+    """`y = log(x)` 는 x > 0 이어야 y 가 있으므로 x 를 제약한다 — 정의로 면제해 smallest(-2)와 비교해
+    근 선택 단계를 '틀렸다'로 내지 않는다(3차 검토 하2). 선택 단계는 판정 불가, 대입 단계에서 종전
+    FAIL 이 남는다."""
+    record = _rec(
+        ["x**2 - 4 = 0", "y = log(x)"],
+        "log(2)",
+        {"x": "2", "y": "log(2)"},
+        ["x = -2, x = 2", "x = 2", "y = log(2)"],
+    )
+    record["verify"]["answer_selection"] = "smallest"
+    item = qa.judge_record(record)
+    assert item.checks["C4"].detail == "전이 1·해석 단계(대입)"
 
 
 def test_two_equations_for_the_variable_leave_the_root_set_undetermined() -> None:
