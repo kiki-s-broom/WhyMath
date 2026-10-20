@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-72-tutor-slot-value-delivery
+title: "P3-72 — 튜터 context 슬롯 값 전달(개념·스킬·숙달·팩 요약) — P3-08 승계·클라우드 LLM 전송 개인정보 판단(Kiki) 선행"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-08-tutor-context-builder
+requires_gates: []
+acceptance:
+  - "① 튜터 정책 입력에 개념·스킬·숙달·교수법 팩 *요약*(값의 비식별 축약 — 예: 개념 code·스킬 수·숙달 라벨)을 싣고, P3-08 매니페스트 delivered_to_tutor가 그 슬롯을 실제 전달로 표기한다(정책 delivered_context_slots 확장 — 핸들러 추정 금지).\n② 착수 전 Kiki 결정 게이트: 학생 숙달·θ 파생 정보를 클라우드 LLM(openrouter 좌석)에 보내는 개인정보 판단 — 로컬 좌석 한정 여부 포함. 결정 전 클라우드 전송 0.\n③ query_curriculum 등으로 실제 그래프 순회가 생기면 ARCH-11 traversal guard(depth ≤ 2·visited set·timeout·token budget) 동반. 프롬프트 예산(≤20 노드·≤3000 토큰) 불변 — 넘치면 요약·선택 규칙.\n④ coach_prose_leak·pedagogy_pack_fidelity 게이트 CLI exit 0 유지, 전달 슬롯을 뮤테이션으로 지우면 RED."
+artifacts: []
+paths: []
+session: null
+notes: "P3-08 승계(PR #1705 검토 상1). P3-08은 9종 조회(resolved)와 실제 튜터 전달(delivered_to_tutor)을 정직하게 표기하는 데까지만 했다 — 현재 튜터에 실리는 것은 학생 답안·풀이 단계·활성 가설·θ(·가드 ON 시 팩)뿐이고 개념·스킬·숙달·문제 내용은 not_delivered로 표기된다. 그 본체(값 전달)는 학생 데이터의 클라우드 LLM 전송이라는 개인정보 판단이 걸려 Kiki 결정 사안이므로 분리했다. 보고서: docs/reviews/p3_08_tutor_context_builder_2026-10-20.md."
+updated: 2026-10-20

@@ -1,1 +1,4 @@
 {"ts": "2026-10-20T08:08:59+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "start", "id": "P3-08-tutor-context-builder", "session": "claude/p3-08-tutor-context-builder", "remote": "ok"}
+{"ts": "2026-10-20T11:15:17+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "add", "id": "P3-72-tutor-slot-value-delivery", "eos_priority": "P1"}
+{"ts": "2026-10-20T11:15:35+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "add", "id": "P3-73-tutor-context-langfuse-record", "eos_priority": "P1"}
+{"ts": "2026-10-20T11:15:48+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "add", "id": "P3-74-tutor-required-context-fallback", "eos_priority": "P1"}
