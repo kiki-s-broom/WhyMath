@@ -334,3 +334,11 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 **③ 시스템 프롬프트** — confidence·확신도를 언급하는 문구는 원래 없었다. 시스템 프롬프트에 "confidence"·"확신"이 없음을 테스트로 단언한다. 정책 docstring(`_hypothesis_summary`·`_budget_context_nodes`)은 결정 내용으로 정정했다.
 
 **④ 게이트·한계** — 게이트 CLI 20종 + declared_unwired 전건 exit 0: coach_prose_leak 노출 상한 0.0093 PASS, pedagogy_pack_fidelity 미검출 상한 0.0362 PASS. 다만 이 게이트들은 hermetic·결정론이고 스크립트 provider를 쓴다. **confidence를 뺀 것이 실 LLM의 도구 선택 품질(예: 어느 가설을 curate/log할지)에 주는 영향은 이 게이트들로 보이지 않는다** — 라이브 측정은 하지 않았다. 가설 순서가 바뀐 것(id 오름차순)도 같은 한계 아래 있다.
+
+**최종 트리 검증(3406c2bf 기준 · exit code)**:
+- ruff 0 · black(100) 0 · mypy --strict 0 · lint-imports 0
+- backend 전체 `-n auto`: 0 — 21,481 passed · 713 skipped · 1 xfailed · 커버리지 87.62% · 계층 게이트 0
+- tests/infra 0 (3,221 passed) · tests/harness 0 (2,307 passed)
+- 게이트 CLI 20종 + declared_unwired 전건 0
+- backlog validate·audit-deps·rules lint·jit check 0 · 위헌 심사 래칫 차단 0건 · cp949_guard 0 · conflict markers 0
+- 로컬 실 PG 통합 3 passed(검증 뒤 임시 PG 인스턴스 정지·삭제)
