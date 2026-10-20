@@ -13,11 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 원자 백본 정본 graph.json을 통합마스터 v3(2026-10-19 정본·교차감사 반영)로 transform-v1 재실행 후 기존 이관 3종(dedup 14건·대학 성취기준 채움·행동스킬 병합)과 S4-60 경계 엣지 24건을 재적용해 교체한다 — 노드 2,683·엣지 2,234 불변, v2 변경이력의 순서 역전 엣지 결함 205건 교정·원자 본문 필드 정정(진단문항·발문 등)·미적Ⅰ 원자ID 표기 통일·서술형 엣지 973건에 수작업 매핑 근거 열 보존\n② 원본 xlsx는 커밋하지 않는다(데이터 카드 §3 redaction) — _provenance.json에 새 source_sha256·재생성 이력·이관 재적용 기록을 남기고 데이터 카드 §1을 갱신한다\n③ 검증: data-pipeline 잡 스텝(tests/data_pipeline 전체)·tests/infra/test_docs_numbers·test_node_granularity_governance·graph_analytics edge_count 2234 통과를 exit code로 보고한다. 변별력: 재생성 전 코퍼스로 되돌리면 순서 역전 엣지 검출 테스트가 실제로 FAIL인지 확인한다\n④ 교차감사 산출물(감사 CSV·README·수능 시그니처 패턴 v2.1 정본 docx)을 docs/data/cross_audit_2026-10-19/에 둔다. 오개념 승격 27건은 데이터 카드 §6 ATOM: 투영 좌석과 이중 보관이 되므로 misconceptions_v1에 추가하지 않는다(사유 기록)\n⑤ 범위 밖(후속 태스크): 서술형 엣지 973건의 소단원코드→대표 원자 해소는 학습 경로에 직접 영향 — 교수학 검토 게이트를 거쳐 별도 등재. prod 적재(atom_graph_prod_parity STATUS=MATCH)는 Kiki 머신 런북"
+  - "④-정정(2026-10-20): 수능 시그니처 패턴 v2.1 정본은 docx(오피스 바이너리 가드 차단)·pandoc md(policy-guard EBS·평가원 본문 패턴 검사에 출처 목록 1줄이 걸림) 모두 PR #1701에서 제외했다 — 가드 거부를 우회하지 않는다. 등재 여부(출처 표기 수정 또는 코드오너 ack)는 후속 태스크 KG-10에서 Kiki 결정. 감사 CSV 8종·README 2종은 등재. 추가로 적재 검증(표기 커버리지 게이트)에서 발견한 12미적Ⅱ-03-04-1 아래첨자 ₖ 2회를 정본 xlsx에서 _k로 교정해 source_sha256 7290aa57…로 갱신(README 3차 반영 기록)"
 artifacts: []
 paths:
   - "data/corpus/atom_graph_v1/**"
   - docs/data/atom_graph_v1.md
   - "docs/data/cross_audit_2026-10-19/**"
 session: claude/kg-09-atom-backbone-v3-regen
-notes: "Kiki 요청(2026-10-20): 교차감사 정본을 저장소에 반영. 원본 xlsx 커밋 금지 규칙에 따라 파이프라인 재생성으로 교체. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+notes: |-
+  Kiki 요청(2026-10-20): 교차감사 정본을 저장소에 반영. 원본 xlsx 커밋 금지 규칙에 따라 파이프라인 재생성으로 교체. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW
+
+  [정정 2026-10-20] acceptance ④ 집행 결과 정정 — 패턴 문서 등재 불가(가드 2종) 사실 기록 + 표기 교정 사실 기록
 updated: 2026-10-20
