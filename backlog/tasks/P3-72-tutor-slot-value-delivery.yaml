@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,7 +19,7 @@ acceptance:
   - "⑦ (PR #1705 재검토 중1 승계) 매니페스트의 delivered_to_tutor 한 비트를 슬롯별 전달 경로로 분리한다 — prompt(LLM 프롬프트 문자열에 실림) · private_tool(정책이 사적 보유, 프롬프트 미포함: θ·학생 답안·풀이 단계) · output_guard(출력 후처리 필터: pack 금지모드 가드, 가드가 실제로 돈 턴만). 시스템 프롬프트의 context_not_delivered 설명을 '사적 보유분은 내용이 당신에게 보이지 않는다'가 드러나게 정정한다. ⑥의 집행(프롬프트 문자열에 θ·숙달 값이 없음)은 이 prompt 경로로 판정하고, 그 부재를 단언하는 테스트 1건 이상을 둔다(PR #1705 재검토 하3). 학년(grade) 전달 여부도 이 태스크에서 판정한다."
 artifacts: []
 paths: []
-session: null
+session: claude/p3-72-tutor-slot-value-delivery
 notes: |-
   P3-08 승계(PR #1705 검토 상1). P3-08은 9종 조회(resolved)와 실제 튜터 전달(delivered_to_tutor)을 정직하게 표기하는 데까지만 했다 — 현재 튜터에 실리는 것은 학생 답안·풀이 단계·활성 가설·θ(·가드 ON 시 팩)뿐이고 개념·스킬·숙달·문제 내용은 not_delivered로 표기된다. 그 본체(값 전달)는 학생 데이터의 클라우드 LLM 전송이라는 개인정보 판단이 걸려 Kiki 결정 사안이므로 분리했다. 보고서: docs/reviews/p3_08_tutor_context_builder_2026-10-20.md.
 
