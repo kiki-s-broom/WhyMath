@@ -3,7 +3,7 @@
 # P3-72 — 튜터 슬롯 값 전달(개념·스킬·문제 구조·팩 요약)과 전달 경로 분리 (2026-10-20)
 
 - 태스크: `P3-72-tutor-slot-value-delivery` · 브랜치 `claude/p3-72-tutor-slot-value-delivery` (claim ad3e761a)
-- 커밋: 구현 2c9d43c4 · 주석 정정 ce1ade2a · 보고서 5fbe40fd · PR #1709 독립 검토 반영 522fc404 · 보고서 개정 faa741e8 · 가설 confidence 제거(Kiki 결정 2026-10-20) f5c39444 · 이 개정
+- 커밋: 구현 2c9d43c4 · 주석 정정 ce1ade2a · 보고서 5fbe40fd · PR #1709 독립 검토 반영 522fc404 · 보고서 개정 faa741e8 · 가설 confidence 제거(Kiki 결정 2026-10-20) f5c39444 · 대장·결정 로그 3406c2bf · 검증 기재 72c8979b · 재검토 반영 8348efe1 · 이 개정
 - 선행: `P3-08` — 보고서 `docs/reviews/p3_08_tutor_context_builder_2026-10-20.md`
 - 근거 결정: Kiki 결정 (가) 2026-10-20 — 튜터 LLM 프롬프트에 싣는 것은 개념·스킬·문제 내용·교수 정책(pack) 요약뿐이다. 학생 개인 학습 데이터(θ·숙달도·mastery 수치와 그 파생 라벨)는 프롬프트에 싣지 않는다(서버 사적 보유는 허용).
 - 산출 코드:
@@ -12,8 +12,8 @@
   - `src/backend/whymath_backend/harness/wh1_primary.py` — 턴 뒤 실측으로 경로 확정
   - `src/backend/whymath_backend/api/coach.py` — 요약 조회(PK 단건·SAVEPOINT·허용 열 SELECT)
 - 테스트:
-  - `tests/backend/harness/test_wh1_tutor_slot_delivery.py`(신규 62건 — 검토 반영 +24)
-  - `tests/backend/api/test_coach_tutor_context.py`(P3-72 신규 18건(파라미터 포함 수집 기준) + 대조군 기대 갱신 — 초판의 '14건'은 오기였다)
+  - `tests/backend/harness/test_wh1_tutor_slot_delivery.py`(신규 파일 · 수집 69건 — 실측 `--collect-only`. 초판 38 → 검토 반영 62 → confidence 결정 67 → 재검토 차분 불변 69)
+  - `tests/backend/api/test_coach_tutor_context.py`(수집 75건 = main 7f091d73의 53건 + P3-72 신규 22건 — 실측 `--collect-only`. 대조군 기대 갱신 포함. 초판의 '14건'·1차 개정의 '18건'은 그 시점 기준이며 이 줄이 현행)
   - `tests/backend/api/test_coach_tutor_content_integration.py`(신규·실 PG 통합 3건 — 검토 중2)
   - `tests/backend/harness/test_wh1_tutor_context.py`(경로 API로 갱신)
 - 새 Entity·스키마·Alembic 0 · 새 모듈 0(인벤토리 귀속 변화 0) · 응답은 필드 추가만(`delivery_paths` — 하위호환)
@@ -108,7 +108,7 @@ prompt 경로는 **토큰 절단 뒤 최종 요약**에서만 계산한다. 가�
 3. HTTP 테스트 `test_prompt_carries_content_summary_but_no_student_learning_data` — 두 핸들러 × 숙달 원천 3종(서버·`mastery_level="숙달"`·`bkt_mastery`), 턴의 모든 프롬프트·시스템 프롬프트
 
 세 테스트 모두 같은 것을 단언한다. **1차 축은 검토 중1 반영으로 바뀌었다** — 금지 키·감시 값 열거는 표기 변형(소수 1자리 반올림·다른 키 이름·하위 키·새 필드)에 뚫렸다(검토자 사본에서 X1~X4 생존).
-- **키 트리 허용 목록**: 렌더된 요약 dict의 키 트리 전체 경로(`a.b`·`a[]`·`a[].b`)가 허용 목록(`ALLOWED_PROMPT_KEY_PATHS` — 48경로) 안에 있어야 한다. 모든 선택 키가 실리는 최대 픽스처에서는 허용 목록과 **정확히 같아야** 한다(양방향 — 키 하나의 추가·누락 모두 RED). 정본은 하네스 테스트 1곳이고, HTTP 테스트는 같은 정본을 파일 경로로 적재한다(복제 0).
+- **키 트리 허용 목록**: 렌더된 요약 dict의 키 트리 전체 경로(`a.b`·`a[]`·`a[].b`)가 허용 목록(`ALLOWED_PROMPT_KEY_PATHS` — 46경로 · 실측 `len()`. 1차 개정의 '48'은 오기였고, confidence 결정으로 1경로가 빠진 현행 값이 46이다) 안에 있어야 한다. 모든 선택 키가 실리는 최대 픽스처에서는 허용 목록과 **정확히 같아야** 한다(양방향 — 키 하나의 추가·누락 모두 RED). 정본은 하네스 테스트 1곳이고, HTTP 테스트는 같은 정본을 파일 경로로 적재한다(복제 0).
 - **수치 잎 감시**: 파싱된 요약의 수치 잎(bool 제외)이 θ·서버 숙달·클라 숙달(`bkt_mastery`)의 ±0.05 근방이 아니고, 학년 값(11)과도 같지 않다. 문자열 형태가 아니라 값으로 보므로 반올림 표기 변형에 뚫리지 않는다.
 - 보조 축(기존): 금지 키 이름 7종 부재 · 값 표기 4형 부재 · 숙달 라벨 3종과 "학년" 부재(두 문자열 전체).
 
@@ -255,7 +255,7 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 | backend · Pytest 전체(5fbe40fd) | `-m "not corpus_authoring" -n auto --dist loadfile --cov … --cov-fail-under=70` → 21,445 passed · 710 skipped · 1 xfailed · 커버리지 87.60% | 0 |
 | backend · Pytest 전체(522fc404 · 검토 반영) | 같은 명령 → 1 failed · 21,475 passed · 713 skipped · 1 xfailed · 커버리지 87.62%. 실패 1건은 `l3/test_isolated_call.py::TestThreadIsNotEnough::test_thread_cannot_stop_the_computation`(CPU 시간 하한 1.5s 단언 — 4코어 병렬 경합). 이 PR은 `l3/`를 건드리지 않았다(`git diff 7f091d73 -- l3` 0). 단독 재실행 3/3 통과. P3-08 보고 §6에 기록된 것과 같은 경합 플레이크다 | 1 → 단독 0 |
 | backend · 계층 커버리지 | `check_layer_coverage.py coverage.xml` (522fc404: api 97.0 · l1 90.8 · l2 96.8 · l3 81.6 · l4 95.8) | 0 |
-| backend · 관련 파일 + 실 PG 통합 | 관련 4파일 + 통합 파일 → 214 passed · 3 skipped(기본 skip), 로컬 PG16에서 `WHYMATH_RUN_INTEGRATION=1` → 통합 3 passed | 0 |
+| backend · 관련 파일 + 실 PG 통합 | 저장소 루트에서 `python -m pytest -c src/backend/pyproject.toml --rootdir=src/backend tests/backend/harness/test_wh1_tutor_slot_delivery.py tests/backend/harness/test_wh1_tutor_context.py tests/backend/api/test_coach_tutor_context.py tests/backend/harness/test_wh1_llm_policy.py tests/backend/api/test_coach_tutor_content_integration.py -p no:randomly` → **225 passed · 3 skipped**(8348efe1 실측 · 통합 3건은 기본 skip). 같은 통합 파일을 로컬 PG16 + `WHYMATH_RUN_INTEGRATION=1`로 → 3 passed. 1차 개정의 '214 passed'는 522fc404 시점 값 | 0 |
 | backend · 게이트 CLI 20종 | 아래 목록 | 전건 0 |
 | backend · 헌법 테스트 | `python -m pytest -q tests/constitution` | 1 (§9-8) |
 | declared-unwired-audit | `python -m whymath_backend.ops.declared_unwired_audit` | 0 |
@@ -279,7 +279,7 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 ## 9. 한계·남은 위험
 
 0. **현재 튜터 정책 호출은 전부 LOCAL로 라우팅된다** — 그래서 지금은 내용 요약과 오개념 confidence가 클라우드로 나가지 않는다. `_routing_request`가 `budget_krw`를 넘기지 않아(기본 0) 라우터가 LOCAL을 강제하기 때문이다(검토자 실측·이 사본에서 구독 4 × 난이도 4 전수 재확인). 이 사실을 테스트로 동결했다(`test_tutor_policy_routes_local_so_prompt_never_reaches_cloud` — provider가 받은 실제 결정의 `cost_tier`를 단언한다). 예산이 배선되는 순간(X12) RED가 된다 — 실측상 basic·killer는 CLOUD_MID, premium·gifted·killer는 CLOUD_HIGH가 된다. **클라우드 좌석으로 바뀌면 내용 요약(개념·스킬 이름·문제 구조·팩)과 가설 id·라벨이 openrouter(US)로 나간다**(confidence는 §11 이후 프롬프트에 없다). 그 RED는 결정 (가)·(2)를 사람이 다시 보라는 신호이며, 테스트를 지우거나 기대값만 바꾸는 것으로 해소하면 안 된다.
-1. ~~오개념 가설 confidence가 프롬프트에 실린다~~ → **해소(Kiki 결정 2026-10-20 (2)·§11)**. 남는 것은 *어느 가설이 실렸는가* 자체다. 가설이 노드 예산(≥ 14자리)을 넘을 때만 서버가 상위 confidence 가설을 골라 싣기 때문에, 실린 집합이 "이 학생에게 상대적으로 강한 가설"이라는 약한 신호를 남긴다. 수치·순위·등급 표기는 없다. 가설 세트가 15건을 넘는 일은 운영상 드물다.
+1. ~~오개념 가설 confidence가 프롬프트에 실린다~~ → **해소(Kiki 결정 2026-10-20 (2)·§11)**. 남는 것은 *어느 가설이 실렸는가* 자체다. 이론상 가설이 노드 예산을 넘으면 서버가 상위 confidence 가설만 골라 실어 "상대적으로 강한 가설"이라는 신호가 남을 수 있다. 그러나 **서빙 경로에서는 구조상 도달하지 않는다**(재검토 하1 정정 — 초판의 '운영상 드물다'는 틀린 서술이었다). 활성 가설은 `l4.misconception.hypothesis._MAX_ACTIVE = 5`로, match는 `top_k = 3`(`diagnose`·`combined` 기본값)으로 상한이 걸려 노드는 최대 8이다. 노드 한도는 내용 요약 노드 최대 6을 빼도 ≥ 14라 선택이 일어나지 않는다. 토큰 3000 근처도 같은 상한에서 도달하지 않는다(가설·match id는 카탈로그 kebab id). 이 상한은 소스를 읽어서 확인한 것이다. 상한이 풀리면 이 서술을 다시 봐야 한다.
 2. **프로즈 계층(S4-04·기본 OFF canary)은 경로표에 들어 있지 않다.** ON이면 학생 답안·단계가 `gate_policy_prose`·`rephrase_coach_utterance`의 금지 조각(출력 가드)으로 쓰이고, 가설 라벨 1건이 rephrase LLM 프롬프트에 실린다. 이 태스크의 `output_guard`는 지시대로 팩 금지모드 가드만 센다. 프로즈 경로까지 경로표에 넣는 것은 후속 대상이다.
 3. **게이트 CLI는 내용 요약이 실린 프롬프트로 LLM 품질을 측정하지 않는다.** `coach_prose_leak_eval`·`pedagogy_pack_fidelity_eval`은 hermetic·결정론이고 `tutor_content`를 넘기지 않는다. exit 0은 "기존 안전 게이트를 깨지 않았다"이지 "요약이 도구 선택을 개선했다"가 아니다. 라이브 효과 측정은 하지 않았다.
 4. **실 PG 확인 범위.** 조회 헬퍼 3종은 실 PG 통합 테스트로 확인했다(§5). 다만 로컬 확인은 마이그레이션 head가 아니라 **ORM 메타데이터로 만든 6테이블**에서 했다(로컬에 pgvector가 없어 `alembic upgrade head`를 돌릴 수 없다). 마이그레이션된 스키마와의 일치는 CI `backend-migrations` 잡이 판정한다.
@@ -333,6 +333,12 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 
 **③ 시스템 프롬프트** — confidence·확신도를 언급하는 문구는 원래 없었다. 시스템 프롬프트에 "confidence"·"확신"이 없음을 테스트로 단언한다. 정책 docstring(`_hypothesis_summary`·`_budget_context_nodes`)은 결정 내용으로 정정했다.
 
+**⑤ 프로즈(rephrase) 경로의 1위 가설 라벨 — Kiki 확인 대기**(재검토 중2 · 이번 커밋은 기록만, 코드 변경 0):
+- 사실: `wh1_primary.py`(rephrase 호출부)가 `hypothesis_label=outcome.hypotheses[0].misconception_id`를 넘기고, `wh1_prose.py`의 rephrase 프롬프트가 그것을 `의심 오개념 라벨: …`로 싣는다. `outcome.hypotheses`는 confidence 내림차순이므로 이것은 **confidence 1위 가설** — ⑧이 금지한 순위 표기의 누출이다.
+- 현재 노출: 0. 프로즈 계층이 기본 OFF(`wh1_prose_rephrase_enabled`)이고, 튜터 라우팅이 LOCAL이기 때문이다(§9-0).
+- 선택지: ⓐ 활성 가설 중 id 최솟값의 라벨을 싣는다(순위 중립) ⓑ rephrase 프롬프트에서 가설 라벨을 제거한다 ⓒ ⑧의 예외로 명시하고 유지한다.
+- 대장: acceptance ⑨ — 프로즈를 켜기(on) 전에 결정해야 한다. **Kiki 확인 대기.**
+
 **④ 게이트·한계** — 게이트 CLI 20종 + declared_unwired 전건 exit 0: coach_prose_leak 노출 상한 0.0093 PASS, pedagogy_pack_fidelity 미검출 상한 0.0362 PASS. 다만 이 게이트들은 hermetic·결정론이고 스크립트 provider를 쓴다. **confidence를 뺀 것이 실 LLM의 도구 선택 품질(예: 어느 가설을 curate/log할지)에 주는 영향은 이 게이트들로 보이지 않는다** — 라이브 측정은 하지 않았다. 가설 순서가 바뀐 것(id 오름차순)도 같은 한계 아래 있다.
 
 **최종 트리 검증(3406c2bf 기준 · exit code)**:
@@ -342,3 +348,17 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 - 게이트 CLI 20종 + declared_unwired 전건 0
 - backlog validate·audit-deps·rules lint·jit check 0 · 위헌 심사 래칫 차단 0건 · cp949_guard 0 · conflict markers 0
 - 로컬 실 PG 통합 3 passed(검증 뒤 임시 PG 인스턴스 정지·삭제)
+
+## 12. PR #1709 재검토(HEAD 72c8979b) 처리
+
+| 등급 | 지적 | 처리 |
+|---|---|---|
+| 중1 | 허용 키의 *값*에 θ·학년·숙달을 조건부로 숨기는 뮤테이션 생존(Y1~Y3·Y6·Y7). 값 감시가 고정 값 하나에서만 돌았다 | **반영** — **차분 불변 테스트**. ① 러너: θ 3값(0.4137·−1.7·2.9)에서 턴의 모든 프롬프트·시스템 프롬프트가 **바이트 동일**하다. θ 부재(None)는 슬롯 이름 공개 키만 바뀐다(나머지 요약 동일). ② HTTP 두 핸들러(create·append): θ(−1.7·2.9)·서버 숙달(0.1·0.9)·학년(7·없음)을 기준(θ 0.4137·숙달 0.5813·학년 11)과 비교해 바이트 동일하고, 클라 숙달 쌍(bkt 0.1/0.9·라벨 초보/숙달)도 바이트 동일하다. HTTP의 pedagogy_policy 비교를 정확 일치로 바꿨다 |
+| 하1 | 보고서 수치 오기·§9-1 서술 | **정정** — 허용 목록 46(실측 `len()`), 테스트 수집 수(실측 `--collect-only`), 관련 테스트 225 passed(재현 명령 병기), §9-1을 '서빙 경로 구조상 도달 불가'로 |
+| 하2 | 통합 테스트가 미도달을 skip으로 삼킴 | **반영(이 파일 한정)** — `WHYMATH_RUN_INTEGRATION`이 켜졌는데 PG·대상 테이블에 닿지 못하면 예외 타입명과 함께 fail. 꺼져 있으면 conftest가 수집 단계에서 skip(기존 관례 유지). 다른 통합 테스트의 graceful skip 관례와 다르게 둔 이유는 파일 docstring에 적었다. 실측: 미도달 + 플래그 on → fail(`ConnectionRefusedError`), 플래그 off → 3 skipped, 로컬 PG16 → 3 passed |
+| 중2 | 프로즈 rephrase가 confidence 1위 가설 라벨을 싣는다(순위 누출) | **기록만**(지시대로 코드 변경 0) — §11 ⑤ · acceptance ⑨ · **Kiki 확인 대기** |
+
+뮤테이션(검토자 정의 `muttools/gen2.py` → 이 사본 · 적용 단언·sha256 원복 단언 전건 통과): X1~X10·Y1~Y8·R1·R2 **20/20 RED**.
+- Y1 θ>0이면 skills.names 역순 · Y2 θ>0.3이면 context_truncated=True · Y3 θ>0.3이면 forbidden_modes에 "ADVANCED" · Y4 θ>0.3이면 bloom_level=EVALUATE · Y5 omitted_count=round(θ·10)
+- Y6 학년 → forbidden_modes "G11" · Y7 숙달>0.5 → "REMEDIAL" · Y8 숙달>0.5 → skills.count+1
+- R1 가설 confidence 순 렌더 · R2 match 원순서

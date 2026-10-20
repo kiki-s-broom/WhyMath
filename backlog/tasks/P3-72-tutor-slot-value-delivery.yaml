@@ -18,6 +18,7 @@ acceptance:
   - "⑥ ⑤의 정정 — learner_state는 지금도 θ가 튜터 정책의 *사적* 입력(select_probe 정보량 계산 전용·LLM 프롬프트 미포함)으로 전달돼 delivered_to_tutor=true다. 결정 (가)의 집행 대상은 'LLM 프롬프트(클라우드로 나가는 문자열)에 실리는가'이므로, 동결 테스트는 프롬프트·시스템 프롬프트 문자열에 θ·숙달도 값과 그 파생 라벨이 없음을 단언한다(서버 측 사적 보유는 허용). mastery는 정책 입력이 아니므로 false를 유지한다."
   - "⑦ (PR #1705 재검토 중1 승계) 매니페스트의 delivered_to_tutor 한 비트를 슬롯별 전달 경로로 분리한다 — prompt(LLM 프롬프트 문자열에 실림) · private_tool(정책이 사적 보유, 프롬프트 미포함: θ·학생 답안·풀이 단계) · output_guard(출력 후처리 필터: pack 금지모드 가드, 가드가 실제로 돈 턴만). 시스템 프롬프트의 context_not_delivered 설명을 '사적 보유분은 내용이 당신에게 보이지 않는다'가 드러나게 정정한다. ⑥의 집행(프롬프트 문자열에 θ·숙달 값이 없음)은 이 prompt 경로로 판정하고, 그 부재를 단언하는 테스트 1건 이상을 둔다(PR #1705 재검토 하3). 학년(grade) 전달 여부도 이 태스크에서 판정한다."
   - "⑧ [Kiki 결정 2026-10-20] 오개념 가설 confidence 수치는 튜터 LLM 프롬프트에 싣지 않는다 — 가설 id(·카탈로그 라벨)만. 수치뿐 아니라 그 파생 등급·순위를 드러내는 표기도 금지하며, 렌더 순서는 confidence가 아니라 id 오름차순이다. 서버 측 사적 사용(노드 예산 선택·토큰 절단·select_probe)은 허용. 집행: `wh1_llm_policy._hypothesis_summary`(id·라벨만) · `_budget_context_nodes`(id 오름차순 렌더) · 동결 = `test_wh1_tutor_slot_delivery.py`의 키 트리 허용 목록(`active_hypotheses[].confidence` 부재)·수치 잎 감시·순서 불변 테스트(뮤테이션 C1~C6 RED)."
+  - "⑨ [PR #1709 재검토 중2 · Kiki 확인 대기] 프로즈 rephrase 프롬프트의 1위 가설 라벨(순위 누출) 처리는 Kiki 확인 후 — 프로즈 활성화(on) 전에 결정 필수. 사실: `wh1_primary.py`가 `hypothesis_label=outcome.hypotheses[0].misconception_id`(confidence 1위)를 넘기고 `wh1_prose.py` rephrase 프롬프트가 `의심 오개념 라벨`로 싣는다. 현재 노출 0(프로즈 기본 OFF·튜터 라우팅 LOCAL). 선택지: ⓐ id 최솟값 라벨 ⓑ 라벨 제거 ⓒ ⑧ 예외 명시. 근거: `docs/reviews/p3_72_tutor_slot_value_delivery_2026-10-20.md` §11 ⑤."
 artifacts: []
 paths: []
 session: claude/p3-72-tutor-slot-value-delivery
@@ -31,4 +32,6 @@ notes: |-
   [정정 2026-10-20] PR #1705 재검토 중1·하3 승계(머지 조건)
 
   [정정 2026-10-20] Kiki 결정 2026-10-20 — 오개념 가설 confidence 미전달(PR #1709 보고서 §9-1 판단 요청에 대한 답)
+
+  [정정 2026-10-20] PR #1709 재검토 중2 — 프로즈 rephrase 1위 가설 라벨 순위 누출 기록(Kiki 확인 대기)
 updated: 2026-10-20
