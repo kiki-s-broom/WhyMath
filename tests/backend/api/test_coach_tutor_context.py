@@ -825,8 +825,13 @@ def test_prompt_carries_content_summary_but_no_student_learning_data(
     sentinels = [*_numeric_forms(0.4137), *_numeric_forms(0.5813), *_numeric_forms(0.3917)]
     for prompt, system, summary in zip(spy.prompts, spy.systems, summaries, strict=True):
         # 1차 축 — 키 트리 허용 목록 + 수치 잎(θ·숙달·클라 숙달 근방·학년 값) 감시(검토 중1).
-        _FREEZE.assert_prompt_summary_frozen(summary, theta=0.4137, mastery=0.5813, grade=11)
-        _FREEZE.assert_prompt_summary_frozen(summary, theta=0.3917, mastery=0.5813, grade=11)
+        conf = [_HYP.confidence]  # Kiki 결정 2026-10-20 — 가설 confidence도 수치로 싣지 않는다
+        _FREEZE.assert_prompt_summary_frozen(
+            summary, theta=0.4137, mastery=0.5813, grade=11, hypothesis_confidences=conf
+        )
+        _FREEZE.assert_prompt_summary_frozen(
+            summary, theta=0.3917, mastery=0.5813, grade=11, hypothesis_confidences=conf
+        )
         assert not (_all_keys(summary) & _FORBIDDEN_KEYS), _all_keys(summary) & _FORBIDDEN_KEYS
         for text in (prompt, system):
             for sentinel in sentinels:

@@ -366,7 +366,8 @@ class LLMTutorPolicy:
         content_fields = self._content.prompt_fields() if self._content is not None else {}
         content_nodes = self._content.node_count() if self._content is not None else 0
         # ① 컨텍스트 노드 예산(내용 요약 노드 선점 + 가설+last_match 총합 상한, confidence 우선).
-        hyp_summaries, match_ids, omitted = self._budget_context_nodes(
+        # 가설은 (사적 confidence, 렌더 요약) 쌍 — confidence는 선택·절단에만 쓰고 싣지 않는다.
+        hyp_entries, match_ids, omitted = self._budget_context_nodes(
             state, limit=max(0, _MAX_CONTEXT_NODES - content_nodes)
         )
         # ② history 예산 — 인스턴스 조절값을 Part 8 천장 안으로 클램프.
@@ -381,7 +382,7 @@ class LLMTutorPolicy:
         held = self._context_held_privately
         summary = self._compose_summary(
             state,
-            hyp_summaries,
+            [d for _, d in hyp_entries],
             match_ids,
             recent,
             omitted,
@@ -399,22 +400,21 @@ class LLMTutorPolicy:
             elif recent:
                 recent.pop(0)  # 가장 오래된 history 먼저
                 omitted += 1
-            elif hyp_summaries:
+            elif hyp_entries:
                 # 저confidence 가설 절단(결정론: 최소 confidence, 동률이면 뒤쪽 인덱스).
-                lo = min(
-                    range(len(hyp_summaries)),
-                    key=lambda i: (hyp_summaries[i]["confidence"], -i),
-                )
-                hyp_summaries.pop(lo)
+                # confidence는 이 선택에만 쓰는 사적 값이다 — 렌더 요약에는 없다(Kiki 결정
+                # 2026-10-20).
+                lo = min(range(len(hyp_entries)), key=lambda i: (hyp_entries[i][0], -i))
+                hyp_entries.pop(lo)
                 omitted += 1
             elif match_ids:
-                match_ids.pop()  # 마지막 match id부터(결정론)
+                match_ids.pop()  # 마지막 match id부터(결정론 — id 오름차순의 끝)
                 omitted += 1
             else:
                 break  # 고정 필드만 남아 더 줄일 수 없음(안전 탈출).
             summary = self._compose_summary(
                 state,
-                hyp_summaries,
+                [d for _, d in hyp_entries],
                 match_ids,
                 recent,
                 omitted,
@@ -437,12 +437,17 @@ class LLMTutorPolicy:
 
     def _budget_context_nodes(
         self, state: TurnState, *, limit: int = _MAX_CONTEXT_NODES
-    ) -> tuple[list[dict[str, object]], list[str], int]:
+    ) -> tuple[list[tuple[float, dict[str, object]]], list[str], int]:
         """가설+last_match를 컨텍스트 노드로 보고 총합을 `limit`(기본 `_MAX_CONTEXT_NODES`)로 제한.
 
         초과 시 confidence 내림차순 상위만 유지(가장 관련 높은 것 우선). 결정론 tiebreak은
-        (kind_rank, 원본 인덱스) — random·시각 미사용. 생존자는 원본 순서로 렌더한다.
-        반환: (가설 요약 리스트, match id 리스트, 절단된 노드 수).
+        (kind_rank, 원본 인덱스) — random·시각 미사용.
+
+        **렌더 순서는 id 오름차순이다(Kiki 결정 2026-10-20 — confidence 수치 미전달).** 가설 세트는
+        confidence 내림차순으로 정렬돼 들어오므로(`l4.misconception.hypothesis` 큐레이션), 원본
+        순서대로 렌더하면 숫자를 빼도 *순위*가 프롬프트에 남는다. match id도 같은 이유로
+        id 오름차순이다.
+        반환: ((사적 confidence, 가설 요약) 리스트, match id 리스트, 절단된 노드 수).
         """
         # (confidence, kind_rank[0=가설,1=매치], 원본 인덱스) — 인덱스로 충돌·동률을 결정론 처리.
         scored: list[tuple[float, int, int]] = []
@@ -462,17 +467,26 @@ class LLMTutorPolicy:
             keep_match = {t[2] for t in ranked if t[1] == 1}
             omitted = total - limit
 
-        hyp_summaries = [
-            self._hypothesis_summary(h) for i, h in enumerate(state.hypotheses) if i in keep_hyp
-        ]
-        match_ids = [
+        hyp_entries = sorted(
+            (
+                (h.confidence, self._hypothesis_summary(h))
+                for i, h in enumerate(state.hypotheses)
+                if i in keep_hyp
+            ),
+            key=lambda e: (str(e[1]["id"]), e[0]),
+        )
+        match_ids = sorted(
             m.misconception.id for j, m in enumerate(state.last_matches) if j in keep_match
-        ]
-        return hyp_summaries, match_ids, omitted
+        )
+        return hyp_entries, match_ids, omitted
 
     @staticmethod
     def _hypothesis_summary(h: MisconceptionHypothesis) -> dict[str, object]:
-        """가설 1건 → 비민감 요약(id + 한국어 라벨 + 반올림 confidence). 원문 미포함."""
+        """가설 1건 → 비민감 요약(id + 한국어 라벨만). 원문·confidence 미포함.
+
+        Kiki 결정 2026-10-20: confidence는 이 학생의 답안에서 파생한 학생별 진단 추정치라 프롬프트에
+        싣지 않는다(수치·등급·순위 표기 모두). 서버 측 선택·절단(예산 규칙)에는 사적으로 쓴다.
+        """
         return {
             "id": h.misconception_id,
             "name": (
@@ -480,7 +494,6 @@ class LLMTutorPolicy:
                 if h.misconception_id in CATALOG_BY_ID
                 else h.misconception_id
             ),
-            "confidence": round(h.confidence, 3),
         }
 
     @staticmethod

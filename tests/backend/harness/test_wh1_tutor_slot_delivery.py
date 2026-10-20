@@ -98,7 +98,7 @@ ALLOWED_PROMPT_KEY_PATHS: frozenset[str] = frozenset(
         "active_hypotheses[]",
         "active_hypotheses[].id",
         "active_hypotheses[].name",
-        "active_hypotheses[].confidence",
+        # `active_hypotheses[].confidence`는 의도적으로 없다 — Kiki 결정 2026-10-20(가설은 id·라벨만).
         "last_match_ids",
         "last_match_ids[]",
         "recent_tools",
@@ -261,7 +261,12 @@ def numeric_leaves(node: Any) -> list[float]:
 
 
 def assert_prompt_summary_frozen(
-    summary: dict[str, Any], *, theta: float, mastery: float, grade: int
+    summary: dict[str, Any],
+    *,
+    theta: float,
+    mastery: float,
+    grade: int,
+    hypothesis_confidences: Sequence[float] = (),
 ) -> None:
     """⑥ 동결 — 키 트리는 허용 목록 안, 수치 잎은 θ·숙달 근방(±0.05)·학년 값이 아니다.
 
@@ -274,12 +279,21 @@ def assert_prompt_summary_frozen(
         assert abs(leaf - theta) > 0.05, f"θ 근방 수치가 프롬프트에 있다: {leaf}"
         assert abs(leaf - mastery) > 0.05, f"숙달 근방 수치가 프롬프트에 있다: {leaf}"
         assert leaf != grade, f"학년 값이 프롬프트에 있다: {leaf}"
+        for conf in hypothesis_confidences:
+            # Kiki 결정 2026-10-20 — 가설 confidence(학생별 진단 추정치)는 수치로도 싣지 않는다.
+            assert abs(leaf - conf) > 0.05, f"가설 confidence 근방 수치가 프롬프트에 있다: {leaf}"
 
 
 def _assert_no_student_learning_data(prompt: str, system: str) -> None:
     """⑥ 동결 판정 — 키 트리 허용 목록·수치 잎 감시 + 두 문자열 전체에 θ·숙달·라벨·학년 부재."""
     summary = _summary(prompt)
-    assert_prompt_summary_frozen(summary, theta=_THETA, mastery=_MASTERY, grade=_GRADE)
+    assert_prompt_summary_frozen(
+        summary,
+        theta=_THETA,
+        mastery=_MASTERY,
+        grade=_GRADE,
+        hypothesis_confidences=[_HYP.confidence],
+    )
     keys = _all_keys(summary)
     assert not keys & _FORBIDDEN_KEYS, keys & _FORBIDDEN_KEYS
     for text in (prompt, system):
@@ -873,3 +887,88 @@ class TestReviewFollowups:
         asyncio.run(policy.next_action(_state()))
         assert decisions, "좌석이 provider에 결정을 넘기지 않았다"
         assert all(d.cost_tier == CostTier.LOCAL for d in decisions), decisions
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Kiki 결정 2026-10-20 — 오개념 가설 confidence는 프롬프트에 싣지 않는다(가설 id·라벨만)
+# ──────────────────────────────────────────────────────────────────────────
+def _hyp(mid: str, confidence: float) -> MisconceptionHypothesis:
+    return MisconceptionHypothesis(
+        misconception_id=mid, confidence=confidence, turns_since_evidence=0, evidence_count=1
+    )
+
+
+def _match(mid: str, confidence: float) -> Any:
+    from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
+    from whymath_backend.l4.misconception.models import MisconceptionMatch
+
+    return MisconceptionMatch(misconception=CATALOG_BY_ID[mid], confidence=confidence)
+
+
+class TestHypothesisConfidenceWithheld:
+    def test_hypotheses_render_id_and_label_only(self) -> None:
+        provider = _CapturingProvider()
+        policy = LLMTutorPolicy(provider)
+        asyncio.run(policy.next_action(_state(hypotheses=[_hyp("distribution-over-power", 0.73)])))
+        summary = _summary(provider.prompts[0])
+        assert summary["active_hypotheses"] == [
+            {"id": "distribution-over-power", "name": "제곱 분배 오류"}
+        ]
+        assert_prompt_summary_frozen(
+            summary, theta=9.0, mastery=9.0, grade=-1, hypothesis_confidences=[0.73]
+        )
+        assert "0.73" not in provider.prompts[0] and "0.7" not in provider.prompts[0]
+        assert "confidence" not in provider.prompts[0]
+        assert "confidence" not in provider.systems[0] and "확신" not in provider.systems[0]
+
+    def test_render_order_is_id_ascending_not_confidence_rank(self) -> None:
+        # 가설 세트는 confidence 내림차순으로 들어온다 — 그대로 렌더하면 숫자를 빼도 순위가 남는다.
+        hyps = [_hyp("zeta-x", 0.9), _hyp("mid-x", 0.5), _hyp("alpha-x", 0.1)]
+        matches = [_match("sign-flip-in-inequality", 0.9), _match("division-by-zero", 0.2)]
+        provider = _CapturingProvider()
+        policy = LLMTutorPolicy(provider)
+        asyncio.run(policy.next_action(_state(hypotheses=hyps, last_matches=matches)))
+        summary = _summary(provider.prompts[0])
+        assert [h["id"] for h in summary["active_hypotheses"]] == ["alpha-x", "mid-x", "zeta-x"]
+        assert summary["last_match_ids"] == ["division-by-zero", "sign-flip-in-inequality"]
+        # 역순 입력이어도 같은 렌더 — 순서가 confidence의 함수가 아니다.
+        reversed_provider = _CapturingProvider()
+        policy2 = LLMTutorPolicy(reversed_provider)
+        asyncio.run(
+            policy2.next_action(
+                _state(hypotheses=list(reversed(hyps)), last_matches=list(reversed(matches)))
+            )
+        )
+        assert _summary(reversed_provider.prompts[0]) == summary
+
+    def test_confidence_still_drives_private_selection_under_node_budget(self) -> None:
+        # 서버 측 사적 사용은 허용 — 노드 예산 초과 시 살아남는 것은 여전히 상위 confidence다.
+        hyps = [_hyp(f"mc-{i:02d}", 0.01 * i) for i in range(_MAX_CONTEXT_NODES + 5)]
+        provider = _CapturingProvider()
+        policy = LLMTutorPolicy(provider)
+        asyncio.run(policy.next_action(_state(hypotheses=hyps)))
+        kept = [h["id"] for h in _summary(provider.prompts[0])["active_hypotheses"]]
+        assert kept == sorted(f"mc-{i:02d}" for i in range(5, _MAX_CONTEXT_NODES + 5))
+
+    def test_token_cut_still_drops_lowest_confidence_first(self) -> None:
+        # 토큰 절단도 사적 confidence로 저confidence부터 — 렌더 순서(id)와 무관하게.
+        big = "x" * 4000
+        hyps = [_hyp(f"a-{big}-low", 0.1), _hyp(f"b-{big}-high", 0.9), _hyp(f"c-{big}-mid", 0.5)]
+        provider = _CapturingProvider()
+        policy = LLMTutorPolicy(provider)
+        asyncio.run(policy.next_action(_state(hypotheses=hyps)))
+        kept = [h["id"] for h in _summary(provider.prompts[0])["active_hypotheses"]]
+        assert kept and all(not k.endswith("-low") for k in kept)
+        assert any(k.endswith("-high") for k in kept)
+
+    def test_numeric_leaf_watch_catches_confidence_under_an_allowed_key(self) -> None:
+        # 허용 목록과 독립인 2차 축 — 허용 키(`turn_index`)에 confidence 값을 숨겨도 수치 잎 감시가 잡는다.
+        leaked = {"turn_index": 0.8, "concept": {"code": "c", "name": "n"}}
+        with pytest.raises(AssertionError, match="가설 confidence"):
+            assert_prompt_summary_frozen(
+                leaked, theta=9.0, mastery=9.0, grade=-1, hypothesis_confidences=[0.83]
+            )
+        # 대조군 — 감시 값과 먼 수치는 통과한다(모든 입력에서 RED인 가드가 아니다).
+        assert_prompt_summary_frozen(
+            {"turn_index": 1}, theta=9.0, mastery=9.0, grade=-1, hypothesis_confidences=[0.83]
+        )
