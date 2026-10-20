@@ -318,7 +318,11 @@ def test_main_writes_json_artifact(tmp_path: Path) -> None:
 # 7. 실 코퍼스 — acceptance① 재현(회귀 감시·정확 단언)
 # ──────────────────────────────────────────────────────────────────────────
 def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
-    """정본 2,234엣지 중 경계 50·내부 2,184, 고→대 24, school_link 47 + 플래그 없는 경계 3.
+    """정본 2,231엣지 중 경계 47·내부 2,184, 고→대 25, school_link 47(플래그 없는 경계 0).
+
+    KG-10 ②(2026-10-20): KG-09 교체분의 경계 신규 10건을 AI 2인 블라인드 검수해 반려 3
+    (중학 인수분해 → CALC1-C03·CALC1-P01·10공수1-01-03-2)·교체 1(→CALC1-P21의 출발을 고등
+    10공수1-01-03-1로)을 정본 xlsx에 반영·재생성했다. 중→대 3건이 사라지고 고→대가 25가 됐다.
 
     KG-09(2026-10-20)가 통합마스터 v3로 원자 백본을 재생성해 엣지 205건이 교체됐다(노드·엣지
     총수는 2,683·2,234로 불변). 교체분이 경계 엣지 6건을 새로 들였다 — 초→고 1(비율의 의미),
@@ -331,29 +335,27 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     payload = json.loads(csc.DEFAULT_CORPUS_PATH.read_text(encoding="utf-8"))
     report = csc.build_report(csc.load_corpus_graph(payload))
 
-    assert report.edge_total == 2234
-    assert report.boundary_edge_total == 50  # 44 + KG-09 교체분 6 → 50/2,234 = 2.24%
-    assert report.intra_level_total == 2184  # 2,190 − 6(교체로 경계가 된 몫)
+    assert report.edge_total == 2231
+    assert report.boundary_edge_total == 47  # 50(KG-09) − 반려 3 → 47/2,231 = 2.11%
+    assert (
+        report.intra_level_total == 2184
+    )  # KG-09 2,190 − 6 · KG-10 ② 반려는 전부 경계 엣지라 불변
     assert report.backward_boundary_total == 0
     assert dict(report.level_pair_counts) == {
         ("초등", "초등"): 537,
         ("초등", "중학"): 9,
         ("초등", "고등"): 1,  # KG-09 — 6수02-03-1 비율의 의미 → 12수문04-01-2
         ("중학", "중학"): 241,
-        ("중학", "고등"): 13,
-        (
-            "중학",
-            "대학",
-        ): 3,  # KG-09 — 9수02-19-2 인수분해 → CALC1 극한·부정형·부분분수(플래그 없음)
+        ("중학", "고등"): 12,  # KG-10 ② 반려 1(9수02-19-2 → 10공수1-01-03-2)
         ("고등", "고등"): 925,
-        ("고등", "대학"): 24,  # S4-60 병합분 — 병합 전 0
+        ("고등", "대학"): 25,  # S4-60 병합분 24 + KG-10 ② 교체 1(10공수1-01-03-1 → CALC1-P21)
         ("대학", "대학"): 481,
     }
 
-    # 이중 확인: 플래그 47건 ⊂ 양끝점 유도 50건(both 47·flag only 0·endpoint only 3).
-    # endpoint only 3 = 위 중→대 3건(원천에 학교급간 표기 없음 — KG-09 기록, 후속 교수학 검토 대상).
-    assert (report.flag_both, report.flag_only, report.endpoint_only) == (47, 0, 3)
-    # 코퍼스 내부 라벨 불일치(기록): S4-60 시점 40 ≠ 44. KG-09 교체 후 라벨 합 35 ≠ 경계 50 —
+    # 이중 확인: 플래그 47건 = 양끝점 유도 47건(both 47·flag only 0·endpoint only 0) — KG-09의
+    # endpoint only 3(중→대·학교급간 표기 없음)은 KG-10 ② 검수로 반려 2·교체(표기 Y) 1이 돼 0이 됐다.
+    assert (report.flag_both, report.flag_only, report.endpoint_only) == (47, 0, 0)
+    # 코퍼스 내부 라벨 불일치(기록): S4-60 시점 40 ≠ 44. KG-09 교체 후 라벨 합 35 ≠ 경계 50(KG-10 ② 후 47) —
     # 교체된 205건 가운데 라벨이 비는 행이 늘었다(라벨 축은 관측 전용·게이트 아님).
     assert report.boundary_label_total == 35
 
@@ -364,6 +366,6 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     uni_to_high = _cell(report, "대학", "고등")
     assert (uni_to_high.population, uni_to_high.reached_within, uni_to_high.reached_any) == (
         1069,
-        (24, 43, 79),
+        (25, 44, 80),  # KG-10 ② 교체 엣지(고등 10공수1-01-03-1 → CALC1-P21)가 1홉 도달을 +1
         198,
     )

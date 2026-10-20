@@ -82,7 +82,7 @@ class _FakeDriver:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 픽스처 — 작은 합성 그래프 + 실 코퍼스(2683/2234)
+# 픽스처 — 작은 합성 그래프 + 실 코퍼스(2683/2231)
 # ──────────────────────────────────────────────────────────────────────
 def _atom(code: str, **over: object) -> AtomConcept:
     data: dict[str, object] = {
@@ -294,16 +294,18 @@ class TestNoSecretsNoRedactedFields:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 실 코퍼스(2683/2234) — graph.json 라운드트립 후 적재
+# 실 코퍼스(2683/2231) — graph.json 라운드트립 후 적재
 # ──────────────────────────────────────────────────────────────────────
 class TestRealCorpus:
-    def test_loads_2683_nodes_2234_edges(self, corpus_graph: dict[str, object]) -> None:
-        """실 코퍼스 적재: 노드 2683·엣지 2234 MERGE·skip 0(전 엣지 ATOM_PREREQUISITE)."""
+    def test_loads_2683_nodes_2231_edges(self, corpus_graph: dict[str, object]) -> None:
+        """실 코퍼스 적재: 노드 2683·엣지 2231 MERGE·skip 0(전 엣지 ATOM_PREREQUISITE)."""
         result = _result_from_corpus(corpus_graph)
         driver = _FakeDriver()
         report = load_graph(result, driver=driver)
         assert report.nodes_merged == 2683
-        assert report.edges_merged == 2234  # 2210 + S4-60 고→대 경계 24
+        assert (
+            report.edges_merged == 2231
+        )  # 2207 + S4-60 고→대 경계 24 · KG-10 ② 경계 검수(반려 3·교체 1)로 2,234→2,231
         assert report.edges_skipped == 0
         for call in _edge_calls(driver.calls):
             assert "MERGE (src)-[r:ATOM_PREREQUISITE]->(dst)" in call.query

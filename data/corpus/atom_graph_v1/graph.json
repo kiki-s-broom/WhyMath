@@ -118570,35 +118570,13 @@
       "evidence": "원자 백본 v1"
     },
     {
-      "from_code": "9수02-19-2",
-      "from_name": "인수분해",
-      "to_code": "CALC1-C03",
-      "to_name": "극한값은 함숫값과 독립",
-      "relation": "prerequisite",
-      "relation_subtype": "참고(서술형)→정규화",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "원자 백본 v1"
-    },
-    {
-      "from_code": "9수02-19-2",
-      "from_name": "인수분해",
-      "to_code": "CALC1-P01",
-      "to_name": "0/0 부정형은 인수분해·약분으로",
-      "relation": "prerequisite",
-      "relation_subtype": "참고(서술형)→정규화",
-      "school_link": false,
-      "strength": 0.8,
-      "evidence": "원자 백본 v1"
-    },
-    {
-      "from_code": "9수02-19-2",
-      "from_name": "인수분해",
+      "from_code": "10공수1-01-03-1",
+      "from_name": "다항식의 인수분해",
       "to_code": "CALC1-P21",
       "to_name": "부분분수는 분모 인수 형태에 맞춰",
       "relation": "prerequisite",
       "relation_subtype": "참고(서술형)→정규화",
-      "school_link": false,
+      "school_link": true,
       "strength": 0.8,
       "evidence": "원자 백본 v1"
     },
@@ -120057,17 +120035,6 @@
     {
       "from_code": "9수02-19-1",
       "from_name": "곱셈공식과 인수분해의 관계",
-      "to_code": "10공수1-01-03-2",
-      "to_name": "인수분해는 왜 곱의 꼴",
-      "relation": "prerequisite",
-      "relation_subtype": "수정추가",
-      "school_link": true,
-      "strength": 0.8,
-      "evidence": "원자 백본 v1"
-    },
-    {
-      "from_code": "9수02-19-2",
-      "from_name": "인수분해",
       "to_code": "10공수1-01-03-2",
       "to_name": "인수분해는 왜 곱의 꼴",
       "relation": "prerequisite",

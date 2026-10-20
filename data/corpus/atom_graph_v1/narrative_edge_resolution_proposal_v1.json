@@ -2,8 +2,8 @@
   "_meta": {
     "task": "KG-10-narrative-edge-resolution-and-boundary-review",
     "rule": "subunit_sink_v1",
-    "status": "proposal — 교수학 검토 전 · 정본 미병합",
-    "source_graph_sha256": "c09259ee2e6342c33668b9b7f3abed5fd815bdecfe804406fd012d20b56136c6",
+    "status": "proposal — AI 검수 2인 블라인드(검수:AI 2026-10-20) 판정: 정본 직접 반영 불가(규칙 FAIL) · 정본 미병합 보존 · 조건부 경로는 docs/data/narrative_edge_resolution_v1.md §6 · 후속 KG-11",
+    "source_graph_sha256": "721fe6ffd72f3634f6d211a739f5e262c58069b83a6d73b45915d63b6227d9e7",
     "narrative_total": 973,
     "status_counts": {
       "already_present": 73,

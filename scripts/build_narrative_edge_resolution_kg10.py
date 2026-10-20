@@ -2,8 +2,9 @@
 """KG-10 ① — 서술형 선수엣지 973건의 대표 원자 해소 *제안 원장* 생성(결정론·멱등·정본 무수정).
 
 무엇을 만드나: `data/corpus/atom_graph_v1/narrative_edge_resolution_proposal_v1.json`.
-정본 `graph.json`은 **읽기만** 한다 — 이 스크립트는 정본을 수정하지 않는다. 정본 반영은 교수학 검토
-게이트(설계 문서 `docs/data/narrative_edge_resolution_v1.md` §6) 통과 뒤 별도 병합 모듈의 몫이다.
+정본 `graph.json`은 **읽기만** 한다 — 이 스크립트는 정본을 수정하지 않는다. 교수학 검토 게이트
+(설계 문서 `docs/data/narrative_edge_resolution_v1.md` §6 · AI 2인 블라인드 2026-10-20)는 이 규칙의
+정본 직접 반영을 **FAIL**로 판정했다 — 원장은 상태 분류·수치 기록·후속(KG-11) 입력으로 보존된다.
 
 해소 규칙 (설계 문서 §3 — "소단원 싱크" 규칙):
   서술형 엣지는 `from(선수)`가 소단원코드(886건) 또는 단원코드(87건)이고 `to(후행)`가 원자다.
@@ -57,7 +58,10 @@ RELATION: Final[str] = "prerequisite"
 RELATION_SUBTYPE: Final[str] = "서술형해소(싱크)"
 #: 기계 해소라 원본 저작 엣지(0.8)보다 낮은 신뢰를 준다 — 설계 문서 §3.4.
 STRENGTH: Final[float] = 0.6
-STATUS_PROPOSAL: Final[str] = "proposal — 교수학 검토 전 · 정본 미병합"
+STATUS_PROPOSAL: Final[str] = (
+    "proposal — AI 검수 2인 블라인드(검수:AI 2026-10-20) 판정: 정본 직접 반영 불가(규칙 FAIL) · "
+    "정본 미병합 보존 · 조건부 경로는 docs/data/narrative_edge_resolution_v1.md §6 · 후속 KG-11"
+)
 
 ATOM_LEVEL: Final[str] = "세부개념"
 SUBUNIT_LEVEL: Final[str] = "소단원"

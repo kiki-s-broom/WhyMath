@@ -42,7 +42,7 @@ BUILDER_PATH = _PROJECT_ROOT / "scripts" / "build_cross_band_edges_s4_01.py"
 
 _EXPECTED_EDGE_COUNT = 24
 #: 병합 직전(S4-60 이전) 정본 sha256 — 원장이 전제한 스냅샷. 상수로 박아 두 번째 증거로 삼는다.
-_PRE_MERGE_GRAPH_SHA256 = "12936fb96151cf895a10a57e398c7cabb7e6521c3df4db9b344791a2b0711bd9"
+_PRE_MERGE_GRAPH_SHA256 = "db3cd1c108431b62a0fc9e697dbd69666daf47f03c3910ba86f2a50351796baa"
 
 Mutation = Callable[[dict[str, Any]], None]
 
