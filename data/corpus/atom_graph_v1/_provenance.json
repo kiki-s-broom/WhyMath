@@ -1,14 +1,14 @@
 {
   "pool": "whymath-original",
-  "source_file": "54c14913-260622__________________.xlsx",
-  "source_sha256": "83a0d2883fe8552868916181f04ebe687f24dd9cabb91ec4b3096d59a767d0e0",
+  "source_file": "261019_WhyMath_통합마스터_v3.xlsx",
+  "source_sha256": "7290aa575bdfa393f9bac95ddbe5335f70227cc85c3823f39268f001a2f2850f",
   "source_citation": "원자-성취기준 매핑 근거: 교육부 고시 제2022-33호 [수학과 교육과정], 국가교육과정정보센터(NCIC, https://www.ncic.go.kr). 원자화·교수학 주석(4요소·원자성)·대학 축은 와이매스 자체작성.",
   "normalization_counts": {
-    "narrative_edges": 1007,
+    "narrative_edges": 973,
     "redacted_핵심명제": 1324,
-    "경계값": 4,
+    "경계값": 5,
     "미적하이픈_distinct": 43,
-    "자리값": 13
+    "자리값": 11
   },
   "node_counts": {
     "atoms": 1823,
@@ -18,7 +18,7 @@
   },
   "edge_counts": {
     "atom_id_edges": 2234,
-    "narrative_edges_raw": 1007
+    "narrative_edges_raw": 973
   },
   "school_level_university_atoms": 512,
   "validation": {
@@ -30,29 +30,51 @@
   "skipped": [],
   "determinism": "결정론 — 동일 sha256 입력 2회 transform 시 byte 동일 산출",
   "post_extraction": [
-    "[U2 2026-06-22] 대학 원자 standard_codes 채움 513건(소단원→성취기준 1:1·standards_university_v1). K-12 원자·단원/소단원 무변경."
-  ],
-  "post_transform_migrations": [
-    {
-      "id": "dedup_merge_2026-07-28",
-      "summary": "중복 원자 병합 14건(검수:Kiki 2026-07-28 승인 16 중 D13·D18은 사이클 충돌로 실행 보류) — 원자 1837→1823·전체 2697→2683·엣지 2213→2210(재배선 32·중복 제거 3)·crosswalk 13건 재배선. 정본 맵: dedup_merges_v1.json. 이후 graph.json은 원본 xlsx transform 산출과 이 이관분만큼 다르다."
-    },
-    {
-      "id": "behavior_skills_merge_v1",
-      "summary": "[SKB-02 2026-09-11] behavior_skills 병합 — 크로스워크 437행(skip 0) 경유 원자 1311건에 전파(비어있지 않음 1198건). 구 437 코퍼스 concepts.jsonl이 저작 정본."
-    },
-    {
-      "id": "cross_band_edges_university_merge_v1",
-      "summary": "[S4-60 2026-10-09] 고→대 경계 엣지 24건 병합(검수:AI 2026-10-08 · 게이트 G-s401-uni-boundary-edge-review) — 엣지 2210→2234. 노드·기존 엣지 무변경, 끝에 덧붙임. 근거(rationale)는 정본에 넣지 않고 원장 cross_band_edges_university_v1.json에 둔다(AtomEdge extra=forbid · 결정 ⒞). 병합 전 정본 sha256 1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f."
-    }
+    "[U2 2026-10-20] 대학 원자 standard_codes 채움 512건(소단원→성취기준 1:1·standards_university_v1). K-12 원자·단원/소단원 무변경.",
+    "[KG-09 2026-10-20] 대학 원자 standard_codes 채움 512건 재적용(university_standard_fill)."
   ],
   "behavior_skills_merge": {
-    "executed_at": "2026-09-11T06:49:39.730759+00:00",
+    "executed_at": "2026-10-20T03:08:26.087455+00:00",
     "crosswalk_path": "data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl",
     "crosswalk_rows": 437,
     "unmapped_crosswalk_rows": 0,
     "atoms_mapped": 1311,
     "atoms_nonempty": 1198,
     "source": "SKB-02 — crosswalk_v1 경유 concept_graph_v1(구 437) behavior_skills 병합"
+  },
+  "post_transform_migrations": [
+    {
+      "id": "dedup_merge_2026-07-28",
+      "summary": "중복 원자 병합 14건(검수:Kiki 2026-07-28 승인 16 중 D13·D18은 사이클 충돌로 실행 보류) — 원자 1837→1823·전체 2697→2683·엣지 2213→2210(재배선 32·중복 제거 3)·crosswalk 13건 재배선. 정본 맵: dedup_merges_v1.json. 이후 graph.json은 원본 xlsx transform 산출과 이 이관분만큼 다르다.",
+      "reapplied": "2026-10-20 v3 재생성 시 dedup_merges_v1.json applied 14건을 동일 규칙(폐기 노드 제거·엣지 재배선·중복/자기참조 제거)으로 재적용 — 노드 2697→2683·엣지 2214→2210"
+    },
+    {
+      "id": "behavior_skills_merge_v1",
+      "summary": "[SKB-02 2026-10-20] behavior_skills 병합 — 크로스워크 437행(skip 0) 경유 원자 1311건에 전파(비어있지 않음 1198건). 구 437 코퍼스 concepts.jsonl이 저작 정본."
+    },
+    {
+      "id": "cross_band_edges_university_merge_v1",
+      "summary": "[S4-60 2026-10-20] 고→대 경계 엣지 24건 병합(검수:AI 2026-10-08 · 게이트 G-s401-uni-boundary-edge-review) — 엣지 2210→2234. 노드·기존 엣지 무변경, 끝에 덧붙임. 근거(rationale)는 정본에 넣지 않고 원장 cross_band_edges_university_v1.json에 둔다(AtomEdge extra=forbid · 결정 ⒞). 병합 전 정본 sha256 12936fb96151cf895a10a57e398c7cabb7e6521c3df4db9b344791a2b0711bd9."
+    }
+  ],
+  "regeneration_history": [
+    {
+      "id": "v3_regeneration_2026-10-20",
+      "summary": "통합마스터 v3(2026-10-19 정본·교차감사 반영)로 transform-v1 재실행. 직전 정본 source_sha256 83a0d2883fe8552868916181f04ebe687f24dd9cabb91ec4b3096d59a767d0e0(2026-06-22 소스) 대비: v2 변경이력 3,709건(엣지 순서 역전 결함 삭제 408 등)·v3 교차감사 변경(미적Ⅰ 원자ID 표기 통일·서술형 엣지 수작업 매핑 근거 열·원자ID 직접 정규화 3건) 반영. 노드 2,683·엣지 2,234(이관 재적용 후) 불변. [2026-10-20 보정] 적재 검증(l3/notation_coverage 게이트)에서 12미적Ⅱ-03-04-1 ②정답·통과기준의 유니코드 아래첨자 ₖ(U+2096) 2회가 지원 표기 밖으로 검출돼 정본 xlsx에서 _k로 교정(변경이력_v3 No.14·15)하고 source_sha256을 360cfa36…→7290aa57…로 갱신했다. transform-v1 재실행 결과 그 한 필드 외 산출 바이트 동일(노드·엣지·서술형 raw 불변).",
+      "previous_source_sha256": "83a0d2883fe8552868916181f04ebe687f24dd9cabb91ec4b3096d59a767d0e0"
+    }
+  ],
+  "pipeline_input": {
+    "file": "pipeline_input_v3.xlsx",
+    "sha256": "7f35a86768b4f5c2225a7f02db1c534f8a2c475e051a5900a0870c9b1dfd04d9",
+    "derivation": "정본 xlsx의 선수엣지_통합.from_유형만 치환한 사본 — '원자ID(정규화 v3)' 3건→'원자ID', '소단원코드/단원코드(수작업매핑 v3)' 973건→'서술형'(패스스루·정규화후보_v3 열 보존). 그 외 바이트 동일. 사유: transform-v1이 from_유형 enum 2종만 받고 엣지 끝점을 원자 노드로 한정(validate dangling_edge_endpoint)"
+  },
+  "uploaded": "2026-10-19",
+  "node_counts_transform_raw": {
+    "atoms": 1837,
+    "units": 217,
+    "subunits": 643,
+    "total": 2697,
+    "note": "dedup 재적용 전 transform-v1 산출(폐기 14 포함)"
   }
 }

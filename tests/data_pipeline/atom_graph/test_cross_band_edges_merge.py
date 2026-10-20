@@ -43,7 +43,7 @@ LEDGER_PATH = _CORPUS / "cross_band_edges_university_v1.json"
 PROVENANCE_PATH = _CORPUS / "_provenance.json"
 
 _N = 24
-_PRE_MERGE_SHA = "1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f"
+_PRE_MERGE_SHA = "12936fb96151cf895a10a57e398c7cabb7e6521c3df4db9b344791a2b0711bd9"
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +67,7 @@ class TestReproducibility:
     def test_pre_merge_view_restores_original_snapshot(
         self, live_graph: dict[str, Any], ledger: dict[str, Any]
     ) -> None:
-        """태그 엣지를 빼면 병합 직전 정본(sha256 1821d31c…)이 바이트 단위로 복원된다."""
+        """태그 엣지를 빼면 병합 직전 정본(sha256 12936fb9… — KG-09 v3 재생성 기준; S4-60 당시 1821d31c…)이 바이트 단위로 복원된다."""
         assert graph_sha256(pre_merge_view(live_graph)) == _PRE_MERGE_SHA
         assert ledger["_meta"]["source_graph_sha256"] == _PRE_MERGE_SHA
 
@@ -212,8 +212,11 @@ class TestPostMergeMeasurements:
         level = {c["code"]: c["school_level"] for c in live_graph["concepts"]}
         edges = live_graph["edges"]
         crossing = [e for e in edges if level[e["from_code"]] != level[e["to_code"]]]
-        assert (len(crossing), len(edges)) == (44, 2234)
-        assert round(len(crossing) / len(edges) * 100, 2) == 1.97
+        assert (len(crossing), len(edges)) == (
+            50,
+            2234,
+        )  # KG-09 v3 재생성: 순서 역전 엣지 205건 교체로 학교급 교차 44 → 50
+        assert round(len(crossing) / len(edges) * 100, 2) == 2.24
         high_to_uni = [
             e for e in crossing if (level[e["from_code"]], level[e["to_code"]]) == ("고등", "대학")
         ]
