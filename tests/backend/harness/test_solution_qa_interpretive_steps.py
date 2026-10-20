@@ -302,6 +302,27 @@ def test_injection_selection_step_against_the_selection_rule() -> None:
     assert item.verdict is qa.Verdict.FAIL
 
 
+def test_injection_selection_step_against_the_smallest_rule() -> None:
+    """answer_selection=smallest 인데 선택 단계가 큰 근 4 를 고른다 — 규칙 위반 확정(C4 FAIL).
+    대조: 같은 규칙에서 작은 근 -2 를 고르면 그 전이는 성립한다."""
+
+    def violate(r: Record) -> None:
+        r["verify"]["answer_selection"] = "smallest"
+
+    item = qa.judge_record(_inject(_selection_rule_step(), violate))
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+    assert "근 선택" in (item.checks["C4"].detail or "")
+
+    def follow(r: Record) -> None:
+        r["verify"]["answer_selection"] = "smallest"
+        r["answer"] = "-2"
+        r["verify"]["answer_map"] = {"x": "-2"}
+        _steps(r)[-1] = "x = -2"
+
+    control = qa.judge_record(_inject(_selection_rule_step(), follow))
+    assert control.checks["C4"].state is qa.CheckState.PASS
+
+
 def test_selection_step_without_a_rule_is_unverifiable_not_pass() -> None:
     def mutate(r: Record) -> None:
         r["verify"]["conditions"] = r["verify"]["conditions"][:1]
@@ -591,6 +612,92 @@ ADVERSARIAL: dict[str, tuple[Record, qa.Verdict]] = {
         ),
         qa.Verdict.FAIL,
     ),
+    # 4차 검토 — 금지 목록 우회(허용 목록으로 구조적으로 막힌다)
+    "B1 .doit() 래퍼 속 약분": (
+        _rec(
+            ["(x*(x - 2)/(x - 2)).doit() = 2", "y = x + 1"],
+            "3",
+            {"x": "2", "y": "3"},
+            ["x = 2", "y = 3"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "B3 exp(-log) 분모 대용": (
+        _rec(
+            ["x*(x - 2)*exp(-log(x - 2)) = 2", "y = x + 1"],
+            "3",
+            {"x": "2", "y": "3"},
+            ["x = 2", "y = 3"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "B10 0 제곱": (
+        _rec(["x*(x - 2)**0 = 2", "y = x + 1"], "3", {"x": "2", "y": "3"}, ["x = 2", "y = 3"]),
+        qa.Verdict.FAIL,
+    ),
+    "D1 Derivative 속 약분(C2)": (
+        _rec(
+            ["Derivative(x**3*(x - 1)/(x - 1), x).doit() = 3", "x > 0"],
+            "1",
+            {"x": "1"},
+            ["x = -1, x = 1"],
+        ),
+        qa.Verdict.UNVERIFIABLE,
+    ),
+    "D2 Derivative 속 약분(선택 뒤 대입)": (
+        _rec(
+            ["Derivative(x**3*(x - 1)/(x - 1), x).doit() = 3", "x > 0", "y = x + 5"],
+            "6",
+            {"x": "1", "y": "6"},
+            ["x = -1, x = 1", "x = 1", "y = 6"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "D3 Derivative 속 약분(값 대입)": (
+        _rec(
+            ["Derivative(x**3*(x - 1)/(x - 1), x).doit() = 3", "x > 0", "y = x + 5"],
+            "6",
+            {"x": "1", "y": "6"},
+            ["x = 1", "y = 6"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "NR1 허수부 1e-10 근(실근 없음)": (
+        _rec(
+            ["(x - 1)**2 + 10**(-20) = 0", "y = x + 1"],
+            "2",
+            {"x": "1", "y": "2"},
+            ["x = 1", "y = 2"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "NR2 같은 꼴·상수 나눗셈 표기": (
+        _rec(
+            ["(x - 1)**2 + 1/10**20 = 0", "y = x + 1"],
+            "2",
+            {"x": "1", "y": "2"},
+            ["x = 1", "y = 2"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "DOK Derivative(다항식).doit() 대조": (
+        _rec(
+            ["Derivative(x**3 - 3*x, x).doit() = 0", "x > 0", "y = x + 5"],
+            "6",
+            {"x": "1", "y": "6"},
+            ["x = -1, x = 1", "x = 1", "y = 6"],
+        ),
+        qa.Verdict.PASS,
+    ),
+    "HD2 5차 다항식 근사 실근 대입": (
+        _rec(
+            ["x**5 - x - 1 = 0", "y = x + 1"],
+            "2.1673039782614187",
+            {"x": "1.1673039782614187", "y": "2.1673039782614187"},
+            ["x = 1.1673039782614187", "y = 2.1673039782614187"],
+        ),
+        qa.Verdict.PASS,
+    ),
     # 정당한 판정 확장(main 의 거짓 실패·판정 불가 → 다항 등식으로 증명돼 PASS)
     "DR2 중근 등식 대입": (
         _rec(
@@ -680,14 +787,13 @@ def test_non_isolated_target_equation_blocks_the_substitution_proof() -> None:
 
 
 def test_near_double_root_answer_is_not_confirmed_by_the_conditions() -> None:
-    """중근 근처 값 2.00001 은 잔차 허용치(1e-9) 안이라 Tier1 이 '근'으로 받고 후보 나열도 완전해
-    보인다. 조건만으로 계산한 `verify_root_selection(…, "unique")` 이 그 값이 근이 아님을 잡는다 —
-    이 확인이 없으면 PASS 가 난다(PR #1703 재검토 중2 — 확인 가드는 등가가 아니다)."""
+    """중근 근처 값 2.00001 은 잔차 허용치(1e-9) 안이라 Tier1 이 '근'으로 받지만, 정확 근 2 와의 대조
+    (허용치 1e-9)에서는 근이 아니다 — 후보를 근으로 세지 않는다(재검토 중2)."""
     record = _rec(
         ["(x-2)**2*(x+1) = 0", "x > 0"], "2.00001", {"x": "2.00001"}, ["x = -1, x = 2.00001"]
     )
     item = qa.judge_record(record)
-    assert item.checks["C2"].code == "C2_DOMAIN_UNVERIFIABLE"
+    assert item.checks["C2"].code == "C2_DOMAIN_CANDIDATE_NOT_ROOT"
     assert item.verdict is not qa.Verdict.PASS
 
 
@@ -710,15 +816,16 @@ def test_condition_mixing_the_variable_with_another_blocks_the_proof() -> None:
     assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
 
 
-def test_mixed_inequality_does_not_mask_a_definite_domain_violation() -> None:
-    """`a + y > 0` 이 `a > 0` 보다 앞에 있어도, 고른 근 -6 이 `a > 0` 을 어긴다는 확정은 남는다."""
+def test_mixed_inequality_blocks_every_conclusion_including_violation() -> None:
+    """`a + y > 0` 처럼 a 를 다른 변수와 묶는 조건이 있으면 근 집합·도메인을 확정하지 않는다 — 위반
+    판정도 내지 않고 판정 불가로 둔다(main 도 이 선택 단계는 판정 불가였다)."""
 
     def mutate(r: Record) -> None:
         r["verify"]["conditions"].insert(1, "a + y > 0")
         _steps(r)[-1] = "a = -6"
 
     item = qa.judge_record(_inject(_domain_selection_step(), mutate))
-    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+    assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
 
 
 def test_c2_domain_does_not_count_roots_of_a_cancelled_rational_equation() -> None:
@@ -753,12 +860,11 @@ def test_two_equations_for_the_variable_leave_the_root_set_undetermined() -> Non
     assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
 
 
-def test_c2_undecidable_domain_on_a_candidate_is_unverifiable_not_excluded() -> None:
-    """후보 -1 에서 `log(x) >= 1` 은 판정 불가 — 그 후보를 허용으로도 제외로도 세지 않는다."""
+def test_c2_uncertified_domain_is_not_used_to_pick_a_root() -> None:
+    """`log(x) >= 1` 은 허용 목록 다항 부등식이 아니다 — 그 도메인으로 근을 고르지 않고 종전 사유로."""
     record = _rec(["x**2 - 1 = 0", "log(x) >= 1"], "1", {"x": "1"}, ["x = -1, x = 1"])
     item = qa.judge_record(record)
-    assert item.checks["C2"].state is qa.CheckState.UNVERIFIABLE
-    assert item.checks["C2"].code == "C2_DOMAIN_UNVERIFIABLE"
+    assert item.checks["C2"].code == "C2_ROOT_CHOICE_UNSTRUCTURED"
 
 
 def test_transitions_already_correct_are_not_reinterpreted() -> None:

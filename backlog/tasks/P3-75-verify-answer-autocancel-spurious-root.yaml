@@ -14,10 +14,14 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 재현: verify_answer(Tier1)·verify_root_selection(원소 1개 경로)·classify_solvability 가 평가 파싱의 자동 약분(x*(x - 2)/(x - 2) → x, (x - 2)**3/(x - 2)**2 → x - 2)으로 분수방정식의 무연근을 근으로 받는다. RF3: conditions [\"x*(x - 2)/(x - 2) = 2\"], answer_map {x: 2} → Tier1 pass(실제로는 x = 2 에서 분모 0 이라 해 없음). RF4: [\"(x - 2)**3/(x - 2)**2 = 0\"], {x: 2} → 같음. 이 결함은 PR #1703(P3-71) 이전부터 C1 에 있었다 — P3-71 은 자기 경로(solution_qa 해석 단계 증명·C2 도메인 완전성·verify_root_selection 도메인 경로)만 막았다.\n② 기준: 원문 분모 0 값 거부 — 조건 원문을 비평가 구조(safe_sympify evaluate=False)로 보고, 그 변수를 담은 분모(음수 지수 거듭제곱의 밑)가 답의 값에서 0(기호적 0 또는 허용치 안)이면 Tier1 은 fail(무연근), 판정 불가면 unverifiable. 표기 변형(x*(x-2)*(x-2)**-1, x/((x-2)/(x-2)))도 같은 판정. verify_answer.denominator_vanishes(P3-71)를 재사용한다.\n③ RED: RF3·RF4·표기 변형 2종이 C1 FAIL, 대조군(x*(x - 2)/(x - 2) = 3 의 x = 3, x/(x + 5) = 1/3 의 x = 5/2)은 종전 판정 유지. 가드를 지우는 뮤테이션 RED.\n④ 회귀: corpus_reverify 전 은행·solution_qa 대표 과정 1,121건에서 판정 전후 대조 — 새 FAIL 이 생기면 문항별로 무연근 여부를 확인해 보고(거짓 실패 0)."
+  - "⑤ (P3-71 4차 검토 하4 — RED 기준 추가) 금지 목록 우회 표기도 재현·RED 대상에 넣는다. 각 꼴을 C1(Tier1 verify_answer)·verify_root_selection 원소 1개 경로·classify_solvability·solution_qa C2 단일 후보 경로에 넣어 pass(또는 실근 1개 unique)가 나오면 RED: (a) .doit() 래퍼 — \"(x*(x - 2)/(x - 2)).doit() = 2\" 의 x = 2, \"Derivative(x**3*(x - 1)/(x - 1), x).doit() = 3\" 의 x = 1(파싱 중 약분 실행) (b) 분모 없는 약분 — \"x*(x - 2)*exp(-log(x - 2)) = 2\" 의 x = 2 (c) 0 지수 — \"x*(x - 2)**0 = 2\" 의 x = 2 (d) 허수부가 아주 작은 근(NR1) — \"(x - 1)**2 + 10**(-20) = 0\"·\"(x - 1)**2 + 1/10**12 = 0\" 의 x = 1(실근 없음 — 잔차 허용치 안이라 pass 로 보임). 기대: fail(원문에서 그 값이 정의되지 않음·실근 아님 확정) 또는 unverifiable — pass 금지. 2026-10-20 실측(main 1a1a7c8b 와 P3-71 브랜치 같음): 6꼴 전부 Tier1 pass · verify_root_selection 원소 1개 unique 는 4꼴 pass(Derivative 꼴은 근 ±1 이라 fail, 1/10**12 꼴은 unverifiable) · classify_solvability 는 1/10**12 꼴만 no_solution 이고 나머지는 unique/multiple.\n⑥ (②의 정정) ②가 재사용하라던 verify_answer.denominator_vanishes 는 P3-71 4차 검토에서 금지 목록 방식(분모 탐지)이 위 ⑤의 표기 변형으로 뚫려 제거됐다. 이 태스크는 금지 목록만으로 막지 않는다 — P3-71 의 허용 목록(certified_polynomial·certified_root_sets: 원문 ast 구문 나무를 실행 없이 허용 노드만으로 세운 유리 계수 다항식·정확 실근)을 쓰거나 같은 원리(허용 구조 밖이면 unverifiable)로 판정한다. 대조군(종전 판정 유지): \"x*(x - 2)/(x - 2) = 3\" 의 x = 3, \"x/(x + 5) = 1/3\" 의 x = 5/2, [\"Derivative(x**3, x).doit() = 3\", \"x > 0\"] 의 x = 1."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/verify_answer.py
   - "tests/backend/l3/test_verify_answer*.py"
 session: null
-notes: "출처: PR #1703(P3-71) 3차 독립 검토 상1 — 재현 RF3·RF4. P3-71 은 해석 단계 증명 경로만 막았고 C1(Tier1) 의 기존 결함은 이 태스크로 분리(지휘자 지시 2026-10-20)."
+notes: |-
+  출처: PR #1703(P3-71) 3차 독립 검토 상1 — 재현 RF3·RF4. P3-71 은 해석 단계 증명 경로만 막았고 C1(Tier1) 의 기존 결함은 이 태스크로 분리(지휘자 지시 2026-10-20).
+
+  [정정 2026-10-20] P3-71 PR #1703 4차 검토 하4 — 금지 목록 우회 입력(.doit()·exp(-log)·**0·NR1) RED 기준 추가 및 ② denominator_vanishes 재사용 문언 정정(허용 목록 전환으로 함수 삭제)
 updated: 2026-10-20

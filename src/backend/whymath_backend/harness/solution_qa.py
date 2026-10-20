@@ -88,11 +88,10 @@ from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
     RootSelection,
-    classify_solvability,
+    certified_polynomial,
+    certified_root_sets,
     condition_relation,
-    has_variable_denominator,
-    is_polynomial_expression,
-    satisfies_domain,
+    match_root,
     split_equation_domain,
     verify_answer,
     verify_root_aggregate,
@@ -390,8 +389,10 @@ def _distinct(values: Sequence[str]) -> list[str] | None:
 # 정답(`answer`·`answer_map`)에서 선택을 역산하지 않는다(P3-24 B3 단서 — 역산하면 순환 통과다).
 # 근거는 셋뿐이다: ①그 변수 하나만 담은 조건 등식(근의 집합) ②그 변수의 도메인 부등식
 # (`a > 0`·`c >= 0, c <= 3`) ③작성자가 구조에 적은 `answer_selection`(largest/smallest).
-# 근의 집합은 풀이가 나열한 후보가 아니라 `verify_root_selection` 이 조건으로 직접 계산한다 — 풀이의
-# 후보 나열이 불완전해도(근 하나를 빠뜨려도) 그 빈자리로 통과하지 않게 한다(PR #1703 검토 상2).
+# 근의 집합은 풀이가 나열한 후보가 아니라 조건 등식에서 **정확히** 계산한다(`certified_root_sets` —
+# 허용 목록 다항 등식만) — 풀이의 후보 나열이 불완전해도(근 하나를 빠뜨려도) 그 빈자리로 통과하지
+# 않게 하고(검토 상2), 인증되지 않는 등식(초월·분수·`.doit()` 래퍼 등)으로는
+# 아무것도 증명하지 않는다.
 _PROVEN: Final = "proven"  # 조건이 요구하는 바로 그 근이다(조건만으로 확정)
 _WRONG: Final = "wrong"  # 도메인 위반·조건의 선택 규칙과 다른 근(확정)
 _UNKNOWN: Final = "unknown"  # 조건에 근거가 없거나 판정 불가
@@ -438,7 +439,7 @@ def _defines_other_variable(condition: str, var: str) -> bool:
             if (
                 relation is not None
                 and relation[1] == frozenset({var})
-                and is_polynomial_expression(other, var) is True
+                and certified_polynomial(other, var) is not None
             ):
                 return True
     return False
@@ -447,29 +448,23 @@ def _defines_other_variable(condition: str, var: str) -> bool:
 def _judge_value(verify: Mapping[str, object], var: str, value: str) -> str:
     """`var = value` 가 조건이 요구하는 근인가 — `_PROVEN`·`_WRONG`·`_UNKNOWN`.
 
-    · 도메인 부등식을 어기면 `_WRONG`(제약 위반 근).
     · `var` 를 다른 변수와 함께 담은 조건이 있으면 `_UNKNOWN` — 그 조건이 `var` 를 더 제약하는지
-      (`x + z > 100`·`x**2 + y**2 = 1` 등) 모른다. 예외는 다른 변수 하나를 `var` 만의 식으로 정하는
-      정의 등식(`y = f(x)`·`f(x) = y`)뿐이다 — 그것은 y 를 정할 뿐 x 를 제약하지 않는다(PR #1703
-      재검토 MV2).
-    · 그 변수 하나만 담은 조건 등식이 정확히 하나여야 근의 집합을 안다 — 아니면 `_UNKNOWN`.
-    · 그 등식이 **실근이 있는 다항 등식**이어야 한다(`classify_solvability` 가 unique/multiple).
-      초월 등식에서 `sympy.solve` 는 해의 일부만 준다(`sin(x) = 1` → [π/2]) — 그것을 "유일한 근"
-      으로 읽으면 증명이 아닌 것이 증명이 된다(PR #1703 재검토 상1). 비다항이면 `_UNKNOWN` 이고,
-      변수 전환 단계라면 `_check_c4` 의 단조 규칙이 종전 incorrect 를 유지한다.
-    · 값이 그 등식의 근이 아니면 `_UNKNOWN`(`verify_root_selection` 이 판정 불가를 낸다 — 후보가
-      다른 식의 해일 수 있다. 변수 전환 단계에서는 `_check_c4` 가 종전 incorrect 를 유지한다).
-    · 선택 규칙 = `answer_selection`(largest/smallest), 없으면 unique. `verify_root_selection` 이
-      조건(등식 + 도메인)만으로 허용 근을 계산해 그 근이면 `_PROVEN`. largest/smallest 인데 다른
-      근이면 `_WRONG`. unique 인데 허용 근이 둘 이상이면 `_UNKNOWN`(어느 쪽도 확정 아님).
+      (`x + z > 100`·`x**2 + y**2 = 1` 등) 모른다. 예외는 다른 변수 하나를 `var` 의 허용 목록
+      다항식으로 정하는 정의 등식(`y = f(x)`·`f(x) = y`)뿐이다(재검토 MV2·3차 하2).
+    · 그 변수 하나만 담은 조건 등식이 정확히 하나이고, 그 등식과 그 변수의 도메인 부등식이 전부
+      **허용 목록 다항식**이어야 한다(`certified_root_sets` — 4차 검토). 아니면 `_UNKNOWN`
+      이고, 변수 전환 단계라면 `_check_c4` 의 단조 규칙이 종전 incorrect 를 유지한다.
+    · 실근은 정확 계산으로 센다. 값은 허용치 안의 정확 근 **하나**에 대응해야 한다
+      (아니면 `_UNKNOWN`).
+    · 그 근이 도메인을 어기면 `_WRONG`. 선택 규칙 = `answer_selection`(largest/smallest —
+      허용 근의 끝/처음이 아니면 `_WRONG`), 없으면 unique(허용 근이 하나일 때만 `_PROVEN`,
+      둘 이상이면 `_UNKNOWN`).
     """
     relations = _relations(verify)
     if relations is None:
         return _UNKNOWN
     domain = [c for c, op, names in relations if op != "==" and names == frozenset({var})]
     equations = [c for c, op, names in relations if op == "==" and names == frozenset({var})]
-    if domain and satisfies_domain(domain, var, value) is False:
-        return _WRONG
     mixed = [
         c
         for c, op, names in relations
@@ -477,24 +472,25 @@ def _judge_value(verify: Mapping[str, object], var: str, value: str) -> str:
     ]
     if mixed or len(equations) != 1:
         return _UNKNOWN
-    if classify_solvability(equations[0]).state not in ("unique", "multiple"):
+    # 허용 목록 다항 등식(구문 나무를 직접 세운 유리 계수 다항식)일 때만 근 집합을 정확히 안다 —
+    # `.doit()` 래퍼·초월 함수·분모·0/음수 지수·실수 계수가 하나라도 있으면
+    # 인증되지 않는다(4차 검토).
+    sets = certified_root_sets(equations[0], domain, var)
+    if sets is None:
         return _UNKNOWN
-    # 분수방정식 — 평가 파싱이 분모를 약분해 무연근이 근처럼 보인다(`x*(x - 2)/(x - 2) = 2` 의
-    # x = 2: 약분하면 `x = 2` 라는 다항 등식이 된다). 원문 구조(비평가 파싱)에 그 변수의 분모가
-    # 하나라도 있으면 증명하지 않는다 — 단조 규칙상 종전 판정이 남는다(PR #1703 3차 검토 상1).
-    # 약분되지 않은 유리식은 위 `classify_solvability` 가 이미 비다항으로 거른다.
-    if has_variable_denominator(equations[0], var) is not False:
-        return _UNKNOWN
+    roots, admissible = sets
+    index = match_root(value, roots)
+    if index is None:
+        return _UNKNOWN  # 값이 정확 실근 하나에 대응하지 않는다(근이 아니거나 판정 불가).
+    chosen = roots[index]
+    if chosen not in admissible:
+        return _WRONG  # 근이지만 도메인 제약을 어긴다(제약 위반 근).
     selection = verify.get("answer_selection")
-    rule = selection if selection in ("largest", "smallest") else "unique"
-    verdict = verify_root_selection(
-        [equations[0], *domain], {var: value}, cast(RootSelection, rule)
-    )
-    if verdict.state == "pass":
-        return _PROVEN
-    if verdict.state == "fail" and rule != "unique":
-        return _WRONG
-    return _UNKNOWN
+    if selection == "largest":
+        return _PROVEN if chosen == admissible[-1] else _WRONG
+    if selection == "smallest":
+        return _PROVEN if chosen == admissible[0] else _WRONG
+    return _PROVEN if len(admissible) == 1 else _UNKNOWN
 
 
 def _check_c2(record: Mapping[str, object], verify: Mapping[str, object] | None) -> CheckResult:
@@ -557,23 +553,6 @@ def _check_c2(record: Mapping[str, object], verify: Mapping[str, object] | None)
     )
 
 
-def _numeric_distinct_count(values: Sequence[str]) -> int | None:
-    """후보의 서로 다른 **수치** 개수(상대·절대 허용치 1e-9). 수치화 불가가 있으면 None.
-
-    완전성 비교는 근 판정(Tier1 수치 대입)과 같은 수치 기준으로 센다. 정본 채점기(`_same`)는
-    `-1.4142135623730951` 과 `-sqrt(2)` 를 다른 값으로 보므로, 그것으로 세면 근 하나를 빠뜨린 나열이
-    "실근 개수와 같다"로 통과한다(PR #1703 재검토 중2 · N4a).
-    """
-    kept: list[float] = []
-    for value in values:
-        number = _float_of(value)
-        if number is None:
-            return None
-        if not any(abs(number - other) <= max(1e-9, 1e-9 * abs(other)) for other in kept):
-            kept.append(number)
-    return len(kept)
-
-
 def _check_c2_domain(
     verify: Mapping[str, object], var: str, roots: Sequence[str], answer: str
 ) -> CheckResult | None:
@@ -583,12 +562,13 @@ def _check_c2_domain(
       ① 정답이 근 자체다 — 개념형(`answer_kind`)·근 집계(`answer_aggregate`)가 아니고, 마지막 단계의
          변수가 정답 변수다(호출부가 answer_map 소속으로 이미 확인).
       ② `verify.conditions` 가 "그 변수의 단일 등식 + 도메인 부등식"이다(`split_equation_domain`).
-      ③ 후보 전부가 그 등식의 근이다(Tier1 대입) — 아니면 후보가 다른 식의 해라 비교 근거가 없다.
-      ④ 후보가 그 등식의 서로 다른 실근 **전부**다(다항식의 실근 개수와 같다) — 근 하나를 빠뜨린
-         나열에서 남은 후보 하나를 "도메인이 고른 근"으로 읽지 않는다(PR #1703 검토 상2).
-    판정: 도메인을 만족하는 후보가 하나 → 정답과 다르면 FAIL, 같으면 조건만으로 계산한
-    `verify_root_selection(조건, 정답, "unique")` 도 pass 일 때 PASS. 하나도 없음 → FAIL(허용되는
-    근이 없는데 정답이 있다 — 모순). 둘 이상 → 검증 불가. 정답은 대조에만 쓴다.
+      ③ 그 등식과 도메인 부등식이 전부 허용 목록 다항식이다(`certified_root_sets` — 4차
+         검토). 아니면 정확 근 집합을 모르므로 종전 사유로 돌아간다.
+      ④ 후보 하나하나가 조건 등식의 정확 실근 하나에 대응하고, 후보가 그 실근 **전부**를
+         가리킨다 — 근 하나를 빠뜨린 나열에서 남은 후보를 "도메인이 고른 근"으로 읽지
+         않는다(검토 상2·재검토 중2).
+    판정(정확 근 기준): 도메인을 만족하는 근이 하나 → 정답이 그 근이면 PASS, 아니면 FAIL. 하나도
+    없음 → FAIL(허용되는 근이 없는데 정답이 있다 — 모순). 둘 이상 → 검증 불가. 정답은 대조에만 쓴다.
     """
     if verify.get("answer_kind") or verify.get("answer_aggregate"):
         return None
@@ -597,45 +577,34 @@ def _check_c2_domain(
     if split is None or split[2] != var or not split[1]:
         return None
     equation, domain, _ = split
-    if has_variable_denominator(equation, var) is not False:
-        # 분수방정식 — 약분된 다항식의 실근 개수로는 후보의 완전성을 말할 수 없다(무연근이 섞인다).
+    sets = certified_root_sets(equation, domain, var)
+    if sets is None:
+        # 허용 목록 밖의 등식(분수식·초월 함수·`.doit()` 래퍼 속 약분 등) — 정확 근 집합을 모른다.
         return None
-    for root in roots:
-        state = verify_answer(equation, {var: root}).state
-        if state == "fail":
-            return _unv("C2_DOMAIN_CANDIDATE_NOT_ROOT", f"후보 {root} 가 조건 등식의 근이 아님")
-        if state == "unverifiable":
-            return _unv("C2_DOMAIN_UNVERIFIABLE", f"후보 {root} 의 등식 대입 판정 불가")
-    solvability = classify_solvability(equation)
-    distinct_count = _numeric_distinct_count(roots)
-    if solvability.state not in ("unique", "multiple") or (
-        distinct_count != solvability.n_distinct_real_roots
-    ):
+    exact_roots, admissible = sets
+    matched = [match_root(candidate, exact_roots) for candidate in roots]
+    if any(index is None for index in matched):
+        return _unv(
+            "C2_DOMAIN_CANDIDATE_NOT_ROOT", "후보가 조건 등식의 정확 실근 하나에 대응하지 않음"
+        )
+    if set(matched) != set(range(len(exact_roots))):
         return _unv(
             "C2_DOMAIN_CANDIDATES_INCOMPLETE",
-            f"후보 수치 {distinct_count}개 ≠ 등식의 실근 {solvability.n_distinct_real_roots}개"
-            f"({solvability.state})",
+            f"후보가 가리키는 근 {len(set(matched))}개 ≠ 등식의 정확 실근 {len(exact_roots)}개",
         )
-    flags = [satisfies_domain(domain, var, root) for root in roots]
-    if any(flag is None for flag in flags):
-        return _unv("C2_DOMAIN_UNVERIFIABLE", "도메인 제약 판정 불가")
-    survivors = [root for root, flag in zip(roots, flags, strict=True) if flag]
-    if not survivors:
+    if not admissible:
         return _fail(
             "C2_DOMAIN_NO_ADMISSIBLE_CANDIDATE",
             f"후보 {list(roots)} 전부 도메인 {list(domain)} 위반",
         )
-    if len(survivors) > 1:
-        return _unv("C2_DOMAIN_AMBIGUOUS", "도메인을 만족하는 후보가 둘 이상·선택 규칙 없음")
-    relation = _same(survivors[0], answer)
-    if relation is _Same.UNKNOWN:
+    if len(admissible) > 1:
+        return _unv("C2_DOMAIN_AMBIGUOUS", "도메인을 만족하는 근이 둘 이상·선택 규칙 없음")
+    answer_index = match_root(answer, exact_roots)
+    if answer_index is not None and exact_roots[answer_index] == admissible[0]:
+        return _PASS
+    if _float_of(answer) is None:
         return _unv("C2_VALUE_UNVERIFIABLE")
-    if relation is _Same.DIFFERENT:
-        return _fail("C2_DOMAIN_PICK_MISMATCH", f"도메인이 고른 후보 {survivors[0]} ≠ 정답")
-    confirm = verify_root_selection([equation, *domain], {var: answer}, "unique")
-    if confirm.state != "pass":
-        return _unv("C2_DOMAIN_UNVERIFIABLE", f"조건만으로 근 선택 확인 불가: {confirm.reason}")
-    return _PASS
+    return _fail("C2_DOMAIN_PICK_MISMATCH", f"도메인이 고른 근 {admissible[0]} ≠ 정답")
 
 
 # ──────────────────────────────────────────────────────────────────────────

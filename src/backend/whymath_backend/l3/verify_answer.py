@@ -52,6 +52,7 @@ Tier1 정직성(설계 §4): `pass`는 "샘플 점들에서 조건을 만족"이
 
 from __future__ import annotations
 
+import ast
 import logging
 import random
 import re
@@ -80,12 +81,11 @@ __all__ = [
     "SolvabilityVerdict",
     "budget_exceeded_verdict",
     "classify_solvability",
+    "certified_polynomial",
+    "certified_root_sets",
     "condition_relation",
-    "denominator_vanishes",
     "derive_selected_root",
-    "has_variable_denominator",
-    "is_polynomial_expression",
-    "satisfies_domain",
+    "match_root",
     "split_equation_domain",
     "verify_answer",
     "verify_conditional_equal",
@@ -633,158 +633,208 @@ def split_equation_domain(
     return equation, tuple(domain), var
 
 
-def _domain_truth(
-    domain: Sequence[str], var: sympy.Symbol, value: sympy.Expr, tol: float
-) -> bool | None:
-    """`value` 가 도메인 부등식 전부를 만족하는가 — True·False(하나라도 위반 확정)·None(판정 불가).
-
-    경계(대입한 잔차가 **기호적으로 정확히 0**)는 수치 허용치보다 먼저 가른다: `s > 3` 에 후보 3 은
-    "모호"가 아니라 위반이 확정이고, `c >= 0` 에 후보 0 은 만족이 확정이다. 수치 경로
-    (`_eval_relation`)만 쓰면 엄격 부등식의 경계를 모호(None)로 접어 판정할 수 있는 근 선택을
-    놓친다.
-    """
-    unknown = False
-    for condition in domain:
-        try:
-            residual, op = _parse_condition(condition)
-            at = safe_subs(residual, {var: value})
-        except Exception as exc:  # noqa: BLE001 — 파싱·대입 불가는 판정 불가(None)
-            logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
-            return None
-        if op == "==" or getattr(at, "free_symbols", None):
-            return None  # 도메인은 부등식만·대입 후 자유변수가 남으면 이 변수의 제약이 아니다.
-        truth: bool | None
-        if getattr(at, "is_zero", None) is True:
-            truth = op in (">=", "<=")  # 정확 경계 — 등호 포함만 만족(`>`·`<`·`!=` 는 위반).
-        else:
-            magnitude = _eval_relation_residual(at, tol)
-            truth = None if magnitude is None else _eval_relation(magnitude, op, tol)
-        if truth is False:
-            return False
-        if truth is None:
-            unknown = True
-    return None if unknown else True
+# ──────────────────────────────────────────────────────────────────────────
+# 허용 목록(allowlist) 다항 등식 — 해석 단계 '증명'이 믿는 유일한 등식 꼴
+# (P3-71 · PR #1703 4차 검토)
+# ──────────────────────────────────────────────────────────────────────────
+# 금지 목록(분모·초월 함수…)은 표기 변형 하나로 뚫렸다(`(…).doit()` 래퍼가 파싱 중
+# 약분을 실행했고, `exp(-log(x - 2))`·`(x - 2)**0` 은 분모 없이 같은 효과를 냈다).
+# 그래서 거꾸로, 조건 원문의 **파이썬 구문 나무**(`ast` — 아무것도 실행하지 않는다)를
+# 아래 허용 노드만으로 직접 SymPy 식으로 세운다.
+#   · 정수 리터럴(크기 상한) · 기호(평범한 식별자이고 SymPy 이름이 아닌 것)
+#   · `+`·`-`·`*`·단항 `±` · `/` 는 분모가 0 아닌 **상수**일 때만
+#   · `**` 는 지수가 양의 정수 리터럴일 때만
+#   · `Derivative(식, 기호)`·`.doit()`·`.subs(기호, 허용 식)` — 다항식에 대한 미분·대입은 다항식이다
+# 그 밖의 노드(함수 전부·실수 리터럴·음수/0/분수/기호 지수·변수 분모·다른 메서드)가 하나라도 있으면
+# 인증하지 않는다. 세운 식은 정의상 유리 계수 다항식이라 약분·정의역 문제가 생길 수 없다. 원문은
+# 그 전에 공식 안전 진입점(`safe_sympify`)의 문자·예산 검사를 통과해야 한다(R22-03).
+_CERT_MAX_INT = 10**30
+_CERT_MAX_EXPONENT = 64
+_CERT_MAX_DEGREE = 24
+_CERT_RELATION: re.Pattern[str] = re.compile(r"(==|!=|<=|>=|<|>|=)")
+_CERT_ZERO = 1e-40  # 정확 근(대수적 수)을 60자리로 평가해 0 판정할 때의 문턱 — 근 분리와 무관한 값
+_CERT_PRECISION = 60
 
 
-def satisfies_domain(
-    domain: Sequence[str], var: str, value: str, *, tol: float = 1e-9
-) -> bool | None:
-    """값 문자열이 변수 `var` 의 도메인 부등식 전부를 만족하는가 — 3상태(`_domain_truth`).
-
-    값이 파싱 불가면 None(판정 불가 — 만족/위반으로 위장하지 않는다). 도메인이 비면 True.
-    """
-    try:
-        parsed = safe_sympify(value)
-    except Exception as exc:  # noqa: BLE001 — 값 파싱 불가는 판정 불가
-        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
-        return None
-    return _domain_truth(domain, sympy.Symbol(var), parsed, tol)
+class _NotCertified(Exception):  # noqa: N818 — 오류가 아니라 '인증 안 됨' 신호
+    """허용 목록 밖의 노드 — 인증하지 않는다(판정 불가)."""
 
 
-# 관계 연산자 토큰 — 원문을 양변으로 가른다(긴 토큰 먼저). 비평가 구조 파싱 전용.
-_RELATION_TOKENS: re.Pattern[str] = re.compile(r"==|!=|<=|>=|<|>|=")
-
-
-def _unevaluated_sides(condition: str) -> list[sympy.Expr] | None:
-    """조건 원문의 각 변을 **계산 없이**(`evaluate=False`) 파싱한 나무. 파싱 불가면 None.
-
-    평가 파싱은 `x*(x - 2)/(x - 2)` 를 `x` 로 약분해 분모를 지운다 — 분모를 보려면 원문의 구조를
-    봐야 한다(문자열 정규식이 아니라 구조라서 `x*(x-2)*(x-2)**-1`·`x/((x-2)/(x-2))` 같은 표기
-    변형도 같은 나무 모양 `Pow(밑, 음수)` 로 드러난다).
-    """
-    sides: list[sympy.Expr] = []
-    for part in _RELATION_TOKENS.split(condition):
-        if not part.strip():
-            return None
-        try:
-            sides.append(safe_sympify(part, evaluate=False))
-        except Exception as exc:  # noqa: BLE001 — 파싱 불가는 판정 불가(None)
-            logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
-            return None
-    return sides
-
-
-def _variable_denominators(condition: str, var: str) -> list[sympy.Expr] | None:
-    """원문 구조에서 `var` 를 담은 분모(음수 지수 거듭제곱의 밑) 목록. 파싱 불가면 None."""
-    sides = _unevaluated_sides(condition)
-    if sides is None:
-        return None
-    symbol = sympy.Symbol(var)
-    found: list[sympy.Expr] = []
-    for side in sides:
-        for node in sympy.preorder_traversal(side):
-            if (
-                isinstance(node, sympy.Pow)
-                and node.exp.could_extract_minus_sign()
-                and symbol in node.base.free_symbols
+def _certified_build(node: ast.AST) -> sympy.Expr:
+    if isinstance(node, ast.Constant):
+        value = node.value
+        if isinstance(value, bool) or not isinstance(value, int) or abs(value) > _CERT_MAX_INT:
+            raise _NotCertified("정수 리터럴만")
+        return sympy.Integer(value)
+    if isinstance(node, ast.Name):
+        if not node.id.isidentifier() or len(node.id) > 30 or hasattr(sympy, node.id):
+            raise _NotCertified("평범한 기호만")
+        return sympy.Symbol(node.id)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        operand = _certified_build(node.operand)
+        return -operand if isinstance(node.op, ast.USub) else operand
+    if isinstance(node, ast.BinOp):
+        left = _certified_build(node.left)
+        if isinstance(node.op, ast.Pow):
+            exponent = node.right
+            if not (
+                isinstance(exponent, ast.Constant)
+                and type(exponent.value) is int
+                and 1 <= exponent.value <= _CERT_MAX_EXPONENT
             ):
-                found.append(node.base)
-    return found
+                raise _NotCertified("지수는 양의 정수 리터럴만")
+            return sympy.Pow(left, exponent.value)
+        right = _certified_build(node.right)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            if right.free_symbols or right == 0:
+                raise _NotCertified("나눗셈은 0 아닌 상수로만")
+            return left / right
+        raise _NotCertified("허용되지 않는 이항 연산")
+    if isinstance(node, ast.Call) and not node.keywords:
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "Derivative" and len(node.args) == 2:
+            inner = _certified_build(node.args[0])
+            variable = _certified_build(node.args[1])
+            if not isinstance(variable, sympy.Symbol):
+                raise _NotCertified("미분 변수는 기호만")
+            return sympy.diff(inner, variable)
+        if isinstance(func, ast.Attribute):
+            if func.attr == "doit" and not node.args:
+                return _certified_build(func.value)
+            if func.attr == "subs" and len(node.args) == 2:
+                base = _certified_build(func.value)
+                target = _certified_build(node.args[0])
+                replacement = _certified_build(node.args[1])
+                if not isinstance(target, sympy.Symbol):
+                    raise _NotCertified("대입 대상은 기호만")
+                return base.subs(target, replacement)
+    raise _NotCertified(f"허용되지 않는 노드 {type(node).__name__}")
 
 
-def has_variable_denominator(condition: str, var: str) -> bool | None:
-    """조건 원문에 `var` 를 담은 분모가 있는가(유리식) — 구조 판정. 파싱 불가면 None."""
-    found = _variable_denominators(condition, var)
-    return None if found is None else bool(found)
-
-
-def denominator_vanishes(condition: str, var: str, value: str, *, tol: float = 1e-9) -> bool | None:
-    """`var = value` 에서 원문의 `var` 분모 중 하나라도 0 이 되는가 — True·False·None(판정 불가).
-
-    분수방정식의 무연근 판정이다: 평가 파싱이 약분한 식에서는 `x*(x - 2)/(x - 2) = 2` 의 x = 2 가
-    근처럼 보이지만 원문에서는 분모가 0 이라 근이 아니다. `var` 분모가 없으면 False.
-    """
-    found = _variable_denominators(condition, var)
-    if found is None:
+def _certified_expression(text: str) -> sympy.Expr | None:
+    """식 원문 → 허용 목록으로만 세운 유리 계수 다항식. 인증 불가면 None."""
+    if not text.strip():
         return None
-    if not found:
-        return False
     try:
-        point = {sympy.Symbol(var): safe_sympify(value)}
-        values = [safe_subs(base, point) for base in found]
-    except Exception as exc:  # noqa: BLE001 — 대입 불가는 판정 불가
+        safe_sympify(text)  # 공식 진입점의 허용 문자·예산 검사를 먼저 통과해야 한다(R22-03).
+        tree = ast.parse(text.strip(), mode="eval")
+        return _certified_build(tree.body)
+    except Exception as exc:  # noqa: BLE001 — 인증 불가는 None(판정 불가로 드러난다)
+        logger.debug("verify_answer 인증 거부: %s", type(exc).__name__)
+        return None
+
+
+def certified_polynomial(text: str, var: str) -> sympy.Poly | None:
+    """식 원문이 허용 목록 구조의 `var` 다항식(유리 계수·다른 기호 없음)이면 Poly, 아니면 None."""
+    expr = _certified_expression(text)
+    symbol = sympy.Symbol(var)
+    if expr is None or not expr.free_symbols <= {symbol}:
+        return None
+    poly = sympy.Poly(sympy.expand(expr), symbol)
+    if poly.domain not in (sympy.ZZ, sympy.QQ) or poly.degree() > _CERT_MAX_DEGREE:
+        return None
+    return poly
+
+
+def _certified_relation(condition: str, var: str) -> tuple[sympy.Poly, str] | None:
+    """관계 원문 → (lhs − rhs 의 인증 다항식, 연산자). 관계가 정확히 하나가 아니면 None."""
+    parts = _CERT_RELATION.split(condition)
+    if len(parts) != 3:
+        return None
+    left, token, right = parts
+    lhs = certified_polynomial(left, var)
+    rhs = certified_polynomial(right, var)
+    if lhs is None or rhs is None:
+        return None
+    return lhs - rhs, ("==" if token in ("=", "==") else token)
+
+
+def _certified_truth(
+    residual: sympy.Poly, base: sympy.Poly, root: sympy.Expr, op: str
+) -> bool | None:
+    """정확 근 `root`(인증 다항식 `base` 의 근)에서 `residual op 0` 의 진리값 — 정확 판정.
+
+    0 판정은 수치가 아니라 대수로 한다: residual(root) = 0 ⇔ root 가 gcd(base, residual) 의 근.
+    0 이 아님이 확정되면 부호는 고정밀(60자리) 평가로 정한다 — 그 값이 문턱 아래면 판정 불가.
+    """
+    common = sympy.gcd(base, residual)
+    zero = False
+    if common.degree() >= 1:
+        target = sympy.N(root, _CERT_PRECISION)
+        zero = any(
+            abs(sympy.N(r, _CERT_PRECISION) - target) < _CERT_ZERO for r in sympy.real_roots(common)
+        )
+    if zero:
+        sign = 0
+    else:
+        value = sympy.N(residual.as_expr().subs(residual.gen, root), _CERT_PRECISION)
+        if not value.is_real or abs(value) < _CERT_ZERO:
+            return None
+        sign = 1 if value > 0 else -1
+    return {
+        "==": sign == 0,
+        "!=": sign != 0,
+        ">": sign > 0,
+        "<": sign < 0,
+        ">=": sign >= 0,
+        "<=": sign <= 0,
+    }.get(op)
+
+
+def certified_root_sets(
+    condition: str, domain: Sequence[str], var: str
+) -> tuple[list[sympy.Expr], list[sympy.Expr]] | None:
+    """허용 목록 다항 등식의 (서로 다른 실근 전부, 그중 도메인을 만족하는 근) — 정확값·오름차순.
+
+    등식·도메인 부등식 어느 하나라도 인증 불가거나, 어느 근에서든 도메인 판정이 불가하면 None.
+    실근은 수치 허용치가 아니라 정확 계산(`real_roots` · 제곱 인수 제거)으로 센다 —
+    허수부가 아주 작은 근(`(x - 1)**2 + 1/10**20`)을 실근으로 세지 않는다.
+    """
+    relation = _certified_relation(condition, var)
+    if relation is None or relation[1] != "==" or relation[0].degree() < 1:
+        return None
+    base = relation[0].sqf_part()
+    roots = list(sympy.real_roots(base))
+    constraints: list[tuple[sympy.Poly, str]] = []
+    for text in domain:
+        parsed = _certified_relation(text, var)
+        if parsed is None or parsed[1] == "==":
+            return None
+        constraints.append(parsed)
+    admissible: list[sympy.Expr] = []
+    for root in roots:
+        truths = [_certified_truth(residual, base, root, op) for residual, op in constraints]
+        if any(truth is None for truth in truths):
+            return None
+        if all(truths):
+            admissible.append(root)
+    return roots, admissible
+
+
+def match_root(value: str, roots: Sequence[sympy.Expr], *, tol: float = 1e-9) -> int | None:
+    """값이 가리키는 정확 근의 위치 — 허용치 안에 근이 **정확히 하나**일 때만, 아니면 None.
+
+    개수는 정확하게 세고 대조만 수치로 한다(근사 소수 근 `1.4142135623730951` 도 √2 로 대조된다).
+    """
+    try:
+        number = _real_value(safe_sympify(value), tol)
+    except Exception as exc:  # noqa: BLE001 — 값 파싱 불가는 None
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return None
-    unknown = False
-    for at in values:
-        if getattr(at, "is_zero", None) is True:
-            return True
-        magnitude = _real_value(at, tol) if not getattr(at, "free_symbols", None) else None
-        if magnitude is None:
-            unknown = True
-        elif abs(magnitude) <= tol:
-            return True
-    return None if unknown else False
-
-
-def is_polynomial_expression(text: str, var: str) -> bool | None:
-    """식 원문이 구조상 `var` 의 다항식인가(덧셈·곱셈·음 아닌 정수 지수만) — 파싱 불가면 None.
-
-    `log(x)`·`sqrt(x)`(지수 1/2)·`1/(x - a)`(음수 지수)·`x**2.0` 처럼 암묵 정의역이 있거나 다항이
-    아닌 꼴은 False. `var` 가 없는 부분식(상수 `sqrt(2)`·`pi`)은 상수로 본다.
-    """
-    sides = _unevaluated_sides(text)
-    if sides is None or len(sides) != 1:
+    if number is None:
         return None
-    symbol = sympy.Symbol(var)
-
-    def polynomial(node: sympy.Basic) -> bool:
-        if symbol not in node.free_symbols:
-            return True
-        if node == symbol:
-            return True
-        if isinstance(node, (sympy.Add, sympy.Mul)):
-            return all(polynomial(arg) for arg in node.args)
-        if isinstance(node, sympy.Pow):
-            exponent = node.exp
-            return (
-                bool(exponent.is_Integer)
-                and not exponent.could_extract_minus_sign()
-                and polynomial(node.base)
-            )
-        return False
-
-    return polynomial(sides[0])
+    hits = [
+        index
+        for index, root in enumerate(roots)
+        if (approx := _real_value(root, tol)) is not None and _approx_equal(number, approx, tol)
+    ]
+    return hits[0] if len(hits) == 1 else None
 
 
 def verify_substituted_value(
@@ -837,6 +887,51 @@ def verify_substituted_value(
     return _fail(
         f"대입 — {dict(given)} 를 대입하면 {target} = {values[0]} 이나 주장값은 {claimed}",
         samples_checked=1,
+    )
+
+
+def _certified_root_selection(
+    condition: str,
+    domain: Sequence[str],
+    var: str,
+    ans_text: str,
+    selection: RootSelection,
+    tol: float,
+) -> AnswerVerdict:
+    """도메인 경로(P3-71) — 허용 목록 다항 등식의 정확 근 집합 안에서만 선택을 판정한다.
+
+    등식·도메인이 허용 목록(`certified_root_sets`) 밖이면 unverifiable — `sympy.solve` 의 부분 해
+    (주기함수)·평가 파싱의 자동 약분(무연근)·허수부가 아주 작은 근을 근 집합으로 믿지
+    않는다(PR #1703 검토 상3 · 3차·4차 상1). 정확 근은 오름차순이라 largest/smallest 는
+    허용 근의 끝·처음이다.
+    """
+    sets = certified_root_sets(condition, domain, var)
+    if sets is None:
+        return _unverifiable("근 선택 — 도메인 경로는 허용 목록 다항 등식·부등식만·안전 회피")
+    roots, admissible = sets
+    index = match_root(ans_text, roots, tol=tol)
+    if index is None:
+        return _unverifiable("근 선택 — 답이 정확 실근 하나에 대응하지 않음(Tier1 소관)·안전 회피")
+    chosen = roots[index]
+    if chosen not in admissible:
+        return _fail(
+            f"근 선택({selection}) — 답이 도메인 제약 {list(domain)}을 어김"
+            f"(허용 근 {[sympy.sstr(r) for r in admissible]}).",
+            samples_checked=len(roots),
+        )
+    if selection == "unique":
+        if len(admissible) == 1:
+            return _pass(samples_checked=len(roots))
+        return _fail(
+            f"근 선택(unique) — 허용 근이 {len(admissible)}개라 답이 유일하게 정해지지 않음",
+            samples_checked=len(roots),
+        )
+    target = admissible[-1] if selection == "largest" else admissible[0]
+    if chosen == target:
+        return _pass(samples_checked=len(roots))
+    return _fail(
+        f"근 선택({selection}) — 답이 요구된 근 {sympy.sstr(target)}가 아님",
+        samples_checked=len(roots),
     )
 
 
@@ -902,14 +997,7 @@ def verify_root_selection(
         return _unverifiable(f"근 선택 — answer_map에 변수 {var} 없음·안전 회피")
 
     if domain:
-        # 도메인 경로는 허용 근을 "근 집합 − 제약 위반"으로 세므로 근 집합이 **완전**해야 한다.
-        # `sympy.solve` 는 주기함수 등에서 해의 일부만 돌려준다(`sin(x) = 0` → [0, pi]) — 그것을 근
-        # 전체로 읽으면 `0 < x < 10` 의 허용 근이 π 하나로 보인다(실제 π·2π·3π · PR #1703 검토 상3).
-        # 다항 등식만 받는다(다항식의 solve 는 근을 빠뜨리지 않는다).
-        try:
-            sympy.Poly(residual, var)
-        except (sympy.PolynomialError, sympy.GeneratorsError, ValueError):
-            return _unverifiable("근 선택 — 도메인 경로는 다항 등식만(근 집합 완전성)·안전 회피")
+        return _certified_root_selection(condition, domain, str(var), ans_text, selection, tol)
 
     try:
         ans_val = _real_value(safe_sympify(ans_text), tol)
@@ -920,38 +1008,13 @@ def verify_root_selection(
     if ans_val is None:
         return _unverifiable("근 선택 — 답이 실수가 아님·안전 회피")
 
-    reals = [(r, rv) for r in raw_roots if (rv := _real_value(r, tol)) is not None]
-    real_roots = [rv for _, rv in reals]
+    real_roots = [rv for r in raw_roots if (rv := _real_value(r, tol)) is not None]
     if not real_roots:
         return _unverifiable("근 선택 — 실근 없음(복소근/풀이 불가)·안전 회피")
 
     # 답이 실근 중 하나인지(Tier1이 이미 보장하나 방어적 확인 — 아니면 Tier1에 판정을 맡긴다).
     if not any(_approx_equal(ans_val, r, tol) for r in real_roots):
         return _unverifiable("근 선택 — 답이 실근 집합에 없음(Tier1 소관)·안전 회피")
-
-    if domain:
-        # 평가 파싱은 분모를 약분한다(`x*(x - 2)/(x - 2)` → `x`) — 약분된 다항식의 근에는 원문
-        # 분모를 0 으로 만드는 무연근이 섞일 수 있다. 계산된 실근 중 하나라도 원문 분모를 0 으로
-        # 만들거나 그 판정이 불가하면 근 집합을 믿지 않는다(PR #1703 3차 검토 상1). 무연근이 없으면
-        # 약분된 근 집합이 곧 원래 근 집합이라 그대로 판정한다(`x*(x - 2)/(x - 2) = 3` 의 x = 3 등 —
-        # 약분되지 않는 유리식은 위 다항 가드가 이미 거른다).
-        vanish = [denominator_vanishes(condition, str(var), sympy.sstr(root)) for root, _ in reals]
-        if any(flag is not False for flag in vanish):
-            return _unverifiable(
-                "근 선택 — 원문 분모를 0 으로 만드는 근(무연근) 또는 판정 불가·안전 회피"
-            )
-        # 도메인 제약으로 허용 근을 가른다(정확근으로 판정 — 경계 근을 모호로 접지 않는다).
-        flags = [_domain_truth(domain, var, root, tol) for root, _ in reals]
-        if any(flag is None for flag in flags):
-            return _unverifiable("근 선택 — 도메인 제약 판정 불가·안전 회피")
-        admissible = [rv for (_, rv), flag in zip(reals, flags, strict=True) if flag]
-        if not any(_approx_equal(ans_val, r, tol) for r in admissible):
-            return _fail(
-                f"근 선택({selection}) — 답 {ans_val}가 도메인 제약 {list(domain)}을 어김"
-                f"(허용 근 {sorted(_distinct_values(admissible, tol))}).",
-                samples_checked=len(real_roots),
-            )
-        real_roots = admissible
 
     distinct = _distinct_values(real_roots, tol)
     if selection == "unique":

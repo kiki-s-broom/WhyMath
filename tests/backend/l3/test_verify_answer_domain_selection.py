@@ -6,14 +6,16 @@
 
 from __future__ import annotations
 
+import ast
+
 import pytest
 
+from whymath_backend.l3 import verify_answer as verify_answer_module
 from whymath_backend.l3.verify_answer import (
+    certified_polynomial,
+    certified_root_sets,
     condition_relation,
-    denominator_vanishes,
-    has_variable_denominator,
-    is_polynomial_expression,
-    satisfies_domain,
+    match_root,
     split_equation_domain,
     verify_root_selection,
     verify_substituted_value,
@@ -56,22 +58,29 @@ class TestSplitEquationDomain:
         assert condition_relation("(((") is None
 
 
-class TestSatisfiesDomain:
+class TestCertifiedDomainTruth:
+    """도메인 판정 3상태 — 허용 목록 다항 등식의 정확 근에서 부등식을 대수적으로 가른다."""
+
     @pytest.mark.parametrize(
-        ("domain", "value", "expected"),
+        ("domain", "expected"),
         [
-            (["s > 3"], "3", False),  # 엄격 경계 — 위반 확정(모호 아님)
-            (["s >= 3"], "3", True),  # 등호 경계 — 만족 확정
-            (["s != 3"], "3", False),
-            (["s > 3"], "5", True),
-            (["s > 3", "s < 4"], "5", False),  # 하나라도 위반이면 False
-            (["s > 3"], "(((", None),  # 값 파싱 불가 — 판정 불가
-            (["s > t"], "5", None),  # 대입 뒤 자유변수 — 이 변수의 제약이 아니다
-            ([], "5", True),
+            (["s > 3"], [5]),  # 엄격 경계 — 3 은 위반 확정(모호 아님)
+            (["s >= 3"], [3, 5]),  # 등호 경계 — 만족 확정
+            (["s != 3"], [5]),
+            (["s > 3", "s < 4"], []),  # 하나라도 위반이면 제외
+            ([], [3, 5]),
         ],
     )
-    def test_three_states(self, domain: list[str], value: str, expected: bool | None) -> None:
-        assert satisfies_domain(domain, "s", value) is expected
+    def test_boundaries_are_exact(self, domain: list[str], expected: list[int]) -> None:
+        sets = certified_root_sets("12*s**2 - 96*s + 180 = 0", domain, "s")
+        assert sets is not None
+        assert sets[0] == [3, 5]
+        assert sets[1] == expected
+
+    @pytest.mark.parametrize("domain", [["s > t"], ["((("], ["s = 3"], ["sin(s) > 0"]])
+    def test_uncertified_domain_is_undecidable(self, domain: list[str]) -> None:
+        # 다른 기호·파싱 불가·등식·초월 함수 — 이 변수의 다항 제약이 아니면 근 집합을 내지 않는다.
+        assert certified_root_sets("12*s**2 - 96*s + 180 = 0", domain, "s") is None
 
 
 class TestRootSelectionWithDomain:
@@ -151,10 +160,23 @@ class TestRootSelectionWithDomain:
         )
         assert verdict.state == "unverifiable"
 
-    def test_cancelled_rational_equation_without_a_spurious_root_is_still_judged(self) -> None:
-        """대조: 같은 꼴이라도 근(3)에서 분모가 0 이 아니면 판정한다(과잉 거부 없음)."""
+    def test_rational_equation_is_not_certified_even_without_a_spurious_root(self) -> None:
+        """허용 목록은 변수 분모를 받지 않는다 — 무연근이 없는 `x*(x - 2)/(x - 2) = 3` 도 판정하지
+        않는다(보수 — 정당한 경우까지 막는 대가로 표기 우회 전부를 구조적으로 막는다)."""
         verdict = verify_root_selection(["x*(x - 2)/(x - 2) = 3", "x > 0"], {"x": "3"}, "unique")
-        assert verdict.state == "pass"
+        assert verdict.state == "unverifiable"
+
+    def test_derivative_of_a_polynomial_is_certified(self) -> None:
+        """대조: 코퍼스 조건 형식 `Derivative(…).doit().subs(x, a)` 는 허용 목록 안이다."""
+        assert verify_root_selection(POSITIVE_A, {"a": "6"}, "unique").state == "pass"
+
+    def test_no_real_root_hidden_by_a_tiny_imaginary_part(self) -> None:
+        """`(x - 1)**2 + 1/10**20 = 0` 은 실근이 없다 — 정확 계산으로 센다(허수부 허용치로 접지 않는다)."""
+        assert certified_root_sets("(x - 1)**2 + 1/10**20 = 0", [], "x") == ([], [])
+        verdict = verify_root_selection(
+            ["(x - 1)**2 + 1/10**20 = 0", "x > 0"], {"x": "1"}, "unique"
+        )
+        assert verdict.state == "unverifiable"
 
     def test_single_element_list_is_unchanged(self) -> None:
         assert verify_root_selection(["x**2 - 10*x + 24 = 0"], {"x": "6"}, "largest").state == (
@@ -195,50 +217,126 @@ class TestSubstitutedValue:
         assert "자유변수" in (verdict.reason or "")
 
 
-class TestDenominatorStructure:
+class TestCertifiedPolynomialAllowlist:
+    """허용 목록 판정 — 거부 노드마다 하나씩, 그리고 허용 꼴의 대조군."""
+
     @pytest.mark.parametrize(
-        "condition",
+        "text",
         [
-            "x*(x - 2)/(x - 2) = 2",
-            "(x - 2)**3/(x - 2)**2 = 0",
-            "x*(x-2)*(x-2)**-1 = 2",
-            "x/((x-2)/(x-2)) = 2",
-            "1/sqrt(x - 2) = 1",
+            "exp(x) - 1",  # 함수
+            "log(x)",
+            "sin(x)",
+            "sqrt(x)",
+            "Abs(x)",
+            "Piecewise((x, x > 0), (-x, True))",
+            "x**-1",  # 음수 지수
+            "x**(-2)",
+            "(x - 2)**0",  # 0 지수
+            "x**(1/2)",  # 분수 지수
+            "x**n",  # 기호 지수
+            "x**2.0",  # 실수 지수
+            "2.5*x",  # 실수 리터럴
+            "x/(x - 2)",  # 변수 분모
+            "1/x",
+            "Rational(1, 2)*x",  # 허용 목록 밖 호출
+            "pi*x",  # SymPy 이름 기호
+            "(x**2).expand()",  # 다른 메서드
+            "(x*(x - 2)/(x - 2)).doit()",  # 래퍼 속 변수 분모
+            "(x**2).subs(x**2, 3)",  # 대입 대상이 기호가 아님
+            "x/0",  # 0 으로 나눔
+            "x**999",  # 지수 상한 초과
+            "x - 1" + "0" * 40,  # 정수 리터럴 상한 초과
+            "Derivative(x**3, x, 2)",  # 미분 인자 개수
+            "Derivative(x**3, x**2)",  # 미분 변수가 기호가 아님
+            "x**2 - 4  # 주석",  # 공식 진입점(safe_sympify)이 거부하는 문자 — 구문 나무만으로 통과 금지
+            "x" + " + 1" * 400,  # 공식 진입점의 길이 예산 초과
+            "x + 0.5 - 0.5",  # 실수 리터럴 — 평가하면 지워져도 노드 단계에서 거부
         ],
     )
-    def test_variable_denominator_is_seen_in_the_unevaluated_structure(
-        self, condition: str
-    ) -> None:
-        assert has_variable_denominator(condition, "x") is True
-
-    @pytest.mark.parametrize(
-        "condition", ["x**2 - 4 = 0", "x/2 = 3", "x = ((112) - (4))/((3) - (0))"]
-    )
-    def test_constant_denominators_are_not_variable_denominators(self, condition: str) -> None:
-        assert has_variable_denominator(condition, "x") is False
-
-    def test_denominator_vanishing_is_decided_at_the_value(self) -> None:
-        assert denominator_vanishes("x*(x - 2)/(x - 2) = 2", "x", "2") is True
-        assert denominator_vanishes("x/(x + 5) = 1/3", "x", "5/2") is False  # 대조
-        assert denominator_vanishes("x/(x + 5) = 1/3", "x", "-5") is True
-        assert denominator_vanishes("x**2 = 4", "x", "2") is False  # 분모 없음
-        assert denominator_vanishes("x/((x-2)/(x-2)) = 2", "x", "2") is not False  # 0/0 — 판정 불가
-        # 기호적 0 은 아니지만 수치로 0(허용치 안)인 분모 — 근사 소수 근 √2 에서 x**2 - 2
-        assert (
-            denominator_vanishes("x*(x**2 - 2)/(x**2 - 2) = 1", "x", "1.4142135623730951") is True
-        )
+    def test_rejected_nodes(self, text: str) -> None:
+        assert certified_polynomial(text, "x") is None
 
     @pytest.mark.parametrize(
         ("text", "expected"),
         [
-            ("2*x**3 - 6*x**2 + 1", True),
-            ("x/2 + sqrt(2)", True),
-            ("log(x)", False),
-            ("sqrt(x)", False),
-            ("1/(x - 3)", False),
-            ("x**2.0", False),
-            ("(((", None),
+            ("2*x**3 - 6*x**2 + 1", "2*x**3 - 6*x**2 + 1"),
+            ("x/2 + 1/3", "x/2 + 1/3"),
+            ("-(x - 1)**2", "-x**2 + 2*x - 1"),
+            ("Derivative(x**3, x).doit()", "3*x**2"),
+            ("Derivative(t**3, t).doit().subs(t, x)", "3*x**2"),
+            ("((112) - (4))/((3) - (0)) + x", "x + 36"),
         ],
     )
-    def test_polynomial_expression_structure(self, text: str, expected: bool | None) -> None:
-        assert is_polynomial_expression(text, "x") is expected
+    def test_accepted_forms(self, text: str, expected: str) -> None:
+        poly = certified_polynomial(text, "x")
+        assert poly is not None
+        assert str(poly.as_expr()) == expected
+
+    def test_other_symbols_are_not_a_polynomial_in_the_variable(self) -> None:
+        assert certified_polynomial("x + a", "x") is None
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "exp(x)",
+            "x**-1",
+            "(x - 2)**0",
+            "x**(1/2)",
+            "x**n",
+            "x**2.0",
+            "2.5*x",
+            "x/(x - 2)",
+            "x/0",
+            "(x**2).expand()",
+            "(x**2).subs(x**2, 3)",
+            "Derivative(x**3, x**2)",
+            "Derivative(x**3, 2)",
+            "Derivative(x**3, x, 2)",
+            "pi*x",
+            "True*x",
+            "x - 1" + "0" * 40,
+        ],
+    )
+    def test_allowlist_builder_rejects_each_node_by_itself(self, text: str) -> None:
+        """허용 목록 빌더 자체가 노드를 거부한다 — 앞단 `safe_sympify` 사전 검사나 뒷단 Poly
+        도메인 검사가 우연히 같은 입력을 막아 주는 것에 기대지 않는다(두 검사는 방어 중복)."""
+        tree = ast.parse(text, mode="eval")
+        with pytest.raises(verify_answer_module._NotCertified):
+            verify_answer_module._certified_build(tree.body)
+
+    def test_sympy_names_are_not_variables(self) -> None:
+        # `E` 는 SymPy 에서 자연상수다 — 구문 나무에서 기호로 세우면 원문의 뜻과 달라진다.
+        assert certified_polynomial("E**2 - 4", "E") is None
+
+    @pytest.mark.parametrize(
+        ("condition", "domain"),
+        [
+            ("x > 0", []),  # 등식이 아니다
+            ("x**2 - 4 = 0", ["0 < x < 3"]),  # 관계가 둘인 도메인
+            # 근 √2 에서 잔차가 1e-44 수준 — 60자리 평가로도 부호를 확정하지 않는다(판정 불가)
+            (
+                "x**2 - 2 = 0",
+                ["x > (14142135623730950488016887242*10**15 + 96980785696718)/10**43"],
+            ),
+        ],
+    )
+    def test_root_sets_refuse_undecidable_shapes(self, condition: str, domain: list[str]) -> None:
+        assert certified_root_sets(condition, domain, "x") is None
+
+    def test_match_requires_a_single_exact_root_within_tolerance(self) -> None:
+        sets = certified_root_sets("(x - 1)*(x - 1 - 1/10**12) = 0", [], "x")
+        assert sets is not None and len(sets[0]) == 2
+        assert match_root("1", sets[0]) is None  # 허용치 안에 정확 근이 둘 — 어느 근인지 모른다
+
+    def test_exact_root_sets_and_matching(self) -> None:
+        roots, admissible = certified_root_sets("x**3 - 2*x = 0", ["x >= 0"], "x") or ([], [])
+        assert len(roots) == 3 and len(admissible) == 2  # -√2, 0, √2 / 0, √2
+        assert match_root("1.4142135623730951", roots) == 2
+        assert match_root("2.00001", certified_root_sets("(x-2)**2*(x+1) = 0", [], "x")[0]) is None
+        assert match_root("(((", roots) is None
+
+    def test_exact_boundary_is_decided_algebraically(self) -> None:
+        sets = certified_root_sets("x**2 - 2 = 0", ["x**2 > 2"], "x")
+        assert sets is not None and sets[1] == []  # 경계(=)에서 엄격 부등식은 거짓 — 정확 0 판정
+        sets = certified_root_sets("x**2 - 2 = 0", ["x**2 >= 2", "x > 0"], "x")
+        assert sets is not None and len(sets[1]) == 1
