@@ -431,15 +431,16 @@ def test_substitution_needs_a_definition_without_borrowed_parameters() -> None:
     assert item.checks["C4"].code == "C4_STEP_INCORRECT"  # 증명 못 한 변수 전환 — 종전 FAIL 유지
 
 
-def test_parameterized_definition_is_ignored_when_a_pure_one_decides() -> None:
-    """정의 등식이 둘(매개변수 섞인 것 + 순수 {x, y})이면 순수한 것만 쓴다 — 매개변수 등식을 섞어
-    '판정 불가'로 끌어내리지도, 그 값을 빌려 오지도 않는다."""
+def test_parameterized_definition_alongside_a_pure_one_blocks_the_proof() -> None:
+    """정의 등식이 둘(매개변수 섞인 것 + 순수 {x, y})이면 x 를 다른 변수와 함께 담은 조건이 남아
+    증명하지 않는다 — 그 매개변수 등식이 x 를 더 제약하는지 모른다(PR #1703 재검토 MV2). 변수 전환은
+    종전 동치 판정(incorrect)을 유지한다."""
 
     def mutate(r: Record) -> None:
         r["verify"]["conditions"].append("y = 2*x**3 + b*x**2 - 18*x + 58")
 
     item = qa.judge_record(_inject(_substitution(), mutate))
-    assert item.checks["C4"].state is qa.CheckState.PASS
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
 
 
 def test_substitution_without_a_defining_condition_keeps_the_old_failure() -> None:
@@ -451,10 +452,11 @@ def test_substitution_without_a_defining_condition_keeps_the_old_failure() -> No
 
 
 def test_one_unproven_definition_blocks_the_substitution_proof() -> None:
-    """정의 등식이 둘이고 하나가 y 를 하나로 정하지 못하면(`y**2 = …` — y = ±…) 성립 증명이 아니다."""
+    """정의 등식이 둘(`y = f(x)` 와 `y = sqrt(x - 10)`)이고 하나가 x = 3 에서 실수 y 를 주지 못하면
+    성립 증명이 아니다 — 하나만 맞는다고 통과시키지 않는다(종전 FAIL 유지)."""
 
     def mutate(r: Record) -> None:
-        r["verify"]["conditions"].append("y**2 = (2*x**3 - 6*x**2 - 18*x + 58)**2")
+        r["verify"]["conditions"].append("y = sqrt(x - 10)")
 
     item = qa.judge_record(_inject(_substitution(), mutate))
     assert item.checks["C4"].code == "C4_STEP_INCORRECT"
@@ -513,6 +515,78 @@ ADVERSARIAL: dict[str, tuple[Record, qa.Verdict]] = {
         ),
         qa.Verdict.UNVERIFIABLE,
     ),
+    # 재검토 상1 — 초월 등식의 부분 해를 "유일 근"으로 읽지 않는다
+    "T1 초월 등식 값 대입": (
+        _rec(["sin(x) = 1", "y = 2*x"], "pi", {"x": "pi/2", "y": "pi"}, ["x = pi/2", "y = pi"]),
+        qa.Verdict.FAIL,
+    ),
+    "T3 초월 등식 근 선택": (
+        _rec(["tan(x) = 1"], "pi/4", {"x": "pi/4"}, ["x = pi/4, x = 5*pi/4", "x = pi/4"]),
+        qa.Verdict.UNVERIFIABLE,
+    ),
+    "T4 초월 등식 + answer_selection": (
+        {
+            **_rec(["sin(x*pi/180) = 1/2"], "150", {"x": "150"}, ["x = 30, x = 150", "x = 150"]),
+            "verify": {
+                "conditions": ["sin(x*pi/180) = 1/2"],
+                "answer_map": {"x": "150"},
+                "answer_selection": "largest",
+                "solution_steps": ["x = 30, x = 150", "x = 150"],
+            },
+        },
+        qa.Verdict.UNVERIFIABLE,
+    ),
+    # 재검토 MV2 — x 를 다른 변수와 함께 제약하는 조건을 무시한 증명
+    "MV2 섞인 제약 무시": (
+        {
+            **_rec([], "3", {}, []),
+            "verify": {
+                "conditions": ["x**2 - 4 = 0", "x > -5", "x + z > 100", "y = x + 1"],
+                "answer_map": {"x": "2", "y": "3", "z": "200"},
+                "answer_selection": "largest",
+                "solution_steps": ["x = -2, x = 2", "x = 2", "y = 3"],
+            },
+        },
+        qa.Verdict.FAIL,
+    ),
+    # 재검토 중2 — 근사 중복 후보로 빠진 근(√2)을 가린 나열
+    "N4a 근사 중복으로 근 누락": (
+        _rec(
+            ["x**3 - 2*x = 0", "x >= 0"],
+            "0",
+            {"x": "0"},
+            ["x = -1.4142135623730951, x = -sqrt(2), x = 0"],
+        ),
+        qa.Verdict.UNVERIFIABLE,
+    ),
+    # 정당한 판정 확장(main 의 거짓 실패·판정 불가 → 다항 등식으로 증명돼 PASS)
+    "DR2 중근 등식 대입": (
+        _rec(
+            ["(x-2)**2*(x+1) = 0", "x > 0", "y = x**2"],
+            "4",
+            {"x": "2", "y": "4"},
+            ["x = 2", "y = 4"],
+        ),
+        qa.Verdict.PASS,
+    ),
+    "IR2 근사 √2 대입": (
+        _rec(
+            ["x**2 - 2 = 0", "x > 0", "y = x**2 + 1"],
+            "3",
+            {"x": "sqrt(2)", "y": "3"},
+            ["x = 1.4142135623730951", "y = 3"],
+        ),
+        qa.Verdict.PASS,
+    ),
+    "SP1 다른 변수만의 등식 섞임": (
+        _rec(
+            ["a**2 - 4 = 0", "a > 0", "y = a**2 + 1", "b = 7"],
+            "5",
+            {"a": "2", "y": "5", "b": "7"},
+            ["a = 2", "y = 5"],
+        ),
+        qa.Verdict.PASS,
+    ),
     # 대조 — 근 선택 근거·정의 등식이 모두 있는 올바른 풀이(main 의 거짓 실패 → PASS)
     "A10 선택 뒤 대입(올바름)": (
         _rec(
@@ -549,6 +623,42 @@ def test_c2_domain_requires_the_full_root_set_even_with_the_right_survivor() -> 
     assert item.verdict is qa.Verdict.UNVERIFIABLE
 
 
+def test_near_duplicate_candidates_do_not_hide_an_omitted_root() -> None:
+    """같은 근을 표기만 달리 두 번 적어(`-1.4142135623730951`·`-sqrt(2)`, 또는 5e-15 차이 소수) 근 √2
+    를 빠뜨린 나열 — 정본 채점기는 둘을 다른 값으로 보지만 근 판정은 수치 기준이다. 완전성은 같은
+    수치 기준으로 세어 '불완전'으로 잡는다(PR #1703 재검토 중2 · N4a)."""
+    for duplicate in ("-1.4142135623730951", "-1.41421356237309"):
+        record = _rec(
+            ["x**3 - 2*x = 0", "x >= 0"], "0", {"x": "0"}, [f"x = {duplicate}, x = -sqrt(2), x = 0"]
+        )
+        item = qa.judge_record(record)
+        assert item.checks["C2"].code == "C2_DOMAIN_CANDIDATES_INCOMPLETE", duplicate
+
+
+def test_non_isolated_target_equation_blocks_the_substitution_proof() -> None:
+    """`y**2 + (x - 3)**2 = 0` 은 y 만 정하는 정의(`y = f(x)`)가 아니라 x 도 묶는다 — x = 3 에서 y 가
+    0 하나로 정해져도, x 를 함께 제약하는 조건이 있는 채로 증명하지 않는다(종전 FAIL 유지)."""
+    record = _rec(
+        ["x**2 - 9 = 0", "x > 0", "y**2 + (x - 3)**2 = 0"],
+        "0",
+        {"x": "3", "y": "0"},
+        ["x = 3", "y = 0"],
+    )
+    assert qa.judge_record(record).checks["C4"].code == "C4_STEP_INCORRECT"
+
+
+def test_near_double_root_answer_is_not_confirmed_by_the_conditions() -> None:
+    """중근 근처 값 2.00001 은 잔차 허용치(1e-9) 안이라 Tier1 이 '근'으로 받고 후보 나열도 완전해
+    보인다. 조건만으로 계산한 `verify_root_selection(…, "unique")` 이 그 값이 근이 아님을 잡는다 —
+    이 확인이 없으면 PASS 가 난다(PR #1703 재검토 중2 — 확인 가드는 등가가 아니다)."""
+    record = _rec(
+        ["(x-2)**2*(x+1) = 0", "x > 0"], "2.00001", {"x": "2.00001"}, ["x = -1, x = 2.00001"]
+    )
+    item = qa.judge_record(record)
+    assert item.checks["C2"].code == "C2_DOMAIN_UNVERIFIABLE"
+    assert item.verdict is not qa.Verdict.PASS
+
+
 def test_answer_aggregate_blocks_the_domain_filter_even_when_values_coincide() -> None:
     def mutate(r: Record) -> None:
         r["verify"]["answer_aggregate"] = "sum"
@@ -557,14 +667,26 @@ def test_answer_aggregate_blocks_the_domain_filter_even_when_values_coincide() -
     assert item.checks["C2"].code == "C2_ROOT_CHOICE_UNSTRUCTURED"
 
 
-def test_multivariable_inequality_is_not_a_domain_constraint() -> None:
-    """`a + y > 0` 은 a 의 도메인이 아니다 — 섞으면 판정이 막힌다(근 선택은 a 의 제약만으로)."""
+def test_condition_mixing_the_variable_with_another_blocks_the_proof() -> None:
+    """`a + y > 0` 은 a 를 y 와 함께 제약한다 — y 를 모르는 채로 "조건이 요구하는 근은 6" 이라고
+    증명하지 않는다(PR #1703 재검토 MV2)."""
 
     def mutate(r: Record) -> None:
         r["verify"]["conditions"].append("a + y > 0")
 
     item = qa.judge_record(_inject(_domain_selection_step(), mutate))
-    assert item.checks["C4"].state is qa.CheckState.PASS
+    assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
+
+
+def test_mixed_inequality_does_not_mask_a_definite_domain_violation() -> None:
+    """`a + y > 0` 이 `a > 0` 보다 앞에 있어도, 고른 근 -6 이 `a > 0` 을 어긴다는 확정은 남는다."""
+
+    def mutate(r: Record) -> None:
+        r["verify"]["conditions"].insert(1, "a + y > 0")
+        _steps(r)[-1] = "a = -6"
+
+    item = qa.judge_record(_inject(_domain_selection_step(), mutate))
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
 
 
 def test_two_equations_for_the_variable_leave_the_root_set_undetermined() -> None:

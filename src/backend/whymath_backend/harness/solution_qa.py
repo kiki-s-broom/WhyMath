@@ -419,11 +419,37 @@ def _relations(verify: Mapping[str, object]) -> list[tuple[str, str, frozenset[s
     return out
 
 
+def _defines_other_variable(condition: str, var: str) -> bool:
+    """`w = f(var)` 꼴(한쪽이 다른 변수 하나뿐, 반대쪽은 `var` 만의 식)인가 — 그 조건은 w 를 정할 뿐
+    `var` 를 제약하지 않는다. `x + z > 100`·`x**2 + y**2 = 1` 처럼 `var` 를 함께 묶는 조건은
+    아니다."""
+    if "<" in condition or ">" in condition or "!" in condition:
+        return False
+    sides = condition.split("=")
+    if len(sides) != 2:
+        return False
+    for lone, other in ((sides[0], sides[1]), (sides[1], sides[0])):
+        name = lone.strip()
+        if name.isidentifier() and name != var:
+            relation = condition_relation(other)
+            if relation is not None and relation[1] == frozenset({var}):
+                return True
+    return False
+
+
 def _judge_value(verify: Mapping[str, object], var: str, value: str) -> str:
     """`var = value` 가 조건이 요구하는 근인가 — `_PROVEN`·`_WRONG`·`_UNKNOWN`.
 
     · 도메인 부등식을 어기면 `_WRONG`(제약 위반 근).
+    · `var` 를 다른 변수와 함께 담은 조건이 있으면 `_UNKNOWN` — 그 조건이 `var` 를 더 제약하는지
+      (`x + z > 100`·`x**2 + y**2 = 1` 등) 모른다. 예외는 다른 변수 하나를 `var` 만의 식으로 정하는
+      정의 등식(`y = f(x)`·`f(x) = y`)뿐이다 — 그것은 y 를 정할 뿐 x 를 제약하지 않는다(PR #1703
+      재검토 MV2).
     · 그 변수 하나만 담은 조건 등식이 정확히 하나여야 근의 집합을 안다 — 아니면 `_UNKNOWN`.
+    · 그 등식이 **실근이 있는 다항 등식**이어야 한다(`classify_solvability` 가 unique/multiple).
+      초월 등식에서 `sympy.solve` 는 해의 일부만 준다(`sin(x) = 1` → [π/2]) — 그것을 "유일한 근"
+      으로 읽으면 증명이 아닌 것이 증명이 된다(PR #1703 재검토 상1). 비다항이면 `_UNKNOWN` 이고,
+      변수 전환 단계라면 `_check_c4` 의 단조 규칙이 종전 incorrect 를 유지한다.
     · 값이 그 등식의 근이 아니면 `_UNKNOWN`(`verify_root_selection` 이 판정 불가를 낸다 — 후보가
       다른 식의 해일 수 있다. 변수 전환 단계에서는 `_check_c4` 가 종전 incorrect 를 유지한다).
     · 선택 규칙 = `answer_selection`(largest/smallest), 없으면 unique. `verify_root_selection` 이
@@ -437,7 +463,14 @@ def _judge_value(verify: Mapping[str, object], var: str, value: str) -> str:
     equations = [c for c, op, names in relations if op == "==" and names == frozenset({var})]
     if domain and satisfies_domain(domain, var, value) is False:
         return _WRONG
-    if len(equations) != 1:
+    mixed = [
+        c
+        for c, op, names in relations
+        if var in names and len(names) > 1 and not _defines_other_variable(c, var)
+    ]
+    if mixed or len(equations) != 1:
+        return _UNKNOWN
+    if classify_solvability(equations[0]).state not in ("unique", "multiple"):
         return _UNKNOWN
     selection = verify.get("answer_selection")
     rule = selection if selection in ("largest", "smallest") else "unique"
@@ -511,6 +544,23 @@ def _check_c2(record: Mapping[str, object], verify: Mapping[str, object] | None)
     )
 
 
+def _numeric_distinct_count(values: Sequence[str]) -> int | None:
+    """후보의 서로 다른 **수치** 개수(상대·절대 허용치 1e-9). 수치화 불가가 있으면 None.
+
+    완전성 비교는 근 판정(Tier1 수치 대입)과 같은 수치 기준으로 센다. 정본 채점기(`_same`)는
+    `-1.4142135623730951` 과 `-sqrt(2)` 를 다른 값으로 보므로, 그것으로 세면 근 하나를 빠뜨린 나열이
+    "실근 개수와 같다"로 통과한다(PR #1703 재검토 중2 · N4a).
+    """
+    kept: list[float] = []
+    for value in values:
+        number = _float_of(value)
+        if number is None:
+            return None
+        if not any(abs(number - other) <= max(1e-9, 1e-9 * abs(other)) for other in kept):
+            kept.append(number)
+    return len(kept)
+
+
 def _check_c2_domain(
     verify: Mapping[str, object], var: str, roots: Sequence[str], answer: str
 ) -> CheckResult | None:
@@ -541,12 +591,13 @@ def _check_c2_domain(
         if state == "unverifiable":
             return _unv("C2_DOMAIN_UNVERIFIABLE", f"후보 {root} 의 등식 대입 판정 불가")
     solvability = classify_solvability(equation)
+    distinct_count = _numeric_distinct_count(roots)
     if solvability.state not in ("unique", "multiple") or (
-        solvability.n_distinct_real_roots != len(roots)
+        distinct_count != solvability.n_distinct_real_roots
     ):
         return _unv(
             "C2_DOMAIN_CANDIDATES_INCOMPLETE",
-            f"후보 {len(roots)}개 ≠ 등식의 실근 {solvability.n_distinct_real_roots}개"
+            f"후보 수치 {distinct_count}개 ≠ 등식의 실근 {solvability.n_distinct_real_roots}개"
             f"({solvability.state})",
         )
     flags = [satisfies_domain(domain, var, root) for root in roots]
