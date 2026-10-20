@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-20 (결정 · D9 Solution QA 판정 규칙 · WP-D 0단계): D9=(가) — 게이트 판정은 P3-14 비율 판정(CLI exit 1은 실행 경보로만), 기준 99%(지시문 원문), 검증 가능 비율 하한은 P3-G2에 두지 않는다 — **기준 완화**다. (사용자 결정, claude 기록 — Kiki '게이트 대행 승인' 2026-10-20) — 판정 기준: main `1a1a7c8b`
+- `G-p307-solution-qa-judgement-rules` clear(D9 규칙) → 그 규칙으로 `G-p3-g2-week2` clear(판정문 `docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md` PASS 수용, Solution QA 456/456은 검증 가능분) — P3-08 착수 가능.
+- 하한 이동: 검증 가능 비율 40.7%(456/1,121)의 하한 조건을 `G-p3-w3-release-merged`(11/15) notes로 옮겼다 — 값은 P3-62 재측정 후 Kiki 확정(후보 60%). 검증 불가 665건은 이 조건으로 승계.
+- 남은 확인 2건(PR #1702 독립 검토): ① `G-p3-g2-week2` 조건 3은 대장 문면(오답 1건 도달) 읽기로 clear했다 — 엄격 읽기(추첨 3개 전부)는 2/3(`M0673` 좌석 없음 → P3-61). 판정문이 clear 전 Kiki 확인을 요구한 지점이며 **Kiki 확인: (가) 대장 문면 읽기로 확정(2026-10-20)**(게이트 notes에도 기록) ② D9 (다) '기준 99%'와 P3-14 ④ 코드 임계 0.995(`ops/phase3_metrics.py`)가 어긋난다 — 현재 값 100%라 영향 없음, P3-G3(11/15) 전에 정리 필요.
+- 선행 집행: `G-p3-w3-release-merged` depends_on에 `P3-62` 추가(notes 산문 선행 → 대장 집행).
+
 ### 2026-10-19 (수정 · WP-A 4회차): 3회차 검토 잔여 10건 중 닫힌 것 10건(패킷 열거분 전부) · 남은 것 #14(Kiki 승인 대기, PR 없음)·D4(10/31 결정) — `backlog/gates.yaml`·HARN 3건 태스크를 origin/main으로 되돌리고 G1~G5를 CLI로 재등재(손편집 0), G1은 `--no-inputs` 사후 등재 후 `--as kiki` clear(evidence에 #909 귀속·`ed3d14da`·판정 기준 `fa8d83dd`; #912는 '잔여 3축'으로 정정). ADR-007 v2.2(맥락 표 ② 귀속 정정)·README 소재·방침 예외 목록(HARN-210 추가)·MEMORY 과장 정정. P1 HARN 3건 `block --handover` 재차단(해제 2027-01-01).
 이벤트 원장(`backlog/events/`)에는 2~4회차의 gate_add·gate_clear·block이 재실행분까지 누적된다 — 되돌림은 YAML만 되돌리고 이벤트는 append-only라, 원장의 건수는 '현재 상태'가 아니라 '시도 이력'으로 읽어야 한다.
 
