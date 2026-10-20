@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-76-acceptance-gate-interpretive-steps
+title: "P3-76 — 수용 게이트·corpus_reverify에 해석 단계 판정(P3-71 허용 목록 증명) 공유 — P3-62 규칙 (가) 선행"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-71-solution-qa-judge-interpretive-steps
+requires_gates: []
+acceptance:
+  - "① 수용 게이트(l3/equivalent/acceptance.py Tier2 _evaluate_verification)와 상시 재검증(harness/corpus_reverify.py _reverify_one)이 P3-71이 solution_qa C4에 넣은 해석 단계 판정(근 선택·대입 — 허용 목록 다항 증명, certified_polynomial·certified_root_sets·match_root)을 같은 의미로 쓰게 한다. 판정 로직은 공용 함수로 올려 세 곳(solution_qa C4·acceptance·corpus_reverify)이 한 구현을 공유한다(복제 금지).\n② 단조 규칙 유지: 종전 판정이 incorrect/fail인 전이는 허용 목록 증명이 성립할 때만 바뀐다. 증명 불가면 종전 판정 유지. 현 승인 은행 전체(corpus_reverify 40개 은행)에서 종전 pass→비pass 0건, 종전 verified→비verified 0건을 회귀 대조로 확인한다.\n③ 주입 실측: P3-62 재개 판정의 GRAPH-SHAPE 실 레코드 변형(근 선택+대입 2줄 추가)이 수용 게이트 verified · corpus_reverify pass가 되고, 근거 없는 대입·틀린 근 선택은 각각 failed/fail로 남는다(RED 픽스처).\n④ 야간 S6 게이트의 의미 변화(판정 확장)를 보고서에 명시한다. 기준 완화가 아니라 판정 확장이며 허용 목록 밖은 종전 판정을 유지한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/acceptance.py
+  - src/backend/whymath_backend/harness/corpus_reverify.py
+  - src/backend/whymath_backend/harness/solution_qa.py
+  - src/backend/whymath_backend/l3/verify_answer.py
+session: null
+notes: "출처: P3-62 재개 판정(docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md 재개 절, 브랜치 claude/p3-62-solution-qa-structuring 4e052b1e) — P3-71이 C4에만 해석 단계 판정을 넣어 수용 게이트·corpus_reverify가 규칙 (가) 문항을 failed/fail로 떨어뜨린다. Kiki A안(판정기 확장 선행) 2026-10-20의 연장."
+updated: 2026-10-20
