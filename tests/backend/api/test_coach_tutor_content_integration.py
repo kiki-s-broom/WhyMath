@@ -8,7 +8,12 @@ head가 적용된 실 PG에 개념·스킬·문항 행을 적재하고 헬퍼를
 - 개념 이름표가 (code, 이름) 순서로 온다.
 - 스킬 이름표가 id 오름차순 앞 5개만 조회된다(그 밖 id의 이름은 결과에 없다).
 
-PG 미도달(또는 마이그레이션 미적용)이면 graceful skip — 다른 통합 테스트와 같은 관례다.
+**PG 미도달은 skip이 아니라 fail이다**(PR #1709 재검토 하2 — 이 파일에만 적용). 저장소의 다른 통합
+테스트는 미도달 시 graceful skip하지만, 이 파일은 `integration` 마크라 `WHYMATH_RUN_INTEGRATION`이
+꺼져 있으면 `tests/backend/conftest.py`가 이미 수집 단계에서 skip한다. 즉 이 픽스처까지 왔다면
+누군가 통합 실행을 *명시적으로 켠* 것이고(CI에서는 실 PG가 붙은 `backend-migrations` 잡뿐 —
+data-pipeline 통합 잡은 `tests/backend`를 수집하지 않는다), 그때의 미도달은 환경 결함이다. skip으로
+삼키면 "정답 열 미조회·enum 반환형" 검증이 한 번도 안 돈 채 초록으로 보인다.
 """
 
 from __future__ import annotations
@@ -39,25 +44,30 @@ async def _with_session(fn: Any) -> Any:
         await engine.dispose()
 
 
-def _reachable() -> bool:
+def _unreachable_reason() -> str | None:
+    """PG·대상 테이블 도달 여부 — 못 닿으면 예외 *타입명*을 담은 사유(침묵 실패 금지)."""
     from sqlalchemy import text
 
-    async def _probe(session: Any) -> bool:
+    async def _probe(session: Any) -> None:
         await session.execute(text("SELECT count(*) FROM problem"))
         await session.execute(text("SELECT count(*) FROM skill_node"))
         await session.execute(text("SELECT count(*) FROM concept"))
-        return True
 
     try:
-        return bool(asyncio.run(_with_session(_probe)))
-    except Exception:
-        return False
+        asyncio.run(_with_session(_probe))
+    except Exception as exc:  # noqa: BLE001 — 사유로 바꿔 fail 메시지에 싣는다(삼키지 않는다).
+        return type(exc).__name__
+    return None
 
 
 @pytest.fixture
 def seeded() -> Any:
-    if not _reachable():
-        pytest.skip("PostgreSQL 미도달(또는 마이그레이션 미적용) — 통합 테스트 건너뜀")
+    reason = _unreachable_reason()
+    if reason is not None:
+        pytest.fail(
+            f"통합 실행이 켜졌는데 PostgreSQL·대상 테이블에 닿지 못했다({reason}) — "
+            "WHYMATH_DATABASE_URL·alembic upgrade head 확인(이 파일은 미도달을 skip하지 않는다)"
+        )
     from sqlalchemy import delete
 
     from whymath_backend.db.models.concept import Concept

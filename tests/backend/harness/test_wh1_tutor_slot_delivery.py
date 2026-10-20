@@ -972,3 +972,45 @@ class TestHypothesisConfidenceWithheld:
         assert_prompt_summary_frozen(
             {"turn_index": 1}, theta=9.0, mastery=9.0, grade=-1, hypothesis_confidences=[0.83]
         )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PR #1709 재검토 중1 — 차분 불변: 학생 학습 데이터 값을 바꿔도 프롬프트가 바이트 동일하다
+# ──────────────────────────────────────────────────────────────────────────
+# 고정 픽스처 값 하나에서만 도는 값 감시는 *허용 키의 값*에 조건부로 숨긴 정보(θ>0이면 목록 역순,
+# θ>0.3이면 context_truncated=True 등)를 못 본다. 그래서 θ를 서로 다른 값으로 바꿔 돌린 턴의
+# 프롬프트·시스템 프롬프트 전체를 바이트로 비교한다 — θ의 어떤 함수도 프롬프트에 남을 수 없다.
+_THETA_VARIANTS = (_THETA, -1.7, 2.9)
+
+
+def _captured_turn(theta: float | None) -> tuple[list[str], list[str]]:
+    provider = _CapturingProvider()
+    _run(
+        TutorDeliveryReceipt(),
+        provider=provider,
+        theta=theta,
+        tutor_context=_manifest(theta=theta),
+    )
+    assert provider.prompts, "턴이 프롬프트를 한 번도 넘기지 않았다"
+    return provider.prompts, provider.systems
+
+
+class TestDifferentialInvariance:
+    def test_theta_values_leave_prompt_and_system_byte_identical(self) -> None:
+        base = _captured_turn(_THETA_VARIANTS[0])
+        for theta in _THETA_VARIANTS[1:]:
+            assert _captured_turn(theta) == base, f"θ={theta}에서 프롬프트가 달라졌다"
+
+    def test_theta_absence_changes_only_the_slot_name_disclosure(self) -> None:
+        # θ 없음은 *값*이 아니라 *부재*다 — 매니페스트가 learner_state를 missing으로 표기해 공개 키
+        # (이름 목록)만 바뀐다. 그 키들을 빼면 나머지 요약은 θ가 있을 때와 같아야 한다.
+        disclosure = {"context_missing", "context_not_delivered", "context_held_privately"}
+        with_theta, _ = _captured_turn(_THETA)
+        without, _ = _captured_turn(None)
+        assert len(with_theta) == len(without)
+        for a, b in zip(with_theta, without, strict=True):
+            sa, sb = _summary(a), _summary(b)
+            assert "learner_state" in sb.get("context_missing", [])
+            assert {k: v for k, v in sa.items() if k not in disclosure} == {
+                k: v for k, v in sb.items() if k not in disclosure
+            }

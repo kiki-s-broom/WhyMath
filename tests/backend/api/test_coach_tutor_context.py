@@ -818,7 +818,12 @@ def test_prompt_carries_content_summary_but_no_student_learning_data(
         "condition_count": 2,
     }
     assert fill.pack is not None
-    assert first["pedagogy_policy"]["k_type"] == fill.pack.k_type
+    # 정확 일치(재검토 중1) — 하위 키 하나만 보면 값 목록에 조건부 표지를 섞어도 통과한다.
+    assert first["pedagogy_policy"] == {
+        "k_type": fill.pack.k_type,
+        "is_stub": fill.pack.is_stub,
+        "forbidden_modes": list(fill.pack.forbidden_modes)[:8],
+    }
     assert first["context_not_delivered"] == ["mastery"]
     assert first["context_held_privately"] == ["learner_state", "student_answer", "solution_record"]
     # ⑥ 동결 — θ·숙달 값·파생 라벨·학년이 프롬프트·시스템 프롬프트 어디에도 없다.
@@ -1034,3 +1039,60 @@ def test_skill_labels_helper_skips_query_without_ids() -> None:
     session = _RecordingSession({})
     assert asyncio.run(coach._skill_labels_for(session, [])) == []  # type: ignore[arg-type]
     assert session.sql == []
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PR #1709 재검토 중1 — 차분 불변(HTTP 두 핸들러): θ·서버 숙달·클라 숙달·학년의 *값*을 바꿔도
+# 튜터가 받은 프롬프트·시스템 프롬프트가 바이트 동일하다. 고정 값 감시는 허용 키의 값에
+# 조건부로 숨긴 정보(숙달>0.5면 금지 모드 하나 추가 등)를 못 보기 때문이다.
+# ──────────────────────────────────────────────────────────────────────────
+def _tutor_strings(
+    monkeypatch: pytest.MonkeyPatch, path: str, fill: _Fill, body: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    spy = _install(monkeypatch, fill)
+    resp = _post(path, body)
+    assert resp.status_code == 201, resp.text
+    assert spy.prompts, "튜터가 프롬프트를 한 번도 받지 않았다"
+    return spy.prompts, spy.systems
+
+
+def _variant(**over: Any) -> _Fill:
+    fill = _Fill()
+    for k, v in over.items():
+        setattr(fill, k, v)
+    return fill
+
+
+_LEARNER_VARIANTS: list[tuple[str, dict[str, Any], dict[str, Any]]] = [
+    ("theta-neg", {"theta": -1.7}, {}),
+    ("theta-high", {"theta": 2.9}, {}),
+    ("mastery-low", {"mastery": 0.1}, {}),
+    ("mastery-high", {"mastery": 0.9}, {}),
+    ("grade-7", {"grade": 7}, {}),
+    ("grade-none", {"grade": None}, {}),
+]
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_learner_values_leave_tutor_prompt_byte_identical(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    base = _tutor_strings(monkeypatch, path, _Fill(), _body())
+    for name, fill_over, body_over in _LEARNER_VARIANTS:
+        fill = _variant(**fill_over)
+        assert vars(fill) != vars(_Fill())  # 주입 적용 단언
+        got = _tutor_strings(monkeypatch, path, fill, _body(**body_over))
+        assert got == base, f"{name}: 학생 값이 바뀌자 튜터 프롬프트가 달라졌다"
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_client_mastery_values_leave_tutor_prompt_byte_identical(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    # 클라 제출 숙달(bkt_mastery·mastery_level)도 값만 다르고 '있음'은 같은 쌍끼리 비교한다.
+    low = _tutor_strings(monkeypatch, path, _Fill(), _body(bkt_mastery=0.1))
+    high = _tutor_strings(monkeypatch, path, _Fill(), _body(bkt_mastery=0.9))
+    assert low == high
+    novice = _tutor_strings(monkeypatch, path, _Fill(), _body(mastery_level="초보"))
+    master = _tutor_strings(monkeypatch, path, _Fill(), _body(mastery_level="숙달"))
+    assert novice == master
