@@ -68,6 +68,7 @@ __all__ = [
     "MasteryRecord",
     "compute_mastery_record",
     "get_all_current_skill_mastery",
+    "get_concept_skill_ids",
     "get_current_skill_mastery",
     "record_problem_attempt_skill_mastery",
 ]
@@ -156,6 +157,16 @@ async def _assessed_skill_ids(session: AsyncSession, concept_ids: Sequence[uuid.
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def get_concept_skill_ids(session: AsyncSession, concept_id: uuid.UUID) -> list[str]:
+    """개념 1개 → mastery-estimable skill_id 목록 — `_assessed_skill_ids`의 **읽기 전용 공개 좌석**.
+
+    P3-08(튜터 context 9종): 코치가 "현재 Skill" 슬롯을 채우려고 적재 경로와 **같은 해소 규칙**
+    (`Concept.behavior_skills` ∩ estimable `skill_node`)을 써야 한다. 규칙을 api에 다시 쓰면 두 번째
+    진실 원천이 되므로 여기서 위임만 한다(신규 쿼리 0 — 같은 SELECT 1회·1홉). 매핑 없으면 빈 목록.
+    """
+    return await _assessed_skill_ids(session, [concept_id])
 
 
 def _resolve_estimator(model: BktModel | None) -> MasteryEstimator:

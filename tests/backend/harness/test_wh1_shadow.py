@@ -215,6 +215,10 @@ class TestNoRawLeak:
             "llm_calls",
             "llm_calls_finished",
             "llm_ms_total",
+            # P3-08 — 튜터 context 슬롯 *이름*(닫힌 9종 어휘) 목록 3종뿐이다. 값·id·원문 없음.
+            "context_missing",
+            "context_not_delivered",
+            "context_coverage_gap",
             "observed_at",
         }
 
