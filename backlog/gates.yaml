@@ -734,7 +734,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-20] input done · KG-10-narrative-edge-resolution-and-boundary-review · 판정 무관: G-kg10-signature-pattern-doc-registration은 kind=decision·assignee=kiki — 등재 방식(ⓐ 출처 표기 수정 후 md 등재 / ⓑ 코드오너 ack / ⓒ 미등재)은 저작권 정책상 Kiki 결정 사항이라 세션이 대신 판정하지 않는다. 이 태스크는 판정 자료(docs/data/narrative_edge_resolution_v1.md §8 · PR #1704)만 제공한다 — done KG-10-narrative-edge-resolution-and-boundary-review 인계"
     depends_on:
       - KG-10-narrative-edge-resolution-and-boundary-review
   - id: G-kiki-device-demo
