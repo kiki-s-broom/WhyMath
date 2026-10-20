@@ -1085,12 +1085,13 @@ gates:
     remind_after_days: 47
     evidence: "판정 기준: main 1a1a7c8b · 판정문 docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md (PR #1695, 판정 기준 main 9f494454) PASS 수용 — Problem Coverage 8/8 · Solution QA 456/456(검증 가능분, D9 규칙) · 오답→교정 1건. 단서: 검증 불가 665건(59.3%)은 G-p3-w3-release-merged 하한 조건으로 승계(G-p307 D9)"
     cleared_by: kiki
-    notes: ""
+    notes: "[판정 근거 2026-10-20] 조건 3 읽기: 대장 문면(오답 1건 도달) 채택 — 엄격 읽기(추첨 3개 전부)는 2/3, 끊긴 지점 M0673(오답 좌석 없음, 소유 P3-61). 이 읽기는 Kiki 확인 대기(판정문 :13·:149). clear 실행 = claude가 Kiki 대행 승인(2026-10-20) 하에 --as kiki"
     corrections:
       - "[2026-09-22] title: 'P3-G2 — Week 2 Gate 판정 (11/8). Problem Coverage 95%+ AND Solution QA Pass 99%+ AND 오답 1건이 교정 전략까지 도달. 선행 P3-04~P3-07. 판정 회차 분리 집행' → 'P3-G2 — Week 2 Gate 판정 (**상한 11/8 · 선행 완료 즉시 앞당겨 판정**). Problem Coverage 95%+ AND Solution QA Pass 99%+ AND 오답 1건이 교정 전략까지 도달. 선행 P3-04~P3-07. 판정 회차 분리 집행' — Kiki 결정 2026-09-22 — 일정은 달력이 아니라 선행 완료로 움직인다(가능하면 앞당긴다). 원 계획 날짜는 고정일이 아니라 상한이므로 문면을 그렇게 고친다. 대장은 이미 이 결정과 정합한다: P3 태스크에 날짜 필드가 없고 착수 조건이 전적으로 depends_on + 게이트다. 부수로 11/22 ↔ 저장소 G3 일정 충돌이 해소된다 — 11/22 는 Phase 3 의 상한일 뿐 판정 예정일이 아니다."
       - "[2026-09-22] remind_after_days: 60 → 47 — acceptance 7 전수 재측정. 이 게이트의 제목은 판정 상한을 11/8 로 명시하는데 독촉은 60일(2026-11-21)이라, 상한을 넘긴 뒤에야 경고가 뜨거나(G1~G3) 상한과 어긋난다(G4). 독촉을 상한 그 날에 맞춘다 — 상한이므로 Kiki 지시 1에 따라 판정은 선행 완료 즉시 더 앞당겨 할 수 있고, 이 값은 늦었을 때 울리는 상한선일 뿐이다."
       - "[2026-09-25] depends_on +P3-16-week2-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 판정 회차 분리 집행을 소유할 태스크가 없어 신규 등재했다(acceptance v2-9 지정)"
       - "[2026-10-18] verdict PASS · inputs: P3-16-week2-gate-judgment · evidence: P3-G2 Week 2 Gate 판정 PASS — 판정문 docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md · 판정 기준 main 9f4944545ff978c5d8b72448e0ffa4b88815a36f · PR #1695 · Problem Coverage 8/8=100% · Solution QA Pass 456/456=100%(검증 불가 665 제외) · 오답 1건 교정 전략 도달(시드 추첨 M0080·M0670 실 PG 라이브, M0673 좌석 없음) · clear 전 확인 2곳: 조건 3 읽기(1건 vs 뽑은 3개 전부) · G-p307-solution-qa-judgement-rules 결정 — done P3-16-week2-gate-judgment 인계"
+      - "[2026-10-20] notes +171자 — PR #1702 독립 검토 중2 — 판정문이 요구한 해석 지점과 대행 사실 기록"
     depends_on:
       - P3-16-week2-gate-judgment
   - id: G-p3-g3-week3
@@ -1132,8 +1133,10 @@ gates:
     corrections:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
       - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
+      - "[2026-10-20] depends_on +P3-62-solution-qa-unverifiable-structuring — D9 하한 값은 P3-62 재측정 뒤 확정 — notes 산문 선행을 대장 depends로 집행(PR #1702 독립 검토 중1)"
     depends_on:
       - P3-17-week3-release-gate-judgment
+      - P3-62-solution-qa-unverifiable-structuring
   - id: G-p301-scope-choice
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
