@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,6 +20,6 @@ paths:
   - src/backend/whymath_backend/harness/corpus_reverify.py
   - src/backend/whymath_backend/harness/solution_qa.py
   - src/backend/whymath_backend/l3/verify_answer.py
-session: null
+session: claude/p3-acceptance-gate-interpretive
 notes: "출처: P3-62 재개 판정(docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md 재개 절, 브랜치 claude/p3-62-solution-qa-structuring 4e052b1e) — P3-71이 C4에만 해석 단계 판정을 넣어 수용 게이트·corpus_reverify가 규칙 (가) 문항을 failed/fail로 떨어뜨린다. Kiki A안(판정기 확장 선행) 2026-10-20의 연장."
 updated: 2026-10-20
