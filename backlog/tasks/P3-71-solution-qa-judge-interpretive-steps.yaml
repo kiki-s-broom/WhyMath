@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,13 +14,17 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① C4 해석 단계 인정: 이웃 단계가 동치가 아니라 근 선택(후보 집합 → 도메인 제약을 만족하는 원소)·대입(변수 값 → 식의 값)인 경우를 SymPy로 판정한다. 해석 단계가 성립하면 passed, 성립하지 않으면 failed(C4_STEP_INCORRECT 유지), 판정 불가면 unverifiable — 해석 단계를 무조건 통과시키지 않는다.\n② 도메인 제약 읽기: C2(또는 C1 root_selection)가 verify.conditions 안의 도메인 제약(a > 0 · c >= 0, c <= 3 · x > 0 등 부등식)으로 후보 근을 걸러, 남은 후보가 정답과 일치하는지 판정한다. verify_root_selection이 '단일 등식 + 도메인 부등식' 리스트를 받게 한다. 정답에서 역산한 selection으로 순환 통과하지 않는다(P3-24 B3 단서).\n③ 기준 완화 금지 검증: 각 확장마다 주입(잘못된 근 선택·틀린 대입값·제약 위반 근)이 failed로 잡히는 RED 테스트를 둔다. 현행 passed 456건 중 failed로 바뀌는 문항이 생기면 멈추고 보고한다. 분모 total 1,121 불변.\n④ 재측정: 생성기·코퍼스를 바꾸지 않은 상태에서 solution_qa 전·후 표(total·passed·failed·unverifiable·decidable_ratio·사유별)를 docs/reviews/에 남긴다. 생성기 규칙 반영·재생성·새 회차 감사는 P3-62가 이어서 한다."
-artifacts: []
+artifacts:
+  - "#1703 (4f0e6652) — Solution QA 판정기 확장: C4 해석 단계·C2 도메인 제약, 증명 경로 허용 목록. 코퍼스 456→548 PASS·실패 0·decidable 0.40678→0.48885. 후속 P3-75(C1 자동 약분)"
 paths:
   - src/backend/whymath_backend/harness/solution_qa.py
   - src/backend/whymath_backend/l3/verify_answer.py
   - "tests/backend/harness/test_solution_qa*.py"
   - "tests/backend/l3/test_verify_answer*.py"
   - "docs/reviews/p3_71_*.md"
-session: claude/p3-solution-qa-judge-extension
-notes: "출처: P3-62 착수 판정(docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md, 브랜치 claude/p3-62-solution-qa-structuring) — 현 판정기로는 규칙 (가)가 거짓 실패 72건, (나)가 순증 0. Kiki A안 결정 2026-10-20: 판정기 확장을 먼저 둔다. 판정 확장이지 기준 완화가 아니다."
+session: null
+notes: |-
+  출처: P3-62 착수 판정(docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md, 브랜치 claude/p3-62-solution-qa-structuring) — 현 판정기로는 규칙 (가)가 거짓 실패 72건, (나)가 순증 0. Kiki A안 결정 2026-10-20: 판정기 확장을 먼저 둔다. 판정 확장이지 기준 완화가 아니다.
+
+  [미러 면제 2026-10-20] 구현 코드는 PR #1703에서 CI 전 잡 green으로 머지됨 — 이 커밋은 대장 상태 변경뿐
 updated: 2026-10-20
