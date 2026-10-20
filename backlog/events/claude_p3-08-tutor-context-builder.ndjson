@@ -2,3 +2,5 @@
 {"ts": "2026-10-20T11:15:17+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "add", "id": "P3-72-tutor-slot-value-delivery", "eos_priority": "P1"}
 {"ts": "2026-10-20T11:15:35+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "add", "id": "P3-73-tutor-context-langfuse-record", "eos_priority": "P1"}
 {"ts": "2026-10-20T11:15:48+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "add", "id": "P3-74-tutor-required-context-fallback", "eos_priority": "P1"}
+{"ts": "2026-10-20T13:28:46+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "amend", "id": "P3-72-tutor-slot-value-delivery", "reason": "Kiki 결정 (가) 2026-10-20", "changed": ["acceptance +1 (⑤ [Kiki 결정 (가) 2026-10-20] 튜터 LLM 프롬프트에 …)"]}
+{"ts": "2026-10-20T13:29:10+00:00", "actor": "claude/p3-08-tutor-context-builder", "action": "amend", "id": "P3-72-tutor-slot-value-delivery", "reason": "Kiki 결정 (가) 2026-10-20 — ⑤ 문구 정정(learner_state 사적 보유 사실)", "changed": ["acceptance +1 (⑥ ⑤의 정정 — learner_state는 지금도 θ가 튜터 정책의 *…)"]}
