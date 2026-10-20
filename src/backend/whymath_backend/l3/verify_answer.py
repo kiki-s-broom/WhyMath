@@ -52,8 +52,10 @@ Tier1 정직성(설계 §4): `pass`는 "샘플 점들에서 조건을 만족"이
 
 from __future__ import annotations
 
+import ast
 import logging
 import random
+import re
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
@@ -79,7 +81,12 @@ __all__ = [
     "SolvabilityVerdict",
     "budget_exceeded_verdict",
     "classify_solvability",
+    "certified_polynomial",
+    "certified_root_sets",
+    "condition_relation",
     "derive_selected_root",
+    "match_root",
+    "split_equation_domain",
     "verify_answer",
     "verify_conditional_equal",
     "verify_congruent_by_ratio",
@@ -96,6 +103,7 @@ __all__ = [
     "verify_root_aggregate",
     "verify_root_selection",
     "verify_series_converges",
+    "verify_substituted_value",
     "warm_isolated_worker",
 ]
 
@@ -573,6 +581,360 @@ def _distinct_values(values: Sequence[float], tol: float) -> list[float]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 도메인 제약(P3-71) — "단일 등식 + 같은 변수의 도메인 부등식" 조건 리스트를 읽는 공용 조각.
+# 근 선택(`verify_root_selection`)과 Solution QA 의 해석 단계 판정(`harness/solution_qa`)이 같은
+# 파서·같은 경계 규칙을 쓰게 여기 둔다(SymPy 판정 권위는 이 모듈 하나).
+# ──────────────────────────────────────────────────────────────────────────
+def condition_relation(condition: str) -> tuple[str, frozenset[str]] | None:
+    """조건 1개의 (관계 연산자, 자유변수 이름 집합). 파싱 불가·미지원 관계면 None.
+
+    연산자는 `_parse_condition` 과 같다 — 등식은 `"=="`, 부등식·≠ 는 `>`·`<`·`>=`·`<=`·`!=`.
+    """
+    try:
+        residual, op = _parse_condition(condition)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 None(호출부가 판정 불가로 드러낸다)
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return None
+    return op, frozenset(str(symbol) for symbol in residual.free_symbols)
+
+
+def split_equation_domain(
+    conditions: str | Sequence[str],
+) -> tuple[str, tuple[str, ...], str] | None:
+    """조건을 (단일 등식, 도메인 부등식들, 변수)로 가른다 — 그 모양이 아니면 None.
+
+    "그 모양" = 조건 전부가 **같은 단일 변수** 하나만 자유변수로 갖고, 그중 등식이 **정확히 하나**,
+    나머지는 부등식·≠ 인 것(예 `["3*a**2 = 108", "a > 0"]`). 도메인 부등식이 없는 단일 등식도
+    `(등식, (), 변수)` 로 돌린다. 등식이 둘 이상(연립)·변수가 둘 이상·파싱 불가는 None — 근 선택의
+    뜻이 불명확하므로 호출부가 판정 불가로 처리한다.
+    """
+    items = [conditions] if isinstance(conditions, str) else list(conditions)
+    equation: str | None = None
+    domain: list[str] = []
+    var: str | None = None
+    for condition in items:
+        relation = condition_relation(condition)
+        if relation is None or len(relation[1]) != 1:
+            return None
+        op, names = relation
+        name = next(iter(names))
+        if var is not None and name != var:
+            return None
+        var = name
+        if op == "==":
+            if equation is not None:
+                return None  # 등식 둘 이상 — 연립이다.
+            equation = condition
+        else:
+            domain.append(condition)
+    if equation is None or var is None:
+        return None
+    return equation, tuple(domain), var
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 허용 목록(allowlist) 다항 등식 — 해석 단계 '증명'이 믿는 유일한 등식 꼴
+# (P3-71 · PR #1703 4차 검토)
+# ──────────────────────────────────────────────────────────────────────────
+# 금지 목록(분모·초월 함수…)은 표기 변형 하나로 뚫렸다(`(…).doit()` 래퍼가 파싱 중
+# 약분을 실행했고, `exp(-log(x - 2))`·`(x - 2)**0` 은 분모 없이 같은 효과를 냈다).
+# 그래서 거꾸로, 조건 원문의 **파이썬 구문 나무**(`ast` — 아무것도 실행하지 않는다)를
+# 아래 허용 노드만으로 직접 SymPy 식으로 세운다.
+#   · 정수 리터럴(크기 상한) · 기호(평범한 식별자이고 SymPy 이름이 아닌 것)
+#   · `+`·`-`·`*`·단항 `±` · `/` 는 분모가 0 아닌 **상수**일 때만
+#   · `**` 는 지수가 양의 정수 리터럴일 때만
+#   · `Derivative(식, 기호)`·`.doit()`·`.subs(기호, 허용 식)` — 다항식에 대한 미분·대입은 다항식이다
+# 그 밖의 노드(함수 전부·실수 리터럴·음수/0/분수/기호 지수·변수 분모·다른 메서드)가 하나라도 있으면
+# 인증하지 않는다. 세운 식은 정의상 유리 계수 다항식이라 약분·정의역 문제가 생길 수 없다. 원문은
+# 그 전에 공식 안전 진입점(`safe_sympify`)의 문자·예산 검사를 통과해야 한다(R22-03).
+_CERT_MAX_INT = 10**30
+_CERT_MAX_EXPONENT = 64
+_CERT_MAX_DEGREE = 24
+_CERT_RELATION: re.Pattern[str] = re.compile(r"(==|!=|<=|>=|<|>|=)")
+_CERT_ZERO = 1e-40  # 정확 근(대수적 수)을 60자리로 평가해 0 판정할 때의 문턱 — 근 분리와 무관한 값
+_CERT_PRECISION = 60
+
+
+class _NotCertified(Exception):  # noqa: N818 — 오류가 아니라 '인증 안 됨' 신호
+    """허용 목록 밖의 노드 — 인증하지 않는다(판정 불가)."""
+
+
+def _certified_build(node: ast.AST) -> sympy.Expr:
+    if isinstance(node, ast.Constant):
+        value = node.value
+        if isinstance(value, bool) or not isinstance(value, int) or abs(value) > _CERT_MAX_INT:
+            raise _NotCertified("정수 리터럴만")
+        return sympy.Integer(value)
+    if isinstance(node, ast.Name):
+        if not node.id.isidentifier() or len(node.id) > 30 or hasattr(sympy, node.id):
+            raise _NotCertified("평범한 기호만")
+        return sympy.Symbol(node.id)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        operand = _certified_build(node.operand)
+        return -operand if isinstance(node.op, ast.USub) else operand
+    if isinstance(node, ast.BinOp):
+        left = _certified_build(node.left)
+        if isinstance(node.op, ast.Pow):
+            exponent = node.right
+            if not (
+                isinstance(exponent, ast.Constant)
+                and type(exponent.value) is int
+                and 1 <= exponent.value <= _CERT_MAX_EXPONENT
+            ):
+                raise _NotCertified("지수는 양의 정수 리터럴만")
+            return sympy.Pow(left, exponent.value)
+        right = _certified_build(node.right)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            if right.free_symbols or right == 0:
+                raise _NotCertified("나눗셈은 0 아닌 상수로만")
+            return left / right
+        raise _NotCertified("허용되지 않는 이항 연산")
+    if isinstance(node, ast.Call) and not node.keywords:
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "Derivative" and len(node.args) == 2:
+            inner = _certified_build(node.args[0])
+            variable = _certified_build(node.args[1])
+            if not isinstance(variable, sympy.Symbol):
+                raise _NotCertified("미분 변수는 기호만")
+            return sympy.diff(inner, variable)
+        if isinstance(func, ast.Attribute):
+            if func.attr == "doit" and not node.args:
+                return _certified_build(func.value)
+            if func.attr == "subs" and len(node.args) == 2:
+                base = _certified_build(func.value)
+                target = _certified_build(node.args[0])
+                replacement = _certified_build(node.args[1])
+                if not isinstance(target, sympy.Symbol):
+                    raise _NotCertified("대입 대상은 기호만")
+                return base.subs(target, replacement)
+    raise _NotCertified(f"허용되지 않는 노드 {type(node).__name__}")
+
+
+def _certified_expression(text: str) -> sympy.Expr | None:
+    """식 원문 → 허용 목록으로만 세운 유리 계수 다항식. 인증 불가면 None."""
+    if not text.strip():
+        return None
+    try:
+        safe_sympify(text)  # 공식 진입점의 허용 문자·예산 검사를 먼저 통과해야 한다(R22-03).
+        tree = ast.parse(text.strip(), mode="eval")
+        return _certified_build(tree.body)
+    except Exception as exc:  # noqa: BLE001 — 인증 불가는 None(판정 불가로 드러난다)
+        logger.debug("verify_answer 인증 거부: %s", type(exc).__name__)
+        return None
+
+
+def certified_polynomial(text: str, var: str) -> sympy.Poly | None:
+    """식 원문이 허용 목록 구조의 `var` 다항식(유리 계수·다른 기호 없음)이면 Poly, 아니면 None."""
+    expr = _certified_expression(text)
+    symbol = sympy.Symbol(var)
+    if expr is None or not expr.free_symbols <= {symbol}:
+        return None
+    poly = sympy.Poly(sympy.expand(expr), symbol)
+    if poly.domain not in (sympy.ZZ, sympy.QQ) or poly.degree() > _CERT_MAX_DEGREE:
+        return None
+    return poly
+
+
+def _certified_relation(condition: str, var: str) -> tuple[sympy.Poly, str] | None:
+    """관계 원문 → (lhs − rhs 의 인증 다항식, 연산자). 관계가 정확히 하나가 아니면 None."""
+    parts = _CERT_RELATION.split(condition)
+    if len(parts) != 3:
+        return None
+    left, token, right = parts
+    lhs = certified_polynomial(left, var)
+    rhs = certified_polynomial(right, var)
+    if lhs is None or rhs is None:
+        return None
+    return lhs - rhs, ("==" if token in ("=", "==") else token)
+
+
+def _certified_truth(
+    residual: sympy.Poly, base: sympy.Poly, root: sympy.Expr, op: str
+) -> bool | None:
+    """정확 근 `root`(인증 다항식 `base` 의 근)에서 `residual op 0` 의 진리값 — 정확 판정.
+
+    0 판정은 수치가 아니라 대수로 한다: residual(root) = 0 ⇔ root 가 gcd(base, residual) 의 근.
+    0 이 아님이 확정되면 부호는 고정밀(60자리) 평가로 정한다 — 그 값이 문턱 아래면 판정 불가.
+    """
+    common = sympy.gcd(base, residual)
+    zero = False
+    if common.degree() >= 1:
+        target = sympy.N(root, _CERT_PRECISION)
+        zero = any(
+            abs(sympy.N(r, _CERT_PRECISION) - target) < _CERT_ZERO for r in sympy.real_roots(common)
+        )
+    if zero:
+        sign = 0
+    else:
+        value = sympy.N(residual.as_expr().subs(residual.gen, root), _CERT_PRECISION)
+        if not value.is_real or abs(value) < _CERT_ZERO:
+            return None
+        sign = 1 if value > 0 else -1
+    return {
+        "==": sign == 0,
+        "!=": sign != 0,
+        ">": sign > 0,
+        "<": sign < 0,
+        ">=": sign >= 0,
+        "<=": sign <= 0,
+    }.get(op)
+
+
+def certified_root_sets(
+    condition: str, domain: Sequence[str], var: str
+) -> tuple[list[sympy.Expr], list[sympy.Expr]] | None:
+    """허용 목록 다항 등식의 (서로 다른 실근 전부, 그중 도메인을 만족하는 근) — 정확값·오름차순.
+
+    등식·도메인 부등식 어느 하나라도 인증 불가거나, 어느 근에서든 도메인 판정이 불가하면 None.
+    실근은 수치 허용치가 아니라 정확 계산(`real_roots` · 제곱 인수 제거)으로 센다 —
+    허수부가 아주 작은 근(`(x - 1)**2 + 1/10**20`)을 실근으로 세지 않는다.
+    """
+    relation = _certified_relation(condition, var)
+    if relation is None or relation[1] != "==" or relation[0].degree() < 1:
+        return None
+    base = relation[0].sqf_part()
+    roots = list(sympy.real_roots(base))
+    constraints: list[tuple[sympy.Poly, str]] = []
+    for text in domain:
+        parsed = _certified_relation(text, var)
+        if parsed is None or parsed[1] == "==":
+            return None
+        constraints.append(parsed)
+    admissible: list[sympy.Expr] = []
+    for root in roots:
+        truths = [_certified_truth(residual, base, root, op) for residual, op in constraints]
+        if any(truth is None for truth in truths):
+            return None
+        if all(truths):
+            admissible.append(root)
+    return roots, admissible
+
+
+def match_root(value: str, roots: Sequence[sympy.Expr], *, tol: float = 1e-9) -> int | None:
+    """값이 가리키는 정확 근의 위치 — 허용치 안에 근이 **정확히 하나**일 때만, 아니면 None.
+
+    개수는 정확하게 세고 대조만 수치로 한다(근사 소수 근 `1.4142135623730951` 도 √2 로 대조된다).
+    """
+    try:
+        number = _real_value(safe_sympify(value), tol)
+    except Exception as exc:  # noqa: BLE001 — 값 파싱 불가는 None
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return None
+    if number is None:
+        return None
+    hits = [
+        index
+        for index, root in enumerate(roots)
+        if (approx := _real_value(root, tol)) is not None and _approx_equal(number, approx, tol)
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
+def verify_substituted_value(
+    condition: str,
+    given: Mapping[str, str],
+    target: str,
+    claimed: str,
+    *,
+    tol: float = 1e-9,
+) -> AnswerVerdict:
+    """대입 단계 판정(P3-71) — 등식 `condition` 에 `given` 을 대입하면 `target` 이 실수 하나로
+    정해지고, 그 값이 `claimed` 인가.
+
+    풀이의 해석 단계 "x = 3 → y = 4"(변수 값 → 식의 값)를 동치가 아니라 **정의 등식에 대입한 결과**
+    로 판정한다. 정의 등식은 호출부가 문항 조건에서 고른다(정답에서 만들지 않는다).
+      - **pass**: 대입 뒤 `target` 에 대한 다항 등식이 서로 다른 실수해 1개를 갖고 그것이 `claimed`.
+      - **fail**: 그 유일 실수해가 `claimed` 와 다르다(틀린 대입값).
+      - **unverifiable**: 등식 아님·대입 뒤 `target` 외 자유변수가 남음·`target` 에 대한 다항식이
+        아님·실수해가 0개 또는 여러 개·값이 실수가 아님(보수적·pass 위장 금지).
+    """
+    try:
+        residual, op = _parse_condition(condition)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("대입 — 조건 파싱 불가·안전 회피")
+    if op != "==":
+        return _unverifiable("대입 — 등식이 아님(부등식/≠)·안전 회피")
+    symbol = sympy.Symbol(target)
+    try:
+        reduced = safe_subs(residual, {sympy.Symbol(k): safe_sympify(v) for k, v in given.items()})
+        claimed_value = _real_value(safe_sympify(claimed), tol)
+    except Exception as exc:  # noqa: BLE001 — 대입·치환 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("대입 — 값 대입/치환 불가·안전 회피")
+    if {str(s) for s in reduced.free_symbols} != {target}:
+        return _unverifiable(f"대입 — 대입 뒤 자유변수가 {target} 하나가 아님·안전 회피")
+    if claimed_value is None:
+        return _unverifiable("대입 — 주장값이 실수가 아님·안전 회피")
+    try:
+        sympy.Poly(reduced, symbol)  # 다항일 때만 solve 의 해 집합을 신뢰한다(빈 결과 오판 회피).
+        raw = sympy.solve(sympy.Eq(reduced, 0), symbol)
+    except Exception as exc:  # noqa: BLE001 — 비다항·풀이 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable(f"대입 — {target} 에 대한 다항 등식이 아님/풀이 불가·안전 회피")
+    values = _distinct_values([rv for r in raw if (rv := _real_value(r, tol)) is not None], tol)
+    if len(values) != 1:
+        return _unverifiable(f"대입 — {target} 이 실수 하나로 정해지지 않음({len(values)}개)")
+    if _approx_equal(claimed_value, values[0], tol):
+        return _pass(samples_checked=1)
+    return _fail(
+        f"대입 — {dict(given)} 를 대입하면 {target} = {values[0]} 이나 주장값은 {claimed}",
+        samples_checked=1,
+    )
+
+
+def _certified_root_selection(
+    condition: str,
+    domain: Sequence[str],
+    var: str,
+    ans_text: str,
+    selection: RootSelection,
+    tol: float,
+) -> AnswerVerdict:
+    """도메인 경로(P3-71) — 허용 목록 다항 등식의 정확 근 집합 안에서만 선택을 판정한다.
+
+    등식·도메인이 허용 목록(`certified_root_sets`) 밖이면 unverifiable — `sympy.solve` 의 부분 해
+    (주기함수)·평가 파싱의 자동 약분(무연근)·허수부가 아주 작은 근을 근 집합으로 믿지
+    않는다(PR #1703 검토 상3 · 3차·4차 상1). 정확 근은 오름차순이라 largest/smallest 는
+    허용 근의 끝·처음이다.
+    """
+    sets = certified_root_sets(condition, domain, var)
+    if sets is None:
+        return _unverifiable("근 선택 — 도메인 경로는 허용 목록 다항 등식·부등식만·안전 회피")
+    roots, admissible = sets
+    index = match_root(ans_text, roots, tol=tol)
+    if index is None:
+        return _unverifiable("근 선택 — 답이 정확 실근 하나에 대응하지 않음(Tier1 소관)·안전 회피")
+    chosen = roots[index]
+    if chosen not in admissible:
+        return _fail(
+            f"근 선택({selection}) — 답이 도메인 제약 {list(domain)}을 어김"
+            f"(허용 근 {[sympy.sstr(r) for r in admissible]}).",
+            samples_checked=len(roots),
+        )
+    if selection == "unique":
+        if len(admissible) == 1:
+            return _pass(samples_checked=len(roots))
+        return _fail(
+            f"근 선택(unique) — 허용 근이 {len(admissible)}개라 답이 유일하게 정해지지 않음",
+            samples_checked=len(roots),
+        )
+    target = admissible[-1] if selection == "largest" else admissible[0]
+    if chosen == target:
+        return _pass(samples_checked=len(roots))
+    return _fail(
+        f"근 선택({selection}) — 답이 요구된 근 {sympy.sstr(target)}가 아님",
+        samples_checked=len(roots),
+    )
+
+
 def verify_root_selection(
     conditions: str | Sequence[str],
     answer: Mapping[str, str],
@@ -587,22 +949,35 @@ def verify_root_selection(
     답이 유일하게 정해지지 않아*(두 근 다 방정식을 만족) Tier1이 **틀린 근도 통과**시키기 때문이다
     (Phaiakes9 실측: `3x²+11x-4=0`의 큰 근에 작은 근 -4를 줘도 Tier1 pass).
 
-    적용 범위: **단일 변수·단일 등식** 조건만. 연립·다변수·파라미터·부등식·비다항 등 풀 수 없거나
-    실근이 없거나 답이 실근이 아니면 **unverifiable**(보수적·pass 위장 금지 — verify_answer 정직성
-    상속). 이 함수는 답이 조건을 *만족*하는지는 검사하지 않는다(그건 verify_answer 소관) — 오직
-    *선택*만 판정한다. 판정:
+    적용 범위: **단일 변수·단일 등식** 조건, 또는 **단일 등식 + 같은 변수의 도메인 부등식** 리스트
+    (P3-71 — 예 `["3*a**2 = 108", "a > 0"]`·`["… = 36", "c >= 0", "c <= 3"]`). 도메인 부등식이
+    있으면 실근을 그 제약으로 먼저 거르고(허용 근), 선택은 허용 근 안에서 한다. 도메인 판정은
+    조건에서만 한다 — 답에서 선택을 역산하지 않는다(P3-24 B3 단서). 연립(등식 둘 이상)·다변수·
+    파라미터·비다항 등 풀 수 없거나 실근이 없거나 답이 실근이 아니면 **unverifiable**
+    (보수적·pass 위장 금지 — verify_answer 정직성 상속). 이 함수는 답이 등식을 *만족*하는지는
+    검사하지 않는다(그건 verify_answer 소관) — 오직 *선택*만 판정한다. 판정:
       - **pass**: 답이 요구된 근(largest=최대·smallest=최소·unique=유일)과 일치.
-      - **fail**: 답이 실근이나 *요구된 근이 아님*(예 큰 근 요구에 작은 근·unique 요구에 다근).
-      - **unverifiable**: 적용 밖(풀 수 없음·다변수·실근 없음 등) — Tier1에 판정을 맡긴다.
+      - **fail**: 답이 실근이나 *요구된 근이 아님*(예 큰 근 요구에 작은 근·unique 요구에 다근·
+        도메인 제약을 어기는 근).
+      - **unverifiable**: 적용 밖(풀 수 없음·다변수·실근 없음·도메인 판정 불가 등) — Tier1에 맡긴다.
     """
-    # 단일 등식만 — 연립/빈 조건은 선택 의미가 불명확(보수적 회피).
+    # 단일 등식(종전) 또는 단일 등식 + 같은 변수의 도메인 부등식(P3-71). 연립/빈 조건은 선택 의미가
+    # 불명확(보수적 회피). 원소 1개 리스트는 종전과 같은 경로다(하위호환).
+    domain: tuple[str, ...] = ()
+    condition: str | None
     if isinstance(conditions, str):
-        condition: str | None = conditions
+        condition = conditions
     else:
         condition_list = list(conditions)
-        condition = condition_list[0] if len(condition_list) == 1 else None
+        if len(condition_list) == 1:
+            condition = condition_list[0]
+        else:
+            split = split_equation_domain(condition_list)
+            condition, domain = (split[0], split[1]) if split is not None else (None, ())
     if condition is None:
-        return _unverifiable("근 선택 — 단일 등식이 아님(연립/빈 조건)·안전 회피")
+        return _unverifiable(
+            "근 선택 — 단일 등식(+같은 변수의 도메인 부등식)이 아님(연립/빈 조건)·안전 회피"
+        )
 
     try:
         residual, op = _parse_condition(condition)
@@ -620,6 +995,9 @@ def verify_root_selection(
     ans_text = answer.get(str(var))
     if ans_text is None:
         return _unverifiable(f"근 선택 — answer_map에 변수 {var} 없음·안전 회피")
+
+    if domain:
+        return _certified_root_selection(condition, domain, str(var), ans_text, selection, tol)
 
     try:
         ans_val = _real_value(safe_sympify(ans_text), tol)
