@@ -1,25 +1,25 @@
 """P3-08 — 코치 세션 서빙 경로의 튜터 context 9종 집행 (hermetic·LLM 0·DB 0).
 
-`test_wh1_tutor_context.py`가 판정기 계약을 본다면, 이 파일은 **서빙 코드가 그 판정기를 실제로
-부르는가**(정본화 ≠ 집행)를 본다. `POST /v1/coach/sessions`와 `.../turns` 두 핸들러에서:
+`test_wh1_tutor_context.py`가 판정기·러너 계약을 본다면, 이 파일은 **서빙 코드가 그것을 실제로
+부르고 사실대로 표기하는가**(정본화 ≠ 집행)를 본다. `POST /v1/coach/sessions`와 `.../turns`에서:
 
-- 대조군: 9종을 전부 채운 요청 → 응답 `tutor_context.complete=True`·누락 로그 0·튜터 러너가 받은
-  매니페스트도 완비.
-- 주입 9건(파라미터화 × 두 핸들러): 슬롯 하나를 비우면 ① 응답이 201로 **진행**하고(거부 아님)
-  ② 응답 `tutor_context.missing`에 그 슬롯이 뜨고 ③ 누락 로그 1줄에 슬롯명이 남고 ④ 튜터 러너
-  (`run_wh1_primary_turn`)가 받은 매니페스트에도 같은 누락이 실린다 — 네 곳 중 하나라도 비면 RED.
-- 조회 실패 주입: 새로 붙인 개념·스킬 조회가 예외를 던져도 201, 원인은 `lookup_failed:<타입명>`.
-- 기존 subgraph 가드 경로 동결: 선수 traversal은 depth ≤ 2로, 웜스타트 탐색 표적은 기본 상한(12 ≤ 20)
-  으로 불리고, 오개념은 튜터 초기 context에 preload되지 않는다(매칭 0이면 튜터가 받는 가설도 0).
-
-튜터 러너는 캡처 스텁으로 대체한다(LLM 0) — 스텁이 None을 돌려 결정론 폴백 경로가 그대로 돈다.
+- 대조군: 9종을 전부 얻은 턴 → `complete=True`이되 튜터에 안 실린 5종(개념·스킬·문제·숙달·팩)이
+  `not_delivered`로 응답·로그에 드러난다(완비 턴도 무증상이 아니다). 전달 표기는 **실제 튜터 러너**
+  (스텁 provider)가 정책 보유값으로 계산한 것이다.
+- 주입 9건 × 두 핸들러: 슬롯 하나를 비우면 201로 진행하고, 응답·로그·튜터가 받은 매니페스트
+  세 곳에 그 누락이 뜬다.
+- 튜터 미호출 턴(primary OFF·완료 상태머신 가로채기): `tutor_invoked=false`·전달 0·WARNING 없음.
+- 배선 절마다의 픽스처(A 사진 제출 답안 · B 텍스트 답안 · C 개념 조회 실패 · D/E/F 플래그 OFF ·
+  G 숙달 라벨만): 각 절을 지우는 뮤테이션이 RED가 되도록 그 절을 실제로 밟는다.
+- 기존 subgraph 가드 경로 동결: 선수 traversal depth ≤ 2, 웜스타트 상한 12 ≤ 20, 오개념 preload 금지.
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
+from types import TracebackType
 from typing import Any
 
 import pytest
@@ -34,7 +34,12 @@ from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.dialogue import Dialogue as DialogueORM
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
-from whymath_backend.harness.wh1_tutor_context import TutorContextManifest, TutorContextSlot
+from whymath_backend.harness import wh1_primary
+from whymath_backend.harness.wh1_tutor_context import (
+    TutorContextManifest,
+    TutorContextSlot,
+)
+from whymath_backend.l3.models import GenerationResult, RoutingDecision
 from whymath_backend.l4.misconception import warmstart
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.pack_registry import get_pack
@@ -46,6 +51,7 @@ _UID = uuid.uuid4()
 _PID = uuid.uuid4()
 _CID = uuid.uuid4()
 _CTX_LOGGER = "whymath.harness.wh1_tutor_context"
+_COACH_LOGGER = "whymath_backend.api.coach"
 _HYP = MisconceptionHypothesis(
     misconception_id="distribution-over-power",
     confidence=0.8,
@@ -53,10 +59,13 @@ _HYP = MisconceptionHypothesis(
     evidence_count=1,
 )
 _WARMSTART_MID = "sign-flip-in-inequality"
+S = TutorContextSlot
+_DELIVERED = {"learner_state", "student_answer", "solution_record", "misconception"}
+_NOT_DELIVERED = ["concept", "skill", "problem", "mastery", "pedagogy_policy"]
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# hermetic 세션 — test_coach.py `_CapturingSession` 축소판(add/commit/get/execute만)
+# hermetic 세션 — add/commit/get/execute + SAVEPOINT(begin_nested) 캡처
 # ──────────────────────────────────────────────────────────────────────────
 class _Result:
     def scalars(self) -> _Result:
@@ -75,10 +84,33 @@ class _Result:
         return None
 
 
+class _Nested:
+    def __init__(self, session: _Session) -> None:
+        self._session = session
+
+    async def __aenter__(self) -> _Nested:
+        self._session.nested_depth += 1
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self._session.nested_depth -= 1
+        if exc is not None:
+            self._session.rolled_back.append(exc)
+
+
 class _Session:
     def __init__(self, preload: dict[Any, Any] | None = None) -> None:
         self.added: list[Any] = []
         self._preload = preload or {}
+        self.nested_depth = 0
+        self.rolled_back: list[BaseException] = []
+        # P3-08 개념·스킬 조회가 SAVEPOINT 안에서 실행됐는가(조회 시점의 중첩 깊이 기록).
+        self.lookup_depths: list[int] = []
 
     def add(self, obj: Any) -> None:
         self.added.append(obj)
@@ -104,6 +136,12 @@ class _Session:
     async def scalar(self, stmt: Any) -> Any:
         return None
 
+    def begin_nested(self) -> _Nested:
+        return _Nested(self)
+
+
+_SESSIONS: list[_Session] = []
+
 
 def _client(preload: dict[Any, Any] | None = None) -> TestClient:
     app = create_app()
@@ -114,6 +152,7 @@ def _client(preload: dict[Any, Any] | None = None) -> TestClient:
         jwt_secret_key=SecretStr("test-secret-0123456789abcdef")
     )
     session = _Session(preload)
+    _SESSIONS.append(session)
 
     async def _sess() -> AsyncIterator[_Session]:
         yield session
@@ -127,21 +166,30 @@ def _isolation() -> Iterator[None]:
     import asyncio
 
     asyncio.run(reset_store())
+    _SESSIONS.clear()
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
 
 
+async def _none_async(*args: Any, **kwargs: Any) -> None:
+    return None
+
+
+def _set_flag(monkeypatch: pytest.MonkeyPatch, name: str, value: bool) -> None:
+    monkeypatch.setenv(f"WHYMATH_{name.upper()}", "true" if value else "false")
+    get_settings.cache_clear()
+
+
 # ──────────────────────────────────────────────────────────────────────────
-# 9종 완비 상태를 만드는 서버 조회 대역 — 실제 핸들러처럼 문항이 없으면 문항 기반 값은 None
+# 9종 공급 대역 — 실제 핸들러처럼 문항이 없으면 문항 기반 값은 None
 # ──────────────────────────────────────────────────────────────────────────
 class _Fill:
-    """슬롯별 공급 값 — 주입은 여기 한 칸을 비우는 것으로 한다."""
-
     def __init__(self) -> None:
         self.theta: float | None = 0.4
         self.grade: int | None = 11
         self.concept: uuid.UUID | None = _CID
+        self.concept_error: Exception | None = None
         self.skills: list[str] = ["SK-ALG-01"]
         self.skill_error: Exception | None = None
         self.mastery: float | None = 0.6
@@ -150,9 +198,21 @@ class _Fill:
         assert self.pack is not None
 
 
-class _Spy:
-    """튜터 러너·가드 좌석의 호출 인자 캡처."""
+class _StubProvider:
+    """튜터 정책의 도구 선택 대역 — 항상 end_turn(질문)만(실 네트워크 0)."""
 
+    async def generate(
+        self,
+        prompt: str,
+        system: str,
+        decision: RoutingDecision,
+        *,
+        images: Sequence[str] | None = None,
+    ) -> GenerationResult:
+        return GenerationResult('{"kind": "end_turn", "action_type": "질문"}')
+
+
+class _Spy:
     def __init__(self) -> None:
         self.tutor_calls: list[dict[str, Any]] = []
         self.prereq_calls: list[dict[str, Any]] = []
@@ -160,12 +220,10 @@ class _Spy:
 
 
 def _install(
-    monkeypatch: pytest.MonkeyPatch,
-    fill: _Fill,
-    *,
-    patch_hypotheses: bool = True,
+    monkeypatch: pytest.MonkeyPatch, fill: _Fill, *, patch_hypotheses: bool = True
 ) -> _Spy:
     spy = _Spy()
+    real_runner = wh1_primary.run_wh1_primary_turn
 
     async def _theta(session: Any, user_id: Any, problem_id: Any) -> float | None:
         return fill.theta
@@ -174,9 +232,13 @@ def _install(
         return fill.grade
 
     async def _concept(session: Any, problem_id: Any) -> uuid.UUID | None:
+        session.lookup_depths.append(session.nested_depth)
+        if fill.concept_error is not None:
+            raise fill.concept_error
         return fill.concept
 
     async def _skills(session: Any, concept_id: Any) -> list[str]:
+        session.lookup_depths.append(session.nested_depth)
         if fill.skill_error is not None:
             raise fill.skill_error
         return list(fill.skills)
@@ -202,8 +264,9 @@ def _install(
         return [_WARMSTART_MID]
 
     async def _tutor(**kwargs: Any) -> str | None:
+        # 실제 러너를 돌린다(스텁 provider·DB 미사용) — 전달 판정은 러너가 정책 보유값으로 낸다.
         spy.tutor_calls.append(kwargs)
-        return None  # 결정론 폴백 — LLM 0
+        return await real_runner(**{**kwargs, "provider": _StubProvider(), "session": None})
 
     monkeypatch.setattr(coach, "_server_theta_for", _theta)
     monkeypatch.setattr(coach, "_grade_for", _grade)
@@ -232,7 +295,7 @@ def _body(**over: Any) -> dict[str, Any]:
     return {k: v for k, v in body.items() if v is not None}
 
 
-def _post(path: str, fill: _Fill, body: dict[str, Any]) -> Any:
+def _post(path: str, body: dict[str, Any]) -> Any:
     if path == "create":
         return _client().post("/v1/coach/sessions", json=body)
     did = uuid.uuid4()
@@ -257,7 +320,52 @@ def _ctx_lines(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
     return [r for r in caplog.records if r.name == _CTX_LOGGER]
 
 
-# 슬롯 하나를 비우는 주입 — (비울 슬롯, fill 변형, body 덮어쓰기). None 값은 body에서 키 삭제.
+def _slot(ctx: dict[str, Any], name: str) -> dict[str, Any]:
+    found: dict[str, Any] = next(s for s in ctx["slots"] if s["slot"] == name)
+    return found
+
+
+def _tutor_manifest(spy: _Spy) -> TutorContextManifest:
+    assert len(spy.tutor_calls) == 1, "튜터 러너가 정확히 한 번 불려야 한다(완료 가로채기 없음)"
+    manifest = spy.tutor_calls[0]["tutor_context"]
+    assert isinstance(manifest, TutorContextManifest)
+    return manifest
+
+
+_PATHS = ("create", "append")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 대조군 — 완비 턴에서도 '튜터 미전달'이 드러난다
+# ──────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("path", _PATHS)
+def test_control_complete_turn_still_discloses_not_delivered(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
+) -> None:
+    spy = _install(monkeypatch, _Fill())
+    with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
+        resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
+    ctx = resp.json()["tutor_context"]
+    assert ctx["tutor_invoked"] is True
+    assert ctx["complete"] is True and ctx["missing"] == []
+    assert ctx["not_delivered"] == _NOT_DELIVERED
+    delivered = {s["slot"] for s in ctx["slots"] if s["delivered_to_tutor"]}
+    assert delivered == _DELIVERED
+    assert _slot(ctx, "student_answer")["size"] is None  # 답안 길이 비노출
+    assert "cause_detail" not in resp.text
+    (line,) = _ctx_lines(caplog)
+    assert line.levelno == logging.INFO
+    assert "튜터 미전달 5: concept skill problem mastery pedagogy_policy" in line.getMessage()
+    # 응답 = 러너 영수증(실제 전달 판정) — 핸들러가 추정한 값이 아니다.
+    receipt = spy.tutor_calls[0]["delivery"]
+    assert receipt.manifest is not None
+    assert receipt.manifest.model_dump(mode="json") == ctx
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 주입 9건 × 두 핸들러
+# ──────────────────────────────────────────────────────────────────────────
 def _inject_learner(f: _Fill) -> None:
     f.theta = None
 
@@ -286,64 +394,26 @@ def _noop(f: _Fill) -> None:
     return None
 
 
-_INJECTIONS: list[tuple[TutorContextSlot, Any, dict[str, Any]]] = [
-    (TutorContextSlot.LEARNER_STATE, _inject_learner, {}),
-    (TutorContextSlot.CONCEPT, _inject_concept, {}),
-    (TutorContextSlot.SKILL, _inject_skill, {}),
-    (TutorContextSlot.PROBLEM, _noop, {"problem_id": None}),
-    (TutorContextSlot.STUDENT_ANSWER, _noop, {"student_input": "", "student_solution": None}),
-    (TutorContextSlot.SOLUTION_RECORD, _noop, {"solution_steps": None}),
-    (TutorContextSlot.MISCONCEPTION, _inject_misconception, {}),
-    (TutorContextSlot.MASTERY, _inject_mastery, {}),
-    (TutorContextSlot.PEDAGOGY_POLICY, _inject_policy, {}),
+_INJECTIONS: list[tuple[TutorContextSlot, Any, dict[str, Any], str]] = [
+    (S.LEARNER_STATE, _inject_learner, {}, "no_history"),
+    (S.CONCEPT, _inject_concept, {}, "coverage_gap"),
+    (S.SKILL, _inject_skill, {}, "coverage_gap"),
+    (S.PROBLEM, _noop, {"problem_id": None}, "not_supplied"),
+    (S.STUDENT_ANSWER, _noop, {"student_input": "", "student_solution": None}, "not_supplied"),
+    (S.SOLUTION_RECORD, _noop, {"solution_steps": None}, "not_supplied"),
+    (S.MISCONCEPTION, _inject_misconception, {}, "none_detected"),
+    (S.MASTERY, _inject_mastery, {}, "no_history"),
+    (S.PEDAGOGY_POLICY, _inject_policy, {}, "coverage_gap"),
 ]
-# 연쇄(실제 핸들러 값 조합) — 개념이 비면 스킬도, 문항이 비면 문항 기반 조회 슬롯 전부.
-_CASCADE: dict[TutorContextSlot, set[TutorContextSlot]] = {
-    TutorContextSlot.CONCEPT: {TutorContextSlot.CONCEPT, TutorContextSlot.SKILL},
-    TutorContextSlot.PROBLEM: {
-        TutorContextSlot.PROBLEM,
-        TutorContextSlot.CONCEPT,
-        TutorContextSlot.SKILL,
-        TutorContextSlot.MASTERY,
-        TutorContextSlot.PEDAGOGY_POLICY,
-    },
+_CASCADE: dict[TutorContextSlot, set[str]] = {
+    S.CONCEPT: {"concept", "skill"},
+    S.PROBLEM: {"problem", "concept", "skill", "mastery", "pedagogy_policy"},
 }
-_PATHS = ("create", "append")
-
-
-def _tutor_manifest(spy: _Spy) -> TutorContextManifest:
-    assert len(spy.tutor_calls) == 1, "튜터 러너가 정확히 한 번 불려야 한다(완료 가로채기 없음)"
-    manifest = spy.tutor_calls[0]["tutor_context"]
-    assert isinstance(manifest, TutorContextManifest)
-    return manifest
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# 대조군 + 주입 9건
-# ──────────────────────────────────────────────────────────────────────────
-@pytest.mark.parametrize("path", _PATHS)
-def test_control_all_nine_filled_reach_tutor_and_response(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
-) -> None:
-    fill = _Fill()
-    spy = _install(monkeypatch, fill)
-    with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
-        resp = _post(path, fill, _body())
-    assert resp.status_code == 201, resp.text
-    ctx = resp.json()["tutor_context"]
-    assert ctx["complete"] is True, ctx
-    assert ctx["missing"] == []
-    assert [s["slot"] for s in ctx["slots"]] == [s.value for s in TutorContextSlot]
-    assert _ctx_lines(caplog) == []  # 완비면 누락 로그 0
-    manifest = _tutor_manifest(spy)
-    assert manifest.complete is True
-    # 응답과 튜터가 본 판정은 같은 객체에서 나온다(단일 판정 원천).
-    assert manifest.model_dump(mode="json") == ctx
 
 
 @pytest.mark.parametrize("path", _PATHS)
 @pytest.mark.parametrize(
-    ("slot", "mutate", "body_over"), _INJECTIONS, ids=[s.value for s, _, _ in _INJECTIONS]
+    ("slot", "mutate", "body_over", "cause"), _INJECTIONS, ids=[s.value for s, *_ in _INJECTIONS]
 )
 def test_each_single_slot_injection_is_disclosed_and_proceeds(
     monkeypatch: pytest.MonkeyPatch,
@@ -352,72 +422,225 @@ def test_each_single_slot_injection_is_disclosed_and_proceeds(
     slot: TutorContextSlot,
     mutate: Any,
     body_over: dict[str, Any],
+    cause: str,
 ) -> None:
     fill = _Fill()
     mutate(fill)
     body = _body(**body_over)
-    # 주입이 실제로 적용됐다(mutated != original) — fill 또는 body 중 하나는 반드시 달라진다.
-    assert body != _body() or vars(fill) != vars(_Fill())
+    assert body != _body() or vars(fill) != vars(_Fill())  # 주입 적용 단언
     spy = _install(monkeypatch, fill)
     with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
-        resp = _post(path, fill, body)
-    # ① 진행(거부 아님) — 학생 경험은 깨지지 않는다.
-    assert resp.status_code == 201, resp.text
-    expected = {s.value for s in _CASCADE.get(slot, {slot})}
-    # ② 응답 표기
+        resp = _post(path, body)
+    assert resp.status_code == 201, resp.text  # ① 진행(거부 아님)
+    expected = _CASCADE.get(slot, {slot.value})
     ctx = resp.json()["tutor_context"]
-    assert ctx["complete"] is False
-    assert set(ctx["missing"]) == expected
-    status = next(s for s in ctx["slots"] if s["slot"] == slot.value)
-    assert status["filled"] is False and status["cause"] is not None
-    # ③ 로그 표기 — 1줄, 슬롯명이 원인과 함께 남는다.
-    lines = _ctx_lines(caplog)
-    assert len(lines) == 1
-    assert f"{slot.value}({status['cause']})" in lines[0].getMessage()
-    # ④ 튜터 러너가 받은 매니페스트에도 같은 누락 — 튜터가 '모른 채' 돌지 않는다.
-    assert set(_tutor_manifest(spy).missing_names()) == expected
+    assert ctx["complete"] is False and set(ctx["missing"]) == expected  # ② 응답
+    status = _slot(ctx, slot.value)
+    assert (status["resolved"], status["delivered_to_tutor"], status["cause"]) == (
+        False,
+        False,
+        cause,
+    )
+    (line,) = _ctx_lines(caplog)  # ③ 로그 1줄 — 학생 측 부재·커버리지 공백이라 INFO
+    assert f"{slot.value}({cause})" in line.getMessage()
+    assert line.levelno == logging.INFO
+    assert set(_tutor_manifest(spy).missing_names()) == expected  # ④ 튜터가 받은 매니페스트
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 튜터 미호출 턴 — tutor_invoked=false · 전달 0 · WARNING 없음(시스템 결함이 있어도 표기만)
+# ──────────────────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("path", _PATHS)
-def test_new_lookup_failure_is_never_break_and_named(
+def test_primary_off_turn_is_marked_not_invoked_without_warning(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
 ) -> None:
     fill = _Fill()
-    fill.skill_error = RuntimeError("db down (test)")
+    fill.theta = None
     spy = _install(monkeypatch, fill)
-    with caplog.at_level(logging.WARNING):
-        resp = _post(path, fill, _body())
+    _set_flag(monkeypatch, "wh1_primary_enabled", False)
+    _set_flag(monkeypatch, "l4_server_theta_enabled", False)  # 시스템 결함 원인을 일부러 넣는다
+    with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
+        resp = _post(path, _body())
     assert resp.status_code == 201, resp.text
-    skill = next(s for s in resp.json()["tutor_context"]["slots"] if s["slot"] == "skill")
-    assert (skill["cause"], skill["cause_detail"]) == ("lookup_failed", "RuntimeError")
-    # 조회 좌석(coach)과 판정 로그(tutor_context) 양쪽에 예외 타입명이 남는다.
-    assert any(
-        r.name == "whymath_backend.api.coach" and "RuntimeError" in r.getMessage()
-        for r in caplog.records
-    )
+    ctx = resp.json()["tutor_context"]
+    assert ctx["tutor_invoked"] is False
+    assert not any(s["delivered_to_tutor"] for s in ctx["slots"])
+    assert _slot(ctx, "learner_state")["cause"] == "source_disabled"
+    assert spy.tutor_calls == []
+    (line,) = _ctx_lines(caplog)
+    assert line.levelno == logging.INFO and "tutor_invoked=False" in line.getMessage()
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_completion_intercepted_turn_is_marked_not_invoked(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    spy = _install(monkeypatch, _Fill())
+    original = coach._resolve_completion
+
+    async def _handled(*args: Any, **kwargs: Any) -> Any:
+        return (await original(*args, **kwargs))._replace(handled=True)
+
+    monkeypatch.setattr(coach, "_resolve_completion", _handled)
+    resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
+    ctx = resp.json()["tutor_context"]
+    assert ctx["tutor_invoked"] is False
+    assert not any(s["delivered_to_tutor"] for s in ctx["slots"])
+    assert spy.tutor_calls == []
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_system_defect_on_invoked_turn_warns(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
+) -> None:
+    fill = _Fill()
+    fill.theta = None
+    _install(monkeypatch, fill)
+    _set_flag(monkeypatch, "l4_server_theta_enabled", False)
+    with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
+        resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
     (line,) = _ctx_lines(caplog)
     assert line.levelno == logging.WARNING
-    assert "skill(lookup_failed·RuntimeError)" in line.getMessage()
-    assert "db down" not in line.getMessage()  # 예외 메시지(값)는 남기지 않는다
-    assert _tutor_manifest(spy).missing_names() == ["skill"]
+    assert "learner_state(source_disabled)" in line.getMessage()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 배선 절 픽스처 A~G — 각 절을 지우면 RED가 되도록 그 절을 실제로 밟는다
+# ──────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("path", _PATHS)
+def test_a_photo_submission_answer_is_read_from_student_solution(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    # 사진(OCR) 제출 턴 — 발화는 비고 풀이만 있다. 튜터는 `student_solution or student_input`을 받는다.
+    _install(monkeypatch, _Fill())
+    resp = _post(path, _body(student_input="", student_solution="x=2"))
+    assert resp.status_code == 201, resp.text
+    answer = _slot(resp.json()["tutor_context"], "student_answer")
+    assert answer["resolved"] is True and answer["delivered_to_tutor"] is True
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_b_text_turn_answer_is_read_from_student_input(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    _install(monkeypatch, _Fill())
+    resp = _post(path, _body(student_input="x=2 같아요", student_solution=None))
+    assert resp.status_code == 201, resp.text
+    answer = _slot(resp.json()["tutor_context"], "student_answer")
+    assert answer["resolved"] is True and answer["delivered_to_tutor"] is True
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize("stage", ["concept", "skill"])
+def test_c_lookup_failure_is_never_break_named_and_savepointed(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str, stage: str
+) -> None:
+    fill = _Fill()
+    if stage == "concept":
+        fill.concept_error = RuntimeError("db down (test)")
+    else:
+        fill.skill_error = RuntimeError("db down (test)")
+    spy = _install(monkeypatch, fill)
+    # 선수 코칭 좌석도 같은 개념 해석을 쓰므로 그쪽 실패와 분리한다 — 이 테스트는 새 조회만 본다.
+    monkeypatch.setattr(coach, "_prerequisite_coaching_for", _none_async)
+    with caplog.at_level(logging.WARNING):
+        resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
+    ctx = resp.json()["tutor_context"]
+    failed = {"concept", "skill"} if stage == "concept" else {"skill"}
+    for name in failed:
+        assert _slot(ctx, name)["cause"] == "lookup_failed"
+    assert "RuntimeError" not in resp.text  # 예외 타입명은 응답에 없다(로그에만)
+    coach_lines = [r for r in caplog.records if r.name == _COACH_LOGGER]
+    assert any(
+        f"튜터 context {stage} 조회 실패(RuntimeError)" in r.getMessage() for r in coach_lines
+    )
+    assert all("db down" not in r.getMessage() for r in caplog.records)
+    (line,) = _ctx_lines(caplog)
+    assert line.levelno == logging.WARNING  # 시스템 결함 ∧ 튜터 호출
+    # SAVEPOINT 안에서 실패했고 롤백됐다(바깥 트랜잭션 aborted 방지).
+    (session,) = _SESSIONS
+    assert session.lookup_depths and all(d > 0 for d in session.lookup_depths)
+    injected = fill.concept_error if stage == "concept" else fill.skill_error
+    assert any(e is injected for e in session.rolled_back)
+    assert set(_tutor_manifest(spy).missing_names()) == failed
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_lookup_success_runs_inside_one_savepoint(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    _install(monkeypatch, _Fill())
+    monkeypatch.setattr(coach, "_prerequisite_coaching_for", _none_async)  # 같은 seam의 다른 소비처
+    assert _post(path, _body()).status_code == 201
+    (session,) = _SESSIONS
+    assert len(session.lookup_depths) == 2  # 개념 1 + 스킬 1 — 둘 다 SAVEPOINT 안
+    assert all(d > 0 for d in session.lookup_depths)
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize(
+    ("flag", "slot", "mutate"),
+    [
+        ("l4_server_theta_enabled", "learner_state", _inject_learner),  # D
+        ("l4_server_mastery_enabled", "mastery", _inject_mastery),  # E
+        ("pedagogy_pack_prompt_enabled", "pedagogy_policy", _inject_policy),  # F
+    ],
+    ids=["d-theta", "e-mastery", "f-pack"],
+)
+def test_def_flag_off_is_reported_as_source_disabled(
+    monkeypatch: pytest.MonkeyPatch, path: str, flag: str, slot: str, mutate: Any
+) -> None:
+    # 플래그 OFF면 핸들러의 조회 좌석이 None을 낸다(대역은 그 결과를 재현) — 원인은 '이력 없음'·
+    # '커버리지 공백'이 아니라 '꺼짐'이어야 한다. 플래그를 읽지 않고 상수로 두면 RED.
+    fill = _Fill()
+    mutate(fill)
+    _install(monkeypatch, fill)
+    _set_flag(monkeypatch, flag, False)
+    resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
+    assert _slot(resp.json()["tutor_context"], slot)["cause"] == "source_disabled"
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_g_mastery_label_alone_resolves_mastery(monkeypatch: pytest.MonkeyPatch, path: str) -> None:
+    fill = _Fill()
+    fill.mastery = None
+    _install(monkeypatch, fill)
+    resp = _post(path, _body(mastery_level="숙달"))
+    assert resp.status_code == 201, resp.text
+    mastery = _slot(resp.json()["tutor_context"], "mastery")
+    assert mastery["resolved"] is True and mastery["delivered_to_tutor"] is False
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_g_bkt_mastery_alone_resolves_mastery(monkeypatch: pytest.MonkeyPatch, path: str) -> None:
+    fill = _Fill()
+    fill.mastery = None
+    _install(monkeypatch, fill)
+    resp = _post(path, _body(bkt_mastery=0.5))
+    assert resp.status_code == 201, resp.text
+    assert _slot(resp.json()["tutor_context"], "mastery")["resolved"] is True
 
 
 def test_stateless_coach_carries_no_tutor_context() -> None:
-    # stateless `/v1/coach`는 튜터를 부르지 않는다(LLM 0·DB 0) — 항상 누락인 가짜 계기판을 싣지 않는다.
+    # stateless `/v1/coach`는 튜터를 부르지 않는다(LLM 0·DB 0) — 늘 누락인 가짜 계기판을 싣지 않는다.
     resp = _client().post("/v1/coach", json={"student_input": "음"})
     assert resp.status_code == 200, resp.text
     assert "tutor_context" not in resp.json()
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# ③ 기존 subgraph 가드 경로 동결 — 서빙 경로가 실제로 그 가드를 탄다
+# 기존 subgraph 가드 경로 동결 — 서빙 경로가 실제로 그 가드를 탄다
 # ──────────────────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("path", _PATHS)
 def test_prerequisite_traversal_on_serving_path_is_depth_bounded(
     monkeypatch: pytest.MonkeyPatch, path: str
 ) -> None:
     spy = _install(monkeypatch, _Fill())
-    assert _post(path, _Fill(), _body()).status_code == 201
+    assert _post(path, _body()).status_code == 201
     assert len(spy.prereq_calls) == 1, "서빙 경로가 선수 traversal 좌석을 타지 않았다"
     assert 1 <= spy.prereq_calls[0]["max_depth"] <= 2
 
@@ -427,9 +650,8 @@ def test_warmstart_probe_targets_use_bounded_default_limit(
     monkeypatch: pytest.MonkeyPatch, path: str
 ) -> None:
     spy = _install(monkeypatch, _Fill())
-    assert _post(path, _Fill(), _body()).status_code == 201
+    assert _post(path, _body()).status_code == 201
     assert len(spy.warmstart_calls) == 1, "서빙 경로가 웜스타트 좌석을 타지 않았다"
-    # 상한을 호출부에서 풀지 않는다 — 기본 상한(12)이 max_nodes 범위(12~20) 안이다.
     assert "limit" not in spy.warmstart_calls[0]
     assert 12 <= warmstart._DEFAULT_LIMIT <= 20
 
@@ -438,14 +660,13 @@ def test_warmstart_probe_targets_use_bounded_default_limit(
 def test_misconceptions_are_not_preloaded_into_tutor_context(
     monkeypatch: pytest.MonkeyPatch, path: str
 ) -> None:
-    # 실제 가설 큐레이션(_apply_hypotheses)을 태운다 — 매칭 없는 발화면 튜터가 받는 가설은 0이고,
-    # 웜스타트 탐색 표적은 사적 probe 좌석(warmstart_outside_mids)으로만 간다(reactive retrieval).
-    fill = _Fill()
-    spy = _install(monkeypatch, fill, patch_hypotheses=False)
-    resp = _post(path, fill, _body(student_input="음", student_solution=None))
+    # 실제 가설 큐레이션을 태운다 — 매칭 없는 발화면 튜터가 받는 가설은 0이고, 웜스타트 표적은
+    # 사적 probe 좌석(warmstart_outside_mids)으로만 간다(reactive retrieval).
+    spy = _install(monkeypatch, _Fill(), patch_hypotheses=False)
+    resp = _post(path, _body(student_input="음", student_solution=None))
     assert resp.status_code == 201, resp.text
     (call,) = spy.tutor_calls
     assert list(call["active_hypotheses"]) == []
     assert list(call["warmstart_outside_mids"]) == [_WARMSTART_MID]
-    misconception = call["tutor_context"].status_of(TutorContextSlot.MISCONCEPTION)
-    assert (misconception.filled, misconception.cause.value) == (False, "none_detected")
+    misconception = _slot(resp.json()["tutor_context"], "misconception")
+    assert (misconception["resolved"], misconception["cause"]) == (False, "none_detected")

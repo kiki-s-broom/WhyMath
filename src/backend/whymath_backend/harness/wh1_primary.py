@@ -68,7 +68,11 @@ from whymath_backend.harness.wh1_shadow import (
     emit_wh1_aborted_observation,
     emit_wh1_observation,
 )
-from whymath_backend.harness.wh1_tutor_context import TutorContextManifest
+from whymath_backend.harness.wh1_tutor_context import (
+    TutorContextManifest,
+    TutorContextSlot,
+    TutorDeliveryReceipt,
+)
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.mode_guard import check_forbidden_modes, fallback_reply_for
@@ -121,6 +125,46 @@ def _final_outcome(policy: LLMTutorPolicy | None, *, mode_guard_replaced: bool) 
     return PRIMARY_ADOPTED
 
 
+class _ContextRecordFields(TypedDict):
+    """관측 레코드의 P3-08 세 필드 — 슬롯 *이름*만(값 0)."""
+
+    context_missing: list[str] | None
+    context_not_delivered: list[str] | None
+    context_coverage_gap: list[str] | None
+
+
+def _context_record_fields(context: TutorContextManifest | None) -> _ContextRecordFields:
+    """매니페스트 → 관측 레코드 필드. 매니페스트 미전달(구 호출자·shadow)이면 전부 None(구판)."""
+    if context is None:
+        return _ContextRecordFields(
+            context_missing=None, context_not_delivered=None, context_coverage_gap=None
+        )
+    return _ContextRecordFields(
+        context_missing=context.missing_names(),
+        context_not_delivered=context.not_delivered_names(),
+        context_coverage_gap=context.coverage_gap_names(),
+    )
+
+
+def _delivered_slots(
+    policy: LLMTutorPolicy,
+    *,
+    initial_hypotheses: Sequence[MisconceptionHypothesis],
+    mode_guard_pack: PedagogyPack | None,
+) -> frozenset[TutorContextSlot]:
+    """튜터 러너가 **실제로 받은** context 슬롯 — 정책 보유값 + 러너 입력(초기 가설·가드 팩).
+
+    인자는 러너가 실제로 넘긴 *바로 그 객체*다(정책 인스턴스·`run_tutoring_turn`에 넘긴 가설 목록·
+    금지모드 가드가 쓸 팩). 핸들러가 '줬다고 생각하는 것'이 아니라 여기서 받은 것만 센다.
+    """
+    slots = set(policy.delivered_context_slots())
+    if initial_hypotheses:
+        slots.add(TutorContextSlot.MISCONCEPTION)
+    if mode_guard_pack is not None:
+        slots.add(TutorContextSlot.PEDAGOGY_POLICY)
+    return frozenset(slots)
+
+
 def _safe_emit(
     outcome: TurnOutcome,
     *,
@@ -133,7 +177,7 @@ def _safe_emit(
     tone_violations: int = 0,
     prose_rephrased: bool = False,
     prose_reason_code: str | None = None,
-    context_missing: Sequence[str] | None = None,
+    context: TutorContextManifest | None = None,
 ) -> None:
     """관측 emit — 실패해도 발화 서빙(본류)을 깨지 않는다(예외 타입명 로그·침묵 실패 금지)."""
     try:
@@ -148,7 +192,7 @@ def _safe_emit(
             prose_rephrased=prose_rephrased,
             prose_reason_code=prose_reason_code,
             primary_outcome=primary_outcome,
-            context_missing=context_missing,
+            **_context_record_fields(context),
             **accounting,
         )
     except Exception as exc:  # noqa: BLE001 — 관측 실패는 서빙을 안 깬다(우선순위 #1≫#6).
@@ -164,7 +208,7 @@ def _safe_emit_aborted(
     turn_index: int,
     problem_id: str | None,
     accounting: _TurnAccounting,
-    context_missing: Sequence[str] | None = None,
+    context: TutorContextManifest | None = None,
 ) -> None:
     """하네스가 결과 없이 중단된 턴(타임아웃·예외)의 기록 — 이 경로만 이전엔 기록이 0줄이었다.
 
@@ -177,7 +221,7 @@ def _safe_emit_aborted(
             dialogue_id=dialogue_id,
             turn_index=turn_index,
             problem_id=problem_id,
-            context_missing=context_missing,
+            **_context_record_fields(context),
             **accounting,
         )
     except Exception as emit_exc:  # noqa: BLE001 — 관측 실패는 서빙을 안 깬다.
@@ -208,6 +252,7 @@ async def run_wh1_primary_turn(
     user_id: uuid.UUID | None = None,
     pack: PedagogyPack | None = None,
     tutor_context: TutorContextManifest | None = None,
+    delivery: TutorDeliveryReceipt | None = None,
 ) -> str | None:
     """WH-1 하네스를 한 턴 돌려 *학생-대면 발화*를 산출한다 — flip primary 경로(S1-11).
 
@@ -236,16 +281,22 @@ async def run_wh1_primary_turn(
     소크라테스 재질문(결정론 템플릿)으로 대체 + reason_code(위반 모드 토큰) 구조화 로그. 팩
     None(기본·미주입)이거나 플래그 OFF면 가드 블록 전체 미실행 — 기존 경로와 비트동일(회귀 0).
 
-    `tutor_context`(P3-08 — `harness/wh1_tutor_context.py`): 호출자(coach)가 이 턴에 이미 조회한
-    9종 context의 채움/누락 매니페스트. 누락 슬롯 *이름*을 ① 정책 프롬프트 요약의
-    `context_missing`(LLM이 그 context 없이 고른다는 사실을 안다) ② 관측 레코드의
-    `context_missing`(원장에서 누락 턴을 센다) 두 곳에 싣는다. 값은 어디에도 싣지 않는다.
-    None(구 호출자·shadow)이면 두 곳 모두 키가 없거나 None — 기존과 비트동일.
+    `tutor_context`·`delivery`(P3-08 — `harness/wh1_tutor_context.py`): 호출자(coach)가 이 턴에
+    조회한 9종 `resolved` 매니페스트를 받아, 정책을 만든 **뒤** 정책이 실제로 보유한 값에서
+    `delivered_to_tutor`를 계산(`_delivered_slots`)해 `delivery.manifest`에 돌려준다. 같은 판정의
+    슬롯 *이름*이 ① 정책 프롬프트 요약(`context_missing`·`context_not_delivered`) ② 관측 레코드
+    (`context_missing`·`context_not_delivered`·`context_coverage_gap`)에 실린다. 값은 싣지 않는다.
+    정책 생성 전에 실패하면 전달 0으로 기록된다. None(구 호출자·shadow)이면 기존과 비트동일.
     """
     started = time.monotonic()
-    context_missing: list[str] | None = (
-        tutor_context.missing_names() if tutor_context is not None else None
+    # 정책 생성 전 실패면 아무것도 전달되지 않았다 — 그 상태가 기본값이다.
+    context: TutorContextManifest | None = (
+        tutor_context.with_delivery(tutor_invoked=True, delivered=())
+        if tutor_context is not None
+        else None
     )
+    if delivery is not None:
+        delivery.manifest = context
     policy: LLMTutorPolicy | None = None
     try:
         probe_candidates = await assemble_probe_candidate_pool(
@@ -267,16 +318,31 @@ async def run_wh1_primary_turn(
             solution_steps=list(solution_steps),
             # select_probe 후보 공급(REC-02 ②) — 사적 probe 컨텍스트로만(프롬프트 미노출).
             probe_candidates=probe_candidates,
-            theta=theta if theta is not None else 0.0,
+            # P3-08: None을 그대로 넘긴다 — 콜드스타트 0.0은 정책이 채우고 '모름'을 기록한다.
+            theta=theta,
             # 웜스타트 outside_mids도 사적 probe 컨텍스트로만(select_probe→plan_probe 전용·
             # 코칭 context에 오개념 preload 0·reactive retrieval 유지·CLAUDE.md).
             outside_mids=list(warmstart_outside_mids),
             # PED-04 D1 reader ②: 직전 세션의 교수 이력(메타 한정·원문 0·복호 0). 정책이
             # 예산 가드 안에서 요약에 실어 "이미 시도한 결"을 알게 한다.
             session_recall=session_recall,
-            # P3-08: 비어 있던 context 슬롯 이름 — 요약의 `context_missing` 정직 신호(값 0).
-            context_missing=context_missing or (),
         )
+        initial_hypotheses = list(active_hypotheses)
+        if tutor_context is not None:
+            # P3-08: 실제 전달 = 방금 만든 정책이 보유한 값 + 아래 run_tutoring_turn·가드에 넘길 것.
+            context = tutor_context.with_delivery(
+                tutor_invoked=True,
+                delivered=_delivered_slots(
+                    policy,
+                    initial_hypotheses=initial_hypotheses,
+                    mode_guard_pack=pack if get_settings().mode_guard_runtime_enabled else None,
+                ),
+            )
+            if delivery is not None:
+                delivery.manifest = context
+            policy.disclose_context(
+                missing=context.missing_names(), not_delivered=context.not_delivered_names()
+            )
         timeout = (
             timeout_seconds
             if timeout_seconds is not None
@@ -287,7 +353,7 @@ async def run_wh1_primary_turn(
                 policy=policy,
                 turn_index=turn_index,
                 has_solution_steps=bool(solution_steps),
-                initial_hypotheses=list(active_hypotheses),
+                initial_hypotheses=initial_hypotheses,
                 max_tool_calls=max_tool_calls,
             ),
             timeout=timeout,
@@ -305,7 +371,7 @@ async def run_wh1_primary_turn(
             turn_index=turn_index,
             problem_id=problem_id,
             accounting=_accounting(policy, started),
-            context_missing=context_missing,
+            context=context,
         )
         return None
 
@@ -322,7 +388,7 @@ async def run_wh1_primary_turn(
                 else "fallback_no_utterance"
             ),
             accounting=_accounting(policy, started),
-            context_missing=context_missing,
+            context=context,
         )
         logger.warning(
             "WH-1 primary 발화 없음(status=%s·tool_calls=%d) — 결정론 템플릿 폴백",
@@ -353,7 +419,7 @@ async def run_wh1_primary_turn(
                     problem_id=problem_id,
                     primary_outcome="fallback_prose_gate",
                     accounting=_accounting(policy, started),
-                    context_missing=context_missing,
+                    context=context,
                     prose_reason_code=prose_reason,
                 )
                 logger.warning(
@@ -426,7 +492,7 @@ async def run_wh1_primary_turn(
         problem_id=problem_id,
         primary_outcome=_final_outcome(policy, mode_guard_replaced=mode_guard_replaced),
         accounting=_accounting(policy, started),
-        context_missing=context_missing,
+        context=context,
         tone_rewritten=report.rewritten,
         tone_violations=len(report.violations),
         prose_rephrased=prose_rephrased,
