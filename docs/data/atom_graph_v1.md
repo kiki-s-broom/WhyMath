@@ -26,6 +26,10 @@
 > 정본 xlsx(변경이력_v3 No.16~19)에 반영해 재생성 — 엣지 **2,234→2,231**, 경계 50→47(중→대 0·고→대 25).
 > 교수학 검토가 서술형 해소 규칙의 정본 반영은 FAIL로 판정해 ①은 미반영(원장 보존·후속 KG-11).
 >
+> **상태(2026-10-20·KG-11)**: 서술형 973건을 **낱말 매칭**(`word_match_v1`)으로 재해소한 비-traversal 참고 원장
+> `narrative_edge_reference_ledger_v1.json`(참고 엣지 651 · 스테이징 183 · 순환 충돌 43 분류·수리 경로) —
+> `docs/data/narrative_edge_reference_v1.md`. 승격은 AI 2인 블라인드 검수 통과분만(§5).
+>
 > **직전 상태(2026-06-22)**: 통합 코퍼스 마스터 정본화 — graph.json 재생성(미적 원자ID 하이픈 채택·
 > 대학 fill 재실행). 코퍼스(`data/corpus/atom_graph_v1/`)는 신규 파이프라인 `data_pipeline/atom_graph/`
 > 산출(§6). (직전 상태 2026-06-21: Phase 0 데이터카드 작성.)
