@@ -177,7 +177,7 @@ ARCH-11(blocked)의 소유 범위는 건드리지 않았다. `query_curriculum`�
 | Mypy | `python -m mypy --strict whymath_backend` | 0 |
 | Import contracts | `lint-imports` | 0 |
 | 관련 디렉터리 | `pytest tests/backend/harness tests/backend/api tests/backend/l4` (8859 passed · 372 skipped) | 0 |
-| 백엔드 전체 · 계층 커버리지 | 최종 HEAD 재실행 결과는 최종 보고에 기재 | — |
+| 백엔드 전체 · 계층 커버리지 | 로컬(8fd2fbce·4코어 `-n auto`): 1 failed · 21,395 passed · 커버리지 87.59% · 계층 게이트 0. 실패 1건 `l3/test_isolated_call.py::TestThreadIsNotEnough::test_thread_cannot_stop_the_computation`(CPU 시간 하한 1.5s 단언에 1.31s — 이 PR 미변경 파일, 단독 3/3 통과, CPU 경합으로 재현). 같은 커밋의 CI backend 잡은 green | 1(로컬) · 0(CI) |
 | backend 게이트 CLI 20종 | coach_prose_leak · pedagogy_pack_fidelity 포함 전건 | 전건 0 |
 | declared-unwired-audit | `python -m whymath_backend.ops.declared_unwired_audit` | 0 |
 | 백로그 | `backlog.py validate` · `audit-deps` | 0 · 0 |
