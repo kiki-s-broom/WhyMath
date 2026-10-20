@@ -63,7 +63,11 @@ from whymath_backend.harness.wh1_loop import (
     TurnState,
     VerifyStepAction,
 )
-from whymath_backend.harness.wh1_tutor_context import TutorContextSlot
+from whymath_backend.harness.wh1_tutor_context import (
+    PROMPT_KEY_SLOTS,
+    TutorContentSummary,
+    TutorContextSlot,
+)
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l3.models import RoutingRequest
@@ -104,7 +108,13 @@ _SYSTEM_PROMPT = """당신은 WhyMath의 수학 튜터링 '두뇌'입니다. 당
 - **내부 도구는 침묵**: read/verify/match/curate/query/select/log는 학생에게 보이지 않는 내부
   동작입니다. 학생 발화는 오직 end_turn에서만 나옵니다.
 - **context 표기**: 상태의 context_missing은 이번 턴에 얻지 못한 정보, context_not_delivered는
-  서버에는 있으나 당신에게 주어지지 않은 정보입니다. 그 정보를 아는 것처럼 추측하지 마세요.
+  서버에는 있으나 당신에게 주어지지 않은 정보, context_held_privately는 하네스가 사적으로 보유해
+  도구 실행(verify_step·match_misconception·select_probe 등)에만 쓰는 정보입니다 — 사적 보유분은
+  존재만 알려 줄 뿐 그 내용은 당신에게 보이지 않습니다. 보이지 않는 정보를 아는 것처럼 추측하지
+  마세요.
+- **문항 요약**: concept·skills·problem·pedagogy_policy는 이번 문항의 비식별 요약입니다(개념 이름·
+  스킬 이름·문항 구조·교수법 유형). 정답·풀이·지문은 들어 있지 않습니다 — 요약으로 정답을 추측해
+  말하지 마세요. pedagogy_policy.forbidden_modes는 이 유형에서 쓰지 말아야 할 교수 방식입니다.
 
 ## 출력 형식 (엄수)
 JSON 객체 하나만 출력하세요. 다른 텍스트·설명·코드펜스 없이:
@@ -161,6 +171,7 @@ class LLMTutorPolicy:
         difficulty: str = "medium",
         max_history: int = 6,
         session_recall: SessionRecall | None = None,
+        content: TutorContentSummary | None = None,
     ) -> None:
         """정책 구성.
 
@@ -177,7 +188,11 @@ class LLMTutorPolicy:
                 전부 enum/정수라 학생 원문을 실을 자리가 타입상 없다. None(기본)이면 요약에
                 키 자체가 없어 프롬프트가 기존과 바이트 동일.
             theta: IRT 능력 추정. **None이면 콜드스타트 0.0으로 쓰되 '모름'을 기록한다**
-                (`delivered_context_slots`가 학생 상태를 전달됨으로 세지 않는다 — P3-08).
+                (`private_context_slots`가 학생 상태를 전달됨으로 세지 않는다 — P3-08). θ는
+                select_probe 정보량 계산 전용 사적 값이며 **프롬프트에 절대 싣지 않는다**(P3-72 ⑥).
+            content: 개념·스킬·문제 구조·교수법 팩 요약(P3-72·Kiki 결정 (가)). 프롬프트 요약에
+                고정 필드로 실린다(예산 루프가 자르지 않음 — 크기 상한이 타입에 박혀 있다).
+                None(기본)이면 키 자체가 없어 프롬프트가 기존과 바이트 동일.
         """
         # 좌석 조립(OPS-36) — 여기서부터 LLM 호출은 `l3.pipeline` 경유다(라우터·캐시·관측).
         # `seam`이 주어지면 그것을 쓴다(대체 가능성을 타입으로 — 테스트·미래 파이프라인 교체).
@@ -197,9 +212,15 @@ class LLMTutorPolicy:
         self._difficulty = difficulty
         self._max_history = max_history
         self._session_recall = session_recall
+        # P3-72: 프롬프트에 싣는 슬롯 내용 요약(비식별) — θ·숙달·학년을 담을 필드가 없는 타입.
+        self._content = content
         # P3-08 정직 신호 — 러너가 정책 생성 *뒤* `disclose_context`로 채운다(기본 = 키 없음).
         self._context_missing: tuple[str, ...] = ()
         self._context_not_delivered: tuple[str, ...] = ()
+        self._context_held_privately: tuple[str, ...] = ()
+        # P3-72 ⑦: 이 정책이 좌석(LLM)에 실제로 넘긴 프롬프트들에 렌더된 슬롯의 합집합 — prompt
+        # 경로의 유일한 원천(핸들러·러너는 이 값을 추정하지 않고 읽기만 한다).
+        self._prompt_slots_sent: set[TutorContextSlot] = set()
         # OPS-134 ② — 이 턴이 LLM을 몇 번 불렀고 얼마나 걸렸는지의 인프로세스 회계. 턴이
         # 타임아웃으로 끊겨도 정책 객체는 호출자(`wh1_primary`)가 쥐고 있어 읽을 수 있다
         # (Langfuse 단독 회계 금지).
@@ -234,14 +255,14 @@ class LLMTutorPolicy:
         """
         return self._last_action_degraded
 
-    # ── P3-08 튜터 context 전달 회계 ─────────────────────────────────────
-    def delivered_context_slots(self) -> frozenset[TutorContextSlot]:
-        """이 정책이 **실제로 보유한** 튜터 context 슬롯 — 매니페스트 `delivered_to_tutor`의 원천.
+    # ── P3-08/P3-72 튜터 context 전달 회계 ───────────────────────────────
+    def private_context_slots(self) -> frozenset[TutorContextSlot]:
+        """이 정책이 **사적으로 보유한**(프롬프트 미포함) 슬롯 — `private_tool` 경로의 정책 몫.
 
         핸들러의 추정이 아니라 정책 객체의 보유값에서 계산한다: 학생 답안(사적 `student_text`가
         공백이 아님)·풀이 기록(공백 아닌 단계가 있음)·학생 상태(θ를 0.0 콜드스타트로 채우지 않고
         실제로 받음). 활성 가설·교수법 팩은 정책이 아니라 러너(초기 가설·금지모드 가드)가 받으므로
-        러너가 합친다. 개념·스킬·숙달·문제 내용은 정책 입력이 아니다 — 여기에 나오지 않는다.
+        러너가 합친다. 숙달은 정책 입력이 아니다 — 여기에 나오지 않는다.
         """
         slots: set[TutorContextSlot] = set()
         if self._student_text.strip():
@@ -252,15 +273,35 @@ class LLMTutorPolicy:
             slots.add(TutorContextSlot.LEARNER_STATE)
         return frozenset(slots)
 
-    def disclose_context(self, *, missing: Sequence[str], not_delivered: Sequence[str]) -> None:
-        """튜터 프롬프트 요약에 실을 누락·미전달 슬롯 이름(값 0)을 정한다 — 러너가 생성 뒤 호출."""
+    def planned_prompt_slots(self) -> frozenset[TutorContextSlot]:
+        """프롬프트에 *실릴* 내용 요약 슬롯(턴 전 공개용) — 렌더러와 같은 `prompt_fields`에서."""
+        if self._content is None:
+            return frozenset()
+        return frozenset(PROMPT_KEY_SLOTS[key] for key in self._content.prompt_fields())
+
+    @property
+    def prompt_slots_sent(self) -> frozenset[TutorContextSlot]:
+        """이 정책이 좌석에 **실제로 넘긴** 프롬프트에 렌더된 슬롯(합집합) — prompt 경로의 원천."""
+        return frozenset(self._prompt_slots_sent)
+
+    def disclose_context(
+        self,
+        *,
+        missing: Sequence[str],
+        not_delivered: Sequence[str],
+        held_privately: Sequence[str] = (),
+    ) -> None:
+        """튜터 프롬프트 요약에 실을 누락·미전달·사적 보유 슬롯 이름(값 0) — 러너가 생성 뒤 호출."""
         self._context_missing = tuple(missing)
         self._context_not_delivered = tuple(not_delivered)
+        self._context_held_privately = tuple(held_privately)
 
     # ── TutorPolicy Protocol ──────────────────────────────────────────
     async def next_action(self, state: TurnState) -> Action:
         """다음 도구를 고른다 — 상태 요약 → L3 provider → 파싱 → 불변식 이중 방어."""
-        prompt = self._build_prompt(state)
+        prompt, rendered = self._build_prompt_with_slots(state)
+        # P3-72 ⑦: 좌석에 넘기기 직전에 회계한다 — 여기서부터 이 프롬프트는 '실린' 것이다.
+        self._prompt_slots_sent.update(rendered)
         # 이번 호출의 강등 여부만 남긴다(`_safe_fallback`이 세운다).
         self._last_action_degraded = False
         self._llm_calls_started += 1
@@ -289,6 +330,10 @@ class LLMTutorPolicy:
 
     # ── 상태 요약(비민감·Minimal Reasoning Subgraph 예산 적용) ──────────
     def _build_prompt(self, state: TurnState) -> str:
+        """프롬프트 문자열만(하위호환 좌석) — 본체는 `_build_prompt_with_slots`."""
+        return self._build_prompt_with_slots(state)[0]
+
+    def _build_prompt_with_slots(self, state: TurnState) -> tuple[str, frozenset[TutorContextSlot]]:
         """`TurnState`를 비민감 JSON 요약으로 압축 — 학생 원문·정답 원문 미포함(요구사항 ⑥).
 
         오개념은 id + 한국어 라벨(name_kr)만(원문 아님). history는 kind/ok만(detail 미포함 —
@@ -311,9 +356,19 @@ class LLMTutorPolicy:
         set·timeout 같은 traversal guard는 *지금* 필요 없고, 없는 traversal에 가짜 guard를 만들지
         않는다. 향후 `query_curriculum`이 L1(개념 그래프)+L2 조인을 이 프롬프트로 실제 순회·주입하게
         배선될 때 visited set·timeout·token budget guard를 그 지점에 동반한다.
+
+        **P3-72 내용 요약**(`content`): 개념 1·스킬 이름 ≤ 5가 노드 예산을 먼저 차지하고(① 노드
+        상한은 *총합* 20), 가설·match는 남은 자리를 confidence 순으로 나눈다. 요약 자체는 크기
+        상한이 타입에 박힌 고정 필드라 ③ 토큰 루프가 자르지 않는다(누락 표기 키와 같은 지위).
+        반환하는 슬롯 집합은 **실제로 렌더된 요약 dict의 키**에서 계산한다(prompt 경로의 원천).
+        θ·숙달·학년은 이 요약 어디에도 들어갈 자리가 없다(⑥ 동결 — 테스트가 문자열로 단언).
         """
-        # ① 컨텍스트 노드 예산(가설+last_match 총합 상한, confidence 우선).
-        hyp_summaries, match_ids, omitted = self._budget_context_nodes(state)
+        content_fields = self._content.prompt_fields() if self._content is not None else {}
+        content_nodes = self._content.node_count() if self._content is not None else 0
+        # ① 컨텍스트 노드 예산(내용 요약 노드 선점 + 가설+last_match 총합 상한, confidence 우선).
+        hyp_summaries, match_ids, omitted = self._budget_context_nodes(
+            state, limit=max(0, _MAX_CONTEXT_NODES - content_nodes)
+        )
         # ② history 예산 — 인스턴스 조절값을 Part 8 천장 안으로 클램프.
         history_limit = min(self._max_history, _MAX_HISTORY)
         recent = [{"kind": r.kind, "ok": r.ok} for r in state.history[-history_limit:]]
@@ -323,7 +378,8 @@ class LLMTutorPolicy:
         #    결정론 절단. 회상이 1순위인 이유: 세션 *간* 맥락은 이번 턴 결정에 가장 덜 급하다.
         recall = self._session_recall
         missing, undelivered = self._context_missing, self._context_not_delivered
-        prompt = self._render_summary(
+        held = self._context_held_privately
+        summary = self._compose_summary(
             state,
             hyp_summaries,
             match_ids,
@@ -332,7 +388,10 @@ class LLMTutorPolicy:
             recall,
             context_missing=missing,
             context_not_delivered=undelivered,
+            context_held_privately=held,
+            content_fields=content_fields,
         )
+        prompt = self._dump_summary(summary)
         while self._approx_tokens(prompt) > _MAX_PROMPT_TOKENS:
             if recall is not None:
                 recall = None
@@ -353,7 +412,7 @@ class LLMTutorPolicy:
                 omitted += 1
             else:
                 break  # 고정 필드만 남아 더 줄일 수 없음(안전 탈출).
-            prompt = self._render_summary(
+            summary = self._compose_summary(
                 state,
                 hyp_summaries,
                 match_ids,
@@ -362,13 +421,24 @@ class LLMTutorPolicy:
                 recall,
                 context_missing=missing,
                 context_not_delivered=undelivered,
+                context_held_privately=held,
+                content_fields=content_fields,
             )
-        return prompt
+            prompt = self._dump_summary(summary)
+        return prompt, self._slots_rendered(summary)
+
+    @staticmethod
+    def _slots_rendered(summary: dict[str, object]) -> frozenset[TutorContextSlot]:
+        """렌더된 요약 dict → 프롬프트에 실린 슬롯(키가 있는 내용 요약 + 가설이 1건 이상)."""
+        slots = {PROMPT_KEY_SLOTS[key] for key in summary if key in PROMPT_KEY_SLOTS}
+        if summary.get("active_hypotheses"):
+            slots.add(TutorContextSlot.MISCONCEPTION)
+        return frozenset(slots)
 
     def _budget_context_nodes(
-        self, state: TurnState
+        self, state: TurnState, *, limit: int = _MAX_CONTEXT_NODES
     ) -> tuple[list[dict[str, object]], list[str], int]:
-        """가설+last_match를 컨텍스트 노드로 보고 총합을 `_MAX_CONTEXT_NODES`로 제한.
+        """가설+last_match를 컨텍스트 노드로 보고 총합을 `limit`(기본 `_MAX_CONTEXT_NODES`)로 제한.
 
         초과 시 confidence 내림차순 상위만 유지(가장 관련 높은 것 우선). 결정론 tiebreak은
         (kind_rank, 원본 인덱스) — random·시각 미사용. 생존자는 원본 순서로 렌더한다.
@@ -382,15 +452,15 @@ class LLMTutorPolicy:
             scored.append((m.confidence, 1, j))
 
         total = len(scored)
-        if total <= _MAX_CONTEXT_NODES:
+        if total <= limit:
             keep_hyp = set(range(len(state.hypotheses)))
             keep_match = set(range(len(state.last_matches)))
             omitted = 0
         else:
-            ranked = sorted(scored, key=lambda t: (-t[0], t[1], t[2]))[:_MAX_CONTEXT_NODES]
+            ranked = sorted(scored, key=lambda t: (-t[0], t[1], t[2]))[:limit]
             keep_hyp = {t[2] for t in ranked if t[1] == 0}
             keep_match = {t[2] for t in ranked if t[1] == 1}
-            omitted = total - _MAX_CONTEXT_NODES
+            omitted = total - limit
 
         hyp_summaries = [
             self._hypothesis_summary(h) for i, h in enumerate(state.hypotheses) if i in keep_hyp
@@ -414,7 +484,7 @@ class LLMTutorPolicy:
         }
 
     @staticmethod
-    def _render_summary(
+    def _compose_summary(
         state: TurnState,
         hyp_summaries: list[dict[str, object]],
         match_ids: list[str],
@@ -424,8 +494,10 @@ class LLMTutorPolicy:
         *,
         context_missing: Sequence[str] = (),
         context_not_delivered: Sequence[str] = (),
-    ) -> str:
-        """예산 적용된 조각들로 최종 프롬프트 문자열을 조립(순수·결정론).
+        context_held_privately: Sequence[str] = (),
+        content_fields: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """예산 적용된 조각들로 최종 프롬프트 요약 dict를 조립(순수·결정론).
 
         `recall`(PED-04)은 **3축만** 싣는다 — 단계·전략·경과. `unresolved_hypothesis_ids`는
         의도적으로 제외한다: 활성 가설은 이미 `active_hypotheses`로 렌더 중이라 중복이고,
@@ -435,6 +507,7 @@ class LLMTutorPolicy:
         `context_missing`·`context_not_delivered`(P3-08)는 **절단 대상이 아니다** — 토큰 예산
         루프가 줄이는 것은 회상·history·가설·match뿐이고 이 키들은 고정 필드처럼 남는다(누락
         표기를 예산 때문에 지우면 그 자체가 무증상 누락이다). 슬롯 이름 ≤ 9개라 압력은 상수다.
+        `context_held_privately`(P3-72)·`content_fields`(내용 요약)도 같은 지위의 고정 필드다.
         """
         summary: dict[str, object] = {
             "turn_index": state.turn_index,
@@ -461,10 +534,21 @@ class LLMTutorPolicy:
         if context_not_delivered:
             # P3-08 정직 신호 — 서버는 얻었으나 이 요약·정책에 실리지 않은 슬롯(이름만).
             summary["context_not_delivered"] = list(context_not_delivered)
+        if context_held_privately:
+            # P3-72 정직 신호 — 하네스가 사적으로 보유해 내용이 이 요약에 없는 슬롯(이름만).
+            summary["context_held_privately"] = list(context_held_privately)
+        if content_fields:
+            # P3-72 내용 요약 — 개념·스킬·문제 구조·팩(비식별·정답 0·θ/숙달/학년 0).
+            summary.update(content_fields)
         if omitted > 0:
             # fail-closed 정직 신호 — 예산으로 컨텍스트를 절단했음을 LLM에 명시(조용한 무동작 금지).
             summary["context_truncated"] = True
             summary["omitted_count"] = omitted
+        return summary
+
+    @staticmethod
+    def _dump_summary(summary: dict[str, object]) -> str:
+        """요약 dict → 프롬프트 문자열(순수·결정론)."""
         state_json = json.dumps(summary, ensure_ascii=False, indent=2)
         return (
             "현재 튜터링 상태(요약·학생 원문/정답 미포함):\n"
