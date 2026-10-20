@@ -53,7 +53,7 @@ from whymath_backend.harness.wh1_tutor_context import (
     build_tutor_content_summary,
     build_tutor_context_manifest,
 )
-from whymath_backend.l3.models import GenerationResult, RoutingDecision
+from whymath_backend.l3.models import CostTier, GenerationResult, RoutingDecision
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.pack_registry import get_pack
 from whymath_backend.l4.session_recall import SessionRecall
@@ -81,6 +81,63 @@ _FORBIDDEN_KEYS = {
     "learner",
 }
 _MASTERY_LABELS = ("초보", "발전 중", "숙달")
+_GRADE = 11
+
+# ⑥ 동결의 1차 축(PR #1709 검토 중1) — 렌더된 프롬프트 요약 dict의 **키 트리 전체** 허용 목록.
+# 금지 키 열거가 아니라 허용 목록이다: 키 하나(최상위·하위 어디든) 추가도 RED가 된다. 목록을 늘리는
+# 변경은 결정 (가)·⑥에 비춘 사람 판단을 거쳐 여기와 보고서를 함께 고쳐야 한다(의도된 마찰).
+# 표기: `a.b` = dict 하위 키, `a[]` = 리스트 원소, `a[].b` = 리스트 원소 dict의 키.
+ALLOWED_PROMPT_KEY_PATHS: frozenset[str] = frozenset(
+    {
+        "turn_index",
+        "has_solution_steps",
+        "verify_called",
+        "last_verdict",
+        "tool_calls",
+        "active_hypotheses",
+        "active_hypotheses[]",
+        "active_hypotheses[].id",
+        "active_hypotheses[].name",
+        "active_hypotheses[].confidence",
+        "last_match_ids",
+        "last_match_ids[]",
+        "recent_tools",
+        "recent_tools[]",
+        "recent_tools[].kind",
+        "recent_tools[].ok",
+        "verify_obligation_pending",
+        "session_recall",
+        "session_recall.last_polya_stage",
+        "session_recall.last_strategies",
+        "session_recall.last_strategies[]",
+        "session_recall.turns_since",
+        "context_missing",
+        "context_missing[]",
+        "context_not_delivered",
+        "context_not_delivered[]",
+        "context_held_privately",
+        "context_held_privately[]",
+        "concept",
+        "concept.code",
+        "concept.name",
+        "skills",
+        "skills.count",
+        "skills.names",
+        "skills.names[]",
+        "problem",
+        "problem.question_format",
+        "problem.bloom_level",
+        "problem.has_visual",
+        "problem.condition_count",
+        "pedagogy_policy",
+        "pedagogy_policy.k_type",
+        "pedagogy_policy.is_stub",
+        "pedagogy_policy.forbidden_modes",
+        "pedagogy_policy.forbidden_modes[]",
+        "context_truncated",
+        "omitted_count",
+    }
+)
 
 
 @pytest.fixture(autouse=True)
@@ -177,9 +234,53 @@ def _numeric_forms(value: float) -> list[str]:
     return [str(value), f"{value:.2f}", f"{value:.3f}", str(round(value * 100))]
 
 
+def key_paths(node: Any, prefix: str = "") -> set[str]:
+    """요약 dict → 키 트리 경로 집합(`a.b`·`a[]`·`a[].b`) — 값은 보지 않는다."""
+    out: set[str] = set()
+    if isinstance(node, dict):
+        for k, v in node.items():
+            path = f"{prefix}.{k}" if prefix else str(k)
+            out.add(path)
+            out |= key_paths(v, path)
+    elif isinstance(node, list):
+        for v in node:
+            out.add(f"{prefix}[]")
+            out |= key_paths(v, f"{prefix}[]")
+    return out
+
+
+def numeric_leaves(node: Any) -> list[float]:
+    """요약 트리의 수치 잎(bool 제외) 전부."""
+    if isinstance(node, dict):
+        return [x for v in node.values() for x in numeric_leaves(v)]
+    if isinstance(node, list):
+        return [x for v in node for x in numeric_leaves(v)]
+    if isinstance(node, (int, float)) and not isinstance(node, bool):
+        return [float(node)]
+    return []
+
+
+def assert_prompt_summary_frozen(
+    summary: dict[str, Any], *, theta: float, mastery: float, grade: int
+) -> None:
+    """⑥ 동결 — 키 트리는 허용 목록 안, 수치 잎은 θ·숙달 근방(±0.05)·학년 값이 아니다.
+
+    값 감시가 표기 변형(소수 1자리·다른 키 이름·하위 키)에 뚫리지 않게, 문자열 형태가 아니라
+    **파싱된 수치**로 본다. 키 감시는 허용 목록 비교라 새 키 이름 자체가 RED다.
+    """
+    extra = key_paths(summary) - ALLOWED_PROMPT_KEY_PATHS
+    assert not extra, f"허용 목록 밖 프롬프트 키: {sorted(extra)}"
+    for leaf in numeric_leaves(summary):
+        assert abs(leaf - theta) > 0.05, f"θ 근방 수치가 프롬프트에 있다: {leaf}"
+        assert abs(leaf - mastery) > 0.05, f"숙달 근방 수치가 프롬프트에 있다: {leaf}"
+        assert leaf != grade, f"학년 값이 프롬프트에 있다: {leaf}"
+
+
 def _assert_no_student_learning_data(prompt: str, system: str) -> None:
-    """⑥ 동결 판정 — 프롬프트 요약의 키와 두 문자열 전체에 θ·숙달 값·파생 라벨·학년이 없다."""
-    keys = _all_keys(_summary(prompt))
+    """⑥ 동결 판정 — 키 트리 허용 목록·수치 잎 감시 + 두 문자열 전체에 θ·숙달·라벨·학년 부재."""
+    summary = _summary(prompt)
+    assert_prompt_summary_frozen(summary, theta=_THETA, mastery=_MASTERY, grade=_GRADE)
+    keys = _all_keys(summary)
     assert not keys & _FORBIDDEN_KEYS, keys & _FORBIDDEN_KEYS
     for text in (prompt, system):
         for sentinel in (*_numeric_forms(_THETA), *_numeric_forms(_MASTERY)):
@@ -259,6 +360,22 @@ class TestContentSummary:
         }[model]
         with pytest.raises(ValidationError):
             model(**{**base, field: 1})
+
+    @pytest.mark.parametrize(
+        ("model", "fields"),
+        [
+            (TutorContentSummary, {"concept", "skills", "problem", "pedagogy_policy"}),
+            (ConceptBrief, {"code", "name"}),
+            (SkillBrief, {"count", "names"}),
+            (ProblemBrief, {"question_format", "bloom_level", "has_visual", "condition_count"}),
+            (PackBrief, {"k_type", "is_stub", "forbidden_modes"}),
+        ],
+        ids=["summary", "concept", "skill", "problem", "pack"],
+    )
+    def test_brief_field_sets_are_frozen_exactly(self, model: Any, fields: set[str]) -> None:
+        # `extra="forbid"`는 *입력*의 여분 키만 막는다 — 필드를 새로 선언하면 통과한다(검토 중1 X4).
+        # 그래서 필드 집합 자체를 정확 집합으로 동결한다: 필드 신설·삭제 모두 RED.
+        assert set(model.model_fields) == fields
 
     def test_prompt_key_table_covers_exactly_the_content_slots(self) -> None:
         assert set(PROMPT_KEY_SLOTS.values()) == {S.CONCEPT, S.SKILL, S.PROBLEM, S.PEDAGOGY_POLICY}
@@ -468,6 +585,59 @@ class TestBudget:
             assert key in summary  # 요약은 예산 루프가 자르지 않는다
         assert summary["context_held_privately"] == names
 
+    def test_rendered_key_tree_is_exactly_the_allowlist(self) -> None:
+        # 모든 선택 키가 실리는 최대 픽스처 — 렌더된 키 트리가 허용 목록과 **정확히** 같다.
+        # (부분집합 검사만 있으면 렌더러가 허용 키를 조용히 빠뜨려도 모른다 — 양방향 동결.)
+        hyps = [
+            MisconceptionHypothesis(
+                misconception_id=f"mc-{i}", confidence=0.9, turns_since_evidence=0, evidence_count=1
+            )
+            for i in range(_MAX_CONTEXT_NODES)
+        ]
+        state = _state(
+            hypotheses=hyps, history=[ToolResult(kind="verify_step", ok=True, detail="x")]
+        )
+        provider = _CapturingProvider()
+        policy = LLMTutorPolicy(
+            provider,
+            content=_content(),
+            session_recall=SessionRecall(
+                last_polya_stage=None, last_socratic_strategies=(), turns_since=3
+            ),
+        )
+        policy.disclose_context(
+            missing=["mastery"], not_delivered=["mastery"], held_privately=["x"]
+        )
+        asyncio.run(policy.next_action(state))
+        summary = _summary(provider.prompts[0])
+        # 빈 리스트 두 곳은 원소 경로를 밟도록 보강한다(키 자체는 렌더러가 이미 냈다).
+        assert (
+            summary["last_match_ids"] == [] and summary["session_recall"]["last_strategies"] == []
+        )
+        summary["last_match_ids"] = ["m"]
+        summary["session_recall"]["last_strategies"] = ["s"]
+        assert key_paths(summary) == ALLOWED_PROMPT_KEY_PATHS
+
+    def test_all_hypotheses_cut_by_token_budget_are_not_counted_as_prompt(self) -> None:
+        # 검토 하1 X5 — prompt 경로는 *절단 뒤* 최종 요약에서 계산한다. 가설이 토큰 예산으로 전부
+        # 잘린 프롬프트에서 misconception을 prompt로 세면 거짓 표기다.
+        huge = [
+            MisconceptionHypothesis(
+                misconception_id=f"mc-{'x' * 13000}-{i}",
+                confidence=0.5,
+                turns_since_evidence=0,
+                evidence_count=1,
+            )
+            for i in range(2)
+        ]
+        provider = _CapturingProvider()
+        policy = LLMTutorPolicy(provider, content=_content())
+        asyncio.run(policy.next_action(_state(hypotheses=huge)))
+        summary = _summary(provider.prompts[0])
+        assert summary["active_hypotheses"] == []  # 픽스처가 그 절(전부 절단)을 실제로 밟았다
+        assert S.MISCONCEPTION not in policy.prompt_slots_sent
+        assert S.CONCEPT in policy.prompt_slots_sent
+
     def test_content_nodes_take_budget_from_hypotheses(self) -> None:
         hyps = [
             MisconceptionHypothesis(
@@ -641,3 +811,65 @@ class TestRunnerPaths:
         assert _paths(receipt)["misconception"] == []
         assert not any("판정 불일치" in r.getMessage() for r in caplog.records)
         assert not any("계획≠실측" in r.getMessage() for r in caplog.records)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 검토 처리 — 프로즈 거부 분기 확정(하1 X6) · 튜터 정책 라우팅 LOCAL 동결(추가)
+# ──────────────────────────────────────────────────────────────────────────
+class TestReviewFollowups:
+    def test_prose_rejected_turn_still_settles_paths(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # 프로즈 게이트가 정책 발화를 거부한 턴도 경로를 실측으로 확정해야 한다 — 확정이 빠지면
+        # 영수증이 '전달 0' 기본값으로 남아 실제로 프롬프트에 실린 요약이 표기에서 사라진다.
+        monkeypatch.setenv("WHYMATH_WH1_PROSE_REPHRASE_ENABLED", "true")
+        get_settings.cache_clear()
+        calls: list[str] = []
+
+        def _reject(text: str, *, student_material: Sequence[str] = ()) -> str:
+            calls.append(text)
+            return "TEST_REJECT"
+
+        monkeypatch.setattr(wh1_primary, "gate_policy_prose", _reject)
+        receipt = TutorDeliveryReceipt()
+        out = _run(
+            receipt,
+            solution_steps=[],
+            tutor_context=_manifest(solution_steps=[]),
+            provider=_CapturingProvider(
+                default='{"kind": "end_turn", "action_type": "질문", "utterance": "어디서 막혔나요?"}'
+            ),
+        )
+        assert out is None and calls, "프로즈 거부 분기를 실제로 밟지 않았다"
+        paths = _paths(receipt)
+        assert paths["concept"] == ["prompt"]
+        assert paths["misconception"] == ["prompt", "private_tool"]
+
+    @pytest.mark.parametrize("subscription", ["free", "basic", "premium", "gifted"])
+    @pytest.mark.parametrize("difficulty", ["easy", "medium", "hard", "killer"])
+    def test_tutor_policy_routes_local_so_prompt_never_reaches_cloud(
+        self, subscription: str, difficulty: str
+    ) -> None:
+        # 동결(검토 추가): 튜터 정책 호출은 `budget_krw`를 넘기지 않아 라우터 규칙상 전부 LOCAL이다 —
+        # 그래서 지금은 내용 요약·오개념 confidence가 클라우드 좌석(openrouter)으로 나가지 않는다.
+        # 예산이 배선되거나 라우팅이 바뀌어 CLOUD가 되는 순간 이 테스트가 RED가 된다 → 결정 (가)·
+        # confidence 판단(보고서 §9-1)을 사람이 다시 봐야 한다는 신호다. 이 테스트를 지우지 말 것.
+        decisions: list[RoutingDecision] = []
+
+        class _Recording(_CapturingProvider):
+            async def generate(
+                self,
+                prompt: str,
+                system: str,
+                decision: RoutingDecision,
+                *,
+                images: Sequence[str] | None = None,
+            ) -> GenerationResult:
+                decisions.append(decision)
+                return await super().generate(prompt, system, decision, images=images)
+
+        policy = LLMTutorPolicy(
+            _Recording(), content=_content(), subscription=subscription, difficulty=difficulty
+        )
+        assert policy._routing_request().budget_krw <= 0
+        asyncio.run(policy.next_action(_state()))
+        assert decisions, "좌석이 provider에 결정을 넘기지 않았다"
+        assert all(d.cost_tier == CostTier.LOCAL for d in decisions), decisions

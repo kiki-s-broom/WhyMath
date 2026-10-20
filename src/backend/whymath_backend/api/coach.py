@@ -569,10 +569,15 @@ _TUTOR_CONTEXT_DESC = (
     "튜터 context 9종의 **조회·전달 표기**(P3-08) — 학생 상태·현재 개념·현재 스킬·문제·"
     "학생 답안·풀이 기록·추정 오개념·숙달·교수법 정책. 슬롯마다 `resolved`(서버 조회·요청으로 "
     "값을 얻었는가)와 `delivered_to_tutor`(그 값이 튜터 LLM 정책 입력에 실제로 실렸는가)를 따로 "
-    "적는다. **현재 튜터에 실리는 것은 학생 답안·풀이 기록·활성 오개념 가설·학생 θ(와 금지모드 "
-    "가드 ON일 때 교수법 팩)뿐이며**, 개념·스킬·숙달·문제 내용은 얻더라도 `not_delivered`에 "
-    "남는다. `tutor_invoked=false`면 이 턴은 튜터를 부르지 않았다(완료 상태머신 가로채기·primary "
-    "OFF) — 전달은 전부 false다. 값은 담지 않는다(숙달·θ 수치·답안 길이·예외 타입명 비노출) — "
+    "적고, P3-72부터 슬롯별 전달 경로 `delivery_paths`를 함께 싣는다 — `prompt`(LLM 프롬프트 "
+    "문자열에 실림: 개념 code·이름·스킬 수·이름·문제 구조·교수법 팩 요약·활성 가설)·`private_tool`"
+    "(정책·하네스가 사적 보유, 프롬프트 미포함: 학생 θ·답안·풀이 기록·가설 세트)·`output_guard`"
+    "(금지모드 가드가 실제로 판정한 턴의 교수법 팩). 빈 목록이 미전달이며 `delivered_to_tutor`는 "
+    "그 목록이 비지 않았는가와 같다. **숙달은 어떤 경로로도 실리지 않아 `not_delivered`에 남고**"
+    "(Kiki 결정 (가)), 학생 상태(θ)는 프롬프트 경로를 갖지 않는다. 학년은 튜터에 전달하지 않는다. "
+    "`tutor_invoked=false`면 이 턴은 튜터를 부르지 않았다(완료 상태머신 가로채기·primary "
+    "OFF) — 전달은 전부 false다. 이 응답은 값을 담지 않는다(숙달·θ 수치·답안 길이·예외 "
+    "타입명 비노출) — "
     "크기와 원인 코드(`not_supplied`·`no_problem_context`·`none_detected`·`no_history`·"
     "`coverage_gap`·`source_disabled`·`lookup_failed`)뿐이다. 누락이 있어도 코칭은 진행되며"
     "(거부하지 않는다) 클라는 관측용으로만 쓴다."
@@ -2374,6 +2379,7 @@ async def _skill_labels_for(
 
 
 _EMPTY_CONTENT = TutorContentSummary()
+"""문항 없는 대화의 내용 요약 — 섹션 0(프롬프트에 내용 키 없음)."""
 
 
 async def _tutor_content_for(
@@ -2434,34 +2440,23 @@ async def _tutor_context_for(
     active_hypotheses: Sequence[MisconceptionHypothesis],
     server_mastery: float | None,
     pack: PedagogyPack | None,
-    with_content: bool = False,
-) -> tuple[TutorContextManifest, TutorContentSummary]:
-    """튜터 context 9종 `resolved` 매니페스트 + 프롬프트 내용 요약을 조립한다(P3-08·P3-72 집행 ①).
+) -> tuple[TutorContextManifest, _ConceptSkillReading]:
+    """튜터 context 9종 `resolved` 매니페스트를 조립한다(P3-08 집행 ①) — 개념·스킬 조회 결과 동반.
 
     세션 생성·턴 추가 두 핸들러가 튜터 호출 직전에 부른다. 값은 핸들러가 이미 조회한 것을
     받기만 하고(재조회 0), 새 조회는 개념·스킬 2건뿐이다. `delivered_to_tutor`는 여기서 정하지
     않는다 — 튜터 러너가 턴 뒤 실측 경로로 정한다(`_finalize_tutor_context`).
 
-    `with_content`(튜터를 부를 턴만 True)면 내용 요약(`_tutor_content_for`)을 함께 만든다 —
-    `grade`·`server_theta`·`server_mastery`는 매니페스트 판정에만 쓰이고 요약에는 들어가지 않는다
-    (Kiki 결정 (가)·학년 미전달 판정 — 보고서 §4).
+    함께 돌려주는 개념·스킬 조회 결과는 튜터 호출이 *확정된 뒤* 핸들러가 내용 요약
+    (`_tutor_content_for` — P3-72)을 만들 때 재사용한다(재조회 0 — 완료 상태머신이 가로챈 턴·
+    primary OFF 턴에는 요약 조회가 돌지 않는다). `grade`·`server_theta`·`server_mastery`는
+    매니페스트 판정에만 쓰이고 요약에는 들어가지 않는다(Kiki 결정 (가)·학년 미전달 — 보고서 §4).
 
     학생 답안은 튜터가 받는 것과 같은 식(`student_solution or student_input`)으로 읽는다 —
     매니페스트가 튜터 입력과 다른 것을 재면 그 자체가 위장이다.
     """
     settings = get_settings()
     concept_skill = await _tutor_concept_skills_for(session, problem_id)
-    content = (
-        await _tutor_content_for(
-            session,
-            problem_id=problem_id,
-            concept_id=concept_skill.concept_id,
-            skill_ids=concept_skill.skill_ids,
-            pack=pack,
-        )
-        if with_content
-        else _EMPTY_CONTENT
-    )
     manifest = build_tutor_context_manifest(
         problem_present=problem_id is not None,
         concept_present=concept_skill.concept_id is not None,
@@ -2480,7 +2475,7 @@ async def _tutor_context_for(
         pack=pack,
         pack_enabled=settings.pedagogy_pack_prompt_enabled,
     )
-    return manifest, content
+    return manifest, concept_skill
 
 
 def _finalize_tutor_context(
@@ -3599,7 +3594,7 @@ async def create_session(
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, body.problem_id)
     # P3-08: 튜터 context 9종 판정 — 튜터 호출(아래 primary)·응답 `tutor_context` 공용 단일 원천.
-    tutor_context, tutor_content = await _tutor_context_for(
+    tutor_context, tutor_reading = await _tutor_context_for(
         session,
         body=body,
         problem_id=body.problem_id,
@@ -3608,8 +3603,6 @@ async def create_session(
         active_hypotheses=active_hypotheses,
         server_mastery=server_mastery,
         pack=pack,
-        # P3-72: 튜터를 부를 수 있는 턴(primary ON)만 내용 요약을 조회한다(그 밖엔 조회 0).
-        with_content=wh1_primary_on,
     )
     # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
     chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
@@ -3662,6 +3655,14 @@ async def create_session(
     tutor_invoked = wh1_primary_on and not completion.handled
     tutor_receipt = TutorDeliveryReceipt()
     if tutor_invoked:
+        # P3-72: 내용 요약은 튜터 호출이 확정된 턴에만 조회한다(가로챈 턴·primary OFF는 조회 0).
+        tutor_content = await _tutor_content_for(
+            session,
+            problem_id=body.problem_id,
+            concept_id=tutor_reading.concept_id,
+            skill_ids=tutor_reading.skill_ids,
+            pack=pack,
+        )
         decision = await _wh1_primary_decision_or(
             decision,
             body=body,
@@ -4051,7 +4052,7 @@ async def append_turns(
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, dialogue.problem_id)
     # P3-08: create_session과 동형 — 문항은 dialogue 출처(append 규약).
-    tutor_context, tutor_content = await _tutor_context_for(
+    tutor_context, tutor_reading = await _tutor_context_for(
         session,
         body=body,
         problem_id=dialogue.problem_id,
@@ -4060,7 +4061,6 @@ async def append_turns(
         active_hypotheses=active_hypotheses,
         server_mastery=server_mastery,
         pack=pack,
-        with_content=wh1_primary_on,  # P3-72: create_session과 동형.
     )
     # OPS-125: create_session과 동형 — 연쇄 검증을 이벤트 루프 밖에서 먼저 계산해 주입한다.
     chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
@@ -4123,6 +4123,14 @@ async def append_turns(
     tutor_invoked = wh1_primary_on and not completion.handled
     tutor_receipt = TutorDeliveryReceipt()
     if tutor_invoked:
+        # P3-72: 내용 요약은 튜터 호출이 확정된 턴에만 조회한다(가로챈 턴·primary OFF는 조회 0).
+        tutor_content = await _tutor_content_for(
+            session,
+            problem_id=dialogue.problem_id,
+            concept_id=tutor_reading.concept_id,
+            skill_ids=tutor_reading.skill_ids,
+            pack=pack,
+        )
         decision = await _wh1_primary_decision_or(
             decision,
             body=body,

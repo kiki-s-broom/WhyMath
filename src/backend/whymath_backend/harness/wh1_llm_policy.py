@@ -515,9 +515,11 @@ class LLMTutorPolicy:
             "verify_called": state.verify_called,
             "last_verdict": state.last_verdict,
             "tool_calls": state.tool_calls,
-            "active_hypotheses": hyp_summaries,
-            "last_match_ids": match_ids,
-            "recent_tools": recent,
+            # 복사본을 싣는다 — 예산 루프가 원본 리스트를 pop하므로, 공유하면 이전에 조립한 요약이
+            # 사후에 바뀐다(P3-72 검토 하1: prompt 경로는 *최종* 요약에서만 계산돼야 한다).
+            "active_hypotheses": list(hyp_summaries),
+            "last_match_ids": list(match_ids),
+            "recent_tools": list(recent),
             "verify_obligation_pending": state.has_solution_steps and not state.verify_called,
         }
         if recall is not None:

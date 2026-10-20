@@ -769,6 +769,26 @@ _FORBIDDEN_KEYS = {
 _MASTERY_LABELS = ("초보", "발전 중", "숙달")
 
 
+def _load_freeze() -> Any:
+    """⑥ 동결 판정기(키 트리 허용 목록·수치 잎 감시)의 단일 정본 — 하네스 테스트 모듈에서 읽는다.
+
+    `--import-mode=importlib`라 테스트 모듈끼리 import가 안 된다 — 허용 목록을 두 곳에 복제하면
+    한쪽만 고쳐지는 순간 동결이 갈라지므로 파일 경로로 같은 정본을 적재한다.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "harness" / "test_wh1_tutor_slot_delivery.py"
+    spec = importlib.util.spec_from_file_location("_p372_prompt_freeze", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_FREEZE = _load_freeze()
+
+
 def _numeric_forms(value: float) -> list[str]:
     return [str(value), f"{value:.2f}", f"{value:.3f}", str(round(value * 100))]
 
@@ -804,6 +824,9 @@ def test_prompt_carries_content_summary_but_no_student_learning_data(
     # ⑥ 동결 — θ·숙달 값·파생 라벨·학년이 프롬프트·시스템 프롬프트 어디에도 없다.
     sentinels = [*_numeric_forms(0.4137), *_numeric_forms(0.5813), *_numeric_forms(0.3917)]
     for prompt, system, summary in zip(spy.prompts, spy.systems, summaries, strict=True):
+        # 1차 축 — 키 트리 허용 목록 + 수치 잎(θ·숙달·클라 숙달 근방·학년 값) 감시(검토 중1).
+        _FREEZE.assert_prompt_summary_frozen(summary, theta=0.4137, mastery=0.5813, grade=11)
+        _FREEZE.assert_prompt_summary_frozen(summary, theta=0.3917, mastery=0.5813, grade=11)
         assert not (_all_keys(summary) & _FORBIDDEN_KEYS), _all_keys(summary) & _FORBIDDEN_KEYS
         for text in (prompt, system):
             for sentinel in sentinels:
@@ -855,6 +878,22 @@ def test_content_lookups_run_inside_savepoint_and_only_when_tutor_may_run(
     assert off.content_depths == []  # 튜터를 못 부르는 턴은 요약 조회 0
 
 
+@pytest.mark.parametrize("path", _PATHS)
+def test_completion_intercepted_turn_runs_no_content_lookup(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    # 검토 하3 — 완료 상태머신이 가로챈 턴은 튜터를 부르지 않으므로 요약 조회도 0이어야 한다.
+    spy = _install(monkeypatch, _Fill())
+    original = coach._resolve_completion
+
+    async def _handled(*args: Any, **kwargs: Any) -> Any:
+        return (await original(*args, **kwargs))._replace(handled=True)
+
+    monkeypatch.setattr(coach, "_resolve_completion", _handled)
+    assert _post(path, _body()).status_code == 201
+    assert spy.tutor_calls == [] and spy.content_depths == []
+
+
 def test_problem_brief_query_reads_only_allowlisted_columns() -> None:
     # 정답 억제 계약 — 문제 요약 조회는 지문·보기·정답·해설·오답 선지·정답 제약 열을 읽지 않는다.
     # 문자열 금지 목록이 아니라 **구성된 SELECT의 실제 열**을 본다.
@@ -875,3 +914,118 @@ def test_problem_brief_query_reads_only_allowlisted_columns() -> None:
         "conditions_parsed",
     }
     assert not selected & forbidden
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 검토 중2 — 실제 조회 헬퍼 3종을 **실행**한다(대역 없이). 문을 캡처해 실행된 SQL로 동결한다.
+# 실 PG 왕복은 `test_coach_tutor_content_integration.py`(integration)가 본다.
+# ──────────────────────────────────────────────────────────────────────────
+class _Rows:
+    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
+        self._rows = rows
+
+    def first(self) -> tuple[Any, ...] | None:
+        return self._rows[0] if self._rows else None
+
+    def all(self) -> list[tuple[Any, ...]]:
+        return list(self._rows)
+
+
+class _RecordingSession:
+    """`execute`가 받은 문을 PG 방언으로 컴파일해 기록하고, 대상 테이블별 행을 돌려준다.
+
+    `get`(ORM 엔티티 전체 로드)은 금지다 — 문제 요약은 허용 열 SELECT로만 읽어야 한다(정답 열
+    미로드). 호출되면 즉시 실패한다.
+    """
+
+    def __init__(self, rows: dict[str, list[tuple[Any, ...]]]) -> None:
+        self._rows = rows
+        self.sql: list[str] = []
+
+    async def execute(self, stmt: Any) -> _Rows:
+        from sqlalchemy.dialects import postgresql
+
+        self.sql.append(
+            str(stmt.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+        )
+        (table,) = {t.name for t in stmt.get_final_froms()}
+        return _Rows(self._rows.get(table, []))
+
+    async def get(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError(
+            "문제 요약이 ORM 엔티티 전체를 로드했다(정답 열 포함) — 허용 열만 읽어야 한다"
+        )
+
+
+_ANSWER_COLUMNS = (
+    "question_text",
+    "choices",
+    "answer",
+    "answer_explanation",
+    "multiple_answers",
+    "distractor_map",
+    "answer_constraint",
+    "answer_transform",
+    "answer_format",
+    "conditions_parsed",
+)
+
+
+def test_problem_brief_helper_reads_only_allowlisted_columns_and_caps() -> None:
+    import asyncio
+
+    from whymath_backend.schema.enums import BloomLevel, QuestionFormat
+
+    session = _RecordingSession({"problem": [(QuestionFormat.단답형, BloomLevel.APPLY, True, 35)]})
+    brief = asyncio.run(coach._problem_brief_for(session, _PID))  # type: ignore[arg-type]
+    assert brief == ProblemBrief(
+        question_format="단답형", bloom_level="APPLY", has_visual=True, condition_count=20
+    )
+    (sql,) = session.sql
+    selected = sql.split("FROM")[0]
+    for col in ("question_format", "bloom_level", "has_visual", "condition_count"):
+        assert f"problem.{col}" in selected
+    for col in _ANSWER_COLUMNS:
+        assert f"problem.{col}" not in sql, col
+    assert str(_PID) in sql  # PK 단건
+
+
+def test_problem_brief_helper_returns_none_without_row() -> None:
+    import asyncio
+
+    session = _RecordingSession({})
+    assert asyncio.run(coach._problem_brief_for(session, _PID)) is None  # type: ignore[arg-type]
+
+
+def test_concept_label_helper_returns_code_then_name() -> None:
+    import asyncio
+
+    session = _RecordingSession({"concept": [("math.algebra.linear-equation", "일차방정식")]})
+    label = asyncio.run(coach._concept_label_for(session, _CID))  # type: ignore[arg-type]
+    assert label == ("math.algebra.linear-equation", "일차방정식")
+    (sql,) = session.sql
+    assert sql.split("FROM")[0].index("concept.code") < sql.split("FROM")[0].index(
+        "concept.name_ko"
+    )
+
+
+def test_skill_labels_helper_queries_only_first_five_sorted_ids() -> None:
+    import asyncio
+
+    ids = [f"SK-{i:02d}" for i in (9, 3, 7, 1, 8, 2, 6, 4)]
+    session = _RecordingSession({"skill_node": [("SK-01", "a"), ("SK-02", "b")]})
+    labels = asyncio.run(coach._skill_labels_for(session, ids))  # type: ignore[arg-type]
+    assert labels == [("SK-01", "a"), ("SK-02", "b")]
+    (sql,) = session.sql
+    for kept in ("SK-01", "SK-02", "SK-03", "SK-04", "SK-06"):
+        assert f"'{kept}'" in sql, kept
+    for dropped in ("SK-07", "SK-08", "SK-09"):
+        assert f"'{dropped}'" not in sql, dropped
+
+
+def test_skill_labels_helper_skips_query_without_ids() -> None:
+    import asyncio
+
+    session = _RecordingSession({})
+    assert asyncio.run(coach._skill_labels_for(session, [])) == []  # type: ignore[arg-type]
+    assert session.sql == []
