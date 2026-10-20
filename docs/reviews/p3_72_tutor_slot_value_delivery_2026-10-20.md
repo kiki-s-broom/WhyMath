@@ -3,7 +3,7 @@
 # P3-72 — 튜터 슬롯 값 전달(개념·스킬·문제 구조·팩 요약)과 전달 경로 분리 (2026-10-20)
 
 - 태스크: `P3-72-tutor-slot-value-delivery` · 브랜치 `claude/p3-72-tutor-slot-value-delivery` (claim ad3e761a)
-- 커밋: 구현 2c9d43c4 · 주석 정정 ce1ade2a · 보고서 5fbe40fd · PR #1709 독립 검토 반영 522fc404 · 이 개정
+- 커밋: 구현 2c9d43c4 · 주석 정정 ce1ade2a · 보고서 5fbe40fd · PR #1709 독립 검토 반영 522fc404 · 보고서 개정 faa741e8 · 가설 confidence 제거(Kiki 결정 2026-10-20) f5c39444 · 이 개정
 - 선행: `P3-08` — 보고서 `docs/reviews/p3_08_tutor_context_builder_2026-10-20.md`
 - 근거 결정: Kiki 결정 (가) 2026-10-20 — 튜터 LLM 프롬프트에 싣는 것은 개념·스킬·문제 내용·교수 정책(pack) 요약뿐이다. 학생 개인 학습 데이터(θ·숙달도·mastery 수치와 그 파생 라벨)는 프롬프트에 싣지 않는다(서버 사적 보유는 허용).
 - 산출 코드:
@@ -20,7 +20,7 @@
 
 ## 0. 결론
 
-acceptance ①~⑦ 중 결정 (가)가 대체한 항목(① '숙달 라벨' 문구·② 개인정보 게이트)을 빼고 **전부 충족**했다. PR #1709 독립 검토(상 0·중 2·하 3·추가 1)는 전건 반영했다(§10). 남은 위험은 §9에 적었다. 가장 큰 것은 오개념 가설의 confidence(학생별 진단 추정치)가 P3-08 이전부터 프롬프트에 실려 왔다는 사실이다. 결정 (가)의 열거(θ·숙달도·mastery)에는 들어 있지 않아 이번에 바꾸지 않았고, Kiki 판단 대상으로 올린다(§9-1).
+acceptance ①~⑦ 중 결정 (가)가 대체한 항목(① '숙달 라벨' 문구·② 개인정보 게이트)을 빼고 **전부 충족**했다. PR #1709 독립 검토(상 0·중 2·하 3·추가 1)는 전건 반영했다(§10). 남은 위험은 §9에 적었다. 초판이 Kiki 판단을 요청한 오개념 가설 confidence는 **Kiki 결정 2026-10-20 (2) — 숫자를 뺀다**로 정해졌고, 이 개정에서 프롬프트에서 제거했다(§11 · acceptance ⑧).
 
 | acceptance | 판정 | 근거 |
 |---|---|---|
@@ -50,7 +50,7 @@ acceptance ①~⑦ 중 결정 (가)가 대체한 항목(① '숙달 라벨' 문�
 | 4 | problem | not_delivered | `prompt` | 문항 구조: question_format·bloom_level·has_visual·condition_count |
 | 5 | student_answer | delivered (사적) | `private_tool` | 없음(match_misconception 인자 전용) |
 | 6 | solution_record | delivered (사적) | `private_tool` | 없음(verify_step 인자 전용) |
-| 7 | misconception | delivered | `prompt` + `private_tool` | 가설 id·한국어 라벨·confidence(기존 S1-a 동작). 하네스도 curate/log 도구용으로 보유한다 |
+| 7 | misconception | delivered | `prompt` + `private_tool` | 가설 id·한국어 라벨만(id 오름차순). confidence는 싣지 않는다(Kiki 결정 2026-10-20 · §11). 하네스는 curate/log 도구용으로 가설 세트(confidence 포함)를 사적으로 보유한다 |
 | 8 | mastery | not_delivered | none | 없음 — 결정 (가). 검증자가 prompt 경로를 거부한다 |
 | 9 | pedagogy_policy | 가드 ON일 때만 delivered | `prompt` (+ 가드가 판정한 턴은 `output_guard`) | 지식 유형·스텁 여부·금지 모드(폐쇄 어휘). 발문 템플릿 본문은 싣지 않는다 |
 
@@ -278,8 +278,8 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 
 ## 9. 한계·남은 위험
 
-0. **현재 튜터 정책 호출은 전부 LOCAL로 라우팅된다** — 그래서 지금은 내용 요약과 오개념 confidence가 클라우드로 나가지 않는다. `_routing_request`가 `budget_krw`를 넘기지 않아(기본 0) 라우터가 LOCAL을 강제하기 때문이다(검토자 실측·이 사본에서 구독 4 × 난이도 4 전수 재확인). 이 사실을 테스트로 동결했다(`test_tutor_policy_routes_local_so_prompt_never_reaches_cloud` — provider가 받은 실제 결정의 `cost_tier`를 단언한다). 예산이 배선되는 순간(X12) RED가 된다 — 실측상 basic·killer는 CLOUD_MID, premium·gifted·killer는 CLOUD_HIGH가 된다. **클라우드 좌석으로 바뀌면 내용 요약(개념·스킬 이름·문제 구조·팩)과 가설 confidence가 openrouter(US)로 나간다.** 그 RED는 결정 (가)와 아래 1번 confidence 판단을 사람이 다시 보라는 신호이며, 테스트를 지우거나 기대값만 바꾸는 것으로 해소하면 안 된다.
-1. **오개념 가설 confidence가 프롬프트에 실린다**(S1-a 이래 기존 동작·이번 변경 없음). 가설 id·라벨은 카탈로그 상수지만, confidence는 이 학생의 답안에서 파생한 학생별 진단 추정치다. 결정 (가)의 열거(θ·숙달도·mastery와 그 파생 라벨)에 없어 범위를 넓히지 않았다. 다만 "학생 개인 학습 데이터"의 취지에는 닿을 수 있다. **Kiki 판단을 요청한다**: 유지 / 라벨만 싣고 confidence 제거 / 클라우드 좌석 한정 제거.
+0. **현재 튜터 정책 호출은 전부 LOCAL로 라우팅된다** — 그래서 지금은 내용 요약과 오개념 confidence가 클라우드로 나가지 않는다. `_routing_request`가 `budget_krw`를 넘기지 않아(기본 0) 라우터가 LOCAL을 강제하기 때문이다(검토자 실측·이 사본에서 구독 4 × 난이도 4 전수 재확인). 이 사실을 테스트로 동결했다(`test_tutor_policy_routes_local_so_prompt_never_reaches_cloud` — provider가 받은 실제 결정의 `cost_tier`를 단언한다). 예산이 배선되는 순간(X12) RED가 된다 — 실측상 basic·killer는 CLOUD_MID, premium·gifted·killer는 CLOUD_HIGH가 된다. **클라우드 좌석으로 바뀌면 내용 요약(개념·스킬 이름·문제 구조·팩)과 가설 id·라벨이 openrouter(US)로 나간다**(confidence는 §11 이후 프롬프트에 없다). 그 RED는 결정 (가)·(2)를 사람이 다시 보라는 신호이며, 테스트를 지우거나 기대값만 바꾸는 것으로 해소하면 안 된다.
+1. ~~오개념 가설 confidence가 프롬프트에 실린다~~ → **해소(Kiki 결정 2026-10-20 (2)·§11)**. 남는 것은 *어느 가설이 실렸는가* 자체다. 가설이 노드 예산(≥ 14자리)을 넘을 때만 서버가 상위 confidence 가설을 골라 싣기 때문에, 실린 집합이 "이 학생에게 상대적으로 강한 가설"이라는 약한 신호를 남긴다. 수치·순위·등급 표기는 없다. 가설 세트가 15건을 넘는 일은 운영상 드물다.
 2. **프로즈 계층(S4-04·기본 OFF canary)은 경로표에 들어 있지 않다.** ON이면 학생 답안·단계가 `gate_policy_prose`·`rephrase_coach_utterance`의 금지 조각(출력 가드)으로 쓰이고, 가설 라벨 1건이 rephrase LLM 프롬프트에 실린다. 이 태스크의 `output_guard`는 지시대로 팩 금지모드 가드만 센다. 프로즈 경로까지 경로표에 넣는 것은 후속 대상이다.
 3. **게이트 CLI는 내용 요약이 실린 프롬프트로 LLM 품질을 측정하지 않는다.** `coach_prose_leak_eval`·`pedagogy_pack_fidelity_eval`은 hermetic·결정론이고 `tutor_content`를 넘기지 않는다. exit 0은 "기존 안전 게이트를 깨지 않았다"이지 "요약이 도구 선택을 개선했다"가 아니다. 라이브 효과 측정은 하지 않았다.
 4. **실 PG 확인 범위.** 조회 헬퍼 3종은 실 PG 통합 테스트로 확인했다(§5). 다만 로컬 확인은 마이그레이션 head가 아니라 **ORM 메타데이터로 만든 6테이블**에서 했다(로컬에 pgvector가 없어 `alembic upgrade head`를 돌릴 수 없다). 마이그레이션된 스키마와의 일치는 CI `backend-migrations` 잡이 판정한다.
@@ -306,3 +306,31 @@ CI 잡 전수 열거(`.github/workflows/ci.yml`)에서 이 변경이 닿는 잡�
 - 백엔드 전체: 플레이크 1건(단독 3/3 통과) 외 전건 통과
 - 게이트 CLI 20종 + declared_unwired 전건 0 — coach_prose_leak(노출 상한 0.0093·PASS)·pedagogy_pack_fidelity(미검출 상한 0.0362·PASS)
 - 뮤테이션 X1~X13 + X4b·X5b 전건 RED
+
+## 11. Kiki 결정 2026-10-20 (2) — 오개념 가설 confidence 미전달
+
+결정: 튜터 LLM 프롬프트의 `active_hypotheses[]`에는 가설 id·라벨("오개념 X 의심")만 싣는다. confidence 수치와 그 파생 등급·순위를 드러내는 표기는 프롬프트·시스템 프롬프트에서 제거한다. 서버 측 사적 보유(select_probe 등 정책 내부 계산)는 허용한다. 대장: acceptance ⑧(`backlog.py amend`, 쓴 뒤 대조 — 원문 일치·식별자 5종 보존). 결정 로그: `MEMORY.md` 맨 위 1블록(앵커 1건·원본 보존·길이 산술 단언, diff +4/−0).
+
+**① 렌더 경로** — `wh1_llm_policy._hypothesis_summary`는 id·라벨만 낸다. confidence는 (사적 confidence, 렌더 요약) 쌍으로 정책 안에만 남아 두 곳에 쓰인다: 노드 예산 초과 시 상위 confidence 선택, 토큰 예산 초과 시 저confidence부터 절단. 사적 사용이 유지되는지도 테스트로 본다.
+
+**순서 판단 — 흘린다, 그래서 바꿨다.** 가설 세트는 `l4.misconception.hypothesis` 큐레이션에서 confidence 내림차순으로 정렬돼 들어온다(`pruned.sort(key=confidence, reverse=True)`). 원래 순서대로 렌더하면 숫자를 빼도 "첫 번째 = 가장 강한 의심"이라는 순위가 남는다. 그래서 렌더 순서를 **id 오름차순**(중립)으로 바꿨다. `last_match_ids`도 매처의 신뢰도 순으로 올 수 있어 같은 이유로 id 오름차순이다. 동결: 입력을 역순으로 줘도 렌더 결과가 바이트 동일해야 한다(순서가 confidence의 함수가 아님).
+
+**② 동결**
+- 키 트리 허용 목록에서 `active_hypotheses[].confidence`를 뺐다 — 재도입하면 RED.
+- 수치 잎 감시에 가설 confidence(±0.05)를 더했다. 허용 목록과 독립인 2차 축이다: 허용 키(`turn_index`)에 confidence 값을 숨긴 요약을 감시가 잡는지, 먼 값은 통과하는지를 양방향으로 확인했다.
+- HTTP 동결 테스트도 같은 감시를 쓴다(두 핸들러 × 숙달 원천 3종).
+
+| # | 뮤테이션 | 결과 |
+|---|---|---|
+| C1 | confidence 재주입(원 키·소수 3자리) | RED |
+| C2 | confidence 반올림 재주입(다른 키 `w`·소수 1자리) | RED |
+| C3 | 순위 표기 재주입(`rank`) | RED |
+| C4 | 렌더 순서를 confidence 순위로 되돌림 | RED |
+| C5 | match id 정렬 제거 | RED |
+| C6 | 토큰 절단이 사적 confidence 대신 위치로 절단(사적 사용 훼손) | RED |
+
+적용 단언·sha256 원복 단언은 6/6 통과했다(검토자 하네스 `mut.py`).
+
+**③ 시스템 프롬프트** — confidence·확신도를 언급하는 문구는 원래 없었다. 시스템 프롬프트에 "confidence"·"확신"이 없음을 테스트로 단언한다. 정책 docstring(`_hypothesis_summary`·`_budget_context_nodes`)은 결정 내용으로 정정했다.
+
+**④ 게이트·한계** — 게이트 CLI 20종 + declared_unwired 전건 exit 0: coach_prose_leak 노출 상한 0.0093 PASS, pedagogy_pack_fidelity 미검출 상한 0.0362 PASS. 다만 이 게이트들은 hermetic·결정론이고 스크립트 provider를 쓴다. **confidence를 뺀 것이 실 LLM의 도구 선택 품질(예: 어느 가설을 curate/log할지)에 주는 영향은 이 게이트들로 보이지 않는다** — 라이브 측정은 하지 않았다. 가설 순서가 바뀐 것(id 오름차순)도 같은 한계 아래 있다.

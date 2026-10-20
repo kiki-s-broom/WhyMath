@@ -338,6 +338,10 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-10-20 (결정 · P3-72 오개념 가설 confidence): (2) — 튜터 LLM 프롬프트의 오개념 가설에는 id·라벨만 싣고 confidence 수치는 뺀다
+- confidence는 학생 답안에서 파생한 학생별 진단 추정치라 결정 (가)의 취지(학생 개인 학습 데이터 미전달)에 따라 프롬프트·시스템 프롬프트에서 제거한다. 수치뿐 아니라 그 파생 등급·순위를 드러내는 표기도 금지 — 가설 세트가 confidence 내림차순으로 들어오므로 렌더 순서는 id 오름차순으로 바꾼다(`last_match_ids`도 같음). 서버 측 사적 사용(노드 예산 선택·토큰 절단·select_probe)은 허용.
+- 집행: `P3-72-tutor-slot-value-delivery` acceptance ⑧(backlog.py amend) · `wh1_llm_policy._hypothesis_summary`·`_budget_context_nodes` · 동결 = 키 트리 허용 목록(`active_hypotheses[].confidence` 부재)·수치 잎 감시·순서 불변 테스트(뮤테이션 C1~C6 RED). 배경: PR #1709 보고서 §9-1 판단 요청. 현재 튜터 라우팅은 전부 LOCAL(예산 미배선 — 동결 테스트 있음)이라 클라우드 노출은 이 결정 이전에도 0이었다. (사용자 결정, claude 기록)
+
 ### 2026-10-20 (결정 · P3-72 튜터 전달 범위): (가) — 튜터 LLM 프롬프트에는 개념·스킬·문제 내용·교수 정책(pack) 요약만 싣는다
 - 학생 개인 학습 데이터(θ·숙달도·mastery 수치와 파생 라벨)는 클라우드 LLM에 보내지 않고 서버에만 둔다(미성년자 데이터 정책). θ의 튜터 정책 *사적* 보유(select_probe 정보량 계산·프롬프트 미포함)는 허용.
 - 집행: `P3-72-tutor-slot-value-delivery` acceptance ⑤⑥(backlog.py amend · 프롬프트 문자열에 θ·숙달 값이 없음을 주입 RED로 동결). 배경: PR #1705 검토 — P3-08은 조회·전달 표기까지, 값 전달은 승계.
