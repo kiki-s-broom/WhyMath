@@ -17,6 +17,12 @@
 > 엣지 모델(끝점=원자)상 `narrative_edges_raw` 패스스루에 둔다 — 대표 원자 해소는 후속 태스크.
 > 교차감사 산출물 = `docs/data/cross_audit_2026-10-19/`.
 >
+> **상태(2026-10-20·KG-10)**: 서술형 973건의 대표 원자 해소를 **제안 원장**으로 냈다 —
+> `narrative_edge_resolution_proposal_v1.json`(소단원 싱크 규칙·제안 1,018건·순환 충돌 73건 분리·빌더
+> `scripts/build_narrative_edge_resolution_kg10.py` 결정론). 설계·전후 수치·교수학 검수·적용 범위 판정은
+> `docs/data/narrative_edge_resolution_v1.md`. 재생성 체인은 `scripts/regenerate_atom_backbone_v3.sh`로
+> 보존(경계 병합 전 정본을 바이트 동일 재현 실측).
+>
 > **직전 상태(2026-06-22)**: 통합 코퍼스 마스터 정본화 — graph.json 재생성(미적 원자ID 하이픈 채택·
 > 대학 fill 재실행). 코퍼스(`data/corpus/atom_graph_v1/`)는 신규 파이프라인 `data_pipeline/atom_graph/`
 > 산출(§6). (직전 상태 2026-06-21: Phase 0 데이터카드 작성.)
@@ -193,7 +199,8 @@ MERGE (src)-[r:ATOM_PREREQUISITE]->(dst) SET r += $props; -- 선수 엣지
 - `atomicity`(a~d dict)는 **Neo4j map 속성 불가** → 결정론 JSON 문자열로 직렬화(구조 진실 원천은
   graph.json·Postgres `atom_node`). `None`·빈 dict 속성은 생략(Neo4j null 미저장).
 - `parent_code`(3단 계층)는 **노드 속성**으로만 보존 — 별도 계층 관계는 만들지 않는다(Phase 3+).
-  `narrative_edges_raw`(서술형 1,007)는 FK 불가라 **적재 대상 아님**(패스스루 보존).
+  `narrative_edges_raw`(서술형 973 · KG-09 전 1,007)는 FK 불가라 **적재 대상 아님**(패스스루 보존 · 해소 제안은
+  `narrative_edge_resolution_proposal_v1.json`, KG-10).
 - **redaction 불변**: AtomConcept에 K-12 핵심명제 본문 슬롯이 없어 dump에 미포함 → 구조적 차단.
   접속 자격은 `NEO4J_URI`·`NEO4J_USER`·`NEO4J_PASSWORD` env 전용(시크릿 하드코딩 금지).
 
