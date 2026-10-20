@@ -68,6 +68,7 @@ from whymath_backend.harness.wh1_shadow import (
     emit_wh1_aborted_observation,
     emit_wh1_observation,
 )
+from whymath_backend.harness.wh1_tutor_context import TutorContextManifest
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.mode_guard import check_forbidden_modes, fallback_reply_for
@@ -132,6 +133,7 @@ def _safe_emit(
     tone_violations: int = 0,
     prose_rephrased: bool = False,
     prose_reason_code: str | None = None,
+    context_missing: Sequence[str] | None = None,
 ) -> None:
     """관측 emit — 실패해도 발화 서빙(본류)을 깨지 않는다(예외 타입명 로그·침묵 실패 금지)."""
     try:
@@ -146,6 +148,7 @@ def _safe_emit(
             prose_rephrased=prose_rephrased,
             prose_reason_code=prose_reason_code,
             primary_outcome=primary_outcome,
+            context_missing=context_missing,
             **accounting,
         )
     except Exception as exc:  # noqa: BLE001 — 관측 실패는 서빙을 안 깬다(우선순위 #1≫#6).
@@ -161,6 +164,7 @@ def _safe_emit_aborted(
     turn_index: int,
     problem_id: str | None,
     accounting: _TurnAccounting,
+    context_missing: Sequence[str] | None = None,
 ) -> None:
     """하네스가 결과 없이 중단된 턴(타임아웃·예외)의 기록 — 이 경로만 이전엔 기록이 0줄이었다.
 
@@ -173,6 +177,7 @@ def _safe_emit_aborted(
             dialogue_id=dialogue_id,
             turn_index=turn_index,
             problem_id=problem_id,
+            context_missing=context_missing,
             **accounting,
         )
     except Exception as emit_exc:  # noqa: BLE001 — 관측 실패는 서빙을 안 깬다.
@@ -202,6 +207,7 @@ async def run_wh1_primary_turn(
     theta: float | None = None,
     user_id: uuid.UUID | None = None,
     pack: PedagogyPack | None = None,
+    tutor_context: TutorContextManifest | None = None,
 ) -> str | None:
     """WH-1 하네스를 한 턴 돌려 *학생-대면 발화*를 산출한다 — flip primary 경로(S1-11).
 
@@ -229,8 +235,17 @@ async def run_wh1_primary_turn(
     직전에 팩 금지 모드 가드를 태운다 — 위반이면 그 발화를 서빙하지 않고(fail-closed) 안전한
     소크라테스 재질문(결정론 템플릿)으로 대체 + reason_code(위반 모드 토큰) 구조화 로그. 팩
     None(기본·미주입)이거나 플래그 OFF면 가드 블록 전체 미실행 — 기존 경로와 비트동일(회귀 0).
+
+    `tutor_context`(P3-08 — `harness/wh1_tutor_context.py`): 호출자(coach)가 이 턴에 이미 조회한
+    9종 context의 채움/누락 매니페스트. 누락 슬롯 *이름*을 ① 정책 프롬프트 요약의
+    `context_missing`(LLM이 그 context 없이 고른다는 사실을 안다) ② 관측 레코드의
+    `context_missing`(원장에서 누락 턴을 센다) 두 곳에 싣는다. 값은 어디에도 싣지 않는다.
+    None(구 호출자·shadow)이면 두 곳 모두 키가 없거나 None — 기존과 비트동일.
     """
     started = time.monotonic()
+    context_missing: list[str] | None = (
+        tutor_context.missing_names() if tutor_context is not None else None
+    )
     policy: LLMTutorPolicy | None = None
     try:
         probe_candidates = await assemble_probe_candidate_pool(
@@ -259,6 +274,8 @@ async def run_wh1_primary_turn(
             # PED-04 D1 reader ②: 직전 세션의 교수 이력(메타 한정·원문 0·복호 0). 정책이
             # 예산 가드 안에서 요약에 실어 "이미 시도한 결"을 알게 한다.
             session_recall=session_recall,
+            # P3-08: 비어 있던 context 슬롯 이름 — 요약의 `context_missing` 정직 신호(값 0).
+            context_missing=context_missing or (),
         )
         timeout = (
             timeout_seconds
@@ -288,6 +305,7 @@ async def run_wh1_primary_turn(
             turn_index=turn_index,
             problem_id=problem_id,
             accounting=_accounting(policy, started),
+            context_missing=context_missing,
         )
         return None
 
@@ -304,6 +322,7 @@ async def run_wh1_primary_turn(
                 else "fallback_no_utterance"
             ),
             accounting=_accounting(policy, started),
+            context_missing=context_missing,
         )
         logger.warning(
             "WH-1 primary 발화 없음(status=%s·tool_calls=%d) — 결정론 템플릿 폴백",
@@ -334,6 +353,7 @@ async def run_wh1_primary_turn(
                     problem_id=problem_id,
                     primary_outcome="fallback_prose_gate",
                     accounting=_accounting(policy, started),
+                    context_missing=context_missing,
                     prose_reason_code=prose_reason,
                 )
                 logger.warning(
@@ -406,6 +426,7 @@ async def run_wh1_primary_turn(
         problem_id=problem_id,
         primary_outcome=_final_outcome(policy, mode_guard_replaced=mode_guard_replaced),
         accounting=_accounting(policy, started),
+        context_missing=context_missing,
         tone_rewritten=report.rewritten,
         tone_violations=len(report.violations),
         prose_rephrased=prose_rephrased,

@@ -158,6 +158,7 @@ class LLMTutorPolicy:
         difficulty: str = "medium",
         max_history: int = 6,
         session_recall: SessionRecall | None = None,
+        context_missing: Sequence[str] = (),
     ) -> None:
         """정책 구성.
 
@@ -173,6 +174,11 @@ class LLMTutorPolicy:
             session_recall: 직전 세션의 교수 이력(PED-04 D1 reader ②·**메타 한정**). 필드가
                 전부 enum/정수라 학생 원문을 실을 자리가 타입상 없다. None(기본)이면 요약에
                 키 자체가 없어 프롬프트가 기존과 바이트 동일.
+            context_missing: P3-08 — 이번 튜터 호출에서 비어 있던 context 슬롯 *이름*
+                (`wh1_tutor_context.TutorContextSlot` 값). 비어 있지 않으면 요약에
+                `context_missing`으로 실어 LLM이 "이 context 없이 고른다"를 알게 한다(빈 값으로
+                조용히 부르지 않는다 — `context_truncated`와 같은 정직 신호). 슬롯 이름뿐이라
+                값·원문이 실릴 자리가 없다. 빈 튜플(기본)이면 키 자체가 없어 프롬프트 바이트 동일.
         """
         # 좌석 조립(OPS-36) — 여기서부터 LLM 호출은 `l3.pipeline` 경유다(라우터·캐시·관측).
         # `seam`이 주어지면 그것을 쓴다(대체 가능성을 타입으로 — 테스트·미래 파이프라인 교체).
@@ -190,6 +196,7 @@ class LLMTutorPolicy:
         self._difficulty = difficulty
         self._max_history = max_history
         self._session_recall = session_recall
+        self._context_missing = tuple(context_missing)
         # OPS-134 ② — 이 턴이 LLM을 몇 번 불렀고 얼마나 걸렸는지의 인프로세스 회계. 턴이
         # 타임아웃으로 끊겨도 정책 객체는 호출자(`wh1_primary`)가 쥐고 있어 읽을 수 있다
         # (Langfuse 단독 회계 금지).
@@ -289,7 +296,10 @@ class LLMTutorPolicy:
         # ③ 토큰 근사 예산 — 초과 시 세션 회상부터, 그다음 history·저confidence 가설·match id를
         #    결정론 절단. 회상이 1순위인 이유: 세션 *간* 맥락은 이번 턴 결정에 가장 덜 급하다.
         recall = self._session_recall
-        prompt = self._render_summary(state, hyp_summaries, match_ids, recent, omitted, recall)
+        missing = self._context_missing
+        prompt = self._render_summary(
+            state, hyp_summaries, match_ids, recent, omitted, recall, context_missing=missing
+        )
         while self._approx_tokens(prompt) > _MAX_PROMPT_TOKENS:
             if recall is not None:
                 recall = None
@@ -310,7 +320,9 @@ class LLMTutorPolicy:
                 omitted += 1
             else:
                 break  # 고정 필드만 남아 더 줄일 수 없음(안전 탈출).
-            prompt = self._render_summary(state, hyp_summaries, match_ids, recent, omitted, recall)
+            prompt = self._render_summary(
+                state, hyp_summaries, match_ids, recent, omitted, recall, context_missing=missing
+            )
         return prompt
 
     def _budget_context_nodes(
@@ -369,6 +381,8 @@ class LLMTutorPolicy:
         recent: list[dict[str, object]],
         omitted: int,
         recall: SessionRecall | None = None,
+        *,
+        context_missing: Sequence[str] = (),
     ) -> str:
         """예산 적용된 조각들로 최종 프롬프트 문자열을 조립(순수·결정론).
 
@@ -376,6 +390,10 @@ class LLMTutorPolicy:
         의도적으로 제외한다: 활성 가설은 이미 `active_hypotheses`로 렌더 중이라 중복이고,
         오개념을 초기 context에 preload하지 않는다는 금기(CLAUDE.md)에도 걸린다. 그 필드의
         소비처는 warmstart `exclude_mids` 하나뿐이다.
+
+        `context_missing`(P3-08)은 **절단 대상이 아니다** — 토큰 예산 루프가 줄이는 것은 회상·
+        history·가설·match뿐이고 이 키는 고정 필드처럼 남는다(누락 표기를 예산 때문에 지우면
+        그 자체가 무증상 누락이다). 슬롯 이름 ≤ 9개라 예산에 주는 압력은 상수다.
         """
         summary: dict[str, object] = {
             "turn_index": state.turn_index,
@@ -396,6 +414,9 @@ class LLMTutorPolicy:
                 "last_strategies": [s.value for s in recall.last_socratic_strategies],
                 "turns_since": recall.turns_since,
             }
+        if context_missing:
+            # P3-08 정직 신호 — 이번 호출에 비어 있던 context 슬롯(이름만·값 0).
+            summary["context_missing"] = list(context_missing)
         if omitted > 0:
             # fail-closed 정직 신호 — 예산으로 컨텍스트를 절단했음을 LLM에 명시(조용한 무동작 금지).
             summary["context_truncated"] = True

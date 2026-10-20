@@ -215,6 +215,12 @@ class Wh1HarnessShadowObservation(BaseModel):
     """끝난 LLM 호출의 소요 합(ms·OPS-134 ①). `elapsed_ms`와 대조하면 예산이 LLM 안에서 소진됐는지
     밖(캐시 대기·후보 조립·도구 실행)에서 소진됐는지 가려진다. 취소된 호출 소요는 몰라 제외."""
 
+    context_missing: list[str] | None = None
+    """P3-08 — 이 턴 튜터 호출에서 **비어 있던 context 슬롯 이름**(9종 중·`wh1_tutor_context`의
+    `TutorContextSlot` 값). **None=구판·shadow 레코드**(매니페스트 미전달)로 "누락 0"(=`[]`)과
+    구분한다. 슬롯 *이름*만 — 값·id·원문은 없다(비식별). 누락이 무증상으로 지나간 턴의 비율을
+    원장에서 세는 좌석이다(응답·로그 표기와 같은 출처)."""
+
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -330,6 +336,7 @@ def emit_wh1_observation(
     llm_calls: int | None = None,
     llm_calls_finished: int | None = None,
     llm_ms_total: int | None = None,
+    context_missing: Sequence[str] | None = None,
 ) -> None:
     """하네스 한 턴 결과를 관측 레코드로 emit — shadow·primary *공통* 단일 좌석(S1-11).
 
@@ -395,6 +402,7 @@ def emit_wh1_observation(
             llm_calls=llm_calls,
             llm_calls_finished=llm_calls_finished,
             llm_ms_total=llm_ms_total,
+            context_missing=list(context_missing) if context_missing is not None else None,
         ).model_dump_json()
     )
 
@@ -409,6 +417,7 @@ def emit_wh1_aborted_observation(
     llm_calls: int | None = None,
     llm_calls_finished: int | None = None,
     llm_ms_total: int | None = None,
+    context_missing: Sequence[str] | None = None,
 ) -> None:
     """하네스가 **결과를 남기지 못하고 중단된** primary 턴의 레코드를 emit한다(OPS-134 ②).
 
@@ -435,6 +444,7 @@ def emit_wh1_aborted_observation(
             llm_calls=llm_calls,
             llm_calls_finished=llm_calls_finished,
             llm_ms_total=llm_ms_total,
+            context_missing=list(context_missing) if context_missing is not None else None,
         ).model_dump_json()
     )
 
