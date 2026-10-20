@@ -88,6 +88,7 @@ from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
     RootSelection,
+    classify_solvability,
     condition_relation,
     satisfies_domain,
     split_equation_domain,
@@ -381,15 +382,17 @@ def _distinct(values: Sequence[str]) -> list[str] | None:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 근 선택 규칙 — 후보 집합에서 "어느 근인가"를 **문항 조건에서만** 고른다 (P3-71 · C2·C4 공용)
+# 근 선택 규칙 — "이 값이 조건이 요구하는 그 근인가"를 **문항 조건에서만** 판정한다
+# (P3-71 · C2·C4 공용)
 # ──────────────────────────────────────────────────────────────────────────
 # 정답(`answer`·`answer_map`)에서 선택을 역산하지 않는다(P3-24 B3 단서 — 역산하면 순환 통과다).
-# 근거는 둘뿐이다: ①`verify.conditions` 안의 그 변수의 도메인 부등식(`a > 0`·`c >= 0, c <= 3`)
-# ②작성자가 구조에 적은 `answer_selection`(largest/smallest). 정답은 고른 뒤 **대조**에만 쓴다.
-_PICK: Final = "pick"  # 후보 하나로 정해짐
-_NONE: Final = "none"  # 도메인을 만족하는 후보가 하나도 없음(확정)
-_AMBIGUOUS: Final = "ambiguous"  # 도메인을 만족하는 후보가 둘 이상이고 고를 규칙이 없음
-_UNDECIDED: Final = "undecided"  # 조건 파싱·도메인 판정·수치화 불가
+# 근거는 셋뿐이다: ①그 변수 하나만 담은 조건 등식(근의 집합) ②그 변수의 도메인 부등식
+# (`a > 0`·`c >= 0, c <= 3`) ③작성자가 구조에 적은 `answer_selection`(largest/smallest).
+# 근의 집합은 풀이가 나열한 후보가 아니라 `verify_root_selection` 이 조건으로 직접 계산한다 — 풀이의
+# 후보 나열이 불완전해도(근 하나를 빠뜨려도) 그 빈자리로 통과하지 않게 한다(PR #1703 검토 상2).
+_PROVEN: Final = "proven"  # 조건이 요구하는 바로 그 근이다(조건만으로 확정)
+_WRONG: Final = "wrong"  # 도메인 위반·조건의 선택 규칙과 다른 근(확정)
+_UNKNOWN: Final = "unknown"  # 조건에 근거가 없거나 판정 불가
 
 
 def _condition_items(verify: Mapping[str, object]) -> list[str] | None:
@@ -399,71 +402,53 @@ def _condition_items(verify: Mapping[str, object]) -> list[str] | None:
     return [conditions] if isinstance(conditions, str) else list(conditions)
 
 
-def _domain_of(verify: Mapping[str, object], var: str) -> list[str] | None:
-    """조건 중 변수 `var` 하나만 담은 부등식·≠ (도메인 제약). 파싱 불가 조건이 있으면 None.
+def _relations(verify: Mapping[str, object]) -> list[tuple[str, str, frozenset[str]]] | None:
+    """조건마다 (원문, 관계 연산자, 자유변수 이름). 파싱 못 한 조건이 하나라도 있으면 None.
 
-    파싱하지 못한 조건이 도메인 제약인지 아닌지 모르므로, 그 상태로 "제약 없음"을 말하지 않는다.
+    파싱하지 못한 조건이 무엇을 제약하는지 모르므로, 그 상태로 "제약 없음"을 말하지 않는다.
     """
     items = _condition_items(verify)
     if items is None:
         return None
-    domain: list[str] = []
+    out: list[tuple[str, str, frozenset[str]]] = []
     for condition in items:
         relation = condition_relation(condition)
         if relation is None:
             return None
-        op, names = relation
-        if op != "==" and names == frozenset({var}):
-            domain.append(condition)
-    return domain
+        out.append((condition, relation[0], relation[1]))
+    return out
 
 
-def _candidates_are_equation_roots(
-    verify: Mapping[str, object], var: str, candidates: Sequence[str]
-) -> bool | None:
-    """후보 전부가 조건의 단일 등식(같은 변수)의 근인가 — 아니면 False, 판정 불가·모양 밖이면 None.
+def _judge_value(verify: Mapping[str, object], var: str, value: str) -> str:
+    """`var = value` 가 조건이 요구하는 근인가 — `_PROVEN`·`_WRONG`·`_UNKNOWN`.
 
-    `answer_selection`(가장 큰/작은 근)은 **조건 등식의 근** 중에서의 선택이다. 풀이의 후보가 그
-    등식의 근이 아니면(예 임계점 나열 뒤 정답이 그 함수) 선택 규칙을 후보에 적용할 근거가 없다.
+    · 도메인 부등식을 어기면 `_WRONG`(제약 위반 근).
+    · 그 변수 하나만 담은 조건 등식이 정확히 하나여야 근의 집합을 안다 — 아니면 `_UNKNOWN`.
+    · 값이 그 등식의 근이 아니면 `_UNKNOWN`(`verify_root_selection` 이 판정 불가를 낸다 — 후보가
+      다른 식의 해일 수 있다. 변수 전환 단계에서는 `_check_c4` 가 종전 incorrect 를 유지한다).
+    · 선택 규칙 = `answer_selection`(largest/smallest), 없으면 unique. `verify_root_selection` 이
+      조건(등식 + 도메인)만으로 허용 근을 계산해 그 근이면 `_PROVEN`. largest/smallest 인데 다른
+      근이면 `_WRONG`. unique 인데 허용 근이 둘 이상이면 `_UNKNOWN`(어느 쪽도 확정 아님).
     """
-    items = _condition_items(verify)
-    split = None if items is None else split_equation_domain(items)
-    if split is None or split[2] != var:
-        return None
-    states = [verify_answer(split[0], {var: candidate}).state for candidate in candidates]
-    if "unverifiable" in states:
-        return None
-    return all(state == "pass" for state in states)
-
-
-def _rule_pick(
-    verify: Mapping[str, object], var: str, candidates: Sequence[str]
-) -> tuple[str, str | None]:
-    """후보(서로 다른 값 ≥2)에서 조건이 고르는 근 — (`_PICK`, 값) 또는 (`_NONE`/`_AMBIGUOUS`/
-    `_UNDECIDED`, None)."""
-    domain = _domain_of(verify, var)
-    if domain is None:
-        return _UNDECIDED, None
-    pool = list(candidates)
-    if domain:
-        flags = [satisfies_domain(domain, var, candidate) for candidate in candidates]
-        if any(flag is None for flag in flags):
-            return _UNDECIDED, None
-        pool = [c for c, flag in zip(candidates, flags, strict=True) if flag]
-        if not pool:
-            return _NONE, None
-        if len(pool) == 1:
-            return _PICK, pool[0]
+    relations = _relations(verify)
+    if relations is None:
+        return _UNKNOWN
+    domain = [c for c, op, names in relations if op != "==" and names == frozenset({var})]
+    equations = [c for c, op, names in relations if op == "==" and names == frozenset({var})]
+    if domain and satisfies_domain(domain, var, value) is False:
+        return _WRONG
+    if len(equations) != 1:
+        return _UNKNOWN
     selection = verify.get("answer_selection")
-    if selection not in ("largest", "smallest"):
-        return _AMBIGUOUS, None
-    if _candidates_are_equation_roots(verify, var, pool) is not True:
-        return _UNDECIDED, None
-    numeric = [_float_of(c) for c in pool]
-    nums = [x for x in numeric if x is not None]
-    if len(nums) != len(pool):
-        return _UNDECIDED, None
-    return _PICK, pool[nums.index(max(nums) if selection == "largest" else min(nums))]
+    rule = selection if selection in ("largest", "smallest") else "unique"
+    verdict = verify_root_selection(
+        [equations[0], *domain], {var: value}, cast(RootSelection, rule)
+    )
+    if verdict.state == "pass":
+        return _PROVEN
+    if verdict.state == "fail" and rule != "unique":
+        return _WRONG
+    return _UNKNOWN
 
 
 def _check_c2(record: Mapping[str, object], verify: Mapping[str, object] | None) -> CheckResult:
@@ -536,8 +521,11 @@ def _check_c2_domain(
          변수가 정답 변수다(호출부가 answer_map 소속으로 이미 확인).
       ② `verify.conditions` 가 "그 변수의 단일 등식 + 도메인 부등식"이다(`split_equation_domain`).
       ③ 후보 전부가 그 등식의 근이다(Tier1 대입) — 아니면 후보가 다른 식의 해라 비교 근거가 없다.
-    판정: 도메인을 만족하는 후보가 하나 → 정답과 같으면 PASS·다르면 FAIL. 하나도 없음 → FAIL(풀이의
-    근 중 허용되는 것이 없는데 정답이 있다 — 모순). 둘 이상 → 검증 불가. 정답은 대조에만 쓴다.
+      ④ 후보가 그 등식의 서로 다른 실근 **전부**다(다항식의 실근 개수와 같다) — 근 하나를 빠뜨린
+         나열에서 남은 후보 하나를 "도메인이 고른 근"으로 읽지 않는다(PR #1703 검토 상2).
+    판정: 도메인을 만족하는 후보가 하나 → 정답과 다르면 FAIL, 같으면 조건만으로 계산한
+    `verify_root_selection(조건, 정답, "unique")` 도 pass 일 때 PASS. 하나도 없음 → FAIL(허용되는
+    근이 없는데 정답이 있다 — 모순). 둘 이상 → 검증 불가. 정답은 대조에만 쓴다.
     """
     if verify.get("answer_kind") or verify.get("answer_aggregate"):
         return None
@@ -545,27 +533,42 @@ def _check_c2_domain(
     split = None if items is None else split_equation_domain(items)
     if split is None or split[2] != var or not split[1]:
         return None
+    equation, domain, _ = split
     for root in roots:
-        state = verify_answer(split[0], {var: root}).state
+        state = verify_answer(equation, {var: root}).state
         if state == "fail":
             return _unv("C2_DOMAIN_CANDIDATE_NOT_ROOT", f"후보 {root} 가 조건 등식의 근이 아님")
         if state == "unverifiable":
             return _unv("C2_DOMAIN_UNVERIFIABLE", f"후보 {root} 의 등식 대입 판정 불가")
-    kind, pick = _rule_pick(verify, var, roots)
-    if kind == _NONE:
-        return _fail(
-            "C2_DOMAIN_NO_ADMISSIBLE_CANDIDATE", f"후보 {list(roots)} 전부 도메인 {split[1]} 위반"
+    solvability = classify_solvability(equation)
+    if solvability.state not in ("unique", "multiple") or (
+        solvability.n_distinct_real_roots != len(roots)
+    ):
+        return _unv(
+            "C2_DOMAIN_CANDIDATES_INCOMPLETE",
+            f"후보 {len(roots)}개 ≠ 등식의 실근 {solvability.n_distinct_real_roots}개"
+            f"({solvability.state})",
         )
-    if kind == _AMBIGUOUS:
-        return _unv("C2_DOMAIN_AMBIGUOUS", "도메인을 만족하는 후보가 둘 이상·선택 규칙 없음")
-    if kind != _PICK or pick is None:
+    flags = [satisfies_domain(domain, var, root) for root in roots]
+    if any(flag is None for flag in flags):
         return _unv("C2_DOMAIN_UNVERIFIABLE", "도메인 제약 판정 불가")
-    relation = _same(pick, answer)
-    if relation is _Same.SAME:
-        return _PASS
+    survivors = [root for root, flag in zip(roots, flags, strict=True) if flag]
+    if not survivors:
+        return _fail(
+            "C2_DOMAIN_NO_ADMISSIBLE_CANDIDATE",
+            f"후보 {list(roots)} 전부 도메인 {list(domain)} 위반",
+        )
+    if len(survivors) > 1:
+        return _unv("C2_DOMAIN_AMBIGUOUS", "도메인을 만족하는 후보가 둘 이상·선택 규칙 없음")
+    relation = _same(survivors[0], answer)
     if relation is _Same.UNKNOWN:
         return _unv("C2_VALUE_UNVERIFIABLE")
-    return _fail("C2_DOMAIN_PICK_MISMATCH", f"도메인이 고른 후보 {pick} ≠ 정답")
+    if relation is _Same.DIFFERENT:
+        return _fail("C2_DOMAIN_PICK_MISMATCH", f"도메인이 고른 후보 {survivors[0]} ≠ 정답")
+    confirm = verify_root_selection([equation, *domain], {var: answer}, "unique")
+    if confirm.state != "pass":
+        return _unv("C2_DOMAIN_UNVERIFIABLE", f"조건만으로 근 선택 확인 불가: {confirm.reason}")
+    return _PASS
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -638,59 +641,39 @@ def _numeric_assignments(step: str) -> tuple[str, list[str]] | None:
     return var, distinct
 
 
-def _judge_selection(
-    verify: Mapping[str, object], var: str, candidates: Sequence[str], chosen: str
-) -> str:
-    """근 선택 단계 `v = a, v = b → v = a` — 조건이 고르는 근이 `chosen` 인가."""
-    domain = _domain_of(verify, var)
-    if domain is None:
-        return _UNJUDGED
-    if domain:
-        admissible = satisfies_domain(domain, var, chosen)
-        if admissible is False:
-            return _INCORRECT  # 고른 근이 도메인 제약을 어긴다(제약 위반 근).
-        if admissible is None:
-            return _UNJUDGED
-    kind, pick = _rule_pick(verify, var, candidates)
-    if kind != _PICK or pick is None:
-        return _UNJUDGED  # 고를 근거가 조건에 없다 — 통과도 실패도 아니다.
-    relation = _same(chosen, pick)
-    if relation is _Same.SAME:
+def _judge_selection(verify: Mapping[str, object], var: str, chosen: str) -> str:
+    """근 선택 단계 `v = a, v = b → v = a` — 고른 값이 조건이 요구하는 근인가(`_judge_value`)."""
+    verdict = _judge_value(verify, var, chosen)
+    if verdict == _PROVEN:
         return _CORRECT
-    return _INCORRECT if relation is _Same.DIFFERENT else _UNJUDGED
+    return _INCORRECT if verdict == _WRONG else _UNJUDGED
 
 
 def _judge_substitution(
     verify: Mapping[str, object], var: str, candidates: Sequence[str], target: str, claimed: str
 ) -> str:
-    """대입 단계 `v = a → w = b` — 조건의 정의 등식(자유변수가 정확히 {v, w})에 v 를 대입한
-    w 가 b 인가.
+    """대입 단계 `v = a → w = b` — 조건이 요구하는 v 를 정의 등식(자유변수가 정확히 {v, w})에
+    대입한 w 가 b 인가.
 
-    앞 단계가 후보 나열이면 먼저 조건의 근 선택 규칙으로 v 를 고른다(못 고르면 판정 불가 —
-    결과값이 맞는 후보를 거꾸로 찾지 않는다: 그것이 정답 역산이다). 다른 매개변수가 섞인 정의
-    등식은 쓰지 않는다(그 값을 정답 기록에서 빌려 오게 되므로).
+    대입에 쓰는 v 는 **조건만으로 확정된 근**이어야 한다(`_judge_value` 가 `_PROVEN`). 앞 단계 값이
+    하나여도 같다 — 풀이 첫 줄에 놓인 값은 들어오는 전이가 없어 아무도 검산하지 않으므로, 여기서
+    도메인·등식의 근·선택 규칙을 확인하지 않으면 틀린 v 로 맞는 대입을 한 풀이가 통과한다(PR #1703
+    검토 상1). 후보가 여럿이면 확정되는 후보가 정확히 하나일 때만 그것을 쓴다 — 결과값에 맞는 후보를
+    거꾸로 찾지 않는다(정답 역산). 다른 매개변수가 섞인 정의 등식은 쓰지 않는다(그 값을 정답
+    기록에서 빌려 오게 되므로).
     """
-    if len(candidates) == 1:
-        value = candidates[0]
-    else:
-        kind, pick = _rule_pick(verify, var, candidates)
-        if kind != _PICK or pick is None:
-            return _UNJUDGED
-        value = pick
-    items = _condition_items(verify)
-    if items is None:
+    # 값이 확정되지 않으면(도메인 위반·등식의 근 아님 포함) 판정 불가를 돌린다 — 변수 전환 단계는
+    # 동치 판정이 늘 incorrect 이므로 `_check_c4` 가 그 incorrect 를 유지한다(성립 증명만 바꾼다).
+    verdicts = [_judge_value(verify, var, candidate) for candidate in candidates]
+    proven = [c for c, verdict in zip(candidates, verdicts, strict=True) if verdict == _PROVEN]
+    if not proven:  # 선택 규칙(unique·largest·smallest)이 확정하는 근은 많아야 하나다.
         return _UNJUDGED
-    definitions: list[str] = []
-    for condition in items:
-        relation = condition_relation(condition)
-        if relation is None:
-            return _UNJUDGED
-        if relation[0] == "==" and relation[1] == frozenset({var, target}):
-            definitions.append(condition)
+    relations = _relations(verify) or []  # 확정된 값이 있으면 조건은 이미 전부 파싱됐다.
+    definitions = [c for c, op, names in relations if op == "==" and names == {var, target}]
     if not definitions:
         return _UNJUDGED
     states = [
-        verify_substituted_value(definition, {var: value}, target, claimed).state
+        verify_substituted_value(definition, {var: proven[0]}, target, claimed).state
         for definition in definitions
     ]
     if "fail" in states:
@@ -718,7 +701,7 @@ def _interpretive_step(
         return _SUBSTITUTION, _judge_substitution(verify, var, candidates, target, claimed)
     if _Same.SAME not in [_same(claimed, candidate) for candidate in candidates]:
         return None
-    return _SELECTION, _judge_selection(verify, var, candidates, claimed)
+    return _SELECTION, _judge_selection(verify, var, claimed)
 
 
 def _check_c4(verify: Mapping[str, object] | None) -> CheckResult:
@@ -727,7 +710,8 @@ def _check_c4(verify: Mapping[str, object] | None) -> CheckResult:
 
     해석 단계는 동치가 아니라서 `verify_step` 이 incorrect/판정 불가를 낸다. 그 전이만 모양을 보고
     다시 판정한다: 성립 → 통과, 불성립 → C4_STEP_INCORRECT, 판정 불가 → C4_STEP_UNVERIFIABLE.
-    `verify_step` 이 correct 를 낸 전이는 건드리지 않는다(해석 단계를 무조건 통과시키지 않는다).
+    단 `verify_step` 이 incorrect 를 낸 전이는 성립이 증명될 때만 바꾸고, 판정 불가면 incorrect 를
+    유지한다(종전 FAIL 을 낮추지 않는다). `verify_step` 이 correct 를 낸 전이는 건드리지 않는다.
     """
     steps = None if verify is None else verify.get("solution_steps")
     if verify is None or not isinstance(steps, list) or len(steps) < 2:
@@ -741,7 +725,12 @@ def _check_c4(verify: Mapping[str, object] | None) -> CheckResult:
         if state != _CORRECT:
             interpreted = _interpretive_step(verify, texts[index], texts[index + 1])
             if interpreted is not None:
-                kinds[index], state = interpreted
+                kinds[index], judged = interpreted
+                # 동치 판정이 incorrect 였던 전이는 해석 판정이 **성립을 증명할 때만** 바꾼다 —
+                # 근거가 없어 판정 불가인 해석 단계로 종전 FAIL 을 검증 불가로 낮추지 않는다
+                # (PR #1703 검토 중4 · 기준 완화 금지가 acceptance ① 보다 상위).
+                if state != _INCORRECT or judged == _CORRECT:
+                    state = judged
         states.append(state)
     if _INCORRECT in states:
         first = states.index(_INCORRECT)

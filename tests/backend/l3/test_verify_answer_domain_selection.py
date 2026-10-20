@@ -111,6 +111,26 @@ class TestRootSelectionWithDomain:
         verdict = verify_root_selection(conditions, {"x": "2", "y": "1"}, "largest")
         assert verdict.state == "unverifiable"
 
+    @pytest.mark.parametrize(
+        ("conditions", "answer", "selection"),
+        [
+            (["sin(x) = 0", "x > 0", "x < 10"], "pi", "unique"),  # 실제 허용 근 π·2π·3π
+            (["sin(x*pi/180) = 1/2", "x >= 0", "x < 720"], "150", "largest"),  # 실제 최대 510
+            (["sin(x*pi/180) = 1/2", "x >= 0", "x < 720"], "30", "unique"),
+        ],
+    )
+    def test_periodic_equation_is_not_judged_on_a_partial_root_set(
+        self, conditions: list[str], answer: str, selection: str
+    ) -> None:
+        """PR #1703 상3: `sympy.solve` 의 부분 해를 근 전체로 읽으면 거짓 pass 가 난다."""
+        verdict = verify_root_selection(conditions, {"x": answer}, selection)  # type: ignore[arg-type]
+        assert verdict.state == "unverifiable"
+
+    def test_undecidable_domain_on_some_root_is_unverifiable_not_admissible(self) -> None:
+        """근 -1 에서 `log(x) >= 0` 은 복소라 판정 불가 — 그 근을 허용으로 세면 unique 가 fail 로 간다."""
+        verdict = verify_root_selection(["x**2 - 1 = 0", "log(x) >= 0"], {"x": "1"}, "unique")
+        assert verdict.state == "unverifiable"
+
     def test_single_element_list_is_unchanged(self) -> None:
         assert verify_root_selection(["x**2 - 10*x + 24 = 0"], {"x": "6"}, "largest").state == (
             "pass"

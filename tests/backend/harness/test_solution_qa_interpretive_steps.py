@@ -311,11 +311,22 @@ def test_selection_step_without_a_rule_is_unverifiable_not_pass() -> None:
     assert item.verdict is qa.Verdict.UNVERIFIABLE
 
 
-def test_selection_rule_is_not_applied_to_candidates_of_another_equation() -> None:
-    """후보가 조건 등식의 근이 아니면(임계점 나열 등) answer_selection 을 후보에 적용하지 않는다."""
+def test_selection_is_checked_against_the_conditions_root_set_not_the_listed_candidates() -> None:
+    """조건 등식의 근은 4·8 이고 largest 는 8 — 풀이가 나열한 후보(-2, 4)에서 4 를 골라도 그것은
+    조건이 요구하는 근이 아니다. 근 집합을 후보 나열이 아니라 조건으로 계산한다(PR #1703 상2)."""
 
     def mutate(r: Record) -> None:
-        r["verify"]["conditions"] = "x**2 - 12*x + 32 = 0"  # 근 4, 8 — 후보 -2, 4 와 다른 등식
+        r["verify"]["conditions"] = "x**2 - 12*x + 32 = 0"
+
+    item = qa.judge_record(_inject(_selection_rule_step(), mutate))
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+
+
+def test_selected_value_that_is_not_a_root_of_the_condition_is_not_judged() -> None:
+    """고른 값이 조건 등식의 근이 아니면(후보가 다른 식의 해) 선택을 판정하지 않는다."""
+
+    def mutate(r: Record) -> None:
+        r["verify"]["conditions"] = "x**2 - 13*x + 40 = 0"  # 근 5, 8 — 고른 4 는 근이 아니다
 
     item = qa.judge_record(_inject(_selection_rule_step(), mutate))
     assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
@@ -344,10 +355,10 @@ def test_symbolic_value_step_is_not_an_interpretive_step() -> None:
 
 def test_unjudged_interpretive_step_is_counted_in_the_detail() -> None:
     def mutate(r: Record) -> None:
-        r["verify"]["conditions"] = r["verify"]["conditions"][:2]
+        r["verify"]["conditions"] = r["verify"]["conditions"][:1]
 
-    item = qa.judge_record(_inject(_substitution(), mutate))
-    assert item.checks["C4"].detail == "1/4전이·해석 단계 1"
+    item = qa.judge_record(_inject(_domain_selection_step(), mutate))
+    assert item.checks["C4"].detail == "1/6전이·해석 단계 1"
 
 
 def test_value_outside_the_candidates_is_not_a_selection_and_stays_incorrect() -> None:
@@ -397,15 +408,16 @@ def test_injection_substitution_of_the_constraint_violating_candidate_turns_red(
     assert item.verdict is qa.Verdict.FAIL
 
 
-def test_substitution_after_candidates_without_a_rule_is_unverifiable() -> None:
-    """후보 둘 중 어느 x 인지 조건이 말하지 않으면, 결과값에 맞는 후보를 거꾸로 찾지 않는다."""
+def test_substitution_after_candidates_without_a_rule_keeps_the_old_failure() -> None:
+    """후보 둘 중 어느 x 인지 조건이 말하지 않으면 결과값에 맞는 후보를 거꾸로 찾지 않는다 — 성립을
+    증명하지 못한 변수 전환은 종전 동치 판정(incorrect)을 그대로 둔다(PR #1703 중4)."""
 
     def mutate(r: Record) -> None:
         r["verify"]["conditions"] = r["verify"]["conditions"][:2]
 
     item = qa.judge_record(_inject(_substitution(), mutate))
-    assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
-    assert item.verdict is qa.Verdict.UNVERIFIABLE
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+    assert item.verdict is qa.Verdict.FAIL
 
 
 def test_substitution_needs_a_definition_without_borrowed_parameters() -> None:
@@ -416,7 +428,7 @@ def test_substitution_needs_a_definition_without_borrowed_parameters() -> None:
         r["verify"]["answer_map"]["a"] = "-6"
 
     item = qa.judge_record(_inject(_substitution(), mutate))
-    assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"  # 증명 못 한 변수 전환 — 종전 FAIL 유지
 
 
 def test_parameterized_definition_is_ignored_when_a_pure_one_decides() -> None:
@@ -430,12 +442,153 @@ def test_parameterized_definition_is_ignored_when_a_pure_one_decides() -> None:
     assert item.checks["C4"].state is qa.CheckState.PASS
 
 
-def test_substitution_without_a_defining_condition_is_unverifiable() -> None:
+def test_substitution_without_a_defining_condition_keeps_the_old_failure() -> None:
     def mutate(r: Record) -> None:
         del r["verify"]["conditions"][1]
 
     item = qa.judge_record(_inject(_substitution(), mutate))
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+
+
+def test_one_unproven_definition_blocks_the_substitution_proof() -> None:
+    """정의 등식이 둘이고 하나가 y 를 하나로 정하지 못하면(`y**2 = …` — y = ±…) 성립 증명이 아니다."""
+
+    def mutate(r: Record) -> None:
+        r["verify"]["conditions"].append("y**2 = (2*x**3 - 6*x**2 - 18*x + 58)**2")
+
+    item = qa.judge_record(_inject(_substitution(), mutate))
+    assert item.checks["C4"].code == "C4_STEP_INCORRECT"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PR #1703 검토 반례 — main 에서 FAIL 이던 입력은 FAIL, 판정 불가이던 입력은 PASS 로 새지 않는다
+# ──────────────────────────────────────────────────────────────────────────
+def _rec(conditions: list[str], answer: str, amap: dict[str, str], steps: list[str]) -> Record:
+    return {
+        "slug": "adv",
+        "unit_codes": ["SYN"],
+        "question_format": "단답형",
+        "answer": answer,
+        "verify": {"conditions": conditions, "answer_map": amap, "solution_steps": steps},
+    }
+
+
+ADVERSARIAL: dict[str, tuple[Record, qa.Verdict]] = {
+    # 상1 — 첫 줄의 틀린 값(도메인 위반·근 아님)에 맞는 대입을 한 풀이
+    "A3d 도메인 위반 값 대입": (
+        _rec(
+            ["a**2 - 4 = 0", "a > 0", "y = a**2 + 1"],
+            "5",
+            {"a": "2", "y": "5"},
+            ["a = -2", "y = 5"],
+        ),
+        qa.Verdict.FAIL,
+    ),
+    "A3c 등식의 근 아닌 값 대입": (
+        _rec(["x**3 = 27", "y = x**2"], "9", {"x": "3", "y": "9"}, ["x = -3", "y = 9"]),
+        qa.Verdict.FAIL,
+    ),
+    "A3 도메인 위반 값 대입(등식 둘)": (
+        _rec(["y = x**2", "x > 0", "x**2 = 9"], "9", {"x": "3", "y": "9"}, ["x = -3", "y = 9"]),
+        qa.Verdict.FAIL,
+    ),
+    "A3b 등식 단계 뒤 도메인 위반 값": (
+        _rec(["y = x**2", "x > 0"], "9", {"x": "3", "y": "9"}, ["x**2 = 9", "x = -3", "y = 9"]),
+        qa.Verdict.FAIL,
+    ),
+    # 중4 — 정의 등식 없는 변수 전환
+    "A4 정의 없는 변수 전환": (
+        _rec(["x**2 = 9", "x > 0"], "5", {"x": "3", "y": "5"}, ["x = 3", "y = 5"]),
+        qa.Verdict.FAIL,
+    ),
+    # 상2 — 불완전한 후보 나열(허용 근 2·3 중 2만 남음)
+    "A1 불완전 후보": (
+        _rec(["(x-1)*(x-2)*(x-3) = 0", "x > 3/2"], "2", {"x": "2"}, ["x = 1, x = 2"]),
+        qa.Verdict.UNVERIFIABLE,
+    ),
+    # 상3 — 주기함수(해 집합 불완전)
+    "A9 삼각 등식 후보": (
+        _rec(
+            ["sin(x*pi/180) = 1/2", "x > 100", "x < 720"], "150", {"x": "150"}, ["x = 30, x = 150"]
+        ),
+        qa.Verdict.UNVERIFIABLE,
+    ),
+    # 대조 — 근 선택 근거·정의 등식이 모두 있는 올바른 풀이(main 의 거짓 실패 → PASS)
+    "A10 선택 뒤 대입(올바름)": (
+        _rec(
+            ["a**2 - 4 = 0", "a > 0", "y = a**2 + 1"],
+            "5",
+            {"a": "2", "y": "5"},
+            ["a**2 - 4 = 0", "a = -2, a = 2", "a = 2", "y = 5"],
+        ),
+        qa.Verdict.PASS,
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(ADVERSARIAL))
+def test_review_counterexamples(name: str) -> None:
+    record, expected = ADVERSARIAL[name]
+    item = qa.judge_record(record)
+    assert item.verdict is expected, item.reason_text()
+
+
+def test_c2_domain_requires_the_full_root_set_even_with_the_right_survivor() -> None:
+    """근 -2 를 빠뜨린 나열(-1, 3) — 남은 후보 3 이 정답과 같아도 근 집합이 불완전하면 판정하지 않는다.
+    완전한 나열(-2, -1, 3)이면 같은 문항이 PASS 다(대조)."""
+    complete = _rec(
+        ["(x + 1)*(x + 2)*(x - 3) = 0", "x > 0"], "3", {"x": "3"}, ["x = -2, x = -1, x = 3"]
+    )
+    assert qa.judge_record(complete).checks["C2"].state is qa.CheckState.PASS
+
+    def mutate(r: Record) -> None:
+        _steps(r)[-1] = "x = -1, x = 3"
+
+    item = qa.judge_record(_inject(complete, mutate))
+    assert item.checks["C2"].code == "C2_DOMAIN_CANDIDATES_INCOMPLETE"
+    assert item.verdict is qa.Verdict.UNVERIFIABLE
+
+
+def test_answer_aggregate_blocks_the_domain_filter_even_when_values_coincide() -> None:
+    def mutate(r: Record) -> None:
+        r["verify"]["answer_aggregate"] = "sum"
+
+    item = qa.judge_record(_inject(_domain_roots(), mutate))
+    assert item.checks["C2"].code == "C2_ROOT_CHOICE_UNSTRUCTURED"
+
+
+def test_multivariable_inequality_is_not_a_domain_constraint() -> None:
+    """`a + y > 0` 은 a 의 도메인이 아니다 — 섞으면 판정이 막힌다(근 선택은 a 의 제약만으로)."""
+
+    def mutate(r: Record) -> None:
+        r["verify"]["conditions"].append("a + y > 0")
+
+    item = qa.judge_record(_inject(_domain_selection_step(), mutate))
+    assert item.checks["C4"].state is qa.CheckState.PASS
+
+
+def test_two_equations_for_the_variable_leave_the_root_set_undetermined() -> None:
+    """그 변수의 등식이 둘이면(`3a² = 108`·`a² = 49`) 근의 집합을 하나로 정하지 않는다."""
+
+    def mutate(r: Record) -> None:
+        r["verify"]["conditions"].append("a**2 = 49")
+
+    item = qa.judge_record(_inject(_domain_selection_step(), mutate))
     assert item.checks["C4"].code == "C4_STEP_UNVERIFIABLE"
+
+
+def test_c2_undecidable_domain_on_a_candidate_is_unverifiable_not_excluded() -> None:
+    """후보 -1 에서 `log(x) >= 1` 은 판정 불가 — 그 후보를 허용으로도 제외로도 세지 않는다."""
+    record = _rec(["x**2 - 1 = 0", "log(x) >= 1"], "1", {"x": "1"}, ["x = -1, x = 1"])
+    item = qa.judge_record(record)
+    assert item.checks["C2"].state is qa.CheckState.UNVERIFIABLE
+    assert item.checks["C2"].code == "C2_DOMAIN_UNVERIFIABLE"
+
+
+def test_transitions_already_correct_are_not_reinterpreted() -> None:
+    """동치 판정이 correct 인 전이(`x = 3 → x = 3`)는 해석 판정으로 다시 보지 않는다."""
+    record = _rec(["x**2 = 9", "x < 0"], "3", {"x": "3"}, ["x = 3", "x = 3"])
+    assert qa.judge_record(record).checks["C4"].state is qa.CheckState.PASS
 
 
 # ──────────────────────────────────────────────────────────────────────────

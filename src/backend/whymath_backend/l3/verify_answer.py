@@ -791,6 +791,16 @@ def verify_root_selection(
     if ans_text is None:
         return _unverifiable(f"근 선택 — answer_map에 변수 {var} 없음·안전 회피")
 
+    if domain:
+        # 도메인 경로는 허용 근을 "근 집합 − 제약 위반"으로 세므로 근 집합이 **완전**해야 한다.
+        # `sympy.solve` 는 주기함수 등에서 해의 일부만 돌려준다(`sin(x) = 0` → [0, pi]) — 그것을 근
+        # 전체로 읽으면 `0 < x < 10` 의 허용 근이 π 하나로 보인다(실제 π·2π·3π · PR #1703 검토 상3).
+        # 다항 등식만 받는다(다항식의 solve 는 근을 빠뜨리지 않는다).
+        try:
+            sympy.Poly(residual, var)
+        except (sympy.PolynomialError, sympy.GeneratorsError, ValueError):
+            return _unverifiable("근 선택 — 도메인 경로는 다항 등식만(근 집합 완전성)·안전 회피")
+
     try:
         ans_val = _real_value(safe_sympify(ans_text), tol)
         raw_roots = sympy.solve(sympy.Eq(residual, 0), var)
