@@ -79,7 +79,10 @@ __all__ = [
     "SolvabilityVerdict",
     "budget_exceeded_verdict",
     "classify_solvability",
+    "condition_relation",
     "derive_selected_root",
+    "satisfies_domain",
+    "split_equation_domain",
     "verify_answer",
     "verify_conditional_equal",
     "verify_congruent_by_ratio",
@@ -96,6 +99,7 @@ __all__ = [
     "verify_root_aggregate",
     "verify_root_selection",
     "verify_series_converges",
+    "verify_substituted_value",
     "warm_isolated_worker",
 ]
 
@@ -573,6 +577,159 @@ def _distinct_values(values: Sequence[float], tol: float) -> list[float]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 도메인 제약(P3-71) — "단일 등식 + 같은 변수의 도메인 부등식" 조건 리스트를 읽는 공용 조각.
+# 근 선택(`verify_root_selection`)과 Solution QA 의 해석 단계 판정(`harness/solution_qa`)이 같은
+# 파서·같은 경계 규칙을 쓰게 여기 둔다(SymPy 판정 권위는 이 모듈 하나).
+# ──────────────────────────────────────────────────────────────────────────
+def condition_relation(condition: str) -> tuple[str, frozenset[str]] | None:
+    """조건 1개의 (관계 연산자, 자유변수 이름 집합). 파싱 불가·미지원 관계면 None.
+
+    연산자는 `_parse_condition` 과 같다 — 등식은 `"=="`, 부등식·≠ 는 `>`·`<`·`>=`·`<=`·`!=`.
+    """
+    try:
+        residual, op = _parse_condition(condition)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 None(호출부가 판정 불가로 드러낸다)
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return None
+    return op, frozenset(str(symbol) for symbol in residual.free_symbols)
+
+
+def split_equation_domain(
+    conditions: str | Sequence[str],
+) -> tuple[str, tuple[str, ...], str] | None:
+    """조건을 (단일 등식, 도메인 부등식들, 변수)로 가른다 — 그 모양이 아니면 None.
+
+    "그 모양" = 조건 전부가 **같은 단일 변수** 하나만 자유변수로 갖고, 그중 등식이 **정확히 하나**,
+    나머지는 부등식·≠ 인 것(예 `["3*a**2 = 108", "a > 0"]`). 도메인 부등식이 없는 단일 등식도
+    `(등식, (), 변수)` 로 돌린다. 등식이 둘 이상(연립)·변수가 둘 이상·파싱 불가는 None — 근 선택의
+    뜻이 불명확하므로 호출부가 판정 불가로 처리한다.
+    """
+    items = [conditions] if isinstance(conditions, str) else list(conditions)
+    equation: str | None = None
+    domain: list[str] = []
+    var: str | None = None
+    for condition in items:
+        relation = condition_relation(condition)
+        if relation is None or len(relation[1]) != 1:
+            return None
+        op, names = relation
+        name = next(iter(names))
+        if var is not None and name != var:
+            return None
+        var = name
+        if op == "==":
+            if equation is not None:
+                return None  # 등식 둘 이상 — 연립이다.
+            equation = condition
+        else:
+            domain.append(condition)
+    if equation is None or var is None:
+        return None
+    return equation, tuple(domain), var
+
+
+def _domain_truth(
+    domain: Sequence[str], var: sympy.Symbol, value: sympy.Expr, tol: float
+) -> bool | None:
+    """`value` 가 도메인 부등식 전부를 만족하는가 — True·False(하나라도 위반 확정)·None(판정 불가).
+
+    경계(대입한 잔차가 **기호적으로 정확히 0**)는 수치 허용치보다 먼저 가른다: `s > 3` 에 후보 3 은
+    "모호"가 아니라 위반이 확정이고, `c >= 0` 에 후보 0 은 만족이 확정이다. 수치 경로
+    (`_eval_relation`)만 쓰면 엄격 부등식의 경계를 모호(None)로 접어 판정할 수 있는 근 선택을
+    놓친다.
+    """
+    unknown = False
+    for condition in domain:
+        try:
+            residual, op = _parse_condition(condition)
+            at = safe_subs(residual, {var: value})
+        except Exception as exc:  # noqa: BLE001 — 파싱·대입 불가는 판정 불가(None)
+            logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+            return None
+        if op == "==" or getattr(at, "free_symbols", None):
+            return None  # 도메인은 부등식만·대입 후 자유변수가 남으면 이 변수의 제약이 아니다.
+        truth: bool | None
+        if getattr(at, "is_zero", None) is True:
+            truth = op in (">=", "<=")  # 정확 경계 — 등호 포함만 만족(`>`·`<`·`!=` 는 위반).
+        else:
+            magnitude = _eval_relation_residual(at, tol)
+            truth = None if magnitude is None else _eval_relation(magnitude, op, tol)
+        if truth is False:
+            return False
+        if truth is None:
+            unknown = True
+    return None if unknown else True
+
+
+def satisfies_domain(
+    domain: Sequence[str], var: str, value: str, *, tol: float = 1e-9
+) -> bool | None:
+    """값 문자열이 변수 `var` 의 도메인 부등식 전부를 만족하는가 — 3상태(`_domain_truth`).
+
+    값이 파싱 불가면 None(판정 불가 — 만족/위반으로 위장하지 않는다). 도메인이 비면 True.
+    """
+    try:
+        parsed = safe_sympify(value)
+    except Exception as exc:  # noqa: BLE001 — 값 파싱 불가는 판정 불가
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return None
+    return _domain_truth(domain, sympy.Symbol(var), parsed, tol)
+
+
+def verify_substituted_value(
+    condition: str,
+    given: Mapping[str, str],
+    target: str,
+    claimed: str,
+    *,
+    tol: float = 1e-9,
+) -> AnswerVerdict:
+    """대입 단계 판정(P3-71) — 등식 `condition` 에 `given` 을 대입하면 `target` 이 실수 하나로
+    정해지고, 그 값이 `claimed` 인가.
+
+    풀이의 해석 단계 "x = 3 → y = 4"(변수 값 → 식의 값)를 동치가 아니라 **정의 등식에 대입한 결과**
+    로 판정한다. 정의 등식은 호출부가 문항 조건에서 고른다(정답에서 만들지 않는다).
+      - **pass**: 대입 뒤 `target` 에 대한 다항 등식이 서로 다른 실수해 1개를 갖고 그것이 `claimed`.
+      - **fail**: 그 유일 실수해가 `claimed` 와 다르다(틀린 대입값).
+      - **unverifiable**: 등식 아님·대입 뒤 `target` 외 자유변수가 남음·`target` 에 대한 다항식이
+        아님·실수해가 0개 또는 여러 개·값이 실수가 아님(보수적·pass 위장 금지).
+    """
+    try:
+        residual, op = _parse_condition(condition)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("대입 — 조건 파싱 불가·안전 회피")
+    if op != "==":
+        return _unverifiable("대입 — 등식이 아님(부등식/≠)·안전 회피")
+    symbol = sympy.Symbol(target)
+    try:
+        reduced = safe_subs(residual, {sympy.Symbol(k): safe_sympify(v) for k, v in given.items()})
+        claimed_value = _real_value(safe_sympify(claimed), tol)
+    except Exception as exc:  # noqa: BLE001 — 대입·치환 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("대입 — 값 대입/치환 불가·안전 회피")
+    if {str(s) for s in reduced.free_symbols} != {target}:
+        return _unverifiable(f"대입 — 대입 뒤 자유변수가 {target} 하나가 아님·안전 회피")
+    if claimed_value is None:
+        return _unverifiable("대입 — 주장값이 실수가 아님·안전 회피")
+    try:
+        sympy.Poly(reduced, symbol)  # 다항일 때만 solve 의 해 집합을 신뢰한다(빈 결과 오판 회피).
+        raw = sympy.solve(sympy.Eq(reduced, 0), symbol)
+    except Exception as exc:  # noqa: BLE001 — 비다항·풀이 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable(f"대입 — {target} 에 대한 다항 등식이 아님/풀이 불가·안전 회피")
+    values = _distinct_values([rv for r in raw if (rv := _real_value(r, tol)) is not None], tol)
+    if len(values) != 1:
+        return _unverifiable(f"대입 — {target} 이 실수 하나로 정해지지 않음({len(values)}개)")
+    if _approx_equal(claimed_value, values[0], tol):
+        return _pass(samples_checked=1)
+    return _fail(
+        f"대입 — {dict(given)} 를 대입하면 {target} = {values[0]} 이나 주장값은 {claimed}",
+        samples_checked=1,
+    )
+
+
 def verify_root_selection(
     conditions: str | Sequence[str],
     answer: Mapping[str, str],
@@ -587,22 +744,35 @@ def verify_root_selection(
     답이 유일하게 정해지지 않아*(두 근 다 방정식을 만족) Tier1이 **틀린 근도 통과**시키기 때문이다
     (Phaiakes9 실측: `3x²+11x-4=0`의 큰 근에 작은 근 -4를 줘도 Tier1 pass).
 
-    적용 범위: **단일 변수·단일 등식** 조건만. 연립·다변수·파라미터·부등식·비다항 등 풀 수 없거나
-    실근이 없거나 답이 실근이 아니면 **unverifiable**(보수적·pass 위장 금지 — verify_answer 정직성
-    상속). 이 함수는 답이 조건을 *만족*하는지는 검사하지 않는다(그건 verify_answer 소관) — 오직
-    *선택*만 판정한다. 판정:
+    적용 범위: **단일 변수·단일 등식** 조건, 또는 **단일 등식 + 같은 변수의 도메인 부등식** 리스트
+    (P3-71 — 예 `["3*a**2 = 108", "a > 0"]`·`["… = 36", "c >= 0", "c <= 3"]`). 도메인 부등식이
+    있으면 실근을 그 제약으로 먼저 거르고(허용 근), 선택은 허용 근 안에서 한다. 도메인 판정은
+    조건에서만 한다 — 답에서 선택을 역산하지 않는다(P3-24 B3 단서). 연립(등식 둘 이상)·다변수·
+    파라미터·비다항 등 풀 수 없거나 실근이 없거나 답이 실근이 아니면 **unverifiable**
+    (보수적·pass 위장 금지 — verify_answer 정직성 상속). 이 함수는 답이 등식을 *만족*하는지는
+    검사하지 않는다(그건 verify_answer 소관) — 오직 *선택*만 판정한다. 판정:
       - **pass**: 답이 요구된 근(largest=최대·smallest=최소·unique=유일)과 일치.
-      - **fail**: 답이 실근이나 *요구된 근이 아님*(예 큰 근 요구에 작은 근·unique 요구에 다근).
-      - **unverifiable**: 적용 밖(풀 수 없음·다변수·실근 없음 등) — Tier1에 판정을 맡긴다.
+      - **fail**: 답이 실근이나 *요구된 근이 아님*(예 큰 근 요구에 작은 근·unique 요구에 다근·
+        도메인 제약을 어기는 근).
+      - **unverifiable**: 적용 밖(풀 수 없음·다변수·실근 없음·도메인 판정 불가 등) — Tier1에 맡긴다.
     """
-    # 단일 등식만 — 연립/빈 조건은 선택 의미가 불명확(보수적 회피).
+    # 단일 등식(종전) 또는 단일 등식 + 같은 변수의 도메인 부등식(P3-71). 연립/빈 조건은 선택 의미가
+    # 불명확(보수적 회피). 원소 1개 리스트는 종전과 같은 경로다(하위호환).
+    domain: tuple[str, ...] = ()
+    condition: str | None
     if isinstance(conditions, str):
-        condition: str | None = conditions
+        condition = conditions
     else:
         condition_list = list(conditions)
-        condition = condition_list[0] if len(condition_list) == 1 else None
+        if len(condition_list) == 1:
+            condition = condition_list[0]
+        else:
+            split = split_equation_domain(condition_list)
+            condition, domain = (split[0], split[1]) if split is not None else (None, ())
     if condition is None:
-        return _unverifiable("근 선택 — 단일 등식이 아님(연립/빈 조건)·안전 회피")
+        return _unverifiable(
+            "근 선택 — 단일 등식(+같은 변수의 도메인 부등식)이 아님(연립/빈 조건)·안전 회피"
+        )
 
     try:
         residual, op = _parse_condition(condition)
@@ -630,13 +800,28 @@ def verify_root_selection(
     if ans_val is None:
         return _unverifiable("근 선택 — 답이 실수가 아님·안전 회피")
 
-    real_roots = [rv for r in raw_roots if (rv := _real_value(r, tol)) is not None]
+    reals = [(r, rv) for r in raw_roots if (rv := _real_value(r, tol)) is not None]
+    real_roots = [rv for _, rv in reals]
     if not real_roots:
         return _unverifiable("근 선택 — 실근 없음(복소근/풀이 불가)·안전 회피")
 
     # 답이 실근 중 하나인지(Tier1이 이미 보장하나 방어적 확인 — 아니면 Tier1에 판정을 맡긴다).
     if not any(_approx_equal(ans_val, r, tol) for r in real_roots):
         return _unverifiable("근 선택 — 답이 실근 집합에 없음(Tier1 소관)·안전 회피")
+
+    if domain:
+        # 도메인 제약으로 허용 근을 가른다(정확근으로 판정 — 경계 근을 모호로 접지 않는다).
+        flags = [_domain_truth(domain, var, root, tol) for root, _ in reals]
+        if any(flag is None for flag in flags):
+            return _unverifiable("근 선택 — 도메인 제약 판정 불가·안전 회피")
+        admissible = [rv for (_, rv), flag in zip(reals, flags, strict=True) if flag]
+        if not any(_approx_equal(ans_val, r, tol) for r in admissible):
+            return _fail(
+                f"근 선택({selection}) — 답 {ans_val}가 도메인 제약 {list(domain)}을 어김"
+                f"(허용 근 {sorted(_distinct_values(admissible, tol))}).",
+                samples_checked=len(real_roots),
+            )
+        real_roots = admissible
 
     distinct = _distinct_values(real_roots, tol)
     if selection == "unique":
