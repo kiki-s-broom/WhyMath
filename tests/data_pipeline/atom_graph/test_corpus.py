@@ -24,16 +24,22 @@ class TestCorpusCounts:
     def test_edge_counts(self, corpus_provenance: dict[str, object]) -> None:
         ec = corpus_provenance["edge_counts"]  # type: ignore[index]
         # 2210(백본 v1) + 24(S4-60 고→대 경계 병합 · cross_band_edges_university_merge_v1)
-        assert ec["atom_id_edges"] == 2234
-        assert ec["narrative_edges_raw"] == 1007
+        assert ec["atom_id_edges"] == 2231  # KG-10 ② 경계 검수(반려 3·교체 1)로 2,234→2,231
+        assert (
+            ec["narrative_edges_raw"] == 973
+        )  # KG-09 v3 재생성: 서술형 1007 → 973(원자ID 직접 정규화 3·중복 정리 31)
 
     def test_university_atoms(self, corpus_provenance: dict[str, object]) -> None:
         assert corpus_provenance["school_level_university_atoms"] == 512
 
     def test_normalization_counts(self, corpus_provenance: dict[str, object]) -> None:
         nc = corpus_provenance["normalization_counts"]  # type: ignore[index]
-        assert nc["자리값"] == 13  # 11(concept/기타 필드) + 2(엣지 from/to_name·4수03-14-2)
-        assert nc["경계값"] == 4
+        assert (
+            nc["자리값"] == 11
+        )  # KG-09 v3 재생성: 13 → 11(v2 마스터가 엣지 from/to_name 2건을 원본에서 교정)
+        assert (
+            nc["경계값"] == 5
+        )  # KG-09 v3 재생성: 4 → 5(v2 마스터 본문 정정분에 비표준 표기 1건 추가 유입 → transform이 흡수)
         assert nc["미적하이픈_distinct"] == 43  # 미적Ⅰ/Ⅱ 무하이픈 고유 코드 43개
         assert nc["redacted_핵심명제"] == 1324  # K-12 원자 전수 redact
 
@@ -48,7 +54,7 @@ class TestCorpusCounts:
         # 통일(공수·기수와 정합) → 129 미적 원자ID만 변경, 그 외 카운트 동일.
         assert (
             corpus_provenance["source_sha256"]
-            == "83a0d2883fe8552868916181f04ebe687f24dd9cabb91ec4b3096d59a767d0e0"
+            == "0f798b255c4022c87cbebf66743394c357feaad8267b85011e79fb432ac25ec9"  # KG-10 ②: 통합마스터 v3 정본 xlsx(변경이력_v3 No.19까지)
         )
 
 

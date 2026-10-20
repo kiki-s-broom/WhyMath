@@ -63,6 +63,7 @@ from whymath_backend.harness.wh1_loop import (
     TurnState,
     VerifyStepAction,
 )
+from whymath_backend.harness.wh1_tutor_context import TutorContextSlot
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l3.models import RoutingRequest
@@ -102,6 +103,8 @@ _SYSTEM_PROMPT = """당신은 WhyMath의 수학 튜터링 '두뇌'입니다. 당
   질문/힌트로 스스로 생각하게 유도하세요(소크라테스). end_turn의 utterance에 정답을 쓰지 마세요.
 - **내부 도구는 침묵**: read/verify/match/curate/query/select/log는 학생에게 보이지 않는 내부
   동작입니다. 학생 발화는 오직 end_turn에서만 나옵니다.
+- **context 표기**: 상태의 context_missing은 이번 턴에 얻지 못한 정보, context_not_delivered는
+  서버에는 있으나 당신에게 주어지지 않은 정보입니다. 그 정보를 아는 것처럼 추측하지 마세요.
 
 ## 출력 형식 (엄수)
 JSON 객체 하나만 출력하세요. 다른 텍스트·설명·코드펜스 없이:
@@ -151,7 +154,7 @@ class LLMTutorPolicy:
         student_text: str = "",
         solution_steps: Sequence[str] = (),
         probe_candidates: Sequence[ProbeCandidate] = (),
-        theta: float = 0.0,
+        theta: float | None = 0.0,
         outside_mids: Sequence[str] = (),
         administered: Sequence[str] = (),
         subscription: str = "free",
@@ -173,6 +176,8 @@ class LLMTutorPolicy:
             session_recall: 직전 세션의 교수 이력(PED-04 D1 reader ②·**메타 한정**). 필드가
                 전부 enum/정수라 학생 원문을 실을 자리가 타입상 없다. None(기본)이면 요약에
                 키 자체가 없어 프롬프트가 기존과 바이트 동일.
+            theta: IRT 능력 추정. **None이면 콜드스타트 0.0으로 쓰되 '모름'을 기록한다**
+                (`delivered_context_slots`가 학생 상태를 전달됨으로 세지 않는다 — P3-08).
         """
         # 좌석 조립(OPS-36) — 여기서부터 LLM 호출은 `l3.pipeline` 경유다(라우터·캐시·관측).
         # `seam`이 주어지면 그것을 쓴다(대체 가능성을 타입으로 — 테스트·미래 파이프라인 교체).
@@ -183,13 +188,18 @@ class LLMTutorPolicy:
         self._student_text = student_text
         self._solution_steps = list(solution_steps)
         self._probe_candidates = list(probe_candidates)
-        self._theta = theta
+        # P3-08: θ 부재를 0.0으로 채우는 콜드스타트는 유지하되, 채웠다는 사실을 잃지 않는다.
+        self._theta_known = theta is not None
+        self._theta = theta if theta is not None else 0.0
         self._outside_mids = list(outside_mids)
         self._administered = list(administered)
         self._subscription = subscription
         self._difficulty = difficulty
         self._max_history = max_history
         self._session_recall = session_recall
+        # P3-08 정직 신호 — 러너가 정책 생성 *뒤* `disclose_context`로 채운다(기본 = 키 없음).
+        self._context_missing: tuple[str, ...] = ()
+        self._context_not_delivered: tuple[str, ...] = ()
         # OPS-134 ② — 이 턴이 LLM을 몇 번 불렀고 얼마나 걸렸는지의 인프로세스 회계. 턴이
         # 타임아웃으로 끊겨도 정책 객체는 호출자(`wh1_primary`)가 쥐고 있어 읽을 수 있다
         # (Langfuse 단독 회계 금지).
@@ -223,6 +233,29 @@ class LLMTutorPolicy:
         호출이 정상이면 지워진다 — 첫 호출만 실패하고 둘째가 정상 발화한 턴은 LLM 발화다.
         """
         return self._last_action_degraded
+
+    # ── P3-08 튜터 context 전달 회계 ─────────────────────────────────────
+    def delivered_context_slots(self) -> frozenset[TutorContextSlot]:
+        """이 정책이 **실제로 보유한** 튜터 context 슬롯 — 매니페스트 `delivered_to_tutor`의 원천.
+
+        핸들러의 추정이 아니라 정책 객체의 보유값에서 계산한다: 학생 답안(사적 `student_text`가
+        공백이 아님)·풀이 기록(공백 아닌 단계가 있음)·학생 상태(θ를 0.0 콜드스타트로 채우지 않고
+        실제로 받음). 활성 가설·교수법 팩은 정책이 아니라 러너(초기 가설·금지모드 가드)가 받으므로
+        러너가 합친다. 개념·스킬·숙달·문제 내용은 정책 입력이 아니다 — 여기에 나오지 않는다.
+        """
+        slots: set[TutorContextSlot] = set()
+        if self._student_text.strip():
+            slots.add(TutorContextSlot.STUDENT_ANSWER)
+        if any(step.strip() for step in self._solution_steps):
+            slots.add(TutorContextSlot.SOLUTION_RECORD)
+        if self._theta_known:
+            slots.add(TutorContextSlot.LEARNER_STATE)
+        return frozenset(slots)
+
+    def disclose_context(self, *, missing: Sequence[str], not_delivered: Sequence[str]) -> None:
+        """튜터 프롬프트 요약에 실을 누락·미전달 슬롯 이름(값 0)을 정한다 — 러너가 생성 뒤 호출."""
+        self._context_missing = tuple(missing)
+        self._context_not_delivered = tuple(not_delivered)
 
     # ── TutorPolicy Protocol ──────────────────────────────────────────
     async def next_action(self, state: TurnState) -> Action:
@@ -289,7 +322,17 @@ class LLMTutorPolicy:
         # ③ 토큰 근사 예산 — 초과 시 세션 회상부터, 그다음 history·저confidence 가설·match id를
         #    결정론 절단. 회상이 1순위인 이유: 세션 *간* 맥락은 이번 턴 결정에 가장 덜 급하다.
         recall = self._session_recall
-        prompt = self._render_summary(state, hyp_summaries, match_ids, recent, omitted, recall)
+        missing, undelivered = self._context_missing, self._context_not_delivered
+        prompt = self._render_summary(
+            state,
+            hyp_summaries,
+            match_ids,
+            recent,
+            omitted,
+            recall,
+            context_missing=missing,
+            context_not_delivered=undelivered,
+        )
         while self._approx_tokens(prompt) > _MAX_PROMPT_TOKENS:
             if recall is not None:
                 recall = None
@@ -310,7 +353,16 @@ class LLMTutorPolicy:
                 omitted += 1
             else:
                 break  # 고정 필드만 남아 더 줄일 수 없음(안전 탈출).
-            prompt = self._render_summary(state, hyp_summaries, match_ids, recent, omitted, recall)
+            prompt = self._render_summary(
+                state,
+                hyp_summaries,
+                match_ids,
+                recent,
+                omitted,
+                recall,
+                context_missing=missing,
+                context_not_delivered=undelivered,
+            )
         return prompt
 
     def _budget_context_nodes(
@@ -369,6 +421,9 @@ class LLMTutorPolicy:
         recent: list[dict[str, object]],
         omitted: int,
         recall: SessionRecall | None = None,
+        *,
+        context_missing: Sequence[str] = (),
+        context_not_delivered: Sequence[str] = (),
     ) -> str:
         """예산 적용된 조각들로 최종 프롬프트 문자열을 조립(순수·결정론).
 
@@ -376,6 +431,10 @@ class LLMTutorPolicy:
         의도적으로 제외한다: 활성 가설은 이미 `active_hypotheses`로 렌더 중이라 중복이고,
         오개념을 초기 context에 preload하지 않는다는 금기(CLAUDE.md)에도 걸린다. 그 필드의
         소비처는 warmstart `exclude_mids` 하나뿐이다.
+
+        `context_missing`·`context_not_delivered`(P3-08)는 **절단 대상이 아니다** — 토큰 예산
+        루프가 줄이는 것은 회상·history·가설·match뿐이고 이 키들은 고정 필드처럼 남는다(누락
+        표기를 예산 때문에 지우면 그 자체가 무증상 누락이다). 슬롯 이름 ≤ 9개라 압력은 상수다.
         """
         summary: dict[str, object] = {
             "turn_index": state.turn_index,
@@ -396,6 +455,12 @@ class LLMTutorPolicy:
                 "last_strategies": [s.value for s in recall.last_socratic_strategies],
                 "turns_since": recall.turns_since,
             }
+        if context_missing:
+            # P3-08 정직 신호 — 이번 턴에 얻지 못한 context 슬롯(이름만·값 0).
+            summary["context_missing"] = list(context_missing)
+        if context_not_delivered:
+            # P3-08 정직 신호 — 서버는 얻었으나 이 요약·정책에 실리지 않은 슬롯(이름만).
+            summary["context_not_delivered"] = list(context_not_delivered)
         if omitted > 0:
             # fail-closed 정직 신호 — 예산으로 컨텍스트를 절단했음을 LLM에 명시(조용한 무동작 금지).
             summary["context_truncated"] = True

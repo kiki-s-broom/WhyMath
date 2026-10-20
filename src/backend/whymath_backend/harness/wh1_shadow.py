@@ -215,7 +215,24 @@ class Wh1HarnessShadowObservation(BaseModel):
     """끝난 LLM 호출의 소요 합(ms·OPS-134 ①). `elapsed_ms`와 대조하면 예산이 LLM 안에서 소진됐는지
     밖(캐시 대기·후보 조립·도구 실행)에서 소진됐는지 가려진다. 취소된 호출 소요는 몰라 제외."""
 
+    context_missing: list[str] | None = None
+    """P3-08 — 이 턴에 **얻지 못한** 튜터 context 슬롯 이름(9종 중·`wh1_tutor_context`의
+    `TutorContextSlot` 값). **None=구판·shadow 레코드**(매니페스트 미전달)로 "누락 0"(=`[]`)과
+    구분한다. 슬롯 *이름*만 — 값·id·원문은 없다(비식별)."""
+
+    context_not_delivered: list[str] | None = None
+    """P3-08 — 얻었으나 **튜터에 실리지 않은** 슬롯 이름(개념·스킬·숙달 등). None=구판."""
+
+    context_coverage_gap: list[str] | None = None
+    """P3-08 — 못 얻은 원인이 데이터 커버리지 공백(미매핑·팩 미보유 단원)인 슬롯 이름 — 로그는
+    INFO라 경보가 되지 않으므로 이 필드로 집계한다. None=구판."""
+
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def _names(values: Sequence[str] | None) -> list[str] | None:
+    """P3-08 슬롯 이름 목록 — None(구판)은 None 그대로, 그 밖은 list로."""
+    return list(values) if values is not None else None
 
 
 def _extract_verify_verdict(trace: Sequence[ToolResult]) -> str | None:
@@ -330,6 +347,9 @@ def emit_wh1_observation(
     llm_calls: int | None = None,
     llm_calls_finished: int | None = None,
     llm_ms_total: int | None = None,
+    context_missing: Sequence[str] | None = None,
+    context_not_delivered: Sequence[str] | None = None,
+    context_coverage_gap: Sequence[str] | None = None,
 ) -> None:
     """하네스 한 턴 결과를 관측 레코드로 emit — shadow·primary *공통* 단일 좌석(S1-11).
 
@@ -395,6 +415,9 @@ def emit_wh1_observation(
             llm_calls=llm_calls,
             llm_calls_finished=llm_calls_finished,
             llm_ms_total=llm_ms_total,
+            context_missing=_names(context_missing),
+            context_not_delivered=_names(context_not_delivered),
+            context_coverage_gap=_names(context_coverage_gap),
         ).model_dump_json()
     )
 
@@ -409,6 +432,9 @@ def emit_wh1_aborted_observation(
     llm_calls: int | None = None,
     llm_calls_finished: int | None = None,
     llm_ms_total: int | None = None,
+    context_missing: Sequence[str] | None = None,
+    context_not_delivered: Sequence[str] | None = None,
+    context_coverage_gap: Sequence[str] | None = None,
 ) -> None:
     """하네스가 **결과를 남기지 못하고 중단된** primary 턴의 레코드를 emit한다(OPS-134 ②).
 
@@ -435,6 +461,9 @@ def emit_wh1_aborted_observation(
             llm_calls=llm_calls,
             llm_calls_finished=llm_calls_finished,
             llm_ms_total=llm_ms_total,
+            context_missing=_names(context_missing),
+            context_not_delivered=_names(context_not_delivered),
+            context_coverage_gap=_names(context_coverage_gap),
         ).model_dump_json()
     )
 

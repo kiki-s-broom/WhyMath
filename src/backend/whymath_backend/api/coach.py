@@ -97,6 +97,12 @@ from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.harness.wh1_primary import run_wh1_primary_turn
 from whymath_backend.harness.wh1_shadow import observe_wh1_harness_shadow
+from whymath_backend.harness.wh1_tutor_context import (
+    TutorContextManifest,
+    TutorDeliveryReceipt,
+    build_tutor_context_manifest,
+    log_tutor_context,
+)
 from whymath_backend.l1.embedding_provider import build_provider
 from whymath_backend.l1.standards.alignment_query import (
     AlignmentAxis,
@@ -119,7 +125,10 @@ from whymath_backend.l2.learning_session_writer import record_learning_activity
 from whymath_backend.l2.learning_state_machine import advance_on_graded_attempt
 from whymath_backend.l2.mastery_tracking import record_problem_attempt_mastery
 from whymath_backend.l2.prerequisite_recommendation import recommend_prerequisite_gaps
-from whymath_backend.l2.skill_mastery_tracking import record_problem_attempt_skill_mastery
+from whymath_backend.l2.skill_mastery_tracking import (
+    get_concept_skill_ids,
+    record_problem_attempt_skill_mastery,
+)
 from whymath_backend.l3.interfaces import (
     CacheBackend,
     LLMProvider,
@@ -548,6 +557,23 @@ _SERVED_HINT_DESC = (
 )
 
 
+# P3-08 — 튜터 context 9종 매니페스트(세션 2응답 공통). stateless `CoachResponse`에는 싣지 않는다 —
+# 그 경로는 튜터(WH-1 primary)를 부르지 않고(LLM 0·DB 0) 9종 중 서버 조회 슬롯을 채울 수 없어,
+# 넣으면 늘 '누락'인 가짜 계기판이 된다.
+_TUTOR_CONTEXT_DESC = (
+    "튜터 context 9종의 **조회·전달 표기**(P3-08) — 학생 상태·현재 개념·현재 스킬·문제·"
+    "학생 답안·풀이 기록·추정 오개념·숙달·교수법 정책. 슬롯마다 `resolved`(서버 조회·요청으로 "
+    "값을 얻었는가)와 `delivered_to_tutor`(그 값이 튜터 LLM 정책 입력에 실제로 실렸는가)를 따로 "
+    "적는다. **현재 튜터에 실리는 것은 학생 답안·풀이 기록·활성 오개념 가설·학생 θ(와 금지모드 "
+    "가드 ON일 때 교수법 팩)뿐이며**, 개념·스킬·숙달·문제 내용은 얻더라도 `not_delivered`에 "
+    "남는다. `tutor_invoked=false`면 이 턴은 튜터를 부르지 않았다(완료 상태머신 가로채기·primary "
+    "OFF) — 전달은 전부 false다. 값은 담지 않는다(숙달·θ 수치·답안 길이·예외 타입명 비노출) — "
+    "크기와 원인 코드(`not_supplied`·`no_problem_context`·`none_detected`·`no_history`·"
+    "`coverage_gap`·`source_disabled`·`lookup_failed`)뿐이다. 누락이 있어도 코칭은 진행되며"
+    "(거부하지 않는다) 클라는 관측용으로만 쓴다."
+)
+
+
 class SessionCreateResponse(CoachResponse):
     """`/v1/coach/sessions` 응답 — `CoachResponse` + 영속된 dialogue/turn ID + 활성 가설 세트."""
 
@@ -582,6 +608,9 @@ class SessionCreateResponse(CoachResponse):
         default=FormVerdict.not_required, description=_ANSWER_FORM_DESC
     )
     served_hint: ServedHint | None = Field(default=None, description=_SERVED_HINT_DESC)
+    tutor_context: TutorContextManifest | None = Field(
+        default=None, description=_TUTOR_CONTEXT_DESC
+    )
 
 
 class TurnAppendResponse(CoachResponse):
@@ -621,6 +650,9 @@ class TurnAppendResponse(CoachResponse):
         default=FormVerdict.not_required, description=_ANSWER_FORM_DESC
     )
     served_hint: ServedHint | None = Field(default=None, description=_SERVED_HINT_DESC)
+    tutor_context: TutorContextManifest | None = Field(
+        default=None, description=_TUTOR_CONTEXT_DESC
+    )
 
 
 class SessionGetResponse(BaseModel):
@@ -2224,6 +2256,121 @@ async def _prerequisite_coaching_for(
     return recommend_prerequisite_coaching(gaps)  # 막힌 선수 없으면 None.
 
 
+class _ConceptSkillReading(NamedTuple):
+    """튜터 context ②③ 슬롯 조회 결과 — 값과 *조회 실패 여부*를 함께 싣는다(타입명은 로그에만)."""
+
+    concept_id: uuid.UUID | None
+    concept_failed: bool
+    skill_ids: tuple[str, ...]
+    skill_failed: bool
+
+
+_NO_CONCEPT_SKILL = _ConceptSkillReading(None, False, (), False)
+
+
+async def _tutor_concept_skills_for(
+    session: AsyncSession, problem_id: uuid.UUID | None
+) -> _ConceptSkillReading:
+    """문항 → 대표 개념 → estimable 스킬 — 튜터 context 9종의 '현재 Concept'·'현재 Skill'(P3-08).
+
+    해소 규칙은 기존 좌석 재사용뿐이다: 개념 = `get_primary_concept_id`(`_server_mastery_for`·
+    `_pack_for`와 같은 seam), 스킬 = `get_concept_skill_ids`(스킬 숙달 적재와 같은 1홉 규칙).
+    **그래프 순회가 아니다** — 개념 1개에서 스킬로 1홉(depth 1)이며 반환값은 튜터 프롬프트에
+    실리지 않고 크기만 매니페스트에 남는다.
+
+    P3-08이 *새로* 붙인 조회라 학생 응답을 깨면 안 된다 — **SAVEPOINT**(`begin_nested`) 안에서
+    돌려 DB 예외가 바깥 트랜잭션을 aborted로 만들지 않게 하고(`l2/learning_session_writer.py`
+    선례), 예외는 never-break로 삼키되 타입명을 로그에 남기고 판정은 `lookup_failed`로 낸다
+    (실패를 '매핑 없음'으로 뭉개지 않는 것이 이 함수의 요점이다).
+    """
+    if problem_id is None:
+        return _NO_CONCEPT_SKILL
+    concept_id: uuid.UUID | None = None
+    stage = "concept"
+    try:
+        async with session.begin_nested():
+            concept_id = await get_primary_concept_id(session, problem_id)
+            if concept_id is None:
+                return _NO_CONCEPT_SKILL
+            stage = "skill"
+            skill_ids = tuple(await get_concept_skill_ids(session, concept_id))
+    except Exception as exc:  # noqa: BLE001 — context 조회 실패는 코칭을 안 깬다(표기는 한다).
+        logger.warning(
+            "튜터 context %s 조회 실패(%s) — 누락(lookup_failed)으로 표기하고 진행",
+            stage,
+            type(exc).__name__,
+        )
+        if stage == "concept":
+            return _ConceptSkillReading(None, True, (), False)
+        return _ConceptSkillReading(concept_id, False, (), True)
+    return _ConceptSkillReading(concept_id, False, skill_ids, False)
+
+
+async def _tutor_context_for(
+    session: AsyncSession,
+    *,
+    body: CoachRequest,
+    problem_id: uuid.UUID | None,
+    server_theta: float | None,
+    grade: int | None,
+    active_hypotheses: Sequence[MisconceptionHypothesis],
+    server_mastery: float | None,
+    pack: PedagogyPack | None,
+) -> TutorContextManifest:
+    """튜터 context 9종 `resolved` 매니페스트를 조립한다(P3-08 집행 지점 ①).
+
+    세션 생성·턴 추가 두 핸들러가 튜터 호출 직전에 부른다. 값은 핸들러가 이미 조회한 것을
+    받기만 하고(재조회 0), 새 조회는 개념·스킬 2건뿐이다. `delivered_to_tutor`는 여기서 정하지
+    않는다 — 튜터 러너가 정책을 만든 뒤 실제 보유값으로 정한다(`_finalize_tutor_context`).
+
+    학생 답안은 튜터가 받는 것과 같은 식(`student_solution or student_input`)으로 읽는다 —
+    매니페스트가 튜터 입력과 다른 것을 재면 그 자체가 위장이다.
+    """
+    settings = get_settings()
+    concept_skill = await _tutor_concept_skills_for(session, problem_id)
+    return build_tutor_context_manifest(
+        problem_present=problem_id is not None,
+        concept_present=concept_skill.concept_id is not None,
+        concept_lookup_failed=concept_skill.concept_failed,
+        skill_ids=concept_skill.skill_ids,
+        skill_lookup_failed=concept_skill.skill_failed,
+        theta=server_theta,
+        theta_enabled=settings.l4_server_theta_enabled,
+        grade=grade,
+        student_answer=body.student_solution or body.student_input,
+        solution_steps=body.solution_steps,
+        hypotheses=active_hypotheses,
+        server_mastery=server_mastery,
+        client_mastery_supplied=body.mastery_level is not None or body.bkt_mastery is not None,
+        mastery_enabled=settings.l4_server_mastery_enabled,
+        pack=pack,
+        pack_enabled=settings.pedagogy_pack_prompt_enabled,
+    )
+
+
+def _finalize_tutor_context(
+    manifest: TutorContextManifest,
+    receipt: TutorDeliveryReceipt,
+    *,
+    tutor_invoked: bool,
+    seat: str,
+) -> TutorContextManifest:
+    """튜터 호출 결과를 반영한 최종 매니페스트 + 로그 1줄(P3-08 집행 지점 ②).
+
+    튜터를 불렀으면 러너가 채운 영수증(정책 실제 보유값 기준)을 쓰고, 영수증이 비었으면(러너가
+    정책 생성 전에 끝났거나 대체물이 채우지 않음) 전달 0으로 적는다 — 추정으로 채우지 않는다.
+    부르지 않았으면 `tutor_invoked=False`·전달 0이다(WARNING 없음·표기만).
+    """
+    if not tutor_invoked:
+        final = manifest
+    elif receipt.manifest is not None:
+        final = receipt.manifest
+    else:
+        final = manifest.with_delivery(tutor_invoked=True, delivered=())
+    log_tutor_context(final, seat=seat)
+    return final
+
+
 async def _log_verify_event(
     session: AsyncSession,
     *,
@@ -2987,6 +3134,8 @@ async def _wh1_primary_decision_or(
     theta: float | None = None,
     user_id: uuid.UUID | None = None,
     pack: PedagogyPack | None = None,
+    tutor_context: TutorContextManifest | None = None,
+    delivery: TutorDeliveryReceipt | None = None,
 ) -> PedagogyDecision:
     """flip(S1-11): 학생-대면 발화를 WH-1 하네스 LLM 발화로 교체 — 실패 시 결정론 폴백.
 
@@ -3007,6 +3156,9 @@ async def _wh1_primary_decision_or(
     러너로 thread한다 — 러너가 톤필터 직전 금지모드 가드(`mode_guard_runtime_enabled` 옵트인·
     기본 OFF)에 재사용(위반 발화 미서빙·소크라테스 재질문 폴백). None(무팩·플래그 OFF 해석)이면
     가드 무관.
+
+    `tutor_context`·`delivery`(P3-08): `_tutor_context_for`가 낸 9종 `resolved` 매니페스트를 러너로
+    넘기고, 러너가 정책 실제 보유값으로 `delivered_to_tutor`를 채운 결과를 `delivery`로 받는다.
     """
     try:
         utterance = await run_wh1_primary_turn(
@@ -3026,6 +3178,8 @@ async def _wh1_primary_decision_or(
             theta=theta,
             user_id=user_id,
             pack=pack,
+            tutor_context=tutor_context,
+            delivery=delivery,
         )
     except Exception as exc:  # noqa: BLE001 — flip은 앱을 죽이지 않는다(이중 방어·타입명 로그).
         logger.warning(
@@ -3306,6 +3460,17 @@ async def create_session(
     # 개념의 성취기준 고시코드) — 둘 다 비노출 개인화 슬롯(_grade_for/_standard_code_for docstring).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, body.problem_id)
+    # P3-08: 튜터 context 9종 판정 — 튜터 호출(아래 primary)·응답 `tutor_context` 공용 단일 원천.
+    tutor_context = await _tutor_context_for(
+        session,
+        body=body,
+        problem_id=body.problem_id,
+        server_theta=server_theta,
+        grade=grade,
+        active_hypotheses=active_hypotheses,
+        server_mastery=server_mastery,
+        pack=pack,
+    )
     # OPS-125: 연쇄 검증은 이벤트 루프 밖에서 먼저 계산해 주입한다(동기 함수 안 계산 금지).
     chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: step_carry = 게이트 이전 단계 검증 운반값(아래 _log_verify_event 적재 전용·비노출).
@@ -3353,7 +3518,10 @@ async def create_session(
     # 결정론 폴백(헬퍼 docstring). 구조화 결정·가설·증거 파이프라인은 위 결정론 경로 그대로.
     # 완료 상태머신이 발화를 가로챘으면(handled·돌아보기/인정/재고) LLM flip을 건너뛴다 — 그 발화는
     # *결정론 메타인지/재고 템플릿*이라 LLM으로 재작성하지 않는다(정서안전·문구 고정).
-    if wh1_primary_on and not completion.handled:
+    # P3-08: 튜터 호출 여부와 실제 전달 영수증 — 응답·로그가 '튜터가 받은 것'을 사실대로 적게 한다.
+    tutor_invoked = wh1_primary_on and not completion.handled
+    tutor_receipt = TutorDeliveryReceipt()
+    if tutor_invoked:
         decision = await _wh1_primary_decision_or(
             decision,
             body=body,
@@ -3372,7 +3540,12 @@ async def create_session(
             theta=server_theta,
             user_id=user.user_id,
             pack=pack,  # PED-23: decide에 넣은 같은 팩 재사용 — 러너의 금지모드 가드(옵트인).
+            tutor_context=tutor_context,  # P3-08: resolved 매니페스트 → 러너가 전달을 채운다.
+            delivery=tutor_receipt,
         )
+    tutor_context = _finalize_tutor_context(
+        tutor_context, tutor_receipt, tutor_invoked=tutor_invoked, seat="coach.create_session"
+    )
 
     now = datetime.now(timezone.utc)
     dialogue = DialogueORM.from_schema(
@@ -3577,6 +3750,7 @@ async def create_session(
         completed_attempt_id=completion.attempt_id,
         completion_evidence=completion.completion_evidence,
         served_hint=served_hint,
+        tutor_context=tutor_context,
     )
 
 
@@ -3735,6 +3909,17 @@ async def append_turns(
     # problem_id 출처(append 규약과 정합·expected_answer/server_mastery와 같은 출처 패턴).
     grade = await _grade_for(session, user.user_id)
     standard_code = await _standard_code_for(session, dialogue.problem_id)
+    # P3-08: create_session과 동형 — 문항은 dialogue 출처(append 규약).
+    tutor_context = await _tutor_context_for(
+        session,
+        body=body,
+        problem_id=dialogue.problem_id,
+        server_theta=server_theta,
+        grade=grade,
+        active_hypotheses=active_hypotheses,
+        server_mastery=server_mastery,
+        pack=pack,
+    )
     # OPS-125: create_session과 동형 — 연쇄 검증을 이벤트 루프 밖에서 먼저 계산해 주입한다.
     chain_verification = await _verify_chain_isolated(body, subject_capabilities.step_chain)
     # S4-19: create_session과 동형 — step_carry(게이트 이전 운반값)는 verify 적재 전용·비노출.
@@ -3792,7 +3977,10 @@ async def append_turns(
     # S1-11 flip: create_session과 동형 — 학생-대면 발화만 하네스 LLM 발화로 교체(검증 게이트·
     # 톤필터 통과분·실패 시 결정론 폴백). 멀티턴 메타(dialogue_id·turn_index)는 shadow와 동일 규약.
     # 완료 상태머신이 발화를 가로챘으면(돌아보기/인정/재고) LLM flip을 건너뛴다(결정론 템플릿 고정).
-    if wh1_primary_on and not completion.handled:
+    # P3-08: create_session과 동형 — 튜터 호출 여부·실제 전달 영수증.
+    tutor_invoked = wh1_primary_on and not completion.handled
+    tutor_receipt = TutorDeliveryReceipt()
+    if tutor_invoked:
         decision = await _wh1_primary_decision_or(
             decision,
             body=body,
@@ -3810,7 +3998,12 @@ async def append_turns(
             theta=server_theta,
             user_id=user.user_id,
             pack=pack,  # PED-23: create_session과 동형 — decide와 같은 팩을 가드에 재사용.
+            tutor_context=tutor_context,  # P3-08: create_session과 동형.
+            delivery=tutor_receipt,
         )
+    tutor_context = _finalize_tutor_context(
+        tutor_context, tutor_receipt, tutor_invoked=tutor_invoked, seat="coach.append_turns"
+    )
 
     current_total = dialogue.total_turns or 0
     student_order = current_total + 1
@@ -4008,6 +4201,7 @@ async def append_turns(
         completed_attempt_id=completion.attempt_id,
         completion_evidence=completion.completion_evidence,
         served_hint=served_hint,
+        tutor_context=tutor_context,
     )
 
 

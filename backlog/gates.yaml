@@ -724,6 +724,20 @@ gates:
       - "[2026-10-15] title: \"KG-02 검수 승격 회차 — 보류 중(2026-09-25 Kiki 판정: 보류+대장 정정) · 입력 작업 CONT-05 완료(2026-09-27 · 판정 기준 main 0e7b4f6b) → Kiki 재판정 대기. CONT-05 결과: 학생 /study 공급이 이제 review_status=reviewed만 통과시킨다(ⓐ fail-closed · 집행 l4/content_supply.py::resolve_concept_dsl — 캐시 적중 포함). 즉 이 승격이 학생 공급을 여는 유일한 문이다. 그러나 도달 실측으로는 지금 승격해도 학생 화면 변화가 0이다 — 파일럿 소단원 학습목표 4건의 개념 코드가 콘텐츠 행에 닿는 수 0: K-12 콘텐츠 437은 원자 코드와 키 공간이 달라 공급 조회에 닿지 않고(크로스워크 atom_codes 역조회 부재 = CONT-06), 대학 409는 그것을 쓰는 소단원 DSL이 없다. 재판정 3택: ⓐ 사람 검수 회차 개시(Kiki 서명) — 순서 재고 필요: 종전 문면의 'K-12 우선(대학 409는 KG-05 재작성 대상이라 후순위)'은 CONT-06 착지 전까지 학생 효과가 0이다. 도달 기준이면 CONT-06 착지 후 파일럿 목표가 가리키는 K-12 2행(10기수1-02-05·HK11 이차함수의 최대·최소)이 첫 대상 ⓑ 보류 유지(세션 권고 — 도달이 생기는 시점에 그 목표들의 콘텐츠부터 검수하면 Kiki 시간 대비 학생 효과가 가장 크다) ⓒ KG-02 범위 재설계. 2026-09-25 정정 사실 3건은 유지: ①재개 경로 ⓐ 소멸(S4-16 cancelled — 승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명, LLM 검수 배치는 선별 보조) ②검색 표면(/v1/concepts/search)은 atom_node를 읽어 이 승격에 무반응 — 승격 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작(DB만 바꾸면 다음 적재가 되돌린다). 참고: 2026-09-23 LLM 1회차는 엉뚱한 트리에서 돌아 리허설로 강등됐다(표본 52건 중 33건 결함 판정 · 상한 73.5%) — KG-08 대조군 추가 후 재측정은 아직 없다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md\" → 'KG-02 검수 승격 회차 — 보류 확정(2026-10-15 Kiki 결정: 사람 대상 내용 검토는 2026-12-31 이후로 미룬다 = 재판정 3택 중 ⓑ 보류 유지). 재판정 시점은 2027-01-01 이후(독촉 102일 = 요청일 2026-09-21 기준 2027-01-01 · 그 전에는 /gates·브리핑에 독촉으로 뜨지 않는다). 이 기간에 사람 서명 승격은 없으므로 학생 /study 공급은 CONT-05 fail-closed 그대로 reviewed 0건이라 개념 콘텐츠가 학생에게 나가지 않는다(의도된 상태). 입력 작업 CONT-05·CONT-06(역조회 · PR 1427)·CONT-08(연결 승인 게이트 · PR 1459) 모두 완료 — 재개 시 선행 작업은 없고 Kiki 서명 회차만 남는다. 재개 때 첫 대상 후보: 파일럿 학습목표가 가리키는 K-12 2행(10기수1-02-05 · HK11 이차함수의 최대·최소), 대학 409는 KG-05 재작성 후순위. 재개 전 확인: 운영 DB에서 학생 요청이 그 2행에 실제로 닿는지(CONT-06 실측은 저장소 코퍼스 기준이고 운영 DB는 미실측). 2026-09-25 정정 사실 3건 유지: ①승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명(LLM 검수 배치는 선별 보조) ②검색 표면 /v1/concepts/search는 atom_node를 읽어 승격에 무반응 — 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작. 이 결정이 닿지 않는 것: LLM 검수 배치 재측정(KG-08 대조군 추가 후 미실시)은 사람 대상이 아니므로 이 이월에 포함하지 않았다. 부수 영향: KG-05(대학 409 기계 패턴 수정)가 KG-02 task를 선행으로 걸고 있어 같은 기간 막힌다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md · docs/reviews/cont06_study_content_lookup_crosswalk_2026-10-02.md · docs/reviews/cont08_review_input_link_visibility_2026-10-03.md' · remind_after_days: 35 → 102 — 2026-10-15 Kiki 결정: 사람 대상 내용 검토는 2026-12-31 이후로 미룬다. 재판정 3택 중 ⓑ 보류 유지에 해당한다. 독촉 35일은 2026-10-26에 울려 결정과 어긋나므로 102일로 늘려 2027-01-01에 울리게 한다."
     depends_on:
       - CONT-05-concept-content-supply-review-gate
+  - id: G-kg10-signature-pattern-doc-registration
+    title: "수능 시그니처 패턴 v2.1 정본 문서의 저장소 등재 방식 결정(ⓐ 출처 표기 수정 후 md 등재 / ⓑ 코드오너 ack / ⓒ 미등재·Kiki 보관) + 2015 체제 앵커 행의 문항 조건값 조각이 저작권 가이드 v2.0 구조 메타데이터 범위 안인지 판정"
+    kind: decision
+    assignee: kiki
+    status: cleared
+    requested: 2026-10-20
+    remind_after_days: null
+    evidence: "Kiki 결정 ⓐ(2026-10-20 채팅 '3. A, 착수') 집행 — 정본 docx 정정(출처 시험명 약칭·A1-18 문항 조건값 구절 3곳 일반화) 후 pandoc md를 docs/data/cross_audit_2026-10-19/suneung_signature_patterns_v2.1.md로 등재. PR https://github.com/kiki-s-broom/WhyMath/pull/1707 (#1707) · 기준 main d880b4b8 · policy-guard EBS·평가원 패턴 0건·test_policy_guard_source_patterns 13 passed"
+    cleared_by: claude
+    notes: ""
+    corrections:
+      - "[2026-10-20] input done · KG-10-narrative-edge-resolution-and-boundary-review · 판정 무관: G-kg10-signature-pattern-doc-registration은 kind=decision·assignee=kiki — 등재 방식(ⓐ 출처 표기 수정 후 md 등재 / ⓑ 코드오너 ack / ⓒ 미등재)은 저작권 정책상 Kiki 결정 사항이라 세션이 대신 판정하지 않는다. 이 태스크는 판정 자료(docs/data/narrative_edge_resolution_v1.md §8 · PR #1704)만 제공한다 — done KG-10-narrative-edge-resolution-and-boundary-review 인계"
+    depends_on:
+      - KG-10-narrative-edge-resolution-and-boundary-review
   - id: G-kiki-device-demo
     title: "S1 탈출 게이트 ① — 실기기 학습 루프 시연"
     kind: human
@@ -1080,17 +1094,22 @@ gates:
     title: "P3-G2 — Week 2 Gate 판정 (**상한 11/8 · 선행 완료 즉시 앞당겨 판정**). Problem Coverage 95%+ AND Solution QA Pass 99%+ AND 오답 1건이 교정 전략까지 도달. 선행 P3-04~P3-07. 판정 회차 분리 집행"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-09-22
     remind_after_days: 47
-    evidence: null
-    cleared_by: null
-    notes: ""
+    evidence: "판정 기준: main 1a1a7c8b · 판정문 docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md (PR #1695, 판정 기준 main 9f494454) PASS 수용 — Problem Coverage 8/8 · Solution QA 456/456(검증 가능분, D9 규칙) · 오답→교정 1건. 단서: 검증 불가 665건(59.3%)은 G-p3-w3-release-merged 하한 조건으로 승계(G-p307 D9)"
+    cleared_by: kiki
+    notes: |-
+      [판정 근거 2026-10-20] 조건 3 읽기: 대장 문면(오답 1건 도달) 채택 — 엄격 읽기(추첨 3개 전부)는 2/3, 끊긴 지점 M0673(오답 좌석 없음, 소유 P3-61). 이 읽기는 Kiki 확인 대기(판정문 :13·:149). clear 실행 = claude가 Kiki 대행 승인(2026-10-20) 하에 --as kiki
+
+      [판정 근거 2026-10-20] Kiki 확인 2026-10-20: 조건 3은 (가) 대장 문면 '오답 1건 도달' 읽기로 확정 — 엄격 읽기(추첨 3개 전부)는 채택하지 않음. M0673 좌석은 P3-61 소유로 남는다
     corrections:
       - "[2026-09-22] title: 'P3-G2 — Week 2 Gate 판정 (11/8). Problem Coverage 95%+ AND Solution QA Pass 99%+ AND 오답 1건이 교정 전략까지 도달. 선행 P3-04~P3-07. 판정 회차 분리 집행' → 'P3-G2 — Week 2 Gate 판정 (**상한 11/8 · 선행 완료 즉시 앞당겨 판정**). Problem Coverage 95%+ AND Solution QA Pass 99%+ AND 오답 1건이 교정 전략까지 도달. 선행 P3-04~P3-07. 판정 회차 분리 집행' — Kiki 결정 2026-09-22 — 일정은 달력이 아니라 선행 완료로 움직인다(가능하면 앞당긴다). 원 계획 날짜는 고정일이 아니라 상한이므로 문면을 그렇게 고친다. 대장은 이미 이 결정과 정합한다: P3 태스크에 날짜 필드가 없고 착수 조건이 전적으로 depends_on + 게이트다. 부수로 11/22 ↔ 저장소 G3 일정 충돌이 해소된다 — 11/22 는 Phase 3 의 상한일 뿐 판정 예정일이 아니다."
       - "[2026-09-22] remind_after_days: 60 → 47 — acceptance 7 전수 재측정. 이 게이트의 제목은 판정 상한을 11/8 로 명시하는데 독촉은 60일(2026-11-21)이라, 상한을 넘긴 뒤에야 경고가 뜨거나(G1~G3) 상한과 어긋난다(G4). 독촉을 상한 그 날에 맞춘다 — 상한이므로 Kiki 지시 1에 따라 판정은 선행 완료 즉시 더 앞당겨 할 수 있고, 이 값은 늦었을 때 울리는 상한선일 뿐이다."
       - "[2026-09-25] depends_on +P3-16-week2-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 판정 회차 분리 집행을 소유할 태스크가 없어 신규 등재했다(acceptance v2-9 지정)"
       - "[2026-10-18] verdict PASS · inputs: P3-16-week2-gate-judgment · evidence: P3-G2 Week 2 Gate 판정 PASS — 판정문 docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md · 판정 기준 main 9f4944545ff978c5d8b72448e0ffa4b88815a36f · PR #1695 · Problem Coverage 8/8=100% · Solution QA Pass 456/456=100%(검증 불가 665 제외) · 오답 1건 교정 전략 도달(시드 추첨 M0080·M0670 실 PG 라이브, M0673 좌석 없음) · clear 전 확인 2곳: 조건 3 읽기(1건 vs 뽑은 3개 전부) · G-p307-solution-qa-judgement-rules 결정 — done P3-16-week2-gate-judgment 인계"
+      - "[2026-10-20] notes +171자 — PR #1702 독립 검토 중2 — 판정문이 요구한 해석 지점과 대행 사실 기록"
+      - "[2026-10-20] notes +105자 — 판정문 :149 해석 지점에 대한 Kiki 결정 기록"
     depends_on:
       - P3-16-week2-gate-judgment
   - id: G-p3-g3-week3
@@ -1128,11 +1147,14 @@ gates:
     remind_after_days: 55
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-10-20] [D9 2026-10-20] Solution QA 검증 가능 비율 하한 조건 추가 — 값은 P3-62 착지 후 Kiki 확정(후보 60%). 현재 40.7%. 근거 G-p307 evidence"
     corrections:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
+      - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
+      - "[2026-10-20] depends_on +P3-62-solution-qa-unverifiable-structuring — D9 하한 값은 P3-62 재측정 뒤 확정 — notes 산문 선행을 대장 depends로 집행(PR #1702 독립 검토 중1)"
     depends_on:
       - P3-17-week3-release-gate-judgment
+      - P3-62-solution-qa-unverifiable-structuring
   - id: G-p301-scope-choice
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
@@ -1161,11 +1183,11 @@ gates:
     title: "P3-07 Solution QA 판정 규칙 확정 — (가) CLI 영 허용(실패 1건이면 exit 1)과 P3-14 ④ 비율 판정(99.5%)을 어느 쪽으로 합칠지 (나) 검증 가능 비율(현재 40.7%)의 하한을 둘지, 둔다면 얼마인지 (다) 지시문 원문 99%와 스코어카드 흡수 99.5% 중 확정"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-18
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 1a1a7c8 · Kiki D9 2026-10-20: (가) 게이트 판정은 P3-14 비율 판정(CLI exit 1은 실행 경보로만) (나) 검증 가능 비율 하한은 P3-G2에 두지 않음 — 현재 40.7%(456/1,121)를 단서로 기록, 하한은 G-p3-w3-release-merged(11/15)로 이동하고 값은 P3-62 착지 후 실측으로 확정(후보 60%) (다) 기준 99%(지시문 원문). 기준 완화임을 명시. 근거 판정문 docs/reviews/p3_g2_week2_gate_judgment_2026-10-18.md:31,53 (PR #1695)"
+    cleared_by: kiki
     notes: ""
     corrections:
       - "[2026-10-18] input done · P3-07-solution-qa-machine-verification · 판정 무관: G-p307-solution-qa-judgement-rules 는 Kiki 결정 게이트다 — CLI 영 허용 vs 비율 판정·검증 가능 비율 하한·99% vs 99.5% 판정은 사람 소유이며 이 태스크는 판정 입력(실측·보고서)을 만들었을 뿐 판정하지 않는다 — done P3-07-solution-qa-machine-verification 인계"

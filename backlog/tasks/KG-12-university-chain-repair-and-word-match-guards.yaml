@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: KG-12-university-chain-repair-and-word-match-guards
+title: "대학 내부 체인 역전 수리(40건) + 낱말 매칭 오류 4종 가드 + 합의 승인 90건 처분(KG-11 검수 후속)"
+track: math-completion
+stage: S4
+subject: math
+layer: data-pipeline
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - KG-11-narrative-edge-name-matching-and-chain-repair
+requires_gates: []
+acceptance:
+  - "① 대학 내부 체인 수리 — KG-11 참고 원장 cycle_conflicts의 (가) 40건(repair_path 동봉 · 예: CALC1-C10→…31홉…→P08, P13→…→P14, C26→…→C27)을 과정별로 묶어 \"정본 체인이 읽기 순서를 선수로 적은 역전\"인지 \"서술이 틀린 것\"인지 판정하고, 역전으로 판정된 엣지의 제거·방향 수정 제안을 원장으로 낸다. 정본 수정은 AI 2인 블라인드 검수 통과분만(S4-60 형식)\n② 낱말 매칭 체계적 오류 4종 가드 — 과정 경계(상위→하위 방향) 가드 · 동음이의 낱말 사전(합동·연결·증명·기저·평면·완전성·기호·특이점·분리) · 과정 간 중복 원자 탐지(ANAL2-P02 vs CALC2-P07 류) · 소단원 안 해당 개념 원자 부재 탐지를 빌더에 넣고, 가드 적용 후 스테이징 후보를 재산출한다(KG-11 183 → 가드 후 N)\n③ KG-11 합의 승인 90건(승격 원장 rows.result ∈ {승인, 교체})의 처분 — ②의 가드를 통과하는 부분집합을 3인째 검수 또는 Kiki 판정으로 승격 여부 결정. Wilson 하한 0.80 게이트는 그대로 둔다(결과를 보고 완화하지 않는다)\n④ 검증: 원장 빌더 결정론·구조·뮤테이션, 정본 변경 시 핀 테스트 갱신·exit code 보고"
+artifacts: []
+paths:
+  - "data/corpus/atom_graph_v1/**"
+  - docs/data/narrative_edge_reference_v1.md
+session: null
+notes: "KG-11 AI 2인 블라인드 검수(2026-10-20)가 낱말 매칭 스테이징 183건을 합의 승인 90·반려 73·보류 20으로 판정 → Wilson 하한 0.43 < 0.80 → 승격 0건. 두 검수자가 공통 지목한 체계적 오류 4종과 (가) 체인 역전 40건이 입력. P2 = 판정 이후(서술형 엣지는 현 학습 경로 미사용). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-20
