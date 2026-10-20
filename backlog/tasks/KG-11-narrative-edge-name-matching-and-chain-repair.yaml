@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: KG-11-narrative-edge-name-matching-and-chain-repair
+title: "서술형 선수엣지 낱말 매칭 재해소(비-traversal 참고 원장) + 대학→대학 스테이징 검수 + 대학 내부 체인 역전 수리(KG-10 검수 권고)"
+track: math-completion
+stage: S4
+subject: math
+layer: data-pipeline
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - KG-10-narrative-edge-resolution-and-boundary-review
+requires_gates: []
+acceptance:
+  - "① 서술형 973건을 '소단원 싱크'가 아니라 낱말 매칭으로 재해소한다 — from_원자명(원 서술 낱말)이 매핑 소단원 안 원자 이름의 부분 문자열인 566건을 개념 원자(-1) 우선으로 해소하고, 산출은 비-traversal 참고 원장(relation_subtype 별도·strength ≤0.5)으로 둔다. prerequisite 승격은 S4-60과 같은 AI 2인 블라인드 검수(Wilson 게이트) 통과분만\n② 대학→대학 가운데 소단원 단일 원자·단원수준 아님·순환 없음 부분집합(KG-10 원장 기준 약 176건)을 스테이징 후보로 분리해 표본 검수한다. K-12→대학 642건은 ①의 재해소 전까지 보류, 단원수준 84건 폐기, 초등→대학 24건은 폐기 가능(표본 8건 중 approve 0)\n③ 순환 충돌 73건(KG-10 원장 status=cycle_conflict)을 (가) 대학 내부 과정순서 엣지 역전 (나) 동반 제안이 닫은 순환 (다) 싱크 상위 원자 역전으로 분류하고, (가)는 대학 내부 체인(481건 완전 선형·CALC1 C10→…→P08 31홉 등) 수리 제안으로 낸다 — 정본 수정은 검수 뒤\n④ 검증: 참고 원장 빌더 결정론 테스트·구조 테스트·뮤테이션, 승격분이 있으면 핀 테스트 갱신과 exit code 보고"
+artifacts: []
+paths:
+  - "data/corpus/atom_graph_v1/**"
+  - docs/data/narrative_edge_resolution_v1.md
+session: null
+notes: "KG-10 ① 교수학 검수(AI 2인 블라인드 2026-10-20 · docs/data/ai_review_narrative_edge_resolution_v1.md)가 소단원 싱크 규칙의 정본 직접 반영을 FAIL로 판정하고 권고한 후속 경로. P2 = 판정 이후(12월 검증에 필수 아님 — 서술형 엣지는 적재 대상이 아니라 현 학습 경로에 영향 없음). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-20

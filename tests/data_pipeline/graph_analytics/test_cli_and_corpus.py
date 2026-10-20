@@ -66,7 +66,9 @@ class TestRealCorpusSmoke:
             crosswalk=_CORPUS / "concept_atom_crosswalk_v1" / "crosswalk.jsonl",
         )
         assert report.atom_count == 1823  # 세부개념만(단원·소단원 제외 — 엣지 우주)
-        assert report.edge_count == 2234  # 2210 + S4-60 고→대 경계 24(신규 엣지는 blocking 무관)
+        assert (
+            report.edge_count == 2231
+        )  # 2207 + S4-60 고→대 경계 24 · KG-10 ② 경계 검수(반려 3·교체 1)로 2,234→2,231
         # 344 → 346: MISC-61 2차(2026-10-17)가 M0417(조건무시)·M0418(해석오류)을 AI 저작해 둘 다 blocking이 됐다.
         assert report.blocking_total == 346
         assert report.success and report.cycle is None

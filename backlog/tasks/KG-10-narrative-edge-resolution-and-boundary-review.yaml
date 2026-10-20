@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: data-pipeline
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - "data/corpus/atom_graph_v1/**"
   - "docs/data/cross_audit_2026-10-19/**"
-session: null
+session: claude/kg-10-narrative-edge-resolution
 notes: "KG-09(PR #1701) acceptance ⑤·정직한 공백 승계. ③은 Kiki 결정 사항(사람 게이트 성격)이라 세션이 단독 집행하지 않는다. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
 updated: 2026-10-20
