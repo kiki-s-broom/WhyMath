@@ -182,3 +182,31 @@
 2. **C2 도메인 PASS 의 강도는 conditions 의 충실도에 묶인다.** P3-07 문서의 단서와 같다 — 도메인 제약이 발문을 충실히 옮겼는지는 보지 않는다. 다만 선택을 정답에서 역산하지 않으므로, 조건의 도메인과 정답이 어긋나면 FAIL 이 난다.
 3. **acceptance `unique` 탐침이 도메인 리스트를 판정하게 됐다**(§4-4). 기존 문항 영향 0을 실측했지만, 신규 생성분은 종전보다 엄격하게 강등될 수 있다.
 4. **`verify_answer.py` 동시 작업(EOS-23)과의 충돌 위험** — 변경은 `__all__` 4줄과 `_distinct_values` 뒤 한 구역(새 함수 4개 + `verify_root_selection` 본문)에 모았다.
+
+## 7. 검증 (판정은 exit code · 커밋 `b46f7bd7` 트리에서 실행)
+
+실행 코드 출처: 매 실행 `PYTHONPATH=src/backend` 로 이 워크트리 모듈을 우선하고 `whymath_backend.harness.solution_qa.__file__` 이 이 워크트리 경로임을 확인했다.
+
+| 잡 | 명령 (CI와 같은 대상·플래그) | exit |
+|---|---|---:|
+| backend | `python -m ruff check . ../../tests/backend ../../tests/constitution` | 0 |
+| backend | `python -m black --check --line-length 100 . ../../tests/backend ../../tests/constitution` | 0 |
+| backend | `python -m mypy --strict whymath_backend` (805 파일) | 0 |
+| backend | `lint-imports` (4 kept · 0 broken) | 0 |
+| backend | `python -m pytest -m "not corpus_authoring" -n auto --dist loadfile --cov… --cov-fail-under=70` — 21,190 passed · 0 failed · **수집 오류 10**(아래) | 1 |
+| backend | 위 수집 오류 10개 모듈을 `data_pipeline` 경로를 더해 재실행 — 163 passed | 0 |
+| backend | `check_layer_coverage.py coverage.xml` (api 96.9 · l1 90.8 · l2 96.4 · l3 81.5 · l4 95.8) | 0 |
+| backend | `python -m whymath_backend.ops.phase3_metrics --self-check` (24건 중 실패 0) | 0 |
+| backend | `python -m whymath_backend.harness.solution_qa` (§2 후) | 0 |
+| backend | `python -m pytest -q tests/constitution` — `test_check_signed_changes.py` 33건 실패(아래), 나머지 39 passed | 1 / 0 |
+| corpus-authoring | `python -m pytest -m corpus_authoring` — 890 passed · 2 xfailed(기존 strict 마커) | 0 |
+| infra-contracts | ruff · black --check (`tests/infra infra conftest.py tests/test_idempotency.py`) | 0 · 0 |
+| infra-contracts | `python3 -m pytest tests/infra` — 3,221 passed · 27 skipped | 0 |
+| harness-integrity | `backlog.py validate` · `backlog.py audit-deps` | 0 · 0 |
+| harness-integrity | `scripts/constitution/audit_ratchet.py` — 단계 2 · 차단 0건 ≤ 기준선 0건 | 0 |
+| harness-integrity | `python3 -m pytest tests/harness` — 2,307 passed | 0 |
+| policy-guard | `cp949_guard.py` · `check_conflict_markers.py` | 0 · 0 |
+| declared-unwired-audit | `python -m whymath_backend.ops.declared_unwired_audit` | 0 |
+| (야간 S6 대조) | `corpus_reverify` 40개 은행 전·후 요약 동일(§4-4) | 0 · 0 |
+
+**이 컨테이너에서 확인하지 못한 것(환경)**: ①전체 스위트의 수집 오류 10건은 이 venv에 `data_pipeline` 이 설치돼 있지 않아서다(CI는 `pip install -e ../data-pipeline`). 그 10개 모듈은 경로를 더해 따로 통과시켰지만, **한 프로세스에서 전체를 다 돈 실행은 없다** — 순서 의존 오염은 CI가 최종 판정한다. ②`test_check_signed_changes.py` 33건은 전부 `ssh-keygen 이 없다`(컨테이너에 OpenSSH 클라이언트 부재) 단언 실패이며 이 변경과 무관한 경로다 — CI에서 확인. ③이 밖의 잡(web·mobile·docker-build·data-pipeline 등)은 이 변경이 닿지 않는다(백엔드 Python 두 파일·테스트·문서만 변경)고 판단해 돌리지 않았다.
