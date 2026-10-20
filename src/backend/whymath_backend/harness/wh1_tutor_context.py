@@ -284,7 +284,8 @@ class TutorContextManifest(BaseModel):
                 if s.resolved
                 else []
             )
-            # model_copy는 검증자를 돌리지 않는다 — 결정 (가) 거부가 여기서도 서도록 재검증한다.
+            # 슬롯을 명시적으로 재검증한다 — 아래 매니페스트 생성자도 슬롯 인스턴스를 재검증하지만
+            # (2026-10-20 실측·뮤테이션 M24 등가), 결정 (가) 거부가 그 동작에 기대지 않게 둔다.
             slots.append(
                 TutorContextSlotStatus.model_validate(
                     {
