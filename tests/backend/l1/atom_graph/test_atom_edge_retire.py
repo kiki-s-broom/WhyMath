@@ -62,8 +62,9 @@ def _row(
     cms: bool = False,
     edge_id: str | None = None,
 ) -> DbEdgeRow:
+    # 결정적 식별자 — parametrize 인자에 무작위 값이 들어가면 병렬 수집이 어긋난다(OPS-144)
     return DbEdgeRow(
-        edge_id=edge_id or str(uuid.uuid4()),
+        edge_id=edge_id or f"{a}>{b}:{edge_type}:{int(cms)}:{subtype}",
         from_code=a,
         to_code=b,
         relation_subtype=subtype,

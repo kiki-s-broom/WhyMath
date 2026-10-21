@@ -53,7 +53,6 @@ from whymath_backend.l1.atom_graph.atom_edge_retire import (
     RetirePlan,
     cycle_after_retirement,
     plan_retirement,
-    read_db_edge_rows,
     render_plan,
     validate_mode,
 )
@@ -309,20 +308,13 @@ def plan_atom_edge_retirement(
     (`SET TRANSACTION READ ONLY`)에서 SELECT 한 번만 읽는다. 두 순환 판정을 함께 낸다 — 은퇴 없이
     덧적재하면 순환인가(지금 적재가 막히는 이유), 은퇴 뒤에도 순환이 남는가(apply가 통과할지).
     """
-    from sqlalchemy import text
-
-    from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
-
     concept_records = load_atom_concepts_from_graph_json(graph_path)
     edge_records, _skipped = load_atom_edges_from_graph_json(graph_path)
     scope = frozenset(c.code for c in concept_records)
     canon_pairs = {(r.from_code, r.to_code) for r in edge_records}
     resolved = settings if settings is not None else get_settings()
-    eng = engine if engine is not None else _build_sync_engine(resolved)
-    with eng.connect() as conn:  # type: ignore[attr-defined]
-        conn.execute(text("SET TRANSACTION READ ONLY"))
-        rows = read_db_edge_rows(conn)
-        conn.rollback()
+    store = AtomBackendEdgeStore(engine=engine, settings=resolved)  # type: ignore[arg-type]
+    rows = store.read_edge_rows_read_only()
     plan = plan_retirement(rows, canon_pairs, scope)
     empty = RetirePlan(stale=(), cms_kept=(), in_scope_prerequisite=0, out_of_scope=0)
     return AtomEdgeRetirementPlan(

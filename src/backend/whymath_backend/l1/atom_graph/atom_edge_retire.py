@@ -27,19 +27,19 @@ DB `concept_edge` 행 가운데 다음 넷을 **모두** 만족하는 것만:
 - `plan` — DB에 아무것도 쓰지 않는다. 지울 목록과 "은퇴 뒤 합집합이 비순환인가"만 판정한다.
 - `apply` — 엣지 적재와 **같은 트랜잭션**에서 지운 뒤 DB 인지 순환 검사와 upsert를 한다. 검사나
   삭제 건수 대조가 실패하면 삭제까지 함께 롤백된다(부분 은퇴 없음).
+
+이 모듈은 **DB를 모른다**(순수 판정·렌더). DB 읽기·삭제는 적재기(`atom_backend_edge.py`)가 한다 —
+데이터 접근 지점을 늘리지 않는다(`scripts/analysis/data_access_layer_audit.py` 처분 (b)).
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import Final
 
 from whymath_backend.schema.enums import EdgeType
 from whymath_backend.schema.learning_loop_contract import find_prerequisite_cycle
-
-if TYPE_CHECKING:
-    from sqlalchemy.engine import Connection
 
 RETIRE_REPORT: Final[str] = "report"
 RETIRE_PLAN: Final[str] = "plan"
@@ -152,78 +152,6 @@ def cycle_after_retirement(
     return find_prerequisite_cycle(sorted(pairs))
 
 
-def read_db_edge_rows(conn: Connection) -> list[DbEdgeRow]:
-    """DB `concept_edge` 전량을 코드로 해석해 읽는다(SELECT 한 문장 · 쓰기 없음)."""
-    from sqlalchemy import select
-    from sqlalchemy.orm import aliased
-
-    from whymath_backend.db.models.concept import Concept, ConceptEdge
-
-    src = aliased(Concept)
-    dst = aliased(Concept)
-    stmt = (
-        select(
-            ConceptEdge.edge_id,
-            src.code.label("from_code"),
-            dst.code.label("to_code"),
-            ConceptEdge.relation_subtype,
-            ConceptEdge.edge_type,
-            ConceptEdge.cms_edited_at.is_not(None).label("cms_owned"),
-        )
-        .join(src, src.concept_id == ConceptEdge.from_concept_id)
-        .join(dst, dst.concept_id == ConceptEdge.to_concept_id)
-    )
-    rows = conn.execute(stmt).all()
-    out: list[DbEdgeRow] = []
-    for row in rows:
-        edge_type = row.edge_type
-        type_text = str(getattr(edge_type, "value", edge_type))
-        out.append(
-            DbEdgeRow(
-                edge_id=str(row.edge_id),
-                from_code=str(row.from_code),
-                to_code=str(row.to_code),
-                relation_subtype=(
-                    None if row.relation_subtype is None else str(row.relation_subtype)
-                ),
-                edge_type=type_text,
-                cms_owned=bool(row.cms_owned),
-            )
-        )
-    return out
-
-
-def delete_stale_edges(conn: Connection, plan: RetirePlan) -> int:
-    """계획한 잔존 행만 지운다 — WHERE에 범위 조건을 다시 걸고, 지운 수가 계획과 다르면 올린다.
-
-    호출자는 선수 그래프 잠금(`lock_prerequisite_graph_sync`)을 잡은 트랜잭션 안이어야 한다. 예외는
-    트랜잭션을 롤백시킨다 — 계획과 다른 삭제(동시 CMS 편집 등)를 조용히 커밋하지 않는다.
-    """
-    if not plan.stale:
-        return 0
-    import uuid
-
-    from sqlalchemy import delete
-
-    from whymath_backend.db.models.concept import ConceptEdge
-
-    ids = [uuid.UUID(row.edge_id) for row in plan.stale]
-    stmt = (
-        delete(ConceptEdge)
-        .where(ConceptEdge.edge_id.in_(ids))
-        .where(ConceptEdge.edge_type == EdgeType.PREREQUISITE)
-        .where(ConceptEdge.cms_edited_at.is_(None))
-        .returning(ConceptEdge.edge_id)
-    )
-    deleted = len(conn.execute(stmt).all())
-    if deleted != len(ids):
-        raise StaleEdgeRetireError(
-            f"잔존 엣지 은퇴 건수 불일치 — 계획 {len(ids)}건 · 실제 삭제 {deleted}건 "
-            "(동시 편집 또는 CMS 표지 변경 가능성). 트랜잭션을 롤백한다"
-        )
-    return deleted
-
-
 def summarize(
     plan: RetirePlan, mode: str, retired: int, *, sample_limit: int = 20
 ) -> RetireOutcome:
@@ -274,9 +202,7 @@ __all__ = [
     "RetirePlan",
     "StaleEdgeRetireError",
     "cycle_after_retirement",
-    "delete_stale_edges",
     "plan_retirement",
-    "read_db_edge_rows",
     "render_plan",
     "summarize",
     "validate_mode",

@@ -33,10 +33,11 @@ from whymath_backend.l1.atom_graph.atom_edge_retire import (
     RETIRE_APPLY,
     RETIRE_PLAN,
     RETIRE_REPORT,
+    DbEdgeRow,
     RetireOutcome,
-    delete_stale_edges,
+    RetirePlan,
+    StaleEdgeRetireError,
     plan_retirement,
-    read_db_edge_rows,
     summarize,
     validate_mode,
 )
@@ -46,7 +47,7 @@ from whymath_backend.schema.enums import EdgeType
 if TYPE_CHECKING:
     import uuid
 
-    from sqlalchemy.engine import Engine
+    from sqlalchemy.engine import Connection, Engine
 
 
 # graph.json `relation`(use_enum_values 직렬화) 중 적재 대상 — 선수만(원자ID 엣지 전량).
@@ -133,6 +134,78 @@ def load_atom_edges_from_graph_json(
     return out, skipped
 
 
+def read_db_edge_rows(conn: Connection) -> list[DbEdgeRow]:
+    """DB `concept_edge` 전량을 코드로 해석해 읽는다(SELECT 한 문장 · 쓰기 없음)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import aliased
+
+    from whymath_backend.db.models.concept import Concept, ConceptEdge
+
+    src = aliased(Concept)
+    dst = aliased(Concept)
+    stmt = (
+        select(
+            ConceptEdge.edge_id,
+            src.code.label("from_code"),
+            dst.code.label("to_code"),
+            ConceptEdge.relation_subtype,
+            ConceptEdge.edge_type,
+            ConceptEdge.cms_edited_at.is_not(None).label("cms_owned"),
+        )
+        .join(src, src.concept_id == ConceptEdge.from_concept_id)
+        .join(dst, dst.concept_id == ConceptEdge.to_concept_id)
+    )
+    rows = conn.execute(stmt).all()
+    out: list[DbEdgeRow] = []
+    for row in rows:
+        edge_type = row.edge_type
+        type_text = str(getattr(edge_type, "value", edge_type))
+        out.append(
+            DbEdgeRow(
+                edge_id=str(row.edge_id),
+                from_code=str(row.from_code),
+                to_code=str(row.to_code),
+                relation_subtype=(
+                    None if row.relation_subtype is None else str(row.relation_subtype)
+                ),
+                edge_type=type_text,
+                cms_owned=bool(row.cms_owned),
+            )
+        )
+    return out
+
+
+def delete_stale_edges(conn: Connection, plan: RetirePlan) -> int:
+    """계획한 잔존 행만 지운다 — WHERE에 범위 조건을 다시 걸고, 지운 수가 계획과 다르면 올린다.
+
+    호출자는 선수 그래프 잠금(`lock_prerequisite_graph_sync`)을 잡은 트랜잭션 안이어야 한다. 예외는
+    트랜잭션을 롤백시킨다 — 계획과 다른 삭제(동시 CMS 편집 등)를 조용히 커밋하지 않는다.
+    """
+    if not plan.stale:
+        return 0
+    import uuid
+
+    from sqlalchemy import delete
+
+    from whymath_backend.db.models.concept import ConceptEdge
+
+    ids = [uuid.UUID(row.edge_id) for row in plan.stale]
+    stmt = (
+        delete(ConceptEdge)
+        .where(ConceptEdge.edge_id.in_(ids))
+        .where(ConceptEdge.edge_type == EdgeType.PREREQUISITE)
+        .where(ConceptEdge.cms_edited_at.is_(None))
+        .returning(ConceptEdge.edge_id)
+    )
+    deleted = len(conn.execute(stmt).all())
+    if deleted != len(ids):
+        raise StaleEdgeRetireError(
+            f"잔존 엣지 은퇴 건수 불일치 — 계획 {len(ids)}건 · 실제 삭제 {deleted}건 "
+            "(동시 편집 또는 CMS 표지 변경 가능성). 트랜잭션을 롤백한다"
+        )
+    return deleted
+
+
 class AtomBackendEdgeStore:
     """원자 백본 선수엣지 → backend `concept_edge` 적재기 — UNIQUE 충돌 멱등 upsert(sync).
 
@@ -176,6 +249,19 @@ class AtomBackendEdgeStore:
         with self._get_engine().connect() as conn:
             rows = conn.execute(stmt).all()
         return {row.code: row.concept_id for row in rows}
+
+    def read_edge_rows_read_only(self) -> list[DbEdgeRow]:
+        """KG-14 plan 모드 — DB `concept_edge`를 한 번 읽는다.
+
+        **읽기 전용 트랜잭션**이라 실수로라도 쓰기가 일어나지 않고, 끝나면 롤백한다.
+        """
+        from sqlalchemy import text
+
+        with self._get_engine().connect() as conn:
+            conn.execute(text("SET TRANSACTION READ ONLY"))
+            rows = read_db_edge_rows(conn)
+            conn.rollback()
+        return rows
 
     def populate(
         self,
@@ -318,6 +404,8 @@ def populate_atom_edges(
 __all__ = [
     "AtomBackendEdgeRecord",
     "AtomBackendEdgeStore",
+    "delete_stale_edges",
     "load_atom_edges_from_graph_json",
     "populate_atom_edges",
+    "read_db_edge_rows",
 ]
