@@ -179,6 +179,8 @@ def _compare_answer_field(record: Mapping[str, object], amap: Mapping[str, str])
     answer = record.get("answer")
     if not isinstance(answer, str) or not answer.strip():
         return ANSWER_UNCOMPARABLE, "answer 없음"
+    if not amap:
+        return ANSWER_UNCOMPARABLE, "answer_map 비어 있음"
     matched = answer_map_vars_matching(amap, answer)
     if matched is None:
         return ANSWER_UNCOMPARABLE, f"answer={answer!r} ↔ answer_map 값 판정 불가"

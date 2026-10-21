@@ -364,7 +364,8 @@ def answer_map_vars_matching(answer_map: Mapping[str, str], answer: str) -> froz
     공백 차이는 같은 값이다. 반환:
       · 비어 있지 않은 집합 — 그 변수(들)의 값이 `answer` 와 같다(대조 성립)
       · 빈 집합 — 모든 변수가 **확정적으로** 다르다(불일치 — 학생 표기와 검산 재료가 갈라졌다)
-      · None — 같은 값을 하나도 못 찾았고 판정 불가가 섞였다(대조 불가 — 통과로 접지 않는다)
+      · None — 같은 값을 하나도 못 찾았고 판정 불가가 섞였다, 또는 answer_map 이 비어 있다
+        (대조 불가 — 통과로 접지 않는다)
 
     변수가 하나면 `answer` 가 그 값이어야 한다(엄격). 변수가 여러 개인 문항은 `answer` 가 어느
     변수의 값인지 구조에 적혀 있지 않아 **소속**으로만 대조한다(약한 검사 — 형제 변수 값으로 바꾼
@@ -379,6 +380,9 @@ def answer_map_vars_matching(answer_map: Mapping[str, str], answer: str) -> froz
     백슬래시가 없으면 손대지 않는다 — 그 함수는 중괄호를 괄호로 바꾸므로 집합 `{1, 2}` 를 튜플로
     만든다. 정규화기가 못 읽는 표기(`\\dfrac`·중첩 분수 등)는 판정 불가 → None 으로 드러난다.
     """
+    if not answer_map:
+        # 비교할 재료가 없다 — '모든 변수가 다르다'(빈 집합)로 단정하지 않는다(모른다 ≠ 아니다).
+        return None
     candidate = latex_to_plain(answer) if "\\" in answer else answer
     matches: set[str] = set()
     unknown = False

@@ -369,6 +369,43 @@ def test_uncomparable_answer_is_skip_not_pass(answer: str | None, detail: str) -
     assert report.answer_decided == 0
 
 
+def test_empty_answer_map_is_uncomparable_not_mismatch() -> None:
+    """검산 재료(answer_map)가 비어 있으면 '불일치(fail)'가 아니라 '대조 불가(skip)'다.
+
+    빈 지도를 '모든 변수가 다르다'로 읽으면 재료가 없는 문항이 거짓 red가 된다(2026-10-21 리뷰 P2).
+    """
+    from whymath_backend.l3.verify_solution import answer_map_vars_matching
+
+    assert answer_map_vars_matching({}, "2") is None
+    record = {
+        "slug": "empty",
+        "answer": "2",
+        "verify": {"conditions": "1 + 1 = 2", "answer_map": {}},
+    }
+    state, reason = cr._reverify_one(record, use_fuzz=False)
+    assert state == "skip"
+    assert reason is not None and reason.startswith(cr.ANSWER_UNCOMPARABLE_REASON)
+    assert "answer_map 비어 있음" in reason
+
+
+@pytest.mark.parametrize(
+    "amap",
+    [{"x": "2"}, {"x": "1", "y": "2"}],
+)
+def test_braced_answer_without_backslash_is_not_latex_normalised(amap: dict[str, str]) -> None:
+    """백슬래시 없는 `{2}`(집합 표기)는 LaTeX 정규화를 거치지 않는다 — 괄호로 바뀌어 `2`와 같아지면 안 된다.
+
+    정규화를 항상 걸면 `{2}` → `(2)` 가 되어 스칼라 2와 일치(통과)로 잘못 접힌다(2026-10-21 리뷰 R1 생존).
+    """
+    record = {
+        "slug": "brace",
+        "answer": "{2}",
+        "verify": {"conditions": [f"{k} - ({v}) = 0" for k, v in amap.items()], "answer_map": amap},
+    }
+    state, _ = cr._reverify_one(record, use_fuzz=False)
+    assert state != "pass"
+
+
 def test_report_line_counts_uncomparable_and_working_ratio(tmp_path: Path) -> None:
     records = [
         _with_answer(_HALF, "0.5"),  # 일치
