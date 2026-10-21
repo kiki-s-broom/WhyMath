@@ -37,6 +37,10 @@
     특이점 샘플은 *건너뛰되*(유효 샘플에서 제외), 유효 샘플이 0이면 unverifiable. 부등식·연립도
     동일 — 판정 불가·일부 미정은 pass로 위장하지 않는다(연립은 보수적으로 unverifiable).
   - **결정론**: 샘플은 *고정 시드*에서 뽑아 같은 입력에 같은 결과를 보장한다(재현·디버그).
+  - **원문 정의역(P3-75)**: 평가 파싱은 `x*(x - 2)/(x - 2)` 를 `x` 로 접어 무연근 x = 2 의 잔차를
+    0 으로 만든다. 그래서 pass 는 조건 원문 구문 나무를 그 점에서 허용 노드만으로 노드별로 평가해
+    (`condition_definedness`) 정의될 때만 남긴다 — 정의되지 않음 확정이면 fail, 허용 구조 밖이면
+    unverifiable. 근 선택·해 존재성 분류의 근 집합도 같은 판정으로 거른다(`trusted_real_roots`).
 
 Tier1 정직성(설계 §4): `pass`는 "샘플 점들에서 조건을 만족"이지 *증명이 아니다*(신뢰도 최저).
 따라서 Tier1 단독 pass를 최종 통과로 쓰지 않고, 반드시 Tier2(`verify_solution`)와 결합한다
@@ -54,10 +58,11 @@ from __future__ import annotations
 
 import ast
 import logging
+import math
 import random
 import re
-from collections.abc import Mapping, Sequence
-from typing import Literal
+from collections.abc import Callable, Mapping, Sequence
+from typing import Final, Literal, cast
 
 import sympy
 from pydantic import BaseModel, ConfigDict, Field
@@ -83,10 +88,12 @@ __all__ = [
     "classify_solvability",
     "certified_polynomial",
     "certified_root_sets",
+    "condition_definedness",
     "condition_relation",
     "derive_selected_root",
     "match_root",
     "split_equation_domain",
+    "trusted_real_roots",
     "verify_answer",
     "verify_conditional_equal",
     "verify_congruent_by_ratio",
@@ -413,7 +420,15 @@ def _verify_single(
         if op == "==":
             verdict = _eval_numeric(substituted, tol)
             if verdict is True:
-                return _pass(samples_checked=1)
+                # P3-75 — 허용치 안의 잔차가 **정확히** 0 이 아니면 근이 아니다
+                # (`(x - 1)**2 + 10**(-20) = 0` 의 x = 1). 근사 소수가 섞이면 허용치를 그대로 쓴다.
+                if not substituted.has(sympy.Float) and substituted.is_zero is False:
+                    return _fail(
+                        f"조건 위반 — 잔차가 허용치 안이나 정확히 0 이 아님: {substituted}",
+                        samples_checked=1,
+                    )
+                passed = _pass(samples_checked=1)
+                return _definedness_gate(condition, residual, substitutions, passed)
             if verdict is False:
                 return _fail(f"조건 위반 — 잔차 ≠ 0: {substituted}", samples_checked=1)
             return _unverifiable("수치 평가 불가(복소/NaN 등) — 검증 안전 회피")
@@ -423,13 +438,101 @@ def _verify_single(
             return _unverifiable("부등식 잔차 수치 평가 불가(복소/NaN 등) — 검증 안전 회피")
         truth = _eval_relation(magnitude, op, tol)
         if truth is True:
-            return _pass(samples_checked=1)
+            return _definedness_gate(condition, residual, substitutions, _pass(samples_checked=1))
         if truth is False:
             return _fail(f"부등식 조건 위반({op}) — 잔차 {magnitude}", samples_checked=1)
         return _unverifiable(f"부등식 경계 모호({op}) — 검증 안전 회피")
 
     # ④ 자유변수 있음(파라미터 문제) → 수치 샘플링(Tier1 핵심·고정 시드 결정론).
-    return _sample_parametric(substituted, free_symbols, op, n_samples=n_samples, tol=tol)
+    # P3-75 — 샘플 점에서도 원문 정의역을 본다: 원문이 정의되는 샘플이 하나도 없으면 pass 가 아니다.
+    # 잔차가 접히며 사라진 이름(`x >= a - b**2` 에 x = a + 1 → 잔차 1 + b**2 의 a)도 원문 평가에는
+    # 값이 필요하다 — 샘플 점의 값을 함께 준다(그 점마다 달라진다).
+    hidden = {symbol for value in substitutions.values() for symbol in value.free_symbols}
+    hidden |= {sympy.Symbol(name) for name in _condition_names(condition)}
+    hidden -= set(substitutions) | set(free_symbols)
+
+    def faithful(point: Mapping[sympy.Symbol, sympy.Expr]) -> bool:
+        filler = next(iter(point.values()))
+        full = {**{symbol: filler for symbol in hidden}, **point}
+        try:
+            values = {
+                str(name): safe_subs(value, dict(full)) for name, value in substitutions.items()
+            }
+        except Exception as exc:  # noqa: BLE001 — 대입 불가는 '정의 확인 못 함'
+            logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+            return False
+        values.update({str(name): value for name, value in full.items()})
+        return condition_definedness(condition, values) == _DEFINED
+
+    return _sample_parametric(
+        substituted, free_symbols, op, n_samples=n_samples, tol=tol, faithful=faithful
+    )
+
+
+def _definedness_gate(
+    condition: str,
+    residual: sympy.Expr,
+    substitutions: Mapping[sympy.Symbol, sympy.Expr],
+    passed: AnswerVerdict,
+) -> AnswerVerdict:
+    """Tier1 pass 직전의 원문 정의역 확인(P3-75) — 자동 약분이 지운 무연근을 pass 로 두지 않는다.
+
+    평가 파싱은 `x*(x - 2)/(x - 2)` 를 `x` 로 접어 x = 2 의 잔차를 0 으로 만든다. 그래서 pass 는
+    원문 구문 나무를 그 점에서 노드별로 평가해(`condition_definedness`) 정의될 때만 남긴다.
+      · undefined → fail(원문에서 그 값이 정의되지 않음 — 무연근)
+      · unknown → unverifiable(허용 구조 밖 — 정의역을 확인하지 못했다)
+    답이 기호를 담아 잔차가 기호적으로 0 이 된 경우(`2*a*x = b` 의 x = b/(2*a))는 그 기호를
+    Tier1 샘플 점에서 평가해, 원문이 정의되는 샘플이 하나라도 있으면 pass 를 남긴다
+    (우연한 특이점은 건너뜀).
+    """
+    params = {symbol for value in substitutions.values() for symbol in value.free_symbols}
+    params |= residual.free_symbols - set(substitutions)
+    # 잔차가 접히며 사라진 이름(`a*x >= a*x` 의 a)도 원문에는 남아 있다 — 원문 이름에서 다시 모은다.
+    params |= {sympy.Symbol(name) for name in _condition_names(condition)} - set(substitutions)
+    if params:
+        return _definedness_gate_sampled(condition, substitutions, sorted(params, key=str), passed)
+    state = condition_definedness(
+        condition, {str(name): value for name, value in substitutions.items()}
+    )
+    if state == _DEFINED:
+        return passed
+    if state == _UNDEFINED:
+        return _fail(
+            "원문 조건이 답의 값에서 정의되지 않음(분모 0·0 의 0 이하 제곱 등) — 무연근",
+            samples_checked=passed.samples_checked,
+        )
+    return _unverifiable(
+        "원문 조건의 정의역을 확인하지 못함(허용 구조 밖) — 검증 안전 회피",
+        samples_checked=passed.samples_checked,
+    )
+
+
+def _definedness_gate_sampled(
+    condition: str,
+    substitutions: Mapping[sympy.Symbol, sympy.Expr],
+    params: Sequence[sympy.Symbol],
+    passed: AnswerVerdict,
+) -> AnswerVerdict:
+    """기호가 남는 답의 원문 정의역 확인 — Tier1 샘플 점(경계값 + 고정 시드 난수)에서 본다."""
+    rng = random.Random(_SAMPLE_SEED)
+    points: list[float] = list(_BOUNDARY_VALUES)
+    points.extend(rng.uniform(_SAMPLE_LOW, _SAMPLE_HIGH) for _ in range(8))
+    for point in points:
+        sample = {symbol: sympy.Float(point) for symbol in params}
+        try:
+            values = {
+                str(name): safe_subs(value, dict(sample)) for name, value in substitutions.items()
+            }
+        except Exception as exc:  # noqa: BLE001 — 대입 불가 샘플은 건너뛴다
+            logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+            continue
+        values.update({str(symbol): value for symbol, value in sample.items()})
+        if condition_definedness(condition, values) == _DEFINED:
+            return passed
+    return _unverifiable(
+        "원문 조건이 정의되는 샘플 0(자동 약분된 점이거나 허용 구조 밖) — 검증 안전 회피",
+        samples_checked=passed.samples_checked,
+    )
 
 
 def _eval_relation_residual(expr: sympy.Expr, tol: float) -> float | None:
@@ -487,6 +590,7 @@ def _sample_parametric(
     *,
     n_samples: int,
     tol: float,
+    faithful: Callable[[Mapping[sympy.Symbol, sympy.Expr]], bool] | None = None,
 ) -> AnswerVerdict:
     """파라미터(자유변수) 잔차를 *고정 시드* 샘플 + 경계값으로 평가 — Tier1 샘플링 코어.
 
@@ -503,6 +607,9 @@ def _sample_parametric(
     """
     rng = random.Random(_SAMPLE_SEED)
     valid_samples = 0
+    # P3-75 — `faithful` 이 주어지면 만족 샘플 중 **원문이 정의되는** 샘플을 센다. 판정(fail)은
+    # 바꾸지 않고, pass 가 원문이 정의되지 않는 점들(자동 약분된 점)에만 기대고 있으면 끌어내린다.
+    faithful_samples = 0
 
     # (1) 단일 점 대입(모든 자유변수에 같은 값) — 경계값 + 난수.
     sample_points: list[float] = list(_BOUNDARY_VALUES)
@@ -521,6 +628,8 @@ def _sample_parametric(
                 f"파라미터 샘플 {point} 에서 조건 위반({op})",
                 samples_checked=valid_samples,
             )
+        if faithful is not None and faithful(substitution):
+            faithful_samples += 1
 
     # (2) 다변수 — 변수별 서로 다른 점도 평가(상관 잔차의 우연한 만족 위장 차단).
     if len(free_symbols) > 1:
@@ -541,10 +650,17 @@ def _sample_parametric(
                     f"다변수 파라미터 샘플에서 조건 위반({op})",
                     samples_checked=valid_samples,
                 )
+            if faithful is not None and faithful(substitution):
+                faithful_samples += 1
 
     # 유효 샘플이 하나도 없으면 판정 불가(전부 특이점·복소·경계 모호) — pass 위장 금지.
     if valid_samples == 0:
         return _unverifiable("유효 샘플 0(전부 특이점/복소/경계 모호) — 검증 안전 회피")
+    if faithful is not None and faithful_samples == 0:
+        return _unverifiable(
+            "원문 조건이 정의되는 샘플 0(자동 약분된 점이거나 허용 구조 밖) — 검증 안전 회피",
+            samples_checked=valid_samples,
+        )
 
     # 모든 유효 샘플에서 조건 만족 → pass(단, 샘플 점 만족이지 증명 아님·Tier2 결합 필수).
     return _pass(samples_checked=valid_samples)
@@ -837,6 +953,553 @@ def match_root(value: str, roots: Sequence[sympy.Expr], *, tol: float = 1e-9) ->
     return hits[0] if len(hits) == 1 else None
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 원문 정의역 판정(P3-75) — 평가 파싱의 자동 약분이 지운 '정의되지 않는 점'을 되살린다
+# ──────────────────────────────────────────────────────────────────────────
+# `safe_sympify`(evaluate=True)는 식을 세우는 순간 `x*(x - 2)/(x - 2)` → `x`,
+# `(x - 2)**3/(x - 2)**2` → `x - 2`, `(x - 2)**0` → `1` 로 접는다. 접힌 식은 원문이 정의된 곳에서는
+# 원문과 같지만, 원문이 **정의되지 않는 점**(분모 0·0의 0제곱·log 0 …)까지 정의된 것처럼 보이게
+# 한다. 그래서 그 점(무연근)이 잔차 0 으로 Tier1 을 통과했다(RF3·RF4).
+#
+# 금지 목록(분모 탐지)은 표기 변형(`.doit()` 래퍼·`exp(-log(x - 2))`·0 지수)에 뚫렸다(P3-71 4차
+# 검토). 그래서 P3-71 의 허용 목록(`_certified_build`)과 같은 원리로 간다 — 조건 원문의 **파이썬
+# 구문 나무**(`ast` · 아무것도 실행하지 않는다)를 아래 허용 노드만으로 **그 점에서 한 노드씩**
+# 평가한다. 노드 하나하나가 숫자로 계산되므로 기호 약분이 끼어들 틈이 없다.
+#   · 정수·실수 리터럴 · 상수 `pi`·`E`·`I` · 값이 주어진 이름(답·샘플 점)
+#   · `+`·`-`·`*`·`/`·`**`(`^`)·단항 `±`
+#   · 허용 함수(`_DEFINED_FUNCTIONS` — 중·고교 표준 함수 · safe_parse 허용 목록의 부분집합)
+#   · `Derivative(f, v…)`(f 가 열린 정의역에서 해석적인 꼴일 때만) · `.doit()` · `.subs(기호, 식)`
+#   · `Integral(f, (v, a, b))`(f 가 전해석 함수 꼴일 때만)
+# 판정은 3상태다.
+#   · DEFINED — 모든 노드가 유한한 값으로 정의된다.
+#   · UNDEFINED — 어느 노드가 그 점에서 **정확히** 정의되지 않는다(분모가 정확히 0·0 의
+#     0 이하 제곱·SymPy 가 무한/NaN 을 낸 함수값). 원문에서 그 값이 정의되지 않음이 확정된다.
+#   · UNKNOWN — 허용 노드 밖·영 여부를 정확히 못 가림·실수 입력에서 실수 아닌 중간값(실수 범위
+#     정의역을 판정하지 않는다)·계산 예산 초과. 판정 불가다(pass 로 위장하지 않는다).
+_DEFINED: Final = "defined"
+_UNDEFINED: Final = "undefined"
+_UNKNOWN: Final = "unknown"
+DefinednessState = Literal["defined", "undefined", "unknown"]
+
+# 허용 함수 → SymPy 함수. 값은 그 점의 인자값에 바로 적용한다(인자는 이미 숫자다).
+_DEFINED_FUNCTIONS: dict[str, Callable[..., sympy.Expr]] = {
+    "sin": sympy.sin,
+    "cos": sympy.cos,
+    "tan": sympy.tan,
+    "cot": sympy.cot,
+    "sec": sympy.sec,
+    "csc": sympy.csc,
+    "asin": sympy.asin,
+    "acos": sympy.acos,
+    "atan": sympy.atan,
+    "acot": sympy.acot,
+    "sinh": sympy.sinh,
+    "cosh": sympy.cosh,
+    "tanh": sympy.tanh,
+    "exp": sympy.exp,
+    "log": sympy.log,
+    "ln": sympy.log,
+    "sqrt": sympy.sqrt,
+    "cbrt": sympy.cbrt,
+    "root": sympy.root,
+    "Abs": sympy.Abs,
+    "abs": sympy.Abs,
+    "sign": sympy.sign,
+    "floor": sympy.floor,
+    "ceiling": sympy.ceiling,
+    "gcd": sympy.gcd,
+    "lcm": sympy.lcm,
+    "factorial": sympy.factorial,
+    "binomial": sympy.binomial,
+    "Max": sympy.Max,
+    "Min": sympy.Min,
+    "max": sympy.Max,
+    "min": sympy.Min,
+}
+# 인자 개수 — 그 밖의 개수는 판정 불가(SymPy 가 다른 뜻으로 받을 수 있다).
+_FUNCTION_ARITY: dict[str, tuple[int, ...]] = {
+    "log": (1, 2),
+    "ln": (1,),
+    "root": (2,),
+    "gcd": (2,),
+    "lcm": (2,),
+    "binomial": (2,),
+    "Max": (2, 3, 4),
+    "Min": (2, 3, 4),
+    "max": (2, 3, 4),
+    "min": (2, 3, 4),
+}
+# 미분 안쪽에 허용하는 함수 — 정의역이 열린 집합이고 그 위에서 해석적이다. 그래서 '그 점에서
+# 정의됨' 이 곧 '그 점 근방에서 정의·미분 가능' 이다(√·|·|·floor 처럼 정의되는데 미분 불가인 점이
+# 있는 함수는 뺀다).
+_SMOOTH_FUNCTIONS: frozenset[str] = frozenset(
+    {"sin", "cos", "tan", "cot", "sec", "csc", "atan", "acot", "sinh", "cosh", "tanh", "exp"}
+    | {"log", "ln"}
+)
+# 적분 안쪽에 허용하는 함수 — 실수 전체에서 정의·연속(전해석)이다.
+_ENTIRE_FUNCTIONS: frozenset[str] = frozenset({"sin", "cos", "exp", "sinh", "cosh"})
+_CONSTANTS: dict[str, sympy.Expr] = {"pi": sympy.pi, "E": sympy.E, "I": sympy.I}
+_DEF_ZERO = sympy.Float("1e-40")  # 정확 값(대수적 수 등)의 60자리 평가에서 '0 일 수 있음' 문턱
+_DEF_FLOAT_ZERO = 1e-9  # 근사 소수가 섞인 값의 '0 일 수 있음' 문턱(Tier1 허용치와 같다)
+_DEF_MAX_POW_BITS = 100_000  # 정확 거듭제곱 결과 크기 상한(비트) — 넘으면 판정 불가
+
+
+class _DefUndefined(Exception):  # noqa: N818 — 오류가 아니라 '정의되지 않음' 신호
+    """그 점에서 원문이 정의되지 않음이 확정됐다."""
+
+
+class _DefUnknown(Exception):  # noqa: N818 — 오류가 아니라 '판정 불가' 신호
+    """허용 노드 밖이거나 정확히 판정하지 못했다."""
+
+
+def _relation_sides(condition: str) -> list[str]:
+    """조건 원문 → 평가할 식 원문 목록. `_parse_condition` 과 같은 순서로 관계를 가른다."""
+    text = condition.strip()
+    if "!=" in text:
+        return list(text.split("!=", 1))
+    if "==" in text:
+        return list(text.split("==", 1))
+    if "=" in text and not any(token in text for token in ("<", ">")):
+        return list(text.split("=", 1))
+    return [text]
+
+
+def _zero_state(value: sympy.Expr) -> bool | None:
+    """값이 0 인가 — True(정확히 0)·False(0 아님)·None(못 가림). 근사 소수는 허용치로 본다."""
+    if value.has(sympy.Float):
+        # 근사 소수가 섞인 값은 0 을 정확히 확정하지 않는다(반올림 0 일 수 있다) — 작으면 못 가림.
+        try:
+            magnitude = abs(complex(value.evalf()))
+        except (TypeError, ValueError):
+            return None
+        return None if magnitude < _DEF_FLOAT_ZERO else False
+    if value == 0:
+        return True
+    exact = value.is_zero
+    if exact is not None:
+        return bool(exact)
+    try:
+        approx = sympy.N(value, _CERT_PRECISION)
+    except Exception as exc:  # noqa: BLE001 — 평가 불가는 '못 가림'
+        logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+        return None
+    if not approx.is_number or approx.has(sympy.nan, sympy.zoo):
+        return None
+    return None if abs(approx) < _DEF_ZERO else False
+
+
+def _checked(value: sympy.Expr, real_inputs: bool) -> sympy.Expr:
+    """노드 값 검사 — 무한·NaN 은 정의되지 않음, 실수 입력에서 실수 아닌 값은 판정 불가."""
+    if value.has(sympy.zoo, sympy.nan, sympy.oo, -sympy.oo) or value.is_finite is False:
+        raise _DefUndefined
+    if real_inputs and value.is_real is False:
+        raise _DefUnknown
+    try:
+        ensure_within_budget(value)
+    except Exception as exc:  # noqa: BLE001 — 예산 초과는 판정 불가
+        raise _DefUnknown from exc
+    return value
+
+
+def _free_names(node: ast.AST, bound: frozenset[str] = frozenset()) -> set[str]:
+    """식 나무의 값 이름(함수 이름·상수 제외).
+
+    `.subs(t, …)` 의 t·`Integral` 의 적분 변수는 그 안에서 묶인 이름이라 뺀다(`Derivative` 의
+    미분 변수는 그 점의 값이 필요해 묶지 않는다).
+    """
+    if isinstance(node, ast.Name):
+        hidden = bound | frozenset(_CONSTANTS) | {"oo", "True", "False", "None"}
+        return set() if node.id in hidden else {node.id}
+    if isinstance(node, ast.Call):
+        func = node.func
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "subs"
+            and len(node.args) == 2
+            and isinstance(node.args[0], ast.Name)
+        ):
+            inner = _free_names(func.value, bound | {node.args[0].id})
+            return inner | _free_names(node.args[1], bound)
+        if (
+            isinstance(func, ast.Name)
+            and func.id == "Integral"
+            and len(node.args) == 2
+            and isinstance(node.args[1], ast.Tuple)
+            and node.args[1].elts
+            and isinstance(node.args[1].elts[0], ast.Name)
+        ):
+            variable = node.args[1].elts[0].id
+            names: set[str] = _free_names(node.args[0], bound | {variable})
+            for limit in node.args[1].elts[1:]:
+                names |= _free_names(limit, bound)
+            return names
+        names = set() if isinstance(func, ast.Name) else _free_names(func, bound)
+        for arg in node.args:
+            names |= _free_names(arg, bound)
+        return names
+    collected: set[str] = set()
+    for child in ast.iter_child_nodes(node):
+        collected |= _free_names(child, bound)
+    return collected
+
+
+def _subtree_expr(node: ast.AST) -> sympy.Expr:
+    """하위 나무 → SymPy 식(평가 파싱). 호출부가 이미 꼴(해석적·전해석)을 확인했다."""
+    return safe_sympify(ast.unparse(node))
+
+
+class _DefinednessEvaluator:
+    """허용 노드만으로 원문 식을 한 점에서 노드별로 평가한다(`_DefUndefined`·`_DefUnknown` 신호)."""
+
+    def __init__(self, real_inputs: bool) -> None:
+        self.real_inputs = real_inputs
+
+    def smooth(
+        self,
+        node: ast.AST,
+        variables: frozenset[str],
+        env: Mapping[str, sympy.Expr],
+        *,
+        entire: bool,
+    ) -> bool:
+        """`variables`(미분·적분 변수)의 함수로서 '열린 정의역에서 해석적'(entire=False) /
+        '전해석'(entire=True) 꼴인가. 변수를 담지 않은 하위 나무는 그 점의 상수라 값으로 본다."""
+        if not (_free_names(node) & variables):
+            # 변수와 무관한 하위 나무는 그 점의 상수다 — 그 값이 정의되는지만 본다(정의되지 않으면
+            # 신호가 그대로 올라간다 — 적분 안의 상수 `a*(a - 2)/(a - 2)` 도 자동 약분 전에 잡힌다).
+            self.value(node, env)
+            return True
+        if isinstance(node, ast.Name):
+            return True
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            return self.smooth(node.operand, variables, env, entire=entire)
+        if isinstance(node, ast.BinOp):
+            if isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
+                return self.smooth(node.left, variables, env, entire=entire) and self.smooth(
+                    node.right, variables, env, entire=entire
+                )
+            if isinstance(node.op, ast.Div):
+                # 전해석 꼴은 변수 없는 값으로만 나눈다(변수 분모는 극이 생긴다).
+                if entire and _free_names(node.right) & variables:
+                    return False
+                return self.smooth(node.left, variables, env, entire=entire) and self.smooth(
+                    node.right, variables, env, entire=entire
+                )
+            if isinstance(node.op, (ast.Pow, ast.BitXor)):
+                return self._smooth_power(node, variables, env, entire=entire)
+            return False
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and not node.keywords:
+            if node.func.id == "Derivative":
+                # 해석 함수의 도함수는 같은 열린 정의역에서 해석적이다(중첩 미분 — 속도·가속도 꼴).
+                if len(node.args) < 2 or not all(isinstance(a, ast.Name) for a in node.args[1:]):
+                    return False
+                inner_vars = variables | {cast(ast.Name, a).id for a in node.args[1:]}
+                return self.smooth(node.args[0], inner_vars, env, entire=entire)
+            allowed = _ENTIRE_FUNCTIONS if entire else _SMOOTH_FUNCTIONS
+            return (
+                node.func.id in allowed
+                and len(node.args) == 1
+                and self.smooth(node.args[0], variables, env, entire=entire)
+            )
+        return False
+
+    def _smooth_power(
+        self,
+        node: ast.BinOp,
+        variables: frozenset[str],
+        env: Mapping[str, sympy.Expr],
+        *,
+        entire: bool,
+    ) -> bool:
+        """거듭제곱 꼴 — 지수가 변수와 무관하면 그 값이 정수(전해석이면 0 이상)여야 하고, 지수가
+        변수를 담으면 밑이 변수와 무관한 양수여야 한다(b**x = exp(x·log b))."""
+        if not (_free_names(node.right) & variables):
+            exponent = self.value(node.right, env)
+            if not exponent.is_Integer or (entire and exponent.is_negative):
+                return False
+            return self.smooth(node.left, variables, env, entire=entire)
+        if _free_names(node.left) & variables:
+            return False
+        return bool(self.value(node.left, env).is_positive) and self.smooth(
+            node.right, variables, env, entire=entire
+        )
+
+    def value(self, node: ast.AST, env: Mapping[str, sympy.Expr]) -> sympy.Expr:
+        if isinstance(node, ast.Constant):
+            raw = node.value
+            if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+                raise _DefUnknown
+            return sympy.Integer(raw) if isinstance(raw, int) else sympy.Float(repr(raw))
+        if isinstance(node, ast.Name):
+            if node.id in env:
+                return env[node.id]
+            if node.id in _CONSTANTS:
+                return _CONSTANTS[node.id]
+            raise _DefUnknown  # 값이 없는 이름(자유 기호)·oo 등 — 그 점이 정해지지 않았다
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            operand = self.value(node.operand, env)
+            return -operand if isinstance(node.op, ast.USub) else operand
+        if isinstance(node, ast.BinOp):
+            return self._binop(node, env)
+        if isinstance(node, ast.Call) and not node.keywords:
+            return self._call(node, env)
+        raise _DefUnknown
+
+    def _binop(self, node: ast.BinOp, env: Mapping[str, sympy.Expr]) -> sympy.Expr:
+        left = self.value(node.left, env)
+        right = self.value(node.right, env)
+        if isinstance(node.op, ast.Add):
+            return _checked(left + right, self.real_inputs)
+        if isinstance(node.op, ast.Sub):
+            return _checked(left - right, self.real_inputs)
+        if isinstance(node.op, ast.Mult):
+            return _checked(left * right, self.real_inputs)
+        if isinstance(node.op, ast.Div):
+            zero = _zero_state(right)
+            if zero is True:
+                raise _DefUndefined
+            if zero is None:
+                raise _DefUnknown
+            return _checked(left / right, self.real_inputs)
+        if isinstance(node.op, (ast.Pow, ast.BitXor)):
+            return self._power(left, right)
+        raise _DefUnknown
+
+    def _power(self, base: sympy.Expr, exponent: sympy.Expr) -> sympy.Expr:
+        zero = _zero_state(base)
+        if zero is None:
+            raise _DefUnknown
+        if zero:
+            # 0 의 거듭제곱 — 지수가 양수일 때만 정의된다(0**0·0**음수는 정의되지 않음).
+            positive = exponent.is_positive
+            if positive is None:
+                raise _DefUnknown
+            if not positive:
+                raise _DefUndefined
+            return sympy.Integer(0)
+        if exponent.is_Integer and base.is_number:
+            try:
+                magnitude = abs(complex(base.evalf()))
+            except (TypeError, ValueError) as exc:
+                raise _DefUnknown from exc
+            bits = abs(int(exponent)) * max(1.0, math.log2(magnitude + 2.0))
+            if bits > _DEF_MAX_POW_BITS:
+                raise _DefUnknown
+        return _checked(sympy.Pow(base, exponent), self.real_inputs)
+
+    def _call(self, node: ast.Call, env: Mapping[str, sympy.Expr]) -> sympy.Expr:
+        func = node.func
+        if isinstance(func, ast.Attribute):
+            if func.attr == "doit" and not node.args:
+                return self.value(func.value, env)
+            if func.attr == "subs" and len(node.args) == 2 and isinstance(node.args[0], ast.Name):
+                replacement = self.value(node.args[1], env)
+                return self.value(func.value, {**env, node.args[0].id: replacement})
+            raise _DefUnknown
+        if not isinstance(func, ast.Name):
+            raise _DefUnknown
+        if func.id == "Derivative":
+            return self._derivative(node, env)
+        if func.id == "Integral":
+            return self._integral(node, env)
+        apply = _DEFINED_FUNCTIONS.get(func.id)
+        if apply is None or len(node.args) not in _FUNCTION_ARITY.get(func.id, (1,)):
+            raise _DefUnknown
+        args = [self.value(arg, env) for arg in node.args]
+        # 함수의 특이점(log 0·tan(pi/2)·밑 1 의 log·factorial(-1) …)은 SymPy 가 무한/NaN 으로 낸다.
+        return _checked(apply(*args), self.real_inputs)
+
+    def _derivative(self, node: ast.Call, env: Mapping[str, sympy.Expr]) -> sympy.Expr:
+        """`Derivative(f, v…)` 의 그 점 값 — f 가 열린 정의역에서 해석적인 꼴이고 그 점에서
+        정의될 때만(그러면 그 점 근방에서 정의·미분 가능하다). 미분 변수의 값은 env 에 있어야
+        한다."""
+        if len(node.args) < 2 or not all(isinstance(a, ast.Name) for a in node.args[1:]):
+            raise _DefUnknown
+        inner = node.args[0]
+        names = [cast(ast.Name, a).id for a in node.args[1:]]
+        if not all(n in env for n in names):
+            raise _DefUnknown
+        if not self.smooth(inner, frozenset(names), env, entire=False):
+            raise _DefUnknown
+        self.value(inner, env)  # 그 점에서 원문 f 가 정의되는가(정의되지 않으면 신호가 올라간다)
+        try:
+            expr = _subtree_expr(inner)
+            # 중첩 Derivative 는 평가 파싱에서 미계산으로 남는다 — 미분 뒤 doit 으로 끝까지
+            # 계산한다.
+            derived = sympy.diff(expr, *[sympy.Symbol(n) for n in names]).doit()
+            point = {sympy.Symbol(k): v for k, v in env.items()}
+            value = safe_subs(derived, point)
+        except Exception as exc:  # noqa: BLE001 — 미분·대입 불가는 판정 불가
+            logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+            raise _DefUnknown from exc
+        if value.free_symbols:
+            raise _DefUnknown
+        return _checked(value, self.real_inputs)
+
+    def _integral(self, node: ast.Call, env: Mapping[str, sympy.Expr]) -> sympy.Expr:
+        """`Integral(f, (v, a, b))` — f 가 전해석 꼴이고 끝점이 유한할 때만(정적분이 정의된다)."""
+        if len(node.args) != 2 or not isinstance(node.args[1], ast.Tuple):
+            raise _DefUnknown
+        limits = node.args[1].elts
+        if len(limits) != 3 or not isinstance(limits[0], ast.Name):
+            raise _DefUnknown
+        inner = node.args[0]
+        bound = limits[0].id
+        lower = self.value(limits[1], env)
+        upper = self.value(limits[2], env)
+        outer = {k: v for k, v in env.items() if k != bound}
+        if not _free_names(inner, frozenset({bound})) <= set(outer):
+            raise _DefUnknown
+        if not self.smooth(inner, frozenset({bound}), outer, entire=True):
+            raise _DefUnknown
+        try:
+            expr = _subtree_expr(inner)
+            point = {sympy.Symbol(k): v for k, v in outer.items()}
+            integrand = safe_subs(expr, point)
+            if integrand.has(sympy.zoo, sympy.nan, sympy.oo, -sympy.oo):
+                raise _DefUndefined
+            value = sympy.Integral(integrand, (sympy.Symbol(bound), lower, upper))
+        except _DefUndefined:
+            raise
+        except Exception as exc:  # noqa: BLE001 — 구성 불가는 판정 불가
+            logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+            raise _DefUnknown from exc
+        if value.free_symbols:
+            raise _DefUnknown
+        return value
+
+
+def condition_definedness(condition: str, values: Mapping[str, sympy.Expr]) -> DefinednessState:
+    """조건 원문이 `values`(이름 → 값) 의 점에서 정의되는가 — defined·undefined·unknown.
+
+    평가 파싱의 자동 약분 전에, 원문 구문 나무를 허용 노드만으로 그 점에서 노드별로 평가한다
+    (위 절 설명). undefined 는 '원문에서 그 값이 정의되지 않음' 이 정확히 확정된 경우뿐이다.
+    """
+    sides = _relation_sides(condition)
+    if any(not side.strip() for side in sides):
+        return _UNKNOWN
+    real_inputs = all(value.is_real is True for value in values.values())
+    try:
+        trees = []
+        for side in sides:
+            safe_sympify(side)
+            tree = ast.parse(side.strip().replace("^", "**"), mode="eval").body
+            trees.append(tree)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가·거부는 판정 불가
+        logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+        return _UNKNOWN
+    uses_imaginary = any(
+        isinstance(child, ast.Name) and child.id == "I"
+        for tree in trees
+        for child in ast.walk(tree)
+    )
+    if uses_imaginary:
+        real_inputs = False  # 허수 단위를 쓰는 조건 — 실수 아닌 중간값이 정상이다
+    evaluator = _DefinednessEvaluator(real_inputs)
+    try:
+        for tree in trees:
+            for part in _comparison_parts(tree):
+                evaluator.value(part, values)
+    except _DefUndefined:
+        return _UNDEFINED
+    except _DefUnknown:
+        return _UNKNOWN
+    except Exception as exc:  # noqa: BLE001 — 예상 밖 예외도 판정 불가(pass 위장 금지)
+        logger.debug("verify_answer 정의역 판정 회피: %s", type(exc).__name__)
+        return _UNKNOWN
+    return _DEFINED
+
+
+def _condition_names(condition: str) -> frozenset[str]:
+    """조건 원문의 값 이름(함수·상수·묶인 이름 제외) — 구문 나무로 모은다(실행하지 않는다).
+
+    못 읽는 쪽은 건너뛴다(그 이름은 정의역 판정에서 '값 없는 이름' 으로 판정 불가가 된다).
+    """
+    names: set[str] = set()
+    for side in _relation_sides(condition):
+        try:
+            tree = ast.parse(side.strip().replace("^", "**"), mode="eval")
+        except SyntaxError:
+            continue
+        names |= _free_names(tree)
+    return frozenset(names)
+
+
+def _comparison_parts(tree: ast.AST) -> list[ast.AST]:
+    """관계 나무를 비교 대상 식들로 편다(`a < b`·`Eq(a, b)`). 관계가 아니면 그 자신."""
+    if isinstance(tree, ast.Compare) and len(tree.ops) == 1:
+        return [tree.left, *tree.comparators]
+    if (
+        isinstance(tree, ast.Call)
+        and isinstance(tree.func, ast.Name)
+        and tree.func.id in ("Eq", "Ne", "Lt", "Le", "Gt", "Ge")
+        and len(tree.args) == 2
+        and not tree.keywords
+    ):
+        return list(tree.args)
+    return [tree]
+
+
+def _root_is_real(root: sympy.Expr) -> bool | None:
+    """근이 실수인가 — SymPy 가정(`is_real`)이 정하면 그대로, 못 정하면 60자리 평가의 허수부가
+    정확히 0 일 때만 실수·문턱보다 크면 실수 아님·그 사이는 못 가림(None). Tier1 허용치(1e-9)로
+    실수라 부르지 않는다 — 허수부 1e-10 인 근이 실근으로 세어지던 결함(P3-75 ⑤(d))."""
+    real = root.is_real
+    if real is not None:
+        return bool(real)
+    try:
+        value = sympy.N(root, _CERT_PRECISION)
+        _, imaginary = value.as_real_imag()
+    except Exception as exc:  # noqa: BLE001 — 평가 불가는 못 가림
+        logger.debug("verify_answer 실근 판정 회피: %s", type(exc).__name__)
+        return None
+    if not imaginary.is_number:
+        return None
+    if imaginary == 0:
+        return True
+    return False if abs(imaginary) > _DEF_ZERO else None
+
+
+def trusted_real_roots(
+    condition: str, residual: sympy.Expr, var: sympy.Symbol
+) -> list[sympy.Expr] | None:
+    """조건 등식의 **원문에서 정의되는** 서로 다른 실근(정확값) — 판정 불가면 None(P3-75).
+
+    `residual` 은 평가 파싱이 자동 약분한 잔차라 그 근에는 원문이 정의되지 않는 점(무연근)이
+    섞일 수 있다. 그래서 두 가지를 정확하게 가린다.
+      · 실근 여부 — 유리 계수 다항식이면 `real_roots`(정확), 아니면 `solve` 의 근마다 SymPy
+        `is_real`(정확) · 못 가리면 None. 허수부가 아주 작은 근(`(x - 1)**2 + 10**(-20)`)을 허용치로
+        실근이라 부르지 않는다.
+      · 원문 정의역 — 근마다 `condition_definedness`. 정의되지 않음은 버리고, 판정 불가가
+        하나라도 있으면 None.
+    `solve` 경로의 근 집합이 완전하다는 보장은 여기서 하지 않는다(종전과 같다 — 호출부가
+    다항일 때만 존재성을 단정한다).
+    """
+    try:
+        poly: sympy.Poly | None = sympy.Poly(residual, var)
+    except (sympy.PolynomialError, sympy.GeneratorsError, ValueError):
+        poly = None
+    candidates: list[sympy.Expr]
+    if poly is not None and poly.domain in (sympy.ZZ, sympy.QQ) and poly.degree() >= 1:
+        candidates = list(sympy.real_roots(poly.sqf_part()))
+    else:
+        candidates = []
+        for root in sympy.solve(sympy.Eq(residual, 0), var):
+            real = _root_is_real(root)
+            if real is None:
+                return None
+            if real:
+                candidates.append(root)
+    kept: list[sympy.Expr] = []
+    for root in candidates:
+        state = condition_definedness(condition, {str(var): root})
+        if state == _UNKNOWN:
+            return None
+        if state == _DEFINED:
+            kept.append(root)
+    return kept
+
+
 def verify_substituted_value(
     condition: str,
     given: Mapping[str, str],
@@ -1001,14 +1664,18 @@ def verify_root_selection(
 
     try:
         ans_val = _real_value(safe_sympify(ans_text), tol)
-        raw_roots = sympy.solve(sympy.Eq(residual, 0), var)
+        # P3-75 — 자동 약분된 잔차의 근에서 원문이 정의되지 않는 근(무연근)을 빼고, 실근 여부를
+        # 허용치가 아니라 정확하게 가린다(`trusted_real_roots`).
+        exact_roots = trusted_real_roots(condition, residual, var)
     except Exception as exc:  # noqa: BLE001 — 풀이/치환 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("근 선택 — 방정식 풀이/치환 불가·안전 회피")
     if ans_val is None:
         return _unverifiable("근 선택 — 답이 실수가 아님·안전 회피")
+    if exact_roots is None:
+        return _unverifiable("근 선택 — 원문 정의역·실근 여부를 확정하지 못함·안전 회피")
 
-    real_roots = [rv for r in raw_roots if (rv := _real_value(r, tol)) is not None]
+    real_roots = [rv for r in exact_roots if (rv := _real_value(r, tol)) is not None]
     if not real_roots:
         return _unverifiable("근 선택 — 실근 없음(복소근/풀이 불가)·안전 회피")
 
@@ -1073,9 +1740,12 @@ def derive_selected_root(
     if len(free) != 1:
         return None
     try:
-        raw_roots = sympy.solve(sympy.Eq(residual, 0), free[0])
+        # P3-75 — 원문에서 정의되는 정확 실근만(무연근·허수부가 아주 작은 근 제외).
+        raw_roots = trusted_real_roots(condition, residual, free[0])
     except Exception as exc:  # noqa: BLE001 — 풀이 불가는 보수적 None
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return None
+    if raw_roots is None:
         return None
 
     # (정확근, 실수값) 쌍 — 복소근은 제외. 실수값은 선택 판정용·반환은 정확근 문자열.
@@ -1280,17 +1950,24 @@ def classify_solvability(
         return SolvabilityVerdict(state="undecidable", reason="다항식이 아님 — 존재성 단정 회피")
 
     try:
-        raw_roots = sympy.solve(sympy.Eq(residual, 0), var)
+        # P3-75 — 자동 약분된 잔차의 근 중 원문에서 정의되는 정확 실근만 센다(무연근·허수부가
+        # 아주 작은 근을 해로 세지 않는다).
+        exact_roots = trusted_real_roots(condition, residual, var)
     except Exception as exc:  # noqa: BLE001 — 풀이 불가는 보수적 undecidable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return SolvabilityVerdict(state="undecidable", reason="방정식 풀이 불가")
+    if exact_roots is None:
+        return SolvabilityVerdict(
+            state="undecidable", reason="원문 정의역·실근 여부를 확정하지 못함 — 존재성 단정 회피"
+        )
 
-    real_roots = [rv for r in raw_roots if (rv := _real_value(r, tol)) is not None]
+    real_roots = [rv for r in exact_roots if (rv := _real_value(r, tol)) is not None]
     distinct = _distinct_values(real_roots, tol)
     n = len(distinct)
     if n == 0:
         return SolvabilityVerdict(
-            state="no_solution", reason="다항이나 실근이 하나도 없음(복소근만)"
+            state="no_solution",
+            reason="다항이나 원문에서 정의되는 실근이 하나도 없음(복소근·무연근만)",
         )
     if n == 1:
         return SolvabilityVerdict(state="unique", reason=None, n_distinct_real_roots=1)

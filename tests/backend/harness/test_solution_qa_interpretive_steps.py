@@ -635,6 +635,8 @@ ADVERSARIAL: dict[str, tuple[Record, qa.Verdict]] = {
         _rec(["x*(x - 2)**0 = 2", "y = x + 1"], "3", {"x": "2", "y": "3"}, ["x = 2", "y = 3"]),
         qa.Verdict.FAIL,
     ),
+    # P3-75 — C1(Tier1)도 원문 정의역을 본다: x = 1 은 원문 분모 (x - 1) 이 0 이라 정의되지 않는다.
+    # 종전(P3-71)에는 C2 가 허용 목록 밖이라 검증 불가였고 C1 은 자동 약분으로 통과했다.
     "D1 Derivative 속 약분(C2)": (
         _rec(
             ["Derivative(x**3*(x - 1)/(x - 1), x).doit() = 3", "x > 0"],
@@ -642,7 +644,7 @@ ADVERSARIAL: dict[str, tuple[Record, qa.Verdict]] = {
             {"x": "1"},
             ["x = -1, x = 1"],
         ),
-        qa.Verdict.UNVERIFIABLE,
+        qa.Verdict.FAIL,
     ),
     "D2 Derivative 속 약분(선택 뒤 대입)": (
         _rec(
