@@ -642,6 +642,18 @@ jobs:
       - name: 게이트 — Solution QA (문제·정답·풀이 불일치 · solution_qa 대표 과정 전수)
         run: python -m whymath_backend.harness.solution_qa
 
+      # P3-10: AI 품질 평가 8종(수학적 정확성·정답 누설·오개념 판정·Hint 적절성·설명 일관성·학생 수준·
+      # hallucination·Curriculum 범위 이탈)의 **변별력 자가 점검**. 대표 과정 평가셋 244사례에 현재 코드의
+      # 결정론 튜터 출력(LLM 0)을 후보로 두고, 8축마다 나쁜 응답을 넣어 그 축 점수가 떨어지고 판정이 FAIL로
+      # 바뀌는지 본다 — 하나라도 무반응·주입 미적용이면 exit 1, 측정 실패(적재·판정 대상 부족·판정기 예외)는
+      # exit 2. hermetic(DB 0·LLM 0·네트워크 0 — SymPy만)·결정론·약 10초.
+      # **실측 판정(`python -m whymath_backend.harness.ai_quality_eval`)은 이 잡에 걸지 않는다**: 오늘의 실
+      # 상태는 정답 누설 무관용 축이 실패 1건(L3 힌트의 동치 산술식 — 보고서 §4)이라 exit 1이 정상이고, 임계는
+      # 제안값이라 Kiki 확인 전이다. 판정기 자체의 변별력은 tests/backend/harness/test_ai_quality_judges.py·
+      # test_ai_quality_eval.py가, 이 스텝의 존재는 tests/infra/test_ai_quality_eval_wiring.py가 동결한다.
+      - name: 게이트 — AI 품질 8종 변별력 (ai_quality_eval --self-test·축별 주입 반응 8/8)
+        run: python -m whymath_backend.harness.ai_quality_eval --self-test
+
       # CONST-03 — 헌법 R2-02(후보 문항 사람 판정 독립)·R2-03(게이트 기록 4요건) 집행 테스트.
       # 왜 이 잡·이 위치인가: 두 테스트가 `whymath_backend`를 import하므로 백엔드 설치가 있는
       # 이 잡이어야 한다. `tests/constitution`은 pytest testpaths(`../../tests/backend`) 밖이라

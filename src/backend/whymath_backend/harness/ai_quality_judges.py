@@ -376,6 +376,19 @@ def _step_state(before: str, after: str) -> VerifyStepState:
     return verify_step(before, after).state
 
 
+@lru_cache(maxsize=65536)
+def _relation_symbols(rel: str) -> frozenset[str] | None:
+    """관계식의 자유 변수 이름 집합(SymPy 해석 — `.subs`·`.doit()` 적용 후). 해석 불가면 None."""
+    names: set[str] = set()
+    for side in rel.split("="):
+        try:
+            expr = safe_sympify(side.replace("^", "**"))
+        except Exception:  # 해석 불가 — 비교 대상에서 뺀다(판정 불가로 귀결)
+            return None
+        names |= {str(sym) for sym in getattr(expr, "free_symbols", set())}
+    return frozenset(names)
+
+
 def _anchored_verdict(rel: str, references: tuple[str, ...]) -> VerifyStepState:
     """문항의 검증된 식(조건 + 풀이 단계) 대비 주장 1건의 판정.
 
@@ -388,10 +401,15 @@ def _anchored_verdict(rel: str, references: tuple[str, ...]) -> VerifyStepState:
     (도함수 = 0)을 풀기 때문에, 조건 대비로는 옳은 풀이 단계가 '어긋남'으로 나온다(2026-10-21 실측 —
     `aq-h-10-04-l3` 의 `6*t**2 - 18*t + 12 = 0` 이 조건 대비 incorrect 였다).
     """
+    claim_vars = _relation_symbols(rel)
     decided: list[VerifyStepState] = []
     for ref in references:
         if normalize_text(ref) == normalize_text(rel):
             return VerifyStepState.correct
+        # 변수 집합이 같은 기준식과만 비교한다 — `verify_step`은 해집합을 값으로 비교하므로 다른
+        # 변수의 식(`x = 2` 대 `t = 5`)도 '어긋남'으로 낸다. 그것은 문항과 무관한 예시일 수 있다.
+        if claim_vars is None or _relation_symbols(ref) != claim_vars:
+            continue
         state = _step_state(ref, rel)
         if state == VerifyStepState.correct:
             return VerifyStepState.correct
@@ -709,11 +727,12 @@ def _refs(response: TutorResponse, registry: Registry) -> _Refs:
     diag = _str_or_none(_diagnosis(output).get("concept_id"))
     if diag is not None:
         structured.append(diag)
+    # 같은 참조가 구조·본문에 겹쳐 나와도 한 번만 센다(순서 보존 중복 제거).
     return _Refs(
-        structured_concepts=tuple(structured),
-        text_concept_codes=tuple(_CONCEPT_CODE_RE.findall(text)),
-        text_standard_codes=tuple(_STANDARD_CODE_RE.findall(text)),
-        text_mids=tuple(_MID_RE.findall(text)),
+        structured_concepts=tuple(dict.fromkeys(structured)),
+        text_concept_codes=tuple(dict.fromkeys(_CONCEPT_CODE_RE.findall(text))),
+        text_standard_codes=tuple(dict.fromkeys(_STANDARD_CODE_RE.findall(text))),
+        text_mids=tuple(dict.fromkeys(_MID_RE.findall(text))),
         mentions=registry.mentioned_concepts(text),
     )
 
@@ -737,7 +756,11 @@ def _judge_level(case: EvalCase, response: TutorResponse, ctx: JudgeContext) -> 
             reasons.append(f"{band.value} 밴드에 도입되지 않은 표기 '{token}'({construct})")
     later = reg.descendants(case.concept_id)
     refs = _refs(response, reg)
-    ids = [c for c in (*refs.structured_concepts, *refs.text_concept_codes) if c in reg.concepts]
+    ids = [
+        c
+        for c in dict.fromkeys((*refs.structured_concepts, *refs.text_concept_codes))
+        if c in reg.concepts
+    ]
     for cid in ids:
         if cid in later:
             counters["not_yet_learned"] += 1
@@ -763,7 +786,7 @@ def _judge_hallucination(case: EvalCase, response: TutorResponse, ctx: JudgeCont
     reasons: list[str] = []
     refs = _refs(response, reg)
     counters = {"concept_id": 0, "misconception_id": 0, "standard_code": 0, "m_id": 0}
-    for cid in (*refs.structured_concepts, *refs.text_concept_codes):
+    for cid in dict.fromkeys((*refs.structured_concepts, *refs.text_concept_codes)):
         if cid not in reg.concepts:
             counters["concept_id"] += 1
             reasons.append(f"존재하지 않는 개념 id {cid!r}")
@@ -791,7 +814,7 @@ def _judge_scope(case: EvalCase, response: TutorResponse, ctx: JudgeContext) -> 
     refs = _refs(response, reg)
     counters = {"concept": 0, "standard_code": 0, "mention": 0}
     # 없는 id는 hallucination 축의 몫이다 — 여기서는 실재하는 참조만 범위를 본다(축 분리).
-    for cid in (*refs.structured_concepts, *refs.text_concept_codes):
+    for cid in dict.fromkeys((*refs.structured_concepts, *refs.text_concept_codes)):
         if cid in reg.concepts and cid not in reg.allowed_scope_concepts:
             counters["concept"] += 1
             reasons.append(f"대표 과정 범위 밖 개념 {cid}")
