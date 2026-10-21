@@ -29,6 +29,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.l1.atom_graph.atom_edge_retire import (
+    RETIRE_APPLY,
+    RETIRE_PLAN,
+    RETIRE_REPORT,
+    RetireOutcome,
+    delete_stale_edges,
+    plan_retirement,
+    read_db_edge_rows,
+    summarize,
+    validate_mode,
+)
 from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
 from whymath_backend.schema.enums import EdgeType
 
@@ -141,6 +152,8 @@ class AtomBackendEdgeStore:
     ) -> None:
         self._engine = engine
         self._settings = settings
+        # KG-14 — 직전 `populate`의 잔존 엣지 은퇴 결과(범위 미지정 호출이면 None)
+        self.last_retire: RetireOutcome | None = None
 
     @property
     def _resolved_settings(self) -> Settings:
@@ -170,6 +183,8 @@ class AtomBackendEdgeStore:
         *,
         overwrite_cms_edits: bool = False,
         conflicts: list[str] | None = None,
+        retire_mode: str = RETIRE_REPORT,
+        retire_scope: frozenset[str] | None = None,
     ) -> tuple[int, list[str]]:
         """선수엣지 레코드들을 backend `concept_edge`에 멱등 upsert (orphan skip·식별자 보존).
 
@@ -182,7 +197,20 @@ class AtomBackendEdgeStore:
         **CMS 소유 보호(P3-26)**: CMS가 만든 관계(`cms_edited_at` 있음)와 같은 쌍인 레코드는
         건너뛰고
         `conflicts`에 `concept_edge:<선수>-><후행>`으로 보고한다 — 적재 행 수에는 포함하지 않는다.
+
+        **잔존 엣지 은퇴(KG-14)**: `retire_scope`(원자 백본 정본의 개념 코드 집합)를 주면 잠금
+        직후 DB 엣지를 읽어 은퇴 계획을 세운다(범위의 정본은 `atom_edge_retire` 모듈 설명).
+        `retire_mode`가 `apply`면 **같은 트랜잭션에서** 잔존 행을 지운 뒤 순환 검사·upsert를
+        한다 — 순환 검사가 실패하면 삭제도 함께 롤백된다. `report`(기본)는 계산만 해
+        `last_retire`에 싣는다.
+        `retire_scope`가 None이면 은퇴 단계를 통째로 건너뛴다(종전 호출 무변경).
         """
+        validate_mode(retire_mode)
+        if retire_mode == RETIRE_PLAN:
+            raise ValueError(
+                "plan 모드는 쓰기 경로가 아니다 — populate.plan_atom_edge_retirement 사용"
+            )
+        self.last_retire = None
         if not records:
             return 0, []
 
@@ -216,6 +244,15 @@ class AtomBackendEdgeStore:
         where, release = upsert_guard(ConceptEdge, overwrite=overwrite_cms_edits)
         with self._get_engine().begin() as conn:
             lock_prerequisite_graph_sync(conn)
+            if retire_scope is not None:
+                plan = plan_retirement(
+                    read_db_edge_rows(conn),
+                    {(r.from_code, r.to_code) for r, _f, _t in resolved},
+                    retire_scope,
+                )
+                retired = delete_stale_edges(conn, plan) if retire_mode == RETIRE_APPLY else 0
+                self.last_retire = summarize(plan, retire_mode, retired)
+            # 은퇴(apply) 뒤의 DB를 읽는다 — 삭제가 같은 트랜잭션이라 여기서 보인다
             assert_acyclic_with_db(conn, [(f, t) for _r, f, t in resolved], uuid_to_code)
             for record, from_uuid, to_uuid in resolved:
                 stmt = pg_insert(ConceptEdge).values(
@@ -256,6 +293,8 @@ def populate_atom_edges(
     store: AtomBackendEdgeStore | None = None,
     overwrite_cms_edits: bool = False,
     conflicts: list[str] | None = None,
+    retire_mode: str = RETIRE_REPORT,
+    retire_scope: frozenset[str] | None = None,
 ) -> int:
     """원자 백본 선수엣지를 backend `concept_edge`로 멱등 적재. 반환=적재 행 수(orphan은 제외).
 
@@ -267,7 +306,11 @@ def populate_atom_edges(
         store if store is not None else AtomBackendEdgeStore(engine=engine, settings=resolved)
     )
     loaded, _skipped = edge_store.populate(
-        records, overwrite_cms_edits=overwrite_cms_edits, conflicts=conflicts
+        records,
+        overwrite_cms_edits=overwrite_cms_edits,
+        conflicts=conflicts,
+        retire_mode=retire_mode,
+        retire_scope=retire_scope,
     )
     return loaded
 

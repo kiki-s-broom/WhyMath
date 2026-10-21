@@ -46,6 +46,17 @@ from whymath_backend.l1.atom_graph.atom_backend_edge import (
     load_atom_edges_from_graph_json,
     populate_atom_edges,
 )
+from whymath_backend.l1.atom_graph.atom_edge_retire import (
+    RETIRE_MODES,
+    RETIRE_PLAN,
+    RETIRE_REPORT,
+    RetirePlan,
+    cycle_after_retirement,
+    plan_retirement,
+    read_db_edge_rows,
+    render_plan,
+    validate_mode,
+)
 from whymath_backend.l1.atom_graph.atom_node_projection import (
     AtomNodeStore,
     load_atom_nodes_from_graph_json,
@@ -141,6 +152,12 @@ class AtomBackbonePopulateReport:
     # SKB-03 — `atom_node` 메타 프로젝션 적재 행 수(opt-out이면 0). 위 Overlay 2종과 같은 한계를
     # 공유한다(0이 "코퍼스가 비었다"와 "건너뛰었다"를 구분 못 함) — CLI stdout이 어느 쪽인지 찍는다.
     atom_nodes_loaded: int
+    # KG-14 — 잔존 엣지 은퇴("작동한 비율": 찾은 수·지운 수·CMS라서 지킨 수).
+    # report 모드는 지운 수가 0이다.
+    retire_mode: str = RETIRE_REPORT
+    stale_edges_found: int = 0
+    edges_retired: int = 0
+    stale_cms_kept: int = 0
 
 
 def populate_atom_backbone(
@@ -157,6 +174,7 @@ def populate_atom_backbone(
     atom_node_store: AtomNodeStore | None = None,
     overwrite_cms_edits: bool = False,
     conflicts: list[str] | None = None,
+    retire_mode: str = RETIRE_REPORT,
 ) -> AtomBackbonePopulateReport:
     """원자 코퍼스 graph.json을 backend `concept`/`concept_edge`에 멱등 적재(노드→parent→엣지).
 
@@ -168,7 +186,14 @@ def populate_atom_backbone(
     적재에서는 항상 함께 적재된다. 코퍼스 파일이 지정됐는데 없으면(오탈자 등) 기존 concept/edge
     로더와 동일하게 `FileNotFoundError`가 그대로 전파된다(조용한 스킵 금지 — 명시적 opt-out만
     허용, 암묵적 실패 금지).
+
+    `retire_mode`(KG-14): `report`(기본)는 잔존 엣지를 세어 리포트에만 싣고, `apply`는 엣지 적재와
+    같은 트랜잭션에서 지운다. 범위는 이 정본의 개념 코드 전체다. `plan`은 쓰기 경로가 아니라
+    `plan_atom_edge_retirement`를 쓴다.
     """
+    validate_mode(retire_mode)
+    if retire_mode == RETIRE_PLAN:
+        raise ValueError("plan 모드는 쓰기 경로가 아니다 — plan_atom_edge_retirement 사용")
     resolved = settings if settings is not None else get_settings()
     c_store = (
         concept_store if concept_store is not None else AtomBackendConceptStore(settings=resolved)
@@ -199,7 +224,10 @@ def populate_atom_backbone(
         store=e_store,
         overwrite_cms_edits=overwrite_cms_edits,
         conflicts=conflicts,
+        retire_mode=retire_mode,
+        retire_scope=frozenset(c.code for c in concept_records),
     )
+    retire = e_store.last_retire
 
     # ── VIZ-01 D1 — 시각화 Overlay 2종 적재(opt-in·concept/edge 적재 성공 후) ──────────────
     visual_styles_loaded = 0
@@ -253,6 +281,54 @@ def populate_atom_backbone(
         visual_styles_loaded=visual_styles_loaded,
         visualization_loaded=visualization_loaded,
         atom_nodes_loaded=atom_nodes_loaded,
+        retire_mode=retire_mode,
+        stale_edges_found=retire.stale_found if retire is not None else 0,
+        edges_retired=retire.retired if retire is not None else 0,
+        stale_cms_kept=retire.cms_kept if retire is not None else 0,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AtomEdgeRetirementPlan:
+    """plan 모드 결과 — 쓰지 않고 계산만 한 은퇴 계획과 두 순환 판정."""
+
+    plan: RetirePlan
+    cycle_after_retire: list[str] | None
+    cycle_without_retire: list[str] | None
+
+
+def plan_atom_edge_retirement(
+    graph_path: Path,
+    *,
+    settings: Settings | None = None,
+    engine: object | None = None,
+) -> AtomEdgeRetirementPlan:
+    """잔존 엣지 은퇴 계획(KG-14 plan 모드) — **DB에 쓰지 않는다**.
+
+    정본(`graph_path`)의 개념 코드가 범위, 정본의 선수 쌍이 남길 집합이다. DB는 읽기 전용 트랜잭션
+    (`SET TRANSACTION READ ONLY`)에서 SELECT 한 번만 읽는다. 두 순환 판정을 함께 낸다 — 은퇴 없이
+    덧적재하면 순환인가(지금 적재가 막히는 이유), 은퇴 뒤에도 순환이 남는가(apply가 통과할지).
+    """
+    from sqlalchemy import text
+
+    from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
+
+    concept_records = load_atom_concepts_from_graph_json(graph_path)
+    edge_records, _skipped = load_atom_edges_from_graph_json(graph_path)
+    scope = frozenset(c.code for c in concept_records)
+    canon_pairs = {(r.from_code, r.to_code) for r in edge_records}
+    resolved = settings if settings is not None else get_settings()
+    eng = engine if engine is not None else _build_sync_engine(resolved)
+    with eng.connect() as conn:  # type: ignore[attr-defined]
+        conn.execute(text("SET TRANSACTION READ ONLY"))
+        rows = read_db_edge_rows(conn)
+        conn.rollback()
+    plan = plan_retirement(rows, canon_pairs, scope)
+    empty = RetirePlan(stale=(), cms_kept=(), in_scope_prerequisite=0, out_of_scope=0)
+    return AtomEdgeRetirementPlan(
+        plan=plan,
+        cycle_after_retire=cycle_after_retirement(rows, plan, canon_pairs),
+        cycle_without_retire=cycle_after_retirement(rows, empty, canon_pairs),
     )
 
 
@@ -297,19 +373,48 @@ def _main() -> None:
             "부르지 않아 prod에 한 번도 적재된 적이 없었다."
         ),
     )
+    parser.add_argument(
+        "--retire-stale-edges",
+        choices=RETIRE_MODES,
+        default=RETIRE_REPORT,
+        help=(
+            "정본에서 지운·뒤집은 선수 엣지(잔존 엣지)의 처리 — report(기본·세기만) · "
+            "plan(DB에 쓰지 않고 계획과 순환 판정만 출력 후 종료 · 순환이 남으면 exit 1) · "
+            "apply(엣지 적재와 같은 트랜잭션에서 삭제). KG-14"
+        ),
+    )
     add_overwrite_argument(parser)
     args = parser.parse_args()
+    if args.retire_stale_edges == RETIRE_PLAN:
+        result = plan_atom_edge_retirement(args.graph)
+        print(
+            render_plan(
+                result.plan,
+                result.cycle_after_retire,
+                cycle_without_retire=result.cycle_without_retire,
+            )
+        )
+        raise SystemExit(0 if result.cycle_after_retire is None else 1)
     conflicts: list[str] = []
     visual_style_path = Path(args.visual_style_corpus) if args.visual_style_corpus else None
     visualization_path = Path(args.visualization_corpus) if args.visualization_corpus else None
-    report = populate_atom_backbone(
-        args.graph,
-        visual_style_path=visual_style_path,
-        visualization_path=visualization_path,
-        populate_node_meta=not args.skip_atom_node,
-        overwrite_cms_edits=args.overwrite_cms_edits,
-        conflicts=conflicts,
-    )
+    try:
+        report = populate_atom_backbone(
+            args.graph,
+            visual_style_path=visual_style_path,
+            visualization_path=visualization_path,
+            populate_node_meta=not args.skip_atom_node,
+            overwrite_cms_edits=args.overwrite_cms_edits,
+            conflicts=conflicts,
+            retire_mode=args.retire_stale_edges,
+        )
+    except PrerequisiteCycleError as exc:
+        print(f"[원자 백본 적재] 엣지 적재 거부(롤백) — {exc}")
+        print(
+            "  정본에서 지운·뒤집은 옛 엣지가 DB에 남아 있으면 이렇게 막힌다(KG-14). "
+            "--retire-stale-edges plan 으로 지울 목록과 순환 해소 여부를 먼저 확인하라."
+        )
+        raise SystemExit(1) from exc
     print(
         f"[원자 백본 적재] concepts={report.concepts_loaded} "
         f"parent_skip={report.parents_skipped} "
@@ -319,7 +424,9 @@ def _main() -> None:
         f"visualizability={report.visualization_loaded}"
         f"({visualization_path if visualization_path else '스킵'}) "
         f"atom_nodes={report.atom_nodes_loaded}"
-        f"({'스킵' if args.skip_atom_node else args.graph})"
+        f"({'스킵' if args.skip_atom_node else args.graph}) "
+        f"retire={report.retire_mode} stale={report.stale_edges_found} "
+        f"retired={report.edges_retired} cms_kept={report.stale_cms_kept}"
     )
     if conflicts:
         print(conflict_summary(conflicts))
@@ -332,7 +439,9 @@ if __name__ == "__main__":  # pragma: no cover
 __all__ = [
     "AtomBackboneCycleError",
     "AtomBackbonePopulateReport",
+    "AtomEdgeRetirementPlan",
     "DEFAULT_VISUAL_STYLE_CORPUS",
     "DEFAULT_VISUALIZATION_CORPUS",
+    "plan_atom_edge_retirement",
     "populate_atom_backbone",
 ]
