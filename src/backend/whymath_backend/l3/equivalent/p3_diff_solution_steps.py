@@ -79,7 +79,8 @@ from typing import Final, cast
 import sympy
 
 from whymath_backend.l3.safe_parse import safe_sympify
-from whymath_backend.l3.verify_solution import verify_solution
+from whymath_backend.l3.verify_answer import certified_polynomial
+from whymath_backend.l3.verify_solution import verify_solution, verify_solution_interpreted
 
 __all__ = [
     "StepChain",
@@ -87,6 +88,8 @@ __all__ = [
     "derive_setup",
     "expand_derivatives",
     "final_solution_values",
+    "explicit_definitions",
+    "final_statement_steps",
     "solution_steps",
 ]
 
@@ -595,3 +598,93 @@ def solution_steps(
             return StepChain(steps=steps, strategy=name)
         attempts.append(f"{name}: 전이 판정 불가/불일치 {list(steps)!r}")
     raise ValueError(f"풀이 단계를 만들 수 없다 — 출발식 {start!r}: " + " / ".join(attempts))
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 규칙 (가) — 풀이 끝에 정답 변수의 값을 진술한다 (P3-62)
+# ──────────────────────────────────────────────────────────────────────────
+def _definition_of(
+    conditions: str | Sequence[str], target: str, variable: str
+) -> sympy.Poly | None:
+    """조건 중 `target = P(variable)`(또는 `P(variable) = target`) 정의 등식의 P — 허용 목록 다항식.
+
+    공용 해석 판정(`l3.verify_solution`)이 대입 단계를 증명할 때 쓰는 꼴과 같다(허용 목록 밖이면
+    판정기가 증명하지 않으므로 여기서도 None). 정의 등식이 둘 이상이면 None(어느 쪽인지 모른다).
+    """
+    found: list[sympy.Poly] = []
+    for condition in _conditions_list(conditions):
+        if not _is_equation(condition):
+            continue
+        lhs, rhs = _sides(condition)
+        for bare, other in ((lhs, rhs), (rhs, lhs)):
+            if bare.strip() != target:
+                continue
+            poly = certified_polynomial(other, variable)
+            if poly is not None:
+                found.append(poly)
+    return found[0] if len(found) == 1 else None
+
+
+def final_statement_steps(
+    steps: Sequence[str], *, conditions: str | Sequence[str], target: str
+) -> tuple[str, ...] | None:
+    """규칙 (가) — 근 목록(또는 값 하나)으로 끝난 연쇄 뒤에 근 선택·정답 변수 값 진술을 붙인다.
+
+    · **선택은 정답에서 역산하지 않는다**(P3-24 B3 단서): 후보 하나하나로 붙여 본 연쇄를 공용 해석
+      판정 `verify_solution_interpreted`가 **조건만으로**(정답·answer_map을 넘기는 자리가 없다)
+      전 전이 correct로 증명하는 후보가 정확히 하나일 때만 그것을 쓴다. 근거는 조건의 도메인
+      부등식(`x > 0`·`12*x - 6 > 0` 등)이며 `answer_selection`은 넘기지 않는다(그 필드는 단계의
+      변수에 적용돼 '가장 큰 y'를 뜻하려던 저작이 x 후보에 적용된다 — P3-76 검토 인계 ⓑ).
+    · 진술값은 조건의 정의 등식 `target = P(v)`를 고른 후보에서 SymPy로 계산한다.
+    · 붙일 수 없으면(마지막 단계가 근 목록이 아님·정의 등식 없음·후보가 하나로 증명되지 않음) None —
+      호출자가 종전 연쇄를 그대로 쓴다. 이 함수는 정답 기록과 대조하지 않는다(호출자 몫).
+    """
+    if not steps:
+        return None
+    tail = final_solution_values(steps[-1])
+    if tail is None:
+        return None
+    variable, values = tail
+    if variable == target:
+        return None
+    definition = _definition_of(conditions, target, variable)
+    if definition is None:
+        return None
+    proven: list[tuple[str, ...]] = []
+    for value in values:
+        stated = sympy.nsimplify(definition.as_expr().subs(sympy.Symbol(variable), value))
+        extra = [] if len(values) == 1 else [f"{variable} = {_fmt(value)}"]
+        extra.append(f"{target} = {_fmt(stated)}")
+        trial = (*steps, *extra)
+        result = verify_solution_interpreted(list(trial), conditions=conditions).result
+        if result.n_transitions >= 1 and result.n_correct == result.n_transitions:
+            proven.append(trial)
+    return proven[0] if len(proven) == 1 else None
+
+
+def explicit_definitions(
+    conditions: str | Sequence[str], target: str, variable: str
+) -> str | tuple[str, ...]:
+    """정의 등식 `target = (식)`의 식을 SymPy로 계산한 **명시 다항식**으로 바꿔 쓴다(규칙 (가)
+    재료).
+
+    `y = Derivative(f, x, x).doit()`(2계 도함수)처럼 허용 목록(`certified_polynomial`) 밖의 꼴은
+    공용 해석 판정이 대입 단계를 증명하지 않는다(P3-71 §3-1 MOTION-WORD 4건). 같은 등식을 SymPy가
+    계산한 `variable`의 유리 계수 다항식으로 다시 쓴다 — 수학적으로 같은 조건의 표기 변환일 뿐이고,
+    계산 결과가 다항식이 아니면(분수식·초월 함수) 원문을 그대로 둔다. 다른 조건은 손대지 않는다.
+    """
+    items = _conditions_list(conditions)
+    out: list[str] = []
+    for condition in items:
+        rewritten = condition
+        if _is_equation(condition):
+            lhs, rhs = _sides(condition)
+            if lhs.strip() == target and certified_polynomial(rhs, variable) is None:
+                expr = sympy.expand(_parse(rhs).doit())
+                symbol = sympy.Symbol(variable)
+                if expr.free_symbols <= {symbol} and expr.is_polynomial(symbol):
+                    candidate = f"{target} = {_fmt(expr)}"
+                    if certified_polynomial(_fmt(expr), variable) is not None:
+                        rewritten = candidate
+        out.append(rewritten)
+    return out[0] if isinstance(conditions, str) else tuple(out)
