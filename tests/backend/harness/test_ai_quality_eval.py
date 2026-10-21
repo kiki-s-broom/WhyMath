@@ -154,6 +154,26 @@ def test_injection_outcome_requires_every_condition() -> None:
     assert not dataclasses.replace(ok, injected_rate=None).ok
 
 
+def test_self_test_requires_fail_transition_not_just_a_drop(
+    eval_set, registry, base, monkeypatch
+) -> None:
+    """점수는 떨어졌지만 임계 위에 머문 축은 '무반응'이다 — `run_self_test`가 실제 판정을 읽어야 잡힌다.
+
+    `InjectionOutcome.ok`만 단위로 보면, `run_self_test`가 판정 대신 상수 "FAIL"을 넘겨도 통과한다
+    (2026-10-21 리뷰 뮤테이션 E5 생존). 그래서 실제 경로를 통과시켜, 임계를 0으로 내린 축이
+    주입 후에도 PASS로 남을 때 자가 점검이 그 축을 무반응으로 계상하는지 본다.
+    """
+    specs = dict(judges.AXIS_SPECS)
+    specs["student_level_fit"] = dataclasses.replace(specs["student_level_fit"], threshold=0.0)
+    monkeypatch.setattr(cli, "AXIS_SPECS", specs)
+    report = cli.run_self_test(eval_set, registry, base, candidate="test")
+    outcome = next(o for o in report.outcomes if o.axis == "student_level_fit")
+    assert outcome.mutated > 0 and outcome.dropped  # 주입은 들어갔고 점수도 떨어졌다
+    assert outcome.injected_verdict == "PASS"  # 그런데 임계 위라 판정이 바뀌지 않았다
+    assert not outcome.ok
+    assert report.exit_code == 1
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # ③ 측정 실패는 통과가 아니다
 # ──────────────────────────────────────────────────────────────────────────
@@ -303,3 +323,29 @@ def test_main_self_test_json(tmp_path: Path) -> None:
     assert payload["exit_code"] == 0
     assert [i["axis"] for i in payload["injections"]] == list(AXES)
     assert all(i["ok"] and i["dropped"] and i["mutated"] > 0 for i in payload["injections"])
+
+
+def test_numeric_parse_contract_error_is_not_swallowed(
+    eval_set, registry, base, monkeypatch
+) -> None:
+    """식 해석기 호출 계약이 깨지면(TypeError) 정답 누설 축은 '통과'가 아니라 측정 실패여야 한다.
+
+    광범위 `except Exception`이 이것을 '판정 불가'로 삼키면 동치 산술식 검사가 조용히 꺼져
+    무관용 축이 전부 통과로 바뀐다(2026-10-21 리뷰 뮤테이션 X2: 실결함이 사라지고 종합 exit 0).
+    """
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise TypeError("unexpected keyword argument")
+
+    monkeypatch.setattr(judges, "safe_sympify", broken)
+    report = _eval(eval_set, registry, base)
+    leak = report.axis("answer_leak")
+    assert leak.verdict == "UNMEASURED" and leak.n_errors > 0
+    assert any("TypeError" in r for f in leak.failures for r in f.reasons)
+    assert report.exit_code == 2
+
+
+def test_expected_parse_failure_is_still_unverifiable() -> None:
+    """대조군 — 해석 불가인 산술식(SympifyError 계열)은 예외 없이 '판정 불가'(None)로 접힌다."""
+    assert judges._closed_numeric("(1 + ") is None
+    assert judges._closed_numeric("2 + 3") == 5

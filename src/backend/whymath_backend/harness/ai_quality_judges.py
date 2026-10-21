@@ -36,12 +36,15 @@ LLM 판정자에 의존하는 항목은 **0개**다. 그 대신 기계 정의가
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import lru_cache
+from tokenize import TokenError
 from typing import Any, Final
 
+import sympy
 from pydantic import ValidationError
 
 from whymath_backend.harness.ai_quality_eval_set import (
@@ -266,6 +269,9 @@ BLIND_SPOTS: Final[Mapping[str, tuple[str, ...]]] = {
         "'아직 배우지 않은 개념' 검사에서 나온다. 두 검사의 작동은 단위 테스트(중등 밴드)가 "
         "봉인한다.",
         "본문 개념 언급은 개념 이름 정확 일치(4자 이상)만 잡는다 — 약칭·동의어는 못 잡는다.",
+        "원시 SymPy 코드 표기(`Derivative(4*x - 3, x)`·`.doit()` 등)를 학생 대면 표기로 보지 "
+        "않는다 — L3 힌트가 이 표기를 그대로 보여 줘도 이 축은 통과한다(2026-10-21 리뷰 실측: "
+        "aq-h-06-04-l3 계열).",
     ),
     "hallucination": (
         "id 모양 문자열(개념 code·성취기준 코드·M-id)과 구조 참조만 본다 — 본문에 지어낸 개념 "
@@ -359,13 +365,32 @@ def extract_relations(text: str) -> list[str]:
     return out
 
 
+#: 식 해석 실패로 *예상되는* 예외 — 이것만 '판정 불가'로 접는다. 그 밖(TypeError·AttributeError 등
+#: 호출 계약이 깨진 프로그래밍 오류)은 삼키지 않고 올려 보낸다 — 삼키면 정답 누설 같은 무관용 축이
+#: 조용히 통과로 바뀐다(2026-10-21 리뷰 실측: `safe_sympify` 호출이 TypeError를 내도록 깨뜨리자
+#: 누설 축 217/217 PASS·종합 exit 0으로 실결함이 사라졌다). 올라간 예외는 축 판정기에서 측정 실패로
+#: 계상되고 타입명이 남는다(`ai_quality_eval._judge_axis`).
+_PARSE_FAILURES: Final[tuple[type[BaseException], ...]] = (
+    sympy.SympifyError,
+    TokenError,
+    SyntaxError,
+    ValueError,
+    ZeroDivisionError,
+    OverflowError,
+    RecursionError,
+)
+
+_LOG: Final = logging.getLogger(__name__)
+
+
 def _closed_numeric(expr: str) -> Any | None:
     """문자 없는 산술식 → 수치(sympy). 파싱 실패·비수치면 None(판정 불가)."""
     if _HAS_LETTER.search(expr):
         return None
     try:
         value = safe_sympify(expr.replace("^", "**"))
-    except Exception:  # 판정 불가 — 통과도 실패도 아니다(아래 회계에서 unverifiable)
+    except _PARSE_FAILURES as exc:  # 판정 불가 — 통과도 실패도 아니다(아래 회계에서 unverifiable)
+        _LOG.debug("산술식 해석 불가(%s) — 판정 불가로 계상", type(exc).__name__)
         return None
     return value if getattr(value, "is_number", False) else None
 
@@ -383,7 +408,8 @@ def _relation_symbols(rel: str) -> frozenset[str] | None:
     for side in rel.split("="):
         try:
             expr = safe_sympify(side.replace("^", "**"))
-        except Exception:  # 해석 불가 — 비교 대상에서 뺀다(판정 불가로 귀결)
+        except _PARSE_FAILURES as exc:  # 해석 불가 — 비교 대상에서 뺀다(판정 불가로 귀결)
+            _LOG.debug("관계식 해석 불가(%s) — 판정 불가로 계상", type(exc).__name__)
             return None
         names |= {str(sym) for sym in getattr(expr, "free_symbols", set())}
     return frozenset(names)
