@@ -318,7 +318,7 @@ def test_main_writes_json_artifact(tmp_path: Path) -> None:
 # 7. 실 코퍼스 — acceptance① 재현(회귀 감시·정확 단언)
 # ──────────────────────────────────────────────────────────────────────────
 def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
-    """정본 2,231엣지 중 경계 47·내부 2,184, 고→대 25, school_link 47(플래그 없는 경계 0).
+    """정본 2,278엣지 중 경계 47·내부 2,231, 고→대 25, school_link 47(플래그 없는 경계 0).
 
     KG-10 ②(2026-10-20): KG-09 교체분의 경계 신규 10건을 AI 2인 블라인드 검수해 반려 3
     (중학 인수분해 → CALC1-C03·CALC1-P01·10공수1-01-03-2)·교체 1(→CALC1-P21의 출발을 고등
