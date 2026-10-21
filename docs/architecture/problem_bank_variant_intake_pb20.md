@@ -65,6 +65,7 @@
 | 빌드→런타임 | `src/backend/whymath_backend/harness/concept_assessment_index.py` | 개념 평가 재료 상속 후보 선별 | 닿을 수 있음 — **`approved`만**(L303) |
 | 코퍼스 변이 | `src/backend/whymath_backend/harness/problem_corpus_author_backfill.py` | `authored_by` 서명을 코퍼스에 제자리 기입 | 아님 (승격 후 대상이 됨 — §4) |
 | 측정(분자=승인) | `src/backend/whymath_backend/l1/standards/phase3_coverage.py` | Phase 3 커버리지 — `approved` 문항만 센다 | 아님 |
+| 측정(분자=승인) | `src/backend/whymath_backend/harness/ai_quality_eval_set.py` | P3-10 AI 품질 평가셋 — `approved` 이고 PRIMARY 개념이 대표 과정인 문항의 `verify`·보기·`distractor_map` 을 id로 해석하는 오프라인 평가기(학생 응답 경로가 아니다) | 아님 |
 | 측정(분자=승인) | `src/backend/whymath_backend/ops/phase3_remediation.py` | P3-06 오답→교정 전략 커버리지 — `approved` 객관식 문항의 보기·정답·distractor_map 만 읽는 오프라인 측정기(학생 응답 경로가 아니다) | 아님 |
 | 측정(분자=승인) | `src/backend/whymath_backend/ops/phase3_metrics.py` | Phase 3 지표 — `approved` 문항만 센다 | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/qa_pipeline.py` | CI QA 축(조건식 DSL 위반 순회) | 아님 — 단 분모에 들어가면 CI 판정이 바뀐다 |
