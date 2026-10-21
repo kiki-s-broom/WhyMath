@@ -9,8 +9,12 @@
 #                python3 scripts/build_cross_band_edges_s4_01.py
 #                python3 -m data_pipeline.atom_graph.cross_band_edges_merge --merged-on <날짜>
 #                python3 scripts/build_inter_course_edges_s4_01.py
-#                python3 scripts/build_narrative_edge_resolution_kg10.py
+#                python3 -m data_pipeline.atom_graph.narrative_promotion_merge \
+#                    --ledger data/corpus/atom_graph_v1/narrative_edge_promotion_v2.json --merged-on <날짜>
 #              그리고 _provenance.json 의 source_sha256·pipeline_input·regeneration_history 를 갱신한다.
+#              역사 원장(KG-10 resolution · KG-11 reference/promotion · KG-12 reference v2)은 재생성하지
+#              않는다 — 검수 행 번호의 정본이며 graph_history 가 묶인 정본을 되감아 --check 한다(KG-12).
+#              MATCHES_CANON 비교의 pre_merge_view 는 경계 24건과 그 뒤 덧붙은 승격 v2 엣지를 함께 벗긴다.
 # 입력 xlsx: 정본 통합마스터의 선수엣지_통합.from_유형만 치환한 파이프라인 입력 사본(데이터 카드 §1
 #            pipeline_input 블록). 원본 xlsx 는 저장소에 없다(데이터 카드 §3 redaction) — Kiki 보관.
 # 사용: bash scripts/regenerate_atom_backbone_v3.sh <pipeline_input.xlsx> <작업 디렉터리>

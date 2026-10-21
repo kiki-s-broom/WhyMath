@@ -6,7 +6,7 @@ end-to-end 적재한다. CI `backend — 마이그레이션·통합 (실 PG)` �
 또는 코퍼스 미존재 시 graceful skip.
 
 검증:
-  ① 적재 — concepts 2,683(원자1823·단원217·소단원643)·edges 2,231(orphan 0 기대 · 2,207 + S4-60 고→대 24)
+  ① 적재 — concepts 2,683(원자1823·단원217·소단원643)·edges 2,278(orphan 0 기대 · 2,195 + S4-60 고→대 24 + KG-12 승격 v2 59)
   ② parent 위계 — 원자→소단원→단원 체인(2수01-01-2 → 초수연-U1-S1 → 초수연-U1)
   ③ relation_subtype 적재(관계유형)·edge 방향(from=선수)
   ④ redaction — 본문 컬럼(description·formal_definition)은 Phase 1b에서 물리 제거(컬럼 부재)
@@ -95,7 +95,7 @@ class TestAtomBackboneLoad:
             report = populate_atom_backbone(_CORPUS, settings=Settings())
             # ① 적재 — concepts 2,683·edges 2,231(orphan 0 기대 · 2,207 + S4-60 고→대 24 · KG-10 ②).
             assert report.concepts_loaded == 2683
-            assert report.edges_loaded == 2231
+            assert report.edges_loaded == 2278  # KG-12 ① 체인 수리·③ 승격 v2(2,231→2,278)
             assert report.edges_skipped == 0
             assert report.parents_skipped == 0
 
@@ -160,7 +160,7 @@ class TestAtomBackboneLoad:
             # ⑤ 멱등 — 재적재 후 행수 불변.
             report2 = populate_atom_backbone(_CORPUS, settings=Settings())
             assert report2.concepts_loaded == 2683
-            assert report2.edges_loaded == 2231
+            assert report2.edges_loaded == 2278
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]

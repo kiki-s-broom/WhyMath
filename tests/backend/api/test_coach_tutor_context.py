@@ -3,9 +3,9 @@
 `test_wh1_tutor_context.py`가 판정기·러너 계약을 본다면, 이 파일은 **서빙 코드가 그것을 실제로
 부르고 사실대로 표기하는가**(정본화 ≠ 집행)를 본다. `POST /v1/coach/sessions`와 `.../turns`에서:
 
-- 대조군: 9종을 전부 얻은 턴 → `complete=True`이되 튜터에 안 실린 5종(개념·스킬·문제·숙달·팩)이
-  `not_delivered`로 응답·로그에 드러난다(완비 턴도 무증상이 아니다). 전달 표기는 **실제 튜터 러너**
-  (스텁 provider)가 정책 보유값으로 계산한 것이다.
+- 대조군: 9종을 전부 얻은 턴 → `complete=True`. P3-72 이후 개념·스킬·문제·팩은 프롬프트 경로로
+  실리고, 숙달만 결정 (가)에 따라 `not_delivered`로 응답·로그에 드러난다(완비 턴도 무증상이 아니다).
+  전달 표기는 **실제 튜터 러너**(스텁 provider)가 정책이 실제로 넘긴 프롬프트·보유값으로 계산한 것이다.
 - 주입 9건 × 두 핸들러: 슬롯 하나를 비우면 201로 진행하고, 응답·로그·튜터가 받은 매니페스트
   세 곳에 그 누락이 뜬다.
 - 튜터 미호출 턴(primary OFF·완료 상태머신 가로채기): `tutor_invoked=false`·전달 0·WARNING 없음.
@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
@@ -36,6 +37,7 @@ from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.harness import wh1_primary
 from whymath_backend.harness.wh1_tutor_context import (
+    ProblemBrief,
     TutorContextManifest,
     TutorContextSlot,
 )
@@ -60,8 +62,29 @@ _HYP = MisconceptionHypothesis(
 )
 _WARMSTART_MID = "sign-flip-in-inequality"
 S = TutorContextSlot
-_DELIVERED = {"learner_state", "student_answer", "solution_record", "misconception"}
-_NOT_DELIVERED = ["concept", "skill", "problem", "mastery", "pedagogy_policy"]
+_DELIVERED = {
+    "learner_state",
+    "concept",
+    "skill",
+    "problem",
+    "student_answer",
+    "solution_record",
+    "misconception",
+    "pedagogy_policy",
+}
+_NOT_DELIVERED = ["mastery"]  # Kiki 결정 (가) — 숙달은 어떤 경로로도 튜터에 실리지 않는다
+# P3-72 ⑦ 대조군 경로표(가드 OFF 기본) — 보고서 §2 표와 같다.
+_PATHS_CONTROL: dict[str, list[str]] = {
+    "learner_state": ["private_tool"],
+    "concept": ["prompt"],
+    "skill": ["prompt"],
+    "problem": ["prompt"],
+    "student_answer": ["private_tool"],
+    "solution_record": ["private_tool"],
+    "misconception": ["prompt", "private_tool"],
+    "mastery": [],
+    "pedagogy_policy": ["prompt"],
+}
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -186,20 +209,30 @@ def _set_flag(monkeypatch: pytest.MonkeyPatch, name: str, value: bool) -> None:
 # ──────────────────────────────────────────────────────────────────────────
 class _Fill:
     def __init__(self) -> None:
-        self.theta: float | None = 0.4
+        self.theta: float | None = 0.4137  # 프롬프트 누출 감시 표지(다른 수치와 겹치지 않게)
         self.grade: int | None = 11
         self.concept: uuid.UUID | None = _CID
         self.concept_error: Exception | None = None
         self.skills: list[str] = ["SK-ALG-01"]
         self.skill_error: Exception | None = None
-        self.mastery: float | None = 0.6
+        self.mastery: float | None = 0.5813
         self.hypotheses: list[MisconceptionHypothesis] = [_HYP]
         self.pack = get_pack("CONCEPT")
         assert self.pack is not None
+        # P3-72 내용 요약 원천(개념 이름표·스킬 이름표·문제 구조).
+        self.concept_label: tuple[str, str] | None = ("math.algebra.linear-equation", "일차방정식")
+        self.skill_labels: list[tuple[str, str]] = [("SK-ALG-01", "등식의 성질로 이항하기")]
+        self.problem_brief: ProblemBrief | None = ProblemBrief(
+            question_format="단답형", bloom_level="APPLY", has_visual=False, condition_count=2
+        )
+        self.content_error: Exception | None = None
 
 
 class _StubProvider:
-    """튜터 정책의 도구 선택 대역 — 항상 end_turn(질문)만(실 네트워크 0)."""
+    """튜터 정책의 도구 선택 대역 — 항상 end_turn(질문)만(실 네트워크 0). 프롬프트를 캡처한다."""
+
+    def __init__(self, sink: _Spy) -> None:
+        self._sink = sink
 
     async def generate(
         self,
@@ -209,6 +242,8 @@ class _StubProvider:
         *,
         images: Sequence[str] | None = None,
     ) -> GenerationResult:
+        self._sink.prompts.append(prompt)
+        self._sink.systems.append(system)
         return GenerationResult('{"kind": "end_turn", "action_type": "질문"}')
 
 
@@ -217,6 +252,9 @@ class _Spy:
         self.tutor_calls: list[dict[str, Any]] = []
         self.prereq_calls: list[dict[str, Any]] = []
         self.warmstart_calls: list[dict[str, Any]] = []
+        self.prompts: list[str] = []
+        self.systems: list[str] = []
+        self.content_depths: list[int] = []
 
 
 def _install(
@@ -266,7 +304,21 @@ def _install(
     async def _tutor(**kwargs: Any) -> str | None:
         # 실제 러너를 돌린다(스텁 provider·DB 미사용) — 전달 판정은 러너가 정책 보유값으로 낸다.
         spy.tutor_calls.append(kwargs)
-        return await real_runner(**{**kwargs, "provider": _StubProvider(), "session": None})
+        return await real_runner(**{**kwargs, "provider": _StubProvider(spy), "session": None})
+
+    async def _problem_brief(session: Any, problem_id: Any) -> ProblemBrief | None:
+        spy.content_depths.append(session.nested_depth)
+        if fill.content_error is not None:
+            raise fill.content_error
+        return fill.problem_brief
+
+    async def _concept_label(session: Any, concept_id: Any) -> tuple[str, str] | None:
+        spy.content_depths.append(session.nested_depth)
+        return fill.concept_label
+
+    async def _skill_labels(session: Any, skill_ids: Any) -> list[tuple[str, str]]:
+        spy.content_depths.append(session.nested_depth)
+        return [pair for pair in fill.skill_labels if pair[0] in skill_ids]
 
     monkeypatch.setattr(coach, "_server_theta_for", _theta)
     monkeypatch.setattr(coach, "_grade_for", _grade)
@@ -281,6 +333,9 @@ def _install(
     monkeypatch.setattr(coach, "recommend_prerequisite_gaps", _prereq)
     monkeypatch.setattr(coach, "assemble_warmstart_probe_hints", _warm)
     monkeypatch.setattr(coach, "run_wh1_primary_turn", _tutor)
+    monkeypatch.setattr(coach, "_problem_brief_for", _problem_brief)
+    monkeypatch.setattr(coach, "_concept_label_for", _concept_label)
+    monkeypatch.setattr(coach, "_skill_labels_for", _skill_labels)
     return spy
 
 
@@ -352,11 +407,13 @@ def test_control_complete_turn_still_discloses_not_delivered(
     assert ctx["not_delivered"] == _NOT_DELIVERED
     delivered = {s["slot"] for s in ctx["slots"] if s["delivered_to_tutor"]}
     assert delivered == _DELIVERED
+    assert {s["slot"]: s["delivery_paths"] for s in ctx["slots"]} == _PATHS_CONTROL
     assert _slot(ctx, "student_answer")["size"] is None  # 답안 길이 비노출
     assert "cause_detail" not in resp.text
     (line,) = _ctx_lines(caplog)
     assert line.levelno == logging.INFO
-    assert "튜터 미전달 5: concept skill problem mastery pedagogy_policy" in line.getMessage()
+    assert "튜터 미전달 1: mastery" in line.getMessage()
+    assert "프롬프트 5: concept skill problem misconception pedagogy_policy" in line.getMessage()
     # 응답 = 러너 영수증(실제 전달 판정) — 핸들러가 추정한 값이 아니다.
     receipt = spy.tutor_calls[0]["delivery"]
     assert receipt.manifest is not None
@@ -670,3 +727,372 @@ def test_misconceptions_are_not_preloaded_into_tutor_context(
     assert list(call["warmstart_outside_mids"]) == [_WARMSTART_MID]
     misconception = _slot(resp.json()["tutor_context"], "misconception")
     assert (misconception["resolved"], misconception["cause"]) == (False, "none_detected")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-72 — 서빙 경로 내용 요약 전달 · 결정 (가) 동결 · 정답 억제 · 조회 안전
+# ──────────────────────────────────────────────────────────────────────────
+def _prompt_summaries(spy: _Spy) -> list[dict[str, Any]]:
+    assert spy.prompts, "튜터 정책이 좌석에 프롬프트를 한 번도 넘기지 않았다"
+    out: list[dict[str, Any]] = []
+    for prompt in spy.prompts:
+        start, end = prompt.index("{"), prompt.rindex("}")
+        out.append(json.loads(prompt[start : end + 1]))
+    return out
+
+
+def _all_keys(node: Any) -> set[str]:
+    if isinstance(node, dict):
+        keys = {str(k) for k in node}
+        for v in node.values():
+            keys |= _all_keys(v)
+        return keys
+    if isinstance(node, list):
+        out: set[str] = set()
+        for v in node:
+            out |= _all_keys(v)
+        return out
+    return set()
+
+
+# 학생 개인 학습 데이터·학년의 *키* — 프롬프트 요약 어디에도 있으면 안 된다(결정 (가)·학년 판정).
+_FORBIDDEN_KEYS = {
+    "theta",
+    "ability",
+    "mastery",
+    "mastery_level",
+    "bkt_mastery",
+    "grade",
+    "learner",
+}
+# 숙달 파생 라벨(`l4.lthc.models.MasteryLevel`) — 값으로도 있으면 안 된다.
+_MASTERY_LABELS = ("초보", "발전 중", "숙달")
+
+
+def _load_freeze() -> Any:
+    """⑥ 동결 판정기(키 트리 허용 목록·수치 잎 감시)의 단일 정본 — 하네스 테스트 모듈에서 읽는다.
+
+    `--import-mode=importlib`라 테스트 모듈끼리 import가 안 된다 — 허용 목록을 두 곳에 복제하면
+    한쪽만 고쳐지는 순간 동결이 갈라지므로 파일 경로로 같은 정본을 적재한다.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "harness" / "test_wh1_tutor_slot_delivery.py"
+    spec = importlib.util.spec_from_file_location("_p372_prompt_freeze", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_FREEZE = _load_freeze()
+
+
+def _numeric_forms(value: float) -> list[str]:
+    return [str(value), f"{value:.2f}", f"{value:.3f}", str(round(value * 100))]
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize(
+    "extra",
+    [{}, {"mastery_level": "숙달"}, {"bkt_mastery": 0.3917}],
+    ids=["server", "label", "bkt"],
+)
+def test_prompt_carries_content_summary_but_no_student_learning_data(
+    monkeypatch: pytest.MonkeyPatch, path: str, extra: dict[str, Any]
+) -> None:
+    fill = _Fill()
+    spy = _install(monkeypatch, fill)
+    resp = _post(path, _body(**extra))
+    assert resp.status_code == 201, resp.text
+    summaries = _prompt_summaries(spy)
+    first = summaries[0]
+    # ⑤ 실린다 — 개념 code·이름 · 스킬 수·이름 · 문제 구조 · 팩 요약.
+    assert first["concept"] == {"code": "math.algebra.linear-equation", "name": "일차방정식"}
+    assert first["skills"] == {"count": 1, "names": ["등식의 성질로 이항하기"]}
+    assert first["problem"] == {
+        "question_format": "단답형",
+        "bloom_level": "APPLY",
+        "has_visual": False,
+        "condition_count": 2,
+    }
+    assert fill.pack is not None
+    # 정확 일치(재검토 중1) — 하위 키 하나만 보면 값 목록에 조건부 표지를 섞어도 통과한다.
+    assert first["pedagogy_policy"] == {
+        "k_type": fill.pack.k_type,
+        "is_stub": fill.pack.is_stub,
+        "forbidden_modes": list(fill.pack.forbidden_modes)[:8],
+    }
+    assert first["context_not_delivered"] == ["mastery"]
+    assert first["context_held_privately"] == ["learner_state", "student_answer", "solution_record"]
+    # ⑥ 동결 — θ·숙달 값·파생 라벨·학년이 프롬프트·시스템 프롬프트 어디에도 없다.
+    sentinels = [*_numeric_forms(0.4137), *_numeric_forms(0.5813), *_numeric_forms(0.3917)]
+    for prompt, system, summary in zip(spy.prompts, spy.systems, summaries, strict=True):
+        # 1차 축 — 키 트리 허용 목록 + 수치 잎(θ·숙달·클라 숙달 근방·학년 값) 감시(검토 중1).
+        conf = [_HYP.confidence]  # Kiki 결정 2026-10-20 — 가설 confidence도 수치로 싣지 않는다
+        _FREEZE.assert_prompt_summary_frozen(
+            summary, theta=0.4137, mastery=0.5813, grade=11, hypothesis_confidences=conf
+        )
+        _FREEZE.assert_prompt_summary_frozen(
+            summary, theta=0.3917, mastery=0.5813, grade=11, hypothesis_confidences=conf
+        )
+        assert not (_all_keys(summary) & _FORBIDDEN_KEYS), _all_keys(summary) & _FORBIDDEN_KEYS
+        for text in (prompt, system):
+            for sentinel in sentinels:
+                assert sentinel not in text, sentinel
+            for label in _MASTERY_LABELS:
+                assert label not in text, label
+            assert "학년" not in text
+    # 응답 경로표도 같은 판정 — 숙달은 경로 0, 학생 상태는 사적 보유뿐.
+    ctx = resp.json()["tutor_context"]
+    assert _slot(ctx, "mastery")["delivery_paths"] == []
+    assert _slot(ctx, "learner_state")["delivery_paths"] == ["private_tool"]
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_content_lookup_failure_leaves_those_slots_undelivered_and_named(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
+) -> None:
+    fill = _Fill()
+    fill.content_error = RuntimeError("db down (test)")
+    spy = _install(monkeypatch, fill)
+    with caplog.at_level(logging.WARNING):
+        resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
+    ctx = resp.json()["tutor_context"]
+    # 값(id)은 얻었으나 이름표 조회가 실패 — 프롬프트에 안 실렸으니 미전달로 정직하게 표기한다.
+    assert ctx["not_delivered"] == ["concept", "skill", "problem", "mastery"]
+    assert _slot(ctx, "pedagogy_policy")["delivery_paths"] == ["prompt"]  # 팩은 DB 없이 요약
+    summary = _prompt_summaries(spy)[0]
+    assert not {"concept", "skills", "problem"} & set(summary)
+    coach_lines = [r for r in caplog.records if r.name == _COACH_LOGGER]
+    assert any(
+        "튜터 내용 요약 problem 조회 실패(RuntimeError)" in r.getMessage() for r in coach_lines
+    )
+    assert all("db down" not in r.getMessage() for r in caplog.records)
+    (session,) = _SESSIONS
+    assert any(e is fill.content_error for e in session.rolled_back)  # SAVEPOINT 롤백
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_content_lookups_run_inside_savepoint_and_only_when_tutor_may_run(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    spy = _install(monkeypatch, _Fill())
+    assert _post(path, _body()).status_code == 201
+    assert len(spy.content_depths) == 3 and all(d > 0 for d in spy.content_depths)
+    off = _install(monkeypatch, _Fill())
+    _set_flag(monkeypatch, "wh1_primary_enabled", False)
+    assert _post(path, _body()).status_code == 201
+    assert off.content_depths == []  # 튜터를 못 부르는 턴은 요약 조회 0
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_completion_intercepted_turn_runs_no_content_lookup(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    # 검토 하3 — 완료 상태머신이 가로챈 턴은 튜터를 부르지 않으므로 요약 조회도 0이어야 한다.
+    spy = _install(monkeypatch, _Fill())
+    original = coach._resolve_completion
+
+    async def _handled(*args: Any, **kwargs: Any) -> Any:
+        return (await original(*args, **kwargs))._replace(handled=True)
+
+    monkeypatch.setattr(coach, "_resolve_completion", _handled)
+    assert _post(path, _body()).status_code == 201
+    assert spy.tutor_calls == [] and spy.content_depths == []
+
+
+def test_problem_brief_query_reads_only_allowlisted_columns() -> None:
+    # 정답 억제 계약 — 문제 요약 조회는 지문·보기·정답·해설·오답 선지·정답 제약 열을 읽지 않는다.
+    # 문자열 금지 목록이 아니라 **구성된 SELECT의 실제 열**을 본다.
+    stmt = coach._problem_brief_query(_PID)
+    selected = {c.name for c in stmt.selected_columns}
+    assert selected == {"question_format", "bloom_level", "has_visual", "condition_count"}
+    forbidden = {
+        "question_text",
+        "question_text_md",
+        "choices",
+        "answer",
+        "answer_explanation",
+        "multiple_answers",
+        "distractor_map",
+        "answer_constraint",
+        "answer_transform",
+        "answer_format",
+        "conditions_parsed",
+    }
+    assert not selected & forbidden
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 검토 중2 — 실제 조회 헬퍼 3종을 **실행**한다(대역 없이). 문을 캡처해 실행된 SQL로 동결한다.
+# 실 PG 왕복은 `test_coach_tutor_content_integration.py`(integration)가 본다.
+# ──────────────────────────────────────────────────────────────────────────
+class _Rows:
+    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
+        self._rows = rows
+
+    def first(self) -> tuple[Any, ...] | None:
+        return self._rows[0] if self._rows else None
+
+    def all(self) -> list[tuple[Any, ...]]:
+        return list(self._rows)
+
+
+class _RecordingSession:
+    """`execute`가 받은 문을 PG 방언으로 컴파일해 기록하고, 대상 테이블별 행을 돌려준다.
+
+    `get`(ORM 엔티티 전체 로드)은 금지다 — 문제 요약은 허용 열 SELECT로만 읽어야 한다(정답 열
+    미로드). 호출되면 즉시 실패한다.
+    """
+
+    def __init__(self, rows: dict[str, list[tuple[Any, ...]]]) -> None:
+        self._rows = rows
+        self.sql: list[str] = []
+
+    async def execute(self, stmt: Any) -> _Rows:
+        from sqlalchemy.dialects import postgresql
+
+        self.sql.append(
+            str(stmt.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+        )
+        (table,) = {t.name for t in stmt.get_final_froms()}
+        return _Rows(self._rows.get(table, []))
+
+    async def get(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError(
+            "문제 요약이 ORM 엔티티 전체를 로드했다(정답 열 포함) — 허용 열만 읽어야 한다"
+        )
+
+
+_ANSWER_COLUMNS = (
+    "question_text",
+    "choices",
+    "answer",
+    "answer_explanation",
+    "multiple_answers",
+    "distractor_map",
+    "answer_constraint",
+    "answer_transform",
+    "answer_format",
+    "conditions_parsed",
+)
+
+
+def test_problem_brief_helper_reads_only_allowlisted_columns_and_caps() -> None:
+    import asyncio
+
+    from whymath_backend.schema.enums import BloomLevel, QuestionFormat
+
+    session = _RecordingSession({"problem": [(QuestionFormat.단답형, BloomLevel.APPLY, True, 35)]})
+    brief = asyncio.run(coach._problem_brief_for(session, _PID))  # type: ignore[arg-type]
+    assert brief == ProblemBrief(
+        question_format="단답형", bloom_level="APPLY", has_visual=True, condition_count=20
+    )
+    (sql,) = session.sql
+    selected = sql.split("FROM")[0]
+    for col in ("question_format", "bloom_level", "has_visual", "condition_count"):
+        assert f"problem.{col}" in selected
+    for col in _ANSWER_COLUMNS:
+        assert f"problem.{col}" not in sql, col
+    assert str(_PID) in sql  # PK 단건
+
+
+def test_problem_brief_helper_returns_none_without_row() -> None:
+    import asyncio
+
+    session = _RecordingSession({})
+    assert asyncio.run(coach._problem_brief_for(session, _PID)) is None  # type: ignore[arg-type]
+
+
+def test_concept_label_helper_returns_code_then_name() -> None:
+    import asyncio
+
+    session = _RecordingSession({"concept": [("math.algebra.linear-equation", "일차방정식")]})
+    label = asyncio.run(coach._concept_label_for(session, _CID))  # type: ignore[arg-type]
+    assert label == ("math.algebra.linear-equation", "일차방정식")
+    (sql,) = session.sql
+    assert sql.split("FROM")[0].index("concept.code") < sql.split("FROM")[0].index(
+        "concept.name_ko"
+    )
+
+
+def test_skill_labels_helper_queries_only_first_five_sorted_ids() -> None:
+    import asyncio
+
+    ids = [f"SK-{i:02d}" for i in (9, 3, 7, 1, 8, 2, 6, 4)]
+    session = _RecordingSession({"skill_node": [("SK-01", "a"), ("SK-02", "b")]})
+    labels = asyncio.run(coach._skill_labels_for(session, ids))  # type: ignore[arg-type]
+    assert labels == [("SK-01", "a"), ("SK-02", "b")]
+    (sql,) = session.sql
+    for kept in ("SK-01", "SK-02", "SK-03", "SK-04", "SK-06"):
+        assert f"'{kept}'" in sql, kept
+    for dropped in ("SK-07", "SK-08", "SK-09"):
+        assert f"'{dropped}'" not in sql, dropped
+
+
+def test_skill_labels_helper_skips_query_without_ids() -> None:
+    import asyncio
+
+    session = _RecordingSession({})
+    assert asyncio.run(coach._skill_labels_for(session, [])) == []  # type: ignore[arg-type]
+    assert session.sql == []
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PR #1709 재검토 중1 — 차분 불변(HTTP 두 핸들러): θ·서버 숙달·클라 숙달·학년의 *값*을 바꿔도
+# 튜터가 받은 프롬프트·시스템 프롬프트가 바이트 동일하다. 고정 값 감시는 허용 키의 값에
+# 조건부로 숨긴 정보(숙달>0.5면 금지 모드 하나 추가 등)를 못 보기 때문이다.
+# ──────────────────────────────────────────────────────────────────────────
+def _tutor_strings(
+    monkeypatch: pytest.MonkeyPatch, path: str, fill: _Fill, body: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    spy = _install(monkeypatch, fill)
+    resp = _post(path, body)
+    assert resp.status_code == 201, resp.text
+    assert spy.prompts, "튜터가 프롬프트를 한 번도 받지 않았다"
+    return spy.prompts, spy.systems
+
+
+def _variant(**over: Any) -> _Fill:
+    fill = _Fill()
+    for k, v in over.items():
+        setattr(fill, k, v)
+    return fill
+
+
+_LEARNER_VARIANTS: list[tuple[str, dict[str, Any], dict[str, Any]]] = [
+    ("theta-neg", {"theta": -1.7}, {}),
+    ("theta-high", {"theta": 2.9}, {}),
+    ("mastery-low", {"mastery": 0.1}, {}),
+    ("mastery-high", {"mastery": 0.9}, {}),
+    ("grade-7", {"grade": 7}, {}),
+    ("grade-none", {"grade": None}, {}),
+]
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_learner_values_leave_tutor_prompt_byte_identical(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    base = _tutor_strings(monkeypatch, path, _Fill(), _body())
+    for name, fill_over, body_over in _LEARNER_VARIANTS:
+        fill = _variant(**fill_over)
+        assert vars(fill) != vars(_Fill())  # 주입 적용 단언
+        got = _tutor_strings(monkeypatch, path, fill, _body(**body_over))
+        assert got == base, f"{name}: 학생 값이 바뀌자 튜터 프롬프트가 달라졌다"
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_client_mastery_values_leave_tutor_prompt_byte_identical(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    # 클라 제출 숙달(bkt_mastery·mastery_level)도 값만 다르고 '있음'은 같은 쌍끼리 비교한다.
+    low = _tutor_strings(monkeypatch, path, _Fill(), _body(bkt_mastery=0.1))
+    high = _tutor_strings(monkeypatch, path, _Fill(), _body(bkt_mastery=0.9))
+    assert low == high
+    novice = _tutor_strings(monkeypatch, path, _Fill(), _body(mastery_level="초보"))
+    master = _tutor_strings(monkeypatch, path, _Fill(), _body(mastery_level="숙달"))
+    assert novice == master

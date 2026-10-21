@@ -45,11 +45,16 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Final
 
 _REPO: Final[Path] = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO / "src" / "data-pipeline"))
+
+from data_pipeline.atom_graph.graph_history import graph_at_sha  # noqa: E402
+
 GRAPH_PATH: Final[Path] = _REPO / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 DEDUP_PATH: Final[Path] = _REPO / "data" / "corpus" / "atom_graph_v1" / "dedup_merges_v1.json"
 OUTPUT_PATH: Final[Path] = (
@@ -332,6 +337,24 @@ def build_payload(
     }
 
 
+def bound_source_sha256() -> str:
+    """원장이 묶인 정본 지문 — 커밋된 원장이 있으면 그 `_meta.source_graph_sha256`(역사 동결),
+    없으면 현재 정본 파일 지문. 정본이 바뀌어도 이 원장은 재생성하지 않는다(행 번호가 검수
+    기록의 정본)."""
+    if OUTPUT_PATH.exists():
+        committed = json.loads(OUTPUT_PATH.read_text(encoding="utf-8"))
+        bound = committed.get("_meta", {}).get("source_graph_sha256") if committed else None
+        if bound:  # 묶임이 없는(손상·빈) 원장은 현재 정본으로 새로 만든다
+            return str(bound)
+    return hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+
+
+def load_bound_graph() -> tuple[dict[str, Any], str]:
+    """묶인 정본을 현재 파일에서 복원해 (graph, sha256)으로 돌려준다(`graph_history`)."""
+    sha = bound_source_sha256()
+    return graph_at_sha(GRAPH_PATH, sha), sha
+
+
 def serialize(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
 
@@ -340,8 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="기록하지 않고 차이만 판정")
     args = parser.parse_args(argv)
-    graph = json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
-    text = serialize(build_payload(graph, graph_file_sha256(GRAPH_PATH)))
+    graph, sha = load_bound_graph()
+    text = serialize(build_payload(graph, sha))
     meta = json.loads(text)["_meta"]
     summary = (
         f"서술형 {meta['narrative_total']}건 → 참고 엣지 {meta['proposed_edge_count']}건 "

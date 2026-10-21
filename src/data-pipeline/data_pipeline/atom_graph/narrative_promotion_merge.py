@@ -60,6 +60,10 @@ class PromotionMergeResult:
     edges_after: int
     pre_merge_sha256: str
     post_merge_sha256: str
+    migration_id: str = PROVENANCE_MIGRATION_ID
+    task_label: str = "KG-11"
+    ledger_names: str = "narrative_edge_promotion_v1.json·narrative_edge_reference_ledger_v1.json"
+    review_label: str = "검수:AI 2인 블라인드 · 합의 승인분만"
 
 
 def serialize_graph(graph: Mapping[str, Any]) -> str:
@@ -156,11 +160,33 @@ def validate_promotion(records: Sequence[Mapping[str, Any]], graph: Mapping[str,
     return errors
 
 
+def ledger_identity(ledger: Mapping[str, Any]) -> dict[str, str]:
+    """원장 _meta에서 provenance 표기(이행 id·태스크 라벨·원장 파일명·검수 라벨)를 읽는다.
+
+    v1 원장(KG-11)은 이 키들이 없어 기본값(KG-11 표기)을 쓴다 — 기존 provenance 문면 불변.
+    """
+    meta = ledger.get("_meta", {})
+    task = str(meta.get("task", ""))
+    label = "-".join(task.split("-", 2)[:2]) if task else "KG-11"
+    return {
+        "migration_id": str(meta.get("provenance_migration_id") or PROVENANCE_MIGRATION_ID),
+        "task_label": label,
+        "ledger_names": str(
+            meta.get("provenance_ledger_names")
+            or "narrative_edge_promotion_v1.json·narrative_edge_reference_ledger_v1.json"
+        ),
+        "review_label": str(
+            meta.get("provenance_review_label") or "검수:AI 2인 블라인드 · 합의 승인분만"
+        ),
+    }
+
+
 def merge_promotion(
     graph: MutableMapping[str, Any], ledger: Mapping[str, Any]
 ) -> PromotionMergeResult:
     """검수 통과 원장을 정본(in-place) 끝에 덧붙인다. 위반은 예외로 올린다(조용히 넘기지 않음)."""
     evidence = ledger_evidence(ledger)
+    ident = ledger_identity(ledger)
     records = ledger_edges(ledger)
     edges: list[dict[str, Any]] = graph["edges"]
     before = len(edges)
@@ -198,6 +224,7 @@ def merge_promotion(
             edges_after=before,
             pre_merge_sha256=graph_sha256(view),
             post_merge_sha256=graph_sha256(graph),
+            **ident,
         )
     errors = validate_promotion(records, graph)
     if errors:
@@ -218,6 +245,7 @@ def merge_promotion(
         edges_after=len(edges),
         pre_merge_sha256=pre_sha,
         post_merge_sha256=graph_sha256(graph),
+        **ident,
     )
 
 
@@ -225,17 +253,17 @@ def append_provenance(
     provenance: MutableMapping[str, Any], result: PromotionMergeResult, *, merged_on: str
 ) -> bool:
     migrations = provenance.setdefault("post_transform_migrations", [])
-    if any(isinstance(m, dict) and m.get("id") == PROVENANCE_MIGRATION_ID for m in migrations):
+    if any(isinstance(m, dict) and m.get("id") == result.migration_id for m in migrations):
         return False
     migrations.append(
         {
-            "id": PROVENANCE_MIGRATION_ID,
+            "id": result.migration_id,
             "summary": (
-                f"[KG-11 {merged_on}] 서술형 낱말매칭 참고 엣지 승격 {result.added}건 병합"
-                f"(검수:AI 2인 블라인드 · 합의 승인분만 · evidence '{result.evidence}') — 엣지 "
+                f"[{result.task_label} {merged_on}] 서술형 낱말매칭 참고 엣지 승격 "
+                f"{result.added}건 병합({result.review_label} · evidence "
+                f"'{result.evidence}') — 엣지 "
                 f"{result.edges_before}→{result.edges_after}. 노드·기존 엣지 무변경, 끝에 덧붙임. "
-                "근거(원 서술·검수 판정)는 원장 narrative_edge_promotion_v1.json·"
-                "narrative_edge_reference_ledger_v1.json에 둔다. 병합 전 정본 sha256 "
+                f"근거(원 서술·검수 판정)는 원장 {result.ledger_names}에 둔다. 병합 전 정본 sha256 "
                 f"{result.pre_merge_sha256}."
             ),
         }
@@ -292,6 +320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 __all__ = [
     "MERGED_EDGE_FIELDS",
+    "ledger_identity",
     "PROVENANCE_MIGRATION_ID",
     "PromotionMergeResult",
     "append_provenance",

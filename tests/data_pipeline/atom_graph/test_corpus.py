@@ -24,7 +24,9 @@ class TestCorpusCounts:
     def test_edge_counts(self, corpus_provenance: dict[str, object]) -> None:
         ec = corpus_provenance["edge_counts"]  # type: ignore[index]
         # 2210(백본 v1) + 24(S4-60 고→대 경계 병합 · cross_band_edges_university_merge_v1)
-        assert ec["atom_id_edges"] == 2231  # KG-10 ② 경계 검수(반려 3·교체 1)로 2,234→2,231
+        assert (
+            ec["atom_id_edges"] == 2278
+        )  # KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리(제거 12·반전 4)로 2,231→2,219 · ③ 낱말매칭 승격 v2 59건으로 2,278
         assert (
             ec["narrative_edges_raw"] == 973
         )  # KG-09 v3 재생성: 서술형 1007 → 973(원자ID 직접 정규화 3·중복 정리 31)
@@ -54,7 +56,7 @@ class TestCorpusCounts:
         # 통일(공수·기수와 정합) → 129 미적 원자ID만 변경, 그 외 카운트 동일.
         assert (
             corpus_provenance["source_sha256"]
-            == "0f798b255c4022c87cbebf66743394c357feaad8267b85011e79fb432ac25ec9"  # KG-10 ②: 통합마스터 v3 정본 xlsx(변경이력_v3 No.19까지)
+            == "648cf9f7091d9d65bfbceaf7ddf4211e58ef1a6fb0e8e77a55344c1e5cb48456"  # KG-12 ①: 통합마스터 v3 정본 xlsx(변경이력_v3 No.35까지)
         )
 
 

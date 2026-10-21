@@ -69,8 +69,10 @@ from whymath_backend.harness.wh1_shadow import (
     emit_wh1_observation,
 )
 from whymath_backend.harness.wh1_tutor_context import (
+    TutorContentSummary,
     TutorContextManifest,
     TutorContextSlot,
+    TutorDeliveryPath,
     TutorDeliveryReceipt,
 )
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
@@ -146,23 +148,38 @@ def _context_record_fields(context: TutorContextManifest | None) -> _ContextReco
     )
 
 
-def _delivered_slots(
+_Paths = dict[TutorContextSlot, set[TutorDeliveryPath]]
+
+
+def _delivery_paths(
     policy: LLMTutorPolicy,
     *,
+    prompt_slots: frozenset[TutorContextSlot],
     initial_hypotheses: Sequence[MisconceptionHypothesis],
-    mode_guard_pack: PedagogyPack | None,
-) -> frozenset[TutorContextSlot]:
-    """튜터 러너가 **실제로 받은** context 슬롯 — 정책 보유값 + 러너 입력(초기 가설·가드 팩).
+    output_guard_ran: bool,
+) -> _Paths:
+    """튜터 러너가 **실제로 넘긴** 경로별 슬롯(P3-72 ⑦) — 핸들러 추정 0.
 
-    인자는 러너가 실제로 넘긴 *바로 그 객체*다(정책 인스턴스·`run_tutoring_turn`에 넘긴 가설 목록·
-    금지모드 가드가 쓸 팩). 핸들러가 '줬다고 생각하는 것'이 아니라 여기서 받은 것만 센다.
+    - prompt: `prompt_slots` — 턴 *뒤*에는 정책이 좌석에 실제로 넘긴 프롬프트의 렌더 결과
+      (`policy.prompt_slots_sent`), 턴 *전* 공개용에는 같은 렌더러의 계획값.
+    - private_tool: 정책 사적 보유값(답안·단계·θ) + `run_tutoring_turn`에 넘긴 바로 그 초기 가설
+      목록(하네스가 curate/log 도구로 다룬다 — 프롬프트 렌더 여부와 별개).
+    - output_guard: 금지모드 가드가 이 턴에 **실제로 판정을 냈을 때만** 교수법 팩.
     """
-    slots = set(policy.delivered_context_slots())
+    paths: _Paths = {}
+
+    def _add(slot: TutorContextSlot, path: TutorDeliveryPath) -> None:
+        paths.setdefault(slot, set()).add(path)
+
+    for slot in prompt_slots:
+        _add(slot, TutorDeliveryPath.PROMPT)
+    for slot in policy.private_context_slots():
+        _add(slot, TutorDeliveryPath.PRIVATE_TOOL)
     if initial_hypotheses:
-        slots.add(TutorContextSlot.MISCONCEPTION)
-    if mode_guard_pack is not None:
-        slots.add(TutorContextSlot.PEDAGOGY_POLICY)
-    return frozenset(slots)
+        _add(TutorContextSlot.MISCONCEPTION, TutorDeliveryPath.PRIVATE_TOOL)
+    if output_guard_ran:
+        _add(TutorContextSlot.PEDAGOGY_POLICY, TutorDeliveryPath.OUTPUT_GUARD)
+    return paths
 
 
 def _safe_emit(
@@ -253,6 +270,7 @@ async def run_wh1_primary_turn(
     pack: PedagogyPack | None = None,
     tutor_context: TutorContextManifest | None = None,
     delivery: TutorDeliveryReceipt | None = None,
+    tutor_content: TutorContentSummary | None = None,
 ) -> str | None:
     """WH-1 하네스를 한 턴 돌려 *학생-대면 발화*를 산출한다 — flip primary 경로(S1-11).
 
@@ -282,22 +300,66 @@ async def run_wh1_primary_turn(
     None(기본·미주입)이거나 플래그 OFF면 가드 블록 전체 미실행 — 기존 경로와 비트동일(회귀 0).
 
     `tutor_context`·`delivery`(P3-08 — `harness/wh1_tutor_context.py`): 호출자(coach)가 이 턴에
-    조회한 9종 `resolved` 매니페스트를 받아, 정책을 만든 **뒤** 정책이 실제로 보유한 값에서
-    `delivered_to_tutor`를 계산(`_delivered_slots`)해 `delivery.manifest`에 돌려준다. 같은 판정의
-    슬롯 *이름*이 ① 정책 프롬프트 요약(`context_missing`·`context_not_delivered`) ② 관측 레코드
+    조회한 9종 `resolved` 매니페스트를 받아, 턴이 끝난 **뒤** 실측 전달 경로(`_delivery_paths`)로
+    `delivery_paths`·`delivered_to_tutor`를 확정해 `delivery.manifest`에 돌려준다. 같은 판정의
+    슬롯 *이름*이 ① 정책 프롬프트 요약(`context_missing`·`context_not_delivered`·
+    `context_held_privately`) ② 관측 레코드
     (`context_missing`·`context_not_delivered`·`context_coverage_gap`)에 실린다. 값은 싣지 않는다.
     정책 생성 전에 실패하면 전달 0으로 기록된다. None(구 호출자·shadow)이면 기존과 비트동일.
+
+    `tutor_content`(P3-72 — Kiki 결정 (가)): 개념·스킬·문제 구조·교수법 팩 요약. 정책 프롬프트의
+    고정 필드로 실린다(θ·숙달·학년을 담을 자리가 없는 타입). 전달 경로는 **턴이 끝난 뒤** 확정한다 —
+    prompt는 정책이 좌석에 실제로 넘긴 프롬프트의 렌더 결과, output_guard는 가드가 실제로 돈 턴만.
+    턴 전에는 같은 렌더러의 계획값으로 프롬프트에 누락·미전달·사적 보유 이름을 공개하고, 턴 뒤
+    실측이 계획과 어긋나면 WARNING을 남긴다(실측이 표기의 원천).
     """
     started = time.monotonic()
     # 정책 생성 전 실패면 아무것도 전달되지 않았다 — 그 상태가 기본값이다.
     context: TutorContextManifest | None = (
-        tutor_context.with_delivery(tutor_invoked=True, delivered=())
+        tutor_context.with_delivery(tutor_invoked=True, paths={})
         if tutor_context is not None
         else None
     )
     if delivery is not None:
         delivery.manifest = context
     policy: LLMTutorPolicy | None = None
+    initial_hypotheses: list[MisconceptionHypothesis] = []
+    planned_prompt: frozenset[TutorContextSlot] = frozenset()
+
+    def _settle(*, output_guard_ran: bool) -> None:
+        """턴 결말마다 실측 경로로 매니페스트를 확정한다(관측 emit 직전 — 레코드도 같은 판정)."""
+        nonlocal context
+        if tutor_context is None or policy is None:
+            return
+        sent = policy.prompt_slots_sent
+        if not initial_hypotheses:
+            # 턴 도중 match 도구가 만든 가설은 도구 *출력*이지 context 슬롯(초기 가설)이 아니다.
+            sent = sent - {TutorContextSlot.MISCONCEPTION}
+        if sent != planned_prompt:
+            logger.warning(
+                "튜터 context 프롬프트 경로 계획≠실측 — 계획=%s 실측=%s (실측으로 표기)",
+                sorted(s.value for s in planned_prompt),
+                sorted(s.value for s in sent),
+            )
+        try:
+            context = tutor_context.with_delivery(
+                tutor_invoked=True,
+                paths=_delivery_paths(
+                    policy,
+                    prompt_slots=sent,
+                    initial_hypotheses=initial_hypotheses,
+                    output_guard_ran=output_guard_ran,
+                ),
+            )
+        except ValueError as exc:
+            # 판정기가 거부한 경로(예: 결정 (가) 위반)는 '전달 0'으로 남기되 침묵하지 않는다.
+            logger.warning(
+                "튜터 context 전달 경로 판정 거부(%s) — 직전 표기 유지", type(exc).__name__
+            )
+            return
+        if delivery is not None:
+            delivery.manifest = context
+
     try:
         probe_candidates = await assemble_probe_candidate_pool(
             session,
@@ -326,22 +388,28 @@ async def run_wh1_primary_turn(
             # PED-04 D1 reader ②: 직전 세션의 교수 이력(메타 한정·원문 0·복호 0). 정책이
             # 예산 가드 안에서 요약에 실어 "이미 시도한 결"을 알게 한다.
             session_recall=session_recall,
+            # P3-72: 개념·스킬·문제 구조·팩 요약만 프롬프트에(θ·숙달·학년은 타입에 자리 없음).
+            content=tutor_content,
         )
         initial_hypotheses = list(active_hypotheses)
         if tutor_context is not None:
-            # P3-08: 실제 전달 = 방금 만든 정책이 보유한 값 + 아래 run_tutoring_turn·가드에 넘길 것.
-            context = tutor_context.with_delivery(
+            # P3-72: 턴 전 공개는 계획값(정책 렌더러·러너 입력·가드 예정)으로 — 확정은 `_settle`.
+            planned_prompt = policy.planned_prompt_slots() | (
+                frozenset({TutorContextSlot.MISCONCEPTION}) if initial_hypotheses else frozenset()
+            )
+            planned = tutor_context.with_delivery(
                 tutor_invoked=True,
-                delivered=_delivered_slots(
+                paths=_delivery_paths(
                     policy,
+                    prompt_slots=planned_prompt,
                     initial_hypotheses=initial_hypotheses,
-                    mode_guard_pack=pack if get_settings().mode_guard_runtime_enabled else None,
+                    output_guard_ran=pack is not None and get_settings().mode_guard_runtime_enabled,
                 ),
             )
-            if delivery is not None:
-                delivery.manifest = context
             policy.disclose_context(
-                missing=context.missing_names(), not_delivered=context.not_delivered_names()
+                missing=planned.missing_names(),
+                not_delivered=planned.not_delivered_names(),
+                held_privately=planned.held_privately_names(),
             )
         timeout = (
             timeout_seconds
@@ -364,6 +432,7 @@ async def run_wh1_primary_turn(
             type(exc).__name__,
             exc_info=True,
         )
+        _settle(output_guard_ran=False)
         # OPS-134 ② — 결과 없이 끝난 턴도 원장에 남긴다(이전엔 0줄이라 폴백률을 읽을 수 없었다).
         _safe_emit_aborted(
             exc,
@@ -376,6 +445,7 @@ async def run_wh1_primary_turn(
         return None
 
     if outcome.status != "ended" or not outcome.utterance:
+        _settle(output_guard_ran=False)
         # 예산 소진·발화 없음 — 관측은 남기고(원장 연속) 폴백 신호. 발화 원문 없음이라 톤 필드 0.
         _safe_emit(
             outcome,
@@ -411,6 +481,7 @@ async def run_wh1_primary_turn(
         if outcome.utterance_source == "policy":
             prose_reason = gate_policy_prose(utterance, student_material=student_material)
             if prose_reason is not None:
+                _settle(output_guard_ran=False)
                 # 거부 사유 코드만 로그·관측(발화 원문 미출력) — 결정론 폴백 신호.
                 _safe_emit(
                     outcome,
@@ -452,9 +523,12 @@ async def run_wh1_primary_turn(
     # 한다 — 04d §2.2 "차단 시 SOCRATIC 강등(말하기 대신 묻기)" 선례의 사후 가드판. 플래그
     # OFF(기본)거나 팩 부재(None — 팩 없으면 forbidden_modes도 없음)면 블록 미실행·비트동일.
     mode_guard_replaced = False
+    output_guard_ran = False
     if settings.mode_guard_runtime_enabled and pack is not None:
         try:
             violated_mode = check_forbidden_modes(pack, utterance)
+            # P3-72 ⑦: 가드가 판정을 냈다 = 팩이 출력 가드 경로로 실제 소비됐다(예외면 유보·미계상).
+            output_guard_ran = True
         except Exception as exc:  # noqa: BLE001 — 가드 자체 장애로 서빙을 죽이지 않는다.
             # 예외 skip은 침묵 금지(CLAUDE.md) — 타입명 로그. 발화는 기존 게이트(하네스 verify·
             # 정답 억제·톤필터)를 이미/곧 통과하므로 가드 판정 유보 상태로 서빙을 계속한다.
@@ -476,6 +550,7 @@ async def run_wh1_primary_turn(
             utterance = fallback_reply_for(violated_mode)
             mode_guard_replaced = True  # 학생이 받은 것은 하네스 발화가 아니라 결정론 재질문이다.
 
+    _settle(output_guard_ran=output_guard_ran)
     # 톤필터 라이브 배선(방침 ③·KPI3) — 위반 시 rewritten 텍스트만 노출·위반 사실은 관측 기록.
     filtered, report = filter_tone(utterance)
     if report.rewritten:

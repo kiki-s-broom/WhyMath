@@ -13,7 +13,8 @@
      (재구현 0). generation_type이 변형/생성류이고 license가 WHYMATH_GENERATED이며
      source_type이 자체생성인지 확인한다.
   2. **정확성 게이트**(`verification`) — Tier1 답 검산(`l3/verify_answer`) + (있으면) Tier2
-     단계 동치(`l3/verify_solution`)를 *직접 조합*한다. whs/verdict의 결합 규칙을 미러하되
+     단계 판정(`l3/verify_solution.verify_solution_interpreted` — 이웃 동치 + 해석 단계(근
+     선택·대입)의 조건 판정, P3-76)을 *직접 조합*한다. whs/verdict의 결합 규칙을 미러하되
      l3→whs 역참조를 피하려고 두 검증기를 직접 부른다(계층 규칙).
   3. **위생 게이트**(`hygiene_ok`) — 후보 본문(해설·발문)에 거짓 수치 등식 등 슬립이 있는지
      `l3/pregenerate/validator`의 시드 검증기로 본다(신호 None=통과).
@@ -67,7 +68,7 @@ from whymath_backend.l3.verify_answer import (
     verify_root_selection,
     verify_series_converges,
 )
-from whymath_backend.l3.verify_solution import verify_solution
+from whymath_backend.l3.verify_solution import verify_solution_interpreted
 from whymath_backend.schema.enums import (
     AnswerFormat,
     GenerationType,
@@ -284,6 +285,12 @@ def _evaluate_verification(
     문제인지 본다 — 항등식(무한해)·해 없음이면 어떤 답을 줘도 malformed이라 **failed**(명시 사유).
     이 축이 없으면 항등식이 Tier1 pass + unique 프로브 unverifiable로 verified 통과하는 구멍이 있다.
 
+    Tier2 단계 판정(P3-76): 이웃 동치(`verify_solution`)에 더해, 동치가 아닌 해석 단계(근 선택
+    `x = -3, x = 4 → x = 4`·대입 `x = 4 → y = -202`)를 문항 조건으로 판정한다 — Solution QA C4·
+    야간 재검증과 같은 공용 구현(`verify_solution_interpreted`). 허용 목록 다항 증명이 성립하면
+    그 전이는 correct, 조건과 어긋남이 확정이면 incorrect, 판정 불가면 이웃 동치 판정 그대로다
+    (incorrect 였던 전이는 증명될 때만 바뀐다 — 판정 확장이지 기준 완화가 아니다).
+
     Tier1/Tier2 결합 규칙(whs/verdict §4 미러·l3→whs 역참조 회피):
       - **failed**: Tier1 fail *또는* 단계 has_incorrect=True(틀린 과정은 답 무관 차단).
       - **verified**: Tier1 pass *그리고* (단계 없음 OR has_incorrect=False·n_unverifiable=0·
@@ -348,8 +355,18 @@ def _evaluate_verification(
     answer_verdict = verify_answer(conditions, answer_map)
     tier1 = answer_verdict.state
 
+    # Tier2 — 이웃 동치 + 해석 단계(근 선택·대입)의 조건 판정(P3-76 · solution_qa C4·야간
+    # 재검증과 같은 공용 구현). 해석 단계는 허용 목록 다항 증명이 성립할 때만 통과로 바뀌고,
+    # 동치 판정이 incorrect 였던 전이는 증명 불가면 incorrect 그대로다(단조 규칙 — 기준 완화 없음).
     steps_result = (
-        verify_solution(solution_steps, solution_step_types) if solution_steps is not None else None
+        verify_solution_interpreted(
+            solution_steps,
+            solution_step_types,
+            conditions=conditions,
+            answer_selection=answer_selection,
+        ).result
+        if solution_steps is not None
+        else None
     )
 
     # ① failed — 답 fail 또는 틀린 과정(단계 incorrect). 답이 맞아도 과정이 틀리면 차단.

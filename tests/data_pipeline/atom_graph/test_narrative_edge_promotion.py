@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -35,7 +34,7 @@ def _load_builder() -> Any:
 @pytest.fixture(scope="module")
 def inputs() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     return (
-        json.loads(GRAPH_PATH.read_text(encoding="utf-8")),
+        _load_builder().load_bound_graph()[0],
         json.loads(REFERENCE_PATH.read_text(encoding="utf-8")),
         json.loads(CONSENSUS_PATH.read_text(encoding="utf-8")),
     )
@@ -51,7 +50,8 @@ def test_regeneration_is_byte_identical(
 ) -> None:
     b = _load_builder()
     graph, ref, cons = inputs
-    sha = hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+    sha = b.bound_source_sha256()
+    assert sha == ref["_meta"]["source_graph_sha256"]  # 승격 원장은 참고 원장과 같은 정본에 묶인다
     assert (
         b.serialize(b.build_payload(graph, ref, cons, sha)).encode("utf-8")
         == PROMOTION_PATH.read_bytes()

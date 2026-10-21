@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: KG-13-university-chain-bridge-after-repair
+title: "대학 내부 체인 수리 후 단절 보완 배선(새 뿌리 5·K-12 도달 198→160) + A합의 서술 엣지 추가 판정"
+track: math-completion
+stage: S4
+subject: math
+layer: data-pipeline
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - KG-12-university-chain-repair-and-word-match-guards
+requires_gates: []
+acceptance:
+  - "① 체인 단절 보완 배선 — KG-12 ① 되감기 엣지 제거로 생긴 새 뿌리 5(CALC1-C20·CALC2-P01·CALC2-R04·LINA1-C11 등 `university_chain_repair_v1.json`·대학→고등 K-12 도달 198→160·상실 48)에 대해 검수자 A·B가 근거란에 적은 재배선 권고와 B합의 잔재 2건(SETLOG-C18→P02·AALG2-C12→P01)을 수리 제안 원장 v2로 내고 AI 2인 블라인드 검수 합의분만 정본 반영(S4-60 형식 · 원본 xlsx 수정 → regenerate_atom_backbone_v3.sh)\n② A합의 21행의 서술 엣지(candidate→to · `narrative_edge_addable_after_repair`) 추가 여부 판정 — B 소견 \"전이 충족 6건(R15·R25·R26·R28~R30)은 불필요\"를 포함해 검수 합의분만\n③ 검증: 수리 후 대학→고등 K-12 도달·직접 선수 0개 원자 수·학습경로 순서화 핀을 전후 비교로 보고(`test_cross_school_connectivity_report`·`test_learning_path_orderability_report`), graph_history 되감기가 새 수정에도 닿도록 단계 추가 + 테스트, 뮤테이션·exit code 보고"
+artifacts: []
+paths:
+  - "data/corpus/atom_graph_v1/**"
+  - docs/data/narrative_edge_reference_v2.md
+session: null
+notes: "KG-12 ① 체인 수리(제거 12·반전 4)가 교수학적으로 틀린 되감기 엣지를 지우면서 2차 저작분이 체인에서 떨어졌다 — 수치는 docs/data/narrative_edge_reference_v2.md §4.1·§6. P2 = 판정 이후(서술형·대학 경로는 현 학습 경로 미사용). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-21

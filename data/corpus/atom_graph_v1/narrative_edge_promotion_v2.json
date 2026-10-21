@@ -1,0 +1,1705 @@
+{
+  "_meta": {
+    "task": "KG-12-university-chain-repair-and-word-match-guards",
+    "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+    "provenance_migration_id": "narrative_edge_promotion_v2",
+    "provenance_ledger_names": "narrative_edge_promotion_v2.json·narrative_edge_reference_ledger_v2.json",
+    "provenance_review_label": "검수:AI 2인 블라인드 합의 승인 ∩ 가드 통과 → 3인째 블라인드 C 승인분만",
+    "review_marker": "검수:AI 3인째 블라인드 2026-10-20",
+    "source_graph_sha256": "516b1ef2b2b3a2f7ae950b72c17d02eb50290461baf77bfdf5c527490696e15c",
+    "source_reference_v2_sha256": "f0bf6a320c21355c69ecb95f299203c676f4f53bf9626916c9389c112435ca71",
+    "staging_total": 183,
+    "subset_total": 66,
+    "third_counts": {
+      "approve": 60,
+      "replace": 2,
+      "reject": 3,
+      "hold": 1
+    },
+    "third_approved": 62,
+    "deferred_to_inter_course_ledger": 3,
+    "approval_rate": 0.9394,
+    "wilson_lower_bound_95": 0.8717,
+    "wilson_floor": 0.8,
+    "gate_pass": true,
+    "promoted_edge_count": 59,
+    "note": "승격 원장 v2 — 부분집합 = KG-11 합의 승인·교체 ∩ 가드 통과. gate_pass가 false면 edges는 비어 있다. review_row·review_result·narrative_indices는 원장 전용 필드."
+  },
+  "rows": [
+    {
+      "row": "E005",
+      "from_code": "AALG1-C02",
+      "to_code": "AALG1-C05",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AALG1-C02"
+    },
+    {
+      "row": "E010",
+      "from_code": "AALG1-C05",
+      "to_code": "AALG1-C07",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AALG1-C05"
+    },
+    {
+      "row": "E011",
+      "from_code": "AALG1-C06",
+      "to_code": "AALG1-C14",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AALG1-C06"
+    },
+    {
+      "row": "E014",
+      "from_code": "AALG2-C01",
+      "to_code": "AALG2-C03",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AALG2-C01"
+    },
+    {
+      "row": "E015",
+      "from_code": "AALG2-C01",
+      "to_code": "AALG2-C05",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AALG2-C01"
+    },
+    {
+      "row": "E018",
+      "from_code": "AALG2-C03",
+      "to_code": "AGEO-C07",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AALG2-C03"
+    },
+    {
+      "row": "E019",
+      "from_code": "AGEO-C01",
+      "to_code": "AGEO-C03",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "AGEO-C01"
+    },
+    {
+      "row": "E025",
+      "from_code": "ANAL1-C04",
+      "to_code": "ANAL1-C06",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL1-C04"
+    },
+    {
+      "row": "E031",
+      "from_code": "ANAL1-C11",
+      "to_code": "ANAL1-C15",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL1-C11"
+    },
+    {
+      "row": "E033",
+      "from_code": "ANAL2-C06",
+      "to_code": "RANAL-C07",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL2-C06"
+    },
+    {
+      "row": "E039",
+      "from_code": "ANAL2-P02",
+      "to_code": "CXAN-C02",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL2-P02"
+    },
+    {
+      "row": "E040",
+      "from_code": "ANAL2-P02",
+      "to_code": "DGEO-C05",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL2-P02"
+    },
+    {
+      "row": "E041",
+      "from_code": "ANAL2-P02",
+      "to_code": "FINM-C08",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL2-P02"
+    },
+    {
+      "row": "E042",
+      "from_code": "ANAL2-P02",
+      "to_code": "ODE-C02",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ANAL2-P02"
+    },
+    {
+      "row": "E044",
+      "from_code": "ANAL2-P02",
+      "to_code": "PDE-C01",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "reject",
+      "C_code": null,
+      "C_approves": false,
+      "promoted_from_code": null
+    },
+    {
+      "row": "E046",
+      "from_code": "ATOPO-C06",
+      "to_code": "ATOPO-P01",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "ATOPO-C06"
+    },
+    {
+      "row": "E048",
+      "from_code": "CALC1-C11",
+      "to_code": "CALC1-P24",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC1-C11"
+    },
+    {
+      "row": "E051",
+      "from_code": "CALC1-C22",
+      "to_code": "CALC1-P18",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC1-C22"
+    },
+    {
+      "row": "E056",
+      "from_code": "CALC1-C25",
+      "to_code": "ODE-P08",
+      "ab_result": "교체",
+      "ab_code": "CALC1-P23",
+      "C": "replace",
+      "C_code": "CALC1-P23",
+      "C_approves": true,
+      "promoted_from_code": null,
+      "note": "S4-01 대학 과목간 저작 원장(미병합 제안)에 같은 쌍이 있다 — 그 원장의 몫으로 남기고 여기서는 승격하지 않는다(판정은 승인으로 센다)"
+    },
+    {
+      "row": "E059",
+      "from_code": "CALC1-P06",
+      "to_code": "CALC1-P19",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC1-P06"
+    },
+    {
+      "row": "E060",
+      "from_code": "CALC1-P08",
+      "to_code": "CALC1-P15",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC1-P08"
+    },
+    {
+      "row": "E063",
+      "from_code": "CALC1-P15",
+      "to_code": "CALC1-P20",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC1-P15"
+    },
+    {
+      "row": "E064",
+      "from_code": "CALC1-P21",
+      "to_code": "ODE-P06",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": null,
+      "note": "S4-01 대학 과목간 저작 원장(미병합 제안)에 같은 쌍이 있다 — 그 원장의 몫으로 남기고 여기서는 승격하지 않는다(판정은 승인으로 센다)"
+    },
+    {
+      "row": "E065",
+      "from_code": "CALC2-C07",
+      "to_code": "CALC2-C21",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC2-C07"
+    },
+    {
+      "row": "E077",
+      "from_code": "CALC2-C17",
+      "to_code": "CALC2-C22",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC2-C17"
+    },
+    {
+      "row": "E078",
+      "from_code": "CALC2-C17",
+      "to_code": "CALC2-P12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC2-C17"
+    },
+    {
+      "row": "E079",
+      "from_code": "CALC2-C17",
+      "to_code": "CALC2-P15",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CALC2-C17"
+    },
+    {
+      "row": "E084",
+      "from_code": "CRYP-C06",
+      "to_code": "CRYP-C10",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "reject",
+      "C_code": null,
+      "C_approves": false,
+      "promoted_from_code": null
+    },
+    {
+      "row": "E085",
+      "from_code": "CXAN-C01",
+      "to_code": "CXAN-C04",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CXAN-C01"
+    },
+    {
+      "row": "E087",
+      "from_code": "CXAN-C03",
+      "to_code": "CXAN-C05",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CXAN-C03"
+    },
+    {
+      "row": "E088",
+      "from_code": "CXAN-C04",
+      "to_code": "CXAN-C06",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CXAN-C04"
+    },
+    {
+      "row": "E089",
+      "from_code": "CXAN-C10",
+      "to_code": "CXAN-C12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "CXAN-C10"
+    },
+    {
+      "row": "E092",
+      "from_code": "DGEO-C01",
+      "to_code": "DGEO-C03",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "DGEO-C01"
+    },
+    {
+      "row": "E093",
+      "from_code": "DGEO-C05",
+      "to_code": "DGEO-C07",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "DGEO-C05"
+    },
+    {
+      "row": "E094",
+      "from_code": "DGEO-C06",
+      "to_code": "DGEO-C11",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "DGEO-C06"
+    },
+    {
+      "row": "E095",
+      "from_code": "DGEO-C08",
+      "to_code": "DGEO-C10",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "DGEO-C08"
+    },
+    {
+      "row": "E096",
+      "from_code": "DGEO-C08",
+      "to_code": "DGEO-C12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "DGEO-C08"
+    },
+    {
+      "row": "E099",
+      "from_code": "FANAL-C01",
+      "to_code": "FANAL-C08",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "FANAL-C01"
+    },
+    {
+      "row": "E104",
+      "from_code": "LINA1-C03",
+      "to_code": "LINA1-P12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-C03"
+    },
+    {
+      "row": "E109",
+      "from_code": "LINA1-C12",
+      "to_code": "LINA1-C16",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-C12"
+    },
+    {
+      "row": "E114",
+      "from_code": "LINA1-C13",
+      "to_code": "LINA1-C17",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-C13"
+    },
+    {
+      "row": "E115",
+      "from_code": "LINA1-C14",
+      "to_code": "LINA1-C17",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-C14"
+    },
+    {
+      "row": "E116",
+      "from_code": "LINA1-C15",
+      "to_code": "LINA1-C17",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-C15"
+    },
+    {
+      "row": "E117",
+      "from_code": "LINA1-P01",
+      "to_code": "LINA1-P06",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-P01"
+    },
+    {
+      "row": "E118",
+      "from_code": "LINA1-P01",
+      "to_code": "NUMER-C11",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA1-P01"
+    },
+    {
+      "row": "E120",
+      "from_code": "LINA2-C02",
+      "to_code": "LINA2-C08",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA2-C02"
+    },
+    {
+      "row": "E121",
+      "from_code": "LINA2-C06",
+      "to_code": "LINA2-R01",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA2-C06"
+    },
+    {
+      "row": "E135",
+      "from_code": "LINA2-P01",
+      "to_code": "LINA2-C03",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA2-P01"
+    },
+    {
+      "row": "E136",
+      "from_code": "LINA2-P01",
+      "to_code": "LINA2-C09",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "LINA2-P01"
+    },
+    {
+      "row": "E139",
+      "from_code": "MSTAT-C01",
+      "to_code": "MSTAT-C03",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "MSTAT-C01"
+    },
+    {
+      "row": "E142",
+      "from_code": "NUMER-C06",
+      "to_code": "NUMER-C12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "NUMER-C06"
+    },
+    {
+      "row": "E147",
+      "from_code": "ODE-C04",
+      "to_code": "ODE-P06",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "hold",
+      "C_code": null,
+      "C_approves": false,
+      "promoted_from_code": null
+    },
+    {
+      "row": "E148",
+      "from_code": "PDE-C01",
+      "to_code": "PDE-C04",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "PDE-C01"
+    },
+    {
+      "row": "E152",
+      "from_code": "RANAL-C05",
+      "to_code": "RANAL-C11",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "RANAL-C05"
+    },
+    {
+      "row": "E153",
+      "from_code": "SET-C01",
+      "to_code": "SET-C03",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SET-C01"
+    },
+    {
+      "row": "E154",
+      "from_code": "SET-C04",
+      "to_code": "SET-C08",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SET-C04"
+    },
+    {
+      "row": "E160",
+      "from_code": "SETLOG-C09",
+      "to_code": "SETLOG-C11",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SETLOG-C09"
+    },
+    {
+      "row": "E163",
+      "from_code": "SETLOG-C11",
+      "to_code": "SETLOG-C15",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SETLOG-C11"
+    },
+    {
+      "row": "E166",
+      "from_code": "SETLOG-C11",
+      "to_code": "TOPO1-C05",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SETLOG-C11"
+    },
+    {
+      "row": "E167",
+      "from_code": "SETLOG-C13",
+      "to_code": "AALG1-C05",
+      "ab_result": "교체",
+      "ab_code": "SETLOG-C14",
+      "C": "replace",
+      "C_code": "SETLOG-C14",
+      "C_approves": true,
+      "promoted_from_code": null,
+      "note": "S4-01 대학 과목간 저작 원장(미병합 제안)에 같은 쌍이 있다 — 그 원장의 몫으로 남기고 여기서는 승격하지 않는다(판정은 승인으로 센다)"
+    },
+    {
+      "row": "E170",
+      "from_code": "SETLOG-P08",
+      "to_code": "SETLOG-C18",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SETLOG-P08"
+    },
+    {
+      "row": "E171",
+      "from_code": "SETLOG-P10",
+      "to_code": "TOPO1-C07",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "reject",
+      "C_code": null,
+      "C_approves": false,
+      "promoted_from_code": null
+    },
+    {
+      "row": "E172",
+      "from_code": "SETLOG-R01",
+      "to_code": "SETLOG-R02",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "SETLOG-R01"
+    },
+    {
+      "row": "E174",
+      "from_code": "TOPO1-C07",
+      "to_code": "TOPO1-C12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "TOPO1-C07"
+    },
+    {
+      "row": "E180",
+      "from_code": "TOPO1-C10",
+      "to_code": "TOPO1-C12",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "TOPO1-C10"
+    },
+    {
+      "row": "E182",
+      "from_code": "TOPO2-C01",
+      "to_code": "TOPO2-C04",
+      "ab_result": "승인",
+      "ab_code": null,
+      "C": "approve",
+      "C_code": null,
+      "C_approves": true,
+      "promoted_from_code": "TOPO2-C01"
+    }
+  ],
+  "edges": [
+    {
+      "from_code": "AALG1-C02",
+      "from_name": "부분군은 연산에 닫혀야 한다",
+      "to_code": "AALG1-C05",
+      "to_name": "잉여류는 군을 균등 분할한다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E005",
+      "review_result": "승인",
+      "narrative_indices": [
+        510
+      ]
+    },
+    {
+      "from_code": "AALG1-C05",
+      "from_name": "잉여류는 군을 균등 분할한다",
+      "to_code": "AALG1-C07",
+      "to_name": "몫군은 정규부분군에서만",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E010",
+      "review_result": "승인",
+      "narrative_indices": [
+        514
+      ]
+    },
+    {
+      "from_code": "AALG1-C06",
+      "from_name": "라그랑주의 역은 거짓",
+      "to_code": "AALG1-C14",
+      "to_name": "실로우 정리(존재·켤레·개수)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E011",
+      "review_result": "승인",
+      "narrative_indices": [
+        525
+      ]
+    },
+    {
+      "from_code": "AALG2-C01",
+      "from_name": "정역은 영인자가 없다",
+      "to_code": "AALG2-C03",
+      "to_name": "소 아이디얼 ⇔ 몫이 정역",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E014",
+      "review_result": "승인",
+      "narrative_indices": [
+        532
+      ]
+    },
+    {
+      "from_code": "AALG2-C01",
+      "from_name": "정역은 영인자가 없다",
+      "to_code": "AALG2-C05",
+      "to_name": "PID는 모든 아이디얼이 단항",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E015",
+      "review_result": "승인",
+      "narrative_indices": [
+        536
+      ]
+    },
+    {
+      "from_code": "AALG2-C03",
+      "from_name": "소 아이디얼 ⇔ 몫이 정역",
+      "to_code": "AGEO-C07",
+      "to_name": "다양체 차원은 좌표환으로",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E018",
+      "review_result": "승인",
+      "narrative_indices": [
+        866
+      ]
+    },
+    {
+      "from_code": "AGEO-C01",
+      "from_name": "아핀 다양체는 다항식의 공통 영점",
+      "to_code": "AGEO-C03",
+      "to_name": "힐베르트 영점정리: I(V(J))=√J",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E019",
+      "review_result": "승인",
+      "narrative_indices": [
+        858
+      ]
+    },
+    {
+      "from_code": "ANAL1-C04",
+      "from_name": "수열 수렴은 모든 ε에 대해",
+      "to_code": "ANAL1-C06",
+      "to_name": "코시: 이웃 항 차→0으로는 부족",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E025",
+      "review_result": "승인",
+      "narrative_indices": [
+        335
+      ]
+    },
+    {
+      "from_code": "ANAL1-C11",
+      "from_name": "컴팩트 = 닫힘 + 유계(ℝⁿ)",
+      "to_code": "ANAL1-C15",
+      "to_name": "최값은 닫힌유계(컴팩트)에서",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E031",
+      "review_result": "승인",
+      "narrative_indices": [
+        361
+      ]
+    },
+    {
+      "from_code": "ANAL2-C06",
+      "from_name": "점별수렴은 성질을 안 지킨다",
+      "to_code": "RANAL-C07",
+      "to_name": "지배수렴 정리(DCT)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E033",
+      "review_result": "승인",
+      "narrative_indices": [
+        740
+      ]
+    },
+    {
+      "from_code": "ANAL2-P02",
+      "from_name": "편미분 계산(한 변수 고정)",
+      "to_code": "CXAN-C02",
+      "to_name": "코시-리만만으로 해석은 부족",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E039",
+      "review_result": "승인",
+      "narrative_indices": [
+        602
+      ]
+    },
+    {
+      "from_code": "ANAL2-P02",
+      "from_name": "편미분 계산(한 변수 고정)",
+      "to_code": "DGEO-C05",
+      "to_name": "접평면은 두 편미분이 친다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E040",
+      "review_result": "승인",
+      "narrative_indices": [
+        638
+      ]
+    },
+    {
+      "from_code": "ANAL2-P02",
+      "from_name": "편미분 계산(한 변수 고정)",
+      "to_code": "FINM-C08",
+      "to_name": "그릭스는 가격 민감도",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E041",
+      "review_result": "승인",
+      "narrative_indices": [
+        926
+      ]
+    },
+    {
+      "from_code": "ANAL2-P02",
+      "from_name": "편미분 계산(한 변수 고정)",
+      "to_code": "ODE-C02",
+      "to_name": "완전미분방정식은 ∂M/∂y=∂N/∂x 확인",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E042",
+      "review_result": "승인",
+      "narrative_indices": [
+        436
+      ]
+    },
+    {
+      "from_code": "ATOPO-C06",
+      "from_name": "호몰로지는 호모토피와 다르다",
+      "to_code": "ATOPO-P01",
+      "to_name": "마이어-피토리스로 호몰로지 계산",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E046",
+      "review_result": "승인",
+      "narrative_indices": [
+        812
+      ]
+    },
+    {
+      "from_code": "CALC1-C11",
+      "from_name": "고계도함수는 반복 미분",
+      "to_code": "CALC1-P24",
+      "to_name": "테일러 계수는 f⁽ⁿ⁾(a)/n!",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E048",
+      "review_result": "승인",
+      "narrative_indices": [
+        103
+      ]
+    },
+    {
+      "from_code": "CALC1-C22",
+      "from_name": "호의 길이는 ∫√(1+(f')²)",
+      "to_code": "CALC1-P18",
+      "to_name": "곡면적은 둘레×호길이 요소",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E051",
+      "review_result": "승인",
+      "narrative_indices": [
+        86
+      ]
+    },
+    {
+      "from_code": "CALC1-P06",
+      "from_name": "곱의 미분은 미분의 곱이 아니다",
+      "to_code": "CALC1-P19",
+      "to_name": "부분적분의 u·dv 선택이 중요",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E059",
+      "review_result": "승인",
+      "narrative_indices": [
+        87
+      ]
+    },
+    {
+      "from_code": "CALC1-P08",
+      "from_name": "연쇄법칙은 안쪽 미분을 곱한다",
+      "to_code": "CALC1-P15",
+      "to_name": "치환적분은 dx까지 바꾼다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E060",
+      "review_result": "승인",
+      "narrative_indices": [
+        74
+      ]
+    },
+    {
+      "from_code": "CALC1-P15",
+      "from_name": "치환적분은 dx까지 바꾼다",
+      "to_code": "CALC1-P20",
+      "to_name": "삼각치환은 역치환·범위까지",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E063",
+      "review_result": "승인",
+      "narrative_indices": [
+        90
+      ]
+    },
+    {
+      "from_code": "CALC2-C07",
+      "from_name": "평면의 (a,b,c)는 법선벡터",
+      "to_code": "CALC2-C21",
+      "to_name": "면적분은 향(orientation)에 의존",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E065",
+      "review_result": "승인",
+      "narrative_indices": [
+        181
+      ]
+    },
+    {
+      "from_code": "CALC2-C17",
+      "from_name": "이중적분이 늘 두 적분의 곱은 아니다",
+      "to_code": "CALC2-C22",
+      "to_name": "그린 정리는 단순폐곡선·양의 방향",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E077",
+      "review_result": "승인",
+      "narrative_indices": [
+        184
+      ]
+    },
+    {
+      "from_code": "CALC2-C17",
+      "from_name": "이중적분이 늘 두 적분의 곱은 아니다",
+      "to_code": "CALC2-P12",
+      "to_name": "극변환 이중적분은 r을 곱한다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E078",
+      "review_result": "승인",
+      "narrative_indices": [
+        170
+      ]
+    },
+    {
+      "from_code": "CALC2-C17",
+      "from_name": "이중적분이 늘 두 적분의 곱은 아니다",
+      "to_code": "CALC2-P15",
+      "to_name": "변수변환엔 야코비안 |J|",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E079",
+      "review_result": "승인",
+      "narrative_indices": [
+        176
+      ]
+    },
+    {
+      "from_code": "CXAN-C01",
+      "from_name": "복소수는 크기와 편각을 함께 가진다",
+      "to_code": "CXAN-C04",
+      "to_name": "복소로그는 다가함수",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E085",
+      "review_result": "승인",
+      "narrative_indices": [
+        607
+      ]
+    },
+    {
+      "from_code": "CXAN-C03",
+      "from_name": "복소지수는 0이 되지 않고 주기적",
+      "to_code": "CXAN-C05",
+      "to_name": "복소 sin·cos는 유계가 아니다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E087",
+      "review_result": "승인",
+      "narrative_indices": [
+        608
+      ]
+    },
+    {
+      "from_code": "CXAN-C04",
+      "from_name": "복소로그는 다가함수",
+      "to_code": "CXAN-C06",
+      "to_name": "분지절단으로 다가함수를 일가화",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E088",
+      "review_result": "승인",
+      "narrative_indices": [
+        610
+      ]
+    },
+    {
+      "from_code": "CXAN-C10",
+      "from_name": "로랑 급수는 음의 차수를 가진다",
+      "to_code": "CXAN-C12",
+      "to_name": "특이점은 세 종류",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E089",
+      "review_result": "승인",
+      "narrative_indices": [
+        622
+      ]
+    },
+    {
+      "from_code": "DGEO-C01",
+      "from_name": "호장 매개변수는 단위속력",
+      "to_code": "DGEO-C03",
+      "to_name": "곡률은 휘는 정도(직선은 0)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E092",
+      "review_result": "승인",
+      "narrative_indices": [
+        632
+      ]
+    },
+    {
+      "from_code": "DGEO-C05",
+      "from_name": "접평면은 두 편미분이 친다",
+      "to_code": "DGEO-C07",
+      "to_name": "제2기본형식은 법선방향 휨(외재)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E093",
+      "review_result": "승인",
+      "narrative_indices": [
+        642
+      ]
+    },
+    {
+      "from_code": "DGEO-C06",
+      "from_name": "제1기본형식은 내재적 거리",
+      "to_code": "DGEO-C11",
+      "to_name": "측지선은 국소 최단(전역 아님)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E094",
+      "review_result": "승인",
+      "narrative_indices": [
+        650
+      ]
+    },
+    {
+      "from_code": "DGEO-C08",
+      "from_name": "가우스 곡률은 두 주곡률의 곱",
+      "to_code": "DGEO-C10",
+      "to_name": "가우스 절묘정리: K는 내재적",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E095",
+      "review_result": "승인",
+      "narrative_indices": [
+        648
+      ]
+    },
+    {
+      "from_code": "DGEO-C08",
+      "from_name": "가우스 곡률은 두 주곡률의 곱",
+      "to_code": "DGEO-C12",
+      "to_name": "가우스-보네: 곡률 적분=2πχ",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E096",
+      "review_result": "승인",
+      "narrative_indices": [
+        652
+      ]
+    },
+    {
+      "from_code": "FANAL-C01",
+      "from_name": "바나흐 공간은 완비 노름공간",
+      "to_code": "FANAL-C08",
+      "to_name": "열린사상 정리",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E099",
+      "review_result": "승인",
+      "narrative_indices": [
+        770
+      ]
+    },
+    {
+      "from_code": "LINA1-C03",
+      "from_name": "기약행제형(RREF)은 유일",
+      "to_code": "LINA1-P12",
+      "to_name": "rank·nullity는 RREF 피벗으로",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E104",
+      "review_result": "승인",
+      "narrative_indices": [
+        250
+      ]
+    },
+    {
+      "from_code": "LINA1-C12",
+      "from_name": "기저는 독립이면서 생성",
+      "to_code": "LINA1-C16",
+      "to_name": "표현행렬은 기저에 의존",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E109",
+      "review_result": "승인",
+      "narrative_indices": [
+        245
+      ]
+    },
+    {
+      "from_code": "LINA1-C13",
+      "from_name": "차원은 성분 수가 아니라 기저 벡터 수",
+      "to_code": "LINA1-C17",
+      "to_name": "계수+영공간차원=정의역 차원",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E114",
+      "review_result": "승인",
+      "narrative_indices": [
+        249
+      ]
+    },
+    {
+      "from_code": "LINA1-C14",
+      "from_name": "핵은 항상 {0}이 아니다(핵={0}일 때만 단사)",
+      "to_code": "LINA1-C17",
+      "to_name": "계수+영공간차원=정의역 차원",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E115",
+      "review_result": "승인",
+      "narrative_indices": [
+        247
+      ]
+    },
+    {
+      "from_code": "LINA1-C15",
+      "from_name": "상이 공역 전체라야 전사",
+      "to_code": "LINA1-C17",
+      "to_name": "계수+영공간차원=정의역 차원",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E116",
+      "review_result": "승인",
+      "narrative_indices": [
+        248
+      ]
+    },
+    {
+      "from_code": "LINA1-P01",
+      "from_name": "가우스 소거: 전진소거+후진대입",
+      "to_code": "LINA1-P06",
+      "to_name": "LU분해엔 행교환(P)이 필요할 수 있다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E117",
+      "review_result": "승인",
+      "narrative_indices": [
+        212
+      ]
+    },
+    {
+      "from_code": "LINA1-P01",
+      "from_name": "가우스 소거: 전진소거+후진대입",
+      "to_code": "NUMER-C11",
+      "to_name": "부분피벗팅으로 안정화",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E118",
+      "review_result": "승인",
+      "narrative_indices": [
+        723
+      ]
+    },
+    {
+      "from_code": "LINA2-C02",
+      "from_name": "대각화엔 독립 고유벡터 n개 필요",
+      "to_code": "LINA2-C08",
+      "to_name": "대각화 불가면 조르당 표준형",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E120",
+      "review_result": "승인",
+      "narrative_indices": [
+        423
+      ]
+    },
+    {
+      "from_code": "LINA2-C06",
+      "from_name": "대칭행렬은 직교대각화 가능",
+      "to_code": "LINA2-R01",
+      "to_name": "이차형식 ↔ 등위곡선(주축)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E121",
+      "review_result": "승인",
+      "narrative_indices": [
+        421
+      ]
+    },
+    {
+      "from_code": "LINA2-P01",
+      "from_name": "특성다항식으로 고유값 계산",
+      "to_code": "LINA2-C03",
+      "to_name": "케일리-해밀턴: A가 자기 특성식을 만족",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E135",
+      "review_result": "승인",
+      "narrative_indices": [
+        409
+      ]
+    },
+    {
+      "from_code": "LINA2-P01",
+      "from_name": "특성다항식으로 고유값 계산",
+      "to_code": "LINA2-C09",
+      "to_name": "최소다항식은 특성다항식과 다를 수 있다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E136",
+      "review_result": "승인",
+      "narrative_indices": [
+        424
+      ]
+    },
+    {
+      "from_code": "MSTAT-C01",
+      "from_name": "카이제곱은 정규 제곱의 합",
+      "to_code": "MSTAT-C03",
+      "to_name": "F분포는 두 분산의 비",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E139",
+      "review_result": "승인",
+      "narrative_indices": [
+        683
+      ]
+    },
+    {
+      "from_code": "NUMER-C06",
+      "from_name": "고정점 반복은 |g'|<1서 수렴",
+      "to_code": "NUMER-C12",
+      "to_name": "반복법은 대각우월서 수렴",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E142",
+      "review_result": "승인",
+      "narrative_indices": [
+        726
+      ]
+    },
+    {
+      "from_code": "PDE-C01",
+      "from_name": "특성곡선법은 PDE를 ODE로",
+      "to_code": "PDE-C04",
+      "to_name": "쌍곡형은 유한속도·특성",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E148",
+      "review_result": "승인",
+      "narrative_indices": [
+        785
+      ]
+    },
+    {
+      "from_code": "RANAL-C05",
+      "from_name": "'거의 어디서나'는 측도 0을 무시",
+      "to_code": "RANAL-C11",
+      "to_name": "절대연속함수가 미적분기본정리를 회복",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E152",
+      "review_result": "승인",
+      "narrative_indices": [
+        751
+      ]
+    },
+    {
+      "from_code": "SET-C01",
+      "from_name": "ZFC는 '아무 모임'을 막는다",
+      "to_code": "SET-C03",
+      "to_name": "정칙성: x∈x는 금지",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E153",
+      "review_result": "승인",
+      "narrative_indices": [
+        465
+      ]
+    },
+    {
+      "from_code": "SET-C04",
+      "from_name": "정렬집합: 모든 부분집합에 최소원",
+      "to_code": "SET-C08",
+      "to_name": "정렬정리는 직관에 반한다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E154",
+      "review_result": "승인",
+      "narrative_indices": [
+        476
+      ]
+    },
+    {
+      "from_code": "SETLOG-C09",
+      "from_name": "함수라고 다 단사는 아니다",
+      "to_code": "SETLOG-C11",
+      "to_name": "전단사는 단사이면서 전사",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E160",
+      "review_result": "승인",
+      "narrative_indices": [
+        297
+      ]
+    },
+    {
+      "from_code": "SETLOG-C11",
+      "from_name": "전단사는 단사이면서 전사",
+      "to_code": "SETLOG-C15",
+      "to_name": "ℤ와 ℕ은 같은 크기(가산)",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E163",
+      "review_result": "승인",
+      "narrative_indices": [
+        307
+      ]
+    },
+    {
+      "from_code": "SETLOG-C11",
+      "from_name": "전단사는 단사이면서 전사",
+      "to_code": "TOPO1-C05",
+      "to_name": "위상동형은 양방향 연속",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E166",
+      "review_result": "승인",
+      "narrative_indices": [
+        563
+      ]
+    },
+    {
+      "from_code": "SETLOG-P08",
+      "from_name": "멱집합 크기는 2의 거듭제곱",
+      "to_code": "SETLOG-C18",
+      "to_name": "집합은 자기 멱집합보다 작다",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E170",
+      "review_result": "승인",
+      "narrative_indices": [
+        317
+      ]
+    },
+    {
+      "from_code": "SETLOG-R01",
+      "from_name": "진리표(표) ↔ 논리식 ↔ 말",
+      "to_code": "SETLOG-R02",
+      "to_name": "∀∃ 기호 ↔ 자연어 번역",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E172",
+      "review_result": "승인",
+      "narrative_indices": [
+        261
+      ]
+    },
+    {
+      "from_code": "TOPO1-C07",
+      "from_name": "곱위상은 상자위상과 다르다",
+      "to_code": "TOPO1-C12",
+      "to_name": "티호노프: 컴팩트의 곱은 컴팩트",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E174",
+      "review_result": "승인",
+      "narrative_indices": [
+        580
+      ]
+    },
+    {
+      "from_code": "TOPO1-C10",
+      "from_name": "컴팩트 = 모든 열린덮개에 유한부분덮개",
+      "to_code": "TOPO1-C12",
+      "to_name": "티호노프: 컴팩트의 곱은 컴팩트",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E180",
+      "review_result": "승인",
+      "narrative_indices": [
+        581
+      ]
+    },
+    {
+      "from_code": "TOPO2-C01",
+      "from_name": "분리공리는 위계를 이룬다",
+      "to_code": "TOPO2-C04",
+      "to_name": "우리손 거리화 정리",
+      "relation": "prerequisite",
+      "relation_subtype": "참고(서술형)→정규화",
+      "school_link": false,
+      "strength": 0.8,
+      "evidence": "KG-12 서술형 낱말매칭 승격 v2",
+      "review_row": "E182",
+      "review_result": "승인",
+      "narrative_indices": [
+        588
+      ]
+    }
+  ]
+}

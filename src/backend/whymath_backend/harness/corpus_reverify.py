@@ -3,7 +3,8 @@
 정본: `docs/standards/superhuman_verification_standard.md` §2 S6. 사람은 승인 후 문항을
 다시 보지 않지만(재검수 0회), 기계는 **전 코퍼스를 매일 밤 전수 재검증**할 수 있다.
 코퍼스 JSONL의 `verify{conditions, answer_map, answer_selection, solution_steps}` 재료로 각
-문항의 정답을 Tier1(`verify_answer`) + Tier2 단계 연쇄(`verify_solution`·steps 보유 시·S2-02)
+문항의 정답을 Tier1(`verify_answer`) + Tier2 단계 연쇄(`verify_solution_interpreted` — 이웃
+동치 + 해석 단계(근 선택·대입)의 조건 판정(P3-76)·steps 보유 시·S2-02)
 + 수치 반례 fuzz(`counterexample_fuzz`)로 다시 검산해,
 **fail이 하나라도 있으면 exit 1**(정본 변경·데이터 오염을 야간 CI가 즉시 잡는다).
 
@@ -36,7 +37,7 @@ from whymath_backend.l3.verify_answer import (
     verify_root_aggregate,
     verify_root_selection,
 )
-from whymath_backend.l3.verify_solution import verify_solution
+from whymath_backend.l3.verify_solution import verify_solution_interpreted
 
 
 # 개념형 검증기 디스패치 — **acceptance의 표를 그대로 쓴다**(EOS-85 ④·사본 금지).
@@ -195,9 +196,14 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
     # 재검산한다(생성기는 100% 증명 가능 체인만 방출 — 수용 게이트가 적재 시 봉인). 여기서도
     # 모듈 정직 규약을 따른다: **incorrect(확정 오염)만 fail**, unverifiable은 오염으로
     # 오판하지 않는다(정본 SymPy 변화 등 — 적재 게이트가 재생성 시 잡는다).
+    # P3-76 — 해석 단계(근 선택·대입)는 수용 게이트·solution_qa C4 와 같은 공용 판정
+    # (`verify_solution_interpreted`)으로 본다. 허용 목록 다항 증명이 성립하는 전이만 통과로
+    # 바뀌고, 동치 판정이 incorrect 였던 전이는 증명 불가면 그대로 fail 이다(단조 규칙).
     steps = verify.get("solution_steps")
     if isinstance(steps, list) and steps:
-        tier2 = verify_solution([str(s) for s in steps])
+        tier2 = verify_solution_interpreted(
+            [str(s) for s in steps], conditions=conditions, answer_selection=selection
+        ).result
         if tier2.has_incorrect:
             return "fail", (
                 f"Tier2 단계 incorrect: 전이 {tier2.first_incorrect_index} "
