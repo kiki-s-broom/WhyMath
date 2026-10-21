@@ -1,6 +1,7 @@
 """KG-11 — 서술형 낱말 매칭 참고 원장(`narrative_edge_reference_ledger_v1.json`) 계약.
 
-1. 재현성 — 빌더 재실행이 커밋된 원장과 바이트 동일, source_graph_sha256 = 정본 파일 지문.
+1. 재현성 — 빌더 재실행이 커밋된 원장과 바이트 동일, source_graph_sha256 = 검수 시점 정본 지문
+   (현재 정본에서 `graph_history`로 되감아 복원 — 행 번호가 검수 기록의 정본이라 재생성하지 않는다).
 2. 전수성 — 서술형 973건 전부 status, 합 = 총수.
 3. 구조 — 제안 끝점은 원자·자기루프 0·정본 중복 0·내부 중복 0, 정본 + uni_staging 제안은 비순환.
 4. 규칙 — 제안 출발 원자 이름이 원 서술 낱말을 포함(낱말 매칭) · 같은 등급 안 개념 우선 · 모호 매칭은
@@ -59,8 +60,9 @@ def _load_builder() -> Any:
 
 
 @pytest.fixture(scope="module")
-def graph() -> dict[str, Any]:
-    return json.loads(GRAPH_PATH.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+def graph(builder: Any) -> dict[str, Any]:
+    """원장이 묶인 정본(KG-11 검수 시점) — 현재 파일에서 graph_history로 복원한다."""
+    return builder.load_bound_graph()[0]  # type: ignore[no-any-return]
 
 
 @pytest.fixture(scope="module")
@@ -109,14 +111,21 @@ class TestReproducibility:
     def test_regeneration_is_byte_identical(
         self, builder: Any, graph: dict[str, Any], ledger_bytes: bytes
     ) -> None:
-        sha = hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+        sha = builder.bound_source_sha256()
         assert builder.serialize(builder.build_payload(graph, sha)).encode("utf-8") == ledger_bytes
 
-    def test_source_sha_matches_canonical_file(self, ledger: dict[str, Any]) -> None:
+    def test_source_sha_is_reconstructable_from_canonical_file(
+        self, ledger: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """묶인 정본은 현재 정본에서 바이트 단위로 되감긴다(graph_history) — 닿지 못하면 fixture가 터진다."""
+        want = ledger["_meta"]["source_graph_sha256"]
         assert (
-            ledger["_meta"]["source_graph_sha256"]
-            == hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+            hashlib.sha256(
+                (json.dumps(graph, ensure_ascii=False, indent=2) + "\n").encode()
+            ).hexdigest()
+            == want
         )
+        assert GRAPH_PATH.exists()
 
 
 class TestCoverage:

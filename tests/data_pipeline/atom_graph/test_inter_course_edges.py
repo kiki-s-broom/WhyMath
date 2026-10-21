@@ -151,11 +151,11 @@ class TestProposalFileShape:
         assert len(graph["concepts"]) == 2683
         # 정본 = 백본 2,210 + S4-60 고→대 경계 병합 24. 이 제안(S4-61)은 아직 병합 전이라 무변경이다.
         assert (
-            len(graph["edges"]) == 2231
-        )  # 정본 무변경 동결 · KG-10 ② 경계 검수(반려 3·교체 1)로 2,234→2,231
+            len(graph["edges"]) == 2278
+        )  # 정본 무변경 동결 · KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리(제거 12·반전 4)로 2,231→2,219 · ③ 낱말매칭 승격 v2 59건으로 2,278
         assert (
-            len(pre_merge_view(graph)["edges"]) == 2207
-        )  # KG-10 ② 경계 검수(반려 3·교체 1)로 2210→2207
+            len(pre_merge_view(graph)["edges"]) == 2195
+        )  # KG-10 ② 경계 검수로 2210→2207 · KG-12 ① 체인 수리로 2,195
 
     def test_report_label_default_is_preserved(self) -> None:
         """슬라이스 1 리포트의 기본 문구가 label 필드 추가로 바뀌지 않았다."""
@@ -317,13 +317,15 @@ class TestMutationsAreRed:
     ) -> None:
         """M7b: 실제로 만난 함정 — 미적분학 I 후반→수치해석 전반 엣지는 기존 사슬 때문에 순환.
 
-        정본에 NUMER-P01→CALC1-C16 이 있고 CALC1 사슬이 C16→…→C26 으로 이어지며 수치해석 사슬이
-        NUMER-C01→…→NUMER-C04→NUMER-P01 로 이어지므로 CALC1-C26→NUMER-C01 은 닫힌 고리를 만든다.
+        정본에 NUMER-P01→CALC1-C16 이 있고 CALC1 사슬이 C16→C17→R08→C18→C19 로 이어지며 수치해석 사슬이
+        NUMER-C01→…→NUMER-C04→NUMER-P01 로 이어지므로 CALC1-C19→NUMER-C01 은 닫힌 고리를 만든다.
+        (KG-12 ① 체인 수리가 CALC1-R09→C20 되감기 엣지를 지워 C26까지는 더 이상 이어지지 않는다 —
+        종전 픽스처 CALC1-C26→NUMER-C01 은 이제 순환을 만들지 못한다.)
         제안 *단독*으로는 사이클이 보이지 않는 — 정본과 합쳐야만 보이는 — 형태다.
         """
 
         def mutate(payload: dict[str, Any]) -> None:
-            payload["edges"].append(_edge_record("CALC1-C26", "NUMER-C01"))
+            payload["edges"].append(_edge_record("CALC1-C19", "NUMER-C01"))
 
         report = _run_mutation(proposal_bytes, graph, mutate)
         assert "acyclic_when_merged" in report.rules_hit(), report.report_text()
@@ -402,15 +404,18 @@ class TestReachability:
         assert rep.university_courses == 32
         assert rep.reached_atoms == 1  # CALC1-P21 하나 — KG-10 ② 교체 엣지(고등 다항식 인수분해)
         assert rep.reached_courses == 1
-        # 32과목 중 수치해석↔미적분학 I 두 과목만 정본에서 이어져 있다 → 31개 성분.
+        # 32과목 중 수치해석↔미적분학 I 두 과목만 정본에서 이어져 있다 → 31개 성분(병합 전 뷰에는
+        # KG-12 승격 v2 과정 간 엣지가 없다 — 병합 후 정본은 23개 성분).
         assert rep.course_components == 31
 
     def test_baseline_after_boundary_merge(self, graph: dict[str, Any]) -> None:
         """S4-60 병합 후 정본의 기준선 — 경계 24건이 만든 진입로만큼 도달한다(수치는 실측 동결)."""
         rep = university_reachability(graph)
-        assert rep.reached_atoms == 198
-        assert rep.reached_courses == 7
-        assert rep.course_components == 31  # 진입 엣지는 과목 사이를 잇지 않는다
+        # KG-12 ① 체인 수리로 198→160: 읽기 순서를 선수로 적은 되감기 엣지 12건을 지워 2차 저작분이
+        # 체인에서 떨어졌다(새 뿌리 5·도달 상실 48·획득 10 — 보완 배선은 후속 KG-13). 과목은 승격 v2로 7→8.
+        assert rep.reached_atoms == 160
+        assert rep.reached_courses == 8
+        assert rep.course_components == 23  # 진입 엣지는 과목 사이를 잇지 않는다(승격 v2가 잇는다)
 
     def test_this_proposal_alone_reaches_nothing(
         self, proposal: dict[str, Any], graph: dict[str, Any]
@@ -419,7 +424,7 @@ class TestReachability:
 
         S4-60 시점엔 진입로 0이라 도달 0이었다. KG-10 ② 교체 엣지(고등 → CALC1-P21) 1건이 병합 전
         정본에 남아, 과목간 엣지를 얹으면 그 한 진입로에서 CALC1-P21의 후행 3곳까지 4원자·2과목에 닿는다.
-        병합 후 정본(진입 24 + 1)의 462와는 두 자릿수 차이 — 대조군의 변별력은 유지된다.
+        병합 후 정본(진입 24 + 1)의 407과는 두 자릿수 차이 — 대조군의 변별력은 유지된다.
         """
         pairs = [(e["from_code"], e["to_code"]) for e in proposal["edges"]]
         rep = university_reachability(pre_merge_view(graph), pairs)
@@ -428,13 +433,13 @@ class TestReachability:
         # 그러나 과목 연결 구조는 바뀐다(성분 31 → 2).
         assert rep.course_components == 2
 
-    def test_this_proposal_on_merged_graph_reaches_462(
+    def test_this_proposal_on_merged_graph_reaches_407(
         self, proposal: dict[str, Any], graph: dict[str, Any]
     ) -> None:
-        """병합 후 정본 위에 이 제안을 얹으면 진입로(198) + 과목간 확산으로 462까지 도달한다."""
+        """병합 후 정본 위에 이 제안을 얹으면 진입로(160) + 과목간 확산으로 407까지 도달한다(KG-12 전 462)."""
         pairs = [(e["from_code"], e["to_code"]) for e in proposal["edges"]]
         rep = university_reachability(graph, pairs)
-        assert rep.reached_atoms == 462
+        assert rep.reached_atoms == 407
         assert rep.reached_courses == 31
         assert rep.course_components == 2
 
@@ -442,9 +447,9 @@ class TestReachability:
         self, graph: dict[str, Any], boundary_pairs: list[tuple[str, str]]
     ) -> None:
         rep = university_reachability(graph, boundary_pairs)
-        assert rep.reached_atoms == 198
-        assert rep.reached_courses == 7
-        assert rep.course_components == 31  # 진입 엣지는 과목 사이를 잇지 않는다
+        assert rep.reached_atoms == 160  # KG-12 ① 체인 수리 전 198
+        assert rep.reached_courses == 8
+        assert rep.course_components == 23  # 진입 엣지는 과목 사이를 잇지 않는다(승격 v2가 잇는다)
 
     def test_both_proposals_together(
         self,
@@ -454,12 +459,12 @@ class TestReachability:
     ) -> None:
         pairs = boundary_pairs + [(e["from_code"], e["to_code"]) for e in proposal["edges"]]
         rep = university_reachability(graph, pairs)
-        assert rep.reached_atoms == 462  # AI 검수 반려 8건 후 재측정(종전 466)
+        assert rep.reached_atoms == 407  # AI 검수 반려 8건 후 462 → KG-12 ① 체인 수리 후 407
         assert rep.university_atoms == 512
         assert rep.reached_courses == 31  # 졸업세미나(내용 선수 없음)만 제외
         assert rep.course_components == 2
-        assert rep.atom_ratio == pytest.approx(462 / 512)
-        assert "462/512" in rep.summary()
+        assert rep.atom_ratio == pytest.approx(407 / 512)
+        assert "407/512" in rep.summary()
 
     def test_measure_is_sensitive_to_edges(
         self,
@@ -485,8 +490,8 @@ class TestReachability:
         )
 
     def test_course_components_ignores_within_course_edges(self, graph: dict[str, Any]) -> None:
-        """과목 내부 엣지는 성분 수에 영향이 없다 — 정본 481건이 있어도 31이다."""
-        assert course_components(graph) == 31
+        """과목 내부 엣지는 성분 수에 영향이 없다 — 과정 간 엣지(S4-60 경계·KG-12 승격 v2)만 센다 → 23."""
+        assert course_components(graph) == 23
 
 
 class TestCli:
@@ -502,7 +507,7 @@ class TestCli:
         assert main(argv) == 0
         out = capsys.readouterr().out
         assert "[PASS]" in out
-        assert "462/512" in out  # 도달성 병기: 슬라이스 1+3 병합 가정 결과
+        assert "407/512" in out  # 도달성 병기: 슬라이스 1+3 병합 가정 결과(KG-12 ① 체인 수리 후)
         assert PROPOSAL_PATH.read_bytes() == proposal_bytes  # 읽기 전용
 
     def test_exit_one_on_broken_proposal(self, proposal_bytes: bytes, tmp_path: Path) -> None:
