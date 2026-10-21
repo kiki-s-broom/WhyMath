@@ -37,6 +37,7 @@ from whymath_backend.harness.wh1_tutor_context import (
     TutorContextManifest,
     TutorContextSlot,
     TutorContextSlotStatus,
+    TutorDeliveryPath,
     TutorDeliveryReceipt,
     build_tutor_context_manifest,
     log_tutor_context,
@@ -60,7 +61,9 @@ _THETA_SENTINEL = 1.2345
 _MASTERY_SENTINEL = 0.6789
 _ANSWER = "x+1=3 이니까 x=2"
 S = TutorContextSlot
-# 현재 튜터 러너가 받는 슬롯(가드 OFF 기본) — 나머지 5종은 얻어도 '미전달'이다.
+P = TutorDeliveryPath
+# 내용 요약(P3-72)을 주지 않은 러너가 받는 슬롯(가드 OFF 기본) — 나머지 5종은 얻어도 '미전달'이다.
+# 내용 요약을 준 경로는 `test_wh1_tutor_slot_delivery.py`가 본다.
 _DELIVERABLE = {S.LEARNER_STATE, S.STUDENT_ANSWER, S.SOLUTION_RECORD, S.MISCONCEPTION}
 _NOT_DELIVERABLE = [S.CONCEPT, S.SKILL, S.PROBLEM, S.MASTERY, S.PEDAGOGY_POLICY]
 
@@ -131,10 +134,18 @@ def _inject(override: dict[str, Any]) -> dict[str, Any]:
     return kwargs
 
 
+# 프롬프트에 실릴 수 있는 슬롯(내용 요약·가설) — 나머지는 사적 보유 경로로 대역한다.
+_PROMPT_CAPABLE = {S.CONCEPT, S.SKILL, S.PROBLEM, S.PEDAGOGY_POLICY, S.MISCONCEPTION}
+
+
+def _paths_for(delivered: Iterable[TutorContextSlot]) -> dict[TutorContextSlot, set[P]]:
+    return {s: {P.PROMPT if s in _PROMPT_CAPABLE else P.PRIVATE_TOOL} for s in delivered}
+
+
 def _invoked(m: TutorContextManifest, delivered: Iterable[TutorContextSlot] = ()) -> Any:
     """튜터 호출 반영 — 실제 러너처럼 *얻은* 슬롯만 전달로 넘긴다(못 얻은 값은 전달될 수 없다)."""
     real = [s for s in delivered if m.status_of(s).resolved]
-    return m.with_delivery(tutor_invoked=True, delivered=real)
+    return m.with_delivery(tutor_invoked=True, paths=_paths_for(real))
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -304,14 +315,16 @@ class TestManifestInvariants:
     ) -> None:
         m = build_tutor_context_manifest(**_inject({"theta": None}))
         with caplog.at_level(logging.WARNING, logger=_CTX_LOGGER):
-            out = m.with_delivery(tutor_invoked=True, delivered=[S.LEARNER_STATE, S.STUDENT_ANSWER])
+            out = m.with_delivery(
+                tutor_invoked=True, paths=_paths_for([S.LEARNER_STATE, S.STUDENT_ANSWER])
+            )
         assert out.status_of(S.LEARNER_STATE).delivered_to_tutor is False
         assert out.status_of(S.STUDENT_ANSWER).delivered_to_tutor is True
         assert any("판정 불일치" in r.getMessage() for r in caplog.records)
 
     def test_not_invoked_delivers_nothing_even_if_asked(self) -> None:
         m = build_tutor_context_manifest(**_full_kwargs())
-        out = m.with_delivery(tutor_invoked=False, delivered=list(S))
+        out = m.with_delivery(tutor_invoked=False, paths=_paths_for(list(S)))
         assert out.tutor_invoked is False
         assert not any(s.delivered_to_tutor for s in out.slots)
 
@@ -451,7 +464,7 @@ class TestPolicyDelivery:
         held = LLMTutorPolicy(
             _CapturingProvider(), student_text=_ANSWER, solution_steps=["x=2"], theta=0.3
         )
-        assert held.delivered_context_slots() == {
+        assert held.private_context_slots() == {
             S.STUDENT_ANSWER,
             S.SOLUTION_RECORD,
             S.LEARNER_STATE,
@@ -459,7 +472,7 @@ class TestPolicyDelivery:
         empty = LLMTutorPolicy(
             _CapturingProvider(), student_text="  ", solution_steps=["", " "], theta=None
         )
-        assert empty.delivered_context_slots() == frozenset()
+        assert empty.private_context_slots() == frozenset()
 
     def test_cold_start_theta_still_feeds_probe_but_is_not_counted_delivered(self) -> None:
         provider = _CapturingProvider(['{"kind": "select_probe"}'])
@@ -468,7 +481,7 @@ class TestPolicyDelivery:
             policy.next_action(TurnState(turn_index=1, has_solution_steps=False, hypotheses=[]))
         )
         assert getattr(action, "theta", None) == 0.0  # 동작 불변 — 콜드스타트 0.0
-        assert S.LEARNER_STATE not in policy.delivered_context_slots()
+        assert S.LEARNER_STATE not in policy.private_context_slots()
 
 
 class TestPolicyPrompt:

@@ -1147,11 +1147,15 @@ gates:
     remind_after_days: 55
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-20] [D9 2026-10-20] Solution QA 검증 가능 비율 하한 조건 추가 — 값은 P3-62 착지 후 Kiki 확정(후보 60%). 현재 40.7%. 근거 G-p307 evidence"
+    notes: |-
+      [판정 근거 2026-10-20] [D9 2026-10-20] Solution QA 검증 가능 비율 하한 조건 추가 — 값은 P3-62 착지 후 Kiki 확정(후보 60%). 현재 40.7%. 근거 G-p307 evidence
+
+      [판정 근거 2026-10-20] [Kiki 2026-10-20] 검증 가능 비율 하한 값은 (다) P3-62 실측 후 결정. 참고: P3-71 머지 후 0.48885, P3-62 규칙 (가) 전량 적용 시 상한 0.5575(후보 60% 미달) — docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md 재개 절
     corrections:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
       - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
       - "[2026-10-20] depends_on +P3-62-solution-qa-unverifiable-structuring — D9 하한 값은 P3-62 재측정 뒤 확정 — notes 산문 선행을 대장 depends로 집행(PR #1702 독립 검토 중1)"
+      - "[2026-10-20] notes +181자 — Kiki 결정 (다): 하한 값 확정 시점"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
