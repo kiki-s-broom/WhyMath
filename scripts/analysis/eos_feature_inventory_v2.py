@@ -570,7 +570,8 @@ CATALOG: tuple[Spec, ...] = (
     # ════════════════════ E 백엔드 엔진 — L1 데이터 기반 ════════════════════
     _e("WM-E-101", "원자 백본 그래프 적재·검색·중복 검수", "Platform", "Knowledge Graph", "P0",
        "B3 선수 그래프 2,683노드·2,210엣지", "l1.atom_graph.atom_backend_concept",
-       "l1.atom_graph.atom_backend_edge", "l1.atom_graph.atom_node_projection",
+       "l1.atom_graph.atom_backend_edge", "l1.atom_graph.atom_edge_retire",
+       "l1.atom_graph.atom_node_projection",
        "l1.atom_graph.axis", "l1.atom_graph.dedup_candidates", "l1.atom_graph.embedding",
        "l1.atom_graph.populate", "l1.atom_graph.retrieval", pipelines=("atom_graph",)),
     _e("WM-E-102", "구 개념그래프 적재·임베딩·검색", "Platform", "Knowledge Graph", "P1",

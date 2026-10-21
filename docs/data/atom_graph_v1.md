@@ -34,6 +34,10 @@
 > 설계 `docs/data/narrative_edge_reference_v2.md`. 역사 원장(KG-10·KG-11 · 검수 행 번호의 정본)은 재생성하지 않고
 > `data_pipeline/atom_graph/graph_history.py`가 묶인 정본(`721fe6ff…`)을 현재 정본에서 바이트 단위로 되감아 검증한다.
 > 대학→고등 K-12 도달은 198→160(되감기 엣지 제거로 새 뿌리 5) — 보완 배선은 후속 `KG-13`.
+> **prod 반영(KG-14 · 2026-10-21)**: 적재기는 추가·갱신만 해서 정본이 지우거나 뒤집은 엣지가 prod에 남고,
+> 옛 방향과 새 방향이 순환을 이뤄 엣지 적재 전체가 거부됐다(실측 prod 2,234 · 잔존 221 · 순환 위험 5쌍).
+> `python -m whymath_backend.l1.atom_graph.populate --retire-stale-edges plan|apply`가 그 행을 같은 트랜잭션에서
+> 은퇴시킨다(범위·모드의 정본 `l1/atom_graph/atom_edge_retire.py` · 런북 `docs/ops/skb03_atom_node_populate_runbook.md` §9).
 >
 > **직전 상태(2026-10-20·KG-11)**: 서술형 973건을 **낱말 매칭**(`word_match_v1`)으로 재해소한 비-traversal 참고 원장
 > `narrative_edge_reference_ledger_v1.json`(참고 엣지 651 · 스테이징 183 · 순환 충돌 43 분류·수리 경로) —
