@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: KG-14-atom-edge-stale-retire-before-load
+title: "원자 백본 적재에 잔존 엣지 은퇴 스텝 + DB 합집합 순환 검사 — upsert 전용 적재가 정본에서 지운·뒤집은 엣지를 prod에 남겨 순환을 만든다"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 잔존 엣지 은퇴(retire) 스텝 — 원자 백본 적재(`whymath_backend.l1.atom_graph.populate`)가 upsert만 해서 정본에서 지운·뒤집은 엣지가 prod `concept_edge`에 남는다. 적재와 **같은 트랜잭션**에서 \"양끝이 원자 백본 코드이고 · `edge_type=PREREQUISITE`이고 · CMS 소유가 아니며(`cms_edited_at IS NULL`) · 정본 적재 예정 집합에 없는\" 행만 지운다. 범위 밖 행(구 개념그래프·CMS·다른 적재기 소유)은 건드리지 않는다\n② 기본은 dry-run — 지울 목록과 건수만 출력하고 쓰지 않는다. 실제 삭제는 명시 플래그로만. dry-run 목록은 패리티 프로브(`atom_graph_prod_parity`)의 `DB에만 있는 엣지`(비-CMS) 집합과 같아야 한다(테스트로 대조)\n③ 적재 후 DB 합집합 순환 검사 — 은퇴+upsert 뒤 prod의 PREREQUISITE 그래프가 비순환인지 커밋 전에 확인하고, 순환이면 롤백(현재 적재기의 순환 검사는 정본 파일만 본다 · 재구성 실측: prod 2,210 상태에 KG-12 정본을 덧적재하면 2-순환 5쌍 — 4수01-02-2→4수01-01-1, AALG1-P03→C14, CALC2-C08→R04, LINA1-P07→P08, MFLD-C06→C07)\n④ \"작동한 비율\" — 리포트에 은퇴 건수·upsert 건수·CMS 보존 건수를 싣는다\n⑤ 검증: 단위(가짜 store)·PG 통합 테스트, 뮤테이션(범위 절 하나씩 제거 → RED: CMS 보존·원자 코드 범위·PREREQUISITE 한정·순환 롤백), exit code 보고\n⑥ 런북 `docs/ops/skb03_atom_node_populate_runbook.md` 갱신(dry-run → 확인 → 적용 · 쓰기 블록 자가거부 가드 · 공유 작업 사본은 main 기준 worktree) 후 Kiki 실행 → 패리티 `STATUS=MATCH`가 완료 증적"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l1/atom_graph/**"
+  - docs/ops/skb03_atom_node_populate_runbook.md
+session: null
+notes: "발견 2026-10-21: KG-12 머지 뒤 prod 적재 런북 실행 중. Kiki 클론이 타 세션 브랜치(d7c8a365)에 있어 PATHS_MATCH_MAIN=False로 적재가 자가거부됐고, 그 사이 적재기(atom_backend_edge.AtomBackendEdgeStore)가 ON CONFLICT DO UPDATE만 하고 삭제 경로가 없음을 코드로 확인했다. 재구성(KG-09 직전 정본의 병합 전 뷰 = 2,210건 = OPS-139 실측 prod 수와 일치) 기준 KG-12 정본 덧적재 시 잔존 221건(고등 123·초등 55·중학 23·대학 16·중→고 4)과 2-순환 5쌍. 실측(읽기 전용 패리티 프로브 --json) 결과로 범위를 확정한 뒤 착수한다. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-21
