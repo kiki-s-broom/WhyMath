@@ -1,8 +1,13 @@
-# P3-62 — Solution QA 검증 불가 665건 구조화: 착수 판정 (Kiki 결정 대기)
+# P3-62 — Solution QA 검증 불가 665건 구조화
 
-판정 기준: main 1a1a7c8 (브랜치 claude/p3-62-solution-qa-structuring HEAD eb73ebb9 = claim 커밋만)
+판정 기준: main 1a1a7c8 (1차 착수 판정 §1~§5) · main 4f0e6652 (재개 판정) · **main 25898155 (2단계 — §B 생성기 반영·후보 은행 실측)**
 
-상태: **③(생성기 반영·재생성) 착수 전 정지.** 작업 트리 변경 0건. 아래는 ①·② 분석과 정지 사유다.
+현재 상태(2026-10-21): 규칙 (가)를 P3 생성기에 넣었다(기본 꺼짐 · 후보 모드 `--structure-final-step`).
+후보 은행은 **스크래치(저장소 밖)에서만** 만들었고, 커밋된 승인 은행 두 개는 한 바이트도 바꾸지 않았다.
+후보로 1,121건을 재면 통과 589 · 실패 0 · 검증 불가 532, 검증 가능 비율 0.52542다(현 main 0.48885 대비 +41건).
+승격하려면 새 회차 S5 감사(LLM 판정자 A·B)가 필요하고, 그 단계는 이 컨테이너에서 실행할 수 없다.
+→ 런북 `docs/reviews/p3_62_s5_candidate_audit_runbook_2026-10-21.md`.
+아래 §1~§5와 '재개 판정'은 당시 기록을 그대로 남긴 것이다(as-found).
 
 ## 1. 사유 × 생성기 귀속표 (①)
 
@@ -78,7 +83,7 @@ rephrased_v0 137건은 generated_v0의 풀이 단계를 그대로 복사한 파�
 
 ## 재개 판정 (P3-71 머지 후 · 판정 기준: main 4f0e6652)
 
-# P3-62 재개 판정 (초안·미커밋) — 판정 기준: main 4f0e6652 (브랜치 HEAD 09cc611f)
+(당시 브랜치 HEAD 09cc611f — 이 절의 해소 경로 1은 P3-76 #1710 으로 착지했다.)
 
 ## 결론: ②(생성기 반영) 착수 전 정지 — 허용 경로 밖 게이트가 규칙 (가)를 막는다
 
@@ -121,3 +126,138 @@ rephrased_v0 137건은 generated_v0의 풀이 단계를 그대로 복사한 파�
 ### 해소 경로 (결정 필요)
 1. 수용 게이트(`l3/equivalent/acceptance.py`)의 Tier2와 `harness/corpus_reverify.py`에 P3-71과 같은 해석 단계 판정을 넣는다. 공용 함수로 승격하는 것이 좋다. 별도 태스크이고, 야간 S6 게이트 의미 변경을 동반한다.
 2. 그다음 P3 생성기에 (가)를 반영한다. 반영 내용: 선택 근거(극소 f''>0 · 극대 f''<0 · 발문 도메인), a 대입 정의 등식, MOTION 2계 도함수 명시 다항식. 이어서 후보 은행을 만들고 새 회차 S5 감사를 한다.
+
+---
+
+## B. 2단계 — 생성기 반영·후보 은행 실측 (판정 기준: main 25898155)
+
+선행: P3-71(#1703, Solution QA C4 해석 단계)과 P3-76(#1710, 수용 게이트·야간 재검증이 같은 판정 공유 — `verify_solution_interpreted`).
+P3-76 검토 인계 두 건을 그대로 따랐다.
+- ⓐ 선택 근거는 `answer_selection`이 아니라 **도메인 부등식**으로 싣는다(selection은 다변수 조건 목록에서 수용 게이트가 unverified로 강등한다).
+- ⓑ 생성기는 `answer_selection`을 새로 쓰지 않는다.
+
+### B-1. 무엇을 바꿨나 (허용 경로 안)
+
+| 파일 | 변경 |
+|---|---|
+| `l3/equivalent/p3_diff_solution_steps.py` | `final_statement_steps`(근 선택·정답 변수 값 두 줄 덧붙이기)와 `explicit_definitions`(정의 등식을 명시 다항식으로 다시 쓰기)를 더했다 |
+| `l3/equivalent/p3_diff_skeleton_base.py` | `DiffItem.structured_conditions`(기본 None) · 구조화 모드 `final_step_structuring`(ContextVar, **기본 꺼짐**) · `structured_view` · `_assemble`(모드가 켜졌을 때만 조건·단계 교체) · `_validate_slot`(구조화 조건은 빌드 시점에 증명 가능해야 함) |
+| `l3/equivalent/p3_diff_graph_shape_skeleton_generator.py` | 틀 3종에 구조화 조건을 달았다(02-08 그래프 개형, 02-07 단조·극값 생성기가 상속): ① `_other_root_value_item`(x = p에서 극값 → 다른 극값) ② `_quartic_k_frame` 가운데 극값 ③ `_find_k_other_root_frame`(상수 k). 선택 근거는 `_kind_basis`(발문이 묻는 종류: 극소 f''>0 · 극대 f''<0), 미지 계수는 `_pin_cond`(f'(p) = 0)로 정한다 |
+| `harness/p3_calculus1_diff_batch.py`·`p3_fill_batch.py` | `--structure-final-step`(후보 모드) · 승인 은행 자리 쓰기 자가거부(`refuses_structured_write` → `WRITE_REFUSED`, exit 2) · `--check`와 함께 쓰면 exit 2 · 후보 사이드카에만 `solution_structuring` 표기 |
+
+규칙 정의:
+- **(가) 풀이 끝 진술**: 근 목록(`x = -3, x = 4`)으로 끝난 연쇄 뒤에 근 선택 `x = 4`와 정답 변수 값 `y = -202`를 덧붙인다.
+  - **정답 역산 금지**: 후보 하나하나로 붙인 연쇄를 공용 판정 `verify_solution_interpreted`가 **조건만으로** 전 전이 correct로 증명하는 후보가 정확히 하나일 때만 쓴다. 함수에는 정답·answer_map을 넘기는 자리가 없다(시그니처를 테스트로 동결).
+  - 진술값은 조건의 정의 등식(`y = P(x)`·`k = V - P(x)`)으로 계산한다. 그 값이 정답 기록과 다르면 빌드가 멈춘다(저작 결함 — 조용히 종전 단계로 돌아가지 않는다).
+  - 매개변수(a·k)를 정하는 조건은 a·k만 담는 꼴로 남겨 C1 검산이 a·k를 계속 본다(`Derivative(f(x; a), x).doit().subs(x, p) = 0`).
+- **(나) 근 선택 조건**: 도메인 부등식으로만 싣는다(위 ⓐⓑ). 남은 ROOT_CHOICE 60건은 개수형·구간 안 정수형이라 고를 근이 없다. 손대지 않았다.
+- **(다) 단계 없는 개념형**: 72건 전부 구형 은행이다. 범위 밖이라 손대지 않았다.
+- **MOTION 2계 도함수**: `explicit_definitions`가 `y = Derivative(f, x, x).doit()`를 SymPy로 계산한 `y = -12*x - 6`으로 다시 쓴다. 같은 조건의 표기 변환이다.
+
+### B-2. 후보 은행 — 결정론·문항 집합 보존
+
+| 은행 | 건수 | 바뀐 레코드 | 바뀐 필드 | 같은 시드 2회 | 후보 sha256 |
+|---|---:|---:|---|---|---|
+| p3_calculus1_diff_v0 | 504 | 25 | `verify.conditions`·`verify.solution_steps`만 | 바이트 동일(`cmp`) | `c4f3ad11232cdafd4b02e29e454e7c74ffb42d655a9d7c28f7227536d07786a9` |
+| p3_fill_v0 | 204 | 16 | 같음 | 바이트 동일 | `8ae08bd8beb088f77fc7ead40eb0d17b7b3bc3165fb839e5ba0ea7fb7b81082e` |
+
+- slug 목록과 순서는 커밋된 승인 은행과 같다(분모 불변). 발문·정답·해설·선지·answer_map은 그대로다.
+- 기본 모드 `--check`는 두 은행 모두 "드리프트 없음"으로 exit 0이다. 승인 은행·결속 테스트는 무변경이다.
+- 서로 다른 프로세스 두 번(cand1·cand2) 실행의 `problems.jsonl`·`_provenance.json`이 모두 바이트 동일했다.
+- 최종 코드로 한 세 번째 실행(cand3)도 cand1과 동일했다 — 결과는 §B-6에 적는다.
+
+### B-3. 후보 실측 — Solution QA (1,121건 · P3 두 은행만 후보로 교체)
+
+| | 현 main 기준선 | 후보 | 차이 |
+|---|---:|---:|---:|
+| total | 1,121 | **1,121** | 0 |
+| passed | 548 | **589** | +41 |
+| failed | 0 | **0** | 0 |
+| unverifiable | 573 | **532** | −41 |
+| decidable_ratio | 0.48885 | **0.52542** | +0.03657 |
+| C2_FINAL_STEP_NOT_ANSWER_FORM | 361 | 361 | 0 |
+| C2_FINAL_STEP_VAR_NOT_ANSWER_VAR | 77 | **39** | −38 |
+| C2_ROOT_CHOICE_UNSTRUCTURED | 63 | **60** | −3 |
+| C2_NO_STEPS | 72 | 72 | 0 |
+
+- 측정 방식: `python -m whymath_backend.harness.solution_qa <합본.jsonl>`(exit 0)으로 쟀다. 합본은 대표 과정 1,121건 원본 행에서 P3 두 은행의 708건만 후보 행으로 바꾼 것이다(problem_id 대조 708/708).
+- 같은 방식으로 기준선 합본을 재면 548/0/573이다. CLI 기본 모드 실측과 같으므로 측정 경로가 같다.
+- 새로 판정 가능해진 41건의 단원: GRAPH-SHAPE 14 · EQ-APP 11 · MOTION-WORD 8 · MONOTONICITY 8.
+- 새로 검증 불가가 된 문항은 0건이다. 기존 통과 548건은 전부 통과로 남았다.
+
+**수용 게이트·야간 재검증 (후보 708건 전수):**
+- 수용 게이트 `_evaluate_verification`: **verified 708/708**.
+- `corpus_reverify._reverify_one`: **pass 708/708**.
+- 기준선(커밋된 은행)도 708/708·708/708이다.
+- 적재 파싱 `populate._record_from_line`(P3-24 02-08 파생 판정 규칙 포함): 위반 0/708.
+- 우회로 판정기 `shortcut_violations`(구조화 조건으로 다시 본 41건): 위반 0.
+
+### B-4. S5 감사 — 기계 단계 실측 (후보 · 이 컨테이너)
+
+| 단계 | calc 후보 (504) | fill 후보 (204) |
+|---|---|---|
+| `bank-sheets`(seed 20261008) | exit 0 · 8묶음 × 63 · 지침 sha `3046a901…` | exit 0 · 4묶음 × 51 |
+| `machine --id-field problem_id` | exit 0 · **결함 0/504** | exit 0 · **결함 0/204** |
+| `s5`(판정자 라벨 없이) | exit 2 — `QualificationInputError: 판정자 라벨 0개 — 2명 이상이 필요하다` | 실행 안 함(같은 사유) |
+
+LLM 판정자 단계는 실행하지 못했다. 이 컨테이너에는 OpenRouter·DeepSeek 키가 없고 Ollama도 없다. Anthropic API는 ARCH-66으로 중단 상태다.
+이전 회차 판정자는 Claude 에이전트였고, 이 서브에이전트에는 하위 에이전트를 띄우는 도구가 없다.
+그래서 **지휘 세션이 서브에이전트 판정자 24명(calc 16 + fill 8)을 돌리는 방안**을 런북 §3에 지시문·격리 규칙·산출 검사와 함께 적었다.
+Kiki 머신은 필요 없고, Kiki의 몫은 승격 승인이다.
+- fill 은행은 n = 204라 **k = 0만 통과**한다. 결함 1건이면 그 회차는 불합격이다(as-found · 새 은행으로 재감사).
+
+### B-5. 남은 검증 불가 (허용 경로 안 119건) — 원인
+
+| 사유 | 단원 | 건수 | 원인 |
+|---|---|---:|---|
+| VAR_NOT_ANSWER_VAR | GRAPH-SHAPE 12 · MONO 14 | 26 | ① 미지수 a·b를 연립으로 구하는 틀(`_find_ab_item`·`_find_b_*`): 정답이 a·b라 `a = P(x)` 정의 등식이 없다 ② 같은 종류 두 극값 중 큰/작은 값(f'' 부호로 하나가 정해지지 않는다). 판정기가 증명하지 못하는 꼴이라 단계를 붙이지 않았다 |
+| VAR_NOT_ANSWER_VAR | EQ-APP | 11 | 사차함수 전역 최솟값(극소 두 개 중 작은 값 · 도메인 없음) — 선택 근거를 다항 부등식으로 쓸 수 없다 |
+| VAR_NOT_ANSWER_VAR | VELOCITY | 2 | '처음' 운동 방향을 바꿀 때 — 시각 t가 조건에 없고 '처음'은 도메인 부등식이 아니다 |
+| ROOT_CHOICE | EQ-APP 42 · GRAPH 6 · MVT 6 · MONO 6 | 60 | 정답이 근이 아니라 개수(real_root_count)이거나 구간 안 정수다 |
+| NOT_ANSWER_FORM | EQ-APP 8 · MVT 6 · POWER 6 | 20 | 허근 섞인 인수분해·지수 속 미지수·변수 분모 — 해 연쇄를 이웃 동치로 판정할 수 없다 |
+
+허용 경로 밖 413건(구형 4개 은행)은 그대로다(§1 귀속표).
+
+### B-6. 검증 (판정은 exit code)
+
+| 검사 | 명령 | exit |
+|---|---|---|
+| 승인 은행 드리프트 | `p3_calculus1_diff_batch --check` · `p3_fill_batch --check` | 0 · 0 |
+| 후보 생성 2회 + 최종 코드 1회 | `--structure-final-step --out-dir <스크래치>` × 3 | 0(6회 전부) · 바이트 동일 |
+| ruff | `python -m ruff check . ../../tests/backend ../../tests/constitution` (src/backend) | 0 |
+| black | `python -m black --check --line-length 100 . ../../tests/backend ../../tests/constitution` | 0 |
+| mypy | `python -m mypy --strict whymath_backend` | 0 (806 파일) |
+| import 계약 | `lint-imports` | 0 (4 kept) |
+| 신규 테스트 | `test_p3_62_final_statement.py`(15) · `test_p3_62_structured_candidate.py`(3, corpus_authoring) | 0 (18 passed) |
+| 뮤테이션 | 규칙 절 9종 — cp 백업 → 주입(앵커 1건·변경 단언) → pytest → cp 원복(바이트 단언) | **9/9 RED** |
+
+뮤테이션 9종:
+1. 선택 증명 생략
+2. 진술값↔정답 대조 제거
+3. 모드 무시
+4. 정의 등식 명시화 제거
+5. 쓰기 자가거부 제거
+6. 극대·극소 근거 부호 뒤집기
+7. 증명 실패 구조화 조건 침묵
+8. k 정의 틀 구조화 제거
+9. 정답 변수 판별 무력화
+
+전체 스위트(코드 확정 뒤 트리 무변경 상태에서 실행):
+
+| 잡(CI와 같은 명령) | 결과 | exit |
+|---|---|---|
+| backend `python -m pytest -m "not corpus_authoring" -n auto --dist loadfile --cov=whymath_backend --cov-fail-under=70` (src/backend) | 21,731 passed · 713 skipped · 1 xfailed · 커버리지 87.69% | 0 |
+| corpus-authoring `python -m pytest -m corpus_authoring` (src/backend) | 893 passed · 1 skipped · 2 xfailed | 0 |
+| infra-contracts `python3 -m pytest tests/infra -q` | 3,221 passed · 27 skipped | 0 |
+| harness-integrity `python3 -m pytest tests/harness -q` | 2,307 passed · 3 skipped | 0 |
+
+backend 잡의 나머지 게이트 스텝(계층 커버리지·게이트 CLI 등)과 mobile·web 잡은 이 세션에서 돌리지 않았다 — CI가 판정한다.
+
+### B-7. 한계
+
+1. **후보는 감사 전이다.** 승인 은행이 아니며, 수치(589/0/532)는 승격 후 기대값일 뿐 현재 main의 Solution QA 값이 아니다. 현재 main은 548/0/573 그대로다.
+2. **구조화 모드 스위치는 기본 꺼짐이다.** 승격 때 기본값을 켜는 코드 변경이 함께 필요하다(런북 §5-4). 꺼진 채로 은행만 바꾸면 `--check`가 드리프트로 red가 된다.
+3. **선택 근거(f'' 부호)는 '극소/극대'라는 발문의 종류에서 나온다.** 그 종류가 발문과 맞는지는 생성기 틀 설계에 달려 있다(P3-24 B3 단서와 같은 축). 다만 근거가 정답과 다른 근을 가리키면 진술값이 정답 기록과 달라져 빌드가 멈춘다(반례 테스트 · 뮤테이션 M2·M6).
+4. 11/15 검증 가능 비율 하한 값은 정하지 않는다. Kiki가 (다)·승격 실측 뒤 정한다(후보 60%).
+   - 이 후보까지의 허용 경로 안 상한은 0.5575다(VAR 77건 전부 해소 가정).
+   - 60%에 닿으려면 구형 은행(허용 경로 밖 413건)이 필요하다.

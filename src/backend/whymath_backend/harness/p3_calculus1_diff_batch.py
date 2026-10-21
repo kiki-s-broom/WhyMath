@@ -70,6 +70,7 @@ from whymath_backend.l3.equivalent.p3_diff_power_derivative_skeleton_generator i
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     SLOT_NAMES_KO,
     P3DiffSlotGenerator,
+    final_step_structuring,
     skeleton_of,
 )
 from whymath_backend.l3.equivalent.p3_diff_tangent_line_skeleton_generator import (
@@ -84,8 +85,10 @@ __all__ = [
     "BACKFILL_STAMP_DEFAULTS",
     "CORPUS_DIR_NAME",
     "GENERATORS",
+    "STRUCTURING_NOTE",
     "build_provenance",
     "drift_against",
+    "refuses_structured_write",
     "main",
     "run_p3_calculus1_diff_batch",
     "strip_backfill_stamps",
@@ -111,6 +114,28 @@ _GENERATED_DATE: Final = "2026-10-06"
 _PROBLEMS_FILE: Final = "problems.jsonl"
 _PROVENANCE_FILE: Final = "_provenance.json"
 
+#: 규칙 (가) 후보 은행 사이드카 표기(P3-62) — 이 키가 있는 은행은 감사받지 않은 **후보**다.
+STRUCTURING_NOTE: Final[dict[str, str]] = {
+    "rule": "P3-62 규칙 (가) — 풀이 끝에 근 선택·정답 변수 값 진술(조건으로 증명된 해석 단계)",
+    "status": "후보 은행 — 새 회차 S5 감사 전에는 승인 은행을 대체하지 않는다",
+    "cli_flag": "--structure-final-step",
+}
+
+
+def refuses_structured_write(out_dir: Path, default_dir: Path) -> str | None:
+    """구조화 후보를 승인 은행 자리에 쓰려 하면 거부 사유(아니면 None).
+
+    승인 은행은 각인을 걷어 낸 바이트가 감사 동결 사본과 결속돼 있다 — 후보를 그 자리에 쓰면 결속
+    테스트가 깨지고, 감사 없이 승인을 새 내용으로 옮기는 셈이다(분모 보호). 후보는 다른 디렉터리에만
+    쓴다. 승격은 새 회차 감사를 거친 뒤 런북 절차로 한다.
+    """
+    if out_dir.resolve() == default_dir.resolve():
+        return (
+            f"--structure-final-step 후보를 승인 은행 자리({default_dir})에 쓰지 않는다 — "
+            "--out-dir 로 다른 디렉터리를 지정하라(승격은 새 회차 S5 감사 뒤 런북 절차)."
+        )
+    return None
+
 
 def _default_out_dir() -> Path:
     root = Path(__file__).resolve().parents[4]
@@ -131,13 +156,27 @@ def run_p3_calculus1_diff_batch(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
     out_path: Path | None = None,
     write: bool = True,
+    structure_final_step: bool = False,
 ) -> CorpusBatchReport:
     """등록부의 개념 × 6슬롯을 돌려 게이트(Tier1 SymPy 검산)를 통과한 문항을 적재한다.
 
     밴드 1개 = (개념, 슬롯). 슬롯마다 수용 게이트 스펙(성취기준·오개념·난이도)을 따로 만든다 —
     오개념 유발 슬롯만 스펙이 kebab 집합을 요구하고, 나머지는 공집합이라 동등성 점수가 1.0이다.
     `signature_index=None`으로 호출한다(구조 dedup이 해값 기반이라 서로 다른 문항을 오탐).
+
+    `structure_final_step`이면 규칙 (가)(P3-62)를 적용한 **후보 은행**을 만든다(문항 집합은 같고
+    검산 조건·풀이 단계만 다르다 — `p3_diff_skeleton_base.final_step_structuring`).
     """
+    with final_step_structuring(structure_final_step):
+        return _run_batch(generators=generators, out_path=out_path, write=write)
+
+
+def _run_batch(
+    *,
+    generators: Sequence[type[P3DiffSlotGenerator]],
+    out_path: Path | None,
+    write: bool,
+) -> CorpusBatchReport:
     resolved_out = out_path if out_path is not None else _default_out_dir() / _PROBLEMS_FILE
     sink = JsonlCorpusSink()
     seen: set[str] = set()
@@ -192,8 +231,20 @@ def run_p3_calculus1_diff_batch(
 
 def build_provenance(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
+    *,
+    structured: bool = False,
 ) -> dict[str, Any]:
-    """사이드카(`_provenance.json`) 내용 — 생성기 문항 목록에서 결정론으로 계산한다(시계 의존 0)."""
+    """사이드카(`_provenance.json`) 내용 — 생성기 문항 목록에서 결정론으로 계산한다(시계 의존 0).
+
+    `structured`면 후보 은행 표기(`solution_structuring`)를 끝에 더한다 — 기본 사이드카 바이트 불변.
+    """
+    provenance = _build_provenance(generators)
+    if structured:
+        provenance["solution_structuring"] = dict(STRUCTURING_NOTE)
+    return provenance
+
+
+def _build_provenance(generators: Sequence[type[P3DiffSlotGenerator]]) -> dict[str, Any]:
     concepts: dict[str, Any] = {}
     total = 0
     for generator_cls in generators:
@@ -285,8 +336,15 @@ def strip_backfill_stamps(text: str) -> str:
     return "".join(out)
 
 
-def _render_provenance(generators: Sequence[type[P3DiffSlotGenerator]]) -> str:
-    return json.dumps(build_provenance(generators), ensure_ascii=False, indent=2) + "\n"
+def _render_provenance(
+    generators: Sequence[type[P3DiffSlotGenerator]], *, structured: bool = False
+) -> str:
+    return (
+        json.dumps(
+            build_provenance(generators, structured=structured), ensure_ascii=False, indent=2
+        )
+        + "\n"
+    )
 
 
 def drift_against(out_dir: Path, fresh_problems: bytes, fresh_provenance: bytes) -> list[str]:
@@ -351,13 +409,34 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check", action="store_true", help="재생성 결과가 저장소 은행과 바이트 동일한지 검사."
     )
+    parser.add_argument(
+        "--structure-final-step",
+        action="store_true",
+        help="규칙 (가)(P3-62) 후보 은행 — 승인 은행 자리에는 쓰지 않는다(--out-dir 필수).",
+    )
     args = parser.parse_args(argv)
     out_dir = Path(args.out_dir) if args.out_dir else _default_out_dir()
 
     if args.check:
+        if args.structure_final_step:
+            print(
+                "--check 는 승인 은행 드리프트 검사다 — 구조화 후보와 함께 쓰지 않는다.",
+                file=sys.stderr,
+            )
+            return 2
         return _check(GENERATORS, out_dir)
+    if args.structure_final_step and not args.dry_run:
+        refusal = refuses_structured_write(out_dir, _default_out_dir())
+        if refusal is not None:
+            print(f"WRITE_REFUSED — {refusal}", file=sys.stderr)
+            return 2
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-    report = run_p3_calculus1_diff_batch(out_path=out_dir / _PROBLEMS_FILE, write=not args.dry_run)
+    report = run_p3_calculus1_diff_batch(
+        out_path=out_dir / _PROBLEMS_FILE,
+        write=not args.dry_run,
+        structure_final_step=args.structure_final_step,
+    )
     print(json.dumps(report.to_json(), ensure_ascii=False, indent=2))
     rejected = sum(len(b.failure_reasons) for b in report.bands)
     if rejected:
@@ -365,7 +444,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.dry_run:
         return 0 if report.total_stored > 0 else 1
-    (out_dir / _PROVENANCE_FILE).write_text(_render_provenance(GENERATORS), encoding="utf-8")
+    (out_dir / _PROVENANCE_FILE).write_text(
+        _render_provenance(GENERATORS, structured=args.structure_final_step), encoding="utf-8"
+    )
     return 0 if report.total_stored > 0 else 1
 
 

@@ -45,6 +45,7 @@ from whymath_backend.harness.p3_calculus1_diff_batch import (
 )
 from whymath_backend.harness.p3_calculus1_diff_batch import (
     drift_against,
+    refuses_structured_write,
     run_p3_calculus1_diff_batch,
 )
 from whymath_backend.l3.equivalent.p3_diff_differentiability_skeleton_generator import (
@@ -94,17 +95,28 @@ def run_p3_fill_batch(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
     out_path: Path | None = None,
     write: bool = True,
+    structure_final_step: bool = False,
 ) -> Any:
-    """등록부의 (개념 × 담당 슬롯)을 돌려 게이트(Tier1 SymPy 검산)를 통과한 문항을 적재한다."""
+    """등록부의 (개념 × 담당 슬롯)을 돌려 게이트(Tier1 SymPy 검산)를 통과한 문항을 적재한다.
+
+    `structure_final_step`이면 규칙 (가)(P3-62) 후보 은행(기존 배치와 같은 스위치).
+    """
     resolved = out_path if out_path is not None else _default_out_dir() / _PROBLEMS_FILE
-    return run_p3_calculus1_diff_batch(generators=generators, out_path=resolved, write=write)
+    return run_p3_calculus1_diff_batch(
+        generators=generators,
+        out_path=resolved,
+        write=write,
+        structure_final_step=structure_final_step,
+    )
 
 
 def build_provenance(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
+    *,
+    structured: bool = False,
 ) -> dict[str, Any]:
     """사이드카 내용 — 기존 배치의 계산에 이 은행의 이름·출처 문구를 덮어쓴다(시계 의존 0)."""
-    provenance = _base_provenance(generators)
+    provenance = _base_provenance(generators, structured=structured)
     provenance.update(
         {
             "corpus_name": CORPUS_DIR_NAME,
@@ -137,8 +149,15 @@ def build_provenance(
     return provenance
 
 
-def _render_provenance(generators: Sequence[type[P3DiffSlotGenerator]]) -> str:
-    return json.dumps(build_provenance(generators), ensure_ascii=False, indent=2) + "\n"
+def _render_provenance(
+    generators: Sequence[type[P3DiffSlotGenerator]], *, structured: bool = False
+) -> str:
+    return (
+        json.dumps(
+            build_provenance(generators, structured=structured), ensure_ascii=False, indent=2
+        )
+        + "\n"
+    )
 
 
 def _check(generators: Sequence[type[P3DiffSlotGenerator]], out_dir: Path) -> int:
@@ -174,13 +193,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check", action="store_true", help="재생성 결과가 저장소 은행과 바이트 동일한지 검사."
     )
+    parser.add_argument(
+        "--structure-final-step",
+        action="store_true",
+        help="규칙 (가)(P3-62) 후보 은행 — 승인 은행 자리에는 쓰지 않는다(--out-dir 필수).",
+    )
     args = parser.parse_args(argv)
     out_dir = Path(args.out_dir) if args.out_dir else _default_out_dir()
 
     if args.check:
+        if args.structure_final_step:
+            print(
+                "--check 는 승인 은행 드리프트 검사다 — 구조화 후보와 함께 쓰지 않는다.",
+                file=sys.stderr,
+            )
+            return 2
         return _check(GENERATORS, out_dir)
+    if args.structure_final_step and not args.dry_run:
+        refusal = refuses_structured_write(out_dir, _default_out_dir())
+        if refusal is not None:
+            print(f"WRITE_REFUSED — {refusal}", file=sys.stderr)
+            return 2
 
-    report = run_p3_fill_batch(out_path=out_dir / _PROBLEMS_FILE, write=not args.dry_run)
+    report = run_p3_fill_batch(
+        out_path=out_dir / _PROBLEMS_FILE,
+        write=not args.dry_run,
+        structure_final_step=args.structure_final_step,
+    )
     print(json.dumps(report.to_json(), ensure_ascii=False, indent=2))
     rejected = sum(len(b.failure_reasons) for b in report.bands)
     if rejected:
@@ -189,7 +228,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return 0 if report.total_stored > 0 else 1
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / _PROVENANCE_FILE).write_text(_render_provenance(GENERATORS), encoding="utf-8")
+    (out_dir / _PROVENANCE_FILE).write_text(
+        _render_provenance(GENERATORS, structured=args.structure_final_step), encoding="utf-8"
+    )
     return 0 if report.total_stored > 0 else 1
 
 
