@@ -84,6 +84,7 @@ from whymath_backend.l4.misconception.probe_selection import (
 )
 
 __all__ = [
+    "CONCEPT_ID_REJECT_DETAIL",
     "Action",
     "CurateHypothesisAction",
     "ENCOURAGE_FALLBACK_UTTERANCE",
@@ -120,6 +121,10 @@ EndTurnType = Literal["질문", "힌트", "출제", "격려"]
 # 단일 원천으로 쓴다. 값 변경은 회귀 핀(test_wh1_loop.py 정확 문자열 단언)과 함께만.
 NEUTRAL_GUIDE_UTTERANCE = "방금 단계에서 무엇을 근거로 그렇게 했는지 말해줄래?"
 ENCOURAGE_FALLBACK_UTTERANCE = "좋아, 지금까지 잘 하고 있어. 다음으로 가보자."
+
+CONCEPT_ID_REJECT_DETAIL = "개념 id 거부 — 이번 턴에 받지 않은 개념 id(환각·이름 오용)."
+"""P3-09 — `read_student_state`·`query_curriculum`이 허용 집합 밖 개념 id를 받았을 때의 `ToolResult`
+detail(닫힌 문자열 — 관측이 이 값으로 센다). **그 도구만 실패**하고 턴은 계속된다(턴 종료 아님)."""
 
 UtteranceSource = Literal["policy", "derived"]
 """발화 출처 — policy(정책 명시 발화 존중 턴)·derived(하네스 파생: 개입·중립·출제·격려).
@@ -299,6 +304,10 @@ class TurnState:
     end_action_type: EndTurnType | None = None
     escalation_rung: EscalationRung | None = None
     history: list[ToolResult] = field(default_factory=list)
+    known_concept_ids: frozenset[str] | None = None
+    """P3-09 — 이번 턴 도구 인자로 허용되는 개념 id(코치가 DB에서 조회해 프롬프트에 실은 code).
+    None이면 검사하지 않는다(shadow·Scripted 정책 — 기존 동작). 빈 집합이면 어떤 개념 id도
+    허용되지 않는다(프롬프트에 개념이 실리지 않은 턴 — LLM이 아는 id가 없다)."""
 
 
 @runtime_checkable
@@ -486,6 +495,11 @@ def _exec_end_turn(state: TurnState, action: EndTurnAction, *, explore_period: i
 def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResult:
     """단일 액션 실행 — 도구별 디스패치 + 불변식 강제. 상태를 in-place 갱신한다."""
     if isinstance(action, ReadStateAction):
+        if state.known_concept_ids is not None and any(
+            n not in state.known_concept_ids for n in action.node_ids
+        ):
+            # P3-09 — 환각 id는 그 도구만 실패시킨다(턴은 계속·정책이 다음 도구를 고른다).
+            return ToolResult(kind=action.kind, ok=False, detail=CONCEPT_ID_REJECT_DETAIL)
         return ToolResult(
             kind=action.kind, ok=True, detail=f"노드 컨텍스트 {len(action.node_ids)}개 조회(기록)."
         )
@@ -545,6 +559,8 @@ def _exec(state: TurnState, action: Action, *, explore_period: int) -> ToolResul
         )
 
     if isinstance(action, QueryCurriculumAction):
+        if state.known_concept_ids is not None and action.node_id not in state.known_concept_ids:
+            return ToolResult(kind=action.kind, ok=False, detail=CONCEPT_ID_REJECT_DETAIL)
         return ToolResult(
             kind=action.kind, ok=True, detail=f"{action.relation} 노드 조회(기록·내부)."
         )
@@ -632,6 +648,7 @@ async def run_tutoring_turn(
     initial_hypotheses: Sequence[MisconceptionHypothesis] = (),
     max_tool_calls: int = 16,
     explore_period: int = _EXPLORE_PERIOD,
+    known_concept_ids: frozenset[str] | None = None,
 ) -> TurnOutcome:
     """WH-1 한 턴 루프 — 정책이 도구를 고르고 하네스가 실행·검증·기록한다(§3 골격·순수).
 
@@ -643,6 +660,10 @@ async def run_tutoring_turn(
     `turn_index`(1-기반·세션 누적)는 ε-탐색 주기 판정에 쓰인다(§2.2). `has_solution_steps`는 이번
     턴 학생 입력에 풀이 단계가 있는지로, verify 의무(§3.1) 게이트의 입력이다. `initial_hypotheses`는
     직전 턴 스냅샷에서 복원한 활성 가설 세트다(웜 스타트·§2.2).
+
+    `known_concept_ids`(P3-09): `read_student_state`·`query_curriculum`이 쓸 수 있는 개념 id 집합.
+    밖의 id는 그 도구를 `ok=False`(`CONCEPT_ID_REJECT_DETAIL`)로 실패시키고 루프는 계속된다.
+    None(기본)이면 검사하지 않는다 — 기존 호출자(shadow·Scripted)와 비트동일.
     """
     if max_tool_calls < 1:
         raise ValueError("max_tool_calls는 1 이상이어야 합니다.")
@@ -650,6 +671,7 @@ async def run_tutoring_turn(
         turn_index=turn_index,
         has_solution_steps=has_solution_steps,
         hypotheses=list(initial_hypotheses),
+        known_concept_ids=known_concept_ids,
     )
 
     while state.tool_calls < max_tool_calls and not state.ended:

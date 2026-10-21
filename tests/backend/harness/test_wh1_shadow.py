@@ -219,6 +219,10 @@ class TestNoRawLeak:
             "context_missing",
             "context_not_delivered",
             "context_coverage_gap",
+            # P3-09 — 스키마 거부 건수(정수)와 출력 거부 사유 코드(닫힌 어휘 라벨)뿐. 값·원문 없음.
+            "llm_output_rejections",
+            "concept_id_tool_rejections",
+            "tutor_output_reason_code",
             "observed_at",
         }
 

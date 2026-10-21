@@ -75,6 +75,7 @@ from whymath_backend.harness.wh1_tutor_context import (
     TutorDeliveryPath,
     TutorDeliveryReceipt,
 )
+from whymath_backend.harness.wh1_tutor_output import TutorOutputReceipt, build_tutor_output
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.pedagogy.mode_guard import check_forbidden_modes, fallback_reply_for
@@ -97,20 +98,28 @@ class _TurnAccounting(TypedDict):
     llm_calls: int
     llm_calls_finished: int
     llm_ms_total: int
+    llm_output_rejections: int | None
 
 
 def _accounting(policy: LLMTutorPolicy | None, started: float) -> _TurnAccounting:
     """시작 시각과 정책 계수기로 회계를 낸다. 정책 생성 전 실패면 LLM 호출은 실제로 0건이다."""
     elapsed_ms = round((time.monotonic() - started) * 1000)
     if policy is None:
+        # 정책 생성 전 실패 — LLM 출력이 없었으니 거부 수는 '모름'(None)이 아니라 실제로 0건이다.
         return _TurnAccounting(
-            elapsed_ms=elapsed_ms, llm_calls=0, llm_calls_finished=0, llm_ms_total=0
+            elapsed_ms=elapsed_ms,
+            llm_calls=0,
+            llm_calls_finished=0,
+            llm_ms_total=0,
+            llm_output_rejections=0,
         )
     return _TurnAccounting(
         elapsed_ms=elapsed_ms,
         llm_calls=policy.llm_calls_started,
         llm_calls_finished=policy.llm_calls_finished,
         llm_ms_total=policy.llm_ms_total,
+        # P3-09 — 이 턴에 스키마 위반으로 거부한 LLM 출력 수(검증기가 작동한 횟수).
+        llm_output_rejections=sum(policy.output_rejections.values()),
     )
 
 
@@ -195,6 +204,7 @@ def _safe_emit(
     prose_rephrased: bool = False,
     prose_reason_code: str | None = None,
     context: TutorContextManifest | None = None,
+    tutor_output_reason_code: str | None = None,
 ) -> None:
     """관측 emit — 실패해도 발화 서빙(본류)을 깨지 않는다(예외 타입명 로그·침묵 실패 금지)."""
     try:
@@ -209,6 +219,7 @@ def _safe_emit(
             prose_rephrased=prose_rephrased,
             prose_reason_code=prose_reason_code,
             primary_outcome=primary_outcome,
+            tutor_output_reason_code=tutor_output_reason_code,
             **_context_record_fields(context),
             **accounting,
         )
@@ -271,6 +282,8 @@ async def run_wh1_primary_turn(
     tutor_context: TutorContextManifest | None = None,
     delivery: TutorDeliveryReceipt | None = None,
     tutor_content: TutorContentSummary | None = None,
+    hint_level: int | None = None,
+    output_receipt: TutorOutputReceipt | None = None,
 ) -> str | None:
     """WH-1 하네스를 한 턴 돌려 *학생-대면 발화*를 산출한다 — flip primary 경로(S1-11).
 
@@ -312,8 +325,18 @@ async def run_wh1_primary_turn(
     prompt는 정책이 좌석에 실제로 넘긴 프롬프트의 렌더 결과, output_guard는 가드가 실제로 돈 턴만.
     턴 전에는 같은 렌더러의 계획값으로 프롬프트에 누락·미전달·사적 보유 이름을 공개하고, 턴 뒤
     실측이 계획과 어긋나면 WARNING을 남긴다(실측이 표기의 원천).
+
+    `hint_level`·`output_receipt`(P3-09 — `harness/wh1_tutor_output.py`): 톤필터를 통과한 발화를
+    **구조화 튜터 출력**(`TutorTurnOutput` — 진단·응답 전략·힌트 단계·발화·다음 행동·
+    `mastery_update_allowed=false`)으로 조립해 스키마 검증을 거친다. 통과해야만 발화를 돌려주고
+    구조체를 `output_receipt.output`에 담는다. 미통과면 `None`(결정론 폴백) + 관측
+    `fallback_output_schema`·사유 코드 + WARNING. `hint_level`은 호출자의 결정론 Polya 결정 값이다
+    (LLM은 힌트 단계를 정하지 않는다). 진단 개념 id는 `tutor_content`의 개념 code(코치가 DB에서
+    조회한 값)만, 오개념 id는 활성 가설 최상위(카탈로그 정본)만 쓴다.
     """
     started = time.monotonic()
+    if output_receipt is not None:
+        output_receipt.output = None  # 통과한 턴만 채운다 — 이전 값이 남아 승격되지 않게.
     # 정책 생성 전 실패면 아무것도 전달되지 않았다 — 그 상태가 기본값이다.
     context: TutorContextManifest | None = (
         tutor_context.with_delivery(tutor_invoked=True, paths={})
@@ -423,6 +446,9 @@ async def run_wh1_primary_turn(
                 has_solution_steps=bool(solution_steps),
                 initial_hypotheses=initial_hypotheses,
                 max_tool_calls=max_tool_calls,
+                # P3-09 검토 중2 — 프롬프트에 실린 개념 code만 도구 인자로 허용. 밖의 id는 그 도구만
+                # 실패(ok=False)하고 턴은 계속된다(턴 종료·격려 강등 아님).
+                known_concept_ids=policy.known_concept_ids,
             ),
             timeout=timeout,
         )
@@ -560,6 +586,51 @@ async def run_wh1_primary_turn(
             len(report.violations),
             sorted(set(report.violations)),
         )
+    # ── P3-09 구조화 출력 스키마 게이트 — 톤필터 *뒤*(학생에게 나갈 최종 문자열로) 조립·검증한다.
+    # 통과 못 하면 발화를 돌려주지 않는다(결정론 폴백). 진단·전략·다음 행동은 전부 서버 값이다.
+    concept_code = (
+        tutor_content.concept.code
+        if tutor_content is not None and tutor_content.concept is not None
+        else None
+    )
+    # 발화 저자: 정책 명시 발화·프로즈 rephrase 산출물이면 LLM, 그 밖(파생 템플릿·안전 강등·금지모드
+    # 재질문)은 하네스 결정론 템플릿이다.
+    llm_authored = not mode_guard_replaced and (
+        outcome.utterance_source == "policy" or prose_rephrased
+    )
+    tutor_output = build_tutor_output(
+        explanation=filtered,
+        explanation_source="llm" if llm_authored else "harness_template",
+        action_type=outcome.action_type,
+        mode_guard_replaced=mode_guard_replaced,
+        verify_verdict=_extract_verify_verdict(outcome.trace),
+        # 진단은 코치가 큐레이션한 초기 활성 가설에서 — 턴 안 LLM 증거로 바뀐 in-memory 세트가
+        # 아니다(검토 중1).
+        hypotheses=initial_hypotheses,
+        concept_id=concept_code,
+        known_concept_ids=policy.known_concept_ids if policy is not None else frozenset(),
+        hint_level=hint_level,
+    )
+    if isinstance(tutor_output, str):
+        _safe_emit(
+            outcome,
+            dialogue_id=dialogue_id,
+            turn_index=turn_index,
+            problem_id=problem_id,
+            primary_outcome="fallback_output_schema",
+            accounting=_accounting(policy, started),
+            context=context,
+            tone_rewritten=report.rewritten,
+            tone_violations=len(report.violations),
+            prose_rephrased=prose_rephrased,
+            prose_reason_code=prose_reason,
+            tutor_output_reason_code=tutor_output,
+        )
+        # 사유 코드만 — 발화 원문·id 값은 싣지 않는다(침묵 실패 금지·프라이버시).
+        logger.warning("WH-1 primary 튜터 출력 스키마 거부(%s) — 결정론 템플릿 폴백", tutor_output)
+        return None
+    if output_receipt is not None:
+        output_receipt.output = tutor_output
     _safe_emit(
         outcome,
         dialogue_id=dialogue_id,
