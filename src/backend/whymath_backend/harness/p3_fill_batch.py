@@ -210,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         return _check(GENERATORS, out_dir)
     if args.structure_final_step and not args.dry_run:
-        refusal = refuses_structured_write(out_dir, _default_out_dir())
+        refusal = refuses_structured_write(out_dir)
         if refusal is not None:
             print(f"WRITE_REFUSED — {refusal}", file=sys.stderr)
             return 2

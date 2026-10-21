@@ -11,11 +11,14 @@
 ④ `explicit_definitions` — 2계 도함수 정의(`Derivative(f, x, x).doit()`)를 명시 다항식으로 다시 쓰고, 다항식이
    아닌 정의는 그대로 둔다.
 ⑤ 구조화 모드 — 기본 꺼짐(승인 은행 바이트 불변), 블록 안에서만 켜지고 블록을 나가면 꺼진다.
-⑥ 배치의 쓰기 자가거부 — 후보를 승인 은행 자리에 쓰려 하면 거부(사유 문자열), 다른 자리는 허용.
+⑥ 배치의 쓰기 자가거부 — 후보를 승인 은행 영역(`data/corpus` 아래 어디든 — 다른 배치의 은행 포함)에
+   쓰려 하면 거부(사유 문자열·CLI exit 2·라이브러리 ValueError), 저장소 밖과 형제 디렉터리는 허용.
+⑦ 빌드 시점 검증 — 구조화 조건이 깨진 문항은 *기본 모드* 빌드에서 멈춘다(후보 배치까지 숨지 않는다).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 from pathlib import Path
 
@@ -24,6 +27,7 @@ import pytest
 from whymath_backend.harness import p3_calculus1_diff_batch as batch
 from whymath_backend.harness import p3_fill_batch as fill_batch
 from whymath_backend.l3.equivalent.p3_diff_graph_shape_skeleton_generator import (
+    P3DiffGraphShapeGenerator,
     ShapeItem,
     _kind_basis,
 )
@@ -173,20 +177,100 @@ def test_mode_is_off_by_default_and_scoped() -> None:
 
 
 # ── ⑥ 쓰기 자가거부 ──────────────────────────────────────────────────────
-def test_structured_write_into_approved_bank_is_refused(tmp_path: Path) -> None:
-    default = tmp_path / "data" / "corpus" / batch.CORPUS_DIR_NAME
-    default.mkdir(parents=True)
-    refusal = batch.refuses_structured_write(default, default)
-    assert refusal is not None and "승인 은행" in refusal
-    assert batch.refuses_structured_write(tmp_path / "candidate", default) is None
+def test_structured_write_into_approved_area_is_refused(tmp_path: Path) -> None:
+    root = tmp_path / "data" / "corpus"
+    own = root / batch.CORPUS_DIR_NAME
+    other = root / fill_batch.CORPUS_DIR_NAME
+    own.mkdir(parents=True)
+    other.mkdir()
+    # 자기 은행·다른 배치의 은행·영역 자체·하위 폴더·`..` 경유 — 전부 거부.
+    for target in (own, other, root, own / "nested", root / "x" / ".." / batch.CORPUS_DIR_NAME):
+        refusal = batch.refuses_structured_write(target, root)
+        assert refusal is not None and "승인 은행" in refusal, target
+    # 심볼릭 링크로 영역 안을 가리켜도 거부(문자열이 아니라 resolve 뒤 경로로 본다).
+    link = tmp_path / "alias"
+    link.symlink_to(other, target_is_directory=True)
+    assert batch.refuses_structured_write(link, root) is not None
+    # 대조군 — 저장소 밖·이름 접두만 같은 형제 디렉터리는 허용(과잉 거부 아님).
+    assert batch.refuses_structured_write(tmp_path / "candidate", root) is None
+    assert batch.refuses_structured_write(tmp_path / "data" / "corpus_candidate", root) is None
+
+
+@pytest.fixture
+def fake_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """가드가 회귀해도 *실제* 승인 은행을 덮지 않도록 기본 경로를 tmp로 돌린다."""
+    root = tmp_path / "data" / "corpus"
+    monkeypatch.setattr(batch, "_corpus_root", lambda: root)
+    monkeypatch.setattr(batch, "_default_out_dir", lambda: root / batch.CORPUS_DIR_NAME)
+    monkeypatch.setattr(fill_batch, "_default_out_dir", lambda: root / fill_batch.CORPUS_DIR_NAME)
+    return root
 
 
 @pytest.mark.parametrize("module", [batch, fill_batch])
 def test_cli_refuses_structured_without_out_dir(
-    module: object, capsys: pytest.CaptureFixture[str]
+    module: object, fake_corpus: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """`--out-dir` 없이 구조화 후보를 쓰려 하면 생성 전에 exit 2(승인 은행 무변경)."""
     main = module.main  # type: ignore[attr-defined]
     assert main(["--structure-final-step"]) == 2
     assert "WRITE_REFUSED" in capsys.readouterr().err
     assert main(["--structure-final-step", "--check"]) == 2
+    assert not list(fake_corpus.rglob("problems.jsonl"))
+
+
+@pytest.mark.parametrize(
+    ("module", "other_bank"),
+    [(batch, fill_batch.CORPUS_DIR_NAME), (fill_batch, batch.CORPUS_DIR_NAME)],
+)
+def test_cli_refuses_structured_into_the_other_batchs_bank(
+    module: object, other_bank: str, fake_corpus: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """교차 은행 — 한 배치가 *다른* 배치의 승인 은행 경로로 후보를 쓰려 해도 exit 2."""
+    main = module.main  # type: ignore[attr-defined]
+    target = fake_corpus / other_bank
+    assert main(["--structure-final-step", "--out-dir", str(target)]) == 2
+    assert "WRITE_REFUSED" in capsys.readouterr().err
+    assert not (target / "problems.jsonl").exists()
+
+
+def test_library_refuses_structured_write_into_approved_bank(fake_corpus: Path) -> None:
+    """CLI 밖 라이브러리 호출(`out_path=None` → 기본 승인 은행)도 쓰기 전에 멈춘다."""
+    with pytest.raises(ValueError, match="승인 은행"):
+        batch.run_p3_calculus1_diff_batch(structure_final_step=True)
+    with pytest.raises(ValueError, match="승인 은행"):
+        fill_batch.run_p3_fill_batch(structure_final_step=True)
+    with pytest.raises(ValueError, match="승인 은행"):
+        batch.run_p3_calculus1_diff_batch(
+            structure_final_step=True,
+            out_path=fake_corpus / fill_batch.CORPUS_DIR_NAME / "problems.jsonl",
+        )
+    assert not list(fake_corpus.rglob("problems.jsonl"))
+
+
+# ── ⑦ 빌드 시점 검증 ─────────────────────────────────────────────────────
+def test_broken_structured_conditions_fail_the_default_mode_build() -> None:
+    """구조화 조건이 깨진 문항은 모드를 켜지 않아도 슬롯 검증에서 멈춘다(결함이 숨지 않는다)."""
+    assert final_step_structuring_enabled() is False
+    for slot in P3DiffGraphShapeGenerator.slots:
+        items = list(P3DiffGraphShapeGenerator.items(slot))
+        index = next(
+            (i for i, it in enumerate(items) if it.structured_conditions is not None), None
+        )
+        if index is None:
+            continue
+        good = items[index]
+        assert good.structured_conditions is not None
+        # 선택 근거(f'' 부호 부등식)를 빼면 두 후보가 다 살아 증명이 안 된다.
+        broken = dataclasses.replace(
+            good,
+            structured_conditions=tuple(
+                c for c in good.structured_conditions if ">" not in c and "<" not in c
+            ),
+        )
+        assert broken.structured_conditions != good.structured_conditions  # 주입 실재
+        P3DiffGraphShapeGenerator._validate_slot(slot, items)  # 대조군 — 원본은 통과
+        items[index] = broken
+        with pytest.raises(ValueError, match="규칙 \\(가\\) 구조화 실패"):
+            P3DiffGraphShapeGenerator._validate_slot(slot, items)
+        return
+    pytest.fail("구조화 문항이 있는 슬롯 0건 — 이 검사가 공허하다")

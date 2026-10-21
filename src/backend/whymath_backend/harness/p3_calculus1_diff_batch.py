@@ -122,24 +122,34 @@ STRUCTURING_NOTE: Final[dict[str, str]] = {
 }
 
 
-def refuses_structured_write(out_dir: Path, default_dir: Path) -> str | None:
-    """구조화 후보를 승인 은행 자리에 쓰려 하면 거부 사유(아니면 None).
+def _corpus_root() -> Path:
+    """저장소 승인 은행들의 공통 부모(`data/corpus`)."""
+    return Path(__file__).resolve().parents[4] / "data" / "corpus"
 
-    승인 은행은 각인을 걷어 낸 바이트가 감사 동결 사본과 결속돼 있다 — 후보를 그 자리에 쓰면 결속
-    테스트가 깨지고, 감사 없이 승인을 새 내용으로 옮기는 셈이다(분모 보호). 후보는 다른 디렉터리에만
-    쓴다. 승격은 새 회차 감사를 거친 뒤 런북 절차로 한다.
+
+def refuses_structured_write(out_dir: Path, corpus_root: Path | None = None) -> str | None:
+    """구조화 후보를 승인 은행 영역(`data/corpus` 아래 어디든)에 쓰려 하면 거부 사유(아니면 None).
+
+    승인 은행은 각인을 걷어 낸 바이트가 감사 동결 사본과 결속돼 있다.
+    후보를 그 자리에 쓰면 결속 테스트가 깨지고, 감사 없이 승인을 새 내용으로 옮기는 셈이다.
+    자기 은행만 막으면 다른 배치의 은행 경로로 덮어쓸 수 있다
+    (예: `p3_fill_batch --out-dir <미적분 은행>`). 그래서 `data/corpus` 전체를 막는다.
+    비교는 `resolve()` 뒤 경로 포함 관계로 한다. 문자열 접두 비교가 아니므로
+    `data/corpus_candidate` 같은 형제 디렉터리는 막지 않는다.
+    후보는 저장소 밖에 쓴다. 승격은 새 회차 감사를 거친 뒤 런북 절차로 한다.
     """
-    if out_dir.resolve() == default_dir.resolve():
+    root = (corpus_root if corpus_root is not None else _corpus_root()).resolve()
+    target = out_dir.resolve()
+    if target == root or target.is_relative_to(root):
         return (
-            f"--structure-final-step 후보를 승인 은행 자리({default_dir})에 쓰지 않는다 — "
-            "--out-dir 로 다른 디렉터리를 지정하라(승격은 새 회차 S5 감사 뒤 런북 절차)."
+            f"--structure-final-step 후보를 승인 은행 영역({root}) 안({out_dir})에 쓰지 않는다 — "
+            "--out-dir 로 저장소 밖 디렉터리를 지정하라(승격은 새 회차 S5 감사 뒤 런북 절차)."
         )
     return None
 
 
 def _default_out_dir() -> Path:
-    root = Path(__file__).resolve().parents[4]
-    return root / "data" / "corpus" / CORPUS_DIR_NAME
+    return _corpus_root() / CORPUS_DIR_NAME
 
 
 def _assert_no_review_status(path: Path) -> None:
@@ -167,6 +177,12 @@ def run_p3_calculus1_diff_batch(
     `structure_final_step`이면 규칙 (가)(P3-62)를 적용한 **후보 은행**을 만든다(문항 집합은 같고
     검산 조건·풀이 단계만 다르다 — `p3_diff_skeleton_base.final_step_structuring`).
     """
+    if structure_final_step and write:
+        # CLI 가드만 있으면 라이브러리 호출(`out_path=None` → 기본 승인 은행)이 그대로 덮어쓴다.
+        target = out_path if out_path is not None else _default_out_dir() / _PROBLEMS_FILE
+        refusal = refuses_structured_write(target.parent)
+        if refusal is not None:
+            raise ValueError(refusal)
     with final_step_structuring(structure_final_step):
         return _run_batch(generators=generators, out_path=out_path, write=write)
 
@@ -426,7 +442,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         return _check(GENERATORS, out_dir)
     if args.structure_final_step and not args.dry_run:
-        refusal = refuses_structured_write(out_dir, _default_out_dir())
+        refusal = refuses_structured_write(out_dir)
         if refusal is not None:
             print(f"WRITE_REFUSED — {refusal}", file=sys.stderr)
             return 2
