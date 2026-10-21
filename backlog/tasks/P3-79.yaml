@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-79
+title: "형제 검증기 4종(실근 개수·극값 개수·대입값·근 집계)의 자동 약분 무연근 — P3-75 승계"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-75-verify-answer-autocancel-spurious-root
+requires_gates: []
+acceptance:
+  - "① 재현: `verify_real_root_count`·`verify_extremum_count`·`verify_substituted_value`·`verify_root_aggregate`(l3/verify_answer.py)가 평가 파싱의 자동 약분(`x*(x - 2)/(x - 2)` → `x`)으로 원문에서 정의되지 않는 점을 근·극값으로 센다. 예: 조건 `x*(x - 2)/(x - 2) = 2`의 실근 개수를 1로 센다(실제 0). P3-75가 Tier1·근 선택(원소 1개)·classify_solvability·derive_selected_root만 막고 남긴 형제 경로다.\n② 기준: P3-75의 원문 정의역 판정 `condition_definedness`(허용 목록·실행 없는 ast 평가 — 금지 목록 방식 금지)와 `trusted_real_roots`를 재사용해, 셈에 들어가는 각 근을 원문 정의역으로 거른다. undefined는 버리고 unknown이 하나라도 있으면 판정 불가.\n③ RED: P3-75 테스트의 6꼴 + RF3/RF4를 네 검증기에 넣어 종전 셈이 나오면 RED. 대조군(정의되는 꼴)은 종전 판정 유지. 거르는 절을 지우는 뮤테이션 RED.\n④ 회귀: corpus_reverify 전 은행·solution_qa 대표 과정에서 판정 전후 대조 — 새 FAIL·판정 불가는 문항별로 무연근 여부를 확인해 보고(거짓 실패 0)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - "tests/backend/l3/test_verify_answer*.py"
+session: null
+notes: ""
+updated: 2026-10-21
