@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,9 +19,9 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/verify_answer.py
   - "tests/backend/l3/test_verify_answer*.py"
-session: null
+session: claude/p3-75-autocancel-spurious-root
 notes: |-
   출처: PR #1703(P3-71) 3차 독립 검토 상1 — 재현 RF3·RF4. P3-71 은 해석 단계 증명 경로만 막았고 C1(Tier1) 의 기존 결함은 이 태스크로 분리(지휘자 지시 2026-10-20).
 
   [정정 2026-10-20] P3-71 PR #1703 4차 검토 하4 — 금지 목록 우회 입력(.doit()·exp(-log)·**0·NR1) RED 기준 추가 및 ② denominator_vanishes 재사용 문언 정정(허용 목록 전환으로 함수 삭제)
-updated: 2026-10-20
+updated: 2026-10-21
