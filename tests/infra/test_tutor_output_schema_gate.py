@@ -322,3 +322,35 @@ class TestMasteryUpdateAllowedIsAlwaysFalse:
             f"`{_CONTRACT_FIELD}`에 False가 아닌 값을 넣는 코드: {hits} — LLM은 학습 상태를 결정하지 "
             "않는다(Phase 2 동결 계약). 빌더는 이 필드를 넘기지 않는다(기본값 false만)"
         )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# G·H. PR #1713 검토 반영 — 개념 id는 도구 단위 실패, 진단은 코치 큐레이션 세트
+# ──────────────────────────────────────────────────────────────────────
+class TestReviewFixesStayWired:
+    @staticmethod
+    def _func() -> ast.AST:
+        return _find_func(_parse(_PRIMARY_FILE), "run_wh1_primary_turn", where=_PRIMARY_FILE)
+
+    def test_runner_hands_the_allowed_concept_set_to_the_harness(self) -> None:
+        calls = [
+            node
+            for node in _own_nodes(self._func())
+            if isinstance(node, ast.Call) and _callee(node) == "run_tutoring_turn"
+        ]
+        assert calls, "러너에서 `run_tutoring_turn` 호출을 못 찾았다 — 스캔이 깨졌다"
+        for call in calls:
+            kw = next((k.value for k in call.keywords if k.arg == "known_concept_ids"), None)
+            assert (
+                isinstance(kw, ast.Attribute) and kw.attr == "known_concept_ids"
+            ), "러너가 허용 개념 집합을 하네스에 넘기지 않는다 — 환각 id가 그대로 성공 처리된다"
+
+    def test_diagnosis_comes_from_the_coach_curated_hypotheses(self) -> None:
+        builds = _bindings(self._func(), "build_tutor_output")
+        assert builds, "`build_tutor_output` 호출을 못 찾았다 — 스캔이 깨졌다"
+        call = builds[0].value
+        assert isinstance(call, ast.Call)
+        hyp = next((k.value for k in call.keywords if k.arg == "hypotheses"), None)
+        assert (
+            isinstance(hyp, ast.Name) and hyp.id == "initial_hypotheses"
+        ), "진단이 코치 큐레이션 초기 가설이 아니다 — 턴 안 LLM 증거가 진단을 바꿀 수 있다"

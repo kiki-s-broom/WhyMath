@@ -35,10 +35,11 @@ Protocol을 *프로덕션*으로 구현한다 — 지금까지 두뇌는 `Script
 
 **출력 스키마 검증(P3-09 1단계 — 정본 `harness/wh1_tutor_output.py`).** LLM이 낸 JSON은 액션으로
 만들기 전에 `classify_action_payload`를 통과해야 한다 — 필수 필드 누락·타입 오류(bool을 정수로
-쓰기·문자열 극성 등 관대한 형변환 금지)·학습 상태 권위 주장(`mastery_update_allowed`가 false가
-아님)·이번 턴 프롬프트에 없던 개념 id·카탈로그 밖 오개념 id는 거부하고 안전 강등한다. 거부는 사유
-코드(또는 예외 타입명)를 WARNING으로 남기고 `output_rejections`로 센다(침묵 실패 금지 — 값·원문은
-로그에 싣지 않는다).
+쓰기·문자열 극성 등 관대한 형변환 금지)·범위 밖 증거 가중치·학습 상태 권위 주장
+(`mastery_update_allowed`가 false가 아님)·카탈로그 밖 오개념 id는 거부하고 안전 강등한다. 거부는
+사유 코드(또는 예외 타입명)를 WARNING으로 남기고 `output_rejections`로 센다(침묵 실패 금지 —
+값·원문은 로그에 싣지 않는다). 이번 턴 프롬프트에 없던 개념 id는 여기서 거부하지 않는다 — 러너가
+허용 집합(`known_concept_ids`)을 하네스에 넘겨 **그 도구만** 실패시킨다(턴 계속).
 
 범위 밖(후속): S1-b(`/v1/coach` 엔드포인트를 하네스 경유로 전환하며 이 정책을 배선)·전략 계층
 도구·fast path. 본 모듈은 *도구 선택 두뇌*만 둔다. `ScriptedTutorPolicy`는 존치(테스트용).
@@ -127,6 +128,9 @@ _SYSTEM_PROMPT = """당신은 WhyMath의 수학 튜터링 '두뇌'입니다. 당
 - **문항 요약**: concept·skills·problem·pedagogy_policy는 이번 문항의 비식별 요약입니다(개념 이름·
   스킬 이름·문항 구조·교수법 유형). 정답·풀이·지문은 들어 있지 않습니다 — 요약으로 정답을 추측해
   말하지 마세요. pedagogy_policy.forbidden_modes는 이 유형에서 쓰지 말아야 할 교수 방식입니다.
+- **개념 id**: read_student_state의 node_ids와 query_curriculum의 node_id에는 상태 요약의
+  concept.code 값만 쓸 수 있습니다. concept.name(한국어 이름)은 id가 아닙니다. concept.code가
+  없으면 개념 id를 넣지 마세요. 그 밖의 id를 쓰면 그 도구는 실패합니다.
 
 ## 출력 형식 (엄수)
 JSON 객체 하나만 출력하세요. 다른 텍스트·설명·코드펜스 없이:
@@ -136,7 +140,10 @@ JSON 객체 하나만 출력하세요. 다른 텍스트·설명·코드펜스 �
 """
 
 _ENCOURAGE_TYPE: EndTurnType = "격려"
-_SOCRATIC_SAFE_TYPES: tuple[EndTurnType, ...] = ("질문", "힌트", "격려")
+_QUESTION_TYPE: EndTurnType = "질문"
+# 억제 verdict(오답·검증 불가) 턴에서 유지하는 유형 — 격려는 빠진다(P3-09 검토 중2: 틀린 풀이에
+# "잘 하고 있어"라고 말하지 않는다 · 질문으로 강등돼 하네스 소크라테스 개입이 대신 말한다).
+_SOCRATIC_SAFE_TYPES: tuple[EndTurnType, ...] = ("질문", "힌트")
 
 # ──────────────────────────────────────────────────────────────────────
 # Minimal Reasoning Subgraph 예산(플레이북 Part 8·CLAUDE.md 하드 게이트·감사 Q2).
@@ -637,7 +644,7 @@ class LLMTutorPolicy:
         data = self._extract_json(raw)
         if data is None:
             return self._reject(state, REASON_NOT_JSON_OBJECT)
-        reason = classify_action_payload(data, known_concept_ids=self._known_concept_ids)
+        reason = classify_action_payload(data)
         if reason is not None:
             return self._reject(state, reason)
         try:
@@ -785,8 +792,15 @@ class LLMTutorPolicy:
         return action
 
     def _safe_fallback(self, state: TurnState) -> Action:
-        """안전 강등 — 조용한 크래시 금지. verify 의무가 걸리면 verify_step, 아니면 격려 종료."""
+        """안전 강등 — 조용한 크래시 금지.
+
+        verify 의무가 걸리면 `verify_step`. 이번 턴 판정이 오답·검증 불가면 **질문**으로 닫는다
+        (하네스가 소크라테스 개입·중립 유도 발화를 파생 — P3-09 검토 중2: 틀린 풀이에 "잘 하고
+        있어"라고 말하지 않는다). 그 밖(정답·판정 없음)은 격려로 닫는다.
+        """
         self._last_action_degraded = True
         if state.has_solution_steps and not state.verify_called:
             return VerifyStepAction(steps=list(self._solution_steps))
+        if state.last_verdict in _ANSWER_SUPPRESSED_VERDICTS:
+            return EndTurnAction(action_type=_QUESTION_TYPE, utterance=None)
         return EndTurnAction(action_type=_ENCOURAGE_TYPE, utterance=None)

@@ -35,7 +35,12 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.harness.wh1_llm_policy import LLMTutorPolicy
-from whymath_backend.harness.wh1_loop import ToolResult, TurnOutcome, run_tutoring_turn
+from whymath_backend.harness.wh1_loop import (
+    CONCEPT_ID_REJECT_DETAIL,
+    ToolResult,
+    TurnOutcome,
+    run_tutoring_turn,
+)
 from whymath_backend.harness.wh1_probe_supply import assemble_probe_candidate_pool
 from whymath_backend.l3.interfaces import LLMProvider
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
@@ -234,6 +239,11 @@ class Wh1HarnessShadowObservation(BaseModel):
     오류·상태 권위 주장·환각 id). 거부는 매번 안전 강등으로 이어진다. **None=구판·shadow·정책 생성
     전 중단**(미계측)으로 "거부 0건"(=0)과 구분한다 — 검증기가 실사용에서 몇 번 작동했는지의 분자.
     """
+
+    concept_id_tool_rejections: int | None = None
+    """P3-09 — 허용 집합 밖 개념 id로 **그 도구만** 실패한 횟수(`read_student_state`·
+    `query_curriculum` · `wh1_loop.CONCEPT_ID_REJECT_DETAIL`). 턴은 계속된다. None=구판·shadow(검사
+    없음 — shadow는 내용 요약을 싣지 않아 허용 집합이 없고, 기존 동작 그대로 검사하지 않는다)."""
 
     tutor_output_reason_code: str | None = None
     """P3-09 — 학생 대면 튜터 출력이 스키마 검증에서 거부된 사유 코드(`wh1_tutor_output`의
@@ -434,6 +444,12 @@ def emit_wh1_observation(
             context_not_delivered=_names(context_not_delivered),
             context_coverage_gap=_names(context_coverage_gap),
             llm_output_rejections=llm_output_rejections,
+            # shadow는 허용 집합을 하네스에 넘기지 않아 검사 자체가 없다 — 0이 아니라 None(미계측).
+            concept_id_tool_rejections=(
+                sum(1 for r in outcome.trace if not r.ok and r.detail == CONCEPT_ID_REJECT_DETAIL)
+                if primary
+                else None
+            ),
             tutor_output_reason_code=tutor_output_reason_code,
         ).model_dump_json()
     )

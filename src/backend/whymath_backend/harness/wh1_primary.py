@@ -446,6 +446,9 @@ async def run_wh1_primary_turn(
                 has_solution_steps=bool(solution_steps),
                 initial_hypotheses=initial_hypotheses,
                 max_tool_calls=max_tool_calls,
+                # P3-09 검토 중2 — 프롬프트에 실린 개념 code만 도구 인자로 허용. 밖의 id는 그 도구만
+                # 실패(ok=False)하고 턴은 계속된다(턴 종료·격려 강등 아님).
+                known_concept_ids=policy.known_concept_ids,
             ),
             timeout=timeout,
         )
@@ -590,12 +593,20 @@ async def run_wh1_primary_turn(
         if tutor_content is not None and tutor_content.concept is not None
         else None
     )
+    # 발화 저자: 정책 명시 발화·프로즈 rephrase 산출물이면 LLM, 그 밖(파생 템플릿·안전 강등·금지모드
+    # 재질문)은 하네스 결정론 템플릿이다.
+    llm_authored = not mode_guard_replaced and (
+        outcome.utterance_source == "policy" or prose_rephrased
+    )
     tutor_output = build_tutor_output(
         explanation=filtered,
+        explanation_source="llm" if llm_authored else "harness_template",
         action_type=outcome.action_type,
         mode_guard_replaced=mode_guard_replaced,
         verify_verdict=_extract_verify_verdict(outcome.trace),
-        hypotheses=outcome.hypotheses,
+        # 진단은 코치가 큐레이션한 초기 활성 가설에서 — 턴 안 LLM 증거로 바뀐 in-memory 세트가
+        # 아니다(검토 중1).
+        hypotheses=initial_hypotheses,
         concept_id=concept_code,
         known_concept_ids=policy.known_concept_ids if policy is not None else frozenset(),
         hint_level=hint_level,

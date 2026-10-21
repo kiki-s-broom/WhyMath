@@ -572,12 +572,15 @@ _SERVED_HINT_DESC = (
 # 넣으면 늘 '누락'인 가짜 계기판이 된다.
 _TUTOR_OUTPUT_DESC = (
     "튜터의 **구조화 출력**(P3-09·`tutor-output-v1`) — 진단(`concept_id`·`misconception_id`·"
-    "`confidence`)·응답 전략·힌트 단계·발화(`explanation`)·다음 행동·`mastery_update_allowed`. "
-    "스키마 검증을 두 번(러너 조립 시·승격 직전) 통과한 튜터 발화만 여기에 실리며, 그때 "
-    "`explanation`은 `decision.prompt`와 같은 문자열이다. `mastery_update_allowed`는 **항상 "
-    "false**다 — LLM은 학습 상태를 결정하지 않는다(숙달 갱신은 `completion_evidence`를 거친 "
-    "평가·숙달 엔진만). 진단 값은 서버가 채운다(개념 = 이번 턴 DB 조회 개념, 오개념 = 활성 가설 "
-    "최상위·카탈로그 정본). null이면 이 턴은 튜터 발화가 아니다 — 튜터 미호출(완료 상태머신 "
+    "`confidence`)·응답 전략·힌트 단계·발화(`explanation`)·발화 저자(`explanation_source`)·다음 "
+    "행동·`mastery_update_allowed`. 스키마 검증을 두 번(러너 조립 시·승격 직전) 통과한 튜터 턴만 "
+    "실리며, 그때 `explanation`은 `decision.prompt`와 같은 문자열이다. `explanation_source`는 "
+    "`llm`(LLM이 쓴 발화)과 `harness_template`(하네스 결정론 템플릿 — LLM 강등 턴 포함)을 가른다. "
+    "`mastery_update_allowed`는 **항상 false**다 — LLM은 학습 상태를 결정하지 않는다(숙달 갱신은 "
+    "`completion_evidence`를 거친 평가·숙달 엔진만). 진단은 하네스·코치가 큐레이션한 결과다: "
+    "개념 = 이번 턴 DB 조회 개념, 오개념 = 코치가 큐레이션한 활성 가설(응답 `active_hypotheses`와 "
+    "같은 원천)의 최상위·카탈로그 정본. 턴 안에서 LLM이 제출한 증거(가중치 [0, 1]로 범위 제한)는 "
+    "이 진단에 쓰지 않는다. null이면 이 턴은 튜터 턴이 아니다 — 튜터 미호출(완료 상태머신 "
     "가로채기·primary OFF)이거나 검증 미통과·실패로 결정론 Polya 발화가 나갔다."
 )
 _TUTOR_CONTEXT_DESC = (

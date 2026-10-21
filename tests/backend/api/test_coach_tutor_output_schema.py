@@ -34,9 +34,11 @@ from whymath_backend.db.models.dialogue import Dialogue as DialogueORM
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
 from whymath_backend.harness import wh1_primary
+from whymath_backend.harness.wh1_loop import ENCOURAGE_FALLBACK_UTTERANCE
 from whymath_backend.harness.wh1_tutor_context import ProblemBrief
 from whymath_backend.harness.wh1_tutor_output import TutorOutputReceipt, TutorTurnOutput
 from whymath_backend.l3.models import GenerationResult, RoutingDecision
+from whymath_backend.l4.misconception import select_intervention_from_hypotheses
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
 from whymath_backend.schema.enums import Persona
@@ -149,10 +151,10 @@ def _isolation() -> Iterator[None]:
 
 
 class _Provider:
-    """튜터 정책 도구 선택 대역 — 같은 원시 출력을 매 호출 돌려준다(네트워크 0)."""
+    """튜터 정책 도구 선택 대역 — 원시 출력을 차례로 돌려준다(마지막은 반복·네트워크 0)."""
 
-    def __init__(self, raw: str) -> None:
-        self._raw = raw
+    def __init__(self, raw: str | Sequence[str]) -> None:
+        self._raws = [raw] if isinstance(raw, str) else list(raw)
 
     async def generate(
         self,
@@ -162,13 +164,15 @@ class _Provider:
         *,
         images: Sequence[str] | None = None,
     ) -> GenerationResult:
-        return GenerationResult(self._raw)
+        return GenerationResult(self._raws.pop(0) if len(self._raws) > 1 else self._raws[0])
 
 
 Tamper = Callable[[TutorOutputReceipt, str | None], None]
 
 
-def _install(monkeypatch: pytest.MonkeyPatch, raw: str, tamper: Tamper | None = None) -> None:
+def _install(
+    monkeypatch: pytest.MonkeyPatch, raw: str | Sequence[str], tamper: Tamper | None = None
+) -> None:
     """서빙 경로 대역 — 9종 조회는 고정값, 튜터 러너는 **실제 러너**(스텁 provider)를 돌린다.
 
     `tamper`는 러너가 돌아온 *뒤* 영수증을 변조한다 — 3단계(승격 직전 재검증) 주입 좌석이다.
@@ -235,17 +239,19 @@ def _install(monkeypatch: pytest.MonkeyPatch, raw: str, tamper: Tamper | None = 
     monkeypatch.setattr(coach, "_skill_labels_for", _skill_labels)
 
 
-def _body() -> dict[str, Any]:
+def _body(*, wrong: bool = False) -> dict[str, Any]:
+    answer = "3" if wrong else "2"
     return {
-        "student_input": "x+1=3 이니까 x=2 라고 생각했어요",
-        "student_solution": "x+1=3 이니까 x=2",
-        "solution_steps": ["x+1=3", "x=2"],  # 정답 풀이 — 정책 명시 발화가 존중되는 턴
+        "student_input": f"x+1=3 이니까 x={answer} 라고 생각했어요",
+        "student_solution": f"x+1=3 이니까 x={answer}",
+        # 정답 풀이(기본) — 정책 명시 발화가 존중되는 턴. wrong=True는 오답 턴(정답 억제 백스톱).
+        "solution_steps": ["x+1=3", f"x={answer}"],
         "problem_id": str(_PID),
     }
 
 
-def _post(path: str) -> Any:
-    body = _body()
+def _post(path: str, *, wrong: bool = False) -> Any:
+    body = _body(wrong=wrong)
     if path == "create":
         return _client().post("/v1/coach/sessions", json=body)
     did = uuid.uuid4()
@@ -291,6 +297,7 @@ def test_control_validated_output_is_delivered(monkeypatch: pytest.MonkeyPatch, 
     assert out["hint_level"] == data["decision"]["hint_level"]
     assert out["response_strategy"] == "guided_question"
     assert out["next_action"] == "continue_dialogue"
+    assert out["explanation_source"] == "llm"
     # 응답 구조체는 스키마를 그대로 통과한다(직렬화 왕복).
     TutorTurnOutput.model_validate(out)
 
@@ -410,3 +417,49 @@ def test_promotion_rejects_tampered_receipt(
     assert resp.json()["tutor_output"] is None
     lines = [r.getMessage() for r in caplog.records if r.name == _COACH_LOGGER]
     assert any(f"튜터 출력 승격 거부({reason})" in line for line in lines), lines
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PR #1713 검토 중2 — 오답 턴의 환각 개념 id: 그 도구만 실패하고 학생 발화는 main과 같은 질문
+# ──────────────────────────────────────────────────────────────────────────
+_VERIFY = '{"kind": "verify_step"}'
+_END_Q = json.dumps({"kind": "end_turn", "action_type": "질문", "utterance": _UTTERANCE})
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize(
+    "tool",
+    [
+        '{"kind": "query_curriculum", "node_id": "일차방정식", "relation": "선수"}',
+        '{"kind": "read_student_state", "node_ids": ["math.fake.node"]}',
+    ],
+)
+def test_wrong_answer_turn_with_bad_concept_id_is_not_encouraged(
+    monkeypatch: pytest.MonkeyPatch, path: str, tool: str
+) -> None:
+    _install(monkeypatch, [_VERIFY, tool, _END_Q])
+    resp = _post(path, wrong=True)
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    prompt = data["decision"]["prompt"]
+    # main e609c543과 같은 발화 — 오답 턴의 하네스 소크라테스 개입(활성 가설 결선). 격려가 아니다.
+    expected = select_intervention_from_hypotheses([_HYP])
+    assert expected is not None
+    assert prompt == expected.prompt
+    assert prompt != ENCOURAGE_FALLBACK_UTTERANCE
+    assert _MARK not in resp.text  # 오답 턴 정책 명시 발화는 억제된다(기존 백스톱)
+    out = data["tutor_output"]
+    assert (out["response_strategy"], out["next_action"]) == ("guided_question", "revise_solution")
+    assert out["explanation_source"] == "harness_template"
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_wrong_answer_degraded_turn_is_not_encouraged(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    """검증 뒤 LLM 출력이 깨져 강등돼도 오답 턴이면 격려가 아니라 질문."""
+    _install(monkeypatch, [_VERIFY, '{"kind": "end_turn"'])
+    resp = _post(path, wrong=True)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["decision"]["prompt"] != ENCOURAGE_FALLBACK_UTTERANCE
+    assert resp.json()["tutor_output"]["response_strategy"] == "guided_question"

@@ -25,13 +25,17 @@ from pydantic import ValidationError
 
 from whymath_backend.harness.wh1_llm_policy import LLMTutorPolicy
 from whymath_backend.harness.wh1_loop import (
+    CONCEPT_ID_REJECT_DETAIL,
     ENCOURAGE_FALLBACK_UTTERANCE,
+    NEUTRAL_GUIDE_UTTERANCE,
     EndTurnAction,
     LogEvidenceAction,
     QueryCurriculumAction,
     ReadStateAction,
+    ScriptedTutorPolicy,
     TurnState,
     VerifyStepAction,
+    run_tutoring_turn,
 )
 from whymath_backend.harness.wh1_primary import run_wh1_primary_turn
 from whymath_backend.harness.wh1_shadow import Wh1HarnessShadowObservation
@@ -39,6 +43,7 @@ from whymath_backend.harness.wh1_tutor_context import ConceptBrief, TutorContent
 from whymath_backend.harness.wh1_tutor_output import (
     MAX_EXPLANATION_CHARS,
     REASON_EXPLANATION_MISMATCH,
+    REASON_FIELD_RANGE,
     REASON_FIELD_TYPE,
     REASON_MISSING_FIELD,
     REASON_MISSING_OUTPUT,
@@ -81,6 +86,7 @@ def _valid_payload(**over: Any) -> dict[str, Any]:
         "response_strategy": "guided_hint",
         "hint_level": 2,
         "explanation": "어느 단계에서 등식의 성질을 썼는지 말해줄래?",
+        "explanation_source": "llm",
         "next_action": "continue_dialogue",
     }
     payload.update(over)
@@ -98,6 +104,7 @@ def test_output_field_set_is_frozen() -> None:
         "response_strategy",
         "hint_level",
         "explanation",
+        "explanation_source",
         "next_action",
         "mastery_update_allowed",
     }
@@ -143,7 +150,21 @@ def test_valid_payload_passes_and_mastery_is_false() -> None:
     [
         ({"hint_level": 5}, "SCHEMA_LITERAL_ERROR"),  # 범위 밖 hint_level
         ({"hint_level": 0}, "SCHEMA_LITERAL_ERROR"),
-        ({"hint_level": "2"}, "SCHEMA_LITERAL_ERROR"),  # strict — 문자열 형변환 금지
+        ({"hint_level": "2"}, "SCHEMA_VALUE_ERROR"),  # 문자열 형변환 금지
+        ({"hint_level": True}, "SCHEMA_VALUE_ERROR"),  # 검토 하1 — Literal 값 동등(True == 1) 차단
+        ({"hint_level": 2.0}, "SCHEMA_VALUE_ERROR"),  # 검토 하1 — 2.0 == 2 차단
+        ({"explanation": "\u200b"}, "SCHEMA_VALUE_ERROR"),  # 검토 하2 — ZWSP만
+        ({"explanation": "\u3164\u3164"}, "SCHEMA_VALUE_ERROR"),  # 한글 채움 문자만
+        ({"explanation": "\ufeff \u2060\u00a0"}, "SCHEMA_VALUE_ERROR"),  # BOM·WJ·NBSP
+        ({"explanation_source": "teacher"}, "SCHEMA_LITERAL_ERROR"),
+        ({"diagnosis": {"misconception_id": _MID, "confidence": True}}, "SCHEMA_VALUE_ERROR"),
+        # 검토 중2 — 전략·다음 행동 일관성
+        (
+            {"response_strategy": "encouragement", "next_action": "revise_solution"},
+            "SCHEMA_VALUE_ERROR",
+        ),
+        ({"response_strategy": "diagnostic_probe"}, "SCHEMA_VALUE_ERROR"),
+        ({"next_action": "solve_probe"}, "SCHEMA_VALUE_ERROR"),
         ({"explanation": ""}, "SCHEMA_STRING_TOO_SHORT"),
         ({"explanation": "   "}, "SCHEMA_VALUE_ERROR"),  # 공백뿐
         ({"explanation": "가" * (MAX_EXPLANATION_CHARS + 1)}, "SCHEMA_STRING_TOO_LONG"),
@@ -196,6 +217,7 @@ def test_concept_id_requires_known_set_and_empty_set_fails_closed() -> None:
 def _build(**over: Any) -> TutorTurnOutput | str:
     kwargs: dict[str, Any] = {
         "explanation": "네가 먼저 본 것은 무엇이었어?",
+        "explanation_source": "llm",
         "action_type": "질문",
         "mode_guard_replaced": False,
         "verify_verdict": "correct",
@@ -367,7 +389,7 @@ _VALID_ACTIONS: list[dict[str, Any]] = [
 @pytest.mark.parametrize("payload", _VALID_ACTIONS)
 def test_valid_action_payloads_pass(payload: dict[str, Any]) -> None:
     """대조군 — 정상 JSON이 거부되면 검증기가 과잉이다(폴백률 위장 상승)."""
-    assert classify_action_payload(payload, known_concept_ids=_KNOWN) is None
+    assert classify_action_payload(payload) is None
 
 
 _INVALID_ACTIONS: list[tuple[dict[str, Any], str]] = [
@@ -395,7 +417,6 @@ _INVALID_ACTIONS: list[tuple[dict[str, Any], str]] = [
     ({"kind": "read_student_state", "node_ids": [" "]}, REASON_FIELD_TYPE),
     ({"kind": "curate_hypothesis", "turns_elapsed": True}, REASON_FIELD_TYPE),
     ({"kind": "curate_hypothesis", "turns_elapsed": "1"}, REASON_FIELD_TYPE),
-    ({"kind": "curate_hypothesis", "turns_elapsed": -1}, REASON_FIELD_TYPE),
     ({"kind": "query_curriculum", "node_id": 3}, REASON_FIELD_TYPE),
     ({"kind": "query_curriculum", "node_id": _CONCEPT, "relation": 2}, REASON_FIELD_TYPE),
     ({"kind": "log_evidence", "misconception_id": _MID, "polarity": True}, REASON_FIELD_TYPE),
@@ -409,13 +430,26 @@ _INVALID_ACTIONS: list[tuple[dict[str, Any], str]] = [
         {"kind": "log_evidence", "misconception_id": _MID, "polarity": 1, "weight": False},
         REASON_FIELD_TYPE,
     ),
-    # 환각 id
-    ({"kind": "read_student_state", "node_ids": ["math.fake.node"]}, REASON_UNKNOWN_CONCEPT_ID),
-    (
-        {"kind": "read_student_state", "node_ids": [_CONCEPT, "math.fake.node"]},
-        REASON_UNKNOWN_CONCEPT_ID,
-    ),
-    ({"kind": "query_curriculum", "node_id": "math.fake.node"}, REASON_UNKNOWN_CONCEPT_ID),
+    # 범위 밖 값(검토 중1 — 가중치 관례 [0, 1]·NaN·inf 거부)
+    *[
+        (
+            {"kind": "log_evidence", "misconception_id": _MID, "polarity": -1, "weight": w},
+            REASON_FIELD_RANGE,
+        )
+        for w in (1e9, 1.0000001, -0.1, float("nan"), float("inf"), float("-inf"))
+    ],
+    ({"kind": "curate_hypothesis", "turns_elapsed": -1}, REASON_FIELD_RANGE),
+    # 상태 권위 주장 변형(검토 하3) — 중첩·전각·camelCase·복수형·한글
+    ({"kind": "end_turn", "action_type": "질문", "meta": {"mastery": 0.9}}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "meta": [{"proficiency": 1}]}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "ｍａｓｔｅｒｙ": 1}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "studentMastery": 1}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "abilities": [1]}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "skillLevel": 2}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "skill_level": 2}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "숙달도": "높음"}, "STATE"),
+    ({"kind": "end_turn", "action_type": "질문", "masteryUpdateAllowed": False}, "STATE"),
+    # 환각 id(오개념 — 카탈로그 정본)
     (
         {"kind": "log_evidence", "misconception_id": "no-such-mid", "polarity": 1},
         REASON_UNKNOWN_MISCONCEPTION_ID,
@@ -426,15 +460,16 @@ _INVALID_ACTIONS: list[tuple[dict[str, Any], str]] = [
 @pytest.mark.parametrize(("payload", "code"), _INVALID_ACTIONS)
 def test_invalid_action_payloads_are_rejected(payload: dict[str, Any], code: str) -> None:
     expected = REASON_STATE_AUTHORITY_CLAIM if code == "STATE" else code
-    assert classify_action_payload(payload, known_concept_ids=_KNOWN) == expected
+    assert classify_action_payload(payload) == expected
 
 
-def test_known_concept_set_is_the_only_concept_authority() -> None:
-    """같은 id라도 알려진 집합이 비면 환각이다 — 프롬프트에 개념이 실리지 않은 턴."""
-    payload = {"kind": "query_curriculum", "node_id": _CONCEPT}
-    assert classify_action_payload(payload, known_concept_ids=frozenset()) == (
-        REASON_UNKNOWN_CONCEPT_ID
-    )
+def test_concept_ids_are_not_judged_by_the_payload_classifier() -> None:
+    """개념 id 실재는 판정기가 보지 않는다 — 하네스가 그 도구만 실패시킨다(턴 종료 아님·검토 중2)."""
+    for payload in (
+        {"kind": "query_curriculum", "node_id": "일차방정식"},
+        {"kind": "read_student_state", "node_ids": ["math.fake.node"]},
+    ):
+        assert classify_action_payload(payload) is None
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -471,7 +506,18 @@ _BROKEN = [
     ("[1, 2, 3]", REASON_NOT_JSON_OBJECT),
     ("정답은 3이야", REASON_NOT_JSON_OBJECT),
     ('{"kind": "end_turn", "action_type": "질문", "mastery_update_allowed": true}', "STATE"),
-    ('{"kind": "query_curriculum", "node_id": "math.fake.node"}', REASON_UNKNOWN_CONCEPT_ID),
+    (
+        '{"kind": "log_evidence", "misconception_id": "'
+        + _MID
+        + '", "polarity": -1, "weight": 1e9}',
+        REASON_FIELD_RANGE,
+    ),
+    (
+        '{"kind": "log_evidence", "misconception_id": "'
+        + _MID
+        + '", "polarity": -1, "weight": NaN}',
+        REASON_FIELD_RANGE,
+    ),
     ('{"kind": "end_turn", "utterance": "x"}', REASON_MISSING_FIELD),
     ('{"kind": "end_turn", "action_type": "질문", "utterance": 3}', REASON_FIELD_TYPE),
     ('{"kind": "end_turn", "action_type": "칭찬"}', "ValidationError"),  # Literal 밖
@@ -532,11 +578,15 @@ def test_policy_accepts_valid_outputs(raw: str, kind: type) -> None:
     assert policy.last_action_degraded is False
 
 
-def test_policy_without_content_treats_every_concept_id_as_hallucinated() -> None:
-    policy = _policy(['{"kind": "query_curriculum", "node_id": "' + _CONCEPT + '"}'], content=False)
-    asyncio.run(policy.next_action(_state()))
-    assert policy.output_rejections == {REASON_UNKNOWN_CONCEPT_ID: 1}
-    assert policy.known_concept_ids == frozenset()
+def test_policy_passes_hallucinated_concept_id_to_the_harness() -> None:
+    """정책은 개념 id를 거부·강등하지 않는다 — 액션을 그대로 넘기고 허용 집합만 공개한다."""
+    policy = _policy(['{"kind": "query_curriculum", "node_id": "일차방정식"}'])
+    action = asyncio.run(policy.next_action(_state()))
+    assert isinstance(action, QueryCurriculumAction)
+    assert policy.output_rejections == {}
+    assert policy.last_action_degraded is False
+    assert policy.known_concept_ids == _KNOWN
+    assert _policy(["{}"], content=False).known_concept_ids == frozenset()
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -662,3 +712,240 @@ def test_runner_broken_json_never_reaches_student(caplog: pytest.LogCaptureFixtu
     assert utterance == ENCOURAGE_FALLBACK_UTTERANCE
     rec = _record(caplog)
     assert rec.llm_output_rejections is not None and rec.llm_output_rejections >= 1
+
+
+# ──────────────────────────────────────────────────────────────────────
+# PR #1713 독립 검토 반영(중2·중1·하1~하5) — 회귀 픽스처
+# ──────────────────────────────────────────────────────────────────────
+def test_visible_text_control_passes() -> None:
+    """대조군 — 보이지 않는 문자가 섞였어도 보이는 글자가 있으면 통과한다."""
+    out = validate_tutor_output(
+        _valid_payload(explanation="​왜 그렇게 했어?"), known_concept_ids=_KNOWN
+    )
+    assert isinstance(out, TutorTurnOutput)
+
+
+def test_mastery_zero_is_rejected_even_without_the_gate() -> None:
+    """`0 == False`라 Literal만으로는 통과한다 — 모델 직접 생성에서도 `is False` 검사가 막는다."""
+    with pytest.raises(ValidationError):
+        TutorTurnOutput.model_validate(_valid_payload(mastery_update_allowed=0))
+    assert TutorTurnOutput.model_validate(_valid_payload()).mastery_update_allowed is False
+
+
+@pytest.mark.parametrize(
+    "key", ["probability", "capability", "probabilities", "masterpiece", "reason"]
+)
+def test_state_key_words_do_not_false_positive(key: str) -> None:
+    """검토 하3 — 부분 문자열 일치가 `probability`·`capability`를 거부하던 거짓 양성 해소."""
+    payload = {"kind": "end_turn", "action_type": "질문", key: 1}
+    assert classify_action_payload(payload) is None
+
+
+def test_nested_contract_echo_is_allowed() -> None:
+    payload = {"kind": "end_turn", "action_type": "질문", "meta": {"mastery_update_allowed": False}}
+    assert classify_action_payload(payload) is None
+
+
+@pytest.mark.parametrize("weight", [0, 0.0, 0.5, 1, 1.0])
+def test_weight_in_range_passes(weight: float) -> None:
+    payload = {"kind": "log_evidence", "misconception_id": _MID, "polarity": 1, "weight": weight}
+    assert classify_action_payload(payload) is None
+
+
+def test_builder_rejects_encouragement_on_a_turn_to_revise() -> None:
+    """검토 중2 — 틀린 풀이 턴에 격려(정책이 고른 격려 포함)는 구조체가 되지 못한다."""
+    assert _build(action_type="격려", verify_verdict="incorrect") == "SCHEMA_VALUE_ERROR"
+    assert isinstance(_build(action_type="격려", verify_verdict="correct"), TutorTurnOutput)
+
+
+def test_builder_skips_out_of_catalog_hypotheses(caplog: pytest.LogCaptureFixture) -> None:
+    """검토 하5 — DB에 남은 구판 id가 최상위여도 출력 전체가 거부되지 않는다(건너뛰고 WARNING)."""
+    stale = _hyp("removed-legacy-misconception", 0.95)
+    with caplog.at_level(logging.WARNING, logger="whymath.harness.wh1_tutor_output"):
+        out = _build(hypotheses=[stale, _hyp(_MID, 0.5)])
+    assert isinstance(out, TutorTurnOutput)
+    assert out.diagnosis.misconception_id == _MID
+    assert any("카탈로그 밖 가설 1건" in r.getMessage() for r in caplog.records)
+    assert all("removed-legacy" not in r.getMessage() for r in caplog.records)
+    only_stale = _build(hypotheses=[stale])
+    assert isinstance(only_stale, TutorTurnOutput) and only_stale.diagnosis.misconception_id is None
+
+
+# ── 러너 회귀(검토 중2) — 오답 턴의 환각 개념 id는 그 도구만 실패, 학생 발화는 격려가 아니다 ──
+class _SeqProvider:
+    """차례로 다른 원시 출력을 돌려준다(마지막은 반복)."""
+
+    def __init__(self, raws: Sequence[str]) -> None:
+        self._raws = list(raws)
+
+    async def generate(
+        self,
+        prompt: str,
+        system: str,
+        decision: RoutingDecision,
+        *,
+        images: Sequence[str] | None = None,
+    ) -> GenerationResult:
+        return GenerationResult(self._raws.pop(0) if len(self._raws) > 1 else self._raws[0])
+
+
+_WRONG = {"student_solution": "x+1=3 이니까 x=3", "solution_steps": ["x+1=3", "x=3"]}
+_END_Q = '{"kind": "end_turn", "action_type": "질문", "utterance": "어느 단계가 이상해 보여?"}'
+
+
+@pytest.mark.parametrize(
+    ("tool", "content"),
+    [
+        ('{"kind": "query_curriculum", "node_id": "일차방정식", "relation": "선수"}', True),
+        ('{"kind": "read_student_state", "node_ids": ["math.fake.node"]}', True),
+        # 미매핑 턴 — 프롬프트에 개념이 없으니 실재 code라도 LLM이 받은 id가 아니다.
+        ('{"kind": "query_curriculum", "node_id": "' + _CONCEPT + '"}', False),
+    ],
+)
+def test_wrong_answer_turn_with_bad_concept_id_is_not_encouraged(
+    tool: str, content: bool, caplog: pytest.LogCaptureFixture
+) -> None:
+    receipt = TutorOutputReceipt()
+    with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        utterance = _run(
+            "",
+            receipt,
+            **_WRONG,
+            active_hypotheses=[],
+            provider=_SeqProvider(['{"kind": "verify_step"}', tool, _END_Q]),
+            tutor_content=(
+                TutorContentSummary(concept=ConceptBrief(code=_CONCEPT, name="일차방정식"))
+                if content
+                else None
+            ),
+        )
+    # main e609c543과 같은 학생 발화 — 오답 턴의 하네스 중립 유도 질문(정답 억제 백스톱).
+    assert utterance == NEUTRAL_GUIDE_UTTERANCE
+    assert utterance != ENCOURAGE_FALLBACK_UTTERANCE
+    out = receipt.output
+    assert out is not None
+    assert (out.response_strategy, out.next_action) == ("guided_question", "revise_solution")
+    assert out.explanation_source == "harness_template"
+    rec = _record(caplog)
+    assert rec.concept_id_tool_rejections == 1  # 그 도구만 실패
+    assert rec.llm_output_rejections == 0  # 턴 종료·강등 없음
+    assert rec.primary_outcome == "adopted"
+
+
+def test_wrong_answer_turn_with_valid_concept_id_control() -> None:
+    """대조군 — 허용 id면 도구 성공·같은 발화."""
+    receipt = TutorOutputReceipt()
+    utterance = _run(
+        "",
+        receipt,
+        **_WRONG,
+        active_hypotheses=[],
+        provider=_SeqProvider(
+            [
+                '{"kind": "verify_step"}',
+                '{"kind": "query_curriculum", "node_id": "' + _CONCEPT + '"}',
+                _END_Q,
+            ]
+        ),
+    )
+    assert utterance == NEUTRAL_GUIDE_UTTERANCE
+
+
+def test_degraded_wrong_answer_turn_asks_instead_of_encouraging() -> None:
+    """검토 중2 (b) — 검증 뒤 LLM 출력이 거부돼 강등돼도, 오답 턴이면 격려가 아니라 질문."""
+    receipt = TutorOutputReceipt()
+    utterance = _run(
+        "",
+        receipt,
+        **_WRONG,
+        active_hypotheses=[],
+        provider=_SeqProvider(['{"kind": "verify_step"}', '{"kind": "end_turn"']),
+    )
+    assert utterance == NEUTRAL_GUIDE_UTTERANCE
+    assert receipt.output is not None
+    assert receipt.output.response_strategy == "guided_question"
+
+
+def test_degraded_correct_turn_still_encourages() -> None:
+    """대조군 — 정답 턴의 강등은 격려 그대로."""
+    utterance = _run(
+        "",
+        TutorOutputReceipt(),
+        provider=_SeqProvider(['{"kind": "verify_step"}', '{"kind": "end_turn"']),
+    )
+    assert utterance == ENCOURAGE_FALLBACK_UTTERANCE
+
+
+def test_llm_chosen_encouragement_on_wrong_answer_becomes_a_question(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """LLM이 오답 턴에 격려를 고르면 정책 불변식이 질문으로 강등한다(main은 격려 템플릿을 그대로
+    냈다) — 하네스 소크라테스 유도가 대신 말하고 구조체도 일관된다."""
+    receipt = TutorOutputReceipt()
+    with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        utterance = _run(
+            "",
+            receipt,
+            **_WRONG,
+            active_hypotheses=[],
+            provider=_SeqProvider(
+                ['{"kind": "verify_step"}', '{"kind": "end_turn", "action_type": "격려"}']
+            ),
+        )
+    assert utterance == NEUTRAL_GUIDE_UTTERANCE
+    assert receipt.output is not None
+    assert receipt.output.response_strategy == "guided_question"
+    assert _record(caplog).primary_outcome == "adopted"
+
+
+def test_diagnosis_ignores_in_turn_llm_evidence() -> None:
+    """검토 중1 — 턴 안 LLM 증거(가중치 상한 1.0)로 가설 세트가 바뀌어도 진단은 코치 큐레이션 세트."""
+    receipt = TutorOutputReceipt()
+    _run(
+        "",
+        receipt,
+        student_solution="(a+b)^2=a^2+b^2",
+        solution_steps=[],
+        active_hypotheses=[_hyp(_MID, 0.9), _hyp(_MID_B, 0.6)],
+        provider=_SeqProvider(
+            [
+                '{"kind": "log_evidence", "misconception_id": "'
+                + _MID
+                + '", "polarity": -1, "weight": 1.0}',
+                '{"kind": "curate_hypothesis"}',
+                _END_Q,
+            ]
+        ),
+    )
+    assert receipt.output is not None
+    assert receipt.output.diagnosis.misconception_id == _MID
+    assert receipt.output.diagnosis.confidence == pytest.approx(0.9)
+
+
+def test_runner_explanation_source_marks_llm_authorship() -> None:
+    receipt = TutorOutputReceipt()
+    _run(_end_turn(_MARKER), receipt)
+    assert receipt.output is not None and receipt.output.explanation_source == "llm"
+
+
+@pytest.mark.parametrize(
+    ("known", "ok"),
+    [(None, True), (frozenset({"math.fake.node"}), True), (frozenset(), False), (_KNOWN, False)],
+)
+def test_harness_fails_only_the_tool_for_unknown_concept_ids(
+    known: frozenset[str] | None, ok: bool
+) -> None:
+    """하네스 단위 — 허용 집합 밖이면 그 도구만 ok=False, 루프는 다음 액션으로 계속(end_turn 도달).
+    None(기본)은 검사하지 않는다(shadow·Scripted 기존 동작)."""
+    policy = ScriptedTutorPolicy(
+        [
+            QueryCurriculumAction(node_id="math.fake.node"),
+            ReadStateAction(node_ids=["math.fake.node"]),
+            EndTurnAction(action_type="질문", utterance=None),
+        ]
+    )
+    outcome = asyncio.run(run_tutoring_turn(policy=policy, known_concept_ids=known))
+    assert outcome.status == "ended"
+    assert [r.ok for r in outcome.trace[:2]] == [ok, ok]
+    if not ok:
+        assert all(r.detail == CONCEPT_ID_REJECT_DETAIL for r in outcome.trace[:2])
