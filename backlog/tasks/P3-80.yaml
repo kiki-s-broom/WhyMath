@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-80
+title: "derive_selected_root가 conceptual 은행 96건에서 AttributeError(튜플 조건) — 호출 경로 확인·형태 검사"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현: `derive_selected_root(verify.conditions, verify.answer_selection or \"unique\")`(l3/verify_answer.py)가 `data/corpus/problem_bank_conceptual_v0/problems.jsonl` 360건 중 96건에서 AttributeError(`'tuple' object has no attribute 'free_symbols'`)를 낸다. main과 P3-75 브랜치가 같다(P3-75 리뷰 중 발견, 2026-10-21).\n② 먼저 호출처를 전수 확인한다: 이 함수가 실제로 conceptual 은행 레코드에 대해 불리는 경로가 있는가(생성기 `_derive_and_normalize`·harness·api). 불리지 않으면 이 꼴을 받았을 때 예외 대신 판정 불가(None 또는 명시 오류)로 접는지를 계약으로 정하고, 불리면 그 경로의 실제 영향(조용한 실패·생성 중단)을 측정한다.\n③ 원인을 고친다: 연립·튜플 조건을 받는 분기에서 자유 변수 수집 전에 형태를 검사한다. 예외를 삼키는 경우 예외 타입명을 로그에 남긴다(침묵 실패 금지).\n④ 회귀: 전 은행 `derive_selected_root` 출력이 main과 같거나(정상 건) 판정 불가로만 바뀌는지(96건) 전수 대조하고, 96건의 꼴을 픽스처로 고정한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/verify_answer.py
+session: null
+notes: ""
+updated: 2026-10-21
