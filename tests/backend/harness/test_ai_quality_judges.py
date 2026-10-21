@@ -137,7 +137,10 @@ class TestMathCorrectness:
         bad = _with(base[case.case_id], explanation=_text(base[case.case_id]) + " 6*7 = 41이야.")
         j = _judge("math_correctness", case, bad, registry, eval_set, base)
         assert j.applicable and not j.passed
-        assert any("6*7 = 41" in r for r in j.reasons)
+        # 거짓은 *주장 단위로* 귀속된다(실패 목록이 어느 식이 틀렸는지 말한다). 본문 전체 검사는
+        # 주장 단위 판정이 놓친 것만 보완한다 — 뮤테이션 M12(주장 단위 거짓 무시) 생존 후 강화.
+        assert any(r.startswith("거짓 수치 관계 '6*7 = 41'") for r in j.reasons), j.reasons
+        assert j.counters["claims_false"] == 1
 
     def test_true_numeric_relation_is_control(self, registry, eval_set, base, clean_ladder) -> None:
         case = clean_ladder[1]

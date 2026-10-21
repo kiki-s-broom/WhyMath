@@ -33,10 +33,13 @@ hallucination · Curriculum 범위 이탈. 축 정의·재사용 판정·사각�
 - 1 — 하나라도 FAIL (`--self-test`: 하나라도 무반응·주입 미적용)
 - 2 — 측정 실패(적재 실패·판정 대상 부족·판정기 예외). 1과 2 모두 CI를 빨갛게 한다.
 
-학생 노출 경로(P3-G3 ② 준비)
----------------------------
+학생 노출 경로(P3-G3 ② 준비) — 범위를 밝힌다
+--------------------------------------------
 실패 사례마다 P3-09 학생 대면 출력 게이트(`validate_tutor_output`)가 그 응답을 **차단하는지**를
-함께 적는다 — 차단되면 그 실패는 학생에게 닿는 경로가 없다. 비차단 실패만이 노출 위험이다.
+함께 적는다(`blocked_by_p309`). 차단되면 그 실패는 그 게이트에서 멈춘다. **미차단이 곧 학생 도달은
+아니다** — 서빙 경로에는 P3-09 앞에 정답 억제 백스톱·프로즈 게이트·톤필터·금지모드 가드가 있고, 이
+CLI는 그 층들을 모델링하지 않는다(실제 러너를 거친 측정은 라이브 후보 측정 태스크의 몫). 그래서
+리포트 표기는 '노출'이 아니라 'P3-09 미차단'이다.
 
 측정 도구 실패 경로(2026-08-22 규칙)
 -----------------------------------
@@ -115,7 +118,7 @@ class FailureCase:
 
 @dataclass(frozen=True)
 class AxisResult:
-    """축 1개의 집계 — 분모·통과·실패·Wilson 경계·판정·실패 사례·노출 경로·작동 회계."""
+    """축 1개의 집계 — 분모·통과·실패·Wilson 경계·판정·실패 사례·P3-09 차단 여부·작동 회계."""
 
     spec: AxisSpec
     n_cases: int
@@ -136,7 +139,7 @@ class AxisResult:
         return self.n_pass / self.n_applicable if self.n_applicable else None
 
     @property
-    def exposed_failures(self) -> int:
+    def unblocked_failures(self) -> int:
         return sum(1 for f in self.failures if not f.blocked_by_p309)
 
 
@@ -338,7 +341,7 @@ def _axis_line(a: AxisResult) -> str:
     reach = "" if a.reachable is None or a.reachable else " · 이 표본으로는 임계 도달 불가"
     return (
         f"[{a.verdict:<10}] {a.spec.name_ko:<14} 대상 {a.n_applicable}/{a.n_cases} · 통과 "
-        f"{a.n_pass} · 실패 {a.n_fail} (노출 {a.exposed_failures}) · {a.observed} · "
+        f"{a.n_pass} · 실패 {a.n_fail} (P3-09 미차단 {a.unblocked_failures}) · {a.observed} · "
         f"기준 {direction} {a.spec.threshold:.2f}{reach}"
         + (f" · 판정기 예외 {a.n_errors}" if a.n_errors else "")
     )
@@ -370,7 +373,7 @@ def render_report(report: EvalReport, *, failures: int = 5) -> str:
                 "    작동 회계: " + ", ".join(f"{k}={v}" for k, v in sorted(a.counters.items()))
             )
         for f in a.failures[:failures]:
-            block = "P3-09 차단" if f.blocked_by_p309 else "노출 가능"
+            block = "P3-09 차단" if f.blocked_by_p309 else "P3-09 미차단"
             lines.append(f"    ✗ {f.case_id} [{block}] {' / '.join(f.reasons)}")
         if len(a.failures) > failures:
             lines.append(f"    … 실패 {len(a.failures) - failures}건 더(--json 에 전건)")
@@ -423,7 +426,7 @@ def _axis_json(a: AxisResult) -> dict[str, Any]:
         "observed": a.observed,
         "reachable": a.reachable,
         "verdict": a.verdict,
-        "exposed_failures": a.exposed_failures,
+        "failures_not_blocked_by_p309": a.unblocked_failures,
         "counters": dict(a.counters),
         "blind_spots": list(BLIND_SPOTS.get(a.spec.axis, ())),
         "failures": [
