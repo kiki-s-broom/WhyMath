@@ -949,3 +949,34 @@ def test_harness_fails_only_the_tool_for_unknown_concept_ids(
     assert [r.ok for r in outcome.trace[:2]] == [ok, ok]
     if not ok:
         assert all(r.detail == CONCEPT_ID_REJECT_DETAIL for r in outcome.trace[:2])
+
+
+class _VerifyThenBoomProvider:
+    """첫 호출은 verify_step, 이후 provider 장애 — 정책이 불변식 *없이* 바로 강등하는 경로."""
+
+    def __init__(self) -> None:
+        self._calls = 0
+
+    async def generate(
+        self,
+        prompt: str,
+        system: str,
+        decision: RoutingDecision,
+        *,
+        images: Sequence[str] | None = None,
+    ) -> GenerationResult:
+        self._calls += 1
+        if self._calls == 1:
+            return GenerationResult('{"kind": "verify_step"}')
+        raise ConnectionError("LLM 도달 불가(테스트)")
+
+
+def test_provider_failure_on_wrong_answer_asks_instead_of_encouraging() -> None:
+    """검토 중2 (b) — provider 장애 강등은 `_enforce_invariants`를 거치지 않으므로 `_safe_fallback`
+    자신이 오답 턴의 격려를 막아야 한다(이 픽스처가 그 절을 밟는다)."""
+    receipt = TutorOutputReceipt()
+    utterance = _run(
+        "", receipt, **_WRONG, active_hypotheses=[], provider=_VerifyThenBoomProvider()
+    )
+    assert utterance == NEUTRAL_GUIDE_UTTERANCE
+    assert receipt.output is not None and receipt.output.response_strategy == "guided_question"
