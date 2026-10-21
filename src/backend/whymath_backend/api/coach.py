@@ -108,6 +108,11 @@ from whymath_backend.harness.wh1_tutor_context import (
     build_tutor_context_manifest,
     log_tutor_context,
 )
+from whymath_backend.harness.wh1_tutor_output import (
+    TutorOutputReceipt,
+    TutorTurnOutput,
+    check_deliverable,
+)
 from whymath_backend.l1.embedding_provider import build_provider
 from whymath_backend.l1.standards.alignment_query import (
     AlignmentAxis,
@@ -565,6 +570,16 @@ _SERVED_HINT_DESC = (
 # P3-08 — 튜터 context 9종 매니페스트(세션 2응답 공통). stateless `CoachResponse`에는 싣지 않는다 —
 # 그 경로는 튜터(WH-1 primary)를 부르지 않고(LLM 0·DB 0) 9종 중 서버 조회 슬롯을 채울 수 없어,
 # 넣으면 늘 '누락'인 가짜 계기판이 된다.
+_TUTOR_OUTPUT_DESC = (
+    "튜터의 **구조화 출력**(P3-09·`tutor-output-v1`) — 진단(`concept_id`·`misconception_id`·"
+    "`confidence`)·응답 전략·힌트 단계·발화(`explanation`)·다음 행동·`mastery_update_allowed`. "
+    "스키마 검증을 두 번(러너 조립 시·승격 직전) 통과한 튜터 발화만 여기에 실리며, 그때 "
+    "`explanation`은 `decision.prompt`와 같은 문자열이다. `mastery_update_allowed`는 **항상 "
+    "false**다 — LLM은 학습 상태를 결정하지 않는다(숙달 갱신은 `completion_evidence`를 거친 "
+    "평가·숙달 엔진만). 진단 값은 서버가 채운다(개념 = 이번 턴 DB 조회 개념, 오개념 = 활성 가설 "
+    "최상위·카탈로그 정본). null이면 이 턴은 튜터 발화가 아니다 — 튜터 미호출(완료 상태머신 "
+    "가로채기·primary OFF)이거나 검증 미통과·실패로 결정론 Polya 발화가 나갔다."
+)
 _TUTOR_CONTEXT_DESC = (
     "튜터 context 9종의 **조회·전달 표기**(P3-08) — 학생 상태·현재 개념·현재 스킬·문제·"
     "학생 답안·풀이 기록·추정 오개념·숙달·교수법 정책. 슬롯마다 `resolved`(서버 조회·요청으로 "
@@ -621,6 +636,7 @@ class SessionCreateResponse(CoachResponse):
     tutor_context: TutorContextManifest | None = Field(
         default=None, description=_TUTOR_CONTEXT_DESC
     )
+    tutor_output: TutorTurnOutput | None = Field(default=None, description=_TUTOR_OUTPUT_DESC)
 
 
 class TurnAppendResponse(CoachResponse):
@@ -663,6 +679,7 @@ class TurnAppendResponse(CoachResponse):
     tutor_context: TutorContextManifest | None = Field(
         default=None, description=_TUTOR_CONTEXT_DESC
     )
+    tutor_output: TutorTurnOutput | None = Field(default=None, description=_TUTOR_OUTPUT_DESC)
 
 
 class SessionGetResponse(BaseModel):
@@ -3267,6 +3284,7 @@ async def _wh1_primary_decision_or(
     tutor_context: TutorContextManifest | None = None,
     delivery: TutorDeliveryReceipt | None = None,
     tutor_content: TutorContentSummary | None = None,
+    output_receipt: TutorOutputReceipt | None = None,
 ) -> PedagogyDecision:
     """flip(S1-11): 학생-대면 발화를 WH-1 하네스 LLM 발화로 교체 — 실패 시 결정론 폴백.
 
@@ -3291,7 +3309,17 @@ async def _wh1_primary_decision_or(
     `tutor_context`·`delivery`(P3-08): `_tutor_context_for`가 낸 9종 `resolved` 매니페스트를 러너로
     넘기고, 러너가 정책 실제 보유값으로 `delivered_to_tutor`를 채운 결과를 `delivery`로 받는다.
     `tutor_content`(P3-72): 개념·스킬·문제 구조·팩 요약 — 러너가 정책 프롬프트에 싣는다.
+
+    `output_receipt`(P3-09 — `harness/wh1_tutor_output.py`): 러너가 스키마 검증을 통과한 구조화
+    튜터 출력(`TutorTurnOutput`)을 담는다. **승격 직전에 한 번 더 검증한다**(`check_deliverable`) —
+    구조체가 없거나·지금 스키마를 통과하지 못하거나(`mastery_update_allowed`가 false가 아닌 객체
+    포함)·진단 개념 id가 이 핸들러가 DB에서 조회한 개념이 아니거나·발화가 구조체의 `explanation`과
+    다르면 LLM 발화를 승격하지 않고 결정론 `decision`을 그대로 돌려준다(사유 코드 WARNING). 통과한
+    구조체만 영수증에 남아 응답 `tutor_output`으로 나간다 — 학생 화면의 발화(`decision.prompt`)와
+    같은 문자열이다.
     """
+    receipt = output_receipt if output_receipt is not None else TutorOutputReceipt()
+    receipt.output = None
     try:
         utterance = await run_wh1_primary_turn(
             student_solution=body.student_solution or body.student_input,
@@ -3313,14 +3341,35 @@ async def _wh1_primary_decision_or(
             tutor_context=tutor_context,
             delivery=delivery,
             tutor_content=tutor_content,
+            # P3-09: 힌트 단계는 결정론 엔진 값을 그대로 옮긴다(LLM이 정하지 않는다).
+            hint_level=decision.hint_level,
+            output_receipt=receipt,
         )
     except Exception as exc:  # noqa: BLE001 — flip은 앱을 죽이지 않는다(이중 방어·타입명 로그).
         logger.warning(
             "WH-1 primary 경로 예외(%s) — 결정론 템플릿 폴백", type(exc).__name__, exc_info=True
         )
+        receipt.output = None
         return decision
     if utterance is None:
+        receipt.output = None
         return decision  # 결정론 폴백(사유는 run_wh1_primary_turn이 이미 로그).
+    # P3-09 승격 직전 재검증 — 이 핸들러가 DB에서 조회한 개념만 진단 개념으로 인정한다.
+    known_concept_ids = (
+        frozenset({tutor_content.concept.code})
+        if tutor_content is not None
+        and tutor_content.concept is not None
+        and tutor_content.concept.code
+        else frozenset()
+    )
+    rejection = check_deliverable(
+        receipt.output, utterance=utterance, known_concept_ids=known_concept_ids
+    )
+    if rejection is not None:
+        # 사유 코드만 — 발화 원문·id 값은 싣지 않는다(침묵 실패 금지·프라이버시).
+        logger.warning("WH-1 primary 튜터 출력 승격 거부(%s) — 결정론 템플릿 폴백", rejection)
+        receipt.output = None
+        return decision
     return decision.model_copy(update={"prompt": utterance})
 
 
@@ -3654,6 +3703,8 @@ async def create_session(
     # P3-08: 튜터 호출 여부와 실제 전달 영수증 — 응답·로그가 '튜터가 받은 것'을 사실대로 적게 한다.
     tutor_invoked = wh1_primary_on and not completion.handled
     tutor_receipt = TutorDeliveryReceipt()
+    # P3-09: 스키마 검증을 통과한 구조화 튜터 출력만 담기는 영수증(미통과·미호출이면 None 유지).
+    tutor_output_receipt = TutorOutputReceipt()
     if tutor_invoked:
         # P3-72: 내용 요약은 튜터 호출이 확정된 턴에만 조회한다(가로챈 턴·primary OFF는 조회 0).
         tutor_content = await _tutor_content_for(
@@ -3684,6 +3735,7 @@ async def create_session(
             tutor_context=tutor_context,  # P3-08: resolved 매니페스트 → 러너가 전달을 채운다.
             delivery=tutor_receipt,
             tutor_content=tutor_content,  # P3-72: 개념·스킬·문제 구조·팩 요약(학생 데이터 0).
+            output_receipt=tutor_output_receipt,  # P3-09: 검증 통과 구조화 출력만 담긴다.
         )
     tutor_context = _finalize_tutor_context(
         tutor_context, tutor_receipt, tutor_invoked=tutor_invoked, seat="coach.create_session"
@@ -3893,6 +3945,7 @@ async def create_session(
         completion_evidence=completion.completion_evidence,
         served_hint=served_hint,
         tutor_context=tutor_context,
+        tutor_output=tutor_output_receipt.output,
     )
 
 
@@ -4122,6 +4175,8 @@ async def append_turns(
     # P3-08: create_session과 동형 — 튜터 호출 여부·실제 전달 영수증.
     tutor_invoked = wh1_primary_on and not completion.handled
     tutor_receipt = TutorDeliveryReceipt()
+    # P3-09: 스키마 검증을 통과한 구조화 튜터 출력만 담기는 영수증(미통과·미호출이면 None 유지).
+    tutor_output_receipt = TutorOutputReceipt()
     if tutor_invoked:
         # P3-72: 내용 요약은 튜터 호출이 확정된 턴에만 조회한다(가로챈 턴·primary OFF는 조회 0).
         tutor_content = await _tutor_content_for(
@@ -4151,6 +4206,7 @@ async def append_turns(
             tutor_context=tutor_context,  # P3-08: create_session과 동형.
             delivery=tutor_receipt,
             tutor_content=tutor_content,  # P3-72: create_session과 동형.
+            output_receipt=tutor_output_receipt,  # P3-09: create_session과 동형.
         )
     tutor_context = _finalize_tutor_context(
         tutor_context, tutor_receipt, tutor_invoked=tutor_invoked, seat="coach.append_turns"
@@ -4353,6 +4409,7 @@ async def append_turns(
         completion_evidence=completion.completion_evidence,
         served_hint=served_hint,
         tutor_context=tutor_context,
+        tutor_output=tutor_output_receipt.output,
     )
 
 

@@ -33,6 +33,13 @@ Protocol을 *프로덕션*으로 구현한다 — 지금까지 두뇌는 `Script
 강등한다 — verify 의무가 걸려 있으면 `verify_step`, 아니면 `end_turn(격려)`. 학생 앞에서 루프가
 죽지 않는다.
 
+**출력 스키마 검증(P3-09 1단계 — 정본 `harness/wh1_tutor_output.py`).** LLM이 낸 JSON은 액션으로
+만들기 전에 `classify_action_payload`를 통과해야 한다 — 필수 필드 누락·타입 오류(bool을 정수로
+쓰기·문자열 극성 등 관대한 형변환 금지)·학습 상태 권위 주장(`mastery_update_allowed`가 false가
+아님)·이번 턴 프롬프트에 없던 개념 id·카탈로그 밖 오개념 id는 거부하고 안전 강등한다. 거부는 사유
+코드(또는 예외 타입명)를 WARNING으로 남기고 `output_rejections`로 센다(침묵 실패 금지 — 값·원문은
+로그에 싣지 않는다).
+
 범위 밖(후속): S1-b(`/v1/coach` 엔드포인트를 하네스 경유로 전환하며 이 정책을 배선)·전략 계층
 도구·fast path. 본 모듈은 *도구 선택 두뇌*만 둔다. `ScriptedTutorPolicy`는 존치(테스트용).
 """
@@ -67,6 +74,11 @@ from whymath_backend.harness.wh1_tutor_context import (
     PROMPT_KEY_SLOTS,
     TutorContentSummary,
     TutorContextSlot,
+)
+from whymath_backend.harness.wh1_tutor_output import (
+    REASON_NOT_JSON_OBJECT,
+    REASON_UNKNOWN_KIND,
+    classify_action_payload,
 )
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
@@ -214,6 +226,15 @@ class LLMTutorPolicy:
         self._session_recall = session_recall
         # P3-72: 프롬프트에 싣는 슬롯 내용 요약(비식별) — θ·숙달·학년을 담을 필드가 없는 타입.
         self._content = content
+        # P3-09: LLM이 도구 인자로 쓸 수 있는 개념 id — 이번 턴 프롬프트에 실린 것(코치가 DB에서
+        # PK로 조회한 PRIMARY 개념 code)뿐이다. 그 밖의 개념 id는 LLM이 본 적 없는 환각이다.
+        self._known_concept_ids: frozenset[str] = (
+            frozenset({content.concept.code})
+            if content is not None and content.concept is not None and content.concept.code
+            else frozenset()
+        )
+        # P3-09: 이 정책이 거부한 LLM 출력의 사유 코드별 건수(관측 `llm_output_rejections`의 원천).
+        self._output_rejections: dict[str, int] = {}
         # P3-08 정직 신호 — 러너가 정책 생성 *뒤* `disclose_context`로 채운다(기본 = 키 없음).
         self._context_missing: tuple[str, ...] = ()
         self._context_not_delivered: tuple[str, ...] = ()
@@ -254,6 +275,16 @@ class LLMTutorPolicy:
         호출이 정상이면 지워진다 — 첫 호출만 실패하고 둘째가 정상 발화한 턴은 LLM 발화다.
         """
         return self._last_action_degraded
+
+    @property
+    def known_concept_ids(self) -> frozenset[str]:
+        """이번 턴 프롬프트에 실린(DB 조회) 개념 code 집합 — 진단 개념 id 검증의 원천(P3-09)."""
+        return self._known_concept_ids
+
+    @property
+    def output_rejections(self) -> dict[str, int]:
+        """이 정책이 스키마 위반으로 거부한 LLM 출력의 사유 코드별 건수(복사본·P3-09)."""
+        return dict(self._output_rejections)
 
     # ── P3-08/P3-72 튜터 context 전달 회계 ───────────────────────────────
     def private_context_slots(self) -> frozenset[TutorContextSlot]:
@@ -597,17 +628,35 @@ class LLMTutorPolicy:
 
     # ── 파싱·매핑 ──────────────────────────────────────────────────────
     def _parse_action(self, raw: str, state: TurnState) -> Action:
-        """LLM 원시 출력 → Action. 파싱 실패·미지 kind·검증 실패는 안전 폴백(크래시 금지)."""
+        """LLM 원시 출력 → Action. 스키마 위반은 사유를 남기고 안전 폴백(크래시·침묵 금지).
+
+        순서: JSON 객체 추출 → 스키마 판정(`classify_action_payload` — P3-09) → 액션 구성(Pydantic
+        판별 유니온 검증). 어느 단계든 실패하면 `_reject`가 사유 코드(구성 단계는 예외 타입명)를
+        남기고 `_safe_fallback`으로 강등한다 — LLM 문자열은 학생에게 가지 않는다.
+        """
         data = self._extract_json(raw)
         if data is None:
-            return self._safe_fallback(state)
+            return self._reject(state, REASON_NOT_JSON_OBJECT)
+        reason = classify_action_payload(data, known_concept_ids=self._known_concept_ids)
+        if reason is not None:
+            return self._reject(state, reason)
         try:
             action = self._build_action(data)
-        except (ValidationError, ValueError, KeyError, TypeError):
-            return self._safe_fallback(state)
+        except (ValidationError, ValueError, KeyError, TypeError) as exc:
+            return self._reject(state, type(exc).__name__)
         if action is None:
-            return self._safe_fallback(state)
+            return self._reject(state, REASON_UNKNOWN_KIND)
         return action
+
+    def _reject(self, state: TurnState, reason: str) -> Action:
+        """스키마 위반 거부 — 사유 코드를 세고 WARNING으로 남긴 뒤 안전 강등(P3-09).
+
+        로그에는 사유 코드(닫힌 어휘 또는 예외 타입명)만 싣는다. LLM 원문은 학생 발화·정답을 담을 수
+        있어 싣지 않는다.
+        """
+        self._output_rejections[reason] = self._output_rejections.get(reason, 0) + 1
+        logger.warning("LLMTutorPolicy 출력 스키마 위반(%s) — 안전 강등(결정론 폴백)", reason)
+        return self._safe_fallback(state)
 
     @staticmethod
     def _extract_json(raw: str) -> dict[str, object] | None:
@@ -652,7 +701,10 @@ class LLMTutorPolicy:
             return MatchMisconceptionAction(student_text=self._student_text)
 
         if kind == "curate_hypothesis":
-            return CurateHypothesisAction(turns_elapsed=self._as_int(data.get("turns_elapsed", 1)))
+            turns = data.get("turns_elapsed")
+            return CurateHypothesisAction(
+                turns_elapsed=self._as_int(turns) if turns is not None else 1
+            )
 
         if kind == "verify_step":
             # 풀이 단계도 정책 보유값(프롬프트 미노출).

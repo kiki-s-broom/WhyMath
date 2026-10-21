@@ -72,13 +72,15 @@ PrimaryOutcome = Literal[
     "fallback_no_utterance",
     "fallback_prose_gate",
     "fallback_mode_guard",
+    "fallback_output_schema",
 ]
 """primary 한 턴의 **결말** 닫힌 어휘(OPS-134 ②) — 학생이 LLM 발화를 받았는가, 왜 못 받았는가.
 
 `adopted` 외는 전부 LLM 발화가 학생에게 닿지 않은 턴이다(결정론 템플릿이 서빙된다).
 `fallback_llm_degraded`는 하네스가 정상 종료했지만 **턴을 끝낸 행동이 정책의 안전 강등**이었던
 경우다 — provider 실패·파싱 불가를 정책이 흡수해 `ended`로 돌려주므로, 이 라벨이 없으면 LLM이
-죽어도 채택으로 센다.
+죽어도 채택으로 센다. `fallback_output_schema`는 학생 대면 튜터 출력(`TutorTurnOutput`·P3-09)이
+스키마 검증을 통과하지 못해 결정론 발화로 돌아간 턴이다(사유 코드는 `tutor_output_reason_code`).
 
 어휘를 닫아 둔 이유: 열린 문자열이면 오타가 새 사유로 집계되고, 분모(시도)와 분자(채택)의 정의가
 호출 지점마다 달라진다."""
@@ -227,6 +229,17 @@ class Wh1HarnessShadowObservation(BaseModel):
     """P3-08 — 못 얻은 원인이 데이터 커버리지 공백(미매핑·팩 미보유 단원)인 슬롯 이름 — 로그는
     INFO라 경보가 되지 않으므로 이 필드로 집계한다. None=구판."""
 
+    llm_output_rejections: int | None = None
+    """P3-09 — 이 턴에 정책이 **스키마 위반으로 거부한** LLM 도구 출력 수(깨진 JSON·필드 누락·타입
+    오류·상태 권위 주장·환각 id). 거부는 매번 안전 강등으로 이어진다. **None=구판·shadow·정책 생성
+    전 중단**(미계측)으로 "거부 0건"(=0)과 구분한다 — 검증기가 실사용에서 몇 번 작동했는지의 분자.
+    """
+
+    tutor_output_reason_code: str | None = None
+    """P3-09 — 학생 대면 튜터 출력이 스키마 검증에서 거부된 사유 코드(`wh1_tutor_output`의
+    `REASON_*` 또는 `SCHEMA_<pydantic 오류 type>`). None=검증 통과 또는 검증 단계 미도달.
+    값·발화 원문은 담지 않는다."""
+
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -350,6 +363,8 @@ def emit_wh1_observation(
     context_missing: Sequence[str] | None = None,
     context_not_delivered: Sequence[str] | None = None,
     context_coverage_gap: Sequence[str] | None = None,
+    llm_output_rejections: int | None = None,
+    tutor_output_reason_code: str | None = None,
 ) -> None:
     """하네스 한 턴 결과를 관측 레코드로 emit — shadow·primary *공통* 단일 좌석(S1-11).
 
@@ -418,6 +433,8 @@ def emit_wh1_observation(
             context_missing=_names(context_missing),
             context_not_delivered=_names(context_not_delivered),
             context_coverage_gap=_names(context_coverage_gap),
+            llm_output_rejections=llm_output_rejections,
+            tutor_output_reason_code=tutor_output_reason_code,
         ).model_dump_json()
     )
 
@@ -435,6 +452,7 @@ def emit_wh1_aborted_observation(
     context_missing: Sequence[str] | None = None,
     context_not_delivered: Sequence[str] | None = None,
     context_coverage_gap: Sequence[str] | None = None,
+    llm_output_rejections: int | None = None,
 ) -> None:
     """하네스가 **결과를 남기지 못하고 중단된** primary 턴의 레코드를 emit한다(OPS-134 ②).
 
@@ -464,6 +482,7 @@ def emit_wh1_aborted_observation(
             context_missing=_names(context_missing),
             context_not_delivered=_names(context_not_delivered),
             context_coverage_gap=_names(context_coverage_gap),
+            llm_output_rejections=llm_output_rejections,
         ).model_dump_json()
     )
 

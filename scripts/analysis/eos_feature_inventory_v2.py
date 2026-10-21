@@ -1051,7 +1051,7 @@ CATALOG: tuple[Spec, ...] = (
        "Pedagogy", "P0", "04a — 학생 대면 발화 primary", "harness.wh1_loop",
        "harness.wh1_llm_policy", "harness.wh1_primary", "harness.wh1_session",
        "harness.wh1_prose", "harness.wh1_probe_supply", "harness.wh1_llm_seam",
-       "harness.wh1_tutor_context", flag="wh1_primary_enabled"),
+       "harness.wh1_tutor_context", "harness.wh1_tutor_output", flag="wh1_primary_enabled"),
     _e("WM-E-705", "WH-1 shadow 관측·수확·2단계 종료 게이트", "Platform", "QA", "P1",
        "S1-b·S1-15 shadow 축적", "harness.wh1_shadow", "harness.wh1_shadow_harvest",
        "harness.agreement_gate", "harness.agreement_gate_cli",
