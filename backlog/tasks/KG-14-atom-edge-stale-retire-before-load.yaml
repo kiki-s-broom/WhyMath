@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,7 +18,7 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/l1/atom_graph/**"
   - docs/ops/skb03_atom_node_populate_runbook.md
-session: null
+session: claude/kg-14-stale-retire
 notes: |-
   발견 2026-10-21: KG-12 머지 뒤 prod 적재 런북 실행 중. Kiki 클론이 타 세션 브랜치(d7c8a365)에 있어 PATHS_MATCH_MAIN=False로 적재가 자가거부됐고, 그 사이 적재기(atom_backend_edge.AtomBackendEdgeStore)가 ON CONFLICT DO UPDATE만 하고 삭제 경로가 없음을 코드로 확인했다. Kiki 머신 읽기 전용 패리티 실측(2026-10-21 · main 9ca012c1): prod 2,234건 · 잔존 예정 221건(고등 123·초등 55·중학 23·대학 16·중→고 4) · 순환 위험 5쌍 · prod에 cms_edited_at 열 없음(스키마 head 아님). 자세한 정정은 acceptance ⑦. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW
 
