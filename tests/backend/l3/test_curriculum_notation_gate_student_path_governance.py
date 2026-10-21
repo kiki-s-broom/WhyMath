@@ -37,7 +37,14 @@ STUDENT_PATH_DIRS: tuple[str, ...] = ("api", "l4/polya", "l4/socratic")
 
 # 게이트를 언급할 수 있는 유일한 소스 파일(패키지 루트 기준) — 엔진과 그것을 부르는 CLI.
 ALLOWED_REFERENCERS: frozenset[str] = frozenset(
-    {"l3/curriculum_notation_gate.py", "harness/curriculum_notation_gate_cli.py"}
+    {
+        "l3/curriculum_notation_gate.py",
+        "harness/curriculum_notation_gate_cli.py",
+        # P3-10 AI 품질 평가 — 튜터 *출력*(생성물)의 표기 구조를 학생 밴드와 대조하는 오프라인
+        # 평가기다. 학생 입력을 거부하지 않고 서빙 경로에서 import되지 않는다(harness 전용).
+        "harness/ai_quality_registry.py",
+        "harness/ai_quality_judges.py",
+    }
 )
 
 

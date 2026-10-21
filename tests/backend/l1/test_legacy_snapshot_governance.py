@@ -67,6 +67,10 @@ _AUDIT_WHITELIST = frozenset(
         # S2-03 원자 재연결 — 문제 태깅 src 태그를 크로스워크로 해석할 때 다리(graph.json의
         # concept_id→src_id)만 빌드타임에 읽는다(개념 *데이터* read 아님·런타임 reader 아님).
         "l1/problem_bank/populate.py",
+        # P3-10 AI 품질 평가(audit 전용·런타임 아님) — 튜터 출력이 참조한 개념 code(= 437 canonical
+        # id · P3-01 명세·P3-09 진단과 같은 공간)의 실재·이름·선수 관계를 대조하려고 ids·concepts·
+        # prerequisite_edges 를 읽는다. 서빙 경로(api·l2·l3·l4)에서 import되지 않는다.
+        "harness/ai_quality_registry.py",
     }
 )
 
