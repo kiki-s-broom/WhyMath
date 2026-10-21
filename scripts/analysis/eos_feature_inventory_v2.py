@@ -1277,6 +1277,11 @@ CATALOG: tuple[Spec, ...] = (
        # 레코드의 `answer` 필드·풀이 최종 답·선택지 유일성까지 보는 별도 판정기라 같은 행에
        # 귀속한다. 지표 ④ 의 엔진이다(phase3_metrics 가 호출).
        "harness.solution_qa",
+       # P3-10 — 튜터 턴 AI 품질 8축(평가셋·판정기·후보/주입·CLI). 판정 권위는 기존 검증 레이어
+       # (verify_step·detect_answer_leakage·check_level_reveals·TutorTurnOutput·MATH-04)를 호출하고
+       # 결함 주입 자가 점검으로 변별력을 상시 봉인하는 판정 가족이라 같은 행에 귀속한다.
+       "harness.ai_quality_eval", "harness.ai_quality_eval_set", "harness.ai_quality_judges",
+       "harness.ai_quality_candidates", "harness.ai_quality_registry",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
        # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
