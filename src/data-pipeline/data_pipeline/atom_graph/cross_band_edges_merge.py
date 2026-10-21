@@ -49,6 +49,7 @@ from data_pipeline.atom_graph.cross_band_edges import (
     proposal_edges,
     validate_cross_band_edges,
 )
+from data_pipeline.atom_graph.graph_history import APPENDED_AFTER_CROSS_BAND
 from data_pipeline.atom_graph.models import AtomEdge
 
 DEFAULT_PROVENANCE_PATH: Final[Path] = Path("data/corpus/atom_graph_v1/_provenance.json")
@@ -79,9 +80,14 @@ def graph_sha256(graph: Mapping[str, Any]) -> str:
 
 
 def pre_merge_view(graph: Mapping[str, Any]) -> dict[str, Any]:
-    """출처 태그 엣지를 뺀 병합 전 정본 — 병합이 끝에 덧붙이기였으므로 바이트 단위로 복원된다."""
+    """출처 태그 엣지를 뺀 병합 전 정본 — 병합이 끝에 덧붙이기였으므로 바이트 단위로 복원된다.
+
+    경계 병합 *뒤에* 덧붙여진 태그(KG-12 서술형 승격 v2)도 함께 벗긴다(순서의 정본은
+    `graph_history`).
+    """
+    drop = {PROPOSAL_EVIDENCE, *APPENDED_AFTER_CROSS_BAND}
     view = dict(graph)
-    view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") != PROPOSAL_EVIDENCE]
+    view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") not in drop]
     return view
 
 

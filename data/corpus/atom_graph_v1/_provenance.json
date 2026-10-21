@@ -1,7 +1,7 @@
 {
   "pool": "whymath-original",
   "source_file": "261019_WhyMath_통합마스터_v3.xlsx",
-  "source_sha256": "0f798b255c4022c87cbebf66743394c357feaad8267b85011e79fb432ac25ec9",
+  "source_sha256": "648cf9f7091d9d65bfbceaf7ddf4211e58ef1a6fb0e8e77a55344c1e5cb48456",
   "source_citation": "원자-성취기준 매핑 근거: 교육부 고시 제2022-33호 [수학과 교육과정], 국가교육과정정보센터(NCIC, https://www.ncic.go.kr). 원자화·교수학 주석(4요소·원자성)·대학 축은 와이매스 자체작성.",
   "normalization_counts": {
     "narrative_edges": 973,
@@ -17,7 +17,7 @@
     "total": 2683
   },
   "edge_counts": {
-    "atom_id_edges": 2231,
+    "atom_id_edges": 2278,
     "narrative_edges_raw": 973
   },
   "school_level_university_atoms": 512,
@@ -54,7 +54,11 @@
     },
     {
       "id": "cross_band_edges_university_merge_v1",
-      "summary": "[S4-60 2026-10-20] 고→대 경계 엣지 24건 병합(검수:AI 2026-10-08 · 게이트 G-s401-uni-boundary-edge-review) — 엣지 2210→2234. 노드·기존 엣지 무변경, 끝에 덧붙임. 근거(rationale)는 정본에 넣지 않고 원장 cross_band_edges_university_v1.json에 둔다(AtomEdge extra=forbid · 결정 ⒞). 병합 전 정본 sha256 db3cd1c108431b62a0fc9e697dbd69666daf47f03c3910ba86f2a50351796baa. [KG-10 재적용 2026-10-20: 엣지 2207→2231]"
+      "summary": "[S4-60 2026-10-20] 고→대 경계 엣지 24건 병합(검수:AI 2026-10-08 · 게이트 G-s401-uni-boundary-edge-review) — 엣지 2210→2234. 노드·기존 엣지 무변경, 끝에 덧붙임. 근거(rationale)는 정본에 넣지 않고 원장 cross_band_edges_university_v1.json에 둔다(AtomEdge extra=forbid · 결정 ⒞). 병합 전 정본 sha256 db3cd1c108431b62a0fc9e697dbd69666daf47f03c3910ba86f2a50351796baa. [KG-10 재적용 2026-10-20: 엣지 2207→2231] [KG-12 ① 재적용 2026-10-20: 엣지 2195→2219 · 병합 전 정본 sha256 ea05b277ab40979d78be709daadb13d3427a72799a6a537561f1dc91c155601d]"
+    },
+    {
+      "id": "narrative_edge_promotion_v2",
+      "summary": "[KG-12 2026-10-20] 서술형 낱말매칭 참고 엣지 승격 59건 병합(검수:AI 2인 블라인드 합의 승인 ∩ 가드 통과 → 3인째 블라인드 C 승인분만 · evidence 'KG-12 서술형 낱말매칭 승격 v2') — 엣지 2219→2278. 노드·기존 엣지 무변경, 끝에 덧붙임. 근거(원 서술·검수 판정)는 원장 narrative_edge_promotion_v2.json·narrative_edge_reference_ledger_v2.json에 둔다. 병합 전 정본 sha256 516b1ef2b2b3a2f7ae950b72c17d02eb50290461baf77bfdf5c527490696e15c."
     }
   ],
   "regeneration_history": [
@@ -67,11 +71,16 @@
       "id": "v3_boundary_review_2026-10-20",
       "summary": "KG-10 ② 학교급 경계 신규 엣지 10건 AI 검수(2인 블라인드 · docs/data/ai_review_narrative_edge_resolution_v1.md) 반영 — 정본 xlsx 선수엣지_통합 3행 삭제(9수02-19-2→CALC1-C03·CALC1-P01·10공수1-01-03-2 반려)·1행 교체(9수02-19-2→CALC1-P21을 10공수1-01-03-1→CALC1-P21로, 학교급연계=Y) → 변경이력_v3 No.16~19 → scripts/regenerate_atom_backbone_v3.sh로 재생성 후 이관 3종·S4-60 경계 24건 재적용. 노드 2,683 불변·엣지 2,234→2,231·학교급 경계 50→47(중→대 0·고→대 25). source_sha256 7290aa57…→0f798b25…, pipeline_input 7f35a867…→34917cc6….",
       "previous_source_sha256": "7290aa575bdfa393f9bac95ddbe5335f70227cc85c3823f39268f001a2f2850f"
+    },
+    {
+      "id": "v3_university_chain_repair_2026-10-20",
+      "summary": "KG-12 ① 대학 내부 체인 역전 (가) 40건 AI 2인 블라인드 검수(docs/data/ai_review_university_chain_repair_v1.md) — A합의 21·B합의 16·보류 3 → 정본 xlsx 선수엣지_통합 12행 삭제·4행 from↔to 반전(변경이력_v3 No.20~35 · 원장 university_chain_repair_v1.json) → scripts/regenerate_atom_backbone_v3.sh로 재생성 후 S4-60 경계 24건 재병합. 노드 2,683 불변·엣지 2,231→2,219(경계 47 불변). 이어서 KG-12 ③ 서술형 낱말매칭 승격 v2 59건 병합(C 승인 62 중 S4-01 과목간 원장과 같은 쌍 3건은 그 원장 몫으로 유보 · post_transform_migrations narrative_edge_promotion_v2) → 2,278. source_sha256 0f798b25…→648cf9f7…, pipeline_input 34917cc6…→cdd917ac…. 역사 원장(KG-10·KG-11)은 재생성하지 않고 graph_history로 묶인 정본 721fe6ff…를 복원해 검증한다.",
+      "previous_source_sha256": "0f798b255c4022c87cbebf66743394c357feaad8267b85011e79fb432ac25ec9"
     }
   ],
   "pipeline_input": {
     "file": "pipeline_input_v3.xlsx",
-    "sha256": "34917cc6362f6ae66f847dd867897a8d5e74cf432272ac17f6571c1ee52a2595",
+    "sha256": "cdd917acfb953bd7685be2b69fcf97a2b3f8a29c0080418a856adeea7cd005a3",
     "derivation": "정본 xlsx의 선수엣지_통합.from_유형만 치환한 사본 — '원자ID(정규화 v3)' 3건→'원자ID', '소단원코드/단원코드(수작업매핑 v3)' 973건→'서술형'(패스스루·정규화후보_v3 열 보존). 그 외 바이트 동일. 사유: transform-v1이 from_유형 enum 2종만 받고 엣지 끝점을 원자 노드로 한정(validate dangling_edge_endpoint)"
   },
   "uploaded": "2026-10-19",

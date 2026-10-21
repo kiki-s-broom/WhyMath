@@ -8,7 +8,8 @@
    정본 + 제안을 합쳐도 prerequisite 그래프가 비순환이다.
 4. **스키마 호환** — 원장 전용 필드(level_pair·unit_level_source·narrative_indices)를 떼면
    `AtomEdge`(extra=forbid)를 통과한다 — 병합 시 정본 엣지가 될 수 있다는 증명.
-5. **정본 무수정** — 원장의 source_graph_sha256이 현재 정본 파일 지문과 같다(정본이 바뀌면 원장 재생성).
+5. **정본 묶임** — 원장의 source_graph_sha256은 검수 시점 정본의 지문이며, 현재 정본에서 그 정본이
+   바이트 단위로 되감긴다(`graph_history` · KG-12 이후 정본이 바뀌어도 원장은 재생성하지 않는다).
 6. **변별력(뮤테이션)** — 정본에 역방향 엣지를 주입하면 그 제안은 cycle_conflict로 빠진다; 제안 1건을
    정본에 미리 넣으면 already_present로 바뀐다.
 """
@@ -54,8 +55,9 @@ def _load_builder() -> Any:
 
 
 @pytest.fixture(scope="module")
-def graph() -> dict[str, Any]:
-    return json.loads(GRAPH_PATH.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+def graph(builder: Any) -> dict[str, Any]:
+    """원장이 묶인 정본(KG-10 검수 시점) — 현재 파일에서 graph_history로 복원한다."""
+    return builder.load_bound_graph()[0]  # type: ignore[no-any-return]
 
 
 @pytest.fixture(scope="module")
@@ -104,15 +106,22 @@ class TestReproducibility:
     def test_regeneration_is_byte_identical(
         self, builder: Any, graph: dict[str, Any], ledger_bytes: bytes
     ) -> None:
-        sha = hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+        sha = builder.bound_source_sha256()
         regenerated = builder.serialize(builder.build_payload(graph, sha))
         assert regenerated.encode("utf-8") == ledger_bytes
 
-    def test_source_sha_matches_canonical_file(self, ledger: dict[str, Any]) -> None:
+    def test_source_sha_is_reconstructable_from_canonical_file(
+        self, ledger: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """묶인 정본은 현재 정본에서 바이트 단위로 되감긴다(graph_history) — 닿지 못하면 fixture가 터진다."""
+        want = ledger["_meta"]["source_graph_sha256"]
         assert (
-            ledger["_meta"]["source_graph_sha256"]
-            == hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+            hashlib.sha256(
+                (json.dumps(graph, ensure_ascii=False, indent=2) + "\n").encode()
+            ).hexdigest()
+            == want
         )
+        assert GRAPH_PATH.exists()
 
     def test_builder_does_not_touch_canonical_graph(
         self, builder: Any, graph: dict[str, Any]

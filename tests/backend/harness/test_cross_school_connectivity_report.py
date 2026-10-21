@@ -331,15 +331,20 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
 
     S4-60(2026-10-09) 핀: 경계 44(20 + 고→대 24)·내부 2,190·플래그 44/0/0·라벨 합 40·
     고→중 (925, (9, 35, 123), 387). 그 이전(병합 전)은 2,210·경계 20·고→대 0·플래그 20이었다.
+
+    KG-12(2026-10-20): ① 대학 내부 체인 수리(제거 12·반전 4 — 전부 대학→대학 내부)로 2,231→2,219,
+    ③ 낱말매칭 승격 v2 59건(대학→대학)으로 2,278. 경계 47·플래그·라벨 합은 불변이고 대학→대학만
+    481→528. 대학→고등 도달은 198→160 — 되감기 엣지 제거로 2차 저작분이 체인에서 떨어졌다(새 뿌리
+    5·보완 배선 후속 KG-13); 1홉·2홉 도달은 승격 엣지로 44→47·80→91.
     """
     payload = json.loads(csc.DEFAULT_CORPUS_PATH.read_text(encoding="utf-8"))
     report = csc.build_report(csc.load_corpus_graph(payload))
 
-    assert report.edge_total == 2231
-    assert report.boundary_edge_total == 47  # 50(KG-09) − 반려 3 → 47/2,231 = 2.11%
+    assert report.edge_total == 2278
+    assert report.boundary_edge_total == 47  # 50(KG-09) − 반려 3 → 47/2,278 = 2.06%
     assert (
-        report.intra_level_total == 2184
-    )  # KG-09 2,190 − 6 · KG-10 ② 반려는 전부 경계 엣지라 불변
+        report.intra_level_total == 2231
+    )  # KG-09 2,190 − 6 → 2,184 · KG-12 대학 내부 −12 + 59 → 2,231
     assert report.backward_boundary_total == 0
     assert dict(report.level_pair_counts) == {
         ("초등", "초등"): 537,
@@ -349,7 +354,7 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
         ("중학", "고등"): 12,  # KG-10 ② 반려 1(9수02-19-2 → 10공수1-01-03-2)
         ("고등", "고등"): 925,
         ("고등", "대학"): 25,  # S4-60 병합분 24 + KG-10 ② 교체 1(10공수1-01-03-1 → CALC1-P21)
-        ("대학", "대학"): 481,
+        ("대학", "대학"): 528,  # KG-12 ① 제거 12 · ③ 승격 v2 59 → 481 − 12 + 59
     }
 
     # 이중 확인: 플래그 47건 = 양끝점 유도 47건(both 47·flag only 0·endpoint only 0) — KG-09의
@@ -362,10 +367,11 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     # 하향 도달 — 고등→중학이 핵심 행. 대학은 아무 하위 학교급에도 닿지 못한다.
     core = _cell(report, "고등", "중학")
     assert (core.population, core.reached_within, core.reached_any) == (925, (11, 42, 134), 307)
-    # 대학은 더 이상 섬이 아니다: 대학 1,069 중 198이 고등 선수에 닿는다(독립 BFS 실측과 일치).
+    # 대학은 더 이상 섬이 아니다: 대학 1,069 중 160이 고등 선수에 닿는다(독립 BFS 실측과 일치 —
+    # KG-12 ① 체인 수리 전 198).
     uni_to_high = _cell(report, "대학", "고등")
     assert (uni_to_high.population, uni_to_high.reached_within, uni_to_high.reached_any) == (
         1069,
-        (25, 44, 80),  # KG-10 ② 교체 엣지(고등 10공수1-01-03-1 → CALC1-P21)가 1홉 도달을 +1
-        198,
+        (25, 47, 91),  # KG-10 ② 교체 엣지가 1홉 +1 · KG-12 ③ 승격 v2가 2홉·3홉 +3·+11
+        160,
     )

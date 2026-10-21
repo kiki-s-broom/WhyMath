@@ -359,6 +359,11 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     24건이 서로 다른 대학 노드 24곳에 하나씩 닿아 직접 선수 1개짜리(1412→1388)가 2개짜리
     (278→302)가 됐고 모집단이 +24 됐다. 새 24곳은 직접 축에서 전부 병렬(260→284)이라 직접 축
     순서화 96은 불변이며, 병합 전후 in-degree 분포를 독립 계산한 값과 대조해 확정했다.
+
+    **KG-12(2026-10-20) 값**: 2,278엣지(① 체인 수리 제거 12·반전 4 → 2,219 · ③ 낱말매칭 승격 v2
+    59 → 2,278)·933/1306/368/68/8·population 444·132/444(29.7%)·depth2 195·depth5 261/444(58.8%)·
+    214/47/183. 직접 선수 0개짜리가 919→933(+14): 되감기 엣지 제거로 2차 저작분 첫 원자가 뿌리가
+    됐다(보완 배선 후속 KG-13). 승격 59건이 대학 원자 59곳에 선수를 더해 모집단 +58·2개짜리 +56.
     """
     if not lpo.DEFAULT_CORPUS_PATH.is_file():
         pytest.skip("data/corpus/atom_graph_v1/graph.json 미존재")
@@ -368,47 +373,47 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     report = lpo.build_report(graph)
 
     assert report.corpus_concept_total == 2683
-    assert report.corpus_edge_total == 2231
-    assert report.direct_predecessor_distribution == {0: 919, 1: 1378, 2: 312, 3: 67, 4: 7}
-    assert report.population_size == 386
+    assert report.corpus_edge_total == 2278
+    assert report.direct_predecessor_distribution == {0: 933, 1: 1306, 2: 368, 3: 68, 4: 8}
+    assert report.population_size == 444
 
     def _cell(depth: int, axis: str) -> lpo.DepthAxisSummary:
         return next(c for c in report.cells if c.depth == depth and c.axis == axis)
 
     depth1_direct = _cell(1, "direct")
-    assert depth1_direct.orderable_count == 117
+    assert depth1_direct.orderable_count == 132
     assert depth1_direct.orderable_rate is not None
-    assert round(depth1_direct.orderable_rate, 3) == round(117 / 386, 3)
+    assert round(depth1_direct.orderable_rate, 3) == round(132 / 444, 3)
     depth1_direct_determinism = (
         depth1_direct.full_count,
         depth1_direct.partial_count,
         depth1_direct.parallel_count,
     )
-    assert depth1_direct_determinism == (79, 38, 269)
+    assert depth1_direct_determinism == (92, 40, 312)
 
     depth1_trans = _cell(1, "transitive")
-    assert depth1_trans.orderable_count == 117  # 1홉 전이 == 직접(구조적으로 동일).
+    assert depth1_trans.orderable_count == 132  # 1홉 전이 == 직접(구조적으로 동일).
 
     depth2_trans = _cell(2, "transitive")
-    assert depth2_trans.orderable_count == 175
+    assert depth2_trans.orderable_count == 195
     assert (depth2_trans.full_count, depth2_trans.partial_count, depth2_trans.parallel_count) == (
-        131,
-        44,
-        211,
+        149,
+        46,
+        249,
     )
 
     depth5_trans = _cell(5, "transitive")
-    assert depth5_trans.orderable_count == 228
-    assert round(depth5_trans.orderable_rate or 0.0, 3) == round(228 / 386, 3)
+    assert depth5_trans.orderable_count == 261
+    assert round(depth5_trans.orderable_rate or 0.0, 3) == round(261 / 444, 3)
     assert (depth5_trans.full_count, depth5_trans.partial_count, depth5_trans.parallel_count) == (
-        181,
+        214,
         47,
-        158,
+        183,
     )
 
-    # 직접 축은 깊이 무관 상수 — depth5 행에서도 117 그대로(변별력⑤: 두 축이 다른 값을 낸다).
+    # 직접 축은 깊이 무관 상수 — depth5 행에서도 132 그대로(변별력⑤: 두 축이 다른 값을 낸다).
     depth5_direct = _cell(5, "direct")
-    assert depth5_direct.orderable_count == 117
+    assert depth5_direct.orderable_count == 132
     assert depth5_direct.orderable_count != depth5_trans.orderable_count
 
     # sanity — DAG 보장 코퍼스이므로 사이클 0건(조용히 숨기지 않고 실측 확인).
