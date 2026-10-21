@@ -589,6 +589,12 @@ _KNOWN_INSTRUMENT_DRIFT: dict[str, tuple[str, str]] = {
     "q181": ("acceptance", "M0677"),
 }
 
+#: OPS-150(2026-10-21) — 야간 재검산(`corpus_reverify`)이 `answer` 필드 ↔ answer_map 을 대조하게 되어,
+#: 측정 당시 기계가 놓쳤던 **답만 +1 변조**(정답지 `variant: answer_only`) 4건을 지금은 잡는다. 계기가
+#: 좋아진 방향(놓친 결함 → 검출)의 드리프트다. 채점은 측정 당시 라벨(커밋본)로 이미 했고 바꾸지 않는다 —
+#: 자격 측정 기록을 재생성하면 그 측정이 무엇을 쟀는지가 사라진다. 이 목록도 정답지로 조건을 검산한다.
+_OPS150_ANSWER_FIELD_DRIFT: frozenset[str] = frozenset({"q027", "q034", "q131", "q180"})
+
 
 @pytest.mark.corpus_authoring
 def test_machine_labels_reproduce_except_pinned_instrument_drift() -> None:
@@ -610,7 +616,20 @@ def test_machine_labels_reproduce_except_pinned_instrument_drift() -> None:
     }
     assert set(now) == set(committed)
     drifted = {i for i in now if now[i] != committed[i]}
-    assert drifted == set(_KNOWN_INSTRUMENT_DRIFT)
+    assert drifted == set(_KNOWN_INSTRUMENT_DRIFT) | _OPS150_ANSWER_FIELD_DRIFT
+    key = {
+        row["item_id"]: row
+        for row in map(json.loads, (_QUAL / "answer_key.jsonl").read_text("utf-8").splitlines())
+    }
+    for ident in _OPS150_ANSWER_FIELD_DRIFT:
+        # ① 측정 당시 놓쳤고 ② 지금은 재검산 하나만 answer 불일치로 걸며 ③ 정답지상 답만 바꾼 결함이다.
+        assert committed[ident]["verdict"] == "ok", ident
+        assert now[ident]["fired"] == ["reverify"], ident
+        assert all("answer≠answer_map" in why for why in now[ident]["reasons"]), ident
+        assert key[ident]["is_defective"] is True and key[ident]["variant"] == "answer_only", ident
+    # 반대 방향(정상 문항에 새 오경보) 드리프트는 이 목록에 들어올 수 없다 — 위 ③이 막는다.
+    answer_only = {i for i, row in key.items() if row.get("variant") == "answer_only"}
+    assert answer_only == _OPS150_ANSWER_FIELD_DRIFT  # 답만 변조 전건을 지금 기계가 잡는다
     by_id = {r["item_id"]: r for r in blind}
     for ident, (gate, old_mid) in _KNOWN_INSTRUMENT_DRIFT.items():
         assert committed[ident]["verdict"] == "ok"

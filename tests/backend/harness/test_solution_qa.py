@@ -182,13 +182,19 @@ def test_injection_wrong_answer_turns_red(control: Record) -> None:
     assert "C1_ANSWER_NOT_IN_ANSWER_MAP" in _codes(mutated)
 
 
-def test_injection_wrong_answer_is_not_caught_by_the_legacy_reverify() -> None:
-    """이 모듈이 따로 존재하는 이유의 고정점 — `answer` 만 틀린 표준 경로 문항을 옛 도구는 통과시킨다."""
+def test_injection_wrong_answer_is_caught_by_both_gates() -> None:
+    """`answer` 만 틀린 표준 경로 문항 — 야간 S6 재검증과 이 도구가 같은 판정으로 잡는다(OPS-150).
+
+    종전엔 이 테스트가 반대(야간 재검증은 못 잡음)를 고정점으로 동결했다. OPS-150 이 두 게이트를
+    공용 대조 함수(`l3.verify_solution.answer_map_vars_matching`) 하나로 묶었으므로 판정이 같아야 한다.
+    """
     from whymath_backend.harness import corpus_reverify as cr
 
     mutated = _wrong_answer(_single_assignment())
-    assert cr.reverify_corpus([mutated], use_fuzz=False).failed == 0  # 옛 도구: 못 잡음
+    report = cr.reverify_corpus([mutated], use_fuzz=False)
+    assert report.failed == 1 and report.answer_mismatched == 1  # 야간 재검증: 잡음
     assert _verdict(mutated) is qa.Verdict.FAIL  # 이 도구: 잡음
+    assert "C1_ANSWER_NOT_IN_ANSWER_MAP" in _codes(mutated)
 
 
 def test_injection_answer_map_change_turns_red(control: Record) -> None:
