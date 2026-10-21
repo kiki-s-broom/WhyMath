@@ -2162,6 +2162,8 @@ jobs:
       # 초인간 검증 S6(상시성) — 전 코퍼스 verify 재료로 정답을 매일 밤 전수 재검산.
       # 정본 변경·데이터 오염을 야간에 즉시 잡는다(fail 1건이라도 있으면 exit 1). 순수 계산·
       # DB/LLM 0이라 PG 없이도 돌지만 이 잡(야간)에 얹어 상시 재검증을 보장한다.
+      # OPS-150: 학생에게 보이는 `answer` 필드 ↔ answer_map 도 대조한다(불일치 fail · 대조 불가 skip).
+      # 배선과 대조 대상 실재(Tier1 경로 문항 ≥ 1)는 tests/infra/test_corpus_reverify_nightly_wiring.py 가 동결한다.
       - name: 전 코퍼스 재검증 (초인간 검증 S6 상시성)
         run: |
           python -m whymath_backend.harness.corpus_reverify \

@@ -12,6 +12,18 @@
 게이트를 깬다 — 재검증 불가를 오염으로 오판하지 않는다(모르면 모른다). `--fuzz`를 켜면
 수치 반례까지 돌려 심볼릭 사각지대도 훑는다(느리지만 야간 배치엔 적합).
 
+학생 표기 대조(OPS-150): Tier1 경로는 검산 재료 `verify.answer_map` 을 검산하지만, 학생에게 보이는
+값은 레코드의 `answer` 필드다. 둘이 갈라지면(대표 과정 40건의 `answer` 만 바꾼 변조 → 종전 0/40
+검출, P3-07 2026-10-18 실측) 검산이 맞아도 학생은 틀린 정답을 본다. 그래서 Tier1 경로 문항마다
+`answer` 와 answer_map 값을 SymPy 단일 권위(`l3.verify_solution.answer_map_vars_matching` — 수용
+품질 `solution_qa` C1 과 같은 함수)로 대조한다:
+  · 불일치(확정)  → fail — 게이트를 깬다
+  · 대조 불가     → skip(사유 `answer 대조 불가: …`) — **통과로 접지 않는다**.
+                    리포트에 건수를 따로 낸다
+  · 다변수 문항   → 소속 대조(약한 검사 — `answer` 가 어느 변수의 값인지 구조에 없다).
+                    건수를 따로 낸다
+근 집계·개념형 경로는 종전부터 `answer` 자체를 독립 계산으로 검산한다(이 대조의 대상이 아니다).
+
 사용:
     python -m whymath_backend.harness.corpus_reverify <코퍼스.jsonl>          # Tier1+근선택
     python -m whymath_backend.harness.corpus_reverify <코퍼스.jsonl> --fuzz   # 수치 반례까지
@@ -22,7 +34,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Callable, Sequence
+from collections import Counter
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,7 +50,10 @@ from whymath_backend.l3.verify_answer import (
     verify_root_aggregate,
     verify_root_selection,
 )
-from whymath_backend.l3.verify_solution import verify_solution_interpreted
+from whymath_backend.l3.verify_solution import (
+    answer_map_vars_matching,
+    verify_solution_interpreted,
+)
 
 
 # 개념형 검증기 디스패치 — **acceptance의 표를 그대로 쓴다**(EOS-85 ④·사본 금지).
@@ -96,15 +112,48 @@ _CONCEPTUAL_VERIFIERS: dict[str, Callable[[str | Sequence[str], str], AnswerVerd
 _EXIT_OK = 0
 _EXIT_FAIL = 1
 
+# `answer` 필드 ↔ answer_map 대조 장부 키(OPS-150). 대조에 도달한 Tier1 경로 문항마다 정확히 1개.
+ANSWER_MATCHED = "matched"  # 단일 변수 — `answer` 가 그 값이다(엄격 대조)
+ANSWER_MEMBERSHIP = "membership"  # 다변수 — `answer` 가 어느 한 변수의 값이다(약한 소속 대조)
+ANSWER_MISMATCHED = "mismatched"  # 모든 변수가 확정적으로 다르다 → fail
+ANSWER_UNCOMPARABLE = "uncomparable"  # 판정 불가·answer 없음 → skip(통과로 접지 않는다)
+ANSWER_LEDGER_KEYS = (ANSWER_MATCHED, ANSWER_MEMBERSHIP, ANSWER_MISMATCHED, ANSWER_UNCOMPARABLE)
+# 사유 문자열 머리 — 리포트·호출부가 대조 실패/불가를 다른 사유와 가를 때 쓴다.
+ANSWER_MISMATCH_REASON = "answer≠answer_map"
+ANSWER_UNCOMPARABLE_REASON = "answer 대조 불가"
+
 
 @dataclass(slots=True, frozen=True)
 class ReverifyReport:
-    """재검증 배치 결과 — 통과·실패·skip 카운트 + 실패 상세. 불변."""
+    """재검증 배치 결과 — 통과·실패·skip 카운트 + 실패 상세. 불변.
+
+    `answer_*` 는 학생 표기 대조(OPS-150) 장부다 — 위 3상태와 **겹쳐 세는 내역**이지 별도 상태가
+    아니다(불일치는 `failed` 안에, 대조 불가는 `skipped` 안에 들어 있다). `total` 은 종전과 같다.
+    """
 
     passed: int
     failed: int
     skipped: int
     failures: tuple[tuple[str, str], ...]  # (slug/id, 사유)
+    answer_matched: int = 0
+    answer_membership: int = 0
+    answer_mismatched: int = 0
+    answer_uncomparable: int = 0
+
+    @property
+    def answer_checked(self) -> int:
+        """학생 표기 대조에 도달한 문항 수(대조 대상)."""
+        return (
+            self.answer_matched
+            + self.answer_membership
+            + self.answer_mismatched
+            + self.answer_uncomparable
+        )
+
+    @property
+    def answer_decided(self) -> int:
+        """대조가 실제로 판정을 낸 문항 수(일치·소속 일치·불일치) — "작동한 비율"의 분자."""
+        return self.answer_matched + self.answer_membership + self.answer_mismatched
 
     @property
     def total(self) -> int:
@@ -125,11 +174,36 @@ def _iter_records(text: str) -> list[dict[str, object]]:
     return records
 
 
-def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, str | None]:
+def _compare_answer_field(record: Mapping[str, object], amap: Mapping[str, str]) -> tuple[str, str]:
+    """`answer` 필드 ↔ answer_map 대조(OPS-150) → (장부 키, 상세). 판정은 공용 함수 한 벌."""
+    answer = record.get("answer")
+    if not isinstance(answer, str) or not answer.strip():
+        return ANSWER_UNCOMPARABLE, "answer 없음"
+    if not amap:
+        return ANSWER_UNCOMPARABLE, "answer_map 비어 있음"
+    matched = answer_map_vars_matching(amap, answer)
+    if matched is None:
+        return ANSWER_UNCOMPARABLE, f"answer={answer!r} ↔ answer_map 값 판정 불가"
+    if not matched:
+        return ANSWER_MISMATCHED, f"answer={answer!r} · answer_map={dict(amap)}"
+    return (ANSWER_MATCHED if len(amap) == 1 else ANSWER_MEMBERSHIP), ""
+
+
+def _reverify_one(
+    record: dict[str, object],
+    *,
+    use_fuzz: bool,
+    answer_ledger: Counter[str] | None = None,
+) -> tuple[str, str | None]:
     """레코드 1건 재검증 → (상태, 사유). 상태: 'pass'/'fail'/'skip'. 사유는 fail/skip 때만.
 
     verify 재료(conditions/answer_map)가 없으면 skip. Tier1 fail 또는 근 선택 위반 또는
-    (use_fuzz 시) 수치 반례 fail이면 fail. unverifiable은 오염이 아니므로 skip 처리.
+    `answer` 필드↔answer_map 불일치(OPS-150) 또는 (use_fuzz 시) 수치 반례 fail이면 fail.
+    unverifiable은 오염이 아니므로 skip 처리. `answer` 대조 불가는 Tier1 이 통과해도 skip 이다
+    (학생에게 보이는 값을 확인하지 못했으므로 통과로 접지 않는다).
+
+    `answer_ledger` 를 주면 Tier1 경로에서 대조에 도달한 문항의 대조 결과(`ANSWER_LEDGER_KEYS`)를
+    1개 더한다 — 반환 계약(3상태)을 바꾸지 않고 리포트가 대조 건수를 따로 내기 위한 통로다.
     """
     verify = record.get("verify")
     if not isinstance(verify, dict):
@@ -192,6 +266,14 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
         if sel.state == "fail":
             return "fail", f"근 선택({selection}) 위반: {sel.reason}"
 
+    # 학생 표기 대조(OPS-150) — `answer` 가 검산한 answer_map 값과 같은가. Tier1 이 판정 불가여도
+    # 대조는 돈다: 두 필드가 확정적으로 갈라진 것은 검산 성패와 무관한 레코드 결함이다.
+    answer_state, answer_detail = _compare_answer_field(record, amap)
+    if answer_ledger is not None:
+        answer_ledger[answer_state] += 1
+    if answer_state == ANSWER_MISMATCHED:
+        return "fail", f"{ANSWER_MISMATCH_REASON}: {answer_detail}"
+
     # Tier2 단계 재검증(S2-02) — verify.solution_steps가 있으면 전이 연쇄를 SymPy 동치로
     # 재검산한다(생성기는 100% 증명 가능 체인만 방출 — 수용 게이트가 적재 시 봉인). 여기서도
     # 모듈 정직 규약을 따른다: **incorrect(확정 오염)만 fail**, unverifiable은 오염으로
@@ -218,7 +300,10 @@ def _reverify_one(record: dict[str, object], *, use_fuzz: bool) -> tuple[str, st
             return "fail", f"수치 반례: {fuzz.reason}"
 
     # Tier1 pass면 통과, unverifiable(파라미터·판정 불가)은 skip(오염 아님).
+    # 단 학생 표기 대조가 불가했으면 통과가 아니다 — skip 으로 드러낸다(OPS-150).
     if tier1.state == "pass":
+        if answer_state == ANSWER_UNCOMPARABLE:
+            return "skip", f"{ANSWER_UNCOMPARABLE_REASON}: {answer_detail}"
         return "pass", None
     return "skip", f"Tier1 unverifiable: {tier1.reason}"
 
@@ -227,9 +312,10 @@ def reverify_corpus(records: list[dict[str, object]], *, use_fuzz: bool) -> Reve
     """레코드 리스트 전수 재검증 → 집계 리포트(순수)."""
     passed = failed = skipped = 0
     failures: list[tuple[str, str]] = []
+    ledger: Counter[str] = Counter()
     for record in records:
         ident = str(record.get("slug") or record.get("problem_id") or "?")
-        state, reason = _reverify_one(record, use_fuzz=use_fuzz)
+        state, reason = _reverify_one(record, use_fuzz=use_fuzz, answer_ledger=ledger)
         if state == "pass":
             passed += 1
         elif state == "fail":
@@ -237,7 +323,28 @@ def reverify_corpus(records: list[dict[str, object]], *, use_fuzz: bool) -> Reve
             failures.append((ident, reason or ""))
         else:
             skipped += 1
-    return ReverifyReport(passed=passed, failed=failed, skipped=skipped, failures=tuple(failures))
+    return ReverifyReport(
+        passed=passed,
+        failed=failed,
+        skipped=skipped,
+        failures=tuple(failures),
+        answer_matched=ledger[ANSWER_MATCHED],
+        answer_membership=ledger[ANSWER_MEMBERSHIP],
+        answer_mismatched=ledger[ANSWER_MISMATCHED],
+        answer_uncomparable=ledger[ANSWER_UNCOMPARABLE],
+    )
+
+
+def _format_answer_line(report: ReverifyReport) -> str:
+    """학생 표기 대조(OPS-150) 한 줄 — 대조가 몇 건에서 실제로 작동했는지를 함께 낸다."""
+    if report.answer_checked == 0:
+        return "answer 대조(OPS-150): 대상 0건 — 이 코퍼스에서는 대조가 한 번도 돌지 않았다"
+    return (
+        f"answer 대조(OPS-150): 대상 {report.answer_checked}  "
+        f"일치 {report.answer_matched}  다변수 소속 {report.answer_membership}(약한 검사)  "
+        f"불일치 {report.answer_mismatched}  대조 불가 {report.answer_uncomparable}  "
+        f"— 작동 {report.answer_decided}/{report.answer_checked}"
+    )
 
 
 def format_report(report: ReverifyReport, *, path: str) -> str:
@@ -248,6 +355,7 @@ def format_report(report: ReverifyReport, *, path: str) -> str:
         "=" * 60,
         f"코퍼스: {path}",
         f"총 {report.total}  통과 {report.passed}  실패 {report.failed}  skip {report.skipped}",
+        _format_answer_line(report),
     ]
     if report.failures:
         lines.append("[실패 상세]")

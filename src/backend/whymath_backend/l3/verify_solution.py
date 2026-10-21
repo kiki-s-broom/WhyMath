@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.l3.safe_parse import safe_sympify
+from whymath_backend.l3.symbolic_equivalence import latex_to_plain
 from whymath_backend.l3.verify_answer import (
     certified_polynomial,
     certified_root_sets,
@@ -65,6 +66,7 @@ __all__ = [
     "SolutionVerificationResult",
     "ValueSame",
     "aggregate_transitions",
+    "answer_map_vars_matching",
     "condition_items",
     "condition_relations",
     "distinct_values",
@@ -353,6 +355,46 @@ def same_value(left: str, right: str) -> ValueSame:
     if verdict.state.value == "incorrect":
         return ValueSame.DIFFERENT
     return ValueSame.UNKNOWN
+
+
+def answer_map_vars_matching(answer_map: Mapping[str, str], answer: str) -> frozenset[str] | None:
+    """`answer`(학생에게 보이는 정답 표기)와 같은 값을 가진 answer_map 변수 집합(OPS-150 공용 판정).
+
+    값 동치는 `same_value`(정본 채점기 `verify_final_answer`)로만 본다 — `1/2`·`0.5`·`\\frac{1}{2}`·
+    공백 차이는 같은 값이다. 반환:
+      · 비어 있지 않은 집합 — 그 변수(들)의 값이 `answer` 와 같다(대조 성립)
+      · 빈 집합 — 모든 변수가 **확정적으로** 다르다(불일치 — 학생 표기와 검산 재료가 갈라졌다)
+      · None — 같은 값을 하나도 못 찾았고 판정 불가가 섞였다, 또는 answer_map 이 비어 있다
+        (대조 불가 — 통과로 접지 않는다)
+
+    변수가 하나면 `answer` 가 그 값이어야 한다(엄격). 변수가 여러 개인 문항은 `answer` 가 어느
+    변수의 값인지 구조에 적혀 있지 않아 **소속**으로만 대조한다(약한 검사 — 형제 변수 값으로 바꾼
+    변조는 못 잡는다. 호출부가 다변수 건수를 따로 드러낸다).
+
+    호출부: 수용 품질 `harness.solution_qa` C1 · 야간 S6 `harness.corpus_reverify` — 두 게이트가
+    같은 판정을 쓰도록 여기 한 벌만 둔다(사본 금지 — 거버넌스 테스트가 동결).
+
+    LaTeX 표기(`\\frac{1}{2}`·`\\sqrt{3}`)는 정본 채점기가 직접 읽지 못하므로, `answer` 에
+    백슬래시가 있을 때만 LaTeX 정규화 단일 권위(`l3.symbolic_equivalence.latex_to_plain`)로
+    평문화한 뒤 비교한다.
+    백슬래시가 없으면 손대지 않는다 — 그 함수는 중괄호를 괄호로 바꾸므로 집합 `{1, 2}` 를 튜플로
+    만든다. 정규화기가 못 읽는 표기(`\\dfrac`·중첩 분수 등)는 판정 불가 → None 으로 드러난다.
+    """
+    if not answer_map:
+        # 비교할 재료가 없다 — '모든 변수가 다르다'(빈 집합)로 단정하지 않는다(모른다 ≠ 아니다).
+        return None
+    candidate = latex_to_plain(answer) if "\\" in answer else answer
+    matches: set[str] = set()
+    unknown = False
+    for var, value in answer_map.items():
+        relation = same_value(value, candidate)
+        if relation is ValueSame.SAME:
+            matches.add(var)
+        elif relation is ValueSame.UNKNOWN:
+            unknown = True
+    if not matches and unknown:
+        return None
+    return frozenset(matches)
 
 
 def split_top_level(text: str) -> list[str]:

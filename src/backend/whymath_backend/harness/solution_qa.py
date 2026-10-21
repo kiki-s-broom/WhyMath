@@ -15,11 +15,16 @@
 
 왜 `corpus_reverify` 와 별개 모듈인가 (2026-10-18 실측)
 -----------------------------------------------------
-`corpus_reverify` 의 표준 경로는 `verify.answer_map` 만 검산하고 레코드의 **`answer` 필드는 비교하지
-않는다**(집계·개념형 경로만 `answer` 를 쓴다). 대표 과정 문항 40건의 `answer` 만 틀린 값으로 바꾸는
-주입을 그 도구에 태우면 0/40 이 검출된다 — 학생에게 보이는 값과 검산된 값이 갈라져도 통과한다.
-또 풀이 최종 답·선택지 유일성은 어느 도구도 보지 않는다. 그래서 `corpus_reverify` 를 고치지 않고(S6
-야간 상시성 게이트의 의미를 바꾸지 않는다) 문제-정답-풀이 일관성 축을 이 모듈이 맡는다.
+당시 `corpus_reverify` 의 표준 경로는 `verify.answer_map` 만 검산하고 레코드의 **`answer` 필드는
+비교하지 않았다**(집계·개념형 경로만 `answer` 를 썼다). 대표 과정 문항 40건의 `answer` 만 틀린
+값으로 바꾸는 주입을 그 도구에 태우면 0/40 이 검출됐다 — 학생에게 보이는 값과 검산된 값이
+갈라져도 통과했다.
+또 풀이 최종 답·선택지 유일성은 어느 도구도 보지 않는다. 그래서 문제-정답-풀이 일관성 축을 이 모듈이
+맡았다.
+
+[OPS-150 · 2026-10-21] `answer` ↔ answer_map 대조는 이제 야간 S6 도 같은 공용 함수
+(`l3.verify_solution.answer_map_vars_matching`)로 한다 — C1 의 그 부분과 판정이 같다. 이 모듈이 따로
+있는 이유는 남은 축(C2 풀이 최종 답 · C3 선택지 유일성 · 검사별 3상태 집계)이다.
 
 판정 규칙 — "모른다 ≠ 아니다", 검증 불가를 통과로 세지 않는다
 -------------------------------------------------------------
@@ -96,6 +101,7 @@ from whymath_backend.l3.verify_answer import (
     verify_root_selection,
 )
 from whymath_backend.l3.verify_solution import ValueSame as _Same
+from whymath_backend.l3.verify_solution import answer_map_vars_matching as _answer_vars
 from whymath_backend.l3.verify_solution import condition_items, verify_solution_interpreted
 from whymath_backend.l3.verify_solution import distinct_values as _distinct
 from whymath_backend.l3.verify_solution import final_assignments as _final_assignments
@@ -256,25 +262,8 @@ def _check_c1(record: Mapping[str, object], verify: Mapping[str, object] | None)
     return _PASS
 
 
-def _answer_vars(amap: Mapping[str, str], answer: str) -> frozenset[str] | None:
-    """`answer` 와 같은 값을 가진 answer_map 변수 집합. 하나도 못 가렸고 판정 불가가 있었으면 None.
-
-    변수가 하나면 `answer` 가 그 값이어야 한다(엄격). 변수가 여러 개인 문항은 `answer` 가
-    어느 변수의
-    값인지 구조에 적혀 있지 않아 **소속**으로만 대조한다(약한 검사 — 형제 변수 값으로 바꾼 변조는 못
-    잡는다. 보고서의 다변수 건수로 따로 드러낸다).
-    """
-    matches: set[str] = set()
-    unknown = False
-    for var, value in amap.items():
-        relation = _same(value, answer)
-        if relation is _Same.SAME:
-            matches.add(var)
-        elif relation is _Same.UNKNOWN:
-            unknown = True
-    if not matches and unknown:
-        return None
-    return frozenset(matches)
+# `_answer_vars` — `answer` 필드 ↔ answer_map 대조는 `l3.verify_solution.answer_map_vars_matching`
+# 한 벌을 쓴다(OPS-150 — 야간 S6 `corpus_reverify` 와 같은 판정. 사본 금지).
 
 
 # ──────────────────────────────────────────────────────────────────────────
