@@ -29,11 +29,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING
+import logging
+import re
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from whymath_backend.l3.safe_parse import safe_sympify
+from whymath_backend.l3.verify_answer import (
+    certified_polynomial,
+    certified_root_sets,
+    condition_relation,
+    match_root,
+    verify_substituted_value,
+)
+from whymath_backend.l3.verify_final_answer import verify_final_answer
 from whymath_backend.l3.verify_step import (
     VerifyStepReasonCode,
     VerifyStepResult,
@@ -43,11 +56,32 @@ from whymath_backend.l3.verify_step import (
 from whymath_backend.schema.enums import StepType
 
 __all__ = [
+    "INTERPRETIVE_SELECTION",
+    "INTERPRETIVE_SUBSTITUTION",
+    "ROOT_PROVEN",
+    "ROOT_UNKNOWN",
+    "ROOT_WRONG",
+    "InterpretedSolutionResult",
     "SolutionVerificationResult",
+    "ValueSame",
     "aggregate_transitions",
+    "condition_items",
+    "condition_relations",
+    "distinct_values",
+    "final_assignments",
+    "float_value",
+    "interpretive_step",
+    "judge_root_value",
+    "normalize_value",
+    "numeric_assignments",
     "plan_transitions",
+    "same_value",
+    "split_top_level",
     "verify_solution",
+    "verify_solution_interpreted",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class SolutionVerificationResult(BaseModel):
@@ -238,6 +272,387 @@ def aggregate_transitions(results: Sequence[VerifyStepResult]) -> SolutionVerifi
         first_incorrect_index=first_incorrect_index,
         has_incorrect=first_incorrect_index is not None,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 해석 단계(근 선택·대입) — 동치가 아닌 전이를 **문항 조건으로** 판정한다
+# (P3-71 이 solution_qa C4 에 넣은 판정을 P3-76 이 여기로 올렸다 — 공용 구현 하나)
+# ══════════════════════════════════════════════════════════════════════════
+# 풀이가 `x = -3, x = 4` 다음에 `x = 4`(근 선택)나 `x = 4` 다음에 `y = -202`(대입)를 쓰면 이웃
+# 동치(`verify_step`)는 판정 불가나 incorrect 를 낸다 — 동치가 아니기 때문이다. 이 구역은 그런
+# 전이를 조건만으로 다시 본다. 쓰는 곳은 셋이다: Solution QA C4(`harness/solution_qa`), 수용 게이트
+# Tier2(`l3/equivalent/acceptance`), 야간 상시 재검증(`harness/corpus_reverify`). 세 곳이 같은
+# 함수(`verify_solution_interpreted`)를 불러 같은 의미로 판정한다(복제 금지 — P3-76 ①).
+#
+# 판정 근거는 조건뿐이다 — 정답(`answer`·`answer_map`)에서 선택을 역산하지 않는다(P3-24 B3
+# 단서: 역산하면 순환 통과다). 근거 셋: ①그 변수 하나만 담은 조건 등식 ②그 변수의 도메인
+# 부등식 ③구조에 적힌 `answer_selection`(largest/smallest). 근의 집합은 풀이의 후보 나열이 아니라
+# 조건 등식에서 **정확히** 계산한다 — 허용 목록 다항식(`certified_root_sets`)일 때만이다. 초월
+# 함수·변수 분모·`.doit()` 래퍼 속 약분 같은 꼴로는 아무것도 증명하지 않는다(P3-71 4차 검토).
+#
+# 단조 규칙(P3-71 검토 중4 · P3-76 ②): 이웃 동치가 incorrect 를 낸 전이는 해석 판정이 **성립을
+# 증명할 때만** 바꾼다. 증명 불가면 incorrect 그대로다 — 판정을 넓힐 뿐 기준을 낮추지 않는다.
+# 이웃 동치가 correct 를 낸 전이는 건드리지 않는다.
+
+# 유니코드 근호 — 정본 채점기가 못 읽는다(`8√3` → unverifiable, 2026-10-18 실측). 비교용으로만
+# `N√M` → `N*sqrt(M)` 로 접는다(원문은 건드리지 않는다).
+_RADICAL: Final = re.compile(r"(\d*)\s*√\s*(\d+|\([^()]*\))")
+_ASSIGN: Final = re.compile(r"^\s*([A-Za-z_]\w*)\s*=\s*(\S.*?)\s*$")
+
+INTERPRETIVE_SELECTION: Final = "근 선택"
+INTERPRETIVE_SUBSTITUTION: Final = "대입"
+
+RootJudgement = Literal["proven", "wrong", "unknown"]
+ROOT_PROVEN: Final = "proven"  # 조건이 요구하는 바로 그 근이다(조건만으로 확정)
+ROOT_WRONG: Final = "wrong"  # 도메인 위반·조건의 선택 규칙과 다른 근(확정)
+ROOT_UNKNOWN: Final = "unknown"  # 조건에 근거가 없거나 판정 불가
+
+ConditionInput = str | Sequence[str] | None
+
+
+def normalize_value(text: str) -> str:
+    """값 문자열을 비교용으로 정리한다(유니코드 근호 접기·앞뒤 공백)."""
+    return _RADICAL.sub(
+        lambda m: (f"{m.group(1)}*" if m.group(1) else "") + f"sqrt({m.group(2)})", text.strip()
+    )
+
+
+@dataclass(slots=True)
+class _AnswerView:
+    """`verify_final_answer` 가 읽는 최소 문항 필드. 선택지 모드를 끄고 값 대 값으로 비교한다."""
+
+    answer: str | None
+    choices: list[str] | None = None
+    question_format: Any = None
+    answer_format: Any = None
+    multiple_answers: dict[str, Any] | None = None
+
+
+class ValueSame(str, Enum):
+    """두 값이 같은가 — 3상태(모르면 모른다)."""
+
+    SAME = "same"
+    DIFFERENT = "different"
+    UNKNOWN = "unknown"
+
+
+def same_value(left: str, right: str) -> ValueSame:
+    """두 값 문자열이 수학적으로 같은가 — 정본 채점기(`verify_final_answer`)에 위임한다.
+
+    판정 불가·예외는 UNKNOWN(같음/다름 위장 금지).
+    """
+    try:
+        verdict = verify_final_answer(
+            normalize_value(left), _AnswerView(answer=normalize_value(right))
+        )
+    except Exception as exc:  # noqa: BLE001 — 한 쌍의 실패는 UNKNOWN 으로 드러난다
+        logger.debug("verify_solution 값 비교 회피: %s", type(exc).__name__)
+        return ValueSame.UNKNOWN
+    if verdict.state.value == "correct":
+        return ValueSame.SAME
+    if verdict.state.value == "incorrect":
+        return ValueSame.DIFFERENT
+    return ValueSame.UNKNOWN
+
+
+def split_top_level(text: str) -> list[str]:
+    """최상위 쉼표로만 자른다 — `f(1, 2)` 안의 쉼표는 자르지 않는다."""
+    parts: list[str] = []
+    depth = 0
+    start = 0
+    for index, ch in enumerate(text):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts
+
+
+def final_assignments(step: str) -> tuple[str, list[str]] | None:
+    """단계가 `v = a` 또는 `v = a, v = b` 형태면 (변수, 값 목록). 아니면 None."""
+    var: str | None = None
+    values: list[str] = []
+    for part in split_top_level(step):
+        if "==" in part or "<" in part or ">" in part:
+            return None
+        match = _ASSIGN.match(part)
+        if match is None:
+            return None
+        name, value = match.group(1), match.group(2)
+        if "=" in value or (var is not None and name != var):
+            return None
+        var = name
+        values.append(value)
+    return (var, values) if var is not None else None
+
+
+def float_value(value: str) -> float | None:
+    """값 문자열의 실수값. 수치화 불가면 None."""
+    try:
+        return float(safe_sympify(normalize_value(value)))
+    except Exception as exc:  # noqa: BLE001 — 수치화 불가는 None(판정 불가로 드러난다)
+        logger.debug("verify_solution 수치화 회피: %s", type(exc).__name__)
+        return None
+
+
+def distinct_values(values: Sequence[str]) -> list[str] | None:
+    """값 목록의 서로 다른 원소. 같은지 판정이 안 되는 쌍이 있으면 None."""
+    kept: list[str] = []
+    for value in values:
+        relations = [same_value(value, other) for other in kept]
+        if ValueSame.UNKNOWN in relations:
+            return None
+        if ValueSame.SAME not in relations:
+            kept.append(value)
+    return kept
+
+
+def numeric_assignments(step: str) -> tuple[str, list[str]] | None:
+    """`v = a[, v = b …]` 이고 값이 전부 수치(자유변수 없음)면 (변수, 서로 다른 값). 아니면 None."""
+    parsed = final_assignments(step)
+    if parsed is None:
+        return None
+    var, values = parsed
+    distinct = distinct_values(values)
+    if distinct is None or any(float_value(value) is None for value in distinct):
+        return None
+    return var, distinct
+
+
+def condition_items(conditions: ConditionInput) -> list[str] | None:
+    """조건 입력(문자열 하나 또는 목록)을 목록으로. 형식이 맞지 않으면 None."""
+    if isinstance(conditions, str):
+        return [conditions]
+    if conditions is None:
+        return None
+    items = list(conditions)
+    if not items or not all(isinstance(item, str) for item in items):
+        return None
+    return items
+
+
+def condition_relations(
+    conditions: ConditionInput,
+) -> list[tuple[str, str, frozenset[str]]] | None:
+    """조건마다 (원문, 관계 연산자, 자유변수 이름). 파싱 못 한 조건이 하나라도 있으면 None.
+
+    파싱하지 못한 조건이 무엇을 제약하는지 모르므로, 그 상태로 "제약 없음"을 말하지 않는다.
+    """
+    items = condition_items(conditions)
+    if items is None:
+        return None
+    out: list[tuple[str, str, frozenset[str]]] = []
+    for condition in items:
+        relation = condition_relation(condition)
+        if relation is None:
+            return None
+        out.append((condition, relation[0], relation[1]))
+    return out
+
+
+def _defines_other_variable(condition: str, var: str) -> bool:
+    """`w = f(var)` 꼴(한쪽이 다른 변수 하나뿐, 반대쪽은 `var` 의 허용 목록 다항식)인가.
+
+    그 조건은 w 를 정할 뿐 `var` 를 제약하지 않는다. `x + z > 100`·`x**2 + y**2 = 1` 처럼
+    `var` 를 함께 묶는 조건은 아니다. f 가 `log(x)`·`sqrt(x)`·`1/(x - a)` 처럼 암묵 정의역을
+    가지면 w 가 존재하려면 x 가 그 정의역 안이어야 하므로 x 를 제약한다 — 정의로 면제하지
+    않는다(PR #1703 3차 검토 하2).
+    """
+    if "<" in condition or ">" in condition or "!" in condition:
+        return False
+    sides = condition.split("=")
+    if len(sides) != 2:
+        return False
+    for lone, other in ((sides[0], sides[1]), (sides[1], sides[0])):
+        name = lone.strip()
+        if name.isidentifier() and name != var:
+            relation = condition_relation(other)
+            if (
+                relation is not None
+                and relation[1] == frozenset({var})
+                and certified_polynomial(other, var) is not None
+            ):
+                return True
+    return False
+
+
+def judge_root_value(
+    conditions: ConditionInput, answer_selection: object, var: str, value: str
+) -> RootJudgement:
+    """`var = value` 가 조건이 요구하는 근인가 — proven·wrong·unknown.
+
+    · `var` 를 다른 변수와 함께 담은 조건이 있으면 unknown — 그 조건이 `var` 를 더 제약하는지
+      모른다. 예외는 다른 변수 하나를 `var` 의 허용 목록 다항식으로 정하는 정의 등식뿐이다.
+    · 그 변수 하나만 담은 조건 등식이 정확히 하나이고, 그 등식과 그 변수의 도메인 부등식이 전부
+      허용 목록 다항식이어야 한다(`certified_root_sets`). 아니면 unknown.
+    · 실근은 정확 계산으로 센다. 값은 허용치 안의 정확 근 **하나**에 대응해야 한다.
+    · 그 근이 도메인을 어기면 wrong. 선택 규칙 = `answer_selection`(largest/smallest — 허용 근의
+      끝/처음이 아니면 wrong), 없으면 unique(허용 근이 하나일 때만 proven, 둘 이상이면 unknown).
+    """
+    relations = condition_relations(conditions)
+    if relations is None:
+        return ROOT_UNKNOWN
+    domain = [c for c, op, names in relations if op != "==" and names == frozenset({var})]
+    equations = [c for c, op, names in relations if op == "==" and names == frozenset({var})]
+    mixed = [
+        c
+        for c, op, names in relations
+        if var in names and len(names) > 1 and not _defines_other_variable(c, var)
+    ]
+    if mixed or len(equations) != 1:
+        return ROOT_UNKNOWN
+    sets = certified_root_sets(equations[0], domain, var)
+    if sets is None:
+        return ROOT_UNKNOWN
+    roots, admissible = sets
+    index = match_root(value, roots)
+    if index is None:
+        return ROOT_UNKNOWN  # 값이 정확 실근 하나에 대응하지 않는다(근이 아니거나 판정 불가).
+    chosen = roots[index]
+    if chosen not in admissible:
+        return ROOT_WRONG  # 근이지만 도메인 제약을 어긴다(제약 위반 근).
+    if answer_selection == "largest":
+        return ROOT_PROVEN if chosen == admissible[-1] else ROOT_WRONG
+    if answer_selection == "smallest":
+        return ROOT_PROVEN if chosen == admissible[0] else ROOT_WRONG
+    return ROOT_PROVEN if len(admissible) == 1 else ROOT_UNKNOWN
+
+
+def _judge_selection(
+    conditions: ConditionInput, answer_selection: object, var: str, chosen: str
+) -> VerifyStepState:
+    """근 선택 `v = a, v = b → v = a` — 고른 값이 조건이 요구하는 근인가."""
+    verdict = judge_root_value(conditions, answer_selection, var, chosen)
+    if verdict == ROOT_PROVEN:
+        return VerifyStepState.correct
+    return VerifyStepState.incorrect if verdict == ROOT_WRONG else VerifyStepState.unverifiable
+
+
+def _judge_substitution(
+    conditions: ConditionInput,
+    answer_selection: object,
+    var: str,
+    candidates: Sequence[str],
+    target: str,
+    claimed: str,
+) -> VerifyStepState:
+    """대입 `v = a → w = b` — 조건이 요구하는 v 를 정의 등식(자유변수가 정확히 {v, w})에 대입한
+    w 가 b 인가.
+
+    대입에 쓰는 v 는 **조건만으로 확정된 근**이어야 한다(proven). 앞 단계 값이 하나여도 같다 —
+    풀이 첫 줄의 값은 들어오는 전이가 없어 아무도 검산하지 않는다(PR #1703 검토 상1). 후보가
+    여럿이면 확정되는 후보가 정확히 하나일 때만 그것을 쓴다 — 결과값에 맞는 후보를 거꾸로 찾지
+    않는다(정답 역산). 다른 매개변수가 섞인 정의 등식은 쓰지 않는다.
+    """
+    verdicts = [judge_root_value(conditions, answer_selection, var, c) for c in candidates]
+    proven = [c for c, verdict in zip(candidates, verdicts, strict=True) if verdict == ROOT_PROVEN]
+    if not proven:  # 선택 규칙(unique·largest·smallest)이 확정하는 근은 많아야 하나다.
+        return VerifyStepState.unverifiable
+    relations = condition_relations(conditions) or []  # 확정됐으면 조건은 이미 전부 파싱됐다.
+    definitions = [c for c, op, names in relations if op == "==" and names == {var, target}]
+    if not definitions:
+        return VerifyStepState.unverifiable
+    states = [
+        verify_substituted_value(definition, {var: proven[0]}, target, claimed).state
+        for definition in definitions
+    ]
+    if "fail" in states:
+        return VerifyStepState.incorrect
+    if all(state == "pass" for state in states):
+        return VerifyStepState.correct
+    return VerifyStepState.unverifiable
+
+
+def interpretive_step(
+    conditions: ConditionInput, answer_selection: object, before: str, after: str
+) -> tuple[str, VerifyStepState] | None:
+    """동치가 아닌 해석 단계면 (종류, 판정). 그 모양이 아니면 None — 동치 판정을 그대로 둔다.
+
+    모양은 좁게 잡는다(넓으면 진짜 틀린 변형이 '해석 단계'로 빠져나간다):
+      · 근 선택 — 앞: 같은 변수의 서로 다른 수치 후보 ≥2, 뒤: 그중 **하나**
+        (후보 밖 값은 선택이 아니다).
+      · 대입 — 앞: 변수 v 의 수치 값(들), 뒤: **다른** 변수 w 의 수치 값 하나.
+    """
+    prev = numeric_assignments(before)
+    nxt = numeric_assignments(after)
+    if prev is None or nxt is None or len(nxt[1]) != 1:
+        return None
+    var, candidates = prev
+    target, (claimed,) = nxt
+    if target != var:
+        judged = _judge_substitution(conditions, answer_selection, var, candidates, target, claimed)
+        return INTERPRETIVE_SUBSTITUTION, judged
+    if ValueSame.SAME not in [same_value(claimed, candidate) for candidate in candidates]:
+        return None
+    return INTERPRETIVE_SELECTION, _judge_selection(conditions, answer_selection, var, claimed)
+
+
+@dataclass(frozen=True, slots=True)
+class InterpretedSolutionResult:
+    """`verify_solution_interpreted` 의 결과.
+
+    `result` 는 해석 판정을 반영한 집계다(필드·불변식은 `SolutionVerificationResult` 그대로 —
+    호출부는 `verify_solution` 결과처럼 쓴다). `interpretive` 는 해석 단계 모양으로 다시 본
+    전이의 위치 → 종류(근 선택·대입)다. 판정이 바뀌지 않은 전이(증명 불가로 종전 판정 유지)도
+    들어 있다 — 사람 검수 목록에서 "조건에 근거 없음"을 가르는 데 쓴다.
+    """
+
+    result: SolutionVerificationResult
+    interpretive: Mapping[int, str]
+
+
+def verify_solution_interpreted(
+    steps: Sequence[str],
+    step_types: Sequence[StepType | None] | None = None,
+    *,
+    conditions: ConditionInput,
+    answer_selection: object = None,
+) -> InterpretedSolutionResult:
+    """`verify_solution`(이웃 동치) + 해석 단계(근 선택·대입)의 조건 판정 — 세 게이트 공용.
+
+    1. `verify_solution(steps, step_types)` 를 그대로 먼저 돌린다(step_types 길이 규약 포함).
+    2. correct 가 아닌 전이만 `interpretive_step` 으로 모양을 본다.
+    3. 단조 규칙: 이웃 동치가 incorrect 였던 전이는 해석 판정이 correct(성립 증명)일 때만
+       바꾼다. unverifiable 이었던 전이는 해석 판정(correct·incorrect)으로 바꾸고, 판정 불가면
+       그대로 둔다. correct 였던 전이는 다시 보지 않는다.
+    4. 바뀐 전이로 `aggregate_transitions` 를 다시 돈다 — 카운트·첫 incorrect 위치가 일관된다.
+    """
+    base = verify_solution(steps, step_types)
+    results = list(base.steps)
+    interpretive: dict[int, str] = {}
+    for index, step in enumerate(base.steps):
+        if step.state == VerifyStepState.correct:
+            continue
+        interpreted = interpretive_step(
+            conditions, answer_selection, steps[index], steps[index + 1]
+        )
+        if interpreted is None:
+            continue
+        kind, judged = interpreted
+        interpretive[index] = kind
+        if judged == VerifyStepState.correct:
+            results[index] = step.model_copy(
+                update={
+                    "state": VerifyStepState.correct,
+                    "reason": None,
+                    "reason_code": None,
+                    "evidence_weight": 1.0,
+                }
+            )
+        elif judged == VerifyStepState.incorrect and step.state == VerifyStepState.unverifiable:
+            results[index] = step.model_copy(
+                update={
+                    "state": VerifyStepState.incorrect,
+                    "reason": f"해석 단계({kind}) — 문항 조건이 요구하는 값과 어긋남(확정)",
+                    "reason_code": None,
+                    "evidence_weight": 1.0,
+                }
+            )
+    return InterpretedSolutionResult(aggregate_transitions(results), interpretive)
 
 
 if TYPE_CHECKING:

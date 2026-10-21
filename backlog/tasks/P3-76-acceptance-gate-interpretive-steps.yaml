@@ -20,6 +20,10 @@ paths:
   - src/backend/whymath_backend/harness/corpus_reverify.py
   - src/backend/whymath_backend/harness/solution_qa.py
   - src/backend/whymath_backend/l3/verify_answer.py
+  - src/backend/whymath_backend/l3/verify_solution.py
 session: claude/p3-acceptance-gate-interpretive
-notes: "출처: P3-62 재개 판정(docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md 재개 절, 브랜치 claude/p3-62-solution-qa-structuring 4e052b1e) — P3-71이 C4에만 해석 단계 판정을 넣어 수용 게이트·corpus_reverify가 규칙 (가) 문항을 failed/fail로 떨어뜨린다. Kiki A안(판정기 확장 선행) 2026-10-20의 연장."
+notes: |-
+  출처: P3-62 재개 판정(docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md 재개 절, 브랜치 claude/p3-62-solution-qa-structuring 4e052b1e) — P3-71이 C4에만 해석 단계 판정을 넣어 수용 게이트·corpus_reverify가 규칙 (가) 문항을 failed/fail로 떨어뜨린다. Kiki A안(판정기 확장 선행) 2026-10-20의 연장.
+
+  [정정 2026-10-20] paths ['src/backend/whymath_backend/l3/equivalent/acceptance.py', 'src/backend/whymath_backend/harness/corpus_reverify.py', 'src/backend/whymath_backend/harness/solution_qa.py', 'src/backend/whymath_backend/l3/verify_answer.py'] → ['src/backend/whymath_backend/l3/equivalent/acceptance.py', 'src/backend/whymath_backend/harness/corpus_reverify.py', 'src/backend/whymath_backend/harness/solution_qa.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'src/backend/whymath_backend/l3/verify_solution.py']: 공용 해석 단계 판정(verify_solution_interpreted)을 l3/verify_solution.py 에 둔다 — 수용 게이트(l3)는 harness 를 import 할 수 없고, 새 모듈은 경계 배정·인벤토리 귀속을 새로 요구하므로 기존 ADAPTER 모듈(풀이 연쇄 판정)에 붙였다
 updated: 2026-10-20
