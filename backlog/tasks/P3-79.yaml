@@ -14,10 +14,11 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 재현: `verify_real_root_count`·`verify_extremum_count`·`verify_substituted_value`·`verify_root_aggregate`(l3/verify_answer.py)가 평가 파싱의 자동 약분(`x*(x - 2)/(x - 2)` → `x`)으로 원문에서 정의되지 않는 점을 근·극값으로 센다. 예: 조건 `x*(x - 2)/(x - 2) = 2`의 실근 개수를 1로 센다(실제 0). P3-75가 Tier1·근 선택(원소 1개)·classify_solvability·derive_selected_root만 막고 남긴 형제 경로다.\n② 기준: P3-75의 원문 정의역 판정 `condition_definedness`(허용 목록·실행 없는 ast 평가 — 금지 목록 방식 금지)와 `trusted_real_roots`를 재사용해, 셈에 들어가는 각 근을 원문 정의역으로 거른다. undefined는 버리고 unknown이 하나라도 있으면 판정 불가.\n③ RED: P3-75 테스트의 6꼴 + RF3/RF4를 네 검증기에 넣어 종전 셈이 나오면 RED. 대조군(정의되는 꼴)은 종전 판정 유지. 거르는 절을 지우는 뮤테이션 RED.\n④ 회귀: corpus_reverify 전 은행·solution_qa 대표 과정에서 판정 전후 대조 — 새 FAIL·판정 불가는 문항별로 무연근 여부를 확인해 보고(거짓 실패 0)."
+  - "⑤ (PR #1719 독립 검토 반영 — 범위 보강) 같은 자동 약분 경로가 세 곳 더 있다: (a) `verify_is_differentiable` — `verify_is_differentiable(\"x**2*(x-1)/(x-1)\", \"1\")` 이 pass(원문은 x = 1 에서 정의되지 않아 미분 불가) (b) `verify_is_one_to_one` — 약분된 식으로 일대일을 판정한다 (c) `counterexample_fuzz.fuzz_answer` — RF3 `x*(x - 2)/(x - 2) = 2` 의 x = 2 를 pass. 세 경로도 ②의 원문 정의역 판정(`condition_definedness`·`trusted_real_roots`)으로 거르고 ③의 RED 대상에 넣는다.\n⑥ (거짓 fail 방향 RED) 종전 셈이 무연근을 세서 **맞는 답이 fail 로 떨어지는** 방향도 RED 기준이다: `verify_real_root_count(\"x*(x - 2)/(x - 2) = 2\", \"0\")` 이 fail(정답 0 — 실근 없음), `verify_root_aggregate(\"(x - 3)*(x - 2)**2/(x - 2) = 0\", \"3\", \"sum\")` 이 fail(정답 3 — 근은 3 하나). 고친 뒤 두 경우는 pass(또는 판정 불가)여야 하고 fail 이면 RED. 2026-10-21 실측(PR #1719 HEAD) 두 경우 모두 fail · (a)·(c) pass."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/verify_answer.py
   - "tests/backend/l3/test_verify_answer*.py"
 session: null
-notes: ""
+notes: "[정정 2026-10-21] PR #1719 독립 검토 P2-5: 범위 보강(미분가능·일대일·fuzz)과 거짓 fail 방향 RED 추가"
 updated: 2026-10-21

@@ -277,3 +277,126 @@ def test_exact_nonzero_residual_within_tolerance_fails() -> None:
 def test_condition_definedness(condition: str, values: dict[str, int], expected: str) -> None:
     point = {name: sympy.Integer(value) for name, value in values.items()}
     assert condition_definedness(condition, point) == expected
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ④ PR #1719 독립 검토 반영 — 검토가 찾은 우회·회귀를 RED/대조로 동결
+# ──────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize(
+    ("condition", "values"),
+    [
+        # 적분 피적분식 속 변수 무관 분모(순서·꼴만 바꾼 우회 — 검토 1)
+        ("Integral(t*(x - 2)/(x - 2), (t, 0, 1)) = 1/2", {"x": "2"}),
+        ("Integral(exp(t)*(x - 2)**3/(x - 2)**2, (t, 0, 1)) = 0", {"x": "2"}),
+        ("Integral((a - 2)*x/(a - 2), (x, 0, 1)) = y", {"a": "2", "y": "1/2"}),
+        ("Integral(sin(t/(a - 2)), (t, 0, 1)) + a = y", {"a": "2", "y": "2"}),
+        # 미분 안 같은 꼴
+        ("Derivative(t*(x - 2)/(x - 2), t).doit().subs(t, 1) = 1", {"x": "2"}),
+    ],
+)
+def test_constant_denominator_inside_integral_or_derivative(
+    condition: str, values: dict[str, str]
+) -> None:
+    point = {name: sympy.sympify(value) for name, value in values.items()}
+    assert condition_definedness(condition, point) == "undefined"
+    # sin(t/0) 꼴은 평가 잔차부터 zoo 라 종전에도 판정 불가다 — 어느 쪽이든 pass 는 아니다.
+    assert verify_answer([condition], values).state != "pass"
+
+
+@pytest.mark.parametrize(
+    ("condition", "values"),
+    [
+        ("Integral(t*(x - 2)/(x - 2), (t, 0, 1)) = 1/2", {"x": "2"}),
+        ("Integral(exp(t)*(x - 2)**3/(x - 2)**2, (t, 0, 1)) = 0", {"x": "2"}),
+        ("Integral((a - 2)*x/(a - 2), (x, 0, 1)) = y", {"a": "2", "y": "1/2"}),
+    ],
+)
+def test_integral_spurious_root_fails(condition: str, values: dict[str, str]) -> None:
+    """검토 재현 3꼴 — 종전 Tier1 pass 였다. 원문 정의역으로 fail 이 확정된다."""
+    assert verify_answer([condition], values).state == "fail"
+
+
+def test_integral_of_derivative_with_constant_denominator_is_undefined() -> None:
+    condition = "Integral(Derivative(t**2*(x - 2)/(x - 2), t), (t, 0, 1)) = 1"
+    assert condition_definedness(condition, {"x": sympy.Integer(2)}) == "undefined"
+    assert verify_answer([condition], {"x": "2"}).state != "pass"
+
+
+def test_control_integral_with_nonzero_constant_denominator() -> None:
+    assert verify_answer(["Integral(t*(x - 2)/(x - 2), (t, 0, 1)) = 1/2"], {"x": "3"}).state == (
+        "pass"
+    )
+
+
+@pytest.mark.parametrize(
+    "condition",
+    ["(x - 1)**2 + 1e-20 = 0", "(x - 1)**2 + 0.0000000001 = 0", "(x-1)**2 + 1.0/10**12 = 0"],
+)
+def test_decimal_literal_tiny_residual_is_not_pass(condition: str) -> None:
+    """조건의 소수 리터럴을 적힌 십진값으로 읽으면 잔차가 0 이 아니다 — 확정은 안 하되 pass 금지."""
+    assert verify_answer([condition], {"x": "1"}).state == "unverifiable"
+
+
+@pytest.mark.parametrize(
+    ("condition", "answer"),
+    [
+        ("1.5*x = 3", "2"),  # 소수 리터럴이지만 정확히 0
+        ("x - 0.1 = 0", "1/10"),
+        ("x**2 = 2", "1.41421356237"),  # 근사 소수 답 — 종전 허용치 판정
+    ],
+)
+def test_control_decimal_literal_pass_is_kept(condition: str, answer: str) -> None:
+    assert verify_answer([condition], {"x": answer}).state == "pass"
+
+
+@pytest.mark.parametrize(
+    "condition",
+    ["x + 0*((x-2)/(x-2), 1)[0] = 2", "x*[(x-2)/(x-2)][0] = 2", "x*((x-2)/(x-2), 0)[0] = 2"],
+)
+def test_nodes_outside_allowlist_are_unknown(condition: str) -> None:
+    """허용 목록 밖 노드(첨자·튜플·리스트)는 판정 불가다 — 금지 목록이 아니라 허용 목록이다(검토 4)."""
+    assert condition_definedness(condition, {"x": sympy.Integer(2)}) == "unknown"
+    assert verify_answer([condition], {"x": "2"}).state == "unverifiable"
+
+
+def test_acot_is_not_smooth_at_zero() -> None:
+    """SymPy 의 acot 은 0 에서 불연속이다 — 미분 안에서 허용하지 않는다(검토 6)."""
+    assert verify_answer(["Derivative(acot(x), x).doit() = -1"], {"x": "0"}).state != "pass"
+
+
+def test_integer_functions_require_textbook_domain() -> None:
+    assert verify_answer(["x + 0*binomial(x - 3, 1) = 2"], {"x": "2"}).state == "unverifiable"
+    assert verify_answer(["binomial(n, 2) = 10"], {"n": "5"}).state == "pass"
+    assert verify_answer(["factorial(n) = 120"], {"n": "5"}).state == "pass"
+
+
+@pytest.mark.parametrize(
+    ("condition", "answer"),
+    [
+        ("x = sqrt(-4)*sqrt(-9)", "-6"),  # 상수 하위 나무의 의도된 복소 산술
+        ("x = (1 + sqrt(-3))*(1 - sqrt(-3))", "4"),
+    ],
+)
+def test_control_constant_complex_arithmetic(condition: str, answer: str) -> None:
+    assert verify_answer([condition], {"x": answer}).state == "pass"
+
+
+def test_control_quintic_crootof_and_irrational_cubic() -> None:
+    """5차 기약 다항식(CRootOf)·무리 계수 3차식(카르다노 근호식) — 종전 판정 유지(검토 8)."""
+    quintic = "x**5 - x - 1 = 0"
+    assert classify_solvability(quintic).state == "unique"
+    assert verify_root_selection(quintic, {"x": "1.1673039782614187"}, "largest").state == "pass"
+    cubic = "x**3 - 3*sqrt(2)*x + 1 = 0"
+    assert classify_solvability(cubic).state == "multiple"
+    assert verify_root_selection(cubic, {"x": "1.9298902860579772"}, "largest").state == "pass"
+    assert verify_root_selection(cubic, {"x": "0.23891668457149623"}, "largest").state == "fail"
+
+
+def test_derive_selected_root_keeps_radical_notation() -> None:
+    """유도 정답은 종전 근호식 표기다 — CRootOf 를 내면 생성기 정규화(safe_sympify)가 거부해
+    derive-and-verify 가드가 조용히 꺼진다(검토 2)."""
+    derived = derive_selected_root("x**3 - 12*x**2 + 48*x - 59 = 0", "largest")
+    assert derived == "4 - 5**(1/3)"
+    assert derive_selected_root("x**3 - 6*x**2 + 12*x - 4 = 0", "unique") == "2 - 2**(2/3)"
+    assert derive_selected_root("x**2 - 2 = 0", "largest") == "sqrt(2)"
+    assert derive_selected_root("x*(x - 2)/(x - 2) = 2", "unique") is None  # 무연근만 — 유도 불가
