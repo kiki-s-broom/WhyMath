@@ -57,10 +57,12 @@ Tier1 정직성(설계 §4): `pass`는 "샘플 점들에서 조건을 만족"이
 from __future__ import annotations
 
 import ast
+import io
 import logging
 import math
 import random
 import re
+import tokenize
 from collections.abc import Callable, Mapping, Sequence
 from typing import Final, Literal, cast
 
@@ -428,7 +430,7 @@ def _verify_single(
                         samples_checked=1,
                     )
                 if substituted.has(sympy.Float) and _decimal_residual_nonzero(
-                    residual, substitutions
+                    condition, substitutions
                 ):
                     return _unverifiable(
                         "조건의 소수 리터럴을 적힌 십진값으로 읽으면 잔차가 0 이 아님"
@@ -477,21 +479,67 @@ def _verify_single(
     )
 
 
+def _exact_decimal_text(condition: str) -> str | None:
+    """조건 원문의 소수 리터럴(`2.0`·`1e-20`)을 **적힌 그대로의** 십진 정확값 `(p/q)` 로 바꾼 원문.
+
+    토큰 단위로 바꾼다(식을 평가하지 않는다). 소수 리터럴이 없거나 토큰화하지 못하면 None.
+    정수·허수(`2j`)·16진 리터럴은 그대로 둔다.
+    """
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(condition).readline))
+    except (tokenize.TokenError, SyntaxError, IndentationError) as exc:
+        logger.debug("verify_answer 소수 리터럴 토큰화 회피: %s", type(exc).__name__)
+        return None
+    if any(token.start[0] != 1 or token.end[0] > 1 for token in tokens if token.string):
+        return None  # 여러 줄 조건은 다루지 않는다(오프셋 계산을 한 줄로 한정)
+    pieces: list[str] = []
+    cursor = 0
+    changed = False
+    for token in tokens:
+        text = token.string
+        if token.type != tokenize.NUMBER:
+            continue
+        lowered = text.lower()
+        if lowered.endswith("j") or lowered.startswith(("0x", "0o", "0b")):
+            continue
+        if "." not in text and "e" not in lowered:
+            continue
+        try:
+            exact = sympy.Rational(text.replace("_", ""))
+        except (TypeError, ValueError) as exc:
+            logger.debug("verify_answer 소수 리터럴 변환 회피: %s", type(exc).__name__)
+            return None
+        start, end = token.start[1], token.end[1]
+        pieces.append(condition[cursor:start])
+        pieces.append(f"({exact.p}/{exact.q})")
+        cursor = end
+        changed = True
+    if not changed:
+        return None
+    pieces.append(condition[cursor:])
+    return "".join(pieces)
+
+
 def _decimal_residual_nonzero(
-    residual: sympy.Expr, substitutions: Mapping[sympy.Symbol, sympy.Expr]
+    condition: str, substitutions: Mapping[sympy.Symbol, sympy.Expr]
 ) -> bool:
     """근사 소수가 **조건 리터럴에서만** 왔을 때, 그 리터럴을 적힌 십진 정확값으로 읽은 잔차가
     정확히 0 이 아닌가(P3-75 검토 3 — `(x - 1)**2 + 1e-20 = 0` 의 x = 1).
+
+    P3-79 ⑦ — 종전에는 *평가된* 잔차의 Float 를 십진값으로 바꿨다. 그러면 `x = sqrt(2.0)` 은
+    `sqrt(2.0)` 이 먼저 1.41421356237310 으로 평가된 뒤 그 반올림값이 정확값이 돼, 정답 sqrt(2) 가
+    unverifiable 로 떨어졌다. 이제 **원문 리터럴**(`2.0`)을 정확값(2)으로 바꾼 원문을 다시 파싱한다.
 
     답에 근사 소수가 있으면 False(종전 허용치 판정을 그대로 둔다 — √2 ≈ 1.4142… 같은 근사 답).
     판정할 수 없으면 False(종전과 같다).
     """
     if any(value.has(sympy.Float) for value in substitutions.values()):
         return False
+    exact_text = _exact_decimal_text(condition)
+    if exact_text is None:
+        return False
     try:
-        exact = residual.xreplace(
-            {number: sympy.Rational(str(number)) for number in residual.atoms(sympy.Float)}
-        )
+        exact, _ = _parse_condition(exact_text)
         value = safe_subs(exact, dict(substitutions))
     except Exception as exc:  # noqa: BLE001 — 정확값 재구성 불가는 종전 판정 유지
         logger.debug("verify_answer 소수 리터럴 재판정 회피: %s", type(exc).__name__)
@@ -1506,13 +1554,25 @@ def _comparison_parts(tree: ast.AST) -> list[ast.AST]:
     return [tree]
 
 
+RootReality = Literal["real", "vanishing", "nonreal"]
+
+
 def _root_is_real(root: sympy.Expr) -> bool | None:
-    """근이 실수인가 — SymPy 가정(`is_real`)이 정하면 그대로, 못 정하면 60자리 평가의 허수부가
-    정확히 0 일 때만 실수·문턱보다 크면 실수 아님·그 사이는 못 가림(None). Tier1 허용치(1e-9)로
-    실수라 부르지 않는다 — 허수부 1e-10 인 근이 실근으로 세어지던 결함(P3-75 ⑤(d))."""
+    """근이 실수인가 — True·False·None(못 가림). 근거의 종류는 `_root_reality` 가 낸다."""
+    reality = _root_reality(root)
+    return None if reality is None else reality != "nonreal"
+
+
+def _root_reality(root: sympy.Expr) -> RootReality | None:
+    """근의 실수 여부와 그 근거 — SymPy 가정(`is_real`)이 정하면 그대로(real·nonreal), 못 정하면
+    120자리 평가의 허수부가 정확히 0 이면 real·문턱보다 크고 정밀도에 따라 변하지 않으면 nonreal·
+    허수부가 정밀도와 함께 계속 사라지면 vanishing(실근 *후보* — 호출부가 SymPy 실근 개수로 맞춘다)·
+    그 밖은 못 가림(None). Tier1 허용치(1e-9)로 실수라 부르지 않는다 — 허수부 1e-10 인 근이 실근으로
+    세어지던 결함(P3-75 ⑤(d)). 반올림 문턱(1e-100) 아래의 0 아닌 허수부도 그대로 실근이라 부르지
+    않는다(P3-79 ⑦)."""
     real = root.is_real
     if real is not None:
-        return bool(real)
+        return "real" if real else "nonreal"
     try:
         low = sympy.N(root, _CERT_PRECISION).as_real_imag()[1]
         high = sympy.N(root, 2 * _CERT_PRECISION).as_real_imag()[1]
@@ -1521,17 +1581,51 @@ def _root_is_real(root: sympy.Expr) -> bool | None:
         return None
     if not (low.is_number and high.is_number):
         return None
-    # 정밀도를 두 배로 올리면 함께 줄어드는 허수부는 반올림 잔여다(카르다노 근호식의 실근 —
-    # `x**3 - 3*sqrt(2)*x + 1`). 정밀도와 무관하게 남는 허수부는 진짜다.
-    if high == 0 or abs(high) < _DEF_ROUNDOFF:
-        return True
+    if high == 0:
+        return "real"
+    if abs(high) < _DEF_ROUNDOFF:
+        # P3-79 ⑦ — 문턱 아래의 허수부를 그대로 실근이라 부르지 않는다. 종전에는 여기서 곧바로
+        # 실근이라 불러, 허수부 ~4.8e-101 인 비실근(`(x - sqrt(2))**2*(x + 3) + 10**(-200)`)을
+        # 실근으로 셌다. 정밀도를 다시 두 배로 올려, 허수부가 그 정밀도와 함께 계속 사라질 때만
+        # (evalf 가 0 을 유효숫자 없는 상한 `0.e-128` 로 낸다 — 카르다노 근호식의 실근
+        # `x**3 - 3*sqrt(2)*x + 1`) 반올림 잔여로 본다. 값이 그대로 남으면 진짜 허수부라 판정 불가.
+        # 사라지는 상한도 증명은 아니다 — 호출부가 SymPy 실근 개수(`count_roots`)로 맞춘다.
+        try:
+            higher = sympy.N(root, 4 * _CERT_PRECISION).as_real_imag()[1]
+        except Exception as exc:  # noqa: BLE001 — 평가 불가는 못 가림
+            logger.debug("verify_answer 실근 판정 회피: %s", type(exc).__name__)
+            return None
+        if higher.is_number and (higher == 0 or abs(higher) <= abs(high) * _DEF_ZERO):
+            return "vanishing"
+        return None
     if abs(high) > _DEF_ZERO and abs(high - low) <= abs(high) * _DEF_ZERO:
-        return False
+        return "nonreal"
     return None
 
 
+def _real_count_agrees(poly: sympy.Poly | None, real_roots: Sequence[sympy.Expr]) -> bool:
+    """실근 후보(사라지는 허수부 상한 포함)의 수가 SymPy 의 정확한 실근 개수와 같은가(P3-79 ⑦).
+
+    잔차가 다항식이 아니거나(`poly` None) 계수 체 위에서 실근을 세지 못하면 False(확인 못 함 —
+    호출부가 판정 불가로 둔다). 대수적 수 계수(`sqrt(2)`)는 확장 체 위의 다항식으로 다시 세운다.
+    """
+    if poly is None or poly.degree() < 1:
+        return False
+    try:
+        algebraic = sympy.Poly(poly.as_expr(), *poly.gens, extension=True).sqf_part()
+        count = algebraic.count_roots()
+    except Exception as exc:  # noqa: BLE001 — 셀 수 없는 계수 체는 '확인 못 함'
+        logger.debug("verify_answer 실근 개수 확인 회피: %s", type(exc).__name__)
+        return False
+    return int(count) == len(real_roots)
+
+
 def trusted_real_roots(
-    condition: str, residual: sympy.Expr, var: sympy.Symbol
+    condition: str,
+    residual: sympy.Expr,
+    var: sympy.Symbol,
+    *,
+    given: Mapping[str, sympy.Expr] | None = None,
 ) -> list[sympy.Expr] | None:
     """조건 등식의 **원문에서 정의되는** 서로 다른 실근(정확값) — 판정 불가면 None(P3-75).
 
@@ -1543,7 +1637,12 @@ def trusted_real_roots(
       · 원문 정의역 — 근마다 `condition_definedness`. 정의되지 않음은 버리고, 판정 불가가
         하나라도 있으면 None.
     `solve` 경로의 근 집합이 완전하다는 보장은 여기서 하지 않는다(종전과 같다 — 호출부가
-    다항일 때만 존재성을 단정한다).
+    다항일 때만 존재성을 단정한다). 다만 실근 후보가 사라지는 허수부 상한(`vanishing`)에서
+    왔으면 실근으로 분류한 개수를 SymPy 실근 개수(`count_roots`)와 맞춰 보고, 어긋나거나 셀 수
+    없으면 None 이다(P3-79 ⑦ — 수치 평가가 허수부를 0 상한으로 낸 비실근을 실근으로 세지 않는다).
+
+    `given`(P3-79) — 조건에 `var` 밖의 이름이 있을 때 그 값(대입 단계 `y = f(x)` 의 x). 원문 정의역
+    판정에 함께 넣는다.
     """
     try:
         poly: sympy.Poly | None = sympy.Poly(residual, var)
@@ -1554,22 +1653,45 @@ def trusted_real_roots(
         candidates = list(sympy.real_roots(poly.sqf_part()))
     else:
         candidates = []
+        vanishing = False  # 사라지는 허수부 상한으로 실근 후보가 된 근이 있는가
         for root in sympy.solve(sympy.Eq(residual, 0), var):
-            real = _root_is_real(root)
-            if real is None:
+            reality = _root_reality(root)
+            if reality is None:
                 return None
-            if real:
+            if reality != "nonreal":
                 candidates.append(root)
+                vanishing = vanishing or reality == "vanishing"
+        if vanishing and not _real_count_agrees(poly, candidates):
+            return None
+    base = {} if given is None else dict(given)
     kept: list[sympy.Expr] = []
     for root in candidates:
         # 5차 이상 기약 다항식의 근(CRootOf)은 원문 평가에 60자리 수치로 넣는다 — 근사 소수라
         # 0 확정은 하지 않는다(분모가 그 근에서 0 에 가까우면 판정 불가로 남는다).
-        point = sympy.N(root, _CERT_PRECISION) if root.has(sympy.CRootOf) else root
-        state = condition_definedness(condition, {str(var): point})
+        state = condition_definedness(condition, {**base, str(var): _definedness_point(root)})
         if state == _UNKNOWN:
             return None
         if state == _DEFINED:
             kept.append(root)
+    return kept
+
+
+def _definedness_point(root: sympy.Expr) -> sympy.Expr:
+    """원문 정의역 평가에 넣을 근의 값 — CRootOf 는 60자리 수치(`trusted_real_roots` 와 같다)."""
+    return sympy.N(root, _CERT_PRECISION) if root.has(sympy.CRootOf) else root
+
+
+def _defined_root_multiplicities(
+    condition: str, var: sympy.Symbol, root_mult: Mapping[sympy.Expr, int]
+) -> dict[sympy.Expr, int] | None:
+    """`{근: 중복도}` 중 원문이 그 근에서 정의되는 것만(P3-79). 판정 불가가 하나라도 있으면 None."""
+    kept: dict[sympy.Expr, int] = {}
+    for root, mult in root_mult.items():
+        state = condition_definedness(condition, {str(var): _definedness_point(root)})
+        if state == _UNKNOWN:
+            return None
+        if state == _DEFINED:
+            kept[root] = mult
     return kept
 
 
@@ -1600,7 +1722,8 @@ def verify_substituted_value(
         return _unverifiable("대입 — 등식이 아님(부등식/≠)·안전 회피")
     symbol = sympy.Symbol(target)
     try:
-        reduced = safe_subs(residual, {sympy.Symbol(k): safe_sympify(v) for k, v in given.items()})
+        given_values = {k: safe_sympify(v) for k, v in given.items()}
+        reduced = safe_subs(residual, {sympy.Symbol(k): v for k, v in given_values.items()})
         claimed_value = _real_value(safe_sympify(claimed), tol)
     except Exception as exc:  # noqa: BLE001 — 대입·치환 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
@@ -1610,12 +1733,17 @@ def verify_substituted_value(
     if claimed_value is None:
         return _unverifiable("대입 — 주장값이 실수가 아님·안전 회피")
     try:
-        sympy.Poly(reduced, symbol)  # 다항일 때만 solve 의 해 집합을 신뢰한다(빈 결과 오판 회피).
-        raw = sympy.solve(sympy.Eq(reduced, 0), symbol)
+        sympy.Poly(reduced, symbol)  # 다항일 때만 근 집합을 신뢰한다(빈 결과 오판 회피).
+        # P3-79 — 대입 뒤 잔차는 자동 약분된 식이라(`y = x*(x - 2)/(x - 2)` 에 x = 2 → y - 2)
+        # 그 해에서 원문 정의 등식이 정의되지 않을 수 있다. 해마다 원문 정의역(대입값 포함)으로
+        # 거르고, 실근 여부도 허용치가 아니라 정확하게 가린다(`trusted_real_roots`).
+        trusted = trusted_real_roots(condition, reduced, symbol, given=given_values)
     except Exception as exc:  # noqa: BLE001 — 비다항·풀이 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable(f"대입 — {target} 에 대한 다항 등식이 아님/풀이 불가·안전 회피")
-    values = _distinct_values([rv for r in raw if (rv := _real_value(r, tol)) is not None], tol)
+    if trusted is None:
+        return _unverifiable("대입 — 원문 정의역·실근 여부를 확정하지 못함·안전 회피")
+    values = _distinct_values([rv for r in trusted if (rv := _real_value(r, tol)) is not None], tol)
     if len(values) != 1:
         return _unverifiable(f"대입 — {target} 이 실수 하나로 정해지지 않음({len(values)}개)")
     if _approx_equal(claimed_value, values[0], tol):
@@ -1911,6 +2039,17 @@ def verify_root_aggregate(
         # 근을 중복도까지 전부 구하지 못함(라디칼 표현 불가 등) → 집계 정확값 보장 못 함.
         return _unverifiable("근 집계 — 근을 중복도까지 전부 구하지 못함·안전 회피")
 
+    # P3-79 — 잔차는 자동 약분된 식이라(`(x - 3)*(x - 2)**2/(x - 2)` → (x - 3)*(x - 2)) 원문에서
+    # 정의되지 않는 근(x = 2)이 섞인다. 근마다(복소근 포함 — 집계는 Vieta 정확값이 계약) 원문
+    # 정의역을 보고, 정의되지 않음은 빼고 판정 불가가 하나라도 있으면 unverifiable.
+    defined = _defined_root_multiplicities(condition, var, root_mult)
+    if defined is None:
+        return _unverifiable("근 집계 — 원문 정의역을 확정하지 못함·안전 회피")
+    if not defined:
+        return _unverifiable("근 집계 — 원문에서 정의되는 근이 없음(무연근만)·안전 회피")
+    root_mult = defined
+    total_mult = sum(root_mult.values())
+
     if kind == "sum":
         actual: sympy.Expr = sum(
             (root * mult for root, mult in root_mult.items()), sympy.Integer(0)
@@ -2173,7 +2312,17 @@ def verify_real_root_count(
     claimed_n = _claimed_int(claimed, tol)
     if claimed_n is None:
         return _unverifiable("실근 개수 — 주장값이 개수(비음 정수)가 아님·안전 회피")
-    real = [rv for r in root_mult if (rv := _real_value(r, tol)) is not None]
+    # P3-79 — 잔차는 자동 약분된 식이라(`x*(x - 2)/(x - 2) = 2` → x - 2) 원문에서 정의되지 않는
+    # 근(무연근)이 섞이고, 허용치(1e-9)로 실수를 부르면 허수부가 아주 작은 근도 섞인다. 셈에
+    # 넣는 근은 원문에서 정의되는 정확 실근만이다(`trusted_real_roots` — 판정 불가면 None).
+    try:
+        trusted = trusted_real_roots(condition, residual, var)
+    except Exception as exc:  # noqa: BLE001 — 근 계산 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("실근 개수 — 근 계산 불가·안전 회피")
+    if trusted is None:
+        return _unverifiable("실근 개수 — 원문 정의역·실근 여부를 확정하지 못함·안전 회피")
+    real = [rv for r in trusted if (rv := _real_value(r, tol)) is not None]
     inside: list[float] = []
     for value in real:
         verdicts = [
@@ -2191,6 +2340,130 @@ def verify_real_root_count(
         f"실근 개수 — 실제 {actual}개이나 주장은 {claimed_n}개(불일치)",
         samples_checked=actual,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 함수 식 원문의 정의역 꼴(P3-79 ⑤) — 극값·일대일·미분가능은 *한 점*이 아니라 *근방·ℝ 전체*의
+# 성질이라, 점별 정의역 판정(`condition_definedness`)만으로는 부족하다. 원문 구문 나무를 허용 노드만
+# 으로 훑어(실행하지 않는다) 정의역이 어떤 꼴인지 가린다.
+#   · TOTAL — 모든 실수에서 정의·유한(다항·상수 분모·Abs·전해석 함수). 평가 파싱이 접은 식과 ℝ
+#     전체에서 값이 같다.
+#   · OPEN  — 변수 분모·변수 밑의 0 이하 정수 지수가 있어 정의되지 않는 점이 있을 수 있으나, 남은
+#     정의역은 열린 집합이고 그 위에서 접은 식과 값이 같다(연속 연산·나눗셈만으로 지어졌다).
+#   · None  — 허용 노드 밖(√·log·`.doit()`·Derivative 등). 정의역 꼴을 모른다.
+# ──────────────────────────────────────────────────────────────────────────
+FunctionDomain = Literal["total", "open"]
+# 실수 전체에서 정의·유한·연속인 함수(인자가 TOTAL 이면 결과도 TOTAL).
+_TOTAL_FUNCTIONS: frozenset[str] = frozenset(
+    {"Abs", "abs", "sin", "cos", "exp", "sinh", "cosh", "atan"}
+)
+
+
+def _constant_value(node: ast.AST) -> sympy.Expr | None:
+    """이름 없는 상수 하위 나무의 값 — 허용 노드 평가(`_DefinednessEvaluator`)로만 구한다."""
+    try:
+        return _DefinednessEvaluator(True).value(node, {})
+    except (_DefUndefined, _DefUnknown):
+        return None
+    except Exception as exc:  # noqa: BLE001 — 예상 밖 예외도 '모름'
+        logger.debug("verify_answer 함수 정의역 판정 회피: %s", type(exc).__name__)
+        return None
+
+
+def _domain_kind(node: ast.AST, var: str) -> FunctionDomain | None:
+    """하위 나무의 정의역 꼴(위 절 설명). 변수 `var` 하나의 함수로 본다."""
+    names = _free_names(node)
+    if names - {var}:
+        return None  # 다른 이름(자유 기호)이 섞이면 단일 변수 함수가 아니다
+    if not names:
+        # 변수 없는 상수 — 그 값이 유한한 실수로 정의되면 어디서나 같은 값(TOTAL).
+        value = _constant_value(node)
+        return "total" if value is not None and value.is_real else None
+    if isinstance(node, ast.Name):
+        return "total"
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        return _domain_kind(node.operand, var)
+    if isinstance(node, ast.BinOp):
+        return _binop_domain_kind(node, var)
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in _TOTAL_FUNCTIONS
+        and len(node.args) == 1
+        and not node.keywords
+    ):
+        return _domain_kind(node.args[0], var)
+    return None
+
+
+def _binop_domain_kind(node: ast.BinOp, var: str) -> FunctionDomain | None:
+    left_has = var in _free_names(node.left)
+    right_has = var in _free_names(node.right)
+    if isinstance(node.op, (ast.Add, ast.Sub, ast.Mult)):
+        kinds = (_domain_kind(node.left, var), _domain_kind(node.right, var))
+        if None in kinds:
+            return None
+        return "total" if kinds == ("total", "total") else "open"
+    if isinstance(node.op, ast.Div):
+        top = _domain_kind(node.left, var)
+        if top is None:
+            return None
+        if not right_has:
+            value = _constant_value(node.right)
+            if value is None or _zero_state(value) is not False:
+                return None  # 상수 분모가 0 이거나 0 여부를 못 가림
+            return top
+        bottom = _domain_kind(node.right, var)
+        return None if bottom is None else "open"
+    if isinstance(node.op, (ast.Pow, ast.BitXor)):
+        if right_has:
+            # b**x — 밑이 변수와 무관한 양수일 때만(exp(x·log b)).
+            base = _constant_value(node.left) if not left_has else None
+            if base is None or base.is_positive is not True:
+                return None
+            return _domain_kind(node.right, var)
+        exponent = _constant_value(node.right)
+        if exponent is None or not exponent.is_Integer:
+            return None
+        base_kind = _domain_kind(node.left, var)
+        if base_kind is None:
+            return None
+        if exponent.is_positive:
+            return base_kind
+        # 변수 밑의 0 이하 정수 지수 — 밑이 0 인 점에서 정의되지 않는다(0**0·0**음수).
+        return "open" if left_has else base_kind
+    return None
+
+
+def function_domain_kind(expression: str, var: str) -> FunctionDomain | None:
+    """함수 식 원문의 정의역 꼴 — `total`·`open`·None(허용 구조 밖). 실행하지 않는다(P3-79)."""
+    try:
+        safe_sympify(expression)  # 안전 진입점의 거부(위험 토큰·예산)를 먼저 통과해야 한다
+        tree = ast.parse(expression.strip().replace("^", "**"), mode="eval").body
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가·거부는 '모름'
+        logger.debug("verify_answer 함수 정의역 판정 회피: %s", type(exc).__name__)
+        return None
+    return _domain_kind(tree, var)
+
+
+def _real_root_items(
+    poly: sympy.Poly, root_mult: Mapping[sympy.Expr, int]
+) -> list[tuple[sympy.Expr, int]] | None:
+    """`{근: 중복도}` 의 실근만 — 실근 여부는 허용치가 아니라 정확하게(`_root_is_real`). 못 가리면
+    None(P3-79 — 허수부 1e-10 인 도함수 근을 임계점으로 세던 결함). 실근 후보가 사라지는
+    허수부 상한(`vanishing`)에서 왔으면 SymPy 실근 개수와 맞춰 본다(`trusted_real_roots` 규칙)."""
+    items: list[tuple[sympy.Expr, int]] = []
+    vanishing = False
+    for root, mult in root_mult.items():
+        reality = _root_reality(root)
+        if reality is None:
+            return None
+        if reality != "nonreal":
+            items.append((root, mult))
+            vanishing = vanishing or reality == "vanishing"
+    if vanishing and not _real_count_agrees(poly, [root for root, _ in items]):
+        return None
+    return items
 
 
 def verify_extremum_count(
@@ -2237,12 +2510,23 @@ def verify_extremum_count(
     claimed_n = _claimed_int(claimed, tol)
     if claimed_n is None:
         return _unverifiable("극값 개수 — 주장값이 개수(비음 정수)가 아님·안전 회피")
+    # P3-79 — f 는 평가 파싱이 접은 식이다(`(x - 2)**3/(x - 2)` → (x - 2)**2). 원문 정의역 꼴이
+    # TOTAL 이면 접은 식과 ℝ 전체에서 같고, OPEN 이면 남은 정의역(열린 집합) 위에서만 같아 정의되지
+    # 않는 임계점(x = 2)은 극값이 아니다 — 점마다 `condition_definedness` 로 거른다. 허용 구조 밖은
+    # 정의역을 몰라 판정 불가.
+    domain = function_domain_kind(condition, str(var))
+    if domain is None:
+        return _unverifiable("극값 개수 — 원문 함수의 정의역을 확인 못 함(허용 구조 밖)·안전 회피")
+    critical = _real_root_items(poly, root_mult)
+    if critical is None:
+        return _unverifiable("극값 개수 — 도함수 근의 실수 여부를 확정하지 못함·안전 회피")
+    if domain == "open":
+        filtered = _defined_root_multiplicities(condition, var, dict(critical))
+        if filtered is None:
+            return _unverifiable("극값 개수 — 임계점에서 원문 정의역을 확정하지 못함·안전 회피")
+        critical = list(filtered.items())
     # 극값 = 실근 중 중복도 홀수(부호 변화). 짝수 중복도(예 x³의 f'=3x²)는 극값 아님.
-    actual = sum(
-        1
-        for root, mult in root_mult.items()
-        if _real_value(root, tol) is not None and mult % 2 == 1
-    )
+    actual = sum(1 for _, mult in critical if mult % 2 == 1)
     if actual == claimed_n:
         return _pass(samples_checked=actual)
     return _fail(
@@ -2283,6 +2567,13 @@ def verify_is_one_to_one(
     if claimed_n not in (0, 1):
         return _unverifiable("일대일 — 주장값이 0/1이 아님·안전 회피")
     var = free[0]
+    # P3-79 — 'ℝ 에서 일대일대응' 은 ℝ 전체에서 정의돼야 묻는다. 평가 파싱이 접은 식
+    # (`x**3*(x - 1)/(x - 1)` → x**3)이 아니라 원문이 ℝ 전체에서 정의되는 꼴(TOTAL)일 때만 판정한다.
+    if function_domain_kind(condition, str(var)) != "total":
+        return _unverifiable(
+            "일대일 — 원문 함수가 ℝ 전체에서 정의되는 꼴임을 확인 못 함(분모·허용 구조 밖)"
+            "·안전 회피"
+        )
     fprime = sympy.diff(expr, var)
     if fprime == 0:
         actual = 0  # 상수함수 → 일대일 아님.
@@ -2294,11 +2585,10 @@ def verify_is_one_to_one(
             return _unverifiable("일대일 — 도함수가 다항식이 아님·안전 회피")
         if sum(root_mult.values()) != poly.degree():
             return _unverifiable("일대일 — 도함수 근을 중복도까지 다 못 구함·안전 회피")
-        sign_changes = sum(
-            1
-            for root, mult in root_mult.items()
-            if _real_value(root, tol) is not None and mult % 2 == 1
-        )
+        critical = _real_root_items(poly, root_mult)
+        if critical is None:
+            return _unverifiable("일대일 — 도함수 근의 실수 여부를 확정하지 못함·안전 회피")
+        sign_changes = sum(1 for _, mult in critical if mult % 2 == 1)
         actual = 1 if sign_changes == 0 else 0  # 부호 변화 없음(단조) → 일대일.
     if actual == claimed_n:
         return _pass(samples_checked=1)
@@ -2437,6 +2727,14 @@ def verify_is_differentiable(
     if claimed_n not in (0, 1):
         return _unverifiable("미분가능 — 주장값이 0/1이 아님·안전 회피")
     var = free[0]
+    # P3-79 ⑤(a) — 'ℝ 전체에서 미분가능' 은 원문이 ℝ 전체에서 정의돼야 성립한다. 평가 파싱이 접은
+    # 식(`x**2*(x - 1)/(x - 1)` → x**2)으로 판정하면 원문이 정의되지 않는 x = 1 을 놓친다 — 원문이
+    # ℝ 전체에서 정의되는 꼴(TOTAL)일 때만 판정하고, 그 밖은 판정 불가.
+    if function_domain_kind(condition, str(var)) != "total":
+        return _unverifiable(
+            "미분가능 — 원문 함수가 ℝ 전체에서 정의되는 꼴임을 확인 못 함(분모·허용 구조 밖)"
+            "·안전 회피"
+        )
     abs_terms = expr.atoms(sympy.Abs)
     if not abs_terms:
         # Abs 없는 다항식은 ℝ 전체에서 매끄러워 미분가능(1). 그 외(유리식 등)는 도메인 복잡 → 회피.

@@ -15,6 +15,11 @@
 
 독립성: 조건 파싱만 `verify_answer._parse_condition`을 재사용(같은 L3 계층·표기 drift
 방지)하고, 근 탐색·판정은 심볼릭 solve를 전혀 쓰지 않는 순수 수치 경로다.
+
+원문 정의역(P3-79): 파싱한 잔차는 평가 파싱이 자동 약분한 식이라(`x*(x - 2)/(x - 2) = 2` → x - 2)
+원문에서 정의되지 않는 점(무연근)이 수치 근으로 잡힌다. 그래서 주장 정답과 선택 판정에 쓰는 근은
+`verify_answer.condition_definedness`(허용 목록·실행 없는 원문 평가)로 거른다 — 정의되지 않는 정답은
+반례, 판정 불가는 pass 로 단정하지 않는다.
 """
 
 from __future__ import annotations
@@ -28,7 +33,7 @@ from typing import Literal
 import sympy
 
 from whymath_backend.l3.safe_parse import safe_sympify
-from whymath_backend.l3.verify_answer import _parse_condition
+from whymath_backend.l3.verify_answer import _parse_condition, condition_definedness
 
 __all__ = ["FuzzVerdict", "fuzz_answer"]
 
@@ -164,6 +169,76 @@ def _find_roots(func: object, radius: float, trials: int, tol: float) -> tuple[l
     return merged, valid
 
 
+def _exact_residual_nonzero(
+    residual: sympy.Expr, symbol: sympy.Symbol, answer_exact: sympy.Expr
+) -> bool:
+    """정확값 답의 잔차가 정확히 0 이 아닌가(P3-79).
+
+    근사 소수가 섞이면 False(수치 판정에 맡긴다).
+    """
+    if answer_exact.has(sympy.Float) or residual.has(sympy.Float):
+        return False
+    try:
+        value = residual.subs(symbol, answer_exact)
+        return bool(not value.free_symbols and value.is_zero is False)
+    except Exception as exc:  # noqa: BLE001 — 정확 잔차 계산 불가는 수치 판정에 맡긴다
+        logger.debug("counterexample_fuzz 정확 잔차 회피: %s", type(exc).__name__)
+        return False
+
+
+def _polished(residual: sympy.Expr, symbol: sympy.Symbol, root: float) -> sympy.Expr:
+    """수치 근을 50자리로 다듬는다(무연근이면 그 점으로 수렴해 원문 분모가 사실상 0 이 된다)."""
+    try:
+        return sympy.Float(sympy.nsolve(residual, symbol, root, prec=50, verify=False), 50)
+    except Exception as exc:  # noqa: BLE001 — 다듬기 실패는 원래 근사값으로
+        logger.debug("counterexample_fuzz 근 다듬기 회피: %s", type(exc).__name__)
+        return sympy.Float(root, 50)
+
+
+def _root_point(residual: sympy.Expr, symbol: sympy.Symbol, root: float) -> sympy.Expr:
+    """원문 정의역 평가에 넣을 수치 근의 점 — 다듬은 근이 간단한 정확값(`0`·`2`·`sqrt(2)`)의 근이면
+    그 정확값, 아니면 50자리 근사 소수. 근사 소수 점은 0 에 가까운 밑·분모를 '못 가림'으로 둬서
+    (`x**2 - 5*x` 의 근 0) 정확값으로 맞출 수 있는 근은 맞춘다."""
+    polished = _polished(residual, symbol, root)
+    try:
+        snapped = sympy.nsimplify(polished, tolerance=sympy.Float("1e-30"))
+        if not snapped.free_symbols and residual.subs(symbol, snapped).is_zero is True:
+            return snapped
+    except Exception as exc:  # noqa: BLE001 — 정확값 맞추기 실패는 근사 소수로
+        logger.debug("counterexample_fuzz 정확값 맞추기 회피: %s", type(exc).__name__)
+    return polished
+
+
+def _defined_numeric_roots(
+    conditions: str,
+    residual: sympy.Expr,
+    symbol: sympy.Symbol,
+    roots: list[float],
+    answer_val: float,
+    tol: float,
+) -> list[float] | None:
+    """수치 근 중 원문에서 정의되는 근만(P3-79). 판정 불가 근이 하나라도 있으면 None.
+
+    주장 정답 근방의 근은 위에서 정확값으로 원문 정의역을 이미 봤으므로 그대로 둔다. 나머지는
+    그 근의 점(`_root_point` — 정확값으로 맞춰지면 정확값, 아니면 50자리 근사 소수)에서
+    `condition_definedness` 를 본다. 무연근은 자동 약분된 분모의 영점이라 다듬기가 그 점(정확값
+    2 등)으로 수렴해 정의되지 않음으로 버려지고, 정확값으로 못 맞춘 근이 영점에 가까우면
+    정의됨으로 부르지 않아 판정 불가가 된다.
+    """
+    kept: list[float] = []
+    for root in roots:
+        if abs(root - answer_val) <= tol * 100:
+            kept.append(root)
+            continue
+        point = _root_point(residual, symbol, root)
+        state = condition_definedness(conditions, {str(symbol): point})
+        if state == "unknown":
+            return None
+        if state == "defined":
+            kept.append(root)
+    return kept
+
+
 def fuzz_answer(
     conditions: str,
     answer_map: Mapping[str, str],
@@ -201,6 +276,22 @@ def fuzz_answer(
     if answer_val is None:
         return FuzzVerdict("unverifiable", f"정답 수치화 불가: {answer_str!r}", 0)
 
+    # P3-79 ⑤(c) — 잔차는 평가 파싱이 자동 약분한 식이라(`x*(x - 2)/(x - 2) = 2` → x - 2) 수치
+    # 탐색이 원문에서 정의되지 않는 점(x = 2)을 근으로 찾는다. 주장 정답은 정확값으로 원문 정의역을
+    # 먼저 본다(`condition_definedness` — 허용 목록·실행 없음): 정의되지 않음이면 반례(무연근),
+    # 판정 불가면 pass 를 단정하지 않는다(반례는 그대로 반례다 — 아래 수치 탐색이 근이 아니라고 하면
+    # 정의역과 무관하게 근이 아니다).
+    try:
+        answer_exact = safe_sympify(answer_str)
+    except (sympy.SympifyError, TypeError, ValueError) as exc:
+        logger.debug("counterexample_fuzz 정답 정확값 회피: %s", type(exc).__name__)
+        return FuzzVerdict("unverifiable", "정답 정확값 파싱 불가", 0)
+    claim_state = condition_definedness(conditions, {str(symbol): answer_exact})
+    if claim_state == "undefined":
+        return FuzzVerdict(
+            "fail", "반례 — 주장 정답에서 원문 조건이 정의되지 않음(분모 0 등 — 무연근)", 0
+        )
+
     try:
         func = sympy.lambdify(symbol, residual, "math")
     except Exception as exc:  # noqa: BLE001 — lambdify 실패는 정직 폴백
@@ -225,7 +316,29 @@ def fuzz_answer(
             roots_tuple,
         )
 
-    # ② 근 선택이 옳은가 — largest/smallest/unique.
+    # ①-b 수치로 근처럼 보여도 정확값 잔차가 0 이 아니면 근이 아니다(P3-79 — 허수부가 아주
+    # 작은 근 `(x - 1)**2 + 10**(-20) = 0` 의 x = 1 을 수치 허용치로 근이라 부르지 않는다.
+    # Tier1 과 같은 규칙).
+    if _exact_residual_nonzero(residual, symbol, answer_exact):
+        return FuzzVerdict(
+            "fail",
+            f"반례 — 주장 정답 {answer_val:.6g}은 근이 아님(수치 허용치 안이나 정확 잔차 ≠ 0)",
+            valid,
+            roots_tuple,
+        )
+
+    # ② 근 선택이 옳은가 — largest/smallest/unique. 선택 판정에 쓰는 다른 근도 원문에서 정의되는
+    # 근만이다(P3-79 — 무연근이 '더 큰 근'·'둘째 근'으로 거짓 반례를 만들지 않게).
+    if answer_selection in ("largest", "smallest", "unique"):
+        defined_roots = _defined_numeric_roots(conditions, residual, symbol, roots, answer_val, tol)
+        if defined_roots is None:
+            return FuzzVerdict(
+                "unverifiable",
+                "탐색된 근 중 원문 정의역을 확정하지 못한 근이 있음(무연근 가능) — 선택 판정 회피",
+                valid,
+                roots_tuple,
+            )
+        roots = defined_roots
     if answer_selection == "largest" and any(r > answer_val + tol * 100 for r in roots):
         bigger = max(roots)
         return FuzzVerdict(
@@ -250,4 +363,11 @@ def fuzz_answer(
             roots_tuple,
         )
 
+    if claim_state == "unknown":
+        return FuzzVerdict(
+            "unverifiable",
+            "주장 정답에서 원문 정의역을 확정하지 못함(허용 구조 밖) — pass 단정 회피",
+            valid,
+            roots_tuple,
+        )
     return FuzzVerdict("pass", None, valid, roots_tuple)
