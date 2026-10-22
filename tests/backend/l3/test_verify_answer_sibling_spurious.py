@@ -478,12 +478,19 @@ def test_decimal_literal_exact_answer_still_passes_at_large_exponent(exponent: i
     assert verify_answer([f"x = 1e-{exponent}"], {"x": f"10**(-{exponent})"}).state == "pass"
 
 
-def test_decimal_literal_rewrite_rejected_fails_closed() -> None:
-    """정확값으로 다시 쓴 리터럴을 안전 파싱이 거부하면(`1e-5000` → `10**(-5000)` 는
-    power_too_large) 판정 불가로 닫는다(fail-closed). 종전처럼 '판정 못 함 → False' 로 두면
-    허용치 안의 0 아닌 잔차가 pass 가 된다(재검토 P2-1 의 실패 경로 그대로)."""
-    assert verify_answer(["(x - 1)**2 + 1e-5000 = 0"], {"x": "1"}).state == "unverifiable"
-    # 유효숫자가 긴 리터럴(100자리 — 안전 파싱 길이 한도 안)도 짧은 꼴로 다시 써져 정확 판정된다.
+@pytest.mark.parametrize("rewritten", ["(x - 1)**2 + ((( = 0", None])
+def test_decimal_literal_rewrite_failure_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, rewritten: str | None
+) -> None:
+    """정확값 재작성을 다시 읽지 못하거나(안전 파싱 거부 — 재검토 P2-1 의 실패 경로) 원문에서 소수
+    리터럴을 찾지 못하면 판정 불가로 닫는다(fail-closed). 지금 파서 한도(소수 지수 ≤ 308·리터럴
+    길이)에서는 짧은 재작성 꼴이 늘 읽히므로, 그 어긋남을 직접 주입해 계약을 고정한다."""
+    monkeypatch.setattr(verify_answer_module, "_exact_decimal_text", lambda _c: rewritten)
+    assert verify_answer(["(x - 1)**2 + 1e-20 = 0"], {"x": "1"}).state == "unverifiable"
+
+
+def test_decimal_literal_with_long_significand_is_read_exactly() -> None:
+    """유효숫자가 긴 리터럴(100자리 — 안전 파싱 길이 한도 안)도 짧은 꼴로 다시 써져 정확 판정된다."""
     long_one = "1." + "0" * 97 + "1"
     assert verify_answer([f"(x - 1)**2 + {long_one} - 1 = 0"], {"x": "1"}).state == "unverifiable"
     assert verify_answer([f"x = {long_one}"], {"x": "1 + 10**(-98)"}).state == "pass"
