@@ -30,6 +30,7 @@ from whymath_backend.harness.ai_quality_candidates import (
 from whymath_backend.harness.ai_quality_eval_set import EvalSet, load_eval_set
 from whymath_backend.harness.ai_quality_judges import AXES, Judgment, TutorResponse
 from whymath_backend.harness.ai_quality_registry import Registry, RegistryError, load_registry
+from whymath_backend.l3 import verify_solution
 
 
 @pytest.fixture(scope="module")
@@ -66,6 +67,31 @@ def test_baseline_is_measurable_on_every_axis(baseline: cli.EvalReport) -> None:
         assert axis.n_applicable >= axis.spec.min_n, axis.spec.axis
         assert axis.reachable, axis.spec.axis
         assert axis.n_errors == 0
+
+
+def test_p3_77_measured_cases_are_resolved_or_explained(baseline: cli.EvalReport, base) -> None:
+    """P3-77 회귀 동결 — P3-10이 잰 실결함 2건의 *현재 처분*을 사례 단위로 고정한다.
+
+    ① `aq-h-06-04-l3`(동치 산술식 누설)은 정답 누설 축 실패에서 사라진다 — 게이트 B 값 축이 그
+       L3를 거부하고 사다리가 1단계 L3(앞 단계 대체)를 낸다.
+    ② `aq-h-10-05-l3`(L3 공백)은 L2 정직 하향으로 처분된다 — 엔진 단계(3)와 표시(2)가 달라 Hint 적절성
+       실패로 *남되*, 그 이유가 리포트에 후보 주석으로 실린다(acceptance ④ '의도적 제외 사유').
+    종합 exit code 전체는 동결하지 않는다 — 임계 6개가 Kiki 확정 전 제안값이라 실측 판정을 CI에
+    걸지 않는다는 P3-10 결정(§8)을 그대로 따른다. 여기서 잠그는 것은 두 사례의 처분뿐이다.
+    """
+    leak_failures = {f.case_id for f in baseline.axis("answer_leak").failures}
+    assert "aq-h-06-04-l3" not in leak_failures
+    mvt = base["aq-h-06-04-l3"]
+    assert (
+        mvt.tutor_output["hint_level"] == 3
+        and "첫 단계에서 적는 식" in mvt.tutor_output["explanation"]
+    )
+    assert mvt.note is not None and "earlier_step_partial" in mvt.note
+    hint_failures = {f.case_id: f for f in baseline.axis("hint_appropriateness").failures}
+    gap = hint_failures.get("aq-h-10-05-l3")
+    assert gap is not None and gap.note is not None and "의도적 제외" in gap.note
+    assert base["aq-h-10-05-l3"].tutor_output["hint_level"] == 2  # 표시 = 본문(L2)
+    assert all("역행" not in r for r in gap.reasons)  # 종전 사다리 역행(L2→0)은 해소
 
 
 def test_baseline_candidate_never_claims_state_authority(base) -> None:
@@ -338,6 +364,9 @@ def test_numeric_parse_contract_error_is_not_swallowed(
         raise TypeError("unexpected keyword argument")
 
     monkeypatch.setattr(judges, "safe_sympify", broken)
+    # P3-77: 동치 산술식 검사는 힌트 게이트와 공용인 `l3.verify_solution.scan_value_exposure`로
+    # 옮겨졌다 — 같은 계약(호출 계약 오류는 삼키지 않는다)이 그 공용 함수에서도 지켜지는지 본다.
+    monkeypatch.setattr(verify_solution, "safe_sympify", broken)
     report = _eval(eval_set, registry, base)
     leak = report.axis("answer_leak")
     assert leak.verdict == "UNMEASURED" and leak.n_errors > 0

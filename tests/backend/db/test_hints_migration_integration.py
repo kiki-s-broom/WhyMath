@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from whymath_backend.config import Settings
+from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
 
 pytestmark = pytest.mark.integration
 
@@ -194,7 +195,12 @@ class TestStoreRoundTripOnRealPg:
             transition_verified=True,
             concept=concept,
         )
-        ctx = GateContext(step_contents=steps, concept_name=concept.name, final_answer="123")
+        ctx = GateContext(
+            step_contents=steps,
+            concept_name=concept.name,
+            final_answer="123",
+            value_exposure=math_answer_value_exposure(),
+        )
         hints = [evaluate_gates(d, ctx) for d in generate_step_hints(source).drafts]
         unverified_l1 = hints[0].model_copy(update={"verified": False})
 
@@ -352,7 +358,7 @@ class TestLoaderToServingOnRealPg:
                 assert path.step_concepts[2] is None
                 assert report.concept_codes_off_axis >= 1
 
-                result = build_path_hints(path)
+                result = build_path_hints(path, value_exposure=math_answer_value_exposure())
                 # 2단계는 개념이 있어 L1~L3, 3단계(마지막·축 밖)는 L2만.
                 assert sorted((h.solution_step_ref.step_order, h.level) for h in result.hints) == [
                     (2, 1),

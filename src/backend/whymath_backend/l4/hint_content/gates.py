@@ -13,17 +13,24 @@ acceptance "게이트 3종(level-reveals 정합 invariant·detect_answer_leakage
      경로의 단계 본문(정규화 2자 이상)이 본문에 있는가 / 원천 개념 이름이 본문에 있는가.
      선언하지 않은 노출(과소 선언 → KPI 과소 계상)과 선언했지만 없는 노출(과대 선언) 둘 다 거부.
   ④ Level 4 경계 — 마지막 단계의 부분 시연 금지(구조 판정) · 시연 결과가 최종 결과와 같으면
-     금지(문자열 *동등* 판정 — 길이 무관) · 최종 결과(2자 이상)가 본문 어디에든 있으면 금지.
+     금지(문자열 *동등* 판정 — 길이 무관) · 최종 결과(2자 이상)가 본문 어디에든 있으면 금지 ·
+     **본문의 식 하나가 최종 단계와 값이 같으면 금지**(P3-77 — 값 동치).
      ④는 게이트 B가 판정 불가(undecidable)를 내는 짧은 정답에서도 전체 풀이 노출을 막는
-     **독립 방어선**이다(B와 달리 정답 값이 아니라 풀이 경로 구조로 판정).
+     **독립 방어선**이다(B와 달리 정답 값이 아니라 풀이 경로의 최종 단계를 목표로 판정 — 문항
+     정답과 풀이 경로의 최종 값이 다른 문항이 실재한다: 2026-10-22 코퍼스 실측 36건).
 
-게이트 B — 정답 누출(`check_answer_leakage`)
-  `harness/pedagogical_rubric.detect_answer_leakage`를 **재사용**한다(재구현 0 — 정규화·단어
-  경계·짧은 값 유보 규칙이 그 한 곳에만 산다). 판정: leaked → 거부 · clean → 통과 ·
-  undecidable(짧거나 흔한 정답) → 통과하되 판정을 리포트에 남긴다(그 구간은 게이트 A ④가 구조로
-  막는다 — 위 설명). 정답 원천이 없으면(문제 answer NULL) **거부**한다(판정 불가를 통과로
-  위장하지 않는다 — fail-closed). 정답 값은 판정 함수에 *넘기기만* 하고 이 모듈이 해석하지
-  않는다(EOS 불투명 페이로드 원칙).
+게이트 B — 정답 누출(`check_answer_leakage`) — 두 축
+  ① 글자 축: `harness/pedagogical_rubric.detect_answer_leakage`를 **재사용**한다(재구현 0 —
+     정규화·단어 경계·짧은 값 유보 규칙이 그 한 곳에만 산다). leaked → 거부.
+  ② 값 축(P3-77): 본문의 식 중 계산하면 정답이 되는 것이 있는가 — 선택적 능력
+     `AnswerValueExposure`(과목 어댑터 구현)에 묻는다. exposed → 거부 · undecidable → **거부**
+     (판정 불가 ≠ 통과) · clean → 통과. 능력이 주입되지 않았으면(None) 값 축을 판정하지 못한
+     것이므로 **거부**한다 — "모른다"를 "노출 없음"으로 접지 않는다.
+  글자 축이 undecidable(짧거나 흔한 정답 — 예: 정답 `4`)이어도 값 축이 판정한다. P3-10 실측
+  `aq-h-06-04-l3`(정답 4 · L3가 `(-3) + (4)*((2) - (0)) + (-3) + (1)*((2) - (0)) = y`를 보여
+  줌)이 바로 그 구간이었다 — 글자 축은 유보하고 ④는 문자열 동등만 봐서 둘 다 통과시켰다.
+  정답 원천이 없으면(문제 answer NULL) **거부**한다(fail-closed). 정답 값은 판정 함수에
+  *넘기기만* 하고 이 모듈이 해석하지 않는다(EOS 불투명 페이로드 원칙).
 
 게이트 C — 정서 톤(`check_tone`)
   `l4/tone_filter.filter_tone`을 재사용한다. 서빙 경로의 톤필터는 금지 패턴을 *치환*하지만,
@@ -47,12 +54,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from whymath_backend.harness.pedagogical_rubric import LeakageVerdict, detect_answer_leakage
 from whymath_backend.l4.hint_content.models import Hint, compute_reveal_score
 from whymath_backend.l4.tone_filter import filter_tone
+from whymath_backend.schema.verification_capabilities import AnswerValueExposure, ValueExposure
 
 __all__ = [
     "GATE_ANSWER_LEAKAGE",
     "GATE_LEVEL_REVEALS",
     "GATE_NAMES",
     "GATE_TONE",
+    "VALUE_NOT_RUN",
     "GateContext",
     "GateReport",
     "GateVerdict",
@@ -75,6 +84,9 @@ _FLOW_MARKERS = re.compile(r"\d+\s*(?:번째\s*)?단계|첫\s*단계|마지막\s
 # 노출은 ④의 *동등* 판정과 L3 선언 확인(길이 무관)으로 다룬다.
 _MIN_DECIDABLE_LEN = 2
 
+# 값 축을 돌리지 못했다는 판정값(능력 미주입) — 3상태(`ValueExposure`) 밖의 네 번째 값이다.
+VALUE_NOT_RUN = "not_run"
+
 
 def _norm(text: str) -> str:
     """비교용 정규화 — NFKC + 공백 제거(표기 공백 차이 흡수·순수)."""
@@ -83,11 +95,36 @@ def _norm(text: str) -> str:
 
 @dataclass(frozen=True)
 class GateContext:
-    """게이트 판정 맥락 — 경로 단계 본문 전체·원천 개념 이름·문제 정답(불투명 값)."""
+    """게이트 판정 맥락 — 경로 단계 본문 전체·원천 개념 이름·문제 정답(불투명 값)·값 축 능력.
+
+    `value_exposure`에 기본값이 없는 이유: 기본값 None이면 호출부가 *잊는 것*과 *능력이 없는
+    과목이라 넘기지 않는 것*이 구별되지 않는다. 필수 인자로 두면 모든 호출부가 둘 중 하나를
+    명시해야 한다(None을 넘기면 값 축은 fail-closed — 모듈 docstring 게이트 B ②).
+    """
 
     step_contents: tuple[str, ...]
     concept_name: str | None
     final_answer: str | None
+    value_exposure: AnswerValueExposure | None
+
+
+def _value_scan(ctx: GateContext, text: str, target: str) -> tuple[str, str | None]:
+    """값 축 판정값(`ValueExposure` 값 또는 `VALUE_NOT_RUN`)과 노출된 식(있으면)."""
+    if ctx.value_exposure is None:
+        return VALUE_NOT_RUN, None
+    scan = ctx.value_exposure.scan_value_exposure(text, target)
+    return scan.outcome.value, scan.fragment
+
+
+def _value_reason(verdict: str, fragment: str | None, *, target_label: str) -> str | None:
+    """값 축 판정값 → 거부 사유(통과면 None). 판정 불가·미실행은 거부다(fail-closed)."""
+    if verdict == ValueExposure.exposed.value:
+        return f"본문의 식이 {target_label}과 값이 같다({fragment!r} — 값 동치 노출)"
+    if verdict == ValueExposure.undecidable.value:
+        return f"본문의 식이 {target_label}과 값이 같은지 판정하지 못했다(판정 불가 ≠ 통과)"
+    if verdict == VALUE_NOT_RUN:
+        return f"값 동치 판정 능력이 주입되지 않아 {target_label} 값 노출을 판정하지 못했다"
+    return None
 
 
 class GateVerdict(BaseModel):
@@ -192,6 +229,7 @@ def check_level_reveals(hint: Hint, ctx: GateContext) -> GateVerdict:
     # ④ Level 4 경계 — 전체 풀이(최종 결과)는 Hint 엔티티가 아니다.
     n = len(ctx.step_contents)
     k = hint.solution_step_ref.step_order
+    final_value = "no_steps"
     if k > n:
         reasons.append(f"단계 참조 order={k}가 경로 단계 수 {n}을 넘는다")
     if n:
@@ -202,28 +240,41 @@ def check_level_reveals(hint: Hint, ctx: GateContext) -> GateVerdict:
             reasons.append("시연한 단계의 결과가 최종 결과와 같다(전체 풀이 노출)")
         if len(final) >= _MIN_DECIDABLE_LEN and final in body:
             reasons.append("최종 단계 결과가 본문에 실렸다(전체 풀이 노출)")
+        # 값 동치(P3-77) — 글자가 달라도 계산하면 최종 단계 값이 되는 식이 본문에 있으면 전체 풀이
+        # 노출이다. 구조(k)가 아니라 **본문**을 본다: 다른 단계의 L3로 대체 서빙된 본문도 같은
+        # 규칙으로 판정되어야 하기 때문이다(store.select_ladder_hint — L3 공백 대체).
+        final_value, fragment = _value_scan(ctx, hint.content, ctx.step_contents[-1])
+        value_reason = _value_reason(final_value, fragment, target_label="최종 단계")
+        if value_reason is not None:
+            reasons.append(f"{value_reason}(전체 풀이 노출)")
 
     return _verdict(
         reasons,
         {
             "derived_flow": str(derived_flow),
             "computation_hit_orders": ",".join(str(o) for o in any_hits),
+            "final_value_verdict": final_value,
         },
     )
 
 
 def check_answer_leakage(hint: Hint, ctx: GateContext) -> GateVerdict:
-    """게이트 B — `detect_answer_leakage` 재사용(leaked 거부·정답 원천 부재 거부)."""
+    """게이트 B — 글자 축(`detect_answer_leakage` 재사용) + 값 축(능력 경유). 모듈 docstring."""
     if ctx.final_answer is None:
         return _verdict(
             ["정답 원천이 없어 누출을 판정할 수 없다(fail-closed — 판정 불가 ≠ 통과)"],
-            {"verdict": "not_run"},
+            {"verdict": "not_run", "value_verdict": VALUE_NOT_RUN},
         )
     verdict = detect_answer_leakage(hint.content, ctx.final_answer)
     reasons: list[str] = []
     if verdict is LeakageVerdict.leaked:
         reasons.append("정답 값이 힌트 본문에 노출됐다(최상위 교수학 금기)")
-    return _verdict(reasons, {"verdict": verdict.value})
+    # 값 축 — 글자 축의 판정과 무관하게 항상 돈다(글자 축 undecidable 구간을 값으로 닫는다).
+    value_verdict, fragment = _value_scan(ctx, hint.content, ctx.final_answer)
+    value_reason = _value_reason(value_verdict, fragment, target_label="정답")
+    if value_reason is not None:
+        reasons.append(value_reason)
+    return _verdict(reasons, {"verdict": verdict.value, "value_verdict": value_verdict})
 
 
 def check_tone(hint: Hint) -> GateVerdict:

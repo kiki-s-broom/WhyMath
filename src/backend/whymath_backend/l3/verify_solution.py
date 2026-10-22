@@ -34,8 +34,10 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from tokenize import TokenError
 from typing import TYPE_CHECKING, Any, Final, Literal
 
+import sympy
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.l3.safe_parse import safe_sympify
@@ -55,6 +57,7 @@ from whymath_backend.l3.verify_step import (
     verify_step,
 )
 from whymath_backend.schema.enums import StepType
+from whymath_backend.schema.verification_capabilities import ValueExposure
 
 __all__ = [
     "INTERPRETIVE_SELECTION",
@@ -64,9 +67,11 @@ __all__ = [
     "ROOT_WRONG",
     "InterpretedSolutionResult",
     "SolutionVerificationResult",
+    "ValueExposureResult",
     "ValueSame",
     "aggregate_transitions",
     "answer_map_vars_matching",
+    "arithmetic_fragments",
     "condition_items",
     "condition_relations",
     "distinct_values",
@@ -78,6 +83,7 @@ __all__ = [
     "numeric_assignments",
     "plan_transitions",
     "same_value",
+    "scan_value_exposure",
     "split_top_level",
     "verify_solution",
     "verify_solution_interpreted",
@@ -412,6 +418,128 @@ def split_top_level(text: str) -> list[str]:
             start = index + 1
     parts.append(text[start:])
     return parts
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 값 노출 훑기 (P3-77) — "본문에 계산하면 정답이 되는 식이 있는가"
+# ──────────────────────────────────────────────────────────────────────────
+# 판정 대상 = 문자 없는 산술 조각. P3-10 판정기(`harness.ai_quality_judges._judge_leak` ③)가 쓰던
+# 추출 규칙을 이곳으로 옮겨 **한 벌만** 둔다 — 힌트 게이트(S4-11 B·④ — 능력 계약 경유)와 판정기가
+# 같은 판정을 쓴다(사본 금지). 값 비교는 새로 만들지 않고 `same_value`(정본 채점기)에 위임한다.
+_VALUE_OP_NORMALIZE: Final = str.maketrans({"×": "*", "÷": "/", "−": "-", "·": "*"})
+# 식 덩어리 — 문자·수·연산자·괄호·쉼표·등호가 이어진 구간(한글·콜론·줄바꿈에서 끊긴다).
+_EXPR_RUN: Final = re.compile(r"[0-9A-Za-z_.()+\-*/^,= \t]+")
+_NUMBER_TOKEN: Final = re.compile(r"\d+(?:\.\d+)?")
+_OPERATOR_BETWEEN: Final = re.compile(r"[0-9)]\s*[-+*/^]\s*[-(0-9]")
+_HAS_LETTER: Final = re.compile(r"[A-Za-z]")
+
+#: 산술 조각 해석 실패로 *예상되는* 예외 — 이것만 "식이 아니다"로 접는다. 호출 계약이 깨진
+#: 프로그래밍 오류(TypeError·AttributeError 등)는 삼키지 않는다 — 삼키면 무관용 축(정답 누설)이
+#: 조용히 통과로 바뀐다(P3-10 리뷰 2026-10-21 실측 — 같은 규칙을 그대로 옮긴다).
+_FRAGMENT_PARSE_FAILURES: Final[tuple[type[BaseException], ...]] = (
+    sympy.SympifyError,
+    TokenError,
+    SyntaxError,
+    ValueError,
+    ZeroDivisionError,
+    OverflowError,
+    RecursionError,
+)
+
+
+@dataclass(frozen=True)
+class ValueExposureResult:
+    """`scan_value_exposure` 결과 — `ValueExposureScan`(능력 계약)을 구조적으로 만족한다."""
+
+    outcome: ValueExposure
+    fragment: str | None = None
+    candidates: int = 0
+    undecided: int = 0
+
+
+def _top_level_sides(run: str) -> list[str]:
+    """식 덩어리 하나를 최상위 `=`·`,`에서 자른 변들(괄호 안의 쉼표는 자르지 않는다)."""
+    sides: list[str] = []
+    for part in split_top_level(run):
+        sides.extend(part.split("="))
+    return sides
+
+
+def arithmetic_fragments(text: str) -> list[str]:
+    """본문 → 값을 가진 **독립** 산술식(문자 없음 · 수 2개 이상 · 수 사이 연산자 · 닫힌 수치).
+
+    독립이란 그 식이 문자를 포함한 더 큰 식의 *일부*가 아니라는 뜻이다. 그래서 먼저 문자까지
+    포함한 식 덩어리(`_EXPR_RUN`)를 잡고, 그 덩어리를 최상위 `=`·`,`로 자른 **변 하나 전체**가
+    문자 없이 수치로 읽힐 때만 대상으로 삼는다. `Derivative(x - 1 + 1, x)` 속의 `- 1 + 1`은
+    변 전체가 아니므로 대상이 아니다 — 잘라 내면 정답 0과 "같은 값"이 되지만 학생에게 값을
+    알려 주는 식이 아니다(2026-10-22 코퍼스 실측: 이 규칙 없이는 승인·미승인 3,735문항의 검수 L3
+    5,377건 중 2,155건이 이런 오탐으로 거부됐다).
+
+    수치로 해석되지 않는 변(괄호 짝이 안 맞는 잘림 등)은 식이 아니므로 대상에서 뺀다 — 판정
+    불가가 아니다. 순서를 보존하고 중복은 한 번만 낸다.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for run in _EXPR_RUN.findall(text.translate(_VALUE_OP_NORMALIZE)):
+        for raw in _top_level_sides(run):
+            frag = raw.strip()
+            if not frag or frag in seen or _HAS_LETTER.search(frag):
+                continue
+            if len(_NUMBER_TOKEN.findall(frag)) < 2 or not _OPERATOR_BETWEEN.search(frag):
+                continue
+            try:
+                value = safe_sympify(frag.replace("^", "**"))
+            except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
+                logger.debug("산술 조각 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
+                continue
+            if not getattr(value, "is_number", False):
+                continue
+            seen.add(frag)
+            out.append(frag)
+    return out
+
+
+def _value_targets(target: str) -> list[str]:
+    """목표 문자열 → 비교할 값 표기 목록. LaTeX는 단일 권위로 평문화하고, 최상위 쉼표로 나뉜 여러
+    값(`x = 2, x = 3`)은 각각을 목표로 삼는다 — 그중 하나만 드러내도 정답의 일부가 샌다."""
+    plain = latex_to_plain(target) if "\\" in target else target
+    parts = [p.strip() for p in split_top_level(plain) if p.strip()]
+    return parts if len(parts) > 1 else [plain.strip()]
+
+
+def scan_value_exposure(text: str, target: str) -> ValueExposureResult:
+    """`text`의 산술 조각 중 값이 `target`과 같은 것이 있는가 — 3상태(P3-77).
+
+    - **exposed**: 조각 하나가 목표(또는 목표의 한 성분)와 `same_value` SAME.
+    - **undecidable**: 같은 것은 없는데 판정하지 못한 쌍(UNKNOWN)이 있다 — 목표를 읽지 못한
+      경우(`{1, 6}`·`3개` 등)가 여기에 든다. **clean으로 접지 않는다**(모른다 ≠ 아니다).
+    - **clean**: 조각이 없거나, 모든 조각이 모든 목표 성분과 DIFFERENT.
+
+    조각이 없으면 목표를 읽을 필요가 없다 — 볼 것이 없었다는 뜻이며 `candidates=0`이 그 사실을
+    남긴다("작동한 비율"). 목표가 비었으면 판정 불가다(호출부가 정답 원천 부재를 먼저 거른다).
+    """
+    fragments = arithmetic_fragments(text)
+    if not fragments:
+        return ValueExposureResult(ValueExposure.clean)
+    targets = _value_targets(target) if target.strip() else []
+    if not targets:
+        return ValueExposureResult(
+            ValueExposure.undecidable, candidates=len(fragments), undecided=len(fragments)
+        )
+    undecided = 0
+    for frag in fragments:
+        relations = [same_value(frag, t) for t in targets]
+        if ValueSame.SAME in relations:
+            return ValueExposureResult(
+                ValueExposure.exposed, fragment=frag, candidates=len(fragments), undecided=undecided
+            )
+        if ValueSame.UNKNOWN in relations:
+            undecided += 1
+    return ValueExposureResult(
+        ValueExposure.undecidable if undecided else ValueExposure.clean,
+        candidates=len(fragments),
+        undecided=undecided,
+    )
 
 
 def final_assignments(step: str) -> tuple[str, list[str]] | None:

@@ -25,6 +25,7 @@ from whymath_backend.l4.hint_content import store
 from whymath_backend.l4.hint_content.gates import GateContext, evaluate_gates
 from whymath_backend.l4.hint_content.generator import ConceptRef, StepSource, generate_step_hints
 from whymath_backend.l4.hint_content.models import Hint, ServedHint
+from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
 
 from ._fakes import _HintTableSession, _Result
 
@@ -43,7 +44,12 @@ def _gated_hints(order: int, *, path_id: str = "sp-a", problem_id: uuid.UUID = _
         transition_verified=True,
         concept=_CONCEPT,
     )
-    ctx = GateContext(step_contents=_STEPS, concept_name=_CONCEPT.name, final_answer="123")
+    ctx = GateContext(
+        step_contents=_STEPS,
+        concept_name=_CONCEPT.name,
+        final_answer="123",
+        value_exposure=math_answer_value_exposure(),
+    )
     return [evaluate_gates(d, ctx) for d in generate_step_hints(source).drafts]
 
 
@@ -209,6 +215,101 @@ class TestServingReader:
             )
         assert served is None
         assert "ValidationError" in caplog.text
+
+
+# ── 사다리 선택(P3-77 ② L3 공백 규칙) ─────────────────────────────────
+def _levels(hints: list[Hint], *levels: int) -> list[Hint]:
+    return [h for h in hints if h.level in levels]
+
+
+class TestLadderSelection:
+    """`select_ladder_hint` — L3는 뒤 단계로 넘어가지 않는다(앞 단계 → L2 정직 하향)."""
+
+    def _pool(self) -> list[Hint]:
+        # 1·2단계에 L1~L3, 3단계(마지막)는 L1·L2만(L3 = Level 4 경계라 생성 안 됨).
+        return _gated_hints(1) + _gated_hints(2) + _gated_hints(3)
+
+    def test_l3_exact_step_is_served_as_requested(self) -> None:
+        pick = store.select_ladder_hint(self._pool(), hint_level=3, from_step_order=2)
+        assert pick is not None and pick.substitution == store.LADDER_AS_REQUESTED
+        assert (pick.hint.level, pick.hint.solution_step_ref.step_order) == (3, 2)
+
+    def test_l3_gap_takes_the_nearest_earlier_step_partial(self) -> None:
+        """3단계엔 L3가 없다 → 가장 가까운 앞 단계(2) L3. 1단계 L3가 아니라 2단계다."""
+        pick = store.select_ladder_hint(self._pool(), hint_level=3, from_step_order=3)
+        assert pick is not None and pick.substitution == store.LADDER_EARLIER_STEP_PARTIAL
+        assert (pick.hint.level, pick.hint.solution_step_ref.step_order) == (3, 2)
+
+    def test_l3_never_jumps_to_a_later_step(self) -> None:
+        """1단계 L3가 빠졌고 2단계 L3만 있다 → 뒤 단계 L3를 내지 않고 L2로 정직하게 내린다.
+
+        종전 서빙 규칙(가장 이른 ≥ 단계)은 여기서 2단계 L3를 냈다 — 학생이 멈춘 1단계의 결과까지
+        보여 주는 두 칸 노출이었다.
+        """
+        pool = [
+            h for h in self._pool() if not (h.level == 3 and h.solution_step_ref.step_order == 1)
+        ]
+        pick = store.select_ladder_hint(pool, hint_level=3, from_step_order=1)
+        assert pick is not None and pick.substitution == store.LADDER_CAPPED_TO_FLOW
+        assert pick.hint.level == 2 and pick.hint.solution_step_ref.step_order == 1
+
+    def test_l3_with_nothing_to_offer_is_none(self) -> None:
+        assert (
+            store.select_ladder_hint(_levels(self._pool(), 1), hint_level=3, from_step_order=2)
+            is None
+        )
+
+    def test_unverified_candidates_are_never_picked(self) -> None:
+        pool = [h.model_copy(update={"verified": False}) for h in self._pool()]
+        for level in (1, 2, 3):
+            assert store.select_ladder_hint(pool, hint_level=level, from_step_order=1) is None
+
+    def test_l1_l2_keep_the_earliest_at_or_after_rule(self) -> None:
+        pick = store.select_ladder_hint(self._pool(), hint_level=2, from_step_order=2)
+        assert pick is not None and pick.substitution == store.LADDER_AS_REQUESTED
+        assert pick.hint.solution_step_ref.step_order == 2
+        assert store.select_ladder_hint(self._pool(), hint_level=1, from_step_order=4) is None
+
+    def test_level_four_is_outside_the_ladder(self) -> None:
+        assert store.select_ladder_hint(self._pool(), hint_level=4, from_step_order=1) is None
+
+    def test_same_step_ties_break_by_path_id(self) -> None:
+        pool = _gated_hints(2, path_id="sp-b") + _gated_hints(2, path_id="sp-a")
+        pick = store.select_ladder_hint(pool, hint_level=3, from_step_order=3)
+        assert pick is not None and pick.hint.solution_step_ref.solution_path_id == "sp-a"
+
+
+class TestServingLadder:
+    """서빙 reader가 같은 규칙을 DB 경로에서 집행한다(가짜 세션 — 실제 문장 조건)."""
+
+    def _catalog(self) -> _HintTableSession:
+        return _HintTableSession([_row(h) for h in _gated_hints(2) + _gated_hints(3)])
+
+    async def test_gap_at_final_step_serves_the_earlier_partial(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.INFO, logger="whymath.l4.hint_content.store"):
+            served = await store.find_served_hint(
+                _session(self._catalog()), problem_id=_PID, hint_level=3, from_step_order=3
+            )
+        assert served is not None and (served.level, served.step_order) == (3, 2)
+        assert "earlier_step_partial" in caplog.text  # 대체가 일어난 사실이 남는다(작동 회계)
+
+    async def test_no_earlier_partial_caps_to_flow_with_honest_level(self) -> None:
+        """1단계 L3가 없는 카탈로그 → 2단계 L3(뒤)가 아니라 L2를 level=2로 낸다."""
+        served = await store.find_served_hint(
+            _session(self._catalog()), problem_id=_PID, hint_level=3, from_step_order=1
+        )
+        assert served is not None and (served.level, served.step_order) == (2, 2)
+        assert served.reveal_score == pytest.approx(2 / 3)  # 표시 = 본문(KPI도 실제 노출)
+
+    async def test_exact_partial_skips_the_flow_query(self) -> None:
+        fake = self._catalog()
+        served = await store.find_served_hint(
+            _session(fake), problem_id=_PID, hint_level=3, from_step_order=2
+        )
+        assert served is not None and (served.level, served.step_order) == (3, 2)
+        assert len(fake.executed) == 1  # 쓸 수 있는 L3가 있으면 L2 후보를 읽지 않는다
 
 
 @pytest.mark.parametrize(

@@ -261,6 +261,10 @@ ignore_imports = [
     # EOS-89(slot_generator·render.adapters push 전환)와 별개로 남는 간선이다 — EOS-89는
     # 이 간선을 몰랐고(병행 개발), 이후 push 전환 여부는 별도 판단 대상이다.
     "whymath_backend.l4.solution_coaching -> whymath_backend.composition",
+    # P3-77: 오프라인 힌트 생성 CLI(`populate.main`)가 프로세스의 시작이라 값 축 능력
+    # (AnswerValueExposure) 기본 구현을 합성 루트에서 받아 순수 조립 함수에 *내려 준다*.
+    # 서빙 경로는 힌트를 만들지 않아 app.state 등록(push) 대상이 아니다(PULL_ONLY).
+    "whymath_backend.l4.hint_content.populate -> whymath_backend.composition",
 ]
 
 # ──────────────────────────────────────────────────────────────────────
