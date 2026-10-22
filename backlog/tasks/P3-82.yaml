@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-82
+title: "1단계부터 정답 값을 담는 풀이 경로 재저작 — L3 공백 근본 해소(P3-77 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-77-hint-l3-numeric-equivalent-leak
+requires_gates: []
+acceptance:
+  - "① P3-77 실측: 풀이 경로 1단계부터 정답 값을 담는 문항(P3-10 평가셋 aq-h-10-05, 속도와 가속도, 정답 -12)은 어떤 L3를 만들어도 정답이 드러나 게이트 B가 전부 거부한다 — 그 단계는 L2로 정직하게 하향된다(P3-77 판정문 docs/reviews/p3_77_hint_l3_gap_pedagogy_judgment_2026-10-22.md).\n② 승인 은행 전수에서 '1단계부터 정답 값을 담는 경로' 문항을 열거한다(P3-77 추정 L3 0건 문항 324건 중 원인별 분류 포함).\n③ 해당 문항의 풀이 경로(`verify.solution_steps`)를 정답 값이 마지막 단계에만 나오도록 재저작하는 방법을 정하고, 승인 은행 결속(감사 동결 사본)을 깨지 않는 절차(후보 은행 → 감사 → 승격)로 진행한다. 재저작 뒤 L3 0건 문항 수와 ai_quality_eval Hint 적절성 축 실패 수가 줄었는지 잰다."
+artifacts: []
+paths:
+  - "data/corpus/**"
+session: null
+notes: ""
+updated: 2026-10-22
