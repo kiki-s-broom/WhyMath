@@ -390,6 +390,24 @@ class TestValueAxis:
         assert any("주입되지 않아" in r for r in leakage.reasons)
         assert evaluate_gates(_drafts()[2], ctx).verified is False
 
+    def test_out_of_contract_outcome_fails_closed(self) -> None:
+        """능력이 계약 밖 판정값을 내면 통과로 접지 않는다(clean만 통과 — 허용 목록)."""
+
+        class _Rogue:
+            def scan_value_exposure(self, text: str, target: str) -> object:
+                class _Odd:
+                    class outcome:  # noqa: N801 — `.value`만 흉내 낸다
+                        value = "maybe"
+
+                    fragment = None
+                    candidates = 1
+                    undecided = 0
+
+                return _Odd()
+
+        verdict = check_answer_leakage(_drafts()[2], _ctx(value_exposure=_Rogue()))
+        assert verdict.passed is False and any("계약 밖" in r for r in verdict.reasons)
+
     def test_exposed_stub_rejects_and_clean_stub_passes(self) -> None:
         """게이트가 능력의 3상태를 재해석하지 않는다 — exposed는 거부, clean은 통과."""
         assert (

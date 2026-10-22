@@ -117,14 +117,17 @@ def _value_scan(ctx: GateContext, text: str, target: str) -> tuple[str, str | No
 
 
 def _value_reason(verdict: str, fragment: str | None, *, target_label: str) -> str | None:
-    """값 축 판정값 → 거부 사유(통과면 None). 판정 불가·미실행은 거부다(fail-closed)."""
+    """값 축 판정값 → 거부 사유(통과면 None). **clean만 통과한다** — 판정 불가·미실행·알 수 없는
+    판정값(능력 구현이 계약 밖 값을 낸 경우)은 전부 거부다(fail-closed · 허용 목록 방식)."""
+    if verdict == ValueExposure.clean.value:
+        return None
     if verdict == ValueExposure.exposed.value:
-        return f"본문의 식이 {target_label}과 값이 같다({fragment!r} — 값 동치 노출)"
+        return f"본문의 식이 {target_label} 값과 같다({fragment!r} — 값 동치 노출)"
     if verdict == ValueExposure.undecidable.value:
-        return f"본문의 식이 {target_label}과 값이 같은지 판정하지 못했다(판정 불가 ≠ 통과)"
+        return f"본문의 식이 {target_label} 값과 같은지 판정하지 못했다(판정 불가 ≠ 통과)"
     if verdict == VALUE_NOT_RUN:
         return f"값 동치 판정 능력이 주입되지 않아 {target_label} 값 노출을 판정하지 못했다"
-    return None
+    return f"값 축 판정값 {verdict!r}은 계약 밖이다(통과로 접지 않는다)"
 
 
 class GateVerdict(BaseModel):
