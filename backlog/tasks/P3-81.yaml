@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,9 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l4/hint_content/**"
-session: null
-notes: ""
+  - docs/ops/p3_81_hint_repopulate_runbook.md
+  - scripts/ops/p3_81_hint_catalog_probe.py
+  - tests/infra/test_p3_81_hint_repopulate_runbook.py
+session: claude/p3-81-hint-repopulate-runbook
+notes: "[정정 2026-10-22] paths ['src/backend/whymath_backend/l4/hint_content/**'] → ['src/backend/whymath_backend/l4/hint_content/**', 'docs/ops/p3_81_hint_repopulate_runbook.md', 'scripts/ops/p3_81_hint_catalog_probe.py', 'tests/infra/test_p3_81_hint_repopulate_runbook.py']: P3-81 런북 산출물의 실제 위치를 선언한다. 종전 paths는 코드 디렉터리 하나뿐이었으나 이 태스크의 산출물은 Kiki 머신 런북(docs/ops)과 읽기 전용 프로브(scripts/ops)와 계약 테스트(tests/infra)다. 선언 범위 밖 편집(scope_drift)을 피하려고 목록 전체를 다시 지정한다."
 updated: 2026-10-22
