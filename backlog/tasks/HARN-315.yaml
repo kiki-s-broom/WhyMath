@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-315
+title: "런북 스캐너: DB에 붙는 블록은 DB 도달 판정을 가드에 포함해야 한다 (Docker 미가동 2회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 런북 스캐너(`scripts/ops/check_runbook_blocks.py`)에 축 추가 — powershell 블록이 DB에 붙는 CLI(`whymath_backend.*` 모듈 실행 · `alembic` · `psql`)를 부르면, 그 호출이 놓인 최상위 `if` 조건(또는 같은 블록의 선행 줄)에 DB 도달 판정 변수(`$DbReach`·`DOCKER_OK` 계열)가 있어야 한다. 없으면 위반\n② 첫 블록이 [A]류 Docker 기동 블록인 런북은 그 블록을 건너뛰는 후속 절(§9 같은 부록 절)이 자기 단계표에 그 블록을 K0로 참조하는지 검사 — 또는 ①만으로 충분한지 판정해 문서로 남긴다\n③ 뮤테이션: 도달 변수 제거 → RED · 가드 없는 읽기 전용 DB 블록 → RED · 도달 가드가 있는 블록 → GREEN(대조군)\n④ 운영 중 런북 전수에 적용해 위반 0 또는 만료 있는 면제"
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
+session: null
+notes: "발견 2026-10-21~22 KG-14 prod 적재: 런북 §9 K2가 Docker 미가동 상태에서 plan을 실행해 접속 타임아웃 traceback(쓰기 0 · 왕복 1회). 같은 런북 앞부분에는 Docker 기동 블록 [A]가 있었으나 §9가 건너뛰었다. 2026-09-14 G-skb01(REACH_EXIT=2인데 적재 블록 진행)에 이은 같은 형태의 2회차. 이번 회차의 국소 대책은 §9 K0 추가 + K2 `$DbReach` 가드 + `tests/infra/test_skb03_kg14_runbook_db_reach.py`(뮤테이션 4종 RED). 이 태스크는 그것을 런북 전체에 거는 계열 탐지기다. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-22

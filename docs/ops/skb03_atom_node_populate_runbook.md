@@ -240,8 +240,9 @@ $WithSkills = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SEL
 
 | 단계 | 무엇 | 쓰기 | 기대 |
 |---|---|---|---|
+| K0 | Docker 기동 + prod DB 도달 — 「실행 블록」의 [A] 블록을 그대로 실행 | 없음 | `DOCKER_OK=True` |
 | K1 | main 기준 임시 worktree | 없음 | `WT_OK=True` · `CLONE_HEAD_UNCHANGED=True` |
-| K2 | 환경 · 코드 출처 · 스키마 판 · **은퇴 계획(plan)** | 없음 | `CODE_FROM_WORKTREE=True` · `AT_HEAD=True` · `PLAN_EXIT=0` · `RETIRE_PLAN_OK=True` |
+| K2 | DB 도달 · 환경 · 코드 출처 · 스키마 판 · **은퇴 계획(plan)** | 없음 | `DB_REACHABLE=True` · `CODE_FROM_WORKTREE=True` · `AT_HEAD=True` · `PLAN_EXIT=0` · `RETIRE_PLAN_OK=True` |
 | K3 | **은퇴 + 적재(apply)** | 있음 | `APPLY_EXIT=0` · `[원자 백본 적재]` 줄의 `retired=`가 K2의 `RETIRE_STALE_FOUND`와 같다 |
 | K4 | 패리티 · atom_node 되읽기 | 없음 | `PARITY_EXIT=0`(`STATUS=MATCH`) |
 | K5 | 임시 worktree 정리 | 저장소 밖 폴더만 | `WT_REMOVED=True` |
@@ -251,10 +252,16 @@ K2의 `RETIRE_STALE_FOUND`와 지울 목록을 **눈으로 본 다음에만** K3
 `PLAN_EXIT=1`은 "은퇴해도 순환이 남는다"는 뜻이다(대개 CMS 소유 엣지가 원인) — 그때는 K3로 가지 않고
 출력 전체를 세션에 전달한다.
 
+### K0 — Docker 기동 + prod DB 도달 (쓰기 없음)
+
+**새 창**에서 「실행 블록」의 [A] 블록을 그대로 붙여넣는다. `DOCKER_OK=True`를 확인한 다음에만 K1로 간다.
+K2가 DB 도달을 다시 검사해 안 되면 계획을 거부하므로, K0를 건너뛰어도 쓰기는 일어나지 않는다 —
+다만 왕복이 한 번 는다(2026-10-21 실측: Docker가 꺼진 채 K2가 돌아 접속 타임아웃 traceback).
+
 ### K1 — main 기준 임시 worktree (쓰기 없음)
 
 ```powershell
-# [Windows PowerShell · Phaiakes9] 새 창 · K1 main 기준 임시 worktree
+# [Windows PowerShell · Phaiakes9] 같은 창(K0 다음) · K1 main 기준 임시 worktree
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 git fetch origin main
 $CloneHead = (git rev-parse --short HEAD)
@@ -286,6 +293,9 @@ $CodeFrom = (& $Py -c "import whymath_backend.l1.atom_graph.atom_edge_retire as 
 $CodeOk = [bool]$Wt -and ($CodeFrom -like "$Wt\*")
 "CODE_FROM=$CodeFrom"
 "CODE_FROM_WORKTREE=$CodeOk"
+$ReachProbe = (docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT 1;" 2>$null)
+$DbReach = ($LASTEXITCODE -eq 0) -and ($ReachProbe -eq "1")
+"DB_REACHABLE=$DbReach"
 $DbRev = (docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT version_num FROM alembic_version;")
 cd "$Wt\src\backend"
 $HeadOut = (& $Py -m alembic heads 2>&1) -join " "
@@ -294,7 +304,7 @@ $AtHead = [bool]$DbRev -and ($HeadOut -match [regex]::Escape($DbRev))
 "DB_REVISION=$DbRev · CODE_HEADS=$HeadOut · AT_HEAD=$AtHead"
 $PlanExit = -1
 $PlanStale = $null
-if ($WtOk -and $CodeOk) { $PlanOut = (& $Py -m whymath_backend.l1.atom_graph.populate --retire-stale-edges plan); $PlanExit = $LASTEXITCODE; $PlanOut; $PlanStale = ($PlanOut | Select-String -Pattern '^RETIRE_STALE_FOUND=(\d+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }) } else { "PLAN_REFUSED=True · WT_OK=$WtOk CODE_FROM_WORKTREE=$CodeOk · K1을 같은 창에서 먼저 실행하세요" }
+if ($WtOk -and $CodeOk -and $DbReach) { $PlanOut = (& $Py -m whymath_backend.l1.atom_graph.populate --retire-stale-edges plan); $PlanExit = $LASTEXITCODE; $PlanOut; $PlanStale = ($PlanOut | Select-String -Pattern '^RETIRE_STALE_FOUND=(\d+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }) } else { "PLAN_REFUSED=True · WT_OK=$WtOk CODE_FROM_WORKTREE=$CodeOk DB_REACHABLE=$DbReach · DB_REACHABLE=False면 K0(「실행 블록」의 [A])로 Docker를 켜고, 나머지가 False면 K1을 같은 창에서 먼저 실행하세요" }
 "PLAN_EXIT=$PlanExit · PLAN_STALE=$PlanStale"
 ```
 
