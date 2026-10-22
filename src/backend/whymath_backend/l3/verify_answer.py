@@ -93,6 +93,7 @@ __all__ = [
     "condition_definedness",
     "condition_relation",
     "derive_selected_root",
+    "function_domain_kind",
     "match_root",
     "split_equation_domain",
     "trusted_real_roots",

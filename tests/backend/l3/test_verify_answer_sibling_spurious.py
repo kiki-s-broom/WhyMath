@@ -325,10 +325,11 @@ def test_fuzz_rejects_spurious_root(name: str, selection: str | None) -> None:
 
 
 def test_fuzz_does_not_pass_when_claim_definedness_is_unknown() -> None:
-    """허용 구조 밖(`asinh`) — 원문 정의역을 못 가리면 pass 로 단정하지 않는다(종전 pass).
-    반례는 정의역과 무관하게 반례다 — 틀린 답은 그대로 fail."""
-    assert fuzz_answer("asinh(x) = 0", {"x": "0"}).state == "unverifiable"
-    assert fuzz_answer("asinh(x) = 0", {"x": "1"}).state == "fail"
+    """허용 구조 밖(미분 안의 √ — 해석 함수 허용 목록 밖) — 원문 정의역을 못 가리면 pass 로
+    단정하지 않는다(종전 pass). 반례는 정의역과 무관하게 반례다 — 틀린 답은 그대로 fail."""
+    condition = "Derivative(sqrt(x), x).doit() = 1/4"
+    assert fuzz_answer(condition, {"x": "4"}).state == "unverifiable"
+    assert fuzz_answer(condition, {"x": "5"}).state == "fail"
 
 
 def test_fuzz_selection_ignores_spurious_neighbour_root() -> None:
