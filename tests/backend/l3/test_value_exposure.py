@@ -245,6 +245,8 @@ def test_bare_function_name_in_prose_is_not_a_candidate(name: str) -> None:
         # 잘린 변(괄호 짝이 안 맞거나 연산자로 끝남)은 식이 아니다
         "식: (2*2, det",
         "식: (1/det)*",
+        # 허용 목록 거절(속성 `.evalf`) 가지도 구문 검사를 거친다 — 잘린 호출은 후보가 아니다
+        "식: (8/2).evalf(",
     ],
 )
 def test_truncated_or_name_only_sides_are_not_undecidable(text: str) -> None:
