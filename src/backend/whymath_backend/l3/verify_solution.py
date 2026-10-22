@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal
 import sympy
 from pydantic import BaseModel, ConfigDict, Field
 
-from whymath_backend.l3.safe_parse import safe_sympify
+from whymath_backend.l3.safe_parse import UnsafeExpressionError, safe_sympify
 from whymath_backend.l3.symbolic_equivalence import latex_to_plain
 from whymath_backend.l3.verify_answer import (
     certified_polynomial,
@@ -435,6 +435,8 @@ _EXPR_RUN: Final = re.compile(r"[0-9A-Za-z_.()+\-*/^,= \t]+")
 _NUMBER_TOKEN: Final = re.compile(r"\d+(?:\.\d+)?")
 _OPERATOR_BETWEEN: Final = re.compile(r"[0-9)]\s*[-+*/^]\s*[-(0-9]")
 _IDENT: Final = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
+# 식에 쓰인 *이름* — 점(.) 바로 뒤의 메서드 이름(`.doit`·`.subs`)은 이름이 아니라 속성이다.
+_NAME: Final = re.compile(r"(?<![.\w])[A-Za-z_][A-Za-z_0-9]*")
 
 #: 산술 조각 해석 실패로 *예상되는* 예외 — 이것만 "식이 아니다"로 접는다. 호출 계약이 깨진
 #: 프로그래밍 오류(TypeError·AttributeError 등)는 삼키지 않는다 — 삼키면 무관용 축(정답 누설)이
@@ -460,37 +462,67 @@ class ValueExposureResult:
     undecided: int = 0
 
 
-@lru_cache(maxsize=512)
-def _names_a_variable(name: str) -> bool:
-    """식에 쓰인 이름 하나가 **변수**(자유 기호)인가 — SymPy가 그 이름을 어떻게 읽는지로 판정한다.
+# 안전 파서의 거부 중 "허용 목록 밖 이름·속성" 사유 — 식은 맞는데 읽기를 거절한 경우다.
+_ALLOWLIST_REFUSALS: Final = frozenset({"disallowed_name", "disallowed_attribute"})
+_NAME_VARIABLE: Final = "variable"
+_NAME_CONSTANT: Final = "constant"
+_NAME_UNKNOWN: Final = "unknown"
 
-    `Abs`·`log`·`sin`·`sqrt`·`factorial`(함수)·`pi`·`E`(상수)는 변수가 아니다. `x`·`y`·`t`처럼
-    기호가 되는 이름, `.doit()`·`.subs()`의 메서드 이름처럼 단독으로는 기호로 읽히는 이름은 변수다.
-    해석이 거부되는 이름(안전 파싱 허용 목록 밖)도 변수로 본다 — 그 변은 어차피 해석되지 않는다.
+
+@lru_cache(maxsize=512)
+def _name_kind(name: str) -> str:
+    """식에 쓰인 이름 하나의 종류 — SymPy가 그 이름을 어떻게 읽는지로 판정한다.
+
+    - **variable**: 자유 기호가 되는 이름(`x`·`y`·`t`).
+    - **constant**: 함수·클래스(`Abs`·`log`·`sin`·`sqrt`·`factorial`·`Derivative`) 또는 자유 기호
+      없는 상수(`pi`·`E`·`I`). 클래스 객체에 `free_symbols`를 물으면 property 객체(참)가 나와
+      변수로 오판한다 — 그래서 SymPy 식(`Basic`)인지를 먼저 가르고, 아니면 호출 가능 여부로 본다.
+    - **unknown**: 안전 파서의 허용 목록 밖이라 읽지 못한 이름(`Rational`·`Integer`·`S`·`N`·
+      `gamma`).
     """
     try:
         value = safe_sympify(name)
-    except _FRAGMENT_PARSE_FAILURES as exc:  # 허용 목록 밖 이름 — 대상에서 빼는 쪽(변수 취급)
-        logger.debug("이름 해석 불가(%s) — 변수로 취급", type(exc).__name__)
-        return True
-    return bool(getattr(value, "free_symbols", None))
+    except _FRAGMENT_PARSE_FAILURES as exc:  # 허용 목록 밖 이름 — 종류를 모른다(unknown)
+        logger.debug("이름 해석 불가(%s) — unknown", type(exc).__name__)
+        return _NAME_UNKNOWN
+    if isinstance(value, sympy.Basic):
+        return _NAME_VARIABLE if value.free_symbols else _NAME_CONSTANT
+    if isinstance(value, type) or callable(value):
+        return _NAME_CONSTANT
+    return _NAME_UNKNOWN
 
 
 def _closed_value(side: str) -> bool:
-    """변 하나가 **쓰인 그대로** 닫힌 값인가 — 변수 이름이 하나도 없고 수치로 계산된다.
+    """변 하나가 **쓰인 그대로** 닫힌 값인가 — 변수 이름이 하나도 없고 값이 수로 정해진다.
 
-    판정은 두 겹이다. ① 쓰인 이름에 변수가 없다(`_names_a_variable`) ② 계산한 값이 자유 기호 없는
-    수다. ①이 필요한 이유: 안전 파서는 `.doit()`·`.subs()`를 *실행*하므로, `Derivative(x**3, x)
-    .doit().subs(x, -2)`처럼 학생이 미분을 해야 하는 설정 식도 계산 뒤에는 수(12)가 된다. 그 식은
-    정답을 알려 주는 식이 아니라 문제를 식으로 옮긴 것이다 — 남은 일이 미분(그 단원의 인지 행동)이기
-    때문이다. 반대로 `Abs(...)`·`log(64, 2)`·`sin(210*pi/180)`는 남은 일이 계산뿐이므로 닫힌 값이다.
+    판정은 두 겹이다. ① 쓰인 이름(메서드 이름 `.doit`·`.subs`는 이름이 아니라 속성이라 뺀다)에
+    변수가 없다(`_name_kind`) ② 계산한 값이 수다. ①이 필요한 이유: 안전 파서는 `.doit()`·`.subs()`를
+    *실행*하므로, `Derivative(x**3, x).doit().subs(x, -2)`처럼 학생이 미분을 해야 하는 설정 식도
+    계산 뒤에는 수(12)가 된다. 그 식은 정답을 알려 주는 식이 아니라 문제를 식으로 옮긴 것이다 — 남은
+    일이 미분(그 단원의 인지 행동)이기 때문이다. 반대로 `Abs(...)`·`log(64, 2)`·`sin(210*pi/180)`·
+    `(2 + 2).doit()`는 남은 일이 계산뿐이므로 닫힌 값이다.
+
+    **읽지 못한 이름**(unknown)만 있고 변수가 없는 변(`Rational(8, 2)`·`Integer(2) + Integer(2)`)은
+    안전 파서로 계산할 수 없지만 식의 모양(수 + 호출 괄호)이면 후보로 낸다 — 값 비교는 정본 채점기
+    (`same_value`)가 하고, 거기서도 못 읽으면 판정 불가(undecidable)가 되어 게이트가 거부한다.
+    읽지 못했다고 후보에서 빼면 판정 불가가 '노출 없음'으로 접힌다.
+
+    수 토큰을 요구하지 않는다 — `x = pi`(정답 `pi`)처럼 수 없는 닫힌 값도 값을 진술한다(P3-77 재리뷰
+    N7: 종전의 수 토큰 가드는 이 누설을 놓치는 쪽으로만 작동했다).
     """
-    if not _NUMBER_TOKEN.search(side):
+    kinds = {_name_kind(name) for name in _NAME.findall(side)}
+    if _NAME_VARIABLE in kinds:
         return False
-    if any(_names_a_variable(name) for name in _IDENT.findall(side)):
-        return False
+    if _NAME_UNKNOWN in kinds:
+        return bool(_NUMBER_TOKEN.search(side)) and "(" in side
     try:
         value = safe_sympify(side.replace("^", "**"))
+    except UnsafeExpressionError as exc:
+        # 안전 파서가 허용 목록 밖 이름·속성(`.evalf()` 등)을 *거절*했다 — 문법 오류(잘린 변)가
+        # 아니라 읽기를 거절한 것이다. 변수 없이 수를 쓰는 식이면 후보로 낸다(값 비교에서 판정
+        # 불가 → 게이트 거부). 그 밖의 거부 사유(구조 해석 불가 등)는 잘린 변과 같게 대상에서 뺀다.
+        logger.debug("변 안전 파싱 거부(%s) — 허용 목록 거절이면 후보", exc.code)
+        return exc.code in _ALLOWLIST_REFUSALS and bool(_NUMBER_TOKEN.search(side))
     except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
         logger.debug("변 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
         return False
@@ -500,7 +532,15 @@ def _closed_value(side: str) -> bool:
 
 
 def _is_single_variable(side: str) -> bool:
-    return _IDENT.fullmatch(side) is not None and _names_a_variable(side)
+    """값 진술의 변수 쪽인가 — 이름 하나이고, 변수이거나 읽지 못한 이름이거나 **한 글자**다.
+
+    한 글자 이름은 SymPy가 상수로 읽어도(`E`·`I`) 학교 수학에서는 거의 언제나 사용자 변수다
+    (에너지 E·전류 I). 그래서 `E = 4`는 값 진술로 본다. 여러 글자 상수(`pi`)는 변수가 아니다 —
+    `pi = 4`는 값 진술이 아니다.
+    """
+    if _IDENT.fullmatch(side) is None:
+        return False
+    return len(side) == 1 or _name_kind(side) != _NAME_CONSTANT
 
 
 def arithmetic_fragments(text: str) -> list[str]:

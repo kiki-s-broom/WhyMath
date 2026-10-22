@@ -205,11 +205,11 @@ class TestCreateSessionServing:
         assert len(events) == 1
         assert events[0].event_data["reveal_score"] == pytest.approx(1 / 3)
         assert events[0].event_data["hint_id"] == _SERVED.hint_id
-        # P3-77 — 같은 행의 hint_level은 *서빙된* 힌트의 레벨이다(결정 레벨과 다를 수 있다).
-        # 이 턴은 결정 레벨(좌절 신호 → 2)과 서빙 레벨(가짜 reader가 준 1)이 갈라지는 경우라,
-        # 결정 레벨을 적던 종전 코드에서는 이 단언이 실패한다(변별력).
+        # P3-77 — 같은 행의 hint_level은 **결정 레벨**이다(학생 대면 발화와 같은 단계 · 다음 턴 사다리
+        # 입력). 이 턴은 결정 레벨(좌절 신호 → 2)과 서빙 레벨(가짜 reader가 준 1)이 갈라지는 경우라,
+        # 서빙 레벨을 적는 코드에서는 이 단언이 실패한다(변별력 — PR #1721 재리뷰 P1).
         assert body["decision"]["hint_level"] != _SERVED.level
-        assert events[0].event_data["hint_level"] == _SERVED.level
+        assert events[0].event_data["hint_level"] == body["decision"]["hint_level"]
 
     def test_no_catalog_hint_logs_none_not_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """카탈로그에 힌트가 없으면 served_hint=null·reveal_score=None(0으로 날조하지 않는다)."""
@@ -314,6 +314,64 @@ class TestAppendTurnServing:
         assert recorder.calls[0]["from_step_order"] == 3
         assert resp.json()["served_hint"]["hint_id"] == _SERVED.hint_id
         assert _hint_events(captured)[0].event_data["hint_id"] == _SERVED.hint_id
+
+
+class _LedgerSession:
+    """힌트제공 원장 1행짜리 가짜 세션 — `_log_hint_event`가 쓴 행을 `_prev_hint_level_for`가 읽는다."""
+
+    def __init__(self) -> None:
+        self.added: list[Any] = []
+
+    def add(self, obj: Any) -> None:
+        self.added.append(obj)
+
+    async def execute(self, _stmt: Any) -> Any:
+        payload = self.added[-1].event_data if self.added else None
+        return SimpleNamespace(scalar_one_or_none=lambda: payload)
+
+
+async def test_l3_gap_still_reaches_level_four_through_the_real_ledger_path() -> None:
+    """P3-77 재리뷰 P1 — L3 공백 문항(3단계 요청 → L2 하향 서빙)에서도 사다리가 4(전체 풀이)에 닿는다.
+
+    실제 경로 `decide_hint_level` → `_log_hint_event` → `_prev_hint_level_for`를 그대로 돈다. 원장에
+    서빙 레벨(2)을 적으면 prev가 2로 되읽혀 결정이 3에서 멈추고(3 → 2 → 3 …) Level 4 안전망에
+    영원히 닿지 못한다 — 그 회귀를 RED로 잡는다.
+    """
+    from whymath_backend.l4.hint_deferral import DEMAND_ANSWER_TOKENS, decide_hint_level
+
+    served_l2 = ServedHint(
+        hint_id="hint-gap-s1-l2",
+        level=2,
+        step_order=1,
+        content="풀이는 모두 2단계로 이어져.",
+        socratic_category=SocraticCategory.IMPLICATION,
+        reveal_score=2 / 3,
+    )
+    fake = _LedgerSession()
+    session = cast(AsyncSession, fake)
+    uid, pid = uuid.uuid4(), uuid.uuid4()
+    demand = sorted(DEMAND_ANSWER_TOKENS)[0]
+    prev: int | None = 2
+    decided: list[int] = []
+    for turn in range(2, 12):
+        level = decide_hint_level(student_input=demand, turn_count=turn, prev_hint_level=prev)
+        decided.append(level)
+        # L3 공백 문항 — 3단계 요청은 L2로 내려 서빙된다(store.select_ladder_hint).
+        served = served_l2 if level == 3 else None
+        await coach._log_hint_event(
+            session,
+            user_id=uid,
+            problem_id=pid,
+            attempt_id=None,
+            hint_level=level,
+            served_hint=served,
+        )
+        assert fake.added[-1].event_data["hint_level"] == level  # 원장 = 결정 레벨
+        prev = await coach._prev_hint_level_for(session, user_id=uid, problem_id=pid)
+        if level == 4:
+            break
+    assert 3 in decided, decided  # 하향 서빙 턴을 실제로 지났다(픽스처가 그 절을 밟는다)
+    assert decided[-1] == 4, f"Level 4 안전망에 닿지 못했다: {decided}"
 
 
 def test_stateless_coach_response_has_no_served_hint_seat() -> None:

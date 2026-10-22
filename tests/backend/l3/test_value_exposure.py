@@ -150,3 +150,56 @@ def test_programming_errors_are_not_swallowed(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(verify_solution, "safe_sympify", broken)
     with pytest.raises(TypeError):
         scan_value_exposure("참고: 2 + 2", "4")
+
+
+# ── PR #1721 재리뷰 P3 — 이름 종류·읽지 못한 이름·상수 이름 진술 ─────────────────
+@pytest.mark.parametrize(
+    "text",
+    [
+        "식: Rational(8, 2)",  # 허용 목록 밖 이름 — 종전엔 '변수'로 오판해 clean
+        "식: Integer(2)+Integer(2)",
+        "식: S(8)/2",
+        "식: N(8/2)",
+        "식: (8/2).evalf()",  # 허용 목록 밖 속성
+    ],
+)
+def test_unreadable_closed_expression_is_undecidable_not_clean(text: str) -> None:
+    """안전 파서가 읽기를 거절한 닫힌 식은 판정 불가 — 게이트가 거부한다(clean으로 접지 않는다)."""
+    assert scan_value_exposure(text, "4").outcome is ValueExposure.undecidable
+
+
+def test_number_only_doit_is_a_closed_value() -> None:
+    """`.doit()`은 속성이지 변수가 아니다 — 수만 있는 `(2+2).doit()`은 계산만 남은 식이다."""
+    assert scan_value_exposure("식: (2+2).doit()", "4").outcome is ValueExposure.exposed
+
+
+@pytest.mark.parametrize(
+    ("text", "target", "expected"),
+    [
+        # 한 글자 이름은 SymPy 상수(E·I)여도 학교 수학에서는 사용자 변수다 — 값 진술로 본다
+        ("식: E = 4", "4", ValueExposure.exposed),
+        ("식: I = 4", "4", ValueExposure.exposed),
+        # 여러 글자 상수(pi)는 변수가 아니다 — `pi = 4`는 값 진술이 아니다(N5 반례)
+        ("식: pi = 4", "4", ValueExposure.clean),
+        # 읽지 못한 이름(gamma)은 변수 쪽으로 본다 — 값 진술이다(N8 반례)
+        ("식: gamma = 4", "4", ValueExposure.exposed),
+        # 수 없는 닫힌 값도 값을 진술한다(N7 — 수 토큰 가드를 없앤 이유)
+        ("식: x = pi", "pi", ValueExposure.exposed),
+        ("식: x = pi", "4", ValueExposure.clean),
+    ],
+)
+def test_value_statement_name_rules(text: str, target: str, expected: ValueExposure) -> None:
+    assert scan_value_exposure(text, target).outcome is expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 묶인 변수가 있는 적분·합은 남은 일이 적분·합 계산(그 단원의 인지 행동)이다 — 닫힌 식이
+        # 아니다(Derivative와 같은 판정 · 판정문 §2.0). Sum은 안전 파서 허용 목록 밖이기도 하다.
+        "식: Integral(2, (x, 0, 2))",
+        "식: Sum(k, (k, 1, 4))",
+    ],
+)
+def test_bound_variable_operators_are_not_closed(text: str) -> None:
+    assert scan_value_exposure(text, "4").outcome is ValueExposure.clean
