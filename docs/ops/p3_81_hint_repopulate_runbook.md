@@ -319,6 +319,8 @@ $ConfirmOk = ($Confirm -ceq "APPLY")
 $ApplyReady = $DryOk -and $BackupOk -and $ConfirmOk -and $WtOk -and $CodeOk -and $BeforeOk -and ($ReachExit -eq 0)
 "APPLY_READY=$ApplyReady · DRY_OK=$DryOk BACKUP_OK=$BackupOk CONFIRMED=$ConfirmOk WT_OK=$WtOk CODE_OK=$CodeOk BEFORE_OK=$BeforeOk REACH_EXIT=$ReachExit"
 if ($ApplyReady) { $ApplyOut = & $Py -m whymath_backend.l4.hint_content.populate --apply; $ApplyExit = $LASTEXITCODE; "APPLY_EXIT=$ApplyExit"; [IO.File]::WriteAllLines($ApplyJson, [string[]]@($ApplyOut)); "SAVED=$ApplyJson" } else { $ApplyExit = -1; "WRITE_REFUSED=True — DRY_OK=$DryOk BACKUP_OK=$BackupOk CONFIRMED=$ConfirmOk WT_OK=$WtOk CODE_OK=$CodeOk BEFORE_OK=$BeforeOk REACH_EXIT=$ReachExit · 전부 True/0이어야 적재합니다. [B]~[F]를 같은 창에서 순서대로 실행하세요" }
+# 확인 입력은 한 번만 유효하다 — 같은 창에서 이 블록을 다시 붙여넣어도 새 확인 없이는 거부된다
+$Confirm = $null
 ```
 
 **확인**: `APPLY_READY=True` → `APPLY_EXIT=0`.
