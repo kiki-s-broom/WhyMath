@@ -203,3 +203,23 @@ def test_value_statement_name_rules(text: str, target: str, expected: ValueExpos
 )
 def test_bound_variable_operators_are_not_closed(text: str) -> None:
     assert scan_value_exposure(text, "4").outcome is ValueExposure.clean
+
+
+@pytest.mark.parametrize(
+    ("name", "kind"),
+    [
+        ("x", "variable"),
+        ("t", "variable"),
+        ("Abs", "constant"),
+        ("sqrt", "constant"),
+        ("pi", "constant"),
+        # 클래스 객체 — `free_symbols`가 property 객체(참)라 그대로 물으면 변수로 오판한다
+        ("Derivative", "constant"),
+        ("Integral", "constant"),
+        ("Rational", "unknown"),  # 안전 파서 허용 목록 밖
+        ("gamma", "unknown"),
+    ],
+)
+def test_name_kind_classification(name: str, kind: str) -> None:
+    """이름 종류 판정을 직접 고정한다 — 클래스 객체 오판(PR #1721 재리뷰 P3-1)의 회귀 방지."""
+    assert verify_solution._name_kind(name) == kind
