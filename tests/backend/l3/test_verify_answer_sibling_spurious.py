@@ -220,6 +220,14 @@ def test_root_aggregate_controls_keep_verdict(condition: str, kind: str, claimed
 # ──────────────────────────────────────────────────────────────────────────
 # ⑥ 거짓 fail 방향 — 종전 셈이 무연근을 세서 *맞는 답*이 fail 이던 경우.
 # ──────────────────────────────────────────────────────────────────────────
+def test_root_aggregate_is_unverifiable_when_a_root_definedness_is_unknown() -> None:
+    """`sqrt(x)**2*x - 4` 는 x² − 4 로 접힌다. x = −2 에서 원문은 실수 범위 밖 중간값(√−2)이라
+    정의역을 판정하지 못한다 — 판정 불가 근이 하나라도 있으면 집계를 단정하지 않는다(종전 pass)."""
+    condition = "sqrt(x)**2*x - 4 = 0"
+    assert verify_root_aggregate(condition, "0", "sum").state == "unverifiable"
+    assert verify_root_aggregate(condition, "-4", "product").state == "unverifiable"
+
+
 def test_false_fail_direction_real_root_count() -> None:
     assert verify_real_root_count("x*(x - 2)/(x - 2) = 2", "0").state == "pass"  # 종전 fail
 
