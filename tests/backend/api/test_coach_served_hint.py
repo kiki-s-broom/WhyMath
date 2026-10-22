@@ -205,6 +205,11 @@ class TestCreateSessionServing:
         assert len(events) == 1
         assert events[0].event_data["reveal_score"] == pytest.approx(1 / 3)
         assert events[0].event_data["hint_id"] == _SERVED.hint_id
+        # P3-77 — 같은 행의 hint_level은 *서빙된* 힌트의 레벨이다(결정 레벨과 다를 수 있다).
+        # 이 턴은 결정 레벨(좌절 신호 → 2)과 서빙 레벨(가짜 reader가 준 1)이 갈라지는 경우라,
+        # 결정 레벨을 적던 종전 코드에서는 이 단언이 실패한다(변별력).
+        assert body["decision"]["hint_level"] != _SERVED.level
+        assert events[0].event_data["hint_level"] == _SERVED.level
 
     def test_no_catalog_hint_logs_none_not_zero(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """카탈로그에 힌트가 없으면 served_hint=null·reveal_score=None(0으로 날조하지 않는다)."""

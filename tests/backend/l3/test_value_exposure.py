@@ -3,8 +3,11 @@
 이 함수 하나가 "본문에 계산하면 목표 값이 되는 식이 있는가"를 정한다. 그래서 세 방향을 모두 잰다:
 ① 노출 주입 → exposed(RED 신호) ② 값이 다른 대조군 → clean ③ 판정 불가 → undecidable(clean으로
 접지 않는다). 그리고 코퍼스 실측에서 드러난 오탐(문자 섞인 식의 *일부*를 잘라 정답과 같다고 보는
-것)을 픽스처로 둔다 — 그 규칙이 없으면 승인·미승인 3,735문항의 검수 L3 5,377건 중 2,155건이
-오탐으로 거부됐다(2026-10-22 실측).
+것)을 픽스처로 둔다. 2026-10-22 실측(승인·미승인 3,735문항의 검수 L3 5,377건): 옛 판정기 규칙은
+2,155건을 거부했고 그중 22건이 그런 오탐(문자 섞인 식의 일부)이었다 — 나머지 2,133건은 진짜 누설.
+
+PR #1721 리뷰(P2-1·P2-2) 회귀도 여기서 동결한다: 함수로 감싼 닫힌 식(`Abs`·`log`·삼각 — 승인
+76문항 102건)과 값 진술(`1 = y` — 승인 9문항)이 글자 규칙을 빠져나갔다.
 """
 
 from __future__ import annotations
@@ -64,9 +67,54 @@ def test_expression_inside_a_symbolic_expression_is_not_a_candidate() -> None:
     assert scan_value_exposure(text, "0").outcome is ValueExposure.clean
 
 
-def test_relation_side_is_a_candidate_but_a_bare_number_is_not() -> None:
-    """`3*(2) + 1 = y`의 좌변은 대상. 수 1개(`x = 7`의 7)는 산술식이 아니다(글자 축의 몫)."""
-    assert arithmetic_fragments("y = 3*(2) + 1, x = 7") == ["3*(2) + 1"]
+def test_relation_side_and_value_statement_are_candidates() -> None:
+    """`3*(2) + 1 = y`의 좌변은 계산만 남은 식, `x = 7`의 7은 값 진술(변수 하나 = 닫힌 값)이다."""
+    assert arithmetic_fragments("y = 3*(2) + 1, x = 7") == ["3*(2) + 1", "7"]
+
+
+def test_bare_number_in_prose_is_not_a_candidate() -> None:
+    """변수 옆 `=`이 없는 수 하나(본문의 '4단계')는 값 진술이 아니다 — 과잉 거부 방지."""
+    assert arithmetic_fragments("풀이는 모두 4단계로 이어져. 지금은 2번째 단계야.") == []
+
+
+@pytest.mark.parametrize(
+    ("text", "target"),
+    [
+        # P2-2 — 정답 그 자체를 좌우 바꿔 보여 준다(문항 1fe0ab77 3단계 L3)
+        ("이것을 한 번 바꾸면 3번째 단계의 식이 돼: 1 = y", "1"),
+        ("식: y = 0", "0"),
+        ("식: (-12) = a", "-12"),
+        # P2-1 — 함수로 감싼 닫힌 식(문항 c019e458 3단계 L3 · log · 삼각)
+        ("이것을 한 번 바꾸면 3번째 단계의 식이 돼: Abs((6*(5)**2 - 8*(5) - 4)) = y", "106"),
+        ("첫 단계에서 적는 식은 다음과 같아: log(64, 2)", "6"),
+        ("첫 단계에서 적는 식은 다음과 같아: sin(210*pi/180)", "-1/2"),
+        ("첫 단계에서 적는 식은 다음과 같아: tan(30*pi/180)", "sqrt(3)/3"),
+        ("첫 단계에서 적는 식은 다음과 같아: sqrt((9 - 6)**2 + (4 - 0)**2)", "5"),
+        ("첫 단계에서 적는 식은 다음과 같아: factorial(6)/factorial(5)", "6"),
+    ],
+)
+def test_review_1721_bypasses_are_exposed(text: str, target: str) -> None:
+    assert scan_value_exposure(text, target).outcome is ValueExposure.exposed
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 남은 일이 미분(그 단원의 인지 행동)인 설정 식 — 안전 파서는 `.doit()`을 실행해 수를
+        # 만들지만, 쓰인 그대로는 변수 x를 쓴다 → 닫힌 값이 아니다(앞 단계 대체 후보가 이것이다).
+        "첫 단계에서 적는 식은 다음과 같아: Derivative(x**3, x).doit().subs(x, -2) = y",
+        "첫 단계에서 적는 식은 다음과 같아: "
+        "((-3) + Derivative(4*x - 3, x)*((2) - (0)) + (-3) + Derivative(x - 3, x)*((2) - (0)))"
+        ".doit() = y",
+        # 대입이 남은 식도 같다 — 학생이 대입을 해야 값이 나온다
+        "이것을 한 번 바꾸면 2번째 단계의 식이 돼: (3*x**2).subs(x, -2) = y",
+        # 변수가 둘 이상 남은 등식은 값 진술이 아니다
+        "식: 3*b**2 - 12*b = 0",
+    ],
+)
+def test_expressions_that_still_name_a_variable_are_not_closed(text: str) -> None:
+    assert scan_value_exposure(text, "12").outcome is ValueExposure.clean
+    assert scan_value_exposure(text, "0").outcome is ValueExposure.clean
 
 
 def test_truncated_run_is_not_a_candidate_and_not_undecidable() -> None:

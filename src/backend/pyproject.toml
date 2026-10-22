@@ -240,8 +240,9 @@ layers = [
     "whymath_backend.schema",
 ]
 # 합성 루트(`whymath_backend.composition`) 경유 면제 — EOS-89가 기존 2건을 0으로 줄였으나
-# **EOS-86이 병행 개발로 신규 1건을 추가해 현재 1건이다** (merge 시 실측 정정 — 두 태스크가
-# 서로를 모르는 채로 같은 구간을 건드렸다).
+# **EOS-86이 병행 개발로 신규 1건을 추가했고, P3-77이 1건을 더해 현재 2건이다** (merge 시 실측
+# 정정 — EOS-86·EOS-89 두 태스크가 서로를 모르는 채로 같은 구간을 건드렸다). 두 간선은 아래
+# 목록 그대로이며 `tests/infra/test_eos_dependency_direction.py`가 정확 일치로 동결한다.
 #
 # 히스토리(지우지 않는 이유): EOS-69는 `l3.pedagogy.slot_generator`·`l3.render.adapters`가
 # 합성 루트를 경유해 어댑터에 닿는 간선 2건을 여기 **간선 단위로** 적어 두고 "호출부가 능력을

@@ -306,6 +306,38 @@ _MVT_STEPS = (
 )
 
 
+# PR #1721 리뷰 P2-2 — 승인 문항 1fe0ab77의 풀이 경로(정답 1). 3단계가 `1 = y`(최종 단계의 좌우 반전).
+_SWAP_STEPS = (
+    "Derivative(x, x).doit().subs(x, 2) = y",
+    "(1).subs(x, 2) = y",
+    "1 = y",
+    "y = 1",
+)
+
+
+class TestSwappedFinalRelation:
+    def test_swapped_final_is_caught_by_the_string_clause_alone(self) -> None:
+        """RED — ④ 문자열 대조가 양변 순서와 무관하다. 값 축 능력이 없어도 이 절이 사유를 낸다."""
+        l3 = _drafts(3, steps=_SWAP_STEPS)[3]
+        verdict = check_level_reveals(l3, _ctx(steps=_SWAP_STEPS, answer="1", value_exposure=None))
+        assert any("최종 단계 결과가 본문에 실렸다" in r for r in verdict.reasons)
+        assert any("최종 결과와 같다" in r for r in verdict.reasons)
+
+    def test_value_statement_is_caught_by_b(self) -> None:
+        """RED — 글자 축은 정답 1자라 유보, B 값 축이 `1 = y`를 값 진술로 잡는다."""
+        l3 = _drafts(3, steps=_SWAP_STEPS)[3]
+        leakage = check_answer_leakage(l3, _ctx(steps=_SWAP_STEPS, answer="1"))
+        assert leakage.detail["verdict"] == "undecidable"
+        assert leakage.passed is False and leakage.detail["value_verdict"] == "exposed"
+
+    def test_earlier_partials_of_the_same_path_pass(self) -> None:
+        """GREEN 대조군 — 같은 경로의 1·2단계 L3(미분·대입이 남은 식)는 통과한다(앞 단계 대체 후보)."""
+        ctx = _ctx(steps=_SWAP_STEPS, answer="1")
+        for order in (1, 2):
+            gated = evaluate_gates(_drafts(order, steps=_SWAP_STEPS)[3], ctx)
+            assert gated.verified is True, (order, gated.gate_report)
+
+
 class TestValueAxis:
     def test_p3_10_measured_leak_is_rejected(self) -> None:
         """RED — L3가 '계산하면 정답(4)이 되는 식'을 보여 준다. 글자 축은 유보(정답 1자)."""
@@ -320,7 +352,7 @@ class TestValueAxis:
         assert evaluate_gates(l3, ctx).verified is False
 
     def test_p3_10_earlier_step_partial_is_the_clean_control(self) -> None:
-        """GREEN — 같은 문항의 1단계 L3(값을 가진 독립 산술식 없음)는 세 게이트를 모두 통과한다.
+        """GREEN — 같은 문항의 1단계 L3(미분이 남은 설정 식 — 닫힌 식 없음)는 세 게이트를 모두 통과한다.
 
         L3 공백 대체(store.select_ladder_hint)가 2단계 대신 내는 후보가 바로 이것이다.
         """

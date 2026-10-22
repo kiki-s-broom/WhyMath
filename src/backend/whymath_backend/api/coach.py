@@ -558,9 +558,13 @@ _COMPLETED_ATTEMPT_ID_DESC = (
 # S4-11 — coach 서빙 reader의 응답 좌석(세션 2응답 공통). stateless `CoachResponse`에는 싣지
 # 않는다 — DB가 없어 카탈로그를 읽을 수 없고, 넣으면 항상 null인 가짜 계기판이 된다.
 _SERVED_HINT_DESC = (
-    "이 턴의 hint_level(1~3)에 맞는 **검수 통과 graded 힌트** 1개(S4-11) — 학생이 아직 적지 않은 "
-    "첫 풀이 단계 이후의 가장 이른 단계 힌트다. 오프라인 생성 후 게이트 3종(레벨-노출 정합·정답 "
-    "누출·정서 톤)을 통과한 카탈로그 행만 나간다. null이면 이 턴에 줄 검수 힌트가 없다(카탈로그 "
+    "이 턴의 hint_level(1~3)에 맞는 **검수 통과 graded 힌트** 1개(S4-11). 1·2단계는 학생이 아직 "
+    "적지 않은 첫 풀이 단계 이후의 가장 이른 단계 힌트다. 3단계(부분 시연)는 **뒤 단계로 넘어가지 "
+    "않는다**(P3-77): 그 단계의 3단계 힌트 → 없으면 가장 가까운 *앞* 단계의 3단계 힌트 → 그것도 "
+    "없으면 2단계(단계 흐름) 힌트로 내려 낸다. 내려 낸 경우 `level`이 2로 실린다 — 표시 레벨은 "
+    "항상 실제 본문의 레벨이며 `decision.hint_level`과 다를 수 있다. 오프라인 생성 후 게이트 "
+    "3종(레벨-노출 정합·정답 누출·정서 톤)을 통과한 카탈로그 행만 나간다. null이면 이 턴에 줄 검수 "
+    "힌트가 없다(카탈로그 "
     "미생성·hint_level 4=전체 풀이는 Hint 밖 안전망·돌아보기/완료 턴·플래그 OFF). **학생 대면 "
     "발화(`decision.prompt`)와 별개의 추가 신호**다 — 클라는 '지금 N단계 힌트' 라벨과 함께 카드로 "
     "보여 줄 수 있고, 발화를 대체하지 않는다. 정답 값은 담기지 않는다(게이트 B)."
@@ -2690,6 +2694,12 @@ async def _log_hint_event(
     실제로 나간 턴만의 비율이다. 태그만 실은 행을 남기는 길은 계약(`HintEventData.hint_level`
     필수)을 바꿔야 하고 ⑤⑧⑮가 그 행을 다시 공급으로 세게 되어 택하지 않았다.
 
+    **P3-77 서빙 레벨**: 검수 힌트가 서빙됐으면 `hint_level`에 그 힌트의 **실제 레벨**을 적는다.
+    3단계 요청에서 쓸 수 있는 부분 시연이 없어 2단계로 내려 낸 턴(`store.select_ladder_hint`)에
+    `decision.hint_level`(3)을 적으면 같은 행에 3단계 라벨과 2단계 힌트 id가 섞여, 다음 턴 사다리
+    입력과 도달 깊이 KPI가 받지 않은 단계를 '제공'으로 센다. 대체 *종류*(앞 단계 대체·하향)는
+    이 계약(`HintEventData`)에 좌석이 없어 싣지 않는다 — reader가 로그로만 남긴다.
+
     **S4-11 reveal_score**: 이 턴에 검수 힌트가 *실제로 서빙됐으면*(`served_hint`) 그 힌트의
     `reveal_score`·`hint_id`를 같은 행에 싣는다 — KPI '도달 깊이 2.5+'의 정밀화 신호(⑧ note가
     읽는다). 미서빙이면 둘 다 None이다(정적 템플릿 턴의 노출을 0으로 날조하지 않는다·재계산 0 —
@@ -2720,7 +2730,8 @@ async def _log_hint_event(
         event_type=EventType.힌트제공,
         event_data=build_event_data(
             EventType.힌트제공,
-            hint_level=hint_level,
+            # P3-77: 서빙된 검수 힌트가 있으면 그 실제 레벨(하향 서빙이면 2) — docstring 참조.
+            hint_level=served_hint.level if served_hint is not None else hint_level,
             mode=mode,
             persona=persona,
             client_state_mismatch=client_state_mismatch,

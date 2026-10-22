@@ -34,6 +34,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
 from tokenize import TokenError
 from typing import TYPE_CHECKING, Any, Final, Literal
 
@@ -423,15 +424,17 @@ def split_top_level(text: str) -> list[str]:
 # ──────────────────────────────────────────────────────────────────────────
 # 값 노출 훑기 (P3-77) — "본문에 계산하면 정답이 되는 식이 있는가"
 # ──────────────────────────────────────────────────────────────────────────
-# 판정 대상 = 문자 없는 산술 조각. P3-10 판정기(`harness.ai_quality_judges._judge_leak` ③)가 쓰던
-# 추출 규칙을 이곳으로 옮겨 **한 벌만** 둔다 — 힌트 게이트(S4-11 B·④ — 능력 계약 경유)와 판정기가
-# 같은 판정을 쓴다(사본 금지). 값 비교는 새로 만들지 않고 `same_value`(정본 채점기)에 위임한다.
+# 판정 대상 = 닫힌 식(계산만 남은 식 · 값 진술 — `arithmetic_fragments`). P3-10 판정기
+# (`harness.ai_quality_judges._judge_leak` ③)가 쓰던 규칙을 이곳으로 옮겨 **한 벌만** 둔다 — 힌트
+# 게이트(S4-11 B·④ — 능력 계약 경유)와 판정기가 같은 판정을 쓴다(사본 금지). PR #1721 리뷰가 그
+# 이관에서 생긴 구멍(함수로 감싼 닫힌 식·`1 = y`)을 잡아 기준을 "쓰인 이름에 변수가 없다"로 바꿨다.
+# 값 비교는 새로 만들지 않고 `same_value`(정본 채점기)에 위임한다.
 _VALUE_OP_NORMALIZE: Final = str.maketrans({"×": "*", "÷": "/", "−": "-", "·": "*"})
 # 식 덩어리 — 문자·수·연산자·괄호·쉼표·등호가 이어진 구간(한글·콜론·줄바꿈에서 끊긴다).
 _EXPR_RUN: Final = re.compile(r"[0-9A-Za-z_.()+\-*/^,= \t]+")
 _NUMBER_TOKEN: Final = re.compile(r"\d+(?:\.\d+)?")
 _OPERATOR_BETWEEN: Final = re.compile(r"[0-9)]\s*[-+*/^]\s*[-(0-9]")
-_HAS_LETTER: Final = re.compile(r"[A-Za-z]")
+_IDENT: Final = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
 
 #: 산술 조각 해석 실패로 *예상되는* 예외 — 이것만 "식이 아니다"로 접는다. 호출 계약이 깨진
 #: 프로그래밍 오류(TypeError·AttributeError 등)는 삼키지 않는다 — 삼키면 무관용 축(정답 누설)이
@@ -457,45 +460,84 @@ class ValueExposureResult:
     undecided: int = 0
 
 
-def _top_level_sides(run: str) -> list[str]:
-    """식 덩어리 하나를 최상위 `=`·`,`에서 자른 변들(괄호 안의 쉼표는 자르지 않는다)."""
-    sides: list[str] = []
-    for part in split_top_level(run):
-        sides.extend(part.split("="))
-    return sides
+@lru_cache(maxsize=512)
+def _names_a_variable(name: str) -> bool:
+    """식에 쓰인 이름 하나가 **변수**(자유 기호)인가 — SymPy가 그 이름을 어떻게 읽는지로 판정한다.
+
+    `Abs`·`log`·`sin`·`sqrt`·`factorial`(함수)·`pi`·`E`(상수)는 변수가 아니다. `x`·`y`·`t`처럼
+    기호가 되는 이름, `.doit()`·`.subs()`의 메서드 이름처럼 단독으로는 기호로 읽히는 이름은 변수다.
+    해석이 거부되는 이름(안전 파싱 허용 목록 밖)도 변수로 본다 — 그 변은 어차피 해석되지 않는다.
+    """
+    try:
+        value = safe_sympify(name)
+    except _FRAGMENT_PARSE_FAILURES as exc:  # 허용 목록 밖 이름 — 대상에서 빼는 쪽(변수 취급)
+        logger.debug("이름 해석 불가(%s) — 변수로 취급", type(exc).__name__)
+        return True
+    return bool(getattr(value, "free_symbols", None))
+
+
+def _closed_value(side: str) -> bool:
+    """변 하나가 **쓰인 그대로** 닫힌 값인가 — 변수 이름이 하나도 없고 수치로 계산된다.
+
+    판정은 두 겹이다. ① 쓰인 이름에 변수가 없다(`_names_a_variable`) ② 계산한 값이 자유 기호 없는
+    수다. ①이 필요한 이유: 안전 파서는 `.doit()`·`.subs()`를 *실행*하므로, `Derivative(x**3, x)
+    .doit().subs(x, -2)`처럼 학생이 미분을 해야 하는 설정 식도 계산 뒤에는 수(12)가 된다. 그 식은
+    정답을 알려 주는 식이 아니라 문제를 식으로 옮긴 것이다 — 남은 일이 미분(그 단원의 인지 행동)이기
+    때문이다. 반대로 `Abs(...)`·`log(64, 2)`·`sin(210*pi/180)`는 남은 일이 계산뿐이므로 닫힌 값이다.
+    """
+    if not _NUMBER_TOKEN.search(side):
+        return False
+    if any(_names_a_variable(name) for name in _IDENT.findall(side)):
+        return False
+    try:
+        value = safe_sympify(side.replace("^", "**"))
+    except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
+        logger.debug("변 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
+        return False
+    return bool(getattr(value, "is_number", False)) and not getattr(value, "free_symbols", True)
+
+
+def _is_single_variable(side: str) -> bool:
+    return _IDENT.fullmatch(side) is not None and _names_a_variable(side)
 
 
 def arithmetic_fragments(text: str) -> list[str]:
-    """본문 → 값을 가진 **독립** 산술식(문자 없음 · 수 2개 이상 · 수 사이 연산자 · 닫힌 수치).
+    """본문 → 값을 드러내는 **닫힌 식** 후보(P3-77). 두 부류다.
 
-    독립이란 그 식이 문자를 포함한 더 큰 식의 *일부*가 아니라는 뜻이다. 그래서 먼저 문자까지
-    포함한 식 덩어리(`_EXPR_RUN`)를 잡고, 그 덩어리를 최상위 `=`·`,`로 자른 **변 하나 전체**가
-    문자 없이 수치로 읽힐 때만 대상으로 삼는다. `Derivative(x - 1 + 1, x)` 속의 `- 1 + 1`은
-    변 전체가 아니므로 대상이 아니다 — 잘라 내면 정답 0과 "같은 값"이 되지만 학생에게 값을
-    알려 주는 식이 아니다(2026-10-22 코퍼스 실측: 이 규칙 없이는 승인·미승인 3,735문항의 검수 L3
-    5,377건 중 2,155건이 이런 오탐으로 거부됐다).
+    ① **계산만 남은 식** — 변 하나 전체가 닫힌 값(`_closed_value`)이고, 수 사이 연산자가 있거나
+       함수를 쓴다. 예: `(-3) + (4)*((2) - (0))`, `Abs((6*(5)**2 - 8*(5) - 4))`, `log(64, 2)`,
+       `sin(210*pi/180)`. 수 하나(`4`)만으로는 이 부류가 아니다 — 본문의 "4단계" 같은 수와
+       구별되지 않는다.
+    ② **값 진술** — 등식의 한 변이 변수 하나이고 다른 변이 닫힌 값이다. 예: `1 = y`, `y = 1`,
+       `x = 3*(2)`. 이때는 수 하나도 대상이다(변수 옆 `=`이 그 수를 값으로 진술한다).
 
-    수치로 해석되지 않는 변(괄호 짝이 안 맞는 잘림 등)은 식이 아니므로 대상에서 뺀다 — 판정
-    불가가 아니다. 순서를 보존하고 중복은 한 번만 낸다.
+    "변 하나 전체"의 뜻: 문자까지 포함한 식 덩어리(`_EXPR_RUN`)를 최상위 `,`·`=`로 자른 단위다.
+    `Derivative(x - 1 + 1, x)` 속의 `- 1 + 1`은 변 전체가 아니므로 대상이 아니고, 그 변 전체는
+    변수 `x`를 쓰므로 닫힌 값도 아니다. 수치로 해석되지 않는 변(괄호 짝이 안 맞는 잘림 등)은 식이
+    아니므로 대상에서 뺀다 — 판정 불가가 아니다. 순서를 보존하고 중복은 한 번만 낸다.
     """
     out: list[str] = []
     seen: set[str] = set()
-    for run in _EXPR_RUN.findall(text.translate(_VALUE_OP_NORMALIZE)):
-        for raw in _top_level_sides(run):
-            frag = raw.strip()
-            if not frag or frag in seen or _HAS_LETTER.search(frag):
-                continue
-            if len(_NUMBER_TOKEN.findall(frag)) < 2 or not _OPERATOR_BETWEEN.search(frag):
-                continue
-            try:
-                value = safe_sympify(frag.replace("^", "**"))
-            except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
-                logger.debug("산술 조각 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
-                continue
-            if not getattr(value, "is_number", False):
-                continue
+
+    def add(frag: str) -> None:
+        if frag not in seen:
             seen.add(frag)
             out.append(frag)
+
+    for run in _EXPR_RUN.findall(text.translate(_VALUE_OP_NORMALIZE)):
+        for part in split_top_level(run):
+            sides = [side.strip() for side in part.split("=")]
+            for side in sides:
+                if not side or side in seen:
+                    continue
+                computed = _OPERATOR_BETWEEN.search(side) or _IDENT.search(side)
+                if computed and _closed_value(side):
+                    add(side)
+            if len(sides) == 2 and all(sides):
+                left, right = sides
+                for var, value in ((left, right), (right, left)):
+                    if _is_single_variable(var) and _closed_value(value):
+                        add(value)
     return out
 
 
@@ -508,14 +550,14 @@ def _value_targets(target: str) -> list[str]:
 
 
 def scan_value_exposure(text: str, target: str) -> ValueExposureResult:
-    """`text`의 산술 조각 중 값이 `target`과 같은 것이 있는가 — 3상태(P3-77).
+    """`text`의 닫힌 식(`arithmetic_fragments`) 중 값이 `target`과 같은 것이 있는가 — 3상태(P3-77).
 
-    - **exposed**: 조각 하나가 목표(또는 목표의 한 성분)와 `same_value` SAME.
+    - **exposed**: 식 하나가 목표(또는 목표의 한 성분)와 `same_value` SAME.
     - **undecidable**: 같은 것은 없는데 판정하지 못한 쌍(UNKNOWN)이 있다 — 목표를 읽지 못한
       경우(`{1, 6}`·`3개` 등)가 여기에 든다. **clean으로 접지 않는다**(모른다 ≠ 아니다).
-    - **clean**: 조각이 없거나, 모든 조각이 모든 목표 성분과 DIFFERENT.
+    - **clean**: 식이 없거나, 모든 식이 모든 목표 성분과 DIFFERENT.
 
-    조각이 없으면 목표를 읽을 필요가 없다 — 볼 것이 없었다는 뜻이며 `candidates=0`이 그 사실을
+    식이 없으면 목표를 읽을 필요가 없다 — 볼 것이 없었다는 뜻이며 `candidates=0`이 그 사실을
     남긴다("작동한 비율"). 목표가 비었으면 판정 불가다(호출부가 정답 원천 부재를 먼저 거른다).
     """
     fragments = arithmetic_fragments(text)

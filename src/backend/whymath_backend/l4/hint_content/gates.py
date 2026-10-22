@@ -108,6 +108,14 @@ class GateContext:
     value_exposure: AnswerValueExposure | None
 
 
+def _relation_forms(normed: str) -> frozenset[str]:
+    """정규화된 단계 본문의 비교 형태 — 등호가 정확히 하나면 좌우를 바꾼 꼴도 같은 진술이다."""
+    sides = normed.split("=")
+    if len(sides) == 2 and all(sides):
+        return frozenset({normed, f"{sides[1]}={sides[0]}"})
+    return frozenset({normed})
+
+
 def _value_scan(ctx: GateContext, text: str, target: str) -> tuple[str, str | None]:
     """값 축 판정값(`ValueExposure` 값 또는 `VALUE_NOT_RUN`)과 노출된 식(있으면)."""
     if ctx.value_exposure is None:
@@ -239,9 +247,12 @@ def check_level_reveals(hint: Hint, ctx: GateContext) -> GateVerdict:
         final = normed_steps[-1]
         if level == 3 and k >= n:
             reasons.append("마지막 단계의 부분 시연은 전체 풀이다(Level 4 — Hint 엔티티 밖)")
-        if level == 3 and k <= n and normed_steps[k - 1] == final:
+        # 등식은 양변 순서와 무관하다(P3-77 리뷰 P2-2) — 최종 단계 `y = 1`을 `1 = y`로 보여 주는
+        # 본문을 문자열 대조가 놓쳤다(승인 9문항 실측). 비교 형태에 좌우를 바꾼 꼴을 함께 둔다.
+        finals = _relation_forms(final)
+        if level == 3 and k <= n and normed_steps[k - 1] in finals:
             reasons.append("시연한 단계의 결과가 최종 결과와 같다(전체 풀이 노출)")
-        if len(final) >= _MIN_DECIDABLE_LEN and final in body:
+        if len(final) >= _MIN_DECIDABLE_LEN and any(f in body for f in finals):
             reasons.append("최종 단계 결과가 본문에 실렸다(전체 풀이 노출)")
         # 값 동치(P3-77) — 글자가 달라도 계산하면 최종 단계 값이 되는 식이 본문에 있으면 전체 풀이
         # 노출이다. 구조(k)가 아니라 **본문**을 본다: 다른 단계의 L3로 대체 서빙된 본문도 같은

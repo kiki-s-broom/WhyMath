@@ -80,7 +80,7 @@ class TestBuildPathHints:
         )
         result = populate.build_path_hints(path, value_exposure=_VALUE)
         l3 = {h.solution_step_ref.step_order: h for h in result.hints if h.level == 3}
-        assert l3[1].verified is True  # `x = 2`만 보여 준다 — 값을 가진 독립 산술식 없음
+        assert l3[1].verified is True  # 값 진술 `x = 2`만 보여 준다(2 ≠ 정답 7)
         assert l3[2].verified is False  # `3*(2) + 1` = 7 = 정답
         payload = populate.summarize(
             [result], load=PathLoadReport(paths_seen=1), applied=False
