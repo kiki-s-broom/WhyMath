@@ -558,9 +558,13 @@ _COMPLETED_ATTEMPT_ID_DESC = (
 # S4-11 — coach 서빙 reader의 응답 좌석(세션 2응답 공통). stateless `CoachResponse`에는 싣지
 # 않는다 — DB가 없어 카탈로그를 읽을 수 없고, 넣으면 항상 null인 가짜 계기판이 된다.
 _SERVED_HINT_DESC = (
-    "이 턴의 hint_level(1~3)에 맞는 **검수 통과 graded 힌트** 1개(S4-11) — 학생이 아직 적지 않은 "
-    "첫 풀이 단계 이후의 가장 이른 단계 힌트다. 오프라인 생성 후 게이트 3종(레벨-노출 정합·정답 "
-    "누출·정서 톤)을 통과한 카탈로그 행만 나간다. null이면 이 턴에 줄 검수 힌트가 없다(카탈로그 "
+    "이 턴의 hint_level(1~3)에 맞는 **검수 통과 graded 힌트** 1개(S4-11). 1·2단계는 학생이 아직 "
+    "적지 않은 첫 풀이 단계 이후의 가장 이른 단계 힌트다. 3단계(부분 시연)는 **뒤 단계로 넘어가지 "
+    "않는다**(P3-77): 그 단계의 3단계 힌트 → 없으면 가장 가까운 *앞* 단계의 3단계 힌트 → 그것도 "
+    "없으면 2단계(단계 흐름) 힌트로 내려 낸다. 내려 낸 경우 `level`이 2로 실린다 — 표시 레벨은 "
+    "항상 실제 본문의 레벨이며 `decision.hint_level`과 다를 수 있다. 오프라인 생성 후 게이트 "
+    "3종(레벨-노출 정합·정답 누출·정서 톤)을 통과한 카탈로그 행만 나간다. null이면 이 턴에 줄 검수 "
+    "힌트가 없다(카탈로그 "
     "미생성·hint_level 4=전체 풀이는 Hint 밖 안전망·돌아보기/완료 턴·플래그 OFF). **학생 대면 "
     "발화(`decision.prompt`)와 별개의 추가 신호**다 — 클라는 '지금 N단계 힌트' 라벨과 함께 카드로 "
     "보여 줄 수 있고, 발화를 대체하지 않는다. 정답 값은 담기지 않는다(게이트 B)."
@@ -2690,6 +2694,16 @@ async def _log_hint_event(
     실제로 나간 턴만의 비율이다. 태그만 실은 행을 남기는 길은 계약(`HintEventData.hint_level`
     필수)을 바꿔야 하고 ⑤⑧⑮가 그 행을 다시 공급으로 세게 되어 택하지 않았다.
 
+    **P3-77 결정 레벨 vs 서빙 레벨**: `hint_level`은 **결정 레벨**(`decision.hint_level`)이다 —
+    학생 대면 발화(`decision.prompt`)가 말하는 단계와 같고, 다음 턴 사다리 입력
+    (`_prev_hint_level_for` → `decide_hint_level`의 prev)이다. 3단계 요청에서 쓸 수 있는 부분 시연이
+    없어 2단계 검수 힌트로 내려 낸 턴(`store.select_ladder_hint`)에도 3을 적는다. 서빙 레벨(2)을
+    적으면 사다리가 3 → 2 → 3을 반복해 **Level 4 안전망에 영원히 닿지 못한다**(상승 규칙
+    prev+1·max(prev, 3)이 3에서 멈춘다 — PR #1721 재리뷰 P1 실측). 서빙 레벨·힌트 id와 결정 레벨이
+    다르면 그 사실은 로그로만 남긴다(관측용 — `HintEventData` 계약은 바꾸지 않는다). 같은 행의
+    `reveal_score`·`hint_id`는 서빙된 힌트의 것이므로, 도달 깊이 KPI는 `reveal_score`(전달된
+    노출)로 읽어야 하고 `hint_level`(결정된 단계)과 구별된다(계약 docstring의 기존 구분 그대로).
+
     **S4-11 reveal_score**: 이 턴에 검수 힌트가 *실제로 서빙됐으면*(`served_hint`) 그 힌트의
     `reveal_score`·`hint_id`를 같은 행에 싣는다 — KPI '도달 깊이 2.5+'의 정밀화 신호(⑧ note가
     읽는다). 미서빙이면 둘 다 None이다(정적 템플릿 턴의 노출을 0으로 날조하지 않는다·재계산 0 —
@@ -2711,6 +2725,14 @@ async def _log_hint_event(
         return  # 가로챈 턴 — 학생은 힌트가 아니라 결정론 템플릿을 받았다(EOS-30).
     if hint_level is None:
         return  # 힌트 레벨 없음(이론적 경계) → 적재 안 함(날조 회피).
+    if served_hint is not None and served_hint.level != hint_level:
+        # 관측용 — 결정 레벨과 서빙 레벨이 갈린 턴(L3 공백의 L2 하향 등). 원장에는 결정 레벨만 간다.
+        logger.info(
+            "힌트제공 결정≠서빙 decided_level=%s served_level=%s hint_id=%s",
+            hint_level,
+            served_hint.level,
+            served_hint.hint_id,
+        )
 
     event = AttemptEventORM(
         event_at=datetime.now(timezone.utc),
@@ -2720,6 +2742,7 @@ async def _log_hint_event(
         event_type=EventType.힌트제공,
         event_data=build_event_data(
             EventType.힌트제공,
+            # P3-77: 결정 레벨 — 사다리 입력이다(서빙 레벨을 적으면 Level 4에 못 닿는다·docstring).
             hint_level=hint_level,
             mode=mode,
             persona=persona,

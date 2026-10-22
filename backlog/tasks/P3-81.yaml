@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-81
+title: "힌트 카탈로그 재적재 — P3-77 값 동치 게이트 반영(운영 DB hints 테이블)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-77-hint-l3-numeric-equivalent-leak
+requires_gates: []
+acceptance:
+  - "① P3-77이 힌트 게이트 B·④에 값 동치 축을 넣어 게이트 판정(`verified`·`gate_report`)이 바뀌었으나, 운영 DB `hints` 테이블은 `python -m whymath_backend.l4.hint_content.populate --apply`를 다시 돌리기 전까지 종전 판정의 L3(정답과 값이 같은 산술식을 보여 주는 것 포함)를 그대로 서빙할 수 있다. P3-77 추정(승인 1,772문항): 검수 L3 3,461 → 2,845, L3 0건 문항 45 → 324.\n② Kiki 머신 prod DB(docker `whymath-pg`, 127.0.0.1:5433)에서 재적재 전후의 `hints` 행 수·verified 분포를 실측해 위 추정과 대조한다. 안내 런북은 쓰기 블록 자가거부 가드·실행 코드 출처 확인(import 후 __file__)·공유 작업 사본 우회(worktree --detach)를 갖춘다.\n③ 재적재 뒤 서빙 경로(`store.find_served_hint`)가 정답 누설 L3를 내지 않는지 표본으로 확인한다(P3-10 `ai_quality_eval` 정답 누설 축과 같은 판정)."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l4/hint_content/**"
+session: null
+notes: ""
+updated: 2026-10-22

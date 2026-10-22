@@ -5,7 +5,10 @@
 1. **`eos-deterministic`(기본)** — 이 저장소의 *현재 코드*가 LLM 없이 학생에게 내는 출력이다.
    LLM이 꺼졌거나 P3-09 게이트에 거부됐을 때 실제로 나가는 결정론 레이어를 그대로 부른다:
    - 힌트 턴: 검수 힌트 생성기 `l4.hint_content.populate.build_path_hints`(S4-11 · 게이트 3종
-     포함)가 만든 `verified` 힌트 중 엔진 단계(`decide_hint_level`)의 것. 없으면 하네스 중립 질문.
+     포함)가 만든 `verified` 힌트 중에서 서빙 reader와 **같은 사다리 규칙**
+     (`l4.hint_content.store.select_ladder_hint` — P3-77 L3 공백 대체)으로 엔진 단계
+     (`decide_hint_level`)의 것을 고른다. L2로 내려 낸 경우 `hint_level`도 2로 적는다(표시 =
+     본문). 하나도 없으면 하네스 중립 질문.
    - 선택 턴: 오답 보기 진단 `l4.misconception.distractor_link.distractor_link_matches`(품질
      게이트 포함) → 개입 발문 `l4.misconception.intervene.select_intervention`. 진단이 없으면
      정답 턴은 격려 템플릿, 오답 턴은 중립 질문(`wh1_loop` 공개 상수).
@@ -41,12 +44,18 @@ from whymath_backend.harness.wh1_tutor_output import TutorTurnOutput, build_tuto
 from whymath_backend.l4.hint_content.generator import ConceptRef
 from whymath_backend.l4.hint_content.models import Hint
 from whymath_backend.l4.hint_content.populate import build_path_hints
-from whymath_backend.l4.hint_content.store import PathInput
+from whymath_backend.l4.hint_content.store import (
+    LADDER_AS_REQUESTED,
+    LADDER_CAPPED_TO_FLOW,
+    PathInput,
+    select_ladder_hint,
+)
 from whymath_backend.l4.hint_deferral import decide_hint_level
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.distractor_link import distractor_link_matches
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.misconception.intervene import select_intervention
+from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
 
 __all__ = [
     "CANDIDATE_EOS",
@@ -120,17 +129,28 @@ def _hint_turn(
                 step_verified=(True,) * len(steps),
                 step_concepts=(concept,) * len(steps),
                 final_answer=material.answer or None,
-            )
+            ),
+            value_exposure=math_answer_value_exposure(),
         ).hints
         cache[case.problem_id] = hints
-    for hint in hints:
-        if (
-            hint.verified
-            and hint.level == level
-            and hint.solution_step_ref.step_order == case.target_step
-        ):
-            return hint.content, "힌트", level, None
-    return NEUTRAL_GUIDE_UTTERANCE, "질문", level, "검수 통과 힌트 없음 → 하네스 중립 질문"
+    pick = select_ladder_hint(hints, hint_level=level, from_step_order=case.target_step)
+    if pick is None:
+        return NEUTRAL_GUIDE_UTTERANCE, "질문", level, "검수 통과 힌트 없음 → 하네스 중립 질문"
+    note: str | None = None
+    if pick.substitution != LADDER_AS_REQUESTED:
+        note = (
+            f"L{level} 사다리 대체({pick.substitution}) — "
+            f"{pick.hint.solution_step_ref.step_order}단계 L{pick.hint.level}"
+        )
+    if pick.substitution == LADDER_CAPPED_TO_FLOW:
+        note = (
+            f"{note} · 의도적 제외(P3-77 ②): 이 단계와 그 앞 단계에 쓸 수 있는 검수 L3가 없다"
+            "(부분 시연이 정답·최종 값을 드러내 게이트가 거부) — 뒤 단계 L3는 노출이 두 칸이 "
+            "되어 쓰지 않고, 정답을 드러내는 L3 대신 L2를 정직한 표시(hint_level=2)로 낸다. "
+            "엔진 단계와의 차이는 결함이 아니라 판정이다(docs/reviews/"
+            "p3_77_hint_l3_gap_pedagogy_judgment_2026-10-22.md)"
+        )
+    return pick.hint.content, "힌트", pick.hint.level, note
 
 
 def _choice_turn(

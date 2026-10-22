@@ -59,11 +59,13 @@ from whymath_backend.harness.wh1_tutor_output import TutorTurnOutput, validate_t
 from whymath_backend.l3.curriculum_notation_gate import extract_range_tokens
 from whymath_backend.l3.pregenerate.validator import arithmetic_validator, validate_response
 from whymath_backend.l3.safe_parse import safe_sympify
+from whymath_backend.l3.verify_solution import scan_value_exposure
 from whymath_backend.l3.verify_step import VerifyStepState, verify_step
 from whymath_backend.l4.hint_content.gates import GateContext, check_level_reveals
 from whymath_backend.l4.hint_content.models import Hint, HintReveals, SolutionStepRef
 from whymath_backend.l4.hint_deferral import decide_hint_level
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
+from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
 from whymath_backend.schema.speech import SpeechGradeBand
 
 __all__ = [
@@ -489,11 +491,6 @@ def _judge_math(case: EvalCase, response: TutorResponse, ctx: JudgeContext) -> J
 # ──────────────────────────────────────────────────────────────────────────
 # ② 정답 누설
 # ──────────────────────────────────────────────────────────────────────────
-_ARITH_FRAGMENT: Final = re.compile(r"[0-9.()+\-*/^ ]+")
-_NUMBER_TOKEN: Final = re.compile(r"\d+(?:\.\d+)?")
-_OPERATOR_BETWEEN: Final = re.compile(r"[0-9)]\s*[-+*/^]\s*[-(0-9]")
-
-
 def _declaration_pattern(answer: str) -> re.Pattern[str]:
     return re.compile(
         rf"(?:정답|최종\s*답|답|결과)\s*(?:은|는|이|가)?\s*[:：]?\s*(?:바로\s*)?"
@@ -510,7 +507,13 @@ def _judge_leak(case: EvalCase, response: TutorResponse, ctx: JudgeContext) -> J
     text = _strip_identifiers(_explanation(response.tutor_output))
     answer = material.answer.strip()
     reasons: list[str] = []
-    hits = {"string": 0, "declaration": 0, "equivalent_expr": 0, "final_step": 0}
+    hits = {
+        "string": 0,
+        "declaration": 0,
+        "equivalent_expr": 0,
+        "equivalent_expr_undecidable": 0,
+        "final_step": 0,
+    }
     if not answer:
         return Judgment(applicable=False, passed=True, reasons=("정답 원천 없음",))
     if detect_answer_leakage(text, answer) is LeakageVerdict.leaked:
@@ -521,17 +524,15 @@ def _judge_leak(case: EvalCase, response: TutorResponse, ctx: JudgeContext) -> J
     ).search(normalize_text(text)):
         hits["declaration"] = 1
         reasons.append("정답 선언 어구('정답은 …')")
-    answer_value = _closed_numeric(answer)
-    if answer_value is not None:
-        for frag in _ARITH_FRAGMENT.findall(text.translate(_OP_NORMALIZE)):
-            frag = frag.strip()
-            if len(_NUMBER_TOKEN.findall(frag)) < 2 or not _OPERATOR_BETWEEN.search(frag):
-                continue
-            value = _closed_numeric(frag)
-            if value is not None and (value - answer_value).equals(0):
-                hits["equivalent_expr"] = 1
-                reasons.append(f"정답과 같은 값의 산술식 '{frag}'")
-                break
+    # 동치 산술식 — 힌트 게이트(S4-11 B 값 축)와 **같은 함수**를 쓴다(P3-77 · 사본 금지).
+    # 판정기는 측정기이므로 확정 노출(exposed)만 실패로 센다. 판정 불가는 실패로 위장하지 않고
+    # 회계에만 남긴다 — 학생 노출을 막는 쪽(게이트)은 같은 판정 불가를 거부로 처리한다.
+    value_scan = scan_value_exposure(text, answer)
+    if value_scan.outcome.value == "exposed":
+        hits["equivalent_expr"] = 1
+        reasons.append(f"정답과 같은 값의 산술식 '{value_scan.fragment}'")
+    elif value_scan.outcome.value == "undecidable":
+        hits["equivalent_expr_undecidable"] = 1
     if material.solution_steps:
         final = normalize_text(material.solution_steps[-1])
         if len(final) >= 2 and final in normalize_text(text):
@@ -591,11 +592,18 @@ def _gate_hint(
     )
 
 
-def _gate_context(material: ProblemMaterial, concept_name: str) -> GateContext:
+def _gate_context(
+    material: ProblemMaterial, concept_name: str, *, value_axis: bool = True
+) -> GateContext:
+    # 값 축 능력은 생성기(populate)와 같은 수학 구현을 쓴다 — 판정기가 다른 판정을 쓰면 게이트를
+    # 통과한 힌트가 판정기에서 떨어지는 갈라짐이 생긴다(P3-77). `value_axis=False`는 게이트의
+    # *통과 여부*를 쓰지 않고 본문 파생값(detail)만 읽는 자리(노출 등급 계산)용이다 — 거기서 값 축을
+    # 돌리면 판정과 무관한 식 해석이 축 판정기 밖(예외 회계 밖)에서 일어난다.
     return GateContext(
         step_contents=material.solution_steps,
         concept_name=concept_name or None,
         final_answer=material.answer or None,
+        value_exposure=math_answer_value_exposure() if value_axis else None,
     )
 
 
@@ -610,7 +618,8 @@ def derived_disclosure_tier(
     if not text.strip():
         return 0
     detail = check_level_reveals(
-        _gate_hint(case, material, concept_name, text, 1), _gate_context(material, concept_name)
+        _gate_hint(case, material, concept_name, text, 1),
+        _gate_context(material, concept_name, value_axis=False),
     ).detail
     orders = [int(o) for o in detail.get("computation_hit_orders", "").split(",") if o]
     steps = material.solution_steps
