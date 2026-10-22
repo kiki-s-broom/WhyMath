@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 야간 S6 상시성 재검증(harness.corpus_reverify)의 표준 경로는 verify.answer_map만 검산하고 레코드의 answer 필드는 비교하지 않는다. 실측: 대표 과정 문항 40건에서 answer만 틀린 값으로 바꾸면 0/40이 통과한다(P3-07, 2026-10-18).\n② 처리 방향을 정한다: (가) corpus_reverify에 answer↔answer_map 대조를 추가한다 (나) 야간 잡이 solution_qa를 함께 돌리게 한다 (다) 그대로 두는 근거를 남긴다. S6 게이트의 의미를 바꾸는 선택이므로 기존 호출처(ci.yml 야간 스텝·tests 10여 개)의 기대를 먼저 전수 확인한다.\n③ 선택한 방향의 주입 테스트(answer 필드 변조 → exit 1)를 둔다."
-artifacts: []
+artifacts:
+  - "#1717"
 paths:
   - ".github/workflows/ci.yml"
   - docs/standards/phase3_metrics_contract.md
@@ -26,9 +27,11 @@ paths:
   - tests/backend/harness/test_p3_audit_qualification.py
   - tests/backend/harness/test_solution_qa.py
   - tests/infra/test_corpus_reverify_nightly_wiring.py
-session: claude/ops-150-reverify-answer-field
+session: null
 notes: |-
   출처: P3-07 세션(2026-10-18). P3-14 ④와 단독 CLI는 이미 solution_qa로 이 구멍을 닫았다. 남은 것은 야간 S6 게이트 쪽 처분이다.
 
   [정정 2026-10-21] paths [] → ['.github/workflows/ci.yml', 'docs/standards/phase3_metrics_contract.md', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/harness/corpus_reverify.py', 'src/backend/whymath_backend/harness/solution_qa.py', 'src/backend/whymath_backend/l3/verify_solution.py', 'tests/backend/harness/test_corpus_reverify.py', 'tests/backend/harness/test_p3_21_derived_shape_probe.py', 'tests/backend/harness/test_p3_audit_qualification.py', 'tests/backend/harness/test_solution_qa.py', 'tests/infra/test_corpus_reverify_nightly_wiring.py']: OPS-150 구현 범위 선언 — paths 미선언 경고 해소(변경 파일 11개: 공용 대조 함수·야간 재검증·solution_qa 사본 제거·주입/배선 테스트·계기 변화 재측정 테스트·사실이 바뀐 문서 3곳)
+
+  [미러 면제 2026-10-21] 대장 전용 커밋 — 구현은 #1717로 main에 머지됨
 updated: 2026-10-21
