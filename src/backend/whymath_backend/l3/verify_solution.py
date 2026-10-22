@@ -494,7 +494,9 @@ def _closed_value(side: str) -> bool:
     except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
         logger.debug("변 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
         return False
-    return bool(getattr(value, "is_number", False)) and not getattr(value, "free_symbols", True)
+    # SymPy `is_number`는 "자유 기호가 없는 수"라는 뜻이다 — 자유 기호 검사를 따로 두지 않는다
+    # (따로 두면 결코 단독으로 작동하지 않는 절이 된다: P3-77 리뷰 반영 뮤테이션 M22 생존).
+    return bool(getattr(value, "is_number", False))
 
 
 def _is_single_variable(side: str) -> bool:
