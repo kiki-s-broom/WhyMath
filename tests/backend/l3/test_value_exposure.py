@@ -223,3 +223,29 @@ def test_bound_variable_operators_are_not_closed(text: str) -> None:
 def test_name_kind_classification(name: str, kind: str) -> None:
     """이름 종류 판정을 직접 고정한다 — 클래스 객체 오판(PR #1721 재리뷰 P3-1)의 회귀 방지."""
     assert verify_solution._name_kind(name) == kind
+
+
+# ── PR #1721 3차 리뷰 P2 — 맨 함수 이름·잘린 변의 오판(fail-closed 회귀) ─────────────
+@pytest.mark.parametrize("name", ["sin", "cos", "log", "exp", "Abs", "sqrt", "factorial"])
+def test_bare_function_name_in_prose_is_not_a_candidate(name: str) -> None:
+    """맨 함수 이름은 SymPy 식이 아니다 — 클래스 객체의 `is_number`(property 객체)를 참으로 읽지 않는다."""
+    text = f"이번 단계에서는 「{name} 함수의 그래프」를 떠올려 볼까?"
+    assert arithmetic_fragments(text) == []
+    assert scan_value_exposure(text, "4").outcome is ValueExposure.clean
+    assert verify_solution._closed_value(name) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 원자 백본 이름 4종 — 직전 판에서 L1~L3 전 레벨이 거부됐다
+        "이번 단계에서는 「정사영 그림↔cosθ식」을 떠올려 볼까?",
+        "이번 단계에서는 「구면좌표는 ρ²sinφ」을 떠올려 볼까?",
+        "이번 단계에서는 「역행렬(2×2, det≠0)」을 떠올려 볼까?",
+        # 잘린 변(괄호 짝이 안 맞거나 연산자로 끝남)은 식이 아니다
+        "식: (2*2, det",
+        "식: (1/det)*",
+    ],
+)
+def test_truncated_or_name_only_sides_are_not_undecidable(text: str) -> None:
+    assert scan_value_exposure(text, "4").outcome is not ValueExposure.undecidable

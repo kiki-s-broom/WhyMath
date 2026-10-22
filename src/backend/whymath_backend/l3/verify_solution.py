@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+import ast
 import logging
 import re
 from collections.abc import Mapping, Sequence
@@ -492,6 +493,20 @@ def _name_kind(name: str) -> str:
     return _NAME_UNKNOWN
 
 
+def _balanced(side: str) -> bool:
+    """식의 모양을 갖췄는가 — 괄호 짝이 맞고 문법상 완결된 식이다(평가하지 않는다).
+
+    안전 파서가 읽지 못한 변은 그 파서로 모양을 확인할 수 없다. 그래서 파이썬 문법 트리로만
+    확인한다(`ast.parse` — 실행 없음). 잘린 변(`(2*2, det`·`(1/det)*`)은 식이 아니므로 후보가 아니다
+    (PR #1721 3차 리뷰 P2 — 원자 이름 `역행렬(2×2, det≠0)`의 힌트가 전 레벨에서 거부됐다).
+    """
+    try:
+        ast.parse(side.replace("^", "**"), mode="eval")
+    except SyntaxError:
+        return False
+    return True
+
+
 def _closed_value(side: str) -> bool:
     """변 하나가 **쓰인 그대로** 닫힌 값인가 — 변수 이름이 하나도 없고 값이 수로 정해진다.
 
@@ -514,7 +529,7 @@ def _closed_value(side: str) -> bool:
     if _NAME_VARIABLE in kinds:
         return False
     if _NAME_UNKNOWN in kinds:
-        return bool(_NUMBER_TOKEN.search(side)) and "(" in side
+        return bool(_NUMBER_TOKEN.search(side)) and "(" in side and _balanced(side)
     try:
         value = safe_sympify(side.replace("^", "**"))
     except UnsafeExpressionError as exc:
@@ -522,13 +537,17 @@ def _closed_value(side: str) -> bool:
         # 아니라 읽기를 거절한 것이다. 변수 없이 수를 쓰는 식이면 후보로 낸다(값 비교에서 판정
         # 불가 → 게이트 거부). 그 밖의 거부 사유(구조 해석 불가 등)는 잘린 변과 같게 대상에서 뺀다.
         logger.debug("변 안전 파싱 거부(%s) — 허용 목록 거절이면 후보", exc.code)
-        return exc.code in _ALLOWLIST_REFUSALS and bool(_NUMBER_TOKEN.search(side))
+        return (
+            exc.code in _ALLOWLIST_REFUSALS and bool(_NUMBER_TOKEN.search(side)) and _balanced(side)
+        )
     except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
         logger.debug("변 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
         return False
     # SymPy `is_number`는 "자유 기호가 없는 수"라는 뜻이다 — 자유 기호 검사를 따로 두지 않는다
     # (따로 두면 결코 단독으로 작동하지 않는 절이 된다: P3-77 리뷰 반영 뮤테이션 M22 생존).
-    return bool(getattr(value, "is_number", False))
+    # 맨 함수·클래스 이름(`sin`)은 SymPy 식이 아니다 — 클래스 객체에 `is_number`를 물으면 property
+    # 객체(참)가 나와 닫힌 값으로 오판한다(PR #1721 3차 리뷰 P2 — `_name_kind`와 같은 함정).
+    return isinstance(value, sympy.Basic) and bool(value.is_number)
 
 
 def _is_single_variable(side: str) -> bool:

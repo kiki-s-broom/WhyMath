@@ -338,6 +338,41 @@ class TestSwappedFinalRelation:
             assert gated.verified is True, (order, gated.gate_report)
 
 
+class TestConceptNameIsNotScanned:
+    """PR #1721 3차 리뷰 — 원천 개념 이름은 값 축 대상이 아니다(문항 정답과 무관한 고정 표기)."""
+
+    @pytest.mark.parametrize(
+        ("name", "answer"),
+        [
+            ("AB=0의 뜻", "0"),
+            ("n=1 확인만으론 부족", "1"),
+            ("매클로린은 a=0의 테일러", "0"),
+            ("가능성 0·1의 뜻", "0"),
+            ("2×2 역행렬은 (1/det)·수반", "4"),
+            ("정사영 그림↔cosθ식", "4"),
+            ("구면좌표는 ρ²sinφ", "4"),
+            ("역행렬(2×2, det≠0)", "4"),
+        ],
+    )
+    def test_value_in_concept_name_does_not_reject_the_hint(self, name: str, answer: str) -> None:
+        concept = ConceptRef(concept_id="c", name=name, source="step")
+        drafts = _drafts(concept=concept)
+        ctx = _ctx(concept=concept, answer=answer)
+        for level in (1, 2):
+            gated = evaluate_gates(drafts[level], ctx)
+            leakage = gated.gate_report[GATE_ANSWER_LEAKAGE]
+            assert isinstance(leakage, dict)
+            assert leakage["detail"]["value_verdict"] == "clean", (name, level)
+
+    def test_leak_outside_the_concept_name_is_still_caught(self) -> None:
+        """대조군 — 이름만 지운다. 본문 다른 자리의 값 진술은 그대로 잡는다."""
+        concept = ConceptRef(concept_id="c", name="AB=0의 뜻", source="step")
+        l2 = _drafts(concept=concept)[2]
+        bad = _with_content(l2, l2.content + " 참고로 y = 0 이야.")
+        verdict = check_answer_leakage(bad, _ctx(concept=concept, answer="0"))
+        assert verdict.passed is False and verdict.detail["value_verdict"] == "exposed"
+
+
 class TestValueAxis:
     def test_p3_10_measured_leak_is_rejected(self) -> None:
         """RED — L3가 '계산하면 정답(4)이 되는 식'을 보여 준다. 글자 축은 유보(정답 1자)."""

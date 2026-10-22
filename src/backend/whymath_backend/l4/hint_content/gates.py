@@ -116,6 +116,19 @@ def _relation_forms(normed: str) -> frozenset[str]:
     return frozenset({normed})
 
 
+def _value_text(hint: Hint, ctx: GateContext) -> str:
+    """값 축이 훑을 본문 — 원천 개념 이름은 지운다.
+
+    개념 이름은 원자 백본의 고정 표기라 문항의 정답과 무관하다(`AB=0의 뜻`·`n=1 확인만으론 부족`).
+    그 안의 값 진술이 우연히 정답과 같다고 그 개념의 힌트를 전 레벨에서 거부하면 안 된다(PR #1721
+    3차 리뷰 P3). 지우는 것은 맥락이 넘겨 준 **그 이름 문자열**뿐이다 — 「」 안 아무 문자열이나
+    지우면 본문이 정답을 「」로 감싸 우회할 수 있다.
+    """
+    if ctx.concept_name:
+        return hint.content.replace(ctx.concept_name, " ")
+    return hint.content
+
+
 def _value_scan(ctx: GateContext, text: str, target: str) -> tuple[str, str | None]:
     """값 축 판정값(`ValueExposure` 값 또는 `VALUE_NOT_RUN`)과 노출된 식(있으면)."""
     if ctx.value_exposure is None:
@@ -257,7 +270,7 @@ def check_level_reveals(hint: Hint, ctx: GateContext) -> GateVerdict:
         # 값 동치(P3-77) — 글자가 달라도 계산하면 최종 단계 값이 되는 식이 본문에 있으면 전체 풀이
         # 노출이다. 구조(k)가 아니라 **본문**을 본다: 다른 단계의 L3로 대체 서빙된 본문도 같은
         # 규칙으로 판정되어야 하기 때문이다(store.select_ladder_hint — L3 공백 대체).
-        final_value, fragment = _value_scan(ctx, hint.content, ctx.step_contents[-1])
+        final_value, fragment = _value_scan(ctx, _value_text(hint, ctx), ctx.step_contents[-1])
         value_reason = _value_reason(final_value, fragment, target_label="최종 단계")
         if value_reason is not None:
             reasons.append(f"{value_reason}(전체 풀이 노출)")
@@ -284,7 +297,7 @@ def check_answer_leakage(hint: Hint, ctx: GateContext) -> GateVerdict:
     if verdict is LeakageVerdict.leaked:
         reasons.append("정답 값이 힌트 본문에 노출됐다(최상위 교수학 금기)")
     # 값 축 — 글자 축의 판정과 무관하게 항상 돈다(글자 축 undecidable 구간을 값으로 닫는다).
-    value_verdict, fragment = _value_scan(ctx, hint.content, ctx.final_answer)
+    value_verdict, fragment = _value_scan(ctx, _value_text(hint, ctx), ctx.final_answer)
     value_reason = _value_reason(value_verdict, fragment, target_label="정답")
     if value_reason is not None:
         reasons.append(value_reason)
