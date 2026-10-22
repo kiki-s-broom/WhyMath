@@ -463,9 +463,6 @@ def test_exact_decimal_text_rewrites_literals_only(condition: str, expected: str
 # ──────────────────────────────────────────────────────────────────────────
 # PR #1722 재검토 — P2-1 소수 리터럴 재판정 fail-closed · P2-2 성능 · P3-1 fuzz 군집 · P3-2 픽스처
 # ──────────────────────────────────────────────────────────────────────────
-_LONG_ONE = "1." + "0" * 120 + "1"  # 유효숫자 122자리 — 정확값 재파싱이 긴 리터럴로 거부된다
-
-
 @pytest.mark.parametrize("exponent", [20, 100, 200, 300])
 def test_decimal_literal_residual_is_not_passed_at_any_exponent(exponent: int) -> None:
     """P2-1 — `1e-100` 을 101자리 정수로 펼치던 재작성이 안전 파싱에 거부되면 종전 코드는
@@ -481,11 +478,15 @@ def test_decimal_literal_exact_answer_still_passes_at_large_exponent(exponent: i
     assert verify_answer([f"x = 1e-{exponent}"], {"x": f"10**(-{exponent})"}).state == "pass"
 
 
-def test_decimal_literal_with_long_significand_fails_closed() -> None:
-    """유효숫자 100자리 이상인 리터럴 — 정확값으로 다시 읽지 못하면 판정 불가로 닫는다(fail-closed).
-    잔차 1e-121 은 허용치 안이라 종전 경로는 pass 였다."""
-    condition = f"(x - 1)**2 + {_LONG_ONE} - 1 = 0"
-    assert verify_answer([condition], {"x": "1"}).state == "unverifiable"
+def test_decimal_literal_rewrite_rejected_fails_closed() -> None:
+    """정확값으로 다시 쓴 리터럴을 안전 파싱이 거부하면(`1e-5000` → `10**(-5000)` 는
+    power_too_large) 판정 불가로 닫는다(fail-closed). 종전처럼 '판정 못 함 → False' 로 두면
+    허용치 안의 0 아닌 잔차가 pass 가 된다(재검토 P2-1 의 실패 경로 그대로)."""
+    assert verify_answer(["(x - 1)**2 + 1e-5000 = 0"], {"x": "1"}).state == "unverifiable"
+    # 유효숫자가 긴 리터럴(100자리 — 안전 파싱 길이 한도 안)도 짧은 꼴로 다시 써져 정확 판정된다.
+    long_one = "1." + "0" * 97 + "1"
+    assert verify_answer([f"(x - 1)**2 + {long_one} - 1 = 0"], {"x": "1"}).state == "unverifiable"
+    assert verify_answer([f"x = {long_one}"], {"x": "1 + 10**(-98)"}).state == "pass"
 
 
 def test_total_condition_skips_per_root_definedness(monkeypatch: pytest.MonkeyPatch) -> None:
