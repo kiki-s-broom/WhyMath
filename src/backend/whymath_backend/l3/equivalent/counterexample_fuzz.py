@@ -51,6 +51,9 @@ _DEFAULT_TOL = 1e-7
 
 Selection = Literal["largest", "smallest", "unique"]
 
+# 수치 근을 정확값으로 맞출 때 차례로 쓰는 허용치(P3-79 — 정확 잔차 0 확인을 거친 값만 쓴다).
+_SNAP_TOLERANCES: tuple[float, ...] = (1e-30, 1e-12, 1e-7)
+
 
 @dataclass(slots=True, frozen=True)
 class FuzzVerdict:
@@ -200,12 +203,20 @@ def _root_point(residual: sympy.Expr, symbol: sympy.Symbol, root: float) -> symp
     그 정확값, 아니면 50자리 근사 소수. 근사 소수 점은 0 에 가까운 밑·분모를 '못 가림'으로 둬서
     (`x**2 - 5*x` 의 근 0) 정확값으로 맞출 수 있는 근은 맞춘다."""
     polished = _polished(residual, symbol, root)
-    try:
-        snapped = sympy.nsimplify(polished, tolerance=sympy.Float("1e-30"))
-        if not snapped.free_symbols and residual.subs(symbol, snapped).is_zero is True:
-            return snapped
-    except Exception as exc:  # noqa: BLE001 — 정확값 맞추기 실패는 근사 소수로
-        logger.debug("counterexample_fuzz 정확값 맞추기 회피: %s", type(exc).__name__)
+    # 중근은 뉴턴 다듬기가 느리게 수렴한다(삼중근 0 이 1e-26 근처에 멈춘다) — 허용치를 넓혀 가며
+    # 맞춰 본다. 맞춘 값은 정확 잔차가 0 일 때만 쓰므로 넓은 허용치가 근이 아닌 값을 들이지 않는다.
+    for tolerance in _SNAP_TOLERANCES:
+        try:
+            # nsimplify 는 0 근방의 아주 작은 값을 0 으로 접지 않는다 — 0 은 따로 맞춰 본다.
+            snapped = (
+                sympy.Integer(0)
+                if abs(polished) < tolerance
+                else sympy.nsimplify(polished, tolerance=tolerance)
+            )
+            if not snapped.free_symbols and residual.subs(symbol, snapped).is_zero is True:
+                return snapped
+        except Exception as exc:  # noqa: BLE001 — 정확값 맞추기 실패는 다음 허용치·근사 소수로
+            logger.debug("counterexample_fuzz 정확값 맞추기 회피: %s", type(exc).__name__)
     return polished
 
 

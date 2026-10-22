@@ -324,6 +324,13 @@ def test_fuzz_rejects_spurious_root(name: str, selection: str | None) -> None:
     assert verdict.state == "fail", verdict.reason
 
 
+def test_fuzz_does_not_pass_when_claim_definedness_is_unknown() -> None:
+    """허용 구조 밖(`asinh`) — 원문 정의역을 못 가리면 pass 로 단정하지 않는다(종전 pass).
+    반례는 정의역과 무관하게 반례다 — 틀린 답은 그대로 fail."""
+    assert fuzz_answer("asinh(x) = 0", {"x": "0"}).state == "unverifiable"
+    assert fuzz_answer("asinh(x) = 0", {"x": "1"}).state == "fail"
+
+
 def test_fuzz_selection_ignores_spurious_neighbour_root() -> None:
     """근 3 하나뿐인 조건 — 무연근 2 가 '둘째 근'·'더 작은 근' 반례를 만들지 않는다(종전 fail)."""
     condition = "(x - 3)*(x - 2)**2/(x - 2) = 0"
@@ -341,6 +348,12 @@ def test_fuzz_selection_ignores_spurious_neighbour_root() -> None:
         ("x**2 - 2 = 0", "sqrt(2)", "largest", "pass"),
         ("x**2 - 2 = 0", "1.41421356237310", None, "pass"),  # 근사 소수 답 — 수치 허용치
         ("2*x + 1 = 4", "2", None, "fail"),
+        # 중근 0(뉴턴 다듬기가 1e-21 근처에 멈춘다)은 정확값 0 으로 맞춰 원문 정의역을 본다 —
+        # 코퍼스 `Derivative(…).doit() = 0` 꼴(p3_calculus1_diff·p3_fill)의 선택 판정 회귀 고정.
+        ("x**3*(x - 2) = 0", "2", "largest", "pass"),
+        ("Derivative(3*x**4 - 4*x**3 - 6, x).doit() = 0", "1", "largest", "pass"),
+        ("Derivative(3*x**4 - 4*x**3 - 6, x).doit() = 0", "1", "unique", "fail"),
+        ("Derivative(-3*x**4 - 12*x**3 + 5, x).doit() = 0", "-3", "smallest", "pass"),
     ],
 )
 def test_fuzz_controls_keep_verdict(
