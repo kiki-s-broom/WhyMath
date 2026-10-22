@@ -245,9 +245,62 @@ def _defined_numeric_roots(
         state = condition_definedness(conditions, {str(symbol): point})
         if state == "unknown":
             return None
+        if state == "undefined" and not _isolated_exact_root(residual, symbol, point, root):
+            # P3-79 재검토 P3-1 — 수치 근이 무연근 정확값으로 맞춰졌는데 그 근방(군집)에 다른 근이
+            # 숨어 있을 수 있다(`x*(x-2)**2*(x - 2 - 3*10**(-8))/(x-2)` 의 진짜 근 2 + 3e-8). 그
+            # 군집을 통째로 버리면 진짜 근이 사라져 거짓 pass 가 난다 — 판정 불가로 닫는다.
+            return None
         if state == "defined":
             kept.append(root)
     return kept
+
+
+# 무연근 군집 확인(P3-79 재검토 P3-1) — 정확 근 주변을 이 창으로 본다(수치 근과의 거리의 배수·하한).
+_ISOLATION_FACTOR = 100
+_ISOLATION_MIN_WINDOW = sympy.Rational(1, 10**5)
+_ISOLATION_MAX_ORDER = 8
+
+
+def _isolated_exact_root(
+    residual: sympy.Expr, symbol: sympy.Symbol, point: sympy.Expr, root: float
+) -> bool:
+    """정확값 `point` 가 잔차의 근이고, 그 근방에 다른 근이 없다고 확인되는가(P3-79 재검토 P3-1).
+
+    잔차를 `point` 에서 `(x - point)**m · g(x)`(g(point) ≠ 0, m 은 정확 도함수로 구한 중복도)로
+    보고, 수치 근이 있던 군집을 덮는 창 `point ± w` 의 양 끝에서 g 가 g(point) 의 절반 안에 머무는지
+    본다. 다른 근이 창 안에 있으면 g(point) 가 그만큼 작아 양 끝 값이 크게 벗어난다. 확인하지
+    못하면(중복도·0 여부 미정·평가 불가) False — 호출부가 판정 불가로 닫는다.
+    """
+    if point.free_symbols or point.has(sympy.Float):
+        return False
+    try:
+        derivative = residual
+        order = 0
+        lead: sympy.Expr | None = None
+        while order < _ISOLATION_MAX_ORDER:
+            order += 1
+            derivative = sympy.diff(derivative, symbol)
+            at_point = derivative.subs(symbol, point)
+            zero = at_point.is_zero
+            if zero is None:
+                return False
+            if not zero:
+                lead = at_point / sympy.factorial(order)
+                break
+        if lead is None:
+            return False
+        offset = sympy.Rational(abs(root - float(sympy.N(point, 30))))
+        window = max(offset * _ISOLATION_FACTOR, _ISOLATION_MIN_WINDOW)
+        reference = abs(complex(sympy.N(lead, 30)))
+        for sign in (1, -1):
+            edge = point + sign * window
+            value = residual.subs(symbol, edge) / (sign * window) ** order
+            if abs(complex(sympy.N(value, 30)) - complex(sympy.N(lead, 30))) > reference / 2:
+                return False
+    except Exception as exc:  # noqa: BLE001 — 확인 불가는 False(판정 불가로 닫는다)
+        logger.debug("counterexample_fuzz 무연근 군집 확인 회피: %s", type(exc).__name__)
+        return False
+    return True
 
 
 def fuzz_answer(

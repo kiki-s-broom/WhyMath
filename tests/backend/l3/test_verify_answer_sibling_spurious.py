@@ -20,9 +20,11 @@ from __future__ import annotations
 import pytest
 import sympy
 
+from whymath_backend.l3 import verify_answer as verify_answer_module
 from whymath_backend.l3.equivalent.counterexample_fuzz import fuzz_answer
 from whymath_backend.l3.verify_answer import (
     _exact_decimal_text,
+    _real_count_agrees,
     _root_is_real,
     classify_solvability,
     derive_selected_root,
@@ -445,13 +447,152 @@ def test_decimal_literals_read_as_written(condition: str, answer: str, state: st
 @pytest.mark.parametrize(
     ("condition", "expected"),
     [
-        ("x = sqrt(2.0)", "x = sqrt((2/1))"),
-        ("x = 2.0**0.5", "x = (2/1)**(1/2)"),
-        ("(x - 1)**2 + 1e-20 = 0", "(x - 1)**2 + (1/100000000000000000000) = 0"),
-        ("x = 1.5", "x = (3/2)"),
+        ("x = sqrt(2.0)", "x = sqrt((20*10**(-1)))"),
+        ("x = 2.0**0.5", "x = (20*10**(-1))**(5*10**(-1))"),
+        ("(x - 1)**2 + 1e-20 = 0", "(x - 1)**2 + (1*10**(-20)) = 0"),
+        ("x = 1.5", "x = (15*10**(-1))"),
+        ("x = 1e-300", "x = (1*10**(-300))"),  # 301자리 정수로 펼치지 않는다(재검토 P2-1)
         ("x**2 = 4", None),  # 소수 리터럴 없음
         ("x = 2j", None),  # 허수 리터럴은 바꾸지 않는다
     ],
 )
 def test_exact_decimal_text_rewrites_literals_only(condition: str, expected: str | None) -> None:
     assert _exact_decimal_text(condition) == expected
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PR #1722 재검토 — P2-1 소수 리터럴 재판정 fail-closed · P2-2 성능 · P3-1 fuzz 군집 · P3-2 픽스처
+# ──────────────────────────────────────────────────────────────────────────
+_LONG_ONE = "1." + "0" * 120 + "1"  # 유효숫자 122자리 — 정확값 재파싱이 긴 리터럴로 거부된다
+
+
+@pytest.mark.parametrize("exponent", [20, 100, 200, 300])
+def test_decimal_literal_residual_is_not_passed_at_any_exponent(exponent: int) -> None:
+    """P2-1 — `1e-100` 을 101자리 정수로 펼치던 재작성이 안전 파싱에 거부되면 종전 코드는
+    False(통과)를 돌려 허용치 안의 0 아닌 잔차가 pass 였다(지수 100·200·300)."""
+    assert verify_answer([f"(x - 1)**2 + 1e-{exponent} = 0"], {"x": "1"}).state == "unverifiable"
+    assert verify_answer([f"x = 1e-{exponent}"], {"x": "0"}).state == "unverifiable"
+    assert verify_answer([f"x**2 + 1.5e-{exponent} = 0"], {"x": "0"}).state == "unverifiable"
+
+
+@pytest.mark.parametrize("exponent", [100, 300])
+def test_decimal_literal_exact_answer_still_passes_at_large_exponent(exponent: int) -> None:
+    """대조군 — 리터럴이 정확히 같은 값이면 큰 지수에서도 pass(재작성이 짧은 꼴이라 재파싱된다)."""
+    assert verify_answer([f"x = 1e-{exponent}"], {"x": f"10**(-{exponent})"}).state == "pass"
+
+
+def test_decimal_literal_with_long_significand_fails_closed() -> None:
+    """유효숫자 100자리 이상인 리터럴 — 정확값으로 다시 읽지 못하면 판정 불가로 닫는다(fail-closed).
+    잔차 1e-121 은 허용치 안이라 종전 경로는 pass 였다."""
+    condition = f"(x - 1)**2 + {_LONG_ONE} - 1 = 0"
+    assert verify_answer([condition], {"x": "1"}).state == "unverifiable"
+
+
+def test_total_condition_skips_per_root_definedness(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P2-2 — 어디서나 정의되는 꼴의 조건은 근마다 원문을 평가하지 않는다(대수적 계수 근호식 근의
+    평가가 근 집계 하나에 25초였다). 구멍이 있는 꼴은 그대로 평가한다(대조)."""
+    calls: list[str] = []
+    original = verify_answer_module.condition_definedness
+
+    def counting(condition: str, values: object) -> str:
+        calls.append(condition)
+        return original(condition, values)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(verify_answer_module, "condition_definedness", counting)
+    assert verify_root_aggregate("x**2 + 2*x - 2 = 0", "-2", "sum").state == "pass"
+    assert verify_real_root_count("x**3 - 3*sqrt(2)*x + 1 = 0", "3").state == "pass"
+    assert calls == []
+    assert verify_root_aggregate("x*(x - 2)/(x - 2) = 2", "2", "sum").state == "unverifiable"
+    assert calls  # 구멍이 있는 꼴은 근별로 본다
+
+
+def test_algebraic_coefficient_aggregate_is_fast() -> None:
+    """P2-2 재현식 — 종전 25.6초. 시간 상한은 넉넉히(CI 부하) 두되 종전 회귀는 잡는 값이다."""
+    import time
+
+    started = time.perf_counter()
+    condition = "x**4 + 3*x**3 - 7*sqrt(5)*x**2 + 11*x - 13 = 0"
+    assert verify_root_aggregate(condition, "-3", "sum").state == "pass"
+    assert time.perf_counter() - started < 8.0
+
+
+@pytest.mark.parametrize(
+    ("condition", "answer"),
+    [
+        ("x*(x-2)**2*(x - 2 - 3*10**(-8))/(x-2) = 0", "0"),
+        ("(x+1)*(3*x-1)**2*(x - 1/3 - 4*10**(-6))/(3*x-1) = 0", "-1"),
+        ("x*(3*x-1)**2*(x - 1/3 - 10**(-9))/(3*x-1) = 0", "0"),
+    ],
+)
+def test_fuzz_does_not_drop_true_root_hidden_next_to_spurious_root(
+    condition: str, answer: str
+) -> None:
+    """P3-1 — 진짜 근이 무연근에서 1e-5 안에 있으면 수치 근이 무연근 정확값으로 맞춰져 통째로
+    버려졌다(거짓 pass). 참 '가장 큰 근' 은 무연근 바로 옆의 진짜 근이라 주장은 틀렸다 — pass 금지."""
+    assert fuzz_answer(condition, {"x": answer}, "largest").state != "pass"
+
+
+def test_fuzz_isolated_spurious_root_is_still_dropped() -> None:
+    """대조군 — 홀로 떨어진 무연근은 그대로 버린다(가장 큰 근 1 이 맞다)."""
+    condition = "(x-1)*(x+5)*(x-2)**3/(x-2)**2 = 0"
+    assert fuzz_answer(condition, {"x": "1"}, "largest").state == "pass"
+    assert fuzz_answer(condition, {"x": "-5"}, "largest").state == "fail"
+
+
+@pytest.mark.parametrize(
+    ("expression", "kind"),
+    [
+        ("x/(1.0 - 0.99999999999)", None),  # R1 — 0 여부를 못 가리는 상수 분모(허용치 안)
+        ("tan(x)", None),  # R2 — 실수 전체에서 정의되지 않는 함수
+        ("(-2)**x", None),  # R3 — 밑이 양수가 아닌 b**x
+        ("2**x", "total"),  # R3 대조군
+    ],
+)
+def test_function_domain_kind_review_clauses(expression: str, kind: str | None) -> None:
+    assert function_domain_kind(expression, "x") == kind
+
+
+def test_differentiable_rejects_function_outside_total_functions() -> None:
+    """R2 — `0*tan(x)` 는 평가 파싱이 지워 x³ 이 되지만 원문은 x = π/2 에서 정의되지 않는다."""
+    assert verify_is_differentiable("x**3 + 0*tan(x)", "1").state == "unverifiable"
+    assert verify_is_differentiable("x**3 + 0*sin(x)", "1").state == "pass"  # 대조군
+
+
+def test_real_count_agreement_is_exact_equality() -> None:
+    """R4 — 실근 후보 수는 SymPy 실근 개수와 **같아야** 한다(더 적으면 놓친 실근이 있다)."""
+    x = sympy.Symbol("x")
+    poly = sympy.Poly(x**3 - x, x)  # 실근 3개
+    assert _real_count_agrees(poly, [sympy.Integer(0)]) is False
+    assert _real_count_agrees(poly, [sympy.Integer(-1), sympy.Integer(0), sympy.Integer(1)]) is True
+
+
+def test_fuzz_selection_with_undecidable_neighbour_root_is_unverifiable() -> None:
+    """R5 — 다른 수치 근(x = −2: 원문 √−2 가 실수 범위 밖)의 정의역을 못 가리면 그 근을 조용히
+    버리지 않는다(버리면 '유일근' 판정이 근거 없이 pass 가 된다)."""
+    assert fuzz_answer("sqrt(x)**2*x - 4 = 0", {"x": "2"}, "unique").state == "unverifiable"
+
+
+def test_root_aggregate_with_only_spurious_roots_is_unverifiable() -> None:
+    """R7 — 원문에서 정의되는 근이 하나도 없으면 빈 합(0)·빈 곱(1)으로 판정하지 않는다."""
+    condition = "x*(x - 2)/(x - 2) = 2"
+    assert verify_root_aggregate(condition, "0", "sum").state == "unverifiable"
+    assert verify_root_aggregate(condition, "1", "product").state == "unverifiable"
+
+
+def test_fuzz_does_not_fail_true_root_whose_exact_residual_is_undecided() -> None:
+    """R9 대조군 — 2cos(2π/9) 는 x³ − 3x + 1 = 0 의 참 근이지만 SymPy 가 정확 잔차의 0 여부를
+    정하지 못한다(`is_zero` None). '모름' 을 '0 아님' 으로 접어 거짓 fail 을 내지 않는다."""
+    condition = "x**3 - 3*x + 1 = 0"
+    assert fuzz_answer(condition, {"x": "2*cos(2*pi/9)"}).state == "pass"
+    assert fuzz_answer(condition, {"x": "2*cos(4*pi/9)"}).state == "pass"
+
+
+def test_derivative_roots_in_ambiguous_band_fall_back_to_exact_reality() -> None:
+    """빠른 실근 판정(30자리)이 가르지 못하는 도함수 근(허수부 ~1e-50 — 실근 수가 SymPy 개수와
+    어긋난다)은 근별 판정으로 넘어가 SymPy 가 비실근으로 확정한다. 허용치로 실근이라 부르면
+    극값 2개·일대일 0 이 거짓으로 나온다."""
+    expression = "x**3/3 - x**2 + x*(1 + 10**(-100))"
+    assert verify_extremum_count(expression, "0").state == "pass"
+    assert verify_extremum_count(expression, "2").state == "fail"
+    assert verify_is_one_to_one(expression, "1").state == "pass"
+    assert verify_is_one_to_one(expression, "0").state == "fail"

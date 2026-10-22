@@ -57,6 +57,7 @@ Tier1 정직성(설계 §4): `pass`는 "샘플 점들에서 조건을 만족"이
 from __future__ import annotations
 
 import ast
+import decimal
 import io
 import logging
 import math
@@ -434,8 +435,8 @@ def _verify_single(
                     condition, substitutions
                 ):
                     return _unverifiable(
-                        "조건의 소수 리터럴을 적힌 십진값으로 읽으면 잔차가 0 이 아님"
-                        "(허용치 안) — 근사 소수 조건이라 확정하지 않음·안전 회피",
+                        "조건의 소수 리터럴을 적힌 십진값으로 읽으면 잔차가 0 이 아니거나 다시"
+                        " 읽지 못함(허용치 안) — 근사 소수 조건이라 확정하지 않음·안전 회피",
                         samples_checked=1,
                     )
                 passed = _pass(samples_checked=1)
@@ -480,19 +481,25 @@ def _verify_single(
     )
 
 
-def _exact_decimal_text(condition: str) -> str | None:
-    """조건 원문의 소수 리터럴(`2.0`·`1e-20`)을 **적힌 그대로의** 십진 정확값 `(p/q)` 로 바꾼 원문.
+class _DecimalRewriteError(Exception):
+    """소수 리터럴을 정확값으로 다시 쓰지 못했다(토큰화·변환 실패). 호출부는 판정 불가로 닫는다."""
 
-    토큰 단위로 바꾼다(식을 평가하지 않는다). 소수 리터럴이 없거나 토큰화하지 못하면 None.
+
+def _exact_decimal_text(condition: str) -> str | None:
+    """조건 원문의 소수 리터럴(`2.0`·`1e-20`)을 **적힌 그대로의** 십진 정확값으로 바꾼 원문.
+
+    토큰 단위로 바꾼다(식을 평가하지 않는다). 리터럴은 `(유효숫자*10**(지수))` 꼴로 쓴다 —
+    `1e-100` 을 `(1/1000…0)` 처럼 101자리 정수로 펼치면 안전 파싱이 긴 리터럴로 거부한다(P3-79
+    재검토 P2-1). 소수 리터럴이 없으면 None, 토큰화·변환에 실패하면 `_DecimalRewriteError`.
     정수·허수(`2j`)·16진 리터럴은 그대로 둔다.
     """
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(condition).readline))
     except (tokenize.TokenError, SyntaxError, IndentationError) as exc:
         logger.debug("verify_answer 소수 리터럴 토큰화 회피: %s", type(exc).__name__)
-        return None
+        raise _DecimalRewriteError from exc
     if any(token.start[0] != 1 or token.end[0] > 1 for token in tokens if token.string):
-        return None  # 여러 줄 조건은 다루지 않는다(오프셋 계산을 한 줄로 한정)
+        raise _DecimalRewriteError  # 여러 줄 조건은 다루지 않는다(오프셋 계산을 한 줄로 한정)
     pieces: list[str] = []
     cursor = 0
     changed = False
@@ -506,13 +513,16 @@ def _exact_decimal_text(condition: str) -> str | None:
         if "." not in text and "e" not in lowered:
             continue
         try:
-            exact = sympy.Rational(text.replace("_", ""))
-        except (TypeError, ValueError) as exc:
+            sign, digits, exponent = decimal.Decimal(text.replace("_", "")).as_tuple()
+        except (decimal.InvalidOperation, ValueError) as exc:
             logger.debug("verify_answer 소수 리터럴 변환 회피: %s", type(exc).__name__)
-            return None
+            raise _DecimalRewriteError from exc
+        if not isinstance(exponent, int):
+            raise _DecimalRewriteError  # inf·nan 은 리터럴로 오지 않는다(방어)
+        significand = int("".join(str(d) for d in digits) or "0")
         start, end = token.start[1], token.end[1]
         pieces.append(condition[cursor:start])
-        pieces.append(f"({exact.p}/{exact.q})")
+        pieces.append(f"({'-' if sign else ''}{significand}*10**({exponent}))")
         cursor = end
         changed = True
     if not changed:
@@ -525,26 +535,31 @@ def _decimal_residual_nonzero(
     condition: str, substitutions: Mapping[sympy.Symbol, sympy.Expr]
 ) -> bool:
     """근사 소수가 **조건 리터럴에서만** 왔을 때, 그 리터럴을 적힌 십진 정확값으로 읽은 잔차가
-    정확히 0 이 아닌가(P3-75 검토 3 — `(x - 1)**2 + 1e-20 = 0` 의 x = 1).
+    정확히 0 이 아님을 확인하지 못했는가 — True 면 호출부가 판정 불가로 둔다(P3-75 검토 3 —
+    `(x - 1)**2 + 1e-20 = 0` 의 x = 1).
 
     P3-79 ⑦ — 종전에는 *평가된* 잔차의 Float 를 십진값으로 바꿨다. 그러면 `x = sqrt(2.0)` 은
     `sqrt(2.0)` 이 먼저 1.41421356237310 으로 평가된 뒤 그 반올림값이 정확값이 돼, 정답 sqrt(2) 가
     unverifiable 로 떨어졌다. 이제 **원문 리터럴**(`2.0`)을 정확값(2)으로 바꾼 원문을 다시 파싱한다.
 
+    P3-79 재검토 P2-1 — 다시 쓰기·재파싱에 실패하면 True(판정 불가로 닫는다). 종전처럼 False 로
+    두면 `(x - 1)**2 + 1e-100 = 0` 의 x = 1 이 허용치 안의 잔차로 pass 가 됐다(fail-open).
+
     답에 근사 소수가 있으면 False(종전 허용치 판정을 그대로 둔다 — √2 ≈ 1.4142… 같은 근사 답).
-    판정할 수 없으면 False(종전과 같다).
+    정확 잔차의 0 여부를 SymPy 가 못 정하면(`is_zero` None) False(종전과 같다).
     """
     if any(value.has(sympy.Float) for value in substitutions.values()):
         return False
-    exact_text = _exact_decimal_text(condition)
-    if exact_text is None:
-        return False
     try:
+        exact_text = _exact_decimal_text(condition)
+        if exact_text is None:
+            # 근사 소수가 잔차에 있는데 원문에 소수 리터럴이 없다 — 어디서 왔는지 모르면 닫는다.
+            return True
         exact, _ = _parse_condition(exact_text)
         value = safe_subs(exact, dict(substitutions))
-    except Exception as exc:  # noqa: BLE001 — 정확값 재구성 불가는 종전 판정 유지
+    except Exception as exc:  # noqa: BLE001 — 정확값 재구성 불가는 판정 불가로 닫는다
         logger.debug("verify_answer 소수 리터럴 재판정 회피: %s", type(exc).__name__)
-        return False
+        return True
     return bool(not value.free_symbols and value.is_zero is False)
 
 
@@ -1604,6 +1619,66 @@ def _root_reality(root: sympy.Expr) -> RootReality | None:
     return None
 
 
+# 빠른 실근 판정(P3-79 재검토 P2-2)의 30자리 평가 문턱 — 근의 크기에 대한 상대값이다.
+_SPLIT_PRECISION = 30
+_SPLIT_REAL = sympy.Float("1e-25")  # 이 아래면 실근 후보(평가 오차 ≤ 1e-30 이라 실근은 반드시 여기)
+_SPLIT_NONREAL = sympy.Float("1e-20")  # 이 위면 확실한 비실근(오차를 빼도 허수부 > 0)
+
+
+def _complete_poly_roots(poly: sympy.Poly | None) -> list[sympy.Expr] | None:
+    """다항식의 서로 다른 근 전부(근호식) — 중복도까지 다 못 구하면 None(호출부가 solve 로)."""
+    if poly is None or poly.degree() < 1:
+        return None
+    try:
+        root_mult = sympy.roots(poly)
+    except Exception as exc:  # noqa: BLE001 — 근 계산 불가는 None(solve 로 넘긴다)
+        logger.debug("verify_answer 근 계산 회피: %s", type(exc).__name__)
+        return None
+    if sum(root_mult.values()) != poly.degree():
+        return None
+    return list(root_mult)
+
+
+def _poly_real_split(poly: sympy.Poly | None, roots: Sequence[sympy.Expr]) -> list[bool] | None:
+    """다항식의 서로 다른 근 `roots` 전부에 대해 실근 여부를 빠르게 확정 — 못 하면 None.
+
+    SymPy 의 정확한 실근 개수(`count_roots`, 확장 체 위)를 기준으로, 30자리 평가에서 허수부가
+    |근|·1e-25 이하인 근(실근은 반드시 여기 든다)의 수가 그 개수와 같고 나머지가 전부 |근|·1e-20
+    보다 크면(확실한 비실근) 그 분할이 곧 정확한 실근 집합이다. 하나라도 사이에 끼거나 개수가
+    어긋나면 None — 호출부는 근별 판정(`_root_reality`)으로 간다. 근별 판정의 `is_real` 가정 추론·
+    120/240자리 평가가 대수적 계수 근호식에서 수 초씩 들던 비용을 피한다(정확성은 같은 기준).
+    """
+    if poly is None or poly.degree() < 1 or not roots:
+        return None
+    try:
+        count = int(sympy.Poly(poly.as_expr(), *poly.gens, extension=True).sqf_part().count_roots())
+        flags: list[bool] = []
+        for root in roots:
+            value = sympy.N(root, _SPLIT_PRECISION)
+            real_part, imag_part = value.as_real_imag()
+            if not (real_part.is_number and imag_part.is_number):
+                return None
+            scale = max(abs(value), sympy.Integer(1))
+            if abs(imag_part) <= scale * _SPLIT_REAL:
+                flags.append(True)
+            elif abs(imag_part) > scale * _SPLIT_NONREAL:
+                flags.append(False)
+            else:
+                return None
+    except Exception as exc:  # noqa: BLE001 — 셀 수 없는 계수 체·평가 불가는 느린 경로로
+        logger.debug("verify_answer 빠른 실근 판정 회피: %s", type(exc).__name__)
+        return None
+    if len(set(roots)) != len(roots) or sum(flags) != count:
+        return None
+    return flags
+
+
+def _condition_total(condition: str, var: str) -> bool:
+    """조건 원문의 모든 변이 `var` 하나의 어디서나 정의되는 꼴(`function_domain_kind` TOTAL)인가."""
+    sides = _relation_sides(condition)
+    return bool(sides) and all(function_domain_kind(side, var) == "total" for side in sides)
+
+
 def _real_count_agrees(poly: sympy.Poly | None, real_roots: Sequence[sympy.Expr]) -> bool:
     """실근 후보(사라지는 허수부 상한 포함)의 수가 SymPy 의 정확한 실근 개수와 같은가(P3-79 ⑦).
 
@@ -1627,6 +1702,7 @@ def trusted_real_roots(
     var: sympy.Symbol,
     *,
     given: Mapping[str, sympy.Expr] | None = None,
+    known_roots: Sequence[sympy.Expr] | None = None,
 ) -> list[sympy.Expr] | None:
     """조건 등식의 **원문에서 정의되는** 서로 다른 실근(정확값) — 판정 불가면 None(P3-75).
 
@@ -1643,7 +1719,9 @@ def trusted_real_roots(
     없으면 None 이다(P3-79 ⑦ — 수치 평가가 허수부를 0 상한으로 낸 비실근을 실근으로 세지 않는다).
 
     `given`(P3-79) — 조건에 `var` 밖의 이름이 있을 때 그 값(대입 단계 `y = f(x)` 의 x). 원문 정의역
-    판정에 함께 넣는다.
+    판정에 함께 넣는다. `known_roots` — 호출부가 이미 구한 잔차의 서로 다른 근 전부(중복도까지 다
+    구한 `sympy.roots` 의 키). 주면 근을 다시 구하지 않는다(비유리 계수 경로만 — 유리 계수는
+    `real_roots` 가 정확해 그대로 쓴다).
     """
     try:
         poly: sympy.Poly | None = sympy.Poly(residual, var)
@@ -1654,16 +1732,27 @@ def trusted_real_roots(
         candidates = list(sympy.real_roots(poly.sqf_part()))
     else:
         candidates = []
-        vanishing = False  # 사라지는 허수부 상한으로 실근 후보가 된 근이 있는가
-        for root in sympy.solve(sympy.Eq(residual, 0), var):
-            reality = _root_reality(root)
-            if reality is None:
+        roots = list(known_roots) if known_roots is not None else _complete_poly_roots(poly)
+        if roots is None:
+            roots = list(sympy.solve(sympy.Eq(residual, 0), var))
+        split = _poly_real_split(poly, roots)
+        if split is not None:
+            candidates = [root for root, real in zip(roots, split, strict=True) if real]
+        else:
+            vanishing = False  # 사라지는 허수부 상한으로 실근 후보가 된 근이 있는가
+            for root in roots:
+                reality = _root_reality(root)
+                if reality is None:
+                    return None
+                if reality != "nonreal":
+                    candidates.append(root)
+                    vanishing = vanishing or reality == "vanishing"
+            if vanishing and not _real_count_agrees(poly, candidates):
                 return None
-            if reality != "nonreal":
-                candidates.append(root)
-                vanishing = vanishing or reality == "vanishing"
-        if vanishing and not _real_count_agrees(poly, candidates):
-            return None
+    if not given and _condition_total(condition, str(var)):
+        # P3-79 재검토 P2-2 — 원문이 어디서나 정의되는 꼴(나눗셈·음수 지수·제한 함수 없음)이면
+        # 근마다 원문을 평가할 까닭이 없다(대수적 계수 근호식 근의 평가가 수십 초였다).
+        return candidates
     base = {} if given is None else dict(given)
     kept: list[sympy.Expr] = []
     for root in candidates:
@@ -1685,7 +1774,12 @@ def _definedness_point(root: sympy.Expr) -> sympy.Expr:
 def _defined_root_multiplicities(
     condition: str, var: sympy.Symbol, root_mult: Mapping[sympy.Expr, int]
 ) -> dict[sympy.Expr, int] | None:
-    """`{근: 중복도}` 중 원문이 그 근에서 정의되는 것만(P3-79). 판정 불가가 하나라도 있으면 None."""
+    """`{근: 중복도}` 중 원문이 그 근에서 정의되는 것만(P3-79). 판정 불가가 하나라도 있으면 None.
+
+    원문이 어디서나 정의되는 꼴(`_condition_total`)이면 근별 평가 없이 그대로 돌려준다 — 그 꼴은
+    복소수 점에서도 정의된다(허용 연산이 다항·상수 나눗셈·전해석 함수뿐이다)."""
+    if _condition_total(condition, str(var)):
+        return dict(root_mult)
     kept: dict[sympy.Expr, int] = {}
     for root, mult in root_mult.items():
         state = condition_definedness(condition, {str(var): _definedness_point(root)})
@@ -2317,7 +2411,7 @@ def verify_real_root_count(
     # 근(무연근)이 섞이고, 허용치(1e-9)로 실수를 부르면 허수부가 아주 작은 근도 섞인다. 셈에
     # 넣는 근은 원문에서 정의되는 정확 실근만이다(`trusted_real_roots` — 판정 불가면 None).
     try:
-        trusted = trusted_real_roots(condition, residual, var)
+        trusted = trusted_real_roots(condition, residual, var, known_roots=list(root_mult))
     except Exception as exc:  # noqa: BLE001 — 근 계산 불가는 보수적 unverifiable
         logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
         return _unverifiable("실근 개수 — 근 계산 불가·안전 회피")
@@ -2453,6 +2547,10 @@ def _real_root_items(
     """`{근: 중복도}` 의 실근만 — 실근 여부는 허용치가 아니라 정확하게(`_root_is_real`). 못 가리면
     None(P3-79 — 허수부 1e-10 인 도함수 근을 임계점으로 세던 결함). 실근 후보가 사라지는
     허수부 상한(`vanishing`)에서 왔으면 SymPy 실근 개수와 맞춰 본다(`trusted_real_roots` 규칙)."""
+    pairs = list(root_mult.items())
+    split = _poly_real_split(poly, [root for root, _ in pairs])
+    if split is not None:
+        return [pair for pair, real in zip(pairs, split, strict=True) if real]
     items: list[tuple[sympy.Expr, int]] = []
     vanishing = False
     for root, mult in root_mult.items():
