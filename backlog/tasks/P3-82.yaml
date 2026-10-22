@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-82
+title: "1단계부터 정답 값을 담는 풀이 경로 재저작 — L3 공백 근본 해소(P3-77 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-77-hint-l3-numeric-equivalent-leak
+requires_gates: []
+acceptance:
+  - "① P3-77 실측: 풀이 경로 1단계부터 정답 값을 담는 문항(P3-10 평가셋 aq-h-10-05, 속도와 가속도, 정답 -12)은 어떤 L3를 만들어도 정답이 드러나 게이트 B가 전부 거부한다 — 그 단계는 L2로 정직하게 하향된다(P3-77 판정문 docs/reviews/p3_77_hint_l3_gap_pedagogy_judgment_2026-10-22.md).\n② 승인 은행 전수에서 '1단계부터 정답 값을 담는 경로' 문항을 열거한다(P3-77 추정 L3 0건 문항 324건 중 원인별 분류 포함).\n③ 해당 문항의 풀이 경로(`verify.solution_steps`)를 정답 값이 마지막 단계에만 나오도록 재저작하는 방법을 정하고, 승인 은행 결속(감사 동결 사본)을 깨지 않는 절차(후보 은행 → 감사 → 승격)로 진행한다. 재저작 뒤 L3 0건 문항 수와 ai_quality_eval Hint 적절성 축 실패 수가 줄었는지 잰다."
+  - "[명시 2026-10-22 · PR #1721 리뷰 반영 · 기준 main 5d1ef801 + P3-77 브랜치] ②의 모집단과 원인 분류를 다음으로 고정한다. 주 모집단 = 승인 은행의 2단계 산술 경로(1단계가 전체 산술식 — 계산하면 정답이 되는 닫힌 식) 276건(리뷰 실측 · P3-77 첫 판 HEAD f5cf78cc 기준). 원인 분류(중복 계상) = 값 축 274건 · 글자 축 32건 · ④ 기타 8건. 참고 재측정(P3-77 리뷰 반영판 — 함수로 감싼 닫힌 식·값 진술 `1 = y`까지 거부): L3 0건 승인 문항 324→396, 그중 2단계 경로 322. 같은 정의(L3 0건 승인 문항 중 2단계이고 1단계가 쓰인 이름에 변수가 없는 닫힌 식)로 재면 306건, 원인(중복 계상) 값 축 368 · 글자 축 42 · ④ 기타 8. 착수 시 그 시점 main 기준으로 다시 세고 기준 커밋을 적는다."
+artifacts: []
+paths:
+  - "data/corpus/**"
+session: null
+notes: "[정정 2026-10-22] PR #1721 리뷰 7항 — 재저작 모집단·원인 분류 명시"
+updated: 2026-10-22

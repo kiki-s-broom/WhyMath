@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l4/hint_content/**"
-session: null
+session: claude/p3-77-hint-l3-equivalent-leak
 notes: "출처: P3-10(AI 품질 평가 8종) 실측 — docs/reviews/p3_10_ai_quality_eval_suite_2026-10-21.md §4. 판정 기준 main 9ef84847. 결정론 튜터 출력(eos-deterministic 후보)에서 정답 누설 무관용 축 실패 1건(aq-h-06-04-l3 — 동치 산술식)과 Hint 적절성 실패 1건(aq-h-10-05-l3 — 검수 L3 부재로 중립 질문)이 나왔다. 둘 다 P3-09 출력 게이트가 막지 않는 학생 노출 경로다. 실 서빙 힌트(served_hint)는 DB 의 검수 힌트 카탈로그에서 오므로 실제 노출 여부는 카탈로그 적재 상태에 달려 있다 — 이 태스크 착수 시 먼저 실측한다."
 updated: 2026-10-21

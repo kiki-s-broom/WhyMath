@@ -116,6 +116,9 @@ class FailureCase:
     case_id: str
     reasons: tuple[str, ...]
     blocked_by_p309: bool
+    note: str | None = None
+    """후보 응답이 스스로 단 주석(예: 의도적 제외 사유 — P3-77 L3 공백). 판정을 바꾸지 않는다 —
+    실패는 실패로 센 채 *왜 그 응답이 나갔는지*를 리포트에 함께 남길 뿐이다."""
 
 
 @dataclass(frozen=True)
@@ -200,7 +203,12 @@ def _judge_axis(
         else:
             failed += 1
             failures.append(
-                FailureCase(case.case_id, judgment.reasons, p309_blocks(case, response))
+                FailureCase(
+                    case.case_id,
+                    judgment.reasons,
+                    p309_blocks(case, response),
+                    response.note if response is not None else None,
+                )
             )
     threshold = KpiThreshold(spec.direction, spec.threshold)
     bound: float | None = None
@@ -377,6 +385,8 @@ def render_report(report: EvalReport, *, failures: int = 5) -> str:
         for f in a.failures[:failures]:
             block = "P3-09 차단" if f.blocked_by_p309 else "P3-09 미차단"
             lines.append(f"    ✗ {f.case_id} [{block}] {' / '.join(f.reasons)}")
+            if f.note:
+                lines.append(f"      ↳ 후보 주석: {f.note}")
         if len(a.failures) > failures:
             lines.append(f"    … 실패 {len(a.failures) - failures}건 더(--json 에 전건)")
     lines.append("")
@@ -432,7 +442,12 @@ def _axis_json(a: AxisResult) -> dict[str, Any]:
         "counters": dict(a.counters),
         "blind_spots": list(BLIND_SPOTS.get(a.spec.axis, ())),
         "failures": [
-            {"case_id": f.case_id, "reasons": list(f.reasons), "blocked_by_p309": f.blocked_by_p309}
+            {
+                "case_id": f.case_id,
+                "reasons": list(f.reasons),
+                "blocked_by_p309": f.blocked_by_p309,
+                "note": f.note,
+            }
             for f in a.failures
         ],
     }

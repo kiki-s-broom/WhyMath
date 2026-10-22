@@ -434,7 +434,7 @@ class TestCliWiring:
         seen: list[bool] = []
 
         async def _run(
-            *, apply: bool, overwrite_cms_edits: bool = False
+            *, apply: bool, value_exposure: object, overwrite_cms_edits: bool = False
         ) -> populate.GenerationReport:
             seen.append(overwrite_cms_edits)
             return populate.summarize([], load=PathLoadReport(paths_seen=1), applied=apply)

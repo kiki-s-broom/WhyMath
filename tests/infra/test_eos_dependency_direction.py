@@ -52,6 +52,7 @@ ADAPTER_IMPL_NAMES: frozenset[str] = frozenset(
         "MathExpressionSeal",
         "MathAnswerFormVerifier",
         "MathStepChainVerifier",
+        "MathAnswerValueExposure",
     }
 )
 ADAPTER_IMPL_MODULE_TOKEN = "subject_adapter_math"
@@ -70,7 +71,14 @@ ADAPTER_IMPL_MODULE_TOKEN = "subject_adapter_math"
 #   ② 설령 ①을 지워도 같은 모듈이 `default_wrong_form_shadow_observer`를 지연 조회하므로 간선은
 #      남는다. 즉 이 baseline의 축소 조건은 "두 폴백을 모두 걷어내는 것"이다.
 # 이 항목을 지우려는 사람은 위 두 import를 먼저 없애야 한다(그러지 않으면 이 테스트가 RED).
-CORE_PULL_BASELINE: frozenset[str] = frozenset({"l4.solution_coaching"})
+# [P3-77 · 2026-10-22] `l4.hint_content.populate`가 1건 늘었다 — **의식적 증가**다. 이 모듈의
+# `main()`은 오프라인 힌트 생성 CLI(`python -m whymath_backend.l4.hint_content.populate`)의 진입점이라
+# 프로세스의 시작 그 자체이고(능력을 줄 상류가 없다 — NON_CORE의 `harness.concept_assessment_index`와
+# 같은 처지), 값 축 능력(`AnswerValueExposure`)을 합성 루트에서 받아 `run` → `build_path_hints` →
+# `GateContext`로 **내려 준다**(순수 조립 함수들은 인자로만 받는다 — 폴백 지연 조회 없음). 서빙
+# 경로는 힌트를 만들지 않아 app.state 등록 대상이 아니다(아래 PULL_ONLY). 축소 조건: 이 CLI의 진입점을
+# CORE 밖(INFRA 진입점 모듈)으로 옮기는 것 — 그때 이 항목이 사라지고 테스트가 ratchet을 요구한다.
+CORE_PULL_BASELINE: frozenset[str] = frozenset({"l4.solution_coaching", "l4.hint_content.populate"})
 
 # 합성 루트를 소비해도 되는 **비-CORE** 모듈 — 프로세스가 시작되는 자리(=합성 루트의 정의).
 # 여기 있는 것은 "허용"이 아니라 **회계**다: 이 집합이 정확히 이 값이어야 통과하므로, 어느
@@ -98,7 +106,11 @@ SUBJECT_CAPABILITY_STATE_MODULE = "api._subject_capability_state"
 # 한다 — 서빙 3경로는 push 주입이고(그래서 여기서 빠짐), 단위테스트용 폴백 지연 import는 소스에
 # 남는다(그래서 `l4.solution_coaching`은 CORE_PULL_BASELINE에 잔존). 그 잔존은 관측기 폴백만으로도
 # 성립하므로, 이 집합에서 능력이 빠졌다고 저 집합이 줄어야 하는 것이 아니다.
-PULL_ONLY_COMPOSITION_FACTORIES: frozenset[str] = frozenset({"default_wrong_form_shadow_observer"})
+# [P3-77] `default_answer_value_exposure`는 오프라인 힌트 생성 CLI만 쓴다 — 서빙 경로(app.py)는 힌트를
+# 만들지 않으므로 등록하지 않는 것이 정상이다(등록하면 소비처 0인 app.state 키가 생긴다).
+PULL_ONLY_COMPOSITION_FACTORIES: frozenset[str] = frozenset(
+    {"default_wrong_form_shadow_observer", "default_answer_value_exposure"}
+)
 
 
 # ──────────────────────────────────────────────────────────────────────

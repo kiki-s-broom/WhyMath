@@ -16,6 +16,11 @@ hermetic 테스트가 가능하다.
     항상 싣는다).
   - 1 — 원천 경로가 0건이다. 빈 DB·승격 미실행(`whs.path_promotion --apply` 선행 필요)을
     "0건 생성 성공"으로 보고하지 않는다(측정 실패 ≠ 0건 통과).
+
+값 축 능력(P3-77): 게이트 B·④의 값 동치 판정은 과목 능력(`AnswerValueExposure`)이 한다. 이 CLI는
+프로세스의 시작이므로 `main()`이 합성 루트에서 기본 구현을 받아 아래로 **내려 준다**
+(`run` → `build_path_hints` → `GateContext`). 순수 조립 함수는 능력을 인자로만 받는다 — 테스트·
+다른 과목이 자기 구현을 넘길 수 있고, 넘기지 않은(None) 호출은 값 축이 fail-closed로 거부된다.
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from whymath_backend.composition import default_answer_value_exposure
 from whymath_backend.db.cms_edit_marker import add_overwrite_argument
 from whymath_backend.db.session import get_sessionmaker
 from whymath_backend.l4.hint_content.gates import (
@@ -45,6 +51,7 @@ from whymath_backend.l4.hint_content.store import (
     load_path_inputs,
     persist_generation,
 )
+from whymath_backend.schema.verification_capabilities import AnswerValueExposure
 
 __all__ = [
     "GenerationReport",
@@ -64,8 +71,12 @@ class PathHints:
     skipped: tuple[tuple[int, int, str], ...]
 
 
-def build_path_hints(path: PathInput) -> PathHints:
-    """경로 1개 → 단계별 L1~L3 생성 + 게이트 3종 평가(순수·결정론 — DB 0)."""
+def build_path_hints(path: PathInput, *, value_exposure: AnswerValueExposure | None) -> PathHints:
+    """경로 1개 → 단계별 L1~L3 생성 + 게이트 3종 평가(순수·결정론 — DB 0).
+
+    `value_exposure`는 필수 키워드다(기본값 없음 — `GateContext` docstring 같은 이유). None이면
+    값 축을 판정하지 못하므로 모든 힌트가 게이트에서 거부된다(fail-closed).
+    """
     hints: list[Hint] = []
     skipped: list[tuple[int, int, str]] = []
     for index, verified in enumerate(path.step_verified):
@@ -85,6 +96,7 @@ def build_path_hints(path: PathInput) -> PathHints:
             step_contents=path.step_contents,
             concept_name=concept.name if concept is not None else None,
             final_answer=path.final_answer,
+            value_exposure=value_exposure,
         )
         hints.extend(evaluate_gates(draft, ctx) for draft in generation.drafts)
     return PathHints(hints=tuple(hints), skipped=tuple(skipped))
@@ -101,6 +113,8 @@ class GenerationReport:
     skipped_by_reason: dict[str, int] = field(default_factory=dict)
     rejected_by_gate: dict[str, int] = field(default_factory=dict)
     leakage_verdicts: dict[str, int] = field(default_factory=dict)
+    value_verdicts: dict[str, int] = field(default_factory=dict)
+    """게이트 B 값 축 판정 분포(P3-77) — exposed·clean·undecidable·not_run("작동한 비율")."""
     writes: HintWriteCounts | None = None
 
     @property
@@ -132,6 +146,7 @@ class GenerationReport:
             "skipped_by_reason": dict(sorted(self.skipped_by_reason.items())),
             "rejected_by_gate": dict(sorted(self.rejected_by_gate.items())),
             "leakage_verdicts": dict(sorted(self.leakage_verdicts.items())),
+            "value_exposure_verdicts": dict(sorted(self.value_verdicts.items())),
             "writes": (
                 {
                     "inserted": self.writes.inserted,
@@ -151,12 +166,12 @@ def _gate_passed(hint: Hint, gate: str) -> bool:
     return isinstance(verdict, dict) and verdict.get("passed") is True
 
 
-def _leakage_verdict(hint: Hint) -> str:
+def _leakage_verdict(hint: Hint, key: str = "verdict") -> str:
     verdict = hint.gate_report.get(GATE_ANSWER_LEAKAGE)
     if isinstance(verdict, dict):
         detail = verdict.get("detail")
         if isinstance(detail, dict):
-            value = detail.get("verdict")
+            value = detail.get(key)
             if isinstance(value, str):
                 return value
     return "unknown"
@@ -171,6 +186,7 @@ def summarize(
     skipped: Counter[str] = Counter()
     rejected: Counter[str] = Counter()
     leakage: Counter[str] = Counter()
+    value: Counter[str] = Counter()
     for result in results:
         for _order, _level, reason in result.skipped:
             skipped[reason] += 1
@@ -182,6 +198,7 @@ def summarize(
                 if not _gate_passed(hint, gate):
                     rejected[gate] += 1
             leakage[_leakage_verdict(hint)] += 1
+            value[_leakage_verdict(hint, "value_verdict")] += 1
     return GenerationReport(
         applied=applied,
         load=load,
@@ -190,15 +207,21 @@ def summarize(
         skipped_by_reason=dict(skipped),
         rejected_by_gate={gate: rejected[gate] for gate in GATE_NAMES},
         leakage_verdicts=dict(leakage),
+        value_verdicts=dict(value),
     )
 
 
-async def run(*, apply: bool, overwrite_cms_edits: bool = False) -> GenerationReport:
+async def run(
+    *,
+    apply: bool,
+    value_exposure: AnswerValueExposure | None,
+    overwrite_cms_edits: bool = False,
+) -> GenerationReport:
     """DB glue — 원천 로드 → 순수 생성 → (apply면) 한 트랜잭션 적재."""
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         inputs, load = await load_path_inputs(session)
-        results = [build_path_hints(path) for path in inputs]
+        results = [build_path_hints(path, value_exposure=value_exposure) for path in inputs]
         report = summarize(results, load=load, applied=apply)
         if apply and inputs:
             report.writes = await persist_generation(
@@ -224,7 +247,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     add_overwrite_argument(parser)
     args = parser.parse_args(list(argv) if argv is not None else None)
     report = asyncio.run(
-        run(apply=bool(args.apply), overwrite_cms_edits=bool(args.overwrite_cms_edits))
+        run(
+            apply=bool(args.apply),
+            value_exposure=default_answer_value_exposure(),
+            overwrite_cms_edits=bool(args.overwrite_cms_edits),
+        )
     )
     print(json.dumps(report.to_json(), ensure_ascii=False, sort_keys=True))
     if report.load.paths_seen == 0:

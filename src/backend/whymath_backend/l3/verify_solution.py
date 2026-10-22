@@ -29,16 +29,20 @@
 
 from __future__ import annotations
 
+import ast
 import logging
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
+from tokenize import TokenError
 from typing import TYPE_CHECKING, Any, Final, Literal
 
+import sympy
 from pydantic import BaseModel, ConfigDict, Field
 
-from whymath_backend.l3.safe_parse import safe_sympify
+from whymath_backend.l3.safe_parse import UnsafeExpressionError, safe_sympify
 from whymath_backend.l3.symbolic_equivalence import latex_to_plain
 from whymath_backend.l3.verify_answer import (
     certified_polynomial,
@@ -55,6 +59,7 @@ from whymath_backend.l3.verify_step import (
     verify_step,
 )
 from whymath_backend.schema.enums import StepType
+from whymath_backend.schema.verification_capabilities import ValueExposure
 
 __all__ = [
     "INTERPRETIVE_SELECTION",
@@ -64,9 +69,11 @@ __all__ = [
     "ROOT_WRONG",
     "InterpretedSolutionResult",
     "SolutionVerificationResult",
+    "ValueExposureResult",
     "ValueSame",
     "aggregate_transitions",
     "answer_map_vars_matching",
+    "arithmetic_fragments",
     "condition_items",
     "condition_relations",
     "distinct_values",
@@ -78,6 +85,7 @@ __all__ = [
     "numeric_assignments",
     "plan_transitions",
     "same_value",
+    "scan_value_exposure",
     "split_top_level",
     "verify_solution",
     "verify_solution_interpreted",
@@ -412,6 +420,229 @@ def split_top_level(text: str) -> list[str]:
             start = index + 1
     parts.append(text[start:])
     return parts
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 값 노출 훑기 (P3-77) — "본문에 계산하면 정답이 되는 식이 있는가"
+# ──────────────────────────────────────────────────────────────────────────
+# 판정 대상 = 닫힌 식(계산만 남은 식 · 값 진술 — `arithmetic_fragments`). P3-10 판정기
+# (`harness.ai_quality_judges._judge_leak` ③)가 쓰던 규칙을 이곳으로 옮겨 **한 벌만** 둔다 — 힌트
+# 게이트(S4-11 B·④ — 능력 계약 경유)와 판정기가 같은 판정을 쓴다(사본 금지). PR #1721 리뷰가 그
+# 이관에서 생긴 구멍(함수로 감싼 닫힌 식·`1 = y`)을 잡아 기준을 "쓰인 이름에 변수가 없다"로 바꿨다.
+# 값 비교는 새로 만들지 않고 `same_value`(정본 채점기)에 위임한다.
+_VALUE_OP_NORMALIZE: Final = str.maketrans({"×": "*", "÷": "/", "−": "-", "·": "*"})
+# 식 덩어리 — 문자·수·연산자·괄호·쉼표·등호가 이어진 구간(한글·콜론·줄바꿈에서 끊긴다).
+_EXPR_RUN: Final = re.compile(r"[0-9A-Za-z_.()+\-*/^,= \t]+")
+_NUMBER_TOKEN: Final = re.compile(r"\d+(?:\.\d+)?")
+_OPERATOR_BETWEEN: Final = re.compile(r"[0-9)]\s*[-+*/^]\s*[-(0-9]")
+_IDENT: Final = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
+# 식에 쓰인 *이름* — 점(.) 바로 뒤의 메서드 이름(`.doit`·`.subs`)은 이름이 아니라 속성이다.
+_NAME: Final = re.compile(r"(?<![.\w])[A-Za-z_][A-Za-z_0-9]*")
+
+#: 산술 조각 해석 실패로 *예상되는* 예외 — 이것만 "식이 아니다"로 접는다. 호출 계약이 깨진
+#: 프로그래밍 오류(TypeError·AttributeError 등)는 삼키지 않는다 — 삼키면 무관용 축(정답 누설)이
+#: 조용히 통과로 바뀐다(P3-10 리뷰 2026-10-21 실측 — 같은 규칙을 그대로 옮긴다).
+_FRAGMENT_PARSE_FAILURES: Final[tuple[type[BaseException], ...]] = (
+    sympy.SympifyError,
+    TokenError,
+    SyntaxError,
+    ValueError,
+    ZeroDivisionError,
+    OverflowError,
+    RecursionError,
+)
+
+
+@dataclass(frozen=True)
+class ValueExposureResult:
+    """`scan_value_exposure` 결과 — `ValueExposureScan`(능력 계약)을 구조적으로 만족한다."""
+
+    outcome: ValueExposure
+    fragment: str | None = None
+    candidates: int = 0
+    undecided: int = 0
+
+
+# 안전 파서의 거부 중 "허용 목록 밖 이름·속성" 사유 — 식은 맞는데 읽기를 거절한 경우다.
+_ALLOWLIST_REFUSALS: Final = frozenset({"disallowed_name", "disallowed_attribute"})
+_NAME_VARIABLE: Final = "variable"
+_NAME_CONSTANT: Final = "constant"
+_NAME_UNKNOWN: Final = "unknown"
+
+
+@lru_cache(maxsize=512)
+def _name_kind(name: str) -> str:
+    """식에 쓰인 이름 하나의 종류 — SymPy가 그 이름을 어떻게 읽는지로 판정한다.
+
+    - **variable**: 자유 기호가 되는 이름(`x`·`y`·`t`).
+    - **constant**: 함수·클래스(`Abs`·`log`·`sin`·`sqrt`·`factorial`·`Derivative`) 또는 자유 기호
+      없는 상수(`pi`·`E`·`I`). 클래스 객체에 `free_symbols`를 물으면 property 객체(참)가 나와
+      변수로 오판한다 — 그래서 SymPy 식(`Basic`)인지를 먼저 가르고, 아니면 호출 가능 여부로 본다.
+    - **unknown**: 안전 파서의 허용 목록 밖이라 읽지 못한 이름(`Rational`·`Integer`·`S`·`N`·
+      `gamma`).
+    """
+    try:
+        value = safe_sympify(name)
+    except _FRAGMENT_PARSE_FAILURES as exc:  # 허용 목록 밖 이름 — 종류를 모른다(unknown)
+        logger.debug("이름 해석 불가(%s) — unknown", type(exc).__name__)
+        return _NAME_UNKNOWN
+    if isinstance(value, sympy.Basic):
+        return _NAME_VARIABLE if value.free_symbols else _NAME_CONSTANT
+    if isinstance(value, type) or callable(value):
+        return _NAME_CONSTANT
+    return _NAME_UNKNOWN
+
+
+def _balanced(side: str) -> bool:
+    """식의 모양을 갖췄는가 — 괄호 짝이 맞고 문법상 완결된 식이다(평가하지 않는다).
+
+    안전 파서가 읽지 못한 변은 그 파서로 모양을 확인할 수 없다. 그래서 파이썬 문법 트리로만
+    확인한다(`ast.parse` — 실행 없음). 잘린 변(`(2*2, det`·`(1/det)*`)은 식이 아니므로 후보가 아니다
+    (PR #1721 3차 리뷰 P2 — 원자 이름 `역행렬(2×2, det≠0)`의 힌트가 전 레벨에서 거부됐다).
+    """
+    try:
+        ast.parse(side.replace("^", "**"), mode="eval")
+    except SyntaxError:
+        return False
+    return True
+
+
+def _closed_value(side: str) -> bool:
+    """변 하나가 **쓰인 그대로** 닫힌 값인가 — 변수 이름이 하나도 없고 값이 수로 정해진다.
+
+    판정은 두 겹이다. ① 쓰인 이름(메서드 이름 `.doit`·`.subs`는 이름이 아니라 속성이라 뺀다)에
+    변수가 없다(`_name_kind`) ② 계산한 값이 수다. ①이 필요한 이유: 안전 파서는 `.doit()`·`.subs()`를
+    *실행*하므로, `Derivative(x**3, x).doit().subs(x, -2)`처럼 학생이 미분을 해야 하는 설정 식도
+    계산 뒤에는 수(12)가 된다. 그 식은 정답을 알려 주는 식이 아니라 문제를 식으로 옮긴 것이다 — 남은
+    일이 미분(그 단원의 인지 행동)이기 때문이다. 반대로 `Abs(...)`·`log(64, 2)`·`sin(210*pi/180)`·
+    `(2 + 2).doit()`는 남은 일이 계산뿐이므로 닫힌 값이다.
+
+    **읽지 못한 이름**(unknown)만 있고 변수가 없는 변(`Rational(8, 2)`·`Integer(2) + Integer(2)`)은
+    안전 파서로 계산할 수 없지만 식의 모양(수 + 호출 괄호)이면 후보로 낸다 — 값 비교는 정본 채점기
+    (`same_value`)가 하고, 거기서도 못 읽으면 판정 불가(undecidable)가 되어 게이트가 거부한다.
+    읽지 못했다고 후보에서 빼면 판정 불가가 '노출 없음'으로 접힌다.
+
+    수 토큰을 요구하지 않는다 — `x = pi`(정답 `pi`)처럼 수 없는 닫힌 값도 값을 진술한다(P3-77 재리뷰
+    N7: 종전의 수 토큰 가드는 이 누설을 놓치는 쪽으로만 작동했다).
+    """
+    kinds = {_name_kind(name) for name in _NAME.findall(side)}
+    if _NAME_VARIABLE in kinds:
+        return False
+    if _NAME_UNKNOWN in kinds:
+        return bool(_NUMBER_TOKEN.search(side)) and "(" in side and _balanced(side)
+    try:
+        value = safe_sympify(side.replace("^", "**"))
+    except UnsafeExpressionError as exc:
+        # 안전 파서가 허용 목록 밖 이름·속성(`.evalf()` 등)을 *거절*했다 — 문법 오류(잘린 변)가
+        # 아니라 읽기를 거절한 것이다. 변수 없이 수를 쓰는 식이면 후보로 낸다(값 비교에서 판정
+        # 불가 → 게이트 거부). 그 밖의 거부 사유(구조 해석 불가 등)는 잘린 변과 같게 대상에서 뺀다.
+        logger.debug("변 안전 파싱 거부(%s) — 허용 목록 거절이면 후보", exc.code)
+        return (
+            exc.code in _ALLOWLIST_REFUSALS and bool(_NUMBER_TOKEN.search(side)) and _balanced(side)
+        )
+    except _FRAGMENT_PARSE_FAILURES as exc:  # 잘린 변 — 식이 아니다(대상 아님)
+        logger.debug("변 해석 불가(%s) — 대상에서 제외", type(exc).__name__)
+        return False
+    # SymPy `is_number`는 "자유 기호가 없는 수"라는 뜻이다 — 자유 기호 검사를 따로 두지 않는다
+    # (따로 두면 결코 단독으로 작동하지 않는 절이 된다: P3-77 리뷰 반영 뮤테이션 M22 생존).
+    # 맨 함수·클래스 이름(`sin`)은 SymPy 식이 아니다 — 클래스 객체에 `is_number`를 물으면 property
+    # 객체(참)가 나와 닫힌 값으로 오판한다(PR #1721 3차 리뷰 P2 — `_name_kind`와 같은 함정).
+    return isinstance(value, sympy.Basic) and bool(value.is_number)
+
+
+def _is_single_variable(side: str) -> bool:
+    """값 진술의 변수 쪽인가 — 이름 하나이고, 변수이거나 읽지 못한 이름이거나 **한 글자**다.
+
+    한 글자 이름은 SymPy가 상수로 읽어도(`E`·`I`) 학교 수학에서는 거의 언제나 사용자 변수다
+    (에너지 E·전류 I). 그래서 `E = 4`는 값 진술로 본다. 여러 글자 상수(`pi`)는 변수가 아니다 —
+    `pi = 4`는 값 진술이 아니다.
+    """
+    if _IDENT.fullmatch(side) is None:
+        return False
+    return len(side) == 1 or _name_kind(side) != _NAME_CONSTANT
+
+
+def arithmetic_fragments(text: str) -> list[str]:
+    """본문 → 값을 드러내는 **닫힌 식** 후보(P3-77). 두 부류다.
+
+    ① **계산만 남은 식** — 변 하나 전체가 닫힌 값(`_closed_value`)이고, 수 사이 연산자가 있거나
+       함수를 쓴다. 예: `(-3) + (4)*((2) - (0))`, `Abs((6*(5)**2 - 8*(5) - 4))`, `log(64, 2)`,
+       `sin(210*pi/180)`. 수 하나(`4`)만으로는 이 부류가 아니다 — 본문의 "4단계" 같은 수와
+       구별되지 않는다.
+    ② **값 진술** — 등식의 한 변이 변수 하나이고 다른 변이 닫힌 값이다. 예: `1 = y`, `y = 1`,
+       `x = 3*(2)`. 이때는 수 하나도 대상이다(변수 옆 `=`이 그 수를 값으로 진술한다).
+
+    "변 하나 전체"의 뜻: 문자까지 포함한 식 덩어리(`_EXPR_RUN`)를 최상위 `,`·`=`로 자른 단위다.
+    `Derivative(x - 1 + 1, x)` 속의 `- 1 + 1`은 변 전체가 아니므로 대상이 아니고, 그 변 전체는
+    변수 `x`를 쓰므로 닫힌 값도 아니다. 수치로 해석되지 않는 변(괄호 짝이 안 맞는 잘림 등)은 식이
+    아니므로 대상에서 뺀다 — 판정 불가가 아니다. 순서를 보존하고 중복은 한 번만 낸다.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def add(frag: str) -> None:
+        if frag not in seen:
+            seen.add(frag)
+            out.append(frag)
+
+    for run in _EXPR_RUN.findall(text.translate(_VALUE_OP_NORMALIZE)):
+        for part in split_top_level(run):
+            sides = [side.strip() for side in part.split("=")]
+            for side in sides:
+                if not side or side in seen:
+                    continue
+                computed = _OPERATOR_BETWEEN.search(side) or _IDENT.search(side)
+                if computed and _closed_value(side):
+                    add(side)
+            if len(sides) == 2 and all(sides):
+                left, right = sides
+                for var, value in ((left, right), (right, left)):
+                    if _is_single_variable(var) and _closed_value(value):
+                        add(value)
+    return out
+
+
+def _value_targets(target: str) -> list[str]:
+    """목표 문자열 → 비교할 값 표기 목록. LaTeX는 단일 권위로 평문화하고, 최상위 쉼표로 나뉜 여러
+    값(`x = 2, x = 3`)은 각각을 목표로 삼는다 — 그중 하나만 드러내도 정답의 일부가 샌다."""
+    plain = latex_to_plain(target) if "\\" in target else target
+    parts = [p.strip() for p in split_top_level(plain) if p.strip()]
+    return parts if len(parts) > 1 else [plain.strip()]
+
+
+def scan_value_exposure(text: str, target: str) -> ValueExposureResult:
+    """`text`의 닫힌 식(`arithmetic_fragments`) 중 값이 `target`과 같은 것이 있는가 — 3상태(P3-77).
+
+    - **exposed**: 식 하나가 목표(또는 목표의 한 성분)와 `same_value` SAME.
+    - **undecidable**: 같은 것은 없는데 판정하지 못한 쌍(UNKNOWN)이 있다 — 목표를 읽지 못한
+      경우(`{1, 6}`·`3개` 등)가 여기에 든다. **clean으로 접지 않는다**(모른다 ≠ 아니다).
+    - **clean**: 식이 없거나, 모든 식이 모든 목표 성분과 DIFFERENT.
+
+    식이 없으면 목표를 읽을 필요가 없다 — 볼 것이 없었다는 뜻이며 `candidates=0`이 그 사실을
+    남긴다("작동한 비율"). 목표가 비었으면 판정 불가다(호출부가 정답 원천 부재를 먼저 거른다).
+    """
+    fragments = arithmetic_fragments(text)
+    if not fragments:
+        return ValueExposureResult(ValueExposure.clean)
+    targets = _value_targets(target) if target.strip() else []
+    if not targets:
+        return ValueExposureResult(
+            ValueExposure.undecidable, candidates=len(fragments), undecided=len(fragments)
+        )
+    undecided = 0
+    for frag in fragments:
+        relations = [same_value(frag, t) for t in targets]
+        if ValueSame.SAME in relations:
+            return ValueExposureResult(
+                ValueExposure.exposed, fragment=frag, candidates=len(fragments), undecided=undecided
+            )
+        if ValueSame.UNKNOWN in relations:
+            undecided += 1
+    return ValueExposureResult(
+        ValueExposure.undecidable if undecided else ValueExposure.clean,
+        candidates=len(fragments),
+        undecided=undecided,
+    )
 
 
 def final_assignments(step: str) -> tuple[str, list[str]] | None:
