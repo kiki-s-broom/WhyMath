@@ -12,7 +12,7 @@
 - 코드베이스가 둘이다. (A) 실제 제품 `kiki-s-broom/WhyMath`(Python 3.12 · FastAPI · PostgreSQL 16 · Flutter). (B) "EOS Micro-Application Factory 버전" `C:\EOS-LABS`(Orchestrator Python/SQLite, 계약 Node+ajv, Factory PowerShell, 앱 Next.js 16+Prisma+mathjs). (B)는 저장소 밖(Kiki 머신)에 있어 이 저장소에서 열람할 수 없다.
 - 1차 감리(10/18)는 (B)만 열람했고 결함 30건 중 11건이 (A)에 대해 틀렸다(감리 재정정보고서).
 - (A)는 자체 EOS 전환 선언(`docs/strategy/eos_transition_declaration_2026-08-30.md`)과 G0~G5·`G-internal-completion-2026-12-31`을 가지며 G0을 통과했다. **(A) 저장소가 (B)를 언급하는 곳은 `backlog/tasks/HARN-206-work-graph-desktop-app.yaml` notes 1곳뿐이다**(2026-10-23 `git grep -i` 재실측: `EOS-LABS`·`eos-orchestrator`·`eos-lab-contracts`·`eos-whymath-governance`·`eos-math-internal`·`eos-math-contracts`·`eos-work-graph`·`P001-math-error-lab` 전부 합쳐 이 1건 — 이 ADR 파일 제외).
-- 2026-10-19 같은 날 저장소 안에서도 10/8 문서를 정본으로 인용한 작업(`ARCH-103` — `eos/compiler/` TypeScript 약 2,750줄, 브랜치 `claude/eos-compiler-pack-check` 헤드 `d7c8a365`, 원격에 실재)이 생겼다. 비정본 표식이 저장소에 없어서 생긴 일이다. Kiki D8=(가)로 보류했다.
+- 2026-10-19 같은 날 저장소 안에서도 10/8 문서를 정본으로 인용한 작업(`ARCH-103` — `eos/compiler/` TypeScript — 47개 파일 추가분 합계 약 2,750줄(lockfile·fixture·yaml 포함, `eos/compiler/src`만은 약 465줄), 브랜치 `claude/eos-compiler-pack-check` 헤드 `d7c8a365`, 원격에 실재)이 생겼다. 비정본 표식이 저장소에 없어서 생긴 일이다. Kiki D8=(가)로 보류했다.
 - (B)의 앱 원격 `P001-math-error-lab`은 2026-10-03 상태에서 멈춰 있고 10/5 대응표의 폐쇄루프 코드(`composition.ts`)는 미푸시다. (B)의 거버넌스는 (A) 헌법의 이식본이며 95/95 unverified다(감리 열람 기록 — 저장소 밖).
 - 개발자 1인, 12/31까지 약 260h(`eos_transition_declaration` :117의 주 25h 상한 × 약 10.4주).
 

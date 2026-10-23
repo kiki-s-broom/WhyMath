@@ -21,7 +21,7 @@
 
 ## 결정
 
-1. **개념 ID 접두를 집합에서 조립한다 (이 PR에서 이행 완료)**: `CONCEPT_ID_PATTERN`은 `SUBJECT_PREFIXES: frozenset[str] = frozenset({"math"})`에서 `build_concept_id_pattern()`으로 조립한다(`^(?:math)\.[a-z]+(-[a-z]+)*\.[a-z0-9]+(-[a-z0-9]+)*$`). 접두 추가는 이 집합에 토큰 1개를 더하는 것으로 끝난다. 조립은 정렬·비캡처 그룹으로 하여 판정과 캡처 그룹 번호가 리터럴 시절과 같고, 빈 집합·`[a-z]+`가 아닌 토큰은 거부한다(빈 접두가 `.area.slug`를 통과시키는 것 방지).
+1. **개념 ID 접두를 집합에서 조립한다 (이 PR에서 이행 완료)**: `CONCEPT_ID_PATTERN`은 `SUBJECT_PREFIXES: frozenset[str] = frozenset({"math"})`에서 `build_concept_id_pattern()`으로 조립한다(`^(?:math)\.[a-z]+(-[a-z]+)*\.[a-z0-9]+(-[a-z0-9]+)*$`). 접두 추가는 데이터 파이프라인 개념 그래프 안에서는 이 집합에 토큰 1개를 더하는 것으로 끝난다(같은 모양의 정규식 리터럴이 `schemas/v1.1/concept.schema.yaml:52`(선언 문서 — 기계가 읽지 않는다)와 `src/backend/whymath_backend/harness/ai_quality_judges.py:738`의 `_CONCEPT_CODE_RE`에 더 있어, 두 번째 접두를 실제로 넣을 때 함께 손봐야 한다). 조립은 정렬·비캡처 그룹으로 하여 판정과 캡처 그룹 번호가 리터럴 시절과 같고, 빈 집합·`[a-z]+`가 아닌 토큰은 거부한다(빈 접두가 `.area.slug`를 통과시키는 것 방지).
    - 검증: 정본 437 ID와 별칭 1,311개, 음성 표본이 옛 리터럴과 **같은 판정**(`tests/data_pipeline/concept_graph/test_concept_id_prefix_set.py`). 집합에 `chem`을 넣었을 때만 `chem.` ID가 통과하는 변별 테스트와, 집합을 비우거나 바꾸면 RED가 되는 테스트가 있다(뮤테이션 8종 전건 검출).
 2. **오개념 ID의 정본은 데이터 `M####`다 (선언)**: DB PK와 코퍼스 843건이 그것이다. 코드의 kebab id는 런타임 탐지용 **alias**다.
    - ⚠ **열린 쟁점**: 감리 초안은 "`catalog.py` 각 항목이 `canonical_id="M####"`를 가져야 한다"고 적었다. 그런데 kebab→M#### 대응은 이미 **승인·서명 게이트를 통과한 별도 데이터**(`misconception_crosslinks_v1` 69건, `crosswalk_gate_contract.md`가 "AI 자기승인 금지"로 통제)로 존재한다. catalog에 필드를 또 두면 같은 관계의 **두 번째 정본**이 생기고, 필드 채움은 사람 검수 없이 이뤄질 수 있다. 그래서 필드 신설(가)과 기존 크로스링크 재사용(나) 중 무엇으로 갈지는 `P3-61` 후속에서 정한다. 이 ADR이 확정하는 것은 "정본 = 데이터 `M####`"라는 방향뿐이며, 12월에는 `Misconception.id` 필드 설명의 "정본" 표현도 건드리지 않는다.
