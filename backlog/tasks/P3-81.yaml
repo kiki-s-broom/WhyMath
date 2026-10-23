@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -14,12 +14,19 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① P3-77이 힌트 게이트 B·④에 값 동치 축을 넣어 게이트 판정(`verified`·`gate_report`)이 바뀌었으나, 운영 DB `hints` 테이블은 `python -m whymath_backend.l4.hint_content.populate --apply`를 다시 돌리기 전까지 종전 판정의 L3(정답과 값이 같은 산술식을 보여 주는 것 포함)를 그대로 서빙할 수 있다. P3-77 추정(승인 1,772문항): 검수 L3 3,461 → 2,845, L3 0건 문항 45 → 324.\n② Kiki 머신 prod DB(docker `whymath-pg`, 127.0.0.1:5433)에서 재적재 전후의 `hints` 행 수·verified 분포를 실측해 위 추정과 대조한다. 안내 런북은 쓰기 블록 자가거부 가드·실행 코드 출처 확인(import 후 __file__)·공유 작업 사본 우회(worktree --detach)를 갖춘다.\n③ 재적재 뒤 서빙 경로(`store.find_served_hint`)가 정답 누설 L3를 내지 않는지 표본으로 확인한다(P3-10 `ai_quality_eval` 정답 누설 축과 같은 판정)."
-artifacts: []
+  - "[정정 2026-10-23 · Kiki 머신 prod DB 실측 · 기준 main 0523e19e] 전제 ①(운영 DB hints가 종전 판정 L3를 서빙할 수 있다)은 이 DB에서는 성립하지 않는다. 블록 C 실측: HINTS_ROWS=0 · HINTS_VERIFIED=0 · HINT_PATHS=0 · PROCESSABLE_PATHS=0 · ALEMBIC_REVISION=a8c4e1f7b3d9 · DB_SERVER_VERSION_NUM=160015 · REACH_EXIT=0 · CODE_OK=True. 블록 D(dry-run): populate가 `원천 경로 0건 — 단계가 실체화된 풀이 경로가 없다(whs.path_promotion --apply 선행 필요)`를 내고 DRY_EXIT=1, DRY_OK=False — CLI가 0건을 성공으로 보고하지 않는 설계대로이며 쓰기 블록은 실행되지 않았다. 즉 재적재할 행이 없고 서빙할 종전 판정 L3도 없다(acceptance ③: 서빙 대상 0행). 첫 적재는 새 게이트(값 축)를 populate가 main()에서 주입하므로 자동으로 새 판정을 받는다. 첫 적재의 선행(문항·solution_paths 적재와 path_promotion --apply)은 P3-32·P3-42가 소유한다. 이 태스크는 런북·프로브·계약 테스트(#1725) 이행으로 닫고, 런북은 해당 선행이 채워진 뒤의 첫 적재·이후 재적재에 그대로 쓴다. 런북 블록 C가 HINTS_ROWS=0일 때 조기 안내를 내지 않아 D에서야 드러난 점은 개선 여지로 남긴다(막을 만한 사고는 없었다 — 쓰기 블록이 자가거부)."
+artifacts:
+  - "#1725"
 paths:
   - "src/backend/whymath_backend/l4/hint_content/**"
   - docs/ops/p3_81_hint_repopulate_runbook.md
   - scripts/ops/p3_81_hint_catalog_probe.py
   - tests/infra/test_p3_81_hint_repopulate_runbook.py
-session: claude/p3-81-hint-repopulate-runbook
-notes: "[정정 2026-10-22] paths ['src/backend/whymath_backend/l4/hint_content/**'] → ['src/backend/whymath_backend/l4/hint_content/**', 'docs/ops/p3_81_hint_repopulate_runbook.md', 'scripts/ops/p3_81_hint_catalog_probe.py', 'tests/infra/test_p3_81_hint_repopulate_runbook.py']: P3-81 런북 산출물의 실제 위치를 선언한다. 종전 paths는 코드 디렉터리 하나뿐이었으나 이 태스크의 산출물은 Kiki 머신 런북(docs/ops)과 읽기 전용 프로브(scripts/ops)와 계약 테스트(tests/infra)다. 선언 범위 밖 편집(scope_drift)을 피하려고 목록 전체를 다시 지정한다."
-updated: 2026-10-22
+session: null
+notes: |-
+  [정정 2026-10-22] paths ['src/backend/whymath_backend/l4/hint_content/**'] → ['src/backend/whymath_backend/l4/hint_content/**', 'docs/ops/p3_81_hint_repopulate_runbook.md', 'scripts/ops/p3_81_hint_catalog_probe.py', 'tests/infra/test_p3_81_hint_repopulate_runbook.py']: P3-81 런북 산출물의 실제 위치를 선언한다. 종전 paths는 코드 디렉터리 하나뿐이었으나 이 태스크의 산출물은 Kiki 머신 런북(docs/ops)과 읽기 전용 프로브(scripts/ops)와 계약 테스트(tests/infra)다. 선언 범위 밖 편집(scope_drift)을 피하려고 목록 전체를 다시 지정한다.
+
+  [정정 2026-10-23] Kiki 머신 prod DB 실측(HINTS_ROWS=0)으로 전제 정정 — 재적재 대상 없음
+
+  [미러 면제 2026-10-23] 원장 전용 PR — 코드는 #1725에서 CI로 검증됨
+updated: 2026-10-23
