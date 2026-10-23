@@ -55,7 +55,7 @@ python3 scripts/harness/adr_number_check.py
 
 ---
 
-## 현재 계열 (2026-09-16)
+## 현재 계열 (2026-10-23)
 
 | 번호 | 주제 | 상태 | 소재 |
 |---|---|---|---|
@@ -65,9 +65,12 @@ python3 scripts/harness/adr_number_check.py
 | [ADR-004](./ADR-004-subject-contract-v1-provisional.md) | Subject Contract v1 잠정 · 교차과목 프로브 후 Freeze | **Frozen (unexercised)** (2026-09-27 G1 판정 · 이전 Provisional) | main |
 | [ADR-005](./ADR-005-ai-gateway-single-router-seam.md) | AI Gateway = L3 라우터 단일 경유 · 3축 라우팅 · 개방 포트폴리오 · 불변 검증 계약 | 채택 (기존 결정의 정본화) | main |
 | [ADR-006](./ADR-006-learning-state-machine-without-stored-state.md) | 학습 상태 머신 8상태 채택 · 상태를 저장하지 않고 전이 원장에서 파생 | 채택 (2026-09-03 보류의 번복 · 게이트 판정 ②) | main |
-| [ADR-007](./ADR-007-eos-g2-disposition.md) | EOS G2·G3·G4 조건 개정(기준 완화·조건 명세표) | Accepted | 브랜치 claude/wp-a-gates (PR 번호는 생성 후 기입) |
+| [ADR-007](./ADR-007-eos-g2-disposition.md) | EOS G2·G3·G4 조건 개정(기준 완화·조건 명세표) | Accepted | main |
+| [ADR-008](./ADR-008-optional-tier-minimum-set-and-fallback.md) | 과목이 반드시 제공할 선택층 능력 최소집합과 미제공 폴백(12월은 문서만, 코드는 2027) | **Proposed** (2026-10-23 · `ARCH-104`) | 브랜치 claude/wp-b-doc-canon (머지 전) |
+| [ADR-009](./ADR-009-concept-id-prefix-constant-and-misconception-id-canon.md) | 개념 ID 접두를 코드 상수 집합으로 조립 · 오개념 ID 정본 = `M####`(데이터) | **Proposed** (2026-10-23 · `ARCH-104` — 결정 1은 같은 PR에서 코드 이행) | 브랜치 claude/wp-b-doc-canon (머지 전) |
+| [ADR-010](./ADR-010-eos-labs-factory-track-freeze.md) | EOS-LABS Factory 트랙 동결(참고자료로만) · 부록 A 설계 문서 트랙·처분표 | **Accepted** (Kiki 2026-10-19 선택지 (가)) | 브랜치 claude/wp-b-doc-canon (머지 전) |
 
-**다음 빈 번호: ADR-008** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
+**다음 빈 번호: ADR-011** — 쓰기 전에 위 §"번호를 고르는 법"의 스캔을 돌릴 것.
 
 ---
 

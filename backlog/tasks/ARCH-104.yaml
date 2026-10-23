@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: ARCH-104
+title: "EOS 감리 WP-B — ADR-008·009·010 등록 · 설계 문서 트랙 표식 · 경계 정본 수치 갱신 · 개념 ID 접두 상수화"
+track: math-completion
+stage: S3
+subject: cross
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① ADR 3건 등록(감리 WP-B · W-08 · W-09 · W-13): `docs/architecture/adr/`에 ADR-008(선택층 능력 최소집합과 미제공 폴백 — 문서만, 코드 이행은 2027-01 ARCH-67 결과 후 별도 ADR) · ADR-009(개념 ID 접두를 코드 상수 집합으로 조립, 오개념 ID 정본 M#### 선언) · ADR-010(EOS-LABS Factory 트랙 동결, Kiki 2026-10-19 선택지 (가) Accepted)을 등록한다. 초안은 감리 정본 04_ADR에 있으나 감리 시점(2026-10-18) 사실이므로 **등록 시점 main 기준으로 맥락 표의 파일:행 근거를 전수 재대조해 낡은 수치를 고친다**. ADR-008·009 상태는 Proposed(ADR-007 선례 · 새 결정 게이트를 만들지 않는다 — 12/31 동결 D5), ADR-010은 Accepted. `python3 scripts/harness/adr_number_check.py` exit 0, 다음 빈 번호 ADR-011.\n② 설계 문서 트랙·폐기 표식(W-07): 감리가 지적한 설계 문서 500(Beta 1,000 users)·600(12/31 공식 출시)·10/8 아키텍처·10/5 검토·대응표는 저장소 밖(EOS-LABS 트랙) 문서일 수 있다. 먼저 어느 것이 저장소 안에 있고 어느 것이 밖에 있는지 실측한다. 저장소 안 문서는 머리말 또는 `docs/superseded/`로 표식을 붙이고, 밖 문서는 원문을 복제하지 않고 ADR-010 부록(또는 `docs/architecture/README`)에 '문서명 · 트랙 · 저장소 결정과의 충돌 지점(12/31=내부 검증 판정일, 선언 §0-2) · 처분' 표 한 장으로 남긴다. 교과서·외부 저작물 본문 복제 금지.\n③ 경계 정본 수치(W-17 · W-26 중 저장소 안 문서): `eos_core_adapter_boundary.md`의 CORE/ADAPTER 모듈 수 표를 `python3 scripts/analysis/eos_core_adapter_boundary_scan.py` 현재 출력과 일치시키고(감리 시점 표 301/51 대 실행값 397/104), 능력 수 '5종/7종/8종' 혼용을 실측 하나(선택층 Protocol 수)로 통일한다. `docs/strategy/subject_pack_spec_v1.md` §0의 '엔진 0줄 수정' 주장을 W-08·W-10·W-11·W-12 사실에 맞게 정정한다(주장을 지우는 것이 아니라 '현재 코드에서 성립하는 범위'로 한정). 문서 수치는 `tests/infra/test_docs_numbers.py`류 대조 테스트가 있으면 그 테스트로 동결한다.\n④ 개념 ID 접두 상수화(W-13 · ADR-009): `src/data-pipeline/data_pipeline/concept_graph/models.py`의 `CONCEPT_ID_PATTERN`에서 `^math` 리터럴을 제거하고 접두 유효 집합(frozenset)에서 조립한다(ADR-003 '접두 유효 집합은 코드 상수'와 일치). 동작은 불변이어야 한다: 개념 그래프 정본 437건이 전부 같은 판정을 받는지 전수 대조하고, 다른 접두 한 개를 넣었을 때만 판정이 바뀌는 테스트 1건을 추가한다(변별력: 접두 집합을 비우면 RED).\n⑤ 검증: CI 잡 전수 열거 후 이 변경이 닿는 잡(backend · infra-contracts · harness-integrity · 문서 수치 · cp949_guard)을 로컬 재현하고 exit code로 보고한다. 부분 스위트 통과를 전체 통과로 말하지 않는다. 새 HARN 태스크·헌법 규칙·결정 게이트·CLAUDE.md 산문 규칙은 추가하지 않는다(D5 동결)."
+artifacts: []
+paths:
+  - docs/architecture/adr
+  - docs/architecture/eos_core_adapter_boundary.md
+  - docs/strategy/subject_pack_spec_v1.md
+  - src/data-pipeline/data_pipeline/concept_graph/models.py
+  - tests/data_pipeline/concept_graph
+session: claude/wp-b-doc-canon
+notes: "EOS 감리 정본(2026-10-19) WP-B 이행. 결함 W-07·W-08(문서)·W-09·W-13·W-17·W-26(저장소 안 문서). 감리 일정표의 시작일(10/26)은 목표이며 내용 선행(WP-A 완료)이 충족돼 앞당겨 착수한다(기간은 목표이지 진도 제한이 아니다 · build_harness §3a). 초안 위치는 감리 정본 04_ADR(세션 스크래치패드)이므로 ADR 3건 본문은 등록 PR에 포함된다."
+updated: 2026-10-23
