@@ -264,8 +264,21 @@ def build_record_from_report(
             measured=False, value=None, unit="count_by_code", reason=reason
         )
     else:
+        # HIT 하한 가드(OPS-90) — 계측 CU의 절반 이상이 하한 미만이면 그 중앙값·처리량은 재입력·
+        # 스킵 세션의 값일 수 있어 `measured: true`로 계상하지 않는다(감리 W-04: 유효 실측 0건인데
+        # 무효 표본 15건이 있었다). `is True`만 막는다 — None(모른다/가드 끔)은 기존 동작 유지.
+        implausible_reason = (
+            f"계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 HIT 하한 "
+            f"{report.min_plausible_seconds:g}초 미만(절반 이상) — 재입력·스킵 세션 의심(OPS-90)"
+            if report.hit_implausible_majority is True
+            else None
+        )
         # HIT — 중앙값(초). CU 표본이 없으면 median=None(0초 산입 금지, hit_cu_metrics 규약).
-        if report.cu_measured > 0 and report.hit_median_seconds is not None:
+        if implausible_reason is not None:
+            kpis["hit_seconds"] = KpiValue(
+                measured=False, value=None, unit="seconds_median", reason=implausible_reason
+            )
+        elif report.cu_measured > 0 and report.hit_median_seconds is not None:
             kpis["hit_seconds"] = KpiValue(
                 measured=True, value=report.hit_median_seconds, unit="seconds_median"
             )
@@ -278,7 +291,12 @@ def build_record_from_report(
             )
 
         # 처리량 — CU/h = measured CU 수 ÷ (HIT 합 시간). 분모 0이면 미산출.
-        if report.cu_measured > 0 and report.hit_total_seconds > 0:
+        # 분모가 같은 HIT 합이라 하한 가드에 걸린 회차는 처리량도 부풀려진다 — 함께 미측정.
+        if implausible_reason is not None:
+            kpis["throughput_cu_per_hour"] = KpiValue(
+                measured=False, value=None, unit="cu_per_hour", reason=implausible_reason
+            )
+        elif report.cu_measured > 0 and report.hit_total_seconds > 0:
             kpis["throughput_cu_per_hour"] = KpiValue(
                 measured=True,
                 value=report.cu_measured / (report.hit_total_seconds / 3600),

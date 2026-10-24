@@ -38,6 +38,48 @@
     통과가 아니라 측정 실패(exit 1)다.
   - **비용 미계측 분리**: 비용 행이 조인되지 않은 CU는 0원 산입이 아니라 분리 카운트.
 
+HIT 하한 가드 (OPS-90 — 게이트의 방향 대칭)
+-------------------------------------------
+`--max-median-minutes`는 **상한**만 본다. 그래서 경과가 0초에 가까울수록 무조건 통과한다 —
+재입력·스킵 세션(검토는 이미 다른 창에서 끝났고 결정만 다시 누른 세션)이 "목표 대비 40배
+달성"으로 읽히는 구조다. 이 모듈은 이미 "미측정 ≠ 0"과 "성공 지표가 실패를 가리는 구조를
+끊는다"(EOS-62)를 채택했는데, HIT 축만 0초 방향이 무방비였다.
+
+  - **측정 단위**: measured CU의 `hit_seconds`(그 CU 전 세션 경과 합)가 하한
+    (`--min-plausible-seconds`, 기본 `DEFAULT_MIN_PLAUSIBLE_SECONDS` = 30초) **미만**이면
+    "비현실적으로 짧은 CU"로 센다. 하한과 **정확히 같으면**(30.0초) 현실적이다(미만만 센다).
+  - **경고**: 그 CU가 계측 CU의 **절반 이상**이면(`2*k >= n`) HIT 중앙값 줄 옆에 경고를 붙이고
+    `hit_implausible_majority=True`로 표시한다. "과반(>50%)"이 아니라 "절반 이상"으로 잡은
+    이유: 정확히 절반이 하한 미만이면(짝수 n) 중앙값은 하한 미만 값과 그 이상 값의 *평균*이라
+    이미 오염됐는데, 엄밀한 과반 기준은 바로 그 지점에서 경고를 끈다(경계에서 열리는 게이트).
+  - **게이트(fail-closed)**: `--max-median-minutes`·`--max-p90-minutes` 중 하나라도 지정됐고
+    `hit_implausible_majority`가 True면 상한을 만족해도 **exit 1**이다. 상한 게이트가 아무리
+    잘 통과해도 그 중앙값이 재입력 세션의 값이면 "통과"는 측정이 아니라 위장이다. 미채택
+    대안(경고만 달고 통과)은 게이트를 읽는 사람(주간 KPI cron·완료 검사)이 경고 줄을 읽는다는
+    가정에 기대는데, 2026-09-22 회차가 정확히 그 가정이 깨진 사례다(증적에 자인으로 적어 막았으나
+    그것은 사람 규율이고 도구에는 집행 지점이 없었다). 게이트가 없는 계측 전용 실행은 경고만
+    내고 exit 0을 유지한다(측정 자체는 성립 — 해석이 틀릴 뿐).
+  - **소비자 연동**: 표본이 하한 가드에 걸린 회차를 `measured: true`로 계상하면 안 된다
+    (감리 W-04: HIT 유효 실측 0건인데 무효 표본 15건이 있었다). 주간 KPI
+    (`ops/weekly_metrics_report`)와 스코어카드 어댑터(`ops/validation_scorecard`)가
+    `hit_implausible_majority`를 읽어 HIT·처리량을 미측정으로 낸다.
+  - **3상태**: `hit_implausible_majority`는 계측 CU 0건이거나 하한이 0(가드 끔)이면 **None**
+    (모른다 ≠ 아니다)이다. False는 "검사했고 괜찮다"일 때만 낸다.
+
+**하한 기본값(30초)의 근거와 한계 — 정직하게**
+  - 실측 근거(2026-09-22 카나리 회차 · 게이트 `G-eos-first-run-canary-review` 증적): 고유 CU
+    15건(승인 13·반려 2) HIT 중앙값 **6초**·P90 **41초**·총합 **4분 6초(246초)**. 이 세션은
+    재입력 세션이라 Kiki가 무효로 자인했다. 원 이벤트 JSONL(`mp02-out/…v3.jsonl`)은 코퍼스
+    데이터라 커밋되지 않아 이 저장소에서는 **요약 3개 수치만** 확인 가능하다(CU별 분포는 미확인).
+  - 30초를 고른 이유(수치): 목표 중앙값 4분(240초)의 1/8이고, 무효로 판정된 회차의 중앙값(6초)의
+    5배·P90(41초)의 약 3/4다. 즉 그 회차는 이 하한으로 **확실히 걸린다**(중앙값이 하한의 1/5).
+    반대로 하한을 올릴수록(예: 60초) 한 번에 읽고 결정할 수 있는 쉬운 문항의 정상 검수까지
+    무효로 버리고, 내릴수록(예: 10초) 6초 중앙값 같은 값이 경계 근처로 올라와 가드가 무력해진다.
+  - **한계**: 정상적인 *최초* 검수의 경과 분포는 이 저장소에 없다(측정된 적이 없다 — 다음 회차
+    EOS-197이 첫 유효 표본이다). 따라서 30초는 "무효 사례를 확실히 잡고 정상 검수를 버리지
+    않도록 보수적으로 낮춘" **판단값**이지 정상 분포에서 도출한 임계가 아니다. 첫 유효 표본이
+    쌓이면 CU별 분포(최소·하위 분위)로 재조정하고, 그때까지는 인자로 덮어쓸 수 있다.
+
 인프로세스 이중 회계 (`ops/cost_probe` 원칙 — SaaS 단독 의존 금지)
 ------------------------------------------------------------------
 비용·토큰의 판정 원천은 **인프로세스 영속**(`GenerationLog` — `db/models/provenance.py`,
@@ -91,6 +133,7 @@ import argparse
 import asyncio
 import dataclasses
 import json
+import math
 import sys
 import uuid
 from collections.abc import Iterable, Sequence
@@ -109,6 +152,7 @@ from whymath_backend.schema.review_timer import (
 )
 
 __all__ = [
+    "DEFAULT_MIN_PLAUSIBLE_SECONDS",
     "CuSummary",
     "HitCuReport",
     "SessionSummary",
@@ -123,6 +167,12 @@ __all__ = [
 
 _EXIT_OK = 0
 _EXIT_MEASUREMENT_FAIL = 1
+
+#: HIT 하한 가드의 기본값(초) — 이 값 *미만*인 CU는 "비현실적으로 짧은 검수"로 센다(OPS-90).
+#: 근거·한계는 모듈 docstring "HIT 하한 가드" 절 참조(요약: 무효로 자인된 2026-09-22 회차의
+#: 중앙값 6초·P90 41초 대비 확실히 걸리고, 목표 4분의 1/8로 정상 검수는 버리지 않도록 낮춘
+#: 판단값 — 정상 분포에서 도출한 값이 아니다).
+DEFAULT_MIN_PLAUSIBLE_SECONDS = 30.0
 
 # F-Ⅲ 판정 축(설계서 §4·§5) — 기계형/판단형 부분집합. 정본은 GenerationFailureCode docstring·
 # `test_generation_failure_code.py::test_judgment_type_subset_frozen`이 동결(여기는 소비).
@@ -456,6 +506,21 @@ class HitCuReport:
     cost_usd_total: float | None = None
     tokens_total: int | None = None
 
+    # ── HIT 하한 가드(OPS-90) — 비현실적으로 짧은 검수(재입력·스킵 세션)의 가시화 ──
+    min_plausible_seconds: float = DEFAULT_MIN_PLAUSIBLE_SECONDS
+    """적용된 하한(초). 0이면 가드 끔 — 리포트·JSON에 항상 남겨 어떤 하한으로 판정했는지 보이게."""
+    cu_implausible_short_count: int = 0
+    """계측 CU 중 `hit_seconds < min_plausible_seconds`인 건수(정확히 하한이면 현실적)."""
+    implausible_short_share: float | None = None
+    """위 건수 / 계측 CU 수. 계측 CU 0건이면 None(0%가 아니라 모름)."""
+    hit_implausible_majority: bool | None = None
+    """하한 미만 CU가 계측 CU의 **절반 이상**(`2*k >= n`)인가 — True면 HIT 중앙값·P90을 신뢰할
+    수 없다(게이트 fail-closed·주간 KPI 미측정 처리의 근거).
+
+    **None = 모른다**: 계측 CU 0건이거나 하한이 0 이하(가드 끔)여서 검사하지 않았다. False는
+    "검사했고 괜찮다"일 때만 낸다(3상태를 2상태로 접으면 검사 안 한 것이 통과로 위장된다).
+    """
+
 
 def aggregate(
     events: Sequence[ReviewTimerEvent],
@@ -466,8 +531,13 @@ def aggregate(
     verdict_rows: Sequence[dict[str, Any]] | None = None,
     genlog_rows: Sequence[dict[str, Any]] | None = None,
     edit_aware_since: datetime | None = None,
+    min_plausible_seconds: float = DEFAULT_MIN_PLAUSIBLE_SECONDS,
 ) -> HitCuReport:
     """순수 집계 — 이벤트(+판정·비용 행) → HitCuReport. I/O 0.
+
+    `min_plausible_seconds` = HIT 하한 가드(OPS-90) — 계측 CU의 `hit_seconds`가 이 값 *미만*이면
+    비현실적으로 짧은 검수로 센다(모듈 docstring "HIT 하한 가드"). 0 이하면 가드를 끈다
+    (`hit_implausible_majority=None`). NaN은 비교가 전부 False라 가드가 조용히 꺼지므로 거부한다.
 
     `edit_aware_since` = EOS-62(판정 3종화) 착지 경계. 그 이전에 기록된 `approved`는 무손질
     인지 손질인지 알 수 없으므로(어휘가 없었다) **판별 불가**로 분리한다. 미지정이면 모든
@@ -482,6 +552,18 @@ def aggregate(
 
     measured = [c for c in cus if c.kind == "measured"]
     hit_samples = sorted(float(c.hit_seconds) for c in measured if c.hit_seconds is not None)
+
+    # ── HIT 하한 가드(OPS-90) — 상한만 보는 게이트의 0초 방향 보완 ──
+    if math.isnan(min_plausible_seconds):
+        raise ValueError("min_plausible_seconds는 NaN일 수 없다 — 비교가 전부 False라 가드가 꺼짐")
+    implausible_short_count = sum(1 for sec in hit_samples if sec < min_plausible_seconds)
+    implausible_share: float | None = None
+    implausible_majority: bool | None = None
+    if hit_samples and min_plausible_seconds > 0:
+        implausible_share = implausible_short_count / len(hit_samples)
+        implausible_majority = 2 * implausible_short_count >= len(hit_samples)
+    elif hit_samples:
+        implausible_share = 0.0  # 하한 0 — 가드 끔: 건수 0은 사실이나 majority는 판정 보류(None)
 
     # ── 적재율 — 판정 소스가 있을 때만(없으면 None=미산출 — 0%로 위장 금지) ──
     finished_slugs = {s.cu_slug for s in sessions if s.has_finish}
@@ -684,6 +766,10 @@ def aggregate(
         # 총액은 "기록된 비용의 합"(부분 기록 CU 포함) — 백분위와 달리 하한임을 렌더가 명기.
         cost_usd_total=sum(cost_by_cu.values()) if has_cost_input else None,
         tokens_total=sum(tokens_by_cu.values()) if has_cost_input else None,
+        min_plausible_seconds=min_plausible_seconds,
+        cu_implausible_short_count=implausible_short_count,
+        implausible_short_share=implausible_share,
+        hit_implausible_majority=implausible_majority,
     )
 
 
@@ -696,6 +782,28 @@ def _fmt_minutes(seconds: float | None) -> str:
     if seconds is None:
         return "미산출(표본 0)"
     return f"{seconds / 60.0:.2f}분 ({seconds:.0f}초)"
+
+
+def _implausible_lines(report: HitCuReport) -> list[str]:
+    """HIT 하한 가드 리포트 줄(OPS-90) — 건수·하한을 항상 내고, 절반 이상이면 경고를 붙인다."""
+    if report.hit_implausible_majority is None:
+        if report.min_plausible_seconds <= 0:
+            return ["- 하한 가드: **꺼짐**(하한 0초) — 비현실적으로 짧은 검수를 걸러내지 않는다."]
+        return ["- 하한 가드: 미산출(계측 CU 0건) — 0건 통과가 아니라 검사할 표본이 없다."]
+    share = report.implausible_short_share if report.implausible_short_share is not None else 0.0
+    lines = [
+        f"- 하한 가드: 계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건"
+        f"({share:.0%})이 하한 {report.min_plausible_seconds:g}초 미만 — 재입력·스킵 세션 "
+        "의심(하한과 정확히 같은 값은 현실적으로 센다)"
+    ]
+    if report.hit_implausible_majority:
+        lines.append(
+            "- ⚠ **경고: 하한 미만이 계측 CU의 절반 이상 — 위 HIT 중앙값·P90은 신뢰할 수 없다.** "
+            "목표(중앙값 4분 이하) 달성이 아니라, 검토를 이미 끝낸 뒤 결정만 다시 누른 세션처럼 "
+            "측정 대상이 다를 가능성이 크다(2026-09-22 회차가 이 경우). 이 회차는 HIT 달성 "
+            "근거로 쓰지 말고 최초 검토 시간을 다시 계측할 것."
+        )
+    return lines
 
 
 def render_report(report: HitCuReport) -> str:
@@ -714,10 +822,12 @@ def render_report(report: HitCuReport) -> str:
         "제외·분리 카운트(0초 산입 금지)",
         "",
         "## HIT (CU당 인간 개입 시간 — 목표 중앙값 ≤4분·P90 ≤8분)",
-        f"- 중앙값: {_fmt_minutes(report.hit_median_seconds)}",
+        f"- 중앙값: {_fmt_minutes(report.hit_median_seconds)}"
+        + (" ⚠ 신뢰 불가 — 아래 하한 가드 경고 참조" if report.hit_implausible_majority else ""),
         f"- P90: {_fmt_minutes(report.hit_p90_seconds)}",
         f"- 평균: {_fmt_minutes(report.hit_mean_seconds)} · 계측 총합 "
         f"{report.hit_total_seconds:.0f}초",
+        *_implausible_lines(report),
         "",
         "## 타이머 적재율 (작동한 비율 — 검수 판정 중 타이머 동반)",
     ]
@@ -1008,6 +1118,15 @@ def main(argv: list[str] | None = None) -> int:
         "센다. 미지정이면 전건 판별불가(소급 재분류 금지·golden_benchmark 동일 기조)",
     )
     parser.add_argument(
+        "--min-plausible-seconds",
+        type=float,
+        default=DEFAULT_MIN_PLAUSIBLE_SECONDS,
+        help="HIT 하한 가드(초, 기본 %(default)s) — 계측 CU의 경과 합이 이 값 미만이면 "
+        "비현실적으로 짧은 검수로 센다. 절반 이상이면 경고하고, HIT 게이트"
+        "(--max-median-minutes/--max-p90-minutes)가 지정됐으면 exit 1(fail-closed). "
+        "0이면 가드 끔",
+    )
+    parser.add_argument(
         "--max-median-minutes",
         type=float,
         default=None,
@@ -1026,6 +1145,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not args.events and not args.from_db:
         parser.error("--events 또는 --from-db 중 하나는 필요합니다")
+    if not math.isfinite(args.min_plausible_seconds) or args.min_plausible_seconds < 0:
+        # NaN·inf·음수는 가드를 조용히 끄거나(NaN) 전건 걸러(inf) 의미를 잃는다 — 입력 오류로 거부.
+        parser.error("--min-plausible-seconds는 0 이상의 유한한 수여야 합니다(0=가드 끔)")
 
     # ── ① 타이머 이벤트 로드(측정 실패는 즉시·타입명과 함께) ──
     events: list[ReviewTimerEvent] = []
@@ -1150,6 +1272,7 @@ def main(argv: list[str] | None = None) -> int:
         verdict_rows=verdict_rows,
         genlog_rows=genlog_rows,
         edit_aware_since=edit_aware_since,
+        min_plausible_seconds=args.min_plausible_seconds,
     )
     # 데이터는 stdout(단일 JSON 문서 또는 리포트 본문), 진행·판정은 stderr(_say) — 분리.
     if args.json:
@@ -1181,6 +1304,24 @@ def main(argv: list[str] | None = None) -> int:
         )
         return _EXIT_MEASUREMENT_FAIL
     failures: list[str] = []
+    if report.hit_implausible_majority:
+        # 경고는 게이트 유무와 무관하게 낸다(계측 전용 실행도 오독 방지).
+        _say(
+            f"[경고] 계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 "
+            f"하한 {report.min_plausible_seconds:g}초 미만 — HIT 중앙값·P90 신뢰 불가"
+            "(재입력·스킵 세션 의심)"
+        )
+    elif report.hit_implausible_majority is None and report.min_plausible_seconds <= 0:
+        _say("[경고] --min-plausible-seconds 0 — HIT 하한 가드가 꺼져 있다(0초 방향 무방비)")
+    hit_gate_requested = args.max_median_minutes is not None or args.max_p90_minutes is not None
+    if hit_gate_requested and report.hit_implausible_majority:
+        # fail-closed: 상한을 아무리 잘 만족해도 그 값이 재입력 세션의 것이면 통과는 위장이다.
+        failures.append(
+            f"HIT 하한 가드 — 계측 CU {report.cu_measured}건 중 "
+            f"{report.cu_implausible_short_count}건이 하한 {report.min_plausible_seconds:g}초 "
+            "미만(절반 이상)이라 HIT 게이트(상한)를 평가할 수 없다 — 상한 통과를 성공으로 "
+            "읽지 말 것"
+        )
     if args.max_median_minutes is not None and report.hit_median_seconds is not None:
         if report.hit_median_seconds > args.max_median_minutes * 60.0:
             failures.append(

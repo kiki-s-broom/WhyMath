@@ -802,7 +802,15 @@ def adapt_hit_cu_metrics(
     median_s = report.get("hit_median_seconds")
     measured = report.get("cu_measured")
     total_s = report.get("hit_total_seconds")
-    if isinstance(median_s, (int, float)) and isinstance(measured, int) and measured > 0:
+    # HIT 하한 가드(OPS-90): 계측 CU의 절반 이상이 하한 미만이면 중앙값·처리량은 재입력·스킵
+    # 세션의 값일 수 있어 옮기지 않는다(미측정으로 남긴다). 키가 없는 옛 산출물(None)은 종전대로.
+    implausible = report.get("hit_implausible_majority") is True
+    if (
+        not implausible
+        and isinstance(median_s, (int, float))
+        and isinstance(measured, int)
+        and measured > 0
+    ):
         out["hit"] = {"median_minutes": float(median_s) / 60.0, "sample_size": measured}
         # 처리량 = 검수 완료 CU ÷ 검수 소요 시간(§6 동결 측정 방법 그대로).
         if isinstance(total_s, (int, float)) and total_s > 0:
