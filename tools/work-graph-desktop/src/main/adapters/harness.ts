@@ -13,8 +13,9 @@ function splitLines(s: string): string[] {
   return s.split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean).slice(0, 200);
 }
 
+/** `root` = 파이썬(.venv)을 찾을 저장소 · `cwd` = work_graph.py를 돌릴 트리(HARN-306: 최신 main 거울이면 거울 폴더) */
 export async function collectHarness(
-  root: string, options: WorkspaceOptions, exec: Exec, platform: NodeJS.Platform = process.platform,
+  root: string, options: WorkspaceOptions, exec: Exec, platform: NodeJS.Platform = process.platform, cwd: string = root,
 ): Promise<HarnessCollect> {
   const at = new Date().toISOString();
   const py = await findPython(exec, root, options.python, platform);
@@ -25,7 +26,7 @@ export async function collectHarness(
   const tool = [py.found.cmd, ...py.found.prefix].join(" ");
   const args = [...py.found.prefix, WORK_GRAPH, "--json"];
   if (!options.remote) args.push("--no-remote");
-  const r = await exec(py.found.cmd, args, { cwd: root, timeoutMs: HARNESS_TIMEOUT_MS });
+  const r = await exec(py.found.cmd, args, { cwd, timeoutMs: HARNESS_TIMEOUT_MS });
   const warnings = splitLines(r.stderr);
   if (r.status !== "ok") {
     return { payload: null, result: { status: r.status, tool, at, reason: r.reason, warnings } };
