@@ -434,6 +434,9 @@ def _hit_report_json(**overrides) -> dict:
     payload: dict = {}
     for field in dataclasses.fields(HitCuReport):
         payload[field.name] = None
+    # HIT 하한 가드(OPS-90) 계약: 어댑터는 `False`("검사했고 괜찮다")일 때만 HIT를 이관한다.
+    # 이 헬퍼는 "정상 표본" 기본값이므로 False로 둔다 — 걸림·미검사·키 없음은 각 테스트가 명시한다.
+    payload["hit_implausible_majority"] = False
     payload.update(overrides)
     return payload
 
@@ -449,6 +452,7 @@ def test_hit_adapter_reads_only_real_producer_fields() -> None:
         "hit_median_seconds",
         "cu_measured",
         "hit_total_seconds",
+        "hit_implausible_majority",
         "failure_code_counts",
         "rejected_count",
         "cost_usd_total",
