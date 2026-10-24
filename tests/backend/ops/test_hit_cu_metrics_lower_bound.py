@@ -288,13 +288,25 @@ class TestInvalidElapsedInputs:
         with pytest.raises(ValueError, match="NaN"):
             aggregate(_many([5_000]), min_plausible_seconds=math.nan)
 
+    @pytest.mark.parametrize("bad", [-0.001, -1.0, -math.inf])
+    def test_negative_floor_rejected_in_direct_aggregate_call(self, bad: float) -> None:
+        """CLI만 거부하고 aggregate() 직접 호출은 음수에서 조용히 가드가 꺼졌다(리뷰 P3-3)."""
+        with pytest.raises(ValueError, match="음수"):
+            aggregate(_many([5_000]), min_plausible_seconds=bad)
+
+    def test_zero_floor_is_allowed_unlike_negative(self) -> None:
+        """대조군 — 0은 '끄겠다'는 명시이므로 거부하지 않는다."""
+        assert aggregate(_many([5_000]), min_plausible_seconds=0.0).hit_implausible_majority is None
+
 
 class TestGuardDisabledAndZeroSample:
     def test_floor_zero_turns_guard_off_as_unknown_not_ok(self) -> None:
         """하한 0 = 가드 끔 — 0초 CU도 걸리지 않고, 'False(괜찮다)'가 아니라 None(미검사)."""
         report = _report([0, 0, 0], min_plausible_seconds=0.0)
         assert report.cu_measured == 3
-        assert report.cu_implausible_short_count == 0
+        # 가드 끔: 건수·비율도 "0건·0%"가 아니라 None — 검사하지 않은 것을 0으로 읽지 않는다.
+        assert report.cu_implausible_short_count is None
+        assert report.implausible_short_share is None
         assert report.hit_implausible_majority is None
         text = render_report(report)
         assert "꺼짐" in text  # 끈 사실이 리포트에 보인다(조용한 비활성 금지)
@@ -423,6 +435,18 @@ class TestCliGate:
         assert "[경고]" in captured.err
         assert "신뢰 불가" in captured.out
 
+    def test_minority_short_no_stderr_warning(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """소수파(1/4)는 건수만 표시하고 stderr 경고는 없다 — 경고 조건이 '1건이라도'로 느슨해지면 깨진다."""
+        path = tmp_path / "events.jsonl"
+        _write_events(path, _many([5_000, 120_000, 180_000, 200_000]))
+        assert main(["--events", str(path)]) == 0
+        captured = capsys.readouterr()
+        assert "[경고]" not in captured.err
+        assert "신뢰 불가" not in captured.out
+        assert "4건 중 1건" in captured.out  # 가시화는 한다
+
     def test_coverage_only_gate_is_not_a_hit_gate(self, tmp_path: Path) -> None:
         """--min-coverage는 HIT 게이트가 아니다 — 하한 가드가 적재율 게이트를 막지 않는다."""
         events_path = tmp_path / "events.jsonl"
@@ -506,11 +530,24 @@ class TestConsumerWeeklyKpi:
         record = self._record(_report([5_000, 120_000, 180_000, 240_000]))
         assert record.kpis["hit_seconds"].measured is True
 
-    def test_guard_off_none_keeps_legacy_behavior(self) -> None:
-        """가드 끔(None)은 '걸렸다'가 아니다 — 소비자가 None을 True로 접으면 안 된다."""
+    def test_guard_off_none_with_measured_cus_is_unmeasured(self) -> None:
+        """가드 끔(None)인데 계측 CU가 있다 — 재입력 세션인지 모르는 값이라 미측정(모른다 ≠ 아니다)."""
         report = _report([5_000, 6_000], min_plausible_seconds=0.0)
         assert report.hit_implausible_majority is None
-        assert self._record(report).kpis["hit_seconds"].measured is True
+        assert report.cu_measured == 2
+        record = self._record(report)
+        for name in ("hit_seconds", "throughput_cu_per_hour"):
+            assert record.kpis[name].measured is False, name
+            assert record.kpis[name].reason and "미검사" in record.kpis[name].reason, name
+
+    def test_none_from_zero_measured_cus_keeps_its_own_reason(self) -> None:
+        """구분 대조군 — None이 '계측 CU 0건'에서 온 정상 분기면 기존 사유가 그대로 나간다."""
+        report = aggregate(_cu("cu-a", None))
+        assert report.hit_implausible_majority is None
+        assert report.cu_measured == 0
+        reason = self._record(report).kpis["hit_seconds"].reason
+        assert reason and "계측 완료 CU 0건" in reason
+        assert "미검사" not in reason
 
 
 def _scorecard_json(**overrides: object) -> dict[str, object]:
@@ -526,21 +563,89 @@ def _scorecard_json(**overrides: object) -> dict[str, object]:
 
 
 class TestConsumerScorecardAdapter:
-    def test_majority_true_drops_hit_and_throughput(self) -> None:
+    """3상태(모른다 ≠ 아니다): `False`일 때만 이관한다 — 4분기 + 사유."""
+
+    def test_majority_true_not_transferred(self) -> None:
         out = vs.adapt_hit_cu_metrics(_scorecard_json(hit_implausible_majority=True))
         assert "hit" not in out
         assert "throughput" not in out
 
-    def test_majority_false_keeps_hit_control(self) -> None:
+    def test_majority_false_transferred_control(self) -> None:
         out = vs.adapt_hit_cu_metrics(_scorecard_json(hit_implausible_majority=False))
         assert out["hit"]["median_minutes"] == pytest.approx(0.1)
         assert "throughput" in out
 
-    def test_missing_key_old_artifact_keeps_hit(self) -> None:
-        """가드 이전에 만든 옛 JSON(키 없음)은 종전대로 — 키 부재를 '걸렸다'로 읽지 않는다."""
-        out = vs.adapt_hit_cu_metrics(_scorecard_json())
-        assert "hit" in out
+    def test_missing_key_old_artifact_not_transferred(self) -> None:
+        """가드 이전 JSON(2026-09-22 회차 형식 — 키 없음)은 6초 중앙값을 그대로 옮기면 안 된다."""
+        report = _scorecard_json()
+        assert "hit_implausible_majority" not in report
+        out = vs.adapt_hit_cu_metrics(report)
+        assert "hit" not in out
+        assert "throughput" not in out
 
-    def test_majority_none_keeps_hit(self) -> None:
+    def test_majority_none_not_transferred(self) -> None:
         out = vs.adapt_hit_cu_metrics(_scorecard_json(hit_implausible_majority=None))
-        assert "hit" in out
+        assert "hit" not in out
+        assert "throughput" not in out
+
+    def test_unexpected_value_not_transferred(self) -> None:
+        """True/False/None도 아닌 값(문자열 등)은 해석할 수 없으므로 이관하지 않는다."""
+        for odd in ("false", 0, "False"):
+            out = vs.adapt_hit_cu_metrics(_scorecard_json(hit_implausible_majority=odd))
+            assert "hit" not in out, odd
+
+    def test_real_producer_json_of_canary_shape_not_transferred_when_key_stripped(self) -> None:
+        """재현(리뷰): 15건 6초 산출물에서 가드 키를 제거하면 옛 형식 — 이관되면 안 된다."""
+        import dataclasses
+
+        report = dataclasses.asdict(_report([6_000] * 15))
+        assert vs.adapt_hit_cu_metrics(report) == {}  # 가드 True라 이관 0
+        del report["hit_implausible_majority"]
+        assert "hit" not in vs.adapt_hit_cu_metrics(report)
+
+    def test_other_axes_still_transferred_when_hit_is_skipped(self) -> None:
+        """HIT만 막는다 — 실패 분포 등 다른 축은 영향이 없다(과잉 차단 없음)."""
+        counts = {f"F{i}": 0 for i in range(1, 9)}
+        counts["F2"] = 1
+        out = vs.adapt_hit_cu_metrics(
+            _scorecard_json(rejected_count=1, failure_code_counts=counts),
+        )
+        assert "hit" not in out
+        assert out["machine_share"] == {"hits": 1, "trials": 1}
+
+    def test_skip_reason_per_branch(self) -> None:
+        assert vs.hit_skip_reason(_scorecard_json(hit_implausible_majority=False)) is None
+        true_reason = vs.hit_skip_reason(_scorecard_json(hit_implausible_majority=True))
+        assert true_reason and "절반 이상" in true_reason
+        none_reason = vs.hit_skip_reason(_scorecard_json(hit_implausible_majority=None))
+        assert none_reason and "미검사" in none_reason
+        missing_reason = vs.hit_skip_reason(_scorecard_json())
+        assert missing_reason and "키 없음" in missing_reason
+        odd_reason = vs.hit_skip_reason(_scorecard_json(hit_implausible_majority="false"))
+        assert odd_reason and "해석할 수 없다" in odd_reason
+
+    def test_skip_reason_none_when_nothing_to_transfer(self) -> None:
+        """옮길 계측 자체가 없으면 '가드가 막았다'고 말하지 않는다(사유 오귀속 방지)."""
+        assert vs.hit_skip_reason(_scorecard_json(cu_measured=0)) is None
+        assert vs.hit_skip_reason(_scorecard_json(hit_median_seconds=None)) is None
+
+    def test_cli_prints_skip_reason_to_stderr(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """운영자가 '그냥 미측정'으로 오독하지 않게 CLI가 사유를 stderr에 남긴다(P3-4)."""
+        path = tmp_path / "hit.json"
+        path.write_text(json.dumps(_scorecard_json()), encoding="utf-8")  # 키 없음
+        vs.main(["--hit-cu-json", str(path)])
+        err = capsys.readouterr().err
+        assert "[HIT·처리량 미이관]" in err
+        assert "키 없음" in err
+
+    def test_cli_silent_on_transferred_report(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        path = tmp_path / "hit.json"
+        path.write_text(
+            json.dumps(_scorecard_json(hit_implausible_majority=False)), encoding="utf-8"
+        )
+        vs.main(["--hit-cu-json", str(path)])
+        assert "미이관" not in capsys.readouterr().err

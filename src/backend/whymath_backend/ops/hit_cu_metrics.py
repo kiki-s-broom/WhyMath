@@ -64,17 +64,22 @@ HIT 하한 가드 (OPS-90 — 게이트의 방향 대칭)
     (`ops/weekly_metrics_report`)와 스코어카드 어댑터(`ops/validation_scorecard`)가
     `hit_implausible_majority`를 읽어 HIT·처리량을 미측정으로 낸다.
   - **3상태**: `hit_implausible_majority`는 계측 CU 0건이거나 하한이 0(가드 끔)이면 **None**
-    (모른다 ≠ 아니다)이다. False는 "검사했고 괜찮다"일 때만 낸다.
+    (모른다 ≠ 아니다)이다. False는 "검사했고 괜찮다"일 때만 낸다. 가드가 꺼졌을 때는
+    `cu_implausible_short_count`·`implausible_short_share`도 0이 아니라 **None**이다(검사하지
+    않은 것을 JSON에서 "0건·0%"로 읽지 않게). 소비자는 이 값이 **False일 때만** 이관한다 —
+    True(걸림)·None(미검사)·키 없음(가드 이전 산출물)은 전부 미측정으로 남긴다.
 
 **하한 기본값(30초)의 근거와 한계 — 정직하게**
   - 실측 근거(2026-09-22 카나리 회차 · 게이트 `G-eos-first-run-canary-review` 증적): 고유 CU
-    15건(승인 13·반려 2) HIT 중앙값 **6초**·P90 **41초**·총합 **4분 6초(246초)**. 이 세션은
-    재입력 세션이라 Kiki가 무효로 자인했다. 원 이벤트 JSONL(`mp02-out/…v3.jsonl`)은 코퍼스
-    데이터라 커밋되지 않아 이 저장소에서는 **요약 3개 수치만** 확인 가능하다(CU별 분포는 미확인).
+    15건(승인 13·반려 2) HIT 중앙값 **6초**·P90 **41초**. 이 세션은 재입력 세션이라 Kiki가
+    무효로 자인했다(여기까지가 게이트 증적에 있는 내용). 총합 **4분 6초(246초)**는 증적에는
+    없고 OPS-90 acceptance ④의 인용이다. 원 이벤트 JSONL(`mp02-out/…v3.jsonl`)은 코퍼스
+    데이터라 커밋되지 않아 이 저장소에서는 **요약 수치만** 확인 가능하다(CU별 분포는 미확인).
   - 30초를 고른 이유(수치): 목표 중앙값 4분(240초)의 1/8이고, 무효로 판정된 회차의 중앙값(6초)의
     5배·P90(41초)의 약 3/4다. 즉 그 회차는 이 하한으로 **확실히 걸린다**(중앙값이 하한의 1/5).
-    반대로 하한을 올릴수록(예: 60초) 한 번에 읽고 결정할 수 있는 쉬운 문항의 정상 검수까지
-    무효로 버리고, 내릴수록(예: 10초) 6초 중앙값 같은 값이 경계 근처로 올라와 가드가 무력해진다.
+    하한을 올릴수록 정상 검수를 무효로 버릴 위험이 커지고, 내릴수록(예: 10초) 6초 중앙값 같은
+    값이 경계 근처로 올라와 가드가 무력해진다. 정상 최초 검수의 경과 분포는 측정된 적이 없어
+    알 수 없으므로 어느 쪽 위험이 얼마나 되는지도 수치로 말할 수 없다.
   - **한계**: 정상적인 *최초* 검수의 경과 분포는 이 저장소에 없다(측정된 적이 없다 — 다음 회차
     EOS-197이 첫 유효 표본이다). 따라서 30초는 "무효 사례를 확실히 잡고 정상 검수를 버리지
     않도록 보수적으로 낮춘" **판단값**이지 정상 분포에서 도출한 임계가 아니다. 첫 유효 표본이
@@ -509,10 +514,11 @@ class HitCuReport:
     # ── HIT 하한 가드(OPS-90) — 비현실적으로 짧은 검수(재입력·스킵 세션)의 가시화 ──
     min_plausible_seconds: float = DEFAULT_MIN_PLAUSIBLE_SECONDS
     """적용된 하한(초). 0이면 가드 끔 — 리포트·JSON에 항상 남겨 어떤 하한으로 판정했는지 보이게."""
-    cu_implausible_short_count: int = 0
-    """계측 CU 중 `hit_seconds < min_plausible_seconds`인 건수(정확히 하한이면 현실적)."""
+    cu_implausible_short_count: int | None = None
+    """계측 CU 중 `hit_seconds < min_plausible_seconds`인 건수(정확히 하한이면 현실적).
+    **None = 가드 끔(하한 0)이라 세지 않았다** — 0건이 아니다."""
     implausible_short_share: float | None = None
-    """위 건수 / 계측 CU 수. 계측 CU 0건이면 None(0%가 아니라 모름)."""
+    """위 건수 / 계측 CU 수. 계측 CU 0건이거나 가드 끔이면 None(0%가 아니라 모름)."""
     hit_implausible_majority: bool | None = None
     """하한 미만 CU가 계측 CU의 **절반 이상**(`2*k >= n`)인가 — True면 HIT 중앙값·P90을 신뢰할
     수 없다(게이트 fail-closed·주간 KPI 미측정 처리의 근거).
@@ -554,16 +560,18 @@ def aggregate(
     hit_samples = sorted(float(c.hit_seconds) for c in measured if c.hit_seconds is not None)
 
     # ── HIT 하한 가드(OPS-90) — 상한만 보는 게이트의 0초 방향 보완 ──
-    if math.isnan(min_plausible_seconds):
-        raise ValueError("min_plausible_seconds는 NaN일 수 없다 — 비교가 전부 False라 가드가 꺼짐")
-    implausible_short_count = sum(1 for sec in hit_samples if sec < min_plausible_seconds)
+    if math.isnan(min_plausible_seconds) or min_plausible_seconds < 0:
+        # NaN은 비교가 전부 False, 음수는 아무것도 걸리지 않아 가드가 조용히 꺼진다 — 끄려면 0.
+        raise ValueError("min_plausible_seconds는 0 이상의 수여야 한다(0=가드 끔, NaN·음수 거부)")
+    # 가드 끔(하한 0)이면 건수·비율도 None — 검사하지 않은 것을 "0건·0%"로 읽지 않게 한다.
+    implausible_short_count: int | None = None
     implausible_share: float | None = None
     implausible_majority: bool | None = None
-    if hit_samples and min_plausible_seconds > 0:
-        implausible_share = implausible_short_count / len(hit_samples)
-        implausible_majority = 2 * implausible_short_count >= len(hit_samples)
-    elif hit_samples:
-        implausible_share = 0.0  # 하한 0 — 가드 끔: 건수 0은 사실이나 majority는 판정 보류(None)
+    if min_plausible_seconds > 0:
+        implausible_short_count = sum(1 for sec in hit_samples if sec < min_plausible_seconds)
+        if hit_samples:
+            implausible_share = implausible_short_count / len(hit_samples)
+            implausible_majority = 2 * implausible_short_count >= len(hit_samples)
 
     # ── 적재율 — 판정 소스가 있을 때만(없으면 None=미산출 — 0%로 위장 금지) ──
     finished_slugs = {s.cu_slug for s in sessions if s.has_finish}

@@ -266,13 +266,22 @@ def build_record_from_report(
     else:
         # HIT 하한 가드(OPS-90) — 계측 CU의 절반 이상이 하한 미만이면 그 중앙값·처리량은 재입력·
         # 스킵 세션의 값일 수 있어 `measured: true`로 계상하지 않는다(감리 W-04: 유효 실측 0건인데
-        # 무효 표본 15건이 있었다). `is True`만 막는다 — None(모른다/가드 끔)은 기존 동작 유지.
-        implausible_reason = (
-            f"계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 HIT 하한 "
-            f"{report.min_plausible_seconds:g}초 미만(절반 이상) — 재입력·스킵 세션 의심(OPS-90)"
-            if report.hit_implausible_majority is True
-            else None
-        )
+        # 무효 표본 15건이 있었다). 3상태(모른다 ≠ 아니다): `False`("검사했고 괜찮다")일 때만
+        # 계상한다. 계측 CU가 있는데 True(걸림)·None(하한 0=가드 끔으로 미검사)이면 미측정이다.
+        # 계측 CU 0건의 None은 정상 분기라 여기서 건드리지 않는다 — 아래 기존 "계측 완료 CU 0건"
+        # 사유가 그대로 나간다.
+        implausible_reason: str | None = None
+        if report.cu_measured > 0 and report.hit_implausible_majority is not False:
+            if report.hit_implausible_majority is True:
+                implausible_reason = (
+                    f"계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 "
+                    f"HIT 하한 {report.min_plausible_seconds:g}초 미만(절반 이상) — "
+                    "재입력·스킵 세션 의심(OPS-90)"
+                )
+            else:
+                implausible_reason = (
+                    "HIT 하한 가드 미검사(하한 0 이하) — 재입력·스킵 세션 여부를 알 수 없다(OPS-90)"
+                )
         # HIT — 중앙값(초). CU 표본이 없으면 median=None(0초 산입 금지, hit_cu_metrics 규약).
         if implausible_reason is not None:
             kpis["hit_seconds"] = KpiValue(
