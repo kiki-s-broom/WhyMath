@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Mapping
 
 import pytest
 import sympy
@@ -695,7 +695,8 @@ def test_fuzz_true_root_near_hole_is_not_passed(condition: str) -> None:
 
 @pytest.mark.parametrize("gap", ["5*10**(-2)", "10**(-1)", "1/2"])
 def test_fuzz_hole_far_from_true_root_is_still_dropped(gap: str) -> None:
-    """① 대조군 — 참 근이 창(격자 간격 2배 = 0.02) 밖이면 무연근은 그대로 버려져 정답이 pass 다.
+    """① 대조군 — 참 근이 창의 2배(격자 간격 4배 ≈ 0.04, 비율 검사 문턱 1/2) 밖이면 무연근은 그대로
+    버려져 정답이 pass 다.
     창을 넓힌 대가로 정상 답이 판정 불가로 밀리지 않는지 본다."""
     condition = f"x*(x-2)**2*(x - 2 - {gap})/(x-2) = 0"
     assert fuzz_answer(condition, {"x": f"2 + {gap}"}, "largest").state == "pass"
@@ -875,6 +876,28 @@ def test_isolation_lead_missing_branch_direct() -> None:
     )
 
 
+def test_isolation_ratio_threshold_is_half_of_the_value_at_the_point() -> None:
+    """창 양 끝에서 g 가 g(점)의 절반 넘게 벗어나면 고립이 아니다 — 문턱 양쪽. 선형 g 에서 다른 근이
+    점에서 r 떨어져 있으면 벗어남 비율은 창/r 이라, r 이 창의 2배보다 약간 가까우면(1.9배) 닫히고
+    약간 멀면(2.1배) 고립이다. 문턱이 비율 1(느슨)이면 1.9배도 고립으로 읽는다."""
+    point = sympy.Integer(2)
+    near = (_X - 2) * (_X - 2 - _WINDOW * sympy.Rational(19, 10))
+    far = (_X - 2) * (_X - 2 - _WINDOW * sympy.Rational(21, 10))
+    assert fuzz_module._isolated_exact_root(near, _X, point, 2.0, _WINDOW) is False
+    assert fuzz_module._isolated_exact_root(far, _X, point, 2.0, _WINDOW) is True
+
+
+def test_fuzz_true_root_just_inside_twice_the_window_is_not_dropped() -> None:
+    """끝에서 끝까지 — 창은 격자 간격의 2배(0.0200)라 무연근에서 0.0400 안의 참 근은 판정 불가로 닫히고
+    (수치 탐색은 이 근을 따로 찾지만 창 끝 비율 검사가 닫는다 — 안전이 아니라 확인 가능성의 비용)
+    0.0400 밖은 무연근만 버려져 판정된다. 양쪽 경계가 문턱 1/2 에 묶여 있다."""
+    for side in ("+", "-"):
+        for gap, state in (("38/1000", "unverifiable"), ("42/1000", "pass")):
+            condition = f"x*(x-2)**2*(x-2{side}{gap})/(x-2) = 0"
+            true_root = f"2 {'+' if side == '-' else '-'} {gap}"
+            assert fuzz_answer(condition, {"x": true_root}, "largest").state == state
+
+
 def test_isolation_unknown_window_or_inexact_point_is_not_isolated() -> None:
     """분기 W·P — 창을 정할 수 없거나(None) 점이 근사 소수·자유 기호를 담으면 고립을 확인한 것이 아니다."""
     residual = (_X - 3) * (_X - 2)
@@ -896,6 +919,39 @@ def _timed(call: Callable[[], AnswerVerdict]) -> tuple[AnswerVerdict, float]:
     return verdict, time.perf_counter() - started
 
 
+# 기약 4차 근(페라리 꼴)의 최소 크기 — 예산(60)을 끈 코드가 원문에 넣어 보게 되는 근이다. 예산 값이
+# 아니라 이 고정 문턱을 쓰므로 예산을 10**9 로 끄거나 우회해도 놓치지 않는다.
+_OVERSIZED_ROOT_OPS = 69
+
+
+class _OversizedRootEvaluated(BaseException):  # noqa: N818 — `except Exception` 이 삼키지 못하게
+    """예산을 넘는 근이 원문 정의역 평가에 들어왔다."""
+
+
+@pytest.fixture
+def no_oversized_root_evaluation(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[int]]:
+    """원문 정의역 평가(`condition_definedness`)에 `count_ops` > 69 인 값이 들어오면 즉시 중단한다.
+
+    예산이 꺼지거나 우회돼도 CI 가 job 시간초과로만 알리지 않고 수 초 안에 단언 실패로 알린다.
+    검증기들이 `except Exception` 으로 예외를 삼키므로 BaseException 으로 올리고, 본 값은 목록에도
+    남겨 시험 끝에서 한 번 더 확인한다."""
+    seen: list[int] = []
+    original = verify_answer_module.condition_definedness
+
+    def spy(condition: str, values: Mapping[str, sympy.Expr]) -> str:
+        for value in values.values():
+            ops = int(sympy.count_ops(value))
+            if ops > _OVERSIZED_ROOT_OPS:
+                seen.append(ops)
+                raise _OversizedRootEvaluated(f"count_ops={ops}")
+        return original(condition, values)
+
+    monkeypatch.setattr(verify_answer_module, "condition_definedness", spy)
+    yield seen
+    assert seen == []
+
+
+@pytest.mark.usefixtures("no_oversized_root_evaluation")
 @pytest.mark.parametrize("kind", ["sum", "product"])
 @pytest.mark.parametrize("condition", [_QUARTIC_ALGEBRAIC_HOLE, _QUARTIC_INTEGER_HOLE])
 def test_quartic_aggregate_with_removable_singularity_is_closed_within_the_time_limit(
@@ -914,12 +970,13 @@ def test_quartic_aggregate_with_removable_singularity_is_closed_within_the_time_
         assert elapsed < _SECONDS_LIMIT
 
 
-@pytest.mark.parametrize("claimed", ["0", "2", "3", "4"])
-def test_quartic_real_root_count_with_algebraic_coefficient_is_closed_within_the_time_limit(
-    claimed: str,
-) -> None:
+@pytest.mark.usefixtures("no_oversized_root_evaluation")
+def test_quartic_real_root_count_with_algebraic_coefficient_is_closed_within_the_time_limit() -> (
+    None
+):
     """② 실근 개수 — 대수 계수 4차는 근 표현이 예산을 넘어 판정 불가(정수 계수는 `real_roots` 의 수치
-    근이라 종전에도 빨랐고 그대로 판정된다)."""
+    근이라 종전에도 빨랐고 그대로 판정된다). 주장값은 판정 불가에 영향이 없어 하나만 본다."""
+    claimed = "2"
     verdict, elapsed = _timed(lambda: verify_real_root_count(_QUARTIC_ALGEBRAIC_HOLE, claimed))
     assert verdict.state == "unverifiable"
     assert elapsed < _SECONDS_LIMIT
@@ -957,6 +1014,17 @@ def _radical_sum_with_ops(target: int) -> sympy.Expr:
             if sympy.count_ops(candidate) == target:
                 return candidate
     raise AssertionError("크기가 맞는 식을 만들지 못했다")
+
+
+def test_roots_between_44_and_60_ops_are_still_decided() -> None:
+    """② 예산이 너무 낮아지지 않는지 — 근호 계수 3차 `x³ + 2√2·x² − 5x + 1` 의 근은 `count_ops` 가
+    44·58·60 이고 0.1초 안에 정의역이 평가된다. 예산을 44 로 낮추면 58·60 이 닫혀 판정 불가가 된다."""
+    condition = "(x**3 + 2*sqrt(2)*x**2 - 5*x + 1)*(x-1)/(x-1) = 0"
+    residual, _ = verify_answer_module._parse_condition(condition)
+    roots = sympy.roots(sympy.Poly(residual, _X))
+    assert sorted(sympy.count_ops(root) for root in roots) == [44, 58, 60]  # 픽스처 전제
+    assert verify_real_root_count(condition, "3").state == "pass"
+    assert verify_real_root_count(condition, "1").state == "fail"
 
 
 def test_definedness_budget_closes_only_oversized_roots(monkeypatch: pytest.MonkeyPatch) -> None:
