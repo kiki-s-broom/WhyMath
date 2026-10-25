@@ -83,7 +83,7 @@ namespace 분리·희소 그래프라 상대적으로 안전.
 
 ### Q4. 유지보수 지옥 가능성이 높은 구조
 "Single change → global rebuild" 후보 3:
-- **오개념 3중 표현**(kebab 30 / M-id 839 / JSONB) FK 없음 — 하나 고치면 나머지 침묵 drift.
+- **오개념 3중 표현**(2026-06-30 작성 당시 kebab 30 / M-id 839 / JSONB) FK 없음 — 하나 고치면 나머지 침묵 drift.
 - **교육과정 이중**(노드 내장 `grade_introduced`·`curriculum_version` + `CurriculumEntry` overlay)
   — 진실 출처 2개.
 - **수식 파서 이중**(SymPy + mathjs) — 동치 규칙이 두 언어에 따로.

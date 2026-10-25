@@ -52,7 +52,8 @@ if TYPE_CHECKING:
 
 # atom mis_id 접두 — 구 M-series(misconceptions_v1)와 네임스페이스 분리(무충돌·결정론).
 ATOM_MIS_ID_PREFIX = "ATOM:"
-# provenance 메모 — atom 백본 출처 표기(구 카탈로그(misconceptions_v1)와 구분·Phase 5 폐기 대상 식별).
+# provenance 메모 — atom 백본 출처 표기(구 카탈로그 misconceptions_v1과 구분·Phase 5 폐기 대상
+# 식별).
 ATOM_PROVENANCE_NOTE = "atom_graph_v1"
 # atom 판별 level 값(세부개념 = 원자) — 단원·소단원은 ①오개념 미보유.
 _ATOM_LEVEL = "세부개념"

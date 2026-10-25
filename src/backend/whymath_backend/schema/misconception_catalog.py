@@ -1,10 +1,10 @@
 """오개념 카탈로그(MisconceptionCatalog) 백엔드 Pydantic 스키마 — M-id 콘텐츠 카탈로그 계약.
 
 설계 정본: L1 데이터 파이프라인의 오개념 추출기(`data_pipeline/misconception/extract.py`의
-`MisconceptionRecord` TypedDict 16필드)를 *백엔드 API/계약 모델*로 옮긴 것. #290에서 커밋한
-코퍼스 `data/corpus/misconceptions_v1/misconceptions.json`(Collection JSON·#290 커밋 당시 839 레코드 — 현재 건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`)을 적재할
-영속 카탈로그의 계약이며, 이 슬라이스(Phase B.2)는 ORM·계약·마이그레이션만 세운다 — 코퍼스
-로더는 후속 슬라이스 몫이다.
+`MisconceptionRecord` TypedDict 16필드)를 *백엔드 API/계약 모델*로 옮긴 것. #290에서 커밋한 코퍼스
+`data/corpus/misconceptions_v1/misconceptions.json`(Collection JSON·#290 커밋 당시 839 레코드 — 현재
+건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`)을 적재할 영속 카탈로그의 계약이며, 이
+슬라이스(Phase B.2)는 ORM·계약·마이그레이션만 세운다 — 코퍼스 로더는 후속 슬라이스 몫이다.
 
 ⚠️ 별개 체계 주의: 이 카탈로그는 **M-id(예 'M0425') 콘텐츠 카탈로그**다. 기존 L4 탐지 엔진
 (`l4/misconception/catalog.py`의 30종 kebab-id)·런타임 테이블(`misconception_hypothesis`·

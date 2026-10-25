@@ -1,10 +1,10 @@
 """오개념 카탈로그(MisconceptionCatalog) ORM 모델 (SQLAlchemy 2.0 영속 레이어).
 
-설계 정본: `schema/misconception_catalog.py`(Pydantic, 검증·API 계약)와 *별도*로 세운 영속
-매핑이며 `from_schema`/`to_schema` 변환 헬퍼가 둘을 잇는다(`models/achievement_standard.py`
-동일 패턴 — SQLModel 미사용). 이 슬라이스(Phase B.2)는 카탈로그의 ORM·계약·마이그레이션만
-세우고, #290 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·#290 커밋 당시 839 레코드 — 현재 건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`) 로더는
-후속 슬라이스 몫이다.
+설계 정본: `schema/misconception_catalog.py`(Pydantic, 검증·API 계약)와 *별도*로 세운 영속 매핑이며
+`from_schema`/`to_schema` 변환 헬퍼가 둘을 잇는다(`models/achievement_standard.py` 동일 패턴 —
+SQLModel 미사용). 이 슬라이스(Phase B.2)는 카탈로그의 ORM·계약·마이그레이션만 세우고, #290
+코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·#290 커밋 당시 839 레코드 — 현재 건수는
+`docs/data/corpus_facts.md`의 `misconceptions.count`) 로더는 후속 슬라이스 몫이다.
 
 PK 판단(이 모듈의 핵심 결정):
   `mis_id`(의미 문자열·예 'M0425')가 PK다. UUID가 아니라 의미 문자열이라 `gen_random_uuid()`

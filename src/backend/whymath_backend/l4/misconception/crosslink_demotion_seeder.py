@@ -57,8 +57,8 @@ def build_demotion_set(
 ) -> list[CrosslinkTrial]:
     """positives + injected negatives(2 tier)로 강등전 셋 구성(순수·결정론).
 
-    `mid_standards`: M-id 코퍼스(misconceptions_v1) {mis_id: standard_code}. `kebab_standards`: 문항에서 역유도한
-    {kebab: 성취기준 집합}(`derive_kebab_standards`). 각 positive kebab마다:
+    `mid_standards`: M-id 코퍼스(misconceptions_v1) {mis_id: standard_code}. `kebab_standards`:
+    문항에서 역유도한 {kebab: 성취기준 집합}(`derive_kebab_standards`). 각 positive kebab마다:
       - positive 1건(정답 매핑),
       - cross_standard_neg: 성취기준이 kebab 집합과 겹치지 않는 M-id(standard None 제외)를 mis_id
         사전순 앞에서 `cross_per_positive`개,

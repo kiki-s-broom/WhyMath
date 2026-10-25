@@ -560,7 +560,7 @@ CREATE TABLE strategy_evidence (
 |`curate_hypothesis`/`select_probe`|L4 `hypothesis.py`+`hypothesis_store.py`(`curate_hypothesis`)·`probe_selection.py`(`select_probe`·정보이득·ε-탐색)·`evidence_links`(가동)|둘 다 순수 로직 구현(`curate_hypothesis` 증거 반박·캡·`select_probe` 판별 태깅·ε)·문항 태그 스키마·ε 카운터 영속·coach 결선은 후속|
 |`end_turn` 코칭 결정               |L4 `recommend_coaching`·`recommend_prerequisite_coaching`·`GET /v1/me/.../coaching`·`/v1/coach/sessions`|§11.2 힌트 경제(개입 금지 타이머)는 이 코칭 결정의 *집행 런타임*       |
 |상태 저장소                        |PostgreSQL 16·Redis 7 (가동)·**벡터=pgvector**                                  |`evidence_links`·`strategy_*`는 향후 alembic 마이그레이션 |
-|커리큘럼 노드                       |개념그래프 **403개념**(`concept` code=UC)·NCIC 성취기준                                |설계안 "545노드"와 용어·수치 정합 필요                         |
+|커리큘럼 노드                       |개념그래프 **<!-- fact:concept_graph.concepts -->437<!-- /fact -->개념**(`concept` code=UC)·NCIC 성취기준                                |설계안 "545노드"와 용어·수치 정합 필요                         |
 
 미구현 테이블(`evidence_links`·`strategy_nodes`·`strategy_evidence`)은 *향후 스키마*다 — 구현 시 alembic 마이그레이션과 §2.3 개인정보 설계(14세 미만 동의·retention·삭제권 연쇄)를 1차에 포함한다. 본 하네스 도입은 ROADMAP상 **0단계(평가 하네스)·verify_step·match_misconception은 Phase 1~2, 전체 도구 루프·전략 계층·자체 모델 학습은 Phase 2~3**으로 단계화한다(1인 capacity 가드·"측정 없는 도입 없음").
 
@@ -581,9 +581,9 @@ CREATE TABLE strategy_evidence (
 
 **구현됨(2026-06-17·마이그레이션 0 — 기존 테이블 재사용)**: `curate_hypothesis`(`l4/misconception/hypothesis_store.py`). 순수 `curate`(`hypothesis.py` — `update_hypotheses` + **반박 제거** + **최대 5 캡**·§2.2) 위에, 후보 오개념(현재 활성 가설 ∪ 새 매치)별 `evidence_store.net_support`를 조회해 *음수(반박 우세)면 archived*하고(§5.1·R4 확증편향 방지 — 반박이 LLM 추론 아닌 증거 그래프 SQL 집계) 최대 5개로 캡한 활성 세트를 `_persist_active_set`(upsert + 탈락 비활성화)으로 영속한다. `apply_matches`(매치만 반영)와 영속 헬퍼 공유(중복 0). **후속**: coach/intervention 결선(`curate_hypothesis`→개입 발화)·`select_probe`(ε-탐색 문항)·단일 트랜잭션 삭제 오케스트레이션(BKT·pgvector 동반).
 
-### 용어·수치 정합: "545 노드" → 구현 403 개념
+### 용어·수치 정합: "545 노드" → 구현 개념그래프 v1
 
-본문의 "545노드 커리큘럼 그래프"는 *설계 시점 추정치*이며 현 저장소에 해당 실체가 없다(레포 grep 결과 "545"는 본 문서 외 0). 구현된 커리큘럼/개념 계층은 **개념그래프 v1 — 403 개념(`concept`·code=UC) + 541 선수엣지(`concept_edge` PREREQUISITE)** + NCIC 성취기준이다. 성취기준 노드를 별도 차원으로 둘 경우 수치를 실측으로 확정한다("545"는 미반영 추정치).
+본문의 "545노드 커리큘럼 그래프"는 *설계 시점 추정치*이며 현 저장소에 해당 실체가 없다(레포 grep 결과 "545"는 본 문서 외 0). 구현된 커리큘럼/개념 계층은 **개념그래프 v1 — <!-- fact:concept_graph.concepts -->437<!-- /fact --> 개념(`concept`·code=UC) + <!-- fact:concept_graph.edges -->581<!-- /fact --> 선수엣지(`concept_edge` PREREQUISITE)** + NCIC 성취기준이다. 성취기준 노드를 별도 차원으로 둘 경우 수치를 실측으로 확정한다("545"는 미반영 추정치).
 
 ### 도구 11종 → 실제 좌석 1:1 매핑 (편집자 부기)
 
