@@ -1008,6 +1008,59 @@ def unmarked_phrases(root: Path, values: dict[str, FactValue] | None = None) -> 
     return out
 
 
+# ── 테스트의 손 고정값 탐지 ──────────────────────────────────────────────────────
+
+# 테스트 코드(주석·문자열 제외)의 숫자 리터럴이 코퍼스 사실 값과 같으면 손으로 박은 고정값이다.
+# 테스트는 `docs/data/corpus_facts.json`에서 읽어야 한다 — 원본이 바뀌면 sync 한 번으로 따라간다.
+# 흔한 수(백 단위 · HTTP 상태 코드)는 우연히 같을 수 있어 보지 않는다.
+PIN_SCAN_GLOBS: tuple[str, ...] = ("tests/**/*.py",)
+PIN_MIN_VALUE = 400
+_COMMON_NUMBERS = frozenset({400, 401, 403, 404, 405, 409, 410, 415, 422, 429, 500, 502, 503, 504})
+PIN_ALLOW = re.compile(r"#\s*corpus-pin:\s*\S")  # 같은 줄에 사유를 달면 허용(합성 픽스처·시점 고정)
+
+
+def distinctive_values(values: dict[str, FactValue]) -> dict[int, list[str]]:
+    out: dict[int, list[str]] = {}
+    for fid, v in values.items():
+        if isinstance(v, int) and v >= PIN_MIN_VALUE and v % 100 and v not in _COMMON_NUMBERS:
+            out.setdefault(v, []).append(fid)
+    return out
+
+
+def hand_pins(root: Path, values: dict[str, FactValue] | None = None) -> list[str]:
+    import io
+    import tokenize
+
+    values = compute_all(root) if values is None else values
+    wanted = distinctive_values(values)
+    out: list[str] = []
+    seen: set[Path] = set()
+    for pattern in PIN_SCAN_GLOBS:
+        for path in sorted(root.glob(pattern)):
+            if path in seen or not path.is_file() or _is_history(str(path.relative_to(root))):
+                continue
+            seen.add(path)
+            text = path.read_text(encoding="utf-8")
+            lines = text.splitlines()
+            try:
+                tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+            except (tokenize.TokenError, SyntaxError):
+                continue
+            for tok in tokens:
+                if tok.type != tokenize.NUMBER:
+                    continue
+                try:
+                    num = int(tok.string.replace("_", ""), 0)
+                except ValueError:
+                    continue
+                if num in wanted and not PIN_ALLOW.search(lines[tok.start[0] - 1]):
+                    out.append(
+                        f"{path.relative_to(root)}:{tok.start[0]} 손 고정값 {tok.string}"
+                        f" ({'·'.join(wanted[num])}) — corpus_facts.json에서 읽는다"
+                    )
+    return out
+
+
 # ── 판정 ────────────────────────────────────────────────────────────────────────
 
 
