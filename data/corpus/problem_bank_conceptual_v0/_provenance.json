@@ -4,7 +4,7 @@
   "generated": "2026-07-17",
   "generation_method": "개념형(개수·판정) 객관식 15밴드 결정론 생성기(LLM 0) — l3/equivalent/conceptual_count_mc_generator.py를 harness/conceptual_count_mc_batch.py가 오케스트레이션(S2-a 수용 게이트 통과분만 편입)",
   "generation_cli": "python -m whymath_backend.harness.conceptual_count_mc_batch",
-  "record_count": 360,
+  "record_count": 372,
   "source_citation": "출처: WhyMath 자체 저작 동등문제(WHYMATH_GENERATED). 평가원·EBS·검정교과서 본문 복제 0 — 성취기준+구조 시그니처만으로 결정론 생성(본문 미보유 출처 인용 아님).",
   "license_notice": "본 코퍼스의 모든 문항은 WhyMath가 자체 생성한 저작물(license=WHYMATH_GENERATED, source_type=자체생성)이다. 저작권은 WhyMath에 있으며 본문 보유가 합법이다(schema/problem.py _METADATA_ONLY_SOURCES 규칙과 정합).",
   "copyright_rail": [
@@ -19,7 +19,8 @@
   "review_status": {
     "note": "노출 4단(게이트 통과→코퍼스 편입→노출 적격→실노출) 중 '노출 적격' 단계 표본 검수 완료(2026-08-03 갱신 — ARCH-25 S3-11 회수 시 정정). S3-09(rotation-0)에서 발견된 조사(josa)·해설 극한 부호·조건부확률 공리 결함을 생성기에서 교정(S3-12)한 뒤 rotation-0과 무관한 신규 독립 표본으로 재검수해 PASS 확정.",
     "sample_review": "rotation-1 결정론 층화 표본 200/360 — 결함 0건, 점추정 0.00%, Wilson 95% 단측 상한 1.33%(≤2% 임계) → PASS(exit 0).",
-    "evidence": "docs/data/ai_review_batch_v0_4corpora_2026-07.md §Rotation-1 환류 검증 결과(S3-12) — corpus_audit_conceptual_v0.jsonl"
+    "evidence": "docs/data/ai_review_batch_v0_4corpora_2026-07.md §Rotation-1 환류 검증 결과(S3-12) — corpus_audit_conceptual_v0.jsonl",
+    "pending_additions": "2026-10-18 P3-51 — 극값의 개수 양성 예 12건(사차 6·오차 6, 정답 1 또는 2)을 뒤에 추가했다. 위 표본 검수(200/360)는 이 12건을 보지 않았으므로 코퍼스 판정을 빌려 오지 않고 review_status=pending 으로 둔다. 사람 검수 뒤에 approved 로 올린다. 기존 360건은 바이트 그대로다."
   },
   "authoring_fields": {
     "note": "problems.jsonl 각 레코드의 concepts/verify/license/generation_type/original_source는 *저작 메타*(Problem 스키마 밖)로, populate가 Problem 본문 필드와 분리 처리한다.",

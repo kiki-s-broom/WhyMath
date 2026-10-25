@@ -15,9 +15,13 @@ from whymath_backend.l3.equivalent.acceptance import (
     evaluate_equivalent_candidate,
 )
 from whymath_backend.l3.equivalent.conceptual_count_mc_generator import (
+    EXTREMUM_POSITIVE_COUNT,
     ConceptualCountMCSkeletonGenerator,
     CountTemplateKind,
+    _build_extremum_count_pool,
+    _extremum_positive_item,
 )
+from whymath_backend.l3.verify_answer import verify_extremum_count
 
 _CASES: tuple[tuple[CountTemplateKind, str, tuple[str, ...]], ...] = (
     ("real_root_count", "discriminant-negative-no-real-root", ("[10공수1-02-02]",)),
@@ -55,6 +59,102 @@ def _gen(template: CountTemplateKind, kebab: str) -> ConceptualCountMCSkeletonGe
     return ConceptualCountMCSkeletonGenerator(
         template, build_kebab_distractor_codes_optional(kebab)
     )
+
+
+def test_extremum_pool_keeps_the_approved_head_in_order() -> None:
+    """P3-51 ③ — 풀 앞 24칸은 기존 승인 문항(a=1~4 × c=0~5) 그대로, 같은 순서다.
+
+    순서가 바뀌면 같은 배치(n=24)가 다른 문항을 뽑아 승인 근거가 새 문항으로 옮겨 간다. 기대 문면은
+    생성기 코드를 빌리지 않고 여기서 따로 조립한다(생성기와 같이 틀리는 일을 막는다).
+    """
+    expected = [
+        f"삼차함수 f(x) = (x - {a})^3{f' + {c}' if c else ''} 의 극값의 개수를 구하시오."
+        for a in range(1, 5)
+        for c in range(0, 6)
+    ]
+    pool = _build_extremum_count_pool()
+    assert [item.question_text for item in pool[:24]] == expected
+    assert {item.answer_str for item in pool[:24]} == {"0"}
+
+
+def test_extremum_pool_appends_positive_examples_after_the_head() -> None:
+    """P3-51 ① — 극값이 있는 문항(정답 1·2)이 승인 머리 바로 뒤에 붙고, 정답 분포가 0 하나가 아니다."""
+    pool = _build_extremum_count_pool()
+    positives = pool[24 : 24 + EXTREMUM_POSITIVE_COUNT]
+    assert len(positives) == EXTREMUM_POSITIVE_COUNT == 12
+    assert {item.answer_str for item in positives} == {"1", "2"}
+    assert len({item.conditions for item in pool}) == len(pool)  # 구조 중복 없음
+
+
+def test_extremum_positive_items_are_checked_by_independent_sympy_and_misc_is_honest() -> None:
+    """P3-51 ② ④ — 정답은 SymPy 독립 검증을 통과하고, 오개념 오답(임계점 수)은 정답과 다르며 fail 한다."""
+    pool = _build_extremum_count_pool()
+    positives = pool[24 : 24 + EXTREMUM_POSITIVE_COUNT]
+    assert positives
+    for item in positives:
+        assert item.misc_str != item.answer_str, item.question_text
+        assert verify_extremum_count(item.conditions, item.answer_str).state == "pass"
+        assert verify_extremum_count(item.conditions, item.misc_str).state == "fail"
+
+
+def test_extremum_positive_candidates_pass_the_acceptance_gate_with_the_misconception_tagged() -> (
+    None
+):
+    """양성 예도 수용 게이트를 통과하고, 오답 선지 1건에만 오개념이 귀속된다(filler 미태깅)."""
+    kebab = "critical-point-implies-extremum"
+    gen = _gen("extremum_count", kebab)
+    spec = _spec(kebab, ("[12미적Ⅰ-02-01]", "[12미적Ⅰ-02-07]"))
+    candidates = [gen.generate(spec) for _ in range(24 + EXTREMUM_POSITIVE_COUNT)]
+    assert all(c is not None for c in candidates)
+    for c in candidates[24:]:
+        assert c is not None
+        verdict = evaluate_equivalent_candidate(
+            spec,
+            c.problem,
+            provenance=c.provenance,
+            conditions=c.conditions,
+            answer_map=c.answer_map,
+            answer_kind=c.answer_kind,
+        )
+        assert verdict.accepted, verdict.reasons
+        (entry,) = c.problem.distractor_map or []
+        assert c.problem.choices[entry.choice_index] != c.problem.answer
+        assert entry.misconception_id == kebab
+
+
+def test_extremum_positive_item_refuses_specs_that_would_misattribute_the_misconception() -> None:
+    """P3-51 ② 보호 장치의 변별력 — 거짓 귀속이 될 설계는 조용히 문항이 되지 않고 멈춘다.
+
+    정상 입력에서 초록인 것은 보호의 증거가 아니다. 막으려는 상태를 직접 넣어 본다:
+      · 단순근만(x³-3x 꼴): 임계점 수 = 극값 수라 오개념 오답이 정답과 같다.
+      · 이중근만(극값 0): 양성 예가 아니다.
+    """
+    simple_only = (6, ((1, 1), (-1, 1)))  # f' = 6(x-1)(x+1) → f = 2x³-6x
+    double_only = (12, ((0, 2), (1, 2)))  # f' = 12x²(x-1)² → 극값 0
+    for bad in (simple_only, double_only):
+        with pytest.raises(ValueError):
+            _extremum_positive_item(0, bad)
+    good = _extremum_positive_item(0, (12, ((0, 2), (1, 1))))
+    assert (good.answer_str, good.misc_str) == ("1", "2")
+
+
+def test_extremum_positive_item_recounts_with_sympy_and_catches_a_duplicated_root() -> None:
+    """스펙 구조만으로는 조건을 통과하지만 실제 함수는 다른 경우 — SymPy 독립 재계산이 잡는다.
+
+    근 1 이 두 번 적힌 스펙은 구조로 세면 극값 2·임계점 3(조건 통과)이지만, 실제 f' = 12(x-1)³x 의 근은
+    1(3중)·0 뿐이라 임계점은 2개다. 구조 계산만 믿으면 오개념 오답을 3 으로 잘못 달게 된다.
+    """
+    duplicated_root = (12, ((1, 2), (1, 1), (0, 1)))
+    with pytest.raises(ValueError, match="SymPy 재계산"):
+        _extremum_positive_item(0, duplicated_root)
+
+
+def test_extremum_positive_explanation_uses_the_right_josa_for_the_misconception_answer() -> None:
+    """해설 끝 '…세면 N(으)로 잘못 답한다' 의 조사 — 3 은 '으로', 2 는 '로' (실측 결함 교정)."""
+    pool = _build_extremum_count_pool()
+    by_misc = {item.misc_str: item for item in pool[24 : 24 + EXTREMUM_POSITIVE_COUNT]}
+    assert "세면 3으로 잘못 답한다" in by_misc["3"].answer_explanation
+    assert "세면 2로 잘못 답한다" in by_misc["2"].answer_explanation
 
 
 def test_extremum_count_is_filed_under_02_07_primary() -> None:

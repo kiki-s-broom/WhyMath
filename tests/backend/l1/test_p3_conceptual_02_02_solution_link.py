@@ -127,11 +127,14 @@ def test_binding_detects_a_content_change_under_an_intact_approval_stamp() -> No
 
 
 def test_other_corpus_rows_carry_no_steps_added_by_this_change() -> None:
-    """이번 변경은 [12미적Ⅰ-02-02] 24건에만 닿는다 — 같은 코퍼스의 나머지 336건은 단계가 없는 그대로다."""
+    """이번 변경은 [12미적Ⅰ-02-02] 24건에만 닿는다 — 같은 코퍼스의 나머지 348건은 단계가 없는 그대로다.
+
+    336 → 348: P3-51 이 극값의 개수 양성 예 12건을 더했다(이 문항들도 풀이 단계가 없다).
+    """
     rows = _rows()
     target_ids = {r["problem_id"] for r in _targets(rows)}
     others = [r for r in rows if r["problem_id"] not in target_ids]
-    assert len(others) == 336
+    assert len(others) == 348
     assert not [r for r in others if r["verify"].get("solution_steps")]
 
 

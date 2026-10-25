@@ -58,7 +58,7 @@ _GOLDEN_CORPUS_TYPE_TOTALS: dict[str, dict[str, int]] = {
         ptm.PTYPE_GENERALIZE_PATTERN: 30,
     },
     ptm.CORPUS_CONCEPTUAL_V0: {
-        ptm.PTYPE_COUNT_SOLUTIONS: 96,  # 4밴드 × 24
+        ptm.PTYPE_COUNT_SOLUTIONS: 108,  # 4밴드 × 24 + 극값의 개수 양성 예 12(P3-51)
         ptm.PTYPE_VERIFY_CLAIM: 264,  # 11밴드 × 24
     },
     ptm.CORPUS_KILLER_V0: {
@@ -129,8 +129,9 @@ _GOLDEN_UNIT_TABLE_TYPE_TOTALS: dict[str, dict[str, int]] = {
 _GOLDEN_UNIT_TABLE_TOTAL = 11396  # CONT-09 실측 — 미태깅이던 문항 수(14,034 − 2,638).
 
 # 직접 2,217 + 계보 421 = 2,638(S3-27·PB-07) + CONT-09 `unit_codes` 표 11,396 = 14,034.
+# 2,638 → 2,650: P3-51이 conceptual_v0 에 극값의 개수 양성 예 12건을 더했다(직접 2,229) → 14,046.
 # p3_calculus1_diff_v0(504, 자가 태깅)는 `classify_record` 소관이 아니라 이 합계에 없다.
-_GOLDEN_TOTAL_TAGGED = 2638 + _GOLDEN_UNIT_TABLE_TOTAL
+_GOLDEN_TOTAL_TAGGED = 2650 + _GOLDEN_UNIT_TABLE_TOTAL
 _GOLDEN_LINEAGE_TOTAL = 421  # rephrased_v0 총량(QUAL-02 은퇴 9건 반영 — 429→421)
 
 
@@ -199,7 +200,7 @@ class TestGoldenDistribution:
         )
 
     def test_total_tagged_matches_golden(self) -> None:
-        # 직접 분류 36종(classify_record) + 계보 1종(classify_rephrased_record) = 14,034.
+        # 직접 분류 36종(classify_record) + 계보 1종(classify_rephrased_record) = 14,046.
         direct = sum(
             sum(dist.values()) for name in ptm.TARGET_CORPORA for dist in [_distribution_for(name)]
         )
