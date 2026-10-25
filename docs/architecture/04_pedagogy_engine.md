@@ -182,7 +182,7 @@ class PedagogyDecision(BaseModel):
 - ✅ 소크라테스 카탈로그 50+
 - ✅ 답 미루기 4단계
 - ✅ 오개념 30개 + 개입 — **실측은 이미 이 기준을 넘었다**(2026-08-11): 런타임 탐지 카탈로그
-  kebab **64종**(`l4/misconception/catalog.py`), 콘텐츠 카탈로그 M-id **843건**. 개입은
+  kebab **64종**(`l4/misconception/catalog.py`), 콘텐츠 카탈로그 M-id **<!-- fact:misconceptions.count -->843<!-- /fact -->건**(현재 값 — 원본이 바뀌면 sync가 따라간다). 개입은
   `intervene.py` 결정트리 2종(반례·거꾸로사고)이 라이브. 정정 근거:
   `misconception_module_gap_review_r2.md` §5-3
 - ✅ 정서 필터 0건 위반
