@@ -444,7 +444,7 @@ def _axis_misconception_crosslink_demotion() -> AxisResult:
     """crosswalk 강등전 셋(자체 라벨 불필요·self-contained)에 게이트를 돌려 측정한다.
 
     `crosslink_demotion_eval.main()`의 CLI 기본값과 동일한 조건으로 재현한다. 코퍼스·
-    843 M-id 기본 경로는 그 값의 단일 진실 원천인 CLI 자신의 private 헬퍼
+    M-id 코퍼스(misconceptions_v1) 기본 경로는 그 값의 단일 진실 원천인 CLI 자신의 private 헬퍼
     (`_default_problem_corpora`/`_default_misconceptions`)를 그대로 재사용한다(경로
     구성 로직을 복제하면 CLI가 기본값을 바꿔도 이 오케스트레이터가 조용히 드리프트한다).
     게이트 판정도 CLI 소스의 `_CROSS_REJECT_FLOOR` 상수를 그대로 import해 하드코딩을

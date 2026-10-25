@@ -93,7 +93,7 @@ class TestAtomBackboneLoad:
 
         try:
             report = populate_atom_backbone(_CORPUS, settings=Settings())
-            # ① 적재 — concepts 2,683·edges 2,231(orphan 0 기대 · 2,207 + S4-60 고→대 24 · KG-10 ②).
+            # ① 적재 — concepts·edges 전건(orphan 0 기대 · 엣지 이력은 아래 주석).
             assert report.concepts_loaded == 2683
             assert report.edges_loaded == 2278  # KG-12 ① 체인 수리·③ 승격 v2(2,231→2,278)
             assert report.edges_skipped == 0

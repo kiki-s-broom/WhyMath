@@ -9,7 +9,7 @@
   ① 합성 row 적재 → 컬럼 라운드트립(mis_id·canonical_statement·concept_src_id/standard_code 원천
      저장·mapping_score Decimal)
   ② 멱등 — 재적재 행수 불변·값 갱신
-  ③ 실 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`) 적재 → 839행·멱등·cleanup
+  ③ 실 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`) 적재 → 코퍼스 전건(`misconceptions.count`)·멱등·cleanup
 """
 
 from __future__ import annotations
@@ -205,10 +205,10 @@ class TestIdempotent:
 
 
 class TestRealCorpusLoad:
-    """③ 실 코퍼스(`data/corpus/misconceptions_v1`) 적재 — 839행·멱등(#290 코퍼스 정합).
+    """③ 실 코퍼스(`data/corpus/misconceptions_v1`) 적재 — 코퍼스 전건·멱등(#290 코퍼스 정합).
 
     합성 행이 아니라 #290이 커밋한 실 Collection JSON을 `load_misconceptions`로 적재해 B.3 로더가
-    실 데이터에 서는지 본다(839 레코드). 정리는 코퍼스 mis_id 전건.
+    실 데이터에 서는지 본다(건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`). 정리는 코퍼스 mis_id 전건.
     """
 
     def test_load_real_corpus_idempotent(self) -> None:

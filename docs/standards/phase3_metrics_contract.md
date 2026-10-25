@@ -27,7 +27,7 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
 | **제품 완성도** | **Phase 3 지표 7종 (이 문서)** | `ops/phase3_metrics.py` | **대표 과정이 얼마나 채워졌나** | 대표 과정 범위 명세(`scope_spec.yaml`)가 동결한 노드·개념·스킬·승인 문항 | Phase 3 Release Gate · 판정기 | 이 문서 |
 
 **이름 충돌 주의 — "coverage"**. `harness/objective_coverage.py`(CUR-02)와 `harness/problem_bank_coverage.py`
-(ARCH-18)도 coverage 를 말하지만 분모가 다르다(성취기준 895건·문제은행 전체). 이 7종의 `Curriculum Coverage`
+(ARCH-18)도 coverage 를 말하지만 분모가 다르다(성취기준 <!-- fact:standards.k12 -->895<!-- /fact -->건·문제은행 전체). 이 7종의 `Curriculum Coverage`
 는 **대표 과정 10노드**가 분모이며, 출력 이름에 범위(`[대표 과정 10노드]`)를 박는다.
 
 경계를 코드가 지킨다: 출력 헤더와 JSON 에 평면 이름(`plane`·`other_plane`)이 박히고, 종합 점수를 만들지 않으며

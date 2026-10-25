@@ -25,7 +25,7 @@ QUAL-03(2026-08-10)이 `question_hygiene_violations`에 ⑦축(무변화 — `or
 현행유지)는 콘텐츠 판정이라 사람/오케스트레이터의 몫이지 이 자동 스윕의 몫이 아니다. 재서술
 *신규 생성* 시점의 무변화 차단은 `l3/equivalent/rephrase.classify_invariance_failure`가
 담당한다(그 함수는 rephrase 직후 `original_text=`원 발문을 넘겨 ⑦축을 활성화한다 — 아직
-코퍼스에 편입되기 *전*에 막으므로 삭제 위험이 없다). 기존(커밋된) 429건의 무변화 실측치는
+코퍼스에 편입되기 *전*에 막으므로 삭제 위험이 없다). 기존(커밋된) 재서술 레코드의 무변화 실측치는
 `harness.problem_duplication_audit`(QUAL-01/QUAL-03 통합 리포트 §7)를 참고한다 — 이 파일은
 `write=False`(`--dry-run`)로 실행해도 무변화를 계산하지 않는다(위 이유대로 배선하지 않았으므로).
 

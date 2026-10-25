@@ -35,7 +35,7 @@
 
 ## 3. 규모와 분해 규칙 (실측)
 
-`_provenance.json`: `{"units": 11, "objectives": 34}` — 성취기준 895건 중 **11건**이 이 DSL로 분해됐다.
+`_provenance.json`: `{"units": 11, "objectives": 34}` — 성취기준 <!-- fact:standards.k12 -->895<!-- /fact -->건 중 **<!-- fact:units.count -->11<!-- /fact -->건**이 이 DSL로 분해됐다.
 
 | 묶음 | 소단원 | 목표 | k_type 분포 |
 |---|---|---|---|

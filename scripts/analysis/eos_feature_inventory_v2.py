@@ -104,6 +104,8 @@ LEDGER_YAML = REPO / "backlog" / "inventory" / "feature_inventory_v2.yaml"
 LEDGER_CSV = REPO / "backlog" / "inventory" / "feature_inventory_v2.csv"
 V1_SCRIPT = pathlib.Path(__file__).with_name("eos_feature_inventory.py")
 SCAN_SCRIPT = pathlib.Path(__file__).with_name("eos_core_adapter_boundary_scan.py")
+# 코퍼스 건수의 단일 원천(OPS-154) — 근거(seat) 문구의 건수를 손으로 적지 않고 여기서 센다.
+FACTS_SCRIPT = pathlib.Path(__file__).with_name("corpus_facts.py")
 
 PLANES = {"S": "서빙 표면", "E": "백엔드 엔진", "C": "클라이언트", "O": "운영자 도구"}
 OWNERSHIP_VOCAB = ("CORE", "CORE+ADAPTER_DEP", "ADAPTER", "MIXED", "INFRA", "CLIENT")
@@ -348,6 +350,30 @@ def _c(
     )
 
 
+_CORPUS_FACTS: Any = None
+
+
+def _fact(fid: str) -> str:
+    """코퍼스 사실 `fid`의 현재 값(천 단위 쉼표) — `corpus_facts.py`가 원본에서 센다.
+
+    근거(seat) 문구에 건수를 손으로 적으면 코퍼스가 바뀔 때 옛 값이 남는다(OPS-154). 같은
+    폴더의 단일 원천 모듈을 한 번만 불러 와 필요한 사실만 계산한다(전체 계산 없음).
+    """
+    global _CORPUS_FACTS
+    if _CORPUS_FACTS is None:
+        spec = importlib.util.spec_from_file_location("_corpus_facts_v2", FACTS_SCRIPT)
+        assert spec is not None and spec.loader is not None, f"스크립트 로드 불가: {FACTS_SCRIPT}"
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module  # dataclass가 모듈을 sys.modules에서 찾는다
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            sys.modules.pop(spec.name, None)
+        _CORPUS_FACTS = module
+    facts = _CORPUS_FACTS.build_facts(REPO)
+    return str(_CORPUS_FACTS.format_value(facts[fid].compute(REPO), raw=False))
+
+
 # fmt: off
 CATALOG: tuple[Spec, ...] = (
     # ════════════════════ S 서빙 표면 — 엔드포인트 그룹 ════════════════════
@@ -569,20 +595,23 @@ CATALOG: tuple[Spec, ...] = (
        "RPT-01 — 무인증 append-only", "reports", "POST /defects"),
     # ════════════════════ E 백엔드 엔진 — L1 데이터 기반 ════════════════════
     _e("WM-E-101", "원자 백본 그래프 적재·검색·중복 검수", "Platform", "Knowledge Graph", "P0",
-       "B3 선수 그래프 2,683노드·2,210엣지", "l1.atom_graph.atom_backend_concept",
+       f"B3 선수 그래프 {_fact('atom_graph.nodes')}노드·{_fact('atom_graph.edges')}엣지",
+       "l1.atom_graph.atom_backend_concept",
        "l1.atom_graph.atom_backend_edge", "l1.atom_graph.atom_edge_retire",
        "l1.atom_graph.atom_node_projection",
        "l1.atom_graph.axis", "l1.atom_graph.dedup_candidates", "l1.atom_graph.embedding",
        "l1.atom_graph.populate", "l1.atom_graph.retrieval", pipelines=("atom_graph",)),
     _e("WM-E-102", "구 개념그래프 적재·임베딩·검색", "Platform", "Knowledge Graph", "P1",
-       "B4 개념 437 — 원자 축 이전(S0-2·ARCH-13) 후 보조 좌석 — 동일 기능 중복",
+       f"B4 개념 {_fact('concept_graph.concepts')} — 원자 축 이전(S0-2·ARCH-13) 후 보조 좌석 — "
+       "동일 기능 중복",
        "l1.concept_graph.backend_concept", "l1.concept_graph.backend_edge",
        "l1.concept_graph.embedding", "l1.concept_graph.locale",
        "l1.concept_graph.node_projection", "l1.concept_graph.populate",
        "l1.concept_graph.retrieval",
        "api._concept_orchestration", pipelines=("concept_graph",), duplicate_of="WM-E-101"),
     _e("WM-E-103", "개념↔원자 크로스워크 이전", "Platform", "Knowledge Graph", "P1",
-       "S0-2 437키 자산 이전", "l1.concept_atom_crosswalk.populate",
+       f"S0-2 {_fact('concept_atom_crosswalk.entries')}키 자산 이전",
+       "l1.concept_atom_crosswalk.populate",
        "l1.concept_atom_crosswalk.transfer",
        # CONT-08 — 콘텐츠 code → 연결 원자 읽기 전용 로더(검수 입력·승격 게이트가 공급 경로와
        # 같은 연결을 본다). 이전(transfer)과 같은 도출 규칙·같은 다리를 쓰는 형제 모듈이다.
@@ -607,7 +636,8 @@ CATALOG: tuple[Spec, ...] = (
        "l1.standards.standard_loader",
        pipelines=("ncic", "standards_university")),
     _e("WM-E-107", "오개념 카탈로그·크로스링크 적재·승인 게이트", "Platform", "Pedagogy", "P0",
-       "B6 오개념 843 + 게이트 계약 동결", "l1.fk_precheck", "l1.misconception.atom_catalog",
+       f"B6 오개념 {_fact('misconceptions.count')} + 게이트 계약 동결", "l1.fk_precheck",
+       "l1.misconception.atom_catalog",
        "l1.misconception.catalog_loader", "l1.misconception.crosslink_gate",
        "l1.misconception.crosslink_loader", "l1.misconception.crosslink_resolve",
        "l1.misconception.populate", "l1.misconception.populate_atom", "l1.misconception.resolve",
@@ -616,7 +646,7 @@ CATALOG: tuple[Spec, ...] = (
        "PED-01 팩 — 프롬프트 4계층 입력", "l1.pedagogy.compile", "l1.pedagogy.pack_loader",
        "l1.pedagogy.populate", "l1.pedagogy.unit_compiler"),
     _e("WM-E-109", "문제은행 적재·임베딩·시그니처·페르소나 적합·정답분포", "Platform", "Content",
-       "P0", "B7 코퍼스 2,647문", "l1.problem_bank.answer_distribution",
+       "P0", f"B7 코퍼스 {_fact('problem_bank.total')}문", "l1.problem_bank.answer_distribution",
        "l1.problem_bank.derived_form_rules",
        "l1.problem_bank.embedding", "l1.problem_bank.persona_fit_rules",
        "l1.problem_bank.populate", "l1.problem_bank.probe_candidates",
@@ -625,7 +655,8 @@ CATALOG: tuple[Spec, ...] = (
        "S4-06 — 수식 엔티티 적재(MIXED)", "l1.formula_graph.formula_node_projection",
        "l1.formula_graph.populate", pipelines=("formula_graph",)),
     _e("WM-E-111", "스킬 그래프 적재·해석", "Platform", "Knowledge Graph", "P0",
-       "계획서 300 Skill 27건 — 얇음", "l1.skill_graph.populate", "l1.skill_graph.resolve",
+       f"계획서 300 Skill {_fact('skill_graph.skills')}건 — 얇음", "l1.skill_graph.populate",
+       "l1.skill_graph.resolve",
        "l1.skill_graph.skill_node_projection", pipelines=("skill_graph",)),
     _e("WM-E-112", "풀이 전략 그래프 적재", "Platform", "Pedagogy", "P2",
        "전략 카탈로그(MIXED)", "l1.strategy_graph.populate",

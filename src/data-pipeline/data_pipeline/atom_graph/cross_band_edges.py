@@ -168,7 +168,8 @@ def _find_prerequisite_cycle(pairs: Sequence[tuple[str, str]]) -> list[str] | No
 
     atom_graph/validate.py의 `_find_prerequisite_cycle`과 같은 알고리즘이되 입력이 모델이 아니라
     *원시 쌍*이다(제안은 아직 `AtomEdge`가 아니다 — 모듈 docstring의 구현 메모 참조).
-    재귀 대신 명시 스택: 원자 백본은 2,683 노드라 깊은 체인에서 재귀 한계를 피한다.
+    재귀 대신 명시 스택: 원자 백본은 수천 노드라(`atom_graph.nodes`) 깊은 체인에서 재귀 한계를
+    피한다.
 
     Returns: 사이클을 이루는 노드 경로(닫힘 노드 반복 포함) 또는 None.
     """

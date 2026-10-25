@@ -316,7 +316,7 @@ def _rule_table(
     R2 정밀화(04g §4 v2)는 **정직한 공백으로 보류**한다: 설계는 오개념 가설의 `error_type`을
     카탈로그 `suitable_error_types`와 대조하라고 지시하나, 2026-07-29 실측 결과 runtime의
     `misconception_ids`(kebab id — `l4/misconception/catalog.py` 34종)에는 `error_type` 필드
-    자체가 없고, error_type은 DB `misconception_catalog`(L1 코퍼스 839+·M-코드)에만 있어
+    자체가 없고, error_type은 DB `misconception_catalog`(L1 오개념 코퍼스·M-코드)에만 있어
     AsyncSession 없이는 조회 불가다(이 모듈은 DB-free 순수 함수 — 억지 배선 금지). kebab↔M코드
     crosslink도 검수 파이프라인이지 프로덕션 매핑 좌석이 아니다. 대조 불가면 기존 R2 그대로가
     설계의 지시이므로, 순수 경로 생산자가 생길 때까지 R2는 v1 그대로 둔다.

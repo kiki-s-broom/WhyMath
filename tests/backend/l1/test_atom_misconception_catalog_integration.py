@@ -10,8 +10,8 @@ end-to-end 적재한다. CI `backend — 마이그레이션·통합 (실 PG)` �
   ① 실 코퍼스 적재 — atom ①오개념 1,823행(mis_id 'ATOM:' 접두)·전건 적재
   ② 멱등 — 재적재 시 행수·접두 행수 불변
   ③ 표본 행 — canonical_statement·error_type·concept_src_id(원자 code)·provenance 라운드트립
-  ④ 네임스페이스 분리 — 'ATOM:' 접두 행은 모두 provenance 'atom_graph_v1'(구 839과 무충돌)
-정리는 `mis_id LIKE 'ATOM:%'` 전건(구 misconceptions_v1 839 행을 건드리지 않는다 — additive 병존).
+  ④ 네임스페이스 분리 — 'ATOM:' 접두 행은 모두 provenance 'atom_graph_v1'(구 카탈로그 misconceptions_v1과 무충돌)
+정리는 `mis_id LIKE 'ATOM:%'` 전건(구 misconceptions_v1 행을 건드리지 않는다 — additive 병존).
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def _reachable() -> bool:
 
 
 def _cleanup() -> None:
-    """atom 출처 행 정리 — 'ATOM:' 접두 전건(구 839은 비접두라 무관)."""
+    """atom 출처 행 정리 — 'ATOM:' 접두 전건(구 misconceptions_v1은 비접두라 무관)."""
     from sqlalchemy import text
 
     engine = _sync_engine()
@@ -123,7 +123,7 @@ class TestRealCorpusLoad:
                     assert db.concept_src_id == sample_row["concept_src_id"]
                     assert db.provenance_note == ATOM_PROVENANCE_NOTE
 
-                    # ④ 네임스페이스 분리 — 접두 행은 전부 atom 출처(구 839과 무충돌).
+                    # ④ 네임스페이스 분리 — 접두 행은 전부 atom 출처(구 카탈로그 misconceptions_v1과 무충돌).
                     provs = conn.execute(
                         text(
                             "SELECT DISTINCT provenance_note FROM misconception_catalog "

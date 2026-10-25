@@ -815,7 +815,7 @@ class TestProblemRow:
         assert pc._problem_from_row(row) is None
 
     def test_missing_review_status_is_not_eligible(self, spec, index, world) -> None:
-        """필드가 없는 행은 '승인'이 아니다 — 14,034행 중 11,396행이 이 상태다."""
+        """필드가 없는 행은 '승인'이 아니다 — 문제은행 대다수가 이 상태다(`review_unset`)."""
         problems = list(world.problems)
         problems[0] = replace(problems[0], review_status=None)
         report = pc.evaluate(spec, index, _inject(world, problems=tuple(problems)))

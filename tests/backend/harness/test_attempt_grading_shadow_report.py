@@ -871,9 +871,9 @@ class TestCorpusVerifyBlockSupply:
     """`derive_verify_inputs`가 `Problem.conditions_parsed` 외에 코퍼스 verify 블록을 공급원으로 쓴다."""
 
     def test_loads_real_corpus_verify_blocks(self) -> None:
-        """코퍼스 로더가 13,647개의 유효한 verify 블록을 읽는다.
+        """코퍼스 로더가 유효한 verify 블록을 읽는다 — 건수는 아래 assert가 핀한다.
 
-        2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
+        건수 이력: 2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
         30종의 문항수와 **정확히 일치**한다(우연한 드리프트가 아니라 회수의 산술 결과).
         13,520 → 13,647(+127): P3-03이 `problem_bank_p3_calculus1_diff_v0` 144건을 더했다. 144건 중
         17건은 검산 조건이 *연립 목록*(부등식 `a > 0`으로 해를 유일하게 가르는 문항)이라 이 로더가

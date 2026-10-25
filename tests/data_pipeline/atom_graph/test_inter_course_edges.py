@@ -149,7 +149,8 @@ class TestProposalFileShape:
         """신규 relation 타입 0 — 정본의 relation 집합은 prerequisite 단일이다(제안이 늘리지 않음)."""
         assert {e["relation"] for e in graph["edges"]} == {"prerequisite"}
         assert len(graph["concepts"]) == 2683
-        # 정본 = 백본 2,210 + S4-60 고→대 경계 병합 24. 이 제안(S4-61)은 아직 병합 전이라 무변경이다.
+        # 정본 엣지 이력: 백본 2,210 → S4-60 고→대 경계 병합 24 → 아래 주석. 이 제안(S4-61)은 아직
+        # 병합 전이라 무변경이다.
         assert (
             len(graph["edges"]) == 2278
         )  # 정본 무변경 동결 · KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리(제거 12·반전 4)로 2,231→2,219 · ③ 낱말매칭 승격 v2 59건으로 2,278

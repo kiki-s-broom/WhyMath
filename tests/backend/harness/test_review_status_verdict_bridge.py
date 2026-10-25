@@ -548,7 +548,7 @@ class TestDomain:
         monkeypatch: pytest.MonkeyPatch,
         with_ledger: bool,
     ) -> None:
-        """고정 코퍼스 8종 경로는 코퍼스 단위 백필의 대상 — 대장이 붙어 있어도 거부한다."""
+        """고정 코퍼스(`KNOWN_CORPORA`) 경로는 코퍼스 단위 백필의 대상 — 대장이 붙어 있어도 거부한다."""
         monkeypatch.chdir(tmp_path)  # KNOWN_CORPORA는 레포 루트 상대경로 — 가짜 루트를 세운다
         # [OPS-138] 가드는 cwd가 아니라 모듈 파일 위치 기준 `_REPO_ROOT`로 해석하므로 거기도 끼운다.
         monkeypatch.setattr(domains, "_REPO_ROOT", tmp_path.resolve())

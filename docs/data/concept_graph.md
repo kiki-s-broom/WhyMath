@@ -4,9 +4,9 @@
 >
 > **상태(2026-08-03 정정): 적재 완료.** 애초 이 카드가 서술한 "미구축·목표 500노드·2,000엣지·
 > Phase 1 고1 미적분 ~100개념"은 stale이다 — 실측 `data/corpus/concept_graph_v1/graph.json`
-> concepts 437건·edges 581건(2026-06-20 e2e 승격), `data/corpus/atom_graph_v1/graph.json`
-> concepts 2,683건·edges 2,210건이 이미 커밋·적재됐다(`knowledge_module_gap_review.md`가
-> 원자 백본 2,697건을 runtime truth source로 정본화). 아래 §2 이하 개별 스펙(9계층 taxonomy·
+> concepts <!-- fact:concept_graph.concepts -->437<!-- /fact -->건·edges <!-- fact:concept_graph.edges -->581<!-- /fact -->건(2026-06-20 e2e 승격), `data/corpus/atom_graph_v1/graph.json`
+> concepts <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->건·edges <!-- fact:atom_graph.edges -->2,278<!-- /fact -->건이 이미 커밋·적재됐다(`knowledge_module_gap_review.md`가
+> 원자 백본(당시 2,697건)을 runtime truth source로 정본화). 아래 §2 이하 개별 스펙(9계층 taxonomy·
 > ID 규약 등)은 2026-07-02 P2d까지 갱신돼 있어 이 리드 문단만 낡아 있었다
 > (`curriculum_module_gap_review.md` §정정 참조).
 

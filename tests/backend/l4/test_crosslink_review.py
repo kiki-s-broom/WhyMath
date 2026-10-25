@@ -3,7 +3,7 @@
 합성 큐로 승격 규칙(승인만 추출·서명 필수·직접매핑 conf<0.6 금지·kebab 실재·top key 오투입
 거부·전건 열거·exit 2)을 검증하고, 실 큐 파일(`docs/data/misconception_crosslink_review_queue.json`)
 은 초안(`misconception_crosslink_candidates.md` §2) 전사 충실성을 회귀 가드한다 — kebab 32 전원·
-M-id 실재(843 코퍼스·극값 MC 신규 저작 M0864·M0865 포함)·전행 pending·직접매핑 conf 초안 명시값
+M-id 실재(M-id 코퍼스 misconceptions_v1·극값 MC 신규 저작 M0864·M0865 포함)·전행 pending·직접매핑 conf 초안 명시값
 일치(전사 왜곡 방지 스팟).
 """
 

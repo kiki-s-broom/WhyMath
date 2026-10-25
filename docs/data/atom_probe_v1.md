@@ -1,6 +1,6 @@
 # 와이매스 원자 진단·소크라테스 v1 (`atom_probe`) — 데이터 카드
 
-> **요약**: 원자 백본(`atom_graph_v1`)의 세부개념 원자 **1,837건**이 보유한 **②진단문항**(발문·정답/
+> **요약**: 원자 백본(`atom_graph_v1`)의 세부개념 원자 **<!-- fact:atom_graph.atoms -->1,823<!-- /fact -->건**이 보유한 **②진단문항**(발문·정답/
 > 통과기준·오답신호)과 **③소크라테스 질문**을 *DB 적재 가능한 1급 프로젝션*으로 승격하는 데이터 카드.
 > 출처는 `data/corpus/atom_graph_v1/graph.json`(Phase 1 산출). 신규 경량 **`atom_probe`** 테이블
 > (code PK·FK 0·additive)에 멱등 투영한다.
@@ -21,7 +21,7 @@
 | 형태 | `atom_graph_v1` graph.json `concepts` 배열 중 세부개념 원자(level=='세부개념') |
 | 원천 코퍼스 | `data/corpus/atom_graph_v1/graph.json`(**커밋됨** — Phase 1 산출) |
 | 저작 | **와이매스 자체/AI 작성**(진단문항·소크라테스 질문·검수필요) |
-| 규모 | **1,837**(원자 전량이 ②③ 보유 — 초등382·중학180·고등762·대학513) |
+| 규모 | **<!-- fact:atom_graph.atoms -->1,823<!-- /fact -->**(원자 전량이 ②③ 보유 — 초등<!-- fact:atom_graph.atoms_elementary -->382<!-- /fact -->·중학<!-- fact:atom_graph.atoms_middle -->180<!-- /fact -->·고등<!-- fact:atom_graph.atoms_high -->749<!-- /fact -->·대학<!-- fact:atom_graph.university_atoms -->512<!-- /fact -->) |
 
 > 원자 백본 원본 xlsx는 커밋하지 않는다. 진실 원천은 커밋된 graph.json(원자 백본 데이터 카드
 > `atom_graph_v1.md` §6 Phase 1 참조).
@@ -32,7 +32,7 @@
 
 | 소스 키(graph.json) | 컬럼 | 비고 |
 |---|---|---|
-| `code` | **PK** `code` | 원자 세부개념 code(예 `2수01-01-2`·`CALC1-C01`)·1,837 유일 |
+| `code` | **PK** `code` | 원자 세부개념 code(예 `2수01-01-2`·`CALC1-C01`)·<!-- fact:atom_graph.atoms -->1,823<!-- /fact --> 유일 |
 | `name` | `name` | 원자명(표시·NOT NULL) |
 | `school_level` | `school_level` | 초등/중학/고등/대학교(필터·인덱스) |
 | `subject_area` | `subject_area` | 영역·과목(필터·인덱스) |
@@ -47,7 +47,7 @@
 | (상수) | `updated_at` | `now()`(upsert 시 갱신·신선도) |
 
 **매핑 원칙(원천 보유 필드만·날조 0)**: 원자 행에 없는 칸은 두지 않는다. ②③가 *전부 빈 값*인 원자·
-code/name 없는 항목·비-원자(단원/소단원)는 *건너뛴다*(조용한 빈 적재 금지). 정상 코퍼스 기대 = 1,837.
+code/name 없는 항목·비-원자(단원/소단원)는 *건너뛴다*(조용한 빈 적재 금지). 정상 코퍼스 기대 = <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->.
 
 ---
 
@@ -66,7 +66,7 @@ code/name 없는 항목·비-원자(단원/소단원)는 *건너뛴다*(조용�
 ---
 
 ## 4. 불변식 (적재 검증)
-- `code` **1,837 유일**(PK).
+- `code` **<!-- fact:atom_graph.atoms -->1,823<!-- /fact --> 유일**(PK).
 - 원자 전량이 ②③ 중 최소 1개 보유(전부 빈 값 행 0 — 실측 both-empty 0).
 - `intrinsic_difficulty` 값이 1~5 범위(범위 이탈 0) 또는 None.
 - 멱등: `ON CONFLICT(code) DO UPDATE` 재적재 시 행수 불변(중복 0).

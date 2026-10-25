@@ -49,13 +49,13 @@ parsed[*].formal`(자유서술 수식 문자열, 전 레포 소비자 0건 확�
 교수학 금기(acceptance②): `unverifiable`은 오답으로 강등하지 않는다 — `client_grade_mismatch`
 집계는 verdict가 `pass`/`fail`일 때만 클라 보고와 대조한다.
 
-채점 가능성 상한(REC-05·`ai_recommendation_module_gap_review_2.md` §2 G1): 위 shadow 채점의
-파생 게이트(`derive_verify_inputs`)는 코퍼스 2,638문항 중 **0건**만 통과한다(조건 보유 30건
-전부 `formal` 결측) — 이 경로만으로는 attempt가 아무리 쌓여도 채점 가능성 관측이 영구히 0건
-이다. `classify_gradability`/`build_gradability_ceiling_report`는 **attempt 없이 코퍼스만으로**
-채점 가능성의 실제 상한(선택형 정확일치·수치 단답 후보·조건 기반 파생 3버킷)을 측정하는
-별도 정적 리포트다 — `derive_verify_inputs`를 C버킷 판정에 그대로 재사용하되(중복 로직 0),
-attempt 유무와 무관하게 코퍼스 전량을 스캔한다.
+채점 가능성 상한(REC-05·`ai_recommendation_module_gap_review_2.md` §2 G1): 위 shadow 채점의 파생
+게이트(`derive_verify_inputs`)는 2026-08-11 기준 코퍼스 2,638문항 중 **0건**만 통과했다(조건 보유
+30건 전부 `formal` 결측) — 이 경로만으로는 attempt가 아무리 쌓여도 채점 가능성 관측이 영구히 0건
+이다. `classify_gradability`/`build_gradability_ceiling_report`는 **attempt 없이 코퍼스만으로** 채점
+가능성의 실제 상한(선택형 정확일치·수치 단답 후보·조건 기반 파생 3버킷)을 측정하는 별도 정적
+리포트다 — `derive_verify_inputs`를 C버킷 판정에 그대로 재사용하되(중복 로직 0), attempt 유무와
+무관하게 코퍼스 전량을 스캔한다.
 
   *수치 현행화(REC-09 회수 시점 2026-08-11)*: 원 구현(REC-05·2026-08-09)은 위 자리를
   **2,647**문항으로 적었다. 그 사이 main이 전진해 `QUAL-02`(PR #777)가 실중복 9레코드를
@@ -65,7 +65,7 @@ attempt 유무와 무관하게 코퍼스 전량을 스캔한다.
   C버킷 0건과 그 원인(조건 보유 30건 전부 `formal` 결측)은 코퍼스가 줄기 전후로 동일하다.
 
 NLP-05 추가(2026-08-14): `derive_verify_inputs`가 `Problem.conditions_parsed`뿐 아니라
-코퍼스 `verify.{conditions,answer_map}`을 공급원으로 삼는다. 코퍼스 2,638건 중
+코퍼스 `verify.{conditions,answer_map}`을 공급원으로 삼는다. 당시 코퍼스 2,638건 중
 verify 블록(conditions+answer_map)을 보유한 것은 2,124건이며, 이 중 단일 미지수 `x`로
 파생 가능한 것도 2,124건(실측). `classify_gradability` 우선순위를 A→C→B로 조정해
 symbolic 파생 가능한 문항이 '수치 단답 후보'보다 정확한 경로로 계상되게 했다. 그 결과

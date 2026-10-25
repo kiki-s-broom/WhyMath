@@ -31,7 +31,7 @@
         [--dry-run | --check]
 
     python -m whymath_backend.harness.problem_corpus_review_status_backfill --all
-        (코퍼스 8종 전부를 제자리 갱신 — `KNOWN_CORPORA` 경로 고정, `AUDIT_LABEL_MAP`으로 판정)
+        (고정 코퍼스 전부를 제자리 갱신 — `KNOWN_CORPORA` 경로 고정, `AUDIT_LABEL_MAP`으로 판정)
 
     python -m whymath_backend.harness.problem_corpus_review_status_backfill --all --check
         (CI 드리프트 가드 — 아무것도 쓰지 않고, 미백필 레코드가 1건이라도 있으면 exit 1)
@@ -349,7 +349,7 @@ def _default_audit_path(in_path: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     """CLI 엔트리 — 백필 후 리포트를 JSON으로 stdout에 낸다(결정론·멱등).
 
-    `--all`이면 `KNOWN_CORPORA` 8종을 순회해 각 코퍼스의 `AUDIT_LABEL_MAP` 판정을 적용한다.
+    `--all`이면 `KNOWN_CORPORA` 전부를 순회해 각 코퍼스의 `AUDIT_LABEL_MAP` 판정을 적용한다.
     단일 파일 처리는 `--in`(+ 필수 `--corpus`, 선택 `--out`/`--audit-out`)을 쓴다. 레포 루트에서
     실행 전제(상대경로 규약).
 

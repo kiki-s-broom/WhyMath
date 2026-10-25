@@ -17,12 +17,12 @@
 | 단계 | 영역 | 상태 |
 |---|---|---|
 | 1 교육철학 · 2 기능분리 | 정체성·7계층 (백엔드 import-linter CI 강제) | ✅ 완료 |
-| 3 개념구조화 | 개념 437노드 (legacy_snapshot·audit_only) / **원자 2,697(세부 1,837) = runtime truth source 단일**. problem_concept·curriculum·성취기준 조인 전부 원자 축 정착(S2-03·S2-07) | 🟢 구현 |
-| 4 오개념 DB | 839개 카탈로그 + 판정 엔진 (reactive만·preload 0 실측). 탐지 카탈로그 64종·kebab↔M-id crosswalk 라이브 64건(전건 사람 서명·기계 reject-only·`G-crosswalk-approval` **cleared**[7회차 적대 검증: 스탬프가 clear 14h 선존·evidence 결함 3건 상환]·적재/노출 플립 전 단계) | 🟢 구현 |
+| 3 개념구조화 | 개념 <!-- fact:concept_graph.concepts -->437<!-- /fact -->노드 (legacy_snapshot·audit_only) / **원자 백본 <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->(세부 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->) = runtime truth source 단일**. problem_concept·curriculum·성취기준 조인 전부 원자 축 정착(S2-03·S2-07) | 🟢 구현 |
+| 4 오개념 DB | <!-- fact:misconceptions.count -->843<!-- /fact -->개 카탈로그 + 판정 엔진 (reactive만·preload 0 실측). 탐지 카탈로그 64종·kebab↔M-id crosswalk 라이브 <!-- fact:misconception_crosslinks.count -->69<!-- /fact -->건(전건 사람 서명·기계 reject-only·`G-crosswalk-approval` **cleared**[7회차 적대 검증: 스탬프가 clear 14h 선존·evidence 결함 3건 상환]·적재/노출 플립 전 단계) | 🟢 구현 |
 | 9 평가·개인화 | BKT·IRT·mastery·학습경로 (문제 태깅 원자 축 재연결로 mastery→enrich hit) | 🟢 구현 |
 | 5 시각화 · 6 Math UI DSL · 8 AI튜터 · 10 자동화 | Graph2dSpec·L3 라우터·WH-1·파이프라인 (8: max_nodes≤20·tokens≤3000 CI 동결·depth≤2 유예). **L3 라이브 개통**(Phaiakes9·READY:True·6모델·rephrase 184/590). **S1-12 비용 실측 완료**(로컬 72.7%<80% as-measured·S1-13 보정 74/358·8회차 §3-A). **S1-11 shadow verdict 라이브 실측**(n=10·검출력 4/4·verify 게이트 승격 부결 유지·실트래픽 재판정 대기·8회차 §3-B) | 🟡 진행 |
 | 7 렌더링 | Flutter/web 계산기·three.js·MathLive | 🟡 프로토타입 |
-| 보류/리스크 | DSL 자기진화(Lean4)·Manim 동영상·WH-1 전략단계(Lv2~3)·**개념↔원자 입도 통합**(런타임 축은 S0-4로 해소 완료, 잔여=437↔2,697 세분도 병합). ~~전문가 검수 대기~~ → **AI 검수 전환**(2026-07-10·`G-domain-partner` clear·검수 큐 가동·MEMORY 결정 로그). ~~클라이언트 무-수학로직 CI 게이트 부재~~ → **ARCH-10으로 해소**(게이트 2종 가동·2026-07-12 감사 4회차 재검증, QuizMode 예외는 **ARCH-12 (a) 데모 전용 예외 공식 존치**(2026-07-13 Kiki 결정·화이트리스트 2건 동결·강제 트리거=학생 노출)). S1 탈출 게이트 ① 실기기 시연 `G-kiki-device-demo` clear·라이브 실측 S1-12(kiki)·저작권 `G-crosswalk-approval` **cleared**(7회차 §3-A). ~~생성 파이프라인 계통 결함 3종~~ → **S2-08 상환 완료**(PR #512·6회차 감사 이행 실측·deferred 표본 29·30 해소). ~~crosswalk 대장 비정합~~ → **S2-10 이행 완료 + 게이트 clear**(7회차 §3-A). 신규: **콘텐츠 공장 가동 완료**(S2-01 620문·Wilson 상한 1.11% PASS[as-found 병기]·S2-02 WH-S replay·PRM 1,282쌍·상시 게이트 Tier1+Tier2 승격). acceptance sampling 엄밀화 **S2-11 done**(§4.5 재채점 금지 규약·`--rotation` 독립 재표본·8회차 §3-C 적대 검증 적정). as-found 병기 기계 게이트화는 `S2-12`(신설·저우선) | 🔴/⏸ |
+| 보류/리스크 | DSL 자기진화(Lean4)·Manim 동영상·WH-1 전략단계(Lv2~3)·**개념↔원자 입도 통합**(런타임 축은 S0-4로 해소 완료, 잔여=<!-- fact:concept_graph.concepts -->437<!-- /fact -->↔<!-- fact:atom_graph.nodes -->2,683<!-- /fact --> 세분도 병합). ~~전문가 검수 대기~~ → **AI 검수 전환**(2026-07-10·`G-domain-partner` clear·검수 큐 가동·MEMORY 결정 로그). ~~클라이언트 무-수학로직 CI 게이트 부재~~ → **ARCH-10으로 해소**(게이트 2종 가동·2026-07-12 감사 4회차 재검증, QuizMode 예외는 **ARCH-12 (a) 데모 전용 예외 공식 존치**(2026-07-13 Kiki 결정·화이트리스트 2건 동결·강제 트리거=학생 노출)). S1 탈출 게이트 ① 실기기 시연 `G-kiki-device-demo` clear·라이브 실측 S1-12(kiki)·저작권 `G-crosswalk-approval` **cleared**(7회차 §3-A). ~~생성 파이프라인 계통 결함 3종~~ → **S2-08 상환 완료**(PR #512·6회차 감사 이행 실측·deferred 표본 29·30 해소). ~~crosswalk 대장 비정합~~ → **S2-10 이행 완료 + 게이트 clear**(7회차 §3-A). 신규: **콘텐츠 공장 가동 완료**(S2-01 620문·Wilson 상한 1.11% PASS[as-found 병기]·S2-02 WH-S replay·PRM 1,282쌍·상시 게이트 Tier1+Tier2 승격). acceptance sampling 엄밀화 **S2-11 done**(§4.5 재채점 금지 규약·`--rotation` 독립 재표본·8회차 §3-C 적대 검증 적정). as-found 병기 기계 게이트화는 `S2-12`(신설·저우선) | 🔴/⏸ |
 
 ---
 
@@ -45,25 +45,25 @@
 - [ ] 7계층 경계 침범(L_n → L_{n+1} **역참조**)이 import-linter로 실제 차단되나?
 - [ ] 수학 로직이 클라(L5)로 새지 않고 L1–L4 독립 코어에만 있나?
 
-## 단계 3. 개념 구조화 (ConceptNode·AST) `[구현·최우선]` — 403노드 / 1,837원자
+## 단계 3. 개념 구조화 (ConceptNode·AST) `[구현·최우선]` — <!-- fact:concept_graph.concepts -->437<!-- /fact -->노드 / <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->원자
 
-- [ ] **노드 폭발 검문**: 각 노드/원자가 "학생 사고가 바뀌는 최소 단위 = **독립 오개념 발생 단위**"인가? 1,837 원자에 '기울기의 x증가량' 급 **과세분**이 섞이지 않았나?
+- [ ] **노드 폭발 검문**: 각 노드/원자가 "학생 사고가 바뀌는 최소 단위 = **독립 오개념 발생 단위**"인가? <!-- fact:atom_graph.atoms -->1,823<!-- /fact --> 원자에 '기울기의 x증가량' 급 **과세분**이 섞이지 않았나?
 - [ ] **Concept Purity**: 노드에 renderer·curriculum·prompt·misconception·embedding이 **혼입**되지 않았나? (`graph.json` 필드 감사)
 - [ ] **파일 크기**: 노드가 1~4KB 이내인가? `graph.json` 단일 대용량 파일이 retrieval precision을 떨어뜨리지 않나(chunk 분리 여부)?
 - [ ] **ID 독립**: ID가 `math.calculus.limit` 형태로 파일명·언어·교육과정과 독립인가?
-- [ ] **⚠️ 단일 진실 원천**: 개념그래프(403)와 원자그래프(1,837)의 truth source가 둘로 갈라져 **"유지보수 지옥"**이 시작되지 않았나? 어느 쪽이 canonical이고, 둘의 동기화 규칙이 **코드로 강제**되나?
+- [ ] **⚠️ 단일 진실 원천**: 개념그래프(<!-- fact:concept_graph.concepts -->437<!-- /fact -->)와 원자그래프(<!-- fact:atom_graph.atoms -->1,823<!-- /fact -->)의 truth source가 둘로 갈라져 **"유지보수 지옥"**이 시작되지 않았나? 어느 쪽이 canonical이고, 둘의 동기화 규칙이 **코드로 강제**되나?
 
-## 단계 3-관계. Edge 설계 `[구현]` — 541엣지 / 3,220선수엣지
+## 단계 3-관계. Edge 설계 `[구현]` — <!-- fact:concept_graph.edges -->581<!-- /fact -->엣지 / <!-- fact:atom_graph.prerequisite_total -->3,251<!-- /fact -->선수엣지
 
 - [ ] **관계 폭발**: Edge 타입이 5~8개로 제한되나? `similar_to`/`related_to`가 **traversal에 쓰이나**?
-- [ ] **순환참조**: `prerequisite`이 DAG를 유지하나? 3,220 선수엣지에 **Reachability(순환) Check**가 CI로 도나?
+- [ ] **순환참조**: `prerequisite`이 DAG를 유지하나? <!-- fact:atom_graph.prerequisite_total -->3,251<!-- /fact --> 선수엣지에 **Reachability(순환) Check**가 CI로 도나?
 - [ ] 단방향 **canonical edge**로 저장됐나?
 
-## 단계 4. 오개념 DB (Misconception) `[구현 · 3대핵심①]` — 839개
+## 단계 4. 오개념 DB (Misconception) `[구현 · 3대핵심①]` — <!-- fact:misconceptions.count -->843<!-- /fact -->개
 
 - [ ] 오개념이 개념과 **독립 DB**인가(Concept≠Misconception)? 개념 노드에 **preload 안 되고 reactive retrieval**인가?
 - [ ] concept / misconception **embedding index가 분리**돼 있나?
-- [ ] 839개가 실제 학생 응답으로 검증되나, **LLM 생성 카탈로그로만** 남았나? (오개념 = 실패 패턴이지 개념이 아님)
+- [ ] <!-- fact:misconceptions.count -->843<!-- /fact -->개가 실제 학생 응답으로 검증되나, **LLM 생성 카탈로그로만** 남았나? (오개념 = 실패 패턴이지 개념이 아님)
 
 ## 단계 5. 시각화 (VisualizationNode) `[구현 · 3대핵심②]` — Graph2dSpec
 

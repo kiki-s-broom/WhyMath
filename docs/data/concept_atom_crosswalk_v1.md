@@ -1,6 +1,6 @@
 # 와이매스 437↔원자 크로스워크 v1 (자체 유도) — 데이터 카드
 
-> **요약**: 구 개념그래프(437개념·`concept_graph_v1`)와 신 원자 백본(원자 1,837·`atom_graph_v1`)을
+> **요약**: 구 개념그래프(<!-- fact:concept_graph.concepts -->437<!-- /fact -->개념·`concept_graph_v1`)와 신 원자 백본(원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->·`atom_graph_v1`)을
 > 잇는 **프로그램적 유도 다리 코퍼스**. Phase 5에서 구 437 그래프를 폐기하려면 437-키 자산
 > (behavior_skills·concept_content K-12)을 원자 축으로 옮겨야 하는데, 그 이관(S0-2)이 소비하는
 > 매핑이 이 크로스워크다. **rekey 금지** — 기존 테이블 키는 바꾸지 않으며 크로스워크는 독립
@@ -16,7 +16,7 @@
 |---|---|
 | 형태 | **자체 프로그램적 유도**(손저작 아님) — `data_pipeline/concept_atom_crosswalk/derive.py` |
 | 소스 ① | `data/corpus/concept_graph_v1/graph.json`(concept_id·standard_codes) + `concepts.jsonl`(name_ko, `source_id`=`src_id` 조인) |
-| 소스 ② | `data/corpus/atom_graph_v1/graph.json` — **원자(level=='세부개념') 1,837만** 대상(단원 217·소단원 643 제외) |
+| 소스 ② | `data/corpus/atom_graph_v1/graph.json` — **원자(level=='세부개념') <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->만** 대상(단원 <!-- fact:atom_graph.units -->217<!-- /fact -->·소단원 <!-- fact:atom_graph.subunits -->643<!-- /fact --> 제외) |
 | 산출 | `data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl`(437행·concept_id 사전순) + `_provenance.json`(소스 sha256·유도 방법·커버리지) |
 | 저작 | 와이매스 자체 유도 — 양측 소스가 전부 자체작성 코퍼스라 **redaction 불요**(코드·이름만 사용·성취기준 본문 미포함) |
 | 재생성 | `python -m data_pipeline.concept_atom_crosswalk derive` (저장소 루트에서·결정론 — 동일 입력 2회 실행 시 byte 동일) |
