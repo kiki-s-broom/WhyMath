@@ -140,6 +140,14 @@ _MIS = "data/corpus/misconceptions_v1/misconceptions.json"
 _STD = "data/corpus/standards_v1/standards.json"
 
 
+_SCHOOL_LEVELS = (
+    ("elementary", "초등"),
+    ("middle", "중학"),
+    ("high", "고등"),
+    ("university", "대학"),
+)
+
+
 def _static_facts() -> dict[str, Fact]:
     f: dict[str, Fact] = {
         # 원자 백본 — 학습 경로·선수 관계의 정본
@@ -274,6 +282,43 @@ def _static_facts() -> dict[str, Fact]:
                 lambda r: r.get("school_level") == "대학" and r.get("level") == "세부개념",
             ),
         ),
+        "atom_graph.prerequisite_total": Fact(
+            "원자 백본 선수 관계 전체(원자ID 엣지 + 서술형 원문)",
+            _ATOM,
+            lambda root: len(_json(root, _ATOM)["edges"])
+            + len(_json(root, _ATOM)["narrative_edges_raw"]),
+        ),
+        **{
+            f"atom_graph.nodes_{key}": Fact(
+                f"원자 백본 {ko} 노드(전 수준)",
+                _ATOM,
+                _count_if(_ATOM, "concepts", lambda r, ko=ko: r.get("school_level") == ko),
+            )
+            for key, ko in _SCHOOL_LEVELS
+        },
+        **{
+            f"atom_graph.atoms_{key}": Fact(
+                f"원자 백본 {ko} 세부개념",
+                _ATOM,
+                _count_if(
+                    _ATOM,
+                    "concepts",
+                    lambda r, ko=ko: r.get("school_level") == ko and r.get("level") == "세부개념",
+                ),
+            )
+            for key, ko in _SCHOOL_LEVELS
+            if key
+            != "university"  # 대학 세부개념은 atom_graph.university_atoms(자기 선언 키와 같은 이름)
+        },
+        "atom_graph.atoms_k12": Fact(
+            "원자 백본 초·중·고 세부개념",
+            _ATOM,
+            _count_if(
+                _ATOM,
+                "concepts",
+                lambda r: r.get("school_level") != "대학" and r.get("level") == "세부개념",
+            ),
+        ),
         "misconceptions.with_ccss": Fact(
             "오개념 중 CCSS 코드가 있는 것",
             _MIS,
@@ -405,6 +450,23 @@ def _static_facts() -> dict[str, Fact]:
             "data/corpus/problem_bank_*/problems.jsonl",
             lambda root: len(_problem_banks(root)),
         ),
+        **{
+            f"problem_bank.review_{key}": Fact(
+                f"문제은행 전체 중 review_status={label}",
+                "data/corpus/problem_bank_*/problems.jsonl",
+                lambda root, status=status: sum(
+                    1
+                    for p in _problem_banks(root)
+                    for r in _jsonl_rows(root, str(p.relative_to(root)))
+                    if r.get("review_status") == status
+                ),
+            )
+            for key, status, label in (
+                ("unset", None, "없음"),
+                ("approved", "approved", "approved"),
+                ("pending", "pending", "pending"),
+            )
+        },
         "problem_bank.total": Fact(
             "문제은행 전체 문항",
             "data/corpus/problem_bank_*/problems.jsonl",
@@ -671,56 +733,255 @@ def render_table(root: Path, facts: dict[str, Fact] | None = None) -> str:
 
 @dataclass(frozen=True)
 class Phrase:
-    """현행 문서에서 표식 없이 쓰면 안 되는 표기 — 숫자 그룹이 `fact_id`의 값을 말한다."""
+    """사실을 말하는 표기 하나. `n` 그룹이 숫자이고, `accepts`의 사실 값 중 하나와 같아야 한다.
 
-    fact_id: str
+    같은 표기가 여러 사실을 가리킬 수 있어(예: '엣지 N'은 원자 백본·구 개념 그래프·서술형 원문
+    모두) 받아들이는 값을 사실 이름 묶음으로 둔다. 어느 값과도 다르면 낡은 값이다.
+    """
+
+    label: str
     pattern: re.Pattern[str]
+    accepts: tuple[str, ...]
+    min_value: int = 100  # 이보다 작은 수는 사실 건수가 아니라 예시·순번일 가능성이 커 보지 않는다
 
+
+# 받아들이는 값에서 이 비율 안쪽에 있는데 같지 않으면 '같은 사실의 낡은 값'으로 본다. 더 멀면 다른
+# 것(부분 집합·다른 지표·예시)을 센 숫자라 이 사실의 언급으로 보지 않는다 — 예: '코퍼스 1,616건'은
+# 문제은행 일부를 센 것이지 전체(14,742)의 옛 값이 아니다.
+NEAR_RATIO = 0.10  # 실측된 낡은 값은 모두 8% 안쪽(541↔581이 최대) — 넓히면 다른 지표를 잡는다
+
+
+_N = r"\**(?P<n>\d{1,3}(?:,\d{3})+|\d{3,6})\**"  # 쉼표 있는 수 또는 3~6자리 수(굵게 표시 허용)
+
+_EDGE_FACTS = (
+    "atom_graph.edges",
+    "atom_graph.prerequisite_total",
+    "atom_graph.narrative_edges_raw",
+    "concept_graph.edges",
+)
+_NODE_FACTS = (
+    "atom_graph.nodes",
+    "atom_graph.atoms",
+    "atom_graph.subunits",
+    "atom_graph.nodes_elementary",
+    "atom_graph.nodes_middle",
+    "atom_graph.nodes_high",
+    "atom_graph.nodes_university",
+    "concept_graph.concepts",
+)
+_ATOM_FACTS = (
+    "atom_graph.atoms",
+    "atom_graph.nodes",
+    "atom_graph.atoms_elementary",
+    "atom_graph.atoms_middle",
+    "atom_graph.atoms_high",
+    "atom_graph.university_atoms",
+    "atom_graph.atoms_k12",
+    "atom_graph.nodes_university",
+)
+_MIS_FACTS = ("misconceptions.count", "misconceptions.with_ccss", "misconceptions.with_error_type")
+_STD_FACTS = (
+    "standards.k12",
+    "standards.k12_2022",
+    "standards.k12_2015",
+    "standards.k12_links",
+    "standards.university",
+    "standards.university_links",
+)
 
 PHRASES: list[Phrase] = [
-    Phrase("atom_graph.nodes", re.compile(r"(\d[\d,]*)\s*노드\s*[·,/]\s*\d[\d,]*\s*엣지")),
-    Phrase("atom_graph.edges", re.compile(r"\d[\d,]*\s*노드\s*[·,/]\s*(\d[\d,]*)\s*엣지")),
-    Phrase("misconceptions.count", re.compile(r"M-id\s*\*{0,2}(\d[\d,]*)\s*건")),
+    Phrase(
+        "N노드·M엣지의 노드", re.compile(_N + r"\s*노드\s*[·,/]\s*\d[\d,]*\s*엣지"), _NODE_FACTS
+    ),
+    Phrase(
+        "N노드·M엣지의 엣지",
+        re.compile(r"\d[\d,]*\s*노드\s*[·,/]\s*" + _N + r"\s*엣지"),
+        _EDGE_FACTS,
+    ),
+    Phrase("N엣지·N 선수엣지", re.compile(_N + r"\s*(?:선수\s*)?엣지"), _EDGE_FACTS),
+    Phrase(
+        "엣지 N·선수엣지 N·원자ID 엣지 N",
+        re.compile(r"(?:원자ID\s*|선수\s*)?엣지\s*(?:는|은|가|이)?\s*" + _N),
+        _EDGE_FACTS,
+    ),
+    Phrase(
+        "원자 N·세부개념 N·원자 리프 N",
+        re.compile(r"(?:원자|세부개념|원자\s*리프)\s*\(?" + _N),
+        _ATOM_FACTS,
+    ),
+    Phrase("N개 원자·N 원자", re.compile(_N + r"\s*(?:개\s*)?원자(?!\s*백본)"), _ATOM_FACTS),
+    Phrase("원자 백본 N", re.compile(r"원자\s*백본\s*\(?" + _N), ("atom_graph.nodes",)),
+    Phrase("N 노드(4자리 이상)", re.compile(r"(?P<n>\d{1,3},\d{3}|\d{4,6})\s*노드"), _NODE_FACTS),
+    Phrase(
+        "서술형 N", re.compile(r"서술형\s*(?:raw\s*)?\(?" + _N), ("atom_graph.narrative_edges_raw",)
+    ),
+    Phrase(
+        "오개념 N·M-id N",
+        re.compile(r"(?:오개념|M-id)\s*(?:카탈로그\s*)?\(?" + _N + r"(?!\s*(?:확장\s*)?트랜치)"),
+        _MIS_FACTS,
+    ),
+    Phrase("성취기준 N", re.compile(r"성취기준\s*\(?" + _N), _STD_FACTS),
+    Phrase(
+        "문제은행·코퍼스 N건/문항",
+        re.compile(
+            r"(?:문제은행|은행|코퍼스)[^\n|]{0,24}?(?P<n>\d{1,2},\d{3}|\d{5})\s*(?:건|문항|문|행)"
+        ),
+        ("problem_bank.total", "problem_bank.review_unset", "problem_bank.review_approved"),
+        min_value=1000,
+    ),
+    Phrase(
+        "N문항(4자리 이상)",
+        re.compile(r"(?P<n>\d{1,2},\d{3}|\d{5})\s*문항"),
+        ("problem_bank.total", "problem_bank.review_unset", "problem_bank.review_approved"),
+        min_value=1000,
+    ),
 ]
 
-# 현행 상태를 말하는 문서 — 여기서는 PHRASES 표기를 표식 없이 쓰면 실패다.
-# 시점 기록(MEMORY 결정 로그 · 리뷰 · 사고 대장 · 태스크 증적 · 런북 실측)은 그 시점 값을 적는 곳이라 범위 밖이다.
-CURRENT_STATE_DOCS: tuple[str, ...] = (
-    "CLAUDE.md",
-    "README.md",
-    "docs/architecture/*.md",
-    "docs/data/*.md",
+# 시점 기록 — 그 시점 값을 적는 곳이라 낡은 값이 있어도 정상이다. 통째로 범위 밖.
+HISTORY_GLOBS: tuple[str, ...] = (
+    "MEMORY.md",
+    "backlog/**",
+    "constitution/**",  # 읽기 전용(헌법 제9조) — 정정은 docs/constitution_proposals/ 초안으로 Kiki가 한다
+    "docs/constitution_proposals/**",
+    "docs/reviews/**",
+    "docs/handoff/**",
+    "docs/strategy/**",
+    "docs/**/*review*.md",
+    "docs/**/*_adr.md",
+    "docs/**/*audit*.md",
+    "docs/**/*20[0-9][0-9]-[0-9][0-9]*",  # 파일·폴더 이름에 날짜가 있는 보고서
+    "docs/**/*20[0-9][0-9]-Q[1-4]*",  # 분기 보고서
+    "docs/data/ai_review_*.md",
+    "src/backend/alembic/versions/**",
+    "tests/fixtures/**",
+    FACTS_TABLE.as_posix(),
+    "scripts/analysis/corpus_facts.py",
+    "tests/infra/test_corpus_facts.py",
+)
+
+# 줄 단위 시점 표지 — 날짜·이력 화살표·'당시/이전'·정정 기록·커밋 기준·취소선
+_DATED = re.compile(
+    r"20\d\d-\d\d(?:-\d\d)?|→|->|당시|이전|직전|시점|착수\s*전|구\s*\d|\(구|~~|정정|"
+    r"main\s+[0-9a-f]{7,}|KG-\d|S4-60|실측\s*\(|과거|옛\s|기존\s*값|원천\s*\d|업로드"
+)
+
+# 스캔 범위 — 현행 상태를 말할 수 있는 곳 전부(코드 주석·docstring 포함)
+SCAN_GLOBS: tuple[str, ...] = (
+    "*.md",
+    "docs/**/*.md",
+    "src/**/*.py",
+    "scripts/**/*.py",
+    "tests/**/*.py",
+    ".github/**/*.yml",
+    "pipeline.yaml",
+    "data/*.json",
 )
 
 
-def _current_state_files(root: Path) -> Iterator[Path]:
+def _is_history(rel: str) -> bool:
+    from fnmatch import fnmatch
+
+    return any(
+        fnmatch(rel, g) or (g.endswith("/**") and rel.startswith(g[:-3] + "/"))
+        for g in HISTORY_GLOBS
+    )
+
+
+def _scan_files(root: Path) -> Iterator[Path]:
     seen: set[Path] = set()
-    for pattern in CURRENT_STATE_DOCS:
+    for pattern in SCAN_GLOBS:
         for path in sorted(root.glob(pattern)):
-            if path not in seen and path.is_file():
-                seen.add(path)
+            if path in seen or not path.is_file():
+                continue
+            rel = path.relative_to(root)
+            if {"node_modules", ".venv", "venv", "__pycache__", ".dart_tool"}.intersection(
+                rel.parts
+            ):
+                continue
+            seen.add(path)
+            if not _is_history(rel.as_posix()):
                 yield path
 
 
-_DATED = re.compile(r"20\d\d-\d\d-\d\d")
+def _current_state_files(root: Path) -> Iterator[Path]:
+    """마크다운 현행 문서 — 여기서는 현재 값도 표식으로 달아야 한다(원본이 바뀌면 sync가 따라간다)."""
+    return (p for p in _scan_files(root) if p.suffix == ".md")
 
 
-def unmarked_phrases(root: Path) -> list[str]:
-    """현행 문서에서 표식 밖에 손으로 적힌 사실 표기. 날짜(YYYY-MM-DD)가 같은 줄에 있으면 시점 기록으로 본다."""
-    out: list[str] = []
-    for path in _current_state_files(root):
-        if path.relative_to(root) == FACTS_TABLE:
-            continue
+def _to_int(text: str) -> int:
+    return int(text.replace(",", ""))
+
+
+@dataclass(frozen=True)
+class Mention:
+    path: str
+    line: int
+    text: str
+    value: int
+    label: str
+    stale: bool  # True = 받아들이는 사실 값 어디에도 없다
+    markable: bool  # 마크다운 본문(코드 블록·인라인 코드 밖) — 표식으로 바꿀 수 있다
+
+
+def find_mentions(root: Path, values: dict[str, FactValue]) -> list[Mention]:
+    out: list[Mention] = []
+    for path in _scan_files(root):
+        rel = str(path.relative_to(root))
+        is_md = path.suffix == ".md"
+        in_fence = False
+        prev_dated = False
         for no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            stripped = MARKER.sub("", line)
-            if _DATED.search(stripped):
+            if is_md and line.lstrip().startswith(("```", "~~~")):
+                in_fence = not in_fence
                 continue
+            body = MARKER.sub("", line)
+            dated = bool(_DATED.search(body))
+            # 줄바꿈된 한 문장: 바로 윗줄에 시점 표지가 있으면 이 줄도 그 시점의 기록이다
+            if dated or (prev_dated and body.strip()):
+                prev_dated = dated
+                continue
+            prev_dated = False
+            code_spans = [m.span() for m in re.finditer(r"`[^`]*`", body)] if is_md else []
+            seen_spans: set[tuple[int, int]] = set()
             for ph in PHRASES:
-                for m in ph.pattern.finditer(stripped):
-                    if m.group(1):
-                        out.append(
-                            f"{path.relative_to(root)}:{no} 표식 없는 '{m.group(0)}' ({ph.fact_id})"
+                for m in ph.pattern.finditer(body):
+                    span = m.span("n")
+                    if span in seen_spans:
+                        continue
+                    raw_n = m.group("n")
+                    value = _to_int(raw_n)
+                    if value < ph.min_value or ("," not in raw_n and 1900 <= value <= 2099):
+                        continue  # 작은 수·연도(2015 개정·2022 개정)는 건수가 아니다
+                    ok = {v for f in ph.accepts if isinstance(v := values.get(f), int)}
+                    if value not in ok and not any(abs(value - v) <= v * NEAR_RATIO for v in ok):
+                        continue  # 이 사실의 언급이 아니다(부분 집합·다른 지표)
+                    seen_spans.add(span)
+                    in_code = any(a <= span[0] < b for a, b in code_spans)
+                    out.append(
+                        Mention(
+                            rel,
+                            no,
+                            m.group(0).strip(),
+                            value,
+                            ph.label,
+                            stale=value not in ok,
+                            markable=is_md and not in_fence and not in_code,
                         )
+                    )
+    return out
+
+
+def unmarked_phrases(root: Path, values: dict[str, FactValue] | None = None) -> list[str]:
+    """낡은 손 기입(어디서든) + 마크다운 본문의 표식 없는 현재 값."""
+    values = compute_all(root) if values is None else values
+    out: list[str] = []
+    for m in find_mentions(root, values):
+        if m.stale:
+            out.append(
+                f"{m.path}:{m.line} 낡은 값 '{m.text}' ({m.label}) — 현재 값으로 고치거나 시점을 밝힌다"
+            )
+        elif m.markable:
+            out.append(f"{m.path}:{m.line} 표식 없는 '{m.text}' ({m.label}) — 표식으로 바꾼다")
     return out
 
 
@@ -748,7 +1009,7 @@ def check(
     table = root / FACTS_TABLE
     if not table.is_file() or table.read_text(encoding="utf-8") != render_table(root, facts):
         problems.append(f"{FACTS_TABLE} 가 원본과 다르다(생성 문서) — sync 필요")
-    problems += unmarked_phrases(root)
+    problems += unmarked_phrases(root, values)
     return problems
 
 

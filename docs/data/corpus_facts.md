@@ -9,11 +9,20 @@
 | `ai_quality_eval.choice_cases` | 64 | AI 품질 평가셋 선택지 사례 | `data/corpus/ai_quality_eval_v1/eval_set.jsonl` |
 | `ai_quality_eval.hint_cases` | 180 | AI 품질 평가셋 힌트 사례 | `data/corpus/ai_quality_eval_v1/eval_set.jsonl` |
 | `atom_graph.atoms` | 1,823 | 원자 백본 세부개념 | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.atoms_elementary` | 382 | 원자 백본 초등 세부개념 | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.atoms_high` | 749 | 원자 백본 고등 세부개념 | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.atoms_k12` | 1,311 | 원자 백본 초·중·고 세부개념 | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.atoms_middle` | 180 | 원자 백본 중학 세부개념 | `data/corpus/atom_graph_v1/graph.json` |
 | `atom_graph.cross_band_edges_university` | 24 | 고→대 경계 엣지 원장 | `data/corpus/atom_graph_v1/cross_band_edges_university_v1.json` |
 | `atom_graph.edges` | 2,278 | 원자 백본 선수 엣지 | `data/corpus/atom_graph_v1/graph.json` |
 | `atom_graph.inter_course_edges_university` | 129 | 대학 과목간 엣지 원장 | `data/corpus/atom_graph_v1/inter_course_edges_university_v1.json` |
 | `atom_graph.narrative_edges_raw` | 973 | 원자 백본 서술형 선수 원문 | `data/corpus/atom_graph_v1/graph.json` |
 | `atom_graph.nodes` | 2,683 | 원자 백본 노드(세부개념+소단원+단원) | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.nodes_elementary` | 464 | 원자 백본 초등 노드(전 수준) | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.nodes_high` | 925 | 원자 백본 고등 노드(전 수준) | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.nodes_middle` | 225 | 원자 백본 중학 노드(전 수준) | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.nodes_university` | 1,069 | 원자 백본 대학 노드(전 수준) | `data/corpus/atom_graph_v1/graph.json` |
+| `atom_graph.prerequisite_total` | 3,251 | 원자 백본 선수 관계 전체(원자ID 엣지 + 서술형 원문) | `data/corpus/atom_graph_v1/graph.json` |
 | `atom_graph.sha12` | a2424fe18727 | 원자 백본 graph.json sha256 앞 12자(LF 기준) | `data/corpus/atom_graph_v1/graph.json` |
 | `atom_graph.subunits` | 643 | 원자 백본 소단원 | `data/corpus/atom_graph_v1/graph.json` |
 | `atom_graph.units` | 217 | 원자 백본 단원 | `data/corpus/atom_graph_v1/graph.json` |
@@ -69,6 +78,9 @@
 | `problem_bank.quad_ineq_v0` | 200 | 문제은행 problem_bank_quad_ineq_v0 | `data/corpus/problem_bank_quad_ineq_v0/problems.jsonl` |
 | `problem_bank.radian_conversion_v0` | 144 | 문제은행 problem_bank_radian_conversion_v0 | `data/corpus/problem_bank_radian_conversion_v0/problems.jsonl` |
 | `problem_bank.rephrased_v0` | 421 | 문제은행 problem_bank_rephrased_v0 | `data/corpus/problem_bank_rephrased_v0/problems.jsonl` |
+| `problem_bank.review_approved` | 3,188 | 문제은행 전체 중 review_status=approved | `data/corpus/problem_bank_*/problems.jsonl` |
+| `problem_bank.review_pending` | 158 | 문제은행 전체 중 review_status=pending | `data/corpus/problem_bank_*/problems.jsonl` |
+| `problem_bank.review_unset` | 11,396 | 문제은행 전체 중 review_status=없음 | `data/corpus/problem_bank_*/problems.jsonl` |
 | `problem_bank.sample_mean_distribution_v0` | 400 | 문제은행 problem_bank_sample_mean_distribution_v0 | `data/corpus/problem_bank_sample_mean_distribution_v0/problems.jsonl` |
 | `problem_bank.sequence_sigma_v0` | 132 | 문제은행 problem_bank_sequence_sigma_v0 | `data/corpus/problem_bank_sequence_sigma_v0/problems.jsonl` |
 | `problem_bank.total` | 14,742 | 문제은행 전체 문항 | `data/corpus/problem_bank_*/problems.jsonl` |
