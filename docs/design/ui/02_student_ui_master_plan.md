@@ -60,7 +60,7 @@ PRD의 "학생·교사·학부모 3개 별도 앱"은 **반려됐다**. 이유(`
 - **진로**: 고교학점제 진로별 과목 선택 추천(PRD 특성 #78·FR-017) — 학교 진도 모드의 콘텐츠 필터 변형.
 - **재수(N수)**: `retake` 모드 🟢(검정고시 N수·자사고 N수 페르소나 C·B).
 - **영재**: `gifted` 모드 🟢(게이팅 구현·코퍼스 대기, Phase3 프리미엄 월 49,900원).
-- **대학**: 별도 코퍼스 존재(`data/corpus/concept_content_university_v1/`·성취기준 409·원자 513) — 진단·개념 콘텐츠는 준비됨. 전용 모드는 후속(PRD #70 v3.0).
+- **대학**: 별도 코퍼스 존재(`data/corpus/concept_content_university_v1/`·성취기준 <!-- fact:standards.university -->409<!-- /fact -->·원자 <!-- fact:atom_graph.university_atoms -->512<!-- /fact -->) — 진단·개념 콘텐츠는 준비됨. 전용 모드는 후속(PRD #70 v3.0).
 
 ### 축 3 — 역할 (6개 역할 UI 레이어)
 

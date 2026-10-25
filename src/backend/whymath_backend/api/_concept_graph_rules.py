@@ -57,7 +57,8 @@ async def find_cycle_if_added(
     """선수 엣지 `from→to`를 더하면 생기는 순환의 경로를 돌려준다(없으면 None).
 
     경로는 `[from, to, …, from]`처럼 **닫힘 노드를 반복**해 사람이 어디를 끊을지 바로 알게 한다.
-    DB에 저장된 모든 선수 엣지를 읽는다(2,210건 규모 — 요청당 한 번의 단순 조회).
+    DB에 저장된 모든 선수 엣지를 읽는다(수천 건 규모 — 요청당 한 번의 단순 조회. 원자 백본 규모는
+    `docs/data/corpus_facts.md`의 `atom_graph.edges`).
     """
     rows = (
         await session.execute(

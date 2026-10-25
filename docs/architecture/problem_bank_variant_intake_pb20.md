@@ -23,7 +23,7 @@
 
 `problem.is_published`는 **읽는 코드가 0건**이다. 나오는 곳은 생성기 docstring, ORM·스키마 정의, 관리자 CMS 편집 허용 필드 목록(`api/admin_cms_resources.py`)뿐이고,
 `l3/dsl/models.py:25` 주석이 "별개의 게시 축이며 현재 읽는 코드가 없다(ADMIN-12)"고 자인한다.
-코퍼스 14,538행 전부 `False`지만 그 값이 노출을 막은 적은 없다. **그래서 `is_published=False`를 노출 방어로
+코퍼스 14,538행(2026-10-13 판정 기준) 전부 `False`지만 그 값이 노출을 막은 적은 없다. **그래서 `is_published=False`를 노출 방어로
 세지 않는다.** 실제로 노출을 막는 축은 `review_status` 하나다.
 
 ### 1.2 서빙 층 — 검수 공백 행이 학생에게 닿는가
@@ -46,7 +46,7 @@
 
 ### 1.3 발견 — 닫히지 않은 곳은 공개 카탈로그 하나다
 
-현 코퍼스는 14,538행 중 `approved` 2,984 · `pending` 158 · **공백 11,396**이다. 공백 11,396행은 승인된 적이
+판정 기준 시점(2026-10-13) 코퍼스는 14,538행 중 `approved` 2,984 · `pending` 158 · **공백 11,396**이다. 공백 11,396행은 승인된 적이
 없는데 이미 `problem_bank_*` 글롭 안(30종)에 있다. CAT·L6는 허용목록이라 이를 막지만, 공개 카탈로그는
 `quarantined`만 빼므로 이 행들이 나간다. 이 구멍은 `PB-08`(`todo`, 의존 없음)이 소유한다.
 
@@ -83,6 +83,7 @@
 | 측정 | `src/backend/whymath_backend/ops/repeat_recommendation_report.py` | 반복 추천 리포트 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_variants.py` | 변형 파생 — 시드 signature로 코퍼스를 읽는다 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_lineage_links.py` | 계보만 걸기 — 시드 역인덱스로 코퍼스를 읽는다 | 아님 |
+| 분석 스크립트 | `scripts/analysis/corpus_facts.py` | 코퍼스 사실 단일 원천 — 은행별·전체 건수 계산(OPS-154) | 아님 |
 | 분석 스크립트 | `scripts/analysis/answer_form_requirement_scan.py` | 정답 형식 요건 스캔 | 아님 |
 | 분석 스크립트 | `scripts/analysis/eos_anchor_asset_audit.py` | EOS 앵커 자산 감사 | 아님 |
 | 분석 스크립트 | `scripts/analysis/measure_sympy_isolation_budget.py` | SymPy 격리 예산 실측 | 아님 |

@@ -230,10 +230,11 @@ class AtomConcept(BaseModel):
 
 
 class AtomEdge(BaseModel):
-    """원자 백본 엣지 — `from_유형=원자ID` 선수 엣지(2,213). evidence/strength 합성.
+    """원자 백본 엣지 — `from_유형=원자ID` 선수 엣지(건수는 `docs/data/corpus_facts.md`의
+    `atom_graph.edges`). evidence/strength 합성.
 
     `(from_code, to_code, relation)` 복합키. `relation_subtype`(관계유형: 원본/소단원내/
-    소단원간/학년간/학교급간(추정))은 신규 메타 컬럼. **서술형 엣지(1,007)는 이 모델로 만들지 않고**
+    소단원간/학년간/학교급간(추정))은 신규 메타 컬럼. **서술형 엣지는 이 모델로 만들지 않고**
     transform이 `narrative_edges_raw`로 패스스루한다(FK 불가 — from이 원자ID가 아닌 서술 문자열).
     """
 

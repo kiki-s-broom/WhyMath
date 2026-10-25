@@ -44,7 +44,7 @@ nodes:
   #   src/backend/whymath_backend/l1/concept_graph/populate.py:1-22 · 코퍼스 data/corpus/concept_graph_v1 (E3 ls)
   concept_graph: { needs: [standards] }
 
-  # [집행·E2] 원자 백본(2,683노드): transform-v1(xlsx→graph.json, --standards 성취기준 결선) src/data-pipeline/data_pipeline/atom_graph/__main__.py:1-20
+  # [집행·E2] 원자 백본(규모는 docs/data/corpus_facts.md의 atom_graph.nodes): transform-v1(xlsx→graph.json, --standards 성취기준 결선) src/data-pipeline/data_pipeline/atom_graph/__main__.py:1-20
   #   적재 ①concept ②parent ③선수엣지 ④⑤시각화 Overlay ⑥atom_node(SKB-03) src/backend/whymath_backend/l1/atom_graph/populate.py:1-22
   #   중복 원자 검수 게이트(사람 검수 후보·자동 병합 아님) src/backend/whymath_backend/l1/atom_graph/dedup_candidates.py:1-12
   #   사람 게이트: backlog/gates.yaml:903 G-skb03-atom-node-populate · 런북 docs/ops/skb03_atom_node_populate_runbook.md:1-12
@@ -81,7 +81,7 @@ nodes:
   curriculum_review: { needs: [standards_load, concept_graph, atom_graph, skill_graph, curriculum_overlay] }
 
   # ───────────── 오개념 ─────────────
-  # [집행·E2] 오개념 839 Collection 추출 src/data-pipeline/data_pipeline/misconception/__main__.py:1-9
+  # [집행·E2] 오개념 Collection 추출(원천 업로드 기준 839 · 현행 규모는 docs/data/corpus_facts.md의 misconceptions.count) src/data-pipeline/data_pipeline/misconception/__main__.py:1-9
   #   적재 src/backend/whymath_backend/l1/misconception/populate.py:1-14 · 코퍼스 data/corpus/misconceptions_v1 (E3 ls)
   #   (제안본 misconceptions 대응 — 선행은 concept_graph 가 아니라 전문가 원본이다)
   misconceptions: { needs: [expert_masters] }

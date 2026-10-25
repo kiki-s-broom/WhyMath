@@ -21,7 +21,7 @@
 | cycle 검출(populate/load 방어선) | **구현 완료** | 저위험·기존 탐지기 미러 |
 | 교육과정 `grade_introduced`·`semester_introduced` 제거 | **구현 완료** | NULL·중복·소비처 0 |
 | 교육과정 `curriculum_version`·`subject` 완전 Overlay 이관 | **구현 완료**(§3) — 두 필드 제거(PR #350) + `curriculum_entry` KR 적재기 완료 | 런타임 소비처 0 확인·Overlay 단일 진실 |
-| 오개념 ID 통합(kebab 30 ↔ M-id 839) | **골격 구현**(§1) — M-id 로더·crosswalk 테이블·read-time resolver 완료. 잔여 = 매핑 큐레이션·게이트 배선 | rekey는 resolver로 불필요화(채택) |
+| 오개념 ID 통합(2026-06-30 작성 당시 kebab 30 ↔ M-id 839) | **골격 구현**(§1) — M-id 로더·crosswalk 테이블·read-time resolver 완료. 잔여 = 매핑 큐레이션·게이트 배선 | rekey는 resolver로 불필요화(채택) |
 | 파서(동치 권위) 일원화 | **구현 완료**(§2) — 경계 명문화 + golden test | `notation_contract.md`·`data/notation_contract.json` |
 | invariant 회귀 동결 게이트(노드 의미·약한 relation·shadow·traversal 예산) | **구현 완료**(PR #357) — risk_register §4 매핑 5종(Q10-③·Q1/Q8·Q2·Q10-⑥·Q10-⑧) | `test_concept.py`·`test_concept_misconception_runtime.py`·`test_edge_relation_governance.py`·`hypothesis_store.py`·`prerequisite_recommendation.py` |
 
@@ -35,10 +35,10 @@
 
 ## 1. 오개념 ID 통합 (최고위험)
 
-### 1.1 현재(부채)
+### 1.1 현재(부채) — 2026-06-30 작성 당시
 - **kebab 30종**(`l4/misconception/catalog.py` 하드코딩) = *런타임 탐지·개입 정본*. 44+ 파일이
   `CATALOG_BY_ID`에 강결합(진단·judge·distractor·probe·learning_scene·wh1_loop 게이트).
-- **M-id 839종**(`schema/misconception_catalog.py`·`data/corpus/misconceptions_v1/`) = *콘텐츠
+- **M-id 839종**(2026-06-30 당시)(`schema/misconception_catalog.py`·`data/corpus/misconceptions_v1/`) = *콘텐츠
   카탈로그*. **로더 구현 완료**(`l1/misconception/catalog_loader.py`·`populate` CLI·alembic
   `c4d5e6f7a8b9`·단위/통합 테스트) — `misconception_catalog` 테이블에 멱등 적재 가능. (API 노출은 후속.)
 - 둘 사이 **crosswalk 부재·FK 없음**. 런타임 테이블(`misconception_hypothesis`·`evidence_link`·

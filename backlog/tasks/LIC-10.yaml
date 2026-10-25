@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: LIC-10
+title: "라이선스 대장이 문제은행 39개 중 7개만 기록 — 32개 은행 행 추가 + 폴더↔대장 정합 CI"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `docs/data/licensing_safety.md` 대장이 문제은행 39개 중 7개(problem_bank_v1·generated·rephrased·conceptual·killer·misconception_mc·probability_finite)만 행으로 기록한다 — 나머지 32개(2026-08-09 회수 배치·P3 은행 등)의 출처·라이선스·풀(pool) 행을 추가한다. 각 은행 `_provenance.json`의 pool·copyright_rail에서 옮긴다\n② 대장이 은행 폴더 목록과 어긋나면 CI가 막는다 — `data/corpus/problem_bank_*` 폴더 집합 ⊆ 대장 등재 집합을 검사(스캔 0건은 실패 · 뮤테이션: 폴더 추가 시 RED)\n③ CLAUDE.md \"모든 데이터 소스의 라이선스를 licensing_safety.md에 기록\" 원칙의 집행 지점을 이 검사로 명시"
+artifacts: []
+paths:
+  - docs/data/licensing_safety.md
+session: null
+notes: "발견 2026-10-25 OPS-154 전수 조사(문제은행 조사 에이전트: 'The ledger only has rows for 7 of the 39 banks'). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-25

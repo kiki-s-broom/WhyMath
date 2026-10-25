@@ -16,8 +16,8 @@ L1→L4는 금지)이 되므로, 그 조립(L1 결과 → L4 `ProbeCandidate`)�
 `difficulty_overall`·`irt_difficulty_b` *원값*만 반환하고 변환은 하네스가 L2를 불러 수행한다.
 
 필터 2종("미응답 제외·난이도 보유만" — 감사 §3 D2 ①):
-  - **난이도 보유**: `difficulty_overall IS NOT NULL`인 문항만(코퍼스 2,647/2,647=100% 보유·감사
-    실측). 난이도 없이는 IRT 정보량을 계산할 수 없어 후보 자격이 없다.
+  - **난이도 보유**: `difficulty_overall IS NOT NULL`인 문항만(감사 실측 당시 코퍼스
+    2,647/2,647=100% 보유). 난이도 없이는 IRT 정보량을 계산할 수 없어 후보 자격이 없다.
   - **미응답**: `user_id`가 주어지면 이 학생이 이미 *채점 완료*(`is_correct IS NOT NULL`) 응답한
     문항을 뺀다(`api/me.py` `/next-problem`의 "미응답 문항" 정의를 그대로 재사용 — 진단 문항도
     이미 답을 아는 문항을 다시 내밀면 판별력이 없다).

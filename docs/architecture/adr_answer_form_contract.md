@@ -22,7 +22,7 @@
 ## 2. 도입 판정 — 측정이 먼저
 
 「측정 없는 도입 없음」에 따라 코퍼스를 전수 조사했다
-(`scripts/analysis/answer_form_requirement_scan.py`, 2,638문항·7뱅크).
+(`scripts/analysis/answer_form_requirement_scan.py`, 2,638문항·7뱅크 — 2026-09-01 결정 당시 코퍼스).
 
 | 형태 어휘 | 적중 | 비율 |
 |---|---:|---:|

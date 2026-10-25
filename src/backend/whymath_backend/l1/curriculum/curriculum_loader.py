@@ -385,9 +385,11 @@ def load_kr_curriculum_entries_with_atoms(
 # 원자코드로 키잉된 KR 셀을 유도한다 — canonical을 우회하는 게 아니라, 대학 축이 애초에
 # canonical 그래프 밖의 자산이므로 정공법이다.
 
-# atom_graph_v1의 `grade_band`("1학년".."4학년")는 전체 2,683 원자 중 대학 원자(1,069건)에만
-# 나타나는 값이다(초·중·고 밴드는 "N~M학년군"·"고N" 표기라 겹치지 않음 — 2026-08-05 corpus
-# 실측: 이 4개 라벨의 전체 등장 횟수와 대학 필터 등장 횟수가 정확히 일치).
+# atom_graph_v1의 `grade_band`("1학년".."4학년")는 원자 백본 노드 중 대학 노드(school_level="대학"
+# — 건수는 `docs/data/corpus_facts.md`의 `atom_graph.nodes_university`)에만, 그중에서도 세부개념
+# (`atom_graph.university_atoms`)에만 나타나는 값이다(초·중·고 밴드는 "N~M학년군"·"고N" 표기라
+# 겹치지 않음 — 2026-08-05 corpus 실측: 이 4개 라벨의 전체 등장 횟수와 대학 필터 등장 횟수가
+# 정확히 일치).
 _UNIV_GRADE_TO_INTRODUCED_GRADE: dict[str, int] = {
     # KR 1~12(초1=1…고3=12, `_GRADE_BAND_TO_INTRODUCED_GRADE`) 다음 번호를 그대로 이어 붙인
     # 로더 내부 관례다(제도가 정한 학년 번호가 아니다) — `introduced_grade`의 "국가 내 학년
@@ -485,9 +487,10 @@ def load_kr_curriculum_entries_for_university_atoms(
     (canonical 개념그래프의 graph.json)와 **다른 파일**이다 — 이 함수는 원자 그래프의
     graph.json(대학 원자 포함)을 읽는다. `load_kr_curriculum_entries_with_atoms`의
     대학 보충 경로다: 크로스워크가 대학 원자를 0건 매핑하므로 이 함수가 없으면 대학 원자
-    1,069건은 커리큘럼 오버레이에 영원히 나타나지 않는다(모듈 docstring "대학 원자 직접 유도"
-    절 참조). 호출자가 이 목록을 canonical·원자(K-12) 목록과 합쳐 적재한다 — entry_id 충돌
-    없음(원자코드 공간이 K-12·대학 사이에서 겹치지 않음).
+    (school_level="대학" 노드 전부 — `atom_graph.nodes_university`)는 커리큘럼 오버레이에 영원히
+    나타나지 않는다(모듈 docstring "대학 원자 직접 유도" 절 참조). 호출자가 이 목록을
+    canonical·원자(K-12) 목록과 합쳐 적재한다 — entry_id 충돌 없음(원자코드 공간이 K-12·대학
+    사이에서 겹치지 않음).
 
     Raises:
         FileNotFoundError: atom_graph.json 부재.

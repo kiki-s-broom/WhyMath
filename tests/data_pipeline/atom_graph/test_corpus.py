@@ -12,27 +12,38 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _STANDARDS = _PROJECT_ROOT / "data" / "corpus" / "standards_v1" / "standards.json"
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_PROJECT_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 
 class TestCorpusCounts:
+    """기대 건수는 사실 파일에서 읽는다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다."""
+
     def test_node_counts(self, corpus_provenance: dict[str, object]) -> None:
         nc = corpus_provenance["node_counts"]  # type: ignore[index]
-        assert nc["atoms"] == 1823
-        assert nc["units"] == 217
-        assert nc["subunits"] == 643
-        assert nc["total"] == 2683
+        assert nc["atoms"] == _FACTS["atom_graph.atoms"]
+        assert nc["units"] == _FACTS["atom_graph.units"]
+        assert nc["subunits"] == _FACTS["atom_graph.subunits"]
+        assert nc["total"] == _FACTS["atom_graph.nodes"]
 
     def test_edge_counts(self, corpus_provenance: dict[str, object]) -> None:
         ec = corpus_provenance["edge_counts"]  # type: ignore[index]
         # 2210(백본 v1) + 24(S4-60 고→대 경계 병합 · cross_band_edges_university_merge_v1)
         assert (
-            ec["atom_id_edges"] == 2278
+            ec["atom_id_edges"] == _FACTS["atom_graph.edges"]
         )  # KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리(제거 12·반전 4)로 2,231→2,219 · ③ 낱말매칭 승격 v2 59건으로 2,278
         assert (
-            ec["narrative_edges_raw"] == 973
+            ec["narrative_edges_raw"] == _FACTS["atom_graph.narrative_edges_raw"]
         )  # KG-09 v3 재생성: 서술형 1007 → 973(원자ID 직접 정규화 3·중복 정리 31)
 
     def test_university_atoms(self, corpus_provenance: dict[str, object]) -> None:
-        assert corpus_provenance["school_level_university_atoms"] == 512
+        assert (
+            corpus_provenance["school_level_university_atoms"]
+            == _FACTS["atom_graph.university_atoms"]
+        )
 
     def test_normalization_counts(self, corpus_provenance: dict[str, object]) -> None:
         nc = corpus_provenance["normalization_counts"]  # type: ignore[index]
@@ -88,7 +99,7 @@ class TestCorpusRedaction:
     ) -> None:
         atoms = [c for c in corpus_graph["concepts"] if c["level"] == "세부개념"]  # type: ignore[index]
         univ = [c for c in atoms if c["school_level"] == "대학"]
-        assert len(univ) == 512
+        assert len(univ) == _FACTS["atom_graph.university_atoms"]
         assert all(c["core_proposition"] for c in univ)
         assert all(c["redacted_fields"] == [] for c in univ)
 

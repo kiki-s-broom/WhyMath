@@ -77,7 +77,7 @@ L1. 데이터 기반            [성취기준 · 검정교과서 · 평가원 ·
 | 수식 입력 | MathLive | 학생 수식 입력 표준 |
 | 백엔드 | Python 3.12 + FastAPI + uvicorn | AVAC 자산 |
 | RDB | PostgreSQL 16 + TimescaleDB (시계열) | AVAC 자산 |
-| Graph DB | ~~Neo4j 5.x (Community)~~ — **런타임 미도입**(2026-08-03 정정·확정) | 개념 연결 그래프의 정본은 **PG 단일 평면**(실측 원자 백본 2,683노드·2,278엣지). Neo4j는 data-pipeline 옵셔널 extra(적재 실험 경로)로만 존재 — backend 의존·docker 서비스 0건. 상세 = `00_overview.md` 5블록 DB·컴포넌트 표 |
+| Graph DB | ~~Neo4j 5.x (Community)~~ — **런타임 미도입**(2026-08-03 정정·확정) | 개념 연결 그래프의 정본은 **PG 단일 평면**(실측 원자 백본 <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->노드·<!-- fact:atom_graph.edges -->2,278<!-- /fact -->엣지). Neo4j는 data-pipeline 옵셔널 extra(적재 실험 경로)로만 존재 — backend 의존·docker 서비스 0건. 상세 = `00_overview.md` 5블록 DB·컴포넌트 표 |
 | Vector DB | **pgvector** (PostgreSQL 16 확장) | 임베딩·의미 검색 — 메타 동거 하이브리드(단일 SQL)·6번째 store 회피. 대규모 시 Qdrant 이관 (MEMORY 슬98) |
 | 행동 로그 | ~~ClickHouse~~ — **런타임 미도입**(2026-08-11 정정·확정) | 행동 로그의 정본은 **PostgreSQL 16 + TimescaleDB 단일 평면**(pgvector가 6번째 store를 회피한 것과 같은 논리). ClickHouse는 backend 의존·docker 서비스·설정 키 0건 — 코드 속 언급은 "이관되면" 가정 주석뿐(`privacy/erasure.py`·`export.py`가 미도입을 이미 명시). 도입 판정은 `DP-01` 착수 조건 |
 | 객체 저장소 | S3 / MinIO | 영상·이미지 |
@@ -395,6 +395,7 @@ L1. 데이터 기반            [성취기준 · 검정교과서 · 평가원 ·
 - `docs/standards/system_superiority_maintenance.md` — 시스템 우월성 유지(SSM): 분기별 기술 트렌드 능동 스캔·도입 게이트(상시 붕괴 방어와 상보)
 - `docs/strategy/*.md` — 시장·차별화·리스크
 - `docs/data/licensing_safety.md` — 데이터 라이선스 매트릭스
+- `docs/data/corpus_facts.md` — 코퍼스 건수·지문 단일 원천(생성 문서 · 문서는 숫자를 손으로 적지 않고 사실 이름 표식으로 인용(형식은 모듈 설명) · 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync` · CI `tests/infra/test_corpus_facts.py` · OPS-154)
 - `docs/prompts/*.md` — 프롬프트 템플릿 라이브러리
 - `docs/standards/testing.md` — 테스트 피라미드·**커버리지 게이트 정본**(집계 70% + 계층 floor l4=90%·l1/l2/api=80%·l3=70% — 수치의 단일 진실 원천은 `scripts/coverage/check_layer_coverage.py`의 `LAYER_FLOORS`)
 - `docs/standards/security_privacy.md` — 미성년 PII·암호화·보존 파기 정본

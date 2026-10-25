@@ -24,6 +24,13 @@ import pytest
 from whymath_backend.harness import cross_school_connectivity_report as csc
 from whymath_backend.l2.prerequisite_recommendation import MAX_PREREQUISITE_DEPTH
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 _E = tuple[str, str]  # (from_code, to_code)
 
 
@@ -340,7 +347,7 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     payload = json.loads(csc.DEFAULT_CORPUS_PATH.read_text(encoding="utf-8"))
     report = csc.build_report(csc.load_corpus_graph(payload))
 
-    assert report.edge_total == 2278
+    assert report.edge_total == _FACTS["atom_graph.edges"]
     assert report.boundary_edge_total == 47  # 50(KG-09) − 반려 3 → 47/2,278 = 2.06%
     assert (
         report.intra_level_total == 2231
@@ -352,7 +359,7 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
         ("초등", "고등"): 1,  # KG-09 — 6수02-03-1 비율의 의미 → 12수문04-01-2
         ("중학", "중학"): 241,
         ("중학", "고등"): 12,  # KG-10 ② 반려 1(9수02-19-2 → 10공수1-01-03-2)
-        ("고등", "고등"): 925,
+        ("고등", "고등"): 925,  # corpus-pin: 측정값 — 고등→고등 엣지 수(고등 노드 수와 우연 일치)
         ("고등", "대학"): 25,  # S4-60 병합분 24 + KG-10 ② 교체 1(10공수1-01-03-1 → CALC1-P21)
         ("대학", "대학"): 528,  # KG-12 ① 제거 12 · ③ 승격 v2 59 → 481 − 12 + 59
     }
@@ -366,12 +373,16 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
 
     # 하향 도달 — 고등→중학이 핵심 행. 대학은 아무 하위 학교급에도 닿지 못한다.
     core = _cell(report, "고등", "중학")
-    assert (core.population, core.reached_within, core.reached_any) == (925, (11, 42, 134), 307)
+    assert (core.population, core.reached_within, core.reached_any) == (
+        _FACTS["atom_graph.nodes_high"],
+        (11, 42, 134),
+        307,
+    )
     # 대학은 더 이상 섬이 아니다: 대학 1,069 중 160이 고등 선수에 닿는다(독립 BFS 실측과 일치 —
     # KG-12 ① 체인 수리 전 198).
     uni_to_high = _cell(report, "대학", "고등")
     assert (uni_to_high.population, uni_to_high.reached_within, uni_to_high.reached_any) == (
-        1069,
+        _FACTS["atom_graph.nodes_university"],
         (25, 47, 91),  # KG-10 ② 교체 엣지가 1홉 +1 · KG-12 ③ 승격 v2가 2홉·3홉 +3·+11
         160,
     )

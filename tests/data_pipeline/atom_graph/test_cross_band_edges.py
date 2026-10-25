@@ -40,7 +40,13 @@ PROPOSAL_PATH = CORPUS_DIR / "cross_band_edges_university_v1.json"
 GRAPH_PATH = CORPUS_DIR / "graph.json"
 BUILDER_PATH = _PROJECT_ROOT / "scripts" / "build_cross_band_edges_s4_01.py"
 
-_EXPECTED_EDGE_COUNT = 24
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_PROJECT_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
+_EXPECTED_EDGE_COUNT = _FACTS["atom_graph.cross_band_edges_university"]
 #: 병합 직전(S4-60 이전) 정본 sha256 — 원장이 전제한 스냅샷. 상수로 박아 두 번째 증거로 삼는다.
 _PRE_MERGE_GRAPH_SHA256 = "ea05b277ab40979d78be709daadb13d3427a72799a6a537561f1dc91c155601d"
 

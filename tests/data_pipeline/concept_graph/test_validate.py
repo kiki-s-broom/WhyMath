@@ -5,12 +5,23 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from data_pipeline.concept_graph.models import Concept, ConceptEdge
 from data_pipeline.concept_graph.transform import transform_dataset
 from data_pipeline.concept_graph.validate import (
     validate_dataset,
     validate_graph,
     validate_idmap,
+)
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
 )
 
 
@@ -300,9 +311,9 @@ class TestValidateIdmap:
         assert report.success is False
 
     def test_real_corpus_idmap_passes(self, concept_records: list[dict[str, object]]) -> None:
-        """실데이터 437건 재ID 불변식 전부 통과(area_map_total·id_unique·alias_roundtrip)."""
+        """실데이터 전건 재ID 불변식 전부 통과(area_map_total·id_unique·alias_roundtrip)."""
         report = validate_idmap(concept_records)
-        assert report.node_count == 437
+        assert report.node_count == _FACTS["concept_graph.concepts"]
         assert report.success is True
         assert report.errors == []
 
@@ -342,8 +353,8 @@ class TestRealDataValidation:
     ) -> None:
         result = transform_dataset(concept_records=concept_records, edge_records=edge_records)
         report = validate_dataset(result)
-        assert report.node_count == 437
-        assert report.edge_count == 581
+        assert report.node_count == _FACTS["concept_graph.concepts"]
+        assert report.edge_count == _FACTS["concept_graph.edges"]
         assert report.success is True  # error 0 (Phase 1: warning은 통과)
         assert report.errors == []
 
@@ -357,5 +368,5 @@ class TestRealDataValidation:
         report = validate_dataset(result)
         text = report.report_text()
         assert "PASS" in text
-        assert "노드 437개" in text
-        assert "엣지 581개" in text
+        assert f"노드 {_FACTS['concept_graph.concepts']}개" in text
+        assert f"엣지 {_FACTS['concept_graph.edges']}개" in text

@@ -1,10 +1,10 @@
 """오개념 카탈로그(MisconceptionCatalog) ORM 모델 (SQLAlchemy 2.0 영속 레이어).
 
-설계 정본: `schema/misconception_catalog.py`(Pydantic, 검증·API 계약)와 *별도*로 세운 영속
-매핑이며 `from_schema`/`to_schema` 변환 헬퍼가 둘을 잇는다(`models/achievement_standard.py`
-동일 패턴 — SQLModel 미사용). 이 슬라이스(Phase B.2)는 카탈로그의 ORM·계약·마이그레이션만
-세우고, #290 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·839 레코드) 로더는
-후속 슬라이스 몫이다.
+설계 정본: `schema/misconception_catalog.py`(Pydantic, 검증·API 계약)와 *별도*로 세운 영속 매핑이며
+`from_schema`/`to_schema` 변환 헬퍼가 둘을 잇는다(`models/achievement_standard.py` 동일 패턴 —
+SQLModel 미사용). 이 슬라이스(Phase B.2)는 카탈로그의 ORM·계약·마이그레이션만 세우고, #290
+코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·#290 커밋 당시 839 레코드 — 현재 건수는
+`docs/data/corpus_facts.md`의 `misconceptions.count`) 로더는 후속 슬라이스 몫이다.
 
 PK 판단(이 모듈의 핵심 결정):
   `mis_id`(의미 문자열·예 'M0425')가 PK다. UUID가 아니라 의미 문자열이라 `gen_random_uuid()`
@@ -21,7 +21,7 @@ PK 판단(이 모듈의 핵심 결정):
 타입 매핑(schema → ORM, achievement_standard.py 선례 그대로):
   - `mis_id`(PK) → `sa.String(32)`(의미 문자열·server_default 없음). 원래 String(16)이었으나
     atom 투영 mis_id(`"ATOM:"+code`, `l1/misconception/atom_catalog.py`)가 실측 최장 18자
-    (1,837건 중 348건이 16자 초과·예 'ATOM:10공수1-01-01-1')라 오버플로 — 32로 확폭했다
+    (작성 당시 1,837건 중 348건이 16자 초과·예 'ATOM:10공수1-01-01-1')라 오버플로 — 32로 확폭했다
     (Phase 5 kebab→ATOM 이전 대비 헤드룸 포함, 마이그레이션 `a5b6c7d8e9f0`).
   - `canonical_statement`·`student_wrong_thinking`·`distractor_rule`·`correction_point`
     (자유 서술) → `sa.Text`(nullable·와이매스 자체 저작 보유 허용).

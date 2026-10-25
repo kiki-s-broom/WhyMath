@@ -28,6 +28,13 @@ import pytest
 
 from whymath_backend.harness import problem_duplication_audit as pda
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 # ──────────────────────────────────────────────────────────────────────────
 # 픽스처 헬퍼
 # ──────────────────────────────────────────────────────────────────────────
@@ -871,13 +878,14 @@ def test_real_corpus_snapshot_t1_resolved_and_t2_zero_pairs_after_qual07() -> No
     # 14,586 → 14,646: 같은 은행에 02-02 미분가능성 5슬롯 × 12건이 늘었다(종수는 39 그대로).
     # 14,646 → 14,694: 02-07 증가·감소 4슬롯 × 12건이 더해졌다(같은 은행).
     # 14,694 → 14,742: 5단계 02-03 규칙 일반화 24건 + 02-10 문장제 24건(같은 은행).
-    assert report.total_problems == 14742
-    assert len(report.corpora) == 39
+    assert report.total_problems == _FACTS["problem_bank.total"]
+    assert len(report.corpora) == _FACTS["problem_bank.banks"]
 
     # T1 — 해소됨.
     assert len(report.slug_collisions) == 0
-    # C(39,2) — PB-13 회수로 7종→37종 · P3-03으로 38종 · P3-05 4단계로 39종
-    assert report.corpus_pairs_scanned == 741
+    # C(은행 수, 2) — PB-13 회수로 7종→37종 · P3-03으로 38종 · P3-05 4단계로 39종
+    banks = _FACTS["problem_bank.banks"]
+    assert report.corpus_pairs_scanned == banks * (banks - 1) // 2
 
     # ── T2 감시 축 2종(QUAL-07이 acceptance ④로 **유지**를 지시한 단언) ─────────────
     # 이 둘은 현재 0쌍 상태에서 **공허 참**이다(빈 목록 위의 전칭·부분집합). 숨기지 않고
@@ -943,13 +951,13 @@ def test_real_corpus_snapshot_rephrase_noop_direct_measurement() -> None:
     noop = report.rephrase_noop
 
     assert noop.target_corpus == "problem_bank_rephrased_v0"
-    assert noop.total == 421
+    assert noop.total == _FACTS["problem_bank.rephrased_v0"]
     assert noop.unchanged_count == 274
     assert noop.changed_count == 147
     assert noop.no_parent_declared_count == 0
     assert noop.orphan_parent_count == 0
-    assert noop.measurable_count == 421
-    assert noop.unchanged_rate == pytest.approx(274 / 421)
+    assert noop.measurable_count == _FACTS["problem_bank.rephrased_v0"]
+    assert noop.unchanged_rate == pytest.approx(274 / _FACTS["problem_bank.rephrased_v0"])
 
     # QUAL-01 간접 하한과의 교차검증 — 이 코퍼스 상태에서는 정확히 일치(정직 회계 비교 대상).
     assert report.lineage_excluded_pair_count == noop.unchanged_count == 274

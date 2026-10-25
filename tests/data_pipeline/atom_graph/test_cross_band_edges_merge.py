@@ -43,7 +43,11 @@ GRAPH_PATH = _CORPUS / "graph.json"
 LEDGER_PATH = _CORPUS / "cross_band_edges_university_v1.json"
 PROVENANCE_PATH = _CORPUS / "_provenance.json"
 
-_N = 24
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+
+_N = _FACTS["atom_graph.cross_band_edges_university"]
 _PRE_MERGE_SHA = "ea05b277ab40979d78be709daadb13d3427a72799a6a537561f1dc91c155601d"
 
 
@@ -102,7 +106,7 @@ class TestReproducibility:
         assert pre_graph == post_cross_band_view
         # 그 뒤 KG-12 승격 v2 59건이 끝에 덧붙어 현재 파일(2,281)이 된다
         assert live_graph["edges"][: len(pre_graph["edges"])] == pre_graph["edges"]
-        assert len(live_graph["edges"]) == 2278
+        assert len(live_graph["edges"]) == _FACTS["atom_graph.edges"]
 
     def test_existing_edges_are_untouched_and_new_ones_are_appended_last(
         self, pre_graph: dict[str, Any], ledger: dict[str, Any]
@@ -111,7 +115,7 @@ class TestReproducibility:
         merge_cross_band_edges(pre_graph, ledger)
         assert pre_graph["edges"][: len(before)] == before  # 기존 2,210건 순서·내용 불변
         assert all(e["evidence"] == PROPOSAL_EVIDENCE for e in pre_graph["edges"][len(before) :])
-        assert len(pre_graph["concepts"]) == 2683  # 노드 무변경
+        assert len(pre_graph["concepts"]) == _FACTS["atom_graph.nodes"]  # 노드 무변경
 
 
 class TestIdempotence:
@@ -235,7 +239,7 @@ class TestPostMergeMeasurements:
         crossing = [e for e in edges if level[e["from_code"]] != level[e["to_code"]]]
         assert (len(crossing), len(edges)) == (
             47,
-            2278,
+            _FACTS["atom_graph.edges"],
         )  # KG-09 v3 재생성 44 → 50 → KG-10 ② 경계 검수(반려 3·교체 1) → 47 · 엣지는 KG-12로 2,281
         assert round(len(crossing) / len(edges) * 100, 2) == 2.06
         high_to_uni = [
@@ -260,7 +264,10 @@ class TestPostMergeMeasurements:
             for c in live_graph["concepts"]
             if c["school_level"] == "대학" and c["level"] == "세부개념"
         }
-        assert (len(uni_atoms), len(uni_atoms & seen)) == (512, 160)  # KG-12 ① 체인 수리 전 198
+        assert (len(uni_atoms), len(uni_atoms & seen)) == (
+            _FACTS["atom_graph.university_atoms"],
+            160,
+        )  # KG-12 ① 체인 수리 전 198
 
 
 class TestProvenance:
@@ -268,7 +275,9 @@ class TestProvenance:
         prov = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
         ids = [m["id"] for m in prov["post_transform_migrations"]]
         assert ids.count(PROVENANCE_MIGRATION_ID) == 1
-        assert prov["edge_counts"]["atom_id_edges"] == 2278  # KG-12 승격 v2 병합 뒤
+        assert (
+            prov["edge_counts"]["atom_id_edges"] == _FACTS["atom_graph.edges"]
+        )  # KG-12 승격 v2 병합 뒤
         assert _PRE_MERGE_SHA in next(
             m["summary"]
             for m in prov["post_transform_migrations"]

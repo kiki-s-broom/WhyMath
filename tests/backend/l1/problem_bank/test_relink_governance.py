@@ -35,15 +35,20 @@ _ROOT = Path(__file__).resolve().parents[4]
 _CROSSWALK = _ROOT / "data" / "corpus" / "concept_atom_crosswalk_v1" / "crosswalk.jsonl"
 _CONCEPT_GRAPH = _ROOT / "data" / "corpus" / "concept_graph_v1" / "graph.json"
 _ATOM_GRAPH = _ROOT / "data" / "corpus" / "atom_graph_v1" / "graph.json"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 # 4 문제코퍼스 — {이름: (경로, 태그 수 하한)} (⑤ 하한은 2026-07-09 실측 동결, mc_v0은 2026-07-29
-# S3-12 rotation-1 concept_src_id 재고정 후 신규 편입).
+# S3-12 rotation-1 concept_src_id 재고정 후 신규 편입). v0 3종의 하한은 그 코퍼스의 문제 수
+# (문제당 태그 1개 — 실측 동일)를 사실 파일에서 읽는다: 문제 은퇴로 건수가 줄면 `sync`의
+# corpus_facts.json diff가 의식적 리뷰 지점이 된다(손 하한 갱신 이력은 아래 주석에 보존).
 _PROBLEM_CORPORA: dict[str, tuple[Path, int]] = {
     "problem_bank_v1": (_ROOT / "data" / "corpus" / "problem_bank_v1" / "problems.jsonl", 6),
     "problem_bank_generated_v0": (
         # QUAL-02 실중복 은퇴(2026-08-11)로 620→619 — 데모풀 동시노출 쌍의 스켈레톤 측
         # 1건(wm-skel-92cd1ba2bbf5) 제거. 판정 정본 docs/data/problem_duplicate_disposition_2026-08.md.
         _ROOT / "data" / "corpus" / "problem_bank_generated_v0" / "problems.jsonl",
-        619,
+        _FACTS["problem_bank.generated_v0"],
     ),
     "problem_bank_rephrased_v0": (
         # S3-12 발문 위생 일괄 적용(rephrased_corpus_hygiene)으로 483→446→443→429 정직 축소 —
@@ -54,7 +59,7 @@ _PROBLEM_CORPORA: dict[str, tuple[Path, int]] = {
         # QUAL-02 실중복 은퇴(2026-08-11)로 429→421 — 무변화 재서술 사본 8건(위생 위반이
         # 아니라 중복 은퇴). 판정 정본 동상.
         _ROOT / "data" / "corpus" / "problem_bank_rephrased_v0" / "problems.jsonl",
-        421,
+        _FACTS["problem_bank.rephrased_v0"],
     ),
     "problem_bank_misconception_mc_v0": (
         # S3-12 rotation-1이 45밴드 중 13개의 concept_src_id(`_TEMPLATE_META`)가 재태깅된
@@ -63,7 +68,7 @@ _PROBLEM_CORPORA: dict[str, tuple[Path, int]] = {
         # 편입 전에는 이 코퍼스가 거버넌스 밖이라 저 13건 dangling-등가 결함이 무기한 미검출
         # 상태였다(재발 방지 — 이 테스트가 이제 4번째 코퍼스로 상시 감시).
         _ROOT / "data" / "corpus" / "problem_bank_misconception_mc_v0" / "problems.jsonl",
-        1080,
+        _FACTS["problem_bank.misconception_mc_v0"],
     ),
 }
 

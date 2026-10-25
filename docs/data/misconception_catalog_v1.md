@@ -1,6 +1,6 @@
 # 와이매스 오개념 카탈로그 v1 — 데이터 카드
 
-> **요약**: 2022 개정 전 범위 수학 **오개념 839종**(고유 `mis_id`)을 *DB 적재 가능한 1급 카탈로그*로
+> **요약**: 2022 개정 전 범위 수학 **오개념 <!-- fact:misconceptions.count -->843<!-- /fact -->종**(2026-06-20 추출 당시 839 · 고유 `mis_id`)을 *DB 적재 가능한 1급 카탈로그*로
 > 승격하기 위한 데이터 카드. 출처는 2026-06-20 업로드 **7계층 본문 JSON**(개념 437·`fac16e6f…`). 각
 > 오개념은 개념·성취기준·CCSS·distractor 규칙·교정포인트를 갖춘 **진단·피드백 1급 자산**이다. 현행
 > `l4/misconception/catalog.py`(Python 상수·kebab-case ~30종·DB 비영속)의 **DB 승격 대상**.
@@ -27,8 +27,8 @@
 | 형태 | 7계층 본문 JSON(437개념·25MB) 내 오개념 레코드 집합 |
 | 원본 sha256(앞 16) | `fcf6d333a419a222` (JSON 전체) |
 | 저작 | **와이매스 자체 저작**(교수학 오개념 분석·distractor 규칙) |
-| 규모 | **839**(고유 `mis_id`·예 `M0425`) |
-| 추출 산출물 | `data/corpus/misconceptions_v1/{misconceptions.json, _provenance.json}` (**커밋됨** — `whymath-misconception`·Collection JSON 839) |
+| 규모 | **<!-- fact:misconceptions.count -->843<!-- /fact -->**(고유 `mis_id`·예 `M0425`) |
+| 추출 산출물 | `data/corpus/misconceptions_v1/{misconceptions.json, _provenance.json}` (**커밋됨** — `whymath-misconception`·Collection JSON <!-- fact:misconceptions.count -->843<!-- /fact -->) |
 
 > 원본 JSON은 커밋하지 않는다. 진실 원천은 추출 Collection JSON(`_provenance.json`의 `source_sha256`으로 재현).
 
@@ -38,7 +38,7 @@
 
 | 소스 키(JSON) | 모델 필드(제안) | 비고 |
 |---|---|---|
-| `mis_id` | **PK** `mis_id` | `M0425` 형식·839 유일 |
+| `mis_id` | **PK** `mis_id` | `M0425` 형식·<!-- fact:misconceptions.count -->843<!-- /fact --> 유일 |
 | `오개념` | `canonical_statement` | 오개념 서술(자체저작) |
 | `학생의_잘못된_사고` | `student_wrong_thinking` | 진단 단서 |
 | `distractor_규칙` | `distractor_rule` | 5축 `distractor_map`이 참조 |
@@ -71,10 +71,10 @@
 ---
 
 ## 4. 불변식 (적재 검증)
-- `mis_id` **839 유일**(PK).
+- `mis_id` **<!-- fact:misconceptions.count -->843<!-- /fact --> 유일**(PK).
 - 모든 오개념의 `개념ID`가 개념그래프에 실재(고아 0·`idmap` 해소) — 또는 명시적 미해소 집계(정직).
 - 모든 `성취기준코드`가 norm_id로 해소(고아 0).
-- 기존 kebab 카탈로그 ~30종이 839 안에 매핑(누락 surface).
+- 기존 kebab 카탈로그 ~30종이 <!-- fact:misconceptions.count -->843<!-- /fact --> 안에 매핑(누락 surface).
 - `error_type` 값 집합이 유한 enum으로 수렴(자유텍스트 잔차 0).
 
 ---
@@ -95,7 +95,7 @@
 | 항목 | 값 |
 |---|---|
 | 출처 | `data/corpus/atom_graph_v1/graph.json` 세부개념 원자(level=='세부개념') |
-| 규모 | **1,837**(원자 전량이 `misconception` 보유 — 초등382·중학180·고등762·대학513) |
+| 규모 | **<!-- fact:atom_graph.atoms -->1,823<!-- /fact -->**(원자 전량이 `misconception` 보유 — 초등<!-- fact:atom_graph.atoms_elementary -->382<!-- /fact -->·중학<!-- fact:atom_graph.atoms_middle -->180<!-- /fact -->·고등<!-- fact:atom_graph.atoms_high -->749<!-- /fact -->·대학<!-- fact:atom_graph.university_atoms -->512<!-- /fact -->) |
 | 적재 | `l1.misconception.atom_catalog`(투영) → 기존 `load_misconceptions` 위임·CLI `populate_atom` |
 | 마이그레이션 | **무추가**(기존 테이블 재사용·head `a8b9c0d1e2f3` 유지) |
 
@@ -106,8 +106,8 @@
 `provenance_note`=`'atom_graph_v1'`. 나머지(student_wrong_thinking·distractor_rule·correction_point·
 difficulty·ccss_code·mapping_*)는 원천 미보유라 **None**(날조하지 않음).
 
-**구 839과의 관계**: mis_id 접두(`ATOM:` vs `M####`)·`provenance_note`로 네임스페이스 분리·**additive
-병존**(Phase 1이 원자를 기존 `concept`/`concept_edge`에 additive 적재한 것과 동형). 구 839
+**구 <!-- fact:misconceptions.count -->843<!-- /fact -->과의 관계**: mis_id 접두(`ATOM:` vs `M####`)·`provenance_note`로 네임스페이스 분리·**additive
+병존**(Phase 1이 원자를 기존 `concept`/`concept_edge`에 additive 적재한 것과 동형). 구 <!-- fact:misconceptions.count -->843<!-- /fact -->
 (misconceptions_v1·개념-grain)는 **Phase 5에서 폐기 예정**. K-12 437↔원자 크로스워크(concept_src_id
 연결)는 Phase 4.
 

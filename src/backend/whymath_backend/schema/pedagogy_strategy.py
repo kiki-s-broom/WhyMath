@@ -1,7 +1,8 @@
 """교수전략 카탈로그(PedagogyStrategyCard) Pydantic 계약 — 카탈로그 YAML의 형식 게이트.
 
 설계 정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §3(전략 카탈로그 — 필드 소비처
-지정표·제거 필드 3종). 오개념(839+원자 전량 카탈로그)·문제 공략 전략(8종 데이터카드)에 비해
+지정표·제거 필드 3종). 오개념(misconceptions_v1 카탈로그 + 원자 전량 카탈로그)·문제 공략
+전략(데이터카드 — 건수는 `docs/data/corpus_facts.md`의 `strategy_graph.strategies`)에 비해
 교수전략만 `PedagogyStrategy` enum+docstring인 비대칭을 해소하는 *서술 자산*의 계약이다 —
 `data/corpus/pedagogy_strategies_v1/*.yaml`(전략 10종·enum 1:1)을 레지스트리
 (`l4/pedagogy/strategy_registry.py`)가 적재하기 전에 이 모델이 게이트한다(`pedagogy_pack.py`의

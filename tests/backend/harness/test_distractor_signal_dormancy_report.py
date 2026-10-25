@@ -37,6 +37,11 @@ from whymath_backend.harness import distractor_signal_dormancy_report as dsdr
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BACKEND_DIR = _REPO_ROOT / "src" / "backend"
 _CORPUS_ROOT = _REPO_ROOT / "data" / "corpus"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -141,7 +146,7 @@ class TestCurrentRealityFrozen:
         """
         files = sorted(_CORPUS_ROOT.glob("problem_bank*/problems.jsonl"))
         # r2 부록 A 7파일 + PB-13 회수 30종 + P3-03 미분 은행 1종 + P3-05 빈 칸 채우기 은행 1종
-        assert len(files) == 39
+        assert len(files) == _FACTS["problem_bank.banks"]
         total = with_choices = with_dmap = both = 0
         for path in files:
             with path.open(encoding="utf-8") as fh:
@@ -160,7 +165,7 @@ class TestCurrentRealityFrozen:
         # (144건 + 02-05·06·08·09·10 생성기 5종 360건)
         # + P3-05 빈 칸 채우기 은행 204(02-01 48 + 02-02 60 + 02-07 48 + 5단계 02-03·02-10 각 24 —
         # 전부 단답형, 선지·오답 귀속 없음)
-        assert total == 14742
+        assert total == _FACTS["problem_bank.total"]
         # r2의 1,616 대비 -4(은퇴 9건 중 객관식 4건) + P3-03 객관식 84건(전부 distractor_map 보유 —
         # 개념 7종 × 오개념 유발 슬롯 12건)
         assert with_choices == 1696

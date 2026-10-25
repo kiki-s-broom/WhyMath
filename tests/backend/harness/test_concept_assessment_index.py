@@ -34,6 +34,13 @@ from whymath_backend.harness.concept_assessment_index import (
 )
 from whymath_backend.schema.enums import is_review_status_cleared
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 
 def _problem(**overrides: object) -> dict[str, object]:
     """상속 자격을 *모두* 갖춘 최소 문항 — 각 테스트는 한 축만 깨서 필터를 검사한다."""
@@ -373,14 +380,14 @@ def test_cli_reports_input_error_without_pretending_success(tmp_path: Path) -> N
 
 
 def test_shipped_concept_corpus_loads_with_review_status() -> None:
-    """실 코퍼스 437행이 로드되고 `review_status` 축이 전 행에 있다.
+    """실 코퍼스 전 행(사실 `concept_content.k12`)이 로드되고 `review_status` 축이 전 행에 있다.
 
     ⚠️ 이 `review_status`는 **개념 콘텐츠 코퍼스**의 축(값: `ai_estimated`)이며, CONT-01이 건
     검수 게이트가 보는 **문항 코퍼스**의 `review_status`(값: pending/approved/rejected,
     `ReviewStatus` enum)와 *다른 축·다른 값집합*이다. 이름이 같아 혼동하기 쉬워 여기 명시한다.
     """
     rows = load_concepts(cai.DEFAULT_CONCEPT_PATH)
-    assert len(rows) == 437
+    assert len(rows) == _FACTS["concept_content.k12"]
     assert all(row.review_status for row in rows)
 
 

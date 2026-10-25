@@ -19,10 +19,11 @@ additive 원칙(MEMORY 결정 로그·태스크 지시): 구 437 개념 그래�
 4. **제약**: `CREATE CONSTRAINT atom_code_unique IF NOT EXISTS`(멱등 DDL)를 적재 전 보장.
 5. **reltype 안전**: Cypher 관계 타입은 파라미터화 불가 → 닫힌 `AtomRelation` enum allowlist에서만
    reltype을 끌어온다(임의 문자열 주입 불가). 값은 enum 검증을 거친 것만 들어온다.
-6. **계층은 노드 속성**: `parent_code`(원자→소단원→단원 3단)는 노드 속성으로만 보존한다 — 별도
-   계층 관계는 만들지 않는다(결정 로그 "엣지 2,213" = prerequisite 전량과 일치·계층은 Phase 3+).
-   `narrative_edges_raw`(서술형 1,007)는 FK 불가라 적재 대상이 아니다(패스스루 — concept_graph가
-   flashcards/intl raw를 적재하지 않는 것과 동형).
+6. **계층은 노드 속성**: `parent_code`(원자→소단원→단원 3단)는 노드 속성으로만 보존한다 — 별도 계층
+   관계는 만들지 않는다(엣지는 prerequisite 전량뿐 — 결정 로그(작성 당시)의 "엣지 2,213"과
+   일치했다·계층은 Phase 3+). `narrative_edges_raw`(서술형 엣지 — 건수는
+   `docs/data/corpus_facts.md`의 `atom_graph.narrative_edges_raw`)는 FK 불가라 적재 대상이
+   아니다(패스스루 — concept_graph가 flashcards/intl raw를 적재하지 않는 것과 동형).
 
 법적·redaction(CLAUDE.md·atom_graph_v1.md §3): `graph.json`은 transform에서 이미 청결하다
 (AtomConcept에 K-12 핵심명제 본문 슬롯 부재 — 구조 차단). 이 로더는 모델 dump 키만 적재하므로

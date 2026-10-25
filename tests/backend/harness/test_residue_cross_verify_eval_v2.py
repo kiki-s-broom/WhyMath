@@ -58,6 +58,11 @@ from whymath_backend.l3.verifier import (
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PILOT_CORPUS = _REPO_ROOT / "data" / "corpus" / CORPUS_DIR_NAME / "problems.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 _VERIFIER_SIGNATURE = "llm:stub-verifier-model"
 
@@ -205,7 +210,9 @@ def test_pilot_passes_with_reachable_threshold(records: list[PilotRecord]) -> No
     stub = StubVerifier()
     report = _run(records, stub)
     assert report.outcome == "PASS" and report.passed and report.exit_ok
-    assert report.eligible == 34 and report.machine_checked == 34 and report.sampled == 34
+    pilot = _FACTS["problem_bank.probability_finite_v0"]  # 적격 = 파일럿 은행 전건
+    assert report.eligible == pilot and report.machine_checked == pilot
+    assert report.sampled == 34  # 표본 크기는 입력(sample_n=34)이다
     assert len(stub.subjects) == 34 and report.defects == 0
 
 

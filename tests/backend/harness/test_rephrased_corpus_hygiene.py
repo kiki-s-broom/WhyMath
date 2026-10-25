@@ -20,6 +20,13 @@ from whymath_backend.harness.rephrased_corpus_hygiene import (
     run_corpus_hygiene_sweep,
 )
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 # 감사 확정 결함 문면(한자 주입·메타 라벨·조사 오류)과 정상 문면이 섞인 미니 코퍼스.
 _CLEAN = {
     "slug": "wm-skel-clean-000000000001",
@@ -134,4 +141,4 @@ class TestCommittedCorpusClean:
         assert corpus.exists()
         report = run_corpus_hygiene_sweep(corpus, None, write=False)
         assert report.dropped == 0, report.dropped_items[:10]
-        assert report.kept == report.total >= 421
+        assert report.kept == report.total >= _FACTS["problem_bank.rephrased_v0"]

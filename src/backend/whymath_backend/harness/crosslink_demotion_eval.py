@@ -62,7 +62,7 @@ def _default_misconceptions() -> Path:
 
 
 def _load_mid_standards(path: Path) -> dict[str, str | None]:
-    """843 코퍼스 → {mis_id: standard_code}(없으면 None)."""
+    """M-id 코퍼스(misconceptions_v1) → {mis_id: standard_code}(없으면 None)."""
     data = json.loads(path.read_text(encoding="utf-8"))
     items = data.get("misconceptions", data)
     out: dict[str, str | None] = {}
@@ -237,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         description="crosswalk 승인 독립 구조 신호 게이트를 강등전으로 측정(자기승인 아님).",
     )
     parser.add_argument("--corpus", action="append", default=None, help="문항 코퍼스 JSONL(반복).")
-    parser.add_argument("--misconceptions", default=None, help="843 M-id 코퍼스 JSON.")
+    parser.add_argument("--misconceptions", default=None, help="M-id 코퍼스 JSON.")
     parser.add_argument("--cross-per-positive", type=int, default=60)
     parser.add_argument("--same-per-positive", type=int, default=60)
     parser.add_argument("--confidence", type=float, default=0.95, help="Wilson 신뢰수준(단측).")

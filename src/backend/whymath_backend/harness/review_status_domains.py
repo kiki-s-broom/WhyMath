@@ -19,10 +19,10 @@
 
 코퍼스 부류 (분류 = `classify_corpus`)
 -------------------------------------
-  ``fixed``    고정 코퍼스 8종(`KNOWN_CORPORA` 경로) — 코퍼스 단위 백필의 대상.
+  ``fixed``    고정 코퍼스(`KNOWN_CORPORA` 경로 전부) — 코퍼스 단위 백필의 대상.
   ``round``    회차 코퍼스 — 축적 CLI가 항상 남기는 회차 대장 사이드카(`<corpus>.rounds.jsonl` =
                `anchor_round_ledger.default_round_ledger_path`)가 실재한다. 사람 판정 각인의 대상.
-  ``other``    그 밖(레포의 배치 코퍼스 30종 등) — **어느 도구의 대상도 아니다.** 빈
+  ``other``    그 밖(레포의 배치 코퍼스 등) — **어느 도구의 대상도 아니다.** 빈
                `review_status` = 노출 차단(fail-closed)이 정상 상태다. 해금은 감사 라벨 표본을
                만들어 `KNOWN_CORPORA`·`AUDIT_LABEL_MAP`에 편입하는 것(코퍼스 단위)이고, 그 결정은
                이 계약 밖이다.
@@ -105,7 +105,7 @@ def _ledger_presence(corpus_path: Path) -> tuple[bool | None, str | None]:
 
 
 def _is_known_fixed(corpus_path: Path) -> bool:
-    """고정 코퍼스 8종 경로 중 하나인가(레포 루트 기준 해석 — cwd 무관)."""
+    """고정 코퍼스(`KNOWN_CORPORA`) 경로 중 하나인가(레포 루트 기준 해석 — cwd 무관)."""
     resolved = corpus_path.resolve()
     return any(resolved == _anchored(known) for known in KNOWN_CORPORA.values())
 

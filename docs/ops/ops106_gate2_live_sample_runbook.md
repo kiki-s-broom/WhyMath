@@ -83,7 +83,7 @@ Phaiakes9 = 평소 쓰시는 **Windows PowerShell**. 작업 디렉터리 `C:\Use
    `completion.handled=False`라 primary LLM이 호출됩니다. **다만 실제 학생(문항이 있고 정답/오답이 판정되는 턴)은
    일부 턴이 돌아보기·재고 템플릿으로 가로채져 LLM을 건너뜁니다** — 이 실측은 "배선이 닿는가"의 확인이지
    "학생 분포를 대표한다"는 주장이 아닙니다.
-3. **rephrase 입력 코퍼스를 아무거나 쓰면 LLM 호출이 0건입니다.** 코퍼스 31개 중 대부분이 `question_text`에서
+3. **rephrase 입력 코퍼스를 아무거나 쓰면 LLM 호출이 0건입니다.** 코퍼스 31개(2026-10-06 작성 당시) 중 대부분이 `question_text`에서
    방정식을 추출할 수 없는 문항(`equation_extractable=0`)이라, 그것을 넘기면 저작 호출이 0건이 되어
    "분리 실패"로 오진됩니다. 이 런북은 **200건 전부 추출 가능한** `problem_bank_discrete_ev_v0`를 쓰고,
    §1이 앞 5건이 실제로 추출 가능한지 **직접 재서** `CORPUS_OK`로 확인합니다.

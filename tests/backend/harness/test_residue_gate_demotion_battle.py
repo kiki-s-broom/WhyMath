@@ -64,6 +64,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PILOT_CORPUS = (
     _REPO_ROOT / "data" / "corpus" / "problem_bank_probability_finite_v0" / "problems.jsonl"
 )
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 # 실 코퍼스에서 읽은 리터럴 발문(그룹별 대표 1건) — 패러프레이즈 아님, 문자 그대로 확인한 값.
 _GROUP_A_TEXT = (
@@ -504,7 +509,7 @@ def test_holdout_mutator_applies_to_ball_group_only_when_white_ball_exists() -> 
 def test_holdout_coverage_is_measured_not_estimated(records: list[PilotRecord]) -> None:
     """실측 커버리지 28/34 — 주사위 19(A 11 + D 8) + 동전 9 + 공 추출 0."""
     battery = build_residue_seeded_set(records)
-    assert len(records) == 34
+    assert len(records) == _FACTS["problem_bank.probability_finite_v0"]
     assert battery.coverage["contradictory_condition"] == 28
     holdout_items = [i for i in battery.seeded if i.defect_class == "contradictory_condition"]
     assert len(holdout_items) == 28

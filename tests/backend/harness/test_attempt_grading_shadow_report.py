@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 import inspect
+import json
 import re
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
@@ -53,6 +55,13 @@ from whymath_backend.schema.problem import Condition, Problem
 from whymath_backend.schema.user import UserProfile as UserProfileSchema
 
 pytestmark = pytest.mark.filterwarnings("ignore")
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -871,9 +880,9 @@ class TestCorpusVerifyBlockSupply:
     """`derive_verify_inputs`가 `Problem.conditions_parsed` 외에 코퍼스 verify 블록을 공급원으로 쓴다."""
 
     def test_loads_real_corpus_verify_blocks(self) -> None:
-        """코퍼스 로더가 13,647개의 유효한 verify 블록을 읽는다.
+        """코퍼스 로더가 유효한 verify 블록을 읽는다 — 건수는 아래 assert가 핀한다.
 
-        2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
+        건수 이력: 2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
         30종의 문항수와 **정확히 일치**한다(우연한 드리프트가 아니라 회수의 산술 결과).
         13,520 → 13,647(+127): P3-03이 `problem_bank_p3_calculus1_diff_v0` 144건을 더했다. 144건 중
         17건은 검산 조건이 *연립 목록*(부등식 `a > 0`으로 해를 유일하게 가르는 문항)이라 이 로더가
@@ -1110,11 +1119,7 @@ class TestCorpusCeilingReportDiscriminates:
         회수된 단일 미지수 `y` 블록 수와 **정확히 일치**한다(우연한 드리프트가 아니라
         `test_multi_symbol_population_is_frozen`이 7,048 → 0으로 간 것의 산술 결과).
         """
-        import json
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parents[3]
-        corpus_root = repo_root / "data" / "corpus"
+        corpus_root = _REPO_ROOT / "data" / "corpus"
         problems: list[Problem] = []
         for path in sorted(corpus_root.glob("problem_bank_*/problems.jsonl")):
             for line in path.read_text(encoding="utf-8").splitlines():
@@ -1141,7 +1146,7 @@ class TestCorpusCeilingReportDiscriminates:
         report = build_gradability_ceiling_report(problems)
         # 14,034 + P3-03 미분 은행 504(144 + 360) + P3-05 빈 칸 채우기 은행 156(48 + 60 + 48)
         # 14,694 → 14,742: 5단계 02-03·02-10 각 24건.
-        assert report.total_problems == 14742
+        assert report.total_problems == _FACTS["problem_bank.total"]
         assert report.bucket_counts["condition_formal_derivable"] > 0
         # 12,268 → 12,373(+105): P3-03 미분 은행 144건 중 객관식 24건은 `selectable_exact_match`로,
         # 문자열 검산 조건을 가진 비객관식 105건이 이 버킷으로 들어왔다(연립 목록 조건 15건은 제외).

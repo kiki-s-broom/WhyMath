@@ -899,8 +899,8 @@ jobs:
   # data-pipeline 실 Neo4j 적재 통합테스트 (슬113-2) — concept_graph load_graph 경로
   # 기본 data-pipeline 잡은 [dev]만 설치(neo4j 드라이버 없음)·Neo4j 서비스 없으므로
   # 적재 통합테스트(test_load_neo4j_integration)가 한 번도 실행되지 않는다(importorskip +
-  # conftest env 게이트 이중 skip). 이 잡이 [neo4j] extra + 실 Neo4j로 적재 경로(노드 403·
-  # 엣지 541·멱등 §5 #9·제약 §2.3)를 상시 검증하는 안전망이다. data-pipeline-integration(PG)
+  # conftest env 게이트 이중 skip). 이 잡이 [neo4j] extra + 실 Neo4j로 적재 경로(노드·엣지 규모는 docs/data/corpus_facts.md의
+  # concept_graph.concepts·concept_graph.edges · 멱등 §5 #9·제약 §2.3)를 상시 검증하는 안전망이다. data-pipeline-integration(PG)
   # 잡과 동형(실 서비스·healthcheck·서드파티 액션 없이 GitHub 기본 서비스 컨테이너).
   # 접속 자격은 env 전용(NEO4J_*) — 시크릿 하드코딩 금지(CLAUDE.md).
   # ─────────────────────────────────────────────────────────────────
@@ -1900,7 +1900,7 @@ jobs:
           python -m whymath_backend.harness.eos_unit_structure_observation_report
           python -m whymath_backend.harness.eos_unit_structure_observation_report --json /tmp/eos_unit_structure_observation.json
 
-      # CUR-06: 학교급 경계 선수 연결 밀도 관측 리포트 — 경계 통과 엣지 20/2,210(0.9%)·고→대 0·
+      # CUR-06: 학교급 경계 선수 연결 밀도 관측 리포트 — 경계 통과 엣지(2026-10-09 작성 당시 20/2,210·0.9%)·고→대 엣지(당시 0)·
       # 고등→중학 하향 도달 비율을 매 실행 눈에 보이게 한다. 게이트가 아니라 리포트(exit 0/2) —
       # 밀도가 0이어도 red가 되지 않고, red가 되는 것은 코퍼스를 읽지 못하는 입력 오류(exit 2)뿐이다.
       # 신규 잡 0: CUR-09 선례대로 이 잡(backend editable 설치 완료)에 편입한다. 판정 회귀는

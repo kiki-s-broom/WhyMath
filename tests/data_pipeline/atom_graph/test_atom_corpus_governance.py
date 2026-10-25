@@ -1,14 +1,14 @@
 """원자 백본 커밋 코퍼스 무결성 거버넌스 — 초인간 검증 S6(hermetic·DB 0).
 
 정본: `docs/standards/superhuman_verification_standard.md` S6(상시성). 커밋된
-`data/corpus/atom_graph_v1/graph.json`(원자 1,823·선수엣지 2,210)의 **구조 무결성을
-DB 없이 상시(빠른 CI) 재검증**한다. 기존 방어는 ⓐ 생성 시점 provenance(손수 편집 후엔
-구식·미생성 시 skip) ⓑ Neo4j 적재(load.py·통합 잡) 두 경로뿐이라, "graph.json이 손수
-편집되고 재생성·DB 적재가 없는" 경로가 상시 게이트에서 비었다(load.py:52 docstring이
-바로 그 손수 편집 위험을 명시). 이 테스트가 그 갭을 매 PR 닫는다.
+`data/corpus/atom_graph_v1/graph.json`(규모는 `docs/data/corpus_facts.md`의 `atom_graph.atoms`·
+`atom_graph.edges`)의 **구조 무결성을 DB 없이 상시(빠른 CI) 재검증**한다. 기존 방어는 ⓐ 생성 시점
+provenance(손수 편집 후엔 구식·미생성 시 skip) ⓑ Neo4j 적재(load.py·통합 잡) 두 경로뿐이라,
+"graph.json이 손수 편집되고 재생성·DB 적재가 없는" 경로가 상시 게이트에서 비었다(load.py:52
+docstring이 바로 그 손수 편집 위험을 명시). 이 테스트가 그 갭을 매 PR 닫는다.
 
 *순환 탐지는 정본 함수 재사용*(`validate._find_prerequisite_cycle`) — 재구현 0. 사람은
-2,210개 엣지에서 순환·dangling을 눈으로 못 찾지만 기계는 즉시 잡는다(§S6 취지).
+수천 개 엣지에서 순환·dangling을 눈으로 못 찾지만 기계는 즉시 잡는다(§S6 취지).
 """
 
 from __future__ import annotations

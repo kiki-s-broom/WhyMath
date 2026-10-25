@@ -1,10 +1,10 @@
 # 와이매스 원자 백본 데이터셋 v1 (자체작성·K-12 3축 + 대학) — 데이터 카드
 
-> **요약**: 기존 개념그래프(437개념·581엣지)를 **원자(atom) 단위로 한 층 더 미세화**한 신규 학습
-> 백본. **원자 1,823 · 선수엣지 3,251**(원자ID 2,278 + 서술형 973) · 초·중·고 + 대학 4축.
+> **요약**: 기존 개념그래프(<!-- fact:concept_graph.concepts -->437<!-- /fact -->개념·<!-- fact:concept_graph.edges -->581<!-- /fact -->엣지)를 **원자(atom) 단위로 한 층 더 미세화**한 신규 학습
+> 백본. **원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact --> · 선수엣지 <!-- fact:atom_graph.prerequisite_total -->3,251<!-- /fact -->**(원자ID <!-- fact:atom_graph.edges -->2,278<!-- /fact --> + 서술형 <!-- fact:atom_graph.narrative_edges_raw -->973<!-- /fact -->) · 초·중·고 + 대학 4축.
 > (2026-08-10 정정: 생성 당시 1,837·2,213이었으나 2026-07-28 중복 원자 dedup 병합 14건
 > — `dedup_merges_v1.json` — 이후 실측이 1,823·2,210이다. `subject_content_coverage_gap_review.md`
-> §정정-ⓑ. 2026-10-09 S4-60이 고→대 경계 엣지 24건을 병합해 원자ID 엣지는 2,234다 —
+> §정정-ⓑ. 2026-10-09 S4-60이 고→대 경계 엣지 24건을 병합해 원자ID 엣지가 2,234가 됐고 이후 KG-10·KG-12 검수로 현재 값은 위 요약과 같다 —
 > `docs/data/cross_band_edges_university_v1.md`.)
 > 성취기준 코드(NCIC)·교수학 4요소(오개념·진단문항·소크라테스·전이)·원자성 메타를 포함하며,
 > 기존 백본을 **전면 교체**한다(마이그레이션 로드맵: `ROADMAP.md` 및 결정 로그 참조).
@@ -82,14 +82,14 @@
 
 ## 2. 스키마 (시트 → 코퍼스)
 
-### 2.1 원자_통합마스터 (1,837행 · 31열)
+### 2.1 원자_통합마스터 (1,837행 · 31열 — 원본 xlsx, 생성 당시)
 순번 · 출처 · 교육과정 · 학교급 · 학년/학년군 · 영역/과목 · **단원** · **소단원** · **소단원코드** ·
 **원자ID** · 원자명 · 원자명_표시 · **인지축**(개념/절차/표상) · **노드유형**(선행/구성/결과) ·
 **오개념유형**(6종) · **난이도**(1~5) · **연결성취기준** · *핵심명제/성취기준내용* · ①오개념 ·
 ②진단문항 · ②정답·통과기준 · ②미통과·오답신호 · ③소크라테스질문 · ④전이 · ④전이예시 ·
 선수원자 · 원자성a · 원자성b · 원자성c · 원자성d · 비고
 
-### 2.2 선수엣지_통합 (3,220행 · 11열)
+### 2.2 선수엣지_통합 (3,220행 · 11열 — 원본 xlsx, 생성 당시)
 출처 · **관계유형**(원본/소단원내/소단원간/학년간/학교급간(추정)/참고[서술형]) · **from(선수)** ·
 from_원자명 · from_학교급 · from_유형(원자ID/서술형) · 관계(선수) · **to(후행)** · to_원자명 ·
 to_학교급 · 학교급연계
@@ -121,7 +121,7 @@ CLI `python -m data_pipeline.atom_graph merge-behavior-skills`. 재실행 결과
 |---|---|
 | `핵심명제/성취기준내용`(K-12 원자) | NCIC 성취기준 *본문(statement)* 근접/직접 복제. 본문은 `standards_v1` 코퍼스(공공누리 1유형)에만 두고, 원자는 **연결성취기준 코드로 다리**만 놓는다 |
 
-> **대학 원자(513)는 연결성취기준이 '없음'** → 해당 `핵심명제`는 *자체작성*이므로 보존(redact 아님).
+> **대학 원자(<!-- fact:atom_graph.university_atoms -->512<!-- /fact -->)는 연결성취기준이 '없음'** → 해당 `핵심명제`는 *자체작성*이므로 보존(redact 아님).
 > 4요소(①~④)·④전이예시·원자성은 자체/AI 작성 → 보존. redaction 마커는 각 레코드 `_redacted_fields`.
 
 신규 콘텐츠 4종(결정 ⑥ — 은유·정식정의·허용표현·암기카드)은 **개념/소개념 레벨·자체/AI 원창작**으로
@@ -150,19 +150,19 @@ Phase 3에서 저작한다. 특히 **정식정의(formal_definition)는 교과�
 
 | 축 | 분포 |
 |---|---|
-| 학교급 | 초등 382 · 중학 180 · 고등 749 · 대학 512 = **1,823** |
+| 학교급 | 초등 <!-- fact:atom_graph.atoms_elementary -->382<!-- /fact --> · 중학 <!-- fact:atom_graph.atoms_middle -->180<!-- /fact --> · 고등 <!-- fact:atom_graph.atoms_high -->749<!-- /fact --> · 대학 <!-- fact:atom_graph.university_atoms -->512<!-- /fact --> = **<!-- fact:atom_graph.atoms -->1,823<!-- /fact -->** |
 | 인지축 | 개념 796 · 절차 546 · 표상 481 |
 | 노드유형 | 구성 1,546 · 결과 151 · 선행 126 |
 | 난이도 | 1=44 · 2=175 · 3=413 · 4=591 · 5=600 |
-| 선수엣지 | 원자ID 2,278(백본 2,195 + 고→대 경계 24 + KG-12 승격 v2 59) + 서술형 973 = **3,251** (KG-12 전 2,231 + 973 · KG-10 ② 경계 검수 전 2,234 + 973) |
-| 계층 노드(승격) | 단원 **217** · 소단원 **643**(distinct 소단원코드) — 원자 1,823의 부모. 코퍼스 총 노드 **2,683** |
+| 선수엣지 | 원자ID <!-- fact:atom_graph.edges -->2,278<!-- /fact -->(백본 2,195 + 고→대 경계 24 + KG-12 승격 v2 59) + 서술형 <!-- fact:atom_graph.narrative_edges_raw -->973<!-- /fact --> = **<!-- fact:atom_graph.prerequisite_total -->3,251<!-- /fact -->** (KG-12 전 2,231 + 973 · KG-10 ② 경계 검수 전 2,234 + 973) |
+| 계층 노드(승격) | 단원 **<!-- fact:atom_graph.units -->217<!-- /fact -->** · 소단원 **<!-- fact:atom_graph.subunits -->643<!-- /fact -->**(distinct 소단원코드) — 원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->의 부모. 코퍼스 총 노드 **<!-- fact:atom_graph.nodes -->2,683<!-- /fact -->** |
 
 > 생성 당시(요약 시트 기준) 수치는 원자 1,837(고등 762·대학 513)·엣지 2,213·총 노드 2,697이었다 —
 > 2026-07-28 dedup 병합 14건(`dedup_merges_v1.json`) 이후 위 표가 현행이다.
 > 안내 시트의 "소단원코드 부여 1,324개"는 *코드를 부여받은 K-12 원자 수*(당시 382+180+762=1,324,
-> 현행 1,311)를 뜻하며, distinct 소단원코드는 **643**(단원 217)이다 — Phase 1 transform 실측.
+> 현행 <!-- fact:atom_graph.atoms_k12 -->1,311<!-- /fact -->)를 뜻하며, distinct 소단원코드는 **643**(단원 217)이다 — Phase 1 transform 실측.
 
-무결성(읽기 전용 실측): 원자ID 1,823 유일·중복 0 · 원자ID 엣지 dangling 0 · DAG 사이클 0.
+무결성(읽기 전용 실측): 원자ID <!-- fact:atom_graph.atoms -->1,823<!-- /fact --> 유일·중복 0 · 원자ID 엣지 dangling 0 · DAG 사이클 0.
 
 ---
 
@@ -211,9 +211,9 @@ MERGE (src)-[r:ATOM_PREREQUISITE]->(dst) SET r += $props; -- 선수 엣지
 ```
 
 ### 적재 규칙
-- **노드 2,683**(원자 1,823·단원 217·소단원 643)·**엣지 2,278**(원자ID prerequisite 전량 · 2,195 + S4-60 고→대 24 + KG-12 승격 v2 59 · KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리로 2,219 · ③ 승격으로 2,278)·skip 0.
+- **노드 <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->**(원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->·단원 <!-- fact:atom_graph.units -->217<!-- /fact -->·소단원 <!-- fact:atom_graph.subunits -->643<!-- /fact -->)·**엣지 <!-- fact:atom_graph.edges -->2,278<!-- /fact -->**(이력: 원자ID prerequisite 전량 · 2,195 + S4-60 고→대 24 + KG-12 승격 v2 59 · KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리로 2,219 · ③ 승격으로 2,278)·skip 0.
   (Phase 2c 적재 당시 실측은 2,697/2,213 — dedup 병합 14건 이후 현행 코퍼스 기준으로 정정.)
-- 엣지 속성: `relation_subtype`(원본/소단원내/소단원간/학년간/학교급간(추정))·`school_link`·
+- 엣지 속성: `relation_subtype`(소단원내/원본/소단원간/수정추가/참고(서술형)→정규화/학교급간(추정)/학년간/소단원내(보완) — 8종)·`school_link`·
   `strength`·`evidence`·`from_name`·`to_name`. `from_code`/`to_code`/`relation`은 MATCH/reltype에 쓰고
   속성으론 넣지 않는다.
 - `atomicity`(a~d dict)는 **Neo4j map 속성 불가** → 결정론 JSON 문자열로 직렬화(구조 진실 원천은
@@ -228,5 +228,5 @@ MERGE (src)-[r:ATOM_PREREQUISITE]->(dst) SET r += $props; -- 선수 엣지
 ```bash
 python -m data_pipeline.atom_graph load --graph data/corpus/atom_graph_v1/graph.json
 ```
-단위(Fake 드라이버·실 코퍼스 현행 2,683/2,210/skip 0 — 작성 당시 2,697/2,213)·통합(`@integration`·`neo4j` importorskip·실
+단위(Fake 드라이버·실 코퍼스 현행 <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->/<!-- fact:atom_graph.edges -->2,278<!-- /fact -->/skip 0 — 작성 당시 2,697/2,213)·통합(`@integration`·`neo4j` importorskip·실
 neo4j:5에서 멱등 재적재 불변·code 집합 격리 정리). CI 전용 `data-pipeline-neo4j` 잡이 실 적재 검증.

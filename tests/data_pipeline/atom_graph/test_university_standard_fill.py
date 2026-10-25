@@ -112,6 +112,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _GRAPH = _PROJECT_ROOT / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 _STD_DIR = _PROJECT_ROOT / "data" / "corpus" / "standards_university_v1"
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_PROJECT_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 
 def test_committed_corpus_university_atoms_filled() -> None:
     import pytest
@@ -122,19 +128,19 @@ def test_committed_corpus_university_atoms_filled() -> None:
     sub_to_code = build_subunit_standard_map(_STD_DIR)
     atoms = [n for n in graph["concepts"] if n["level"] == "세부개념"]
     uni = [n for n in atoms if n.get("subunit_code") in sub_to_code]
-    # 512 대학 원자 전부 자기 소단원 성취기준을 첫 코드로 채움. 병합 대표 원자(dedup_merges_v1
+    # 대학 원자 전부 자기 소단원 성취기준을 첫 코드로 채움. 병합 대표 원자(dedup_merges_v1
     # applied의 canonical)만 은퇴 원자 성취기준의 *병기*가 허용된다(검수:Kiki 2026-07-28 —
     # 그 외 원자의 다중 코드는 여전히 회귀).
     ledger = json.loads((_GRAPH.parent / "dedup_merges_v1.json").read_text(encoding="utf-8"))
     merge_canonicals = {m["canonical"] for m in ledger["applied"]}
-    assert len(uni) == 512
+    assert len(uni) == _FACTS["atom_graph.university_atoms"]
     for n in uni:
         own = sub_to_code[n["subunit_code"]]
         if n["code"] in merge_canonicals:
             assert n["standard_codes"][0] == own  # 대표 자신 코드 우선·병기 허용
         else:
             assert n["standard_codes"] == [own]
-    # K-12 원자(1311·병합 13건 반영)는 비대학 — standard_codes 비어있지 않음(기존 채움 보존).
+    # K-12 원자(atoms_k12 · 병합 13건 반영)는 비대학 — standard_codes 비어있지 않음(기존 채움 보존).
     k12 = [n for n in atoms if n.get("subunit_code") not in sub_to_code]
-    assert len(k12) == 1311
+    assert len(k12) == _FACTS["atom_graph.atoms_k12"]
     assert all(n["standard_codes"] for n in k12)

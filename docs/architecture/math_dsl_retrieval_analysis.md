@@ -36,7 +36,7 @@
 
 **현재 구조 근거**
 - Concept `code`는 `{TRACK}-{AREA}-{NNN}`(`schema/concept.py`). 동일 수학 대상이 학년별로 **별도 노드**로 존재한다: `ELEM-FUNC-*`("함수"·직관), `MID-FUNC-*`, `HIGH-FUNC-*`. `name_ko`는 셋 다 "함수"일 수 있다.
-- 오개념은 3중 네임스페이스 병존(kebab 30 · `ATOM:` 1,837 · `M####` 839, FK 0). 같은 오개념이 서로 다른 키로 최대 3번 존재.
+- 오개념은 3중 네임스페이스 병존(2026-07-01 작성 당시 kebab 30 · `ATOM:` 1,837 · `M####` 839, FK 0). 같은 오개념이 서로 다른 키로 최대 3번 존재.
 - SolutionPath.`concept_sequence`는 **순서 있는 list**(`solution_path.schema.yaml`). 검색이 이를 set으로 취급하면 대수풀이/기하풀이가 같은 이웃으로 뭉친다.
 - Hint는 동일 step에 `level` 1·2·3 세 행(`hint.schema.yaml`). level 무시 회수 시 "거의 정답"(level 3)이 조기 노출될 수 있다.
 
@@ -106,7 +106,7 @@
 ## 5. Misconception retrieval failure 가능성
 
 **현재 구조 근거**
-- 오개념 **3중 네임스페이스**(kebab 30·`ATOM:` 1,837·`M####` 839), 상호 **FK 0**. `Concept.misconception_codes`의 dangling 참조는 **경고만**(`schema/concept.py`, Phase 1 30개만 실재).
+- 오개념 **3중 네임스페이스**(2026-07-01 작성 당시 kebab 30·`ATOM:` 1,837·`M####` 839), 상호 **FK 0**. `Concept.misconception_codes`의 dangling 참조는 **경고만**(`schema/concept.py`, Phase 1 30개만 실재).
 - 오개념 임베딩은 **별 테이블**(`misconception_embedding`), 개념 임베딩(`concept_embedding`)과 **교차조회 좌석 부재**. 두 인덱스는 서로를 모른다.
 
 **실패 시나리오**: L4가 학생 오답 → 오개념 회수 → `M0123` 반환. 그런데 개념↔오개념 연결이 kebab 코드로만 걸려 있어 그 오개념이 어느 개념 노드에 붙는지 해석 불가 → 개념 점화 지도·소크라테스 카테고리 선택에 반영 실패(오개념을 찾고도 못 쓴다).

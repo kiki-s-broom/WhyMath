@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         description="crosswalk 후보의 기계 자율 거부(cross-standard·측정 안전 구간·승인 아님).",
     )
     parser.add_argument("--queue", default=None, help="검수 큐 JSON(기본 docs/data).")
-    parser.add_argument("--misconceptions", default=None, help="843 M-id 코퍼스 JSON.")
+    parser.add_argument("--misconceptions", default=None, help="M-id 코퍼스 JSON.")
     parser.add_argument("--floor", type=int, default=MACHINE_REJECT_EVIDENCE_FLOOR)
     args = parser.parse_args(argv)
 

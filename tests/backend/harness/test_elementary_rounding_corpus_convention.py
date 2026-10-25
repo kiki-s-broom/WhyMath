@@ -30,6 +30,9 @@ from whymath_backend.l3.equivalent.elementary_rounding_skeleton_generator import
 
 _ROOT = Path(__file__).resolve().parents[3]
 _CORPUS = _ROOT / "data" / "corpus" / CORPUS_DIR_NAME / "problems.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 # 교과서 정식 표현 — 전체 일치(옛 "X의 자리에서" 발문은 여기서 걸러진다).
 _QUESTION = re.compile(
@@ -55,7 +58,8 @@ def _convention_answer(question_text: str) -> tuple[int, int]:
 def _corpus_records() -> list[dict]:
     assert _CORPUS.exists(), f"코퍼스 부재(공허 통과 금지): {_CORPUS}"
     records = [json.loads(line) for line in _CORPUS.read_text(encoding="utf-8").splitlines()]
-    assert len(records) == 600  # 스캔 0건·부분 스캔은 실패.
+    # 스캔 0건·부분 스캔은 실패.
+    assert len(records) == _FACTS["problem_bank.elementary_rounding_v0"]
     return records
 
 

@@ -5,7 +5,7 @@
 2026-07-08 극값 2(M0864·M0865)·2026-07-10 트리아지 A 11 + B 8 + frac 1·2026-07-12 미매핑 Tier C
 Tier C 10 + period + root-loss + 843 트랜치1~5 각 6(신규 탐지 kebab·계산형)을 승인해
 **총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-06 게이트 `G-misc40-new-crosslink-signature` 재판정으로 승인 4건(M0462·M0515·M0671·M0672)이 더해져 68건이 되었고, 2026-10-16 보류였던 M0599가 승인(`G-misc40-deferred-m0599-redecision`)되어 **69건**이다. 이 테스트는 hermetic(DB 0)으로 봉인한다:
-① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈843 코퍼스(참조 무결성)
+① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈M-id 코퍼스(misconceptions_v1·참조 무결성)
 ③ `select_canonical`이 각 kebab에 canonical M-id를 실제로 돌려줌(단절 해소·843→34 도달).
 """
 
@@ -31,6 +31,11 @@ from whymath_backend.schema.misconception_crosslink import MisconceptionCrosslin
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CROSSLINKS = _REPO_ROOT / "data" / "corpus" / "misconception_crosslinks_v1" / "crosslinks.json"
 _MISCONCEPTIONS = _REPO_ROOT / "data" / "corpus" / "misconceptions_v1" / "misconceptions.json"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 # Kiki 승인분(MEMORY 정본·극값 2·A/B/frac 20·Tier C 10·period·root-loss·843 트랜치1~5 각 6)
 # — 탐지 카탈로그 64 전수 매핑·기대 매핑 동결.
@@ -192,7 +197,7 @@ def test_load_gate_passes() -> None:
 def test_every_corpus_row_is_direct_mapping() -> None:
     # MISC-63 — 비직접 행이 하나라도 섞이면 전건 열거로 실패한다(스캔 0건 공허 통과 방지: 행 수도 단언).
     rows = _load_rows()
-    assert len(rows) == 69
+    assert len(rows) == _FACTS["misconception_crosslinks.count"]
     non_direct = [
         (r.kebab_id, r.mis_id, r.link_type) for r in rows if r.link_type != DIRECT_LINK_TYPE
     ]

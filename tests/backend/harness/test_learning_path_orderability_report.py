@@ -23,6 +23,13 @@ import pytest
 from whymath_backend.harness import learning_path_orderability_report as lpo
 from whymath_backend.l2.prerequisite_recommendation import MAX_PREREQUISITE_DEPTH
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 
 def _payload(concepts: list[str], edges: list[tuple[str, str, str]]) -> dict[str, object]:
     """`(from_code, to_code, relation)` 튜플 목록 → graph.json 형태 payload."""
@@ -336,7 +343,7 @@ def test_main_writes_json_artifact(tmp_path: Path) -> None:
 # 7. 실 코퍼스 — acceptance① 정확 재현(임계값 단언·회귀 감시)
 # ──────────────────────────────────────────────────────────────────────────
 def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
-    """2,683노드/2,231엣지 원자 백본(KG-10 ② 경계 검수 반영 후)의 순서화 수치를 정확히 재현한다.
+    """원자 백본의 순서화 수치를 정확히 재현한다 — 현행 핀은 맨 끝 **KG-12** 단락의 값이다.
 
     **KG-10 ②(2026-10-20) 경계 검수 반영 후 값**: 직접선수 분포(919/1378/312/67/7)·population 386·
     depth1 순서화 117/386(30.3%)·depth2 175·depth5 228/386(59.1%)·181/47/158. 반려 3(중학 인수분해→
@@ -372,8 +379,8 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     graph = lpo.load_corpus_graph(payload)
     report = lpo.build_report(graph)
 
-    assert report.corpus_concept_total == 2683
-    assert report.corpus_edge_total == 2278
+    assert report.corpus_concept_total == _FACTS["atom_graph.nodes"]
+    assert report.corpus_edge_total == _FACTS["atom_graph.edges"]
     assert report.direct_predecessor_distribution == {0: 933, 1: 1306, 2: 368, 3: 68, 4: 8}
     assert report.population_size == 444
 

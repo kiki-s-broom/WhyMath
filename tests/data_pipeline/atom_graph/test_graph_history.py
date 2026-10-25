@@ -25,6 +25,10 @@ from data_pipeline.atom_graph.graph_history import (
 
 _ROOT = Path(__file__).resolve().parents[3]
 _CORPUS = _ROOT / "data" / "corpus" / "atom_graph_v1"
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 GRAPH_PATH = _CORPUS / "graph.json"
 REFERENCE_V1_PATH = _CORPUS / "narrative_edge_reference_ledger_v1.json"
 
@@ -142,5 +146,8 @@ class TestRealCorpus:
         assert want != hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()  # 정본은 그 뒤 바뀌었다
         old = graph_at_sha(GRAPH_PATH, want)
         assert graph_sha256(old) == want
-        assert len(old["edges"]) == 2231
-        assert len(json.loads(GRAPH_PATH.read_text(encoding="utf-8"))["edges"]) == 2278
+        assert len(old["edges"]) == 2231  # corpus-pin: 시점 고정 — KG-11 참고 원장 정본
+        assert (
+            len(json.loads(GRAPH_PATH.read_text(encoding="utf-8"))["edges"])
+            == _FACTS["atom_graph.edges"]
+        )
