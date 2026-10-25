@@ -17,7 +17,7 @@ CMS가 선수 관계를 DB에 직접 쓰게 되면(`api/admin_cms_graph.py`) DB�
 DB 전체를 읽는 이유: 적재기는 기본으로 삭제하지 않으므로 파일에서 사라진 옛 엣지도 DB에 남아 있고,
 그것도 순환의 재료가 될 수 있다. 원자 백본 적재는 `--retire-stale-edges apply`(KG-14 ·
 `atom_graph/atom_edge_retire.py`)로 그 옛 엣지를 같은 트랜잭션에서 먼저 지운 뒤 이 검사를 부른다.
-2,234건 규모라 비용은 무시할 수 있다.
+수천 건 규모라(원자 백본은 `docs/data/corpus_facts.md`의 `atom_graph.edges`) 비용은 무시할 수 있다.
 """
 
 from __future__ import annotations

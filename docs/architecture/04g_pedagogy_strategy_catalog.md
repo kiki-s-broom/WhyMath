@@ -56,7 +56,7 @@
 | 적용 대상 학년 | 🆕 | `target_grade_bands`(§3) — 생산자 `UserProfile.grade` 실재 확인 |
 | 적용 개념 | 🔀 | 개념 *개별* 매핑 금지(노드 폭발) → **k_type(지식유형 7종) 단위**로 변형(`target_k_types`) |
 | 적용 난이도 | 🆕 | `difficulty_range`(§3) |
-| 적합한 오개념 | 🔀 | 오개념 *개별*(M-id) 매핑 금지(10×839 관계 폭발) → **`error_type` 6종 단위**로 변형(`suitable_error_types`) |
+| 적합한 오개념 | 🔀 | 오개념 *개별*(M-id) 매핑 금지(10×<!-- fact:misconceptions.count -->843<!-- /fact --> 관계 폭발) → **`error_type` 6종 단위**로 변형(`suitable_error_types`) |
 | 기대 효과 | 🔀 | 별도 필드 비신설 — `usage_notes` 서술에 흡수. *측정*은 04d §3.2/`adaptive/effectiveness.py` 소관(구현 2/4 지표 — 정직 부기) |
 | 사용 조건 | 🔀 | 기계 판정은 `select()` 규칙표(04d §2)가 정본 — 카탈로그에는 **사람 서술만**(`usage_notes`·기계 배선 금지) |
 | 금지 조건 | 🔀 | 기계 판정은 팩 `forbidden_modes`(폐쇄 어휘 7종)+`gate()` 2축이 정본 — 카탈로그 중복 금지(§3 제거 필드) |
@@ -66,7 +66,7 @@
 
 **대표 전략 10종 대조**: 직접 교수법=`DIRECT` ✅ · 소크라테스 문답=`SOCRATIC` ✅ · PBL=`PROBLEM_BASED` ✅ ·
 유추(비유)=`ANALOGY` ✅ · 시각화=`VISUALIZATION` ✅(어댑터 미구현 — §10) · 반례 제시=🔀 전략이 아니라 **오개념
-개입 패턴**(카탈로그 839+원자 전량이 `counterexample` 보유·`04c` reactive) · 오개념 교정=🔀 동일(개입 축이 더
+개입 패턴**(카탈로그 <!-- fact:misconceptions.count -->843<!-- /fact -->+원자 전량이 `counterexample` 보유·`04c` reactive) · 오개념 교정=🔀 동일(개입 축이 더
 정교) · Scaffolding=🔀 전략이 아니라 **답 미루기 4단계+팩 페이딩**(`04` 정본·graded Hint) · 발견학습=⏸(SOCRATIC·
 PROBLEM_BASED와 경계 불명 — enum 폐쇄 거버넌스상 실수요 확인 전 미추가) · 구체물 활용=⏸(CRA의 C — 초등
 확장(E축·`G-s5-subject-expansion` 뒤) 시점에 재검토. 04d §1의 "k_type별 CRA류 진행"은 설계용 축이라 별개).
@@ -118,7 +118,7 @@ WhyMath 고유 4종(RETRIEVAL·SPACING·INTERLEAVING·SELF_EXPLANATION — 인�
 
 ### 3.1 자산 구조 — 팩 선례 미러
 
-오개념(839+원자 전량×12필드)·문제 공략 전략(8종×5필드 데이터카드)에 비해 **교수전략만 enum+docstring**인
+오개념(<!-- fact:misconceptions.count -->843<!-- /fact -->+원자 전량×12필드)·문제 공략 전략(8종×5필드 데이터카드)에 비해 **교수전략만 enum+docstring**인
 비대칭을 해소한다. 구조는 `pedagogy_pack` 선례(PED-01)를 그대로 미러한다:
 
 ```
@@ -320,7 +320,7 @@ L4 supply()/발주서 ──"이 개념·이 슬롯이 필요"──▶ l3/pedag
 |---|---|---|
 | ① | AI 추천점수 정적 필드 | bandit 무정보 사전 오염·"측정 없는 도입 없음" 위반(§3.3) |
 | ② | 게임형(전략·비유·예시 전 축) | 반게임화 정체성 — CLAUDE.md 절대 금기·enum GAME 배제 선례 |
-| ③ | 전략×오개념 개별 매핑 | 10×839=8,390 엣지 — 관계 폭발. error_type 6종 단위로만(§3.2) |
+| ③ | 전략×오개념 개별 매핑 | 10×<!-- fact:misconceptions.count -->843<!-- /fact -->=8,430 엣지 — 관계 폭발. error_type 6종 단위로만(§3.2) |
 | ④ | 설명방식 독립 enum 10종 | 중첩 축·렌더 조합폭발(5×8=40)·처치 생산자 부재(§5) |
 | ⑤ | 애니메이션=설명방식 | L5 시각화 축(`05b`) 소관 — 계층 침범 |
 | ⑥ | 역사적 배경 방식/유형 | 자산 0 — 정직한 공백(자산 실수요 확인 전 보류) |

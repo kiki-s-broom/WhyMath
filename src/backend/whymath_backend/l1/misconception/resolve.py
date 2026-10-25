@@ -1,6 +1,6 @@
 """L1 오개념 카탈로그 *느슨참조 해소* — 읽기 전용 런타임 헬퍼 (해소 슬라이스).
 
-B 아크(#290~#292)가 적재한 `misconception_catalog`(839행)의 `concept_src_id`·`standard_code`는
+B 아크(#290~#292)가 적재한 `misconception_catalog`(적재 당시 839행 — 현재 코퍼스 건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`)의 `concept_src_id`·`standard_code`는
 *느슨참조*(FK 아님·원천 문자열 그대로)로 남아 있다. 이 모듈은 그 느슨참조를 실 `Concept`·
 `AchievementStandard` 행에 잇는 **읽기 전용 해소 헬퍼**다(마이그레이션 0·로더 변경 0 — FK 컬럼·
 링크 테이블을 만들지 않고 조회 시 조인).
@@ -9,7 +9,7 @@ B 아크(#290~#292)가 적재한 `misconception_catalog`(839행)의 `concept_src
   - `concept_src_id`(원 source_id 예 `N1`·`10기수1-01-01`) → `Concept.source_id` *직접 조인*
     (NOT `code` — code는 재ID된 새 코드·`standard_loader`의 `{source_id: code}` 선례와 동일
     키 공간). 100% 해소 예상.
-  - `standard_code`(`[2수01-01]` 형식·835 단일·4 다중`;`) → `AchievementStandard.official_code`
+  - `standard_code`(`[2수01-01]` 형식·대부분 단일·소수 다중`;` — 작성 당시 835 단일·4 다중) → `AchievementStandard.official_code`
     *직접 일치*. 한 official_code가 2015·2022 두 개정에 존재 가능 → 다중 norm_id를 *정직 반환*
     (revision 강제 선택 안 함 — catalog의 standard_code엔 revision 신호가 없어 자동 선택은
     의도 날조다. 소비처가 하류 필터).

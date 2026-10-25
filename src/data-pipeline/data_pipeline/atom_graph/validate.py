@@ -7,7 +7,7 @@
 같은 분담):
 
   - **prerequisite_cycle**(error) — 순환 선수관계 = 학습 경로 불능(DAG 보장·concept_graph와 동일).
-  - **atom_id_unique**(error) — 원자 노드 code 유일(1,837 충돌 0).
+  - **atom_id_unique**(error) — 원자 노드 code 유일(충돌 0 — 매 실행 판정).
   - **dangling_edge_endpoint**(error) — 원자ID 엣지 양끝이 원자 노드 집합에 존재.
   - **parent_exists**(error) — 모든 parent_code가 노드 집합에 존재(계층 무결성).
   - **subunit_name_consistency**(error) — 같은 소단원코드 = 같은 소단원명.
@@ -103,7 +103,8 @@ class GraphValidationReport:
 def _find_prerequisite_cycle(edges: Sequence[AtomEdge]) -> list[str] | None:
     """선수 엣지 그래프(from=선수→to=후행)에서 사이클 1건 탐지(DFS·반복 스택).
 
-    재귀 대신 명시 스택을 쓴다 — 원자 백본은 1,837 노드라 깊은 체인에서 재귀 한계를 피한다.
+    재귀 대신 명시 스택을 쓴다 — 원자 백본은 수천 노드라(`docs/data/corpus_facts.md`의
+    `atom_graph.nodes`) 깊은 체인에서 재귀 한계를 피한다.
     Returns: 사이클을 이루는 노드 경로(닫힘 노드 반복 포함) 또는 None.
     """
     adj: dict[str, list[str]] = {}

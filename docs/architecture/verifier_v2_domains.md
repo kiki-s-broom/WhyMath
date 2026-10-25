@@ -480,7 +480,7 @@ verify:
 ### 6.1 실제 선정 결과와 §3.5의 어긋남 (S4-57 기록)
 
 - **선정 결과**: 단계 A는 `statistical_claim`으로 구현됐다(S4-53, PR #874). 위 권장(`geometric_discrete` 1순위)과 다른 결과이며 선정 사유는 대장에 남아 있지 않다(S4-53 notes는 "최종 선택은 코퍼스 우선순위/소비처에 따름"까지만 적었다). `geometric_discrete`는 미착수다.
-- **소비처**: 현재 `statistical_claim`을 `verify.answer_kind`로 쓰는 코퍼스 레코드는 **0건**이다(전체 14,034건 실측 — §7.1). 구현은 있으나 이를 쓰는 데이터가 아직 없다.
+- **소비처**: 현재 `statistical_claim`을 `verify.answer_kind`로 쓰는 코퍼스 레코드는 **0건**이다(전체 <!-- fact:problem_bank.total -->14,742<!-- /fact -->건 — 2026-10-08 §7.1 실측은 14,034건 시점, 이후 늘어난 은행에도 0건). 구현은 있으나 이를 쓰는 데이터가 아직 없다.
 - **§3.5와의 어긋남**: §3.5는 "정확 유리수(또는 `Decimal`)로 처리, 부동소수점 사용 금지"라고 적었으나 구현(`l3/statistical_claim.py`)은 `float`으로 계산하고 `math.isclose(rel_tol=1e-9)`로 대조한다(`_TOL = 1e-9`, 66행). 교차검증 재계산 판정기(`cross_verify.py` 391행)도 같은 방식이다.
 
 이 비교식이 값이 큰 구간에서 오답을 통과시키는지 실측했다. 점화식 `a(n+1)=2a(n)+1`, `a(1)=1`의 정확한 항을 정수 연산으로 구하고, 참값에 1만 더한 오답을 `math.isclose(rel_tol=1e-9, abs_tol=1e-9)`와 정수 일치로 각각 대조했다.
@@ -663,7 +663,7 @@ for code in sorted(want):
 | ID | 실측 | 처리 |
 |---|---|---|
 | C1 | 재현 확정 — `cross_verifier` 주입 시 개념형 15종 **전부** 확률 관점(`PROBABILITY_PERSPECTIVES`)으로 가서 `pass`가 찍힌다(대조군 `sequence_induction`·`statistical_claim`은 각자 관점). 읽기 기준 판정이 실행으로 맞았다. | `_CROSS_VERIFY_PERSPECTIVES.get(kind)`에서 기본값 폴백 제거. 미등록은 교차검증기를 **부르지 않고** `unverifiable`(사유에 kind 명시·기계 축/잔여 축 보존). 확률 관점은 `finite_probability`·`finite_count`에 명시 등록. 테스트 `test_verifier_perspective_fail_closed.py`. |
-| C5 | 코퍼스 14,034건 중 조건 보유 레코드의 등식 DSL 위반은 정확히 6종·130건(24×4+8+26)이고, 등식 DSL 11종은 위반 0건. `statistical_claim`·`sequence_induction`은 코퍼스 0건. | `statistical_claim`을 제외 목록에 추가. 목록을 레지스트리에서 **파생하지 않는다** — 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 `test_qa_pipeline_dsl_kinds_sync.py`가 v2 kind를 (비등식 DSL \| 등식 DSL) 중 정확히 하나로 분류하게 강제해, 새 kind는 분류 없이 RED다. |
+| C5 | 코퍼스 14,034건(2026-10-08 실측 당시) 중 조건 보유 레코드의 등식 DSL 위반은 정확히 6종·130건(24×4+8+26)이고, 등식 DSL 11종은 위반 0건. `statistical_claim`·`sequence_induction`은 코퍼스 0건. | `statistical_claim`을 제외 목록에 추가. 목록을 레지스트리에서 **파생하지 않는다** — 레지스트리는 kind가 어떤 DSL을 쓰는지 모른다. 대신 `test_qa_pipeline_dsl_kinds_sync.py`가 v2 kind를 (비등식 DSL \| 등식 DSL) 중 정확히 하나로 분류하게 강제해, 새 kind는 분류 없이 RED다. |
 | C6 | L1 허용 집합 2값 ↔ L3 `VerificationTier` 9값. 읽는 쪽(`read_verification_tier`·`residue_cross_verify_eval`)은 9값을 이미 받는다. | L1 집합을 9값으로 확장(부분집합 유지는 의도 아님). `test_verification_tier_sync.py`가 두 집합의 **정확한 일치**를 대조. **R6-02 증거**: 전수 적재(37개 파일·14,034건)의 다이제스트가 변경 전(HEAD 사본)·후에 바이트 동일. `problem_id` 없는 4건(`problem_bank_v1`)은 로더가 무작위 UUID를 채워 실행마다 달라지므로 그 필드만 마스킹했다. |
 | C7 | 재현 확정 — v2 전용 kind의 레코드는 개념형 분기에 못 들어가 오답이어도 fail이 아니라 **skip**(`(passed, failed, skipped) == (0, 0, 1)`)이다. acceptance 표에 등록하는 안은 `_build_verifiers_v2`의 중복 가드(import 시점 `ValueError`)로 불가. | 디스패치 표 = acceptance 표 ∪ (`_VERIFIERS_V2` 중 acceptance에 없는 kind의 어댑터). 기존 17종 항목은 같은 함수 객체 그대로(동작 불변·테스트로 동결). 순환 import 없음(`verifier`→`acceptance`, `corpus_reverify`→둘 다). v2에 kind가 늘면 야간 재검증에도 자동 포함. |
 | C8 | `residual_axes`의 소비처는 `l4/subject_adapter_math.py` 1곳(DTO 필드로 통과)이고 축 이름 문자열로 분기하는 코드는 0건(내가 찾은 방법: `residual_axes` 전수 grep). | **어휘 등록부는 지금 필요 없다**고 판정. 기존 오타(`문발↔형식모델 정합`)는 바꾸지 않는다(감사 라벨이 영속될 수 있고 소비처가 없어 얻는 것이 없다). 재판정 조건: 축 이름으로 집계·분기하는 소비처가 생길 때. |

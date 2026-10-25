@@ -99,8 +99,9 @@ def _find_prerequisite_cycle_in_records(
 
     데이터 파이프라인 `data_pipeline.atom_graph.validate._find_prerequisite_cycle`의 backend
     짝이다(별 패키지라 import 대신 동일 알고리즘 미러). 모든 레코드는 PREREQUISITE이다
-    (`load_atom_edges_from_graph_json`이 선수만 남김). 1,837 노드 깊은 체인 대비 재귀 대신 명시
-    스택을 쓴다. Returns: 사이클 노드 경로(닫힘 노드 반복) 또는 None.
+    (`load_atom_edges_from_graph_json`이 선수만 남김). 수천 노드(`docs/data/corpus_facts.md`의
+    `atom_graph.nodes`)의 깊은 체인 대비 재귀 대신 명시 스택을 쓴다. Returns: 사이클 노드
+    경로(닫힘 노드 반복) 또는 None.
     """
     adj: dict[str, list[str]] = {}
     for record in records:

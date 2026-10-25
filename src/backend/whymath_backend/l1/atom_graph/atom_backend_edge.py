@@ -9,8 +9,9 @@
 방향: `from_code`(선수) → `to_code`(후행) — "from을 알아야 to를 안다". backend
 `EdgeType.PREREQUISITE`(A→B: A는 B의 선수)와 일치 → from_code→from_concept_id·to_code→to_concept_id.
 
-범위: graph.json `relation`은 전량 `"prerequisite"`(원자ID 엣지 2,213). 서술형 엣지
-(narrative_edges_raw 1,007)는 원자ID가 아니라 적재 대상이 아니다. self-edge·양끝 누락은
+범위: graph.json `relation`은 전량 `"prerequisite"`(원자ID 엣지 — 건수는
+`docs/data/corpus_facts.md`의 `atom_graph.edges`). 서술형 엣지(`narrative_edges_raw` — 건수는
+`atom_graph.narrative_edges_raw`)는 원자ID가 아니라 적재 대상이 아니다. self-edge·양끝 누락은
 로딩에서 skip(불변·FK 방어).
 
 최소 적재: INSERT 컬럼은 (from·to·edge_type·edge_strength·relation_subtype)뿐 —

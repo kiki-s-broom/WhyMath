@@ -61,7 +61,7 @@
 
 ### 4.1 개념 ID — 수학 ID 불변 + AREA 니모닉 레지스트리 (확정)
 
-- **수학 concept_id 재발급 영구 금지.** 3번째 breaking 재ID(개념 437 + 아톰 2,697 + aliases 사슬 +
+- **수학 concept_id 재발급 영구 금지.** 3번째 breaking 재ID(개념 <!-- fact:concept_graph.concepts -->437<!-- /fact --> + 아톰 <!-- fact:atom_graph.nodes -->2,683<!-- /fact --> + aliases 사슬 +
   curriculum_entry·textbook join 전파)는 편익 0에 비용 최대.
 - subject를 ID 세그먼트로 **넣지 않는다** — 노드에서 *제거한* 축(rev `f3a4b5c6d7e8`)을 ID 문자열로
   되들이는 자기모순. 과목 스코핑 정본은 Overlay `subject`(S1) + `search_concepts(domain=...)` 필터.
@@ -85,7 +85,7 @@
   (slash 아님 — kebab charset·URL 안전 유지). 수학 기존 30종은 무접두 그대로(재명명 금지).
 - S3 게이트: 수학 카탈로그가 예약 접두를 침범하지 않음을 동결. (역방향 — 물리 오개념이 무접두로
   들어오는 것은 물리 시드 슬라이스의 게이트 소관.)
-- 오개념 `subject` **필드**는 보류 — 3중 표현 부채(kebab 30/M-id 839/JSONB) canonical 수렴이 선행
+- 오개념 `subject` **필드**는 보류 — 3중 표현 부채(2026-07-02 작성 당시 kebab 30/M-id 839/JSONB) canonical 수렴이 선행
   트랙이며, 수렴 스키마 설계에 과목 축과 오류 유형 5분류(절차/개념/표상/오독/사실혼동 — 로드맵 제안
   수용)를 함께 반영한다.
 

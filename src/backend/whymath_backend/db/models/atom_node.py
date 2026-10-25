@@ -1,10 +1,11 @@
 """원자 메타 *PG 프로젝션* ORM — code 키 안전 표시·필터 메타 (원자 마이그레이션 Phase 2a).
 
 `concept_node`(개념그래프 소비 슬1·UC 키 메타 프로젝션)의 *원자 백본* 짝이다. Phase 1이 원자
-코퍼스(`data/corpus/atom_graph_v1/graph.json`·2,697 노드)를 backend `concept`/`concept_edge`에
-*런타임 최소 식별*만 적재했고, 풍부 원자 메타(인지축·노드유형·학교급·전이·원자성·연결성취기준)는
-코퍼스에 보존돼 있었다. 이 테이블이 그 *안전 메타*를 code 키로 영속 투영한다 — 검색 enrichment·
-필터·검수 게이팅을 backend async-PG 조인으로 하기 위한 백킹(`concept_node`와 동일 설계 철학).
+코퍼스(`data/corpus/atom_graph_v1/graph.json` — 노드 수는 `docs/data/corpus_facts.md`의
+`atom_graph.nodes`)를 backend `concept`/`concept_edge`에 *런타임 최소 식별*만 적재했고, 풍부
+원자 메타(인지축·노드유형·학교급·전이·원자성·연결성취기준)는 코퍼스에 보존돼 있었다. 이
+테이블이 그 *안전 메타*를 code 키로 영속 투영한다 — 검색 enrichment·필터·검수 게이팅을
+backend async-PG 조인으로 하기 위한 백킹(`concept_node`와 동일 설계 철학).
 
 ────────────────────────────────────────────────────────────────────────────
 concept_node와의 차이 (왜 신규 테이블인가 — 재키잉 아닌 additive)

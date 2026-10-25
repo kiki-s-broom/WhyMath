@@ -4,7 +4,7 @@
 Phase B.2(#291)가 카탈로그의 ORM(`db/models/misconception_catalog.py`)·계약
 (`schema/misconception_catalog.py`)·마이그레이션만 세우고 코퍼스 로더는 *후속 몫*으로 보류했는데,
 이 모듈이 그 로더를 놓는다 — #290 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·
-839 레코드·Collection JSON)를 backend 영속 `misconception_catalog` 테이블로 멱등 적재한다.
+Collection JSON·커밋 당시 839 레코드 — 현재 건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`)를 backend 영속 `misconception_catalog` 테이블로 멱등 적재한다.
 
 (주의: 기존 `l4/misconception`는 *탐지 엔진*(kebab-id 30종)으로 별개 체계다. 이 패키지는 L1
 *적재* 인프라이며 두 체계는 FK로 잇지 않는다 — ORM/schema 모듈 docstring "별개 체계".)

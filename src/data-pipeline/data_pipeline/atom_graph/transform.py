@@ -14,8 +14,9 @@
      (고유값·진리값·실고유값 등)는 *정확히 `자리값`·`경계값` 토큰만* 치환하므로 건드리지 않는다.
   3. **연결성취기준 미적Ⅰ/Ⅱ 하이픈 정규화**: `12미적Ⅰ01-01`→`12미적Ⅰ-01-01`(43개). 공수·기수는
      이미 하이픈이라 무변경.
-  4. **관계유형 매핑**: 선수엣지 `관계유형`→`relation_subtype`. `from_유형=원자ID`(2,213) →
-     `AtomEdge`. **`from_유형=서술형`(1,007)은 FK 불가 → `narrative_edges_raw`로 패스스루**.
+  4. **관계유형 매핑**: 선수엣지 `관계유형`→`relation_subtype`. `from_유형=원자ID` → `AtomEdge`.
+     **`from_유형=서술형`은 FK 불가 → `narrative_edges_raw`로 패스스루**(현재 건수는
+     `docs/data/corpus_facts.md`의 `atom_graph.edges`·`atom_graph.narrative_edges_raw`).
   5. **redaction**: K-12(학교급≠대학) 원자의 `핵심명제/성취기준내용`(=NCIC 본문)은 산출에 싣지
      않고 `redacted_fields` 마커만 남긴다. 대학 핵심명제는 자체작성 → `core_proposition` 보존.
 
