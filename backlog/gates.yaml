@@ -461,9 +461,13 @@ gates:
     remind_after_days: 69
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-19] 원문 불변(ADR-007 결정 4). F-Ⅰ~Ⅴ는 원문 그대로 판정. 증거 = docs/reviews/eos_g5_evidence_2026-12-27.md(WP-G)"
+    notes: |-
+      [판정 근거 2026-10-19] 원문 불변(ADR-007 결정 4). F-Ⅰ~Ⅴ는 원문 그대로 판정. 증거 = docs/reviews/eos_g5_evidence_2026-12-27.md(WP-G)
+
+      [판정 근거 2026-10-25] 2027 범위 결정의 입력: 이월 후보 5건(W-10·W-11·W-12·W-20·W-24)은 docs/strategy/eos_2027_carryover_candidates_2026-10-25.md 참조 — 게이트가 아닌 후보 목록(12/31 방침 규칙 2·3)
     corrections:
       - "[2026-10-19] notes +92자 — ADR-007"
+      - "[2026-10-25] notes +145자 — 감리 R-11 이행 — 신규 게이트 없이 기존 G5 판정 입력으로 연결"
     depends_on:
       - ARCH-67-required-tier-unexercised-watch-r2
   - id: G-eos-ip-separation-evidence

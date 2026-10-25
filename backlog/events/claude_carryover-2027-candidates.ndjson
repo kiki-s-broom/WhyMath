@@ -1,0 +1,1 @@
+{"ts": "2026-10-25T00:44:52+00:00", "actor": "claude/carryover-2027-candidates", "action": "gate_amend", "id": "G-eos-g5", "reason": "감리 R-11 이행 — 신규 게이트 없이 기존 G5 판정 입력으로 연결", "changes": "notes +145자", "note": "2027 범위 결정의 입력: 이월 후보 5건(W-10·W-11·W-12·W-20·W-24)은 docs/strategy/eos_2027_carryover_candidates_2026-10-25.md 참조 — 게이트가 아닌 후보 목록(12/31 방침 규칙 2·3)"}
