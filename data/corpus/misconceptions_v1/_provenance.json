@@ -4,10 +4,10 @@
   "source_name": "fac16e6f-WhyMath_______.json",
   "uploaded": "2026-06-20",
   "counts": {
-    "misconceptions": 841,
+    "misconceptions": 843,
     "duplicates_skipped": 0,
-    "with_ccss": 773,
-    "with_error_type": 732
+    "with_ccss": 775,
+    "with_error_type": 738
   },
   "error_types": [
     "공식혼동",
