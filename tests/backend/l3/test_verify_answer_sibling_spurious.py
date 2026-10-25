@@ -17,12 +17,18 @@ main(`5d1ef801`)에서 실측한 값이다.
 
 from __future__ import annotations
 
+import logging
+import time
+from collections.abc import Callable, Iterator, Mapping
+
 import pytest
 import sympy
 
 from whymath_backend.l3 import verify_answer as verify_answer_module
+from whymath_backend.l3.equivalent import counterexample_fuzz as fuzz_module
 from whymath_backend.l3.equivalent.counterexample_fuzz import fuzz_answer
 from whymath_backend.l3.verify_answer import (
+    AnswerVerdict,
     _exact_decimal_text,
     _real_count_agrees,
     _root_is_real,
@@ -604,3 +610,451 @@ def test_derivative_roots_in_ambiguous_band_fall_back_to_exact_reality() -> None
     assert verify_extremum_count(expression, "2").state == "fail"
     assert verify_is_one_to_one(expression, "1").state == "pass"
     assert verify_is_one_to_one(expression, "0").state == "fail"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-83 — P3-79 재검토 잔여 P3 3건: ① fuzz 군집 창 ② 4차 대수 계수 성능 ③ fail-closed 분기 동결
+# ──────────────────────────────────────────────────────────────────────────
+_X = sympy.Symbol("x")
+# 창 계산에 쓰는 임의의 유한 창(분기 단위 시험용) — 실제 호출부는 격자 간격에서 정한다.
+_WINDOW = sympy.Rational(1, 50)
+# 정확히 0 이지만 SymPy 가 0 임을 증명하지 못하는 상수(`is_zero` None) — '도함수 0 여부 미정'의 재료.
+_HIDDEN_ZERO = sympy.sin(1) ** 2 + sympy.cos(1) ** 2 - 1
+
+
+def _hole_grid() -> list[tuple[str, str, str, bool]]:
+    """① 거짓 pass 격자 520건 — (조건, 답, 선택, 주장이 참인가).
+
+    조건은 `x*(x-2)**m*(x - 2 ± d)/(x-2)**k = 0` — 참 근은 0 과 2 ∓ d, x = 2 는 분모 0 이라 무연근.
+    홀 중복도 5종(m, k) × 부호 2 × 간격 d 13종(1e-9 ~ 1e-3) × 주장 4종(거짓 2·참 2) = 520.
+    """
+    gaps = [
+        "1*10**(-9)",
+        "1*10**(-8)",
+        "3*10**(-8)",
+        "1*10**(-7)",
+        "1*10**(-6)",
+        "5*10**(-6)",
+        "9*10**(-6)",
+        "10**(-5)",
+        "11*10**(-6)",
+        "2*10**(-5)",
+        "5*10**(-5)",
+        "10**(-4)",
+        "10**(-3)",
+    ]
+    cases: list[tuple[str, str, str, bool]] = []
+    for m, k in ((1, 1), (2, 1), (2, 2), (3, 1), (3, 2)):
+        for sign in ("+", "-"):
+            true_root_sign = "-" if sign == "+" else "+"
+            for gap in gaps:
+                condition = f"x*(x-2)**{m}*(x - 2 {sign} {gap})/(x-2)**{k} = 0"
+                cases.append((condition, "0", "largest", False))  # 참 최대 근은 2 근방
+                cases.append((condition, "0", "unique", False))  # 서로 다른 정의 근이 둘
+                cases.append((condition, f"2 {true_root_sign} {gap}", "largest", True))
+                cases.append((condition, "0", "smallest", True))
+    return cases
+
+
+# 종전부터 있던 한계 — 수치 탐색이 한 칸 안에서 합친 참 근을 못 봐 '맞는 답'을 '근이 아님'으로
+# 부르는 거짓 fail(P3-83 착수 시점 main 실측 27건, 창 확대 뒤에도 같다). 늘어나면 RED.
+_GRID_KNOWN_FALSE_FAIL = 27
+
+
+def test_fuzz_hole_grid_has_no_false_pass() -> None:
+    """P3-83 ① — 무연근 곁(2e-5~3e-3)의 참 근이 무연근 군집으로 버려져 거짓 pass 가 나던 격자 520건.
+
+    착수 시점 main 은 거짓 pass 20건(거짓 주장 `0` 이 '가장 큰 근'·'유일근'으로 pass)이었다. 거짓 주장은
+    pass 가 아니어야 하고, 참 주장의 거짓 fail 은 종전 한계(27건)를 넘지 않아야 한다."""
+    cases = _hole_grid()
+    assert len(cases) == 520
+    false_pass: list[tuple[str, str, str]] = []
+    false_fail = 0
+    for condition, answer, selection, claim_is_true in cases:
+        state = fuzz_answer(condition, {"x": answer}, selection).state
+        if not claim_is_true and state == "pass":
+            false_pass.append((condition, answer, selection))
+        if claim_is_true and state == "fail":
+            false_fail += 1
+    assert false_pass == []
+    assert false_fail <= _GRID_KNOWN_FALSE_FAIL
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        "x*(x-2)**2*(x - 2 + 5*10**(-5))/(x-2) = 0",
+        "x*(x-2)**3*(x-2-3*10**(-3))/(x-2)**2 = 0",
+    ],
+)
+def test_fuzz_true_root_near_hole_is_not_passed(condition: str) -> None:
+    """P3-83 ① 재현식 — 참 근은 0 과 무연근 곁의 한 점이라 '가장 큰 근 = 0' 은 거짓이다."""
+    assert fuzz_answer(condition, {"x": "0"}, "largest").state != "pass"
+    assert fuzz_answer(condition, {"x": "0"}, "unique").state != "pass"
+
+
+@pytest.mark.parametrize("gap", ["5*10**(-2)", "10**(-1)", "1/2"])
+def test_fuzz_hole_far_from_true_root_is_still_dropped(gap: str) -> None:
+    """① 대조군 — 참 근이 창의 2배(격자 간격 4배 ≈ 0.04, 비율 검사 문턱 1/2) 밖이면 무연근은 그대로
+    버려져 정답이 pass 다.
+    창을 넓힌 대가로 정상 답이 판정 불가로 밀리지 않는지 본다."""
+    condition = f"x*(x-2)**2*(x - 2 - {gap})/(x-2) = 0"
+    assert fuzz_answer(condition, {"x": f"2 + {gap}"}, "largest").state == "pass"
+    assert fuzz_answer(condition, {"x": "0"}, "smallest").state == "pass"
+    assert fuzz_answer(condition, {"x": "0"}, "largest").state == "fail"
+
+
+def test_isolation_window_follows_the_search_grid() -> None:
+    """① 창 하한 = 격자 간격의 `_ISOLATION_GRID_STEPS` 배(작은 격자에서도 절대 하한 1e-5 아래로 안
+    내려간다). 격자 간격을 모르면(0·음수·NaN·무한) 창을 정하지 않는다(None — 고립을 확인하지 못함)."""
+    step = (2.0 * 50.0) / (10_000 - 1)
+    window = fuzz_module._isolation_min_window(step)
+    assert window is not None
+    assert float(window) == pytest.approx(step * fuzz_module._ISOLATION_GRID_STEPS)
+    assert fuzz_module._isolation_min_window(1e-9) == fuzz_module._ISOLATION_MIN_WINDOW
+    for unknown in (0.0, -0.01, float("nan"), float("inf")):
+        assert fuzz_module._isolation_min_window(unknown) is None
+
+
+def test_fuzz_isolation_window_covers_numeric_merge_radius() -> None:
+    """① 창 하한의 근거 재측정 — 수치 탐색이 무연근 곁의 참 근을 따로 찾지 못하는 최대 간격이 창 하한
+    안에 든다. 순중복도 1·2 · 격자 위 무연근 위치 20곳 · 간격 1.0~1.8 격자(0.1 간격)를 훑는다 —
+    최대 1.6 격자(순중복도 2)가 합쳐지므로 창 하한이 1.5 격자 이하면 RED. 측정이 합쳐짐을 실제로
+    보는지(스캔 0건 = 공허한 통과)도 함께 단언한다."""
+    step = (2.0 * 50.0) / (10_000 - 1)
+    window = float(fuzz_module._isolation_min_window(step) or 0)
+    hidden_max = 0.0
+    for net in (1, 2):  # 무연근의 순중복도
+        for offset in range(20):  # 격자 위 무연근 위치 20곳
+            hole = 2.0 + step * offset / 20
+            for tenth in range(10, 19):  # 간격 1.0 ~ 1.8 격자
+                for sign in (1.0, -1.0):
+                    gap = sign * (tenth / 10) * step
+                    func = sympy.lambdify(_X, _X * (_X - hole) ** net * (_X - hole - gap), "math")
+                    roots, _ = fuzz_module._find_roots(func, 50.0, 10_000, 1e-7)
+                    near = [
+                        r
+                        for r in roots
+                        if min(hole, hole + gap) - 0.05 <= r <= max(hole, hole + gap) + 0.05
+                    ]
+                    if len(near) < 2:  # 두 근이 하나로 합쳐졌다
+                        hidden_max = max(hidden_max, abs(gap))
+    assert hidden_max >= 1.5 * step  # 측정이 합쳐짐을 실제로 본다(실측 최대 1.6 격자)
+    assert hidden_max < window  # 합쳐지는 간격은 모두 창 안이다
+
+
+# ── ③ `_isolated_exact_root` 의 fail-closed 분기 동결 ──────────────────────────
+# 반환값을 True 로 뒤집으면 무연근 군집을 '고립됨'으로 오판해 참 근을 통째로 버린다(거짓 pass).
+# 분기마다 실세계 원인을 열거하고, 원인별로 (해로운 입력 · 고립된 구멍 · 성공 방향 대조군)을 둔다.
+#
+#  분기 E(예외 → False) 원인: ⓐ `sympy.diff` 가 식을 못 미분(NotImplementedError 등) ⓑ 값이 수가 아닌 채
+#      남아 `complex()` 가 TypeError ⓒ 아주 큰 식의 RecursionError(같은 분기 — 따로 재현하지 못했다).
+#  분기 F(비유한 값 → False, P3-83 신설) 원인: 창 끝이 잔차의 극점이라 값이 zoo/NaN.
+#  분기 Z(`is_zero` None → False) 원인: ⓐ 도함수 값이 정확히 0 이지만 SymPy 가 증명하지 못하는 상수
+#      (삼각 항등식 등)를 담음 ⓑ 도함수 값이 깊은 근호 중첩이라 0 여부를 못 가림.
+#  분기 L(`lead` None → False) 원인: ⓐ 무연근의 순중복도가 8 을 넘음 ⓑ 잔차가 항등적으로 0.
+#  (분기 W: 창을 정할 수 없음 · 분기 P: 점이 근사 소수/자유 기호를 담음 — 같은 방식으로 고정한다.)
+def _near_root_condition(power: int, denominator: int, gap: str = "3*10**(-8)") -> str:
+    return f"x*(x-2)**{power}*(x-2-{gap})/(x-2)**{denominator} = 0"
+
+
+def _isolated_hole_condition(power: int, denominator: int) -> str:
+    return f"x*(x-5)*(x-2)**{power}/(x-2)**{denominator} = 0"
+
+
+def _raising_diff(*_args: object, **_kwargs: object) -> object:
+    raise NotImplementedError("지원하지 않는 식")
+
+
+def _hidden_zero_diff(real_diff: object) -> object:
+    """미분 결과에 '정확히 0 이나 증명 불가'한 상수를 더한다 — 도함수 값의 0 여부를 미정으로 만든다."""
+
+    def patched(expr: sympy.Expr, *args: object, **kwargs: object) -> sympy.Expr:
+        return real_diff(expr, *args, **kwargs) + _HIDDEN_ZERO  # type: ignore[operator, no-any-return]
+
+    return patched
+
+
+def test_hidden_zero_constant_is_really_undecidable() -> None:
+    """픽스처 전제 — 이 상수가 0 이라고 SymPy 가 답했다면 분기 Z 의 픽스처가 그 분기를 밟지 않는다."""
+    assert _HIDDEN_ZERO.is_zero is None
+    assert abs(float(_HIDDEN_ZERO.evalf(30))) < 1e-25  # 실제로 0
+
+
+def test_isolation_exception_branch_fails_closed_end_to_end(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """분기 E ⓐ — 미분이 예외를 올리면 '고립됨'이 아니라 판정 불가다(예외 타입명은 로그에 남는다)."""
+    harmful = _near_root_condition(3, 2)
+    isolated = _isolated_hole_condition(3, 2)
+    assert fuzz_answer(isolated, {"x": "5"}, "largest").state == "pass"  # 대조군 — 고립된 구멍
+    monkeypatch.setattr(fuzz_module.sympy, "diff", _raising_diff)
+    with caplog.at_level(logging.DEBUG, logger="whymath.l3.equivalent.counterexample_fuzz"):
+        assert fuzz_answer(harmful, {"x": "0"}, "largest").state == "unverifiable"
+        assert fuzz_answer(isolated, {"x": "5"}, "largest").state == "unverifiable"
+    assert any(
+        "무연근 군집 확인 회피" in rec.getMessage() and "NotImplementedError" in rec.getMessage()
+        for rec in caplog.records
+    )
+
+
+def test_isolation_exception_branch_pole_at_window_edge(caplog: pytest.LogCaptureFixture) -> None:
+    """분기 E ⓑ — 창 끝(2 − 1/50)이 잔차의 극점이면 값이 zoo 라 판정 불가. 다른 쪽 끝 값이 `g(2)` 와
+    가까워 NaN 비교가 '벗어나지 않음'으로 접히면 거짓 '고립됨'이 되는 모양이다(대조군: 극점이 멀면 고립).
+    극점은 `complex()` 가 예외 없이 NaN 으로 바꾸므로 예외 분기가 아니라 비유한 값 분기를 탄다."""
+    nearly_flat = (_X - 2) ** 2 * (1 + sympy.Rational(1, 5000) / (_X - 2 + _WINDOW))
+    with caplog.at_level(logging.DEBUG, logger="whymath.l3.equivalent.counterexample_fuzz"):
+        assert (
+            fuzz_module._isolated_exact_root(nearly_flat, _X, sympy.Integer(2), 2.0, _WINDOW)
+            is False
+        )
+    assert not any("무연근 군집 확인 회피" in rec.getMessage() for rec in caplog.records)
+    far_pole = (_X - 2) ** 2 * (1 + sympy.Rational(1, 5000) / (_X - 7))
+    assert fuzz_module._isolated_exact_root(far_pole, _X, sympy.Integer(2), 2.0, _WINDOW) is True
+
+
+def test_isolation_exception_branch_non_numeric_value(caplog: pytest.LogCaptureFixture) -> None:
+    """분기 E ⓑ — 값이 수가 아닌 채 남는 식(복소수로 못 바꾸는 값)은 예외 분기로 판정 불가."""
+    unevaluated = _X * (_X - 2) ** 2 + sympy.Symbol("a")  # 자유 기호가 남아 N() 이 수가 아니다
+    with caplog.at_level(logging.DEBUG, logger="whymath.l3.equivalent.counterexample_fuzz"):
+        assert (
+            fuzz_module._isolated_exact_root(unevaluated, _X, sympy.Integer(2), 2.0, _WINDOW)
+            is False
+        )
+    assert any(
+        "무연근 군집 확인 회피" in rec.getMessage() and "TypeError" in rec.getMessage()
+        for rec in caplog.records
+    )
+    assert (
+        fuzz_module._isolated_exact_root(_X * (_X - 2) ** 2, _X, sympy.Integer(2), 2.0, _WINDOW)
+        is True
+    )  # 대조군 — 같은 식에서 자유 기호만 없으면 고립
+
+
+def test_isolation_zero_unknown_branch_fails_closed_end_to_end(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """분기 Z ⓐ — 도함수 값의 0 여부를 못 가리면 '모른다'다(고립됨으로 접지 않는다)."""
+    harmful = _near_root_condition(
+        3, 1
+    )  # 무연근의 순중복도 2 — 1계 도함수 값이 0 이어야 다음 차수로
+    isolated = _isolated_hole_condition(3, 1)
+    assert fuzz_answer(isolated, {"x": "5"}, "largest").state == "pass"  # 대조군
+    monkeypatch.setattr(fuzz_module.sympy, "diff", _hidden_zero_diff(sympy.diff))
+    assert fuzz_answer(harmful, {"x": "0"}, "largest").state == "unverifiable"
+    assert fuzz_answer(isolated, {"x": "5"}, "largest").state == "unverifiable"
+
+
+def test_isolation_zero_unknown_branch_direct() -> None:
+    """분기 Z ⓐ 직접 — 1계 도함수 값이 증명 불가한 0(`(x-1)·c`, c = sin²1 + cos²1 − 1)이면 False,
+    대조군(같은 모양에서 c 대신 결정되는 수)은 True."""
+    undecided = (_X - 1) * _HIDDEN_ZERO
+    assert fuzz_module._isolated_exact_root(undecided, _X, sympy.Integer(1), 1.0, _WINDOW) is False
+    decided = (_X - 1) * (_X - 5)
+    assert fuzz_module._isolated_exact_root(decided, _X, sympy.Integer(1), 1.0, _WINDOW) is True
+
+
+def test_isolation_lead_missing_branch_fails_closed_end_to_end() -> None:
+    """분기 L ⓐ — 무연근의 순중복도 9(> 8)는 도함수로 중복도를 못 구해 판정 불가. 경계(8)는 고립 확인."""
+    assert fuzz_answer(_near_root_condition(10, 1), {"x": "0"}, "largest").state == "unverifiable"
+    assert (
+        fuzz_answer(_isolated_hole_condition(10, 1), {"x": "5"}, "largest").state == "unverifiable"
+    )
+    assert fuzz_answer(_near_root_condition(9, 1), {"x": "0"}, "largest").state == "unverifiable"
+    assert (
+        fuzz_answer(_isolated_hole_condition(9, 1), {"x": "5"}, "largest").state == "pass"
+    )  # 경계 대조군
+
+
+def test_isolation_lead_missing_branch_direct() -> None:
+    """분기 L 직접 — ⓐ 순중복도 9 ⓑ 항등적으로 0 인 잔차는 False, 순중복도 8 은 True(대조군)."""
+    point = sympy.Integer(2)
+    assert fuzz_module._isolated_exact_root(_X * (_X - 2) ** 9, _X, point, 2.0, _WINDOW) is False
+    assert fuzz_module._isolated_exact_root(sympy.Integer(0), _X, point, 2.0, _WINDOW) is False
+    assert (
+        fuzz_module._isolated_exact_root((_X - 3) * (_X - 2) ** 8, _X, point, 2.0, _WINDOW) is True
+    )
+
+
+def test_isolation_ratio_threshold_is_half_of_the_value_at_the_point() -> None:
+    """창 양 끝에서 g 가 g(점)의 절반 넘게 벗어나면 고립이 아니다 — 문턱 양쪽. 선형 g 에서 다른 근이
+    점에서 r 떨어져 있으면 벗어남 비율은 창/r 이라, r 이 창의 2배보다 약간 가까우면(1.9배) 닫히고
+    약간 멀면(2.1배) 고립이다. 문턱이 비율 1(느슨)이면 1.9배도 고립으로 읽는다."""
+    point = sympy.Integer(2)
+    near = (_X - 2) * (_X - 2 - _WINDOW * sympy.Rational(19, 10))
+    far = (_X - 2) * (_X - 2 - _WINDOW * sympy.Rational(21, 10))
+    assert fuzz_module._isolated_exact_root(near, _X, point, 2.0, _WINDOW) is False
+    assert fuzz_module._isolated_exact_root(far, _X, point, 2.0, _WINDOW) is True
+
+
+def test_fuzz_true_root_just_inside_twice_the_window_is_not_dropped() -> None:
+    """끝에서 끝까지 — 창은 격자 간격의 2배(0.0200)라 무연근에서 0.0400 안의 참 근은 판정 불가로 닫히고
+    (수치 탐색은 이 근을 따로 찾지만 창 끝 비율 검사가 닫는다 — 안전이 아니라 확인 가능성의 비용)
+    0.0400 밖은 무연근만 버려져 판정된다. 양쪽 경계가 문턱 1/2 에 묶여 있다."""
+    for side in ("+", "-"):
+        for gap, state in (("38/1000", "unverifiable"), ("42/1000", "pass")):
+            condition = f"x*(x-2)**2*(x-2{side}{gap})/(x-2) = 0"
+            true_root = f"2 {'+' if side == '-' else '-'} {gap}"
+            assert fuzz_answer(condition, {"x": true_root}, "largest").state == state
+
+
+def test_isolation_unknown_window_or_inexact_point_is_not_isolated() -> None:
+    """분기 W·P — 창을 정할 수 없거나(None) 점이 근사 소수·자유 기호를 담으면 고립을 확인한 것이 아니다."""
+    residual = (_X - 3) * (_X - 2)
+    assert fuzz_module._isolated_exact_root(residual, _X, sympy.Integer(2), 2.0, _WINDOW) is True
+    assert fuzz_module._isolated_exact_root(residual, _X, sympy.Integer(2), 2.0, None) is False
+    assert fuzz_module._isolated_exact_root(residual, _X, sympy.Float(2), 2.0, _WINDOW) is False
+    assert fuzz_module._isolated_exact_root(residual, _X, sympy.Symbol("a"), 2.0, _WINDOW) is False
+
+
+# ── ② 4차 이상 근호 근의 원문 정의역 평가 예산 ───────────────────────────────
+_QUARTIC_ALGEBRAIC_HOLE = "(x**4 + 3*x**3 - 7*sqrt(5)*x**2 + 11*x - 13)*(x-1)/(x-1) = 0"
+_QUARTIC_INTEGER_HOLE = "(x**4 + 3*x**3 - 7*x**2 + 11*x - 13)*(x-1)/(x-1) = 0"
+_SECONDS_LIMIT = 10.0  # 종전 15분 이상 · 15초 안팎이 정상인 CI 부하를 넉넉히 덮는 상한
+
+
+def _timed(call: Callable[[], AnswerVerdict]) -> tuple[AnswerVerdict, float]:
+    started = time.perf_counter()
+    verdict = call()
+    return verdict, time.perf_counter() - started
+
+
+# 기약 4차 근(페라리 꼴)의 최소 크기 — 예산(60)을 끈 코드가 원문에 넣어 보게 되는 근이다. 예산 값이
+# 아니라 이 고정 문턱을 쓰므로 예산을 10**9 로 끄거나 우회해도 놓치지 않는다.
+_OVERSIZED_ROOT_OPS = 69
+
+
+class _OversizedRootEvaluated(BaseException):  # noqa: N818 — `except Exception` 이 삼키지 못하게
+    """예산을 넘는 근이 원문 정의역 평가에 들어왔다."""
+
+
+@pytest.fixture
+def no_oversized_root_evaluation(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[int]]:
+    """원문 정의역 평가(`condition_definedness`)에 `count_ops` > 69 인 값이 들어오면 즉시 중단한다.
+
+    예산이 꺼지거나 우회돼도 CI 가 job 시간초과로만 알리지 않고 수 초 안에 단언 실패로 알린다.
+    검증기들이 `except Exception` 으로 예외를 삼키므로 BaseException 으로 올리고, 본 값은 목록에도
+    남겨 시험 끝에서 한 번 더 확인한다."""
+    seen: list[int] = []
+    original = verify_answer_module.condition_definedness
+
+    def spy(condition: str, values: Mapping[str, sympy.Expr]) -> str:
+        for value in values.values():
+            ops = int(sympy.count_ops(value))
+            if ops > _OVERSIZED_ROOT_OPS:
+                seen.append(ops)
+                raise _OversizedRootEvaluated(f"count_ops={ops}")
+        return original(condition, values)
+
+    monkeypatch.setattr(verify_answer_module, "condition_definedness", spy)
+    yield seen
+    assert seen == []
+
+
+@pytest.mark.usefixtures("no_oversized_root_evaluation")
+@pytest.mark.parametrize("kind", ["sum", "product"])
+@pytest.mark.parametrize("condition", [_QUARTIC_ALGEBRAIC_HOLE, _QUARTIC_INTEGER_HOLE])
+def test_quartic_aggregate_with_removable_singularity_is_closed_within_the_time_limit(
+    condition: str, kind: str
+) -> None:
+    """P3-83 ② — 제거 가능한 특이점이 붙은 기약 4차식의 근 집계는 근의 페라리 꼴을 원문에 넣어 보는 데
+    수 분이 걸렸다(근호 계수 15분 이상 · 정수 계수 근 하나당 25초). 크기 예산으로 판정 불가로 닫는다 —
+    틀린 pass 가 아니라 판정 불가여야 하고, 맞는 주장도 거짓 fail 이 되지 않는다."""
+    right = "-3" if kind == "sum" else "-13"  # 근의 합 −3 · 곱 −13 (참)
+    wrong = "5" if kind == "sum" else "7"
+    for claimed in (right, wrong):
+        verdict, elapsed = _timed(
+            lambda claimed=claimed: verify_root_aggregate(condition, claimed, kind)  # type: ignore[arg-type]
+        )
+        assert verdict.state == "unverifiable"
+        assert elapsed < _SECONDS_LIMIT
+
+
+@pytest.mark.usefixtures("no_oversized_root_evaluation")
+def test_quartic_real_root_count_with_algebraic_coefficient_is_closed_within_the_time_limit() -> (
+    None
+):
+    """② 실근 개수 — 대수 계수 4차는 근 표현이 예산을 넘어 판정 불가(정수 계수는 `real_roots` 의 수치
+    근이라 종전에도 빨랐고 그대로 판정된다). 주장값은 판정 불가에 영향이 없어 하나만 본다."""
+    claimed = "2"
+    verdict, elapsed = _timed(lambda: verify_real_root_count(_QUARTIC_ALGEBRAIC_HOLE, claimed))
+    assert verdict.state == "unverifiable"
+    assert elapsed < _SECONDS_LIMIT
+    integer_verdict, integer_elapsed = _timed(
+        lambda: verify_real_root_count(_QUARTIC_INTEGER_HOLE, claimed)
+    )
+    assert integer_verdict.state in ("pass", "fail")
+    assert integer_elapsed < _SECONDS_LIMIT
+
+
+@pytest.mark.parametrize(
+    ("condition", "claimed_sum"),
+    [
+        ("(x**3 - 3*x + 1)*(x-1)/(x-1) = 0", "0"),
+        ("(x**3 - 6*x + 2)*(x-1)/(x-1) = 0", "0"),
+        ("(x**2 - 2*sqrt(5)*x + 3)*(x-1)/(x-1) = 0", "2*sqrt(5)"),
+    ],
+)
+def test_cubic_or_quadratic_with_removable_singularity_is_still_decided(
+    condition: str, claimed_sum: str
+) -> None:
+    """② 대조군 — 근 표현이 작은 3차 이하(카르다노 꼴 count_ops ≤ 45)는 예산 안이라 종전처럼 판정된다."""
+    assert verify_root_aggregate(condition, claimed_sum, "sum").state == "pass"
+    assert verify_root_aggregate(condition, "100", "sum").state == "fail"
+
+
+def _radical_sum_with_ops(target: int) -> sympy.Expr:
+    """`count_ops` 가 정확히 `target` 인 근호 합 — 서로 다른 소수의 제곱근을 더하고(항 하나에 3), 앞의
+    몇 항에 계수 2 를 곱해(항마다 +1) 크기를 한 칸씩 맞춘다."""
+    primes = list(sympy.primerange(2, 600))
+    for count in range(1, len(primes) + 1):
+        for scaled in range(count + 1):
+            terms = [(2 if i < scaled else 1) * sympy.sqrt(p) for i, p in enumerate(primes[:count])]
+            candidate = sympy.Add(*terms)
+            if sympy.count_ops(candidate) == target:
+                return candidate
+    raise AssertionError("크기가 맞는 식을 만들지 못했다")
+
+
+def test_roots_between_44_and_60_ops_are_still_decided() -> None:
+    """② 예산이 너무 낮아지지 않는지 — 근호 계수 3차 `x³ + 2√2·x² − 5x + 1` 의 근은 `count_ops` 가
+    44·58·60 이고 0.1초 안에 정의역이 평가된다. 예산을 44 로 낮추면 58·60 이 닫혀 판정 불가가 된다."""
+    condition = "(x**3 + 2*sqrt(2)*x**2 - 5*x + 1)*(x-1)/(x-1) = 0"
+    residual, _ = verify_answer_module._parse_condition(condition)
+    roots = sympy.roots(sympy.Poly(residual, _X))
+    assert sorted(sympy.count_ops(root) for root in roots) == [44, 58, 60]  # 픽스처 전제
+    assert verify_real_root_count(condition, "3").state == "pass"
+    assert verify_real_root_count(condition, "1").state == "fail"
+
+
+def test_definedness_budget_closes_only_oversized_roots(monkeypatch: pytest.MonkeyPatch) -> None:
+    """② 예산의 경계 — 근 표현의 `count_ops` 가 상한과 같으면 평가하고(대조군), 하나만 넘어도 평가 없이
+    판정 불가. CRootOf(5차 이상)는 60자리 수치로 넣으므로 식이 커도 예산과 무관하게 평가한다."""
+    budget = verify_answer_module._DEF_ROOT_MAX_OPS
+    calls: list[str] = []
+    original = verify_answer_module.condition_definedness
+
+    def counting(condition: str, values: object) -> str:
+        calls.append(condition)
+        return original(condition, values)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(verify_answer_module, "condition_definedness", counting)
+    condition = "(x**2 - 2)*(x-1)/(x-1) = 0"
+    at_budget = _radical_sum_with_ops(budget)
+    over_budget = _radical_sum_with_ops(budget + 1)
+    assert sympy.count_ops(at_budget) == budget
+    assert sympy.count_ops(over_budget) == budget + 1
+
+    assert verify_answer_module._root_definedness(condition, "x", at_budget, {}) == "defined"
+    assert len(calls) == 1
+    assert verify_answer_module._root_definedness(condition, "x", over_budget, {}) == "unknown"
+    assert len(calls) == 1  # 예산을 넘은 근은 평가하지 않았다
+
+    quintic_root = sympy.CRootOf(_X**5 - _X - 1, 0)
+    assert verify_answer_module._root_definedness(condition, "x", quintic_root, {}) == "defined"
+    assert len(calls) == 2
+    # 식이 큰 CRootOf(다항식 항이 많다)도 예산 대상이 아니다 — 수치로 평가한다.
+    wide = sympy.CRootOf(sum((k + 2) * _X**k for k in range(0, 45)) - 7, 0)
+    assert sympy.count_ops(wide) > budget
+    assert verify_answer_module._root_definedness(condition, "x", wide, {}) == "defined"
+    assert len(calls) == 3

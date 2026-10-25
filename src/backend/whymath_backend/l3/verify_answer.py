@@ -1758,7 +1758,7 @@ def trusted_real_roots(
     for root in candidates:
         # 5차 이상 기약 다항식의 근(CRootOf)은 원문 평가에 60자리 수치로 넣는다 — 근사 소수라
         # 0 확정은 하지 않는다(분모가 그 근에서 0 에 가까우면 판정 불가로 남는다).
-        state = condition_definedness(condition, {**base, str(var): _definedness_point(root)})
+        state = _root_definedness(condition, str(var), root, base)
         if state == _UNKNOWN:
             return None
         if state == _DEFINED:
@@ -1769,6 +1769,38 @@ def trusted_real_roots(
 def _definedness_point(root: sympy.Expr) -> sympy.Expr:
     """원문 정의역 평가에 넣을 근의 값 — CRootOf 는 60자리 수치(`trusted_real_roots` 와 같다)."""
     return sympy.N(root, _CERT_PRECISION) if root.has(sympy.CRootOf) else root
+
+
+# 정확한 근 표현의 크기 예산(P3-83) — 근호가 겹겹이 쌓인 근(기약 4차 방정식의 페라리 꼴·
+# 대수적 수 계수 3차의 카르다노 꼴)을 원문에 넣으면 SymPy 의 영 판정(`is_zero`)·실수 판정
+# (`is_real`)이 최소다항식 연산으로 가서 한 근에 수십 초~수 분이 걸린다(같은 크기에서도 어떤
+# 근은 0.2초, 어떤 근은 20초 넘게 — 예측할 수 없다). 시간 상한은 비결정이고 이 모듈은 알람을
+# 쓰지 않으므로(작업자 스레드 — safe_parse 머리말) 크기로 닫는다: 이 값(`count_ops`)을 넘는
+# 근은 원문 정의역을 확정하지 못한 것으로 둔다(판정 불가 — fail-closed).
+# 실측(P3-83): 예산 밖의 근은 기약 4차 꼴(69 이상 — 정수 계수 72~87 · 근호 계수 500 이상)이고
+# 20초를 넘는 근이 섞인다. 예산 안에서는 정수 계수 3차의 카르다노 꼴(≤45)이 대체로 0.2초 안이다.
+# 한계(예산이 닫지 못하는 잔여 클래스 — 후속): 크기가 작아도 느린 꼬리가 있다.
+#   · `(x**4 - 4*x**3 - 6*x**2 - 3*x - 2)*(x-1)/(x-1) = 0` 의
+#     `verify_root_aggregate(…, "0", "sum")` 은 근의 `count_ops` 가 1·19·33·35 라 모두 예산 밑인데
+#     PYTHONHASHSEED 0~3 에서 PR 은 100.1·5.3·102.6·197.8초, 종전 main 은 4.4·4.6·202.5·195.4초였다
+#     (4.5초~200초). 어느 한쪽이 일관되게 느리지 않다 — PR 이 느린 시드(0)도 main 이 느린 시드(2)도
+#     있고, 예산 검사의 `count_ops` 호출 하나를 빼기만 해도 시드 2 가 102.6 → 4.5초로 바뀐다.
+#   · 대수적 수 계수 3차도 60 이하에서 드물게(142근 중 5근) 1초를 넘고 2근은 20초를 넘겼다.
+#   크기만으로는 예측할 수 없고, 오프라인 배치 `root_aggregate_batch`·`corpus_reverify` 에는
+#   시간 상한이 없다.
+_DEF_ROOT_MAX_OPS = 60
+
+
+def _root_definedness(
+    condition: str, var: str, root: sympy.Expr, base: Mapping[str, sympy.Expr]
+) -> DefinednessState:
+    """근 하나에서 조건 원문이 정의되는가 — 근 표현이 예산을 넘으면 평가하지 않고 판정 불가(P3-83).
+
+    CRootOf 는 60자리 수치로 평가하므로 예산을 보지 않는다. `base` 는 var 밖 이름의 값."""
+    if not root.has(sympy.CRootOf) and sympy.count_ops(root) > _DEF_ROOT_MAX_OPS:
+        logger.debug("verify_answer 정의역 판정 불가: root_expression_too_large")
+        return _UNKNOWN
+    return condition_definedness(condition, {**base, var: _definedness_point(root)})
 
 
 def _defined_root_multiplicities(
@@ -1782,7 +1814,7 @@ def _defined_root_multiplicities(
         return dict(root_mult)
     kept: dict[sympy.Expr, int] = {}
     for root, mult in root_mult.items():
-        state = condition_definedness(condition, {str(var): _definedness_point(root)})
+        state = _root_definedness(condition, str(var), root, {})
         if state == _UNKNOWN:
             return None
         if state == _DEFINED:
