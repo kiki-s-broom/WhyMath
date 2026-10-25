@@ -395,7 +395,7 @@ L1. 데이터 기반            [성취기준 · 검정교과서 · 평가원 ·
 - `docs/standards/system_superiority_maintenance.md` — 시스템 우월성 유지(SSM): 분기별 기술 트렌드 능동 스캔·도입 게이트(상시 붕괴 방어와 상보)
 - `docs/strategy/*.md` — 시장·차별화·리스크
 - `docs/data/licensing_safety.md` — 데이터 라이선스 매트릭스
-- `docs/data/corpus_facts.md` — 코퍼스 건수·지문 단일 원천(생성 문서 · 문서는 숫자 대신 `<!-- fact:이름 -->` 표식으로 인용 · 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync` · CI `tests/infra/test_corpus_facts.py` · OPS-154)
+- `docs/data/corpus_facts.md` — 코퍼스 건수·지문 단일 원천(생성 문서 · 문서는 숫자를 손으로 적지 않고 사실 이름 표식으로 인용(형식은 모듈 설명) · 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync` · CI `tests/infra/test_corpus_facts.py` · OPS-154)
 - `docs/prompts/*.md` — 프롬프트 템플릿 라이브러리
 - `docs/standards/testing.md` — 테스트 피라미드·**커버리지 게이트 정본**(집계 70% + 계층 floor l4=90%·l1/l2/api=80%·l3=70% — 수치의 단일 진실 원천은 `scripts/coverage/check_layer_coverage.py`의 `LAYER_FLOORS`)
 - `docs/standards/security_privacy.md` — 미성년 PII·암호화·보존 파기 정본
