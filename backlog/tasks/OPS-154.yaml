@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 전수 점검 — 저장소 문서·코드 주석·데이터 카드·런북·태스크 대장이 인용하는 코퍼스 사실(건수·지문·버전·경로)을 수집해, 원본에서 센 값과 다른 표기를 목록으로 낸다(판정 기준 커밋 해시 명기). 현재 집행은 tests/infra/test_docs_numbers.py의 원자 백본 노드·엣지·M-id 2종 4문서뿐이다\n② 단일 원천 — 코퍼스 사실을 원본 파일에서 계산하는 레지스트리 하나(정의 = 사실 이름 → 계산 함수)를 두고, 문서는 값을 손으로 적지 않고 그 레지스트리를 참조하는 표식으로 인용한다. 원본이 바뀌면 동기화 명령 한 번으로 모든 인용이 함께 갱신된다\n③ 집행 — CI에서 ⓐ표식 안의 값이 레지스트리와 다르면 RED ⓑ표식 밖에 적힌 같은 사실의 낡은 값(알려진 옛 값·형식)을 검출하면 RED ⓒ스캔 0건은 실패. 역사 기록(MEMORY 결정 로그·사고 대장·완료 태스크 증적·리뷰 문서처럼 그 시점 값을 적는 곳)은 면제하되 면제 목록을 명시한다\n④ 발견한 불일치를 고친다 — 현행 상태를 말하는 문장은 레지스트리 값으로, 시점 기록은 시점을 밝혀 남긴다\n⑤ 뮤테이션 — 원본 값 변경 시 미동기 문서가 RED · 표식 값 손편집 RED · 면제 경로 밖 낡은 값 RED · 정상 GREEN 대조군"
-artifacts: []
+artifacts:
+  - "PR #1734 (스쿼시 0fb839c0) — 코퍼스 사실 단일 원천 scripts/analysis/corpus_facts.py(사실 103) · 생성 문서 docs/data/corpus_facts.md·json · 문서 표식 157 · 자기 선언 대조(misconceptions_v1 841→843·773→775·732→738 정정) · 낡은 값 검출기 + 테스트 손 고정값 검출기(CI tests/infra/test_corpus_facts.py · 뮤테이션 16종 RED) · 문서 46·코드 주석 약 60곳 정리 · 테스트 고정값 144곳+ 사실 파일 읽기로 전환 · 전파 실험(오개념 1건 추가 → check exit 1·29곳 → sync 12파일 → check 0·테스트 31 passed) · 헌법 등록부 정정 초안 A0006 · 후속 PB-25·LIC-10·MISC-65. 판정 기준 main 0fb839c0 check exit 0"
 paths:
   - tests/infra/test_docs_numbers.py
   - "scripts/analysis/corpus_facts*.py"
   - "docs/data/corpus_facts*.md"
-session: claude/corpus-facts-single-source
+session: null
 notes: "요청 2026-10-25 Kiki: \"기존 코퍼스관련 정보를 일원화하여 통일 — 여기저기 널린 정보가 상이하게 표시된 것이 있는지, 한 개라도 정보가 변경되면 전체에 영향을 미치도록 해서 개별 항목마다 다르게 읽히는 사례가 발생하지 않도록 전체 점검\". 선례: KG-10·KG-12가 엣지 수가 바뀔 때마다 CLAUDE.md·00_overview.md·통합 테스트 핀을 손으로 고쳤고 KG-12에서는 통합 테스트 핀(2231)을 놓쳐 2차 커밋이 필요했다. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
 updated: 2026-10-25
