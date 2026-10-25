@@ -23,6 +23,11 @@ import pytest
 from whymath_backend.harness import learning_path_orderability_report as lpo
 from whymath_backend.l2.prerequisite_recommendation import MAX_PREREQUISITE_DEPTH
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads((_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+
 
 def _payload(concepts: list[str], edges: list[tuple[str, str, str]]) -> dict[str, object]:
     """`(from_code, to_code, relation)` 튜플 목록 → graph.json 형태 payload."""
@@ -372,8 +377,8 @@ def test_real_corpus_reproduces_pinned_acceptance_one_numbers() -> None:
     graph = lpo.load_corpus_graph(payload)
     report = lpo.build_report(graph)
 
-    assert report.corpus_concept_total == 2683
-    assert report.corpus_edge_total == 2278
+    assert report.corpus_concept_total == _FACTS["atom_graph.nodes"]
+    assert report.corpus_edge_total == _FACTS["atom_graph.edges"]
     assert report.direct_predecessor_distribution == {0: 933, 1: 1306, 2: 368, 3: 68, 4: 8}
     assert report.population_size == 444
 

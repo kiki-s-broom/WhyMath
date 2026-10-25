@@ -440,7 +440,11 @@ class TestRealCorpusCrossValidation:
             for s in standards_payload["standards"]
             if s["curriculum_revision"] == "2015 개정"
         ]
-        assert len(pair_rows) == 460  # 데이터 카드 실측(2022:435+2015:460)의 2015 개정 subset
+        # 2015 개정 subset 건수는 단일 원천의 기계용 사본에서 읽는다(OPS-154 — 손 고정 금지).
+        facts = json.loads(
+            (_repo_root() / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
+        assert len(pair_rows) == facts["standards.k12_2015"]  # standards_v1의 2015 개정 subset
 
         c_store, _ = _criteria_store(pair_rows)
         l_store, _ = _level_store()

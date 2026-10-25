@@ -337,6 +337,9 @@ class TestPopulate:
 _ROOT = Path(__file__).resolve().parents[3]
 _REAL_GRAPH = _ROOT / "data" / "corpus" / "concept_graph_v1" / "graph.json"
 _REAL_CROSSWALK = _ROOT / "data" / "corpus" / "concept_atom_crosswalk_v1" / "crosswalk.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 
 def _canonical(
@@ -569,12 +572,14 @@ class TestDeriveAtomEntries:
         assert _REAL_CROSSWALK.exists(), f"실 코퍼스 부재: {_REAL_CROSSWALK}"
         canonical = load_kr_curriculum_entries_from_graph_json(_REAL_GRAPH, now=_NOW)
         atoms = derive_atom_curriculum_entries(canonical, load_crosswalk_records(_REAL_CROSSWALK))
+        floor_canonical = _FACTS["concept_graph.concepts"]
         assert (
-            len(canonical) >= 437
-        ), f"canonical {len(canonical)} < 하한 437(코퍼스 축소 드리프트?)"
+            len(canonical) >= floor_canonical
+        ), f"canonical {len(canonical)} < 하한 {floor_canonical}(코퍼스 축소 드리프트?)"
+        floor_atoms = _FACTS["atom_graph.atoms_k12"]  # 초·중·고 세부개념 전량(병합 13건 반영 2026-07-28)
         assert (
-            len(atoms) >= 1311
-        ), f"원자 행 {len(atoms)} < 하한 1311(코퍼스 축소 드리프트? — 병합 13건 반영 2026-07-28)"
+            len(atoms) >= floor_atoms
+        ), f"원자 행 {len(atoms)} < 하한 {floor_atoms}(코퍼스 축소 드리프트?)"
         # entry_id 유일(원자당 1셀·충돌 승자 단일) + 무접미 `{원자}:KR` 규약.
         entry_ids = [a.entry_id for a in atoms]
         assert len(set(entry_ids)) == len(entry_ids)
@@ -710,7 +715,8 @@ class TestUniversityAtomDerivation:
         """
         assert _REAL_ATOM_GRAPH.exists(), f"실 코퍼스 부재: {_REAL_ATOM_GRAPH}"
         entries = load_kr_curriculum_entries_for_university_atoms(_REAL_ATOM_GRAPH, now=_NOW)
-        assert len(entries) >= 512, f"대학 원자 행 {len(entries)} < 하한 512(코퍼스 축소 드리프트?)"
+        floor = _FACTS["atom_graph.university_atoms"]
+        assert len(entries) >= floor, f"대학 원자 행 {len(entries)} < 하한 {floor}(코퍼스 축소 드리프트?)"
         # entry_id 유일 + 무접미 `{원자}:KR` 규약 + KR 셀 상수.
         entry_ids = [e.entry_id for e in entries]
         assert len(set(entry_ids)) == len(entry_ids)
