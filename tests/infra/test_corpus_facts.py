@@ -99,6 +99,7 @@ def _fake_repo(
         "# 장난감\n\n현재 <!-- fact:toy.rows -->3<!-- /fact -->행이다.\n", encoding="utf-8"
     )
     (root / cf.FACTS_TABLE).write_text(cf.render_table(root, facts), encoding="utf-8")
+    (root / cf.FACTS_JSON).write_text(cf.render_json(root, facts), encoding="utf-8")
     return root, facts, decls
 
 
@@ -120,6 +121,7 @@ def test_source_change_makes_unsynced_marker_red_and_sync_fixes_it(tmp_path: Pat
         "data/corpus/toy_v1/_provenance.json",
         "docs/data/toy.md",
         str(cf.FACTS_TABLE),
+        str(cf.FACTS_JSON),
     }
     assert cf.check(root, facts, decls) == []
     assert "<!-- fact:toy.rows -->4<!-- /fact -->" in (root / "docs/data/toy.md").read_text(
@@ -188,3 +190,14 @@ def test_stale_generated_table_is_red(tmp_path: Path) -> None:
     table = root / cf.FACTS_TABLE
     table.write_text(table.read_text(encoding="utf-8").replace("| 3 |", "| 30 |"), encoding="utf-8")
     assert any("생성 문서" in p for p in cf.check(root, facts, decls))
+
+
+def test_stale_facts_json_is_red(tmp_path: Path) -> None:
+    root, facts, decls = _fake_repo(tmp_path)
+    (root / cf.FACTS_JSON).write_text('{"toy.rows": 30}\n', encoding="utf-8")
+    assert any("corpus_facts.json" in p for p in cf.check(root, facts, decls))
+
+
+def test_committed_facts_json_matches_registry() -> None:
+    """테스트가 읽는 기계용 사본이 원본에서 센 값과 같다 — 낡으면 테스트들이 옛 값을 기대하게 된다."""
+    assert cf.load_facts_json(ROOT) == cf.compute_all(ROOT)

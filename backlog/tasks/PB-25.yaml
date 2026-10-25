@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-25
+title: "게이팅·청사진 후보 fetch 상한 3,000이 코퍼스 14,742건보다 작다 — 최근 적재분만 후보가 될 수 있음(실측 선행)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 실측 — prod(Kiki 머신 whymath-pg) `problem` 테이블 행 수와 은행별 분포를 읽기 전용으로 잰다. 3,000을 넘는지가 이 태스크의 성립 조건이다(넘지 않으면 관측 근거만 남기고 종결)\n② 넘으면 — `api/gating.py` `_fetch_candidates`(상한 `_CANDIDATE_FETCH_LIMIT = 3000` · `created_at desc` 정렬)와 `api/me.py` `_BLUEPRINT_CANDIDATE_FETCH_LIMIT = 3000`이 가장 최근 적재분 3,000건만 게이팅·청사진 조립에 넘긴다 → 오래된 은행은 학생에게 한 번도 후보가 되지 않는다. 상한 근거가 \"코퍼스 2,647건 + 여유\"(2026-08)였고 현재 코퍼스는 39개 은행 14,742건이다\n③ 처분 — 상한 재산정(실측 지연 근거) 또는 SQL 사전 축소(단원·과목 키) 중 하나를 측정으로 고른다. 게이팅이 단일 진실 게이트라는 설계 규칙(사전 필터 금지 주석)과의 충돌을 판정 문서로 남긴다\n④ 절단 경고 로그(`gating candidate fetch truncated`)가 prod·데모에서 실제로 났는지 확인 — 이미 났다면 사고 대장 등재\n⑤ 회귀 테스트 — 상한보다 많은 행이 있을 때 특정 은행이 후보에서 통째로 빠지지 않음을 고정"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/gating.py
+  - src/backend/whymath_backend/api/me.py
+session: null
+notes: "발견 2026-10-25 OPS-154 코퍼스 사실 전수 조사(문제은행 조사 에이전트). 근거 주석: gating.py 'PB-03 축③ — 현재 코퍼스(2026-08 기준 7종 2,647건)+여유를 감안해 1000→3000' · me.py '코퍼스 2,647건 + 여유'. 코드 미변경(OPS-154는 주석의 시점만 밝힌다). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-25

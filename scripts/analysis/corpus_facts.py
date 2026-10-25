@@ -1,4 +1,6 @@
-"""코퍼스 사실 단일 원천 (OPS-154) — 건수·지문을 원본 파일에서 계산하고, 문서는 그 값을 표식으로 인용한다.
+"""코퍼스 사실 단일 원천 (OPS-154).
+
+건수·지문을 원본 파일에서 계산하고, 문서는 그 값을 표식으로 인용한다.
 
 ## 왜 있는가
 
@@ -8,17 +10,18 @@
 
 ## 규칙 세 가지
 
-1. **값은 여기서만 계산한다** — `FACTS`의 각 항목이 "사실 이름 → 원본에서 세는 함수"다. 숫자를 손으로
-   적어 두는 곳은 없다.
-2. **문서는 표식으로 인용한다** — 마크다운에 아래처럼 쓴다. 렌더링에서는 주석이 안 보이고 숫자만 보인다.
+1. **값은 여기서만 계산한다** — `build_facts()`의 각 항목이 "사실 이름 → 원본에서 세는
+   함수"다. 숫자를 손으로 적어 두는 곳은 없다.
+2. **문서는 표식으로 인용한다** — 마크다운에 아래처럼 쓴다. 렌더링에서는 주석이 안 보이고
+   숫자만 보인다.
 
        <!-- fact:atom_graph.edges -->2,278<!-- /fact -->
 
    천 단위 쉼표 없이 쓰려면 `<!-- fact:atom_graph.edges raw -->2278<!-- /fact -->`.
-3. **원본이 바뀌면 `sync` 한 번** — 모든 표식의 숫자와 사실 표(`docs/data/corpus_facts.md`)를 새로 쓴다.
-   CI(`tests/infra/test_corpus_facts.py`)는 `check`와 같은 판정을 돌려, 표식이 낡았거나 · 없는 사실을
-   가리키거나 · 코퍼스 자기 선언이 실제와 다르거나 · 표식 밖에 같은 사실을 손으로 적은 현행 문장이 있으면
-   실패한다.
+3. **원본이 바뀌면 `sync` 한 번** — 모든 표식의 숫자와 사실 표(`docs/data/corpus_facts.md`)를
+   새로 쓴다. CI(`tests/infra/test_corpus_facts.py`)는 `check`와 같은 판정을 돌려 다음 중 하나라도
+   있으면 실패한다: 표식이 낡음 · 없는 사실을 가리킴 · 코퍼스 자기 선언이 실제와 다름 · 표식 밖에
+   같은 사실의 낡은 값을 손으로 적은 현행 문장.
 
 ## 사용
 
@@ -44,6 +47,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 CORPUS = Path("data/corpus")
 FACTS_TABLE = Path("docs/data/corpus_facts.md")
+FACTS_JSON = Path("docs/data/corpus_facts.json")  # 테스트·스크립트가 읽는 기계용 사본(같은 값)
 
 FactValue = int | str
 
@@ -618,7 +622,8 @@ def sync_provenance(
             if json.dumps(json.loads(raw), ensure_ascii=False, indent=2) + newline != raw:
                 # 다시 쓰면 건수 말고 서식까지 바뀌는 파일 — 조용히 재서식하지 않고 사람에게 넘긴다
                 raise SystemExit(
-                    f"{path}: 2칸 들여쓰기 JSON이 아니라 자동 갱신하지 않는다 — 건수만 손으로 고쳐라"
+                    f"{path}: 2칸 들여쓰기 JSON이 아니라 자동 갱신하지 않는다"
+                    " — 건수만 손으로 고쳐라"
                 )
             text = json.dumps(data, ensure_ascii=False, indent=2) + newline
             path.write_text(text, encoding="utf-8")
@@ -679,7 +684,8 @@ def unclosed_markers(root: Path) -> list[str]:
         opens = len(re.findall(r"<!-- fact:", text))
         if opens and opens != len(MARKER.findall(text)):
             out.append(
-                f"{path.relative_to(root)}: 여는 표식 {opens}개 중 짝이 맞는 것 {len(MARKER.findall(text))}개"
+                f"{path.relative_to(root)}: 여는 표식 {opens}개 중"
+                f" 짝이 맞는 것 {len(MARKER.findall(text))}개"
             )
     return out
 
@@ -714,7 +720,8 @@ def render_table(root: Path, facts: dict[str, Fact] | None = None) -> str:
     lines = [
         "# 코퍼스 사실 표 (생성 문서 — 손으로 고치지 않는다)",
         "",
-        "> 이 파일은 `python3 scripts/analysis/corpus_facts.py sync`가 만든다. 값은 원본 파일에서 센 것이다.",
+        "> 이 파일은 `python3 scripts/analysis/corpus_facts.py sync`가 만든다."
+        " 값은 원본 파일에서 센 것이다.",
         "> 문서에서 이 값을 인용할 때는 숫자를 손으로 적지 말고 사실 이름으로 표식을 단다"
         " — 표식 형식·규칙은 `scripts/analysis/corpus_facts.py` 모듈 설명(태스크 OPS-154).",
         "",
@@ -723,9 +730,22 @@ def render_table(root: Path, facts: dict[str, Fact] | None = None) -> str:
     ]
     for fid in sorted(facts):
         lines.append(
-            f"| `{fid}` | {format_value(values[fid], False)} | {facts[fid].desc} | `{facts[fid].source}` |"
+            f"| `{fid}` | {format_value(values[fid], False)} | {facts[fid].desc}"
+            f" | `{facts[fid].source}` |"
         )
     return "\n".join(lines) + "\n"
+
+
+def render_json(root: Path, facts: dict[str, Fact] | None = None) -> str:
+    """기계용 사실 표 — 테스트는 건수를 손으로 박지 않고 이 파일에서 읽는다."""
+    values = compute_all(root, facts)
+    return json.dumps(dict(sorted(values.items())), ensure_ascii=False, indent=2) + "\n"
+
+
+def load_facts_json(root: Path = ROOT) -> dict[str, FactValue]:
+    """커밋된 기계용 사실 표를 읽는다(원본을 다시 세지 않는다 — 신선도는 check가 보증)."""
+    data: dict[str, FactValue] = json.loads((root / FACTS_JSON).read_text(encoding="utf-8"))
+    return data
 
 
 # ── 표식 밖 손 기입 탐지 ──────────────────────────────────────────────────────────
@@ -841,7 +861,8 @@ PHRASES: list[Phrase] = [
 HISTORY_GLOBS: tuple[str, ...] = (
     "MEMORY.md",
     "backlog/**",
-    "constitution/**",  # 읽기 전용(헌법 제9조) — 정정은 docs/constitution_proposals/ 초안으로 Kiki가 한다
+    # 읽기 전용(헌법 제9조) — 정정은 docs/constitution_proposals/ 초안으로 Kiki가 한다
+    "constitution/**",
     "docs/constitution_proposals/**",
     "docs/reviews/**",
     "docs/handoff/**",
@@ -855,6 +876,7 @@ HISTORY_GLOBS: tuple[str, ...] = (
     "src/backend/alembic/versions/**",
     "tests/fixtures/**",
     FACTS_TABLE.as_posix(),
+    FACTS_JSON.as_posix(),
     "scripts/analysis/corpus_facts.py",
     "tests/infra/test_corpus_facts.py",
 )
@@ -904,7 +926,7 @@ def _scan_files(root: Path) -> Iterator[Path]:
 
 
 def _current_state_files(root: Path) -> Iterator[Path]:
-    """마크다운 현행 문서 — 여기서는 현재 값도 표식으로 달아야 한다(원본이 바뀌면 sync가 따라간다)."""
+    """마크다운 현행 문서 — 현재 값도 표식으로 달아야 한다(원본이 바뀌면 sync가 따라간다)."""
     return (p for p in _scan_files(root) if p.suffix == ".md")
 
 
@@ -978,7 +1000,8 @@ def unmarked_phrases(root: Path, values: dict[str, FactValue] | None = None) -> 
     for m in find_mentions(root, values):
         if m.stale:
             out.append(
-                f"{m.path}:{m.line} 낡은 값 '{m.text}' ({m.label}) — 현재 값으로 고치거나 시점을 밝힌다"
+                f"{m.path}:{m.line} 낡은 값 '{m.text}' ({m.label})"
+                " — 현재 값으로 고치거나 시점을 밝힌다"
             )
         elif m.markable:
             out.append(f"{m.path}:{m.line} 표식 없는 '{m.text}' ({m.label}) — 표식으로 바꾼다")
@@ -1009,6 +1032,9 @@ def check(
     table = root / FACTS_TABLE
     if not table.is_file() or table.read_text(encoding="utf-8") != render_table(root, facts):
         problems.append(f"{FACTS_TABLE} 가 원본과 다르다(생성 문서) — sync 필요")
+    fj = root / FACTS_JSON
+    if not fj.is_file() or fj.read_text(encoding="utf-8") != render_json(root, facts):
+        problems.append(f"{FACTS_JSON} 가 원본과 다르다(생성 문서) — sync 필요")
     problems += unmarked_phrases(root, values)
     return problems
 
@@ -1026,6 +1052,11 @@ def sync(
     if not table.is_file() or table.read_text(encoding="utf-8") != rendered:
         table.write_text(rendered, encoding="utf-8")
         changed.append(str(FACTS_TABLE))
+    fj = root / FACTS_JSON
+    rendered_json = render_json(root, facts)
+    if not fj.is_file() or fj.read_text(encoding="utf-8") != rendered_json:
+        fj.write_text(rendered_json, encoding="utf-8")
+        changed.append(str(FACTS_JSON))
     return changed
 
 
