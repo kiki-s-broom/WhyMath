@@ -83,6 +83,7 @@
 | 측정 | `src/backend/whymath_backend/ops/repeat_recommendation_report.py` | 반복 추천 리포트 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_variants.py` | 변형 파생 — 시드 signature로 코퍼스를 읽는다 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_lineage_links.py` | 계보만 걸기 — 시드 역인덱스로 코퍼스를 읽는다 | 아님 |
+| 분석 스크립트 | `scripts/analysis/corpus_facts.py` | 코퍼스 사실 단일 원천 — 은행별·전체 건수 계산(OPS-154) | 아님 |
 | 분석 스크립트 | `scripts/analysis/answer_form_requirement_scan.py` | 정답 형식 요건 스캔 | 아님 |
 | 분석 스크립트 | `scripts/analysis/eos_anchor_asset_audit.py` | EOS 앵커 자산 감사 | 아님 |
 | 분석 스크립트 | `scripts/analysis/measure_sympy_isolation_budget.py` | SymPy 격리 예산 실측 | 아님 |
