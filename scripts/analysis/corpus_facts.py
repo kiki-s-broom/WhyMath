@@ -1089,6 +1089,7 @@ def check(
     if not fj.is_file() or fj.read_text(encoding="utf-8") != render_json(root, facts):
         problems.append(f"{FACTS_JSON} 가 원본과 다르다(생성 문서) — sync 필요")
     problems += unmarked_phrases(root, values)
+    problems += hand_pins(root, values)
     return problems
 
 

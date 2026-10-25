@@ -201,3 +201,109 @@ def test_stale_facts_json_is_red(tmp_path: Path) -> None:
 def test_committed_facts_json_matches_registry() -> None:
     """테스트가 읽는 기계용 사본이 원본에서 센 값과 같다 — 낡으면 테스트들이 옛 값을 기대하게 된다."""
     assert cf.load_facts_json(ROOT) == cf.compute_all(ROOT)
+
+
+# ── 낡은 값·표식 없는 값·손 고정값 검출(변별력) ─────────────────────────────────
+
+
+def _mention_repo(
+    tmp_path: Path, doc: str, rel: str = "docs/data/card.md"
+) -> tuple[Path, dict[str, object]]:
+    root = tmp_path / "repo"
+    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / rel).write_text(doc, encoding="utf-8")
+    values = {"atom_graph.edges": 2278, "atom_graph.nodes": 2683, "concept_graph.edges": 581}
+    return root, values
+
+
+def _mentions(tmp_path: Path, doc: str, rel: str = "docs/data/card.md") -> list[str]:
+    root, values = _mention_repo(tmp_path, doc, rel)
+    return cf.unmarked_phrases(root, values)
+
+
+def test_stale_value_in_current_doc_is_red(tmp_path: Path) -> None:
+    out = _mentions(tmp_path, "원자 백본은 2,683노드·2,234엣지다.\n")
+    assert any("낡은 값" in p and "2,234" in p for p in out)
+
+
+def test_current_value_without_marker_is_red_in_markdown(tmp_path: Path) -> None:
+    out = _mentions(tmp_path, "원자 백본은 2,683노드·2,278엣지다.\n")
+    assert any("표식 없는" in p for p in out) and not any("낡은 값" in p for p in out)
+
+
+def test_marked_value_is_green(tmp_path: Path) -> None:
+    doc = (
+        "원자 백본은 <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->노드·"
+        "<!-- fact:atom_graph.edges -->2,278<!-- /fact -->엣지다.\n"
+    )
+    assert _mentions(tmp_path, doc) == []
+
+
+def test_dated_line_and_wrapped_next_line_are_exempt(tmp_path: Path) -> None:
+    assert _mentions(tmp_path, "2026-08-10 실측: 엣지 2,234건.\n") == []
+    assert _mentions(tmp_path, "KG-12 이전 기록(2026-10-15)\n엣지 2,231건이었다.\n") == []
+    assert _mentions(tmp_path, "엣지 2,234→2,278로 정정.\n") == []
+
+
+def test_history_file_is_exempt(tmp_path: Path) -> None:
+    assert _mentions(tmp_path, "엣지 2,210건\n", rel="docs/reviews/r.md") == []
+    assert _mentions(tmp_path, "엣지 2,210건\n", rel="MEMORY.md") == []
+
+
+def test_far_value_and_year_are_not_mentions(tmp_path: Path) -> None:
+    assert _mentions(tmp_path, "엣지 120건만 본다. 성취기준(2022 개정).\n") == []
+
+
+def test_code_comment_current_value_is_allowed_but_stale_is_red(tmp_path: Path) -> None:
+    ok = _mentions(tmp_path, "# 원자 백본 엣지 2,278건\n", rel="src/x.py")
+    bad = _mentions(tmp_path, "# 원자 백본 엣지 2,213건\n", rel="src/x.py")
+    assert ok == [] and any("낡은 값" in p for p in bad)
+
+
+def test_value_inside_code_fence_is_not_asked_for_marker(tmp_path: Path) -> None:
+    assert _mentions(tmp_path, "```\nAFTER 엣지 2,278\n```\n") == []
+    assert any("낡은 값" in p for p in _mentions(tmp_path, "```\n엣지 2,210\n```\n"))
+
+
+def test_hand_pin_in_test_code_is_red_and_tag_allows(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    (root / "tests").mkdir(parents=True)
+    values = {"atom_graph.edges": 2278}
+    (root / "tests/test_a.py").write_text("def test():\n    assert n == 2278\n", encoding="utf-8")
+    assert any("손 고정값 2278" in p for p in cf.hand_pins(root, values))
+    (root / "tests/test_a.py").write_text(
+        "def test():\n    assert n == 2278  # corpus-pin: 시점 고정 — 예시\n", encoding="utf-8"
+    )
+    assert cf.hand_pins(root, values) == []
+    (root / "tests/test_a.py").write_text(
+        "# 주석의 2278은 숫자 토큰이 아니다\nX = '2278'\n", encoding="utf-8"
+    )
+    assert cf.hand_pins(root, values) == []
+
+
+def test_common_numbers_are_not_pins() -> None:
+    vals = cf.distinctive_values({"a": 400, "b": 409, "c": 2278, "d": 1500, "e": 399})
+    assert set(vals) == {2278}
+
+
+def test_year_is_not_read_as_a_count(tmp_path: Path) -> None:
+    """연도 제외 절이 없으면 '성취기준(2022 개정)'의 2022가 성취기준 2,010건의 낡은 값으로 잡힌다."""
+    root, _ = _mention_repo(tmp_path, "성취기준(2022 개정) 기준.\n")
+    assert cf.unmarked_phrases(root, {"standards.k12": 2010}) == []
+    root2, _ = _mention_repo(tmp_path / "b", "성취기준 2,022건.\n")
+    assert any("낡은 값" in p for p in cf.unmarked_phrases(root2, {"standards.k12": 2010}))
+
+
+def test_check_reports_stale_phrase_and_hand_pin(tmp_path: Path) -> None:
+    """check가 두 검출기를 실제로 부른다 — 함수만 있고 판정에 안 들어가면 CI는 못 본다."""
+    root, facts, decls = _fake_repo(tmp_path)
+    (root / "docs/data/toy.md").write_text("현재 원자 백본 엣지 2,234건\n", encoding="utf-8")
+    (root / "tests").mkdir()
+    big = cf.Fact("큰 값", "data/corpus/toy_v1/rows.jsonl", lambda r: 2278)
+    facts = {**facts, "atom_graph.edges": big}
+    (root / cf.FACTS_TABLE).write_text(cf.render_table(root, facts), encoding="utf-8")
+    (root / cf.FACTS_JSON).write_text(cf.render_json(root, facts), encoding="utf-8")
+    (root / "tests/test_x.py").write_text("assert n == 2278\n", encoding="utf-8")
+    problems = cf.check(root, facts, decls)
+    assert any("손 고정값 2278" in p for p in problems)
+    assert any("낡은 값" in p and "2,234" in p for p in problems)
