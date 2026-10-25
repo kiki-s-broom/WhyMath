@@ -34,11 +34,11 @@ class TestStandardPopulateMain:
 
         def _fake_std(session: Any, path: Path) -> int:
             calls["std"] = path
-            return 895
+            return 895  # corpus-pin: 합성 픽스처
 
         def _fake_links(session: Any, path: Path) -> int:
             calls["links"] = path
-            return 443
+            return 443  # corpus-pin: 합성 픽스처
 
         monkeypatch.setattr(populate, "load_standards", _fake_std)
         monkeypatch.setattr(populate, "load_links", _fake_links)

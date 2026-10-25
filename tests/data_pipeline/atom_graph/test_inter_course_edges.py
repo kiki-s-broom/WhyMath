@@ -516,7 +516,9 @@ class TestCli:
         assert main(argv) == 0
         out = capsys.readouterr().out
         assert "[PASS]" in out
-        assert f"407/{_UNIV}" in out  # 도달성 병기: 슬라이스 1+3 병합 가정 결과(KG-12 ① 체인 수리 후)
+        assert (
+            f"407/{_UNIV}" in out
+        )  # 도달성 병기: 슬라이스 1+3 병합 가정 결과(KG-12 ① 체인 수리 후)
         assert PROPOSAL_PATH.read_bytes() == proposal_bytes  # 읽기 전용
 
     def test_exit_one_on_broken_proposal(self, proposal_bytes: bytes, tmp_path: Path) -> None:

@@ -10,8 +10,10 @@ test_load_neo4j_integration.py(통합·기본 SKIP)에서 한다. 여기서는 �
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -27,6 +29,14 @@ from data_pipeline.atom_graph.load import (
 )
 from data_pipeline.atom_graph.models import AtomConcept, AtomEdge, NodeLevel, SchoolLevel
 from data_pipeline.atom_graph.transform import TransformResult
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -294,29 +304,29 @@ class TestNoSecretsNoRedactedFields:
 
 
 # ──────────────────────────────────────────────────────────────────────
-# 실 코퍼스(2683/2278) — graph.json 라운드트립 후 적재
+# 실 코퍼스(전 노드·전 엣지 — 건수는 사실 파일) — graph.json 라운드트립 후 적재
 # ──────────────────────────────────────────────────────────────────────
 class TestRealCorpus:
-    def test_loads_2683_nodes_2278_edges(self, corpus_graph: dict[str, object]) -> None:
-        """실 코퍼스 적재: 노드 2683·엣지 2278 MERGE·skip 0(전 엣지 ATOM_PREREQUISITE)."""
+    def test_loads_all_nodes_and_edges(self, corpus_graph: dict[str, object]) -> None:
+        """실 코퍼스 적재: 전 노드·전 엣지 MERGE·skip 0(전 엣지 ATOM_PREREQUISITE · 건수는 사실 파일)."""
         result = _result_from_corpus(corpus_graph)
         driver = _FakeDriver()
         report = load_graph(result, driver=driver)
-        assert report.nodes_merged == 2683
+        assert report.nodes_merged == _FACTS["atom_graph.nodes"]
         assert (
-            report.edges_merged == 2278
+            report.edges_merged == _FACTS["atom_graph.edges"]
         )  # 2207 + S4-60 고→대 경계 24 · KG-10 ② 경계 검수(반려 3·교체 1)로 2,234→2,231
         assert report.edges_skipped == 0
         for call in _edge_calls(driver.calls):
             assert "MERGE (src)-[r:ATOM_PREREQUISITE]->(dst)" in call.query
 
     def test_real_corpus_node_codes_unique_in_merge(self, corpus_graph: dict[str, object]) -> None:
-        """2683 노드 MERGE의 code가 모두 유일(코드 충돌 0)."""
+        """전 노드 MERGE의 code가 모두 유일(코드 충돌 0)."""
         result = _result_from_corpus(corpus_graph)
         driver = _FakeDriver()
         load_graph(result, driver=driver)
         codes = [c.params["code"] for c in _node_calls(driver.calls)]
-        assert len(codes) == len(set(codes)) == 2683
+        assert len(codes) == len(set(codes)) == _FACTS["atom_graph.nodes"]
 
     def test_real_corpus_no_map_props(self, corpus_graph: dict[str, object]) -> None:
         """실 코퍼스 적재 시 어떤 노드 props도 dict(map)를 담지 않는다(Neo4j 속성 규칙)."""
@@ -401,7 +411,12 @@ class TestHelpers:
 
 class TestLoadReport:
     def test_summary_mentions_counts(self) -> None:
-        report = LoadReport(constraints=1, indexes=2, nodes_merged=2683, edges_merged=2210)
+        report = LoadReport(
+            constraints=1,
+            indexes=2,
+            nodes_merged=2683,  # corpus-pin: 합성 픽스처
+            edges_merged=2210,
+        )
         text = report.summary()
-        assert "2683" in text
+        assert "2683" in text  # corpus-pin: 합성 픽스처
         assert "2210" in text

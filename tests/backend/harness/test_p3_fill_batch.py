@@ -20,6 +20,9 @@ from whymath_backend.schema.problem_metadata import ProblemSlot, parse_slot_tags
 
 _REPO = Path(__file__).resolve().parents[3]
 _BANK = _REPO / "data" / "corpus" / batch.CORPUS_DIR_NAME
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_REPO / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -79,13 +82,13 @@ def test_batch_is_byte_deterministic(tmp_path: Path) -> None:
 
 class TestBank:
     def test_scan_is_not_vacuous(self) -> None:
-        assert len(_rows()) == 204
+        assert len(_rows()) == _FACTS["problem_bank.p3_fill_v0"]
 
     def test_the_batch_never_writes_an_approval(self, fresh: dict[str, Any]) -> None:
         """생성기는 승인을 쓰지 않는다 — 재생성 산출물에는 `review_status`가 없고, 저장소 은행의 전건
         `approved`는 3회차 S5 감사 뒤 코퍼스 단위 백필이 얹은 각인이다(결속 테스트가 감사 내용에 묶는다)."""
         fresh_rows = [json.loads(line) for line in fresh["problems"].decode("utf-8").splitlines()]
-        assert len(fresh_rows) == 204
+        assert len(fresh_rows) == _FACTS["problem_bank.p3_fill_v0"]  # 재생성 = 커밋 은행
         assert all("review_status" not in row for row in fresh_rows)
         assert {row.get("review_status") for row in _rows()} == {"approved"}
 

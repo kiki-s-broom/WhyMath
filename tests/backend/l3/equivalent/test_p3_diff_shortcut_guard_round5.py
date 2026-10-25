@@ -165,7 +165,7 @@ def by_prefix(audited: dict[str, dict[str, object]]) -> dict[str, dict[str, obje
 def test_disposition_covers_the_frozen_audit_bank(
     audited: dict[str, dict[str, object]], causes: dict[str, str]
 ) -> None:
-    assert len(audited) == 504
+    assert len(audited) == 504  # corpus-pin: 시점 고정 — 5회차 감사(bank_audit) 동결 사본
     assert set(causes) <= set(audited)
     assert dict(Counter(causes.values())) == _CAUSE_COUNTS
     assert sum(_CAUSE_COUNTS.values()) == 68

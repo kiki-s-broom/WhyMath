@@ -37,6 +37,17 @@ from whymath_backend.schema.enums import RelationType
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CORPUS_ROOT = _REPO_ROOT / "data" / "corpus"
 _PROBLEM_TYPES_PATH = _CORPUS_ROOT / "problem_type_graph_v1" / "problem_types.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
+
+def _bank_total(corpus: str) -> int:
+    """은행 폴더 이름(`problem_bank_<x>`) → 사실 `problem_bank.<x>`(그 은행의 전체 문항 수)."""
+    return _FACTS[f"problem_bank.{corpus.removeprefix('problem_bank_')}"]
+
 
 # 골든 분포(2026-07-30 S3-27 백필 실측 — `harness/problem_type_backfill.py` 산출물과 정합).
 # 이 상수가 어긋나면 매핑표가 바뀌었다는 뜻이다 — 의도적 변경이면 이 상수도 함께 갱신할 것.
@@ -62,7 +73,7 @@ _GOLDEN_CORPUS_TYPE_TOTALS: dict[str, dict[str, int]] = {
         ptm.PTYPE_VERIFY_CLAIM: 264,  # 11밴드 × 24
     },
     ptm.CORPUS_KILLER_V0: {
-        ptm.PTYPE_EVALUATE_EXPRESSION: 120,
+        ptm.PTYPE_EVALUATE_EXPRESSION: _bank_total(ptm.CORPUS_KILLER_V0),  # 단일 유형 = 은행 전량
     },
     # 42밴드×24=1008(evaluate) · transpose-no-sign-change=24(solve) ·
     # combination-no-denominator·same-item-permutation-no-divide=2밴드×24=48(enumerate).
@@ -94,44 +105,68 @@ _GOLDEN_REPHRASED_TYPE_TOTALS: dict[str, int] = {
 #   (LINEAR-INEQUALITY-SYSTEM 600·QUAD-INEQ-BOUNDARY 200) · transform-expression
 #   (POLYNOMIAL-FACTORING 600).
 _E = ptm.PTYPE_EVALUATE_EXPRESSION
-_GOLDEN_UNIT_TABLE_TYPE_TOTALS: dict[str, dict[str, int]] = {
-    "problem_bank_binomial_distribution_v0": {_E: 300},
-    "problem_bank_calculus1_integral_v0": {_E: 400},
-    "problem_bank_calculus2_trig_integral_v0": {_E: 80},
-    "problem_bank_combination_binomial_v0": {ptm.PTYPE_ENUMERATE_CASES: 56, _E: 65},
-    "problem_bank_complex_number_arithmetic_v0": {_E: 900},
-    "problem_bank_conic_section_focus_v0": {_E: 65},
-    "problem_bank_coordinate_geometry_v0": {_E: 200, ptm.PTYPE_DETERMINE_COEFFICIENT: 200},
-    "problem_bank_discrete_ev_v0": {_E: 200},
-    "problem_bank_elementary_area_measure_v0": {_E: 270},
-    "problem_bank_elementary_division_remainder_v0": {_E: 400},
-    "problem_bank_elementary_gcd_lcm_v0": {_E: 600},
-    "problem_bank_elementary_rounding_v0": {_E: 600},
-    "problem_bank_elementary_v0": {_E: 400},
-    "problem_bank_elementary_volume_measure_v0": {_E: 300},
-    "problem_bank_highschool_quotient_rule_v0": {_E: 200},
-    "problem_bank_linear_inequality_system_v0": {ptm.PTYPE_CONDITION_SATISFACTION: 600},
-    "problem_bank_matrix_ops_v0": {_E: 320},
-    "problem_bank_measurement_unit_conversion_v0": {_E: 180},
-    "problem_bank_middle_function_v0": {_E: 200},
-    "problem_bank_permutation_combination_v0": {ptm.PTYPE_ENUMERATE_CASES: 160},
-    "problem_bank_polynomial_arithmetic_v0": {_E: 1500},
-    "problem_bank_polynomial_factoring_v0": {ptm.PTYPE_TRANSFORM_EXPRESSION: 600},
-    "problem_bank_probability_law_v0": {_E: 724},
-    "problem_bank_quad_ineq_v0": {ptm.PTYPE_CONDITION_SATISFACTION: 200},
-    "problem_bank_radian_conversion_v0": {_E: 144},
-    "problem_bank_sample_mean_distribution_v0": {_E: 400},
-    "problem_bank_sequence_sigma_v0": {_E: 132},
-    "problem_bank_university_calc1_chain_quotient_v0": {_E: 400},
-    "problem_bank_university_calc1_v0": {_E: 200},
-    "problem_bank_vector_operations_v0": {_E: 400},
+# 단일 유형 은행 — 그 유형의 총량 = 은행 전체 문항 수이므로 값은 사실 파일에서 읽는다.
+_UNIT_TABLE_SINGLE_TYPE: dict[str, str] = {
+    "problem_bank_binomial_distribution_v0": _E,
+    "problem_bank_calculus1_integral_v0": _E,
+    "problem_bank_calculus2_trig_integral_v0": _E,
+    "problem_bank_complex_number_arithmetic_v0": _E,
+    "problem_bank_conic_section_focus_v0": _E,
+    "problem_bank_discrete_ev_v0": _E,
+    "problem_bank_elementary_area_measure_v0": _E,
+    "problem_bank_elementary_division_remainder_v0": _E,
+    "problem_bank_elementary_gcd_lcm_v0": _E,
+    "problem_bank_elementary_rounding_v0": _E,
+    "problem_bank_elementary_v0": _E,
+    "problem_bank_elementary_volume_measure_v0": _E,
+    "problem_bank_highschool_quotient_rule_v0": _E,
+    "problem_bank_linear_inequality_system_v0": ptm.PTYPE_CONDITION_SATISFACTION,
+    "problem_bank_matrix_ops_v0": _E,
+    "problem_bank_measurement_unit_conversion_v0": _E,
+    "problem_bank_middle_function_v0": _E,
+    "problem_bank_permutation_combination_v0": ptm.PTYPE_ENUMERATE_CASES,
+    "problem_bank_polynomial_arithmetic_v0": _E,
+    "problem_bank_polynomial_factoring_v0": ptm.PTYPE_TRANSFORM_EXPRESSION,
+    "problem_bank_probability_law_v0": _E,
+    "problem_bank_quad_ineq_v0": ptm.PTYPE_CONDITION_SATISFACTION,
+    "problem_bank_radian_conversion_v0": _E,
+    "problem_bank_sample_mean_distribution_v0": _E,
+    "problem_bank_sequence_sigma_v0": _E,
+    "problem_bank_university_calc1_chain_quotient_v0": _E,
+    "problem_bank_university_calc1_v0": _E,
+    "problem_bank_vector_operations_v0": _E,
 }
-_GOLDEN_UNIT_TABLE_TOTAL = 11396  # CONT-09 실측 — 미태깅이던 문항 수(14,034 − 2,638).
+# 복수 유형 은행 — 유형 분할은 실측 골든이다(사실 파일에 없다).
+_UNIT_TABLE_SPLIT_TYPE_TOTALS: dict[str, dict[str, int]] = {
+    "problem_bank_combination_binomial_v0": {ptm.PTYPE_ENUMERATE_CASES: 56, _E: 65},
+    "problem_bank_coordinate_geometry_v0": {_E: 200, ptm.PTYPE_DETERMINE_COEFFICIENT: 200},
+}
+_GOLDEN_UNIT_TABLE_TYPE_TOTALS: dict[str, dict[str, int]] = dict(
+    sorted(
+        {
+            **{name: {ptype: _bank_total(name)} for name, ptype in _UNIT_TABLE_SINGLE_TYPE.items()},
+            **_UNIT_TABLE_SPLIT_TYPE_TOTALS,
+        }.items()
+    )
+)
+# CONT-09 — 미태깅이던 문항 수 = 표 은행 30종의 전체 문항 수 합(사실 파일 기준).
+_GOLDEN_UNIT_TABLE_TOTAL = sum(_bank_total(name) for name in _GOLDEN_UNIT_TABLE_TYPE_TOTALS)
 
-# 직접 2,217 + 계보 421 = 2,638(S3-27·PB-07) + CONT-09 `unit_codes` 표 11,396 = 14,034.
-# p3_calculus1_diff_v0(504, 자가 태깅)는 `classify_record` 소관이 아니라 이 합계에 없다.
-_GOLDEN_TOTAL_TAGGED = 2638 + _GOLDEN_UNIT_TABLE_TOTAL
-_GOLDEN_LINEAGE_TOTAL = 421  # rephrased_v0 총량(QUAL-02 은퇴 9건 반영 — 429→421)
+# 직접 6종 + 계보(rephrased_v0) (S3-27·PB-07) + CONT-09 `unit_codes` 표 30종.
+# p3_calculus1_diff_v0·p3_fill_v0(자가 태깅)는 `classify_record` 소관이 아니라 이 합계에 없다.
+_GOLDEN_DIRECT_TOTAL = sum(
+    _bank_total(name)
+    for name in (
+        ptm.CORPUS_V1,
+        ptm.CORPUS_GENERATED_V0,
+        ptm.CORPUS_CONCEPTUAL_V0,
+        ptm.CORPUS_KILLER_V0,
+        ptm.CORPUS_MISCONCEPTION_MC_V0,
+        ptm.CORPUS_PROBABILITY_FINITE_V0,
+    )
+)
+_GOLDEN_LINEAGE_TOTAL = _bank_total(ptm.CORPUS_REPHRASED_V0)  # rephrased_v0 총량
+_GOLDEN_TOTAL_TAGGED = _GOLDEN_DIRECT_TOTAL + _GOLDEN_LINEAGE_TOTAL + _GOLDEN_UNIT_TABLE_TOTAL
 
 
 def _load_corpus_lines(name: str) -> list[dict[str, object]]:

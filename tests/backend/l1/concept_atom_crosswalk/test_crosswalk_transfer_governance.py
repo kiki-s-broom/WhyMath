@@ -133,4 +133,5 @@ def test_skill_coverage_lower_bound() -> None:
     assert len(derived) >= 1_300
     assert nonempty >= 1_000
     unique_skills = {s for skills in derived.values() for s in skills}
-    assert len(unique_skills) == _FACTS["skill_graph.skills"]  # 스킬 정본 전부가 최소 한 원자에 닿는다
+    # 스킬 정본 전부가 최소 한 원자에 닿는다.
+    assert len(unique_skills) == _FACTS["skill_graph.skills"]

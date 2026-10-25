@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 from data_pipeline.standards_university.models import (
     UNIV_CODE_PATTERN,
@@ -13,8 +15,16 @@ from data_pipeline.standards_university.models import (
     UNIV_SUBUNIT_PATTERN,
 )
 
-_EXPECTED_STANDARDS = 409
-_EXPECTED_SUBJECTS = 32
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+_EXPECTED_STANDARDS = _FACTS["standards.university"]
+_EXPECTED_SUBJECTS = _FACTS["standards.university_subjects"]
 
 
 def test_corpus_counts(corpus_standards: dict, corpus_links: dict) -> None:

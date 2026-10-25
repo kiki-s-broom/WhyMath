@@ -22,6 +22,12 @@ _PROVENANCE = _REPO_ROOT / "data" / "corpus" / "concept_atom_crosswalk_v1" / "_p
 _CONCEPT_GRAPH = _REPO_ROOT / "data" / "corpus" / "concept_graph_v1" / "graph.json"
 _ATOM_GRAPH = _REPO_ROOT / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 # 커버리지 하한 — #419 behavior_skills 선례(350/437) 수준. 실측 437/437(2026-07-03 유도)이나,
 # 소스 코퍼스 변경 시 재유도로 다소 줄 수 있어 하한은 350으로 동결(대량 유실 회귀 안전판).
 _MIN_MAPPED = 350
@@ -42,11 +48,14 @@ def _atom_codes() -> set[str]:
     return {str(node["code"]) for node in payload["concepts"] if node.get("level") == "세부개념"}
 
 
-def test_full_437_rows_and_sorted() -> None:
-    """437행 전량(구 그래프 개념 수와 동일) + concept_id 사전순·중복 0."""
+def test_full_rows_and_sorted() -> None:
+    """전량(구 그래프 개념 수와 동일) + concept_id 사전순·중복 0.
+
+    기대 행 수는 사실 파일에서 읽는다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+    """
     entries = _entries()
     concept_ids = _concept_ids()
-    assert len(entries) == len(concept_ids) == 437
+    assert len(entries) == len(concept_ids) == _FACTS["concept_atom_crosswalk.entries"]
     ids = [e.concept_id for e in entries]
     assert ids == sorted(ids), "crosswalk.jsonl은 concept_id 사전순이어야 함"
     assert len(set(ids)) == len(ids), "concept_id 중복"
@@ -78,4 +87,8 @@ def test_provenance_records_sources_and_counts() -> None:
     for meta in sources.values():
         assert len(meta["sha256"]) == 64
     counts = payload["counts"]
-    assert counts["entries"] == counts["mapped"] + counts["unmapped"] == 437
+    assert (
+        counts["entries"]
+        == counts["mapped"] + counts["unmapped"]
+        == _FACTS["concept_atom_crosswalk.entries"]
+    )

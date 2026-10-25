@@ -42,7 +42,9 @@ _UNIV_CORPUS = _REPO_ROOT / "data" / "corpus" / "concept_content_university_v1" 
 
 # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
 # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
-_FACTS = json.loads((_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 # 적재 총행 = K-12 콘텐츠 + 대학 콘텐츠(계산식이 드러나게 사실의 합으로 쓴다).
 _EXPECTED_TOTAL = _FACTS["concept_content.k12"] + _FACTS["concept_content.university"]
 
@@ -137,7 +139,10 @@ class TestConceptContentProjectionLoad:
                     ).all()
                     by_scope = {r.scope: r.n for r in scope_rows}
                     assert by_scope.get(CONTENT_SCOPE_K12) == _FACTS["concept_content.k12"]
-                    assert by_scope.get(CONTENT_SCOPE_UNIVERSITY) == _FACTS["concept_content.university"]
+                    assert (
+                        by_scope.get(CONTENT_SCOPE_UNIVERSITY)
+                        == _FACTS["concept_content.university"]
+                    )
 
                     # ② flashcards JSONB·standard_codes TEXT[] 왕복(타입 보존).
                     sample = conn.execute(

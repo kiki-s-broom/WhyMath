@@ -576,7 +576,8 @@ class TestDeriveAtomEntries:
         assert (
             len(canonical) >= floor_canonical
         ), f"canonical {len(canonical)} < 하한 {floor_canonical}(코퍼스 축소 드리프트?)"
-        floor_atoms = _FACTS["atom_graph.atoms_k12"]  # 초·중·고 세부개념 전량(병합 13건 반영 2026-07-28)
+        # 초·중·고 세부개념 전량(병합 13건 반영 2026-07-28).
+        floor_atoms = _FACTS["atom_graph.atoms_k12"]
         assert (
             len(atoms) >= floor_atoms
         ), f"원자 행 {len(atoms)} < 하한 {floor_atoms}(코퍼스 축소 드리프트?)"
@@ -716,7 +717,9 @@ class TestUniversityAtomDerivation:
         assert _REAL_ATOM_GRAPH.exists(), f"실 코퍼스 부재: {_REAL_ATOM_GRAPH}"
         entries = load_kr_curriculum_entries_for_university_atoms(_REAL_ATOM_GRAPH, now=_NOW)
         floor = _FACTS["atom_graph.university_atoms"]
-        assert len(entries) >= floor, f"대학 원자 행 {len(entries)} < 하한 {floor}(코퍼스 축소 드리프트?)"
+        assert (
+            len(entries) >= floor
+        ), f"대학 원자 행 {len(entries)} < 하한 {floor}(코퍼스 축소 드리프트?)"
         # entry_id 유일 + 무접미 `{원자}:KR` 규약 + KR 셀 상수.
         entry_ids = [e.entry_id for e in entries]
         assert len(set(entry_ids)) == len(entry_ids)

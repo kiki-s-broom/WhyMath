@@ -37,7 +37,9 @@ from whymath_backend.schema.enums import is_review_status_cleared
 # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
 # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_FACTS = json.loads((_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 def _problem(**overrides: object) -> dict[str, object]:

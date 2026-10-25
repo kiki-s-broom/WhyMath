@@ -39,7 +39,9 @@ _BACKEND_DIR = _REPO_ROOT / "src" / "backend"
 _CORPUS_ROOT = _REPO_ROOT / "data" / "corpus"
 # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
 # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
-_FACTS = json.loads((_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────

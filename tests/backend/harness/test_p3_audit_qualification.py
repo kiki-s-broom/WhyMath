@@ -35,6 +35,9 @@ _ROOT = Path(__file__).resolve().parents[3]
 _QUAL = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "qualification"
 #: 시험지·1회차 감사 묶음을 만든 은행 v0의 동결 사본 — 현 은행은 생성기 교정으로 바뀔 수 있다.
 _BANK = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "bank_audit" / "audited_bank.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 _M0677_CUT = "f(x)=k의 근의 개수를 그래프와 가로선 y=k의 교점으로 보는 관점을"
 #: 판정자가 시험지·묶음에서 본 오개념 설명 중, 측정 뒤 코퍼스가 정정되어 지금은 달라진 것(오개념 id → 측정
@@ -663,7 +666,7 @@ def test_bank_sheets_partition_the_bank_with_the_blind_field_set() -> None:
     assert [len(s) for s in shards] == [63] * 8
     ids = [r["item_id"] for s in shards for r in s]
     bank_ids = [json.loads(line)["problem_id"] for line in _BANK.read_text("utf-8").splitlines()]
-    assert len(ids) == len(set(ids)) == 504
+    assert len(ids) == len(set(ids)) == 504  # corpus-pin: 시점 고정 — 은행 v0 감사 동결 사본
     assert set(ids) == set(bank_ids)
     blind_keys = list(json.loads((_QUAL / "blind_240.jsonl").read_text("utf-8").splitlines()[0]))
     assert all(list(r) == blind_keys for s in shards for r in s)
@@ -704,6 +707,7 @@ def test_bank_sheets_input_errors(tmp_path: Path, capsys: pytest.CaptureFixture[
 
 # ── 빈 칸 채우기 은행(P3-05) — 같은 프로토콜을 다른 은행에 쓰는 일반화 ─────────────
 _FILL_BANK = _ROOT / "data" / "corpus" / "problem_bank_p3_fill_v0" / "problems.jsonl"
+_FILL_SIZE = _FACTS["problem_bank.p3_fill_v0"]  # 현 은행(동결 사본이 아니다)의 문항 수
 
 
 def _fill_rows() -> list[dict[str, Any]]:
@@ -726,7 +730,7 @@ def test_generator_is_resolved_by_unit_code_not_by_standard_code() -> None:
 
 
 def test_machine_gates_pass_every_row_of_the_fill_bank() -> None:
-    """빈 칸 채우기 은행 204건에 기계 게이트 전부가 결함을 걸지 않는다(회귀 동결 — 1회차 감사 전 정리)."""
+    """빈 칸 채우기 은행 전건에 기계 게이트 전부가 결함을 걸지 않는다(회귀 동결 — 1회차 감사 전 정리)."""
     flagged = [
         (row["problem_id"], qual.machine_label(row, row["problem_id"])["reasons"])
         for row in _fill_rows()
@@ -748,18 +752,18 @@ def test_bank_sheets_take_an_explicit_size_task_and_label() -> None:
         _FILL_BANK,
         qual.BANK_AUDIT_SEED,
         4,
-        expected_size=204,
+        expected_size=_FILL_SIZE,
         task="P3-05-triangle-density",
         bank_label="data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
     )
     shards = [[json.loads(line) for line in text.splitlines()] for text in sheets.shards]
-    assert [len(s) for s in shards] == [51] * 4
+    assert [len(s) for s in shards] == [_FILL_SIZE // 4] * 4
     ids = [r["item_id"] for s in shards for r in s]
-    assert len(ids) == len(set(ids)) == 204
+    assert len(ids) == len(set(ids)) == _FILL_SIZE
     manifest = json.loads(sheets.manifest)
     assert manifest["task"] == "P3-05-triangle-density"
     assert manifest["bank"] == "data/corpus/problem_bank_p3_fill_v0/problems.jsonl"
-    assert manifest["n_items"] == 204 and manifest["shard_size"] == 51
+    assert manifest["n_items"] == _FILL_SIZE and manifest["shard_size"] == _FILL_SIZE // 4
     with pytest.raises(qual.QualificationInputError, match="기준 504건"):
         qual.build_bank_sheets(_FILL_BANK, qual.BANK_AUDIT_SEED, 4)  # 기본 기준은 P3-03 은행 504건
     default = json.loads(qual.build_bank_sheets(_BANK, qual.BANK_AUDIT_SEED, 8).manifest)
@@ -784,7 +788,7 @@ def test_s5_takes_an_explicit_bank_size_and_label(tmp_path: Path) -> None:
                 "--llm", str(a),
                 "--llm", str(b),
                 "--qualification", str(good),
-                "--expected-size", "204",
+                "--expected-size", str(_FILL_SIZE),
                 "--label", "P3-05 빈 칸 채우기 은행",
             ]
         )  # fmt: skip

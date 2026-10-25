@@ -33,12 +33,12 @@ from whymath_backend.l3.equivalent.p3_diff_text_scanner import (
     undefined_function_defects,
 )
 
-_BANK = (
-    Path(__file__).resolve().parents[4]
-    / "data"
-    / "corpus"
-    / "problem_bank_p3_calculus1_diff_v0"
-    / "problems.jsonl"
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_BANK = _REPO_ROOT / "data" / "corpus" / "problem_bank_p3_calculus1_diff_v0" / "problems.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
 )
 
 
@@ -56,7 +56,7 @@ def _texts(row: dict[str, object]) -> list[str]:
 
 
 def test_bank_has_no_josa_or_notation_defects(rows: list[dict[str, object]]) -> None:
-    assert len(rows) == 504
+    assert len(rows) == _FACTS["problem_bank.p3_calculus1_diff_v0"]
     found = [
         (str(row["problem_id"])[:8], kind, ctx)
         for row in rows

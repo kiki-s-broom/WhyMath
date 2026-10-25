@@ -8,8 +8,10 @@ SET하고, 어디에도 시크릿이 없음을 *주입 FAKE*로 검증한다. nc
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -24,6 +26,14 @@ from data_pipeline.concept_graph.load import (
 )
 from data_pipeline.concept_graph.models import Concept, ConceptEdge
 from data_pipeline.concept_graph.transform import TransformResult, transform_dataset
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -259,20 +269,20 @@ class TestNoSecretsNoRedactedFields:
 # 실데이터(403/541) — 정형화 산출을 그대로 적재
 # ──────────────────────────────────────────────────────────────────────
 class TestRealCorpus:
-    def test_loads_437_nodes_581_edges(
+    def test_loads_all_nodes_and_edges(
         self,
         concept_records: list[dict[str, object]],
         edge_records: list[dict[str, object]],
     ) -> None:
-        """실데이터 정형화 → 적재: 노드 437·엣지 581 MERGE(전 엣지 prerequisite)."""
+        """실데이터 정형화 → 적재: 전 노드·전 엣지 MERGE(전 엣지 prerequisite · 건수는 사실 파일)."""
         result = transform_dataset(
             concept_records=concept_records,
             edge_records=edge_records,
         )
         driver = _FakeDriver()
         report = load_graph(result, driver=driver)
-        assert report.nodes_merged == 437
-        assert report.edges_merged == 581
+        assert report.nodes_merged == _FACTS["concept_graph.concepts"]
+        assert report.edges_merged == _FACTS["concept_graph.edges"]
         assert report.edges_skipped == 0
         # 모든 엣지 reltype은 PREREQUISITE(데이터셋 단일 관계)
         for call in _edge_calls(driver.calls):
@@ -283,12 +293,12 @@ class TestRealCorpus:
         concept_records: list[dict[str, object]],
         edge_records: list[dict[str, object]],
     ) -> None:
-        """437 노드 MERGE의 concept_id가 모두 유일(concept_id 매핑 충돌 0 — 슬1 보장)."""
+        """전 노드 MERGE의 concept_id가 모두 유일(concept_id 매핑 충돌 0 — 슬1 보장)."""
         result = transform_dataset(concept_records=concept_records, edge_records=edge_records)
         driver = _FakeDriver()
         load_graph(result, driver=driver)
         ids = [c.params["concept_id"] for c in _node_calls(driver.calls)]
-        assert len(ids) == len(set(ids)) == 437
+        assert len(ids) == len(set(ids)) == _FACTS["concept_graph.concepts"]
 
 
 # ──────────────────────────────────────────────────────────────────────

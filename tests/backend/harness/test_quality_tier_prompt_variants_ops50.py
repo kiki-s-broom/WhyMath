@@ -29,6 +29,8 @@ _AUDIT = (
     / "audit"
     / "ops-48-moe-accuracy-battle-20260822_232452.jsonl"
 )
+# 출력 토큰 상한(num_predict) — 가짜 응답이 이 값에 닿으면 절단으로 본다.
+_NUM_PREDICT = 512  # corpus-pin: 코퍼스 무관 — 출력 토큰 상한
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -211,11 +213,14 @@ def test_few_shot_example_is_not_in_the_seeded_test_set() -> None:
 # 원인 기록 — failure_kind
 # ──────────────────────────────────────────────────────────────────────────
 def test_classify_failure_separates_causes() -> None:
-    assert qb._classify_failure("", 30, 512) == "empty"
-    assert qb._classify_failure('{"has_defect": true, "reason": "끊긴', 512, 512) == "truncated"
-    assert qb._classify_failure("JSON 아님", 30, 512) == "malformed"
+    assert qb._classify_failure("", 30, _NUM_PREDICT) == "empty"
+    assert (
+        qb._classify_failure('{"has_defect": true, "reason": "끊긴', _NUM_PREDICT, _NUM_PREDICT)
+        == "truncated"
+    )
+    assert qb._classify_failure("JSON 아님", 30, _NUM_PREDICT) == "malformed"
     # 상한을 모르면(None) 절단이라 단정하지 않는다.
-    assert qb._classify_failure("{끊긴", 512, None) == "malformed"
+    assert qb._classify_failure("{끊긴", _NUM_PREDICT, None) == "malformed"
 
 
 def _run(responder: Any, **kwargs: Any) -> list[qb.ModelOutcome]:
@@ -233,7 +238,9 @@ def _run(responder: Any, **kwargs: Any) -> list[qb.ModelOutcome]:
 
 def test_truncated_response_is_recorded_with_cause() -> None:
     out = _run(
-        lambda _k: _FakeResponse('{"has_defect": true, "reason": "정답이 맞으나, 해설에서', 512)
+        lambda _k: _FakeResponse(
+            '{"has_defect": true, "reason": "정답이 맞으나, 해설에서', _NUM_PREDICT
+        )
     )
     assert all(not o.parsed and o.failure_kind == "truncated" for o in out)
     report = qb._summarize("fake", out)
@@ -422,7 +429,7 @@ def _half_unresolved_clean_client(items: list[Any]) -> _FakeOllamaClient:
         if truth[slug]:
             return _FakeResponse(f'{{"has_defect": true, "defect_class": "{truth[slug]}"}}')
         if slug in cut:
-            return _FakeResponse('{"has_defect": true, "reason": "끊긴', 512)
+            return _FakeResponse('{"has_defect": true, "reason": "끊긴', _NUM_PREDICT)
         return _FakeResponse('{"has_defect": false}')
 
     return _FakeOllamaClient(responder)

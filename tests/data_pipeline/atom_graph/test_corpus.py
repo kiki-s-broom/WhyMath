@@ -40,7 +40,10 @@ class TestCorpusCounts:
         )  # KG-09 v3 재생성: 서술형 1007 → 973(원자ID 직접 정규화 3·중복 정리 31)
 
     def test_university_atoms(self, corpus_provenance: dict[str, object]) -> None:
-        assert corpus_provenance["school_level_university_atoms"] == _FACTS["atom_graph.university_atoms"]
+        assert (
+            corpus_provenance["school_level_university_atoms"]
+            == _FACTS["atom_graph.university_atoms"]
+        )
 
     def test_normalization_counts(self, corpus_provenance: dict[str, object]) -> None:
         nc = corpus_provenance["normalization_counts"]  # type: ignore[index]
