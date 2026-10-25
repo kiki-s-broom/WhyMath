@@ -227,6 +227,7 @@ def _defined_numeric_roots(
     roots: list[float],
     answer_val: float,
     tol: float,
+    step: float,
 ) -> list[float] | None:
     """수치 근 중 원문에서 정의되는 근만(P3-79). 판정 불가 근이 하나라도 있으면 None.
 
@@ -234,8 +235,10 @@ def _defined_numeric_roots(
     그 근의 점(`_root_point` — 정확값으로 맞춰지면 정확값, 아니면 50자리 근사 소수)에서
     `condition_definedness` 를 본다. 무연근은 자동 약분된 분모의 영점이라 다듬기가 그 점(정확값
     2 등)으로 수렴해 정의되지 않음으로 버려지고, 정확값으로 못 맞춘 근이 영점에 가까우면
-    정의됨으로 부르지 않아 판정 불가가 된다.
+    정의됨으로 부르지 않아 판정 불가가 된다. `step` 은 탐색 격자 간격 — 무연근 군집 확인 창의
+    하한을 정한다(`_isolation_min_window`).
     """
+    min_window = _isolation_min_window(step)
     kept: list[float] = []
     for root in roots:
         if abs(root - answer_val) <= tol * 100:
@@ -245,7 +248,9 @@ def _defined_numeric_roots(
         state = condition_definedness(conditions, {str(symbol): point})
         if state == "unknown":
             return None
-        if state == "undefined" and not _isolated_exact_root(residual, symbol, point, root):
+        if state == "undefined" and not _isolated_exact_root(
+            residual, symbol, point, root, min_window
+        ):
             # P3-79 재검토 P3-1 — 수치 근이 무연근 정확값으로 맞춰졌는데 그 근방(군집)에 다른 근이
             # 숨어 있을 수 있다(`x*(x-2)**2*(x - 2 - 3*10**(-8))/(x-2)` 의 진짜 근 2 + 3e-8). 그
             # 군집을 통째로 버리면 진짜 근이 사라져 거짓 pass 가 난다 — 판정 불가로 닫는다.
@@ -259,10 +264,32 @@ def _defined_numeric_roots(
 _ISOLATION_FACTOR = 100
 _ISOLATION_MIN_WINDOW = sympy.Rational(1, 10**5)
 _ISOLATION_MAX_ORDER = 8
+# 창 하한 = 탐색 격자 간격의 이 배수(P3-83). 수치 탐색은 한 격자 칸 안(또는 이웃 두 칸)에 든 두 근을
+# 부호 변화로 나누지 못하고 하나로 합친다 — 합쳐진 두 근의 최대 간격을 순중복도 1·2, 격자 위 무연근
+# 위치 60곳, 간격 0.05~1.65 격자로 쟀더니 순중복도 1 은 0.95배, 2 는 1.6배(기본 격자 0.01 에서
+# 0.016)였다(`test_fuzz_isolation_window_covers_numeric_merge_radius` 가 같은 측정을 줄여 다시
+# 한다). 종전 하한(1e-5)은 이보다 천 배 좁아, 무연근과 2e-5~3e-3 떨어진 참 근이 무연근 군집으로
+# 취급돼 버려졌다(거짓 pass). 2배면 실측 합쳐짐 반경을 덮고 여유가 있다.
+_ISOLATION_GRID_STEPS = 2
+
+
+def _isolation_min_window(step: float) -> sympy.Expr | None:
+    """군집 확인 창의 하한(P3-83) — 종전 절대 하한과 격자 간격의 `_ISOLATION_GRID_STEPS` 배 중 큼.
+
+    격자 간격이 유한한 양수가 아니면(0·음수·NaN·무한) 창을 정할 수 없다 — None(모른다)을 돌려주고
+    `_isolated_exact_root` 가 이를 '고립을 확인하지 못함'으로 닫는다(종전 하한으로 돌아가지 않는다).
+    """
+    if not (math.isfinite(step) and step > 0):
+        return None
+    return max(_ISOLATION_MIN_WINDOW, sympy.Rational(repr(step * _ISOLATION_GRID_STEPS)))
 
 
 def _isolated_exact_root(
-    residual: sympy.Expr, symbol: sympy.Symbol, point: sympy.Expr, root: float
+    residual: sympy.Expr,
+    symbol: sympy.Symbol,
+    point: sympy.Expr,
+    root: float,
+    min_window: sympy.Expr | None,
 ) -> bool:
     """정확값 `point` 가 잔차의 근이고, 그 근방에 다른 근이 없다고 확인되는가(P3-79 재검토 P3-1).
 
@@ -271,7 +298,7 @@ def _isolated_exact_root(
     본다. 다른 근이 창 안에 있으면 g(point) 가 그만큼 작아 양 끝 값이 크게 벗어난다. 확인하지
     못하면(중복도·0 여부 미정·평가 불가) False — 호출부가 판정 불가로 닫는다.
     """
-    if point.free_symbols or point.has(sympy.Float):
+    if min_window is None or point.free_symbols or point.has(sympy.Float):
         return False
     try:
         derivative = residual
@@ -290,12 +317,17 @@ def _isolated_exact_root(
         if lead is None:
             return False
         offset = sympy.Rational(abs(root - float(sympy.N(point, 30))))
-        window = max(offset * _ISOLATION_FACTOR, _ISOLATION_MIN_WINDOW)
-        reference = abs(complex(sympy.N(lead, 30)))
+        window = max(offset * _ISOLATION_FACTOR, min_window)
+        lead_value = complex(sympy.N(lead, 30))
+        reference = abs(lead_value)
         for sign in (1, -1):
             edge = point + sign * window
-            value = residual.subs(symbol, edge) / (sign * window) ** order
-            if abs(complex(sympy.N(value, 30)) - complex(sympy.N(lead, 30))) > reference / 2:
+            value = complex(sympy.N(residual.subs(symbol, edge) / (sign * window) ** order, 30))
+            # 창 끝이 잔차의 극점이면 값이 zoo/NaN 이다 — NaN 은 아래 비교를 늘 False 로 만들어
+            # '벗어나지 않음'(고립됨)으로 접히므로 먼저 거른다(P3-83 — 모른다 ≠ 아니다).
+            if not (math.isfinite(value.real) and math.isfinite(value.imag)):
+                return False
+            if abs(value - lead_value) > reference / 2:
                 return False
     except Exception as exc:  # noqa: BLE001 — 확인 불가는 False(판정 불가로 닫는다)
         logger.debug("counterexample_fuzz 무연근 군집 확인 회피: %s", type(exc).__name__)
@@ -394,7 +426,9 @@ def fuzz_answer(
     # ② 근 선택이 옳은가 — largest/smallest/unique. 선택 판정에 쓰는 다른 근도 원문에서 정의되는
     # 근만이다(P3-79 — 무연근이 '더 큰 근'·'둘째 근'으로 거짓 반례를 만들지 않게).
     if answer_selection in ("largest", "smallest", "unique"):
-        defined_roots = _defined_numeric_roots(conditions, residual, symbol, roots, answer_val, tol)
+        defined_roots = _defined_numeric_roots(
+            conditions, residual, symbol, roots, answer_val, tol, (2.0 * radius) / (trials - 1)
+        )
         if defined_roots is None:
             return FuzzVerdict(
                 "unverifiable",

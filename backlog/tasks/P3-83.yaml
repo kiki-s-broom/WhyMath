@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/equivalent/counterexample_fuzz.py
   - src/backend/whymath_backend/l3/verify_answer.py
-session: null
+session: claude/p3-83-fuzz-cluster
 notes: "P3-79(#1722) 2차 독립 재리뷰(머지 가능)가 남긴 잔여 P3 3건의 후속. 코퍼스 영향은 0건이고 모두 꾸민 입력이거나 테스트 동결 누락이다. ①이 거짓 pass라 가장 먼저 한다."
-updated: 2026-10-22
+updated: 2026-10-25
