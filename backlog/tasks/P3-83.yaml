@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -13,14 +13,17 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① fuzz 무연근 군집 확인 창 확대(거짓 pass): `counterexample_fuzz._isolated_exact_root`의 창 하한 1e-5가 수치 근 병합 반경(약 1e-3)보다 좁아, 홀 차수가 높고 참 근이 무연근에서 2e-5~3e-3 떨어진 식에서 거짓 pass가 난다(P3-79 2차 재리뷰 실측). 재현: `fuzz_answer(\"x*(x-2)**2*(x - 2 + 5*10**(-5))/(x-2) = 0\", {\"x\":\"0\"}, \"largest\")`이 pass(참 근은 0과 1.99995라 fail이어야 함), `x*(x-2)**3*(x-2-3*10**(-3))/(x-2)**2 = 0`도 같다. 520건 격자(홀 중복도 5종 × 간격 ±1e-9~1e-3)에서 PR 20건·main 0건. 창 하한을 병합 반경 이상으로 넓히거나, 병합 반경 안이면 판정 불가로 닫는다. 격자 520건을 거짓 pass 0으로 고정한다.\n② 성능: 제거 가능 특이점이 붙은 4차 대수 계수식 `(x**4 + 3*x**3 - 7*sqrt(5)*x**2 + 11*x - 13)*(x-1)/(x-1) = 0`에서 `verify_real_root_count`·`verify_root_aggregate`가 60초 넘게(15분 이상 확인) 돈다(main 1.5s·0.26s). 원인은 근별 원문 정의역 확인(`condition_definedness`)이 4차 대수적 수 위에서 `is_zero`를 돌려 `minimal_polynomial` 연산으로 가는 것. 항별 시간·크기 예산을 두거나 4차 이상 대수 계수는 판정 불가로 닫는다. 오프라인 배치(`root_aggregate_batch`·`corpus_reverify`)에 시간 상한이 없는지 먼저 확인한다.\n③ 테스트 동결: `_isolated_exact_root`의 fail-closed 분기 3곳(예외 · 도함수 0 여부 미정 · 중복도 8 초과)에서 반환값을 True로 뒤집는 뮤테이션 X5·X6·X7이 생존했다. 각 분기의 반례(예: `x*(x-2)**10*(x-2-3*10**(-8))/(x-2)`)를 픽스처로 넣고 git archive 사본에서 RED를 확인한다(주입 적용·원복 sha256 단언 포함).\n④ 회귀: 전 은행 14,742건 × 25필드 판정이 P3-79 머지본과 같다(변화 0건)."
-artifacts: []
+artifacts:
+  - "#1733"
 paths:
   - src/backend/whymath_backend/l3/equivalent/counterexample_fuzz.py
   - src/backend/whymath_backend/l3/verify_answer.py
   - tests/backend/l3/test_verify_answer_sibling_spurious.py
-session: claude/p3-83-fuzz-cluster
+session: null
 notes: |-
   P3-79(#1722) 2차 독립 재리뷰(머지 가능)가 남긴 잔여 P3 3건의 후속. 코퍼스 영향은 0건이고 모두 꾸민 입력이거나 테스트 동결 누락이다. ①이 거짓 pass라 가장 먼저 한다.
 
   [정정 2026-10-25] paths ['src/backend/whymath_backend/l3/equivalent/counterexample_fuzz.py', 'src/backend/whymath_backend/l3/verify_answer.py'] → ['src/backend/whymath_backend/l3/equivalent/counterexample_fuzz.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'tests/backend/l3/test_verify_answer_sibling_spurious.py']: 변경된 테스트 파일을 작업 경로에 반영 (P3-83 리뷰 P3-E)
+
+  [미러 면제 2026-10-25] 원장 전용 PR — 코드는 #1733에서 CI(backend 포함)로 검증됨
 updated: 2026-10-25
