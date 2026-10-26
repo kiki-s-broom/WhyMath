@@ -44,6 +44,13 @@ primary LLM 정책)에 전달되지 않았다** — 정책이 받는 것은 학�
 차단 장치가 아니다** — 정책은 `PROMPT_KEY_SLOTS` 4키와 가설만 슬롯으로 매핑하므로, 누가 θ를 다른
 키로 프롬프트에 넣어도 이 검증자는 런타임에 발동하지 않는다. 전송 차단의 집행은 ① θ·숙달을 담을
 필드가 없는 요약 타입 ② 렌더된 프롬프트 요약의 키 트리 허용 목록·값 감시 테스트(⑥ 동결)다.
+
+**P3-73 — Langfuse 기록.** 튜터를 부른 턴마다 같은 매니페스트의 구성 요약(슬롯 이름·resolved·전달
+경로·크기·원인 코드 — 값 0)을 Langfuse 이벤트 `tutor_context`로 남긴다(`record_tutor_context`).
+이벤트명을 `l3_routing`과 다르게 두는 이유: 비용 판독(`ops/cost_report.py`)은 `l3_routing`
+이름으로만 조회하므로 같은 이름이면 비용 게이트② 표본에 섞인다. 기록 필드의 이름 목록(누락·미전달·
+커버리지 공백)은 관측 레코드(`context_*`)와 같은 매니페스트 메서드에서 나온다 — 인프로세스 레코드와
+Langfuse의 이중 회계이며, Langfuse가 죽어도 레코드 쪽은 남는다.
 """
 
 from __future__ import annotations
@@ -55,6 +62,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from whymath_backend.l3.interfaces import NamedEventSink, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.schema.pedagogy_pack import PedagogyPack
 
@@ -63,6 +71,7 @@ __all__ = [
     "PROMPT_FORBIDDEN_SLOTS",
     "PROMPT_KEY_SLOTS",
     "SYSTEM_DEFECT_CAUSES",
+    "TUTOR_CONTEXT_EVENT_NAME",
     "AbsenceCause",
     "ConceptBrief",
     "PackBrief",
@@ -77,6 +86,8 @@ __all__ = [
     "build_tutor_content_summary",
     "build_tutor_context_manifest",
     "log_tutor_context",
+    "record_tutor_context",
+    "tutor_context_trace_fields",
 ]
 
 logger = logging.getLogger("whymath.harness.wh1_tutor_context")
@@ -617,3 +628,73 @@ def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
         len(manifest.prompt_names()),
         " ".join(manifest.prompt_names()) or "-",
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-73 — 튜터 context 구성 요약의 Langfuse 기록(이벤트 `tutor_context` · 값 0)
+# ──────────────────────────────────────────────────────────────────────────
+TUTOR_CONTEXT_EVENT_NAME = "tutor_context"
+"""Langfuse 이벤트명 — `l3_routing`(비용 판독 조회 키)과 달라야 한다(테스트가 동결)."""
+
+
+def tutor_context_trace_fields(manifest: TutorContextManifest, *, seat: str) -> dict[str, object]:
+    """매니페스트 → Langfuse 이벤트 필드(순수 함수). 슬롯 *이름*·판정·크기·원인 코드만 — 값은 없다.
+
+    크기(`size`)는 응답 `tutor_context`에 이미 실리는 그 값이다(축 수·스킬 수·단계 수·가설 수 —
+    학생 답안은 null). 이름 목록 세 개(`context_missing`·`context_not_delivered`·
+    `context_coverage_gap`)는 관측 레코드의 같은 이름 필드와 **같은 메서드**에서 나온다(이중 회계).
+    """
+    return {
+        "seat": seat,
+        "tutor_invoked": manifest.tutor_invoked,
+        "complete": manifest.complete,
+        "slots": [
+            {
+                "slot": s.slot.value,
+                "resolved": s.resolved,
+                "delivered_to_tutor": s.delivered_to_tutor,
+                "delivery_paths": [p.value for p in s.delivery_paths],
+                "size": s.size,
+                "cause": s.cause.value if s.cause is not None else None,
+            }
+            for s in manifest.slots
+        ],
+        "context_missing": manifest.missing_names(),
+        "context_not_delivered": manifest.not_delivered_names(),
+        "context_coverage_gap": manifest.coverage_gap_names(),
+        "context_prompt": manifest.prompt_names(),
+        "context_held_privately": manifest.held_privately_names(),
+    }
+
+
+def record_tutor_context(
+    trace: TraceSink | None, manifest: TutorContextManifest, *, seat: str
+) -> bool:
+    """튜터 context 구성 요약을 Langfuse 이벤트 `tutor_context`로 남긴다 — never-break.
+
+    반환: 기록을 싱크에 넘겼으면 True, 넘기지 않았으면 False(호출부·테스트가 읽는다).
+
+    - 싱크가 없으면(`trace=None` — 앱 state 미구성) 기록 0·로그 없음(설정 부재는 결함이 아니다).
+    - 싱크가 이름 있는 이벤트를 못 받으면(`NamedEventSink` 미충족) 기록 0 + WARNING(싱크 타입명) —
+      `record()`로 대신 보내지 않는다(그러면 `l3_routing` 비용 표본이 오염된다).
+    - 필드 조립·전송 중 예외는 삼키고 **예외 타입명**을 WARNING으로 남긴다(침묵 실패 금지) — 관측
+      장애가 학생 응답을 깨지 않는다(우선순위 #1 ≫ #6).
+    """
+    if trace is None:
+        return False
+    if not isinstance(trace, NamedEventSink):
+        logger.warning(
+            "튜터 context Langfuse 기록 생략 — 싱크(%s)가 이름 있는 이벤트를 받지 않는다",
+            type(trace).__name__,
+        )
+        return False
+    try:
+        trace.record_event(
+            TUTOR_CONTEXT_EVENT_NAME, tutor_context_trace_fields(manifest, seat=seat)
+        )
+    except Exception as exc:  # noqa: BLE001 — 관측 실패가 학생 응답을 깨면 안 된다.
+        logger.warning(
+            "튜터 context Langfuse 기록 실패(%s) — 무시하고 계속(응답 비차단)", type(exc).__name__
+        )
+        return False
+    return True

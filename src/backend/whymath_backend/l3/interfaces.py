@@ -114,6 +114,20 @@ class TraceSink(Protocol):
         ...
 
 
+@runtime_checkable
+class NamedEventSink(Protocol):
+    """이벤트명을 고를 수 있는 관측 싱크(P3-73) — `TraceSink.record`는 `l3_routing` 고정이다.
+
+    라우팅 결정이 아닌 기록(튜터 context 구성 요약 등)을 비용 판독 표본(`l3_routing`)과 섞지 않고
+    **자기 이름**으로 남길 때 쓴다. 이 능력이 없는 싱크에는 그런 기록을 보내지 않는다(호출부가
+    `isinstance(trace, NamedEventSink)`로 가린다).
+    """
+
+    def record_event(self, name: str, fields: dict[str, object]) -> None:
+        """이름 있는 관측 이벤트 1건 기록."""
+        ...
+
+
 class TrafficSurface(str, Enum):
     """trace 표면 표지 — 이 호출이 **누구를 위한 트래픽인가**(OPS-84 ③ → OPS-105 일반화).
 
@@ -188,6 +202,12 @@ class SurfaceTaggingTraceSink:
         """표지를 싣고(먼저 실린 표지 우선) 안쪽 싱크에 기록한다."""
         self._inner.record(with_traffic_surface(fields, self._surface))
 
+    def record_event(self, name: str, fields: dict[str, object]) -> None:
+        """안쪽 싱크가 이름 있는 이벤트를 받으면 표지를 실어 위임한다(못 받으면 기록 0)."""
+        inner = self._inner
+        if isinstance(inner, NamedEventSink):
+            inner.record_event(name, with_traffic_surface(fields, self._surface))
+
     def flush(self) -> None:
         """안쪽 싱크가 `flush`를 노출하면 위임한다."""
         flush = getattr(self._inner, "flush", None)
@@ -239,7 +259,13 @@ class RecordingTraceSink:
 
     def __init__(self) -> None:
         self.records: list[dict[str, object]] = []
+        # P3-73: 이름 있는 이벤트는 `records`(= l3_routing)와 따로 보관한다 — 섞이면 표본 오염.
+        self.named_events: list[tuple[str, dict[str, object]]] = []
 
     def record(self, fields: dict[str, object]) -> None:
         """태그 dict를 보관."""
         self.records.append(fields)
+
+    def record_event(self, name: str, fields: dict[str, object]) -> None:
+        """이름 있는 이벤트를 `named_events`에 보관(NamedEventSink)."""
+        self.named_events.append((name, fields))

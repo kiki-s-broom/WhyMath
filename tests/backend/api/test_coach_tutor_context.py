@@ -166,8 +166,9 @@ class _Session:
 _SESSIONS: list[_Session] = []
 
 
-def _client(preload: dict[Any, Any] | None = None) -> TestClient:
-    app = create_app()
+def _client(preload: dict[Any, Any] | None = None, trace: Any = None) -> TestClient:
+    # P3-73: trace를 넘기면 앱 공유 싱크로 쓴다(None이면 기존과 같은 기본 LangfuseSink — 키 없음·no-op).
+    app = create_app(trace=trace)
     app.dependency_overrides[get_consented_user] = lambda: UserProfile.from_schema(
         UserProfileSchema(user_id=_UID, persona_primary=Persona.A_일반고고3)
     )
@@ -350,9 +351,9 @@ def _body(**over: Any) -> dict[str, Any]:
     return {k: v for k, v in body.items() if v is not None}
 
 
-def _post(path: str, body: dict[str, Any]) -> Any:
+def _post(path: str, body: dict[str, Any], trace: Any = None) -> Any:
     if path == "create":
-        return _client().post("/v1/coach/sessions", json=body)
+        return _client(trace=trace).post("/v1/coach/sessions", json=body)
     did = uuid.uuid4()
     problem_id = uuid.UUID(body["problem_id"]) if "problem_id" in body else None
     dialogue = DialogueORM.from_schema(
@@ -366,7 +367,7 @@ def _post(path: str, body: dict[str, Any]) -> Any:
         )
     )
     turn_body = {k: v for k, v in body.items() if k != "problem_id"}
-    return _client({(DialogueORM, did): dialogue}).post(
+    return _client({(DialogueORM, did): dialogue}, trace=trace).post(
         f"/v1/coach/sessions/{did}/turns", json=turn_body
     )
 
@@ -1096,3 +1097,67 @@ def test_client_mastery_values_leave_tutor_prompt_byte_identical(
     novice = _tutor_strings(monkeypatch, path, _Fill(), _body(mastery_level="초보"))
     master = _tutor_strings(monkeypatch, path, _Fill(), _body(mastery_level="숙달"))
     assert novice == master
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-73 — 서빙 경로가 튜터 context 구성 요약을 Langfuse `tutor_context`로 실제로 남기는가
+# ──────────────────────────────────────────────────────────────────────────
+_SEATS = {"create": "coach.create_session", "append": "coach.append_turns"}
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_invoked_turn_records_one_tutor_context_event_matching_response(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    from whymath_backend.harness.wh1_tutor_context import (
+        TUTOR_CONTEXT_EVENT_NAME,
+        tutor_context_trace_fields,
+    )
+    from whymath_backend.l3.interfaces import RecordingTraceSink
+
+    fill = _Fill()
+    fill.theta = None  # 누락 1건을 넣어 요약이 대조군과 다르게 보이게 한다
+    _install(monkeypatch, fill)
+    sink = RecordingTraceSink()
+    resp = _post(path, _body(), trace=sink)
+    assert resp.status_code == 201, resp.text
+    named = [(n, f) for n, f in sink.named_events if n == TUTOR_CONTEXT_EVENT_NAME]
+    assert len(named) == 1, sink.named_events
+    final = TutorContextManifest.model_validate(resp.json()["tutor_context"])
+    assert named[0][1] == tutor_context_trace_fields(final, seat=_SEATS[path])
+    assert named[0][1]["context_missing"] == ["learner_state"]
+    # 비용 표본(l3_routing 기록)에는 튜터 context 요약이 섞이지 않는다.
+    assert not any("context_missing" in r for r in sink.records)
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_not_invoked_turn_records_no_tutor_context_event(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    from whymath_backend.l3.interfaces import RecordingTraceSink
+
+    _install(monkeypatch, _Fill())
+    _set_flag(monkeypatch, "wh1_primary_enabled", False)
+    sink = RecordingTraceSink()
+    resp = _post(path, _body(), trace=sink)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["tutor_context"]["tutor_invoked"] is False
+    assert sink.named_events == []
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_langfuse_outage_does_not_break_the_turn(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
+) -> None:
+    class _Down:
+        def record(self, fields: dict[str, object]) -> None:
+            return None
+
+        def record_event(self, name: str, fields: dict[str, object]) -> None:
+            raise ConnectionRefusedError
+
+    _install(monkeypatch, _Fill())
+    with caplog.at_level(logging.WARNING, logger=_CTX_LOGGER):
+        resp = _post(path, _body(), trace=_Down())
+    assert resp.status_code == 201, resp.text
+    assert any("ConnectionRefusedError" in r.getMessage() for r in _ctx_lines(caplog))
