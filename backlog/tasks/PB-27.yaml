@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,10 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 결정(Kiki) — 전 은행 prod 적재 시 후보 조회를 ⓐ 후보 캐시(전량 1회 조회 후 변경 시만 재조회 · 게이팅 단일 게이트 규칙 유지 · 내린 문항이 캐시 수명만큼 노출될 위험) ⓑ SQL 사전 축소(과목·단원 키 · 설계 규칙 개정 필요) 중 하나로 정한다. 근거 실측은 docs/architecture/problem_bank_candidate_fetch_limit_pb25.md(전량 무제한 조회 3.95초·주입 포함 4.9~6.2초·게이팅 메모리 2~42ms)\n② 구현 — 결정안을 api/gating.py에 넣고, 전 은행 적재 로컬 DB에서 학생 6개 모드 요청 지연·후보 전수 진입을 실측한다. ⓐ면 무효화 신호가 PB-26(created_at·updated_at 복원)에 기대므로 depends_on으로 건다\n③ 회귀 테스트 — 상한보다 많은 행이 있을 때 특정 은행·문항이 후보에서 고정적으로 빠지지 않음을 고정(PB-25 ⑤ 승계) · ⓐ면 문항 내림·수정이 캐시 수명 안에 반영되는지 대조군 포함\n④ 정리 — api/me.py `_BLUEPRINT_CANDIDATE_FETCH_LIMIT`(정의만 있고 미사용) 제거 · 전량 적재 런북(docs/ops/lic03_provenance_restore_runbook.md)에 'PB-27 착지 전 --all 금지' 선행 조건 표기\n⑤ prod에 문제은행 일부만 적재된 상태(39개 중 소수 · 1,703건)가 의도인지 Kiki 확인 — 의도면 그 범위를 데이터 카드에 적고, 아니면 전량 적재 게이트를 등재"
-artifacts: []
+  - "⑥ 결정 기록(Kiki 2026-10-26) — ⓐ·ⓑ가 아니라 ⓒ \"검수 승인 문항만 DB에서 미리 읽기\"로 정했다. 근거: 모든 모드·청사진의 L6 게이트가 검수 미통과를 무조건 거르므로 사전 축소가 결과를 바꾸지 않는다 · 격리(`api/admin_bff.py`)는 `updated_at`을 갱신하지 않아 캐시(ⓐ) 신선도로 잡히지 않는다 · 과목·단원 축소(ⓑ)는 판정 원천을 둘로 만든다. 따라서 ②의 'ⓐ면 PB-26 depends_on'은 해당 없음. ⑤(prod 일부 적재 의도 확인)는 Kiki 결정이 필요해 PB-28로 승계한다"
+artifacts:
+  - "PR #1749 · 판정 기준 main cb7653e0 · 결정 ⓒ(Kiki 2026-10-26) 검수 승인 문항만 후보 조회 — api/gating.py _review_cleared_clause(권위 유도)·상한 10000·절단 count 동일 조건 · me.py 미사용 상수 제거 · 실측(전 은행 14,742·승인 3,188): 후보 속 승인 630→3,188, 빠진 승인 2,558→0, 6모드 지연 1.2~1.6초 · 등가성: 전 문항 무절단 대비 6모드 응답 동일 · 테스트 단위 3·실 PG 통합 2, 뮤테이션 5종 RED · LIC-03 런북 PB27_LANDED 자가거부 · ⑤는 PB-28로 승계 · CI 미러 d19c8e477 전 잡 exit 0 · 통합 잡 재현 677 passed"
 paths:
   - src/backend/whymath_backend/api/gating.py
   - src/backend/whymath_backend/api/me.py
 session: null
-notes: "발견 2026-10-26 PB-25 측정. prod는 1,703건이라 지금은 절단 없음 — 전 은행 적재(LIC-03 --all 등)가 발화 조건. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+notes: |-
+  발견 2026-10-26 PB-25 측정. prod는 1,703건이라 지금은 절단 없음 — 전 은행 적재(LIC-03 --all 등)가 발화 조건. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW
+
+  [정정 2026-10-26] Kiki 결정 ⓒ 기록 · ⑤를 PB-28로 승계
 updated: 2026-10-26

@@ -26,7 +26,11 @@
 5. **실행 환경** — Windows PowerShell(= Phaiakes9). 작업 디렉터리
    `C:\Users\kiki\Desktop\__AI\WhyMath`. 선행 조건 2건: **Docker Desktop 가동**(prod DB
    컨테이너 `whymath-pg`) · **PR #1268이 main에 머지돼 있을 것**(`--all` 플래그가 그 PR에
-   들어 있다 — 블록 [1]이 그 존재를 실측해 확인하고, 없으면 [3]이 거부한다).
+   들어 있다 — 블록 [1]이 그 존재를 실측해 확인하고, 없으면 [3]이 거부한다) · **PB-27이 main에
+   머지돼 있을 것**(학생 후보 조회가 검수 승인 문항만 읽게 바뀐 변경. 그 전 코드로 전 은행을
+   적재하면 후보 상한 3,000건을 미검수 문항이 차지해 승인 문항의 약 80%가 학생에게 한 번도
+   나가지 않는다 — 판정 문서 `docs/architecture/problem_bank_candidate_fetch_limit_pb25.md`.
+   블록 [1]이 그 존재를 실측하고, 없으면 [3]이 거부한다).
 
 6. **창 구분** — **새 PowerShell 창 1개**에서 블록 4개를 모두 실행한다. 장기 점유
    프로세스(서버 등)가 없으므로 창을 나눌 필요가 없고, 블록 [1]이 설정한 변수를 [3]이
@@ -43,16 +47,19 @@ git checkout main
 git pull --ff-only origin main
 git log -1 --oneline
 $Py = ".\.venv\Scripts\python.exe"
-$Probe = & $Py -c "from whymath_backend.l1.problem_bank import populate as m; print(m.__file__); print('ALL=' + str(hasattr(m, 'discover_problem_corpora')))" 2>&1 | Out-String
+$Probe = & $Py -c "from whymath_backend.l1.problem_bank import populate as m; from whymath_backend.api import gating as g; print(m.__file__); print('ALL=' + str(hasattr(m, 'discover_problem_corpora'))); print('PB27=' + str(hasattr(g, '_review_cleared_clause')))" 2>&1 | Out-String
 $HasAll = $Probe -match 'ALL=True'
+$HasPb27 = $Probe -match 'PB27=True'
 $PgUp = (& docker ps --filter "name=whymath-pg" --format "{{.Names}}" | Out-String).Trim() -eq "whymath-pg"
 "HAS_ALL_FLAG=$HasAll"
+"PB27_LANDED=$HasPb27"
 "LOADED_MODULE=$($Probe.Split([char]10)[0].Trim())"
 "PG_CONTAINER_UP=$PgUp"
 ```
 
-세 줄이 전부 참(`HAS_ALL_FLAG=True` · `LOADED_MODULE`이 이 클론 경로 ·
-`PG_CONTAINER_UP=True`)이어야 다음으로 갑니다. `HAS_ALL_FLAG=False`면 PR #1268이 아직
+네 줄이 전부 참(`HAS_ALL_FLAG=True` · `PB27_LANDED=True` · `LOADED_MODULE`이 이 클론 경로 ·
+`PG_CONTAINER_UP=True`)이어야 다음으로 갑니다. `PB27_LANDED=False`면 PB-27이 아직 머지되지
+않은 것입니다 — 이 상태로 전 은행을 적재하면 학생 후보가 잘립니다. `HAS_ALL_FLAG=False`면 PR #1268이 아직
 머지되지 않았거나 다른 트리의 코드가 로드된 것입니다 — `LOADED_MODULE` 경로가 답을 줍니다
 (파일을 읽어 보는 것만으로는 *그 파일이 실제로 임포트됐는지* 알 수 없으므로 import로 확인합니다).
 
@@ -72,11 +79,12 @@ $Before = (& docker exec whymath-pg psql -U whymath -d whymath -tAc "select (sel
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $Py = ".\.venv\Scripts\python.exe"
 $env:WHYMATH_DATABASE_URL = "postgresql+asyncpg://whymath@127.0.0.1:5433/whymath"
-$ReProbe = & $Py -c "from whymath_backend.l1.problem_bank import populate as m; print('ALL=' + str(hasattr(m, 'discover_problem_corpora')))" 2>&1 | Out-String
+$ReProbe = & $Py -c "from whymath_backend.l1.problem_bank import populate as m; from whymath_backend.api import gating as g; print('ALL=' + str(hasattr(m, 'discover_problem_corpora'))); print('PB27=' + str(hasattr(g, '_review_cleared_clause')))" 2>&1 | Out-String
 $OkAll = $ReProbe -match 'ALL=True'
+$OkPb27 = $ReProbe -match 'PB27=True'
 $OkPg = (& docker ps --filter "name=whymath-pg" --format "{{.Names}}" | Out-String).Trim() -eq "whymath-pg"
 $OkCorpus = @(Get-ChildItem -Path "data\corpus" -Filter "problems.jsonl" -Recurse | Where-Object { $_.Directory.Name -like "problem_bank_*" }).Count
-if ($OkAll -and $OkPg -and ($OkCorpus -ge 30)) { & $Py -m whymath_backend.l1.problem_bank.populate --all; "POPULATE_EXIT=$LASTEXITCODE"; $After = (& docker exec whymath-pg psql -U whymath -d whymath -tAc "select (select count(*) from problem)||'/'||(select count(*) from content_provenance)" | Out-String).Trim(); "AFTER problem/provenance = $After" } else { "WRITE_REFUSED=True — 쓰지 않았습니다. HAS_ALL_FLAG=$OkAll PG_CONTAINER_UP=$OkPg CORPUS_COUNT=$OkCorpus (각각 True/True/30이상이어야 실행됩니다)" }
+if ($OkAll -and $OkPb27 -and $OkPg -and ($OkCorpus -ge 30)) { & $Py -m whymath_backend.l1.problem_bank.populate --all; "POPULATE_EXIT=$LASTEXITCODE"; $After = (& docker exec whymath-pg psql -U whymath -d whymath -tAc "select (select count(*) from problem)||'/'||(select count(*) from content_provenance)" | Out-String).Trim(); "AFTER problem/provenance = $After" } else { "WRITE_REFUSED=True — 쓰지 않았습니다. HAS_ALL_FLAG=$OkAll PB27_LANDED=$OkPb27 PG_CONTAINER_UP=$OkPg CORPUS_COUNT=$OkCorpus (각각 True/True/True/30이상이어야 실행됩니다)" }
 ```
 
 ## §4. 블록 [4] — 복원 후 검증 (읽기 전용)
