@@ -13,7 +13,6 @@ import logging
 from typing import Any
 
 import pytest
-
 from sqlalchemy.dialects import postgresql
 
 from whymath_backend.api import gating as gating_module
@@ -146,7 +145,9 @@ async def test_candidate_sql_keeps_only_review_cleared_statuses() -> None:
         assert f"'{value}'" in sql
     for status in ReviewStatus:
         if status.value not in cleared:
-            assert f"'{status.value}'" not in sql, f"통과하지 않는 상태 {status.value}가 조건에 있다"
+            assert (
+                f"'{status.value}'" not in sql
+            ), f"통과하지 않는 상태 {status.value}가 조건에 있다"
     # 권위가 미평가(None)를 통과시키지 않는 한 NULL 행은 후보가 아니다.
     assert "IS NULL" not in sql
 
