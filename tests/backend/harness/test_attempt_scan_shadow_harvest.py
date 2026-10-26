@@ -26,10 +26,13 @@ PASS(0)만으로는 판정기의 증거가 되지 않으므로, 기준마다 그
 
 from __future__ import annotations
 
+import itertools
 import json
+import logging
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +41,7 @@ import pytest
 from whymath_backend.config import get_settings
 from whymath_backend.harness import attempt_scan_shadow_harvest as harvest
 from whymath_backend.l4.misconception import answer_signature as signature_module
+from whymath_backend.l4.misconception import derivative_signature as derivative_module
 from whymath_backend.l4.misconception.answer_signature import (
     DerivativeShadowRecord,
     scan_attempt_answer,
@@ -63,6 +67,8 @@ P_NONNUMERIC = "synthetic-nonnumeric-answer-0001"
 P_STAGING = "synthetic-staging-only-0001"
 #: 문항은행 어디에도 없는 문항.
 P_MISSING = "not-in-any-bank-0001"
+#: 합성 — 정답은 수인데 엔진이 질문을 읽지 못하는 지문(로그 시점 엔진과 현재 엔진이 갈린 상황 재현).
+P_UNREADABLE = "synthetic-unreadable-question-0001"
 
 
 # ── 픽스처 ─────────────────────────────────────────────────────────────────────────────────
@@ -106,6 +112,14 @@ def corpus_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     )
     rows.append(
         {
+            "problem_id": P_UNREADABLE,
+            "question_text": "다음 값을 구하시오.",
+            "answer": "5",
+            "review_status": "approved",
+        }
+    )
+    rows.append(
+        {
             "problem_id": P_STAGING,
             "question_text": "함수 f(x) = x^4에 대하여 f'(1)의 값을 구하시오.",
             "answer": "4",
@@ -134,10 +148,16 @@ class Block:
     fired: bool = False
 
 
+#: 레코드마다 다른 `observed_at` — 운영 레코드처럼 시도마다 바이트가 달라야 중복 제거에 걸리지 않는다.
+_TICK = itertools.count()
+_BASE_TIME = datetime(2026, 10, 1, tzinfo=UTC)
+
+
 def _record(kind: str, fired: bool) -> str:
     applicable = kind != "not_applicable"
     correct: bool | None = {"wrong": False, "correct": True}.get(kind)
     return DerivativeShadowRecord(
+        observed_at=_BASE_TIME + timedelta(microseconds=next(_TICK)),
         rules_total=12,
         applicable=applicable,
         answer_is_correct=correct,
@@ -152,10 +172,9 @@ def _record(kind: str, fired: bool) -> str:
 def _lines(blocks: list[Block]) -> list[str]:
     out: list[str] = []
     for b in blocks:
-        line = json.dumps(
-            {"problem_id": b.problem_id, "adapter_records": [_record(b.kind, b.fired)]}
-        )
-        out.extend([line] * b.count)
+        for _ in range(b.count):
+            record = _record(b.kind, b.fired)
+            out.append(json.dumps({"problem_id": b.problem_id, "adapter_records": [record]}))
     return out
 
 
@@ -601,16 +620,23 @@ class TestBaselineComesFromTheEngine:
         corpus_root: Path,
         capsys: Any,
         monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         def boom(**_: Any) -> Any:
             raise RuntimeError("engine down")
 
         monkeypatch.setattr(signature_module, "scan_attempt_answer", boom)
         path = _write(tmp_path, _lines(_passing_blocks()))
-        code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
+        with caplog.at_level(logging.ERROR, logger="whymath.harness.attempt_scan_shadow_harvest"):
+            code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
         out = capsys.readouterr().out
         assert code == harvest.EXIT_UNMEASURABLE  # 측정 도구의 결함이 FAIL(1)로 위장되지 않는다
         assert "RuntimeError" in out
+        errors = [
+            r for r in caplog.records if r.name == "whymath.harness.attempt_scan_shadow_harvest"
+        ]
+        assert errors and errors[-1].exc_info is not None  # 트레이스백이 로그에 남는다
+        assert "RuntimeError" in errors[-1].getMessage()
 
     def test_missing_shadow_record_is_unmeasurable(
         self,
@@ -681,3 +707,285 @@ class TestOutput:
         assert harvest.MAX_SINGLE_PROBLEM_SHARE == 0.30
         assert harvest.BASELINE_OFFSET_RANGE == 30
         assert harvest.CONFIDENCE == 0.95
+
+
+# ── 독립 리뷰 지적(P1·P2·P3) 회귀 동결 ──────────────────────────────────────────────────────
+
+
+class TestEngineMustActuallyWorkForBaseline:
+    """P1 — 기준선 후보마다 엔진이 일했는지(규칙 적재·질문 읽음) 확인한다. 아니면 측정 불가."""
+
+    def test_rule_table_load_failure_is_unmeasurable_not_zero_baseline(
+        self,
+        tmp_path: Path,
+        corpus_root: Path,
+        capsys: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """엔진은 규칙표 적재 실패를 삼키고 빈 결과를 낸다 — 그대로 세면 기준선 0 → C3 거짓 통과."""
+
+        def broken() -> Any:
+            raise RuntimeError("rule table missing")
+
+        monkeypatch.setattr(derivative_module, "compile_rules", broken)
+        # 우연 수준(4%) 발화 — 기준선이 0으로 무너지면 C3가 통과해 버리는 표본이다.
+        blocks = _spread("wrong", 100, 4) + _spread("correct", 30, 0)
+        path = _write(tmp_path, _lines(blocks))
+        code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "엔진 규칙 0건" in out
+        assert any(pid in out for pid in REAL)
+
+    def test_question_the_engine_cannot_read_is_unmeasurable(
+        self, tmp_path: Path, corpus_root: Path, capsys: Any
+    ) -> None:
+        """로그는 '질문을 읽은 오답'이라는데 현재 엔진은 그 지문을 못 읽는다 — 기준선을 잴 수 없다."""
+        blocks = _passing_blocks() + [Block(P_UNREADABLE, "wrong", 3)]
+        path = _write(tmp_path, _lines(blocks))
+        code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "엔진이 질문을 읽지 못함" in out
+        assert P_UNREADABLE in out
+
+    def test_stubbed_not_applicable_record_is_unmeasurable(
+        self,
+        tmp_path: Path,
+        corpus_root: Path,
+        capsys: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        real = signature_module.scan_attempt_answer
+
+        def not_applicable(*, question_text: str, student_answer: str | None) -> Any:
+            result = real(question_text=question_text, student_answer=student_answer)
+            record = DerivativeShadowRecord.model_validate_json(result.shadow_records[0])
+            patched = record.model_copy(update={"applicable": False, "answer_is_correct": None})
+            return result.model_copy(update={"shadow_records": (patched.model_dump_json(),)})
+
+        monkeypatch.setattr(signature_module, "scan_attempt_answer", not_applicable)
+        path = _write(tmp_path, _lines(_passing_blocks()))
+        code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "엔진이 질문을 읽지 못함" in out
+
+
+class TestDuplicateRecords:
+    """P2-1 — 같은 (문항 id, 레코드 문자열)은 같은 사건의 이중 기록이다."""
+
+    def test_concatenated_log_counts_once_and_reports_duplicates(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        # 오답 296건 — 두 번 이어 붙인 파일을 그대로 세면 592건이 되어 C1을 거짓 충족한다.
+        lines = _lines(_spread("wrong", 74, 20) + _spread("correct", 30, 0))
+        code_once, once = _run(tmp_path, lines, corpus_root, baseline_cache, capsys)
+        code_twice, twice = _run(tmp_path, lines + lines, corpus_root, baseline_cache, capsys)
+        assert code_once == code_twice == harvest.EXIT_UNMEASURABLE
+        assert once["duplicate_records"] == 0
+        assert twice["duplicate_records"] == len(lines)
+        for key in ("wrong_attempts", "correct_attempts", "fired_wrong", "derivative_records"):
+            assert twice[key] == once[key], key
+        assert _criteria(twice) == _criteria(once)
+
+    def test_summary_warns_about_duplicates_at_the_top(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        lines = _lines(_passing_blocks())
+        path = _write(tmp_path, lines + lines[:7])
+        harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache=baseline_cache)
+        out = capsys.readouterr().out.splitlines()
+        assert "중복 레코드 7건" in out[1]
+
+    def test_distinct_records_on_the_same_problem_are_not_duplicates(self) -> None:
+        lines = _lines([Block(P_A, "wrong", 5)])
+        assert len(set(lines)) == 5  # 픽스처 전제: 시도마다 바이트가 다르다
+        log = harvest.load_shadow_log("\n".join(lines))
+        assert len(log.records) == 5
+        assert log.duplicate_records == 0
+
+
+class TestBankRequirementScope:
+    """P2-2 — 은행 존재는 기준선이 필요한 문항(오답 시도 ≥ 1)에만 요구한다."""
+
+    def test_unknown_problem_without_wrong_attempts_is_info_only(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        blocks = _passing_blocks() + [
+            Block(P_MISSING, "not_applicable", 5),
+            Block(P_STAGING, "correct", 2),
+        ]
+        code, report = _run(tmp_path, _lines(blocks), corpus_root, baseline_cache, capsys)
+        assert code == harvest.EXIT_PASS
+        assert _criteria(report) == ALL_PASS
+        assert report["unknown_bank_problems_info"] == sorted([P_MISSING, P_STAGING])
+
+    def test_unknown_problem_with_wrong_attempts_is_still_unmeasurable(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        blocks = _passing_blocks() + [
+            Block(P_MISSING, "wrong", 1),
+            Block(P_STAGING, "not_applicable", 3),
+        ]
+        code, report = _run(tmp_path, _lines(blocks), corpus_root, baseline_cache, capsys)
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert _criterion(report, "C0")["values"]["missing_problem_ids"] == [P_MISSING]
+        assert report["unknown_bank_problems_info"] == [P_STAGING]
+
+
+class TestFiredUnknown:
+    """P2-3 — 정답 여부를 모르는 시도의 발화는 오발화인지 모른다 → C2 측정 불가."""
+
+    def test_fired_unknown_makes_c2_unmeasurable(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        blocks = _passing_blocks() + [Block(P_A, "unknown", 1, fired=True)]
+        code, report = _run(tmp_path, _lines(blocks), corpus_root, baseline_cache, capsys)
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert report["fired_unknown"] == 1
+        assert report["fired_correct"] == 0
+        assert _criteria(report) == {**ALL_PASS, "C2": "UNMEASURABLE"}
+        row = next(r for r in report["problems"] if r["problem_id"] == P_A)
+        assert row["fired_unknown"] == 1
+
+    def test_confirmed_misfire_still_dominates_fired_unknown(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        blocks = _passing_blocks() + [
+            Block(P_A, "unknown", 1, fired=True),
+            Block(P_B, "correct", 1, fired=True),
+        ]
+        code, report = _run(tmp_path, _lines(blocks), corpus_root, baseline_cache, capsys)
+        assert code == harvest.EXIT_FAIL
+        assert _criteria(report)["C2"] == "FAIL"
+
+
+class TestInputContract:
+    """P3 ① — 줄 = 로거 메시지 그대로. `#`·빈 줄은 건너뛰고, 포매터 접두는 측정 불가."""
+
+    def test_comment_and_blank_lines_are_skipped(
+        self, tmp_path: Path, corpus_root: Path, baseline_cache: Any, capsys: Any
+    ) -> None:
+        lines = _lines(_passing_blocks())
+        mixed = ["# 수집 2026-10-26", "", *lines[:10], "   # 중간 주석", *lines[10:]]
+        code, report = _run(tmp_path, mixed, corpus_root, baseline_cache, capsys)
+        assert code == harvest.EXIT_PASS
+        assert report["log_lines"] == len(lines)
+
+    def test_formatter_prefix_is_unmeasurable_at_line_one(
+        self, tmp_path: Path, corpus_root: Path, capsys: Any
+    ) -> None:
+        lines = [
+            f"INFO:whymath.api.attempt_scan_shadow.record:{x}" for x in _lines(_passing_blocks())
+        ]
+        path = _write(tmp_path, lines)
+        code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "1번째 줄" in out
+        assert "%(message)s" in out
+
+    def test_log_that_is_not_utf8_is_unmeasurable(
+        self, tmp_path: Path, corpus_root: Path, capsys: Any
+    ) -> None:
+        path = tmp_path / "shadow.jsonl"
+        path.write_bytes(b"\xff\xfe\x00broken\n")
+        code = harvest.main([str(path), "--corpus-root", str(corpus_root)], baseline_cache={})
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "UnicodeDecodeError" in out
+        # 입력 결함으로 진단돼야 한다 — 최후 catch-all(예기치 못한 예외)로 떨어지면 원인이 흐려진다.
+        assert "로그 파일을 읽지 못했다" in out
+        assert "예기치 못한 예외" not in out
+
+
+class TestBankAndModeEdges:
+    """P3 ②·⑥ — 미테스트 분기."""
+
+    def _bank(self, root: Path, name: str, rows: list[Any]) -> None:
+        bank = root / name
+        bank.mkdir(parents=True)
+        (bank / "problems.jsonl").write_text(
+            "\n".join(r if isinstance(r, str) else json.dumps(r) for r in rows) + "\n",
+            encoding="utf-8",
+        )
+
+    def test_same_id_with_different_content_in_two_banks_is_unmeasurable(
+        self, tmp_path: Path, capsys: Any
+    ) -> None:
+        row = {"problem_id": P_A, "question_text": "q", "answer": "1", "review_status": "approved"}
+        self._bank(tmp_path / "corpus", "problem_bank_a_v0", [row])
+        self._bank(tmp_path / "corpus", "problem_bank_b_v0", [{**row, "answer": "2"}])
+        log = _write(tmp_path, _lines([Block(P_A, "wrong", 1)]))
+        code = harvest.main(
+            [str(log), "--corpus-root", str(tmp_path / "corpus")], baseline_cache={}
+        )
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "같은 id가 다른 내용으로" in out
+
+    def test_same_id_with_same_content_in_two_banks_is_fine(self, tmp_path: Path) -> None:
+        row = {"problem_id": P_A, "question_text": "q", "answer": "1", "review_status": "approved"}
+        self._bank(tmp_path / "corpus", "problem_bank_a_v0", [row])
+        self._bank(tmp_path / "corpus", "problem_bank_b_v0", [row])
+        bank = harvest.load_problem_bank(tmp_path / "corpus", {P_A})
+        assert bank[P_A].answer == "1"
+
+    def test_bank_line_that_is_not_json_is_unmeasurable(self, tmp_path: Path, capsys: Any) -> None:
+        self._bank(tmp_path / "corpus", "problem_bank_a_v0", ["{broken"])
+        log = _write(tmp_path, _lines([Block(P_A, "wrong", 1)]))
+        code = harvest.main(
+            [str(log), "--corpus-root", str(tmp_path / "corpus")], baseline_cache={}
+        )
+        out = capsys.readouterr().out
+        assert code == harvest.EXIT_UNMEASURABLE
+        assert "문항은행 problem_bank_a_v0 1번째 줄" in out
+        assert "JSONDecodeError" in out
+
+    @pytest.mark.parametrize(
+        ("answer", "reason"),
+        [
+            ("(((", "정답 파싱 실패("),
+            ("2*x", "정답이 수가 아님"),
+            ("oo", "정답이 유한 실수가 아님"),
+            ("I", "정답이 유한 실수가 아님"),
+        ],
+    )
+    def test_bank_answer_reasons_are_distinguished(self, answer: str, reason: str) -> None:
+        problem = harvest.BankProblem(problem_id="x", question_text="q", answer=answer)
+        baseline = harvest.compute_chance_baseline(problem)
+        assert baseline.computable is False
+        assert baseline.reason.startswith(reason), baseline.reason
+
+    def test_shadow_mode_refuses_when_mode_does_not_take(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _Off:
+            l4_derivative_signature_mode = "off"
+
+        class _Stub:
+            @staticmethod
+            def cache_clear() -> None:
+                return None
+
+            def __call__(self) -> _Off:
+                return _Off()
+
+        monkeypatch.setattr(harvest, "get_settings", _Stub())
+        with pytest.raises(harvest.HarvestInputError, match="그림자 모드를 켜지 못했다"):
+            with harvest._shadow_mode():
+                pytest.fail("모드가 안 먹었는데 블록 본문이 실행됐다")
+
+    def test_shadow_mode_restores_a_preexisting_env_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("WHYMATH_L4_DERIVATIVE_SIGNATURE_MODE", "off")
+        try:
+            with harvest._shadow_mode():
+                assert os.environ["WHYMATH_L4_DERIVATIVE_SIGNATURE_MODE"] == "shadow"
+                assert get_settings().l4_derivative_signature_mode == "shadow"
+            assert os.environ["WHYMATH_L4_DERIVATIVE_SIGNATURE_MODE"] == "off"
+            assert get_settings().l4_derivative_signature_mode == "off"
+        finally:
+            get_settings.cache_clear()

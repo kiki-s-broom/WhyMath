@@ -18,16 +18,31 @@
 
 (`--corpus-root` 기본값은 저장소 `data/corpus` — 테스트는 임시 문항은행을 가리킨다.)
 
+입력 계약(중요)
+────────────────────────────────────────────────────────────────────────────
+· 한 줄 = 로거 메시지 하나 **그대로**다. 수집 핸들러의 포매터는 `%(message)s`여야 한다 —
+  uvicorn·`logging.basicConfig` 기본 포매터처럼 `INFO:whymath...:` 접두가 붙으면 그 줄은 JSON이
+  아니므로 **1번째 줄에서 측정 불가**로 멈춘다(접두를 추측해 벗기지 않는다 — 형식이 틀린 입력을
+  고쳐 읽으면 무엇을 읽었는지 말할 수 없다).
+· 빈 줄과 `#`로 시작하는 줄은 건너뛴다(`wrong_form_shadow_harvest` 선례 — 수집 스크립트의 주석용).
+· 같은 (문항 id, 어댑터 레코드 문자열)이 **바이트까지 같으면** 같은 사건의 이중 기록이다
+  (레코드의 `observed_at`이 마이크로초 단위라 서로 다른 시도가 우연히 같을 수 없다). 중복은 한 번만
+  세고, 건수를 `duplicate_records`로 보고하며 요약 상단에 경고한다 — 수집을 두 번 이어 붙인 파일이
+  표본을 두 배로 부풀려 C1을 거짓 충족시키지 못하게 한다.
+
 판정 기준(§9.3 — 수치는 **제안**이며 게이트 `G-p356-signature-activation`에서 Kiki가 확정한다)
 ────────────────────────────────────────────────────────────────────────────
   C1 표본       질문을 읽은 문항의 오답 시도 n ≥ 300. 미만은 FAIL이 아니라 측정 불가.
   C2 정답 오발화 정답 시도 중 `fired`가 1건이라도 있으면 FAIL(표본 크기와 무관 — 확인된 오발화는
-                표본이 작다고 통과로 바뀌지 않는다). 0건이어도 정답 시도가 100건 미만이면 측정 불가.
+                표본이 작다고 통과로 바뀌지 않는다). 확정 오발화가 0이어도 정답 여부를 모르는
+                시도에서 발화가 있으면(`fired_unknown > 0`) 측정 불가 — 그것이 오발화인지 모른다.
+                그 밖에 정답 시도가 100건 미만이면 측정 불가.
   C3 우연 초과   오답 발화율의 Wilson 95% 단측 하한 ≥ 5 × 기준선. 기준선은 문항별 우연 발화율
                 (정답 ± 1..30 정수 답 60개 중 엔진이 `fired`를 내는 비율)을 오답 시도 수로 가중평균.
   C4 쏠림 없음   한 문항이 오답 발화의 30%를 넘으면 FAIL. 단 C1 표본(n ≥ 300) 미충족이면 측정 불가 —
                 §9.3은 기준 간 순서를 정하지 않는다 — 이 순서는 도구의 결정(게이트에서 Kiki 확정).
-  C0 데이터 정합 로그의 문항 id가 문항은행에 없으면 측정 불가(기준선을 잴 지문이 없다).
+  C0 데이터 정합 **기준선이 필요한 문항**(질문을 읽은 오답 시도가 1건 이상)이 문항은행에 없으면 측정
+                불가(기준선을 잴 지문이 없다). 그 밖의 은행 미존재 문항은 정보로만 보고한다.
 
 종합: FAIL이 하나라도 있으면 1 → 아니면 측정 불가가 하나라도 있으면 3 → 아니면 0. **모든 기준을
 먼저 계산한 뒤** 판정한다 — 앞 기준에서 일찍 끝내면 나머지 값이 보고서에서 사라진다.
@@ -38,13 +53,26 @@
   모드로 호출해 그 레코드의 `fired`를 센다 — 판정 로직을 이 파일에 다시 쓰면 엔진이 바뀔 때 기준선이
   조용히 어긋난다. 그림자 모드는 이 계산 동안에만 환경변수 + 설정 캐시 비우기로 켜고, 끝나면
   원복한다(전역 상태를 남기지 않는다 — `qa_pipeline._axis_coach_prose_leak` 선례).
+· **기준선 후보 답마다 엔진이 실제로 일했는지 확인한다.** 레코드가 `rules_total > 0`이고
+  `applicable is True`가 아니면 측정 불가다. 엔진은 규칙표 적재 실패를 삼키고 빈 결과를 돌려주므로
+  (`answer_signature._read_derivative_channel`), 그것을 그대로 세면 60개 전부 미발화 → 기준선 0 →
+  C3가 거짓 통과한다(작동한 비율 원칙).
 · **문항 본문은 문항은행에서 읽는다.** 로그에는 문항 id만 있고 학생 답·지문은 없다(미성년 PII).
   이 CLI도 학생 답·지문을 출력하지 않는다 — 문항 id·건수·비율만 낸다.
 · **모른다 ≠ 아니다.** `answer_is_correct is None`(질문을 못 읽음)은 오답으로 접지 않고 따로 센다.
 · **빈 입력·깨진 입력은 통과가 아니다.** 파일 없음·형식 오류·미분 레코드 0건은 전부 측정 불가(3)다.
-· **기준선의 한계**: "정답 ± 30 정수 균등" 가정이라 실제 계산 실수 분포(정답 근처 쏠림)와 다르다.
-  이 판정은 정밀도를 직접 재지 않는다 — 발화가 우연 이상이라는 통계적 근거를 줄 뿐이다.
 · DB·네트워크 0. 순수 파일 읽기 + 엔진 호출.
+
+한계(정직)
+────────────────────────────────────────────────────────────────────────────
+· **기준선은 "정답 ± 30 정수 균등" 가정**이라 실제 계산 실수 분포(정답 근처 쏠림)와 다르다. 이
+  판정은 정밀도를 직접 재지 않는다 — 발화가 우연 이상이라는 통계적 근거를 줄 뿐이다.
+· **기준선 0/60을 참 0으로 취급한다.** 60개 표본의 0은 "우연 발화율이 작다"이지 "0이다"가 아니지만
+  기준선에 신뢰경계를 씌우지 않는다(§9.3 문면이 점 기준선을 쓴다). 대신 C3는 발화율 하한이 0보다
+  커야 통과한다 — 발화 0건이 기준선 0과 만나 공허하게 통과하지 않게.
+· **레코드에 엔진·규칙표 버전이 없다.** 로그를 남긴 시점의 엔진과 이 CLI가 기준선을 재는 엔진이
+  다르면(규칙 추가·수정) 그 차이를 탐지하지 못한다. 수확은 로그 수집 기간의 배포 버전과 같은
+  커밋에서 돌려야 한다.
 """
 
 from __future__ import annotations
@@ -132,7 +160,7 @@ def _default_corpus_root() -> Path:
 
 
 class HarvestInputError(Exception):
-    """입력(로그·문항은행)을 읽을 수 없다 — 판정이 아니라 측정 불가(exit 3)의 원인."""
+    """입력(로그·문항은행·엔진)을 읽을 수 없다 — 판정이 아니라 측정 불가(exit 3)의 원인."""
 
 
 class Verdict(StrEnum):
@@ -161,11 +189,12 @@ _EXIT_BY_VERDICT = {
 
 @dataclass(frozen=True, slots=True)
 class ShadowLog:
-    """로그 파일에서 읽은 미분 서명 관측 — `(문항 id, 레코드)` 목록 + 다른 채널 건수."""
+    """로그 파일에서 읽은 미분 서명 관측 — `(문항 id, 레코드)` 목록 + 다른 채널·중복 건수."""
 
     lines: int
     records: tuple[tuple[str, DerivativeShadowRecord], ...]
     other_channel_records: int
+    duplicate_records: int = 0
 
 
 def _describe_validation_error(exc: ValidationError) -> str:
@@ -190,23 +219,26 @@ def _line_error(line_no: int, exc: Exception, what: str) -> HarvestInputError:
 def load_shadow_log(text: str) -> ShadowLog:
     """로그 JSONL 텍스트 → `ShadowLog`. 형식이 틀린 줄이 하나라도 있으면 `HarvestInputError`.
 
-    빈 줄만 건너뛴다. 한 줄은 `problem_id`(비어 있지 않은 문자열)와 `adapter_records`(문자열
+    빈 줄·`#` 줄만 건너뛴다. 한 줄은 `problem_id`(비어 있지 않은 문자열)와 `adapter_records`(문자열
     목록)를 가진 JSON 객체여야 한다. 레코드 문자열마다 `channel`을 보고, 미분 서명이면
     `DerivativeShadowRecord`로 **엄격 검증**한다(extra 금지 — 스키마 이탈을 조용히 흡수하지 않는다).
-    다른 채널은 세기만 하고 버린다(이 CLI의 판정 대상이 아니다).
+    다른 채널은 세기만 하고 버린다(이 CLI의 판정 대상이 아니다). 같은 (문항 id, 레코드 문자열)은
+    한 번만 센다(모듈 docstring "입력 계약").
     """
     records: list[tuple[str, DerivativeShadowRecord]] = []
+    seen: set[tuple[str, str]] = set()
+    duplicates = 0
     other = 0
     lines = 0
     for line_no, raw in enumerate(text.splitlines(), start=1):
         stripped = raw.strip()
-        if not stripped:
+        if not stripped or stripped.startswith("#"):
             continue
         lines += 1
         try:
             row = json.loads(stripped)
         except json.JSONDecodeError as exc:
-            raise _line_error(line_no, exc, "JSON이 아니다") from exc
+            raise _line_error(line_no, exc, "JSON이 아니다(수집 포매터가 %(message)s인가)") from exc
         if not isinstance(row, dict):
             raise HarvestInputError(f"{line_no}번째 줄: JSON 객체가 아니다 — {type(row).__name__}")
         problem_id = row.get("problem_id")
@@ -217,6 +249,7 @@ def load_shadow_log(text: str) -> ShadowLog:
             isinstance(r, str) for r in adapter_records
         ):
             raise HarvestInputError(f"{line_no}번째 줄: adapter_records가 문자열 목록이 아니다")
+        pid = problem_id.strip()
         for record_text in adapter_records:
             try:
                 payload = json.loads(record_text)
@@ -234,8 +267,18 @@ def load_shadow_log(text: str) -> ShadowLog:
                 record = DerivativeShadowRecord.model_validate_json(record_text)
             except ValidationError as exc:
                 raise _line_error(line_no, exc, "미분 서명 레코드 스키마 불일치") from exc
-            records.append((problem_id.strip(), record))
-    return ShadowLog(lines=lines, records=tuple(records), other_channel_records=other)
+            key = (pid, record_text)
+            if key in seen:
+                duplicates += 1
+                continue
+            seen.add(key)
+            records.append((pid, record))
+    return ShadowLog(
+        lines=lines,
+        records=tuple(records),
+        other_channel_records=other,
+        duplicate_records=duplicates,
+    )
 
 
 # ── 입력: 문항은행 ─────────────────────────────────────────────────────────────────────────
@@ -295,8 +338,8 @@ def load_problem_bank(corpus_root: Path, wanted: set[str]) -> dict[str, BankProb
 class ChanceBaseline:
     """문항 1개의 우연 발화율 — 정답 ± 1..30 정수 답 중 엔진이 `fired`를 낸 비율.
 
-    `computable=False`면 정답이 유한 실수가 아니어서(또는 파싱 불가) 기준선을 정의할 수 없다 —
-    그 문항의 오답 시도는 C3 부분집합에서 빠지고, 빠진 건수가 보고서에 남는다.
+    `computable=False`면 정답을 파싱하지 못했거나 유한 실수가 아니어서 기준선을 정의할 수 없다 —
+    그 문항의 오답 시도는 C3 부분집합에서 빠지고, 빠진 건수와 사유가 보고서에 남는다.
     """
 
     computable: bool
@@ -333,29 +376,31 @@ def _shadow_mode() -> Iterator[None]:
         get_settings.cache_clear()
 
 
-def _bank_answer_value(answer: str) -> Any | None:
-    """문항은행 정답을 SymPy 값으로 — 유한 실수가 아니면 `None`(기준선 정의 불가)."""
+def _bank_answer_value(answer: str) -> tuple[Any | None, str]:
+    """문항은행 정답을 SymPy 값으로 — 실패하면 `(None, 사유)`. 파싱 실패와 비실수를 구분한다."""
     try:
         value = safe_sympify(to_sympy_source(answer))
     except Exception as exc:  # noqa: BLE001 — 읽지 못한 정답은 '기준선 없음'으로 접고 원인을 남긴다
         logger.warning("문항은행 정답 파싱 실패: %s", type(exc).__name__)
-        return None
+        return None, f"정답 파싱 실패({type(exc).__name__})"
     if not getattr(value, "is_number", False):
-        return None
+        return None, "정답이 수가 아님(식·기호)"
     if value.is_real is not True or value.is_finite is not True:
-        return None
-    return value
+        return None, "정답이 유한 실수가 아님"
+    return value, ""
 
 
 def compute_chance_baseline(problem: BankProblem) -> ChanceBaseline:
     """한 문항의 우연 발화율을 엔진으로 잰다. 호출자가 `_shadow_mode()` 안에서 불러야 한다.
 
-    후보 답은 `str(정답 + k)`(k ∈ [-30, 30], k ≠ 0)이다. 그림자 레코드가 없으면(관측 조립 실패)
-    `HarvestInputError` — 레코드 없는 답을 '발화 안 함'으로 세면 기준선이 낮아져 C3가 거짓 통과한다.
+    후보 답은 `str(정답 + k)`(k ∈ [-30, 30], k ≠ 0)이다. 후보마다 엔진이 **실제로 일했는지**를
+    확인한다 — 그림자 레코드가 정확히 1건이고, 규칙이 적재됐고(`rules_total > 0`), 질문을
+    읽었어야(`applicable is True`) 한다. 어기면 `HarvestInputError`(측정 불가): 일하지 않은 엔진의
+    '미발화'를 세면 기준선이 0으로 내려가 C3가 거짓 통과한다.
     """
-    value = _bank_answer_value(problem.answer)
+    value, reason = _bank_answer_value(problem.answer)
     if value is None:
-        return ChanceBaseline(computable=False, reason="정답이 유한 실수가 아님")
+        return ChanceBaseline(computable=False, reason=reason)
     fired = 0
     trials = 0
     for k in range(-BASELINE_OFFSET_RANGE, BASELINE_OFFSET_RANGE + 1):
@@ -371,6 +416,16 @@ def compute_chance_baseline(problem: BankProblem) -> ChanceBaseline:
                 f"문항 {problem.problem_id}"
             )
         record = DerivativeShadowRecord.model_validate_json(result.shadow_records[0])
+        if record.rules_total <= 0:
+            raise HarvestInputError(
+                f"기준선 계산 불가 — 문항 {problem.problem_id}: 엔진 규칙 0건"
+                "(규칙표 적재 실패 — 엔진 로그의 예외 타입명을 확인)"
+            )
+        if record.applicable is not True:
+            raise HarvestInputError(
+                f"기준선 계산 불가 — 문항 {problem.problem_id}: 엔진이 질문을 읽지 못함"
+                "(로그 시점 엔진과 현재 엔진이 다를 수 있다)"
+            )
         trials += 1
         fired += int(record.fired)
     return ChanceBaseline(computable=True, fired=fired, trials=trials)
@@ -388,6 +443,7 @@ class _ProblemTally:
     correct: int = 0
     fired_correct: int = 0
     unknown: int = 0
+    fired_unknown: int = 0
 
 
 class CriterionResult(BaseModel):
@@ -413,6 +469,7 @@ class ProblemRow(BaseModel):
     correct: int
     fired_correct: int
     unknown: int
+    fired_unknown: int
     baseline_rate: float | None
     baseline_note: str
 
@@ -425,6 +482,7 @@ class HarvestReport(BaseModel):
     verdict: Verdict
     log_lines: int
     derivative_records: int
+    duplicate_records: int
     other_channel_records: int
     applicable: int
     reach_rate: float | None
@@ -433,7 +491,9 @@ class HarvestReport(BaseModel):
     unknown_attempts: int
     fired_wrong: int
     fired_correct: int
+    fired_unknown: int
     fire_rate: float | None
+    unknown_bank_problems_info: tuple[str, ...]
     criteria: tuple[CriterionResult, ...]
     problems: tuple[ProblemRow, ...]
 
@@ -446,7 +506,12 @@ class _Tallies:
 
 
 def _classify(log: ShadowLog) -> _Tallies:
-    """레코드를 오답·정답·모름으로 나눈다. `None`은 오답이 아니다(모른다 ≠ 아니다)."""
+    """레코드를 오답·정답·모름으로 나눈다. `None`은 오답이 아니다(모른다 ≠ 아니다).
+
+    모름으로 분류된 레코드의 발화도 따로 센다(`fired_unknown`) — 그것이 정답 위의 오발화인지 알 수
+    없으므로 C2가 측정 불가로 다룬다. 정상 엔진에서는 질문을 못 읽으면 발화도 없지만, 레코드가 그
+    불변식을 어기면 그것도 '모르는 발화'다.
+    """
     tallies = _Tallies()
     for problem_id, record in log.records:
         tally = tallies.per_problem.setdefault(problem_id, _ProblemTally())
@@ -461,6 +526,7 @@ def _classify(log: ShadowLog) -> _Tallies:
             tally.fired_correct += int(record.fired)
         else:
             tally.unknown += 1
+            tally.fired_unknown += int(record.fired)
     return tallies
 
 
@@ -469,13 +535,16 @@ def _criterion_c0(missing: list[str]) -> CriterionResult:
         return CriterionResult(
             criterion="C0 데이터 정합",
             verdict=Verdict.UNMEASURABLE,
-            detail=f"문항은행에 없는 문항 id {len(missing)}개 — 지문이 없어 기준선을 잴 수 없다",
+            detail=(
+                f"오답 시도가 있는데 문항은행에 없는 문항 id {len(missing)}개 — "
+                "지문이 없어 기준선을 잴 수 없다"
+            ),
             values={"missing_problem_ids": sorted(missing)},
         )
     return CriterionResult(
         criterion="C0 데이터 정합",
         verdict=Verdict.PASS,
-        detail="로그의 모든 문항 id가 문항은행에 있다",
+        detail="기준선이 필요한 모든 문항 id가 문항은행에 있다",
         values={"missing_problem_ids": []},
     )
 
@@ -490,11 +559,17 @@ def _criterion_c1(wrong: int) -> CriterionResult:
     )
 
 
-def _criterion_c2(correct: int, fired_correct: int) -> CriterionResult:
+def _criterion_c2(correct: int, fired_correct: int, fired_unknown: int) -> CriterionResult:
     # 확인된 오발화는 표본이 작아도 통과로 바뀌지 않는다 — 표본 검사보다 먼저 본다.
     if fired_correct > 0:
         verdict = Verdict.FAIL
         detail = f"정답 시도 {correct}건 중 오발화 {fired_correct}건"
+    elif fired_unknown > 0:
+        verdict = Verdict.UNMEASURABLE
+        detail = (
+            f"확정 오발화 0건이나 정답 여부를 모르는 시도의 발화 {fired_unknown}건 — "
+            "그것이 오발화인지 알 수 없다"
+        )
     elif correct < MIN_CORRECT_ATTEMPTS:
         verdict = Verdict.UNMEASURABLE
         detail = f"오발화 0건이나 정답 시도 {correct}건 (기준 ≥ {MIN_CORRECT_ATTEMPTS})"
@@ -508,6 +583,7 @@ def _criterion_c2(correct: int, fired_correct: int) -> CriterionResult:
         values={
             "correct_attempts": correct,
             "fired_correct": fired_correct,
+            "fired_unknown": fired_unknown,
             "min": MIN_CORRECT_ATTEMPTS,
         },
     )
@@ -643,10 +719,14 @@ def evaluate(
     """집계 → 기준선 → 기준 C0~C4를 **모두** 계산한 뒤 종합한다.
 
     `baseline_fn`은 문항 1개의 기준선을 낸다(실행에서는 캐시를 낀 엔진 호출). 기준선은 오답
-    시도가 있는 문항에만 잰다 — 가중치가 오답 시도 수이므로 오답 0건 문항은 기여가 없다.
+    시도가 있는 문항에만 잰다 — 가중치가 오답 시도 수이므로 오답 0건 문항은 기여가 없다. 같은 이유로
+    문항은행 존재는 그 문항들에만 요구하고(C0), 나머지 미존재 문항은 정보로만 보고한다.
     """
     tallies = _classify(log)
-    missing = [pid for pid in tallies.per_problem if pid not in bank]
+    missing = [pid for pid, t in tallies.per_problem.items() if t.wrong > 0 and pid not in bank]
+    info_missing = [
+        pid for pid, t in tallies.per_problem.items() if t.wrong == 0 and pid not in bank
+    ]
     baselines: dict[str, ChanceBaseline] = {}
     for pid, tally in tallies.per_problem.items():
         if tally.wrong > 0 and pid in bank:
@@ -657,11 +737,12 @@ def evaluate(
     unknown = sum(t.unknown for t in tallies.per_problem.values())
     fired_wrong = sum(t.fired_wrong for t in tallies.per_problem.values())
     fired_correct = sum(t.fired_correct for t in tallies.per_problem.values())
+    fired_unknown = sum(t.fired_unknown for t in tallies.per_problem.values())
 
     criteria = (
         _criterion_c0(missing),
         _criterion_c1(wrong),
-        _criterion_c2(correct, fired_correct),
+        _criterion_c2(correct, fired_correct, fired_unknown),
         _criterion_c3(tallies.per_problem, baselines),
         _criterion_c4(tallies.per_problem, wrong),
     )
@@ -686,6 +767,7 @@ def evaluate(
                 correct=tally.correct,
                 fired_correct=tally.fired_correct,
                 unknown=tally.unknown,
+                fired_unknown=tally.fired_unknown,
                 baseline_rate=baseline.rate if baseline is not None else None,
                 baseline_note=note,
             )
@@ -694,6 +776,7 @@ def evaluate(
         verdict=_combine(criteria),
         log_lines=log.lines,
         derivative_records=tallies.total,
+        duplicate_records=log.duplicate_records,
         other_channel_records=log.other_channel_records,
         applicable=tallies.applicable,
         reach_rate=tallies.applicable / tallies.total if tallies.total else None,
@@ -702,7 +785,9 @@ def evaluate(
         unknown_attempts=unknown,
         fired_wrong=fired_wrong,
         fired_correct=fired_correct,
+        fired_unknown=fired_unknown,
         fire_rate=fired_wrong / wrong if wrong else None,
+        unknown_bank_problems_info=tuple(sorted(info_missing)),
         criteria=criteria,
         problems=tuple(rows),
     )
@@ -756,27 +841,40 @@ def _pct(value: float | None) -> str:
 
 def render_summary(report: HarvestReport) -> str:
     """사람이 읽는 한국어 요약 — 문항 id·건수·비율만(지문·학생 답 없음)."""
-    lines = [
-        "미분 오답 서명 그림자 관측 — 활성화 판정 (P3-66 · §9.3 사전 등록 기준 · 수치는 제안)",
+    lines = ["미분 오답 서명 그림자 관측 — 활성화 판정 (P3-66 · §9.3 사전 등록 기준 · 수치는 제안)"]
+    if report.duplicate_records:
+        lines.append(
+            f"⚠ 중복 레코드 {report.duplicate_records}건을 한 번만 셌다 — 같은 사건의 이중 기록"
+            "(수집 파일을 이어 붙였는지 확인)"
+        )
+    if report.unknown_bank_problems_info:
+        lines.append(
+            f"ⓘ 문항은행에 없는 문항 {len(report.unknown_bank_problems_info)}개(오답 시도 0 — "
+            "기준선 불필요, 판정에 영향 없음)"
+        )
+    lines += [
         f"· 로그 줄 {report.log_lines} · 미분 레코드 {report.derivative_records}"
         f" · 다른 채널 레코드 {report.other_channel_records}(무시)",
-        f"· 도달률(질문을 읽음) {report.applicable}/{report.derivative_records}"
-        f" = {_pct(report.reach_rate)}",
+        f"· 도달률 — 앱 전체 텍스트 답안 시도(그림자 레코드가 남은 훑기) 대비 질문을 읽은 비율:"
+        f" {report.applicable}/{report.derivative_records} = {_pct(report.reach_rate)}",
         f"· 오답 {report.wrong_attempts} · 정답 {report.correct_attempts}"
         f" · 모름(None·미적용) {report.unknown_attempts} — 모름은 오답으로 세지 않는다",
         f"· 오답 발화 {report.fired_wrong}/{report.wrong_attempts} = {_pct(report.fire_rate)}"
-        f" · 정답 오발화 {report.fired_correct}",
+        f" · 정답 오발화 {report.fired_correct} · 모르는 시도의 발화 {report.fired_unknown}",
         "",
         "기준별 판정",
     ]
     for c in report.criteria:
         lines.append(f"  [{_VERDICT_LABEL[c.verdict]}] {c.criterion}: {c.detail}")
-    lines += ["", "문항별 (문항 id · 오답 · 오답 발화 · 정답 · 정답 오발화 · 모름 · 기준선)"]
+    lines += [
+        "",
+        "문항별 (문항 id · 오답 · 오답 발화 · 정답 · 정답 오발화 · 모름 · 모름 발화 · 기준선)",
+    ]
     for row in report.problems:
         lines.append(
             f"  {row.problem_id} · {row.wrong} · {row.fired_wrong} · {row.correct}"
-            f" · {row.fired_correct} · {row.unknown} · {_pct(row.baseline_rate)}"
-            f" ({row.baseline_note})"
+            f" · {row.fired_correct} · {row.unknown} · {row.fired_unknown}"
+            f" · {_pct(row.baseline_rate)} ({row.baseline_note})"
         )
     return "\n".join(lines)
 
@@ -805,7 +903,8 @@ def main(argv: list[str] | None = None, *, baseline_cache: BaselineCache | None 
     `baseline_cache`는 테스트가 여러 실행에서 기준선을 공유하려고 넘기는 인자다(CLI는 쓰지 않는다).
 
     예기치 못한 예외(엔진 결함 등)도 측정 불가로 접는다 — 측정 도구가 터진 것을 FAIL(1)로 읽히게
-    하면 "기준 미달"과 "못 쟀다"가 같은 숫자가 된다. 예외 타입명은 출력과 로그에 남긴다.
+    하면 "기준 미달"과 "못 쟀다"가 같은 숫자가 된다. 예외 타입명은 출력에, 트레이스백은 로그
+    (`exc_info` — 핸들러가 없으면 logging의 최후 핸들러가 stderr로)에 남긴다.
     """
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.harness.attempt_scan_shadow_harvest",
@@ -826,7 +925,7 @@ def main(argv: list[str] | None = None, *, baseline_cache: BaselineCache | None 
     except HarvestInputError as exc:
         return _emit_unmeasurable(str(exc), as_json=args.json)
     except Exception as exc:  # noqa: BLE001 — 측정 도구의 결함은 판정이 아니라 측정 불가다
-        logger.error("수확 중 예기치 못한 예외: %s", type(exc).__name__)
+        logger.error("수확 중 예기치 못한 예외: %s", type(exc).__name__, exc_info=True)
         return _emit_unmeasurable(f"예기치 못한 예외 — {type(exc).__name__}", as_json=args.json)
 
     code = _EXIT_BY_VERDICT[report.verdict]
