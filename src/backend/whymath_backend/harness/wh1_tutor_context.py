@@ -17,17 +17,29 @@ primary LLM 정책)에 전달되지 않았다** — 정책이 받는 것은 학�
   프롬프트(`LLMTutorPolicy.prompt_slots_sent`)·사적 보유값(`private_context_slots`)·초기 가설·가드
   실행 기록에서 계산해 `TutorDeliveryReceipt`로 돌려준다.
 
-누락 처리 정책(보고서 §3): **진행하되 표기**. 표기는 응답 `tutor_context`, 로그 1줄, 튜터 프롬프트
-요약(`context_missing`·`context_not_delivered`·`context_held_privately`), 관측 레코드 네 곳이다.
+누락 처리 정책(보고서 §3): **진행하되 표기** — 단 **필수 누락은 예외**(P3-74, 아래). 표기는 응답
+`tutor_context`, 로그 1줄, 튜터 프롬프트 요약(`context_missing`·`context_not_delivered`·
+`context_held_privately`), 관측 레코드 네 곳이다.
 **이 표기들에는 값이 없다** — 숙달·θ 수치(slice 69/70 비노출)·개념/스킬 id·학생 원문·답안 길이·
 예외 타입명은 응답·로그·레코드에 없다(예외 타입명은 조회 좌석의 서버 로그에만 남는다). 슬롯 *값*의
 요약이 실리는 곳은 튜터 프롬프트 하나뿐이며, 그 내용은 아래 `TutorContentSummary`로 한정된다.
 
-**로그 등급**: WARNING은 *시스템 결함*(`source_disabled`·`lookup_failed`)이 있고 튜터가 실제로 불린
-턴에만 낸다. 학생 측 정상 부재(`not_supplied`·`no_problem_context`·`none_detected`·`no_history`=
-콜드스타트)와 데이터 커버리지 공백(`coverage_gap` — 팩 미보유 단원·개념/스킬 미매핑)은 INFO다 —
-운영 턴 대부분이 해당하므로 WARNING이면 상시 경보가 되어 진짜 결함이 묻힌다. 커버리지 공백은 관측
-레코드의 `context_coverage_gap`으로 집계한다.
+**P3-74 — 필수 누락이면 LLM을 부르지 않는다(지시문 [12] 3항).** 필수 슬롯은 학생 상태(θ)와
+현재 개념 두 개다(`REQUIRED_TUTOR_SLOTS`). 이 둘 중 하나가 *시스템 결함*(`source_disabled`·
+`lookup_failed`)으로 비면 튜터는 그 사실을 모른 채 빈 값으로 돈다 — θ는 정책이 0.0(평균 학생)으로
+채우고, 개념은 프롬프트 요약·진단 개념 id·도구 인자 허용 목록이 통째로 빈다. 그래서 그 턴은 튜터를
+부르지 않고 결정론 Polya 템플릿으로 보낸다(`required_context_missing` → `with_required_fallback`).
+학생 측 정상 부재(`no_history` 콜드스타트·`no_problem_context`)와 커버리지 공백(`coverage_gap`)은
+필수 누락이 **아니다** — 첫 진입·미매핑 문항에서 LLM 튜터가 꺼지면 정상 학습 흐름이 깨진다.
+비필수 슬롯(스킬·팩·오개념 등)은 결함으로 비어도 진행하되 표기한다(팩은 base Polya 정책이 설계된
+대체물이고, 숙달은 결정 (가)로 튜터에 실리지 않는다). 판정은 `status_of` 한 곳에서만 나온다(두 번째
+판정 원천 없음).
+
+**로그 등급**: WARNING은 *시스템 결함*(`source_disabled`·`lookup_failed`)이 있고 튜터가 실제로
+불렸거나 필수 누락으로 폴백한 턴에만 낸다. 학생 측 정상 부재(`not_supplied`·`no_problem_context`·
+`none_detected`·`no_history`=콜드스타트)와 데이터 커버리지 공백(`coverage_gap` — 팩 미보유 단원·
+개념/스킬 미매핑)은 INFO다 — 운영 턴 대부분이 해당하므로 WARNING이면 상시 경보가 되어 진짜 결함이
+묻힌다. 커버리지 공백은 관측 레코드의 `context_coverage_gap`으로 집계한다.
 
 **P3-72 — 전달 경로 분리와 내용 요약(Kiki 결정 (가) 2026-10-20).** `delivered_to_tutor` 한 비트를
 슬롯별 전달 경로(`delivery_paths`)로 나눈다 — `prompt`(LLM 프롬프트 문자열에 실림)·`private_tool`
@@ -44,6 +56,13 @@ primary LLM 정책)에 전달되지 않았다** — 정책이 받는 것은 학�
 차단 장치가 아니다** — 정책은 `PROMPT_KEY_SLOTS` 4키와 가설만 슬롯으로 매핑하므로, 누가 θ를 다른
 키로 프롬프트에 넣어도 이 검증자는 런타임에 발동하지 않는다. 전송 차단의 집행은 ① θ·숙달을 담을
 필드가 없는 요약 타입 ② 렌더된 프롬프트 요약의 키 트리 허용 목록·값 감시 테스트(⑥ 동결)다.
+
+**P3-73 — Langfuse 기록.** 튜터를 부른 턴마다 같은 매니페스트의 구성 요약(슬롯 이름·resolved·전달
+경로·크기·원인 코드 — 값 0)을 Langfuse 이벤트 `tutor_context`로 남긴다(`record_tutor_context`).
+이벤트명을 `l3_routing`과 다르게 두는 이유: 비용 판독(`ops/cost_report.py`)은 `l3_routing`
+이름으로만 조회하므로 같은 이름이면 비용 게이트② 표본에 섞인다. 기록 필드의 이름 목록(누락·미전달·
+커버리지 공백)은 관측 레코드(`context_*`)와 같은 매니페스트 메서드에서 나온다 — 인프로세스 레코드와
+Langfuse의 이중 회계이며, Langfuse가 죽어도 레코드 쪽은 남는다.
 """
 
 from __future__ import annotations
@@ -52,9 +71,11 @@ import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from whymath_backend.l3.interfaces import NamedEventSink, TraceSink
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.schema.pedagogy_pack import PedagogyPack
 
@@ -62,7 +83,10 @@ __all__ = [
     "MAX_SKILL_NAMES",
     "PROMPT_FORBIDDEN_SLOTS",
     "PROMPT_KEY_SLOTS",
+    "REQUIRED_CONTEXT_FALLBACK",
+    "REQUIRED_TUTOR_SLOTS",
     "SYSTEM_DEFECT_CAUSES",
+    "TUTOR_CONTEXT_EVENT_NAME",
     "AbsenceCause",
     "ConceptBrief",
     "PackBrief",
@@ -77,6 +101,9 @@ __all__ = [
     "build_tutor_content_summary",
     "build_tutor_context_manifest",
     "log_tutor_context",
+    "record_tutor_context",
+    "required_context_missing",
+    "tutor_context_trace_fields",
 ]
 
 logger = logging.getLogger("whymath.harness.wh1_tutor_context")
@@ -128,6 +155,34 @@ SYSTEM_DEFECT_CAUSES: frozenset[AbsenceCause] = frozenset(
     {AbsenceCause.SOURCE_DISABLED, AbsenceCause.LOOKUP_FAILED}
 )
 """튜터가 불린 턴에서 WARNING을 낼 원인 — 시스템 결함뿐(학생 측 부재·커버리지 공백은 INFO)."""
+
+REQUIRED_CONTEXT_FALLBACK = "required_context_missing"
+"""필수 누락 폴백 사유 코드(P3-74) — 응답 `tutor_context.fallback_reason`·로그·관측 공용."""
+
+REQUIRED_TUTOR_SLOTS: tuple[TutorContextSlot, ...] = (
+    TutorContextSlot.LEARNER_STATE,
+    TutorContextSlot.CONCEPT,
+)
+"""필수 슬롯(P3-74 · 지시문 순서) — 교수학 근거는 모듈 docstring 'P3-74' 단락.
+
+학생 상태: 튜터가 가진 유일한 학습자 모델(θ)이다. 없으면 정책이 0.0(평균 학생)으로 채워 측정한
+적 없는 학생을 아는 것처럼 비계를 정한다. 현재 개념: 튜터가 무엇을 가르치는지의 닻이다. 없으면
+프롬프트 개념 요약·구조화 출력의 진단 개념 id·도구 인자 허용 목록이 모두 빈다. 둘 다 *결함으로*
+빌 때만 필수 누락이다."""
+
+
+def required_context_missing(manifest: TutorContextManifest) -> list[TutorContextSlot]:
+    """필수 누락 슬롯(지시문 순서) — 필수 슬롯 중 *시스템 결함* 원인으로 비어 있는 것만.
+
+    판정은 매니페스트 `status_of`에서만 읽는다(두 번째 판정 원천 금지). 학생 측 정상 부재
+    (`no_history`·`no_problem_context`·`not_supplied`)와 커버리지 공백은 세지 않는다.
+    """
+    return [
+        slot
+        for slot in REQUIRED_TUTOR_SLOTS
+        if not manifest.status_of(slot).resolved
+        and manifest.status_of(slot).cause in SYSTEM_DEFECT_CAUSES
+    ]
 
 
 class TutorDeliveryPath(str, Enum):
@@ -219,6 +274,17 @@ class TutorContextManifest(BaseModel):
         description="값은 얻었으나 튜터에 실리지 않은 슬롯(지시문 순서). 완비 턴에도 남을 수 있다."
     )
     complete: bool = Field(description="9종 값을 전부 얻었는가(= missing이 비었는가).")
+    fallback_reason: Literal["required_context_missing"] | None = Field(
+        default=None,
+        description=(
+            "P3-74 — 필수 context(학생 상태·현재 개념)가 시스템 결함으로 비어 튜터를 부르지 않고 "
+            "결정론 Polya 템플릿으로 보낸 턴이면 `required_context_missing`. 그 밖은 null."
+        ),
+    )
+    required_missing: list[TutorContextSlot] = Field(
+        default_factory=list,
+        description="폴백을 일으킨 필수 슬롯(지시문 순서). 폴백이 아니면 빈 목록.",
+    )
 
     @model_validator(mode="after")
     def _all_nine_and_consistent(self) -> TutorContextManifest:
@@ -234,6 +300,18 @@ class TutorContextManifest(BaseModel):
             raise ValueError("complete가 missing과 어긋난다")
         if not self.tutor_invoked and any(s.delivered_to_tutor for s in self.slots):
             raise ValueError("튜터를 부르지 않은 턴에 전달됨 표기는 있을 수 없다")
+        # P3-74: 폴백 표기는 판정과 맞아야 한다 — 사유 없이 슬롯만, 슬롯 없이 사유만, 튜터를
+        # 부르고도 폴백 표기는 모두 거짓 표기다. 슬롯 목록은 `required_context_missing`(같은 판정)과
+        # 같아야 한다.
+        if self.fallback_reason is None:
+            if self.required_missing:
+                raise ValueError("폴백 사유 없이 required_missing을 표기할 수 없다")
+        else:
+            if self.tutor_invoked:
+                raise ValueError("필수 누락 폴백 턴은 튜터를 부르지 않는다")
+            expected = required_context_missing(self)
+            if not expected or self.required_missing != expected:
+                raise ValueError(f"required_missing이 판정과 어긋난다: {self.required_missing}")
         return self
 
     def status_of(self, slot: TutorContextSlot) -> TutorContextSlotStatus:
@@ -263,6 +341,20 @@ class TutorContextManifest(BaseModel):
             for s in self.slots
             if s.delivery_paths and TutorDeliveryPath.PROMPT not in s.delivery_paths
         ]
+
+    def with_required_fallback(self) -> TutorContextManifest:
+        """필수 누락 폴백(P3-74) 표기를 단 새 매니페스트 — 튜터 미호출·전달 0.
+
+        필수 누락이 없으면 `ValueError`(검증자) — 폴백 사유를 꾸며 달 수 없다.
+        """
+        return TutorContextManifest.model_validate(
+            {
+                **self.model_dump(),
+                "tutor_invoked": False,
+                "fallback_reason": REQUIRED_CONTEXT_FALLBACK,
+                "required_missing": required_context_missing(self),
+            }
+        )
 
     def with_delivery(
         self,
@@ -591,8 +683,9 @@ def build_tutor_context_manifest(
 def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
     """누락·미전달을 로그 1줄로 남긴다 — `슬롯(원인)`과 미전달 슬롯명만, 값·원문은 없다.
 
-    WARNING은 튜터가 불린 턴에서 시스템 결함 원인이 있을 때만. 그 밖의 누락·미전달은 INFO.
-    둘 다 없으면 남기지 않는다.
+    WARNING은 튜터가 불렸거나 필수 누락으로 폴백한 턴(P3-74)에서 시스템 결함 원인이 있을 때만.
+    그 밖의 누락·미전달은 INFO. 둘 다 없으면 남기지 않는다. 폴백 턴은 줄 끝에
+    `폴백 <사유>(<필수 슬롯>)`를 단다.
     """
     if manifest.complete and not manifest.not_delivered:
         return
@@ -603,11 +696,18 @@ def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
         for s in manifest.slots
         if not s.resolved
     )
-    defect = manifest.tutor_invoked and any(s.cause in SYSTEM_DEFECT_CAUSES for s in manifest.slots)
+    tutor_path = manifest.tutor_invoked or manifest.fallback_reason is not None
+    defect = tutor_path and any(s.cause in SYSTEM_DEFECT_CAUSES for s in manifest.slots)
+    required = " ".join(s.value for s in manifest.required_missing)
+    fallback = (
+        f" · 폴백 {manifest.fallback_reason}({required})"
+        if manifest.fallback_reason is not None
+        else ""
+    )
     logger.log(
         logging.WARNING if defect else logging.INFO,
         "튜터 context(seat=%s·tutor_invoked=%s) — 누락 %d/9: %s · 튜터 미전달 %d: %s"
-        " · 프롬프트 %d: %s",
+        " · 프롬프트 %d: %s%s",
         seat,
         manifest.tutor_invoked,
         len(manifest.missing),
@@ -616,4 +716,78 @@ def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
         " ".join(manifest.not_delivered_names()) or "-",
         len(manifest.prompt_names()),
         " ".join(manifest.prompt_names()) or "-",
+        fallback,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-73 — 튜터 context 구성 요약의 Langfuse 기록(이벤트 `tutor_context` · 값 0)
+# ──────────────────────────────────────────────────────────────────────────
+TUTOR_CONTEXT_EVENT_NAME = "tutor_context"
+"""Langfuse 이벤트명 — `l3_routing`(비용 판독 조회 키)과 달라야 한다(테스트가 동결)."""
+
+
+def tutor_context_trace_fields(manifest: TutorContextManifest, *, seat: str) -> dict[str, object]:
+    """매니페스트 → Langfuse 이벤트 필드(순수 함수). 슬롯 *이름*·판정·크기·원인 코드만 — 값은 없다.
+
+    크기(`size`)는 응답 `tutor_context`에 이미 실리는 그 값이다(축 수·스킬 수·단계 수·가설 수 —
+    학생 답안은 null). 이름 목록 세 개(`context_missing`·`context_not_delivered`·
+    `context_coverage_gap`)는 관측 레코드의 같은 이름 필드와 **같은 메서드**에서 나온다(이중 회계).
+    """
+    return {
+        "seat": seat,
+        "tutor_invoked": manifest.tutor_invoked,
+        "complete": manifest.complete,
+        "slots": [
+            {
+                "slot": s.slot.value,
+                "resolved": s.resolved,
+                "delivered_to_tutor": s.delivered_to_tutor,
+                "delivery_paths": [p.value for p in s.delivery_paths],
+                "size": s.size,
+                "cause": s.cause.value if s.cause is not None else None,
+            }
+            for s in manifest.slots
+        ],
+        "context_missing": manifest.missing_names(),
+        "context_not_delivered": manifest.not_delivered_names(),
+        "context_coverage_gap": manifest.coverage_gap_names(),
+        "context_prompt": manifest.prompt_names(),
+        "context_held_privately": manifest.held_privately_names(),
+        # P3-74 — 필수 누락 폴백 턴이면 사유·슬롯 이름(아니면 null·빈 목록).
+        "fallback_reason": manifest.fallback_reason,
+        "required_missing": [s.value for s in manifest.required_missing],
+    }
+
+
+def record_tutor_context(
+    trace: TraceSink | None, manifest: TutorContextManifest, *, seat: str
+) -> bool:
+    """튜터 context 구성 요약을 Langfuse 이벤트 `tutor_context`로 남긴다 — never-break.
+
+    반환: 기록을 싱크에 넘겼으면 True, 넘기지 않았으면 False(호출부·테스트가 읽는다).
+
+    - 싱크가 없으면(`trace=None` — 앱 state 미구성) 기록 0·로그 없음(설정 부재는 결함이 아니다).
+    - 싱크가 이름 있는 이벤트를 못 받으면(`NamedEventSink` 미충족) 기록 0 + WARNING(싱크 타입명) —
+      `record()`로 대신 보내지 않는다(그러면 `l3_routing` 비용 표본이 오염된다).
+    - 필드 조립·전송 중 예외는 삼키고 **예외 타입명**을 WARNING으로 남긴다(침묵 실패 금지) — 관측
+      장애가 학생 응답을 깨지 않는다(우선순위 #1 ≫ #6).
+    """
+    if trace is None:
+        return False
+    if not isinstance(trace, NamedEventSink):
+        logger.warning(
+            "튜터 context Langfuse 기록 생략 — 싱크(%s)가 이름 있는 이벤트를 받지 않는다",
+            type(trace).__name__,
+        )
+        return False
+    try:
+        trace.record_event(
+            TUTOR_CONTEXT_EVENT_NAME, tutor_context_trace_fields(manifest, seat=seat)
+        )
+    except Exception as exc:  # noqa: BLE001 — 관측 실패가 학생 응답을 깨면 안 된다.
+        logger.warning(
+            "튜터 context Langfuse 기록 실패(%s) — 무시하고 계속(응답 비차단)", type(exc).__name__
+        )
+        return False
+    return True

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,8 +14,12 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 튜터 호출마다 P3-08 매니페스트 구성 요약(슬롯 이름·resolved/delivered·원인 코드 — 값 0)을 Langfuse에 남긴다. 방식은 둘 중 하나: ⓐ 별도 이벤트명(cost_report는 name=\"l3_routing\" 필터라 표본 오염 없음 — ops/cost_report.py:63·628) ⓑ 튜터 l3_routing 이벤트의 메타데이터 키.\n② LangfuseSink가 이벤트명을 l3_routing으로 하드코딩(l3/trace/langfuse_sink.py:61)하므로 sink 확장(이벤트명 인자) 또는 메타데이터 결선을 함께 한다. cost_report 집계 무변화를 테스트로 동결.\n③ 관측 장애 시 never-break·예외 타입명 로그(침묵 실패 금지), 인프로세스 레코드(context_* 필드)와 이중 회계."
-artifacts: []
+artifacts:
+  - "PR #1742 · 스쿼시 83c293b4"
 paths: []
 session: null
-notes: "P3-08 승계(PR #1705 검토 중5-b·하6). 지시문 [12] 4항 'Langfuse에 context 구성 요약(키·크기)' 미이행분. P3-08은 같은 요약을 WH-1 관측 레코드(context_missing·context_not_delivered·context_coverage_gap)에만 실었다. 보류 사유는 오염 우려가 아니라 sink 확장 필요(이벤트명 하드코딩)."
-updated: 2026-10-20
+notes: |-
+  P3-08 승계(PR #1705 검토 중5-b·하6). 지시문 [12] 4항 'Langfuse에 context 구성 요약(키·크기)' 미이행분. P3-08은 같은 요약을 WH-1 관측 레코드(context_missing·context_not_delivered·context_coverage_gap)에만 실었다. 보류 사유는 오염 우려가 아니라 sink 확장 필요(이벤트명 하드코딩).
+
+  [미러 면제 2026-10-26] 구현 커밋 2d23549a에서 ci_mirror 실행분 전부 통과(미실행 1=코퍼스 조건부 QA 스텝) 후 PR #1742 머지 큐 CI 통과로 main 83c293b4 머지 — done은 머지 후 대장 기록이라 현재 HEAD(main) 재현은 머지 큐 CI가 이미 판정
+updated: 2026-10-26
