@@ -1,6 +1,6 @@
 """Solution QA — 문제·정답·풀이 불일치 기계 검증 (P3-07 · 순수·결정론·LLM 0·DB 0).
 
-수학앱은 문항 하나가 틀려도 신뢰가 무너진다. 이 모듈은 문항마다 **네 가지 검사**를 SymPy 단일 권위
+수학앱은 문항 하나가 틀려도 신뢰가 무너진다. 이 모듈은 문항마다 **다섯 가지 검사**를 SymPy 단일 권위
 경로로 돌려 3상태(통과/실패/검증 불가)를 낸다.
 
   C1 정답 ↔ 문제 조건   `verify.conditions` 를 정답이 만족하는가 + 레코드의 `answer` 필드가
@@ -12,6 +12,12 @@
                         동치가 아닌 해석 단계(근 선택 `a = -6, a = 6 → a = 6`·
                         대입 `x = 3 → y = 4`)는 문항 조건(도메인 제약·`answer_selection`·
                         정의 등식)으로 판정한다(P3-71)
+  C5 발문 독립 재유도     `question_text` 에서 함수식·질문 의도를 읽어 정답을 **처음부터 다시
+  계산**해
+                        `answer` 와 비교한다(P3-63 · `question_rederive`). `verify` 를 한 글자도
+                        읽지 않는다 — C1 이 "정답이 정답에서 역산한 conditions 를 만족한다"에 그치는
+                        계열의 독립성 고리를 닫는다. 인식기가 없는 문장 틀은 **미적용**이며
+                        통과로 세지 않고 적용 범위 표(`[C5 적용 범위]`)에 따로 낸다
 
 왜 `corpus_reverify` 와 별개 모듈인가 (2026-10-18 실측)
 -----------------------------------------------------
@@ -30,7 +36,8 @@
 -------------------------------------------------------------
 검사 하나의 상태는 PASS / FAIL / UNVERIFIABLE / NOT_APPLICABLE(구조상 해당 없음 — 선택지 없는 문항의
 C3). 문항의 판정은 FAIL 이 하나라도 있으면 FAIL, 없고 UNVERIFIABLE 이 하나라도 있으면 UNVERIFIABLE,
-아니면 PASS 다. 즉 **네 검사가 모두 결정된 문항만 통과**한다.
+아니면 PASS 다. 즉 **적용된 검사가 모두 결정된 문항만 통과**한다(C3·C5 는 해당 없음/미적용일 수 있고
+그 범위는 보고서가 따로 낸다).
 
   Solution QA Pass = PASS / (PASS + FAIL)      ← 기계 검증 대상 = 판정이 난 문항
   검증 가능 비율    = (PASS + FAIL) / 전체      ← 분모를 줄여 통과율을 올리는 길을 막으려 함께 낸다
@@ -54,8 +61,8 @@ P3-14 ④ 는 같은 집계를 스코어카드 임계(비율)로 판정하므로
   (예: 극댓값
   108 문항의 conditions 가 `x**2 + 284*x - 42336 = 0`). 이 경우 C1 통과는 "정답이 자기 자신에게서
   유도된 식을 만족한다"는 뜻이라 **통과율은 실제 정확도의 상한**이다. 발문 ↔ conditions
-  독립 재유도는
-  계열별 파서가 필요한 별개 작업이다(후속 태스크로 등재).
+  독립 재유도는 C5(P3-63)가 맡는다 — 단 **C5 가 적용된 문항에 한해서**다. 미적용 문항은 이 상한이
+  그대로 남는다(적용 범위는 보고서 `[C5 적용 범위]`).
 · `answer_explanation`(서술 해설)은 기계가 읽지 않는다. 풀이 검증 대상은 구조화된
   `solution_steps` 뿐이다.
 · 근 선택 규칙이 `answer_selection`(큰 근/작은 근)으로 구조화돼 있지 않은 문항은,
@@ -90,6 +97,11 @@ from typing import Any, Final, cast
 # 값 동치·풀이 꼴 해석·해석 단계 판정은 `l3.verify_solution` 의 공용 구현을 쓴다(P3-76 —
 # 수용 게이트·야간 재검증과 한 구현). 별칭은 이 모듈의 기존 호출부 이름을 유지한다.
 from whymath_backend.harness.corpus_reverify import _CONCEPTUAL_VERIFIERS, _iter_records
+from whymath_backend.harness.question_rederive import (
+    FAMILY_TITLES,
+    RederiveState,
+    rederive_question,
+)
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
     RootSelection,
@@ -124,12 +136,13 @@ EXIT_OK: Final = 0
 EXIT_FAIL: Final = 1
 EXIT_UNMEASURED: Final = 2
 
-CHECK_IDS: Final = ("C1", "C2", "C3", "C4")
+CHECK_IDS: Final = ("C1", "C2", "C3", "C4", "C5")
 CHECK_TITLES: Final[Mapping[str, str]] = {
     "C1": "정답 ↔ 문제 조건 (+ answer 필드 ↔ answer_map)",
     "C2": "풀이 최종 답 ↔ 정답",
     "C3": "선택지에 정답이 정확히 한 번",
     "C4": "풀이 단계 연쇄 동치",
+    "C5": "발문 독립 재유도 ↔ 정답 (적용된 문항만)",
 }
 
 # 보고용 상한 — 화면 요약에서만 자른다(사람 검수 대기 목록은 --queue-out 으로 전건).
@@ -469,6 +482,39 @@ def _check_c4(verify: Mapping[str, object] | None) -> CheckResult:
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# C5 — 발문 독립 재유도 ↔ 정답
+# ──────────────────────────────────────────────────────────────────────────
+C5_NOT_COVERED: Final = "C5_NOT_COVERED"
+
+
+def _check_c5(record: Mapping[str, object]) -> CheckResult:
+    """발문(`question_text`)만으로 정답을 다시 계산해 `answer` 와 비교한다(`verify` 는 안 읽는다).
+
+    미적용(인식기 없음·매개변수 미지원)은 NOT_APPLICABLE 로 두되 사유 코드를 남겨 적용 범위 표가
+    센다.
+    판정 가능하지만 값이 하나로 안 정해지면 UNVERIFIABLE(모른다 ≠ 아니다).
+    """
+    question, answer = record.get("question_text"), record.get("answer")
+    if not isinstance(question, str) or not question.strip():
+        return CheckResult(CheckState.NOT_APPLICABLE, "C5_NO_QUESTION_TEXT")
+    if not isinstance(answer, str) or not answer.strip():
+        return CheckResult(CheckState.NOT_APPLICABLE, "C5_NO_ANSWER")  # 정답 부재는 C1 이 FAIL
+    result = rederive_question(question)
+    if result.state is RederiveState.NOT_COVERED:
+        return CheckResult(CheckState.NOT_APPLICABLE, C5_NOT_COVERED, result.reason)
+    family = result.family or "?"
+    if result.state is RederiveState.UNDECIDED:
+        return _unv("C5_REDERIVE_UNDECIDED", f"{family}:{result.reason}")
+    assert result.value is not None
+    relation = _same(result.value, answer)
+    if relation is _Same.SAME:
+        return CheckResult(CheckState.PASS, None, family)
+    if relation is _Same.UNKNOWN:
+        return _unv("C5_VALUE_COMPARE_UNKNOWN", family)
+    return _fail("C5_QUESTION_REDERIVED_MISMATCH", f"{family}: 발문 재유도 값 ≠ 정답")
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 문항 판정·집계
 # ──────────────────────────────────────────────────────────────────────────
 def _guard(compute: Callable[[], CheckResult]) -> CheckResult:
@@ -480,7 +526,7 @@ def _guard(compute: Callable[[], CheckResult]) -> CheckResult:
 
 
 def judge_record(record: Mapping[str, object]) -> ItemResult:
-    """문항 1건 → 4검사 결과와 판정."""
+    """문항 1건 → 5검사 결과와 판정."""
     raw_verify = record.get("verify")
     verify = raw_verify if isinstance(raw_verify, dict) else None
     checks = {
@@ -488,6 +534,7 @@ def judge_record(record: Mapping[str, object]) -> ItemResult:
         "C2": _guard(lambda: _check_c2(record, verify)),
         "C3": _guard(lambda: _check_c3(record)),
         "C4": _guard(lambda: _check_c4(verify)),
+        "C5": _guard(lambda: _check_c5(record)),
     }
     states = {res.state for res in checks.values()}
     if CheckState.FAIL in states:
@@ -577,6 +624,37 @@ class SolutionQaReport:
                 counter[f"{cid}:{res.code}"] += 1
         return dict(sorted(counter.items(), key=lambda kv: (-kv[1], kv[0])))
 
+    def c5_outcome(self, item: ItemResult) -> str:
+        """C5 결과를 적용 범위 분류로: applied · undecided · not_covered · not_applicable."""
+        res = item.checks["C5"]
+        if res.state in (CheckState.PASS, CheckState.FAIL):
+            return "applied"
+        if res.state is CheckState.UNVERIFIABLE:
+            return "undecided"
+        return "not_covered" if res.code == C5_NOT_COVERED else "not_applicable"
+
+    def c5_coverage(self) -> dict[str, dict[str, int]]:
+        """단원별 C5 적용 범위 — 적용 문항만 발문 재유도를 거쳤다."""
+        table: dict[str, Counter[str]] = {}
+        for item in self.items:
+            table.setdefault(item.unit, Counter())[self.c5_outcome(item)] += 1
+        return {unit: dict(c) for unit, c in sorted(table.items())}
+
+    def c5_by_family(self) -> dict[str, int]:
+        """C5 가 적용된 문항의 문장 틀 계열별 건수(PASS 는 detail 에 계열을 남긴다)."""
+        counter: Counter[str] = Counter()
+        for item in self.items:
+            res = item.checks["C5"]
+            if res.state is CheckState.PASS and res.detail:
+                counter[res.detail] += 1
+            elif res.state is CheckState.FAIL and res.detail:
+                counter[res.detail.split(":", 1)[0]] += 1
+        return dict(sorted(counter.items(), key=lambda kv: (-kv[1], kv[0])))
+
+    def c5_not_covered(self) -> tuple[ItemResult, ...]:
+        """C5 미적용 문항 전건 — 발문 독립 재유도를 못 받은, 사람 검수에 남는 목록."""
+        return tuple(item for item in self.items if self.c5_outcome(item) == "not_covered")
+
     def unit_breakdown(self) -> dict[str, dict[str, int]]:
         table: dict[str, Counter[str]] = {}
         for item in self.items:
@@ -604,6 +682,31 @@ def _pct(value: float | None) -> str:
     return "측정 불가" if value is None else f"{value:.2%}"
 
 
+def _format_c5_coverage(report: SolutionQaReport) -> list[str]:
+    """C5(발문 독립 재유도)의 적용 범위 — 통과율이 이 범위만큼만 독립 검증됐음을 매번 적는다."""
+    totals: Counter[str] = Counter()
+    for item in report.items:
+        totals[report.c5_outcome(item)] += 1
+    applied = totals["applied"]
+    rate = applied / report.total if report.total else None
+    lines = [
+        "",
+        "[C5 적용 범위] — 발문에서 정답을 다시 계산한 문항만 독립 검증이다",
+        f"  적용 {applied}/{report.total} = {_pct(rate)}"
+        f"  · 값 미정(검증 불가) {totals['undecided']} · 미적용 {totals['not_covered']}"
+        f" · 해당 없음 {totals['not_applicable']}",
+    ]
+    for unit, counts in report.c5_coverage().items():
+        n = sum(counts.values())
+        lines.append(f"  {unit}: 적용 {counts.get('applied', 0)}/{n}")
+    if totals["not_covered"]:
+        lines.append(
+            "  ※ 미적용 문항은 C1~C4 만 통과한 값이다(발문 ↔ conditions 독립성 미확인) — "
+            "전건 목록: --c5-list-out"
+        )
+    return lines
+
+
 def format_report(report: SolutionQaReport, *, scope: str, target: float | None) -> str:
     lines = [
         "=" * 64,
@@ -626,6 +729,7 @@ def format_report(report: SolutionQaReport, *, scope: str, target: float | None)
     for cid, counts in report.check_matrix().items():
         lines.append(f"  {cid} {CHECK_TITLES[cid]}: {counts}")
     lines.append(f"  (C1 다변수 소속 대조 {report.multivar_membership}건 — 약한 검사)")
+    lines += _format_c5_coverage(report)
     unv = report.reason_counts(CheckState.UNVERIFIABLE)
     if unv:
         lines += ["", "[검증 불가 사유 — 사람 검수 대기]"]
@@ -654,6 +758,15 @@ def to_json(report: SolutionQaReport, *, scope: str, target: float | None) -> di
         "unverifiable_reasons": report.reason_counts(CheckState.UNVERIFIABLE),
         "unit_breakdown": report.unit_breakdown(),
         "multivar_membership": report.multivar_membership,
+        "c5_coverage": report.c5_coverage(),
+        "c5_by_family": report.c5_by_family(),
+        "c5_family_titles": {
+            k: FAMILY_TITLES[k] for k in report.c5_by_family() if k in FAMILY_TITLES
+        },
+        "c5_not_covered": [
+            {"ident": i.ident, "unit": i.unit, "reason": i.checks["C5"].detail}
+            for i in report.c5_not_covered()
+        ],
         "failures": [{"ident": i, "reason": r} for i, r in report.failures],
     }
 
@@ -699,6 +812,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--queue-out", type=Path, default=None, help="사람 검수 대기 목록 JSONL(검증 불가 전건)"
     )
+    parser.add_argument(
+        "--c5-list-out",
+        type=Path,
+        default=None,
+        help="C5 미적용(발문 재유도를 못 받은) 문항 전건 JSONL — 사유 코드 포함",
+    )
     return parser
 
 
@@ -736,6 +855,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.queue_out is not None:
         args.queue_out.write_text(
             "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in _queue_rows(report)),
+            encoding="utf-8",
+        )
+    if args.c5_list_out is not None:
+        args.c5_list_out.write_text(
+            "".join(
+                json.dumps(
+                    {"ident": i.ident, "unit": i.unit, "reason": i.checks["C5"].detail},
+                    ensure_ascii=False,
+                )
+                + "\n"
+                for i in report.c5_not_covered()
+            ),
             encoding="utf-8",
         )
     if report.pass_rate is None:
