@@ -12,7 +12,8 @@
                         동치가 아닌 해석 단계(근 선택 `a = -6, a = 6 → a = 6`·
                         대입 `x = 3 → y = 4`)는 문항 조건(도메인 제약·`answer_selection`·
                         정의 등식)으로 판정한다(P3-71)
-  C5 발문 독립 재유도     `question_text` 에서 함수식·질문 의도를 읽어 정답을 **처음부터 다시 계산**해
+  C5 발문 독립 재유도     `question_text` 에서 함수식·질문 의도를 읽어 정답을 **처음부터 다시
+  계산**해
                         `answer` 와 비교한다(P3-63 · `question_rederive`). `verify` 를 한 글자도
                         읽지 않는다 — C1 이 "정답이 정답에서 역산한 conditions 를 만족한다"에 그치는
                         계열의 독립성 고리를 닫는다. 인식기가 없는 문장 틀은 **미적용**이며
@@ -487,9 +488,10 @@ C5_NOT_COVERED: Final = "C5_NOT_COVERED"
 
 
 def _check_c5(record: Mapping[str, object]) -> CheckResult:
-    """발문(`question_text`)만으로 정답을 다시 계산해 `answer` 와 비교한다 — `verify` 는 읽지 않는다.
+    """발문(`question_text`)만으로 정답을 다시 계산해 `answer` 와 비교한다(`verify` 는 안 읽는다).
 
-    미적용(인식기 없음·매개변수 미지원)은 NOT_APPLICABLE 로 두되 사유 코드를 남겨 적용 범위 표가 센다.
+    미적용(인식기 없음·매개변수 미지원)은 NOT_APPLICABLE 로 두되 사유 코드를 남겨 적용 범위 표가
+    센다.
     판정 가능하지만 값이 하나로 안 정해지면 UNVERIFIABLE(모른다 ≠ 아니다).
     """
     question, answer = record.get("question_text"), record.get("answer")
@@ -686,10 +688,11 @@ def _format_c5_coverage(report: SolutionQaReport) -> list[str]:
     for item in report.items:
         totals[report.c5_outcome(item)] += 1
     applied = totals["applied"]
+    rate = applied / report.total if report.total else None
     lines = [
         "",
         "[C5 적용 범위] — 발문에서 정답을 다시 계산한 문항만 독립 검증이다",
-        f"  적용 {applied}/{report.total} = {_pct(applied / report.total if report.total else None)}"
+        f"  적용 {applied}/{report.total} = {_pct(rate)}"
         f"  · 값 미정(검증 불가) {totals['undecided']} · 미적용 {totals['not_covered']}"
         f" · 해당 없음 {totals['not_applicable']}",
     ]
@@ -757,7 +760,9 @@ def to_json(report: SolutionQaReport, *, scope: str, target: float | None) -> di
         "multivar_membership": report.multivar_membership,
         "c5_coverage": report.c5_coverage(),
         "c5_by_family": report.c5_by_family(),
-        "c5_family_titles": {k: FAMILY_TITLES[k] for k in report.c5_by_family() if k in FAMILY_TITLES},
+        "c5_family_titles": {
+            k: FAMILY_TITLES[k] for k in report.c5_by_family() if k in FAMILY_TITLES
+        },
         "c5_not_covered": [
             {"ident": i.ident, "unit": i.unit, "reason": i.checks["C5"].detail}
             for i in report.c5_not_covered()

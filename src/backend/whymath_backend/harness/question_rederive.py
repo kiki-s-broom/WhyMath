@@ -1,4 +1,4 @@
-"""발문 독립 재유도 — 문항 본문(question_text)에서 정답을 처음부터 다시 계산한다 (P3-63 · Solution QA C5).
+"""발문 독립 재유도 — 문항 본문에서 정답을 처음부터 다시 계산한다 (P3-63 · Solution QA C5).
 
 왜 필요한가 (P3-07 실측 · 2026-10-18)
 -------------------------------------
@@ -14,7 +14,8 @@ x=108 이 근이 되도록 만든 식이다). 이 경우 C1 통과는 "정답이
 인식 방식 — 문장 틀 전체 일치(fullmatch)
 ----------------------------------------
 발문을 느슨하게 훑어 숫자를 줍지 않는다. 생성기 문장 틀마다 **정규식 전체 일치**로 의도를 확정하고,
-함수식 칸(`f(x) = ⟨식⟩`)만 SymPy 로 읽는다. 틀에 안 맞는 발문은 억지로 풀지 않고 **미적용**으로 둔다 —
+함수식 칸(`f(x) = ⟨식⟩`)만 SymPy 로 읽는다. 틀에 안 맞는 발문은 억지로 풀지 않고 **미적용**으로 둔다
+—
 "읽었다고 믿고 틀린 값을 재유도"하는 것이 "읽지 않는 것"보다 나쁘다(거짓 FAIL 이 사람 시간을 쓴다).
 식 파싱은 `l3.safe_parse.safe_sympify` 단일 진입점만 쓴다(코딩 헌법 R22-03).
 
@@ -26,10 +27,13 @@ x=108 이 근이 되도록 만든 식이다). 이 경우 C1 통과는 "정답이
 
 정직 스코프
 -----------
-· 이 모듈이 읽는 것은 **함수식과 질문 의도**뿐이다. 발문의 서술 맥락(단, 조건)이 식에 영향을 주는 틀은
+· 이 모듈이 읽는 것은 **함수식과 질문 의도**뿐이다. 발문의 서술 맥락(단, 조건)이 식에 영향을 주는
+  틀은
   그 조건까지 틀에 포함한 것만 인식한다.
-· 매개변수가 든 식(`x^3 + ax^2 - 5x`)은 방정식을 세워 풀어야 해서 이번 범위 밖이다 — 미적용으로 목록화한다.
-· 인식기가 맞아 보여도 **재유도 값 = 정답** 은 "발문이 이 정답을 낳는다"의 증거일 뿐, 풀이 서술의 옳음은
+· 매개변수가 든 식(`x^3 + ax^2 - 5x`)은 방정식을 세워 풀어야 해서 이번 범위 밖이다 — 미적용으로
+  목록화한다.
+· 인식기가 맞아 보여도 **재유도 값 = 정답** 은 "발문이 이 정답을 낳는다"의 증거일 뿐, 풀이 서술의
+  옳음은
   C2·C4 가 따로 본다.
 """
 
@@ -82,7 +86,7 @@ class _NotCovered(Exception):  # noqa: N818 — 오류가 아니라 '이 발문�
         self.reason = reason
 
 
-class _NoMatch(Exception):  # noqa: N818 — 접두는 맞았지만 꼬리 문장을 모르는 틀: 다음 규칙으로 넘긴다
+class _NoMatch(Exception):  # noqa: N818 — 접두만 맞고 꼬리를 모르는 틀: 다음 규칙으로
     pass
 
 
@@ -132,7 +136,8 @@ def _expand_ellipsis(raw: str) -> str:
     """`x + 2x^2 + 3x^3 + ... + 8x^8` 같은 나열을 펼친다. 규칙을 확정할 수 없으면 미적용.
 
     머리항(2개 이상)에서 거듭제곱의 등차(공차 s)와 계수의 규칙(등차 또는 부호 교대)을 읽고, 꼬리항의
-    거듭제곱까지 같은 규칙으로 채운 뒤 **꼬리항의 계수가 규칙의 예측과 일치하는지** 확인한다 — 예측과
+    거듭제곱까지 같은 규칙으로 채운 뒤 **꼬리항의 계수가 규칙의 예측과 일치하는지** 확인한다 —
+    예측과
     다르면 규칙을 잘못 읽은 것이므로 풀지 않는다.
     """
     m = re.fullmatch(r"(?P<head>.+?) \+ \.\.\. (?P<ts>[+-]) (?P<tail>.+)", raw)
@@ -150,7 +155,7 @@ def _expand_ellipsis(raw: str) -> str:
         return out
 
     head = terms(m["head"])
-    (tail_coef, tail_pow) = terms(m["ts"] + m["tail"])[0]
+    tail_coef, tail_pow = terms(m["ts"] + m["tail"])[0]
     if len(head) < 2:
         raise _NotCovered("ELLIPSIS_TOO_SHORT")
     step = head[1][1] - head[0][1]
@@ -168,13 +173,13 @@ def _expand_ellipsis(raw: str) -> str:
     elif alternating:
 
         def predict(i: int) -> int:
-            return coefs[0] * (-1) ** i
+            return coefs[0] * (1 if i % 2 == 0 else -1)
 
     elif coefs[0] != 0 and len(set(b / a for a, b in zip(coefs, coefs[1:], strict=False))) == 1:
         ratio = coefs[1] // coefs[0]  # 등비 — 머리항 3개 이상일 때만 공비가 확정된다
 
         def predict(i: int) -> int:
-            return coefs[0] * ratio**i
+            return coefs[0] * int(ratio**i)
 
         if len(coefs) < 3 or coefs[1] != coefs[0] * ratio:
             raise _NotCovered("ELLIPSIS_COEFFICIENT_RULE")
@@ -253,12 +258,13 @@ def _local_sign(g: sympy.Expr, point: sympy.Expr, side: int) -> int:
         value = sympy.simplify(sympy.diff(g, _X, order).subs(_X, point))
         if value != 0:
             sign = 1 if value > 0 else -1
-            return sign * (side**order)
+            return sign * (1 if order % 2 == 0 else side)
     raise _Undecided("ABS_SIGN_UNRESOLVED")
 
 
 def _resolve_abs(f: sympy.Expr, point: sympy.Expr, side: int) -> sympy.Expr:
-    """`point` 의 한쪽(우 +1 · 좌 -1) 근방에서 절댓값을 벗긴 다항식 — 그 쪽 미분계수의 정확한 원천."""
+    """`point` 의 한쪽(우 +1 · 좌 -1) 근방에서 절댓값을 벗긴 다항식 — 그 쪽 미분계수의 "
+    "정확한 원천."""
     mapping: dict[sympy.Expr, sympy.Expr] = {}
     for node in f.atoms(sympy.Abs):
         (arg,) = node.args
@@ -317,9 +323,9 @@ _RULES: list[_Rule] = []
 FAMILY_TITLES: dict[str, str] = {}
 
 
-def _rule(family: str, title: str, pattern: str) -> Callable[
-    [Callable[[re.Match[str]], sympy.Expr]], Callable[[re.Match[str]], sympy.Expr]
-]:
+def _rule(
+    family: str, title: str, pattern: str
+) -> Callable[[Callable[[re.Match[str]], sympy.Expr]], Callable[[re.Match[str]], sympy.Expr]]:
     """문장 틀 하나를 등록한다. `pattern` 은 발문 **전체**에 일치해야 한다."""
 
     def register(
@@ -370,7 +376,8 @@ def _tangent_slope_pick(m: re.Match[str]) -> sympy.Expr:
     r"(?P<k2>극댓값|극솟값)을 가질 때, 그 x의 값)(?:을|를) 구하시오\.",
 )
 def _local_extremum_x(m: re.Match[str]) -> sympy.Expr:
-    # '극대'(대 U+B300)와 '극댓값'(댓 U+B313)은 둘째 글자가 다르다 — 접두 비교 하나로는 극댓값을 놓친다.
+    # '극대'(대 U+B300)와 '극댓값'(댓 U+B313)은 둘째 글자가 다르다 — 접두 비교 하나로는 극댓값을
+    # 놓친다.
     kind = "max" if (m["k1"] or m["k2"]).startswith(("극대", "극댓")) else "min"
     return _single(_local_extrema(_read_expr(m["f"]), kind), "EXTREMUM_POINTS")
 
@@ -388,9 +395,7 @@ def _local_extremum_x(m: re.Match[str]) -> sympy.Expr:
 )
 def _local_extremum_value(m: re.Match[str]) -> sympy.Expr:
     f = _read_expr(m["f"])
-    point = _single(
-        _local_extrema(f, "max" if m["k"] == "극댓값" else "min"), "EXTREMUM_POINTS"
-    )
+    point = _single(_local_extrema(f, "max" if m["k"] == "극댓값" else "min"), "EXTREMUM_POINTS")
     return sympy.simplify(f.subs(_X, point))
 
 
@@ -501,7 +506,8 @@ def _derivative_constant_term(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "power_derivative_form",
     "x^n 의 도함수 cx^m 꼴의 c+m · c·m",
-    r"(?:함수 )?(?:f\(x\)|g\(t\)|y) = (?P<c0>\d*)(?P<v>[xt])\^(?P<n>\d+).*?(?P<ask>[ck] \+ m|[ck]와 m의 곱).*",
+    r"(?:함수 )?(?:f\(x\)|g\(t\)|y) = (?P<c0>\d*)(?P<v>[xt])\^(?P<n>\d+).*?(?P<ask>[ck] "
+    r"\+ m|[ck]와 m의 곱).*",
 )
 def _power_derivative_form(m: re.Match[str]) -> sympy.Expr:
     n = int(m["n"])
@@ -625,7 +631,8 @@ def _tangent(f: sympy.Expr, a: sympy.Expr) -> tuple[sympy.Expr, sympy.Expr]:
 
 
 def _require_on_curve(f: sympy.Expr, a: sympy.Expr, b_text: str | None) -> None:
-    """발문이 준 접점 (a, b) 가 곡선 위에 있는지 — 아니면 발문 자체가 모순이라 값을 정하지 않는다."""
+    """발문이 준 접점 (a, b) 가 곡선 위에 있는지 — 아니면 발문 자체가 모순이라 "
+    "값을 정하지 않는다."""
     if b_text is None or b_text.startswith("f("):
         return
     if sympy.simplify(f.subs(_X, a) - sympy.Rational(b_text)) != 0:
@@ -639,7 +646,9 @@ _TANGENT_PREFIXES: Final = (
     r"(?P<tail>.+)",
 )
 _TAIL_SLOPE: Final = re.compile(r"의 기울기(?:를 구하시오|는\?|로 옳은 것은\?)\.?")
-_TAIL_YINT: Final = re.compile(r"(?:의 y절편(?:을 구하시오|은\?)|이 y축과 만나는 점의 y좌표를 구하시오)\.?")
+_TAIL_YINT: Final = re.compile(
+    r"(?:의 y절편(?:을 구하시오|은\?)|이 y축과 만나는 점의 y좌표를 구하시오)\.?"
+)
 _TAIL_XINT: Final = re.compile(r"이 x축과 만나는 점의 x좌표를 구하시오\.")
 _TAIL_G: Final = re.compile(
     rf"의 방정식을 y = g\(x\)라 할 때, g\((?P<c>{_NUM})\)의 값(?:을 구하시오|은\?)\.?"
@@ -779,7 +788,10 @@ def _tangent_at_axis_crossing(m: re.Match[str]) -> sympy.Expr:
 # 수직선 위의 운동 — 위치 x(t) 에서 속도·가속도
 # ──────────────────────────────────────────────────────────────────────────
 _T_RANGE: Final = r"(?: \(t [>≥] 0\))?"
-_MOTION: Final = rf"수직선 위(?:의|를 움직이는) 점 P의 시각 t{_T_RANGE}에서의 위치가 x = (?P<f>{_E})(?:일 때|이다)"
+_MOTION: Final = (
+    rf"수직선 위(?:의|를 움직이는) 점 P의 시각 t{_T_RANGE}에서의 위치가 x = (?P<f>{_E})(?:일 "
+    r"때|이다)"
+)
 _Q: Final = {"속도": 1, "순간속도": 1, "가속도": 2}
 
 
@@ -793,9 +805,9 @@ def _at(expr: sympy.Expr, t: str) -> sympy.Expr:
     return sympy.simplify(expr.subs(_T, _rat(t)))
 
 
-def _motion(pattern: str, family: str, title: str) -> Callable[
-    [Callable[[re.Match[str]], sympy.Expr]], Callable[[re.Match[str]], sympy.Expr]
-]:
+def _motion(
+    pattern: str, family: str, title: str
+) -> Callable[[Callable[[re.Match[str]], sympy.Expr]], Callable[[re.Match[str]], sympy.Expr]]:
     return _rule(family, title, rf"{_MOTION}, {pattern}")
 
 
@@ -932,7 +944,8 @@ def _nth_direction_change(m: re.Match[str]) -> sympy.Expr:
 
 
 @_motion(
-    r"점 P가 (?P<o>처음 |처음으로 |두 번째로 )?운동 방향을 바꾸(?:는|ㄹ) (?P<ask>시각 t를 구하시오\.)",
+    r"점 P가 (?P<o>처음 |처음으로 |두 번째로 )?운동 방향을 바꾸(?:는|ㄹ) (?P<ask>시각 "
+    r"t를 구하시오\.)",
     "motion_direction_change",
     "운동 방향을 바꾸는 시각·위치·가속도",
 )
@@ -1022,7 +1035,8 @@ _EXTREMUM_TAILS: Final[list[tuple[re.Pattern[str], _TailFn]]] = [
     ),
     (
         re.compile(
-            rf"(?:증가·감소가|증가와 감소가) 바뀌는 (?:점의 )?x(?:좌표|의 값) 중 {_PICK} 값을 구하시오\."
+            r"(?:증가·감소가|증가와 감소가) 바뀌는 (?:점의 )?x(?:좌표|의 값) "
+            rf"중 {_PICK} 값을 구하시오\."
         ),
         lambda m, c: _pick_by_size(_both(c), m["s"]),
     ),
@@ -1109,7 +1123,8 @@ def _root_count_equation(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "real_root_count",
     "방정식·곡선의 서로 다른 실근(교점) 개수",
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 방정식 f\(x\) = (?P<k>{_NUM})의 서로 다른 실근의 개수{_COUNT_ASK}",
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 방정식 f\(x\) = (?P<k>{_NUM})의 서로 다른 실근의 "
+    rf"개수{_COUNT_ASK}",
 )
 @_rule(
     "real_root_count",
@@ -1130,7 +1145,8 @@ def _root_count_level(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "real_root_count",
     "방정식·곡선의 서로 다른 실근(교점) 개수",
-    rf"곡선 y = (?P<f>{_E})(?:와|과) 직선 y = (?P<g>{_E})(?:(?:이|가) 만나는 서로 다른 점의|의 서로 다른 교점의|의 교점의)"
+    rf"곡선 y = (?P<f>{_E})(?:와|과) 직선 y = (?P<g>{_E})(?:(?:이|가) 만나는 서로 "
+    r"다른 점의|의 서로 다른 교점의|의 교점의)"
     rf" 개수(?:를 구하시오\.|로 옳은 것은\?)",
 )
 @_rule(
@@ -1171,13 +1187,17 @@ def _in_open(value: sympy.Expr, lo: sympy.Expr, hi: sympy.Expr) -> bool:
     return float(lo) + 1e-12 < x < float(hi) - 1e-12
 
 
-def _mvt_roots(f: sympy.Expr, lo: sympy.Expr, hi: sympy.Expr, var: sympy.Symbol) -> list[sympy.Expr]:
+def _mvt_roots(
+    f: sympy.Expr, lo: sympy.Expr, hi: sympy.Expr, var: sympy.Symbol
+) -> list[sympy.Expr]:
     """f'(c) = (f(hi) - f(lo)) / (hi - lo) 의 열린구간 (lo, hi) 안 실근."""
     slope = (f.subs(var, hi) - f.subs(var, lo)) / (hi - lo)
     return [r for r in _real_roots(sympy.diff(f, var) - slope, var) if _in_open(r, lo, hi)]
 
 
-def _bounds(m: re.Match[str], lo_key: str = "lo", hi_key: str = "hi") -> tuple[sympy.Expr, sympy.Expr]:
+def _bounds(
+    m: re.Match[str], lo_key: str = "lo", hi_key: str = "hi"
+) -> tuple[sympy.Expr, sympy.Expr]:
     lo, hi = _rat(m[lo_key]), _rat(m[hi_key])
     if lo >= hi:
         raise _Undecided("INTERVAL_ORDER")
@@ -1192,8 +1212,10 @@ _MVT_TITLE: Final = "평균값 정리·롤의 정리·평균속도로 구하는 
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"{_MVT_FN}(?:닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]|열린구간 \((?P<lo2>{_NUM}), (?P<hi2>{_NUM})\))"
-    rf"에서 평균값 정리(?:를|의 결론을) 만족시키는 (?:상수 |실수 )?c의 값(?:을 구하시오\.|은\?|으로 옳은 것은\?)"
+    rf"{_MVT_FN}(?:닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]|열린구간 \((?P<lo2>{_NUM}), "
+    rf"(?P<hi2>{_NUM})\))"
+    r"에서 평균값 정리(?:를|의 결론을) 만족시키는 (?:상수 |실수 )?c의 값(?:을 "
+    r"구하시오\.|은\?|으로 옳은 것은\?)"
     rf"{_RANGE_NOTE}",
 )
 def _mvt_standard(m: re.Match[str]) -> sympy.Expr:
@@ -1204,7 +1226,8 @@ def _mvt_standard(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"{_MVT_FN}(?:닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]|열린구간 \((?P<lo2>{_NUM}), (?P<hi2>{_NUM})\))"
+    rf"{_MVT_FN}(?:닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]|열린구간 \((?P<lo2>{_NUM}), "
+    rf"(?P<hi2>{_NUM})\))"
     r"에서 평균값 정리를 만족시키는 실수 c의 개수를 구하시오\.",
 )
 def _mvt_count(m: re.Match[str]) -> sympy.Expr:
@@ -1221,7 +1244,8 @@ def _wrapped(text: str) -> str:
     _MVT_TITLE,
     rf"{_FN}(?P<f>{_E}) ?에 대하여, f는 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 연속이고 "
     rf"열린구간 \((?P=lo), (?P=hi)\)에서 미분가능하다\. f'\(c\) = \(f\((?P=hi)\) - f\((?P=lo)\)\)/"
-    rf"\((?P<den>.+?)\)인 c가 열린구간 \((?P=lo), (?P=hi)\)에 오직 하나 존재할 때, c의 값을 구하시오\.",
+    r"\((?P<den>.+?)\)인 c가 열린구간 \((?P=lo), (?P=hi)\)에 오직 하나 존재할 "
+    r"때, c의 값을 구하시오\.",
 )
 def _mvt_stated_formula(m: re.Match[str]) -> sympy.Expr:
     lo, hi = _bounds(m)
@@ -1239,7 +1263,8 @@ def _mvt_stated_formula(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 f\((?P<lo>{_NUM})\) = f\((?P<hi>{_NUM})\)이므로 롤의 정리에 의하여 "
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 f\((?P<lo>{_NUM})\) = f\((?P<hi>{_NUM})\)이므로 "
+    r"롤의 정리에 의하여 "
     r"f'\(c\) = 0인 c가 열린구간 \((?P=lo), (?P=hi)\)에 존재한다\. 이 c의 값을 구하시오\.",
 )
 def _rolle(m: re.Match[str]) -> sympy.Expr:
@@ -1252,8 +1277,10 @@ def _rolle(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"{_FN}(?P<f>{_E})의 그래프 위의 x좌표가 (?P<lo>{_NUM}), (?P<hi>{_NUM})인 두 점을 각각 A, B라 하자\. "
-    r"열린구간 \((?P=lo), (?P=hi)\)에서 곡선 y = f\(x\) 위의 점 P\(c, f\(c\)\)에서의 접선이 직선 AB와 "
+    rf"{_FN}(?P<f>{_E})의 그래프 위의 x좌표가 (?P<lo>{_NUM}), (?P<hi>{_NUM})인 "
+    r"두 점을 각각 A, B라 하자\. "
+    r"열린구간 \((?P=lo), (?P=hi)\)에서 곡선 y = f\(x\) 위의 점 P\(c, f\(c\)\)에서의 "
+    r"접선이 직선 AB와 "
     r"평행할 때, c의 값을 구하시오\.",
 )
 def _mvt_parallel_by_x(m: re.Match[str]) -> sympy.Expr:
@@ -1291,7 +1318,8 @@ def _mvt_parallel_by_points(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"곡선 y = (?P<f>{_E}) 위의 두 점 A\((?P<ax>{_NUM}), (?P<ay>{_NUM})\), B\((?P<bx>{_NUM}), (?P<by>{_NUM})\)에 "
+    rf"곡선 y = (?P<f>{_E}) 위의 두 점 A\((?P<ax>{_NUM}), (?P<ay>{_NUM})\), B\((?P<bx>{_NUM}), "
+    rf"(?P<by>{_NUM})\)에 "
     r"대하여, (?P=ax) < x < (?P=bx)인 범위에서 접선이 직선 AB와 평행한 점의 개수를 구하시오\.",
 )
 def _mvt_parallel_count(m: re.Match[str]) -> sympy.Expr:
@@ -1306,8 +1334,10 @@ _VELOCITY_MVT_FN: Final = r"x\(t\) = (?P<f>" + _E + ")"
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"직선 위를 움직이는 점 P의 시각 t에서의 위치가 {_VELOCITY_MVT_FN}일 때, 시각 t = (?P<lo>{_NUM})부터 "
-    rf"t = (?P<hi>{_NUM})까지의 평균속도와 순간속도가 같아지는 시각 t = c \((?P=lo) < c < (?P=hi)\)의 "
+    rf"직선 위를 움직이는 점 P의 시각 t에서의 위치가 {_VELOCITY_MVT_FN}일 때, "
+    rf"시각 t = (?P<lo>{_NUM})부터 "
+    rf"t = (?P<hi>{_NUM})까지의 평균속도와 순간속도가 같아지는 시각 t = c \((?P=lo) "
+    r"< c < (?P=hi)\)의 "
     r"값을 구하시오\.",
 )
 @_rule(
@@ -1325,7 +1355,8 @@ def _mvt_velocity(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 {_VELOCITY_MVT_FN}이다\. (?P<lo>{_NUM}) < t < "
+    rf"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 {_VELOCITY_MVT_FN}이다\. "
+    rf"(?P<lo>{_NUM}) < t < "
     rf"(?P<hi>{_NUM})에서 점 P의 순간속도가 t = (?P=lo)부터 t = (?P=hi)까지의 평균속도와 같아지는 "
     r"시각을 t = c라 할 때, c의 값을 구하시오\.",
 )
@@ -1338,8 +1369,10 @@ def _mvt_velocity_phrase(m: re.Match[str]) -> sympy.Expr:
     "mean_value_c",
     _MVT_TITLE,
     rf"자동차가 출발한 지 t시간 후의 이동 거리가 s\(t\) = (?P<f>{_E}) \(km\)이다\. "
-    rf"(?:출발 후 (?P<lo>{_NUM})시간부터 (?P<hi>{_NUM})시간까지|출발 시각부터 (?P<hi2>{_NUM})시간 후까지)의 "
-    r"평균 속도와 순간 속도가 같아지는 시각 t = c \((?P<lo3>-?\d+) < c < (?P<hi3>-?\d+)\)의 값을 구하시오\.",
+    rf"(?:출발 후 (?P<lo>{_NUM})시간부터 (?P<hi>{_NUM})시간까지|출발 시각부터 "
+    rf"(?P<hi2>{_NUM})시간 후까지)의 "
+    r"평균 속도와 순간 속도가 같아지는 시각 t = c \((?P<lo3>-?\d+) < c < (?P<hi3>-?\d+)\)의 "
+    r"값을 구하시오\.",
 )
 def _mvt_car(m: re.Match[str]) -> sympy.Expr:
     lo = _rat(m["lo"] if m["lo"] is not None else "0")
@@ -1371,7 +1404,7 @@ def _solve_params(
     real = [sol for sol in solutions if all(v.is_real for v in sol.values())]
     if len(real) != 1 or set(real[0]) != set(params):
         raise _Undecided(f"PARAMETER_SOLUTIONS_{len(real)}")
-    return real[0]
+    return dict(real[0])
 
 
 def _free_params(*exprs: sympy.Expr) -> list[sympy.Symbol]:
@@ -1412,12 +1445,14 @@ _EXT_ASK: Final = (
 @_rule(
     "extremum_parameter",
     "극값 조건으로 매개변수를 정한 뒤의 극댓값·극솟값",
-    rf"{_EXT_HEAD} ?(?:이|가|은|는) x = (?P<r>{_NUM})에서 극값을 (?:가질 때, |갖는다\. ){_EXT_ASK}{_EXT_NOTE}",
+    rf"{_EXT_HEAD} ?(?:이|가|은|는) x = (?P<r>{_NUM})에서 극값을 (?:가질 때, |갖는다\. "
+    rf"){_EXT_ASK}{_EXT_NOTE}",
 )
 @_rule(
     "extremum_parameter",
     "극값 조건으로 매개변수를 정한 뒤의 극댓값·극솟값",
-    rf"{_EXT_HEAD} ?에 대하여 방정식 f'\(x\) = 0의 한 근이 x = (?P<r>{_NUM})이다\. {_EXT_ASK}{_EXT_NOTE}",
+    rf"{_EXT_HEAD} ?에 대하여 방정식 f'\(x\) = 0의 한 근이 x = (?P<r>{_NUM})이다\. "
+    rf"{_EXT_ASK}{_EXT_NOTE}",
 )
 def _extremum_parameter(m: re.Match[str]) -> sympy.Expr:
     f = _read_with_params(m["f"])
@@ -1435,13 +1470,15 @@ def _extremum_parameter(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "extremum_parameter",
     "극값 조건으로 매개변수를 정한 뒤의 극댓값·극솟값",
-    rf"{_EXT_HEAD}(?:이|가) x = (?P<r>{_NUM})에서 극값을 갖고 f\(x\)의 (?P<kind>극댓값|극솟값)이 (?P<v>{_NUM})일 때, "
+    rf"{_EXT_HEAD}(?:이|가) x = (?P<r>{_NUM})에서 극값을 갖고 f\(x\)의 (?P<kind>극댓값|극솟값)이 "
+    rf"(?P<v>{_NUM})일 때, "
     r"상수 (?P<k>[a-z])의 값을 구하시오\. \(단, [a-z]는 상수이다\.\)",
 )
 @_rule(
     "extremum_parameter",
     "극값 조건으로 매개변수를 정한 뒤의 극댓값·극솟값",
-    rf"{_EXT_HEAD}(?:는|은) x = (?P<r>{_NUM})에서 극값을 갖는다\. 이 함수의 (?P<kind>극댓값|극솟값)이 (?P<v>{_NUM})일 때, "
+    rf"{_EXT_HEAD}(?:는|은) x = (?P<r>{_NUM})에서 극값을 갖는다\. 이 함수의 "
+    rf"(?P<kind>극댓값|극솟값)이 (?P<v>{_NUM})일 때, "
     r"상수 (?P<k>[a-z])의 값을 구하시오\. \(단, [a-z]는 상수이다\.\)",
 )
 def _extremum_two_parameters(m: re.Match[str]) -> sympy.Expr:
@@ -1461,7 +1498,8 @@ def _extremum_two_parameters(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "extremum_parameter",
     "극값 조건으로 매개변수를 정한 뒤의 극댓값·극솟값",
-    rf"{_EXT_HEAD}(?:이|가) x = (?P<r>{_NUM})에서 (?P<kind>극댓값|극솟값) (?P<v>{_NUM})(?:을|를) 가질 때, "
+    rf"{_EXT_HEAD}(?:이|가) x = (?P<r>{_NUM})에서 (?P<kind>극댓값|극솟값) (?P<v>{_NUM})(?:을|를) "
+    r"가질 때, "
     r"상수 (?P<ask>[a-z])의 값을 구하시오\. \(단, [a-z](?:, [a-z])?는 상수이다\.\)",
 )
 def _extremum_value_given(m: re.Match[str]) -> sympy.Expr:
@@ -1481,7 +1519,8 @@ def _extremum_value_given(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "extremum_points",
     "극값·증감 전환점의 x좌표",
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 방정식 f'\(x\) = 0의 실근은 x = (?P<r1>{_NUM})과 x = (?P<r2>{_NUM})이다\. "
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 방정식 f'\(x\) = 0의 실근은 x = (?P<r1>{_NUM})과 "
+    rf"x = (?P<r2>{_NUM})이다\. "
     r"f\(x\)의 극값을 구하시오\.",
 )
 def _extremum_value_with_stated_roots(m: re.Match[str]) -> sympy.Expr:
@@ -1499,8 +1538,10 @@ def _extremum_value_with_stated_roots(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_bounds",
     "평균값 정리로 구하는 k · 함숫값의 한계",
-    rf"함수 f는 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 연속이고 열린구간 \((?P=lo), (?P=hi)\)에서 "
-    rf"미분가능하며 f\((?P=lo)\) = (?P<a>{_NUM}), f\((?P=hi)\) = (?P<b>{_NUM})이다\. 평균값 정리에 의하여 "
+    rf"함수 f는 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 연속이고 열린구간 "
+    r"\((?P=lo), (?P=hi)\)에서 "
+    rf"미분가능하며 f\((?P=lo)\) = (?P<a>{_NUM}), f\((?P=hi)\) = (?P<b>{_NUM})이다\. "
+    r"평균값 정리에 의하여 "
     r"f'\(c\) = k인 c가 이 열린구간에 존재할 때, k의 값을 구하시오\.",
 )
 def _mvt_k(m: re.Match[str]) -> sympy.Expr:
@@ -1529,7 +1570,8 @@ def _mvt_one_sided_bound(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_bounds",
     "평균값 정리로 구하는 k · 함숫값의 한계",
-    rf"함수 f\(x\)는 모든 실수 x에서 미분가능하고 (?P<lo_m>{_NUM}) ≤ f'\(x\) ≤ (?P<hi_m>{_NUM})이다\. "
+    rf"함수 f\(x\)는 모든 실수 x에서 미분가능하고 (?P<lo_m>{_NUM}) ≤ f'\(x\) ≤ "
+    rf"(?P<hi_m>{_NUM})이다\. "
     rf"f\((?P<a>{_NUM})\) = (?P<fa>{_NUM})일 때, f\((?P<b>{_NUM})\)의 값이 될 수 있는 가장 큰 값과 "
     r"가장 작은 값의 합을 구하시오\.",
 )
@@ -1562,7 +1604,8 @@ def _difference_quotient_parameter(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "difference_quotient_limit",
     "차분몫의 극한 (f(a+ch)-f(a))/(dh)",
-    rf"{_FN}(?P<f>{_E}) \((?P<p>[a-z])는 상수\)에서 x의 값이 (?P<lo>{_NUM})에서 (?P<hi>{_NUM})까지 변할 때의 "
+    rf"{_FN}(?P<f>{_E}) \((?P<p>[a-z])는 상수\)에서 x의 값이 (?P<lo>{_NUM})에서 "
+    rf"(?P<hi>{_NUM})까지 변할 때의 "
     rf"평균변화율이 x = (?P<c>{_NUM})에서의 미분계수와 같다\. 상수 (?P=p)의 값을 구하시오\.",
 )
 def _average_rate_parameter(m: re.Match[str]) -> sympy.Expr:
@@ -1576,7 +1619,8 @@ def _average_rate_parameter(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "difference_quotient_limit",
     "차분몫의 극한 (f(a+ch)-f(a))/(dh)",
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 x가 (?P<a>{_NUM})에 한없이 가까워질 때 \(f\(x\) - f\((?P=a)\)\) / "
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 x가 (?P<a>{_NUM})에 한없이 가까워질 때 \(f\(x\) "
+    r"- f\((?P=a)\)\) / "
     r"\(x [+-] \d+\)의 극한값을 구하시오\.",
 )
 def _limit_x_to_a(m: re.Match[str]) -> sympy.Expr:
@@ -1659,7 +1703,8 @@ def _coefficient_sum(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "derivative_coefficient_sum",
     "도함수의 모든 계수의 합",
-    rf"두 함수 f\(x\) = (?P<f>{_E}), g\(x\) = (?P<g>{_E})에 대하여 함수 y = f\(x\) \+ g\(x\)의 도함수의 "
+    rf"두 함수 f\(x\) = (?P<f>{_E}), g\(x\) = (?P<g>{_E})에 대하여 함수 y = f\(x\) "
+    r"\+ g\(x\)의 도함수의 "
     r"모든 계수의 합을 구하시오\.",
 )
 def _coefficient_sum_of_sum(m: re.Match[str]) -> sympy.Expr:
@@ -1683,8 +1728,10 @@ def _linear_combination(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "linear_combination_derivative",
     "αf ± βg 의 x = a 에서의 미분계수",
-    rf"두 함수 f\(x\), g\(x\)에 대하여 f'\(1\)의 값이 (?P<fa>{_NUM}), g'\(1\)의 값이 (?P<ga>{_NUM})일 때, "
-    r"함수 h\(x\) = (?P<al>\d*)f\(x\) (?P<op>[+-]) (?P<be>\d*)g\(x\)의 x = 1에서의 미분계수를 구하시오\.",
+    rf"두 함수 f\(x\), g\(x\)에 대하여 f'\(1\)의 값이 (?P<fa>{_NUM}), g'\(1\)의 "
+    rf"값이 (?P<ga>{_NUM})일 때, "
+    r"함수 h\(x\) = (?P<al>\d*)f\(x\) (?P<op>[+-]) (?P<be>\d*)g\(x\)의 x = 1에서의 "
+    r"미분계수를 구하시오\.",
 )
 def _abstract_linear_combination(m: re.Match[str]) -> sympy.Expr:
     alpha, beta = int(m["al"] or 1), int(m["be"] or 1)
@@ -1695,7 +1742,8 @@ def _abstract_linear_combination(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "shifted_function_difference",
     "g = f + c 일 때 g'(a) - f'(a)",
-    rf"{_HEAD}에 대하여 g\(x\) = f\(x\) (?P<op>[+-]) (?P<c>\d+)(?:이)?라 할 때, g'\((?P<a>{_NUM})\) - "
+    rf"{_HEAD}에 대하여 g\(x\) = f\(x\) (?P<op>[+-]) (?P<c>\d+)(?:이)?라 할 때, "
+    rf"g'\((?P<a>{_NUM})\) - "
     r"f'\((?P=a)\)의 값을 구하시오\.",
 )
 def _shifted_difference(m: re.Match[str]) -> sympy.Expr:
@@ -1705,7 +1753,8 @@ def _shifted_difference(m: re.Match[str]) -> sympy.Expr:
     return _derivative_at(f + shift, a) - _derivative_at(f, a)
 
 
-# f'(a) = c 를 만족하는 a (양수·0 이 아닌 수 등 조건) ------------------------------------------------
+# f'(a) = c 를 만족하는 a (양수·0 이 아닌 수 등 조건)
+# ------------------------------------------------
 _POS_FILTERS: Final = {"양수 ": lambda v: float(v) > 0, "0이 아닌 실수 ": lambda v: float(v) != 0}
 
 
@@ -1720,7 +1769,8 @@ _A_FILTER: Final = r"(?P<flt>양수 |0이 아닌 실수 )?"
 @_rule(
     "derivative_equation_root",
     "f'(a) 가 주어진 값이 되는 a",
-    rf"{_HEAD}에 대하여 f'\(a\) = (?P<k>{_NUM})(?:을|를) 만족시키는 {_A_FILTER}a의 값(?:을 구하시오\.|은\?)",
+    rf"{_HEAD}에 대하여 f'\(a\) = (?P<k>{_NUM})(?:을|를) 만족시키는 {_A_FILTER}a의 "
+    r"값(?:을 구하시오\.|은\?)",
 )
 @_rule(
     "derivative_equation_root",
@@ -1779,7 +1829,8 @@ _COND: Final = rf"f'\({_NUM}\)의 값이 {_NUM}"
 @_rule(
     "derivative_parameter",
     "미분계수 조건으로 정하는 매개변수",
-    rf"{_FN}(?P<f>{_E})(?: \([a-z](?:, [a-z])?는 상수\))? ?에 대하여 (?P<conds>{_COND}(?:이고 {_COND})?)일 때, "
+    rf"{_FN}(?P<f>{_E})(?: \([a-z](?:, [a-z])?는 상수\))? ?에 대하여 (?P<conds>{_COND}(?:이고 "
+    rf"{_COND})?)일 때, "
     r"(?:상수 )?(?P<ask>[a-z])의 값을 구하시오\.",
 )
 def _derivative_parameter(m: re.Match[str]) -> sympy.Expr:
@@ -1798,13 +1849,17 @@ def _derivative_parameter(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "derivative_parameter",
     "미분계수 조건으로 정하는 매개변수",
-    rf"{_FN}(?P<f>{_E}) \((?P<p>[a-z]), (?P<q>[a-z])는 상수\)에 대하여 방정식 f'\(x\) = 0의 두 실근이 "
+    rf"{_FN}(?P<f>{_E}) \((?P<p>[a-z]), (?P<q>[a-z])는 상수\)에 대하여 방정식 "
+    r"f'\(x\) = 0의 두 실근이 "
     rf"(?P<r1>{_NUM}), (?P<r2>{_NUM})일 때, 상수 (?P<ask>[a-z])의 값을 구하시오\.",
 )
 def _derivative_roots_parameter(m: re.Match[str]) -> sympy.Expr:
     f = _read_with_params(m["f"])
     params = _free_params(f)
-    equations = [sympy.diff(f, _X).subs(_X, _rat(m["r1"])), sympy.diff(f, _X).subs(_X, _rat(m["r2"]))]
+    equations = [
+        sympy.diff(f, _X).subs(_X, _rat(m["r1"])),
+        sympy.diff(f, _X).subs(_X, _rat(m["r2"])),
+    ]
     if len(params) != 2:
         raise _NotCovered("PARAMETER_COUNT")
     return _solve_params(equations, params)[sympy.Symbol(m["ask"])]
@@ -1813,7 +1868,8 @@ def _derivative_roots_parameter(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "derivative_parameter",
     "미분계수 조건으로 정하는 매개변수",
-    rf"{_FN}(?P<f>{_E})의 도함수가 f'\(x\) = (?P<g>{_E})일 때, 상수 (?P<ask>[a-z])의 값을 구하시오\.",
+    rf"{_FN}(?P<f>{_E})의 도함수가 f'\(x\) = (?P<g>{_E})일 때, 상수 (?P<ask>[a-z])의 "
+    r"값을 구하시오\.",
 )
 def _derivative_identity_parameter(m: re.Match[str]) -> sympy.Expr:
     derivative = sympy.diff(_read_expr(m["f"]), _X)
@@ -1851,7 +1907,8 @@ def _pow_d(n: int, a: str) -> sympy.Expr:
 @_rule(
     "power_exponent_unknown",
     "x^n 에서 지수 n 을 정하는 틀",
-    rf"{_XN}에 대하여 f'\((?P<a>{_NUM})\)의 값이 (?P<v>{_NUM})일 때, f'\((?P<b>{_NUM})\)의 값을 구하시오\.",
+    rf"{_XN}에 대하여 f'\((?P<a>{_NUM})\)의 값이 (?P<v>{_NUM})일 때, f'\((?P<b>{_NUM})\)의 "
+    r"값을 구하시오\.",
 )
 def _power_exponent_then_derivative(m: re.Match[str]) -> sympy.Expr:
     n = _exponent_candidates(
@@ -1876,7 +1933,8 @@ def _power_exponent_from_derivative(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "power_exponent_unknown",
     "x^n 에서 지수 n 을 정하는 틀",
-    rf"{_XN}에 대하여 f'\((?P<a>{_NUM})\)의 값이 f\((?P=a)\)의 값의 (?P<r>\d+)배일 때, n의 값을 구하시오\.",
+    rf"{_XN}에 대하여 f'\((?P<a>{_NUM})\)의 값이 f\((?P=a)\)의 값의 (?P<r>\d+)배일 "
+    r"때, n의 값을 구하시오\.",
 )
 def _power_exponent_from_ratio(m: re.Match[str]) -> sympy.Expr:
     a = _rat(m["a"])
@@ -1909,7 +1967,8 @@ def _power_exponent_from_form(m: re.Match[str]) -> sympy.Expr:
 def _minimum_value(g: sympy.Expr, domain: str, var: sympy.Symbol = _X) -> sympy.Expr:
     """다항식 g 의 정의역(`R` · `>=0` · `>0`) 위 최솟값. 최솟값이 존재한다고 확정될 때만 값을 낸다.
 
-    보류 조건: 아래로 한없이 내려간다(최고차 계수 부호·차수로 판정) · 하한이 열린 경계에서만 닿아 값이
+    보류 조건: 아래로 한없이 내려간다(최고차 계수 부호·차수로 판정) · 하한이 열린 경계에서만 닿아
+    값이
     실제로 달성되지 않는다(x > 0 에서 g(0) 이 내부 후보보다 작은 경우).
     """
     poly = sympy.Poly(g, var)
@@ -1961,7 +2020,8 @@ def _min_all_reals_inequality(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"x (?P<d>[≥>]) 0일 때 부등식 (?P<l>{_E}) > (?P<r>{_E})(?:이|가) 성립함을 보이려 한다\. x [≥>] 0에서 "
+    rf"x (?P<d>[≥>]) 0일 때 부등식 (?P<l>{_E}) > (?P<r>{_E})(?:이|가) 성립함을 "
+    r"보이려 한다\. x [≥>] 0에서 "
     r"두 변의 차 (?P<g>.+?)의 최솟값을 구하시오\.",
 )
 def _min_halfline_inequality(m: re.Match[str]) -> sympy.Expr:
@@ -1975,7 +2035,8 @@ def _min_halfline_inequality(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"모든 실수 x에 대하여 (?P<a>{_E})의 값은 (?P<b>{_E})의 값보다 크다\. 두 식의 값의 차 (?P<g>.+?)의 "
+    rf"모든 실수 x에 대하여 (?P<a>{_E})의 값은 (?P<b>{_E})의 값보다 크다\. 두 "
+    r"식의 값의 차 (?P<g>.+?)의 "
     r"최솟값을 구하시오\.",
 )
 def _min_two_expressions(m: re.Match[str]) -> sympy.Expr:
@@ -1988,7 +2049,8 @@ def _min_two_expressions(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"x > 0에서 곡선 y = (?P<a>{_E})(?:은|는) (?:직선|곡선) y = (?P<b>{_E})보다 위쪽에 있다\. x > 0에서 "
+    rf"x > 0에서 곡선 y = (?P<a>{_E})(?:은|는) (?:직선|곡선) y = (?P<b>{_E})보다 "
+    r"위쪽에 있다\. x > 0에서 "
     r"(?:곡선과 직선의|두 곡선의) y좌표의 차 (?P<g>.+?)의 최솟값을 구하시오\.",
 )
 def _min_curve_gap(m: re.Match[str]) -> sympy.Expr:
@@ -2007,7 +2069,8 @@ def _min_curve_gap(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 x ≥ 0에서 f\(x\) > 0임{_IMPLIES} x ≥ 0에서 f\(x\)의 최솟값을 구하시오\.",
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 x ≥ 0에서 f\(x\) > 0임{_IMPLIES} x ≥ 0에서 "
+    r"f\(x\)의 최솟값을 구하시오\.",
 )
 def _min_function_halfline(m: re.Match[str]) -> sympy.Expr:
     return _minimum_value(_read_expr(m["f"]), ">=0")
@@ -2016,7 +2079,8 @@ def _min_function_halfline(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"두 함수 f\(x\) = (?P<f>{_E}), g\(x\) = (?P<g>{_E})에 대하여 x ≥ 0에서 f\(x\) > g\(x\)임{_IMPLIES} "
+    rf"두 함수 f\(x\) = (?P<f>{_E}), g\(x\) = (?P<g>{_E})에 대하여 x ≥ 0에서 f\(x\) "
+    rf"> g\(x\)임{_IMPLIES} "
     r"x ≥ 0에서 f\(x\) - g\(x\)의 최솟값을 구하시오\.",
 )
 def _min_function_gap(m: re.Match[str]) -> sympy.Expr:
@@ -2026,17 +2090,20 @@ def _min_function_gap(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"사차함수 y = (?P<f>{_E})의 그래프가 x축과 만나지 않음{_IMPLIES} 이 함수의 최솟값을 구하시오\.",
+    rf"사차함수 y = (?P<f>{_E})의 그래프가 x축과 만나지 않음{_IMPLIES} 이 함수의 "
+    r"최솟값을 구하시오\.",
 )
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"곡선 y = (?P<f>{_E})(?:이|가) x축보다 위쪽에 있음{_IMPLIES} 이 곡선 위의 점의 y좌표의 최솟값을 구하시오\.",
+    rf"곡선 y = (?P<f>{_E})(?:이|가) x축보다 위쪽에 있음{_IMPLIES} 이 곡선 위의 "
+    r"점의 y좌표의 최솟값을 구하시오\.",
 )
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 모든 실수 x에서 f\(x\) > 0임{_IMPLIES} f\(x\)의 최솟값을 구하시오\.",
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 모든 실수 x에서 f\(x\) > 0임{_IMPLIES} f\(x\)의 "
+    r"최솟값을 구하시오\.",
 )
 def _min_function_all_reals(m: re.Match[str]) -> sympy.Expr:
     return _minimum_value(_read_expr(m["f"]), "R")
@@ -2045,7 +2112,8 @@ def _min_function_all_reals(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"모든 실수 x에 대하여 곡선 y = (?P<a>{_E})(?:은|는) 직선 y = (?P<b>{_E})보다 위쪽에 있음{_IMPLIES} "
+    rf"모든 실수 x에 대하여 곡선 y = (?P<a>{_E})(?:은|는) 직선 y = (?P<b>{_E})보다 "
+    rf"위쪽에 있음{_IMPLIES} "
     r"두 그래프의 y좌표의 차의 최솟값을 구하시오\.",
 )
 def _min_graph_gap(m: re.Match[str]) -> sympy.Expr:
@@ -2087,7 +2155,8 @@ def _line_slope(text: str) -> sympy.Expr:
     "tangent_relation_to_unknown_point",
     "접선이 직선과 평행·수직이거나 한 점을 지날 때의 접점 a",
     rf"{_FN}(?P<f>{_E}) ?에 대하여 곡선 y = f\(x\) 위의 점 \(a, f\(a\)\)에서의 접선이 "
-    rf"(?:직선 (?P<line>.+?)에 (?P<rel>평행할|수직일) 때|(?:점 \((?P<px>{_NUM}), (?P<py>{_NUM})\)(?:를|을)|(?P<origin>원점을)) 지날 때), "
+    rf"(?:직선 (?P<line>.+?)에 (?P<rel>평행할|수직일) 때|(?:점 \((?P<px>{_NUM}), "
+    rf"(?P<py>{_NUM})\)(?:를|을)|(?P<origin>원점을)) 지날 때), "
     r"양수 a의 값을 구하시오\.",
 )
 def _tangent_relation(m: re.Match[str]) -> sympy.Expr:
@@ -2109,7 +2178,8 @@ def _tangent_relation(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "tangent_parameter",
     "접선 조건으로 정하는 곡선의 매개변수",
-    rf"곡선 y = (?P<f>{_E})(?: \((?P<n>[a-z])는 상수\))? 위의 x좌표가 (?P<r>{_NUM})인 점에서의 접선의 "
+    rf"곡선 y = (?P<f>{_E})(?: \((?P<n>[a-z])는 상수\))? 위의 x좌표가 (?P<r>{_NUM})인 "
+    r"점에서의 접선의 "
     rf"(?P<w>기울기|y절편)(?:이|가) (?P<k>{_NUM})일 때, (?:상수 )?(?P<p>[a-z])의 값을 구하시오\.",
 )
 def _tangent_parameter(m: re.Match[str]) -> sympy.Expr:
@@ -2127,20 +2197,26 @@ def _tangent_parameter(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "tangent_parallel_other_point",
     "접선과 평행한 접선을 갖는 또 다른 점",
-    rf"곡선 y = (?P<f>{_E}) 위의 x좌표가 (?P<r>{_NUM})인 점에서의 접선과 평행한 접선을 갖는 또 다른 점의 "
+    rf"곡선 y = (?P<f>{_E}) 위의 x좌표가 (?P<r>{_NUM})인 점에서의 접선과 평행한 "
+    r"접선을 갖는 또 다른 점의 "
     r"x좌표를 b라 할 때, b의 값을 구하시오\.",
 )
 def _tangent_other_point(m: re.Match[str]) -> sympy.Expr:
     f = _read_expr(m["f"])
     r = _rat(m["r"])
-    roots = [v for v in _real_roots(sympy.diff(f, _X) - sympy.diff(f, _X).subs(_X, r)) if float(v) != float(r)]
+    roots = [
+        v
+        for v in _real_roots(sympy.diff(f, _X) - sympy.diff(f, _X).subs(_X, r))
+        if float(v) != float(r)
+    ]
     return _single(roots, "OTHER_POINTS")
 
 
 @_rule(
     "tangent_line_parameter",
     "직선이 곡선에 접하도록 하는 상수",
-    rf"직선 y = (?P<m>{_NUM})x \+ k(?:가|이) 곡선 y = (?P<f>{_E}) 위의 x좌표가 양수인 점에서 이 곡선에 접할 때, "
+    rf"직선 y = (?P<m>{_NUM})x \+ k(?:가|이) 곡선 y = (?P<f>{_E}) 위의 x좌표가 "
+    r"양수인 점에서 이 곡선에 접할 때, "
     r"상수 k의 값을 구하시오\.",
 )
 def _tangent_line_constant(m: re.Match[str]) -> sympy.Expr:
@@ -2153,7 +2229,8 @@ def _tangent_line_constant(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "tangent_second_intersection",
     "접선이 곡선과 다시 만나는 점",
-    rf"곡선 y = (?P<f>{_E}) 위의 점 \((?P<a>{_NUM}), (?P<b>{_NUM})\)에서의 접선이 이 곡선과 만나는 점 중 "
+    rf"곡선 y = (?P<f>{_E}) 위의 점 \((?P<a>{_NUM}), (?P<b>{_NUM})\)에서의 접선이 "
+    r"이 곡선과 만나는 점 중 "
     r"접점이 아닌 점의 x좌표를 구하시오\.",
 )
 def _tangent_second_intersection(m: re.Match[str]) -> sympy.Expr:
@@ -2181,7 +2258,8 @@ def _tangent_from_outside(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "tangent_two_curves_parameter",
     "두 곡선이 한 점에서 접할 때의 상수",
-    rf"곡선 y = (?P<f>{_E})(?:가|이) 곡선 y = (?P<g>{_E})와 x = (?P<r>{_NUM})인 점에서 접할 때, 상수 (?P<ask>[a-z])의 값을 "
+    rf"곡선 y = (?P<f>{_E})(?:가|이) 곡선 y = (?P<g>{_E})와 x = (?P<r>{_NUM})인 점에서 "
+    r"접할 때, 상수 (?P<ask>[a-z])의 값을 "
     r"구하시오\. \(단, [a-z], [a-z]는 상수이다\.\)",
 )
 def _tangent_two_curves(m: re.Match[str]) -> sympy.Expr:
@@ -2198,7 +2276,8 @@ def _tangent_two_curves(m: re.Match[str]) -> sympy.Expr:
 # 열차 운동(직선 레일) · 매개변수 형 운동
 # ──────────────────────────────────────────────────────────────────────────
 _TRAIN: Final = (
-    rf"직선 레일 위를 움직이는 장난감 열차가 출발한 지 t초 후, 출발 지점에서 잰 위치는 s\(t\) = (?P<f>{_E}) \(cm\)이다"
+    r"직선 레일 위를 움직이는 장난감 열차가 출발한 지 t초 후, 출발 지점에서 잰 "
+    rf"위치는 s\(t\) = (?P<f>{_E}) \(cm\)이다"
     r"(?: \((?P<p>[a-z])는 상수\))?\. (?P<tail>.+)"
 )
 
@@ -2215,21 +2294,37 @@ def _train_motion(m: re.Match[str]) -> sympy.Expr:
         pos = _read_expr(m["f"], frozenset({_T}))
         vel, acc = sympy.diff(pos, _T), sympy.diff(pos, _T, 2)
         changes = [t for t in _sign_changes_in(_poly(vel, _T), _T) if float(t) > 0]
-        if re.fullmatch(r"열차가 운동 방향을 바꾸는 순간 출발 지점에서 잰 위치는 몇 cm인가\? \(단, t > 0\)", tail):
+        if re.fullmatch(
+            r"열차가 운동 방향을 바꾸는 순간 출발 지점에서 잰 위치는 몇 cm인가\? \(단, t > 0\)",
+            tail,
+        ):
             return sympy.simplify(pos.subs(_T, _single(changes, "DIRECTION_CHANGES")))
-        if re.fullmatch(r"열차가 운동 방향을 바꾸는 순간의 가속도는 몇 cm/초\^2인가\? \(단, t > 0\)", tail):
+        if re.fullmatch(
+            r"열차가 운동 방향을 바꾸는 순간의 가속도는 몇 cm/초\^2인가\? \(단, t > 0\)", tail
+        ):
             return sympy.simplify(acc.subs(_T, _single(changes, "DIRECTION_CHANGES")))
-        if re.fullmatch(r"열차가 운동 방향을 바꾸는 것은 출발한 지 몇 초 후인가\? \(단, t > 0\)", tail):
+        if re.fullmatch(
+            r"열차가 운동 방향을 바꾸는 것은 출발한 지 몇 초 후인가\? \(단, t > 0\)", tail
+        ):
             return _single(changes, "DIRECTION_CHANGES")
         raise _NoMatch
     param = sympy.Symbol(m["p"])
     vel, acc = sympy.diff(pos, _T), sympy.diff(pos, _T, 2)
-    if g := re.fullmatch(rf"열차가 출발한 지 (?P<a>\d+)초 후에 순간적으로 멈췄다고 할 때, {m['p']}의 값을 구하시오\.", tail):
+    if g := re.fullmatch(
+        rf"열차가 출발한 지 (?P<a>\d+)초 후에 순간적으로 멈췄다고 할 때, {m['p']}의 "
+        r"값을 구하시오\.",
+        tail,
+    ):
         equation = vel.subs(_T, _rat(g["a"]))
-    elif g := re.fullmatch(rf"열차의 가속도가 출발한 지 (?P<a>\d+)초 후에 0이 되었다고 할 때, {m['p']}의 값을 구하시오\.", tail):
+    elif g := re.fullmatch(
+        rf"열차의 가속도가 출발한 지 (?P<a>\d+)초 후에 0이 되었다고 할 때, {m['p']}의 "
+        r"값을 구하시오\.",
+        tail,
+    ):
         equation = acc.subs(_T, _rat(g["a"]))
     elif g := re.fullmatch(
-        rf"열차의 (?P<q>속도|가속도)가 출발한 지 (?P<a>\d+)초 후에 (?P<v>{_NUM}) cm/초(?:\^2)?였다고 할 때, "
+        rf"열차의 (?P<q>속도|가속도)가 출발한 지 (?P<a>\d+)초 후에 (?P<v>{_NUM}) "
+        r"cm/초(?:\^2)?였다고 할 때, "
         rf"{m['p']}의 값을 구하시오\.",
         tail,
     ):
@@ -2242,9 +2337,11 @@ def _train_motion(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "motion_parameter",
     "운동 조건으로 정하는 매개변수",
-    rf"수직선 위(?:의|를 움직이는) 점 P의 시각 t에서의 위치가 x = (?P<f>{_E})(?: \((?P<n>[a-z])는 상수\))?이다\. "
+    rf"수직선 위(?:의|를 움직이는) 점 P의 시각 t에서의 위치가 x = (?P<f>{_E})(?: "
+    r"\((?P<n>[a-z])는 상수\))?이다\. "
     rf"t = (?P<a>{_NUM})에서(?:의)? 점 P의 (?P<q>속도|가속도)가 (?P<c>{_NUM})일 때, "
-    rf"(?:상수 (?P<p>[a-z])의 값을 구하시오|t = (?P<b>{_NUM})에서의 점 P의 (?P<q2>속도|가속도)를 구하시오)\.",
+    rf"(?:상수 (?P<p>[a-z])의 값을 구하시오|t = (?P<b>{_NUM})에서의 점 P의 (?P<q2>속도|가속도)를 "
+    r"구하시오)\.",
 )
 def _motion_parameter(m: re.Match[str]) -> sympy.Expr:
     pos = _read_with_params(m["f"], _T)
@@ -2271,14 +2368,16 @@ def _slope_between(f: sympy.Expr, lo: sympy.Expr, hi: sympy.Expr) -> sympy.Expr:
 @_rule(
     "mean_value_parameter",
     "평균값 정리의 c 값이 주어질 때 매개변수·끝점",
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 평균값 정리를 만족시키는 c의 값이 "
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 "
+    r"평균값 정리를 만족시키는 c의 값이 "
     rf"(?P<cv>{_NUM})일 때, 상수 (?P<p>[a-z])의 값을 구하시오\.",
 )
 @_rule(
     "mean_value_parameter",
     "평균값 정리의 c 값이 주어질 때 매개변수·끝점",
     rf"{_FN}(?P<f>{_E}) ?에 대하여 곡선 y = f\(x\) 위의 두 점 \((?P<lo>{_NUM}), f\((?P=lo)\)\), "
-    rf"\((?P<hi>{_NUM}), f\((?P=hi)\)\)을 잇는 직선과 평행한 접선의 접점의 x좌표가 (?P<cv>{_NUM})일 때, "
+    rf"\((?P<hi>{_NUM}), f\((?P=hi)\)\)을 잇는 직선과 평행한 접선의 접점의 x좌표가 "
+    rf"(?P<cv>{_NUM})일 때, "
     r"상수 (?P<p>[a-z])의 값을 구하시오\.",
 )
 def _mvt_parameter(m: re.Match[str]) -> sympy.Expr:
@@ -2287,13 +2386,16 @@ def _mvt_parameter(m: re.Match[str]) -> sympy.Expr:
     if not lo < cv < hi:
         raise _Undecided("C_OUTSIDE_INTERVAL")
     param = sympy.Symbol(m["p"])
-    return _solve_params([sympy.diff(f, _X).subs(_X, cv) - _slope_between(f, lo, hi)], [param])[param]
+    return _solve_params([sympy.diff(f, _X).subs(_X, cv) - _slope_between(f, lo, hi)], [param])[
+        param
+    ]
 
 
 @_rule(
     "mean_value_parameter",
     "평균값 정리의 c 값이 주어질 때 매개변수·끝점",
-    rf"{_FN}(?P<f>{_E}) ?에 대하여 (?:닫힌)?구간 \[(?P<lo>[^,\]]+), (?P<hi>[^,\]]+)\] \((?P<cond>[a-z] [<>] {_NUM})\)에서 "
+    rf"{_FN}(?P<f>{_E}) ?에 대하여 (?:닫힌)?구간 \[(?P<lo>[^,\]]+), (?P<hi>[^,\]]+)\] "
+    rf"\((?P<cond>[a-z] [<>] {_NUM})\)에서 "
     rf"평균값 정리를 만족시키는 c의 값이 (?P<cv>{_NUM})일 때, (?P<p>[a-z])의 값을 구하시오\.",
 )
 def _mvt_unknown_endpoint(m: re.Match[str]) -> sympy.Expr:
@@ -2323,7 +2425,8 @@ def _mvt_unknown_endpoint(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_parameter",
     "평균값 정리의 c 값이 주어질 때 매개변수·끝점",
-    rf"{_FN}(?P<f>{_E})(?:이|가) 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 롤의 정리의 가정을 만족시키도록 "
+    rf"{_FN}(?P<f>{_E})(?:이|가) 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 "
+    r"롤의 정리의 가정을 만족시키도록 "
     r"상수 (?P<p>[a-z])의 값을 정할 때, 롤의 정리를 만족시키는 c의 값을 구하시오\.",
 )
 def _rolle_parameter(m: re.Match[str]) -> sympy.Expr:
@@ -2352,7 +2455,8 @@ def _roots_with_formula(m: re.Match[str], *, inside: bool) -> sympy.Expr:
     "mean_value_c",
     _MVT_TITLE,
     rf"{_FN}(?P<f>{_E}) ?에 대하여 {_ROOTS_SLOPE}을 만족시키는 실수 x는 두 개이다\. "
-    rf"이 중 열린구간 \((?P<ilo>{_NUM}), (?P<ihi>{_NUM})\)에 속하는 것을 c라 할 때, c의 값을 구하시오\.",
+    rf"이 중 열린구간 \((?P<ilo>{_NUM}), (?P<ihi>{_NUM})\)에 속하는 것을 c라 할 "
+    r"때, c의 값을 구하시오\.",
 )
 def _mvt_inside_root(m: re.Match[str]) -> sympy.Expr:
     return _roots_with_formula(m, inside=True)
@@ -2371,7 +2475,8 @@ def _mvt_outside_root(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 함수 f\(x\) = (?P<f>{_E})의 평균변화율과 x = c에서의 "
+    rf"닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 함수 f\(x\) = (?P<f>{_E})의 "
+    r"평균변화율과 x = c에서의 "
     r"미분계수가 같아지는 c \((?P=lo) < c < (?P=hi)\)의 값을 구하시오\.",
 )
 def _mvt_average_rate_phrase(m: re.Match[str]) -> sympy.Expr:
@@ -2383,7 +2488,8 @@ def _mvt_average_rate_phrase(m: re.Match[str]) -> sympy.Expr:
     "mean_value_c",
     _MVT_TITLE,
     rf"삼차함수 f\(x\) = (?P<f>{_E})에 대하여 f\((?P<hi>{_NUM})\) - f\((?P<lo>{_NUM})\) = "
-    rf"f'\(c\)\((?P=hi) - (?P<den>.+?)\)을 만족시키는 c \((?P=lo) < c < (?P=hi)\)의 값을 구하시오\.",
+    r"f'\(c\)\((?P=hi) - (?P<den>.+?)\)을 만족시키는 c \((?P=lo) < c < (?P=hi)\)의 "
+    r"값을 구하시오\.",
 )
 def _mvt_product_form(m: re.Match[str]) -> sympy.Expr:
     lo, hi = _bounds(m)
@@ -2396,7 +2502,8 @@ def _mvt_product_form(m: re.Match[str]) -> sympy.Expr:
     "mean_value_c",
     _MVT_TITLE,
     rf"{_FN}(?P<f>{_E})에 대하여 f\((?P<lo>{_NUM})\)과 f\((?P<hi>{_NUM})\)의 값은 서로 다르다\. "
-    r"구간 \[(?P=lo), (?P=hi)\]에서 평균값 정리를 만족시키는 c를 구하려 할 때, 올바른 방정식을 세워 구한 c의 값은\?",
+    r"구간 \[(?P=lo), (?P=hi)\]에서 평균값 정리를 만족시키는 c를 구하려 할 때, "
+    r"올바른 방정식을 세워 구한 c의 값은\?",
 )
 def _mvt_correct_equation(m: re.Match[str]) -> sympy.Expr:
     lo, hi = _bounds(m)
@@ -2409,8 +2516,10 @@ def _mvt_correct_equation(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "mean_value_c",
     _MVT_TITLE,
-    rf"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 {_VELOCITY_MVT_FN}일 때, (?P<lo>{_NUM}) < t < (?P<hi>{_NUM})에서 "
-    rf"점 P의 순간속도가 t = (?P=lo)부터 t = (?P=hi)까지의 평균속도와 같아지는 시각의 개수를 구하시오\.",
+    rf"수직선 위를 움직이는 점 P의 시각 t에서의 위치가 {_VELOCITY_MVT_FN}일 때, "
+    rf"(?P<lo>{_NUM}) < t < (?P<hi>{_NUM})에서 "
+    r"점 P의 순간속도가 t = (?P=lo)부터 t = (?P=hi)까지의 평균속도와 같아지는 "
+    r"시각의 개수를 구하시오\.",
 )
 def _mvt_velocity_count(m: re.Match[str]) -> sympy.Expr:
     lo, hi = _bounds(m)
@@ -2421,8 +2530,10 @@ def _mvt_velocity_count(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "inequality_minimum",
     _MIN_TITLE,
-    rf"수직선 위를 움직이는 두 점 P, Q의 시각 t \(t ≥ 0\)에서의 위치가 각각 p\(t\) = (?P<p>{_E}), q\(t\) = (?P<q>{_E})이다\. "
-    r"t ≥ 0에서 점 P는 항상 점 Q보다 오른쪽에 있음을 보이려 한다\. t ≥ 0에서 p\(t\) - q\(t\)의 최솟값을 구하시오\.",
+    rf"수직선 위를 움직이는 두 점 P, Q의 시각 t \(t ≥ 0\)에서의 위치가 각각 p\(t\) = (?P<p>{_E}), "
+    rf"q\(t\) = (?P<q>{_E})이다\. "
+    r"t ≥ 0에서 점 P는 항상 점 Q보다 오른쪽에 있음을 보이려 한다\. t ≥ 0에서 p\(t\) "
+    r"- q\(t\)의 최솟값을 구하시오\.",
 )
 def _min_position_gap(m: re.Match[str]) -> sympy.Expr:
     gap = _read_expr(m["p"], frozenset({_T})) - _read_expr(m["q"], frozenset({_T}))
@@ -2443,7 +2554,8 @@ def _motion_average_equals_instant(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "motion_time_when",
     "속도·가속도가 c 가 되는 시각",
-    rf"수직선 위를 움직이는 두 점 P, Q의 시각 t에서의 위치가 각각 f\(t\) = (?P<f>{_E}), g\(t\) = (?P<g>{_E})이다\. "
+    rf"수직선 위를 움직이는 두 점 P, Q의 시각 t에서의 위치가 각각 f\(t\) = (?P<f>{_E}), "
+    rf"g\(t\) = (?P<g>{_E})이다\. "
     r"두 점의 속도가 같아지는 시각 t \(t > 0\)의 값을 구하시오\.",
 )
 def _two_points_equal_velocity(m: re.Match[str]) -> sympy.Expr:

@@ -39,7 +39,8 @@ def test_not_covered_does_not_block_the_verdict_but_is_counted_and_listed() -> N
     outcomes = {i.ident: report.c5_outcome(i) for i in report.items}
     assert outcomes == {"cov": "applied", "unc": "not_covered"}
     assert [i.ident for i in report.c5_not_covered()] == ["unc"]
-    # C1~C4 가 해당 없음/자료 없음이라 판정은 C5 가 없는 문항과 같은 규칙 — 미적용이 FAIL 을 만들지 않는다
+    # C1~C4 가 해당 없음/자료 없음이라 판정은 C5 가 없는 문항과 같은 규칙 — 미적용이 FAIL 을 만들지
+    # 않는다
     assert report.items[1].checks["C5"].state is qa.CheckState.NOT_APPLICABLE
     assert report.items[1].checks["C5"].code == qa.C5_NOT_COVERED
 
@@ -78,7 +79,9 @@ def test_failed_family_is_counted_by_family_not_by_message() -> None:
 # CLI — 종료 코드와 목록 출력
 # ──────────────────────────────────────────────────────────────────────────
 def _write(path: Path, rows: list[dict[str, object]]) -> Path:
-    path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8"
+    )
     return path
 
 
@@ -110,10 +113,14 @@ def world_records() -> list[dict[str, object]]:
     return records
 
 
-def test_real_corpus_has_no_c5_failure_and_high_coverage(world_records: list[dict[str, object]]) -> None:
+def test_real_corpus_has_no_c5_failure_and_high_coverage(
+    world_records: list[dict[str, object]],
+) -> None:
     checks = [(str(r.get("slug")), qa._check_c5(r)) for r in world_records]
     fails = [ident for ident, c in checks if c.state is qa.CheckState.FAIL]
-    assert not fails, f"발문 재유도가 정답과 어긋난 문항 {fails[:5]} — 코퍼스 결함이거나 인식기 결함"
+    assert (
+        not fails
+    ), f"발문 재유도가 정답과 어긋난 문항 {fails[:5]} — 코퍼스 결함이거나 인식기 결함"
     applied = sum(1 for _, c in checks if c.state is qa.CheckState.PASS)
     # 하한은 래칫이다 — 새 생성기 틀이 인식기 없이 늘면 적용률이 내려가 이 테스트가 신호를 낸다
     assert applied / len(checks) >= 0.95, (applied, len(checks))

@@ -752,7 +752,8 @@ def _solution_qa(world: World, scope: str, reverify: ReverifyFn) -> MetricOutcom
         ),
         (
             "재검증 도구",
-            "harness.solution_qa(C1 정답↔조건 · C2 풀이 최종 답 · C3 선택지 · C4 단계 연쇄 · C5 발문 독립 재유도). "
+            "harness.solution_qa(C1 정답↔조건 · C2 풀이 최종 답 · C3 선택지 · "
+            "C4 단계 연쇄 · C5 발문 독립 재유도). "
             "검증 불가 사유·검수 대기 목록: `python -m whymath_backend.harness.solution_qa`",
         ),
         (

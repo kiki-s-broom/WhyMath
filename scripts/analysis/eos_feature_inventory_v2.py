@@ -1304,11 +1304,14 @@ CATALOG: tuple[Spec, ...] = (
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",
-       # P3-07 — 문항별 문제·정답·풀이 불일치 기계 검증(C1~C4)과 Solution QA Pass 산출.
+       # P3-07 — 문항별 문제·정답·풀이 불일치 기계 검증(C1~C5)과 Solution QA Pass 산출.
        # `corpus_reverify`(야간 상시성 — answer_map 검산 + OPS-150 부터 `answer` 필드 대조)와 같은
        # 전수 재검산 가족이되, 풀이 최종 답·선택지 유일성까지 보는 별도 판정기라 같은 행에
        # 귀속한다. 지표 ④ 의 엔진이다(phase3_metrics 가 호출).
        "harness.solution_qa",
+       # P3-63 — solution_qa C5 의 엔진: 발문(question_text)에서 정답을 SymPy 로 독립 재유도한다.
+       # solution_qa 가 호출하는 순수 계산 모듈이라 같은 행에 귀속한다.
+       "harness.question_rederive",
        # P3-10 — 튜터 턴 AI 품질 8축(평가셋·판정기·후보/주입·CLI). 판정 권위는 기존 검증 레이어
        # (verify_step·detect_answer_leakage·check_level_reveals·TutorTurnOutput·MATH-04)를 호출하고
        # 결함 주입 자가 점검으로 변별력을 상시 봉인하는 판정 가족이라 같은 행에 귀속한다.

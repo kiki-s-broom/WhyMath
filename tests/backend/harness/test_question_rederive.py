@@ -18,7 +18,8 @@ from whymath_backend.harness import solution_qa as qa
 CONTROLS: list[tuple[str, str, str]] = [
     (
         "tangent_slope_pick",
-        "함수 f(x) = x^3 - 18x^2 + 90x 의 그래프 위에서 접선의 기울기가 -6인 두 점 중 x좌표가 작은 점의 x좌표를 구하시오.",
+        "함수 f(x) = x^3 - 18x^2 + 90x 의 그래프 위에서 접선의 기울기가 -6인 두 "
+        "점 중 x좌표가 작은 점의 x좌표를 구하시오.",
         "4",  # 3x^2-36x+96=0 → x=4,8
     ),
     (
@@ -53,7 +54,8 @@ CONTROLS: list[tuple[str, str, str]] = [
     ),
     (
         "product_derivative_at_point",
-        "두 함수 f(x) = x^1, g(x) = x^2 에 대하여 함수 f(x)g(x) 의 x = 6 에서의 미분계수를 구하시오.",
+        "두 함수 f(x) = x^1, g(x) = x^2 에 대하여 함수 f(x)g(x) 의 x = 6 에서의 "
+        "미분계수를 구하시오.",
         "108",  # (x^3)'=3x^2
     ),
     (
@@ -63,12 +65,14 @@ CONTROLS: list[tuple[str, str, str]] = [
     ),
     (
         "monotone_integer(floor)",
-        "함수 f(x) = 4x^3 + 12x^2 + 9x + 4가 감소하는 x의 값의 범위에 속하는 정수는 하나뿐이다. 그 정수를 구하시오.",
+        "함수 f(x) = 4x^3 + 12x^2 + 9x + 4가 감소하는 x의 값의 범위에 속하는 정수는 "
+        "하나뿐이다. 그 정수를 구하시오.",
         "-1",  # f'=3(2x+1)(2x+3) <0 on (-3/2,-1/2) — int() 절단이면 0 이 나온다
     ),
     (
         "motion_at_time",
-        "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = -t^3 + 3t^2 + 4t + 2일 때, t = 3에서의 점 P의 속도를 구하시오.",
+        "수직선 위를 움직이는 점 P의 시각 t에서의 위치가 x = -t^3 + 3t^2 + 4t "
+        "+ 2일 때, t = 3에서의 점 P의 속도를 구하시오.",
         "-5",  # -3t^2+6t+4 at 3 = -27+18+4
     ),
     (
@@ -78,17 +82,20 @@ CONTROLS: list[tuple[str, str, str]] = [
     ),
     (
         "extremum_parameter",
-        "함수 f(x) = 2x^3 + ax^2 - 72x + 6이 x = -3에서 극값을 가질 때, f(x)의 극솟값을 구하시오. (단, a는 상수이다.)",
+        "함수 f(x) = 2x^3 + ax^2 - 72x + 6이 x = -3에서 극값을 가질 때, f(x)의 "
+        "극솟값을 구하시오. (단, a는 상수이다.)",
         "-202",  # f'(-3)=0 → a=-3, 극소 x=4: 128-48-288+6
     ),
     (
         "mean_value_c",
-        "함수 f(x) = 2x^3 - x^2 - 3에 대하여 닫힌구간 [0, 4]에서 평균값 정리를 만족시키는 c의 값은?",
+        "함수 f(x) = 2x^3 - x^2 - 3에 대하여 닫힌구간 [0, 4]에서 평균값 정리를 "
+        "만족시키는 c의 값은?",
         "7/3",  # 평균기울기 28, 6x^2-2x=28 → x=7/3
     ),
     (
         "inequality_minimum",
-        "함수 f(x) = 2x^3 - 6x + 6에 대하여 x ≥ 0에서 f(x) > 0임을 보이려 한다. x ≥ 0에서 f(x)의 최솟값을 구하시오.",
+        "함수 f(x) = 2x^3 - 6x + 6에 대하여 x ≥ 0에서 f(x) > 0임을 보이려 한다. "
+        "x ≥ 0에서 f(x)의 최솟값을 구하시오.",
         "2",  # f'=6(x^2-1), x=1: 2-6+6
     ),
 ]
@@ -166,7 +173,8 @@ def test_c5_does_not_read_the_verify_block() -> None:
 
 
 def test_c5_rederivation_does_not_use_the_answer_back_derived_conditions() -> None:
-    """역산 conditions(정답 108 에서 만든 식)가 있어도 틀린 정답은 C5 가 잡는다 — C1 은 못 잡는 구멍."""
+    """역산 conditions(정답 108 에서 만든 식)가 있어도 틀린 정답은 C5 가 잡는다 "
+    "— C1 은 못 잡는 구멍."""
     wrong = 109  # 참값은 108 — 정답을 109 로 틀리게 적고, conditions 는 그 정답에서 역산한다
     record = {
         "slug": "back-derived",
@@ -202,7 +210,8 @@ def test_parameter_formula_without_a_solver_rule_is_not_covered() -> None:
 
 
 def test_two_candidates_is_undecided_not_a_guess() -> None:
-    """극대가 두 개인 사차함수에 '극대가 되는 x의 값'은 하나로 안 정해진다 — 임의로 고르지 않는다."""
+    """극대가 두 개인 사차함수에 '극대가 되는 x의 값'은 하나로 안 정해진다 — 임의로 "
+    "고르지 않는다."""
     q = "사차함수 f(x) = -x^4 + 8x^2 가 극대가 되는 x의 값을 구하시오."
     result = qr.rederive_question(q)
     assert result.state is qr.RederiveState.UNDECIDED
@@ -219,9 +228,9 @@ def test_point_not_on_the_curve_is_undecided() -> None:
 
 def test_missing_question_or_answer_is_not_applicable_with_a_code() -> None:
     assert qa._check_c5({"answer": "1"}).code == "C5_NO_QUESTION_TEXT"
-    assert qa._check_c5({"question_text": "함수 f(x) = x^3에 대하여 f'(2)의 값을 구하시오."}).code == (
-        "C5_NO_ANSWER"
-    )
+    assert qa._check_c5(
+        {"question_text": "함수 f(x) = x^3에 대하여 f'(2)의 값을 구하시오."}
+    ).code == ("C5_NO_ANSWER")
 
 
 def test_unbounded_minimum_is_undecided() -> None:
@@ -241,10 +250,14 @@ def test_ellipsis_with_a_wrong_tail_is_not_guessed() -> None:
 
 
 def test_ellipsis_alternating_and_geometric_rules() -> None:
-    alt = qr.rederive_question("함수 f(x) = x - x^2 + x^3 - x^4 + ... + x^7에 대하여 f'(1)의 값을 구하시오.")
+    alt = qr.rederive_question(
+        "함수 f(x) = x - x^2 + x^3 - x^4 + ... + x^7에 대하여 f'(1)의 값을 구하시오."
+    )
     # 1 -2 +3 -4 +5 -6 +7 = 4
     assert alt.value == "4"
-    geo = qr.rederive_question("함수 f(x) = x + 2x^2 + 4x^3 + ... + 64x^7에 대하여 f'(0)의 값을 구하시오.")
+    geo = qr.rederive_question(
+        "함수 f(x) = x + 2x^2 + 4x^3 + ... + 64x^7에 대하여 f'(0)의 값을 구하시오."
+    )
     assert geo.value == "1"
 
 
