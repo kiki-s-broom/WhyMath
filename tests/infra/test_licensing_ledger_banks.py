@@ -37,7 +37,9 @@ _POOL_CELL = re.compile(r"^`([^`]+)`$")
 def parse_ledger(text: str) -> dict[str, list[str]]:
     """대장 표를 {은행 폴더명: 칸 목록}으로 읽는다. 앵커가 없으면 ValueError."""
     if text.count(START) != 1 or text.count(END) != 1:
-        raise ValueError(f"대장 앵커가 정확히 1쌍이 아니다({START} ×{text.count(START)} · {END} ×{text.count(END)})")
+        raise ValueError(
+            f"대장 앵커가 정확히 1쌍이 아니다({START} ×{text.count(START)} · {END} ×{text.count(END)})"
+        )
     body = text[text.index(START) + len(START) : text.index(END)]
     rows: dict[str, list[str]] = {}
     for line in body.splitlines():
@@ -83,11 +85,15 @@ def violations(root: Path) -> list[str]:
         pool_m = _POOL_CELL.match(pool_cell)
         shown_pool = pool_m.group(1) if pool_m else None
         if shown_pool != prov.get("pool"):
-            out.append(f"{d.name}: pool 불일치 — 대장 {pool_cell!r} · provenance {prov.get('pool')!r}")
+            out.append(
+                f"{d.name}: pool 불일치 — 대장 {pool_cell!r} · provenance {prov.get('pool')!r}"
+            )
         has_rail = bool(prov.get("copyright_rail"))
         shown_rail = rail_cell != MISSING
         if has_rail != shown_rail:
-            out.append(f"{d.name}: copyright_rail 기재 여부 불일치 — 대장 {rail_cell!r} · provenance 기재={has_rail}")
+            out.append(
+                f"{d.name}: copyright_rail 기재 여부 불일치 — 대장 {rail_cell!r} · provenance 기재={has_rail}"
+            )
     return out
 
 
@@ -119,7 +125,10 @@ def _make_repo(
         d.mkdir(parents=True)
         if prov is not None:
             (d / "_provenance.json").write_text(json.dumps(prov), encoding="utf-8")
-    table = "| 은행 | 건수 | pool | copyright_rail | a | b | c | d |\n|---|---|---|---|---|---|---|---|\n" + "\n".join(rows)
+    table = (
+        "| 은행 | 건수 | pool | copyright_rail | a | b | c | d |\n|---|---|---|---|---|---|---|---|\n"
+        + "\n".join(rows)
+    )
     body = f"{START}\n{table}\n{END}\n" if anchors else table + "\n"
     doc = tmp_path / LEDGER_DOC
     doc.parent.mkdir(parents=True)
@@ -143,12 +152,20 @@ def test_control_consistent_repo_is_green(tmp_path: Path) -> None:
 
 def test_control_retired_ledger_row_without_folder_is_allowed(tmp_path: Path) -> None:
     # 요구는 폴더 ⊆ 대장 — 대장에만 있는 행(은퇴 은행)은 막지 않는다
-    repo = _make_repo(tmp_path, {"problem_bank_a_v0": _POOL}, [_row("problem_bank_a_v0"), _row("problem_bank_gone_v0")])
+    repo = _make_repo(
+        tmp_path,
+        {"problem_bank_a_v0": _POOL},
+        [_row("problem_bank_a_v0"), _row("problem_bank_gone_v0")],
+    )
     assert violations(repo) == []
 
 
 def test_new_bank_folder_without_ledger_row_is_red(tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path, {"problem_bank_a_v0": _POOL, "problem_bank_new_v0": _POOL}, [_row("problem_bank_a_v0")])
+    repo = _make_repo(
+        tmp_path,
+        {"problem_bank_a_v0": _POOL, "problem_bank_new_v0": _POOL},
+        [_row("problem_bank_a_v0")],
+    )
     found = violations(repo)
     assert len(found) == 1 and "problem_bank_new_v0: 대장 미등재" in found[0]
 
@@ -166,12 +183,16 @@ def test_empty_ledger_table_is_red(tmp_path: Path) -> None:
 
 
 def test_missing_anchors_is_red(tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path, {"problem_bank_a_v0": _POOL}, [_row("problem_bank_a_v0")], anchors=False)
+    repo = _make_repo(
+        tmp_path, {"problem_bank_a_v0": _POOL}, [_row("problem_bank_a_v0")], anchors=False
+    )
     assert any("앵커" in v for v in violations(repo))
 
 
 def test_pool_mismatch_is_red(tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path, {"problem_bank_a_v0": _POOL}, [_row("problem_bank_a_v0", pool="`other-pool`")])
+    repo = _make_repo(
+        tmp_path, {"problem_bank_a_v0": _POOL}, [_row("problem_bank_a_v0", pool="`other-pool`")]
+    )
     assert any("pool 불일치" in v for v in violations(repo))
 
 
@@ -186,8 +207,12 @@ def test_pool_shown_but_absent_in_provenance_is_red(tmp_path: Path) -> None:
     [(_POOL, "기재(1항)"), (_RAILED, MISSING)],
     ids=["ledger-claims-rail-provenance-lacks", "ledger-says-missing-provenance-has"],
 )
-def test_copyright_rail_presence_mismatch_is_red(tmp_path: Path, prov: dict[str, object], rail_cell: str) -> None:
-    repo = _make_repo(tmp_path, {"problem_bank_a_v0": prov}, [_row("problem_bank_a_v0", rail=rail_cell)])
+def test_copyright_rail_presence_mismatch_is_red(
+    tmp_path: Path, prov: dict[str, object], rail_cell: str
+) -> None:
+    repo = _make_repo(
+        tmp_path, {"problem_bank_a_v0": prov}, [_row("problem_bank_a_v0", rail=rail_cell)]
+    )
     assert any("copyright_rail 기재 여부 불일치" in v for v in violations(repo))
 
 
