@@ -192,6 +192,32 @@ def budget_exceeded_verdict() -> AnswerVerdict:
 _RELATION_OPS: frozenset[str] = frozenset({">", "<", ">=", "<=", "!="})
 
 
+class _ConditionShapeError(ValueError):
+    """조건 문자열이 *단일 스칼라 식*으로 읽히지 않는다(P3-80) — 파싱 불가의 한 갈래.
+
+    `"1,2,3,4,9"` 같은 쉼표 나열은 sympify가 파이썬 `tuple`로 돌려준다. 이것은 개념형 문항의
+    자료 목록 DSL(`_parse_number_list` 소비 — 평균=중앙값·독립·조건부확률·내적)이지 방정식이
+    아니다. 잔차(`sympy.Expr`) 계약을 어긴 채 돌려주면 호출부가 `.free_symbols`에서
+    `AttributeError`로 터지거나(근 선택 유도·근 선택·근 집계·실근 개수 등), 상수 튜플을 0 아닌
+    상수로 읽어 "해 없음"을 **확정**했다(`classify_solvability` — 판정 불가여야 할 자리의 틀린
+    판정).
+
+    `ValueError`의 하위형이라 기존 호출부(전부 파싱 실패를 판정 불가로 접는다)가 그대로 받는다.
+    로그에는 이 타입명이 남아 다른 파싱 실패와 구분된다(침묵 실패 금지 — 필드값은 싣지 않는다).
+    """
+
+
+def _require_scalar(expr: object, where: str) -> sympy.Expr:
+    """`expr`이 SymPy 스칼라 식(`sympy.Expr`)이 아니면 `_ConditionShapeError`(형태 검사·P3-80).
+
+    튜플·리스트(쉼표 나열)·행렬·집합·진리값처럼 `잔차 == 0`으로 읽을 수 없는 꼴을 *자유 변수 수집
+    전에* 막는다. 사유에는 타입명만 싣는다(조건 원문·값은 싣지 않는다).
+    """
+    if not isinstance(expr, sympy.Expr):
+        raise _ConditionShapeError(f"조건의 {where}이 단일 식이 아님({type(expr).__name__})")
+    return expr
+
+
 def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
     """condition 문자열을 (잔차 식, 관계 연산자)로 파싱.
 
@@ -201,7 +227,9 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
       - `">"`,`"<"`,`">="`,`"<="`,`"!="` — 부등식·≠. 잔차는 `lhs - rhs`이며, 진리값은 잔차를
         수치 평가해 *연산자*로 판정한다(`_eval_relation`). 별도의 진리값 평가 경로다.
 
-    파싱 불가는 예외를 일으켜 호출부가 unverifiable로 처리한다(보수적·pass 위장 금지).
+    파싱 불가는 예외를 일으켜 호출부가 unverifiable로 처리한다(보수적·pass 위장 금지). 반환
+    잔차는 **항상** `sympy.Expr`이다 — 좌·우변 또는 단일 식이 스칼라 식이 아니면(쉼표 나열이
+    만든 튜플 등) `_ConditionShapeError`(`ValueError` 하위형)를 낸다(P3-80).
     """
     text = condition.strip()
     if not text:
@@ -210,8 +238,8 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
     # `!=`(≠)는 파이썬 비교라 sympify가 bool로 접어버린다 — SymPy `Ne(lhs, rhs)`로 명시 변환.
     if "!=" in text:
         lhs_text, rhs_text = text.split("!=", 1)
-        lhs = safe_sympify(lhs_text)
-        rhs = safe_sympify(rhs_text)
+        lhs = _require_scalar(safe_sympify(lhs_text), "좌변")
+        rhs = _require_scalar(safe_sympify(rhs_text), "우변")
         return ensure_within_budget(lhs - rhs), "!="
 
     # `==`(파이썬식 등호)를 등식 잔차로 변환 — sympify가 `==`를 *구조 비교*로 접어 `False`(상수
@@ -219,8 +247,8 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
     # 쓰는 회귀(Phaiakes9 실측·S2-i) — 단일 `=` 경로와 동형이되 `==` 토큰을 별도로 받는다.
     if "==" in text:
         lhs_text, rhs_text = text.split("==", 1)
-        lhs = safe_sympify(lhs_text)
-        rhs = safe_sympify(rhs_text)
+        lhs = _require_scalar(safe_sympify(lhs_text), "좌변")
+        rhs = _require_scalar(safe_sympify(rhs_text), "우변")
         return ensure_within_budget(lhs - rhs), "=="
 
     # `=`(단일 등호, `==`/`<=`/`>=` 아님)를 등식 잔차로 변환. `==`는 위에서 이미 처리했다.
@@ -233,8 +261,8 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
         and ">" not in text
     ):
         lhs_text, rhs_text = text.split("=", 1)
-        lhs = safe_sympify(lhs_text)
-        rhs = safe_sympify(rhs_text)
+        lhs = _require_scalar(safe_sympify(lhs_text), "좌변")
+        rhs = _require_scalar(safe_sympify(rhs_text), "우변")
         return ensure_within_budget(lhs - rhs), "=="
 
     parsed = safe_sympify(text)
@@ -251,8 +279,9 @@ def _parse_condition(condition: str) -> tuple[sympy.Expr, str]:
         # sympify가 이미 진리값(BooleanTrue/False)으로 접은 경우 — 자유변수 없는 관계라 잔차
         # 모델로 환원 불가(보수적 거부). 호출부가 unverifiable 처리.
         raise ValueError("관계가 상수 진리값으로 환원 — Tier1 잔차 모델 적용 불가")
-    # 등식 기호가 없는 단일 식 → 식 == 0을 묻는 잔차로 본다.
-    return parsed, "=="
+    # 등식 기호가 없는 단일 식 → 식 == 0을 묻는 잔차로 본다. 쉼표 나열(파이썬 tuple)·행렬·집합은
+    # 단일 식이 아니다 — 여기서 막아야 호출부의 `.free_symbols`가 터지지 않는다(P3-80).
+    return _require_scalar(parsed, "식"), "=="
 
 
 def _eval_relation(magnitude: float, op: str, tol: float) -> bool | None:
@@ -2045,6 +2074,10 @@ def derive_selected_root(
     반환은 SymPy 정확값 문자열이다(예 `'4/3'`·`'3/2'`·`'sqrt(2)'` — 반올림 소수 아님). 적용 밖
     (연립·다변수·부등식·실근 없음·unique인데 다근·미지 selection)은 None(보수적 — 호출자는
     유도 없이 기존 경로를 탄다). 판정 규약은 verify_root_selection과 동일 계약을 공유한다.
+
+    단일 식이 아닌 조건(쉼표 나열 `"1,2,3,4,9"` 같은 개념형 자료 목록 — 파싱 결과가 튜플)도
+    판정 불가 None이다. 예외를 내지 않는다(P3-80 — 종전에는 `AttributeError`). 형태 검사는
+    `_parse_condition`이 자유 변수 수집 전에 한다.
     """
     if selection not in ("largest", "smallest", "unique"):
         return None
@@ -2622,6 +2655,8 @@ def verify_extremum_count(
         return _unverifiable("극값 개수 — 식 파싱 불가·안전 회피")
     if isinstance(expr, sympy.core.relational.Relational):
         return _unverifiable("극값 개수 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    if not isinstance(expr, sympy.Expr):  # P3-80 — 쉼표 나열(튜플) 등은 자유 변수 수집 전에 회피
+        return _unverifiable("극값 개수 — 단일 식이 아님(쉼표 나열 등)·안전 회피")
     free = sorted(expr.free_symbols, key=str)
     if len(free) != 1:
         return _unverifiable("극값 개수 — 단일 변수 함수가 아님·안전 회피")
@@ -2691,6 +2726,8 @@ def verify_is_one_to_one(
         return _unverifiable("일대일 — 식 파싱 불가·안전 회피")
     if isinstance(expr, sympy.core.relational.Relational):
         return _unverifiable("일대일 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    if not isinstance(expr, sympy.Expr):  # P3-80 — 쉼표 나열(튜플) 등은 자유 변수 수집 전에 회피
+        return _unverifiable("일대일 — 단일 식이 아님(쉼표 나열 등)·안전 회피")
     free = sorted(expr.free_symbols, key=str)
     if len(free) != 1:
         return _unverifiable("일대일 — 단일 변수 함수가 아님·안전 회피")
@@ -2788,6 +2825,8 @@ def verify_limit_equals_value(
         return _unverifiable("극한=함숫값 — 식 파싱 불가·안전 회피")
     if isinstance(expr, sympy.core.relational.Relational):
         return _unverifiable("극한=함숫값 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    if not isinstance(expr, sympy.Expr):  # P3-80 — 쉼표 나열(튜플) 등은 자유 변수 수집 전에 회피
+        return _unverifiable("극한=함숫값 — 단일 식이 아님(쉼표 나열 등)·안전 회피")
     free = sorted(expr.free_symbols, key=str)
     if len(free) != 1:
         return _unverifiable("극한=함숫값 — 단일 변수 함수가 아님·안전 회피")
@@ -2851,6 +2890,8 @@ def verify_is_differentiable(
         return _unverifiable("미분가능 — 식 파싱 불가·안전 회피")
     if isinstance(expr, sympy.core.relational.Relational):
         return _unverifiable("미분가능 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    if not isinstance(expr, sympy.Expr):  # P3-80 — 쉼표 나열(튜플) 등은 자유 변수 수집 전에 회피
+        return _unverifiable("미분가능 — 단일 식이 아님(쉼표 나열 등)·안전 회피")
     free = sorted(expr.free_symbols, key=str)
     if len(free) != 1:
         return _unverifiable("미분가능 — 단일 변수 함수가 아님·안전 회피")
@@ -2930,6 +2971,8 @@ def verify_series_converges(
         return _unverifiable("급수 수렴 — 식 파싱 불가·안전 회피")
     if isinstance(term, sympy.core.relational.Relational):
         return _unverifiable("급수 수렴 — 일반항 식이어야 함(등식/부등식 아님)·안전 회피")
+    if not isinstance(term, sympy.Expr):  # P3-80 — 쉼표 나열(튜플) 등은 자유 변수 수집 전에 회피
+        return _unverifiable("급수 수렴 — 단일 식이 아님(쉼표 나열 등)·안전 회피")
     free = sorted(term.free_symbols, key=str)
     if len(free) != 1:
         return _unverifiable("급수 수렴 — 단일 변수 일반항이 아님·안전 회피")

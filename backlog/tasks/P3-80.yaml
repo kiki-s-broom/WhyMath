@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,6 +16,7 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/verify_answer.py
-session: null
-notes: ""
-updated: 2026-10-21
+  - tests/backend/l3/test_verify_answer_condition_shape.py
+session: claude/p3-80-derive-selected-root-tuple
+notes: "[정정 2026-10-26] paths ['src/backend/whymath_backend/l3/verify_answer.py'] → ['src/backend/whymath_backend/l3/verify_answer.py', 'tests/backend/l3/test_verify_answer_condition_shape.py']: 신규 테스트 파일을 작업 경로에 반영"
+updated: 2026-10-26
