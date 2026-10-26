@@ -17,17 +17,29 @@ primary LLM 정책)에 전달되지 않았다** — 정책이 받는 것은 학�
   프롬프트(`LLMTutorPolicy.prompt_slots_sent`)·사적 보유값(`private_context_slots`)·초기 가설·가드
   실행 기록에서 계산해 `TutorDeliveryReceipt`로 돌려준다.
 
-누락 처리 정책(보고서 §3): **진행하되 표기**. 표기는 응답 `tutor_context`, 로그 1줄, 튜터 프롬프트
-요약(`context_missing`·`context_not_delivered`·`context_held_privately`), 관측 레코드 네 곳이다.
+누락 처리 정책(보고서 §3): **진행하되 표기** — 단 **필수 누락은 예외**(P3-74, 아래). 표기는 응답
+`tutor_context`, 로그 1줄, 튜터 프롬프트 요약(`context_missing`·`context_not_delivered`·
+`context_held_privately`), 관측 레코드 네 곳이다.
 **이 표기들에는 값이 없다** — 숙달·θ 수치(slice 69/70 비노출)·개념/스킬 id·학생 원문·답안 길이·
 예외 타입명은 응답·로그·레코드에 없다(예외 타입명은 조회 좌석의 서버 로그에만 남는다). 슬롯 *값*의
 요약이 실리는 곳은 튜터 프롬프트 하나뿐이며, 그 내용은 아래 `TutorContentSummary`로 한정된다.
 
-**로그 등급**: WARNING은 *시스템 결함*(`source_disabled`·`lookup_failed`)이 있고 튜터가 실제로 불린
-턴에만 낸다. 학생 측 정상 부재(`not_supplied`·`no_problem_context`·`none_detected`·`no_history`=
-콜드스타트)와 데이터 커버리지 공백(`coverage_gap` — 팩 미보유 단원·개념/스킬 미매핑)은 INFO다 —
-운영 턴 대부분이 해당하므로 WARNING이면 상시 경보가 되어 진짜 결함이 묻힌다. 커버리지 공백은 관측
-레코드의 `context_coverage_gap`으로 집계한다.
+**P3-74 — 필수 누락이면 LLM을 부르지 않는다(지시문 [12] 3항).** 필수 슬롯은 학생 상태(θ)와
+현재 개념 두 개다(`REQUIRED_TUTOR_SLOTS`). 이 둘 중 하나가 *시스템 결함*(`source_disabled`·
+`lookup_failed`)으로 비면 튜터는 그 사실을 모른 채 빈 값으로 돈다 — θ는 정책이 0.0(평균 학생)으로
+채우고, 개념은 프롬프트 요약·진단 개념 id·도구 인자 허용 목록이 통째로 빈다. 그래서 그 턴은 튜터를
+부르지 않고 결정론 Polya 템플릿으로 보낸다(`required_context_missing` → `with_required_fallback`).
+학생 측 정상 부재(`no_history` 콜드스타트·`no_problem_context`)와 커버리지 공백(`coverage_gap`)은
+필수 누락이 **아니다** — 첫 진입·미매핑 문항에서 LLM 튜터가 꺼지면 정상 학습 흐름이 깨진다.
+비필수 슬롯(스킬·팩·오개념 등)은 결함으로 비어도 진행하되 표기한다(팩은 base Polya 정책이 설계된
+대체물이고, 숙달은 결정 (가)로 튜터에 실리지 않는다). 판정은 `status_of` 한 곳에서만 나온다(두 번째
+판정 원천 없음).
+
+**로그 등급**: WARNING은 *시스템 결함*(`source_disabled`·`lookup_failed`)이 있고 튜터가 실제로
+불렸거나 필수 누락으로 폴백한 턴에만 낸다. 학생 측 정상 부재(`not_supplied`·`no_problem_context`·
+`none_detected`·`no_history`=콜드스타트)와 데이터 커버리지 공백(`coverage_gap` — 팩 미보유 단원·
+개념/스킬 미매핑)은 INFO다 — 운영 턴 대부분이 해당하므로 WARNING이면 상시 경보가 되어 진짜 결함이
+묻힌다. 커버리지 공백은 관측 레코드의 `context_coverage_gap`으로 집계한다.
 
 **P3-72 — 전달 경로 분리와 내용 요약(Kiki 결정 (가) 2026-10-20).** `delivered_to_tutor` 한 비트를
 슬롯별 전달 경로(`delivery_paths`)로 나눈다 — `prompt`(LLM 프롬프트 문자열에 실림)·`private_tool`
@@ -59,6 +71,7 @@ import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -70,6 +83,8 @@ __all__ = [
     "MAX_SKILL_NAMES",
     "PROMPT_FORBIDDEN_SLOTS",
     "PROMPT_KEY_SLOTS",
+    "REQUIRED_CONTEXT_FALLBACK",
+    "REQUIRED_TUTOR_SLOTS",
     "SYSTEM_DEFECT_CAUSES",
     "TUTOR_CONTEXT_EVENT_NAME",
     "AbsenceCause",
@@ -87,6 +102,7 @@ __all__ = [
     "build_tutor_context_manifest",
     "log_tutor_context",
     "record_tutor_context",
+    "required_context_missing",
     "tutor_context_trace_fields",
 ]
 
@@ -139,6 +155,34 @@ SYSTEM_DEFECT_CAUSES: frozenset[AbsenceCause] = frozenset(
     {AbsenceCause.SOURCE_DISABLED, AbsenceCause.LOOKUP_FAILED}
 )
 """튜터가 불린 턴에서 WARNING을 낼 원인 — 시스템 결함뿐(학생 측 부재·커버리지 공백은 INFO)."""
+
+REQUIRED_CONTEXT_FALLBACK = "required_context_missing"
+"""필수 누락 폴백 사유 코드(P3-74) — 응답 `tutor_context.fallback_reason`·로그·관측 공용."""
+
+REQUIRED_TUTOR_SLOTS: tuple[TutorContextSlot, ...] = (
+    TutorContextSlot.LEARNER_STATE,
+    TutorContextSlot.CONCEPT,
+)
+"""필수 슬롯(P3-74 · 지시문 순서) — 교수학 근거는 모듈 docstring 'P3-74' 단락.
+
+학생 상태: 튜터가 가진 유일한 학습자 모델(θ)이다. 없으면 정책이 0.0(평균 학생)으로 채워 측정한
+적 없는 학생을 아는 것처럼 비계를 정한다. 현재 개념: 튜터가 무엇을 가르치는지의 닻이다. 없으면
+프롬프트 개념 요약·구조화 출력의 진단 개념 id·도구 인자 허용 목록이 모두 빈다. 둘 다 *결함으로*
+빌 때만 필수 누락이다."""
+
+
+def required_context_missing(manifest: TutorContextManifest) -> list[TutorContextSlot]:
+    """필수 누락 슬롯(지시문 순서) — 필수 슬롯 중 *시스템 결함* 원인으로 비어 있는 것만.
+
+    판정은 매니페스트 `status_of`에서만 읽는다(두 번째 판정 원천 금지). 학생 측 정상 부재
+    (`no_history`·`no_problem_context`·`not_supplied`)와 커버리지 공백은 세지 않는다.
+    """
+    return [
+        slot
+        for slot in REQUIRED_TUTOR_SLOTS
+        if not manifest.status_of(slot).resolved
+        and manifest.status_of(slot).cause in SYSTEM_DEFECT_CAUSES
+    ]
 
 
 class TutorDeliveryPath(str, Enum):
@@ -230,6 +274,17 @@ class TutorContextManifest(BaseModel):
         description="값은 얻었으나 튜터에 실리지 않은 슬롯(지시문 순서). 완비 턴에도 남을 수 있다."
     )
     complete: bool = Field(description="9종 값을 전부 얻었는가(= missing이 비었는가).")
+    fallback_reason: Literal["required_context_missing"] | None = Field(
+        default=None,
+        description=(
+            "P3-74 — 필수 context(학생 상태·현재 개념)가 시스템 결함으로 비어 튜터를 부르지 않고 "
+            "결정론 Polya 템플릿으로 보낸 턴이면 `required_context_missing`. 그 밖은 null."
+        ),
+    )
+    required_missing: list[TutorContextSlot] = Field(
+        default_factory=list,
+        description="폴백을 일으킨 필수 슬롯(지시문 순서). 폴백이 아니면 빈 목록.",
+    )
 
     @model_validator(mode="after")
     def _all_nine_and_consistent(self) -> TutorContextManifest:
@@ -245,6 +300,18 @@ class TutorContextManifest(BaseModel):
             raise ValueError("complete가 missing과 어긋난다")
         if not self.tutor_invoked and any(s.delivered_to_tutor for s in self.slots):
             raise ValueError("튜터를 부르지 않은 턴에 전달됨 표기는 있을 수 없다")
+        # P3-74: 폴백 표기는 판정과 맞아야 한다 — 사유 없이 슬롯만, 슬롯 없이 사유만, 튜터를
+        # 부르고도 폴백 표기는 모두 거짓 표기다. 슬롯 목록은 `required_context_missing`(같은 판정)과
+        # 같아야 한다.
+        if self.fallback_reason is None:
+            if self.required_missing:
+                raise ValueError("폴백 사유 없이 required_missing을 표기할 수 없다")
+        else:
+            if self.tutor_invoked:
+                raise ValueError("필수 누락 폴백 턴은 튜터를 부르지 않는다")
+            expected = required_context_missing(self)
+            if not expected or self.required_missing != expected:
+                raise ValueError(f"required_missing이 판정과 어긋난다: {self.required_missing}")
         return self
 
     def status_of(self, slot: TutorContextSlot) -> TutorContextSlotStatus:
@@ -274,6 +341,20 @@ class TutorContextManifest(BaseModel):
             for s in self.slots
             if s.delivery_paths and TutorDeliveryPath.PROMPT not in s.delivery_paths
         ]
+
+    def with_required_fallback(self) -> TutorContextManifest:
+        """필수 누락 폴백(P3-74) 표기를 단 새 매니페스트 — 튜터 미호출·전달 0.
+
+        필수 누락이 없으면 `ValueError`(검증자) — 폴백 사유를 꾸며 달 수 없다.
+        """
+        return TutorContextManifest.model_validate(
+            {
+                **self.model_dump(),
+                "tutor_invoked": False,
+                "fallback_reason": REQUIRED_CONTEXT_FALLBACK,
+                "required_missing": required_context_missing(self),
+            }
+        )
 
     def with_delivery(
         self,
@@ -602,8 +683,9 @@ def build_tutor_context_manifest(
 def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
     """누락·미전달을 로그 1줄로 남긴다 — `슬롯(원인)`과 미전달 슬롯명만, 값·원문은 없다.
 
-    WARNING은 튜터가 불린 턴에서 시스템 결함 원인이 있을 때만. 그 밖의 누락·미전달은 INFO.
-    둘 다 없으면 남기지 않는다.
+    WARNING은 튜터가 불렸거나 필수 누락으로 폴백한 턴(P3-74)에서 시스템 결함 원인이 있을 때만.
+    그 밖의 누락·미전달은 INFO. 둘 다 없으면 남기지 않는다. 폴백 턴은 줄 끝에
+    `폴백 <사유>(<필수 슬롯>)`를 단다.
     """
     if manifest.complete and not manifest.not_delivered:
         return
@@ -614,11 +696,18 @@ def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
         for s in manifest.slots
         if not s.resolved
     )
-    defect = manifest.tutor_invoked and any(s.cause in SYSTEM_DEFECT_CAUSES for s in manifest.slots)
+    tutor_path = manifest.tutor_invoked or manifest.fallback_reason is not None
+    defect = tutor_path and any(s.cause in SYSTEM_DEFECT_CAUSES for s in manifest.slots)
+    required = " ".join(s.value for s in manifest.required_missing)
+    fallback = (
+        f" · 폴백 {manifest.fallback_reason}({required})"
+        if manifest.fallback_reason is not None
+        else ""
+    )
     logger.log(
         logging.WARNING if defect else logging.INFO,
         "튜터 context(seat=%s·tutor_invoked=%s) — 누락 %d/9: %s · 튜터 미전달 %d: %s"
-        " · 프롬프트 %d: %s",
+        " · 프롬프트 %d: %s%s",
         seat,
         manifest.tutor_invoked,
         len(manifest.missing),
@@ -627,6 +716,7 @@ def log_tutor_context(manifest: TutorContextManifest, *, seat: str) -> None:
         " ".join(manifest.not_delivered_names()) or "-",
         len(manifest.prompt_names()),
         " ".join(manifest.prompt_names()) or "-",
+        fallback,
     )
 
 
@@ -664,6 +754,9 @@ def tutor_context_trace_fields(manifest: TutorContextManifest, *, seat: str) -> 
         "context_coverage_gap": manifest.coverage_gap_names(),
         "context_prompt": manifest.prompt_names(),
         "context_held_privately": manifest.held_privately_names(),
+        # P3-74 — 필수 누락 폴백 턴이면 사유·슬롯 이름(아니면 null·빈 목록).
+        "fallback_reason": manifest.fallback_reason,
+        "required_missing": [s.value for s in manifest.required_missing],
     }
 
 

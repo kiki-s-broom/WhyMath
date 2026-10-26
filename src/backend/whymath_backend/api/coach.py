@@ -108,6 +108,7 @@ from whymath_backend.harness.wh1_tutor_context import (
     build_tutor_context_manifest,
     log_tutor_context,
     record_tutor_context,
+    required_context_missing,
 )
 from whymath_backend.harness.wh1_tutor_output import (
     TutorOutputReceipt,
@@ -2519,7 +2520,8 @@ def _finalize_tutor_context(
 
     P3-73: 튜터를 부른 턴이면 같은 최종 매니페스트의 구성 요약(값 0)을 Langfuse 이벤트
     `tutor_context`로 남긴다(`record_tutor_context` — never-break). 부르지 않은 턴은 남기지 않는다
-    ('튜터 호출마다'). `trace`는 앱 공유 싱크(`judge_deps.trace`)다.
+    ('튜터 호출마다') — 단 필수 누락으로 부르려다 멈춘 턴(P3-74 `fallback_reason`)은 남긴다.
+    `trace`는 앱 공유 싱크(`judge_deps.trace`)다.
     """
     if not tutor_invoked:
         final = manifest
@@ -2528,9 +2530,27 @@ def _finalize_tutor_context(
     else:
         final = manifest.with_delivery(tutor_invoked=True, paths={})
     log_tutor_context(final, seat=seat)
-    if tutor_invoked:
+    if tutor_invoked or final.fallback_reason is not None:
         record_tutor_context(trace, final, seat=seat)
     return final
+
+
+def _plan_tutor_call(
+    manifest: TutorContextManifest, *, tutor_wanted: bool
+) -> tuple[TutorContextManifest, bool]:
+    """튜터를 부를지 정한다(P3-74 집행 지점) — (표기할 매니페스트, 튜터 호출 여부).
+
+    `tutor_wanted`는 기존 조건(primary ON ∧ 완료 상태머신이 가로채지 않음)이다. 그 조건에서 필수
+    context가 시스템 결함으로 비어 있으면(`required_context_missing` — 매니페스트 `status_of` 단일
+    판정) 튜터를 부르지 않고 폴백 표기(`fallback_reason`·`required_missing`)를 단다. 학생이 받는
+    발화는 이미 만들어 둔 결정론 Polya 결정 그대로다(primary OFF 턴과 같은 경로). 튜터를 원하지
+    않던 턴에는 폴백 표기를 달지 않는다 — 폴백은 '부르려다 멈춘' 턴에만 있는 사실이다.
+    """
+    if not tutor_wanted:
+        return manifest, False
+    if required_context_missing(manifest):
+        return manifest.with_required_fallback(), False
+    return manifest, True
 
 
 async def _log_verify_event(
@@ -3735,7 +3755,11 @@ async def create_session(
     # 완료 상태머신이 발화를 가로챘으면(handled·돌아보기/인정/재고) LLM flip을 건너뛴다 — 그 발화는
     # *결정론 메타인지/재고 템플릿*이라 LLM으로 재작성하지 않는다(정서안전·문구 고정).
     # P3-08: 튜터 호출 여부와 실제 전달 영수증 — 응답·로그가 '튜터가 받은 것'을 사실대로 적게 한다.
-    tutor_invoked = wh1_primary_on and not completion.handled
+    # P3-74: 필수 context(학생 상태·개념)가 결함으로 비면 튜터를 부르지 않는다 — 결정론 Polya
+    # 유지·사유 표기.
+    tutor_context, tutor_invoked = _plan_tutor_call(
+        tutor_context, tutor_wanted=wh1_primary_on and not completion.handled
+    )
     tutor_receipt = TutorDeliveryReceipt()
     # P3-09: 스키마 검증을 통과한 구조화 튜터 출력만 담기는 영수증(미통과·미호출이면 None 유지).
     tutor_output_receipt = TutorOutputReceipt()
@@ -4211,7 +4235,11 @@ async def append_turns(
     # 톤필터 통과분·실패 시 결정론 폴백). 멀티턴 메타(dialogue_id·turn_index)는 shadow와 동일 규약.
     # 완료 상태머신이 발화를 가로챘으면(돌아보기/인정/재고) LLM flip을 건너뛴다(결정론 템플릿 고정).
     # P3-08: create_session과 동형 — 튜터 호출 여부·실제 전달 영수증.
-    tutor_invoked = wh1_primary_on and not completion.handled
+    # P3-74: 필수 context(학생 상태·개념)가 결함으로 비면 튜터를 부르지 않는다 — 결정론 Polya
+    # 유지·사유 표기.
+    tutor_context, tutor_invoked = _plan_tutor_call(
+        tutor_context, tutor_wanted=wh1_primary_on and not completion.handled
+    )
     tutor_receipt = TutorDeliveryReceipt()
     # P3-09: 스키마 검증을 통과한 구조화 튜터 출력만 담기는 영수증(미통과·미호출이면 None 유지).
     tutor_output_receipt = TutorOutputReceipt()
