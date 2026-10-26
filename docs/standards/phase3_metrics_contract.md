@@ -145,6 +145,8 @@ DB `hints` 에만 있어 `--hints-from-db` 가 읽는다 — P3-22 · 이 CLI �
 
 ---
 
+**Content Coverage 판정문의 견고성 병기 (P3-64 · 소비 절차)**. P3 게이트 판정문이 Content Coverage Rate 를 근거로 쓸 때는 `phase3_coverage` 보고서의 `link_robustness`(텍스트 「스킬 연결 견고성」 표 · `--json` 의 `link_robustness.concepts`)를 함께 옮겨 적고, `status: thin` 인 개념을 이름으로 적는다 — 연결 10/10 이 같은 사실 하나를 반복해 묻는 한 틀 위에 서 있는지를 판정문이 말하게 하려는 것이다. 이 필드는 **공개 전용**이라 met·exit code 를 바꾸지 않으며, 취약 기준(`LINK_THIN_MIN_DISTINCT_*`)은 잠정값이다(확정은 Kiki 결정 후보).
+
 ## 4. 상태·종합·종료 코드
 
 지표 1종의 상태는 셋이다: `measured`(값·목표·충족 여부) · `unmeasured`(사유·예외 타입명, **0 도 100% 도 아님**) ·

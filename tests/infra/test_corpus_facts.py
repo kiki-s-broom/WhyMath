@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -307,3 +308,25 @@ def test_check_reports_stale_phrase_and_hand_pin(tmp_path: Path) -> None:
     problems = cf.check(root, facts, decls)
     assert any("손 고정값 2278" in p for p in problems)
     assert any("낡은 값" in p and "2,234" in p for p in problems)
+
+
+# ── Windows 체크아웃에서도 같은 판정(2026-10-26 Kiki 머신 실측: CRLF로 지문·경로가 달라 check exit 1) ──
+
+
+def test_sha12_ignores_crlf_checkout(tmp_path: Path) -> None:
+    """Windows 체크아웃(CRLF)에서도 지문이 같아야 한다 — 다르면 사실 표·json이 '원본과 다름'이 된다."""
+    (tmp_path / "lf.json").write_bytes(b'{\n  "a": 1\n}\n')
+    (tmp_path / "crlf.json").write_bytes(b'{\r\n  "a": 1\r\n}\r\n')
+    assert cf._sha12("lf.json")(tmp_path) == cf._sha12("crlf.json")(tmp_path)
+
+
+def test_module_is_platform_neutral_in_paths_and_newlines() -> None:
+    """경로는 `/`로, 쓰기는 LF로 — `str(경로)`는 Windows에서 `\\`가 돼 사실 표의 출처 열이 달라진다.
+
+    CI는 Linux라 이 차이를 실행으로 볼 수 없어 코드 형태로 고정한다.
+    """
+    src = (ROOT / "scripts" / "analysis" / "corpus_facts.py").read_text(encoding="utf-8")
+    assert not re.search(r"str\(\w+\.relative_to\(", src), "상대 경로는 .as_posix()로 만든다"
+    writes = re.findall(r"\.write_text\([^)]*\)", src)
+    assert writes, "쓰기 호출을 못 찾음 — 검사가 공허하다"
+    assert all('newline="\\n"' in w for w in writes), f"LF 고정 없는 쓰기: {writes}"

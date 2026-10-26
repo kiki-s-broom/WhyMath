@@ -1896,3 +1896,293 @@ class TestGateCli:
         monkeypatch.setattr(pc, "load_corpus", lambda s: world)
         pc.main(["--gate", "P3-G1"])
         assert path.read_bytes() == before
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-64 — 스킬 연결 견고성 공개(건수·줄기·정답·(은행, 유형) 조합) · 판정 불참여
+# ──────────────────────────────────────────────────────────────────────────
+#: P3-64 이전 `to_json` 의 최상위 키 — 기존 키는 그대로이고 `link_robustness` 하나만 더해진다.
+_PRE_P3_64_JSON_KEYS = frozenset(
+    {
+        "spec_id",
+        "frozen_at",
+        "frozen_by_gate",
+        "exit_code",
+        "metrics",
+        "supply_coverage",
+        "link_counts",
+        "chain_funnel",
+        "completeness_measurable",
+        "problems_scanned",
+        "warnings",
+        "failures",
+        "slot_coverage",
+        "problem_metadata",
+        "hint_seat",
+    }
+)
+
+#: 서로 다른 문면 3종 — 숫자가 아니라 낱말이 달라 `phase3_stem_fold` 가 합치지 않는다.
+_DIVERSE_STEMS = (
+    "함수 f(x) = x^{n} 의 도함수를 구하시오.",
+    "곡선 위 점에서 접선의 기울기를 구하시오.",
+    "주어진 조건을 만족하는 상수의 값을 구하시오.",
+)
+
+
+def _robust_world(world: pc.CoverageCorpus) -> pc.CoverageCorpus:
+    """핵심 개념마다 연결 문항 3건 — 줄기 3 · 정답 3 · (은행, 유형) 조합 2. 취약 표시가 꺼지는 대조군."""
+    problems: list[pc.ProblemRef] = []
+    for base in world.problems:
+        for k, stem in enumerate(_DIVERSE_STEMS):
+            problems.append(
+                replace(
+                    base,
+                    problem_id=f"{base.problem_id}-r{k}",
+                    question_text=stem,
+                    answer=str(k + 1),
+                    bank="bank_a" if k < 2 else "bank_b",
+                )
+            )
+    return _inject(world, problems=tuple(problems), problems_scanned=len(problems))
+
+
+def _rows(report: pc.CoverageReport) -> dict[str, pc.LinkRobustness]:
+    assert report.link_robustness is not None
+    return {r.concept_code: r for r in report.link_robustness}
+
+
+def _rewrite_concept(
+    corpus: pc.CoverageCorpus, src_id: str, **changes: Callable[[pc.ProblemRef, int], Any]
+) -> pc.CoverageCorpus:
+    """개념 하나(원 개념 ID)의 문항만 필드별 함수로 다시 쓴다 — 다른 개념은 그대로 둔다."""
+    out: list[pc.ProblemRef] = []
+    k = 0
+    for p in corpus.problems:
+        if src_id in p.primary_src_ids:
+            p = replace(p, **{name: fn(p, k) for name, fn in changes.items()})
+            k += 1
+        out.append(p)
+    return _inject(corpus, problems=tuple(out))
+
+
+@pytest.fixture(scope="module")
+def robust(world: pc.CoverageCorpus) -> pc.CoverageCorpus:
+    return _robust_world(world)
+
+
+class TestLinkRobustness:
+    def test_control_diverse_world_has_no_thin_concept(self, spec, index, robust) -> None:
+        rows = _rows(pc.evaluate(spec, index, robust))
+        assert set(rows) == {c.code for c in spec.core_concepts}
+        for row in rows.values():
+            assert row.status == "ok", row
+            assert (row.linked, row.distinct_stems, row.distinct_answers) == (3, 3, 3)
+            assert len(row.bank_type_pairs) == 2
+            assert row.reasons == ()
+
+    def test_single_template_single_answer_turns_thin(self, spec, index, robust) -> None:
+        """결함 주입 — P3-55 ②-4 의 02-02 형태: 숫자만 다른 한 틀 + 정답 하나."""
+        target = spec.core_concepts[0]
+        thin = _rewrite_concept(
+            robust,
+            target.source_id,
+            question_text=lambda p, k: f"함수 f(x) = |x - {k}| 이 미분가능하면 1, 아니면 0을 쓰시오.",
+            answer=lambda p, k: "0",
+        )
+        rows = _rows(pc.evaluate(spec, index, thin))
+        row = rows[target.code]
+        assert row.status == "thin"
+        assert (row.linked, row.distinct_stems, row.distinct_answers) == (3, 1, 1)
+        assert len(row.reasons) == 2
+        others = [r for code, r in rows.items() if code != target.code]
+        assert others and all(r.status == "ok" for r in others)
+
+    def test_single_answer_alone_turns_thin(self, spec, index, robust) -> None:
+        """정답 절만 밟는 반례 — 줄기는 다양해도 정답이 하나면 취약이다."""
+        target = spec.core_concepts[0]
+        row = _rows(
+            pc.evaluate(
+                spec, index, _rewrite_concept(robust, target.source_id, answer=lambda p, k: "0")
+            )
+        )[target.code]
+        assert row.status == "thin" and row.distinct_stems == 3 and row.distinct_answers == 1
+        assert len(row.reasons) == 1 and "정답" in row.reasons[0]
+
+    def test_single_stem_alone_turns_thin(self, spec, index, robust) -> None:
+        """줄기 절만 밟는 반례 — 정답이 달라도 숫자만 다른 한 틀이면 취약이다."""
+        target = spec.core_concepts[0]
+        row = _rows(
+            pc.evaluate(
+                spec,
+                index,
+                _rewrite_concept(
+                    robust,
+                    target.source_id,
+                    question_text=lambda p, k: f"x = {k} 일 때 값을 구하시오.",
+                ),
+            )
+        )[target.code]
+        assert row.status == "thin" and row.distinct_stems == 1 and row.distinct_answers == 3
+        assert len(row.reasons) == 1 and "줄기" in row.reasons[0]
+
+    def test_threshold_boundary_is_not_thin(self, spec, index, robust) -> None:
+        """기준값과 같은 수(서로 다른 값 2개)는 취약이 아니다 — `<` 를 `<=` 로 바꾸면 이 테스트가 깨진다."""
+        target = spec.core_concepts[0]
+        corpus = _rewrite_concept(
+            robust,
+            target.source_id,
+            question_text=lambda p, k: _DIVERSE_STEMS[k % pc.LINK_THIN_MIN_DISTINCT_STEMS],
+            answer=lambda p, k: str(k % pc.LINK_THIN_MIN_DISTINCT_ANSWERS),
+        )
+        row = _rows(pc.evaluate(spec, index, corpus))[target.code]
+        assert row.distinct_stems == pc.LINK_THIN_MIN_DISTINCT_STEMS
+        assert row.distinct_answers == pc.LINK_THIN_MIN_DISTINCT_ANSWERS
+        assert row.status == "ok"
+
+    def test_unlinked_concept_is_not_reported_as_thin(self, spec, index, robust) -> None:
+        """연결 0건은 '얇다'가 아니라 '없다'다 — Content 미충족이 이미 말한다."""
+        target = spec.core_concepts[0]
+        corpus = _rewrite_concept(robust, target.source_id, problem_type_codes=lambda p, k: ())
+        row = _rows(pc.evaluate(spec, index, corpus))[target.code]
+        assert (row.status, row.linked, row.reasons, row.bank_type_pairs) == ("unlinked", 0, (), ())
+
+    def test_unread_answers_and_stems_are_not_merged(self, spec, index, robust) -> None:
+        """모르는 값은 합치지 않는다 — 정답·문면을 못 읽은 문항이 '전부 같다'로 접히면 거짓 취약이다."""
+        target = spec.core_concepts[0]
+        corpus = _rewrite_concept(
+            robust, target.source_id, answer=lambda p, k: None, question_text=lambda p, k: None
+        )
+        row = _rows(pc.evaluate(spec, index, corpus))[target.code]
+        assert (row.distinct_answers, row.unread_answers) == (3, 3)
+        assert (row.distinct_stems, row.unfolded_stems) == (3, 3)
+        assert row.status == "ok"
+
+    def test_pairs_count_only_types_that_make_the_link(self, spec, index, robust) -> None:
+        """연결을 만들지 않은 문제유형은 조합에 넣지 않는다 — 넣으면 다양성이 부풀려진다."""
+        target = spec.core_concepts[0]
+        stray = "ptype.syn-stray"
+        corpus = _inject(robust, type_skills={**robust.type_skills, stray: ("no-such-skill",)})
+        corpus = _rewrite_concept(
+            corpus, target.source_id, problem_type_codes=lambda p, k: (*p.problem_type_codes, stray)
+        )
+        row = _rows(pc.evaluate(spec, index, corpus))[target.code]
+        assert all(code != stray for _, code in row.bank_type_pairs)
+        assert len(row.bank_type_pairs) == 2
+
+    def test_unknown_bank_is_marked_not_dropped(self, spec, index, world) -> None:
+        rows = _rows(pc.evaluate(spec, index, world))
+        assert all(bank == pc.UNKNOWN_BANK for r in rows.values() for bank, _ in r.bank_type_pairs)
+        assert all(r.bank_type_pairs for r in rows.values())
+
+
+class TestLinkRobustnessDoesNotJudge:
+    """acceptance ② — 공개만 한다. 견고성이 바뀌어도 판정(지표·실패·경고·종료 코드)은 같다."""
+
+    def _thin_everywhere(self, robust: pc.CoverageCorpus) -> pc.CoverageCorpus:
+        return _inject(
+            robust,
+            problems=tuple(
+                replace(p, question_text="같은 틀 1 의 문제", answer="0", bank=None)
+                for p in robust.problems
+            ),
+        )
+
+    def test_verdict_is_identical_when_only_robustness_changes(self, spec, index, robust) -> None:
+        before = pc.evaluate(spec, index, robust)
+        after = pc.evaluate(spec, index, self._thin_everywhere(robust))
+        assert {r.status for r in _rows(before).values()} == {"ok"}
+        assert {r.status for r in _rows(after).values()} == {"thin"}  # 주입이 실제로 닿았다
+        assert after.metrics == before.metrics
+        assert after.supply == before.supply
+        assert (after.failures, after.warnings, after.exit_code) == (
+            before.failures,
+            before.warnings,
+            before.exit_code,
+        )
+        old, new = pc.to_json(before), pc.to_json(after)
+        assert old.pop("link_robustness") != new.pop("link_robustness")
+        assert old == new
+
+    def test_json_keeps_every_existing_key_and_adds_one(self, spec, index, robust) -> None:
+        doc = pc.to_json(pc.evaluate(spec, index, robust))
+        assert set(doc) == _PRE_P3_64_JSON_KEYS | {"link_robustness"}
+        block = doc["link_robustness"]
+        assert block["thresholds"] == {
+            "min_distinct_stems": pc.LINK_THIN_MIN_DISTINCT_STEMS,
+            "min_distinct_answers": pc.LINK_THIN_MIN_DISTINCT_ANSWERS,
+            "provisional": True,
+        }
+        first = block["concepts"][0]
+        assert set(first) == {
+            "concept_code",
+            "linked",
+            "distinct_stems",
+            "unfolded_stems",
+            "distinct_answers",
+            "unread_answers",
+            "bank_type_pairs",
+            "pair_count",
+            "status",
+            "reasons",
+        }
+        assert first["pair_count"] == len(first["bank_type_pairs"])
+
+    def test_report_without_robustness_serializes_as_none(self, spec, index, robust) -> None:
+        report = replace(pc.evaluate(spec, index, robust), link_robustness=None)
+        assert pc.to_json(report)["link_robustness"] is None
+        assert "스킬 연결 견고성" not in pc.render(report)
+
+    def test_text_output_shows_the_table_and_thin_mark(self, spec, index, robust) -> None:
+        text = pc.render(pc.evaluate(spec, index, self._thin_everywhere(robust)))
+        assert "스킬 연결 견고성" in text and "판정 불참여" in text
+        for concept in spec.core_concepts:
+            assert concept.code in text
+        assert "취약" in text and "서로 다른 정답 1개" in text
+
+
+class TestLinkRobustnessRealCorpus:
+    """실 코퍼스 — 수치는 박지 않는다. 로더와 **다른 경로**(평문 json·디렉터리 이름)로 다시 센 값과
+    대조해, 은행·정답·문면 축이 조용히 비어 읽히는 상태를 잡는다(acceptance ① 재현의 기계 검증)."""
+
+    def test_every_kept_problem_knows_its_bank(self, spec) -> None:
+        corpus = pc.load_corpus(spec)
+        assert corpus.problems and all(p.bank for p in corpus.problems)
+
+    def test_independent_recount_matches_the_report(self, spec, index, real_report) -> None:
+        from whymath_backend.l1.standards.phase3_stem_fold import fold_stem
+
+        raw: dict[str, tuple[str, dict[str, Any]]] = {}
+        for path in sorted(_REPO.glob(pc._PROBLEM_GLOB)):
+            bank = path.parent.name.split("problem_bank_", 1)[1]
+            for line in path.read_text(encoding="utf-8").splitlines():
+                row = json.loads(line) if line.strip() else None
+                # ID 없는 행은 로더도 버린다(`_problem_from_row` → None). 중복 ID 는 은행을 가리므로 거부.
+                if isinstance(row, dict) and isinstance(row.get("problem_id"), str):
+                    assert row["problem_id"] not in raw, row["problem_id"]
+                    raw[row["problem_id"]] = (bank, row)
+        corpus = pc.load_corpus(spec)
+        rows = _rows(real_report)
+        assert set(rows) == {c.code for c in spec.core_concepts}
+        for concept in spec.core_concepts:
+            facts = pc._facts(spec, index, corpus, concept)
+            skills = set(facts.skills)
+            linked = [raw[p.problem_id] for p in facts.skill_linked]
+            stems = {fold_stem(r.get("question_text")) for _, r in linked}
+            answers = {
+                ("" if r.get("answer") is None else str(r["answer"])).strip() for _, r in linked
+            }
+            pairs = {
+                (bank, code)
+                for bank, r in linked
+                for code in r.get("problem_type_codes") or []
+                if skills & set(corpus.type_skills.get(code, ()))
+            }
+            got = rows[concept.code]
+            assert got.linked == len(linked), concept.code
+            assert None not in stems or got.unfolded_stems > 0, concept.code
+            assert got.distinct_stems == len(stems - {None}) + got.unfolded_stems, concept.code
+            assert got.distinct_answers == len(answers), concept.code
+            assert set(got.bank_type_pairs) == pairs, concept.code
+            assert got.status == ("unlinked" if not linked else got.status)
+        assert any(r.linked for r in rows.values())

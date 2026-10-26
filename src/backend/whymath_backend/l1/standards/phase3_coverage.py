@@ -95,6 +95,21 @@ CONT-05 판정 — Content Coverage 의 '완전 연결'이 검수 상태를 조�
   · 두 수치가 벌어지면 출력이 그 차이를 경고 줄로 적는다(연결 N · 공급 가능 M).
 
 ────────────────────────────────────────────────────────────────────────────
+스킬 연결 견고성 공개 (P3-64) — 정본화와 소비를 나눠 적는다
+────────────────────────────────────────────────────────────────────────────
+Content Coverage 의 '완전 연결'은 스킬 연결된 승인 문항이 **1건 이상**인지만 묻는다. 그 근거가
+서로 다른 문제 수십 개인지, 같은 사실을 묻는 한 틀의 변형인지는 지표가 말하지 않는다(P3-55 판정
+②-4 — 02-02 의 연결 문항은 정답이 전부 같다).
+
+  · 정본화(이 모듈) — 보고서 `link_robustness`: 핵심 개념마다 연결 건수 · 서로 다른 줄기
+    (`phase3_stem_fold`) · 서로 다른 정답 · (은행, 연결 유형) 조합. 취약 표시 기준은 보고 전용 상수
+    `LINK_THIN_MIN_DISTINCT_STEMS`·`LINK_THIN_MIN_DISTINCT_ANSWERS`(잠정값 · 확정은 Kiki 결정 후보).
+    **판정에 참여하지 않는다** — 지표·실패·경고·종료 코드를 다 만든 뒤에 따로 계산한다.
+  · 소비 — P3 게이트 판정문이 Content Coverage 를 근거로 쓸 때 이 표를 옮겨 적고 취약 개념을
+    이름으로 적는다 — `docs/standards/phase3_metrics_contract.md`
+    「Content Coverage 판정문의 견고성 병기」.
+
+────────────────────────────────────────────────────────────────────────────
 측정 방식의 한계 (정직한 공백)
 ────────────────────────────────────────────────────────────────────────────
 · 이 계측기는 풀이의 수학적 정확성을 **재검증하지 않는다**. solution 연결은 해설·단계의 존재와
@@ -114,7 +129,7 @@ import json
 import re
 import sys
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Final, Literal
 
@@ -169,6 +184,7 @@ CURRICULUM_PATH: Final[tuple[str, ...]] = ("curriculum", "concept", "skill", "pr
 
 #: 코퍼스 위치(레포 루트 기준). 명세의 `sources` 는 참조 검사용 7종이라 여기서 더 읽는 5종만 둔다.
 _PROBLEM_GLOB: Final = "data/corpus/problem_bank_*/problems.jsonl"
+_BANK_DIR_PREFIX: Final = "problem_bank_"
 _CROSSLINKS: Final = "data/corpus/misconception_crosslinks_v1/crosslinks.json"
 _CONCEPT_CONTENT: Final = "data/corpus/concept_content_v1/content.json"
 _UNITS_GLOB: Final = "data/corpus/units_v1/*.unit.yaml"
@@ -187,6 +203,21 @@ GATE_METRIC_KEYS: Final[tuple[str, ...]] = (
 )
 
 LinkStatus = Literal["linked", "missing", "unmeasured"]
+
+#: P3-64 — 스킬 연결 견고성의 '취약' 표시 기준.
+#: **보고 전용이며 판정(met·exit code)에 참여하지 않는다.**
+#: 잠정값 2 는 "연결 문항이 전부 같다"(서로 다른 값이 1개)만 취약으로 본다는 뜻이다.
+#: P3-55 판정 ②-4 가 문제 삼은 상태가 정확히 이것이다 — 02-02 의 승인 연결 문항은 정답이
+#: 전부 `0` 이라 같은 사실 하나를 반복해 묻는다. 그보다 높은 기준(예: 명세의 슬롯당 최소
+#: 서로 다른 문제 수)을 쓸지, (은행, 유형) 조합 수도 기준에 넣을지는 **Kiki 결정 후보**다
+#: (태스크 notes) — 이 값은 세션이 확정한 기준이 아니다.
+LINK_THIN_MIN_DISTINCT_STEMS: Final = 2
+LINK_THIN_MIN_DISTINCT_ANSWERS: Final = 2
+
+#: 은행을 모르는 문항(합성 입력 등)의 (은행, 유형) 조합 표기.
+UNKNOWN_BANK: Final = "?"
+
+LinkRobustnessStatus = Literal["unlinked", "thin", "ok"]
 
 #: 힌트 연결이 측정 불가인 이유 — `hint_problem_ids` 가 채워지면(`--hints-from-db`) 사라진다.
 HINT_UNMEASURED_REASON: Final = (
@@ -221,6 +252,9 @@ class ProblemRef:
     # P3-05 — 근사 중복 기준(`phase3_stem_fold`)이 읽는 문면. None 은 "문면을 읽지 못했다"라서
     # 그 문항은 합쳐지지 않고 각각 1건으로 센다(모르면서 합치지 않는다).
     question_text: str | None = None
+    # P3-64 — 문항이 들어 있는 은행(`problem_bank_<이름>` 의 <이름>). 견고성 공개의 (은행, 유형)
+    # 조합만 읽는다. None 은 "은행을 모른다"이며 지표 판정에는 쓰이지 않는다.
+    bank: str | None = None
 
 
 @dataclass(frozen=True)
@@ -331,11 +365,18 @@ def _problem_from_row(row: Mapping[str, Any]) -> ProblemRef | None:
     )
 
 
+def _bank_name(path: Path) -> str:
+    """`data/corpus/problem_bank_<이름>/problems.jsonl` → `<이름>`."""
+    folder = path.parent.name
+    return folder.removeprefix(_BANK_DIR_PREFIX)
+
+
 def _load_problems(root: Path, scope_srcs: frozenset[str]) -> tuple[tuple[ProblemRef, ...], int]:
     """전 문제은행 디렉터리를 읽는다. 명세 범위 개념에 달린 문항만 남기고 읽은 총 행 수를 센다."""
     kept: list[ProblemRef] = []
     scanned = 0
     for path in sorted(root.glob(_PROBLEM_GLOB)):
+        bank = _bank_name(path)
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except OSError as exc:
@@ -356,7 +397,7 @@ def _load_problems(root: Path, scope_srcs: frozenset[str]) -> tuple[tuple[Proble
             scanned += 1
             problem = _problem_from_row(row)
             if problem is not None and problem.primary_src_ids & scope_srcs:
-                kept.append(problem)
+                kept.append(replace(problem, bank=bank))
     _nonzero("문항", scanned)
     return tuple(kept), scanned
 
@@ -724,6 +765,34 @@ class HintSeatStats:
 
 
 @dataclass(frozen=True)
+class LinkRobustness:
+    """P3-64 — 개념 1건의 스킬 연결이 얼마나 두꺼운 근거 위에 서 있는가(공개 전용).
+
+    Content Coverage 는 '스킬 연결된 승인 문항이 1건 이상'만 묻는다. 그 1건 이상이 서로 다른 문제
+    수십 개인지, 같은 사실을 묻는 한 틀의 변형인지는 지표가 말하지 않는다. 이 값이 그 차이를 보인다.
+
+    · linked — 스킬 연결된 승인 문항 수(`ConceptFacts.skill_linked`).
+    · distinct_stems — 그 문항들의 서로 다른 줄기(`phase3_stem_fold` · 숫자만 다른 문면은 하나).
+      문면을 읽지 못한 문항은 합치지 않고 각각 1건으로 센다(`unfolded_stems`).
+    · distinct_answers — 서로 다른 정답(`answer` 앞뒤 공백 제거). 정답을 읽지 못한 문항
+      (`answer is None`)은 합치지 않고 각각 1건으로 센다(`unread_answers`).
+    · bank_type_pairs — (은행, 연결 유형) 조합. 연결 유형 = 문항의 문제유형 중 개념 스킬과 겹치는
+      스킬을 가진 것(연결을 실제로 만든 유형만 — 연결에 기여하지 않은 유형은 세지 않는다).
+    · status — unlinked(연결 0건 · Content 미충족이 이미 말한다) · thin(위 기준 미만) · ok.
+    """
+
+    concept_code: str
+    linked: int
+    distinct_stems: int
+    unfolded_stems: int
+    distinct_answers: int
+    unread_answers: int
+    bank_type_pairs: tuple[tuple[str, str], ...]
+    status: LinkRobustnessStatus
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class GateVerdict:
     """P3-54 — 게이트 하나를 그 조건 지표만으로 판정한 결과.
 
@@ -757,6 +826,8 @@ class CoverageReport:
     problem_metadata: ProblemMetadataStats | None = None
     # P3-22 — None 은 힌트 입력이 없는 실행(측정 불가)이다.
     hint_seat: HintSeatStats | None = None
+    # P3-64 — 핵심 개념별 스킬 연결 견고성(공개 전용 · 판정 불참여). None 은 계산하지 않은 보고서다.
+    link_robustness: tuple[LinkRobustness, ...] | None = None
 
     @property
     def exit_code(self) -> int:
@@ -1039,6 +1110,67 @@ def _connectivity(
         note="개념 → 스킬 → 문항 → 오개념 → 교수가 한 줄로 이어짐 (목표는 명세가 갖는다)",
     )
     return result, funnel
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-64 — 스킬 연결 견고성(공개 전용 · 판정 불참여)
+# ──────────────────────────────────────────────────────────────────────────
+def _link_robustness(
+    facts: tuple[ConceptFacts, ...], corpus: CoverageCorpus
+) -> tuple[LinkRobustness, ...]:
+    """핵심 개념마다 스킬 연결 문항의 건수·줄기·정답·(은행, 유형) 조합을 센다.
+
+    이 값은 어떤 지표의 분자·분모에도 들어가지 않는다 — `evaluate` 가 지표·실패·경고를 다 만든 뒤에
+    따로 계산해 보고서에 싣기만 한다(게이트 판정 불변 · acceptance ②).
+    """
+    out: list[LinkRobustness] = []
+    for fact in facts:
+        linked = fact.skill_linked
+        skill_set = set(fact.skills)
+        stems = distinct_count(p.question_text for p in linked)
+        known_answers = {p.answer.strip() for p in linked if p.answer is not None}
+        unread_answers = sum(1 for p in linked if p.answer is None)
+        distinct_answers = len(known_answers) + unread_answers
+        pairs = tuple(
+            sorted(
+                {
+                    (p.bank or UNKNOWN_BANK, code)
+                    for p in linked
+                    for code in p.problem_type_codes
+                    if skill_set & set(corpus.type_skills.get(code, ()))
+                }
+            )
+        )
+        reasons: list[str] = []
+        status: LinkRobustnessStatus
+        if not linked:
+            status = "unlinked"
+        else:
+            if stems.distinct < LINK_THIN_MIN_DISTINCT_STEMS:
+                reasons.append(
+                    f"서로 다른 줄기 {stems.distinct}개 < {LINK_THIN_MIN_DISTINCT_STEMS}"
+                    f" (연결 문항 {len(linked)}건)"
+                )
+            if distinct_answers < LINK_THIN_MIN_DISTINCT_ANSWERS:
+                reasons.append(
+                    f"서로 다른 정답 {distinct_answers}개 < {LINK_THIN_MIN_DISTINCT_ANSWERS}"
+                    f" (연결 문항 {len(linked)}건)"
+                )
+            status = "thin" if reasons else "ok"
+        out.append(
+            LinkRobustness(
+                concept_code=fact.concept.code,
+                linked=len(linked),
+                distinct_stems=stems.distinct,
+                unfolded_stems=stems.unfolded,
+                distinct_answers=distinct_answers,
+                unread_answers=unread_answers,
+                bank_type_pairs=pairs,
+                status=status,
+                reasons=tuple(reasons),
+            )
+        )
+    return tuple(out)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1387,6 +1519,8 @@ def evaluate(spec: ScopeSpec, index: ReferenceIndex, corpus: CoverageCorpus) -> 
         slots=slot_metric,
         problem_metadata=metadata,
         hint_seat=hint_seat,
+        # 지표·실패·경고가 다 정해진 뒤에 계산한다 — 이 값은 판정에 들어가지 않는다(P3-64 ②).
+        link_robustness=_link_robustness(facts, corpus),
     )
 
 
@@ -1418,6 +1552,37 @@ def _metadata_json(stats: ProblemMetadataStats | None) -> dict[str, Any] | None:
         "inherited_only": stats.inherited_only,
         "unmeasured_fields": list(stats.unmeasured_fields),
         "unmet": [{"subject": u.subject, "missing": list(u.missing)} for u in stats.unmet],
+    }
+
+
+def _robustness_json(rows: tuple[LinkRobustness, ...] | None) -> dict[str, Any] | None:
+    if rows is None:
+        return None
+    return {
+        "basis": (
+            "공개 전용 · 판정 불참여 — 스킬 연결된 승인 문항의 건수"
+            "·서로 다른 줄기(phase3_stem_fold)·서로 다른 정답·(은행, 연결 유형) 조합"
+        ),
+        "thresholds": {
+            "min_distinct_stems": LINK_THIN_MIN_DISTINCT_STEMS,
+            "min_distinct_answers": LINK_THIN_MIN_DISTINCT_ANSWERS,
+            "provisional": True,
+        },
+        "concepts": [
+            {
+                "concept_code": r.concept_code,
+                "linked": r.linked,
+                "distinct_stems": r.distinct_stems,
+                "unfolded_stems": r.unfolded_stems,
+                "distinct_answers": r.distinct_answers,
+                "unread_answers": r.unread_answers,
+                "bank_type_pairs": [list(pair) for pair in r.bank_type_pairs],
+                "pair_count": len(r.bank_type_pairs),
+                "status": r.status,
+                "reasons": list(r.reasons),
+            }
+            for r in rows
+        ],
     }
 
 
@@ -1456,6 +1621,7 @@ def to_json(report: CoverageReport, gate: GateVerdict | None = None) -> dict[str
         "slot_coverage": None if report.slots is None else _metric_json(report.slots),
         "problem_metadata": _metadata_json(report.problem_metadata),
         "hint_seat": None if report.hint_seat is None else asdict(report.hint_seat),
+        "link_robustness": _robustness_json(report.link_robustness),
     }
     if gate is not None:
         doc["gate"] = _gate_json(gate)
@@ -1464,6 +1630,36 @@ def to_json(report: CoverageReport, gate: GateVerdict | None = None) -> dict[str
 
 def _pct(value: float | None) -> str:
     return "측정 불가" if value is None else f"{value:.1%}"
+
+
+_ROBUSTNESS_MARK: Final[Mapping[str, str]] = {"unlinked": "연결 없음", "thin": "취약", "ok": "—"}
+
+
+def _render_robustness(rows: tuple[LinkRobustness, ...] | None) -> list[str]:
+    """P3-64 — 개념별 연결 견고성 표. 판정 줄이 아니라 공개 줄이다."""
+    if rows is None:
+        return []
+    lines = [
+        "",
+        "스킬 연결 견고성 (공개 전용 · 판정 불참여 · 취약 기준은 잠정값 — "
+        f"줄기 < {LINK_THIN_MIN_DISTINCT_STEMS} 또는 정답 < {LINK_THIN_MIN_DISTINCT_ANSWERS})",
+        "  개념                  연결  줄기  정답  조합  표시",
+    ]
+    for r in rows:
+        lines.append(
+            f"  {r.concept_code:<20}  {r.linked:>4}  {r.distinct_stems:>4}  "
+            f"{r.distinct_answers:>4}  {len(r.bank_type_pairs):>4}  {_ROBUSTNESS_MARK[r.status]}"
+        )
+        if r.bank_type_pairs:
+            shown = " · ".join(f"{bank} × {code}" for bank, code in r.bank_type_pairs)
+            lines.append(f"      조합: {shown}")
+        lines += [f"      ! {why}" for why in r.reasons]
+        if r.unfolded_stems or r.unread_answers:
+            lines.append(
+                f"      문면 미확인 {r.unfolded_stems}건 · 정답 미확인 {r.unread_answers}건"
+                "(합치지 않고 각각 1건으로 셈)"
+            )
+    return lines
 
 
 def render(report: CoverageReport, gate: GateVerdict | None = None) -> str:
@@ -1525,6 +1721,7 @@ def render(report: CoverageReport, gate: GateVerdict | None = None) -> str:
         f"  스킬 {funnel['skill']} → 문항 {funnel['problem']} → 오개념 {funnel['misconception']} "
         f"→ 교수 {funnel['pedagogy']}",
     ]
+    lines += _render_robustness(report.link_robustness)
     for m in (*report.metrics, report.supply, *([report.slots] if report.slots else [])):
         if not m.unmet:
             continue

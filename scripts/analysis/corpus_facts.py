@@ -129,7 +129,10 @@ def _sum_len(rel: str, key: str | None, field: str) -> Callable[[Path], int]:
 
 
 def _sha12(rel: str) -> Callable[[Path], str]:
-    return lambda root: hashlib.sha256((root / rel).read_bytes()).hexdigest()[:12]
+    """줄바꿈을 LF로 통일한 뒤의 sha256 앞 12자 — Windows 체크아웃(CRLF)에서도 같은 값이 나온다."""
+    return lambda root: hashlib.sha256(
+        (root / rel).read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()[:12]
 
 
 def _problem_banks(root: Path) -> list[Path]:
@@ -461,7 +464,7 @@ def _static_facts() -> dict[str, Fact]:
                 lambda root, status=status: sum(
                     1
                     for p in _problem_banks(root)
-                    for r in _jsonl_rows(root, str(p.relative_to(root)))
+                    for r in _jsonl_rows(root, p.relative_to(root).as_posix())
                     if r.get("review_status") == status
                 ),
             )
@@ -475,7 +478,7 @@ def _static_facts() -> dict[str, Fact]:
             "문제은행 전체 문항",
             "data/corpus/problem_bank_*/problems.jsonl",
             lambda root: sum(
-                _jsonl_count(root, str(p.relative_to(root))) for p in _problem_banks(root)
+                _jsonl_count(root, p.relative_to(root).as_posix()) for p in _problem_banks(root)
             ),
         ),
     }
@@ -487,7 +490,7 @@ def build_facts(root: Path = ROOT) -> dict[str, Fact]:
     facts = _static_facts()
     for path in _problem_banks(root):
         name = path.parent.name.removeprefix("problem_bank_")
-        rel = str(path.relative_to(root))
+        rel = path.relative_to(root).as_posix()
         facts[f"problem_bank.{name}"] = Fact(f"문제은행 {path.parent.name}", rel, _jsonl(rel))
     return facts
 
@@ -626,8 +629,8 @@ def sync_provenance(
                     " — 건수만 손으로 고쳐라"
                 )
             text = json.dumps(data, ensure_ascii=False, indent=2) + newline
-            path.write_text(text, encoding="utf-8")
-            changed.append(str(path.relative_to(root)))
+            path.write_text(text, encoding="utf-8", newline="\n")
+            changed.append(path.relative_to(root).as_posix())
     return changed
 
 
@@ -671,7 +674,7 @@ def scan_markers(root: Path, values: dict[str, FactValue]) -> list[MarkerHit]:
             expected = format_value(values[fid], bool(m.group("raw"))) if fid in values else None
             line = text.count("\n", 0, m.start()) + 1
             hits.append(
-                MarkerHit(str(path.relative_to(root)), line, fid, m.group("shown"), expected)
+                MarkerHit(path.relative_to(root).as_posix(), line, fid, m.group("shown"), expected)
             )
     return hits
 
@@ -706,8 +709,8 @@ def sync_markers(root: Path, values: dict[str, FactValue]) -> list[str]:
 
         new = MARKER.sub(_sub, text)
         if new != text:
-            path.write_text(new, encoding="utf-8")
-            changed.append(str(path.relative_to(root)))
+            path.write_text(new, encoding="utf-8", newline="\n")
+            changed.append(path.relative_to(root).as_posix())
     return changed
 
 
@@ -948,7 +951,7 @@ class Mention:
 def find_mentions(root: Path, values: dict[str, FactValue]) -> list[Mention]:
     out: list[Mention] = []
     for path in _scan_files(root):
-        rel = str(path.relative_to(root))
+        rel = path.relative_to(root).as_posix()
         is_md = path.suffix == ".md"
         in_fence = False
         prev_dated = False
@@ -1037,7 +1040,7 @@ def hand_pins(root: Path, values: dict[str, FactValue] | None = None) -> list[st
     seen: set[Path] = set()
     for pattern in PIN_SCAN_GLOBS:
         for path in sorted(root.glob(pattern)):
-            if path in seen or not path.is_file() or _is_history(str(path.relative_to(root))):
+            if path in seen or not path.is_file() or _is_history(path.relative_to(root).as_posix()):
                 continue
             seen.add(path)
             text = path.read_text(encoding="utf-8")
@@ -1104,12 +1107,12 @@ def sync(
     table = root / FACTS_TABLE
     rendered = render_table(root, facts)
     if not table.is_file() or table.read_text(encoding="utf-8") != rendered:
-        table.write_text(rendered, encoding="utf-8")
+        table.write_text(rendered, encoding="utf-8", newline="\n")
         changed.append(str(FACTS_TABLE))
     fj = root / FACTS_JSON
     rendered_json = render_json(root, facts)
     if not fj.is_file() or fj.read_text(encoding="utf-8") != rendered_json:
-        fj.write_text(rendered_json, encoding="utf-8")
+        fj.write_text(rendered_json, encoding="utf-8", newline="\n")
         changed.append(str(FACTS_JSON))
     return changed
 
