@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-155
+title: "corpus-authoring 잡 경로 필터에 verify_answer 누락 — 생성기 의존 모듈 변경 PR에서 미실행"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① ci.yml changes 잡의 authoring 필터가 결정론 생성기가 의존하는 `src/backend/whymath_backend/l3/verify_answer.py`(와 그 테스트 `tests/backend/l3/test_verify_answer*.py`)를 건드리는 PR에서도 corpus-authoring 잡을 깨운다 ② 필터 정규식의 대상 경로를 회귀 테스트(tests/infra)로 고정하고, 경로를 지우는 뮤테이션이 RED임을 확인한다 ③ pyproject.toml corpus_authoring 마커 설명(\"그 테스트가 지키는 코드를 바꾸면 그 PR에서 반드시 실행\")과 필터가 일치하는지, 생성기의 다른 l3 의존 모듈도 같은 빠짐이 있는지 전수 확인해 결과를 적는다"
+artifacts: []
+paths:
+  - ".github/workflows/ci.yml"
+  - "tests/infra/*authoring*"
+  - src/backend/pyproject.toml
+session: null
+notes: "출처: PR #1737(P3-80) 독립 리뷰 P3-d. #1737은 verify_answer.py를 고쳤지만 corpus-authoring 잡이 PR에서 skipped였다(merge_group·야간에서만 실행). 그 PR은 로컬에서 -m corpus_authoring 893 passed로 대신 확인했다."
+updated: 2026-10-26
