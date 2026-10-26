@@ -552,16 +552,20 @@ def test_completion_intercepted_turn_is_marked_not_invoked(
 def test_system_defect_on_invoked_turn_warns(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, path: str
 ) -> None:
+    # P3-74 이후: 학생 상태·개념 결함은 필수 누락 폴백(튜터 미호출)이므로, '튜터가 불린 턴의 결함
+    # WARNING'은 필수가 아닌 슬롯의 결함(팩 플래그 OFF)으로 본다.
     fill = _Fill()
-    fill.theta = None
-    _install(monkeypatch, fill)
-    _set_flag(monkeypatch, "l4_server_theta_enabled", False)
+    fill.pack = None
+    spy = _install(monkeypatch, fill)
+    _set_flag(monkeypatch, "pedagogy_pack_prompt_enabled", False)
     with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
         resp = _post(path, _body())
     assert resp.status_code == 201, resp.text
+    assert len(spy.tutor_calls) == 1
     (line,) = _ctx_lines(caplog)
     assert line.levelno == logging.WARNING
-    assert "learner_state(source_disabled)" in line.getMessage()
+    assert "pedagogy_policy(source_disabled)" in line.getMessage()
+    assert "폴백" not in line.getMessage()
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -617,13 +621,21 @@ def test_c_lookup_failure_is_never_break_named_and_savepointed(
     )
     assert all("db down" not in r.getMessage() for r in caplog.records)
     (line,) = _ctx_lines(caplog)
-    assert line.levelno == logging.WARNING  # 시스템 결함 ∧ 튜터 호출
+    assert line.levelno == logging.WARNING  # 시스템 결함 ∧ (튜터 호출 또는 필수 누락 폴백)
     # SAVEPOINT 안에서 실패했고 롤백됐다(바깥 트랜잭션 aborted 방지).
     (session,) = _SESSIONS
     assert session.lookup_depths and all(d > 0 for d in session.lookup_depths)
     injected = fill.concept_error if stage == "concept" else fill.skill_error
     assert any(e is injected for e in session.rolled_back)
-    assert set(_tutor_manifest(spy).missing_names()) == failed
+    if stage == "concept":
+        # P3-74: 개념은 필수 슬롯이다 — 조회 실패면 튜터를 부르지 않고 폴백 사유를 표기한다.
+        assert spy.tutor_calls == []
+        assert ctx["fallback_reason"] == "required_context_missing"
+        assert ctx["required_missing"] == ["concept"]
+    else:
+        # 스킬은 필수가 아니다 — 결함으로 비어도 튜터는 그대로 돈다(진행하되 표기).
+        assert set(_tutor_manifest(spy).missing_names()) == failed
+        assert ctx["fallback_reason"] is None
 
 
 @pytest.mark.parametrize("path", _PATHS)
@@ -1161,3 +1173,135 @@ def test_langfuse_outage_does_not_break_the_turn(
         resp = _post(path, _body(), trace=_Down())
     assert resp.status_code == 201, resp.text
     assert any("ConnectionRefusedError" in r.getMessage() for r in _ctx_lines(caplog))
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-74 — 필수 context 누락이면 튜터(LLM)를 부르지 않고 결정론 Polya로 보낸다(지시문 [12] 3항)
+# ──────────────────────────────────────────────────────────────────────────
+def _required_theta_off(monkeypatch: pytest.MonkeyPatch, fill: _Fill) -> None:
+    fill.theta = None
+    _set_flag(monkeypatch, "l4_server_theta_enabled", False)
+
+
+def _required_concept_fail(monkeypatch: pytest.MonkeyPatch, fill: _Fill) -> None:
+    fill.concept_error = RuntimeError("db down (test)")
+    # 선수 코칭 좌석도 같은 개념 해석을 쓴다 — 이 테스트는 튜터 context 조회 실패만 본다.
+    monkeypatch.setattr(coach, "_prerequisite_coaching_for", _none_async)
+
+
+_REQUIRED_INJECTIONS = [
+    pytest.param(_required_theta_off, ["learner_state"], id="learner_state-source_disabled"),
+    pytest.param(_required_concept_fail, ["concept"], id="concept-lookup_failed"),
+]
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize(("inject", "expected"), _REQUIRED_INJECTIONS)
+def test_required_missing_skips_tutor_and_serves_deterministic_polya(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    path: str,
+    inject: Any,
+    expected: list[str],
+) -> None:
+    from whymath_backend.l3.interfaces import RecordingTraceSink
+
+    fill = _Fill()
+    spy = _install(monkeypatch, fill)
+    inject(monkeypatch, fill)
+    sink = RecordingTraceSink()
+    with caplog.at_level(logging.DEBUG, logger=_CTX_LOGGER):
+        resp = _post(path, _body(), trace=sink)
+    assert resp.status_code == 201, resp.text  # 학생 흐름은 깨지지 않는다
+    body = resp.json()
+    ctx = body["tutor_context"]
+    # ① 튜터(LLM 러너)를 한 번도 부르지 않았다 — 스텁 provider 프롬프트도 0건.
+    assert spy.tutor_calls == [] and spy.prompts == []
+    assert body["tutor_output"] is None
+    # ② 응답에 폴백 사유와 필수 슬롯이 실린다.
+    assert ctx["tutor_invoked"] is False
+    assert ctx["fallback_reason"] == "required_context_missing"
+    assert ctx["required_missing"] == expected
+    # ③ 로그 1줄 — WARNING + 폴백 사유.
+    (line,) = _ctx_lines(caplog)
+    assert line.levelno == logging.WARNING
+    assert f"폴백 required_context_missing({' '.join(expected)})" in line.getMessage()
+    # ④ Langfuse `tutor_context`에도 폴백이 남는다(부르려다 멈춘 턴).
+    ((name, fields),) = sink.named_events
+    assert name == "tutor_context" and fields["fallback_reason"] == "required_context_missing"
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize(("inject", "expected"), _REQUIRED_INJECTIONS)
+def test_fallback_serves_the_same_decision_as_primary_off(
+    monkeypatch: pytest.MonkeyPatch, path: str, inject: Any, expected: list[str]
+) -> None:
+    """학생이 받는 발화 = primary OFF 턴의 결정론 Polya 결정(같은 입력) — 새 템플릿을 만들지 않았다."""
+    fill = _Fill()
+    _install(monkeypatch, fill)
+    inject(monkeypatch, fill)
+    fallback = _post(path, _body()).json()["decision"]
+    _set_flag(monkeypatch, "wh1_primary_enabled", False)
+    primary_off = _post(path, _body()).json()["decision"]
+    assert fallback["prompt"] == primary_off["prompt"]
+
+
+_NOT_REQUIRED_CASES = [
+    # 필수 슬롯의 정상 부재
+    pytest.param(lambda m, f: setattr(f, "theta", None), id="learner_state-no_history"),
+    pytest.param(lambda m, f: setattr(f, "concept", None), id="concept-coverage_gap"),
+    # 비필수 슬롯의 결함
+    pytest.param(
+        lambda m, f: (
+            setattr(f, "skill_error", RuntimeError("db down (test)")),
+            m.setattr(coach, "_prerequisite_coaching_for", _none_async),
+        ),
+        id="skill-lookup_failed",
+    ),
+    pytest.param(
+        lambda m, f: (
+            setattr(f, "pack", None),
+            _set_flag(m, "pedagogy_pack_prompt_enabled", False),
+        ),
+        id="pedagogy_policy-source_disabled",
+    ),
+    pytest.param(
+        lambda m, f: (
+            setattr(f, "mastery", None),
+            _set_flag(m, "l4_server_mastery_enabled", False),
+        ),
+        id="mastery-source_disabled",
+    ),
+]
+
+
+@pytest.mark.parametrize("path", _PATHS)
+@pytest.mark.parametrize("inject", _NOT_REQUIRED_CASES)
+def test_non_required_or_normal_absence_still_runs_tutor(
+    monkeypatch: pytest.MonkeyPatch, path: str, inject: Any
+) -> None:
+    """대조군 — 정상 부재·비필수 결함에서는 튜터가 그대로 돈다(진행하되 표기)."""
+    fill = _Fill()
+    spy = _install(monkeypatch, fill)
+    inject(monkeypatch, fill)
+    resp = _post(path, _body())
+    assert resp.status_code == 201, resp.text
+    ctx = resp.json()["tutor_context"]
+    assert len(spy.tutor_calls) == 1
+    assert ctx["tutor_invoked"] is True
+    assert ctx["fallback_reason"] is None and ctx["required_missing"] == []
+    assert ctx["missing"], "주입한 누락이 표기돼야 한다(대조군이 실제로 무언가를 비웠는가)"
+
+
+@pytest.mark.parametrize("path", _PATHS)
+def test_primary_off_with_required_defect_is_not_marked_as_fallback(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    """튜터를 원하지 않던 턴은 '부르려다 멈춘' 턴이 아니다 — 폴백 표기 없음."""
+    fill = _Fill()
+    _install(monkeypatch, fill)
+    _required_theta_off(monkeypatch, fill)
+    _set_flag(monkeypatch, "wh1_primary_enabled", False)
+    ctx = _post(path, _body()).json()["tutor_context"]
+    assert ctx["tutor_invoked"] is False
+    assert ctx["fallback_reason"] is None and ctx["required_missing"] == []

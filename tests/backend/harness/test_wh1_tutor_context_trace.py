@@ -208,6 +208,8 @@ def test_fields_carry_names_and_judgements_but_no_values() -> None:
         "context_coverage_gap",
         "context_prompt",
         "context_held_privately",
+        "fallback_reason",
+        "required_missing",
     }
     slots = fields["slots"]
     assert isinstance(slots, list) and len(slots) == 9

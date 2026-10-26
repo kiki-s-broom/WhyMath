@@ -97,6 +97,8 @@
 
 지시문 3항("필수 누락 시 명시 fallback")은 어떤 슬롯을 필수로 볼지라는 정책 선택이 남아 있어 `P3-74`로 넘겼다. 판정 좌석(`manifest.status_of`)은 이미 한 곳에 있다.
 
+> **후속(P3-74 · 2026-10-26)**: 필수 슬롯 = 학생 상태·현재 개념. 둘 중 하나가 *시스템 결함*(`source_disabled`·`lookup_failed`)으로 비면 튜터를 부르지 않고 결정론 Polya 결정으로 보내며 응답 `tutor_context.fallback_reason`=`required_context_missing`·`required_missing`과 로그에 표기한다. 정상 부재(콜드스타트·문항 없음)·커버리지 공백·비필수 슬롯 결함은 이 절의 "진행하되 표기"를 그대로 따른다. 근거·집행 지점 = `harness/wh1_tutor_context.py` 모듈 docstring 'P3-74' 단락·`api/coach._plan_tutor_call`.
+
 ## 4. 주입·뮤테이션 결과 (exit code 판정)
 
 ### 4.1 주입 9건 × 2핸들러 (HTTP — 실제 튜터 러너 + 스텁 provider)
