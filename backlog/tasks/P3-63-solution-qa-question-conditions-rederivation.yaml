@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,8 +14,9 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 발문(question_text)과 verify.conditions의 독립 재유도 가능성을 생성기 계열별로 실측한다. 근거: 단원 CALC-EXTREMUM-VALUE(74건) 극댓값 문항의 conditions가 'x**2 + 284*x - 42336 = 0'처럼 정답 108에서 역산한 식이라, C1 통과가 '정답이 자기 자신에게서 유도된 식을 만족한다'는 뜻에 그친다(P3-07 실측).\n② 계열별로 (가) 발문에서 함수식을 읽어 정답을 처음부터 다시 계산하는 검사기를 둘 수 있는지 (나) 불가하면 사람 검수로 남길 목록을 낸다. LLM 판정이 아니라 SymPy 계산이어야 한다.\n③ 가능한 계열은 solution_qa에 C5(발문 재유도)로 얹고 주입(발문 속 수식 변조)이 RED인지 확인한다. 불가한 계열은 이유와 함께 목록으로 낸다."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1743 · src/backend/whymath_backend/harness/question_rederive.py · docs/reviews/solution_qa_c5_question_rederivation_2026-10-26.md · 판정 기준 main f212a276"
 paths: []
-session: claude/happy-heisenberg-4s2h56
+session: null
 notes: "출처: P3-07 세션(2026-10-18). solution_qa C1의 정직 스코프 — 통과율은 conditions가 발문을 충실히 옮겼다는 전제 위의 값이다."
 updated: 2026-10-26
