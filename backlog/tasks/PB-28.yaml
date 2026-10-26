@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-28
+title: "prod 문제은행 일부 적재(1,703건 · 승인 은행 6개 중 2개)가 의도인지 확인 — 아니면 승인 은행 적재"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: kiki
+depends_on:
+  - PB-27
+requires_gates: []
+acceptance:
+  - "① 결정(Kiki) — prod `whymath-pg`에 문제은행 일부만 적재된 상태가 의도인지 정한다. 2026-10-26 실측: prod 1,703건 = `misconception_mc_v0` 1,080 + `generated_v0` 619 + `problem_bank_v1` 4(검수 대기 · 학생 미노출). 코퍼스에서 승인 문항이 있는 은행 6개 중 2개만 들어가 있어 승인 문항 1,489건(`p3_calculus1_diff_v0` 504 · `rephrased_v0` 421 · `conceptual_v0` 360 · `p3_fill_v0` 204)이 학생에게 나가지 않는다. `rephrased_v0`는 `generated_v0`를 바꿔 쓴 판이라 같은 문제가 두 번 나가지 않게 일부러 뺐을 가능성이 있다\n② 의도면 — 적재 범위와 그 이유를 데이터 카드(docs/data/)에 적는다\n③ 의도가 아니면 — LIC-03 런북(docs/ops/lic03_provenance_restore_runbook.md)으로 적재한다. 블록 [1]의 PB27_LANDED=True가 선행 조건이다(PB-27 이전 코드로 전 은행을 적재하면 학생 후보가 잘린다). 적재 후 prod의 승인 문항 수가 코퍼스 사실 problem_bank.review_approved와 같은지(rephrased를 뺐다면 그만큼 적은지) 실측해 회신한다"
+artifacts: []
+paths: []
+session: null
+notes: "PB-27 ⑤에서 분리(2026-10-26). PB-27(후보 조회가 승인 문항만 읽음)이 착지해야 전 은행 적재가 학생 후보를 자르지 않는다. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-26

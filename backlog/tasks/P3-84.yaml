@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/verify_answer.py
   - "tests/backend/l3/test_verify_answer*.py"
-session: null
+session: claude/p3-84-number-list-shape
 notes: "출처: PR #1737(P3-80) 독립 리뷰 P3-b·P3-c. P3-c는 #1737 이전부터 main에 있던 결함이며 은행 해당 건은 0건이다. P3-80이 고친 96건이 실제로 쓰는 검증기가 이 4종이라 같은 계열로 정리한다."
 updated: 2026-10-26

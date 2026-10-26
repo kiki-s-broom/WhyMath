@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-85
+title: "P3-85 — θ 조회 실패를 lookup_failed로 분류해 튜터 필수 누락 폴백에 편입(현재는 예외 전파로 턴 전체 실패) — P3-74 승계"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-74-tutor-required-context-fallback
+requires_gates: []
+acceptance:
+  - "① θ 조회(`api/coach._server_theta_for` → `l2/ability_tracking.get_current_ability`·`get_current_theta`) 실패를 never-break로 흡수하고, 개념·스킬 조회(`_tutor_concept_skills_for`)와 같은 SAVEPOINT 패턴으로 바깥 트랜잭션을 보호한다. 예외 타입명은 서버 로그에만(값·메시지 0).\n② 실패를 P3-08 매니페스트 학생 상태 슬롯의 `lookup_failed`로 표기한다 — 성공 None(이력 없음 `no_history`)과 구분한다. 판정 좌석은 `build_tutor_context_manifest` 하나(두 번째 판정 원천 금지).\n③ 그 결과 P3-74 필수 누락 폴백(`required_context_missing`)이 θ 조회 실패에도 발화함을 두 핸들러(create_session·append_turns)에서 테스트한다: 튜터 러너 0회·응답 `fallback_reason`·WARNING 로그. 대조군 = 조회 성공 None(콜드스타트)은 튜터 그대로 호출.\n④ θ를 쓰는 다른 소비처(`recommend_coaching` 결정 등)가 조회 실패 시에도 기존 콜드스타트 동작으로 이어지는지 확인하고, 분기 제거 뮤테이션 RED."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/harness/wh1_tutor_context.py
+  - tests/backend/api/test_coach_tutor_context.py
+session: null
+notes: |-
+  P3-74 승계(PR #1746 정직한 공백). 2026-10-26 실측(main 89735a65): `_server_theta_for`·`get_current_theta`·`get_current_ability` 어디에도 예외 처리가 없어 θ 조회 DB 오류는 코치 턴 전체를 오류로 끝낸다 — 매니페스트 `lookup_failed`로 분류될 길이 없어, P3-74의 학생 상태 필수 누락 폴백은 지금 `l4_server_theta_enabled=false`(source_disabled)에서만 발화한다. PR #1746 본문의 "no_history와 같은 None으로 보일 수도"는 부정확했다 — 실제로는 예외 전파다. 인접 태스크: `EOS-40`(같은 `_server_theta_for`의 전과목 폴백 신뢰 게이트 — 다른 결함이나 같은 함수를 고치므로 함께 착수 시 충돌 주의).
+
+  [정정 2026-10-26] notes 치환 — 인접 태스크 EOS-40 상호 참조 추가
+updated: 2026-10-26

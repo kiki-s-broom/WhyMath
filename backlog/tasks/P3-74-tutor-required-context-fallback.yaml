@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,8 +14,12 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 지시문 [12] 3항 — '필수 context가 비어 있으면 조용히 빈 값으로 LLM을 부르지 말고 명시적으로 fallback 경로로 보낸다'를 집행한다. 어떤 슬롯이 필수인지(예: 학생 상태) 교수학 근거와 함께 정하고, 필수 누락 턴은 결정론 Polya 템플릿으로 보내되 응답·로그에 fallback 사유를 표기한다.\n② 판정 좌석은 P3-08 매니페스트(status_of)를 재사용한다 — 두 번째 판정 원천 금지. 학생 측 정상 부재(첫 진입·텍스트 턴)는 필수 누락으로 세지 않는다.\n③ 필수 누락 주입마다 fallback이 일어나는지·비필수 누락에선 튜터가 그대로 도는지 대조군 포함 테스트, 분기를 지우는 뮤테이션 RED."
-artifacts: []
+artifacts:
+  - "PR #1746 · 스쿼시 161330e8"
 paths: []
-session: claude/nice-einstein-mp3i60
-notes: "P3-08 승계(PR #1705 검토 중5-c). P3-08은 '진행하되 표기'를 택했다(보고서 §3 근거). 필수 누락 시 명시 fallback은 정책 선택이 남아 있어 분리했다 — 학생 경험을 깨지 않는 범위에서."
+session: null
+notes: |-
+  P3-08 승계(PR #1705 검토 중5-c). P3-08은 '진행하되 표기'를 택했다(보고서 §3 근거). 필수 누락 시 명시 fallback은 정책 선택이 남아 있어 분리했다 — 학생 경험을 깨지 않는 범위에서.
+
+  [미러 면제 2026-10-26] 구현 커밋 216c4be9에서 ci_mirror 실행분 전부 통과(미실행 1=코퍼스 조건부 QA 스텝) 후 PR #1746 머지 큐 CI 통과로 main 161330e8 머지 — done은 머지 후 대장 기록
 updated: 2026-10-26

@@ -3094,14 +3094,22 @@ def verify_series_converges(
 
 
 def _parse_number_list(condition: str) -> list[sympy.Expr] | None:
-    """쉼표 구분 수치 목록을 SymPy 정확값 리스트로 — 하나라도 파싱 불가·비수치면 None(보수적)."""
+    """쉼표 구분 수치 목록을 SymPy 정확값 리스트로 — 하나라도 파싱 불가·비수치면 None(보수적).
+
+    항목 하나가 *SymPy 식이 아닌 값*으로 읽히면(P3-84) 그것도 파싱 불가로 친다. `safe_sympify`는
+    `True`→`bool`·`None`→`NoneType`·`[1]`→`list`·`()`→`tuple`·`2 == 3`→`bool`(파이썬 구조 비교)처럼
+    `.is_number`가 없는 값을 돌려줄 수 있고, 종전에는 그 속성 조회가 `try` 밖이라 `AttributeError`가
+    네 검증기(평균=중앙값·독립·조건부확률·내적) 밖으로 새어 나갔다. 형태 검사(`_require_scalar`)를
+    `try` 안에서 부르므로 그 실패는 다른 파싱 실패와 같은 출구(None → 호출부 unverifiable)로 닫히고,
+    로그에는 `_ConditionShapeError` 타입명만 남는다(항목 값은 싣지 않는다).
+    """
     parts = [p.strip() for p in condition.split(",") if p.strip()]
     if not parts:
         return None
     values: list[sympy.Expr] = []
     for part in parts:
         try:
-            expr = safe_sympify(part)
+            expr = _require_scalar(safe_sympify(part), "나열 항목")
         except Exception as exc:  # noqa: BLE001 — 파싱 불가는 목록 전체 무효
             logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
             return None
