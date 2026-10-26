@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,11 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l1/standards/phase3_coverage.py
   - tests/backend/l1/test_phase3_coverage.py
-session: null
-notes: "출처: P3-55 판정(2026-10-18) R4 — Content 지표가 연결 여부만 말해 02-02 의 단일 템플릿 의존이 10/12·10/17 두 판정문에서 드러나지 않았다. 같은 파일(phase3_coverage.py)을 P3-54 도 건드린다 — 착수 시 paths 겹침 검사 결과를 확인할 것."
-updated: 2026-10-18
+  - docs/standards/phase3_metrics_contract.md
+session: claude/gracious-newton-lj741v
+notes: |-
+  출처: P3-55 판정(2026-10-18) R4 — Content 지표가 연결 여부만 말해 02-02 의 단일 템플릿 의존이 10/12·10/17 두 판정문에서 드러나지 않았다. 같은 파일(phase3_coverage.py)을 P3-54 도 건드린다 — 착수 시 paths 겹침 검사 결과를 확인할 것. [Kiki 결정 후보 — P3-64 취약 표시 기준] 현재 잠정값은 줄기 2 미만 또는 정답 2 미만(서로 다른 값이 1개뿐 = 전부 같다)이며 보고 전용이라 판정에 참여하지 않는다. 결정할 것: (a) 기준을 올릴지 — 후보는 명세 min_distinct_per_slot(슬롯당 최소 서로 다른 문제 수)과 맞추기 (b) (은행, 유형) 조합 수도 기준에 넣을지 — 넣으면 02-01·02-05·02-08·02-09 처럼 한 유형만 쓰는 개념이 추가로 취약이 된다 (c) 연결 건수 하한을 둘지 — 02-06 은 6건이다. 세션은 (a)~(c) 어느 것도 확정하지 않았다.
+
+  [정정 2026-10-26] paths ['src/backend/whymath_backend/l1/standards/phase3_coverage.py', 'tests/backend/l1/test_phase3_coverage.py'] → ['src/backend/whymath_backend/l1/standards/phase3_coverage.py', 'tests/backend/l1/test_phase3_coverage.py', 'docs/standards/phase3_metrics_contract.md']: P3-64 ③ 임계값 Kiki 결정 후보 기록 · ④ 소비 절차 문서 경로 등록
+  notes 치환 — P3-64 ③ 임계값 Kiki 결정 후보 기록 · ④ 소비 절차 문서 경로 등록
+updated: 2026-10-26
