@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/api/gating.py
   - src/backend/whymath_backend/api/me.py
-session: null
+session: claude/pb-25-candidate-fetch-limit
 notes: "발견 2026-10-25 OPS-154 코퍼스 사실 전수 조사(문제은행 조사 에이전트). 근거 주석: gating.py 'PB-03 축③ — 현재 코퍼스(2026-08 기준 7종 2,647건)+여유를 감안해 1000→3000' · me.py '코퍼스 2,647건 + 여유'. 코드 미변경(OPS-154는 주석의 시점만 밝힌다). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
-updated: 2026-10-25
+updated: 2026-10-26
