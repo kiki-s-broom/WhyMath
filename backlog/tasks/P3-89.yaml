@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-89
+title: "[12미적Ⅰ-02-02] 개념 스킬 집합에 절차(계산 계열) 스킬 추가 — Kiki 승인 2026-10-26"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결정 — Kiki 승인(2026-10-26, P3-65 판정문 §⑥ 질문): [12미적Ⅰ-02-02] 개념 스킬 집합에 절차(계산 계열) 면을 더한다. P3-55 판정문 §③ 의 채택하지 않았던 대안을 이번에 채택한다.\n② 범위 — 02-02 한 개념만. 절차 원자(12미적Ⅰ-02-02-2 등)에 배정할 계산 계열 스킬을 기존 스킬 목록에서 고른다(새 스킬을 만들지 않는다). 배정 근거를 단원 목표(좌·우미분계수를 구해 비교하는 절차)와 문항 유형 스킬 표에 대조해 적는다.\n③ 영향 공개 — 변경 전후 phase3_coverage 표와 02-02 연결 건수 변화(p3_fill_v0 60건이 연결되는지)를 공개하고, 같은 스킬 데이터를 읽는 크로스워크·학습 경로·concept_behavior_skills 소비처에 회귀가 없음을 테스트로 확인한다.\n④ 운영 DB — 스킬 배정이 운영 DB 적재를 동반하면 그 적재는 사람 게이트로 분리하고 이 태스크에서 실행하지 않는다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-65 판정문 §⑥ Kiki 결정 질문 → 승인(2026-10-26). P3-65는 acceptance ⑥에 따라 이 변경을 하지 않았다. 스킬 배정은 SKB-02 L1 데이터라 크로스워크·학습 경로가 함께 읽는다."
+updated: 2026-10-26
