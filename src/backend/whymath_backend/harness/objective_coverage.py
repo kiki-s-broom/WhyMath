@@ -1,11 +1,13 @@
 """학습목표(Objective) 커버리지 관측 리포트 CLI — 빌드타임 결정론 관측(LLM 0·DB 0·HTTP 0).
 
 설계 정본: `docs/architecture/curriculum_module_gap_review.md` §3 **D2**. `ARCH-18`(문제은행
-커버리지 리포트, `harness/problem_bank_coverage.py`) 패턴을 그대로 재사용해, 성취기준 895건 중
-소단원(unit) DSL이 실제로 목표(Objective)로 분해한 건수·비율과 k_type(CONCEPT/PROCEDURE/
-REPRESENT/MODELING) 분포를 낸다. `LearningObjective` 스키마·`unit_compiler.py` 컴파일러·런타임
-API(`/v1/me/objectives/*`)는 이미 완비됐지만, 실데이터가 소단원 1건(`quadratic_maxmin`, 목표
-4개)뿐이라는 "완비된 소비 경로 + 미도달 공급원" 패턴을 드러내는 것이 이 도구의 존재 이유다.
+커버리지 리포트, `harness/problem_bank_coverage.py`) 패턴을 그대로 재사용해, 성취기준 대장
+전량(건수는 `docs/data/corpus_facts.md`의 `standards.k12`) 중 소단원(unit) DSL이 실제로
+목표(Objective)로 분해한 건수·비율과 k_type(CONCEPT/PROCEDURE/REPRESENT/MODELING) 분포를 낸다.
+`LearningObjective` 스키마·`unit_compiler.py` 컴파일러·런타임 API(`/v1/me/objectives/*`)는 이미
+완비됐지만, 작성 당시 실데이터가 소단원 1건(`quadratic_maxmin`, 목표 4개)뿐이었다 — 그런 "완비된
+소비 경로 + 미도달 공급원" 패턴을 드러내는 것이 이 도구의 존재 이유다(현재 소단원 수는
+`units.count`, 커버 건수는 이 리포트의 출력).
 
 **게이트가 아니다**(같은 harness 축의 `corpus_audit_eval`과의 결정적 차이): 커버율이 0.11%든
 0%든 이 모듈은 **exit 1을 내지 않는다** — 종료 코드는 성공(0)과 입력 오류(2·성취기준 대장
@@ -17,13 +19,14 @@ API(`/v1/me/objectives/*`)는 이미 완비됐지만, 실데이터가 소단원 
 
 **커버리지 정의(주의 — `problem_bank_coverage`와 분모가 다르다)**: 성취기준 대장
 (`standards.json`)의 `curriculum_revision` 값은 `"2022 개정"`처럼 "개정" 접미가 붙는 반면, 소단원
-YAML의 `curriculum_rev`는 `"2022"`(접미 없는 연도)라 **문자열이 그대로 일치하지 않는다**. 이 값
-형식 불일치를 여기서 해소하려 들지 않고(정규화 규칙을 날조하면 실측 없는 매핑이 된다), 애초에
+YAML의 `curriculum_rev`는 `"2022"`(접미 없는 연도)라 **문자열이 그대로 일치하지 않는다**. 이 값 형식
+불일치를 여기서 해소하려 들지 않고(정규화 규칙을 날조하면 실측 없는 매핑이 된다), 애초에
 `curriculum_rev`를 커버리지 분모/조인 키로 **쓰지 않는다** — 오직 `code`(대괄호 포함 고시코드)
-문자열만으로 조인한다. 대신 분모는 대장 **레코드 전량(895건, 개정 통합)**으로 잡는다(레코드 1건
-= 성취기준 고시 1개정 사본). 그 결과가 "895건 중 1건(0.11%)"이다. 개정별 분포는 §1.2에서
-대장 자체의 `curriculum_revision` 필드만으로(조인 없이) 별도로 보여준다 — 소단원의
-`curriculum_rev`는 §3 유닛별 분해에 참고용 원문 그대로만 실리고 어떤 집계에도 쓰이지 않는다.
+문자열만으로 조인한다. 대신 분모는 대장 **레코드 전량(개정 통합 — 건수는 `standards.k12`)**으로
+잡는다(레코드 1건 = 성취기준 고시 1개정 사본). 작성 당시 그 결과는 "895건 중 1건(0.11%)"이었다.
+개정별 분포는 §1.2에서 대장 자체의 `curriculum_revision` 필드만으로(조인 없이) 별도로 보여준다 —
+소단원의 `curriculum_rev`는 §3 유닛별 분해에 참고용 원문 그대로만 실리고 어떤 집계에도 쓰이지
+않는다.
 
 **정직 회계**(CLAUDE.md 침묵 실패 금지): 소단원 YAML 파싱 실패·필수 필드 누락·성취기준 대장에
 없는 코드(오타·구버전 등)는 조용히 버리지 않고 전부 별도 카운트로 보고한다.
@@ -507,10 +510,10 @@ def _sorted_bucket(bucket: dict[str, tuple[int, int]]) -> list[tuple[str, tuple[
 def render_report(report: CoverageReport, *, max_covered_display: int = 100) -> str:
     """커버리지 관측 결과를 마크다운으로 렌더(순수·입력 외 계산 없음).
 
-    거의 모든 성취기준이 0커버인 상태가 정상(현재 894/895)이라 **0커버 코드 895개를 나열하지
-    않는다** — 대신 (작을 것으로 예상되는) *커버된* 코드 목록을 §1.1에 상세히 싣는다. 커버된
-    목록이 `max_covered_display`를 넘기면 잘렸다는 사실을 문장으로 남긴다(조용한 절단 금지·
-    전량은 `--json` 산출물에 있다).
+    거의 모든 성취기준이 0커버인 상태가 정상(작성 당시 894/895 — 현재 값은 리포트 출력)이라 **0커버
+    코드를 전부 나열하지 않는다** — 대신 (작을 것으로 예상되는) *커버된* 코드 목록을 §1.1에 상세히
+    싣는다. 커버된 목록이 `max_covered_display`를 넘기면 잘렸다는 사실을 문장으로 남긴다(조용한 절단
+    금지·전량은 `--json` 산출물에 있다).
     """
     lines: list[str] = [
         "# 학습목표(Objective) 커버리지 관측 리포트 (CUR-02)",

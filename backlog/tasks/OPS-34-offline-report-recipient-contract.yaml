@@ -11,6 +11,7 @@ eos_priority: P2
 owner: claude
 depends_on:
   - OPS-29-ci-enforcement-declaration-contract
+  - OPS-129-goldberg-ops34-offline-recipient-recovery
 requires_gates: []
 acceptance:
   - "① 현행 실측 고정 — ops/declared_unwired_audit.py의 _OFFLINE_REPORT('빌드타임 관측 리포트 — 수치를 보려고 사람이 돌린다') 면제 항목 수와, 그 '사람'에게 돌리라고 지시하는 런북·주기 문서가 0건임을 재확인한다(docs/ 전수 grep). 반증되면 범위를 재조정한다"
@@ -22,5 +23,5 @@ paths:
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
   - "tests/infra/**"
 session: null
-notes: "docs/architecture/ai_recommendation_module_gap_review_r3.md §3 D8. REC-01 acceptance ④가 요구한 'CI 배선 실재 확인'의 답이 by-design 면제(_OFFLINE_REPORT)였는데 면제의 전제인 수취인이 실재하지 않는다 — ops.recommendation_reach_report를 포함한 면제 항목 전부에 런북·주기·만료가 0이다(argparse CLI는 실재하나 그것을 돌리라고 적힌 문서가 없다). CLAUDE.md '만료 없는 유예·제외 금지'(2026-08-03) 직접 저촉. 추천축이 아니라 횡단 인프라축이라(면제 항목 중 추천 관련 2건뿐) 추천 전용의 좁은 태스크를 만들지 않고 infra-debt로 등재한다. 운영 r3 D9('정직 표기는 침묵 통과는 막지만 영구 미상환은 막지 못한다')의 면제 사전 평면 재발. 등재 경위: OPS-33으로 시도했으나 CLI가 원격 OPS-33-yaml-spec-unwired-audit-axis와 번호 충돌로 거부(HARN-10) → 우회하지 않고 제안 번호 OPS-34 수용. 그 OPS-33이 이후 main에 착지해 내용 대조가 가능해졌고, 축이 다르므로 중복이 아님을 확인했다(OPS-33=YAML 스펙 선언↔코드 구현 / OPS-34=면제 사전의 수취인·만료). 착수 전 조율 필수: 같은 파일 ops/declared_unwired_audit.py에 SOL-03(scene_element_kinds)·OPS-33(yaml_spec_impl)이 각각 축을 신설하며, OPS-33 acceptance ⑦이 '축을 서수가 아니라 이름으로 식별한다'는 규약을 이미 세웠다 — OPS-34는 축 신설이 아니라 기존 _OFFLINE_REPORT 사전에 필드를 요구하는 것이지만, ARCH-25 만료 계약을 세 태스크가 공유하므로 먼저 착지한 쪽의 구현을 재사용한다(재구현 0).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "docs/architecture/ai_recommendation_module_gap_review_r3.md §3 D8. REC-01 acceptance ④가 요구한 'CI 배선 실재 확인'의 답이 by-design 면제(_OFFLINE_REPORT)였는데 면제의 전제인 수취인이 실재하지 않는다 — ops.recommendation_reach_report를 포함한 면제 항목 전부에 런북·주기·만료가 0이다(argparse CLI는 실재하나 그것을 돌리라고 적힌 문서가 없다). CLAUDE.md '만료 없는 유예·제외 금지'(2026-08-03) 직접 저촉. 추천축이 아니라 횡단 인프라축이라(면제 항목 중 추천 관련 2건뿐) 추천 전용의 좁은 태스크를 만들지 않고 infra-debt로 등재한다. 운영 r3 D9('정직 표기는 침묵 통과는 막지만 영구 미상환은 막지 못한다')의 면제 사전 평면 재발. 등재 경위: OPS-33으로 시도했으나 CLI가 원격 OPS-33-yaml-spec-unwired-audit-axis와 번호 충돌로 거부(HARN-10) → 우회하지 않고 제안 번호 OPS-34 수용. 그 OPS-33이 이후 main에 착지해 내용 대조가 가능해졌고, 축이 다르므로 중복이 아님을 확인했다(OPS-33=YAML 스펙 선언↔코드 구현 / OPS-34=면제 사전의 수취인·만료). 착수 전 조율 필수: 같은 파일 ops/declared_unwired_audit.py에 SOL-03(scene_element_kinds)·OPS-33(yaml_spec_impl)이 각각 축을 신설하며, OPS-33 acceptance ⑦이 '축을 서수가 아니라 이름으로 식별한다'는 규약을 이미 세웠다 — OPS-34는 축 신설이 아니라 기존 _OFFLINE_REPORT 사전에 필드를 요구하는 것이지만, ARCH-25 만료 계약을 세 태스크가 공유하므로 먼저 착지한 쪽의 구현을 재사용한다(재구현 0).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-10-12] stray-code 17회차: 완성 구현이 claude/amazing-goldberg-1oc67i에만 있고 원격 claim이 TTL 초과 — 회수(OPS-129-goldberg-ops34-offline-recipient-recovery) 없이 착수하면 같은 구현을 처음부터 반복한다. 선행 부착"
+updated: 2026-10-12

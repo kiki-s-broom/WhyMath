@@ -277,7 +277,7 @@ class Settings(BaseSettings):
         description=(
             "교수법 팩 forbidden_modes 런타임 가드(`mode_guard.check_forbidden_modes`)를 WH-1 "
             "primary 학생-대면 발화 경로의 톤필터 *앞*에 걸지(PED-23 회수 — 정본 "
-            "docs/architecture/04e_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
+            "docs/architecture/04g_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
             "OFF면 가드 블록 미실행으로 기존 서빙 경로와 비트동일(회귀 0·킬스위치). ON이면 팩이 "
             "해석된 턴에서 발화가 팩 금지 모드를 위반할 때 그 발화를 학생에게 보내지 않고 "
             "안전한 소크라테스식 재질문(결정론 템플릿·`fallback_reply_for`)으로 대체하며 "
@@ -298,13 +298,13 @@ class Settings(BaseSettings):
         description=(
             "교수전략 카탈로그(PED-05·PED-22 회수)의 적합성 필드(target_grade_bands·"
             "difficulty_range·target_k_types)를 `runtime_selector.select()`의 **후보 필터**로 "
-            "소비할지(PED-23 회수 — 정본 docs/architecture/04e_pedagogy_strategy_catalog.md §4). "
+            "소비할지(PED-23 회수 — 정본 docs/architecture/04g_pedagogy_strategy_catalog.md §4). "
             "**False(기본·옵트인)** — OFF면 카탈로그 미조회·규칙표 v1(R1~R5) 원판정 그대로(기존 "
             "선택 경로와 비트동일·킬스위치). ON이면 규칙표 적용 전에 후보 집합을 카탈로그 적합성"
             "으로 **좁히기만** 한다: 좁힌 결과가 공집합이거나 규칙표가 후보를 소진하면 필터를 "
             "무시하고 원판정으로 폴백하며 reason_code(CATALOG_FILTER_EMPTY/EXHAUSTED)를 구조화 "
             "로그로 남긴다(조용한 실패 금지). 카탈로그는 select 전용 — `gate()`는 플래그와 "
-            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04e §4 불변식 ②·테스트 동결). "
+            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04g §4 불변식 ②·테스트 동결). "
             "GA flip(기본 True)은 측정+사인오프 후 별도 커밋(mode_guard 캔어리 선례). "
             "WHYMATH_PEDAGOGY_CATALOG_FILTER_ENABLED=false 킬스위치."
         ),
@@ -315,7 +315,7 @@ class Settings(BaseSettings):
         description=(
             "`supply()` 생성 폴백의 system 프롬프트에 선택된 교수전략의 카탈로그 카드"
             "(name_ko·description·research_basis 요약 1줄 — attention 절약)를 얹을지(PED-23 "
-            "회수 — 정본 04e §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
+            "회수 — 정본 04g §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
             "미조회·system 무변경으로 기존 생성 경로와 비트동일(프롬프트-해시 캐시 키도 불변·"
             "킬스위치). ON이면 `decide()`가 고른(게이트 통과 후) 전략의 카드를 조회해 "
             "`attach_strategy_card`로 system 뒤에 1블록을 덧붙인다 — 카드 조회 실패는 예외 "
@@ -372,6 +372,26 @@ class Settings(BaseSettings):
             "그것이 False면 이 플래그와 무관하게 통째로 not_run이다(같은 좌석에 쓰는 채널이라 "
             "상위 스위치가 거짓말하면 안 된다). 이 플래그는 *선지 채널만* 끄는 좁은 스위치이며, "
             "끄면 텍스트 채널은 그대로 돈다. WHYMATH_L4_DISTRACTOR_LINK_ENABLED=false로 끈다."
+        ),
+    )
+
+    l4_derivative_signature_mode: Literal["off", "shadow", "on"] = Field(
+        default="off",
+        description=(
+            "답안 훑기의 **미분 오답 서명 독법**(`l4.misconception.derivative_signature`·"
+            "P3-56 후보 구현)을 어떻게 쓸지. 3값: **`off`(기본·opt-in)** = 이 독법을 아예 "
+            "부르지 않는다 — 훑기는 종전과 비트동일하고 SymPy 비용도 늘지 않는다. "
+            "**`shadow`** = 독법을 *라이브로 돌리되* 학생에게 가는 결과·가설 갱신·교정은 "
+            "`off`와 똑같고, '켰다면 무엇이 달라졌는가'만 관측 레코드로 남긴다"
+            "(`whymath.api.attempt_scan_shadow.record` 로거에 JSON 한 줄·학생 답과 지문 "
+            "미포함·문항 id만). 켜기 전 **실제 학생 오답에서의 발화율을 우연 일치 "
+            "기준선과 비교**하는 근거 수집용이다. **`on`** = 독법의 후보를 기존 후보와 "
+            "합쳐 같은 품질 게이트(0.65)로 노출한다. `on`은 활성화 게이트"
+            "(`G-p356-signature-activation`)가 PASS하기 전에는 켜지 않는다. 모드는 워커 "
+            "프로세스 풀이 상주하므로 **앱 재기동으로** 바뀐다. "
+            "WHYMATH_L4_DERIVATIVE_SIGNATURE_MODE=shadow|on으로 켠다. 상위 킬 스위치 "
+            "`l4_attempt_misconception_scan_enabled`가 False면 이 값과 무관하게 훑기 "
+            "자체가 없다."
         ),
     )
 
@@ -473,8 +493,12 @@ class Settings(BaseSettings):
             "OPS-96 — SymPy 호출 1건의 계산 시간 상한(초·워커가 일을 받은 순간부터). 기본 5초는 "
             "`safe_parse` 구조 예산을 통과하는 *가장 느린* 입력(차수 20 방정식 ≈3.0초·실측 "
             "2026-10-02)보다 크고, 정상 문항(밀리초대)과는 3자릿수 차이다. 이 값을 낮추면 정상 "
-            "입력이 판정 불가로 떨어질 수 있으니 `sympy_isolation_budget_exceeded` 로그 비율을 "
-            "보고 조정한다."
+            "입력이 판정 불가로 떨어질 수 있으니 `/health/ready`의 `sympy_isolation."
+            "undecidable_ratio`(OPS-126)와 `isolation_budget_exceeded` 로그를 보고 조정한다. "
+            "OPS-126 ② 재판정(2026-10-12·OPS-140 재측정 2026-10-14) — 교육과정 형태 합성 단계 "
+            "354건 최대 0.18초, 고차 방정식 스트레스 16건은 상한 없이도 전부 unverifiable(상한은 "
+            "판정 정보를 잃지 않는다). 합성 대리 분포이며 실 학생 입력 분포는 파일럿 지표 누적 "
+            "뒤 재판정한다(OPS-131)."
         ),
     )
     sympy_isolation_preload_modules: list[str] = Field(
@@ -485,14 +509,32 @@ class Settings(BaseSettings):
             "요청이 느리다). 격리 장치 자체는 과목 어휘를 모르므로(Core) 이 목록을 설정이 정한다."
         ),
     )
+    sympy_isolation_warmup: list[str] = Field(
+        default_factory=lambda: [
+            "whymath_backend.l3.verify_step:warm_isolated_worker",
+            "whymath_backend.l3.verify_answer:warm_isolated_worker",
+        ],
+        description=(
+            "OPS-142 — SymPy 워커 프로세스가 `ready` 이전에 미리 돌릴 웜업 함수('모듈:함수'·인자 "
+            "없음). 식 종류별 첫 사용이 하위 모듈을 지연 import하는데(`simplify` 첫 호출 ≈68ms·"
+            "워커 CPU 몫 1/8에서 543~742ms — 실측 2026-10-14) 그 시간은 *계산 상한 안*이라, 상한이 "
+            "짧거나 기계가 바쁘면 정상 식이 판정 불가로 샌다. 기동 단계(상한 밖)에서 미리 치르면 "
+            "상한 초과로 kill된 뒤의 교체 워커도 데워진 채 뜬다. 비우면 종전(첫 요청이 비용을 "
+            "치름)이다. 웜업이 실패해도 워커는 뜨고 경고 로그에 예외 타입명이 남는다."
+        ),
+    )
     sympy_isolation_max_workers: int = Field(
         default=2,
         ge=1,
         le=16,
         description=(
             "OPS-96 — SymPy 워커 프로세스 수(= 동시 SymPy 계산 수). 각 워커는 SymPy를 import한 "
-            "상태로 상주한다(메모리 약 100~150MB/개 — 서버 워커 수 × 이 값 만큼 프로세스가 뜬다). "
-            "모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 판정 불가로 떨어진다."
+            "상태로 상주한다(실측 2026-10-12·14 OPS-126 ③·OPS-140 — Linux·SymPy 1.14에서 RSS "
+            "73~78MB/개(Python 3.12·3.13)·PSS 약 64~66MB, 무거운 계산 12회 뒤 약 78MB로 완만히 "
+            "증가·장기 상한과 Windows는 미측정이라 100MB 안팎으로 가정 — 서버 워커 수 × 이 값 "
+            "만큼 프로세스가 뜬다). 모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 "
+            "판정 불가로 떨어진다 — 늘릴 신호는 `/health/ready`의 `sympy_isolation.queue_waits > 0`"
+            "이다."
         ),
     )
 
@@ -1782,6 +1824,28 @@ class Settings(BaseSettings):
             "인프로세스 요청 계측의 최근 창 크기(요청 수·고정 deque maxlen). 에러율·p95는 "
             "이 창에서 계산한다 — 전 기간 평균은 최근 악화를 희석하므로 최근 창이 알림 "
             "판정선이다. 기본 500. WHYMATH_OPS_METRICS_WINDOW_SIZE로 조정."
+        ),
+    )
+    # OPS-30: 알림의 마지막 1홉 — breach/다운이 로그가 아니라 사람에게 닿는 채널.
+    # URL 자체가 인증 토큰이라(Slack/Discord 수신 웹훅) SecretStr로 받아 repr·로그 노출을 막는다.
+    ops_alert_webhook_url: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            '알림 수신 웹훅 URL(Slack Incoming Webhook 형식 — `{"text": ...}` POST). '
+            "Discord는 웹훅 URL 끝에 `/slack`을 붙이면 같은 형식을 받는다. 빈 값(기본)이면 "
+            "발송 채널 미설정 — breach는 기존 로그 경로에만 남고, 그 사실을 기동 로그·"
+            "/health/ready `alert_delivery.configured=false`가 드러낸다(무증상 no-op 금지). "
+            "WHYMATH_OPS_ALERT_WEBHOOK_URL로 설정."
+        ),
+    )
+    ops_alert_webhook_timeout_s: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=30.0,
+        description=(
+            "알림 웹훅 POST 제한 시간(초). 발송은 별도 스레드라 요청 경로를 막지 않지만 "
+            "멈춘 소켓이 스레드를 영구 점유하지 않게 반드시 건다. 기본 5. "
+            "WHYMATH_OPS_ALERT_WEBHOOK_TIMEOUT_S로 조정."
         ),
     )
 

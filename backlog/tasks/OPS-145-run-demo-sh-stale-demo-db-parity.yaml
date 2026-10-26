@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-145-run-demo-sh-stale-demo-db-parity
+title: "run_demo.sh(bash 미러)도 낡은 데모 DB를 진단하지 못한다 — OPS-133 계약을 bash에 이식"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 4
+eos_priority: P3
+owner: claude
+depends_on:
+  - OPS-133-run-demo-stale-throwaway-db-diagnosis
+requires_gates: []
+acceptance:
+  - "scripts/demo/run_demo.sh [2/6]이 alembic upgrade 실패 시 원인을 진단하지 못하는 갭을 OPS-133(run_demo.ps1)과 같은 계약으로 메운다. ①낡은 데모 DB(코드에 없는 리비전 기억) 감지 시 scripts/demo/diagnose_stale_demo_db.py를 재사용해 원인과 리비전 번호를 출력(판정 로직 재구현 금지) ②초기화는 자동이 아니라 명시 플래그 --reset-stale-demo-db 일 때만, 대상은 docker-compose.demo.yml의 demo-db 한정(운영 DB는 어떤 경로로도 불가침) ③UNKNOWN/CLEAN 판정은 플래그가 있어도 초기화하지 않는다 ④실패 주입 양방향 테스트(bash 제어 흐름을 스텁으로 실행)로 동결하고 뮤테이션으로 RED를 확인한다."
+artifacts: []
+paths:
+  - scripts/demo/run_demo.sh
+  - scripts/demo/stop_demo.sh
+session: null
+notes: "출처: OPS-133 구현 중 발견(2026-10-14). OPS-133은 run_demo.ps1(Windows)만 고쳤고 run_demo.sh(macOS/Linux/WSL 미러)는 [2/6]이 여전히 alembic 실패를 진단 없이 전파한다. Kiki 작업 PC는 Windows라 우선순위는 낮다. 판정은 diagnose_stale_demo_db.py(표준 라이브러리만)를 그대로 쓰면 되고 새로 만드는 것은 bash 분기와 그 테스트뿐이다."
+updated: 2026-10-14

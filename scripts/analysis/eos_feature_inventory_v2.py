@@ -104,6 +104,8 @@ LEDGER_YAML = REPO / "backlog" / "inventory" / "feature_inventory_v2.yaml"
 LEDGER_CSV = REPO / "backlog" / "inventory" / "feature_inventory_v2.csv"
 V1_SCRIPT = pathlib.Path(__file__).with_name("eos_feature_inventory.py")
 SCAN_SCRIPT = pathlib.Path(__file__).with_name("eos_core_adapter_boundary_scan.py")
+# 코퍼스 건수의 단일 원천(OPS-154) — 근거(seat) 문구의 건수를 손으로 적지 않고 여기서 센다.
+FACTS_SCRIPT = pathlib.Path(__file__).with_name("corpus_facts.py")
 
 PLANES = {"S": "서빙 표면", "E": "백엔드 엔진", "C": "클라이언트", "O": "운영자 도구"}
 OWNERSHIP_VOCAB = ("CORE", "CORE+ADAPTER_DEP", "ADAPTER", "MIXED", "INFRA", "CLIENT")
@@ -348,6 +350,30 @@ def _c(
     )
 
 
+_CORPUS_FACTS: Any = None
+
+
+def _fact(fid: str) -> str:
+    """코퍼스 사실 `fid`의 현재 값(천 단위 쉼표) — `corpus_facts.py`가 원본에서 센다.
+
+    근거(seat) 문구에 건수를 손으로 적으면 코퍼스가 바뀔 때 옛 값이 남는다(OPS-154). 같은
+    폴더의 단일 원천 모듈을 한 번만 불러 와 필요한 사실만 계산한다(전체 계산 없음).
+    """
+    global _CORPUS_FACTS
+    if _CORPUS_FACTS is None:
+        spec = importlib.util.spec_from_file_location("_corpus_facts_v2", FACTS_SCRIPT)
+        assert spec is not None and spec.loader is not None, f"스크립트 로드 불가: {FACTS_SCRIPT}"
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module  # dataclass가 모듈을 sys.modules에서 찾는다
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            sys.modules.pop(spec.name, None)
+        _CORPUS_FACTS = module
+    facts = _CORPUS_FACTS.build_facts(REPO)
+    return str(_CORPUS_FACTS.format_value(facts[fid].compute(REPO), raw=False))
+
+
 # fmt: off
 CATALOG: tuple[Spec, ...] = (
     # ════════════════════ S 서빙 표면 — 엔드포인트 그룹 ════════════════════
@@ -441,7 +467,8 @@ CATALOG: tuple[Spec, ...] = (
        "admin_bff", "GET /models", "GET /costs", "GET /review-queue", "GET /users",
        "GET /users/{user_id}", "GET /review-queue/items",
        "GET /review-queue/items/{problem_id}",
-       "POST /review-queue/items/{problem_id}/transitions"),
+       "POST /review-queue/items/{problem_id}/transitions",
+       "POST /review-queue/items/{problem_id}/review-sessions"),
     _s("WM-S-056", "관리자 CMS — 개념 버전 워크플로우·콘텐츠 제자리 편집·변경이력", "Admin",
        "Operations", "P1",
        "P3-12 — 개념 편집은 새 DRAFT 판이고 제출·검토·승인·발행·롤백은 발행 게이트만 경유한다. "
@@ -463,6 +490,27 @@ CATALOG: tuple[Spec, ...] = (
        "PATCH /concept_content/items/{pk}", "POST /concept_content/items/{pk}/review",
        "GET /hint", "GET /hint/items/{pk}", "PATCH /hint/items/{pk}",
        "GET /skill_node", "GET /skill_node/items/{pk}"),
+    _s("WM-S-057",
+       "관리자 CMS — 신규 개념 제안·선수 관계 쓰기·개념 삭제(개념 그래프 쓰기)", "Admin",
+       "Operations", "P1",
+       "P3-26 — 신규 개념은 살아있는 개념 행을 만들지 않고 제안(DRAFT)→검토→승인→발행을 거치며 "
+       "개념 행은 발행하는 순간 게이트가 만든다. 선수 관계는 서버가 비순환(DAG)을 "
+       "검사한 뒤에만 쓰고 "
+       "(어드바이저리 잠금으로 동시 요청도 직렬화), graph.json이 소유한 관계·개념은 CMS가 지우지 "
+       "못한다. 발행본이 있는 개념은 삭제 거부. 관계·삭제는 발행 권한, 제안은 편집 권한",
+       "admin_cms_graph",
+       "GET /concept-proposals", "POST /concept-proposals",
+       "POST /concept-proposals/{code}/drafts", "DELETE /concepts/{concept_id}",
+       "POST /edges", "DELETE /edges/{edge_id}"),
+    _s("WM-S-058", "관리자 CMS — 문항 판 발행 호출 표면(초안·제출·검토·승인·발행·내리기)", "Admin",
+       "Versioning", "P1",
+       "EOS-194 — `l3.problem_publish_gate`(EOS-190)의 운영 호출자. 초안은 항상 지금 라이브 문항의 "
+       "스냅숏이고(내용을 호출자가 정하는 입구 없음), 전이는 권한(편집·검수·배포)을 DB 접근 전에 "
+       "검사하며 전이 1건마다 감사 1행을 남긴다. 발행 포인터 전환이 시도 버전 고정(EOS-47)이 읽는 "
+       "값이다 · 롤백은 없다(EOS-196)",
+       "admin_cms_problem_versions",
+       "POST /problems/{problem_id}/drafts", "GET /problems/{problem_id}/versions",
+       "GET /problem-versions/{version_id}", "POST /problem-versions/{version_id}/transitions"),
     _s("WM-S-019", "약개념 추천·복습 우선순위 큐", "Student", "Recommendation", "P0",
        "Gate2 ④ Concept 자동 선택", "me", "GET /weak-concepts", "GET /review-queue"),
     _s("WM-S-020", "선수개념 갭·학습 경로·개념 코칭 결정", "Student", "Recommendation", "P0",
@@ -547,19 +595,23 @@ CATALOG: tuple[Spec, ...] = (
        "RPT-01 — 무인증 append-only", "reports", "POST /defects"),
     # ════════════════════ E 백엔드 엔진 — L1 데이터 기반 ════════════════════
     _e("WM-E-101", "원자 백본 그래프 적재·검색·중복 검수", "Platform", "Knowledge Graph", "P0",
-       "B3 선수 그래프 2,683노드·2,210엣지", "l1.atom_graph.atom_backend_concept",
-       "l1.atom_graph.atom_backend_edge", "l1.atom_graph.atom_node_projection",
+       f"B3 선수 그래프 {_fact('atom_graph.nodes')}노드·{_fact('atom_graph.edges')}엣지",
+       "l1.atom_graph.atom_backend_concept",
+       "l1.atom_graph.atom_backend_edge", "l1.atom_graph.atom_edge_retire",
+       "l1.atom_graph.atom_node_projection",
        "l1.atom_graph.axis", "l1.atom_graph.dedup_candidates", "l1.atom_graph.embedding",
        "l1.atom_graph.populate", "l1.atom_graph.retrieval", pipelines=("atom_graph",)),
     _e("WM-E-102", "구 개념그래프 적재·임베딩·검색", "Platform", "Knowledge Graph", "P1",
-       "B4 개념 437 — 원자 축 이전(S0-2·ARCH-13) 후 보조 좌석 — 동일 기능 중복",
+       f"B4 개념 {_fact('concept_graph.concepts')} — 원자 축 이전(S0-2·ARCH-13) 후 보조 좌석 — "
+       "동일 기능 중복",
        "l1.concept_graph.backend_concept", "l1.concept_graph.backend_edge",
        "l1.concept_graph.embedding", "l1.concept_graph.locale",
        "l1.concept_graph.node_projection", "l1.concept_graph.populate",
        "l1.concept_graph.retrieval",
        "api._concept_orchestration", pipelines=("concept_graph",), duplicate_of="WM-E-101"),
     _e("WM-E-103", "개념↔원자 크로스워크 이전", "Platform", "Knowledge Graph", "P1",
-       "S0-2 437키 자산 이전", "l1.concept_atom_crosswalk.populate",
+       f"S0-2 {_fact('concept_atom_crosswalk.entries')}키 자산 이전",
+       "l1.concept_atom_crosswalk.populate",
        "l1.concept_atom_crosswalk.transfer",
        # CONT-08 — 콘텐츠 code → 연결 원자 읽기 전용 로더(검수 입력·승격 게이트가 공급 경로와
        # 같은 연결을 본다). 이전(transfer)과 같은 도출 규칙·같은 다리를 쓰는 형제 모듈이다.
@@ -577,11 +629,15 @@ CATALOG: tuple[Spec, ...] = (
        "Platform", "Curriculum", "P0", "B1·F1 앵커 성취기준 코드셋",
        "l1.standards.alignment_query", "l1.standards.anchor_registry",
        "l1.standards.criteria_loader", "l1.standards.learning_map",
-       "l1.standards.phase3_coverage", "l1.standards.phase3_scope", "l1.standards.populate",
+       "l1.standards.phase3_coverage", "l1.standards.phase3_remediation_spec",
+       "l1.standards.phase3_scope",
+       "l1.standards.phase3_slot_rules", "l1.standards.phase3_stem_fold",
+       "l1.standards.populate",
        "l1.standards.standard_loader",
        pipelines=("ncic", "standards_university")),
     _e("WM-E-107", "오개념 카탈로그·크로스링크 적재·승인 게이트", "Platform", "Pedagogy", "P0",
-       "B6 오개념 843 + 게이트 계약 동결", "l1.fk_precheck", "l1.misconception.atom_catalog",
+       f"B6 오개념 {_fact('misconceptions.count')} + 게이트 계약 동결", "l1.fk_precheck",
+       "l1.misconception.atom_catalog",
        "l1.misconception.catalog_loader", "l1.misconception.crosslink_gate",
        "l1.misconception.crosslink_loader", "l1.misconception.crosslink_resolve",
        "l1.misconception.populate", "l1.misconception.populate_atom", "l1.misconception.resolve",
@@ -590,7 +646,7 @@ CATALOG: tuple[Spec, ...] = (
        "PED-01 팩 — 프롬프트 4계층 입력", "l1.pedagogy.compile", "l1.pedagogy.pack_loader",
        "l1.pedagogy.populate", "l1.pedagogy.unit_compiler"),
     _e("WM-E-109", "문제은행 적재·임베딩·시그니처·페르소나 적합·정답분포", "Platform", "Content",
-       "P0", "B7 코퍼스 2,647문", "l1.problem_bank.answer_distribution",
+       "P0", f"B7 코퍼스 {_fact('problem_bank.total')}문", "l1.problem_bank.answer_distribution",
        "l1.problem_bank.derived_form_rules",
        "l1.problem_bank.embedding", "l1.problem_bank.persona_fit_rules",
        "l1.problem_bank.populate", "l1.problem_bank.probe_candidates",
@@ -599,7 +655,8 @@ CATALOG: tuple[Spec, ...] = (
        "S4-06 — 수식 엔티티 적재(MIXED)", "l1.formula_graph.formula_node_projection",
        "l1.formula_graph.populate", pipelines=("formula_graph",)),
     _e("WM-E-111", "스킬 그래프 적재·해석", "Platform", "Knowledge Graph", "P0",
-       "계획서 300 Skill 27건 — 얇음", "l1.skill_graph.populate", "l1.skill_graph.resolve",
+       f"계획서 300 Skill {_fact('skill_graph.skills')}건 — 얇음", "l1.skill_graph.populate",
+       "l1.skill_graph.resolve",
        "l1.skill_graph.skill_node_projection", pipelines=("skill_graph",)),
     _e("WM-E-112", "풀이 전략 그래프 적재", "Platform", "Pedagogy", "P2",
        "전략 카탈로그(MIXED)", "l1.strategy_graph.populate",
@@ -649,9 +706,11 @@ CATALOG: tuple[Spec, ...] = (
     # (`evidence_event.session_id → learning_session.user_id`)라 같은 기능의 적재 축이다.
     _e("WM-E-206", "학습 증거 이벤트 적재(attempt·처치·추천 회계·학습 세션)", "Student", "Event",
        "P0",
-       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer",
+       "E3 Event — REC-03·PED-03·EOS-57 · EOS-131 서버 30분 유휴 규칙 세션 writer · "
+       "EOS-47 시도 접수 시점 문항 판·채점 환경 고정(l2.attempt_version_pin)",
        "l2.evidence_event_store", "l2.attempt_skill_event",
-       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer"),
+       "l2.pedagogy_evidence", "l2.recommendation_evidence", "l2.learning_session_writer",
+       "l2.attempt_version_pin"),
     _e("WM-E-207", "목표 진행 조회 좌석", "Student", "Learning Model", "P2",
        "수능 D-day 축", "l2.target_progress"),
     _e("WM-E-208", "일별 학습 지표 롤업 writer", "Admin", "Analytics", "P1",
@@ -776,13 +835,30 @@ CATALOG: tuple[Spec, ...] = (
     _e("WM-E-316", "콘텐츠 버전 Publish Gate(전이표·검증 파이프라인·Rollback)", "Admin",
        "Versioning", "P1",
        "EOS-50 — 44 §9·P3-11. 운영 호출자는 P3-12 관리자 CMS(`/v1/admin/cms`) · 학생 노출 아님"
-       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5)",
-       "l3.publish_gate", status="Batch"),
-    _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)",
+       "(서빙 경로가 판을 읽지 않는다 — 축 판정 B5). EOS-190 — 문항 판 writer(`l3."
+       "problem_publish_gate`)는 `problem_version`·발행 포인터의 유일한 쓰기 자리이고 운영 호출자"
+       "는 EOS-194의 관리자 CMS 문항 판 표면(WM-S-058)이다 · 시도 버전 고정(EOS-47)만 포인터를 "
+       "읽는다 · "
+       "P3-04 — PUBLISH 게이트가 Problem 필수 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 "
+       "전략)를 요구한다(`l3.problem_metadata_evidence`가 DB에서 증거를 읽는다 · 정의는 "
+       "`schema.problem_metadata`)",
+       "l3.publish_gate", "l3.problem_publish_gate", "l3.problem_metadata_evidence",
+       status="Batch"),
+    _e("WM-E-317", "관리자 CMS 리소스 선언(허용 필드·검수 표지·워크플로우 상태 컬럼 금지 목록)"
+       "·CMS 편집 표지(적재 보호)",
        "Admin", "Versioning", "P1",
        "P3-12 — 개념 외 7종의 제자리 편집 허용 목록. 상태·발행 컬럼은 편집 가능 필드에 들어갈 수 "
-       "없고 선언 오류는 기동 시점에 거부된다",
-       "api.admin_cms_resources"),
+       "없고 선언 오류는 기동 시점에 거부된다. P3-25 — 적재가 덮어쓰는 5종은 CMS 쓰기가 "
+       "cms_edited_at 표지를 채우고 CLI 적재는 표지 행을 건너뛰어 충돌로 보고한다"
+       "(db.cms_edit_marker — 5개 적재기가 공유하는 단일 규약)",
+       "api.admin_cms_resources", "db.cms_edit_marker"),
+    _e("WM-E-318", "개념 그래프 쓰기 규칙(선수 엣지 비순환 검사·소유 판정·삭제 가능 판정)"
+       "·적재의 DB 인지 순환 방어", "Admin", "Knowledge Graph", "P1",
+       "P3-26 — 관리 API와 기존 개념 삭제 라우트가 같은 규칙을 쓰고(`api._concept_graph_rules`), "
+       "적재 CLI는 같은 어드바이저리 잠금 안에서 DB의 CMS 관계와 합쳐 순환을 검사한다"
+       "(`l1.concept_graph.prerequisite_guard`) — 파일만 보면 각각은 비순환이어도 합치면 순환일 수 "
+       "있다",
+       "api._concept_graph_rules", "l1.concept_graph.prerequisite_guard"),
     # ════════════════════ E — L3 (Math Adapter) ════════════════════
     _e("WM-E-351", "동등문제 생성 파이프라인(생성·수용 게이트·정규화·rephrase·감사)", "Admin",
        "Math Engine", "P0", "C1·C3·C4 — 앵커 CU 생산 사슬", "l3.equivalent.generator",
@@ -790,8 +866,14 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.skeleton_generator", "l3.equivalent.difficulty",
        "l3.equivalent.canonicalize", "l3.equivalent.rephrase", "l3.equivalent.rephrase_hygiene",
        "l3.equivalent.retag", "l3.equivalent.latex_gate", "l3.equivalent.counterexample_fuzz",
-       "l3.equivalent.defect_seeder"),
-    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대)", "Admin", "Math Engine", "P0",
+       "l3.equivalent.defect_seeder",
+       # P3-03 감사자 자격 측정 — 은행 전용 결함 주입기(defect_seeder와 같은 강등전 원리·이 은행의
+       # 실제 문항에 7종을 심어 정답지를 구성으로 확정). 소비자는 harness.p3_audit_qualification.
+       "l3.equivalent.p3_diff_defect_seeder",
+       # PB-09 변형 3종(난이도 계열·조건변형·역문제) — 코퍼스 행에서 자식을 낳는 결정론 모듈.
+       "l3.equivalent.variants"),
+    _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
+       "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
        "l3.equivalent.calculus1_integral_skeleton_generator",
        "l3.equivalent.calculus2_trig_integral_skeleton_generator",
@@ -832,7 +914,32 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.trig_skeleton_generator",
        "l3.equivalent.vector_operations_skeleton_generator",
        "l3.equivalent.conceptual_count_mc_generator",
-       "l3.equivalent.misconception_eval_mc_generator"),
+       "l3.equivalent.misconception_eval_mc_generator",
+       # P3-03 — Phase 3 미적분Ⅰ 미분 대단원 개념별 결정론 생성기(승인 문항 0건이던 개념 채움).
+       # 생성기 7종 + 공용 기반(슬롯 구조·후보 조립) + 공용 식 도구. 개념 추가는 생성기 파일 1개 +
+       # `harness.p3_calculus1_diff_batch.GENERATORS` 한 줄이라 여기 귀속도 같이 늘어난다.
+       "l3.equivalent.p3_diff_expr", "l3.equivalent.p3_diff_skeleton_base",
+       # 3차 감사 처분 — '선수 계산 우회로' 판정기(생성기 빌드가 문항마다 부르는 fail-loud 게이트).
+       "l3.equivalent.p3_diff_shortcut_guard",
+       # 1·2차 감사 문면 결함 스캐너 — 테스트 안에 있던 판정 함수를 감사자 자격 측정의 기계 게이트가
+       # 쓰도록 승격(규칙 불변·대조군은 test_p3_diff_text_defects가 그대로 봉인).
+       "l3.equivalent.p3_diff_text_scanner",
+       # 풀이 단계(`verify.solution_steps`) 결정론 도출 — 도함수 출발식부터 SymPy 계산(Tier2 계약).
+       "l3.equivalent.p3_diff_solution_steps",
+       "l3.equivalent.p3_diff_power_derivative_skeleton_generator",
+       "l3.equivalent.p3_diff_polynomial_rules_skeleton_generator",
+       "l3.equivalent.p3_diff_tangent_line_skeleton_generator",
+       "l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator",
+       "l3.equivalent.p3_diff_graph_shape_skeleton_generator",
+       "l3.equivalent.p3_diff_equation_application_skeleton_generator",
+       "l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator",
+       # P3-05 4·5단계 — 빈 칸 채우기 은행의 개념별 생성기(담당 슬롯만 선언하는 부분집합 생성기).
+       "l3.equivalent.p3_diff_differential_coefficient_skeleton_generator",
+       "l3.equivalent.p3_diff_differentiability_skeleton_generator",
+       "l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator",
+       # P3-05 5단계 — 스킬 덮기(규칙 일반화 · 문장제 모델링) 생성기.
+       "l3.equivalent.p3_diff_power_pattern_skeleton_generator",
+       "l3.equivalent.p3_diff_motion_word_problem_skeleton_generator"),
     _e("WM-E-353", "기호 동치·해집합 보존 판정 primitive", "Platform", "Math Engine", "P0",
        "SymPy 단일 권위 — 불변 계약", "l3.symbolic_equivalence", "l3.solution_set"),
     _e("WM-E-354", "답 검산(Tier1 수치·형태·최종답)", "Student", "Math Engine", "P0",
@@ -892,7 +999,11 @@ CATALOG: tuple[Spec, ...] = (
        "l4.misconception.match_gate", "l4.misconception.distractor",
        "l4.misconception.distractor_link",
        "l4.misconception.validate", "l4.misconception.visualize", "l4.misconception.audit",
-       "l4.misconception.answer_signature", "api._attempt_misconception_scan"),
+       "l4.misconception.answer_signature", "l4.misconception.remediation_strategy",
+       "api._attempt_misconception_scan",
+       # P3-56 후보 — 미분 오답 서명 독법(단답형 오답 → 후보). Kiki 승인 전에는 머지하지 않는다.
+       "l4.misconception.derivative_signature",
+       "l1.misconception.wrong_answer_signature_table", "schema.wrong_answer_signature"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
        "l4.misconception.hypothesis",
@@ -972,7 +1083,7 @@ CATALOG: tuple[Spec, ...] = (
        "Pedagogy", "P0", "04a — 학생 대면 발화 primary", "harness.wh1_loop",
        "harness.wh1_llm_policy", "harness.wh1_primary", "harness.wh1_session",
        "harness.wh1_prose", "harness.wh1_probe_supply", "harness.wh1_llm_seam",
-       flag="wh1_primary_enabled"),
+       "harness.wh1_tutor_context", "harness.wh1_tutor_output", flag="wh1_primary_enabled"),
     _e("WM-E-705", "WH-1 shadow 관측·수확·2단계 종료 게이트", "Platform", "QA", "P1",
        "S1-b·S1-15 shadow 축적", "harness.wh1_shadow", "harness.wh1_shadow_harvest",
        "harness.agreement_gate", "harness.agreement_gate_cli",
@@ -989,12 +1100,14 @@ CATALOG: tuple[Spec, ...] = (
        "schema.cms_access", "schema.concept", "schema.concept_content", "schema.concept_version",
        "schema.corpus_provenance", "schema.curriculum_entry", "schema.curriculum_framework",
        "schema.curriculum_version", "schema.dialogue", "schema.enums",
-       "schema.event_data_contract", "schema.evidence_link", "schema.hint_usage",
+       "schema.evaluation_context", "schema.event_data_contract", "schema.evidence_link",
+       "schema.hint_usage",
        "schema.learning_loop_contract", "schema.learning_state", "schema.mastery_contract",
        "schema.misconception_catalog", "schema.misconception_crosslink",
        "schema.misconception_hypothesis", "schema.misconception_relation", "schema.ocr",
        "schema.parental_consent", "schema.pedagogy_pack", "schema.pedagogy_strategy",
-       "schema.problem", "schema.problem_version", "schema.provenance", "schema.review_timer",
+       "schema.problem", "schema.problem_metadata", "schema.problem_version", "schema.provenance",
+       "schema.review_timer",
        "schema.review_transition", "schema.rights",
        "schema.speech", "schema.standard", "schema.student_solution_step",
        "schema.textbook_mapping", "schema.timeseries", "schema.unit_dsl", "schema.user",
@@ -1070,6 +1183,13 @@ CATALOG: tuple[Spec, ...] = (
        "Operations", "P0", "OPS-01·SEC-05·SEC-11·OPS-72", "ops.service_health",
        "ops.live_preflight", "ops.dialogue_encryption_preflight", "ops.log_scrubber",
        "ops.db_host_reachability",
+       # OPS-139: 정본(graph.json)↔prod DB 패리티 프로브 — 도달성 진단과 같은 축
+       # (prod DB를 docker exec로 읽기 전용 관측하는 운영자 도구)이라 같은 좌석에 귀속한다.
+       "ops.atom_graph_prod_parity",
+       # OPS-30: 알림의 마지막 1홉 — AlertLogNotifier가 계산한 전이를 웹훅으로 내보내는 sink와,
+       # 서버 프로세스 밖에서 /health/ready를 폴링해 S4를 계산하는 업타임 프로브. 둘 다
+       # "서비스 헬스 관측"의 같은 축(서버가 알리지 못하는 것까지 알린다)이라 같은 좌석에 귀속한다.
+       "ops.alert_delivery", "ops.uptime_probe",
        # OPS-53: 패키지 임포트 시 CLI stdout/stderr을 UTF-8로 맞추는 헬퍼 — 운영 CLI의 출력 안전.
        "_stdio", status="Production"),
     _o("WM-O-904", "LLM 비용 프로브·비용 리포트·프로바이더 라이브 프로브", "Admin", "Analytics",
@@ -1121,7 +1241,9 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_persona_fit_backfill", "harness.problem_corpus_rephrase",
        "harness.problem_corpus_rephrase_diagnose", "harness.problem_corpus_rephrase_sweep",
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
-       "harness.problem_corpus_tag", "harness.binomial_distribution_batch",
+       "harness.problem_corpus_tag", "harness.problem_corpus_variants",
+       "harness.problem_corpus_lineage_links",
+       "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
        "harness.conceptual_count_mc_batch", "harness.conic_section_focus_batch",
@@ -1139,6 +1261,8 @@ CATALOG: tuple[Spec, ...] = (
        "harness.root_aggregate_batch", "harness.sample_mean_distribution_batch",
        "harness.sequence_sigma_batch", "harness.university_calc1_batch",
        "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
+       "harness.p3_calculus1_diff_batch",
+       "harness.problem_slot_backfill", "harness.p3_fill_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",
@@ -1170,12 +1294,29 @@ CATALOG: tuple[Spec, ...] = (
        "harness.banned_words_pii_eval", "harness.coach_prose_leak_eval",
        "harness.corpus_audit_eval", "harness.crosslink_demotion_eval",
        "harness.defect_detection_eval", "harness.explanation_f7_eval",
+       # P3-03 — 미분 은행 감사자 자격 측정(결함 주입 강등전 · 기계 ∪ LLM 이중 판정 · S5 보정 상한).
+       "harness.p3_audit_qualification",
        "harness.explicit_correction_gap_eval", "harness.misconception_false_positive_eval",
        "harness.pedagogy_pack_fidelity_eval", "harness.pedagogy_policy_eval",
        "harness.residue_cross_verify_eval", "harness.selective_grading_demotion_eval",
+       # S4-56 — 잔여 축 교차검증 게이트 v2(도메인 플러그인·사전점검·dry-run). v1과 같은 판정 가족.
+       "harness.residue_cross_verify_eval_v2",
        "harness.answer_distribution_battle",
        "harness.provider_accuracy_battle", "harness.quality_tier_moe_accuracy_battle",
        "harness.residue_gate_demotion_battle", "harness.corpus_reverify",
+       # P3-07 — 문항별 문제·정답·풀이 불일치 기계 검증(C1~C5)과 Solution QA Pass 산출.
+       # `corpus_reverify`(야간 상시성 — answer_map 검산 + OPS-150 부터 `answer` 필드 대조)와 같은
+       # 전수 재검산 가족이되, 풀이 최종 답·선택지 유일성까지 보는 별도 판정기라 같은 행에
+       # 귀속한다. 지표 ④ 의 엔진이다(phase3_metrics 가 호출).
+       "harness.solution_qa",
+       # P3-63 — solution_qa C5 의 엔진: 발문(question_text)에서 정답을 SymPy 로 독립 재유도한다.
+       # solution_qa 가 호출하는 순수 계산 모듈이라 같은 행에 귀속한다.
+       "harness.question_rederive",
+       # P3-10 — 튜터 턴 AI 품질 8축(평가셋·판정기·후보/주입·CLI). 판정 권위는 기존 검증 레이어
+       # (verify_step·detect_answer_leakage·check_level_reveals·TutorTurnOutput·MATH-04)를 호출하고
+       # 결함 주입 자가 점검으로 변별력을 상시 봉인하는 판정 가족이라 같은 행에 귀속한다.
+       "harness.ai_quality_eval", "harness.ai_quality_eval_set", "harness.ai_quality_judges",
+       "harness.ai_quality_candidates", "harness.ai_quality_registry",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
        # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.
@@ -1215,6 +1356,22 @@ CATALOG: tuple[Spec, ...] = (
     _o("WM-O-915", "학습 루프 KPI 게이트 5종(완주·정합·설명가능·수기개입·역추적)", "Admin", "QA",
        "P0", "EOS-15 — 계획서 §19 Phase 2 KPI · 미측정을 통과로 위장하지 않는 판정기",
        "ops.loop_kpi_gate", "ops.loop_kpi_sample_load"),
+    # P3-14 — 제품 완성도 평면(Phase 3 대표 과정) 7종. 생산 공정 12종(WM-O-905)·Phase 2 루프 KPI
+    # 5종(WM-O-915)과 **분모가 다른 세 번째 축**이라 두 행 어디에도 얹지 않고 별도 행으로 둔다
+    # (WM-O-915 주석과 같은 이유 — 한 행에 묶으면 인벤토리에서도 'KPI 17종' 착시가 생긴다).
+    # 이 모듈은 위 두 행의 산출(`evaluate_hard_gates`·LOOP_COMPLETION)을 **흡수만** 하고 새 정의를
+    # 만들지 않는다. 정본 경계: docs/standards/phase3_metrics_contract.md.
+    _o("WM-O-917", "Phase 3 지표 7종 일괄 CLI(제품 완성도 평면·위반 주입 자가 점검)", "Admin", "QA",
+       "P1", "P3-14 — 대표 과정 Coverage·QA·루프·결함 한 명령 · 미측정≠통과 판정기",
+       "ops.phase3_metrics"),
+    # P3-06 — 핵심 오개념 12개에 오답→후보·신뢰도→교정 전략 체인이 실제로 도는지 재는 CLI.
+    # 위 지표 7종과 분모(핵심 오개념)·성격(체인 실행 + 결함 주입)이 달라 별도 행이다.
+    # 체인 본체는 WM-E 오개념 행의 `l4.misconception.remediation_strategy`,
+    # 데이터 로더는 WM-E-106 에 있다.
+    _o("WM-O-918", "Phase 3 오답→교정 전략 커버리지 CLI(체인 실행·막힘 정직 보고)",
+       "Admin", "QA",
+       "P1", "P3-06 — 오답 1건이 교정 전략까지 도달하는지 · 좌석 없음은 막힘으로 표기",
+       "ops.phase3_remediation"),
     # ════════════════════ C 클라이언트 — Flutter·Web ════════════════════
     _c("WM-C-001", "로그인·계정 보안 화면·토큰 배관", "Student", "Client UX", "P0",
        "폐쇄루프 진입 — 클라 절반", "mobile/lib/features/auth", "mobile/lib/core"),

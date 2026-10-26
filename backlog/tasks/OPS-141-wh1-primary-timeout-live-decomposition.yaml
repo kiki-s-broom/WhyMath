@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-141-wh1-primary-timeout-live-decomposition
+title: "WH-1 primary 시간 초과 소요 분해 라이브 실측 + 기본 타임아웃 재판정 (OPS-134 ①④ 승계)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-134-wh1-primary-timeout-fallback-accounting
+requires_gates: []
+acceptance:
+  - "① 소요 분해 라이브 실측(OPS-134 ① 승계) — Phaiakes9에서 합성 트래픽으로 primary 한 턴의 시간 예산(`wh1_primary_timeout_seconds` 기본 15초)이 어디서 소진되는지 잰다. OPS-134가 관측 레코드에 싣는 `elapsed_ms`·`llm_ms_total`·`llm_calls`·`llm_calls_finished`와 수확기 리포트의 「primary 채택률」 절(타임아웃 소요 분해 줄)이 읽는 재료다. 같은 합성 트래픽을 Redis 미기동 환경과 기동 환경에서 각각 돌려 대조한다(2026-10-12 서버 stderr의 `Redis 캐시 강등 — TimeoutError` 1건이 시간 초과의 원인인지는 미검증 가설이다). 모델 콜드 로드(첫 턴)와 웜 상태를 구분해 기록한다. 서버 로그만으로는 「취소된 호출」과 「비LLM 단계」의 소요가 갈리지 않는다는 한계가 OPS-134 리포트에 명시돼 있으므로, 갈라야 하면 어느 쪽 계측을 추가할지 이 태스크가 판정한다.\n② 원인 가설 판정 — ①의 수치로 시간 초과의 지배 원인을 가른다: (가) 모델 콜드 로드 (나) 턴당 LLM 호출 수 × 호출당 지연이 15초를 구조적으로 넘음 (다) Redis 캐시 대기 (라) 후보 조립 등 비LLM 단계. 어느 것이 지배적인지 수치로 적고, 지배 원인이 없으면 없다고 적는다.\n③ 타임아웃 기본값 재판정(OPS-134 ④ 승계) — 15초가 로컬 모델 조건에서 적정한지 ①②로 판정한다. 값을 바꾸면 `config.py` 기본값을 바꾸고 테스트로 동결하며(뮤테이션 RED 확인) MEMORY 결정 로그에 근거를 남긴다. 바꾸지 않으면 그 판정 근거를 남긴다. OPS-98(턴 지연 분포·예산 정합)과 범위가 겹치므로 착수 시 두 태스크의 acceptance를 대조해 중복을 피한다.\n④ 실행 런북 — Kiki 실행이 필요하므로 6항목 브리핑 규칙을 따르는 런북을 쓰고 사람 게이트를 등재한다. 런북의 모든 명령은 실행 전에 저장소 코드 경로를 실측해 검증한다(검증 없는 실행 안내 금지). 기존 `scripts/demo/wh1_primary_probe.py`를 합성 트래픽 도구로 쓸 수 있는지부터 확인한다. 측정 도구는 턴마다 즉시 기록하고 실패 원인을 남기며 실행 식별자로 이번 실행분만 집계한다."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1637 — 측정 도구 scripts/ops/wh1_primary_timeout_decompose.py + 런북 docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md + 게이트 G-ops141-wh1-timeout-live-decompose 등재(acceptance ④ 이행, ① 의 도구 부분). 미이행: ① 라이브 실측 본체는 Kiki 실행 대상이라 게이트가 소유, ② 지배 원인 판정·③ 15초 재판정은 수치가 필요해 승계 태스크 OPS-146-wh1-primary-timeout-cause-and-default-rejudgement 가 소유(requires_gates 로 게이트에 연결). 기본 타임아웃 15초 미변경. 도구 결함 2건(LLM 사망 실행 위장)은 스모크가 드러내 같은 PR 에서 수정. 가드 훅 오탐은 HARN-312 로 분리."
+paths:
+  - "docs/ops/**"
+  - "scripts/ops/**"
+  - src/backend/whymath_backend/config.py
+session: null
+notes: "출처: OPS-134(WH-1 primary 폴백 회계)의 acceptance ①④ 승계. OPS-134는 코드로 풀 수 있는 부분(② 폴백 결말 기록·채택률 리포트, ③ 폐기 호출 비중 집계, ① 계측 재료)을 착지했고, 라이브 실측이 필요한 ①④를 이 태스크로 분리했다 — 클라우드 세션에는 Ollama·Redis·로컬 모델이 없다. 판정 기준: OPS-134 PR 브랜치(`claude/wizardly-cerf-n3tur9`)이며 머지 전에는 main에 없다. 학생 대면 영향 범위: 시간 초과 시 결정론 템플릿 폴백으로 서빙은 계속되므로 장애가 아니라 품질 저하(덜 개인화된 코칭)다. 이 태스크가 판정 전까지 기본값은 변경하지 않는다."
+updated: 2026-10-15

@@ -74,6 +74,10 @@ def _fixed(rows: list[tuple[str, str, str]]) -> type:
 
 
 # ── ① 현행 트렁크 계약 ──────────────────────────────────────────────────────────
+# 실데이터 전수 감사(전 생성기 소진) — 같은 감사를 backend 잡의 게이트 스텝(이 모듈 CLI)이 매 PR
+# 돌리고, CLI는 미측정·잘림도 exit 2로 막는다. 이 테스트는 저작 잡(생성기·배치 변경 PR·야간)에서
+# 돈다 — 커버리지 아래 소진 빌드가 backend 잡 시간 상한을 압박해서다(2026-10-09 실측 약 630초).
+@pytest.mark.corpus_authoring
 def test_trunk_has_no_question_space_overlap() -> None:
     """실제 생성기 전수 — 발문 공간이 쌍마다 서로소여야 한다(게이트 본체)."""
     report = audit.audit_generator_spaces()
@@ -83,6 +87,10 @@ def test_trunk_has_no_question_space_overlap() -> None:
     assert report.ok is True
 
 
+# 실데이터 전수 감사(전 생성기 소진) — 같은 감사를 backend 잡의 게이트 스텝(이 모듈 CLI)이 매 PR
+# 돌리고, CLI는 미측정·잘림도 exit 2로 막는다. 이 테스트는 저작 잡(생성기·배치 변경 PR·야간)에서
+# 돈다 — 커버리지 아래 소진 빌드가 backend 잡 시간 상한을 압박해서다(2026-10-09 실측 약 630초).
+@pytest.mark.corpus_authoring
 def test_trunk_measures_every_generator_class() -> None:
     """미측정 0 — '겹침 0'이 '안 봤다'가 아니려면 모집단이 전수여야 한다."""
     report = audit.audit_generator_spaces()
@@ -91,6 +99,10 @@ def test_trunk_measures_every_generator_class() -> None:
     assert report.pairs_compared > 1500, f"비교 쌍이 비정상적으로 적다: {report.pairs_compared}"
 
 
+# 실데이터 전수 감사(전 생성기 소진) — 같은 감사를 backend 잡의 게이트 스텝(이 모듈 CLI)이 매 PR
+# 돌리고, CLI는 미측정·잘림도 exit 2로 막는다. 이 테스트는 저작 잡(생성기·배치 변경 PR·야간)에서
+# 돈다 — 커버리지 아래 소진 빌드가 backend 잡 시간 상한을 압박해서다(2026-10-09 실측 약 630초).
+@pytest.mark.corpus_authoring
 def test_condition_axis_is_reported_but_not_a_verdict() -> None:
     """조건식 겹침은 실재하지만 게이트를 빨갛게 만들지 않는다(기각 축 — 오탐 지배)."""
     report = audit.audit_generator_spaces()
@@ -251,6 +263,10 @@ def test_rejected_axis_condition_and_unit_would_have_missed_qual07(
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
+# 실데이터 전수 감사(전 생성기 소진) — 같은 감사를 backend 잡의 게이트 스텝(이 모듈 CLI)이 매 PR
+# 돌리고, CLI는 미측정·잘림도 exit 2로 막는다. 이 테스트는 저작 잡(생성기·배치 변경 PR·야간)에서
+# 돈다 — 커버리지 아래 소진 빌드가 backend 잡 시간 상한을 압박해서다(2026-10-09 실측 약 630초).
+@pytest.mark.corpus_authoring
 def test_cli_exits_zero_on_clean_tree(capsys: pytest.CaptureFixture[str]) -> None:
     assert audit.main([]) == 0
     assert "✅ 발문 공간 겹침 없음" in capsys.readouterr().out
@@ -275,6 +291,62 @@ def test_cli_exits_two_on_measurement_failure(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(audit, "_generator_classes", _boom)
     assert audit.main([]) == 2
+
+
+def test_cli_exits_two_when_a_generator_is_unmeasured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """미측정 클래스가 있으면 겹침이 없어도 exit 2 — 안 본 구성의 '겹침 0'을 통과로 접지 않는다."""
+
+    class _NeedsArg:
+        def __init__(self, mystery: object) -> None:
+            self._mystery = mystery
+
+        def generate(self, spec: object) -> None:
+            return None
+
+    _install(
+        monkeypatch,
+        [("mod_a", "GenA", _fixed([("문항", "c", "U")])), ("mod_y", "NeedsArg", _NeedsArg)],
+    )
+    assert audit.main([]) == 2
+
+
+def test_cli_exits_two_when_a_pool_is_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """풀이 상한에서 잘리면 exit 2 — 잘린 표본의 0은 서로소가 아니다."""
+
+    class _Endless:
+        def __init__(self) -> None:
+            self._n = 0
+
+        def generate(self, spec: object) -> _FakeCandidate:
+            self._n += 1
+            return _FakeCandidate(_FakeProblem(f"문항 {self._n}", ["U1"]), f"c{self._n}")
+
+    monkeypatch.setattr(audit, "_DRAIN_CAP", 50)
+    _install(monkeypatch, [("mod_x", "Endless", _Endless)])
+    assert audit.main([]) == 2
+
+
+def test_cli_overlap_finding_wins_over_incomplete_measurement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """겹침이 발견되면 측정 불완전과 함께여도 exit 1 — 발견은 표본이 일부여도 사실이다."""
+
+    class _NeedsArg:
+        def __init__(self, mystery: object) -> None:
+            self._mystery = mystery
+
+        def generate(self, spec: object) -> None:
+            return None
+
+    _install(
+        monkeypatch,
+        [
+            ("mod_a", "GenA", _fixed([("같은 발문", "c", "U1")])),
+            ("mod_b", "GenB", _fixed([("같은 발문", "c", "U2")])),
+            ("mod_y", "NeedsArg", _NeedsArg),
+        ],
+    )
+    assert audit.main([]) == 1
 
 
 def test_cli_json_payload_carries_scope_and_verdict(

@@ -29,9 +29,10 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
 갖고 있는지에 따라 진짜 0(이번 주 활동 없음)과 미측정(DB 연결 자체 실패)이 갈린다 —
 후자만 `measured=False`로 낸다.
 
-**환경의 정직한 공백(중요)**: `review_timer_event`는 마이그레이션은 있지만 **쓰기 경로가
-아직 없다**(`ReviewTimerEvent.from_schema()` 호출처 0건 — 검수 UI(ADMIN-07)가 아직 이
-테이블에 쓰지 않는다). 그리고 이 저장소의 CI(GitHub Actions 호스팅 러너)가 붙는 Postgres는
+**환경의 정직한 공백(중요)**: `review_timer_event`의 쓰기 경로는 ADMIN-18이 Admin BFF
+(`POST …/review-sessions`·`POST …/transitions`)에 열었지만, 그 경로가 실제로 운영 DB에 닿아
+행이 쌓이기 전까지는 비어 있다(검수 화면 결선 = 웹 쪽 절반). 그리고 이 저장소의 CI
+(GitHub Actions 호스팅 러너)가 붙는 Postgres는
 `ci.yml`의 다른 실PG 잡들과 마찬가지로 **매 실행 새로 뜨는 빈 컨테이너**이지 Phaiakes9의
 실제 콘텐츠 제작 DB가 아니다 — 원격에서 그 DB로의 네트워크 경로 자체가 없다(비밀값
 `DEPLOY_SSH_*`는 배포 대상 서버용이지 Phaiakes9용이 아니다). 즉 **이 크론이 GitHub
@@ -263,8 +264,30 @@ def build_record_from_report(
             measured=False, value=None, unit="count_by_code", reason=reason
         )
     else:
+        # HIT 하한 가드(OPS-90) — 계측 CU의 절반 이상이 하한 미만이면 그 중앙값·처리량은 재입력·
+        # 스킵 세션의 값일 수 있어 `measured: true`로 계상하지 않는다(감리 W-04: 유효 실측 0건인데
+        # 무효 표본 15건이 있었다). 3상태(모른다 ≠ 아니다): `False`("검사했고 괜찮다")일 때만
+        # 계상한다. 계측 CU가 있는데 True(걸림)·None(하한 0=가드 끔으로 미검사)이면 미측정이다.
+        # 계측 CU 0건의 None은 정상 분기라 여기서 건드리지 않는다 — 아래 기존 "계측 완료 CU 0건"
+        # 사유가 그대로 나간다.
+        implausible_reason: str | None = None
+        if report.cu_measured > 0 and report.hit_implausible_majority is not False:
+            if report.hit_implausible_majority is True:
+                implausible_reason = (
+                    f"계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 "
+                    f"HIT 하한 {report.min_plausible_seconds:g}초 미만(절반 이상) — "
+                    "재입력·스킵 세션 의심(OPS-90)"
+                )
+            else:
+                implausible_reason = (
+                    "HIT 하한 가드 미검사(하한 0 이하) — 재입력·스킵 세션 여부를 알 수 없다(OPS-90)"
+                )
         # HIT — 중앙값(초). CU 표본이 없으면 median=None(0초 산입 금지, hit_cu_metrics 규약).
-        if report.cu_measured > 0 and report.hit_median_seconds is not None:
+        if implausible_reason is not None:
+            kpis["hit_seconds"] = KpiValue(
+                measured=False, value=None, unit="seconds_median", reason=implausible_reason
+            )
+        elif report.cu_measured > 0 and report.hit_median_seconds is not None:
             kpis["hit_seconds"] = KpiValue(
                 measured=True, value=report.hit_median_seconds, unit="seconds_median"
             )
@@ -277,7 +300,12 @@ def build_record_from_report(
             )
 
         # 처리량 — CU/h = measured CU 수 ÷ (HIT 합 시간). 분모 0이면 미산출.
-        if report.cu_measured > 0 and report.hit_total_seconds > 0:
+        # 분모가 같은 HIT 합이라 하한 가드에 걸린 회차는 처리량도 부풀려진다 — 함께 미측정.
+        if implausible_reason is not None:
+            kpis["throughput_cu_per_hour"] = KpiValue(
+                measured=False, value=None, unit="cu_per_hour", reason=implausible_reason
+            )
+        elif report.cu_measured > 0 and report.hit_total_seconds > 0:
             kpis["throughput_cu_per_hour"] = KpiValue(
                 measured=True,
                 value=report.cu_measured / (report.hit_total_seconds / 3600),

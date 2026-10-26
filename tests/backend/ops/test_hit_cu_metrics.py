@@ -372,7 +372,8 @@ class TestReportRender:
         [EOS-78 갱신] 초판은 "결선은 후속 태스크(HARN-24 amend CLI 부재)"를 단언했으나 그
         서술은 생산자가 0이던 시절의 것이다. `harness/review_session` CLI가 착지해 생산자가
         생겼으므로, footer가 말해야 하는 사실이 바뀌었다 — ①생산자는 배선됐다 ②그러나 강제는
-        그 CLI 경로에 한정되고 전 경로 강제는 ADMIN-07 몫이다. 둘 다 명기되는지 동결한다
+        그 CLI·Admin BFF 경로에 한정되고 이전·밖 경로의 판정은 적재율로 드러난다(ADMIN-18로 갱신).
+        둘 다 명기되는지 동결한다
         (완료를 과장하지도, 이미 된 일을 미결로 남기지도 않는다).
         """
         text = render_report(aggregate(_reviewed_cu("cu-a", 60_000)))
@@ -380,8 +381,8 @@ class TestReportRender:
         # ① 생산자 배선 사실
         assert "review_session" in text
         assert "EOS-78" in text
-        # ② 남은 간극 — 전 경로 강제는 아직 아니다
-        assert "ADMIN-07" in text
+        # ② 남은 간극 — 이 API 밖 경로의 판정은 타이머 없이 있을 수 있다(ADMIN-18 배선 명기)
+        assert "ADMIN-18" in text
 
     def test_unmeasured_counts_rendered(self) -> None:
         text = render_report(aggregate(_reviewed_cu("cu-a", 60_000) + _reviewed_cu("cu-b", None)))
@@ -823,3 +824,85 @@ class TestApprovalSampleRepresentativeness:
 
 def _no_verdict_source_report():
     return aggregate(_reviewed_cu("cu-a", 60_000, verdict="approved"))
+
+
+# ==========================================================================
+# --from-db (ADMIN-18) — DB 적재분 직접 읽기. 실 PG 실측은 api 통합 테스트가 맡고, 여기서는 CLI 배선과
+# 실패 경로를 로더 대역으로 고정한다.
+# ==========================================================================
+
+
+class TestFromDbMode:
+    @staticmethod
+    def _patch_loader(
+        monkeypatch: pytest.MonkeyPatch,
+        events: list[ReviewTimerEvent],
+        verdicts: list[dict[str, object]],
+        errors: list[str] | None = None,
+    ) -> None:
+        async def _fake(
+            *, database_url: str | None = None
+        ) -> tuple[list[ReviewTimerEvent], list[str], list[dict[str, object]]]:
+            return events, list(errors or []), verdicts
+
+        monkeypatch.setattr("whymath_backend.ops.hit_cu_metrics.load_db_sources", _fake)
+
+    def test_db_verdicts_become_the_coverage_denominator(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._patch_loader(
+            monkeypatch,
+            _reviewed_cu("cu-a", 60_000),
+            [
+                {"slug": "cu-a", "review_status": "approved"},
+                {"slug": "cu-legacy", "review_status": "approved"},  # 타이머 없는 옛 판정
+            ],
+        )
+        assert main(["--from-db", "--json"]) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert (payload["verdict_total"], payload["verdict_with_timer"]) == (2, 1)
+        assert payload["coverage_rate"] == 0.5
+
+    def test_explicit_verdicts_file_wins_over_db_verdicts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._patch_loader(
+            monkeypatch,
+            _reviewed_cu("cu-a", 60_000),
+            [{"slug": "x", "review_status": "approved"}] * 5,
+        )
+        verdicts = tmp_path / "v.jsonl"
+        _write_jsonl(verdicts, [{"slug": "cu-a", "review_status": "approved"}])
+        assert main(["--from-db", "--verdicts", str(verdicts), "--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["verdict_total"] == 1
+
+    def test_db_failure_is_a_measurement_failure_with_the_exception_type(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        async def _boom(*, database_url: str | None = None) -> None:
+            raise ConnectionRefusedError("db down")
+
+        monkeypatch.setattr("whymath_backend.ops.hit_cu_metrics.load_db_sources", _boom)
+        assert main(["--from-db"]) == 1
+        err = capsys.readouterr().err
+        assert "ConnectionRefusedError" in err and "측정 실패" in err
+
+    def test_empty_db_is_a_measurement_failure_not_zero_success(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._patch_loader(monkeypatch, [], [])
+        assert main(["--from-db"]) == 1
+
+    def test_db_row_validation_failures_block_the_gate(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """깨진 DB 행이 있으면 부분 입력으로 통과시키지 않는다(파일 입력과 같은 규율)."""
+        self._patch_loader(
+            monkeypatch, _reviewed_cu("cu-a", 60_000), [], errors=["db row 1: ValidationError"]
+        )
+        assert main(["--from-db"]) == 1
+
+    def test_requires_a_source(self) -> None:
+        with pytest.raises(SystemExit) as info:
+            main([])
+        assert info.value.code == 2

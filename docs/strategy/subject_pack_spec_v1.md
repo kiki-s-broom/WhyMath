@@ -9,7 +9,7 @@
 
 ---
 
-## 0. 과목 팩 = 6개 데이터 팩 (엔진 0줄 수정)
+## 0. 과목 팩 = 6개 데이터 팩 (엔진 0줄 수정 — 성립 범위는 §0-1로 한정)
 
 | # | 팩 | 실존 위치 (수학 기준) | 새 과목이 채우는 것 | 새 코드 필요? |
 |---|---|---|---|---|
@@ -21,6 +21,30 @@
 | 6 | 문제 | `data/corpus/problem_bank_<subj>/` + `Problem.subject_area` | 동등문제 JSONL | ⚠️ subject_area 축 신설 |
 
 > **핵심**: 6개 팩 중 엔진 수정이 필요한 것은 5번(형제 검증 primitive 추가)과 축 신설 2건(idmap AREA·`Problem.subject_area`)뿐. 나머지는 **데이터만 채운다**.
+
+### 0-1. "엔진 0줄 수정"이 성립하는 범위 — 2026-10-23 정정 (`ARCH-104` · 감리 W-08·W-10·W-11·W-12 · 판정 기준 main `0523e19e`)
+
+위 표와 핵심 문장은 2026-07-06 작성 그대로다. 그 뒤 EOS 감리(2026-10-19)가 현재 코드와 대조해 **"엔진 0줄"을
+그대로 읽으면 틀린 구간**을 찾았다. 주장을 지우지 않고 **성립하는 범위로 한정**한다.
+
+**성립하는 것 (등록·데이터 적재 층)**: 성취기준·원자/개념·오개념·프롬프트 팩은 파일·스키마·로더 재사용으로
+채울 수 있다. 필수층 `SubjectAdapter` 3메서드는 교차 과목 프로브(`EOS-92`)에서 물리 문항으로 필드 15개를
+채워 ✗ 0이었다(Frozen · unexercised — Core 호출자 0). 개념 ID 접두는 `ADR-009`로 코드 상수 집합
+(`SUBJECT_PREFIXES`)에서 조립되므로 새 접두는 개념 그래프 안에서는 **집합에 토큰 1개를 더하는 것**으로 끝난다(이 정규식 수정은 불필요하나, 같은 모양의 리터럴이 `schemas/v1.1/concept.schema.yaml`·`ai_quality_judges.py`의 `_CONCEPT_CODE_RE`에 더 있다 — ADR-009).
+
+**성립하지 않는 것 (학생이 풀고 채점받는 동작 층)** — 새 과목의 동작 경로를 열려면 아래 CORE/MIXED 지점을 *고쳐야 한다*:
+
+| 지점 | 현재 코드 | 왜 "0줄"이 아닌가 |
+|---|---|---|
+| 선택층 능력 계약 (감리 W-08) | `schema/verification_capabilities.py` 능력 Protocol 8종 중 `ExpressionEquivalence`·`ExpressionSeal`·`AnswerFormVerifier`·`AssessmentAnswerVerifier`·`AnswerValueExposure` 5종이 수식·값 계산을 전제한다(파일 스스로 "역사·국어엔 없다"). 필수층만 구현하면 등록은 되나 채점 경로가 열리지 않는다 | 미제공 능력의 폴백이 지점마다 다르다. 최소집합·폴백 단일화는 `ADR-008`(Proposed · 12월은 문서만) |
+| 문항 적재 (W-10) | `db/models/problem.py` `Problem.subject`는 NOT NULL PG enum(`Subject` 5값 = 수능 선택과목 축). 위 §6이 선언한 `Problem.subject_area` 컬럼은 **아직 없다**(선언 ≠ 착지) | 타 과목 문항은 INSERT 자체가 불가 — 컬럼·Alembic·`schema/problem.py` 변경이 필요 |
+| CORE 안의 수학 데이터 상수 (W-11) | `l4/misconception/catalog.py`(오개념 72종 코드 상수) · `l3/pedagogy/slot_generator.py`(이차함수 프롬프트 예시) · `l6/suneung/scope.py`(성취기준 코드 파싱) · `schema/enums.py`(`SourceType`·`ExamType`) | CORE로 배정됐지만 수학 데이터를 품고 있다 — 데이터 이전이 필요(2027 이월 후보, 12/31 내부 검증 기간 방침 3항) |
+| 능력 계약 우회 (W-12) | `api/verify.py`가 `/v1/verify`에서 `l3.verify_answer`·`verify_solution`·`verify_step`을 직접 호출한다. import-linter `ignore_imports`에 MIXED·INFRA 출발 8간선(+ 합성 루트 경유 2간선)이 면제로 적혀 있다 | 능력 계약을 거치지 않는 경로는 과목을 갈아 끼울 수 없다 |
+| 합성 루트·등록 | `composition.py` 팩토리 9개와 `app.py` 능력 7종 등록은 수학 단일 과목 고정 — 과목 셀렉터는 두 번째 과목이 실재할 때 도입한다고 파일 스스로 적었다 | 두 번째 과목을 붙이면 이 파일은 고쳐야 한다(INFRA의 정의) |
+
+따라서 이 문서의 "엔진 0줄 수정"은 **"등록·데이터 적재 층에서"** 로 읽는다. 동작 층은 위 5지점이
+2027-01 이후 이월 게이트(감리 R-11)의 몫이며, 12/31까지는 건드리지 않는다. 능력 수 정의(8종·등록 7종·팩토리 9개)는
+`docs/architecture/eos_core_adapter_boundary.md` 상단 「능력 수는 이렇게 센다」가 정본이다.
 
 ---
 

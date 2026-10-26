@@ -57,7 +57,10 @@ _EXPECTED: dict[str, Verdict] = {  # type: ignore[valid-type]
     "A1": Verdict.POSSIBLE,  # 경계점 = f'=0의 근 — 값만 틀린 오답이 fail
     "A2": Verdict.POSSIBLE,  # 증가 구간 소속 점 — 감소 구간 점(부호 뒤바꿈)이 fail
     "A2d": Verdict.POSSIBLE,  # 감소 구간 소속 점 — 증가 구간 점이 fail
-    "A3": Verdict.PARTIAL,  # 경계 포함 뒤바꿈 — 오답이 fail이 아니라 skip(변별 불가)
+    # A3 — 2026-10-21 OPS-150 재측정: PARTIAL → IMPOSSIBLE. 정답 `x ≥ 2`(구간 표기)를 answer_map 경계값
+    # `2` 와 값으로 대조할 수 없어 정답이 skip(answer 대조 불가)이다. 종전 PARTIAL 은 학생 표기를 보지
+    # 않고 경계값 검산만으로 정답을 통과로 셌던 결과다 — 대조 불가를 통과로 접지 않는다.
+    "A3": Verdict.IMPOSSIBLE,  # 경계 포함 뒤바꿈 — 정답이 skip(구간 표기 ↔ 경계값 대조 불가)
     "A4": Verdict.IMPOSSIBLE,  # 구간 표기 답 그대로 — 정답이 skip
     "A5": Verdict.CORRECT_REJECTED,  # 구간 표기를 식 단독 조건으로 — 정답이 fail(오염 위장)
     # 극값 x좌표
@@ -67,7 +70,10 @@ _EXPECTED: dict[str, Verdict] = {  # type: ignore[valid-type]
     # 극값의 값
     "C1": Verdict.POSSIBLE,  # 점 (x, f(x)) 검산 — 값만 틀린 오답이 fail
     "C2": Verdict.POSSIBLE,  # 부호 뒤바꿈 — x가 묶여 있어 fail
-    "C3": Verdict.SHAM,  # 극대·극소 점 뒤바꿈 — 곡선 위의 점이라 오답 통과
+    # C3 — 2026-10-21 OPS-150 재측정: SHAM → IMPOSSIBLE. 순서쌍 답 `(2, -2)` 는 스칼라 answer_map 과
+    # 값으로 대조할 수 없어 정답·오답 모두 skip(answer 대조 불가)이다. 위장(오답 통과)은 사라졌지만
+    # 정답을 검증했다고 말할 수도 없다 — 순서쌍 성분 대조는 구조 태그가 없어 의도적으로 두지 않았다.
+    "C3": Verdict.IMPOSSIBLE,  # 극대·극소 점 뒤바꿈 — 순서쌍 ↔ 스칼라 대조 불가(정답·오답 skip)
     "C4": Verdict.CORRECT_REJECTED,  # x 없이 값만 — 자유변수 샘플 위반으로 정답도 fail
 }
 
@@ -187,13 +193,15 @@ class TestRealProbeThroughCorpusReverify:
         assert {k: verdicts[_MAIN_FORM[k]] for k in _KINDS} == {k: Verdict.POSSIBLE for k in _KINDS}
 
     def test_whole_file_exit_codes_and_counts(self) -> None:
-        # 13행 일괄 실행. 정답 파일은 통과 7·실패 2(A5·C4 정답 오거부)·skip 1(A4)·exit 1 —
-        # exit 1이므로 '검증됨'이 아니고, 일괄 판정은 종류·형태를 가리지 못한다.
+        # 13행 일괄 실행. 정답 파일은 통과 8·실패 2(A5·C4 정답 오거부)·skip 3(A4 재료 없음·A3 구간
+        # 표기·C3 순서쌍 — 뒤 둘은 OPS-150 answer 대조 불가)·exit 1 — exit 1이므로 '검증됨'이 아니고,
+        # 일괄 판정은 종류·형태를 가리지 못한다.
         correct = run_cli(_CORRECT)
-        assert (correct.exit_code, correct.passed, correct.failed, correct.skipped) == (1, 10, 2, 1)
-        # 오답 파일: 통과 2(B3·C3 위장) · 실패 9 · skip 2(A3 경계 불포함·A4 표기). 통과 2가 곧 위장 2다.
+        assert (correct.exit_code, correct.passed, correct.failed, correct.skipped) == (1, 8, 2, 3)
+        # 오답 파일: 통과 1(B3 위장) · 실패 9 · skip 3(A3 경계 불포함·A4 표기·C3 순서쌍 대조 불가).
+        # 통과 1이 곧 위장 1이다(OPS-150 이전엔 C3 오답도 통과해 위장 2였다).
         wrong = run_cli(_WRONG)
-        assert (wrong.exit_code, wrong.passed, wrong.failed, wrong.skipped) == (1, 2, 9, 2)
+        assert (wrong.exit_code, wrong.passed, wrong.failed, wrong.skipped) == (1, 1, 9, 3)
 
     def test_wrong_rows_that_pass_are_exactly_the_sham_forms(self, tmp_path: Path) -> None:
         # 변별력 — 오답이 통과한 형태는 위장 판정을 받은 형태와 정확히 같다(그 밖에는 통과가 없다).
@@ -204,7 +212,7 @@ class TestRealProbeThroughCorpusReverify:
             if _outcome_of_row(wrong[form], tmp_path, f"wp_{form}").passed > 0
         }
         sham = {form for form, v in _EXPECTED.items() if v is Verdict.SHAM}
-        assert passing == sham == {"B3", "C3"}
+        assert passing == sham == {"B3"}
 
     def test_boundary_swap_wrong_row_is_skip_not_fail(self, tmp_path: Path) -> None:
         # A3: 경계 불포함 오답은 fail이 아니라 skip — 엄격 부등식의 경계점(잔차 0)은 판정 불가로 넘어간다.

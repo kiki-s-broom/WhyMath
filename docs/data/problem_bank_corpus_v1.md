@@ -1,7 +1,7 @@
 # 문제은행 코퍼스 (자체 저작 6종) — 데이터 카드
 
 > **⚠️ 정정 (2026-08-11 · 문제은행 R3 §정정-1 → 커버리지 회수 시 재정정)**: 아래 요약의
-> **"6종 · 전 2,613건"은 stale**이다. **현행 실측은 7종 2,638건**이다. 두 단계로 움직였다:
+> **"6종 · 전 2,613건"은 stale**이다. 2026-08-11 정정 당시 실측은 7종 2,638건이었고, **현재 문제은행은 <!-- fact:problem_bank.banks -->39<!-- /fact -->종 <!-- fact:problem_bank.total -->14,742<!-- /fact -->건**이다(은행별 건수는 `docs/data/corpus_facts.md`). 7종 2,638건까지는 두 단계로 움직였다:
 > ① `S4-13`이 7번째 코퍼스 `problem_bank_probability_finite_v0` **34건**을 신설(2,613 + 34 =
 > 2,647) ② `QUAL-02`(PR #777·`50b43b6e`)가 실중복 **9레코드를 은퇴**(`generated_v0` 620→619 ·
 > `rephrased_v0` 429→421)해 **2,647 − 9 = 2,638**. `probability_finite_v0`의 34문은
@@ -9,7 +9,7 @@
 > 문면의 해제 조건 "`S4-16` 강등전 통과"는 더 이상 없다 — `S4-16`이 2026-09-25 **기각**(Kiki · 게이트
 > `G-s416-round2-live-battle`)돼 기계 게이트 경로가 닫혔고, 노출하려면 사람 검수 경로(검증 권위 서열
 > ③)만 남았다. 그 검수는 **보류**(담당·일정 미정 — `docs/standards/residue_gate_demotion_battle_history.md`
-> §5-4·§6). 본문(§0 표 포함)은 이력 보존을 위해 개정하지 않는다 — 정본 수치는 이 배너다.
+> §5-4·§6). 본문(§0 표 포함)은 이력 보존을 위해 개정하지 않는다 — 정본 수치는 이 배너와 `docs/data/corpus_facts.md`다.
 > 근거: `docs/architecture/problem_bank_gap_review_r3.md` §부록 ·
 > `docs/data/problem_duplicate_disposition_2026-08.md` · `docs/data/problem_bank_coverage_2026-08.md` §8.1.
 
@@ -23,7 +23,7 @@
 
 ---
 
-## 0. 코퍼스 6종 요약
+## 0. 코퍼스 6종 요약 (2026-08-03 기준 — 이력 보존)
 
 | 코퍼스 | 건수 | 생성 방식(LLM 개입) | 생성 CLI | 표본 검수 | `_provenance.json` |
 |---|---:|---|---|---|---|

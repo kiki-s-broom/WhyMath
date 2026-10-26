@@ -62,7 +62,7 @@ from collections.abc import Sequence
 from functools import lru_cache
 from typing import Literal
 
-from whymath_backend.l4.misconception.catalog import CATALOG
+from whymath_backend.l4.misconception.catalog import BODY_CATALOG
 from whymath_backend.l4.misconception.models import (
     Misconception,
     MisconceptionMatch,
@@ -408,6 +408,11 @@ def _match_one(misconception: Misconception, text: str) -> MisconceptionMatch | 
     동일해(`refuting_regex`로 반박할 대상 자체가 없음) 정규식 매치 자체가 확정 증거가 될 수
     없는 항목을 위한 것이다(models.py 필드 docstring 근거).
     """
+    # P3-61 — 선지 역추적 전용 항목은 본문으로 후보가 되지 않는다. 신호가 없어 아래에서 자연히
+    # None이 되지만 "신호가 비어서 우연히 안 나온다"에 기대지 않고 부류 규칙으로 명시한다(누군가
+    # 이 항목에 신호를 달거나 아래 가산식을 바꿔도 본문 누수가 생기지 않게).
+    if misconception.choice_trace_only:
+        return None
     norm_text = _normalize(text)
     # 반박 조건 먼저(MISC-23) — 양성 단편을 세기 *전에* 판정한다. 나중에 감점하는 형태였다면
     # "얼마나 깎을 것인가"라는 답 없는 눈금 문제가 생기고, 깎인 후보가 하류에 약한 증거로 남는다.
@@ -479,10 +484,11 @@ def correct_form_present(misconception: Misconception, text: str) -> bool:
 def diagnose(student_solution: str, *, top_k: int = _DEFAULT_TOP_K) -> list[MisconceptionMatch]:
     """학생 풀이에서 오개념 후보 top-K를 confidence 내림차순으로 반환한다.
 
-    매칭 0이면 빈 리스트. 동률은 catalog 순서(=doc 명시 순서) 안정 유지.
+    매칭 0이면 빈 리스트. 동률은 catalog 순서(=doc 명시 순서) 안정 유지. 순회 대상은
+    `BODY_CATALOG` — 선지 역추적 전용 항목(P3-61)은 본문 채널에서 제외된다.
     """
     matches: list[MisconceptionMatch] = []
-    for m in CATALOG:
+    for m in BODY_CATALOG:
         result = _match_one(m, student_solution)
         if result is not None:
             matches.append(result)

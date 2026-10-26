@@ -1,13 +1,13 @@
 """비유·예시 결함주입 강등전(PED-09 acceptance ③) — 검출기 미검출률 Wilson 상한 게이트.
 
-정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §6.3 — "`analogy_fidelity_eval`
+정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §6.3 — "`analogy_fidelity_eval`
 결함주입 강등전 신설(CLI exit 0/1·`pedagogy_pack_fidelity_eval` 선례)". 그 선례를 그대로
 미러한다: **정답지를 우리가 100% 아는** 결함 주입 시험지를 만들어
 `l3/pedagogy/analogy_checker`(순수 규칙 검출기)에 태우고, 검출을 기계 판정해 Wilson 단측
 **상한**으로 게이트한다(exit 0/1·점추정 금지). 라이브 LLM 0 — 스크립트 텍스트 주입
 (hermetic·결정론·고정 그리드)이라 컨테이너·CI에서 완결된다.
 
-시험지 그리드(전수 열거·셀당 n 변형) — 04e §6.3 결함 축의 규칙 검출 가능 프록시 전량:
+시험지 그리드(전수 열거·셀당 n 변형) — 04g §6.3 결함 축의 규칙 검출 가능 프록시 전량:
   - violating(정답지=결함) 셀: grain×축별 6 템플릿
       · analogy/MISSING_BREAK_CLAUSE — 한계 명시가 전무한 비유(①-a 오개념 유발 위험 구조)
       · analogy/OVERIDENTIFICATION — "완전히 같다/똑같다/그 자체" 동일시 단정(①-b)
@@ -313,7 +313,7 @@ def render_report(report: FidelityReport, *, confidence: float, control: bool) -
     """사람용 요약 — 텍스트 원문 미출력(카운트·상한·셀 라벨만)."""
     miss_upper = report.miss_upper_bound(confidence)
     alarm_upper = report.false_alarm_upper_bound(confidence)
-    banner = "비유·예시 결함주입 강등전 (PED-09 · 04e §6.3)"
+    banner = "비유·예시 결함주입 강등전 (PED-09 · 04g §6.3)"
     if control:
         banner += " — [대조군: 널 검출기]"
     lines = ["=" * 64, banner + " — Wilson 상한 게이트", "=" * 64]

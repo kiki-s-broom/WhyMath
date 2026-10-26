@@ -1,0 +1,39 @@
+# 소단원 DSL v0.1 — 다항함수의 도함수 (미적분Ⅰ · 미분 대단원 · 소단원 4/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 개념/절차/표상 3개 → CONCEPT/PROCEDURE/REPRESENT 목표 1개씩(docs/data/units_v1.md §3).
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-04-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-04] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-다항함수의도함수"
+unit_version: 1
+api_version: "unit/0.1"
+title: "다항함수의 도함수"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-04]"]
+concept_nodes: ["12미적Ⅰ-02-04-1", "12미적Ⅰ-02-04-2", "12미적Ⅰ-02-04-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -2(개념). 오개념이 '(fg)′=f′g′'라 반례(예: x·x)로 경계를 시험하는 CONCEPT
+  # 팩이 맞다 — 곱의 미분 공식을 먼저 주지 않고 '왜 각각의 도함수의 곱이 아닌가'를 먼저 묻는다.
+  - suffix: "OBJ-01"
+    statement: "두 함수의 곱의 도함수가 각 함수의 도함수의 곱과 같지 않은 까닭을 이해한다"
+    standard_code: "[12미적Ⅰ-02-04]"
+    source_verb: "이해한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-04-2"]
+  # OBJ-02 절차형 — 원자 -1(절차·primary). 실수배·합·차·곱의 미분법을 적용하는 절차다.
+  - suffix: "OBJ-02"
+    statement: "실수배, 합, 차, 곱의 미분법을 써서 다항함수의 도함수를 구한다"
+    standard_code: "[12미적Ⅰ-02-04]"
+    source_verb: "구한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-04-1"]
+  # OBJ-03 표상형 — 원자 -3(표상). 식의 실수배와 그래프의 세로 확대·접선 기울기 변화를 잇는 번역이다.
+  - suffix: "OBJ-03"
+    statement: "함수에 실수를 곱했을 때 그래프의 세로 방향 확대가 접선의 기울기에 주는 영향을 해석한다"
+    standard_code: "[12미적Ⅰ-02-04]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-04-3"]

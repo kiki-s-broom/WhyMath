@@ -14,7 +14,7 @@ CI hermetic 잡엔 PostgreSQL이 없으므로 `CurriculumEntryStore`/`populate_k
   ④ 원자 축 유도(S2-07) — 크로스워크 전파(atom_codes 전체·최심 승계·사전순 tie-break)·미매핑
      원자 행 0·canonical 존치·결정론·실 코퍼스 원자 행 수 하한 동결(드리프트 감지)
   ⑤ 대학 원자 직접 유도(W0 — S-1) — atom_graph_v1 대학 원자(school_level="대학") grade_band
-     ("1학년".."4학년")→introduced_grade(13~16)·required_depth(mastery 천장) 매핑·미상 라벨/
+     ("1학년".."4학년")→introduced_grade(13~16)·required_depth(cognitive_type 도출·S4-64) 매핑·미상 라벨/
      None grade_band 조용히 건너뜀(날조 금지)·결정론·실 코퍼스 하한 동결
 """
 
@@ -337,6 +337,9 @@ class TestPopulate:
 _ROOT = Path(__file__).resolve().parents[3]
 _REAL_GRAPH = _ROOT / "data" / "corpus" / "concept_graph_v1" / "graph.json"
 _REAL_CROSSWALK = _ROOT / "data" / "corpus" / "concept_atom_crosswalk_v1" / "crosswalk.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 
 def _canonical(
@@ -569,12 +572,15 @@ class TestDeriveAtomEntries:
         assert _REAL_CROSSWALK.exists(), f"실 코퍼스 부재: {_REAL_CROSSWALK}"
         canonical = load_kr_curriculum_entries_from_graph_json(_REAL_GRAPH, now=_NOW)
         atoms = derive_atom_curriculum_entries(canonical, load_crosswalk_records(_REAL_CROSSWALK))
+        floor_canonical = _FACTS["concept_graph.concepts"]
         assert (
-            len(canonical) >= 437
-        ), f"canonical {len(canonical)} < 하한 437(코퍼스 축소 드리프트?)"
+            len(canonical) >= floor_canonical
+        ), f"canonical {len(canonical)} < 하한 {floor_canonical}(코퍼스 축소 드리프트?)"
+        # 초·중·고 세부개념 전량(병합 13건 반영 2026-07-28).
+        floor_atoms = _FACTS["atom_graph.atoms_k12"]
         assert (
-            len(atoms) >= 1311
-        ), f"원자 행 {len(atoms)} < 하한 1311(코퍼스 축소 드리프트? — 병합 13건 반영 2026-07-28)"
+            len(atoms) >= floor_atoms
+        ), f"원자 행 {len(atoms)} < 하한 {floor_atoms}(코퍼스 축소 드리프트?)"
         # entry_id 유일(원자당 1셀·충돌 승자 단일) + 무접미 `{원자}:KR` 규약.
         entry_ids = [a.entry_id for a in atoms]
         assert len(set(entry_ids)) == len(entry_ids)
@@ -596,7 +602,9 @@ def _write_atom_graph(tmp_path: Path, atoms: list[dict[str, object]]) -> Path:
 
 
 class TestUniversityAtomDerivation:
-    def test_maps_grade_band_to_introduced_grade_and_mastery_depth(self, tmp_path: Path) -> None:
+    def test_maps_grade_band_to_introduced_grade_and_cognitive_type_depth(
+        self, tmp_path: Path
+    ) -> None:
         path = _write_atom_graph(
             tmp_path,
             [
@@ -605,6 +613,7 @@ class TestUniversityAtomDerivation:
                     "school_level": "대학",
                     "grade_band": "1학년",
                     "subject_area": "미적분학 I",
+                    "cognitive_type": "절차",
                     "standard_codes": ["[CALC1-01-01]"],
                 }
             ],
@@ -619,7 +628,7 @@ class TestUniversityAtomDerivation:
         assert e.grade_band == "1학년"
         assert e.introduced_grade == 13  # 고3(12) 다음 이어붙인 로더 내부 관례
         assert e.domain_label == "미적분학 I"
-        assert e.required_depth == "mastery"  # 4단계 천장(고등학교와 동일 서열)
+        assert e.required_depth == "procedural"  # cognitive_type 절차 → procedural(S4-64 결정)
         assert e.national_standard_codes == ["[CALC1-01-01]"]
         assert e.is_present is True
         assert e.confidence == 0.6  # 원자 코퍼스는 review_status 신호 없음 — 보수적 기본값
@@ -707,12 +716,16 @@ class TestUniversityAtomDerivation:
         """
         assert _REAL_ATOM_GRAPH.exists(), f"실 코퍼스 부재: {_REAL_ATOM_GRAPH}"
         entries = load_kr_curriculum_entries_for_university_atoms(_REAL_ATOM_GRAPH, now=_NOW)
-        assert len(entries) >= 512, f"대학 원자 행 {len(entries)} < 하한 512(코퍼스 축소 드리프트?)"
-        # entry_id 유일 + 무접미 `{원자}:KR` 규약 + 전량 mastery(4단계 천장) + KR 셀 상수.
+        floor = _FACTS["atom_graph.university_atoms"]
+        assert (
+            len(entries) >= floor
+        ), f"대학 원자 행 {len(entries)} < 하한 {floor}(코퍼스 축소 드리프트?)"
+        # entry_id 유일 + 무접미 `{원자}:KR` 규약 + KR 셀 상수.
         entry_ids = [e.entry_id for e in entries]
         assert len(set(entry_ids)) == len(entry_ids)
         assert all(eid == f"{e.concept_id}:KR" for eid, e in zip(entry_ids, entries, strict=True))
-        assert all(e.required_depth == "mastery" for e in entries)
+        # 대학 required_depth는 cognitive_type 도출이라 mastery 고정이 아니다(S4-64 · Kiki 2026-10-09).
+        assert all(e.required_depth != "mastery" for e in entries)
         assert all(e.grade_band in {"1학년", "2학년", "3학년", "4학년"} for e in entries)
         # canonical·K-12 원자 키 공간과 무교차(둘 다 `math.*`/NCIC 원자코드, 대학은 자체 코드계).
         assert not any(e.concept_id.startswith("math.") for e in entries)

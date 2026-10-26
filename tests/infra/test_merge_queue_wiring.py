@@ -39,6 +39,9 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOC_PATH = _REPO_ROOT / ".github" / "branch-protection-setup.md"
 _CI_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+# ci.yml 밖에서 정의됐지만 문서의 required 목록에 오른 잡의 워크플로(HARN-313). required인데 큐에서
+# 안 돌면 큐가 영원히 기다리므로 이 워크플로도 `merge_group` 트리거를 가져야 한다.
+_EXTRA_REQUIRED_WORKFLOWS = (".github/workflows/release-freeze.yml",)
 
 _BEGIN = "<!-- REQUIRED_CHECKS_BEGIN"
 _END = "<!-- REQUIRED_CHECKS_END -->"
@@ -133,11 +136,18 @@ class TestRequiredChecksReportInQueue:
         """
         ci = _load_ci()
         jobs_by_name = {job.get("name", key): job for key, job in ci["jobs"].items()}
+        for rel in _EXTRA_REQUIRED_WORKFLOWS:
+            extra = yaml.safe_load((_REPO_ROOT / rel).read_text(encoding="utf-8"))
+            assert "merge_group" in _triggers(extra), (
+                f"{rel}: required 체크를 정의하는데 merge_group 트리거가 없다 — 큐가 이 체크를 "
+                "영원히 기다린다(무한 대기·에러 아님)"
+            )
+            jobs_by_name.update({job.get("name", key): job for key, job in extra["jobs"].items()})
 
         missing: list[str] = []
         for check in _documented_checks():
             assert check in jobs_by_name, (
-                f"문서가 required로 선언한 '{check}'에 대응하는 잡이 ci.yml에 없다 "
+                f"문서가 required로 선언한 '{check}'에 대응하는 잡이 워크플로에 없다 "
                 "(test_required_checks_doc.py가 이 축을 별도로 동결한다)"
             )
             condition = jobs_by_name[check].get("if")

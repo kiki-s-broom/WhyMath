@@ -9,7 +9,7 @@
   ① 합성 row 적재 → 컬럼 라운드트립(mis_id·canonical_statement·concept_src_id/standard_code 원천
      저장·mapping_score Decimal)
   ② 멱등 — 재적재 행수 불변·값 갱신
-  ③ 실 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`) 적재 → 839행·멱등·cleanup
+  ③ 실 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`) 적재 → 코퍼스 전건(`misconceptions.count`)·멱등·cleanup
 """
 
 from __future__ import annotations
@@ -205,10 +205,10 @@ class TestIdempotent:
 
 
 class TestRealCorpusLoad:
-    """③ 실 코퍼스(`data/corpus/misconceptions_v1`) 적재 — 839행·멱등(#290 코퍼스 정합).
+    """③ 실 코퍼스(`data/corpus/misconceptions_v1`) 적재 — 코퍼스 전건·멱등(#290 코퍼스 정합).
 
     합성 행이 아니라 #290이 커밋한 실 Collection JSON을 `load_misconceptions`로 적재해 B.3 로더가
-    실 데이터에 서는지 본다(839 레코드). 정리는 코퍼스 mis_id 전건.
+    실 데이터에 서는지 본다(건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`). 정리는 코퍼스 mis_id 전건.
     """
 
     def test_load_real_corpus_idempotent(self) -> None:
@@ -223,14 +223,20 @@ class TestRealCorpusLoad:
         corpus = repo_root / "data" / "corpus" / "misconceptions_v1" / "misconceptions.json"
         if not corpus.exists():
             pytest.skip("실 코퍼스 미존재(data/corpus/misconceptions_v1/misconceptions.json)")
+        # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+        # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+        facts = json.loads(
+            (repo_root / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
+        expected = facts["misconceptions.count"]
         payload = json.loads(corpus.read_text(encoding="utf-8"))
         mis_ids = [str(m["mis_id"]) for m in payload["misconceptions"]]
         try:
             count = load_misconceptions(None, corpus, settings=Settings())
-            assert count == 843  # 극값 MC: 신규 M-id 2건(M0864·M0865) 저작으로 841→843.
+            assert count == expected  # 극값 MC: 신규 M-id 2건(M0864·M0865) 저작으로 841→843(이력).
             # 재적재 멱등 — 같은 코퍼스 → DB 행수 불변.
             recount = load_misconceptions(None, corpus, settings=Settings())
-            assert recount == 843
+            assert recount == expected
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]
@@ -238,7 +244,7 @@ class TestRealCorpusLoad:
                         text("SELECT count(*) FROM misconception_catalog WHERE mis_id = ANY(:ids)"),
                         {"ids": mis_ids},
                     ).scalar_one()
-                assert total == 843  # 멱등(2회 적재 후에도 843행·극값 MC +2)
+                assert total == expected  # 멱등(2회 적재 후에도 전건 행)
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:

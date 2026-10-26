@@ -1,0 +1,30 @@
+{
+  "pool": "whymath-original",
+  "corpus_name": "problem_variants_staging_v0",
+  "generated": "2026-10-13",
+  "generation_method": "PB-09 변형 3종(난이도 계열·조건변형·역문제)을 generated_v0 부모 126건에서 결정론으로 파생(LLM 0·DB 0·두 번 실행 바이트 동일) — l3/equivalent/variants.py가 파생하고 harness/problem_corpus_variants.py가 S2-a 수용 게이트·구조 signature dedup에 태워 저장한다. PB-20이 이 산출물을 problem_bank_* 글롭 밖 스테이징에 둔다.",
+  "generation_cli": "python -m whymath_backend.harness.problem_corpus_variants",
+  "record_count": 313,
+  "sha256": "be102af9a6bd1527beda235755785f8b8ca25313d0e96ad1c5eb9f624e982440",
+  "relation_type_counts": {
+    "대조": 70,
+    "변형": 158,
+    "선수": 10,
+    "심화": 75
+  },
+  "generation_type_counts": {
+    "VARIANT_CONTEXT": 158,
+    "VARIANT_STRUCTURE": 155
+  },
+  "staging": {
+    "status": "staged_not_exposed",
+    "why_outside_glob": "populate·QA·CAT 후보 선정 등 노출 경로가 data/corpus/problem_bank_*/problems.jsonl을 전수 글롭한다. 이 디렉터리명은 그 글롭에 일치하지 않으므로 검수 표본 감사(Wilson 게이트)를 거치기 전에는 어떤 소비처도 이 파일을 읽지 않는다(PB-20 — docs/architecture/problem_bank_variant_intake_pb20.md).",
+    "promotion": "문서 §4의 순서 5단을 한 PR로 수행한다. 근거 차용 금지 — generated_v0의 승인을 물려받지 않는다.",
+    "frozen_lot": "sha256이 이 로트의 정체다. 파일이 바뀌면 감사 라벨은 다른 로트의 것이 된다."
+  },
+  "source_citation": "출처: WhyMath 자체 저작 동등문제(WHYMATH_GENERATED) — generated_v0(자체 저작)의 풀이 구조에서 결정론 파생한 변형. 평가원·EBS·검정교과서 본문 복제 0.",
+  "license_notice": "본 코퍼스의 모든 문항은 WhyMath가 자체 생성한 저작물(license=WHYMATH_GENERATED, source_type=자체생성)이다. 외부 저작물의 본문·문항·풀이·그림을 포함하지 않는다.",
+  "review_status": {
+    "note": "전 레코드 review_status 공백(미검수). 공백은 노출 차단이며(l6 is_review_cleared·CAT approved 허용목록), 승격 전까지 글롭 밖이라 서빙 코드가 읽지도 않는다."
+  }
+}

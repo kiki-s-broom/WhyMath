@@ -518,14 +518,20 @@ class TestRealCorpusLoad:
         corpus = repo_root / "data" / "corpus" / "standards_v1" / "standards.json"
         if not corpus.exists():
             pytest.skip("실 코퍼스 미존재(data/corpus/standards_v1/standards.json)")
+        # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+        # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+        facts = json.loads(
+            (repo_root / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
+        expected = facts["standards.k12"]  # 2022 + 2015 개정
         payload = json.loads(corpus.read_text(encoding="utf-8"))
         norm_ids = [str(s["norm_id"]) for s in payload["standards"]]
         try:
             count = load_standards(None, corpus, settings=Settings())
-            assert count == 895  # 2022:435 + 2015:460
+            assert count == expected
             # 재적재 멱등 — 같은 코퍼스 → DB 행수 불변(중복 적재 없음).
             recount = load_standards(None, corpus, settings=Settings())
-            assert recount == 895
+            assert recount == expected
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]
@@ -535,7 +541,7 @@ class TestRealCorpusLoad:
                         ),
                         {"ids": norm_ids},
                     ).scalar_one()
-                assert total == 895  # 멱등(2회 적재 후에도 895행)
+                assert total == expected  # 멱등(2회 적재 후에도 전건)
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:
@@ -563,13 +569,19 @@ class TestUniversityCorpusLoad:
         corpus = repo_root / "data" / "corpus" / "standards_university_v1" / "standards.json"
         if not corpus.exists():
             pytest.skip("대학 코퍼스 미존재(data/corpus/standards_university_v1/standards.json)")
+        # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+        # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+        facts = json.loads(
+            (repo_root / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
+        expected = facts["standards.university"]  # 대학 성취기준 전건
         payload = json.loads(corpus.read_text(encoding="utf-8"))
         norm_ids = [str(s["norm_id"]) for s in payload["standards"]]
         try:
             count = load_standards(None, corpus, settings=Settings())
-            assert count == 409  # 대학 성취기준 전건
+            assert count == expected
             recount = load_standards(None, corpus, settings=Settings())
-            assert recount == 409  # 멱등
+            assert recount == expected  # 멱등
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]
@@ -584,8 +596,8 @@ class TestUniversityCorpusLoad:
                         ),
                         {"ids": norm_ids},
                     ).scalar_one()
-                assert total == 409  # 멱등(2회 적재 후에도 409행)
-                assert univ == 409  # 전부 대학 개정 표식
+                assert total == expected  # 멱등(2회 적재 후에도 전건)
+                assert univ == expected  # 전부 대학 개정 표식
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:

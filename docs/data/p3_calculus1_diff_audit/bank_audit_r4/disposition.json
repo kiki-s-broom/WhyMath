@@ -1,0 +1,62 @@
+{
+ "note": "원인 묶음은 결함 판정 뒤의 교정용 분류다 — S5 판정(k=5)에는 쓰이지 않으며 어떤 판정도 바꾸지 않는다(as-found).",
+ "bank_sha256": "061db7cd8f61ca160548f602ef43593f3672fe6203545c6f00f21ccd2c784dbb",
+ "k": 5,
+ "items": [
+  {
+   "problem_id": "01729815-9def-51a7-80fe-50af2297180d",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "02-08 증감 — 기함수 + 상수 꼴의 대칭 증가 구간·'정수 하나뿐' 단서 → 0이 강제"
+  },
+  {
+   "problem_id": "49d9955a-f8f9-5a5f-ac88-ea748e7b6767",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "applied",
+   "rater_A": "ok",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "02-03 해설 문장 — '~이므로 ~이므로' 연결 어미 중복"
+  },
+  {
+   "problem_id": "9c9bfdb5-8212-54f5-986f-89c1643d91b5",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "diagnostic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "02-06 평균값 정리 — f'(c) 값을 물으면 평균변화율 대입만으로 답(도함수 미사용)"
+  },
+  {
+   "problem_id": "c4251980-4ac5-5808-b1c4-b92627b55b66",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "해설",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "02-09 해설 — f(x) = 0 실근 개수 문항이 '직선'을 지칭(x축·y = 0 소개 없음)"
+  },
+  {
+   "problem_id": "e2b88365-a826-5c73-a1c6-d02df7a3d21c",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "applied",
+   "rater_A": "ok",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "02-03 해설 문장 — '~이므로 ~이므로' 연결 어미 중복"
+  }
+ ]
+}

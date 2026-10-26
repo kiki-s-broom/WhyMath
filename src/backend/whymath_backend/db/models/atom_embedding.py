@@ -37,8 +37,9 @@ name_ko+metaphor+accepted와 달리 원자엔 그 필드가 없다 — 적재 �
   '수학'으로 기존 행이 무손상 백필된다(재임베딩 0 — subject는 컬럼/스코프에만 들어가고 임베딩
   *텍스트*에는 안 들어간다).
 - **updated_at**: 마지막 upsert 시각(운영·신선도 추적). server_default now().
-- **HNSW/IVFFlat 인덱스 없음**: `concept_embedding`과 동일 — 현 규모(원자 1,837)는 seq-scan이
-  최적. 스케일 코퍼스는 *fixed-dim + HNSW cosine 인덱스*가 정석이나, 이 테이블은 *영속화 +
+- **HNSW/IVFFlat 인덱스 없음**: `concept_embedding`과 동일 — 현 규모(세부개념 원자 — 건수는
+  `docs/data/corpus_facts.md`의 `atom_graph.atoms`)는 seq-scan이 최적. 스케일 코퍼스는
+  *fixed-dim + HNSW cosine 인덱스*가 정석이나, 이 테이블은 *영속화 +
   의미검색 groundwork*이지 스케일 검색 최적화가 아니다(과장 금지).
 - **schema/ 상응물 없음**: 서버 내부 의미검색 인덱스라 Pydantic schema 표면이 없다
   (`concept_embedding`·`concept_node`·`atom_node` 선례 — 검색 결과는 좌석 인터페이스에 흡수).

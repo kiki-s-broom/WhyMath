@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from data_pipeline.concept_graph.idmap import build_id_map
 from data_pipeline.concept_graph.models import EvidenceSource, Relation, ReviewStatus
 from data_pipeline.concept_graph.transform import (
@@ -12,6 +15,14 @@ from data_pipeline.concept_graph.transform import (
     transform_concepts,
     transform_dataset,
     transform_edges,
+)
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
 )
 
 # 합성 픽스처용 고정 canonical ID(math.<area>.<slug>·pattern 통과). HK01·HK02는 [공통]식·방정식·
@@ -300,8 +311,8 @@ class TestTransformRealData:
             flashcard_records=flashcard_records,
             intl_records=intl_records,
         )
-        assert len(result.concepts) == 437
-        assert len(result.edges) == 581
+        assert len(result.concepts) == _FACTS["concept_graph.concepts"]
+        assert len(result.edges) == _FACTS["concept_graph.edges"]
         assert result.skipped == []  # 실데이터는 전량 매핑
 
     def test_review_status_distribution_148_289(
@@ -346,7 +357,7 @@ class TestDomainPurity:
     def test_real_corpus_domains_have_no_curriculum_prefix(
         self, concept_records: list[dict[str, object]]
     ) -> None:
-        """실데이터 437 개념의 domain에 교육과정 레벨 접두(`[…]`) 0건 — 정화 잠금."""
+        """실데이터 전 개념의 domain에 교육과정 레벨 접두(`[…]`) 0건 — 정화 잠금."""
         concepts, _ = transform_concepts(concept_records, _real_id_map(concept_records))
         prefixed = [c.domain for c in concepts if c.domain.startswith("[")]
         assert prefixed == [], f"교육과정 접두 잔존 domain: {sorted(set(prefixed))}"

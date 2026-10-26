@@ -240,8 +240,9 @@ layers = [
     "whymath_backend.schema",
 ]
 # 합성 루트(`whymath_backend.composition`) 경유 면제 — EOS-89가 기존 2건을 0으로 줄였으나
-# **EOS-86이 병행 개발로 신규 1건을 추가해 현재 1건이다** (merge 시 실측 정정 — 두 태스크가
-# 서로를 모르는 채로 같은 구간을 건드렸다).
+# **EOS-86이 병행 개발로 신규 1건을 추가했고, P3-77이 1건을 더해 현재 2건이다** (merge 시 실측
+# 정정 — EOS-86·EOS-89 두 태스크가 서로를 모르는 채로 같은 구간을 건드렸다). 두 간선은 아래
+# 목록 그대로이며 `tests/infra/test_eos_dependency_direction.py`가 정확 일치로 동결한다.
 #
 # 히스토리(지우지 않는 이유): EOS-69는 `l3.pedagogy.slot_generator`·`l3.render.adapters`가
 # 합성 루트를 경유해 어댑터에 닿는 간선 2건을 여기 **간선 단위로** 적어 두고 "호출부가 능력을
@@ -261,6 +262,10 @@ ignore_imports = [
     # EOS-89(slot_generator·render.adapters push 전환)와 별개로 남는 간선이다 — EOS-89는
     # 이 간선을 몰랐고(병행 개발), 이후 push 전환 여부는 별도 판단 대상이다.
     "whymath_backend.l4.solution_coaching -> whymath_backend.composition",
+    # P3-77: 오프라인 힌트 생성 CLI(`populate.main`)가 프로세스의 시작이라 값 축 능력
+    # (AnswerValueExposure) 기본 구현을 합성 루트에서 받아 순수 조립 함수에 *내려 준다*.
+    # 서빙 경로는 힌트를 만들지 않아 app.state 등록(push) 대상이 아니다(PULL_ONLY).
+    "whymath_backend.l4.hint_content.populate -> whymath_backend.composition",
 ]
 
 # ──────────────────────────────────────────────────────────────────────
@@ -318,6 +323,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
     "whymath_backend.l4.misconception.answer_signature",
+    "whymath_backend.l4.misconception.derivative_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -381,6 +387,7 @@ forbidden_modules = [
     "whymath_backend.l3.verify_solution",
     "whymath_backend.l3.verify_step",
     "whymath_backend.l4.misconception.answer_signature",
+    "whymath_backend.l4.misconception.derivative_signature",
     "whymath_backend.l4.misconception.wrong_form_match",
     "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
     "whymath_backend.l4.subject_adapter_math",
@@ -409,6 +416,10 @@ ignore_imports = [
     # EOS-104: 오답 서명 검출기(ADAPTER)가 거짓형 정합기(ADAPTER)에 위임한다 — 탐지 알고리즘을
     # 다시 쓰지 않는 것이 요점이라 이 간선이 곧 "재구현 0"의 증거다. ADAPTER→ADAPTER라 위반이 아니다.
     "whymath_backend.l4.misconception.answer_signature -> whymath_backend.l4.misconception.wrong_form_match",
+    # P3-06: 오답 서명 검출기(ADAPTER)가 미분 오답 서명 독법(ADAPTER)을 두 번째 독법으로 합친다
+    # (같은 게이트를 건다). 그 독법은 동치 권위(항등 판정·구조 보존 파싱)에 위임한다 — ADAPTER→ADAPTER.
+    "whymath_backend.l4.misconception.answer_signature -> whymath_backend.l4.misconception.derivative_signature",
+    "whymath_backend.l4.misconception.derivative_signature -> whymath_backend.l3.symbolic_equivalence",
     # 수학 어댑터가 그 검출기를 선택층 능력(AttemptMisconceptionDetector)으로 노출한다.
     "whymath_backend.l4.subject_adapter_math -> whymath_backend.l4.misconception.answer_signature",
     #   MIXED 출발 (해소 경로 = 모듈 분할. api.verify/speech/ocr는 표면이 중립·페이로드가 수식):

@@ -28,8 +28,9 @@
   · Concept = 원자 백본 리프(`atom_graph_v1`, `level=세부개념`). 런타임 정본 축(S4-11). 구 437
     `concept_graph_v1`은 참고 열로만 센다.
   · Misconception = M-id 오개념 DB(`misconceptions_v1`) 행. `ATOM:<code>` 원자 유래 오개념은 원자
-    1,823개 전부가 1:1로 가져 변별력이 없으므로 밀도 계산에서 제외하고 총량만 보고한다.
-  · Skill = `skill_graph_v1`(27종). 원자↔스킬은 원자 `behavior_skills`(SKB-02 병합분).
+    전부(`atom_graph.atoms`)가 1:1로 가져 변별력이 없으므로 밀도 계산에서 제외하고 총량만 보고한다.
+  · Skill = `skill_graph_v1`(건수는 `skill_graph.skills`). 원자↔스킬은 원자 `behavior_skills`
+    (SKB-02 병합분).
 
 연결(명시적 링크만 — 같은 성취기준에 속한다는 것은 '보유'이지 '연결'이 아니다)
 -----------------------------------------------------------------------------

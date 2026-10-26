@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-66-signature-shadow-harvest-activation-cli
+title: "P3-66 — 미분 오답 서명 독법의 그림자 관측 수확·활성화 판정 CLI (P3-56 조건부 승인의 후속 ①)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-56-short-answer-no-misconception-channel
+requires_gates: []
+acceptance:
+  - "① 그림자 관측 수확·판정 CLI — 로거 whymath.api.attempt_scan_shadow.record 의 JSON 줄(adapter_records 안의 DerivativeShadowRecord)을 읽어 도달률(applicable)·발화율(fired/오답 시도)·정답 오발화·문항별 쏠림·문항별 우연 일치 기준선을 계산하고 종료 코드로 판정한다(PASS 0 · FAIL 1 · 측정 불가 3). 입력이 0줄이거나 형식이 틀리면 통과가 아니라 측정 불가다.\n② 활성화 기준(사전 등록 2026-10-18 · docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md §9.3): ①표본 — 질문을 읽은 문항의 오답 시도 n≥300(미만은 FAIL이 아니라 측정 불가 exit 3) ②정답 오발화 0(정답 시도 표본 100건 이상에서 fired 1건이라도 있으면 FAIL) ③우연 일치 초과 — 발화율의 Wilson 95% 단측 하한 ≥ 5×기준선(기준선=문항별 정답±30 정수 답의 발화 비율을 시도 수로 가중평균) ④쏠림 없음 — 한 문항이 발화의 30%를 넘으면 FAIL.\n③ 기준선은 엔진을 직접 호출해 계산한다(재구현 금지) — 문항 본문을 아는 쪽은 문항은행이므로 CLI가 problem_id로 문항은행에서 지문을 읽는다. 학생 답은 로그에 없으므로 읽지 않는다.\n④ 변별력 — 정답 오발화 1건 주입 · 우연 수준 발화율 주입 · 한 문항 쏠림 주입 · 표본 부족 주입이 각각 의도한 종료 코드를 내는지 테스트로 동결하고, 판정 로직을 제거하는 뮤테이션이 RED가 되는지 확인한다(주입 적용·바이트 동일 원복 단언 포함).\n⑤ 배선 — 신규 테스트가 CI에서 수집되는지 실측한다. CLAUDE.md는 수정하지 않는다(2026-09-20 새 산문 규칙 등재 동결)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/attempt_scan_shadow_harvest.py
+  - tests/backend/harness/test_attempt_scan_shadow_harvest.py
+session: null
+notes: |-
+  출처: P3-56 조건부 승인(사용자 2026-10-18) — 승인 조건 2 '켜기 전 실제 오답 데이터로 오귀속률을 재서 기준 미달이면 켜지 않는 기준을 사전에 정한다'의 집행 도구. 기준 수치는 제안이며 활성화 게이트 G-p356-signature-activation 에서 Kiki가 확정한다. 한계: 기준선은 정답±30 정수 균등 가정이라 실제 계산 실수 분포와 다르고, 이 판정은 정밀도를 직접 재지 않는다 — 발화가 우연 이상이라는 통계 근거다.
+
+  [정정 2026-10-18] paths ['src/backend/whymath_backend/harness/**', 'tests/backend/harness/**'] → ['src/backend/whymath_backend/harness/attempt_scan_shadow_harvest.py', 'tests/backend/harness/test_attempt_scan_shadow_harvest.py']: 경로 범위가 harness/** 로 넓어 무관 태스크 다수와 겹침 경고가 났다 — 신규 파일 2개로 좁힌다
+  paths 제거 2건: ['src/backend/whymath_backend/harness/**', 'tests/backend/harness/**']
+updated: 2026-10-18

@@ -72,6 +72,7 @@ __all__ = [
     "CONTENT_KPI_THRESHOLDS",
     "REQUIRED_ANCHORS",
     "adapt_hit_cu_metrics",
+    "hit_skip_reason",
     "adapt_qa_confusion_matrix",
     "merge_payloads",
     "evaluate",
@@ -786,6 +787,31 @@ _MACHINE_FAILURE_CODES: tuple[str, ...] = ("F1", "F2")
 _JUDGMENT_FAILURE_CODES: tuple[str, ...] = ("F3", "F6", "F7")
 
 
+def hit_skip_reason(report: dict[str, Any]) -> str | None:
+    """HIT 하한 가드 때문에 HIT·처리량을 이관하지 않는 사유(OPS-90). 이관 대상이면 None.
+
+    이관할 계측(계측 CU>0·중앙값 있음)이 없으면 None이다 — 애초에 옮길 것이 없는 경우를
+    "가드가 막았다"로 말하지 않는다.
+    """
+    median_s = report.get("hit_median_seconds")
+    measured = report.get("cu_measured")
+    if not (isinstance(median_s, (int, float)) and isinstance(measured, int) and measured > 0):
+        return None
+    if "hit_implausible_majority" not in report:
+        return (
+            "hit_implausible_majority 키 없음 — HIT 하한 가드 이전 산출물이라 재입력·스킵 세션 "
+            "여부를 알 수 없다"
+        )
+    verdict = report["hit_implausible_majority"]
+    if verdict is False:
+        return None
+    if verdict is True:
+        return "계측 CU의 절반 이상이 HIT 하한 미만 — 재입력·스킵 세션 의심"
+    if verdict is None:
+        return "HIT 하한 가드 미검사(hit_implausible_majority=None — 하한 0 이하)"
+    return f"hit_implausible_majority 값을 해석할 수 없다({type(verdict).__name__})"
+
+
 def adapt_hit_cu_metrics(
     report: dict[str, Any], *, krw_per_usd: float | None = None
 ) -> dict[str, Any]:
@@ -796,13 +822,24 @@ def adapt_hit_cu_metrics(
       · HIT P90 — 생산자가 중앙값·평균만 낸다(EOS-54 미산출). 만들면 없는 측정이 생긴다.
       · 자동검증 1차 통과율·재작업률 — 생성 Run 로그(EOS-55) 좌석 미착지.
       · 앵커별 HIT(F-Ⅰ) — 생산자에 앵커 축이 없다(CU 단위 집계).
+      · **HIT 하한 가드(OPS-90)가 `False`("검사했고 괜찮다")를 확인해 주지 않은 HIT·처리량**
+        — `hit_implausible_majority`가 True(절반 이상이 하한 미만)·None(미검사)·키 없음
+        (가드 이전 산출물, 예: 2026-09-22 회차 형식)·그 밖의 값이면 이관하지 않고 미측정으로
+        남긴다(모른다 ≠ 아니다). 사유는 `hit_skip_reason`이 내고 CLI가 stderr에 출력한다.
     """
     out: dict[str, Any] = {}
 
     median_s = report.get("hit_median_seconds")
     measured = report.get("cu_measured")
     total_s = report.get("hit_total_seconds")
-    if isinstance(median_s, (int, float)) and isinstance(measured, int) and measured > 0:
+    # HIT 하한 가드(OPS-90) — 3상태: `False`(검사했고 괜찮다)일 때만 이관한다. True(걸림)뿐 아니라
+    # None(미검사)·키 없음(가드 이전 산출물)도 재입력·스킵 세션일 수 있는 값이라 미측정으로 남긴다.
+    if (
+        report.get("hit_implausible_majority") is False
+        and isinstance(median_s, (int, float))
+        and isinstance(measured, int)
+        and measured > 0
+    ):
         out["hit"] = {"median_minutes": float(median_s) / 60.0, "sample_size": measured}
         # 처리량 = 검수 완료 CU ÷ 검수 소요 시간(§6 동결 측정 방법 그대로).
         if isinstance(total_s, (int, float)) and total_s > 0:
@@ -1031,6 +1068,10 @@ def main(argv: list[str] | None = None) -> int:
         loaded = _load(args.hit_cu_json)
         if loaded is None:
             return 1
+        skip_reason = hit_skip_reason(loaded)
+        if skip_reason is not None:
+            # 운영자가 "그냥 미측정"으로 오독하지 않게 사유를 남긴다(OPS-90).
+            print(f"[HIT·처리량 미이관] {skip_reason}", file=sys.stderr)
         parts.append(adapt_hit_cu_metrics(loaded, krw_per_usd=args.krw_per_usd))
     if args.qa_matrix_json is not None:
         loaded = _load(args.qa_matrix_json)

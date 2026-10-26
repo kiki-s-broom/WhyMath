@@ -106,7 +106,8 @@ def load_atom_probes_from_json(path: Path) -> list[AtomProbeRecord]:
     `concepts` 배열에서 **원자(level=='세부개념')**만 골라 `AtomProbeRecord`로 투영한다 — 단원·
     소단원(②③ 미보유)·code/name 없는 항목·②③가 *전부 빈 값*인 항목은 *건너뛴다*(조용한 빈 적재 X).
     `socratic`은 `socratic_question`으로 rename하고, 성취기준 본문 슬롯은 두지 않는다(구조 차단).
-    `standard_codes`는 리스트가 아니면 빈 튜플로 둔다. 정상 코퍼스 기대 = 1,837.
+    `standard_codes`는 리스트가 아니면 빈 튜플로 둔다. 정상 코퍼스 기대 = 원자 전건
+    (`docs/data/corpus_facts.md`의 `atom_graph.atoms` — ②③가 전부 빈 원자는 빠진다).
 
     빈/누락 `concepts`는 빈 목록을 낸다(graceful).
 

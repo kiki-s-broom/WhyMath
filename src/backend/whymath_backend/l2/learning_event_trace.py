@@ -215,8 +215,11 @@ class SourceCoverage(BaseModel):
 _REASON_PRODUCED_LEARNING_SESSION = (
     "l2/learning_session_writer가 인증된 학습 활동(/me/next-problem·/me/attempts·코치 턴)마다 "
     "서버 30분 유휴 규칙으로 learning_session을 잇거나 연다(EOS-131). 세션 개시(started_at)를 "
-    "이 이벤트로 투영한다 — target_concept_id는 이 writer가 채우지 않으므로 concept_id는 비어 "
-    "있을 수 있고, 그 None은 '목표 개념을 지정하지 않은 활동 묶음'이라는 사실이다."
+    "이 이벤트로 투영한다 — concept_id는 그 묶음에서 문항을 실은 첫 활동(시도·코치 턴)이 확인한 "
+    "문항 대표 개념이다(P3-27 · 덮어쓰지 않으므로 '첫 확인 개념'이지 학습한 개념의 집합이 "
+    "아니다). 추천 조회만 있었거나 문항이 개념에 매핑되지 않았으면 None이고, 그 None은 '개념을 "
+    "확인한 활동이 아직 없는 묶음'이라는 사실이다. occurred_at은 세션 개시 시각이라 개념이 확인된 "
+    "시각보다 앞설 수 있다."
 )
 _REASON_PRODUCED_LEARNER_STATE = (
     "l2/recommendation_evidence.record_recommendation_treatment가 추천 처치 meta에 그 추천이 "
@@ -723,6 +726,10 @@ def project_mastery_rows(
                 ),
                 concept_id=getattr(row, "concept_id", None) if concept_axis else None,
                 skill_id=None if concept_axis else getattr(row, "skill_id", None),
+                # P3-27 ②: 이 측정을 낳은 시도의 귀속(없으면 None — 배치·백필·파기된 시도).
+                attempt_id=getattr(row, "attempt_id", None),
+                problem_id=getattr(row, "problem_id", None),
+                session_id=getattr(row, "session_id", None),
                 mastery_change=change,
             )
         )
@@ -955,13 +962,26 @@ def _mastery_stmt(
             model.mastery.label("mastery"),
             model.confidence.label("confidence"),
             model.sample_size.label("sample_size"),
+            model.attempt_id.label("attempt_id"),
             before.label("mastery_before"),
         )
         .where(model.user_id == learner_id)
         .subquery()
     )
+    # P3-27 ②: 숙달 측정을 낳은 시도(`attempt_id`)로 문항·세션을 되짚는다. 시도 PK 조인이라 행 수가
+    # 늘지 않고, 시도가 없으면(배치·백필 측정은 attempt_id NULL · 보존 파기로 시도가 사라진 행) 두
+    # 값은 NULL로 남는다 — 채워 넣지 않는다. 학습자 조건은 방어(남의 시도가 붙지 않게).
     return (
-        select(inner)
+        select(
+            inner,
+            ProblemAttempt.problem_id.label("attempt_problem_id"),
+            ProblemAttempt.session_id.label("attempt_session_id"),
+        )
+        .outerjoin(
+            ProblemAttempt,
+            (ProblemAttempt.attempt_id == inner.c.attempt_id)
+            & (ProblemAttempt.user_id == learner_id),
+        )
         .where(*_window(inner.c.measured_at, since, until))
         .order_by(inner.c.measured_at.desc())
         .limit(limit)
@@ -979,6 +999,9 @@ class _MasteryRowView:
         "sample_size",
         "concept_id",
         "skill_id",
+        "attempt_id",
+        "problem_id",
+        "session_id",
     )
 
     def __init__(self, row: Any, *, concept_axis: bool) -> None:
@@ -989,6 +1012,9 @@ class _MasteryRowView:
         self.sample_size = row.sample_size
         self.concept_id = row.axis_id if concept_axis else None
         self.skill_id = None if concept_axis else row.axis_id
+        self.attempt_id = row.attempt_id
+        self.problem_id = row.attempt_problem_id
+        self.session_id = row.attempt_session_id
 
 
 async def build_trace(

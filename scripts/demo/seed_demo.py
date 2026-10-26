@@ -25,10 +25,11 @@ _CORPUS_ROOT = _REPO_ROOT / "data" / "corpus"
 # 고갈돼(NOT IN 제외) "추천 없음"→앱이 마지막 문항 폴백="같은 문제 반복" 체감(2026-07-22 실기기).
 # answer 100% 보유 코퍼스만(완료 감지 verify_final_answer 필요)·전부 자체생성·WHYMATH_GENERATED
 # (populate 위생 통과 실측). 첫 항목(손저작 v1)은 *필수*, 나머지는 best-effort(부재/실패 skip).
+# 은행별 건수는 `docs/data/corpus_facts.md`의 `problem_bank.<은행 이름>`(v1·generated_v0·…).
 _CORPORA: tuple[Path, ...] = (
-    _CORPUS_ROOT / "problem_bank_v1" / "problems.jsonl",  # 손저작 4(필수·안정)
-    _CORPUS_ROOT / "problem_bank_generated_v0" / "problems.jsonl",  # 단답 620(answer 100%)
-    _CORPUS_ROOT / "problem_bank_misconception_mc_v0" / "problems.jsonl",  # 객관식 1080(choices)
+    _CORPUS_ROOT / "problem_bank_v1" / "problems.jsonl",  # 손저작(필수·안정)
+    _CORPUS_ROOT / "problem_bank_generated_v0" / "problems.jsonl",  # 단답(answer 100%)
+    _CORPUS_ROOT / "problem_bank_misconception_mc_v0" / "problems.jsonl",  # 객관식(choices)
 )
 
 

@@ -32,6 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
+from typing import Literal
 
 from whymath_backend.schema.enums import ReviewStatus
 
@@ -73,6 +74,41 @@ _TRANSITIONS: MappingProxyType[ReviewTransitionAction, tuple[ReviewStatus, Revie
 
 #: 사유(`reason`)를 반드시 요구하는 액션 — 격리 계약 §3(격리 사유 기록 의무).
 _REASON_REQUIRED: frozenset[ReviewTransitionAction] = frozenset({ReviewTransitionAction.quarantine})
+
+
+#: 인간 *판정*(검수 타이머 `finished` 이벤트를 남겨야 하는) 액션 — approve·reject뿐(ADMIN-18).
+#: `ReviewVerdict`(approved|approved_with_edit|rejected)에 대응 값이 있는 액션이 이것이다.
+#: quarantine·release는 **사후 회수·복원**이지 새 검수 판정이 아니므로(ReviewVerdict에 값이 없고
+#: HIT는 "검수 한 건에 든 인간 시간"을 재는 지표다) 타이머 세션을 요구하지 않는다.
+_TIMER_VERDICT: MappingProxyType[ReviewTransitionAction, Literal["approved", "rejected"]] = (
+    MappingProxyType(
+        {
+            ReviewTransitionAction.approve: "approved",
+            ReviewTransitionAction.reject: "rejected",
+        }
+    )
+)
+
+#: 반려코드(GenerationFailureCode F1~F8)를 반드시 요구하는 액션 — 설계서 §4 "모든 검수 반려는 8코드
+#: 중 하나로 강제 분류". 함수 레벨 집행(`schema/review_timer.py`)을 HTTP 경계에서도 건다.
+_FAILURE_CODE_REQUIRED: frozenset[ReviewTransitionAction] = frozenset(
+    {ReviewTransitionAction.reject}
+)
+
+
+def verdict_for_action(action: ReviewTransitionAction) -> Literal["approved", "rejected"] | None:
+    """이 액션이 낳는 검수 판정(타이머 이벤트 `verdict`). 판정이 아닌 액션이면 None."""
+    return _TIMER_VERDICT.get(action)
+
+
+def action_requires_review_session(action: ReviewTransitionAction) -> bool:
+    """이 액션이 검수 세션(타이머)을 필수로 요구하는가(approve·reject만 True) — ADMIN-18."""
+    return action in _TIMER_VERDICT
+
+
+def action_requires_failure_code(action: ReviewTransitionAction) -> bool:
+    """이 액션이 반려코드(F1~F8)를 필수로 요구하는가(reject만 True) — ADMIN-18."""
+    return action in _FAILURE_CODE_REQUIRED
 
 
 def resolve_review_transition(
@@ -135,6 +171,23 @@ class QuarantineRecordLocked(ValueError):  # noqa: N818 — 계약상 이름(Err
     """
 
     code = "quarantine_record_immutable"
+
+
+class VerdictRequiresReviewSession(ValueError):  # noqa: N818 — 계약상 이름(Error 접미사 없음)
+    """목표 상태로 들어오는 표면(PATCH)이 인간 판정(approve·reject) 전이를 요구했다(ADMIN-18).
+
+    PATCH는 반려코드·검수 세션(타이머)을 실을 자리가 없다. 그대로 통과시키면 "반려코드 없는 반려",
+    "타이머 없는 판정"이 이 표면으로 새므로 거부하고 `POST …/transitions`로 안내한다.
+    """
+
+    code = "review_session_required"
+
+    def __init__(self, action: ReviewTransitionAction) -> None:
+        self.action = action
+        super().__init__(
+            f"{action.value} 판정은 반려코드·검수 세션(타이머)이 필요해 이 표면으로는 불가합니다. "
+            "POST /v1/admin/review-queue/items/{problem_id}/transitions 를 사용하세요."
+        )
 
 
 def action_for_status_change(
@@ -207,3 +260,44 @@ def plan_review_field_change(
             f"{action.value} 전이와 함께 바꿀 수 없습니다."
         )
     return ReviewFieldChangePlan(action=action)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ADMIN-19 — 생성(POST) 시점의 초기 상태: 전이표는 "이미 있는 문항"의 변경만 다룬다
+# ──────────────────────────────────────────────────────────────────────────
+
+#: 문항이 **태어날 때** 가질 수 있는 검수 상태. 전이표(approve/reject/quarantine/release)는 기존
+#: 행의 변경만 판정하므로, 생성 요청이 `approved`·`rejected`·`quarantined`를 직접 실으면 전이도
+#: 감사 동작(approve 등)도 검수 기록도 없이 그 상태로 태어난다(ADMIN-16이 PATCH에서 닫은 우회의
+#: 생성 축). 그래서 승인·거부·격리는 전부 `pending`에서 출발하는 전이의 몫이고, 생성은 아직
+#: 판정된 적 없음(`None`) 또는 검수 대기(`pending`)만 허용한다.
+#:
+#: `None`을 허용하는 이유: 기존 호출자가 필드를 생략해 왔고(코퍼스 백필 대상 레코드와 같은 상태),
+#: 생략을 `pending`으로 접으면 "모른다 ≠ pending"(모듈 docstring)을 생성 경로가 어긴다. 대가:
+#: `None`으로 태어난 문항은 전이표상 어떤 액션도 불허라 검수 큐로 들어가려면 먼저 상태가
+#: 정해져야 한다 — 그 입구는 이 상수가 아니라 별도 결정의 몫이다.
+INITIAL_REVIEW_STATUSES: frozenset[ReviewStatus | None] = frozenset({None, ReviewStatus.pending})
+
+
+class IllegalInitialReviewStatus(ValueError):  # noqa: N818 — 계약상 이름(Error 접미사 없음)
+    """생성 요청이 `INITIAL_REVIEW_STATUSES` 밖의 검수 상태로 문항을 만들려 했다."""
+
+    code = "illegal_initial_status"
+
+    def __init__(self, requested: ReviewStatus | None) -> None:
+        self.requested = requested
+        shown = requested.value if requested is not None else "미설정"
+        super().__init__(
+            f"생성 시 검수 상태는 미설정 또는 pending만 허용됩니다(요청: {shown}). "
+            "승인·거부·격리는 생성 뒤 검수 전이로만 정해집니다."
+        )
+
+
+def ensure_initial_review_status(requested: ReviewStatus | None) -> None:
+    """생성 요청의 `review_status`가 허용된 초기 상태인지 판정한다(순수 — DB·HTTP·시계 의존 0).
+
+    Raises:
+      IllegalInitialReviewStatus: `requested`가 `INITIAL_REVIEW_STATUSES`에 없다.
+    """
+    if requested not in INITIAL_REVIEW_STATUSES:
+        raise IllegalInitialReviewStatus(requested)

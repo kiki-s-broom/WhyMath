@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-49-extremum-count-items-retag-to-02-07
+title: "P3-49 — 극값의 개수 24건 개념 02-01 -> 02-07 이동 적용 (P3-43 변경 요청서 실행)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-43-extremum-count-items-concept-mapping-review
+requires_gates:
+  - G-p3-49-extremum-retag-approval
+acceptance:
+  - "① docs/reviews/p3_43_extremum_count_concept_mapping_2026-10-16.md 6절 변경 요청서 5항목을 적용한다: (1) problem_bank_conceptual_v0 의 \"극값의 개수\" 24건 concepts PRIMARY 를 H:12미적Ⅰ02-01 에서 H:12미적Ⅰ02-07 로 바꾼다 — 발문·선지·정답·해설·오답 귀속·achievement_standard_codes 는 바이트 동일(problem_slot_backfill 과 같은 바이트 계약, 2회 실행 바이트 동일) (2) conceptual_count_mc_generator.py 의 _TEMPLATE_META[\"extremum_count\"] 를 02-07 로 정정 (3) slot_assignment_rules.yaml 의 hold-extremum-count-under-02-01 폐기 + test_phase3_slot_rules.py 의 test_yaml_round_trip_of_the_real_file_keeps_hold_reason 이 보류 규칙 1개 이상을 단언하는 부분 정정 (4) problem_slot_backfill 재실행으로 24건에 p3-slot 태그 부여 (5) 운영 DB problem_concept 가 구 개념(02-01)에 남는지 확인하고 필요하면 재적재(Kiki 머신 행동이면 실행 명령 동봉 + 자가검증).\n② 집행 지점(정본화와 별항): 24건이 02-01 PRIMARY 로 되살아나는 경로를 막는다 — 생성기를 다시 돌려도 02-07 로 나온다는 테스트, 그리고 conceptual_v0 의 극값의 개수 문항 중 02-01 PRIMARY 가 0건이라는 코퍼스 대조 테스트. 둘 다 결함 주입(생성기 표를 02-01 로 되돌림)으로 RED 를 확인한다.\n③ 적용 후 phase3_coverage 를 같은 명령으로 다시 재서 실측 전후를 보고한다(P3-43 문서 4절은 시뮬이다). 기대: 6슬롯 60/60 유지, 02-07 오개념 유발 칸 56(17) -> 80(19), Graph Connectivity 5/10 -> 4/10(Kiki 가 게이트에서 하락을 수용한 상태). 기대와 다르면 원인을 규명한다.\n④ 모든 변경 후 CI 가 쓰는 검사를 잡 단위로 전부 재현한다(backend 잡 전 스텝 + infra-contracts 잡 + harness 테스트)."
+artifacts:
+  - "PR #1678 머지(6f668474, 판정 기준 main 6f668474): 극값의 개수 24건 PRIMARY 02-01 -> 02-07 (concepts·tags 외 바이트 동일, 백필 2회 sha256 동일) · 생성기 표 정정 · 보류 규칙 hold-extremum-count-under-02-01 폐기 · 집행 테스트 3종(결함 주입 M1·M2 RED 확인). phase3_coverage 전후 실측: 6슬롯 60/60 유지, 02-07 오개념 유발 칸 56(17)->80(19), 02-01 적격 200->176·02-07 285->309, Graph Connectivity 5/10->4/10(Kiki 게이트 수용). 운영 DB 확인(변경 요청서 (5)): Kiki 머신 whymath-pg 읽기 전용 실측 — 대상 24건 슬러그·problem_id 양쪽 0건, 대조군 problem 1703행 slug 전부 채움(NOT_IN_DB_CONFIRMED) -> problem_bank_conceptual_v0 는 운영 DB 미적재라 재적재 불필요. 미재현: backend-migrations·docker-build 로컬(CI 통과), QA 파이프라인 defect_report_intake 축 DB 부재로 미측정."
+paths:
+  - data/corpus/problem_bank_conceptual_v0/problems.jsonl
+  - data/corpus/phase3_scope_v1/slot_assignment_rules.yaml
+  - src/backend/whymath_backend/l3/equivalent/conceptual_count_mc_generator.py
+  - tests/backend/l1/test_phase3_slot_rules.py
+session: null
+notes: "출처: P3-43 판정(Kiki 2026-10-16: 02-07 소속). 변경 요청서 = docs/reviews/p3_43_extremum_count_concept_mapping_2026-10-16.md 6절. 게이트 승인 전 착수 금지 — 지표 하락(Graph Connectivity 5/10->4/10) 수용 여부가 승인 항목이다. 타 세션 P3-44-graph-connectivity-misconception-edge(원격 예약, 미머지)가 같은 지표를 올리는 태스크라 착수 전에 상태를 확인한다."
+updated: 2026-10-18

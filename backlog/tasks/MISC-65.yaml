@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: MISC-65
+title: "kebab 오개념 탐지 카탈로그 종 수가 문서마다 다름(72·67·64·34) — 정본 실측 후 레지스트리 사실로"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① kebab 오개념 탐지 카탈로그의 종 수가 문서마다 다르다 — ADR-009 72 · constitution/rules.yaml 1018줄·A0003 67 · 04_pedagogy_engine·04e·tests/backend/l1/test_approved_crosslinks_corpus.py:203 64 · misconception_crosslink_candidates.md:107 '현 34' · test_crosslink_demotion_eval.py:43 72. 정본(`docs/prompts/misconception_diagnosis.md` 또는 코드 상수)을 실측해 하나로 정한다\n② 그 값을 코드 상수에서 계산하는 사실로 OPS-154 레지스트리(scripts/analysis/corpus_facts.py)에 더하고, 현행 문서는 표식으로 인용한다\n③ constitution/ 쪽은 정정 초안(docs/constitution_proposals/)으로만 — A0006 초안의 '덧붙여 알림' 참조"
+  - "④ 실측 보강(2026-10-25 OPS-154 문서 조사): 코드 정본 `len(CATALOG_BY_ID)`는 72. 문서 표기는 30·~30·32·64로 더 갈린다 — 05a_learning_scene_dsl.md:134 · math_ai_failure_checklist.md:66,124(\"32\") · current_phase_checklist.md:55(\"kebab 30\") · misconception_catalog_v1.md:77(\"~30\") · build_checkpoint_questions.md:21 · 04c:133(\"64종\"). 72가 별칭(alias)을 포함한 값인지부터 판정한다"
+artifacts: []
+paths:
+  - docs/prompts/misconception_diagnosis.md
+session: null
+notes: |-
+  발견 2026-10-25 OPS-154 전수 조사(오개념 조사 에이전트). 코퍼스 파일이 아니라 코드·프롬프트 정본이라 OPS-154 범위에서 뺐다. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW
+
+  [정정 2026-10-25] OPS-154 문서 조사 실측 보강
+updated: 2026-10-25

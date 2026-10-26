@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-61-choice-trace-only-kebabs
+title: "P3-61 - 선지 역추적 전용 kebab 4개 신설(M0673·M0674·M0676·M0678): 좌석 없는 핵심 오개념을 오답 보기 경로로 연결 (안 A)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 결정(2026-10-17 Kiki, P3-06 재판정): 게이트 G-misc40-unseated-concepts-disposition의 안 A를 4개 개념에 한해 채택한다 - M0673(접선) · M0674(평균값 정리) · M0676(그래프 개형) · M0678(속도·가속도)에 대해 객관식 선지 역추적 전용 kebab(본문 신호 없이 오답 보기 선택으로만 후보가 되는 이름표)을 허용한다. M0677은 제외한다 - 게이트 G-p345-m0677-link-disposition(P3-52) 소관이다. 근거 판정문 docs/reviews/p3_06_wrong_answer_remediation_judgment_2026-10-17.md"
+  - "② 문서 선행(doc-first) - docs/prompts/misconception_diagnosis.md에 선지 역추적 전용 항목의 정의·허용 조건(본문 신호 0건 허용, 후보는 distractor_link 채널로만 생성)을 먼저 쓴다. 그 뒤에 l4/misconception/catalog.py에 4개 항목을 더한다. 현행 불변식 signals 1건 이상을 이 부류에 한해 완화하되 완화 범위를 코드(명시 플래그)와 테스트로 동결한다 - 부류 밖 항목에는 불변식이 그대로 유효해야 하고, 이를 어기는 항목을 주입하면 RED여야 한다."
+  - "③ 영향 범위 - 카탈로그 항목 수를 동결한 테스트(l1/test_approved_crosslinks_corpus · test_misconception_crosslink_integration · test_crosslink_gate_contract · harness/test_misconception_mc_coverage 등 약 14개 경로)를 실측으로 찾아 갱신한다. 승인 문항 코퍼스의 재생성 결정론(misconception_mc_batch의 op-code 역유도)이 바뀌지 않는지 착수 전에 먼저 실측한다 - P3-58 주의 항목과 같은 위험이다.\n④ 크로스링크 - 새 kebab 4개의 kebab-M-id 연결은 승인 전 pending 행으로만 docs/data/misconception_crosslink_review_queue.json에 더한다. 승인(서명)은 사람 전용이므로 세션이 승인 코퍼스에 넣지 않는다. 서명 대기 게이트는 구현이 병합된 뒤 등재한다.\n⑤ 검증 - P3-06의 python -m whymath_backend.ops.phase3_remediation을 다시 돌려 서명 픽스처를 4개 더한 뒤 12개 중 몇 개가 served로 바뀌는지 실측 보고한다(승인 전에는 served가 아니라 pending임을 정직하게 구분한다). 오탐 주입 - 정답 보기를 새 kebab으로 라벨하면 RED, 신호 0건 항목이 본문 채널에서 후보로 새면 RED."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1688 · 커밋 fe04c650d · 공식 CI 미러 8개 잡 통과(미실행 qa_pipeline 1건은 직접 실행 exit 0) · phase3_remediation 7/12 불변(서명·보기 연결 전) · 재생성 바이트 동일"
+paths:
+  - src/backend/whymath_backend/l4/misconception/catalog.py
+  - docs/prompts/misconception_diagnosis.md
+  - docs/data/misconception_crosslink_review_queue.json
+session: null
+notes: "출처: P3-06 재판정(2026-10-17 Kiki 안 A). 판정 기준: main d199205f. 관련: P3-58(op-code 공백 - 같은 재생성 결정론 위험), P3-57(raw M-id 계측/서빙 불일치 - M0674 12건), P3-52(M0677). 등재는 착수가 아니다."
+updated: 2026-10-18

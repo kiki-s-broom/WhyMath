@@ -1,9 +1,11 @@
 """원자 백본 → backend 런타임 `concept`/`concept_edge` 적재(원자 마이그레이션 Phase 1).
 
 `l1/concept_graph/backend_concept.py`·`backend_edge.py`(구 개념그래프 적재기)의 *원자 백본* 짝이다.
-산출 코퍼스 `data/corpus/atom_graph_v1/graph.json`(원자 1,837 + 단원 217 + 소단원 643 = 2,697 노드·
-선수엣지 2,213)을 backend `concept`(3계층·parent 위계)·`concept_edge`(PREREQUISITE +
-relation_subtype)에 멱등 적재한다. 구 437 개념과 *병존*(code 공간 무충돌 — 원자 code =
+산출 코퍼스 `data/corpus/atom_graph_v1/graph.json`(세부개념 원자 + 단원 + 소단원 노드와 원자ID
+선수엣지 — 규모는 `docs/data/corpus_facts.md`의 `atom_graph.atoms`·`atom_graph.units`·
+`atom_graph.subunits`·`atom_graph.nodes`·`atom_graph.edges`)을 backend `concept`(3계층·parent
+위계)·`concept_edge`(PREREQUISITE + relation_subtype)에 멱등 적재한다. 구 개념그래프(437 개념 —
+`concept_graph.concepts`)와 *병존*(code 공간 무충돌 — 원자 code =
 원자ID/소단원코드/단원코드, 구 개념 code = UC `{TRACK}-{AREA}-{NNN}`).
 
 **최소 적재 철학**(backend_concept.py 동일): backend `concept`는 *런타임 최소 식별*(code·name_ko·

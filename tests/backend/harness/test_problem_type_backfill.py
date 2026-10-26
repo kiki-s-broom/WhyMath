@@ -15,8 +15,13 @@ from pathlib import Path
 from whymath_backend.harness.problem_type_backfill import main, run_backfill
 from whymath_backend.harness.problem_type_mapping import (
     CORPUS_GENERATED_V0,
+    CORPUS_P3_CALCULUS1_DIFF_V0,
+    CORPUS_P3_FILL_V0,
     CORPUS_REPHRASED_V0,
     CORPUS_V1,
+    PTYPE_CONDITION_SATISFACTION,
+    PTYPE_EVALUATE_EXPRESSION,
+    TARGET_CORPORA,
 )
 
 
@@ -232,6 +237,126 @@ class TestRunBackfill:
         assert CORPUS_REPHRASED_V0 in {c.name for c in report.corpora}  # 계보 코퍼스도 회계 대상.
         assert report.excluded_total == 0
         assert report.grand_total == 0
+
+
+class TestUnitTableCorporaBackfill:
+    """CONT-09 — `unit_codes` 표 코퍼스 태깅과 자가 태깅 코퍼스의 읽기 전용 회계."""
+
+    _POLY = "problem_bank_polynomial_arithmetic_v0"
+    _INEQ = "problem_bank_quad_ineq_v0"
+
+    def test_unit_table_corpora_are_backfilled_and_reported(self, tmp_path: Path) -> None:
+        root = tmp_path / "corpus"
+        _write_jsonl(
+            root / self._POLY / "problems.jsonl",
+            [{"problem_id": "a", "slug": "s-a", "unit_codes": ["POLYNOMIAL-ARITHMETIC"]}],
+        )
+        _write_jsonl(
+            root / self._INEQ / "problems.jsonl",
+            [
+                {"problem_id": "b", "slug": "s-b", "unit_codes": ["QUAD-INEQ-BOUNDARY"]},
+                # 표에 없는 unit_codes — 침묵 오분류가 아니라 미태깅으로 리포트에 잡혀야 한다.
+                {"problem_id": "c", "slug": "s-c", "unit_codes": ["NOT-IN-TABLE"]},
+            ],
+        )
+        report = run_backfill(corpus_root=root, write=True)
+
+        by_name = {c.name: c for c in report.corpora}
+        assert by_name[self._POLY].tagged == 1 and by_name[self._POLY].untagged == 0
+        assert by_name[self._INEQ].total == 2
+        assert by_name[self._INEQ].tagged == 1
+        assert by_name[self._INEQ].untagged == 1  # NOT-IN-TABLE.
+
+        poly = json.loads((root / self._POLY / "problems.jsonl").read_text("utf-8").splitlines()[0])
+        assert poly["problem_type_codes"] == [PTYPE_EVALUATE_EXPRESSION]
+        ineq_lines = (root / self._INEQ / "problems.jsonl").read_text("utf-8").splitlines()
+        assert json.loads(ineq_lines[0])["problem_type_codes"] == [PTYPE_CONDITION_SATISFACTION]
+        # 미태깅 행은 원문 바이트 그대로(키를 새로 만들지 않는다 — 기존 바이트 계약).
+        assert "problem_type_codes" not in json.loads(ineq_lines[1])
+
+    def test_unit_table_corpora_are_in_the_default_target_run(self) -> None:
+        # 기본 실행(`run_backfill`)이 새 코퍼스를 실제로 순회하는지 — TARGET_CORPORA 편입이 배선이다.
+        assert self._POLY in TARGET_CORPORA and self._INEQ in TARGET_CORPORA
+
+    def test_second_run_is_byte_identical_for_unit_table_corpus(self, tmp_path: Path) -> None:
+        root = tmp_path / "corpus"
+        path = root / self._POLY / "problems.jsonl"
+        _write_jsonl(
+            path,
+            [{"problem_id": "a", "slug": "s-a", "unit_codes": ["POLYNOMIAL-ARITHMETIC"]}],
+        )
+        run_backfill(corpus_root=root, write=True)
+        first = path.read_bytes()
+        second_report = run_backfill(corpus_root=root, write=True)
+        assert path.read_bytes() == first
+        assert {c.name: c for c in second_report.corpora}[self._POLY].changed == 0
+
+    def test_nonempty_stored_tag_is_preserved_when_table_does_not_know_the_row(
+        self, tmp_path: Path
+    ) -> None:
+        # 표에 없는 unit_codes 행에 누군가 올바른 태그를 달아 둔 경우 — 백필이 []로 덮어쓰면 안 된다.
+        root = tmp_path / "corpus"
+        path = root / self._POLY / "problems.jsonl"
+        _write_jsonl(
+            path,
+            [
+                {
+                    "problem_id": "a",
+                    "slug": "s-a",
+                    "unit_codes": ["NEW-BAND-NOT-IN-TABLE"],
+                    "problem_type_codes": ["ptype.count-solutions"],
+                },
+                {"problem_id": "b", "slug": "s-b", "unit_codes": ["POLYNOMIAL-ARITHMETIC"]},
+            ],
+        )
+        before_first_line = path.read_text("utf-8").splitlines()[0]
+        report = run_backfill(corpus_root=root, write=True)
+
+        lines = path.read_text("utf-8").splitlines()
+        assert lines[0] == before_first_line  # 보존 행은 원문 바이트 그대로.
+        assert json.loads(lines[1])["problem_type_codes"] == [PTYPE_EVALUATE_EXPRESSION]
+        poly = {c.name: c for c in report.corpora}[self._POLY]
+        assert poly.preserved == 1  # 침묵 보존이 아니라 건수로 드러난다.
+        assert poly.tagged == 2 and poly.changed == 1
+        assert (
+            report.to_json()["corpora"][[c.name for c in report.corpora].index(self._POLY)][
+                "preserved"
+            ]
+            == 1
+        )
+
+    def test_self_tagged_corpus_is_never_rewritten_and_is_accounted(self, tmp_path: Path) -> None:
+        # p3는 레코드별 유형을 생성 시점에 직접 기록한다. 백필이 쓰면(`classify_record`는 빈 리스트)
+        # 저장된 유형이 지워진다 — 쓰기 모드에서도 바이트 무변경이어야 한다.
+        root = tmp_path / "corpus"
+        path = root / CORPUS_P3_CALCULUS1_DIFF_V0 / "problems.jsonl"
+        _write_jsonl(
+            path,
+            [
+                {
+                    "problem_id": "a",
+                    "unit_codes": ["P3-X"],
+                    "problem_type_codes": ["ptype.count-solutions"],
+                },
+                {"problem_id": "b", "unit_codes": ["P3-X"], "problem_type_codes": []},
+            ],
+        )
+        before = path.read_bytes()
+        report = run_backfill(corpus_root=root, write=True)
+
+        assert path.read_bytes() == before  # 쓰지 않았다.
+        # 자가 태깅 좌석이 둘이다(P3-03 은행·P3-05 빈 칸 채우기 은행) — 시험 코퍼스에는 앞의 것만 있다.
+        p3, fill = report.self_tagged
+        assert fill.name == CORPUS_P3_FILL_V0 and fill.total == 0
+        assert p3.name == CORPUS_P3_CALCULUS1_DIFF_V0
+        assert (p3.total, p3.tagged, p3.untagged) == (2, 1, 1)
+        assert p3.changed == 0 and p3.written is None
+        # 정직 회계: 미태깅 1건이 리포트에 드러나고, 전체 합계에도 포함된다.
+        assert report.untagged_self_tagged == 1
+        assert report.grand_total == 2
+        payload = report.to_json()
+        assert payload["untagged_self_tagged"] == 1
+        assert payload["self_tagged"][0]["name"] == CORPUS_P3_CALCULUS1_DIFF_V0
 
 
 class TestMainCli:

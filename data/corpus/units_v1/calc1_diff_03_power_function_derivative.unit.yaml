@@ -1,0 +1,41 @@
+# 소단원 DSL v0.1 — 함수 y=xⁿ의 도함수 (미적분Ⅰ · 미분 대단원 · 소단원 3/10)
+# 지위: P3-03 초안(2026-10-07) — 교수학 사람 검토 전. 적재 시 k_type_verified=False(컴파일러 기본).
+# 출처: WhyMath 자체 저작 소단원 명세. 인용 범위 = 성취기준 *코드*와 NCIC 소영역명(제목)뿐이며
+#   둘 다 공공누리 사실정보다. 학습목표 문장은 성취기준을 자체 분해한 저작이고 검정교과서·평가원·
+#   EBS의 본문·학습목표 텍스트를 옮기지 않았다.
+# 분해 규칙: 원자 개념/절차/표상 3개 → CONCEPT/PROCEDURE/REPRESENT 목표 1개씩(docs/data/units_v1.md §3).
+#   성취기준 문장은 '구할 수 있다'(절차) 하나지만, 원자 백본이 '도함수는 함수다'(개념)·'그래프로'(표상)
+#   원자를 따로 두었으므로 그 둘도 목표로 둔다.
+# 인용 코드 실측 확인:
+#   원자 12미적Ⅰ-02-03-1/2/3 ∈ data/corpus/atom_graph_v1/graph.json
+#   성취기준 [12미적Ⅰ-02-03] ∈ data/corpus/standards_v1/standards.json
+unit_id: "12미적Ⅰ-미분-xn의도함수"
+unit_version: 1
+api_version: "unit/0.1"
+title: "함수 y=xⁿ의 도함수"
+curriculum_rev: "2022"
+standard_codes: ["[12미적Ⅰ-02-03]"]
+concept_nodes: ["12미적Ⅰ-02-03-1", "12미적Ⅰ-02-03-2", "12미적Ⅰ-02-03-3"]
+objectives:
+  # OBJ-01 개념형 — 원자 -2(개념). 오개념이 'f′(x)를 한 점의 수(미분계수)와 혼동'이라, 한 점의 값과
+  # 함수의 대비(예·비예)로 '함수에서 함수로'를 세우는 CONCEPT 팩이 맞다.
+  - suffix: "OBJ-01"
+    statement: "도함수가 각 x에 그 점에서의 미분계수를 대응시키는 새로운 함수임을 이해한다"
+    standard_code: "[12미적Ⅰ-02-03]"
+    source_verb: "이해한다"
+    k_type: CONCEPT
+    concept_nodes: ["12미적Ⅰ-02-03-2"]
+  # OBJ-02 절차형 — 원자 -1(절차·primary). 계수 n 누락 오개념을 단계 짚기로 다루는 PROCEDURE 팩.
+  - suffix: "OBJ-02"
+    statement: "도함수의 정의로부터 y=xⁿ(n은 양의 정수)의 도함수를 구한다"
+    standard_code: "[12미적Ⅰ-02-03]"
+    source_verb: "구한다"
+    k_type: PROCEDURE
+    concept_nodes: ["12미적Ⅰ-02-03-1"]
+  # OBJ-03 표상형 — 원자 -3(표상). f와 f′의 그래프를 오가며 '접선 기울기 = 도함수의 함숫값'을 읽는다.
+  - suffix: "OBJ-03"
+    statement: "y=xⁿ과 그 도함수의 그래프를 비교하여 각 점의 접선의 기울기가 도함수의 함숫값이 됨을 해석한다"
+    standard_code: "[12미적Ⅰ-02-03]"
+    source_verb: "해석한다"
+    k_type: REPRESENT
+    concept_nodes: ["12미적Ⅰ-02-03-3"]

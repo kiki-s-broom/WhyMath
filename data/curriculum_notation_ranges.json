@@ -5,7 +5,7 @@
   "kinds": {
     "macro": "LaTeX 매크로 — notation_coverage.extract_macros. 음성화 엔진(l3/speech.py _gate)이 학년별로 실제 반응하는 항목만 둔다(드리프트 테스트로 묶임).",
     "glyph": "유니코드 수학 글리프 — notation_coverage.is_math_glyph가 추출하는 것.",
-    "word": "ASCII 함수 단어 — 코퍼스 14,034문항에 LaTeX 매크로가 0건이고 표기가 평문이라 필요한 축. 글자열 전체가 일치할 때만 센다(using·cosine 등 오탐 방지)."
+    "word": "ASCII 함수 단어 — 코퍼스 문항에 LaTeX 매크로가 0건이고(2026-10-08 작성 당시 14,034문항 실측 · 규모는 docs/data/corpus_facts.md의 problem_bank.total) 표기가 평문이라 필요한 축. 글자열 전체가 일치할 때만 센다(using·cosine 등 오탐 방지)."
   },
   "entries": [
     {"token": "\\frac", "kind": "macro", "construct": "fraction"},

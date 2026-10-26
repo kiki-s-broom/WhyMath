@@ -29,7 +29,7 @@ from whymath_backend.l1.concept_graph.embedding import _build_sync_engine
 from whymath_backend.schema.misconception_crosslink import CrosslinkType
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from sqlalchemy.engine import Engine
 
@@ -103,6 +103,102 @@ def select_canonical(links: Sequence[ResolvedLink]) -> CanonicalSelection:
         direct_count=direct_count,
         reason="ok",
     )
+
+
+CanonicalLoadVerdictKind = Literal["ok", "wrong_winner", "tie"]
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalLoadVerdict:
+    """kebab 하나에 대한 적재 후 canonical 시뮬 판정(HARN-216) — 코퍼스 자신의 선택과 비교한다.
+
+    `corpus`는 적재 파일의 행**만**으로 계산한 선택(코퍼스가 의도한 canonical), `after_load`는
+    라이브 잔존 행과 합친 집합의 선택이다. `rivals`는 코퍼스에 없는(=업서트가 지우지 못하는)
+    라이브 직접매핑
+    행 — 두 선택이 갈린 원인 후보이며 신뢰도 내림차순이다.
+    """
+
+    kebab_id: str
+    verdict: CanonicalLoadVerdictKind
+    corpus: CanonicalSelection
+    after_load: CanonicalSelection
+    corpus_confidence: float | None
+    """코퍼스 canonical의 신뢰도(미선정이면 None) — 메시지에서 라이브 행과 비교하게 한다."""
+    rivals: tuple[ResolvedLink, ...]
+
+
+def _triplet(link: ResolvedLink) -> tuple[str, str]:
+    """의미 유일키의 kebab 이후 부분 `(mis_id, link_type)` — 적재기 ON CONFLICT 키와 같다."""
+    return (link.mis_id, link.link_type)
+
+
+def simulate_load_canonical(
+    live: Mapping[str, Sequence[ResolvedLink]],
+    incoming: Mapping[str, Sequence[ResolvedLink]],
+) -> list[CanonicalLoadVerdict]:
+    """적재 **전에** 적재 후 canonical을 계산해 코퍼스 의도와 다른 kebab을 가린다(순수·DB 0).
+
+    업서트(`ON CONFLICT DO UPDATE`)는 같은 `(kebab, mis_id, link_type)`만 덮어쓰고 코퍼스에 없는
+    라이브 행은 **지우지 못한다**. 그래서 코퍼스를 그대로 다시 적재해도 오귀속 행이 살아남아 더 높은
+    신뢰도로
+    정답을 이기거나(wrong_winner) 같은 신뢰도로 동률을 만들 수 있다(tie) — 적재가 오류를 고친 것처럼
+    보이면서 고치지 못하는 상태다. 이 함수는 그 결과를 쓰기 전에 보여 준다.
+
+    - `live`: 적재 직전 DB의 kebab별 링크(적재 대상 kebab만 있으면 충분하다).
+    - `incoming`: 적재 예정 링크. 같은 트리플 중복은 적재기와 같이 **마지막 우선**으로 접는다.
+    - 반환: 적재 대상(incoming) kebab 전부, kebab 오름차순. 비교는 `(canonical_mis_id, reason)` —
+      같으면 `ok`, 다르면서 적재 후가 동률이면 `tie`, 그 밖에는 `wrong_winner`.
+      라이브에만 있고 코퍼스에 없는 kebab은 이 적재가 건드리지 않으므로 판정하지 않는다.
+    """
+    verdicts: list[CanonicalLoadVerdict] = []
+    for kebab_id in sorted(incoming):
+        corpus_by_key = {_triplet(link): link for link in incoming[kebab_id]}  # 마지막 우선
+        corpus_links = list(corpus_by_key.values())
+        # 라이브 중 코퍼스와 같은 트리플은 업서트가 코퍼스 값으로 덮으므로 *남는* 것은 나머지뿐이다.
+        survivors = [link for link in live.get(kebab_id, ()) if _triplet(link) not in corpus_by_key]
+
+        corpus = select_canonical(corpus_links)
+        after_load = select_canonical([*corpus_links, *survivors])
+
+        if (corpus.canonical_mis_id, corpus.reason) == (
+            after_load.canonical_mis_id,
+            after_load.reason,
+        ):
+            kind: CanonicalLoadVerdictKind = "ok"
+        elif after_load.reason == "tie":
+            kind = "tie"
+        else:
+            kind = "wrong_winner"
+
+        corpus_conf = next(
+            (
+                link.confidence
+                for link in corpus_links
+                if link.mis_id == corpus.canonical_mis_id and link.link_type == _DIRECT_LINK_TYPE
+            ),
+            None,
+        )
+        rivals = tuple(
+            sorted(
+                (
+                    link
+                    for link in survivors
+                    if link.link_type == _DIRECT_LINK_TYPE and link.confidence is not None
+                ),
+                key=lambda link: (-(link.confidence or 0.0), link.mis_id),
+            )
+        )
+        verdicts.append(
+            CanonicalLoadVerdict(
+                kebab_id=kebab_id,
+                verdict=kind,
+                corpus=corpus,
+                after_load=after_load,
+                corpus_confidence=corpus_conf,
+                rivals=rivals,
+            )
+        )
+    return verdicts
 
 
 class MisconceptionCrosslinkResolver:
@@ -222,8 +318,11 @@ class MisconceptionCrosslinkResolver:
 
 
 __all__ = [
+    "CanonicalLoadVerdict",
+    "CanonicalLoadVerdictKind",
     "CanonicalSelection",
     "MisconceptionCrosslinkResolver",
     "ResolvedLink",
     "select_canonical",
+    "simulate_load_canonical",
 ]

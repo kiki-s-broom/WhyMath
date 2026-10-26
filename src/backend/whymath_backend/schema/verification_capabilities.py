@@ -54,6 +54,9 @@ __all__ = [
     "AssessmentAnswerVerifier",
     "ExpressionSeal",
     "ExpressionEquivalence",
+    "AnswerValueExposure",
+    "ValueExposure",
+    "ValueExposureScan",
 ]
 
 
@@ -300,6 +303,68 @@ class ExpressionEquivalence(Protocol):
 
     def identity_status(self, lhs: str, rhs: str) -> EquivalenceOutcome:
         """4상태 판정 — `undecidable`/`parse_error`를 합치지 않는다."""
+        ...
+
+
+class ValueExposure(str, Enum):
+    """본문이 목표 값을 *값으로* 드러내는가 — 3상태(P3-77 · 과목 중립).
+
+    문자열 대조(`detect_answer_leakage`)는 같은 *글자*를 찾는다. 이 축은 글자가 달라도 **값이
+    같은** 표현(예: 계산하면 목표 값이 되는 식)을 본다. 어떤 표현이 "값을 가진 식"인지, 두 값이
+    같은지는 과목이 안다 — Core는 이 3상태만 읽는다.
+    """
+
+    exposed = "exposed"
+    """본문의 표현 하나가 목표 값과 같음이 확정 — 노출."""
+
+    clean = "clean"
+    """값을 가진 표현이 없거나, 있는 표현이 전부 목표 값과 다름이 확정."""
+
+    undecidable = "undecidable"
+    """같은지 판정하지 못한 표현이 있다(또는 목표 값을 읽지 못했다). **`clean`으로 접으면 안
+    된다** — 판정 불가는 노출 없음이 아니다."""
+
+
+@runtime_checkable
+class ValueExposureScan(Protocol):
+    """값 노출 훑기 결과 중 **Core가 읽는 부분**(규칙 2 — 판정 근거 표현과 작동 회계만)."""
+
+    @property
+    def outcome(self) -> ValueExposure:
+        """3상태 — 위 enum 정의를 그대로 따른다."""
+        ...
+
+    @property
+    def fragment(self) -> str | None:
+        """`exposed`일 때 목표 값과 같았던 표현(사유 기록용 — Core는 해석하지 않는다)."""
+        ...
+
+    @property
+    def candidates(self) -> int:
+        """값을 가진 표현으로 읽혀 판정 대상이 된 수("작동한 비율" — 0이면 볼 것이 없었다)."""
+        ...
+
+    @property
+    def undecided(self) -> int:
+        """그중 목표 값과 같은지 판정하지 못한 수."""
+        ...
+
+
+class AnswerValueExposure(Protocol):
+    """본문 속 표현이 목표 값과 *값으로* 같은지 훑는 능력 — **선택적** (P3-77).
+
+    수학·물리처럼 값을 계산할 수 있는 과목엔 있고, 역사·국어엔 없다. 그래서 필수 3종이 아니다.
+
+    Core(힌트 게이트)는 이 능력이 **없을 때의 경로를 반드시 갖는다**: 능력이 없으면 값 축을
+    판정하지 못한 것이고, 그것은 "노출 없음"이 아니다(fail-closed — 호출부가 거부로 처리).
+    """
+
+    def scan_value_exposure(self, text: str, target: str) -> ValueExposureScan:
+        """`text` 안의 표현 중 값이 `target`과 같은 것이 있는가.
+
+        두 인자는 Core에게 **불투명 문자열**이다 — Core는 해석하지 않고 그대로 전달만 한다
+        (불투명 페이로드 원칙).
+        """
         ...
 
 

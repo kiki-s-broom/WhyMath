@@ -1,0 +1,240 @@
+{"item_id": "q001", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["acceptance: 위생 게이트 — answer_explanation arithmetic: arithmetic error: '(41 - (-4))/3 = 16' (sympy: 15 != 16)"]}
+{"item_id": "q002", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q003", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q004", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q005", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q006", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q007", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q008", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q009", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: plus_minus"]}
+{"item_id": "q010", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q011", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q012", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q013", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q014", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q015", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q016", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q017", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: curve_derivative, undefined:f:발문"]}
+{"item_id": "q018", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q019", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q020", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q021", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q022", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q023", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q024", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q025", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 조건 위반 — 잔차 ≠ 0: -1", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 조건 위반 — 잔차 ≠ 0: -1"]}
+{"item_id": "q026", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q027", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q028", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q029", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q030", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q031", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q032", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q033", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q034", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q035", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q036", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q037", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q038", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q039", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q040", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q041", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q042", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q043", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q044", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q045", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q046", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q047", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["reverify: Tier1 fail: 조건 위반 — 잔차 ≠ 0: -3", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 조건 위반 — 잔차 ≠ 0: -3"]}
+{"item_id": "q048", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q049", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q050", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q051", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q052", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q053", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q054", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q055", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q056", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q057", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q058", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q059", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: josa_token"]}
+{"item_id": "q060", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q061", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q062", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q063", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q064", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q065", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: 1", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: 1"]}
+{"item_id": "q066", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q067", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q068", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q069", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q070", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: T09-pinned-minimizer"]}
+{"item_id": "q071", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q072", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q073", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q074", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q075", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q076", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q077", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: W-ascii-inequality"]}
+{"item_id": "q078", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q079", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q080", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q081", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q082", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q083", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q084", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q085", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q086", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q087", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q088", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 조건 위반 — 잔차 ≠ 0: 131", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 조건 위반 — 잔차 ≠ 0: 131"]}
+{"item_id": "q089", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q090", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q091", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q092", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: T08-given-critical-points"]}
+{"item_id": "q093", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: T06-given-rate"]}
+{"item_id": "q094", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q095", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q096", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q097", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q098", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q099", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q100", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q101", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q102", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q103", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q104", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q105", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: undefined:f:발문"]}
+{"item_id": "q106", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q107", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q108", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q109", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q110", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: T06-given-rate"]}
+{"item_id": "q111", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q112", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: W-ascii-inequality"]}
+{"item_id": "q113", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q114", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q115", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: T09-pinned-minimizer"]}
+{"item_id": "q116", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q117", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q118", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q119", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: T-zero-monomial"]}
+{"item_id": "q120", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["acceptance: 위생 게이트 — answer_explanation arithmetic: arithmetic error: '(-16 - 0)/4 = -3' (sympy: -4 != -3)"]}
+{"item_id": "q121", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q122", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q123", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q124", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q125", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q126", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 1번 위반 — 조건 위반 — 잔차 ≠ 0: 1", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 1번 위반 — 조건 위반 — 잔차 ≠ 0: 1"]}
+{"item_id": "q127", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q128", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q129", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q130", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q131", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q132", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q133", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q134", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q135", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q136", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q137", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q138", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q139", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q140", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q141", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q142", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q143", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: josa_token"]}
+{"item_id": "q144", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: E-derivative"]}
+{"item_id": "q145", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q146", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: josa_token"]}
+{"item_id": "q147", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q148", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: plus_minus"]}
+{"item_id": "q149", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q150", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q151", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: -9", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: -9"]}
+{"item_id": "q152", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q153", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q154", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q155", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q156", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q157", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q158", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q159", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q160", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q161", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q162", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q163", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q164", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q165", "verdict": "defect", "fired": ["shortcut_guard", "text_scanner"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: E-derivative", "text_scanner: count_explanation_conclusion_only"]}
+{"item_id": "q166", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q167", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q168", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q169", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q170", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q171", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["acceptance: 위생 게이트 — answer_explanation arithmetic: arithmetic error: '(17 - 3)/2 = 8' (sympy: 7 != 8)"]}
+{"item_id": "q172", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q173", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q174", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q175", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q176", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q177", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q178", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q179", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q180", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q181", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q182", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q183", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q184", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q185", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: real_root_count 불일치: 실근 개수 — 실제 3개이나 주장은 4개(불일치)", "acceptance: 정확성 실패 — real_root_count 불일치: 실근 개수 — 실제 3개이나 주장은 4개(불일치)"]}
+{"item_id": "q186", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: T08-given-critical-points"]}
+{"item_id": "q187", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 1번 위반 — 조건 위반 — 잔차 ≠ 0: 1", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 1번 위반 — 조건 위반 — 잔차 ≠ 0: 1"]}
+{"item_id": "q188", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q189", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q190", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q191", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q192", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: -39", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: -39"]}
+{"item_id": "q193", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q194", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q195", "verdict": "defect", "fired": ["text_scanner"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["text_scanner: curve_graph_dup, undefined:f:발문"]}
+{"item_id": "q196", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: E-derivative"]}
+{"item_id": "q197", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q198", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q199", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q200", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q201", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q202", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: T06-given-rate"]}
+{"item_id": "q203", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q204", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: W-ascii-inequality"]}
+{"item_id": "q205", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q206", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q207", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q208", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: T-zero-monomial"]}
+{"item_id": "q209", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: T08-given-critical-points"]}
+{"item_id": "q210", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q211", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q212", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: real_root_count 불일치: 실근 개수 — 실제 2개이나 주장은 3개(불일치)", "acceptance: 정확성 실패 — real_root_count 불일치: 실근 개수 — 실제 2개이나 주장은 3개(불일치)"]}
+{"item_id": "q213", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 조건 위반 — 잔차 ≠ 0: 2", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 조건 위반 — 잔차 ≠ 0: 2"]}
+{"item_id": "q214", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q215", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q216", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: E-derivative, E-kinematics"]}
+{"item_id": "q217", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q218", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: 1", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: 1"]}
+{"item_id": "q219", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: real_root_count 불일치: 실근 개수 — 실제 2개이나 주장은 3개(불일치)", "acceptance: 정확성 실패 — real_root_count 불일치: 실근 개수 — 실제 2개이나 주장은 3개(불일치)"]}
+{"item_id": "q220", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q221", "verdict": "defect", "fired": ["shortcut_guard"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["shortcut_guard: E-derivative"]}
+{"item_id": "q222", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q223", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q224", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q225", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q226", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["acceptance: 정확성 미검증 — 답이 여러 실근 중 하나이나 선택(큰 근/작은 근/유일)이 명시되지 않아 유일하게 확정되지 않음: 근 선택(unique) — 실근이 2개라 답이 유일하게 정해지지 않음; 동등성 검수필요 — 점수 1.00(성취기준 1.00·오개념 1.00·난이도 1.00·답형태 1.00"]}
+{"item_id": "q227", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q228", "verdict": "defect", "fired": ["shortcut_guard", "text_scanner"], "diagnostic": {"statement_auditor": "fail"}, "reasons": ["shortcut_guard: T08-biquadratic", "text_scanner: plus_minus"]}
+{"item_id": "q229", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q230", "verdict": "defect", "fired": ["reverify", "acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["reverify: Tier1 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: 36", "acceptance: 정확성 실패 — Tier1 답 검산 fail: 연립 조건 0번 위반 — 조건 위반 — 잔차 ≠ 0: 36"]}
+{"item_id": "q231", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q232", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q233", "verdict": "defect", "fired": ["acceptance"], "diagnostic": {"statement_auditor": "pass"}, "reasons": ["acceptance: 위생 게이트 — answer_explanation arithmetic: arithmetic error: '(29 - (-7))/3 = 13' (sympy: 12 != 13)"]}
+{"item_id": "q234", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q235", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q236", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q237", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q238", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "fail"}, "reasons": []}
+{"item_id": "q239", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}
+{"item_id": "q240", "verdict": "ok", "fired": [], "diagnostic": {"statement_auditor": "pass"}, "reasons": []}

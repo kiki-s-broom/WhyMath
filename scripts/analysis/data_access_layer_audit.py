@@ -124,6 +124,13 @@ BASELINE: dict[str, frozenset[str]] = {
             # 좌석으로 옮겼다. 이 등재가 리뷰에 보이는 것이 이 가드의 목적이다.
             "api/_attempt_misconception_scan.py",
             "api/_auth.py",
+            # P3-26 — 개념 그래프 쓰기의 **공유 규칙**(선수 엣지 비순환 검사·삭제 가능 판정).
+            # 신규 접근점이지만 기존 조회 함수로 대체할 수 없다: 순환 검사는 선수 엣지 전체를 읽고
+            # 쓰기와 같은 트랜잭션(어드바이저리 잠금)에서 해야 하며, 관리 API(`admin_cms_graph`)와
+            # 기존 개념 삭제 라우트(`concepts.py`)가 **같은 규칙**을 써야
+            # 한쪽이 우회로가 되지 않는다.
+            # 판 상태는 이 파일이 아니라 `publish_gate`가 읽어 준다.
+            "api/_concept_graph_rules.py",
             "api/_concept_orchestration.py",
             # EOS-19 — `api/me.py`의 수능 분기가 정책 구현체로 이동한 것이다(신규 접근점
             # 아님·같은 쿼리). L6 게이팅 + DB를 동시에 쓰는 정책이라 `l2`(l6 import 불가)에도
@@ -144,6 +151,16 @@ BASELINE: dict[str, frozenset[str]] = {
             # 소유한다 — 이 파일은 `ConceptVersion` ORM을 import하지 않는다(AST 동결 R1). 이 등재가
             # 리뷰에 보이는 것이 이 가드의 목적이다.
             "api/admin_cms.py",
+            # P3-26 — 개념 그래프 쓰기 BFF(제안·삭제·선수 관계). `admin_cms.py`와 같은 이유
+            # (쓰기 경계와 쿼리가 한 트랜잭션)로 세션을 직접 쓴다. 개념 행은 만들지 않는다 —
+            # 발행하는 순간 `publish_gate`가 만든다.
+            "api/admin_cms_graph.py",
+            # EOS-194 — 문항 판 발행 호출 표면. **쿼리는 하지 않는다**(조회·쓰기는 전부 게이트 모듈
+            # `l3/problem_publish_gate.py`의 공개 함수) — 이 파일이 소유하는 것은 **트랜잭션 경계**
+            # (`commit`·`rollback`)뿐이다. 전이 + 감사 1행 + commit 1회가 같은 트랜잭션이어야
+            # 하므로 경계가 라우트 핸들러에 있어야 한다(개념 CMS `api/admin_cms.py`와 같은 이유).
+            # 존재 확인 쿼리는 게이트의 `problem_exists`로 옮겨 이 등재가 경계 소유로만 남게 했다.
+            "api/admin_cms_problem_versions.py",
             "api/auth.py",
             "api/coach.py",
             "api/concepts.py",
@@ -196,6 +213,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/concept_graph/backend_edge.py",
             "l1/concept_graph/embedding.py",
             "l1/concept_graph/node_projection.py",
+            # P3-26 — 적재 트랜잭션 안에서 DB의 선수 엣지를 읽어 순환을 검사하는 가드.
+            # 적재기 두 곳이 같은 가드를 쓰도록 한곳에 두었다
+            # (복제하면 두 적재기의 순환 판정이 갈라진다).
+            "l1/concept_graph/prerequisite_guard.py",
             "l1/concept_visual_style/overlay.py",
             "l1/concept_visualization/overlay.py",
             "l1/curriculum/curriculum_loader.py",
@@ -221,6 +242,12 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/standards/alignment_query.py",
             "l1/standards/criteria_loader.py",
             "l1/standards/learning_map.py",
+            # P3-22 — Coverage 계측기의 힌트 입력(`--hints-from-db`). `hints.verified = true` 행의
+            # 문항 ID를 DISTINCT로 읽기만 한다(쓰기 0 · 본문 미조회 · 기본 실행은 DB를 열지 않는다).
+            # 기존 조회 함수로 대체할 수 없다: 힌트 읽기 담당(`l4/hint_content/store.py`)은 L4라
+            # L1 계측기가 import하면 7계층 역방향이고, `find_served_hint`는 문항·레벨 단위 서빙
+            # 조회라 전체 문항 집합을 주지 않는다. 연결을 못 열면 CoverageError(exit 2)로 멈춘다.
+            "l1/standards/phase3_coverage.py",
             "l1/standards/standard_loader.py",
             "l1/strategy_graph/strategy_node_projection.py",
         }
@@ -235,6 +262,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/ability_snapshot_capture.py",
             "l2/ability_tracking.py",
             "l2/attempt_skill_event.py",
+            # EOS-47: 시도 접수 시점의 문항 판 포인터·교육과정 라벨을 PK 조회 1건
+            # (`session.get(Problem)`)으로 읽는 새 접근점. 쓰기 0 · 기존 baseline 파일에
+            # 문항 단건 조회 함수가 없어 재사용 불가.
+            "l2/attempt_version_pin.py",
             "l2/concept_diagnosis.py",
             "l2/evidence_event_store.py",
             "l2/item_calibration.py",
@@ -300,6 +331,24 @@ BASELINE: dict[str, frozenset[str]] = {
             # 트랜잭션·같은 행 잠금 안에 있어야 하므로 저장소 계층으로 분리하지 않았다 — 이
             # 등재가 "이 파일은 DB를 직접 잡는다"의 서면 선언이다.
             "l3/publish_gate.py",
+            # EOS-190 — 문항 판 Publish Gate. 위 개념 판 게이트의 짝으로, `problem_version` 행과
+            # 발행 포인터(`problem.problem_version_id`)를 쓰는 **유일한** 자리다(AST 동결
+            # test_problem_publish_gate_enforcement.py). 같은 이유로 저장소 계층으로
+            # 분리하지 않았다 — PUBLISH 전이는 문항 행 잠금 → 라이브 내용 대조 → 판 행 잠금 →
+            # 포인터 전환이 **한 트랜잭션·한 잠금 순서** 안에 있어야 `live_content_current`
+            # 검사가 의미를 갖는다.
+            "l3/problem_publish_gate.py",
+            # P3-04 — 발행 게이트가 PUBLISH 직전에 부르는 **읽기 전용** 증거 수집기다. 문항 하나의
+            # 7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 전략)를 5개 테이블(problem_concept
+            # · concept · skill_node · misconception_catalog/crosslink · hints)에서 읽는다.
+            # 재사용할 기존 조회 함수가 없는 새 접근점이다: `integrity_violations_gate.
+            # skill_coverage`는 전체 집계 SQL이라 문항 1건의 증거를 돌려주지 못하고, 그 모듈은
+            # ops 계층이라 l3이 import할 수도 없다. 세션을 직접 열지 않고 호출자(게이트)의
+            # 트랜잭션 안에서 받은 세션으로만 읽으며 잠금·쓰기가 없다. 게이트 모듈 안에 넣지 않은
+            # 이유는 그 모듈이 "problem_version의 유일한 writer"라는 AST 동결(R1·B1)을 지키는
+            # 좌석이어서 읽기 쿼리 5종을 섞으면 그 경계가 흐려지기 때문이다. 이 등재가 리뷰에
+            # 보이는 것이 이 가드의 목적이다.
+            "l3/problem_metadata_evidence.py",
             "l3/solution_path_store.py",
         }
     ),
@@ -323,6 +372,9 @@ BASELINE: dict[str, frozenset[str]] = {
         {
             "ops/account_bootstrap_cli.py",
             "ops/dialogue_encryption_preflight.py",
+            # ADMIN-18 — `--from-db`: 검수 타이머 이벤트·문항 판정을 DB에서 직접 읽어 적재율을 재는
+            # 관측 CLI(`weekly_metrics_report`·`loop_kpi_gate`와 같은 부류). 읽기 전용.
+            "ops/hit_cu_metrics.py",
             "ops/integrity_violations_gate.py",
             # EOS-15 — 루프 KPI 5종 수집기. 관측 CLI라 DB 직접 조회가 본질이며(관측 대상이
             # 실 운영 데이터다), `recommendation_reach_report`·`service_health`와 같은 부류다.

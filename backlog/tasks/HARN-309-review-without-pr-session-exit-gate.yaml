@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-309-review-without-pr-session-exit-gate
+title: "review 상태로 PR 없이 세션이 끝난다 — backlog.py review의 PR 증적 요구 + check-stop의 review·PR 미개설 차단 (완성품 4건이 3일 방치된 17회차 사고)"
+track: math-completion
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현 — 2026-10-09~12 사이 서로 다른 세션 4개가 완성 구현을 PR 없이 review 상태로 두고 끝났다: brave-franklin-2999u5(MATH-06 · 커밋 메시지 '태스크 in_progress → review (PR 미개설)') · amazing-goldberg-1oc67i(OPS-34 · 'review 전환 (PR 대기 — CLAUDE.md 먼저 지시 대기)') · nice-cray-mbg1mq(PED-26 · '상태 review(done은 PR 증적 필요 — PR 미개설)') · happy-turing-kmrd5z(OPS-50 · 부분 완료). 전부 원격 claim이 TTL 72h를 넘겨 방치됐고 main 부재 줄은 590~876줄이다(docs/reviews/unmerged_branch_audit_2026-10-12.md §3). 원인 = 두 지시의 충돌을 세션이 '합법 출구'로 풀었다: 클라우드 세션 기본 지시('PR은 사용자가 요청할 때만')와 CLAUDE.md '완료·병합'(산출물이 있으면 요청 없이 PR을 연다)이 충돌할 때 세션이 전자를 택하고, backlog.py review(in_progress→review)가 PR 증적을 묻지 않으므로 대장상 정상 상태로 종료된다. 실측 근거: scripts/harness/backlog.py의 cmd_review는 PR 참조·--no-pr 사유를 검사하지 않고, check-stop은 in_progress 소유 태스크만 막는다(review는 통과)"
+  - "② 집행 — (가) review 전이에 done과 같은 PR 증적 검사(HARN-23의 _has_pr_reference·--no-pr {investigation|incomplete|ci-red|kiki-hold} 재사용)를 적용하거나, review를 'PR 열림·검토 대기'로 재정의한다. 어느 쪽이든 PR도 예외 사유도 없이 review로 갈 수 없다 (나) check-stop(Stop 훅)은 세션 브랜치 소유 태스크가 review인데 PR 참조가 없으면 exit 2로 종료를 막고 PR을 열라는 재작업을 요구한다 (다) 두 경로 모두 거부 시 대장·이벤트 파일을 한 바이트도 바꾸지 않는다. HARN-20(review 전이 도입) 설계 의도와 충돌하는지 먼저 판정해 적는다"
+  - "③ 변별력 — tests/harness에 PR 없음·--no-pr 사유 있음·PR 참조 있음 3경우를 두고, 게이트를 제거하면 첫 경우가 RED가 되는지 뮤테이션으로 확인한다(주입 적용 mutated != original 단언과 원복 바이트 동일 단언 포함). 정상 대조군(PR 참조·정당한 예외 4종)이 통과해야 한다. 통과 대조군이 없으면 '전부 거부'로 과잉 수정된 게이트가 초록으로 보인다"
+  - "④ 배선 — 신규 테스트가 CI의 harness-integrity 잡에서 실제로 수집되는지 실측한다. CLAUDE.md는 수정하지 않는다(2026-09-20 새 산문 규칙 등재 동결) — 세션이 보는 문구가 필요하면 brief --format hook 출력에 한 줄을 병기하는 것으로 한정한다"
+  - "⑤ done 경로의 같은 구멍(2026-10-14 stray-code 18회차 추가) — review만 막으면 done --no-pr incomplete가 남는다. 2026-10-12T13:50:58Z claude/relaxed-keller-4wk0b2가 OPS-126을 done으로 닫으면서 no_pr_reason=incomplete를 썼다(이벤트 샤드 실측). 커밋 메시지는 전체 스위트·CI 잡 재현 통과를 적었는데 사유는 '미완'이라, 완료로 닫힌 태스크가 PR 없이 고립됐다(회수 = OPS-140). 즉 incomplete는 done과 의미가 모순되는데 CLI가 허용한다. 집행: (가) done에서 incomplete를 거부하고 미완이면 in_progress/review를 유지하게 하거나 (나) incomplete로 done을 허용하되 미이행 acceptance 항을 notes에 강제 열거하고 PR 사후 해소(HARN-57)까지 후속 감시 대상으로 올린다. 어느 쪽이든 HARN-23 정본 문면('incomplete=미완 또는 사람 게이트 대기')과의 충돌을 먼저 판정해 적고, 정당한 사람 게이트 대기 대조군이 통과하는지 함께 검증한다."
+artifacts: []
+paths:
+  - "scripts/harness/**"
+  - "tests/harness/**"
+session: null
+notes: |-
+  출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §4 (stray-code 17회차). 기존 대책과의 관계 — HARN-23은 done 시점의 PR 증적만 막고, HARN-47은 고립과 PR 대기를 탐지하는 축이라 review 전환 시점의 방치는 둘 다 못 본다. 탐지(야간 고립 리포트)는 claim TTL이 지나야 해당 브랜치를 올리므로 최대 3일 늦다 — 이 태스크는 그 지연 구간을 입구에서 닫는다. 반복 실수(고립 5회차+)이므로 CLAUDE.md 실수 관리에 따라 대책은 코드·태스크 형태다.
+
+  [정정 2026-10-14] stray-code 18회차: review 전이만 막으면 done --no-pr incomplete 경로가 남는다는 실측(OPS-126 relaxed-keller) 추가
+updated: 2026-10-14

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """S4-18 결정론 계보 동기화 — rephrase 변형에 identity_id/problem_relation을 부여한다.
 
-**소급(429건) + 향후(재실행 가능)** 양쪽에 쓰는 같은 스크립트다 — `problem_corpus_rephrase.py`는
-의도적으로 slug/problem_id/identity_id를 건드리지 않는다(발문만 다양화하는 것이 그 함수의
-계약이자, `--in` 소스 코퍼스는 이 파이프라인 전체에서 읽기 전용이라는 기존 관례 — S2-08
-`reconcile_rephrased_corpus_s2_08.py`와 동형). 그래서 Phaiakes9에서 새 rephrase 배치를 돌린
-뒤에는 매번 이 스크립트를 재실행해 계보를 동기화한다(멱등이라 몇 번을 돌려도 안전 — 이미
-처리된 레코드는 스킵하고 신규 레코드만 처리).
+**소급(S4-18 당시 429건) + 향후(재실행 가능)** 양쪽에 쓰는 같은 스크립트다 —
+`problem_corpus_rephrase.py`는 의도적으로 slug/problem_id/identity_id를 건드리지 않는다(발문만
+다양화하는 것이 그 함수의 계약이자, `--in` 소스 코퍼스는 이 파이프라인 전체에서 읽기 전용이라는 기존
+관례 — S2-08 `reconcile_rephrased_corpus_s2_08.py`와 동형). 그래서 Phaiakes9에서 새 rephrase 배치를
+돌린 뒤에는 매번 이 스크립트를 재실행해 계보를 동기화한다(멱등이라 몇 번을 돌려도 안전 — 이미 처리된
+레코드는 스킵하고 신규 레코드만 처리).
 
 배경: rephrase는 원본 Problem을 그대로 복사하며 question_text만 바꾸므로(`l3/equivalent/
-rephrase.py` 계약), rephrased_v0 429건 중 392건(91%)이 원본과 *동일* slug·problem_id를
+rephrase.py` 계약), 당시 rephrased_v0 429건 중 392건(91%)이 원본과 *동일* slug·problem_id를
 갖는다(실측 확인) — populate.py의 slug ON CONFLICT upsert가 이 둘을 *같은 DB 행*으로
 병합해, problem_relation(2행 관계)을 맺을 대상 행 자체가 없다(schema._no_self_relation이
 구조적으로 막음). 나머지 37건(8.6%)은 이미 별개 slug/problem_id를 갖지만 계보(relation)가
@@ -139,7 +139,7 @@ def _load(path: Path) -> list[dict]:
 
 
 def backfill(*, check: bool) -> int:
-    """전량 429건 계보 백필 — 미해석/충돌 잔여가 있으면 즉시 실패(fail-closed)."""
+    """전량 계보 백필(S4-18 당시 429건) — 미해석/충돌 잔여가 있으면 즉시 실패(fail-closed)."""
     generated = _load(_GENERATED)
     rephrased = _load(_REPHRASED)
 

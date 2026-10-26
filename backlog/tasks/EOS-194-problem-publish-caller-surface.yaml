@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-194-problem-publish-caller-surface
+title: "문항 발행 호출 표면 — l3/problem_publish_gate의 운영 호출자 (EOS-190 writer는 있으나 부르는 곳이 0건)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: review
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-190-problem-version-publish-writer
+requires_gates: []
+acceptance:
+  - "문항 발행 호출 표면: l3/problem_publish_gate의 운영 호출자를 만든다. EOS-190은 problem_version의 유일한 writer 모듈을 만들었지만 이 모듈을 부르는 라우트·CLI가 0건이라 운영 DB의 problem.problem_version_id는 여전히 전부 NULL이고 EOS-47의 outcome=pinned 비율은 0이다. 이 태스크가 그 마지막 연결이다. 표면은 관리자 CMS 라우트(P3-12 api/admin_cms.py의 권한 가드 재사용)와 운영 CLI 중 판정 근거와 함께 하나를 고른다. 호출자는 게이트 모듈의 공개 함수만 부르고 ORM ProblemVersion을 import하지 않는다(AST 동결 R1이 이미 강제)."
+  - "권한 매핑: 초안 생성·제출은 content_editor, 검토 통과는 content_reviewer, 승인·발행·내리기는 content_publisher(schema/cms_access.py 정본 재사용). 전이 1건마다 감사 행 1개(record_content_mutation_audit)를 남긴다."
+  - "착지 후 실측(작동한 비율): 실제 호출 표면으로 문항 1건을 발행해 submit_attempt가 outcome=pinned를 내고 problem_attempt.problem_version_id가 채워짐을 확인하고, 운영 DB에서 problem.problem_version_id IS NOT NULL 문항 수를 분모(전체 노출 문항 수)와 함께 보고한다. 0건이면 0건이라고 적는다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1629"
+paths:
+  - "src/backend/whymath_backend/api/**"
+  - "tests/backend/api/**"
+session: claude/hopeful-sagan-tj2m92
+notes: |-
+  출처: EOS-190 착지 시 발견. 모듈 docstring의 '운영 호출자 없음' 항목을 이 태스크가 소유한다. docs/architecture/eos190_problem_publish_writer.md 5절.
+
+  [정정 2026-10-14] PR 증적 기록 — 인수 조건 1·2 충족, 조건 3(운영 DB 실측)은 Kiki 실행 과제로 남아 done 보류
+updated: 2026-10-14

@@ -43,7 +43,7 @@ import argparse
 import json
 import sys
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -84,6 +84,8 @@ class ApplyReport:
     db_updated: int
     missing_in_corpus: list[str]
     gate_violations: list[str]
+    cms_edit_conflicts: list[str] = field(default_factory=list)
+    """CMS가 고친 본문이라 DB 승격을 건너뛴 코드(P3-25) — `concept_content:<code>` 형식."""
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -96,6 +98,7 @@ class ApplyReport:
             "db_updated": self.db_updated,
             "missing_in_corpus": sorted(self.missing_in_corpus),
             "gate_violations": list(self.gate_violations),
+            "cms_edit_conflicts": sorted(self.cms_edit_conflicts),
         }
 
     def render(self) -> str:
@@ -110,6 +113,11 @@ class ApplyReport:
             f"대학 JSON 갱신: {self.university_updated}건",
             f"DB 갱신: {self.db_updated}건",
         ]
+        if self.cms_edit_conflicts:
+            lines.append(
+                f"CMS 편집 보호로 DB 승격을 건너뜀: {len(self.cms_edit_conflicts)}건 — "
+                "고친 본문은 이 검수 라벨이 본 본문이 아니다(CMS에서 다시 검수)."
+            )
         if self.gate_violations:
             lines.append("")
             lines.append(
@@ -260,7 +268,9 @@ def apply_labels(
     # DB 갱신
     content_store = store if store is not None else ConceptContentStore()
     if not dry_run:
-        report.db_updated = content_store.mark_review_status(tuple(approved_codes), "reviewed")
+        report.db_updated = content_store.mark_review_status(
+            tuple(approved_codes), "reviewed", conflicts=report.cms_edit_conflicts
+        )
 
     return report
 

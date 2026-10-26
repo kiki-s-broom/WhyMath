@@ -1,0 +1,29 @@
+{
+  "task": "P3-05-triangle-density",
+  "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+  "seed": 20261008,
+  "bank": "data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
+  "bank_sha256": "a4b7823d87a143484f62028f242e18b6de4727257a9b52644108422b9aa2e450",
+  "n_items": 204,
+  "n_shards": 4,
+  "shard_size": 51,
+  "shards": [
+    {
+      "file": "shard1.jsonl",
+      "sha256": "a001ef41c377d1612f5871e3ef236ad7fbf557995e0ab36bad1946e08b85cfdd"
+    },
+    {
+      "file": "shard2.jsonl",
+      "sha256": "4429e42b20f848d84a8bd2a0c094810a913ffda0d62790906c0ab5d930555852"
+    },
+    {
+      "file": "shard3.jsonl",
+      "sha256": "06815386d4f40e571fc6be3f9fc9569ccfa2fc311d7e8ac2a245a32a07722b4d"
+    },
+    {
+      "file": "shard4.jsonl",
+      "sha256": "0b0487c2e8891f6291d35e1abbacc2b0f4dd63aad6d1abffc1d6e3c3d27de84d"
+    }
+  ],
+  "rater_protocol_sha256": "3046a901033ea2eadd7c3aafbc32e2a94c3c241551f7d8e6fa50eb2c606ee27a"
+}

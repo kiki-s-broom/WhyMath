@@ -1,0 +1,40 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-135-ci-container-image-registry-resilience
+title: "CI 컨테이너 이미지의 Docker Hub 익명 pull 의존 제거 — 2026-10-09 한도 초과로 머지 queue 연속 탈락(서비스 컨테이너 4잡 + docker-build + weekly-metrics)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates:
+  - G-ops135-ci-image-source-decision
+acceptance:
+  - "① 결정(착수 조건 — 게이트로 집행): 게이트 G-ops135-ci-image-source-decision이 통과해 공급원 선택지(ghcr 미러 / Docker Hub 로그인 pull / 감수)가 정해져 있다. ③(감수)이 선택되면 이 태스크는 구현 없이 cancel하고(사유 = 게이트 evidence) 재판정 트리거(다음 탈락 시점)만 notes에 남긴다.\n\n② 범위 전수(착수 시 코드로 재산출 — 아래 목록은 2026-10-09 실측이며 정본이 아니다): Docker Hub를 익명으로 부르는 지점 전부. 실측 목록 = ci.yml의 backend-migrations(pgvector/pgvector:pg16) · data-pipeline-integration(pgvector/pgvector:pg16) · data-pipeline-neo4j(neo4j:5) · e2e-nightly(pgvector/pgvector:pg16) 서비스 컨테이너, docker-build 잡의 Dockerfile(FROM python:3.12-slim 2곳 + 첫 줄 syntax=docker/dockerfile:1 프런트엔드 이미지), weekly-metrics.yml의 pgvector/pgvector:pg16. 재산출은 grep 한 이름이 아니라 워크플로 YAML을 파싱해 services.*.image·container·docker pull/run 인자를, Dockerfile에서 FROM·syntax를 읽어 낸다(부재 판정은 검색 방법 자체가 옳아야 성립한다). 범위 밖으로 명시: 운영 docker-compose의 이미지 참조(CI 아님).\n\n③ 구현(선택지별): ①이면 미러 워크플로 신설(수동 + 주기 실행 · digest 고정 · pull 재시도) 후 서비스 이미지·Dockerfile FROM·프런트엔드 이미지를 미러 참조로 전환한다. ②이면 services.*.credentials와 docker-build 잡의 로그인 스텝을 추가하고, 시크릿 부재(포크 PR) 시 동작을 명시하며, 시크릿 등록은 사람 게이트로 분리한다. 어느 쪽이든 변경 대상은 ②의 재산출 목록 전부이고, 일부만 바꾼 상태를 완료로 치지 않는다.\n\n④ 집행(정본화와 별항): tests/infra에 거버넌스 테스트를 신설해 ②의 재산출 로직으로 모든 이미지 참조가 선택된 공급원(또는 credentials 보유)인지 단언한다. 새 익명 Docker Hub 참조가 추가되면 RED다. 스캔 대상 0건이면 실패한다(공허 통과 금지). 실패 주입은 순수 Python 하네스로 적용 단언(변이본 != 원본)과 바이트 동일 원복을 넣고, 최소 4종 — 서비스 이미지를 옛 참조로 되돌림 / credentials 키 삭제 / Dockerfile FROM을 옛 참조로 되돌림 / 새 잡에 익명 참조 추가 — 이 각각 RED이고 정상 입력(대조군)은 GREEN이어야 한다. 테스트가 CI에서 실제로 도는 잡(infra-contracts)을 실측으로 적는다.\n\n⑤ 실물 검증(초록만으로 판정 금지): 변경 후 PR CI 1회와 머지 queue 실행 1회에서 컨테이너 단계가 성공하고, 로그에 새 공급원 pull 줄(ghcr 참조 또는 인증 pull)이 실제로 찍힌 것을 인용한다. 익명 pull로 폴백했는데 마침 한도가 안 걸려 통과한 경우와 구분하려는 것이다.\n\n⑥ 관측 판정(구현이 아니라 판정 기록): 한도 실패(toomanyrequests · 429)가 코드 실패로 읽히지 않도록 CI에서 원인을 구분해 보이게 할 수 있는지 판정하고, 불가능하면 그 이유를 notes에 기록한다. 서비스 컨테이너 초기화가 실패한 잡은 뒤 스텝이 실행되지 않을 수 있어 가능 여부부터 실측해야 한다.\n\n⑦ 잔여 위험 기록: 미러를 택했다면 미러 이미지가 낡는 문제(보안 패치 지연)의 갱신 주기와 책임을, 로그인 pull을 택했다면 계정 한도가 CI 전체에서 공유되는 문제를 정본 문서 한 곳에 적는다."
+artifacts:
+  - "PR #1626 (1단계: 미러 목록·도구·워크플로·런북, main a11a1320) · PR #1628 (2단계: CI 참조 전환 + 공급원 계약 테스트 tests/infra/test_ci_image_sources.py, main 0cf43504). 공급원 판정: 게이트 G-ops135-ci-image-source-decision ①ghcr 미러(Kiki 2026-10-14). 실물 검증(acceptance ⑤): mirror-ci-images 첫 실행 run 38602523083 3/3건·digest 3종 업스트림 일치 · #1628 PR CI run 38607751417 및 머지 큐 run 38640444196 모두 성공, Neo4j·PG 서비스가 docker login ghcr.io 뒤 ghcr 사본을 pull(Status: Downloaded)하고 docker-build가 FROM ghcr.io/…/python:3.12-slim@sha256:a6e34c59를 해석, 큐 Neo4j 잡 로그 489줄에 Docker Hub 접근 0건. 미확인(런북 §5): 사본 패키지 공개 전환 여부(현재 비공개·익명 읽기 401) · neo4j/pgvector 이미지 재배포 라이선스 · Docker Hub 현행 한도 수치."
+paths:
+  - ".github/workflows/ci.yml"
+  - ".github/workflows/weekly-metrics.yml"
+  - Dockerfile
+  - tests/infra/test_ci_image_sources.py
+session: null
+notes: |-
+  [배경 실측 — 2026-10-09 UTC, 판정 기준 main 62243f2b7] 머지 queue 실행 3회(run 37989891118 · 37990209063 · 37992321577)가 서비스 컨테이너를 띄우는 Initialize containers 단계에서 docker pull을 3회 연속 실패했다. 로그: toomanyrequests: You have reached your unauthenticated pull rate limit. 이 때문에 PR #1529가 20:53:27Z · 20:56:23Z · 21:16:17Z에 CI_FAILURE로 dequeue됐다(그 앞서 19:38Z 탈락은 별개 원인 — 시간 단언 테스트). 같은 시간대 다른 PR의 pull_request 실행(run 37990987788 · 21:03Z)도 data-pipeline 실 PG · 실 Neo4j · backend-migrations가 같은 단계에서 실패했고, docker-build 잡은 21:10Z 이미지 빌드에서 429 Too Many Requests(registry-1.docker.io 의 library/python:3.12-slim 매니페스트 HEAD 요청)로 실패했다. 한도는 20:53Z부터 21:16Z까지 최소 23분 지속됐다. 러너는 이미 pull을 약 13초 동안 3회 재시도했으므로(run 37989891118 로그: 20:52:57 · 20:53:05 · 20:53:09) 재시도를 조금 늘려서는 해소되지 않는다.
+
+  [해소 관측] 10-12 07:02Z 이후 머지 queue 실행 7건 중 6건 성공했다. 실패 1건(PR #1565, 12:32~13:04Z)은 32분이 걸렸으므로 컨테이너 초기화 단계의 수십 초 실패와는 다른 모양이다 — 원인은 로그로 확인하지 않았다. 10-09 21:16Z ~ 10-12 07:02Z 사이에 한도가 언제 풀렸는지는 조사하지 않았다.
+
+  [미확인 — 구현 전에 확인] Docker Hub 익명·인증 한도 수치(정책이 바뀌므로 문서로 재확인) · ghcr 공개 패키지로 neo4j / pgvector 이미지를 재배포해도 되는지(라이선스) · 비공개 패키지로 둘 때 플랜별 저장 용량 상한 · mirror.gcr.io / public.ecr.aws에 두 이미지가 실제로 있는지.
+
+  [기각한 대안] ①서비스 컨테이너 pull 재시도 확대: 러너 재시도가 이미 있고 한도 지속이 23분 이상이라 무효. ②공개 풀스루 미러(mirror.gcr.io 등) 직접 참조: 우리가 통제하지 못하는 캐시이고 이미지 존재도 미확인. ③잡 단위 재실행: 머지 queue 한 칸이 약 30분이라 한 번의 한도 실패가 곧 30분 손실이다.
+
+  [관련] OPS-121(CI 의존 해석 고정 — 외부 공급원 변동이 CI 재현성을 흔드는 같은 계열) · OPS-100 / OPS-120(CI 잡 시간 예산). 이 태스크는 시간 예산이 아니라 공급원 안정성 축이다.
+
+  [사람 행동 구분] 게이트 G-ops135-ci-image-source-decision 이 선택지를 정한다. ②를 고르면 Docker Hub 계정 · 액세스 토큰 발급과 GitHub Actions Secrets 등록은 Kiki가 직접 해야 한다(세션이 대신할 수 없다). ①을 고르면 조직의 패키지 권한 확인이 필요하다.
+
+  [사고 기록] 같은 사건은 사고 대장(incident add)에 등재했고 대책 참조가 이 태스크다.
+  [진행 — 2026-10-14] 게이트 G-ops135-ci-image-source-decision을 Kiki가 ①ghcr 미러로 판정했다(채팅 지정). 1단계 PR #1626 머지(a11a1320): 미러 목록·도구·워크플로·런북. 머지 직후 mirror-ci-images 첫 실행 성공(run 38602523083 · 49초 · 3/3건) — 사본 digest 3종이 업스트림 실측과 일치한다(pgvector 7b822b0a · neo4j f1e52d4d · python a6e34c59). **사본 패키지는 비공개다**(로그인 없는 imagetools inspect가 3종 모두 401) → 소비처는 credentials·docker login·packages 읽기 권한이 필요하다. 2단계(CI 참조 전환 + 계약 테스트 tests/infra/test_ci_image_sources.py)는 커밋 b81f41fd이며 로컬 CI 미러 상시 잡 5종이 40스텝 전부 통과했다 — PR 대기. 남은 일: ⑤ 실물 검증(2단계 PR CI·머지 큐 로그에서 사본 pull 줄을 인용 — 익명 폴백과 구분) → 그 뒤에 done. ⑥ 관측 판정은 런북 §5 ⑥에 기록했다(컨테이너 초기화 실패 잡은 뒤 스텝이 안 돌아 CI 안에서 원인을 따로 표시할 수 없다 — 미실측 추론). ⑦ 잔여 위험은 런북 §5로 충족. 미확인으로 남은 것: 사본 공개 전환 여부·neo4j/pgvector 재배포 라이선스·Docker Hub 현행 한도 수치.
+updated: 2026-10-14

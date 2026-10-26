@@ -27,8 +27,11 @@ Lifecycle 불변식 시행(§7):
   아니라 **DB BEFORE UPDATE 트리거**(`problem_version_immutability_guard`, alembic 리비전에서
   생성)가 유일 권위로 강제한다 — ORM에는 가짜 CHECK/이벤트 리스너를 만들지 않는다.
 
-**운영 writer는 아직 없다.** 전이 실행(게이트)은 `l3/publish_gate.py`가 `ConceptVersion`에 대해서만
-갖고 있다. 문항 발행 경로가 생기면 그 모듈이 이 ORM의 유일한 쓰기 자리가 되어야 한다(별도 태스크).
+**운영 writer는 `l3/problem_publish_gate.py` 하나다**(EOS-190). 이 ORM의 클래스 import는 이 정의
+파일·`db/models/__init__.py`·그 게이트 모듈에서만 허용되고, `problem.problem_version_id` 포인터
+쓰기도 그 모듈뿐이다(AST 동결 `tests/backend/l3/test_problem_publish_gate_enforcement.py`).
+그 모듈을 부르는 운영 호출자는 관리자 CMS의 문항 판 표면(`api/admin_cms_problem_versions.py`,
+EOS-194)이다 — 운영 DB의 포인터는 운영자가 문항을 발행한 만큼만 값이 생긴다.
 """
 
 from __future__ import annotations

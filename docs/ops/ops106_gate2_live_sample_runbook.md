@@ -83,7 +83,7 @@ Phaiakes9 = 평소 쓰시는 **Windows PowerShell**. 작업 디렉터리 `C:\Use
    `completion.handled=False`라 primary LLM이 호출됩니다. **다만 실제 학생(문항이 있고 정답/오답이 판정되는 턴)은
    일부 턴이 돌아보기·재고 템플릿으로 가로채져 LLM을 건너뜁니다** — 이 실측은 "배선이 닿는가"의 확인이지
    "학생 분포를 대표한다"는 주장이 아닙니다.
-3. **rephrase 입력 코퍼스를 아무거나 쓰면 LLM 호출이 0건입니다.** 코퍼스 31개 중 대부분이 `question_text`에서
+3. **rephrase 입력 코퍼스를 아무거나 쓰면 LLM 호출이 0건입니다.** 코퍼스 31개(2026-10-06 작성 당시) 중 대부분이 `question_text`에서
    방정식을 추출할 수 없는 문항(`equation_extractable=0`)이라, 그것을 넘기면 저작 호출이 0건이 되어
    "분리 실패"로 오진됩니다. 이 런북은 **200건 전부 추출 가능한** `problem_bank_discrete_ev_v0`를 쓰고,
    §1이 앞 5건이 실제로 추출 가능한지 **직접 재서** `CORPUS_OK`로 확인합니다.
@@ -142,11 +142,56 @@ $CorpOut
 **판정**: `PRE_OK=True`면 §2로 갑니다. 하나라도 `False`면 그 줄(`FETCH_OK`·`CODE_MATCHES_ORIGIN_MAIN`·
 `LOADED_FROM_CLONE`·`LANGFUSE_KEYS_OK`·`WH1_PRIMARY_ON`·`OLLAMA_REACHABLE`·`CORPUS_OK`)을 회신해 주십시오.
 
-- `CODE_MATCHES_ORIGIN_MAIN=False` — 이 클론이 다른 브랜치이거나 미커밋 변경이 있는 것입니다. **브랜치를 옮기지
-  마십시오**(여러 세션이 공유하는 작업 사본입니다). 출력을 회신하면 세션이 처리합니다.
+- `CODE_MATCHES_ORIGIN_MAIN=False` — 이 클론의 코드가 `origin/main`과 다른 것입니다. 원인은 셋 중 하나입니다:
+  ⓐ 클론이 main에서 **단순히 뒤처짐**(아래 「클론이 origin/main보다 뒤처졌을 때」 절로 해소) ⓑ 다른 브랜치이거나
+  main보다 앞선 커밋이 있음 ⓒ 비교 대상 경로에 미커밋 변경이 있음. ⓑ·ⓒ는 **브랜치를 옮기지 마십시오**(여러
+  세션이 공유하는 작업 사본입니다) — 출력을 회신하면 세션이 처리합니다.
 - `KEY_PREFIX_TYPICAL=False`는 정보일 뿐 중단 사유가 아닙니다(자체 호스팅 키는 접두사가 다를 수 있음).
   중단 사유는 `KEYS_PLACEHOLDER_FREE`(키가 20자 미만이거나 `…` 문자가 섞임 = 자리표시자 키)입니다.
 - `WH1_PRIMARY_ON=False` — `WHYMATH_WH1_PRIMARY_ENABLED=false`가 어딘가에 남아 있는 것입니다(킬스위치).
+
+### 클론이 origin/main보다 뒤처졌을 때 (`CODE_MATCHES_ORIGIN_MAIN=False`의 해소)
+
+**언제 쓰는가**: §1 출력이 `CODE_MATCHES_ORIGIN_MAIN=False`이고, 클론이 main 브랜치에 있으면서 main보다 **뒤처지기만**
+했을 때(원격에는 새 커밋이 있고 내 클론에는 그것이 없는 상태)입니다. 이때 코드를 맞추는 안전한 방법은 "빨리감기"
+(`git merge --ff-only`) 하나뿐입니다 — 내 쪽에 따로 쌓은 커밋이 없을 때만 성립하고, 성립하지 않으면 git이 스스로
+거부합니다.
+
+**이 블록이 스스로 확인한 뒤에만 합칩니다.** 다섯 조건이 전부 참일 때만 `git merge --ff-only origin/main`을 실행하고,
+하나라도 거짓이면 **아무것도 바꾸지 않고** 어느 조건이 거짓인지 출력합니다. `git pull`·`git checkout`·`git reset`은
+쓰지 않습니다(공유 작업 사본의 브랜치와 미커밋 변경을 건드리지 않기 위해서입니다).
+
+| 조건 | 거짓이면 무슨 뜻인가 |
+|---|---|
+| `FETCH_OK` | `git fetch`가 실패(네트워크·인증) — 비교 기준이 낡았을 수 있다 |
+| `ON_MAIN` | 클론이 main이 아닌 브랜치에 있다 — 다른 세션이 옮겨 둔 것이니 옮기지 말고 회신 |
+| `AHEAD_ZERO` | main에 없는 내 커밋이 있다 — 빨리감기 불가(갈라짐) |
+| `BEHIND_POSITIVE` | 뒤처진 게 아니다 — 이미 최신이거나, 다른 원인이다 |
+| `PATHS_CLEAN` | 비교 대상 경로(`src/backend`·`scripts/demo`·코퍼스)에 미커밋 변경이 있다 |
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ② — 뒤처짐 해소(빨리감기 전용 · 조건 불충족이면 아무것도 바꾸지 않고 거부)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+$Repo = "C:\Users\kiki\Desktop\__AI\WhyMath"
+git fetch origin main
+$FetchOk = ($LASTEXITCODE -eq 0)
+$Branch = (git rev-parse --abbrev-ref HEAD)
+$Ahead = [int](git rev-list --count origin/main..HEAD)
+$Behind = [int](git rev-list --count HEAD..origin/main)
+$Dirty = @(git status --porcelain -- src/backend scripts/demo data/corpus/problem_bank_discrete_ev_v0)
+$OnMain = ($Branch -eq "main")
+$AheadZero = ($Ahead -eq 0)
+$BehindPositive = ($Behind -gt 0)
+$PathsClean = ($Dirty.Count -eq 0)
+$CanFf = ($FetchOk -and $OnMain -and $AheadZero -and $BehindPositive -and $PathsClean)
+"BRANCH=$Branch  AHEAD=$Ahead  BEHIND=$Behind  DIRTY_PATH_ENTRIES=$($Dirty.Count)"
+"FETCH_OK=$FetchOk  ON_MAIN=$OnMain  AHEAD_ZERO=$AheadZero  BEHIND_POSITIVE=$BehindPositive  PATHS_CLEAN=$PathsClean"
+if ($CanFf) { git merge --ff-only origin/main; "FF_MERGE_EXIT=$LASTEXITCODE"; "HEAD_NOW=$(git rev-parse --short HEAD)  ORIGIN_MAIN=$(git rev-parse --short origin/main)" } else { "FF_REFUSED=True — 위 다섯 조건 중 False인 줄이 이유입니다. 아무것도 바꾸지 않았습니다. 이 두 줄을 그대로 회신해 주십시오." }
+```
+
+**판정**: `FF_MERGE_EXIT=0`이고 `HEAD_NOW`와 `ORIGIN_MAIN`이 같으면 해소된 것입니다 — **이 절 위의 §1 블록을 다시 붙여넣어**
+`CODE_MATCHES_ORIGIN_MAIN=True`·`PRE_OK=True`를 확인하십시오(이 블록의 성공은 §1의 통과가 아닙니다). `FF_REFUSED=True`면
+`False`인 조건 줄을 회신하십시오 — 그 상태는 사람이 판단할 일이라 세션이 처리합니다.
 
 ---
 
@@ -165,6 +210,39 @@ cd C:\Users\kiki\Desktop\__AI\WhyMath
 `▶ [6/6]` 단계와 "실기기 시연 준비 완료" 안내가 보이면 기동이 끝난 것입니다(1~3분 추정). 이 런북은 실기기·Flutter를
 쓰지 않으므로 안내된 `flutter run` 명령은 무시하십시오. 이 줄에서 `throw` 오류(`backend 프로세스가 기동 직후
 종료`, `PG가 시간 내 준비되지 않음` 등)가 나면 그 문장을 회신해 주십시오.
+
+### alembic 리비전을 못 찾을 때 (낡은 데모 DB)
+
+**증상**: `▶ [2/6]`에서 `Can't locate revision identified by '...'`(영문) 뒤에 서버가 멈춥니다. 2026-10-12
+실측에서는 리비전 `79de95331710`이었고, `Container whymath-demo-db Started`가 찍혀 있었습니다 — 새로 만든 DB가 아니라
+**예전에 쓰던 데모 컨테이너를 다시 켠 것**입니다.
+
+**원인**: 그 데모 DB가 예전에 닫힌 PR·미머지 브랜치의 코드로 마이그레이션(DB 구조 갱신)된 적이 있어, 지금 `main`에는
+없는 리비전 번호를 기억하고 있습니다. 데모 DB는 일회용이라 지워도 되는 DB이며, **운영 DB와는 다른 컨테이너**입니다
+(`run_demo.ps1`은 운영 DB에 접속하지도 않습니다).
+
+**이제 `run_demo.ps1`이 스스로 판정합니다.** 실패하면 데모 DB가 기억하는 리비전을 읽어 현재 코드와 대조하고, 낡은 DB면
+`✖ 낡은 데모 DB`와 함께 **코드에 없는 리비전 번호**를 보여 줍니다. 자동으로 지우지는 않습니다 — 판정이 `낡은 DB`일
+때 안내되는 명령을 **직접** 붙여 다시 실행해야만 초기화됩니다. 판정 결과별 의미는 다음과 같습니다.
+
+| 화면에 보이는 문장 | 의미 | 할 일 |
+|---|---|---|
+| `✖ 낡은 데모 DB` + `코드에 없는 리비전: <번호>` | DB가 현재 코드에 없는 리비전을 기억함 | 아래 블록(`-ResetStaleDemoDb`) |
+| `데모 DB가 기억하는 리비전은 모두 현재 코드에 있습니다` | 낡은 DB가 아님 — 마이그레이션 자체 오류 | 위쪽 alembic 오류 문장을 회신 |
+| `낡은 데모 DB인지 판정하지 못했습니다` | 조회 실패(컨테이너 미응답 등) — 낡았다고 단정하지 않음 | 그 문장 전체를 회신 |
+| `데모 DB(127.0.0.1:55432)가 아니거나 … 진단·초기화를 건너뜁니다` | `WHYMATH_DEMO_DATABASE_URL`로 다른 DB를 가리키는 중 | 그 문장을 회신(세션이 처리) |
+
+낡은 DB로 판정됐을 때만, **창 ①에서** 아래 한 블록을 붙여넣습니다. 서버 기동 명령이라 이 창은 이후 조작하지 마십시오
+(위 §2 경고와 같습니다). 지워지는 것은 **데모 컨테이너 `whymath-demo-db`의 데이터뿐**입니다.
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — 낡은 데모 DB 초기화 후 서버 기동(이 창은 이후 조작 금지)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+.\scripts\demo\run_demo.ps1 -ResetStaleDemoDb
+```
+
+초기화를 직접 하고 싶다면 종전 방법도 유효합니다: 창 ②에서 `.\scripts\demo\stop_demo.ps1`(데모 컨테이너를 볼륨째 삭제)을 실행한 뒤
+창 ①에서 `.\scripts\demo\run_demo.ps1`. 두 방법 모두 운영 DB와 무관합니다.
 
 ---
 

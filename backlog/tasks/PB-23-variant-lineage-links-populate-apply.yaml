@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-23-variant-lineage-links-populate-apply
+title: "변형 계보 연결 후보 적재 — PB-20 사이드 JSONL 을 problem_relation 으로 올려 CAT 에 닿게 한다"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - PB-20-variant-corpus-intake-and-link-only-lineage
+requires_gates: []
+acceptance:
+  - "① 적재 경로 — harness/problem_corpus_lineage_links.py 가 내는 사이드 JSONL(child_slug·parent_slug·relation_type)을 problem_relation 으로 멱등 upsert 하는 단계를 populate 계열에 둔다. 키는 기존 (parent_problem_id, related_problem_id, relation_type) 유니크 키이며 similarity_score 는 None 그대로다. 봉인된 코퍼스의 relations 는 건드리지 않는다.\n② 참조 무결성 — slug 가 DB 에서 해석되지 않으면 orphan skip 으로 세고 리포트에 싣는다(조용한 누락 금지). 자기 관계는 ProblemCorpusError 로 거부한다.\n③ 선행 확인 — 적용 전에 sibling_filter 기본값이 OFF 임과 PB-19 분류기가 변형·선수·심화를 역할로 읽음을 테스트로 확인한다. 적재 뒤 CAT 에 닿는 쌍(부모·상대 모두 approved)의 수를 리포트로 남긴다.\n④ 집행 지점(정본화와 별항) — 적재된 관계가 load_sibling_ids 호출 경로를 실제로 경유해 소비됨을 테스트로 동결한다.\n⑤ 작동한 비율 — 연결 후보 대비 적재 성공·skip 사유별 깔때기를 낸다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+  - src/backend/whymath_backend/harness/problem_corpus_lineage_links.py
+  - "tests/backend/l1/problem_bank/**"
+session: null
+notes: PB-20 발견 사항. 근거 문서 docs/architecture/problem_bank_variant_intake_pb20.md 6절. 판정 기준 main dc214a2f.
+updated: 2026-10-13

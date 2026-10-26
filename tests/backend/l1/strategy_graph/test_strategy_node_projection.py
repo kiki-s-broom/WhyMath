@@ -24,6 +24,13 @@ from whymath_backend.l1.strategy_graph.strategy_node_projection import (
 )
 
 
+class _FakeResult:
+    """적재 upsert 결과 흉내 — RETURNING이 키 1행을 돌려준 상태(=적재됨). P3-25 보호 판정이 읽는다."""
+
+    def first(self) -> tuple[int]:
+        return (1,)
+
+
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
         self._engine = engine
@@ -39,9 +46,9 @@ class _FakeConnection:
     ) -> None:
         return None
 
-    def execute(self, statement: object) -> None:
+    def execute(self, statement: object) -> _FakeResult:
         self._engine.executed.append(statement)
-        return None
+        return _FakeResult()
 
 
 class _FakeEngine:

@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-133-run-demo-stale-throwaway-db-diagnosis
+title: "run_demo.ps1이 낡은 데모 DB(main에 없는 alembic 리비전)를 진단하지 못하고 즉사한다 — 감지·안내 + 런북 §1/§2 보강"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-106-gate2-live-sample-serving-vs-authoring
+requires_gates: []
+acceptance:
+  - "① 낡은 데모 DB 감지 — scripts/demo/run_demo.ps1 [2/6]이 alembic upgrade 실패(\"Can't locate revision\")를 만나면 원인을 \"데모 DB가 main에 없는 리비전을 기억함\"으로 식별해 출력한다(현재는 throw 한 줄로 끝나 원인이 안 보인다). 대상은 데모 컨테이너 whymath-demo-db(호스트 55432)에 한정하며 운영 DB whymath-pg(5433)는 어떤 경로로도 건드리지 않는다. 초기화(stop_demo.ps1 = down -v)는 자동 수행이 아니라 명시 확인 또는 명시 플래그를 요구한다.\n② 런북 보강 — docs/ops/ops106_gate2_live_sample_runbook.md §1에 \"클론이 origin/main보다 뒤처졌을 때\" 절(현재 CODE_MATCHES_ORIGIN_MAIN=False의 해소 절차가 런북에 없다 — 브랜치 main·AHEAD=0·경로 한정 미커밋 변경 0을 스스로 재검사한 뒤 git merge --ff-only만 수행하는 자기 거부 블록)과 §2에 \"alembic 리비전을 못 찾을 때\" 절을 추가한다.\n③ 실패 주입 — 존재하지 않는 리비전을 alembic_version에 찍은 DB에서 ①의 감지가 RED를 내고, 정상 DB에서는 GREEN인 것을 테스트로 동결한다(양방향 확인).\n④ 같은 증상이 다른 세션에서 재현 가능한지 — 닫힌 PR #880 브랜치(claude/backend-audit-event-foundation-29ac1b)의 마이그레이션 79de95331710이 데모 DB에 남아 있던 것이 원인이다. 미머지 브랜치가 데모 DB 스키마를 오염시키는 다른 경로(다른 브랜치 마이그레이션 전례)가 있는지 대장에서 확인하고 결과를 notes에 남긴다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1625"
+  - e10e1461
+paths:
+  - "scripts/demo/**"
+  - docs/ops/ops106_gate2_live_sample_runbook.md
+session: null
+notes: |-
+  출처: G-ops106-gate2-live-sample 실행(2026-10-12 Phaiakes9, 실측). run_demo.ps1 [2/6]이 "Can't locate revision identified by '79de95331710'"로 즉사했다. 로그에 "Container whymath-demo-db Started"가 찍혀 새로 만든 것이 아니라 예전 컨테이너를 재기동한 것이었고, 그 DB의 alembic_version이 닫힌 PR #880 브랜치의 audit_event 마이그레이션(20260825_1258_79de95331710)을 가리키고 있었다. 해소는 stop_demo.ps1(down -v)로 데모 컨테이너를 지우고 run_demo.ps1로 재생성(수동, 운영 DB 5433 무관). 도구 결함으로 분류: throwaway DB의 낡음을 run_demo가 진단하지 못한다. [④ 오염 경로 실측 2026-10-14 · 기준 origin/main b2eb3cbc] 범위=shallow 클론에서 보이는 원격 ref 54개 중 src/backend/alembic/versions/에 main에 없는 파일을 가진 브랜치를 git ls-tree로 대조. 결과=브랜치 3개·리비전 4건: ①claude/backend-audit-event-foundation-29ac1b → 79de95331710(ADMIN-10 audit_event, PR #880 닫힘·이번 사고) ②claude/subject-problems-theory-check-7n9n72 → 7ef2b5a8e69e·0afd40ce1867(main은 이 두 ID를 docstring에서 폐기/건너뜀으로만 언급하고 포트본은 5b3e9c27a1f6 등 다른 ID) ③claude/whymath-mvp-plan-architecture-trjg5x → d8559726a87a(ADMIN-02 계열·main에 이 ID 없음). main에 리비전으로 존재하는 ID는 4건 중 0건. 결론=같은 증상은 재현 가능하다: 위 3개 브랜치 중 하나의 코드로 데모 DB를 마이그레이션한 뒤 stop_demo.ps1(down -v) 없이 컨테이너를 두면 다음 run_demo가 같은 방식으로 죽는다. 한계=원격 claim만 있고 ref가 없는 세션·로컬 전용 브랜치·shallow로 누락된 ref는 못 봤다(내가 찾은 방법으로는 3개). 구현=run_demo.ps1 -ResetStaleDemoDb(명시 플래그)·demo_db_recovery.ps1·diagnose_stale_demo_db.py·tests/infra/test_run_demo_stale_db_diagnosis.py(뮤테이션 17종 전건 RED, pwsh 7.6.7로 분기 실행 — Windows PowerShell 5.1·실 Docker/alembic/PG는 미검증). 미이행=run_demo.sh(bash 미러) 동일 갭 → OPS-145로 분리.
+
+  [정정 2026-10-14] notes 치환 — acceptance ④ 오염 경로 실측 결과 기록
+
+  [정정 2026-10-14] notes 치환 — 후속 태스크 번호 정정(OPS-140은 타 세션 예약 → OPS-145)
+updated: 2026-10-14

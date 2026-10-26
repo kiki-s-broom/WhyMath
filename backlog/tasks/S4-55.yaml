@@ -20,6 +20,7 @@ acceptance:
   - "stamp_verification_tier() 신규값 기록 및 하위호환 테스트"
   - "ruff/black/mypy green, import-linter 7계층 위반 0"
   - PR 생성 및 CI 통과
+  - "정정(2026-10-09, S4-72): 위 ③의 \"NUMERIC_SAMPLING/STATISTICAL_ESTIMATE alias\"는 코드와 맞지 않는 문구였다. 코드(_TIER_ALIASES)는 MACHINE_SAMPLED→NUMERIC_SAMPLING 단일 매핑이며 이것이 올바른 설계다 — 레거시 문자열 1개는 멤버 1개로만 해석되므로 STATISTICAL_ESTIMATE로 갈라질 근거가 없다. STATISTICAL_ESTIMATE는 레거시 값의 alias 대상이 아니라 신규 생산자가 직접 각인하는 등급이다(2026-10-09 Kiki 추천안 승인). 따라서 ③은 \"MACHINE_SAMPLED→NUMERIC_SAMPLING 단일 매핑 유지\"로 읽는다. 설계서 verifier_v2_design.md §4.1·§4.2 정정은 S4-72가 소유한다. 또 ④는 문자열 입력만 이행됐고 enum 멤버 입력의 alias 누락은 S4-72가 닫는다"
 artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/872"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1528"
@@ -29,5 +30,5 @@ paths:
   - docs/architecture/verifier_v2_design.md
   - "backlog/tasks/**"
 session: null
-notes: "S4-52 v2 설계서 §4. '증명된 축의 집합'으로 tier를 세분화하되, 기존 MACHINE_EXHAUSTIVE/MACHINE_SAMPLED는 legacy alias로 유지해 마이그레이션 없이 기존 코퍼스를 그대로 읽을 수 있게 한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-10-08
+notes: "S4-52 v2 설계서 §4. '증명된 축의 집합'으로 tier를 세분화하되, 기존 MACHINE_EXHAUSTIVE/MACHINE_SAMPLED는 legacy alias로 유지해 마이그레이션 없이 기존 코퍼스를 그대로 읽을 수 있게 한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-09] S4-55 마감 점검: acceptance ③ 문구가 코드(NUMERIC_SAMPLING 단일 매핑)와 불일치 + ④ 멤버 입력 누락을 후속 S4-72로 이관 — 대장은 append 전용이라 정정 항 추가"
+updated: 2026-10-09

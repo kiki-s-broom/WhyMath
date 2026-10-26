@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: review
 priority: 3
 eos_priority: P1
 owner: claude
@@ -22,12 +22,20 @@ acceptance:
   - "audit.jsonl + as_found 병기 + exit 0/1 산출"
   - "ruff/black/mypy green, import-linter 7계층 위반 0"
   - PR 생성 및 CI 통과
+  - "[정정 2026-10-13 — 착수 시 사실 재대조] 이 정정은 완료 조건 이행 현황을 그대로 적은 것이다. 이행: ①(residue_cross_verify_eval_v2 CLI와 도메인별 --domain 플래그) ③(도메인별 sample_n·min_n·max-defect-upper 기본값 칸 — 값은 기본 임계를 결함 0건으로 통과 가능한 최소 표본 52로 유도하고 도메인 간 차등은 두지 않음) ④(기계 축 전수 재검증 후 잔여 축 표본 Wilson) ⑥(audit.jsonl과 as_found 병기와 exit 0/1 — 측정 불가는 exit 2로 분리) ⑦(ruff·black·mypy strict·lint-imports 전건 exit 0). 부분 이행: ②는 확률·통계 자료·수열 관점 템플릿을 게이트에 적용했으나 '기하 이산'은 이행 불가 — geometric_discrete는 도메인 verifier와 관점 세트가 없는 미착수 도메인이다(verifier_v2_domains.md 6.1, S4-53은 statistical_claim을 구현). CLI는 이 이름을 받으면 exit 2로 거부한다. 미이행: ⑤(파일럿 30~50문 게이트 승격) — (가) 기본 임계(상한 0.05·신뢰 95%)는 결함 0건이어도 표본 52건이 필요해 30~50문 밴드로 통과할 수 없다(설계 부록 FC-4) (나) 2026-09-25 Kiki 판정(게이트 G-s416-round2-live-battle)으로 이 잔여 축 LLM 게이트는 인간 검수 대체 후보에서 제외됐고 재측정은 변조기 정답지 수리와 대조군 사람 검수가 선행한다 (다) statistical_claim·sequence_induction의 코퍼스 소비처는 0건이다. 이 구현은 승격이 아니라 CLI 메커니즘과 CI backend 잡의 --dry-run 배선이며 그 판정은 DRY_RUN_OK로 PASS가 아니다. ⑤와 ②의 기하 이산 처분은 Kiki 판단 몫이라 이 태스크는 done 처리하지 않고 review 상태로 둔다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/cross_verify.py
   - src/backend/whymath_backend/harness/residue_cross_verify_eval_v2.py
   - docs/architecture/verifier_v2_design.md
   - "backlog/tasks/**"
-session: null
-notes: "S4-52 v2 설계서 §5~§6. S4-53(도메인 verifier)와 S4-54(통합 contract) 완료 후 실행. 파일럿 코퍼스를 통해 잔여 축 교차검증 게이트를 실제 측정으로 승격한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필"
-updated: 2026-09-01
+  - src/backend/whymath_backend/l3/verifier.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - ".github/workflows/ci.yml"
+  - tests/backend/harness/test_residue_cross_verify_eval_v2.py
+  - docs/architecture/verifier_v2_domains.md
+  - docs/standards/residue_gate_demotion_battle_history.md
+session: claude/sharp-sagan-rzvi7f
+notes: "S4-52 v2 설계서 §5~§6. S4-53(도메인 verifier)와 S4-54(통합 contract) 완료 후 실행. 파일럿 코퍼스를 통해 잔여 축 교차검증 게이트를 실제 측정으로 승격한다.\n\n[정정 2026-09-01] eos_priority null → P1: 판정표 R/A3 — 12월 검증 관여(KPI·계약·앵커 자산). EOS-80 일괄 백필\n\n[정정 2026-10-13] 착수 시 사실 재대조: 기하 이산 도메인 미착수·30~50문 승격 불가(FC-4)·2026-09-25 기각 판정 — 이행 현황 명시(HARN-24)\n\n[정정 2026-10-13] paths ['src/backend/whymath_backend/l3/cross_verify.py', 'src/backend/whymath_backend/harness/residue_cross_verify_eval_v2.py', 'docs/architecture/verifier_v2_design.md', 'backlog/tasks/**'] → ['src/backend/whymath_backend/l3/cross_verify.py', 'src/backend/whymath_backend/harness/residue_cross_verify_eval_v2.py', 'docs/architecture/verifier_v2_design.md', 'backlog/tasks/**', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', '.github/workflows/ci.yml', 'tests/backend/harness/test_residue_cross_verify_eval_v2.py', 'docs/architecture/verifier_v2_domains.md', 'docs/standards/residue_gate_demotion_battle_history.md']: paths를 실제 변경 범위로 정정 — 기존 4개 유지 + 신규 7개(verifier 대상 조립 단일화·미배선 감사 면제 정리·인벤토리 귀속·CI dry-run 배선·테스트·문서 2종). 잃는 파일 없음"
+updated: 2026-10-13

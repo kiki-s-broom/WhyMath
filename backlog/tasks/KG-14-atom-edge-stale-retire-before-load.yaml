@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: KG-14-atom-edge-stale-retire-before-load
+title: "원자 백본 적재에 잔존 엣지 은퇴 스텝 — upsert 전용 적재가 정본에서 지운·뒤집은 엣지를 prod에 남겨, 새 정본 적재가 DB 순환 검사에 막힌다(prod 2,234 · 잔존 221 · 순환 위험 5쌍)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 잔존 엣지 은퇴(retire) 스텝 — 원자 백본 적재(`whymath_backend.l1.atom_graph.populate`)가 upsert만 해서 정본에서 지운·뒤집은 엣지가 prod `concept_edge`에 남는다. 적재와 **같은 트랜잭션**에서 \"양끝이 원자 백본 코드이고 · `edge_type=PREREQUISITE`이고 · CMS 소유가 아니며(`cms_edited_at IS NULL`) · 정본 적재 예정 집합에 없는\" 행만 지운다. 범위 밖 행(구 개념그래프·CMS·다른 적재기 소유)은 건드리지 않는다\n② 기본은 dry-run — 지울 목록과 건수만 출력하고 쓰지 않는다. 실제 삭제는 명시 플래그로만. dry-run 목록은 패리티 프로브(`atom_graph_prod_parity`)의 `DB에만 있는 엣지`(비-CMS) 집합과 같아야 한다(테스트로 대조)\n③ 적재 후 DB 합집합 순환 검사 — 은퇴+upsert 뒤 prod의 PREREQUISITE 그래프가 비순환인지 커밋 전에 확인하고, 순환이면 롤백(현재 적재기의 순환 검사는 정본 파일만 본다 · 재구성 실측: prod 2,210 상태에 KG-12 정본을 덧적재하면 2-순환 5쌍 — 4수01-02-2→4수01-01-1, AALG1-P03→C14, CALC2-C08→R04, LINA1-P07→P08, MFLD-C06→C07)\n④ \"작동한 비율\" — 리포트에 은퇴 건수·upsert 건수·CMS 보존 건수를 싣는다\n⑤ 검증: 단위(가짜 store)·PG 통합 테스트, 뮤테이션(범위 절 하나씩 제거 → RED: CMS 보존·원자 코드 범위·PREREQUISITE 한정·순환 롤백), exit code 보고\n⑥ 런북 `docs/ops/skb03_atom_node_populate_runbook.md` 갱신(dry-run → 확인 → 적용 · 쓰기 블록 자가거부 가드 · 공유 작업 사본은 main 기준 worktree) 후 Kiki 실행 → 패리티 `STATUS=MATCH`가 완료 증적"
+  - "⑦ 정정 및 실측 반영(2026-10-21 Kiki 머신 읽기 전용 패리티 · 판정 기준 main 9ca012c1) — ⓐ ③의 괄호 \"현재 적재기의 순환 검사는 정본 파일만 본다\"는 **틀렸다**. 엣지 적재기(`AtomBackendEdgeStore.populate`)는 쓰기 전에 `assert_acyclic_with_db`로 DB의 모든 PREREQUISITE 엣지와 새 엣지의 합집합을 검사하고 순환이면 `PrerequisiteCycleError`로 거부한다. 따라서 지금 적재하면 prod에 순환이 생기는 것이 아니라 **엣지 적재가 거부되고**(개념 upsert는 앞선 별도 트랜잭션이라 이미 반영될 수 있다), 정본이 prod에 영영 도달하지 못한다. ③은 \"은퇴 → upsert → 기존 합집합 순환 검사\"가 한 트랜잭션에서 통과하는 것으로 읽는다 ⓑ 실측: prod `concept_edge` 2,234건(= KG-09 직전 정본 + S4-60 경계 24 · 재구성 추정 2,210은 경계 24를 빼고 센 오류) · 정본에만 265 · DB에만 221 · 적재 후 잔존 예정 221 · 순환 위험 5쌍(4수01-02-2→4수01-01-1 · AALG1-P03→AALG1-C14 · CALC2-C08→CALC2-R04 · LINA1-P07→LINA1-P08 · MFLD-C06→MFLD-C07) ⓒ prod에 `concept_edge.cms_edited_at` 열이 없다 — 리비전 a8c4e1f7b3d9(`concept`·`concept_edge`에 열 추가)가 미적용이다. 현재 적재기는 그 열을 쓰므로(CMS 소유 보호 `upsert_guard`) 스키마가 head가 아니면 적재가 실패한다. ⑥의 런북은 백업 + `alembic upgrade head` 선행 단계와 판 확인을 포함한다(선례 `docs/ops/g_admin06_browser_menu_call_runbook.md` B1·B2)"
+artifacts:
+  - "PR #1718 (스쿼시 2e000940) — 잔존 엣지 은퇴 report/plan/apply · 런북 §9. ⑥ 완료 증적(2026-10-21 Kiki 머신 · 판정 기준 main 2e000940): K2 plan RETIRE_STALE_FOUND=221 · RETIRE_CMS_KEPT=0 · RETIRE_IN_SCOPE=2234 · CYCLE_WITHOUT_RETIRE=LINA1-P07→LINA1-P08→LINA1-P07 · CYCLE_AFTER_RETIRE=없음 · PLAN_EXIT=0 → K3 apply concepts=2683 edges=2278 edge_skip=0 atom_nodes=2683 retire=apply stale=221 retired=221 cms_kept=0 · APPLY_EXIT=0 → K4 패리티 DB 엣지 2278·개념 2683·atom_node 2683 STATUS=MATCH · PARITY_EXIT=0 (정본 sha256 a4405e03a975 = main a2424fe18727의 CRLF 체크아웃 · 엣지 집합 지문 대조 포함). prod 스키마 a8c4e1f7b3d9(head) · 사전 덤프 whymath_before_kg14_schema_20261021_224838.dump · K5 임시 worktree 2개 정리"
+paths:
+  - "src/backend/whymath_backend/l1/atom_graph/**"
+  - docs/ops/skb03_atom_node_populate_runbook.md
+session: null
+notes: |-
+  발견 2026-10-21: KG-12 머지 뒤 prod 적재 런북 실행 중. Kiki 클론이 타 세션 브랜치(d7c8a365)에 있어 PATHS_MATCH_MAIN=False로 적재가 자가거부됐고, 그 사이 적재기(atom_backend_edge.AtomBackendEdgeStore)가 ON CONFLICT DO UPDATE만 하고 삭제 경로가 없음을 코드로 확인했다. Kiki 머신 읽기 전용 패리티 실측(2026-10-21 · main 9ca012c1): prod 2,234건 · 잔존 예정 221건(고등 123·초등 55·중학 23·대학 16·중→고 4) · 순환 위험 5쌍 · prod에 cms_edited_at 열 없음(스키마 head 아님). 자세한 정정은 acceptance ⑦. 세션 session_01P8SX4CbnEXJnwfqeCKRQkW
+
+  [정정 2026-10-21] title '원자 백본 적재에 잔존 엣지 은퇴 스텝 + DB 합집합 순환 검사 — upsert 전용 적재가 정본에서 지운·뒤집은 엣지를 prod에 남겨 순환을 만든다' → '원자 백본 적재에 잔존 엣지 은퇴 스텝 — upsert 전용 적재가 정본에서 지운·뒤집은 엣지를 prod에 남겨, 새 정본 적재가 DB 순환 검사에 막힌다(prod 2,234 · 잔존 221 · 순환 위험 5쌍)': Kiki 머신 실측 반영 + 적재기 DB 순환 검사 존재를 놓친 서술 정정
+  notes 치환 — Kiki 머신 실측 반영 + 적재기 DB 순환 검사 존재를 놓친 서술 정정
+updated: 2026-10-22

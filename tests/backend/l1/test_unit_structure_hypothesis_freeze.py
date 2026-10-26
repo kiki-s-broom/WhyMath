@@ -319,7 +319,8 @@ def test_m2_no_first_class_tree_table() -> None:
 
 @pytest.fixture(scope="module")
 def atom_graph() -> dict[str, Any]:
-    """원자 백본 코퍼스(graph.json) — 실적재 원장(2,683 노드·2,210 엣지 규모)."""
+    """원자 백본 코퍼스(graph.json) — 실적재 원장(규모는 `docs/data/corpus_facts.md`의
+    `atom_graph.nodes`·`atom_graph.edges`)."""
     loaded: dict[str, Any] = json.loads(_GRAPH_JSON.read_text(encoding="utf-8"))
     return loaded
 

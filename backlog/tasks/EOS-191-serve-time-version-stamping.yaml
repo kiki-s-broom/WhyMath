@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-191-serve-time-version-stamping
+title: "출제 시점 문항 판 확정 — 접수 시점 포인터 복사의 오차 창 제거 (EOS-47 한계)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - EOS-190-problem-version-publish-writer
+requires_gates: []
+acceptance:
+  - "출제 시점 판 확정: EOS-47 헬퍼는 시도를 받은 순간의 포인터를 읽으므로, 학생이 문항을 받은 뒤 푸는 동안 새 판이 발행되면 학생이 본 판이 아니라 새 판이 박힌다. 출제 응답(next-problem·코치 문항 제시)에 판 id를 싣고 제출 때 되돌려받거나 서버 세션에 보관하는 방식 중 하나를 설계·판정하고, 클라가 보고한 판 id를 신뢰하지 않는 검증(해당 문항의 판 체인에 속하는가)을 포함한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l2/attempt_version_pin.py
+session: null
+notes: "출처: EOS-47 알려진 한계 2. 문서 docs/architecture/eos47_attempt_version_pinning.md §5-2."
+updated: 2026-10-09

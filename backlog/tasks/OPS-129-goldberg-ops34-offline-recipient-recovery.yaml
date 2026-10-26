@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-129-goldberg-ops34-offline-recipient-recovery
+title: "goldberg 회수 — OPS-34 오프라인 리포트 면제의 수취인 선언 계약(declared_unwired_audit 확장·런북 7섹션·테스트 37건)을 main 현행 위에서 재검증하며 이식"
+track: infra-debt
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/amazing-goldberg-1oc67i head 777b860f(2026-10-09 · ahead 3 · behind 22 · 판정 기준 main d873d064). 구현·검증이 완료됐고 태스크가 review 상태로 'PR 대기'에서 멈췄다(커밋 메시지: 백엔드 전체 18334+166 passed·infra 2961·harness 2256·constitution 39·계층 커버리지 전 계층 PASS·mypy --strict/lint-imports/ruff/black exit 0·헌법 래칫 차단 0건·뮤테이션 17종 전건 RED). 산출 = ops/declared_unwired_audit.py(+208 — _OFFLINE_REPORT 면제 7건에 runbook:/report-schedule:/pending-task: 수취인 선언 요구·_pending_task_verdict 추출)·docs/ops/offline_reports_runbook.md(163줄·main 부재)·tests/backend/ops/test_offline_report_recipients.py(393줄·main 부재)·MEMORY.md 결정 로그 8줄. main 부재 590줄. OPS-34 원격 claim(2026-10-09T11:37Z)은 TTL 초과"
+  - "② 이식 방식 = 파일 단위(통째 머지 금지 — 22커밋 낡음). declared_unwired_audit.py는 main이 그 뒤 면제 항목을 바꿨을 수 있으므로 _OFFLINE_REPORT 면제 목록이 main 현행에서도 7건인지 먼저 재실측한다(건수가 달라졌으면 그 차이를 판정 문서에 적고 수취인 선언 대상을 현행에 맞춘다). 원 번호 OPS-34는 재사용하지 않는다. 신규 문서 1·신규 테스트 1은 byte 단위 이식이 가능하다"
+  - "③ 집행 지점 — 신규 계약은 declared-unwired-audit이 exit 1로 막을 때만 보호다. 그 감사가 CI 잡의 어느 스텝에서 실행되는지 적고, 수취인 선언을 하나 지운 주입이 실제로 exit 1을 내는지(주입 적용·원복 바이트 동일 단언 포함) 확인한다. 이식한 테스트 37건이 CI에서 수집되는 경로(tests/backend/ops)임을 실측한다"
+  - "④ 소유 태스크 OPS-34-offline-report-recipient-contract의 acceptance 전 항을 main 기준으로 재대조해 이행/미이행/의도적 제외를 적고, 미이행분은 승계 태스크로 분리 등재한 뒤 OPS-34를 닫을 수 있는지 판정한다. OPS-34는 이 태스크를 선행으로 부착했다. 이식 PR은 반드시 연다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - docs/ops/offline_reports_runbook.md
+  - tests/backend/ops/test_offline_report_recipients.py
+session: null
+notes: "출처: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-① (stray-code 17회차). 소유 태스크 OPS-34-offline-report-recipient-contract. 회수 완료 전 원 브랜치 claude/amazing-goldberg-1oc67i 삭제 금지. 원격 claim OPS-34는 TTL 초과이나 해제는 이 감사의 범위가 아니다 — 착수 세션이 backlog.py claims reap(dry-run) 결과를 확인한 뒤 진행한다."
+updated: 2026-10-12

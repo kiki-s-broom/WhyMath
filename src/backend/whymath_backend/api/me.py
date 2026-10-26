@@ -129,6 +129,7 @@ from whymath_backend.l2.ability_estimation import (
 )
 from whymath_backend.l2.assessment_evidence import collect_assessment_evidence
 from whymath_backend.l2.attempt_skill_event import AttemptSource, record_attempt_skill_event
+from whymath_backend.l2.attempt_version_pin import resolve_attempt_version_pin
 from whymath_backend.l2.concept_diagnosis import Agreement, compute_concept_diagnoses
 from whymath_backend.l2.irt import (
     IrtItem,
@@ -1112,13 +1113,21 @@ async def submit_attempt(
     # EOS-131: 이 시도가 속한 학습 세션을 **서버가** 정한다(30분 유휴 규칙). 수신 시각을 그대로
     # 넘겨 `last_activity_at == ingested_at`이 되게 한다 — 보존 파기의 세션 기준이 이 값을 쓴다.
     # never-break: 세션 기록이 실패해도 채점 제출은 진행하고(None), 그때만 클라 신고값으로 폴백.
+    # P3-27: 시도가 실어 온 문항의 대표 개념을 세션에 채운다
+    # (트레이스 `concept_selected`가 개념을 싣게).
     learning_session_id = await record_learning_activity(
-        session, user_id=user.user_id, now=received_at
+        session, user_id=user.user_id, now=received_at, problem_id=body.problem_id
     )
+    # EOS-47: 이 시도가 푼 문항의 **판**과 채점 환경을 접수 시점에 고정한다 — 문항이 나중에 수정돼도
+    # 시도는 푼 당시의 판을 가리킨다. 판 포인터가 없는 문항은 None(날조 금지)이고, 이 호출은 실패를
+    # 삼키지 않는다(`l2/attempt_version_pin` 모듈 docstring: 읽기 실패 뒤의 INSERT는 어차피 불가).
+    version_pin = await resolve_attempt_version_pin(session, body.problem_id)
     attempt = ProblemAttempt(
         attempt_id=uuid.uuid4(),  # 명시 발급(server_default 의존 X·응답에 즉시 사용)
         user_id=user.user_id,
         problem_id=body.problem_id,
+        problem_version_id=version_pin.problem_version_id,
+        evaluation_context=version_pin.evaluation_context,
         session_id=learning_session_id if learning_session_id is not None else body.session_id,
         is_correct=body.is_correct,
         student_answer=student_answer_plain,
@@ -3317,11 +3326,6 @@ _BLUEPRINT_NOTE = (
     "평가 청사진 기반 테스트셋 조립(ASM-04) — 단원 마감 측정 전용(CAT 대체 아님). 등급·점수·"
     "백분위·합격예측 4개 예측 필드는 게임화 금기로 이 경로에서 의도적으로 채우지 않음(항상 null)."
 )
-
-_BLUEPRINT_CANDIDATE_FETCH_LIMIT = 3000
-"""청사진 조립에 먹일 후보 문항 fetch 상한 — `api/gating.py`의 후보 상한과 같은 값(코퍼스
-2,647건 + 여유). L6 조립기가 적격·제약·개수를 전부 판정하므로 이 상한은 "후보 풀 크기"일 뿐
-응답 크기가 아니다. 상한과 정확히 같은 건수를 읽으면 절단 의심이므로 경고 로그를 남긴다."""
 
 
 def _blueprint_pattern_diagnosis(assembly: AssembledTestSet) -> list[dict[str, Any]]:

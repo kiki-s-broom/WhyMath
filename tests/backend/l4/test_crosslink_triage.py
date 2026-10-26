@@ -125,12 +125,20 @@ class TestCommittedQueueEndToEnd:
         # (탐지 카탈로그 40 전수 등장·agree). MISC-21(앵커 A1·A2·A3 좌석 보강) 3종은 아직 문항
         # 코퍼스에 등장하지 않아(kebab 문항 미등장) no_signal 3건으로 정직 집계된다 — 기계가
         # agreement를 판정할 신호 자체가 없다는 뜻이지 오매핑 의심이 아니다(사람 검수 대상).
-        # MISC-40(미분 대단원 좌석 판정)이 신설한 power-rule-step-omitted도 같은 이유로 no_signal
-        # (문항 코퍼스에 아직 안 나온다)이라 3→4건이다 — corroborated 107·auto_reject 4는 불변.
+        # MISC-40(미분 대단원 좌석 판정)이 신설한 power-rule-step-omitted는 한때 같은 이유로
+        # no_signal(문항 코퍼스에 아직 안 나온다)이라 3→4건이었다. P3-03 미분 문항 은행이 그 kebab을
+        # 오답 귀인으로 쓰기 시작해(`problem_bank_p3_calculus1_diff_v0`) 신호가 생겼고 성취기준
+        # [12미적Ⅰ-02-03]이 일치해 corroborated 107→108·no_signal 4→3이다(auto_reject 4 불변).
+        # corroborated는 *기계 일치*일 뿐 서명이 아니다 — 승인·적재는 여전히 Kiki 서명 게이트 몫.
+        # P3-61(선지 역추적 전용 kebab 4종: tangent-external-point-as-contact·mvt-conditions-unchecked·
+        # graph-sketch-few-points-only·velocity-sign-ignored)은 카탈로그 좌석과 pending 큐 행만 생겼고
+        # 승인 문항의 오답 보기가 아직 이 kebab을 가리키지 않아(2026-10-18 실측 0건) 같은 이유로
+        # no_signal 3→7건이다. corroborated 108·auto_reject 4는 불변 — 신호가 없는 행을 일치로 세지
+        # 않는다. 보기가 연결되면(P3-44·P3-57) 이 4건이 corroborated 또는 thin_disagree로 옮겨 간다.
         report = self._run()
         assert report.counts == {  # type: ignore[attr-defined]
-            "corroborated": 107,
-            "no_signal": 4,
+            "corroborated": 108,
+            "no_signal": 7,
             "auto_reject": 4,
             "thin_disagree": 0,
         }

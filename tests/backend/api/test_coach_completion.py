@@ -46,7 +46,7 @@ from whymath_backend.db.models.problem import Problem as ProblemORM
 from whymath_backend.db.session import get_session
 from whymath_backend.l4.completion import _REDIRECT_PROMPT
 from whymath_backend.schema.dialogue import Dialogue as DialogueSchema
-from whymath_backend.schema.enums import EventType, Persona
+from whymath_backend.schema.enums import Curriculum, EventType, Persona
 from whymath_backend.schema.user import UserProfile as UserProfileSchema
 
 _UID = uuid.uuid4()
@@ -175,6 +175,10 @@ def _problem(
         multiple_answers=None,
         domain=None,
         subunit=None,
+        # EOS-47: 시도 버전 고정(`l2/attempt_version_pin`)이 읽는 두 속성. 실 ORM 행은
+        # curriculum_version이 NOT NULL이고 판 포인터는 NULL(=판 없음)이 현재 모든 문항의 상태다.
+        curriculum_version=Curriculum.REVISION_2022,
+        problem_version_id=None,
     )
 
 

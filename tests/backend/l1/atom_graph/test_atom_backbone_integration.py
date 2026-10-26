@@ -6,7 +6,7 @@ end-to-end 적재한다. CI `backend — 마이그레이션·통합 (실 PG)` �
 또는 코퍼스 미존재 시 graceful skip.
 
 검증:
-  ① 적재 — concepts 2,683(원자1823·단원217·소단원643)·edges 2,210(orphan 0 기대)
+  ① 적재 — concepts 2,683(원자1823·단원217·소단원643)·edges 2,278(orphan 0 기대 · 2,195 + S4-60 고→대 24 + KG-12 승격 v2 59)
   ② parent 위계 — 원자→소단원→단원 체인(2수01-01-2 → 초수연-U1-S1 → 초수연-U1)
   ③ relation_subtype 적재(관계유형)·edge 방향(from=선수)
   ④ redaction — 본문 컬럼(description·formal_definition)은 Phase 1b에서 물리 제거(컬럼 부재)
@@ -29,6 +29,14 @@ pytestmark = pytest.mark.integration
 # 레포 루트 앵커(tests/backend/l1/atom_graph/ → parents[4]) — CWD 상대 경로는 CI(cwd=src/backend)
 # 에서 항상 "코퍼스 미존재" skip(침묵 skip 결함 수정).
 _CORPUS = Path(__file__).resolve().parents[4] / "data" / "corpus" / "atom_graph_v1" / "graph.json"
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (Path(__file__).resolve().parents[4] / "docs" / "data" / "corpus_facts.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 
 def _sync_engine() -> object:
@@ -93,9 +101,11 @@ class TestAtomBackboneLoad:
 
         try:
             report = populate_atom_backbone(_CORPUS, settings=Settings())
-            # ① 적재 — concepts 2,683·edges 2,210(orphan 0 기대).
-            assert report.concepts_loaded == 2683
-            assert report.edges_loaded == 2210
+            # ① 적재 — concepts·edges 전건(orphan 0 기대 · 엣지 이력은 아래 주석).
+            assert report.concepts_loaded == _FACTS["atom_graph.nodes"]
+            assert (
+                report.edges_loaded == _FACTS["atom_graph.edges"]
+            )  # KG-12 ① 체인 수리·③ 승격 v2(2,231→2,278)
             assert report.edges_skipped == 0
             assert report.parents_skipped == 0
 
@@ -151,16 +161,16 @@ class TestAtomBackboneLoad:
                         {"k": codes},
                     ).all()
                     by_level = {r.level: r.n for r in level_rows}
-                    assert by_level.get("세부개념") == 1823
-                    assert by_level.get("소단원") == 643
-                    assert by_level.get("단원") == 217
+                    assert by_level.get("세부개념") == _FACTS["atom_graph.atoms"]
+                    assert by_level.get("소단원") == _FACTS["atom_graph.subunits"]
+                    assert by_level.get("단원") == _FACTS["atom_graph.units"]
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
 
             # ⑤ 멱등 — 재적재 후 행수 불변.
             report2 = populate_atom_backbone(_CORPUS, settings=Settings())
-            assert report2.concepts_loaded == 2683
-            assert report2.edges_loaded == 2210
+            assert report2.concepts_loaded == _FACTS["atom_graph.nodes"]
+            assert report2.edges_loaded == _FACTS["atom_graph.edges"]
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]
@@ -168,7 +178,7 @@ class TestAtomBackboneLoad:
                         text("SELECT count(*) FROM concept WHERE code = ANY(:k)"),
                         {"k": codes},
                     ).scalar_one()
-                    assert total_nodes == 2683  # 중복 0(멱등)
+                    assert total_nodes == _FACTS["atom_graph.nodes"]  # 중복 0(멱등)
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:

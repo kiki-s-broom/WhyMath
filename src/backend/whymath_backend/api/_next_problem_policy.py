@@ -211,7 +211,9 @@ class SuneungRecommendationPolicy:
         if self._sibling_filter is not None:
             last_wrong = await last_incorrect_problem_id(session, user_id)
             if last_wrong is not None:
-                sibling_ids = await load_sibling_ids(session, last_wrong)
+                sibling_ids = await load_sibling_ids(
+                    session, last_wrong, sibling_filter=self._sibling_filter
+                )
 
         band_calibrated = False if learning_context.purpose == "learning" else None
 

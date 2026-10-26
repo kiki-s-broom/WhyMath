@@ -87,6 +87,7 @@ main
 - `harness-integrity — backlog 무결성·claim 교차 검증`
 - `declared-unwired-audit — 선언≠배선 4축 정적 감사 (OPS-22)`
 - `corpus-authoring — 결정론 저작 도구 회귀 (생성기·배치)`
+- `release-freeze — Feature/Code Freeze 라벨 검사`
 <!-- REQUIRED_CHECKS_END -->
 
   **제외 3종**: `e2e-nightly — 관통 슬라이스 (실 PG·야간)`·

@@ -6,13 +6,19 @@ CLAUDE.md "보호 장치를 실패 주입 없이 '보호 있음'으로 선언 �
 게이트의 몫을 대신 막아 주는 '우연한 초록'을 배제한다(게이트가 실제로 그 결함을 잡는다는 증거).
 
 게이트 A의 각 절(①~④)마다 그 절이 없으면 통과하는 입력을 둔다(CLAUDE.md "픽스처가 그 절을
-실제로 밟는가") — 특히 ④의 '시연 결과 = 최종 결과'는 정답이 1자라 게이트 B가 undecidable을 내는
-경로에서만 의미가 있으므로 그 조건을 그대로 픽스처로 만든다.
+실제로 밟는가") — 특히 ④의 '시연 결과 = 최종 결과'는 정답이 1자라 게이트 B의 글자 축이
+undecidable을 내는 경로에서만 의미가 있으므로 그 조건을 그대로 픽스처로 만든다.
+
+P3-77 값 축(B ②·④ 값 동치)은 `TestValueAxis`가 동결한다: 값 동치 식 주입 → RED(그 게이트만) ·
+값이 다른 식 대조군 → GREEN · 판정 불가·능력 미주입 → fail-closed. P3-10 실측 사례
+(`aq-h-06-04-l3` — 정답 4)를 그대로 회귀 픽스처로 둔다.
 """
 
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
+from typing import cast
 
 import pytest
 
@@ -20,6 +26,7 @@ from whymath_backend.l4.hint_content.gates import (
     GATE_ANSWER_LEAKAGE,
     GATE_LEVEL_REVEALS,
     GATE_TONE,
+    VALUE_NOT_RUN,
     GateContext,
     check_answer_leakage,
     check_level_reveals,
@@ -28,12 +35,17 @@ from whymath_backend.l4.hint_content.gates import (
 )
 from whymath_backend.l4.hint_content.generator import ConceptRef, StepSource, generate_step_hints
 from whymath_backend.l4.hint_content.models import Hint, HintReveals, SolutionStepRef
+from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
+from whymath_backend.schema.verification_capabilities import AnswerValueExposure, ValueExposure
 
 _PID = uuid.UUID("00000000-0000-0000-0000-00000000b022")
 _STEPS = ("x**2 - 5*x + 6", "(x - 2)*(x - 3)", "x = 2, x = 3")
 _CONCEPT = ConceptRef(concept_id="math.algebra.factoring", name="인수분해", source="step")
 # 정답은 단계 본문과 *다른 표기*로 둔다 — 게이트 B 주입이 게이트 A(단계 본문 노출)와 섞이지 않게.
 _ANSWER = "123"
+# 값 축 능력 — 생성 CLI(populate.main)가 합성 루트에서 받는 것과 같은 수학 구현.
+_MATH_VALUE = math_answer_value_exposure()
+_DEFAULT = object()  # `_ctx(value_exposure=None)`(능력 미주입)과 '기본값'을 구별하는 표지
 
 
 def _drafts(
@@ -58,12 +70,38 @@ def _ctx(
     steps: tuple[str, ...] = _STEPS,
     concept: ConceptRef | None = _CONCEPT,
     answer: str | None = _ANSWER,
+    value_exposure: object = _DEFAULT,
 ) -> GateContext:
+    capability = cast(
+        "AnswerValueExposure | None", _MATH_VALUE if value_exposure is _DEFAULT else value_exposure
+    )
     return GateContext(
         step_contents=steps,
         concept_name=concept.name if concept is not None else None,
         final_answer=answer,
+        value_exposure=capability,
     )
+
+
+@dataclass(frozen=True)
+class _Scan:
+    outcome: ValueExposure
+    fragment: str | None = None
+    candidates: int = 1
+    undecided: int = 0
+
+
+class _StubExposure:
+    """값 축 능력 더블 — 정해진 판정만 낸다(판정 불가 경로를 결정론으로 만든다)."""
+
+    def __init__(self, outcome: ValueExposure) -> None:
+        self.outcome = outcome
+        self.calls: list[tuple[str, str]] = []
+
+    def scan_value_exposure(self, text: str, target: str) -> _Scan:
+        self.calls.append((text, target))
+        undecided = 1 if self.outcome is ValueExposure.undecidable else 0
+        return _Scan(self.outcome, candidates=1, undecided=undecided)
 
 
 def _with_content(hint: Hint, content: str) -> Hint:
@@ -188,7 +226,12 @@ class TestLevelRevealsGate:
     def test_demonstrated_result_equal_to_final_is_rejected_even_when_b_cannot_decide(
         self,
     ) -> None:
-        """④ 시연 결과 = 최종 결과(1자)면 거부 — 정답이 1자라 B는 undecidable, A만이 막는다."""
+        """④ 시연 결과 = 최종 결과(1자)면 거부 — 정답이 1자라 B의 **글자 축**은 undecidable.
+
+        ④의 문자열 동등 절은 값 축 없이도(능력 미주입이어도) 이 경로를 막는다 — 그 절의 독립성을
+        보려고 값 축 능력 없이도 사유가 나오는지 함께 본다. P3-77 이후 B는 값 축(`2 + 5` = 7)으로
+        같은 본문을 *따로* 잡는다(이중 방어 — 둘 중 하나가 빠져도 거부).
+        """
         steps = ("2 + 5", "7", "7")
         drafts = _drafts(steps=steps)
         ctx = _ctx(steps=steps, answer="7")
@@ -196,8 +239,11 @@ class TestLevelRevealsGate:
         verdict = check_level_reveals(l3, ctx)
         assert verdict.passed is False
         assert any("최종 결과와 같다" in r for r in verdict.reasons)
+        no_value = check_level_reveals(l3, _ctx(steps=steps, answer="7", value_exposure=None))
+        assert any("최종 결과와 같다" in r for r in no_value.reasons)
         leakage = check_answer_leakage(l3, ctx)
-        assert leakage.passed is True and leakage.detail["verdict"] == "undecidable"
+        assert leakage.detail["verdict"] == "undecidable"  # 글자 축은 여전히 유보
+        assert leakage.passed is False and leakage.detail["value_verdict"] == "exposed"
         assert evaluate_gates(l3, ctx).verified is False
 
     def test_final_result_anywhere_in_body_is_rejected(self) -> None:
@@ -235,8 +281,10 @@ class TestAnswerLeakageGate:
         assert verdict.passed is True and verdict.detail["verdict"] == "clean"
 
     def test_undecidable_passes_but_is_recorded(self) -> None:
+        """글자 축 undecidable(짧은 정답)은 값 축이 판정한다 — 값을 가진 식이 없으면 clean."""
         verdict = check_answer_leakage(_drafts()[2], _ctx(answer="7"))
         assert verdict.passed is True and verdict.detail["verdict"] == "undecidable"
+        assert verdict.detail["value_verdict"] == "clean"
 
     def test_missing_answer_fails_closed(self) -> None:
         """정답 원천이 없으면 판정 불가 — 통과로 위장하지 않고 거부."""
@@ -244,6 +292,203 @@ class TestAnswerLeakageGate:
         assert verdict.passed is False
         assert verdict.detail["verdict"] == "not_run"
         assert evaluate_gates(_drafts()[2], _ctx(answer=None)).verified is False
+
+
+# ──────────────────────────────────────────────────────────────────────
+# P3-77 값 축 — 게이트 B ②(정답 값)·게이트 A ④(최종 단계 값)
+# ──────────────────────────────────────────────────────────────────────
+# P3-10 실측 `aq-h-06-04-l3`(평균값 정리 · 정답 4)의 풀이 경로 그대로.
+_MVT_STEPS = (
+    "((-3) + Derivative(4*x - 3, x)*((2) - (0)) + (-3) + Derivative(x - 3, x)*((2) - (0))).doit()"
+    " = y",
+    "(-3) + (4)*((2) - (0)) + (-3) + (1)*((2) - (0)) = y",
+    "y = 4",
+)
+
+
+# PR #1721 리뷰 P2-2 — 승인 문항 1fe0ab77의 풀이 경로(정답 1). 3단계가 `1 = y`(최종 단계의 좌우 반전).
+_SWAP_STEPS = (
+    "Derivative(x, x).doit().subs(x, 2) = y",
+    "(1).subs(x, 2) = y",
+    "1 = y",
+    "y = 1",
+)
+
+
+class TestSwappedFinalRelation:
+    def test_swapped_final_is_caught_by_the_string_clause_alone(self) -> None:
+        """RED — ④ 문자열 대조가 양변 순서와 무관하다. 값 축 능력이 없어도 이 절이 사유를 낸다."""
+        l3 = _drafts(3, steps=_SWAP_STEPS)[3]
+        verdict = check_level_reveals(l3, _ctx(steps=_SWAP_STEPS, answer="1", value_exposure=None))
+        assert any("최종 단계 결과가 본문에 실렸다" in r for r in verdict.reasons)
+        assert any("최종 결과와 같다" in r for r in verdict.reasons)
+
+    def test_value_statement_is_caught_by_b(self) -> None:
+        """RED — 글자 축은 정답 1자라 유보, B 값 축이 `1 = y`를 값 진술로 잡는다."""
+        l3 = _drafts(3, steps=_SWAP_STEPS)[3]
+        leakage = check_answer_leakage(l3, _ctx(steps=_SWAP_STEPS, answer="1"))
+        assert leakage.detail["verdict"] == "undecidable"
+        assert leakage.passed is False and leakage.detail["value_verdict"] == "exposed"
+
+    def test_earlier_partials_of_the_same_path_pass(self) -> None:
+        """GREEN 대조군 — 같은 경로의 1·2단계 L3(미분·대입이 남은 식)는 통과한다(앞 단계 대체 후보)."""
+        ctx = _ctx(steps=_SWAP_STEPS, answer="1")
+        for order in (1, 2):
+            gated = evaluate_gates(_drafts(order, steps=_SWAP_STEPS)[3], ctx)
+            assert gated.verified is True, (order, gated.gate_report)
+
+
+class TestConceptNameIsNotScanned:
+    """PR #1721 3차 리뷰 — 원천 개념 이름은 값 축 대상이 아니다(문항 정답과 무관한 고정 표기)."""
+
+    @pytest.mark.parametrize(
+        ("name", "answer"),
+        [
+            ("AB=0의 뜻", "0"),
+            ("n=1 확인만으론 부족", "1"),
+            ("매클로린은 a=0의 테일러", "0"),
+            ("가능성 0·1의 뜻", "0"),
+            ("2×2 역행렬은 (1/det)·수반", "4"),
+            ("정사영 그림↔cosθ식", "4"),
+            ("구면좌표는 ρ²sinφ", "4"),
+            ("역행렬(2×2, det≠0)", "4"),
+        ],
+    )
+    def test_value_in_concept_name_does_not_reject_the_hint(self, name: str, answer: str) -> None:
+        concept = ConceptRef(concept_id="c", name=name, source="step")
+        drafts = _drafts(concept=concept)
+        ctx = _ctx(concept=concept, answer=answer)
+        for level in (1, 2):
+            gated = evaluate_gates(drafts[level], ctx)
+            leakage = gated.gate_report[GATE_ANSWER_LEAKAGE]
+            assert isinstance(leakage, dict)
+            assert leakage["detail"]["value_verdict"] == "clean", (name, level)
+
+    def test_leak_outside_the_concept_name_is_still_caught(self) -> None:
+        """대조군 — 이름만 지운다. 본문 다른 자리의 값 진술은 그대로 잡는다."""
+        concept = ConceptRef(concept_id="c", name="AB=0의 뜻", source="step")
+        l2 = _drafts(concept=concept)[2]
+        bad = _with_content(l2, l2.content + " 참고로 y = 0 이야.")
+        verdict = check_answer_leakage(bad, _ctx(concept=concept, answer="0"))
+        assert verdict.passed is False and verdict.detail["value_verdict"] == "exposed"
+
+
+class TestValueAxis:
+    def test_p3_10_measured_leak_is_rejected(self) -> None:
+        """RED — L3가 '계산하면 정답(4)이 되는 식'을 보여 준다. 글자 축은 유보(정답 1자)."""
+        l3 = _drafts(2, steps=_MVT_STEPS)[3]
+        ctx = _ctx(steps=_MVT_STEPS, answer="4")
+        leakage = check_answer_leakage(l3, ctx)
+        assert leakage.detail["verdict"] == "undecidable"  # 종전 통과 경로(글자 축 유보)
+        assert leakage.passed is False and leakage.detail["value_verdict"] == "exposed"
+        assert any("(-3) + (4)*((2) - (0))" in r for r in leakage.reasons)
+        reveals = check_level_reveals(l3, ctx)  # ④ 값 동치 — 최종 단계 `y = 4`와 같은 값
+        assert reveals.passed is False and reveals.detail["final_value_verdict"] == "exposed"
+        assert evaluate_gates(l3, ctx).verified is False
+
+    def test_p3_10_earlier_step_partial_is_the_clean_control(self) -> None:
+        """GREEN — 같은 문항의 1단계 L3(미분이 남은 설정 식 — 닫힌 식 없음)는 세 게이트를 모두 통과한다.
+
+        L3 공백 대체(store.select_ladder_hint)가 2단계 대신 내는 후보가 바로 이것이다.
+        """
+        l3 = _drafts(1, steps=_MVT_STEPS)[3]
+        ctx = _ctx(steps=_MVT_STEPS, answer="4")
+        gated = evaluate_gates(l3, ctx)
+        assert gated.verified is True, gated.gate_report
+        leakage = gated.gate_report[GATE_ANSWER_LEAKAGE]
+        assert isinstance(leakage, dict) and leakage["detail"]["value_verdict"] == "clean"
+
+    def test_answer_valued_expression_alone_is_rejected_by_b_only(self) -> None:
+        """RED(B만) — 단계 본문이 아닌 식이라 A는 통과, 톤도 통과. B 값 축만이 잡는다."""
+        l2 = _drafts()[2]
+        bad = _with_content(l2, l2.content + " 참고로 (2) + (2) 를 떠올려 봐.")
+        ctx = _ctx(answer="4")
+        verdict = check_answer_leakage(bad, ctx)
+        assert verdict.passed is False and verdict.detail["value_verdict"] == "exposed"
+        assert check_level_reveals(bad, ctx).passed is True
+        assert check_tone(bad).passed is True
+        assert evaluate_gates(bad, ctx).verified is False
+
+    def test_different_value_expression_passes(self) -> None:
+        """GREEN 대조군 — 정답과 값이 다른 식(2 + 3 = 5 ≠ 4)은 통과한다(과잉 거부 아님)."""
+        l2 = _drafts()[2]
+        ok = _with_content(l2, l2.content + " 참고로 (2) + (3) 를 떠올려 봐.")
+        ctx = _ctx(answer="4")
+        verdict = check_answer_leakage(ok, ctx)
+        assert verdict.passed is True and verdict.detail["value_verdict"] == "clean"
+        assert evaluate_gates(ok, ctx).verified is True
+
+    def test_final_step_valued_expression_is_rejected_by_a_only(self) -> None:
+        """RED(A만) — 문항 정답(123)과는 다르지만 최종 단계(`x = 2, x = 3`)의 한 값과 같다."""
+        l2 = _drafts()[2]
+        bad = _with_content(l2, l2.content + " 참고로 (1) + (1) 를 떠올려 봐.")
+        verdict = check_level_reveals(bad, _ctx())
+        assert verdict.passed is False and verdict.detail["final_value_verdict"] == "exposed"
+        assert any("최종 단계" in r for r in verdict.reasons)
+        assert check_answer_leakage(bad, _ctx()).passed is True
+        ok = _with_content(l2, l2.content + " 참고로 (1) + (3) 를 떠올려 봐.")
+        assert check_level_reveals(ok, _ctx()).passed is True  # 대조군 — 4는 2·3 어느 쪽도 아님
+
+    def test_expression_inside_a_symbolic_expression_is_not_a_candidate(self) -> None:
+        """GREEN — `Derivative(x - 1 + 1, x)` 속 `- 1 + 1`(= 0)은 독립 식이 아니다(코퍼스 오탐 원인)."""
+        l2 = _drafts()[2]
+        ok = _with_content(l2, l2.content + " Derivative(x - 1 + 1, x)")
+        verdict = check_answer_leakage(ok, _ctx(answer="0"))
+        assert verdict.passed is True and verdict.detail["value_verdict"] == "clean"
+
+    def test_undecidable_value_fails_closed(self) -> None:
+        """판정 불가는 통과가 아니다 — 실제 수학 구현(목표 `{1, 6}`)·더블 두 경로 모두 거부."""
+        l2 = _drafts()[2]
+        bad = _with_content(l2, l2.content + " 참고로 (2) + (2) 를 떠올려 봐.")
+        real = check_answer_leakage(bad, _ctx(answer="{1, 6}"))
+        assert real.passed is False and real.detail["value_verdict"] == "undecidable"
+        stub = _StubExposure(ValueExposure.undecidable)
+        ctx = _ctx(value_exposure=stub)
+        assert check_answer_leakage(_drafts()[2], ctx).passed is False
+        assert check_level_reveals(_drafts()[2], ctx).passed is False
+        # 더블이 받은 목표: B는 문항 정답, A ④는 최종 단계 본문(불투명 문자열 그대로 전달)
+        assert {target for _text, target in stub.calls} == {_ANSWER, _STEPS[-1]}
+
+    def test_missing_capability_fails_closed(self) -> None:
+        """능력 미주입(None) = 값 축 미실행 → 거부(모른다 ≠ 노출 없음)."""
+        ctx = _ctx(value_exposure=None)
+        leakage = check_answer_leakage(_drafts()[2], ctx)
+        assert leakage.passed is False and leakage.detail["value_verdict"] == VALUE_NOT_RUN
+        assert any("주입되지 않아" in r for r in leakage.reasons)
+        assert evaluate_gates(_drafts()[2], ctx).verified is False
+
+    def test_out_of_contract_outcome_fails_closed(self) -> None:
+        """능력이 계약 밖 판정값을 내면 통과로 접지 않는다(clean만 통과 — 허용 목록)."""
+
+        class _Rogue:
+            def scan_value_exposure(self, text: str, target: str) -> object:
+                class _Odd:
+                    class outcome:  # noqa: N801 — `.value`만 흉내 낸다
+                        value = "maybe"
+
+                    fragment = None
+                    candidates = 1
+                    undecided = 0
+
+                return _Odd()
+
+        verdict = check_answer_leakage(_drafts()[2], _ctx(value_exposure=_Rogue()))
+        assert verdict.passed is False and any("계약 밖" in r for r in verdict.reasons)
+
+    def test_exposed_stub_rejects_and_clean_stub_passes(self) -> None:
+        """게이트가 능력의 3상태를 재해석하지 않는다 — exposed는 거부, clean은 통과."""
+        assert (
+            check_answer_leakage(
+                _drafts()[2], _ctx(value_exposure=_StubExposure(ValueExposure.exposed))
+            ).passed
+            is False
+        )
+        assert (
+            check_answer_leakage(
+                _drafts()[2], _ctx(value_exposure=_StubExposure(ValueExposure.clean))
+            ).passed
+            is True
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -71,6 +71,26 @@ crosswalk 매핑(런타임 탐지 kebab-id → 리포트에 뜨는 canonical M-i
 - 승인 코퍼스(`data/corpus/misconception_crosslinks_v1/crosslinks.json`)는 전 행 직접매핑이며
   `test_approved_crosslinks_corpus.py`가 동결한다.
 
+## 적재 후 canonical 경쟁 (`canonical_flip` — HARN-216 · 2026-10-13)
+
+업서트(`ON CONFLICT DO UPDATE`)는 **같은 `(kebab, mis_id, link_type)`만 덮어쓰고 코퍼스에 없는 라이브 행은
+지우지 못한다.** 그래서 라이브에 오귀속 행이 남아 있으면 코퍼스를 그대로 다시 적재해도 canonical이 고쳐지지
+않는다(2026-10-07 실측 4건 — 신뢰도가 더 높은 잔존 행이 정답을 이김 2건 · 같은 신뢰도라 동률 미선정 2건).
+
+- **판정(계약)**: `simulate_load_canonical`(`crosslink_resolve`·순수 함수)이 적재 직전 라이브 행 + 적재 예정 행을 합친
+  집합의 `select_canonical`을 계산해 **코퍼스 행만으로 계산한 선택**과 비교한다. 같으면 `ok`, 다르면서 적재 후가
+  동률이면 `tie`, 그 밖에는 `wrong_winner`.
+- **집행(별항)**: `load_crosslinks`가 외래키 사전확인 다음·쓰기 앞에서 판정을 불러 `tie`·`wrong_winner`가 1건이라도
+  있으면 아무것도 쓰지 않고 `CanonicalFlipError`로 거부한다(전건 열거). `promote --load`는 **종료 코드 4**
+  (1 큐 위반 · 2 입력 부재 · 3 외래키 대상 누락과 구분 — 3은 입력 쪽, 4는 라이브 쪽 문제).
+- **우회 인자 없음**: `check_fk_targets=False`(hermetic 좌석)도 이 판정을 끄지 못한다. 해소는 라이브 잔존 행이
+  오귀속인지 사람이 확인해 삭제한 뒤 다시 적재하는 것뿐이다.
+- **한계(정직 기술)**: 판정(읽기)과 쓰기는 **다른 트랜잭션**이다 — 그 사이 다른 세션이 행을 넣으면 판정이 낡는다
+  (적재는 운영자 1인의 수동 작업이라 수용). 코퍼스에 없는 kebab의 라이브 행은 이 적재가 건드리지 않으므로 판정하지 않는다.
+  라이브 행이 **무엇을 얼마나 바꾸는지**(신규/변경 건수)는 `HARN-215`의 범위다.
+- 동결: 계약 `test_crosslink_canonical_flip_contract.py` · 집행 `test_crosslink_canonical_flip_enforcement.py` ·
+  실 PostgreSQL 관통 `test_crosslink_canonical_flip_integration.py`.
+
 ## 기계 자율 거부 규칙 (`machine_reject` — 측정된 안전 자율 행동·초인간 검증 §3.3)
 
 승인(approve)은 여전히 **사람 전용**이다(AI 자기승인 금지 불변). 그러나 강등전으로 *성취기준

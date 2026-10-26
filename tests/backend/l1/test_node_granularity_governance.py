@@ -7,8 +7,9 @@
 docs/architecture/concept_node_layering_decision.md §입도). build_checkpoint_questions.md 단계3이
 최우선 리스크로 지목한 **이중 truth source**(개념그래프 vs 원자그래프)를 코드로 가시화한다:
 
-  ① **이중 truth source 카운트 동결**: concept_graph_v1(437)·atom_graph_v1(2,683) 노드 수를
-     스냅샷으로 고정 — 무단 재분할·중복 증식으로 수가 예기치 않게 변하면 red(의식적 리뷰 강제).
+  ① **이중 truth source 카운트 동결**: concept_graph_v1·atom_graph_v1 노드 수를 스냅샷으로
+     고정 — 무단 재분할·중복 증식으로 수가 예기치 않게 변하면 red(의식적 리뷰 강제). 고정 지점은
+     `docs/data/corpus_facts.json`(OPS-154)이며, 그 파일의 diff가 의식적 리뷰 지점이다.
   ② **입도 순서 sanity**: 원자그래프가 개념그래프보다 *세분*이다(atom > concept).
   ③ **오개념 발생 단위 불변식(핵심)**: 원자그래프 '세부개념' 레벨 노드는 *전부* 독립 오개념
      (`misconception`)을 보유한다 — 즉 세부개념 원자는 Part 2 §1 법칙("독립 오개념 발생 단위")을
@@ -27,13 +28,18 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CONCEPT_GRAPH = _REPO_ROOT / "data" / "corpus" / "concept_graph_v1" / "graph.json"
 _ATOM_GRAPH = _REPO_ROOT / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 
-# 동결 스냅샷(2026-07-02 기준·Part 2 검토). 값이 바뀌면 *의식적으로* 갱신하라 —
+# 동결 스냅샷(2026-07-02 기준·Part 2 검토 — 당시 437·2,683). 값이 바뀌면 *의식적으로* 갱신하라 —
 # 무단 재분할/중복 증식/누락을 잡는 회귀 가드다(단일 진실 원천 붕괴 감지).
+# 고정 지점(OPS-154): 손 숫자가 아니라 `docs/data/corpus_facts.json`에서 읽는다. 코퍼스가 바뀌면
+# `corpus_facts.py sync`가 그 파일을 갱신하고, *그 파일의 diff*가 의식적 리뷰 지점이 된다.
 # 관점(2026-07-04·S0-4b): 구 437 개념그래프는 `legacy_snapshot`으로 격하됐고 원자 2,683이
 # runtime truth source다. 여기서는 *카운트 스냅샷만* 동결한다(값·로직 불변). 격하 자체의 회귀
 # 가드는 `test_legacy_snapshot_governance.py` 소관.
-_EXPECTED_CONCEPT_NODES = 437
-_EXPECTED_ATOM_NODES = 2683
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+_EXPECTED_CONCEPT_NODES = _FACTS["concept_graph.concepts"]
+_EXPECTED_ATOM_NODES = _FACTS["atom_graph.nodes"]
 _ATOM_DETAIL_LEVEL = "세부개념"
 
 
@@ -54,7 +60,7 @@ def test_dual_truth_source_counts_frozen() -> None:
     atom_nodes = _load_nodes(_ATOM_GRAPH)
     assert len(concept_nodes) == _EXPECTED_CONCEPT_NODES, (
         f"개념그래프 노드 수가 {_EXPECTED_CONCEPT_NODES}→{len(concept_nodes)}로 바뀌었다. "
-        "무단 재분할/중복이 아닌지 확인하고, 정당하면 이 스냅샷을 갱신하라."
+        "무단 재분할/중복이 아닌지 확인하고, 정당하면 corpus_facts.py sync로 사실 파일을 갱신하라."
     )
     assert len(atom_nodes) == _EXPECTED_ATOM_NODES, (
         f"원자그래프 노드 수가 {_EXPECTED_ATOM_NODES}→{len(atom_nodes)}로 바뀌었다. "

@@ -208,6 +208,21 @@ class TestNoRawLeak:
             "tone_violations",
             "prose_rephrased",
             "prose_reason_code",
+            # OPS-134 — primary 결말(닫힌 어휘 라벨 7종)·소요 ms·LLM 호출 수·호출 소요 합은 전부
+            # 비식별 *정수/라벨*이다. 어떤 학생의 무엇을 했는지가 아니라 한 턴이 얼마나 걸렸는지다.
+            "primary_outcome",
+            "elapsed_ms",
+            "llm_calls",
+            "llm_calls_finished",
+            "llm_ms_total",
+            # P3-08 — 튜터 context 슬롯 *이름*(닫힌 9종 어휘) 목록 3종뿐이다. 값·id·원문 없음.
+            "context_missing",
+            "context_not_delivered",
+            "context_coverage_gap",
+            # P3-09 — 스키마 거부 건수(정수)와 출력 거부 사유 코드(닫힌 어휘 라벨)뿐. 값·원문 없음.
+            "llm_output_rejections",
+            "concept_id_tool_rejections",
+            "tutor_output_reason_code",
             "observed_at",
         }
 

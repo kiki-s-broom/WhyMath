@@ -14,6 +14,7 @@ from fractions import Fraction
 
 import pytest
 
+from whymath_backend.l3 import verifier as verifier_module
 from whymath_backend.l3.cross_verify import (
     CrossVerificationResult,
     Perspective,
@@ -66,7 +67,7 @@ async def test_unknown_answer_kind_returns_unverifiable() -> None:
     verdict = await verifier.verify(problem)
     assert verdict.state == "unverifiable"
     assert "not_registered_kind" in (verdict.reason or "")
-    assert verdict.tier == VerificationTier.MACHINE_SAMPLED
+    assert verdict.tier == VerificationTier.NUMERIC_SAMPLING
 
 
 @pytest.mark.asyncio
@@ -80,7 +81,7 @@ async def test_finite_probability_pass_without_cross_verifier_is_unverifiable() 
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "unverifiable"
-    assert verdict.tier == VerificationTier.MACHINE_EXHAUSTIVE
+    assert verdict.tier == VerificationTier.FINITE_EXHAUSTIVE
     assert "유한 표본공간 전수 열거" in verdict.machine_axes
     assert "문발↔형식모델 정합" in verdict.residual_axes
     assert "cross_verifier" in (verdict.reason or "")
@@ -96,7 +97,7 @@ async def test_finite_probability_fail_returns_fail() -> None:
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "fail"
-    assert verdict.tier == VerificationTier.MACHINE_SAMPLED
+    assert verdict.tier == VerificationTier.FINITE_EXHAUSTIVE
     assert "전수 열거 결과" in (verdict.reason or "")
 
 
@@ -200,7 +201,7 @@ async def test_statistical_claim_pass_without_cross_verifier_is_unverifiable() -
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "unverifiable"
-    assert verdict.tier == VerificationTier.MACHINE_EXHAUSTIVE
+    assert verdict.tier == VerificationTier.DETERMINISTIC_DATA
     assert "통계량 전수 결정론 검산" in verdict.machine_axes
     assert "자료↔발문 정합" in verdict.residual_axes
 
@@ -215,7 +216,7 @@ async def test_statistical_claim_fail_returns_fail() -> None:
     )
     verdict = await verifier.verify(problem)
     assert verdict.state == "fail"
-    assert verdict.tier == VerificationTier.MACHINE_SAMPLED
+    assert verdict.tier == VerificationTier.DETERMINISTIC_DATA
     assert "불일치" in (verdict.reason or "")
 
 
@@ -269,3 +270,18 @@ async def test_statistical_claim_integer_precision_fails_through_verifier() -> N
     )
     verdict = await Verifier().verify(problem)
     assert verdict.state == "fail"
+
+
+@pytest.mark.parametrize("domain_kind", ["statistical_claim", "sequence_induction"])
+def test_duplicate_answer_kind_is_rejected_at_build(
+    domain_kind: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """도메인 전용 verifier로 사전 등록된 kind가 `_CONCEPTUAL_VERIFIERS`에도 있으면 구성 시점에 거부.
+
+    설계서 §3.3 "중복 키는 금지(구성 시점 ValueError)". 거부가 사라지면 개념형 래퍼가 도메인
+    verifier를 조용히 덮어써 다른 판정 경로가 되는데, 그 퇴행을 잡는 테스트가 없었다.
+    """
+    conceptual = verifier_module._CONCEPTUAL_VERIFIERS
+    monkeypatch.setitem(conceptual, domain_kind, conceptual["real_root_count"])
+    with pytest.raises(ValueError, match="중복"):
+        verifier_module._build_verifiers_v2()

@@ -356,3 +356,50 @@ claude/sleepy-feynman-skndtr
 claude/crosslink-signature-mm6kie
 claude/magical-maxwell-99n5e8
 claude/friendly-dijkstra-230lnm
+
+# ── 2026-10-12 15차 배치 (0건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-12.md §3-③'·§3-④ ──
+# 직전 배치 집행 확인(2026-10-12 ls-remote 실측): 14차 11건(t608mk · azdnov · vafylb · tbj2jf · 7x90dj ·
+#   onojq9 · 39xler · skndtr · mm6kie · 99n5e8 · friendly-dijkstra-230lnm) 전건 **잔존 0/11**.
+# 이번 회차는 삭제 줄 0건이다(no-op) — 삭제 가능 내용 소멸 브랜치 3건이 원격 claim 해제를 기다리고,
+#   3건은 Kiki 판단이 필요하다. 삭제 전 head SHA 스냅샷(다음 배치가 이 값과 대조):
+#   blissful-lovelace-ubp9tw = d4e4b432 (OPS-123 done #1573 · 코드 부재 0 · 테스트는 main에 강화판 · claim OPS-96 TTL 초과)
+#   status-f6qz0c = e90d2d6f (ahead 0 · diff 0 · claim EOS-63 TTL 초과)
+#   stoic-hawking-vzumx5 = a54f628f (QUAL-10 착수 claim 기록뿐 · claim TTL 초과)
+# ⚠ Kiki 판단 대기(삭제 금지): friendly-pascal-mnmypk(c229d21c · 내용 전량 흡수이나 2026-10-09 보존 지시와 충돌) ·
+#   gracious-cannon-xwn0lh(4a51ab09 · 보존 지시의 유일한 기록) · status-f9lp65(d792c9d0 · HARN-56 session이 지목)
+# ⚠ 회수 태스크가 등재된 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 신규: brave-franklin-2999u5(MATH-07) ·
+#   amazing-goldberg-1oc67i(OPS-129) · happy-turing-kmrd5z(OPS-130) · nice-cray-mbg1mq(PED-45 — 이 브랜치가 사라지면
+#   gdmwhk·uqyg79 정합 결과와 승계 태스크 원문이 함께 소실) · 기존: practical-maxwell-kuwl7x(OPS-122) · remaining-track-34zvse(HARN-212)
+#   승계 11건 유지: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79 · 5t5lmv · iws58k · 6eejrv · e98dw4 · q8tvcx · 29ac1b
+# ── 2026-10-13 16차 배치 (1건) — 회수 태스크 OPS-38 완료로 제외 사유 소멸 (PR #1536) ──
+# (번호 정정: 이 블록은 처음 15차였으나 main이 같은 번호의 15차 배치(0건, 2026-10-12)를 먼저 병합해 16차로 바꿨다. 위 15차가
+#  q8tvcx를 "승계 11건 유지"로 적은 것은 이 블록이 회수 완결로 갱신한다.)
+# 위 14차 배치(2026-10-09)가 q8tvcx를 "q8tvcx(OPS-38·OPS-67)" 의도적 제외로 적었으나, 이 PR이 회수를 완결해 그 제외를 갱신한다.
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   whymath-ai-recommendation-review-q8tvcx = e1835c0c  (2026-10-08 git ls-remote 실측)
+#     근거: 이전 배치들이 이 브랜치(q8tvcx)를 "회수 태스크 OPS-38·OPS-67이 참조"해 의도적 제외했다. main에 없는
+#     고유 커밋은 3건뿐이며(나머지는 전부 (#NNN) 스쿼시 번호가 붙은 main 커밋) 전부 처분됐다:
+#       ee9df6dc 갭 재점검 r2 문서 → docs/architecture/data_platform_truthfulness_gap_review_2026-08-04.md 로 회수
+#                (MEMORY.md 결정 로그 +25줄은 2026-10-08 OPS-38 회수 항목으로 대체 · 태스크 YAML 5건은 번호 매핑
+#                 OPS-19→OPS-38 · SEC-13→SEC-32 · OPS-20→OPS-67 · OPS-21→OPS-32 · HARN-15 유지로 main에 이미 존재)
+#       592c961f CI 수정(data-pipeline 잡 if · notation_coverage 중복 스텝) → 이식 안 함: COLLAB-07(#817)이 다른 방식으로
+#                먼저 해소. 테스트는 tests/infra/test_ci_gate_reachability.py 로 재구현해 이식(OPS-38)
+#       e1835c0c 원 OPS-19 done 등재 → 번호 OPS-19 재사용 금지(HARN-10)로 폐기
+#     OPS-67(B1)의 유일한 상세 근거였던 r2 §2-B1·부록 B1은 위 회수 문서가 main에 싣고 있으므로 이 브랜치 보존 사유가 없다.
+claude/whymath-ai-recommendation-review-q8tvcx
+
+# ── 2026-10-14 17차 배치 (0건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-14.md §3-③'·§3-④ ──
+# 직전 배치 집행 확인(2026-10-14 ls-remote 실측): 16차 1건(q8tvcx) **잔존 0/1**. 소멸 브랜치 2건:
+#   whymath-ai-recommendation-review-q8tvcx(16차 집행) · adoring-goodall-3dfsdi(QUAL-12 done · PR #1589 — 삭제 배치 경유 아님).
+# 이번 회차는 삭제 줄 0건이다(no-op) — 17회차와 같은 사유다. 삭제 가능 내용 소멸 브랜치 3건이 원격 claim 해제를 기다리고
+#   (claims reap --apply 미실행), 3건은 Kiki 판단이 필요하다. 삭제 전 head SHA 스냅샷(다음 배치가 이 값과 대조):
+#   blissful-lovelace-ubp9tw = d4e4b432 (OPS-123 done #1573 · claim OPS-96 TTL 초과)
+#   status-f6qz0c = e90d2d6f (ahead 0 · diff 0 · claim EOS-63 TTL 초과)
+#   stoic-hawking-vzumx5 = a54f628f (QUAL-10 착수 claim 기록뿐 · claim TTL 초과)
+# ⚠ Kiki 판단 대기(삭제 금지): friendly-pascal-mnmypk(c229d21c) · gracious-cannon-xwn0lh(4a51ab09) · status-f9lp65(d792c9d0)
+# ⚠ 회수 태스크가 등재된 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 신규: relaxed-keller-4wk0b2(bd22bf43) ·
+#   wonderful-allen-vhbdra(af36c2cf) = OPS-140(OPS-126 이중 구현 — 두 브랜치 모두 보존해야 기준 구현 비교가 가능하다) ·
+#   기존: brave-franklin-2999u5(MATH-07) · amazing-goldberg-1oc67i(OPS-129) · happy-turing-kmrd5z(OPS-130) ·
+#   nice-cray-mbg1mq(PED-45) · practical-maxwell-kuwl7x(OPS-122) · remaining-track-34zvse(HARN-212)
+#   승계 10건 유지: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79 · 5t5lmv · iws58k · 6eejrv · e98dw4 · 29ac1b
+# ⚠ 활성 claim 4건은 손대지 않는다: peaceful-bell-s7mlg8(MISC-61) · jolly-fermi-6km81l(EOS-194) · pensive-cerf-guowbr(EOS-195) · zen-ramanujan-mzr0ug(OPS-137)

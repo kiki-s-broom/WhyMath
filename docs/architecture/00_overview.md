@@ -120,7 +120,7 @@ L7 → L6 → L5 → L4 → L3 → L2 → L1
 | NCIC 크롤러 | L1 | P0 | Phase 1 첫 작업 |
 | 학교알리미 크롤러 | L1 | P0 | 학생별 교과서 매핑 |
 | 검정교과서 목차 DB | L1 | P0 | 본문 X, 목차만 |
-| 개념 연결 그래프 | L1 | P1 | PG 단일 평면(2026-08-03 정정 — Neo4j 런타임 연결 안 함·확정), 실측 원자 백본 2,683노드·2,210엣지 |
+| 개념 연결 그래프 | L1 | P1 | PG 단일 평면(2026-08-03 정정 — Neo4j 런타임 연결 안 함·확정), 실측 원자 백본 <!-- fact:atom_graph.nodes -->2,683<!-- /fact -->노드·<!-- fact:atom_graph.edges -->2,278<!-- /fact -->엣지 |
 | 다국 커리큘럼 매트릭스 | L1 | P3 | Phase 1은 한국+참고용 미국·IMO만 |
 | 교과서 매핑 파이프라인 | L1 | P1~P2 | 구조 메타데이터만, 12단계(부록 H) |
 | 자동 커리큘럼 정렬 엔진 | L1+L6 | P1 | L1이 입력 보유, L6 모드가 소비 |
@@ -188,8 +188,9 @@ WhyMath 아키텍처는 *서로 직교하는 두 축*으로 본다:
 - L3 라우터 설계: `03a_l3_router_design.md`
 - 하네스: `03b_wh_s_solver_harness.md`(솔버·WH-S) · `04a_wh1_tutoring_harness.md`(튜터링·WH-1)
 - 콘텐츠 전략(교수법-중립 DSL·Rendering Engine·2층 캐시): `03c_content_strategy_cache.md`
-- 문제은행 격차·정합 정본: `problem_bank_gap_review.md` — 코퍼스 6종 현황·외부 틀(18~22) 대조 판정·설계 D1~D9
+- 문제은행 격차·정합 정본: `problem_bank_gap_review.md` — 코퍼스 6종 시절(2026-07-28) 현황(현재 은행 수·건수는 `../data/corpus_facts.md`의 `problem_bank.banks`·`problem_bank.total`)·외부 틀(18~22) 대조 판정·설계 D1~D9
 - 2단계 교수법·런타임 선택·적응 엔진: `04d_adaptive_pedagogy_engine.md` · 북극성 서사: `../strategy/education_os_positioning_v1.md`
+- 교수전략 카탈로그·격차 완결(외부 프레임워크 대조 판정·비유/예시 생성·용어 3축): `04g_pedagogy_strategy_catalog.md` (구 번호 04e — 04e는 `04e_misconception_remediation_design.md`)
 - 시장 전략: `../strategy/`
 - 코딩 표준: `../standards/`
 - 프롬프트 라이브러리: `../prompts/`

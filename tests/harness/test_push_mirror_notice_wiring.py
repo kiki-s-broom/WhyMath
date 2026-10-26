@@ -11,7 +11,7 @@
   훅 → 진입점 → 판정·본문 섹션 호출 사슬   고지문은 나가는데 PR 본문 섹션이 사슬에서 빠진다
   additionalContext JSON(ASCII)          stdout 평문은 PreToolUse에서 모델에 안 간다(공식 문서) —
                                          평문으로 내면 고지가 영영 안 보인다
-  종료 코드 항상 0                       고지 훅이 푸시·PR 생성을 막는 훅으로 변질
+  종료 코드 0·2뿐 (2 = 푸시 차단)         PR 생성 고지가 막는 훅으로 변질 / 차단이 다른 코드로 새서 도구가 오류로만 읽음
   평가 한 건당 로그 한 줄                습관화 감시(판정 문서 §6)의 입력이 사라짐
   /drive 절차가 섹션 생성 경로를 가리킴   PR을 여는 절차가 이 경로를 모른다
 """
@@ -100,19 +100,22 @@ def test_call_chain_from_hook_to_pr_section() -> None:
     assert {"compute_reach", "render_pr_section", "render_notice"} <= notice_calls
 
 
-def test_hook_never_blocks() -> None:
-    """고지 훅은 반환값이 0뿐이다 — 거부(2)나 비정상 종료 코드로의 변질을 막는다."""
+def test_hook_exit_codes_are_only_pass_or_block() -> None:
+    """훅의 반환값은 0(통과)과 2(푸시 차단, HARN-308)뿐이다 — 그 밖의 코드는 도구가 오류로만 읽고 막지 못한다.
+
+    PR 생성 고지가 차단으로 변질되지 않는 것은 `test_push_mirror_block.py`의 PR 생성 대조군이 맡는다.
+    """
     tree = ast.parse(_HOOK.read_text(encoding="utf-8"))
     values = {
         node.value.value if isinstance(node.value, ast.Constant) else "<식>"
         for node in ast.walk(_function(tree, "main"))
         if isinstance(node, ast.Return) and node.value is not None
     }
-    assert values == {0}
+    assert values == {0, 2}
     source = _HOOK.read_text(encoding="utf-8")
     assert (
         "permissionDecision" not in source
-    ), "권한 결정을 건드리면 사용자의 권한 흐름을 우회할 수 있다"
+    ), "차단은 종료 코드로 한다 — 권한 결정을 건드리면 사용자의 권한 흐름을 우회할 수 있다"
     assert "updatedInput" not in source
 
 
@@ -192,27 +195,41 @@ def _push(command: str = "git push -u origin feature") -> dict:
 
 
 class TestRegisteredCommandEndToEnd:
-    def test_unmirrored_push_emits_additional_context_json(self, repo: Path) -> None:
+    def test_unmirrored_push_is_refused_with_the_reason_on_stderr(self, repo: Path) -> None:
+        """HARN-308 — 미러 없는 푸시는 exit 2로 거부된다. stdout은 무시되므로 이유는 stderr에 있다."""
         proc = _run_registered(repo, _push())
-        assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
-        out = json.loads(proc.stdout.decode("utf-8"))
-        spec = out["hookSpecificOutput"]
-        assert spec["hookEventName"] == "PreToolUse"
-        assert "[CI 미러 고지 · 푸시 직전]" in spec["additionalContext"]
-        assert set(spec) == {"hookEventName", "additionalContext"}, "권한 결정 필드를 섞지 않는다"
+        assert proc.returncode == 2
+        assert proc.stdout == b""
+        assert "[CI 미러 차단 · 푸시 직전]" in proc.stderr.decode("utf-8")
         rows = _log_rows(repo)
-        assert [(r["code"], r["notified"], r["deduped"]) for r in rows] == [
+        assert [(r["code"], r["blocked"], r["notified"]) for r in rows] == [
             ("no_result", True, False)
         ]
+
+    def test_notice_json_shape_on_pr_create(self, repo: Path) -> None:
+        """고지 전용으로 남은 경로(PR 생성)의 additionalContext 형태 — 권한 결정 필드를 섞지 않는다."""
+        event = {
+            "tool_name": _PR_TOOL,
+            "tool_input": {"head": "feature", "base": "main", "title": "t", "body": "요약"},
+        }
+        proc = _run_registered(repo, event)
+        assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+        spec = json.loads(proc.stdout.decode("utf-8"))["hookSpecificOutput"]
+        assert spec["hookEventName"] == "PreToolUse"
+        assert "[CI 미러 고지 · PR 생성 직전]" in spec["additionalContext"]
+        assert set(spec) == {"hookEventName", "additionalContext"}
 
     def test_same_commit_and_reason_is_notified_once_but_logged_every_time(
         self, repo: Path
     ) -> None:
-        first = _run_registered(repo, _push())
-        second = _run_registered(repo, _push())
-        assert (
-            first.stdout and not second.stdout
-        ), "재시도 푸시에 같은 고지를 되풀이하면 소음이 된다"
+        """고지는 같은 (트리거·HEAD·사유)를 한 번만 — 소음 방지. 차단은 이 억제를 따르지 않는다."""
+        event = {
+            "tool_name": _PR_TOOL,
+            "tool_input": {"head": "feature", "base": "main", "title": "t", "body": "요약"},
+        }
+        first = _run_registered(repo, event)
+        second = _run_registered(repo, event)
+        assert first.stdout and not second.stdout, "재시도에 같은 고지를 되풀이하면 소음이 된다"
         rows = _log_rows(repo)
         assert [(r["notified"], r["deduped"]) for r in rows] == [(True, False), (False, True)]
 
@@ -248,15 +265,30 @@ class TestRegisteredCommandEndToEnd:
         assert row["trigger"] == "pr_create" and row["code"] == "body_missing_section"
 
     def test_output_survives_a_cp949_console(self, repo: Path) -> None:
-        """한국어 Windows(cp949) 표준 입출력에서도 JSON이 손상되지 않는다 — 출력은 순수 ASCII."""
-        command = 'git commit -m "한글 — 설명" && git push'
-        proc = _run_registered(
-            repo, _push(command), env_extra={"PYTHONIOENCODING": "cp949", "PYTHONUTF8": "0"}
-        )
+        """한국어 Windows(cp949) 표준 입출력에서도 손상되지 않는다.
+
+        고지(PR 생성)는 stdout JSON이 순수 ASCII, 차단(푸시)은 stderr가 UTF-8 바이트여야 한다.
+        """
+        cp949 = {"PYTHONIOENCODING": "cp949", "PYTHONUTF8": "0"}
+        event = {
+            "tool_name": _PR_TOOL,
+            "tool_input": {
+                "head": "feature",
+                "base": "main",
+                "title": "한글 — 제목",
+                "body": "요약",
+            },
+        }
+        proc = _run_registered(repo, event, env_extra=cp949)
         assert proc.returncode == 0, proc.stderr.decode("cp949", "replace")
         assert proc.stdout.decode("ascii")  # 비ASCII가 있으면 UnicodeDecodeError
         context = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
-        assert "푸시 직전" in context
+        assert "PR 생성 직전" in context
+
+        command = 'git commit -m "한글 — 설명" && git push'
+        blocked = _run_registered(repo, _push(command), env_extra=cp949)
+        assert blocked.returncode == 2
+        assert "푸시 직전" in blocked.stderr.decode("utf-8")  # UTF-8이 아니면 UnicodeDecodeError
 
     def test_log_never_contains_the_command_text(self, repo: Path) -> None:
         secret = "TOKEN-되면-안-남는-값"

@@ -37,8 +37,13 @@ def _num(text: str) -> int:
     return int(text.replace(",", ""))
 
 
+# OPS-154 — 문서는 숫자를 `<!-- fact:이름 -->값<!-- /fact -->` 표식으로 인용한다. 표식 주석을 걷어 내고
+# 보이는 글자 그대로 대조한다(표식 값 자체의 정합은 tests/infra/test_corpus_facts.py가 따로 본다).
+_FACT_MARKER = re.compile(r"<!-- /?fact(?::[a-z0-9_.]+(?: raw)?)? -->")
+
+
 def _read(rel: str) -> str:
-    return (ROOT / rel).read_text(encoding="utf-8")
+    return _FACT_MARKER.sub("", (ROOT / rel).read_text(encoding="utf-8"))
 
 
 def _truth() -> dict[str, int]:

@@ -66,6 +66,14 @@ class _FakeSession:
     async def commit(self) -> None:
         self.commits += 1
 
+    async def get(self, _model: Any, _pk: Any) -> None:
+        """EOS-47: 시도 버전 고정이 문항 행을 PK로 읽는다 — 이 대역엔 문항이 없다(None=문항 없음).
+
+        고정 값 자체는 `tests/backend/l2/test_attempt_version_pin.py`·배선 테스트가 잰다. 이 파일이
+        재는 것(채점·적재 순서 등)은 그 값과 무관하다.
+        """
+        return None
+
     async def execute(self, _stmt: Any) -> _EmptyResult:
         """EOS-12 증거 조립이 개념·스킬을 조회한다 — 스텁하지 않고 *실제로* 돌린다.
 

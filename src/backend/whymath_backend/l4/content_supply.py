@@ -521,7 +521,7 @@ async def supply(
             )
         return result
 
-    # 전략 카드 계층(PED-23 회수 — 04e §3.2): decide()가 고른(게이트 통과 후) 전략의 카탈로그
+    # 전략 카드 계층(PED-23 회수 — 04g §3.2): decide()가 고른(게이트 통과 후) 전략의 카탈로그
     # 카드를 system 뒤에 1블록 덧붙인다. 이 지점이 decide 산출 전략이 LLM 프롬프트와 만나는
     # **유일한 실측 소비 지점**이다(렌더 경로는 프롬프트가 없다). 플래그 OFF(기본)면 카탈로그
     # 미조회·system 무변경 — 프롬프트-해시 캐시 키(`cache_key_for(prompt, system, ...)`)도

@@ -105,6 +105,7 @@ async def test_unregistered_kind_is_unverifiable_and_never_reaches_cross_verifie
             lambda _c, _a: AnswerVerdict(state="pass", reason=None, samples_checked=1),
             machine_axis="probe-machine",
             residual_axis="probe-residual",
+            tier=VerificationTier.SYMBOLIC_PROOF,
         ),
     )
     recorder = _RecordingCrossVerifier()
@@ -117,7 +118,7 @@ async def test_unregistered_kind_is_unverifiable_and_never_reaches_cross_verifie
     # 기계가 닫은 축·못 닫은 축은 그대로 보존된다(관점이 없다고 기계 결과를 지우지 않는다).
     assert verdict.machine_axes == ("probe-machine",)
     assert verdict.residual_axes == ("probe-residual",)
-    assert verdict.tier == VerificationTier.MACHINE_EXHAUSTIVE
+    assert verdict.tier == VerificationTier.SYMBOLIC_PROOF
 
 
 @pytest.mark.asyncio

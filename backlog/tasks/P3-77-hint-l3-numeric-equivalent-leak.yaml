@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-77-hint-l3-numeric-equivalent-leak
+title: "P3-77 — 힌트 L3 수치 동치 누설·L3 공백: S4-11 게이트 ④·B를 값 동치로 넓힌다 (P3-10 실측 2건)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 수치 동치 누설을 막는다 — S4-11 힌트 게이트(l4/hint_content/gates.py)의 ④(시연 결과 = 최종 결과)와 B(정답 누출)가 문자열 동등만 봐서, L3 부분 시연이 정답과 값이 같은 순수 산술식(예: (-3) + (4)*((2) - (0)) + (-3) + (1)*((2) - (0)) = y, 정답 4)을 보여 주는 힌트가 verified 로 통과한다. 정답이 1자라 B가 undecidable 로 유보한 구간이다. 수치 동치(SymPy)로 판정을 넓히거나, 그 단계의 L3 를 만들지 않는다.\n② L3 공백을 처리한다 — 게이트 B가 L3 를 거부해 그 단계에 검수 L3 힌트가 0건인 문항(P3-10 실측 aq-h-10-05: 속도와 가속도, 정답 -12)은 5회 막힘 학생에게 하네스 중립 질문만 나간다. 다른 단계 L3 로 대체할지·Level 4 안전망으로 둘지 교수학 판정을 적고 구현한다.\n③ 변별력 — 수치 동치 L3 를 주입하면 게이트가 거부하고(RED), 정답과 값이 다른 산술식은 통과하는 대조군을 둔다.\n④ 완료 판정 — python -m whymath_backend.harness.ai_quality_eval 의 정답 누설·Hint 적절성 축 실패 사례 2건(aq-h-06-04-l3 · aq-h-10-05-l3)이 사라지거나, 남는다면 의도적 제외 사유가 리포트에 적힌다."
+artifacts:
+  - "#1721"
+paths:
+  - "src/backend/whymath_backend/l4/hint_content/**"
+session: null
+notes: |-
+  출처: P3-10(AI 품질 평가 8종) 실측 — docs/reviews/p3_10_ai_quality_eval_suite_2026-10-21.md §4. 판정 기준 main 9ef84847. 결정론 튜터 출력(eos-deterministic 후보)에서 정답 누설 무관용 축 실패 1건(aq-h-06-04-l3 — 동치 산술식)과 Hint 적절성 실패 1건(aq-h-10-05-l3 — 검수 L3 부재로 중립 질문)이 나왔다. 둘 다 P3-09 출력 게이트가 막지 않는 학생 노출 경로다. 실 서빙 힌트(served_hint)는 DB 의 검수 힌트 카탈로그에서 오므로 실제 노출 여부는 카탈로그 적재 상태에 달려 있다 — 이 태스크 착수 시 먼저 실측한다.
+
+  [미러 면제 2026-10-22] 원장 전용 PR — 코드는 #1721에서 CI(backend 포함)로 이미 검증됨
+updated: 2026-10-22

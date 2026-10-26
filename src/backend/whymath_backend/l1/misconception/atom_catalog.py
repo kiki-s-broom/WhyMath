@@ -24,13 +24,13 @@ Phase 1 산출 코퍼스 `data/corpus/atom_graph_v1/graph.json`의 원자(세부
   - `concept_src_id` = `code`(원자 code·느슨참조·`atom_node.code`와 동일 공간)
   - `standard_code` = `standard_codes[0]`(원자는 전건 보유·없으면 None·느슨참조)
   - `school_level`·`domain`(←`subject_area`)·`subunit` = 원자 안전 메타 그대로
-  - `provenance_note` = `"atom_graph_v1"`(출처 표기·구 839과 구분)
+  - `provenance_note` = `"atom_graph_v1"`(출처 표기·구 카탈로그(misconceptions_v1)와 구분)
   - 나머지(student_wrong_thinking·distractor_rule·correction_point·difficulty·ccss_code·
     mapping_*) = None(원자 ①오개념 원천 미보유 — 날조하지 않는다)
 
-구 839(misconceptions_v1·개념-grain·`N1` 출처)와는 mis_id 네임스페이스(`ATOM:` 접두)·
+구 카탈로그(misconceptions_v1·개념-grain·`N1` 출처)와는 mis_id 네임스페이스(`ATOM:` 접두)·
 `provenance_note`로 분리되며 *additive 병존*한다(Phase 1이 원자를 기존 `concept`/`concept_edge`에
-additive 적재한 것과 동형). 구 839는 Phase 5에서 폐기 예정.
+additive 적재한 것과 동형). 구 카탈로그(misconceptions_v1)는 Phase 5에서 폐기 예정.
 
 7계층: L1 데이터 기반의 *런타임 엔티티 적재*. 소비(진단·distractor 생성)는 이 행을 *조회*하되
 여기서 구현하지 않는다(역방향 의존 금지·후속).
@@ -52,7 +52,8 @@ if TYPE_CHECKING:
 
 # atom mis_id 접두 — 구 M-series(misconceptions_v1)와 네임스페이스 분리(무충돌·결정론).
 ATOM_MIS_ID_PREFIX = "ATOM:"
-# provenance 메모 — atom 백본 출처 표기(구 839과 구분·Phase 5 폐기 대상 식별).
+# provenance 메모 — atom 백본 출처 표기(구 카탈로그 misconceptions_v1과 구분·Phase 5 폐기 대상
+# 식별).
 ATOM_PROVENANCE_NOTE = "atom_graph_v1"
 # atom 판별 level 값(세부개념 = 원자) — 단원·소단원은 ①오개념 미보유.
 _ATOM_LEVEL = "세부개념"
@@ -119,8 +120,13 @@ def load_atom_misconceptions(
     engine: Engine | None = None,
     settings: Settings | None = None,
     store: MisconceptionCatalogStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """atom 백본 `graph.json` ①오개념 → `misconception_catalog` 멱등 적재. 반환=적재 행 수.
+
+    `overwrite_cms_edits`·`conflicts`는 CMS 편집 보호(P3-25)로 `load_misconceptions`에 그대로
+    위임된다 — 보호로 건너뛴 행은 반환 행 수에서 빠진다.
 
     `atom_misconception_rows`로 graph.json을 행 dict 목록으로 투영한 뒤 `{"misconceptions": rows}`
     Collection으로 감싸 **기존 `load_misconceptions`에 위임**한다 — 검증(extra=forbid)·mis_id 기준
@@ -132,7 +138,15 @@ def load_atom_misconceptions(
     """
     rows = atom_misconception_rows(graph_path)
     collection: dict[str, Any] = {"misconceptions": rows}
-    return load_misconceptions(None, collection, engine=engine, settings=settings, store=store)
+    return load_misconceptions(
+        None,
+        collection,
+        engine=engine,
+        settings=settings,
+        store=store,
+        overwrite_cms_edits=overwrite_cms_edits,
+        conflicts=conflicts,
+    )
 
 
 __all__ = [

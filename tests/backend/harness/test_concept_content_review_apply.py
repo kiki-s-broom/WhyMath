@@ -21,6 +21,13 @@ from whymath_backend.harness.concept_content_review_apply import (
     main,
 )
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 
 class _FakeStore:
     """ConceptContentStore 표면 모사 — mark_review_status 호출 기록."""
@@ -28,7 +35,9 @@ class _FakeStore:
     def __init__(self) -> None:
         self.calls: list[tuple[tuple[str, ...], str]] = []
 
-    def mark_review_status(self, codes: tuple[str, ...], status: str) -> int:
+    def mark_review_status(
+        self, codes: tuple[str, ...], status: str, *, conflicts: list[str] | None = None
+    ) -> int:
         self.calls.append((codes, status))
         return len(codes)
 
@@ -452,12 +461,12 @@ class TestLinkApprovalGate:
         assert report.gate_violations == []
 
     def test_real_corpus_every_k12_code_requires_link_approval(self, tmp_path: Path) -> None:
-        # 실 코퍼스 전수 — 437행 전부 연결이 있어, link_approved 없는 reviewed 라벨은 전부 거부된다.
+        # 실 코퍼스 전수 — 매핑된 크로스워크 행 전부 연결이 있어, link_approved 없는 reviewed 라벨은 전부 거부된다.
         from whymath_backend.harness.concept_content_link_context import load_content_links
 
         links = load_content_links()
         codes = sorted(links)
-        assert len(codes) == 437
+        assert len(codes) == _FACTS["concept_atom_crosswalk.mapped"]
         k12 = _write_corpus(tmp_path, scope=CONTENT_SCOPE_K12, codes=codes)
         univ = _write_corpus(tmp_path, scope=CONTENT_SCOPE_UNIVERSITY, codes=[])
         store = _FakeStore()
@@ -468,7 +477,7 @@ class TestLinkApprovalGate:
             store=store,
             links=links,
         )
-        assert len(report.gate_violations) == 437
+        assert len(report.gate_violations) == _FACTS["concept_atom_crosswalk.mapped"]
         assert store.calls == []
 
     def test_main_returns_gate_exit_code_for_missing_link_approval(self, tmp_path: Path) -> None:

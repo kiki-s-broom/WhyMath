@@ -36,6 +36,7 @@ import pytest
 from whymath_backend.app import RouteLatencyBody
 from whymath_backend.config import Settings
 from whymath_backend.l3.router import SLA_GATE_MS
+from whymath_backend.ops import uptime_probe
 from whymath_backend.ops.declared_unwired_audit import route_paths
 from whymath_backend.ops.service_health import ServiceMetrics
 
@@ -73,6 +74,10 @@ def _expected_constants() -> dict[str, float]:
         "ops_latency_p95_alert_ms": float(fields["ops_latency_p95_alert_ms"].default),
         "ops_metrics_window_size": float(fields["ops_metrics_window_size"].default),
         "l3_sla_gate_ms": float(SLA_GATE_MS),
+        # OPS-30: S4 목표·창은 uptime_probe가 정본(프로브가 계산에 쓰는 바로 그 상수).
+        "s4_availability_target": float(uptime_probe.S4_AVAILABILITY_TARGET),
+        "s4_window_start_kst_hour": float(uptime_probe.S4_WINDOW_START_KST_HOUR),
+        "s4_window_end_kst_hour": float(uptime_probe.S4_WINDOW_END_KST_HOUR),
     }
 
 

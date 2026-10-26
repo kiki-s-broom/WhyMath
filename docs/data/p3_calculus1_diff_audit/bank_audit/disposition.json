@@ -1,0 +1,779 @@
+{
+ "note": "원인 묶음은 결함 판정 뒤의 교정용 분류다 — S5 판정(k=68)에는 쓰이지 않으며 어떤 판정도 바꾸지 않는다(as-found).",
+ "bank_sha256": "cc7e953974185ac4aa4c1291d3e27e08fc999a76bc5f82b5471d7a31900af16f",
+ "k": 68,
+ "items": [
+  {
+   "problem_id": "033597a2-00d1-56d7-9486-8041f70250f6",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "106fff4b-2e79-5db0-8418-29b95ffe712a",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "이차 롤/속도 0 = 꼭짓점"
+  },
+  {
+   "problem_id": "1bdcda49-391d-54bf-bc10-5539891bd162",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "가속도 해설 v(t) 단계 누락"
+  },
+  {
+   "problem_id": "1ebb69fb-e027-5995-a8e7-5b56109fb8eb",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "mastery_check",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "2359c043-9c48-5c2c-98ee-a50a1d1e6170",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "극값을 발문이 알려 줌(실근 개수)"
+  },
+  {
+   "problem_id": "23e5615c-70b3-5ee6-a344-6f8b0be0c829",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "representative",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "24d7eb97-62eb-5c7d-8d7f-ea121b5aa9ff",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "applied",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "284122b4-9da1-5794-ae57-8e5d0f8d74e2",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "mastery_check",
+   "rater_A": "발문 검산 불일치",
+   "rater_B": "발문 검산 불일치",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "발문–검산 불일치(verify가 다른 문제)"
+  },
+  {
+   "problem_id": "2a9e753d-a2a5-5bb7-8cfa-73e12fd7818a",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "applied",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 롤/속도 0 = 꼭짓점"
+  },
+  {
+   "problem_id": "2d14ff84-7feb-55d1-9cf3-09e7cf463ca3",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "확실"
+   ],
+   "cause": "발문이 답을 알려 줌"
+  },
+  {
+   "problem_id": "2fd9fad4-965c-57ac-b5e5-aabf208f087a",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "applied",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 접선 = 판별식·중근"
+  },
+  {
+   "problem_id": "327a1b94-d576-5607-82e7-9b3dd5a1f2ec",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "확실"
+   ],
+   "cause": "발문이 답을 알려 줌"
+  },
+  {
+   "problem_id": "3294c5cf-877c-58e9-b8e7-0cc158342dc1",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "ok",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "가속도 해설 v(t) 단계 누락"
+  },
+  {
+   "problem_id": "32ec89c8-ad3b-5982-a7a3-06369430b455",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "representative",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 접선 = 판별식·중근"
+  },
+  {
+   "problem_id": "38745ca2-cfa5-52d6-963a-8b5f653f66e4",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "'극대' 문항에 임계점=극값 오개념 연결"
+  },
+  {
+   "problem_id": "3a44d0c6-ad59-5105-9118-edc7bbfe3428",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "'극대' 문항에 임계점=극값 오개념 연결"
+  },
+  {
+   "problem_id": "44e7281a-35a4-599f-a1af-c2f81866218c",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "해설 문장 결함(비문·용어)"
+  },
+  {
+   "problem_id": "47e06865-d69b-5fd8-8a1d-dc39c46ee685",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "극값을 발문이 알려 줌(실근 개수)"
+  },
+  {
+   "problem_id": "48e20b23-3465-5e52-b924-791ea4b376a9",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "492338dc-efff-5d96-91a5-8d51d54a36ff",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "확실"
+   ],
+   "cause": "발문이 답을 알려 줌"
+  },
+  {
+   "problem_id": "4b597448-0d0b-51a8-9885-30ec3bd552dc",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 롤/속도 0 = 꼭짓점"
+  },
+  {
+   "problem_id": "4cd0aa3d-e738-5963-ae54-eb77a64b6b4b",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "4eb43c2c-c924-5652-b124-8e717898ce6f",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "mastery_check",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "발문이 답을 알려 줌"
+  },
+  {
+   "problem_id": "4efc709d-136b-59bd-a33f-a934110e1021",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "문장 표기",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "5664f0d4-b006-55fc-ad39-facd593bbae1",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "applied",
+   "rater_A": "ok",
+   "rater_B": "해설",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "해설 a=0 배제 누락"
+  },
+  {
+   "problem_id": "57e65606-d451-5041-bfe4-bfb69b9a7276",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "59582349-2efc-533d-8593-d4a8cfb8fc16",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "59bacdba-3a45-5274-92d8-8c0dc2432452",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 롤/속도 0 = 꼭짓점"
+  },
+  {
+   "problem_id": "62d2b1fc-9574-5d9b-acf6-04a0ea22aadc",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "mastery_check",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "63407aa1-bece-5105-96fa-769d6187d3e4",
+   "standard": "[12미적Ⅰ-02-04]",
+   "slot": "mastery_check",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(변별 없음)"
+  },
+  {
+   "problem_id": "6359d702-22d4-57ff-9d17-8fb55b6e37d7",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "가속도 해설 v(t) 단계 누락"
+  },
+  {
+   "problem_id": "6751a639-16e4-5e63-8cd6-7550d5af9a43",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(변별 없음)"
+  },
+  {
+   "problem_id": "6770ef21-4967-5fe2-9b92-7f54c9fdf590",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "오개념 연결",
+   "rater_B": "오개념 연결",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "68f08851-b5ce-5058-9302-dfaddcfed161",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "6cc457ca-6b92-542f-bf1e-489e34b1c3a6",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "representative",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "가속도 해설 v(t) 단계 누락"
+  },
+  {
+   "problem_id": "71dcf0c5-3c2b-5e39-9177-f916fc747820",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "753ab59f-b648-5780-b666-ecb2dedf6e47",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "79d7c8b4-1c1a-5e91-b71a-a86462f9641e",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "7e31841b-4131-5820-9e72-b07ac47c64f1",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "applied",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 접선 = 판별식·중근"
+  },
+  {
+   "problem_id": "8a11d456-071e-5c49-bdd0-404e7acd442e",
+   "standard": "[12미적Ⅰ-02-04]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(변별 없음)"
+  },
+  {
+   "problem_id": "8f45f606-5092-5325-8828-d1eae9f878ba",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "오답 경로가 정답과 일치(변별 없음)"
+  },
+  {
+   "problem_id": "8f820f9c-5eaa-539e-a2b4-6ce2206ac943",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "91a6d932-1022-5fe0-be47-760522a3a81b",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "문장 표기",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "9364ac56-8c5f-5291-b4e0-fe2974484f4f",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "953ef7a0-a3b1-5b64-a186-bf3e77c06439",
+   "standard": "[12미적Ⅰ-02-05]",
+   "slot": "diagnostic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "오답 경로가 정답과 일치(변별 없음)"
+  },
+  {
+   "problem_id": "9ad57d30-bd3a-553f-b3d3-79b399af6f92",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "representative",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "9ba17739-d9d7-52de-8c4a-73a2fa79fdad",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "a6231174-9358-5b0c-8ec1-b33bae73ea3b",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "b21b1689-d4cd-5357-83ef-745d210b3d12",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "basic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "해설 '극값을 가지므로' 전제 역전"
+  },
+  {
+   "problem_id": "b464661b-a685-5df3-bfda-ddc8687f4b0c",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "ba218b2d-e93f-53f4-b8df-947bb6c1e2f5",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "applied",
+   "rater_A": "해설",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "오답 경로가 정답과 일치(변별 없음)"
+  },
+  {
+   "problem_id": "ba2a7f9a-ef26-585e-b2f0-7c69b83df665",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "diagnostic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간",
+    "확실"
+   ],
+   "cause": "발문이 답을 알려 줌"
+  },
+  {
+   "problem_id": "ba3dd22e-405b-5c47-84c4-0fe1f7f78df4",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "diagnostic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "중간",
+    "확실"
+   ],
+   "cause": "해설 정의 없는 k"
+  },
+  {
+   "problem_id": "be76bfc1-888e-5aaa-b29f-72e8ffda1734",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "diagnostic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 롤/속도 0 = 꼭짓점"
+  },
+  {
+   "problem_id": "cb3160fd-3767-570f-9a1a-45752b5ded28",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "representative",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "d246cabc-ca42-52bf-9138-f6d50fb5ca0b",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "applied",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 롤/속도 0 = 꼭짓점"
+  },
+  {
+   "problem_id": "db749952-8c07-50e2-bc74-287ab782c854",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "applied",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "e0624ddf-eb85-5cc3-aad1-216956b545fb",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "e2d79e3c-0e9f-5bcd-99fd-83eb09823611",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "문장 표기",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "e51cca1b-db5b-521b-aa22-8eb507f6179b",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "문장 표기",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "e54f775f-9c01-59c3-8ec8-18f7ab483dab",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "diagnostic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "중간",
+    "확실"
+   ],
+   "cause": "해설 정의 없는 k"
+  },
+  {
+   "problem_id": "eb3af4c6-cca5-5e19-a695-c76cf184f463",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "문장 표기",
+   "rater_B": "문장 표기",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  },
+  {
+   "problem_id": "ee393142-5c68-5294-87f9-23920c208bfa",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "representative",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "발문이 답을 알려 줌"
+  },
+  {
+   "problem_id": "f00ec689-43a4-5138-a22d-82cdad9d54bc",
+   "standard": "[12미적Ⅰ-02-06]",
+   "slot": "basic",
+   "rater_A": "미분 없이 풀림",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "이차 평균값 정리 = 구간 중점"
+  },
+  {
+   "problem_id": "f62c164b-6dc3-53a6-9275-4d5c5c62d964",
+   "standard": "[12미적Ⅰ-02-08]",
+   "slot": "basic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "불확실",
+    "중간"
+   ],
+   "cause": "해설 '극값을 가지므로' 전제 역전"
+  },
+  {
+   "problem_id": "f89e5610-ed6c-5099-af40-5fc1a430f56a",
+   "standard": "[12미적Ⅰ-02-03]",
+   "slot": "diagnostic",
+   "rater_A": "해설",
+   "rater_B": "해설",
+   "certainty": [
+    "중간",
+    "확실"
+   ],
+   "cause": "해설 정의 없는 k"
+  },
+  {
+   "problem_id": "fb822e89-4528-58f2-aa29-8e5b19bdc70e",
+   "standard": "[12미적Ⅰ-02-10]",
+   "slot": "basic",
+   "rater_A": "해설",
+   "rater_B": "ok",
+   "certainty": [
+    "불확실"
+   ],
+   "cause": "가속도 해설 v(t) 단계 누락"
+  },
+  {
+   "problem_id": "fdbfe0c3-6760-5f07-8013-64abf7312baa",
+   "standard": "[12미적Ⅰ-02-09]",
+   "slot": "misconception_trigger",
+   "rater_A": "ok",
+   "rater_B": "미분 없이 풀림",
+   "certainty": [
+    "중간"
+   ],
+   "cause": "M0677 오개념 설명 손상·절차 미기술"
+  }
+ ],
+ "cause_counts": {
+  "이차 평균값 정리 = 구간 중점": 18,
+  "M0677 오개념 설명 손상·절차 미기술": 12,
+  "이차 롤/속도 0 = 꼭짓점": 6,
+  "발문이 답을 알려 줌": 6,
+  "오답 경로가 정답과 일치(변별 없음)": 6,
+  "가속도 해설 v(t) 단계 누락": 5,
+  "이차 접선 = 판별식·중근": 3,
+  "해설 정의 없는 k": 3,
+  "극값을 발문이 알려 줌(실근 개수)": 2,
+  "'극대' 문항에 임계점=극값 오개념 연결": 2,
+  "해설 '극값을 가지므로' 전제 역전": 2,
+  "발문–검산 불일치(verify가 다른 문제)": 1,
+  "해설 문장 결함(비문·용어)": 1,
+  "해설 a=0 배제 누락": 1
+ }
+}

@@ -35,7 +35,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from whymath_backend.api._auth import ConsentedUser
-from whymath_backend.api._isolated_call import isolated
+from whymath_backend.api._isolated_call import CHAIN_BUDGET_FACTOR, isolated
 from whymath_backend.config import get_settings
 from whymath_backend.l3.verify_answer import (
     AnswerVerdict,
@@ -62,7 +62,7 @@ _MAX_ANSWER_VARS = 50
 
 # OPS-96: verify-solution 체인 전체의 총 시간 예산 = 호출 1건 상한 × 이 배수. 전이마다 상한을 따로
 # 주면 병리적 전이 199개가 한 요청으로 워커를 199×상한 동안 붙잡을 수 있다.
-_CHAIN_BUDGET_FACTOR = 4
+_CHAIN_BUDGET_FACTOR = CHAIN_BUDGET_FACTOR  # OPS-125: 코치 턴과 단일 출처 공유
 
 logger = logging.getLogger("whymath.api.verify")
 
@@ -202,6 +202,10 @@ async def post_verify_solution(
                 on_budget_exceeded=partial(budget_exceeded_result, step_type),
                 # 남은 총 예산이 호출 상한보다 작으면 그만큼만 준다 — 체인 시간이 예산을 넘지 않게.
                 timeout_s=min(cap_s, remaining_s),
+                # 계산 상한만으로는 부족하다 — 워커 기동·복원 대기는 계산 상한 밖이라, 마감 직전에
+                # 시작한 전이가 요청을 재기동 1회(최악 60초)만큼 늘렸다. 남은 예산을 호출 전체의
+                # 벽시계 예산으로도 넘겨 그 대기까지 마감 안에 가둔다(OPS-128).
+                budget_s=remaining_s,
             )
         )
     return aggregate_transitions(results)

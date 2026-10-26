@@ -1,10 +1,11 @@
 """오개념 카탈로그 코퍼스 → backend 적재 CLI — `whymath_backend.l1.misconception.populate`.
 
-#290이 커밋한 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·Collection JSON·839
-레코드)를 backend 영속 `misconception_catalog` 테이블에 멱등 적재한다. `l1/standards/populate`
-(성취기준 적재 CLI)의 오개념 짝이며 같은 CLI 골격을 따른다(argparse·`main(argv)->int`·파일 부재
-`return 2`·stdout 행수 보고). 오개념은 임베딩·pgvector와 무관(순수 RDB sync 적재)하므로
-vector_store 게이트가 없다(성취기준 CLI와 동일).
+#290이 커밋한 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·Collection JSON·커밋 당시
+839 레코드 — 현재 건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`)를 backend 영속
+`misconception_catalog` 테이블에 멱등 적재한다. `l1/standards/populate` (성취기준 적재 CLI)의 오개념
+짝이며 같은 CLI 골격을 따른다(argparse·`main(argv)->int`·파일 부재 `return 2`·stdout 행수 보고).
+오개념은 임베딩·pgvector와 무관(순수 RDB sync 적재)하므로 vector_store 게이트가 없다(성취기준 CLI와
+동일).
 
 적재 로직 0(얇은 래퍼): `load_misconceptions`(catalog_loader)가 Collection 파싱·멱등 upsert를
 담당한다. 본 CLI는 경로 결선·실행·보고만 한다.
@@ -19,6 +20,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from whymath_backend.db.cms_edit_marker import add_overwrite_argument, conflict_summary
 from whymath_backend.l1.misconception.catalog_loader import load_misconceptions
 
 # 코퍼스 기본 경로(#290 산출 관례).
@@ -49,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="상세 출력(현재는 표준 보고만 — 호환 자리표시).",
     )
+    add_overwrite_argument(parser)
     args = parser.parse_args(argv)
 
     path: Path = args.misconceptions
@@ -56,8 +59,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"오개념 Collection 없음: {path} — 코퍼스 생성기로 먼저 생성하세요.")
         return 2
 
-    count = load_misconceptions(None, path)
+    conflicts: list[str] = []
+    count = load_misconceptions(
+        None, path, overwrite_cms_edits=args.overwrite_cms_edits, conflicts=conflicts
+    )
     print(f"오개념 적재 완료: {count}건 (src={path}).")
+    if conflicts:
+        print(conflict_summary(conflicts))
     return 0
 
 

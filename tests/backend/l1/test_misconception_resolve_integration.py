@@ -418,6 +418,11 @@ class TestRealCorpusResolve:
         for path in (graph, standards, misconceptions):
             if not path.exists():
                 pytest.skip(f"실 코퍼스 미존재({path})")
+        # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+        # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+        facts = json.loads(
+            (repo_root / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
 
         # 적재 키 — 코퍼스 전건(정리용).
         graph_payload = json.loads(graph.read_text(encoding="utf-8"))
@@ -442,7 +447,7 @@ class TestRealCorpusResolve:
             concept_count = populate_backend_concepts(
                 load_backend_concepts_from_graph_json(graph), settings=Settings()
             )
-            assert concept_count == 437
+            assert concept_count == facts["concept_graph.concepts"]
             assert load_standards(None, standards, settings=Settings()) > 0
             assert load_misconceptions(None, misconceptions, settings=Settings()) == len(mis_ids)
 

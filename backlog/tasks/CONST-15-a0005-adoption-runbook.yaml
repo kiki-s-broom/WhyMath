@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-15-a0005-adoption-runbook
+title: "코딩 헌법 개정 A0005 채택 런북(과제 E) — 채택 도우미 미지원분을 git apply + stamp 재사용으로 메운다"
+track: infra-debt
+stage: S4
+subject: math
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 런북 `docs/ops/coding_constitution_kiki_runbook.md` 에 「과제 E — A0005 채택」을 추가한다(사전 브리핑 6항목 + 블록 E-1~E-5). 채택 도우미가 A0005 를 지원하지 않으므로(`adopt_amendment.py` 는 A0002~A0004 만) 패치는 `git apply`, 개정 기록은 도우미의 `stamp()`·`write()` 를 재사용해 UTF-8·LF 로 쓴다. ② 쓰기 블록은 선행 판정값을 스스로 재검사해 거부하고(HARN-106), 실행 코드 출처(`whymath_backend.__file__`)가 작업 사본인지 동결한다. ③ 실패 주입 검증: 리눅스 사본에서 블록의 비셸 로직(패치 적용·기록 생성·R0-02·audit --json 판정)을 정상·결함 각각 돌려 변별을 확인한다(PowerShell 자체는 이 환경에서 실행하지 못했음을 런북에 명시). ④ 범위 밖: `constitution/` 편집(Kiki 채택)·게이트 clear(Kiki 증적 후 세션)·어긋남 5건 처분 태스크 등재(채택 후)."
+artifacts:
+  - "PR #1640 https://github.com/kiki-s-broom/WhyMath/pull/1640"
+paths:
+  - docs/ops/coding_constitution_kiki_runbook.md
+session: null
+notes: "게이트 `G-const-a0005-part1-corrections` 판정 지원(2026-10-15 세션): 패치는 main 56f4ace3 에 `patch -p1`·`git apply` 모두 통과, 사본 심사 차단 47→46(기록 없음, R0-02)→45(기록 포함), 파트 I 3단계 대상 전건 통과, 래칫 단계 2 exit 0. 이 태스크는 게이트를 기다리지 않는다(런북은 채택 *수단*이다). CONST-03 은 다른 세션 소유라 손대지 않는다."
+updated: 2026-10-15

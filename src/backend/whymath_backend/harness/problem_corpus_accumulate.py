@@ -103,6 +103,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sys
 import uuid
 from collections.abc import Callable, Sequence
@@ -181,6 +182,7 @@ __all__ = [
     "main",
     "run_corpus_accumulate",
     "top_p_seat_precheck",
+    "worklist_aliases_review_queue",
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -757,6 +759,37 @@ def default_worklist_path(out_path: Path) -> Path:
     return out_path.with_suffix(".worklist.md")
 
 
+def worklist_aliases_review_queue(
+    worklist_path: Path,
+    queue_path: Path,
+    *,
+    normcase: Callable[[str], str] | None = None,
+) -> bool:
+    """`--worklist-out`이 내구 검수 큐 정본과 **같은 파일**을 가리키는가(OPS-147).
+
+    회차 끝의 `worklist_path.write_text(...)`는 파일 전체를 덮어쓴다. 뷰 경로가 큐 정본
+    `<out>.review.jsonl`과 같으면 그 한 번의 쓰기가 JSONL 정본을 마크다운 뷰로 바꿔 버린다
+    (EOS-121 사고 — 비수용 후보의 구조화 payload가 소실). 문자열 비교만으로는 같은 파일의
+    표기 변형을 못 잡으므로 두 겹으로 본다:
+      ① 해석 경로 비교 — `resolve()`가 절대화·`..` 정규화·심볼릭 링크를 풀고, `normcase`가
+         Windows에서 대소문자·구분자를 접는다(`normcase`는 테스트가 Windows 규칙을 주입하는 심).
+      ② 두 파일이 모두 있으면 `samefile`(inode 동치) — 하드 링크·대소문자 무시 파일시스템.
+    한쪽이 없으면 ②는 판정 대상이 아니다(없는 파일은 다른 파일과 같을 수 없다). 그 외의
+    `OSError`(권한 등)는 삼키지 않고 전파한다 — 판정 불가를 "다르다"로 접으면 정본을 덮어쓰는
+    경로가 열리고, 이 함수는 어떤 파일도 쓰기 **전에** 호출되므로 크게 터지는 쪽이 안전하다.
+    """
+    # 기본값을 호출 시점에 해석한다 — 정의 시점에 묶으면 플랫폼 규칙을 갈아 끼울 수 없다.
+    fold = normcase if normcase is not None else os.path.normcase
+    worklist_resolved = Path(worklist_path).resolve()
+    queue_resolved = Path(queue_path).resolve()
+    if fold(str(worklist_resolved)) == fold(str(queue_resolved)):
+        return True
+    try:
+        return os.path.samefile(worklist_resolved, queue_resolved)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+
+
 def load_spec_plan_file(
     path: Path,
     *,
@@ -1138,7 +1171,8 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "검수 워크리스트(내구 큐 <out>.review.jsonl 전체의 누적 렌더 뷰) 마크다운 경로"
             "(EOS-58). 미지정 시 <out>.worklist.md 사이드카에 항상 기록한다(끄기 없음 — 사람 "
-            "검수 큐 공급이 기본·뷰 경로를 바꿔도 큐 저장소는 <out>.review.jsonl 고정)."
+            "검수 큐 공급이 기본·뷰 경로를 바꿔도 큐 저장소는 <out>.review.jsonl 고정). 그 정본과 "
+            "같은 파일을 뷰로 지정하면 덮어쓰이므로 exit 2로 거부한다(OPS-147)."
         ),
     )
     parser.add_argument(
@@ -1225,6 +1259,23 @@ def main(argv: list[str] | None = None) -> int:
         # 누적확률이므로 (0,1] 밖은 의미가 없다. 공급사가 400으로 거부하는 값을 180호출
         # **한복판에서** 만나면 회차가 통째로 날아가므로 인자 단계에서 막는다.
         parser.error(f"--top-p는 (0,1] 범위여야 한다(받은 값 {args.top_p}).")
+
+    # ── `--worklist-out` × 검수 큐 정본 동치 사전 거부(OPS-147) ──────────────
+    # 인자 해석 직후·첫 LLM 호출 전·**어떤 파일도 쓰기 전**에 막는다. 회차 끝 뷰 쓰기는 파일
+    # 전체를 덮어쓰므로, 뷰 경로가 큐 정본과 같으면 돌린 뒤에야 정본이 사라진 것을 알게 된다.
+    # 호출은 비싸고(EOS-121 90호출) 소실은 되돌릴 수 없다 — 그래서 호출 0건에서 거부한다.
+    if args.worklist_out is not None:
+        queue_path_for_guard = default_review_queue_path(args.out)
+        if worklist_aliases_review_queue(args.worklist_out, queue_path_for_guard):
+            sys.stderr.write(
+                "[--worklist-out 거부] 검수 큐 정본과 같은 파일입니다 — 회차 끝 쓰기가 JSONL "
+                "정본을 마크다운 뷰로 덮어써 비수용 후보의 구조화 payload가 소실됩니다.\n"
+                f"  --worklist-out : {Path(args.worklist_out).resolve()}\n"
+                f"  검수 큐 정본   : {queue_path_for_guard.resolve()}\n"
+                "  뷰는 마크다운 확장자의 다른 경로(예: <out>.review.md)로 주거나, 생략해 "
+                "기본 <out>.worklist.md에 기록하세요.\n"
+            )
+            return 2
 
     # ── `--top-p` × 좌석 사전 거부(EOS-121 라이브 정정) ─────────────────────
     # **호출 0건에서** 막는 것이 요점이다 — 프로바이더 가드만 있으면 90번 시도해 90번 실패한다.

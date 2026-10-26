@@ -63,6 +63,7 @@ from whymath_backend.schema.enums import (
     EventType,
     SessionType,
 )
+from whymath_backend.schema.evaluation_context import EvaluationContext
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -225,6 +226,22 @@ class ProblemAttempt(BaseModel):
     problem_id: uuid.UUID | None = Field(
         default=None,
         description="문제 FK (problem 참조)",
+    )
+
+    # ===== 버전 고정 (EOS-47 — 44_eos_version_management.md §10.2) =====
+    problem_version_id: uuid.UUID | None = Field(
+        default=None,
+        description="이 시도가 가리키는 문항 **판**(`problem_version.version_id`). "
+        "시도 접수 시점의 "
+        "`problem.problem_version_id` 포인터를 복사한 값이라 문항이 나중에 수정(새 판)돼도 바뀌지 "
+        "않는다. None=고정 안 됨(그 시점에 문항에 판이 없었거나 EOS-47 이전 행 — 백필 금지: "
+        "판을 날조해 넣지 않는다)",
+    )
+    evaluation_context: EvaluationContext | None = Field(
+        default=None,
+        description="채점 시점의 교육 환경 스냅숏(교육과정·채점정책 등 버전). None=기록 안 됨"
+        "(EOS-47 이전 행). 키별로 None은 '기록 불가(모름)' — 계약 정본 "
+        "`schema/evaluation_context.py`",
     )
 
     # ===== 시간 =====

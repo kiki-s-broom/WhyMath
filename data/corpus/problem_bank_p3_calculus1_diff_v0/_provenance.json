@@ -1,0 +1,131 @@
+{
+  "pool": "whymath-original",
+  "source_citation": "출처: WhyMath 자체 저작 동등문제(WHYMATH_GENERATED). 평가원·EBS·검정교과서 본문 복제 0 — 성취기준 코드와 수학 구조(도함수 규칙)만으로 결정론 생성(본문 미보유 출처 인용 아님).",
+  "license_notice": "본 코퍼스의 모든 문항은 WhyMath가 자체 생성한 저작물(license=WHYMATH_GENERATED, source_type=자체생성)이다. 저작권은 WhyMath에 있으며 본문 보유가 합법이다(schema/problem.py _METADATA_ONLY_SOURCES 규칙과 정합).",
+  "corpus_name": "problem_bank_p3_calculus1_diff_v0",
+  "record_count": 504,
+  "generated": "2026-10-06",
+  "generation_method": "결정론 스켈레톤 생성기(LLM 0) — 개념 1개당 생성기 1파일(l3/equivalent/p3_diff_*_skeleton_generator.py), 슬롯 6종(대표·기본·응용·오개념 유발·진단·숙련도 확인). 정답은 SymPy 미분으로 계산하고 수용 게이트 Tier1이 재검산한다.",
+  "generation_cli": "python -m whymath_backend.harness.p3_calculus1_diff_batch",
+  "task": "P3-03-coverage-fill",
+  "slot_names_ko": {
+    "representative": "대표",
+    "basic": "기본",
+    "applied": "응용",
+    "misconception_trigger": "오개념 유발",
+    "diagnostic": "진단",
+    "mastery_check": "숙련도 확인"
+  },
+  "concepts": {
+    "[12미적Ⅰ-02-03]": {
+      "concept_src_id": "H:12미적Ⅰ02-03",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 31,
+      "distinct_skeletons": 37,
+      "generator": "p3_diff_power_derivative_skeleton_generator.P3DiffPowerDerivativeGenerator"
+    },
+    "[12미적Ⅰ-02-04]": {
+      "concept_src_id": "H:12미적Ⅰ02-04",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 34,
+      "distinct_skeletons": 61,
+      "generator": "p3_diff_polynomial_rules_skeleton_generator.P3DiffPolynomialRulesGenerator"
+    },
+    "[12미적Ⅰ-02-05]": {
+      "concept_src_id": "H:12미적Ⅰ02-05",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 34,
+      "distinct_skeletons": 69,
+      "generator": "p3_diff_tangent_line_skeleton_generator.P3DiffTangentLineGenerator"
+    },
+    "[12미적Ⅰ-02-06]": {
+      "concept_src_id": "H:12미적Ⅰ02-06",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 32,
+      "distinct_skeletons": 68,
+      "generator": "p3_diff_mean_value_theorem_skeleton_generator.P3DiffMeanValueTheoremGenerator"
+    },
+    "[12미적Ⅰ-02-08]": {
+      "concept_src_id": "H:12미적Ⅰ02-08",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 36,
+      "distinct_skeletons": 71,
+      "generator": "p3_diff_graph_shape_skeleton_generator.P3DiffGraphShapeGenerator"
+    },
+    "[12미적Ⅰ-02-09]": {
+      "concept_src_id": "H:12미적Ⅰ02-09",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 30,
+      "distinct_skeletons": 60,
+      "generator": "p3_diff_equation_application_skeleton_generator.P3DiffEquationApplicationGenerator"
+    },
+    "[12미적Ⅰ-02-10]": {
+      "concept_src_id": "H:12미적Ⅰ02-10",
+      "records": 72,
+      "slots": {
+        "representative": 12,
+        "basic": 12,
+        "applied": 12,
+        "misconception_trigger": 12,
+        "diagnostic": 12,
+        "mastery_check": 12
+      },
+      "distinct_frames": 33,
+      "distinct_skeletons": 65,
+      "generator": "p3_diff_velocity_acceleration_skeleton_generator.P3DiffVelocityAccelerationGenerator"
+    }
+  },
+  "approval_status": {
+    "note": "이 도구는 review_status를 쓰지 않는다(키 부재). 승인 각인은 코퍼스 단위 백필(problem_corpus_review_status_backfill · 코퍼스 키 p3_calculus1_diff_v0)이 감사 라벨로 쓴다. 각인을 걷어 낸 은행 바이트가 감사 동결 사본과 같아야 승인이 유효하다.",
+    "sample_review": "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, 결함 1건 · 보정 상한 0.01151 ≤ 0.02",
+    "evidence": "docs/data/p3_calculus1_diff_audit/bank_audit_r5/ (사전 등록·라벨·동결 사본) · docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl (코퍼스 단위 라벨) · is_published=False 유지"
+  }
+}

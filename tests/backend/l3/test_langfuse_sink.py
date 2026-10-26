@@ -428,3 +428,95 @@ class TestV2CompatWrite:
         with caplog.at_level(logging.WARNING, logger="whymath.l3.trace"):
             sink.record(_sample_fields())
         assert any("RuntimeError" in r.getMessage() for r in caplog.records)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-73 — record_event(이벤트명 인자): 비용 표본(l3_routing) 밖으로 기록을 보내는 길
+# ──────────────────────────────────────────────────────────────────────────
+class TestRecordEvent:
+    def test_uses_given_name_with_same_metadata_mapping(self) -> None:
+        client = FakeLangfuseClient()
+        sink = LangfuseSink(client=client)
+        fields = {"seat": "coach.create_session", "complete": True}
+        sink.record_event("tutor_context", fields)
+        assert client.events == [
+            {"name": "tutor_context", "metadata": _to_metadata(fields), "level": "DEFAULT"}
+        ]
+
+    def test_record_keeps_l3_routing_name(self) -> None:
+        """대조군 — `record()`는 여전히 `l3_routing`이다(이벤트명 인자화가 기존 경로를 바꾸지 않음)."""
+        client = FakeLangfuseClient()
+        LangfuseSink(client=client).record(_sample_fields())
+        assert [e["name"] for e in client.events] == [_EVENT_NAME] == ["l3_routing"]
+
+    def test_v2_fallback_uses_given_name(self) -> None:
+        client = FakeLangfuseV2Client()
+        sink = LangfuseSink(client=client)  # type: ignore[arg-type]
+        sink.record_event("tutor_context", {"seat": "s"})
+        assert client.events[0]["name"] == "tutor_context"
+
+    def test_unconfigured_is_noop(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        built: list[object] = []
+        monkeypatch.setattr(
+            "whymath_backend.l3.trace.langfuse_sink._build_default_client",
+            lambda settings: built.append(settings),
+        )
+        LangfuseSink(settings=_unconfigured_settings()).record_event("tutor_context", {"a": 1})
+        assert built == []
+
+    def test_traffic_surface_is_attached(self) -> None:
+        from whymath_backend.l3.interfaces import TrafficSurface
+
+        client = FakeLangfuseClient()
+        sink = LangfuseSink(client=client, traffic_surface=TrafficSurface.SERVING)
+        sink.record_event("tutor_context", {"seat": "s"})
+        meta = client.events[0]["metadata"]
+        assert meta["traffic_surface"] == "serving"
+        assert "traffic_surface:serving" in meta["tags"]
+
+    def test_client_error_swallowed_with_type_name(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging
+
+        sink = LangfuseSink(client=FakeLangfuseClient(raises=ConnectionError("x")))
+        with caplog.at_level(logging.WARNING, logger="whymath.l3.trace"):
+            sink.record_event("tutor_context", {"seat": "s"})
+        assert any("ConnectionError" in r.getMessage() for r in caplog.records)
+
+    @pytest.mark.parametrize("name", ["l3_routing", "", "  "])
+    def test_refuses_routing_or_blank_name(self, name: str) -> None:
+        client = FakeLangfuseClient()
+        LangfuseSink(client=client).record_event(name, {"cost_tier": "local"})
+        assert client.events == []
+
+    def test_sink_satisfies_named_event_protocol(self) -> None:
+        from whymath_backend.l3.interfaces import NamedEventSink
+
+        assert isinstance(LangfuseSink(client=FakeLangfuseClient()), NamedEventSink)
+
+
+class TestSurfaceTaggingNamedEvent:
+    def test_delegates_with_surface_when_inner_supports_named_events(self) -> None:
+        from whymath_backend.l3.interfaces import (
+            RecordingTraceSink,
+            SurfaceTaggingTraceSink,
+            TrafficSurface,
+        )
+
+        inner = RecordingTraceSink()
+        SurfaceTaggingTraceSink(inner, TrafficSurface.AUTHORING).record_event("tutor_context", {})
+        assert inner.records == []
+        assert inner.named_events == [("tutor_context", {"traffic_surface": "authoring"})]
+
+    def test_inner_without_named_events_records_nothing(self) -> None:
+        from whymath_backend.l3.interfaces import SurfaceTaggingTraceSink, TrafficSurface
+
+        class _RoutingOnly:
+            def __init__(self) -> None:
+                self.records: list[dict[str, object]] = []
+
+            def record(self, fields: dict[str, object]) -> None:
+                self.records.append(fields)
+
+        inner = _RoutingOnly()
+        SurfaceTaggingTraceSink(inner, TrafficSurface.AUTHORING).record_event("tutor_context", {})
+        assert inner.records == []  # l3_routing으로 새지 않는다

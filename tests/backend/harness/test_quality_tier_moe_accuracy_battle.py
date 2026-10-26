@@ -231,7 +231,7 @@ def test_evaluate_model_records_latency_and_usage() -> None:
     # options에 num_ctx/num_predict/temperature가 들어간다.
     options = client.calls[0]["options"]
     assert options.get("num_ctx") == 8192
-    assert options.get("num_predict") == 512
+    assert options.get("num_predict") == 512  # corpus-pin: 코퍼스 무관 — 출력 토큰 상한
     assert options.get("temperature") == 0.0
 
 

@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import importlib.util
 import json
 from collections.abc import Callable, Mapping
@@ -32,6 +31,7 @@ from data_pipeline.atom_graph.cross_band_edges import (
     proposal_edges,
     validate_cross_band_edges,
 )
+from data_pipeline.atom_graph.cross_band_edges_merge import graph_sha256, pre_merge_view
 
 # tests/data_pipeline/atom_graph/ → parents[3] = 프로젝트 루트(conftest.py와 같은 규약).
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -40,7 +40,15 @@ PROPOSAL_PATH = CORPUS_DIR / "cross_band_edges_university_v1.json"
 GRAPH_PATH = CORPUS_DIR / "graph.json"
 BUILDER_PATH = _PROJECT_ROOT / "scripts" / "build_cross_band_edges_s4_01.py"
 
-_EXPECTED_EDGE_COUNT = 24
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_PROJECT_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
+_EXPECTED_EDGE_COUNT = _FACTS["atom_graph.cross_band_edges_university"]
+#: 병합 직전(S4-60 이전) 정본 sha256 — 원장이 전제한 스냅샷. 상수로 박아 두 번째 증거로 삼는다.
+_PRE_MERGE_GRAPH_SHA256 = "ea05b277ab40979d78be709daadb13d3427a72799a6a537561f1dc91c155601d"
 
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -103,10 +111,11 @@ class TestProposalFileShape:
         meta = proposal["_meta"]
         assert meta["generated_by"] == "scripts/build_cross_band_edges_s4_01.py"
         assert meta["task"] == "S4-01-math-k12-complete"
-        assert meta["status"].startswith("proposal")
+        assert meta["status"].startswith("merged")  # S4-60 병합 완료 — 이 파일은 근거 원장
         assert meta["edge_count"] == _EXPECTED_EDGE_COUNT
-        # 제안이 전제한 정본 스냅샷 — graph.json이 바뀌면 재검수 신호가 된다.
-        assert meta["source_graph_sha256"] == hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+        # 원장이 전제한 것은 *병합 전* 정본 — 병합 후 정본에서 태그 엣지를 빼면 바이트 단위로 복원된다.
+        assert meta["source_graph_sha256"] == _PRE_MERGE_GRAPH_SHA256
+        assert meta["source_graph_sha256"] == graph_sha256(pre_merge_view(graph))
 
     def test_edge_count_and_record_shape(self, proposal: dict[str, Any]) -> None:
         edges = proposal_edges(proposal)
@@ -149,7 +158,8 @@ class TestProposalFileShape:
         spec.loader.exec_module(builder)
 
         graph_payload = json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
-        sha = hashlib.sha256(GRAPH_PATH.read_bytes()).hexdigest()
+        # 빌더의 해시 계산(_pre_merge_sha256)과 별개 구현(병합 모듈)으로 같은 값을 얻는다.
+        sha = graph_sha256(pre_merge_view(graph_payload))
         regenerated = builder.serialize(builder.build_payload(graph_payload, sha))
         assert regenerated.encode("utf-8") == proposal_bytes
 
@@ -164,7 +174,12 @@ class TestControlGroup:
         assert report.errors == [], report.report_text()
         assert report.success is True
         assert report.proposal_count == _EXPECTED_EDGE_COUNT
-        assert report.existing_edge_count == len(graph["edges"])
+        # 기존 엣지 수 = 정본에서 이 제안의 태그 엣지 24건만 뺀 것(그 뒤 덧붙은 KG-12 승격 v2
+        # 엣지는 판정 시점의 "기존 엣지"다 — pre_merge_view 는 재현성 전용으로 그것까지 벗긴다).
+        assert report.existing_edge_count == len(
+            [e for e in graph["edges"] if e.get("evidence") != PROPOSAL_EVIDENCE]
+        )
+        assert report.already_merged_count == _EXPECTED_EDGE_COUNT
 
     def test_pristine_proposal_has_no_subject_warning(
         self, proposal: dict[str, Any], graph: dict[str, Any]
@@ -330,6 +345,82 @@ class TestMutations:
         report = _run_mutation(proposal_bytes, graph, mutate)
         assert "relation_prerequisite_only" in report.rules_hit(), report.report_text()
         assert report.success is False
+
+
+class TestMergedState:
+    """병합 전·후 양쪽 판정 — 태그 엣지는 면제가 아니라 *원장과 대조*한다(S4-60).
+
+    대조군 2종(병합 후·병합 전 정본 모두 GREEN)과 뮤테이션 4종(정본 쪽 변조 3 · 원장 쪽 변조 1)을
+    둔다. 주입은 deepcopy에 하고 `mutated != original`을 단언한다.
+    """
+
+    @staticmethod
+    def _tagged(g: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+        return [e for e in g["edges"] if e.get("evidence") == PROPOSAL_EVIDENCE]
+
+    def test_control_merged_graph_is_green(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        report = validate_cross_band_edges(proposal_edges(proposal), graph)
+        assert report.errors == [], report.report_text()
+        assert report.already_merged_count == _EXPECTED_EDGE_COUNT
+
+    def test_control_pre_merge_graph_is_green(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """병합 전 뷰에서도 GREEN — 같은 검증기가 병합 전·후 양쪽을 판정한다."""
+        report = validate_cross_band_edges(proposal_edges(proposal), pre_merge_view(graph))
+        assert report.errors == [], report.report_text()
+        assert report.already_merged_count == 0
+
+    def test_m10_merged_edge_differs_from_ledger(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """M10: 정본의 태그 엣지 strength를 바꾸면 원장과 불일치 → merged_edge_mismatch RED."""
+        mutated = copy.deepcopy(graph)
+        self._tagged(mutated)[0]["strength"] = 0.5
+        assert mutated != graph, "주입이 적용되지 않았다"
+        report = validate_cross_band_edges(proposal_edges(proposal), mutated)
+        assert report.rules_hit() == {"merged_edge_mismatch"}, report.report_text()
+
+    def test_m11_tagged_edge_missing_from_ledger(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """M11: 원장에 없는 태그 엣지가 정본에 있다(근거 추적 불가) → merged_edge_orphan RED."""
+        mutated = copy.deepcopy(graph)
+        extra = dict(self._tagged(mutated)[0])
+        extra["from_code"], extra["to_code"] = "2수01-01-1", "2수01-01-3"  # 원장에 없는 쌍
+        mutated["edges"].append(extra)
+        assert mutated != graph, "주입이 적용되지 않았다"
+        report = validate_cross_band_edges(proposal_edges(proposal), mutated)
+        assert "merged_edge_orphan" in report.rules_hit(), report.report_text()
+
+    def test_m12_same_pair_with_other_evidence_is_still_duplicate(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """M12: 같은 쌍이 *다른 출처*로 이미 있으면 면제되지 않는다 — no_duplicate RED.
+
+        태그가 같을 때만 병합본으로 보는 규칙의 반례(태그만 보고 면제하는 과잉 면제 방지).
+        """
+        mutated = pre_merge_view(graph)
+        first = proposal_edges(proposal)[0]
+        mutated["edges"] = [
+            *mutated["edges"],
+            {**{k: first[k] for k in first if k != "rationale"}, "evidence": "원자 백본 v1"},
+        ]
+        report = validate_cross_band_edges(proposal_edges(proposal), mutated)
+        assert "no_duplicate" in report.rules_hit(), report.report_text()
+        assert report.already_merged_count == 0
+
+    def test_m13_ledger_differs_from_merged_edge(
+        self, proposal: dict[str, Any], graph: dict[str, Any]
+    ) -> None:
+        """M13: 원장 쪽을 바꿔도 불일치 RED(대칭) — 원장 relation_subtype 변조."""
+        mutated = copy.deepcopy(proposal)
+        mutated["edges"][0]["relation_subtype"] = "변조"
+        assert mutated != proposal, "주입이 적용되지 않았다"
+        report = validate_cross_band_edges(proposal_edges(mutated), graph)
+        assert "merged_edge_mismatch" in report.rules_hit(), report.report_text()
 
 
 class TestSubjectCoherenceIsWarningOnly:

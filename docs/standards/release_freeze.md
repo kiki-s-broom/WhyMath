@@ -50,11 +50,11 @@
 | 축 | 내용 | 상태 |
 |---|---|---|
 | ① 문서 | 이 문서 | 착지 |
-| ② 기계 검사 | `scripts/ops/check_release_freeze.py` + `.github/workflows/release-freeze.yml` | 착지 — 단 **required check 아님** |
-| ③ 저장소 설정 (Kiki) | 라벨 2종 생성 · 룰셋에 `release-freeze` required 등록 | **게이트 `G-release-freeze-labels-and-required`로 이관** |
+| ② 기계 검사 | `scripts/ops/check_release_freeze.py` + `.github/workflows/release-freeze.yml` | 착지 — 2026-10-15부터 **required check**(룰셋 16623542) |
+| ③ 저장소 설정 (Kiki) | 라벨 2종 생성 · 룰셋에 `release-freeze` required 등록 | 착지 — 게이트 `G-release-freeze-labels-and-required` 2026-10-15 clear |
 
-③은 되돌리기 어려운 저장소 설정 조작이라 세션이 하지 않는다. 그 전까지 ②는 빨간 체크를
-보여 줄 뿐 머지를 막지 못한다.
+③은 되돌리기 어려운 저장소 설정 조작이라 세션이 하지 않고 Kiki가 집행했다(2026-10-15). 그 전에는
+②가 빨간 체크를 보여 줄 뿐 머지를 막지 못했다. 지금은 required라 위반 PR의 머지가 막힌다.
 
 ### 가용성 실측 (2026-10-08)
 

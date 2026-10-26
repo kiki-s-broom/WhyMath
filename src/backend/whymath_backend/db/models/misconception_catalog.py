@@ -1,10 +1,10 @@
 """오개념 카탈로그(MisconceptionCatalog) ORM 모델 (SQLAlchemy 2.0 영속 레이어).
 
-설계 정본: `schema/misconception_catalog.py`(Pydantic, 검증·API 계약)와 *별도*로 세운 영속
-매핑이며 `from_schema`/`to_schema` 변환 헬퍼가 둘을 잇는다(`models/achievement_standard.py`
-동일 패턴 — SQLModel 미사용). 이 슬라이스(Phase B.2)는 카탈로그의 ORM·계약·마이그레이션만
-세우고, #290 코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·839 레코드) 로더는
-후속 슬라이스 몫이다.
+설계 정본: `schema/misconception_catalog.py`(Pydantic, 검증·API 계약)와 *별도*로 세운 영속 매핑이며
+`from_schema`/`to_schema` 변환 헬퍼가 둘을 잇는다(`models/achievement_standard.py` 동일 패턴 —
+SQLModel 미사용). 이 슬라이스(Phase B.2)는 카탈로그의 ORM·계약·마이그레이션만 세우고, #290
+코퍼스(`data/corpus/misconceptions_v1/misconceptions.json`·#290 커밋 당시 839 레코드 — 현재 건수는
+`docs/data/corpus_facts.md`의 `misconceptions.count`) 로더는 후속 슬라이스 몫이다.
 
 PK 판단(이 모듈의 핵심 결정):
   `mis_id`(의미 문자열·예 'M0425')가 PK다. UUID가 아니라 의미 문자열이라 `gen_random_uuid()`
@@ -21,7 +21,7 @@ PK 판단(이 모듈의 핵심 결정):
 타입 매핑(schema → ORM, achievement_standard.py 선례 그대로):
   - `mis_id`(PK) → `sa.String(32)`(의미 문자열·server_default 없음). 원래 String(16)이었으나
     atom 투영 mis_id(`"ATOM:"+code`, `l1/misconception/atom_catalog.py`)가 실측 최장 18자
-    (1,837건 중 348건이 16자 초과·예 'ATOM:10공수1-01-01-1')라 오버플로 — 32로 확폭했다
+    (작성 당시 1,837건 중 348건이 16자 초과·예 'ATOM:10공수1-01-01-1')라 오버플로 — 32로 확폭했다
     (Phase 5 kebab→ATOM 이전 대비 헤드룸 포함, 마이그레이션 `a5b6c7d8e9f0`).
   - `canonical_statement`·`student_wrong_thinking`·`distractor_rule`·`correction_point`
     (자유 서술) → `sa.Text`(nullable·와이매스 자체 저작 보유 허용).
@@ -43,6 +43,7 @@ PK 판단(이 모듈의 핵심 결정):
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -50,6 +51,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
+from whymath_backend.db.cms_edit_marker import CMS_EDIT_MARKER
 from whymath_backend.schema.misconception_catalog import (
     MisconceptionCatalog as SchemaMisconceptionCatalog,
 )
@@ -107,6 +109,13 @@ class MisconceptionCatalog(Base):
         ARRAY(sa.Text), nullable=False, server_default=sa.text("'{}'::text[]")
     )
 
+    # CMS 편집 표지(P3-25) — NULL=사람이 고친 적 없음(적재가 소유), 값=CMS가 마지막으로 고친 시각.
+    # 적재(`populate`)는 이 값이 있는 행을 건너뛰어 충돌로 보고한다. server_default·백필 금지.
+    # 규약 정본: `db/cms_edit_marker.py` · `docs/standards/cms_edit_vs_loader_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     # ── 인덱스 (조회 경로 — UNIQUE는 mis_id PK뿐) ────────────────────────
     __table_args__ = (
         # 개념 코드로 카탈로그를 찾는 경로(느슨참조).
@@ -128,8 +137,9 @@ class MisconceptionCatalog(Base):
 
     def to_schema(self) -> SchemaMisconceptionCatalog:
         """영속 ORM → `schema.MisconceptionCatalog`(Pydantic 검증 복원)."""
+        # CMS 편집 표지는 운영 메타라 schema(extra=forbid)에 없다 — 복원 대상에서 뺀다(P3-25).
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
-        data = {key: getattr(self, key) for key in mapped_keys}
+        data = {key: getattr(self, key) for key in mapped_keys if key != CMS_EDIT_MARKER}
         return SchemaMisconceptionCatalog.model_validate(data)
 
 

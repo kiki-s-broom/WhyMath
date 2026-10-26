@@ -1,11 +1,14 @@
 """학교급 경계 선수 연결 밀도 관측 리포트 CLI — 빌드타임 결정론 관측(DB 0·LLM 0·HTTP 0). CUR-06
 acceptance(D6).
 
-설계 정본: `docs/architecture/curriculum_module_gap_review_r2.md` §3 D6. 원자 백본 2,210엣지는
-전량 `prerequisite`인데, 이 중 **양끝점의 학교급이 다른 경계 엣지는 20건(0.9%)** 뿐이고
-고등→대학은 0건이다. 그래서 `recommend_prerequisite_gaps`의 재귀 CTE(깊이 ≤ `MAX_PREREQUISITE_
-DEPTH`)는 고등 약점에서 중학 결손으로 사실상 내려가지 못한다 — 알고리즘이 아니라 **데이터 위상**
-문제다. 이전 판정("prerequisite ✅ 초과")은 내부 밀도(2,190건)만 보고 경계 밀도를 보지 않았다.
+설계 정본: `docs/architecture/curriculum_module_gap_review_r2.md` §3 D6. 설계 시점(r2 리뷰)
+당시 실측으로 원자 백본 2,210엣지는 전량 `prerequisite`이었고, 이 중 **양끝점의 학교급이 다른
+경계 엣지는 20건(0.9%)** 뿐이었으며 고등→대학은 0건이었다. 그 뒤 2026-10-09 S4-60이 고→대
+경계를 병합하는 등 정본이 바뀌었으므로, 현재의 경계 건수·비율은 손으로 적지 않고 이 리포트의
+출력을 본다(엣지 총수는 `docs/data/corpus_facts.md`의 `atom_graph.edges`). 그래서 설계 당시
+`recommend_prerequisite_gaps`의 재귀 CTE(깊이 ≤ `MAX_PREREQUISITE_DEPTH`)는 고등 약점에서
+중학 결손으로 사실상 내려가지 못했다 — 알고리즘이 아니라 **데이터 위상** 문제다. 이전
+판정("prerequisite ✅ 초과")은 내부 밀도(2,190건)만 보고 경계 밀도를 보지 않았다.
 이 모듈은 그 수치를 *영구히 눈에 보이게* 한다 — `learning_path_orderability_report`(PATH-01)가
 확립한 "코퍼스 JSON을 읽고 순수 코어로 집계" 패턴의 답습이다.
 

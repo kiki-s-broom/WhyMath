@@ -155,6 +155,10 @@ _VALID_ROLES: frozenset[str] = frozenset(r.value for r in ConceptRole)
 # 근 선택(S2-i) 유효값 — LLM이 낸 answer_selection 검증용. verify_root_selection 계약과 동일.
 _VALID_ROOT_SELECTIONS: frozenset[str] = frozenset({"largest", "smallest", "unique"})
 
+# 근 집계(S2 킬러) 유효값 — LLM이 낸 answer_aggregate 검증용. verify_root_aggregate 계약과 동일.
+# EOS-23 ⑤: 이 필드가 저작 경로에 없어 "두 근의 합" 문항이 게이트의 집계 분기에 닿을 수 없었다.
+_VALID_ROOT_AGGREGATES: frozenset[str] = frozenset({"sum", "product"})
+
 # ──────────────────────────────────────────────────────────────────────────
 # 출력 JSON 스키마(S2-j structured output) — 로컬(Ollama) 결정일 때 format= 제약 디코딩으로
 # 강제한다. 자유 텍스트·코드펜스·LaTeX 이스케이프·필수 필드 누락을 *문법 수준에서 원천 차단*.
@@ -178,6 +182,8 @@ _OUTPUT_JSON_SCHEMA: dict[str, object] = {
         },
         "answer_map": {"type": "object", "additionalProperties": {"type": "string"}},
         "answer_selection": {"type": "string", "enum": sorted(_VALID_ROOT_SELECTIONS)},
+        # 선택(required 아님) — 합/곱 문항만 선언한다. 선언하면 answer는 근이 아니라 집계값이다.
+        "answer_aggregate": {"type": "string", "enum": sorted(_VALID_ROOT_AGGREGATES)},
         "difficulty_overall": {"type": "number", "minimum": 1.0, "maximum": 5.0},
         "unit_codes": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         "answer_format": {"type": "string", "enum": [f.value for f in AnswerFormat]},
@@ -924,12 +930,25 @@ class LLMEquivalentProblemGenerator:
         answer = self._require_str(data, "answer")
         answer_explanation = self._opt_str(data, "answer_explanation")
         conditions = self._parse_conditions(data.get("conditions"))
-        answer_map = self._parse_answer_map(data.get("answer_map"))
-        answer_selection = self._parse_answer_selection(data.get("answer_selection"))
-        # derive-and-verify(S2-n) — 근 선택 문제는 정답을 우리가 유도해 대조·정확값 정규화.
-        answer, answer_map = self._derive_and_normalize(
-            answer, answer_map, conditions, answer_selection
-        )
+        answer_aggregate = self._parse_answer_aggregate(data.get("answer_aggregate"))
+        answer_map: dict[str, str]
+        answer_selection: str | None
+        if answer_aggregate is None:
+            answer_map = self._parse_answer_map(data.get("answer_map"))
+            answer_selection = self._parse_answer_selection(data.get("answer_selection"))
+            # derive-and-verify(S2-n) — 근 선택 문제는 정답을 우리가 유도해 대조·정확값 정규화.
+            answer, answer_map = self._derive_and_normalize(
+                answer, answer_map, conditions, answer_selection
+            )
+        else:
+            # EOS-23 ⑤ — 근 집계(합/곱) 문항: 답이 근이 아니라 집계값이라 근 치환맵·근 선택·
+            # derive-and-verify가 모두 성립하지 않는다. 결정론 집계 생성기와 같은 형태로 고정한다
+            # (answer_map 비움·answer_selection 없음). 모델이 보낸 두 필드는 **읽지 않는다** —
+            # `{x: 합}`을 영속하면 "x의 값이 합"이라는 거짓 검산 재료가 코퍼스에 남고, 선택(largest)
+            # 이 따라오면 derive-and-verify가 합을 틀린 근으로 오판해 정답 문항을 버린다.
+            # 집계값의 정오는 게이트(`verify_root_aggregate`·Vieta)가 독립 계산으로 판정한다.
+            answer_map = {}
+            answer_selection = None
         difficulty_overall = self._parse_difficulty(data.get("difficulty_overall"), spec)
         unit_codes = self._parse_unit_codes(data.get("unit_codes"))
         answer_format = self._parse_answer_format(data.get("answer_format"), spec)
@@ -978,6 +997,7 @@ class LLMEquivalentProblemGenerator:
             conditions=conditions,
             answer_map=answer_map,
             answer_selection=answer_selection,
+            answer_aggregate=answer_aggregate,
             solution_steps=solution_steps,
             concept_tags=concept_tags,
         )
@@ -1071,6 +1091,17 @@ class LLMEquivalentProblemGenerator:
         None으로 떨궈(오분류 방지) 다근 유일성 강등 경로에 맡긴다(조용한 오채택 금지).
         """
         if isinstance(value, str) and value.strip() in _VALID_ROOT_SELECTIONS:
+            return value.strip()
+        return None
+
+    @staticmethod
+    def _parse_answer_aggregate(value: object) -> str | None:
+        """근 집계(S2 킬러) — sum/product만 허용, 그 외·결측은 None(일반 문항).
+
+        미지 값을 조용히 None으로 떨구는 것은 안전 방향이다: 일반 문항 경로로 가면 answer_map이
+        필수라 집계 문항은 생성 실패가 되거나, 근이 아닌 답이 Tier1에서 거부된다(오채택 없음).
+        """
+        if isinstance(value, str) and value.strip() in _VALID_ROOT_AGGREGATES:
             return value.strip()
         return None
 

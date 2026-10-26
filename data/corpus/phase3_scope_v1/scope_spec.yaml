@@ -16,6 +16,13 @@
 #     p3_18_calculus_verifiability_probe_result_2026-10-01.md
 #   · 항목 정의·임계값 원문: docs/strategy/phase3_math_eos_completion_instruction_set.md
 #     [03]·[04]·[07]·[08]·[09]
+#   · 지표 목표 확정: 게이트 G-p314-phase3-metric-targets (2026-10-12 Kiki 결정 — 지표 7
+#     graph_connectivity_coverage 목표 0.95 확정, 나머지 4개는 예시값 그대로). 반영 P3-33
+#   · 필수 문제유형 2종 추가: P3-05 (2026-10-14) — 아래 "판단이 들어간 두 곳" ② 의 추정이 실측으로
+#     틀렸음이 확인돼 변경한다. 근거 docs/reviews/p3_05_triangle_density_design_2026-10-14.md §2
+#   · 게이트 조건 지표 항 10 신설: P3-54 (2026-10-18) — 계측기 종료 코드가 전 지표의 합이라 게이트 하나의
+#     조건을 종료 코드로 판정할 수 없었다(근거 docs/reviews/p3_g1_week1_gate_rejudgment_2026-10-17.md).
+#     분모·목표값·기존 8항은 바꾸지 않았고 `phase3_coverage --gate` 가 읽는 선언만 더했다.
 #
 # 단방향 관례 (CLAUDE.md "YAML=소스 · DB=산출물")
 # ----------------------------------------------
@@ -32,8 +39,12 @@
 # --------------------------------------------------------
 #   ① core_misconceptions 의 선정 규칙(selection_rule) — 규칙은 기계적이지만 "문항에 이미 닿은
 #      것을 우선한다"는 선택 자체는 세션의 제안이다.
-#   ② required_problem_types — 현재 범위 문항이 쓰는 유형 5종이다. 신규 개념의 문항 형태가
-#      이 5종으로 표현된다는 것은 세션의 추정이며 P3-04·P3-05 에서 확인한다.
+#   ② required_problem_types — 처음에는 범위 문항이 쓰는 유형 5종이었고, 신규 개념의 문항 형태가
+#      이 5종으로 표현된다는 것은 세션의 추정이었다. P3-05 가 확인한 결과 **틀렸다**(스킬
+#      pattern-generalization·word-problem-modeling 을 행사하는 유형이 5종 밖에 있어 두 스킬의 승인
+#      문항이 0건) — 그래서 2종을 추가했다(P3-05, 2026-10-14). 이 목록의 소비처는 생성 문항의
+#      허용 유형 집합이다(tests/backend/l3/equivalent/test_p3_diff_*_generators.py). Problem
+#      Coverage 지표는 이 목록이 아니라 문제유형 코퍼스 전체를 읽으므로 이 변경은 지표값을 바꾸지 않는다.
 
 spec_version: 1
 spec_id: phase3-scope-v1
@@ -204,16 +215,21 @@ core_misconceptions:
     - {mis_id: M0678, concept_code: "[12미적Ⅰ-02-10]"}
 
 # ── 항 7. 필수 Problem Type 목록 ────────────────────────────────────────────
-# 현재 범위 문항 413건이 쓰는 문제유형 5종(problem_type_graph_v1 17종 중). 신규 개념의 문항 형태가
-# 이 5종으로 표현된다는 것은 세션의 추정이다 — P3-04·P3-05 에서 확인하고, 모자라면 PR 로 추가한다.
+# problem_type_graph_v1 17종 중 7종. 앞 5종은 기존 범위 문항 413건이 쓰는 유형이고, 뒤 2종은 P3-05 가
+# 추가했다(기존 5종으로는 스킬 pattern-generalization·word-problem-modeling 을 행사할 수 없었다).
+# 개념에서 유형을 고른 근거: 패턴 일반화 ← 개념 02-03(원자 3개 전부), 문장제 모델링 ← 개념 02-09·02-10.
+# 범위 규율상 이 2종 외에는 늘리지 않는다 — ptype.enumerate-cases·ptype.optimize-constrained 는 같은 두
+# 스킬을 가졌지만 위 2종만으로 두 스킬이 덮이므로 넣지 않는다.
 required_problem_types:
-  basis: "범위 문항 413건이 이미 쓰는 유형(optimize-extremum 237 · solve-for-unknown 80 · evaluate-expression 48 · count-solutions 24 · verify-claim 24)"
+  basis: "기존 5종은 범위 문항 413건이 쓰는 유형(optimize-extremum 237 · solve-for-unknown 80 · evaluate-expression 48 · count-solutions 24 · verify-claim 24). 추가 2종(generalize-pattern · model-word-problem)은 P3-05 가 두 스킬을 덮기 위해 더했고 현재 승인 문항은 0건이다"
   items:
     - ptype.evaluate-expression
     - ptype.solve-for-unknown
     - ptype.optimize-extremum
     - ptype.count-solutions
     - ptype.verify-claim
+    - ptype.generalize-pattern
+    - ptype.model-word-problem
 
 # ── 항 8. 문제 수량 목표 ───────────────────────────────────────────────────
 # 6슬롯 원문(지시문 [07] P3-04 ②): 대표 / 기본 / 응용 / 오개념 유발 / 진단 / 숙련도 확인.
@@ -228,7 +244,7 @@ quantity_targets:
     - {id: mastery_check, name_ko: "숙련도 확인"}
   min_distinct_problems_per_slot: 1
   total_min_distinct_problems: 60
-  distinct_basis: "문면 골격(숫자를 #로 접은 문면)의 고유 수 — 후보 문서 §2.1 의 실측 기준. P3-05 가 근사 중복 기준을 정하면 그 정의로 교체한다(PR)."
+  distinct_basis: "문면 골격(숫자를 #로 접은 문면)의 고유 수 = 1단 기준 — 후보 문서 §2.1 의 실측 기준이며 P3-05 가 계측기(l1.standards.phase3_stem_fold)에 처음 적용했다(2026-10-15). 2단(변수·함수 이름까지 접기)은 보류: 같은 날 실측에서 1단에 더한 합침이 0건이었다(코퍼스 변수가 x·f 로 통일). 문면을 읽지 못한 문항은 합치지 않고 각각 1건으로 센다. 정의는 생성기 skeleton_of 에도 같은 것이 있고 두 구현의 동치는 test_phase3_stem_fold.py 가 지킨다."
   counting_rules:
     - "오개념 유발 슬롯의 문제는 연결된 misconception signature 가 있을 때만 센다(지시문 [08] ③)."
     - "새 문제의 정답은 SymPy 로 검증된 것만 연결 완료로 센다(지시문 [08] ⑤)."
@@ -242,9 +258,7 @@ completeness:
     curriculum_coverage: {value: 0.98}
     concept_completeness: {value: 0.95}
     problem_coverage_by_skill: {value: 0.95}
-    graph_connectivity_coverage:
-      value: null
-      reason: "지시문 원문에 목표 수치가 없다 — P3-02 가 기준선을 실측한 뒤 제안한다."
+    graph_connectivity_coverage: {value: 0.95}
   concept_required_links: [prerequisite, misconception, solution, hint, pedagogy]
   graph_path: [concept, skill, problem, misconception, pedagogy]
   curriculum_path: [curriculum, concept, skill, problem]
@@ -257,3 +271,28 @@ completeness:
     - misconception_signature
     - hint_strategy
   empty_denominator: fail
+
+# ── 항 10. 게이트 조건 지표 (P3-54) ────────────────────────────────────────
+# 계측기 `phase3_coverage` 의 종료 코드는 기본적으로 목표가 있는 **모든** 지표의 합이다. 게이트 하나의
+# 조건은 그중 일부이므로, 합산 종료 코드로는 게이트를 판정할 수 없다(2026-10-17 재판정 실측: 무주입·
+# Content Coverage 를 9/10·8/10 으로 떨어뜨린 주입 4종·대조군 2종이 전부 exit 1). `--gate <ID>` 를 주면
+# 아래에 선언된 지표만으로 종료 코드를 낸다. 어떤 지표가 어떤 게이트의 조건인지는 코드가 아니라 이 항이
+# 소유한다. 기본 동작(`--gate` 없음)은 그대로다.
+#
+# 규칙
+#   · metrics 는 목표가 있는 지표 키여야 한다(content_coverage_rate · curriculum_coverage ·
+#     concept_completeness · graph_connectivity_coverage). 목표가 없는 지표를 조건으로 두면 계측기가
+#     판정을 거부한다(exit 2) — 목표가 없는 지표로 종료 코드를 내면 항상 0 이라 상시 통과가 된다.
+#   · 여기 적히지 않은 게이트는 `--gate` 로 판정할 수 없다(exit 2). 게이트 문면에 대응하는 지표가 이
+#     계측기에 없다는 사실을 '통과'로 접지 않는다.
+#   · 이 항은 게이트 조건 가운데 **이 계측기가 재는 것**만 선언한다. 명세 동결·금지 변경 0건처럼 이
+#     계측기가 재지 않는 조건은 해당 게이트 판정문이 각자의 근거로 다룬다.
+#
+# P3-G2 를 싣지 않은 이유: 게이트 문면의 Problem Coverage 는 이 계측기의 지표가 아니라 별도 모듈
+# (`ops.phase3_metrics` 의 problem_coverage_by_skill)이 재고, 이 계측기의 슬롯 지표(slot_coverage)는
+# 명세에 목표가 없다. 대응을 지어내서 싣지 않는다 — 대응이 정해지면(지표 정의·목표는 이 태스크 밖이다)
+# 그때 PR 로 추가한다.
+gate_conditions:
+  P3-G1:
+    metrics: [content_coverage_rate]
+    basis: "backlog/gates.yaml G-p3-g1-week1 문면 '핵심 Concept Content Coverage 95%+' — 명세 목표 completeness.targets.content_coverage_rate"

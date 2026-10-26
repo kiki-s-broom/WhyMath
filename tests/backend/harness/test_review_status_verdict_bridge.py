@@ -29,6 +29,7 @@ from typing import Any
 
 import pytest
 
+from whymath_backend.harness import review_status_domains as domains
 from whymath_backend.harness import review_status_verdict_bridge as bridge
 from whymath_backend.harness.golden_promotion_gate import _human_verdicts
 from whymath_backend.harness.golden_promotion_gate import main as gate_main
@@ -547,8 +548,10 @@ class TestDomain:
         monkeypatch: pytest.MonkeyPatch,
         with_ledger: bool,
     ) -> None:
-        """고정 코퍼스 7종 경로는 코퍼스 단위 백필의 대상 — 대장이 붙어 있어도 거부한다."""
+        """고정 코퍼스(`KNOWN_CORPORA`) 경로는 코퍼스 단위 백필의 대상 — 대장이 붙어 있어도 거부한다."""
         monkeypatch.chdir(tmp_path)  # KNOWN_CORPORA는 레포 루트 상대경로 — 가짜 루트를 세운다
+        # [OPS-138] 가드는 cwd가 아니라 모듈 파일 위치 기준 `_REPO_ROOT`로 해석하므로 거기도 끼운다.
+        monkeypatch.setattr(domains, "_REPO_ROOT", tmp_path.resolve())
         fixed_dir = tmp_path / "data" / "corpus" / "problem_bank_v1"
         fixed_dir.mkdir(parents=True)
         corpus = _round_corpus(fixed_dir, [_record("wm-a")], ledger=with_ledger)

@@ -9,6 +9,11 @@
 + 2026-08-11 PB-07 rephrased 계보 백필 결과물)을 직접 읽어 전수 대조한다 — 합성 fixture가
 아니라 *실제 산출물*이 골든 값과 일치하는지 보는 것이 이 매핑표의 유일한 존재 이유이기 때문이다.
 
+**전수 귀속 계약**(CONT-09·`TestCorpusSeatContract`): `data/corpus/problem_bank*` 디렉터리 전부가
+정확히 한 좌석(직접 분류·계보·제외·자가 태깅)에 앉아야 한다 — S3-27 이후 추가된 코퍼스 30종
+11,396문이 어느 좌석에도 없어 태깅 계약 밖에 방치됐던 사고의 재발 차단. 변별력은 코퍼스 1종을
+좌석에서 빼 RED를 실측하고 되돌려 GREEN을 실측하는 것으로 증명한다.
+
 **제외 만료 계약**(PB-07·`TestExclusionExpiryContract`): `EXCLUDED_CORPORA` 좌석의 각 항목이
 ①실재하는 backlog 태스크를 참조하는지 ②참조 태스크가 done인데 항목이 방치되지 않았는지를
 상시 대조한다 — `ops/provenance_audit`의 `TestGrandfatherExpiryContract`(ARCH-25)와 동형.
@@ -16,7 +21,9 @@
 
 from __future__ import annotations
 
+import ast
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -30,6 +37,17 @@ from whymath_backend.schema.enums import RelationType
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CORPUS_ROOT = _REPO_ROOT / "data" / "corpus"
 _PROBLEM_TYPES_PATH = _CORPUS_ROOT / "problem_type_graph_v1" / "problem_types.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
+
+def _bank_total(corpus: str) -> int:
+    """은행 폴더 이름(`problem_bank_<x>`) → 사실 `problem_bank.<x>`(그 은행의 전체 문항 수)."""
+    return _FACTS[f"problem_bank.{corpus.removeprefix('problem_bank_')}"]
+
 
 # 골든 분포(2026-07-30 S3-27 백필 실측 — `harness/problem_type_backfill.py` 산출물과 정합).
 # 이 상수가 어긋나면 매핑표가 바뀌었다는 뜻이다 — 의도적 변경이면 이 상수도 함께 갱신할 것.
@@ -55,7 +73,7 @@ _GOLDEN_CORPUS_TYPE_TOTALS: dict[str, dict[str, int]] = {
         ptm.PTYPE_VERIFY_CLAIM: 264,  # 11밴드 × 24
     },
     ptm.CORPUS_KILLER_V0: {
-        ptm.PTYPE_EVALUATE_EXPRESSION: 120,
+        ptm.PTYPE_EVALUATE_EXPRESSION: _bank_total(ptm.CORPUS_KILLER_V0),  # 단일 유형 = 은행 전량
     },
     # 42밴드×24=1008(evaluate) · transpose-no-sign-change=24(solve) ·
     # combination-no-denominator·same-item-permutation-no-divide=2밴드×24=48(enumerate).
@@ -80,8 +98,75 @@ _GOLDEN_REPHRASED_TYPE_TOTALS: dict[str, int] = {
     ptm.PTYPE_EVALUATE_EXPRESSION: 103,
 }
 
-_GOLDEN_TOTAL_TAGGED = 2638  # 직접 2,217 + 계보 421 — 7종 전건(PB-07이 rephrased 제외 해제)
-_GOLDEN_LINEAGE_TOTAL = 421  # rephrased_v0 총량(QUAL-02 은퇴 9건 반영 — 429→421)
+# CONT-09 골든(2026-10-12 실측) — `unit_codes` 표로 직접 분류하는 30종의 유형별 총량.
+# 각 값은 코퍼스의 `unit_codes`별 문항 수(실코퍼스 순회)에서 손으로 합산했다:
+#   evaluate 대다수 · 나머지 4군 = enumerate(REPEATED-COMBINATION 56·SUM-PRODUCT-PRINCIPLE 120·
+#   PERMUTATION 40) · determine-coefficient(LINE-EQUATION 200) · condition-satisfaction
+#   (LINEAR-INEQUALITY-SYSTEM 600·QUAD-INEQ-BOUNDARY 200) · transform-expression
+#   (POLYNOMIAL-FACTORING 600).
+_E = ptm.PTYPE_EVALUATE_EXPRESSION
+# 단일 유형 은행 — 그 유형의 총량 = 은행 전체 문항 수이므로 값은 사실 파일에서 읽는다.
+_UNIT_TABLE_SINGLE_TYPE: dict[str, str] = {
+    "problem_bank_binomial_distribution_v0": _E,
+    "problem_bank_calculus1_integral_v0": _E,
+    "problem_bank_calculus2_trig_integral_v0": _E,
+    "problem_bank_complex_number_arithmetic_v0": _E,
+    "problem_bank_conic_section_focus_v0": _E,
+    "problem_bank_discrete_ev_v0": _E,
+    "problem_bank_elementary_area_measure_v0": _E,
+    "problem_bank_elementary_division_remainder_v0": _E,
+    "problem_bank_elementary_gcd_lcm_v0": _E,
+    "problem_bank_elementary_rounding_v0": _E,
+    "problem_bank_elementary_v0": _E,
+    "problem_bank_elementary_volume_measure_v0": _E,
+    "problem_bank_highschool_quotient_rule_v0": _E,
+    "problem_bank_linear_inequality_system_v0": ptm.PTYPE_CONDITION_SATISFACTION,
+    "problem_bank_matrix_ops_v0": _E,
+    "problem_bank_measurement_unit_conversion_v0": _E,
+    "problem_bank_middle_function_v0": _E,
+    "problem_bank_permutation_combination_v0": ptm.PTYPE_ENUMERATE_CASES,
+    "problem_bank_polynomial_arithmetic_v0": _E,
+    "problem_bank_polynomial_factoring_v0": ptm.PTYPE_TRANSFORM_EXPRESSION,
+    "problem_bank_probability_law_v0": _E,
+    "problem_bank_quad_ineq_v0": ptm.PTYPE_CONDITION_SATISFACTION,
+    "problem_bank_radian_conversion_v0": _E,
+    "problem_bank_sample_mean_distribution_v0": _E,
+    "problem_bank_sequence_sigma_v0": _E,
+    "problem_bank_university_calc1_chain_quotient_v0": _E,
+    "problem_bank_university_calc1_v0": _E,
+    "problem_bank_vector_operations_v0": _E,
+}
+# 복수 유형 은행 — 유형 분할은 실측 골든이다(사실 파일에 없다).
+_UNIT_TABLE_SPLIT_TYPE_TOTALS: dict[str, dict[str, int]] = {
+    "problem_bank_combination_binomial_v0": {ptm.PTYPE_ENUMERATE_CASES: 56, _E: 65},
+    "problem_bank_coordinate_geometry_v0": {_E: 200, ptm.PTYPE_DETERMINE_COEFFICIENT: 200},
+}
+_GOLDEN_UNIT_TABLE_TYPE_TOTALS: dict[str, dict[str, int]] = dict(
+    sorted(
+        {
+            **{name: {ptype: _bank_total(name)} for name, ptype in _UNIT_TABLE_SINGLE_TYPE.items()},
+            **_UNIT_TABLE_SPLIT_TYPE_TOTALS,
+        }.items()
+    )
+)
+# CONT-09 — 미태깅이던 문항 수 = 표 은행 30종의 전체 문항 수 합(사실 파일 기준).
+_GOLDEN_UNIT_TABLE_TOTAL = sum(_bank_total(name) for name in _GOLDEN_UNIT_TABLE_TYPE_TOTALS)
+
+# 직접 6종 + 계보(rephrased_v0) (S3-27·PB-07) + CONT-09 `unit_codes` 표 30종.
+# p3_calculus1_diff_v0·p3_fill_v0(자가 태깅)는 `classify_record` 소관이 아니라 이 합계에 없다.
+_GOLDEN_DIRECT_TOTAL = sum(
+    _bank_total(name)
+    for name in (
+        ptm.CORPUS_V1,
+        ptm.CORPUS_GENERATED_V0,
+        ptm.CORPUS_CONCEPTUAL_V0,
+        ptm.CORPUS_KILLER_V0,
+        ptm.CORPUS_MISCONCEPTION_MC_V0,
+        ptm.CORPUS_PROBABILITY_FINITE_V0,
+    )
+)
+_GOLDEN_LINEAGE_TOTAL = _bank_total(ptm.CORPUS_REPHRASED_V0)  # rephrased_v0 총량
+_GOLDEN_TOTAL_TAGGED = _GOLDEN_DIRECT_TOTAL + _GOLDEN_LINEAGE_TOTAL + _GOLDEN_UNIT_TABLE_TOTAL
 
 
 def _load_corpus_lines(name: str) -> list[dict[str, object]]:
@@ -130,6 +215,18 @@ class TestGoldenDistribution:
     def test_corpus_distribution_matches_golden(self, corpus_name: str) -> None:
         assert dict(_distribution_for(corpus_name)) == _GOLDEN_CORPUS_TYPE_TOTALS[corpus_name]
 
+    @pytest.mark.parametrize("corpus_name", list(_GOLDEN_UNIT_TABLE_TYPE_TOTALS))
+    def test_unit_table_corpus_distribution_matches_golden(self, corpus_name: str) -> None:
+        # CONT-09: 30종 각각의 유형별 분포가 손 합산 골든과 정확히 일치.
+        assert dict(_distribution_for(corpus_name)) == _GOLDEN_UNIT_TABLE_TYPE_TOTALS[corpus_name]
+
+    def test_unit_table_golden_covers_exactly_the_unit_table_corpora(self) -> None:
+        # 골든 키 집합 == 표 코퍼스 집합 — 표에 코퍼스를 넣고 골든을 빠뜨리거나 그 반대를 막는다.
+        assert set(_GOLDEN_UNIT_TABLE_TYPE_TOTALS) == set(ptm.UNIT_CODE_TABLE_CORPORA)
+        assert sum(sum(v.values()) for v in _GOLDEN_UNIT_TABLE_TYPE_TOTALS.values()) == (
+            _GOLDEN_UNIT_TABLE_TOTAL
+        )
+
     def test_rephrased_distribution_matches_golden(self) -> None:
         # PB-07 계보 백필 골든 — 부모(generated_v0) 유형 승계 결과가 실측 골든과 정확히 일치.
         assert dict(_lineage_distribution_for(ptm.CORPUS_REPHRASED_V0)) == (
@@ -137,7 +234,7 @@ class TestGoldenDistribution:
         )
 
     def test_total_tagged_matches_golden(self) -> None:
-        # 직접 6종(classify_record) + 계보 1종(classify_rephrased_record) = 7종 전건 2,638.
+        # 직접 분류 36종(classify_record) + 계보 1종(classify_rephrased_record) = 14,034.
         direct = sum(
             sum(dist.values()) for name in ptm.TARGET_CORPORA for dist in [_distribution_for(name)]
         )
@@ -177,7 +274,7 @@ class TestMappingIntegrity:
         assert catalog_ids == ptm.ALL_PROBLEM_TYPE_IDS
 
     def test_no_untagged_records_in_target_corpora(self) -> None:
-        # acceptance③: 대상 6개 코퍼스는 전량 태깅됨(0건 미태깅) — 실측 확인.
+        # acceptance③: 직접 분류 대상 36개 코퍼스는 전량 태깅됨(0건 미태깅) — 실측 확인.
         for name in ptm.TARGET_CORPORA:
             records = _load_corpus_lines(name)
             untagged = sum(1 for r in records if not ptm.classify_record(name, r))
@@ -191,6 +288,24 @@ class TestMappingIntegrity:
             records = _load_corpus_lines(name)
             untagged = sum(1 for r in records if not ptm.classify_rephrased_record(r, index))
             assert untagged == 0, f"{name}에 계보 추적 불가(미태깅) {untagged}건"
+
+    def test_stored_codes_match_derivation_in_all_target_corpora(self) -> None:
+        # 저장된 problem_type_codes(백필 산출물)가 유도 값과 전건 일치 — 리뷰 지적(CONT-09 PR):
+        # 위 테스트들은 `classify_record` **유도**만 대조해 저장분을 못 본다. 배치 CLI가 코퍼스를
+        # 재생성하면(`problem_type_codes=[]` 기본값) 저장 태그가 조용히 사라지는데 그때 이 테스트만
+        # RED가 된다. 실패 시 어느 코퍼스에 몇 건이 어긋났는지 드러낸다.
+        mismatched: dict[str, int] = {}
+        for name in ptm.TARGET_CORPORA:
+            bad = sum(
+                1
+                for record in _load_corpus_lines(name)
+                if record.get("problem_type_codes") != ptm.classify_record(name, record)
+            )
+            if bad:
+                mismatched[name] = bad
+        assert (
+            mismatched == {}
+        ), f"저장 태그가 유도값과 어긋난 코퍼스: {mismatched} — 백필 재실행 필요"
 
     def test_stored_rephrased_codes_match_lineage_derivation(self) -> None:
         # 저장된 problem_type_codes(PB-07 백필 산출물)가 계보 유도 값과 전건 일치 — 멱등 계약의
@@ -254,6 +369,182 @@ class TestMutationDetection:
 
         monkeypatch.undo()
         assert dict(_distribution_for(ptm.CORPUS_MISCONCEPTION_MC_V0)) == golden
+
+
+class TestUnitTableIntegrity:
+    """CONT-09 `unit_codes` 표의 구조 정합 — 표 키 집합이 실코퍼스의 `unit_codes` 집합과 같아야 한다.
+
+    표에 없는 값은 `classify_record`가 침묵 대신 빈 리스트(미태깅)로 드러내고(전수 태깅 테스트가
+    잡는다), 코퍼스에 없는 키는 죽은 항목이다 — 후자는 이 테스트가 잡는다.
+    """
+
+    @pytest.mark.parametrize("corpus_name", list(ptm.UNIT_CODE_TABLE_CORPORA))
+    def test_table_keys_equal_observed_unit_codes(self, corpus_name: str) -> None:
+        observed = {
+            tuple(sorted(r["unit_codes"]))  # type: ignore[arg-type]
+            for r in _load_corpus_lines(corpus_name)
+        }
+        assert set(ptm._UNIT_CODE_TABLES[corpus_name]) == observed
+
+    def test_table_corpora_are_all_direct_targets_and_ordered(self) -> None:
+        assert set(ptm.UNIT_CODE_TABLE_CORPORA) <= set(ptm.TARGET_CORPORA)
+        assert list(ptm.UNIT_CODE_TABLE_CORPORA) == sorted(ptm.UNIT_CODE_TABLE_CORPORA)
+        assert len(ptm.TARGET_CORPORA) == len(set(ptm.TARGET_CORPORA))  # 좌석 내 중복 0.
+
+    def test_every_table_value_is_a_real_catalog_type(self) -> None:
+        for corpus_name, table in ptm._UNIT_CODE_TABLES.items():
+            for unit_codes, ptype in table.items():
+                assert ptype in ptm.ALL_PROBLEM_TYPE_IDS, (corpus_name, unit_codes)
+
+    def test_unmapped_unit_code_stays_untagged_not_misclassified(self) -> None:
+        # 표에 없는 unit_codes(예: 신규 밴드 추가) → 빈 리스트. 다른 값으로 둔갑하지 않는다.
+        record = {"unit_codes": ["NOT-IN-TABLE"], "slug": "x"}
+        assert ptm.classify_record("problem_bank_polynomial_arithmetic_v0", record) == []
+
+    def test_mutated_unit_table_entry_breaks_golden_check(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 변별력: POLYNOMIAL-ARITHMETIC(1,500건)을 틀린 유형으로 바꾸면 골든 대조가 실제로 어긋난다.
+        name = "problem_bank_polynomial_arithmetic_v0"
+        golden = _GOLDEN_UNIT_TABLE_TYPE_TOTALS[name]
+        assert dict(_distribution_for(name)) == golden  # 대조군.
+
+        corrupted = {
+            **ptm._UNIT_CODE_TABLES,
+            name: {("POLYNOMIAL-ARITHMETIC",): ptm.PTYPE_SKETCH_GRAPH},
+        }
+        monkeypatch.setattr(ptm, "_UNIT_CODE_TABLES", corrupted)
+        mutated = dict(_distribution_for(name))
+        assert mutated != golden
+        assert mutated == {ptm.PTYPE_SKETCH_GRAPH: 1500}
+
+        monkeypatch.undo()
+        assert dict(_distribution_for(name)) == golden
+
+
+class TestCorpusSeatContract:
+    """전수 귀속(CONT-09) — 모든 `problem_bank*` 디렉터리가 정확히 한 좌석에 앉는다.
+
+    ``find_corpus_seat_violations``의 세 위반(미귀속·중복·죽은 좌석)과 스캔 0건 실패를 각각
+    주입해 RED를 실측하고, 정상 상태에서 GREEN을 실측한다 — 정상 입력의 초록만으로는 보호의 증거가
+    아니다(CLAUDE.md "보호 장치를 실패 주입 없이 보호 있음으로 선언 금지").
+    """
+
+    @staticmethod
+    def _mirror_seats(root: Path) -> None:
+        """현재 좌석 전체와 같은 이름의 빈 코퍼스 디렉터리를 `root` 아래 만든다(정상 상태 재현)."""
+        for name in ptm._corpus_seats():
+            (root / name).mkdir(parents=True)
+
+    def test_seat_glob_equals_coverage_meter_glob(self) -> None:
+        # 이 계약이 지키는 코퍼스 집합과 계측기가 읽는 집합을 묶는다 — 한쪽 glob만 바뀌면
+        # "계측기는 보는데 계약은 모르는" 코퍼스(CONT-09 사고 형태)가 다시 생긴다.
+        from whymath_backend.harness import problem_bank_coverage as pbc
+
+        assert ptm._CORPUS_DIR_GLOB is pbc.CORPUS_DIR_GLOB  # 값 복제가 아니라 같은 상수 객체.
+
+        # PB-20 `test_investigation_doc_names_every_glob_consumer`와 같은 AST 규칙: 이 모듈에
+        # `problem_bank`+`*` 문자열 상수가 다시 생기면 조사 문서 소비처 표에 새 행이 필요해진다.
+        tree = ast.parse(Path(ptm.__file__).read_text(encoding="utf-8"))
+        duplicated = [
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and re.fullmatch(r"[\w./*\[\]{}\-]+", node.value)
+            and "problem_bank" in node.value
+            and "*" in node.value
+        ]
+        assert duplicated == [], f"글롭 상수 복제 금지(PB-20): {duplicated}"
+
+    def test_real_repo_has_no_seat_violations(self) -> None:
+        assert ptm.find_corpus_seat_violations() == []
+
+    def test_real_repo_seat_count_equals_directory_count(self) -> None:
+        # 좌석 합계 == 디스크의 코퍼스 디렉터리 수 — 한쪽만 늘어난 드리프트를 숫자로 드러낸다.
+        on_disk = sorted(p.name for p in _CORPUS_ROOT.glob("problem_bank*") if p.is_dir())
+        seats = ptm._corpus_seats()
+        assert on_disk == sorted(seats)
+        assert on_disk, "스캔 0건"
+
+    def test_normal_mirror_is_green(self, tmp_path: Path) -> None:
+        self._mirror_seats(tmp_path)
+        assert ptm.find_corpus_seat_violations(tmp_path) == []
+
+    def test_unseated_new_corpus_is_red(self, tmp_path: Path) -> None:
+        self._mirror_seats(tmp_path)
+        (tmp_path / "problem_bank_brand_new_v0").mkdir()
+        violations = ptm.find_corpus_seat_violations(tmp_path)
+        assert len(violations) == 1
+        assert "problem_bank_brand_new_v0" in violations[0]
+        assert "어느 좌석" in violations[0]
+
+    def test_removing_one_real_corpus_from_its_seat_is_red_then_green(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # acceptance④ 변별력: 실제 코퍼스 1종을 좌석에서 빼면 RED, 되돌리면 GREEN.
+        victim = ptm.UNIT_CODE_TABLE_CORPORA[0]
+        assert ptm.find_corpus_seat_violations() == []  # 정상 상태 GREEN.
+
+        monkeypatch.setattr(
+            ptm, "TARGET_CORPORA", tuple(n for n in ptm.TARGET_CORPORA if n != victim)
+        )
+        red = ptm.find_corpus_seat_violations()
+        assert len(red) == 1 and victim in red[0]
+
+        monkeypatch.undo()
+        assert ptm.find_corpus_seat_violations() == []  # 원복 후 GREEN.
+
+    def test_corpus_on_two_seats_is_red(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # 자가 태깅이면서 직접 분류이기도 하면 백필이 저장 유형을 지운다 — 중복 좌석을 막는다.
+        self._mirror_seats(tmp_path)
+        both = ptm.UNIT_CODE_TABLE_CORPORA[0]
+        monkeypatch.setattr(ptm, "SELF_TAGGED_CORPORA", (*ptm.SELF_TAGGED_CORPORA, both))
+        violations = ptm.find_corpus_seat_violations(tmp_path)
+        assert len(violations) == 1 and both in violations[0] and "중복" in violations[0]
+
+    def test_stale_seat_without_directory_is_red(self, tmp_path: Path) -> None:
+        self._mirror_seats(tmp_path)
+        gone = ptm.UNIT_CODE_TABLE_CORPORA[0]
+        (tmp_path / gone).rmdir()
+        violations = ptm.find_corpus_seat_violations(tmp_path)
+        assert len(violations) == 1 and gone in violations[0] and "디렉터리가 없다" in violations[0]
+
+    def test_zero_scan_is_a_failure_not_a_pass(self, tmp_path: Path) -> None:
+        # 빈 루트·존재하지 않는 루트 모두 "위반 없음"이 아니라 위반이다(공허한 통과 금지).
+        assert ptm.find_corpus_seat_violations(tmp_path)  # 빈 디렉터리.
+        assert ptm.find_corpus_seat_violations(tmp_path / "does-not-exist")  # 없는 경로.
+
+
+class TestSelfTaggedSeat:
+    """자가 태깅 좌석(p3_calculus1_diff_v0) — 백필이 쓰지 않으므로 저장분 자체를 상시 대조한다."""
+
+    def test_seat_membership(self) -> None:
+        assert ptm.SELF_TAGGED_CORPORA == (
+            ptm.CORPUS_P3_CALCULUS1_DIFF_V0,
+            ptm.CORPUS_P3_FILL_V0,
+        )
+        # 직접 분류 대상이면 백필이 저장된 유형을 지운다 — 좌석이 서로소여야 한다.
+        assert ptm.CORPUS_P3_CALCULUS1_DIFF_V0 not in ptm.TARGET_CORPORA
+        assert ptm.CORPUS_P3_CALCULUS1_DIFF_V0 not in ptm.LINEAGE_CORPORA
+        assert ptm.CORPUS_P3_FILL_V0 not in ptm.TARGET_CORPORA
+        assert ptm.CORPUS_P3_FILL_V0 not in ptm.LINEAGE_CORPORA
+
+    def test_classify_record_cannot_derive_it(self) -> None:
+        # 같은 unit_codes 안에서 유형이 갈리므로 표 분류는 불가 — 침묵 오분류 대신 빈 리스트.
+        sample = _load_corpus_lines(ptm.CORPUS_P3_CALCULUS1_DIFF_V0)[0]
+        assert ptm.classify_record(ptm.CORPUS_P3_CALCULUS1_DIFF_V0, sample) == []
+
+    def test_every_stored_record_is_tagged_with_a_catalog_type(self) -> None:
+        for name in ptm.SELF_TAGGED_CORPORA:
+            records = _load_corpus_lines(name)
+            assert records, f"{name}: 스캔 0건"
+            for record in records:
+                codes = record.get("problem_type_codes")
+                assert isinstance(codes, list) and len(codes) == 1, record.get("slug")
+                assert codes[0] in ptm.ALL_PROBLEM_TYPE_IDS, record.get("slug")
 
 
 class TestLineageClassification:

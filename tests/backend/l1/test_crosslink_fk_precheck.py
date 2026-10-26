@@ -195,6 +195,10 @@ class _StubStore:
         self.checked += 1
         return self._missing
 
+    def live_links(self, _kebab_ids: Any) -> dict[str, list[Any]]:
+        """라이브 잔존 행 없음 — canonical 경쟁 판정(HARN-216)은 별도 파일이 고정한다."""
+        return {}
+
     def populate(self, records: Any) -> int:
         self.populated += 1
         return len(list(records))

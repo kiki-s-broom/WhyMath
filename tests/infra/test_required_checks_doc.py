@@ -32,6 +32,10 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOC_PATH = _REPO_ROOT / ".github" / "branch-protection-setup.md"
 _CI_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+# ci.yml 밖에서 정의됐지만 required로 등록된 잡의 워크플로(HARN-313). 날짜가 바뀌면 동작이 달라지는
+# 잡이라 일부러 ci.yml과 분리돼 있다(.github/workflows/release-freeze.yml 머리 주석). 계약 ①(문서
+# 이름의 실재)에만 쓴다 — 계약 ②(ci.yml 잡의 required 판단 강제)의 범위 확장은 HARN-165가 소유한다.
+_EXTRA_REQUIRED_WORKFLOWS = (".github/workflows/release-freeze.yml",)
 
 _BEGIN = "<!-- REQUIRED_CHECKS_BEGIN"
 _END = "<!-- REQUIRED_CHECKS_END -->"
@@ -78,20 +82,35 @@ def _documented_checks() -> list[str]:
     return names
 
 
-def _ci_job_names() -> list[str]:
-    """`ci.yml`의 모든 잡 `name:` 값. 이름 없는 잡은 잡 키를 그대로 쓴다(GitHub 동작)."""
-    spec = yaml.safe_load(_CI_PATH.read_text(encoding="utf-8"))
+def _workflow_job_names(path: Path) -> list[str]:
+    """워크플로 파일의 모든 잡 `name:` 값. 이름 없는 잡은 잡 키를 그대로 쓴다(GitHub 동작)."""
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
     jobs = spec.get("jobs") or {}
     return [str(body.get("name") or key) for key, body in jobs.items()]
 
 
+def _ci_job_names() -> list[str]:
+    """`ci.yml`의 모든 잡 이름."""
+    return _workflow_job_names(_CI_PATH)
+
+
+def _extra_required_job_names() -> list[str]:
+    """ci.yml 밖 워크플로의 잡 이름. 파일이 없거나 잡이 0개면 예외로 실패한다(공허 통과 차단)."""
+    names: list[str] = []
+    for rel in _EXTRA_REQUIRED_WORKFLOWS:
+        found = _workflow_job_names(_REPO_ROOT / rel)
+        assert found, f"{rel}: 잡이 하나도 없다 — 문서가 안내하는 이름의 실재를 확인할 수 없다."
+        names.extend(found)
+    return names
+
+
 def test_documented_checks_all_exist_in_ci() -> None:
-    """계약 ① — 문서가 안내하는 이름이 전부 ci.yml에 실재해야 한다.
+    """계약 ① — 문서가 안내하는 이름이 전부 워크플로(ci.yml + 별도 등록 워크플로)에 실재해야 한다.
 
     실패 = UI 검색이 빌 이름을 안내하고 있다는 뜻이며, 그 체크는 미설정으로 남는다.
     """
     documented = _documented_checks()
-    actual = set(_ci_job_names())
+    actual = set(_ci_job_names()) | set(_extra_required_job_names())
     missing = [name for name in documented if name not in actual]
     assert not missing, (
         "문서가 존재하지 않는 CI 잡 이름을 안내한다(UI 검색이 비어 미설정으로 샌다): "

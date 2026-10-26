@@ -5,7 +5,8 @@
 선언 금지"). 이 스크립트는 서빙 코드(`src/backend/whymath_backend`)에 회귀를 하나씩 주입하고, 지목한
 가드가 실제로 RED를 내는지 본다. 두 묶음이다:
 
-  census   — **이벤트 기록을 끊는 주입** 9종. 이벤트 생산자 한 곳씩을 끊고
+  census   — **이벤트 기록·귀속을 끊는 주입** 14종(C01~C09 생산자, C10~C14 P3-27 개념 채움·
+             시도 귀속). 이벤트 생산자 한 곳씩을 끊고
              `tests/backend/scenarios/test_gate_d_event_role_census.py`가 그 역할에서 RED인지 본다.
              (Gate D: "기록이 끊기면 관측 가능한 실패가 나는가")
   boundary — **Core 경계 위반 주입** 2종. Core 모듈에 `if subject == "math"` 분기를 넣거나
@@ -118,8 +119,9 @@ MUTATIONS: tuple[Mutation, ...] = (
         "concept_viewed→concept_selected",
         PKG / "l2" / "learning_session_writer.py",
         (
-            "            touched = await touch_learning_session("
-            "session, user_id=user_id, now=now)\n"
+            "            touched = await touch_learning_session(\n"
+            "                session, user_id=user_id, now=now, concept_id=concept_id\n"
+            "            )\n"
             "        return touched.session_id\n"
         ),
         "            pass  # MUTANT — 학습 세션을 잇거나 열지 않는다\n        return None\n",
@@ -195,6 +197,58 @@ MUTATIONS: tuple[Mutation, ...] = (
         ),
         "채점 제출이 problem_attempt를 적재하지 않는다 → problem_attempted 소실"
         "(후속 FK 단계가 함께 깨질 수 있다)",
+    ),
+    # ── P3-27 — 승격한 단언(개념 채움·시도 귀속)이 끊김에서 RED인가 ─────────────────────────
+    Mutation(
+        "C10-no-concept-resolution",
+        "census",
+        "concept_viewed→concept_selected.concept_id",
+        PKG / "l2" / "learning_session_writer.py",
+        "        concept_id = await _resolve_concept(session, problem_id)\n",
+        "        concept_id = None  # MUTANT — 문항의 대표 개념을 해석하지 않는다\n",
+        "세션 writer가 문항의 개념을 해석하지 않는다 → concept_selected가 개념 없이 남는다",
+    ),
+    Mutation(
+        "C11-no-concept-fill-on-continuation",
+        "census",
+        "concept_viewed→concept_selected.concept_id(NULL→값)",
+        PKG / "l2" / "learning_session_writer.py",
+        (
+            "    if concept_id is None or row.target_concept_id is not None:\n"
+            "        return False\n"
+            "    row.target_concept_id = concept_id\n"
+            "    return True\n"
+        ),
+        "    return False  # MUTANT — 이어진 세션에 개념을 채우지 않는다\n",
+        "개념 없이 열린 세션(추천 조회가 첫 활동)을 뒤 활동이 채우지 못한다"
+        " → concept_selected 개념 소실",
+    ),
+    Mutation(
+        "C12-no-attempt-session-attribution",
+        "census",
+        "mastery_updated.session_id",
+        PKG / "l2" / "learning_event_trace.py",
+        '                session_id=getattr(row, "session_id", None),\n',
+        "                session_id=None,  # MUTANT — 숙달 변경의 세션 귀속을 떨어뜨린다\n",
+        "트레이스가 숙달 변경의 세션 귀속을 투영에서 떨어뜨린다 → mastery_updated.session_id 소실",
+    ),
+    Mutation(
+        "C13-no-attempt-problem-attribution",
+        "census",
+        "mastery_updated.problem_id",
+        PKG / "l2" / "learning_event_trace.py",
+        '                problem_id=getattr(row, "problem_id", None),\n',
+        "                problem_id=None,  # MUTANT — 숙달 변경의 문항 귀속을 떨어뜨린다\n",
+        "트레이스가 숙달 변경의 문항 귀속을 투영에서 떨어뜨린다 → mastery_updated.problem_id 소실",
+    ),
+    Mutation(
+        "C14-attempt-join-never-matches",
+        "census",
+        "mastery_updated.problem_id·session_id",
+        PKG / "l2" / "learning_event_trace.py",
+        "            & (ProblemAttempt.user_id == learner_id),\n",
+        "            & (ProblemAttempt.user_id != learner_id),  # MUTANT — 시도 조인 불일치\n",
+        "숙달 이력↔시도 조인이 맞지 않는다 → 귀속 두 필드가 함께 NULL",
     ),
     # ── Gate E — Core 경계 위반 주입 ─────────────────────────────────────────────────────
     Mutation(

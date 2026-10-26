@@ -1,0 +1,867 @@
+"""P3-44 프로토타입 — [12미적Ⅰ-02-05] 접선의 방정식 × M0673 '곡선 밖의 점에서 그은 접선'.
+
+저장소 코드를 import만 한다(저장소 수정 0). 실행: cd /home/user/WhyMath/src/backend && python3 <이 파일>
+
+오개념 절차 P*(M0673 "접점의 좌표와 기울기를 따로 구하지 않는다 · 곡선 밖의 점에서 그은 접선의 접점을
+미지수로 두는 것을 빠뜨린다")를 다음 하나로 못 박는다:
+    접점을 미지수 t로 두지 않고 주어진 점 (p, q)를 접점으로 삼는다 → 접선 y = f'(p)(x - p) + q.
+    기울기 질문의 산출 = f'(p) / y절편 질문 = q - p·f'(p) / g(s) 질문 = q + f'(p)(s - p).
+정답 절차: 접점을 (t, f(t))로 두고 q = f(t) + f'(t)(p - t)를 t에 대해 풀어 f'(t)를 구한다.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+from typing import ClassVar
+
+import sympy
+
+from whymath_backend.l1.standards.phase3_stem_fold import fold_stem
+from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
+from whymath_backend.l3.equivalent.p3_diff_expr import (
+    Poly,
+    derivative_of,
+    eval_at,
+    poly_from_sympy,
+    poly_to_sympy,
+    poly_to_sympy_str,
+    render_factored,
+    render_poly,
+    with_eul_reul,
+)
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    ShortcutProbe,
+    parameter_coincidences,
+    shortcut_violations,
+)
+from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
+    ChoiceEntry,
+    DiffItem,
+    Frame,
+    P3DiffSlotGenerator,
+    answer_format_for,
+    build_choices,
+    probe_of,
+    round_robin_items,
+    seeded_order,
+    skeleton_of,
+    steps_of,
+)
+from whymath_backend.l3.safe_parse import safe_sympify
+from whymath_backend.l3.verify_answer import verify_answer
+
+STD = "[12미적Ⅰ-02-05]"
+MID = "M0673"  # 사슬 조건 (d): distractor_map 에 M-id 를 직접 적는다(계약 §3 — 카탈로그 실재면 인정)
+SOLVE = "ptype.solve-for-unknown"  # → skill.equation-rearrangement (개념 스킬과 겹침)
+X, T = sympy.symbols("x t")
+CORPUS = Path("/home/user/WhyMath/data/corpus")
+
+
+# ───────────────────────── 수학 핵심 (생성기 쪽 — t 접근) ─────────────────────────
+def _poly(coeffs: dict[int, int]) -> Poly:
+    return tuple(sorted(((e, c) for e, c in coeffs.items() if c), reverse=True))
+
+
+def contact_equation(f: Poly, p: int, q: int) -> sympy.Expr:
+    """접점 x좌표 t 가 만족하는 식 g(t) = f(t) + f'(t)(p - t) - q (= 0)."""
+    ft = poly_to_sympy(f, "t")
+    return sympy.expand(ft + sympy.diff(ft, T) * (p - T) - q)
+
+
+def real_contacts(f: Poly, p: int, q: int) -> list[sympy.Expr]:
+    g = sympy.Poly(contact_equation(f, p, q), T)
+    return sorted(set(sympy.real_roots(g)), key=float)
+
+
+def fprime(f: Poly, x0: int) -> int:
+    return eval_at(derivative_of(f), x0)
+
+
+def p_star_slope(f: Poly, p: int, q: int) -> int:
+    return fprime(f, p)
+
+
+def p_star_intercept(f: Poly, p: int, q: int) -> int:
+    return q - p * fprime(f, p)
+
+
+def p_star_value(f: Poly, p: int, q: int, s: int) -> int:
+    return q + fprime(f, p) * (s - p)
+
+
+# ───────────────────────── Tier1 독립 경로: 판별식 = 0 (미분 없음) ─────────────────────────
+def disc_condition(
+    f: Poly, slope_of_u: sympy.Expr, p: int, q: int, u: sympy.Symbol, answer: int, guards: list[str]
+) -> str | tuple[str, ...] | None:
+    """직선(점 (p,q) 경유, 모수 u)과 곡선의 차가 x 에 대해 이중근 ⇔ 판별식 = 0 (u 의 다항식)."""
+    line = slope_of_u * (X - p) + q
+    h = sympy.together(poly_to_sympy(f) - line)
+    disc = sympy.numer(sympy.together(sympy.discriminant(sympy.expand(h * 1), X)))
+    disc = sympy.expand(disc)
+    if disc.free_symbols != {u}:
+        return None
+    roots = sorted(set(sympy.real_roots(sympy.Poly(disc, u))), key=float)
+    if sympy.Integer(answer) not in roots:
+        return None
+    others = [r for r in roots if r != answer]
+    if guards is not None and len(guards) == 0 and others:
+        return None  # 유일 접선 틀인데 다른 실근이 있다
+    cond = f"{sympy.sstr(disc)} = 0"
+    return (cond, *guards) if guards else cond
+
+
+# ───────────────────────── 틀 정의 ─────────────────────────
+def _m_symbol() -> sympy.Symbol:
+    return sympy.Symbol("m")
+
+
+def _unique_ctx(f: Poly, t0: int, p: int):
+    """유일 접선(U-A) 맥락 — (q, 접점 x 목록) 또는 None."""
+    q = eval_at(f, t0) + fprime(f, t0) * (p - t0)
+    if q == eval_at(f, p):
+        return None  # 곡선 위의 점 — 곡선 밖이어야 M0673 상황이 생긴다
+    if abs(q) > 99:
+        return None
+    roots = real_contacts(f, p, q)
+    if roots != [sympy.Integer(t0)]:
+        return None
+    g = sympy.Poly(contact_equation(f, p, q), T)
+    quad = sympy.quo(g, sympy.Poly(T - t0, T))
+    if sympy.rem(g, sympy.Poly(T - t0, T)) != 0 or quad.degree() != 2:
+        return None
+    a2, b2, c2 = quad.all_coeffs()
+    if b2 * b2 - 4 * a2 * c2 >= 0:
+        return None  # 해설의 '나머지 이차 인수는 판별식이 음수'가 거짓이 되는 경우(삼중근 포함) 배제
+    return q
+
+
+def _fillers(cands: list[int], used: set[int], n: int) -> list[int]:
+    out: list[int] = []
+    for v in cands:
+        if v not in used and v not in out:
+            out.append(v)
+        if len(out) == n:
+            break
+    return out
+
+
+def _mc(
+    *,
+    frame_id: str,
+    text: str,
+    correct: int,
+    wrong_mid: int,
+    fillers: list[int],
+    conditions,
+    answer_map,
+    explanation: str,
+    setup: str,
+    key: str,
+    avoid: tuple[int, ...] = (),
+) -> DiffItem | None:
+    values = {correct, wrong_mid, *avoid}
+    fill = _fillers(fillers, values, 2)
+    if len(fill) < 2 or correct == wrong_mid or wrong_mid in avoid or max(abs(v) for v in [correct, wrong_mid, *fill]) > 99:
+        return None
+    try:
+        choices, answer, distractors = build_choices(
+            [
+                ChoiceEntry(str(correct), is_correct=True, sort_key=float(correct)),
+                ChoiceEntry(str(wrong_mid), MID, sort_key=float(wrong_mid)),
+                ChoiceEntry(str(fill[0]), sort_key=float(fill[0])),
+                ChoiceEntry(str(fill[1]), sort_key=float(fill[1])),
+            ],
+            shuffle_seed=key,
+        )
+    except ValueError:
+        return None
+    return DiffItem(
+        slot="misconception_trigger",
+        frame_id=frame_id,
+        question_text=text,
+        answer_text=answer,
+        explanation=explanation,
+        conditions=conditions,
+        answer_map=answer_map,
+        problem_type_code=SOLVE,
+        answer_format=answer_format_for(answer),
+        choices=choices,
+        distractors=distractors,
+        solution_setup=setup,
+    )
+
+
+def _pt_form(m: int, t0: int, ft0: int) -> str:
+    """'y = m(x - t0) + f(t0)' — 부호를 읽기 좋게(이중 부호 '+ -21' 금지)."""
+    x_part = f"x - {t0}" if t0 >= 0 else f"x + {-t0}"
+    tail = f"+ {ft0}" if ft0 >= 0 else f"- {-ft0}"
+    return f"y = {m}({x_part}) {tail}"
+
+
+def _trap(p: int, q: int, f: Poly) -> str:
+    """함정 문장 — 오답 선지가 나오는 경로(주어진 점을 접점으로 삼음)를 짚는다."""
+    return (
+        " 주어진 점은 곡선 위의 점이 아니므로 접점이 아니다. 이 점을 접점으로 보고 "
+        f"{with_eul_reul(f'f' + chr(39) + f'({p})')} 기울기로 쓰면 오답이 된다."
+    )
+
+
+def _contact_sentence(f: Poly, p: int, q: int, t0: int) -> str:
+    g_poly = poly_from_sympy(contact_equation(f, p, q), "t")
+    fp = derivative_of(f)
+    return (
+        f"접점을 (t, f(t))라 하자. f'(x) = {render_poly(fp)}이므로 접선은 "
+        f"y = f'(t)(x - t) + f(t)이고, 이 접선이 점 {with_eul_reul(f'({p}, {q})')} 지나므로 "
+        f"{q} = f(t) + f'(t)({p} - t)이다. 정리하면 {render_poly(g_poly, 't')} = 0, 즉 "
+        f"{render_factored(g_poly, 't')} = 0이다."
+    )
+
+
+def build_frames() -> list[Frame]:
+    m = _m_symbol()
+
+    # ── A. 기울기 (유일 접선) ────────────────────────────────────────────
+    def a_build(par):
+        f, t0, p = par
+        q = _unique_ctx(f, t0, p)
+        if q is None or p == 0 or t0 == p:
+            return None
+        m0, m_star = fprime(f, t0), p_star_slope(f, p, q)
+        cond = disc_condition(f, m, p, q, m, m0, [])
+        if cond is None:
+            return None
+        g_poly = poly_from_sympy(contact_equation(f, p, q), "t")
+        expl = (
+            _contact_sentence(f, p, q, t0)
+            + f" 나머지 이차 인수는 판별식의 값이 음수이므로 실근을 갖지 않아 t = {t0}뿐이다. "
+            f"따라서 접선의 기울기는 f'({t0})의 값인 {m0}이다." + _trap(p, q, f)
+        )
+        return _mc(
+            frame_id="mc-outer-point-tangent-slope",
+            text=(
+                f"점 ({p}, {q})에서 곡선 y = {render_poly(f)}에 그은 접선은 하나뿐이다. "
+                "이 접선의 기울기로 옳은 것은?"
+            ),
+            correct=m0,
+            wrong_mid=m_star,
+            fillers=[fprime(f, -t0), eval_at(f, t0), fprime(f, t0 + 1), fprime(f, t0 - 1)],
+            conditions=cond,
+            answer_map=(("m", str(m0)),),
+            explanation=expl,
+            setup=f"Derivative({poly_to_sympy_str(f)}, x).doit().subs(x, {t0}) = m",
+            key=f"oA:{render_poly(f)}:{p}:{t0}",
+        )
+
+    # ── B. y절편 (유일 접선) ──────────────────────────────────────────────
+    def b_build(par):
+        f, t0, p = par
+        q = _unique_ctx(f, t0, p)
+        if q is None or p == 0 or t0 == p:
+            return None
+        m0 = fprime(f, t0)
+        k0 = eval_at(f, t0) - t0 * m0
+        k_star = p_star_intercept(f, p, q)
+        k_variant = eval_at(f, p) - p * fprime(f, p)  # (p, f(p))를 접점으로 읽는 변형 — 정답과 달라야 한다
+        if k_variant == k0:
+            return None
+        k = sympy.Symbol("k")
+        cond = disc_condition(f, (q - k) / sympy.Integer(p), p, q, k, k0, [])
+        if cond is None:
+            return None
+        expl = (
+            _contact_sentence(f, p, q, t0)
+            + f" 나머지 이차 인수는 판별식의 값이 음수이므로 실근을 갖지 않아 t = {t0}뿐이다. "
+            f"접선은 {_pt_form(m0, t0, eval_at(f, t0))}이고 "
+            f"x = 0을 대입하면 y절편은 {k0}이다." + _trap(p, q, f)
+        )
+        return _mc(
+            frame_id="mc-outer-point-tangent-y-intercept",
+            text=(
+                f"점 ({p}, {q})에서 곡선 y = {render_poly(f)}에 그은 접선은 하나뿐이다. "
+                "이 접선의 y절편으로 옳은 것은?"
+            ),
+            correct=k0,
+            wrong_mid=k_star,
+            fillers=[m0, eval_at(f, t0), k0 + m0, -k0],
+            conditions=cond,
+            answer_map=(("k", str(k0)),),
+            explanation=expl,
+            setup=(
+                f"({poly_to_sympy_str(f)} + Derivative({poly_to_sympy_str(f)}, x)*((0) - x))"
+                f".doit().subs(x, {t0}) = k"
+            ),
+            key=f"oB:{render_poly(f)}:{p}:{t0}",
+            avoid=(k_variant,),
+        )
+
+    # ── C. 접선 위의 값 g(s) (유일 접선) ───────────────────────────────────
+    def c_build(par):
+        f, t0, p, s = par
+        q = _unique_ctx(f, t0, p)
+        if q is None or p == 0 or t0 == p or s in (p, 0, t0):
+            return None
+        m0 = fprime(f, t0)
+        v0 = eval_at(f, t0) + m0 * (s - t0)
+        v_star = p_star_value(f, p, q, s)
+        v_variant = eval_at(f, p) + fprime(f, p) * (s - p)
+        if v_variant == v0:
+            return None
+        y = sympy.Symbol("y")
+        cond = disc_condition(f, (y - q) / sympy.Integer(s - p), p, q, y, v0, [])
+        if cond is None:
+            return None
+        expl = (
+            _contact_sentence(f, p, q, t0)
+            + f" 나머지 이차 인수는 판별식의 값이 음수이므로 실근을 갖지 않아 t = {t0}뿐이다. "
+            f"접점 ({t0}, {eval_at(f, t0)})에서의 기울기는 f'({t0})의 값인 {m0}이므로 "
+            f"접선은 {_pt_form(m0, t0, eval_at(f, t0))}이고 "
+            f"g({s}) = {v0}이다." + _trap(p, q, f)
+        )
+        return _mc(
+            frame_id="mc-outer-point-tangent-line-value",
+            text=(
+                f"점 ({p}, {q})에서 곡선 y = {render_poly(f)}에 그은 접선은 하나뿐이다. "
+                f"이 접선의 방정식을 y = g(x)라 할 때, g({s})의 값으로 옳은 것은?"
+            ),
+            correct=v0,
+            wrong_mid=v_star,
+            fillers=[m0, eval_at(f, s), v0 + m0, eval_at(f, t0)],
+            conditions=cond,
+            answer_map=(("y", str(v0)),),
+            explanation=expl,
+            setup=(
+                f"({poly_to_sympy_str(f)} + Derivative({poly_to_sympy_str(f)}, x)*(({s}) - x))"
+                f".doit().subs(x, {t0}) = y"
+            ),
+            key=f"oC:{render_poly(f)}:{p}:{t0}:{s}",
+            avoid=(v_variant,),
+        )
+
+    # ── D. 기울기 (접선이 셋 — '접점의 x좌표가 양수'로 유일화) ──────────────────
+    def d_build(par):
+        f, p, q = par
+        if q == eval_at(f, p) or abs(q) > 99:
+            return None
+        roots = real_contacts(f, p, q)
+        if len(roots) != 3 or any(not r.is_integer for r in roots):
+            return None
+        pos = [r for r in roots if r > 0]
+        if len(pos) != 1 or 0 in roots:
+            return None
+        t0 = int(pos[0])
+        slopes = {int(r): fprime(f, int(r)) for r in roots}
+        if len(set(slopes.values())) != 3:
+            return None
+        m0, m_star = slopes[t0], p_star_slope(f, p, q)
+        if m_star in slopes.values():
+            return None
+        others = sorted(v for r, v in slopes.items() if r != t0)
+        guards = [f"m != {v}" for v in others]
+        cond = disc_condition(f, m, p, q, m, m0, guards)
+        if cond is None:
+            return None
+        g_poly = poly_from_sympy(contact_equation(f, p, q), "t")
+        expl = (
+            _contact_sentence(f, p, q, t0)
+            + f" 따라서 t = {', '.join(str(int(r)) for r in roots)}이고, 접점의 x좌표가 양수이므로 "
+            f"t = {t0}이다. 접선의 기울기는 f'({t0})의 값인 {m0}이다." + _trap(p, q, f)
+        )
+        return _mc(
+            frame_id="mc-outer-point-tangent-slope-positive-contact",
+            text=(
+                f"점 ({p}, {q})에서 곡선 y = {render_poly(f)}에 그은 접선 중 접점의 x좌표가 "
+                "양수인 것의 기울기로 옳은 것은?"
+            ),
+            correct=m0,
+            wrong_mid=m_star,
+            fillers=others + [eval_at(f, t0), fprime(f, -t0)],
+            conditions=cond,
+            answer_map=(("m", str(m0)),),
+            explanation=expl,
+            setup=f"Derivative({poly_to_sympy_str(f)}, x).doit().subs(x, {t0}) = m",
+            key=f"oD:{render_poly(f)}:{p}:{q}",
+        )
+
+    return [a_build, b_build, c_build, d_build]  # 아래 params 와 짝지어 Frame 으로 만든다
+
+
+# ───────────────────────── 파라미터 공간 ─────────────────────────
+def _curve_pool() -> list[Poly]:
+    out = []
+    for a in (1, 2, -1, -2):
+        for b in range(-3, 4):
+            for c in range(-4, 5):
+                d = (-3, -1, 0, 2, 4)[(a + b + c) % 5]
+                out.append(_poly({3: a, 2: b, 1: c, 0: d}))
+    return out
+
+
+def _grid(seed: str, *axes):
+    combos = [()]
+    for ax in axes:
+        combos = [(*c, v) for c in combos for v in ax]
+    return tuple(seeded_order(seed, combos))
+
+
+T0S = (-3, -2, -1, 1, 2, 3)
+PS = (-4, -3, -2, -1, 1, 2, 3, 4)
+SS = (-2, -1, 1, 2, 3)
+
+
+def full_params() -> dict[str, tuple]:
+    pool = _curve_pool()
+    return {
+        "A": _grid("oA", pool, T0S, PS),
+        "B": _grid("oB", pool, T0S, PS),
+        "C": _grid("oC", pool, T0S, PS, SS),
+    }
+
+
+def d_params_from_roots() -> tuple:
+    """D: 접점 x 의 세 근이 서로 다른 정수가 되는 (f, p, q) 를 근-계수 관계로 역산해 전수 열거.
+
+    g(t) = -2a t^3 + (3ap - b) t^2 + 2bp t + (d + cp - q) = -2a(t - r1)(t - r2)(t - r3) 이므로
+    합 = (3ap - b)/(2a) · 쌍합 = -bp/a · 상수항에서 q = d + cp - 2a·r1 r2 r3.
+    """
+    out = []
+    for f in _curve_pool():
+        tab = dict(f)
+        a, b, c, d = tab.get(3, 0), tab.get(2, 0), tab.get(1, 0), tab.get(0, 0)
+        for p in PS:
+            ssum = sympy.Rational(3 * a * p - b, 2 * a)
+            pair = sympy.Rational(-b * p, a)
+            if not (ssum.is_integer and pair.is_integer):
+                continue
+            for r1 in range(-5, 6):
+                for r2 in range(r1 + 1, 6):
+                    r3 = ssum - r1 - r2
+                    if r3 <= r2 or r1 * r2 + r1 * r3 + r2 * r3 != pair:
+                        continue
+                    q = d + c * p - 2 * a * r1 * r2 * int(r3)
+                    out.append((f, p, int(q)))
+    return tuple(dict.fromkeys(out))
+
+
+# ───────────────────────── 슬롯 생성기 (저장소 베이스 재사용) ─────────────────────────
+def make_generator(count: int = 48):
+    builders = build_frames()
+    pr = full_params()
+    frames = [
+        Frame("mc-outer-point-tangent-slope", pr["A"][::6], builders[0]),
+        Frame("mc-outer-point-tangent-y-intercept", pr["B"][::6], builders[1]),
+        Frame("mc-outer-point-tangent-line-value", pr["C"][::24], builders[2]),
+    ]
+
+    class ProtoGen(P3DiffSlotGenerator):
+        standard_code: ClassVar[str] = STD
+        concept_src_id: ClassVar[str] = "H:12미적Ⅰ02-05"
+        unit_code: ClassVar[str] = "P3-CALC1-DIFF-TANGENT-LINE"
+        slug_prefix: ClassVar[str] = "wm-p3-proto-outer"
+        slot_difficulty: ClassVar[dict[str, float]] = {"misconception_trigger": 3.0}
+        slots: ClassVar[tuple] = ("misconception_trigger",)
+        slot_count: ClassVar[int] = count
+
+        @classmethod
+        def _slot_items(cls, slot, claimed):
+            return round_robin_items(frames, cls.slot_count, claimed=claimed, standard_code=STD)
+
+    return ProtoGen, frames
+
+
+# ───────────────────────── 독립 재도출 (발문 텍스트만 읽는다) ─────────────────────────
+_STEM = re.compile(
+    r"^점 \((?P<p>-?\d+), (?P<q>-?\d+)\)에서 곡선 y = (?P<f>.+?)에 그은 접선"
+)
+
+
+def _sym(text: str) -> sympy.Expr:
+    text = re.sub(r"(\d)([a-z])", r"\1*\2", text.replace("^", "**"))
+    return safe_sympify(text)
+
+
+def parse_stem(text: str):
+    m = _STEM.match(text)
+    if m is None:
+        return None
+    f = sympy.expand(_sym(m.group("f")))
+    kind = (
+        "slope+" if "접점의 x좌표가 양수인 것의 기울기" in text
+        else "slope" if "기울기로 옳은 것은" in text
+        else "intercept" if "y절편으로 옳은 것은" in text
+        else "value" if "g(" in text
+        else None
+    )
+    s = None
+    if kind == "value":
+        s = int(re.search(r"g\((-?\d+)\)의 값", text).group(1))
+    return int(m.group("p")), int(m.group("q")), f, kind, s
+
+
+def independent_tangents(f: sympy.Expr, p: int, q: int) -> list[tuple[sympy.Expr, sympy.Expr]]:
+    """판별식 경로: 기울기 m 의 직선 y = m(x-p)+q 가 접하는 m 과 접점 x 를 (m, 접점) 쌍으로. t-접근과 독립."""
+    m = sympy.Symbol("m")
+    h = sympy.expand(f - (m * (X - p) + q))
+    disc = sympy.Poly(sympy.discriminant(h, X), m)
+    out = []
+    for mi in sorted(set(sympy.real_roots(disc)), key=float):
+        hm = sympy.Poly(h.subs(m, mi), X)
+        gd = sympy.gcd(hm, hm.diff(X))
+        xs = sympy.roots(gd)
+        out.append((mi, list(xs)[0]))
+    return out
+
+
+def m0673_procedure_value(text: str) -> sympy.Expr | None:
+    """M0673 오개념 절차(P*)의 산출 — 발문 텍스트만으로 재도출. 모르는 틀이면 None(fail-closed)."""
+    parsed = parse_stem(text)
+    if parsed is None or parsed[3] is None:
+        return None
+    p, q, f, kind, s = parsed
+    if sympy.expand(f.subs(X, p)) == q:
+        return None  # 곡선 위의 점 — M0673 상황(곡선 밖의 점)이 아니다
+    slope = sympy.diff(f, X).subs(X, p)
+    if kind in ("slope", "slope+"):
+        return slope
+    if kind == "intercept":
+        return q - p * slope
+    return q + slope * (s - p)
+
+
+def correct_value(text: str) -> sympy.Expr | None:
+    parsed = parse_stem(text)
+    if parsed is None:
+        return None
+    p, q, f, kind, s = parsed
+    pairs = independent_tangents(f, p, q)
+    if kind == "slope+":
+        pairs = [(mi, t) for mi, t in pairs if t > 0]
+    if len(pairs) != 1:
+        return None  # 정답이 유일하지 않다
+    mi, t = pairs[0]
+    if kind in ("slope", "slope+"):
+        return mi
+    if kind == "intercept":
+        return sympy.expand(f.subs(X, t) - t * mi)
+    return f.subs(X, t) + mi * (s - t)
+
+
+def m0673_link_violations(probe: ShortcutProbe) -> list[str]:
+    """[판정기 확장 시안] M0673 귀속 선지가 P* 산출과 다르면 위반 — 현행 `_misconception_rules`에는 이 절이 없다."""
+    out = []
+    labeled = [i for i, mid in probe.distractors if mid == MID]
+    if not labeled:
+        return out
+    star = m0673_procedure_value(probe.question_text)
+    if star is None:
+        return ["M-link-procedure(M0673): 발문을 읽지 못했거나 곡선 위의 점이다 — 절차 값 판정 불가"]
+    for i in labeled:
+        val = sympy.sympify(probe.choices[i])
+        if val != star:
+            out.append(f"M-link-procedure(M0673): 선지 {probe.choices[i]} != 절차 산출 {star}")
+    return out
+
+
+# ───────────────────────── 검증 실행 ─────────────────────────
+def load_bank(name: str):
+    rows = [json.loads(l) for l in open(CORPUS / name / "problems.jsonl", encoding="utf-8")]
+    stems = {fold_stem(r["question_text"]) for r in rows}
+    conds = set()
+    for r in rows:
+        c = (r.get("verify") or {}).get("conditions")
+        if isinstance(c, str):
+            conds.add(c)
+        elif isinstance(c, list):
+            conds.add("&&".join(c))
+    return stems, conds
+
+
+def main() -> int:
+    fails: list[str] = []
+
+    def check(cond: bool, msg: str) -> None:
+        if not cond:
+            fails.append(msg)
+
+    Gen, frames = make_generator(48)
+    items = Gen.items("misconception_trigger")  # 베이스가 균일성·우회로 판정기·풀이 단계 도출을 모두 강제한다
+    print(f"[생성] 인스턴스 {len(items)}건 (베이스 _validate_slot 통과 = 우회로 판정기 위반 0 · 풀이 단계 전이 전건 correct)")
+    by_frame: dict[str, int] = {}
+    for it in items:
+        by_frame[it.frame_id] = by_frame.get(it.frame_id, 0) + 1
+    print("  틀별:", by_frame)
+    check(len(items) >= 40, "인스턴스 40건 미만")
+
+    bank_stems, bank_conds = set(), set()
+    for name in ("problem_bank_p3_calculus1_diff_v0", "problem_bank_p3_fill_v0"):
+        s, c = load_bank(name)
+        bank_stems |= s
+        bank_conds |= c
+
+    seen_stem, seen_cond = set(), set()
+    for it in items:
+        q = it.question_text
+        # 1. 정답이 SymPy 로 옳다 — 발문만 읽는 독립 경로(판별식) 와 일치
+        want = correct_value(q)
+        check(want is not None and sympy.sympify(it.answer_text) == want, f"정답 불일치: {q} -> {it.answer_text} vs {want}")
+        # 2. 오개념 선택지 값 == 오개념 절차 산출 (발문만으로 재도출)
+        star = m0673_procedure_value(q)
+        labeled = [it.choices[i] for i, mid in it.distractors if mid == MID]
+        check(len(labeled) == 1, f"M0673 귀속 선지가 1개가 아니다: {q}")
+        check(star is not None and all(sympy.sympify(v) == star for v in labeled), f"절차 산출 불일치: {q}")
+        # 3. 오개념 선택지 != 정답, 선택지 4개 서로 다름
+        check(all(v != it.answer_text for v in labeled), f"오개념 선지 == 정답: {q}")
+        check(len(set(it.choices)) == 4 and len(it.choices) == 4, f"선택지 중복: {q}")
+        check(it.answer_text in it.choices, f"정답이 선지에 없다: {q}")
+        # 4. 곡선 밖의 점 (M0673 상황이 발생)
+        p, qq, f, kind, s = parse_stem(q)
+        check(sympy.expand(f.subs(X, p)) != qq, f"곡선 위의 점: {q}")
+        # 5. Tier1 (원 조건에 정답 대입) — 판별식 독립 경로
+        v = verify_answer(it.conditions if isinstance(it.conditions, str) else list(it.conditions), dict(it.answer_map))
+        check(v.state == "pass", f"Tier1 {v.state}: {q}")
+        # 6. 우회로 판정기 위반 0 (+ 시안 규칙)
+        probe = probe_of(STD, it)
+        viol = shortcut_violations(probe)
+        check(not viol, f"우회로 위반 {viol}: {q}")
+        check(not m0673_link_violations(probe), f"M0673 시안 규칙 위반: {q}")
+        # 7. 기존 두 은행과 문면 골격·검산 조건 중복 0
+        fold = skeleton_of(q)
+        check(fold_stem(q) not in bank_stems, f"기존 은행과 문면 골격 중복: {q}")
+        ck = it.conditions if isinstance(it.conditions, str) else "&&".join(it.conditions)
+        check(ck not in bank_conds, f"기존 은행과 검산 조건 중복: {q}")
+        check(ck not in seen_cond, f"이번 묶음 내 검산 조건 중복: {q}")
+        seen_cond.add(ck)
+        seen_stem.add(fold_stem(q))
+        # 8. 문제유형 → 스킬 (정직성은 design 문서에 서술; 여기서는 코드값만 확인)
+        check(it.problem_type_code == SOLVE, "문제유형 코드")
+    print(f"  문면 골격(숫자 접기) 고유 수: {len(seen_stem)} / {len(items)}건")
+
+    # 샘플 출력 (틀별 1건)
+    shown = set()
+    for it in items:
+        if it.frame_id in shown:
+            continue
+        shown.add(it.frame_id)
+        print("\n── 샘플:", it.frame_id)
+        print("  발문:", it.question_text)
+        print("  선지:", it.choices, "정답:", it.answer_text, "귀속:", it.distractors)
+        print("  해설:", it.explanation)
+        print("  검산 조건:", it.conditions)
+        print("  풀이 단계:", steps_of(it).steps, steps_of(it).strategy)
+
+    # 수용 게이트 전체(저작권·정확성·위생·LaTeX) — 베이스 generate() 경로로 N건
+    from whymath_backend.l3.equivalent.acceptance import evaluate_equivalent_candidate
+
+    gen = Gen(slot="misconception_trigger")
+    spec = Gen.spec_for("misconception_trigger")
+    verdicts: dict[str, int] = {}
+    n_gate = 0
+    while (cand := gen.generate(spec)) is not None and n_gate < len(items):
+        n_gate += 1
+        verdict = evaluate_equivalent_candidate(
+            spec,
+            cand.problem,
+            provenance=cand.provenance,
+            conditions=cand.conditions,
+            answer_map=cand.answer_map,
+            solution_steps=cand.solution_steps,
+        )
+        key = f"accepted={verdict.accepted}/verif={verdict.verification}/hyg={verdict.hygiene_ok}/latex={verdict.latex_ok}/eq={verdict.equivalence}"
+        verdicts[key] = verdicts.get(key, 0) + 1
+        if not verdict.accepted:
+            print("   게이트 거부 사유:", verdict.reasons[:3], cand.problem.question_text[:60])
+    print(f"\n[수용 게이트 S2-a] {n_gate}건 판정 분포: {verdicts}")
+
+    # ───── 변별 주입 ─────
+    print("\n[변별 주입] 단언이 위장이 아님을 확인 — 전부 '검출'이어야 한다")
+    base = items[0]
+    probe0 = probe_of(STD, base)
+
+    def inject_label(item: DiffItem, idx: int) -> ShortcutProbe:
+        p0 = probe_of(STD, item)
+        return ShortcutProbe(**{**p0.__dict__, "distractors": ((idx, MID),)}) if False else ShortcutProbe(
+            standard_code=p0.standard_code, question_text=p0.question_text, answer=p0.answer,
+            explanation=p0.explanation, choices=p0.choices, conditions=p0.conditions,
+            answer_map=p0.answer_map, answer_kind=p0.answer_kind, answer_format=p0.answer_format,
+            distractors=((idx, MID),), slot=p0.slot,
+        )
+
+    star_idx = next(i for i, mid in base.distractors if mid == MID)
+    other_idx = next(i for i in range(4) if i != star_idx and base.choices[i] != base.answer_text)
+    correct_idx = base.choices.index(base.answer_text)
+    inj = {
+        "I1 무관한 오답을 M0673 로 라벨": inject_label(base, other_idx),
+        "I2 정답 자체를 M0673 로 라벨": inject_label(base, correct_idx),
+    }
+    for name, pr in inj.items():
+        mine = m0673_link_violations(pr)
+        repo = shortcut_violations(pr)
+        repo_m = [v for v in repo if v.rule.startswith("M-link")]
+        print(f"  {name}: 시안 규칙 {'검출' if mine else '놓침'}({len(mine)}) · 현행 판정기 M-link {len(repo_m)}건 / 전체 위반 {len(repo)}건")
+        check(bool(mine), f"주입 놓침: {name}")
+    # I3 곡선 위의 점으로 만든 발문 — 시안 규칙이 '절차 판정 불가'로 막는다
+    p, qq, f, kind, s = parse_stem(base.question_text)
+    on_curve = base.question_text.replace(f"({p}, {qq})", f"({p}, {int(f.subs(X, p))})", 1)
+    pr3 = ShortcutProbe(
+        standard_code=STD, question_text=on_curve, answer=base.answer_text, explanation=base.explanation,
+        choices=base.choices, conditions=(base.conditions if isinstance(base.conditions, str) else base.conditions[0],),
+        distractors=((star_idx, MID),),
+    )
+    mine3 = m0673_link_violations(pr3)
+    print(f"  I3 곡선 위의 점으로 바꾼 발문: 시안 규칙 {'검출' if mine3 else '놓침'}")
+    check(bool(mine3), "I3 놓침")
+    # I4 (p, f(p)) 를 접점으로 읽는 변형 값(y절편·g(s) 틀에서 P* 와 다르다)을 라벨 — 절차 하나로 못 박았음을 확인
+    ib = next((it for it in items if it.frame_id == "mc-outer-point-tangent-y-intercept"), None)
+    if ib is not None:
+        pb, qb, fb, kb, sb = parse_stem(ib.question_text)
+        variant = int(fb.subs(X, pb) - pb * sympy.diff(fb, X).subs(X, pb))
+        if str(variant) not in ib.choices:
+            ch = list(ib.choices)
+            ch[next(i for i in range(4) if i != ib.choices.index(ib.answer_text) and ch[i] != ib.choices[next(j for j, m_ in ib.distractors if m_ == MID)])] = str(variant)
+            pv = ShortcutProbe(
+                standard_code=STD, question_text=ib.question_text, answer=ib.answer_text,
+                explanation=ib.explanation, choices=tuple(ch),
+                conditions=(ib.conditions if isinstance(ib.conditions, str) else ib.conditions[0],),
+                distractors=((ch.index(str(variant)), MID),),
+            )
+            minev = m0673_link_violations(pv)
+            print(f"  I4 변형 절차((p, f(p))를 접점)의 값 {variant}을 라벨: 시안 규칙 {'검출' if minev else '놓침'}")
+            check(bool(minev), "I4 놓침")
+    # I5 정답 위치에 틀린 정답 — 독립 정답 재도출이 잡는지
+    wrong_answer_ok = sympy.sympify(base.answer_text) != correct_value(base.question_text) + 1
+    check(wrong_answer_ok, "I5 정답 재도출 변별")
+    print(f"  I5 정답을 +1 한 값은 독립 재도출과 {'불일치(검출)' if wrong_answer_ok else '일치(놓침)'}")
+
+    # I6 접선이 셋인 점에 '하나뿐이다'를 붙인 발문 — 독립 정답 재도출이 '유일하지 않음'으로 거부하는가
+    f6, p6, q6 = d_params_from_roots()[0]
+    bad_stem = f"점 ({p6}, {q6})에서 곡선 y = {render_poly(f6)}에 그은 접선은 하나뿐이다. 이 접선의 기울기로 옳은 것은?"
+    got6 = correct_value(bad_stem)
+    print(f"  I6 접선이 셋인 점에 '하나뿐이다'를 붙임: 독립 재도출 {'거부(검출)' if got6 is None else '통과(놓침)'}")
+    check(got6 is None, "I6 놓침")
+
+    print("\n[결과]", "FAIL" if fails else "PASS", f"— 단언 실패 {len(fails)}건")
+    for m_ in fails[:20]:
+        print("  -", m_)
+    return 1 if fails else 0
+
+
+def capacity(tags: tuple[str, ...] = ("A", "B", "C")) -> None:
+    """틀별 파라미터 공간 전수 — 서로 다른 인스턴스 수·문면 골격 수·규칙별 탈락 (실행: --capacity)."""
+    import collections
+    import time
+
+    builders = build_frames()
+    pr = full_params()
+    claimed: dict[str, set[str]] = {}
+    for tag, bi in (("A", 0), ("B", 1), ("C", 2)):
+        if tag not in tags:
+            continue
+        t_start = time.time()
+        raw = len(pr[tag])
+        built = coincide = 0
+        viol_rules: collections.Counter = collections.Counter()
+        conds: set[str] = set()
+        stems: set[str] = set()
+        texts: set[str] = set()
+        for par in pr[tag]:
+            it = builders[bi](par)
+            if it is None:
+                continue
+            built += 1
+            pb = probe_of(STD, it)
+            if parameter_coincidences(pb):
+                coincide += 1
+                continue
+            vs = shortcut_violations(pb)
+            if vs:
+                for v in vs:
+                    viol_rules[v.rule] += 1
+                continue
+            ck = it.conditions if isinstance(it.conditions, str) else "&&".join(it.conditions)
+            if ck in conds or it.question_text in texts:
+                continue
+            conds.add(ck)
+            texts.add(it.question_text)
+            stems.add(fold_stem(it.question_text))
+        print(
+            f"[용량 {tag}] 후보 {raw} → 빌더 통과 {built} → 우연일치 거부 {coincide} · "
+            f"비우연 위반 {sum(viol_rules.values())}{dict(viol_rules)} → 검산 조건 고유 {len(conds)} · "
+            f"문면 골격 고유 {len(stems)}  ({time.time() - t_start:.0f}s)"
+        )
+    if "D" not in tags:
+        return
+    dp = d_params_from_roots()
+    ok = sum(1 for par in dp if builders[3](par) is not None)
+    print(f"[용량 D(접선 셋·접점 양수 유일화)] 정수 근 3개 역산 후보 {len(dp)} → 수치 한도(|값| <= 99)·변별 조건 통과 {ok}")
+
+
+def chain() -> int:
+    """사슬 4조건을 계측기 코드(`phase3_coverage._facts`)로 직접 재현 — 실제 코퍼스 + 이 틀의 문항을 승인된 것으로 가정.
+
+    (a) approved (b) PRIMARY (c) 문제유형→스킬 겹침 (d) 오답 보기가 핵심 오개념 도달. 대조군 3종으로 변별을 확인한다.
+    """
+    import dataclasses
+
+    from whymath_backend.l1.standards import phase3_coverage as pc
+    from whymath_backend.l1.standards.phase3_scope import (
+        default_spec_path,
+        load_reference_index,
+        load_scope_spec,
+    )
+
+    spec = load_scope_spec(default_spec_path())
+    index = load_reference_index(spec)
+    corpus = pc.load_corpus(spec)
+    concept = next(c for c in spec.concepts if c.source_id == "H:12미적Ⅰ02-05")
+    base = pc._facts(spec, index, corpus, concept)
+    print(f"[사슬] 02-05 현행: 스킬 {base.skills} · 승인 문항 {len(base.eligible)} · 스킬연결 {len(base.skill_linked)} · 사슬 {len(base.chain_problems)} · 핵심 오개념 {base.core_misconceptions}")
+    Gen, _ = make_generator(48)
+    items = Gen.items("misconception_trigger")
+
+    def rows(ptype: str, mid: str, status: str = "approved", primary: bool = True):
+        out = []
+        for n, it in enumerate(items):
+            out.append(
+                {
+                    "problem_id": f"proto-{n}",
+                    "concepts": [{"role": "PRIMARY" if primary else "RELATED", "concept_src_id": "H:12미적Ⅰ02-05"}],
+                    "review_status": status,
+                    "problem_type_codes": [ptype],
+                    "distractor_map": [{"choice_index": i, "misconception_id": mid} for i, _ in it.distractors],
+                    "answer_explanation": it.explanation,
+                    "verify": {"solution_steps": list(steps_of(it).steps)},
+                    "answer": it.answer_text,
+                    "question_text": it.question_text,
+                    "difficulty_overall": 3.0,
+                    "tags": ["p3-slot:misconception_trigger"],
+                }
+            )
+        return [pc.problem_ref_from_row(r) for r in out]
+
+    def measure(label: str, **kw) -> int:
+        refs = rows(**kw)
+        c2 = dataclasses.replace(corpus, problems=corpus.problems + tuple(refs))
+        f2 = pc._facts(spec, index, c2, concept)
+        n_new = sum(1 for p in f2.chain_problems if p.problem_id.startswith("proto-"))
+        print(f"  {label}: 사슬 문항 {len(f2.chain_problems)} (이 틀 {n_new}건)")
+        return n_new
+
+    ok = measure("본 설계 (approved·PRIMARY·solve-for-unknown·M0673)", ptype=SOLVE, mid=MID) == len(items)
+    c1 = measure("대조 (c): evaluate-expression 유형", ptype="ptype.evaluate-expression", mid=MID) == 0
+    c2 = measure("대조 (d): 오개념 M0671(02-03 핵심)로 라벨", ptype=SOLVE, mid="M0671") == 0
+    c3 = measure("대조 (a): review_status 미승인", ptype=SOLVE, mid=MID, status="draft") == 0
+    c4 = measure("대조 (b): PRIMARY 아님", ptype=SOLVE, mid=MID, primary=False) == 0
+    print("[사슬 판정]", "PASS" if ok and c1 and c2 and c3 and c4 else "FAIL")
+    return 0 if ok and c1 and c2 and c3 and c4 else 1
+
+
+if __name__ == "__main__":
+    if "--chain" in sys.argv:
+        sys.exit(chain())
+    if "--capacity" in sys.argv:
+        rest = tuple(a for a in sys.argv[sys.argv.index("--capacity") + 1 :] if a in "ABCD")
+        capacity(rest or ("A", "B", "C", "D"))
+        sys.exit(0)
+    sys.exit(main())

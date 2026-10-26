@@ -1,4 +1,5 @@
 """푸시·PR 생성 시점의 CI 미러 고지 — 미러 결과 커밋이 푸시 대상 HEAD와 다르면 알린다 (HARN-209).
+푸시는 여기서 한 걸음 더 나아가 **막는다** (HARN-308 — 아래 "차단" 절).
 
 왜 있는가 (판정 문서 = `docs/reviews/harn209_push_time_mirror_notice_judgment_2026-10-08.md`):
   `done`의 미러 게이트(HARN-173)는 완료 선언 시점에만 선다. `/drive` 순서가 커밋 → PR(푸시) →
@@ -6,8 +7,10 @@
   **직전**에 "이 커밋은 로컬 CI 미러를 거치지 않았다"를 알리고,
   PR 본문에 싣을 도달 잡 섹션을 만든다.
 
-고지만 한다 — 막지 않는다. 측정 전 차단은 데이터 공백(푸시 시점 불일치 빈도는 한 번도 기록된 적이
-없다) 위에 강제를 얹는 것이다. 대신 평가한 모든 푸시를 로그로 남겨 공백을 메운다(훅 쪽 책임).
+PR 생성은 고지만 한다 — 막지 않는다. 푸시는 HARN-308부터 막는다: HARN-209는 측정 전 차단이 데이터
+공백 위의 강제라 고지만 걸고 모든 푸시를 로그로 남겼는데(훅 쪽 책임), 2026-10-09 P3-03(PR #1512)에서
+고지가 두 번 무시됐고(재시도는 중복 억제로 아예 침묵) 두 번째 푸시가 상시 잡 `infra-contracts`에서
+red가 됐다. 판정 문서 = `docs/reviews/harn308_push_block_judgment_2026-10-12.md`.
 
 "코드 없는 푸시"를 가려내는 방법 (판정 문서 §4):
   `ci_job_coverage scope`로는 못 가려낸다 — 상시 잡 6개가 모든 diff에 닿고, 원 사고(EOS-24)의 누락
@@ -37,7 +40,7 @@ import re
 import shlex
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -684,18 +687,293 @@ def render_notice(
     return "\n".join(lines)
 
 
+# ── 차단 (HARN-308) ─────────────────────────────────────────────────────────
+#
+# 고지는 "막지 않는 알림"이고 같은 (트리거·HEAD·사유)를 한 번만 알린다. 2026-10-09 P3-03
+# (PR #1512)에서 그 설계가 그대로 구멍이 됐다 — 세션이 고지를 보고도 푸시했고, 재시도는 중복
+# 억제로 아예 침묵했으며, 두 번째 푸시가 로컬에서 한 번도 돌리지 않은 상시 잡
+# `infra-contracts`에서 red가 됐다. 고지·산문이 2회 이상 뚫리면 코드로 막는다(CLAUDE.md 실수 관리).
+#
+# 차단하는 것 = 이 HEAD의 내용이 **필수 상시 잡 전부**의 로컬 미러를 거치지 않았다는 증거가 있을 때.
+# 필수 상시 잡 = 필터와 무관하게 매 PR에서 도는 잡 중 로컬 재현이 가능한 것(`ci_mirror run`이 자동
+# 선택으로 돌리는 잡과 같다 — `changes` 필터 계산 잡은 미러가 대신 읽으므로 제외).
+# 경로 필터가 깨운 잡(backend 등)은 요구하지 않는다: 전체 백엔드 스위트는 한 번에 수십 분이라
+# 푸시마다 강제할 비용이 아니고, 상시 잡은 모든 diff에 닿아 "닿는 잡"을 가려낼 필요가 없다
+# (판정 문서 §4).
+
+GATE_ALLOW = "allow"  # 막지 않는다 (고지는 별개)
+GATE_BLOCK = "block"  # 거부 — 훅이 종료 코드 2로 낸다
+GATE_WAIVED = "waived"  # 막았을 상태를 사유 있는 면제로 통과 (이벤트 대장에 기록됨)
+
+#: 미러 결과는 이 HEAD에 대해 통과였지만 필수 상시 잡 중 돌았다는 증거가 없는 잡이 있다.
+BLOCK_JOBS_MISSING = "mirror_missing_jobs"
+
+#: 우회 이벤트의 `action` — `waive` 서브커맨드가 대장에 쓰고, 게이트가 현재 세션 샤드에서 읽는다.
+WAIVER_ACTION = "push_mirror_waiver"
+
+#: 이 HEAD의 내용이 로컬 미러를 거치지 않았다(결과 없음·다른 커밋·형식 불량·실패·아직 없는 커밋).
+_BLOCKING_NOTIFY_CODES: frozenset[str] = frozenset(
+    {
+        NOTIFY_NO_RESULT,
+        NOTIFY_OTHER_COMMIT,
+        NOTIFY_RESULT_UNUSABLE,
+        NOTIFY_FAILED,
+        NOTIFY_HEAD_MOVES,
+    }
+)
+#: 미러 결과가 통과(또는 미실행)로 읽힌 경우 — 이때만 결과 안의 잡 구성을 따져 본다.
+_MIRRORED_SILENT_CODES: frozenset[str] = frozenset(
+    {SILENT_PASS, SILENT_NOT_EXECUTED, SILENT_SAME_CONTRIBUTION}
+)
+
+_BLOCK_HEADLINE: dict[str, str] = {
+    NOTIFY_NO_RESULT: "이 커밋에 대한 로컬 CI 미러 결과가 없다",
+    NOTIFY_OTHER_COMMIT: "로컬 CI 미러 결과가 다른 커밋의 것이다(이 내용은 측정되지 않았다)",
+    NOTIFY_RESULT_UNUSABLE: "로컬 CI 미러 결과를 판정할 수 없다(형식·오염·잡 0건)",
+    NOTIFY_FAILED: "로컬 CI 미러가 실패로 끝났다",
+    NOTIFY_HEAD_MOVES: "같은 명령이 만드는 새 커밋은 로컬 CI 미러를 거칠 수 없다",
+    BLOCK_JOBS_MISSING: "미러 결과에 필수 상시 잡 일부가 돈 증거가 없다",
+}
+
+
+def _ci_job_coverage() -> Any:
+    """`ci_job_coverage` 모듈 — `_ci_mirror`와 같은 이유로 호출 시점에 임포트한다."""
+    harness_dir = str(Path(__file__).resolve().parent)
+    if harness_dir not in sys.path:
+        sys.path.append(harness_dir)
+    import ci_job_coverage  # noqa: PLC0415
+
+    return ci_job_coverage
+
+
+def _store() -> Any:
+    """`store` 모듈 — 이벤트 대장 읽기·쓰기 창구(샤드 이름 규칙을 한 곳에서 정한다)."""
+    harness_dir = str(Path(__file__).resolve().parent)
+    if harness_dir not in sys.path:
+        sys.path.append(harness_dir)
+    import store  # noqa: PLC0415
+
+    return store
+
+
+def required_always_jobs(root: Path) -> tuple[tuple[str, ...], str | None]:
+    """(필수 상시 잡 이름들, 계산 실패 시 예외 타입명). 워크플로가 없는 저장소는 ((), None).
+
+    잡 선택은 `ci_mirror run`의 자동 선택과 같은 정본(`classify_jobs`)에서 읽는다 — 이 목록과
+    미러가 실제로 돌리는 잡이 갈라지면 "요구하는데 돌릴 수 없는 잡"이 영구 차단을 만든다.
+    워크플로가 있는데 상시 잡이 0건이면 읽기 실패와 같다(스캔 0건은 통과가 아니다).
+    """
+    workflow_path = root / DEFAULT_WORKFLOW
+    if not workflow_path.exists():
+        return (), None
+    try:
+        coverage = _ci_job_coverage()
+        scopes = coverage.classify_jobs(coverage.load_workflow(workflow_path), [])
+        jobs = tuple(
+            s.name
+            for s in scopes
+            if s.status == coverage.ALWAYS
+            and s.env.reproducible_locally
+            and s.name != coverage.FILTER_JOB
+        )
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001  (필수 잡 목록은 부가 판정 축 — 실패는 타입명으로 남기고 그 축만 건너뛴다)
+        return (), type(exc).__name__
+    if not jobs:
+        return (), "EmptyAlwaysJobScan"
+    return jobs, None
+
+
+def jobs_missing(payload: Mapping[str, Any] | None, required: Sequence[str]) -> tuple[str, ...]:
+    """필수 잡 중 이 미러 결과에 **돌았다는 증거**가 없는 것.
+
+    증거 = 결과에 그 이름의 잡이 있고, 종료 코드가 0이고, 통과한 스텝이 하나 이상 있다. 스텝이
+    전부 환경 전제(액션)·미실행인 기록은 잡이 돈 것이 아니다 — 스캔 0건은 통과가 아니다.
+    """
+    passed = _ci_mirror().PASSED
+    ran: set[str] = set()
+    jobs = payload.get("jobs") if isinstance(payload, Mapping) else None
+    for job in jobs if isinstance(jobs, list) else []:
+        if not isinstance(job, Mapping) or job.get("exit"):
+            continue
+        steps = job.get("steps")
+        if isinstance(steps, list) and any(
+            isinstance(s, Mapping) and s.get("status") == passed for s in steps
+        ):
+            ran.add(str(job.get("name", "")))
+    return tuple(name for name in required if name not in ran)
+
+
+def find_waiver(
+    root: Path, head: str, *, base: str = DEFAULT_BASE
+) -> tuple[str | None, str | None]:
+    """(우회 사유, 조회 오류 타입명). 현재 세션(브랜치) 대장 샤드에서 이 HEAD의 우회를 찾는다.
+
+    다른 세션의 우회는 읽지 않는다 — 남의 사유로 내 푸시가 열리면 안 된다. 사유가 비었거나 공백뿐인
+    기록(수기 편집)은 우회가 아니다. 우회 당시 HEAD가 아니어도 **트렁크 대비 기여(대장 기록 제외)가
+    blob까지 같으면** 같은 내용이므로 유효하다 — 우회한 푸시 뒤 `done`의 대장 커밋이 다시 막히면
+    안 된다(면제 B와 같은 논리). 읽기에 실패하면 우회 없음으로 접는다(열지 않는 쪽이 안전하다).
+    """
+    try:
+        store = _store()
+        shard_name = store.session_shard_name(store.current_branch(root))
+        shard = store.backlog_dir(root) / "events" / shard_name
+        lines = shard.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return None, None
+    except (ImportError, OSError, ValueError) as exc:
+        return None, type(exc).__name__
+    records: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        reason = record.get("reason") if isinstance(record, dict) else None
+        if (
+            isinstance(record, dict)
+            and record.get("action") == WAIVER_ACTION
+            and isinstance(record.get("head"), str)
+            and isinstance(reason, str)
+            and reason.strip()
+        ):
+            records.append(record)
+    current: dict[str, str] | None = None
+    for record in reversed(records):
+        if record["head"] == head:
+            return str(record["reason"]).strip(), None
+        if current is None:
+            try:
+                current = _substantive(contribution(root, base, head))
+            except (OSError, subprocess.SubprocessError, GitQueryError):
+                return None, None  # 지금 내용을 모르면 같은 내용이라고 접지 않는다
+        try:
+            waived = _substantive(contribution(root, base, record["head"]))
+        except (OSError, subprocess.SubprocessError, GitQueryError):
+            continue  # 우회 당시 커밋이 사라졌다(재작성) — 이 기록은 같은 내용임을 증명하지 못한다
+        if current and waived == current:
+            return str(record["reason"]).strip(), None
+    return None, None
+
+
+@dataclass(frozen=True)
+class PushGate:
+    """푸시 하나에 대한 차단 판정 — `outcome`이 `block`이면 훅이 종료 코드 2로 거부한다."""
+
+    outcome: str
+    #: 차단·우회의 사유 코드(고지 사유 코드 또는 `BLOCK_JOBS_MISSING`). 허용이면 평가 사유 그대로.
+    code: str
+    required_jobs: tuple[str, ...] = ()
+    #: 이 HEAD에 대해 돌았다는 증거가 없는 필수 상시 잡.
+    missing_jobs: tuple[str, ...] = ()
+    #: 필수 잡 목록 계산이 실패했을 때의 예외 타입명(그 축은 건너뛴다 — 로그에 남긴다).
+    required_error: str | None = None
+    waiver_reason: str | None = None
+    waiver_error: str | None = None
+
+    @property
+    def blocked(self) -> bool:
+        return self.outcome == GATE_BLOCK
+
+
+def push_gate(
+    root: Path,
+    assessment: Assessment,
+    *,
+    base: str = DEFAULT_BASE,
+    result_path: Path | None = None,
+    required_jobs: Sequence[str] | None = None,
+) -> PushGate:
+    """평가(`assess`) 결과를 차단 판정으로 옮긴다.
+
+    · 면제(대장 기록만·브랜치 변경 없음)·측정 불가(`unavailable`)·PR 본문 사유는 **막지 않는다** —
+      판정하지 못한 것을 막으면 훅 자신의 고장이 모든 푸시를 막고 사람이 훅을 끈다.
+    · 미러 결과가 없다·다른 커밋·형식 불량·실패·아직 없는 커밋이면 막는다.
+    · 통과(미실행 포함)로 읽혀도 필수 상시 잡 중 돈 증거가 없는 잡이 있으면 막는다.
+    · 막을 상태라도 현재 세션 대장에 사유 있는 우회가 있으면 통과(`waived`)시킨다.
+    """
+    code = assessment.code
+    if code not in _BLOCKING_NOTIFY_CODES and code not in _MIRRORED_SILENT_CODES:
+        return PushGate(GATE_ALLOW, code)
+    if required_jobs is not None:
+        required, required_error = tuple(required_jobs), None
+    else:
+        required, required_error = required_always_jobs(root)
+    if code in _BLOCKING_NOTIFY_CODES:
+        block_code = code
+        missing = required
+    else:
+        mirror = _ci_mirror()
+        payload = mirror.load_payload(result_path or (root / mirror.DEFAULT_RESULT_PATH))
+        missing = jobs_missing(payload, required)
+        if not missing:
+            return PushGate(GATE_ALLOW, code, required, (), required_error)
+        block_code = BLOCK_JOBS_MISSING
+    reason: str | None = None
+    waiver_error: str | None = None
+    # 아직 없는 커밋(같은 명령이 만드는 커밋)은 우회할 대상 자체가 없다.
+    if assessment.head and code != NOTIFY_HEAD_MOVES:
+        reason, waiver_error = find_waiver(root, assessment.head, base=base)
+    outcome = GATE_WAIVED if reason else GATE_BLOCK
+    return PushGate(outcome, block_code, required, missing, required_error, reason, waiver_error)
+
+
+def render_block(assessment: Assessment, gate: PushGate) -> str:
+    """차단 문구 — 이유와 **다음에 실행할 명령**을 함께 낸다. 훅이 stderr 바이트(UTF-8)로 전한다."""
+    head = (assessment.head or "?")[:12]
+    lines = [
+        "[CI 미러 차단 · 푸시 직전] HARN-308 — 이 푸시는 거부되었습니다 (훅 종료 코드 2).",
+        f"- 이유: {_BLOCK_HEADLINE.get(gate.code, gate.code)} (HEAD {head}).",
+    ]
+    if assessment.detail:
+        lines.append(f"  · {assessment.detail.splitlines()[0]}")
+    if assessment.error_type:
+        lines.append(f"  · 조회 오류 타입: {assessment.error_type}")
+    if gate.missing_jobs:
+        names = ", ".join(gate.missing_jobs)
+        lines.append(f"  · 이 HEAD에 대해 돈 증거가 없는 필수 상시 잡: {names}")
+    if gate.required_error:
+        lines.append(f"  · 필수 상시 잡 목록 계산 오류 타입: {gate.required_error}")
+    if gate.waiver_error:
+        lines.append(f"  · 우회 기록 조회 오류 타입: {gate.waiver_error}")
+    if gate.code == NOTIFY_HEAD_MOVES:
+        lines.append(
+            "- 해소: 커밋과 푸시를 같은 명령에 묶지 마세요. 먼저 커밋하고, 미러를 돌린 뒤, 푸시를 "
+            "따로 하세요."
+        )
+    lines.append(
+        "- 해소: `python3 scripts/harness/ci_mirror.py run --prepend-path <python 디렉터리>` — "
+        "상시 잡을 포함해 이 HEAD를 재현하고, 통과(또는 미실행)면 같은 푸시를 다시 하세요. "
+        "같은 푸시를 되풀이해도 이 거부는 풀리지 않습니다."
+    )
+    lines.append(
+        "- 로컬에서 재현할 수 없는 환경이면: "
+        "`python3 scripts/harness/push_mirror_notice.py waive --reason '<사유>'` 를 실행한 뒤 같은 "
+        "푸시를 다시 하세요. 사유는 이벤트 대장에 남고(무사유 면제는 없습니다), 이 HEAD의 내용에만 "
+        "유효합니다."
+    )
+    lines.append(
+        "- 푸시 없이 미리 확인: `python3 scripts/harness/push_mirror_notice.py gate` "
+        "(차단이면 종료 코드 1)"
+    )
+    return "\n".join(lines)
+
+
 # ── 진입점: 트리거별 (평가 + 고지문) ─────────────────────────────────────────
 
 
 @dataclass(frozen=True)
 class NoticeResult:
-    """훅이 쓰는 한 건의 결과 — `text`가 None이면 침묵한다."""
+    """훅이 쓰는 한 건의 결과 — `text`가 None이면 침묵한다. 차단이면 `text`는 차단 문구다."""
 
     trigger: str
     assessment: Assessment
     text: str | None = None
     reach: Reach | None = None
     parse_failed: bool = False
+    #: 푸시 트리거에서만 채워진다 (PR 생성은 차단하지 않는다 — 푸시가 이미 이 게이트를 지났다).
+    gate: PushGate | None = None
 
 
 def _with_notice(
@@ -729,7 +1007,15 @@ def notice_for_push(command: str, root: Path, *, base: str = DEFAULT_BASE) -> No
         return NoticeResult(TRIGGER_PUSH, Assessment(SILENT_NON_HEAD_REF))
     assessment = assess(root, base=base, head_moves=plan.head_moves)
     result = _with_notice(assessment, trigger=TRIGGER_PUSH, root=root, base=base, body_check=False)
-    return replace(result, parse_failed=plan.parse_failed)
+    gate = push_gate(root, assessment, base=base)
+    text = result.text
+    if gate.blocked:
+        text = render_block(assessment, gate)
+    elif gate.outcome == GATE_WAIVED:
+        # 우회로 통과한 푸시도 알린다 — 조용한 통과가 아니다. 사유 본문은 대장에만 있다.
+        waived = f"- 차단을 우회해 통과했다(HARN-308 waive · 대장 기록): {gate.waiver_reason}"
+        text = f"{text}\n{waived}" if text else f"[CI 미러 고지 · 푸시 직전]\n{waived}"
+    return replace(result, text=text, parse_failed=plan.parse_failed, gate=gate)
 
 
 def notice_for_pr_create(
@@ -769,19 +1055,101 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+class WaiverRefusedError(RuntimeError):
+    """우회를 기록할 수 없다 — 사유 문제이거나 우회할 차단이 없다. 메시지가 곧 처방이다."""
+
+
+def check_waiver_reason(reason: str | None) -> str:
+    """우회 사유 검증 — 정리한 사유를 돌려주고, 비었거나 공백뿐이면 거부한다(무사유 면제 없음)."""
+    if reason is None or not reason.strip():
+        raise WaiverRefusedError(
+            "--reason이 비었거나 공백뿐이다 — 무사유 우회는 없다. 실제 사유를 적어라"
+            "(인자가 비어 전달됐는지도 확인하라)"
+        )
+    return reason.strip()
+
+
+def record_waiver(root: Path, reason: str | None, *, base: str = DEFAULT_BASE) -> dict[str, Any]:
+    """현재 HEAD의 차단을 사유와 함께 우회하고, 그 사실을 이벤트 대장에 남긴다.
+
+    대장에 쓴 **뒤에만** 게이트가 열린다(게이트가 대장을 읽는다) — 남지 않는 탈출구가 없다.
+    지금 차단 대상이 아닌 HEAD에는 기록하지 않는다: 쓸모없는 우회 이벤트가 쌓이면 "우회 N건"이
+    습관화 감시(판정 문서 §6)의 신호가 되지 못한다.
+    """
+    cleaned = check_waiver_reason(reason)
+    assessment = assess(root, base=base)
+    if not assessment.head:
+        raise WaiverRefusedError(
+            f"HEAD를 확인하지 못해 우회를 기록할 수 없다({assessment.error_type or '원인 미상'})"
+        )
+    gate = push_gate(root, assessment, base=base)
+    if gate.outcome == GATE_WAIVED:
+        raise WaiverRefusedError(
+            "이 HEAD(또는 같은 내용)는 이미 우회가 기록되어 있다 — 다시 푸시하라"
+        )
+    if not gate.blocked:
+        raise WaiverRefusedError(
+            f"지금 이 HEAD는 차단 대상이 아니다(판정 {gate.code}) — 우회를 기록하지 않았다"
+        )
+    if gate.code == NOTIFY_HEAD_MOVES:
+        raise WaiverRefusedError(
+            "같은 명령이 만들 커밋은 아직 없어 우회할 대상이 없다 — 먼저 커밋하고 다시 확인하라"
+        )
+    _store().append_event(
+        root,
+        WAIVER_ACTION,
+        "-",
+        head=assessment.head,
+        reason=cleaned,
+        code=gate.code,
+        mirror_state=assessment.mirror_state,
+        missing_jobs=list(gate.missing_jobs),
+    )
+    return {"head": assessment.head, "code": gate.code, "missing_jobs": list(gate.missing_jobs)}
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="푸시·PR 생성 시점 CI 미러 고지 (HARN-209)")
+    parser = argparse.ArgumentParser(
+        description="푸시·PR 생성 시점 CI 미러 고지·차단 (HARN-209/308)"
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name, help_text in (
         ("pr-section", "PR 본문에 붙일 `## CI 도달 잡` 섹션을 출력한다"),
         ("assess", "현재 HEAD를 판정해 JSON으로 출력한다 (디버그)"),
+        ("gate", "지금 푸시하면 막히는지 미리 본다 — 막히면 종료 코드 1 (HARN-308)"),
+        ("waive", "차단을 사유와 함께 우회하고 이벤트 대장에 남긴다 (HARN-308)"),
     ):
         p = sub.add_parser(name, help=help_text)
         p.add_argument("--base", default=DEFAULT_BASE)
         p.add_argument("--root", type=Path, default=_repo_root())
+        if name == "waive":
+            p.add_argument("--reason", required=True, help="우회 사유(필수 · 대장에 기록된다)")
     args = parser.parse_args(argv)
 
+    if args.cmd == "waive":
+        try:
+            done = record_waiver(args.root, args.reason, base=args.base)
+        except WaiverRefusedError as exc:
+            print(f"✗ {exc}", file=sys.stderr)
+            return 2
+        except (OSError, subprocess.SubprocessError, GitQueryError, ImportError) as exc:
+            print(f"✗ 우회를 기록하지 못했다({type(exc).__name__}): {exc}", file=sys.stderr)
+            return 2
+        print(
+            f"✔ 우회를 이벤트 대장에 기록했다 — HEAD {done['head'][:12]} · 코드 {done['code']}. "
+            "같은 푸시를 다시 하라. 이 HEAD의 내용에만 유효하다"
+        )
+        return 0
+
     assessment = assess(args.root, base=args.base)
+    if args.cmd == "gate":
+        gate = push_gate(args.root, assessment, base=args.base)
+        if gate.blocked:
+            print(render_block(assessment, gate))
+            return 1
+        verdict = "우회로 통과" if gate.outcome == GATE_WAIVED else "차단 대상 아님"
+        print(f"✔ {verdict} — HEAD {(assessment.head or '?')[:12]} · 판정 {gate.code}")
+        return 0
     if args.cmd == "assess":
         out = {
             "code": assessment.code,

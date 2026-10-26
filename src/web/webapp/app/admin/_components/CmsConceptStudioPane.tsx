@@ -19,6 +19,8 @@ import {
   type CmsNotice,
   type NoteResult,
 } from "./CmsCommon";
+import { CmsConceptDeleteBox } from "./CmsConceptDeleteBox";
+import { CmsEdgePanel } from "./CmsEdgePanel";
 import { CmsResourcePanel } from "./CmsResourcePanel";
 
 import styles from "./Cms.module.css";
@@ -30,8 +32,9 @@ import styles from "./Cms.module.css";
  * 상태를 어떤 경로로도 쓰지 못하게 AST로 동결), 초안이 발행되기까지는 판 이력 화면의 전이(제출→검토→
  * 승인→발행)를 거쳐야 한다. 화면은 그 규칙을 모른다 — 폼이 보내는 것은 "바뀐 필드"뿐이다.
  *
- * 관계(선행/후행)를 읽기 전용으로 두는 이유: 원천 정본이 그래프 파일이라 DB 엣지를 CMS가 고치면 다음
- * 적재가 덮어쓴다. 쓰기를 열기 전에 정본 계약과 DAG 검사가 선행되어야 한다(후속 과제로 등재).
+ * 관계(선수/후행)와 개념 삭제는 P3-26에서 열렸다(`CmsEdgePanel`·`CmsConceptDeleteBox`). 정본이 행마다
+ * 갈려(원천 파일 소유 / CMS가 만듦) CMS가 만든 것만 지울 수 있고, 순환 검사·권한·삭제 가능 여부는
+ * 전부 서버가 판정한다 — 이 파일은 서버가 준 값을 내려 보낼 뿐이다.
  */
 
 type PayloadBase =
@@ -126,9 +129,11 @@ interface Props {
   /** 스킬 목록 선언(읽기 전용 리소스). 없으면 스킬 찾기 도우미를 보이지 않는다. */
   skillMeta: CmsResourceMeta | null;
   onChanged: () => void;
+  /** 개념이 삭제된 뒤(부모가 선택을 풀고 목록을 다시 읽는다). */
+  onDeleted: (conceptCode: string) => void;
 }
 
-export function CmsConceptStudioPane({ token, note, detail, skillMeta, onChanged }: Props) {
+export function CmsConceptStudioPane({ token, note, detail, skillMeta, onChanged, onDeleted }: Props) {
   const [base, setBase] = useState<PayloadBase>({ kind: "loading" });
   const [notice, setNotice] = useState<CmsNotice>(null);
 
@@ -181,12 +186,11 @@ export function CmsConceptStudioPane({ token, note, detail, skillMeta, onChanged
       </section>
 
       <section className={styles.block} aria-label="관계">
-        <h4 className={styles.blockTitle}>관계 (읽기 전용)</h4>
-        <EdgeList title="이 개념을 선행으로 삼는 관계" edges={detail.incoming} />
-        <EdgeList title="이 개념이 선행으로 삼는 관계" edges={detail.outgoing} />
+        <h4 className={styles.blockTitle}>관계 (선수·후행)</h4>
         <p className={styles.hint}>
-          관계의 원천 정본이 그래프 파일이라 여기서는 고치지 않습니다(고치면 다음 적재가 덮어씁니다).
+          이 개념의 출처: {detail.cms_owned ? "CMS가 만든 개념" : "원천 파일(graph.json) 소유 개념"}
         </p>
+        <CmsEdgePanel token={token} note={note} detail={detail} onChanged={onChanged} />
       </section>
 
       <section className={styles.block} aria-label="새 초안">
@@ -223,6 +227,14 @@ export function CmsConceptStudioPane({ token, note, detail, skillMeta, onChanged
           />
         )}
       </section>
+
+      <CmsConceptDeleteBox
+        token={token}
+        note={note}
+        detail={detail}
+        onDeleted={onDeleted}
+        onChanged={onChanged}
+      />
     </div>
   );
 }
@@ -233,27 +245,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <dt>{label}</dt>
       <dd>{children}</dd>
     </>
-  );
-}
-
-function EdgeList(props: { title: string; edges: CmsConceptDetail["incoming"] }) {
-  return (
-    <div>
-      <p className={styles.label}>
-        {props.title} ({props.edges.length}건)
-      </p>
-      {props.edges.length === 0 ? (
-        <p className={styles.muted}>(없음)</p>
-      ) : (
-        <ul className={styles.edgeList}>
-          {props.edges.map((edge) => (
-            <li key={edge.other_concept_id + ":" + edge.edge_type}>
-              {edge.other_code} {edge.other_name_ko} — {edge.edge_type}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }
 

@@ -79,6 +79,13 @@ class _QueueSession:
     async def flush(self) -> None:
         self.flushes += 1
 
+    async def get(self, _model: Any, _pk: Any) -> None:
+        """EOS-47: 시도 버전 고정이 문항 행을 PK로 읽는다 — 이 대역엔 문항이 없다(None=문항 없음).
+
+        execute 큐를 소비하지 않으므로(별도 경로) 이 파일의 시나리오 큐 순서는 그대로다.
+        """
+        return None
+
     async def execute(self, _stmt: Any) -> _Rows:
         rows = self._results[self._i] if self._i < len(self._results) else []
         self._i += 1

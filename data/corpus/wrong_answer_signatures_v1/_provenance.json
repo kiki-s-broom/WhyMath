@@ -1,0 +1,17 @@
+{
+  "pool": "whymath-original",
+  "source_name": "오답 서명 규칙표 v1 (P3-56 후보 — 미분 단원 오답 값 → 오개념 후보)",
+  "uploaded": "2026-10-16",
+  "counts": {
+    "rules": 10,
+    "fixtures_wrong": 21,
+    "fixtures_not_wrong": 27
+  },
+  "source_citation": "출처: WhyMath 자체 저작 — 오개념 코퍼스(misconceptions_v1)의 M-id와 승인 크로스워크(misconception_crosslinks_v1)에 걸린 핵심 오개념 7개의 오답 모양 규칙. 픽스처는 WhyMath 자체 생성 문항은행(WHYMATH_GENERATED)의 problem_id를 가리키며 문항 본문을 복제하지 않는다.",
+  "license_notice": "WHYMATH_ORIGINAL — 와이매스 자체 저작물(규칙 선언·신뢰도·픽스처 선택). 검정교과서·평가원·EBS 본문·문항·풀이를 포함하지 않는다. 오답 값의 독립 근거는 자체 문항은행의 distractor_map이거나 엔진과 무관한 단순 계산이다.",
+  "note": "오답 값을 만드는 수학(변환)과 질문 읽기(추출기)는 코드(l4/misconception/derivative_signature.py)가 이름으로 소유하고, 이 파일은 이름·신뢰도·근거 종류·픽스처만 가진다. 계약 = schema/wrong_answer_signature.py(SignatureSpec). 사람 검수 전 보수적 초안이 아니라 기계 계측(문항은행 3,188건 정답 오탐 0건·보기 오라클 대조)을 통과한 규칙이다.",
+  "post_extraction": [
+    "l1/misconception/wrong_answer_signature_table.py가 lru_cache로 적재·검증(fail-closed: 파일 부재·형식 위반은 예외).",
+    "l4/misconception/derivative_signature.py가 레지스트리·크로스워크·카탈로그와 대조해 적재(어긋나면 거부)."
+  ]
+}

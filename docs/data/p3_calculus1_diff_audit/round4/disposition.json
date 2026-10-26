@@ -1,0 +1,1628 @@
+{
+ "note": "4회차 감사(대상 커밋 e110735e) defects.json 115개 판정 레코드(문항 88건)의 처분표. 각 레코드의 결함을 4회차 우회로 판정기 규칙이 as-found 원문(round4/audited_bank.jsonl)에서 잡았는지(guard_rules_as_found — 결함 부류에 대응하는 규칙군 T/W/E만)와 처분·교정 후 은행 상태를 적는다. '유지' 처분은 0건이다 — 확신 '불확실' 레코드 31건도 근거를 검토해 결함으로 인정했다(02-03 f'(x) = 0의 근·02-08 복이차·02-09 순수 최솟값·02-10 등속 운동의 가속도·02-06 해설의 '두 점'). 이 파일은 교정 기록이며 as-found 판정 (defects.json·R*/)은 고치지 않는다.",
+ "generated_by": "결정론 스크립트(판정기 `l3/equivalent/p3_diff_shortcut_guard` · 교정 후 은행 problems.jsonl 대조)",
+ "records": [
+  {
+   "problem_id": "1542c673-ebd6-5fc4-bc68-bf332a1e74a2",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T-zero-monomial"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — x^n의 x = 0 대입·f'(x) = 0의 근(답 0 불변) → 대체 틀 'f'(2)는 f(2)의 몇 배'(오답 경로마다 답이 다르다)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "20030476-845b-5934-a02c-9655ba198029",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R1",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "20030476-845b-5934-a02c-9655ba198029",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "284cc353-63ed-57ad-ba07-3d1cfa53dc84",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T-zero-monomial"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — x^n의 x = 0 대입·f'(x) = 0의 근(답 0 불변) → 대체 틀 'f'(2)는 f(2)의 몇 배'(오답 경로마다 답이 다르다)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "5f4b63f8-f5e6-58d9-9037-9533a4b91855",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T-zero-monomial"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — x^n의 x = 0 대입·f'(x) = 0의 근(답 0 불변) → 대체 틀 'f'(2)는 f(2)의 몇 배'(오답 경로마다 답이 다르다)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "ba44c2a7-e962-50a1-b028-02bc502a64d7",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R1",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "ba44c2a7-e962-50a1-b028-02bc502a64d7",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "e5e0060e-e939-58ed-a47b-449b920f45e5",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T-zero-monomial"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — x^n의 x = 0 대입·f'(x) = 0의 근(답 0 불변) → 대체 틀 'f'(2)는 f(2)의 몇 배'(오답 경로마다 답이 다르다)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "e90ceadf-6ec6-5214-b265-326a327e481b",
+   "concept": "H:12미적Ⅰ02-03",
+   "rater": "R6",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T-zero-monomial"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — x^n의 x = 0 대입·f'(x) = 0의 근(답 0 불변) → 대체 틀 'f'(2)는 f(2)의 몇 배'(오답 경로마다 답이 다르다)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "1ca81e06-9881-5a70-8444-b9884a06ae1e",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "1ca81e06-9881-5a70-8444-b9884a06ae1e",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "382f1505-d39c-512d-9dce-c1e377d67310",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-line-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 직선(상수함수 포함) 위의 점에서의 접선의 기울기",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "47578c0b-b3db-5285-80fe-da8ae8f64f3e",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "47578c0b-b3db-5285-80fe-da8ae8f64f3e",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "66384aed-e1c8-51d8-b28d-1e27b7f028dd",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "66384aed-e1c8-51d8-b28d-1e27b7f028dd",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "87fc6a5f-0007-5f81-9003-d169561d7555",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "87fc6a5f-0007-5f81-9003-d169561d7555",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "a96d8d96-9e54-509f-8380-700101581339",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-line-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 직선(상수함수 포함) 위의 점에서의 접선의 기울기",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "bf1c7400-e147-5b0a-aa82-4e56c6423cf2",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-line-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 직선(상수함수 포함) 위의 점에서의 접선의 기울기",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "ca824a0d-ed41-5c82-8db7-fa4afee7a93b",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-line-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 직선(상수함수 포함) 위의 점에서의 접선의 기울기",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d2b9104b-5782-5586-bbb3-1a81a7288cce",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d2b9104b-5782-5586-bbb3-1a81a7288cce",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d865b2ec-edd8-51d0-8eec-e8557f911230",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d865b2ec-edd8-51d0-8eec-e8557f911230",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T05-vertex-tangent"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제·제외 — 포물선 꼭짓점·x축 평행 접선 진단 틀 삭제, 대표 '기울기가 m인 점'에서 m = 0 제외 → 대체 틀(삼차 곡선 · x절편에서의 기울기 · 기울기 m인 점이 하나뿐)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "ed0d7a69-01de-5e66-9fba-931fb328a056",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R1",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "ed0d7a69-01de-5e66-9fba-931fb328a056",
+   "concept": "H:12미적Ⅰ02-05",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "12a33423-90a2-5f97-996c-3654527f37e1",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "12a33423-90a2-5f97-996c-3654527f37e1",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "66bc9b06-d9e7-5733-a54c-dfeeab82b49e",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_explanation",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "E-object-intro"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "해설 교정 — 발문에 없는 '두 점'·'접점' 대신 '구간에서의 평균변화율'·f'(c)로 서술(`_k_item(points_in_question=False)`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "87f54872-db35-5316-ac3f-faa99c762f1c",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_explanation",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "E-object-intro"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "해설 교정 — 발문에 없는 '두 점'·'접점' 대신 '구간에서의 평균변화율'·f'(c)로 서술(`_k_item(points_in_question=False)`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "8e6568ef-b192-53b5-8e19-ead82cdf255a",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "8e6568ef-b192-53b5-8e19-ead82cdf255a",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "bc2a3af4-f08d-51a4-8ddf-0ea5a36567a6",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "bc2a3af4-f08d-51a4-8ddf-0ea5a36567a6",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d44fc3c5-1dd6-5174-8837-a6913e3b18c1",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_explanation",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "E-object-intro"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "해설 교정 — 발문에 없는 '두 점'·'접점' 대신 '구간에서의 평균변화율'·f'(c)로 서술(`_k_item(points_in_question=False)`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "e22e2e22-0a1d-56a9-ab40-5054e5762263",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "e22e2e22-0a1d-56a9-ab40-5054e5762263",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f51f2290-2c03-5558-b772-5d37221bc96a",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f51f2290-2c03-5558-b772-5d37221bc96a",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f790698f-49ed-5f08-9554-8889ef16dd74",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R2",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f790698f-49ed-5f08-9554-8889ef16dd74",
+   "concept": "H:12미적Ⅰ02-06",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "01729815-9def-51a7-80fe-50af2297180d",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "04ed3c76-37a7-5ef0-bb6c-d7bcc2803009",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "04ed3c76-37a7-5ef0-bb6c-d7bcc2803009",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "11bcb2e2-928b-5905-9fe9-8e9d58bcab7f",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "11bcb2e2-928b-5905-9fe9-8e9d58bcab7f",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "14030125-6d22-5b0a-b412-e622dce15c77",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "14f3d5d9-9742-5495-8961-c590c99cd49d",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "18ecd01b-a2b6-5c1b-8f47-ee679ca93183",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "1ca6b2f5-edd8-50a8-8cdb-641c2de4fdf1",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "397c7c65-f3f6-56a9-883b-ab128df9cd4a",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "3c17e90a-2ce7-590f-8c3f-8df8fcc23646",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "452f8506-32fc-5512-9cde-8429a45586f1",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "452f8506-32fc-5512-9cde-8429a45586f1",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "5524145b-0954-5354-8db1-54aab716a052",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "60e4f2b4-cd52-5c57-aa84-8eaea66281ed",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "72feeed6-f797-5ab7-924c-cfea02b87bd8",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "72feeed6-f797-5ab7-924c-cfea02b87bd8",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "7a8d7d84-692c-5489-8cb3-9898f3fcd898",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "8060e583-addb-5a4e-99c4-763297235635",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-biquadratic",
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음) / 틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "8060e583-addb-5a4e-99c4-763297235635",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic",
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음) / 틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "95b91d1d-9c0a-5578-bd11-7da4ca6ba4c7",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "a2b3eb22-8fbd-5009-a6a4-7da157d8f099",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "ad8c03d8-cf23-53e1-8834-56f5d54885f5",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "ad8c03d8-cf23-53e1-8834-56f5d54885f5",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "b0563c61-0e02-50e7-9682-d6c6ab657e8f",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-biquadratic",
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음) / 틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "b0563c61-0e02-50e7-9682-d6c6ab657e8f",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic",
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음) / 틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "b2ee5fea-7b7a-5e2e-b3df-cd263a2a7dce",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "b36a172f-5be6-522e-a1df-7980b8f4398e",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "c6274508-d4d0-5a4c-a25d-75830010692e",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "c6274508-d4d0-5a4c-a25d-75830010692e",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "c6510cd4-d075-5a57-acb1-16c97ab02d13",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "cca2825c-51dc-5680-bd58-0c4cba533921",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d854b266-1d33-5f04-b5e8-2e30a0d0e919",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d99ad7c3-283d-5553-b1c9-b608960b133b",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d99ad7c3-283d-5553-b1c9-b608960b133b",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "daf7f2b3-08f5-5216-a446-afca430bbf9b",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "f13fbe3d-7a5c-508c-bf08-3f00e5f04747",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T08-given-critical-points"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 임계점은 하나만 x = p로 고정하고 계수 하나를 미지로 둔다. f'(p) = 0으로 계수를 구하고 나머지 임계점·종류를 판정해 *고정되지 않은* 극값을 답한다(삼차 a 미지 · 상수 k 미지 · 비대칭 사차 k 미지)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f4fe19a0-a827-5a8c-b559-2b6d21ae0d4e",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f4fe19a0-a827-5a8c-b559-2b6d21ae0d4e",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T08-biquadratic"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 재설계 — 복이차(우함수) 사차식 대신 비대칭 임계점 사차식(완전제곱 우회로 없음)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "f9d9b7ca-1bc8-521f-a73d-9b8bbb883235",
+   "concept": "H:12미적Ⅰ02-08",
+   "rater": "R3",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "00364a3c-e440-50a8-83db-b3e3eeb66ebe",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "01d759ec-a35e-53e2-a1f3-d15203a6e133",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [
+    "T09-no-application"
+   ],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변) / 부수: 재서술 — 같은 최솟값을 방정식 f(x) = 0의 실근 없음·그래프와 x축의 위치 관계를 보이는 활용으로 묻는다",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "054833ce-0ffb-5d89-a81b-e932b926dc43",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [
+    "T09-no-application"
+   ],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변) / 부수: 재서술 — 같은 최솟값을 방정식 f(x) = 0의 실근 없음·그래프와 x축의 위치 관계를 보이는 활용으로 묻는다",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "0ef2a302-e7f1-5808-b911-89b82c458866",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T09-no-application"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "재서술 — 같은 최솟값을 방정식 f(x) = 0의 실근 없음·그래프와 x축의 위치 관계를 보이는 활용으로 묻는다",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "1a7c1e1c-3bf6-5ae7-86c5-80d28f8bf799",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "1d550250-0bf4-5018-8843-5aa542c9da52",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "21772313-51c5-5b29-98e2-b5ab5139e86a",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "22faf427-ccc4-51d5-84ab-9d979e22a3fd",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "242e7663-af02-536a-a656-988e7a264945",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "29517759-e92e-5e31-91d8-0a99a2d7aa98",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "5809fe5f-4cf8-5c80-94f1-c92f38293434",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "7ca694c3-4fe8-5865-ac4f-f1c0f4814673",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [
+    "T09-no-application"
+   ],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변) / 부수: 재서술 — 같은 최솟값을 방정식 f(x) = 0의 실근 없음·그래프와 x축의 위치 관계를 보이는 활용으로 묻는다",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "7ce15d7a-6888-5328-8fca-ac6670834754",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "92f2faf7-c942-5abf-8190-a4e38347c423",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "98f8c77f-a8bb-5383-9f2b-592e2902a3de",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "9bc46541-f887-5edb-99d1-9d9345ddda9c",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "a51e8538-422b-534b-88ab-015bbc639458",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "ad2bd554-0bc2-53c2-a8aa-5041298d5084",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "ae107b10-9586-5c6e-ba75-7ee8bce917fc",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T09-no-application"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "재서술 — 같은 최솟값을 방정식 f(x) = 0의 실근 없음·그래프와 x축의 위치 관계를 보이는 활용으로 묻는다",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "ba06c740-693b-5c3b-a05d-2dd9c956b58c",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "dd714381-dee4-546b-9ab6-67751e983bcd",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "e57317cf-8360-5a6c-9650-bc597b18ede1",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [
+    "T09-no-application"
+   ],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변) / 부수: 재서술 — 같은 최솟값을 방정식 f(x) = 0의 실근 없음·그래프와 x축의 위치 관계를 보이는 활용으로 묻는다",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "e96ca3a1-b13f-5c33-bd92-6dedbcb9adb7",
+   "concept": "H:12미적Ⅰ02-09",
+   "rater": "R4",
+   "defect_class": "bad_wording",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "W-ascii-inequality"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 학생 대면 '<='·'>='를 '≤'·'≥'로(생성기 문자열 리터럴 · 검산 조건의 SymPy 표기는 불변)",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "0d306fe5-3082-503d-8dc5-4b1baefe8f9b",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "0d306fe5-3082-503d-8dc5-4b1baefe8f9b",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R7",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "2a8ef451-1229-598d-82c4-9b8d17304d96",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T10-linear-position"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 위치가 상수·일차인 진단 틀 3종 → 대체 틀 '이차 위치의 가속도'",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "491c88ce-2566-502a-a904-6da06cd50e87",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T10-linear-position"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 위치가 상수·일차인 진단 틀 3종 → 대체 틀 '이차 위치의 가속도'",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "6c2893ec-7db0-5ed8-b0ec-bdd17a0a00c7",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T10-linear-position"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 위치가 상수·일차인 진단 틀 3종 → 대체 틀 '이차 위치의 가속도'",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "6dd4ea57-806f-56e6-b7e4-04f42bf83fc9",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "불확실",
+   "guard_rules_as_found": [
+    "T10-linear-position"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 위치가 상수·일차인 진단 틀 3종 → 대체 틀 '이차 위치의 가속도'",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "b6b0efe4-9969-5a8a-911c-412308a90361",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "b6b0efe4-9969-5a8a-911c-412308a90361",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R7",
+   "defect_class": "bad_wording",
+   "certainty": "확실",
+   "guard_rules_as_found": [
+    "W-sqrt-call"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "표기 교정 — 선지 '8sqrt(3)' 꼴을 '8√3'으로(`p3_diff_expr.render_surd`)",
+   "bank_after": "id 유지(해설·선지만 교정 — 발문 불변)"
+  },
+  {
+   "problem_id": "be54b288-c5a8-5172-aeba-ffa80e44a0d1",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T10-linear-position"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 위치가 상수·일차인 진단 틀 3종 → 대체 틀 '이차 위치의 가속도'",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  },
+  {
+   "problem_id": "d75493d3-b8d8-53e7-b4e4-9eb72e561f45",
+   "concept": "H:12미적Ⅰ02-10",
+   "rater": "R5",
+   "defect_class": "bad_tag",
+   "certainty": "중간",
+   "guard_rules_as_found": [
+    "T10-linear-position"
+   ],
+   "other_round4_rules": [],
+   "disposition": "교정",
+   "action": "틀 삭제 — 위치가 상수·일차인 진단 틀 3종 → 대체 틀 '이차 위치의 가속도'",
+   "bank_after": "id 교체(발문이 바뀌었거나 틀이 삭제·재설계됨 — 은행에 이 원문 없음)"
+  }
+ ]
+}

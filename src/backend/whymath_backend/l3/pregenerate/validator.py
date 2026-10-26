@@ -169,6 +169,32 @@ def _breaks_standalone(ch: str, adjacent: frozenset[str]) -> bool:
     return ch in adjacent or ch.isalnum()
 
 
+# 프라임 기호 — `f'(2)`·`f''(x)`·`f′(1)`의 도함수 표시. ASCII 작은따옴표 외에
+# 유니코드 프라임(U+2032)·오른쪽 작은따옴표(U+2019, LLM·워드프로세서가 프라임 대신 자주 낸다)·백틱.
+_PRIME_MARKS = frozenset("'′’`")
+
+
+def _follows_function_symbol(text: str, pos: int) -> bool:
+    """`pos`의 `(`가 *함수 기호 바로 뒤*(공백 없음)라 인수 괄호인가 — `f'(2)`·`f^{-1}(2)` (QUAL-13).
+
+    함수 적용의 괄호는 곱셈의 피연산자가 아니다. 판정은 두 가지다.
+    ① 프라임(0개 이상)을 걷어 낸 앞 글자가 영숫자(한글 제외) — `f(2)`·`f'(2)`·`f''(2)`·`f_1'(2)`.
+       한글 제외는 산문 속 닫는 따옴표 `‘함수’(2) = 5`를 함수로 오인하지 않기 위함이고,
+       앞 글자가 영숫자여야 한다는 조건은 *따옴표로 인용한 식* `'(2) = 5'`(공백 뒤 여는 따옴표)를
+       함수로 오인해 진짜 거짓 등식을 놓치지 않기 위함이다.
+    ② `}` 뒤: LaTeX 첨자 함수 `f^{-1}(2)`·`f_{n}(2)`·`f^{\\prime}(2)`.
+    `}` 꼬리는 `\\frac{1}{2}(3)` 같은 곱셈도 건너뛰게 한다 — 보수적 방향(통과)이라 허용한다.
+    """
+    i = pos - 1
+    if i < 0:
+        return False
+    if text[i] == "}":
+        return True
+    while i >= 0 and text[i] in _PRIME_MARKS:
+        i -= 1
+    return i >= 0 and text[i].isalnum() and not _is_hangul(text[i])
+
+
 def _is_standalone(
     text: str, start: int, end: int, adjacent: frozenset[str] = _ADJACENT_MATH
 ) -> bool:
@@ -178,7 +204,10 @@ def _is_standalone(
     잡되, 줄이 다른/한글 산문에 인접한 식은 독립으로 인정한다(slice 54: 한국어 풀이 지원).
     `adjacent`는 "더 큰 식의 일부"로 볼 인접 문자 집합(등식=`_ADJACENT_MATH`·연쇄는 `<>=`
     제외 — 연쇄 관계 조각 허용). 한글 경계 판정은 `_breaks_standalone`에 위임.
+    수치 토큰이 `(`로 시작하고 그 앞이 함수 기호면(`f'(2)`) 괄호는 인수라 독립 식이 아니다(QUAL-13).
     """
+    if text[start : start + 1] == "(" and _follows_function_symbol(text, start):
+        return False
     i = start - 1
     while i >= 0 and text[i] in " \t":
         i -= 1
@@ -400,6 +429,50 @@ _EXPR_TOKEN = r"[+-]?(?:[0-9A-Za-z(][0-9A-Za-z \t+\-*/^().]*[0-9A-Za-z)]|[0-9A-Z
 _RELATION_RE = re.compile(rf"({_EXPR_TOKEN})[ \t]*=[ \t]*({_EXPR_TOKEN})")
 
 
+# 한 글자 함수 기호 + 곧바로 `(` — `f(2)`·`F(t)`·`x(t)`.
+# 앞이 영숫자면(`2x(`·`xf(`) 계수·변수 병치라 제외.
+_FUNC_CALL_RE = re.compile(r"(?<![0-9A-Za-z])([A-Za-z])\(")
+
+
+def _has_function_application(expr: str) -> bool:
+    """식 토큰 안에 *함수 적용* `f(a)`가 있는가 — 곱셈 `x(x+1)`과 구별한다 (QUAL-13).
+
+    암묵 곱셈 파서는 `f(2)`를 `2·f`로 읽는다("f(1)=3, f(2)=5"가 f=3 vs f=5/2 모순으로 보인다).
+    글자만으로는 함수 `f(2)`와 곱 `x(x+1)`이 갈리지 않으므로 **인수 안에 그 글자가 있으면 곱셈**
+    ("x"를 x에 대입하는 함수는 없다)·없으면 함수로 본다. 틀리면 *통과*하는 방향(해 주장 검증을
+    건너뜀)이라 보수적이다.
+    `2x(`처럼 앞이 영숫자인 병치는 정규식이 애초에 잡지 않아 곱셈 해석이 유지된다.
+    """
+    for call in _FUNC_CALL_RE.finditer(expr):
+        depth = 1
+        end = len(expr)  # 닫는 괄호가 없으면(토큰이 잘림) 끝까지를 인수로 본다
+        for k in range(call.end(), len(expr)):
+            if expr[k] == "(":
+                depth += 1
+            elif expr[k] == ")":
+                depth -= 1
+                if depth == 0:
+                    end = k
+                    break
+        if call.group(1) not in expr[call.end() : end]:
+            return True
+    return False
+
+
+def _is_function_notation_relation(text: str, match: re.Match[str]) -> bool:
+    """`_RELATION_RE` 매치가 함수 표기를 포함해 *변수 방정식으로 읽으면 안 되는* 관계인가 (QUAL-13).
+
+    ① 좌변 토큰이 프라임·첨자 함수 뒤 괄호로 시작(`f'(x) = 2x`의 `(x) = 2x`) ② 양변 토큰에 함수 적용
+    `f(2)`가 있음. 둘 다 건너뛰면 가짜 방정식이 진짜 슬립의 검출을 가리는 것(`(x) = 2x`가 만든 x=0이
+    공통 해집합을 비워 `x = 5` 오류를 놓침)과 곱셈 오독 오탐을 함께 막는다.
+    """
+    return (
+        _follows_function_symbol(text, match.start(1))
+        or _has_function_application(match.group(1))
+        or _has_function_application(match.group(2))
+    )
+
+
 # 암묵적 곱셈("2x"→2*x)·"^"→거듭제곱 변환 포함 — 학생/LLM이 계수 병치를 자주 씀.
 # `implicit_multiplication`은 *계수 병치*만(함수 적용 "sin x"는 제외 — 더 보수적).
 _PARSE_TRANSFORMS = standard_transformations + (implicit_multiplication, convert_xor)
@@ -519,6 +592,8 @@ class SymPySolutionValidator:
             if checked >= self._max_checks:
                 break
             checked += 1
+            if _is_function_notation_relation(normalized, match):
+                continue  # 함수 값 서술 `f(2) = 5`·`f'(x) = 2x`는 변수 방정식이 아니다(QUAL-13)
             lhs = _parse_expr(match.group(1).strip())
             rhs = _parse_expr(match.group(2).strip())
             if lhs is None or rhs is None:
@@ -702,6 +777,8 @@ def detect_step_breaks(response: str, *, max_relations: int = 100) -> list[StepB
     for match in _RELATION_RE.finditer(normalized):
         if len(relations) >= max_relations:
             break
+        if _is_function_notation_relation(normalized, match):
+            continue  # 함수 값 서술은 단계 등가 비교 대상이 아니다(QUAL-13)
         lhs = _parse_expr(match.group(1).strip())
         rhs = _parse_expr(match.group(2).strip())
         if lhs is None or rhs is None:

@@ -19,10 +19,10 @@
 
 코퍼스 부류 (분류 = `classify_corpus`)
 -------------------------------------
-  ``fixed``    고정 코퍼스 7종(`KNOWN_CORPORA` 경로) — 코퍼스 단위 백필의 대상.
+  ``fixed``    고정 코퍼스(`KNOWN_CORPORA` 경로 전부) — 코퍼스 단위 백필의 대상.
   ``round``    회차 코퍼스 — 축적 CLI가 항상 남기는 회차 대장 사이드카(`<corpus>.rounds.jsonl` =
                `anchor_round_ledger.default_round_ledger_path`)가 실재한다. 사람 판정 각인의 대상.
-  ``other``    그 밖(레포의 배치 코퍼스 30종 등) — **어느 도구의 대상도 아니다.** 빈
+  ``other``    그 밖(레포의 배치 코퍼스 등) — **어느 도구의 대상도 아니다.** 빈
                `review_status` = 노출 차단(fail-closed)이 정상 상태다. 해금은 감사 라벨 표본을
                만들어 `KNOWN_CORPORA`·`AUDIT_LABEL_MAP`에 편입하는 것(코퍼스 단위)이고, 그 결정은
                이 계약 밖이다.
@@ -71,8 +71,24 @@ CorpusKind = Literal["fixed", "round", "other", "conflict", "unknown"]
 #: 분류 어휘(폐쇄 집합) — 계약 문서 표와 테스트가 이 튜플을 대조한다.
 CORPUS_KINDS: tuple[CorpusKind, ...] = ("fixed", "round", "other", "conflict", "unknown")
 
-# 레포 코퍼스 루트(레포 루트 기준 상대경로 — 두 도구 모두 "레포 루트에서 실행" 전제).
-_REPO_CORPUS_DIR = Path("data/corpus")
+# 레포 루트 — 이 파일 위치 기준(harness/ → whymath_backend/ → backend/ → src/ → 레포 루트라
+# parents[4]. `ops/repeat_recommendation_report.py`와 같은 관용구). [OPS-138] 예전에는 상대경로
+# `Path("data/corpus")`를 `.resolve()`로 비교해, 작업 디렉터리가 레포 루트가 아니면(CI 백엔드 잡의
+# cwd = src/backend) 같은 입력에 거부 대신 None을 돌려줬다 — 가드가 에러 없이 꺼졌다.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+# 레포 코퍼스 루트(절대경로 — cwd와 무관하다).
+_REPO_CORPUS_DIR = _REPO_ROOT / "data" / "corpus"
+
+
+def _anchored(path: Path) -> Path:
+    """`KNOWN_CORPORA`의 상대경로(레포 루트 기준)를 레포 루트에 붙여 해석한다.
+
+    `KNOWN_CORPORA`는 `Path("data/corpus/…")` 상대경로 사전이라 `.resolve()`만 하면 cwd에 붙는다.
+    비교의 양변(식별 대상 `in_path`는 실제 파일이라 절대 위치, 기준 경로)이 같은 기준에 서야 하므로
+    여기서 한 곳으로 모은다. 이미 절대경로(테스트가 주입한 임시 경로 등)면 그대로 쓴다.
+    """
+    return (path if path.is_absolute() else _REPO_ROOT / path).resolve()
 
 
 def _ledger_presence(corpus_path: Path) -> tuple[bool | None, str | None]:
@@ -89,9 +105,9 @@ def _ledger_presence(corpus_path: Path) -> tuple[bool | None, str | None]:
 
 
 def _is_known_fixed(corpus_path: Path) -> bool:
-    """고정 코퍼스 7종 경로 중 하나인가(레포 루트 기준 해석)."""
+    """고정 코퍼스(`KNOWN_CORPORA`) 경로 중 하나인가(레포 루트 기준 해석 — cwd 무관)."""
     resolved = corpus_path.resolve()
-    return any(resolved == known.resolve() for known in KNOWN_CORPORA.values())
+    return any(resolved == _anchored(known) for known in KNOWN_CORPORA.values())
 
 
 def classify_corpus(corpus_path: Path) -> tuple[CorpusKind, str | None]:
@@ -133,7 +149,7 @@ def corpus_backfill_refusal(in_path: Path, corpus_key: str) -> str | None:
     if expected is None:
         return None
     resolved = in_path.resolve()
-    if resolved == expected.resolve():
+    if resolved == _anchored(expected):
         return None
     if kind == "fixed" or resolved.is_relative_to(_REPO_CORPUS_DIR.resolve()):
         return (

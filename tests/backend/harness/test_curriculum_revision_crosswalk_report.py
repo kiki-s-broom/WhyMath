@@ -681,6 +681,7 @@ def test_real_repo_corpus_confirms_three_vocabulary_coexistence() -> None:
     조사로 확인된 현재 사실(2026-08-03 실측):
       - standards_v1: 895건 중 "2022 개정" 435건·"2015 개정" 460건(2어휘 중 하나).
       - units_v1: 파일 1개(`quadratic_maxmin.unit.yaml`), `curriculum_rev="2022"`(연도만 표기).
+        → 2026-10-07 P3-03: 미적분Ⅰ '미분' 초안 10편 반입으로 파일 11개 — 전부 `"2022"`(어휘 ② 유지).
       - problem_bank*: 전량(2638건 — 2026-08-03 실측 2647건에서 QUAL-02 실중복 은퇴 9건 반영)
         `curriculum_version="2022_REVISION"`(enum 값 표기).
       - curriculum_entry: 대응 코퍼스 없음(관측 불가).
@@ -696,9 +697,10 @@ def test_real_repo_corpus_confirms_three_vocabulary_coexistence() -> None:
     standards_raw = {obs.raw_value for obs in standards_load.observations}
     assert standards_raw == {"2022 개정", "2015 개정"}
 
-    # ② units_v1 — 파일 1개, 연도만 표기(어휘 ②).
-    assert len(unit_load.observations) == 1
-    assert unit_load.observations[0].raw_value == "2022"
+    # ② units_v1 — 연도만 표기(어휘 ②). 2026-10-07 P3-03: 파일 1개 → 11개(미적분Ⅰ 미분 초안 10편
+    # 반입·의도된 진전). 첫 파일만 보던 단언을 *전 파일*이 연도 표기인지로 넓혔다(약화 아님).
+    assert len(unit_load.observations) == 11
+    assert {obs.raw_value for obs in unit_load.observations} == {"2022"}
 
     # ③ problem_bank* — enum 값 표기(어휘 ③), 2015/2009_REVISION은 실 데이터 0건.
     problem_raw = {obs.raw_value for obs in problem_load.observations}

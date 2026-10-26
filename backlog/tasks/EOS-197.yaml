@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-197
+title: "EOS 감리 WP-C — LLM 저작 회차 1회(A6, 두 좌석 15 CU씩 ≥30 CU) 산출물·GenerationLog·HIT·주간 KPI 첫 물증 커밋"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-90-hit-lower-bound-implausible-review
+requires_gates: []
+acceptance:
+  - "① 좌석(D3 Kiki 2026-10-23 결정 (c)): 로컬 qwen3:30b-a3b와 openrouter deepseek-v4.1-flash 두 좌석을 15 CU씩 돌려 비교 기록한다(합계 ≥30 CU, 앵커는 ADR-007이 정한 A6). 한 좌석의 실패가 회차 전체를 무효로 만들지 않게 좌석별 산출물을 따로 남긴다. openrouter 좌석은 학생 데이터 0 조건에서만 쓴다(CN 관할 표기). Anthropic 좌석은 12/31까지 API 사용 중단(ARCH-66)이라 쓰지 않는다.\n② 산출물: data/runs/<run_id>/cu.jsonl(≥30행), 각 CU의 GenerationLog(model_name·prompt_version·seed·input_sha256 — 감리 W-18), 검수 canary_review JSONL(타이머 ON, HIT 유효 표본 ≥15 목표 — OPS-90 하한 가드 착지 후), metrics/weekly.json에 hit_seconds·unit_cost_krw measured:true 첫 기록(ops/weekly-metrics 브랜치를 main에 머지).\n③ 완료 검사: wc -l data/runs/*/cu.jsonl ≥ 30 · python -m whymath_backend.ops.provenance_audit exit 0 · weekly.json 최신 회차 kpis의 hit_seconds·unit_cost_krw measured true. 이 산출물의 main 커밋 존재가 12/31 판정 조건 ③(D4 교체)이다.\n④ 실행 방식(D10 Kiki 2026-10-23 결정 (다) 보류): 무인 실행기를 도입하지 않고 세션이 런북을 만들어 Kiki 머신(Phaiakes9)에서 수동 실행한다(6항목 사전 브리핑 · 쓰기 블록 자가거부 · 실행 코드 출처 동결 준수). 클라우드 세션에는 Postgres·Docker·로컬 LLM이 없어 라이브 실행은 Kiki 머신에서만 가능하다.\n⑤ 선행: OPS-90(HIT 하한 가드) 먼저. 12/31 동결(D5) 준수 — 새 HARN 태스크·헌법 규칙·결정 게이트 신설 금지."
+artifacts: []
+paths:
+  - data/runs
+  - metrics
+session: null
+notes: "EOS 감리 정본(2026-10-19) WP-C 이행. 결함 W-03·W-04·W-18. 감리 일정표 기간은 10/27~11/8이며 목표일 뿐 하한이 아니다 — OPS-90이 끝나는 대로 앞당겨 착수한다."
+updated: 2026-10-23

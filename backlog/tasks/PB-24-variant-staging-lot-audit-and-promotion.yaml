@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-24-variant-staging-lot-audit-and-promotion
+title: "변형 스테이징 로트 감사·승격 — 313행 표본 감사(n>=200)를 거쳐 problem_bank_* 로 옮긴다"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - PB-20-variant-corpus-intake-and-link-only-lineage
+requires_gates: []
+acceptance:
+  - "① 감사 — docs/architecture/problem_bank_variant_intake_pb20.md 4절의 5단을 따른다. problem_variants_staging_v0 로트(313행, 사이드카 sha256 동결) 전체에서 감사 표본 n>=200(로트의 64% 이상)을 라벨링한다. 모드별 로트는 단독으로 200에 못 미치므로 로트는 하나다. 결함율 Wilson 95% 단측 상한이 0.02 이하여야 한다.\n② 라벨링 주체 — 검증 권위 서열 2(측정 통과 기계 게이트) 또는 3(인간 폴백)만 쓴다. 측정되지 않은 기계 판정을 인간 검수 대체로 선언하지 않는다.\n③ 승격 전 결정론 백필 — 유형 태깅·persona_fit·authored_by 를 스테이징 파일에 명시 경로로 적용하고 sha256 을 다시 동결한다. 감사는 그 뒤의 내용에 대해서만 유효하다.\n④ 승격 — KNOWN_CORPORA·AUDIT_LABEL_MAP 등록, 디렉터리를 problem_bank_variants_v0 로 이동, 코퍼스 단위 백필로 review_status 각인, 관계 거버넌스 테스트의 코퍼스 목록 갱신을 한 PR 에서 수행한다. generated_v0 의 승인을 물려받지 않는다.\n⑤ 미달 시 — 상한을 넘으면 승격하지 않고 결함 유형을 파생기(l3/equivalent/variants.py)에 되먹임한다. 스테이징은 그대로 둔다."
+artifacts: []
+paths:
+  - "data/corpus/problem_variants_staging_v0/**"
+  - "docs/data/**"
+  - src/backend/whymath_backend/harness/problem_corpus_review_status_backfill.py
+session: null
+notes: PB-20 발견 사항. 근거 문서 docs/architecture/problem_bank_variant_intake_pb20.md 6절. 판정 기준 main dc214a2f.
+updated: 2026-10-13

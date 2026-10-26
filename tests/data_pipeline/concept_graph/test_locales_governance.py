@@ -3,15 +3,26 @@
 정본: docs/standards/part9_id_policy_review.md(P2d ②) + docs/data/concept_graph.md §2.4.
 
 P2d ②로 표시이름(name_ko/en/ja)을 노드에서 분리해 locale 레이어(`locales/ko.json` 등·canonical_id
-키)로 옮겼다. 이 테스트는 (a) locale(ko) 키가 graph 노드와 1:1(437), (b) 모든 ko 표기가 비공백,
+키)로 옮겼다. 이 테스트는 (a) locale(ko) 키가 graph 노드와 1:1(전량), (b) 모든 ko 표기가 비공백,
 (c) Concept 모델에 name_* 슬롯이 없음(Concept Purity)을 강제한다.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from data_pipeline.concept_graph.models import Concept
 from data_pipeline.concept_graph.transform import build_locales, transform_dataset
 from data_pipeline.concept_graph.validate import validate_locales
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 class TestNodePurity:
@@ -23,19 +34,19 @@ class TestNodePurity:
 
 
 class TestLocaleParity:
-    def test_locale_ko_matches_nodes_437(
+    def test_locale_ko_matches_all_nodes(
         self,
         concept_records: list[dict[str, object]],
         edge_records: list[dict[str, object]],
     ) -> None:
-        """locale(ko) 키 집합 == graph concept_id 집합(437 1:1·고아 0)."""
+        """locale(ko) 키 집합 == graph concept_id 집합(전량 1:1·고아 0)."""
         result = transform_dataset(concept_records=concept_records, edge_records=edge_records)
         report = validate_locales(result.locales, result.concepts)
         assert report.success is True, report.report_text()
         assert report.errors == []
         node_ids = {c.concept_id for c in result.concepts}
         assert set(result.locales["ko"]) == node_ids
-        assert len(result.locales["ko"]) == 437
+        assert len(result.locales["ko"]) == _FACTS["concept_graph.concepts"]
 
     def test_every_ko_name_nonblank(self, concept_records: list[dict[str, object]]) -> None:
         """모든 ko 표시이름이 비공백(빈 표기 금지)."""

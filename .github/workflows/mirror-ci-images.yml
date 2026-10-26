@@ -1,0 +1,83 @@
+# CI 컨테이너 이미지 ghcr.io 미러 (OPS-135)
+#
+# 왜: 2026-10-09 머지 큐가 Docker Hub 익명 pull 한도(toomanyrequests)로 연속 탈락했다.
+# 러너 IP는 다른 사용자와 공유돼서 우리 호출량과 무관하게 한도가 소진된다. CI가 쓰는
+# Docker Hub 이미지의 사본을 ghcr.io(GitHub 안)에 두고, CI는 사본만 받는다.
+# 선택 근거: 게이트 G-ops135-ci-image-source-decision (2026-10-14 Kiki ① ghcr 미러).
+#
+# 무엇을 미러하나: infra/ci/mirrored-images.yaml (단일 진실 원천). 로직은
+# scripts/ops/mirror_ci_images.py — digest를 먼저 해석해 그 digest로 복사하고, 복사 뒤
+# 플랫폼 digest 집합이 같은지 검증한다. 운영 절차·잔여 위험: docs/ops/ci_image_mirror_runbook.md.
+#
+# 언제 도나:
+#   - 주 1회(월) — 업스트림 태그(pg16 등)가 받은 보안 패치를 사본에 반영한다.
+#   - 목록·이 파일이 main에서 바뀔 때 — 새 이미지를 더하면 사본이 곧바로 생긴다.
+#   - 수동(workflow_dispatch) — 긴급 갱신·복구.
+#
+# ★ 순서 주의: 사본이 생기기 전에 CI 참조를 사본으로 바꾸면 전 잡이 이미지를 못 받는다.
+#   새 이미지는 ① 목록에 추가·머지 → ② 이 워크플로 성공 확인 → ③ CI 참조 전환 순서로만 간다.
+name: mirror-ci-images
+
+on:
+  schedule:
+    # 월 04:23 UTC. 정각을 피한 이유: 정시에 몰리는 예약 실행은 지연된다.
+    - cron: "23 4 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - infra/ci/mirrored-images.yaml
+      - scripts/ops/mirror_ci_images.py
+      - .github/workflows/mirror-ci-images.yml
+  workflow_dispatch:
+
+# 최소 권한은 잡 단위로 올린다 — 기본은 읽기 전용.
+permissions:
+  contents: read
+
+concurrency:
+  # 취소 금지 — 복사 도중 취소하면 사본이 반쯤 갱신된 채 남을 수 있다. 직렬 대기가 안전하다.
+  group: mirror-ci-images
+  cancel-in-progress: false
+
+# 의존 해석 고정 (OPS-121) — 이 파일의 모든 `pip install`이 제약 파일의 정확한 버전만 고른다.
+# 범위 안의 신규 릴리스는 제약 파일을 바꾸는 갱신 PR을 거쳐서만 닿는다. 잡·스텝 env로 재정의하거나
+# `pip --isolated`를 쓰면 고정이 풀리므로 scripts/ops/ci_constraints.py check가 막는다.
+# 절대경로인 이유: 잡마다 working-directory가 다르다.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/infra/ci/constraints-py312.txt
+
+jobs:
+  mirror:
+    name: mirror — Docker Hub → ghcr.io 이미지 사본 갱신
+    runs-on: ubuntu-latest
+    # 스크립트 전체 예산(40분)보다 길어야 한다 — 예산 초과는 스크립트가 스스로 실패로 끝낸다.
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      # 사본 패키지를 만들고 갱신하려면 쓰기가 필요하다. 이 잡만 갖는다.
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python3 -m pip install "pyyaml>=6.0.1,<7"
+
+      # 토큰은 env로만 넘기고 stdin으로 로그인한다 — 명령줄 인자에 두면 프로세스 목록에 남는다.
+      - name: ghcr.io 로그인
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # 판정은 스크립트의 exit code로 한다(0 성공 · 1 복사·검증 실패 · 2 설정 실패) — `|| true`로
+      # 은닉하면 상시 실패해도 초록으로 보인다. 소유자는 환경에서 받는다(리터럴 금지 — 조직 이관 선례).
+      - name: 이미지 미러 (digest 해석 → 복사 → 플랫폼 digest 검증)
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: python3 scripts/ops/mirror_ci_images.py

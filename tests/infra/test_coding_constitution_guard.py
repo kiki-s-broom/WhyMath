@@ -54,7 +54,15 @@ def _load_selftest():  # type: ignore[no-untyped-def]
     return module
 
 
-_FIXTURES = _load_selftest().FIXTURES
+_SELFTEST_MODULE = _load_selftest()
+_FIXTURES = _SELFTEST_MODULE.FIXTURES
+
+#: 원격 저장소에 파일을 바로 쓰는 MCP GitHub 도구 — 가드 매처가 반드시 받아야 한다 (CONST-16)
+_MCP_WRITE_TOOLS = (
+    "mcp__github__push_files",
+    "mcp__github__create_or_update_file",
+    "mcp__github__delete_file",
+)
 
 
 def _run_guard(
@@ -99,6 +107,8 @@ def test_guard_is_wired_as_pretooluse_hook() -> None:
     ), "guard_constitution.py 를 부르는 PreToolUse 항목이 정확히 1개여야 한다"
     matcher = set(entries[0]["matcher"].split("|"))
     assert {"Edit", "Write", "MultiEdit", "Bash"} <= matcher, f"매처 부족: {matcher}"
+    # CONST-16: 매처에 없는 도구는 훅이 호출되지 않는다 — 가드 코드가 판정해도 닿지 못한다
+    assert set(_MCP_WRITE_TOOLS) <= matcher, f"MCP GitHub 쓰기 도구 누락: {matcher}"
 
 
 def test_permission_deny_covers_edit_tools() -> None:
@@ -133,7 +143,7 @@ def test_fixture_set_is_two_sided() -> None:
 
 @pytest.mark.parametrize(("desc", "tool", "tool_input", "expected"), _FIXTURES)
 def test_guard_fixture(desc: str, tool: str, tool_input: dict, expected: int) -> None:
-    filled = {k: v.replace("{root}", str(_REPO_ROOT)) for k, v in tool_input.items()}
+    filled = _SELFTEST_MODULE.fill_root(tool_input, str(_REPO_ROOT))
     proc = _run_guard(
         _GUARD, {"tool_name": tool, "tool_input": filled, "cwd": str(_REPO_ROOT)}, _REPO_ROOT
     )
@@ -190,6 +200,51 @@ def test_guard_mutation_is_caught(tmp_path: Path) -> None:
     }
     assert _run_guard(_GUARD, payload, _REPO_ROOT).returncode == 2
     assert _run_guard(mutant, payload, _REPO_ROOT).returncode == 0
+
+
+def test_mcp_write_tools_are_covered_by_fixtures_both_ways() -> None:
+    """MCP 쓰기 도구 3종마다 차단·통과 픽스처가 모두 있어야 한 방향 구현이 초록이 되지 않는다."""
+    for tool in _MCP_WRITE_TOOLS:
+        codes = {f[3] for f in _FIXTURES if f[1] == tool}
+        assert codes == {0, 2}, f"{tool}: 차단·통과 픽스처가 둘 다 있어야 한다 — {codes}"
+
+
+@pytest.mark.parametrize(
+    ("label", "old", "new"),
+    [
+        # 도구 집합에서 push_files 를 빼면 그 도구의 헌법 쓰기가 통과한다
+        ("도구 집합에서 제거", '"mcp__github__push_files", ', ""),
+        # 첫 칸 비교를 느슨하게(아무 칸이나) 바꾸면 scripts/constitution/ 대조군이 막힌다
+        ("경로 비교 약화", "parts[0] == PROTECTED_DIRNAME", "PROTECTED_DIRNAME in parts"),
+        # '..' 정규화를 빼면 docs/../constitution 우회가 통과한다
+        ("정규화 제거", 'posixpath.normpath("/" + cleaned)', '"/" + cleaned'),
+        # 형식을 못 읽을 때 차단하는 분기를 통과로 뒤집으면 모른다=아니다가 된다
+        (
+            "모른다를 통과로",
+            "if paths is None:\n            return f",
+            "if False:\n            return f",
+        ),
+    ],
+)
+def test_mcp_guard_mutations_are_caught(tmp_path: Path, label: str, old: str, new: str) -> None:
+    """가드 사본에 결함을 주입하면 MCP 픽스처 중 최소 1건이 기대를 어긴다(주입 적용도 단언)."""
+    original = _GUARD.read_text(encoding="utf-8")
+    assert (
+        original.count(old) == 1
+    ), f"{label}: 주입 대상이 정확히 1곳이어야 한다({original.count(old)})"
+    mutant = tmp_path / "guard_mutant.py"
+    mutant.write_text(original.replace(old, new), encoding="utf-8")
+    assert mutant.read_text(encoding="utf-8") != original, f"{label}: 주입이 적용되지 않았다"
+    broken = []
+    for desc, tool, tool_input, expected in _FIXTURES:
+        if not tool.startswith("mcp__github__"):
+            continue
+        filled = _SELFTEST_MODULE.fill_root(tool_input, str(_REPO_ROOT))
+        payload = {"tool_name": tool, "tool_input": filled, "cwd": str(_REPO_ROOT)}
+        if _run_guard(mutant, payload, _REPO_ROOT).returncode != expected:
+            broken.append(desc)
+    assert broken, f"{label}: 결함을 주입했는데도 MCP 픽스처가 전건 통과했다 — 가드가 위장이다"
+    # 원복 확인: 원본 가드는 같은 픽스처를 전건 만족한다(위 selftest 가 따로 단언)
 
 
 # ── ⑤ 파싱 실패 ────────────────────────────────────────────────────────────

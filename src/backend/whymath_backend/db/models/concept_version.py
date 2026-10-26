@@ -13,9 +13,11 @@ D안) — `concept_version`은 새 엔티티가 아니라 **Concept 좌석의 4�
 PK 판단(Principle 1: Entity ID ≠ Version ID):
   `version_id`는 UUID PK — server_default `gen_random_uuid()`.
   `concept_id`(Text)는 **의미 ID**(`Concept.code` — `math.<area>.<slug>`, 이 코드베이스
-  실측 형식은 `{TRACK}-{AREA}-{NNN}`)를 참조하는 FK다. **`Concept.concept_id`(UUID 대리키)를
+  실측 형식은 `{TRACK}-{AREA}-{NNN}`)를 가리킨다. **`Concept.concept_id`(UUID 대리키)를
   참조하지 않는다** — 태스크 acceptance ①이 명시한 방향이며 `curriculum_version.framework_id
   → curriculum_framework.framework_id`(둘 다 의미 문자열 PK)와 동형 선례다.
+  P3-26부터 이 가리킴은 DB FK가 아니라 트리거 2종이 지킨다(아래 컬럼 주석) — 아직 살아있는 행이 없는
+  신규 개념의 제안을 담기 위해서다.
 
 전이 실행(EOS-50): 상태·거버넌스·게이트 기록을 쓰는 코드는 `l3/publish_gate.py` 한 곳이다 —
 전이표(`schema/version_lifecycle.py`)를 조회해 게이트를 통과한 전이만 반영한다. 이 ORM
@@ -62,8 +64,9 @@ _JSONB_FIELDS: tuple[str, ...] = ("change", "source", "governance", "integrity",
 class ConceptVersion(Base):
     """Concept 버전 레코드 영속 ORM — Concept 좌석의 4번째 테이블(EOS-49).
 
-    `concept_id`는 `concept.code`(Text UNIQUE, 의미 ID)를 참조한다 — `concept.concept_id`
-    (UUID 대리키)가 아니다. `previous_version_id`는 self-FK(버전 체인).
+    `concept_id`는 `concept.code`(Text UNIQUE, 의미 ID)를 가리킨다 — `concept.concept_id`
+    (UUID 대리키)가 아니다. 가리킴의 무결성은 FK가 아니라 DB 트리거가 지킨다(P3-26: 아직 개념
+    행이 없는 신규 개념 제안을 담는다). `previous_version_id`는 self-FK(버전 체인).
     """
 
     __tablename__ = "concept_version"
@@ -75,7 +78,12 @@ class ConceptVersion(Base):
         server_default=sa.text("gen_random_uuid()"),
     )
     # 의미 ID(Concept.code) 참조 — Concept.concept_id(UUID 대리키)가 아니다(Principle 1).
-    concept_id: Mapped[str] = mapped_column(sa.Text, sa.ForeignKey("concept.code"), nullable=False)
+    # **FK를 두지 않는다(P3-26)**: 아직 살아있는 행이 없는 *신규 개념의 제안*(초안·검토·승인)을 이
+    # 테이블에
+    # 담아야 하기 때문이다. 무결성은 FK 대신 DB 트리거 둘이 지킨다 — ① PUBLISHED 판은 살아있는 개념
+    # 행이
+    # 있어야만 쓸 수 있다 ② 발행본이 있는 개념 행은 지울 수 없다(둘 다 alembic a8c4e1f7b3d9).
+    concept_id: Mapped[str] = mapped_column(sa.Text, nullable=False)
     entity_type: Mapped[str] = mapped_column(
         sa.String(50), nullable=False, server_default=sa.text("'Concept'")
     )

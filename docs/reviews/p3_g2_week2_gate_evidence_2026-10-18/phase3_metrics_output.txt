@@ -1,0 +1,59 @@
+Phase 3 지표 7종 — 제품 완성도 평면 (Phase 3 Math EOS 대표 과정)
+  ※ 생산 공정 평면 (KPI 12종 · ops.validation_scorecard) 과 별개 평면이다 — 합산·평균하지 않는다
+  run_id    : 72fc1bd7376c
+  관측 시각 : 2026-10-18T11:21:17.603180+00:00
+  표본 기준 : live
+  명세      : phase3-scope-v1
+
+[  충족] 1. Curriculum Coverage [대표 과정 10노드]
+        값/목표  : 10/10 = 100.0% (목표 ≥98.0%)
+        판정근거 : 노드 → 개념 → 스킬 → 문항 (분모=교육과정 노드 · 개념 콘텐츠 행 불요)
+        출처     : l1.standards.phase3_coverage (P3-02)
+
+[ 미측정] 2. Concept Completeness [대표 과정 핵심 개념 10개]
+        값/목표  : 측정 불가 (분자/분모 0/10)
+        판정근거 : 충족 여부를 알 수 없다 — 측정 불가 연결(hint)만 남은 개념이 10개 있어 값이 0/10~10/10 구간이다(목표 95%). 측정 불가는 충족이 아니고 미달도 아니다.
+        출처     : l1.standards.phase3_coverage (P3-02 · 5연결 재설계본)
+        · 완전 연결 확정: 0/10
+        · 미달이 확정되지 않은 개념(측정 불가 연결만 남음): 10/10
+        · 측정 불가 연결: hint
+        · 힌트 입력: 없음(측정 불가) — --hints-from-db 로 읽는다
+
+[  충족] 3. Problem Coverage [대표 과정 스킬 8종]
+        값/목표  : 8/8 = 100.0% (목표 ≥95.0%)
+        판정근거 : 명세 skills 중 승인 문항이 문제유형 경유로 행사하는 스킬의 비율(직접 계수).
+        출처     : 신규 계산 (명세 skills × 승인 문항 × 문제유형 스킬)
+        · 스킬별 승인 문항 수: skill.case-analysis=72, skill.deductive-reasoning=48, skill.equation-rearrangement=316, skill.graph-reading=72, skill.graph-sketching=421, skill.pattern-generalization=24, skill.polynomial-arithmetic=312, skill.word-problem-modeling=24
+
+[  충족] 4. Solution QA Pass [대표 과정 승인 문항 1121건 재검증]
+        값/목표  : 456/456 = 100.0% (목표 ≥99.5%)
+        판정근거 : 통과/(통과+실패). 검증 불가(skip)는 분모·분자에 넣지 않고 따로 낸다. 전수 계수.
+        출처     : harness.solution_qa (P3-07) + ops.validation_scorecard 임계 흡수
+        · 통과/실패/검증 불가: 456/0/665
+        · 검증 불가 비율: 665/1121 = 59.3%
+        · 재검증 도구: harness.solution_qa(C1 정답↔조건 · C2 풀이 최종 답 · C3 선택지 · C4 단계 연쇄). 검증 불가 사유·검수 대기 목록: `python -m whymath_backend.harness.solution_qa`
+        · 모집단 주의: 스코어카드 '수학적 오류율'은 골든 항목 FN(독립 모델 심판), 이 값은 대표 과정 승인 문항 SymPy 재검증 통과율 — 같은 숫자가 아니다
+
+[ 미측정] 5. Learning Loop Success [학습 루프(세션) · 관측창]
+        값/목표  : 측정 불가
+        판정근거 : 관측치가 없다 — DB 수집을 하지 않았고(--no-db) 입력도 없다. 0 이 아니라 측정 불가다.
+        출처     : ops.loop_kpi_gate LOOP_COMPLETION (재사용)
+
+[ 미측정] 6. Critical Defect [Hard Gate F-Ⅱ·F-Ⅴ 2종 — F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관(이 지표 밖)]
+        값/목표  : 측정 불가
+        판정근거 : 입력 payload 가 없다 — 흡수한 Hard Gate 2종(F-Ⅱ·F-Ⅴ) 전부 판정 불가. 이 CLI 는 payload 수집기를 갖지 않는다(--hard-gate-input). 0 이 아니라 '측정 불가'다.
+        출처     : ops.validation_scorecard.evaluate_hard_gates F-Ⅱ·F-Ⅴ (흡수)
+
+[  미달] 7. Graph Connectivity Coverage [대표 과정 핵심 개념 10개]
+        값/목표  : 4/10 = 40.0% (목표 ≥95.0%)
+        판정근거 : 개념 → 스킬 → 문항 → 오개념 → 교수가 한 줄로 이어짐 (목표는 명세가 갖는다)
+        출처     : l1.standards.phase3_coverage (P3-02)
+        - 미충족 [12미적Ⅰ-02-01]: problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+        - 미충족 [12미적Ⅰ-02-05]: problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+        - 미충족 [12미적Ⅰ-02-06]: problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+        - 미충족 [12미적Ⅰ-02-08]: problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+        - 미충족 [12미적Ⅰ-02-09]: problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+        - 미충족 [12미적Ⅰ-02-10]: problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+
+합계: 충족 3 · 미달 1 · 미측정 3 · 목표미정 0 / 전체 7  (종합 점수 없음)
+종합: 측정 실패 — 미측정 지표가 있어 종합을 못 낸다 → exit 2

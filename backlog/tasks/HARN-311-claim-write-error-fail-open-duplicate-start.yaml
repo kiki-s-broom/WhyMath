@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-311-claim-write-error-fail-open-duplicate-start
+title: "원격 claim 쓰기가 error인데 착수가 허용돼 같은 태스크를 두 세션이 병렬 구현했다 — fail-open 착수의 3회차 재발(OPS-07 · MP-04 · OPS-126)"
+track: math-completion
+stage: S4
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현(사실 고정) — 2026-10-12 같은 태스크 OPS-126을 두 세션이 12분 간격으로 착수해 둘 다 완성 구현을 남겼다. claude/wonderful-allen-vhbdra의 이벤트 샤드: 12:37:59Z action=claim_remote_unavailable status=error → 12:38:00Z action=start remote=error+readscan_ok(원격 claim 쓰기가 실패했는데 착수는 허용됐다). 12:50:48Z claude/relaxed-keller-4wk0b2의 start는 remote=ok였고 이 세션의 읽기 스캔은 wonderful-allen의 작업을 볼 수 없었다 — 원격 claim이 없었고 브랜치는 13:09Z 첫 커밋 뒤에야 올라왔기 때문이다. 결과: 두 구현이 각각 PR 없이 고립(OPS-140이 회수). 같은 계열 선례: 2026-07-27 OPS-07 병렬 구현(735줄 폐기·HARN-07) · 2026-09-06 MP-04 40분 구현 전량 폐기. 이번이 3회차다."
+  - "② 원인 규명(실측 선행) — 12:37:59Z claim 쓰기가 왜 실패했는지는 이 감사가 재현하지 못했다(error 한 줄뿐 원인 미기록). start가 claim 쓰기 실패의 원인(HTTP 상태·git stderr·타임아웃)을 이벤트에 남기도록 하고, 최근 이벤트 샤드에서 claim_remote_unavailable의 건수와 원인 분포를 측정한다. 분포가 상시 실패(2회+)면 'fail-open 보호는 상시 무력 상태'로 간주한다."
+  - "③ 대책 판정 — HARN-07이 닫은 것은 읽기 쪽(다른 세션의 claim을 보는 스캔)뿐이고 내 claim이 안 올라간 경우의 가시성은 열려 있다. 후보: (가) claim 쓰기가 error면 start를 거부하고 재시도 또는 명시적 우회 플래그(사유를 대장에 남김)를 요구한다 (나) 거부하지 않되 착수 직후 작업 브랜치를 즉시 push하게 해 브랜치 스캔이 대신 보이게 한다 (다) (가)(나) 혼합. 선택 근거를 적고, HARN-07·HARN-09(refs/claims 우회)·HARN-125(거부된 세션의 정보 공백)와 충돌하지 않는지 먼저 판정한다."
+  - "④ 변별력 — tests/harness에 (i) 쓰기 성공 (ii) 쓰기 error (iii) 쓰기 error + 우회 플래그 3경우를 두고 선택한 대책을 제거하면 (ii)가 RED가 되는지 뮤테이션으로 확인한다(주입 적용 mutated != original 단언·원복 바이트 동일 단언 포함). (i)이 통과하는 대조군이 없으면 전부 거부로 과잉 수정된 게이트가 초록으로 보인다."
+  - "⑤ 배선 — 신규 테스트가 CI harness-integrity 잡에서 실제로 수집되는지 실측한다. CLAUDE.md는 수정하지 않는다(2026-09-20 새 산문 규칙 등재 동결)."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - "tests/harness/**"
+session: null
+notes: |-
+  출처: stray-code 18회차(docs/reviews/unmerged_branch_audit_2026-10-14.md §4). 관련 사고 회수는 OPS-140이 소유한다. 이 태스크는 병렬 중복 구현의 3회차 재발에 대한 코드 대책이다 — 산문 규칙은 추가하지 않는다. 사용 이벤트 증거는 claude/wonderful-allen-vhbdra·claude/relaxed-keller-4wk0b2 브랜치의 backlog/events 샤드(두 브랜치는 OPS-140 완료 전 삭제 금지).
+
+  [정정 2026-10-14] paths ['scripts/harness/backlog.py', 'scripts/harness/claims.py', 'tests/harness/**'] → ['scripts/harness/backlog.py', 'tests/harness/**']: 등재 시 추측으로 적은 scripts/harness/claims.py는 저장소에 없다 — claim_remote_unavailable을 내는 곳은 backlog.py뿐(grep 실측)이라 범위를 실재 경로로 정정
+  paths 제거 1건: ['scripts/harness/claims.py']
+updated: 2026-10-14

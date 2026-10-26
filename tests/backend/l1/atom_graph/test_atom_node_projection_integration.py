@@ -34,6 +34,14 @@ pytestmark = pytest.mark.integration
 # 에서 항상 "코퍼스 미존재" skip(침묵 skip 결함 수정).
 _CORPUS = Path(__file__).resolve().parents[4] / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (Path(__file__).resolve().parents[4] / "docs" / "data" / "corpus_facts.json").read_text(
+        encoding="utf-8"
+    )
+)
+
 
 def _sync_engine() -> object:
     from sqlalchemy import create_engine
@@ -91,8 +99,8 @@ class TestAtomNodeProjectionLoad:
         try:
             records = load_atom_nodes_from_graph_json(_CORPUS)
             count = populate_atom_nodes(records, settings=Settings())
-            # ① 적재 — 2,683 전량(name 빈 노드 0).
-            assert count == 2683
+            # ① 적재 — 원자 노드 전량(name 빈 노드 0).
+            assert count == _FACTS["atom_graph.nodes"]
 
             engine = _sync_engine()
             try:
@@ -101,9 +109,9 @@ class TestAtomNodeProjectionLoad:
                         text("SELECT count(*) FROM atom_node WHERE code = ANY(:k)"),
                         {"k": codes},
                     ).scalar_one()
-                    assert total == 2683
+                    assert total == _FACTS["atom_graph.nodes"]
 
-                    # ① level 분포(세부개념1823·소단원643·단원217).
+                    # ① level 분포(세부개념·소단원·단원 — 사실 파일의 원자·소단원·단원 건수).
                     level_rows = conn.execute(
                         text(
                             "SELECT level, count(*) AS n FROM atom_node "
@@ -112,9 +120,9 @@ class TestAtomNodeProjectionLoad:
                         {"k": codes},
                     ).all()
                     by_level = {r.level: r.n for r in level_rows}
-                    assert by_level.get("세부개념") == 1823
-                    assert by_level.get("소단원") == 643
-                    assert by_level.get("단원") == 217
+                    assert by_level.get("세부개념") == _FACTS["atom_graph.atoms"]
+                    assert by_level.get("소단원") == _FACTS["atom_graph.subunits"]
+                    assert by_level.get("단원") == _FACTS["atom_graph.units"]
 
                     # ② cognitive_type 표본 — 세부개념 원자는 인지축 보유.
                     sample = conn.execute(
@@ -160,7 +168,7 @@ class TestAtomNodeProjectionLoad:
 
             # ⑤ 멱등 — 재적재 후 행수 불변.
             count2 = populate_atom_nodes(records, settings=Settings())
-            assert count2 == 2683
+            assert count2 == _FACTS["atom_graph.nodes"]
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]
@@ -168,7 +176,7 @@ class TestAtomNodeProjectionLoad:
                         text("SELECT count(*) FROM atom_node WHERE code = ANY(:k)"),
                         {"k": codes},
                     ).scalar_one()
-                    assert total2 == 2683  # 중복 0(멱등)
+                    assert total2 == _FACTS["atom_graph.nodes"]  # 중복 0(멱등)
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:

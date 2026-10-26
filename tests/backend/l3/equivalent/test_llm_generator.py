@@ -558,6 +558,185 @@ class TestRootSelectionParsing:
 
 
 # ──────────────────────────────────────────────────────────────────────
+# EOS-23 ⑤: 근 집계(합/곱) 선언 — LLM 저작 경로가 answer_aggregate를 낼 수 있어야 한다.
+#
+# 배경: EOS-121 라이브 회차에서 anthropic 좌석의 quad-sum(두 근의 합) 거부 30행 중 29행이
+# "문항·답은 옳고 검산 계약이 합을 근으로 검산해 잔차 ≠ 0"이었다(ⓑ 표현 불일치·ⓐ 산술 오류 0).
+# 게이트의 집계 분기(verify_root_aggregate)는 이미 있는데 저작 경로가 그 필드를 낼 수 없었다.
+# 아래 두 테스트가 쌍이다 — 같은 문항·같은 답이 선언 없이는 거부되고 선언하면 통과한다. 통과
+# 테스트 하나만 있으면 "게이트가 원래 관대했다"와 구분되지 않아, 거부 짝(대조군)을 함께 둔다.
+# ──────────────────────────────────────────────────────────────────────
+def _sum_payload(**overrides: object) -> dict[str, object]:
+    """3x² − 7x − 6 = 0 (근 3·−2/3) 의 두 근의 합 7/3 — 판정 문서의 고유 문제 1번."""
+    payload: dict[str, object] = {
+        "question_text": "이차방정식 3x^2 - 7x - 6 = 0 의 두 근의 합을 구하시오.",
+        "answer": "7/3",
+        "answer_explanation": "근과 계수의 관계에서 두 근의 합은 7/3이다.",
+        "conditions": "3*x**2 - 7*x - 6 = 0",
+        "answer_map": {},
+        "answer_selection": "unique",
+        "answer_aggregate": "sum",
+        "difficulty_overall": 3.5,
+        "unit_codes": ["CAL-INT-DEF"],
+        "answer_format": "분수",
+        "achievement_standard_codes": [_STANDARD],
+        # 스펙의 겨냥 오개념과 맞춘다 — 비우면 동등성 점수가 0.70으로 떨어져 검수필요가 된다
+        # (이 테스트가 보려는 것은 정확성 축이므로 다른 축은 만점으로 고정한다).
+        "distractor_map": [{"choice_index": 1, "misconception_id": _MISCONCEPTION}],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _gate(candidate: CandidateProblem, **spec_overrides: object):  # type: ignore[no-untyped-def]
+    """후보를 실제 S2-a 게이트에 넣는다 — 결선 인자를 후보 필드에서 그대로 옮긴다."""
+    return evaluate_equivalent_candidate(
+        _spec(answer_format=AnswerFormat.분수, **spec_overrides),
+        candidate.problem,
+        provenance=candidate.provenance,
+        conditions=candidate.conditions,
+        answer_map=candidate.answer_map,
+        answer_selection=candidate.answer_selection,
+        answer_aggregate=candidate.answer_aggregate,
+        solution_steps=candidate.solution_steps,
+    )
+
+
+class TestRootAggregateDeclaration:
+    def test_declared_sum_is_carried_and_model_map_is_not_persisted(self) -> None:
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload())])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate == "sum"
+        assert candidate.answer_map == {}  # 결정론 집계 생성기와 같은 형태
+        assert candidate.answer_selection is None
+        assert candidate.problem.answer == "7/3"
+
+    def test_declared_sum_passes_the_real_gate(self) -> None:
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload())])).generate(_spec())
+        assert candidate is not None
+        verdict = _gate(candidate)
+        assert verdict.verification == "verified", verdict.reasons
+        assert verdict.accepted is True, verdict.reasons
+
+    def test_same_item_without_declaration_is_rejected_by_tier1(self) -> None:
+        """대조군 — 선언만 빼고 모든 것이 같다. EOS-121 라이브의 거부 형태를 그대로 재현한다.
+
+        기대 잔차 −6은 판정 문서의 기계 사유(`조건 위반 — 잔차 ≠ 0: -6`)와 같다. 이 단언이
+        깨지면 위 통과 테스트가 "게이트가 관대해서" 통과하는 것인지 가릴 수 없게 된다.
+        """
+        payload = _sum_payload(answer_map={"x": "7/3"})
+        del payload["answer_aggregate"]
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate is None
+        verdict = _gate(candidate)
+        assert verdict.verification == "failed"
+        assert any("잔차 ≠ 0: -6" in reason for reason in verdict.reasons), verdict.reasons
+
+    def test_wrong_sum_is_still_rejected(self) -> None:
+        """선언이 게이트를 느슨하게 만들지 않는다 — 틀린 합은 Vieta 대조에서 거부된다."""
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload(answer="1"))])).generate(_spec())
+        assert candidate is not None
+        verdict = _gate(candidate)
+        assert verdict.verification == "failed"
+        assert any("근 sum 불일치" in reason for reason in verdict.reasons), verdict.reasons
+
+    def test_root_value_declared_as_sum_is_rejected(self) -> None:
+        """합이라고 선언하고 근(큰 근 3)을 답으로 낸 오선언 — 근은 합이 아니므로 거부된다."""
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload(answer="3"))])).generate(_spec())
+        assert candidate is not None
+        assert _gate(candidate).verification == "failed"
+
+    def test_product_declared_passes_the_real_gate(self) -> None:
+        payload = _sum_payload(
+            question_text="이차방정식 x^2 - 5x + 6 = 0 의 두 근의 곱을 구하시오.",
+            answer="6",
+            conditions="x**2 - 5*x + 6 = 0",
+            answer_aggregate="product",
+            answer_format="자연수",
+        )
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate == "product"
+        verdict = evaluate_equivalent_candidate(
+            _spec(),
+            candidate.problem,
+            provenance=candidate.provenance,
+            conditions=candidate.conditions,
+            answer_map=candidate.answer_map,
+            answer_selection=candidate.answer_selection,
+            answer_aggregate=candidate.answer_aggregate,
+        )
+        assert verdict.verification == "verified", verdict.reasons
+
+    def test_aggregate_ignores_model_supplied_map_and_selection(self) -> None:
+        """모델이 `{x: 합}`과 `largest`를 같이 보내도 읽지 않는다.
+
+        읽으면 두 가지가 터진다 — ① derive-and-verify가 합 7/3을 '큰 근 3'과 대조해 정답
+        문항을 ValueError로 버린다 ② `{x: 7/3}`이 영속돼 "x = 합"이라는 거짓 검산 재료가 남는다.
+        """
+        payload = _sum_payload(answer_map={"x": "7/3"}, answer_selection="largest")
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_map == {}
+        assert candidate.answer_selection is None
+        assert candidate.answer_aggregate == "sum"
+
+    def test_unknown_aggregate_value_falls_back_to_regular_path(self) -> None:
+        """미지 값은 조용히 None — 일반 경로로 가므로 answer_map 없는 문항은 생성 실패가 된다."""
+        no_map = _sum_payload(answer_aggregate="mean")
+        assert _gen(FakeProvider([json.dumps(no_map)])).generate(_spec()) is None
+        with_map = _sum_payload(answer_aggregate="mean", answer_map={"x": "7/3"})
+        candidate = _gen(FakeProvider([json.dumps(with_map)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate is None
+        assert _gate(candidate).verification == "failed"  # 오채택 없음
+
+    def test_regular_root_item_is_unchanged(self) -> None:
+        """회귀 0 — 선언 없는 기존 근 문항은 종전과 동일(answer_aggregate None·map 보존)."""
+        candidate = _gen(FakeProvider([_HAPPY])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate is None
+        assert candidate.answer_map == {"x": "3"}
+        assert candidate.answer_selection == "largest"
+
+    def test_empty_answer_map_without_declaration_is_still_a_failure(self) -> None:
+        """`answer_map: {}` 허용은 **선언이 있을 때만**이다 — 선언 없는 빈 맵은 종전대로 실패."""
+        payload = json.loads(_HAPPY)
+        payload["answer_map"] = {}
+        assert _gen(FakeProvider([json.dumps(payload)])).generate(_spec()) is None
+
+    def test_schema_offers_aggregate_enum_but_does_not_require_it(self) -> None:
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        schema = provider.json_schemas[0]
+        assert schema is not None
+        props = schema["properties"]
+        assert isinstance(props, dict)
+        assert props["answer_aggregate"]["enum"] == ["product", "sum"]
+        assert "answer_aggregate" not in schema["required"]  # type: ignore[operator]
+
+    def test_system_prompt_instructs_the_declaration(self) -> None:
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        _, system = provider.calls[0]
+        assert "answer_aggregate" in system
+        assert '"sum"' in system and '"product"' in system
+
+    def test_declaration_reaches_the_stored_corpus_record(self) -> None:
+        """생성기 → 게이트 → 저장 레코드까지 선언이 살아서 도달한다(끊기면 재검증이 일반 경로로 간다)."""
+        store = _FakeStore()
+        gen = _gen(FakeProvider([json.dumps(_sum_payload())]))
+        outcome = run_equivalent_generation(
+            _spec(answer_format=AnswerFormat.분수, difficulty_overall=3.5), gen, store=store
+        )
+        assert outcome.status == "accepted_stored", outcome
+        (records,) = store.calls
+        assert records[0].verify.answer_aggregate == "sum"
+        assert records[0].verify.answer_map == {}
+
+
+# ──────────────────────────────────────────────────────────────────────
 # S2-h: 저작용 로컬 패밀리 — 기본 GENERAL(qwen2.5)로 라우팅(qwen2-math mode collapse 회피).
 # ──────────────────────────────────────────────────────────────────────
 class TestAuthoringFamily:

@@ -63,7 +63,7 @@
 | **L1 Symbolic Engine** | 🟡 | SymPy 완비·외부 프로버 미연동 | `symbolic_equivalence`·`verify_*` 4모듈. Wolfram/Lean/Coq 미연동(Lean Tier3 로드맵) |
 | **L2 Proof Verification** | ⬜ | step verifier만·PRM/정리증명 미구현 | `verify_step`/`verify_solution` 실동작 = 실질 Tier2. **PRM은 프롬프트+export 도구만**(`whs/prm_builder*.py`는 학습셋 export). 정리 증명 검증 없음 |
 | **L3 Multi-agent Validation** | 🟡 | 하네스 골격+결정론 검증기 실동작·LLM 에이전트 미가동 | `whs/harness.py`·`harness/wh1_*.py`·`agreement_gate.py`. solver/critic LLM 정책(Ollama·Phaiakes9)은 주입만 |
-| **L4 Misconception DB** | ✅ | **가장 성숙** | 코드 카탈로그 32종(`catalog.py`) + 코퍼스 841종 + 탐지(substring·pgvector·LLM-judge)·distractor 역추적 |
+| **L4 Misconception DB** | ✅ | **가장 성숙** | 코드 카탈로그 32종(`catalog.py`) + 코퍼스 <!-- fact:misconceptions.count -->843<!-- /fact -->종 + 탐지(substring·pgvector·LLM-judge)·distractor 역추적 |
 | **L5 Confidence Calibration** | 🟡 | 학생 보정 있음·AI 자기 불확실성은 3상태 격리로만 | `calibration_coaching.py`(학생 과신). AI 측은 `unverifiable`→`unverified` 격리 + "모르면 모른다"(L110-112). **명시적 자연어 "확실하지 않음" 레이어 부재** |
 
 ---
@@ -121,7 +121,7 @@
 
 사례집이 제안한 확장(Failure Ontology·Hallucination Taxonomy·오개념↔AI오류 매핑 DB·검증 DSL)과
 WhyMath 자산의 접점:
-- **오개념↔AI오류 매핑 DB**: 이미 `l4/misconception/`(32+841) + `distractor.py` 역추적이 골격.
+- **오개념↔AI오류 매핑 DB**: 이미 `l4/misconception/`(32+<!-- fact:misconceptions.count -->843<!-- /fact -->) + `distractor.py` 역추적이 골격.
   AI 오류 사례를 오개념 id로 태깅하면 학생/AI 오류 통합 그래프가 된다.
 - **검증 DSL**: `canonicalize.condition_dsl_violation`(닫힌 DSL)이 씨앗. 함수-인식 확장(C2)이 다음.
 - **Failure Ontology**: 본 Part A/C가 v0 온톨로지. 각 범주에 재현 조건·탐지기·상태를 필드화하면 JSON 스키마로 승격 가능.

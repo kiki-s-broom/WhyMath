@@ -8,6 +8,11 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ops\run_moe_quality_battle.ps1
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ops\run_moe_quality_battle.ps1 -NDefective 100 -NClean 100
 #
+# OPS-50(후보 프롬프트 변형 재측정 — 기준 27B는 OPS-48 감사 파일에서 재사용):
+#   $A = "data\audit\ops-48-moe-accuracy-battle-20260822_232452.jsonl"
+#   powershell -ExecutionPolicy Bypass -File .\scripts\ops\run_moe_quality_battle.ps1 `
+#       -NDefective 50 -NClean 50 -PromptVariant short_reason -BaselineAudit $A
+#
 # 선행 조건: Ollama for Windows 설치·기동 가능, qwen3.5:27b/qwen3:30b-a3b 모델 설치.
 #   모델이 없으면 스크립트가 /api/tags로 확인 후 중단한다(자동 pull하지 않음).
 
@@ -20,7 +25,17 @@ param(
     [int]$Seed = 20260708,
     [string]$OllamaHost = "http://127.0.0.1:11434",
     [int]$TimeoutSec = 600,
-    [string]$OutDir = ""
+    [string]$OutDir = "",
+    # OPS-50 — 후보에 적용할 프롬프트 변형(baseline|short_reason|reason_first|stage_split|latex_check|few_shot).
+    [string]$PromptVariant = "baseline",
+    # OPS-50 — 기준 모델 결과를 이전 감사 JSONL에서 재사용(27B 재실행 생략). 시험지가 다르면 중단된다.
+    [string]$BaselineAudit = "",
+    # 후보가 기준보다 열등한지 판정하는 허용 마진. OPS-48 문서의 판정 마진은 0.05였다.
+    [double]$NotWorseMargin = 0.0,
+    # 후보 미분류율 상한(1.0=끔). OPS-50 ③은 0.05.
+    [double]$MaxUnresolvedRate = 1.0,
+    # exclude=A(미분류 제외) | worst=검출 B·오경보 C 최악 가정. 세 값은 리포트에 항상 병기된다.
+    [string]$UnresolvedPolicy = "exclude"
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -33,7 +48,12 @@ if ($OutDir -eq "") { $OutDir = Join-Path (Join-Path $RepoRoot "data") "audit" }
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
 
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$AuditOut = Join-Path $OutDir ("ops-48-moe-accuracy-battle-{0}.jsonl" -f $Timestamp)
+if ($PromptVariant -eq "baseline" -and $BaselineAudit -eq "") {
+    $AuditOut = Join-Path $OutDir ("ops-48-moe-accuracy-battle-{0}.jsonl" -f $Timestamp)
+}
+else {
+    $AuditOut = Join-Path $OutDir ("ops-50-moe-prompt-{0}-{1}.jsonl" -f $PromptVariant, $Timestamp)
+}
 
 # ── 헬퍼 (호출보다 먼저 정의) ────────────────────────────────────────────────
 function Write-Head {
@@ -126,6 +146,8 @@ Write-Head "OPS-48 QUALITY 티어 dense ↔ MoE 정확도 축 강등전"
 Write-Host "기준: $BaselineModel"
 Write-Host "후보: $CandidateModel"
 Write-Host "시험지: 결함 $NDefective · 무결함 $NClean · seed $Seed"
+Write-Host "후보 프롬프트 변형: $PromptVariant"
+if ($BaselineAudit -ne "") { Write-Host "기준 결과 재사용: $BaselineAudit" }
 Write-Host "감사 출력: $AuditOut"
 
 Write-Head "① Ollama 환경변수 적용"
@@ -143,7 +165,10 @@ if (-not (Start-OllamaServer -Base $OllamaHost)) {
 }
 
 Write-Head "④ 모델 설치 확인"
-if (-not (Test-ModelsInstalled -Base $OllamaHost -Models @($BaselineModel, $CandidateModel))) {
+# 기준 결과를 감사 파일에서 재사용하면 기준 모델은 호출하지 않으므로 설치 여부도 요구하지 않는다.
+$NeededModels = @($CandidateModel)
+if ($BaselineAudit -eq "") { $NeededModels = @($BaselineModel, $CandidateModel) }
+if (-not (Test-ModelsInstalled -Base $OllamaHost -Models $NeededModels)) {
     exit 1
 }
 
@@ -165,8 +190,19 @@ $argsList = @(
     "--timeout", [string]$TimeoutSec,
     "--concurrency", "1",
     "--require-candidate-not-worse-than-baseline",
+    "--not-worse-margin", [string]$NotWorseMargin,
+    "--prompt-variant", $PromptVariant,
+    "--max-unresolved-rate", [string]$MaxUnresolvedRate,
+    "--unresolved-policy", $UnresolvedPolicy,
     "--audit-out", $AuditOut
 )
+if ($BaselineAudit -ne "") {
+    if (-not (Test-Path $BaselineAudit)) {
+        Write-Host "  [FAIL] 기준 감사 파일이 없다: $BaselineAudit"
+        exit 1
+    }
+    $argsList += @("--baseline-audit", $BaselineAudit)
+}
 
 Write-Host "  명령: $python $argsList"
 & $python $argsList

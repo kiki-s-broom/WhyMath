@@ -130,7 +130,7 @@ async def test_unverifiable_input_claims_no_machine_axis() -> None:
         assert verdict.state == "unverifiable", conditions
         assert verdict.machine_axes == ()
         assert verdict.residual_axes == ()
-        assert verdict.tier is VerificationTier.MACHINE_SAMPLED  # 종전 상수 — 도메인 등급 아님
+        assert verdict.tier is VerificationTier.NUMERIC_SAMPLING  # 하한 등급 — 닫은 축이 없다
 
 
 def test_domain_result_for_unverifiable_claims_no_axis_at_the_domain_boundary() -> None:
@@ -244,8 +244,8 @@ def test_adapter_contract_is_unchanged() -> None:
 
 
 @pytest.mark.asyncio
-async def test_existing_domains_keep_constant_tiers() -> None:
-    """tier=None 도메인(기존 전부)은 종전 상수 등급 그대로다 — 이 슬라이스가 바꾼 것이 아니다."""
+async def test_statistical_claim_carries_deterministic_data_tier() -> None:
+    """S4-65 — 통계 자료형은 pass·fail 모두 `DETERMINISTIC_DATA`다(종전 레거시 상수에서 전환)."""
     stat = await Verifier().verify(
         ProblemVerifyInput(
             slug="s",
@@ -255,7 +255,7 @@ async def test_existing_domains_keep_constant_tiers() -> None:
             conditions="data=[1,2,3,4,5]; stat=mean",
         )
     )
-    assert stat.tier is VerificationTier.MACHINE_EXHAUSTIVE
+    assert stat.tier is VerificationTier.DETERMINISTIC_DATA
     stat_fail = await Verifier().verify(
         ProblemVerifyInput(
             slug="s",
@@ -265,7 +265,7 @@ async def test_existing_domains_keep_constant_tiers() -> None:
             conditions="data=[1,2,3,4,5]; stat=mean",
         )
     )
-    assert stat_fail.tier is VerificationTier.MACHINE_SAMPLED
+    assert stat_fail.tier is VerificationTier.DETERMINISTIC_DATA
 
 
 # ── ③ 정확 일치 판정기 ───────────────────────────────────────────────

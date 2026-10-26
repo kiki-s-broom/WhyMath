@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 import inspect
+import json
 import re
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text
@@ -53,6 +55,13 @@ from whymath_backend.schema.problem import Condition, Problem
 from whymath_backend.schema.user import UserProfile as UserProfileSchema
 
 pytestmark = pytest.mark.filterwarnings("ignore")
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -871,13 +880,43 @@ class TestCorpusVerifyBlockSupply:
     """`derive_verify_inputs`가 `Problem.conditions_parsed` 외에 코퍼스 verify 블록을 공급원으로 쓴다."""
 
     def test_loads_real_corpus_verify_blocks(self) -> None:
-        """코퍼스 로더가 13,570개의 유효한 verify 블록을 읽는다.
+        """코퍼스 로더가 유효한 verify 블록을 읽는다 — 건수는 아래 assert가 핀한다.
 
-        2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
+        건수 이력: 2,124(NLP-05 실측) → 13,520. 증분 11,446은 PB-13이 회수한 저작 확장 코퍼스
         30종의 문항수와 **정확히 일치**한다(우연한 드리프트가 아니라 회수의 산술 결과).
+        13,520 → 13,647(+127): P3-03이 `problem_bank_p3_calculus1_diff_v0` 144건을 더했다. 144건 중
+        17건은 검산 조건이 *연립 목록*(부등식 `a > 0`으로 해를 유일하게 가르는 문항)이라 이 로더가
+        문자열 조건만 읽는 계약상 블록에서 빠진다 — 그래서 증분이 144가 아니라 127이다.
         """
         blocks = _load_corpus_verify_blocks()
-        assert len(blocks) == 13520
+        # 13,647 → 13,841(+194): P3-03이 02-05·06·08·09·10 생성기 5종 360건을 더했다. 360건 중 166건은
+        # 블록에서 빠진다 — (a) 검산 조건이 *연립 목록*(부등식 보호·02-06 c값 구간 경계·02-08 극값 좌표)인
+        # 109건은 이 로더가 문자열 조건만 읽는 계약상, (b) answer_map이 빈 개수·집계형(02-06 11건·02-09
+        # 46건 = 57건)은 미지수가 답이 아니라 블록이 성립하지 않아서다(109 + 57 = 166). 그래서 증분이
+        # 360이 아니라 194다.
+        # 13,841 → 13,842(+1): P3-03 감사 결함 교정(문면·태그 정합)이 02-06의 개수형(answer_map 빔)
+        # 틀 2개(진단 `미분계수 값`·응용 `기울기 개수`)를 값형 진단 틀로 바꿔 answer_map을 가진 문항이
+        # 1건 늘었다(은행 504건·슬롯 6x12 불변 — 값만 갱신).
+        # 13,842 → 13,819(-23): P3-03 3차 감사 처분(우회로 판정기 `p3_diff_shortcut_guard`)으로 문자열 조건 +
+        # answer_map 블록이 23건 줄었다(은행 504건·슬롯 6x12 불변 — 값만 갱신). 02-09 -18: '등호가 성립하는 x'
+        # 값형(문자열 조건 18건 — 정수 중근이라 인수분해 우회로)을 최솟값형(임계점·y = f 연립 목록 조건)과
+        # 개수형(answer_map 빔)으로 바꿨다. 02-05 -2: 숙련도 삼차 접선의 판별식 조건에 다른 접선을 빼는 보호
+        # 조건이 붙어 목록이 됐다. 02-06 -3: 진단·응용 틀 교체로 c값 문항(방정식 + 열린구간 경계 목록)이 늘었다.
+        # 로더가 문자열 조건만 읽는 계약은 그대로다(무약화 — 빠진 23건은 목록·빈 answer_map 형태라 제외).
+        # 13,819 → 13,817(-2): P3-03 7회차 교정(은행 감사 3회차)이 02-05 오개념 유발 'y = x^2 위의 점의 접선
+        # 기울기' 틀(문자열 조건 2건)을 삼차곡선 y = x^3 + qx로 바꿔 두 근 ±a 중 양수를 'a > 0'으로 고르는 목록
+        # 조건이 됐다(은행 504건·슬롯 6x12 불변 — 값만 갱신).
+        # 13,817 유지: P3-03 8회차 교정(은행 감사 4회차)이 02-06 'f'(c)의 값' 진단 틀(문자열 조건 3건)을 지우고
+        # '왼쪽 끝값 하한' 진단 틀을 넣었다 — 그 3자리를 하한 문항 3건(모두 문자열 조건 + answer_map)이 채워
+        # 건수가 그대로다(구성만 바뀜).
+        # 13,817 → 13,865(+48): P3-05 4단계가 새 은행 `problem_bank_p3_fill_v0` 48건을 더했다
+        # (전부 문자열 조건 1개 + answer_map 1키 — 로더가 읽는 형태).
+        # 13,865 → 13,925(+60): P3-05 4단계 두 번째 조각이 02-02 미분가능성 5슬롯 × 12건을 더했다(같은 형태).
+        # 13,925 → 13,949(+24): 02-07 증가·감소 4슬롯 × 12건 가운데 문자열 조건 1개 + answer_map인
+        # 24건만 로더가 읽는다(나머지 24건은 극값의 값·미지 상수형이라 연립 목록 조건 — 로더가 건너뛴다).
+        # 13,949 → 13,987(+38): 5단계 02-03 규칙 일반화 24건(전부 문자열 조건 1개)과 02-10 문장제 24건 가운데
+        # 단일 조건 14건만 로더가 읽는다(02-10의 방향 전환 시각·값형 10건은 연립 목록 조건이라 건너뛴다).
+        assert len(blocks) == 13987
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1080,11 +1119,7 @@ class TestCorpusCeilingReportDiscriminates:
         회수된 단일 미지수 `y` 블록 수와 **정확히 일치**한다(우연한 드리프트가 아니라
         `test_multi_symbol_population_is_frozen`이 7,048 → 0으로 간 것의 산술 결과).
         """
-        import json
-        from pathlib import Path
-
-        repo_root = Path(__file__).resolve().parents[3]
-        corpus_root = repo_root / "data" / "corpus"
+        corpus_root = _REPO_ROOT / "data" / "corpus"
         problems: list[Problem] = []
         for path in sorted(corpus_root.glob("problem_bank_*/problems.jsonl")):
             for line in path.read_text(encoding="utf-8").splitlines():
@@ -1109,6 +1144,21 @@ class TestCorpusCeilingReportDiscriminates:
                 )
 
         report = build_gradability_ceiling_report(problems)
-        assert report.total_problems == 14034
+        # 14,034 + P3-03 미분 은행 504(144 + 360) + P3-05 빈 칸 채우기 은행 156(48 + 60 + 48)
+        # 14,694 → 14,742: 5단계 02-03·02-10 각 24건.
+        assert report.total_problems == _FACTS["problem_bank.total"]
         assert report.bucket_counts["condition_formal_derivable"] > 0
-        assert report.bucket_counts["condition_formal_derivable"] == 12268
+        # 12,268 → 12,373(+105): P3-03 미분 은행 144건 중 객관식 24건은 `selectable_exact_match`로,
+        # 문자열 검산 조건을 가진 비객관식 105건이 이 버킷으로 들어왔다(연립 목록 조건 15건은 제외).
+        # 12,373 → 12,535(+162): 02-05·06·08·09·10 생성기 5종 360건 중 객관식 60건은 selectable로,
+        # 비객관식 300건 중 문자열 검산 조건과 비지 않은 answer_map을 함께 가진 162건이 이 버킷으로 들어왔다
+        # (연립 목록 조건·개수/집계형(answer_map 빔)은 이 버킷이 아니다).
+        # 12,535 → 12,536(+1): 위 블록 +1과 같은 사유(P3-03 감사 결함 교정 — 개수형 틀이 값형으로).
+        # 12,536 → 12,513(-23): 위 블록 -23과 같은 사유(P3-03 3차 감사 처분 — 문자열 조건 + answer_map인
+        # 비객관식이 268 → 245건. 객관식 54건은 그대로 selectable이라 이 버킷의 감소분은 블록 감소분과 같다).
+        # 12,513 유지: 위 블록과 같은 사유(P3-03 8회차 교정 — 교체 전후 문항 모두 비객관식 문자열 조건).
+        # 12,513 → 12,561(+48): P3-05 4단계 빈 칸 채우기 은행(전부 형식적으로 유도 가능한 단답형 조건).
+        # 12,561 → 12,621(+60): 02-02 미분가능성 5슬롯 × 12건도 전부 같은 형태.
+        # 12,621 → 12,645(+24): 02-07 중 문자열 조건 24건(연립 목록 조건 24건은 이 버킷이 아니다).
+        # 12,645 → 12,683(+38): 5단계 중 문자열 조건 38건(위 블록 +38과 같은 사유).
+        assert report.bucket_counts["condition_formal_derivable"] == 12683

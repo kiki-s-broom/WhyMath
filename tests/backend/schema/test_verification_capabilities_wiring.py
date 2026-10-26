@@ -21,6 +21,7 @@ import pytest
 
 from whymath_backend import composition
 from whymath_backend.schema.verification_capabilities import (
+    AnswerValueExposure,
     AssessmentAnswerVerifier,
     ChainVerification,
     ChainVerificationCounts,
@@ -29,6 +30,7 @@ from whymath_backend.schema.verification_capabilities import (
     ExpressionSeal,
     FinalAnswerVerifier,
     StepOutcome,
+    ValueExposure,
     VerificationOutcome,
 )
 
@@ -45,6 +47,7 @@ _COMPOSITION_PATH = pathlib.Path(composition.__file__)
         ("default_final_answer_verifier", FinalAnswerVerifier),
         ("default_assessment_answer_verifier", AssessmentAnswerVerifier),
         ("default_expression_seal", ExpressionSeal),
+        ("default_answer_value_exposure", AnswerValueExposure),
     ],
 )
 def test_composition_factory_returns_a_working_capability(
@@ -54,6 +57,13 @@ def test_composition_factory_returns_a_working_capability(
     impl = getattr(composition, factory_name)()
     for method in (name for name in dir(protocol) if not name.startswith("_")):
         assert callable(getattr(impl, method, None)), f"{factory_name} → {method} 미구현"
+
+
+def test_default_value_exposure_actually_judges() -> None:
+    """P3-77 값 축 능력도 껍데기가 아니라 판정한다 — 같은 식에서 목표에 따라 다른 값을 낸다."""
+    impl = composition.default_answer_value_exposure()
+    assert impl.scan_value_exposure("참고: 2 + 2", "4").outcome is ValueExposure.exposed
+    assert impl.scan_value_exposure("참고: 2 + 2", "5").outcome is ValueExposure.clean
 
 
 def test_default_equivalence_actually_judges() -> None:
@@ -216,7 +226,13 @@ def test_registered_capability_keys_match_the_composition_factories() -> None:
     from whymath_backend.api._subject_capability_state import SUBJECT_CAPABILITY_KEYS
 
     # 관측기(비-능력) 팩토리 — 위 docstring 참조. 능력 카운트에서 항상 제외한다.
-    non_capability_factories = frozenset({"default_wrong_form_shadow_observer"})
+    # [P3-77] `default_answer_value_exposure`는 능력이지만 **오프라인 전용**이다 — 소비자가 힌트 생성
+    # CLI(`l4.hint_content.populate.main`) 하나이고 서빙 경로는 힌트를 만들지 않아 app.state에
+    # 등록하지 않는다(등록하면 소비처 0인 키가 생긴다). `test_eos_dependency_direction.py`의
+    # `PULL_ONLY_COMPOSITION_FACTORIES`와 이중 회계되는 같은 사실이다.
+    non_capability_factories = frozenset(
+        {"default_wrong_form_shadow_observer", "default_answer_value_exposure"}
+    )
 
     factories = [
         n

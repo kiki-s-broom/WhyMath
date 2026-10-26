@@ -42,9 +42,11 @@ KPI)의 측정 방법 "검수 타이머 이벤트(시작·종료·중단) 전수
 인덱스: `(review_session_id)` — 세션 페어링 조인. `(cu_slug, recorded_at DESC)` — CU 단위
 HIT 집계·최근순(hint_usage `(user_id, requested_at DESC)` 동형).
 
-집행 별항(정본화≠집행 — acceptance ③): 검수 UI(ADMIN-07)가 타이머·반려코드 없이 판정 제출
-불가하게 하는 UI 결선은 **후속 태스크**(ADMIN-07 acceptance 확장 — amend CLI 부재(HARN-24
-todo)로 등재 세션 판정 사안). 이 테이블·writer·CLI는 저장소와 함수 레벨 계약까지만 집행한다.
+집행 별항(정본화≠집행 — acceptance ③): 서버 쪽 집행은 ADMIN-18이 `api/admin_bff.py`에 건다 —
+approve/reject 전이는 `review_session_id` 없이 422, 반려는 `failure_code` 없이 422, 성공 시 같은
+트랜잭션에 finished 행을 이 테이블에 적재하고(`from_schema`) 적재가 실패하면 상태 변경도 롤백한다.
+검수 화면의 착수·판정 호출 결선은 웹 쪽 절반이다. 이 테이블·writer·CLI 자체는 저장소와 함수 레벨
+계약까지만 집행한다.
 """
 
 from __future__ import annotations

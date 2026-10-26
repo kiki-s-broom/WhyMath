@@ -61,6 +61,7 @@ from whymath_backend.api._concurrency import (
 )
 from whymath_backend.api._rate_limit import _client_ip
 from whymath_backend.config import get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
 from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
 from whymath_backend.db.session import get_session
@@ -84,10 +85,14 @@ from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import ProblemRelation as ProblemRelationSchema
 from whymath_backend.schema.problem import PublicProblem, PublicProblemStep
 from whymath_backend.schema.review_transition import (
+    IllegalInitialReviewStatus,
     IllegalReviewStatusChange,
     QuarantineReasonRequired,
     QuarantineRecordLocked,
     ReviewTransitionAction,
+    VerdictRequiresReviewSession,
+    action_requires_review_session,
+    ensure_initial_review_status,
     plan_review_field_change,
 )
 
@@ -211,6 +216,32 @@ class ProblemCreateRequest(ProblemSchema):
     )
 
 
+def _initial_review_status_refusal(
+    exc: IllegalInitialReviewStatus, *, actor_id: uuid.UUID
+) -> HTTPException:
+    """생성 시 초기 검수 상태 거부를 422로 옮긴다(ADMIN-19) — 응답 모양은 PATCH 422와 같은 축이다.
+
+    승인 상태로 태어나려는 시도는 검수 우회 신호라 WARNING으로 남긴다(행위자·요청 상태·코드만 —
+    자유 텍스트는 싣지 않는다). `privacy_audit`에는 쓰지 않는다: 그 테이블의 `content_mutation`은
+    "문항이 만들어졌다"는 사실의 기록이고 거부된 시도는 생성이 아니다(`_review_patch_refusal`과
+    같은 논거 — 감사 원장이 일어나지 않은 일을 말하면 안 된다).
+    """
+    _logger.warning(
+        "초기 검수 상태 거부(ADMIN-19) — 생성 우회 시도: actor=%s requested=%s code=%s",
+        actor_id,
+        exc.requested.value if exc.requested is not None else None,
+        exc.code,
+    )
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail={
+            "code": exc.code,
+            "message": str(exc),
+            "requested_status": exc.requested.value if exc.requested is not None else None,
+        },
+    )
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -240,7 +271,18 @@ async def create_problem(
     원장 FK(`content_provenance.problem_id → problem`)가 문항 행을 요구하므로 문항을 먼저
     flush한 뒤 원장을 add한다 — ORM 간 relationship이 없어 unit-of-work의 INSERT 순서에
     기대지 않는다.
+
+    **초기 검수 상태 제한(ADMIN-19)**: `review_status`는 미설정 또는 `pending`만 허용한다 — 그 외
+    (`approved`·`rejected`·`quarantined`)는 **DB·원장 관문보다 앞에서** 422
+    `illegal_initial_status`다. 상태 전이(승인·거부·격리)는 기존 문항에 대한 `PATCH`·
+    `POST …/transitions`의 몫이며, 생성이 그 상태로 직접 태어나게 하면 전이·감사 동작·검수 기록이
+    모두 건너뛰어진다. 판정은 `schema/review_transition.py::ensure_initial_review_status`가
+    단일 권위다.
     """
+    try:
+        ensure_initial_review_status(_as_review_status(body.review_status))
+    except IllegalInitialReviewStatus as exc:
+        raise _initial_review_status_refusal(exc, actor_id=admin.user_id) from exc
     try:
         gate_result = require_provenance(
             slug=body.slug or str(body.problem_id),
@@ -432,7 +474,12 @@ def _as_review_status(value: ReviewStatus | str | None) -> ReviewStatus | None:
 
 
 def _review_patch_refusal(
-    exc: IllegalReviewStatusChange | QuarantineReasonRequired | QuarantineRecordLocked,
+    exc: (
+        IllegalReviewStatusChange
+        | QuarantineReasonRequired
+        | QuarantineRecordLocked
+        | VerdictRequiresReviewSession
+    ),
     *,
     problem_id: uuid.UUID,
     actor_id: uuid.UUID,
@@ -464,6 +511,18 @@ def _review_patch_refusal(
                 "message": "현재 상태에서 허용되지 않는 전이입니다.",
                 "current_status": current.value if current is not None else None,
                 "requested_status": target.value if target is not None else None,
+            },
+        )
+    if isinstance(exc, VerdictRequiresReviewSession):
+        # ADMIN-18 — PATCH는 반려코드·검수 세션(타이머)을 실을 자리가 없다. 안내 경로를 함께 준다.
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+                "current_status": current.value if current is not None else None,
+                "requested_status": target.value if target is not None else None,
+                "transition_path": f"/v1/admin/review-queue/items/{problem_id}/transitions",
             },
         )
     if isinstance(exc, QuarantineReasonRequired):
@@ -501,8 +560,11 @@ async def patch_problem(
     (rejected→approved · 미설정→무엇이든 등)은 409 `illegal_transition`, 격리(`approved→
     quarantined`)에 *이번 요청의* `quarantine_reason`이 없으면 422 `reason_required`, 격리가 아닌
     전이가 격리 기록을 함께 바꾸려 하면 409 `quarantine_record_immutable`이며 어느 경우든 쓰기도
-    감사도 없다. 합법 변경은 감사 행 1개의 동작이 `update`가 아니라 **전이 액션**(approve/reject/
-    quarantine/release)이 되고, 격리 시각은 클라이언트 값이 아니라 **서버 시각**이 기록된다
+    감사도 없다. **인간 판정(pending→approved·pending→rejected)은 이 표면으로 할 수 없다(ADMIN-18)**
+    — 반려코드·검수 세션(타이머)을 실을 자리가 없어 409 `review_session_required`로 거부하고
+    `POST /v1/admin/review-queue/items/{id}/transitions`로 안내한다(격리·해제는 판정이 아니라
+    허용). 그 외 합법 변경(격리·해제)은 감사 행 1개의 동작이 `update`가 아니라 **전이 액션**
+    (quarantine/release)이 되고, 격리 시각은 클라이언트 값이 아니라 **서버 시각**이 기록된다
     (`POST …/transitions`와 같은 의미 — 시계가 클라이언트 소유면 격리를 소급할 수 있다). 상태를
     바꾸려는 요청(본문에 `review_status` 포함)은 전이 라우트와 같은 `SELECT … FOR UPDATE`로
     행을 잠그고 최신 값으로 판정한다. 상태가 그대로인 요청(GET 본문을 되돌려 보내는 왕복 포함)은
@@ -559,6 +621,16 @@ async def patch_problem(
             current=current_status,
             target=target_status,
         ) from exc
+    if plan.action is not None and action_requires_review_session(plan.action):
+        # ADMIN-18 — 인간 판정(approve·reject)은 반려코드·검수 세션(타이머)이 필요한데 이 표면에는
+        # 그것을 실을 자리가 없다. 통과시키면 "타이머 없는 판정"이 이 경로로 새므로 POST로 안내한다.
+        raise _review_patch_refusal(
+            VerdictRequiresReviewSession(plan.action),
+            problem_id=problem_id,
+            actor_id=admin.user_id,
+            current=current_status,
+            target=target_status,
+        )
     if plan.action is ReviewTransitionAction.quarantine:
         # 격리 기록은 상태와 함께, 시각은 서버가 쓴다(격리 계약 §3). 클라이언트가 보낸 시각은
         # 응답 본문에 실제 기록값이 나오므로 덮어쓴 사실이 관측된다.
@@ -569,6 +641,8 @@ async def patch_problem(
             }
         )
     updated = await session.merge(Problem.from_schema(validated))
+    # 사람이 고친 행 — 다음 CLI 적재가 덮어쓰지 못하게 표지를 남긴다(P3-25).
+    mark_cms_edited(updated)
     settings = get_settings()
     record_content_mutation_audit(
         session,
