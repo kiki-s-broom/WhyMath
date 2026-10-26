@@ -153,6 +153,8 @@ CORPUS_REPHRASED_V0 = "problem_bank_rephrased_v0"
 CORPUS_P3_CALCULUS1_DIFF_V0 = "problem_bank_p3_calculus1_diff_v0"
 # P3-05 4·5단계 — 빈 칸 채우기 은행. P3-03 은행과 같은 자가 태깅(생성기가 문항마다 유형을 단다).
 CORPUS_P3_FILL_V0 = "problem_bank_p3_fill_v0"
+# P3-65 — [12미적Ⅰ-02-02] 스킬 도달 은행. 같은 생성기 계열이라 문항마다 유형을 스스로 단다.
+CORPUS_P3_DIFFERENTIABILITY_REACH_V0 = "problem_bank_p3_differentiability_reach_v0"
 
 # ──────────────────────────────────────────────────────────────────────────
 # CONT-09 — S3-27 이후 추가된 코퍼스 30종의 `unit_codes` → problem_type_id 표.
@@ -301,7 +303,11 @@ TARGET_CORPORA: tuple[str, ...] = (
 # solve 54·evaluate 12·count 6) `unit_codes` 표로는 분류할 수 없다 — 이 코퍼스를 `TARGET_CORPORA`에
 # 넣으면 백필이 저장된 유형을 빈 리스트로 덮어 지운다. 대신 "저장분이 전량 채워져 있고 카탈로그의
 # 17종 안에 있는가"를 거버넌스 테스트가 상시 대조한다(`test_problem_type_mapping.py`).
-SELF_TAGGED_CORPORA: tuple[str, ...] = (CORPUS_P3_CALCULUS1_DIFF_V0, CORPUS_P3_FILL_V0)
+SELF_TAGGED_CORPORA: tuple[str, ...] = (
+    CORPUS_P3_CALCULUS1_DIFF_V0,
+    CORPUS_P3_FILL_V0,
+    CORPUS_P3_DIFFERENTIABILITY_REACH_V0,
+)
 
 # 계보 분류 대상(결정론 순서) — 자기 레코드의 생성기 흔적이 아니라 "변형" 계보의 부모
 # (원 생성기 산출물) 유형을 승계하는 코퍼스. 단일 레코드 서명(`classify_record`)으로는

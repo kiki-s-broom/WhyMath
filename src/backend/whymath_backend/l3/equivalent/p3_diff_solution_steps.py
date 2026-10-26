@@ -91,6 +91,7 @@ __all__ = [
     "explicit_definitions",
     "final_statement_steps",
     "solution_steps",
+    "verified_expression_chain",
 ]
 
 _DERIVATIVE: Final = "Derivative"
@@ -559,6 +560,29 @@ def _check_answer_reached(steps: Sequence[str], answer_map: Mapping[str, str]) -
             f"풀이 단계의 마지막 근 목록에 정답 {variable} = {answer_map[variable]}이 없다: "
             f"{steps[-1]!r}"
         )
+
+
+def verified_expression_chain(steps: Sequence[str]) -> StepChain:
+    """생성기가 직접 쓴 **식↔식** 연쇄를 그대로 쓰되, 전이 전건 correct일 때만 받는다.
+
+    P3-65 · 전략 E.
+
+    개념형 판정 문항(`is_differentiable` — 답이 0/1)은 출발식이 등식이 아니다. 답을 정하는 계산은
+    'x = p 에서 우미분계수 - 좌미분계수'라는 *식의 값*이므로, 등식 전략(A·B·C)으로 만들면 그 값을
+    담을 새 변수(예 `y = 2`)가 필요하고, 그 변수의 값(2)이 정답(0)과 달라 검산 재료가 발문과 다른
+    값을 말하는 것처럼 읽힌다. 그래서 식 연쇄
+    (`(Derivative(R, x) - Derivative(L, x)).doit().subs(x, p)`
+    → `(r) - (l)` → 값)를 생성기가 쓰고, 이 함수는 **검증만** 한다 — 등식 전략과 같은 기준
+    (`verify_solution` 전이 전건 correct · 전이 1개 이상)이다. 어기면 ValueError(fail-loud).
+    """
+    chain = tuple(steps)
+    if len(chain) < 2:
+        raise ValueError(f"식 연쇄는 단계가 2개 이상이어야 한다: {chain!r}")
+    if any(_is_equation(step) for step in chain):
+        raise ValueError(f"식 연쇄에 등식이 섞였다(식↔등식 전이는 판정 불가): {chain!r}")
+    if not _all_correct(chain):
+        raise ValueError(f"식 연쇄의 전이가 전건 correct가 아니다: {chain!r}")
+    return StepChain(steps=chain, strategy="E")
 
 
 def solution_steps(

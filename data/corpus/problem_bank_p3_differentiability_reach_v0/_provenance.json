@@ -1,0 +1,40 @@
+{
+  "pool": "whymath-original",
+  "source_citation": "출처: WhyMath 자체 저작 동등문제(WHYMATH_GENERATED). 평가원·EBS·검정교과서 본문 복제 0 — 성취기준 코드와 수학 구조(도함수 규칙)만으로 결정론 생성(본문 미보유 출처 인용 아님).",
+  "license_notice": "본 코퍼스의 모든 문항은 WhyMath가 자체 생성한 저작물(license=WHYMATH_GENERATED, source_type=자체생성)이다. 저작권은 WhyMath에 있으며 본문 보유가 합법이다(schema/problem.py _METADATA_ONLY_SOURCES 규칙과 정합).",
+  "corpus_name": "problem_bank_p3_differentiability_reach_v0",
+  "record_count": 300,
+  "generated": "2026-10-26",
+  "generation_method": "결정론 스켈레톤 생성기(LLM 0) — 개념 생성기 모듈 p3_diff_differentiability_skeleton_generator 의 P3DiffDifferentiabilityReachGenerator(저작 서명 모듈 p3_diff_skeleton_base). [12미적Ⅰ-02-02]의 개념 스킬에 닿는 두 유형(count-solutions · verify-claim)만 만든다. 정답은 SymPy가 후보(절댓값 안의 식의 실근)마다 좌·우 분기의 미분계수를 비교해 계산하고, 수용 게이트 Tier1이 차분몫의 좌·우 극한으로 다시 검산한다(nondifferentiable_point_count · is_differentiable).",
+  "generation_cli": "python -m whymath_backend.harness.p3_differentiability_reach_batch",
+  "task": "P3-65-calc1-02-02-skill-reaching-bank",
+  "slot_names_ko": {
+    "representative": "대표",
+    "basic": "기본",
+    "applied": "응용",
+    "misconception_trigger": "오개념 유발",
+    "diagnostic": "진단",
+    "mastery_check": "숙련도 확인"
+  },
+  "concepts": {
+    "[12미적Ⅰ-02-02]": {
+      "concept_src_id": "H:12미적Ⅰ02-02",
+      "records": 300,
+      "slots": {
+        "representative": 60,
+        "basic": 60,
+        "applied": 60,
+        "diagnostic": 60,
+        "mastery_check": 60
+      },
+      "distinct_frames": 14,
+      "distinct_skeletons": 271,
+      "generator": "p3_diff_differentiability_skeleton_generator.P3DiffDifferentiabilityReachGenerator"
+    }
+  },
+  "approval_status": {
+    "note": "이 도구는 review_status를 쓰지 않는다(키 부재). 승인은 자격 통과 프로토콜 감사(n ≥ 200 · 보정 상한 ≤ 0.02 — n = 300에서 k ≤ 1 통과) 뒤 코퍼스 단위 백필이 쓴다. 감사 전에는 phase3_coverage 의 적격 문항이 아니다.",
+    "sample_review": "미실시 — 감사 라운드 대기(사람 게이트)",
+    "evidence": "docs/reviews/p3_65_calc1_02_02_skill_reaching_bank_2026-10-26.md (감사 런북 · 커버리지 전후·투영 표) · is_published=False 유지"
+  }
+}

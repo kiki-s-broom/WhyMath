@@ -110,6 +110,7 @@ __all__ = [
     "verify_is_one_to_one",
     "verify_limit_equals_value",
     "verify_mean_equals_median",
+    "verify_nondifferentiable_point_count",
     "verify_real_root_count",
     "verify_root_aggregate",
     "verify_root_selection",
@@ -2901,6 +2902,100 @@ def verify_is_differentiable(
     verdict = "미분가능" if actual else "미분 불가(꺾인점)"
     return _fail(
         f"미분가능 — 실제 {verdict}이나 주장 {claimed_n}(불일치)",
+        samples_checked=1,
+    )
+
+
+def verify_nondifferentiable_point_count(
+    conditions: str | Sequence[str],
+    claimed: str,
+    *,
+    tol: float = 1e-9,
+) -> AnswerVerdict:
+    """함수 f(x)가 ℝ에서 *미분가능하지 않은 점의 개수*를 검증(개념형 · P3-65).
+
+    `conditions`는 f(x) 식이다.
+
+    `verify_is_differentiable`(0/1)의 개수형이다. f는 다항식과 절댓값 항으로 된 식이고, 절댓값
+    안의 식이 0이 아닌 점에서는 f가 한 다항식과 같아 미분가능하다. 그래서 후보는 각 `Abs` 인자의
+    실근뿐이고, 후보마다 **좌·우 차분몫 극한(좌·우미분계수)** 을 계산해 다르거나 발산하는 점을 센다.
+    '절댓값 안이 0이 되는 점의 개수'(`(x - p)|x - p|`·`|x - p|^3`처럼 매끄러운 꼴도 세는 오개념)나
+    '절댓값 항의 개수'로 센 답은 fail한다.
+
+    is_differentiable 과 판정을 공유하지 않는 이유: 그 함수는 첫 미분불가 점에서 멈추므로(0/1이면
+    충분하다) 뒤 후보의 계산 불가를 보지 않는다. 개수는 후보 **전부**를 판정해야 하므로, 한 후보라도
+    계산할 수 없으면 개수 전체를 판정 불가로 둔다(모른다 ≠ 아니다 — 일부만 센 값으로 pass/fail 하지
+    않는다).
+      - pass: 실제 개수 == 주장.
+      - fail: 불일치.
+      - unverifiable: 단일변수 아님·주장이 0 이상 정수 아님·ℝ 전체 정의 꼴 확인 불가·다항식·절댓값
+        꼴 아님·후보 계산 불가·극한 불가(보수적 회피).
+    """
+    condition = _single_condition(conditions)
+    if condition is None:
+        return _unverifiable("미분불가 점 개수 — 단일 식이 아님·안전 회피")
+    try:
+        expr = safe_sympify(condition)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("미분불가 점 개수 — 식 파싱 불가·안전 회피")
+    if isinstance(expr, sympy.core.relational.Relational):
+        return _unverifiable("미분불가 점 개수 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    free = sorted(expr.free_symbols, key=str)
+    if len(free) != 1:
+        return _unverifiable("미분불가 점 개수 — 단일 변수 함수가 아님·안전 회피")
+    claimed_n = _claimed_int(claimed, tol)
+    if claimed_n is None:
+        return _unverifiable("미분불가 점 개수 — 주장값이 0 이상 정수가 아님·안전 회피")
+    var = free[0]
+    if function_domain_kind(condition, str(var)) != "total":
+        return _unverifiable(
+            "미분불가 점 개수 — 원문 함수가 ℝ 전체에서 정의되는 꼴임을 확인 못 함·안전 회피"
+        )
+    abs_terms = expr.atoms(sympy.Abs)
+    if not abs_terms:
+        if expr.is_polynomial(var):
+            actual = 0
+        else:
+            return _unverifiable("미분불가 점 개수 — 다항식·절댓값 꼴이 아님·안전 회피")
+    else:
+        # 절댓값을 벗긴 뒤 다항식이 아닌 식(분수식 등)은 '후보 = Abs 인자의 근' 전제가 깨진다.
+        stripped = expr.xreplace({term: term.args[0] for term in abs_terms})
+        if not stripped.is_polynomial(var) or any(
+            not term.args[0].is_polynomial(var) for term in abs_terms
+        ):
+            return _unverifiable("미분불가 점 개수 — 다항식·절댓값 꼴이 아님·안전 회피")
+        corners: set[sympy.Expr] = set()
+        for term in abs_terms:
+            try:
+                roots = sympy.solve(sympy.Eq(term.args[0], 0), var)
+            except (NotImplementedError, sympy.PolynomialError, ValueError):
+                return _unverifiable("미분불가 점 개수 — 후보 계산 불가·안전 회피")
+            corners.update(r for r in roots if r.is_real)
+        actual = 0
+        for corner in sorted(corners, key=sympy.default_sort_key):
+            f_corner = expr.subs(var, corner)
+            if f_corner.is_finite is not True:
+                return _unverifiable("미분불가 점 개수 — 후보에서 함수값 미정의·안전 회피")
+            quotient = (expr - f_corner) / (var - corner)
+            try:
+                left = sympy.limit(quotient, var, corner, "-")
+                right = sympy.limit(quotient, var, corner, "+")
+            except Exception as exc:  # noqa: BLE001 — 극한 불가는 보수적 회피
+                logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+                return _unverifiable("미분불가 점 개수 — 좌우 미분계수 계산 불가·안전 회피")
+            if left.is_finite is not True or right.is_finite is not True:
+                actual += 1  # 한쪽 미분계수가 발산 → 그 점에서 미분 불가.
+                continue
+            difference = sympy.simplify(left - right)
+            if difference.is_zero is None:
+                return _unverifiable("미분불가 점 개수 — 좌우 미분계수 비교 불가·안전 회피")
+            if not difference.is_zero:
+                actual += 1
+    if actual == claimed_n:
+        return _pass(samples_checked=1)
+    return _fail(
+        f"미분불가 점 개수 — 실제 {actual}개이나 주장 {claimed_n}(불일치)",
         samples_checked=1,
     )
 

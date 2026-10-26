@@ -1263,6 +1263,7 @@ CATALOG: tuple[Spec, ...] = (
        "harness.university_calc1_chain_quotient_batch", "harness.vector_operations_batch",
        "harness.p3_calculus1_diff_batch",
        "harness.problem_slot_backfill", "harness.p3_fill_batch",
+       "harness.p3_differentiability_reach_batch",
        "harness.problem_type_backfill", "harness.problem_type_mapping",
        "harness.rephrased_corpus_hygiene"),
     _o("WM-O-910", "검수 워크플로(HIT 타이머·검수 세션·워크리스트·표본 패키지)", "Admin", "QA",

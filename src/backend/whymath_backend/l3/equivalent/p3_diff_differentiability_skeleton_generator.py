@@ -28,15 +28,35 @@
 --------------
 값을 계산하는 대표·기본·진단은 `ptype.evaluate-expression`, 미지 상수를 구하는 응용·숙련도 확인은
 `ptype.solve-for-unknown`.
+
+두 번째 생성기 — `P3DiffDifferentiabilityReachGenerator` (P3-65)
+--------------------------------------------------------------
+위 두 유형은 이 개념의 스킬(`deductive-reasoning`·`graph-reading`)에 닿지 않아,
+개념의 Content 연결이 `conceptual_v0`의 24건(정답 0 하나)에만 걸려 있었다
+(P3-55 판정 R1·R2). 이 모듈 아래쪽의 두 번째 생성기가 스킬에 닿는
+`count-solutions`(미분가능하지 않은 점의 개수)·`verify-claim`(미분가능성 0/1)
+문항을 **별도 은행**(`problem_bank_p3_differentiability_reach_v0`)에 만든다.
+위에서 쓰지 않았던 0/1 판정형의 풀이 단계는 그 생성기가 식↔식 연쇄
+('우미분계수 - 좌미분계수')로 직접 쓰고 기반이 검증한다
+(`ReachDiffItem.explicit_steps`). 첫 생성기의 클래스·문항은 한 바이트도 바꾸지
+않는다(승인 은행 `p3_fill_v0`의 감사 동결 사본 결속).
 """
 
 from __future__ import annotations
 
+import random
+from dataclasses import dataclass
 from typing import ClassVar, Final
 
 import sympy
 
+from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
+from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.p3_diff_expr import Poly, render_poly
+from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
+    KindedDiffItem,
+    with_item_kinds,
+)
 from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     DiffItem,
     Frame,
@@ -47,7 +67,11 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     seeded_order,
 )
 
-__all__ = ["P3DiffDifferentiabilityGenerator"]
+__all__ = [
+    "P3DiffDifferentiabilityGenerator",
+    "P3DiffDifferentiabilityReachGenerator",
+    "ReachDiffItem",
+]
 
 _EVAL: Final = "ptype.evaluate-expression"
 _SOLVE: Final = "ptype.solve-for-unknown"
@@ -762,3 +786,732 @@ class P3DiffDifferentiabilityGenerator(P3DiffSlotGenerator):
             claimed=claimed,
             standard_code=cls.standard_code,
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# P3-65 — 개념 스킬에 닿는 유형(미분불가 점의 개수 · 미분가능성 참/거짓) 은행
+# ══════════════════════════════════════════════════════════════════════════
+# 위 생성기(P3-05)의 60건은 값 계산(`evaluate-expression`)·미지 상수(`solve-for-unknown`)라
+# [12미적Ⅰ-02-02]의 개념 스킬(`deductive-reasoning`·`graph-reading`)에 닿지 않는다(P3-55 판정 ②).
+# 아래 생성기는 동결 명세(`phase3_scope_v1.required_problem_types`)가 이미 허용하는 두 유형 —
+# `count-solutions`(미분가능하지 않은 점의 개수)와 `verify-claim`(미분가능성의 참/거짓 0/1) — 의
+# 문항을 **새 은행**(`problem_bank_p3_differentiability_reach_v0`)에 만든다. 유형은 문면 형태 그대로
+# 단다: 개수를 묻는 문항은 count-solutions, '참이면 1, 거짓이면 0'·'미분가능하면 1'은 verify-claim.
+#
+# 정답의 단일 권위는 SymPy다 — 후보(절댓값 안의 식의 실근)마다 그 점의 양옆에서 절댓값을 벗긴 분기
+# 다항식을 만들고, 두 분기의 도함수를 그 점에서 비교한다(좌·우미분계수). 수용 게이트 Tier1은 이와
+# 독립인 경로(차분몫의 좌·우 극한 —
+# `verify_nondifferentiable_point_count`·`verify_is_differentiable`)로
+# 같은 답을 다시 계산한다.
+#
+# 변별력(P3-55 위험 R2 — 기존 24건은 정답이 늘 0인 같은 사실 하나였다):
+# · 참/거짓 문항은 **같은 틀 안에서** 매개변수에 따라 정답이 0과 1로 갈린다(절댓값이 보이면 0이라는
+#   규칙 하나로 풀리지 않는다).
+# · 개수 문항은 '절댓값 안의 식이 0이 되는 점의 개수'(후보 수)와 '절댓값 항의 개수'로 센 답이 정답과
+#   **다른** 매개변수만 쓴다 — 매끄러운 절댓값 꼴(`(x - p)|x - p|`·`|x - p|^3`·중근)이나 꺾임이
+#   상쇄되는
+#   항을 늘 하나 이상 넣는다(`_count_item`이 강제 — 어기면 그 매개변수를 건너뛴다).
+
+_COUNT: Final = "ptype.count-solutions"
+_CLAIM: Final = "ptype.verify-claim"
+_KIND_COUNT: Final = "nondifferentiable_point_count"
+_KIND_CLAIM: Final = "is_differentiable"
+#: 분기를 고를 때 후보의 양옆 탐침 거리 — 후보가 정수라 다른 후보와 섞이지 않는다
+#: (1보다 충분히 작다).
+_EPS: Final = sympy.Rational(1, 1000)
+
+
+@dataclass(frozen=True, slots=True)
+class ReachDiffItem(KindedDiffItem):
+    """개념형 판정 문항 — `KindedDiffItem` + 생성기가 직접 쓴 식↔식 풀이 연쇄(P3-65).
+
+    참/거짓(0/1) 문항의 풀이 계산은 '우미분계수 - 좌미분계수'라는 식의 값이라 등식 연쇄로 쓰면 새
+    변수가 필요하다. `explicit_steps`가 있으면 기반의 `steps_of`가 그 연쇄를 **검증해** 쓴다
+    (`p3_diff_solution_steps.verified_expression_chain` — 전이 전건 correct가 아니면 빌드가 멈춘다).
+    """
+
+    explicit_steps: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _Term:
+    """함수의 한 항 — SymPy 식과 학생 표기.
+
+    표기는 선두 부호를 포함한다(`_join`이 '+ -'를 만들지 않게 잇는다).
+    """
+
+    expr: sympy.Expr
+    text: str
+
+
+def _coef(k: int, body: str) -> str:
+    """계수 표기 — 1이면 생략, -1이면 '-'만('1x'·'-1(…)' 표기를 만들지 않는다)."""
+    if k == 1:
+        return body
+    if k == -1:
+        return f"-{body}"
+    return f"{k}{body}"
+
+
+def _kink(k: int, a: int) -> _Term:
+    """k|x - a| — x = a에서 꺾인다(k ≠ 0)."""
+    return _Term(k * sympy.Abs(_X - a), _coef(k, f"|{_shift(a)}|"))
+
+
+def _signed_square(m: int, a: int) -> _Term:
+    """m(x - a)|x - a| — 절댓값이 있어도 x = a에서 미분가능하다(좌·우미분계수 모두 0)."""
+    return _Term(m * (_X - a) * sympy.Abs(_X - a), _coef(m, f"({_shift(a)})|{_shift(a)}|"))
+
+
+def _abs_cube(m: int, a: int) -> _Term:
+    """m|x - a|^3 — x = a에서 미분가능하다."""
+    return _Term(m * sympy.Abs(_X - a) ** 3, _coef(m, f"|{_shift(a)}|^3"))
+
+
+def _times_shift(a: int, b: int) -> _Term:
+    """|x - a|(x - b) — b ≠ a면 x = a에서 꺾인다(곱 꼴이지만 매끄러운 꼴이 아니다)."""
+    return _Term(sympy.Abs(_X - a) * (_X - b), f"|{_shift(a)}|({_shift(b)})")
+
+
+def _smooth(expr: sympy.Expr | None) -> list[_Term]:
+    if expr is None or expr == 0:
+        return []
+    return [_Term(sympy.expand(expr), _render(expr))]
+
+
+def _function(terms: list[_Term]) -> tuple[sympy.Expr, str]:
+    return sympy.Add(*(t.expr for t in terms)), _join([t.text for t in terms])
+
+
+def _abs_roots(f_expr: sympy.Expr) -> tuple[int, ...]:
+    """후보 — 절댓값 안의 식의 실근(정수만 쓴다 · 정수가 아니면 ValueError — 틀 설계 결함)."""
+    roots: set[int] = set()
+    for term in f_expr.atoms(sympy.Abs):
+        for root in sympy.roots(sympy.Poly(term.args[0], _X), filter="R"):
+            if not root.is_integer:
+                raise ValueError(f"정수가 아닌 후보: {root} ({f_expr})")
+            roots.add(int(root))
+    return tuple(sorted(roots))
+
+
+def _slope_at(branch: sympy.Expr, point: int) -> int:
+    """분기 다항식의 x = point 미분계수(다항식 미분 — `_poly_value`와 같은 값, 정수 계수 전용)."""
+    return int(sympy.Poly(branch, _X).diff(_X).eval(point))
+
+
+@dataclass(frozen=True, slots=True)
+class _Side:
+    """후보 한 점의 좌·우 분기와 그 점의 좌·우미분계수."""
+
+    point: int
+    left: sympy.Expr
+    right: sympy.Expr
+    left_value: int
+    right_value: int
+
+    @property
+    def differentiable(self) -> bool:
+        return self.left_value == self.right_value
+
+
+def _sides(f_expr: sympy.Expr) -> tuple[_Side, ...]:
+    """후보마다 양옆(±`_EPS`)에서 절댓값 안의 식의 부호로 |u| = ±u를 골라 분기 다항식을 만든다."""
+    out: list[_Side] = []
+    for point in _abs_roots(f_expr):
+
+        def branch(side: int, at: int = point) -> sympy.Expr:
+            probe = at + side * _EPS
+            sub = {
+                t: (t.args[0] if t.args[0].subs(_X, probe) > 0 else -t.args[0])
+                for t in f_expr.atoms(sympy.Abs)
+            }
+            return sympy.expand(f_expr.xreplace(sub))
+
+        left, right = branch(-1), branch(+1)
+        out.append(_Side(point, left, right, _slope_at(left, point), _slope_at(right, point)))
+    return tuple(out)
+
+
+def _side_text(side: _Side) -> str:
+    p = side.point
+    return (
+        f"x = {p} 가까이에서 x > {p}일 때 f(x) = {_render(side.right)}이므로 "
+        f"f'(x) = {_render(sympy.diff(side.right, _X))}이고 우미분계수는 {side.right_value}이다. "
+        f"x < {p}일 때 f(x) = {_render(side.left)}이므로 "
+        f"f'(x) = {_render(sympy.diff(side.left, _X))}이고 좌미분계수는 {side.left_value}이다. "
+        + (
+            f"두 값이 같으므로 x = {p}에서 미분가능하다."
+            if side.differentiable
+            else f"두 값이 다르므로 x = {p}에서 미분가능하지 않다."
+        )
+    )
+
+
+def _candidates_text(sides: tuple[_Side, ...]) -> str:
+    listed = ", ".join(str(s.point) for s in sides)
+    only = "뿐이고" if len(sides) == 1 else "이고"
+    return (
+        f"절댓값 안의 식이 0이 되는 x의 값은 {listed}{only}, 그 밖의 점 가까이에서는 절댓값 안의 "
+        "식의 부호가 일정해 f(x)가 다항함수와 같으므로 미분가능하다. "
+    )
+
+
+def _jump_chain(side: _Side) -> tuple[str, ...]:
+    """x = p에서 '우미분계수 - 좌미분계수'의 식↔식 연쇄(도함수 → 대입값 → 차)."""
+    p = side.point
+    return (
+        f"(Derivative({side.right}, x) - Derivative({side.left}, x)).doit().subs(x, {p})",
+        f"({side.right_value}) - ({side.left_value})",
+        str(side.right_value - side.left_value),
+    )
+
+
+# ── 개수(count-solutions) ────────────────────────────────────────────────
+_COUNT_STEMS: Final = (
+    "함수 f(x) = {f}에 대하여 f(x)가 미분가능하지 않은 x의 값의 개수를 구하시오.",
+    "함수 f(x) = {f}에 대하여 실수 전체의 집합에서 f(x)가 미분가능하지 않은 점의 개수를 구하시오.",
+)
+
+
+def _naive_counts(
+    f_expr: sympy.Expr, terms: list[_Term], sides: tuple[_Side, ...]
+) -> frozenset[int]:
+    """좌·우미분계수를 비교하지 않는 셈법이 내는 값 — 정답이 이 중 하나면 그 매개변수를 쓰지 않는다.
+
+    ① 후보 수(절댓값 안의 식이 0이 되는 점을 전부 미분불가로 셈 — 매끄러운 꼴을 놓친다).
+    ② 절댓값 항의 수(절댓값 하나에 꺾임 하나).
+    ③ 절댓값 안 다항식의 차수(절댓값이 하나일 때 '차수만큼 근 → 그만큼 꺾임').
+    """
+    naive = {len(sides), sum(1 for t in terms if t.expr.has(sympy.Abs))}
+    inners = [t.args[0] for t in f_expr.atoms(sympy.Abs)]
+    if len(inners) == 1:
+        naive.add(int(sympy.degree(inners[0], _X)))
+    return frozenset(naive)
+
+
+def _count_item(*, slot: str, frame_id: str, terms: list[_Term], stem: int) -> ReachDiffItem | None:
+    """미분가능하지 않은 점의 개수 — 후보 수·절댓값 항 수로 센 답과 다른 매개변수만 낸다."""
+    f_expr, f_text = _function(terms)
+    sides = _sides(f_expr)
+    if not sides:
+        return None
+    answer = sum(1 for s in sides if not s.differentiable)
+    if answer in _naive_counts(f_expr, terms, sides):
+        return None  # 좌·우미분계수를 비교하지 않는 셈법으로도 같은 답 — 변별이 없다
+    if _constant_slope(*(b for s in sides for b in (s.left, s.right))):
+        return None  # 해설의 도함수 식이 x를 담지 못한다(E-derivative)
+    kinks = [s.point for s in sides if not s.differentiable]
+    conclusion = (
+        f"따라서 미분가능하지 않은 x의 값은 {', '.join(map(str, kinks))}이고 "
+        f"그 개수는 {answer}이다."
+        if kinks
+        else f"따라서 f(x)는 실수 전체의 집합에서 미분가능하고, 구하는 개수는 {answer}이다."
+    )
+    explanation = (
+        _candidates_text(sides) + " ".join(_side_text(s) for s in sides) + " " + conclusion
+    )
+    candidates = sorted({t.args[0] for t in f_expr.atoms(sympy.Abs)}, key=sympy.default_sort_key)
+    return ReachDiffItem(
+        slot=slot,
+        frame_id=frame_id,
+        question_text=_COUNT_STEMS[stem].format(f=f_text),
+        answer_text=str(answer),
+        explanation=explanation,
+        conditions=str(f_expr),
+        answer_map=(),
+        problem_type_code=_COUNT,
+        answer_format=answer_format_for(str(answer)),
+        # 풀이 단계 — 후보(절댓값 안의 식 = 0)의 근 목록. 개수는 그 후보마다 좌·우미분계수를 비교한
+        # 결과라 식 연쇄로 표현되지 않는다(MVT 개수 문항과 같은 한계 — Tier1이 개수를 검산한다).
+        solution_setup=f"{sympy.Mul(*candidates)} = 0",
+        answer_kind=_KIND_COUNT,
+    )
+
+
+# ── 참/거짓(verify-claim · 0/1) ──────────────────────────────────────────
+_POINT_STEMS: Final = (
+    "함수 f(x) = {f}에 대하여 f(x)가 x = {p}에서 미분가능하면 1, 미분가능하지 않으면 0을 쓰시오.",
+    "함수 f(x) = {f}에 대하여 x = {p}에서의 우미분계수와 좌미분계수가 같으면 1, 다르면 0을 쓰시오.",
+)
+#: 실수 전체에서의 판정 — 명제를 작은따옴표로 감싸면 '…다'가'가 프라임 조사 표기(`prime_josa`)로
+#: 읽혀 기계 판정이 결함으로 센다(2026-10-26 실측 45건) — 따옴표 없이 쓴다.
+_REAL_STEM: Final = (
+    "함수 f(x) = {f}에 대하여 f(x)가 실수 전체의 집합에서 미분가능하면 1, 미분가능하지 않으면 0을 "
+    "쓰시오."
+)
+
+
+def _point_claim_item(
+    *, slot: str, frame_id: str, terms: list[_Term], point: int, stem: int
+) -> ReachDiffItem | None:
+    """x = point에서의 미분가능성 0/1 — 후보가 그 점 하나뿐인 함수만(Tier1은 ℝ 전체를 판정한다).
+
+    후보가 하나면 '실수 전체에서 미분가능' ⟺ 'x = point에서 미분가능'이다(그 밖은 다항함수와 같다).
+    그래서 검산 조건(`is_differentiable` — ℝ 전체)과 발문(한 점)이 같은 명제를 가리킨다.
+    """
+    f_expr, f_text = _function(terms)
+    sides = _sides(f_expr)
+    if [s.point for s in sides] != [point]:
+        return None
+    (side,) = sides
+    if _constant_slope(side.left, side.right):
+        return None
+    answer = 1 if side.differentiable else 0
+    tail = f" 따라서 답은 {answer}이다."
+    return ReachDiffItem(
+        slot=slot,
+        frame_id=frame_id,
+        question_text=_POINT_STEMS[stem].format(f=f_text, p=point),
+        answer_text=str(answer),
+        explanation=_side_text(side) + tail,
+        conditions=str(f_expr),
+        answer_map=(),
+        problem_type_code=_CLAIM,
+        answer_format=answer_format_for(str(answer)),
+        answer_kind=_KIND_CLAIM,
+        explicit_steps=_jump_chain(side),
+    )
+
+
+def _real_claim_item(*, slot: str, frame_id: str, terms: list[_Term]) -> ReachDiffItem | None:
+    """f(x)가 실수 전체의 집합에서 미분가능한가의 0/1 — 후보 전부를 판정한다."""
+    f_expr, f_text = _function(terms)
+    sides = _sides(f_expr)
+    if not sides or _constant_slope(*(b for s in sides for b in (s.left, s.right))):
+        return None
+    answer = 1 if all(s.differentiable for s in sides) else 0
+    first_kink = next((s for s in sides if not s.differentiable), None)
+    conclusion = (
+        " 모든 후보에서 미분가능하므로 f(x)는 실수 전체의 집합에서 미분가능하다. 따라서 답은 1이다."
+        if first_kink is None
+        else (
+            f" x = {first_kink.point}에서 미분가능하지 않으므로 f(x)는 실수 전체의 집합에서 "
+            "미분가능하지 않다. 따라서 답은 0이다."
+        )
+    )
+    shown = (first_kink,) if first_kink is not None else sides
+    return ReachDiffItem(
+        slot=slot,
+        frame_id=frame_id,
+        question_text=_REAL_STEM.format(f=f_text),
+        answer_text=str(answer),
+        explanation=_candidates_text(sides) + " ".join(_side_text(s) for s in shown) + conclusion,
+        conditions=str(f_expr),
+        answer_map=(),
+        problem_type_code=_CLAIM,
+        answer_format=answer_format_for(str(answer)),
+        answer_kind=_KIND_CLAIM,
+        explicit_steps=_jump_chain(first_kink if first_kink is not None else sides[0]),
+    )
+
+
+# ── 매개변수 풀 ──────────────────────────────────────────────────────────
+_PTS: Final = (-3, -2, -1, 1, 2, 3)
+#: 덧붙이는 매끄러운 항(없음 포함) — 분기 도함수가 x를 담게 하고 문면을 다양하게 한다.
+_R_POOL: Final[tuple[sympy.Expr | None, ...]] = (
+    None,
+    _X**2,
+    -(_X**2) + 3 * _X,
+    2 * _X**2 - 1,
+    _X**3 - 2 * _X,
+    -2 * _X**2 + 5,
+)
+
+
+def _cartesian(seed: str, *axes: tuple[object, ...]) -> tuple[tuple[object, ...], ...]:
+    """축들의 곱집합을 시드 순서로 섞는다(`_grid`와 같은 절차 — 축 값이 정수만이 아니다)."""
+    combos: list[tuple[object, ...]] = [()]
+    for axis in axes:
+        combos = [(*c, v) for c in combos for v in axis]
+    return tuple(seeded_order(seed, combos))
+
+
+def _sampled(seed: str, count: int, *axes: tuple[object, ...]) -> tuple[tuple[object, ...], ...]:
+    """곱집합이 너무 큰 축(항 4개 × 종류·계수)에서 시드 고정 표본 `count`개 — 결정론·중복 제거."""
+    rng = random.Random(seed)
+    seen: set[tuple[object, ...]] = set()
+    out: list[tuple[object, ...]] = []
+    for _ in range(count * 4):
+        combo = tuple(rng.choice(axis) for axis in axes)
+        if combo not in seen:
+            seen.add(combo)
+            out.append(combo)
+        if len(out) >= count:
+            break
+    return tuple(out)
+
+
+def _ints(p: tuple[object, ...]) -> list[int]:
+    return [int(str(v)) for v in p]
+
+
+def _r_at(index: object) -> sympy.Expr | None:
+    return _R_POOL[int(str(index)) % len(_R_POOL)]
+
+
+# ── 대표(representative) — 개수: 꺾이는 항과 매끄러운 절댓값 항의 합 ───────
+_TERM_KINDS: Final = ("kink", "square", "cube", "shifted")
+
+
+def _term_of(kind: str, a: int, coef: int, other: int) -> _Term | None:
+    if kind == "kink":
+        return _kink(coef, a)
+    if kind == "square":
+        return _signed_square(coef, a)
+    if kind == "cube":
+        return _abs_cube(coef, a)
+    if other == a:
+        return None  # |x - a|(x - a)는 square 와 같은 꼴 — 'shifted'는 꺾이는 곱 꼴만 쓴다
+    return _times_shift(a, other)
+
+
+def _reach_rep_frames() -> list[Frame]:
+    def sum_of_terms(n_terms: int, frame_id: str, stem: int) -> Frame:
+        def build(p: tuple[object, ...]) -> DiffItem | None:
+            points = _ints(p[0:n_terms])
+            kinds = [str(k) for k in p[n_terms : 2 * n_terms]]
+            coefs = _ints(p[2 * n_terms : 3 * n_terms])
+            if len(set(points)) != n_terms:
+                return None
+            terms: list[_Term] = []
+            for i, (a, kind, c) in enumerate(zip(points, kinds, coefs, strict=True)):
+                other = points[(i + 1) % n_terms]
+                term = _term_of(kind, a, c, other)
+                if term is None:
+                    return None
+                terms.append(term)
+            return _count_item(slot="representative", frame_id=frame_id, terms=terms, stem=stem)
+
+        axes: list[tuple[object, ...]] = [_PTS] * n_terms
+        axes += [_TERM_KINDS] * n_terms
+        axes += [(1, 2, -1)] * n_terms
+        return Frame(frame_id, _sampled(f"p365:rep:{frame_id}", 3000, *axes), build)
+
+    return [
+        sum_of_terms(2, "reach-rep-two-terms", 0),
+        sum_of_terms(3, "reach-rep-three-terms", 1),
+        sum_of_terms(3, "reach-rep-three-terms-x", 0),
+        sum_of_terms(4, "reach-rep-four-terms", 1),
+    ]
+
+
+# ── 응용(applied) — 개수: 다항식의 절댓값(중근은 매끄럽다) ─────────────────
+def _factor_text(a: int, m: int) -> str:
+    return f"({_shift(a)})" if m == 1 else f"({_shift(a)})^{m}"
+
+
+def _reach_applied_frames() -> list[Frame]:
+    def factored(p: tuple[object, ...]) -> DiffItem | None:
+        a, b, c, d, ma, mb, mc, md, k = _ints(p)
+        roots = [(a, ma), (b, mb)] + ([(c, mc)] if mc else []) + ([(d, md)] if mc and md else [])
+        if len({r for r, _ in roots}) != len(roots) or all(m == 2 for _, m in roots):
+            return None
+        inner = sympy.Mul(*((_X - r) ** m for r, m in roots))
+        text = "".join(_factor_text(r, m) for r, m in roots)
+        terms = [_Term(k * sympy.Abs(inner), _coef(k, f"|{text}|"))]
+        return _count_item(slot="applied", frame_id="reach-app-abs-factored", terms=terms, stem=0)
+
+    def expanded(p: tuple[object, ...]) -> DiffItem | None:
+        a, b, c, ma, mb, mc, stem = _ints(p)
+        roots = [(a, ma), (b, mb)] + ([(c, mc)] if mc else [])
+        if len({r for r, _ in roots}) != len(roots) or all(m == 2 for _, m in roots):
+            return None
+        inner = sympy.expand(sympy.Mul(*((_X - r) ** m for r, m in roots)))
+        if max(abs(int(v)) for v in sympy.Poly(inner, _X).all_coeffs()) > 40:
+            return None  # 학생 손계산으로 인수분해할 크기만
+        terms = [_Term(sympy.Abs(inner), f"|{_render(inner)}|")]
+        return _count_item(
+            slot="applied", frame_id="reach-app-abs-expanded", terms=terms, stem=stem
+        )
+
+    def quadratic_with_smooth(p: tuple[object, ...]) -> DiffItem | None:
+        # |x^2 - a^2|는 절댓값 하나에 꺾임 둘이고 매끄러운 항은 절댓값 하나에 꺾임 0이라, 매끄러운
+        # 항이 하나뿐이면 '절댓값 항 수'가 늘 정답과 같다 — 매끄러운 항을 둘 둔다(c, d).
+        a, c, d, e, m, kind, k = _ints(p)
+        if len({a, -a, c, d, e}) != 5:
+            return None
+        first = _signed_square(m, c) if kind == 0 else _abs_cube(m, c)
+        second = _abs_cube(-m, d) if kind == 0 else _signed_square(-m, d)
+        terms = [
+            _Term(sympy.Abs(_X**2 - a * a), f"|x^2 - {a * a}|"),
+            first,
+            second,
+            *([_kink(k, e)] if k else []),
+        ]
+        return _count_item(
+            slot="applied", frame_id="reach-app-difference-of-squares", terms=terms, stem=1
+        )
+
+    return [
+        Frame(
+            "reach-app-abs-factored",
+            _cartesian(
+                "p365:app:fac",
+                _PTS,
+                _PTS,
+                _PTS,
+                (0, *_PTS),
+                (1, 2),
+                (1, 2),
+                (0, 1, 2),
+                (0, 1, 2),
+                (1, 2),
+            ),
+            factored,
+        ),
+        Frame(
+            "reach-app-abs-expanded",
+            _cartesian("p365:app:exp", _PTS, _PTS, (0, *_PTS), (1, 2), (1, 2), (0, 1, 2), (0, 1)),
+            expanded,
+        ),
+        Frame(
+            "reach-app-difference-of-squares",
+            _cartesian(
+                "p365:app:sq", (1, 2, 3), _PTS, _PTS, (*_PTS, 4), (1, -1, 2), (0, 1), (0, 1, -2)
+            ),
+            quadratic_with_smooth,
+        ),
+    ]
+
+
+# ── 기본(basic) — 참/거짓: 한 점의 미분가능성 ─────────────────────────────
+def _linear_text(c: int, d: int) -> str:
+    return _render(c * _X + d)
+
+
+def _reach_basic_frames() -> list[Frame]:
+    def times_linear(p: tuple[object, ...]) -> DiffItem | None:
+        point, c, shift, order, r, stem = _ints(p)
+        d = -c * point + shift  # shift = 0이면 cx + d = c(x - point) → 매끄럽다(답 1)
+        abs_text, lin_text = f"|{_shift(point)}|", f"({_linear_text(c, d)})"
+        body = abs_text + lin_text if order == 0 else lin_text + abs_text
+        terms = [_Term(sympy.Abs(_X - point) * (c * _X + d), body), *_smooth(_r_at(r))]
+        return _point_claim_item(
+            slot="basic",
+            frame_id="reach-basic-abs-times-linear",
+            terms=terms,
+            point=point,
+            stem=stem,
+        )
+
+    def cube_plus_kink(p: tuple[object, ...]) -> DiffItem | None:
+        point, m, k, r, stem = _ints(p)
+        terms = [_abs_cube(m, point), *([_kink(k, point)] if k else []), *_smooth(_r_at(r))]
+        return _point_claim_item(
+            slot="basic",
+            frame_id="reach-basic-cube-plus-kink",
+            terms=terms,
+            point=point,
+            stem=stem,
+        )
+
+    return [
+        Frame(
+            "reach-basic-abs-times-linear",
+            _cartesian(
+                "p365:basic:lin",
+                _PTS,
+                (1, 2, -1, 3),
+                (0, 0, 1, -2),
+                (0, 1),
+                (0, 1, 2, 3, 4, 5),
+                (0, 1),
+            ),
+            times_linear,
+        ),
+        Frame(
+            "reach-basic-cube-plus-kink",
+            _cartesian(
+                "p365:basic:cube", _PTS, (1, 2, -1), (0, 0, 1, -2, 3), (1, 2, 3, 4, 5), (0, 1)
+            ),
+            cube_plus_kink,
+        ),
+    ]
+
+
+# ── 진단(diagnostic) — 참/거짓: 곱 꼴의 매끄러움 판정 ──────────────────────
+def _reach_diag_frames() -> list[Frame]:
+    def times_square(p: tuple[object, ...]) -> DiffItem | None:
+        point, gap, order, r, stem = _ints(p)
+        q = point + gap  # gap = 0이면 |x - p|(x - p)^2 = |x - p|^3 → 매끄럽다
+        abs_text, sq_text = f"|{_shift(point)}|", f"({_shift(q)})^2"
+        body = abs_text + sq_text if order == 0 else sq_text + abs_text
+        terms = [_Term(sympy.Abs(_X - point) * (_X - q) ** 2, body), *_smooth(_r_at(r))]
+        if stem == 2:
+            return _real_claim_item(
+                slot="diagnostic", frame_id="reach-diag-times-square", terms=terms
+            )
+        return _point_claim_item(
+            slot="diagnostic",
+            frame_id="reach-diag-times-square",
+            terms=terms,
+            point=point,
+            stem=stem,
+        )
+
+    def times_quadratic(p: tuple[object, ...]) -> DiffItem | None:
+        point, offset, order, r, stem = _ints(p)
+        big_q = point * point + offset  # offset = 0이면 x^2 - Q 가 x = p에서 0 → 매끄럽다
+        if big_q <= 0:
+            return None
+        abs_text, q_text = f"|{_shift(point)}|", f"(x^2 - {big_q})"
+        body = abs_text + q_text if order == 0 else q_text + abs_text
+        terms = [_Term(sympy.Abs(_X - point) * (_X**2 - big_q), body), *_smooth(_r_at(r))]
+        if stem == 2:
+            return _real_claim_item(
+                slot="diagnostic", frame_id="reach-diag-times-quadratic", terms=terms
+            )
+        return _point_claim_item(
+            slot="diagnostic",
+            frame_id="reach-diag-times-quadratic",
+            terms=terms,
+            point=point,
+            stem=stem,
+        )
+
+    return [
+        Frame(
+            "reach-diag-times-square",
+            _cartesian(
+                "p365:diag:sq", _PTS, (0, 0, 1, -1, 2), (0, 1), (0, 1, 2, 3, 4, 5), (0, 1, 2)
+            ),
+            times_square,
+        ),
+        Frame(
+            "reach-diag-times-quadratic",
+            _cartesian(
+                "p365:diag:quad", _PTS, (0, 0, 1, -2, 3), (0, 1), (0, 1, 2, 3, 4, 5), (0, 1, 2)
+            ),
+            times_quadratic,
+        ),
+    ]
+
+
+# ── 숙련도 확인(mastery_check) — 꺾임이 상쇄되는 합(개수·참/거짓) ──────────
+def _cancel_terms(a: int, b: int, m: int, n: int) -> list[_Term] | None:
+    """|(x - a)(x - b)| + m(x - b)|x - a| + n(x - a)|x - b| — 두 후보 각각에서 꺾임이 상쇄될 수
+    있다.
+
+    x = a 가까이에서 |(x - a)(x - b)| = sgn(a - b)(x - b)|x - a|라 m = -sgn(a - b)면 x = a의 꺾임이
+    사라진다(x = b도 같다). 절댓값 안의 이차식은 전개해 보인다(인수분해가 첫 단계).
+    """
+    if a == b or (m == 0 and n == 0):
+        return None
+    inner = sympy.expand((_X - a) * (_X - b))
+    terms = [_Term(sympy.Abs(inner), f"|{_render(inner)}|")]
+    if m:
+        terms.append(
+            _Term(m * (_X - b) * sympy.Abs(_X - a), _coef(m, f"({_shift(b)})|{_shift(a)}|"))
+        )
+    if n:
+        terms.append(
+            _Term(n * (_X - a) * sympy.Abs(_X - b), _coef(n, f"({_shift(a)})|{_shift(b)}|"))
+        )
+    return terms
+
+
+def _reach_mastery_frames() -> list[Frame]:
+    def cancel_count(p: tuple[object, ...]) -> DiffItem | None:
+        a, b, m, n, stem = _ints(p)
+        terms = _cancel_terms(a, b, m, n)
+        if terms is None:
+            return None
+        return _count_item(
+            slot="mastery_check", frame_id="reach-mastery-cancel-count", terms=terms, stem=stem
+        )
+
+    def cancel_claim(p: tuple[object, ...]) -> DiffItem | None:
+        a, b, flip_m, flip_n = _ints(p)
+        sign = 1 if a > b else -1
+        # 상쇄 계수(-sgn)에서 flip만큼 비켜 둔다 — 둘 다 0이면 참(답 1), 하나라도 아니면 거짓(답 0).
+        m, n = -sign + flip_m, sign + flip_n
+        terms = _cancel_terms(a, b, m, n)
+        if terms is None:
+            return None
+        return _real_claim_item(
+            slot="mastery_check", frame_id="reach-mastery-cancel-claim", terms=terms
+        )
+
+    def squares_plus_kink(p: tuple[object, ...]) -> DiffItem | None:
+        a, c, d, e, m, k = _ints(p)
+        if len({a, -a, c, d, e}) != 5:
+            return None
+        terms = [
+            _Term(sympy.Abs(_X**2 - a * a), f"|x^2 - {a * a}|"),
+            _abs_cube(m, c),
+            *([_kink(k, e)] if k else []),
+            _signed_square(1 if m < 0 else -1, d),
+        ]
+        return _count_item(
+            slot="mastery_check", frame_id="reach-mastery-squares-plus-kink", terms=terms, stem=0
+        )
+
+    return [
+        Frame(
+            "reach-mastery-cancel-count",
+            _cartesian("p365:mas:cc", _PTS, _PTS, (0, 1, -1, 2, -2), (0, 1, -1, 2, -2), (0, 1)),
+            cancel_count,
+        ),
+        Frame(
+            "reach-mastery-cancel-claim",
+            _cartesian("p365:mas:cl", _PTS, _PTS, (0, 0, 1, -2), (0, 0, -1, 2)),
+            cancel_claim,
+        ),
+        Frame(
+            "reach-mastery-squares-plus-kink",
+            _cartesian("p365:mas:sk", (1, 2, 3), _PTS, _PTS, (*_PTS, 4), (1, -1, 2), (0, 1, 2, -1)),
+            squares_plus_kink,
+        ),
+    ]
+
+
+_REACH_SLOT_FRAMES = {
+    "representative": _reach_rep_frames,
+    "basic": _reach_basic_frames,
+    "applied": _reach_applied_frames,
+    "diagnostic": _reach_diag_frames,
+    "mastery_check": _reach_mastery_frames,
+}
+
+
+class P3DiffDifferentiabilityReachGenerator(P3DiffSlotGenerator):
+    """[12미적Ⅰ-02-02] 개념 스킬 도달 은행(P3-65) — 개수(count-solutions)·참/거짓(verify-claim).
+
+    기존 [12미적Ⅰ-02-02] 생성기(`P3DiffDifferentiabilityGenerator` — 승인 은행 `p3_fill_v0`의
+    60건)와 **다른 클래스**다: 그 생성기의 문항 바이트는 감사 동결 사본과 결속돼 있어 한 글자도
+    바꾸지 않는다.
+    단위 코드도 따로 둔다(감사 기계 판정 `p3_audit_qualification`이 단위 코드로 생성기를 찾는다).
+    """
+
+    standard_code: ClassVar[str] = "[12미적Ⅰ-02-02]"
+    concept_src_id: ClassVar[str] = "H:12미적Ⅰ02-02"
+    unit_code: ClassVar[str] = "P3-CALC1-DIFF-DIFFERENTIABILITY-REACH"
+    slug_prefix: ClassVar[str] = "wm-p3-diff-diffreach"
+    slots: ClassVar[tuple[SlotId, ...]] = (
+        "representative",
+        "basic",
+        "applied",
+        "diagnostic",
+        "mastery_check",
+    )
+    slot_difficulty: ClassVar[dict[str, float]] = {
+        "representative": 2.5,
+        "basic": 2.0,
+        "applied": 3.0,
+        "diagnostic": 3.0,
+        "mastery_check": 3.5,
+    }
+    slot_count: ClassVar[int] = 60
+
+    @classmethod
+    def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
+        return round_robin_items(
+            _REACH_SLOT_FRAMES[slot](),
+            cls.slot_count,
+            claimed=claimed,
+            standard_code=cls.standard_code,
+        )
+
+    def _assemble(self, spec: EquivalenceSpec, item: DiffItem) -> CandidateProblem:
+        """기반 후보에 개념형 검증 종류(`answer_kind`)를 얹는다(기반 `_assemble`은 싣지 않는다)."""
+        return with_item_kinds(super()._assemble(spec, item), item)

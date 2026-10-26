@@ -340,7 +340,7 @@ def _wrap_conceptual_verifier(
 
 
 # 개념형 판정의 등급표(S4-65) — kind마다 **결정 단계가 무엇이었는가**로 정한다. 키 집합은
-# `_CONCEPTUAL_VERIFIERS`에서 유한 전수 2종(`finite_*`, 전용 래퍼가 등급을 싣는다)을 뺀 15종과
+# `_CONCEPTUAL_VERIFIERS`에서 유한 전수 2종(`finite_*`, 전용 래퍼가 등급을 싣는다)을 뺀 16종과
 # 같아야 하며, 어긋나면 `tests/backend/l3/test_verifier_tier_assignment.py`가 RED다.
 #
 # 알려진 한계(설계서 §4.4): 근의 실수 여부·서로 다른 근 판별은 허용오차(`tol=1e-9`)로 비교한다.
@@ -355,6 +355,7 @@ _CONCEPTUAL_TIERS: dict[str, VerificationTier] = {
     "is_one_to_one": VerificationTier.SYMBOLIC_PROOF,
     "limit_equals_value": VerificationTier.SYMBOLIC_PROOF,
     "is_differentiable": VerificationTier.SYMBOLIC_PROOF,
+    "nondifferentiable_point_count": VerificationTier.SYMBOLIC_PROOF,
     "series_converges": VerificationTier.SYMBOLIC_PROOF,
     "inequality_direction": VerificationTier.SYMBOLIC_PROOF,
     # 문항이 준 유한 개수의 수치에 대한 결정론 계산 — 정확 산술(simplify == 0) 또는 단일 값 비교.
@@ -378,6 +379,7 @@ _SYMPTY_BASED_KINDS: frozenset[str] = frozenset(
         "geometric_convergence",
         "limit_equals_value",
         "is_differentiable",
+        "nondifferentiable_point_count",
         "series_converges",
         "excluded_point_count",
         "root_loss_count",
