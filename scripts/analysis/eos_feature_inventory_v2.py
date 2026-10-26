@@ -1003,7 +1003,10 @@ CATALOG: tuple[Spec, ...] = (
        "api._attempt_misconception_scan",
        # P3-56 후보 — 미분 오답 서명 독법(단답형 오답 → 후보). Kiki 승인 전에는 머지하지 않는다.
        "l4.misconception.derivative_signature",
-       "l1.misconception.wrong_answer_signature_table", "schema.wrong_answer_signature"),
+       "l1.misconception.wrong_answer_signature_table", "schema.wrong_answer_signature",
+       # P3-66 — 위 독법의 그림자 관측 수확·활성화 판정 CLI(게이트 G-p356-signature-activation의
+       # 측정 도구). 독법 자신과 같은 행에 귀속한다 — 켜기 전 오귀속 근거를 재는 짝이다.
+       "harness.attempt_scan_shadow_harvest"),
     _e("WM-E-412", "활성 오개념 가설·프로브 선택·웜스타트·증거 저장", "Student", "Pedagogy", "P0",
        "WH-1 §8.4 — 가설 감쇠·ε 규칙 (채점 회차 가설 정책 = EOS-123)",
        "l4.misconception.hypothesis",

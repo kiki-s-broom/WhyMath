@@ -1836,6 +1836,9 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "l4.misconception.judge_shadow_harvest": _SHADOW_HARVEST,
         "l4.misconception.semantic_shadow_harvest": _SHADOW_HARVEST,
         "l4.misconception.wrong_form_shadow_harvest": _SHADOW_HARVEST,
+        # P3-66 — 미분 오답 서명 독법의 그림자 관측(`whymath.api.attempt_scan_shadow.record`)을
+        # 운영이 모은 파일의 소비 쪽 · 활성화 게이트 G-p356-signature-activation 판정 도구.
+        "harness.attempt_scan_shadow_harvest": _SHADOW_HARVEST,
         "l4.step_shadow_harvest": _SHADOW_HARVEST,
         "l4.misconception.semantic_eval": (
             "by-design:오개념 의미 매칭 측정 하니스(slice 107) — 플립 결정의 구체 임계(R·F)를 "
