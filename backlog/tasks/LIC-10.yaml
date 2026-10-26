@@ -5,7 +5,7 @@ track: infra-debt
 stage: S4
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - docs/data/licensing_safety.md
-session: null
+session: claude/kind-edison-cxtn2i
 notes: "발견 2026-10-25 OPS-154 전수 조사(문제은행 조사 에이전트: 'The ledger only has rows for 7 of the 39 banks'). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
-updated: 2026-10-25
+updated: 2026-10-26
