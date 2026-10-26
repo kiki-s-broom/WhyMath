@@ -24,7 +24,7 @@
   ① Curriculum Coverage        `l1.standards.phase3_coverage` (P3-02) 재사용
   ② Concept Completeness       같은 모듈 재사용 — 필드 채움이 아니라 5연결 재설계본(아래 ARCH-43 절)
   ③ Problem Coverage           **신규 계산** — 대표 과정 스킬 중 승인 문항이 1건 이상인 스킬의 비율
-  ④ Solution QA Pass           `harness.solution_qa`(P3-07 · C1~C4) + 임계는 스코어카드에서 흡수
+  ④ Solution QA Pass           `harness.solution_qa`(P3-07 · C1~C5) + 임계는 스코어카드에서 흡수
   ⑤ Learning Loop Success      `ops.loop_kpi_gate` 의 LOOP_COMPLETION **그대로**(새 정의 없음)
   ⑥ Critical Defect            `ops.validation_scorecard.evaluate_hard_gates` 의 **F-Ⅱ·F-Ⅴ 2종만**
                                그대로 흡수(P3-33 — F-Ⅰ·Ⅲ·Ⅳ 는 생산 공정 평면 소관이라 이 지표 밖)
@@ -752,7 +752,7 @@ def _solution_qa(world: World, scope: str, reverify: ReverifyFn) -> MetricOutcom
         ),
         (
             "재검증 도구",
-            "harness.solution_qa(C1 정답↔조건 · C2 풀이 최종 답 · C3 선택지 · C4 단계 연쇄). "
+            "harness.solution_qa(C1 정답↔조건 · C2 풀이 최종 답 · C3 선택지 · C4 단계 연쇄 · C5 발문 독립 재유도). "
             "검증 불가 사유·검수 대기 목록: `python -m whymath_backend.harness.solution_qa`",
         ),
         (

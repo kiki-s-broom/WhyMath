@@ -45,7 +45,7 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
 | ① | Curriculum Coverage | Curriculum → Concept → Skill → Problem 경로가 있는 노드 | 대표 과정 교육과정 노드(10) | `l1.standards.phase3_coverage` (P3-02) **재사용** | 명세 `targets.curriculum_coverage` |
 | ② | Concept Completeness | 연결 5종(Prerequisite·Misconception·Solution·Hint·Pedagogy)이 **전부 linked** 인 핵심 개념 | 핵심 개념(10) | 같은 모듈 **재사용** — §3 재설계본 | 명세 `targets.concept_completeness` |
 | ③ | Problem Coverage | 승인 문항이 1건 이상 행사하는 스킬 | 명세 `skills`(8) | **신규 계산**(아래) | 명세 `targets.problem_coverage_by_skill` |
-| ④ | Solution QA Pass | 4검사(C1~C4)가 모두 결정되어 통과한 문항 | 통과 + 실패 문항(검증 불가 제외) | `harness.solution_qa.run_solution_qa` (P3-07 · 승인 ∧ 대표 과정 PRIMARY 문항 전수) | `1 − ` 스코어카드 `수학적 오류율` ceiling (**흡수**) |
+| ④ | Solution QA Pass | 적용된 검사(C1~C5)가 모두 결정되어 통과한 문항 | 통과 + 실패 문항(검증 불가 제외) | `harness.solution_qa.run_solution_qa` (P3-07 · 승인 ∧ 대표 과정 PRIMARY 문항 전수) | `1 − ` 스코어카드 `수학적 오류율` ceiling (**흡수**) |
 | ⑤ | Learning Loop Success | `loop_kpi_gate` LOOP_COMPLETION 의 분자 | 같은 분모 | `ops.loop_kpi_gate` **그대로 재사용**(새 정의 없음) | `LOOP_KPI_SPECS` 의 임계(Wilson 하한) |
 | ⑥ | Critical Defect | 해당(triggered) Hard Gate 수 | Hard Gate **2종**(F-Ⅱ·F-Ⅴ) | `ops.validation_scorecard.evaluate_hard_gates` 의 F-Ⅱ·F-Ⅴ **그대로 흡수**(F-Ⅰ·Ⅲ·Ⅳ 는 범위 밖) | 0건 |
 | ⑦ | Graph Connectivity Coverage | Concept → Skill → Problem → Misconception → Pedagogy 가 **한 줄**로 이어지는 핵심 개념 | 핵심 개념(10) | P3-02 **재사용** | 명세 `targets.graph_connectivity_coverage` — **0.95**(2026-10-12 확정) |
@@ -62,11 +62,12 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
   정확히 1개가 아니거나 방향이 ceiling 이 아니면 던진다(흡수 계약 파손을 조용히 넘기지 않는다).
 - **모집단이 다르다.** 스코어카드의 오류율은 *골든 항목의 FN*(독립 모델 심판 전수)이고, ④ 는 *대표 과정 승인 문항의
   SymPy 재검증 통과율*이다. 같은 숫자가 아니며 출력의 `모집단 주의` 줄이 이를 매번 적는다.
-- **검증 불가는 통과가 아니다.** 4검사 중 하나라도 결정하지 못한 문항(풀이가 답 형태로 끝나지 않음·근 선택 규칙이
+- **검증 불가는 통과가 아니다.** 적용된 검사 중 하나라도 결정하지 못한 문항(풀이가 답 형태로 끝나지 않음·근 선택 규칙이
   구조에 없음 등)은 분자·분모에 넣지 않고 `검증 불가 비율`로 따로 낸다. 검증 가능한 문항이 0건이면 **측정 실패**다
   (0% 도 100% 도 아니다). 전수 계수(표본 추정 아님)이므로 Wilson 경계를 쓰지 않는다(P3-02 와 같은 입장).
 - **엔진 = `harness.solution_qa`(P3-07).** 문항마다 C1 정답↔조건(+`answer` 필드↔`answer_map`) · C2 풀이 최종 답↔정답 ·
-  C3 선택지에 정답이 정확히 한 번 · C4 풀이 단계 연쇄 동치를 SymPy 단일 권위(`verify_answer`·`verify_final_answer`·
+  C3 선택지에 정답이 정확히 한 번 · C4 풀이 단계 연쇄 동치 · C5 발문 독립 재유도↔정답(P3-63 · 인식기가 있는 문장 틀만 — 미적용은
+  통과로 세지 않고 보고서 `[C5 적용 범위]`에 따로 낸다)을 SymPy 단일 권위(`verify_answer`·`verify_final_answer`·
   `verify_solution`)로 돌린다. 판정: 실패가 하나라도 있으면 FAIL, 없고 검증 불가가 하나라도 있으면 검증 불가, 아니면 통과.
 - **흡수 판정(P3-07 acceptance ④ · 2026-10-18).** 이원화하지 않는다 — 새 지표를 얹지 않고 이 ④ 가 곧 Solution QA Pass
   이며 임계는 스코어카드 흡수값(99.5%)을 그대로 쓴다(지시문 원문 ≥ 99% 보다 엄격). 단독 CLI(`python -m
