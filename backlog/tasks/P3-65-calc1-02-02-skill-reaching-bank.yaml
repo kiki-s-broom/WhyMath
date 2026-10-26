@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/equivalent/p3_diff_differentiability_skeleton_generator.py
-session: null
+session: claude/p3-65-calc1-02-02-skill-bank
 notes: "출처: P3-55 판정(2026-10-18) 결정 (나) 의 (가) 가지. 감사 라운드는 사람 게이트라 판정 세션이 끝낼 수 없었다. 후보 형태(구현 아님): count-solutions \"미분불가능한 점의 개수\"(꺾인 점이 여럿인 함수), verify-claim 양성 예를 섞은 0/1 판정. 02-06 의 6건 연결은 P3-44 가 새 은행을 만드는 중이라 이 태스크 범위 밖이다."
-updated: 2026-10-18
+updated: 2026-10-26
