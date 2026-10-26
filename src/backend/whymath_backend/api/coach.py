@@ -107,6 +107,7 @@ from whymath_backend.harness.wh1_tutor_context import (
     build_tutor_content_summary,
     build_tutor_context_manifest,
     log_tutor_context,
+    record_tutor_context,
 )
 from whymath_backend.harness.wh1_tutor_output import (
     TutorOutputReceipt,
@@ -2508,12 +2509,17 @@ def _finalize_tutor_context(
     *,
     tutor_invoked: bool,
     seat: str,
+    trace: TraceSink | None = None,
 ) -> TutorContextManifest:
     """튜터 호출 결과를 반영한 최종 매니페스트 + 로그 1줄(P3-08 집행 지점 ②).
 
     튜터를 불렀으면 러너가 채운 영수증(정책 실제 보유값 기준)을 쓰고, 영수증이 비었으면(러너가
     정책 생성 전에 끝났거나 대체물이 채우지 않음) 전달 0으로 적는다 — 추정으로 채우지 않는다.
     부르지 않았으면 `tutor_invoked=False`·전달 0이다(WARNING 없음·표기만).
+
+    P3-73: 튜터를 부른 턴이면 같은 최종 매니페스트의 구성 요약(값 0)을 Langfuse 이벤트
+    `tutor_context`로 남긴다(`record_tutor_context` — never-break). 부르지 않은 턴은 남기지 않는다
+    ('튜터 호출마다'). `trace`는 앱 공유 싱크(`judge_deps.trace`)다.
     """
     if not tutor_invoked:
         final = manifest
@@ -2522,6 +2528,8 @@ def _finalize_tutor_context(
     else:
         final = manifest.with_delivery(tutor_invoked=True, paths={})
     log_tutor_context(final, seat=seat)
+    if tutor_invoked:
+        record_tutor_context(trace, final, seat=seat)
     return final
 
 
@@ -3764,7 +3772,11 @@ async def create_session(
             output_receipt=tutor_output_receipt,  # P3-09: 검증 통과 구조화 출력만 담긴다.
         )
     tutor_context = _finalize_tutor_context(
-        tutor_context, tutor_receipt, tutor_invoked=tutor_invoked, seat="coach.create_session"
+        tutor_context,
+        tutor_receipt,
+        tutor_invoked=tutor_invoked,
+        seat="coach.create_session",
+        trace=judge_deps.trace,  # P3-73: 튜터 context 구성 요약 → Langfuse `tutor_context`.
     )
 
     now = datetime.now(timezone.utc)
@@ -4235,7 +4247,11 @@ async def append_turns(
             output_receipt=tutor_output_receipt,  # P3-09: create_session과 동형.
         )
     tutor_context = _finalize_tutor_context(
-        tutor_context, tutor_receipt, tutor_invoked=tutor_invoked, seat="coach.append_turns"
+        tutor_context,
+        tutor_receipt,
+        tutor_invoked=tutor_invoked,
+        seat="coach.append_turns",
+        trace=judge_deps.trace,  # P3-73: create_session과 동형.
     )
 
     current_total = dialogue.total_turns or 0
