@@ -21,7 +21,7 @@ list[ProblemSchema]`이며, api 레이어는 "DB 조회 + L6 함수 호출 + sch
 **게이팅이 저작권·페르소나 진실 게이트**(CLAUDE.md 우선순위 #2 법적 ≫ #5 UX): 어떤 문항을
 어떤 페르소나에게 노출해도 되는가의 판정 — 저작권 노출 가능성(`is_exposable`)·대상 페르소나·
 진도/시험 정합 — 은 **전부 L6 게이팅이** 수행한다. 이 라우터의 SQL 조회는 *후보 축소*가
-목적인 *최소* 조회이며(사전 필터 없이 단순 `select(Problem)` + fetch 상한), 게이팅이 모든
+목적인 *최소* 조회이며(검수 축 사전 축소 하나 + fetch 상한 — PB-27), 게이팅이 모든
 부적격 문항을 거른다. 특히 **평가원/EBS/교과서처럼 본문 미보유(구조 메타 전용) 출처는 학생
 노출이 불가**하므로(저작권법 §32 단서·영리 금지) L6 저작권 게이트가 응답에서 원천 차단한다 —
 이 라우터는 그 차단을 우회하지 않는다(테스트로 입증).
@@ -43,7 +43,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api._l6_mode_reach_state import (
@@ -78,7 +78,13 @@ from whymath_backend.l6 import (
     select_suneung_items,
     select_thinking_items,
 )
-from whymath_backend.schema.enums import Curriculum, Persona, RequiredDepth
+from whymath_backend.schema.enums import (
+    Curriculum,
+    Persona,
+    RequiredDepth,
+    ReviewStatus,
+    is_review_status_cleared,
+)
 from whymath_backend.schema.problem import Problem as ProblemSchema
 from whymath_backend.schema.problem import PublicProblem
 
@@ -89,33 +95,63 @@ _logger = logging.getLogger(__name__)
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 # 게이팅에 넘길 후보 문항 fetch 상한(합리적 상한) — 게이팅은 *메모리 안에서* 적격성·우선순위·
-# limit을 적용하므로, DB에서는 후보를 *최소 사전 필터 없이* 한 번에 끌어와 게이팅이 모두 거르게
-# 한다(게이팅이 진실 게이트라는 설계 규칙). 다만 무제한 조회는 비현실적이라 상한을 둔다 —
-# 게이팅이 다시 limit으로 줄이므로 이 상한은 "게이팅에 먹일 후보 풀의 크기"일 뿐 응답 크기가
-# 아니다. 응답 limit은 각 엔드포인트의 `limit` 쿼리 파라미터(기본 20·최대 200)가 정한다.
-# (사전 필터를 두지 않는 이유: 저작권·페르소나·진도 정합 판정을 SQL로 흩지 않고 L6 한 곳에
-# 모은다 — SQL 사전 필터가 없어도 게이팅이 부적격을 전부 차단해 *입증 가능한 단일 게이트*가 된다.)
-# PB-03 축③ — 현재 코퍼스(2026-08 기준 7종 2,647건)+여유를 감안해 1000→3000으로 상향. 이
-# sandbox에는 살아있는 Postgres가 없어 실측 성능 비교는 못 했다(정직한 공백 — 보수적으로
-# 상향한 것뿐이다). SQL 사전축소로의 재설계는 이번 범위 밖(성능 실측 후 별도 후속).
-_CANDIDATE_FETCH_LIMIT = 3000
+# limit을 적용하므로, DB에서는 후보를 한 번에 끌어와 게이팅이 모두 거르게 한다(게이팅이 진실
+# 게이트라는 설계 규칙). 다만 무제한 조회는 비현실적이라 상한을 둔다 — 게이팅이 다시 limit으로
+# 줄이므로 이 상한은 "게이팅에 먹일 후보 풀의 크기"일 뿐 응답 크기가 아니다. 응답 limit은 각
+# 엔드포인트의 `limit` 쿼리 파라미터(기본 20·최대 200)가 정한다.
+#
+# SQL 사전 축소 규칙(PB-27 · 2026-10-26 Kiki 결정 ⓒ): **허용되는 사전 축소는 검수 축 하나뿐**이다.
+#   - 검수 통과(`is_review_status_cleared`)가 아닌 문항은 모든 모드·청사진의 L6 게이트가 무조건
+#     거르므로(fail-closed), DB에서 먼저 빼도 게이트 결과는 바뀌지 않는다. 빼지 않으면 그 문항들이
+#     상한을 차지해 *통과할 문항*이 후보에서 고정적으로 밀려난다(PB-25 실측 2026-10-26: 전 은행
+#     적재 시 승인은 약 22% — 상한 3,000이면 승인 문항 상당수가 한 번도 후보가 되지 않음).
+#   - 조건은 판정 권위(`is_review_status_cleared`)에서 *호출 시점에* 유도한다 — `== approved`를
+#     여기 다시 적지 않는다(기준 이원화 금지 · CONT-01). 권위가 바뀌면 SQL도 따라간다.
+#   - 이 축소는 *빼기만* 하므로 부적격 문항이 새어 나갈 길을 만들지 않는다(게이트는 그대로 다시
+#     검사). 최악의 실패는 '나가야 할 문항의 누락'이며, 그것은 위 권위 유도로 막는다.
+#   - 저작권·페르소나·진도 정합 판정은 여전히 SQL로 옮기지 않는다 — L6 한 곳에 모아 *입증 가능한
+#     단일 게이트*를 유지한다(과목·단원 사전 축소 ⓑ를 택하지 않은 이유).
+#   - 격리(내림)는 검수 상태를 바꾸므로 다음 요청부터 즉시 후보에서 빠진다 — 캐시(ⓐ)를 택하지 않은
+#     이유(격리는 `updated_at`을 갱신하지 않아 캐시 신선도 신호로 잡히지 않는다).
+# 상한 이력: PB-03 축③ 1000→3000(2026-08 · 당시 코퍼스 2,647건) → PB-27 3000→10000(검수 통과
+# 문항만 세므로 — 현재 승인 건수는 `docs/data/corpus_facts.md`의 `problem_bank.review_approved`).
+# 승인 문항이 상한에 가까워지면 절단 경고(아래)가 나며, 그때 캐시 등 재설계를 검토한다.
+_CANDIDATE_FETCH_LIMIT = 10000
+
+
+def _review_cleared_clause() -> ColumnElement[bool]:
+    """후보 SQL의 검수 축 사전 축소 조건 — 판정 권위에서 *호출 시점에* 유도한다(PB-27).
+
+    `ReviewStatus`의 각 값을 `is_review_status_cleared`에 물어 통과하는 값만 `IN`으로 모은다.
+    권위가 미평가(`None`)까지 통과시키게 바뀌면 `IS NULL`도 함께 붙인다 — 권위와 SQL이 어긋나는
+    자리를 남기지 않는다. 통과 값이 하나도 없으면 빈 `IN`이 되어 후보가 0건이 된다(fail-closed —
+    게이트도 그 경우 전부 거르므로 결과가 같다).
+    """
+    cleared = [status for status in ReviewStatus if is_review_status_cleared(status)]
+    clause: ColumnElement[bool] = Problem.review_status.in_(cleared)
+    if is_review_status_cleared(None):
+        clause = or_(clause, Problem.review_status.is_(None))
+    return clause
 
 
 async def _fetch_candidates(session: SessionDep) -> list[ProblemSchema]:
     """게이팅에 넘길 후보 문항을 L1 영속 레이어에서 읽어 L1 schema로 복원한다.
 
-    `select(Problem)`(ORM)으로 후보를 fetch 상한(`_CANDIDATE_FETCH_LIMIT`)까지 끌어와, 각
-    ORM 행을 `to_schema()`로 `schema.Problem`(Pydantic)으로 변환해 돌려준다. **사전 SQL 필터를
-    두지 않는다** — 저작권/페르소나/진도 정합 판정은 전부 L6 게이팅 소관이며(라우터 docstring),
-    이 함수는 후보를 *축소만*(상한) 한다. `to_schema()`는 본문 미보유 불변식을 다시 통과시키므로
-    (problem.py `to_schema` 계약) 게이팅에는 항상 검증된 L1 모델만 들어간다.
+    `select(Problem)`(ORM)으로 **검수 통과 문항만**(`_review_cleared_clause` — 판정 권위에서 유도한
+    검수 축 사전 축소·PB-27) fetch 상한(`_CANDIDATE_FETCH_LIMIT`)까지 끌어와, 각 ORM 행을
+    `to_schema()`로 `schema.Problem`(Pydantic)으로 변환해 돌려준다. 검수 축 외의 SQL 필터는 **두지
+    않는다** — 저작권/페르소나/진도 정합 판정은 전부 L6 게이팅 소관이며(라우터 docstring), L6
+    게이트는 검수 축도 그대로 다시 검사한다(사전 축소는 빼기만 하므로 부적격이 새지 않는다).
+    `to_schema()`는 본문 미보유 불변식을 다시 통과시키므로(problem.py `to_schema` 계약) 게이팅에는
+    항상 검증된 L1 모델만 들어간다.
 
     안정적 결과를 위해 `created_at desc, problem_id`로 정렬한다(problems.py 목록과 동일 보조키 —
     동일 created_at에서도 결정적 순서). 게이팅이 다시 우선순위로 재정렬하지만, fetch 상한에 걸릴
     때 *어떤* 후보가 잘리는지를 결정적으로 만들기 위함이다.
 
     PB-03 축③ — 절단 관측: fetch 결과 건수가 정확히 `_CANDIDATE_FETCH_LIMIT`와 같으면(절단
-    의심 신호) 전체 행 수를 `SELECT count(*)`로 추가 조회해 `logger.warning`으로 남긴다. 조용한
+    의심 신호) 검수 통과 행 수를 같은 조건의 `SELECT count(*)`로 추가 조회해 `logger.warning`으로
+    남긴다(`total`은 *후보가 될 수 있었던* 행 수 — 조건이 다르면 절단 규모가 부풀려진다). 조용한
     절단(silent truncation)을 남기지 않는다(CLAUDE.md 침묵 실패 금지의 구체화).
 
     Args:
@@ -124,17 +160,21 @@ async def _fetch_candidates(session: SessionDep) -> list[ProblemSchema]:
     Returns:
       후보 문항의 `schema.Problem` 리스트(최대 `_CANDIDATE_FETCH_LIMIT`개·게이팅 입력).
     """
+    cleared = _review_cleared_clause()
     stmt = (
         select(Problem)
+        .where(cleared)
         .order_by(Problem.created_at.desc(), Problem.problem_id)
         .limit(_CANDIDATE_FETCH_LIMIT)
     )
     result = await session.execute(stmt)
     rows = result.scalars().all()
     if len(rows) == _CANDIDATE_FETCH_LIMIT:
-        # 절단 의심 — fetch 건수가 상한과 정확히 같다. 전체 행 수를 별도 조회해 실제 절단
-        # 여부·규모를 로그로 남긴다(조용히 넘기지 않는다).
-        total = (await session.execute(select(func.count()).select_from(Problem))).scalar_one()
+        # 절단 의심 — fetch 건수가 상한과 정확히 같다. 같은 검수 조건의 행 수를 별도 조회해 실제
+        # 절단 여부·규모를 로그로 남긴다(조용히 넘기지 않는다).
+        total = (
+            await session.execute(select(func.count()).select_from(Problem).where(cleared))
+        ).scalar_one()
         truncated = max(total - _CANDIDATE_FETCH_LIMIT, 0)
         _logger.warning(
             "gating candidate fetch truncated: fetched=%d total=%d truncated=%d",
