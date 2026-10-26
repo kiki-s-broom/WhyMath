@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,12 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 현상 고정 — P3-55 판정문(docs/reviews/p3_55_calc1_02_02_content_single_template_judgment_2026-10-18.md) §②-4 표를 phase3_coverage 보고서(텍스트·--json 둘 다)에서 재현한다: 개념별로 스킬에 닿는 승인 문항의 건수·서로 다른 줄기(phase3_stem_fold 기준)·서로 다른 정답·(은행, 유형) 조합 수. 판정 기준 main d33ab2e4 에서 [12미적Ⅰ-02-02] = 24건·줄기 4·정답 1·조합 1(conceptual_v0 × verify-claim), [12미적Ⅰ-02-06] = 6건·줄기 6·정답 1·조합 1.\n② 게이트 판정 불변 — 이 값은 공개만 한다. 목표값·met·exit code·기존 JSON 키는 바뀌지 않는다(종료 코드 분리는 P3-54 소관). 변경 전후 metrics 동일을 테스트로 고정한다.\n③ 변별력 — 연결 문항이 1틀·정답 1개인 합성 코퍼스에서는 취약 표시가 켜지고, 다양한 합성 코퍼스에서는 꺼지는 정상/결함 주입 쌍을 둔다. 취약 표시의 임계값은 근거와 함께 보고 전용 상수로 두고, 임계값 선택(몇 개 미만을 취약으로 볼지)은 Kiki 결정 후보로 notes에 남긴다 — 세션이 임의로 확정하지 않는다.\n④ 집행 지점 분리 — 정본화(보고서 필드)와 소비(P3 게이트 판정문이 이 필드를 읽는 절차)를 별항으로 적고, 소비 쪽은 docs/standards 의 게이트 판정 절차에 한 줄 병기한다. 계층 커버리지 l1 80% 유지."
-artifacts: []
+artifacts:
+  - "#1741 (커밋 6ba07234)"
 paths:
   - src/backend/whymath_backend/l1/standards/phase3_coverage.py
   - tests/backend/l1/test_phase3_coverage.py
   - docs/standards/phase3_metrics_contract.md
-session: claude/gracious-newton-lj741v
+session: null
 notes: |-
   출처: P3-55 판정(2026-10-18) R4 — Content 지표가 연결 여부만 말해 02-02 의 단일 템플릿 의존이 10/12·10/17 두 판정문에서 드러나지 않았다. 같은 파일(phase3_coverage.py)을 P3-54 도 건드린다 — 착수 시 paths 겹침 검사 결과를 확인할 것. [Kiki 결정 후보 — P3-64 취약 표시 기준] 현재 잠정값은 줄기 2 미만 또는 정답 2 미만(서로 다른 값이 1개뿐 = 전부 같다)이며 보고 전용이라 판정에 참여하지 않는다. 결정할 것: (a) 기준을 올릴지 — 후보는 명세 min_distinct_per_slot(슬롯당 최소 서로 다른 문제 수)과 맞추기 (b) (은행, 유형) 조합 수도 기준에 넣을지 — 넣으면 02-01·02-05·02-08·02-09 처럼 한 유형만 쓰는 개념이 추가로 취약이 된다 (c) 연결 건수 하한을 둘지 — 02-06 은 6건이다. 세션은 (a)~(c) 어느 것도 확정하지 않았다.
 
