@@ -49,7 +49,8 @@ def _items() -> list[ReachDiffItem]:
 
 def _expr(text: str) -> sympy.Expr:
     """학생 표기 식('|x - 2|(x + 1) - x^2')을 SymPy로 읽는다 — `|…|`는 `Abs(…)`로."""
-    s = re.sub(r"\|([^|]+)\|", r"Abs(\1)", text)
+    # 막대 양옆에 공백을 둔다 — 'x|x - 1|'이 'xAbs(…)'(한 이름)로 붙어 읽히지 않게.
+    s = re.sub(r"\|([^|]+)\|", r" Abs(\1) ", text)
     return parse_expr(s, local_dict={"x": _X, "Abs": sympy.Abs}, transformations=_TRANSFORMS)
 
 
@@ -271,10 +272,28 @@ class TestSolutionSteps:
             "-2",
         )
         assert verified_expression_chain(good).steps == good
-        for bad in (
-            (*good[:2], "2"),
-            (*good[:2], "y = -2"),
-            good[:1],
-        ):
-            with pytest.raises(ValueError):
-                verified_expression_chain(bad)
+        # 세 거부 가지를 각각 사유 문구로 가른다 — 한 가지가 지워져도 다른 가지가 대신 거부하면
+        # `pytest.raises(ValueError)` 만으로는 그 삭제가 보이지 않는다(P3-65 리뷰 ⑤).
+        with pytest.raises(ValueError, match="전건 correct가 아니다"):
+            verified_expression_chain((*good[:2], "2"))
+        with pytest.raises(ValueError, match="등식이 섞였다"):
+            verified_expression_chain((*good[:2], "y = -2"))
+        with pytest.raises(ValueError, match="2개 이상"):
+            verified_expression_chain(good[:1])
+        with pytest.raises(ValueError, match="2개 이상"):
+            verified_expression_chain(())
+
+
+class TestCandidateRootsAreNeverSilentlyDropped:
+    """생성기의 후보(절댓값 안 식의 실근)는 차수만큼 · 정수로 나와야 한다 — 아니면 생성 거부(⑥)."""
+
+    def test_integer_roots_with_multiplicity(self) -> None:
+        assert mod._abs_roots(sympy.Abs((_X - 1) ** 2 * (_X + 2))) == (-2, 1)
+
+    @pytest.mark.parametrize(
+        "inner",
+        [_X**2 + 1, (_X - 1) * (_X**2 + 4), _X**2 - 2, _X**3 - 3 * _X + 1],
+    )
+    def test_missing_or_irrational_roots_refuse_generation(self, inner: sympy.Expr) -> None:
+        with pytest.raises(ValueError, match="차수만큼|정수가 아닌"):
+            mod._abs_roots(sympy.Abs(inner))

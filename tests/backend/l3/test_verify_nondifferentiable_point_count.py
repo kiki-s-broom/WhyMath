@@ -8,7 +8,9 @@ unverifiable 을 동결한다. 픽스처는 절마다 그 절이 없으면 통�
 from __future__ import annotations
 
 import pytest
+import sympy
 
+from whymath_backend.l3 import verify_answer as va
 from whymath_backend.l3.verify_answer import (
     verify_is_differentiable,
     verify_nondifferentiable_point_count,
@@ -99,3 +101,115 @@ class TestOutOfScopeIsUnverifiableNotAVerdict:
         """|sin x| 는 꺾이는 점이 무한히 많다 — 어떤 주장도 판정하지 않는다(유한 후보 전제 밖)."""
         for claimed in ("0", "1", "2"):
             assert _state("Abs(sin(x))", claimed) == "unverifiable"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-65 독립 리뷰 P1-1 — 무리수 실근(세 실근 기약 삼차식)의 후보를 놓치던 결함의 회귀 동결
+# ──────────────────────────────────────────────────────────────────────────
+#: `sympy.solve` 가 허수 섞인 근호식(`is_real` None)으로 돌려주는 세 실근 — 종전 `if r.is_real` 필터가
+#: 셋 다 버려 후보 0개 → '0'(미분불가 점 없음)·'1'(미분가능)이 pass 했다.
+_THREE_IRRATIONAL_KINKS = ("Abs(x**3 - 3*x + 1)", "Abs(x**3 - 4*x + 1)", "x*Abs(x**3 - 3*x + 1)")
+
+
+class TestIrrationalRealRootsAreCandidates:
+    @pytest.mark.parametrize("expr", _THREE_IRRATIONAL_KINKS)
+    def test_three_kinks_are_counted(self, expr: str) -> None:
+        assert _state(expr, "0") == "fail"
+        assert _state(expr, "3") == "pass"
+
+    @pytest.mark.parametrize("expr", _THREE_IRRATIONAL_KINKS)
+    def test_zero_one_verifier_never_passes_differentiable(self, expr: str) -> None:
+        """`verify_is_differentiable` 도 같은 결함이 있었다 — '1'(미분가능)이 pass 하면 안 된다.
+
+        그 검증기는 후보에서 차분몫 극한을 쓰는데 `CRootOf` 에서 극한이 계산되지 않으므로 판정 불가로
+        접는다(거짓 pass 가 아니면 된다 — 판정 범위 확장은 이 태스크 밖).
+        """
+        assert verify_is_differentiable(expr, "1").state != "pass"
+
+    @pytest.mark.parametrize(
+        ("expr", "count"),
+        [
+            ("Abs(x**5 - x - 1)", 1),  # 실근 하나(CRootOf) — 극한으로는 계산 불가였던 실제 사례
+            ("Abs(x**5 - 5*x + 1)", 3),  # 실근 셋(CRootOf)
+            ("Abs(x**3 - 2*x - 1)", 3),  # 유리근 + 근호식 근
+            ("Abs(x**2 - 2)*(x**2 - 2)", 0),  # 무리근이지만 매끄러운 꼴
+            ("Abs(x**3 - 3*x + 1)**3", 0),  # 무리근 · 세제곱 — 매끄럽다
+        ],
+    )
+    def test_exact_algebra_decides_irrational_corners(self, expr: str, count: int) -> None:
+        assert _state(expr, str(count)) == "pass"
+        assert _state(expr, str(count + 1)) == "fail"
+
+
+class TestUnverifiableBranches:
+    """판정 불가 가지마다 그 가지를 밟는 입력 — 가지를 지우면 pass/fail·예외로 바뀐다(뮤테이션 동결)."""
+
+    def test_non_polynomial_after_stripping(self) -> None:
+        assert _state("Abs(x - 1) + sin(x)", "1") == "unverifiable"
+
+    def test_zero_one_verifier_refuses_non_polynomial_inner(self) -> None:
+        """후보를 `real_roots` 로 구하므로 인자가 다항식이 아니면 후보를 셀 수 없다."""
+        assert verify_is_differentiable("Abs(sin(x))", "0").state == "unverifiable"
+        assert verify_is_differentiable("Abs(sin(x))", "1").state == "unverifiable"
+
+    @pytest.mark.parametrize("claimed", ["1+", "2개", "x"])
+    def test_unparseable_claims_are_not_counts(self, claimed: str) -> None:
+        """안전 파서가 거부하는 주장 — 예외를 올리지 않고 판정 불가로 접는다."""
+        assert _state("Abs(x - 1)", claimed) == "unverifiable"
+
+    def test_real_root_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def boom(*_a: object, **_k: object) -> list[sympy.Expr]:
+            raise NotImplementedError("실근 계산 불가 주입")
+
+        monkeypatch.setattr(sympy, "real_roots", boom)
+        assert _state("Abs(x - 1)", "1") == "unverifiable"
+        assert verify_is_differentiable("Abs(x - 1)", "0").state == "unverifiable"
+
+    def test_root_reality_not_established(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sympy, "real_roots", lambda *_a, **_k: [sympy.Symbol("r")])
+        assert _state("Abs(x - 1)", "1") == "unverifiable"
+        assert verify_is_differentiable("Abs(x - 1)", "0").state == "unverifiable"
+
+    def test_minimal_polynomial_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def boom(*_a: object, **_k: object) -> sympy.Expr:
+            raise NotImplementedError("최소다항식 불가 주입")
+
+        monkeypatch.setattr(sympy, "minimal_polynomial", boom)
+        assert _state("Abs(x - 1)", "1") == "unverifiable"
+
+    def test_reality_check_is_its_own_gate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """실수 여부가 None 인 근(`solve` 의 근호식)이 와도 부호 판독이 통과해 버리는 상황을 만든다 —
+        그때 막는 것은 `is_real is not True` 검사 하나다(다른 가지가 대신 막지 않게 고립)."""
+        radicals = sympy.solve(sympy.Symbol("x") ** 3 - 3 * sympy.Symbol("x") + 1)
+        assert all(r.is_real is None for r in radicals)  # 전제 — 픽스처가 그 절을 밟는다
+        monkeypatch.setattr(sympy, "real_roots", lambda *_a, **_k: radicals)
+        monkeypatch.setattr(va, "_nonzero_sign", lambda _v: 1)
+        assert _state("Abs(x**3 - 3*x + 1)", "3") == "unverifiable"
+        assert _state("Abs(x**3 - 3*x + 1)", "0") == "unverifiable"
+
+    def test_sign_not_readable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(va, "_nonzero_sign", lambda _v: None)
+        assert _state("Abs(x - 1)", "1") == "unverifiable"
+
+    @pytest.mark.parametrize(("unreadable_call", "label"), [(0, "기울기"), (1, "인자")])
+    def test_each_sign_gate_alone(
+        self, monkeypatch: pytest.MonkeyPatch, unreadable_call: int, label: str
+    ) -> None:
+        """부호 판독 두 곳(최소다항식 기울기 · 인자의 나머지 몫)을 하나씩만 실패시킨다 — 한 가지가
+        지워지면 다른 가지가 대신 막지 못하고 None 이 산술로 흘러간다."""
+        calls: list[int] = []
+
+        def reader(_value: sympy.Expr) -> int | None:
+            calls.append(1)
+            return None if len(calls) - 1 == unreadable_call else 1
+
+        monkeypatch.setattr(va, "_nonzero_sign", reader)
+        verdict = verify_nondifferentiable_point_count("Abs(x - 1)", "1")
+        assert verdict.state == "unverifiable", label
+        assert verdict.reason is not None and label in verdict.reason
+
+    def test_sign_reader_refuses_zero_and_complex(self) -> None:
+        assert va._nonzero_sign(sympy.Integer(0)) is None
+        assert va._nonzero_sign(sympy.I) is None
+        assert va._nonzero_sign(sympy.sqrt(2) - 1) == 1
+        assert va._nonzero_sign(1 - sympy.sqrt(3)) == -1

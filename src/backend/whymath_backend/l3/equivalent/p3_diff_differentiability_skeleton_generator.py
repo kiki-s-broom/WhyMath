@@ -887,7 +887,14 @@ def _abs_roots(f_expr: sympy.Expr) -> tuple[int, ...]:
     """후보 — 절댓값 안의 식의 실근(정수만 쓴다 · 정수가 아니면 ValueError — 틀 설계 결함)."""
     roots: set[int] = set()
     for term in f_expr.atoms(sympy.Abs):
-        for root in sympy.roots(sympy.Poly(term.args[0], _X), filter="R"):
+        poly = sympy.Poly(term.args[0], _X)
+        found = sympy.real_roots(poly)  # 중복도만큼 반복 · 실근 전부(근호식·CRootOf 포함)
+        # 실근이 차수만큼 나오지 않으면(허근·놓친 근) 후보 목록을 확정할 수 없다 — 조용히 줄여 쓰지
+        # 않고 생성을 거부한다(P3-65 리뷰 ⑥). 이 생성기의 절댓값 인자는 전부 정수 근으로
+        # 인수분해된다.
+        if len(found) != poly.degree():
+            raise ValueError(f"실근이 차수만큼 나오지 않는 절댓값 인자: {term.args[0]} ({f_expr})")
+        for root in found:
             if not root.is_integer:
                 raise ValueError(f"정수가 아닌 후보: {root} ({f_expr})")
             roots.add(int(root))
@@ -1197,6 +1204,12 @@ def _reach_rep_frames() -> list[Frame]:
 
 # ── 응용(applied) — 개수: 다항식의 절댓값(중근은 매끄럽다) ─────────────────
 def _factor_text(a: int, m: int) -> str:
+    """인수 표기 — `(x - a)`·`(x - a)^2`, a = 0이면 괄호 없이 `x`·`x^2`.
+
+    `(x)` 표기를 만들지 않는다(P3-65 리뷰 ③).
+    """
+    if a == 0:
+        return "x" if m == 1 else f"x^{m}"
     return f"({_shift(a)})" if m == 1 else f"({_shift(a)})^{m}"
 
 
@@ -1207,7 +1220,8 @@ def _reach_applied_frames() -> list[Frame]:
         if len({r for r, _ in roots}) != len(roots) or all(m == 2 for _, m in roots):
             return None
         inner = sympy.Mul(*((_X - r) ** m for r, m in roots))
-        text = "".join(_factor_text(r, m) for r, m in roots)
+        # x 인수는 맨 앞에 쓴다('(x - 1)x'가 아니라 'x(x - 1)') — 식은 그대로, 표기 순서만.
+        text = "".join(_factor_text(r, m) for r, m in sorted(roots, key=lambda rm: rm[0] != 0))
         terms = [_Term(k * sympy.Abs(inner), _coef(k, f"|{text}|"))]
         return _count_item(slot="applied", frame_id="reach-app-abs-factored", terms=terms, stem=0)
 
@@ -1285,6 +1299,8 @@ def _reach_basic_frames() -> list[Frame]:
         d = -c * point + shift  # shift = 0이면 cx + d = c(x - point) → 매끄럽다(답 1)
         abs_text, lin_text = f"|{_shift(point)}|", f"({_linear_text(c, d)})"
         body = abs_text + lin_text if order == 0 else lin_text + abs_text
+        if d == 0:  # 일차식이 cx 뿐이면 괄호 없이 앞에 쓴다('|x - 1|(x)'가 아니라 'x|x - 1|')
+            body = _coef(c, f"x{abs_text}")
         terms = [_Term(sympy.Abs(_X - point) * (c * _X + d), body), *_smooth(_r_at(r))]
         return _point_claim_item(
             slot="basic",
@@ -1336,6 +1352,8 @@ def _reach_diag_frames() -> list[Frame]:
         q = point + gap  # gap = 0이면 |x - p|(x - p)^2 = |x - p|^3 → 매끄럽다
         abs_text, sq_text = f"|{_shift(point)}|", f"({_shift(q)})^2"
         body = abs_text + sq_text if order == 0 else sq_text + abs_text
+        if q == 0:  # '(x)^2' 표기를 만들지 않는다 — 'x^2|x - p|'
+            body = f"x^2{abs_text}"
         terms = [_Term(sympy.Abs(_X - point) * (_X - q) ** 2, body), *_smooth(_r_at(r))]
         if stem == 2:
             return _real_claim_item(
