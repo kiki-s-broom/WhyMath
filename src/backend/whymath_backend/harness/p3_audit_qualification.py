@@ -61,6 +61,9 @@ from pydantic import ValidationError
 
 from whymath_backend.harness.corpus_reverify import reverify_corpus
 from whymath_backend.harness.p3_calculus1_diff_batch import GENERATORS
+from whymath_backend.harness.p3_differentiability_reach_batch import (
+    GENERATORS as REACH_GENERATORS,
+)
 from whymath_backend.harness.p3_fill_batch import GENERATORS as FILL_GENERATORS
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
 from whymath_backend.l1.problem_bank.derived_form_rules import derived_form_violations
@@ -493,7 +496,12 @@ def _cmd_emit(args: argparse.Namespace) -> int:
 _GENERATOR_BY_CODE: Final = {g.standard_code: g for g in GENERATORS}
 #: 단위 코드로 생성기를 찾는다 — 빈 칸 채우기 은행(P3-05)은 같은 성취기준(02-03·02-10)에 생성기가
 #: 둘이라 성취기준 코드만으로는 어느 쪽 문항인지 가릴 수 없다(단위 코드는 생성기마다 고유하다).
-_GENERATOR_BY_UNIT: Final = {g.unit_code: g for g in (*GENERATORS, *FILL_GENERATORS)}
+#: P3-65 스킬 도달 은행(`problem_bank_p3_differentiability_reach_v0`)의 생성기도 단위 코드로
+#: 찾는다 —
+#: [12미적Ⅰ-02-02]에 생성기가 둘(빈 칸 채우기 · 스킬 도달)이라 성취기준 코드로는 가릴 수 없다.
+_GENERATOR_BY_UNIT: Final = {
+    g.unit_code: g for g in (*GENERATORS, *FILL_GENERATORS, *REACH_GENERATORS)
+}
 _FILL_STANDARD_CODES: Final = {g.standard_code: g for g in FILL_GENERATORS}
 
 

@@ -1306,6 +1306,7 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.highschool_quotient_rule_batch": _BATCH_GENERATOR,
         "harness.p3_calculus1_diff_batch": _BATCH_GENERATOR,
         "harness.p3_fill_batch": _BATCH_GENERATOR,
+        "harness.p3_differentiability_reach_batch": _BATCH_GENERATOR,
         "harness.linear_inequality_system_batch": _BATCH_GENERATOR,
         "harness.matrix_ops_batch": _BATCH_GENERATOR,
         "harness.measurement_unit_conversion_batch": _BATCH_GENERATOR,

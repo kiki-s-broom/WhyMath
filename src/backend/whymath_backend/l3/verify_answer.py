@@ -65,6 +65,7 @@ import random
 import re
 import tokenize
 from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from typing import Final, Literal, cast
 
 import sympy
@@ -110,6 +111,7 @@ __all__ = [
     "verify_is_one_to_one",
     "verify_limit_equals_value",
     "verify_mean_equals_median",
+    "verify_nondifferentiable_point_count",
     "verify_real_root_count",
     "verify_root_aggregate",
     "verify_root_selection",
@@ -2915,13 +2917,9 @@ def verify_is_differentiable(
         else:
             return _unverifiable("미분가능 — 다항식·절댓값 꼴이 아님·안전 회피")
     else:
-        corners: set[sympy.Expr] = set()
-        for term in abs_terms:
-            try:
-                roots = sympy.solve(sympy.Eq(term.args[0], 0), var)
-            except (NotImplementedError, sympy.PolynomialError, ValueError):
-                return _unverifiable("미분가능 — 꺾인점 계산 불가·안전 회피")
-            corners.update(r for r in roots if r.is_real)
+        corners = _abs_real_corners(abs_terms, var)
+        if isinstance(corners, str):
+            return _unverifiable(f"미분가능 — {corners}·안전 회피")
         actual = 1
         for corner in corners:
             f_corner = expr.subs(var, corner)
@@ -2942,6 +2940,204 @@ def verify_is_differentiable(
     verdict = "미분가능" if actual else "미분 불가(꺾인점)"
     return _fail(
         f"미분가능 — 실제 {verdict}이나 주장 {claimed_n}(불일치)",
+        samples_checked=1,
+    )
+
+
+def _abs_real_corners(
+    abs_terms: AbstractSet[sympy.Expr], var: sympy.Symbol
+) -> list[sympy.Expr] | str:
+    """절댓값 인자의 실근 전부(정확값 — 유리수·근호식·`CRootOf`) · 셀 수 없으면 사유 문자열.
+
+    P3-65 리뷰 P1-1.
+
+    `sympy.solve` 는 세 실근을 가진 기약 삼차식(`x**3 - 3*x + 1`)의 근을 허수가 섞인 근호식으로
+    돌려주고 그 `is_real` 은 None 이다 — `if r.is_real` 로 거르면 **실근 셋이 조용히 사라져** 후보가
+    0개가 되고, 꺾이는 함수가 '미분가능'으로 통과했다(2026-10-26 독립 리뷰 실측). 그래서 실근은
+    `real_roots`(실근만·정확·`CRootOf`)로 구하고, 인자가 다항식이 아니거나 실근 판정이 확정되지
+    않으면(`is_real` 이 True 가 아님) 후보 집합을 모른다 — 셀 수 없음으로 접는다(모른다 ≠ 없다).
+    """
+    corners: list[sympy.Expr] = []
+    for term in sorted(abs_terms, key=sympy.default_sort_key):
+        inner = term.args[0]
+        try:
+            # 인자가 다항식이 아니면(|sin x| 등 — 후보가 유한하지 않다) `Poly` 가
+            # PolynomialError 다.
+            roots = sympy.real_roots(sympy.Poly(inner, var))
+        except (NotImplementedError, sympy.PolynomialError, ValueError) as exc:
+            logger.debug("verify_answer 실근 계산 회피: %s", type(exc).__name__)
+            return "꺾인점 후보 계산 불가(인자가 다항식이 아니거나 실근 계산 실패)"
+        for root in roots:
+            if root.is_real is not True:
+                return "꺾인점 후보의 실수 여부 미확정"
+            if root not in corners:
+                corners.append(root)
+    return corners
+
+
+#: 0 이 아님을 정확히 판정한 대수적 수의 부호를 수치로 읽을 때의 자릿수·하한(아래 참조).
+_SIGN_DIGITS: Final = 50
+_SIGN_FLOOR: Final = sympy.Rational(1, 10**40)
+
+
+def _minimal_poly(root: sympy.Expr, var: sympy.Symbol) -> sympy.Poly | None:
+    """후보 근의 (Q 위) 최소다항식 — `real_roots` 는 유리수·근호식·`CRootOf` 를 섞어 돌려준다.
+
+    셋 모두 `minimal_polynomial` 로 다룬다. 계산할 수 없으면 None(호출측이 판정 불가로 접는다).
+    """
+    try:
+        return sympy.Poly(sympy.minimal_polynomial(root, var), var)
+    except (NotImplementedError, sympy.PolynomialError, ValueError) as exc:
+        logger.debug("verify_answer 최소다항식 회피: %s", type(exc).__name__)
+        return None
+
+
+def _nonzero_sign(value: sympy.Expr) -> int | None:
+    """0 이 아님이 이미 정확히 판정된 실수의 부호 — 수치(50자리)가 하한보다 작거나 복소면 None."""
+    numeric = sympy.N(value, _SIGN_DIGITS)
+    if not numeric.is_real or abs(numeric) < _SIGN_FLOOR:
+        return None
+    return 1 if numeric > 0 else -1
+
+
+def _corner_differentiability(
+    expr: sympy.Expr, abs_terms: AbstractSet[sympy.Expr], var: sympy.Symbol
+) -> list[bool] | str:
+    """후보마다 미분가능한가(좌·우미분계수가 같은가) — **극한 없이 정확 대수**로 판정(P3-65 P1-1).
+
+    전제: f 는 다항식과 `Abs(u)`(u 다항식)로만 된 식이다. 후보 c 에서 각 `Abs(u)` 는 c 의 양옆에서
+    ±u 로 벗겨진다 — u 를 c 의 기약 다항식 g 로 나눠 u = g^k·h (h(c) ≠ 0) 라 하면 우측 부호는
+    sgn h(c)·sgn g'(c)^k, 좌측 부호는 sgn h(c)·(-sgn g'(c))^k 다(g 는 기약이라 c 는 단순근). 벗긴
+    두 분기 R·L 의 도함수 차 D = (R - L)' 가 c 에서 0 인지는 **D 를 g 로 나눈 나머지가 0 인가**로
+    정확히 판정한다 — `CRootOf` 에서의 극한(`sympy.limit` 은 NotImplementedError)이 필요 없다.
+    부호는 '0 이 아님'을 나머지로 정확히 확인한 뒤에만 50자리 수치로 읽는다(하한 미만이면 판정
+    불가).
+    셀 수 없으면 사유 문자열(호출측이 unverifiable 로 접는다).
+    """
+    stripped = expr.xreplace({term: term.args[0] for term in abs_terms})
+    if not stripped.is_polynomial(var):
+        return "절댓값을 벗긴 식이 다항식이 아님"
+    try:
+        # 벗긴 식이 상쇄로 다항식이 돼도(`|sin x| − sin x`) 인자는 다항식이 아닐 수 있다 — 그때
+        # `Poly` 가 PolynomialError 다(P3-65 4차 리뷰 P2: 예외가 밖으로 새면 배치가 중단된다).
+        inner_polys = {term: sympy.Poly(term.args[0], var) for term in abs_terms}
+        stripped_poly = sympy.Poly(stripped, var)
+    except (sympy.PolynomialError, NotImplementedError, ValueError) as exc:
+        logger.debug("verify_answer 절댓값 인자 다항식화 회피: %s", type(exc).__name__)
+        return "절댓값 인자가 다항식이 아님"
+    # 아래 '나머지가 0인가'는 g(최소다항식)가 **Q 위에서** 기약이라는 데 기댄다. 계수가 Q(√2)처럼
+    # 확장체에 있으면 나눗셈이 그 체에서 일어나 g가 쪼개지고(x²−2 = (x−√2)(x+√2)), 'c에서 0'이
+    # 아니라 '켤레 근 전부에서 0'을 묻게 돼 매끄러운 점을 꺾인 점으로 센다(P3-65 3차 리뷰 P1 —
+    # |x²−2|(x−√2)에 '2' pass). 소수(RR)·π(ZZ[π])도 같은 전제 밖이므로 정수·유리수 계수만 판정한다.
+    for poly in (stripped_poly, *inner_polys.values()):
+        if not (poly.domain.is_ZZ or poly.domain.is_QQ):
+            return "계수가 정수·유리수가 아님(정확 판정 범위 밖)"
+    corners = _abs_real_corners(abs_terms, var)
+    if isinstance(corners, str):
+        return corners
+    verdicts: list[bool] = []
+    for corner in corners:
+        g = _minimal_poly(corner, var)
+        if g is None:
+            return "후보 근의 최소다항식 계산 불가"
+        g_slope = _nonzero_sign(g.diff(var).as_expr().subs(var, corner))
+        if g_slope is None:
+            return "후보 근의 기울기 부호 판정 불가"
+        right: dict[sympy.Expr, sympy.Expr] = {}
+        left: dict[sympy.Expr, sympy.Expr] = {}
+        for term, u in inner_polys.items():
+            k, h = 0, u
+            while not h.is_zero and h.rem(g).is_zero:
+                h, k = h.quo(g), k + 1
+            # h = 0 이면(인자가 0 인 식 — 실근 계산이 먼저 거부해 도달하지 않는다) 부호가 None 이다.
+            h_sign = _nonzero_sign(h.as_expr().subs(var, corner))
+            if h_sign is None:
+                return "절댓값 인자의 부호 판정 불가"
+            r_sign = h_sign * g_slope**k
+            l_sign = h_sign * (-g_slope) ** k
+            right[term] = r_sign * term.args[0]
+            left[term] = l_sign * term.args[0]
+        jump = sympy.Poly(
+            sympy.expand(sympy.diff(expr.xreplace(right) - expr.xreplace(left), var)), var
+        )
+        verdicts.append(jump.is_zero or jump.rem(g).is_zero)
+    return verdicts
+
+
+def verify_nondifferentiable_point_count(
+    conditions: str | Sequence[str],
+    claimed: str,
+    *,
+    tol: float = 1e-9,
+) -> AnswerVerdict:
+    """함수 f(x)가 ℝ에서 *미분가능하지 않은 점의 개수*를 검증(개념형 · P3-65).
+
+    `conditions`는 f(x) 식이다.
+
+    `verify_is_differentiable`(0/1)의 개수형이다. f는 다항식과 절댓값 항으로 된 식이고, 절댓값
+    안의 식이 0이 아닌 점에서는 f가 한 다항식과 같아 미분가능하다. 그래서 후보는 각 `Abs` 인자의
+    실근(`real_roots` — 정확값)뿐이고, 후보마다 좌·우 분기의 미분계수가 같은지를 **정확 대수**로
+    판정해(`_corner_differentiability` — 극한을 쓰지 않아 무리수 근 `CRootOf` 도 판정한다) 다른 점을
+    센다.
+    '절댓값 안이 0이 되는 점의 개수'(`(x - p)|x - p|`·`|x - p|^3`처럼 매끄러운 꼴도 세는 오개념)나
+    '절댓값 항의 개수'로 센 답은 fail한다.
+
+    개수는 후보 **전부**를 판정해야 하므로, 한 후보라도 판정할 수 없으면 개수 전체를 판정 불가로
+    둔다(모른다 ≠ 아니다 — 일부만 센 값으로 pass/fail 하지 않는다). 주장 문자열이 안전 파서에서
+    거부되는 꼴('1+'·'2개')도 개수가 아니므로 판정 불가다.
+      - pass: 실제 개수 == 주장.
+      - fail: 불일치.
+      - unverifiable: 단일변수 아님·주장이 0 이상 정수 아님·ℝ 전체 정의 꼴 확인 불가·다항식·절댓값
+        꼴 아님(중첩 절댓값 포함)·후보(실근) 계산 불가·실수 여부 미확정·최소다항식 계산 불가·부호
+        판정 불가(보수적 회피).
+    """
+    condition = _single_condition(conditions)
+    if condition is None:
+        return _unverifiable("미분불가 점 개수 — 단일 식이 아님·안전 회피")
+    try:
+        expr = safe_sympify(condition)
+    except Exception as exc:  # noqa: BLE001 — 파싱 불가는 보수적 unverifiable
+        logger.debug("verify_answer 보수 회피: %s", type(exc).__name__)
+        return _unverifiable("미분불가 점 개수 — 식 파싱 불가·안전 회피")
+    if isinstance(expr, sympy.core.relational.Relational):
+        return _unverifiable("미분불가 점 개수 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    if expr.has(sympy.Float):
+        # 아래 판정은 '정확 대수'(나머지가 정확히 0인가)에 기댄다. 소수 계수는 근
+        # (`real_roots`가 유리수로 돌려줌)과 식(소수 그대로) 사이에 반올림 잔차를 남겨,
+        # 매끄러운 `|x - 0.1|^3`을 꺾인 점으로 세거나 `|x^2 - 2.0000000000000001|`의
+        # 부호를 잘못 확정한다(P3-65 재리뷰 P1 실측). 유리화(nsimplify)는 함수를 바꿀 수
+        # 있으므로 하지 않고 판정 불가로 접는다(모른다 ≠ 아니다).
+        return _unverifiable("미분불가 점 개수 — 소수 계수 식은 정확 판정 불가·안전 회피")
+    free = sorted(expr.free_symbols, key=str)
+    if len(free) != 1:
+        return _unverifiable("미분불가 점 개수 — 단일 변수 함수가 아님·안전 회피")
+    try:
+        claimed_n = _claimed_int(claimed, tol)
+    except Exception as exc:  # noqa: BLE001 — '1+'·'2개' 등 파싱 거부는 '개수가 아님'으로 접는다
+        logger.debug("verify_answer 주장 파싱 회피: %s", type(exc).__name__)
+        claimed_n = None
+    if claimed_n is None:
+        return _unverifiable("미분불가 점 개수 — 주장값이 0 이상 정수가 아님·안전 회피")
+    var = free[0]
+    if function_domain_kind(condition, str(var)) != "total":
+        return _unverifiable(
+            "미분불가 점 개수 — 원문 함수가 ℝ 전체에서 정의되는 꼴임을 확인 못 함·안전 회피"
+        )
+    abs_terms = expr.atoms(sympy.Abs)
+    if not abs_terms:
+        if expr.is_polynomial(var):
+            actual = 0
+        else:
+            return _unverifiable("미분불가 점 개수 — 다항식·절댓값 꼴이 아님·안전 회피")
+    else:
+        judged = _corner_differentiability(expr, abs_terms, var)
+        if isinstance(judged, str):
+            return _unverifiable(f"미분불가 점 개수 — {judged}·안전 회피")
+        actual = sum(1 for differentiable in judged if not differentiable)
+    if actual == claimed_n:
+        return _pass(samples_checked=1)
+    return _fail(
+        f"미분불가 점 개수 — 실제 {actual}개이나 주장 {claimed_n}(불일치)",
         samples_checked=1,
     )
 

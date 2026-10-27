@@ -525,12 +525,12 @@ class TestSelfTaggedSeat:
         assert ptm.SELF_TAGGED_CORPORA == (
             ptm.CORPUS_P3_CALCULUS1_DIFF_V0,
             ptm.CORPUS_P3_FILL_V0,
+            ptm.CORPUS_P3_DIFFERENTIABILITY_REACH_V0,
         )
         # 직접 분류 대상이면 백필이 저장된 유형을 지운다 — 좌석이 서로소여야 한다.
-        assert ptm.CORPUS_P3_CALCULUS1_DIFF_V0 not in ptm.TARGET_CORPORA
-        assert ptm.CORPUS_P3_CALCULUS1_DIFF_V0 not in ptm.LINEAGE_CORPORA
-        assert ptm.CORPUS_P3_FILL_V0 not in ptm.TARGET_CORPORA
-        assert ptm.CORPUS_P3_FILL_V0 not in ptm.LINEAGE_CORPORA
+        for name in ptm.SELF_TAGGED_CORPORA:
+            assert name not in ptm.TARGET_CORPORA
+            assert name not in ptm.LINEAGE_CORPORA
 
     def test_classify_record_cannot_derive_it(self) -> None:
         # 같은 unit_codes 안에서 유형이 갈리므로 표 분류는 불가 — 침묵 오분류 대신 빈 리스트.

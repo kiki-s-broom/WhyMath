@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,44 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 전제 — P3-55 판정문의 결정 (나) 채택과 위험 R1(승인 의존)·R2(줄기 4·정답 1)를 읽고 착수한다. 착수 시 MP-03 절차와 P3-05 감사 선례(회차마다 새 은행, n=204 에서 k=0 만 통과하는 경계)를 확인한다.\n② 범위 — [12미적Ⅰ-02-02] 한 개념만. 사용 유형은 동결 명세(phase3_scope_v1 required_problem_types)가 이미 허용하는 02-02 스킬 도달 유형 count-solutions·verify-claim 으로 한정한다. prove-statement·infer-relationship 등 명세 밖 유형이 필요하다고 판단되면 명세 변경 게이트를 먼저 등재하고 이 태스크에서 임의로 쓰지 않는다.\n③ 형태 — 결정론 생성(LLM 0), SymPy 가 좌·우미분계수를 비교해 정답을 산출, 문제유형은 문면에 정직하게 태그(스킬에 닿으려고 유형을 바꿔 달지 않는다), 정답 분포가 단일 값이 아니다(0/1 이 섞이거나 개수형), verify.solution_steps 제공.\n④ 승인 — 새 은행은 감사 라운드(사람 게이트)를 거쳐 승인 각인한다. 세션은 승인하지 않는다. 필요한 게이트는 착수 시 backlog.py gates add 로 등재한다.\n⑤ 완료 판정 — phase3_coverage 재측정 전후 표: 02-02 의 스킬 연결 건수·서로 다른 줄기·서로 다른 정답이 P3-55 판정문 §②-4 대비 늘고, 다른 개념의 연결과 Content 10/10 은 줄지 않는다. 다른 개념(02-06 포함)을 채우지 않는다.\n⑥ 질문 — 02-02 개념 스킬 집합에 절차 면(계산 계열 스킬)을 더할지는 P3-55 판정문 §③ 의 채택하지 않은 대안이다. 이 태스크는 그 변경을 하지 않고 Kiki 결정 질문으로 올린다."
-artifacts: []
+artifacts:
+  - "#1757"
 paths:
+  - docs/architecture/system_deep_dive.md
+  - docs/architecture/verifier_v2_domains.md
+  - docs/data/corpus_facts.json
+  - docs/data/corpus_facts.md
+  - docs/data/licensing_safety.md
+  - docs/data/problem_bank_corpus_v1.md
+  - docs/ops/lic03_provenance_restore_runbook.md
+  - docs/standards/problem_metadata_contract.md
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - src/backend/whymath_backend/harness/p3_audit_qualification.py
+  - src/backend/whymath_backend/harness/problem_type_mapping.py
+  - src/backend/whymath_backend/l3/equivalent/acceptance.py
   - src/backend/whymath_backend/l3/equivalent/p3_diff_differentiability_skeleton_generator.py
+  - src/backend/whymath_backend/l3/equivalent/p3_diff_skeleton_base.py
+  - src/backend/whymath_backend/l3/equivalent/p3_diff_solution_steps.py
+  - src/backend/whymath_backend/l3/verifier.py
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - tests/backend/harness/test_corpus_reverify.py
+  - tests/backend/harness/test_problem_type_backfill.py
+  - tests/backend/harness/test_problem_type_mapping.py
+  - tests/backend/harness/test_qa_pipeline_dsl_kinds_sync.py
+  - tests/backend/l3/test_verifier_perspective_fail_closed.py
+  - tests/backend/l3/test_verifier_tier_assignment.py
+  - "data/corpus/problem_bank_p3_differentiability_reach_v0/**"
+  - docs/reviews/p3_65_calc1_02_02_skill_reaching_bank_2026-10-26.md
+  - src/backend/whymath_backend/harness/p3_differentiability_reach_batch.py
+  - tests/backend/harness/test_p3_differentiability_reach_batch.py
+  - tests/backend/l3/equivalent/test_p3_diff_differentiability_reach_generator.py
+  - tests/backend/l3/test_verify_nondifferentiable_point_count.py
 session: null
-notes: "출처: P3-55 판정(2026-10-18) 결정 (나) 의 (가) 가지. 감사 라운드는 사람 게이트라 판정 세션이 끝낼 수 없었다. 후보 형태(구현 아님): count-solutions \"미분불가능한 점의 개수\"(꺾인 점이 여럿인 함수), verify-claim 양성 예를 섞은 0/1 판정. 02-06 의 6건 연결은 P3-44 가 새 은행을 만드는 중이라 이 태스크 범위 밖이다."
-updated: 2026-10-18
+notes: |-
+  출처: P3-55 판정(2026-10-18) 결정 (나) 의 (가) 가지. 감사 라운드는 사람 게이트라 판정 세션이 끝낼 수 없었다. 후보 형태(구현 아님): count-solutions "미분불가능한 점의 개수"(꺾인 점이 여럿인 함수), verify-claim 양성 예를 섞은 0/1 판정. 02-06 의 6건 연결은 P3-44 가 새 은행을 만드는 중이라 이 태스크 범위 밖이다.
+
+  [정정 2026-10-26] paths ['src/backend/whymath_backend/l3/equivalent/p3_diff_differentiability_skeleton_generator.py'] → ['docs/architecture/system_deep_dive.md', 'docs/architecture/verifier_v2_domains.md', 'docs/data/corpus_facts.json', 'docs/data/corpus_facts.md', 'docs/data/licensing_safety.md', 'docs/data/problem_bank_corpus_v1.md', 'docs/ops/lic03_provenance_restore_runbook.md', 'docs/standards/problem_metadata_contract.md', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/harness/p3_audit_qualification.py', 'src/backend/whymath_backend/harness/problem_type_mapping.py', 'src/backend/whymath_backend/l3/equivalent/acceptance.py', 'src/backend/whymath_backend/l3/equivalent/p3_diff_differentiability_skeleton_generator.py', 'src/backend/whymath_backend/l3/equivalent/p3_diff_skeleton_base.py', 'src/backend/whymath_backend/l3/equivalent/p3_diff_solution_steps.py', 'src/backend/whymath_backend/l3/verifier.py', 'src/backend/whymath_backend/l3/verify_answer.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'tests/backend/harness/test_corpus_reverify.py', 'tests/backend/harness/test_problem_type_backfill.py', 'tests/backend/harness/test_problem_type_mapping.py', 'tests/backend/harness/test_qa_pipeline_dsl_kinds_sync.py', 'tests/backend/l3/test_verifier_perspective_fail_closed.py', 'tests/backend/l3/test_verifier_tier_assignment.py', 'data/corpus/problem_bank_p3_differentiability_reach_v0/**', 'docs/reviews/p3_65_calc1_02_02_skill_reaching_bank_2026-10-26.md', 'src/backend/whymath_backend/harness/p3_differentiability_reach_batch.py', 'tests/backend/harness/test_p3_differentiability_reach_batch.py', 'tests/backend/l3/equivalent/test_p3_diff_differentiability_reach_generator.py', 'tests/backend/l3/test_verify_nondifferentiable_point_count.py']: 구현이 닿은 전 파일로 paths 정정 — 새 은행·개념형 검증기(verify_answer 신규 함수)·등록표·자산 귀속 가드·코퍼스 사실 sync
+
+  [미러 면제 2026-10-27] 원장 전용 PR — 코드는 #1757에서 CI로 검증됨
+updated: 2026-10-27

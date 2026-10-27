@@ -193,7 +193,7 @@ WhyMath의 뼈대는 **책임 레이어 L1~L7**(무엇을 책임지나)이고, �
 
 **핵심 설계 결정 ③ SA 전염 회피**: CC BY-SA 자료(AoPS·LibreTexts·Wikipedia·StackExchange)를 AI 학습에 직접 쓰면 모델 가중치를 SA로 공개해야 한다는 해석 위험이 있어(SaaS 붕괴), Feist 판례·대법원 2000다61664("사실은 저작권 보호 대상 아님")에 근거해 수학적 사실·구조만 추출하고 표현은 자체 생성합니다. Khan Academy(CC BY-NC-SA = NC+SA 이중독성)는 완전 격리합니다.
 
-**현재 상태·리스크**: 위험 소스 0건, NCIC 본문 redaction 삼중 방어 가동. 자체 저작 자산(원자 백본의 원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->·오개념 <!-- fact:misconceptions.count -->843<!-- /fact -->·자체문항 <!-- fact:problem_bank.total -->14,742<!-- /fact -->·대학 성취기준 <!-- fact:standards.university -->409<!-- /fact -->)은 redaction 불요. **리스크**는 전 조합이 "변호사 최종 검토 전제"라는 점 — 법률 검토는 코드로 대체할 수 없는 사람 게이트입니다.
+**현재 상태·리스크**: 위험 소스 0건, NCIC 본문 redaction 삼중 방어 가동. 자체 저작 자산(원자 백본의 원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->·오개념 <!-- fact:misconceptions.count -->843<!-- /fact -->·자체문항 <!-- fact:problem_bank.total -->15,042<!-- /fact -->·대학 성취기준 <!-- fact:standards.university -->409<!-- /fact -->)은 redaction 불요. **리스크**는 전 조합이 "변호사 최종 검토 전제"라는 점 — 법률 검토는 코드로 대체할 수 없는 사람 게이트입니다.
 
 > 정본: [`../data/licensing_safety.md`](../data/licensing_safety.md) · 원문 [`../legal/copyright_guide_v2.md`](../legal/copyright_guide_v2.md)
 

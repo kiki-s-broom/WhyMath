@@ -1335,6 +1335,19 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "서명은 Kiki 본인의 사람 전용 행위이며 입력 태스크 P3-61은 PR 1688로 이미 병합됨 — 대기 대상은 검수 큐 4행 판정뿐"
+  - id: G-p365-reach-bank-audit-promotion
+    title: "P3-65 새 은행(02-02 스킬 도달 300건) S5 감사 결과 확인 뒤 승격 승인 — P3-87 감사가 exit 0이면 승격 PR(P3-88) 착수를 승인한다. 감사 실행은 세션 몫, 승격 승인은 Kiki 몫"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-10-26
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-87
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human

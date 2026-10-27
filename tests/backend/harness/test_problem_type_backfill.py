@@ -16,6 +16,7 @@ from whymath_backend.harness.problem_type_backfill import main, run_backfill
 from whymath_backend.harness.problem_type_mapping import (
     CORPUS_GENERATED_V0,
     CORPUS_P3_CALCULUS1_DIFF_V0,
+    CORPUS_P3_DIFFERENTIABILITY_REACH_V0,
     CORPUS_P3_FILL_V0,
     CORPUS_REPHRASED_V0,
     CORPUS_V1,
@@ -345,9 +346,11 @@ class TestUnitTableCorporaBackfill:
         report = run_backfill(corpus_root=root, write=True)
 
         assert path.read_bytes() == before  # 쓰지 않았다.
-        # 자가 태깅 좌석이 둘이다(P3-03 은행·P3-05 빈 칸 채우기 은행) — 시험 코퍼스에는 앞의 것만 있다.
-        p3, fill = report.self_tagged
+        # 자가 태깅 좌석이 셋이다(P3-03 은행·P3-05 빈 칸 채우기 은행·P3-65 스킬 도달 은행) — 시험
+        # 코퍼스에는 앞의 것만 있다.
+        p3, fill, reach = report.self_tagged
         assert fill.name == CORPUS_P3_FILL_V0 and fill.total == 0
+        assert reach.name == CORPUS_P3_DIFFERENTIABILITY_REACH_V0 and reach.total == 0
         assert p3.name == CORPUS_P3_CALCULUS1_DIFF_V0
         assert (p3.total, p3.tagged, p3.untagged) == (2, 1, 1)
         assert p3.changed == 0 and p3.written is None
