@@ -1,31 +1,38 @@
 # EOS-197 — A6 LLM 저작 회차 1회 (두 좌석 × 15 CU) Kiki 실행 런북
 
-> **판정 기준: main `1c441f59`.** 이 런북이 읽는 코드(`harness/problem_corpus_accumulate.py`·
-> `harness/review_session.py`·`ops/hit_cu_metrics.py`·`ops/weekly_metrics_report.py`·
-> `l3/equivalent/llm_generator.py`·`l3/generation_seed.py`·`l3/router.py`·`config.py`·
-> `scripts/ops/check_runbook_blocks.py`)는 이 런북을 쓴 브랜치의 분기점 `09daeb63`부터
-> `1c441f59`까지 바뀌지 않았다(`git diff --stat` — 무관한 `ops/declared_unwired_audit.py` 1줄만 변경).
+> **판정 기준: EOS-198이 머지된 뒤의 main.** 초안의 판정 기준 main `1c441f59`(그때 읽은 코드:
+> `harness/problem_corpus_accumulate.py`·`harness/review_session.py`·`ops/hit_cu_metrics.py`·
+> `ops/weekly_metrics_report.py`·`l3/equivalent/llm_generator.py`·`l3/generation_seed.py`·
+> `l3/router.py`·`config.py`·`scripts/ops/check_runbook_blocks.py`)에 더해, EOS-198이 바꾼 세
+> 모듈을 읽는다 — `ops/weekly_metrics_report.py`(파일 입력 모드·cu_slug 조인)·
+> `harness/problem_corpus_accumulate.py`(A6 과목·slug 접두)·`ops/provenance_audit.py`
+> (`data/runs/` 검사). [B]가 그 코드가 **실제로 import됐는지** 실측한다(`EOS198_CODE=True`) —
+> EOS-198이 main에 없으면 `READY_B=False`이고 [F]·[G]가 스스로 거부한다.
 >
 > **실행 방식(D10 Kiki 2026-10-23 결정 (다) 보류)**: 무인 실행기를 쓰지 않는다. Kiki가 이 런북의
 > 블록을 **손으로** 붙여넣어 한 회차를 돈다.
 >
-> ⛔ **이 런북은 초안이다 — 아래 "공백" 절의 G-A·G-B가 해소되기 전에는 완료 검사 ③의
-> `weekly.json` 축을 채울 수 없다.** 저작·검수·산출물 회수([A]~[L])는 지금 코드로 돌아가지만,
-> `metrics/weekly.json`에 `measured: true`를 남기는 단계는 이 런북에 **없다**(세션 몫 — 공백 절).
+> **역할 분담**: Kiki 머신은 저작·검수·산출물 push([A]~[L])까지만 한다 — DB에도 주간 KPI
+> 원장에도 쓰지 않는다. `metrics/weekly.json`의 `measured: true` 기록은 **세션이** [L]로 넘겨받은
+> JSONL을 주간 KPI CLI의 **파일 입력 모드**(`--events-jsonl`·`--generation-log-jsonl`)로 집계해
+> PR로 남긴다. [K]는 같은 CLI·같은 파일·같은 창을 `--dry-run`으로 돌린 미리보기다.
 
 ---
 
-## 공백 — 이 런북이 지금 코드로 낼 수 없는 것 (실행 전에 읽을 것)
+## 공백 — 착수 조사에서 나온 7건과 그 처리 (실행 전에 읽을 것)
+
+G-A·G-B·G-D·G-F·G-G는 **EOS-198이 코드·문서로 해소했다**(이 런북은 그 착지 뒤에 돈다). G-C는 Kiki
+결정으로 그대로 두고, G-E는 폴더 구조로 우회한다.
 
 | ID | 공백 | 근거(파일:줄) | 이 런북의 처리 |
 |---|---|---|---|
-| G-A | `ops/weekly_metrics_report`는 **DB만** 읽는다(`review_timer_event`·`generation_log` 테이블). 저작 CLI는 GenerationLog를 JSONL에만 쓰고, 검수 CLI도 타이머 이벤트를 JSONL에만 쓴다. JSONL→DB 적재 경로는 내가 찾은 방법으로는 0건이다(ORM `GenerationLog`·`ReviewTimerEvent`를 쓰는 코드 검색 — 쓰기는 Admin BFF 검수 전이 API뿐). | `ops/weekly_metrics_report.py:377-417`(`_fetch_report`)·`:487-489`(창 = 실행 시각 기준 직전 7일)·`harness/problem_corpus_accumulate.py:1363-1365`·`harness/review_session.py:618-619` | [K]가 **미리보기**만 낸다(원장 미기록). 원장 기록은 세션이 공백 해소 후 회수한 JSONL로 한다. |
-| G-B | 위 DB 경로가 생성 로그 행을 `problem_id`·`cost_usd`·토큰 4키로만 옮겨 **`cu_slug`를 버린다.** 배치 저작 행은 `problem_id=None`이라, DB에 행이 있어도 비용이 CU에 조인되지 않아 `unit_cost_krw`는 `measured: false`("비용 계측 완료 CU 0건")가 된다. | `ops/weekly_metrics_report.py:407-416` · 조인 규칙 `ops/hit_cu_metrics.py:682-688` · `l3/equivalent/llm_generator.py:722-726`(배치 `problem_id=None`) | 세션 실측: 같은 행을 그 4키로 줄여 넣으면 `matched 0` → 미측정, `cu_slug`를 살리면 `measured True`. |
-| G-C | openrouter 좌석의 GenerationLog는 **`seed`가 항상 `null`**이다. seed는 LOCAL 결정에서만 뽑아 싣는다(Anthropic 시절 근거). acceptance ②의 "각 CU의 seed"는 이 좌석에서 지금 코드로 채울 수 없다. | `l3/generation_seed.py:94-100`·`:114-115` · `l3/equivalent/llm_generator.py:453-454` | [H]가 좌석별 `CU_MISSING_SEED`를 그대로 보고한다(로컬 0 · openrouter = CU 수가 정상). |
-| G-D | 저작 CLI가 생성기를 `subject=Subject.공통`·`slug_prefix="wm-gen-quad"`로 **고정**해 만든다. A6(미적분Ⅰ) CU가 과목 `공통`, slug `wm-gen-quad-…`로 기록된다(성취기준 코드는 spec대로 `[12미적Ⅰ-02-…]`). | `harness/problem_corpus_accumulate.py:1051-1052` | 그대로 돈다. 과목·slug 접두는 산출물에 그대로 남는다. |
+| G-A **해소** | (종전) `ops/weekly_metrics_report`가 **DB만** 읽었다(`review_timer_event`·`generation_log`). 저작·검수 CLI는 JSONL에만 쓰고 JSONL→DB 적재기는 0건이었다. → EOS-198 ①: **파일 입력 모드** — `--events-jsonl`(반복)·`--generation-log-jsonl`(반복)을 주면 DB에 연결하지 않고 그 파일을 같은 `aggregate`·`build_record_from_report`로 집계한다. 창은 `--week-start`/`--week-end`로 지정한다(회차가 실행 시각 기준 직전 7일 밖이어도 된다). 같은 입력이면 DB 경로와 같은 레코드가 나온다(실 PG 대조 테스트 포함). | 종전 `ops/weekly_metrics_report.py:377-417`·`:487-489` · 테스트 `tests/backend/ops/test_weekly_metrics_file_input.py`·`test_weekly_metrics_report_integration.py::TestDbPathEqualsFileInputMode` | [K]가 이 CLI를 `--dry-run`으로 돌려 미리보기를 낸다. 원장 기록은 세션이 [L]로 받은 **같은 파일·같은 창**으로 한다. |
+| G-B **해소** | (종전) DB 경로가 생성 로그 행을 `problem_id`·`cost_usd`·토큰 4키로만 옮겨 `cu_slug`를 버렸다 — 배치 저작 행(`problem_id=None`)의 비용이 CU에 조인되지 않아 `unit_cost_krw`가 미측정이었다. → EOS-198 ②: 변환을 `_genlog_row_for_aggregate` 하나로 모으고 `cu_slug`를 싣는다(DB·파일 공통). | 테스트 `test_weekly_metrics_file_input.py::TestCuSlugJoin`(cu_slug 제거 뮤테이션 RED) | [K]의 `PREVIEW_UNIT_COST_KRW_MEASURED=True`가 조인이 일했다는 증거다. |
+| G-C 유지 | openrouter 좌석의 GenerationLog는 **`seed`가 항상 `null`**이다(seed는 LOCAL 결정에서만 뽑아 싣는다). **Kiki 결정 2026-10-27: 구조적 미지원으로 기록하고 W-18 충족으로 인정 — 코드 수정 없음.** 산출물에는 정직하게 드러난다: 그 좌석 행은 `seed: null`(0·가짜 값이 아니다)이고, 읽기측 분류 `capability_for_model`은 이 모델명을 "지원"으로 반올림하지 않는다. | `l3/generation_seed.py:94-100`·`:114-115` · `l3/equivalent/llm_generator.py:453-454` | [H]가 좌석별 `CU_MISSING_SEED`를 그대로 보고한다(로컬 0 · openrouter = CU 수가 정상). `provenance_audit`는 seed를 **로컬 좌석만** 검사하고, 검사하지 않은 행 수를 모델별로 적는다(검사 안 함 ≠ 통과). |
+| G-D **해소** | (종전) 저작 CLI가 생성기를 `공통`·`wm-gen-quad`로 **고정**해, A6 CU가 과목 `공통`·slug `wm-gen-quad-…`로 기록됐다. → EOS-198 ③: spec의 성취기준 코드 `[12미적Ⅰ-…]`이면 과목 **`미적분`**·slug 접두 **`wm-gen-calc1`**(결정론 미적분Ⅰ 정본 `p3_diff_skeleton_base.py`와 같은 과목 값). 그 밖의 코드(이차방정식 등)는 종전 값 그대로다. | `harness/problem_corpus_accumulate.py`(`authoring_subject_for_codes`) · 테스트 `tests/backend/harness/test_accumulate_authoring_subject.py` | [B]가 이 코드가 import됐는지 보고, [H]가 `CU_SUBJECT_CALC`·`CU_SLUG_CALC1`이 그 좌석 CU 수와 같은지 센다. |
 | G-E | 저작 CLI가 `run_id`를 실행 중에 `uuid4`로 **스스로** 만든다(입력 인자 없음). 실행 전에 run_id 이름의 산출 폴더를 정할 수 없고, 목표 15건을 못 채워 회차를 덧붙이면 한 파일에 run_id가 여러 개다. | `harness/problem_corpus_accumulate.py:1347` | 폴더를 **좌석 이름**으로 둔다(`data/runs/eos197-a6-local/` · `…-openrouter/`). run_id는 각 폴더의 `cu.rounds.jsonl`·`cu.genlog.jsonl`이 담는다. |
-| G-F | 완료 검사 ③의 `provenance_audit`는 `data/corpus/`만 스캔한다. `data/runs/`도 GenerationLog도 보지 않으므로 이 회차가 무엇을 내든 exit 0이 나온다(2026-10-27 세션 실측 = 코퍼스 66개 · 위반 0 · exit 0). | `ops/provenance_audit.py:130-133`(`default_corpus_root`) | 이 런북은 그 검사를 돌리지 않는다(변별력 0). |
-| G-G | A6 범위가 문서마다 다르다 — ADR-007은 `12미적Ⅰ` 02-01~02-10, 앵커 레지스트리는 02-05~02-10(01~04는 "미분계수와 도함수" 소단원이라 제외). | `docs/architecture/adr/ADR-007-eos-g2-disposition.md:20` · `data/corpus/eos_anchor_set_v1/anchors.yaml:177-186` | **레지스트리**(코드가 읽는 정본)를 따른다. spec 4종 = 02-05·02-07·02-09·02-10. |
+| G-F **해소** | (종전) `provenance_audit`가 `data/corpus/`만 봐서 이 회차가 무엇을 내든 exit 0이었다(변별력 0). → EOS-198 ④: `data/runs/*/cu.jsonl`의 `license`·`source_type`과 곁의 `cu.genlog.jsonl`(같은 `cu_slug`의 **성공** 호출 조인 · `model_name`·`prompt_version`·`input_sha256` · `seed`는 로컬 좌석만)을 검사한다. `--require-runs`면 회차 0건도 위반이다. CI backend 잡도 `data/runs/` 변경에 깨어난다(`ci.yml` backend 필터). | `ops/provenance_audit.py`(`audit_runs_root`) · 테스트 `tests/backend/ops/test_provenance_audit_runs.py`(실 저작 CLI 산출물 감사 포함) | [H]가 워크트리에서 `--require-runs`로 돌려 `PROVENANCE_EXIT=0`을 본다(완료 검사 ③과 같은 검사). |
+| G-G **해소** | (종전) A6 범위가 문서마다 달랐다 — ADR-007은 `12미적Ⅰ` 02-01~02-10, 앵커 레지스트리는 02-05~02-10. → **Kiki 결정 2026-10-27: 정본 = 레지스트리.** EOS-198 ⑤가 ADR-007을 v2.3으로 정정했다(결정 내용 불변 · 정정 이력 절). | `docs/architecture/adr/ADR-007-eos-g2-disposition.md` §정정 이력 · `data/corpus/eos_anchor_set_v1/anchors.yaml:167-187` | spec 4종 = 02-05·02-07·02-09·02-10(02-06·02-08은 정답 단일화 곤란으로 제외 — EOS-197 ⑥). |
 
 **위험(공백은 아니다)**: 저작 CLI가 `[12미적Ⅰ-…]` 코드로 돈 기록이 MEMORY에 없다(지금까지의 LLM 회차는 전부 이차방정식 `[9수02-20]`·`[10공수1-02-02]`). 수용률을 예측할 근거가 없으므로, [F]·[G]가 목표(15건)에 닿을 때까지 회차를 덧붙이되 **시도 상한 45건**에서 멈춘다.
 
@@ -37,7 +44,7 @@
 EOS-197 A6(고2 도함수의 활용) LLM 저작 회차 1회 — 로컬 좌석 15 CU + openrouter 좌석 15 CU, 이어서 카나리 검수(타이머 ON).
 
 ### ② 목적
-12/31 판정 조건 ③(D4 교체)과 G2 재판정(11/8, ADR-007)의 물증을 만든다: A6 저작 산출물 30행 이상 + CU별 생성 로그(모델·프롬프트 버전·시드·입력 해시) + 사람 검수 타이머로 잰 HIT 첫 유효 표본(15건 이상). 두 좌석을 같은 조건으로 돌려 **로컬과 클라우드 저작의 수용률·비용을 비교 기록**한다(D3 Kiki 2026-10-23 결정 (c)). 결과물은 세션이 가져가 main에 커밋하고, 공백 G-A·G-B를 고친 뒤 주간 KPI 원장의 첫 `measured: true` 기록을 만든다.
+12/31 판정 조건 ③(D4 교체)과 G2 재판정(11/8, ADR-007)의 물증을 만든다: A6 저작 산출물 30행 이상 + CU별 생성 로그(모델·프롬프트 버전·시드·입력 해시) + 사람 검수 타이머로 잰 HIT 첫 유효 표본(15건 이상). 두 좌석을 같은 조건으로 돌려 **로컬과 클라우드 저작의 수용률·비용을 비교 기록**한다(D3 Kiki 2026-10-23 결정 (c)). 결과물은 세션이 git 브랜치로 넘겨받아([L]) main에 커밋하고, **같은 JSONL을 주간 KPI CLI의 파일 입력 모드로 집계해** 원장(`metrics/weekly.json`)의 첫 `measured: true` 기록을 만든다.
 
 ### ③ 구체적 절차 (예상 소요)
 
@@ -59,14 +66,14 @@ EOS-197 A6(고2 도함수의 활용) LLM 저작 회차 1회 — 로컬 좌석 15
 | [M] | (선택) 워크트리 정리 — 세션이 수신을 확인한 뒤에만 | 워크트리 삭제 | 즉시 |
 | [N] | 회신 | — | — |
 
-**총 예상: 약 1.5~3.5시간**(검수 [J]가 절반 이상). [J]는 `--resume`으로 나눠 할 수 있다 — 단 [K]·회신은 **검수를 마친 뒤 7일 안에** 해 주십시오(주간 KPI 창이 실행 시각 기준 직전 7일이다 — G-A 행).
+**총 예상: 약 1.5~3.5시간**(검수 [J]가 절반 이상). [J]는 `--resume`으로 나눠 할 수 있다. 주간 KPI 집계 창은 [K]가 **산출물의 시각에서 직접** 정하므로(파일 입력 모드 `--week-start`/`--week-end` — G-A 행) 검수를 며칠에 나눠도 된다.
 
 로컬 시간 근거: `qwen3:30b-a3b` 저작 60시도가 20~60분(MP-02 3회차·`docs/reviews/mp02_rerun_runbook.md` §7-2) → 시도당 20~60초. 첫 호출은 모델 로드에 30초~2분이 더 걸린다. openrouter 시간 근거: EOS-121 90호출 20~40분(`docs/ops/eos121_seat_generation_diversity_runbook.md` §5) → 시도당 약 15~25초.
 
 ### ④ 성공 기준
 - [B] `READY_B=True` · [C] `READY_C=True` · [D] `READY_D=True`. 하나라도 False면 [F]·[G]가 **스스로 거부**한다(`WRITE_REFUSED=True`와 이유가 출력된다).
 - [F] `LOCAL_DONE lines=` 15 이상 · [G] `OPENROUTER_DONE lines=` 15 이상 → 합계 30행 이상.
-- [H] 좌석마다 `CU_MISSING_GENLOG=0`·`CU_MISSING_MODEL_NAME=0`·`CU_MISSING_PROMPT_VERSION=0`·`CU_MISSING_INPUT_SHA256=0`. `CU_MISSING_SEED`는 로컬 0 · openrouter = 그 좌석 CU 수(공백 G-C — 이것이 지금 코드의 정상값이다).
+- [H] 좌석마다 `CU_MISSING_GENLOG=0`·`CU_MISSING_MODEL_NAME=0`·`CU_MISSING_PROMPT_VERSION=0`·`CU_MISSING_INPUT_SHA256=0`. `CU_MISSING_SEED`는 로컬 0 · openrouter = 그 좌석 CU 수(공백 G-C — Kiki 결정으로 이것이 정상값이다). 좌석마다 `CU_SUBJECT_CALC`·`CU_SLUG_CALC1` = 그 좌석 `CU_LINES`(공백 G-D). `PROVENANCE_EXIT=0`(공백 G-F).
 - [J] 세션 요약의 `승인 + 수정승인 + 반려` 합 = [I]의 `QUEUE_LINES`.
 - [K] `HIT_…_EXIT=0` · `CU_MEASURED` 15 이상 · `IMPLAUSIBLE_MAJORITY=False` · `PREVIEW_HIT_SECONDS_MEASURED=True` · `PREVIEW_UNIT_COST_KRW_MEASURED=True`.
 - [L] `PUSH_VERIFIED=True`.
@@ -80,7 +87,7 @@ EOS-197 A6(고2 도함수의 활용) LLM 저작 회차 1회 — 로컬 좌석 15
 - **실행 디렉터리**: `C:\Users\kiki\Desktop\__AI\WhyMath-eos197` ([A]가 main 최신 커밋으로 만드는 격리 워크트리). 산출물도 여기 `data\runs\` 아래에 쌓인다.
 - **파이썬**: `C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe` + `PYTHONPATH`로 워크트리 코드를 먼저 읽게 한다(import 후 `__file__`로 확인).
 - **선행 조건**: Ollama 가동 · 인터넷(openrouter 좌석 · 모델 내려받기) · OpenRouter 키(User 환경변수 — 2026-09-16 등록 기록이 있다, [C]가 확인).
-- **불요**: Docker·`whymath-pg`(5433)·백엔드 서버. **이 회차는 DB에 아무것도 쓰지 않는다**(공백 G-A가 바로 그 사실이다).
+- **불요**: Docker·`whymath-pg`(5433)·백엔드 서버. **이 회차는 DB에 아무것도 쓰지 않는다** — 주간 KPI는 세션이 파일 입력 모드로 집계한다(공백 G-A).
 - **좌석 제약**: Anthropic 좌석은 쓰지 않는다(ARCH-66 · 12/31까지 API 중단 — [C]가 `AN_API_ENABLED=False`를 확인). openrouter 좌석은 **학생 데이터 0** 조건에서만 쓴다 — 이 회차의 모델 입력은 spec 4종·주제 힌트·오개념 카탈로그 라벨·이번 회차 자신의 산출물(회피 목록)뿐이고, `--seed` 코퍼스 3종(전건 `WHYMATH_GENERATED`·자체생성 1,327행)은 **로컬 중복 판정에만** 쓰인다(`harness/problem_corpus_accumulate.py:336-358`). 공급사는 `deepinfra`로 고정 · 관할 표기는 코드상 `US`(`l3/providers/openrouter.py:106`)이며, 모델 자체는 DeepSeek(중국 개발 오픈웨이트)다.
 
 ### ⑥ 창 구분
@@ -133,20 +140,23 @@ $HelpText = & $Py -m whymath_backend.harness.problem_corpus_accumulate --help | 
 $FlagsOk = ($HelpText -match "--spec-file") -and ($HelpText -match "--authoring-tier") -and ($HelpText -match "--avoid-recent")
 $PlanCount = & $Py -c "import sys,pathlib; from whymath_backend.harness.problem_corpus_accumulate import load_spec_plan_file as L; e=L(pathlib.Path(sys.argv[1]), default_standard_code='[12미적Ⅰ-02-05]', default_difficulty=2.5, default_topic_hint='x'); print(len(e)); [print(s, sorted(sp.achievement_standard_codes)[0], sp.difficulty_overall) for s, sp, _ in e]" $Plan
 $PlanOk = ($PlanCount -and ($PlanCount[0] -eq "4"))
-$ReadyB = $CodeOk -and $FlagsOk -and $PlanOk -and ($SeedsPresent -eq 3)
+$G198Py = "from whymath_backend.harness.problem_corpus_accumulate import authoring_subject_for_codes as A; from whymath_backend.ops.weekly_metrics_report import report_from_files; from whymath_backend.ops.provenance_audit import audit_runs_root; print(A(['[12미적Ⅰ-02-05]']) == ('미적분', 'wm-gen-calc1') and A(['[10공수1-02-02]']) == ('공통', 'wm-gen-quad'))"
+$G198 = & $Py -c $G198Py
+$ReadyB = $CodeOk -and $FlagsOk -and $PlanOk -and ($SeedsPresent -eq 3) -and ($G198 -eq "True")
 "IO_ENCODING=$(& $Py -c 'import sys; print(sys.stdout.encoding)')"
 "CODE_FILE=$CodeFile"
 "CODE_FROM_WORKTREE=$CodeOk"
 "CLI_FLAGS_OK=$FlagsOk"
 "SPEC_PLAN=$($PlanCount -join ' | ')"
 "SEEDS_PRESENT=$SeedsPresent"
+"EOS198_CODE=$G198"
 "WORKTREE_HEAD=$(git rev-parse --short HEAD)"
 "READY_B=$ReadyB"
 ```
 
-**판정**: `IO_ENCODING=utf-8` · `CODE_FROM_WORKTREE=True` · `CLI_FLAGS_OK=True` · `SPEC_PLAN=4 | a6-tangent [12미적Ⅰ-02-05] 2.5 | a6-extremum … | a6-root-count … | a6-velocity …` · `SEEDS_PRESENT=3` · `READY_B=True`.
+**판정**: `IO_ENCODING=utf-8` · `CODE_FROM_WORKTREE=True` · `CLI_FLAGS_OK=True` · `SPEC_PLAN=4 | a6-tangent [12미적Ⅰ-02-05] 2.5 | a6-extremum … | a6-root-count … | a6-velocity …` · `SEEDS_PRESENT=3` · `EOS198_CODE=True` · `READY_B=True`.
 
-> 변별력: `CODE_FROM_WORKTREE`는 `PYTHONPATH`가 먹지 않으면 평소 클론 경로가 찍혀 False가 된다(파일이 있다는 것과 그 파일이 import됐다는 것은 다르다). `SPEC_PLAN`은 이 런북의 PR이 머지되기 전 main에서 `FileNotFoundError`로 비고 `READY_B=False`가 된다. `SEEDS_PRESENT`는 시드 경로가 틀리면 3보다 작다 — 저작 CLI는 없는 시드를 **조용히 건너뛰므로**(`problem_corpus_accumulate.py:348-349`) 여기서 막아야 한다.
+> 변별력: `CODE_FROM_WORKTREE`는 `PYTHONPATH`가 먹지 않으면 평소 클론 경로가 찍혀 False가 된다(파일이 있다는 것과 그 파일이 import됐다는 것은 다르다). `SPEC_PLAN`은 이 런북의 PR이 머지되기 전 main에서 `FileNotFoundError`로 비고 `READY_B=False`가 된다. `SEEDS_PRESENT`는 시드 경로가 틀리면 3보다 작다 — 저작 CLI는 없는 시드를 **조용히 건너뛰므로**(`problem_corpus_accumulate.py:348-349`) 여기서 막아야 한다. `EOS198_CODE`는 EOS-198 이전 코드면 `ImportError`로 비어 False가 되고(파일 입력 모드·회차 감사·과목 선택 함수가 없다), 과목 선택이 옛 고정값으로 되돌아가 있으면 `False`가 찍힌다 — 그 상태로 저작하면 A6 CU가 다시 `공통`·`wm-gen-quad`로 기록된다.
 
 `ModuleNotFoundError`가 나면 `& $Py -m pip install -e C:\Users\kiki\Desktop\__AI\WhyMath\src\backend`를 돌린 뒤 [B]를 다시 붙여넣는다.
 
@@ -285,8 +295,9 @@ $CodeOkF = [bool]($CodeFileF -and $CodeFileF.StartsWith($Wt))
 $ModelF = & $Py -c $Probe
 $PlanOkF = Test-Path $Plan
 $SeedsOkF = (@($Seeds | Where-Object { Test-Path $_ }).Count -eq 3)
-"PRECHECK_F CodeOk=$CodeOkF Model=$ModelF PlanExists=$PlanOkF SeedsOk=$SeedsOkF WorktreeHead=$(git rev-parse --short HEAD)"
-if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b")) {
+$G198F = & $Py -c $G198Py
+"PRECHECK_F CodeOk=$CodeOkF Model=$ModelF PlanExists=$PlanOkF SeedsOk=$SeedsOkF Eos198Code=$G198F WorktreeHead=$(git rev-parse --short HEAD)"
+if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -and ($G198F -eq "True")) {
   New-Item -ItemType Directory -Force -Path (Split-Path $LocalOut) | Out-Null
   $TriedF = 0
   $LinesF = [int](& $Py -c $CountPy $LocalOut)
@@ -301,7 +312,7 @@ if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b")) {
     if ($RoundExitF -eq 2) { "ROUND_STOP=exit2 — 연속 무진전 알람 또는 설정 오류입니다. 위 stderr 문구를 회신하세요"; break }
   }
   "LOCAL_DONE lines=$LinesF tried=$TriedF target=15 budget=45"
-} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkF(True여야) Model=$ModelF(qwen3:30b-a3b여야) PlanExists=$PlanOkF(True여야) SeedsOk=$SeedsOkF(True여야) · 새 창이면 [B]부터, 아니면 [B]·[D]를 다시 확인하세요" }
+} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkF(True여야) Model=$ModelF(qwen3:30b-a3b여야) PlanExists=$PlanOkF(True여야) SeedsOk=$SeedsOkF(True여야) Eos198Code=$G198F(True여야 — EOS-198 이전 코드면 A6 CU가 공통·wm-gen-quad로 기록된다) · 새 창이면 [B]부터, 아니면 [B]·[D]를 다시 확인하세요" }
 ```
 
 **예상 출력**: 회차마다 진행 로그 → 리포트 JSON → `ROUND_END … exit=0`(이번 회차에 1건 이상 붙음) 또는 `exit=1`(이번 회차 무진전 — 다음 회차로 넘어간다). 끝에 `LOCAL_DONE lines=15 이상`.
@@ -330,8 +341,9 @@ $SeatG = & $Py -c "from whymath_backend.config import Settings; from whymath_bac
 $SeatOkG = ($SeatG -eq "openrouter|deepseek/deepseek-v4.1-flash|False|True|True")
 $PlanOkG = Test-Path $Plan
 $SeedsOkG = (@($Seeds | Where-Object { Test-Path $_ }).Count -eq 3)
-"PRECHECK_G CodeOk=$CodeOkG SeatCheck=$SeatG SeatOk=$SeatOkG PlanExists=$PlanOkG SeedsOk=$SeedsOkG WorktreeHead=$(git rev-parse --short HEAD)"
-if ($CodeOkG -and $SeatOkG -and $PlanOkG -and $SeedsOkG) {
+$G198G = & $Py -c $G198Py
+"PRECHECK_G CodeOk=$CodeOkG SeatCheck=$SeatG SeatOk=$SeatOkG PlanExists=$PlanOkG SeedsOk=$SeedsOkG Eos198Code=$G198G WorktreeHead=$(git rev-parse --short HEAD)"
+if ($CodeOkG -and $SeatOkG -and $PlanOkG -and $SeedsOkG -and ($G198G -eq "True")) {
   New-Item -ItemType Directory -Force -Path (Split-Path $OrOut) | Out-Null
   $TriedG = 0
   $LinesG = [int](& $Py -c $CountPy $OrOut)
@@ -346,7 +358,7 @@ if ($CodeOkG -and $SeatOkG -and $PlanOkG -and $SeedsOkG) {
     if ($RoundExitG -eq 2) { "ROUND_STOP=exit2 — 연속 무진전 알람 또는 설정 오류입니다. 위 stderr 문구를 회신하세요"; break }
   }
   "OPENROUTER_DONE lines=$LinesG tried=$TriedG target=15 budget=45"
-} else { "WRITE_REFUSED=True — 호출하지 않았다(과금 0). CodeOk=$CodeOkG(True여야) SeatCheck=$SeatG(openrouter|deepseek/deepseek-v4.1-flash|False|True|True여야) PlanExists=$PlanOkG SeedsOk=$SeedsOkG · [C]부터 다시 확인하세요" }
+} else { "WRITE_REFUSED=True — 호출하지 않았다(과금 0). CodeOk=$CodeOkG(True여야) SeatCheck=$SeatG(openrouter|deepseek/deepseek-v4.1-flash|False|True|True여야) PlanExists=$PlanOkG SeedsOk=$SeedsOkG Eos198Code=$G198G(True여야) · [B]·[C]부터 다시 확인하세요" }
 ```
 
 **판정**: `OPENROUTER_DONE lines=15 이상`. 호출이 전건 실패하면(리포트 `outcome_counts`가 전부 `generation_failed`) 키·네트워크 문제다 — 출력 전문을 회신한다. 이 좌석이 실패해도 [F]의 산출물은 그대로이며 [H]~[L]은 이어 갈 수 있다.
@@ -355,7 +367,7 @@ if ($CodeOkG -and $SeatOkG -and $PlanOkG -and $SeedsOkG) {
 
 ## [H] 두 좌석 산출물·GenerationLog 4필드 검사 — 창 ① (읽기 전용 · 즉시)
 
-CU 1행마다 그 CU를 만든 성공 생성 호출 1건(`cu_slug`가 같은 genlog 행)을 찾아 4필드(`model_name`·`prompt_version`·`seed`·`input_sha256`)가 채워졌는지 센다. `input_sha256`은 입력 스냅샷에서 스키마가 재계산해 채운다(`schema/provenance.py:559-561`).
+CU 1행마다 그 CU를 만든 성공 생성 호출 1건(`cu_slug`가 같은 genlog 행)을 찾아 4필드(`model_name`·`prompt_version`·`seed`·`input_sha256`)가 채워졌는지 센다. `input_sha256`은 입력 스냅샷에서 스키마가 재계산해 채운다(`schema/provenance.py:559-561`). 이어서 CU의 과목·slug 접두(공백 G-D)를 세고, 완료 검사 ③과 **같은 감사**(`provenance_audit --require-runs` — 공백 G-F)를 이 워크트리의 `data\runs\`에 돌린다.
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [H] 산출물·GenerationLog 4필드 검사 (읽기 전용)
@@ -382,6 +394,7 @@ for s in slugs:
 costs=[x.get('cost_usd') for x in g]
 print('SEAT_DIR=%s' % d.name)
 print('CU_LINES=%d DISTINCT_SLUGS=%d' % (len(c), len(set(slugs))))
+print('CU_SUBJECT_CALC=%d CU_SLUG_CALC1=%d' % (sum(1 for x in c if x.get('subject') == '미적분'), sum(1 for x in c if str(x.get('slug', '')).startswith('wm-gen-calc1-'))))
 print('ROUNDS=%d RUN_IDS=%s' % (len(r), ','.join(str(x.get('run_id')) for x in r)))
 print('ATTEMPTED=%d ACCEPTED=%d APPENDED=%d' % (sum(x.get('attempted',0) for x in r), sum(x.get('accepted',0) for x in r), sum(x.get('appended',0) for x in r)))
 print('GENLOG_ROWS=%d GENLOG_SUCCESS=%d' % (len(g), sum(1 for x in g if x.get('success'))))
@@ -391,7 +404,7 @@ for k,v in miss.items():
     print('CU_MISSING_%s=%d' % (k.upper(), v))
 print('COST_USD_SUM=%.6f COST_NULL_ROWS=%d' % (sum(v for v in costs if v is not None), sum(1 for v in costs if v is None)))"
 $HaveH = [bool]($Py -and $Runs -and ((Test-Path "$Runs\eos197-a6-local\cu.jsonl") -or (Test-Path "$Runs\eos197-a6-openrouter\cu.jsonl")))
-if ($HaveH) { & $Py -c $SeatCheckPy "$Runs\eos197-a6-local"; "---"; & $Py -c $SeatCheckPy "$Runs\eos197-a6-openrouter"; "TOTAL_CU_LINES=$([int](& $Py -c $CountPy "$Runs\eos197-a6-local\cu.jsonl") + [int](& $Py -c $CountPy "$Runs\eos197-a6-openrouter\cu.jsonl"))" } else { "READ_REFUSED=True — 두 좌석 모두 cu.jsonl이 없다(또는 창 변수가 없다 — 새 창이면 [B]부터). [F]·[G] 출력을 회신하세요" }
+if ($HaveH) { & $Py -c $SeatCheckPy "$Runs\eos197-a6-local"; "---"; & $Py -c $SeatCheckPy "$Runs\eos197-a6-openrouter"; "TOTAL_CU_LINES=$([int](& $Py -c $CountPy "$Runs\eos197-a6-local\cu.jsonl") + [int](& $Py -c $CountPy "$Runs\eos197-a6-openrouter\cu.jsonl"))"; "---"; & $Py -m whymath_backend.ops.provenance_audit --require-runs; "PROVENANCE_EXIT=$LASTEXITCODE" } else { "READ_REFUSED=True — 두 좌석 모두 cu.jsonl이 없다(또는 창 변수가 없다 — 새 창이면 [B]부터). [F]·[G] 출력을 회신하세요" }
 ```
 
 **판정**:
@@ -400,8 +413,10 @@ if ($HaveH) { & $Py -c $SeatCheckPy "$Runs\eos197-a6-local"; "---"; & $Py -c $Se
 - `CU_MISSING_SEED`: 로컬 = 0 · openrouter = 그 좌석 `CU_LINES`와 같은 값(공백 G-C — 지금 코드의 정상값). 로컬에서 0이 아니면 이상 신호다 — 회신.
 - `MODELS`: 로컬 폴더 = `qwen3:30b-a3b` · openrouter 폴더 = `deepseek/deepseek-v4.1-flash`. 다른 이름이 섞이면 좌석이 갈린 것이다 — 회신.
 - `COST_USD_SUM`: 로컬 = 0.000000(로컬 0원 확정 — `l3/pregenerate/provenance_bridge.py:115-116`) · openrouter = 0보다 큰 값.
+- `CU_SUBJECT_CALC`·`CU_SLUG_CALC1`: 둘 다 그 좌석 `CU_LINES`와 같은 값(과목 `미적분`·slug `wm-gen-calc1-…` — 공백 G-D). 0이면 EOS-198 이전 코드로 저작된 것이다 — 회신.
+- `PROVENANCE_EXIT=0`: 감사 출력의 `회차 루트`가 이 워크트리의 `data\runs`이고 `스캔한 회차    : 2`(좌석 둘 · 검수 폴더는 `cu.jsonl 없는 폴더`로 따로 적힌다)·`위반 : 0건`. `seed 미검사` 줄에 openrouter 모델이 그 좌석 CU 수만큼 적히는 것이 정상이다(공백 G-C). exit 1이면 위반 줄 전체를 회신한다.
 
-> 변별력: 이 검사는 세션 실측에서 genlog 행이 없는 CU를 `CU_MISSING_GENLOG=1`로 잡았다(가짜 산출물 주입 · 2026-10-27).
+> 변별력: 이 검사는 세션 실측에서 genlog 행이 없는 CU를 `CU_MISSING_GENLOG=1`로 잡았다(가짜 산출물 주입 · 2026-10-27). `provenance_audit --require-runs`는 회차 폴더가 없으면 `RUNS_EMPTY`로 exit 1이고, 로컬 좌석 seed 결손·`prompt_version` 결손·조인 불가를 각각 exit 1로 잡는다(`tests/backend/ops/test_provenance_audit_runs.py` — 실 저작 CLI 산출물에 결함을 주입한 경우 포함).
 
 ---
 
@@ -466,7 +481,7 @@ if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -c $QueuePy "$Runs\eos1
 
 반려코드: F1 수식·파싱 실패 · F2 정답 불일치 · F3 풀이 논리 비약 · F4 성취기준 이탈 · F5 난이도 미스 · F6 오개념 오연결 · F7 언어 수준 부적합 · F8 힌트 정답 누설(`docs/standards/eos_verification_design_v1.md` §4).
 
-**A6 검수 관점(참고)**: 접선의 y절편·극댓값·실근 개수(정수 k의 개수)·속도 — 답 하나가 정수로 정해지는가, 성취기준 코드가 문항 내용과 맞는가(F4), 과목·slug 접두가 `공통`·`wm-gen-quad`로 찍힌 것은 공백 G-D이므로 **반려 사유로 쓰지 않는다**.
+**A6 검수 관점(참고)**: 접선의 y절편·극댓값·실근 개수(정수 k의 개수)·속도 — 답 하나가 정수로 정해지는가, 성취기준 코드가 문항 내용과 맞는가(F4), 과목은 `미적분`·slug는 `wm-gen-calc1-…`로 찍혀 있어야 한다(공백 G-D 해소 — [H]가 이미 셌다. 다르게 찍혀 있으면 검수를 멈추고 회신한다).
 
 **아래 블록은 대화형 명령 한 줄뿐이다. 다른 줄과 함께 붙여넣지 마십시오.** [I]가 `QUEUE_WRITTEN=True`를 낸 뒤에만 실행한다.
 
@@ -490,16 +505,17 @@ if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -c $QueuePy "$Runs\eos1
 
 ## [K] HIT·비용 요약 + 주간 KPI 미리보기 — 창 ① (읽기 전용 · 1분)
 
-`ops/hit_cu_metrics`를 좌석별 생성 로그로 한 번씩 돌려 HIT·비용을 내고, 이어서 **주간 KPI 원장(`metrics/weekly.json`)에 들어갈 값을 같은 집계 함수로 미리** 계산한다. **원장에는 쓰지 않는다**(공백 G-A·G-B — 원장 기록은 세션 몫).
+`ops/hit_cu_metrics`를 좌석별 생성 로그로 한 번씩 돌려 HIT·비용을 내고, 이어서 **주간 KPI CLI를 파일 입력 모드·`--dry-run`으로** 돌려 원장(`metrics/weekly.json`)에 들어갈 레코드를 미리 낸다(공백 G-A·G-B 해소분). **원장에는 쓰지 않는다** — 원장 기록은 세션이 [L]로 받은 같은 파일로 한다.
+
+집계 창은 **산출물의 시각에서 정한다**: 검수 이벤트의 `recorded_at`과 두 좌석 생성 로그의 `generated_at` 중 가장 이른 시각부터 가장 늦은 시각 + 1초까지(`WINDOW_START`·`WINDOW_END`). 주간 KPI CLI는 창 밖 행을 빼므로(DB 경로의 WHERE와 같은 규칙) 이 창이면 회차의 행이 하나도 빠지지 않는다 — CLI가 stderr로 내는 `[파일 입력] … 창 안 N행` 줄이 그 확인이다. 환율은 라우터 상수 `USD_TO_KRW`(1540)를 그대로 넘긴다(주간 KPI CLI는 기본 환율을 두지 않는다 — 세션도 같은 값으로 기록한다).
 
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ① — [K] HIT·비용 요약 + 주간 KPI 미리보기 (읽기 전용 · 원장 미기록)
+# Windows PowerShell (= Phaiakes9) · 창 ① — [K] HIT·비용 요약 + 주간 KPI 미리보기 (읽기 전용 · 파일 입력 모드 --dry-run · 원장 미기록)
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
 $HitPy = "import io,json,sys,contextlib,pathlib
-from datetime import datetime,timedelta,UTC
+from datetime import datetime,timedelta
 from whymath_backend.ops import hit_cu_metrics as H
 from whymath_backend.ops import weekly_metrics_report as W
-from whymath_backend.harness.review_timer import load_events_jsonl
 from whymath_backend.l3.router import USD_TO_KRW
 ev,vd,gl,go=(pathlib.Path(a) for a in sys.argv[1:5])
 for seat,g in (('local',gl),('openrouter',go)):
@@ -508,14 +524,24 @@ for seat,g in (('local',gl),('openrouter',go)):
         code=H.main(['--events',str(ev),'--verdicts',str(vd),'--generation-log',str(g),'--json'])
     r=json.loads(buf.getvalue())
     print('HIT_%s_EXIT=%d CU_MEASURED=%s HIT_MEDIAN_S=%s IMPLAUSIBLE_MAJORITY=%s CU_WITH_COST=%s COST_USD_TOTAL=%s COVERAGE=%s' % (seat.upper(), code, r['cu_measured'], r['hit_median_seconds'], r['hit_implausible_majority'], r['cu_with_cost'], r['cost_usd_total'], r['coverage_rate']))
-events,errs=load_events_jsonl(ev)
-rows=[]
-for g in (gl,go):
-    if g.exists():
-        rows+=[json.loads(l) for l in g.read_text(encoding='utf-8').splitlines() if l.strip()]
-now=datetime.now(UTC)
-rep=H.aggregate(events,parse_error_count=len(errs),genlog_rows=rows)
-rec=W.build_record_from_report(rep,week_start=now-timedelta(days=7),week_end=now,generated_at=now,krw_per_usd=USD_TO_KRW).to_json()
+ts=[]
+for p,key in ((ev,'recorded_at'),(gl,'generated_at'),(go,'generated_at')):
+    for l in p.read_text(encoding='utf-8').splitlines():
+        if l.strip():
+            v=json.loads(l).get(key)
+            if v:
+                ts.append(datetime.fromisoformat(v))
+if not ts:
+    print('WINDOW_UNKNOWN=True — 시각이 찍힌 행이 0건이다(측정 실패 · 회신)')
+    raise SystemExit(1)
+ws=min(ts).isoformat()
+we=(max(ts)+timedelta(seconds=1)).isoformat()
+print('WINDOW_START=%s WINDOW_END=%s TIMESTAMPED_ROWS=%d' % (ws, we, len(ts)))
+buf=io.StringIO()
+with contextlib.redirect_stdout(buf):
+    code=W.main(['--dry-run','--events-jsonl',str(ev),'--generation-log-jsonl',str(gl),'--generation-log-jsonl',str(go),'--week-start',ws,'--week-end',we,'--krw-per-usd',str(USD_TO_KRW)])
+rec=json.loads(buf.getvalue())
+print('WEEKLY_CLI_EXIT=%d WEEK_START=%s WEEK_END=%s' % (code, rec['week_start'], rec['week_end']))
 for k in ('hit_seconds','unit_cost_krw'):
     v=rec['kpis'][k]
     print('PREVIEW_%s_MEASURED=%s VALUE=%s REASON=%s' % (k.upper(), v['measured'], v['value'], v['reason']))
@@ -529,9 +555,10 @@ if ($HaveK) { "EVENT_LINES=$(& $Py -c $CountPy $EvK) VERDICT_LINES=$(& $Py -c $C
 **판정**:
 - `HIT_LOCAL_EXIT=0`·`HIT_OPENROUTER_EXIT=0` · `CU_MEASURED` 15 이상(HIT 유효 표본 목표) · `IMPLAUSIBLE_MAJORITY=False`.
 - `CU_WITH_COST`: 로컬 줄 = 로컬 CU 중 검수된 수 · openrouter 줄 = openrouter CU 중 검수된 수(각 좌석 로그는 자기 CU만 조인한다 — 다른 좌석 CU는 미조인으로 분리되는 것이 정상이다).
-- `PREVIEW_HIT_SECONDS_MEASURED=True` · `PREVIEW_UNIT_COST_KRW_MEASURED=True` — 공백이 해소되면 원장에 이 값이 들어간다는 **예보**다. `IMPLAUSIBLE_MAJORITY=True`이면 HIT 미리보기가 False로 나오고 사유에 "HIT 하한 30초 미만(절반 이상)"이 적힌다 — 그 경우 검수가 재입력 세션으로 읽힌 것이니 회신에 그대로 적는다.
+- `WINDOW_START`·`WINDOW_END`가 찍히고 `WEEKLY_CLI_EXIT=0`. stderr의 `[파일 입력] … 이벤트 N행 중 창 안 N행 … 생성 로그 M행 중 창 안 M행 · 파싱 실패 0행` — **창 안 행 수가 전체 행 수와 같아야** 한다(다르면 회차 행이 창 밖으로 빠진 것이다 — 회신).
+- `PREVIEW_HIT_SECONDS_MEASURED=True` · `PREVIEW_UNIT_COST_KRW_MEASURED=True` — 세션이 같은 파일·같은 창으로 원장에 기록할 **바로 그 값**이다. `IMPLAUSIBLE_MAJORITY=True`이면 HIT 미리보기가 False로 나오고 사유에 "HIT 하한 30초 미만(절반 이상)"이 적힌다 — 그 경우 검수가 재입력 세션으로 읽힌 것이니 회신에 그대로 적는다. 사유에 "입력 파싱 실패"가 있으면 파일 하나가 깨진 것이다(부분 입력으로는 판정하지 않는다) — 회신.
 
-> 변별력: 세션 실측(2026-10-27 · 가짜 산출물)에서 같은 행을 주간 원장 DB 경로의 행 모양(4키)으로 줄여 넣자 `unit_cost_krw`가 `measured False`·"이번 주 비용 계측 완료 CU 0건"이 됐고, `cu_slug`를 살리면 `measured True`였다(공백 G-B의 주입 확인 — DB 자체를 돌린 것은 아니다).
+> 변별력: 파일 입력 모드는 입력 0건·창 밖·비용 미기록·cu_slug 결손·파싱 실패·파일 없음을 전부 `measured: false`(사유 동반)로 낸다. cu_slug를 지우는 뮤테이션은 `unit_cost_krw`를 `measured False`·"이번 주 비용 계측 완료 CU 0건"으로 떨어뜨려 회귀 테스트가 RED가 된다(`tests/backend/ops/test_weekly_metrics_file_input.py` — 공백 G-B).
 
 ---
 
@@ -547,14 +574,18 @@ $EmailSet = [bool](git config user.email)
 $NewFiles = @(git status --porcelain --untracked-files=all -- data/runs).Count
 $OtherDirty = @(git status --porcelain -- . ':!data/runs').Count
 $RemoteExists = [bool](git ls-remote --heads origin $Branch)
-"PRECHECK_L EmailSet=$EmailSet NewFiles=$NewFiles OtherDirty=$OtherDirty RemoteBranchExists=$RemoteExists"
-if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $RemoteExists)) { git checkout -B $Branch; git add -- data/runs; git commit -m "EOS-197: A6 저작 회차 산출물 — 두 좌석 cu.jsonl·생성 로그·회차 대장·검수 이벤트 (Kiki 머신 실행분)"; git push -u origin $Branch; $LocalSha = git rev-parse HEAD; $RemoteSha = ((git ls-remote origin "refs/heads/$Branch") -split "\s+")[0]; "COMMITTED_FILES=$(@(git show --name-only --format= HEAD).Count)"; "LOCAL_SHA=$LocalSha"; "REMOTE_SHA=$RemoteSha"; "PUSH_VERIFIED=$($LocalSha -eq $RemoteSha)" } else { "WRITE_REFUSED=True — 커밋·push하지 않았다. EmailSet=$EmailSet(True여야 — git 사용자 설정) NewFiles=$NewFiles(1 이상이어야) OtherDirty=$OtherDirty(0이어야 — 산출물 밖 변경이 있으면 목록을 회신) RemoteBranchExists=$RemoteExists(False여야 — 이미 있으면 앞 push가 성공한 것일 수 있다. 회신하세요)" }
+$SessionFiles = @("eos197-a6-local\cu.jsonl", "eos197-a6-local\cu.genlog.jsonl", "eos197-a6-local\cu.rounds.jsonl", "eos197-a6-openrouter\cu.jsonl", "eos197-a6-openrouter\cu.genlog.jsonl", "eos197-a6-openrouter\cu.rounds.jsonl", "eos197-a6-review\canary_review_queue.jsonl", "eos197-a6-review\canary_review_events.jsonl", "eos197-a6-review\canary_review_verdicts.jsonl")
+$MissingL = @($SessionFiles | Where-Object { -not (Test-Path "$Runs\$_") })
+$ReviewOkL = (Test-Path "$Runs\eos197-a6-review\canary_review_events.jsonl") -and (Test-Path "$Runs\eos197-a6-review\canary_review_verdicts.jsonl")
+"PRECHECK_L EmailSet=$EmailSet NewFiles=$NewFiles OtherDirty=$OtherDirty RemoteBranchExists=$RemoteExists ReviewFilesPresent=$ReviewOkL"
+"SESSION_FILES_MISSING=$($MissingL.Count) $($MissingL -join ' ')"
+if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $RemoteExists) -and $ReviewOkL) { git checkout -B $Branch; git add -- data/runs; git commit -m "EOS-197: A6 저작 회차 산출물 — 두 좌석 cu.jsonl·생성 로그·회차 대장·검수 이벤트 (Kiki 머신 실행분)"; git push -u origin $Branch; $LocalSha = git rev-parse HEAD; $RemoteSha = ((git ls-remote origin "refs/heads/$Branch") -split "\s+")[0]; "COMMITTED_FILES=$(@(git show --name-only --format= HEAD).Count)"; "LOCAL_SHA=$LocalSha"; "REMOTE_SHA=$RemoteSha"; "PUSH_VERIFIED=$($LocalSha -eq $RemoteSha)" } else { "WRITE_REFUSED=True — 커밋·push하지 않았다. EmailSet=$EmailSet(True여야 — git 사용자 설정) NewFiles=$NewFiles(1 이상이어야) OtherDirty=$OtherDirty(0이어야 — 산출물 밖 변경이 있으면 목록을 회신) RemoteBranchExists=$RemoteExists(False여야 — 이미 있으면 앞 push가 성공한 것일 수 있다. 회신하세요) ReviewFilesPresent=$ReviewOkL(True여야 — 검수 이벤트·판정 파일이 없는 채로 push하면 이 블록이 다시는 push하지 않으므로 [J]를 먼저 마치세요)" }
 ```
 
-**판정**: `PUSH_VERIFIED=True`(원격 브랜치 끝이 방금 만든 커밋과 같다 — push 명령의 성공 메시지가 아니라 **원격을 다시 읽어** 대조한다). `COMMITTED_FILES`는 보통 13개 안팎이다(좌석당 `cu.jsonl`·`cu.genlog.jsonl`·`cu.rounds.jsonl`·`cu.review.jsonl`(비수용이 있을 때)·`cu.worklist.md` + 검수 폴더 3개).
+**판정**: `PUSH_VERIFIED=True`(원격 브랜치 끝이 방금 만든 커밋과 같다 — push 명령의 성공 메시지가 아니라 **원격을 다시 읽어** 대조한다). `SESSION_FILES_MISSING=0`이면 세션이 원장 기록·완료 검사에 쓰는 9개 파일이 모두 실렸다 — 0이 아니면 빠진 파일 이름이 같은 줄에 찍힌다(한 좌석이 실패했다면 그 좌석 파일만 빠지는 것이 정상이며, 세션은 남은 좌석으로 집계한다). `COMMITTED_FILES`는 보통 13개 안팎이다(좌석당 `cu.jsonl`·`cu.genlog.jsonl`·`cu.rounds.jsonl`·`cu.review.jsonl`(비수용이 있을 때)·`cu.worklist.md` + 검수 폴더 3개).
 
 - push가 인증 오류로 실패하면 `PUSH_VERIFIED=False`·`REMOTE_SHA=` 빈칸이 나온다 — 출력 전문을 회신한다(세션이 다른 회수 경로를 정한다). 커밋은 워크트리에 남아 있으므로 다시 저작할 필요는 없다.
-- 판정 문구: 이 push는 **산출물 전달**이지 main 반영이 아니다. main 반영·`metrics/weekly.json` 기록은 세션이 PR로 한다.
+- 판정 문구: 이 push는 **산출물 전달**이지 main 반영이 아니다. main 반영·`metrics/weekly.json` 기록은 세션이 PR로 한다 — 세션은 이 브랜치의 파일로 주간 KPI CLI를 파일 입력 모드로 돌리고(`--events-jsonl …\canary_review_events.jsonl --generation-log-jsonl …local\cu.genlog.jsonl --generation-log-jsonl …openrouter\cu.genlog.jsonl --week-start/--week-end`(=[K]의 창) `--krw-per-usd 1540`), 완료 검사 ③(`wc -l`·`provenance_audit --require-runs`·`weekly.json` measured)을 main 기준으로 다시 잰다.
 
 ---
 
@@ -583,14 +614,16 @@ if ($SafeM) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } els
 3. [F]의 `ROUND_START`/`ROUND_END` 줄 전부와 `LOCAL_DONE` · [G]의 같은 줄들과 `OPENROUTER_DONE`. 각 회차 리포트 JSON의 `outcome_counts` 줄.
 4. [H]의 출력 전체.
 5. [I]의 `QUEUE_LINES` 줄 · [J]의 `=== 검수 세션 요약 ===` 전체.
-6. [K]의 출력 전체.
-7. [L]의 `PUSH_VERIFIED`·`LOCAL_SHA`·`REMOTE_SHA` 세 줄.
+6. [K]의 출력 전체(stderr의 `[파일 입력]` 줄 포함 — 창 안 행 수 대조에 쓴다).
+7. [L]의 `PRECHECK_L`·`SESSION_FILES_MISSING`·`PUSH_VERIFIED`·`LOCAL_SHA`·`REMOTE_SHA` 줄.
+
+**파일 자체는 회신하지 않아도 된다** — 세션은 [L]이 push한 브랜치 `eos197/a6-authoring-output`에서 다음 9개를 읽는다: 좌석마다(`eos197-a6-local`·`eos197-a6-openrouter`) `cu.jsonl`(CU 산출물 · 완료 검사 `wc -l`)·`cu.genlog.jsonl`(GenerationLog · W-18 감사와 단위비용)·`cu.rounds.jsonl`(회차 대장 · run_id), 검수 폴더(`eos197-a6-review`)의 `canary_review_queue.jsonl`(분모)·`canary_review_events.jsonl`(HIT)·`canary_review_verdicts.jsonl`(판정). 회신의 [K] 창 값은 세션이 같은 창으로 기록했는지 대조하는 데 쓴다.
 
 **출력을 자르지 말고 그대로** 주십시오 — 잘린 출력으로 판정하면 분모가 조용히 줄어든 것을 놓칩니다.
 
 ---
 
-## 부록 — 근거 (실측 출처 · 판정 기준 main `1c441f59`)
+## 부록 — 근거 (실측 출처 · 판정 기준 main `1c441f59` + EOS-198 브랜치 `claude/eos-197-authoring-round`)
 
 | 사실 | 출처 |
 |---|---|
@@ -610,5 +643,7 @@ if ($SafeM) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } els
 | spec 계획 파일 4종이 `load_spec_plan_file`로 읽힘 | `docs/ops/eos197_a6_spec_plan.jsonl` · 2026-10-27 세션 실행(`SPEC_PLAN_OK 4`) |
 | 검수 CLI 인자(`--queue`·`--events`·`--verdicts`·`--reviewer-id`·`--resume`·`--limit`) · 코퍼스 JSONL을 큐로 받음 | `harness/review_session.py:615-626` · `--help` 2026-10-27 실행 |
 | HIT 하한 가드 30초 · 절반 이상이면 주간 KPI가 미측정으로 냄 | `ops/hit_cu_metrics.py` 모듈 설명 · `ops/weekly_metrics_report.py`(`build_record_from_report`의 `implausible_reason`) |
-| 주간 KPI CLI는 DB만 읽고 genlog 행에서 `cu_slug`를 버림 | `ops/weekly_metrics_report.py:377-417` |
+| 주간 KPI CLI는 (종전) DB만 읽고 genlog 행에서 `cu_slug`를 버렸다 → EOS-198이 파일 입력 모드·cu_slug 조인 추가 | 종전 `ops/weekly_metrics_report.py:377-417` · 현행 같은 파일 `report_from_files`·`_genlog_row_for_aggregate` |
+| A6 산출물 과목·slug 접두 = `미적분`·`wm-gen-calc1`(그 밖의 코드는 종전 `공통`·`wm-gen-quad`) | `harness/problem_corpus_accumulate.py`(`authoring_subject_for_codes`) |
+| `provenance_audit`가 `data/runs/*/cu.jsonl`·`cu.genlog.jsonl` 검사 · `--require-runs` | `ops/provenance_audit.py`(`audit_runs_root`) |
 | 주간 KPI 원장 `metrics/weekly.json`은 main에 없음 · 자동 cron 산출 브랜치 2개(`ops/weekly-metrics-20261019T000122Z`·`…20261025T235900Z`)는 `measured: false`뿐이고 PR 조회 결과 0건 | `git ls-remote` · `gh api repos/kiki-s-broom/whymath/pulls?head=…`(2026-10-27) |

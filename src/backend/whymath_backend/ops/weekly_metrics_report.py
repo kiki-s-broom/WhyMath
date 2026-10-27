@@ -46,6 +46,35 @@ Actions에서 도는 한, 4종 KPI는 당분간 정직하게 "0"(빈 스키마�
 `WHYMATH_DATABASE_URL` 환경변수 + 이 파일이 신설하는 GitHub Actions 스케줄(월 07:00
 KST)이 최소한으로 담당하되, **그 스케줄이 실제 프로덕션 데이터에 닿게 만드는 것**(러너가
 Phaiakes9에 도달하는 경로)은 `OPS-19`의 몫이다.
+
+파일 입력 모드 (EOS-198 ① — 공백 G-A)
+-------------------------------------
+DB 경로만 있으면 **DB에 적재되지 않는 회차는 원장에 영영 못 들어온다.** 저작 CLI
+(`harness/problem_corpus_accumulate`)는 GenerationLog를 `<out>.genlog.jsonl`에만, 검수 CLI
+(`harness/review_session`)는 타이머 이벤트를 `--events` JSONL에만 쓴다. 그 JSONL을 DB로
+옮기는 적재기는 없다(2026-10-27 실측 — ORM 쓰기는 Admin BFF 검수 전이 API뿐). 그래서
+`--events-jsonl`(반복)·`--generation-log-jsonl`(반복)을 주면 DB에 **연결하지 않고** 그
+파일을 입력으로 쓴다. 두 경로는 다음을 공유해 같은 입력에서 같은 레코드를 낸다:
+
+  ① 창 판정 — 이벤트는 `recorded_at`, 생성 로그는 `generated_at`이 `[week_start,
+     week_end)` 안인 것만 쓴다(DB 쿼리의 WHERE와 같은 규칙). 시각이 비면 창 밖으로 친다
+     (SQL 비교가 NULL을 제외하는 것과 같다) — 파일 모드는 그 건수를 stderr로 말한다.
+  ② 생성 로그 → 집계 행 변환(`_genlog_row_for_aggregate`) — 한 함수만 쓴다.
+  ③ 집계(`ops.hit_cu_metrics.aggregate`)·레코드 조립(`build_record_from_report`).
+
+회차가 실행 시각 기준 직전 7일 밖에 있을 수 있으므로 `--week-start`·`--week-end`로 창을
+지정할 수 있다(두 모드 공통). 입력 파일의 **파싱 실패가 1행이라도 있으면 4종을 미측정**으로
+낸다 — 깨진 행이 하필 느린 검수였다면 그 행이 빠진 채 측정치가 나온다(부분 입력 판정 금지 ·
+`hit_cu_metrics` CLI와 같은 기조). 파일이 없으면 역시 미측정이다(사유에 예외 타입명).
+
+cu_slug 조인 (EOS-198 ② — 공백 G-B)
+-----------------------------------
+배치 저작 행은 `problem_id=None`이다(문제 행이 아직 없다 — `l3/equivalent/llm_generator.py`).
+그 행의 비용이 CU에 붙는 유일한 열쇠가 `cu_slug`인데, 종전 DB 경로는 집계 행을
+`problem_id`·`cost_usd`·토큰 4키로만 만들어 **cu_slug를 버렸다** — DB에 행이 있어도
+`unit_cost_krw`가 "비용 계측 완료 CU 0건"으로 미측정이 되던 결함이다. 변환을
+`_genlog_row_for_aggregate` 하나로 모으고 cu_slug를 싣는다(회귀 테스트
+`test_weekly_metrics_file_input.py::TestCuSlugJoin`이 cu_slug 제거 뮤테이션을 RED로 잡는다).
 """
 
 from __future__ import annotations
@@ -58,7 +87,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -68,7 +97,11 @@ from whymath_backend.db.models.provenance import GenerationLog
 from whymath_backend.db.models.review_timer_event import (
     ReviewTimerEvent as OrmReviewTimerEvent,
 )
+from whymath_backend.harness.review_timer import load_events_jsonl
+from whymath_backend.l3.pregenerate.provenance_bridge import load_generation_logs_jsonl
 from whymath_backend.ops.hit_cu_metrics import HitCuReport, aggregate
+from whymath_backend.schema.provenance import GenerationLog as SchemaGenerationLog
+from whymath_backend.schema.review_timer import ReviewTimerEvent as SchemaReviewTimerEvent
 
 __all__ = [
     "HARNESS_METRIC_NAMES",
@@ -80,6 +113,9 @@ __all__ = [
     "WeeklyRecord",
     "build_record_from_report",
     "collect",
+    "collect_from_files",
+    "FileInputSummary",
+    "report_from_files",
     "load_ledger",
     "append_record",
     "main",
@@ -404,17 +440,167 @@ async def _fetch_report(
         .scalars()
         .all()
     )
-    genlog_rows: list[dict[str, Any]] = [
-        {
-            "problem_id": str(row.problem_id) if row.problem_id is not None else None,
-            "cost_usd": float(row.cost_usd) if row.cost_usd is not None else None,
-            "input_tokens": row.input_tokens,
-            "output_tokens": row.output_tokens,
-        }
-        for row in genlog_orm_rows
-    ]
+    genlog_rows = [_genlog_row_for_aggregate(row) for row in genlog_orm_rows]
 
     return aggregate(events, genlog_rows=genlog_rows)
+
+
+class _GenlogLike(Protocol):
+    """집계 행 변환이 읽는 5속성 — ORM `GenerationLog`·schema `GenerationLog` 둘 다 만족한다."""
+
+    @property
+    def problem_id(self) -> Any: ...
+
+    @property
+    def cu_slug(self) -> str | None: ...
+
+    @property
+    def cost_usd(self) -> Any: ...
+
+    @property
+    def input_tokens(self) -> int | None: ...
+
+    @property
+    def output_tokens(self) -> int | None: ...
+
+
+def _genlog_row_for_aggregate(row: _GenlogLike) -> dict[str, Any]:
+    """생성 로그 1행 → `aggregate(genlog_rows=…)` 입력 dict. DB·파일 두 경로의 **유일한** 변환.
+
+    `cu_slug`가 핵심이다(EOS-198 ② · 공백 G-B): 배치 저작 행은 `problem_id=None`이라 이것이
+    없으면 비용이 CU에 조인되지 않는다(`hit_cu_metrics.aggregate`의 조인 규칙 = slug 우선 ·
+    problem_id 폴백). 값이 None인 필드는 None 그대로 둔다 — 0으로 바꾸면 미계측이 "$0 계측"으로
+    위장된다.
+    """
+    return {
+        "problem_id": str(row.problem_id) if row.problem_id is not None else None,
+        "cu_slug": row.cu_slug,
+        "cost_usd": float(row.cost_usd) if row.cost_usd is not None else None,
+        "input_tokens": row.input_tokens,
+        "output_tokens": row.output_tokens,
+    }
+
+
+def _in_window(moment: datetime | None, *, week_start: datetime, week_end: datetime) -> bool:
+    """`[week_start, week_end)` 판정 — DB 쿼리의 WHERE와 같은 규칙.
+
+    시각 없음은 창 밖이다(SQL 비교가 NULL을 제외하는 것과 같다).
+    """
+    if moment is None:
+        return False
+    aware = moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+    return week_start <= aware < week_end
+
+
+@dataclass(frozen=True, slots=True)
+class FileInputSummary:
+    """파일 입력 모드의 입력 회계 — 무엇을 읽고 무엇을 창 밖으로 뺐는가(stderr 보고용).
+
+    출력 레코드(`WeeklyRecord`)에는 싣지 않는다 — 원장 행 형태는 DB 경로와 같아야 한다.
+    """
+
+    event_rows: int
+    event_rows_in_window: int
+    event_rows_no_time: int
+    genlog_rows: int | None  # None = 생성 로그 입력 미지정(비용 KPI 미측정의 사유)
+    genlog_rows_in_window: int | None
+    genlog_rows_no_time: int | None
+    parse_errors: tuple[str, ...]
+
+
+def report_from_files(
+    *,
+    events_paths: list[Path],
+    genlog_paths: list[Path] | None,
+    week_start: datetime,
+    week_end: datetime,
+) -> tuple[HitCuReport | None, FileInputSummary | None, str | None]:
+    """회차 JSONL → (`HitCuReport` | None, 입력 회계, 실패 사유). DB에 연결하지 않는다.
+
+    실패(파일 없음·파싱 실패 ≥1행)면 report=None과 사유를 돌려준다 — 호출측이
+    `build_record_from_report(None, db_failure_reason=사유)`로 4종을 미측정 처리한다.
+    `genlog_paths=None`이면 비용 입력이 없다는 뜻이다(`aggregate(genlog_rows=None)` →
+    단위비용 미측정). 빈 리스트와 구분한다.
+    """
+    events: list[SchemaReviewTimerEvent] = []
+    errors: list[str] = []
+    try:
+        for path in events_paths:
+            loaded, errs = load_events_jsonl(path)
+            events.extend(loaded)
+            errors.extend(f"{path.name} {e}" for e in errs)
+        logs: list[SchemaGenerationLog] | None = None
+        if genlog_paths is not None:
+            logs = []
+            for path in genlog_paths:
+                loaded_logs, log_errs = load_generation_logs_jsonl(path)
+                logs.extend(loaded_logs)
+                errors.extend(f"{path.name} {e}" for e in log_errs)
+    except OSError as exc:  # FileNotFoundError 포함 — 타입명을 사유에 남긴다(침묵 실패 금지).
+        return None, None, f"입력 파일 읽기 실패 — {type(exc).__name__}: {exc}"
+
+    kept_events = [
+        e for e in events if _in_window(e.recorded_at, week_start=week_start, week_end=week_end)
+    ]
+    kept_logs = (
+        None
+        if logs is None
+        else [
+            g for g in logs if _in_window(g.generated_at, week_start=week_start, week_end=week_end)
+        ]
+    )
+    summary = FileInputSummary(
+        event_rows=len(events),
+        event_rows_in_window=len(kept_events),
+        event_rows_no_time=sum(1 for e in events if e.recorded_at is None),
+        genlog_rows=None if logs is None else len(logs),
+        genlog_rows_in_window=None if kept_logs is None else len(kept_logs),
+        genlog_rows_no_time=(
+            None if logs is None else sum(1 for g in logs if g.generated_at is None)
+        ),
+        parse_errors=tuple(errors),
+    )
+    if errors:
+        # 부분 입력으로 판정하지 않는다 — 깨진 행이 하필 느린 검수·비싼 호출이었다면 그 행이
+        # 빠진 채 측정치가 나온다(hit_cu_metrics CLI ⑥과 같은 기조).
+        return (
+            None,
+            summary,
+            f"입력 파싱 실패 {len(errors)}행 — 부분 입력으로 판정하지 않는다(첫 사유: {errors[0]})",
+        )
+    genlog_rows = None if kept_logs is None else [_genlog_row_for_aggregate(g) for g in kept_logs]
+    return aggregate(kept_events, genlog_rows=genlog_rows), summary, None
+
+
+def collect_from_files(
+    *,
+    events_paths: list[Path],
+    genlog_paths: list[Path] | None,
+    week_start: datetime,
+    week_end: datetime,
+    generated_at: datetime,
+    krw_per_usd: float | None,
+    harness: dict[str, KpiValue] | None = None,
+) -> tuple[WeeklyRecord, FileInputSummary | None]:
+    """파일 입력 모드의 `collect` — 같은 `build_record_from_report`로 같은 형태의 레코드를 낸다."""
+    report, summary, failure = report_from_files(
+        events_paths=events_paths,
+        genlog_paths=genlog_paths,
+        week_start=week_start,
+        week_end=week_end,
+    )
+    if failure is not None:
+        _logger.error("weekly_metrics_report: 파일 입력 실패 — %s", failure)
+    record = build_record_from_report(
+        report,
+        week_start=week_start,
+        week_end=week_end,
+        generated_at=generated_at,
+        krw_per_usd=krw_per_usd,
+        db_failure_reason=failure,
+        harness=harness,
+    )
+    return record, summary
 
 
 async def collect(
@@ -489,6 +675,45 @@ def _resolve_window(*, now: datetime) -> tuple[datetime, datetime]:
     return now - timedelta(days=7), now
 
 
+def _parse_window_moment(raw: str) -> datetime:
+    """창 경계 ISO 파싱 — 시간대 없으면 UTC로 본다(`hit_cu_metrics._parse_moment` 동형 ·
+    aware/naive 혼합 비교 방지)."""
+    moment = datetime.fromisoformat(raw)
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+def _report_file_input(
+    summary: FileInputSummary | None, *, week_start: datetime, week_end: datetime
+) -> None:
+    """파일 입력 회계를 stderr로 낸다 — 창 밖으로 뺀 행이 보여야 창을 잘못 잡은 것을 안다.
+
+    stdout은 레코드 JSON 전용이다(소비자 `json.load`가 깨지지 않게).
+    """
+    window = f"[{week_start.isoformat()}, {week_end.isoformat()})"
+    if summary is None:
+        print(
+            f"[파일 입력] 창 {window} — 입력을 읽지 못했다(사유는 레코드 reason)",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+    print(
+        f"[파일 입력] 창 {window} · 이벤트 {summary.event_rows}행 중 창 안 "
+        f"{summary.event_rows_in_window}행(시각 없음 {summary.event_rows_no_time}) · 생성 로그 "
+        + (
+            "미지정(단위비용 미측정)"
+            if summary.genlog_rows is None
+            else f"{summary.genlog_rows}행 중 창 안 {summary.genlog_rows_in_window}행"
+            f"(시각 없음 {summary.genlog_rows_no_time})"
+        )
+        + f" · 파싱 실패 {len(summary.parse_errors)}행",
+        file=sys.stderr,
+        flush=True,
+    )
+    for reason in summary.parse_errors:
+        print(f"  · 파싱 실패: {reason}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.ops.weekly_metrics_report",
@@ -522,25 +747,85 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="집계만 하고 파일에 쓰지 않음(stdout에 출력)"
     )
+    # ── 파일 입력 모드(EOS-198 ① · 공백 G-A) ──
+    parser.add_argument(
+        "--events-jsonl",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "검수 타이머 이벤트 JSONL(반복 가능 · `review_session --events` 산출물). 주면 DB에 "
+            "연결하지 않는 파일 입력 모드가 된다"
+        ),
+    )
+    parser.add_argument(
+        "--generation-log-jsonl",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "GenerationLog JSONL(반복 가능 · 저작 CLI의 `<out>.genlog.jsonl`). --events-jsonl과 "
+            "함께만 쓴다. 미지정이면 단위비용 KPI는 미측정"
+        ),
+    )
+    parser.add_argument(
+        "--week-start",
+        default=None,
+        help=(
+            "집계 창 시작 ISO8601(포함 · 시간대 없으면 UTC). --week-end와 함께 준다. 미지정이면 "
+            "실행 시각 기준 직전 7일"
+        ),
+    )
+    parser.add_argument(
+        "--week-end", default=None, help="집계 창 끝 ISO8601(미포함 · --week-start와 함께)"
+    )
     args = parser.parse_args(argv)
 
+    if args.generation_log_jsonl and not args.events_jsonl:
+        parser.error(
+            "--generation-log-jsonl은 --events-jsonl과 함께만 쓸 수 있습니다(파일 입력 모드)"
+        )
+    if (args.week_start is None) != (args.week_end is None):
+        parser.error("--week-start와 --week-end는 함께 지정해야 합니다")
+
     now = datetime.now(UTC)
-    week_start, week_end = _resolve_window(now=now)
+    if args.week_start is not None:
+        try:
+            week_start = _parse_window_moment(args.week_start)
+            week_end = _parse_window_moment(args.week_end)
+        except ValueError as exc:
+            parser.error(f"--week-start/--week-end ISO8601 파싱 실패 — {type(exc).__name__}")
+        if not week_start < week_end:
+            parser.error("--week-start는 --week-end보다 앞이어야 합니다(빈 창은 판정 불가)")
+    else:
+        week_start, week_end = _resolve_window(now=now)
 
     summary, summary_failure = load_incidents_summary(args.incidents_summary)
     if summary_failure is not None:
         _logger.warning("weekly_metrics_report: 하네스 지표 미수집 — %s", summary_failure)
     harness = build_harness_metrics(summary, failure_reason=summary_failure)
 
-    record = asyncio.run(
-        collect(
+    if args.events_jsonl:
+        record, file_summary = collect_from_files(
+            events_paths=list(args.events_jsonl),
+            genlog_paths=list(args.generation_log_jsonl) if args.generation_log_jsonl else None,
             week_start=week_start,
             week_end=week_end,
             generated_at=now,
             krw_per_usd=args.krw_per_usd,
             harness=harness,
         )
-    )
+        _report_file_input(file_summary, week_start=week_start, week_end=week_end)
+    else:
+        record = asyncio.run(
+            collect(
+                week_start=week_start,
+                week_end=week_end,
+                generated_at=now,
+                krw_per_usd=args.krw_per_usd,
+                harness=harness,
+            )
+        )
 
     if args.dry_run:
         json.dump(record.to_json(), sys.stdout, ensure_ascii=False, indent=2)

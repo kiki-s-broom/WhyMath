@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -127,6 +129,109 @@ class TestCollectRealDatabaseRoundTrip:
                             text("DELETE FROM review_timer_event WHERE cu_slug = :slug"),
                             {"slug": slug},
                         )
+                    await session.commit()
+            finally:
+                await engine.dispose()
+
+
+# ── EOS-198 ①② — 같은 입력이면 DB 경로와 파일 입력 모드가 같은 레코드를 낸다(실 PG) ──
+# 위 두 테스트와 섞이지 않게 다른 과거 창을 쓴다(삽입 전 창이 비어 있음을 먼저 단언한다).
+_EQ_WEEK_START = datetime(2026, 4, 6, tzinfo=UTC)
+_EQ_WEEK_END = datetime(2026, 4, 13, tzinfo=UTC)
+_EQ_INSIDE = datetime(2026, 4, 9, tzinfo=UTC)
+
+
+class TestDbPathEqualsFileInputMode:
+    async def test_same_rows_same_record_including_batch_cost_join(self, tmp_path: Path) -> None:
+        """DB에 넣은 행과 같은 행을 JSONL로 써서 파일 모드로 돌리면 KPI가 같다.
+
+        배치 저작 행(problem_id=None)의 비용이 cu_slug로 조인되는지도 실 DB에서 본다(G-B) —
+        종전 DB 경로라면 여기서 unit_cost_krw가 미측정이었다.
+        """
+        if not await _pg_reachable():
+            pytest.skip("실 PG 도달 불가 — CI의 '실 PG' 잡에서만 실행")
+        from whymath_backend.db.models.provenance import GenerationLog as OrmGenerationLog
+        from whymath_backend.ops.weekly_metrics_report import collect_from_files
+        from whymath_backend.schema.provenance import GenerationLog as SchemaGenerationLog
+
+        slug = f"eos198-eq-{uuid.uuid4().hex[:8]}"
+        log = SchemaGenerationLog(
+            model_name="deepseek/deepseek-v4.1-flash",
+            input_tokens=3000,
+            output_tokens=1500,
+            cost_usd=0.0015,
+            success=True,
+            generated_at=_EQ_INSIDE,
+            cu_slug=slug,
+        )
+        try:
+            before = await collect(
+                week_start=_EQ_WEEK_START,
+                week_end=_EQ_WEEK_END,
+                generated_at=datetime.now(UTC),
+                krw_per_usd=1540,
+            )
+            assert before.kpis["hit_seconds"].measured is False  # 대조 — 창이 비어 있다
+
+            await _insert_review_pair(slug, 95_000, _EQ_INSIDE)
+            engine = create_async_engine(get_settings().database_url)
+            try:
+                async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                    session.add(OrmGenerationLog.from_schema(log))
+                    await session.commit()
+            finally:
+                await engine.dispose()
+
+            db_record = await collect(
+                week_start=_EQ_WEEK_START,
+                week_end=_EQ_WEEK_END,
+                generated_at=_EQ_WEEK_END,
+                krw_per_usd=1540,
+            )
+
+            # 같은 행을 파일로 — 이벤트는 DB가 읽어 준 그대로(recorded_at 포함) 덤프한다.
+            engine = create_async_engine(get_settings().database_url)
+            try:
+                async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                    rows = (
+                        (
+                            await session.execute(
+                                sa.select(OrmReviewTimerEvent).where(
+                                    OrmReviewTimerEvent.cu_slug == slug
+                                )
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    events = [r.to_schema() for r in rows]
+            finally:
+                await engine.dispose()
+            ev_path = tmp_path / "events.jsonl"
+            ev_path.write_text("".join(e.model_dump_json() + "\n" for e in events), "utf-8")
+            gl_path = tmp_path / "cu.genlog.jsonl"
+            gl_path.write_text(log.model_dump_json() + "\n", "utf-8")
+            file_record, _ = collect_from_files(
+                events_paths=[ev_path],
+                genlog_paths=[gl_path],
+                week_start=_EQ_WEEK_START,
+                week_end=_EQ_WEEK_END,
+                generated_at=_EQ_WEEK_END,
+                krw_per_usd=1540,
+            )
+
+            assert db_record.kpis["unit_cost_krw"].measured is True
+            assert db_record.to_json() == file_record.to_json()
+        finally:
+            engine = create_async_engine(get_settings().database_url)
+            try:
+                async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+                    await session.execute(
+                        text("DELETE FROM review_timer_event WHERE cu_slug = :slug"), {"slug": slug}
+                    )
+                    await session.execute(
+                        text("DELETE FROM generation_log WHERE cu_slug = :slug"), {"slug": slug}
+                    )
                     await session.commit()
             finally:
                 await engine.dispose()
