@@ -141,6 +141,34 @@ class TestIrrationalRealRootsAreCandidates:
         assert _state(expr, str(count + 1)) == "fail"
 
 
+class TestDecimalCoefficientsAreUnverifiable:
+    """P3-65 재리뷰 P1 — 소수 계수는 정확 대수의 전제(나머지가 정확히 0)를 깨 거짓 pass를 만들었다.
+
+    `|x - 0.1|^3`은 매끄러운데(참값 0) 반올림 잔차로 '1'이 pass했고, `|x^2 - 2.0000000000000001|`은
+    꺾인 점이 2개인데 '0'이 pass했다. 어느 주장도 pass하지 않아야 하며, 판정 불가가 정직한 답이다.
+    """
+
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "Abs(x - 0.1)**3",
+            "Abs(x - 0.2)**3",
+            "Abs(x - 3.7)**3",
+            "Abs(x**2 - 2.0000000000000001)",
+            "(x - 0.1)*Abs(x - 0.1)",
+        ],
+    )
+    @pytest.mark.parametrize("claimed", ["0", "1", "2"])
+    def test_decimal_coefficients_never_pass(self, expr: str, claimed: str) -> None:
+        assert _state(expr, claimed) == "unverifiable", (expr, claimed)
+
+    def test_rational_twin_is_still_decided(self) -> None:
+        # 대조군 — 같은 함수를 유리수 계수로 쓰면 정확 판정이 그대로 돈다(가드가 과잉 거부가 아님).
+        assert _state("Abs(x - 1/10)**3", "0") == "pass"
+        assert _state("Abs(x - 1/10)**3", "1") == "fail"
+        assert _state("Abs(x**2 - 2)", "2") == "pass"
+
+
 class TestUnverifiableBranches:
     """판정 불가 가지마다 그 가지를 밟는 입력 — 가지를 지우면 pass/fail·예외로 바뀐다(뮤테이션 동결)."""
 

@@ -3087,6 +3087,13 @@ def verify_nondifferentiable_point_count(
         return _unverifiable("미분불가 점 개수 — 식 파싱 불가·안전 회피")
     if isinstance(expr, sympy.core.relational.Relational):
         return _unverifiable("미분불가 점 개수 — 함수 식이어야 함(등식/부등식 아님)·안전 회피")
+    if expr.has(sympy.Float):
+        # 아래 판정은 '정확 대수'(나머지가 정확히 0인가)에 기댄다. 소수 계수는 근
+        # (`real_roots`가 유리수로 돌려줌)과 식(소수 그대로) 사이에 반올림 잔차를 남겨,
+        # 매끄러운 `|x - 0.1|^3`을 꺾인 점으로 세거나 `|x^2 - 2.0000000000000001|`의
+        # 부호를 잘못 확정한다(P3-65 재리뷰 P1 실측). 유리화(nsimplify)는 함수를 바꿀 수
+        # 있으므로 하지 않고 판정 불가로 접는다(모른다 ≠ 아니다).
+        return _unverifiable("미분불가 점 개수 — 소수 계수 식은 정확 판정 불가·안전 회피")
     free = sorted(expr.free_symbols, key=str)
     if len(free) != 1:
         return _unverifiable("미분불가 점 개수 — 단일 변수 함수가 아님·안전 회피")
