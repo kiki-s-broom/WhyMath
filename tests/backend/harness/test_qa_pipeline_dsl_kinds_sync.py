@@ -31,6 +31,9 @@ _EQUATION_DSL_KINDS = frozenset(
         "geometric_convergence",
         "limit_equals_value",
         "is_differentiable",
+        # P3-65 — 조건은 is_differentiable 과 같은 함수 식(`Abs(x - 1) + …`)이다. 실측(2026-10-26):
+        # 새 은행 problem_bank_p3_differentiability_reach_v0 300건 중 등식 DSL 위반 0건.
+        "nondifferentiable_point_count",
         "series_converges",
         "excluded_point_count",
         "root_loss_count",

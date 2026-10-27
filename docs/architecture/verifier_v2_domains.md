@@ -480,7 +480,7 @@ verify:
 ### 6.1 실제 선정 결과와 §3.5의 어긋남 (S4-57 기록)
 
 - **선정 결과**: 단계 A는 `statistical_claim`으로 구현됐다(S4-53, PR #874). 위 권장(`geometric_discrete` 1순위)과 다른 결과이며 선정 사유는 대장에 남아 있지 않다(S4-53 notes는 "최종 선택은 코퍼스 우선순위/소비처에 따름"까지만 적었다). `geometric_discrete`는 미착수다.
-- **소비처**: 현재 `statistical_claim`을 `verify.answer_kind`로 쓰는 코퍼스 레코드는 **0건**이다(전체 <!-- fact:problem_bank.total -->14,742<!-- /fact -->건 — 2026-10-08 §7.1 실측은 14,034건 시점, 이후 늘어난 은행에도 0건). 구현은 있으나 이를 쓰는 데이터가 아직 없다.
+- **소비처**: 현재 `statistical_claim`을 `verify.answer_kind`로 쓰는 코퍼스 레코드는 **0건**이다(전체 <!-- fact:problem_bank.total -->15,042<!-- /fact -->건 — 2026-10-08 §7.1 실측은 14,034건 시점, 이후 늘어난 은행에도 0건). 구현은 있으나 이를 쓰는 데이터가 아직 없다.
 - **§3.5와의 어긋남**: §3.5는 "정확 유리수(또는 `Decimal`)로 처리, 부동소수점 사용 금지"라고 적었으나 구현(`l3/statistical_claim.py`)은 `float`으로 계산하고 `math.isclose(rel_tol=1e-9)`로 대조한다(`_TOL = 1e-9`, 66행). 교차검증 재계산 판정기(`cross_verify.py` 391행)도 같은 방식이다.
 
 이 비교식이 값이 큰 구간에서 오답을 통과시키는지 실측했다. 점화식 `a(n+1)=2a(n)+1`, `a(1)=1`의 정확한 항을 정수 연산으로 구하고, 참값에 1만 더한 오답을 `math.isclose(rel_tol=1e-9, abs_tol=1e-9)`와 정수 일치로 각각 대조했다.

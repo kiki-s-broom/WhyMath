@@ -63,6 +63,7 @@ from whymath_backend.l3.verify_answer import (
     verify_is_one_to_one,
     verify_limit_equals_value,
     verify_mean_equals_median,
+    verify_nondifferentiable_point_count,
     verify_real_root_count,
     verify_root_aggregate,
     verify_root_selection,
@@ -126,6 +127,8 @@ _CONCEPTUAL_VERIFIERS: dict[str, Callable[[str | Sequence[str], str], AnswerVerd
     "geometric_convergence": verify_geometric_convergence,
     "limit_equals_value": verify_limit_equals_value,
     "is_differentiable": verify_is_differentiable,
+    # P3-65: 미분가능하지 않은 점의 개수 — 후보(절댓값 인자의 실근)마다 좌·우미분계수를 비교해 센다.
+    "nondifferentiable_point_count": verify_nondifferentiable_point_count,
     "series_converges": verify_series_converges,
     # division-by-zero: 정의역 제외점(분모=0 실근) 개수 — 근 개수 검증기를 그대로 재사용.
     "excluded_point_count": verify_real_root_count,

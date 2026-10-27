@@ -44,7 +44,7 @@
 | `misconceptions.count` | 843 | 오개념(M-id) | `data/corpus/misconceptions_v1/misconceptions.json` |
 | `misconceptions.with_ccss` | 775 | 오개념 중 CCSS 코드가 있는 것 | `data/corpus/misconceptions_v1/misconceptions.json` |
 | `misconceptions.with_error_type` | 738 | 오개념 중 오류 유형이 있는 것 | `data/corpus/misconceptions_v1/misconceptions.json` |
-| `problem_bank.banks` | 39 | 문제은행 수 | `data/corpus/problem_bank_*/problems.jsonl` |
+| `problem_bank.banks` | 40 | 문제은행 수 | `data/corpus/problem_bank_*/problems.jsonl` |
 | `problem_bank.binomial_distribution_v0` | 300 | 문제은행 problem_bank_binomial_distribution_v0 | `data/corpus/problem_bank_binomial_distribution_v0/problems.jsonl` |
 | `problem_bank.calculus1_integral_v0` | 400 | 문제은행 problem_bank_calculus1_integral_v0 | `data/corpus/problem_bank_calculus1_integral_v0/problems.jsonl` |
 | `problem_bank.calculus2_trig_integral_v0` | 80 | 문제은행 problem_bank_calculus2_trig_integral_v0 | `data/corpus/problem_bank_calculus2_trig_integral_v0/problems.jsonl` |
@@ -69,6 +69,7 @@
 | `problem_bank.middle_function_v0` | 200 | 문제은행 problem_bank_middle_function_v0 | `data/corpus/problem_bank_middle_function_v0/problems.jsonl` |
 | `problem_bank.misconception_mc_v0` | 1,080 | 문제은행 problem_bank_misconception_mc_v0 | `data/corpus/problem_bank_misconception_mc_v0/problems.jsonl` |
 | `problem_bank.p3_calculus1_diff_v0` | 504 | 문제은행 problem_bank_p3_calculus1_diff_v0 | `data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl` |
+| `problem_bank.p3_differentiability_reach_v0` | 300 | 문제은행 problem_bank_p3_differentiability_reach_v0 | `data/corpus/problem_bank_p3_differentiability_reach_v0/problems.jsonl` |
 | `problem_bank.p3_fill_v0` | 204 | 문제은행 problem_bank_p3_fill_v0 | `data/corpus/problem_bank_p3_fill_v0/problems.jsonl` |
 | `problem_bank.permutation_combination_v0` | 160 | 문제은행 problem_bank_permutation_combination_v0 | `data/corpus/problem_bank_permutation_combination_v0/problems.jsonl` |
 | `problem_bank.polynomial_arithmetic_v0` | 1,500 | 문제은행 problem_bank_polynomial_arithmetic_v0 | `data/corpus/problem_bank_polynomial_arithmetic_v0/problems.jsonl` |
@@ -80,10 +81,10 @@
 | `problem_bank.rephrased_v0` | 421 | 문제은행 problem_bank_rephrased_v0 | `data/corpus/problem_bank_rephrased_v0/problems.jsonl` |
 | `problem_bank.review_approved` | 3,188 | 문제은행 전체 중 review_status=approved | `data/corpus/problem_bank_*/problems.jsonl` |
 | `problem_bank.review_pending` | 158 | 문제은행 전체 중 review_status=pending | `data/corpus/problem_bank_*/problems.jsonl` |
-| `problem_bank.review_unset` | 11,396 | 문제은행 전체 중 review_status=없음 | `data/corpus/problem_bank_*/problems.jsonl` |
+| `problem_bank.review_unset` | 11,696 | 문제은행 전체 중 review_status=없음 | `data/corpus/problem_bank_*/problems.jsonl` |
 | `problem_bank.sample_mean_distribution_v0` | 400 | 문제은행 problem_bank_sample_mean_distribution_v0 | `data/corpus/problem_bank_sample_mean_distribution_v0/problems.jsonl` |
 | `problem_bank.sequence_sigma_v0` | 132 | 문제은행 problem_bank_sequence_sigma_v0 | `data/corpus/problem_bank_sequence_sigma_v0/problems.jsonl` |
-| `problem_bank.total` | 14,742 | 문제은행 전체 문항 | `data/corpus/problem_bank_*/problems.jsonl` |
+| `problem_bank.total` | 15,042 | 문제은행 전체 문항 | `data/corpus/problem_bank_*/problems.jsonl` |
 | `problem_bank.university_calc1_chain_quotient_v0` | 400 | 문제은행 problem_bank_university_calc1_chain_quotient_v0 | `data/corpus/problem_bank_university_calc1_chain_quotient_v0/problems.jsonl` |
 | `problem_bank.university_calc1_v0` | 200 | 문제은행 problem_bank_university_calc1_v0 | `data/corpus/problem_bank_university_calc1_v0/problems.jsonl` |
 | `problem_bank.v1` | 4 | 문제은행 problem_bank_v1 | `data/corpus/problem_bank_v1/problems.jsonl` |

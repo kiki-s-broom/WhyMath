@@ -11,7 +11,7 @@
   ③ **`RESIDUE_REVIEWED`·`HUMAN_REVIEWED`는 verify()가 절대 찍지 않는다**(Kiki 판정 2026-10-13) —
      교차검증이 ok여도 등급은 기계 축의 등급 그대로다.
   ④ 레거시 값이 verifier.py의 *구성된 결과*에 남지 않는다(AST — 문자열 금지 패턴이 아니다).
-  ⑤ 개념형 15종에 교차검증 관점을 정의하지 않는다는 결정(설계서 §5.5)이 동결돼 있다.
+  ⑤ 개념형 16종에 교차검증 관점을 정의하지 않는다는 결정(설계서 §5.5)이 동결돼 있다.
 
 변별력: 소스의 등급 부여를 레거시 상수로 되돌리면 ①②가, 교차검증 ok에 `RESIDUE_REVIEWED`를 찍으면
 ③이, 레거시 참조를 되살리면 ④가, 관점을 추가하면 ⑤가 RED다.
@@ -82,6 +82,8 @@ _CASES: dict[str, _Case] = {
     "is_one_to_one": _Case("x**3", "1", "0", _SYMBOLIC),
     "limit_equals_value": _Case("(x**2 - 1)/(x - 1)", "0", "1", _SYMBOLIC),
     "is_differentiable": _Case("Abs(x)", "0", "1", _SYMBOLIC),
+    # P3-65 — |x - 1| + (x + 2)|x + 2| 는 x = 1 에서만 꺾인다(x = -2 는 매끄러움 · 후보 2개를 세면 오답).
+    "nondifferentiable_point_count": _Case("Abs(x - 1) + (x + 2)*Abs(x + 2)", "1", "2", _SYMBOLIC),
     "series_converges": _Case("1/n**2", "1", "0", _SYMBOLIC),
     "inequality_direction": _Case("-2*x < 6", "1", "0", _SYMBOLIC),
     # 개념형 — 문항이 준 수치에 대한 결정론 계산
@@ -132,14 +134,14 @@ def _problem(kind: str, answer: str, conditions: str) -> ProblemVerifyInput:
 def test_case_table_covers_every_registered_kind() -> None:
     """이 파일이 훑는 kind가 레지스트리 전부다 — kind가 늘면 등급 결정 없이 지나가지 못한다."""
     assert set(_CASES) == set(_VERIFIERS_V2)
-    assert len(_CASES) == 19  # 개념형 15 + 유한 전수 2 + 통계 1 + 수열 1
+    assert len(_CASES) == 20  # 개념형 16 + 유한 전수 2 + 통계 1 + 수열 1
 
 
 def test_conceptual_tier_table_matches_registry_exactly() -> None:
-    """등급표 키 = `_CONCEPTUAL_VERIFIERS`에서 `finite_*`(전용 래퍼가 등급을 싣는다)를 뺀 15종."""
+    """등급표 키 = `_CONCEPTUAL_VERIFIERS`에서 `finite_*`(전용 래퍼가 등급을 싣는다)를 뺀 16종."""
     expected = set(_CONCEPTUAL_VERIFIERS) - {"finite_probability", "finite_count"}
     assert set(_CONCEPTUAL_TIERS) == expected
-    assert len(expected) == 15
+    assert len(expected) == 16
     assert set(_CONCEPTUAL_TIERS.values()) <= {_SYMBOLIC, _DATA}
 
 
@@ -279,7 +281,7 @@ def test_source_has_no_reference_to_legacy_or_review_tiers() -> None:
 
 # ── ⑤ 개념형 관점 미정의 결정 동결 ───────────────────────────────────────
 def test_concept_perspective_decision_is_frozen() -> None:
-    """개념형(SymPy) 15종에는 교차검증 관점을 정의하지 않는다(설계서 §5.5, Kiki 판정 2026-10-13).
+    """개념형(SymPy) 16종에는 교차검증 관점을 정의하지 않는다(설계서 §5.5, Kiki 판정 2026-10-13).
 
     관점을 새로 등록하려면 이 테스트와 설계서 §5.5을 함께 고쳐야 한다 — 프롬프트 자산·감사기 레일·
     강등전 측정이 따라와야 하는 결정이라 조용히 늘어나지 않게 막는다.

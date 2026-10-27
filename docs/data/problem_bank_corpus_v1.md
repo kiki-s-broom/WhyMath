@@ -1,7 +1,7 @@
 # 문제은행 코퍼스 (자체 저작 6종) — 데이터 카드
 
 > **⚠️ 정정 (2026-08-11 · 문제은행 R3 §정정-1 → 커버리지 회수 시 재정정)**: 아래 요약의
-> **"6종 · 전 2,613건"은 stale**이다. 2026-08-11 정정 당시 실측은 7종 2,638건이었고, **현재 문제은행은 <!-- fact:problem_bank.banks -->39<!-- /fact -->종 <!-- fact:problem_bank.total -->14,742<!-- /fact -->건**이다(은행별 건수는 `docs/data/corpus_facts.md`). 7종 2,638건까지는 두 단계로 움직였다:
+> **"6종 · 전 2,613건"은 stale**이다. 2026-08-11 정정 당시 실측은 7종 2,638건이었고, **현재 문제은행은 <!-- fact:problem_bank.banks -->40<!-- /fact -->종 <!-- fact:problem_bank.total -->15,042<!-- /fact -->건**이다(은행별 건수는 `docs/data/corpus_facts.md`). 7종 2,638건까지는 두 단계로 움직였다:
 > ① `S4-13`이 7번째 코퍼스 `problem_bank_probability_finite_v0` **34건**을 신설(2,613 + 34 =
 > 2,647) ② `QUAL-02`(PR #777·`50b43b6e`)가 실중복 **9레코드를 은퇴**(`generated_v0` 620→619 ·
 > `rephrased_v0` 429→421)해 **2,647 − 9 = 2,638**. `probability_finite_v0`의 34문은

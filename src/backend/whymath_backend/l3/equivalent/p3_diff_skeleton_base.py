@@ -66,6 +66,7 @@ from whymath_backend.l3.equivalent.p3_diff_solution_steps import (
     final_solution_values,
     final_statement_steps,
     solution_steps,
+    verified_expression_chain,
 )
 from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.schema.enums import (
@@ -328,6 +329,11 @@ def steps_of(item: DiffItem) -> StepChain:
     빌드 검증(`_validate_slot`)과 후보 조립(`_assemble`)이 같은 결과를 쓴다(문항은 불변·해시 가능).
     전이 전건 correct인 연쇄를 못 만들면 ValueError(검증 안 된 단계를 은행에 싣지 않는다).
     """
+    # P3-65 — 생성기가 식↔식 연쇄를 직접 단 문항(개념형 0/1 판정)은 그 연쇄를 검증해 쓴다. 이 속성은
+    # 그 생성기의 문항 확장 클래스에만 있다(기존 문항은 None — 기존 은행 바이트 불변).
+    explicit = getattr(item, "explicit_steps", None)
+    if explicit is not None:
+        return verified_expression_chain(explicit)
     kind = getattr(item, "answer_kind", None)
     return solution_steps(
         conditions=item.conditions,

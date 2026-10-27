@@ -5,7 +5,7 @@
 15종이 `cross_verifier` 주입 시 전부 확률 관점으로 가서 `pass`가 찍혔다.
 
 검증 축:
-  ① 관점 미등록 kind(개념형 15종)는 교차검증기를 **부르지 않고** `unverifiable`(사유 명시)이다.
+  ① 관점 미등록 kind(개념형 16종)는 교차검증기를 **부르지 않고** `unverifiable`(사유 명시)이다.
   ② 등록 kind 4종은 각자의 관점 세트로 교차검증기를 부른다(확률 관점은 finite_* 2종에 *명시* 등록).
   ③ 관점 표에 죽은 키(레지스트리에 없는 kind)가 없다.
 
@@ -86,9 +86,12 @@ def _pass_with_residual(_conditions: str, _answer: str) -> _DomainResult:
     )
 
 
-def test_probe_precondition_unregistered_set_is_exactly_the_15_conceptual_kinds() -> None:
-    """전제 고정 — 이 테스트가 훑는 대상이 실측과 같은 15종이다(조용히 줄어들면 ①이 공허해진다)."""
-    assert len(_UNREGISTERED_CONCEPTUAL_KINDS) == 15
+def test_probe_precondition_unregistered_set_is_exactly_the_16_conceptual_kinds() -> None:
+    """전제 고정 — 이 테스트가 훑는 대상이 실측과 같은 16종이다(조용히 줄어들면 ①이 공허해진다).
+
+    15 → 16: P3-65 가 `nondifferentiable_point_count`(미분불가 점 개수)를 개념형으로 더했다.
+    """
+    assert len(_UNREGISTERED_CONCEPTUAL_KINDS) == 16
     assert not set(_UNREGISTERED_CONCEPTUAL_KINDS) & set(_CROSS_VERIFY_PERSPECTIVES)
 
 
@@ -97,7 +100,7 @@ def test_probe_precondition_unregistered_set_is_exactly_the_15_conceptual_kinds(
 async def test_unregistered_kind_is_unverifiable_and_never_reaches_cross_verifier(
     kind: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """① 개념형 15종 — 확률 관점으로 pass가 찍히지 않고, 교차검증기는 호출조차 되지 않는다."""
+    """① 개념형 16종 — 확률 관점으로 pass가 찍히지 않고, 교차검증기는 호출조차 되지 않는다."""
     monkeypatch.setitem(
         _VERIFIERS_V2,
         kind,
