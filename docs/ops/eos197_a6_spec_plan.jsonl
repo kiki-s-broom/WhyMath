@@ -1,0 +1,4 @@
+{"spec_id": "a6-tangent", "standard_code": "[12미적Ⅰ-02-05]", "difficulty": 2.5, "topic_hint": "고2 미적분Ⅰ 접선의 방정식 — 다항함수 그래프 위의 한 점에서 그은 접선의 y절편을 구하는 형태(답 하나·정수)"}
+{"spec_id": "a6-extremum", "standard_code": "[12미적Ⅰ-02-07]", "difficulty": 3.0, "topic_hint": "고2 미적분Ⅰ 극대와 극소 — 삼차함수의 극댓값을 구하는 형태(답 하나·정수)"}
+{"spec_id": "a6-root-count", "standard_code": "[12미적Ⅰ-02-09]", "difficulty": 3.5, "topic_hint": "고2 미적분Ⅰ 방정식의 실근 — 삼차방정식 f(x) = k가 서로 다른 세 실근을 갖도록 하는 정수 k의 개수를 구하는 형태(답 하나)"}
+{"spec_id": "a6-velocity", "standard_code": "[12미적Ⅰ-02-10]", "difficulty": 2.5, "topic_hint": "고2 미적분Ⅰ 속도와 가속도 — 수직선 위를 움직이는 점의 위치가 시각 t의 다항식일 때 주어진 시각의 속도를 구하는 형태(답 하나·정수)"}
