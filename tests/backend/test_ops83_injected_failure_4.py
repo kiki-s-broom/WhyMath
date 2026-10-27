@@ -3,4 +3,5 @@
 
 def test_ops83_injected() -> None:
     # 고의 실패: 집계 잡(backend — lint·type·test)이 이 샤드 실패를 red로 판정하는지 확인
-    assert False
+    observed = 1
+    assert observed == 2, "OPS-83 고의 실패 주입"
