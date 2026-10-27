@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-198
+title: "EOS-197 선행 — 주간 KPI 파일 입력·cu_slug 조인·A6 생성기 과목/접두·provenance_audit 범위·ADR-007 A6 정정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P0
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 주간 KPI 파일 입력 경로(G-A) — `ops/weekly_metrics_report`가 DB 없이도 회차 산출물 JSONL(`review_session` 이벤트·`cu.genlog.jsonl` 생성 기록)을 입력으로 받아 같은 `aggregate`로 hit_seconds·unit_cost_krw를 계산한다(창 지정 인자 포함). DB 경로의 결과와 같은 입력에서 같은 값이 나옴을 테스트로 고정하고, 입력 0건·필드 결손이면 measured:false로 정직하게 떨어지는지 확인한다 ② cu_slug 조인(G-B) — `_fetch_report`가 cu_slug를 버려 배치 CU(problem_id=None)의 비용이 CU에 조인되지 않던 결함을 고친다. cu_slug를 지우는 뮤테이션이 RED가 되는 회귀 테스트 ③ A6 생성기 과목·접두(G-D) — `problem_corpus_accumulate`의 A6(미적분Ⅰ) 저작 경로가 subject=공통·slug_prefix=wm-gen-quad로 고정 기록되던 것을 성취기준 코드에 맞는 과목·접두로 기록한다. 기존 경로의 출력은 바뀌지 않음을 대조 ④ provenance_audit 범위(G-F) — `whymath_backend.ops.provenance_audit`가 `data/runs/*/cu.jsonl`도 검사 대상에 넣어(license·source_type·GenerationLog 4필드 중 검사 가능한 것) EOS-197 완료 검사의 exit 0이 이 산출물에 대해 의미를 갖게 한다. 결함 레코드 주입 시 exit 1 확인 ⑤ ADR-007 A6 범위 문구를 앵커 레지스트리(`data/corpus/eos_anchor_set_v1/anchors.yaml` [12미적Ⅰ-02-05]~[02-10])에 맞게 정정(Kiki 2026-10-27 결정)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/weekly_metrics_report.py
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - src/backend/whymath_backend/ops/provenance_audit.py
+  - "docs/architecture/adr/ADR-007*"
+  - "tests/backend/ops/**"
+  - "tests/backend/harness/**"
+session: claude/eos-197-authoring-round
+notes: "출처: EOS-197 착수 조사(코드 경로 실측)에서 나온 공백 G-A·G-B·G-D·G-F·G-G. 이 다섯이 없으면 Kiki 머신 회차를 돌려도 완료 검사 ③(weekly.json measured:true)을 채울 수 없거나 provenance_audit exit 0이 무의미하다. Kiki 결정(2026-10-27): openrouter 좌석 seed=null은 구조적 미지원으로 기록하고 W-18 충족으로 인정(G-C · 코드 수정 없음), A6 범위 정본은 앵커 레지스트리 02-05~02-10(G-G). 런북 초안은 EOS-197 브랜치 docs/ops/eos197_authoring_round_runbook.md."
+updated: 2026-10-27
