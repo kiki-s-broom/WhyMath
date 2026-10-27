@@ -21,6 +21,12 @@ paths:
   - "docs/architecture/adr/ADR-007*"
   - "tests/backend/ops/**"
   - "tests/backend/harness/**"
+  - docs/ops/eos197_authoring_round_runbook.md
+  - docs/ops/eos197_a6_spec_plan.jsonl
+  - ".github/workflows/ci.yml"
 session: claude/eos-197-authoring-round
-notes: "출처: EOS-197 착수 조사(코드 경로 실측)에서 나온 공백 G-A·G-B·G-D·G-F·G-G. 이 다섯이 없으면 Kiki 머신 회차를 돌려도 완료 검사 ③(weekly.json measured:true)을 채울 수 없거나 provenance_audit exit 0이 무의미하다. Kiki 결정(2026-10-27): openrouter 좌석 seed=null은 구조적 미지원으로 기록하고 W-18 충족으로 인정(G-C · 코드 수정 없음), A6 범위 정본은 앵커 레지스트리 02-05~02-10(G-G). 런북 초안은 EOS-197 브랜치 docs/ops/eos197_authoring_round_runbook.md."
+notes: |-
+  출처: EOS-197 착수 조사(코드 경로 실측)에서 나온 공백 G-A·G-B·G-D·G-F·G-G. 이 다섯이 없으면 Kiki 머신 회차를 돌려도 완료 검사 ③(weekly.json measured:true)을 채울 수 없거나 provenance_audit exit 0이 무의미하다. Kiki 결정(2026-10-27): openrouter 좌석 seed=null은 구조적 미지원으로 기록하고 W-18 충족으로 인정(G-C · 코드 수정 없음), A6 범위 정본은 앵커 레지스트리 02-05~02-10(G-G). 런북 초안은 EOS-197 브랜치 docs/ops/eos197_authoring_round_runbook.md.
+
+  [정정 2026-10-27] paths ['src/backend/whymath_backend/ops/weekly_metrics_report.py', 'src/backend/whymath_backend/harness/problem_corpus_accumulate.py', 'src/backend/whymath_backend/ops/provenance_audit.py', 'docs/architecture/adr/ADR-007*', 'tests/backend/ops/**', 'tests/backend/harness/**'] → ['src/backend/whymath_backend/ops/weekly_metrics_report.py', 'src/backend/whymath_backend/harness/problem_corpus_accumulate.py', 'src/backend/whymath_backend/ops/provenance_audit.py', 'docs/architecture/adr/ADR-007*', 'tests/backend/ops/**', 'tests/backend/harness/**', 'docs/ops/eos197_authoring_round_runbook.md', 'docs/ops/eos197_a6_spec_plan.jsonl', '.github/workflows/ci.yml']: 런북 정합과 산출물 커밋 PR에서 provenance_audit가 돌도록 한 changes 필터 보강이 작업 경로 밖이어서 실제 변경 파일에 맞춘다
 updated: 2026-10-27
