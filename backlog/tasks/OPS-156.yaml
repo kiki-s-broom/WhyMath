@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-156
+title: "OPS-83 샤딩 후속 — 샤드 pytest 실패 은폐 차단·경로 필터 공백·상한 실측화·합산 커버리지 대조"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 샤드 pytest 명령의 실패 은폐 차단 — 세 샤드 잡의 pytest 줄 끝에 `|| true`·`|| :`·`; exit 0` 같은 종료 코드 은폐가 들어가면 `tests/infra/test_backend_shard_wiring.py`가 RED를 낸다(현재는 `continue-on-error`만 검사해 PR #1753 리뷰 뮤테이션 M18이 생존). 문자열 열거가 아니라 run 블록의 마지막 명령이 pytest인지·종료 코드가 전파되는지를 판정하고, 은폐 변형 3종 이상 주입으로 RED 확인 ② changes 잡 backend 경로 필터에 `scripts/coverage/`를 넣어 샤드 플러그인·판정기·계층 게이트만 바꾼 PR에서도 PR CI가 backend 4잡과 집계 잡을 돌리게 한다(지금은 머지 큐에서야 검증됨). 필터 대상 경로를 회귀 테스트로 고정 ③ `test_ci_job_timeout_floor.py`의 샤드·집계 잡 상한을 추정 표에서 실측 표로 옮긴다 — 근거 표본은 PR #1753 이후 merge_group 실행이며, 50분 취소 표본(우측 절단)을 추정에서 빼면 낮게 치우친다는 점을 정리한다 ④ 머지 후 `coverage-backend` 산출물의 합산 커버리지(구문·실행 줄·분기 총계)를 OPS-83 이전 main 단일 잡 수치와 대조해 일치를 기록한다(최종 해시 배정 N=3의 CI 수치 대조는 아직 없음) ⑤ `src/backend/whymath_backend/harness/formula_reach_report.py` docstring의 옛 「Pytest (with coverage)」 스텝 인용을 새 샤드 잡으로 정정"
+artifacts: []
+paths:
+  - ".github/workflows/ci.yml"
+  - tests/infra/test_backend_shard_wiring.py
+  - tests/infra/test_ci_job_timeout_floor.py
+  - src/backend/whymath_backend/harness/formula_reach_report.py
+session: null
+notes: "출처: PR #1753(OPS-83) 독립 리뷰 P3 1·2·3·4·7. 머지 큐 실측(run 40440903968): 전체 20.4분, 샤드 최대 19.0분, 이후 병목은 corpus-authoring 20.1분."
+updated: 2026-10-27
