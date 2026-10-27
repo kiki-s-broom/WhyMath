@@ -26,6 +26,8 @@ venv/
 .coverage.*
 htmlcov/
 coverage.xml
+# backend pytest 샤드 산출물(커버리지 데이터·배정 보고서 — OPS-83 · ci.yml backend-pytest-*)
+pytest-shard/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

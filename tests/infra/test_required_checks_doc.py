@@ -52,6 +52,23 @@ _INTENTIONAL_EXCLUSIONS: dict[str, str] = {
         "required로 걸면 PR 머지 게이트에 직렬 26분이 되돌아와 OPS-58 병렬화가 무의미해진다. "
         "배선 실재성은 tests/infra/test_backend_serial_nightly_wiring.py가 동결한다."
     ),
+    # OPS-83 — backend 잡 분할로 생긴 하위 잡 4종. 이들의 판정은 required인 집계 잡
+    # `backend — lint·type·test`(ci.yml backend-verdict)가 `needs`로 모아 내린다(실패·취소·건너뜀
+    # 전부 집계 잡 red). 하위 잡을 직접 required로 걸면 이름이 바뀔 때마다 룰셋 변경(관리자 권한)이
+    # 필요해지고, 그것이 이 분할이 필수 체크 이름을 집계 잡에 물려준 이유다(OPS-83 ⑦).
+    # 집계 잡의 needs 전수·always()·판정 스텝은 tests/infra/test_backend_shard_wiring.py가 동결한다.
+    "backend — 정적 검사·게이트 CLI": (
+        "집계 잡 `backend — lint·type·test`가 needs로 판정한다(OPS-83) — 직접 required 불요."
+    ),
+    "backend — pytest 샤드 1/3": (
+        "집계 잡 `backend — lint·type·test`가 needs로 판정한다(OPS-83) — 직접 required 불요."
+    ),
+    "backend — pytest 샤드 2/3": (
+        "집계 잡 `backend — lint·type·test`가 needs로 판정한다(OPS-83) — 직접 required 불요."
+    ),
+    "backend — pytest 샤드 3/3": (
+        "집계 잡 `backend — lint·type·test`가 needs로 판정한다(OPS-83) — 직접 required 불요."
+    ),
     "constraints-freshness — 제약 파일 연령 센서 (야간)": (
         "if: github.event_name == 'schedule' — PR에서 항상 skip(위와 같은 사유). 연령은 시계에 "
         "따라 결과가 바뀌는 입력이라 머지 게이트(PR·머지 큐)에 넣으면 같은 코드가 날짜에 따라 "

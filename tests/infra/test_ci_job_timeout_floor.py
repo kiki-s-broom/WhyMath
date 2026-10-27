@@ -23,6 +23,12 @@
 harness-integrity 한 잡은 OPS-69의 `test_ci_harness_integrity_timeout.py`(실측 5.1분 기준,
 하한 10분)가 별도로 동결한다. 이 파일은 같은 잡의 **현재** 실측(9.18분)을 기준으로 더 높은
 하한을 건다 — 두 테스트는 충돌하지 않고 엄격한 쪽이 이긴다.
+
+OPS-83(2026-10-26) — backend 잡 분할: `backend` 키는 이제 정적 검사·게이트 CLI 잡이고(pytest는
+`backend-pytest-1~3` 샤드로, 합산·판정은 `backend-verdict`로 옮겼다), 그 실측 최대는 같은 스텝들의
+과거 합(merge_group 통과 15표본, 잡 소요 − Pytest 스텝)이다. 샤드·집계 잡은 아직 실행 이력이 없어
+**추정치**를 `_PROJECTED_MAX_MINUTES`에 따로 둔다 — 실측과 같은 표에 섞으면 추정이 실측처럼 읽힌다.
+적용 후 OPS-100 감시가 실측을 내면 그 값으로 `_MEASURED_MAX_MINUTES`에 옮긴다(OPS-83 ⑤).
 """
 
 from __future__ import annotations
@@ -39,13 +45,29 @@ _CI_YAML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 # OPS-47 기준: 최대 표본 소요가 상한의 70% 이하(여유 30% 이상).
 _MIN_HEADROOM_RATIO = 0.30
 
-# 잡 id → (2026-10-09 실측 최대 소요 분, 근거 표본 수). 이름은 ci.yml의 잡 키(id)다.
+# 잡 id → (실측 최대 소요 분, 근거 표본 수). 이름은 ci.yml의 잡 키(id)다. 날짜는 2026-10-09
+# (OPS-120) — `backend`만 2026-10-26(OPS-83 분할 후 정적 잡 · 과거 스텝 합으로 산출).
 _MEASURED_MAX_MINUTES: dict[str, tuple[float, int]] = {
-    "backend": (31.93, 33),
+    "backend": (7.85, 15),
     "backend-migrations": (14.10, 39),
     "backend-serial-nightly": (33.15, 17),
     "harness-integrity": (9.18, 59),
     "infra-contracts": (7.15, 57),
+}
+
+# 잡 id → (추정 최대 소요 분, 근거). **실측 전 추정** — 실행 이력이 생기면 위 표로 옮긴다.
+# 샤드: 단일 잡 시절 Pytest 스텝 최대 41.9분 ÷ 3 = 14.0 + 설치 최대 1.05 + 샤드마다 반복되는
+# 전건 수집 ≈ 17분. 집계: 체크아웃·pytest-cov 설치·합산·보고 ≈ 3분(로컬 합산+보고 1분 미만).
+_PROJECTED_MAX_MINUTES: dict[str, tuple[float, str]] = {
+    "backend-pytest-1": (17.0, "OPS-83 추정 — 단일 잡 Pytest 최대 41.9분/3 + 설치·수집"),
+    "backend-pytest-2": (17.0, "OPS-83 추정 — 샤드 1과 같은 근거"),
+    "backend-pytest-3": (17.0, "OPS-83 추정 — 샤드 1과 같은 근거"),
+    "backend-verdict": (3.0, "OPS-83 추정 — 설치·합산·보고만"),
+}
+
+_ALL_FLOORS: dict[str, float] = {
+    **{k: v[0] for k, v in _MEASURED_MAX_MINUTES.items()},
+    **{k: v[0] for k, v in _PROJECTED_MAX_MINUTES.items()},
 }
 
 
@@ -89,10 +111,27 @@ def _headroom_shortfall(timeout: int, measured_max: float) -> float:
     return measured_max / (1 - _MIN_HEADROOM_RATIO) - timeout
 
 
-@pytest.mark.parametrize("job_name", sorted(_MEASURED_MAX_MINUTES))
+@pytest.mark.parametrize("job_name", sorted(_ALL_FLOORS))
 def test_job_declares_integer_timeout(job_name: str) -> None:
     """① 잡이 있고 timeout-minutes가 양의 정수다."""
     assert _declared_timeout(job_name) > 0
+
+
+@pytest.mark.parametrize("job_name", sorted(_PROJECTED_MAX_MINUTES))
+def test_job_timeout_keeps_30_percent_headroom_over_projected_max(job_name: str) -> None:
+    """② 추정판 — 실행 이력이 없는 잡(OPS-83 샤드·집계)도 추정 최대의 여유 30%를 확보한다."""
+    projected, basis = _PROJECTED_MAX_MINUTES[job_name]
+    timeout = _declared_timeout(job_name)
+    shortfall = _headroom_shortfall(timeout, projected)
+    assert shortfall <= 1e-9, (
+        f"'{job_name}' 상한 {timeout}분 × 0.7 = {timeout * 0.7:.1f}분 < 추정 최대 {projected}분"
+        f"({basis}) — 여유 30%를 채우려면 {projected / 0.7:.1f}분 이상이어야 한다."
+    )
+
+
+def test_projected_and_measured_tables_do_not_overlap() -> None:
+    """같은 잡이 두 표에 있으면 추정이 실측을 덮거나 그 반대다 — 옮길 때는 한쪽에서 지운다."""
+    assert not set(_MEASURED_MAX_MINUTES) & set(_PROJECTED_MAX_MINUTES)
 
 
 @pytest.mark.parametrize("job_name", sorted(_MEASURED_MAX_MINUTES))
@@ -155,8 +194,10 @@ def test_pre_ops120_limits_would_have_failed_the_headroom_check() -> None:
     상한을 되돌리면 ②가 RED가 된다는 것을 코드로 보인다 — 정상 입력에서만 초록인 동결은
     보호가 아니다. 이전 상한은 ci.yml 주석과 MEMORY의 OPS-100 첫 실측 기록에 있다.
     """
+    # `backend`는 뺐다 — OPS-120 이전의 35분은 pytest가 들어 있던 단일 잡의 상한이고, 지금의
+    # `backend` 키는 OPS-83이 분할한 정적 잡이라 같은 잡이 아니다(대조군이 성립하지 않는다).
+    # 분할 뒤 상한의 변별력은 아래 test_shard_limit_below_projection_would_fail가 맡는다.
     previous = {
-        "backend": 35,
         "backend-migrations": 15,
         "backend-serial-nightly": 45,
         "harness-integrity": 12,
@@ -167,3 +208,14 @@ def test_pre_ops120_limits_would_have_failed_the_headroom_check() -> None:
         assert (
             _headroom_shortfall(old_timeout, measured) > 0
         ), f"'{job_name}' 이전 상한 {old_timeout}분이 이미 충족이면 이 동결은 변별력이 없다."
+
+
+def test_shard_limit_below_projection_would_fail() -> None:
+    """변별력 대조군(OPS-83) — 샤드 상한을 단일 잡 시절처럼 근거 없이 낮추면 ②가 RED가 된다.
+
+    샤드 하나가 단일 잡 Pytest의 1/3만 돈다고 상한도 1/3(약 17분)으로 깎으면 느린 러너 한 대에서
+    여유가 0이 된다. 20분(×0.7 = 14분)은 추정 최대 17분을 못 덮는다.
+    """
+    projected, _ = _PROJECTED_MAX_MINUTES["backend-pytest-1"]
+    assert _headroom_shortfall(20, projected) > 0
+    assert _headroom_shortfall(_declared_timeout("backend-pytest-1"), projected) <= 1e-9
