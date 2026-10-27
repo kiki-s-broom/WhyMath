@@ -169,6 +169,50 @@ class Settings(BaseSettings):
         ),
     )
 
+    # PED-48: 학생 의도 섀도 관측 — 자체 호스팅 laya-serve(laya-ko-whymath)의 6종 의도·개인정보
+    # 판단을 규칙 분류기(`classify_student_intent`) 옆에 *로그로만* 남긴다. 4개 필드가 모두
+    # 갖춰져야 켜진다(하나라도 비면 외부 호출 0회) — 반쯤 설정된 상태가 조용히 실패하지 않게.
+    laya_intent_shadow_enabled: bool = Field(
+        default=False,
+        description=(
+            "학생 의도 섀도 관측(PED-48) 활성 여부. True이고 URL·API 키가 모두 설정돼 있으면 "
+            "/v1/coach 세션·턴 엔드포인트가 학생 턴 커밋 *뒤* laya-serve에 학생 발화를 보내 "
+            "6종 의도(concept·stuck·answer_only·hint·check·chitchat)·개인정보 확률을 받고, "
+            "규칙 분류기 결과와 나란히 구조화 레코드로만 기록한다. **비노출·비차단** — 응답·"
+            "DB 적재·교수 결정은 어느 쪽이든 불변이고 학생 원문은 레코드·로그에 남지 않는다. "
+            "**False(기본·opt-in)**. WHYMATH_LAYA_INTENT_SHADOW_ENABLED=true로 켠다."
+        ),
+    )
+
+    laya_intent_shadow_url: str = Field(
+        default="",
+        description=(
+            "laya-serve 기준 URL(예: http://127.0.0.1:18080 — 경로 없이). 비어 있으면 섀도 "
+            "관측은 켜지지 않는다. 학생 발화가 이 주소로 전송되므로 *자체 호스팅·내부망* 서버만 "
+            "가리킨다(미성년자 데이터 외부 공유 금지). WHYMATH_LAYA_INTENT_SHADOW_URL."
+        ),
+    )
+
+    laya_intent_shadow_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "laya-serve Bearer 키(LAYA_API_KEY와 같은 값). SecretStr — repr/로그에 평문 노출 "
+            "안 됨. 비어 있으면 섀도 관측은 켜지지 않는다(무인증 서버로의 전송 차단). "
+            "WHYMATH_LAYA_INTENT_SHADOW_API_KEY."
+        ),
+    )
+
+    laya_intent_shadow_timeout_s: float = Field(
+        default=2.0,
+        gt=0,
+        le=30,
+        description=(
+            "laya-serve 단일 호출 타임아웃(초). 섀도는 응답 뒤 백그라운드에서 돌아 학생 지연에 "
+            "더해지지 않지만, 무한 대기로 task가 쌓이지 않게 상한을 건다(CPU 실측 0.3~0.5초/건). "
+            "WHYMATH_LAYA_INTENT_SHADOW_TIMEOUT_S."
+        ),
+    )
+
     wh1_harness_shadow_enabled: bool = Field(
         default=False,
         description=(

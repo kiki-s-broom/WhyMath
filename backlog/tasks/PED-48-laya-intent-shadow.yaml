@@ -1,0 +1,37 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-48-laya-intent-shadow
+title: "학생 의도 섀도 관측 — laya-ko-whymath 판단을 규칙 분류기 옆에 로그로만 기록(본류 불변·원문 미기록)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 설정 게이트 — config.py에 laya_intent_shadow_enabled(기본 False)·laya_intent_shadow_url·laya_intent_shadow_api_key(SecretStr, 미설정 허용)·laya_intent_shadow_timeout_s를 둔다. 꺼져 있거나 URL·키가 없으면 외부 호출 0회(테스트 동결)"
+  - "② 섀도 어댑터 — 학생 발화를 laya-serve(/v1/systemone)에 보내 6종 의도·개인정보 확률을 받는 비차단 관측 모듈. 본류(코칭 결정·응답·DB 적재)를 어떤 경우에도 바꾸지 않는다(반환 None·예외 흡수). 흡수한 예외는 예외 타입명을 로그에 남긴다(침묵 실패 금지). 타임아웃 필수. 학생 원문은 로그·레코드 어디에도 남기지 않는다(미성년자 채팅 평문 저장 금지)"
+  - "③ 구조화 관측 레코드 — 별도 record 로거로 1턴 1레코드: 규칙 분류기 의도(classify_student_intent 결과)·Laya 의도·answer_confidence·개인정보 확률·라우팅 모델명·지연 ms·실패 시 실패 타입. 세션·턴 식별자는 기존 관측 선례(step_shadow)의 범위를 따른다. 원문·원문 해시 미포함을 테스트로 동결"
+  - "④ 집행 지점(정본화와 별항) — api/coach.py의 학생 턴 적재 2곳(classify_student_intent 호출부)이 실제로 섀도를 부르는지 서빙 경로 테스트로 동결. 섀도 지연이 학생 응답 지연에 더해지지 않게 응답 후 실행(백그라운드)되는지도 동결"
+  - "⑤ 실패 주입 — 꺼짐·URL 없음·키 없음·타임아웃·연결 거부·401·5xx·잘못된 JSON 각각에서 본류 응답이 바이트 동일하고 실패 타입이 기록되는지 픽스처로 검증. 성공 대조군 포함. 뮤테이션으로 가드 절마다 RED 확인"
+  - "⑥ 범위 밖(명시) — StudentIntent 5종 enum·DB 스키마·교수 결정 로직 변경 없음. Laya 판단으로 학생 노출·저장 값을 바꾸는 승격은 파일럿 일치도 측정 뒤 별도 태스크·Kiki 결정. 개인정보 감지는 보조 관측 신호일 뿐 PII 보호 절차를 대체하지 않는다(법령 유래 절차 기계 대체 금지)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/api/coach.py
+  - src/backend/whymath_backend/api/_intent_shadow.py
+  - tests/backend/api/test_intent_shadow.py
+  - tests/backend/api/test_coach_intent_shadow_integration.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+session: claude/ped-48-laya-intent-shadow
+notes: |-
+  배경(2026-10-27 Kiki 세션): laya-multilingual을 한국어 학생 메시지로 파인튜닝한 laya-ko-whymath v1(의도 6종: concept·stuck·answer_only·hint·check·chitchat + 개인정보)을 Phaiakes9에 laya-serve Docker(127.0.0.1:18080, Bearer 키)로 배포 완료. 합성 최종 시험셋 272건 1회 평가: 의도 정확도 0.893·개인정보 재현율 1.000·ECE 0.094 — 합성 데이터·사람 검수 전 수치. 같은 272건에 현행 classify_student_intent를 적용한 비교: 답요구 43건 중 포기 6건(14%), 막힘 53건 중 막힘표현 19건(36%), 전체 194/272(71%)가 이해확인(잔여 범주)으로 수렴 — has_solution=False 고정 조건이라 실서비스와 다를 수 있다. Kiki 결정(2026-10-27): 교체·재설계가 아니라 섀도 연결(선택지 ①)로 실학생 데이터 일치도를 먼저 측정. step_shadow·l3_shadow_validation_enabled 선례 동형. 겹침 후보: PED-19(student_intent 질문 reader)·PED-44(coach 교수법 축) — 둘 다 student_intent를 소비하는 쪽이고 이 태스크는 값을 바꾸지 않는 관측이라 축이 다르다
+
+  [정정 2026-10-27] paths ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/l5/**', 'tests/backend/**'] → ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/api/_intent_shadow.py', 'tests/backend/api/test_intent_shadow.py', 'scripts/analysis/eos_feature_inventory_v2.py']: 등재 시 tests/backend/** 와 l5/** 를 넓게 잡아 무관 태스크와 겹침 경고 106건 발생 — 실제로 손대는 파일 5개로 축소(l5는 미사용·어댑터는 api 비공개 모듈)
+  paths 제거 2건: ['src/backend/whymath_backend/l5/**', 'tests/backend/**']
+
+  [정정 2026-10-27] paths ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/api/_intent_shadow.py', 'tests/backend/api/test_intent_shadow.py', 'scripts/analysis/eos_feature_inventory_v2.py'] → ['src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/api/coach.py', 'src/backend/whymath_backend/api/_intent_shadow.py', 'tests/backend/api/test_intent_shadow.py', 'tests/backend/api/test_coach_intent_shadow_integration.py', 'scripts/analysis/eos_feature_inventory_v2.py']: 서빙 경로 통합테스트 파일 추가(acceptance ④ 실행 검증)
+updated: 2026-10-27
