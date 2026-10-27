@@ -628,8 +628,13 @@ def _mutate_gate_job_watches_the_wrong_flag(text: str) -> str:
     start = text.index("\n  backend:\n")
     old = "needs.changes.outputs.backend == 'true'"
     hit = text.index(old, start)
+    # 블록 끝 = backend 바로 다음 잡 키. OPS-83이 backend 뒤에 샤드·집계 잡을 두면서 "다음 잡 =
+    # backend-migrations" 가정이 깨졌다 — 그 잡들도 같은 if를 가져 앵커가 5건이 됐다.
+    nxt = re.search(r"\n  [A-Za-z0-9_-]+:\n", text[start + 1 :])
+    assert nxt is not None, "backend 다음 잡 키를 찾지 못했다 — 블록 끝을 결정할 수 없다"
+    end = start + 1 + nxt.start()
     assert (
-        text.count(old, start, text.index("\n  backend-migrations:\n")) == 1
+        text.count(old, start, end) == 1
     ), "backend 잡 블록 안의 if 앵커가 1건이 아니다 — 주입 대상을 결정할 수 없다"
     return text[:hit] + "needs.changes.outputs.mobile == 'true'" + text[hit + len(old) :]
 
