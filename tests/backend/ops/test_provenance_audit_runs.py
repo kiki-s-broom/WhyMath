@@ -213,6 +213,24 @@ class TestEmptyTargets:
     def test_default_runs_root_is_repo_data_runs(self) -> None:
         assert pa.default_runs_root() == pa.default_corpus_root().parent / "runs"
 
+    def test_bare_cli_audits_default_runs_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """인자 없는 CLI(= CI 스텝·EOS-197 완료 검사의 형태)가 기본 회차 루트를 실제로 검사한다.
+
+        정본 경로 두 개를 tmp로 바꾸고, 회차에 결함을 넣어 exit 1을 본다 — 기본 경로 분기가
+        회차를 건너뛰면 corpus는 비어 있으므로 exit 0이 나와 RED가 된다.
+        """
+        corpus = tmp_path / "corpus"
+        corpus.mkdir()
+        runs = _two_seat_runs(tmp_path)
+        monkeypatch.setattr(pa, "default_corpus_root", lambda: corpus)
+        monkeypatch.setattr(pa, "default_runs_root", lambda: runs)
+        assert pa.main([]) == 0  # 대조 — 결함 없는 회차
+        _write(runs / "eos197-a6-local" / "cu.jsonl", [_cu("wm-l-1", source_type=None)])
+        assert pa.main([]) == 1
+        assert pa.main(["--require-runs"]) == 1
+
 
 # ──────────────────────────────────────────────────────────────────────
 # ④ 실 생산자 산출물 — 저작 CLI가 쓴 파일을 그대로 감사
