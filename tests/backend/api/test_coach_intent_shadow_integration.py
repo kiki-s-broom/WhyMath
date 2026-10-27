@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
+import time
 import uuid
 from collections.abc import Coroutine, Iterator
 from typing import Any
@@ -124,7 +126,8 @@ def _isolate() -> Iterator[None]:
 
 def _enable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WHYMATH_LAYA_INTENT_SHADOW_ENABLED", "true")
-    monkeypatch.setenv("WHYMATH_LAYA_INTENT_SHADOW_URL", "http://laya.test:18080")
+    # 내부망만 허용(설정 검증) — 실제 연결은 MockTransport가 받는다
+    monkeypatch.setenv("WHYMATH_LAYA_INTENT_SHADOW_URL", "http://127.0.0.1:18080")
     monkeypatch.setenv("WHYMATH_LAYA_INTENT_SHADOW_API_KEY", "integration-laya-key-0123456789")
     get_settings.cache_clear()
 
@@ -142,13 +145,18 @@ class _Captured:
         self.coros.clear()
 
 
-def _laya(status: int, body: dict[str, Any] | None = None) -> None:
-    def _h(_r: httpx.Request) -> httpx.Response:
+def _laya(status: int, body: dict[str, Any] | None = None) -> list[str]:
+    """laya 대역 — 받은 요청의 `state`(학생 발화)를 순서대로 돌려준다(원 발화 전송 검증용)."""
+    states: list[str] = []
+
+    def _h(r: httpx.Request) -> httpx.Response:
+        states.append(json.loads(r.content)["state"])
         return httpx.Response(status, json=body if body is not None else {"detail": "x"})
 
     shadow.set_client_factory(
         lambda t: httpx.AsyncClient(transport=httpx.MockTransport(_h), timeout=t)
     )
+    return states
 
 
 def _client() -> TestClient:
@@ -217,7 +225,7 @@ def test_flag_on_spawns_per_student_turn_response_unchanged_and_intent_matches_d
         assert cap.coros == []
 
         _enable(monkeypatch)
-        _laya(200, _OK_BODY)
+        sent_states = _laya(200, _OK_BODY)
         with _client() as client:
             on_first, on_second = _session_and_turn(client, uid)
             on_did = uuid.UUID(on_first.json()["dialogue_id"])
@@ -232,6 +240,8 @@ def test_flag_on_spawns_per_student_turn_response_unchanged_and_intent_matches_d
             cap.drive()
         recs = [json.loads(r.getMessage()) for r in caplog.records if r.name == _RECORD_LOGGER]
         assert [r["route"] for r in recs] == ["create_session", "append_turns"]
+        # 보낸 것은 *원 발화*다(풀이·암호문·다른 턴의 발화가 아니다)
+        assert sent_states == [_FIRST, _SECOND]
         assert all(r["laya_intent"] == "answer_only" and r["failure"] is None for r in recs)
         # 레코드의 규칙 의도 == DB에 실제로 적재된 student_intent (같은 값을 비교해야 의미가 있다)
         stored = asyncio.run(_stored_student_intents(on_did))
@@ -261,4 +271,56 @@ def test_laya_failure_never_breaks_turns(
         assert len(recs) == 2
         assert all(r["failure"] == "HTTPStatusError" and r["http_status"] == 503 for r in recs)
     finally:
+        asyncio.run(_cleanup(uid, dids))
+
+
+def test_real_spawn_does_not_block_the_response(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """실제 `_spawn`(create_task) 경로 — laya가 멈춰 있어도 학생 응답은 먼저 돌아온다.
+
+    다른 테스트는 `_spawn`을 캡처기로 바꿔 '구조상 비차단'만 본다. 여기서는 바꾸지 않고, laya 대역이
+    `release` 신호를 받을 때까지 멈추게 한다. 응답이 섀도를 기다렸다면 요청이 30초 대기에 걸린다.
+    """
+    _require_pg()
+    uid = uuid.uuid4()
+    dids: list[uuid.UUID] = []
+    entered = threading.Event()
+    release = threading.Event()
+
+    async def _hold(_r: httpx.Request) -> httpx.Response:
+        entered.set()
+        await asyncio.to_thread(release.wait, 30)
+        return httpx.Response(200, json=_OK_BODY)
+
+    try:
+        asyncio.run(_add_user(uid))
+        _enable(monkeypatch)
+        shadow.set_client_factory(
+            lambda t: httpx.AsyncClient(transport=httpx.MockTransport(_hold), timeout=t)
+        )
+        monkeypatch.setenv("WHYMATH_LAYA_INTENT_SHADOW_TIMEOUT_S", "30")
+        get_settings.cache_clear()
+        with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER), _client() as client:
+            started = time.monotonic()
+            resp = client.post(
+                "/v1/coach/sessions", headers=_auth(uid), json={"student_input": _FIRST}
+            )
+            elapsed = time.monotonic() - started
+            assert resp.status_code == 201, resp.text
+            dids.append(uuid.UUID(resp.json()["dialogue_id"]))
+            # 응답이 돌아온 시점에 laya는 아직 풀려나지 않았다 — 응답이 섀도를 기다리지 않았다
+            assert not release.is_set()
+            assert elapsed < 20, f"응답이 섀도 대기에 걸렸다: {elapsed:.1f}s"
+            assert entered.wait(10), "섀도 task가 시작되지 않았다"
+            release.set()
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                if any(r.name == _RECORD_LOGGER for r in caplog.records):
+                    break
+                time.sleep(0.05)
+        recs = [json.loads(r.getMessage()) for r in caplog.records if r.name == _RECORD_LOGGER]
+        assert len(recs) == 1 and recs[0]["failure"] is None
+    finally:
+        release.set()
         asyncio.run(_cleanup(uid, dids))

@@ -328,3 +328,31 @@ UX(묶음 제출 유도·S3-05).**
 3. **다중행 블록 붙여넣기의 마지막 줄은 Enter 미실행일 수 있다** — 창①의 uvicorn 명령이 프롬프트에
    입력만 된 채 대기하면 서버가 안 떠 있다(2026-07-19 실측 — 창② /health 연결 거부가 검출).
    블록 실행 후 `INFO: Uvicorn running`이 *보이는지* 눈으로 확인한다.
+
+## 학생 의도 섀도 (PED-48 — laya-ko-whymath ↔ 규칙 분류기)
+
+**무엇을 재는가**: 발화가 있는 학생 턴마다 규칙 분류기(`classify_student_intent`, DB 적재값)와
+laya-ko-whymath v1(6종 의도·개인정보 확률)의 판단 쌍. 교체(승격)는 이 일치도·오류 분포를 본 뒤 별도
+결정이며, 이 섀도는 응답·DB·교수 결정을 바꾸지 않는다. 정본 = `api/_intent_shadow.py` 모듈 docstring.
+
+**발동 조건 (셋 다 필요 — 하나라도 비면 부팅 거부)**:
+- `WHYMATH_LAYA_INTENT_SHADOW_ENABLED=true`
+- `WHYMATH_LAYA_INTENT_SHADOW_URL` — laya-serve 기준 URL(경로 없이). 내부망 호스트만 허용
+  (루프백·사설 IP·`localhost`·Docker 서비스명). 외부 호스트는 설정 검증이 부팅을 거부한다.
+- `WHYMATH_LAYA_INTENT_SHADOW_API_KEY` — laya-serve의 `LAYA_API_KEY`와 같은 값
+- (선택) `WHYMATH_LAYA_INTENT_SHADOW_TIMEOUT_S` — 총 시간 상한, 기본 2초
+
+**수집 경로**: 레코드는 `whymath.api.intent_shadow.record` 로거로 나간다. **기본 로깅 설정에는 이
+로거의 핸들러가 없어 레코드가 버려진다** — 서버를 `--log-config ../../scripts/demo/wh1_shadow_logconfig.json`
+으로 띄우면 `src/backend/intent_shadow_records.log`(JSON 한 줄 = 1턴)에 쌓인다. 운영 컨테이너
+(`Dockerfile` CMD)는 로그 설정을 지정하지 않으므로 섀도를 켜도 레코드가 남지 않는다 — 측정은 위 로그
+설정으로 띄운 서버에서만 한다.
+
+**레코드 필드**: `schema_version`·`route`(create_session/append_turns)·`rule_intent`·`has_solution`·
+`laya_intent`·`laya_confidence`·`pii_prob`·`routed_model`·`questions_version`·`latency_ms`·`failure`·
+`http_status`·`observed_at`(시 단위 절삭). 학생 원문·해시·식별자는 없다. `failure`가 있는 레코드도
+분모다 — 작동 비율 = `failure`가 null인 레코드 / 전체 레코드. `Overloaded`는 동시 판정 상한(4)
+초과로 호출을 건너뛴 턴이다.
+
+**아직 없는 것(후속)**: 레코드를 일치도 표·오류 사례로 집계하는 harvest CLI. 집계 기준(두 라벨
+체계의 대응표 — 6종 ↔ 5종)은 기계적으로 정할 수 없어 사람 결정이 먼저다.
