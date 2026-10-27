@@ -99,9 +99,12 @@ def _evaluate_under_merge_group(expression: str) -> bool:
         r"needs\.[A-Za-z0-9_]+\.outputs\.[A-Za-z0-9_]+", f"'{_MERGE_GROUP_OUTPUTS}'", expr
     )
     expr = expr.replace("||", " or ").replace("&&", " and ")
+    # `always()`(OPS-83 backend 집계 잡)는 선행 결과와 무관하게 참이다. 다른 상태 함수
+    # (success·failure·cancelled)는 선행 결과에 따라 갈리므로 풀지 않는다 — 아래에서 예외가 된다.
+    expr = re.sub(r"\balways\(\)", " True ", expr)
 
     # 남은 토큰이 전부 알려진 것인지 확인 — 모르는 것이 있으면 평가하지 않는다.
-    residue = re.sub(r"'[^']*'|==|!=|\bor\b|\band\b|[()\s]", "", expr)
+    residue = re.sub(r"'[^']*'|==|!=|\bor\b|\band\b|\bTrue\b|[()\s]", "", expr)
     if residue:
         raise AssertionError(
             f"지원하지 않는 표현식 토큰 {residue!r} — 표현식: {expression!r}. "
@@ -202,6 +205,15 @@ class TestEvaluatorIsDiscriminating:
             "&& github.event_name != 'schedule'"
         )
         assert _evaluate_under_merge_group(actual) is True
+
+    def test_always_is_true_but_does_not_mask_the_rest(self) -> None:
+        """OPS-83 집계 잡 형태 — always()는 참이고, 뒤 조건이 merge_group을 배제하면 거짓이다."""
+        actual = (
+            "always() && ((github.event_name != 'pull_request' || "
+            "needs.changes.outputs.backend == 'true') && github.event_name != 'schedule')"
+        )
+        assert _evaluate_under_merge_group(actual) is True
+        assert _evaluate_under_merge_group("always() && github.event_name == 'schedule'") is False
 
     def test_unknown_token_raises_instead_of_passing(self) -> None:
         """★ 해석 못 한 표현식을 True로 접으면 이 테스트 전체가 위장이 된다."""
