@@ -175,6 +175,25 @@ class TestThreeValuedLogic:
         """모르는 문법은 UNKNOWN — False로 접으면 잡이 조용히 면제된다."""
         assert tool.evaluate_condition("contains(github.ref, 'main')", {}) is tool.UNKNOWN_VALUE
 
+    def test_always_function_is_true_and_combines(self):
+        """OPS-83 — `always() && (<조건>)` 집계 잡: always()는 참이고 뒤 조건이 판정을 가른다.
+
+        always()를 모르면 집계 잡이 UNKNOWN이 되어 모든 backend PR의 `check`가 '판정 불가 잔존'으로
+        실패한다(도구를 끄게 만든다). 반대로 always()를 통째로 참으로 접으면 doc-only PR에서도
+        집계 잡이 '닿음'이 된다 — 뒤 조건이 False면 False여야 한다(이 절의 반례).
+        """
+        expr = "always() && (needs.changes.outputs.backend == 'true')"
+        assert tool.evaluate_condition("always()", {}) is True
+        assert tool.evaluate_condition(expr, {"backend": True}) is True
+        assert tool.evaluate_condition(expr, {"backend": False}) is False
+
+    def test_other_status_functions_stay_unknown(self):
+        """success()·failure()·cancelled()는 선행 결과에 따라 갈리므로 풀지 않는다(UNKNOWN 유지)."""
+        for fn in ("success()", "failure()", "cancelled()", "!cancelled()"):
+            assert tool.evaluate_condition(fn, {}) is tool.UNKNOWN_VALUE, fn
+        # `always` 뒤에 괄호가 없으면 함수 호출이 아니다 — 문맥 조회(UNKNOWN)로 남는다.
+        assert tool.evaluate_condition("always == 'x'", {}) is tool.UNKNOWN_VALUE
+
     def test_unknown_job_is_included_in_coverage(self):
         """판정 불가 잡은 '봐야 하는 잡'에 포함된다 — 면제하면 도구가 위장이 된다."""
         wf = {
@@ -257,6 +276,25 @@ class TestJobEnvironment:
         """대조군 — 모든 잡을 '재현 불가'로 접는 과잉 수정을 막는다."""
         env = tool.describe_job_env(tool.enumerate_jobs(workflow)["policy-guard"])
         assert env.reproducible_locally is True
+
+    def test_artifact_consuming_job_is_irreproducible(self, workflow):
+        """OPS-83 — 다른 잡의 산출물을 내려받는 집계 잡은 로컬에 그 산출물이 없다.
+
+        미러가 돌리면 '산출물 없음' 거짓 실패이거나, 이전 실행 잔여물로 거짓 통과다. 그래서 재현 불가로
+        명시하고 CI가 최종 판정한다. 대조군: 산출물을 *올리기만* 하는 샤드 잡은 재현 가능이다.
+        """
+        jobs = tool.enumerate_jobs(workflow)
+        verdict = tool.describe_job_env(jobs["backend-verdict"])
+        assert verdict.reproducible_locally is False
+        assert verdict.irreproducible_reason and "산출물" in verdict.irreproducible_reason
+        assert tool.describe_job_env(jobs["backend-pytest-1"]).reproducible_locally is True
+
+    def test_artifact_rule_reads_the_uses_key(self):
+        """합성 반례 — download-artifact 스텝 하나만 있어도 재현 불가, upload만이면 재현 가능."""
+        down = {"steps": [{"uses": "actions/download-artifact@v4"}]}
+        up = {"steps": [{"uses": "actions/upload-artifact@v4"}]}
+        assert tool.describe_job_env(down).reproducible_locally is False
+        assert tool.describe_job_env(up).reproducible_locally is True
 
 
 # ── ⑥ 뮤테이션 — 정본이 바뀌면 판정도 바뀐다 ──────────────────────────────

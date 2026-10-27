@@ -98,6 +98,14 @@ main
   직렬 26분이 되돌아와 병렬화(OPS-58)가 무의미해진다 — 배선 실재성은
   `tests/infra/test_backend_serial_nightly_wiring.py`가 대신 동결한다.
 
+  **backend 하위 잡 4종도 넣지 않는다(OPS-83 · 2026-10-26)**: `backend — 정적 검사·게이트 CLI`·
+  `backend — pytest 샤드 1/3`·`2/3`·`3/3`. backend 검증을 잡 단위로 나누면서 **required 이름
+  `backend — lint·type·test`는 집계 잡이 물려받았다** — 그 잡이 네 하위 잡을 `needs`로 기다려
+  하나라도 success가 아니면(실패·취소·건너뜀 포함) red가 된다. 그래서 위 목록과 라이브 룰셋은
+  바뀌지 않으며 관리자 작업도 없다. 하위 잡을 직접 required로 걸면 샤드 수를 바꿀 때마다 룰셋을
+  고쳐야 한다. 집계 잡의 `if: always()`·needs 전수·판정 스텝은
+  `tests/infra/test_backend_shard_wiring.py`가 동결한다.
+
   **경로 필터로 skip되는 잡을 required로 걸어도 안전한 이유**: GitHub은 `skipped` 결론을
   required check 충족으로 센다. 이 레포는 이미 그 동작에 의존한다 — `ci.yml`의
   "doc-only PR이면 skip(비용 절감·**required check는 skipped=충족**)" 주석 3곳. 따라서

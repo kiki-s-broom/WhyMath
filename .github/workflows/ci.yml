@@ -348,9 +348,36 @@ jobs:
   # L3 백엔드 (LLM 라우터 M1.2 — 결정 로직 + 타입 인터페이스)
   # data-pipeline 잡을 미러링. 라이브 서비스·API 키 없이 단위테스트만.
   # ─────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────
+  # backend 검증 = 정적 검사·게이트 1잡 + pytest 샤드 3잡 + 집계 1잡 (OPS-83 · 잡 단위 샤딩)
+  #
+  #   backend            정적 검사(ruff·black·mypy·import-linter)·게이트 CLI·헌법 테스트
+  #   backend-pytest-1~3 전체 스위트를 파일 단위로 3등분(scripts/coverage/backend_shard_plugin.py)
+  #   backend-verdict    **`backend — lint·type·test`** — 위 넷을 needs로 기다려 판정·커버리지 합산
+  #
+  # 왜 쪼갰는가(2026-10-26 merge_group 실측): 단일 잡이 하루 15회 중 4회 50분 상한에서 취소됐고,
+  # 통과 11회도 27.8~49.6분(중앙 46.2분)이었다. 그중 Pytest 스텝이 중앙 2,346초로 84.5%이고, 같은
+  # 커밋에서도 러너 속도가 1.8배 흔들렸다(CPU 스텝만 비례해 느림). OPS-58이 러너 1대의 코어 4개를
+  # xdist로 이미 다 쓰고 있어 잡 *내부*로는 더 줄일 곳이 없다 — 러너를 늘리는 축이 남았다.
+  #
+  # N=3인 이유: 샤딩 뒤에는 `corpus-authoring`(같은 15표본 중앙 17.3·최대 21.3분)이 required 중
+  # 최장이 된다. N=3이면 backend가 그 수준(추정 중앙 약 19분 — 아래 샤드 상한 주석의 로컬 실측
+  # 비율 0.42를 단일 잡 Pytest 중앙 2,346초에 적용 + 설치·집계)으로 내려오고, N=4 이상은 큐 회전을
+  # 더 줄이지 못한다(병목이 옮겨 간다). 공개 저장소라 표준 러너 분은 과금되지 않으며, 같은 15표본의
+  # 잡 시작 대기는 최대 8초로 동시성 한도 징후가 없었다. 효과 실측은 OPS-83 ⑤가 적용 후 대조한다.
+  #
+  # 필수 체크 이름을 바꾸지 않는다(OPS-83 ⑦): 룰셋·머지 큐는 `backend — lint·type·test`만 안다.
+  # 그 이름을 집계 잡이 가지므로 룰셋 변경이 필요 없다. 정적·샤드 잡은 required가 아니다 —
+  # 집계 잡이 그 결과를 needs로 판정하므로(tests/infra/test_required_checks_doc.py 제외 목록).
+  # ─────────────────────────────────────────────────────────────────
   backend:
-    name: backend — lint·type·test
+    name: backend — 정적 검사·게이트 CLI
     runs-on: ubuntu-latest
+    # 15분(OPS-83): pytest가 샤드 잡으로 옮겨 가 이 잡은 설치·정적 검사·게이트 CLI만 남는다.
+    # 같은 스텝들의 실측 합(2026-10-26 merge_group 통과 15표본, 잡 소요 − Pytest 스텝)이 최대
+    # 7.85분이다 → 7.85/0.7=11.2 → 15분(여유 47.7%). 하한은 test_ci_job_timeout_floor.py가 동결한다.
+    #
+    # 이하 이력은 pytest가 이 잡 안에 있던 시절의 것이다(상한 판단의 근거가 바뀐 이유를 남긴다).
     # 스위트 성장(초인간 검증 하니스·843 트랜치·원자 축 누적·CACHE-01 content_supply)으로
     # 유닛+커버리지가 25분 경계 초과 → 2026-07-25 boundary 타임아웃 실측(pytest 단독 22분+ 미완).
     # timeout은 상한일 뿐이라 정상 완료 시 낭비 없음(hang 방지 상한만 유지)이므로 여유 상향.
@@ -366,11 +393,11 @@ jobs:
     # 30.8분 대 17.3분(10-09 00:20)·17.1분 대 31.0분(06:59)으로 갈렸고, CPU 스텝(Black 1.71배·
     # mypy 1.73배·pytest 1.80배)만 비례해 느리며 네트워크 스텝(pip 설치)은 1.22배였다. 러너 CPU
     # 모델은 미확인이라 이것은 '읽어서 그렇게 보이는' 해석이다. 상한은 느린 러너 기준 최대(31.93분)가
-    # 70% 이하가 되는 46분 이상이어야 한다(31.93/0.7=45.6). 분할은 이번엔 채택하지 않는다 — 잡 이름이
+    # 70% 이하가 되는 46분 이상이어야 한다(31.93/0.7=45.6). 분할은 그때 채택하지 않았다 — 잡 이름이
     # 필수 체크 문서·ruleset_drift 계약에 박혀 있어 룰셋 변경(사람 소유)을 동반하고, 커버리지 XML을
-    # 한 파일로 읽는 계층 게이트도 병합이 필요하다. 하한은
-    # tests/infra/test_ci_job_timeout_floor.py가 동결한다.
-    timeout-minutes: 50
+    # 한 파일로 읽는 계층 게이트도 병합이 필요하다는 이유였다. OPS-83이 두 이유를 각각 집계 잡이
+    # 이름을 물려받는 것과 `coverage combine`으로 풀었다(위 블록 머리 주석).
+    timeout-minutes: 15
     needs: changes
     # doc-only PR이면 skip(비용 절감·required check는 skipped=충족). push는 항상 실행.
     if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
@@ -416,36 +443,9 @@ jobs:
       - name: Import contracts (import-linter — 7계층 단방향)
         run: lint-imports
 
-      # OPS-58 — 워커 병렬화. 이 잡 29분 41초 중 이 스텝이 26분 53초(90%)였다(run
-      # 33387572394 스텝 타임스탬프 실측). 나머지 전 스텝 합이 3분 미만이라 여기 말고는
-      # 줄일 곳이 없다. `--dist loadfile`(같은 파일 = 같은 워커)은 이 저장소의 순서 의존
-      # 전역 오염 이력(OPS-06/07/09 `db.session._engine`)을 고려한 보수적 선택이면서
-      # 실측상 기본 `load`보다 오히려 빠르다(32.0s vs 41.4s) — 안전과 속도가 같은 방향.
-      #
-      # **실 CI A/B로 검증했다**(이 변경은 런타임 코드를 0줄 바꾸므로 base 커밋과 측정
-      # 대상이 같다 — 통제 대조군이 성립한다):
-      #   직렬 main 1e2e341d(run 33454551710) 1585.46s / 11268 passed·323 skipped·1 xfailed
-      #   병렬 이 스텝  (run 33455108087)      855.75s / 11268 passed·323 skipped·1 xfailed
-      # 아래 계층별 커버리지 게이트가 이 산출물을 읽으므로 PASS 여부가 아니라 **수치까지**
-      # 대조했고 다섯 계층 전부 한 자리도 다르지 않았다(api 3972/4122 · l1 3777/4334 ·
-      # l2 1348/1376 · l3 9100/9747 · l4 3984/4170). 어긋났다면 게이트가 통과하면서도
-      # 틀린 판정을 냈을 자리다.
-      - name: Pytest (with coverage)
-        run: |
-          python -m pytest \
-            -m "not corpus_authoring" \
-            -n auto --dist loadfile \
-            --cov=whymath_backend \
-            --cov-report=term \
-            --cov-report=xml \
-            --cov-fail-under=70
-
-      # 계층별 커버리지 게이트 (ARCH-14 ② '강화') — 집계 70%(위)에 더해 서브패키지(l1~l4·api)별
-      # 라인 커버리지 바닥선을 강제한다(한 계층이 낮아도 집계 평균에 묻히던 사각 폐색). 바닥선은
-      # 실측 ratchet(회귀 방지)·지향치(testing.md L4 90% 등)로 점진 상향. coverage.xml만 읽는
-      # hermetic 스텝(위 Pytest 산출물 소비). 무측정 계층은 성공 위장 대신 명시 실패.
-      - name: 계층별 커버리지 게이트 (서브패키지 floor — l1~l4·api)
-        run: python ../../scripts/coverage/check_layer_coverage.py coverage.xml
+      # Pytest·커버리지는 이 잡에 없다 — backend-pytest-1~3(실행)과 backend-verdict(합산·집계 70%·
+      # 계층별 floor)로 옮겼다(OPS-83). 아래 게이트 CLI는 pytest 산출물을 읽지 않으므로 샤드와
+      # 병렬로 돈다.
 
       # 초인간 검증 게이트 (hermetic·라이브 0·고정 시드) — ci.yml 상시 배선(ARCH-14 ①).
       # pytest 회귀에 더해 CLI exit 0/1 게이트를 독립 스텝으로 심어 "측정 통과 기계 게이트"가
@@ -664,6 +664,248 @@ jobs:
       - name: 헌법 집행 테스트 (CONST-03 — R2-02·R2-03)
         working-directory: .
         run: python -m pytest -q tests/constitution
+
+  # ─────────────────────────────────────────────────────────────────
+  # backend pytest 샤드 1/3 · 2/3 · 3/3 (OPS-83)
+  # 세 잡은 `--shard K/3`과 산출물 이름의 K만 다르다. matrix를 쓰지 않는 이유: 잡 이름이
+  # `${{ matrix.* }}` 식이 되면 ci.yml을 정본으로 읽는 도구들이 그 이름을 풀지 못한다 — 타임아웃
+  # 여유 감시(measure_ci_job_timeout_headroom.py)는 API 잡 이름과 ci.yml `name:`을 글자 그대로
+  # 대조하고, CI 미러·잡 커버리지 열거(scripts/harness/ci_mirror.py·ci_job_coverage.py)는 matrix를
+  # 펼치지 않는다. 세 벌의 일치(K 1..N 전수·N 일치·명령 동형·집계 잡 needs·합산 목록)는
+  # tests/infra/test_backend_shard_wiring.py가 동결한다.
+  #
+  # 순서 의존 오염(OPS-06/07/09): 분배 단위가 파일이라 `--dist loadfile`과 같은 성질이다 — 같은
+  # 파일은 반드시 같은 프로세스에서 돈다. 파일이 *다르면* 다른 프로세스일 수 있다는 사각은 샤딩
+  # 이전(xdist 워커)부터 있던 것이고, 야간 직렬 전건 잡(backend-serial-nightly)이 계속 맡는다.
+  # ─────────────────────────────────────────────────────────────────
+  backend-pytest-1:
+    name: backend — pytest 샤드 1/3
+    runs-on: ubuntu-latest
+    # 30분(OPS-83 · CI 실측 전 추정): 샤드 하나는 단일 실행의 1/3이 아니라 **0.42배**가 걸린다 —
+    # 로컬 4코어 실측(2026-10-27)에서 단일 실행 1,864초 대비 샤드 3개가 690·597·787초였다(샤드마다
+    # 전건을 다시 수집하고, 가장 무거운 파일 636초가 샤드 벽시계의 하한이 된다). 단일 잡 시절 CI
+    # Pytest 최대 41.9분(2026-10-26 merge_group 통과 15표본) × 0.42 = 17.6분 + 설치 최대 1.05분 ≈
+    # 19분 → 19/0.7=27.1 → 30분. CI 실측이 생기면 교체한다(test_ci_job_timeout_floor.py 추정 표 · ⑤).
+    timeout-minutes: 30
+    needs: changes
+    if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: src/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (editable + dev extras)
+        run: |
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
+          # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 샤드에도 설치.
+          python -m pip install -e ../data-pipeline
+
+      # OPS-58(잡 내부 병렬화)의 `-n auto --dist loadfile`을 샤드 안에서 그대로 쓴다. `--dist
+      # loadfile`(같은 파일 = 같은 워커)은 이 저장소의 순서 의존 전역 오염 이력(OPS-06/07/09
+      # `db.session._engine`)을 고려한 보수적 선택이면서 실측상 기본 `load`보다 빠르다.
+      # OPS-58 실 CI A/B: 직렬 1585.46s → 병렬 855.75s, 11268 passed·323 skipped·1 xfailed 동일,
+      # 계층별 커버리지 5계층 수치가 한 자리도 다르지 않았다(api 3972/4122 · l1 3777/4334 ·
+      # l2 1348/1376 · l3 9100/9747 · l4 3984/4170).
+      #
+      # 샤딩(OPS-83): `backend_shard_plugin`이 pytest의 수집 결과를 파일 단위로 3등분해 자기 몫만
+      # 남긴다(나머지는 deselect). 우주를 pytest 수집 자신으로 삼으므로 수집된 파일이 어느 샤드에도
+      # 안 가는 일이 없고, 그 사실을 배정 보고서(report-K.json)로 집계 잡에 증명한다.
+      # `--cov-fail-under`는 여기 두지 않는다 — 샤드 하나의 커버리지는 부분이라 70%에 못 미치는 게
+      # 정상이다. 집계 70%·계층 floor는 집계 잡이 합산 뒤에 건다. PYTHONPATH는 `$PWD` 기준 절대
+      # 경로다 — xdist 워커가 플러그인을 다시 import하므로 상대 경로의 기준 디렉터리에 기대지 않는다.
+      - name: Pytest 샤드 1/3 (with coverage)
+        run: |
+          mkdir -p pytest-shard
+          PYTHONPATH="$PWD/../../scripts/coverage" python -m pytest \
+            -p backend_shard_plugin --shard 1/3 --shard-report pytest-shard/report-1.json \
+            -m "not corpus_authoring" \
+            -n auto --dist loadfile \
+            --cov=whymath_backend \
+            --cov-report=
+          mv .coverage pytest-shard/coverage-1.data
+
+      - name: 샤드 산출물 업로드 (커버리지 데이터·배정 보고서)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-shard-1
+          path: src/backend/pytest-shard/
+          if-no-files-found: error
+          retention-days: 3
+
+  backend-pytest-2:
+    name: backend — pytest 샤드 2/3
+    runs-on: ubuntu-latest
+    # 30분 — 샤드 1/3과 같은 근거(세 샤드는 같은 상한을 쓴다 · 동형 동결).
+    timeout-minutes: 30
+    needs: changes
+    if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: src/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (editable + dev extras)
+        run: |
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
+          # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 샤드에도 설치.
+          python -m pip install -e ../data-pipeline
+
+      - name: Pytest 샤드 2/3 (with coverage)
+        run: |
+          mkdir -p pytest-shard
+          PYTHONPATH="$PWD/../../scripts/coverage" python -m pytest \
+            -p backend_shard_plugin --shard 2/3 --shard-report pytest-shard/report-2.json \
+            -m "not corpus_authoring" \
+            -n auto --dist loadfile \
+            --cov=whymath_backend \
+            --cov-report=
+          mv .coverage pytest-shard/coverage-2.data
+
+      - name: 샤드 산출물 업로드 (커버리지 데이터·배정 보고서)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-shard-2
+          path: src/backend/pytest-shard/
+          if-no-files-found: error
+          retention-days: 3
+
+  backend-pytest-3:
+    name: backend — pytest 샤드 3/3
+    runs-on: ubuntu-latest
+    # 30분 — 샤드 1/3과 같은 근거(세 샤드는 같은 상한을 쓴다 · 동형 동결).
+    timeout-minutes: 30
+    needs: changes
+    if: (github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: src/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (editable + dev extras)
+        run: |
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
+          # 교차계층 거버넌스 테스트가 data_pipeline(L1)을 import → 샤드에도 설치.
+          python -m pip install -e ../data-pipeline
+
+      - name: Pytest 샤드 3/3 (with coverage)
+        run: |
+          mkdir -p pytest-shard
+          PYTHONPATH="$PWD/../../scripts/coverage" python -m pytest \
+            -p backend_shard_plugin --shard 3/3 --shard-report pytest-shard/report-3.json \
+            -m "not corpus_authoring" \
+            -n auto --dist loadfile \
+            --cov=whymath_backend \
+            --cov-report=
+          mv .coverage pytest-shard/coverage-3.data
+
+      - name: 샤드 산출물 업로드 (커버리지 데이터·배정 보고서)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-shard-3
+          path: src/backend/pytest-shard/
+          if-no-files-found: error
+          retention-days: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # backend 집계 — 필수 체크 `backend — lint·type·test`의 이름을 이 잡이 가진다 (OPS-83 ⑥⑦)
+  # ─────────────────────────────────────────────────────────────────
+  backend-verdict:
+    name: backend — lint·type·test
+    runs-on: ubuntu-latest
+    # 10분(OPS-83 · 실측 전 추정): 체크아웃·setup-python·pytest-cov 한 개 설치·합산·보고만 한다.
+    # 로컬 실측(4코어) 합산+xml+보고+계층 게이트가 1분 미만이다. 적용 후 실측으로 교체한다.
+    timeout-minutes: 10
+    needs: [changes, backend, backend-pytest-1, backend-pytest-2, backend-pytest-3]
+    # `always()`가 핵심이다: 선행 잡이 실패·취소되면 GitHub는 뒤 잡을 *건너뛰고*, 건너뛴 required
+    # check를 **충족**으로 센다. 그러면 샤드 실패가 머지를 막지 못한다. 그래서 이 잡은 항상 돌고,
+    # 판정은 첫 판정 스텝이 한다(skipped·cancelled도 실패). `!cancelled()`를 쓰지 않는 이유도 같다 —
+    # 취소된 실행에서 이 잡이 건너뛰어지면 그 결론이 skipped(=충족)가 된다.
+    # 뒤의 조건은 샤드 잡과 **같은** 실행 조건이다. doc-only PR이면 이 잡도 skip되고 그것은 종전
+    # 단일 잡의 skip과 같은 충족이다. 그 밖에서 이 잡이 돌았다면 샤드도 돌았어야 했으므로, 샤드의
+    # skipped는 "검증이 일어나지 않았다"이지 통과가 아니다.
+    if: always() && ((github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true') && github.event_name != 'schedule')
+    defaults:
+      run:
+        working-directory: src/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 판정 ① — 선행 잡 전부 success. 실패·취소·건너뜀이 하나라도 있으면 exit 1이고 뒤 스텝은
+      # 돌지 않는다(어차피 이 잡은 red다). 표준 라이브러리만 쓰므로 설치보다 먼저 둔다.
+      - name: 판정 — 선행 잡 결과 (정적 검사·샤드 전부 success)
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python ../../scripts/coverage/backend_shard_verdict.py needs
+
+      # coverage 단독이 아니라 pytest-cov로 설치한다 — 샤드와 **같은 coverage 핀**(제약 파일)이 깔리고,
+      # 워크플로 인라인 직접 의존 이름 집합이 늘지 않아 제약 파일 갱신이 필요 없다(OPS-121).
+      - name: Install coverage (pytest-cov 경유 — 샤드와 같은 coverage 핀)
+        run: python -m pip install "pytest-cov>=5.0.0,<8"
+
+      - name: 샤드 산출물 내려받기
+        uses: actions/download-artifact@v4
+        with:
+          pattern: backend-shard-*
+          merge-multiple: true
+          path: src/backend/pytest-shard
+
+      # 판정 ② — 배정 보고서가 하나의 완전한 분할인가. 샤드 잡이 전부 초록이어도 어떤 파일이 어느
+      # 샤드에도 배정되지 않았다면 "일부만 돌았다"가 "전부 통과"로 보인다(OPS-83 ⑥).
+      - name: 판정 — 샤드 분할 완전성 (겹침 0·누락 0·항목 합 = 수집 우주)
+        run: python ../../scripts/coverage/backend_shard_verdict.py reports pytest-shard
+
+      # 합산 결과가 단일 잡(xdist) 수치와 lines·branches 총계까지 일치함을 OPS-83 ③이 로컬에서
+      # 증명했다(OPS-58 ② 기준). 합산 목록은 샤드 수와 같아야 한다 — 목록에서 빠진 샤드의 커버리지는
+      # 조용히 사라지고 집계가 낮아질 뿐 실패하지 않을 수 있다(test_backend_shard_wiring.py 동결).
+      - name: 커버리지 합산 + 집계 하한 (coverage combine · fail-under 70)
+        run: |
+          python -m coverage combine --keep pytest-shard/coverage-1.data pytest-shard/coverage-2.data pytest-shard/coverage-3.data
+          python -m coverage xml
+          python -m coverage report --fail-under=70
+
+      # 계층별 커버리지 게이트 (ARCH-14 ② '강화') — 집계 70%(위)에 더해 서브패키지(l1~l4·api)별
+      # 라인 커버리지 바닥선을 강제한다(한 계층이 낮아도 집계 평균에 묻히던 사각 폐색). 바닥선은
+      # 실측 ratchet(회귀 방지)·지향치(testing.md L4 90% 등)로 점진 상향. coverage.xml만 읽는
+      # hermetic 스텝(위 합산 산출물 소비). 무측정 계층은 성공 위장 대신 명시 실패.
+      - name: 계층별 커버리지 게이트 (서브패키지 floor — l1~l4·api)
+        run: python ../../scripts/coverage/check_layer_coverage.py coverage.xml
 
       - name: Upload coverage artifact
         if: always()
