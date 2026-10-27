@@ -72,6 +72,7 @@
 | 측정(CI 게이트) | `src/backend/whymath_backend/l3/notation_coverage.py` | 표기 커버리지 | 아님 — 단 게이트라 미검수 행의 표기 결손이 CI를 깬다 |
 | 측정(CI 게이트) | `src/backend/whymath_backend/l3/curriculum_notation_gate.py` | 교육과정 표기 게이트 | 아님 — 위와 같다 |
 | 측정 | `src/backend/whymath_backend/harness/attempt_grading_shadow_report.py` | 서버 채점 섀도 리포트 | 아님 |
+| 측정(분자=승인) | `src/backend/whymath_backend/harness/attempt_scan_shadow_harvest.py` | P3-66 미분 오답 서명 그림자 관측의 활성화 판정 — 로그의 문항 id로 `approved` 문항의 지문·정답만 읽어 우연 일치 기준선을 엔진으로 잰다(오프라인·학생 응답 경로가 아니다) | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/selective_grading_demotion_eval.py` | 채점 결함 주입 강등전 | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/crosslink_demotion_eval.py` | 오개념 크로스링크 강등전 | 아님 |
 | 측정 | `src/backend/whymath_backend/l4/misconception/crosslink_machine_reject.py` | 크로스링크 기계 거부 | 아님 |

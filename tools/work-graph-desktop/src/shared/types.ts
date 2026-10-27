@@ -27,6 +27,8 @@ export interface WorkspaceOptions {
   github: boolean;
   /** python 실행 파일 지정(없으면 python3 → python → py -3 순 탐색) */
   python?: string;
+  /** 무엇을 그릴까(HARN-306) — trunk: git fetch 뒤 최신 origin/main(기본) · worktree: 저장소 폴더의 지금 상태 */
+  source?: "trunk" | "worktree";
 }
 
 export interface Workspace {
@@ -183,10 +185,22 @@ export interface PullRequestFact {
   checks?: string;
 }
 
+/** 최신 main 거울(HARN-306) — 그래프를 어느 커밋에서 그렸는가 */
+export interface TrunkFacts {
+  ref: string;
+  sha: string;
+  /** 이번 새로고침에서 git fetch가 성공했는가 — false면 마지막으로 받아 둔 ref로 그렸다 */
+  fetched: boolean;
+  fetchReason?: string;
+  dir: string;
+}
+
 export interface Snapshot {
   workspaceId: string;
   collectedAt: string;
   sources: {
+    /** 최신 main 거울 — source=worktree면 skipped. 옛 스냅샷에는 없다 */
+    trunk?: SourceResult<TrunkFacts>;
     harness: SourceResult<null>;
     git: SourceResult<GitFacts>;
     github: SourceResult<PullRequestFact[]>;

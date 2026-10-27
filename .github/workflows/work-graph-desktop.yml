@@ -45,7 +45,9 @@ env:
 jobs:
   linux:
     name: work-graph-desktop — linux (vitest·렌더러·Electron)
-    runs-on: ubuntu-latest
+    # ubuntu-latest가 26.04로 바뀌자 Playwright 1.56.1이 chromium 의존성 설치를 거부했다(2026-10-26 실측 ·
+    # 'Playwright does not support chromium on ubuntu26.04-x64'). Playwright가 지원하는 이미지로 고정한다.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
