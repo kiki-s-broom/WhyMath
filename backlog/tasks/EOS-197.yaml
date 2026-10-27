@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ artifacts: []
 paths:
   - data/runs
   - metrics
-session: null
+session: claude/eos-197-authoring-round
 notes: "EOS 감리 정본(2026-10-19) WP-C 이행. 결함 W-03·W-04·W-18. 감리 일정표 기간은 10/27~11/8이며 목표일 뿐 하한이 아니다 — OPS-90이 끝나는 대로 앞당겨 착수한다."
-updated: 2026-10-23
+updated: 2026-10-27
