@@ -32,6 +32,12 @@
       "filename": "wh1_shadow_records.log",
       "encoding": "utf-8",
       "formatter": "record_json"
+    },
+    "intent_shadow_record_file": {
+      "class": "logging.FileHandler",
+      "filename": "intent_shadow_records.log",
+      "encoding": "utf-8",
+      "formatter": "record_json"
     }
   },
   "loggers": {
@@ -55,6 +61,13 @@
     "whymath.harness.wh1_shadow.record": {
       "handlers": [
         "wh1_record_file"
+      ],
+      "level": "INFO",
+      "propagate": false
+    },
+    "whymath.api.intent_shadow.record": {
+      "handlers": [
+        "intent_shadow_record_file"
       ],
       "level": "INFO",
       "propagate": false

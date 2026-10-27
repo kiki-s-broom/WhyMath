@@ -19,8 +19,10 @@ S2가 Redis 캐시 설정(redis_url)을 추가했으며, S3가 Langfuse 관측�
 
 from __future__ import annotations
 
+import ipaddress
 from functools import lru_cache
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -166,6 +168,50 @@ class Settings(BaseSettings):
             "순차유도 오류(A)와 변수재사용(B)을 구문 분리 못 해 노이즈가 섞이므로 학생엔 안 보이고 "
             "진단 데이터(향후 L7·교사 대시보드)로만 쓴다. **False(기본·opt-in)**: (A)/(B) 노이즈가 "
             "구조적·sink 미구현이라 보수적 off. WHYMATH_L4_STEP_SHADOW_ENABLED=true로 켠다."
+        ),
+    )
+
+    # PED-48: 학생 의도 섀도 관측 — 자체 호스팅 laya-serve(laya-ko-whymath)의 6종 의도·개인정보
+    # 판단을 규칙 분류기(`classify_student_intent`) 옆에 *로그로만* 남긴다. 4개 필드가 모두
+    # 갖춰져야 켜진다(하나라도 비면 외부 호출 0회) — 반쯤 설정된 상태가 조용히 실패하지 않게.
+    laya_intent_shadow_enabled: bool = Field(
+        default=False,
+        description=(
+            "학생 의도 섀도 관측(PED-48) 활성 여부. True이고 URL·API 키가 모두 설정돼 있으면 "
+            "/v1/coach 세션·턴 엔드포인트가 학생 턴 커밋 *뒤* laya-serve에 학생 발화를 보내 "
+            "6종 의도(concept·stuck·answer_only·hint·check·chitchat)·개인정보 확률을 받고, "
+            "규칙 분류기 결과와 나란히 구조화 레코드로만 기록한다. **비노출·비차단** — 응답·"
+            "DB 적재·교수 결정은 어느 쪽이든 불변이고 학생 원문은 레코드·로그에 남지 않는다. "
+            "**False(기본·opt-in)**. WHYMATH_LAYA_INTENT_SHADOW_ENABLED=true로 켠다."
+        ),
+    )
+
+    laya_intent_shadow_url: str = Field(
+        default="",
+        description=(
+            "laya-serve 기준 URL(예: http://127.0.0.1:18080 — 경로 없이). 비어 있으면 섀도 "
+            "관측은 켜지지 않는다. 학생 발화가 이 주소로 전송되므로 *자체 호스팅·내부망* 서버만 "
+            "가리킨다(미성년자 데이터 외부 공유 금지). WHYMATH_LAYA_INTENT_SHADOW_URL."
+        ),
+    )
+
+    laya_intent_shadow_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "laya-serve Bearer 키(LAYA_API_KEY와 같은 값). SecretStr — repr/로그에 평문 노출 "
+            "안 됨. 비어 있으면 섀도 관측은 켜지지 않는다(무인증 서버로의 전송 차단). "
+            "WHYMATH_LAYA_INTENT_SHADOW_API_KEY."
+        ),
+    )
+
+    laya_intent_shadow_timeout_s: float = Field(
+        default=2.0,
+        gt=0,
+        le=30,
+        description=(
+            "laya-serve 단일 호출 타임아웃(초). 섀도는 응답 뒤 백그라운드에서 돌아 학생 지연에 "
+            "더해지지 않지만, 무한 대기로 task가 쌓이지 않게 상한을 건다(CPU 실측 0.3~0.5초/건). "
+            "WHYMATH_LAYA_INTENT_SHADOW_TIMEOUT_S."
         ),
     )
 
@@ -1218,6 +1264,74 @@ class Settings(BaseSettings):
         if isinstance(value, str) and value.strip() == "":
             return False
         return value
+
+    @field_validator("laya_intent_shadow_url", mode="after")
+    @classmethod
+    def _laya_shadow_url_is_internal_base(cls, value: str) -> str:
+        """laya 섀도 URL은 *내부망 서버의 기준 URL*만 허용한다(PED-48 · 부팅 시 거부).
+
+        학생 발화(미성년자·개인정보 포함 가능)가 이 주소로 나가므로, 외부 호스트를 가리키는
+        설정은 문서 규율이 아니라 부팅 실패로 막는다(헌법 제8조 — 개인정보 유출은 자동 차단).
+        허용: http/https + 루프백·사설 IP 리터럴, `localhost`, 점 없는 단일 이름(Docker 서비스명).
+        경로·쿼리가 붙으면 `/v1/systemone`이 이중으로 붙으므로 거부한다. 빈 값은 '미설정'이다.
+        """
+        url = value.strip()
+        if not url:
+            return ""
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_URL은 http(s)://호스트[:포트] 형식이어야 합니다."
+            )
+        if parts.path not in ("", "/") or parts.query or parts.fragment:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_URL에는 경로·쿼리를 붙이지 않습니다(기준 URL만)."
+            )
+        host = parts.hostname
+        try:
+            ip = ipaddress.ip_address(host)
+            internal = ip.is_loopback or ip.is_private
+        except ValueError:
+            internal = host == "localhost" or "." not in host
+        if not internal:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_URL은 내부망 호스트(루프백·사설 IP·localhost·"
+                "Docker 서비스명)만 허용합니다 — 학생 발화를 외부로 보내지 않습니다."
+            )
+        return url.rstrip("/")
+
+    @field_validator("laya_intent_shadow_api_key", mode="after")
+    @classmethod
+    def _strip_laya_shadow_key(cls, value: SecretStr) -> SecretStr:
+        """키 앞뒤 공백 제거 — 검사(strip)와 전송값이 갈라지지 않게 저장값 자체를 정규화한다."""
+        return SecretStr(value.get_secret_value().strip())
+
+    @model_validator(mode="after")
+    def _laya_shadow_requires_url_and_key(self) -> "Settings":
+        """섀도를 켰는데 URL·키가 비었으면 부팅을 거부한다(반쯤 설정된 상태의 침묵 꺼짐 방지).
+
+        켜 놓고 아무 레코드도 안 나오면 사람은 "측정 중"으로 믿는다 — 그 상태를 조용히 두지
+        않는다(R8-03 필수 설정 누락 즉시 실패). 메시지에는 어느 항목이 비었는지만 적는다(값 미출력).
+        """
+        if not self.laya_intent_shadow_enabled:
+            return self
+        missing = [
+            name
+            for name, empty in (
+                ("WHYMATH_LAYA_INTENT_SHADOW_URL", not self.laya_intent_shadow_url),
+                (
+                    "WHYMATH_LAYA_INTENT_SHADOW_API_KEY",
+                    not self.laya_intent_shadow_api_key.get_secret_value(),
+                ),
+            )
+            if empty
+        ]
+        if missing:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_ENABLED=true인데 다음 설정이 비어 있습니다: "
+                + ", ".join(missing)
+            )
+        return self
 
     @model_validator(mode="after")
     def _forbid_cors_wildcard_with_credentials(self) -> "Settings":
