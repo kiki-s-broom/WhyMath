@@ -60,6 +60,7 @@ EOS-197 A6(고2 도함수의 활용) LLM 저작 회차 1회 — 로컬 좌석 15
 | [G] | **좌석 2 = openrouter `deepseek/deepseek-v4.1-flash`** 저작 — 같은 조건 | 산출 파일 · 유료 호출 | **8~25분** |
 | [H] | 두 좌석 산출물·GenerationLog 4필드 검사 | 없음 | 즉시 |
 | [I] | 검수 큐 조립(두 좌석 번갈아 섞기) | 큐 파일 1개 | 즉시 |
+| [J-0] | 검수 전 작업 디렉터리·큐 확인(대화형 블록과 분리) | 없음 | 즉시 |
 | [J] | **카나리 검수**(대화형 · 타이머 ON) | 이벤트·판정 파일 | **60~120분**(30건 × 2~4분 · 나눠서 가능) |
 | [K] | HIT·비용 요약 + 주간 KPI 미리보기 | 없음 | 1분 |
 | [L] | 산출물 브랜치 커밋·push + 원격 대조 | git 브랜치 1개 | 1~2분 |
@@ -88,12 +89,12 @@ EOS-197 A6(고2 도함수의 활용) LLM 저작 회차 1회 — 로컬 좌석 15
 - **파이썬**: `C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe` + `PYTHONPATH`로 워크트리 코드를 먼저 읽게 한다(import 후 `__file__`로 확인).
 - **선행 조건**: Ollama 가동 · 인터넷(openrouter 좌석 · 모델 내려받기) · OpenRouter 키(User 환경변수 — 2026-09-16 등록 기록이 있다, [C]가 확인).
 - **불요**: Docker·`whymath-pg`(5433)·백엔드 서버. **이 회차는 DB에 아무것도 쓰지 않는다** — 주간 KPI는 세션이 파일 입력 모드로 집계한다(공백 G-A).
-- **좌석 제약**: Anthropic 좌석은 쓰지 않는다(ARCH-66 · 12/31까지 API 중단 — [C]가 `AN_API_ENABLED=False`를 확인). openrouter 좌석은 **학생 데이터 0** 조건에서만 쓴다 — 이 회차의 모델 입력은 spec 4종·주제 힌트·오개념 카탈로그 라벨·이번 회차 자신의 산출물(회피 목록)뿐이고, `--seed` 코퍼스 3종(전건 `WHYMATH_GENERATED`·자체생성 1,327행)은 **로컬 중복 판정에만** 쓰인다(`harness/problem_corpus_accumulate.py:336-358`). 공급사는 `deepinfra`로 고정 · 관할 표기는 코드상 `US`(`l3/providers/openrouter.py:106`)이며, 모델 자체는 DeepSeek(중국 개발 오픈웨이트)다.
+- **좌석 제약**: Anthropic 좌석은 쓰지 않는다(ARCH-66 · 12/31까지 API 중단 — [C]가 `AN_API_ENABLED=False`를 확인). openrouter 좌석은 **학생 데이터 0** 조건에서만 쓴다 — 이 회차의 모델 입력은 spec 4종·주제 힌트·오개념 카탈로그 라벨·이번 회차 자신의 산출물(회피 목록)뿐이고, `--seed` 코퍼스 3종(전건 `WHYMATH_GENERATED`·자체생성 1,327행)은 **로컬 중복 판정에만** 쓰인다(`harness/problem_corpus_accumulate.py:336-358`). **관할을 정확히 적으면**: 실제로 요청을 처리하는 **공급사는 `deepinfra` 한 곳**(설정 `openrouter_allowed_providers` 기본값)이고, 그 관할은 코드 정본상 **US**다(`l3/providers/openrouter.py:106` `"deepinfra": Jurisdiction.US` — 근거 A: OpenRouter 공급사 패널의 Headquarters US · Zero retention · Prompt training No, 2026-09-17 Kiki 확인). [C]가 `JURIS=us`로 그 값을 실측해 막는다. **모델 개발사**는 DeepSeek(중국)이고 가중치는 오픈웨이트다 — EOS-197 acceptance ①의 "CN 관할 표기"는 이 모델 출처를 가리키는 문구이며(acceptance는 append 전용이라 그대로 둔다), 요청 데이터의 처리 관할은 아니다. 어느 쪽이든 이 회차는 학생 데이터 0 조건으로만 쓴다.
 
 ### ⑥ 창 구분
 - **창 ①** (새 PowerShell 창) — [A]~[N] 전부. 앞 블록이 만든 변수를 뒤 블록이 쓰므로 **같은 창에서 이어 간다.** [F]·[G]는 수십 분 걸린다 — 도는 동안 그 창을 건드리지 마십시오. `Ctrl+C`는 복사가 아니라 **중단 신호**입니다(중단해도 그때까지의 생성 로그·대장은 호출마다 즉시 기록돼 남는다).
 - **창 ②** (새 창 · [D]가 Ollama 미가동을 말할 때만) — `ollama serve` 한 줄. **그 창은 서버가 점유하므로 이후 아무것도 입력하지 마십시오.**
-- [J]는 **대화형**이다 — [J] 블록은 그 한 줄만 붙여넣는다(뒤에 붙인 줄이 판정 입력으로 먹힌다 — 2026-09-22 실측·MP-11).
+- [J]는 **대화형**이다 — `cd`·확인은 [J-0]에서 먼저 끝내고, [J] 블록은 그 한 줄만 붙여넣는다(함께 붙여넣은 줄은 앞이든 뒤든 판정 입력으로 먹힌다 — 2026-09-22 실측·MP-11).
 
 ---
 
@@ -132,7 +133,8 @@ $Plan = "$Wt\docs\ops\eos197_a6_spec_plan.jsonl"
 $Runs = "$Wt\data\runs"
 $Seeds = @("$Wt\data\corpus\problem_bank_p3_calculus1_diff_v0\problems.jsonl", "$Wt\data\corpus\problem_bank_p3_fill_v0\problems.jsonl", "$Wt\data\corpus\problem_bank_generated_v0\problems.jsonl")
 $CountPy = "import sys,pathlib; p=pathlib.Path(sys.argv[1]); print(sum(1 for l in p.read_text(encoding='utf-8').splitlines() if l.strip()) if p.exists() else 0)"
-$Probe = "from whymath_backend.l3.equivalent.llm_generator import LLMEquivalentProblemGenerator as G; from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec as S; from whymath_backend.l3.router import resolve_model; g=G(None, misconception_catalog={}, topic_hint='x', routing_sync=False); d=g._decide_routing(S(achievement_standard_codes=frozenset({'[12미적Ⅰ-02-07]'}), target_misconception_ids=frozenset(), difficulty_overall=3.0, answer_format=None)); print(resolve_model(d.local_family, d.local_model))"
+$Probe = "from whymath_backend.harness.problem_corpus_accumulate import _build_live_generator as B; from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec as S; from whymath_backend.l3.router import resolve_model; g=B('x', authoring_tier='quality'); d=g._decide_routing(S(achievement_standard_codes=frozenset({'[12미적Ⅰ-02-07]'}), target_misconception_ids=frozenset(), difficulty_overall=3.0, answer_format=None)); print(resolve_model(d.local_family, d.local_model))"
+$LocalOnlyPy = "from whymath_backend.harness.problem_corpus_accumulate import _build_live_generator as B, authoring_can_reach_cloud as R; from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec as S; g=B('x', authoring_tier='quality'); d=g._decide_routing(S(achievement_standard_codes=frozenset({'[12미적Ⅰ-02-07]'}), target_misconception_ids=frozenset(), difficulty_overall=3.0, answer_format=None)); print((not R(None, None)) and str(getattr(d.cost_tier, 'value', d.cost_tier)) == 'local')"
 $SeedsPresent = @($Seeds | Where-Object { Test-Path $_ }).Count
 $CodeFile = & $Py -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOk = [bool]($CodeFile -and $CodeFile.StartsWith($Wt))
@@ -156,7 +158,7 @@ $ReadyB = $CodeOk -and $FlagsOk -and $PlanOk -and ($SeedsPresent -eq 3) -and ($G
 
 **판정**: `IO_ENCODING=utf-8` · `CODE_FROM_WORKTREE=True` · `CLI_FLAGS_OK=True` · `SPEC_PLAN=4 | a6-tangent [12미적Ⅰ-02-05] 2.5 | a6-extremum … | a6-root-count … | a6-velocity …` · `SEEDS_PRESENT=3` · `EOS198_CODE=True` · `READY_B=True`.
 
-> 변별력: `CODE_FROM_WORKTREE`는 `PYTHONPATH`가 먹지 않으면 평소 클론 경로가 찍혀 False가 된다(파일이 있다는 것과 그 파일이 import됐다는 것은 다르다). `SPEC_PLAN`은 이 런북의 PR이 머지되기 전 main에서 `FileNotFoundError`로 비고 `READY_B=False`가 된다. `SEEDS_PRESENT`는 시드 경로가 틀리면 3보다 작다 — 저작 CLI는 없는 시드를 **조용히 건너뛰므로**(`problem_corpus_accumulate.py:348-349`) 여기서 막아야 한다. `EOS198_CODE`는 EOS-198 이전 코드면 `ImportError`로 비어 False가 되고(파일 입력 모드·회차 감사·과목 선택 함수가 없다), 과목 선택이 옛 고정값으로 되돌아가 있으면 `False`가 찍힌다 — 그 상태로 저작하면 A6 CU가 다시 `공통`·`wm-gen-quad`로 기록된다.
+> 변별력: `CODE_FROM_WORKTREE`는 `PYTHONPATH`가 먹지 않으면 평소 클론 경로가 찍혀 False가 된다(파일이 있다는 것과 그 파일이 import됐다는 것은 다르다). `SPEC_PLAN`은 이 런북의 PR이 머지되기 전 main에서 `FileNotFoundError`로 비고 `READY_B=False`가 된다. `SEEDS_PRESENT`는 시드 경로가 틀리면 3보다 작다 — 저작 CLI는 없는 시드를 **조용히 건너뛰므로**(`problem_corpus_accumulate.py:348-349`) 여기서 막아야 한다. `$Probe`·`$LocalOnlyPy`는 [F]가 실제로 쓰는 조립 함수(`_build_live_generator(authoring_tier='quality')`)로 라우팅을 묻는다 — 생성기를 따로 손으로 만들면 [F]와 다른 경로를 검사하게 된다(세션 실측: 같은 함수에 `authoring_tier` 기본값이면 `qwen2.5:7b`, 클라우드 신호를 주면 `cloud_mid`가 나와 변별된다). `EOS198_CODE`는 EOS-198 이전 코드면 `ImportError`로 비어 False가 되고(파일 입력 모드·회차 감사·과목 선택 함수가 없다), 과목 선택이 옛 고정값으로 되돌아가 있으면 `False`가 찍힌다 — 그 상태로 저작하면 A6 CU가 다시 `공통`·`wm-gen-quad`로 기록된다.
 
 `ModuleNotFoundError`가 나면 `& $Py -m pip install -e C:\Users\kiki\Desktop\__AI\WhyMath\src\backend`를 돌린 뒤 [B]를 다시 붙여넣는다.
 
@@ -167,9 +169,9 @@ $ReadyB = $CodeOk -and $FlagsOk -and $PlanOk -and ($SeedsPresent -eq 3) -and ($G
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [C] 좌석·키 자가검증 (읽기 전용 · 호출 0건 · 키 값 미출력)
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
-$SeatOut = & $Py -c "from whymath_backend.config import Settings; from whymath_backend.l3.providers.factory import cloud_model_pins, cloud_provider_name; from whymath_backend.harness.problem_corpus_accumulate import authoring_can_reach_cloud as R; s=Settings(); k=s.openrouter_api_key.get_secret_value(); print('SEAT=%s PIN_MID=%s ALLOWED=%s AN_API_ENABLED=%s AN_CONFIGURED=%s KEY_LEN_OK=%s KEY_HAS_ELLIPSIS=%s KEY_PREFIX_SK_OR=%s CLOUD_REACH_PAID=%s CLOUD_REACH_DEFAULT=%s' % (cloud_provider_name(s), cloud_model_pins(s)[0], ','.join(s.openrouter_allowed_providers), s.anthropic_api_enabled, s.anthropic_configured, len(k) >= 20, chr(8230) in k, k.startswith('sk-or-'), R('premium', 5000.0), R(None, None)))"
+$SeatOut = & $Py -c "from whymath_backend.config import Settings; from whymath_backend.l3.providers.factory import cloud_model_pins, cloud_provider_name; from whymath_backend.harness.problem_corpus_accumulate import authoring_can_reach_cloud as R; from whymath_backend.l3.providers.openrouter import jurisdiction_of_slugs as J; s=Settings(); k=s.openrouter_api_key.get_secret_value(); print('SEAT=%s PIN_MID=%s ALLOWED=%s JURIS=%s AN_API_ENABLED=%s AN_CONFIGURED=%s KEY_LEN_OK=%s KEY_HAS_ELLIPSIS=%s KEY_PREFIX_SK_OR=%s CLOUD_REACH_PAID=%s CLOUD_REACH_DEFAULT=%s' % (cloud_provider_name(s), cloud_model_pins(s)[0], ','.join(s.openrouter_allowed_providers), J(s.openrouter_allowed_providers).value, s.anthropic_api_enabled, s.anthropic_configured, len(k) >= 20, chr(8230) in k, k.startswith('sk-or-'), R('premium', 5000.0), R(None, None)))"
 $StatusOut = & $Py -c "import asyncio; from whymath_backend.l3.providers.openrouter import OpenRouterProvider; s=asyncio.run(OpenRouterProvider().check_status()); print(f'CONFIGURED={s.configured} PROVIDERS={s.allowed_providers} JURISDICTION={s.jurisdiction} ERROR={s.error}')"
-$ReadyC = [bool]($SeatOut -and ($SeatOut -match "SEAT=openrouter ") -and ($SeatOut -match "PIN_MID=deepseek/deepseek-v4\.1-flash ") -and ($SeatOut -match "ALLOWED=deepinfra ") -and ($SeatOut -match "AN_API_ENABLED=False ") -and ($SeatOut -match "AN_CONFIGURED=False ") -and ($SeatOut -match "KEY_LEN_OK=True ") -and ($SeatOut -match "KEY_HAS_ELLIPSIS=False ") -and ($SeatOut -match "KEY_PREFIX_SK_OR=True ") -and ($SeatOut -match "CLOUD_REACH_PAID=True ") -and ($SeatOut -match "CLOUD_REACH_DEFAULT=False"))
+$ReadyC = [bool]($SeatOut -and ($SeatOut -match "SEAT=openrouter ") -and ($SeatOut -match "PIN_MID=deepseek/deepseek-v4\.1-flash ") -and ($SeatOut -match "ALLOWED=deepinfra ") -and ($SeatOut -match "JURIS=us ") -and ($SeatOut -match "AN_API_ENABLED=False ") -and ($SeatOut -match "AN_CONFIGURED=False ") -and ($SeatOut -match "KEY_LEN_OK=True ") -and ($SeatOut -match "KEY_HAS_ELLIPSIS=False ") -and ($SeatOut -match "KEY_PREFIX_SK_OR=True ") -and ($SeatOut -match "CLOUD_REACH_PAID=True ") -and ($SeatOut -match "CLOUD_REACH_DEFAULT=False"))
 "SEAT_CHECK=$SeatOut"
 "PROVIDER_STATUS=$StatusOut"
 "USER_VAR_OPENROUTER_API_KEY_SET=$([bool][Environment]::GetEnvironmentVariable('OPENROUTER_API_KEY','User'))"
@@ -179,6 +181,7 @@ $ReadyC = [bool]($SeatOut -and ($SeatOut -match "SEAT=openrouter ") -and ($SeatO
 
 **각 항목이 막는 것**:
 - `SEAT=openrouter`·`PIN_MID=deepseek/deepseek-v4.1-flash`·`ALLOWED=deepinfra` — 좌석 셀렉터가 다른 값으로 덮여(환경변수 `WHYMATH_CLOUD_PROVIDER`) 다른 모델로 도는 것.
+- `JURIS=us` — 허용 공급사 목록의 관할을 코드 정본(`l3/providers/openrouter.py`의 `PROVIDER_JURISDICTIONS`, `deepinfra` 행 = `Jurisdiction.US`)으로 계산한 값이다. 허용목록이 바뀌어 CN·미등재 공급사가 섞이면 `cn`·`unknown`이 나와 거부된다.
 - `AN_API_ENABLED=False`·`AN_CONFIGURED=False` — Anthropic 좌석 사용(ARCH-66 위반).
 - `KEY_*` — 키는 **값이 아니라 길이·형태만** 본다. 자리표시자나 말줄임표(`…`)가 키로 등록된 상태(2026-07-16 사고 유형)를 잡는다.
 - `CLOUD_REACH_PAID=True` — [G]가 쓰는 라우팅 신호(`--subscription premium --budget-krw 5000`)가 정말 클라우드에 닿는다. `CLOUD_REACH_DEFAULT=False` — [F]의 신호 없는 기본값이 정말 **로컬에만** 간다(로컬 좌석이 몰래 유료 호출을 하지 않는다).
@@ -284,7 +287,7 @@ if ($Py -and $Runs) { "LOCAL_LINES=$(& $Py -c $CountPy $LocalOut) LOCAL_FILES=$(
 
 - **목표 15행**에 닿을 때까지 회차를 덧붙인다. 회차 크기 = `min(20, (15 − 현재 행 수) × 2)`(최소 5) · **시도 상한 45건**(수용률이 낮아도 끝없이 돌지 않는다).
 - 인자: `--authoring-tier quality`(라우터 규칙이 로컬 QUALITY = `qwen3:30b-a3b`를 고른다 · MP-02 실측 채택) · `--avoid-recent 10`(회차 내 자기 중복 회피 · MP-02 3회차에서 중복 0) · `--spec-file`(A6 spec 4종 순환) · `--seed` 3종(기존 A6·미적분 자산과의 중복 차단) · `--canary 0 --abort-window 0`(회차가 20건 이하라 두 관문이 판정하지 않는다 — 꺼 둔 사실을 회차 대장에 그대로 남긴다).
-- `--subscription`·`--budget-krw`를 **주지 않는다** — 그러면 라우터가 로컬로 강제한다([C]의 `CLOUD_REACH_DEFAULT=False`가 그 증거).
+- `--subscription`·`--budget-krw`를 **주지 않는다** — 그러면 라우터가 로컬로 강제한다([C]의 `CLOUD_REACH_DEFAULT=False`가 그 증거). 이 블록은 그 사실을 **쓰기 직전에 다시 계산**한다(`LocalOnly` — `authoring_can_reach_cloud(None, None)`이 False이고, [F]와 같은 조립 함수의 라우팅 결정이 `local`인가). [C] 이후 환경변수가 바뀌어도 그 상태로는 돌지 않는다.
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [F] 좌석 1: 로컬 qwen3:30b-a3b 저작 (쓰기 · 로컬 LLM 호출)
@@ -296,8 +299,9 @@ $ModelF = & $Py -c $Probe
 $PlanOkF = Test-Path $Plan
 $SeedsOkF = (@($Seeds | Where-Object { Test-Path $_ }).Count -eq 3)
 $G198F = & $Py -c $G198Py
-"PRECHECK_F CodeOk=$CodeOkF Model=$ModelF PlanExists=$PlanOkF SeedsOk=$SeedsOkF Eos198Code=$G198F WorktreeHead=$(git rev-parse --short HEAD)"
-if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -and ($G198F -eq "True")) {
+$LocalOnlyF = & $Py -c $LocalOnlyPy
+"PRECHECK_F CodeOk=$CodeOkF Model=$ModelF PlanExists=$PlanOkF SeedsOk=$SeedsOkF Eos198Code=$G198F LocalOnly=$LocalOnlyF WorktreeHead=$(git rev-parse --short HEAD)"
+if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -and ($G198F -eq "True") -and ($LocalOnlyF -eq "True")) {
   New-Item -ItemType Directory -Force -Path (Split-Path $LocalOut) | Out-Null
   $TriedF = 0
   $LinesF = [int](& $Py -c $CountPy $LocalOut)
@@ -312,7 +316,7 @@ if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -an
     if ($RoundExitF -eq 2) { "ROUND_STOP=exit2 — 연속 무진전 알람 또는 설정 오류입니다. 위 stderr 문구를 회신하세요"; break }
   }
   "LOCAL_DONE lines=$LinesF tried=$TriedF target=15 budget=45"
-} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkF(True여야) Model=$ModelF(qwen3:30b-a3b여야) PlanExists=$PlanOkF(True여야) SeedsOk=$SeedsOkF(True여야) Eos198Code=$G198F(True여야 — EOS-198 이전 코드면 A6 CU가 공통·wm-gen-quad로 기록된다) · 새 창이면 [B]부터, 아니면 [B]·[D]를 다시 확인하세요" }
+} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkF(True여야) Model=$ModelF(qwen3:30b-a3b여야) PlanExists=$PlanOkF(True여야) SeedsOk=$SeedsOkF(True여야) Eos198Code=$G198F(True여야 — EOS-198 이전 코드면 A6 CU가 공통·wm-gen-quad로 기록된다) LocalOnly=$LocalOnlyF(True여야 — False면 신호 없는 저작이 클라우드에 닿을 수 있다: 유료 호출 위험) · 새 창이면 [B]부터, 아니면 [B]·[D]를 다시 확인하세요" }
 ```
 
 **예상 출력**: 회차마다 진행 로그 → 리포트 JSON → `ROUND_END … exit=0`(이번 회차에 1건 이상 붙음) 또는 `exit=1`(이번 회차 무진전 — 다음 회차로 넘어간다). 끝에 `LOCAL_DONE lines=15 이상`.
@@ -483,9 +487,22 @@ if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -c $QueuePy "$Runs\eos1
 
 **A6 검수 관점(참고)**: 접선의 y절편·극댓값·실근 개수(정수 k의 개수)·속도 — 답 하나가 정수로 정해지는가, 성취기준 코드가 문항 내용과 맞는가(F4), 과목은 `미적분`·slug는 `wm-gen-calc1-…`로 찍혀 있어야 한다(공백 G-D 해소 — [H]가 이미 셌다. 다르게 찍혀 있으면 검수를 멈추고 회신한다).
 
-**아래 블록은 대화형 명령 한 줄뿐이다. 다른 줄과 함께 붙여넣지 마십시오.** [I]가 `QUEUE_WRITTEN=True`를 낸 뒤에만 실행한다.
+**두 블록으로 나눈다.** 대화형 명령은 **다른 명령과 한 블록에 두지 않는다** — 블록을 통째로 붙여넣으면 대화형 명령이 시작되는 순간 붙여넣기 버퍼에 남은 줄(앞 줄이어도 그렇다)이 판정 프롬프트의 입력으로 먹힌다(2026-09-22 실측: 무효 입력 10회 + 첫 항목 HIT 타이머 오염 · `scripts/ops/check_runbook_blocks.py` 「대화형」 규칙). 그래서 `cd`와 큐 확인은 [J-0]에서 끝내고, [J]는 실행 시스템 라벨 주석과 대화형 명령 한 줄만 둔다(주석은 명령이 아니다). [I]가 `QUEUE_WRITTEN=True`를 낸 뒤에만 실행한다.
+
+### [J-0] 작업 디렉터리·큐 확인 — 창 ① (읽기 전용 · [J]·[J-2] 직전에 한 번)
 
 ```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — [J-0] 검수 전 작업 디렉터리·큐 확인 (읽기 전용)
+cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
+"PWD_IS_WORKTREE=$((Get-Location).Path -eq 'C:\Users\kiki\Desktop\__AI\WhyMath-eos197') PY_SET=$([bool]$Py) QUEUE_PRESENT=$(Test-Path "$Runs\eos197-a6-review\canary_review_queue.jsonl")"
+```
+
+**판정**: 셋 다 `True`일 때만 [J](또는 [J-2])의 한 줄을 붙여넣는다. `PY_SET=False`면 새 창이다 — [B]부터 다시. `QUEUE_PRESENT=False`면 [I]로.
+
+### [J] 검수 실행 — 이 블록은 대화형 한 줄이다(다른 줄과 함께 붙여넣지 않는다)
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — [J] 카나리 검수 (대화형 한 줄 · [J-0] 뒤 · 작업 디렉터리 C:\Users\kiki\Desktop\__AI\WhyMath-eos197)
 & $Py -m whymath_backend.harness.review_session --queue "$Runs\eos197-a6-review\canary_review_queue.jsonl" --events "$Runs\eos197-a6-review\canary_review_events.jsonl" --verdicts "$Runs\eos197-a6-review\canary_review_verdicts.jsonl" --reviewer-id kiki
 ```
 
@@ -495,9 +512,10 @@ if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -c $QueuePy "$Runs\eos1
 
 ## [J-2] 이어서 검수 — 중간에 그만둔 뒤 (대화형 한 줄)
 
-`q`로 끝냈거나 창을 닫았다면, (새 창이면 [B]를 먼저 붙여넣은 뒤) 아래 한 줄만 붙여넣는다. 이미 종결한 건을 건너뛴다(이중 계측 방지). 이벤트·판정은 항목마다 즉시 기록되므로 그때까지의 기록은 남아 있다.
+`q`로 끝냈거나 창을 닫았다면, (새 창이면 [B]를 먼저 붙여넣은 뒤) **[J-0]을 붙여넣어 셋 다 True인지 본 다음** 아래 한 줄만 붙여넣는다(대화형 — 다른 줄과 함께 붙여넣지 않는다). 이미 종결한 건을 건너뛴다(이중 계측 방지). 이벤트·판정은 항목마다 즉시 기록되므로 그때까지의 기록은 남아 있다.
 
 ```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — [J-2] 이어서 검수 (대화형 한 줄 · [J-0] 뒤 · 작업 디렉터리 C:\Users\kiki\Desktop\__AI\WhyMath-eos197)
 & $Py -m whymath_backend.harness.review_session --queue "$Runs\eos197-a6-review\canary_review_queue.jsonl" --events "$Runs\eos197-a6-review\canary_review_events.jsonl" --verdicts "$Runs\eos197-a6-review\canary_review_verdicts.jsonl" --reviewer-id kiki --resume
 ```
 
@@ -513,34 +531,59 @@ if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -c $QueuePy "$Runs\eos1
 # Windows PowerShell (= Phaiakes9) · 창 ① — [K] HIT·비용 요약 + 주간 KPI 미리보기 (읽기 전용 · 파일 입력 모드 --dry-run · 원장 미기록)
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
 $HitPy = "import io,json,sys,contextlib,pathlib
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,timezone
 from whymath_backend.ops import hit_cu_metrics as H
 from whymath_backend.ops import weekly_metrics_report as W
 from whymath_backend.l3.router import USD_TO_KRW
 ev,vd,gl,go=(pathlib.Path(a) for a in sys.argv[1:5])
-for seat,g in (('local',gl),('openrouter',go)):
+def run_json(fn, args):
     buf=io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        code=H.main(['--events',str(ev),'--verdicts',str(vd),'--generation-log',str(g),'--json'])
-    r=json.loads(buf.getvalue())
-    print('HIT_%s_EXIT=%d CU_MEASURED=%s HIT_MEDIAN_S=%s IMPLAUSIBLE_MAJORITY=%s CU_WITH_COST=%s COST_USD_TOTAL=%s COVERAGE=%s' % (seat.upper(), code, r['cu_measured'], r['hit_median_seconds'], r['hit_implausible_majority'], r['cu_with_cost'], r['cost_usd_total'], r['coverage_rate']))
+    try:
+        with contextlib.redirect_stdout(buf):
+            code=fn(args)
+    except SystemExit as exc:
+        code=exc.code if isinstance(exc.code, int) else 2
+    try:
+        return code, json.loads(buf.getvalue())
+    except ValueError as exc:
+        return code, type(exc).__name__
+for seat,g in (('local',gl),('openrouter',go)):
+    code,r=run_json(H.main, ['--events',str(ev),'--verdicts',str(vd),'--generation-log',str(g),'--json'])
+    if not isinstance(r, dict):
+        print('HIT_%s_EXIT=%s REPORT_UNREADABLE=%s — 위 stderr의 [측정 실패] 줄을 회신' % (seat.upper(), code, r))
+        continue
+    print('HIT_%s_EXIT=%d CU_MEASURED=%s HIT_MEDIAN_S=%s IMPLAUSIBLE_MAJORITY=%s CU_WITH_COST=%s CU_COST_INCOMPLETE=%s COST_USD_COMPLETE=%s COVERAGE=%s' % (seat.upper(), code, r['cu_measured'], r['hit_median_seconds'], r['hit_implausible_majority'], r['cu_with_cost'], r['cu_cost_incomplete'], r['cost_usd_complete_total'], r['coverage_rate']))
 ts=[]
+broken=[]
 for p,key in ((ev,'recorded_at'),(gl,'generated_at'),(go,'generated_at')):
-    for l in p.read_text(encoding='utf-8').splitlines():
-        if l.strip():
+    try:
+        lines=p.read_text(encoding='utf-8').splitlines()
+    except (OSError, ValueError) as exc:
+        broken.append('%s:read:%s' % (p.name, type(exc).__name__))
+        continue
+    for n,l in enumerate(lines, start=1):
+        if not l.strip():
+            continue
+        try:
             v=json.loads(l).get(key)
             if v:
-                ts.append(datetime.fromisoformat(v))
+                d=datetime.fromisoformat(v)
+                ts.append(d if d.tzinfo else d.replace(tzinfo=timezone.utc))
+        except (ValueError, TypeError, AttributeError) as exc:
+            broken.append('%s:%d:%s' % (p.name, n, type(exc).__name__))
+if broken:
+    print('WINDOW_INPUT_BROKEN=True BROKEN_ROWS=%d FIRST=%s — 깨진 행이 있는 파일로는 창을 정하지 않는다(이 줄을 회신)' % (len(broken), broken[0]))
+    raise SystemExit(1)
 if not ts:
     print('WINDOW_UNKNOWN=True — 시각이 찍힌 행이 0건이다(측정 실패 · 회신)')
     raise SystemExit(1)
 ws=min(ts).isoformat()
 we=(max(ts)+timedelta(seconds=1)).isoformat()
 print('WINDOW_START=%s WINDOW_END=%s TIMESTAMPED_ROWS=%d' % (ws, we, len(ts)))
-buf=io.StringIO()
-with contextlib.redirect_stdout(buf):
-    code=W.main(['--dry-run','--events-jsonl',str(ev),'--generation-log-jsonl',str(gl),'--generation-log-jsonl',str(go),'--week-start',ws,'--week-end',we,'--krw-per-usd',str(USD_TO_KRW)])
-rec=json.loads(buf.getvalue())
+code,rec=run_json(W.main, ['--dry-run','--events-jsonl',str(ev),'--generation-log-jsonl',str(gl),'--generation-log-jsonl',str(go),'--week-start',ws,'--week-end',we,'--krw-per-usd',str(USD_TO_KRW)])
+if not isinstance(rec, dict):
+    print('WEEKLY_CLI_EXIT=%s PREVIEW_UNREADABLE=%s — 위 stderr를 회신' % (code, rec))
+    raise SystemExit(1)
 print('WEEKLY_CLI_EXIT=%d WEEK_START=%s WEEK_END=%s' % (code, rec['week_start'], rec['week_end']))
 for k in ('hit_seconds','unit_cost_krw'):
     v=rec['kpis'][k]
@@ -555,8 +598,9 @@ if ($HaveK) { "EVENT_LINES=$(& $Py -c $CountPy $EvK) VERDICT_LINES=$(& $Py -c $C
 **판정**:
 - `HIT_LOCAL_EXIT=0`·`HIT_OPENROUTER_EXIT=0` · `CU_MEASURED` 15 이상(HIT 유효 표본 목표) · `IMPLAUSIBLE_MAJORITY=False`.
 - `CU_WITH_COST`: 로컬 줄 = 로컬 CU 중 검수된 수 · openrouter 줄 = openrouter CU 중 검수된 수(각 좌석 로그는 자기 CU만 조인한다 — 다른 좌석 CU는 미조인으로 분리되는 것이 정상이다).
+- `WINDOW_INPUT_BROKEN=True`·`REPORT_UNREADABLE=…`·`PREVIEW_UNREADABLE=…`가 나오면 파일 하나가 깨졌거나 없는 것이다 — 그 줄(어느 파일 몇 번째 줄·예외 타입)을 회신한다(traceback 대신 이 사유 줄로 끝난다).
 - `WINDOW_START`·`WINDOW_END`가 찍히고 `WEEKLY_CLI_EXIT=0`. stderr의 `[파일 입력] … 이벤트 N행 중 창 안 N행 … 생성 로그 M행 중 창 안 M행 · 파싱 실패 0행` — **창 안 행 수가 전체 행 수와 같아야** 한다(다르면 회차 행이 창 밖으로 빠진 것이다 — 회신).
-- `PREVIEW_HIT_SECONDS_MEASURED=True` · `PREVIEW_UNIT_COST_KRW_MEASURED=True` — 세션이 같은 파일·같은 창으로 원장에 기록할 **바로 그 값**이다. `IMPLAUSIBLE_MAJORITY=True`이면 HIT 미리보기가 False로 나오고 사유에 "HIT 하한 30초 미만(절반 이상)"이 적힌다 — 그 경우 검수가 재입력 세션으로 읽힌 것이니 회신에 그대로 적는다. 사유에 "입력 파싱 실패"가 있으면 파일 하나가 깨진 것이다(부분 입력으로는 판정하지 않는다) — 회신.
+- `PREVIEW_HIT_SECONDS_MEASURED=True` · `PREVIEW_UNIT_COST_KRW_MEASURED=True` — 세션이 같은 파일·같은 창으로 원장에 기록할 **바로 그 값**이다. 단위비용은 **완전 계측 CU만의 평균**이다 — 비용 미기록 호출이 섞인 CU가 있으면 `REASON=부분 표본 …`에 제외 수가 적힌다(분자·분모 모두에서 뺀다). 같은 생성 로그 파일을 두 번 넘겨도 값은 바뀌지 않는다(`log_id` 기준 중복 제거 — stderr `중복 제거 … 생성 로그 N행`). `IMPLAUSIBLE_MAJORITY=True`이면 HIT 미리보기가 False로 나오고 사유에 "HIT 하한 30초 미만(절반 이상)"이 적힌다 — 그 경우 검수가 재입력 세션으로 읽힌 것이니 회신에 그대로 적는다. 사유에 "입력 파싱 실패"가 있으면 파일 하나가 깨진 것이다(부분 입력으로는 판정하지 않는다) — 회신.
 
 > 변별력: 파일 입력 모드는 입력 0건·창 밖·비용 미기록·cu_slug 결손·파싱 실패·파일 없음을 전부 `measured: false`(사유 동반)로 낸다. cu_slug를 지우는 뮤테이션은 `unit_cost_krw`를 `measured False`·"이번 주 비용 계측 완료 CU 0건"으로 떨어뜨려 회귀 테스트가 RED가 된다(`tests/backend/ops/test_weekly_metrics_file_input.py` — 공백 G-B).
 
@@ -579,10 +623,26 @@ $MissingL = @($SessionFiles | Where-Object { -not (Test-Path "$Runs\$_") })
 $ReviewOkL = (Test-Path "$Runs\eos197-a6-review\canary_review_events.jsonl") -and (Test-Path "$Runs\eos197-a6-review\canary_review_verdicts.jsonl")
 "PRECHECK_L EmailSet=$EmailSet NewFiles=$NewFiles OtherDirty=$OtherDirty RemoteBranchExists=$RemoteExists ReviewFilesPresent=$ReviewOkL"
 "SESSION_FILES_MISSING=$($MissingL.Count) $($MissingL -join ' ')"
-if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $RemoteExists) -and $ReviewOkL) { git checkout -B $Branch; git add -- data/runs; git commit -m "EOS-197: A6 저작 회차 산출물 — 두 좌석 cu.jsonl·생성 로그·회차 대장·검수 이벤트 (Kiki 머신 실행분)"; git push -u origin $Branch; $LocalSha = git rev-parse HEAD; $RemoteSha = ((git ls-remote origin "refs/heads/$Branch") -split "\s+")[0]; "COMMITTED_FILES=$(@(git show --name-only --format= HEAD).Count)"; "LOCAL_SHA=$LocalSha"; "REMOTE_SHA=$RemoteSha"; "PUSH_VERIFIED=$($LocalSha -eq $RemoteSha)" } else { "WRITE_REFUSED=True — 커밋·push하지 않았다. EmailSet=$EmailSet(True여야 — git 사용자 설정) NewFiles=$NewFiles(1 이상이어야) OtherDirty=$OtherDirty(0이어야 — 산출물 밖 변경이 있으면 목록을 회신) RemoteBranchExists=$RemoteExists(False여야 — 이미 있으면 앞 push가 성공한 것일 수 있다. 회신하세요) ReviewFilesPresent=$ReviewOkL(True여야 — 검수 이벤트·판정 파일이 없는 채로 push하면 이 블록이 다시는 push하지 않으므로 [J]를 먼저 마치세요)" }
+if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $RemoteExists) -and $ReviewOkL) {
+  git checkout -B $Branch
+  git add -- data/runs
+  git commit -m "EOS-197: A6 저작 회차 산출물 — 두 좌석 cu.jsonl·생성 로그·회차 대장·검수 이벤트 (Kiki 머신 실행분)"
+  $LocalSha = git rev-parse HEAD
+  $MainSha = git rev-parse origin/main
+  $HeadNotMain = [bool]($LocalSha -and $MainSha -and ($LocalSha -ne $MainSha))
+  $CommittedRuns = @(git show --name-only --format= HEAD -- data/runs | Where-Object { $_ }).Count
+  "LOCAL_SHA=$LocalSha MAIN_SHA=$MainSha HEAD_NOT_MAIN=$HeadNotMain COMMITTED_RUNS_FILES=$CommittedRuns COMMITTED_FILES=$(@(git show --name-only --format= HEAD | Where-Object { $_ }).Count)"
+  if ($HeadNotMain -and ($CommittedRuns -gt 0)) {
+    git push -u origin $Branch
+    $RemoteSha = ((git ls-remote origin "refs/heads/$Branch") -split "\s+")[0]
+    $RemoteIsCommit = [bool]($RemoteSha -and ($RemoteSha -eq $LocalSha))
+    "REMOTE_SHA=$RemoteSha REMOTE_IS_COMMIT=$RemoteIsCommit"
+    "PUSH_VERIFIED=$($HeadNotMain -and ($CommittedRuns -gt 0) -and $RemoteIsCommit) — HEAD_NOT_MAIN=$HeadNotMain COMMITTED_RUNS_FILES=$CommittedRuns REMOTE_IS_COMMIT=$RemoteIsCommit(셋 다 True·1 이상이어야)"
+  } else { "PUSH_REFUSED=True PUSH_VERIFIED=False — push하지 않았다. HEAD_NOT_MAIN=$HeadNotMain(True여야 — False면 커밋이 실패해 HEAD가 main 그대로다: 위 git commit 출력을 회신) COMMITTED_RUNS_FILES=$CommittedRuns(1 이상이어야 — 0이면 마지막 커밋에 data/runs 파일이 없다)" }
+} else { "WRITE_REFUSED=True — 커밋·push하지 않았다. EmailSet=$EmailSet(True여야 — git 사용자 설정) NewFiles=$NewFiles(1 이상이어야) OtherDirty=$OtherDirty(0이어야 — 산출물 밖 변경이 있으면 목록을 회신) RemoteBranchExists=$RemoteExists(False여야 — 이미 있으면 앞 push가 성공한 것일 수 있다. 회신하세요) ReviewFilesPresent=$ReviewOkL(True여야 — 검수 이벤트·판정 파일이 없는 채로 push하면 이 블록이 다시는 push하지 않으므로 [J]를 먼저 마치세요)" }
 ```
 
-**판정**: `PUSH_VERIFIED=True`(원격 브랜치 끝이 방금 만든 커밋과 같다 — push 명령의 성공 메시지가 아니라 **원격을 다시 읽어** 대조한다). `SESSION_FILES_MISSING=0`이면 세션이 원장 기록·완료 검사에 쓰는 9개 파일이 모두 실렸다 — 0이 아니면 빠진 파일 이름이 같은 줄에 찍힌다(한 좌석이 실패했다면 그 좌석 파일만 빠지는 것이 정상이며, 세션은 남은 좌석으로 집계한다). `COMMITTED_FILES`는 보통 13개 안팎이다(좌석당 `cu.jsonl`·`cu.genlog.jsonl`·`cu.rounds.jsonl`·`cu.review.jsonl`(비수용이 있을 때)·`cu.worklist.md` + 검수 폴더 3개).
+**판정**: `PUSH_VERIFIED=True`. 이 값은 세 단언의 곱이다 — ① `HEAD_NOT_MAIN=True`(커밋이 실제로 만들어졌다 — 커밋이 실패하면 HEAD가 [A]의 main 그대로라 False) ② `COMMITTED_RUNS_FILES` 1 이상(마지막 커밋이 `data/runs/` 파일을 담았다) ③ `REMOTE_IS_COMMIT=True`(원격 브랜치 끝이 그 커밋이다 — push 성공 메시지가 아니라 **원격을 다시 읽어** 대조한다). ①·②가 False면 push 자체를 하지 않고 `PUSH_REFUSED=True`와 무엇이 False였는지를 출력한다(종전엔 로컬 HEAD = 원격 HEAD만 봐서, 커밋이 실패해도 main 커밋이 push되면서 True가 나올 수 있었다). `SESSION_FILES_MISSING=0`이면 세션이 원장 기록·완료 검사에 쓰는 9개 파일이 모두 실렸다 — 0이 아니면 빠진 파일 이름이 같은 줄에 찍힌다(한 좌석이 실패했다면 그 좌석 파일만 빠지는 것이 정상이며, 세션은 남은 좌석으로 집계한다). `COMMITTED_FILES`는 보통 13개 안팎이다(좌석당 `cu.jsonl`·`cu.genlog.jsonl`·`cu.rounds.jsonl`·`cu.review.jsonl`(비수용이 있을 때)·`cu.worklist.md` + 검수 폴더 3개).
 
 - push가 인증 오류로 실패하면 `PUSH_VERIFIED=False`·`REMOTE_SHA=` 빈칸이 나온다 — 출력 전문을 회신한다(세션이 다른 회수 경로를 정한다). 커밋은 워크트리에 남아 있으므로 다시 저작할 필요는 없다.
 - 판정 문구: 이 push는 **산출물 전달**이지 main 반영이 아니다. main 반영·`metrics/weekly.json` 기록은 세션이 PR로 한다 — 세션은 이 브랜치의 파일로 주간 KPI CLI를 파일 입력 모드로 돌리고(`--events-jsonl …\canary_review_events.jsonl --generation-log-jsonl …local\cu.genlog.jsonl --generation-log-jsonl …openrouter\cu.genlog.jsonl --week-start/--week-end`(=[K]의 창) `--krw-per-usd 1540`), 완료 검사 ③(`wc -l`·`provenance_audit --require-runs`·`weekly.json` measured)을 main 기준으로 다시 잰다.

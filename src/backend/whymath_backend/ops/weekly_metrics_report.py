@@ -87,7 +87,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -356,6 +356,10 @@ def build_record_from_report(
             )
 
         # 단위 비용 — KRW/CU. 환율 미지정이거나 비용 계측 CU가 0이면 미산출(하드코딩 금지).
+        # 분자·분모는 **같은 CU 집합(완전 계측 CU)**이다(EOS-198 P3-1): 비용 미기록 행이 섞인
+        # CU는 부분합(하한)이라 양쪽에서 뺀다. 종전엔 분자에 부분 기록 CU까지 든
+        # `cost_usd_total`을 써서 단가가 부풀었다. 뺀 CU가 있으면 measured=True를 유지하되
+        # reason에 "부분 표본"과 제외 수를 적는다(값이 무엇의 평균인지 원장에서 보이게).
         if krw_per_usd is None:
             kpis["unit_cost_krw"] = KpiValue(
                 measured=False,
@@ -363,11 +367,17 @@ def build_record_from_report(
                 unit="krw_per_cu",
                 reason="환율 미지정(--krw-per-usd) — 하드코딩된 기본 환율은 두지 않는다",
             )
-        elif report.cu_with_cost > 0 and report.cost_usd_total is not None:
+        elif report.cu_with_cost > 0 and report.cost_usd_complete_total is not None:
             kpis["unit_cost_krw"] = KpiValue(
                 measured=True,
-                value=(report.cost_usd_total * krw_per_usd) / report.cu_with_cost,
+                value=(report.cost_usd_complete_total * krw_per_usd) / report.cu_with_cost,
                 unit="krw_per_cu",
+                reason=(
+                    f"부분 표본 — 완전 계측 CU {report.cu_with_cost}건의 평균 · 비용 미기록 행이 "
+                    f"섞인 CU {report.cu_cost_incomplete}건은 분자·분모에서 제외"
+                    if report.cu_cost_incomplete > 0
+                    else None
+                ),
             )
         else:
             kpis["unit_cost_krw"] = KpiValue(
@@ -445,6 +455,9 @@ async def _fetch_report(
     return aggregate(events, genlog_rows=genlog_rows)
 
 
+_PkRow = TypeVar("_PkRow", SchemaReviewTimerEvent, SchemaGenerationLog)
+
+
 class _GenlogLike(Protocol):
     """집계 행 변환이 읽는 5속성 — ORM `GenerationLog`·schema `GenerationLog` 둘 다 만족한다."""
 
@@ -506,6 +519,55 @@ class FileInputSummary:
     genlog_rows_in_window: int | None
     genlog_rows_no_time: int | None
     parse_errors: tuple[str, ...]
+    # 중복 제거 회계(EOS-198 P2-1) — 같은 PK의 재출현을 뺀 수. 0이 아니면 같은 파일을 두 번
+    # 줬거나 사이드카가 재기록된 것이다(값을 두 배로 만들지 않고 센다).
+    event_duplicates: int = 0
+    genlog_duplicates: int = 0
+
+
+def _rows_missing_key(path: Path, key: str) -> list[str]:
+    """원문 JSONL에서 `key`가 **없는** 객체 행 — 사유 목록(줄 번호·키 이름만, 값은 싣지 않는다).
+
+    왜 원문을 다시 읽는가: 스키마의 PK(`log_id`·`event_id`)는 `default_factory=uuid4`라, 키가
+    없는 행도 검증을 통과하며 **읽을 때마다 새 PK를 받는다.** 그러면 같은 행이 두 번 들어와도
+    PK가 달라 중복 제거가 불가능하고, 값이 조용히 두 배가 된다. 이 저장소의 생산자(저작 CLI의
+    `append_generation_log_jsonl`·검수 CLI의 `append_event_jsonl`)는 PK를 **항상** 쓰므로, PK가
+    없는 행은 손으로 만든·다른 도구가 만든 입력이다 — 중복 여부를 알 수 없으니 **입력 실패로
+    친다**(fail-closed). JSON 자체가 깨진 줄은 스키마 로더가 이미 사유로 냈으므로 여기서는 세지
+    않는다(같은 줄의 이중 계상 방지).
+    """
+    missing: list[str] = []
+    with path.open("r", encoding="utf-8") as fh:
+        for line_no, line in enumerate(fh, start=1):
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict) and parsed.get(key) is None:
+                missing.append(f"line {line_no}: MissingPrimaryKey({key}) — 중복 판정 불가")
+    return missing
+
+
+def _dedupe_by_pk(rows: list[_PkRow], pk: str) -> tuple[list[_PkRow], int, list[str]]:
+    """PK 기준 중복 제거(첫 관측 유지·순서 보존) → (행, 같은 내용 재출현 수, 충돌 사유)."""
+    first: dict[Any, _PkRow] = {}
+    kept: list[_PkRow] = []
+    duplicates = 0
+    conflicts: list[str] = []
+    for row in rows:
+        key = getattr(row, pk)
+        seen = first.get(key)
+        if seen is None:
+            first[key] = row
+            kept.append(row)
+        elif seen.model_dump() == row.model_dump():
+            duplicates += 1
+        else:
+            conflicts.append(f"{pk} {key} 충돌 — 같은 PK에 내용이 다른 행(재기록이 아니다)")
+    return kept, duplicates, conflicts
 
 
 def report_from_files(
@@ -529,6 +591,7 @@ def report_from_files(
             loaded, errs = load_events_jsonl(path)
             events.extend(loaded)
             errors.extend(f"{path.name} {e}" for e in errs)
+            errors.extend(f"{path.name} {e}" for e in _rows_missing_key(path, "event_id"))
         logs: list[SchemaGenerationLog] | None = None
         if genlog_paths is not None:
             logs = []
@@ -536,8 +599,21 @@ def report_from_files(
                 loaded_logs, log_errs = load_generation_logs_jsonl(path)
                 logs.extend(loaded_logs)
                 errors.extend(f"{path.name} {e}" for e in log_errs)
+                errors.extend(f"{path.name} {e}" for e in _rows_missing_key(path, "log_id"))
     except OSError as exc:  # FileNotFoundError 포함 — 타입명을 사유에 남긴다(침묵 실패 금지).
         return None, None, f"입력 파일 읽기 실패 — {type(exc).__name__}: {exc}"
+
+    # ── PK 기준 중복 제거(EOS-198 P2-1) — DB 경로는 PK가 유일성을 보장하므로 파일 경로도
+    # 같은 성질을 가져야 같은 입력에서 같은 값이 난다. 같은 파일을 두 번 주면 종전엔 단위비용이
+    # 두 배인 채 measured:true였다(이벤트는 aggregate가 event_id로 이미 제거 — 비대칭이었다).
+    # 같은 PK인데 내용이 다르면 재기록이 아니라 충돌이다 — 어느 쪽이 맞는지 모르므로 판정하지
+    # 않는다(파싱 실패와 같은 실패로 친다).
+    events, event_duplicates, event_conflicts = _dedupe_by_pk(events, "event_id")
+    genlog_duplicates = 0
+    if logs is not None:
+        logs, genlog_duplicates, log_conflicts = _dedupe_by_pk(logs, "log_id")
+        errors.extend(log_conflicts)
+    errors.extend(event_conflicts)
 
     kept_events = [
         e for e in events if _in_window(e.recorded_at, week_start=week_start, week_end=week_end)
@@ -559,6 +635,8 @@ def report_from_files(
             None if logs is None else sum(1 for g in logs if g.generated_at is None)
         ),
         parse_errors=tuple(errors),
+        event_duplicates=event_duplicates,
+        genlog_duplicates=genlog_duplicates,
     )
     if errors:
         # 부분 입력으로 판정하지 않는다 — 깨진 행이 하필 느린 검수·비싼 호출이었다면 그 행이
@@ -706,6 +784,8 @@ def _report_file_input(
             else f"{summary.genlog_rows}행 중 창 안 {summary.genlog_rows_in_window}행"
             f"(시각 없음 {summary.genlog_rows_no_time})"
         )
+        + f" · 중복 제거 이벤트 {summary.event_duplicates}행"
+        + f"·생성 로그 {summary.genlog_duplicates}행"
         + f" · 파싱 실패 {len(summary.parse_errors)}행",
         file=sys.stderr,
         flush=True,

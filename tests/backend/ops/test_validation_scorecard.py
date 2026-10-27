@@ -473,6 +473,9 @@ def test_hit_adapter_turns_a_real_report_into_measured_kpis() -> None:
         failure_code_counts={f"F{i}": 0 for i in range(1, 9)}
         | {"F1": 40, "F2": 30, "F3": 10, "F6": 5, "F7": 5},
         cost_usd_total=20.0,
+        # 실제 생산자는 완전 계측 합·부분 기록 CU 수를 함께 낸다(EOS-198 P3-1).
+        cost_usd_complete_total=20.0,
+        cu_cost_incomplete=0,
         cu_with_cost=200,
     )
     adapted = vs.adapt_hit_cu_metrics(report, krw_per_usd=1400.0)
@@ -762,3 +765,33 @@ class TestEditAwareVerdictSeam:
         adapted = vs.adapt_hit_cu_metrics(self._producer_report())
         assert "approval_rate_clean" not in adapted
         assert adapted["hit"]["sample_size"] == 3
+
+
+def test_unit_cost_uses_complete_cu_cost_not_partial_total() -> None:
+    """EOS-198 P3-1 — 분자·분모는 같은 CU 집합(완전 계측 CU)이다.
+
+    `cost_usd_total`은 부분 기록 CU까지 든 하한 합이라, 그것을 `cu_with_cost`로 나누면 단가가
+    부푼다. 완전 계측 합(`cost_usd_complete_total`)을 쓴다.
+    """
+    from whymath_backend.ops import validation_scorecard as vs
+
+    adapted = vs.adapt_hit_cu_metrics(
+        _hit_report_json(
+            cost_usd_total=0.003,  # a $0.0015 + b의 부분합 $0.0015
+            cost_usd_complete_total=0.0015,  # a만
+            cu_with_cost=1,
+            cu_cost_incomplete=1,
+        ),
+        krw_per_usd=1540.0,
+    )
+    assert adapted["unit_cost"]["krw_per_cu"] == pytest.approx(2.31)
+
+
+def test_old_report_without_complete_total_and_incomplete_cus_yields_no_unit_cost() -> None:
+    """옛 산출물(키 없음)에 부분 기록 CU가 있으면 분자를 알 수 없다 — 단가를 만들지 않는다."""
+    from whymath_backend.ops import validation_scorecard as vs
+
+    report = _hit_report_json(cost_usd_total=0.003, cu_with_cost=1, cu_cost_incomplete=1)
+    report.pop("cost_usd_complete_total", None)
+    adapted = vs.adapt_hit_cu_metrics(report, krw_per_usd=1540.0)
+    assert "unit_cost" not in adapted

@@ -509,6 +509,15 @@ class HitCuReport:
     cost_usd_per_cu_p50: float | None = None
     cost_usd_per_cu_p90: float | None = None
     cost_usd_total: float | None = None
+    """기록된 비용의 합 — **부분 기록 CU 포함**(하한). 단위비용의 분자로 쓰면 안 된다(아래)."""
+    cost_usd_complete_total: float | None = None
+    """**완전 계측 CU**(`cu_with_cost`개)만의 비용 합 — 단위비용(KRW/CU)의 분자(EOS-198 P3-1).
+
+    분자·분모는 같은 CU 집합이어야 한다. 종전 소비자(주간 KPI·스코어카드)는 분자에
+    `cost_usd_total`(부분 기록 CU 포함)을, 분모에 `cu_with_cost`(완전 계측 CU만)를 써서, 비용
+    미기록 행이 섞인 CU가 있으면 단가가 부풀었다. 부분 기록 CU의 합은 진짜 비용의 하한일 뿐이라
+    분자·분모 **양쪽에서** 뺀다(백분위 표본과 같은 규칙). None = 비용 입력 자체가 없었다.
+    """
     tokens_total: int | None = None
 
     # ── HIT 하한 가드(OPS-90) — 비현실적으로 짧은 검수(재입력·스킵 세션)의 가시화 ──
@@ -773,6 +782,7 @@ def aggregate(
         cost_usd_per_cu_p90=_percentile(per_cu_costs, 0.90),
         # 총액은 "기록된 비용의 합"(부분 기록 CU 포함) — 백분위와 달리 하한임을 렌더가 명기.
         cost_usd_total=sum(cost_by_cu.values()) if has_cost_input else None,
+        cost_usd_complete_total=(sum(complete_cost_by_cu.values()) if has_cost_input else None),
         tokens_total=sum(tokens_by_cu.values()) if has_cost_input else None,
         min_plausible_seconds=min_plausible_seconds,
         cu_implausible_short_count=implausible_short_count,

@@ -861,8 +861,13 @@ def adapt_hit_cu_metrics(
                 "rejected_total": rejected,
             }
 
-    cost_usd = report.get("cost_usd_total")
+    # 분자·분모는 같은 CU 집합(완전 계측 CU)이어야 한다(EOS-198 P3-1 — `HitCuReport.
+    # cost_usd_complete_total` docstring). 그 키가 없는 옛 산출물은 부분 기록 CU가 0건일 때만
+    # `cost_usd_total`과 같으므로 그때만 그것을 쓰고, 아니면 단가를 만들지 않는다(미측정).
     with_cost = report.get("cu_with_cost")
+    cost_usd = report.get("cost_usd_complete_total")
+    if cost_usd is None and report.get("cu_cost_incomplete") == 0:
+        cost_usd = report.get("cost_usd_total")
     if (
         krw_per_usd is not None
         and isinstance(cost_usd, (int, float))

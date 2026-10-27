@@ -418,3 +418,164 @@ class TestFileModeCli:
         with pytest.raises(SystemExit) as excinfo:
             wmr.main(["--dry-run", *extra])
         assert excinfo.value.code == 2
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-198 P2-1 — 파일 모드 PK 중복 제거(같은 파일을 두 번 줘도 값 불변)
+# ──────────────────────────────────────────────────────────────────────
+class TestDuplicateInputIsIdempotent:
+    def _two_cu_files(self, tmp_path: Path) -> tuple[Path, Path]:
+        ev = _write_jsonl(
+            tmp_path / "e.jsonl",
+            [*_review_pair("wm-a", 95_000, _INSIDE), *_review_pair("wm-b", 125_000, _INSIDE)],
+        )
+        gl = _write_jsonl(
+            tmp_path / "g.jsonl",
+            [_batch_log("wm-a", 0.0010, _INSIDE), _batch_log("wm-b", 0.0020, _INSIDE)],
+        )
+        return ev, gl
+
+    def _kpis(self, ev: list[Path], gl: list[Path]) -> tuple[dict[str, Any], Any]:
+        record, summary = wmr.collect_from_files(
+            events_paths=ev,
+            genlog_paths=gl,
+            week_start=_WEEK_START,
+            week_end=_WEEK_END,
+            generated_at=_GENERATED_AT,
+            krw_per_usd=_KRW,
+        )
+        return record.to_json()["kpis"], summary
+
+    def test_same_genlog_file_twice_keeps_unit_cost(self, tmp_path: Path) -> None:
+        ev, gl = self._two_cu_files(tmp_path)
+        once, _ = self._kpis([ev], [gl])
+        twice, summary = self._kpis([ev], [gl, gl])
+        assert once["unit_cost_krw"]["measured"] is True
+        assert twice["unit_cost_krw"] == once["unit_cost_krw"]  # 두 배가 되면 안 된다
+        assert once["unit_cost_krw"]["value"] == pytest.approx((0.0010 + 0.0020) * _KRW / 2)
+        assert summary.genlog_duplicates == 2
+
+    def test_same_events_file_twice_keeps_hit(self, tmp_path: Path) -> None:
+        ev, gl = self._two_cu_files(tmp_path)
+        once, _ = self._kpis([ev], [gl])
+        twice, summary = self._kpis([ev, ev], [gl])
+        assert twice == once
+        assert summary.event_duplicates == 4
+
+    def test_genlog_row_without_log_id_fails_closed(self, tmp_path: Path) -> None:
+        """PK 없는 행은 읽을 때마다 새 PK를 받아 중복 판정이 불가능하다 — 입력 실패로 친다."""
+        ev, _ = self._two_cu_files(tmp_path)
+        raw = json.loads(_batch_log("wm-a", 0.0010, _INSIDE).model_dump_json())
+        del raw["log_id"]
+        gl = tmp_path / "no_pk.jsonl"
+        gl.write_text(json.dumps(raw) + "\n", encoding="utf-8")
+        kpis, summary = self._kpis([ev], [gl])
+        assert any("MissingPrimaryKey(log_id)" in e for e in summary.parse_errors)
+        assert kpis["unit_cost_krw"]["measured"] is False
+        assert kpis["hit_seconds"]["measured"] is False  # 부분 입력으로 판정하지 않는다
+
+    def test_event_row_without_event_id_fails_closed(self, tmp_path: Path) -> None:
+        _, gl = self._two_cu_files(tmp_path)
+        rows = [json.loads(e.model_dump_json()) for e in _review_pair("wm-a", 95_000, _INSIDE)]
+        del rows[1]["event_id"]
+        ev = tmp_path / "no_pk_events.jsonl"
+        ev.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        kpis, summary = self._kpis([ev], [gl])
+        assert any("MissingPrimaryKey(event_id)" in e for e in summary.parse_errors)
+        assert kpis["hit_seconds"]["measured"] is False
+
+    def test_same_log_id_with_different_content_is_a_conflict(self, tmp_path: Path) -> None:
+        ev, gl = self._two_cu_files(tmp_path)
+        first = _batch_log("wm-a", 0.0010, _INSIDE)
+        tampered = first.model_copy(update={"cost_usd": 0.9})
+        gl2 = _write_jsonl(tmp_path / "g2.jsonl", [tampered])
+        kpis, summary = self._kpis([ev], [_write_jsonl(tmp_path / "g1.jsonl", [first]), gl2])
+        assert any("충돌" in e for e in summary.parse_errors)
+        assert kpis["unit_cost_krw"]["measured"] is False
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-198 P3-1 — 단위비용 분자·분모는 같은 CU 집합(완전 계측 CU)
+# ──────────────────────────────────────────────────────────────────────
+class TestUnitCostUsesOneCuSet:
+    """CU a = 완전 계측($0.0015) · CU b = 비용 행 $0.0015 + 비용 null 행(부분 기록).
+
+    올바른 값 = a만의 평균 = 0.0015 × 1540 = 2.31원. 종전엔 분자에 b의 부분합이 들어가고
+    분모엔 빠져 4.62원(두 배)이 measured:true로 나갔다.
+    """
+
+    def _inputs(self) -> tuple[list[ReviewTimerEvent], list[GenerationLog]]:
+        events = [*_review_pair("wm-a", 95_000, _INSIDE), *_review_pair("wm-b", 125_000, _INSIDE)]
+        logs = [
+            _batch_log("wm-a", 0.0015, _INSIDE),
+            _batch_log("wm-b", 0.0015, _INSIDE),
+            _batch_log("wm-b", None, _INSIDE),  # 같은 CU의 비용 미기록 호출 → b는 부분 기록
+        ]
+        return events, logs
+
+    def _assert_complete_set_only(self, kpi: dict[str, Any]) -> None:
+        assert kpi["measured"] is True
+        assert kpi["value"] == pytest.approx(0.0015 * _KRW)  # 2.31 — 4.62가 아니다
+        assert kpi["reason"] is not None and "부분 표본" in kpi["reason"]
+        assert "1건" in kpi["reason"]  # 제외된 CU 수가 원장에서 보인다
+
+    async def test_db_path(self) -> None:
+        events, logs = self._inputs()
+        report = await _db_report(events, logs)
+        assert (report.cu_with_cost, report.cu_cost_incomplete) == (1, 1)
+        self._assert_complete_set_only(_record(report)["kpis"]["unit_cost_krw"])
+
+    def test_file_path(self, tmp_path: Path) -> None:
+        events, logs = self._inputs()
+        record, _ = wmr.collect_from_files(
+            events_paths=[_write_jsonl(tmp_path / "e.jsonl", events)],
+            genlog_paths=[_write_jsonl(tmp_path / "g.jsonl", logs)],
+            week_start=_WEEK_START,
+            week_end=_WEEK_END,
+            generated_at=_GENERATED_AT,
+            krw_per_usd=_KRW,
+        )
+        self._assert_complete_set_only(record.to_json()["kpis"]["unit_cost_krw"])
+
+    async def test_no_incomplete_cu_has_no_reason(self) -> None:
+        """대조군 — 부분 기록 CU가 없으면 사유 없이 전체 평균이다."""
+        events = _review_pair("wm-a", 95_000, _INSIDE)
+        report = await _db_report(events, [_batch_log("wm-a", 0.0015, _INSIDE)])
+        kpi = _record(report)["kpis"]["unit_cost_krw"]
+        assert kpi == {
+            "measured": True,
+            "value": pytest.approx(0.0015 * _KRW),
+            "unit": "krw_per_cu",
+            "reason": None,
+        }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-198 P3-2 — 창 경계: 시작은 포함, 끝은 미포함(DB WHERE `>= start AND < end`)
+# ──────────────────────────────────────────────────────────────────────
+class TestWindowBoundaries:
+    def _report(self, tmp_path: Path, moment: datetime) -> Any:
+        report, summary, failure = wmr.report_from_files(
+            events_paths=[_write_jsonl(tmp_path / "e.jsonl", _review_pair("wm-a", 95_000, moment))],
+            genlog_paths=[_write_jsonl(tmp_path / "g.jsonl", [_batch_log("wm-a", 0.001, moment)])],
+            week_start=_WEEK_START,
+            week_end=_WEEK_END,
+        )
+        assert failure is None
+        return report, summary
+
+    def test_row_exactly_at_week_end_is_outside(self, tmp_path: Path) -> None:
+        report, summary = self._report(tmp_path, _WEEK_END)
+        assert summary.event_rows_in_window == 0
+        assert summary.genlog_rows_in_window == 0
+        assert report.cu_measured == 0
+
+    def test_row_exactly_at_week_start_is_inside(self, tmp_path: Path) -> None:
+        report, summary = self._report(tmp_path, _WEEK_START)
+        assert summary.event_rows_in_window == 2
+        assert summary.genlog_rows_in_window == 1
+        assert report.cu_measured == 1
+
+    def test_one_microsecond_before_week_end_is_inside(self, tmp_path: Path) -> None:
+        report, _ = self._report(tmp_path, _WEEK_END - timedelta(microseconds=1))
+        assert report.cu_measured == 1
