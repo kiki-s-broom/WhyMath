@@ -1290,9 +1290,11 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-10-27] depends_on +P3-90 · verdict FAIL · owners: P3-90 · inputs: P3-66-signature-shadow-harvest-activation-cli · evidence: 판정 기준 main 8ed9e26a1 (#1744 머지) — 운영 그림자 관측 레코드 0건: 빈 입력에 attempt_scan_shadow_harvest exit 3(측정 불가 · 미분 서명 레코드 0건). 활성화 기준 C1(오답 시도 n≥300) 미충족 — 측정 불가는 PASS가 아니다(게이트 문면). 수집 배선은 P3-56이 의도적으로 만들지 않았다(판정문 §9.5). — done P3-66-signature-shadow-harvest-activation-cli 인계"
     depends_on:
       - P3-66-signature-shadow-harvest-activation-cli
+      - P3-90
   - id: G-p356-signature-engine-approval
     title: "P3-56 — 미분 오답 서명 독법(예측 오답값 매처)을 구현 항목으로 승격할 것인가: 승인 / 보류 / 반려. 근거 = docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md 와 드래프트 PR. 승인 전에는 머지하지 않는다 (P3-56 ③④)"
     kind: decision
