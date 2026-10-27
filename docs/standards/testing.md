@@ -55,7 +55,8 @@ privacy·whs)은 계층 게이트를 부여하지 않고 집계 70%로 커버한
 
 backend 스위트는 CI에서 **러너 3대에 파일 단위로 나뉘어** 돈다(`backend-pytest-1~3`). 각 샤드는
 `scripts/coverage/backend_shard_plugin.py`(`-p backend_shard_plugin --shard K/3`)가 pytest 자신의
-수집 결과를 항목 수 기준으로 3등분한 몫만 남기고(나머지 deselect), 부분 커버리지 데이터와 배정
+수집 결과에서 **파일 경로의 sha256 mod 3**으로 정해진 자기 몫 파일만 남기고(나머지 deselect —
+배정은 그 파일의 경로만의 함수라 새 파일이 생겨도 기존 파일의 샤드는 움직이지 않는다), 부분 커버리지 데이터와 배정
 보고서를 산출물로 올린다. 필수 체크 `backend — lint·type·test`는 집계 잡(`backend-verdict`)이
 가진다 — 정적 잡·샤드 3개를 `needs`로 기다려 ① 전부 success인지(실패·취소·건너뜀 전부 red)
 ② 배정 보고서가 겹침 0·누락 0·항목 합 = 수집 우주인지(`backend_shard_verdict.py`) 판정한 뒤
