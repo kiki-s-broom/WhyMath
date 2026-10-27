@@ -191,6 +191,17 @@ class TestIrrationalCoefficientsAreUnverifiable:
     def test_irrational_coefficients_never_pass(self, expr: str, claimed: str) -> None:
         assert _state(expr, claimed) == "unverifiable", (expr, claimed)
 
+    @pytest.mark.parametrize(
+        "expr",
+        ["Abs(sin(x)) - sin(x)", "Abs(sin(x)) - sin(x) + x**2", "Abs(x**2 + sin(x)) - sin(x)"],
+    )
+    @pytest.mark.parametrize("claimed", ["0", "1", "2"])
+    def test_non_polynomial_inner_cancelling_outside_is_unverifiable_not_an_exception(
+        self, expr: str, claimed: str
+    ) -> None:
+        # 4차 리뷰 P2 — 벗긴 식은 상쇄로 다항식이지만 절댓값 인자는 아니다. 예외가 새면 안 된다.
+        assert _state(expr, claimed) == "unverifiable", (expr, claimed)
+
     def test_rational_coefficients_with_irrational_corners_are_still_decided(self) -> None:
         # 대조군 — 계수는 유리수이고 꺾인 점만 무리수인 식은 정확 판정 그대로다(과잉 거부가 아님).
         assert _state("Abs(x**2 - 2)", "2") == "pass"
