@@ -56,12 +56,13 @@ _MEASURED_MAX_MINUTES: dict[str, tuple[float, int]] = {
 }
 
 # 잡 id → (추정 최대 소요 분, 근거). **실측 전 추정** — 실행 이력이 생기면 위 표로 옮긴다.
-# 샤드: 단일 잡 시절 Pytest 스텝 최대 41.9분 ÷ 3 = 14.0 + 설치 최대 1.05 + 샤드마다 반복되는
-# 전건 수집 ≈ 17분. 집계: 체크아웃·pytest-cov 설치·합산·보고 ≈ 3분(로컬 합산+보고 1분 미만).
+# 샤드: 단일 잡 시절 Pytest 스텝 최대 41.9분 × 0.42(로컬 실측 샤드 최대/단일 실행 = 787/1,864초)
+# = 17.6 + 설치 최대 1.05 ≈ 19분. 집계: 체크아웃·pytest-cov 설치·합산·보고 ≈ 3분(로컬 합산+xml+
+# 보고+계층 게이트 27초).
 _PROJECTED_MAX_MINUTES: dict[str, tuple[float, str]] = {
-    "backend-pytest-1": (17.0, "OPS-83 추정 — 단일 잡 Pytest 최대 41.9분/3 + 설치·수집"),
-    "backend-pytest-2": (17.0, "OPS-83 추정 — 샤드 1과 같은 근거"),
-    "backend-pytest-3": (17.0, "OPS-83 추정 — 샤드 1과 같은 근거"),
+    "backend-pytest-1": (19.0, "OPS-83 추정 — 단일 잡 Pytest 최대 41.9분×0.42 + 설치"),
+    "backend-pytest-2": (19.0, "OPS-83 추정 — 샤드 1과 같은 근거"),
+    "backend-pytest-3": (19.0, "OPS-83 추정 — 샤드 1과 같은 근거"),
     "backend-verdict": (3.0, "OPS-83 추정 — 설치·합산·보고만"),
 }
 
@@ -214,7 +215,8 @@ def test_shard_limit_below_projection_would_fail() -> None:
     """변별력 대조군(OPS-83) — 샤드 상한을 단일 잡 시절처럼 근거 없이 낮추면 ②가 RED가 된다.
 
     샤드 하나가 단일 잡 Pytest의 1/3만 돈다고 상한도 1/3(약 17분)으로 깎으면 느린 러너 한 대에서
-    여유가 0이 된다. 20분(×0.7 = 14분)은 추정 최대 17분을 못 덮는다.
+    여유가 0이 된다(실측상 샤드는 1/3이 아니라 0.42배다). 20분(×0.7 = 14분)은 추정 최대 19분을
+    못 덮는다.
     """
     projected, _ = _PROJECTED_MAX_MINUTES["backend-pytest-1"]
     assert _headroom_shortfall(20, projected) > 0
