@@ -3017,10 +3017,17 @@ def _corner_differentiability(
     stripped = expr.xreplace({term: term.args[0] for term in abs_terms})
     if not stripped.is_polynomial(var):
         return "절댓값을 벗긴 식이 다항식이 아님"
+    inner_polys = {term: sympy.Poly(term.args[0], var) for term in abs_terms}
+    # 아래 '나머지가 0인가'는 g(최소다항식)가 **Q 위에서** 기약이라는 데 기댄다. 계수가 Q(√2)처럼
+    # 확장체에 있으면 나눗셈이 그 체에서 일어나 g가 쪼개지고(x²−2 = (x−√2)(x+√2)), 'c에서 0'이
+    # 아니라 '켤레 근 전부에서 0'을 묻게 돼 매끄러운 점을 꺾인 점으로 센다(P3-65 3차 리뷰 P1 —
+    # |x²−2|(x−√2)에 '2' pass). 소수(RR)·π(ZZ[π])도 같은 전제 밖이므로 정수·유리수 계수만 판정한다.
+    for poly in (sympy.Poly(stripped, var), *inner_polys.values()):
+        if not (poly.domain.is_ZZ or poly.domain.is_QQ):
+            return "계수가 정수·유리수가 아님(정확 판정 범위 밖)"
     corners = _abs_real_corners(abs_terms, var)
     if isinstance(corners, str):
         return corners
-    inner_polys = {term: sympy.Poly(term.args[0], var) for term in abs_terms}
     verdicts: list[bool] = []
     for corner in corners:
         g = _minimal_poly(corner, var)

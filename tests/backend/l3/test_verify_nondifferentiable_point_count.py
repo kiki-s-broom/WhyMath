@@ -169,6 +169,35 @@ class TestDecimalCoefficientsAreUnverifiable:
         assert _state("Abs(x**2 - 2)", "2") == "pass"
 
 
+class TestIrrationalCoefficientsAreUnverifiable:
+    """P3-65 3차 리뷰 P1 — 무리수 계수는 Q 위 기약이라는 전제를 깨 켤레 근의 꺾임을 옮겨 셌다.
+
+    `|x²−2|(x−√2)`는 √2에서 매끄럽고 −√2에서만 꺾이는데(참값 1) '2'가 pass했고,
+    `|x³−2|(x−∛2)`는 매끄러운데(참값 0) '1'이 pass했다. 어느 주장도 pass하지 않아야 한다.
+    """
+
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "Abs(x**2 - 2)*(x - sqrt(2))",
+            "Abs(x**2 - 2)*(x + sqrt(2))",
+            "Abs(x**2 - 3)*(x - sqrt(3)) + x**2",
+            "(x - sqrt(2))*Abs(x**2 - 2) + Abs(x)",
+            "Abs(x**3 - 2)*(x - 2**(1/3))",
+            "Abs(x - sqrt(2))",
+        ],
+    )
+    @pytest.mark.parametrize("claimed", ["0", "1", "2", "3"])
+    def test_irrational_coefficients_never_pass(self, expr: str, claimed: str) -> None:
+        assert _state(expr, claimed) == "unverifiable", (expr, claimed)
+
+    def test_rational_coefficients_with_irrational_corners_are_still_decided(self) -> None:
+        # 대조군 — 계수는 유리수이고 꺾인 점만 무리수인 식은 정확 판정 그대로다(과잉 거부가 아님).
+        assert _state("Abs(x**2 - 2)", "2") == "pass"
+        assert _state("Abs(x**3 - 3*x + 1)", "3") == "pass"
+        assert _state("Abs(x**3 - 3*x + 1)", "0") == "fail"
+
+
 class TestUnverifiableBranches:
     """판정 불가 가지마다 그 가지를 밟는 입력 — 가지를 지우면 pass/fail·예외로 바뀐다(뮤테이션 동결)."""
 
