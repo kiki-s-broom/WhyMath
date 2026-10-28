@@ -31,6 +31,12 @@ def test_logconfig_captures_record_logger(tmp_path: Path) -> None:
     """dictConfig 로드 + record 로거 라인이 순수 메시지로 파일 캡처된다(e2e)."""
     config = json.loads(_LOGCONFIG.read_text(encoding="ascii"))
     out = tmp_path / "records.log"
+    # PED-48: 설정에 파일 핸들러가 여럿이다(wh1·intent_shadow). dictConfig는 FileHandler를 만들
+    # 때 *즉시* 파일을 열므로, 대상 외 핸들러도 전부 tmp로 돌려 작업 트리에 로그 파일이 생기지
+    # 않게 한다.
+    for name, spec in config["handlers"].items():
+        if "filename" in spec:
+            spec["filename"] = str(tmp_path / f"{name}.log")
     config["handlers"]["wh1_record_file"]["filename"] = str(out)
     # 오염 스냅샷 — dictConfig는 설정의 loggers 키 각각에 propagate/disabled를 쓴다.
     # 구 버전은 finally가 핸들러만 복원해 propagate=False가 잔존했다(구 OPS-15 — pytest 8.x
@@ -42,6 +48,7 @@ def test_logconfig_captures_record_logger(tmp_path: Path) -> None:
         name: (logging.getLogger(name).propagate, logging.getLogger(name).disabled)
         for name in configured_loggers
     }
+    handlers_before = {name: list(logging.getLogger(name).handlers) for name in configured_loggers}
     logging.config.dictConfig(config)
     try:
         logging.getLogger(_RECORD_LOGGER).info('{"probe": "e2e"}')
@@ -50,9 +57,14 @@ def test_logconfig_captures_record_logger(tmp_path: Path) -> None:
         assert out.read_text(encoding="utf-8").strip() == '{"probe": "e2e"}'
     finally:
         # 전역 로깅 상태 복원 — 핸들러뿐 아니라 propagate/disabled 스냅샷도 원복한다.
-        for handler in list(logging.getLogger(_RECORD_LOGGER).handlers):
-            logging.getLogger(_RECORD_LOGGER).removeHandler(handler)
-            handler.close()
+        # 핸들러는 *설정된 모든 로거*에서 걷어낸다(PED-48 — record 로거가 둘이 되면서, 한쪽만
+        # 걷으면 다른 쪽 FileHandler가 남아 이후 테스트의 레코드를 tmp 파일로 빨아들인다).
+        for name in configured_loggers:
+            target = logging.getLogger(name)
+            for handler in list(target.handlers):
+                if handler not in handlers_before[name]:  # dictConfig가 붙인 것만 걷는다
+                    target.removeHandler(handler)
+                    handler.close()
         for name, (propagate, disabled) in snapshot.items():
             logger = logging.getLogger(name)
             logger.propagate = propagate
@@ -68,7 +80,11 @@ def test_logconfig_test_restores_logger_state(tmp_path: Path) -> None:
     """
     logger = logging.getLogger(_RECORD_LOGGER)
     before = (logger.propagate, logger.disabled)
+    # PED-48: 설정된 *모든* 로거의 핸들러 수도 사전 상태로 돌아와야 한다(남은 FileHandler 차단)
+    config = json.loads(_LOGCONFIG.read_text(encoding="ascii"))
+    handler_counts = {n: len(logging.getLogger(n).handlers) for n in config["loggers"]}
     test_logconfig_captures_record_logger(tmp_path)
+    assert {n: len(logging.getLogger(n).handlers) for n in config["loggers"]} == handler_counts
     after = (logger.propagate, logger.disabled)
     assert after == before, (
         f"dictConfig 테스트가 로거 상태를 잔존시켰습니다: {before} → {after}. "

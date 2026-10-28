@@ -56,6 +56,7 @@ from whymath_backend.api._crypto import (
     resolve_dialogue_image_analysis,
     resolve_dialogue_image_uri,
 )
+from whymath_backend.api._intent_shadow import spawn_intent_shadow
 from whymath_backend.api._isolated_call import CHAIN_BUDGET_FACTOR, isolated
 from whymath_backend.api._l3_state import (
     CACHE_KEY as _CACHE_KEY,
@@ -3889,6 +3890,11 @@ async def create_session(
         else server_state.current_stage
     )
     targeted_step = stage_to_targeted_step(target_stage)
+    # PED-48: 규칙 분류 결과를 변수로 받아 DB 적재(TurnMeta)와 의도 섀도 관측이 *같은 값*을 쓴다.
+    has_solution = bool((body.student_solution or "").strip())
+    student_intent = classify_student_intent(
+        student_input=body.student_input, has_solution=has_solution
+    )
     student_turn = _build_dialogue_turn(
         DialogueTurnSchema(
             dialogue_id=dialogue.dialogue_id,
@@ -3901,10 +3907,7 @@ async def create_session(
         content_cipher,
         TurnMeta(
             targeted_step=targeted_step,
-            student_intent=classify_student_intent(
-                student_input=body.student_input,
-                has_solution=bool((body.student_solution or "").strip()),
-            ),
+            student_intent=student_intent,
             student_understanding_signal=compose_understanding_signal(
                 mastery=(server_mastery if server_mastery is not None else body.bkt_mastery),
                 verify_passed=verify_passed,
@@ -3979,6 +3982,14 @@ async def create_session(
             solution_text=body.student_solution,
         )
     await session.commit()
+    # PED-48: 학생 턴이 *커밋된 뒤* 의도 섀도를 비차단으로 띄운다(비노출·응답 지연 0 —
+    # 꺼져 있으면 task 0개). 커밋 실패 턴은 적재되지 않았으므로 관측하지 않는다.
+    spawn_intent_shadow(
+        student_input=body.student_input,
+        rule_intent=student_intent,
+        has_solution=has_solution,
+        route="create_session",
+    )
 
     # WH-1 멀티턴 연속성 — 새 dialogue라 직전 total_turns=0 → 첫 교환은 턴 1(§2.2 ε 카운터).
     wh1_turn_index, wh1_exploration = _wh1_turn_state(0)
@@ -4347,6 +4358,11 @@ async def append_turns(
         else server_state.current_stage
     )
     targeted_step = stage_to_targeted_step(target_stage)
+    # PED-48: 규칙 분류 결과를 변수로 받아 DB 적재(TurnMeta)와 의도 섀도 관측이 *같은 값*을 쓴다.
+    has_solution = bool((body.student_solution or "").strip())
+    student_intent = classify_student_intent(
+        student_input=body.student_input, has_solution=has_solution
+    )
     student_turn = _build_dialogue_turn(
         DialogueTurnSchema(
             dialogue_id=dialogue_id,
@@ -4359,10 +4375,7 @@ async def append_turns(
         content_cipher,
         TurnMeta(
             targeted_step=targeted_step,
-            student_intent=classify_student_intent(
-                student_input=body.student_input,
-                has_solution=bool((body.student_solution or "").strip()),
-            ),
+            student_intent=student_intent,
             student_understanding_signal=compose_understanding_signal(
                 mastery=(server_mastery if server_mastery is not None else body.bkt_mastery),
                 verify_passed=verify_passed,
@@ -4450,6 +4463,14 @@ async def append_turns(
             solution_text=body.student_solution,
         )
     await session.commit()
+    # PED-48: 학생 턴이 *커밋된 뒤* 의도 섀도를 비차단으로 띄운다(비노출·응답 지연 0 —
+    # 꺼져 있으면 task 0개). 커밋 실패 턴은 적재되지 않았으므로 관측하지 않는다.
+    spawn_intent_shadow(
+        student_input=body.student_input,
+        rule_intent=student_intent,
+        has_solution=has_solution,
+        route="append_turns",
+    )
 
     # WH-1 멀티턴 연속성 — 이번 교환 *전* total_turns(current_total)에서 누적 턴 번호 유도(§2.2).
     wh1_turn_index, wh1_exploration = _wh1_turn_state(current_total)
