@@ -326,6 +326,39 @@ class TestWindowClose:
         ]
 
 
+    def test_window_close_failure_is_shown_and_window_stays(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """재리뷰 P3-2 — aborted 기록이 실패하면 창을 닫지 않고 빨간 글씨·로그로 알린다.
+
+        실제 창 없이 ``on_close``를 가짜 부품으로 부른다(CI 헤드리스에서도 돈다).
+        """
+        import logging
+        import types
+
+        class _FailingCtl:
+            def close(self) -> None:
+                raise PermissionError("잠김")
+
+        calls: dict[str, list[object]] = {"status": [], "destroy": [], "summary": []}
+        fake = types.SimpleNamespace(
+            _ctl=_FailingCtl(),
+            _status=types.SimpleNamespace(configure=lambda **kw: calls["status"].append(kw)),
+            _root=types.SimpleNamespace(destroy=lambda: calls["destroy"].append(True)),
+            print_summary=lambda: calls["summary"].append(True),
+            _cancel_job=lambda job: None,
+            _tick_job=None,
+            _unlock_job=None,
+        )
+        with caplog.at_level(logging.WARNING, logger=review_session_gui.__name__):
+            review_session_gui.ReviewWindow.on_close(fake)  # type: ignore[arg-type]
+        assert calls["destroy"] == [] and calls["summary"] == []  # 창은 열린 채로 남는다
+        assert len(calls["status"]) == 1
+        shown = calls["status"][0]
+        assert isinstance(shown, dict) and "PermissionError" in str(shown["text"])
+        assert "PermissionError" in caplog.text
+
+
 class TestMainHeadless:
     """acceptance ④ — 입력 판정은 tkinter 이전. 큐 0건 → 창 없이 exit 1."""
 
@@ -677,6 +710,34 @@ class TestNoLetterShortcuts:
             if isinstance(node, ast.Attribute) and node.attr in ("bind_all", "bind_class")
         ]
         assert key_literals == [] and bind_all == []
+
+    def test_every_button_refuses_keyboard_focus(self) -> None:
+        """P1-2 — 판정 버튼은 Tab·스페이스로 눌리면 안 된다(``takefocus=False``).
+
+        실제 창 테스트는 CI(헤드리스)에서 건너뛰므로, 버튼 생성 인자를 AST로 직접 본다.
+        이 인자가 빠지면 메모 칸에서 Tab으로 승인 버튼에 닿고 스페이스로 읽지 않은 문항이
+        확정된다(재리뷰 Xvfb 실측). 버튼이 0개로 잡히면 검사 자체가 공허하므로 실패시킨다.
+        """
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(review_session_gui))
+        button_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "Button"
+        ]
+        # 판정 버튼 5개를 만드는 반복 1곳 + ◀·▶ 2곳 = 생성 자리 3곳
+        assert len(button_calls) == 3
+        for call in button_calls:
+            takefocus = [kw.value for kw in call.keywords if kw.arg == "takefocus"]
+            assert len(takefocus) == 1, f"{call.lineno}행 버튼에 takefocus가 없다"
+            value = takefocus[0]
+            assert isinstance(value, ast.Constant) and value.value is False, (
+                f"{call.lineno}행 버튼의 takefocus가 False가 아니다"
+            )
 
 
 class _FakeTk:

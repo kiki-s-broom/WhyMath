@@ -1215,8 +1215,26 @@ class ReviewWindow:
             self._summary_printed = True
 
     def on_close(self) -> None:
-        """창 닫기(X) — 열린 항목은 aborted로 남기고 요약을 낸 뒤 닫는다."""
-        self._ctl.close()
+        """창 닫기(X) — 열린 항목은 aborted로 남기고 요약을 낸 뒤 닫는다.
+
+        aborted 기록이 실패하면(이벤트 파일을 다른 프로그램이 잡고 있는 경우 등) 창을 닫지
+        않고 빨간 글씨로 알린다 — 예외가 Tk 처리기로 흘러 창이 아무 말 없이 남는 것을 막는다.
+        그 프로그램을 닫고 X를 다시 누르면 aborted가 정상 기록된다(열린 항목은 그대로다).
+        """
+        try:
+            self._ctl.close()
+        except Exception as exc:  # 침묵 금지: 타입명을 화면·로그에 남긴다
+            logger.warning(
+                "검수 창 닫기 중 기록 실패 — 창을 열어 둔다: %s", type(exc).__name__
+            )
+            self._status.configure(
+                text=(
+                    f"창을 닫는 중 기록 실패: {type(exc).__name__} — 이벤트 파일을 잡고 있는 "
+                    "프로그램(Excel 등)을 닫고 X를 다시 누르세요"
+                ),
+                fg=_COLOR_ERROR,
+            )
+            return
         self.print_summary()
         self._cancel_job(self._tick_job)
         self._cancel_job(self._unlock_job)
