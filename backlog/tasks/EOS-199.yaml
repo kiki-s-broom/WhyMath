@@ -19,6 +19,10 @@ paths:
   - src/backend/whymath_backend/harness/review_session.py
   - "tests/backend/harness/test_review_session_gui*.py"
   - docs/ops/eos197_authoring_round_runbook.md
+  - scripts/analysis/eos_feature_inventory_v2.py
 session: claude/eos-199-review-gui
-notes: "출처: EOS-197 검수 단계에서 Kiki 요청(2026-10-28 \"편리하게 작업하기 위해 윈도우 UI로 작업해줘\"). 터미널 대화형 검수는 붙여넣기 버퍼 오염(2026-09-22 실측)·키 입력 혼동 위험이 있다. 이 도구는 EOS-197 회차 검수에 바로 쓰인다."
+notes: |-
+  출처: EOS-197 검수 단계에서 Kiki 요청(2026-10-28 "편리하게 작업하기 위해 윈도우 UI로 작업해줘"). 터미널 대화형 검수는 붙여넣기 버퍼 오염(2026-09-22 실측)·키 입력 혼동 위험이 있다. 이 도구는 EOS-197 회차 검수에 바로 쓰인다.
+
+  [정정 2026-10-28] paths ['src/backend/whymath_backend/harness/review_session_gui.py', 'src/backend/whymath_backend/harness/review_session.py', 'tests/backend/harness/test_review_session_gui*.py', 'docs/ops/eos197_authoring_round_runbook.md'] → ['src/backend/whymath_backend/harness/review_session_gui.py', 'src/backend/whymath_backend/harness/review_session.py', 'tests/backend/harness/test_review_session_gui*.py', 'docs/ops/eos197_authoring_round_runbook.md', 'scripts/analysis/eos_feature_inventory_v2.py']: 새 검수 창 모듈을 EOS 기능 인벤토리에 귀속해야 infra 전수 귀속 검사가 통과하므로 작업 경로에 인벤토리 스크립트를 더한다
 updated: 2026-10-28
