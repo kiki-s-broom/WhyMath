@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-202
+title: "동등문제 생성기 — provider 실패 경고에 예외 타입명 기록(침묵 실패 금지)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `l3/equivalent/llm_generator.py`의 provider 호출 실패 경고(`동등문제 생성 provider 호출 실패 — None 폴백`)가 예외 **타입명**을 로그에 남기게 한다 — 지금은 예외 메시지만 넣어 타입이 빠지고(CLAUDE.md 침묵 실패 금지 위반), 메시지에 응답 본문 일부가 섞일 수 있다. 타입명 + 안전한 요약만 남기고 시크릿·필드값은 넣지 않는다 ② 같은 파일·같은 계열(never-break 폴백)의 다른 경고도 전수 확인해 같은 규칙으로 맞춘다 ③ 테스트: 폴백 경로에서 로그에 타입명이 있고 예외 메시지 원문은 없음을 단언, 타입명 제거 뮤테이션 RED"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/llm_generator.py
+session: null
+notes: |-
+  출처: EOS-197 A6 저작 회차(2026-10-28) 진단 중 발견 — 로컬 좌석 ReadTimeout을 콘솔 경고만으로는 구분할 수 없었다(생성 로그 error_detail에는 타입이 있어 그것으로 진단).
+
+  겹침 고지: EOS-23(세션 claude/optimistic-tesla-njo0v1)이 같은 파일 llm_generator.py를 작업 경로로 잡고 있다 — 착수 전 그쪽 상태 확인.
+updated: 2026-10-28

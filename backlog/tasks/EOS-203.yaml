@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-203
+title: "로컬 좌석 저작 수락률 — 사고 모드 끄기 옵션 실측 비교 · 저작 런북 Ollama 타임아웃 설정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 로컬 좌석(`qwen3:30b-a3b`) 저작 실패율을 낮춘다 — EOS-197 실측에서 사고 모드가 출력 4,400~8,100토큰을 내 컨텍스트 8,192와 요청 타임아웃을 넘겨 45회 시도 중 3건만 수락됐다(genlog 51회 중 12회 성공). 저작 경로(동등문제 생성)에 사고 모드 끄기 옵션을 두고 라우터 경유로 적용한다(직접 호출 금지 불변) ② 끈 상태와 켠 상태의 수락률·지연을 같은 스펙 표본으로 실측 비교해 기본값을 정한다(실측 없는 기본값 변경 금지) ③ 저작 런북(`docs/ops/eos197_authoring_round_runbook.md` [F] 및 같은 계열 런북)에 `WHYMATH_OLLAMA_REQUEST_TIMEOUT_S` 설정과 자가검증을 넣는다 — 기본 30초로는 첫 회차가 ReadTimeout으로 공전했다 ④ 학생 대면 서빙 경로의 모델 설정은 바꾸지 않는다(저작 한정)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/llm_generator.py
+  - src/backend/whymath_backend/l3/router.py
+  - docs/ops/eos197_authoring_round_runbook.md
+session: null
+notes: |-
+  출처: EOS-197 A6 저작 회차(2026-10-28) 로컬 좌석 결과. Kiki가 런북 밖에서 타임아웃 180초를 수동 설정해 재실행했다. 비용 0원 좌석이라 수락률이 오르면 클라우드 좌석 비용(이번 회차 약 $0.34)을 줄일 수 있다.
+
+  겹침 고지: EOS-23(세션 claude/optimistic-tesla-njo0v1)이 llm_generator.py를 작업 경로로 잡고 있다 — 착수 전 그쪽 상태 확인.
+updated: 2026-10-28
