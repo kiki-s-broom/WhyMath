@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,15 +16,21 @@ requires_gates: []
 acceptance:
   - "① 좌석(D3 Kiki 2026-10-23 결정 (c)): 로컬 qwen3:30b-a3b와 openrouter deepseek-v4.1-flash 두 좌석을 15 CU씩 돌려 비교 기록한다(합계 ≥30 CU, 앵커는 ADR-007이 정한 A6). 한 좌석의 실패가 회차 전체를 무효로 만들지 않게 좌석별 산출물을 따로 남긴다. openrouter 좌석은 학생 데이터 0 조건에서만 쓴다(CN 관할 표기). Anthropic 좌석은 12/31까지 API 사용 중단(ARCH-66)이라 쓰지 않는다.\n② 산출물: data/runs/<run_id>/cu.jsonl(≥30행), 각 CU의 GenerationLog(model_name·prompt_version·seed·input_sha256 — 감리 W-18), 검수 canary_review JSONL(타이머 ON, HIT 유효 표본 ≥15 목표 — OPS-90 하한 가드 착지 후), metrics/weekly.json에 hit_seconds·unit_cost_krw measured:true 첫 기록(ops/weekly-metrics 브랜치를 main에 머지).\n③ 완료 검사: wc -l data/runs/*/cu.jsonl ≥ 30 · python -m whymath_backend.ops.provenance_audit exit 0 · weekly.json 최신 회차 kpis의 hit_seconds·unit_cost_krw measured true. 이 산출물의 main 커밋 존재가 12/31 판정 조건 ③(D4 교체)이다.\n④ 실행 방식(D10 Kiki 2026-10-23 결정 (다) 보류): 무인 실행기를 도입하지 않고 세션이 런북을 만들어 Kiki 머신(Phaiakes9)에서 수동 실행한다(6항목 사전 브리핑 · 쓰기 블록 자가거부 · 실행 코드 출처 동결 준수). 클라우드 세션에는 Postgres·Docker·로컬 LLM이 없어 라이브 실행은 Kiki 머신에서만 가능하다.\n⑤ 선행: OPS-90(HIT 하한 가드) 먼저. 12/31 동결(D5) 준수 — 새 HARN 태스크·헌법 규칙·결정 게이트 신설 금지."
   - "⑥ Kiki 결정 반영(2026-10-27): openrouter 좌석의 GenerationLog seed=null은 구조적 미지원으로 기록하고 W-18 충족으로 본다(로컬 좌석은 seed 기록). A6 범위 정본은 앵커 레지스트리 [12미적Ⅰ-02-05]~[02-10]이며 이번 회차 spec은 02-05·02-07·02-09·02-10 4종(02-06·02-08은 정답 단일화 곤란으로 제외). 산출 폴더는 좌석별 data/runs/eos197-a6-local/·data/runs/eos197-a6-openrouter/로 둔다(CLI가 run_id를 uuid4로 직접 정해 사전 지정 불가 — ③의 wc -l 검사는 이 구조에서 성립). 선행 코드 공백(G-A·G-B·G-D·G-F·G-G)은 EOS-198이 소유한다."
-artifacts: []
+  - "⑦ Kiki 결정·정정 반영(2026-10-28 · PR #1765 머지 4ec479e6): (a) 좌석 비교는 로컬 3 CU : openrouter 27 CU로 ① 충족을 인정한다 — 로컬 qwen3:30b-a3b는 시도 45건 중 수락 3건(생성 로그 51행 중 실패 39: ReadTimeout 25 · JSON 파싱 11 · 조립 3)으로 그 실패 자체를 비교 결과로 기록하고 개선은 EOS-203이 맡는다 (b) 검수 방식은 AI 보조 검수(검수자가 대화형 AI의 분석을 받아 판정·메모를 직접 확정)이며 HIT 중앙값 53.24초는 그 조건의 첫 기준선이다 (c) 반려 2건(검수 10번·30번)의 실패 코드 F8은 힌트 정답 누설이 아니라 완전 중복이다 — F1~F8에 중복 코드가 없어 생긴 표기이며 원 기록은 위변조하지 않는다(중복 사전 차단 = 후속 태스크) (d) 완료 증적은 metrics/weekly.json의 generated_at 2026-10-28T07:57:24.957552Z 레코드로 고정한다(③ 문면의 '최신'은 이후 cron append로 바뀔 수 있다)"
+artifacts:
+  - "#1765 4ec479e6"
 paths:
   - data/runs
   - metrics
-session: claude/eos-197-a6-round
+session: null
 notes: |-
   EOS 감리 정본(2026-10-19) WP-C 이행. 결함 W-03·W-04·W-18. 감리 일정표 기간은 10/27~11/8이며 목표일 뿐 하한이 아니다 — OPS-90이 끝나는 대로 앞당겨 착수한다.
 
   [정정 2026-10-27] 착수 조사에서 코드 공백 5건이 나와 선행 태스크로 분리하고, Kiki 결정 두 건(클라우드 seed·A6 범위)과 산출 폴더 구조를 완료 조건에 덧붙인다
 
   [차단 2026-10-27] 선행 EOS-198(주간 KPI 파일 입력·cu_slug 조인·A6 생성기 과목/접두·provenance_audit 범위·ADR-007 정정) 착지 대기 — 런북 초안은 이 브랜치에 있다
-updated: 2026-10-27
+
+  [정정 2026-10-28] Kiki 결정 2건(3:27 인정·AI 보조 검수)과 F8 표기 정정을 완료 조건에 기록
+
+  [미러 면제 2026-10-28] 머지 커밋 4ec479e6(#1765)가 원격 main에 착지 — 미러 대상 없음
+updated: 2026-10-28

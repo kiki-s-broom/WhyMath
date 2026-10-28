@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-206
+title: "주간 KPI 단위비용 정의 정리 — 실패 시도 비용 포함 실지출·좌석 혼합 평균·처리량 분모 명시"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 주간 KPI `unit_cost_krw`의 정의를 정리한다 — 지금은 수락된 CU를 만든 호출의 비용만 세어(cu_slug 조인) 실패한 시도의 비용이 빠진다. EOS-197 실측: 지표 5.23원/CU ↔ 실지출(생성 로그 85회 $0.343 ≈ 528원) ÷ 수락 30 = 17.6원/CU, 약 3.4배 과소 ② 수락 CU당 실지출(실패 시도 포함)을 별도 필드로 함께 내거나 정의를 바꾸되, 바꾸면 지난 기록과의 비교 가능성을 어떻게 지키는지 문서화(원장 기록은 소급 수정하지 않는다) ③ 좌석 혼합 평균의 표기 — 비용 0원 좌석(로컬)이 분모에 섞이는 사실을 레코드 사유 또는 좌석별 분해로 드러낸다(EOS-197: 혼합 5.23원 · openrouter만 5.81원) ④ 처리량(throughput) 분모가 중단 건 검수 시간을 포함하는 정의도 같은 문서에 명시 ⑤ 정의 변경은 테스트로 고정하고 기존 파일 입력 모드 회귀(`test_weekly_metrics_file_input.py`) 통과"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/weekly_metrics_report.py
+  - "tests/backend/ops/test_weekly_metrics*.py"
+session: null
+notes: "출처: EOS-197 회차 [K] 미리보기와 PR #1765 독립 리뷰 P3. 첫 measured 기록(2026-10-28 generated_at 07:57:24Z)은 현 정의로 남긴다."
+updated: 2026-10-28
