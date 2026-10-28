@@ -418,6 +418,7 @@ gates:
     corrections:
       - "[2026-10-19] notes +140자 — ADR-007 조건 명세 보존"
       - "[2026-10-24] depends_on +EOS-197 · verdict FAIL · owners: EOS-197 · inputs: OPS-90-hit-lower-bound-implausible-review · evidence: 판정 기준: main 346442b8 (OPS-90 PR 1730 머지). OPS-90 착지로 G2의 HIT 측정 체계 조건(하한 가드)은 충족됐으나, 같은 게이트의 A6 LLM 저작 회차 30 CU 이상 산출물(GenerationLog 포함)은 아직 저장소에 없다(data/runs 0건). 이 조건의 소유 태스크 = EOS-197 (D3 결정 (c) 두 좌석 15 CU씩). 게이트는 pending 유지. — done OPS-90-hit-lower-bound-implausible-review 인계"
+      - "[2026-10-28] input done · EOS-197 · 판정 무관: G-eos-g2·G-eos-g3는 Kiki 결정 게이트 — 세션이 근거(30 CU·HIT 53.24초 n=30·자동검증 1차 통과율 미측정·F8 2건은 중복 표기)를 정리해 Kiki 판정을 받는다 — done EOS-197 인계"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
