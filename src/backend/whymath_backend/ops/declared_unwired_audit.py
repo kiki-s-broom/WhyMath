@@ -1378,6 +1378,10 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 검수 세션(EOS-78) — 판정을 받으며 HIT 타이머를 생산한다. `reviewer_sample_package`
         # (표본 *제시*)와 달리 사람의 판정을 되받는 대면 도구라 배치 사유를 빌려 쓰지 않는다.
         "harness.review_session": _HUMAN_REVIEW_TOOL,
+        # 검수 창(EOS-199) — 위 review_session과 같은 기록을 버튼으로 남기는 Windows 창.
+        # 사람이 화면을 보며 판정하는 대면 도구라 CI가 원리적으로 못 돈다(같은 사유).
+        # 기록 경로는 review_session의 함수를 그대로 쓰며 pytest가 컨트롤러를 화면 없이 검증한다.
+        "harness.review_session_gui": _HUMAN_REVIEW_TOOL,
         # P3-03(2026-10-08): 미분 은행 감사자 자격 측정(결함 주입 강등전). score·s5의 입력은
         # 저장소 밖에서 만든 LLM 판정자 라벨이라(판정자는 저장소에 접근하면 안 된다 — 블라인드)
         # CI가 원리적으로 못 돈다. emit·machine의 재현성(커밋된 시험지·기계 라벨과 바이트 대조)은

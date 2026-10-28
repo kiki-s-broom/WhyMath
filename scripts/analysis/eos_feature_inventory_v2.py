@@ -162,6 +162,7 @@ PRODUCTION_LOOP_ROUTES: frozenset[tuple[str, str]] = frozenset(
 PRODUCTION_LOOP_MODULES: tuple[str, ...] = (
     "harness.problem_corpus_accumulate",  # G1 앵커 1개 E2E(생성→검증→검수큐)
     "harness.review_session",  # G1 HIT 이벤트 적재
+    "harness.review_session_gui",  # G1 HIT 이벤트 적재(같은 기록의 창 입력 경로 · EOS-199)
     "harness.review_timer",
     "harness.needs_review_worklist",  # G1 검수큐
     "ops.hit_cu_metrics",  # G2 HIT 중앙값 판독
@@ -1282,7 +1283,10 @@ CATALOG: tuple[Spec, ...] = (
        "harness.canary_slice",
        # CONT-08 — 검수 입력(배치 프롬프트)·승격 게이트(apply)가 같은 연결 원자를 보게 하는
        # 읽기 전용 컨텍스트 공급자. 검수 워크플로의 *입력 공급자*라 여기 귀속한다.
-       "harness.concept_content_link_context"),
+       "harness.concept_content_link_context",
+       # EOS-199 — 같은 검수를 창(tkinter)에서 받는 입력 경로. 기록은 review_session의
+       # open/close 헬퍼를 그대로 부르므로 같은 기능의 다른 입력 매체다.
+       "harness.review_session_gui"),
     _o("WM-O-911", "골든 벤치마크 승격·경로 게이트·앵커 회차 대장", "Admin", "QA", "P0",
        "EOS-60/64 — 판정기의 FN율", "harness.golden_benchmark",
        "harness.golden_promotion_gate", "harness.anchor_round_ledger",
