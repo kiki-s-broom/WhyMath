@@ -525,9 +525,12 @@ cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
 
 터미널에서 키를 치는 대신 **창에서 버튼으로** 판정한다. 기록(이벤트·판정 파일)은 터미널 [J]와 **같은 함수로 같은 형식**으로 남으므로([K]·[L]은 그대로 쓴다), 둘 중 하나만 고르면 된다. 섞어도 된다 — 터미널로 하다 그만둔 것을 창이 이어받고, 그 반대도 된다(같은 파일·이어하기).
 
-- **화면**: 위에 진행(예: `3/30`)과 경과 시간(1초마다 갱신 · **30초 미만은 주황**), 가운데에 문항 본문(터미널과 같은 내용 · 스크롤), 아래에 사유 드롭다운(F1~F8)·메모 칸·버튼 5개.
-- **버튼 = 판정 키**: 승인(a) · 수정승인(e) · 반려(r) · 보류(s) · 종료(q). 키보드 단축키도 같다 — 단 **한/영 키가 영문일 때만** 먹는다(한글 입력 상태면 버튼을 누른다). 메모 칸에 글을 쓰는 중에는 단축키가 글자로 들어가고 판정되지 않는다.
-- **반려**는 드롭다운에서 사유(F1~F8)를 골라야 제출된다(안 고르면 창 아래에 빨간 글씨로 거부되고 아무것도 기록되지 않는다). **수정승인**은 사유 선택. **승인·보류·종료**는 사유·메모를 기록하지 않으므로, 그 칸이 채워져 있으면 거부된다(지우거나 수정승인을 쓴다).
+- **화면**: 위에 진행(예: `3/30`)과 경과 시간(1초마다 갱신 · **30초 미만은 주황**), 가운데에 문항 본문(터미널과 같은 내용 · 스크롤), 아래에 사유 드롭다운(F1~F8)·메모 칸, 맨 아래에 `◀ 이전`·`다음 ▶`과 판정 버튼 5개(승인 · 수정승인 · 반려 · 보류 · 종료).
+- **판정은 마우스로 버튼을 눌러서만** 한다. 키보드 단축키는 없다(한/영·Caps Lock 상태와 무관 — 메모를 치다 잘못 눌러 판정되는 일이 없다).
+- **새 문항이 뜨면 버튼이 1초 동안 꺼진다**(버튼 옆에 "버튼은 1초 뒤에 켜집니다" 표시). 더블클릭·연타가 아직 읽지 않은 다음 문항에 판정을 남기지 않게 하려는 것이다 — 켜진 뒤 누른다.
+- **반려**는 드롭다운에서 사유(F1~F8)를 골라야 제출된다. **수정승인**은 사유 선택이지만, **메모를 쓰려면 사유를 먼저 골라야** 한다(메모는 사유에 붙는 설명으로만 기록된다). 메모는 **2000자까지**. **승인·보류·종료**는 사유·메모를 기록하지 않으므로 그 칸이 채워져 있으면 거부된다. 거부되면 창 아래에 빨간 글씨로 이유가 뜨고 **아무것도 기록되지 않는다**(그 문항은 계속 열려 있다 — 고쳐서 다시 누른다).
+- **`◀ 이전`·`다음 ▶` = 이미 판정한 문항 다시 보기(읽기 전용)**. 승인·수정승인·반려한 문항만 판정 파일 순서대로 거슬러 보며(이어하기 이전 회차 것 포함 · 보류·종료한 문항은 없다), 그때의 판정·사유·메모가 본문 위에 노란 띠로 보인다. 다시 보는 동안은 "다시 보기 중 (k/N) — 판정할 수 없습니다" 배너가 뜨고 판정 버튼·사유·메모가 꺼진다. `다음 ▶`을 끝까지 누르면 지금 판정할 문항으로 돌아오며, 쓰던 사유·메모가 그대로 있고 버튼은 다시 1초 잠긴다. **다시 보는 동안에도 지금 문항의 경과 시간은 계속 흐른다**(그 시간도 그 문항의 검수 시간으로 기록된다).
+- **창 아래에 빨간 `기록 실패…`가 뜨면** 판정 버튼이 꺼지고 더 판정할 수 없다 — 대개 판정·이벤트 파일을 **Excel 등 다른 프로그램이 열어 둔** 경우다. 그 프로그램을 닫고 창을 닫은 뒤 [J-G]를 다시 붙여넣는다(이어하기). 빨간 문구는 그대로 세션에 알려 준다. (열기 전에 미리 걸리면 "…쓸 수 없어 제출하지 않았습니다"로 거부만 되고 기록은 0건이다 — 프로그램을 닫고 같은 버튼을 다시 누르면 된다.)
 - **창을 닫으면(X)** 지금 보던 건은 중단(`aborted`)으로 남고 끝난다 — [J-G]를 다시 붙여넣으면 이어서 한다.
 - **30초 가드**: 30초 미만 판정을 막지는 않는다(주황 표시만). 판정은 [K]의 집계가 한다 — 이 화면에서 처음 읽고 판정해 달라는 [J]의 당부는 그대로다.
 
@@ -550,14 +553,17 @@ $env:PYTHONPATH = "$GuiWt\src\backend"
 $GuiFile = & $Py -c "import whymath_backend.harness.review_session_gui as m; print(m.__file__)"
 $TkOk = & $Py -c "import tkinter; print('TK_OK=True')"
 $env:PYTHONPATH = "$Wt\src\backend"
-"GUI_REF=$GuiRef GUI_HEAD=$(git -C $GuiWt rev-parse --short HEAD)"
+$GuiRefSha = git rev-parse $GuiRef 2>$null
+$GuiHeadSha = git -C $GuiWt rev-parse HEAD 2>$null
+"GUI_REF=$GuiRef GUI_HEAD=$(git -C $GuiWt rev-parse --short HEAD) GUI_REF_HEAD=$(git rev-parse --short $GuiRef)"
+"GUI_HEAD_MATCHES_REF=$([bool]($GuiHeadSha -and $GuiRefSha -and ($GuiHeadSha -eq $GuiRefSha)))"
 "GUI_CODE_FILE=$GuiFile"
 "GUI_CODE_FROM_WORKTREE=$([bool]($GuiFile -and $GuiFile.StartsWith($GuiWt)))"
 "TK_OK=$($TkOk -eq 'TK_OK=True')"
 "PYTHONPATH_RESTORED=$($env:PYTHONPATH -eq "$Wt\src\backend")"
 ```
 
-**판정**: `GUI_CODE_FROM_WORKTREE=True` · `TK_OK=True` · `PYTHONPATH_RESTORED=True`일 때만 [J-G]를 붙여넣는다.
+**판정**: `GUI_CODE_FROM_WORKTREE=True` · `GUI_HEAD_MATCHES_REF=True` · `TK_OK=True` · `PYTHONPATH_RESTORED=True`일 때만 [J-G]를 붙여넣는다. `GUI_HEAD_MATCHES_REF=False`면 검수 창 워크트리가 방금 받은 원격 코드와 다른 커밋에 있다(갱신 실패) — [J-G0]을 다시 붙여넣고, 그래도 False면 `GUI_REF`·`GUI_HEAD`·`GUI_REF_HEAD` 줄을 회신한다.
 
 > 변별력: `GUI_CODE_FROM_WORKTREE`는 검수 창 코드가 없는 트리(머지 전 main 등)면 `ModuleNotFoundError`로 비어 False다. `TK_OK`는 Tcl/Tk가 빠진 파이썬(일부 conda·임베디드 배포)이면 import가 실패해 False다 — 그때는 터미널 [J]를 쓴다.
 
@@ -567,10 +573,10 @@ $env:PYTHONPATH = "$Wt\src\backend"
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [J-G] 검수 창 (한 줄 · [J-G0] 뒤 · 작업 디렉터리 C:\Users\kiki\Desktop\__AI\WhyMath-eos197)
-$env:PYTHONPATH = "$GuiWt\src\backend"; & $Py -m whymath_backend.harness.review_session_gui --queue "$Runs\eos197-a6-review\canary_review_queue.jsonl" --events "$Runs\eos197-a6-review\canary_review_events.jsonl" --verdicts "$Runs\eos197-a6-review\canary_review_verdicts.jsonl" --reviewer-id kiki --resume; "GUI_EXIT=$LASTEXITCODE"; $env:PYTHONPATH = "$Wt\src\backend"; "PYTHONPATH_RESTORED=$($env:PYTHONPATH -eq "$Wt\src\backend")"
+if ($Py -and $GuiWt -and $Wt -and $Runs -and (Test-Path "$GuiWt\src\backend\whymath_backend\harness\review_session_gui.py")) { $env:PYTHONPATH = "$GuiWt\src\backend"; & $Py -m whymath_backend.harness.review_session_gui --queue "$Runs\eos197-a6-review\canary_review_queue.jsonl" --events "$Runs\eos197-a6-review\canary_review_events.jsonl" --verdicts "$Runs\eos197-a6-review\canary_review_verdicts.jsonl" --reviewer-id kiki --resume; "GUI_EXIT=$LASTEXITCODE"; $env:PYTHONPATH = "$Wt\src\backend" } else { "GUI_REFUSED=True — 이유: Py=[$Py] GuiWt=[$GuiWt] Wt=[$Wt] Runs=[$Runs] GUI_FILE_PRESENT=$([bool]($GuiWt -and (Test-Path "$GuiWt\src\backend\whymath_backend\harness\review_session_gui.py"))) (빈 값·False가 있으면 [B]와 [J-G0]을 먼저 붙여넣으세요)" }; "PYTHONPATH_RESTORED=$([bool]($Wt -and ($env:PYTHONPATH -eq "$Wt\src\backend")))"
 ```
 
-**판정**: PowerShell 창에 `=== 검수 세션 요약 ===`과 `GUI_EXIT=0`·`PYTHONPATH_RESTORED=True`가 찍힌다. `승인 + 수정승인 + 반려`의 합(재개 세션이면 앞 세션 것과 더해서)이 [I]의 `QUEUE_LINES`와 같으면 완주다. 적으면 [J-G]를 다시 붙여넣는다. `GUI_EXIT=1`이면 위 출력의 `[입력 실패]`(큐 없음·0건 → [I]로) 또는 `[실행 실패] … tkinter`(→ 터미널 [J])를 본다.
+**판정**: PowerShell 창에 `=== 검수 세션 요약 ===`과 `GUI_EXIT=0`·`PYTHONPATH_RESTORED=True`가 찍힌다. `승인 + 수정승인 + 반려`의 합(재개 세션이면 앞 세션 것과 더해서)이 [I]의 `QUEUE_LINES`와 같으면 완주다. 적으면 [J-G]를 다시 붙여넣는다. `GUI_REFUSED=True`면 창을 띄우지 않았다(아무것도 기록하지 않음) — 이유 줄의 빈 값·False를 보고 [B]·[J-G0]부터 다시 한다. `GUI_EXIT=1`이면 위 출력의 `[입력 실패]`(큐 없음·0건 → [I]로) · `[실행 실패] … tkinter`(→ 터미널 [J]) · `[기록 실패]`(파일을 잡고 있는 프로그램을 닫고 [J-G] 재실행 · 빨간 문구와 함께 회신)를 본다. `PYTHONPATH_RESTORED=False`면 `$Wt`가 비어 있는 것이다 — [B]를 다시 붙여넣는다.
 
 ---
 
