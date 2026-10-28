@@ -981,6 +981,24 @@ class TestWindowWithDisplay:
         assert _event_types(tmp_path / "events.jsonl") == ["started"]
         window.on_close()
 
+    def test_close_cancels_pending_jobs(self, tmp_path: Path) -> None:
+        """닫을 때 경과 갱신·잠금 해제 예약을 취소한다 — 닫힌 뒤 실행돼 Tcl 오류가 찍히지 않게."""
+        import tkinter
+
+        from whymath_backend.harness.review_session_gui import ReviewWindow
+
+        ctl = _real_controller(tmp_path, _items(2))
+        root = tkinter.Tk()
+        window = ReviewWindow(root, ctl)
+        _pump(root, 0.2)  # 잠금 해제(1초)·경과 갱신(1초) 예약이 걸려 있는 시점
+        assert root.tk.splitlist(root.tk.call("after", "info")) != ()
+        destroy = root.destroy
+        root.destroy = lambda: None  # type: ignore[method-assign]  # 예약 목록을 읽으려 잠시 보류
+        window.on_close()
+        pending = root.tk.splitlist(root.tk.call("after", "info"))
+        destroy()
+        assert pending == ()
+
     def test_buttons_locked_then_enabled_and_double_click_absorbed(self, tmp_path: Path) -> None:
         import tkinter
 
