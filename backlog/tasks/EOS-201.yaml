@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-201
+title: "검수 창 보완 — 다시 보기 이력 검수자·지문 한정 · 정지 요약 문구 · 사전 점검 · 테스트 보강"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 다시 보기(◀▶) 이력을 판정 파일 전체가 아니라 같은 검수자(`reviewer_id`)와 같은 내용 지문(`content_fingerprint` — 현재 큐 항목과 일치)인 판정으로 한정하고, 이번 세션에서 아직 판정하지 않은 문항의 과거 판정은 보이지 않게 한다(독립 판정 선입견 오염 방지 — 재리뷰 실측: 다른 검수자·옛 지문 판정이 현재 본문 위에 표시됨) ② 다시 보기에 쓴 시간이 현재 문항 HIT에 섞이는 것을 집계가 구분할 수 있게 표지(이벤트 필드 또는 별도 기록)를 남기거나, 표지 없이 두는 근거를 문서화 ③ 아직 없는 판정 파일의 사전 점검이 부모 폴더 쓰기 가능 여부까지 본다 ④ 기록 도중 실패로 정지한 세션의 요약이 `--resume` 안내를 그대로 내지 않게(그 항목은 재개가 건너뛰어 판정 행이 영구히 빠짐 — slug를 명시해 복구 안내) ⑤ 테스트 보강: 창 닫기 실패 표시의 빨간 글씨(`fg`) 단언, 버튼 takefocus AST 검사가 별칭·맨 이름 호출도 세게 ⑥ 다시 보기 중 상단 진행 라벨과 본문 위치 표시가 섞이지 않게"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/review_session_gui.py
+  - "tests/backend/harness/test_review_session_gui*.py"
+session: null
+notes: "출처: PR #1763(EOS-199) 재리뷰·최종 확인 리뷰의 P3(머지 비차단) 묶음. 정상 런북 흐름(같은 회차 파일·--resume·큐 덮어쓰기 가드)에서는 드물지만 ①은 판정 독립성, ④는 판정 누락으로 이어질 수 있다."
+updated: 2026-10-28
