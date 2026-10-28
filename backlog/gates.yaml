@@ -418,6 +418,8 @@ gates:
     corrections:
       - "[2026-10-19] notes +140자 — ADR-007 조건 명세 보존"
       - "[2026-10-24] depends_on +EOS-197 · verdict FAIL · owners: EOS-197 · inputs: OPS-90-hit-lower-bound-implausible-review · evidence: 판정 기준: main 346442b8 (OPS-90 PR 1730 머지). OPS-90 착지로 G2의 HIT 측정 체계 조건(하한 가드)은 충족됐으나, 같은 게이트의 A6 LLM 저작 회차 30 CU 이상 산출물(GenerationLog 포함)은 아직 저장소에 없다(data/runs 0건). 이 조건의 소유 태스크 = EOS-197 (D3 결정 (c) 두 좌석 15 CU씩). 게이트는 pending 유지. — done OPS-90-hit-lower-bound-implausible-review 인계"
+      - "[2026-10-28] input done · EOS-197 · 판정 무관: G-eos-g2·G-eos-g3는 Kiki 결정 게이트 — 세션이 근거(30 CU·HIT 53.24초 n=30·자동검증 1차 통과율 미측정·F8 2건은 중복 표기)를 정리해 Kiki 판정을 받는다 — done EOS-197 인계"
+      - "[2026-10-28] verdict PASS · inputs: EOS-197, OPS-90-hit-lower-bound-implausible-review · evidence: Kiki 판정 PASS(2026-10-28 · 판정 기준 main 4ec479e6 = PR #1765 머지). 조건 ① A6 LLM 저작 회차 1회 ≥30 CU 산출물 저장소 커밋: data/runs/eos197-a6-local 3 + eos197-a6-openrouter 27 = 30 CU, 30건 전부 GenerationLog(model_name·prompt_version·seed·input_sha256 — openrouter seed=null은 EOS-197 ⑥ 인정)와 slug 1:1 조인, provenance_audit --require-runs exit 0. 조건 ② HIT 측정 체계 착지: OPS-90 done, 검수 30건 HIT 중앙값 53.24초(30초 하한 과반 아님) · metrics/weekly.json generated_at 2026-10-28T07:57:24.957552Z 레코드 hit_seconds·unit_cost_krw measured true. 단서: 좌석 비교 3:27(로컬 좌석 사실상 실패 → EOS-203) · 검수는 AI 보조 검수(HIT 53초는 그 조건 기준선) · F8 2건은 중복 표기(EOS-204). — Kiki 판정 PASS 기록(2026-10-28 채팅 결정)"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
@@ -430,14 +432,20 @@ gates:
     remind_after_days: 34
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-19] 원문 조건과 처분: 앵커 전부 60 CU+(폭 확장) → 2027-01 이월(폭 확장 목적 소실) · 4급 중 3급 HIT≤6분 → 2027-01 이월 · 누설 0·메타 누락 0 → 유지. '자동검증 1차 통과율 산출됨'은 원문 외 추가 조건(계측 가능성 확인). 기준 완화(ADR-007)."
+    notes: |-
+      [판정 근거 2026-10-19] 원문 조건과 처분: 앵커 전부 60 CU+(폭 확장) → 2027-01 이월(폭 확장 목적 소실) · 4급 중 3급 HIT≤6분 → 2027-01 이월 · 누설 0·메타 누락 0 → 유지. '자동검증 1차 통과율 산출됨'은 원문 외 추가 조건(계측 가능성 확인). 기준 완화(ADR-007).
+
+      [판정 근거 2026-10-28] [Kiki 결정 2026-10-28] 11/22까지 판정 보류. 입력 EOS-197 done(#1765 4ec479e6) 기준 현황: A6 ≥30 CU 충족(30) · HIT 중앙값 ≤8분·표본 ≥15 충족(53.24초·30건 — AI 보조 검수 조건) · 자동검증 1차 통과율 미산출(weekly.json auto_gate_pass_rate measured false — Deterministic Gate 누적 로그 없음) · 힌트 의미 누설 0과 메타 누락 0은 이번 회차에서 따로 측정하지 않음(F8 2건은 누설이 아니라 중복 표기 — EOS-197 ⑦). 판정 전에 미측정 3항목의 측정 경로를 마련해야 한다.
     corrections:
       - "[2026-10-19] notes +163자 — ADR-007 조건 명세 보존"
       - "[2026-10-24] depends_on +EOS-197 — G3 조건(유효 HIT 표본·산출물)의 소유 태스크를 입력으로 연결"
       - "[2026-10-24] verdict FAIL · owners: EOS-197 · inputs: OPS-90-hit-lower-bound-implausible-review · evidence: 판정 기준: main 346442b8 (OPS-90 PR 1730 머지). G3의 HIT 중앙값 8분 이하(유효 표본 15건 이상) 조건은 하한 가드가 착지해 무효 표본을 거를 수 있게 됐으나 유효 표본 자체는 아직 없다. 산출물 조건의 소유 태스크 = EOS-197. 게이트는 pending 유지. — OPS-90 완료에 따른 G3 판정 결과 기록"
+      - "[2026-10-28] notes +345자 — Kiki 결정: 11/22까지 판정 보류 — 현황 기록"
+      - "[2026-10-28] depends_on +EOS-207 — G3 판정 전 미측정 3항목(자동검증 1차 통과율·힌트 의미 누설·메타 누락)의 측정 경로를 입력으로 연결 — Kiki 11/22 보류 결정에 따름"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
+      - EOS-207
   - id: G-eos-g4
     title: "EOS G4(12/13) — 누적 ≥60 CU(A6 30 + 두 번째 앵커 A4 30) + 자동검증 1차 통과율 ≥70% + A6 깊이앵커 무개입 루프 3연속 + 내부 테스트 계정 표본 ≥20(EOS-135 기확정) + P0 결함 0"
     kind: decision

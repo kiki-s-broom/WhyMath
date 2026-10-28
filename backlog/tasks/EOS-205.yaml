@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-205
+title: "동등문제 생성기 산출 결함 — 동어반복 검산식 거부 · 정답 키·단원 코드 고정 · 교육과정 밖 해설 차단"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 동등문제 생성기(`l3/equivalent`) 산출 CU의 **검산식이 정답 상수와의 비교만 하는 동어반복**(예: `n = 3`·`v - 24 = 0`)이 되지 않게 한다 — EOS-197 회차 30 CU 중 17건이 이 형태라 기계 검증이 사실상 우회됐다(학생 제공 전 검증 원칙 위반 위험). 검산식은 문항의 함수·조건에서 정답을 다시 계산하는 식이어야 하며, 생성 후 검증 단계가 동어반복 검산식을 거부한다(SymPy로 정답 기호를 지운 뒤에도 참인지 등 기계 판정) ② 정답 키를 스키마의 `answer`로 고정한다(실측: `b`·`v`·`n` 혼재) ③ 단원 코드를 성취기준·표준 코드 표기로 고정한다(실측: `CALC1-TANGENT` 비표준) ④ 해설이 교육과정 범위 밖 방법(예: 미적분Ⅰ 극값 판정에 이계도함수)을 쓰지 않게 프롬프트·검증으로 막는다(실측: 수정승인 2건 F4) ⑤ 같은 스펙 표본으로 수정 전후 수락률·동어반복 비율을 실측 비교하고 프롬프트 버전을 올린다(prompt_version 해시 변경이 GenerationLog에 남는지 확인)"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/**"
+session: null
+notes: "출처: EOS-197 A6 저작 회차(2026-10-28 · PR #1765) 수정승인 27건의 검수 메모에 반복된 결함. 검수는 AI 보조 검수였고 판정·메모는 Kiki가 확정했다. 겹침 고지: EOS-23(세션 claude/optimistic-tesla-njo0v1)·EOS-202·EOS-203이 같은 생성기 파일을 작업 경로로 잡고 있다 — 착수 전 상태 확인."
+updated: 2026-10-28
