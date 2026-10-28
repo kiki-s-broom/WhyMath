@@ -595,6 +595,7 @@ class TestRecordingFailure:
         assert _event_types(tmp_path / "events.jsonl") == ["started", "finished"]
         assert _read(verdicts) == []
         assert ctl.summary().stopped_early is True
+        assert ctl.summary().events_written == 2  # 요약의 이벤트 수가 파일과 같다
 
     def test_failure_before_finished_reports_not_recorded(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

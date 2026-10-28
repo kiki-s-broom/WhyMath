@@ -664,6 +664,7 @@ class ReviewController:
         slug = opened.item.slug
         finished = self._finished_recorded(opened)
         if finished is True:
+            self._events_written += 1  # 요약의 이벤트 수가 파일과 맞게(판정 수는 판정 파일 기준)
             state = (
                 f"이벤트 파일에는 이 항목({slug})의 판정(finished)이 남았지만 판정 파일에는 쓰지 "
                 "못했습니다. 이 항목은 다시 판정하지 않습니다 — 이 문구를 세션에 알려 주세요"
@@ -858,6 +859,9 @@ class ReviewWindow:
         self._failure: str | None = None
         self._shown = False
         self._lock_token = 0
+        # 예약된 after 작업 — 창을 닫을 때 취소한다(닫힌 뒤 실행돼 Tcl 오류가 찍히지 않게).
+        self._tick_job: str | None = None
+        self._unlock_job: str | None = None
 
         families = set(tkfont.families(root))
         family = next((f for f in _FONT_CANDIDATES if f in families), "TkDefaultFont")
@@ -1129,9 +1133,11 @@ class ReviewWindow:
         token = self._lock_token
         self._set_buttons("disabled")
         self._lock_label.configure(text=f"버튼은 {INPUT_LOCK_SECONDS:g}초 뒤에 켜집니다(연타 방지)")
-        self._root.after(_UI_UNLOCK_MS, lambda: self._unlock_inputs(token))
+        self._cancel_job(self._unlock_job)
+        self._unlock_job = self._root.after(_UI_UNLOCK_MS, lambda: self._unlock_inputs(token))
 
     def _unlock_inputs(self, token: int) -> None:
+        self._unlock_job = None  # 실행됐다 — 닫을 때 취소할 대상이 아니다
         # 그 사이 다음 항목·다시 보기로 넘어갔거나(다른 토큰) 멈췄으면 켜지 않는다.
         if token != self._lock_token or self.failed or self._ctl.done or self._ctl.reviewing:
             return
@@ -1176,8 +1182,17 @@ class ReviewWindow:
 
     def _tick(self) -> None:
         self._refresh_elapsed()
+        self._tick_job = None
         if not self._ctl.done and not self.failed:
-            self._root.after(1000, self._tick)
+            self._tick_job = self._root.after(1000, self._tick)
+
+    def _cancel_job(self, job: str | None) -> None:
+        if job is None:
+            return
+        try:
+            self._root.after_cancel(job)
+        except Exception as exc:  # 이미 실행·취소된 작업 — 무해하지만 침묵하지 않는다
+            logger.warning("검수 창 예약 작업 취소 실패: %s", type(exc).__name__)
 
     def _finish(self) -> None:
         """세션 종료 화면 — 요약을 창과 stdout에 낸다(한 번만)."""
@@ -1203,6 +1218,9 @@ class ReviewWindow:
         """창 닫기(X) — 열린 항목은 aborted로 남기고 요약을 낸 뒤 닫는다."""
         self._ctl.close()
         self.print_summary()
+        self._cancel_job(self._tick_job)
+        self._cancel_job(self._unlock_job)
+        self._tick_job = self._unlock_job = None
         self._root.destroy()
 
 
