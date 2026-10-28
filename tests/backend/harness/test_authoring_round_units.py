@@ -25,7 +25,11 @@ from whymath_backend.harness.authoring_round_config import (
     load_round_config,
     parse_round_config,
 )
-from whymath_backend.harness.authoring_round_ports import RunResult, SubprocessRunner
+from whymath_backend.harness.authoring_round_ports import (
+    RunResult,
+    SubprocessRunner,
+    mask_secrets,
+)
 from whymath_backend.harness.authoring_round_probe import run_probe
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -47,6 +51,7 @@ def _base(**over: Any) -> dict[str, Any]:
                 "subscription": "premium",
                 "budget_krw": 5000,
                 "expected_jurisdiction": "us",
+                "expected_allowed_providers": ["deepinfra"],
                 "target_cu": 3,
                 "attempt_budget": 10,
             }
@@ -117,6 +122,38 @@ def test_local_seat_with_cloud_signal_is_rejected() -> None:
 def test_deliver_branch_main_is_rejected() -> None:
     with pytest.raises(RoundConfigError, match="deliver.branch"):
         _parse(_base(deliver={"branch": "main"}))
+
+
+def test_unknown_key_is_rejected_so_typos_do_not_disable_checks() -> None:
+    data = _base()
+    data["seats"][0]["attempt_budjet"] = 5  # 오타
+    with pytest.raises(RoundConfigError, match="모르는 키"):
+        _parse(data)
+    with pytest.raises(RoundConfigError, match="모르는 키"):
+        _parse(_base(expected_subjct="미적분"))
+    with pytest.raises(RoundConfigError, match="모르는 키"):
+        _parse(_base(review={"reviewer_id": "kiki", "uii": "gui"}))
+
+
+def test_cloud_seat_requires_expected_allowed_providers() -> None:
+    data = _base()
+    del data["seats"][0]["expected_allowed_providers"]
+    with pytest.raises(RoundConfigError, match="expected_allowed_providers"):
+        _parse(data)
+
+
+def test_example_config_pins_allowed_providers() -> None:
+    cfg = load_round_config(_EXAMPLE)
+    assert cfg.seats[1].expected_allowed_providers == ("deepinfra",)
+
+
+def test_mask_secrets_hides_key_shapes() -> None:
+    text = "key=sk-or-v1-abcdef123456 · sk-ant-api03-zzzzzz · Authorization: Bearer abcdefghijkl"
+    masked = mask_secrets(text)
+    assert (
+        "sk-or-v1" not in masked and "sk-ant-api03" not in masked and "abcdefghijkl" not in masked
+    )
+    assert mask_secrets("sk-or- 로 시작") == "sk-or- 로 시작"  # 안내 문구의 접두만은 그대로
 
 
 def test_bool_is_not_accepted_as_int() -> None:
@@ -243,12 +280,45 @@ def test_runner_keeps_stderr_tail_in_stream_mode(tmp_path: Path) -> None:
     assert "마지막 원인" in res.failure_reason()
 
 
+def test_runner_masks_secrets_in_streamed_stderr(tmp_path: Path) -> None:
+    code = "import sys; sys.stderr.write('auth sk-or-v1-abcdef0123456789\\n'); sys.exit(1)"
+    res = SubprocessRunner().run(
+        [sys.executable, "-c", code], cwd=tmp_path, env={}, timeout_s=30, mode="stream"
+    )
+    assert "sk-or-v1-abcdef" not in res.stderr_tail
+    assert "***" in res.stderr_tail
+
+
 def test_runner_reports_launch_error(tmp_path: Path) -> None:
     res = SubprocessRunner().run(
         [str(tmp_path / "no-such-binary")], cwd=tmp_path, env={}, timeout_s=5
     )
     assert res.launch_error in ("FileNotFoundError", "PermissionError")
     assert not res.ok
+
+
+def test_runner_kills_child_on_ctrl_c(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ctrl+C(KeyboardInterrupt)가 오면 자식을 직접 끝내고 다시 올린다 — 고아 저작 프로세스 방지."""
+    import subprocess
+
+    seen: list[subprocess.Popen[str]] = []
+    real_wait = subprocess.Popen.wait
+
+    def fake_wait(self: subprocess.Popen[str], timeout: float | None = None) -> int:
+        if timeout is not None:  # 실행기의 첫 대기(타임아웃 있음)에서 Ctrl+C를 흉내 낸다
+            seen.append(self)
+            raise KeyboardInterrupt
+        return real_wait(self)
+
+    monkeypatch.setattr(subprocess.Popen, "wait", fake_wait)
+    with pytest.raises(KeyboardInterrupt):
+        SubprocessRunner().run(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            cwd=tmp_path,
+            env={"PATH": ""},
+            timeout_s=60,
+        )
+    assert seen and seen[0].poll() is not None  # 자식이 이미 끝났다
 
 
 def test_run_result_ok_requires_zero_exit() -> None:

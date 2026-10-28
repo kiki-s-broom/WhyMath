@@ -20,7 +20,7 @@
 | `check` | [H] | 산출물·GenerationLog 4필드·과목/slug·`provenance_audit --require-runs` | 없음 |
 | `queue` | [I] | 좌석 번갈아 섞은 검수 큐(slug 중복 제외 · 이미 있으면 덮어쓰지 않는다) | 큐 파일 |
 | `review` | [J-G] | **검수 창**이 뜬다 — 사람이 판정한다. 창을 닫으면 판정 수를 큐 행 수와 대조 | 검수 기록 |
-| `summarize` | [K] | HIT·비용·주간 KPI 미리보기(원장에는 쓰지 않는다) | 없음 |
+| `summarize` | [K] | HIT·비용·주간 KPI 미리보기(원장에는 쓰지 않는다) | 산출물 없음(상태 파일·설정 스냅샷만 갱신) |
 | `deliver` | [L] | 산출물 브랜치 커밋·push·원격 대조 — **판정 수 = 큐 행 수**이고 산출물 밖 변경 0일 때만 | 원격 브랜치 1개 |
 
 **이어하기**: 같은 한 줄을 다시 붙여넣으면 **실물로 끝난 쓰기 단계는 건너뛰고** 남은 단계부터 간다
@@ -47,7 +47,8 @@
 
 - **목표·예산만 바꿀 때**(좌석이 목표에 못 미쳤는데 더 돌리고 싶을 때): 워크트리 안의 그 설정 파일에서
   `target_cu`·`attempt_budget`을 고치고 같은 한 줄을 다시 붙여넣는다. 남은 예산만큼 이어서 저작한다.
-  **검수 큐를 만든 뒤에는 저작을 덧붙이지 않는다**(검수 분모가 바뀐다 — `QUEUE_ABSENT=False`로 거부).
+  **검수 큐를 만든 뒤에는 저작을 덧붙이지 않는다**(검수 분모가 바뀐다 — 저작 단계는 `AUTHOR_FROZEN`으로
+  건너뛰고 다음 단계로 간다. 목표·예산 상향은 큐를 만들기 전에만 반영된다).
   설정 파일 수정은 deliver의 "산출물 밖 변경"으로 세지 않으며, 실제로 쓰인 설정은 산출 폴더의
   `round_config.yaml`로 함께 보내진다.
 - 유료 좌석 `attempt_budget`은 **필수**이고 300을 넘으면 설정 오류(exit 2)로 거부된다(오타 과금 방지).
@@ -73,7 +74,8 @@
 | [R2] | **한 줄 실행** — 끝까지 간다. 검수 창이 뜨면 거기서 판정 | 저작 15~45분/좌석 + 검수 60~120분 |
 | [R3] | (선택) 워크트리 정리 — 세션이 수신을 확인한 뒤에만 | 즉시 |
 
-키가 없다고 나오면 [K-1]·[K-2](키 입력·등록)를 한 번 하고 [R2]를 다시 붙여넣는다.
+키가 없다고 나오면 [K-1]·[K-2](키 입력·등록)를 한 번 하고 [R2]를 다시 붙여넣는다. `…_BUDGET_EVIDENCED=False`가
+나오면 「예약 풀기」 한 줄을 쓴다.
 
 ### ④ 성공 기준
 - 마지막에 `PUSH_VERIFIED=True` · `ROUND_STATUS=complete` · `ROUND_EXIT=0`.
@@ -170,13 +172,27 @@ if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$
 
 ## 단계 하나만 다시 — 창 ① (한 줄)
 
-집계 미리보기만 다시 보고 싶을 때(쓰기 없음). 다른 단계 이름도 같은 형태로 쓸 수 있다
+집계 미리보기만 다시 보고 싶을 때(산출물 쓰기 없음 — 상태 파일·설정 스냅샷만 갱신). 다른 단계 이름도 같은 형태로 쓸 수 있다
 (`preflight`·`author-local`·`author-cloud`·`check`·`queue`·`review`·`summarize`·`deliver` — 선행 조건 재검사는 그대로).
 
 ```powershell
-# Windows PowerShell (= Phaiakes9) · 창 ① — 집계 미리보기만 다시 (쓰기 없음)
+# Windows PowerShell (= Phaiakes9) · 창 ① — 집계 미리보기만 다시 (산출물 쓰기 없음 · 상태 파일만 갱신)
 if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$Wt\src\backend"; & $Py -m whymath_backend.harness.authoring_round --config $Cfg --worktree $Wt --stage summarize; "ROUND_EXIT=$LASTEXITCODE" } else { "RUN_REFUSED=True — Py=[$Py] Wt=[$Wt] Cfg=[$Cfg] — 새 창이면 [R0]·[R1]부터" }
 ```
+
+## 예약 풀기 — `…_BUDGET_EVIDENCED=False`가 나올 때만 (한 줄)
+
+저작 회차는 호출 **전에** 시도 수를 예약하고 그 예약을 줄이지 않는다(끊긴 회차가 같은 유료 예산을 두 번 쓰지
+않게). 그런데 시작 직후 실패한 실행(임포트·설정 오류)은 호출 0건으로 예약만 남긴다. 그 예약만으로 예산이 차면
+오케스트레이터는 '예산 소진 완료'라고 하지 않고 거부한다. **앞 실패 원인을 고친 뒤에만** 아래 한 줄로 예약을
+실물 근거(대장·genlog)로 되돌린다 — 되돌린 수는 상태 파일 이력에 남는다.
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — 근거 없는 예약 풀기 + 이어서 실행 (상태 파일 이력에 기록)
+if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$Wt\src\backend"; & $Py -m whymath_backend.harness.authoring_round --config $Cfg --worktree $Wt --release-unevidenced; "ROUND_EXIT=$LASTEXITCODE" } else { "RUN_REFUSED=True — Py=[$Py] Wt=[$Wt] Cfg=[$Cfg] — 새 창이면 [R0]·[R1]부터" }
+```
+
+`RESERVATION_RELEASED seat=… from=… to=…` 줄이 풀어 준 수다.
 
 ## [K-1] 키 입력 — `OPENROUTER_KEY_SHAPE_OK=False`가 나올 때만 · 이 블록만 단독으로
 
@@ -235,12 +251,18 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
 | `…_MODEL_ROUTED` · `…_LOCAL_ONLY` | 라우터가 설정과 다른 모델로 보내거나 로컬 좌석이 클라우드에 닿을 수 있다(유료 위험) | 멈추고 회신 |
 | `…_KEY_SHAPE_OK` | OpenRouter 키가 없거나 형태가 이상하다 | [K-1]·[K-2] 후 [R2] |
 | `…_SEAT` · `…_PIN` · `…_JURISDICTION` · `…_ANTHROPIC_OFF` | 클라우드 좌석 설정이 회차 설정과 다르다 | 멈추고 회신 |
-| `QUEUE_ABSENT`(저작 단계) | 검수 큐가 이미 있어 저작을 덧붙이지 않는다 | 회신(새 회차 이름으로 시작해야 한다) |
+| `AUTHOR_FROZEN`(거부 아님) | 검수 큐가 이미 있어 저작을 덧붙이지 않고 건너뛰었다 | 정상 — 더 저작하려면 세션에 새 회차를 요청 |
+| `…_BUDGET_EVIDENCED` · `AUTHOR_UNEVIDENCED` | 시도 예산이 **호출 기록 없는 예약**으로 찼다(시작 직후 실패한 실행) | 앞 `STAGE_FAILED` 원인을 고친 뒤 「예약 풀기」 한 줄 |
+| `…_ALLOWED_PROVIDERS` | OpenRouter 허용 공급사 목록이 설정(`expected_allowed_providers`)과 다르다 | 멈추고 회신 |
+| `LOCK_HELD=True` | 같은 회차가 다른 창에서 이미 돌고 있다(또는 앞 실행이 강제 종료돼 잠금이 남았다) | 다른 창 확인 → 정말 없으면 같은 줄의 `Remove-Item` 경로를 지운 뒤 [R2] |
+| `BRANCH_NAME_VALID` | 설정의 산출물 브랜치 이름이 git 규칙에 어긋난다 | 회신 |
 | `SPEC_PLAN_UNCHANGED` | 회차 도중 spec이 바뀌었다 | 회신 |
 | `REVIEW_COMPLETE` · `JUDGED<QUEUE_LINES` | 검수가 남았다 — 업로드하지 않는다 | [R2]를 다시(검수 창이 남은 것부터) |
 | `OTHER_DIRTY_ZERO` | 산출물 밖 파일이 바뀌었다(`OTHER_DIRTY_PATHS` 줄에 경로) | 경로를 회신 |
 | `REMOTE_BRANCH_ABSENT` | 산출물 브랜치가 원격에 이미 있다(앞 push 성공 가능) 또는 원격 조회 실패 | 회신 |
-| `STAGE_FAILED … error=RoundStopped` | 저작 CLI가 exit 2(연속 무진전 알람·설정 오류)·타임아웃·비정상 종료 | `STAGE_FAILED_CAUSE` 줄과 위 진행 로그를 회신 |
+| `STAGE_FAILED … error=RoundStopped` | 저작 회차가 멈췄다 — CAUSE 줄 앞의 `[RoundExit2]`(연속 무진전 알람·설정 오류)·`[RoundTimeout]`(회차 시간 상한)·`[LedgerNotWritten]`(대장 없이 종료 — 시작 직후 실패)·`[LaunchError]` | `STAGE_FAILED_CAUSE` 줄과 위 진행 로그를 회신 |
+| `STAGE_FAILED … error=ReviewToolFailed` | 검수 창이 비정상 종료했다(파일을 다른 프로그램이 잡음·tkinter 없음 등) | 그 프로그램을 닫고 [R2] — 판정은 건마다 즉시 기록돼 남아 있다 |
+| `STAGE_FAILED … error=CommitVerificationFailed` · `RemoteMismatch` | 커밋에 산출물 밖 파일이 섞였거나 push 뒤 원격 끝이 그 커밋이 아니다 | 회신(push하지 않았거나 대조 실패) |
 | `STAGE_FAILED … error=ProbeFailed` | 탐침이 import부터 실패했다(원인 예외 타입이 CAUSE 줄에) | 회신 |
 | `STAGE_FAILED … error=ArtifactCheckFailed` | GenerationLog 4필드 결손·감사 실패·합계 미달 | `SEAT_CHECK`·`PROVENANCE_…` 줄을 회신 |
 | `STAGE_FAILED … error=GitPushFailed` | push 인증·네트워크 실패(커밋은 워크트리에 남는다) | [R2]를 다시 — 커밋을 그대로 보낸다 |

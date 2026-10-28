@@ -92,6 +92,16 @@ class World:
     author_exit_override: int | None = None
     author_stderr: str = ""
     author_writes_ledger: bool = True
+    # 대장 없이 끝나는 실행(author_writes_ledger=False)에서 genlog를 몇 행 남기는가 —
+    # None = n행 전부(Ctrl+C·타임아웃: 호출은 했다) · 0 = 하나도 없음(시작 직후 실패: 호출 0)
+    crash_genlog_rows: int | None = None
+    # 세 번째 이후 호출부터 대장을 다시 쓰는 등 호출별로 바꾸고 싶을 때(호출 순번 → 대장 기록 여부)
+    ledger_by_call: Callable[[int], bool] | None = None
+    author_call_no: int = 0
+    git_hook: Callable[[Sequence[str]], RunResult | None] | None = None
+    provenance_stdout: str = ""
+    weekly_stderr: str = ""
+    review_exit: int = 0
     drop_seed: bool = False
     review_limit: int | None = None  # 이번 검수 실행에서 판정할 최대 건수(None=전부)
     probe_exit: int = 0
@@ -146,6 +156,7 @@ def _fake_probe(world: World, argv: Sequence[str], env: Mapping[str, str]) -> Ru
             key_length=40,
             key_shape_ok=True,
             cloud_reach_paid=True,
+            cloud_allowed_providers=["deepinfra"],
         )
     if "--check-tk" in argv:
         result["tk_ok"] = True
@@ -158,7 +169,14 @@ def _fake_author(world: World, argv: Sequence[str]) -> RunResult:
     n = int(str(_arg(argv, "--n")))
     cloud = "--subscription" in argv
     seat = out.parent.name
-    k = min(n, world.accept(seat, n))
+    world.author_call_no += 1
+    writes_ledger = (
+        world.ledger_by_call(world.author_call_no)
+        if world.ledger_by_call is not None
+        else world.author_writes_ledger
+    )
+    run_id = f"run-{seat}-{world.author_call_no}"
+    k = min(n, world.accept(seat, n)) if writes_ledger else 0
     cu_rows: list[dict[str, Any]] = []
     gen_rows: list[dict[str, Any]] = []
     stamp = (_NOW + timedelta(minutes=world.counter)).isoformat()
@@ -176,17 +194,29 @@ def _fake_author(world: World, argv: Sequence[str]) -> RunResult:
                 "input_sha256": "sha256:in",
                 "cost_usd": 0.001 if cloud else 0.0,
                 "generated_at": stamp,
+                "run_id": run_id,
             }
         )
         if ok:
             cu_rows.append({"slug": slug, "subject": "미적분", "license": "WHYMATH_GENERATED"})
     if cu_rows:
         _append(out, cu_rows)
-    _append(out.with_suffix(".genlog.jsonl"), gen_rows)
-    if world.author_writes_ledger:
+    if not writes_ledger and world.crash_genlog_rows is not None:
+        gen_rows = gen_rows[: world.crash_genlog_rows]
+    if gen_rows:
+        _append(out.with_suffix(".genlog.jsonl"), gen_rows)
+    if writes_ledger:
         _append(
             out.with_suffix(".rounds.jsonl"),
-            [{"attempted": n, "accepted": k, "appended": k, "recorded_at": stamp}],
+            [
+                {
+                    "run_id": run_id,
+                    "attempted": n,
+                    "accepted": k,
+                    "appended": k,
+                    "recorded_at": stamp,
+                }
+            ],
         )
     code = world.author_exit_override
     if code is None:
@@ -254,6 +284,10 @@ class FakeRunner:
     ) -> RunResult:
         assert timeout_s > 0  # 모든 외부 호출에 타임아웃이 실린다
         if argv[0] == "git":
+            if self.world.git_hook is not None:
+                hooked = self.world.git_hook(argv)
+                if hooked is not None:
+                    return hooked
             return self.real.run(argv, cwd=cwd, env=env, timeout_s=timeout_s)
         self.world.calls.append(list(argv))
         module = argv[2]
@@ -262,13 +296,16 @@ class FakeRunner:
         if module == "whymath_backend.harness.problem_corpus_accumulate":
             return _fake_author(self.world, argv)
         if module == "whymath_backend.ops.provenance_audit":
-            return RunResult(0, "", "")
+            return RunResult(0, self.world.provenance_stdout, "")
         if module in (
             "whymath_backend.harness.review_session_gui",
             "whymath_backend.harness.review_session",
         ):
             assert mode == "inherit"  # 대화형 창은 화면을 그대로 물려받는다
-            return _fake_review(self.world, argv)
+            res = _fake_review(self.world, argv)
+            if self.world.review_exit:
+                return RunResult(self.world.review_exit, "", "[기록 실패] PermissionError")
+            return res
         if module == "whymath_backend.ops.hit_cu_metrics":
             report = {
                 "cu_measured": 3,
@@ -288,7 +325,7 @@ class FakeRunner:
                     "unit_cost_krw": {"measured": True, "value": 1.5, "reason": None},
                 },
             }
-            return RunResult(0, json.dumps(rec), "")
+            return RunResult(0, json.dumps(rec), self.world.weekly_stderr)
         raise AssertionError(f"예상 밖 자식 프로세스: {argv}")
 
 
@@ -337,6 +374,7 @@ def _config_dict(wt: Path, **over: Any) -> dict[str, Any]:
                 "subscription": "premium",
                 "budget_krw": 5000,
                 "expected_jurisdiction": "us",
+                "expected_allowed_providers": ["deepinfra"],
                 "target_cu": 3,
                 "attempt_budget": 10,
             },
@@ -585,25 +623,86 @@ def test_cloud_budget_never_exceeded_even_with_zero_acceptance(h: Harness) -> No
     assert "outcome=budget_exhausted" in h.text
 
 
-def test_reserved_attempts_count_against_budget_without_ledger(h: Harness) -> None:
-    """중단된 회차(대장 미기록)의 예약분도 소진으로 센다 — 재실행이 같은 예산을 다시 쓰지 않는다."""
+def _write_state(h: Harness, seats: dict[str, Any], *, raw: str | None = None) -> Path:
     state = h.runs() / "t1-review" / "round_state.json"
-    state.parent.mkdir(parents=True)
-    state.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "round_name": "t1",
-                "stages": {},
-                "seats": {"openrouter": {"reserved_attempts": 10}},
-                "history": [],
-            }
-        ),
-        encoding="utf-8",
-    )
-    assert h.run(only="author-cloud") == 0, h.text
+    state.parent.mkdir(parents=True, exist_ok=True)
+    body = {"schema_version": 1, "round_name": "t1", "stages": {}, "seats": seats, "history": []}
+    state.write_text(raw if raw is not None else json.dumps(body), encoding="utf-8")
+    return state
+
+
+def _author_n_total(h: Harness) -> int:
+    calls = h.world.module_calls("whymath_backend.harness.problem_corpus_accumulate")
+    return sum(int(str(_arg(c, "--n"))) for c in calls)
+
+
+def _cloud_budget(h: Harness, budget: int, target: int = 15) -> dict[str, Any]:
+    h.world.accept = lambda seat, n: 0
+    data = _config_dict(h.repo.wt)
+    data["seats"][1]["attempt_budget"] = budget
+    data["seats"][1]["target_cu"] = target
+    h.make(data=data)
+    return data
+
+
+def test_unevidenced_reservation_alone_is_not_budget_exhausted(h: Harness) -> None:
+    """근거(대장·genlog) 없는 예약만으로 예산이 찼으면 '소진 완료'가 아니라 거부 + 안내(P2-1)."""
+    _write_state(h, {"openrouter": {"reserved_attempts": 10}})
+    assert h.run(only="author-cloud") == 1, h.text
     assert h.world.module_calls("whymath_backend.harness.problem_corpus_accumulate") == []
+    assert "OPENROUTER_BUDGET_EVIDENCED=False" in h.text
+    assert "--release-unevidenced" in h.text
+    assert "outcome=budget_exhausted" not in h.text
+
+
+def test_release_unevidenced_restores_budget_and_is_recorded(h: Harness) -> None:
+    state = _write_state(h, {"openrouter": {"reserved_attempts": 10}})
+    assert h.make().run(only="author-cloud", release_unevidenced=True) == 0, h.text
+    assert "RESERVATION_RELEASED seat=openrouter from=10 to=0" in h.text
+    hist = json.loads(state.read_text(encoding="utf-8"))["history"]
+    assert any(e.get("stage") == "release-unevidenced" for e in hist)
+    assert h.world.module_calls("whymath_backend.harness.problem_corpus_accumulate")
+
+
+def test_interrupted_round_then_normal_round_never_exceeds_budget(h: Harness) -> None:
+    """리뷰 P1 재현 순서: 대장 없이 끊김(호출 20) → 정상 회차 → 재실행 — 총 시도 ≤ 예산 30."""
+    _cloud_budget(h, 30)
+    h.world.ledger_by_call = lambda no: no != 1  # 1회차만 대장 없이 끊긴다(genlog 20행은 남음)
+    assert h.run(only="author-cloud") == 1  # 1회차: LedgerNotWritten으로 정지
+    assert "[LedgerNotWritten]" in h.text
+    h.run(only="author-cloud")  # 2회차: 남은 예산만
+    h.run(only="author-cloud")  # 3회차: 더 쓸 예산이 없다
+    assert _author_n_total(h) <= 30
     assert "outcome=budget_exhausted" in h.text
+
+
+def test_zero_call_crash_then_normal_round_stays_within_budget(h: Harness) -> None:
+    """시작 직후 실패(genlog 0행)의 예약이 뒤 정상 회차에 덮여 지워지지 않는다(예약 단조 증가)."""
+    _cloud_budget(h, 30)
+    h.world.crash_genlog_rows = 0
+    h.world.ledger_by_call = lambda no: no != 1
+    assert h.run(only="author-cloud") == 1
+    state = h.runs() / "t1-review" / "round_state.json"
+    reserved = json.loads(state.read_text(encoding="utf-8"))["seats"]["openrouter"]
+    assert reserved["reserved_attempts"] == 20  # 호출 전에 예약을 실제로 썼다
+    h.run(only="author-cloud")
+    h.run(only="author-cloud")
+    assert _author_n_total(h) <= 30
+    # 실제 호출 근거는 10건뿐이다 — 거짓 '소진 완료' 대신 거부로 안내한다.
+    assert "OPENROUTER_BUDGET_EVIDENCED=False" in h.text
+
+
+def test_unreadable_state_keeps_consumption_from_genlog(h: Harness) -> None:
+    """상태 파일이 깨져도(STATE_UNREADABLE) 끊긴 회차의 genlog 행이 소진 근거로 남는다(P2-5)."""
+    _cloud_budget(h, 30)
+    h.world.ledger_by_call = lambda no: no != 1
+    h.run(only="author-cloud")
+    state = h.runs() / "t1-review" / "round_state.json"
+    state.write_text("{깨진", encoding="utf-8")
+    h.run(only="author-cloud")
+    assert "STATE_UNREADABLE=True" in h.text
+    assert _author_n_total(h) <= 30
+    assert list(state.parent.glob("round_state.json.unreadable-*"))  # 깨진 원본을 보존했다
 
 
 def test_refused_when_module_not_from_worktree(h: Harness) -> None:
@@ -665,12 +764,13 @@ def test_refused_when_ollama_model_absent(h: Harness) -> None:
     assert "LOCAL_OLLAMA_MODEL_PRESENT=False" in h.text
 
 
-def test_refused_author_when_queue_already_exists(h: Harness) -> None:
+def test_author_frozen_when_queue_already_exists(h: Harness) -> None:
+    """검수 큐가 생긴 뒤에는 저작을 덧붙이지 않는다 — 거부가 아니라 동결(체인이 막히지 않는다)."""
     queue = h.runs() / "t1-review" / "canary_review_queue.jsonl"
     queue.parent.mkdir(parents=True)
     queue.write_text('{"slug": "x"}\n', encoding="utf-8")
-    assert h.run(only="author-local") == 1
-    assert "QUEUE_ABSENT=False" in h.text
+    assert h.run(only="author-local") == 0, h.text
+    assert "AUTHOR_FROZEN seat=local reason=queue_exists" in h.text
     assert h.world.module_calls("whymath_backend.harness.problem_corpus_accumulate") == []
 
 
@@ -798,3 +898,130 @@ def test_main_returns_2_on_bad_config(tmp_path: Path) -> None:
     )
     assert ar.main(["--config", str(bad)], io=io_) == 2
     assert "CONFIG_ERROR=" in out.getvalue()
+
+
+# ── 리뷰 후속(EOS-208 리뷰 P2·P3) ────────────────────────────────────────
+
+
+def _lock_path(h: Harness) -> Path:
+    gitdir = Path(_git(h.repo.wt, "rev-parse", "--absolute-git-dir"))
+    return gitdir / "whymath_authoring_round_t1.lock"
+
+
+def test_lock_held_refuses_and_tells_how_to_clear(h: Harness) -> None:
+    lock = _lock_path(h)
+    lock.write_text('{"pid": 1, "started_at": "x"}', encoding="utf-8")
+    assert h.run() == 1
+    assert "LOCK_HELD=True" in h.text
+    assert f'Remove-Item "{lock}"' in h.text
+    assert h.world.calls == []
+    assert lock.exists()  # 남의 잠금은 지우지 않는다
+
+
+def test_lock_released_after_success_and_failure(h: Harness) -> None:
+    assert h.run(only="author-local") == 0
+    assert "LOCK_ACQUIRED=True" in h.text
+    assert not _lock_path(h).exists()
+    h.world.author_exit_override = 2
+    h.world.accept = lambda seat, n: 0
+    data = _config_dict(h.repo.wt)
+    data["seats"][1]["target_cu"] = 99
+    h.make(data=data)
+    assert h.run(only="author-cloud") == 1
+    assert not _lock_path(h).exists()
+
+
+def test_refused_when_allowed_providers_differ(h: Harness) -> None:
+    h.world.probe_overrides = {"cloud_allowed_providers": ["deepinfra", "novita"]}
+    assert h.run(only="author-cloud") == 1
+    assert "OPENROUTER_ALLOWED_PROVIDERS=False" in h.text
+    assert h.world.module_calls("whymath_backend.harness.problem_corpus_accumulate") == []
+
+
+def test_commit_with_foreign_file_is_not_pushed(h: Harness) -> None:
+    """커밋 검증(CommitVerificationFailed) — 커밋에 회차 폴더 밖 파일이 섞이면 push하지 않는다."""
+
+    def hook(argv: Sequence[str]) -> RunResult | None:
+        if "show" in argv and "--name-only" in argv:
+            real = SubprocessRunner().run(argv, cwd=h.repo.wt, env={}, timeout_s=30)
+            return RunResult(0, real.stdout + "\0README.md\0", "")
+        return None
+
+    h.world.git_hook = hook
+    assert h.run() == 1
+    assert "STAGE_FAILED stage=deliver error=CommitVerificationFailed" in h.text
+    assert not _remote_has_branch(h.repo, "round/t1-output")
+
+
+def test_push_without_remote_update_is_not_verified(h: Harness) -> None:
+    """원격 대조(PUSH_VERIFIED) — push가 0으로 끝나도 원격 끝이 그 커밋이 아니면 실패다."""
+    h.world.git_hook = lambda argv: RunResult(0, "", "") if "push" in argv else None
+    assert h.run() == 1
+    assert "PUSH_VERIFIED=False" in h.text
+    assert "STAGE_FAILED stage=deliver error=RemoteMismatch" in h.text
+
+
+def test_push_uses_explicit_refspec(h: Harness) -> None:
+    pushes: list[list[str]] = []
+
+    def hook(argv: Sequence[str]) -> RunResult | None:
+        if "push" in argv:
+            pushes.append(list(argv))
+        return None
+
+    h.world.git_hook = hook
+    assert h.run() == 0, h.text
+    assert pushes and "HEAD:refs/heads/round/t1-output" in pushes[0]
+
+
+def test_review_tool_failure_is_stage_failed(h: Harness) -> None:
+    h.world.review_exit = 1
+    assert h.run() == 1
+    assert "STAGE_FAILED stage=review error=ReviewToolFailed" in h.text
+    assert "PermissionError" in h.text
+
+
+def test_secrets_in_child_stderr_are_masked(h: Harness) -> None:
+    h.world.author_exit_override = 2
+    h.world.author_stderr = "401 Unauthorized key=sk-or-v1-abcdefabcdef0123"
+    assert h.run(only="author-local") == 1
+    assert "sk-or-v1-abcdef" not in h.text
+    state = (h.runs() / "t1-review" / "round_state.json").read_text(encoding="utf-8")
+    assert "sk-or-v1-abcdef" not in state
+
+
+def test_audit_and_weekly_judgement_lines_shown_on_success(h: Harness) -> None:
+    h.world.provenance_stdout = "회차 루트 : data/runs\n스캔한 회차    : 2\n위반 : 0건\n"
+    h.world.weekly_stderr = (
+        "[파일 입력] 이벤트 10행 중 창 안 10행 · 생성 로그 5행 중 창 안 5행\n잡음 줄\n"
+    )
+    assert h.run() == 0, h.text
+    assert "PROVENANCE| 스캔한 회차    : 2" in h.text
+    assert "WEEKLY| [파일 입력] 이벤트 10행 중 창 안 10행" in h.text
+    assert "잡음 줄" not in h.text
+
+
+def test_invalid_branch_name_refused(h: Harness) -> None:
+    data = _config_dict(h.repo.wt)
+    data["deliver"]["branch"] = "round/t1..bad"
+    h.make(data=data)
+    assert h.run() == 1
+    assert "BRANCH_NAME_VALID=False" in h.text
+
+
+def test_chain_skips_authoring_once_queue_exists(h: Harness) -> None:
+    """큐가 생긴 뒤 목표를 올려도 체인이 저작에서 막히지 않는다 — 저작은 동결로 건너뛴다."""
+    queue = h.runs() / "t1-review" / "canary_review_queue.jsonl"
+    queue.parent.mkdir(parents=True)
+    queue.write_text('{"slug": "x"}\n', encoding="utf-8")
+    h.run(dry_run=True)
+    assert "STAGE_SKIP stage=author-local" in h.text
+    assert "STAGE_SKIP stage=author-cloud" in h.text
+
+
+def test_chain_does_not_skip_seat_exhausted_only_by_reservation(h: Harness) -> None:
+    """근거 없는 예약만으로 찬 좌석은 '실물 완료'가 아니다 — 체인이 건너뛰지 않고 거부로 멈춘다."""
+    _write_state(h, {"openrouter": {"reserved_attempts": 10}})
+    assert h.run() == 1
+    assert "WRITE_REFUSED=True stage=author-cloud" in h.text
+    assert "STAGE_START stage=check" not in h.text

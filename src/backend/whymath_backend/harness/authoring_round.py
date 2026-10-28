@@ -68,6 +68,7 @@ from whymath_backend.harness.authoring_round_ports import (
     SubprocessRunner,
     SystemClock,
     UrllibHttp,
+    mask_secrets,
 )
 
 STAGES: tuple[str, ...] = (
@@ -191,15 +192,27 @@ def next_round_size(lines: int, tried: int, target: int, budget: int) -> int:
     return max(0, min(budget - tried, want))
 
 
-def seat_ledger(seat_dir: Path) -> tuple[int, int]:
-    """회차 대장(`cu.rounds.jsonl`)의 (회차 수, 시도 합) — 시도 예산 소진의 실물 근거.
+def seat_consumption(seat_dir: Path) -> dict[str, int]:
+    """좌석 폴더의 시도 소진 **실물 근거** — 상태 파일이 깨지거나 지워져도 여기서 다시 나온다.
 
-    저작 CLI는 회차가 정상 종료하면 수용 0건이어도 대장에 1행을 남긴다(`--help`의
-    `--stagnation-window` 설명: "회차 이력은 대장에 항상 적재"). 그래서 회차 수가 늘지 않은
-    실행은 비정상 종료(임포트 실패·강제 종료 등)로 본다.
+    - `ledger_rounds`·`ledger_attempts` — 회차 대장(`cu.rounds.jsonl`)의 회차 수·시도 합. 저작 CLI는
+      회차가 정상 종료하면 수용 0건이어도 대장에 1행을 남긴다(`--stagnation-window` 도움말: "회차
+      이력은 대장에 항상 적재"). 회차 수가 늘지 않은 실행은 비정상 종료(임포트 실패·강제 종료)다.
+    - `unrecorded_calls` — 생성 로그(`cu.genlog.jsonl`, 호출마다 즉시 기록) 중 run_id가 대장에
+      **없는** 행 수 = 대장 없이 끊긴 회차(Ctrl+C·타임아웃)가 실제로 한 호출. run_id가 없는 행도
+      여기 센다(모르면 소진 쪽으로 — 보수적).
     """
-    rows = read_jsonl(seat_dir / "cu.rounds.jsonl")
-    return len(rows), sum(int(r.get("attempted", 0) or 0) for r in rows)
+    rounds = read_jsonl(seat_dir / "cu.rounds.jsonl")
+    recorded_ids = {str(r.get("run_id")) for r in rounds if r.get("run_id")}
+    genlog = read_jsonl(seat_dir / "cu.genlog.jsonl")
+    unrecorded = sum(
+        1 for g in genlog if not g.get("run_id") or str(g.get("run_id")) not in recorded_ids
+    )
+    return {
+        "ledger_rounds": len(rounds),
+        "ledger_attempts": sum(int(r.get("attempted", 0) or 0) for r in rounds),
+        "unrecorded_calls": unrecorded,
+    }
 
 
 def seat_artifact_stats(seat_dir: Path) -> dict[str, Any]:
@@ -312,6 +325,8 @@ class AuthoringRound:
         self.io = io
         self.dry_run = dry_run
         self._state_writable = False
+        self._state_corrupt = False
+        self._lock_path: Path | None = None
         self.state: dict[str, Any] = self._load_state()
 
     # ── 출력 ──
@@ -340,33 +355,47 @@ class AuthoringRound:
         except (OSError, ValueError) as exc:
             # 깨진 상태 파일은 실물 판정으로 대체한다 — 상태 파일은 보조 기록일 뿐이다.
             self.kv(f"STATE_UNREADABLE=True error={type(exc).__name__} — 실물 기준으로 진행")
+            self._state_corrupt = True
             return base
         if not isinstance(loaded, dict) or loaded.get("round_name") != self.cfg.round_name:
             self.kv("STATE_UNREADABLE=True error=RoundNameMismatch — 실물 기준으로 진행")
+            self._state_corrupt = True
             return base
         for key in ("stages", "seats", "history"):
             loaded.setdefault(key, base[key])
         return loaded
 
-    def _save_state(self) -> None:
+    def _save_state(self) -> bool:
+        """상태 파일을 원자적으로 쓴다. 쓰기 실패는 타입명 줄을 내고 False(원시 traceback 금지).
+
+        읽지 못한 상태 파일은 덮어쓰기 전에 `.unreadable-<시각>`으로 옮겨 증거를 남긴다.
+        """
         if self.dry_run or not self._state_writable:
-            return
+            return self.dry_run
         path = self.cfg.state_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.state["updated_at"] = self.io.clock.now().isoformat()
-        self.state["config_sha256"] = self.cfg.source_sha256
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(tmp, path)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if self._state_corrupt and path.exists():
+                stamp = self.io.clock.now().strftime("%Y%m%dT%H%M%S")
+                os.replace(path, path.with_name(f"{path.name}.unreadable-{stamp}"))
+                self._state_corrupt = False
+            self.state["updated_at"] = self.io.clock.now().isoformat()
+            self.state["config_sha256"] = self.cfg.source_sha256
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(tmp, path)
+        except OSError as exc:
+            self.kv(f"STATE_WRITE_FAILED=True error={type(exc).__name__} path={path}")
+            return False
         # 실제로 쓰인 설정을 산출물과 함께 남긴다(설정을 바꿔 재실행해도 무엇으로 돌았는지 남는다).
         snap = self.cfg.review_dir() / "round_config.yaml"
         try:
             src = self.cfg.source_path.read_bytes()
+            if not snap.exists() or snap.read_bytes() != src:
+                snap.write_bytes(src)
         except OSError as exc:
             self.kv(f"CONFIG_SNAPSHOT_FAILED=True error={type(exc).__name__}")
-            return
-        if not snap.exists() or snap.read_bytes() != src:
-            snap.write_bytes(src)
+        return True
 
     def _record(self, stage: str, status: str, detail: Mapping[str, Any]) -> None:
         now = self.io.clock.now().isoformat()
@@ -495,6 +524,8 @@ class AuthoringRound:
         return {
             f"{p}_SEAT": probe.get("cloud_seat") == seat.provider,
             f"{p}_PIN": probe.get("cloud_pin_mid") == seat.model,
+            f"{p}_ALLOWED_PROVIDERS": probe.get("cloud_allowed_providers")
+            == list(seat.expected_allowed_providers),
             f"{p}_JURISDICTION": probe.get("cloud_jurisdiction") == seat.expected_jurisdiction,
             f"{p}_ANTHROPIC_OFF": probe.get("anthropic_api_enabled") is False
             and probe.get("anthropic_configured") is False,
@@ -530,21 +561,38 @@ class AuthoringRound:
 
     # ── 실물 판정 ──
     def seat_progress(self, seat: SeatConfig) -> dict[str, int]:
-        seat_dir = self.cfg.seat_dir(seat)
-        rounds, ledger = seat_ledger(seat_dir)
+        """좌석의 행 수와 시도 소진.
+
+        - `evidenced` = 대장 시도 합 + 대장 밖 genlog 행(끊긴 회차의 실제 호출) — 산출 파일 근거.
+        - `reserved_attempts` = 상태 파일의 예약 누계. 호출 **전에** 더하고 **절대 줄이지 않는다**
+          (단조 증가 — 앞서 끊긴 회차의 예약이 뒤 정상 회차에 덮여 지워지면 유료 좌석이 같은 예산을
+          두 번 쓴다. EOS-208 리뷰 P1 재현: 예산 30에 50시도).
+        - `tried` = max(evidenced, reserved) — 회차 크기·예산 상한은 항상 이 보수적 값으로 정한다.
+        - `unevidenced` = tried − evidenced — 호출 기록이 없는 예약(시작 직후 실패한 실행 등).
+        """
+        cons = seat_consumption(self.cfg.seat_dir(seat))
         reserved = int(self.state.get("seats", {}).get(seat.name, {}).get("reserved_attempts", 0))
+        evidenced = cons["ledger_attempts"] + cons["unrecorded_calls"]
+        tried = max(evidenced, reserved)
         return {
             "lines": count_lines(self.cfg.seat_out(seat)),
-            "ledger_rounds": rounds,
-            "ledger_attempts": ledger,
+            **cons,
+            "evidenced": evidenced,
             "reserved_attempts": reserved,
-            # 보수적으로 큰 쪽 — 중단된 회차(대장 미기록)의 호출도 예산에서 뺀다.
-            "tried": max(ledger, reserved),
+            "tried": tried,
+            "unevidenced": tried - evidenced,
         }
 
     def seat_complete(self, seat: SeatConfig) -> bool:
+        """저작 완료 = 목표 달성 또는 **실물 근거로** 예산 소진 · 또는 검수 큐가 이미 있다(동결).
+
+        근거 없는 예약만으로 예산이 찬 상태는 완료가 아니다(리뷰 P2-1 — 호출 0건 실패 두 번이 거짓
+        '예산 소진 완료'로 다음 단계에 넘어가던 결함). 그 상태는 저작 단계가 거부로 안내한다.
+        """
+        if self.cfg.queue_path().exists():
+            return True
         prog = self.seat_progress(seat)
-        return prog["lines"] >= seat.target_cu or prog["tried"] >= seat.attempt_budget
+        return prog["lines"] >= seat.target_cu or prog["evidenced"] >= seat.attempt_budget
 
     def judged_count(self) -> tuple[int, int]:
         """(큐 행 수, 판정 완료 수) — 판정 = 판정 파일의 승인·수정승인·반려 ∩ 종결 이벤트 ∩ 큐."""
@@ -701,27 +749,34 @@ class AuthoringRound:
 
     def _author_seat(self, stage: str, seat: SeatConfig) -> dict[str, Any]:
         prog = self.seat_progress(seat)
-        if prog["ledger_attempts"] != prog["reserved_attempts"] and prog["reserved_attempts"]:
+        if prog["unevidenced"] > 0:
             self.kv(
-                f"STATE_MISMATCH seat={seat.name} ledger_attempts={prog['ledger_attempts']} "
-                f"reserved_attempts={prog['reserved_attempts']} — 큰 쪽({prog['tried']})을 "
-                "소진으로 본다(중단된 회차의 호출도 예산에서 뺀다)"
+                f"STATE_MISMATCH seat={seat.name} evidenced={prog['evidenced']} "
+                f"(ledger={prog['ledger_attempts']} unrecorded_genlog={prog['unrecorded_calls']}) "
+                f"reserved={prog['reserved_attempts']} — 큰 쪽({prog['tried']})으로 예산을 센다"
             )
-        if prog["lines"] >= seat.target_cu or prog["tried"] >= seat.attempt_budget:
-            return self._seat_summary(seat, stopped=None)
+        if self.cfg.queue_path().exists():
+            # 검수 큐가 생긴 뒤에는 저작을 덧붙이지 않는다(검수 분모가 바뀐다) — 거부가 아니라 동결.
+            # 목표·예산 상향은 큐를 만들기 전에만 의미가 있다.
+            self.kv(f"AUTHOR_FROZEN seat={seat.name} reason=queue_exists lines={prog['lines']}")
+            self.say(
+                f"좌석 {seat.name}: 검수 큐가 이미 있어 저작을 더 하지 않습니다(목표·예산 상향은 "
+                "큐를 만들기 전에만 반영됩니다 — 더 저작하려면 새 round_name으로 회차를 시작)"
+            )
+            return {"outcome": "frozen_by_queue", **prog}
+        if prog["lines"] >= seat.target_cu or prog["evidenced"] >= seat.attempt_budget:
+            return self._seat_summary(seat)
+        self._refuse_unevidenced(stage, seat, prog)
         # ── 쓰기 직전 재검사(이 좌석 기준) ──
         probe = self.probe(seat)
         checks: dict[str, object] = {**self.base_guard(), **self.child_code_checks(probe)}
         checks.update(self.seeds_check())
         checks.update(self.seat_checks(seat, probe))
-        checks["QUEUE_ABSENT"] = not self.cfg.queue_path().exists()
         checks["BUDGET_LEFT"] = prog["tried"] < seat.attempt_budget
         self.refuse_unless(
             stage,
             checks,
-            "호출하지 않았다(과금 0). QUEUE_ABSENT=False면 이미 검수 큐가 있어 저작을 "
-            "덧붙이지 않는다(검수 분모가 바뀐다 — 새 회차 이름으로 시작) · "
-            "키·모델·타임아웃 항목은 준비 점검 안내를 따르세요",
+            "호출하지 않았다(과금 0). 키·모델·타임아웃 항목은 준비 점검 안내를 따르세요",
         )
         if self.dry_run:
             n = next_round_size(prog["lines"], prog["tried"], seat.target_cu, seat.attempt_budget)
@@ -731,7 +786,7 @@ class AuthoringRound:
             )
             return {"dry_run": True}
         self._ensure_spec_plan()
-        stopped: str | None = None
+        stopped: tuple[str, str] | None = None
         while True:
             prog = self.seat_progress(seat)
             if prog["lines"] >= seat.target_cu or prog["tried"] >= seat.attempt_budget:
@@ -740,12 +795,20 @@ class AuthoringRound:
             if n <= 0:
                 break
             if self.cfg.queue_path().exists():
-                stopped = "queue_appeared"
+                stopped = (
+                    "QueueAppeared",
+                    "저작 도중 검수 큐가 생겼다 — 다른 창에서 같은 회차가 돌고 있는지 확인",
+                )
                 break
-            # 예산을 **호출 전에** 상태 파일에 예약한다 — 중단돼 대장이 안 남아도 소진으로 센다.
+            # 예산을 **호출 전에** 예약한다 — 단조 증가(줄이지 않는다). 못 쓰면 호출하지 않는다.
             seats_state = self.state.setdefault("seats", {}).setdefault(seat.name, {})
             seats_state["reserved_attempts"] = prog["tried"] + n
-            self._save_state()
+            if not self._save_state():
+                raise StageFailedError(
+                    stage,
+                    "ReservationNotSaved",
+                    "시도 예약을 상태 파일에 쓰지 못해 호출하지 않았다",
+                )
             rounds_before = prog["ledger_rounds"]
             self.kv(
                 f"ROUND_START seat={seat.name} n={n} lines_before={prog['lines']} "
@@ -757,45 +820,78 @@ class AuthoringRound:
             report = last_json_object(res.stdout) or {}
             after = self.seat_progress(seat)
             recorded = after["ledger_rounds"] > rounds_before
-            if recorded:
-                # 대장이 자랐다 = 회차가 정상 종료했다 → 실물(대장)로 예약을 맞춘다.
-                seats_state["reserved_attempts"] = after["ledger_attempts"]
-                self._save_state()
             exit_label = "timeout" if res.timed_out else str(res.returncode)
             self.kv(
                 f"ROUND_END seat={seat.name} exit={exit_label} lines_after={after['lines']} "
-                f"tried_after={max(after['ledger_attempts'], seats_state['reserved_attempts'])} "
+                f"tried_after={after['tried']} evidenced_after={after['evidenced']} "
                 f"outcome_counts={json.dumps(report.get('outcome_counts'), ensure_ascii=False)}"
             )
-            if res.returncode == 2 or res.timed_out or res.launch_error is not None:
-                stopped = res.failure_reason()
+            if res.launch_error is not None:
+                stopped = ("LaunchError", f"저작 CLI를 실행하지 못했다 — {res.failure_reason()}")
+                break
+            if res.timed_out:
+                stopped = (
+                    "RoundTimeout",
+                    f"회차 시간 상한({n * seat.attempt_timeout_s:.0f}초)을 넘겨 중단했다 — Ollama "
+                    "응답이 멈췄는지 확인하세요. 그때까지의 호출은 genlog로 소진에 계상된다",
+                )
+                break
+            if res.returncode == 2:
+                stopped = (
+                    "RoundExit2",
+                    f"저작 CLI exit 2 — 연속 무진전 알람 또는 설정 오류다({res.failure_reason()})",
+                )
                 break
             if not recorded:
-                # 대장 없이 끝난 실행은 '무진전'(exit 1)이 아니라 비정상 종료다 — 같은 실패를
-                # 예산이 바닥날 때까지 반복하지 않는다. 예약분은 소진으로 남긴다(보수적).
-                stopped = "LedgerNotWritten(회차 대장 미기록 — 비정상 종료) " + res.failure_reason()
+                stopped = (
+                    "LedgerNotWritten",
+                    "회차 대장 없이 끝났다 — 저작 CLI가 시작 직후 실패했을 수 있다(임포트·설정 "
+                    f"오류 등 · {res.failure_reason()}). 같은 실패를 반복하지 않으려 멈췄다",
+                )
                 break
-        summary = self._seat_summary(seat, stopped=stopped)
         if stopped is not None:
+            self._seat_summary(seat)
             raise StageFailedError(
                 stage,
                 "RoundStopped",
-                f"좌석 {seat.name}: {stopped} — exit 2는 연속 무진전 알람·설정 오류다. "
-                "위 출력을 회신하세요",
+                f"좌석 {seat.name}: [{stopped[0]}] {stopped[1]} — 위 출력을 회신하세요",
             )
-        return summary
+        prog = self.seat_progress(seat)
+        if prog["lines"] < seat.target_cu and prog["evidenced"] < seat.attempt_budget:
+            self._refuse_unevidenced(stage, seat, prog)
+        return self._seat_summary(seat)
 
-    def _seat_summary(self, seat: SeatConfig, *, stopped: str | None) -> dict[str, Any]:
+    def _refuse_unevidenced(self, stage: str, seat: SeatConfig, prog: Mapping[str, int]) -> None:
+        """근거 없는 예약만으로 예산이 찼으면 '소진 완료'가 아니라 거부한다(리뷰 P2-1)."""
+        if prog["tried"] < seat.attempt_budget or prog["evidenced"] >= seat.attempt_budget:
+            return
+        self.kv(
+            f"AUTHOR_UNEVIDENCED seat={seat.name} evidenced={prog['evidenced']} "
+            f"reserved={prog['reserved_attempts']} unevidenced={prog['unevidenced']} "
+            f"budget={seat.attempt_budget}"
+        )
+        raise StageRefusedError(
+            stage,
+            {f"{seat.name.upper().replace('-', '_')}_BUDGET_EVIDENCED": False},
+            f"좌석 {seat.name}: 시도 예산 {seat.attempt_budget} 중 실물 근거(대장·genlog)는 "
+            f"{prog['evidenced']}건이고 {prog['unevidenced']}건은 호출 기록이 없는 예약이다"
+            "(시작 직후 "
+            "실패한 실행). 앞 실행의 STAGE_FAILED 원인을 고친 뒤, 그 예약을 풀려면 같은 한 줄에 "
+            "--release-unevidenced를 붙여 실행하세요(풀어 준 수가 상태 파일 이력에 남는다)",
+        )
+
+    def _seat_summary(self, seat: SeatConfig) -> dict[str, Any]:
         prog = self.seat_progress(seat)
         if prog["lines"] >= seat.target_cu:
             outcome = "target_met"
-        elif prog["tried"] >= seat.attempt_budget:
+        elif prog["evidenced"] >= seat.attempt_budget:
             outcome = "budget_exhausted"
         else:
-            outcome = "stopped" if stopped else "incomplete"
+            outcome = "stopped"
         self.kv(
             f"AUTHOR_DONE seat={seat.name} lines={prog['lines']} tried={prog['tried']} "
-            f"target={seat.target_cu} budget={seat.attempt_budget} outcome={outcome}"
+            f"evidenced={prog['evidenced']} target={seat.target_cu} "
+            f"budget={seat.attempt_budget} outcome={outcome}"
         )
         if outcome == "target_met":
             self.say(f"좌석 {seat.name}: 목표 {seat.target_cu}건 달성({prog['lines']}건)")
@@ -806,6 +902,30 @@ class AuthoringRound:
                 "attempt_budget을 바꾸고 같은 한 줄을 다시 실행하세요(검수 큐를 만들기 전까지만)"
             )
         return {"outcome": outcome, **prog}
+
+    def release_unevidenced(self) -> None:
+        """사람이 명시적으로 근거 없는 예약을 실물 근거로 되돌린다(`--release-unevidenced`)."""
+        for seat in self.cfg.seats:
+            prog = self.seat_progress(seat)
+            if prog["unevidenced"] <= 0:
+                continue
+            seats_state = self.state.setdefault("seats", {}).setdefault(seat.name, {})
+            seats_state["reserved_attempts"] = prog["evidenced"]
+            self.state["history"].append(
+                {
+                    "at": self.io.clock.now().isoformat(),
+                    "stage": "release-unevidenced",
+                    "status": "released",
+                    "seat": seat.name,
+                    "reserved_before": prog["reserved_attempts"],
+                    "evidenced": prog["evidenced"],
+                }
+            )
+            self.kv(
+                f"RESERVATION_RELEASED seat={seat.name} from={prog['reserved_attempts']} "
+                f"to={prog['evidenced']}"
+            )
+        self._save_state()
 
     def check_core(self) -> tuple[bool, dict[str, Any]]:
         """런북 [H] — 좌석별 4필드·과목·slug 계수 + provenance_audit --require-runs."""
@@ -863,6 +983,9 @@ class AuthoringRound:
             timeout_s=_METRICS_TIMEOUT_S,
         )
         prov_exit = "timeout" if res.timed_out else res.returncode
+        for line in res.stdout.splitlines()[-30:]:
+            if line.strip():
+                self.kv(f"PROVENANCE| {line.rstrip()}")
         self.kv(f"PROVENANCE_EXIT={prov_exit}")
         if not res.ok:
             self.kv(f"PROVENANCE_CAUSE={res.failure_reason()}")
@@ -967,8 +1090,9 @@ class AuthoringRound:
             f"REVIEW_EXIT={'timeout' if res.timed_out else res.returncode} "
             f"REVIEW_JUDGED={judged} QUEUE_LINES={total} REVIEW_DONE={done}"
         )
-        if res.launch_error is not None or (res.returncode not in (0, None) and not done):
-            self.kv(f"REVIEW_CAUSE={res.failure_reason()}")
+        if not res.ok:
+            # 창이 비정상 종료(입력 실패·tkinter 없음·기록 실패·타임아웃) — 미완이 아니라 실패다.
+            raise StageFailedError("review", "ReviewToolFailed", res.failure_reason())
         if not done:
             self.say(
                 f"검수 {total - judged}건이 남았습니다 — "
@@ -1063,6 +1187,10 @@ class AuthoringRound:
             weekly += ["--generation-log-jsonl", str(self.cfg.seat_dir(seat) / "cu.genlog.jsonl")]
         weekly += ["--week-start", start, "--week-end", end, "--krw-per-usd", str(USD_TO_KRW)]
         res = self.run_child(weekly, timeout_s=_METRICS_TIMEOUT_S)
+        for line in res.stderr_tail.splitlines():
+            # [K] 판정 항목 — 창 안 행 수가 전체 행 수와 같은지(회차 행이 창 밖으로 빠지지 않았는지)
+            if "[파일 입력]" in line or "중복 제거" in line:
+                self.kv(f"WEEKLY| {line.rstrip()}")
         rec = last_json_object(res.stdout)
         if rec is None or not res.ok:
             failed.append("weekly")
@@ -1135,8 +1263,10 @@ class AuthoringRound:
         on_branch = branch_res.ok and branch_res.stdout.strip() == self.cfg.deliver_branch
         # 앞 실행이 커밋까지 하고 push에서 실패했을 수 있다 — 새 파일이 없어도 보낼 것이 있다.
         prior_commit = on_branch and bool(head) and head != main_sha
+        ref_ok = self.git("check-ref-format", "--branch", self.cfg.deliver_branch).ok
         checks: dict[str, object] = {
             **self.base_guard(),
+            "BRANCH_NAME_VALID": ref_ok,
             "EMAIL_SET": email.ok and bool(email.stdout.strip()),
             "REVIEW_COMPLETE": total > 0 and judged == total,
             "JUDGED": judged,
@@ -1197,7 +1327,11 @@ class AuthoringRound:
                 "커밋이 만들어지지 않았거나 산출물 밖 파일이 섞였다 — push하지 않았다",
             )
         push = self.git(
-            "push", "-u", "origin", self.cfg.deliver_branch, timeout_s=_GIT_PUSH_TIMEOUT_S
+            "push",
+            "-u",
+            "origin",
+            f"HEAD:refs/heads/{self.cfg.deliver_branch}",
+            timeout_s=_GIT_PUSH_TIMEOUT_S,
         )
         if not push.ok:
             raise StageFailedError("deliver", "GitPushFailed", push.failure_reason())
@@ -1231,11 +1365,88 @@ class AuthoringRound:
         }
         return handlers[stage]()
 
-    def run(self, *, only: str | None = None, start: str | None = None) -> int:
+    # ── 단일 실행 잠금 ──
+    def _lock_file(self) -> Path | None:
+        """잠금 파일 경로 — 워크트리의 git 디렉터리 안(작업 트리 밖 — 산출물·커밋에 안 섞인다)."""
+        res = self.git("rev-parse", "--absolute-git-dir")
+        if not res.ok or not res.stdout.strip():
+            return None
+        return Path(res.stdout.strip()) / f"whymath_authoring_round_{self.cfg.round_name}.lock"
+
+    def acquire_lock(self) -> bool:
+        """O_EXCL로 잠금을 만든다. 이미 있으면 거부하고 내용·지우는 방법을 보인다."""
+        path = self._lock_file()
+        if path is None:
+            self.kv(
+                "LOCK_REFUSED=True reason=GitDirUnknown — 워크트리의 git 디렉터리를 찾지 못했다"
+            )
+            return False
+        body = json.dumps(
+            {"pid": os.getpid(), "started_at": self.io.clock.now().isoformat()}, ensure_ascii=False
+        )
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                held = path.read_text(encoding="utf-8").strip()
+            except OSError as exc:
+                held = f"(읽기 실패 {type(exc).__name__})"
+            self.kv(f"LOCK_HELD=True path={path} holder={held}")
+            self.say(
+                "같은 회차가 이미 실행 중입니다(다른 창 확인). 실행 중인 창이 정말 없으면"
+                "(앞 실행이 "
+                f'강제 종료됨) 이 파일을 지운 뒤 다시 실행하세요: Remove-Item "{path}"'
+            )
+            return False
+        except OSError as exc:
+            self.kv(f"LOCK_REFUSED=True reason={type(exc).__name__} path={path}")
+            return False
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(body)
+        self._lock_path = path
+        self.kv(f"LOCK_ACQUIRED=True path={path}")
+        return True
+
+    def release_lock(self) -> None:
+        path = self._lock_path
+        if path is None:
+            return
+        try:
+            path.unlink()
+        except OSError as exc:
+            self.kv(f"LOCK_RELEASE_FAILED=True error={type(exc).__name__} path={path}")
+        self._lock_path = None
+
+    def run(
+        self,
+        *,
+        only: str | None = None,
+        start: str | None = None,
+        release_unevidenced: bool = False,
+    ) -> int:
         self.kv(
             f"ROUND={self.cfg.round_name} CONFIG_SHA256={self.cfg.source_sha256[:12]} "
             f"DRY_RUN={self.dry_run} WORKTREE={self.cfg.worktree}"
         )
+        # 잠금은 격리 워크트리에서 이 모듈이 돌 때만 건다(아니면 준비 점검이 거부한다 — 평소 클론의
+        # git 디렉터리에 파일을 남기지 않는다). 드라이런은 쓰지 않으므로 잠그지 않는다.
+        if not self.dry_run and self._passed(self.base_guard()):
+            if not self.acquire_lock():
+                return 1
+        try:
+            if release_unevidenced and not self.dry_run:
+                try:
+                    self.release_unevidenced()
+                # 깨진 대장·genlog 등 — 단계 이름·타입명을 남기고 멈춘다(침묵 실패 금지).
+                except Exception as exc:  # noqa: BLE001
+                    return self._fail(
+                        StageFailedError("release-unevidenced", type(exc).__name__, str(exc)[:300])
+                    )
+            return self._run_plan(only=only, start=start)
+        finally:
+            self.release_lock()
+
+    def _run_plan(self, *, only: str | None, start: str | None) -> int:
         if only is not None:
             plan = [only]
             forced = {only}
@@ -1306,9 +1517,10 @@ class AuthoringRound:
 
     def _fail(self, exc: StageFailedError, *, stage: str | None = None) -> int:
         name = stage or exc.stage
-        self._record(name, "failed", {"error": exc.error, "cause": exc.cause[:500]})
+        cause = mask_secrets(exc.cause)[:500]
+        self._record(name, "failed", {"error": exc.error, "cause": cause})
         self.kv(f"STAGE_FAILED stage={name} error={exc.error}")
-        self.kv(f"STAGE_FAILED_CAUSE={exc.cause[:500]}")
+        self.kv(f"STAGE_FAILED_CAUSE={cause}")
         self.say(
             f"[{name}] 실패({exc.error}) — 위 원인 줄을 회신하세요. "
             "고친 뒤 같은 한 줄로 이어갑니다"
@@ -1336,6 +1548,11 @@ def main(argv: list[str] | None = None, *, io: Boundaries | None = None) -> int:
         "--worktree", type=Path, default=None, help="설정의 worktree 값 대신 쓸 경로"
     )
     parser.add_argument("--dry-run", action="store_true", help="쓰지 않고 다음에 할 일만 보인다")
+    parser.add_argument(
+        "--release-unevidenced",
+        action="store_true",
+        help="호출 기록(대장·genlog)이 없는 시도 예약을 풀어 준다(사람 판단 · 이력에 남음)",
+    )
     args = parser.parse_args(argv)
     boundaries = io or default_boundaries()
     try:
@@ -1344,7 +1561,7 @@ def main(argv: list[str] | None = None, *, io: Boundaries | None = None) -> int:
         print(f"CONFIG_ERROR={exc}", file=boundaries.out, flush=True)
         return 2
     return AuthoringRound(cfg, boundaries, dry_run=args.dry_run).run(
-        only=args.stage, start=args.start
+        only=args.stage, start=args.start, release_unevidenced=args.release_unevidenced
     )
 
 

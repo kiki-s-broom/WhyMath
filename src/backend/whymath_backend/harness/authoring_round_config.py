@@ -41,6 +41,54 @@ class RoundConfigError(ValueError):
     """설정 파일이 계약을 어겼다 — 사유에는 필드 경로만 싣는다(값 원문은 최소화)."""
 
 
+# 매핑마다 받는 키 — 모르는 키는 거부한다(오타 `attempt_budjet`이 검사를 조용히 끄지 않게).
+_TOP_KEYS = frozenset(
+    {
+        "schema_version",
+        "round_name",
+        "task_id",
+        "worktree",
+        "output_root",
+        "ollama_request_timeout_s",
+        "seats",
+        "anchors",
+        "seeds",
+        "authoring_args",
+        "expected_subject",
+        "expected_slug_prefix",
+        "min_queue_cu",
+        "review",
+        "deliver",
+    }
+)
+_SEAT_KEYS = frozenset(
+    {
+        "name",
+        "kind",
+        "model",
+        "target_cu",
+        "attempt_budget",
+        "attempt_timeout_s",
+        "authoring_tier",
+        "provider",
+        "subscription",
+        "budget_krw",
+        "expected_jurisdiction",
+        "expected_allowed_providers",
+    }
+)
+_ANCHOR_KEYS = frozenset({"spec_id", "standard_code", "difficulty", "topic_hint"})
+_AUTHORING_KEYS = frozenset({"avoid_recent", "canary", "abort_window"})
+_REVIEW_KEYS = frozenset({"reviewer_id", "ui", "timeout_s"})
+_DELIVER_KEYS = frozenset({"branch", "commit_message"})
+
+
+def _no_unknown_keys(data: dict[str, Any], allowed: frozenset[str], where: str) -> None:
+    unknown = sorted(str(k) for k in data if k not in allowed)
+    if unknown:
+        raise RoundConfigError(f"{where}: 모르는 키 {unknown} — 오타인지 확인하세요")
+
+
 @dataclass(frozen=True)
 class AnchorSpec:
     """spec 순환 계획 한 줄(저작 CLI `--spec-file` JSONL 한 행과 같은 4필드)."""
@@ -74,6 +122,7 @@ class SeatConfig:
     subscription: str | None = None  # cloud 전용 라우팅 신호
     budget_krw: float | None = None  # cloud 전용 라우팅 신호(지출 상한이 아니다)
     expected_jurisdiction: str | None = None  # cloud 전용(예: us)
+    expected_allowed_providers: tuple[str, ...] = ()  # cloud 전용(런북 [C] ALLOWED=deepinfra)
 
 
 @dataclass(frozen=True)
@@ -180,6 +229,7 @@ def _parse_seat(raw: Any, index: int, ollama_timeout_s: float) -> SeatConfig:
     where = f"seats[{index}]"
     if not isinstance(raw, dict):
         raise RoundConfigError(f"{where}: 매핑이어야 한다")
+    _no_unknown_keys(raw, _SEAT_KEYS, where)
     name = _as_str(_req(raw, "name", where), f"{where}.name")
     if not name.replace("-", "").replace("_", "").isalnum() or not name.isascii():
         raise RoundConfigError(f"{where}.name: 영문·숫자·-·_만 쓴다(폴더 이름이 된다)")
@@ -201,7 +251,7 @@ def _parse_seat(raw: Any, index: int, ollama_timeout_s: float) -> SeatConfig:
         tier = _as_str(raw.get("authoring_tier", "quality"), f"{where}.authoring_tier")
         if tier not in ("mid", "quality"):
             raise RoundConfigError(f"{where}.authoring_tier: mid|quality 중 하나여야 한다")
-        for key in ("provider", "subscription", "budget_krw"):
+        for key in ("provider", "subscription", "budget_krw", "expected_allowed_providers"):
             if raw.get(key) is not None:
                 # 로컬 좌석에 클라우드 신호를 주면 라우터가 클라우드로 보낼 수 있다(유료 호출 위험).
                 raise RoundConfigError(f"{where}.{key}: local 좌석에는 쓸 수 없다")
@@ -224,6 +274,14 @@ def _parse_seat(raw: Any, index: int, ollama_timeout_s: float) -> SeatConfig:
     )
     if raw.get("authoring_tier") is not None:
         raise RoundConfigError(f"{where}.authoring_tier: cloud 좌석에는 쓰이지 않는다")
+    allowed_raw = _req(raw, "expected_allowed_providers", where)
+    if not isinstance(allowed_raw, list) or not allowed_raw:
+        raise RoundConfigError(
+            f"{where}.expected_allowed_providers: 비어 있지 않은 목록이어야 한다"
+        )
+    allowed = tuple(
+        _as_str(v, f"{where}.expected_allowed_providers[{i}]") for i, v in enumerate(allowed_raw)
+    )
     return SeatConfig(
         name=name,
         kind=kind,
@@ -235,6 +293,7 @@ def _parse_seat(raw: Any, index: int, ollama_timeout_s: float) -> SeatConfig:
         subscription=subscription,
         budget_krw=budget_krw,
         expected_jurisdiction=jurisdiction,
+        expected_allowed_providers=allowed,
     )
 
 
@@ -244,6 +303,7 @@ def parse_round_config(
     """YAML 파싱 결과(매핑) → `RoundConfig`. 계약 위반은 `RoundConfigError`."""
     if not isinstance(data, dict):
         raise RoundConfigError("최상위가 매핑이어야 한다")
+    _no_unknown_keys(data, _TOP_KEYS, "config")
     version = data.get("schema_version")
     if version != 1:
         raise RoundConfigError("schema_version: 1이어야 한다")
@@ -277,6 +337,7 @@ def parse_round_config(
         where = f"anchors[{i}]"
         if not isinstance(raw, dict):
             raise RoundConfigError(f"{where}: 매핑이어야 한다")
+        _no_unknown_keys(raw, _ANCHOR_KEYS, where)
         anchors.append(
             AnchorSpec(
                 spec_id=_as_str(_req(raw, "spec_id", where), f"{where}.spec_id"),
@@ -300,6 +361,9 @@ def parse_round_config(
     deliver = _req(data, "deliver", "config")
     if not isinstance(review, dict) or not isinstance(deliver, dict):
         raise RoundConfigError("review·deliver: 매핑이어야 한다")
+    _no_unknown_keys(authoring, _AUTHORING_KEYS, "authoring_args")
+    _no_unknown_keys(review, _REVIEW_KEYS, "review")
+    _no_unknown_keys(deliver, _DELIVER_KEYS, "deliver")
     review_ui = _as_str(review.get("ui", "gui"), "review.ui")
     if review_ui not in REVIEW_UIS:
         raise RoundConfigError(f"review.ui: {REVIEW_UIS} 중 하나여야 한다")

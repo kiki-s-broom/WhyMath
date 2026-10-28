@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -35,6 +36,19 @@ from typing import Any, Literal, Protocol
 
 RunMode = Literal["capture", "stream", "inherit"]
 _TAIL_LINES = 40
+
+# 자식 stderr·원인 줄에 키가 섞여 나와도 화면·상태 파일에 남기지 않는다(시크릿 미출력).
+_SECRET_PATTERNS = (
+    re.compile(r"sk-(?:or|ant)-[A-Za-z0-9_\-]{4,}"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
+)
+
+
+def mask_secrets(text: str) -> str:
+    """키처럼 보이는 문자열을 `***`로 가린다(OpenRouter·Anthropic 키 접두·Bearer 토큰)."""
+    for pattern in _SECRET_PATTERNS:
+        text = pattern.sub("***", text)
+    return text
 
 
 @dataclass(frozen=True)
@@ -62,7 +76,9 @@ class RunResult:
         if self.timed_out:
             return "TimeoutExpired(타임아웃으로 중단)"
         last = next((ln for ln in reversed(self.stderr_tail.splitlines()) if ln.strip()), "")
-        return f"exit {self.returncode}" + (f" — {last.strip()[:300]}" if last else "")
+        return mask_secrets(
+            f"exit {self.returncode}" + (f" — {last.strip()[:300]}" if last else "")
+        )
 
 
 class ProcessRunner(Protocol):
@@ -108,7 +124,8 @@ class UrllibHttp:
 
 
 def _pump(stream: Any, tail: deque[str], echo: bool) -> None:
-    for line in iter(stream.readline, ""):
+    for raw in iter(stream.readline, ""):
+        line = mask_secrets(raw)
         tail.append(line.rstrip("\n"))
         if echo:
             try:
@@ -170,6 +187,11 @@ class SubprocessRunner:
         out_thread.start()
         try:
             code = proc.wait(timeout=timeout_s)
+        except KeyboardInterrupt:
+            # Ctrl+C — 자식이 같은 신호를 못 받았을 수 있으니(콘솔 그룹 밖) 직접 끝낸다.
+            proc.kill()
+            proc.wait()
+            raise
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()

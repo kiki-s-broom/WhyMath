@@ -35,6 +35,7 @@ seats:
     subscription: premium         # 라우팅 신호 — budget_krw와 함께여야 클라우드로 간다
     budget_krw: 5000              # 라우팅 티어 입력이지 지출 상한이 아니다(지출 상한 = attempt_budget)
     expected_jurisdiction: us     # 허용 공급사 deepinfra의 관할(코드 정본 l3/providers/openrouter.py)
+    expected_allowed_providers: [deepinfra]   # 런북 [C] ALLOWED=deepinfra — 설정 openrouter_allowed_providers와 대조
     target_cu: 27
     attempt_budget: 90
 

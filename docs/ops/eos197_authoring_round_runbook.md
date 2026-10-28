@@ -9,9 +9,12 @@
 > 모든 회차 공통 절차·거부 줄 읽는 법은 `docs/ops/authoring_round_runbook.md`가 정본이다.
 >
 > **EOS-197 회차 자체는 이미 끝났다**(산출물 30 CU·검수 30건이 main `4ec479e6`에 있다 · PR #1765).
-> 지금 이 한 줄을 돌리면 저작·큐·검수 단계는 실물 완료로 건너뛰고, 마지막 deliver는 원격 브랜치
-> `eos197/a6-authoring-output`이 이미 있어 `REMOTE_BRANCH_ABSENT=False`로 **거부**하는 것이 정상이다.
-> 이 절은 다음 회차가 따를 형태의 기준본이다.
+> 지금 이 한 줄을 돌리면 저작·큐·검수 단계는 실물 완료로 건너뛴다. 마지막 deliver는 **원격 브랜치
+> `eos197/a6-authoring-output`이 남아 있는 동안** `REMOTE_BRANCH_ABSENT=False`로 거부한다(2026-10-28 기준
+> 그 브랜치가 원격에 있다고 가정한 서술이다). 그 브랜치가 정리돼 지워졌다면 거부하지 **않고**, 이번 실행이 새로
+> 쓴 상태 파일·설정 스냅샷(`eos197-a6-review/round_state.json`·`round_config.yaml`) 2개만 담은 산출물 브랜치를
+> push한다 — 산출물 본체는 이미 main에 있으므로 EOS-197을 다시 돌릴 이유는 없다. 이 절은 다음 회차가 따를
+> 형태의 기준본으로만 읽는다.
 
 ### 6항목 사전 브리핑 (한 줄 실행)
 
@@ -62,8 +65,8 @@ if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$
 ```
 
 **판정**: 위 4번. 키 없음(`OPENROUTER_KEY_SHAPE_OK=False`)이면 아래 수동 대안의 [C-1]·[C-2]를 한 번 하고 [S2]를 다시.
-미리보기(쓰기 없음)·단계 하나만 다시·워크트리 정리는 `docs/ops/authoring_round_runbook.md`의 [R2-D]·「단계 하나만
-다시」·[R3]를 쓴다(그 블록들은 이 창의 `$Py`·`$Wt`·`$Cfg`를 그대로 쓴다).
+미리보기(쓰기 없음)·단계 하나만 다시·예약 풀기·워크트리 정리는 `docs/ops/authoring_round_runbook.md`의 [R2-D]·「단계 하나만
+다시」·「예약 풀기」·[R3]를 쓴다(그 블록들은 이 창의 `$Py`·`$Wt`·`$Cfg`를 그대로 쓴다).
 
 ---
 
