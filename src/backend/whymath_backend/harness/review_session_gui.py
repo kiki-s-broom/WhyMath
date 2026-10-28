@@ -1224,9 +1224,7 @@ class ReviewWindow:
         try:
             self._ctl.close()
         except Exception as exc:  # 침묵 금지: 타입명을 화면·로그에 남긴다
-            logger.warning(
-                "검수 창 닫기 중 기록 실패 — 창을 열어 둔다: %s", type(exc).__name__
-            )
+            logger.warning("검수 창 닫기 중 기록 실패 — 창을 열어 둔다: %s", type(exc).__name__)
             self._status.configure(
                 text=(
                     f"창을 닫는 중 기록 실패: {type(exc).__name__} — 이벤트 파일을 잡고 있는 "

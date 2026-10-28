@@ -325,7 +325,6 @@ class TestWindowClose:
             "aborted",
         ]
 
-
     def test_window_close_failure_is_shown_and_window_stays(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -735,9 +734,9 @@ class TestNoLetterShortcuts:
             takefocus = [kw.value for kw in call.keywords if kw.arg == "takefocus"]
             assert len(takefocus) == 1, f"{call.lineno}행 버튼에 takefocus가 없다"
             value = takefocus[0]
-            assert isinstance(value, ast.Constant) and value.value is False, (
-                f"{call.lineno}행 버튼의 takefocus가 False가 아니다"
-            )
+            assert (
+                isinstance(value, ast.Constant) and value.value is False
+            ), f"{call.lineno}행 버튼의 takefocus가 False가 아니다"
 
 
 class _FakeTk:
