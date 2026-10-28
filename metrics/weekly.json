@@ -1,0 +1,200 @@
+[
+  {
+    "week_start": "2026-10-12T00:01:21.322919+00:00",
+    "week_end": "2026-10-19T00:01:21.322919+00:00",
+    "generated_at": "2026-10-19T00:01:21.322919+00:00",
+    "kpis": {
+      "hit_seconds": {
+        "measured": false,
+        "value": null,
+        "unit": "seconds_median",
+        "reason": "이번 주 계측 완료 CU 0건(cu_total=0)"
+      },
+      "throughput_cu_per_hour": {
+        "measured": false,
+        "value": null,
+        "unit": "cu_per_hour",
+        "reason": "이번 주 계측 완료 CU 0건(cu_total=0)"
+      },
+      "unit_cost_krw": {
+        "measured": false,
+        "value": null,
+        "unit": "krw_per_cu",
+        "reason": "이번 주 비용 계측 완료 CU 0건"
+      },
+      "failure_type_distribution": {
+        "measured": false,
+        "value": null,
+        "unit": "count_by_code",
+        "reason": "이번 주 반려(rejected) 판정 0건"
+      },
+      "auto_gate_pass_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측)"
+      },
+      "rework_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 좌석 미착지(2026-09-11 실측)"
+      }
+    },
+    "harness": {
+      "incident_count": {
+        "measured": true,
+        "value": 810.0,
+        "unit": "count",
+        "reason": null
+      },
+      "max_series_nth": {
+        "measured": true,
+        "value": 18.0,
+        "unit": "count",
+        "reason": null
+      },
+      "rule_only_fix_ratio": {
+        "measured": true,
+        "value": 0.0889,
+        "unit": "ratio",
+        "reason": null
+      }
+    }
+  },
+  {
+    "week_start": "2026-10-18T23:59:00.326961+00:00",
+    "week_end": "2026-10-25T23:59:00.326961+00:00",
+    "generated_at": "2026-10-25T23:59:00.326961+00:00",
+    "kpis": {
+      "hit_seconds": {
+        "measured": false,
+        "value": null,
+        "unit": "seconds_median",
+        "reason": "이번 주 계측 완료 CU 0건(cu_total=0)"
+      },
+      "throughput_cu_per_hour": {
+        "measured": false,
+        "value": null,
+        "unit": "cu_per_hour",
+        "reason": "이번 주 계측 완료 CU 0건(cu_total=0)"
+      },
+      "unit_cost_krw": {
+        "measured": false,
+        "value": null,
+        "unit": "krw_per_cu",
+        "reason": "이번 주 비용 계측 완료 CU 0건"
+      },
+      "failure_type_distribution": {
+        "measured": false,
+        "value": null,
+        "unit": "count_by_code",
+        "reason": "이번 주 반려(rejected) 판정 0건"
+      },
+      "auto_gate_pass_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측)"
+      },
+      "rework_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 좌석 미착지(2026-09-11 실측)"
+      }
+    },
+    "harness": {
+      "incident_count": {
+        "measured": true,
+        "value": 811.0,
+        "unit": "count",
+        "reason": null
+      },
+      "max_series_nth": {
+        "measured": true,
+        "value": 18.0,
+        "unit": "count",
+        "reason": null
+      },
+      "rule_only_fix_ratio": {
+        "measured": true,
+        "value": 0.0888,
+        "unit": "ratio",
+        "reason": null
+      }
+    }
+  },
+  {
+    "week_start": "2026-10-27T14:06:14.101338+00:00",
+    "week_end": "2026-10-28T07:52:53.299873+00:00",
+    "generated_at": "2026-10-28T07:57:24.957552+00:00",
+    "kpis": {
+      "hit_seconds": {
+        "measured": true,
+        "value": 53.2405,
+        "unit": "seconds_median",
+        "reason": null
+      },
+      "throughput_cu_per_hour": {
+        "measured": true,
+        "value": 40.856828216330854,
+        "unit": "cu_per_hour",
+        "reason": null
+      },
+      "unit_cost_krw": {
+        "measured": true,
+        "value": 5.232447733333333,
+        "unit": "krw_per_cu",
+        "reason": null
+      },
+      "failure_type_distribution": {
+        "measured": true,
+        "value": {
+          "F1": 0,
+          "F2": 0,
+          "F3": 0,
+          "F4": 0,
+          "F5": 0,
+          "F6": 0,
+          "F7": 0,
+          "F8": 2
+        },
+        "unit": "count_by_code",
+        "reason": null
+      },
+      "auto_gate_pass_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측)"
+      },
+      "rework_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 좌석 미착지(2026-09-11 실측)"
+      }
+    },
+    "harness": {
+      "incident_count": {
+        "measured": false,
+        "value": null,
+        "unit": "count",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      },
+      "max_series_nth": {
+        "measured": false,
+        "value": null,
+        "unit": "count",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      },
+      "rule_only_fix_ratio": {
+        "measured": false,
+        "value": null,
+        "unit": "ratio",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      }
+    }
+  }
+]
