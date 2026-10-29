@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P0
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/weekly_metrics_report.py
   - "src/backend/whymath_backend/l3/equivalent/**"
-session: null
+session: claude/eos-207-g3-measures
 notes: "출처: EOS-197 완료(#1765) 후 G-eos-g3 판정 검토(2026-10-28). Kiki가 G3를 11/22까지 보류로 결정했고, 판정 전에 미측정 3항목의 측정 경로가 필요하다. 관련: EOS-205(검산식 동어반복 — (a)의 1차 통과율 의미에 직접 영향)."
-updated: 2026-10-28
+updated: 2026-10-29
