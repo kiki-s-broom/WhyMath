@@ -373,6 +373,19 @@ class TestSemanticAxis:
             "NOT_MEASURABLE",
         )
 
+    def test_unjudged_member_blocks_pass_even_when_n_reaches_30(self, tmp_path: Path) -> None:
+        """n≥30이어도 표본 하나를 건너뛰면 측정 불가다 — n<30 절과 별개로 미판정 절이 막는다
+        (위 n=29 픽스처는 두 절이 동시에 걸려 미판정 절을 단독으로 밟지 못한다)."""
+        rnd = Round(tmp_path, 16)  # 모집단 32
+        manifest = rnd.manifest(size=31)
+        verdicts = _all_not_leaked(rnd, manifest)[1:]  # 31건 중 30건 판정
+        semantic = rnd.report(verdicts, manifest)["hint_leak"]["semantic"]
+        assert (semantic["n"], semantic["unjudged"], semantic["status"]) == (
+            30,
+            1,
+            "NOT_MEASURABLE",
+        )
+
     def test_out_of_manifest_verdicts_are_counted_apart(self, tmp_path: Path) -> None:
         """사후 바꿔치기 반례 — 표본 하나를 빼고 표본 밖 힌트로 채워도 n은 29다."""
         rnd = Round(tmp_path, 16)
@@ -598,6 +611,22 @@ class TestCli:
         lines = capsys.readouterr().out.splitlines()
         assert code == g3.EXIT_UNMEASURED
         assert "HINT_HUMAN_INPUT_ERRORS=1" in lines
+
+    def test_corrupt_verdict_file_is_exit_2_even_when_a_fail_was_read(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """손상 파일에서 *읽힌* 행이 FAIL을 만들어도 종료 코드는 측정 실패(2)다 — 못 읽은 행 위에서
+        낸 판정은 믿지 않는다(위 손상 테스트는 경쟁하는 FAIL이 없어 이 절을 단독으로 밟지 못한다)."""
+        rnd = Round(tmp_path, 15)
+        hints_path = rnd.write()
+        verdicts = tmp_path / "v.jsonl"
+        hv.append_verdict(verdicts, rnd.verdict("h00-l1", None, "leaked"))  # 기계 clean · 사람 누설
+        with verdicts.open("a", encoding="utf-8") as handle:
+            handle.write("{broken\n")
+        code = g3.main(self._args(rnd, hints_path, "--hint-verdicts", str(verdicts)))
+        lines = capsys.readouterr().out.splitlines()
+        assert "HINT_SEMANTIC_AXIS=FAIL" in lines  # 읽힌 행은 FAIL을 만들었다
+        assert code == g3.EXIT_UNMEASURED
 
     def test_semantic_pass_via_cli(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
