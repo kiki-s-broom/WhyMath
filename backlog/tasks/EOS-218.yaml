@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-218
+title: "힌트 누설 사람 판정 좌석 보강 — R19-02/03 보정 문항·판정자 간 일치도·LLM 심판 축·게이트 기록 스키마 편입(EOS-210 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① EOS-210 힌트 누설 사람 판정 좌석(`ops/hint_human_verdicts.py`·`harness/hint_verdict_session.py`)에 헌법 R19-02(보정 문항 혼입)·R19-03(보정 정답률 미달 세션 재검토)을 적용한다 — 지금은 판정자 신뢰도를 재는 장치가 없어 사람 판정이 측정되지 않은 검출기로 남는다(CLAUDE.md 「검증 권위」 — 인간 검수도 오류율을 재야 하는 검출기) ② 같은 힌트를 여러 판정자가 본 경우의 일치도(κ 등)를 산출해 측정기 출력에 공개한다 — 지금은 최신 판정이 이기고 뒤집힌 수만 센다 ③ 표준 §6 \"LLM 심판\" 축(라우터 경유 · 사람 판정 전 비노출 · 사람 판정과의 일치도 측정)을 도입할지 판정하고 근거를 남긴다 ④ 판정 기록 모델을 `tests/constitution/test_gate_schema.py`의 `GATE_RECORD_MODELS`에 편입할지 판정(필드명 `judged_by`·`checks`·`content_hash` 고정과의 정합) ⑤ 표본 매니페스트에 기계 판정 불가 hint_id 목록이 실려 판정자가 파일을 열면 목적을 알 수 있다 — 매니페스트 분리 또는 운영 규율 중 결정"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/hint_human_verdicts.py
+  - src/backend/whymath_backend/harness/hint_verdict_session.py
+session: null
+notes: "출처: EOS-210 구현 보고(2026-10-29) — 첫 실행(EOS-211 라이브 산출물 후)에는 필요 없는 보강 축이라 분리."
+updated: 2026-10-29
