@@ -445,6 +445,7 @@ gates:
       - "[2026-10-29] input done · EOS-207 · 판정 무관: 측정 경로·첫 측정값만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 힌트 축은 EOS-211·EOS-210 뒤에야 측정 가능(main aed2b87a) — done EOS-207 인계"
       - "[2026-10-29] depends_on +EOS-211 · depends_on +EOS-210 — Kiki 결정(2026-10-29): G3 조건 '힌트 의미 누설 0'은 힌트가 있어야(EOS-211) 하고 의미 누설은 사람 표본(EOS-210)으로만 잰다 — 둘 다 G3 판정 전 입력으로 연결"
       - "[2026-10-29] input done · EOS-210 · 판정 무관: 사람 판정 좌석(기록 계약·표본·맹검 CLI·의미 축)만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 의미 축 값은 Kiki 맹검 판정 실행 뒤 산출(main 2b65315e) — done EOS-210 인계"
+      - "[2026-10-29] input done · EOS-211 · 판정 무관: 힌트 생성 경로와 첫 실행 산출물·소급 측정값만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 의미 축은 EOS-210 사람 판정 실행 뒤 산출(main 8f6d1024) — done EOS-211 인계"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
