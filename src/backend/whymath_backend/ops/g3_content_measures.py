@@ -919,7 +919,13 @@ def _label_crosscheck(
             flags = [
                 j["leaked"] for j in hint_entry["judged"] if j["level"] in _ZERO_TOLERANCE_LEVELS
             ]
-            machine_hint_leak = True if True in flags else (None if None in flags else False)
+            # L1·L2를 각각 갖추지 못한 CU는 빠진 단의 누설을 모른다 — False(누설 없음)로 적지
+            # 않는다(무관용 축의 cu_without_l12와 같은 기준 · 재리뷰 P3)
+            complete = _ZERO_TOLERANCE_LEVELS <= {j["level"] for j in hint_entry["judged"]}
+            if True in flags:
+                machine_hint_leak = True
+            elif complete and None not in flags:
+                machine_hint_leak = False
         record = {
             "slug": slug,
             "label_verdict": verdict.get("verdict"),

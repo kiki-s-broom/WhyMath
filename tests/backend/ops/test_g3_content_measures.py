@@ -615,6 +615,20 @@ class TestLabelCrosscheck:
         ]
         assert [m["kind"] for m in cross["mismatches"]] == ["machine_hint_leak_without_F8"]
 
+    @pytest.mark.parametrize(("levels", "expected"), [((1,), None), ((2,), None), ((1, 2), False)])
+    def test_machine_flag_is_unknown_when_cu_lacks_l1_or_l2(
+        self, tmp_path: Path, levels: tuple[int, ...], expected: bool | None
+    ) -> None:
+        """재리뷰 P3 반례 — 한 단만 clean인 CU를 "기계: 누설 없음(False)"으로 적으면 모르는 것을
+        아니라고 적는 것이다. 대조군 = L1·L2 둘 다 clean이면 False."""
+        cu = _cu("one", "answer == 20+5", "25")
+        _seat(tmp_path, "r1-a", cus=[cu])
+        _verdicts(tmp_path, [{"slug": "one", "verdict": "rejected", "failure_code": "F8"}])
+        hints = [_hint(cu["problem_id"], "두 수를 차례로 더해 봐요", level=lv) for lv in levels]
+        cross = _report(tmp_path, hints)["label_crosscheck"]
+        assert cross["rows"][0]["machine_hint_leak_l12"] is expected
+        assert cross["mismatches"][0]["detail"].endswith(f"L1·L2 기계 판정 {expected}")
+
     def test_approved_with_bypassed_verification_is_a_mismatch(self, tmp_path: Path) -> None:
         _seat(tmp_path, "r1-a", cus=[_cu("ok", "n = 5", "5", var="n")])
         _verdicts(tmp_path, [{"slug": "ok", "verdict": "approved", "failure_code": None}])
