@@ -158,6 +158,7 @@ from whymath_backend.ops.hint_human_verdicts import (
     load_verdicts,
     measure_semantic_axis,
     sample_population,
+    verdict_ordering_errors,
 )
 from whymath_backend.ops.provenance_audit import (
     GENLOG_ALWAYS_REQUIRED_FIELDS,
@@ -699,6 +700,7 @@ class HintLeakMeasure:
     human_bypassed: int = 0
     human_bypassed_leak_candidates: list[str] = field(default_factory=list)
     human_disagreements: dict[str, dict[str, str]] = field(default_factory=dict)
+    human_leak_withdrawn: dict[str, list[str]] = field(default_factory=dict)
     human_orphan: int = 0
     human_resolved_leaked: int = 0
     human_resolved_clean: int = 0
@@ -781,12 +783,18 @@ class HintLeakMeasure:
     @property
     def _human_note(self) -> str:
         """재판정 뒤집힘·판정자 불일치를 사유에 드러낸다(조용히 최신만 쓰지 않는다 — 리뷰 P2-1)."""
-        if not (self.human_flipped or self.human_disagreements):
+        if not (self.human_flipped or self.human_disagreements or self.human_leak_withdrawn):
             return ""
-        return (
+        note = (
             f" · 같은 판정자 재판정 뒤집힘 {self.human_flipped}건 · 판정자 불일치 "
             f"{len(self.human_disagreements)}건(누설 우선)"
         )
+        if self.human_leak_withdrawn:
+            note += (
+                f" · ⚠ 누설 철회 {len(self.human_leak_withdrawn)}건 — 사람 확인 필요(판정자 ID는 "
+                "자기 신고라 남의 ID로도 철회할 수 있다)"
+            )
+        return note
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -801,6 +809,7 @@ class HintLeakMeasure:
                 "superseded": self.human_superseded,
                 "flipped": self.human_flipped,
                 "reviewer_disagreements": dict(sorted(self.human_disagreements.items())),
+                "leak_withdrawn": dict(sorted(self.human_leak_withdrawn.items())),
                 "bypassed_leak_candidates": sorted(set(self.human_bypassed_leak_candidates)),
                 "stale": self.human_stale,
                 "bypassed": self.human_bypassed,
@@ -898,6 +907,7 @@ def _usable_human_verdicts(
     measure.human_superseded = latest.superseded
     measure.human_flipped = latest.flipped
     measure.human_disagreements = latest.disagreements
+    measure.human_leak_withdrawn = latest.withdrawn
     return latest.latest
 
 
@@ -908,6 +918,7 @@ def measure_hint_leakage(
     hint_inputs: int,
     errors: Sequence[str] = (),
     human_verdicts: Sequence[HintHumanVerdict] = (),
+    human_verdict_sources: Sequence[tuple[str, Sequence[HintHumanVerdict]]] = (),
     human_errors: Sequence[str] = (),
     manifest: SampleManifest | None = None,
     manifest_requested: bool = False,
@@ -916,14 +927,21 @@ def measure_hint_leakage(
 ) -> HintLeakMeasure:
     """CU 정답 × 그 CU의 힌트 → (b). `hint_inputs`는 받은 힌트 파일 수(0이면 '입력 없음' 사유).
 
-    사람 판정(`human_verdicts`)·표본 매니페스트는 모듈 docstring '사람 판정 좌석'. `human_errors`는
-    판정 파일 읽기 오류(측정 실패), `manifest_errors`는 매니페스트 오류(의미 축 측정 불가)다.
+    사람 판정·표본 매니페스트는 모듈 docstring '사람 판정 좌석'. 판정은 파일별
+    (`human_verdict_sources` — (이름, 행) 목록)로 받는다 — append 순서를 믿을 수 있는지 파일 단위로
+    검사하기 때문이다(`verdict_ordering_errors`). `human_verdicts`는 파일 하나로 취급한다.
+    `human_errors`는 판정 파일 읽기 오류(측정 실패), `manifest_errors`는 매니페스트 오류다.
     """
     measure = HintLeakMeasure(
         hint_inputs=hint_inputs, errors=list(errors), human_errors=list(human_errors)
     )
+    sources = list(human_verdict_sources)
+    if human_verdicts:
+        sources.append(("<human_verdicts>", human_verdicts))
+    measure.human_errors.extend(verdict_ordering_errors(sources))
+    flat = [verdict for _, rows in sources for verdict in rows]
     human = _usable_human_verdicts(
-        measure, cu_rows, hints, human_verdicts, now if now is not None else datetime.now(UTC)
+        measure, cu_rows, hints, flat, now if now is not None else datetime.now(UTC)
     )
     machine_by_id: dict[str, bool | None] = {}
     level_by_id: dict[str, int] = {}
@@ -1245,6 +1263,7 @@ def build_report(
     hint_inputs: int,
     hint_errors: Sequence[str],
     human_verdicts: Sequence[HintHumanVerdict] = (),
+    human_verdict_sources: Sequence[tuple[str, Sequence[HintHumanVerdict]]] = (),
     human_errors: Sequence[str] = (),
     manifest: SampleManifest | None = None,
     manifest_requested: bool = False,
@@ -1268,6 +1287,7 @@ def build_report(
         hint_inputs=hint_inputs,
         errors=hint_errors,
         human_verdicts=human_verdicts,
+        human_verdict_sources=human_verdict_sources,
         human_errors=human_errors,
         manifest=manifest,
         manifest_requested=manifest_requested or manifest is not None,
@@ -1365,6 +1385,8 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         f"HINT_HUMAN_MACHINE_MISMATCH={len(hint['human']['machine_mismatches'])}",
         f"HINT_HUMAN_INPUT_ERRORS={len(hint['human']['errors'])}",
         f"HINT_HUMAN_REVIEWER_DISAGREEMENT={len(hint['human']['reviewer_disagreements'])}",
+        f"HINT_HUMAN_LEAK_WITHDRAWN={len(hint['human']['leak_withdrawn'])}",
+        f"HUMAN_CONFIRMATION_REQUIRED={bool(hint['human']['leak_withdrawn'])}",
         f"HINT_HUMAN_BYPASSED_LEAKED={len(hint['semantic']['bypassed_leaks'])}",
         f"META_CU_TOTAL={meta['cu_total']}",
         f"META_CU_MISSING={meta['cu_missing']}",
@@ -1394,6 +1416,10 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         for hint_id, by in hint["human"]["reviewer_disagreements"].items()
     )
     lines.extend(f"HINT_HUMAN_BYPASSED_LEAK={h}" for h in hint["semantic"]["bypassed_leaks"])
+    lines.extend(
+        f"HINT_HUMAN_WITHDRAWN={hint_id} 판정자 {','.join(who)} — 누설 → 아님(사람 확인 필요)"
+        for hint_id, who in hint["human"]["leak_withdrawn"].items()
+    )
     lines.extend(f"INPUT_ERROR={e}" for e in report["input_errors"])
     lines.extend(f"GATE_ERROR={e}" for e in gate["errors"] if e not in report["input_errors"])
     lines.extend(f"MISMATCH={m['slug']} {m['kind']} — {m['detail']}" for m in cross["mismatches"])
@@ -1453,11 +1479,11 @@ def main(argv: list[str] | None = None) -> int:
     round_input = discover_round(runs_root, args.round, review_dir=args.review_dir)
     hint_paths = list(args.hints_jsonl or [])
     hints, hint_errors = load_hints(hint_paths)
-    human_verdicts: list[HintHumanVerdict] = []
+    human_sources: list[tuple[str, Sequence[HintHumanVerdict]]] = []
     human_errors: list[str] = []
     for verdict_path in args.hint_verdicts or []:
         rows, errors = load_verdicts(verdict_path)
-        human_verdicts.extend(rows)
+        human_sources.append((str(verdict_path), rows))
         human_errors.extend(errors)
     manifest: SampleManifest | None = None
     manifest_errors: list[str] = []
@@ -1468,7 +1494,7 @@ def main(argv: list[str] | None = None) -> int:
         hints,
         hint_inputs=len(hint_paths),
         hint_errors=hint_errors,
-        human_verdicts=human_verdicts,
+        human_verdict_sources=human_sources,
         human_errors=human_errors,
         manifest=manifest,
         manifest_requested=args.hint_sample_manifest is not None,

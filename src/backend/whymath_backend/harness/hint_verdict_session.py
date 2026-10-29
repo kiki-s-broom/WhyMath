@@ -87,6 +87,7 @@ from whymath_backend.ops.hint_human_verdicts import (
     load_verdicts,
     review_view,
     sample_population,
+    verdict_ordering_errors,
     write_manifest,
 )
 from whymath_backend.ops.provenance_audit import default_runs_root
@@ -333,6 +334,7 @@ def run_review_session(
     clock: Callable[[], float] = time.monotonic,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     session_id: uuid.UUID | None = None,
+    not_before: datetime | None = None,
 ) -> SessionOutcome:
     """대화형 판정 루프. `done`의 항목은 건너뛴다(재개). 기록 실패면 즉시 멈춘다."""
     session = session_id or uuid.uuid4()
@@ -388,6 +390,15 @@ def run_review_session(
             except ValidationError as exc:
                 out.write(f"  판정이 기록 계약을 통과하지 못했습니다 — {type(exc).__name__}\n")
                 continue
+            if not_before is not None and verdict.judged_at < not_before:
+                # 시계 역행 — 이대로 쓰면 측정기가 파일 전체를 입력 오류로 거부한다(확인 리뷰 P2-1)
+                out.write(
+                    "기록 거부 — 지금 시각이 이 파일의 마지막 판정보다 이르다(시계 역행). 세션을 "
+                    f"멈춥니다(힌트 {item.hint.hint_id}의 이번 판정은 기록되지 않았다). PC 시계를 "
+                    "확인하세요.\n"
+                )
+                outcome.record_failed = True
+                return outcome
             try:
                 append_verdict(verdicts_path, verdict)
             except OSError as exc:
@@ -397,6 +408,7 @@ def run_review_session(
                 )
                 outcome.record_failed = True
                 return outcome
+            not_before = verdict.judged_at
             outcome.recorded += 1
             outcome.recorded_hint_ids.append(item.hint.hint_id)
             out.write(f"  기록했습니다({index}/{outcome.total}).\n")
@@ -509,6 +521,11 @@ def _cmd_review(
     if verdicts_path.exists():
         existing, verdict_errors = load_verdicts(verdicts_path)
         errors.extend(f"기존 판정 파일 손상 — 이어 쓰지 않는다: {e}" for e in verdict_errors)
+        # 순서가 이미 깨진 파일(시각 역행)에 이어 쓰면 측정기가 어차피 거부한다 — 먼저 멈춘다
+        errors.extend(
+            f"기존 판정 파일 순서 손상 — 이어 쓰지 않는다: {e}"
+            for e in verdict_ordering_errors([(verdicts_path.name, existing)])
+        )
     work_ids = {item.hint.hint_id for item in items}
     unknown = sorted(set(args.rejudge or []) - work_ids)
     if unknown:
@@ -534,6 +551,7 @@ def _cmd_review(
         stream=stream,
         out=out,
         clock=clock,
+        not_before=max((v.judged_at for v in existing), default=None),
     )
     out.write(render_summary(outcome))
     return EXIT_RECORD if outcome.record_failed else EXIT_OK

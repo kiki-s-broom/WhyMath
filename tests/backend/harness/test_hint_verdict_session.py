@@ -17,6 +17,7 @@ import io
 import json
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -371,6 +372,59 @@ class TestStopResume:
         code, out = _review(world, ["1", "근거", "y"])
         assert code == hvs.EXIT_INPUT and "손상" in out
         assert path.read_text(encoding="utf-8") == '{"hint_id": "x"\n'
+
+    def test_existing_file_with_time_going_backwards_is_not_appended_to(
+        self, world: dict[str, Any]
+    ) -> None:
+        """확인 리뷰 P2-1 — 순서가 깨진 파일에 이어 쓰면 측정기가 파일 전체를 거부한다."""
+        assert _sample(world)[0] == 0
+        manifest = _manifest(world)
+        path = _verdicts_path(world)
+        for stamp in ("2026-10-02T00:00:00Z", "2026-10-01T00:00:00Z"):  # 두 번째가 더 이르다
+            hint = world["hints"][0]
+            hv.append_verdict(
+                path,
+                hv.HintHumanVerdict(
+                    schema_version="hint-human-verdict/v1",
+                    hint_id=hint.hint_id,
+                    problem_id=hint.solution_step_ref.problem_id,
+                    reviewer="kiki",
+                    judged_at=stamp,  # type: ignore[arg-type]
+                    verdict=hv.HintVerdict.NOT_LEAKED,
+                    rationale="근거",
+                    purpose=manifest.purpose_of(hint.hint_id),
+                    sample_id=manifest.sample_id,
+                    content_fingerprint=hv.hint_review_fingerprint(world["cus"][0], hint),
+                    review_session_id=uuid.uuid4(),
+                    bypassed=False,
+                ),
+            )
+        before = path.read_bytes()
+        code, out = _review(world, ["1", "근거", "y"])
+        assert code == hvs.EXIT_INPUT and "순서 손상" in out
+        assert path.read_bytes() == before
+
+    def test_clock_running_backwards_stops_before_writing(self, world: dict[str, Any]) -> None:
+        assert _sample(world)[0] == 0
+        manifest = _manifest(world)
+        items, errors = hvs.prepare_work(manifest, world["cus"], world["hints"])
+        assert errors == []
+        path = _verdicts_path(world)
+        out = io.StringIO()
+        outcome = hvs.run_review_session(
+            items,
+            manifest=manifest,
+            verdicts_path=path,
+            reviewer="kiki",
+            done=set(),
+            stream=io.StringIO("1\n근거\ny\n"),
+            out=out,
+            clock=_ticking(),
+            now=lambda: datetime(2026, 10, 1, tzinfo=UTC),
+            not_before=datetime(2026, 10, 2, tzinfo=UTC),
+        )
+        assert outcome.record_failed and outcome.recorded == 0
+        assert "시계 역행" in out.getvalue() and not path.exists()
 
     @pytest.mark.parametrize("reviewer", ["김철수", "kim cheolsu", "", "a" * 33])
     def test_name_like_reviewer_id_is_refused(self, world: dict[str, Any], reviewer: str) -> None:

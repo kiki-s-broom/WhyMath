@@ -39,10 +39,16 @@ G3 조건 "힌트 의미 누설 0"을 재는 `ops/g3_content_measures`(EOS-207)�
 
 **재판정은 덮어쓰지 않는다** (EOS-210 리뷰 P2-1 — 규칙 정본은 `latest_verdicts`):
 
-  - 최신은 **append 순서**(파일 안 위치 · 여러 파일이면 주어진 순서)로 고른다. `judged_at`은
-    기록용이다.
+  - 최신은 **append 순서**(파일 안 위치)로 고른다. `judged_at`은 기록용이다. 단 순서를 믿을 수
+    있어야 하므로 두 가지를 입력 오류(exit 2)로 거부한다(확인 리뷰 P2-1 ·
+    `verdict_ordering_errors`):
+    ① 같은 (hint_id, 판정자)가 **서로 다른 파일**에 나옴 — 그러면 CLI 인자 순서가 최신을 정한다
+    ② 한 파일 안에서 `judged_at`이 append 순서대로 **단조 증가하지 않음** — 시계 역행이나 손으로
+    고친 기록이다. 그래서 append 순서와 시각은 늘 같은 방향을 가리킨다.
   - `judged_at`이 측정 시각 + `FUTURE_SKEW`(5분)보다 늦은 행은 **입력 오류(exit 2)**다.
   - 같은 판정자의 재판정은 그 판정자의 마지막 행을 쓰고, 뒤집힌 수(`flipped`)를 사유·요약에 낸다.
+    그중 **누설 → 아님**(누설 철회)은 `withdrawn`으로 따로 내고 "사람 확인 필요"를 표시한다 —
+    판정자 ID는 자기 신고라 공식 도구만으로도 남의 ID로 누설을 거둘 수 있기 때문이다.
   - **판정자 사이의 불일치는 덮어쓰지 않는다** — 누설 쪽을 유효 판정으로 쓰고 불일치를 따로 센다.
     누설을 거둘 수 있는 것은 그 판정을 낸 판정자 자신의 재판정뿐이다.
 
@@ -153,6 +159,7 @@ __all__ = [
     "derive_seed",
     "draw_sample",
     "future_dated_errors",
+    "verdict_ordering_errors",
     "hint_review_fingerprint",
     "latest_verdicts",
     "load_manifest",
@@ -324,6 +331,7 @@ class LatestVerdicts:
     superseded: int = 0
     flipped: int = 0
     disagreements: dict[str, dict[str, str]] = field(default_factory=dict)
+    withdrawn: dict[str, list[str]] = field(default_factory=dict)
     history_counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -357,6 +365,11 @@ def latest_verdicts(verdicts: Iterable[HintHumanVerdict]) -> LatestVerdicts:
             result.superseded += len(rows) - 1
             if len({v.verdict for _, v in rows}) > 1:
                 result.flipped += 1
+            # 누설 철회 — 이 판정자가 한 번이라도 누설을 냈는데 마지막 판정이 "아님"
+            if rows[-1][1].verdict is HintVerdict.NOT_LEAKED and any(
+                v.verdict is HintVerdict.LEAKED for _, v in rows
+            ):
+                result.withdrawn.setdefault(hint_id, []).append(reviewer)
         result.history_counts[hint_id] = total
         ordered = sorted(finals.values(), key=lambda pair: pair[0])
         if len({v.verdict for _, v in ordered}) > 1:
@@ -368,6 +381,41 @@ def latest_verdicts(verdicts: Iterable[HintHumanVerdict]) -> LatestVerdicts:
         else:
             result.latest[hint_id] = ordered[-1][1]
     return result
+
+
+def verdict_ordering_errors(
+    sources: Sequence[tuple[str, Sequence[HintHumanVerdict]]],
+) -> list[str]:
+    """append 순서를 믿을 수 있는가 — (파일 이름, 그 파일의 판정 행) 목록 → 입력 오류.
+
+    ① 같은 (hint_id, 판정자)가 두 파일 이상에 나오면 오류 — 파일을 주는 순서가 곧 최신 판정을
+       정하게 된다(확인 리뷰 실측: 순서를 뒤집자 FAIL이 PASS·exit 0이 됐다).
+    ② 한 파일 안에서 `judged_at`이 append 순서대로 단조 증가(같음 허용)하지 않으면 오류 — 도구는
+       기록 시각을 실행 시각으로 찍으므로, 역행은 시계 역행이나 손으로 고친 행이다.
+    """
+    errors: list[str] = []
+    owner: dict[tuple[str, str], str] = {}
+    reported: set[tuple[str, str, str]] = set()
+    for name, rows in sources:
+        latest_seen: datetime | None = None
+        for index, verdict in enumerate(rows, start=1):
+            key = (verdict.hint_id, verdict.reviewer)
+            first = owner.setdefault(key, name)
+            if first != name and (*key, name) not in reported:
+                reported.add((*key, name))
+                errors.append(
+                    f"hint_id {verdict.hint_id}·판정자 {verdict.reviewer}의 판정이 두 파일"
+                    f"({first} · {name})에 나온다 — 파일 순서가 최신 판정을 정하게 된다"
+                    "(한 파일로 모은다)"
+                )
+            if latest_seen is not None and verdict.judged_at < latest_seen:
+                errors.append(
+                    f"{name} {index}번째 판정(hint_id {verdict.hint_id})의 judged_at이 앞 행보다 "
+                    "이르다 — append 순서와 시각이 어긋난다(시계 역행·손으로 고친 기록)"
+                )
+            if latest_seen is None or verdict.judged_at > latest_seen:
+                latest_seen = verdict.judged_at
+    return errors
 
 
 def future_dated_errors(

@@ -177,6 +177,14 @@ class Round:
         _seat(self.root, self.cus)
         round_input = g3.discover_round(self.root, "r1")
         kw.setdefault("now", _NOW)
+        # 판정 시각을 목록 순서대로 1초씩 다시 찍는다 — 측정기는 append 순서와 judged_at이 같은
+        # 방향이 아니면 입력 오류로 거부한다(EOS-210 확인 리뷰 P2-1). 시각 자체를 시험하는 테스트만
+        # `restamp=False`로 끈다.
+        if kw.pop("restamp", True) and verdicts:
+            verdicts = [
+                v.model_copy(update={"judged_at": _JUDGED + timedelta(seconds=i)})
+                for i, v in enumerate(verdicts)
+            ]
         return g3.build_report(
             round_input,
             self.hints,
@@ -564,7 +572,7 @@ class TestMachineFallback:
         undecided = self._undecided_ids(rnd)
         path = tmp_path / "v.jsonl"
         first = rnd.verdict(undecided[0], None, "leaked")
-        later = rnd.verdict(undecided[0], None, judged_at=_JUDGED + timedelta(hours=1))
+        later = rnd.verdict(undecided[0], None)
         for verdict in (first, later, *(rnd.verdict(h, None) for h in undecided[1:])):
             hv.append_verdict(path, verdict)
         rows = path.read_text(encoding="utf-8").splitlines()
@@ -598,9 +606,7 @@ class TestRejudgementIntegrity:
         rnd = self._short(tmp_path)
         undecided = self._undecided(rnd)
         verdicts = [rnd.verdict(undecided[0], None, "leaked", reviewer="a")]
-        verdicts.append(
-            rnd.verdict(undecided[0], None, reviewer="b", judged_at=_JUDGED + timedelta(hours=1))
-        )
+        verdicts.append(rnd.verdict(undecided[0], None, reviewer="b"))
         verdicts += [rnd.verdict(h, None, reviewer="a") for h in undecided[1:]]
         report = rnd.report(verdicts)
         hint = report["hint_leak"]
@@ -654,7 +660,7 @@ class TestRejudgementIntegrity:
         future = rnd.verdict(undecided[0], None, judged_at=_NOW + timedelta(days=3650))
         verdicts = [future, rnd.verdict(undecided[0], None, "leaked")]
         verdicts += [rnd.verdict(h, None) for h in undecided[1:]]
-        report = rnd.report(verdicts)
+        report = rnd.report(verdicts, restamp=False)
         assert report["exit_code"] == g3.EXIT_UNMEASURED
         assert any("미래" in e for e in report["hint_leak"]["human"]["errors"])
 
@@ -663,7 +669,7 @@ class TestRejudgementIntegrity:
         rnd = self._short(tmp_path)
         undecided = self._undecided(rnd)
         verdicts = [rnd.verdict(h, None, judged_at=_NOW + timedelta(minutes=4)) for h in undecided]
-        assert rnd.report(verdicts)["hint_leak"]["human"]["errors"] == []
+        assert rnd.report(verdicts, restamp=False)["hint_leak"]["human"]["errors"] == []
 
     def test_bypassed_leak_is_disclosed_and_fails(self, tmp_path: Path) -> None:
         """P3-1 — 우회 판정은 통과를 돕지 못하지만, 누설 신호는 숨기지 않는다."""
@@ -681,6 +687,105 @@ class TestRejudgementIntegrity:
         semantic = report["hint_leak"]["semantic"]
         assert (semantic["bypassed_leaks"], semantic["status"]) == ([], "NOT_MEASURED")
         assert report["exit_code"] == g3.EXIT_PASS
+
+    def test_leak_withdrawal_is_disclosed_as_needing_confirmation(self, tmp_path: Path) -> None:
+        """확인 리뷰 P3-1 — 같은 ID로 누설을 거두면(사칭 가능) 사람 확인 필요 신호를 낸다."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        verdicts = [rnd.verdict(undecided[0], None, "leaked")]
+        verdicts += [rnd.verdict(h, None) for h in undecided]
+        report = rnd.report(verdicts)
+        hint = report["hint_leak"]
+        assert hint["human"]["leak_withdrawn"] == {undecided[0]: ["kiki"]}
+        assert "누설 철회 1건 — 사람 확인 필요" in hint["reason"]
+        lines = g3.render_lines(report)
+        assert {"HINT_HUMAN_LEAK_WITHDRAWN=1", "HUMAN_CONFIRMATION_REQUIRED=True"} <= set(lines)
+        assert any(line.startswith(f"HINT_HUMAN_WITHDRAWN={undecided[0]} ") for line in lines)
+
+    def test_not_leaked_to_leaked_is_not_a_withdrawal(self, tmp_path: Path) -> None:
+        """대조군 — 아님 → 누설은 철회가 아니다(뒤집힘으로만 센다)."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        verdicts = [rnd.verdict(undecided[0], None)]
+        verdicts += [rnd.verdict(undecided[0], None, "leaked")]
+        report = rnd.report(verdicts)
+        assert report["hint_leak"]["human"]["leak_withdrawn"] == {}
+        assert "HUMAN_CONFIRMATION_REQUIRED=False" in g3.render_lines(report)
+
+
+class TestVerdictOrdering:
+    """확인 리뷰 P2-1 — append 순서를 믿을 수 있어야 최신 판정이 성립한다."""
+
+    _short = TestMachineFallback._short_answer_round
+    _undecided = TestMachineFallback._undecided_ids
+
+    def _cli(self, rnd: Round, *files: Path) -> int:
+        hints_path = rnd.write()
+        args = ["--round", "r1", "--runs-root", str(rnd.root), "--hints-jsonl", str(hints_path)]
+        for f in files:
+            args += ["--hint-verdicts", str(f)]
+        return g3.main(args)
+
+    def test_same_reviewer_across_files_is_input_error_in_both_orders(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """리뷰 실측 — 옛 '아님'(T)과 새 '누설'(T+5h)을 두 파일에 나누면 인자 순서가 판정을 뒤집었다."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        old, new = tmp_path / "old.jsonl", tmp_path / "new.jsonl"
+        hv.append_verdict(old, rnd.verdict(undecided[0], None))
+        for h in undecided[1:]:
+            hv.append_verdict(old, rnd.verdict(h, None))
+        hv.append_verdict(
+            new, rnd.verdict(undecided[0], None, "leaked", judged_at=_JUDGED + timedelta(hours=5))
+        )
+        assert self._cli(rnd, old, new) == g3.EXIT_UNMEASURED
+        assert self._cli(rnd, new, old) == g3.EXIT_UNMEASURED
+        assert "두 파일" in capsys.readouterr().out
+
+    def test_different_reviewers_in_different_files_are_fine(self, tmp_path: Path) -> None:
+        """대조군 — 판정자가 다르면 파일이 갈라져도 순서 문제가 없다."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        a, b = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+        for h in undecided:
+            hv.append_verdict(a, rnd.verdict(h, None, reviewer="a"))
+            hv.append_verdict(b, rnd.verdict(h, None, reviewer="b"))
+        assert self._cli(rnd, a, b) == g3.EXIT_PASS
+
+    def test_time_going_backwards_within_a_file_is_input_error(self, tmp_path: Path) -> None:
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        path = tmp_path / "v.jsonl"
+        hv.append_verdict(
+            path, rnd.verdict(undecided[0], None, "leaked", judged_at=_JUDGED + timedelta(hours=5))
+        )
+        for h in undecided:
+            hv.append_verdict(path, rnd.verdict(h, None))  # judged_at = T — 앞 행보다 이르다
+        assert self._cli(rnd, path) == g3.EXIT_UNMEASURED
+
+    def test_equal_times_are_monotonic(self) -> None:
+        """대조군 — 같은 시각은 역행이 아니다(단조 증가는 같음을 허용한다)."""
+        rnd_verdicts = [
+            hv.HintHumanVerdict.model_validate(
+                {
+                    "schema_version": "hint-human-verdict/v1",
+                    "hint_id": f"h{i}",
+                    "problem_id": str(uuid.UUID(int=i + 1)),
+                    "reviewer": "kiki",
+                    "judged_at": _JUDGED.isoformat(),
+                    "verdict": "not_leaked",
+                    "rationale": "근거",
+                    "purpose": "machine_undecided",
+                    "sample_id": "hvs-" + "0" * 16,
+                    "content_fingerprint": "sha256:" + "0" * 64,
+                    "review_session_id": str(uuid.UUID(int=1)),
+                    "bypassed": False,
+                }
+            )
+            for i in range(3)
+        ]
+        assert hv.verdict_ordering_errors([("v.jsonl", rnd_verdicts)]) == []
 
 
 # ──────────────────────────────────────────────────────────────────────

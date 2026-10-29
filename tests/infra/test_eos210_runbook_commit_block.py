@@ -64,3 +64,20 @@ def test_clone_is_returned_only_if_the_switch_happened() -> None:
     block = _commit_block()
     returns = [line for line in block.splitlines() if "git switch $OrigBranch" in line]
     assert returns and all("$Switched" in line for line in returns)
+
+
+def test_records_are_restored_to_the_worktree_after_switching_back() -> None:
+    """확인 리뷰 P2-2 — 원래 브랜치(main)에서 두 파일은 미추적이라 `git switch`가 작업 트리에서
+    지운다. 돌아간 *뒤에* 커밋본을 작업 트리에만 복원하고(인덱스 무변경), 내용이 커밋본과 같은지
+    blob 해시로 확인해야 한다."""
+    block = _commit_block()
+    lines = block.splitlines()
+    restore = _line_with(block, "git restore")
+    assert "git restore --source=$Branch --worktree -- $Manifest $Verdicts" in restore
+    assert restore.lstrip().startswith("if ($Committed) {"), restore
+    assert "--staged" not in restore
+    assert "git hash-object $Manifest" in restore and "git hash-object $Verdicts" in restore
+    switch_back = max(i for i, line in enumerate(lines) if "git switch $OrigBranch" in line)
+    assert lines.index(restore) > switch_back, "복원은 원래 브랜치로 돌아간 뒤여야 한다"
+    commit = _line_with(block, "git commit")
+    assert "$Committed = ($Rc -eq 0)" in commit
