@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 힌트 정답 누설의 사람 판정 기록 좌석을 만든다 — 두 용도: (가) 기계 판정 불가 힌트(`ops/g3_content_measures`의 L1·L2 사람 폴백 · 짧은 정답의 글자 축 유보 등)의 판정 (나) 의미적 누설 표본 검수(`docs/standards/eos_verification_design_v1.md` §5 F-Ⅴ \"자동 검사 밖\" · §6 \"전수 자동 + LLM 심판 + 인간 30건\"). 판정 기록은 hint_id·판정자·일시·판정(누설/아님)·근거를 갖는다(헌법 R2-03 게이트 기록 4요건) ② 측정 CLI(`ops/g3_content_measures`)가 그 기록을 읽어 기계 판정 불가 힌트의 UNDECIDED를 해소하고, 의미 축(`HINT_SEMANTIC_AXIS`)을 표본 크기·누설 건수·Wilson 상한으로 낸다 — 표본이 30건 미만이면 측정 불가로 낸다(0건 통과 위장 금지) ③ 사람 판정은 기계 판정을 대체하지 않는다 — 기계가 누설로 판정한 힌트는 사람 판정과 무관하게 누설이며, 어긋나면 둘 다 보존하고 어긋남을 센다(EOS-207 ③ 선례) ④ 검수 도구가 사람 판정 입력 전에 기계 판정을 보여주지 않는다(헌법 R19-01)"
-artifacts: []
+artifacts:
+  - "#1774 2b65315e"
 paths:
   - src/backend/whymath_backend/ops/g3_content_measures.py
   - "src/backend/whymath_backend/harness/review_session*.py"
@@ -26,7 +27,7 @@ paths:
   - scripts/analysis/eos_feature_inventory_v2.py
   - scripts/ops/check_runbook_blocks.py
   - tests/infra/test_runbook_write_guard.py
-session: claude/eos-210-hint-human-verdict
+session: null
 notes: |-
   출처: EOS-207 독립 리뷰 P2-2(2026-10-29). 측정기는 의미 축을 항상 NOT_MEASURED로 내고 판정 불가 힌트를 UNDECIDED로 남긴다 — 그것을 해소할 사람 판정 입력 경로가 없다. G-eos-g3의 입력으로 연결할지는 Kiki 결정 사항이라 게이트 연결은 하지 않았다. 관련: EOS-211(힌트 생성 — 판정 좌석은 픽스처로 따로 만들 수 있어 depends_on으로 묶지 않았다).
 
@@ -35,4 +36,6 @@ notes: |-
   [정정 2026-10-29] notes 치환 — 참조 번호 정정 — EOS-209가 EOS-211로 개명됨(번호 충돌)
 
   [정정 2026-10-29] paths ['src/backend/whymath_backend/ops/g3_content_measures.py', 'src/backend/whymath_backend/harness/review_session*.py'] → ['src/backend/whymath_backend/ops/g3_content_measures.py', 'src/backend/whymath_backend/harness/review_session*.py', 'src/backend/whymath_backend/ops/hint_human_verdicts.py', 'src/backend/whymath_backend/harness/hint_verdict_session.py', 'tests/backend/ops/test_hint_human_verdicts.py', 'tests/backend/harness/test_hint_verdict_session.py', 'docs/ops/eos210_hint_human_verdict_runbook.md', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py']: 구현이 닿은 경로 편입 — 판정 기록 계약·맹검 검수 CLI·런북·인벤토리·선언≠배선 감사·런북 대화형 가드(기존 2경로 유지·전체 재나열)
+
+  [미러 면제 2026-10-29] 대장 전용 PR — 구현은 #1774로 main 착지
 updated: 2026-10-29
