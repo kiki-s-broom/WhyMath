@@ -105,13 +105,17 @@ EOS-210)이며, 숨기지 않기 위해 요약 줄이 **시도 수·게이트 �
 다시 만들 때 그 CU의 이전 채택본 힌트·문맥 행은 원자적으로 교체되고, 거부 기록·생성 로그(이력)는
 그대로 남는다.
 
-무결성: 채택본 힌트 행은 문맥 행과 레벨 집합·`generator_version`(시도 ID 포함)이 정확히 맞아야 한다.
-두 파일의 원자적 교체 사이에서 끊긴 CU는 어긋나므로 두 파일에서 그 CU를 걷어내고 미완으로 다룬다
-(`RESUME_DISCARDED_INCONSISTENT_ROWS`). append 전용 파일(생성 로그·거부 기록)의 끊긴 마지막 줄·깨진
-줄은 append 전에 `<파일>.corrupt`로 옮겨 보존하고 본 파일에서 걷어낸다(`GENLOG_QUARANTINED_LINES`·
-`REJECTED_QUARANTINED_LINES`) — 영구 손상 행이 남지 않는다. 원자적 교체로만 쓰는 두
-파일(채택본·문맥)이 깨져 있으면 외부 손상이므로 입력 오류(2)로 멈춘다
-(복구 = `--quarantine-damaged-state`로 다시 돌리기 — 런북 [R]).
+무결성: 채택본 두 파일은 **하나의 교체 단위**다 — 교체 전에 직전 내용을
+보존본(`cu.hints.state.bak.json`)에 쓰고, 문맥 → 힌트 순서로 교체한 뒤 보존본을 지운다. 그 사이에서
+끊기면 다음 실행이 보존본으로 직전 정합 상태를 복원한다(`RESUME_RESTORED_FROM_BACKUP`). 끊긴 원자적
+쓰기의 `<파일>.tmp`는 재개 시작에서 지운다 (`RESUME_REMOVED_TMP`). 그래도 채택본 힌트 행이 문맥
+행과 레벨 집합·`generator_version`(시도 ID 포함)이 맞지 않으면(외부 편집 등) 그 CU를 걷어내고
+미완으로 다룬다(`RESUME_DISCARDED_INCONSISTENT_ROWS`). 요약의 `THIS_RUN_*`는 이번 실행분,
+`TOTAL_*`는 채택본 파일 기준 누적이다(판정은 누적으로 한다). append 전용 파일(생성 로그·거부
+기록)의 끊긴 마지막 줄·깨진 줄은 append 전에 `<파일>.corrupt`로 옮겨 보존하고 본 파일에서
+걷어낸다(`GENLOG_QUARANTINED_LINES`· `REJECTED_QUARANTINED_LINES`) — 영구 손상 행이 남지 않는다.
+원자적 교체로만 쓰는 두 파일(채택본·문맥)이 깨져 있으면 외부 손상이므로 입력 오류(2)로 멈춘다 (복구
+= `--quarantine-damaged-state`로 다시 돌리기 — 런북 [R]).
 
 생성 로그 `error_detail`에는 예외 **원문을 싣지 않는다**(`<단계 앞머리>: <타입명>(HTTP nnn)` — 이
 파일은 산출물 브랜치로 원격에 올라간다). Langfuse 관측은 응답을 받은 호출만 기록한다 — provider 예외
@@ -123,7 +127,9 @@ EOS-210)이며, 숨기지 않기 위해 요약 줄이 **시도 수·게이트 �
   - 0 — `cu.jsonl`의 CU **전부**가 L1·L2·L3 모두 verified다.
   - 1 — 일부 CU가 미완이다: 재시도 후에도 생성 실패(`FAILED_CUS`) · 게이트가 한 레벨 이상 거부
     (`INCOMPLETE_CUS`) · 시도 예산 소진(`CU_BUDGET_EXHAUSTED`) · `--limit`로 이번 실행에서 처리하지
-    않음(`CU_PENDING`) · 생성 로그 기록 실패.
+    않음(`CU_PENDING`) · 생성 로그 기록 실패(**첫 실패에서 패스를 멈춘다** —
+    `PASS_STOPPED=genlog_write_failed`. 기록 없는 호출은 예산 회계에서 빠져 같은 CU를 다시 부르게
+    되므로 더 부르지 않는다).
   - 2 — 입력 오류: 회차 폴더·`cu.jsonl` 부재·파싱 실패·필수 필드 결측·CU 0건·자체 저작이 아닌 CU
     (클라우드 반출 등급 선언이 거짓이 된다)·기존 산출물 손상. 이 경우 **LLM을 한 번도
     부르지 않는다**.
@@ -196,6 +202,7 @@ __all__ = [
     "GENLOG_FILE",
     "HINTS_FILE",
     "REJECTED_FILE",
+    "STATE_BACKUP_FILE",
     "UNMATCHED_CONCEPT_PREFIX",
     "CuHintDraft",
     "CuInput",
@@ -218,6 +225,8 @@ HINTS_FILE: Final[str] = "cu.hints.jsonl"
 REJECTED_FILE: Final[str] = "cu.hints.rejected.jsonl"
 GENLOG_FILE: Final[str] = "cu.hints.genlog.jsonl"
 CONTEXT_FILE: Final[str] = "cu.hints.context.jsonl"
+STATE_BACKUP_FILE: Final[str] = "cu.hints.state.bak.json"
+"""채택본 교체 직전 상태의 보존본 — 교체 도중 끊기면 재개가 이것으로 직전 정합 상태를 복원한다."""
 
 EXIT_OK: Final[int] = 0
 EXIT_INCOMPLETE: Final[int] = 1
@@ -607,6 +616,8 @@ class _ResumeState:
     quarantined_genlog: int = 0
     quarantined_rejected: int = 0
     quarantined_state: int = 0
+    removed_tmp: int = 0
+    restored_from_backup: bool = False
     errors: list[str] = field(default_factory=list)
 
 
@@ -680,6 +691,13 @@ def _load_resume_state(
     state = _ResumeState(cu={cu.problem_id: _CuState() for cu in cus})
     known = set(state.cu)
     by_slug = {cu.slug: cu.problem_id for cu in cus}
+    # ⓪ 끊긴 쓰기의 흔적 — 미완성 임시 파일은 버리고, 교체 도중 끊겼으면 직전 정합 상태로 되돌린다.
+    state.removed_tmp = _remove_leftover_tmp(run_dir)
+    try:
+        state.restored_from_backup = _restore_interrupted_state(run_dir)
+    except (OSError, ValueError) as exc:
+        state.errors.append(f"{STATE_BACKUP_FILE} 복원 실패 — {type(exc).__name__}")
+        return state
     # ① append 전용 이력 파일은 append 전에 손상 줄부터 격리한다(영구 손상 행 0).
     state.quarantined_genlog = _quarantine_damaged_lines(run_dir / GENLOG_FILE)
     state.quarantined_rejected = _quarantine_damaged_lines(run_dir / REJECTED_FILE)
@@ -742,15 +760,69 @@ def _load_resume_state(
 def _write_current_state(
     run_dir: Path, cus: Sequence[CuInput], cu_states: Mapping[uuid.UUID, _CuState]
 ) -> None:
-    """현재 채택본 전체를 두 파일에 원자적으로 쓴다 — 채택본 힌트 먼저, 문맥 행 나중."""
+    """현재 채택본 전체를 두 파일에 쓴다 — 두 파일을 **하나의 교체 단위**로 묶는다.
+
+    순서: ① 직전 두 파일 내용을 보존본(`STATE_BACKUP_FILE`)에 원자적으로 쓴다 ② 문맥 → ③ 채택본
+    힌트를 각각 원자적으로 교체한다 ④ 보존본을 지운다(**커밋 지점**). ①~④ 사이 어디서 끊겨도
+    보존본이 남으므로, 다음 실행의 `_restore_interrupted_state`가 두 파일을 직전 정합 상태로
+    되돌린다(새 채택본은 잃지만 생성 로그·거부 이력은 남고, 그 CU는 남은 예산 안에서 다시 만든다).
+    보존본 쓰기 자체가 끊기면(①) 두 파일은 손대지 않은 상태다.
+    """
     hint_lines = [line for cu in cus for line in cu_states[cu.problem_id].hint_lines]
     context_lines = [
         json.dumps(cu_states[cu.problem_id].context, ensure_ascii=False)
         for cu in cus
         if cu_states[cu.problem_id].context is not None
     ]
-    _atomic_write_lines(run_dir / HINTS_FILE, hint_lines)
+    backup = {
+        "context": _read_text_or_none(run_dir / CONTEXT_FILE),
+        "hints": _read_text_or_none(run_dir / HINTS_FILE),
+    }
+    _atomic_write_bytes(
+        run_dir / STATE_BACKUP_FILE, json.dumps(backup, ensure_ascii=False).encode("utf-8")
+    )
     _atomic_write_lines(run_dir / CONTEXT_FILE, context_lines)
+    _atomic_write_lines(run_dir / HINTS_FILE, hint_lines)
+    (run_dir / STATE_BACKUP_FILE).unlink()
+
+
+def _read_text_or_none(path: Path) -> str | None:
+    return path.read_text(encoding="utf-8") if path.is_file() else None
+
+
+def _restore_interrupted_state(run_dir: Path) -> bool:
+    """보존본이 남아 있으면(교체 도중 끊김) 두 상태 파일을 직전 정합 상태로 되돌리고 보존본을
+    지운다.
+
+    복원 도중 다시 끊겨도 보존본은 마지막에 지우므로 다음 실행이 같은 복원을 다시 한다(멱등).
+    보존본이 JSON으로 읽히지 않으면 예외가 올라가 입력 오류로 멈춘다 — 원자적으로 쓴 파일이라 정상
+    경로에서는 없다.
+    """
+    backup_path = run_dir / STATE_BACKUP_FILE
+    if not backup_path.is_file():
+        return False
+    backup = json.loads(backup_path.read_text(encoding="utf-8"))
+    for name, key in ((CONTEXT_FILE, "context"), (HINTS_FILE, "hints")):
+        previous = backup.get(key)
+        if previous is None:
+            (run_dir / name).unlink(missing_ok=True)
+        else:
+            _atomic_write_bytes(run_dir / name, str(previous).encode("utf-8"))
+    backup_path.unlink()
+    _LOGGER.warning("채택본 교체 도중 끊긴 흔적 — 보존본으로 직전 정합 상태를 복원했다")
+    return True
+
+
+def _remove_leftover_tmp(run_dir: Path) -> int:
+    """끊긴 원자적 쓰기가 남긴 `<파일>.tmp`를 지운다 — 완성되지 않은 쓰기라 내용은 버린다(원본은
+    그대로다)."""
+    removed = 0
+    for name in (HINTS_FILE, CONTEXT_FILE, GENLOG_FILE, REJECTED_FILE, STATE_BACKUP_FILE):
+        tmp = run_dir / (name + ".tmp")
+        if tmp.is_file():
+            tmp.unlink()
+            removed += 1
+    return removed
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -776,7 +848,13 @@ class PassReport:
     measurable_cus: int = 0
     hints_generated: int = 0
     verified_by_level: Counter[int] = field(default_factory=Counter)
+    """이번 실행에서 새로 채택된 힌트의 레벨 분포(THIS_RUN_*)."""
+    total_verified_by_level: Counter[int] = field(default_factory=Counter)
+    """채택본 파일 기준 누적 레벨 분포(TOTAL_*) — 판정은 이 값으로 한다."""
     rejected_by_gate: Counter[str] = field(default_factory=Counter)
+    stopped_reason: str = ""
+    removed_tmp: int = 0
+    restored_from_backup: int = 0
     failure_kinds: Counter[str] = field(default_factory=Counter)
     routes: Counter[str] = field(default_factory=Counter)
     models: Counter[str] = field(default_factory=Counter)
@@ -810,6 +888,7 @@ class PassReport:
             return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
         by_level = {f"L{k}": v for k, v in sorted(self.verified_by_level.items())}
+        total_by_level = {f"L{k}": v for k, v in sorted(self.total_verified_by_level.items())}
         rate = self.gate_reject_rate
         regenerated = sorted(s for s, n in self.cu_gated_attempts.items() if n > 1)
         lines = [
@@ -837,10 +916,14 @@ class PassReport:
             f"HINT_GATE_REJECTED_HINTS_TOTAL={self.rejected_hints_total}",
             f"HINT_GATE_REJECT_RATE={'None' if rate is None else f'{rate:.4f}'}",
             f"CU_ATTEMPTS={j(self.cu_attempts)}",
-            f"HINTS_GENERATED={self.hints_generated}",
-            f"HINTS_VERIFIED={sum(self.verified_by_level.values())}",
-            f"VERIFIED_BY_LEVEL={j(by_level)}",
-            f"REJECTED_BY_GATE={j({g: self.rejected_by_gate[g] for g in GATE_NAMES})}",
+            f"THIS_RUN_HINTS_GATED={self.hints_generated}",
+            f"THIS_RUN_HINTS_VERIFIED={sum(self.verified_by_level.values())}",
+            f"THIS_RUN_VERIFIED_BY_LEVEL={j(by_level)}",
+            f"THIS_RUN_REJECTED_BY_GATE={j({g: self.rejected_by_gate[g] for g in GATE_NAMES})}",
+            f"TOTAL_HINTS_VERIFIED={sum(self.total_verified_by_level.values())}",
+            f"TOTAL_VERIFIED_BY_LEVEL={j(total_by_level)}",
+            f"RESUME_REMOVED_TMP={self.removed_tmp}",
+            f"RESUME_RESTORED_FROM_BACKUP={self.restored_from_backup}",
             f"RESUME_DISCARDED_INCONSISTENT_ROWS={self.discarded_inconsistent_rows}",
             f"GENLOG_QUARANTINED_LINES={self.quarantined_genlog}",
             f"REJECTED_QUARANTINED_LINES={self.quarantined_rejected}",
@@ -853,6 +936,7 @@ class PassReport:
         lines.append(f"BUDGET_EXHAUSTED_CUS={','.join(self.budget_exhausted_cus)}")
         lines.append(f"REGENERATED_CUS={','.join(regenerated)}")
         lines.append(f"PENDING_CUS={','.join(self.pending_cus)}")
+        lines.append(f"PASS_STOPPED={self.stopped_reason}")
         lines.append(f"EXIT={self.exit_code}")
         return lines
 
@@ -974,8 +1058,9 @@ def _emit_genlog(
     result: GenerationResult | None,
     seed: int | None,
     error_detail: str | None,
-) -> None:
-    """시도 1건 → `GenerationLog` 1행 즉시 append(log_id = 시도 ID). 실패는 타입명 + 회계."""
+) -> bool:
+    """시도 1건 → `GenerationLog` 1행 즉시 append(log_id = 시도 ID). 기록 실패면 False(타입명
+    로그)."""
     usage = result.usage if result is not None else None
     try:
         model_name = model_name_for_decision(decision, settings=call.settings)
@@ -1010,11 +1095,22 @@ def _emit_genlog(
         )
         append_generation_log_jsonl(call.genlog_path, log, run_id=call.run_id)
         report.models[model_name] += 1
-    except Exception as exc:  # noqa: BLE001 — 기록 실패를 삼키지 않는다(회계 + 타입명)
+        return True
+    except Exception as exc:  # noqa: BLE001 — 기록 실패를 삼키지 않는다(회계 + 타입명 + 정지)
         report.genlog_errors += 1
         _LOGGER.warning(
-            "CU 힌트 생성 로그 기록 실패(%s) — 종료 코드 1로 드러낸다", type(exc).__name__
+            "CU 힌트 생성 로그 기록 실패(%s) — 패스를 멈춘다(종료 코드 1)", type(exc).__name__
         )
+        return False
+
+
+class _GenlogWriteStoppedError(Exception):
+    """생성 로그를 쓰지 못했다 — 기록 없는 호출을 더 하지 않도록 패스를 멈추는 내부 신호.
+
+    기록이 없으면 그 시도는 예산 회계(생성 로그 행 수)에서 빠져 다음 실행이 같은 CU를 다시
+    부른다(유료 좌석이면 과금 누수). "실패해도 증거가 남아야 한다"는 측정 도구 규칙상 증거를 남길
+    수 없는 상태에서는 호출을 계속하지 않는다.
+    """
 
 
 async def _attempt(
@@ -1037,7 +1133,7 @@ async def _attempt(
     report.calls += 1
 
     def log(result: GenerationResult | None, error_detail: str | None) -> None:
-        _emit_genlog(
+        if not _emit_genlog(
             call,
             report,
             attempt_id=attempt_id,
@@ -1047,7 +1143,8 @@ async def _attempt(
             result=result,
             seed=seed,
             error_detail=error_detail,
-        )
+        ):
+            raise _GenlogWriteStoppedError
 
     try:
         result = await call.provider.generate(prompt, CU_HINT_SYSTEM, decision, **kwargs)
@@ -1074,6 +1171,20 @@ async def _attempt(
 # ──────────────────────────────────────────────────────────────────────────
 # 게이트 → 후보
 # ──────────────────────────────────────────────────────────────────────────
+def _adoption_key(candidate: _Candidate) -> tuple[bool, int, int]:
+    """채택 순위 — ① L1·L2를 둘 다 통과했는가(측정기가 그 CU를 판정할 수 있는가) ② 통과 레벨 수 ③
+    나중 시도.
+
+    ①이 첫 키인 이유: {L1,L3}와 {L1,L2}는 통과 수가 같지만, 측정기(무관용 L1·L2)는 앞의 것을
+    판정하지 못해 UNDECIDED를 낸다. 통과 수만 보면 나중 시도 {L1,L3}가 측정 가능한 {L1,L2}를
+    밀어낸다.
+    """
+    return (_MEASURABLE_LEVELS <= candidate.verified, len(candidate.verified), candidate.order)
+
+
+_MEASURABLE_LEVELS: Final[frozenset[int]] = frozenset({1, 2})
+
+
 @dataclass
 class _Candidate:
     """게이트까지 간 시도 1건 — 채택 후보(통과 힌트·문맥 행)."""
@@ -1196,6 +1307,8 @@ async def run_cu_hint_pass(
         report.input_errors.extend(state.errors)
         return report
     report.discarded_inconsistent_rows = state.discarded_inconsistent_rows
+    report.removed_tmp = state.removed_tmp
+    report.restored_from_backup = int(state.restored_from_backup)
 
     call = _CallContext(
         provider=provider,
@@ -1228,20 +1341,28 @@ async def run_cu_hint_pass(
             else:
                 _tally(report, cu, st.verified_levels)
             continue
-        if limit is not None and report.cu_processed >= limit:
+        if report.stopped_reason or (limit is not None and report.cu_processed >= limit):
             report.pending_cus.append(cu.slug)
             _account(report, cu, st)
             continue
         report.cu_processed += 1
-        best = await _run_cu(
-            run_dir,
-            call,
-            report,
-            cu,
-            st,
-            remaining=remaining,
-            value_exposure=value_exposure,
-        )
+        try:
+            best = await _run_cu(
+                run_dir,
+                call,
+                report,
+                cu,
+                st,
+                remaining=remaining,
+                value_exposure=value_exposure,
+            )
+        except _GenlogWriteStoppedError:
+            # 기록 없는 시도의 결과는 채택하지 않는다 — 이 CU는 직전 상태 그대로 미처리로 남긴다.
+            report.stopped_reason = "genlog_write_failed"
+            report.pending_cus.append(cu.slug)
+            _account(report, cu, st)
+            _progress(call, f"PASS_STOPPED reason=genlog_write_failed slug={cu.slug}")
+            continue
         if best is not None and best.order >= 0:
             st.context = best.context
             st.hint_lines = [_hint_line(h) for h in best.accepted]
@@ -1280,6 +1401,8 @@ def _account(report: PassReport, cu: CuInput, st: _CuState) -> None:
     report.cu_attempts[cu.slug] = st.attempts
     report.cu_gated_attempts[cu.slug] = st.gated_attempts
     report.rejected_hints_total += st.rejected_hints
+    for level in st.verified_levels:
+        report.total_verified_by_level[level] += 1
 
 
 async def _run_cu(
@@ -1340,7 +1463,7 @@ async def _run_cu(
             break
     if not candidates:
         return None
-    best = max(candidates, key=lambda c: (len(c.verified), c.order))
+    best = max(candidates, key=_adoption_key)
     if best.order >= 0:
         for hint in best.accepted:
             report.verified_by_level[hint.level] += 1
@@ -1400,12 +1523,14 @@ def run_cli(
     prog: str,
     provider_factory: Callable[[], LLMProvider],
     trace_factory: Callable[[], TraceSink | None],
-    value_exposure: AnswerValueExposure | None,
+    value_exposure_factory: Callable[[], AnswerValueExposure | None],
 ) -> int:
     """인자 해석 → 패스 → 요약 출력 → 종료 코드. provider는 인자 검증 *뒤에* 만든다.
 
-    처리되지 않은 예외는 여기서 잡아 `UNHANDLED_ERROR=<타입명>`·`EXIT=3`으로 낸다 — 1(미완)과 섞이면
-    "일부 CU 미완"과 "디스크가 꽉 찼다"가 같은 신호가 된다. 원문은 싣지 않는다(타입명만).
+    세 의존(provider·관측·값 축 능력)은 모두 try **안에서** 만든다 — 조립 단계의 예외도 exit 3으로
+    드러난다. 처리되지 않은 예외는 여기서 잡아 `UNHANDLED_ERROR=<타입명>`·`EXIT=3`으로 낸다 —
+    1(미완)과 섞이면 "일부 CU 미완"과 "디스크가 꽉 찼다"가 같은 신호가 된다. 원문은 싣지
+    않는다(타입명만).
     """
     args = build_arg_parser(prog).parse_args(list(argv) if argv is not None else None)
     try:
@@ -1413,7 +1538,7 @@ def run_cli(
             run_cu_hint_pass(
                 args.run_dir,
                 provider=provider_factory(),
-                value_exposure=value_exposure,
+                value_exposure=value_exposure_factory(),
                 trace=trace_factory(),
                 retries=args.retries,
                 limit=args.limit,

@@ -17,6 +17,7 @@ hermetic(LLM 0·DB 0·네트워크 0) — 가짜 provider가 스크립트된 응
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -190,7 +191,8 @@ class TestNormalPathWithMeasurer:
         assert report.exit_code == chp.EXIT_OK
         lines = report.render_lines()
         assert lines[-1] == "EXIT=0"
-        assert "CU_COMPLETE=1" in lines and "HINTS_VERIFIED=3" in lines
+        assert "CU_COMPLETE=1" in lines and "TOTAL_HINTS_VERIFIED=3" in lines
+        assert "THIS_RUN_HINTS_VERIFIED=3" in lines
         hints = _lines(run / chp.HINTS_FILE)
         assert [h["level"] for h in hints] == [1, 2, 3]
         assert all(h["verified"] is True for h in hints)
@@ -464,7 +466,7 @@ class TestPromptAndCli:
             prog="t",
             provider_factory=lambda: _Provider([_good()]),
             trace_factory=lambda: None,
-            value_exposure=math_answer_value_exposure(),
+            value_exposure_factory=math_answer_value_exposure,
         )
         out = capsys.readouterr().out.strip().splitlines()
         assert code == 0 and out[-1] == "EXIT=0"
@@ -480,8 +482,8 @@ class TestPromptAndCli:
 
         monkeypatch.setattr(harness_entry, "run_cli", fake_run_cli)
         assert harness_entry.main(["--run-dir", "x"]) == 0
-        assert seen["value_exposure"] is not None  # None이면 전 힌트가 fail-closed로 거부된다
-        assert type(seen["value_exposure"]).__name__ == "MathAnswerValueExposure"
+        exposure = seen["value_exposure_factory"]()  # None이면 전 힌트가 fail-closed로 거부된다
+        assert type(exposure).__name__ == "MathAnswerValueExposure"
         provider = seen["provider_factory"]()  # 지연 연결 — 구성만으로 네트워크 0
         assert type(provider).__name__ == "CompositeProvider"
 
@@ -656,9 +658,131 @@ class TestP3Hardening:
             prog="t",
             provider_factory=lambda: _Provider([_good()]),
             trace_factory=lambda: None,
-            value_exposure=math_answer_value_exposure(),
+            value_exposure_factory=math_answer_value_exposure,
         )
         out = capsys.readouterr().out.strip().splitlines()
         assert code == chp.EXIT_UNHANDLED == 3
         assert out[-2:] == ["UNHANDLED_ERROR=PermissionError", "EXIT=3"]
         assert "비밀" not in "\n".join(out)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 재리뷰 — 채택 키 · 교체 단위 복원 · genlog 정지 · 임시 파일 · 런북 가드
+# ──────────────────────────────────────────────────────────────────────
+_NO_DEMO_L3 = (
+    "첫 단계를 같이 해 볼게. 미분부터 시작하면 어떨까?"  # 단계 식 없음 → 게이트 A가 L3 거부
+)
+
+
+class TestReReview:
+    def test_measurable_candidate_beats_a_later_tie(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        script = [_good(hints={"L3": _NO_DEMO_L3}), _good(hints={"L2": _LEAK_L2}), "{}"]
+        report = _run(run, _Provider(script))
+        assert [h["level"] for h in _lines(run / chp.HINTS_FILE)] == [
+            1,
+            2,
+        ]  # {L1,L2} > 나중 {L1,L3}
+        assert report.measurable_cus == 1
+        assert _summary(report)["CU_MEASURABLE_L12"] == "1"
+
+    def test_measurable_prior_adoption_is_kept_against_a_new_tie(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good(hints={"L3": _NO_DEMO_L3})]), retries=0)
+        report = _run(run, _Provider([_good(hints={"L2": _LEAK_L2})]), retries=1)
+        assert [h["level"] for h in _lines(run / chp.HINTS_FILE)] == [1, 2]
+        (context,) = _lines(run / chp.CONTEXT_FILE)
+        assert context["attempt_no"] == 1 and context["attempts_total"] == 2
+        assert report.measurable_cus == 1
+
+    def test_interrupted_state_swap_returns_to_the_last_consistent_state(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good(hints={"L2": _LEAK_L2})]), retries=0)  # 채택본 {L1,L3}
+        before_hints = (run / chp.HINTS_FILE).read_bytes()
+        before_context = (run / chp.CONTEXT_FILE).read_bytes()
+        real_write = chp._atomic_write_lines
+
+        def crash_on_hints(path: Path, lines: Sequence[str]) -> None:
+            if path.name == chp.HINTS_FILE:
+                raise RuntimeError("교체 도중 끊김")
+            real_write(path, lines)
+
+        monkeypatch.setattr(chp, "_atomic_write_lines", crash_on_hints)
+        with pytest.raises(RuntimeError):
+            _run(run, _Provider([_good()]), retries=0, redo_incomplete=True)
+        assert (run / chp.STATE_BACKUP_FILE).is_file()  # 문맥만 바뀌고 힌트는 옛것 — 짝이 깨졌다
+        monkeypatch.setattr(chp, "_atomic_write_lines", real_write)
+        report = _run(run, _Provider([]), retries=0)
+        assert _summary(report)["RESUME_RESTORED_FROM_BACKUP"] == "1"
+        assert (run / chp.HINTS_FILE).read_bytes() == before_hints
+        assert (run / chp.CONTEXT_FILE).read_bytes() == before_context
+        assert not (run / chp.STATE_BACKUP_FILE).exists()
+        assert len(_lines(run / chp.GENLOG_FILE)) == 2  # 끊긴 시도의 호출 기록은 남는다
+
+    def test_genlog_write_failure_stops_the_pass(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cus = [r for r in _real_rows(_OR_RUN) if r.get("answer_explanation")][:2]
+        run = _seat(tmp_path, cus)
+
+        def disk_full(path: Path, log: Any, *, run_id: str | None = None) -> Any:
+            raise OSError("디스크 가득")
+
+        monkeypatch.setattr(chp, "append_generation_log_jsonl", disk_full)
+        provider = _Provider([_good(), _good()])
+        report = _run(run, provider)
+        assert len(provider.calls) == 1  # 기록 없는 호출을 더 하지 않는다
+        summary = _summary(report)
+        assert summary["PASS_STOPPED"] == "genlog_write_failed"
+        assert summary["GENLOG_WRITE_ERRORS"] == "1"
+        assert report.pending_cus == [c["slug"] for c in cus]
+        assert report.exit_code == chp.EXIT_INCOMPLETE
+        assert not (run / chp.HINTS_FILE).exists()  # 기록 없는 시도의 결과는 채택하지 않는다
+
+    def test_leftover_tmp_files_are_removed_on_resume(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good()]))
+        (run / (chp.HINTS_FILE + ".tmp")).write_text("반쯤 쓴 파일", encoding="utf-8")
+        report = _run(run, _Provider([]))
+        assert _summary(report)["RESUME_REMOVED_TMP"] == "1"
+        assert not (run / (chp.HINTS_FILE + ".tmp")).exists()
+        assert report.exit_code == chp.EXIT_OK
+
+    def test_summary_separates_this_run_and_total(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good()]))
+        summary = _summary(_run(run, _Provider([])))
+        assert summary["THIS_RUN_HINTS_VERIFIED"] == "0"  # 두 번째 실행은 새로 채택한 것이 없다
+        assert summary["TOTAL_HINTS_VERIFIED"] == "3"  # 파일 기준 누적
+        assert summary["TOTAL_VERIFIED_BY_LEVEL"] == '{"L1": 1, "L2": 1, "L3": 1}'
+
+
+_RUNBOOK = _REPO / "docs" / "ops" / "eos211_cu_hint_pass_runbook.md"
+_PS_BLOCK = re.compile(r"```powershell\n(.*?)```", re.DOTALL)
+
+
+def _pass_blocks() -> list[str]:
+    blocks = [
+        b for b in _PS_BLOCK.findall(_RUNBOOK.read_text("utf-8")) if "cu_hint_pass --run-dir" in b
+    ]
+    assert len(blocks) == 2, "런북의 패스 실행 블록([D]·[E])이 2개여야 한다"
+    return blocks
+
+
+class TestRunbookGuards:
+    def test_pass_blocks_refuse_unless_head_is_origin_main(self) -> None:
+        for block in _pass_blocks():
+            head_vars = re.findall(
+                r"^(\$HeadOk\w*) = .*git rev-parse HEAD.*git rev-parse origin/main", block, re.M
+            )
+            assert len(head_vars) == 1, "패스 블록이 HEAD == origin/main을 스스로 계산하지 않는다"
+            guard = next(line for line in block.splitlines() if line.startswith("if ("))
+            assert head_vars[0] in guard, "자가 거부 조건에 HEAD 검사가 없다"
+
+    def test_tee_variable_is_reset_before_each_run(self) -> None:
+        for block in _pass_blocks():
+            var = re.search(r"Tee-Object -Variable (\w+)", block)
+            assert var is not None
+            assert f"${var.group(1)} = @()" in block.split("Tee-Object")[0]

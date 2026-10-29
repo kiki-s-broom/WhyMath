@@ -68,7 +68,12 @@
 - `HINT_ATTEMPTS_TOTAL`(누적 시도) · `HINT_GATED_ATTEMPTS_TOTAL`(게이트까지 간 시도) ·
   `HINT_GATE_REJECTED_HINTS_TOTAL`(거부 힌트) · `HINT_GATE_REJECT_RATE`(거부 힌트 ÷ 게이트 도달 시도×3).
 - `GENLOG_QUARANTINED_LINES`·`REJECTED_QUARANTINED_LINES` — 앞 실행이 쓰는 도중 끊겨 깨진 줄을 `.corrupt`로
-  옮긴 수(0이 정상 · 0이 아니면 회신).
+  옮긴 수(0이 정상 · 0이 아니면 회신). `RESUME_REMOVED_TMP`·`RESUME_RESTORED_FROM_BACKUP` — 끊긴 원자적 쓰기의
+  임시 파일을 지운 수·채택본 교체 도중 끊겨 직전 정합 상태로 되돌린 횟수(0이 정상).
+- `THIS_RUN_*`(이번 실행에서 새로 게이트를 지나거나 채택된 것)와 `TOTAL_*`(채택본 파일 기준 누적)는 다르다 —
+  **판정은 `TOTAL_HINTS_VERIFIED`·`TOTAL_VERIFIED_BY_LEVEL`·`CU_COMPLETE`·`CU_MEASURABLE_L12`(누적)로 한다.**
+- `PASS_STOPPED=genlog_write_failed` — 생성 로그를 쓰지 못해 패스가 멈췄다(기록 없는 호출을 더 하지 않는다 ·
+  남은 CU는 `PENDING_CUS`). 디스크·권한을 확인하고 회신한다.
 - `CU_COMPLETE`(L1·L2·L3 모두 통과) · `CU_MEASURABLE_L12`(측정기가 판정할 수 있는 CU — L1·L2 둘 다 통과) ·
   `CU_INCOMPLETE`(한 레벨 이상 거부) · `CU_GENERATION_FAILED`(재시도 후에도 응답을 계약으로 받지 못함).
 - `CALL_FAILURE_KINDS` — `provider`(타임아웃·전송 오류) · `parse`(JSON 아님) · `schema`(형식 위반).
@@ -126,15 +131,22 @@ if ($StaleA2 -and ($TrackedDirtyA2 -eq 0) -and $CarryEmptyA2) {
   "CARRY_COPIED=$($RelA2.Count) CARRY_HASH_MISMATCH=$CopyMismatchA2"
   if ($CopyMismatchA2 -eq 0) {
     git worktree remove --force $Wt
-    git worktree add --detach $Wt origin/main
-    foreach ($r in $RelA2) { New-Item -ItemType Directory -Force -Path (Split-Path (Join-Path $Wt $r)) | Out-Null; Copy-Item -LiteralPath (Join-Path $Carry $r) -Destination (Join-Path $Wt $r) }
-    $RestoreMismatchA2 = @($RelA2 | Where-Object { -not (Test-Path (Join-Path $Wt $_)) -or ((Get-FileHash -LiteralPath (Join-Path $Wt $_)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $Carry $_)).Hash) }).Count
-    "WORKTREE_HEAD_NOW=$(git -C $Wt rev-parse HEAD) MAIN_HEAD=$MainHeadA2 RESTORED=$($RelA2.Count) RESTORE_HASH_MISMATCH=$RestoreMismatchA2"
+    $RemoveExitA2 = $LASTEXITCODE
+    $AddExitA2 = -1
+    if ($RemoveExitA2 -eq 0) { git worktree add --detach $Wt origin/main; $AddExitA2 = $LASTEXITCODE }
+    $WtHeadNowA2 = if ($AddExitA2 -eq 0) { git -C $Wt rev-parse HEAD } else { "" }
+    "WORKTREE_REMOVE_EXIT=$RemoveExitA2 WORKTREE_ADD_EXIT=$AddExitA2 WORKTREE_HEAD_NOW=$WtHeadNowA2 MAIN_HEAD=$MainHeadA2"
+    if (($RemoveExitA2 -eq 0) -and ($AddExitA2 -eq 0) -and ($WtHeadNowA2 -eq $MainHeadA2)) {
+      foreach ($r in $RelA2) { New-Item -ItemType Directory -Force -Path (Split-Path (Join-Path $Wt $r)) | Out-Null; Copy-Item -LiteralPath (Join-Path $Carry $r) -Destination (Join-Path $Wt $r) }
+      $RestoreMismatchA2 = @($RelA2 | Where-Object { -not (Test-Path (Join-Path $Wt $_)) -or ((Get-FileHash -LiteralPath (Join-Path $Wt $_)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $Carry $_)).Hash) }).Count
+      "RESTORED=$($RelA2.Count) RESTORE_HASH_MISMATCH=$RestoreMismatchA2"
+    } else { "WRITE_REFUSED=True — 산출물을 되돌리지 않았다. WORKTREE_REMOVE_EXIT=$RemoveExitA2 WORKTREE_ADD_EXIT=$AddExitA2(둘 다 0이어야) WORKTREE_HEAD_NOW=$WtHeadNowA2(MAIN_HEAD와 같아야) — 산출물은 보존 폴더 $Carry 에 그대로 있다. 위 git 출력과 함께 회신" }
   } else { "WRITE_REFUSED=True — 워크트리를 지우지 않았다. 복사본 해시 불일치 $CopyMismatchA2건(0이어야) — 보존 폴더 $Carry 를 그대로 두고 이 출력을 회신" }
 } else { "WRITE_REFUSED=True — 아무것도 하지 않았다. Stale=$StaleA2(True여야 — False면 이미 최신이거나 워크트리가 없다: [A]부터) TrackedDirty=$TrackedDirtyA2(0이어야 — 추적 파일이 바뀌어 있으면 회신) CarryEmpty=$CarryEmptyA2(True여야 — 앞 이전의 보존본이 남아 있으면 회신)" }
 ```
 
-**판정**: `CARRY_HASH_MISMATCH=0` · `WORKTREE_HEAD_NOW`가 `MAIN_HEAD`와 같다 · `RESTORE_HASH_MISMATCH=0`. 그다음 **[B]부터**
+**판정**: `CARRY_HASH_MISMATCH=0` · `WORKTREE_REMOVE_EXIT=0 WORKTREE_ADD_EXIT=0` · `WORKTREE_HEAD_NOW`가 `MAIN_HEAD`와 같다 ·
+`RESTORE_HASH_MISMATCH=0`. git 명령 하나라도 실패하면 되돌리기 복사를 하지 않는다(산출물은 보존 폴더에 남는다). 그다음 **[B]부터**
 다시 붙여넣는다(재개 — 되돌린 산출물이 그대로 이어진다). 보존 폴더 `C:\Users\kiki\Desktop\__AI\WhyMath-eos211-carry`는
 세션이 수신을 확인할 때까지 지우지 않는다.
 
@@ -246,14 +258,16 @@ $CodeFileD = & $Py -c "import whymath_backend.l4.hint_content.cu_hint_pass as m;
 $CodeOkD = [bool]($CodeFileD -and $CodeFileD.StartsWith($Wt))
 $RouteD = & $Py -c "from whymath_backend.l4.hint_content.cu_hint_pass import routing_request_for as R; from whymath_backend.l3.router import Router, resolve_model; a=Router().route(R(subscription=None, budget_krw=None)); print('%s|%s' % (a.cost_tier, resolve_model(a.local_family, a.local_model)))"
 $TimeoutD = & $Py -c "from whymath_backend.config import Settings; print(Settings().ollama_request_timeout_s)"
-"PRECHECK_D CodeOk=$CodeOkD Route=$RouteD OllamaTimeout=$TimeoutD CuFile=$(Test-Path "$LocalRun\cu.jsonl") WorktreeHead=$(git rev-parse --short HEAD)"
-if ($CodeOkD -and ($RouteD -eq "local|qwen3:30b-a3b") -and ($TimeoutD -eq "180.0") -and (Test-Path "$LocalRun\cu.jsonl")) {
+$HeadOkD = [bool]((git rev-parse HEAD) -eq (git rev-parse origin/main))
+"PRECHECK_D CodeOk=$CodeOkD HeadIsMain=$HeadOkD Route=$RouteD OllamaTimeout=$TimeoutD CuFile=$(Test-Path "$LocalRun\cu.jsonl") WorktreeHead=$(git rev-parse --short HEAD)"
+if ($CodeOkD -and $HeadOkD -and ($RouteD -eq "local|qwen3:30b-a3b") -and ($TimeoutD -eq "180.0") -and (Test-Path "$LocalRun\cu.jsonl")) {
+  $OutD = @()
   & $Py -m whymath_backend.harness.cu_hint_pass --run-dir $LocalRun @PassArgs | Tee-Object -Variable OutD
   $LocalExit = $LASTEXITCODE
   $ExitLineD = @($OutD | Where-Object { $_ -match '^EXIT=' }) | Select-Object -Last 1
   "SUMMARY_EXIT_LINE=$ExitLineD LOCAL_PASS_EXIT=$LocalExit PASS_ARGS=$($PassArgs -join ' ')"
   "HINTS=$(& $Py -c $CountPy "$LocalRun\cu.hints.jsonl") REJECTED=$(& $Py -c $CountPy "$LocalRun\cu.hints.rejected.jsonl") CALLS_LOGGED=$(& $Py -c $CountPy "$LocalRun\cu.hints.genlog.jsonl") CU_WITH_STATE=$(& $Py -c $CountPy "$LocalRun\cu.hints.context.jsonl")"
-} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkD(True여야) Route=$RouteD(local|qwen3:30b-a3b여야 — 다르면 좌석이 바뀌었다) OllamaTimeout=$TimeoutD(180.0이어야 — 새 창이면 [B]부터) CuFile=$(Test-Path "$LocalRun\cu.jsonl")(True여야)" }
+} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkD(True여야) HeadIsMain=$HeadOkD(True여야 — False면 워크트리가 최신 main이 아니다: [A-2]) Route=$RouteD(local|qwen3:30b-a3b여야 — 다르면 좌석이 바뀌었다) OllamaTimeout=$TimeoutD(180.0이어야 — 새 창이면 [B]부터) CuFile=$(Test-Path "$LocalRun\cu.jsonl")(True여야)" }
 ```
 
 **판정**: `SUMMARY_EXIT_LINE=EXIT=0` 또는 `EXIT=1`이고 그 값이 `LOCAL_PASS_EXIT`와 같다. `SUMMARY_EXIT_LINE=`이
@@ -285,18 +299,24 @@ $CodeFileE = & $Py -c "import whymath_backend.l4.hint_content.cu_hint_pass as m;
 $CodeOkE = [bool]($CodeFileE -and $CodeFileE.StartsWith($Wt))
 $RouteE = & $Py -c "from whymath_backend.l4.hint_content.cu_hint_pass import routing_request_for as R; from whymath_backend.l3.router import Router; b=Router().route(R(subscription='premium', budget_krw=5000.0)); print(b.cost_tier)"
 $SeatE = & $Py -c "from whymath_backend.config import Settings; from whymath_backend.l3.providers.factory import cloud_model_pins, cloud_provider_name; s=Settings(); k=s.openrouter_api_key.get_secret_value(); print('%s|%s|%s|%s' % (cloud_provider_name(s), cloud_model_pins(s)[0], s.anthropic_api_enabled, len(k) >= 20 and k.startswith('sk-or-') and chr(8230) not in k))"
-"PRECHECK_E CodeOk=$CodeOkE Route=$RouteE SeatCheck=$SeatE CuFile=$(Test-Path "$OrRun\cu.jsonl") WorktreeHead=$(git rev-parse --short HEAD)"
-if ($CodeOkE -and ($RouteE -eq "cloud_mid") -and ($SeatE -eq "openrouter|deepseek/deepseek-v4.1-flash|False|True") -and (Test-Path "$OrRun\cu.jsonl")) {
+$HeadOkE = [bool]((git rev-parse HEAD) -eq (git rev-parse origin/main))
+"PRECHECK_E CodeOk=$CodeOkE HeadIsMain=$HeadOkE Route=$RouteE SeatCheck=$SeatE CuFile=$(Test-Path "$OrRun\cu.jsonl") WorktreeHead=$(git rev-parse --short HEAD)"
+if ($CodeOkE -and $HeadOkE -and ($RouteE -eq "cloud_mid") -and ($SeatE -eq "openrouter|deepseek/deepseek-v4.1-flash|False|True") -and (Test-Path "$OrRun\cu.jsonl")) {
+  $OutE = @()
   & $Py -m whymath_backend.harness.cu_hint_pass --run-dir $OrRun --subscription premium --budget-krw 5000 @PassArgs | Tee-Object -Variable OutE
   $OrExit = $LASTEXITCODE
   $ExitLineE = @($OutE | Where-Object { $_ -match '^EXIT=' }) | Select-Object -Last 1
   "SUMMARY_EXIT_LINE=$ExitLineE OPENROUTER_PASS_EXIT=$OrExit PASS_ARGS=$($PassArgs -join ' ')"
   "HINTS=$(& $Py -c $CountPy "$OrRun\cu.hints.jsonl") REJECTED=$(& $Py -c $CountPy "$OrRun\cu.hints.rejected.jsonl") CALLS_LOGGED=$(& $Py -c $CountPy "$OrRun\cu.hints.genlog.jsonl") CU_WITH_STATE=$(& $Py -c $CountPy "$OrRun\cu.hints.context.jsonl")"
-} else { "WRITE_REFUSED=True — 호출하지 않았다(과금 0). CodeOk=$CodeOkE(True여야) Route=$RouteE(cloud_mid여야) SeatCheck=$SeatE(openrouter|deepseek/deepseek-v4.1-flash|False|True여야) CuFile=$(Test-Path "$OrRun\cu.jsonl")(True여야) · [C]부터 다시 확인하세요" }
+} else { "WRITE_REFUSED=True — 호출하지 않았다(과금 0). CodeOk=$CodeOkE(True여야) HeadIsMain=$HeadOkE(True여야 — False면 [A-2]) Route=$RouteE(cloud_mid여야) SeatCheck=$SeatE(openrouter|deepseek/deepseek-v4.1-flash|False|True여야) CuFile=$(Test-Path "$OrRun\cu.jsonl")(True여야) · [C]부터 다시 확인하세요" }
 ```
 
-**판정**: [D]와 같다(`SUMMARY_EXIT_LINE=EXIT=0` 또는 `EXIT=1` · `CU_WITH_STATE`가 27이면 전 CU가 게이트까지 갔다).
-`CU_WITH_STATE`가 27보다 작으면 **[E]를 한 번 더** 붙여넣는다(끝난 CU는 다시 부르지 않아 추가 과금은 남은 CU분뿐이다).
+**판정**: [D]와 같다(`SUMMARY_EXIT_LINE=EXIT=0` 또는 `EXIT=1`). 요약의 `TOTAL_HINTS_VERIFIED`·`CU_MEASURABLE_L12`·
+`CU_COMPLETE`가 누적 기준 판정값이다(`THIS_RUN_*`는 이번 실행분만이다). `EXIT=1`일 때 할 일은 남은 CU의 종류로 갈린다:
+`PENDING_CUS`(멈춤·`PASS_STOPPED` 포함)나 예산이 남은 `INCOMPLETE_CUS`·`FAILED_CUS`가 있으면 **[E]를 한 번 더**
+붙여넣는다(완료 CU와 예산이 떨어진 CU는 부르지 않는다). 남은 것이 `BUDGET_EXHAUSTED_CUS`뿐이면 [E]를 다시 붙여넣어도
+**호출이 일어나지 않는다** — 그대로 [F]로 가고, 다시 만들지(`--redo-incomplete` — [D-R]) 여부는 회신을 받은 세션이
+정한다. `PASS_STOPPED=genlog_write_failed`면 디스크·권한 문제다 — 다시 붙여넣기 전에 회신한다.
 
 ---
 
@@ -304,12 +324,13 @@ if ($CodeOkE -and ($RouteE -eq "cloud_mid") -and ($SeatE -eq "openrouter|deepsee
 
 [D]·[E]가 `BUDGET_EXHAUSTED_CUS`를 남겼고 **세션이 다시 만들라고 회신했을 때만** 쓴다. 다음 [D]·[E] 실행에
 `--redo-incomplete`를 붙인다(그 실행에서 미완 CU에 시도 3회를 새로 준다 · 거부 이력·생성 로그는 그대로 남는다).
-이 블록은 변수만 바꾸고 아무것도 실행하지 않는다 — 이어서 해당 좌석의 [D] 또는 [E]를 붙여넣는다.
+이 블록은 변수만 바꾸고 아무것도 실행하지 않는다 — 이어서 해당 좌석의 [D] 또는 [E]를 붙여넣는다. [R]과 함께 써도 서로를
+덮지 않는다(각 블록은 자기 스위치가 없을 때만 덧붙인다 · 초기화는 [B]만 한다).
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [D-R] 다음 [D]/[E] 실행에 재생성 스위치 싣기 (변수만 설정)
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos211
-$PassArgs = @("--redo-incomplete")
+if (-not (@($PassArgs) -contains "--redo-incomplete")) { $PassArgs = @($PassArgs) + "--redo-incomplete" }
 "PASS_ARGS=$($PassArgs -join ' ')"
 ```
 
@@ -325,7 +346,7 @@ $PassArgs = @("--redo-incomplete")
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [R] 다음 [D]/[E] 실행에 손상 격리 스위치 싣기 (변수만 설정)
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos211
-$PassArgs = @("--quarantine-damaged-state")
+if (-not (@($PassArgs) -contains "--quarantine-damaged-state")) { $PassArgs = @($PassArgs) + "--quarantine-damaged-state" }
 "PASS_ARGS=$($PassArgs -join ' ')"
 ```
 
@@ -382,9 +403,11 @@ $OtherDirty = @(git status --porcelain -- . ':!data/runs').Count
 $RemoteExists = [bool](git ls-remote --heads origin $Branch)
 $Expected = @("eos197-a6-local\cu.hints.genlog.jsonl", "eos197-a6-local\cu.hints.context.jsonl", "eos197-a6-openrouter\cu.hints.genlog.jsonl", "eos197-a6-openrouter\cu.hints.context.jsonl", "eos197-a6-review\g3_content_measures_eos211.json")
 $MissingG = @($Expected | Where-Object { -not (Test-Path "$Runs\$_") })
+$LeftoverG = @(Get-ChildItem -Path $Runs -Recurse -File -ErrorAction SilentlyContinue | Where-Object { ($_.Name -like "cu.hints*.tmp") -or ($_.Name -eq "cu.hints.state.bak.json") })
 "PRECHECK_G EmailSet=$EmailSet NewFiles=$NewFiles OtherDirty=$OtherDirty RemoteBranchExists=$RemoteExists MeasureJson=$(Test-Path $MeasureJson)"
 "EXPECTED_FILES_MISSING=$($MissingG.Count) $($MissingG -join ' ')"
-if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $RemoteExists) -and (Test-Path $MeasureJson)) {
+"LEFTOVER_INTERRUPTED_FILES=$($LeftoverG.Count) $(@($LeftoverG | ForEach-Object { $_.Name }) -join ' ')"
+if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $RemoteExists) -and (Test-Path $MeasureJson) -and ($LeftoverG.Count -eq 0)) {
   git checkout -B $Branch
   git add -- data/runs
   git commit -m "EOS-211: CU 사후 힌트 패스 산출물 — EOS-197 A6 두 좌석 cu.hints 4종 + G3 소급 측정 리포트 (Kiki 머신 실행분)"
@@ -400,7 +423,7 @@ if ($EmailSet -and ($NewFiles -gt 0) -and ($OtherDirty -eq 0) -and (-not $Remote
     "REMOTE_SHA=$RemoteSha REMOTE_IS_COMMIT=$RemoteIsCommit"
     "PUSH_VERIFIED=$($HeadNotMain -and ($CommittedRuns -gt 0) -and $RemoteIsCommit) — HEAD_NOT_MAIN=$HeadNotMain COMMITTED_RUNS_FILES=$CommittedRuns REMOTE_IS_COMMIT=$RemoteIsCommit(셋 다 True·1 이상이어야)"
   } else { "PUSH_REFUSED=True PUSH_VERIFIED=False — push하지 않았다. HEAD_NOT_MAIN=$HeadNotMain(True여야 — False면 커밋이 실패했다: 위 git commit 출력을 회신) COMMITTED_RUNS_FILES=$CommittedRuns(1 이상이어야)" }
-} else { "WRITE_REFUSED=True — 커밋·push하지 않았다. EmailSet=$EmailSet(True여야) NewFiles=$NewFiles(1 이상이어야) OtherDirty=$OtherDirty(0이어야 — 산출물 밖 변경이 있으면 목록을 회신) RemoteBranchExists=$RemoteExists(False여야 — 이미 있으면 앞 push가 성공한 것일 수 있다. 회신하세요) MeasureJson=$(Test-Path $MeasureJson)(True여야 — [F]를 먼저)" }
+} else { "WRITE_REFUSED=True — 커밋·push하지 않았다. EmailSet=$EmailSet(True여야) NewFiles=$NewFiles(1 이상이어야) OtherDirty=$OtherDirty(0이어야 — 산출물 밖 변경이 있으면 목록을 회신) RemoteBranchExists=$RemoteExists(False여야 — 이미 있으면 앞 push가 성공한 것일 수 있다. 회신하세요) MeasureJson=$(Test-Path $MeasureJson)(True여야 — [F]를 먼저) LeftoverInterrupted=$($LeftoverG.Count)(0이어야 — 끊긴 실행의 흔적이다. 그 좌석의 [D]/[E]를 한 번 더 붙여넣으면 재개 시작에서 정리·복원된다)" }
 ```
 
 **판정**: `PUSH_VERIFIED=True`(커밋이 실제로 만들어졌고 · 마지막 커밋에 `data/runs/` 파일이 있고 · 원격 브랜치 끝이 그

@@ -51,13 +51,16 @@ def _standard_trace() -> TraceSink:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """CLI 진입점 — 요약 `KEY=VALUE` 줄을 내고 종료 코드(0·1·2)로 판정한다."""
+    """CLI 진입점 — 요약 `KEY=VALUE` 줄을 내고 종료 코드(0·1·2·3)로 판정한다.
+
+    세 의존은 팩토리로 넘긴다 — `run_cli`가 인자 검증 뒤, 최상위 예외 처리(exit 3) 안에서 만든다.
+    """
     return run_cli(
         argv,
         prog=_PROG,
         provider_factory=_standard_provider,
         trace_factory=_standard_trace,
-        value_exposure=math_answer_value_exposure(),
+        value_exposure_factory=math_answer_value_exposure,
     )
 
 
