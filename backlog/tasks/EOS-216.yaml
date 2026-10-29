@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-216
+title: "LLM 저작 경로 provider 실패 호출도 Langfuse 추적 — 성공·파싱 실패만 기록되는 공백(EOS-211 재리뷰 P3)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① LLM 저작 경로(`l3/equivalent/llm_generator.py`·`l3/pipeline`·`l4/hint_content/cu_hint_pass.py` 등)가 provider가 예외를 던진 호출을 Langfuse에 기록하지 않는다 — 성공·파싱 실패 호출만 추적된다(EOS-211 재리뷰 P3 · 선례 동일). CLAUDE.md \"모든 LLM 호출 → Langfuse 추적\"을 문면대로 충족하도록 실패 호출도 추적 이벤트(실패 표시·예외 타입명·지연 · 응답 본문 미포함)로 남긴다 ② 어떤 호출 지점이 해당하는지 역할 기반 검색으로 전수 열거하고 범위를 문서에 적는다 ③ 추적 기록 자체의 실패는 never-break(타입명 로그)로 유지 ④ 인프로세스 이중 회계(genlog)와 Langfuse 건수가 일치하는지 대조할 수 있게 한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/llm_generator.py
+  - src/backend/whymath_backend/l4/hint_content/cu_hint_pass.py
+session: null
+notes: "출처: EOS-211 재리뷰(2026-10-29) — 선례(llm_generator·pipeline)와 같은 동작이라 EOS-211 범위에서는 유지."
+updated: 2026-10-29
