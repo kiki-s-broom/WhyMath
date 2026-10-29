@@ -13,11 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 교체 완료 후 보존본 삭제 직전에 끊기면 다음 실행이 정합한 새 상태를 보존본으로 되돌린다(`l4/hint_content/cu_hint_pass.py`의 `_write_current_state`·`_restore_interrupted_state`) — 보존본에 새 상태의 해시를 함께 담아, 현재 두 파일이 새 상태와 같으면 보존본만 지우고(전진) 다를 때만 되돌린다. 비용 들인 완료본 손실 재현 테스트로 고정 ② 보존본(`cu.hints.state.bak.json`)이 손상(JSON 파싱 실패·dict 아님)되면 매 실행 exit 2/3이고 `--quarantine-damaged-state`로도 복구되지 않는다 — 보존본도 `.corrupt` 격리 경로에 포함하고 dict 검사 후 exit 2로 일관되게 처리, 런북 [R]에 안내 ③ genlog 기록 실패 정지(`_GenlogWriteStoppedError`)가 같은 CU의 이미 기록된 시도 후보를 버린다 — 기록된 후보는 채택 대상으로 보존 ④ 같은 회차 폴더 동시 실행 방지 잠금(`cu.hints.lock` · O_EXCL 생성 · 이미 있으면 exit 2 · 정상 종료 시 해제 · 낡은 잠금 판정 규칙 문서화) — 재개 시 tmp 정리·보존본 복원이 다른 실행의 파일을 건드리지 않게"
+  - "⑤ 런북 `docs/ops/eos211_cu_hint_pass_runbook.md`의 쓰기 블록 [D]·[E]가 `HEAD == origin/main`을 요구해, 실행 도중 main에 무관한 PR(대장 기록 등)이 머지되고 원 클론이 fetch하면(워크트리는 refs를 공유한다) 멀쩡한 실행이 `WRITE_REFUSED`로 멈춘다 — 2026-10-29 Kiki 라이브 실행에서 실측(#1773 대장 PR 머지 후 [D] 거부 → [A-2] 재생성 왕복 1회). 판정을 \"커밋 동일\"이 아니라 \"실행이 읽는 경로의 내용 동일\"(`git diff --quiet origin/main -- <cu_hint_pass 계열 경로·프롬프트>`)로 바꾸고, 무관 커밋으로는 거부되지 않음·실행 경로 변경으로는 거부됨을 런북 가드 테스트로 고정한다(CLAUDE.md 대화형 붙여넣기 축 ③의 동등성 판정 부수 규칙)"
 artifacts: []
 paths:
   - src/backend/whymath_backend/l4/hint_content/cu_hint_pass.py
   - tests/backend/l4/hint_content/test_cu_hint_pass.py
   - docs/ops/eos211_cu_hint_pass_runbook.md
 session: null
-notes: "출처: EOS-211 2차 수정 확인 리뷰(2026-10-29) — 머지 가능 판정·P1·P2 없음. 4건 모두 드문 경로(종료 직전 unlink 실패·외부 손상·동시 실행)이고 측정을 거짓 PASS로 만들지 않아 분리. ①은 --redo-incomplete로, ②는 보존본 수동 삭제로 우회 가능."
+notes: |-
+  출처: EOS-211 2차 수정 확인 리뷰(2026-10-29) — 머지 가능 판정·P1·P2 없음. 4건 모두 드문 경로(종료 직전 unlink 실패·외부 손상·동시 실행)이고 측정을 거짓 PASS로 만들지 않아 분리. ①은 --redo-incomplete로, ②는 보존본 수동 삭제로 우회 가능.
+
+  [정정 2026-10-29] EOS-211 라이브 실행 중 실측된 런북 가드 과민(무관 머지로 거부) 편입
 updated: 2026-10-29
