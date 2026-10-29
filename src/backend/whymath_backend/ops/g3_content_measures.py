@@ -151,6 +151,7 @@ from whymath_backend.ops.hint_human_verdicts import (
     HintVerdict,
     SampleManifest,
     SemanticAxis,
+    future_dated_errors,
     hint_review_fingerprint,
     latest_verdicts,
     load_manifest,
@@ -696,6 +697,8 @@ class HintLeakMeasure:
     human_flipped: int = 0
     human_stale: int = 0
     human_bypassed: int = 0
+    human_bypassed_leak_candidates: list[str] = field(default_factory=list)
+    human_disagreements: dict[str, dict[str, str]] = field(default_factory=dict)
     human_orphan: int = 0
     human_resolved_leaked: int = 0
     human_resolved_clean: int = 0
@@ -754,7 +757,7 @@ class HintLeakMeasure:
             return (
                 f"L1·L2 힌트 정답 누설 {self.leaked_l12 + self.human_resolved_leaked}건(무관용 — "
                 f"기계 {self.leaked_l12} · 기계 판정 불가를 사람이 누설로 해소 "
-                f"{self.human_resolved_leaked})"
+                f"{self.human_resolved_leaked}){self._human_note}"
             )
         if (
             self.cu_without_hints
@@ -766,11 +769,24 @@ class HintLeakMeasure:
                 f"힌트 없는 CU {self.cu_without_hints}건 · L1·L2를 모두 갖추지 못한 CU "
                 f"{self.cu_without_l12}건 · L1·L2 사람 폴백 {self.undecided_l12}건 중 미해소 "
                 f"{self.undecided_l12_unresolved}건 · CU에 붙지 않는 힌트 {self.unmatched_hints}건 "
-                "— 누설 0을 확정할 수 없다"
+                f"— 누설 0을 확정할 수 없다{self._human_note}"
             )
         resolved = self.human_resolved_clean
         suffix = f" · 사람 폴백 {resolved}건은 사람 판정으로 해소" if resolved else ""
-        return f"기계 두 축(글자·값) L1·L2 누설 0{suffix} — 의미 축은 별도(사람 표본)"
+        return (
+            f"기계 두 축(글자·값) L1·L2 누설 0{suffix} — 의미 축은 별도(사람 표본)"
+            f"{self._human_note}"
+        )
+
+    @property
+    def _human_note(self) -> str:
+        """재판정 뒤집힘·판정자 불일치를 사유에 드러낸다(조용히 최신만 쓰지 않는다 — 리뷰 P2-1)."""
+        if not (self.human_flipped or self.human_disagreements):
+            return ""
+        return (
+            f" · 같은 판정자 재판정 뒤집힘 {self.human_flipped}건 · 판정자 불일치 "
+            f"{len(self.human_disagreements)}건(누설 우선)"
+        )
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -784,6 +800,8 @@ class HintLeakMeasure:
                 "usable_hints": self.human_usable_hints,
                 "superseded": self.human_superseded,
                 "flipped": self.human_flipped,
+                "reviewer_disagreements": dict(sorted(self.human_disagreements.items())),
+                "bypassed_leak_candidates": sorted(set(self.human_bypassed_leak_candidates)),
                 "stale": self.human_stale,
                 "bypassed": self.human_bypassed,
                 "orphan": self.human_orphan,
@@ -836,11 +854,15 @@ def _usable_human_verdicts(
     cu_rows: Sequence[Mapping[str, Any]],
     hints: Sequence[Hint],
     verdicts: Sequence[HintHumanVerdict],
+    now: datetime,
 ) -> dict[str, HintHumanVerdict]:
-    """사람 판정 → hint_id별 **유효한 최신** 판정. 고아·우회·낡음은 빼고 센다(지우지 않는다).
+    """사람 판정 → hint_id별 **유효한** 판정. 고아·우회·낡음은 빼고 센다(지우지 않는다).
 
-    problem_id가 힌트의 문제와 다르면 기록이 엉뚱한 문항을 가리키는 것이므로 측정 실패다.
+    problem_id가 힌트의 문제와 다르면 기록이 엉뚱한 문항을 가리키는 것이므로, `judged_at`이 측정
+    시각보다 미래면 순서를 믿을 수 없으므로 측정 실패다. 최신·불일치 규칙은
+    `hint_human_verdicts.latest_verdicts`(append 순서 · 판정자 불일치는 누설 우선).
     """
+    measure.human_errors.extend(future_dated_errors(verdicts, now=now))
     hints_by_id: dict[str, Hint] = {}
     for hint in hints:
         hints_by_id.setdefault(hint.hint_id, hint)
@@ -860,10 +882,14 @@ def _usable_human_verdicts(
                 f"사람 판정 hint_id {verdict.hint_id}의 problem_id가 힌트의 문제와 다르다"
             )
             continue
+        fresh = verdict.content_fingerprint == hint_review_fingerprint(cu_row, target)
         if verdict.bypassed:
             measure.human_bypassed += 1
+            # 우회 판정은 통과·해소의 근거가 아니지만, 지금 내용에 대한 누설 신호는 숨기지 않는다
+            if fresh and verdict.verdict is HintVerdict.LEAKED:
+                measure.human_bypassed_leak_candidates.append(verdict.hint_id)
             continue
-        if verdict.content_fingerprint != hint_review_fingerprint(cu_row, target):
+        if not fresh:
             measure.human_stale += 1
             continue
         usable.append(verdict)
@@ -871,6 +897,7 @@ def _usable_human_verdicts(
     measure.human_usable_hints = len(latest.latest)
     measure.human_superseded = latest.superseded
     measure.human_flipped = latest.flipped
+    measure.human_disagreements = latest.disagreements
     return latest.latest
 
 
@@ -885,6 +912,7 @@ def measure_hint_leakage(
     manifest: SampleManifest | None = None,
     manifest_requested: bool = False,
     manifest_errors: Sequence[str] = (),
+    now: datetime | None = None,
 ) -> HintLeakMeasure:
     """CU 정답 × 그 CU의 힌트 → (b). `hint_inputs`는 받은 힌트 파일 수(0이면 '입력 없음' 사유).
 
@@ -894,7 +922,9 @@ def measure_hint_leakage(
     measure = HintLeakMeasure(
         hint_inputs=hint_inputs, errors=list(errors), human_errors=list(human_errors)
     )
-    human = _usable_human_verdicts(measure, cu_rows, hints, human_verdicts)
+    human = _usable_human_verdicts(
+        measure, cu_rows, hints, human_verdicts, now if now is not None else datetime.now(UTC)
+    )
     machine_by_id: dict[str, bool | None] = {}
     level_by_id: dict[str, int] = {}
     by_problem: dict[str, list[Hint]] = {}
@@ -958,6 +988,8 @@ def measure_hint_leakage(
         machine=machine_by_id,
         levels=level_by_id,
         errors=semantic_errors,
+        bypassed_leak_candidates=measure.human_bypassed_leak_candidates,
+        disagreements=measure.human_disagreements,
     )
     return measure
 
@@ -1217,8 +1249,12 @@ def build_report(
     manifest: SampleManifest | None = None,
     manifest_requested: bool = False,
     manifest_errors: Sequence[str] = (),
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    """세 측정 + 라벨 대조 → 리포트 dict(순수 · I/O 0)."""
+    """세 측정 + 라벨 대조 → 리포트 dict(I/O 0).
+
+    `now`는 미래 시각 판정 검사의 기준이다(기본 실행 시각).
+    """
     gate = measure_auto_gate(round_input.run_dirs, input_errors=round_input.errors)
     cu_rows = [row for run in round_input.run_dirs for row in run.cu_rows]
     manifest_problems = list(manifest_errors)
@@ -1236,6 +1272,7 @@ def build_report(
         manifest=manifest,
         manifest_requested=manifest_requested or manifest is not None,
         manifest_errors=manifest_problems,
+        now=now,
     )
     meta = measure_meta(round_input.run_dirs, input_errors=round_input.errors)
     crosscheck = _label_crosscheck(round_input.verdict_rows, gate, hint, meta)
@@ -1327,6 +1364,8 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         f"HINT_HUMAN_RESOLVED_CLEAN={hint['human']['resolved_clean']}",
         f"HINT_HUMAN_MACHINE_MISMATCH={len(hint['human']['machine_mismatches'])}",
         f"HINT_HUMAN_INPUT_ERRORS={len(hint['human']['errors'])}",
+        f"HINT_HUMAN_REVIEWER_DISAGREEMENT={len(hint['human']['reviewer_disagreements'])}",
+        f"HINT_HUMAN_BYPASSED_LEAKED={len(hint['semantic']['bypassed_leaks'])}",
         f"META_CU_TOTAL={meta['cu_total']}",
         f"META_CU_MISSING={meta['cu_missing']}",
         f"META_MISSING_BY_FIELD={_j(meta['missing_by_field'])}",
@@ -1350,6 +1389,11 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         f"{m['human_verdict']}({m['reviewer']} {m['judged_at']})"
         for m in hint["human"]["machine_mismatches"]
     )
+    lines.extend(
+        f"HINT_HUMAN_DISAGREEMENT={hint_id} " + " · ".join(f"{r}={v}" for r, v in by.items())
+        for hint_id, by in hint["human"]["reviewer_disagreements"].items()
+    )
+    lines.extend(f"HINT_HUMAN_BYPASSED_LEAK={h}" for h in hint["semantic"]["bypassed_leaks"])
     lines.extend(f"INPUT_ERROR={e}" for e in report["input_errors"])
     lines.extend(f"GATE_ERROR={e}" for e in gate["errors"] if e not in report["input_errors"])
     lines.extend(f"MISMATCH={m['slug']} {m['kind']} — {m['detail']}" for m in cross["mismatches"])

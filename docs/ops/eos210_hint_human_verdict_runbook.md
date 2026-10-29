@@ -38,7 +38,7 @@ G3 "힌트 의미 누설 0"의 사람 판정 — 힌트 표본 추출 → 맹검
 | D | 표본 추출 — 매니페스트 작성 | 매니페스트 파일 1개 | `SAMPLE_OK=True` |
 | E | 맹검 판정 세션(대화형 — 한 줄 블록) | 판정 1건마다 append | `SESSION_STATE=완료` |
 | F | 측정기 실행 | `work\` 아래 리포트 JSON만 | `MEASURE_RAN=True` |
-| G | 판정 기록 커밋·push(새 브랜치) | git 브랜치·커밋·push | `COMMIT_EXIT=0` · `PUSH_EXIT=0` |
+| G | 판정 기록 커밋·push(새 브랜치) | git 브랜치·커밋·push | `LAST_STEP=push` · `STEP_EXIT=0` |
 
 **판정 세션 안에서 보이는 것**: 문항·선택지·정답·힌트 단계·힌트 본문뿐이다. 기계 판정, 게이트 기록, 그
 힌트가 왜 물어졌는지(표본인지 기계 판정 불가인지), 이미 기록된 판정(자기 것·다른 사람 것)은 **보이지
@@ -59,7 +59,7 @@ G3 "힌트 의미 누설 0"의 사람 판정 — 힌트 표본 추출 → 맹검
 | D | `SAMPLE_OK=True` · `SEMANTIC_SAMPLE_REACHES_30=True` | `SEMANTIC_SAMPLE_REACHES_30=False` — 모집단이 30 미만이라 의미 축은 측정 불가로 끝난다(그래도 판정은 진행 — (가) 해소에 쓰인다). `INPUT_ERROR=다른 매니페스트가 이미 있다` — 힌트가 바뀌었다. 출력 전달 |
 | E | 마지막 요약 `SESSION_REMAINING=0` | `WRITE_PREFLIGHT_FAILED` — 판정 파일을 다른 프로그램(Excel 등)이 열고 있다. 닫고 [E] 재실행 · `기록 실패 — …` — 그 항목은 기록되지 않았다. 원인을 고치고 [E] 재실행 |
 | F | `MEASURE_RAN=True` | `HINT_HUMAN_INPUT_ERRORS`가 0이 아님 — 판정 파일이 손상됐다. **손으로 고치지 말고** 출력 전달 |
-| G | `COMMIT_EXIT=0` · `PUSH_EXIT=0` · `CLONE_BRANCH_NOW`가 원래 브랜치 | `WRITE_REFUSED=True` — 같은 줄의 False 항목을 보고 앞 블록을 다시 |
+| G | `LAST_STEP=push` · `STEP_EXIT=0` · `CLONE_NOW`가 `ORIGINAL`과 같음 | `WRITE_REFUSED=True` — 같은 줄의 False 항목을 보고 [G] 아래 표의 대처 · `WRITE_STOPPED=True` — 멈춘 단계 뒤는 실행되지 않았다. 출력 전달 |
 
 **측정 결과 읽는 법**([F] 출력): `HINT_SEMANTIC_AXIS=PASS`면 표본 30건 이상에서 누설 0이고
 `HINT_SEMANTIC_WILSON_UPPER_95`가 그 보증 상한이다(0/30이어도 약 0.083 — 0이 아니다). `FAIL`이면 누설이
@@ -199,30 +199,73 @@ $MeasureRan = ($MeasureExit -in @(0, 1, 2)) -and ($MeasureMap["HINT_HUMAN_INPUT_
 
 ### [G] 판정 기록 커밋·push (새 브랜치 · 조건 미충족이면 스스로 거부)
 
-매니페스트와 판정 기록 두 파일만 새 브랜치에 커밋해 push하고, 클론을 **원래 브랜치로 되돌린다**. PR은
+매니페스트와 판정 기록 **두 파일만** 새 브랜치에 커밋해 push하고, 클론을 **원래 위치로 되돌린다**. PR은
 세션이 연다(브랜치 이름을 전달).
+
+이 블록이 막는 것 두 가지(EOS-210 리뷰 P2-2·P2-3):
+
+- **다른 세션이 스테이징해 둔 변경까지 커밋** — 공유 클론이다. 그래서 시작 전에 스테이징된 것이 **하나도
+  없어야** 하고(`NOTHING_STAGED=True`), 커밋은 두 경로만 지정한다(`git commit … -- 두 파일`).
+- **재실행하면 main에 커밋** — PowerShell의 `;`는 앞 명령이 실패해도 다음 명령을 실행한다. `git switch -c`가
+  "이미 있음"으로 실패하면 그 뒤 커밋이 **현재 브랜치(main)**에 들어간다. 그래서 브랜치가 로컬·원격 어디에도
+  없어야 시작하고(`BRANCH_FREE=True`), 단계마다 종료 코드를 보고 실패하면 **뒤 단계를 실행하지 않는다**.
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창 · G 기록 커밋·push (쓰기 · 조건 미충족이면 스스로 거부)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 $HeadNow = (git rev-parse --short HEAD)
 $OrigBranch = (git rev-parse --abbrev-ref HEAD)
+$OrigSha = (git rev-parse HEAD)
 $Branch = "eos210-hint-verdicts-$Round"
 $Changed = @(git status --porcelain -- "data/runs/$Round-review")
-$CommitReady = $MeasureRan -and $SampleOk -and ($HeadNow -eq $MainSha) -and (Test-Path $Manifest) -and (Test-Path $Verdicts) -and ($Changed.Count -ge 1)
-"COMMIT_READY=$CommitReady · MEASURE_RAN=$MeasureRan · SAMPLE_OK=$SampleOk · HEAD_NOW=$HeadNow · MAIN=$MainSha · CHANGED=" + $Changed.Count
-if ($CommitReady) { git switch -c $Branch; git add -- $Manifest $Verdicts; git commit -m "EOS-210: 힌트 누설 사람 판정 기록 $Round"; $CommitExit = $LASTEXITCODE; git push -u origin $Branch; $PushExit = $LASTEXITCODE; "COMMIT_EXIT=$CommitExit · PUSH_EXIT=$PushExit · BRANCH=$Branch · BRANCH_HEAD=" + (git rev-parse --short HEAD); git log -1 --stat --oneline; git checkout $OrigBranch } else { "WRITE_REFUSED=True — MEASURE_RAN=$MeasureRan · SAMPLE_OK=$SampleOk · HEAD_NOW=$HeadNow · MAIN=$MainSha · CHANGED=" + $Changed.Count + " · [B]~[F]를 같은 창에서 순서대로 실행하세요" }
-"CLONE_BRANCH_NOW=" + (git rev-parse --abbrev-ref HEAD) + " · ORIGINAL=$OrigBranch"
+git diff --cached --quiet
+$NothingStaged = ($LASTEXITCODE -eq 0)
+git rev-parse --verify --quiet "refs/heads/$Branch" *> $null
+$LocalBranchFree = ($LASTEXITCODE -ne 0)
+git ls-remote --exit-code --heads origin $Branch *> $null
+$RemoteRc = $LASTEXITCODE
+$RemoteBranchFree = ($RemoteRc -eq 2)
+$BranchFree = $LocalBranchFree -and $RemoteBranchFree
+$CommitReady = $MeasureRan -and $SampleOk -and ($HeadNow -eq $MainSha) -and (Test-Path $Manifest) -and (Test-Path $Verdicts) -and ($Changed.Count -ge 1) -and $NothingStaged -and $BranchFree
+"COMMIT_READY=$CommitReady · MEASURE_RAN=$MeasureRan · SAMPLE_OK=$SampleOk · HEAD_NOW=$HeadNow · MAIN=$MainSha · CHANGED=" + $Changed.Count + " · NOTHING_STAGED=$NothingStaged · BRANCH_FREE=$BranchFree(LOCAL=$LocalBranchFree REMOTE_RC=$RemoteRc)"
+if ($CommitReady) {
+  $Step = "switch"; $Switched = $false
+  git switch -c $Branch; $Rc = $LASTEXITCODE
+  if ($Rc -eq 0) { $Switched = $true; $Step = "add"; git add -- $Manifest $Verdicts; $Rc = $LASTEXITCODE }
+  if ($Rc -eq 0) { $Step = "commit"; git commit -m "EOS-210: 힌트 누설 사람 판정 기록 $Round" -- $Manifest $Verdicts; $Rc = $LASTEXITCODE }
+  if ($Rc -eq 0) { $Step = "push"; git push -u origin $Branch; $Rc = $LASTEXITCODE }
+  "LAST_STEP=$Step · STEP_EXIT=$Rc · BRANCH=$Branch · BRANCH_HEAD=" + (git rev-parse --short HEAD)
+  if ($Rc -ne 0) { "WRITE_STOPPED=True — $Step 단계가 실패(exit $Rc)해 뒤 단계는 실행하지 않았다. 출력 전체를 세션에 전달하세요" }
+  if ($Rc -eq 0) { git log -1 --stat --oneline }
+  if ($Switched -and ($OrigBranch -ne "HEAD")) { git switch $OrigBranch }
+  if ($Switched -and ($OrigBranch -eq "HEAD")) { git switch --detach $OrigSha }
+} else { "WRITE_REFUSED=True — MEASURE_RAN=$MeasureRan · SAMPLE_OK=$SampleOk · HEAD_NOW=$HeadNow · MAIN=$MainSha · CHANGED=" + $Changed.Count + " · NOTHING_STAGED=$NothingStaged · BRANCH_FREE=$BranchFree · 아래 표의 대처를 보세요" }
+"CLONE_NOW=" + (git rev-parse --abbrev-ref HEAD) + "@" + (git rev-parse --short HEAD) + " · ORIGINAL=$OrigBranch@$HeadNow"
 ```
 
-**확인**: `COMMIT_EXIT=0` · `PUSH_EXIT=0` · `git log` 줄에 두 파일(`hint_sample_manifest.json`·
-`hint_verdicts.jsonl`)만 보임 · `CLONE_BRANCH_NOW`가 `ORIGINAL`과 같음. `BRANCH=` 값을 세션에 전달한다.
+**확인**: `LAST_STEP=push` · `STEP_EXIT=0` · `git log` 줄에 두 파일(`hint_sample_manifest.json`·
+`hint_verdicts.jsonl`)만 보임 · `CLONE_NOW`가 `ORIGINAL`과 같음. `BRANCH=` 값을 세션에 전달한다.
 
 | 증상 | 뜻 | 대처 |
 |---|---|---|
 | `CHANGED=0` | 이번 실행으로 바뀐 기록이 없다(이미 커밋됨) | 커밋할 것이 없다. 그대로 끝 |
-| `COMMIT_EXIT`가 0이 아님 | git 사용자 설정·훅 문제 | 출력 전체 전달. 브랜치는 이미 바뀌었을 수 있다 — `CLONE_BRANCH_NOW` 줄을 함께 전달 |
-| `PUSH_EXIT`가 0이 아님 | 원격 거부·네트워크 | 커밋은 로컬 브랜치에 남아 있다. 출력 전달 |
+| `NOTHING_STAGED=False` | 공유 클론에 **다른 작업의 스테이징**이 있다 | 건드리지 말고 출력 전달 — 그 스테이징의 주인을 세션이 확인한다 |
+| `BRANCH_FREE=False` | 같은 이름의 브랜치가 이미 있다(앞선 실행이 만들었거나 push까지 됐다) | 다시 붙여넣지 말고 출력 전달 — `REMOTE_RC=0`이면 이미 push된 것이고, 판정을 더 했으면 세션이 그 브랜치에 이어 올리는 절차를 따로 준다 |
+| `REMOTE_RC`가 0·2가 아님 | 원격 조회 자체가 실패(네트워크·인증) | 쓰기는 거부됐다. 연결을 확인하고 [G] 재실행 |
+| `WRITE_STOPPED=True` | 표시된 단계에서 멈췄고 뒤 단계는 안 돌았다 | 출력 전체 전달. `LAST_STEP=push`면 커밋은 로컬 브랜치에 있다. 클론은 원래 위치로 되돌렸다(`CLONE_NOW`로 확인) |
+
+### 판정 중 주의 (R19-01 맹검 — 도구 밖에서 깨지 않기)
+
+도구는 기계 판정을 보여 주지 않지만, **파일을 직접 열면** 그 보호가 사라진다. 판정 세션이 끝날 때까지:
+
+- `data\runs\<회차>-review\hint_sample_manifest.json`을 열지 않는다 — `machine_undecided_hint_ids`가 곧
+  "기계가 판정하지 못한 힌트" 목록이다.
+- `data\runs\<회차>-*\cu.hints.jsonl`을 열지 않는다 — 각 줄의 `gate_report`가 게이트(기계) 판정이다.
+- `hint_verdicts.jsonl`을 열지 않는다 — 다른 판정자의 판정과 근거가 들어 있다.
+- **[F] 측정 뒤의 재판정은 맹검이 아니다.** [F] 출력의 `HINT_HUMAN_MISMATCH`·`HINT_HUMAN_DISAGREEMENT` 줄이
+  기계 판정과 다른 판정자의 판정을 보여 준다. 그것을 본 뒤 `--rejudge`로 다시 판정하면 그 판정은 기계·타인
+  판정을 본 상태의 판정이다 — 재판정이 필요하면 [F] 출력을 보지 않은 **다른 판정자**에게 맡기거나, 세션에
+  알려 그 사실을 기록에 남긴다.
 
 ---
 

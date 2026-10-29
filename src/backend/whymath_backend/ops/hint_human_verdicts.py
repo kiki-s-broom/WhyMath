@@ -25,8 +25,11 @@ G3 조건 "힌트 의미 누설 0"을 재는 `ops/g3_content_measures`(EOS-207)�
                + `content_fingerprint` — 판정자에게 **보인 내용**(문항·선택지·정답·힌트 단계·본문)의
                지문. 판정 뒤 힌트·정답이 바뀌면 측정기가 그 판정을 낡음(stale)으로 빼고 센다.
   - 우회 여부 = `bypassed`    — True = 맹검 도구(R19-01)를 거치지 않고 기입된 판정. 도구는 항상
-               False를 쓴다. True 행은 **어느 축에도 계상하지 않고** 따로 센다. 기본값이 없다 —
-               손으로 쓴 행이 필드를 빼먹어 "우회 아님"으로 조용히 채워지지 않게 한다.
+               False를 쓴다. True 행은 PASS·해소의 근거로 **쓰지 않는다**. 단 그 행이 **누설**을
+               말하면(내용 지문 일치 L1·L2 · 기계 누설이 아닌 힌트) 의미 축을 FAIL로 올리고
+               `bypassed_leaks`로 따로 낸다 — 우회 판정은 통과를 도울 수 없지만, 확인된 누설
+               신호를 숨기는 데 쓰여서도 안 된다(비대칭 · 학생 안전 우선). 기본값이 없다 — 손으로
+               쓴 행이 필드를 빼먹어 "우회 아님"으로 조용히 채워지지 않게 한다.
 
 나머지: `hint_id`·`problem_id`(힌트의 문제와 다르면 측정 실패) · `verdict`(`leaked`/`not_leaked`) ·
 `purpose`(`machine_undecided`/`semantic_sample` — **물은 이유**. 두 목적이 겹치는 힌트는 한 번만
@@ -34,8 +37,32 @@ G3 조건 "힌트 의미 누설 0"을 재는 `ops/g3_content_measures`(EOS-207)�
 해소는 목적과 무관하게 그 힌트의 최신 판정을 쓴다) · `sample_id`(매니페스트 식별자) ·
 `review_session_id`.
 
-**재판정은 덮어쓰지 않는다.** 같은 `hint_id`의 행이 여럿이면 `judged_at`이 가장 늦은 행(동률이면
-파일에서 뒤의 행)을 쓰고, 앞선 행은 지우지 않은 채 `superseded`·판정이 뒤집힌 수(`flipped`)로 센다.
+**재판정은 덮어쓰지 않는다** (EOS-210 리뷰 P2-1 — 규칙 정본은 `latest_verdicts`):
+
+  - 최신은 **append 순서**(파일 안 위치 · 여러 파일이면 주어진 순서)로 고른다. `judged_at`은
+    기록용이다.
+  - `judged_at`이 측정 시각 + `FUTURE_SKEW`(5분)보다 늦은 행은 **입력 오류(exit 2)**다.
+  - 같은 판정자의 재판정은 그 판정자의 마지막 행을 쓰고, 뒤집힌 수(`flipped`)를 사유·요약에 낸다.
+  - **판정자 사이의 불일치는 덮어쓰지 않는다** — 누설 쪽을 유효 판정으로 쓰고 불일치를 따로 센다.
+    누설을 거둘 수 있는 것은 그 판정을 낸 판정자 자신의 재판정뿐이다.
+
+앞선 행은 지우지 않는다(`superseded`로 센다).
+
+위조 방지의 한계 (정직한 범위)
+----------------------------
+이 좌석은 **사고(실수·시계 오류·재판정 덮어쓰기)를 막지, 위조를 막지 않는다.** 판정 파일은 평문
+JSONL이라 손으로 쓴 행은 도구가 쓴 행과 구별되지 않는다 — `bypassed`는 자기 신고값이고, 내용 지문·
+`review_session_id`도 누구나 계산·생성할 수 있다. 서명·서버 저장은 두지 않았다(오프라인 단일 PC
+운영). 판정 무결성은 **git 이력**(판정 파일·매니페스트를 커밋하고 PR 리뷰를 거친다 — 런북 [G])과
+**리뷰**에 기댄다. 그 위에서 설계가 지키는 것은 비대칭 하나다: 의심스러운 행(우회·불일치)은 FAIL을
+만들 수는 있어도 PASS를 만들 수는 없다.
+
+입력 전제 — 모든 힌트 파일
+-------------------------
+표본 추출·판정·측정에는 **그 회차의 모든 `cu.hints.jsonl`을 같은 집합으로** 준다. 일부만 주면 모집단
+지문이 바뀌어 seed·표본이 달라진다 — 즉 입력 파일을 골라 넣는 것이 "표본을 다시 뽑는 자유"가 된다.
+측정기는 매니페스트 모집단과 현재 입력의 모집단이 다르면 의미 축을 측정 불가로 내지만, *처음부터*
+부분 입력으로 매니페스트를 만들면 그 대조로는 잡히지 않는다(런북은 회차 폴더를 전수 스캔해 넘긴다).
 
 **손상은 측정 실패다.** JSON 파싱 실패·필수 필드 누락·잘못된 verdict·빈 근거는 줄 번호와 예외
 타입명(필드값 제외)을 오류로 남기고, 측정기는 그 오류를 입력 오류로 올린다(exit 2). 못 읽은
@@ -88,6 +115,7 @@ import random
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
@@ -107,6 +135,7 @@ from whymath_backend.l4.hint_content.models import Hint
 
 __all__ = [
     "DEFAULT_SAMPLE_SIZE",
+    "FUTURE_SKEW",
     "MANIFEST_SCHEMA",
     "RATIONALE_MAX_LENGTH",
     "REVIEWER_ID_PATTERN",
@@ -123,6 +152,7 @@ __all__ = [
     "derive_sample_id",
     "derive_seed",
     "draw_sample",
+    "future_dated_errors",
     "hint_review_fingerprint",
     "latest_verdicts",
     "load_manifest",
@@ -144,6 +174,9 @@ REVIEWER_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$"
 _FINGERPRINT_PATTERN = r"^sha256:[0-9a-f]{64}$"
 _SAMPLE_ID_PATTERN = r"^hvs-[0-9a-f]{16}$"
 _ZERO_TOLERANCE_LEVELS: frozenset[int] = frozenset({1, 2})
+# 미래 시각 판정의 허용 오차 — 같은 머신(Phaiakes9)에서 판정·측정하므로 시계 차는 0에 가깝다.
+# 5분은 NTP 보정·다른 머신 측정의 여유분이며, 그보다 늦은 judged_at은 시계 오류나 손으로 쓴 행이다.
+FUTURE_SKEW = timedelta(minutes=5)
 
 
 class HintVerdict(StrEnum):
@@ -281,28 +314,73 @@ def append_verdict(path: Path, verdict: HintHumanVerdict) -> None:
 
 @dataclass(slots=True)
 class LatestVerdicts:
-    """hint_id → 최신 판정 + 이력 계수(덮어쓴 행은 지우지 않고 센다)."""
+    """hint_id → 유효 판정 + 이력 계수(덮어쓴 행은 지우지 않고 센다).
+
+    `latest`는 판정자별 최신 판정을 합친 결과다 — 판정자 사이가 엇갈리면 누설 쪽 행이다
+    (`disagreements`에 판정자별 판정을 그대로 남긴다).
+    """
 
     latest: dict[str, HintHumanVerdict] = field(default_factory=dict)
     superseded: int = 0
     flipped: int = 0
+    disagreements: dict[str, dict[str, str]] = field(default_factory=dict)
     history_counts: dict[str, int] = field(default_factory=dict)
 
 
 def latest_verdicts(verdicts: Iterable[HintHumanVerdict]) -> LatestVerdicts:
-    """같은 hint_id의 여러 판정 중 `judged_at`이 가장 늦은 것(동률이면 뒤의 행)을 고른다."""
-    grouped: dict[str, list[tuple[int, HintHumanVerdict]]] = {}
+    """판정 행(입력 순서 = append 순서) → hint_id별 유효 판정 (EOS-210 리뷰 P2-1).
+
+    1. **최신은 append 순서로 고른다** — `judged_at`은 기록용일 뿐 순위에 쓰지 않는다.
+       `judged_at`으로 고르면 미래 시각 행 하나가 그 뒤의 모든 재판정을 영구히 이긴다(리뷰 실측
+       ⓑ). 미래 시각 행 자체는 측정기가 입력 오류로 거부한다(`future_dated_errors`).
+    2. **같은 판정자의 재판정**은 그 판정자의 마지막 행을 쓴다. 판정이 바뀐 (hint, 판정자) 수를
+       `flipped`로 센다 — 측정기는 이 수를 사유·요약 줄에 낸다.
+    3. **판정자 사이의 불일치는 덮어쓰지 않는다** — 판정자별 최신 판정이 서로 다르면
+       `disagreements`에 남기고 **누설 쪽**을 유효 판정으로 쓴다(리뷰 실측 ⓐ: a의 누설을 b의
+       "아님"이 1시간 뒤 덮어 PASS가 났다). 근거: 무관용 기준("누설 0")에서 사람 검출기 하나가
+       누설을 냈다면, 그것을 거둘 수 있는 것은 **그 판정자 자신의 재판정**뿐이다(2번 경로).
+       다른 판정자의 "아님"은 반증이 아니라 또 하나의 관측이다. 측정 불가(NOT_MEASURABLE)로
+       물리면 누설 신호가 "측정 부족"(exit 2)으로 약해져 숨는 것과 같다(학생 안전 우선).
+    """
+    grouped: dict[str, dict[str, list[tuple[int, HintHumanVerdict]]]] = {}
     for order, verdict in enumerate(verdicts):
-        grouped.setdefault(verdict.hint_id, []).append((order, verdict))
+        grouped.setdefault(verdict.hint_id, {}).setdefault(verdict.reviewer, []).append(
+            (order, verdict)
+        )
     result = LatestVerdicts()
-    for hint_id, rows in grouped.items():
-        rows.sort(key=lambda pair: (pair[1].judged_at, pair[0]))
-        result.latest[hint_id] = rows[-1][1]
-        result.history_counts[hint_id] = len(rows)
-        result.superseded += len(rows) - 1
-        if len({v.verdict for _, v in rows}) > 1:
-            result.flipped += 1
+    for hint_id, by_reviewer in grouped.items():
+        finals: dict[str, tuple[int, HintHumanVerdict]] = {}
+        total = 0
+        for reviewer, rows in by_reviewer.items():
+            finals[reviewer] = rows[-1]  # append 순서상 마지막
+            total += len(rows)
+            result.superseded += len(rows) - 1
+            if len({v.verdict for _, v in rows}) > 1:
+                result.flipped += 1
+        result.history_counts[hint_id] = total
+        ordered = sorted(finals.values(), key=lambda pair: pair[0])
+        if len({v.verdict for _, v in ordered}) > 1:
+            result.disagreements[hint_id] = {
+                reviewer: pair[1].verdict.value for reviewer, pair in sorted(finals.items())
+            }
+            leaked = [v for _, v in ordered if v.verdict is HintVerdict.LEAKED]
+            result.latest[hint_id] = leaked[-1]
+        else:
+            result.latest[hint_id] = ordered[-1][1]
     return result
+
+
+def future_dated_errors(
+    verdicts: Iterable[HintHumanVerdict], *, now: datetime, skew: timedelta = FUTURE_SKEW
+) -> list[str]:
+    """`judged_at`이 측정 시각 + 허용 오차보다 늦은 행 → 입력 오류(값 대신 hint_id·판정자만)."""
+    limit = now + skew
+    return [
+        f"사람 판정 hint_id {v.hint_id}(판정자 {v.reviewer})의 judged_at이 측정 시각보다 미래다 — "
+        "시계 오류이거나 손으로 쓴 행이다"
+        for v in verdicts
+        if v.judged_at > limit
+    ]
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -469,6 +547,8 @@ class SemanticAxis:
     outside_manifest: int = 0
     sample_id_mismatch: int = 0
     human_leaks_outside_sample: list[str] = field(default_factory=list)
+    bypassed_leaks: list[str] = field(default_factory=list)
+    reviewer_disagreements: int = 0
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -478,10 +558,12 @@ class SemanticAxis:
     @property
     def status(self) -> str:
         if not self.engaged:
-            return "FAIL" if self.human_leaks_outside_sample else "NOT_MEASURED"
+            return (
+                "FAIL" if self.human_leaks_outside_sample or self.bypassed_leaks else "NOT_MEASURED"
+            )
         if self.errors:
             return "NOT_MEASURABLE"
-        if self.k or self.human_leaks_outside_sample:
+        if self.k or self.human_leaks_outside_sample or self.bypassed_leaks:
             return "FAIL"
         if self.unjudged or self.n < SEMANTIC_MIN_SAMPLE:
             return "NOT_MEASURABLE"
@@ -490,19 +572,25 @@ class SemanticAxis:
     @property
     def reason(self) -> str:
         outside = len(self.human_leaks_outside_sample)
+        bypassed = len(self.bypassed_leaks)
+        disagreement = (
+            f" · 판정자 불일치 {self.reviewer_disagreements}건(누설 우선)"
+            if self.reviewer_disagreements
+            else ""
+        )
         if not self.engaged:
-            if outside:
+            if outside or bypassed:
                 return (
-                    f"표본 밖 사람 확인 누설 {outside}건(기계 clean L1·L2) — 확인된 누설은 "
-                    "숨기지 않는다"
+                    f"표본 밖 사람 확인 누설 {outside}건(기계 clean L1·L2) · 우회 판정 누설 "
+                    f"{bypassed}건 — 확인된 누설은 숨기지 않는다"
                 )
             return "표본 매니페스트 미지정 — 의미 축은 사람 표본 검수 전용(§5 F-Ⅴ·§6 인간 30건)"
         if self.errors:
             return f"의미 축 입력 오류 {len(self.errors)}건(첫 사유: {self.errors[0]})"
-        if self.k or outside:
+        if self.k or outside or bypassed:
             return (
-                f"의미 누설 — 표본 {self.n}건 중 {self.k}건 · 표본 밖 사람 확인 누설 {outside}건"
-                "(무관용)"
+                f"의미 누설 — 표본 {self.n}건 중 {self.k}건 · 표본 밖 사람 확인 누설 {outside}건 · "
+                f"우회 판정 누설 {bypassed}건(무관용){disagreement}"
             )
         if self.unjudged:
             return (
@@ -534,6 +622,8 @@ class SemanticAxis:
             "outside_manifest": self.outside_manifest,
             "sample_id_mismatch": self.sample_id_mismatch,
             "human_leaks_outside_sample": list(self.human_leaks_outside_sample),
+            "bypassed_leaks": list(self.bypassed_leaks),
+            "reviewer_disagreements": self.reviewer_disagreements,
             "errors": list(self.errors),
         }
 
@@ -547,6 +637,8 @@ def measure_semantic_axis(
     machine: Mapping[str, bool | None],
     levels: Mapping[str, int],
     errors: Sequence[str] = (),
+    bypassed_leak_candidates: Iterable[str] = (),
+    disagreements: Iterable[str] = (),
 ) -> SemanticAxis:
     """의미 축(모듈 docstring). `usable`은 낡음·우회·고아를 뺀 hint_id → 최신 판정,
     `machine`은 hint_id → 기계 누설 3상태, `levels`는 hint_id → 레벨이다.
@@ -602,4 +694,13 @@ def measure_semantic_axis(
         if machine_leak or judged.verdict is HintVerdict.LEAKED:
             axis.k += 1
     axis.human_leaks_outside_sample.sort()
+    # 우회 판정의 누설 신호 — 기계가 이미 누설로 센 힌트는 빼고(이중 계상 금지) 공개한다.
+    axis.bypassed_leaks = sorted(
+        {
+            hint_id
+            for hint_id in bypassed_leak_candidates
+            if levels.get(hint_id) in _ZERO_TOLERANCE_LEVELS and machine.get(hint_id) is not True
+        }
+    )
+    axis.reviewer_disagreements = len(set(disagreements))
     return axis

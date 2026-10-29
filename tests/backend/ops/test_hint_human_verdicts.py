@@ -27,7 +27,10 @@ from whymath_backend.ops import g3_content_measures as g3
 from whymath_backend.ops import hint_human_verdicts as hv
 
 _T0 = "2026-10-27T23:00:00Z"
-_JUDGED = datetime(2026, 10, 29, 1, 0, tzinfo=UTC)
+# 판정 시각은 과거로 고정하고, 측정 시각(`_NOW`)은 report가 명시 주입한다 — 미래 시각 검사가
+# 실행 머신의 시계에 따라 흔들리지 않게 한다.
+_JUDGED = datetime(2026, 10, 1, 1, 0, tzinfo=UTC)
+_NOW = _JUDGED + timedelta(days=1)
 _CLEAN_L1 = "기울기부터 구해 볼까요?"
 _CLEAN_L2 = "접점을 먼저 정해 봐요"
 
@@ -173,6 +176,7 @@ class Round:
     ) -> dict[str, Any]:
         _seat(self.root, self.cus)
         round_input = g3.discover_round(self.root, "r1")
+        kw.setdefault("now", _NOW)
         return g3.build_report(
             round_input,
             self.hints,
@@ -571,14 +575,112 @@ class TestMachineFallback:
         assert (hint["human"]["superseded"], hint["human"]["flipped"]) == (1, 1)
         assert (hint["status"], hint["human"]["resolved_clean"]) == ("PASS", len(undecided))
 
-    def test_older_row_later_in_file_does_not_win(self, tmp_path: Path) -> None:
-        """최신은 파일 순서가 아니라 judged_at이다 — 늦게 append된 옛 판정이 이기면 안 된다."""
-        rnd = self._short_answer_round(tmp_path)
-        undecided = self._undecided_ids(rnd)
-        newer = rnd.verdict(undecided[0], None, judged_at=_JUDGED + timedelta(hours=1))
-        older = rnd.verdict(undecided[0], None, "leaked")
-        latest = hv.latest_verdicts([newer, older])
-        assert latest.latest[undecided[0]].verdict is hv.HintVerdict.NOT_LEAKED
+
+# ──────────────────────────────────────────────────────────────────────
+# 재판정·판정자 불일치·미래 시각·우회 누설 (EOS-210 리뷰 P2-1·P3-1)
+# ──────────────────────────────────────────────────────────────────────
+class TestRejudgementIntegrity:
+    _short = TestMachineFallback._short_answer_round
+    _undecided = TestMachineFallback._undecided_ids
+
+    def test_latest_is_append_order_not_judged_at(self, tmp_path: Path) -> None:
+        """같은 판정자 — judged_at이 더 이른 행이라도 뒤에 append됐으면 그것이 최신이다."""
+        rnd = self._short(tmp_path)
+        target = self._undecided(rnd)[0]
+        first = rnd.verdict(target, None, judged_at=_JUDGED + timedelta(hours=1))
+        later_in_file = rnd.verdict(target, None, "leaked")  # judged_at은 더 이르다
+        latest = hv.latest_verdicts([first, later_in_file])
+        assert latest.latest[target].verdict is hv.HintVerdict.LEAKED
+        assert latest.flipped == 1 and latest.disagreements == {}
+
+    def test_other_reviewer_cannot_overwrite_a_leak(self, tmp_path: Path) -> None:
+        """리뷰 실측 ⓐ — a의 누설을 b의 '아님'이 1시간 뒤 덮어 PASS가 나던 경로."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        verdicts = [rnd.verdict(undecided[0], None, "leaked", reviewer="a")]
+        verdicts.append(
+            rnd.verdict(undecided[0], None, reviewer="b", judged_at=_JUDGED + timedelta(hours=1))
+        )
+        verdicts += [rnd.verdict(h, None, reviewer="a") for h in undecided[1:]]
+        report = rnd.report(verdicts)
+        hint = report["hint_leak"]
+        assert (hint["status"], report["exit_code"]) == ("FAIL", g3.EXIT_VIOLATION)
+        assert hint["human"]["reviewer_disagreements"] == {
+            undecided[0]: {"a": "leaked", "b": "not_leaked"}
+        }
+        lines = g3.render_lines(report)
+        assert "HINT_HUMAN_REVIEWER_DISAGREEMENT=1" in lines
+        assert "판정자 불일치 1건(누설 우선)" in hint["reason"]
+
+    def test_reviewer_disagreement_in_sample_fails_semantic_axis(self, tmp_path: Path) -> None:
+        rnd = Round(tmp_path, 15)
+        manifest = rnd.manifest()
+        verdicts = _all_not_leaked(rnd, manifest)
+        verdicts.insert(
+            0, rnd.verdict(manifest.sample_hint_ids[0], manifest, "leaked", reviewer="a")
+        )
+        semantic = rnd.report(verdicts, manifest)["hint_leak"]["semantic"]
+        assert (semantic["k"], semantic["status"], semantic["reviewer_disagreements"]) == (
+            1,
+            "FAIL",
+            1,
+        )
+
+    def test_agreeing_reviewers_are_not_a_disagreement(self, tmp_path: Path) -> None:
+        """대조군 — 두 판정자가 같은 판정이면 불일치가 아니다."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        verdicts = [rnd.verdict(h, None, reviewer=r) for h in undecided for r in ("a", "b")]
+        hint = rnd.report(verdicts)["hint_leak"]
+        assert hint["human"]["reviewer_disagreements"] == {} and hint["status"] == "PASS"
+
+    def test_same_reviewer_rejudgement_retracts_and_is_disclosed(self, tmp_path: Path) -> None:
+        """같은 판정자는 자기 누설을 거둘 수 있다 — 단 뒤집힘이 사유·요약에 드러난다."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        verdicts = [rnd.verdict(undecided[0], None, "leaked")]
+        verdicts += [rnd.verdict(h, None) for h in undecided]
+        report = rnd.report(verdicts)
+        hint = report["hint_leak"]
+        assert (hint["status"], report["exit_code"]) == ("PASS", g3.EXIT_PASS)
+        assert hint["human"]["flipped"] == 1
+        assert "같은 판정자 재판정 뒤집힘 1건" in hint["reason"]
+        assert "HINT_HUMAN_FLIPPED=1" in g3.render_lines(report)
+
+    def test_future_dated_row_is_input_error(self, tmp_path: Path) -> None:
+        """리뷰 실측 ⓑ — +10년 '아님' 행이 그 뒤 실제 누설 재판정을 영구히 이기던 경로."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        future = rnd.verdict(undecided[0], None, judged_at=_NOW + timedelta(days=3650))
+        verdicts = [future, rnd.verdict(undecided[0], None, "leaked")]
+        verdicts += [rnd.verdict(h, None) for h in undecided[1:]]
+        report = rnd.report(verdicts)
+        assert report["exit_code"] == g3.EXIT_UNMEASURED
+        assert any("미래" in e for e in report["hint_leak"]["human"]["errors"])
+
+    def test_within_skew_is_accepted(self, tmp_path: Path) -> None:
+        """대조군 — 허용 오차(5분) 안의 시계 차는 오류가 아니다."""
+        rnd = self._short(tmp_path)
+        undecided = self._undecided(rnd)
+        verdicts = [rnd.verdict(h, None, judged_at=_NOW + timedelta(minutes=4)) for h in undecided]
+        assert rnd.report(verdicts)["hint_leak"]["human"]["errors"] == []
+
+    def test_bypassed_leak_is_disclosed_and_fails(self, tmp_path: Path) -> None:
+        """P3-1 — 우회 판정은 통과를 돕지 못하지만, 누설 신호는 숨기지 않는다."""
+        rnd = Round(tmp_path, 15)
+        report = rnd.report([rnd.verdict("h03-l1", None, "leaked", bypassed=True)])
+        semantic = report["hint_leak"]["semantic"]
+        assert semantic["bypassed_leaks"] == ["h03-l1"] and semantic["status"] == "FAIL"
+        assert report["exit_code"] == g3.EXIT_VIOLATION
+        assert "HINT_HUMAN_BYPASSED_LEAKED=1" in g3.render_lines(report)
+
+    def test_bypassed_not_leaked_has_no_effect(self, tmp_path: Path) -> None:
+        """대조군 — 우회 '아님'은 아무것도 바꾸지 않는다(PASS 근거로 쓰이지 않는다)."""
+        rnd = Round(tmp_path, 15)
+        report = rnd.report([rnd.verdict("h03-l1", None, bypassed=True)])
+        semantic = report["hint_leak"]["semantic"]
+        assert (semantic["bypassed_leaks"], semantic["status"]) == ([], "NOT_MEASURED")
+        assert report["exit_code"] == g3.EXIT_PASS
 
 
 # ──────────────────────────────────────────────────────────────────────
