@@ -1,5 +1,81 @@
 # EOS-197 — A6 LLM 저작 회차 1회 (두 좌석 × 15 CU) Kiki 실행 런북
 
+## 한 줄 실행 (EOS-208 — 기본 경로 · 2026-10-28 신설)
+
+> 아래 [A]~[N] 블록 15개를 손으로 붙여넣는 대신, 같은 단계를 **한 줄**이 순서대로 돈다(준비 점검 →
+> 두 좌석 저작 → 산출물·GenerationLog 검사 → 검수 큐 → 검수 창 → 집계 미리보기 → 산출물 브랜치 push).
+> 오케스트레이터 = `python -m whymath_backend.harness.authoring_round`, 회차 설정 =
+> `docs/ops/authoring_round_eos197.yaml`(이 런북의 값 — 좌석·목표·예산·spec·시드·Ollama 타임아웃 180초).
+> 모든 회차 공통 절차·거부 줄 읽는 법은 `docs/ops/authoring_round_runbook.md`가 정본이다.
+>
+> **EOS-197 회차 자체는 이미 끝났다**(산출물 30 CU·검수 30건이 main `4ec479e6`에 있다 · PR #1765).
+> 지금 이 한 줄을 돌리면 저작·큐·검수 단계는 실물 완료로 건너뛴다. 마지막 deliver는 **원격 브랜치
+> `eos197/a6-authoring-output`이 남아 있는 동안** `REMOTE_BRANCH_ABSENT=False`로 거부한다(2026-10-28 기준
+> 그 브랜치가 원격에 있다고 가정한 서술이다). 그 브랜치가 정리돼 지워졌다면 거부하지 **않고**, 이번 실행이 새로
+> 쓴 상태 파일·설정 스냅샷(`eos197-a6-review/round_state.json`·`round_config.yaml`) 2개만 담은 산출물 브랜치를
+> push한다 — 산출물 본체는 이미 main에 있으므로 EOS-197을 다시 돌릴 이유는 없다. 이 절은 다음 회차가 따를
+> 형태의 기준본으로만 읽는다.
+
+### 6항목 사전 브리핑 (한 줄 실행)
+
+1. **과제 명칭** — EOS-197 A6 저작 회차 한 줄 실행.
+2. **목적** — 블록 15개를 손으로 붙여넣으며 생긴 마찰(타임아웃 30초 공전·목표 미달 시 블록 재작성·판정 29건
+   업로드 시도·블록 순서 혼동)을 없애고, 같은 산출물을 같은 검사로 만든다.
+3. **구체적 절차** — [S1] 워크트리 준비(1분) → [S2] 한 줄 실행(저작 좌석당 15~45분 + 검수 60~120분 · 검수 창이
+   뜨면 거기서 판정) → 끝. 중간에 멈춰도 [S2]를 다시 붙여넣으면 이어서 간다(끝난 단계는 건너뛴다).
+4. **성공 기준** — 마지막에 `PUSH_VERIFIED=True`·`ROUND_STATUS=complete`·`ROUND_EXIT=0`. 쓰기 단계는 선행 조건을
+   스스로 다시 계산해 어긋나면 `WRITE_REFUSED=True stage=… FALSE: …`를 내고 아무것도 쓰지 않는다 — 그 줄의 항목
+   이름을 `docs/ops/authoring_round_runbook.md` 「거부·실패 줄 읽는 법」에서 찾는다(실패 시 대처: 그 표의 조치 후
+   [S2] 다시).
+5. **실행 환경** — Phaiakes9(이 PC) · Windows PowerShell · 원 작업 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath`
+   (건드리지 않는다) · 실행 디렉터리 `C:\Users\kiki\Desktop\__AI\WhyMath-eos197`(격리 워크트리) · 파이썬
+   `C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe` · 선행 조건: Ollama 가동·인터넷·OpenRouter 키.
+6. **창 구분** — 새 PowerShell 창 ① 하나에서 [S1]·[S2]. [S2]가 도는 동안 그 창은 건드리지 않는다(`Ctrl+C`는 중단
+   신호 — 다시 [S2]로 이어진다). Ollama가 꺼져 있다고 나오면 새 창 ②에서 `ollama serve`(그 창은 이후 입력 금지).
+   검수 단계에서 별도 검수 창이 뜬다.
+
+### [S1] 격리 워크트리 준비 — 창 ① (워크트리 폴더 1개 · 이미 있으면 그대로 쓴다)
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — [S1] EOS-197 격리 워크트리 준비 + 실행 변수 (워크트리 폴더 1개)
+cd C:\Users\kiki\Desktop\__AI\WhyMath
+git fetch origin main
+$Round = "eos197"
+$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\.venv\Scripts\python.exe"
+$Wt = "C:\Users\kiki\Desktop\__AI\WhyMath-eos197"
+$Cfg = "$Wt\docs\ops\authoring_round_eos197.yaml"
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$WtExisted = Test-Path $Wt
+$CfgOnMain = [bool](git ls-tree --name-only origin/main "docs/ops/authoring_round_eos197.yaml")
+if ($CfgOnMain -and (-not $WtExisted)) { git worktree add --detach $Wt origin/main; "WORKTREE_CREATED=$(Test-Path $Wt)" } else { "WORKTREE_ADD_SKIPPED=True — CfgOnMain=$CfgOnMain(False면 설정이 아직 main에 없다 — 세션에 회신) WtExisted=$WtExisted(True면 앞 시도의 워크트리를 그대로 쓴다 — 정상)" }
+"WORKTREE_PRESENT=$(Test-Path $Wt) CONFIG_PRESENT=$(Test-Path $Cfg) PY_PRESENT=$(Test-Path $Py)"
+"MAIN_HEAD=$(git rev-parse --short origin/main)"
+if (Test-Path $Wt) { "WORKTREE_HEAD=$(git -C $Wt rev-parse --short HEAD)" } else { "WORKTREE_HEAD=없음 — 위 SKIPPED 줄의 이유를 보세요" }
+```
+
+**판정**: `WORKTREE_PRESENT=True CONFIG_PRESENT=True PY_PRESENT=True`면 [S2]로.
+
+### [S2] 한 줄 실행 — 창 ① (이 한 줄만 붙여넣는다 · 다시 붙여넣으면 이어서 간다)
+
+```powershell
+# Windows PowerShell (= Phaiakes9) · 창 ① — [S2] EOS-197 저작 회차 한 줄 실행 (쓰기·유료 호출·push는 단계마다 스스로 재검사 후 실행)
+if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$Wt\src\backend"; & $Py -m whymath_backend.harness.authoring_round --config $Cfg --worktree $Wt; "ROUND_EXIT=$LASTEXITCODE" } else { "RUN_REFUSED=True — Py=[$Py] Wt=[$Wt] Cfg=[$Cfg] — 새 창이면 [S1]부터" }
+```
+
+**판정**: 위 4번. 키 없음(`OPENROUTER_KEY_SHAPE_OK=False`)이면 아래 수동 대안의 [C-1]·[C-2]를 한 번 하고 [S2]를 다시.
+미리보기(쓰기 없음)·단계 하나만 다시·예약 풀기·워크트리 정리는 `docs/ops/authoring_round_runbook.md`의 [R2-D]·「단계 하나만
+다시」·「예약 풀기」·[R3]를 쓴다(그 블록들은 이 창의 `$Py`·`$Wt`·`$Cfg`를 그대로 쓴다).
+
+---
+
+## 수동 대안 — 블록별 실행 [A]~[N] (한 줄 실행이 막혔을 때만)
+
+아래는 EOS-197 회차를 실제로 돈 블록별 절차다. 한 줄 실행이 같은 단계를 같은 검사로 돌므로, 오케스트레이터가
+막혀 세션이 지시할 때만 쓴다.
+
+
 > **판정 기준: EOS-198이 머지된 뒤의 main.** 초안의 판정 기준 main `1c441f59`(그때 읽은 코드:
 > `harness/problem_corpus_accumulate.py`·`harness/review_session.py`·`ops/hit_cu_metrics.py`·
 > `ops/weekly_metrics_report.py`·`l3/equivalent/llm_generator.py`·`l3/generation_seed.py`·
