@@ -681,12 +681,18 @@ def auto_gate_kpi_from_run_dirs(
         unit="rate",
         reason=(
             f"재계산 검증 통과 {measure.recomputed}/{measure.responded}(모델 응답 수) · 검산식 "
-            f"우회 통과 {measure.bypassed}건 제외(원시 통과율 {measure.rate_raw:.4f}) · 게이트 앞 "
-            f"결정론 거부(파싱·조립) {measure.deterministic_rejected}건은 분모 안 · 미생성 "
-            f"{measure.failure_kinds.get('not_generated', 0)}건은 분모 밖 · 게이트 도달 기준 "
-            f"{measure.rate_gate_reached:.4f} · 창 밖 {measure.outside_window}건"
+            f"우회 통과 {measure.bypassed}건 제외(원시 통과율 {_fmt_rate(measure.rate_raw)}) · "
+            f"게이트 앞 결정론 거부(파싱·조립) {measure.deterministic_rejected}건은 분모 안 · "
+            f"미생성 {measure.failure_kinds.get('not_generated', 0)}건은 분모 밖 · "
+            f"게이트 도달 기준 {_fmt_rate(measure.rate_gate_reached)} · "
+            f"창 밖 {measure.outside_window}건"
         ),
     )
+
+
+def _fmt_rate(value: float | None) -> str:
+    """비율 표기 — 분모 0으로 산출 불가면 숫자 대신 그 사실을 적는다(0으로 위장하지 않는다)."""
+    return "산출 불가(분모 0)" if value is None else f"{value:.4f}"
 
 
 def collect_from_files(

@@ -5,7 +5,7 @@
       통과는 우회로 뺀다(대조군: 재계산 검산식) · 우회 판정 불가는 값을 내지 않는다 · 회계 불일치·
       알 수 없는 상태·필수 파일 부재는 측정 실패 · 창 밖 시도 제외
   (b) 힌트 정답 누설 — 입력 없음/힌트 0건 = 측정 대상 부재 · 글자 축 누설 · 값 축 누설 · 짧은 정답
-      사람 폴백(None) · L3 누설은 무관용 밖 · 힌트 없는 CU는 UNDECIDED · 계약 위반 행은 오류
+      사람 폴백(None) · L3 누설은 무관용 밖 · 힌트 없는 CU·L1·L2 중 한 단이 빠진 CU는 UNDECIDED · 계약 위반 행은 오류
   (c) 메타 누락 — 필수 필드마다 누락 반례 + 전부 채운 대조군 · seed는 좌석이 받을 때만
   ③ 라벨 대조 — F8인데 힌트 0건 · 기계 누설인데 F8 없음 · 무수정 승인인데 우회 · 판정 파일 없음
   종료 코드 0/1/2 · 실데이터(EOS-197) 첫 측정값 동결
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ import pytest
 
 from whymath_backend.l4.hint_content.models import Hint, HintReveals, SolutionStepRef
 from whymath_backend.ops import g3_content_measures as g3
+from whymath_backend.ops import weekly_metrics_report as wmr
 
 _REPO = Path(__file__).resolve().parents[3]
 _T0 = "2026-10-27T23:00:00Z"
@@ -235,6 +237,29 @@ class TestAutoGate:
         assert gate["responded"] == responded
         assert gate["rate"] == pytest.approx(1 / responded)
 
+    def test_all_responses_rejected_before_gate_does_not_crash_weekly(self, tmp_path: Path) -> None:
+        """확인 리뷰 P2 반례 — 응답이 전부 파싱·조립 거부면 게이트 도달 0건(분모 0). 주간 원장의
+        사유 문자열이 None을 `:.4f`로 찍다 TypeError로 죽으면 안 된다(값은 0, 도달 기준은 산출 불가)."""
+        seat = _seat(
+            tmp_path,
+            "r1-a",
+            cus=[],
+            reviews=[
+                _review(None, "generation_failed", detail=_PARSE),
+                _review(None, "generation_failed", detail=_ASSEMBLY),
+            ],
+        )
+        gate = _report(tmp_path)["auto_gate"]
+        assert (gate["measured"], gate["evaluated"], gate["responded"]) == (True, 0, 2)
+        assert gate["rate_gate_reached"] is None
+        kpi = wmr.auto_gate_kpi_from_run_dirs(
+            [seat],
+            week_start=datetime(2026, 10, 27, tzinfo=UTC),
+            week_end=datetime(2026, 10, 28, tzinfo=UTC),
+        )
+        assert (kpi.measured, kpi.value) == (True, 0.0)
+        assert kpi.reason is not None and "게이트 도달 기준 산출 불가(분모 0)" in kpi.reason
+
     def test_unclassified_failure_withholds_the_value(self, tmp_path: Path) -> None:
         _seat(
             tmp_path,
@@ -392,18 +417,22 @@ class TestHintLeak:
         pids = self._round(tmp_path)
         hints = [
             _hint(pids["h-14"], "접선의 기울기부터 구해 볼까요?"),
-            _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요", level=2),
+            _hint(pids["h-14"], "접점을 먼저 정해 봐요", level=2),
+            _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요"),
+            _hint(pids["h-13"], "두 수를 차례로 더해 봐요", level=2),
         ]
         hint = _report(tmp_path, hints)["hint_leak"]
-        assert hint["status"] == "PASS"
+        assert (hint["cu_without_l12"], hint["status"]) == (0, "PASS")  # 대조군 — L1·L2 각각 있음
         assert hint["semantic_axis"] == "NOT_MEASURED"  # 기계 clean ≠ 의미 누설 0
 
     def test_l3_leak_is_counted_outside_zero_tolerance(self, tmp_path: Path) -> None:
         pids = self._round(tmp_path)
         hints = [
             _hint(pids["h-14"], "접선의 기울기부터 구해 볼까요?"),
+            _hint(pids["h-14"], "접점을 먼저 정해 봐요", level=2),
             _hint(pids["h-14"], "y절편은 -14가 돼요", level=3),
             _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요"),
+            _hint(pids["h-13"], "두 수를 차례로 더해 봐요", level=2),
         ]
         hint = _report(tmp_path, hints)["hint_leak"]
         assert (hint["leaked_l12"], hint["leaked_l3"]) == (0, 1)
@@ -428,10 +457,27 @@ class TestHintLeak:
         pids = self._round(tmp_path)
         hints = [
             _hint(pids["h-14"], "접선의 기울기부터 구해 볼까요?"),
+            _hint(pids["h-14"], "접점을 먼저 정해 봐요", level=2),
             _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요", level=3),
         ]
         hint = _report(tmp_path, hints)["hint_leak"]
         assert (hint["cu_without_l12"], hint["status"]) == (1, "UNDECIDED")
+
+    @pytest.mark.parametrize("present_level", [1, 2])
+    def test_cu_with_only_one_of_l1_l2_keeps_axis_undecided(
+        self, tmp_path: Path, present_level: int
+    ) -> None:
+        """확인 리뷰 P2 반례 — L1만(또는 L2만) 있는 CU는 나머지 단의 누설을 모른다(EOS-211 ④)."""
+        pids = self._round(tmp_path)
+        hints = [
+            _hint(pids["h-14"], "접선의 기울기부터 구해 볼까요?"),
+            _hint(pids["h-14"], "접점을 먼저 정해 봐요", level=2),
+            _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요", level=present_level),
+        ]
+        hint = _report(tmp_path, hints)["hint_leak"]
+        assert (hint["leaked_l12"], hint["cu_without_l12"]) == (0, 1)
+        assert hint["status"] == "UNDECIDED"
+        assert "L1·L2를 모두 갖추지 못한 CU 1건" in hint["reason"]
 
     def test_unmatched_hint_keeps_axis_undecided_and_is_printed(self, tmp_path: Path) -> None:
         """리뷰 P1 반례 — 다른 문항의 problem_id에 붙은 누설 힌트가 조용히 사라지면 안 된다."""
@@ -596,7 +642,10 @@ class TestExitCodes:
     def _complete(self, root: Path) -> list[Hint]:
         cu = _cu("ok", "answer == 20+5", "25")
         _seat(root, "r1-a", cus=[cu])
-        return [_hint(cu["problem_id"], "도함수를 먼저 떠올려 봐요")]
+        return [
+            _hint(cu["problem_id"], "도함수를 먼저 떠올려 봐요"),
+            _hint(cu["problem_id"], "두 수를 차례로 더해 봐요", level=2),
+        ]
 
     def test_pass_when_all_three_measured_clean(self, tmp_path: Path) -> None:
         assert _report(tmp_path, self._complete(tmp_path))["exit_code"] == g3.EXIT_PASS

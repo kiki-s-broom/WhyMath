@@ -55,9 +55,9 @@ CU 정의(§3)의 "3단계 힌트" 좌석은 S4-11 `hints` 표다(`l4/hint_conte
 
 무관용 기준은 F8 정의대로 **L1·L2**다(§4 "힌트 정답 누설(L1·L2 무관용)"). L3 누설은 따로 센다.
 힌트가 0건인 CU는 "누설 0"이 아니라 **측정 대상 부재**다(스캔 0건은 통과가 아니다). 같은 이유로
-**판정한 L1·L2 힌트가 0건이면 측정 불가**이고(L3만 있는 회차), L1·L2 힌트가 없는 CU·어느 CU에도
-붙지 않는 힌트(problem_id 조인 실패)가 있으면 **판정 불가(UNDECIDED)**다 — 보지 않은 것을 통과로
-세지 않는다(EOS-207 리뷰 P1).
+**판정한 L1·L2 힌트가 0건이면 측정 불가**이고(L3만 있는 회차), L1·L2를 *각각* 갖추지 못한
+CU(한 단만 있어도 해당 — 확인 리뷰 P2)·어느 CU에도 붙지 않는 힌트(problem_id 조인 실패)가 있으면
+**판정 불가(UNDECIDED)**다 — 보지 않은 것을 통과로 세지 않는다(EOS-207 리뷰 P1).
 
 **의미 축은 이 CLI가 재지 않는다**: §5 F-Ⅴ가 "힌트의 의미적 정답 누설(**자동 검사 밖**)"을 표본
 검수로 재라고 못박았고, §6이 "전수 자동 + LLM 심판 + 인간 30건"을 요구한다. 기계 두 축이 clean이라는
@@ -686,7 +686,7 @@ class HintLeakMeasure:
             or self.unmatched_hints
         ):
             return (
-                f"힌트 없는 CU {self.cu_without_hints}건 · L1·L2 힌트 없는 CU "
+                f"힌트 없는 CU {self.cu_without_hints}건 · L1·L2를 모두 갖추지 못한 CU "
                 f"{self.cu_without_l12}건 · L1·L2 사람 폴백 {self.undecided_l12}건 · "
                 f"CU에 붙지 않는 힌트 {self.unmatched_hints}건 — 누설 0을 확정할 수 없다"
             )
@@ -763,8 +763,11 @@ def measure_hint_leakage(
             measure.per_cu[slug] = entry
             continue
         measure.cu_with_hints += 1
-        if not any(hint.level in _ZERO_TOLERANCE_LEVELS for hint in cu_hints):
-            measure.cu_without_l12 += 1  # L3만 붙은 CU — 무관용 축은 이 CU를 보지 못했다
+        # L1과 L2를 *각각* 갖춰야 그 CU를 무관용 축이 다 본 것이다 — 한 단만 있으면 나머지 단의
+        # 누설 여부는 모른다(모른다 ≠ 아니다). L3만 붙은 CU도 여기 든다
+        cu_levels = {hint.level for hint in cu_hints}
+        if not _ZERO_TOLERANCE_LEVELS <= cu_levels:
+            measure.cu_without_l12 += 1
         for hint in cu_hints:
             measure.hints_total += 1
             levels[f"L{hint.level}"] += 1
