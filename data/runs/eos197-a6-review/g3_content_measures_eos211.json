@@ -1,0 +1,1858 @@
+{
+  "round": "eos197-a6",
+  "runs_root": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos211\\data\\runs",
+  "run_dirs": [
+    "eos197-a6-local",
+    "eos197-a6-openrouter"
+  ],
+  "verdicts_path": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos211\\data\\runs\\eos197-a6-review\\canary_review_verdicts.jsonl",
+  "input_errors": [],
+  "auto_gate": {
+    "measured": true,
+    "rate": 0.11711711711711711,
+    "rate_raw": 0.3153153153153153,
+    "rate_gate_reached": 0.14606741573033707,
+    "rate_raw_gate_reached": 0.39325842696629215,
+    "attempt_rate": 0.09558823529411764,
+    "wilson_lower_95": 0.07579594073828778,
+    "reason": null,
+    "attempts": 136,
+    "generation_failed": 47,
+    "failure_kinds": {
+      "assembly_rejected": 11,
+      "not_generated": 25,
+      "parse_rejected": 11
+    },
+    "deterministic_rejected": 22,
+    "responded": 111,
+    "evaluated": 89,
+    "status_counts": {
+      "accepted_stored": 30,
+      "generation_failed": 47,
+      "needs_review": 44,
+      "rejected_duplicate": 5,
+      "rejected_gate": 10
+    },
+    "passed_raw": 35,
+    "recomputed": 13,
+    "bypassed": 22,
+    "bypass_kinds": {
+      "recompute": 13,
+      "restatement": 22
+    },
+    "bypass_undecided": 0,
+    "outside_window": 0,
+    "errors": [],
+    "passes": [
+      {
+        "run_dir": "eos197-a6-local",
+        "slug": "wm-gen-calc1-443f1ed59b71",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "answer == 2*1**3 - 3*1**2 + 4*1 - 1*(6*1**2 - 6*1 + 4)",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×3, 3×2, 4×2, 6×2})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-local",
+        "slug": "wm-gen-calc1-5f6175401a1f",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "v = 4*3 + 7",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {3×1, 4×1, 7×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-local",
+        "slug": "wm-gen-calc1-8e2d59861b36",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "v = 4*2 + 5",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1, 4×1, 5×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-fa7021b73e67",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "b = 7*(0 - 2)",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1, 7×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-ef3b1971fcd3",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "M**2 - M - 182 = 0",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {182×1, 2×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-2235de23fd8e",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "-3*2 + b = 6",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1, 3×1, 6×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-580d11379fec",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "n = 3",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(3)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-a523bca97be2",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "v - 24 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(24)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-40f00a8f57ca",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "-2*1 + b = 5",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1, 5×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-9e4ec39eaadd",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "x = 3",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(3)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-1c97770a69ff",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "y + 3 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(-3)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-1c39b6c014e0",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "v - 8 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(8)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-377ef98133ed",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "b + 23 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(-23)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-91e9545d2a4b",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "2 = -4 + b",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1, 4×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-d943d7f6f5ba",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "n = 7",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(7)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-4dc5bdbfc524",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "y - 5 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(5)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-60f3df347c07",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "n - 5 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(5)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-0b70422616db",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "M**2 + 2*M - 255 = 0",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {255×1, 2×2})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-adc6c358b6cb",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "10*2 + b = 9",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {10×1, 2×1, 9×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-89cc30aac3f0",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "(3 - b)/2 = -1",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1, 3×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-1f3f6d5385e7",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "y = -2*0 + 1",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {2×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-24b776c9512d",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "b - 2 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(2)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-ea0344f69c14",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "n = 4",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(4)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-e7c73d651ae3",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "y - 22 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(22)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-f76acdd14d39",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "v - 36 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(36)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-cf311fa5bf53",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "y - 9 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(9)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-635a543509ae",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "b + 6 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(-6)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-90e491183fea",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "recompute",
+          "bypassed": false,
+          "reason": "재계산 등식이 있다",
+          "conditions": [
+            {
+              "condition": "v = 3*4**2 - 12*4 + 9",
+              "kind": "recompute",
+              "is_equation": true,
+              "reason": "정답에 없는 수로 정답을 다시 낸다(리터럴 {12×1, 2×1, 3×1, 4×2, 9×1})"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-0a6ce7e7b20b",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "b + 31 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(-31)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-c42808b25a8f",
+        "status": "accepted_stored",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "b - 9 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(9)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-4e1728723532",
+        "status": "rejected_duplicate",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "x - 14 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(14)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-fd7ebcc6b1ae",
+        "status": "rejected_duplicate",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "v - 24 = 0",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(24)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-6697c952cd40",
+        "status": "rejected_duplicate",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "x = 25",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(25)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-d2105f3430c5",
+        "status": "rejected_duplicate",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "n = 7",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(7)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      },
+      {
+        "run_dir": "eos197-a6-openrouter",
+        "slug": "wm-gen-calc1-d5b296e9375d",
+        "status": "rejected_duplicate",
+        "bypass": {
+          "kind": "restatement",
+          "bypassed": true,
+          "reason": "등식이 전부 정답 재진술·무조건 참 — 검증 우회",
+          "conditions": [
+            {
+              "condition": "n = 3",
+              "kind": "restatement",
+              "is_equation": true,
+              "reason": "정답(3)의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료가 없다"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "hint_leak": {
+    "status": "UNDECIDED",
+    "reason": "힌트 없는 CU 0건 · L1·L2를 모두 갖추지 못한 CU 0건 · L1·L2 사람 폴백 30건 · CU에 붙지 않는 힌트 0건 — 누설 0을 확정할 수 없다",
+    "semantic_axis": "NOT_MEASURED",
+    "hint_inputs": 2,
+    "cu_total": 30,
+    "cu_with_hints": 30,
+    "cu_without_hints": 0,
+    "cu_without_l12": 0,
+    "hints_total": 89,
+    "judged_l12": 60,
+    "hints_by_level": {
+      "L1": 30,
+      "L2": 30,
+      "L3": 29
+    },
+    "leaked_l12": 0,
+    "undecided_l12": 30,
+    "clean_l12": 30,
+    "leaked_l3": 0,
+    "unmatched_hints": 0,
+    "errors": [],
+    "per_cu": {
+      "wm-gen-calc1-443f1ed59b71": {
+        "problem_id": "7c26159f-0ecf-44ad-80a4-390d81ad038d",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-443f1ed59b71-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-443f1ed59b71-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-443f1ed59b71-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-5f6175401a1f": {
+        "problem_id": "a6d4c0a8-c0aa-4f29-8f3d-abfcc33aec59",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-5f6175401a1f-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-5f6175401a1f-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-5f6175401a1f-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-8e2d59861b36": {
+        "problem_id": "009e58a9-77e8-49ca-9d1c-24c667ae4a40",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-8e2d59861b36-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-8e2d59861b36-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-8e2d59861b36-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-fa7021b73e67": {
+        "problem_id": "e255abcf-0c9f-4178-a5fa-4c04e9d8ca03",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-fa7021b73e67-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-fa7021b73e67-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-fa7021b73e67-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-ef3b1971fcd3": {
+        "problem_id": "888d91c0-ec6a-4388-88f1-04856ae0e504",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-ef3b1971fcd3-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-ef3b1971fcd3-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-ef3b1971fcd3-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-2235de23fd8e": {
+        "problem_id": "fe5c9fe7-5377-45fd-a79f-7ab7104d1711",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-2235de23fd8e-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-2235de23fd8e-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-2235de23fd8e-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-580d11379fec": {
+        "problem_id": "33d0afce-d18a-415e-83fa-b0d48d9cce30",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-580d11379fec-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-580d11379fec-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-580d11379fec-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-a523bca97be2": {
+        "problem_id": "961ef009-7e3e-446f-8acd-778052855d7f",
+        "hints": 2,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-a523bca97be2-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-a523bca97be2-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-40f00a8f57ca": {
+        "problem_id": "349af92c-f074-4fdd-8345-2f08ba244b65",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-40f00a8f57ca-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-40f00a8f57ca-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-40f00a8f57ca-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-9e4ec39eaadd": {
+        "problem_id": "cfe26cc0-f320-4ea2-a036-ccf4c009b64b",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-9e4ec39eaadd-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-9e4ec39eaadd-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-9e4ec39eaadd-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-1c97770a69ff": {
+        "problem_id": "6879df6c-23b3-49bd-bc98-f728f1517c70",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1c97770a69ff-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1c97770a69ff-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1c97770a69ff-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-1c39b6c014e0": {
+        "problem_id": "6f965cfd-ac1a-4103-894f-4daa3ef206a4",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1c39b6c014e0-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1c39b6c014e0-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1c39b6c014e0-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-377ef98133ed": {
+        "problem_id": "dd7866da-898c-4d85-b68f-961df9ffe603",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-377ef98133ed-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-377ef98133ed-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-377ef98133ed-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-91e9545d2a4b": {
+        "problem_id": "81eedc96-3545-4c2f-9f60-48fb63213d89",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-91e9545d2a4b-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-91e9545d2a4b-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-91e9545d2a4b-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-d943d7f6f5ba": {
+        "problem_id": "fa864d37-afe3-4df5-a119-75f03eb02a79",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-d943d7f6f5ba-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-d943d7f6f5ba-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-d943d7f6f5ba-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-4dc5bdbfc524": {
+        "problem_id": "2922beca-d949-4100-91e4-98a38959fae6",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-4dc5bdbfc524-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-4dc5bdbfc524-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-4dc5bdbfc524-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-60f3df347c07": {
+        "problem_id": "69e43df6-15f6-4dbc-851c-c85d60e09913",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-60f3df347c07-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-60f3df347c07-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-60f3df347c07-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-0b70422616db": {
+        "problem_id": "711f603d-0fe1-4822-8475-4674d64d04ea",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-0b70422616db-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-0b70422616db-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-0b70422616db-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-adc6c358b6cb": {
+        "problem_id": "f35c2853-6bde-486d-96bc-028f3df0d33a",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-adc6c358b6cb-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-adc6c358b6cb-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-adc6c358b6cb-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-89cc30aac3f0": {
+        "problem_id": "08cfd97c-93c7-4e06-9b14-5bbd0ed24541",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-89cc30aac3f0-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-89cc30aac3f0-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-89cc30aac3f0-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-1f3f6d5385e7": {
+        "problem_id": "16bc0e4f-b9a8-41b8-b4b4-46c5e29e61b3",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1f3f6d5385e7-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1f3f6d5385e7-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-1f3f6d5385e7-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-24b776c9512d": {
+        "problem_id": "2037c8a0-2d8a-4200-a21f-88da9a0281a5",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-24b776c9512d-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-24b776c9512d-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-24b776c9512d-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-ea0344f69c14": {
+        "problem_id": "ddb11bb7-4a4a-4cae-b763-39de23d6cc73",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-ea0344f69c14-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-ea0344f69c14-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-ea0344f69c14-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-e7c73d651ae3": {
+        "problem_id": "b3e1c373-2bf3-48df-a09c-58e84519b7ce",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-e7c73d651ae3-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-e7c73d651ae3-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-e7c73d651ae3-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-f76acdd14d39": {
+        "problem_id": "3386c92b-4cb0-4d43-af41-051a652a78df",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-f76acdd14d39-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-f76acdd14d39-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-f76acdd14d39-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-cf311fa5bf53": {
+        "problem_id": "56584726-e3e7-4c3a-8316-58c43a7402b0",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-cf311fa5bf53-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-cf311fa5bf53-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-cf311fa5bf53-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-635a543509ae": {
+        "problem_id": "65c9d715-14b8-4d89-890b-ad46badf4eaa",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-635a543509ae-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-635a543509ae-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-635a543509ae-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-90e491183fea": {
+        "problem_id": "d1f9f464-607d-4ee9-92fa-3c08af00f904",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-90e491183fea-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-90e491183fea-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-90e491183fea-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-0a6ce7e7b20b": {
+        "problem_id": "4f260909-090a-40df-bfd9-c7fe310948a0",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-0a6ce7e7b20b-s1-l1",
+            "level": 1,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-0a6ce7e7b20b-s1-l2",
+            "level": 2,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-0a6ce7e7b20b-s1-l3",
+            "level": 3,
+            "leaked": false,
+            "verdict": "clean",
+            "value_verdict": "clean"
+          }
+        ]
+      },
+      "wm-gen-calc1-c42808b25a8f": {
+        "problem_id": "6ba0de36-9ae2-484f-a446-7bdd91ff6e9e",
+        "hints": 3,
+        "judged": [
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-c42808b25a8f-s1-l1",
+            "level": 1,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-c42808b25a8f-s1-l2",
+            "level": 2,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          },
+          {
+            "hint_id": "hint-cu-wm-gen-calc1-c42808b25a8f-s1-l3",
+            "level": 3,
+            "leaked": null,
+            "verdict": "undecidable",
+            "value_verdict": "clean"
+          }
+        ]
+      }
+    }
+  },
+  "meta": {
+    "status": "PASS",
+    "required_record_meta": [
+      "achievement_standard_codes",
+      "license",
+      "source_type",
+      "generation_type",
+      "authored_by"
+    ],
+    "required_genlog_meta": [
+      "linked_success_call",
+      "model_name",
+      "prompt_version",
+      "input_sha256",
+      "seed*"
+    ],
+    "cu_total": 30,
+    "cu_missing": 0,
+    "missing_by_field": {},
+    "seed_checked": 3,
+    "seed_not_applicable_by_model": {
+      "deepseek/deepseek-v4.1-flash(미상)": 27
+    },
+    "errors": [],
+    "per_cu_missing": {}
+  },
+  "label_crosscheck": {
+    "performed": true,
+    "verdict_rows": 30,
+    "crosstab_verdict_x_bypass": {
+      "approved_with_edit×recompute": 12,
+      "approved_with_edit×restatement": 15,
+      "approved×recompute": 1,
+      "rejected×restatement": 2
+    },
+    "mismatches": [
+      {
+        "slug": "wm-gen-calc1-c42808b25a8f",
+        "kind": "F8_label_without_machine_hint_leak",
+        "detail": "검수 라벨 F8(힌트 정답 누설) ↔ 기계: 이 CU의 힌트 3건 · L1·L2 기계 판정 None"
+      },
+      {
+        "slug": "wm-gen-calc1-9e4ec39eaadd",
+        "kind": "F8_label_without_machine_hint_leak",
+        "detail": "검수 라벨 F8(힌트 정답 누설) ↔ 기계: 이 CU의 힌트 3건 · L1·L2 기계 판정 None"
+      }
+    ],
+    "rows": [
+      {
+        "slug": "wm-gen-calc1-443f1ed59b71",
+        "label_verdict": "approved",
+        "label_failure_code": null,
+        "label_note_first_line": null,
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-fa7021b73e67",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F4",
+        "label_note_first_line": "단원 코드 CALC1-TANGENT → 표준 코드 하나로 통일 (CALC-TAN 등)",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-5f6175401a1f",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "정답(19)과 수학 내용은 정확해서 반려나 보류할 이유가 없습니다. 다만 그대로 쓰기 전에 아래 항목은 고쳐야 합니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-ef3b1971fcd3",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "2. 검산식 분석: 맞지만 우회적임",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-8e2d59861b36",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "정답(13)은 정확하고, 고칠 부분은 3번과 똑같습니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-2235de23fd8e",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "정답(12)과 해설은 정확합니다. 사용 전에 데이터 항목만 고치면 됩니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-580d11379fec",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "문항·정답(3)·해설 모두 수학적으로 정확합니다. 다만 이번엔 검산식 교체가 필수입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-a523bca97be2",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "문항 표현과 정답(24), 해설 모두 정확합니다. 사용 전에 아래만 고치면 됩니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 2,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-40f00a8f57ca",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-1c97770a69ff",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-1c39b6c014e0",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-377ef98133ed",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "정답(−23)과 해설은 정확합니다. 사용 전에 아래만 고치면 됩니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-91e9545d2a4b",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-d943d7f6f5ba",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-4dc5bdbfc524",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-60f3df347c07",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-0b70422616db",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F4",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-adc6c358b6cb",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-89cc30aac3f0",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-1f3f6d5385e7",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-24b776c9512d",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-ea0344f69c14",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-e7c73d651ae3",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-f76acdd14d39",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-cf311fa5bf53",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-635a543509ae",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-90e491183fea",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "recompute",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-0a6ce7e7b20b",
+        "label_verdict": "approved_with_edit",
+        "label_failure_code": "F7",
+        "label_note_first_line": "수정승인입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": false,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-c42808b25a8f",
+        "label_verdict": "rejected",
+        "label_failure_code": "F8",
+        "label_note_first_line": "반려입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      },
+      {
+        "slug": "wm-gen-calc1-9e4ec39eaadd",
+        "label_verdict": "rejected",
+        "label_failure_code": "F8",
+        "label_note_first_line": "반려입니다.",
+        "machine_bypass_kind": "restatement",
+        "machine_hints": 3,
+        "machine_hint_leak_l12": null,
+        "machine_meta_missing": []
+      }
+    ]
+  },
+  "exit_code": 2
+}
