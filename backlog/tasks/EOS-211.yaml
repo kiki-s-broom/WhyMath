@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-211
+title: "동등문제 생성기 CU 3단계 힌트(L1·L2·L3) 생성·내보내기 — EOS-197 회차 힌트 0건"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 동등문제 생성기(`l3/equivalent`)가 수용한 CU마다 CU 정의(`docs/standards/eos_verification_design_v1.md` §3)의 \"3단계 힌트\"를 S4-11 좌석(`l4/hint_content` · `hints` 표 · `Hint` 모델 L1·L2·L3)에 만든다 — EOS-197 A6 회차는 30 CU 전부 힌트 0건이라 G3 조건 \"힌트 의미 누설 0\"이 측정 대상 부재(EOS-207 첫 측정)였다 ② 만든 힌트는 힌트 게이트 3종(`l4/hint_content/gates.evaluate_gates`)을 통과한 것만 verified=true다(정답 누설 게이트 B 포함 · 판정 불가 ≠ 통과) ③ 저작 회차 산출물 옆에 `Hint` 모델 JSON 1행 1건 JSONL로 내보내 `python -m whymath_backend.ops.g3_content_measures --round <회차> --hints-jsonl <파일>`이 그대로 읽는다(EOS-207 입력 계약) — 실회차 1회 이상 소급 측정값을 남긴다 ④ CU 1건당 L1·L2 힌트가 각각 1건 이상이어야 측정기가 그 CU를 판정한다(L3만 있는 CU는 측정기가 UNDECIDED로 센다 — EOS-207 리뷰 P1)"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/**"
+  - "src/backend/whymath_backend/l4/hint_content/**"
+session: null
+notes: |-
+  출처: EOS-207 독립 리뷰 P2-2(2026-10-29). EOS-197 회차 CU에 힌트가 없어 G3 힌트 조건이 판정 불가였다. G-eos-g3의 입력으로 연결할지는 Kiki 결정 사항이라 게이트 연결은 하지 않았다. 관련: EOS-205(같은 생성기 파일), S4-11(힌트 좌석·게이트).
+
+  [개명 2026-10-29] EOS-209 → EOS-211: 번호 충돌 — main에 EOS-209(저작 회차 오케스트레이터 보완 · #1768)가 먼저 머지됨. 등재 시점 원격 브랜치 스냅샷이 오래돼 충돌 검사가 놓쳤다
+updated: 2026-10-29

@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P0
 owner: claude
@@ -17,6 +17,18 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/weekly_metrics_report.py
   - "src/backend/whymath_backend/l3/equivalent/**"
-session: null
-notes: "출처: EOS-197 완료(#1765) 후 G-eos-g3 판정 검토(2026-10-28). Kiki가 G3를 11/22까지 보류로 결정했고, 판정 전에 미측정 3항목의 측정 경로가 필요하다. 관련: EOS-205(검산식 동어반복 — (a)의 1차 통과율 의미에 직접 영향)."
-updated: 2026-10-28
+  - src/backend/whymath_backend/ops/g3_content_measures.py
+  - src/backend/whymath_backend/ops/provenance_audit.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - tests/backend/ops/test_g3_content_measures.py
+  - tests/backend/ops/test_weekly_metrics_file_input.py
+  - tests/backend/ops/test_weekly_metrics_report.py
+  - tests/backend/l3/equivalent/test_verify_bypass.py
+  - docs/reviews/eos207_g3_measures_2026-10-29.md
+session: claude/eos-207-g3-measures
+notes: |-
+  출처: EOS-197 완료(#1765) 후 G-eos-g3 판정 검토(2026-10-28). Kiki가 G3를 11/22까지 보류로 결정했고, 판정 전에 미측정 3항목의 측정 경로가 필요하다. 관련: EOS-205(검산식 동어반복 — (a)의 1차 통과율 의미에 직접 영향).
+
+  [정정 2026-10-29] paths ['src/backend/whymath_backend/ops/weekly_metrics_report.py', 'src/backend/whymath_backend/l3/equivalent/**'] → ['src/backend/whymath_backend/ops/weekly_metrics_report.py', 'src/backend/whymath_backend/l3/equivalent/**', 'src/backend/whymath_backend/ops/g3_content_measures.py', 'src/backend/whymath_backend/ops/provenance_audit.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'tests/backend/ops/test_g3_content_measures.py', 'tests/backend/ops/test_weekly_metrics_file_input.py', 'tests/backend/ops/test_weekly_metrics_report.py', 'tests/backend/l3/equivalent/test_verify_bypass.py', 'docs/reviews/eos207_g3_measures_2026-10-29.md']: G3 미측정 3항목 측정 경로 구현에 필요한 신규 모듈·테스트·판정 근거 문서·기능 인벤토리·선언≠배선 감사·provenance_audit 공개 상수를 작업 경로에 편입한다(기존 2경로 유지·전체 재나열).
+updated: 2026-10-29

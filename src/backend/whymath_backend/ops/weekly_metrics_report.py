@@ -18,10 +18,13 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
 --------------------------------------------------
 6종 중 **2종은 이 저장소에 집계 대상 로그 자체가 없다**(실측, 2026-09-11):
   - **자동검증 1차 통과율** — Deterministic Gate pass/fail을 누적 기록하는 테이블이 없다.
+    **DB 경로에서는 여전히 그렇다.** 파일 입력 모드에서 `--authoring-run-dir`(저작 회차 폴더 —
+    `cu.jsonl`·`cu.review.jsonl`·`cu.genlog.jsonl`)를 주면 그 수용 게이트 로그로 산출한다
+    (EOS-207 — 정의·우회 검산식 제외 규칙은 `ops/g3_content_measures` 모듈 docstring (a)).
   - **재작업률** — Run 재생성 카운트 로그가 없다(EOS-55는 재현성 컬럼만 추가했고 재생성
     카운트 자체는 좌석 미착지 — `validation_scorecard.adapt_hit_cu_metrics` 독스트링 동일 판정).
-이 둘은 DB 연결 성공 여부와 무관하게 **항상** `measured=False`로 낸다 — "0%"이 아니라
-"측정 불가"다.
+이 둘은 DB 연결 성공 여부와 무관하게 `measured=False`로 낸다 — "0%"이 아니라
+"측정 불가"다(자동검증 1차 통과율만 위 `--authoring-run-dir` 예외).
 
 나머지 4종(HIT·처리량·단위비용·실패유형분포)은 `review_timer_event`·`generation_log`
 테이블에서 실시간 계산한다(집계 수식은 재발명하지 않고 `ops.hit_cu_metrics.aggregate`를
@@ -99,6 +102,7 @@ from whymath_backend.db.models.review_timer_event import (
 )
 from whymath_backend.harness.review_timer import load_events_jsonl
 from whymath_backend.l3.pregenerate.provenance_bridge import load_generation_logs_jsonl
+from whymath_backend.ops.g3_content_measures import load_run_dir, measure_auto_gate
 from whymath_backend.ops.hit_cu_metrics import HitCuReport, aggregate
 from whymath_backend.schema.provenance import GenerationLog as SchemaGenerationLog
 from whymath_backend.schema.review_timer import ReviewTimerEvent as SchemaReviewTimerEvent
@@ -111,6 +115,7 @@ __all__ = [
     "load_incidents_summary",
     "KpiValue",
     "WeeklyRecord",
+    "auto_gate_kpi_from_run_dirs",
     "build_record_from_report",
     "collect",
     "collect_from_files",
@@ -139,7 +144,8 @@ KPI_NAMES: tuple[str, ...] = (
 # (모듈 docstring 참조). 값이 바뀌면(로그가 신설되면) 여기서 빼고 실제 계산으로 옮긴다.
 STRUCTURALLY_UNMEASURED: dict[str, str] = {
     "auto_gate_pass_rate": (
-        "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측)"
+        "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측) · "
+        "파일 입력 모드는 --authoring-run-dir로 수용 게이트 로그에서 산출(EOS-207)"
     ),
     "rework_rate": (
         "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 "
@@ -279,11 +285,14 @@ def build_record_from_report(
     krw_per_usd: float | None,
     db_failure_reason: str | None = None,
     harness: dict[str, KpiValue] | None = None,
+    auto_gate: KpiValue | None = None,
 ) -> WeeklyRecord:
     """`HitCuReport`(또는 DB 실패 시 `None`) → `WeeklyRecord`. 순수 함수 — I/O 0.
 
     `report is None`이면(DB 연결 실패) 4종(HIT·처리량·단위비용·실패분포) 전부
-    `db_failure_reason`으로 미측정 처리한다 — 나머지 2종은 원래도 항상 미측정이다.
+    `db_failure_reason`으로 미측정 처리한다 — 나머지 2종은 원래도 미측정이다.
+    `auto_gate`를 주면(파일 입력 모드 `--authoring-run-dir` · EOS-207) 자동검증 1차 통과율의
+    구조적 미측정을 그 값으로 바꾼다 — 그 값 자신이 `measured=False`일 수 있다(회계 불일치 등).
     """
     kpis: dict[str, KpiValue] = {}
 
@@ -405,6 +414,8 @@ def build_record_from_report(
     # 구조적으로 항상 미측정인 2종 — DB 성패와 무관.
     for name, reason in STRUCTURALLY_UNMEASURED.items():
         kpis[name] = KpiValue(measured=False, value=None, unit="rate", reason=reason)
+    if auto_gate is not None:
+        kpis["auto_gate_pass_rate"] = auto_gate
 
     assert set(kpis) == set(KPI_NAMES), f"KPI 누락/초과: {set(kpis) ^ set(KPI_NAMES)}"
 
@@ -650,6 +661,40 @@ def report_from_files(
     return aggregate(kept_events, genlog_rows=genlog_rows), summary, None
 
 
+def auto_gate_kpi_from_run_dirs(
+    run_dirs: list[Path], *, week_start: datetime, week_end: datetime
+) -> KpiValue:
+    """저작 회차 폴더들 → 자동검증 1차 통과율 KPI(EOS-207). 창은 시도의 판정 시각 기준.
+
+    값 = 재계산 검증으로 게이트를 통과한 후보 ÷ 모델 응답 수(게이트 도달 + 파싱 거부 + 조립 거부 ·
+    우회 검산식 통과 제외 · 정의는 `ops/g3_content_measures` (a)). 입력·회계 오류·원인 분류 불가
+    생성 실패·우회 판정 불가가 있으면 미측정이다.
+    """
+    loaded = [load_run_dir(path) for path in run_dirs]
+    errors = [e for run in loaded for e in run.errors]
+    measure = measure_auto_gate(loaded, window=(week_start, week_end), input_errors=errors)
+    if not measure.measured:
+        return KpiValue(measured=False, value=None, unit="rate", reason=measure.reason)
+    return KpiValue(
+        measured=True,
+        value=measure.rate,
+        unit="rate",
+        reason=(
+            f"재계산 검증 통과 {measure.recomputed}/{measure.responded}(모델 응답 수) · 검산식 "
+            f"우회 통과 {measure.bypassed}건 제외(원시 통과율 {_fmt_rate(measure.rate_raw)}) · "
+            f"게이트 앞 결정론 거부(파싱·조립) {measure.deterministic_rejected}건은 분모 안 · "
+            f"미생성 {measure.failure_kinds.get('not_generated', 0)}건은 분모 밖 · "
+            f"게이트 도달 기준 {_fmt_rate(measure.rate_gate_reached)} · "
+            f"창 밖 {measure.outside_window}건"
+        ),
+    )
+
+
+def _fmt_rate(value: float | None) -> str:
+    """비율 표기 — 분모 0으로 산출 불가면 숫자 대신 그 사실을 적는다(0으로 위장하지 않는다)."""
+    return "산출 불가(분모 0)" if value is None else f"{value:.4f}"
+
+
 def collect_from_files(
     *,
     events_paths: list[Path],
@@ -659,8 +704,18 @@ def collect_from_files(
     generated_at: datetime,
     krw_per_usd: float | None,
     harness: dict[str, KpiValue] | None = None,
+    authoring_run_dirs: list[Path] | None = None,
 ) -> tuple[WeeklyRecord, FileInputSummary | None]:
-    """파일 입력 모드의 `collect` — 같은 `build_record_from_report`로 같은 형태의 레코드를 낸다."""
+    """파일 입력 모드의 `collect` — 같은 `build_record_from_report`로 같은 형태의 레코드를 낸다.
+
+    `authoring_run_dirs`(EOS-207)를 주면 자동검증 1차 통과율을 그 수용 게이트 로그로 낸다.
+    None이면 종전대로 구조적 미측정이다(빈 목록과 구분하지 않는다 — 둘 다 입력 없음).
+    """
+    auto_gate = (
+        auto_gate_kpi_from_run_dirs(authoring_run_dirs, week_start=week_start, week_end=week_end)
+        if authoring_run_dirs
+        else None
+    )
     report, summary, failure = report_from_files(
         events_paths=events_paths,
         genlog_paths=genlog_paths,
@@ -677,6 +732,7 @@ def collect_from_files(
         krw_per_usd=krw_per_usd,
         db_failure_reason=failure,
         harness=harness,
+        auto_gate=auto_gate,
     )
     return record, summary
 
@@ -799,8 +855,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m whymath_backend.ops.weekly_metrics_report",
         description=(
             "EOS-51 §6 기술 KPI 6종을 지난 7일 창으로 집계해 metrics/weekly.json에 "
-            "append한다(OPS-56). 자동검증 1차 통과율·재작업률은 이 저장소에 집계 대상 "
-            "로그가 아직 없어 구조적으로 항상 미측정이다."
+            "append한다(OPS-56). 재작업률은 이 저장소에 집계 대상 로그가 아직 없어 구조적으로 "
+            "미측정이다. 자동검증 1차 통과율은 파일 입력 모드의 --authoring-run-dir로만 산출한다."
         ),
     )
     parser.add_argument(
@@ -849,6 +905,17 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--authoring-run-dir",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "저작 회차 폴더(반복 가능 · cu.jsonl·cu.review.jsonl·cu.genlog.jsonl). 주면 "
+            "자동검증 1차 통과율을 그 수용 게이트 로그로 산출한다(EOS-207). "
+            "--events-jsonl과 함께만 쓴다"
+        ),
+    )
+    parser.add_argument(
         "--week-start",
         default=None,
         help=(
@@ -861,6 +928,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.authoring_run_dir and not args.events_jsonl:
+        parser.error("--authoring-run-dir는 --events-jsonl과 함께만 쓸 수 있습니다(파일 입력 모드)")
     if args.generation_log_jsonl and not args.events_jsonl:
         parser.error(
             "--generation-log-jsonl은 --events-jsonl과 함께만 쓸 수 있습니다(파일 입력 모드)"
@@ -894,6 +963,7 @@ def main(argv: list[str] | None = None) -> int:
             generated_at=now,
             krw_per_usd=args.krw_per_usd,
             harness=harness,
+            authoring_run_dirs=list(args.authoring_run_dir) if args.authoring_run_dir else None,
         )
         _report_file_input(file_summary, week_start=week_start, week_end=week_end)
     else:

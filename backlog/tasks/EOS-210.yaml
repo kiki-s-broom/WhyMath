@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-210
+title: "힌트 누설 사람 판정 좌석 — 기계 판정 불가 폴백 + 의미 누설 표본(§6 인간 30건) 기록·측정 연결"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 힌트 정답 누설의 사람 판정 기록 좌석을 만든다 — 두 용도: (가) 기계 판정 불가 힌트(`ops/g3_content_measures`의 L1·L2 사람 폴백 · 짧은 정답의 글자 축 유보 등)의 판정 (나) 의미적 누설 표본 검수(`docs/standards/eos_verification_design_v1.md` §5 F-Ⅴ \"자동 검사 밖\" · §6 \"전수 자동 + LLM 심판 + 인간 30건\"). 판정 기록은 hint_id·판정자·일시·판정(누설/아님)·근거를 갖는다(헌법 R2-03 게이트 기록 4요건) ② 측정 CLI(`ops/g3_content_measures`)가 그 기록을 읽어 기계 판정 불가 힌트의 UNDECIDED를 해소하고, 의미 축(`HINT_SEMANTIC_AXIS`)을 표본 크기·누설 건수·Wilson 상한으로 낸다 — 표본이 30건 미만이면 측정 불가로 낸다(0건 통과 위장 금지) ③ 사람 판정은 기계 판정을 대체하지 않는다 — 기계가 누설로 판정한 힌트는 사람 판정과 무관하게 누설이며, 어긋나면 둘 다 보존하고 어긋남을 센다(EOS-207 ③ 선례) ④ 검수 도구가 사람 판정 입력 전에 기계 판정을 보여주지 않는다(헌법 R19-01)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/g3_content_measures.py
+  - "src/backend/whymath_backend/harness/review_session*.py"
+session: null
+notes: |-
+  출처: EOS-207 독립 리뷰 P2-2(2026-10-29). 측정기는 의미 축을 항상 NOT_MEASURED로 내고 판정 불가 힌트를 UNDECIDED로 남긴다 — 그것을 해소할 사람 판정 입력 경로가 없다. G-eos-g3의 입력으로 연결할지는 Kiki 결정 사항이라 게이트 연결은 하지 않았다. 관련: EOS-211(힌트 생성 — 판정 좌석은 픽스처로 따로 만들 수 있어 depends_on으로 묶지 않았다).
+
+  [정정 2026-10-29] notes 치환 — notes의 모호한 의존 어구를 관련 표기로 정정
+
+  [정정 2026-10-29] notes 치환 — 참조 번호 정정 — EOS-209가 EOS-211로 개명됨(번호 충돌)
+updated: 2026-10-29

@@ -171,6 +171,7 @@ PRODUCTION_LOOP_MODULES: tuple[str, ...] = (
     "harness.anchor_round_ledger",  # G2 CU 물량 회차 대장(EOS-64)
     "ops.provenance_audit",  # G1 provenance 레일 · G2 금칙 소스
     "ops.validation_scorecard",  # G5 Go/No-Go 판정기
+    "ops.g3_content_measures",  # G3 자동검증 1차 통과율·힌트 누설·메타 누락(EOS-207)
 )
 # 불변 계약(선언 §0-6): 루프 도달성과 무관하게 P0 — 미성년 PII·저작권 레일·Langfuse 추적·동의.
 # *구현*하는 모듈만 본다(서빙 표면은 호출 폐쇄에, 엔진은 자기 모듈에). `api._auth`처럼 모든
@@ -872,7 +873,11 @@ CATALOG: tuple[Spec, ...] = (
        # 실제 문항에 7종을 심어 정답지를 구성으로 확정). 소비자는 harness.p3_audit_qualification.
        "l3.equivalent.p3_diff_defect_seeder",
        # PB-09 변형 3종(난이도 계열·조건변형·역문제) — 코퍼스 행에서 자식을 낳는 결정론 모듈.
-       "l3.equivalent.variants"),
+       "l3.equivalent.variants",
+       # EOS-207 검산식 우회(동어반복) 판정 — 수용 게이트 통과가 실제 재계산이었는가를 가르는
+       # 순수 판정기. 자동검증 1차 통과율(ops.g3_content_measures)이 소비하고 EOS-205가 생성
+       # 단계 거부에 재사용한다(같은 생산 사슬의 검증 축).
+       "l3.equivalent.verify_bypass"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
        "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
@@ -1216,7 +1221,10 @@ CATALOG: tuple[Spec, ...] = (
        "harness.qa_item_verdicts",
        # OPS-56: EOS-51 §6 "기술 KPI 6종" 주간 cron 집계기 — hit_cu_metrics.aggregate()를
        # 재사용하는 소비자라 같은 좌석(같은 Go/No-Go 계측 묶음)에 귀속한다.
-       "ops.weekly_metrics_report"),
+       "ops.weekly_metrics_report",
+       # EOS-207: G3 미측정 3항목 측정기 — 주간 KPI의 자동검증 1차 통과율 산출원이기도 해서
+       # 같은 Go/No-Go 계측 묶음에 귀속한다.
+       "ops.g3_content_measures"),
     _o("WM-O-906", "콘텐츠 출처·라이선스 감사 게이트·사이드카", "Admin", "Content", "P0",
        "ARCH-20·PB-11 — 저작권 레일 · EOS-97 리콜(genlog 사이드카 선별·처분)",
        "ops.provenance_audit", "ops.corpus_provenance_sidecar", "ops.generation_recall"),
