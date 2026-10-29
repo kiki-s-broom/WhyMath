@@ -1535,6 +1535,19 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "실데이터 값·판정 분기는 tests/backend/ops/test_g3_content_measures.py가 상시 동결. "
             "G3(11/22) 판정 시점에 운영자가 돌린다"
         ),
+        # EOS-210(2026-10-29): 힌트 누설 사람 판정 도구(표본 추출 sample + 맹검 판정 review).
+        # review는 사람이 키보드로 판정을 넣는 **대화형** CLI라 CI에서 돌 수 없고, sample도 저작
+        # 회차 실산출물(`cu.hints.jsonl` — EOS-211 라이브 실행 산출)이 있어야 의미가 있다.
+        # 판정 분기(맹검·입력 잠금·기록 실패 정지·재개·재판정 이력)는 backend 잡이 수집하는
+        # tests/backend/harness/test_hint_verdict_session.py가 상시 검증하고, 그 기록을 읽는 측정기
+        # 쪽은 tests/backend/ops/test_hint_human_verdicts.py가 동결한다. Kiki가 런북
+        # docs/ops/eos210_hint_human_verdict_runbook.md로 돌린다.
+        "harness.hint_verdict_session": (
+            "by-design:힌트 누설 사람 판정 대화형 CLI(EOS-210) — 사람이 판정을 입력하는 도구라 CI "
+            "실행 비대상. 판정 분기는 tests/backend/harness/test_hint_verdict_session.py가 상시 "
+            "동결. "
+            "G3 판정 전 Kiki가 런북 eos210_hint_human_verdict_runbook.md로 돌린다"
+        ),
         # EOS-211(2026-10-29): CU 사후 LLM 힌트 패스 — 저장된 CU에 단계·L1·L2·L3를 붙이는 *라이브
         # LLM 배치*다(Kiki PC 런북 1회 실행 · docs/ops/eos211_cu_hint_pass_runbook.md). CI에는 LLM
         # 키·Ollama가 없어 상시 실행 대상이 아니다. 판정 분기(게이트 3종 통과분만 verified · 재시도·

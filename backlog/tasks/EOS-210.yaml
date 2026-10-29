@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,11 +17,22 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/g3_content_measures.py
   - "src/backend/whymath_backend/harness/review_session*.py"
-session: null
+  - src/backend/whymath_backend/ops/hint_human_verdicts.py
+  - src/backend/whymath_backend/harness/hint_verdict_session.py
+  - tests/backend/ops/test_hint_human_verdicts.py
+  - tests/backend/harness/test_hint_verdict_session.py
+  - docs/ops/eos210_hint_human_verdict_runbook.md
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
+session: claude/eos-210-hint-human-verdict
 notes: |-
   출처: EOS-207 독립 리뷰 P2-2(2026-10-29). 측정기는 의미 축을 항상 NOT_MEASURED로 내고 판정 불가 힌트를 UNDECIDED로 남긴다 — 그것을 해소할 사람 판정 입력 경로가 없다. G-eos-g3의 입력으로 연결할지는 Kiki 결정 사항이라 게이트 연결은 하지 않았다. 관련: EOS-211(힌트 생성 — 판정 좌석은 픽스처로 따로 만들 수 있어 depends_on으로 묶지 않았다).
 
   [정정 2026-10-29] notes 치환 — notes의 모호한 의존 어구를 관련 표기로 정정
 
   [정정 2026-10-29] notes 치환 — 참조 번호 정정 — EOS-209가 EOS-211로 개명됨(번호 충돌)
+
+  [정정 2026-10-29] paths ['src/backend/whymath_backend/ops/g3_content_measures.py', 'src/backend/whymath_backend/harness/review_session*.py'] → ['src/backend/whymath_backend/ops/g3_content_measures.py', 'src/backend/whymath_backend/harness/review_session*.py', 'src/backend/whymath_backend/ops/hint_human_verdicts.py', 'src/backend/whymath_backend/harness/hint_verdict_session.py', 'tests/backend/ops/test_hint_human_verdicts.py', 'tests/backend/harness/test_hint_verdict_session.py', 'docs/ops/eos210_hint_human_verdict_runbook.md', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py']: 구현이 닿은 경로 편입 — 판정 기록 계약·맹검 검수 CLI·런북·인벤토리·선언≠배선 감사·런북 대화형 가드(기존 2경로 유지·전체 재나열)
 updated: 2026-10-29

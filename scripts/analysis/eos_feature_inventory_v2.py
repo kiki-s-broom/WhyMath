@@ -1228,7 +1228,11 @@ CATALOG: tuple[Spec, ...] = (
        "ops.weekly_metrics_report",
        # EOS-207: G3 미측정 3항목 측정기 — 주간 KPI의 자동검증 1차 통과율 산출원이기도 해서
        # 같은 Go/No-Go 계측 묶음에 귀속한다.
-       "ops.g3_content_measures"),
+       "ops.g3_content_measures",
+       # EOS-210: G3 "힌트 의미 누설 0"의 사람 판정 좌석 — 기록·표본 계약(ops)과 그 기록을 받는
+       # 맹검 검수 CLI(harness). 둘 다 g3_content_measures가 소비하는 입력의 생산 경로라 같은
+       # 판정기 행에 귀속한다(qa_item_verdicts → 혼동행렬과 같은 규칙).
+       "ops.hint_human_verdicts", "harness.hint_verdict_session"),
     _o("WM-O-906", "콘텐츠 출처·라이선스 감사 게이트·사이드카", "Admin", "Content", "P0",
        "ARCH-20·PB-11 — 저작권 레일 · EOS-97 리콜(genlog 사이드카 선별·처분)",
        "ops.provenance_audit", "ops.corpus_provenance_sidecar", "ops.generation_recall"),
