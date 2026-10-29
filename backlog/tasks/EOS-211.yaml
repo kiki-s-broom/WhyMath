@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,7 +17,7 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/equivalent/**"
   - "src/backend/whymath_backend/l4/hint_content/**"
-session: null
+session: claude/eos-211-cu-hints
 notes: |-
   출처: EOS-207 독립 리뷰 P2-2(2026-10-29). EOS-197 회차 CU에 힌트가 없어 G3 힌트 조건이 판정 불가였다. G-eos-g3의 입력으로 연결할지는 Kiki 결정 사항이라 게이트 연결은 하지 않았다. 관련: EOS-205(같은 생성기 파일), S4-11(힌트 좌석·게이트).
 
