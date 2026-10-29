@@ -59,11 +59,26 @@ CU 정의(§3)의 "3단계 힌트" 좌석은 S4-11 `hints` 표다(`l4/hint_conte
 CU(한 단만 있어도 해당 — 확인 리뷰 P2)·어느 CU에도 붙지 않는 힌트(problem_id 조인 실패)가 있으면
 **판정 불가(UNDECIDED)**다 — 보지 않은 것을 통과로 세지 않는다(EOS-207 리뷰 P1).
 
-**의미 축은 이 CLI가 재지 않는다**: §5 F-Ⅴ가 "힌트의 의미적 정답 누설(**자동 검사 밖**)"을 표본
+**의미 축은 기계가 재지 않는다**: §5 F-Ⅴ가 "힌트의 의미적 정답 누설(**자동 검사 밖**)"을 표본
 검수로 재라고 못박았고, §6이 "전수 자동 + LLM 심판 + 인간 30건"을 요구한다. 기계 두 축이 clean이라는
 것은 *글자·값으로는 안 드러났다*는 뜻일 뿐 의미상 누설 0의 증명이 아니다(측정 없는 기계 게이트를
-인간 검수 대체로 선언 금지 — `docs/standards/superhuman_verification_standard.md`). 그래서 출력에
-`HINT_SEMANTIC_AXIS=NOT_MEASURED`를 항상 싣고, 종료 코드는 **기계 판정**만 말한다.
+인간 검수 대체로 선언 금지 — `docs/standards/superhuman_verification_standard.md`).
+
+사람 판정 좌석 (EOS-210 — 계약 정본 `ops/hint_human_verdicts`)
+------------------------------------------------------------
+`--hint-verdicts`(사람 판정 JSONL)와 `--hint-sample-manifest`(표본 매니페스트)를 주면 두 가지를
+더 한다.
+
+  ① **기계 판정 불가 해소** — 사람 폴백(None)인 L1·L2 힌트에 유효한 사람 판정이 있으면 해소한다.
+     "누설"이면 무관용 FAIL, "아님"이면 clean으로 센다. 기계 누설(True)은 사람 판정으로 **뒤집지
+     않는다** — 어긋나면 둘 다 보존하고 `HINT_HUMAN_MACHINE_MISMATCH`로 센다(③ 라벨 대조 선례).
+     판정 뒤 보인 내용(문항·정답·힌트)이 바뀐 판정은 낡음(stale)으로, 맹검 도구를 거치지 않은 판정은
+     우회(bypassed)로, 입력에 없는 힌트의 판정은 고아(orphan)로 빼고 각각 센다.
+  ② **의미 축** — 매니페스트 표본의 판정으로 n·k·Wilson 단측 95% 상한을 낸다. n<30·표본 미판정 →
+     NOT_MEASURABLE, k>0 → FAIL, 그 밖 PASS(+상한). 매니페스트 밖 판정은 의미 축에 넣지 않는다.
+
+판정 파일이 손상(파싱 실패·필수 필드 누락·빈 근거)되면 **측정 실패(exit 2)**다 — 못 읽은 "누설"
+판정 하나가 조용히 사라진 채 통과가 나오면 안 된다.
 
 (c) 메타 누락 — 필수 목록과 그 출처
 ---------------------------------
@@ -81,18 +96,31 @@ seed를 검사하지 않은 CU는 모델별로 따로 센다(검사 안 함 ≠ 
 위변조하지 않고(EOS-197 ⑦ (c)) 어긋남만 `LABEL_MISMATCH`로 센다. 예: 실패 코드 F8(힌트 정답
 누설)인데 그 CU에 힌트가 0건이면 라벨이 가리킬 힌트가 없다.
 
-종료 코드 (기계 판정)
---------------------
-- 0 : 세 항목 모두 측정됐고 위반 0·판정 불가 0(힌트 의미 축은 별도 — 위 (b)).
-- 1 : 측정된 위반이 있다(L1·L2 힌트 누설 ≥1 또는 메타 누락 CU ≥1).
+종료 코드
+--------
+- 0 : 세 항목 모두 측정됐고 위반 0·판정 불가 0. 의미 축은 **매니페스트를 준 경우에만** 여기에
+  든다(아래).
+- 1 : 측정된 위반이 있다(L1·L2 힌트 누설 ≥1 — 기계 또는 사람 해소 · 메타 누락 CU ≥1 · 의미 축 FAIL).
 - 2 : 측정 실패 또는 판정 불가(회차 없음·파싱 실패·회계 불일치·우회 판정 불가·힌트 0건·사람 폴백
-  대기). "0건 통과"로 위장하지 않는다.
+  미해소·사람 판정 파일 손상·의미 축 NOT_MEASURABLE). "0건 통과"로 위장하지 않는다.
+
+**의미 축과 종료 코드 (EOS-210 설계 근거)**: 의미 축 상태가 `NOT_MEASURED`(매니페스트를 주지
+않음)이면 종료 코드에 **반영하지 않는다** — EOS-207의 계약("종료 코드는 기계 판정만 말한다")을
+그대로 지켜 기존 호출자(주간 원장·런북)의 판정을 바꾸지 않기 위해서다. 이때도
+`HINT_SEMANTIC_AXIS=NOT_MEASURED`와 `HINT_SEMANTIC_IN_EXIT=False`를 함께 출력하므로 exit 0이
+"의미 누설 0"으로 읽히지 않는다. 매니페스트를 주면 운영자가 의미 축 측정을 **요청한 것**이므로
+`FAIL`→1, `NOT_MEASURABLE`→2로 반영한다(요청한 측정이 안 됐는데 0을 내면 위장이다).
+예외 하나 — 매니페스트가 없어도 사람이 **확인한 누설**(기계 clean L1·L2)은 의미 축을 FAIL로
+만들고 exit 1이 된다(확인된 누설은 숨기지 않는다).
 
 사용
 ----
     python -m whymath_backend.ops.g3_content_measures --round eos197-a6
     python -m whymath_backend.ops.g3_content_measures --round eos197-a6 --json out.json
     python -m whymath_backend.ops.g3_content_measures --round eos197-a6 --hints-jsonl hints.jsonl
+    python -m whymath_backend.ops.g3_content_measures --round R --hints-jsonl H \
+        --hint-verdicts data/runs/R-review/hint_verdicts.jsonl \
+        --hint-sample-manifest data/runs/R-review/hint_sample_manifest.json
 """
 
 from __future__ import annotations
@@ -118,6 +146,18 @@ from whymath_backend.l3.generation_seed import SeedCapability, capability_for_mo
 from whymath_backend.l4.hint_content.gates import GateContext, check_answer_leakage
 from whymath_backend.l4.hint_content.models import Hint
 from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
+from whymath_backend.ops.hint_human_verdicts import (
+    HintHumanVerdict,
+    HintVerdict,
+    SampleManifest,
+    SemanticAxis,
+    hint_review_fingerprint,
+    latest_verdicts,
+    load_manifest,
+    load_verdicts,
+    measure_semantic_axis,
+    sample_population,
+)
 from whymath_backend.ops.provenance_audit import (
     GENLOG_ALWAYS_REQUIRED_FIELDS,
     RUN_REQUIRED_RECORD_FIELDS,
@@ -135,6 +175,7 @@ __all__ = [
     "RunDirInput",
     "build_report",
     "discover_round",
+    "hint_machine_verdict",
     "load_run_dir",
     "main",
     "measure_auto_gate",
@@ -620,6 +661,15 @@ def _hint_leaked(hint: Hint, answer: str | None) -> tuple[bool | None, dict[str,
     return None, verdict.detail
 
 
+def hint_machine_verdict(hint: Hint, answer: str | None) -> bool | None:
+    """힌트 1건의 기계 누설 3상태(True 누설·False 아님·None 사람 폴백) — 근거 detail 없이.
+
+    사람 판정 도구가 (가) 대상(None)을 고를 때 쓴다. 판정 근거(detail)를 돌려주지 않는 이유는 그
+    도구가 이 값을 *화면에 낼 이유가 없기* 때문이다(R19-01 — 사람 입력 전 AI 판정 비노출).
+    """
+    return _hint_leaked(hint, answer)[0]
+
+
 @dataclass(slots=True)
 class HintLeakMeasure:
     """(b)의 결과. `status` ∈ PASS·FAIL·UNDECIDED·NOT_MEASURABLE(기계 축만 — 의미 축은 별도)."""
@@ -638,6 +688,19 @@ class HintLeakMeasure:
     unmatched_hints: int = 0
     errors: list[str] = field(default_factory=list)
     per_cu: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # 사람 판정 좌석(EOS-210) — 행 계수·해소·어긋남. 판정 파일 손상은 `human_errors`(측정 실패).
+    human_errors: list[str] = field(default_factory=list)
+    human_rows: int = 0
+    human_usable_hints: int = 0
+    human_superseded: int = 0
+    human_flipped: int = 0
+    human_stale: int = 0
+    human_bypassed: int = 0
+    human_orphan: int = 0
+    human_resolved_leaked: int = 0
+    human_resolved_clean: int = 0
+    human_machine_mismatches: list[dict[str, Any]] = field(default_factory=list)
+    semantic: SemanticAxis = field(default_factory=SemanticAxis)
 
     @property
     def judged_l12(self) -> int:
@@ -645,17 +708,22 @@ class HintLeakMeasure:
         return self.leaked_l12 + self.clean_l12 + self.undecided_l12
 
     @property
+    def undecided_l12_unresolved(self) -> int:
+        """사람 폴백 중 사람 판정으로 해소되지 않은 수."""
+        return self.undecided_l12 - self.human_resolved_leaked - self.human_resolved_clean
+
+    @property
     def status(self) -> str:
-        if self.errors:
+        if self.errors or self.human_errors:
             return "NOT_MEASURABLE"
         if self.judged_l12 == 0:  # 힌트 0건도 여기 든다(판정 0건) — 무관용 축의 측정 대상 부재
             return "NOT_MEASURABLE"
-        if self.leaked_l12:
+        if self.leaked_l12 or self.human_resolved_leaked:
             return "FAIL"
         if (
             self.cu_without_hints
             or self.cu_without_l12
-            or self.undecided_l12
+            or self.undecided_l12_unresolved
             or self.unmatched_hints
         ):
             return "UNDECIDED"
@@ -665,6 +733,11 @@ class HintLeakMeasure:
     def reason(self) -> str:
         if self.errors:
             return f"힌트 입력 오류 {len(self.errors)}건(첫 사유: {self.errors[0]})"
+        if self.human_errors:
+            return (
+                f"사람 판정 입력 오류 {len(self.human_errors)}건 — 못 읽은 판정을 건너뛰지 않는다"
+                f"(첫 사유: {self.human_errors[0]})"
+            )
         if self.hint_inputs == 0:
             return (
                 "힌트 입력 없음(--hints-jsonl 미지정) — 회차 산출물에는 힌트가 실리지 않으므로"
@@ -677,26 +750,48 @@ class HintLeakMeasure:
                 f"힌트 {self.hints_total}건 중 L1·L2가 0건 — 무관용 축의 측정 대상 부재"
                 "(누설 0이 아니다)"
             )
-        if self.leaked_l12:
-            return f"L1·L2 힌트 정답 누설 {self.leaked_l12}건(무관용)"
+        if self.leaked_l12 or self.human_resolved_leaked:
+            return (
+                f"L1·L2 힌트 정답 누설 {self.leaked_l12 + self.human_resolved_leaked}건(무관용 — "
+                f"기계 {self.leaked_l12} · 기계 판정 불가를 사람이 누설로 해소 "
+                f"{self.human_resolved_leaked})"
+            )
         if (
             self.cu_without_hints
             or self.cu_without_l12
-            or self.undecided_l12
+            or self.undecided_l12_unresolved
             or self.unmatched_hints
         ):
             return (
                 f"힌트 없는 CU {self.cu_without_hints}건 · L1·L2를 모두 갖추지 못한 CU "
-                f"{self.cu_without_l12}건 · L1·L2 사람 폴백 {self.undecided_l12}건 · "
-                f"CU에 붙지 않는 힌트 {self.unmatched_hints}건 — 누설 0을 확정할 수 없다"
+                f"{self.cu_without_l12}건 · L1·L2 사람 폴백 {self.undecided_l12}건 중 미해소 "
+                f"{self.undecided_l12_unresolved}건 · CU에 붙지 않는 힌트 {self.unmatched_hints}건 "
+                "— 누설 0을 확정할 수 없다"
             )
-        return "기계 두 축(글자·값) L1·L2 누설 0 — 의미 축은 별도(사람 표본)"
+        resolved = self.human_resolved_clean
+        suffix = f" · 사람 폴백 {resolved}건은 사람 판정으로 해소" if resolved else ""
+        return f"기계 두 축(글자·값) L1·L2 누설 0{suffix} — 의미 축은 별도(사람 표본)"
 
     def to_json(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "reason": self.reason,
-            "semantic_axis": "NOT_MEASURED",
+            "semantic_axis": self.semantic.status,
+            "semantic": self.semantic.to_json(),
+            "human": {
+                "errors": list(self.human_errors),
+                "rows": self.human_rows,
+                "usable_hints": self.human_usable_hints,
+                "superseded": self.human_superseded,
+                "flipped": self.human_flipped,
+                "stale": self.human_stale,
+                "bypassed": self.human_bypassed,
+                "orphan": self.human_orphan,
+                "resolved_leaked": self.human_resolved_leaked,
+                "resolved_clean": self.human_resolved_clean,
+                "machine_mismatches": list(self.human_machine_mismatches),
+            },
+            "undecided_l12_unresolved": self.undecided_l12_unresolved,
             "hint_inputs": self.hint_inputs,
             "cu_total": self.cu_total,
             "cu_with_hints": self.cu_with_hints,
@@ -736,15 +831,72 @@ def load_hints(paths: Sequence[Path]) -> tuple[list[Hint], list[str]]:
     return hints, errors
 
 
+def _usable_human_verdicts(
+    measure: HintLeakMeasure,
+    cu_rows: Sequence[Mapping[str, Any]],
+    hints: Sequence[Hint],
+    verdicts: Sequence[HintHumanVerdict],
+) -> dict[str, HintHumanVerdict]:
+    """사람 판정 → hint_id별 **유효한 최신** 판정. 고아·우회·낡음은 빼고 센다(지우지 않는다).
+
+    problem_id가 힌트의 문제와 다르면 기록이 엉뚱한 문항을 가리키는 것이므로 측정 실패다.
+    """
+    hints_by_id: dict[str, Hint] = {}
+    for hint in hints:
+        hints_by_id.setdefault(hint.hint_id, hint)
+    rows_by_problem: dict[str, Mapping[str, Any]] = {}
+    for row in cu_rows:
+        rows_by_problem.setdefault(str(row.get("problem_id")), row)
+    usable: list[HintHumanVerdict] = []
+    for verdict in verdicts:
+        measure.human_rows += 1
+        target = hints_by_id.get(verdict.hint_id)
+        cu_row = rows_by_problem.get(str(target.solution_step_ref.problem_id)) if target else None
+        if target is None or cu_row is None:
+            measure.human_orphan += 1
+            continue
+        if verdict.problem_id != target.solution_step_ref.problem_id:
+            measure.human_errors.append(
+                f"사람 판정 hint_id {verdict.hint_id}의 problem_id가 힌트의 문제와 다르다"
+            )
+            continue
+        if verdict.bypassed:
+            measure.human_bypassed += 1
+            continue
+        if verdict.content_fingerprint != hint_review_fingerprint(cu_row, target):
+            measure.human_stale += 1
+            continue
+        usable.append(verdict)
+    latest = latest_verdicts(usable)
+    measure.human_usable_hints = len(latest.latest)
+    measure.human_superseded = latest.superseded
+    measure.human_flipped = latest.flipped
+    return latest.latest
+
+
 def measure_hint_leakage(
     cu_rows: Sequence[Mapping[str, Any]],
     hints: Sequence[Hint],
     *,
     hint_inputs: int,
     errors: Sequence[str] = (),
+    human_verdicts: Sequence[HintHumanVerdict] = (),
+    human_errors: Sequence[str] = (),
+    manifest: SampleManifest | None = None,
+    manifest_requested: bool = False,
+    manifest_errors: Sequence[str] = (),
 ) -> HintLeakMeasure:
-    """CU 정답 × 그 CU의 힌트 → (b). `hint_inputs`는 받은 힌트 파일 수(0이면 '입력 없음' 사유)."""
-    measure = HintLeakMeasure(hint_inputs=hint_inputs, errors=list(errors))
+    """CU 정답 × 그 CU의 힌트 → (b). `hint_inputs`는 받은 힌트 파일 수(0이면 '입력 없음' 사유).
+
+    사람 판정(`human_verdicts`)·표본 매니페스트는 모듈 docstring '사람 판정 좌석'. `human_errors`는
+    판정 파일 읽기 오류(측정 실패), `manifest_errors`는 매니페스트 오류(의미 축 측정 불가)다.
+    """
+    measure = HintLeakMeasure(
+        hint_inputs=hint_inputs, errors=list(errors), human_errors=list(human_errors)
+    )
+    human = _usable_human_verdicts(measure, cu_rows, hints, human_verdicts)
+    machine_by_id: dict[str, bool | None] = {}
+    level_by_id: dict[str, int] = {}
     by_problem: dict[str, list[Hint]] = {}
     for hint in hints:
         by_problem.setdefault(str(hint.solution_step_ref.problem_id), []).append(hint)
@@ -772,16 +924,20 @@ def measure_hint_leakage(
             measure.hints_total += 1
             levels[f"L{hint.level}"] += 1
             leaked, detail = _hint_leaked(hint, answer)
+            machine_by_id[hint.hint_id] = leaked
+            level_by_id[hint.hint_id] = int(hint.level)
+            person = human.get(hint.hint_id)
             entry["judged"].append(
-                {"hint_id": hint.hint_id, "level": hint.level, "leaked": leaked, **detail}
+                {
+                    "hint_id": hint.hint_id,
+                    "level": hint.level,
+                    "leaked": leaked,
+                    "human_verdict": person.verdict.value if person else None,
+                    **detail,
+                }
             )
             if hint.level in _ZERO_TOLERANCE_LEVELS:
-                if leaked is True:
-                    measure.leaked_l12 += 1
-                elif leaked is False:
-                    measure.clean_l12 += 1
-                else:
-                    measure.undecided_l12 += 1
+                _tally_l12(measure, hint, leaked, person)
             elif leaked is True:
                 measure.leaked_l3 += 1
         measure.per_cu[slug] = entry
@@ -789,7 +945,57 @@ def measure_hint_leakage(
         len(group) for pid, group in by_problem.items() if pid not in known_problems
     )
     measure.hints_by_level = dict(levels)
+    current_population: dict[str, str] | None = None
+    semantic_errors = [*manifest_errors, *measure.human_errors]
+    if manifest is not None:
+        current_population, population_errors = sample_population(cu_rows, hints)
+        semantic_errors.extend(population_errors)
+    measure.semantic = measure_semantic_axis(
+        manifest=manifest,
+        requested=manifest_requested,
+        current_population=current_population,
+        usable=human,
+        machine=machine_by_id,
+        levels=level_by_id,
+        errors=semantic_errors,
+    )
     return measure
+
+
+def _tally_l12(
+    measure: HintLeakMeasure, hint: Hint, leaked: bool | None, person: HintHumanVerdict | None
+) -> None:
+    """L1·L2 힌트 1건 계수 — 기계 3상태 × 사람 판정. 기계 누설은 사람이 뒤집지 못한다."""
+    if leaked is True:
+        measure.leaked_l12 += 1
+    elif leaked is False:
+        measure.clean_l12 += 1
+    else:
+        measure.undecided_l12 += 1
+        if person is not None:
+            if person.verdict is HintVerdict.LEAKED:
+                measure.human_resolved_leaked += 1
+            else:
+                measure.human_resolved_clean += 1
+        return
+    if person is None:
+        return
+    human_leaked = person.verdict is HintVerdict.LEAKED
+    if human_leaked != leaked:  # 어긋남 — 어느 쪽도 고치지 않고 둘 다 보존한다
+        measure.human_machine_mismatches.append(
+            {
+                "hint_id": hint.hint_id,
+                "problem_id": str(hint.solution_step_ref.problem_id),
+                "level": int(hint.level),
+                "kind": (
+                    "machine_leak_vs_human_not_leaked" if leaked else "human_leak_vs_machine_clean"
+                ),
+                "machine_leaked": leaked,
+                "human_verdict": person.verdict.value,
+                "reviewer": person.reviewer,
+                "judged_at": person.judged_at.isoformat(),
+            }
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -984,22 +1190,53 @@ def _exit_code(
     round_input: RoundInput, gate: AutoGateMeasure, hint: HintLeakMeasure, meta: MetaMeasure
 ) -> int:
     """종료 코드(모듈 docstring) — 입력 실패 > 위반 > 미측정 > 통과 순."""
-    if round_input.errors or gate.errors:
+    # 사람 판정 파일 손상은 위반보다 먼저 측정 실패다 — 못 읽은 판정 위의 FAIL/PASS는 믿지 않는다.
+    if round_input.errors or gate.errors or hint.human_errors:
         return EXIT_UNMEASURED
-    if hint.status == "FAIL" or meta.status == "FAIL":
+    semantic = hint.semantic.status  # NOT_MEASURED는 반영하지 않는다(모듈 docstring '종료 코드')
+    if hint.status == "FAIL" or meta.status == "FAIL" or semantic == "FAIL":
         return EXIT_VIOLATION
-    if not gate.measured or hint.status != "PASS" or meta.status != "PASS":
+    if (
+        not gate.measured
+        or hint.status != "PASS"
+        or meta.status != "PASS"
+        or semantic == "NOT_MEASURABLE"
+    ):
         return EXIT_UNMEASURED
     return EXIT_PASS
 
 
 def build_report(
-    round_input: RoundInput, hints: Sequence[Hint], *, hint_inputs: int, hint_errors: Sequence[str]
+    round_input: RoundInput,
+    hints: Sequence[Hint],
+    *,
+    hint_inputs: int,
+    hint_errors: Sequence[str],
+    human_verdicts: Sequence[HintHumanVerdict] = (),
+    human_errors: Sequence[str] = (),
+    manifest: SampleManifest | None = None,
+    manifest_requested: bool = False,
+    manifest_errors: Sequence[str] = (),
 ) -> dict[str, Any]:
     """세 측정 + 라벨 대조 → 리포트 dict(순수 · I/O 0)."""
     gate = measure_auto_gate(round_input.run_dirs, input_errors=round_input.errors)
     cu_rows = [row for run in round_input.run_dirs for row in run.cu_rows]
-    hint = measure_hint_leakage(cu_rows, hints, hint_inputs=hint_inputs, errors=hint_errors)
+    manifest_problems = list(manifest_errors)
+    if manifest is not None and manifest.round_id != round_input.round_id:
+        manifest_problems.append(
+            f"매니페스트 회차 {manifest.round_id!r} ≠ 측정 회차 {round_input.round_id!r}"
+        )
+    hint = measure_hint_leakage(
+        cu_rows,
+        hints,
+        hint_inputs=hint_inputs,
+        errors=hint_errors,
+        human_verdicts=human_verdicts,
+        human_errors=human_errors,
+        manifest=manifest,
+        manifest_requested=manifest_requested or manifest is not None,
+        manifest_errors=manifest_problems,
+    )
     meta = measure_meta(round_input.run_dirs, input_errors=round_input.errors)
     crosscheck = _label_crosscheck(round_input.verdict_rows, gate, hint, meta)
     exit_code = _exit_code(round_input, gate, hint, meta)
@@ -1068,6 +1305,28 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         f"HINT_LEAKED_L3={hint['leaked_l3']}",
         f"HINT_MACHINE_AXIS={hint['status']}",
         f"HINT_SEMANTIC_AXIS={hint['semantic_axis']}",
+        f"HINT_SEMANTIC_IN_EXIT={hint['semantic']['engaged'] or hint['semantic_axis'] == 'FAIL'}",
+        f"HINT_SEMANTIC_SAMPLE_ID={hint['semantic']['sample_id']}",
+        f"HINT_SEMANTIC_N={hint['semantic']['n']}",
+        f"HINT_SEMANTIC_K={hint['semantic']['k']}",
+        f"HINT_SEMANTIC_UNJUDGED={hint['semantic']['unjudged']}",
+        f"HINT_SEMANTIC_WILSON_UPPER_95={_fmt(hint['semantic']['wilson_upper_95'])}",
+        f"HINT_SEMANTIC_OUTSIDE_MANIFEST={hint['semantic']['outside_manifest']}",
+        f"HINT_SEMANTIC_SAMPLE_ID_MISMATCH={hint['semantic']['sample_id_mismatch']}",
+        "HINT_SEMANTIC_HUMAN_LEAK_OUTSIDE_SAMPLE="
+        f"{len(hint['semantic']['human_leaks_outside_sample'])}",
+        f"HINT_UNDECIDED_L12_UNRESOLVED={hint['undecided_l12_unresolved']}",
+        f"HINT_HUMAN_ROWS={hint['human']['rows']}",
+        f"HINT_HUMAN_USABLE_HINTS={hint['human']['usable_hints']}",
+        f"HINT_HUMAN_SUPERSEDED={hint['human']['superseded']}",
+        f"HINT_HUMAN_FLIPPED={hint['human']['flipped']}",
+        f"HINT_HUMAN_STALE={hint['human']['stale']}",
+        f"HINT_HUMAN_BYPASSED={hint['human']['bypassed']}",
+        f"HINT_HUMAN_ORPHAN={hint['human']['orphan']}",
+        f"HINT_HUMAN_RESOLVED_LEAKED={hint['human']['resolved_leaked']}",
+        f"HINT_HUMAN_RESOLVED_CLEAN={hint['human']['resolved_clean']}",
+        f"HINT_HUMAN_MACHINE_MISMATCH={len(hint['human']['machine_mismatches'])}",
+        f"HINT_HUMAN_INPUT_ERRORS={len(hint['human']['errors'])}",
         f"META_CU_TOTAL={meta['cu_total']}",
         f"META_CU_MISSING={meta['cu_missing']}",
         f"META_MISSING_BY_FIELD={_j(meta['missing_by_field'])}",
@@ -1081,8 +1340,16 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
     reasons = [
         ("AUTO_GATE_REASON", gate["reason"]),
         ("HINT_REASON", hint["reason"]),
+        ("HINT_SEMANTIC_REASON", hint["semantic"]["reason"]),
     ]
     lines.extend(f"{key}={value}" for key, value in reasons if value)
+    lines.extend(f"HINT_HUMAN_ERROR={e}" for e in hint["human"]["errors"])
+    lines.extend(f"HINT_SEMANTIC_ERROR={e}" for e in hint["semantic"]["errors"])
+    lines.extend(
+        f"HINT_HUMAN_MISMATCH={m['hint_id']} {m['kind']} — 기계 {m['machine_leaked']} · 사람 "
+        f"{m['human_verdict']}({m['reviewer']} {m['judged_at']})"
+        for m in hint["human"]["machine_mismatches"]
+    )
     lines.extend(f"INPUT_ERROR={e}" for e in report["input_errors"])
     lines.extend(f"GATE_ERROR={e}" for e in gate["errors"] if e not in report["input_errors"])
     lines.extend(f"MISMATCH={m['slug']} {m['kind']} — {m['detail']}" for m in cross["mismatches"])
@@ -1119,6 +1386,22 @@ def main(argv: list[str] | None = None) -> int:
             "측정 대상 부재"
         ),
     )
+    parser.add_argument(
+        "--hint-verdicts",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "힌트 누설 사람 판정 JSONL(EOS-210 · ops/hint_human_verdicts 계약 · 반복 가능). "
+            "손상되면 측정 실패(exit 2)"
+        ),
+    )
+    parser.add_argument(
+        "--hint-sample-manifest",
+        type=Path,
+        default=None,
+        help="의미 축 표본 매니페스트(주면 의미 축이 종료 코드에 든다 — 모듈 docstring)",
+    )
     parser.add_argument("--json", type=Path, default=None, help="전체 리포트 JSON 저장 경로")
     args = parser.parse_args(argv)
 
@@ -1126,7 +1409,27 @@ def main(argv: list[str] | None = None) -> int:
     round_input = discover_round(runs_root, args.round, review_dir=args.review_dir)
     hint_paths = list(args.hints_jsonl or [])
     hints, hint_errors = load_hints(hint_paths)
-    report = build_report(round_input, hints, hint_inputs=len(hint_paths), hint_errors=hint_errors)
+    human_verdicts: list[HintHumanVerdict] = []
+    human_errors: list[str] = []
+    for verdict_path in args.hint_verdicts or []:
+        rows, errors = load_verdicts(verdict_path)
+        human_verdicts.extend(rows)
+        human_errors.extend(errors)
+    manifest: SampleManifest | None = None
+    manifest_errors: list[str] = []
+    if args.hint_sample_manifest is not None:
+        manifest, manifest_errors = load_manifest(args.hint_sample_manifest)
+    report = build_report(
+        round_input,
+        hints,
+        hint_inputs=len(hint_paths),
+        hint_errors=hint_errors,
+        human_verdicts=human_verdicts,
+        human_errors=human_errors,
+        manifest=manifest,
+        manifest_requested=args.hint_sample_manifest is not None,
+        manifest_errors=manifest_errors,
+    )
     if args.json is not None:
         try:
             args.json.parent.mkdir(parents=True, exist_ok=True)
