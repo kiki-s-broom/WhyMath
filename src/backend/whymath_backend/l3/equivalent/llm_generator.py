@@ -149,6 +149,45 @@ __all__ = ["LLMEquivalentProblemGenerator"]
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _safe_exc_summary(exc: BaseException) -> str:
+    """never-break 경고용 예외 요약 — **타입명 + 비내용 구조 필드**만 담는다(EOS-202).
+
+    `str(exc)`(예외 메시지 원문)는 넣지 않는다. 이 파일이 삼키는 예외의 메시지는 내용을 싣는다:
+      - provider 실패: `SeatHttpError`는 메시지에 공급사 **응답 본문 최대 2000자**를 붙이고
+        (`_openai_compat.py`), SDK 예외도 요청·응답 일부를 메시지에 담는다.
+      - 조립 실패: pydantic `ValidationError` 메시지는 LLM이 낸 **입력값**(`input_value=…`)을,
+        우리 `ValueError`는 LLM 답·조건식(`LLM 답({given})`)을 담는다.
+    경고 로그는 콘솔·수집기로 흘러가므로 그 본문이 거기 남지 않게 한다(CLAUDE.md 「침묵 실패
+    금지」 — 타입명 필수·시크릿·필드값 제외).
+
+    "안전한 요약"의 정의(값이 아니라 **구조**만):
+      ① 예외 타입명 — 실패 종류를 가르는 최소 정보(필수).
+      ② HTTP 상태코드 — **정수 속성**에서만 읽는다(`exc.status_code` · `exc.response.status_code`,
+         `seat_failure._http_status_of`와 같은 두 자리). 메시지에서 캐내지 않는다. 상태코드는
+         응답 내용이 아니라 프로토콜 분류값이라 429·5xx·4xx 구분(재시도할지·설정을 고칠지)을
+         로그만으로 가능하게 한다. bool은 int 하위지만 상태코드가 아니라 배제한다.
+      ③ pydantic 검증 오류 **건수** — 몇 군데가 틀렸는지만(필드 경로·입력값은 미포함).
+    """
+    name = type(exc).__name__
+    parts: list[str] = []
+    try:
+        candidates: list[object] = [getattr(exc, "status_code", None)]
+        response = getattr(exc, "response", None)
+        if response is not None:
+            candidates.append(getattr(response, "status_code", None))
+        for value in candidates:
+            if isinstance(value, int) and not isinstance(value, bool):
+                parts.append(f"HTTP {value}")
+                break
+        if isinstance(exc, ValidationError):
+            parts.append(f"errors={exc.error_count()}")
+    except Exception:  # noqa: BLE001 — 로그 요약이 never-break 폴백을 깨면 안 된다(리뷰 P3)
+        # 속성 접근이 AttributeError 아닌 예외를 던지는 객체(property 등) — 타입명만 남긴다.
+        return name
+    return f"{name}({', '.join(parts)})" if parts else name
+
+
 # 개념 태깅 role 유효값(ConceptRole) — LLM이 낸 role 문자열 검증용(schema는 최하위·import 허용).
 _VALID_ROLES: frozenset[str] = frozenset(r.value for r in ConceptRole)
 
@@ -455,7 +494,12 @@ class LLMEquivalentProblemGenerator:
         try:
             generated = self._invoke(prompt, decision, seed=seed)
         except Exception as exc:  # noqa: BLE001 — provider 장애 시 배치 크래시 금지·안전 폴백.
-            _LOGGER.warning("동등문제 생성 provider 호출 실패 — None 폴백: %s", exc)
+            # 침묵실패 금지 — 타입명 + 안전 요약만(메시지 원문엔 응답 본문이 섞인다·EOS-202).
+            # 아래 GenerationLog.error_detail 형식은 g3_content_measures가 앞머리로
+            # 분류하므로 무변경.
+            _LOGGER.warning(
+                "동등문제 생성 provider 호출 실패(%s) — None 폴백", _safe_exc_summary(exc)
+            )
             # 실패한 호출 *시도*도 Run 이력이다(EOS-55) — usage 미상(None)·정직 실패 기록.
             self._emit_generation_log(
                 spec,
@@ -492,7 +536,8 @@ class LLMEquivalentProblemGenerator:
         except (ValidationError, ValueError, KeyError, TypeError) as exc:
             # Problem/Provenance 불변식 위반(저작권 게이트가 생성 거부)·필수 결측·타입 오류.
             # 조용히 통과시키지 않고 로그 + None(게이트에 도달하기 전 정직한 생성 실패).
-            _LOGGER.warning("동등문제 후보 조립 실패 — None 폴백: %s", exc)
+            # 메시지 원문은 LLM 입력값·답을 싣는다 — 타입명 + 오류 건수만(EOS-202).
+            _LOGGER.warning("동등문제 후보 조립 실패(%s) — None 폴백", _safe_exc_summary(exc))
             self._emit_generation_log(
                 spec,
                 prompt,
@@ -1072,7 +1117,12 @@ class LLMEquivalentProblemGenerator:
             # CONST-09: LLM 답은 신뢰 입력이 아니다 — 안전 진입점으로 파싱한다(거부는 아래 except).
             given_value = complex(safe_sympify(given).evalf())
             derived_value = complex(safe_sympify(derived).evalf())
-        except Exception:  # noqa: BLE001 — 답 파싱 불가는 정규화 포기(게이트 위임)
+        except Exception as exc:  # noqa: BLE001 — 답 파싱 불가는 정규화 포기(게이트 위임)
+            # 침묵실패 금지(EOS-202) — 종전엔 로그 없이 삼켰다. 타입명만 남긴다(LLM 답 값 미출력).
+            _LOGGER.warning(
+                "동등문제 답 수치 평가 실패(%s) — derive-and-verify 정규화 생략·게이트 위임",
+                _safe_exc_summary(exc),
+            )
             return answer, answer_map
         # 부동소수 표기 차이만 흡수(상대 1e-6) — 반올림 소수(1.33)·틀린 근은 불일치로 거부.
         tolerance = max(1e-6, 1e-6 * abs(derived_value))

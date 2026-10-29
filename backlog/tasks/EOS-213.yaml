@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-213
+title: "L3 생성기 never-break 경고의 예외 메시지 원문 로그 제거 — explanation_generator 외 전수(EOS-202 기준 확장)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `l3/pedagogy/explanation_generator.py`의 provider 호출 실패 경고(`설명 생성 provider 호출 실패(%s) — None 폴백: %s`)가 타입명과 함께 예외 메시지 원문 `exc`를 로그에 싣는다 — 공급사 응답 본문(`SeatHttpError` 최대 2000자)·LLM 출력이 콘솔·수집기에 남을 수 있다. EOS-202가 `l3/equivalent/llm_generator.py`에 정한 기준(타입명 + 비내용 구조 필드만 · `str(exc)` 금지)으로 맞춘다 ② `l3/` 전체에서 never-break 폴백이 예외 메시지 원문을 로그에 싣는 자리를 전수 열거하고(검색 방법과 범위를 문서에 적는다 — 이름이 아니라 역할로 검색) 같은 기준으로 맞춘다 ③ 회귀 가드: 원문 `exc`를 로그 인자로 넘기는 형태를 AST로 잡는 거버넌스 테스트(문자열 정규식이 아니라 구성된 호출 인자 검사) — 뮤테이션으로 RED 확인 ④ EOS-212(공용 안전 요약 함수 판정)와 함수 하나를 공유한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/pedagogy/explanation_generator.py
+  - "tests/backend/l3/**"
+session: null
+notes: "출처: EOS-202 구현 보고(2026-10-29) — 같은 계열 결함을 범위 밖이라 손대지 않음. 관련: EOS-212."
+updated: 2026-10-29
