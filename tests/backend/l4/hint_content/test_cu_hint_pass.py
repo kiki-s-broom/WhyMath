@@ -209,7 +209,7 @@ class TestNormalPathWithMeasurer:
         assert log["model_name"] and log["prompt_version"] == cu_hint_prompt_version()
         assert len(log["input_sha256"]) == 64 and log["seed"] == 7
         assert log["cu_slug"] == _REAL_SLUG and log["run_id"] == "test-run"
-        assert context["genlog_log_id"] == log["log_id"]
+        assert context["attempt_id"] == log["log_id"]  # 시도 ID = 생성 로그 log_id
         # 관측 — 성공 호출마다 1건 + 배치 끝 flush
         assert len(trace.records) == 1 and trace.flushed == 1
         # 프롬프트에 해설이 실린다(해설 있는 좌석)
@@ -246,7 +246,7 @@ class TestLeakIsRejected:
         leak = (
             "풀이는 모두 3단계로 이어져. 지금은 첫 단계야. 끝에 극댓값 14가 나와. 어떻게 시작할까?"
         )
-        report = _run(run, _Provider([_good(hints={"L2": leak})]))
+        report = _run(run, _Provider([_good(hints={"L2": leak})]), retries=0)
 
         assert report.exit_code == chp.EXIT_INCOMPLETE
         assert report.incomplete_cus == [_REAL_SLUG]
@@ -263,7 +263,7 @@ class TestLeakIsRejected:
 
     def test_missing_value_capability_rejects_everything(self, tmp_path: Path) -> None:
         run = _seat(tmp_path, [_real_cu()])
-        report = _run(run, _Provider([_good()]), value_exposure=None)
+        report = _run(run, _Provider([_good()]), value_exposure=None, retries=0)
         assert _lines(run / chp.HINTS_FILE) == []
         assert len(_lines(run / chp.REJECTED_FILE)) == 3
         assert report.exit_code == chp.EXIT_INCOMPLETE
@@ -343,14 +343,14 @@ class TestResume:
         assert {p.name: p.read_bytes() for p in run.iterdir()} == before
         assert report.cu_resumed == 1 and report.exit_code == chp.EXIT_OK
 
-    def test_orphan_rows_of_an_interrupted_cu_are_replaced_not_duplicated(
+    def test_inconsistent_rows_of_an_interrupted_cu_are_replaced_not_duplicated(
         self, tmp_path: Path
     ) -> None:
         run = _seat(tmp_path, [_real_cu()])
         _run(run, _Provider([_good()]))
-        (run / chp.CONTEXT_FILE).unlink()  # 힌트는 썼는데 문맥(완료 표지) 전에 끊긴 상태
+        (run / chp.CONTEXT_FILE).unlink()  # 채택본은 썼는데 문맥 행 교체 전에 끊긴 상태
         report = _run(run, _Provider([_good()]))
-        assert report.discarded_orphan_rows == 3
+        assert report.discarded_inconsistent_rows == 3
         hint_ids = [h["hint_id"] for h in _lines(run / chp.HINTS_FILE)]
         assert len(hint_ids) == 3 and len(set(hint_ids)) == 3
         assert len(_lines(run / chp.GENLOG_FILE)) == 2  # 호출 기록은 걷어내지 않는다
@@ -439,7 +439,7 @@ class TestRouting:
         seen: list[str] = []
         _run(_seat(tmp_path, cus), _Provider([_good(), "{}"]), retries=0, on_progress=seen.append)
         assert seen[0].startswith(f"CU_DONE slug={cus[0]['slug']}")
-        assert seen[1] == f"CU_FAILED slug={cus[1]['slug']} attempts=1"
+        assert seen[1] == f"CU_FAILED slug={cus[1]['slug']} attempts_total=1"
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -487,7 +487,178 @@ class TestPromptAndCli:
 
     def test_written_rows_are_hint_model_json(self, tmp_path: Path) -> None:
         run = _seat(tmp_path, [_real_cu()])
-        _run(run, _Provider([_good(hints={"L2": "극댓값은 14야. 몇 단계일까?"})]))
+        _run(run, _Provider([_good(hints={"L2": "극댓값은 14야. 몇 단계일까?"})]), retries=0)
         for name in (chp.HINTS_FILE, chp.REJECTED_FILE):
             for row in _lines(run / name):
                 Hint.model_validate(row)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# P2-1 게이트 거부 재생성 · 시도 예산 · 재개 정의
+# ──────────────────────────────────────────────────────────────────────
+_LEAK_L2 = "풀이는 모두 3단계로 이어져. 지금은 첫 단계야. 끝에 극댓값 14가 나와. 어떻게 시작할까?"
+
+
+def _summary(report: chp.PassReport) -> dict[str, str]:
+    return dict(line.split("=", 1) for line in report.render_lines())
+
+
+class TestRegeneration:
+    def test_gate_rejection_is_regenerated_within_budget(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        provider = _Provider([_good(hints={"L2": _LEAK_L2}), _good()])
+        report = _run(run, provider)
+        assert len(provider.calls) == 2 and report.exit_code == chp.EXIT_OK
+        assert [h["level"] for h in _lines(run / chp.HINTS_FILE)] == [1, 2, 3]
+        assert [h["level"] for h in _lines(run / chp.REJECTED_FILE)] == [2]  # 이력은 남는다
+        logs = _lines(run / chp.GENLOG_FILE)
+        assert [log["success"] for log in logs] == [True, True]  # 시도마다 1행
+        (context,) = _lines(run / chp.CONTEXT_FILE)
+        assert context["attempt_no"] == 2 and context["attempts_total"] == 2
+        assert context["attempt_id"] == logs[1]["log_id"]
+        hints = _lines(run / chp.HINTS_FILE)
+        assert all(h["generator_version"].endswith(uuid_hex12(logs[1]["log_id"])) for h in hints)
+        summary = _summary(report)
+        assert summary["HINT_ATTEMPTS_TOTAL"] == "2"
+        assert summary["HINT_GATED_ATTEMPTS_TOTAL"] == "2"
+        assert summary["HINT_GATE_REJECTED_HINTS_TOTAL"] == "1"
+        assert summary["HINT_GATE_REJECT_RATE"] == "0.1667"
+        assert summary["CU_REGENERATED"] == "1" and summary["REGENERATED_CUS"] == _REAL_SLUG
+
+    def test_best_candidate_is_kept_when_budget_runs_out(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        worse = _good(hints={"L1": "어떤 성질을 쓸 수 있을까?", "L2": _LEAK_L2})
+        report = _run(run, _Provider([_good(hints={"L2": _LEAK_L2}), worse, "{}"]))
+        assert [h["level"] for h in _lines(run / chp.HINTS_FILE)] == [1, 3]
+        (context,) = _lines(run / chp.CONTEXT_FILE)
+        assert context["attempt_no"] == 1 and context["attempts_total"] == 3
+        assert context["gated_attempts_total"] == 2 and context["rejected_hints_total"] == 3
+        assert _summary(report)["HINT_GATE_REJECT_RATE"] == "0.5000"
+        assert report.incomplete_cus == [_REAL_SLUG] and report.exit_code == chp.EXIT_INCOMPLETE
+
+    def test_budget_counts_from_the_first_attempt_across_runs(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good(hints={"L2": _LEAK_L2})]), retries=0)
+        second = _Provider([_good(), _good()])
+        report = _run(run, second, retries=1)  # 총 2회 중 1회는 이미 썼다
+        assert len(second.calls) == 1 and report.exit_code == chp.EXIT_OK
+        assert _summary(report)["HINT_ATTEMPTS_TOTAL"] == "2"
+
+    def test_exhausted_budget_skips_until_redo_incomplete(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good(hints={"L2": _LEAK_L2})]), retries=0)
+        idle = _Provider([])
+        report = _run(run, idle, retries=0)
+        assert idle.calls == [] and report.budget_exhausted_cus == [_REAL_SLUG]
+        assert report.exit_code == chp.EXIT_INCOMPLETE
+        redo = _Provider([_good()])
+        report = _run(run, redo, retries=0, redo_incomplete=True)
+        assert len(redo.calls) == 1 and report.exit_code == chp.EXIT_OK
+        hint_ids = [h["hint_id"] for h in _lines(run / chp.HINTS_FILE)]
+        assert len(hint_ids) == 3 and len(set(hint_ids)) == 3  # 채택본은 교체(중복 0)
+        assert len(_lines(run / chp.REJECTED_FILE)) == 1  # 거부 이력은 지우지 않는다
+        assert len(_lines(run / chp.GENLOG_FILE)) == 2
+        (context,) = _lines(run / chp.CONTEXT_FILE)
+        assert context["verified_levels"] == [1, 2, 3] and context["attempts_total"] == 2
+
+
+def uuid_hex12(log_id: str) -> str:
+    return log_id.replace("-", "")[:12]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# P3 — 원문 비노출 · 개념 이름 정규화 · 손상 줄 격리 · 최상위 예외
+# ──────────────────────────────────────────────────────────────────────
+class _HttpError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Bearer sk-or-SECRET1234 at https://api.example/v1?key=abc")
+        self.status_code = 429
+
+
+class _BrokenStatusError(Exception):
+    @property
+    def status_code(self) -> int:
+        raise RuntimeError("속성 접근이 터진다")
+
+
+class TestP3Hardening:
+    def test_error_detail_has_type_and_status_but_no_message(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_HttpError()]), retries=0)
+        (log,) = _lines(run / chp.GENLOG_FILE)
+        assert log["error_detail"] == "provider.generate failed: _HttpError(HTTP 429)"
+        assert "SECRET" not in (run / chp.GENLOG_FILE).read_text("utf-8")
+
+    def test_safe_summary_never_raises(self) -> None:
+        assert chp._safe_exc_summary(_BrokenStatusError("x")) == "_BrokenStatusError"
+        assert chp._safe_exc_summary(ValueError("민감한 원문")) == "ValueError"
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            pytest.param("３차 함수의 극값", id="fullwidth-digit"),
+            pytest.param("½ 공식의 활용", id="vulgar-fraction"),
+            pytest.param("원주율 π의 뜻", id="pi"),
+        ],
+    )
+    def test_concept_name_is_checked_after_nfkc(self, name: str) -> None:
+        with pytest.raises(chp.DraftError, match="concept_name"):
+            chp.parse_draft(_good(concept_name=name))
+
+    def test_concept_name_containing_the_answer_is_rejected(self) -> None:
+        with pytest.raises(chp.DraftError, match="concept_name"):
+            chp.parse_draft(_good(concept_name="ａｂ 꼴의 성질"), answer="ab")
+
+    def test_one_char_answer_is_not_judged_by_containment(self) -> None:
+        # 1자 정답은 개념 이름의 흔한 글자와 우연히 겹친다 — 판정하지 않는다(근거는 모듈 상수 주석)
+        draft = chp.parse_draft(_good(concept_name="자연상수 e의 성질"), answer="e")
+        assert draft.concept_name == "자연상수 e의 성질"
+
+    def test_truncated_genlog_tail_is_quarantined_before_append(self, tmp_path: Path) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([TimeoutError("x")]), retries=0)
+        with (run / chp.GENLOG_FILE).open("ab") as handle:
+            handle.write(b'{"log_id": "cut-mid-wri')  # 쓰는 도중 끊긴 마지막 줄(개행 없음)
+        report = _run(run, _Provider([_good()]), retries=2)
+        assert report.exit_code == chp.EXIT_OK, report.input_errors
+        assert _summary(report)["GENLOG_QUARANTINED_LINES"] == "1"
+        corrupt = (run / (chp.GENLOG_FILE + ".corrupt")).read_bytes()
+        assert corrupt == b'{"log_id": "cut-mid-wri\n'
+        logs = _lines(run / chp.GENLOG_FILE)  # 남은 줄은 전부 온전한 JSON
+        assert [log["success"] for log in logs] == [False, True]
+
+    def test_damaged_state_file_stops_then_recovers_with_quarantine_switch(
+        self, tmp_path: Path
+    ) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+        _run(run, _Provider([_good()]))
+        data = (run / chp.CONTEXT_FILE).read_bytes()
+        (run / chp.CONTEXT_FILE).write_bytes(data[: len(data) // 2])  # 외부 손상(잘린 줄)
+        stopped = _run(run, _Provider([]))
+        assert stopped.exit_code == chp.EXIT_INPUT_ERROR
+        recovered = _run(run, _Provider([_good()]), quarantine_damaged_state=True)
+        assert recovered.exit_code == chp.EXIT_OK, recovered.input_errors
+        assert _summary(recovered)["STATE_QUARANTINED_LINES"] == "1"
+        assert (run / (chp.CONTEXT_FILE + ".corrupt")).is_file()
+        assert [h["level"] for h in _lines(run / chp.HINTS_FILE)] == [1, 2, 3]
+
+    def test_unhandled_error_exits_3_with_type_name(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        run = _seat(tmp_path, [_real_cu()])
+
+        def denied(path: Path, data: bytes) -> None:
+            raise PermissionError("/비밀/경로 접근 거부")
+
+        monkeypatch.setattr(chp, "_atomic_write_bytes", denied)
+        code = chp.run_cli(
+            ["--run-dir", str(run)],
+            prog="t",
+            provider_factory=lambda: _Provider([_good()]),
+            trace_factory=lambda: None,
+            value_exposure=math_answer_value_exposure(),
+        )
+        out = capsys.readouterr().out.strip().splitlines()
+        assert code == chp.EXIT_UNHANDLED == 3
+        assert out[-2:] == ["UNHANDLED_ERROR=PermissionError", "EXIT=3"]
+        assert "비밀" not in "\n".join(out)

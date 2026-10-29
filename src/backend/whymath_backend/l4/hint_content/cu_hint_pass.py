@@ -69,29 +69,67 @@ final_answer=CU answer, value_exposure=주입된 능력)`. 값 축 능력은 `po
 
 산출물(회차 폴더 = `data/runs/<좌석>/`, 줄마다 즉시 flush — 도중에 끊겨도 증거가 남는다)
 --------------------------------------------------------------------------------------
-  - `cu.hints.jsonl`          verified=true `Hint` JSON 1행 1건 — 학생에게 나갈 집합이자 측정 입력.
-  - `cu.hints.rejected.jsonl` 게이트 거부 `Hint` JSON(gate_report에 게이트별 사유).
-  - `cu.hints.genlog.jsonl`   LLM 호출마다 `GenerationLog` 1행(기존 `cu.genlog.jsonl`과 같은 모델) —
-    model_name·prompt_version·seed·input_sha256 + success·error_detail(예외 타입명 포함).
-  - `cu.hints.context.jsonl`  CU당 1행 — 게이트가 본 맥락(단계·개념 이름·정답)과 레벨별 판정.
-    **이 행이 그 CU의 완료 표지**다(아래 재개). 게이트 판정을 재현하려면 이 맥락이 필요하다.
+  - `cu.hints.jsonl`          **현재 채택본**의 verified=true `Hint` JSON 1행 1건 — 학생에게 나갈
+    집합이자 측정 입력. CU별로 원자적 교체(`os.replace`)로만 쓴다.
+  - `cu.hints.rejected.jsonl` 게이트 거부 `Hint` JSON(gate_report에 게이트별 사유) — **이력**이다.
+    재생성해도 지우지 않는다(append 전용).
+  - `cu.hints.genlog.jsonl`   LLM 호출(시도)마다 `GenerationLog` 1행 — **이력**(append 전용). 기존
+    `cu.genlog.jsonl`과 같은 모델: model_name·prompt_version·seed·input_sha256 +
+    success·error_detail.
+    `log_id` = 시도 ID(채택본 `Hint.generator_version`의 `#<12hex>` 꼬리와 같은 값).
+  - `cu.hints.context.jsonl`  CU당 1행(현재 채택본) — 게이트가 본 맥락(단계·개념 이름·정답)·레벨별
+    판정·시도 회계(총 시도·게이트 도달 시도·거부 힌트 수). 원자적 교체로만 쓴다.
 
-재개(resume) — 같은 CU 중복 생성 0
----------------------------------
-CU 완료 = `cu.hints.context.jsonl`에 행이 있다. 쓰기 순서가 `힌트 → 거부 → 문맥`이라, 문맥 행 없이
-힌트 행만 있는 CU는 지난 실행이 그 사이에 끊긴 것이다(고아 행). 재개 시 고아 행을 두 힌트 파일에서
-걷어내고(원자적 교체 · 걷어낸 행 수를 요약에 싣는다) 그 CU를 다시 만든다. 생성 로그는 append
-전용이라 걷어내지 않는다(호출이 실제로 있었다는 기록이다).
+재생성·재시도 예산 (P2-1 — 게이트 거부도 다시 만든다)
+--------------------------------------------------
+`--retries N`이면 **CU 1건의 총 시도 상한 = N+1회**이고, 그 수는 그 CU의 **첫 시도부터**(이전 실행
+포함 — 생성 로그의 그 CU 행 수) 센다. 시도 하나는 provider 실패·JSON 파싱 실패·계약 위반·**게이트
+거부**(L1·L2·L3 중 하나라도 미통과) 중 무엇으로 끝나든 1회이며, 생성 로그에 1행을 남긴다. 세 레벨이
+모두 통과하면 그 시도를 채택하고 멈춘다. 예산이 다 떨어지면 게이트까지 간 시도 중 **통과 레벨이 가장
+많은 것**(같으면 나중 것 — 이전 실행의 채택본도 후보다)을 채택본으로 남긴다.
+
+⚠ **선택 편향(정직한 공개)**: 게이트 거부 재생성은 "검출기를 통과할 때까지 다시 뽑기"다. 그래서
+채택본은 게이트 B를 통과하도록 **골라진** 표본이고, 측정기의 기계 축(같은 게이트 B)이 0을 내는 것은
+원래도 순환이었지만 재생성으로 그 순환이 더 강해진다. 이것을 상쇄하는 것은 의미 축(사람 표본 검수 —
+EOS-210)이며, 숨기지 않기 위해 요약 줄이 **시도 수·게이트 거부율**을 늘
+싣는다(`HINT_ATTEMPTS_TOTAL`·
+`HINT_GATED_ATTEMPTS_TOTAL`·`HINT_GATE_REJECTED_HINTS_TOTAL`·`HINT_GATE_REJECT_RATE`·
+`CU_REGENERATED`· `CU_ATTEMPTS`). 측정 해석에서 거부율이 높은 좌석일수록 채택본이 "운 좋게 통과한 한
+장"일 가능성이 크다 — 의미 축 표본은 재생성된 CU(`CU_REGENERATED`)를 우선 포함해야 한다.
+
+재개(resume) — 완료 = L1·L2·L3 모두 verified
+------------------------------------------
+재실행하면 **완료 CU는 호출 없이 건너뛴다.** 미완 CU(한 레벨 이상 미통과·채택본 없음)는 시도 예산이
+남았으면 남은 만큼 다시 만들고, 예산이 떨어졌으면 건너뛴다(`CU_BUDGET_EXHAUSTED`) —
+`--redo-incomplete`를 주면 그 실행에서 예산을 새로 N+1회 준다(총 시도 수는 그대로 누적 기록된다).
+다시 만들 때 그 CU의 이전 채택본 힌트·문맥 행은 원자적으로 교체되고, 거부 기록·생성 로그(이력)는
+그대로 남는다.
+
+무결성: 채택본 힌트 행은 문맥 행과 레벨 집합·`generator_version`(시도 ID 포함)이 정확히 맞아야 한다.
+두 파일의 원자적 교체 사이에서 끊긴 CU는 어긋나므로 두 파일에서 그 CU를 걷어내고 미완으로 다룬다
+(`RESUME_DISCARDED_INCONSISTENT_ROWS`). append 전용 파일(생성 로그·거부 기록)의 끊긴 마지막 줄·깨진
+줄은 append 전에 `<파일>.corrupt`로 옮겨 보존하고 본 파일에서 걷어낸다(`GENLOG_QUARANTINED_LINES`·
+`REJECTED_QUARANTINED_LINES`) — 영구 손상 행이 남지 않는다. 원자적 교체로만 쓰는 두
+파일(채택본·문맥)이 깨져 있으면 외부 손상이므로 입력 오류(2)로 멈춘다
+(복구 = `--quarantine-damaged-state`로 다시 돌리기 — 런북 [R]).
+
+생성 로그 `error_detail`에는 예외 **원문을 싣지 않는다**(`<단계 앞머리>: <타입명>(HTTP nnn)` — 이
+파일은 산출물 브랜치로 원격에 올라간다). Langfuse 관측은 응답을 받은 호출만 기록한다 — provider 예외
+호출은 선례(`l3/equivalent/llm_generator`·`l3/pipeline`)와 같이 관측하지 않고, 그 시도는 생성
+로그(인프로세스 이중 회계)에 남는다.
 
 종료 코드 (요약은 `KEY=VALUE` 줄, 마지막 줄 `EXIT=<n>`)
 ----------------------------------------------------
   - 0 — `cu.jsonl`의 CU **전부**가 L1·L2·L3 모두 verified다.
   - 1 — 일부 CU가 미완이다: 재시도 후에도 생성 실패(`FAILED_CUS`) · 게이트가 한 레벨 이상 거부
-    (`INCOMPLETE_CUS`) · `--limit`로 이번 실행에서 처리하지 않음(`CU_PENDING`) · 생성 로그
-    기록 실패.
+    (`INCOMPLETE_CUS`) · 시도 예산 소진(`CU_BUDGET_EXHAUSTED`) · `--limit`로 이번 실행에서 처리하지
+    않음(`CU_PENDING`) · 생성 로그 기록 실패.
   - 2 — 입력 오류: 회차 폴더·`cu.jsonl` 부재·파싱 실패·필수 필드 결측·CU 0건·자체 저작이 아닌 CU
     (클라우드 반출 등급 선언이 거짓이 된다)·기존 산출물 손상. 이 경우 **LLM을 한 번도
     부르지 않는다**.
+  - 3 — 처리되지 않은 예외(디스크·권한 오류 등). 요약은 `UNHANDLED_ERROR=<타입명>`과 `EXIT=3` 두
+  줄이다
+    — 1(미완)과 섞이지 않게 따로 둔다.
 """
 
 from __future__ import annotations
@@ -154,6 +192,7 @@ __all__ = [
     "EXIT_INCOMPLETE",
     "EXIT_INPUT_ERROR",
     "EXIT_OK",
+    "EXIT_UNHANDLED",
     "GENLOG_FILE",
     "HINTS_FILE",
     "REJECTED_FILE",
@@ -183,6 +222,7 @@ CONTEXT_FILE: Final[str] = "cu.hints.context.jsonl"
 EXIT_OK: Final[int] = 0
 EXIT_INCOMPLETE: Final[int] = 1
 EXIT_INPUT_ERROR: Final[int] = 2
+EXIT_UNHANDLED: Final[int] = 3
 
 CU_PATH_PREFIX: Final[str] = "cu-"
 """합성 풀이 경로 ID 접두 — 실제 경로(`sp-`)·평가 하네스(`aq-eval-`)와 겹치지 않는다."""
@@ -205,9 +245,16 @@ _SELF_AUTHORED_LICENSE: Final[str] = "WHYMATH_GENERATED"
 _SELF_AUTHORED_SOURCE: Final[str] = "자체생성"
 _LEVEL_KEYS: Final[dict[HintLevel, str]] = {1: "L1", 2: "L2", 3: "L3"}
 # 개념 이름 금지 문자 — 게이트는 값 축을 돌리기 전에 개념 이름을 본문에서 지운다
-# (`gates._value_text`).
-# 개념 이름에 값·식이 들어가면 그 자리가 값 축의 사각이 되므로 수·등호·연산 기호를 금한다.
-_CONCEPT_FORBIDDEN = re.compile(r"[0-9=+*/^<>]")
+# (`gates._value_text`). 개념 이름에 값·식이 들어가면 그 자리가 값 축의 사각이 되므로 수·등호·
+# 연산 기호·수 상수 기호를 금한다. **NFKC 정규화 뒤에** 검사한다 — 전각 `３`·분수 `½`(→ `1⁄2`)는
+# 정규화 전에는 ASCII 범위를 피해 간다. `π`·`√`·`∞`는 NFKC로도 바뀌지 않으므로 직접 적는다.
+_CONCEPT_FORBIDDEN = re.compile(r"[0-9=+*/^<>⁄√π∞]")
+# 정답 포함 검사의 최소 길이(정규화 후) — 1자 정답(`4`·`e`·`a`)은 개념 이름의 흔한 글자와 우연히
+# 겹친다(예: 정답 `e`와 「자연상수 e」·「집합의 원소」 속 영문자). 숫자 1자는 위 금지 문자가 이미
+# 막고,
+# 영문 1자는 오탐이 커 판정하지 않는다 — 게이트 B 글자 축(`detect_answer_leakage`)의 1자 유보,
+# 게이트 A의 `_MIN_DECIDABLE_LEN`(2)과 같은 규약이다.
+_MIN_ANSWER_CONTAIN_LEN: Final[int] = 2
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
 
 
@@ -366,7 +413,8 @@ class CuHintDraft(BaseModel):
     @field_validator("concept_name")
     @classmethod
     def _concept_has_no_value(cls, name: str) -> str:
-        if _CONCEPT_FORBIDDEN.search(name):
+        normalized = unicodedata.normalize("NFKC", name)
+        if _CONCEPT_FORBIDDEN.search(normalized):
             raise ValueError("개념 이름에 수·등호·연산 기호가 있다(값 축 사각 방지)")
         return name
 
@@ -386,8 +434,12 @@ def _extract_json_text(raw: str) -> str:
     return text[start : end + 1] if 0 <= start < end else text
 
 
-def parse_draft(raw: str) -> CuHintDraft:
-    """원시 응답 → 계약. 실패는 `DraftError`(예외 타입명 + 위반 위치만 — 응답 값은 싣지 않는다)."""
+def parse_draft(raw: str, *, answer: str | None = None) -> CuHintDraft:
+    """원시 응답 → 계약. 실패는 `DraftError`(예외 타입명 + 위반 위치만 — 응답 값은 싣지 않는다).
+
+    `answer`를 주면 정규화한 정답이 정규화한 개념 이름에 들어 있는지도 본다(2자 이상일 때만 —
+    `_MIN_ANSWER_CONTAIN_LEN` 근거). 들어 있으면 계약 위반이다(정답 값은 사유에 싣지 않는다).
+    """
     try:
         data = json.loads(_extract_json_text(raw))
     except json.JSONDecodeError as exc:
@@ -395,10 +447,15 @@ def parse_draft(raw: str) -> CuHintDraft:
     if not isinstance(data, dict):
         raise DraftError(f"응답 JSON 파싱 실패: 객체가 아님({type(data).__name__})")
     try:
-        return CuHintDraft.model_validate(data)
+        draft = CuHintDraft.model_validate(data)
     except ValidationError as exc:
         locs = sorted({".".join(str(p) for p in err["loc"]) or "<root>" for err in exc.errors()})
         raise DraftError(f"응답 스키마 위반: {type(exc).__name__} ({', '.join(locs)})") from exc
+    if answer is not None:
+        norm_answer = _norm(answer)
+        if len(norm_answer) >= _MIN_ANSWER_CONTAIN_LEN and norm_answer in _norm(draft.concept_name):
+            raise DraftError("응답 스키마 위반: 개념 이름에 정답 값이 들어 있다 (concept_name)")
+    return draft
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -445,7 +502,7 @@ def build_cu_hints(cu: CuInput, draft: CuHintDraft, *, generator_version: str) -
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 산출물 쓰기 — 줄마다 open→write→flush→close(도중에 끊겨도 앞의 줄은 남는다)
+# 산출물 I/O — append 전용(이력)은 줄마다 flush, 현재 상태(채택본·문맥)는 원자적 교체
 # ──────────────────────────────────────────────────────────────────────────
 def _append_lines(path: Path, lines: Sequence[str]) -> None:
     if not lines:
@@ -457,17 +514,99 @@ def _append_lines(path: Path, lines: Sequence[str]) -> None:
             handle.flush()
 
 
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """원자적 교체 — 같은 폴더 임시 파일에 쓰고 fsync 뒤 `os.replace`(중간 상태 노출 0)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("wb") as handle:
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(tmp, path)
+
+
+def _atomic_write_lines(path: Path, lines: Sequence[str]) -> None:
+    _atomic_write_bytes(path, "".join(line + "\n" for line in lines).encode("utf-8"))
+
+
 def _hint_line(hint: Hint) -> str:
     return hint.model_dump_json()
 
 
+def _is_json_object_line(raw: bytes) -> bool:
+    try:
+        return isinstance(json.loads(raw.decode("utf-8")), dict)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+
+
+def _quarantine_damaged_lines(path: Path) -> int:
+    """append 전용 파일의 손상 줄을 `<이름>.corrupt`로 옮겨 보존하고 본 파일에서 걷어낸다.
+
+    손상 = ① 개행 없이 끝난 마지막 줄(쓰는 도중 끊김 — 다음 append가 그 뒤에 붙으면 두 레코드가 한
+    줄로 섞여 **영구 손상 행**이 된다) ② JSON 객체로 읽히지 않는 줄. 정상 줄은 바이트 그대로 남긴다.
+    보존 파일은 append라 같은 손상이 여러 번 생겨도 앞의 증거를 덮지 않는다. 돌려주는 값은 옮긴 줄
+    수다.
+    """
+    if not path.is_file():
+        return 0
+    data = path.read_bytes()
+    if not data:
+        return 0
+    parts = data.split(b"\n")
+    tail = parts.pop()  # 마지막 개행 뒤 조각 — 정상이면 빈 바이트
+    keep: list[bytes] = []
+    bad: list[bytes] = []
+    for part in parts:
+        if not part.strip():
+            continue
+        (keep if _is_json_object_line(part) else bad).append(part)
+    if tail.strip():
+        bad.append(tail)
+    if not bad:
+        return 0
+    corrupt = path.with_name(path.name + ".corrupt")
+    with corrupt.open("ab") as handle:
+        for part in bad:
+            handle.write(part + b"\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    _atomic_write_bytes(path, b"".join(part + b"\n" for part in keep))
+    _LOGGER.warning("%s 손상 줄 %d개를 %s로 격리", path.name, len(bad), corrupt.name)
+    return len(bad)
+
+
 # ──────────────────────────────────────────────────────────────────────────
-# 재개 상태 — 완료 CU·고아 행
+# 재개 상태 — CU별 현재 채택본·시도 회계
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass
+class _CuState:
+    """CU 1건의 현재 상태 — 채택본(문맥 행 + 통과 힌트 줄)과 누적 시도 회계(이력 파일에서 셈)."""
+
+    context: dict[str, Any] | None = None
+    hint_lines: list[str] = field(default_factory=list)
+    attempts: int = 0
+    gated_attempts: int = 0
+    rejected_hints: int = 0
+
+    @property
+    def verified_levels(self) -> frozenset[int]:
+        if self.context is None:
+            return frozenset()
+        return frozenset(self.context.get("verified_levels") or [])
+
+    @property
+    def complete(self) -> bool:
+        return self.verified_levels >= frozenset(HINT_LEVELS)
+
+
+@dataclass
 class _ResumeState:
-    done: dict[uuid.UUID, dict[str, Any]] = field(default_factory=dict)
-    discarded_orphan_rows: int = 0
+    cu: dict[uuid.UUID, _CuState] = field(default_factory=dict)
+    discarded_inconsistent_rows: int = 0
+    quarantined_genlog: int = 0
+    quarantined_rejected: int = 0
+    quarantined_state: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -502,72 +641,116 @@ def _load_hint_rows(
     return out
 
 
-def _compact(path: Path, keep: Sequence[str]) -> None:
-    """원자적 교체 — 같은 폴더 임시 파일에 남길 줄을 쓰고 `os.replace`(중간 상태 노출 0)."""
-    tmp = path.with_name(path.name + ".tmp")
-    with tmp.open("w", encoding="utf-8") as handle:
-        for line in keep:
-            handle.write(line + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+def _load_contexts(
+    path: Path, known: set[uuid.UUID], errors: list[str]
+) -> dict[uuid.UUID, dict[str, Any]]:
+    contexts: dict[uuid.UUID, dict[str, Any]] = {}
+    if not path.is_file():
+        return contexts
+    rows, errs = _read_jsonl(path)
+    errors.extend(errs)
+    for line_no, _raw, row in rows:
+        try:
+            pid = uuid.UUID(str(row.get("problem_id")))
+        except ValueError as exc:
+            errors.append(f"{CONTEXT_FILE}:{line_no} problem_id 손상 — {type(exc).__name__}")
+            continue
+        verified = _levels(row.get("verified_levels"))
+        rejected = _levels(row.get("rejected_levels"))
+        if (
+            pid not in known
+            or pid in contexts
+            or verified is None
+            or rejected is None
+            or not isinstance(row.get("generator_version"), str)
+        ):
+            errors.append(f"{CONTEXT_FILE}:{line_no} 알 수 없는 CU·중복·레벨·판 손상")
+            continue
+        if verified | rejected != frozenset(HINT_LEVELS) or verified & rejected:
+            errors.append(f"{CONTEXT_FILE}:{line_no} 레벨 판정이 L1·L2·L3를 나누지 않는다")
+            continue
+        contexts[pid] = row
+    return contexts
 
 
-def _load_resume_state(run_dir: Path, cus: Sequence[CuInput]) -> _ResumeState:
-    """기존 산출물 → 완료 CU·고아 정리. 손상은 오류로 돌려 LLM 호출 전에 멈춘다."""
-    state = _ResumeState()
-    known = {cu.problem_id for cu in cus}
-    context_path = run_dir / CONTEXT_FILE
-    if context_path.is_file():
-        rows, errs = _read_jsonl(context_path)
+def _load_resume_state(
+    run_dir: Path, cus: Sequence[CuInput], *, quarantine_state: bool = False
+) -> _ResumeState:
+    """기존 산출물 → CU별 채택본·누적 시도. 이력 파일 손상 줄은 격리, 상태 파일 손상은 오류."""
+    state = _ResumeState(cu={cu.problem_id: _CuState() for cu in cus})
+    known = set(state.cu)
+    by_slug = {cu.slug: cu.problem_id for cu in cus}
+    # ① append 전용 이력 파일은 append 전에 손상 줄부터 격리한다(영구 손상 행 0).
+    state.quarantined_genlog = _quarantine_damaged_lines(run_dir / GENLOG_FILE)
+    state.quarantined_rejected = _quarantine_damaged_lines(run_dir / REJECTED_FILE)
+    if quarantine_state:
+        # 복구 스위치(런북 [R]) — 원자적 교체로만 쓰는 두 상태 파일이 외부에서 깨졌을 때만
+        # 쓴다. 깨진 줄은 `.corrupt`로 보존되고, 짝을 잃은 CU는 아래 정합 검사가 걷어내 다시 만든다.
+        state.quarantined_state = _quarantine_damaged_lines(
+            run_dir / HINTS_FILE
+        ) + _quarantine_damaged_lines(run_dir / CONTEXT_FILE)
+    # ② 시도 회계 — 생성 로그의 그 CU 행 수가 총 시도, success 행 수가 게이트 도달 시도다.
+    genlog_path = run_dir / GENLOG_FILE
+    if genlog_path.is_file():
+        rows, errs = _read_jsonl(genlog_path)
         state.errors.extend(errs)
         for line_no, _raw, row in rows:
-            try:
-                pid = uuid.UUID(str(row.get("problem_id")))
-            except ValueError as exc:
-                state.errors.append(
-                    f"{CONTEXT_FILE}:{line_no} problem_id 손상 — {type(exc).__name__}"
-                )
+            pid = by_slug.get(str(row.get("cu_slug")))
+            if pid is None:
+                state.errors.append(f"{GENLOG_FILE}:{line_no} cu.jsonl에 없는 CU의 시도 기록")
                 continue
-            verified, rejected = _levels(row.get("verified_levels")), _levels(
-                row.get("rejected_levels")
-            )
-            if pid not in known or pid in state.done or verified is None or rejected is None:
-                state.errors.append(f"{CONTEXT_FILE}:{line_no} 알 수 없는 CU·중복·레벨 손상")
-                continue
-            if verified | rejected != frozenset(HINT_LEVELS) or verified & rejected:
-                state.errors.append(
-                    f"{CONTEXT_FILE}:{line_no} 레벨 판정이 L1·L2·L3를 나누지 않는다"
-                )
-                continue
-            state.done[pid] = row
+            state.cu[pid].attempts += 1
+            if row.get("success") is True:
+                state.cu[pid].gated_attempts += 1
+    for _raw, hint in _load_hint_rows(
+        run_dir / REJECTED_FILE, verified=False, known=known, errors=state.errors
+    ):
+        state.cu[hint.solution_step_ref.problem_id].rejected_hints += 1
+    # ③ 현재 상태 — 문맥 행 + 채택본 힌트 줄. 둘이 어긋난 CU는 걷어낸다.
+    contexts = _load_contexts(run_dir / CONTEXT_FILE, known, state.errors)
     accepted = _load_hint_rows(
         run_dir / HINTS_FILE, verified=True, known=known, errors=state.errors
     )
-    rejected_rows = _load_hint_rows(
-        run_dir / REJECTED_FILE, verified=False, known=known, errors=state.errors
-    )
     if state.errors:
         return state
-    # 완료 CU는 행이 문맥 판정과 정확히 맞아야 한다 — 어긋나면 손상(사람이 봐야 한다).
-    for pid, ctx in state.done.items():
-        got_acc = sorted(h.level for _, h in accepted if h.solution_step_ref.problem_id == pid)
-        got_rej = sorted(h.level for _, h in rejected_rows if h.solution_step_ref.problem_id == pid)
-        if got_acc != sorted(ctx["verified_levels"]) or got_rej != sorted(ctx["rejected_levels"]):
-            state.errors.append(f"완료 CU {ctx.get('slug')}의 힌트 행이 문맥 판정과 다르다(손상)")
-    if state.errors:
-        return state
-    # 고아 행(문맥 없이 힌트만 있는 CU) — 지난 실행이 그 CU 도중에 끊겼다. 걷어내고 다시 만든다.
-    for path, hint_rows in (
-        (run_dir / HINTS_FILE, accepted),
-        (run_dir / REJECTED_FILE, rejected_rows),
-    ):
-        orphans = [raw for raw, h in hint_rows if h.solution_step_ref.problem_id not in state.done]
-        if orphans:
-            keep = [raw for raw, h in hint_rows if h.solution_step_ref.problem_id in state.done]
-            _compact(path, keep)
-            state.discarded_orphan_rows += len(orphans)
+    grouped: dict[uuid.UUID, list[tuple[str, Hint]]] = {}
+    for raw, hint in accepted:
+        grouped.setdefault(hint.solution_step_ref.problem_id, []).append((raw, hint))
+    dropped = False
+    for pid, st in state.cu.items():
+        ctx = contexts.get(pid)
+        cu_rows = grouped.get(pid, [])
+        levels = [h.level for _, h in cu_rows]
+        consistent = (
+            ctx is not None
+            and len(levels) == len(set(levels))
+            and frozenset(levels) == frozenset(ctx["verified_levels"])
+            and all(h.generator_version == ctx["generator_version"] for _, h in cu_rows)
+        )
+        if consistent:
+            st.context = ctx
+            st.hint_lines = [raw for raw, _ in cu_rows]
+        elif ctx is not None or cu_rows:
+            # 원자적 교체 두 번 사이에서 끊겼다 — 어느 쪽도 믿지 않고 미완으로 다시 만든다.
+            state.discarded_inconsistent_rows += len(cu_rows) + (1 if ctx is not None else 0)
+            dropped = True
+    if dropped:
+        _write_current_state(run_dir, cus, state.cu)
     return state
+
+
+def _write_current_state(
+    run_dir: Path, cus: Sequence[CuInput], cu_states: Mapping[uuid.UUID, _CuState]
+) -> None:
+    """현재 채택본 전체를 두 파일에 원자적으로 쓴다 — 채택본 힌트 먼저, 문맥 행 나중."""
+    hint_lines = [line for cu in cus for line in cu_states[cu.problem_id].hint_lines]
+    context_lines = [
+        json.dumps(cu_states[cu.problem_id].context, ensure_ascii=False)
+        for cu in cus
+        if cu_states[cu.problem_id].context is not None
+    ]
+    _atomic_write_lines(run_dir / HINTS_FILE, hint_lines)
+    _atomic_write_lines(run_dir / CONTEXT_FILE, context_lines)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -575,7 +758,7 @@ def _load_resume_state(run_dir: Path, cus: Sequence[CuInput]) -> _ResumeState:
 # ──────────────────────────────────────────────────────────────────────────
 @dataclass
 class PassReport:
-    """패스 1회 정직 회계 — 수치는 전부 실측(조용한 생략 0)."""
+    """패스 1회 정직 회계 — 수치는 전부 실측(조용한 생략 0). `*_total`은 이전 실행 누적 포함."""
 
     run_dir: str
     prompt_version: str
@@ -588,6 +771,7 @@ class PassReport:
     failed_cus: list[str] = field(default_factory=list)
     incomplete_cus: list[str] = field(default_factory=list)
     pending_cus: list[str] = field(default_factory=list)
+    budget_exhausted_cus: list[str] = field(default_factory=list)
     complete_cus: int = 0
     measurable_cus: int = 0
     hints_generated: int = 0
@@ -596,7 +780,13 @@ class PassReport:
     failure_kinds: Counter[str] = field(default_factory=Counter)
     routes: Counter[str] = field(default_factory=Counter)
     models: Counter[str] = field(default_factory=Counter)
-    discarded_orphan_rows: int = 0
+    cu_attempts: dict[str, int] = field(default_factory=dict)
+    cu_gated_attempts: dict[str, int] = field(default_factory=dict)
+    rejected_hints_total: int = 0
+    discarded_inconsistent_rows: int = 0
+    quarantined_genlog: int = 0
+    quarantined_rejected: int = 0
+    quarantined_state: int = 0
     genlog_errors: int = 0
 
     @property
@@ -607,6 +797,12 @@ class PassReport:
             return EXIT_INCOMPLETE
         return EXIT_OK
 
+    @property
+    def gate_reject_rate(self) -> float | None:
+        """게이트 거부율 = 거부 힌트 ÷ (게이트 도달 시도 × 3) — 누적. 분모 0이면 None(날조 금지)."""
+        gated = sum(self.cu_gated_attempts.values())
+        return self.rejected_hints_total / (gated * len(HINT_LEVELS)) if gated else None
+
     def render_lines(self) -> list[str]:
         """요약 `KEY=VALUE` 줄 — 마지막 줄은 항상 `EXIT=<n>`."""
 
@@ -614,7 +810,8 @@ class PassReport:
             return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
         by_level = {f"L{k}": v for k, v in sorted(self.verified_by_level.items())}
-
+        rate = self.gate_reject_rate
+        regenerated = sorted(s for s, n in self.cu_gated_attempts.items() if n > 1)
         lines = [
             f"RUN_DIR={self.run_dir}",
             f"PROMPT_VERSION={self.prompt_version}",
@@ -627,21 +824,34 @@ class PassReport:
             f"CU_MEASURABLE_L12={self.measurable_cus}",
             f"CU_INCOMPLETE={len(self.incomplete_cus)}",
             f"CU_GENERATION_FAILED={len(self.failed_cus)}",
+            f"CU_BUDGET_EXHAUSTED={len(self.budget_exhausted_cus)}",
+            f"CU_REGENERATED={len(regenerated)}",
             f"CALLS={self.calls}",
             f"CALLS_FAILED={self.calls_failed}",
             f"CALL_FAILURE_KINDS={j(dict(self.failure_kinds))}",
             f"ROUTES={j(dict(self.routes))}",
             f"MODELS={j(dict(self.models))}",
+            f"HINT_ATTEMPTS_THIS_RUN={self.calls}",
+            f"HINT_ATTEMPTS_TOTAL={sum(self.cu_attempts.values())}",
+            f"HINT_GATED_ATTEMPTS_TOTAL={sum(self.cu_gated_attempts.values())}",
+            f"HINT_GATE_REJECTED_HINTS_TOTAL={self.rejected_hints_total}",
+            f"HINT_GATE_REJECT_RATE={'None' if rate is None else f'{rate:.4f}'}",
+            f"CU_ATTEMPTS={j(self.cu_attempts)}",
             f"HINTS_GENERATED={self.hints_generated}",
             f"HINTS_VERIFIED={sum(self.verified_by_level.values())}",
             f"VERIFIED_BY_LEVEL={j(by_level)}",
             f"REJECTED_BY_GATE={j({g: self.rejected_by_gate[g] for g in GATE_NAMES})}",
-            f"RESUME_DISCARDED_ORPHAN_ROWS={self.discarded_orphan_rows}",
+            f"RESUME_DISCARDED_INCONSISTENT_ROWS={self.discarded_inconsistent_rows}",
+            f"GENLOG_QUARANTINED_LINES={self.quarantined_genlog}",
+            f"REJECTED_QUARANTINED_LINES={self.quarantined_rejected}",
+            f"STATE_QUARANTINED_LINES={self.quarantined_state}",
             f"GENLOG_WRITE_ERRORS={self.genlog_errors}",
         ]
         lines.extend(f"INPUT_ERROR={e}" for e in self.input_errors)
         lines.append(f"FAILED_CUS={','.join(self.failed_cus)}")
         lines.append(f"INCOMPLETE_CUS={','.join(self.incomplete_cus)}")
+        lines.append(f"BUDGET_EXHAUSTED_CUS={','.join(self.budget_exhausted_cus)}")
+        lines.append(f"REGENERATED_CUS={','.join(regenerated)}")
         lines.append(f"PENDING_CUS={','.join(self.pending_cus)}")
         lines.append(f"EXIT={self.exit_code}")
         return lines
@@ -702,8 +912,39 @@ def _route_label(decision: RoutingDecision) -> str:
     return f"{decision.cost_tier}:{decision.local_family or '-'}:{decision.local_model or '-'}"
 
 
+def _http_status(exc: BaseException) -> int | None:
+    """예외에 붙은 HTTP 상태코드(비내용 필드) — `status_code`·`status`·`response.status_code`."""
+    candidates = (
+        getattr(exc, "status_code", None),
+        getattr(exc, "status", None),
+        getattr(getattr(exc, "response", None), "status_code", None),
+    )
+    for value in candidates:
+        if isinstance(value, int) and not isinstance(value, bool) and 100 <= value <= 599:
+            return value
+    return None
+
+
+def _safe_exc_summary(exc: BaseException) -> str:
+    """예외 요약 — `<타입명>` 또는 `<타입명>(HTTP nnn)`. **원문(str(exc))은 싣지 않는다.**
+
+    원문에는 요청 URL·헤더 조각·응답 본문(때로 키 접두)이 섞일 수 있고, 생성 로그는 산출물 브랜치로
+    원격에 올라간다. 이 함수는 **절대 예외를 던지지 않는다** — 속성 접근이 실패하면 타입명만, 그마저
+    실패하면 고정 문자열로 접는다(같은 의미의 공용 함수는 EOS-212가 정리한다).
+    """
+    try:
+        name = type(exc).__name__
+        status = _http_status(exc)
+        return f"{name}(HTTP {status})" if status is not None else name
+    except Exception:  # noqa: BLE001 — 요약 함수가 실패 경로를 깨면 안 된다
+        try:
+            return type(exc).__name__
+        except Exception:  # noqa: BLE001
+            return "UnknownError"
+
+
 def _record_trace(call: _CallContext, decision: RoutingDecision, result: GenerationResult) -> None:
-    """Langfuse 관측(모든 LLM 호출 추적) — never-break, 실패는 예외 타입명을 남긴다."""
+    """Langfuse 관측(응답을 받은 호출) — never-break, 실패는 예외 타입명을 남긴다."""
     if call.trace is None:
         return
     usage = result.usage
@@ -726,20 +967,22 @@ def _emit_genlog(
     call: _CallContext,
     report: PassReport,
     *,
+    attempt_id: uuid.UUID,
     cu: CuInput,
     prompt: str,
     decision: RoutingDecision,
     result: GenerationResult | None,
     seed: int | None,
     error_detail: str | None,
-) -> str | None:
-    """호출 1건 → `GenerationLog` 1행 즉시 append. 실패는 타입명 로그 + 회계(종료 코드 1)."""
+) -> None:
+    """시도 1건 → `GenerationLog` 1행 즉시 append(log_id = 시도 ID). 실패는 타입명 + 회계."""
     usage = result.usage if result is not None else None
     try:
         model_name = model_name_for_decision(decision, settings=call.settings)
         seat = None if _is_local(decision) else cloud_provider_name(call.settings)
         latency = int(round(usage.latency_ms)) if usage and usage.latency_ms is not None else None
         log = GenerationLog(
+            log_id=attempt_id,
             model_name=model_name,
             prompt_version=call.prompt_version,
             seed=seed,
@@ -765,21 +1008,20 @@ def _emit_genlog(
             # 이 호출이 겨냥한 CU — 성공·실패 모두 같은 정체성(입력 CU가 처음부터 정해져 있다).
             cu_slug=cu.slug,
         )
-        stamped = append_generation_log_jsonl(call.genlog_path, log, run_id=call.run_id)
+        append_generation_log_jsonl(call.genlog_path, log, run_id=call.run_id)
         report.models[model_name] += 1
-        return str(stamped.log_id)
     except Exception as exc:  # noqa: BLE001 — 기록 실패를 삼키지 않는다(회계 + 타입명)
         report.genlog_errors += 1
         _LOGGER.warning(
             "CU 힌트 생성 로그 기록 실패(%s) — 종료 코드 1로 드러낸다", type(exc).__name__
         )
-        return None
 
 
 async def _attempt(
     call: _CallContext, report: PassReport, cu: CuInput, prompt: str
-) -> tuple[CuHintDraft | None, RoutingDecision, str | None]:
-    """라우터 결정 → 호출 → 로그 → 파싱. (계약 또는 None, 결정, 성공 호출의 log_id)."""
+) -> tuple[CuHintDraft | None, RoutingDecision, uuid.UUID]:
+    """라우터 결정 → 호출 → 파싱 → 로그 1행. (계약 또는 None, 결정, 시도 ID)."""
+    attempt_id = uuid.uuid4()
     decision = Router().route(
         routing_request_for(subscription=call.subscription, budget_krw=call.budget_krw)
     )
@@ -793,172 +1035,63 @@ async def _attempt(
     if seed is not None:
         kwargs["seed"] = seed
     report.calls += 1
-    try:
-        result = await call.provider.generate(prompt, CU_HINT_SYSTEM, decision, **kwargs)
-    except Exception as exc:  # noqa: BLE001 — provider 장애는 재시도 대상(타입명 기록)
-        report.calls_failed += 1
-        report.failure_kinds["provider"] += 1
-        detail = f"provider.generate failed: {type(exc).__name__}: {exc}"
-        _LOGGER.warning("CU 힌트 provider 호출 실패(%s) — %s", type(exc).__name__, cu.slug)
+
+    def log(result: GenerationResult | None, error_detail: str | None) -> None:
         _emit_genlog(
             call,
             report,
-            cu=cu,
-            prompt=prompt,
-            decision=decision,
-            result=None,
-            seed=seed,
-            error_detail=detail,
-        )
-        return None, decision, None
-    _record_trace(call, decision, result)
-    try:
-        draft = parse_draft(result.text)
-    except DraftError as exc:
-        report.calls_failed += 1
-        report.failure_kinds["parse" if "파싱" in exc.detail else "schema"] += 1
-        _LOGGER.warning("CU 힌트 응답 거부(%s) — %s", exc.detail, cu.slug)
-        _emit_genlog(
-            call,
-            report,
+            attempt_id=attempt_id,
             cu=cu,
             prompt=prompt,
             decision=decision,
             result=result,
             seed=seed,
-            error_detail=exc.detail,
+            error_detail=error_detail,
         )
-        return None, decision, None
-    log_id = _emit_genlog(
-        call,
-        report,
-        cu=cu,
-        prompt=prompt,
-        decision=decision,
-        result=result,
-        seed=seed,
-        error_detail=None,
-    )
-    return draft, decision, log_id
+
+    try:
+        result = await call.provider.generate(prompt, CU_HINT_SYSTEM, decision, **kwargs)
+    except Exception as exc:  # noqa: BLE001 — provider 장애는 재시도 대상(타입명만 기록)
+        report.calls_failed += 1
+        report.failure_kinds["provider"] += 1
+        detail = f"provider.generate failed: {_safe_exc_summary(exc)}"
+        _LOGGER.warning("CU 힌트 provider 호출 실패(%s) — %s", _safe_exc_summary(exc), cu.slug)
+        log(None, detail)
+        return None, decision, attempt_id
+    _record_trace(call, decision, result)
+    try:
+        draft = parse_draft(result.text, answer=cu.answer)
+    except DraftError as exc:
+        report.calls_failed += 1
+        report.failure_kinds["parse" if "파싱" in exc.detail else "schema"] += 1
+        _LOGGER.warning("CU 힌트 응답 거부(%s) — %s", exc.detail, cu.slug)
+        log(result, exc.detail)
+        return None, decision, attempt_id
+    log(result, None)
+    return draft, decision, attempt_id
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 패스 본체
+# 게이트 → 후보
 # ──────────────────────────────────────────────────────────────────────────
-async def run_cu_hint_pass(
-    run_dir: Path,
-    *,
-    provider: LLMProvider,
-    value_exposure: AnswerValueExposure | None,
-    trace: TraceSink | None = None,
-    settings: Settings | None = None,
-    retries: int = _DEFAULT_RETRIES,
-    limit: int | None = None,
-    subscription: str | None = None,
-    budget_krw: float | None = None,
-    temperature: float = _DEFAULT_TEMPERATURE,
-    seed_source: SeedSource | None = None,
-    run_id: str | None = None,
-    on_progress: Callable[[str], None] | None = None,
-) -> PassReport:
-    """회차 폴더 1개에 사후 힌트 패스를 돈다.
+@dataclass
+class _Candidate:
+    """게이트까지 간 시도 1건 — 채택 후보(통과 힌트·문맥 행)."""
 
-    `value_exposure`는 필수 키워드다(None = 값 축 fail-closed). 입력 오류가 있으면 LLM을 한 번도
-    부르지 않고 리포트만 돌려준다(종료 코드 2).
-    """
-    prompt_version = cu_hint_prompt_version()
-    report = PassReport(run_dir=str(run_dir), prompt_version=prompt_version)
-    if retries < 0:
-        report.input_errors.append(f"retries는 0 이상이어야 한다(받은 값 {retries})")
-        return report
-    if limit is not None and limit < 1:
-        report.input_errors.append(f"limit는 1 이상이어야 한다(받은 값 {limit})")
-        return report
-    cus, errors = load_cu_inputs(run_dir)
-    report.cu_total = len(cus)
-    if errors:
-        report.input_errors.extend(errors)
-        return report
-    state = _load_resume_state(run_dir, cus)
-    if state.errors:
-        report.input_errors.extend(state.errors)
-        return report
-    report.discarded_orphan_rows = state.discarded_orphan_rows
+    accepted: list[Hint]
+    context: dict[str, Any]
+    order: int  # 채택 동점일 때 나중 것을 고르는 순번(이전 실행 채택본 = -1)
 
-    call = _CallContext(
-        provider=provider,
-        trace=trace,
-        settings=settings,
-        seed_source=seed_source,
-        subscription=subscription,
-        budget_krw=budget_krw,
-        on_progress=on_progress,
-        temperature=temperature,
-        genlog_path=run_dir / GENLOG_FILE,
-        run_id=run_id or uuid.uuid4().hex,
-        prompt_version=prompt_version,
-    )
-    generator_version = f"{CU_HINT_GENERATOR_VERSION}@{prompt_version}"
+    @property
+    def verified(self) -> frozenset[int]:
+        return frozenset(self.context["verified_levels"])
 
-    for cu in cus:
-        if cu.problem_id in state.done:
-            report.cu_resumed += 1
-            _tally_levels(report, cu, state.done[cu.problem_id])
-            continue
-        if limit is not None and report.cu_processed >= limit:
-            report.pending_cus.append(cu.slug)
-            continue
-        report.cu_processed += 1
-        prompt = build_cu_hint_user(
-            question=cu.question,
-            answer=cu.answer,
-            explanation=cu.explanation,
-            subject=cu.subject,
-            standards=cu.standards,
-        )
-        draft: CuHintDraft | None = None
-        decision: RoutingDecision | None = None
-        log_id: str | None = None
-        for _ in range(retries + 1):
-            draft, decision, log_id = await _attempt(call, report, cu, prompt)
-            if draft is not None:
-                break
-        if draft is None or decision is None:
-            report.failed_cus.append(cu.slug)
-            _progress(call, f"CU_FAILED slug={cu.slug} attempts={retries + 1}")
-            continue
-        context_row = _gate_and_write(
-            run_dir,
-            report,
-            cu,
-            draft,
-            value_exposure=value_exposure,
-            generator_version=generator_version,
-            extra={
-                "prompt_version": prompt_version,
-                "route": _route_label(decision),
-                "genlog_log_id": log_id,
-                "run_id": call.run_id,
-            },
-        )
-        _tally_levels(report, cu, context_row)
-        _progress(
-            call,
-            f"CU_DONE slug={cu.slug} verified_levels={context_row['verified_levels']} "
-            f"rejected_levels={context_row['rejected_levels']} "
-            f"processed={report.cu_processed}/{len(cus) - report.cu_resumed}",
-        )
-
-    flush = getattr(trace, "flush", None)
-    if callable(flush):
-        try:
-            flush()
-        except Exception as exc:  # noqa: BLE001 — 전송 확정 실패가 결과를 깨면 안 된다(타입명 로그)
-            _LOGGER.warning("CU 힌트 패스 관측 flush 실패(%s)", type(exc).__name__)
-    return report
+    @property
+    def complete(self) -> bool:
+        return self.verified >= frozenset(HINT_LEVELS)
 
 
-def _gate_and_write(
+def _gate(
     run_dir: Path,
     report: PassReport,
     cu: CuInput,
@@ -966,9 +1099,10 @@ def _gate_and_write(
     *,
     value_exposure: AnswerValueExposure | None,
     generator_version: str,
+    order: int,
     extra: Mapping[str, object],
-) -> dict[str, Any]:
-    """게이트 3종 → 통과분·거부분 쓰기 → 문맥 행(완료 표지) 쓰기. 쓰기 순서가 재개 계약이다."""
+) -> _Candidate:
+    """게이트 3종 → 거부분은 이력 파일에 즉시 append → 채택 후보(아직 현재 상태에 쓰지 않는다)."""
     ctx = GateContext(
         step_contents=draft.steps,
         concept_name=draft.concept_name,
@@ -982,14 +1116,11 @@ def _gate_and_write(
     report.hints_generated += len(gated)
     accepted = [h for h in gated if h.verified]
     rejected = [h for h in gated if not h.verified]
-    for hint in accepted:
-        report.verified_by_level[hint.level] += 1
     for hint in rejected:
         for gate in GATE_NAMES:
             verdict = hint.gate_report.get(gate)
             if not (isinstance(verdict, dict) and verdict.get("passed") is True):
                 report.rejected_by_gate[gate] += 1
-    _append_lines(run_dir / HINTS_FILE, [_hint_line(h) for h in accepted])
     _append_lines(run_dir / REJECTED_FILE, [_hint_line(h) for h in rejected])
     context_row: dict[str, Any] = {
         "problem_id": str(cu.problem_id),
@@ -1005,19 +1136,215 @@ def _gate_and_write(
         "written_at": datetime.now(UTC).isoformat(),
         **extra,
     }
-    _append_lines(run_dir / CONTEXT_FILE, [json.dumps(context_row, ensure_ascii=False)])
-    return context_row
+    return _Candidate(accepted=accepted, context=context_row, order=order)
 
 
-def _tally_levels(report: PassReport, cu: CuInput, context_row: Mapping[str, Any]) -> None:
+def _tally(report: PassReport, cu: CuInput, verified: frozenset[int]) -> None:
     """CU 상태 회계 — 완료(L1·L2·L3 verified)·측정 가능(L1·L2 verified)·미완."""
-    verified = set(context_row.get("verified_levels") or [])
     if verified >= {1, 2}:
         report.measurable_cus += 1
     if verified >= set(HINT_LEVELS):
         report.complete_cus += 1
     else:
         report.incomplete_cus.append(cu.slug)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 패스 본체
+# ──────────────────────────────────────────────────────────────────────────
+async def run_cu_hint_pass(
+    run_dir: Path,
+    *,
+    provider: LLMProvider,
+    value_exposure: AnswerValueExposure | None,
+    trace: TraceSink | None = None,
+    settings: Settings | None = None,
+    retries: int = _DEFAULT_RETRIES,
+    limit: int | None = None,
+    redo_incomplete: bool = False,
+    quarantine_damaged_state: bool = False,
+    subscription: str | None = None,
+    budget_krw: float | None = None,
+    temperature: float = _DEFAULT_TEMPERATURE,
+    seed_source: SeedSource | None = None,
+    run_id: str | None = None,
+    on_progress: Callable[[str], None] | None = None,
+) -> PassReport:
+    """회차 폴더 1개에 사후 힌트 패스를 돈다.
+
+    `value_exposure`는 필수 키워드다(None = 값 축 fail-closed). 입력 오류가 있으면 LLM을 한 번도
+    부르지 않고 리포트만 돌려준다(종료 코드 2). 시도 예산·재개·선택 규칙은 모듈 docstring.
+    """
+    prompt_version = cu_hint_prompt_version()
+    report = PassReport(run_dir=str(run_dir), prompt_version=prompt_version)
+    if retries < 0:
+        report.input_errors.append(f"retries는 0 이상이어야 한다(받은 값 {retries})")
+        return report
+    if limit is not None and limit < 1:
+        report.input_errors.append(f"limit는 1 이상이어야 한다(받은 값 {limit})")
+        return report
+    cus, errors = load_cu_inputs(run_dir)
+    report.cu_total = len(cus)
+    if errors:
+        report.input_errors.extend(errors)
+        return report
+    state = _load_resume_state(run_dir, cus, quarantine_state=quarantine_damaged_state)
+    report.quarantined_genlog = state.quarantined_genlog
+    report.quarantined_rejected = state.quarantined_rejected
+    report.quarantined_state = state.quarantined_state
+    if state.errors:
+        report.input_errors.extend(state.errors)
+        return report
+    report.discarded_inconsistent_rows = state.discarded_inconsistent_rows
+
+    call = _CallContext(
+        provider=provider,
+        trace=trace,
+        settings=settings,
+        seed_source=seed_source,
+        subscription=subscription,
+        budget_krw=budget_krw,
+        on_progress=on_progress,
+        temperature=temperature,
+        genlog_path=run_dir / GENLOG_FILE,
+        run_id=run_id or uuid.uuid4().hex,
+        prompt_version=prompt_version,
+    )
+    budget = retries + 1
+
+    for cu in cus:
+        st = state.cu[cu.problem_id]
+        if st.complete:
+            report.cu_resumed += 1
+            _account(report, cu, st)
+            _tally(report, cu, st.verified_levels)
+            continue
+        remaining = budget if redo_incomplete else budget - st.attempts
+        if remaining <= 0:
+            report.budget_exhausted_cus.append(cu.slug)
+            _account(report, cu, st)
+            if st.context is None:
+                report.failed_cus.append(cu.slug)
+            else:
+                _tally(report, cu, st.verified_levels)
+            continue
+        if limit is not None and report.cu_processed >= limit:
+            report.pending_cus.append(cu.slug)
+            _account(report, cu, st)
+            continue
+        report.cu_processed += 1
+        best = await _run_cu(
+            run_dir,
+            call,
+            report,
+            cu,
+            st,
+            remaining=remaining,
+            value_exposure=value_exposure,
+        )
+        if best is not None and best.order >= 0:
+            st.context = best.context
+            st.hint_lines = [_hint_line(h) for h in best.accepted]
+        if st.context is not None:
+            # 누적 시도 회계를 채택본 문맥 행에 싣는다(이전 채택본이 남아도 회계는 최신).
+            st.context = {
+                **st.context,
+                "attempts_total": st.attempts,
+                "gated_attempts_total": st.gated_attempts,
+                "rejected_hints_total": st.rejected_hints,
+            }
+            _write_current_state(run_dir, cus, state.cu)
+        _account(report, cu, st)
+        if st.context is None:
+            report.failed_cus.append(cu.slug)
+            _progress(call, f"CU_FAILED slug={cu.slug} attempts_total={st.attempts}")
+            continue
+        _tally(report, cu, st.verified_levels)
+        _progress(
+            call,
+            f"CU_DONE slug={cu.slug} verified_levels={sorted(st.verified_levels)} "
+            f"attempts_total={st.attempts} gated_attempts_total={st.gated_attempts} "
+            f"processed={report.cu_processed}",
+        )
+
+    flush = getattr(trace, "flush", None)
+    if callable(flush):
+        try:
+            flush()
+        except Exception as exc:  # noqa: BLE001 — 전송 확정 실패가 결과를 깨면 안 된다(타입명 로그)
+            _LOGGER.warning("CU 힌트 패스 관측 flush 실패(%s)", type(exc).__name__)
+    return report
+
+
+def _account(report: PassReport, cu: CuInput, st: _CuState) -> None:
+    report.cu_attempts[cu.slug] = st.attempts
+    report.cu_gated_attempts[cu.slug] = st.gated_attempts
+    report.rejected_hints_total += st.rejected_hints
+
+
+async def _run_cu(
+    run_dir: Path,
+    call: _CallContext,
+    report: PassReport,
+    cu: CuInput,
+    st: _CuState,
+    *,
+    remaining: int,
+    value_exposure: AnswerValueExposure | None,
+) -> _Candidate | None:
+    """CU 1건의 시도 루프 — 세 레벨 통과면 멈추고, 아니면 예산 안에서 다시 만든다. 채택 후보를 낸다.
+
+    게이트 거부도 시도 1회를 쓴다(provider·파싱·계약 실패와 같은 예산). 채택 규칙: 세 레벨 통과가
+    나오면 그것, 아니면 통과 레벨 수가 가장 많은 후보(동점이면 나중 것 · 이전 실행 채택본도 후보
+    `order=-1`).
+    """
+    prompt = build_cu_hint_user(
+        question=cu.question,
+        answer=cu.answer,
+        explanation=cu.explanation,
+        subject=cu.subject,
+        standards=cu.standards,
+    )
+    candidates: list[_Candidate] = []
+    if st.context is not None:
+        prior_hints = [Hint.model_validate_json(line) for line in st.hint_lines]
+        candidates.append(_Candidate(accepted=prior_hints, context=st.context, order=-1))
+    for order in range(remaining):
+        draft, decision, attempt_id = await _attempt(call, report, cu, prompt)
+        st.attempts += 1
+        if draft is None:
+            continue
+        st.gated_attempts += 1
+        generator_version = (
+            f"{CU_HINT_GENERATOR_VERSION}@{call.prompt_version}#{attempt_id.hex[:12]}"
+        )
+        candidate = _gate(
+            run_dir,
+            report,
+            cu,
+            draft,
+            value_exposure=value_exposure,
+            generator_version=generator_version,
+            order=order,
+            extra={
+                "prompt_version": call.prompt_version,
+                "route": _route_label(decision),
+                "attempt_id": str(attempt_id),
+                "attempt_no": st.attempts,
+                "run_id": call.run_id,
+            },
+        )
+        st.rejected_hints += len(candidate.context["rejected_levels"])
+        candidates.append(candidate)
+        if candidate.complete:
+            break
+    if not candidates:
+        return None
+    best = max(candidates, key=lambda c: (len(c.verified), c.order))
+    if best.order >= 0:
+        for hint in best.accepted:
+            report.verified_by_level[hint.level] += 1
+    return best
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1029,14 +1356,31 @@ def build_arg_parser(prog: str) -> argparse.ArgumentParser:
         prog=prog,
         description=(
             "저장된 CU에 LLM으로 단계 목록과 L1·L2·L3 힌트를 붙이고 게이트 3종 통과분만 verified로 "
-            "내보낸다(EOS-211). exit 0=전 CU 완료 · 1=일부 미완 · 2=입력 오류."
+            "내보낸다(EOS-211). exit 0=전 CU 완료 · 1=일부 미완 · 2=입력 오류 · "
+            "3=처리되지 않은 예외."
         ),
     )
     parser.add_argument("--run-dir", type=Path, required=True, help="회차 좌석 폴더(cu.jsonl 보유)")
     parser.add_argument(
-        "--retries", type=int, default=_DEFAULT_RETRIES, help="같은 CU 재시도 횟수(기본 2)"
+        "--retries",
+        type=int,
+        default=_DEFAULT_RETRIES,
+        help="CU당 총 시도 상한 = retries+1(첫 시도부터 누적 · 게이트 거부 재생성 포함 · 기본 2)",
     )
     parser.add_argument("--limit", type=int, default=None, help="이번 실행에서 새로 처리할 CU 상한")
+    parser.add_argument(
+        "--redo-incomplete",
+        action="store_true",
+        help="시도 예산이 떨어진 미완 CU에도 이번 실행에서 예산을 새로 준다(이력은 보존)",
+    )
+    parser.add_argument(
+        "--quarantine-damaged-state",
+        action="store_true",
+        help=(
+            "복구용 — 채택본·문맥 파일의 깨진 줄을 .corrupt로 옮기고 짝을 잃은 CU를 다시 만든다"
+            "(기본은 입력 오류 2로 멈춘다)"
+        ),
+    )
     parser.add_argument(
         "--subscription",
         default=None,
@@ -1058,21 +1402,33 @@ def run_cli(
     trace_factory: Callable[[], TraceSink | None],
     value_exposure: AnswerValueExposure | None,
 ) -> int:
-    """인자 해석 → 패스 → 요약 출력 → 종료 코드. provider는 인자 검증 *뒤에* 만든다."""
+    """인자 해석 → 패스 → 요약 출력 → 종료 코드. provider는 인자 검증 *뒤에* 만든다.
+
+    처리되지 않은 예외는 여기서 잡아 `UNHANDLED_ERROR=<타입명>`·`EXIT=3`으로 낸다 — 1(미완)과 섞이면
+    "일부 CU 미완"과 "디스크가 꽉 찼다"가 같은 신호가 된다. 원문은 싣지 않는다(타입명만).
+    """
     args = build_arg_parser(prog).parse_args(list(argv) if argv is not None else None)
-    report = asyncio.run(
-        run_cu_hint_pass(
-            args.run_dir,
-            provider=provider_factory(),
-            value_exposure=value_exposure,
-            trace=trace_factory(),
-            retries=args.retries,
-            limit=args.limit,
-            subscription=args.subscription,
-            budget_krw=args.budget_krw,
-            on_progress=lambda line: print(line, flush=True),
-            temperature=args.temperature,
+    try:
+        report = asyncio.run(
+            run_cu_hint_pass(
+                args.run_dir,
+                provider=provider_factory(),
+                value_exposure=value_exposure,
+                trace=trace_factory(),
+                retries=args.retries,
+                limit=args.limit,
+                redo_incomplete=bool(args.redo_incomplete),
+                quarantine_damaged_state=bool(args.quarantine_damaged_state),
+                subscription=args.subscription,
+                budget_krw=args.budget_krw,
+                on_progress=lambda line: print(line, flush=True),
+                temperature=args.temperature,
+            )
         )
-    )
+    except Exception as exc:  # noqa: BLE001 — 최상위: 미분류 예외를 별도 종료 코드로 드러낸다
+        summary = _safe_exc_summary(exc)
+        _LOGGER.error("CU 힌트 패스 처리되지 않은 예외(%s)", summary)
+        print(f"UNHANDLED_ERROR={summary}\nEXIT={EXIT_UNHANDLED}", flush=True)
+        return EXIT_UNHANDLED
     print("\n".join(report.render_lines()))
     return report.exit_code
