@@ -16,8 +16,9 @@
 ---------------------------------------------
 조건 1개(`_parse_condition` — Tier1 검산과 **같은 파서**로 읽는다):
 
-- **IDENTITY(무조건 참)** — 등식인데 정답 변수를 하나도 쓰지 않거나(`2 = 2`), 잔차가 항등적으로
-  0이다(`n = n`). 정답이 무엇이든 참이므로 정답을 검증하지 않는다.
+- **IDENTITY(무조건 참)** — 등식인데 자유 기호가 하나도 없거나(`2 = 2`), 잔차가 항등적으로
+  0이다(`n = n`). 정답이 무엇이든 참이므로 정답을 검증하지 않는다. 정답 변수가 아닌 기호만 쓰는
+  등식(`t = 3`, 정답 변수 v)은 IDENTITY가 아니라 UNDECIDABLE이다.
 - **RESTATEMENT(정답 재진술)** — 등식이고, 자유 기호가 정답 변수 **하나**뿐이며, 식 원문(AST)에
   나오는 수 리터럴 중 0·1이 아닌 것의 크기 다중집합이 **정답 표기의 그것과 정확히 같다**.
   즉 식이 정답의 수 외에는 아무 수도 쓰지 않는다 — 다시 계산할 재료(문항의 계수·좌표)가 없다.
@@ -47,6 +48,10 @@
   블라인드 재도출(R13-01·EOS-205)의 몫이다.
 - `x = 2*3`(정답 6)처럼 문항과 무관한 산술도 RECOMPUTE다 — 수 리터럴이 문항 본문에서 왔는지는
   보지 않는다(본문 대조는 표기 변형에 약해 오탐 위험이 크다).
+- **1의 합으로 정답을 쓰면 놓친다** — `x = 1+1+1`(정답 3)은 0·1을 빼면 리터럴이 비어 정답의 `{3}`과
+  달라 RECOMPUTE가 된다. 상수 부분식을 접으면 잡히지만 그러면 `4*3 + 7`도 19 하나로 접혀 진짜
+  재계산이 재진술로 둔갑한다 — 접지 않는 쪽(미탐)을 택했다. 이 회피는 의도적 산출이라 생성기
+  거부(EOS-205)에서 막을 몫이다.
 """
 
 from __future__ import annotations
@@ -201,14 +206,17 @@ def classify_condition(condition: str, answer_map: Mapping[str, object]) -> Cond
             condition, BypassKind.UNDECIDABLE, False, f"등식 아님({op}) — 값을 정하지 않는다"
         )
     free = {str(s) for s in residual.free_symbols}
-    if not free & answer_vars:
+    if not free:
         return ConditionBypass(
-            condition, BypassKind.IDENTITY, True, "정답 변수를 쓰지 않는 등식 — 정답과 무관하게 참"
+            condition, BypassKind.IDENTITY, True, "자유 기호가 없는 등식 — 정답과 무관하게 참"
         )
     if sympy.simplify(residual) == 0:
         return ConditionBypass(
             condition, BypassKind.IDENTITY, True, "잔차가 항등적으로 0 — 정답과 무관하게 참"
         )
+    # 정답 변수가 아닌 기호가 있으면(정답 변수를 아예 안 써도) 값 하나로 정해지지 않는다
+    # — 판정 불가.
+    # 종전 순서는 `t = 3`(정답 변수 v)을 '정답 변수 미포함'으로 IDENTITY 처리했다(EOS-207 리뷰 P3).
     if not free <= answer_vars:
         return ConditionBypass(
             condition,

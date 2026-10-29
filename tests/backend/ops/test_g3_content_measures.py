@@ -64,15 +64,28 @@ def _log(slug: str | None, *, success: bool = True, **over: Any) -> dict[str, An
     return row
 
 
+_NOT_GENERATED = "provider.generate failed: ReadTimeout: timed out"
+_PARSE = "응답 JSON 파싱 실패"
+_ASSEMBLY = "후보 조립 실패: ValueError"
+
+
 def _review(
-    slug: str | None, status: str, *, payload: dict[str, Any] | None = None
+    slug: str | None,
+    status: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    detail: str = _NOT_GENERATED,
 ) -> dict[str, Any]:
-    return {
+    """검토 행. `generation_failed`의 원인(`detail`)은 `_seat`가 생성 로그 실패 행으로 옮긴다."""
+    row: dict[str, Any] = {
         "status": status,
         "slug": slug,
         "candidate_payload": payload,
         "recorded_at": _T0,
     }
+    if status == "generation_failed":
+        row["_detail"] = detail
+    return row
 
 
 def _write(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -93,9 +106,14 @@ def _seat(
     """좌석 폴더 1개. 생성 로그를 안 주면 CU마다 성공 1행 + 검토 행마다 1행(회계 일치)을 만든다."""
     seat = root / name
     reviews = reviews or []
+    details = [r.pop("_detail", None) for r in reviews]
     if logs is None:
         logs = [_log(c["slug"]) for c in cus]
-        logs += [_log(r["slug"], success=r["status"] != "generation_failed") for r in reviews]
+        for review, detail in zip(reviews, details, strict=True):
+            failed = review["status"] == "generation_failed"
+            logs.append(
+                _log(None if failed else review["slug"], success=not failed, error_detail=detail)
+            )
     _write(seat / "cu.jsonl", cus)
     _write(seat / "cu.review.jsonl", reviews)
     _write(seat / "cu.genlog.jsonl", logs)
@@ -113,8 +131,8 @@ def _baseline_round(root: Path) -> None:
         _review("s-dup", "rejected_duplicate", payload=_cu("s-dup", "answer == 2*5", "10")),
         _review("s-nr", "needs_review"),
         _review("s-rg", "rejected_gate"),
-        _review(None, "generation_failed"),
-        _review(None, "generation_failed"),
+        _review(None, "generation_failed", detail=_NOT_GENERATED),
+        _review(None, "generation_failed", detail=_ASSEMBLY),
     ]
     _seat(root, "r1-seatA", cus=cus, reviews=reviews)
 
@@ -152,12 +170,16 @@ class TestAutoGate:
         gate = _report(tmp_path)["auto_gate"]
         assert gate["attempts"] == 8
         assert gate["generation_failed"] == 2
-        assert gate["evaluated"] == 6  # 생성 실패는 분모 밖
+        assert gate["failure_kinds"] == {"assembly_rejected": 1, "not_generated": 1}
+        assert gate["evaluated"] == 6
+        assert gate["responded"] == 7  # 조립 거부는 분모 안 · 미생성은 분모 밖
         assert gate["passed_raw"] == 4  # 저장 3 + 중복 거부 1(게이트는 통과했다)
         assert gate["bypassed"] == 1  # n = 3
         assert gate["recomputed"] == 3
-        assert gate["rate"] == pytest.approx(3 / 6)
-        assert gate["rate_raw"] == pytest.approx(4 / 6)
+        assert gate["rate"] == pytest.approx(3 / 7)
+        assert gate["rate_raw"] == pytest.approx(4 / 7)
+        assert gate["rate_gate_reached"] == pytest.approx(3 / 6)
+        assert gate["rate_raw_gate_reached"] == pytest.approx(4 / 6)
         assert gate["attempt_rate"] == pytest.approx(3 / 8)
         assert gate["measured"] is True
         assert 0 < gate["wilson_lower_95"] < 0.5
@@ -183,6 +205,70 @@ class TestAutoGate:
         assert gate["rate"] == pytest.approx(0.5)
         assert gate["rate_raw"] == pytest.approx(1.0)
 
+    @pytest.mark.parametrize(
+        ("detail", "kind"),
+        [
+            (_NOT_GENERATED, "not_generated"),
+            (_PARSE, "parse_rejected"),
+            (_ASSEMBLY, "assembly_rejected"),
+            ("후보 조립 실패: ValidationError", "assembly_rejected"),
+            ("알 수 없는 실패", "unknown"),
+            (None, "unknown"),
+        ],
+    )
+    def test_failure_classification(self, detail: object, kind: str) -> None:
+        assert g3.classify_failure(detail) == kind
+
+    @pytest.mark.parametrize(
+        ("detail", "responded"), [(_PARSE, 2), (_ASSEMBLY, 2), (_NOT_GENERATED, 1)]
+    )
+    def test_deterministic_rejection_is_in_denominator_but_transport_failure_is_not(
+        self, tmp_path: Path, detail: str, responded: int
+    ) -> None:
+        _seat(
+            tmp_path,
+            "r1-a",
+            cus=[_cu("r", "answer == 2+3", "5")],
+            reviews=[_review(None, "generation_failed", detail=detail)],
+        )
+        gate = _report(tmp_path)["auto_gate"]
+        assert gate["responded"] == responded
+        assert gate["rate"] == pytest.approx(1 / responded)
+
+    def test_unclassified_failure_withholds_the_value(self, tmp_path: Path) -> None:
+        _seat(
+            tmp_path,
+            "r1-a",
+            cus=[_cu("r", "answer == 2+3", "5")],
+            reviews=[_review(None, "generation_failed", detail="갑자기 다른 오류")],
+        )
+        gate = _report(tmp_path)["auto_gate"]
+        assert gate["measured"] is False and gate["rate"] is None and gate["rate_raw"] is None
+        assert "원인 분류 불가" in gate["reason"]
+
+    def test_slug_level_accounting_catches_swapped_rows(self, tmp_path: Path) -> None:
+        """행 수는 맞는데 slug가 다르다 — 행 수 대조만으로는 통과하는 반례."""
+        _seat(
+            tmp_path,
+            "r1-a",
+            cus=[_cu("a", "answer == 2+3", "5")],
+            logs=[_log("other")],
+        )
+        gate = _report(tmp_path)["auto_gate"]
+        assert any("slug 단위" in e for e in gate["errors"])
+        assert gate["measured"] is False
+
+    def test_failure_count_accounting(self, tmp_path: Path) -> None:
+        _seat(
+            tmp_path,
+            "r1-a",
+            cus=[_cu("a", "answer == 2+3", "5")],
+            reviews=[_review(None, "generation_failed")],
+            logs=[_log("a")],  # 실패 호출 0건 ↔ generation_failed 1행
+        )
+        gate = _report(tmp_path)["auto_gate"]
+        assert any("실패 호출 0건" in e for e in gate["errors"])
+
     def test_undecidable_bypass_withholds_the_value(self, tmp_path: Path) -> None:
         _seat(tmp_path, "r1-a", cus=[_cu("u", "answer > 0", "5"), _cu("r", "answer == 2+3", "5")])
         gate = _report(tmp_path)["auto_gate"]
@@ -196,7 +282,7 @@ class TestAutoGate:
             tmp_path,
             "r1-a",
             cus=[_cu("a", "answer == 2+3", "5")],
-            logs=[_log("a"), _log(None, success=False)],  # 생성 로그 2행 ↔ 게이트 기록 1행
+            logs=[_log("a"), _log(None, success=False, error_detail=_NOT_GENERATED)],
         )
         report = _report(tmp_path)
         assert report["auto_gate"]["measured"] is False
@@ -328,6 +414,40 @@ class TestHintLeak:
         hint = _report(tmp_path, [_hint(pids["h-14"], "기울기부터 구해 볼까요?")])["hint_leak"]
         assert hint["cu_without_hints"] == 1
         assert hint["status"] == "UNDECIDED"
+
+    def test_l3_only_round_is_not_measurable(self, tmp_path: Path) -> None:
+        """리뷰 P1 반례 — L1·L2를 하나도 판정하지 않았는데 PASS가 나면 안 된다."""
+        cu = _cu("only", "answer == 10 + 3", "13")
+        _seat(tmp_path, "r1-a", cus=[cu])
+        hint = _report(tmp_path, [_hint(cu["problem_id"], "도함수를 먼저 떠올려 봐요", level=3)])[
+            "hint_leak"
+        ]
+        assert (hint["judged_l12"], hint["status"]) == (0, "NOT_MEASURABLE")
+
+    def test_cu_with_only_l3_hint_keeps_axis_undecided(self, tmp_path: Path) -> None:
+        pids = self._round(tmp_path)
+        hints = [
+            _hint(pids["h-14"], "접선의 기울기부터 구해 볼까요?"),
+            _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요", level=3),
+        ]
+        hint = _report(tmp_path, hints)["hint_leak"]
+        assert (hint["cu_without_l12"], hint["status"]) == (1, "UNDECIDED")
+
+    def test_unmatched_hint_keeps_axis_undecided_and_is_printed(self, tmp_path: Path) -> None:
+        """리뷰 P1 반례 — 다른 문항의 problem_id에 붙은 누설 힌트가 조용히 사라지면 안 된다."""
+        pids = self._round(tmp_path)
+        stray = str(uuid.uuid5(uuid.NAMESPACE_URL, "not-in-round"))
+        hints = [
+            _hint(pids["h-14"], "접선의 기울기부터 구해 볼까요?"),
+            _hint(pids["h-13"], "도함수를 먼저 떠올려 봐요"),
+            _hint(stray, "y절편은 -14가 돼요"),
+        ]
+        report = _report(tmp_path, hints)
+        assert (report["hint_leak"]["unmatched_hints"], report["hint_leak"]["status"]) == (
+            1,
+            "UNDECIDED",
+        )
+        assert "HINT_UNMATCHED=1" in g3.render_lines(report)
 
     def test_invalid_hint_row_is_input_error(self, tmp_path: Path) -> None:
         self._round(tmp_path)
@@ -542,9 +662,17 @@ class TestEos197FirstMeasurement:
             "rejected_gate": 10,
         }
         assert (gate["attempts"], gate["evaluated"], gate["passed_raw"]) == (136, 89, 35)
+        assert gate["failure_kinds"] == {
+            "assembly_rejected": 11,
+            "not_generated": 25,
+            "parse_rejected": 11,
+        }
+        assert gate["responded"] == 111
         assert (gate["bypassed"], gate["recomputed"], gate["bypass_undecided"]) == (22, 13, 0)
-        assert gate["rate"] == pytest.approx(13 / 89)
-        assert gate["rate_raw"] == pytest.approx(35 / 89)
+        assert gate["rate"] == pytest.approx(13 / 111)
+        assert gate["rate_raw"] == pytest.approx(35 / 111)
+        assert gate["rate_gate_reached"] == pytest.approx(13 / 89)
+        assert gate["rate_raw_gate_reached"] == pytest.approx(35 / 89)
 
     def test_hint_axis_has_nothing_to_measure(self, report: dict[str, Any]) -> None:
         hint = report["hint_leak"]

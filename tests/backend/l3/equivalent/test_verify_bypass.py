@@ -114,6 +114,18 @@ def test_undecidable_is_three_state_none(verify: object, needle: str) -> None:
     assert needle in verdict.reason
 
 
+def test_non_answer_symbol_only_is_undecidable_not_identity() -> None:
+    """리뷰 P3 반례 — 정답 변수(v)를 안 쓰고 다른 기호(t)만 쓰는 등식은 무조건 참이 아니다."""
+    verdict = classify_condition("t = 3", {"v": "19"})
+    assert verdict.kind is BypassKind.UNDECIDABLE
+    assert "'t'" in verdict.reason
+
+
+def test_sum_of_ones_is_a_known_miss() -> None:
+    """한계 동결 — `x = 1+1+1`(정답 3)은 재진술이지만 0·1 제외 때문에 RECOMPUTE로 놓친다(문서화)."""
+    assert classify_condition("x = 1+1+1", {"x": "3"}).kind is BypassKind.RECOMPUTE
+
+
 def test_extra_free_symbol_reason_names_the_symbol() -> None:
     verdict = classify_condition("y = -3*x + 10", {"y": "10"})
     assert verdict.kind is BypassKind.UNDECIDABLE

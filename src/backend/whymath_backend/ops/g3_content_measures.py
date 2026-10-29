@@ -18,18 +18,29 @@
   `생성 → 수용 게이트 → 과유사(dedup) → 저장`이므로 **게이트 통과 = `accepted_stored` +
   `rejected_duplicate`**다(중복 거부는 게이트를 통과한 *뒤* 신규성 축에서 걸린 것이다).
   `needs_review`(게이트가 정확성을 확인하지 못함)·`rejected_gate`는 1차 불통과다.
-- **전체 생성** = 생성기가 후보를 낸 시도 = 게이트에 도달한 후보(`generation_failed` 제외 —
-  후보가 없으면 게이트가 판정할 것이 없다). 시도 전체 대비 비율도 함께 낸다(`ATTEMPT_PASS_RATE`).
+- **전체 생성** = 모델이 **응답을 돌려준** 시도다. `generation_failed`는 한 덩어리가 아니라
+  생성 로그 `error_detail`로 셋으로 갈린다(`l3/equivalent/llm_generator.py`):
+    ① **미생성**(`provider.generate failed: …` — 타임아웃·전송 오류): 모델이 아무것도 내지 않았다.
+       생성이 없으므로 분모 밖이다.
+    ② **파싱 거부**(`응답 JSON 파싱 실패`): 모델은 답했으나 응답 형식 검증(결정론)이 거부했다.
+    ③ **조립 거부**(`후보 조립 실패: <예외 타입>`): 모델은 답했으나 Problem 스키마·Provenance
+       불변식(결정론 — 저작권 게이트 포함)이 후보 조립을 거부했다.
+  EOS-207 acceptance ①(a)가 결정론 검증을 "SymPy 검산·**스키마**·**출처**"로 적으므로 ②③은
+  결정론 검증의 **1차 불통과**다 — 수용 게이트(`acceptance.py`)에 닿기 전 단계에서 걸렸을 뿐 같은
+  결정론 검증 사슬이다. 그래서 **주(主) 분모 = 응답 수 = 게이트 도달 + 파싱 거부 + 조립 거부**다.
+  게이트 도달 후보만 분모로 쓴 값은 대안으로 함께 낸다(`AUTO_GATE_PASS_RATE_GATE_REACHED`).
+  위 셋 중 어디에도 들지 않는 실패 원인이 있으면 분모를 정할 수 없으므로 **값을 내지 않는다**.
 - **수용 게이트 로그** = 회차 폴더의 `cu.jsonl`(저장분) + `cu.review.jsonl`(비저장분 · 사유 포함).
-  두 파일의 행 합이 생성 로그(`cu.genlog.jsonl`) 행 수와 같아야 한다 — 다르면 **회계 불일치로
-  측정 실패**다(빠진 행이 하필 불통과였다면 비율이 부풀어 보인다).
+  생성 로그(`cu.genlog.jsonl`)와 **두 단위로** 대조한다 — ① 성공 호출의 `cu_slug` 다중집합 =
+  저장분·비저장분(생성 실패 제외)의 `slug` 다중집합 ② 실패 호출 수 = `generation_failed` 행 수.
+  어긋나면 **회계 불일치로 측정 실패**다(빠진 행이 하필 불통과였다면 비율이 부풀어 보인다).
 - **1차** = 게이트가 후보를 처음 판정한 결과. 사람 검수(승인·수정승인)는 세지 않는다 — 사람이
   고친 뒤의 통과는 자동검증의 통과가 아니다.
 
 **우회된 통과는 통과가 아니다**: 게이트 통과분의 검산식을 `l3/equivalent/verify_bypass`로 기계
 판정해, 정답 상수를 재진술만 하는 검산식(`n = 3`·`v - 24 = 0`)이나 무조건 참인 검산식으로 통과한
 후보를 **우회(bypassed)**로 뺀다. KPI 값(`AUTO_GATE_PASS_RATE`)은 **재계산 검증으로 통과한
-후보 ÷ 게이트 도달 후보**다. 우회를 빼지 않은 값은 `AUTO_GATE_PASS_RATE_RAW`로 함께 남긴다(두 값의
+후보 ÷ 응답 수**다. 우회를 빼지 않은 값은 `AUTO_GATE_PASS_RATE_RAW`로 함께 남긴다(두 값의
 차가 곧 우회의 크기다). 우회 판정이 안 되는 통과가 1건이라도 있으면 값을 내지 않는다
 (`measured=False` · 상·하한만 사유에 적는다 — 모르는 것을 통과로도 불통과로도 접지 않는다).
 
@@ -43,7 +54,10 @@ CU 정의(§3)의 "3단계 힌트" 좌석은 S4-11 `hints` 표다(`l4/hint_conte
 (False)**, 그 밖(짧은 정답의 글자 축 유보·값 축 판정 불가)은 **사람 폴백(None)**.
 
 무관용 기준은 F8 정의대로 **L1·L2**다(§4 "힌트 정답 누설(L1·L2 무관용)"). L3 누설은 따로 센다.
-힌트가 0건인 CU는 "누설 0"이 아니라 **측정 대상 부재**다(스캔 0건은 통과가 아니다).
+힌트가 0건인 CU는 "누설 0"이 아니라 **측정 대상 부재**다(스캔 0건은 통과가 아니다). 같은 이유로
+**판정한 L1·L2 힌트가 0건이면 측정 불가**이고(L3만 있는 회차), L1·L2 힌트가 없는 CU·어느 CU에도
+붙지 않는 힌트(problem_id 조인 실패)가 있으면 **판정 불가(UNDECIDED)**다 — 보지 않은 것을 통과로
+세지 않는다(EOS-207 리뷰 P1).
 
 **의미 축은 이 CLI가 재지 않는다**: §5 F-Ⅴ가 "힌트의 의미적 정답 누설(**자동 검사 밖**)"을 표본
 검수로 재라고 못박았고, §6이 "전수 자동 + LLM 심판 + 인간 30건"을 요구한다. 기계 두 축이 clean이라는
@@ -280,15 +294,40 @@ def discover_round(runs_root: Path, round_id: str, *, review_dir: Path | None = 
 # ──────────────────────────────────────────────────────────────────────────
 # (a) 자동검증 1차 통과율
 # ──────────────────────────────────────────────────────────────────────────
+# 생성 실패 원인 3분류(모듈 docstring (a)) — 생성 로그 `error_detail` 앞머리로 가른다.
+FAILURE_NOT_GENERATED = "not_generated"  # 미생성 — 분모 밖
+FAILURE_PARSE_REJECTED = "parse_rejected"  # 파싱 거부 — 결정론 검증 1차 불통과
+FAILURE_ASSEMBLY_REJECTED = "assembly_rejected"  # 조립 거부 — 결정론 검증 1차 불통과
+FAILURE_UNKNOWN = "unknown"  # 분류 불가 — 분모를 정할 수 없다(값을 내지 않는다)
+_FAILURE_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("provider.generate failed", FAILURE_NOT_GENERATED),
+    ("응답 JSON 파싱 실패", FAILURE_PARSE_REJECTED),
+    ("후보 조립 실패", FAILURE_ASSEMBLY_REJECTED),
+)
+_DETERMINISTIC_REJECTIONS: frozenset[str] = frozenset(
+    {FAILURE_PARSE_REJECTED, FAILURE_ASSEMBLY_REJECTED}
+)
+
+
+def classify_failure(error_detail: object) -> str:
+    """생성 실패 1건의 원인 분류. 앞머리가 맞지 않으면 `unknown`(추측하지 않는다)."""
+    if isinstance(error_detail, str):
+        for prefix, kind in _FAILURE_PREFIXES:
+            if error_detail.startswith(prefix):
+                return kind
+    return FAILURE_UNKNOWN
+
+
 @dataclass(frozen=True, slots=True)
 class GateOutcome:
-    """게이트 판정 1건(=생성 시도 1건). `bypass`는 게이트 통과분에만 있다."""
+    """생성 시도 1건의 결과. `bypass`는 게이트 통과분에만, `failure_kind`는 생성 실패분에만 있다."""
 
     run_dir: str
     slug: str | None
     status: str
     moment: datetime | None
     bypass: VerifyBypassVerdict | None
+    failure_kind: str | None = None
 
 
 def _success_times(genlog_rows: Iterable[Mapping[str, Any]]) -> dict[str, datetime]:
@@ -307,10 +346,15 @@ def _success_times(genlog_rows: Iterable[Mapping[str, Any]]) -> dict[str, dateti
 
 
 def _outcomes_for(run: RunDirInput) -> tuple[list[GateOutcome], list[str]]:
-    """좌석 1개의 게이트 판정 목록 + 회계 오류."""
+    """좌석 1개의 시도 결과 목록 + 회계 오류.
+
+    생성 실패분은 검토 행(`generation_failed` — 원인이 없다)이 아니라 생성 로그의 실패 호출에서
+    만든다(원인·시각이 거기 있다). 두 쪽의 건수는 회계로 대조한다.
+    """
     errors: list[str] = []
     times = _success_times(run.genlog_rows)
     outcomes: list[GateOutcome] = []
+    review_failed = 0
     for row in run.cu_rows:
         slug = row.get("slug") if isinstance(row.get("slug"), str) else None
         # 저장분 = accepted_stored. 검산식 판정은 저장된 *원본* 페이로드로 한다(사람 수정 전).
@@ -329,6 +373,9 @@ def _outcomes_for(run: RunDirInput) -> tuple[list[GateOutcome], list[str]]:
         if not isinstance(status, str) or status not in _KNOWN_STATUSES:
             errors.append(f"{run.name}/{_REVIEW_FILE} 알 수 없는 상태 {status!r} — 회계 불가")
             continue
+        if status == _NOT_EVALUATED_STATUS:
+            review_failed += 1
+            continue
         bypass = None
         if status in GATE_PASS_STATUSES:
             payload = _mapping(row.get("candidate_payload"))
@@ -336,11 +383,38 @@ def _outcomes_for(run: RunDirInput) -> tuple[list[GateOutcome], list[str]]:
         outcomes.append(
             GateOutcome(run.name, slug, status, _parse_moment(row.get("recorded_at")), bypass)
         )
-    if len(run.genlog_rows) != len(outcomes):
+    # 회계 ① — 성공 호출 cu_slug 다중집합 = 게이트 기록 slug 다중집합(slug 단위).
+    success_slugs: Counter[str | None] = Counter(
+        row.get("cu_slug") if isinstance(row.get("cu_slug"), str) else None
+        for row in run.genlog_rows
+        if row.get("success") is True
+    )
+    outcome_slugs: Counter[str | None] = Counter(o.slug for o in outcomes)
+    if success_slugs != outcome_slugs:
+        only_log = sorted(str(k) for k in (success_slugs - outcome_slugs))
+        only_gate = sorted(str(k) for k in (outcome_slugs - success_slugs))
         errors.append(
-            f"{run.name} 회계 불일치 — 생성 로그 {len(run.genlog_rows)}행 ≠ 게이트 기록 "
-            f"{len(outcomes)}행({_CU_FILE} {len(run.cu_rows)} + {_REVIEW_FILE} "
-            f"{len(run.review_rows)})"
+            f"{run.name} 회계 불일치(slug 단위) — 성공 호출 {sum(success_slugs.values())}건 ↔ "
+            f"게이트 기록 {sum(outcome_slugs.values())}건 · 로그에만 {only_log[:3]} · "
+            f"게이트에만 {only_gate[:3]}"
+        )
+    # 회계 ② — 실패 호출 수 = generation_failed 행 수. 실패분은 생성 로그에서 만든다.
+    failed_logs = [row for row in run.genlog_rows if row.get("success") is not True]
+    if len(failed_logs) != review_failed:
+        errors.append(
+            f"{run.name} 회계 불일치 — 실패 호출 {len(failed_logs)}건 ≠ {_REVIEW_FILE} "
+            f"generation_failed {review_failed}행"
+        )
+    for row in failed_logs:
+        outcomes.append(
+            GateOutcome(
+                run.name,
+                None,
+                _NOT_EVALUATED_STATUS,
+                _parse_moment(row.get("generated_at")),
+                None,
+                classify_failure(row.get("error_detail")),
+            )
         )
     return outcomes, errors
 
@@ -355,6 +429,7 @@ class AutoGateMeasure:
 
     attempts: int = 0
     generation_failed: int = 0
+    failure_kinds: dict[str, int] = field(default_factory=dict)
     evaluated: int = 0
     status_counts: dict[str, int] = field(default_factory=dict)
     passed_raw: int = 0
@@ -367,16 +442,45 @@ class AutoGateMeasure:
     passes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
+    def deterministic_rejected(self) -> int:
+        """게이트 앞 결정론 검증(파싱·조립)이 거부한 응답 수."""
+        return sum(self.failure_kinds.get(k, 0) for k in _DETERMINISTIC_REJECTIONS)
+
+    @property
+    def unknown_failures(self) -> int:
+        return self.failure_kinds.get(FAILURE_UNKNOWN, 0)
+
+    @property
+    def responded(self) -> int:
+        """주 분모 — 모델이 응답을 돌려준 시도 = 게이트 도달 + 파싱 거부 + 조립 거부."""
+        return self.evaluated + self.deterministic_rejected
+
+    @property
+    def counted(self) -> bool:
+        """원시 값을 낼 수 있는가 — 입력·회계 오류와 분류 불가 실패가 없고 분모가 있다."""
+        return not self.errors and self.unknown_failures == 0 and self.responded > 0
+
+    @property
     def measured(self) -> bool:
-        return not self.errors and self.evaluated > 0 and self.bypass_undecided == 0
+        return self.counted and self.bypass_undecided == 0
 
     @property
     def rate(self) -> float | None:
-        return self.recomputed / self.evaluated if self.measured else None
+        return self.recomputed / self.responded if self.measured else None
+
+    @property
+    def rate_gate_reached(self) -> float | None:
+        if not self.measured or not self.evaluated:
+            return None
+        return self.recomputed / self.evaluated
 
     @property
     def rate_raw(self) -> float | None:
-        return self.passed_raw / self.evaluated if (not self.errors and self.evaluated) else None
+        return self.passed_raw / self.responded if self.counted else None
+
+    @property
+    def rate_raw_gate_reached(self) -> float | None:
+        return self.passed_raw / self.evaluated if self.counted and self.evaluated else None
 
     @property
     def attempt_rate(self) -> float | None:
@@ -384,7 +488,7 @@ class AutoGateMeasure:
 
     @property
     def wilson_lower(self) -> float | None:
-        return wilson_lower_bound(self.recomputed, self.evaluated) if self.measured else None
+        return wilson_lower_bound(self.recomputed, self.responded) if self.measured else None
 
     @property
     def reason(self) -> str | None:
@@ -394,11 +498,16 @@ class AutoGateMeasure:
                 f"입력·회계 오류 {len(self.errors)}건 — 부분 입력으로 판정하지 않는다"
                 f"(첫 사유: {self.errors[0]})"
             )
-        if self.evaluated == 0:
-            return "게이트에 도달한 후보 0건 — 분모 0(통과율 미산출)"
+        if self.unknown_failures:
+            return (
+                f"원인 분류 불가 생성 실패 {self.unknown_failures}건 — 응답이 있었는지 알 수 없어 "
+                "분모를 정할 수 없다(통과율 미산출)"
+            )
+        if self.responded == 0:
+            return "모델 응답 0건 — 분모 0(통과율 미산출)"
         if self.bypass_undecided:
-            low = self.recomputed / self.evaluated
-            high = (self.recomputed + self.bypass_undecided) / self.evaluated
+            low = self.recomputed / self.responded
+            high = (self.recomputed + self.bypass_undecided) / self.responded
             return (
                 f"게이트 통과 {self.passed_raw}건 중 검산식 우회 판정 불가 "
                 f"{self.bypass_undecided}건 — "
@@ -411,11 +520,16 @@ class AutoGateMeasure:
             "measured": self.measured,
             "rate": self.rate,
             "rate_raw": self.rate_raw,
+            "rate_gate_reached": self.rate_gate_reached,
+            "rate_raw_gate_reached": self.rate_raw_gate_reached,
             "attempt_rate": self.attempt_rate,
             "wilson_lower_95": self.wilson_lower,
             "reason": self.reason,
             "attempts": self.attempts,
             "generation_failed": self.generation_failed,
+            "failure_kinds": dict(sorted(self.failure_kinds.items())),
+            "deterministic_rejected": self.deterministic_rejected,
+            "responded": self.responded,
             "evaluated": self.evaluated,
             "status_counts": dict(sorted(self.status_counts.items())),
             "passed_raw": self.passed_raw,
@@ -440,6 +554,7 @@ def measure_auto_gate(
     measure = AutoGateMeasure(errors=list(input_errors))
     status_counts: Counter[str] = Counter()
     bypass_kinds: Counter[str] = Counter()
+    failure_kinds: Counter[str] = Counter()
     for run in run_dirs:
         outcomes, errors = _outcomes_for(run)
         measure.errors.extend(errors)
@@ -453,6 +568,7 @@ def measure_auto_gate(
             status_counts[outcome.status] += 1
             if outcome.status == _NOT_EVALUATED_STATUS:
                 measure.generation_failed += 1
+                failure_kinds[outcome.failure_kind or FAILURE_UNKNOWN] += 1
                 continue
             measure.evaluated += 1
             if outcome.status not in GATE_PASS_STATUSES:
@@ -477,6 +593,7 @@ def measure_auto_gate(
             )
     measure.status_counts = dict(status_counts)
     measure.bypass_kinds = dict(bypass_kinds)
+    measure.failure_kinds = dict(failure_kinds)
     return measure
 
 
@@ -511,6 +628,7 @@ class HintLeakMeasure:
     cu_total: int = 0
     cu_with_hints: int = 0
     cu_without_hints: int = 0
+    cu_without_l12: int = 0
     hints_total: int = 0
     hints_by_level: dict[str, int] = field(default_factory=dict)
     leaked_l12: int = 0
@@ -522,14 +640,24 @@ class HintLeakMeasure:
     per_cu: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
+    def judged_l12(self) -> int:
+        """기계가 판정한 L1·L2 힌트 수(누설·아님·사람 폴백 합)."""
+        return self.leaked_l12 + self.clean_l12 + self.undecided_l12
+
+    @property
     def status(self) -> str:
         if self.errors:
             return "NOT_MEASURABLE"
-        if self.hints_total == 0:
+        if self.judged_l12 == 0:  # 힌트 0건도 여기 든다(판정 0건) — 무관용 축의 측정 대상 부재
             return "NOT_MEASURABLE"
         if self.leaked_l12:
             return "FAIL"
-        if self.cu_without_hints or self.undecided_l12:
+        if (
+            self.cu_without_hints
+            or self.cu_without_l12
+            or self.undecided_l12
+            or self.unmatched_hints
+        ):
             return "UNDECIDED"
         return "PASS"
 
@@ -544,13 +672,23 @@ class HintLeakMeasure:
             )
         if self.hints_total == 0:
             return f"CU {self.cu_total}건에 붙는 힌트 0건 — 측정 대상 부재(누설 0이 아니다)"
+        if self.judged_l12 == 0:
+            return (
+                f"힌트 {self.hints_total}건 중 L1·L2가 0건 — 무관용 축의 측정 대상 부재"
+                "(누설 0이 아니다)"
+            )
         if self.leaked_l12:
             return f"L1·L2 힌트 정답 누설 {self.leaked_l12}건(무관용)"
-        if self.cu_without_hints or self.undecided_l12:
+        if (
+            self.cu_without_hints
+            or self.cu_without_l12
+            or self.undecided_l12
+            or self.unmatched_hints
+        ):
             return (
-                f"힌트 없는 CU {self.cu_without_hints}건 · L1·L2 사람 폴백 "
-                f"{self.undecided_l12}건 — "
-                "누설 0을 확정할 수 없다"
+                f"힌트 없는 CU {self.cu_without_hints}건 · L1·L2 힌트 없는 CU "
+                f"{self.cu_without_l12}건 · L1·L2 사람 폴백 {self.undecided_l12}건 · "
+                f"CU에 붙지 않는 힌트 {self.unmatched_hints}건 — 누설 0을 확정할 수 없다"
             )
         return "기계 두 축(글자·값) L1·L2 누설 0 — 의미 축은 별도(사람 표본)"
 
@@ -563,7 +701,9 @@ class HintLeakMeasure:
             "cu_total": self.cu_total,
             "cu_with_hints": self.cu_with_hints,
             "cu_without_hints": self.cu_without_hints,
+            "cu_without_l12": self.cu_without_l12,
             "hints_total": self.hints_total,
+            "judged_l12": self.judged_l12,
             "hints_by_level": dict(sorted(self.hints_by_level.items())),
             "leaked_l12": self.leaked_l12,
             "undecided_l12": self.undecided_l12,
@@ -623,6 +763,8 @@ def measure_hint_leakage(
             measure.per_cu[slug] = entry
             continue
         measure.cu_with_hints += 1
+        if not any(hint.level in _ZERO_TOLERANCE_LEVELS for hint in cu_hints):
+            measure.cu_without_l12 += 1  # L3만 붙은 CU — 무관용 축은 이 CU를 보지 못했다
         for hint in cu_hints:
             measure.hints_total += 1
             levels[f"L{hint.level}"] += 1
@@ -888,6 +1030,9 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         f"INPUT_ERRORS={len(report['input_errors'])}",
         f"GATE_ATTEMPTS={gate['attempts']}",
         f"GATE_GENERATION_FAILED={gate['generation_failed']}",
+        f"GATE_FAILURE_KINDS={_j(gate['failure_kinds'])}",
+        f"GATE_DETERMINISTIC_REJECTED={gate['deterministic_rejected']}",
+        f"GATE_RESPONDED={gate['responded']}",
         f"GATE_EVALUATED={gate['evaluated']}",
         f"GATE_STATUS_COUNTS={_j(gate['status_counts'])}",
         f"GATE_PASS_RAW={gate['passed_raw']}",
@@ -897,13 +1042,18 @@ def render_lines(report: Mapping[str, Any]) -> list[str]:
         f"GATE_PASS_UNDECIDED={gate['bypass_undecided']}",
         f"AUTO_GATE_PASS_RATE_RAW={_fmt(gate['rate_raw'])}",
         f"AUTO_GATE_PASS_RATE={_fmt(gate['rate'])}",
+        f"AUTO_GATE_PASS_RATE_GATE_REACHED={_fmt(gate['rate_gate_reached'])}",
+        f"AUTO_GATE_PASS_RATE_RAW_GATE_REACHED={_fmt(gate['rate_raw_gate_reached'])}",
         f"AUTO_GATE_PASS_RATE_WILSON_LOWER_95={_fmt(gate['wilson_lower_95'])}",
         f"ATTEMPT_PASS_RATE={_fmt(gate['attempt_rate'])}",
         f"AUTO_GATE_MEASURED={gate['measured']}",
         f"HINT_INPUTS={hint['hint_inputs']}",
         f"HINT_CU_TOTAL={hint['cu_total']}",
         f"HINT_CU_WITHOUT_HINTS={hint['cu_without_hints']}",
+        f"HINT_CU_WITHOUT_L12={hint['cu_without_l12']}",
         f"HINT_TOTAL={hint['hints_total']}",
+        f"HINT_JUDGED_L12={hint['judged_l12']}",
+        f"HINT_UNMATCHED={hint['unmatched_hints']}",
         f"HINT_LEAKED_L12={hint['leaked_l12']}",
         f"HINT_UNDECIDED_L12={hint['undecided_l12']}",
         f"HINT_LEAKED_L3={hint['leaked_l3']}",

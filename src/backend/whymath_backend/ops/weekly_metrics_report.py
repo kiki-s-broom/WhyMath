@@ -666,8 +666,9 @@ def auto_gate_kpi_from_run_dirs(
 ) -> KpiValue:
     """저작 회차 폴더들 → 자동검증 1차 통과율 KPI(EOS-207). 창은 시도의 판정 시각 기준.
 
-    값 = 재계산 검증으로 게이트를 통과한 후보 ÷ 게이트 도달 후보(우회 검산식 통과 제외 ·
-    정의는 `ops/g3_content_measures` (a)). 입력·회계 오류나 우회 판정 불가가 있으면 미측정이다.
+    값 = 재계산 검증으로 게이트를 통과한 후보 ÷ 모델 응답 수(게이트 도달 + 파싱 거부 + 조립 거부 ·
+    우회 검산식 통과 제외 · 정의는 `ops/g3_content_measures` (a)). 입력·회계 오류·원인 분류 불가
+    생성 실패·우회 판정 불가가 있으면 미측정이다.
     """
     loaded = [load_run_dir(path) for path in run_dirs]
     errors = [e for run in loaded for e in run.errors]
@@ -679,9 +680,11 @@ def auto_gate_kpi_from_run_dirs(
         value=measure.rate,
         unit="rate",
         reason=(
-            f"재계산 검증 통과 {measure.recomputed}/{measure.evaluated} · 검산식 우회 통과 "
-            f"{measure.bypassed}건 제외(원시 통과율 {measure.rate_raw:.4f}) · 생성 실패 "
-            f"{measure.generation_failed}건은 분모 밖 · 창 밖 {measure.outside_window}건"
+            f"재계산 검증 통과 {measure.recomputed}/{measure.responded}(모델 응답 수) · 검산식 "
+            f"우회 통과 {measure.bypassed}건 제외(원시 통과율 {measure.rate_raw:.4f}) · 게이트 앞 "
+            f"결정론 거부(파싱·조립) {measure.deterministic_rejected}건은 분모 안 · 미생성 "
+            f"{measure.failure_kinds.get('not_generated', 0)}건은 분모 밖 · 게이트 도달 기준 "
+            f"{measure.rate_gate_reached:.4f} · 창 밖 {measure.outside_window}건"
         ),
     )
 

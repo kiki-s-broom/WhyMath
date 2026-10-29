@@ -598,7 +598,9 @@ class TestAuthoringRunDirAutoGate:
             _EOS197_SEATS, week_start=_EOS197_WINDOW[0], week_end=_EOS197_WINDOW[1]
         )
         assert kpi.measured is True
-        assert kpi.value == pytest.approx(13 / 89)
+        assert kpi.value == pytest.approx(
+            13 / 111
+        )  # 분모 = 모델 응답 수(게이트 앞 결정론 거부 포함)
         assert kpi.reason is not None and "우회 통과 22건 제외" in kpi.reason
 
     def test_record_carries_the_value_only_when_run_dirs_are_given(self, tmp_path: Path) -> None:
