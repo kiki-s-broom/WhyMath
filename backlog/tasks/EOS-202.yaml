@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,9 +16,9 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/equivalent/llm_generator.py
-session: null
+session: claude/eos-202-provider-warning-type
 notes: |-
   출처: EOS-197 A6 저작 회차(2026-10-28) 진단 중 발견 — 로컬 좌석 ReadTimeout을 콘솔 경고만으로는 구분할 수 없었다(생성 로그 error_detail에는 타입이 있어 그것으로 진단).
 
   겹침 고지: EOS-23(세션 claude/optimistic-tesla-njo0v1)이 같은 파일 llm_generator.py를 작업 경로로 잡고 있다 — 착수 전 그쪽 상태 확인.
-updated: 2026-10-28
+updated: 2026-10-29
