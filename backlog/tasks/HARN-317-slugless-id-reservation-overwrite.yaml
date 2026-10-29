@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-317-slugless-id-reservation-overwrite
+title: "번호 예약 가드가 슬러그 없는 같은 ID(EOS-209)를 재예약으로 보고 다른 브랜치 예약을 덮어씀 — 번호 충돌 14회차"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: blocked
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 번호 예약 가드(`scripts/harness/number_guard.py`의 `reserve`)가 같은 full ID의 기존 예약을 '같은 태스크의 재예약'으로 보고 통과시키는 판정을, 슬러그 없이 번호만으로 등재된 ID(예: `EOS-209`)에서는 쓰지 않게 고친다 — 슬러그 없는 ID는 full ID가 같아도 다른 태스크일 수 있으므로 브랜치(세션)가 다르면 conflict로 판정한다. 같은 브랜치 재실행·같은 태스크의 다른 클론 시딩(기존 비충돌 의도)은 계속 통과해야 하므로, 그 경우를 구분할 근거(예약 레코드에 제목 해시 등 태스크 정체 지문 추가)를 함께 설계한다 ② 반례 테스트: 브랜치 A가 `EOS-209`를 예약한 상태에서 브랜치 B가 제목이 다른 `EOS-209`를 add → conflict(다음 빈 번호 제안) · 같은 브랜치 재실행 → ok · 같은 태스크의 다른 클론 → ok(대조군) ③ 뮤테이션 RED(주입 적용 단언·원복 sha256) ④ 선택: `backlog.py add`가 `--id`에 슬러그가 없을 때 경고하거나 슬러그 부여를 권한다"
+artifacts: []
+paths:
+  - scripts/harness/number_guard.py
+  - "tests/harness/test_number_guard*.py"
+session: null
+notes: |-
+  출처: 사고 대장 계열 task-id-collision 14회차(2026-10-29). EOS-209를 claude/eos-208-ledger가 02:22Z에 예약·등재(#1768로 main 착지)했는데, 03:08Z claude/eos-207-g3-measures의 add가 같은 full ID `EOS-209`(둘 다 슬러그 없음)를 같은 태스크의 재예약으로 판정해 예약을 덮어썼다(harness-claims 커밋 677f29ad → 2ea363fd). 발견은 병합 직전 세션이 파일 목록을 대조해서였고 validate는 통과했다(브랜치에 같은 번호 파일 2개가 공존하지 않음). 정정 = rename EOS-209 → EOS-211(PR EOS-207 브랜치). D5(12/31 기간 방침): 대책 등재는 허용, HARN 착수는 2027-01 이후 — 등재 직후 인계 차단.
+
+  [차단 2026-10-29] D5 12/31 기간 방침 — HARN 신규 착수는 2027-01 이후(대책 등재만 허용). 피해 진행 중 아님: 정정 완료·validate가 2선 방어
+updated: 2026-10-29
