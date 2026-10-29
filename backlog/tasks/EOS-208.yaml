@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-208
+title: "저작 회차 한 줄 실행 — 런북 [A]~[L] 오케스트레이터(설정 파일·이어하기·자가거부)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 저작 회차 오케스트레이터 — EOS-197 런북(`docs/ops/eos197_authoring_round_runbook.md` [A]~[L])의 단계를 Python CLI 하나(`whymath_backend.harness.authoring_round`)로 묶어, Kiki가 Windows PowerShell에서 한 줄로 실행하면 준비·자가검증 → 두 좌석 저작 → 산출물·GenerationLog 4필드 검사 → 검수 큐 조립 → 검수 창(GUI) 실행 → 집계 미리보기 → 산출물 브랜치 커밋·push·원격 대조까지 진행한다. 사람이 하는 일은 검수와(최초 1회) 키 등록뿐이다 ② 회차 설정 파일(회차 이름·앵커 스펙·좌석·좌석별 목표·시도 예산·Ollama 타임아웃 등)로 다음 회차를 재사용하고, EOS-197 값을 예시 설정으로 둔다 ③ 단계별 상태 파일로 이어하기 — 중간에 멈추거나 실패해도 다시 실행하면 끝난 단계를 건너뛰고(산출물 실재·행 수로 판정), 단계를 지정해 다시 돌릴 수 있다 ④ 안전: 각 쓰기 단계는 선행 조건을 스스로 재검사해 거부한다(코드 출처 = 실행 중인 모듈 파일 경로 대조 · 작업 트리 산출물 밖 변경 0 · 판정 수 = 큐 행 수 전에는 업로드 거부 · 원격 브랜치 기존재 시 거부 · 유료 좌석 시도 예산 상한) · 시크릿은 출력하지 않는다 · 실패는 예외 타입명과 함께 단계 이름을 남기고 멈춘다(침묵 실패 금지) ⑤ 런북 [F]의 기본 타임아웃 공전(EOS-197 실측)을 막기 위해 Ollama 요청 타임아웃을 설정값으로 주입하고 자가검증한다 ⑥ 외부 호출(git·Ollama·openrouter·GUI)은 주입 가능한 경계로 분리해 CI(헤드리스·네트워크 없음)에서 단계 흐름·거부 조건·이어하기를 테스트로 고정하고, 각 거부 가드의 뮤테이션 RED를 확인한다 ⑦ 런북에 한 줄 실행 절과 6항목 브리핑을 추가하고, 기존 블록별 절은 수동 대안으로 남긴다"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/harness/authoring_round*.py"
+  - "tests/backend/harness/test_authoring_round*.py"
+  - docs/ops/eos197_authoring_round_runbook.md
+  - "docs/ops/authoring_round*"
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - tests/backend/test_anthropic_policy_block_surfaces.py
+session: claude/eos-208-authoring-round
+notes: |-
+  출처: Kiki 지시(2026-10-28 "런북의 내용까지 자동화 해줘") — 세션이 Kiki PC(Windows)에 직접 접속하는 원격 실행은 미지원이라, Kiki가 직접 실행하는 한 줄 스크립트로 묶는다. D10(2026-10-23 무인 실행기 보류)과의 관계: 무인 실행기가 아니라 Kiki가 실행·검수하는 수동 실행의 단계 묶음이다. EOS-197 회차(2026-10-28)에서 붙여넣기 블록 15개·왕복 다수·타임아웃 공전·판정 29건 업로드 시도 등 운영 마찰이 실측됐다.
+
+  [정정 2026-10-29] paths ['src/backend/whymath_backend/harness/authoring_round*.py', 'tests/backend/harness/test_authoring_round*.py', 'docs/ops/eos197_authoring_round_runbook.md', 'docs/ops/authoring_round*', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py'] → ['src/backend/whymath_backend/harness/authoring_round*.py', 'tests/backend/harness/test_authoring_round*.py', 'docs/ops/eos197_authoring_round_runbook.md', 'docs/ops/authoring_round*', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'tests/backend/test_anthropic_policy_block_surfaces.py']: Anthropic 설정값 소비자 거버넌스 목록에 저작 회차 탐침 등재(CI 샤드 1 실패 대응)
+updated: 2026-10-29

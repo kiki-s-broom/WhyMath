@@ -1,0 +1,84 @@
+# 저작 회차 설정 — EOS-197 A6(고2 도함수의 활용) 예시 (EOS-208 ②)
+#
+# 이 파일 하나가 회차 하나다. 읽는 쪽 = `python -m whymath_backend.harness.authoring_round --config <이 파일>`.
+# 다음 회차는 이 파일을 복사해 round_name·worktree·anchors·seats·deliver.branch를 바꾼다
+# (같은 round_name을 다시 쓰면 앞 회차 산출물 위에 이어 붙는다 — 새 회차면 이름도 새로).
+#
+# 값의 출처(판정 기준: main 4ec479e6 — EOS-197 산출물이 이 커밋으로 main에 있다):
+#   - spec 4종·시드 3종·인자(avoid_recent 10 · canary 0 · abort_window 0)
+#       = docs/ops/eos197_authoring_round_runbook.md [F]·[G]와 docs/ops/eos197_a6_spec_plan.jsonl
+#   - 좌석 목표·예산 = 실제로 돈 값. 런북 초기값은 두 좌석 모두 15/45였다.
+#       local      : 45시도를 다 쓰고 3 CU에서 멈췄다(data/runs/eos197-a6-local/cu.rounds.jsonl 합 45).
+#       openrouter : 실행 중 목표를 27로 올렸다 — 회차 크기 20·20·20·14·6·5가 목표 27의
+#                    회차 크기 규칙과 정확히 맞는다(대장 역산). 예산은 85시도 이상이어야 마지막 회차가
+#                    가능하므로 90으로 적는다(**역산 추정** — 실제 입력값 기록은 없다).
+#   - Ollama 타임아웃 180초 = EOS-197에서 기본 30초 ReadTimeout 공전 후 수동 설정한 값.
+schema_version: 1
+round_name: eos197-a6
+task_id: EOS-197
+# 격리 워크트리(런북 한 줄 실행 절 [R1]이 만드는 경로). 평소 클론(WhyMath)이 아니다.
+worktree: C:\Users\kiki\Desktop\__AI\WhyMath-eos197
+output_root: data/runs
+ollama_request_timeout_s: 180
+
+seats:
+  - name: local
+    kind: local
+    model: qwen3:30b-a3b          # 라우터가 고르는 로컬 QUALITY 핀 — 준비 점검이 라우터에 물어 대조한다
+    authoring_tier: quality
+    target_cu: 15
+    attempt_budget: 45
+  - name: openrouter
+    kind: cloud                   # 유료 — attempt_budget 필수(상한 300)
+    provider: openrouter
+    model: deepseek/deepseek-v4.1-flash
+    subscription: premium         # 라우팅 신호 — budget_krw와 함께여야 클라우드로 간다
+    budget_krw: 5000              # 라우팅 티어 입력이지 지출 상한이 아니다(지출 상한 = attempt_budget)
+    expected_jurisdiction: us     # 허용 공급사 deepinfra의 관할(코드 정본 l3/providers/openrouter.py)
+    expected_allowed_providers: [deepinfra]   # 런북 [C] ALLOWED=deepinfra — 설정 openrouter_allowed_providers와 대조
+    target_cu: 27
+    attempt_budget: 90
+
+anchors:
+  - spec_id: a6-tangent
+    standard_code: "[12미적Ⅰ-02-05]"
+    difficulty: 2.5
+    topic_hint: "고2 미적분Ⅰ 접선의 방정식 — 다항함수 그래프 위의 한 점에서 그은 접선의 y절편을 구하는 형태(답 하나·정수)"
+  - spec_id: a6-extremum
+    standard_code: "[12미적Ⅰ-02-07]"
+    difficulty: 3.0
+    topic_hint: "고2 미적분Ⅰ 극대와 극소 — 삼차함수의 극댓값을 구하는 형태(답 하나·정수)"
+  - spec_id: a6-root-count
+    standard_code: "[12미적Ⅰ-02-09]"
+    difficulty: 3.5
+    topic_hint: "고2 미적분Ⅰ 방정식의 실근 — 삼차방정식 f(x) = k가 서로 다른 세 실근을 갖도록 하는 정수 k의 개수를 구하는 형태(답 하나)"
+  - spec_id: a6-velocity
+    standard_code: "[12미적Ⅰ-02-10]"
+    difficulty: 2.5
+    topic_hint: "고2 미적분Ⅰ 속도와 가속도 — 수직선 위를 움직이는 점의 위치가 시각 t의 다항식일 때 주어진 시각의 속도를 구하는 형태(답 하나·정수)"
+
+# 기존 자산과의 중복 판정에만 쓰인다(모델 입력이 아니다 — 학생 데이터 0 조건).
+seeds:
+  - data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl
+  - data/corpus/problem_bank_p3_fill_v0/problems.jsonl
+  - data/corpus/problem_bank_generated_v0/problems.jsonl
+
+authoring_args:
+  avoid_recent: 10
+  canary: 0          # 회차가 20건 이하라 관문이 판정하지 않는다 — 꺼 둔 사실이 회차 대장에 남는다
+  abort_window: 0
+
+# 산출물 검사(check)가 CU 전건에 요구하는 과목·slug 접두(EOS-198 ③ — [12미적Ⅰ-…] → 미적분·wm-gen-calc1)
+expected_subject: 미적분
+expected_slug_prefix: wm-gen-calc1
+# 검수 큐를 만드는 최소 합계 CU(HIT 유효 표본 하한)
+min_queue_cu: 15
+
+review:
+  reviewer_id: kiki
+  ui: gui            # gui = 버튼 창(EOS-199) · terminal = 키 입력(review_session)
+  timeout_s: 28800   # 검수 창 최대 8시간 — 넘으면 창을 닫고 이어하기(기록은 건마다 즉시 남는다)
+
+deliver:
+  branch: eos197/a6-authoring-output
+  commit_message: "EOS-197: A6 저작 회차 산출물 — 두 좌석 cu.jsonl·생성 로그·회차 대장·검수 기록 (Kiki 머신 실행분)"

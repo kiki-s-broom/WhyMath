@@ -1382,6 +1382,23 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 사람이 화면을 보며 판정하는 대면 도구라 CI가 원리적으로 못 돈다(같은 사유).
         # 기록 경로는 review_session의 함수를 그대로 쓰며 pytest가 컨트롤러를 화면 없이 검증한다.
         "harness.review_session_gui": _HUMAN_REVIEW_TOOL,
+        # 저작 회차 오케스트레이터(EOS-208) — Kiki가 PC에서 한 줄로 돌리는 런북 [A]~[L] 묶음.
+        # 라이브 LLM 저작(유료 좌석 포함)·검수 창(사람 판정)·원격 push를 차례로 부르므로 CI가
+        # 원리적으로 못 돈다(위 두 사유의 합). 단계 흐름·거부 가드·이어하기는 backend 잡이 수집하는
+        # tests/backend/harness/test_authoring_round*.py가 경계(자식 프로세스·HTTP)를 가짜로,
+        # git은 실물 임시 저장소로 상시 검증한다 — "안 도는 코드"가 아니라
+        # "사람이 PC에서 돌리는 운전자"다.
+        "harness.authoring_round": (
+            "by-design:사람이 PC에서 실행하는 저작 회차 운전자(EOS-208) — 라이브 LLM 저작·검수 창·"
+            "원격 push를 부르므로 CI 미도달이 정상이다. 흐름·거부 가드는 단위 테스트가 상시 검증"
+        ),
+        # 위 오케스트레이터가 자식 프로세스로만 부르는 탐침 — 저작 CLI가 받을 환경(PYTHONPATH·
+        # 타임아웃 주입)에서 라우팅·좌석을 묻는다. 실제 코드 대상 실행은 단위 테스트가 in-process로
+        # 본다.
+        "harness.authoring_round_probe": (
+            "by-design:저작 회차 오케스트레이터 전용 자식 탐침(EOS-208) — 독립 진입점이 아니라 "
+            "authoring_round가 회차 환경에서 부른다. run_probe는 단위 테스트가 실제 코드로 실행"
+        ),
         # P3-03(2026-10-08): 미분 은행 감사자 자격 측정(결함 주입 강등전). score·s5의 입력은
         # 저장소 밖에서 만든 LLM 판정자 라벨이라(판정자는 저장소에 접근하면 안 된다 — 블라인드)
         # CI가 원리적으로 못 돈다. emit·machine의 재현성(커밋된 시험지·기계 라벨과 바이트 대조)은

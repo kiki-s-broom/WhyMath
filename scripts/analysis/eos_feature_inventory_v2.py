@@ -1258,6 +1258,11 @@ CATALOG: tuple[Spec, ...] = (
        "harness.problem_corpus_review_status_backfill", "harness.problem_corpus_round_reply",
        "harness.problem_corpus_tag", "harness.problem_corpus_variants",
        "harness.problem_corpus_lineage_links",
+       # EOS-208 — 저작 회차 오케스트레이터(런북 [A]~[L] 한 줄 실행)와 그 설정·경계·탐침.
+       # 저작 CLI(problem_corpus_accumulate)를 자식 프로세스로 부르는 *회차 운전자*라 축적 행에
+       # 귀속한다(검수·집계 CLI도 부르지만 그것들의 소유는 각자의 행이 유지한다).
+       "harness.authoring_round", "harness.authoring_round_config",
+       "harness.authoring_round_ports", "harness.authoring_round_probe",
        "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",
