@@ -21,6 +21,10 @@ paths:
   - "docs/ops/authoring_round*"
   - scripts/analysis/eos_feature_inventory_v2.py
   - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - tests/backend/test_anthropic_policy_block_surfaces.py
 session: claude/eos-208-authoring-round
-notes: "출처: Kiki 지시(2026-10-28 \"런북의 내용까지 자동화 해줘\") — 세션이 Kiki PC(Windows)에 직접 접속하는 원격 실행은 미지원이라, Kiki가 직접 실행하는 한 줄 스크립트로 묶는다. D10(2026-10-23 무인 실행기 보류)과의 관계: 무인 실행기가 아니라 Kiki가 실행·검수하는 수동 실행의 단계 묶음이다. EOS-197 회차(2026-10-28)에서 붙여넣기 블록 15개·왕복 다수·타임아웃 공전·판정 29건 업로드 시도 등 운영 마찰이 실측됐다."
-updated: 2026-10-28
+notes: |-
+  출처: Kiki 지시(2026-10-28 "런북의 내용까지 자동화 해줘") — 세션이 Kiki PC(Windows)에 직접 접속하는 원격 실행은 미지원이라, Kiki가 직접 실행하는 한 줄 스크립트로 묶는다. D10(2026-10-23 무인 실행기 보류)과의 관계: 무인 실행기가 아니라 Kiki가 실행·검수하는 수동 실행의 단계 묶음이다. EOS-197 회차(2026-10-28)에서 붙여넣기 블록 15개·왕복 다수·타임아웃 공전·판정 29건 업로드 시도 등 운영 마찰이 실측됐다.
+
+  [정정 2026-10-29] paths ['src/backend/whymath_backend/harness/authoring_round*.py', 'tests/backend/harness/test_authoring_round*.py', 'docs/ops/eos197_authoring_round_runbook.md', 'docs/ops/authoring_round*', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py'] → ['src/backend/whymath_backend/harness/authoring_round*.py', 'tests/backend/harness/test_authoring_round*.py', 'docs/ops/eos197_authoring_round_runbook.md', 'docs/ops/authoring_round*', 'scripts/analysis/eos_feature_inventory_v2.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'tests/backend/test_anthropic_policy_block_surfaces.py']: Anthropic 설정값 소비자 거버넌스 목록에 저작 회차 탐침 등재(CI 샤드 1 실패 대응)
+updated: 2026-10-29
