@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from collections.abc import Mapping, Sequence
 
@@ -45,6 +46,7 @@ from whymath_backend.l3.models import (
     Usage,
 )
 from whymath_backend.l3.prompt_assets import prompt_text
+from whymath_backend.l3.providers.seat_failure import SeatHttpError
 from whymath_backend.l3.router import resolve_model
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.schema.enums import AnswerFormat, LicenseType, SourceType
@@ -881,6 +883,143 @@ class TestSafeFallback:
 class TestProviderFailure:
     def test_provider_exception_returns_none(self) -> None:
         assert _gen(RaisingProvider()).generate(_spec()) is None
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-202 — never-break 폴백 경고는 예외 *타입명*을 남기고 메시지 원문은 남기지 않는다.
+# 메시지 원문에는 공급사 응답 본문(SeatHttpError는 본문 최대 2000자)·LLM 입력값이 섞인다.
+# ──────────────────────────────────────────────────────────────────────
+_LOGGER_NAME = "whymath_backend.l3.equivalent.llm_generator"
+# 메시지 원문에만 있는 표지 — 로그에 이 문자열이 보이면 str(exc)가 새어 나간 것이다.
+_BODY_MARKER = "응답본문-SECRET-sk-or-v1-deadbeef"
+
+
+class _ScriptedRaisingProvider:
+    """지정한 예외를 그대로 던지는 provider 대역 — 예외 타입별 경고 형식 검증용."""
+
+    def __init__(self, exc: BaseException) -> None:
+        self._exc = exc
+
+    async def generate(
+        self, prompt: str, system: str, decision: RoutingDecision, **kwargs: object
+    ) -> GenerationResult:
+        raise self._exc
+
+
+class _HttpxLikeStatusError(Exception):
+    """httpx `HTTPStatusError`처럼 상태코드를 `response.status_code`에 싣는 예외 대역."""
+
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+
+        class _Resp:
+            pass
+
+        self.response = _Resp()
+        self.response.status_code = status_code  # type: ignore[attr-defined]
+
+
+def _warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == _LOGGER_NAME and r.levelno == logging.WARNING
+    ]
+
+
+class TestFallbackWarningCarriesTypeNotMessage:
+    def test_provider_failure_warning_has_type_name_without_message(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        provider = _ScriptedRaisingProvider(RuntimeError(f"provider 다운 {_BODY_MARKER}"))
+        assert _gen(provider).generate(_spec()) is None
+        msgs = [m for m in _warnings(caplog) if "provider 호출 실패" in m]
+        assert len(msgs) == 1, _warnings(caplog)
+        assert "provider 호출 실패(RuntimeError)" in msgs[0]
+        assert _BODY_MARKER not in caplog.text
+        assert "provider 다운" not in caplog.text
+
+    def test_seat_http_error_warning_has_status_code_but_not_body(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        exc = SeatHttpError(
+            f"OpenAI 호환 호출 실패 HTTP 429: {_BODY_MARKER} (시도 3회)", status_code=429
+        )
+        assert _gen(_ScriptedRaisingProvider(exc)).generate(_spec()) is None
+        msgs = [m for m in _warnings(caplog) if "provider 호출 실패" in m]
+        assert msgs == ["동등문제 생성 provider 호출 실패(SeatHttpError(HTTP 429)) — None 폴백"]
+        assert _BODY_MARKER not in caplog.text
+
+    def test_status_code_is_read_from_response_attribute(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        exc = _HttpxLikeStatusError(f"Server error {_BODY_MARKER}", status_code=503)
+        assert _gen(_ScriptedRaisingProvider(exc)).generate(_spec()) is None
+        assert any("_HttpxLikeStatusError(HTTP 503)" in m for m in _warnings(caplog))
+        assert _BODY_MARKER not in caplog.text
+
+    def test_status_code_is_never_read_from_message(self) -> None:
+        """상태코드는 **속성**에서만 — 메시지에 "HTTP 429"가 있어도 타입명만 낸다."""
+        assert llm_generator._safe_exc_summary(RuntimeError("HTTP 429 본문")) == "RuntimeError"
+
+    def test_bool_status_attribute_is_not_a_status_code(self) -> None:
+        exc = RuntimeError("x")
+        exc.status_code = True  # type: ignore[attr-defined]
+        assert llm_generator._safe_exc_summary(exc) == "RuntimeError"
+
+    def test_validation_error_summary_is_count_only(self) -> None:
+        """pydantic 검증 오류는 건수만 — 메시지의 `input_value=…`(LLM 입력값)는 빠진다."""
+        from pydantic import BaseModel, ValidationError
+
+        class _M(BaseModel):
+            n: int
+
+        with pytest.raises(ValidationError) as info:
+            _M(n=_BODY_MARKER)  # type: ignore[arg-type]
+        assert _BODY_MARKER in str(info.value)  # 원문에는 입력값이 실린다(전제 확인)
+        summary = llm_generator._safe_exc_summary(info.value)
+        assert summary == "ValidationError(errors=1)"
+        assert _BODY_MARKER not in summary
+
+    def test_provider_failure_generation_log_error_detail_format_unchanged(self) -> None:
+        """GenerationLog.error_detail 앞머리는 g3_content_measures가 분류하므로 무변경이다."""
+        logs: list[object] = []
+        provider = _ScriptedRaisingProvider(RuntimeError("provider 다운"))
+        assert _gen(provider, generation_log_sink=logs.append).generate(_spec()) is None
+        assert len(logs) == 1
+        detail = logs[0].error_detail  # type: ignore[attr-defined]
+        assert detail == "provider.generate failed: RuntimeError: provider 다운"
+
+    def test_assembly_failure_warning_has_type_name_without_message(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """derive-and-verify 불일치(ValueError) — 메시지에 실린 LLM 답·유도 정답은 로그에 없다."""
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        payload = json.loads(_HAPPY)
+        payload["conditions"] = "2*x**2 - 7*x + 3 = 0"
+        payload["answer_map"] = {"x": "3.5"}
+        payload["answer"] = "3.5"
+        assert _gen(FakeProvider([json.dumps(payload)])).generate(_spec()) is None
+        msgs = [m for m in _warnings(caplog) if "후보 조립 실패" in m]
+        assert msgs == ["동등문제 후보 조립 실패(ValueError) — None 폴백"]
+        assert "derive-and-verify 불일치" not in caplog.text
+        assert "3.5" not in caplog.text
+
+    def test_answer_evaluation_failure_is_logged_with_type_name(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """종전엔 로그 없이 삼키던 답 수치 평가 실패도 타입명으로 남는다(답 값 미출력)."""
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        payload = json.loads(_HAPPY)
+        payload["answer_map"] = {"x": "이건-수식이-아님"}
+        _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        msgs = [m for m in _warnings(caplog) if "답 수치 평가 실패" in m]
+        assert len(msgs) == 1, _warnings(caplog)
+        assert re.search(r"답 수치 평가 실패\([A-Za-z_][A-Za-z0-9_]*\)", msgs[0])
+        assert "이건-수식이-아님" not in caplog.text
 
 
 # ──────────────────────────────────────────────────────────────────────
