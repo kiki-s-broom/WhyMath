@@ -169,18 +169,22 @@ def _safe_exc_summary(exc: BaseException) -> str:
          로그만으로 가능하게 한다. bool은 int 하위지만 상태코드가 아니라 배제한다.
       ③ pydantic 검증 오류 **건수** — 몇 군데가 틀렸는지만(필드 경로·입력값은 미포함).
     """
-    parts: list[str] = []
-    candidates: list[object] = [getattr(exc, "status_code", None)]
-    response = getattr(exc, "response", None)
-    if response is not None:
-        candidates.append(getattr(response, "status_code", None))
-    for value in candidates:
-        if isinstance(value, int) and not isinstance(value, bool):
-            parts.append(f"HTTP {value}")
-            break
-    if isinstance(exc, ValidationError):
-        parts.append(f"errors={exc.error_count()}")
     name = type(exc).__name__
+    parts: list[str] = []
+    try:
+        candidates: list[object] = [getattr(exc, "status_code", None)]
+        response = getattr(exc, "response", None)
+        if response is not None:
+            candidates.append(getattr(response, "status_code", None))
+        for value in candidates:
+            if isinstance(value, int) and not isinstance(value, bool):
+                parts.append(f"HTTP {value}")
+                break
+        if isinstance(exc, ValidationError):
+            parts.append(f"errors={exc.error_count()}")
+    except Exception:  # noqa: BLE001 — 로그 요약이 never-break 폴백을 깨면 안 된다(리뷰 P3)
+        # 속성 접근이 AttributeError 아닌 예외를 던지는 객체(property 등) — 타입명만 남긴다.
+        return name
     return f"{name}({', '.join(parts)})" if parts else name
 
 

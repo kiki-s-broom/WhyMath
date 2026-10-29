@@ -991,7 +991,19 @@ class TestFallbackWarningCarriesTypeNotMessage:
         assert _gen(provider, generation_log_sink=logs.append).generate(_spec()) is None
         assert len(logs) == 1
         detail = logs[0].error_detail  # type: ignore[attr-defined]
-        assert detail == "provider.generate failed: RuntimeError: provider 다운"
+        # 앞머리·타입명만 고정한다 — 꼬리(메시지 원문)를 줄이는 후속 EOS-212를 막지 않게(리뷰 P3).
+        assert detail.startswith("provider.generate failed: RuntimeError")
+
+    def test_safe_summary_never_raises_from_hostile_attributes(self) -> None:
+        """속성 접근이 예외를 던지는 예외 객체도 요약이 터지지 않는다 — 타입명으로 접힌다."""
+        from whymath_backend.l3.equivalent.llm_generator import _safe_exc_summary
+
+        class _HostileError(Exception):
+            @property
+            def response(self) -> object:
+                raise RuntimeError("응답 본문 비밀")
+
+        assert _safe_exc_summary(_HostileError("x")) == "_HostileError"
 
     def test_assembly_failure_warning_has_type_name_without_message(
         self, caplog: pytest.LogCaptureFixture
