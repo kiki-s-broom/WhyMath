@@ -579,3 +579,62 @@ class TestWindowBoundaries:
     def test_one_microsecond_before_week_end_is_inside(self, tmp_path: Path) -> None:
         report, _ = self._report(tmp_path, _WEEK_END - timedelta(microseconds=1))
         assert report.cu_measured == 1
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-207 — 자동검증 1차 통과율: 파일 입력 모드 `--authoring-run-dir`
+# ──────────────────────────────────────────────────────────────────────
+_RUNS = Path(__file__).resolve().parents[3] / "data" / "runs"
+_EOS197_SEATS = [_RUNS / "eos197-a6-local", _RUNS / "eos197-a6-openrouter"]
+_EOS197_WINDOW = (
+    datetime(2026, 10, 27, 14, 6, 14, 101338, tzinfo=UTC),
+    datetime(2026, 10, 28, 7, 52, 53, 299873, tzinfo=UTC),
+)  # 원장 2026-10-28T07:57:24Z 레코드(EOS-197 ⑦ (d) 고정 증적)의 창
+
+
+class TestAuthoringRunDirAutoGate:
+    def test_eos197_round_yields_measured_rate(self) -> None:
+        kpi = wmr.auto_gate_kpi_from_run_dirs(
+            _EOS197_SEATS, week_start=_EOS197_WINDOW[0], week_end=_EOS197_WINDOW[1]
+        )
+        assert kpi.measured is True
+        assert kpi.value == pytest.approx(13 / 89)
+        assert kpi.reason is not None and "우회 통과 22건 제외" in kpi.reason
+
+    def test_record_carries_the_value_only_when_run_dirs_are_given(self, tmp_path: Path) -> None:
+        events = _write_jsonl(tmp_path / "e.jsonl", _review_pair("wm-a", 95_000, _INSIDE))
+        common: dict[str, Any] = {
+            "events_paths": [events],
+            "genlog_paths": None,
+            "week_start": _EOS197_WINDOW[0],
+            "week_end": _EOS197_WINDOW[1],
+            "generated_at": _GENERATED_AT,
+            "krw_per_usd": _KRW,
+        }
+        without, _ = wmr.collect_from_files(**common)
+        with_dirs, _ = wmr.collect_from_files(**common, authoring_run_dirs=_EOS197_SEATS)
+        assert without.kpis["auto_gate_pass_rate"].measured is False  # 대조군 — 종전 그대로
+        assert "EOS-207" in (without.kpis["auto_gate_pass_rate"].reason or "")
+        assert with_dirs.kpis["auto_gate_pass_rate"].measured is True
+        assert with_dirs.kpis["rework_rate"].measured is False  # 다른 구조적 미측정은 그대로
+
+    def test_window_outside_round_is_unmeasured_not_zero(self) -> None:
+        kpi = wmr.auto_gate_kpi_from_run_dirs(
+            _EOS197_SEATS, week_start=_WEEK_START, week_end=_WEEK_END
+        )
+        assert kpi.measured is False
+        assert kpi.value is None
+        assert kpi.reason is not None and "분모 0" in kpi.reason
+
+    def test_broken_run_dir_is_unmeasured_with_reason(self, tmp_path: Path) -> None:
+        seat = tmp_path / "r-x"
+        seat.mkdir()
+        (seat / "cu.jsonl").write_text("", encoding="utf-8")  # 생성 로그 부재
+        kpi = wmr.auto_gate_kpi_from_run_dirs([seat], week_start=_WEEK_START, week_end=_WEEK_END)
+        assert kpi.measured is False
+        assert kpi.reason is not None and "cu.genlog.jsonl 없음" in kpi.reason
+
+    def test_authoring_run_dir_requires_file_mode(self) -> None:
+        with pytest.raises(SystemExit) as excinfo:
+            wmr.main(["--dry-run", "--authoring-run-dir", str(_EOS197_SEATS[0])])
+        assert excinfo.value.code == 2

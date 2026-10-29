@@ -96,6 +96,8 @@ from whymath_backend.l3.generation_seed import SeedCapability, capability_for_mo
 from whymath_backend.schema.corpus_provenance import CorpusProvenanceSidecar
 
 __all__ = [
+    "GENLOG_ALWAYS_REQUIRED_FIELDS",
+    "RUN_REQUIRED_RECORD_FIELDS",
     "AuditReport",
     "GrandfatherEntry",
     "Violation",
@@ -141,6 +143,11 @@ _RUN_RECORD_FILENAME = "cu.jsonl"
 _RUN_GENLOG_SUFFIX = ".genlog.jsonl"
 # seed는 모델 좌석에 따라 검사 여부가 갈리므로 여기 넣지 않는다(_check_run_genlog 참조).
 _GENLOG_ALWAYS_REQUIRED: tuple[str, ...] = ("model_name", "prompt_version", "input_sha256")
+
+# 공개 별칭 — 메타 누락 측정기(`ops/g3_content_measures`, EOS-207)가 같은 필수 목록을 쓴다
+# (목록을 두 곳에 적으면 한쪽만 바뀌어 두 도구가 다른 '필수'를 말한다).
+RUN_REQUIRED_RECORD_FIELDS: tuple[str, ...] = _REQUIRED_RECORD_FIELDS
+GENLOG_ALWAYS_REQUIRED_FIELDS: tuple[str, ...] = _GENLOG_ALWAYS_REQUIRED
 
 
 @dataclass(slots=True, frozen=True)
