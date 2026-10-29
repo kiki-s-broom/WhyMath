@@ -183,8 +183,10 @@ if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$
 ## 예약 풀기 — `…_BUDGET_EVIDENCED=False`가 나올 때만 (한 줄)
 
 저작 회차는 호출 **전에** 시도 수를 예약하고 그 예약을 줄이지 않는다(끊긴 회차가 같은 유료 예산을 두 번 쓰지
-않게). 그런데 시작 직후 실패한 실행(임포트·설정 오류)은 호출 0건으로 예약만 남긴다. 그 예약만으로 예산이 차면
-오케스트레이터는 '예산 소진 완료'라고 하지 않고 거부한다. **앞 실패 원인을 고친 뒤에만** 아래 한 줄로 예약을
+않게). 그런데 호출 기록 없이 예약만 남는 경우가 세 가지 있다 — ① 시작 직후 실패한 실행(임포트·설정 오류 · 호출 0건)
+② Ctrl+C·시간 상한으로 회차 중간에 끊겨 나머지 예약분을 호출하지 못한 경우 ③ 요청보다 적게 시도하고 끝난 회차.
+그 예약만으로 예산이 차면 오케스트레이터는 '예산 소진 완료'라고 하지 않고 거부한다. **끊긴 원인(`STAGE_FAILED`·
+`STAGE_INTERRUPTED` 줄)을 확인한 뒤에만** 아래 한 줄로 예약을
 실물 근거(대장·genlog)로 되돌린다 — 되돌린 수는 상태 파일 이력에 남는다.
 
 ```powershell
@@ -252,7 +254,7 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
 | `…_KEY_SHAPE_OK` | OpenRouter 키가 없거나 형태가 이상하다 | [K-1]·[K-2] 후 [R2] |
 | `…_SEAT` · `…_PIN` · `…_JURISDICTION` · `…_ANTHROPIC_OFF` | 클라우드 좌석 설정이 회차 설정과 다르다 | 멈추고 회신 |
 | `AUTHOR_FROZEN`(거부 아님) | 검수 큐가 이미 있어 저작을 덧붙이지 않고 건너뛰었다 | 정상 — 더 저작하려면 세션에 새 회차를 요청 |
-| `…_BUDGET_EVIDENCED` · `AUTHOR_UNEVIDENCED` | 시도 예산이 **호출 기록 없는 예약**으로 찼다(시작 직후 실패한 실행) | 앞 `STAGE_FAILED` 원인을 고친 뒤 「예약 풀기」 한 줄 |
+| `…_BUDGET_EVIDENCED` · `AUTHOR_UNEVIDENCED` | 시도 예산이 **호출 기록 없는 예약**으로 찼다(시작 직후 실패 · 중간에 끊긴 회차의 나머지 · 요청보다 적게 시도한 회차) | 끊긴 원인(`STAGE_FAILED`·`STAGE_INTERRUPTED` 줄)을 확인한 뒤 「예약 풀기」 한 줄 |
 | `…_ALLOWED_PROVIDERS` | OpenRouter 허용 공급사 목록이 설정(`expected_allowed_providers`)과 다르다 | 멈추고 회신 |
 | `LOCK_HELD=True` | 같은 회차가 다른 창에서 이미 돌고 있다(또는 앞 실행이 강제 종료돼 잠금이 남았다) | 다른 창 확인 → 정말 없으면 같은 줄의 `Remove-Item` 경로를 지운 뒤 [R2] |
 | `BRANCH_NAME_VALID` | 설정의 산출물 브랜치 이름이 git 규칙에 어긋난다 | 회신 |
@@ -283,4 +285,6 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
   도는 환경은 같은 인터프리터·같은 환경변수지만, Ollama 데몬 상태는 탐침 뒤에 바뀔 수 있다(그때는 저작
   회차가 `generation_failed`로 끝나고 `outcome_counts`에 남는다).
 - 끊긴 저작 회차의 시도 수는 대장 기록이 없어도 **예약분 전체를 소진으로** 센다(보수적 — 실제 호출은 더
-  적었을 수 있다). `STATE_MISMATCH seat=…` 줄이 그 차이를 보여 준다. 예산을 늘리려면 설정에서 올린다.
+  적었을 수 있다). `STATE_MISMATCH seat=…` 줄이 그 차이를 보여 준다. 그 예약만으로 예산이 차서 거부되면
+  「예약 풀기」 한 줄로 실물 근거까지만 되돌린다(끊긴 순간 진행 중이던 호출 1건은 근거에 안 잡혀 풀릴 수 있다).
+  예산 자체를 늘리려면 설정에서 올린다.

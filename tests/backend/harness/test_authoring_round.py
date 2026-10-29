@@ -97,6 +97,8 @@ class World:
     crash_genlog_rows: int | None = None
     # 세 번째 이후 호출부터 대장을 다시 쓰는 등 호출별로 바꾸고 싶을 때(호출 순번 → 대장 기록 여부)
     ledger_by_call: Callable[[int], bool] | None = None
+    # 대장은 쓰되 요청 n보다 적게 시도하고 끝나는 회차(롤링 중단·카나리 차단 유형) — (호출 순번, n) → 실제 시도 수
+    attempted_by_call: Callable[[int, int], int] | None = None
     author_call_no: int = 0
     git_hook: Callable[[Sequence[str]], RunResult | None] | None = None
     provenance_stdout: str = ""
@@ -176,6 +178,8 @@ def _fake_author(world: World, argv: Sequence[str]) -> RunResult:
         else world.author_writes_ledger
     )
     run_id = f"run-{seat}-{world.author_call_no}"
+    if world.attempted_by_call is not None and writes_ledger:
+        n = min(n, world.attempted_by_call(world.author_call_no, n))
     k = min(n, world.accept(seat, n)) if writes_ledger else 0
     cu_rows: list[dict[str, Any]] = []
     gen_rows: list[dict[str, Any]] = []
@@ -1025,3 +1029,36 @@ def test_chain_does_not_skip_seat_exhausted_only_by_reservation(h: Harness) -> N
     assert h.run() == 1
     assert "WRITE_REFUSED=True stage=author-cloud" in h.text
     assert "STAGE_START stage=check" not in h.text
+
+
+def test_short_rounds_that_fill_budget_by_reservation_are_refused(h: Harness) -> None:
+    """대장은 남았지만 회차가 요청 n의 절반만 시도한 채 끝나면(롤링 중단 유형), 예약이 예산을
+    채워도 실물 근거는 그보다 적다 — 이 경우 '예산 소진 완료'가 아니라 거부해야 한다(재리뷰 M18).
+
+    루프 뒤의 근거 검사가 없으면 AUTHOR_DONE outcome=stopped → 단계 완료로 넘어간다.
+    """
+    h.world.accept = lambda seat, n: 0
+    h.world.attempted_by_call = lambda call_no, n: n // 2
+    data = _config_dict(h.repo.wt)
+    data["seats"][1]["attempt_budget"] = 30
+    data["seats"][1]["target_cu"] = 15
+    h.make(data=data)
+    rc = h.run(only="author-cloud")
+    assert rc == 1
+    assert "BUDGET_EVIDENCED=False" in h.text
+    assert "STAGE_END stage=author-cloud status=done" not in h.text
+
+
+def test_reservation_save_failure_blocks_the_paid_call(h: Harness) -> None:
+    """예약을 상태 파일에 쓰지 못하면 호출하지 않는다 — 못 쓴 예약은 다음 실행에서 사라져
+    같은 유료 예산을 두 번 쓰게 되기 때문이다(재리뷰 M6a)."""
+    h.world.accept = lambda seat, n: 0
+    h.make()
+    blocker = h.runs() / "t1-review" / "round_state.json.tmp"
+    blocker.mkdir(parents=True)  # 원자적 쓰기의 임시 파일 자리를 디렉터리로 막는다
+    rc = h.run(only="author-cloud")
+    assert rc == 1
+    assert "STATE_WRITE_FAILED=True" in h.text
+    assert "ReservationNotSaved" in h.text
+    genlog = h.runs() / "t1-openrouter" / "cu.genlog.jsonl"
+    assert not genlog.exists()  # 호출 0

@@ -875,9 +875,10 @@ class AuthoringRound:
             {f"{seat.name.upper().replace('-', '_')}_BUDGET_EVIDENCED": False},
             f"좌석 {seat.name}: 시도 예산 {seat.attempt_budget} 중 실물 근거(대장·genlog)는 "
             f"{prog['evidenced']}건이고 {prog['unevidenced']}건은 호출 기록이 없는 예약이다"
-            "(시작 직후 "
-            "실패한 실행). 앞 실행의 STAGE_FAILED 원인을 고친 뒤, 그 예약을 풀려면 같은 한 줄에 "
-            "--release-unevidenced를 붙여 실행하세요(풀어 준 수가 상태 파일 이력에 남는다)",
+            "(시작 직후 실패한 실행 · Ctrl+C·시간 상한으로 중간에 끊긴 회차의 나머지 예약 · "
+            "요청보다 적게 시도하고 끝난 회차). 끊긴 원인(위 STAGE_FAILED·STAGE_INTERRUPTED 줄)을 "
+            "확인한 뒤, 그 예약을 풀려면 같은 한 줄에 --release-unevidenced를 붙여 실행하세요"
+            "(풀어 준 수가 상태 파일 이력에 남는다)",
         )
 
     def _seat_summary(self, seat: SeatConfig) -> dict[str, Any]:
