@@ -1060,7 +1060,11 @@ CATALOG: tuple[Spec, ...] = (
        "Pedagogy", "P0",
        "C7 힌트 3단계 — S4-11(HintNode 연기 해제·reveal_score KPI 정밀화)",
        "l4.hint_content.models", "l4.hint_content.generator", "l4.hint_content.gates",
-       "l4.hint_content.store", "l4.hint_content.populate"),
+       "l4.hint_content.store", "l4.hint_content.populate",
+       # EOS-211 — CU 사후 LLM 힌트 패스(저장된 동등문제 CU에 단계·L1~L3 생성 → 같은 게이트 3종).
+       # 힌트 좌석·게이트를 그대로 쓰는 두 번째 생산 경로라 같은 행에 귀속한다(진입점 harness 포함).
+       "l4.hint_content.cu_hint_pass", "l4.hint_content.cu_hint_prompts",
+       "harness.cu_hint_pass"),
     # ════════════════════ E — L5·L6 ════════════════════
     _e("WM-E-501", "OCR 파이프라인(검출→라우팅→인식→조립·검증)", "Student", "Math Engine", "P2",
        "PaddleOCR+Qwen3-VL — 라이브 정확도 미검증", "l5.ocr.assemble", "l5.ocr.detect",

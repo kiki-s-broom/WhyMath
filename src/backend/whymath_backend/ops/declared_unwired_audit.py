@@ -1548,6 +1548,18 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "동결. "
             "G3 판정 전 Kiki가 런북 eos210_hint_human_verdict_runbook.md로 돌린다"
         ),
+        # EOS-211(2026-10-29): CU 사후 LLM 힌트 패스 — 저장된 CU에 단계·L1·L2·L3를 붙이는 *라이브
+        # LLM 배치*다(Kiki PC 런북 1회 실행 · docs/ops/eos211_cu_hint_pass_runbook.md). CI에는 LLM
+        # 키·Ollama가 없어 상시 실행 대상이 아니다. 판정 분기(게이트 3종 통과분만 verified · 재시도·
+        # 타입명 기록 · 재개 중복 0 · 종료 코드 0/1/2 · EOS-207 측정기 입력 계약)는 backend 잡이
+        # 수집하는 tests/backend/l4/hint_content/test_cu_hint_pass.py가 가짜 provider로 상시
+        # 검증한다.
+        "harness.cu_hint_pass": (
+            "by-design:CU 사후 LLM 힌트 패스(EOS-211) — 라이브 LLM 배치라 CI 상시 실행 비대상. "
+            "운영자가 런북으로 회차 폴더마다 1회 돌리고, 산출 cu.hints.jsonl을 g3_content_measures "
+            "--hints-jsonl로 소급 측정한다. 판정 분기는 tests/backend/l4/hint_content/"
+            "test_cu_hint_pass.py가 가짜 provider로 상시 동결"
+        ),
         # EOS-60(2026-08-31): 골든 승격기 + QA 엔진 혼동행렬 — 둘 다 EOS-54 검수 *실이벤트*가
         # 입력이다(별도 라벨링 캠페인 금지 규약의 귀결). 검수 판정이 쌓이기 전에는 승격 0건 =
         # 측정 실패(exit 1)가 설계값이라 hit_cu_metrics와 같은 이유로 CI 상시 배선 비대상 —

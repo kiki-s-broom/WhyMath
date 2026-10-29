@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-215
+title: "CU 사후 힌트 DB 좌석 — hints 표 FK(solution_paths·problem) 결정·적재 · 개념 ID 연결(EOS-211 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① EOS-211 사후 힌트 패스의 verified 힌트를 S4-11 `hints` 표에 적재할 좌석을 정한다 — 지금은 파일 내보내기(`cu.hints.jsonl`)까지만이다. `hints.solution_path_id`가 `solution_paths` FK이고 `problem_id`가 `problem` FK인데 저작 CU는 둘 다 DB에 없다(합성 ID `cu-<slug>`). 선택지(CU 적재 시 풀이 경로 행 생성 · FK 완화 · CU 전용 좌석)를 비교해 결정 근거를 남기고 마이그레이션·멱등 upsert를 구현한다 ② 개념 이름 `unmatched-concept:<이름>`을 원자 백본 개념 ID로 연결하는 경로(LLM 호출 지점이면 라우터 경유·검수 경로 포함)를 정한다 — 원자 코드를 지어내지 않는다 ③ 서빙 경로(`ServedHint`)가 CU 힌트를 노출하는지·노출해도 되는지 판정(EOS-214 검산 착지 전 노출 금지)"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l4/hint_content/**"
+session: null
+notes: "출처: EOS-211 구현(2026-10-29) — FK 때문에 마이그레이션 없이 적재 불가라 파일 내보내기까지만 했다. 관련: EOS-214(검산 착지 전 서빙 금지)."
+updated: 2026-10-29
