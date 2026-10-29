@@ -442,10 +442,13 @@ gates:
       - "[2026-10-24] verdict FAIL · owners: EOS-197 · inputs: OPS-90-hit-lower-bound-implausible-review · evidence: 판정 기준: main 346442b8 (OPS-90 PR 1730 머지). G3의 HIT 중앙값 8분 이하(유효 표본 15건 이상) 조건은 하한 가드가 착지해 무효 표본을 거를 수 있게 됐으나 유효 표본 자체는 아직 없다. 산출물 조건의 소유 태스크 = EOS-197. 게이트는 pending 유지. — OPS-90 완료에 따른 G3 판정 결과 기록"
       - "[2026-10-28] notes +345자 — Kiki 결정: 11/22까지 판정 보류 — 현황 기록"
       - "[2026-10-28] depends_on +EOS-207 — G3 판정 전 미측정 3항목(자동검증 1차 통과율·힌트 의미 누설·메타 누락)의 측정 경로를 입력으로 연결 — Kiki 11/22 보류 결정에 따름"
+      - "[2026-10-29] depends_on +EOS-211 · depends_on +EOS-210 — Kiki 결정(2026-10-29): G3 조건 '힌트 의미 누설 0'은 힌트가 있어야(EOS-211) 하고 의미 누설은 사람 표본(EOS-210)으로만 잰다 — 둘 다 G3 판정 전 입력으로 연결"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
       - EOS-207
+      - EOS-211
+      - EOS-210
   - id: G-eos-g4
     title: "EOS G4(12/13) — 누적 ≥60 CU(A6 30 + 두 번째 앵커 A4 30) + 자동검증 1차 통과율 ≥70% + A6 깊이앵커 무개입 루프 3연속 + 내부 테스트 계정 표본 ≥20(EOS-135 기확정) + P0 결함 0"
     kind: decision
