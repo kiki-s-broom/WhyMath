@@ -1549,7 +1549,8 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "G3 판정 전 Kiki가 런북 eos210_hint_human_verdict_runbook.md로 돌린다"
         ),
         # EOS-219(2026-10-30): 같은 힌트 누설 판정을 Windows 창(tkinter)에서 받고, 남은 판정을
-        # 모두 마친 세션 끝에만 AI 권고를 보여 준다. 사람이 창을 보고 버튼을 누르는 도구라 CI에서 돌 수 없다.
+        # 모두 마친 세션 끝에만 AI 권고를 보여 준다. 사람이 창을 보고 버튼을 누르는 도구라
+        # CI에서 돌 수 없다.
         # 제어기·권고 로더·불일치 보고(맹검 순서 포함)는 backend 잡이 수집하는
         # tests/backend/harness/test_hint_verdict_gui.py가 tkinter 없이 상시 검증한다.
         "harness.hint_verdict_gui": (
