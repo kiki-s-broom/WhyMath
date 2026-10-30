@@ -11,7 +11,7 @@
 >    공유 클론의 브랜치·파일은 건드리지 않는다.
 > 2. **입력 창(`Read-Host`)을 쓰지 않는다** — 회차 `eos197-a6`·판정자 `kiki`를 블록에 채워 두었다(2026-10-30
 >    실측: `Read-Host`를 뒤 블록과 함께 붙여넣으면 빈 값이 들어갔다).
-> 3. **판정은 Windows 팝업 창으로 한다** — AI 권고는 **그 힌트의 판정을 기록한 직후에만** 창에 나온다
+> 3. **판정은 Windows 팝업 창으로 한다** — AI 권고는 **남은 45건을 모두 판정(또는 건너뛰기)한 뒤 세션 끝에 한 번에** 창에 나온다
 >    (헌법 R19-01 "검토 도구는 사람이 판정을 입력하기 전에 AI 참고 판정을 보여주지 않는다").
 
 ## 1. 과제 명칭
@@ -25,9 +25,11 @@ G3 "힌트 의미 누설 0"의 사람 판정 — 판정 전용 폴더 준비 →
 (나) 의미 누설 표본 30건과 (가) 기계가 판정하지 못한 30건을 판정해 G3 의미 축 값을 만든다(두 묶음이 15건
 겹쳐 실제 판정 대상은 **45건**). 결과는 G3 판정(11/22)의 입력이다 — **이 런북은 게이트를 닫지 않는다.**
 
-AI 권고(세션이 45건 전부 미리 써 둔 판정과 이유)는 판정을 기록한 직후에만 보이고, 사람 판정과 다르면
-"불일치"로 표시된다. 세션 끝에 불일치 목록이 파일로 남는다. **사람 판정 기록은 권고를 보기 전에 쓰이므로
-맹검 판정 그대로다.**
+AI 권고(세션이 45건 전부 미리 써 둔 판정과 이유)는 **판정 도중에는 하나도 보이지 않고**, 남은 항목을 모두
+판정(또는 건너뛰기)한 뒤 마지막 화면에서 한 번에 공개된다 — 일치 수와 불일치 목록(힌트·사람 판정·AI 판정·이유).
+불일치 목록은 판정자별 파일로 남는다. 중간에 창을 닫으면 권고는 공개되지 않는다. **모든 사람 판정은 권고를
+보기 전에 기록되므로 맹검 판정 그대로다**(헌법 R19-01). 처음 설계는 건별 공개였으나, 이번 회차 권고 45건이
+전부 같은 판정이라 첫 공개 뒤 나머지가 사실상 미리 드러나므로 세션 끝 공개로 바꿨다(독립 검토 H1).
 
 ## 3. 구체적 절차
 
@@ -46,9 +48,11 @@ AI 권고(세션이 45건 전부 미리 써 둔 판정과 이유)는 판정을 �
 2. **`1  누설`** 또는 **`2  누설 아님`** 버튼을 누른다(키보드 1·2도 된다). 항목이 뜬 뒤 2초 동안은 기록 버튼이
    잠겨 있다(실수 입력 방지).
 3. **근거**를 한 줄 적고 **`기록`**을 누르면 확인 창이 뜬다 — `예`를 누르면 판정 파일에 1건이 기록된다.
-4. 기록 직후 **AI 권고**와 **일치(초록)/불일치(빨강)**가 나온다. 판정은 여기서 바꿀 수 없다. **`다음`**을 누른다.
+4. 기록되면 "기록했습니다"만 보이고 다음 항목으로 넘어간다(AI 권고는 이때 보이지 않는다). Enter 키로도 기록할 수 있다.
 5. 판단이 어려우면 **`건너뛰기`**, 그만두려면 **`종료`** 또는 창 닫기. 그때까지의 판정은 남고, [E]를 다시
-   붙여넣으면 남은 항목부터 이어서 한다.
+   붙여넣으면 남은 항목부터 이어서 한다. 중간에 닫으면 AI 권고는 공개되지 않는다.
+6. 마지막 항목까지 끝나면 **결과 화면**에 AI 권고와의 일치 수·불일치 목록이 나온다. 판정은 여기서 바꿀 수
+   없다. **`닫기`**를 누른다.
 
 ## 4. 성공 기준
 
@@ -57,7 +61,7 @@ AI 권고(세션이 45건 전부 미리 써 둔 판정과 이유)는 판정을 �
 | W | `WT_MATCHES_MAIN=True` | `WORKTREE_UPDATE_SKIPPED=True`이면서 `DIRTY`가 0이 아님 — 그 폴더에 앞선 판정 기록이 있다. 지우지 말고 출력 전체를 세션에 전달 |
 | B | `ENV_OK=True` · `RECS_FILE=True` · 경로 3줄이 `…\WhyMath-eos210\src\backend\`로 시작 | `CODE_OK=False` — 다른 폴더의 코드가 돌았다 · `RECS_FILE=False` — EOS-219 PR이 아직 main에 없다. 출력 전달 |
 | D | `SAMPLE_OK=True` · `WORK_ITEMS=45` · `SAMPLE_ID=hvs-6bfbb1baa75f6e34` | `INPUT_ERROR=다른 매니페스트가 이미 있다` — 출력 전달 |
-| E | 창을 닫은 뒤 `SESSION_REMAINING=0` · `AI_RECS_LOADED=45` · `AI_RECS_STALE=0` | `GUI_UNAVAILABLE=` — 창을 띄울 수 없다(출력 전달) · `WRITE_PREFLIGHT_FAILED` — 판정 파일을 다른 프로그램이 열고 있다(닫고 [E] 재실행) · `INPUT_ERROR=권고 파일 —` — 권고 파일 손상(출력 전달) |
+| E | 창을 닫은 뒤 `SESSION_REMAINING=0` · `AI_RECS_LOADED=45` · `AI_RECS_STALE=0` · `AI_AGREE`·`AI_DISAGREE` 줄 · `GUI_EXIT=0` | `GUI_UNAVAILABLE=` — 창을 띄울 수 없다(출력 전달) · `WRITE_PREFLIGHT_FAILED` — 판정 파일을 다른 프로그램이 열고 있다(닫고 [E] 재실행) · `INPUT_ERROR=권고 파일 —` — 권고 파일 손상(출력 전달) |
 | F | `MEASURE_RAN=True` | `HINT_HUMAN_INPUT_ERRORS`가 0이 아님 — 판정 파일 손상. **손으로 고치지 말고** 출력 전달 |
 | G | `LAST_STEP=push` · `STEP_EXIT=0` · `git log` 줄에 세 파일만 | `WRITE_REFUSED=True` — 같은 줄의 False 항목을 보고 출력 전달 · `WRITE_STOPPED=True` — 멈춘 단계 뒤는 실행되지 않았다. 출력 전달 |
 
@@ -133,9 +137,9 @@ foreach ($F in $HintFiles) { $HintArgs += "--hints-jsonl"; $HintArgs += $F }
 $ReviewDir = "$Wt\data\runs\$Round-review"
 $Manifest = "$ReviewDir\hint_sample_manifest.json"
 $Verdicts = "$ReviewDir\hint_verdicts.jsonl"
-$Disagreements = "$ReviewDir\hint_ai_disagreements.json"
+$Disagreements = "$ReviewDir\hint_ai_disagreements.$Reviewer.json"
 $RecsFile = Test-Path "$ReviewDir\hint_ai_recommendations.jsonl"
-$OutDir = "C:\Users\kiki\Desktop\__AI\WhyMath\work\eos210_$Round"
+$OutDir = "$Wt\work\eos210_$Round"
 "WT_HEAD=$WtHead · ORIGIN_MAIN=$MainSha · HEAD_OK=$HeadOk · CODE_OK=$CodeOk · RECS_FILE=$RecsFile"
 "ROUND=$Round · REVIEWER=$Reviewer · CU_HINTS_FILES=" + $HintFiles.Count + " · MANIFEST_EXISTS=" + (Test-Path $Manifest) + " · VERDICTS_EXISTS=" + (Test-Path $Verdicts)
 $EnvOk = $HeadOk -and $CodeOk -and $RecsFile -and ($HintFiles.Count -eq 2)
@@ -167,6 +171,7 @@ if ($SampleOk -and ((Get-Location).Path -eq $Wt)) { & $Py -m whymath_backend.har
 
 **확인**: 창을 닫으면 PowerShell 창에 요약이 찍힌다 — `SESSION_REMAINING=0` · `AI_RECS_LOADED=45` ·
 `AI_RECS_STALE=0` · `GUI_EXIT=0`. `AI_AGREE`·`AI_DISAGREE`는 사람 판정과 AI 권고가 같았던·달랐던 수다.
+중간에 닫았으면 권고 비교 대신 `AI_COMPARE=WITHHELD`가 찍힌다(권고 비공개 — 정상).
 중간에 멈췄으면 `SESSION_STATE=중단`과 남은 수가 찍힌다 — 이 한 줄을 다시 붙여넣으면 이어서 한다.
 
 ### [F] 측정기 실행 (읽기 전용 · 리포트는 `work\` 아래)
@@ -187,7 +192,7 @@ $MeasureRan = ($MeasureExit -in @(0, 1, 2)) -and ($MeasureMap["HINT_HUMAN_INPUT_
 
 ### [G] 판정 기록 커밋·push (판정 전용 폴더 안 · 조건 미충족이면 스스로 거부)
 
-매니페스트·판정 기록·불일치 목록 **세 파일만** 새 브랜치에 커밋해 push한다. 공유 클론은 건드리지 않는다.
+매니페스트·판정 기록·불일치 목록(`hint_ai_disagreements.kiki.json` — 45건을 다 끝냈을 때만 생긴다) **세 파일만** 새 브랜치에 커밋해 push한다. 공유 클론은 건드리지 않는다.
 PR은 세션이 연다(브랜치 이름을 전달).
 
 ```powershell
@@ -226,8 +231,11 @@ if ($CommitReady) {
 때까지 `WhyMath-eos210\data\runs\eos197-a6-*` 아래 파일을 열지 않는다 — 특히 `hint_ai_recommendations.jsonl`
 (AI 권고 전부)·`hint_sample_manifest.json`(기계 판정 불가 목록)·`cu.hints.jsonl`(게이트 판정).
 
-**알려진 한계**: 앞 힌트에서 본 AI 권고 이유가 뒤 힌트 판정에 영향을 줄 수 있다. 각 판정은 그 힌트의 권고를
-보기 전에 기록되지만, 세션 전체의 독립성까지 보장하지는 못한다.
+**알려진 한계**: 권고 파일이 판정 폴더 안에 있어, 파일을 직접 열면 맹검이 깨진다(위 경고만이 막는다).
+
+**재실행 주의**: [G]까지 끝낸 뒤 PR이 병합되기 전에 [W]를 다시 돌리면 판정 전용 폴더가 main으로 되돌아가
+판정 파일이 폴더에서 사라진다(기록은 push한 브랜치에 안전하다). [G] 뒤에는 [W]를 다시 돌리지 말고 세션에
+알린다. 2026-10-30의 첫 시도는 [B]에서 멈춰 판정 기록이 만들어지지 않았다 — 이어받을 판정은 없다.
 
 ## 7. 이 문서가 검증한 것과 못 한 것
 
@@ -236,8 +244,8 @@ if ($CommitReady) {
 - 판정 창의 판정 흐름(권고 잠금·입력 잠금·기록·불일치 보고): `tests/backend/harness/test_hint_verdict_gui.py`
   와 실데이터 45건 끝까지 돌린 제어기 실행(실제 `eos197-a6` 힌트 · `SAMPLE_ID=hvs-6bfbb1baa75f6e34` ·
   권고 45건 로드 · 낡은 권고 0). 그 판정 기록을 측정기가 입력 오류 0건으로 읽는 것까지 확인했다.
-- 창 자체: 가상 디스플레이(Xvfb)에서 기록 버튼 잠금 → 판정 → 기록 → 권고 공개 → 다음 → 건너뛰기 →
-  종료까지 한 바퀴.
+- 창 자체: 가상 디스플레이(Xvfb)에서 기록 버튼 잠금 → 판정 → 기록 → 다음 항목(권고 비공개) → 마지막 결과 화면
+  (권고 공개), 그리고 중간 종료 시 권고 비공개(`AI_COMPARE=WITHHELD`).
 - 블록 형식: `scripts/ops/check_runbook_blocks.py`·`scripts/ops/check_ps_scripts.py` 정적 검사.
 
 **못 함**
