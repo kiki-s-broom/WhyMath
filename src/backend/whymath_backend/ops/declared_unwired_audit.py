@@ -1548,6 +1548,15 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "동결. "
             "G3 판정 전 Kiki가 런북 eos210_hint_human_verdict_runbook.md로 돌린다"
         ),
+        # EOS-219(2026-10-30): 같은 힌트 누설 판정을 Windows 창(tkinter)에서 받고, 판정이 기록된
+        # 뒤에만 AI 권고를 보여 준다. 사람이 창을 보고 버튼을 누르는 도구라 CI에서 돌 수 없다.
+        # 제어기·권고 로더·불일치 보고(맹검 순서 포함)는 backend 잡이 수집하는
+        # tests/backend/harness/test_hint_verdict_gui.py가 tkinter 없이 상시 검증한다.
+        "harness.hint_verdict_gui": (
+            "by-design:힌트 누설 사람 판정 창(EOS-219) — 사람이 창에서 판정하는 도구라 CI 실행 "
+            "비대상. 판정·권고 공개 순서는 tests/backend/harness/test_hint_verdict_gui.py가 상시 "
+            "동결. G3 판정 전 Kiki가 런북으로 돌린다"
+        ),
         # EOS-211(2026-10-29): CU 사후 LLM 힌트 패스 — 저장된 CU에 단계·L1·L2·L3를 붙이는 *라이브
         # LLM 배치*다(Kiki PC 런북 1회 실행 · docs/ops/eos211_cu_hint_pass_runbook.md). CI에는 LLM
         # 키·Ollama가 없어 상시 실행 대상이 아니다. 판정 분기(게이트 3종 통과분만 verified · 재시도·

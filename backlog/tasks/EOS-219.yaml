@@ -17,14 +17,21 @@ acceptance:
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/hint_verdict_gui.py
-  - src/backend/whymath_backend/ops/hint_human_verdicts.py
   - src/backend/whymath_backend/harness/hint_verdict_session.py
+  - src/backend/whymath_backend/ops/hint_human_verdicts.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
   - tests/backend/harness/test_hint_verdict_gui.py
-  - "docs/ops/eos219_*"
+  - docs/ops/eos219_hint_verdict_gui_runbook.md
   - data/runs/eos197-a6-review/hint_ai_recommendations.jsonl
 session: claude/eos-210-gui-ai-assist
 notes: |-
   Kiki 지시(2026-10-30): EOS-210 판정 화면을 Windows 팝업 창으로, 판정 전에 힌트별 AI 권고 제공. 세션이 맹검 약화(R19-01)와 G3 의미 축 증거력 약화를 설명했고 Kiki가 권고 선행을 선택했다. 그러므로 이번 회차 사람 판정은 독립 맹검 판정이 아니라 AI 권고 참조 판정으로 기록·보고한다.
 
   [정정 2026-10-30] 헌법 R19-01 충돌 — Kiki가 지시 변경 선택
+
+  [정정 2026-10-30] paths ['src/backend/whymath_backend/harness/hint_verdict_gui.py', 'src/backend/whymath_backend/ops/hint_human_verdicts.py', 'src/backend/whymath_backend/harness/hint_verdict_session.py', 'tests/backend/harness/test_hint_verdict_gui.py', 'docs/ops/eos219_*', 'data/runs/eos197-a6-review/hint_ai_recommendations.jsonl'] → ['src/backend/whymath_backend/harness/hint_verdict_gui.py', 'src/backend/whymath_backend/harness/hint_verdict_session.py', 'src/backend/whymath_backend/ops/hint_human_verdicts.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py', 'tests/backend/harness/test_hint_verdict_gui.py', 'docs/ops/eos219_hint_verdict_gui_runbook.md', 'data/runs/eos197-a6-review/hint_ai_recommendations.jsonl']: 구현이 닿은 등록 장치 4건·런북 실명 반영
+  paths 제거 1건: ['docs/ops/eos219_*']
 updated: 2026-10-30

@@ -1232,7 +1232,11 @@ CATALOG: tuple[Spec, ...] = (
        # EOS-210: G3 "힌트 의미 누설 0"의 사람 판정 좌석 — 기록·표본 계약(ops)과 그 기록을 받는
        # 맹검 검수 CLI(harness). 둘 다 g3_content_measures가 소비하는 입력의 생산 경로라 같은
        # 판정기 행에 귀속한다(qa_item_verdicts → 혼동행렬과 같은 규칙).
-       "ops.hint_human_verdicts", "harness.hint_verdict_session"),
+       "ops.hint_human_verdicts", "harness.hint_verdict_session",
+       # EOS-219: 같은 판정을 창(tkinter)에서 받는 입력 경로 + 판정 뒤 AI 권고 공개·불일치 보고.
+       # 기록은 hint_verdict_session의 build_verdict·load_review_inputs를 그대로 부르므로 같은
+       # 기능의 다른 입력 매체다(review_session_gui → review_session과 같은 규칙).
+       "harness.hint_verdict_gui"),
     _o("WM-O-906", "콘텐츠 출처·라이선스 감사 게이트·사이드카", "Admin", "Content", "P0",
        "ARCH-20·PB-11 — 저작권 레일 · EOS-97 리콜(genlog 사이드카 선별·처분)",
        "ops.provenance_audit", "ops.corpus_provenance_sidecar", "ops.generation_recall"),
