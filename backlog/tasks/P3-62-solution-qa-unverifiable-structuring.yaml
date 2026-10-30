@@ -16,6 +16,6 @@ acceptance:
   - "① 검증 불가 665건(대표 과정 승인 문항의 59.3%)의 사유별 원인을 생성기·저작 규칙 단위로 귀속한다: C2_FINAL_STEP_NOT_ANSWER_FORM 361 · C2_ROOT_CHOICE_UNSTRUCTURED 155 · C2_FINAL_STEP_VAR_NOT_ANSWER_VAR 77 · C2_NO_STEPS 72 (2026-10-18 P3-07 실측, 판정 기준 main f5dc7dc3, 목록 = docs/reviews/p3_07_solution_qa_review_queue_2026-10-18.jsonl).\n② 각 사유를 푸는 구조화 규칙을 정한다 — (가) 풀이의 마지막 단계에 정답 변수의 값 진술을 둔다 (나) '양수 a'처럼 발문에만 있는 근 선택 조건을 answer_selection 또는 도메인 제약 필드로 구조화한다 (다) 단계 자료가 없는 개념형 문항에 풀이 단계를 둔다. P3-24(파생 판정 저작 규칙 집행)의 selection 필수 규칙과 중복·충돌하지 않는지 먼저 대조한다.\n③ 규칙을 생성기에 반영하고 재생성 전후의 검증 가능 비율을 solution_qa CLI로 재측정한다. 수치를 맞추려고 문항을 제외하지 않는다(분모 불변 확인).\n④ 이 태스크는 콘텐츠 구조 보강이며 새 Entity·대규모 스키마 변경이 아니다. 범위 규율(Release Blocker 외 신규 Entity 금지)에 걸리면 착수하지 않고 Kiki에게 되묻는다."
 artifacts: []
 paths: []
-session: claude/p3-62-solution-qa-structuring
+session: claude/p3-62-s5-audit-remeasure
 notes: "출처: P3-07 세션(2026-10-18)의 발견. Solution QA 통과율 456/456은 검증 가능한 문항에 대한 값이고 검증 가능 비율은 40.7%다. 올리는 길은 분모를 줄이는 것이 아니라 풀이의 구조화다."
-updated: 2026-10-20
+updated: 2026-10-30
