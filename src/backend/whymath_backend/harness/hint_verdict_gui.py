@@ -1,4 +1,4 @@
-"""힌트 정답 누설 사람 판정 — Windows 팝업 창 + **판정 뒤** AI 권고 공개 (EOS-219).
+"""힌트 정답 누설 사람 판정 — Windows 팝업 창 + **세션 끝** AI 권고 비교 (EOS-219).
 
 EOS-210 터미널 도구(`harness/hint_verdict_session review`)와 **같은 작업 목록·같은 기록 계약**
 (`hint_verdicts.jsonl` append 전용·내용 지문)으로 판정을 받되, 키보드 한 줄 입력 대신 창의
@@ -6,22 +6,34 @@ EOS-210 터미널 도구(`harness/hint_verdict_session review`)와 **같은 작�
 
 맹검 — 헌법 R19-01 ("사람이 판정을 입력하기 전에 AI 참고 판정을 보여주지 않는다")
 -----------------------------------------------------------------------------
-Kiki 선택(2026-10-30 · EOS-219 acceptance 정정): AI 권고는 **그 힌트의 사람 판정이 판정 파일에
-append된 직후에만** 보여 준다. 판정 전 화면에 내는 것은 터미널 도구와 같은 다섯 칸(`review_view` —
-문항·선택지·정답·힌트 단계·힌트 본문)과 고정 기준표(`RUBRIC_TEXT` — "무엇이 누설인가")뿐이다.
-기계 판정·`gate_report`·목적(`purpose`)·기존 판정은 터미널 도구와 똑같이 내지 않는다.
+판정하는 동안에는 AI 권고를 **한 건도** 보여 주지 않는다. 판정 화면에 내는 것은 터미널 도구와
+같은 다섯 칸(`review_view` — 문항·선택지·정답·힌트 단계·힌트 본문)과 고정 기준표(`RUBRIC_TEXT` —
+"무엇이 누설인가")뿐이다. 기록에 성공하면 "기록했습니다 (i/N)" 확인만 내고 바로 다음 항목으로
+넘어간다(항목별 AI 문구·일치/불일치 색 없음).
 
-집행 지점은 `GuiReviewController.reveal_recommendation`이다 — 이번 세션에서 **기록에 성공한**
-hint_id가 아니면 `RecommendationLockedError`를 올린다(판정 전·건너뛰기·기록 실패 모두 거부).
-창은 이 함수로만 권고를 얻으므로, 창 코드가 실수로 판정 전에 부르면 예외로 드러난다.
+공개는 **세션 끝, 남은 판정 대상이 0건일 때 한 번**뿐이다(이번 세션이나 앞 세션에서 모든 대상을
+기록 또는 건너뛰기 — 제어기 `finished`). 그때 창이 끝 화면으로 바뀌어 일치·불일치·권고 없음·미판정
+수와 불일치 목록(힌트 본문·사람 판정·AI 판정·AI 이유)을 보여 준다. 끝 화면에서는 판정을 바꿀 수
+없다 — 재판정은 맹검이 아니므로 터미널 도구의 `--rejudge`와 그 표기 규칙을 따른다(이 창은
+`--rejudge`를 받지 않는다).
 
-판정 행은 맹검 판정 그대로다(권고 공개 *전*에 기록된다). 공개 뒤 같은 창에서 판정을 바꾸는 경로는
-없다 — 재판정은 맹검이 아니므로 터미널 도구의 `--rejudge`와 그 표기 규칙을 따른다. 그래서 이 창은
-`--rejudge`를 받지 않는다.
+**중간에 종료·창 닫기(남은 항목 있음)·기록 실패로 끝나면 공개하지 않는다** — 창에도, stdout에도.
+요약은 `SESSION_*`·`AI_RECS_FILE/LOADED/STALE` 줄과 `AI_COMPARE=WITHHELD` 한 줄만 내고 불일치
+파일은 쓰지 않는다.
 
-**남는 한계(명시)**: 앞 힌트의 AI 이유를 본 판정자는 뒤 힌트에서 AI의 기준에 끌려갈 수 있다(교정
-학습 효과). 이것은 "판정 전 권고 비노출"을 지키되 세션 전체의 독립성까지 보장하지는 못한다. 그
-영향은 불일치 보고(`hint_ai_disagreements.json`)와 EOS-218(판정자 신뢰도·일치도)이 다룬다.
+집행 지점은 `GuiReviewController.final_comparison`이다 — `finished and not halted`가 아니면
+`RecommendationLockedError`를 올린다. 창 클래스는 권고 사전(`_recommendations`)을 직접 읽지 않고
+(AST 테스트가 동결), `final_comparison`은 끝 화면 메서드에서만 부른다.
+
+왜 항목별 공개를 버렸나(독립 검토 H1): 한 회차의 권고가 전부 같은 값이면, 첫 공개 뒤 판정자는
+남은 모든 힌트의 AI 판정을 판정 *전에* 사실상 알게 된다 — 항목별 공개가 R19-01을 무력화한다. 세션
+끝 공개는 이 앵커링을 없앤다.
+
+**남는 한계(명시)**: ① 권고 파일(`hint_ai_recommendations.jsonl`)은 검수 폴더에 그대로 있다 — 판정
+중에 그 파일을 열어 보지 않는 것은 사람 규율이다. ② 건너뛴 항목도 공개 조건(`finished`)을
+채운다. 끝 화면은 건너뛴 항목을 "미판정"으로만 세고 그 권고는 싣지 않지만, 공개된 다른 항목의
+권고 경향을 본 뒤 다음 세션에서 그 항목을 판정하면 맹검이 아니다. 그 영향은 EOS-218(판정자
+신뢰도·일치도)이 다룬다.
 
 권고 파일 계약 — `<round>-review/hint_ai_recommendations.jsonl`
 ----------------------------------------------------------------
@@ -31,34 +43,40 @@ hint_id가 아니면 `RecommendationLockedError`를 올린다(판정 전·건너
 않고 이 파일에만 둔다.
 
   - 형식 오류·hint_id 중복·판정 대상 밖 hint_id → **시작 거부**(exit 1 · `INPUT_ERROR=`)
-  - 지문이 지금 내용과 다른 행 → **낡음(stale)**: 보여 주지 않고 "권고 없음(내용이 바뀜)"으로 표시,
-    따로 센다(`AI_RECS_STALE`)
-  - 파일 없음 → 권고 없이 판정만 한다("권고 없음" · 요약 `AI_RECS_FILE=MISSING`)
+  - 지문이 지금 내용과 다른 행 → **낡음(stale)**: 비교하지 않고 "권고 없음"으로 센다
+    (`AI_RECS_STALE`)
+  - 파일 없음 → 권고 없이 판정만 한다(요약 `AI_RECS_FILE=MISSING`)
 
-불일치 보고 — `<round>-review/hint_ai_disagreements.json`
--------------------------------------------------------
-세션이 끝나면(완료·종료·창 닫기 모두) 판정 파일에서 **이 판정자·이 표본·지금 내용 지문**의 최신
-판정(append 순서)을 권고와 비교해 불일치 목록 `[{hint_id, human, ai, ai_rationale}]`을 쓴다.
-판정하지 않은 힌트의 권고는 이 파일에도 싣지 않는다(맹검 유지). stdout 요약 줄은 터미널 도구의
-`SESSION_*` 줄에 `AI_RECS_FILE`·`AI_RECS_LOADED`·`AI_RECS_STALE`·`AI_AGREE`·`AI_DISAGREE`·
-`AI_NO_REC`·`DISAGREEMENTS_PATH`를 더한다.
+불일치 보고 — `<round>-review/hint_ai_disagreements.<reviewer>.json`
+----------------------------------------------------------------
+판정자마다 따로 쓴다(독립 검토 M3 — 두 판정자가 같은 파일을 덮어쓰지 않게). 세션이 **끝났을 때만**
+(`finished and not halted`) 판정 파일에서 **이 판정자·이 표본·지금 내용 지문**의 최신 판정(append
+순서)을 권고와 비교해 불일치 목록 `[{hint_id, hint_content, human, ai, ai_rationale}]`을 쓴다.
+판정하지 않은 힌트의 권고는 싣지 않는다. stdout 요약은 터미널 도구의 `SESSION_*` 줄에
+`AI_RECS_FILE`·`AI_RECS_LOADED`·`AI_RECS_STALE`를 더하고, 끝났으면 `AI_AGREE`·`AI_DISAGREE`·
+`AI_NO_REC`·`AI_UNJUDGED`·`DISAGREEMENTS_PATH`를, 아니면 `AI_COMPARE=WITHHELD`를 더한다.
 
 창 로직과 위젯 분리
 ------------------
-`GuiReviewController`·권고 로더·불일치 보고는 tkinter를 모른다 — CI(디스플레이 없음)에서 그대로
-테스트된다. tkinter는 `_import_tk()`(창을 만들 때)에서만 **지연 import**한다. tkinter가 없거나
-디스플레이가 없으면 `GUI_UNAVAILABLE=<예외타입>`을 내고 exit 2.
+`GuiReviewController`·권고 로더·불일치 보고·창 콜백 오류 처리기는 tkinter를 모른다 — CI(디스플레이
+없음)에서 그대로 테스트된다. tkinter는 `_import_tk()`(창을 만들 때)에서만 **지연 import**한다.
+tkinter가 없거나 디스플레이가 없으면 `GUI_UNAVAILABLE=<예외타입>`을 내고 exit 2. 창 생성·이벤트
+루프에서 예상 못한 예외가 나면 `GUI_ERROR=<예외타입>`을 내고 exit 2(fail-closed — traceback exit 1
+아님). 이벤트 콜백 안의 예외는 `root.report_callback_exception`이 받아 세션을 멈추고 오류 창(예외
+타입명) 뒤 창을 닫는다(exit 2).
 
 실수 방지(터미널 도구와 같은 규칙)
 ---------------------------------
   - 쓰기 전 검증 — 판정은 `build_verdict`(터미널과 같은 함수)로 모델을 만든 뒤에만 쓴다
   - 쓰기 가능 사전 점검 — 창을 띄우기 전에 판정 파일을 append로 열어 본다(실패면 exit 2)
-  - 입력 잠금 — 항목을 띄운 뒤 `INPUT_LOCK_SECONDS`(2초) 안의 기록은 거부한다
-  - 확인 — 기록 버튼 뒤 "기록: … · 근거: … — 맞습니까?"를 한 번 더 묻는다
+  - 입력 잠금 — 항목이 **실제로 화면에 뜬 뒤**(이벤트 루프의 첫 idle 이후 `current_view()`)
+    `INPUT_LOCK_SECONDS`(2초) 안의 기록은 거부한다
+  - 확인 — 기록 버튼(또는 Enter) 뒤 "기록: … · 근거: … — 맞습니까?"를 한 번 더 묻는다
   - 시계 역행 — 판정 시각이 파일의 마지막 판정보다 이르면 쓰지 않고 세션을 멈춘다
   - 기록 실패 — append 실패(`OSError`)면 오류 창(예외 타입명) 후 창을 닫고 exit 2
 
-exit code: 0 정상 종료(중간 종료·창 닫기 포함) / 1 입력 실패 / 2 기록 실패·창을 띄울 수 없음.
+exit code: 0 정상 종료(중간 종료·창 닫기 포함) / 1 입력 실패 / 2 기록 실패·창 오류·창을 띄울 수
+없음.
 
 사용(Windows PowerShell — 런북 `docs/ops/eos219_*`):
     python -m whymath_backend.harness.hint_verdict_gui --round R \\
@@ -118,8 +136,8 @@ if TYPE_CHECKING:  # 런타임에는 창을 띄울 때만 import한다(CI 헤드
     import tkinter as tk
 
 __all__ = [
-    "DEFAULT_DISAGREEMENTS_NAME",
     "DEFAULT_RECOMMENDATIONS_NAME",
+    "DISAGREEMENTS_NAME_FORMAT",
     "RECOMMENDATION_SCHEMA",
     "RUBRIC_TEXT",
     "DisagreementReport",
@@ -127,18 +145,20 @@ __all__ = [
     "HintAiRecommendation",
     "ItemView",
     "RecommendationLockedError",
-    "RecommendationReveal",
     "RecordResult",
     "build_disagreement_report",
+    "disagreements_filename",
     "load_recommendations",
     "main",
+    "make_callback_error_handler",
 ]
 
 logger = logging.getLogger(__name__)
 
 RECOMMENDATION_SCHEMA = "hint-ai-recommendation/v1"
 DEFAULT_RECOMMENDATIONS_NAME = "hint_ai_recommendations.jsonl"
-DEFAULT_DISAGREEMENTS_NAME = "hint_ai_disagreements.json"
+#: 판정자별 불일치 보고 파일 이름(독립 검토 M3) — `disagreements_filename`으로만 만든다.
+DISAGREEMENTS_NAME_FORMAT = "hint_ai_disagreements.{reviewer}.json"
 _FINGERPRINT_PATTERN = r"^sha256:[0-9a-f]{64}$"
 
 #: 판정 전에 보여 주는 유일한 보조 정보 — 고정 기준표(힌트마다 바뀌지 않으므로 AI 판정이 아니다).
@@ -184,6 +204,13 @@ class HintAiRecommendation(BaseModel):
         if not value.strip():
             raise ValueError("권고 이유(rationale)가 비었다")
         return value
+
+
+def disagreements_filename(reviewer: str) -> str:
+    """판정자별 불일치 보고 파일 이름. 판정자 ID 형식(파일 이름에 안전)이 아니면 ValueError."""
+    if not re.fullmatch(REVIEWER_ID_PATTERN, reviewer):
+        raise ValueError(REVIEWER_FORMAT_ERROR)
+    return DISAGREEMENTS_NAME_FORMAT.format(reviewer=reviewer)
 
 
 def load_recommendations(
@@ -236,7 +263,7 @@ def load_recommendations(
 # 제어기 — tkinter 없이 동작한다
 # ──────────────────────────────────────────────────────────────────────────
 class RecommendationLockedError(RuntimeError):
-    """기록에 성공하지 않은 힌트의 권고를 요청했다 — R19-01 집행 지점."""
+    """세션이 끝나기 전에 AI 비교를 요청했다 — R19-01 집행 지점(`final_comparison`)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,45 +282,26 @@ class ItemView:
 
 @dataclass(frozen=True, slots=True)
 class RecordResult:
-    """기록 시도 결과 — `recorded`(기록됨) · `rejected`(쓰지 않음·다시 입력) ·
-    `record_failed`(정지)."""
+    """기록 시도 결과 — `recorded`(기록됨·다음 항목으로 넘어감) · `rejected`(쓰지 않음·다시 입력) ·
+    `record_failed`(정지). 권고 정보는 싣지 않는다."""
 
     status: Literal["recorded", "rejected", "record_failed"]
     message: str
     hint_id: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class RecommendationReveal:
-    """기록 직후 공개하는 권고 — `state`: `shown` · `none`(권고 없음) · `stale`(내용이 바뀜)."""
-
-    hint_id: str
-    human: HintVerdict
-    state: Literal["shown", "none", "stale"]
-    ai: HintVerdict | None
-    ai_rationale: str | None
-
-    @property
-    def agrees(self) -> bool | None:
-        """사람 판정과 권고가 같은가 — 권고가 없으면 None(모른다 ≠ 일치)."""
-        return None if self.ai is None else self.ai is self.human
-
-    def text(self) -> str:
-        """공개 패널 문구."""
-        if self.state == "stale":
-            return "AI 권고: 권고 없음(내용이 바뀜)"
-        if self.state == "none" or self.ai is None:
-            return "AI 권고: 권고 없음"
-        return f"AI 권고: {_VERDICT_LABEL[self.ai]} — 이유: {self.ai_rationale}"
-
-
 @dataclass(slots=True)
 class DisagreementReport:
-    """세션 끝 사람-AI 비교 — 이 판정자·이 표본·지금 내용 지문의 최신 판정만 센다."""
+    """세션 끝 사람-AI 비교 — 이 판정자·이 표본·지금 내용 지문의 최신 판정만 센다.
+
+    `unjudged`는 지금 내용 지문으로 이 판정자의 판정이 없는 대상 수(건너뛴 항목 포함)다 — 그
+    권고는 비교하지도, 싣지도 않는다.
+    """
 
     agree: int = 0
     disagree: int = 0
     no_rec: int = 0
+    unjudged: int = 0
     disagreements: list[dict[str, str]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -306,7 +314,11 @@ def build_disagreement_report(
     reviewer: str,
     sample_id: str,
 ) -> DisagreementReport:
-    """판정 파일을 다시 읽어 사람-AI 일치·불일치를 센다(판정하지 않은 힌트는 싣지 않는다)."""
+    """판정 파일을 다시 읽어 사람-AI 일치·불일치를 센다(판정하지 않은 힌트는 싣지 않는다).
+
+    **공개 게이트가 없는 순수 계산이다** — 창은 이 함수를 부르지 않고 제어기의
+    `final_comparison`(세션 끝 게이트)만 부른다(AST 테스트가 동결).
+    """
     report = DisagreementReport()
     if not verdicts_path.exists():
         verdicts: list[HintHumanVerdict] = []
@@ -316,6 +328,7 @@ def build_disagreement_report(
     fingerprints = {
         item.hint.hint_id: hint_review_fingerprint(item.cu_row, item.hint) for item in items
     }
+    contents = {item.hint.hint_id: item.hint.content for item in items}
     latest: dict[str, HintHumanVerdict] = {}
     for verdict in verdicts:  # append 순서상 마지막이 최신(latest_verdicts와 같은 규칙)
         if (
@@ -324,6 +337,7 @@ def build_disagreement_report(
             and fingerprints.get(verdict.hint_id) == verdict.content_fingerprint
         ):
             latest[verdict.hint_id] = verdict
+    report.unjudged = len(fingerprints) - len(latest)
     for hint_id in sorted(latest):
         human = latest[hint_id].verdict
         rec = recommendations.get(hint_id)
@@ -337,6 +351,7 @@ def build_disagreement_report(
         report.disagreements.append(
             {
                 "hint_id": hint_id,
+                "hint_content": contents[hint_id],
                 "human": human.value,
                 "ai": rec.recommendation.value,
                 "ai_rationale": rec.rationale,
@@ -354,12 +369,14 @@ def _write_json_atomic(path: Path, payload: Any) -> None:
 
 
 class GuiReviewController:
-    """판정·기록·권고 공개 상태 — 창은 이 객체의 메서드로만 상태를 바꾼다.
+    """판정·기록·세션 끝 비교 상태 — 창은 이 객체의 메서드로만 상태를 바꾼다.
 
     상태 흐름(항목 1건): `current_view()`(처음 호출 = 화면에 띄운 순간 · 잠금 시작) →
-    `submit()` 성공 → 공개 상태(`revealing`) → `reveal_recommendation()` → `advance()`.
-    건너뛰기는 `skip()`, 종료는 `quit()`. 기록 실패·시계 역행이면 `halted` — 이후 모든 판정을
-    거부한다.
+    `submit()` 성공(기록 · 곧바로 다음 항목) 또는 `skip()`. 종료는 `quit()`. 기록 실패·시계
+    역행·창 오류면 `halted` — 이후 모든 판정을 거부하고 비교도 공개하지 않는다.
+
+    AI 비교는 `final_comparison()` 하나로만 나가며, 남은 항목이 0건이고 정지하지 않았을 때만
+    돌려준다(R19-01 집행 지점).
     """
 
     def __init__(
@@ -397,29 +414,27 @@ class GuiReviewController:
         )
         self._index = 0
         self._shown_at: float | None = None
-        self._revealing = False
-        self._recorded: dict[str, HintVerdict] = {}
         self.halted_reason: str | None = None
 
     # ── 상태 조회 ──────────────────────────────────────────────────────
     @property
     def halted(self) -> bool:
-        """기록 실패·시계 역행으로 정지했다."""
+        """기록 실패·시계 역행·창 오류로 정지했다."""
         return self.outcome.record_failed
 
     @property
     def finished(self) -> bool:
-        """남은 항목이 없다(정지·종료와 별개)."""
+        """남은 항목이 없다(이번·앞 세션에서 모두 기록 또는 건너뜀 — 정지와 별개)."""
         return self._index >= len(self._pending)
 
     @property
-    def revealing(self) -> bool:
-        """방금 기록한 항목의 권고 공개 단계 — 다음(`advance`)만 할 수 있다."""
-        return self._revealing
+    def comparison_unlocked(self) -> bool:
+        """세션 끝 비교를 공개할 수 있다 — 남은 항목 0건이고 정지하지 않았다."""
+        return self.finished and not self.halted
 
     @property
     def stale_count(self) -> int:
-        """지문이 지금 내용과 다른 권고 수(보여 주지 않는다)."""
+        """지문이 지금 내용과 다른 권고 수(비교하지 않는다)."""
         return sum(
             1
             for hint_id, rec in self._recommendations.items()
@@ -467,12 +482,11 @@ class GuiReviewController:
 
     # ── 상태 변경 ──────────────────────────────────────────────────────
     def submit(self, verdict: HintVerdict, rationale: str) -> RecordResult:
-        """판정 1건 기록. 거부는 쓰지 않고 다시 받는다 · 기록 실패는 세션을 멈춘다."""
+        """판정 1건 기록 → 성공이면 곧바로 다음 항목으로. 거부는 쓰지 않고 다시 받는다 · 기록
+        실패는 세션을 멈춘다. 결과에는 기록 확인만 싣는다(권고 없음 — R19-01)."""
         item = self._current_item()
         if item is None:
             return RecordResult("rejected", "판정할 항목이 없습니다.")
-        if self._revealing:
-            return RecordResult("rejected", "이미 기록한 항목입니다 — '다음'을 누르세요.")
         if self._shown_at is None:
             return RecordResult("rejected", "화면에 띄우지 않은 항목은 판정할 수 없습니다.")
         if self._clock() - self._shown_at < INPUT_LOCK_SECONDS:
@@ -520,78 +534,73 @@ class GuiReviewController:
                 "기록되지 않았다). 판정 파일을 다른 프로그램이 열고 있는지 확인하세요.",
                 hint_id,
             )
+        position = self.outcome.already_done + self._index + 1
         self._not_before = record.judged_at
-        self._recorded[hint_id] = verdict
-        self._revealing = True
         self.outcome.recorded += 1
         self.outcome.recorded_hint_ids.append(hint_id)
-        return RecordResult("recorded", "기록했습니다.", hint_id)
+        self._advance()
+        return RecordResult("recorded", f"기록했습니다 ({position}/{self.outcome.total})", hint_id)
+
+    def _advance(self) -> None:
+        self._index += 1
+        self._shown_at = None
 
     def _halt(self, message: str, hint_id: str | None) -> RecordResult:
         self.outcome.record_failed = True
         self.halted_reason = message
-        self._revealing = False
         return RecordResult("record_failed", message, hint_id)
 
     def fail(self, message: str) -> None:
         """창 쪽 예상 못한 오류 — 세션을 기록 실패로 멈춘다(요약 `SESSION_STATE`에 드러난다)."""
         self._halt(message, None)
 
-    def reveal_recommendation(self, hint_id: str) -> RecommendationReveal:
-        """권고 공개 — **이번 세션에서 기록에 성공한 힌트만**. 그 밖은 예외(R19-01 집행 지점)."""
-        human = self._recorded.get(hint_id)
-        if human is None:
-            raise RecommendationLockedError(
-                f"hint_id {hint_id}는 이번 세션에서 기록되지 않았다 — 판정 전 권고 공개 "
-                "금지(R19-01)"
-            )
-        rec = self._recommendations.get(hint_id)
-        if rec is None:
-            return RecommendationReveal(hint_id, human, "none", None, None)
-        if rec.content_fingerprint != self._fingerprints.get(hint_id):
-            return RecommendationReveal(hint_id, human, "stale", None, None)
-        return RecommendationReveal(hint_id, human, "shown", rec.recommendation, rec.rationale)
-
-    def advance(self) -> bool:
-        """공개 단계에서 다음 항목으로. 공개 단계가 아니면 아무것도 하지 않는다."""
-        if not self._revealing or self.halted:
-            return False
-        self._revealing = False
-        self._index += 1
-        self._shown_at = None
-        return True
-
     def skip(self) -> bool:
-        """지금 항목을 건너뛴다(기록 없음 · 권고 비공개). 공개 단계·정지·끝이면 거부."""
-        if self._revealing or self._current_item() is None:
+        """지금 항목을 건너뛴다(기록 없음). 정지·끝이면 거부."""
+        if self._current_item() is None:
             return False
         self.outcome.skipped += 1
-        self._index += 1
-        self._shown_at = None
+        self._advance()
         return True
 
     def quit(self) -> None:
-        """종료·창 닫기 — 남은 항목이 있으면 중단으로 센다(기록된 판정은 그대로)."""
+        """종료·창 닫기 — 남은 항목이 있으면 중단으로 센다(기록된 판정은 그대로). 남은 항목이
+        없으면(끝 화면에서 닫기 포함) 중단이 아니다."""
         if not self.finished and not self.halted:
             self.outcome.aborted = True
 
     # ── 세션 끝 ────────────────────────────────────────────────────────
-    def summary_text(self, disagreements_path: Path) -> str:
-        """불일치 보고를 쓰고 stdout 요약 줄을 만든다(터미널 `SESSION_*` 줄 + AI 비교 줄)."""
-        report = build_disagreement_report(
+    def final_comparison(self) -> DisagreementReport:
+        """세션 끝 사람-AI 비교 — **남은 항목 0건 · 정지 아님**일 때만. 그 밖은 예외(R19-01)."""
+        if not (self.finished and not self.halted):
+            raise RecommendationLockedError(
+                "판정 대상이 남아 있거나 세션이 정지했다 — 세션 끝 전 AI 비교 공개 금지(R19-01)"
+            )
+        return build_disagreement_report(
             self._verdicts_path,
             self._items,
             self._recommendations,
             reviewer=self._reviewer,
             sample_id=self._manifest.sample_id,
         )
+
+    def summary_text(self, disagreements_path: Path) -> str:
+        """stdout 요약 줄(터미널 `SESSION_*` 줄 + 권고 파일 줄 + AI 비교 줄).
+
+        세션이 끝났을 때만 비교 수를 내고 불일치 보고를 쓴다. 끝나지 않았으면(중간 종료·정지)
+        `AI_COMPARE=WITHHELD` 한 줄만 내고 보고 파일은 쓰지 않는다.
+        """
         lines = [render_summary(self.outcome)]
         lines.append(
             "AI_RECS_FILE=" + ("PRESENT" if self.recommendations_present else "MISSING") + "\n"
         )
         lines.append(f"AI_RECS_LOADED={self.loaded_count}\nAI_RECS_STALE={self.stale_count}\n")
+        if not self.comparison_unlocked:
+            lines.append("AI_COMPARE=WITHHELD\n")
+            return "".join(lines)
+        report = self.final_comparison()
         lines.append(
-            f"AI_AGREE={report.agree}\nAI_DISAGREE={report.disagree}\nAI_NO_REC={report.no_rec}\n"
+            f"AI_AGREE={report.agree}\nAI_DISAGREE={report.disagree}\n"
+            f"AI_NO_REC={report.no_rec}\nAI_UNJUDGED={report.unjudged}\n"
         )
         lines.extend(f"REPORT_ERROR={e}\n" for e in report.errors)
         try:
@@ -604,15 +613,48 @@ class GuiReviewController:
         return "".join(lines)
 
 
+def make_callback_error_handler(
+    controller: GuiReviewController,
+    *,
+    show_error: Callable[[str, str], object],
+    close: Callable[[], object],
+) -> Callable[[type[BaseException], BaseException, Any], None]:
+    """`root.report_callback_exception` 처리기 — 창 이벤트 콜백 안의 예외를 fail-closed로 받는다.
+
+    세션을 정지(`controller.fail` → 요약 `기록 실패로 정지` · exit 2)시키고, 오류 창에 **예외
+    타입명**을 보인 뒤 창을 닫는다. 처리기 자신의 실패(오류 창·닫기)도 타입명으로 로그한다.
+    tkinter를 모르므로 가짜 함수로 테스트된다.
+    """
+
+    def handler(exc_type: type[BaseException], exc: BaseException, _tb: Any) -> None:
+        name = exc_type.__name__
+        logger.error("판정 창 콜백 예외: %s", name)
+        controller.fail(f"창 오류 — {name}. 세션을 멈춥니다.")
+        try:
+            show_error("창 오류", f"예상 못한 오류 — {name}. 세션을 멈추고 창을 닫습니다.")
+        except Exception as inner:  # 오류 창도 못 띄우면 로그만 — 닫기는 계속한다
+            logger.error("오류 창 표시 실패: %s", type(inner).__name__)
+        try:
+            close()
+        except Exception as inner:
+            logger.error("판정 창 닫기 실패: %s", type(inner).__name__)
+
+    return handler
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # 창 (tkinter — 여기서만 지연 import)
 # ──────────────────────────────────────────────────────────────────────────
 _FONT_CANDIDATES = ("맑은 고딕", "Malgun Gothic")
-_COLOR_AGREE = "#15803d"
-_COLOR_DISAGREE = "#b91c1c"
+_COLOR_OK = "#15803d"
 _COLOR_MUTED = "#6b7280"
 _COLOR_ERROR = "#b91c1c"
 _LOCK_POLL_MS = 200
+#: 기본 창 크기·최소 크기(독립 검토 M2 — 작은 화면에서도 기록·건너뛰기·종료 막대가 잘리지 않게)
+_WINDOW_GEOMETRY = "1100x880"
+_WINDOW_MINSIZE = (1000, 820)
+#: 처음 띄울 때 다른 창 뒤에 숨지 않도록 잠깐만 맨 위로(L3) — 이 시간 뒤 풀어 준다
+_TOPMOST_RELEASE_MS = 500
 
 
 def _import_tk() -> ModuleType:
@@ -623,7 +665,11 @@ def _import_tk() -> ModuleType:
 
 
 class HintVerdictWindow:
-    """판정 창 — 위젯 배치와 이벤트 연결만 한다. 판정·기록·공개 판단은 전부 제어기가 한다."""
+    """판정 창 — 위젯 배치와 이벤트 연결만 한다. 판정·기록·공개 판단은 전부 제어기가 한다.
+
+    이 클래스는 권고 사전(`_recommendations`)을 읽지 않고, 세션 끝 비교(`final_comparison`)는
+    끝 화면 메서드(`_show_end_screen`)에서만 부른다 — 둘 다 AST 테스트가 동결한다.
+    """
 
     def __init__(self, root: tk.Tk, controller: GuiReviewController) -> None:
         import tkinter as tk
@@ -633,31 +679,41 @@ class HintVerdictWindow:
         self._ctl = controller
         self._verdict: HintVerdict | None = None
         self._poll_job: str | None = None
+        self._ended = False
         self.record_failed = False
 
         families = set(tkfont.families(root))
         family = next((f for f in _FONT_CANDIDATES if f in families), "TkDefaultFont")
-        font = (family, 12)
-        bold = (family, 12, "bold")
+        self._font = (family, 12)
+        self._bold = (family, 12, "bold")
         big = (family, 16, "bold")
+        font, bold = self._font, self._bold
 
         root.title("WhyMath 힌트 누설 판정")
-        root.geometry("1000x760")
+        root.geometry(_WINDOW_GEOMETRY)
+        root.minsize(*_WINDOW_MINSIZE)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        self._progress = tk.Label(root, font=bold, anchor="w", padx=12, pady=6)
+        # 판정 화면 전체 — 끝 화면으로 바뀔 때 통째로 내린다.
+        # pack 순서(M2): 진행 → 본문 칸 → 판정 버튼 → 근거 + 행동 막대 → 상태 → 기준표(마지막·
+        # 남는 공간). 창이 작아지면 pack은 뒤에 붙인 것부터 자르므로 행동 막대가 잘리지 않는다.
+        self._main = tk.Frame(root)
+        self._main.pack(fill="both", expand=True)
+        main = self._main
+
+        self._progress = tk.Label(main, font=bold, anchor="w", padx=12, pady=6, text="불러오는 중…")
         self._progress.pack(fill="x")
 
-        body = tk.Frame(root, padx=12)
-        body.pack(fill="both", expand=True)
+        body = tk.Frame(main, padx=12)
+        body.pack(fill="x")
         self._fields: dict[str, tk.Text] = {}
-        for row, (key, label, height) in enumerate(
+        for row, (key, label, height, scroll) in enumerate(
             (
-                ("question", "문항", 5),
-                ("choices", "선택지", 3),
-                ("answer", "정답", 1),
-                ("level", "힌트 단계", 1),
-                ("hint", "힌트 본문", 4),
+                ("question", "문항", 6, True),
+                ("choices", "선택지", 3, True),
+                ("answer", "정답", 1, False),
+                ("level", "힌트 단계", 1, False),
+                ("hint", "힌트 본문", 5, True),
             )
         ):
             tk.Label(body, text=label, font=bold, anchor="nw").grid(
@@ -665,23 +721,22 @@ class HintVerdictWindow:
             )
             text = tk.Text(body, wrap="word", font=font, height=height, relief="solid", bd=1)
             text.grid(row=row, column=1, sticky="nsew", pady=2)
+            if scroll:
+                bar = tk.Scrollbar(body, orient="vertical", command=text.yview)
+                bar.grid(row=row, column=2, sticky="ns", pady=2)
+                text.configure(yscrollcommand=bar.set)
             text.configure(state="disabled")
             self._fields[key] = text
         body.columnconfigure(1, weight=1)
-        body.rowconfigure(0, weight=1)
-        body.rowconfigure(4, weight=1)
 
-        rubric = tk.LabelFrame(root, text="판정 기준", font=bold, padx=8, pady=4)
-        rubric.pack(fill="x", padx=12, pady=(6, 0))
-        tk.Label(rubric, text=RUBRIC_TEXT, font=font, justify="left", anchor="w").pack(fill="x")
-
-        choose = tk.Frame(root, padx=12, pady=6)
+        choose = tk.Frame(main, padx=12, pady=6)
         choose.pack(fill="x")
         self._btn_leaked = tk.Button(
             choose,
             text="1  누설",
             font=big,
             width=12,
+            state="disabled",
             command=lambda: self._choose(HintVerdict.LEAKED),
         )
         self._btn_leaked.pack(side="left", padx=(0, 8))
@@ -690,28 +745,29 @@ class HintVerdictWindow:
             text="2  누설 아님",
             font=big,
             width=12,
+            state="disabled",
             command=lambda: self._choose(HintVerdict.NOT_LEAKED),
         )
         self._btn_not.pack(side="left", padx=(0, 16))
         self._chosen = tk.Label(choose, font=bold, anchor="w", text="선택: (없음)")
         self._chosen.pack(side="left")
 
-        form = tk.Frame(root, padx=12)
+        form = tk.Frame(main, padx=12)
         form.pack(fill="x")
-        tk.Label(form, text="근거(한 줄)", font=font).pack(side="left")
+        tk.Label(form, text="근거(한 줄 · Enter = 기록)", font=font).pack(side="left")
         self._rationale_var = tk.StringVar(master=root)
         self._rationale = tk.Entry(form, font=font, textvariable=self._rationale_var)
         self._rationale.pack(side="left", fill="x", expand=True, padx=8)
         self._rationale_var.trace_add("write", lambda *_a: self._refresh_record_button())
 
-        actions = tk.Frame(root, padx=12, pady=6)
+        actions = tk.Frame(main, padx=12, pady=6)
         actions.pack(fill="x")
         self._btn_record = tk.Button(
             actions, text="기록", font=bold, width=10, state="disabled", command=self._record
         )
         self._btn_record.pack(side="left", padx=(0, 8))
         self._btn_skip = tk.Button(
-            actions, text="건너뛰기", font=font, width=10, command=self._skip
+            actions, text="건너뛰기", font=font, width=10, state="disabled", command=self._skip
         )
         self._btn_skip.pack(side="left", padx=(0, 8))
         self._btn_quit = tk.Button(actions, text="종료", font=font, width=10, command=self.on_close)
@@ -719,27 +775,35 @@ class HintVerdictWindow:
         self._lock_label = tk.Label(actions, font=font, fg=_COLOR_MUTED, anchor="w")
         self._lock_label.pack(side="left", padx=12)
 
-        # 공개 패널 — 기록 성공 뒤에만 채운다(그 전에는 빈 채로 숨김)
-        self._reveal = tk.Frame(root, padx=12, pady=6, relief="groove", bd=2)
-        self._reveal_text = tk.Label(
-            self._reveal, font=font, justify="left", anchor="w", wraplength=900
-        )
-        self._reveal_text.pack(fill="x")
-        self._reveal_badge = tk.Label(self._reveal, font=big, anchor="w")
-        self._reveal_badge.pack(side="left")
-        self._btn_next = tk.Button(
-            self._reveal, text="다음", font=bold, width=10, command=self._next
-        )
-        self._btn_next.pack(side="right")
-
-        self._status = tk.Label(root, font=font, fg=_COLOR_ERROR, anchor="w", padx=12)
+        self._status = tk.Label(main, font=font, fg=_COLOR_ERROR, anchor="w", padx=12)
         self._status.pack(fill="x", pady=(0, 6))
+
+        rubric = tk.LabelFrame(main, text="판정 기준", font=bold, padx=8, pady=4)
+        rubric.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        tk.Label(rubric, text=RUBRIC_TEXT, font=font, justify="left", anchor="nw").pack(
+            fill="both", expand=True
+        )
 
         root.bind("<Key-1>", lambda event: self._on_key(event, HintVerdict.LEAKED))
         root.bind("<Key-2>", lambda event: self._on_key(event, HintVerdict.NOT_LEAKED))
-        self._show_current()
+        root.bind("<Return>", self._on_return)
+
+        # 첫 항목은 이벤트 루프가 돈 뒤(첫 idle)에 띄운다 — 입력 잠금은 실제로 보인 순간부터(L3)
+        root.after_idle(self._start)
+        self._bring_to_front()
 
     # ── 화면 ──────────────────────────────────────────────────────────
+    def _bring_to_front(self) -> None:
+        """다른 창 뒤에 숨지 않게 잠깐 맨 위로 올리고 포커스를 가져온다(L3)."""
+        self._root.lift()
+        self._root.attributes("-topmost", True)
+        self._root.after(_TOPMOST_RELEASE_MS, lambda: self._root.attributes("-topmost", False))
+        self._root.focus_force()
+
+    def _start(self) -> None:
+        self._root.update_idletasks()
+        self._show_current()
+
     def _set_text(self, key: str, value: str) -> None:
         widget = self._fields[key]
         widget.configure(state="normal")
@@ -750,7 +814,10 @@ class HintVerdictWindow:
     def _show_current(self) -> None:
         view = self._ctl.current_view()
         if view is None:
-            self._finish()
+            if self._ctl.halted:  # 정지 — 비교를 공개하지 않고 닫는다
+                self._close_window()
+                return
+            self._show_end_screen()
             return
         self._progress.configure(text=f"[{view.index}/{view.total}] 힌트 {view.hint_id}")
         self._set_text("question", view.question_text or "(문항 본문 없음)")
@@ -771,7 +838,6 @@ class HintVerdictWindow:
         self._rationale_var.set("")
         for button in (self._btn_leaked, self._btn_not, self._btn_skip):
             button.configure(state="normal")
-        self._reveal.pack_forget()
         self._status.configure(text="")
         self._refresh_record_button()
 
@@ -781,19 +847,31 @@ class HintVerdictWindow:
             return
         self._choose(verdict)
 
+    def _on_return(self, _event: tk.Event[tk.Misc]) -> None:
+        """Enter = 기록 버튼(켜져 있을 때만 · 확인 창은 그대로 거친다)."""
+        if self._ended or str(self._btn_record.cget("state")) != "normal":
+            return
+        self._record()
+
     def _choose(self, verdict: HintVerdict) -> None:
-        if self._ctl.revealing or self._ctl.halted or self._ctl.finished:
+        if self._ended or self._ctl.halted or self._ctl.finished:
             return
         self._verdict = verdict
         self._chosen.configure(text=f"선택: {_VERDICT_LABEL[verdict]}")
         self._refresh_record_button()
 
+    def _cancel_poll(self) -> None:
+        if self._poll_job is not None:
+            try:
+                self._root.after_cancel(self._poll_job)
+            except Exception as exc:  # 이미 실행된 작업 — 무해하지만 침묵하지 않는다
+                logger.warning("판정 창 예약 작업 취소 실패: %s", type(exc).__name__)
+            self._poll_job = None
+
     def _refresh_record_button(self) -> None:
         """기록 버튼 — 판정 선택 + 근거 입력 + 잠금 해제가 모두 성립해야 켠다."""
-        if self._poll_job is not None:
-            self._root.after_cancel(self._poll_job)
-            self._poll_job = None
-        if self._ctl.revealing or self._ctl.halted or self._ctl.finished:
+        self._cancel_poll()
+        if self._ended or self._ctl.halted or self._ctl.finished:
             self._btn_record.configure(state="disabled")
             self._lock_label.configure(text="")
             return
@@ -832,44 +910,83 @@ class HintVerdictWindow:
         if result.status == "record_failed":
             self._fail(result.message)
             return
-        if result.status == "rejected" or result.hint_id is None:
+        if result.status == "rejected":
             self._status.configure(text=result.message, fg=_COLOR_ERROR)
             return
-        self._show_reveal(result.hint_id)
-
-    def _show_reveal(self, hint_id: str) -> None:
-        reveal = self._ctl.reveal_recommendation(hint_id)  # 기록 성공 뒤에만 도달한다
-        for button in (self._btn_leaked, self._btn_not, self._btn_skip):
-            button.configure(state="disabled")
-        self._rationale.configure(state="disabled")
-        self._refresh_record_button()
-        self._status.configure(text="기록했습니다 — 판정은 바꿀 수 없습니다.", fg=_COLOR_MUTED)
-        self._reveal_text.configure(text=reveal.text())
-        agrees = reveal.agrees
-        if agrees is None:
-            self._reveal_badge.configure(text="", fg=_COLOR_MUTED)
-        elif agrees:
-            self._reveal_badge.configure(text="일치", fg=_COLOR_AGREE)
-        else:
-            self._reveal_badge.configure(text="불일치", fg=_COLOR_DISAGREE)
-        self._reveal.pack(fill="x", padx=12, pady=(0, 6), before=self._status)
-
-    def _next(self) -> None:
-        if self._ctl.advance():
-            self._show_current()
+        # 기록 성공 — 확인 문구만 내고 다음 항목으로(권고는 세션 끝까지 비공개 · R19-01)
+        self._show_current()
+        if not self._ended:
+            self._status.configure(text=result.message, fg=_COLOR_OK)
 
     def _skip(self) -> None:
         if self._ctl.skip():
             self._show_current()
 
-    def _finish(self) -> None:
-        for button in (self._btn_leaked, self._btn_not, self._btn_skip, self._btn_record):
-            button.configure(state="disabled")
-        self._rationale.configure(state="disabled")
-        self._reveal.pack_forget()
-        self._progress.configure(
-            text="끝 — 남은 판정 대상이 없습니다. 창을 닫으면 요약이 나옵니다."
-        )
+    def _show_end_screen(self) -> None:
+        """끝 화면 — 남은 항목 0건·정지 아님일 때만 사람-AI 비교를 공개한다(판정 변경 없음)."""
+        if not self._ctl.finished or self._ctl.halted:  # 이중 게이트(제어기도 예외로 막는다)
+            return
+        import tkinter as tk
+
+        report = self._ctl.final_comparison()
+        self._ended = True
+        self._cancel_poll()
+        self._main.pack_forget()
+        font, bold = self._font, self._bold
+
+        end = tk.Frame(self._root, padx=12, pady=8)
+        end.pack(fill="both", expand=True)
+        tk.Label(
+            end,
+            font=bold,
+            anchor="w",
+            justify="left",
+            text="끝 — 남은 판정 대상이 없습니다. 이제 AI 권고와 비교합니다"
+            "(기록된 판정은 바꿀 수 없습니다).",
+        ).pack(fill="x")
+        tk.Label(
+            end,
+            font=bold,
+            anchor="w",
+            text=(
+                f"일치 {report.agree} · 불일치 {report.disagree} · 권고 없음 {report.no_rec} · "
+                f"미판정(건너뜀 등) {report.unjudged}"
+            ),
+        ).pack(fill="x", pady=(4, 4))
+        if report.errors:
+            tk.Label(
+                end,
+                font=font,
+                fg=_COLOR_ERROR,
+                anchor="w",
+                text=f"판정 파일 읽기 오류 {len(report.errors)}건 — 요약의 REPORT_ERROR 줄 참조",
+            ).pack(fill="x")
+        # 닫기 막대를 목록보다 먼저 붙인다 — 창이 작아도 잘리지 않게(M2)
+        bar = tk.Frame(end, pady=6)
+        bar.pack(side="bottom", fill="x")
+        tk.Button(bar, text="닫기", font=bold, width=10, command=self.on_close).pack(side="right")
+
+        tk.Label(end, text="불일치 목록", font=bold, anchor="w").pack(fill="x")
+        holder = tk.Frame(end)
+        holder.pack(fill="both", expand=True)
+        listing = tk.Text(holder, wrap="word", font=font, relief="solid", bd=1)
+        scroll = tk.Scrollbar(holder, orient="vertical", command=listing.yview)
+        listing.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        listing.pack(side="left", fill="both", expand=True)
+        if report.disagreements:
+            for n, row in enumerate(report.disagreements, 1):
+                listing.insert(
+                    "end",
+                    f"[{n}] 힌트 {row['hint_id']}\n"
+                    f"힌트 본문: {row['hint_content']}\n"
+                    f"사람: {_VERDICT_LABEL[HintVerdict(row['human'])]} · "
+                    f"AI: {_VERDICT_LABEL[HintVerdict(row['ai'])]}\n"
+                    f"AI 이유: {row['ai_rationale']}\n\n",
+                )
+        else:
+            listing.insert("end", "불일치 없음")
+        listing.configure(state="disabled")
 
     def _fail(self, message: str) -> None:
         from tkinter import messagebox
@@ -881,17 +998,12 @@ class HintVerdictWindow:
             self._close_window()
 
     def on_close(self) -> None:
-        """종료 버튼·창 닫기 — 기록된 판정은 그대로 두고 끝낸다."""
+        """종료 버튼·창 닫기·끝 화면 닫기 — 기록된 판정은 그대로 두고 끝낸다."""
         self._ctl.quit()
         self._close_window()
 
     def _close_window(self) -> None:
-        if self._poll_job is not None:
-            try:
-                self._root.after_cancel(self._poll_job)
-            except Exception as exc:  # 이미 실행된 작업 — 무해하지만 침묵하지 않는다
-                logger.warning("판정 창 예약 작업 취소 실패: %s", type(exc).__name__)
-            self._poll_job = None
+        self._cancel_poll()
         self._root.destroy()
 
 
@@ -901,7 +1013,7 @@ class HintVerdictWindow:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.harness.hint_verdict_gui",
-        description="힌트 정답 누설 사람 판정 창 — 판정 뒤에만 AI 권고 공개 (EOS-219)",
+        description="힌트 정답 누설 사람 판정 창 — 세션 끝에만 AI 권고 비교 공개 (EOS-219)",
     )
     parser.add_argument("--round", required=True, help="회차 접두어(<round>-* 좌석)")
     parser.add_argument("--runs-root", type=Path, default=None, help="회차 루트(기본 data/runs)")
@@ -939,12 +1051,27 @@ def _finish_session(controller: GuiReviewController, disagreements_path: Path) -
     sys.stdout.flush()
 
 
+def _show_error_box(root: Any, title: str, message: str) -> None:
+    """오류 창 — 모듈 함수로 둬서 테스트가 실제 대화 상자 없이 바꿔 끼운다."""
+    from tkinter import messagebox
+
+    messagebox.showerror(title, message, parent=root)
+
+
+def _destroy_quietly(root: Any) -> None:
+    """창 오류 뒤 정리 — 이미 닫혔으면 실패해도 타입명만 남기고 넘어간다."""
+    try:
+        root.destroy()
+    except Exception as exc:
+        logger.warning("판정 창 정리(destroy) 실패: %s", type(exc).__name__)
+
+
 def main(
     argv: list[str] | None = None,
     *,
     clock: Callable[[], float] = time.monotonic,
 ) -> int:
-    """CLI 진입점 — exit 0 정상(종료 포함) / 1 입력 실패 / 2 기록 실패·창을 띄울 수 없음."""
+    """CLI 진입점 — exit 0 정상(종료 포함) / 1 입력 실패 / 2 기록 실패·창 오류·창을 띄울 수 없음."""
     args = _parser().parse_args(argv)
     out = sys.stdout
     if not re.fullmatch(REVIEWER_ID_PATTERN, args.reviewer or ""):
@@ -954,7 +1081,7 @@ def main(
     folder = review_dir(runs_root, args.round)
     verdicts_path = args.verdicts or folder / DEFAULT_VERDICTS_NAME
     recs_path = args.recommendations or folder / DEFAULT_RECOMMENDATIONS_NAME
-    disagreements_path = folder / DEFAULT_DISAGREEMENTS_NAME
+    disagreements_path = folder / disagreements_filename(args.reviewer)
     inputs = load_review_inputs(
         runs_root=runs_root,
         round_id=args.round,
@@ -992,13 +1119,13 @@ def main(
         f"판정 창 — 전체 {controller.outcome.total}건 · 이미 판정 "
         f"{controller.outcome.already_done}건(건너뜀)\n판정 파일: {verdicts_path}\n"
         + (
-            f"AI 권고 파일: {recs_path}\n"
+            f"AI 권고 파일: {recs_path} — 남은 대상을 모두 마친 뒤에만 비교를 보여 줍니다\n"
             if recs_present
             else "AI 권고 파일 없음 — 권고 없이 판정\n"
         )
     )
     out.flush()
-    if controller.finished:  # 남은 대상 0건 — 창 없이 요약만
+    if controller.finished:  # 남은 대상 0건 — 창 없이 요약(세션 끝 비교 포함)만
         _finish_session(controller, disagreements_path)
         return EXIT_OK
     try:
@@ -1021,12 +1148,25 @@ def main(
     except tk.TclError as exc:  # 디스플레이 없음 등 — 창을 만들 수 없다
         out.write(f"GUI_UNAVAILABLE={type(exc).__name__} — 창을 만들 수 없다(디스플레이 확인).\n")
         return EXIT_RECORD
+
+    # 이벤트 콜백 안의 예외 — 기본 동작(stderr 출력 후 계속)은 fail-open이므로 바꾼다(M1)
+    root.report_callback_exception = make_callback_error_handler(
+        controller,
+        show_error=lambda title, message: _show_error_box(root, title, message),
+        close=root.destroy,
+    )
     window: HintVerdictWindow | None = None
     try:
         window = HintVerdictWindow(root, controller)
         root.mainloop()
+    except Exception as exc:  # 창 생성·루프의 예상 못한 오류 — traceback exit 1 대신 exit 2(L2)
+        name = type(exc).__name__
+        logger.error("판정 창 오류: %s", name)
+        out.write(f"GUI_ERROR={name}\n")
+        controller.fail(f"창 오류 — {name}. 세션을 멈춥니다(기록된 판정은 그대로).")
+        _destroy_quietly(root)
     finally:
-        controller.quit()  # 어떤 경로로 끝나든 남은 항목은 중단으로 센다(기록은 그대로)
+        controller.quit()  # 남은 항목이 있으면 중단으로 센다(기록은 그대로 · 끝났으면 완료)
         _finish_session(controller, disagreements_path)
     if controller.halted or (window is not None and window.record_failed):
         sys.stderr.write(

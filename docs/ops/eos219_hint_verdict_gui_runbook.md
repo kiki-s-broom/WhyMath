@@ -222,7 +222,7 @@ if ($CommitReady) {
 ```
 
 **확인**: `LAST_STEP=push` · `STEP_EXIT=0` · `git log` 줄에 세 파일(`hint_sample_manifest.json`·
-`hint_verdicts.jsonl`·`hint_ai_disagreements.json`)만 보임. `BRANCH=` 값을 세션에 전달한다. 판정 전용 폴더는
+`hint_verdicts.jsonl`·`hint_ai_disagreements.kiki.json`)만 보임. `BRANCH=` 값을 세션에 전달한다. 판정 전용 폴더는
 세션이 PR을 병합한 뒤 정리 명령을 따로 준다(지금 지우지 않는다).
 
 ### 판정 중 주의 (맹검을 도구 밖에서 깨지 않기)
