@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-222
+title: "EOS 감리 WP-E — LLM 저작 산출물 8-gram 일치율 기록 (저작권 가이드 v2 n-gram 가드레일 · 대조 가능한 원본 한정)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① LLM 저작 산출물(data/runs/*/cu.jsonl의 발문·해설)마다 비교 원본과의 8-gram 일치율을 산출해 회차 산출물에 기록한다. 기준은 docs/legal/copyright_guide_v2.md의 n-gram 가드레일(8-gram · 70% 이상이면 재생성)이다.\n② 비교 원본 집합을 명시한다 — 저장소에 실재하는 것(그 회차의 시드·입력 문항, 법적 안전 코퍼스)만 쓴다. 평가원·EBS·검정교과서 본문은 저장소에 없으므로 대조할 수 없다 — 이 한계를 산출물과 문서에 적는다(측정하지 않은 것을 0%로 쓰지 않는다).\n③ 기존 회차(data/runs/eos197-a6-*)에 소급해 첫 값을 내고, 70% 이상 건이 있으면 CU slug와 함께 보고한다.\n④ 변별력 — 원본을 그대로 복사한 CU를 주입하면 일치율이 기준을 넘어 걸리는지 확인한다.\n⑤ 새 모듈이면 EOS 기능 인벤토리·선언≠배선 감사에 귀속시킨다(infra-contracts 잡)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/ngram_overlap_report.py
+  - tests/backend/ops/test_ngram_overlap_report.py
+session: null
+notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-E 소유 태스크 등재(판정 기준 main 3a83ed64). 저장소에 8-gram 일치율 산출 코드는 0건(docs/legal/copyright_guide_v2.md의 예시 코드뿐 — 2026-10-30 grep). 같은 WP의 라이선스 레지스트리 정정은 기존 LIC-08이 소유한다."
+updated: 2026-10-30

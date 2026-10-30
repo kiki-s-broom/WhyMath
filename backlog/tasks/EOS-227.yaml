@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-227
+title: "EOS 감리 WP-F — G4 측정 문서: 누적 60 CU·1차 통과율 ≥70%·무개입 루프 3연속·테스트 계정 ≥20·P0 결함 0 실측표 (판정은 Kiki)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P0
+owner: claude
+depends_on:
+  - EOS-225
+requires_gates: []
+acceptance:
+  - "① G-eos-g4(12/13) 조건 5개를 main 기준으로 실측해 한 문서에 남긴다 — docs/reviews/eos_g4_measurement_2026-12.md. 조건: 누적 ≥60 CU(A6 30 + A4 30) · 자동검증 1차 통과율 ≥70%(Wilson 단측 하한 병기) · A6 깊이앵커 무개입 루프 3연속(Phase 3 Gate A와 동일 회차) · 내부 테스트 계정 표본 ≥20건(실사용자 아님을 명시 · EOS-135) · P0 결함 0.\n② 문서 상단에 판정 기준 main 커밋 해시를 박는다. 조건마다 값·근거 경로(파일·명령 출력)·측정 시각을 적는다. 측정하지 못한 조건은 '측정 실패'로 적고 PASS로 계상하지 않는다.\n③ 'P0 결함'을 무엇으로 세는지 출처를 명시한다. 저장소에 정해진 출처가 없으면 세는 방법을 정하지 말고 Kiki에게 확인한다.\n④ 이 문서는 판정문이 아니다 — clear 요청이나 verdict 기록은 Kiki 몫이다(에이전트가 --as kiki로 대행하지 않는다)."
+artifacts: []
+paths:
+  - docs/reviews/eos_g4_measurement_2026-12.md
+session: null
+notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-F 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = A4 2회차 저작(EOS-225 — 그 태스크가 WP-K 측정을 다시 기다린다). G-eos-g4 판정일 12/13."
+updated: 2026-10-30
