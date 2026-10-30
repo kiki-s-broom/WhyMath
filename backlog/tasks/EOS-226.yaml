@@ -7,17 +7,23 @@ subject: math
 layer: backend
 status: todo
 priority: 2
-eos_priority: P0
+eos_priority: P1
 owner: claude
 depends_on:
   - EOS-225
 requires_gates: []
 acceptance:
   - "① 사람 단독(AI 보조 없음) 검수 HIT 유효 표본 ≥15건을 A4 2회차 CU에서 남긴다. A6 회차 HIT 중앙값 53.24초는 AI 보조 검수 조건(EOS-197 ⑦(b))이라 사람 단독 HIT는 아직 0건이다.\n② 근거: 실패정의 F-Ⅰ(중등 기준선 앵커 A3·A4에서 HIT 중앙값 > 12분/CU)은 G5에서 원문 그대로 판정한다(ADR-007 결정 4). A3는 12월에 생산하지 않으므로 이 표본이 F-Ⅰ의 A4 쪽 유일한 입력이다.\n③ 유효 표본은 OPS-90 하한 가드를 통과한 것만 센다. 검수 조건(AI 보조 여부)을 레코드와 문서 양쪽에 표기한다 — 조건이 섞이면 따로 집계한다.\n④ 검수는 Kiki가 한다. 세션은 큐 준비·집계·문서만 맡는다. 측정 1건 = 실행 + 결과 커밋 + MEMORY 3줄.\n⑤ 산출: HIT 중앙값·P90·유효 표본 수·제외 건과 사유를 docs/reviews/eos_a4_human_hit_2026-12.md에 남긴다. 판정은 하지 않는다(G5 몫)."
+  - "⑥ 정정(2026-10-30 독립 검토): HIT 표본은 A4 CU의 첫 검수(EOS-225 ⑦ — AI 보조 없음)에서 나온 것만 쓴다. 이미 한 번 검수한 CU를 다시 검수한 HIT는 표본에서 제외하고 제외 건수를 적는다. 다시 보기(◀▶)를 쓴 문항은 그 문항 HIT에 다시 보기 시간이 섞이므로(review_session_gui review_back 설명) 표본에서 제외하거나 따로 집계한다."
 artifacts: []
 paths:
   - "data/runs/eos-a4-*/cu.review*.jsonl"
   - docs/reviews/eos_a4_human_hit_2026-12.md
 session: null
-notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-F 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = A4 2회차 저작(EOS-225) — 검수할 CU가 그 회차에서 나온다. 앵커 레지스트리 주석이 A3·A4를 F-Ⅰ 판정 대상(기준선 앵커)으로 적는다."
+notes: |-
+  출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-F 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = A4 2회차 저작(EOS-225) — 검수할 CU가 그 회차에서 나온다. 앵커 레지스트리 주석이 A3·A4를 F-Ⅰ 판정 대상(기준선 앵커)으로 적는다.
+
+  [정정 2026-10-30] PR #1781 독립 검토 지적 반영(정정 항 append)
+
+  [정정 2026-10-30] eos_priority P0 → P1: PR #1781 독립 검토: G4 조건 'P0 결함 0'을 비종결 P0 태스크로 읽으면 G4 판정일(12/13) 뒤에 끝나는 판정 작업이 G4를 자동 FAIL로 만든다(종전 G-internal-completion ③ 문면이 그렇게 읽은 선례). 순서는 게이트 입력 간선이 집행하므로 등급은 P1로 둔다
 updated: 2026-10-30

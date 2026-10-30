@@ -7,7 +7,7 @@ subject: math
 layer: docs
 status: todo
 priority: 2
-eos_priority: P0
+eos_priority: P1
 owner: claude
 depends_on:
   - EOS-227
@@ -15,9 +15,15 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① G5 증거 문서 docs/reviews/eos_g5_evidence_2026-12-27.md를 만든다(G-eos-g5 notes가 지목한 경로). 실패정의 F-Ⅰ~Ⅴ(EOS 전환 선언 부록 D · 검증설계서 §5 동결본)를 원문 그대로 두고, 정의마다 판정 재료·값·근거 경로를 적는다. ADR-007 결정 4에 따라 'F-Ⅰ·F-Ⅳ 미달(A3 미생산)'을 숨기지 않고 기록한다.\n② 12/27 데이터 동결 — 동결 시점의 main 커밋을 문서 상단에 박고, 주석 태그(예: eos-g5-freeze-2026-12-27)를 만든다. 태그 push가 이 환경에서 되는지 실행 전에 확인하고, 안 되면 커밋 해시 고정으로 대체하고 그 사실을 적는다. 동결 뒤 들어온 데이터는 증거에 쓰지 않는다.\n③ 입력을 연결한다: G4 측정 문서 · A4 사람 단독 HIT · ARCH-67(필수층 미사용 재확인) · 2027 이월 후보(docs/strategy/eos_2027_carryover_candidates_2026-10-25.md).\n④ 판정(Go / Conditional Go / No-Go + 2027 범위)은 Kiki 몫이다. 문서는 판정 재료까지만 낸다."
+  - "⑤ 정정(2026-10-30 독립 검토): F-Ⅰ~Ⅴ의 값은 EOS-61의 판정 실행기(src/backend/whymath_backend/ops/validation_scorecard.py — Hard Gate F-Ⅰ~F-Ⅴ + KPI 스코어카드)를 돌린 결과를 정본으로 쓴다. 손으로 따로 계산해 이중 경로를 만들지 않는다. 실행기가 측정 실패(exit 1)를 내면 그대로 적는다.\n⑥ 정정(2026-10-30 독립 검토): ARCH-67은 G-eos-g5의 직접 입력이라 이 태스크의 depends_on에 넣지 않는다 — ARCH-67이 기다리는 G-required-tier-caller-recheck-g5의 재확인 지점이 이 태스크 ②의 12/27 동결이라, 걸면 순서가 꼬인다. 증거 문서는 ARCH-67 결과가 있으면 링크하고 없으면 미완으로 적는다. 나중에 동결을 다른 게이트의 입력으로 이어야 하면 ②(동결)를 별도 태스크로 먼저 나눈다."
 artifacts: []
 paths:
   - docs/reviews/eos_g5_evidence_2026-12-27.md
 session: null
-notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-G 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = G4 측정 문서(EOS-227)와 A4 사람 단독 HIT(EOS-226 — F-Ⅰ의 A4 쪽 입력). 같은 WP의 필수층 미사용 재확인은 기존 ARCH-67이 소유한다(G-eos-g5의 입력 간선)."
+notes: |-
+  출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-G 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = G4 측정 문서(EOS-227)와 A4 사람 단독 HIT(EOS-226 — F-Ⅰ의 A4 쪽 입력). 같은 WP의 필수층 미사용 재확인은 기존 ARCH-67이 소유한다(G-eos-g5의 입력 간선).
+
+  [정정 2026-10-30] PR #1781 독립 검토 지적 반영(정정 항 append)
+
+  [정정 2026-10-30] eos_priority P0 → P1: PR #1781 독립 검토: G4 조건 'P0 결함 0'을 비종결 P0 태스크로 읽으면 G4 판정일(12/13) 뒤에 끝나는 판정 작업이 G4를 자동 FAIL로 만든다(종전 G-internal-completion ③ 문면이 그렇게 읽은 선례). 순서는 게이트 입력 간선이 집행하므로 등급은 P1로 둔다
 updated: 2026-10-30

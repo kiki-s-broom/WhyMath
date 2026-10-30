@@ -13,11 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 자동검증 1차 통과율 — EOS-207이 만든 파일 입력 경로(weekly_metrics_report의 --authoring-run-dir)로 주간 KPI 회차를 실행해 metrics/weekly.json에 auto_gate_pass_rate measured:true 레코드를 남긴다. 값·분자·분모·근거 회차 경로를 함께 남기고, 분모 정의는 EOS-207 측정 문서(docs/reviews/eos207_g3_measures_2026-10-29.md §2 (a) — 모델 응답 기준)와 같게 한다. 다르게 하면 이유를 적는다. G4 판정 형식(Wilson 단측 95% 하한)을 함께 산출한다.\n② 재작업률 — 지금 rework_rate는 STRUCTURALLY_UNMEASURED(Run 재생성 카운트 로그 없음)다. 저작 회차 산출물에서 재작업(같은 CU 슬롯에 대한 재생성·검수 반려 후 재저작)을 세는 정의를 문서화하고 산출 경로를 만든다. 근거 로그가 없는 구간은 measured:false와 사유로 남긴다(0으로 위장 금지).\n③ 변별력 — 두 KPI 입력에 위반 상태를 주입해 값이 실제로 바뀌는지 확인하고, 주입이 적용됐는지(mutated != original)도 단언한다.\n④ 측정 1건 = 실행 + 결과 파일 커밋 + MEMORY 결정 로그 3줄(12/31 내부 검증 기간 방침 4항).\n⑤ 완료 판정 — main의 metrics/weekly.json 최신 레코드에서 auto_gate_pass_rate가 measured:true이고, rework_rate는 measured:true이거나 measured:false + 근거 있는 사유다."
+  - "⑥ 정정(2026-10-30 독립 검토): ⑤의 \"최신 레코드\"는 증적이 될 수 없다 — 주간 cron(.github/workflows/weekly-metrics.yml · 일요일 DB 모드)은 --authoring-run-dir 없이 돌아 매주 auto_gate_pass_rate measured:false 레코드를 덧붙인다. 완료 증적은 측정 레코드의 generated_at 값으로 고정한다(EOS-197 ⑦(d) 선례). cron이 파일 입력을 읽게 바꿀지는 이 태스크에서 판정하고 근거를 남긴다."
 artifacts: []
 paths:
   - src/backend/whymath_backend/ops/weekly_metrics_report.py
   - "tests/backend/ops/test_weekly_metrics*.py"
   - metrics/weekly.json
 session: null
-notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-K 소유 태스크 등재(판정 기준 main 3a83ed64). 현황: metrics/weekly.json 최신 레코드(2026-10-28 07:57:24Z)에서 auto_gate_pass_rate·rework_rate 둘 다 measured:false. EOS-207이 파일 입력 경로와 첫 값(1차 통과율 0.1171 = 13/111)을 냈으나 weekly.json에는 아직 기록되지 않았다. WP-F A4 2회차 저작(G4)이 이 태스크를 선행으로 기다린다."
+notes: |-
+  출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-K 소유 태스크 등재(판정 기준 main 3a83ed64). 현황: metrics/weekly.json 최신 레코드(2026-10-28 07:57:24Z)에서 auto_gate_pass_rate·rework_rate 둘 다 measured:false. EOS-207이 파일 입력 경로와 첫 값(1차 통과율 0.1171 = 13/111)을 냈으나 weekly.json에는 아직 기록되지 않았다. WP-F A4 2회차 저작(G4)이 이 태스크를 선행으로 기다린다.
+
+  [정정 2026-10-30] PR #1781 독립 검토 지적 반영(정정 항 append)
 updated: 2026-10-30

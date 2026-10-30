@@ -16,6 +16,10 @@ acceptance:
 artifacts: []
 paths:
   - docs/ops/kiki_pc_execution_standard.md
+  - docs/ops/eos197_authoring_round_runbook.md
 session: null
-notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-L 소유 태스크 등재(판정 기준 main 3a83ed64). WP-L의 저작 경로 결함 몫은 기존 EOS-203·204·205·209·212가 소유한다(docs/reviews/eos_wp_owner_tasks_2026-11.md). 이 태스크는 그중 실행 표준 문서만 맡는다."
+notes: |-
+  출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-L 소유 태스크 등재(판정 기준 main 3a83ed64). WP-L의 저작 경로 결함 몫은 기존 EOS-203·204·205·209·212가 소유한다(docs/reviews/eos_wp_owner_tasks_2026-11.md). 이 태스크는 그중 실행 표준 문서만 맡는다.
+
+  [정정 2026-10-30] paths ['docs/ops/kiki_pc_execution_standard.md'] → ['docs/ops/kiki_pc_execution_standard.md', 'docs/ops/eos197_authoring_round_runbook.md']: PR #1781 독립 검토: acceptance ③이 저작 회차 런북 수정을 요구하는데 paths에 없었다
 updated: 2026-10-30
