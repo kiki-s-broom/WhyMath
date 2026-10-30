@@ -99,12 +99,20 @@ __all__ = [
     "EXIT_OK",
     "EXIT_RECORD",
     "INPUT_LOCK_SECONDS",
+    "REVIEWER_FORMAT_ERROR",
+    "ReviewInputs",
     "SessionOutcome",
     "WorkItem",
+    "already_done",
+    "build_verdict",
+    "load_review_inputs",
     "machine_undecided_hint_ids",
     "main",
+    "preflight_writable",
     "prepare_work",
     "render_item",
+    "render_summary",
+    "review_dir",
     "run_review_session",
 ]
 
@@ -116,6 +124,10 @@ DEFAULT_MANIFEST_NAME = "hint_sample_manifest.json"
 DEFAULT_VERDICTS_NAME = "hint_verdicts.jsonl"
 _ORDER_SALT = 0x5EED_0210  # 표시 순서 섞기용(표본 추출 seed와 다른 난수열)
 _ZERO_TOLERANCE_LEVELS = frozenset({1, 2})
+#: 판정자 ID 형식 오류 안내 — 터미널·창(`hint_verdict_gui`) 두 도구가 같은 문장을 낸다.
+REVIEWER_FORMAT_ERROR = (
+    "판정자 ID 형식 — 영문·숫자로 시작하는 1~32자(영문·숫자·_ . -)만 쓴다(이름 대신 짧은 ID)"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,7 +303,7 @@ def _ask_rationale(stream: TextIO, out: TextIO) -> str | None:
 # ──────────────────────────────────────────────────────────────────────────
 # 세션
 # ──────────────────────────────────────────────────────────────────────────
-def _preflight_writable(path: Path) -> OSError | None:
+def preflight_writable(path: Path) -> OSError | None:
     """판정 파일을 append로 열어 본다(없으면 만든다 · 내용은 바꾸지 않는다)."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -302,7 +314,7 @@ def _preflight_writable(path: Path) -> OSError | None:
     return None
 
 
-def _already_done(
+def already_done(
     existing: Sequence[HintHumanVerdict],
     items: Sequence[WorkItem],
     *,
@@ -320,6 +332,37 @@ def _already_done(
         and verdict.sample_id == sample_id
         and fingerprints.get(verdict.hint_id) == verdict.content_fingerprint
     }
+
+
+def build_verdict(
+    item: WorkItem,
+    *,
+    manifest: SampleManifest,
+    reviewer: str,
+    verdict: HintVerdict,
+    rationale: str,
+    judged_at: datetime,
+    session_id: uuid.UUID,
+) -> HintHumanVerdict:
+    """판정 1건을 기록 계약 모델로 만든다 — 터미널·창 두 도구가 같은 함수를 쓴다.
+
+    목적은 매니페스트에서, 지문은 판정자에게 보인 내용(`review_view`)에서 계산한다. 도구를 거친
+    판정이므로 `bypassed=False`다. 계약 위반(빈 근거 등)은 `ValidationError`로 올린다.
+    """
+    return HintHumanVerdict(
+        schema_version="hint-human-verdict/v1",
+        hint_id=item.hint.hint_id,
+        problem_id=item.hint.solution_step_ref.problem_id,
+        reviewer=reviewer,
+        judged_at=judged_at,
+        verdict=verdict,
+        rationale=rationale,
+        purpose=manifest.purpose_of(item.hint.hint_id),
+        sample_id=manifest.sample_id,
+        content_fingerprint=hint_review_fingerprint(item.cu_row, item.hint),
+        review_session_id=session_id,
+        bypassed=False,
+    )
 
 
 def run_review_session(
@@ -373,19 +416,14 @@ def run_review_session(
                 out.write("  다시 판정합니다.\n")
                 continue
             try:
-                verdict = HintHumanVerdict(
-                    schema_version="hint-human-verdict/v1",
-                    hint_id=item.hint.hint_id,
-                    problem_id=item.hint.solution_step_ref.problem_id,
+                verdict = build_verdict(
+                    item,
+                    manifest=manifest,
                     reviewer=reviewer,
-                    judged_at=now(),
                     verdict=choice,
                     rationale=rationale,
-                    purpose=manifest.purpose_of(item.hint.hint_id),
-                    sample_id=manifest.sample_id,
-                    content_fingerprint=hint_review_fingerprint(item.cu_row, item.hint),
-                    review_session_id=session,
-                    bypassed=False,
+                    judged_at=now(),
+                    session_id=session,
                 )
             except ValidationError as exc:
                 out.write(f"  판정이 기록 계약을 통과하지 못했습니다 — {type(exc).__name__}\n")
@@ -430,13 +468,63 @@ def render_summary(outcome: SessionOutcome) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 # CLI
 # ──────────────────────────────────────────────────────────────────────────
-def _review_dir(runs_root: Path, round_id: str) -> Path:
+def review_dir(runs_root: Path, round_id: str) -> Path:
+    """회차의 검수 폴더 — 매니페스트·판정·권고·불일치 파일이 모두 여기 산다."""
     return runs_root / f"{round_id}-review"
+
+
+@dataclass(slots=True)
+class ReviewInputs:
+    """판정 세션 입력 — 매니페스트·판정 대상·기존 판정·입력 오류(오류가 있으면 시작하지 않는다)."""
+
+    manifest: SampleManifest | None
+    items: list[WorkItem]
+    existing: list[HintHumanVerdict]
+    errors: list[str]
+
+
+def load_review_inputs(
+    *,
+    runs_root: Path,
+    round_id: str,
+    hint_paths: Sequence[Path],
+    manifest_path: Path,
+    verdicts_path: Path,
+    rejudge: Sequence[str] = (),
+) -> ReviewInputs:
+    """회차·힌트·매니페스트·기존 판정을 읽고 판정 대상을 만든다 — 터미널·창 공용(같은 거부 규칙).
+
+    거부 사유: 회차·힌트 입력 오류 · 매니페스트 손상·회차 불일치 · 모집단 변경 · 기존 판정 파일
+    손상·순서 손상(시각 역행) · 판정 대상 밖 `--rejudge`.
+    """
+    cu_rows, hints, errors = _load_inputs(runs_root, round_id, hint_paths)
+    manifest, manifest_errors = load_manifest(manifest_path)
+    errors.extend(manifest_errors)
+    if manifest is not None and manifest.round_id != round_id:
+        errors.append(f"매니페스트 회차 {manifest.round_id!r} ≠ --round {round_id!r}")
+    items: list[WorkItem] = []
+    if manifest is not None and not errors:
+        items, work_errors = prepare_work(manifest, cu_rows, hints)
+        errors.extend(work_errors)
+    existing: list[HintHumanVerdict] = []
+    if verdicts_path.exists():
+        existing, verdict_errors = load_verdicts(verdicts_path)
+        errors.extend(f"기존 판정 파일 손상 — 이어 쓰지 않는다: {e}" for e in verdict_errors)
+        # 순서가 이미 깨진 파일(시각 역행)에 이어 쓰면 측정기가 어차피 거부한다 — 먼저 멈춘다
+        errors.extend(
+            f"기존 판정 파일 순서 손상 — 이어 쓰지 않는다: {e}"
+            for e in verdict_ordering_errors([(verdicts_path.name, existing)])
+        )
+    work_ids = {item.hint.hint_id for item in items}
+    unknown = sorted(set(rejudge) - work_ids)
+    if unknown:
+        errors.append(f"--rejudge 대상이 판정 대상 목록에 없다: {', '.join(unknown)}")
+    return ReviewInputs(manifest=manifest, items=items, existing=existing, errors=errors)
 
 
 def _cmd_sample(args: argparse.Namespace, out: TextIO) -> int:
     runs_root = args.runs_root if args.runs_root is not None else default_runs_root()
-    manifest_path = args.manifest or _review_dir(runs_root, args.round) / DEFAULT_MANIFEST_NAME
+    manifest_path = args.manifest or review_dir(runs_root, args.round) / DEFAULT_MANIFEST_NAME
     cu_rows, hints, errors = _load_inputs(runs_root, args.round, args.hints_jsonl or [])
     population, population_errors = sample_population(cu_rows, hints)
     errors.extend(population_errors)
@@ -499,48 +587,31 @@ def _cmd_review(
     clock: Callable[[], float] = time.monotonic,
 ) -> int:
     if not re.fullmatch(REVIEWER_ID_PATTERN, args.reviewer or ""):
-        out.write(
-            "INPUT_ERROR=판정자 ID 형식 — 영문·숫자로 시작하는 1~32자(영문·숫자·_ . -)만 쓴다"
-            "(이름 대신 짧은 ID)\n"
-        )
+        out.write(f"INPUT_ERROR={REVIEWER_FORMAT_ERROR}\n")
         return EXIT_INPUT
     runs_root = args.runs_root if args.runs_root is not None else default_runs_root()
-    review_dir = _review_dir(runs_root, args.round)
-    manifest_path = args.manifest or review_dir / DEFAULT_MANIFEST_NAME
-    verdicts_path = args.verdicts or review_dir / DEFAULT_VERDICTS_NAME
-    cu_rows, hints, errors = _load_inputs(runs_root, args.round, args.hints_jsonl or [])
-    manifest, manifest_errors = load_manifest(manifest_path)
-    errors.extend(manifest_errors)
-    if manifest is not None and manifest.round_id != args.round:
-        errors.append(f"매니페스트 회차 {manifest.round_id!r} ≠ --round {args.round!r}")
-    items: list[WorkItem] = []
-    if manifest is not None and not errors:
-        items, work_errors = prepare_work(manifest, cu_rows, hints)
-        errors.extend(work_errors)
-    existing: list[HintHumanVerdict] = []
-    if verdicts_path.exists():
-        existing, verdict_errors = load_verdicts(verdicts_path)
-        errors.extend(f"기존 판정 파일 손상 — 이어 쓰지 않는다: {e}" for e in verdict_errors)
-        # 순서가 이미 깨진 파일(시각 역행)에 이어 쓰면 측정기가 어차피 거부한다 — 먼저 멈춘다
-        errors.extend(
-            f"기존 판정 파일 순서 손상 — 이어 쓰지 않는다: {e}"
-            for e in verdict_ordering_errors([(verdicts_path.name, existing)])
-        )
-    work_ids = {item.hint.hint_id for item in items}
-    unknown = sorted(set(args.rejudge or []) - work_ids)
-    if unknown:
-        errors.append(f"--rejudge 대상이 판정 대상 목록에 없다: {', '.join(unknown)}")
-    if errors or manifest is None:
-        out.write("".join(f"INPUT_ERROR={e}\n" for e in errors))
+    folder = review_dir(runs_root, args.round)
+    verdicts_path = args.verdicts or folder / DEFAULT_VERDICTS_NAME
+    inputs = load_review_inputs(
+        runs_root=runs_root,
+        round_id=args.round,
+        hint_paths=args.hints_jsonl or [],
+        manifest_path=args.manifest or folder / DEFAULT_MANIFEST_NAME,
+        verdicts_path=verdicts_path,
+        rejudge=args.rejudge or [],
+    )
+    manifest, items, existing = inputs.manifest, inputs.items, inputs.existing
+    if inputs.errors or manifest is None:
+        out.write("".join(f"INPUT_ERROR={e}\n" for e in inputs.errors))
         return EXIT_INPUT
-    failure = _preflight_writable(verdicts_path)
+    failure = preflight_writable(verdicts_path)
     if failure is not None:
         out.write(
             f"WRITE_PREFLIGHT_FAILED={type(failure).__name__} — 판정 파일을 쓸 수 없다"
             "(다른 프로그램이 열고 있는지 확인). 아무것도 묻지 않고 멈춘다.\n"
         )
         return EXIT_RECORD
-    done = _already_done(existing, items, reviewer=args.reviewer, sample_id=manifest.sample_id)
+    done = already_done(existing, items, reviewer=args.reviewer, sample_id=manifest.sample_id)
     done -= set(args.rejudge or [])
     outcome = run_review_session(
         items,

@@ -167,6 +167,9 @@ _SECURE_STRING = re.compile(r"-AsSecureString\b", re.IGNORECASE)
 #   review_session — 카나리 검수 TUI(항목마다 판정 키를 묻는 루프)
 #   hint_verdict_session review — 힌트 누설 사람 판정 루프(EOS-210 · 항목마다 판정·근거·확인을
 #                                  묻는다). 같은 모듈의 `sample`은 한 번에 끝나므로 대상이 아니다
+#   hint_verdict_gui — 같은 판정을 창에서 받는다(EOS-219). stdin을 읽지는 않지만 창이 닫힐
+#                      때까지 프롬프트를 붙잡으므로, 같은 블록의 뒤 줄은 판정이 끝난 뒤
+#                      *예고 없이* 실행된다 — 판정 창은 한 줄 블록으로 따로 띄운다
 #
 # `Read-Host`는 **의도적으로 제외한다.** 한 줄만 읽고 반환하므로 버퍼를 비우는 것이 아니라
 # *한 줄을 소비하고 멈추는* 장치이고, CLAUDE.md가 붙여넣기 정지 수단으로 **권장**한다
@@ -175,7 +178,9 @@ _SECURE_STRING = re.compile(r"-AsSecureString\b", re.IGNORECASE)
 # 두 런북의 **정상 정지 장치**를 위반으로 잡았다(2026-09-22 실측) — 헌법이 처방한 형태를
 # 가드가 거부하면 사람은 가드를 끈다. 여기에 어휘를 더할 때는 "한 줄인가, 루프인가"를 먼저
 # 판정할 것.
-_INTERACTIVE = re.compile(r"\breview_session\b|\bhint_verdict_session\s+review\b", re.IGNORECASE)
+_INTERACTIVE = re.compile(
+    r"\breview_session\b|\bhint_verdict_session\s+review\b|\bhint_verdict_gui\b", re.IGNORECASE
+)
 _LENGTH_CHECK = re.compile(r"\.Length\b|\bLength\b", re.IGNORECASE)
 
 _VARIABLE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*|\$\(")

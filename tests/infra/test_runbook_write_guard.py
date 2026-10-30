@@ -209,6 +209,18 @@ $PyExe = "C:\\repo\\.venv\\Scripts\\python.exe"
 "SAMPLE_EXIT=$LASTEXITCODE"
 """
 
+# EOS-219 판정 창 — stdin을 읽지 않아도 창이 닫힐 때까지 프롬프트를 붙잡는다. 같은 블록의 뒤 줄은
+# 판정이 끝난 뒤 예고 없이 실행되므로 설정과 한 블록이면 위반이다.
+_HINT_VERDICT_GUI_WITH_SETUP = """
+$PyExe = "C:\\repo\\.venv\\Scripts\\python.exe"
+& $PyExe -m whymath_backend.harness.hint_verdict_gui --round r1 --reviewer kiki
+"""
+
+# 같은 명령이 혼자 있으면 정당하다(대조군 — 「판정 창 자체를 금지」하는 과잉 수정을 막는다).
+_HINT_VERDICT_GUI_ALONE = """
+& $PyExe -m whymath_backend.harness.hint_verdict_gui --round r1 --reviewer kiki
+"""
+
 # `Read-Host`는 **의도적으로 대화형 축 밖**이다 — 한 줄만 읽고 반환하므로 버퍼를 비우는 것이
 # 아니라 *한 줄을 소비하고 멈추는* 장치이고, CLAUDE.md가 붙여넣기 정지 수단으로 권장한다.
 # 초판이 이것을 축에 넣었다가 실제 런북 2건의 정상 정지 장치를 red로 만들었다(2026-09-22).
@@ -285,6 +297,7 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("dangling_else_only", _DANGLING_ELSE_WITHOUT_OTHER_DEFECTS),
         ("interactive_with_setup", _INTERACTIVE_WITH_SETUP),
         ("hint_verdict_review_with_setup", _HINT_VERDICT_REVIEW_WITH_SETUP),
+        ("hint_verdict_gui_with_setup", _HINT_VERDICT_GUI_WITH_SETUP),
         ("wrapped_psql_delete", _WRAPPED_PSQL_DELETE_UNGUARDED),
         ("load_cli", _LOAD_CLI_UNGUARDED),
         ("load_crosslinks_call", _LOAD_CROSSLINKS_CALL_UNGUARDED),
@@ -306,6 +319,7 @@ def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
         ("secure_verified", _SECURE_STRING_VERIFIED),
         ("interactive_alone", _INTERACTIVE_ALONE),
         ("hint_verdict_sample_with_setup", _HINT_VERDICT_SAMPLE_WITH_SETUP),
+        ("hint_verdict_gui_alone", _HINT_VERDICT_GUI_ALONE),
         ("read_host_with_setup", _READ_HOST_WITH_SETUP),
         ("nested_guard_closing", _NESTED_GUARD_CLOSING),
         ("wrapped_psql_guarded", _WRAPPED_PSQL_DELETE_GUARDED),
