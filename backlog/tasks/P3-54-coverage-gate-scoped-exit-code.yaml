@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-54-coverage-gate-scoped-exit-code
+title: "phase3_coverage 종료 코드를 게이트 조건 단위로 분리 — 지금은 기준선·주입·대조군 전부 exit 1이라 Content Coverage를 종료 코드로 판정할 수 없다"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현재 상태 재현 — phase3_coverage의 종료 코드는 목표가 있는 모든 지표의 합이라, 게이트 하나의 조건을 종료 코드로 판정할 수 없다. 2026-10-17 P3-G1 재판정 실측(main e35692ef): 무주입 exit=1, Content Coverage를 9/10·8/10으로 떨어뜨린 주입 4종 exit=1, 대조군 2종 exit=1 — 종료 코드가 Content Coverage를 변별하지 못한다(원인은 Concept Completeness 0/10과 Graph Connectivity 5/10).\n② 게이트 조건에 해당하는 지표만으로 종료 코드를 내는 선택 수단을 CLI에 둔다. 어떤 지표가 어떤 게이트(P3-G1·G2)의 조건인지는 코드가 아니라 명세(scope_spec.yaml)가 소유한다. 기본 동작(전 지표 합산)은 바꾸지 않는다.\n③ 변별력 — 지표마다 그 지표만 떨어뜨리는 주입에 선택된 종료 코드가 1이 되고, 다른 지표만 떨어뜨리는 주입에는 0을 유지하는 쌍 테스트를 둔다. mutated != original과 원복 바이트 동일을 단언한다.\n④ 이 태스크는 측정 도구의 판정 표면만 다룬다. 지표 정의·목표값은 바꾸지 않는다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1683"
+  - 2e8ebcecb
+paths:
+  - src/backend/whymath_backend/l1/standards/phase3_coverage.py
+  - tests/backend/l1/test_phase3_coverage.py
+session: null
+notes: |-
+  출처: P3-53-week1-gate-rejudgment-2026-10-17 판정 중 발견한 별건(판정 전용 세션이라 구현하지 않고 등재만 한다). 10/12 판정문도 같은 사실(CLI exit 1)을 적고 게이트 문면(Content Coverage)으로 읽어 PASS를 냈다 — 종료 코드로 판정하라는 P3-02 acceptance ②와 실제 판정 방식이 어긋난 채 남아 있다.
+
+  [트리거 면제] 별건 등재 — 새 규칙 도입 아님
+
+  [미러 면제 2026-10-18] 2e8ebcecb 는 PR #1683 의 스쿼시 머지이며 같은 내용이 PR CI 와 merge queue CI 에서 필수 잡 전부 success 로 검증됐다. 로컬 샌드박스는 ssh-keygen 부재로 미러가 서명 검증 2스텝에서 실패하는 환경이라 재현해도 같은 환경 실패만 반복된다
+updated: 2026-10-18

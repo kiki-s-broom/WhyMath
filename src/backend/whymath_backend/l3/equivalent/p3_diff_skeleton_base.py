@@ -39,12 +39,14 @@ review_status
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import functools
 import hashlib
 import random
 import re
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import ClassVar, Final, Literal
@@ -58,7 +60,15 @@ from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
     parameter_coincidences,
     shortcut_violations,
 )
-from whymath_backend.l3.equivalent.p3_diff_solution_steps import StepChain, solution_steps
+from whymath_backend.l3.equivalent.p3_diff_solution_steps import (
+    StepChain,
+    explicit_definitions,
+    final_solution_values,
+    final_statement_steps,
+    solution_steps,
+    verified_expression_chain,
+)
+from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.schema.enums import (
     AnswerFormat,
     Curriculum,
@@ -81,11 +91,14 @@ __all__ = [
     "P3DiffSlotGenerator",
     "answer_format_for",
     "build_choices",
+    "final_step_structuring",
+    "final_step_structuring_enabled",
     "probe_of",
     "round_robin_items",
     "seeded_order",
     "skeleton_of",
     "steps_of",
+    "structured_view",
 ]
 
 #: 슬롯 id 타입 — `Literal`로 두어야 형제 생성기 공간 겹침 감사기(`harness/
@@ -188,6 +201,12 @@ class DiffItem:
     #: 없는 문항(기울기를 상수로 풀어 쓴 산술식·판별식 등)만 생성기가 단다. None이면
     #: `p3_diff_solution_steps.derive_setup`이 검산 조건에서 고른다.
     solution_setup: str | None = None
+    #: 규칙 (가)(P3-62) 재료 — 풀이 끝의 '근 선택 → 정답 변수 값' 두 줄을 공용 해석 판정이
+    #: **조건만으로** 증명할 수 있게 다시 쓴 검산 조건(매개변수 대입·선택 근거 도메인 부등식·정의
+    #: 등식). None이면 원래 조건을 쓴다(정의 등식의 명시 다항식화만 — `explicit_definitions`).
+    #: 구조화 모드(`final_step_structuring`)에서만 후보에 실린다 — 기본 모드의 은행 바이트는 이
+    #: 필드와 무관하다.
+    structured_conditions: tuple[str, ...] | None = None
 
     @property
     def misconception_ids(self) -> frozenset[str]:
@@ -310,6 +329,11 @@ def steps_of(item: DiffItem) -> StepChain:
     빌드 검증(`_validate_slot`)과 후보 조립(`_assemble`)이 같은 결과를 쓴다(문항은 불변·해시 가능).
     전이 전건 correct인 연쇄를 못 만들면 ValueError(검증 안 된 단계를 은행에 싣지 않는다).
     """
+    # P3-65 — 생성기가 식↔식 연쇄를 직접 단 문항(개념형 0/1 판정)은 그 연쇄를 검증해 쓴다. 이 속성은
+    # 그 생성기의 문항 확장 클래스에만 있다(기존 문항은 None — 기존 은행 바이트 불변).
+    explicit = getattr(item, "explicit_steps", None)
+    if explicit is not None:
+        return verified_expression_chain(explicit)
     kind = getattr(item, "answer_kind", None)
     return solution_steps(
         conditions=item.conditions,
@@ -317,6 +341,95 @@ def steps_of(item: DiffItem) -> StepChain:
         answer_kind=kind if isinstance(kind, str) else None,
         setup=item.solution_setup,
     )
+
+
+#: 규칙 (가) 구조화 모드 — 기본 꺼짐(승인 은행 바이트 불변). 후보 은행 배치만 켠다.
+_FINAL_STEP_MODE: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "p3_diff_final_step_structuring", default=False
+)
+
+
+@contextlib.contextmanager
+def final_step_structuring(enabled: bool = True) -> Iterator[None]:
+    """이 블록 안에서 조립되는 후보에 규칙 (가)(풀이 끝 정답 변수 값 진술)를 적용한다(P3-62).
+
+    기본(블록 밖)은 꺼짐이다 — 감사 동결 사본과 바이트가 결속된 승인 은행을 재생성하는 기본 배치·
+    `--check` 드리프트 검사는 이 모드와 무관하다. 문항 선택(틀·파라미터·중복 제거)은 모드와 무관하게
+    같으므로 두 모드의 문항 집합(slug)은 같다 — 바뀌는 것은 검산 조건과 풀이 단계뿐이다.
+    """
+    token = _FINAL_STEP_MODE.set(enabled)
+    try:
+        yield
+    finally:
+        _FINAL_STEP_MODE.reset(token)
+
+
+def final_step_structuring_enabled() -> bool:
+    return _FINAL_STEP_MODE.get()
+
+
+def _same_number(left: str, right: str) -> bool:
+    difference = safe_sympify(f"({left}) - ({right})")
+    return bool(getattr(difference, "is_zero", False))
+
+
+def _answer_variable(item: DiffItem, pick_variable: str) -> str | None:
+    """정답 변수 — answer_map에서 값이 정답 표기와 같은 변수(후보 나열 변수 제외). 하나가 아니면
+    None.
+
+    *어느 변수가 정답인가*를 읽을 뿐 근 선택에 정답을 쓰지 않는다(선택은 조건만으로 증명한다).
+    """
+    names = [
+        name
+        for name, value in item.answer_map
+        if name != pick_variable and _same_number(value, item.answer_text)
+    ]
+    return names[0] if len(names) == 1 else None
+
+
+@functools.lru_cache(maxsize=None)
+def structured_view(item: DiffItem) -> tuple[str | tuple[str, ...], tuple[str, ...]] | None:
+    """규칙 (가)를 적용한 (검산 조건, 풀이 단계) — 붙일 수 없으면 None(종전 조건·단계를 쓴다).
+
+    · 풀이 단계 = 종전 연쇄(`steps_of`) + `final_statement_steps`가 조건만으로 증명한 두 줄.
+    · 진술값이 정답 기록(answer_map)과 다르면 **ValueError**(저작 결함 — 조용히 종전 단계로 돌아가지
+      않는다). 생성기가 `structured_conditions`를 달았는데 증명이 안 되면 그것도 ValueError(틀 설계
+      결함 — 근거 조건이 판정기 허용 목록 밖).
+    """
+    chain = steps_of(item).steps
+    tail = final_solution_values(chain[-1])
+    if tail is None:
+        if item.structured_conditions is not None:
+            raise ValueError(
+                f"{item.frame_id}: 구조화 조건이 있는데 풀이가 근 목록으로 끝나지 않는다"
+            )
+        return None
+    pick = tail[0]
+    target = _answer_variable(item, pick)
+    if target is None:
+        if item.structured_conditions is not None:
+            raise ValueError(f"{item.frame_id}: 구조화 조건이 있는데 정답 변수를 하나로 못 정한다")
+        return None
+    conditions: str | tuple[str, ...] = (
+        item.structured_conditions
+        if item.structured_conditions is not None
+        else explicit_definitions(item.conditions, target, pick)
+    )
+    steps = final_statement_steps(chain, conditions=conditions, target=target)
+    if steps is None:
+        if item.structured_conditions is not None:
+            raise ValueError(
+                f"{item.frame_id}: 구조화 조건으로 근 선택·대입을 증명하지 못했다 — {conditions!r}"
+            )
+        return None
+    stated = steps[-1].split("=", 1)[1].strip()
+    recorded = dict(item.answer_map)[target]
+    if not _same_number(stated, recorded):
+        raise ValueError(
+            f"{item.frame_id}: 풀이 끝 진술값 {target} = {stated} ≠ 정답 기록 {recorded} — "
+            "저작 결함"
+        )
+    return conditions, steps
 
 
 def probe_of(standard_code: str, item: DiffItem) -> ShortcutProbe:
@@ -369,6 +482,11 @@ class P3DiffSlotGenerator:
     concept_relevance: ClassVar[float] = 0.95
     slot_difficulty: ClassVar[Mapping[str, float]]
     slot_count: ClassVar[int] = 12
+    #: 이 생성기가 담당하는 슬롯 — 기본은 6종 전부(기존 7개 개념 생성기·기존 은행 바이트 불변).
+    #: 기존 문항이 이미 채운 칸을 건너뛰고 *빈 칸만* 만드는 생성기(P3-05 4·5단계)는 부분집합을
+    #: 선언한다. 담당하지 않는 슬롯은 문항이 0건인 생성기로 인스턴스화된다(`items()`가 빈 튜플) —
+    #: 겹침 감사기(QUAL-08)가 `slot` Literal 의 모든 값으로 인스턴스화해도 깨지지 않게 한다.
+    slots: ClassVar[tuple[SlotId, ...]] = SLOT_IDS
 
     def __init__(self, *, slot: SlotId, skip_conditions: AbstractSet[str] | None = None) -> None:
         if slot not in SLOT_IDS:
@@ -388,14 +506,16 @@ class P3DiffSlotGenerator:
     @classmethod
     def items(cls, slot: str) -> tuple[DiffItem, ...]:
         """슬롯의 전 문항(캐시) — 슬롯 불변식을 빌드 시점에 강제한다."""
+        if slot not in cls.slots:
+            return ()  # 담당하지 않는 슬롯 — 빈 생성기(위 `slots` 설명)
         key = (cls, slot)
         cached = _ITEM_CACHE.get(key)
         if cached is not None:
             return cached
-        # 호출 순서와 무관하게 결정론이도록 6슬롯을 SLOT_IDS 순서로 한 번에 빌드한다
+        # 호출 순서와 무관하게 결정론이도록 담당 슬롯을 SLOT_IDS 순서로 한 번에 빌드한다
         # (슬롯 사이 검산 조건 중복 제거를 위해 `claimed`를 공유).
         claimed: set[str] = set()
-        for slot_id in SLOT_IDS:
+        for slot_id in cls.slots:
             built = tuple(cls._slot_items(slot_id, claimed))
             cls._validate_slot(slot_id, built)
             _ITEM_CACHE[(cls, slot_id)] = built
@@ -452,6 +572,15 @@ class P3DiffSlotGenerator:
                 raise ValueError(
                     f"{cls.__name__}[{slot}] {item.frame_id}: 풀이 단계 도출 실패 — {exc}"
                 ) from exc
+            # 규칙 (가)(P3-62) — 구조화 조건은 모드와 무관하게 빌드 시점에 증명 가능해야 한다
+            # (모드를 켠 배치에서야 터지면 후보 은행을 만들 때까지 결함이 숨는다).
+            if item.structured_conditions is not None:
+                try:
+                    structured_view(item)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{cls.__name__}[{slot}] {item.frame_id}: 규칙 (가) 구조화 실패 — {exc}"
+                    ) from exc
 
     @classmethod
     def target_misconception_ids(cls, slot: str) -> frozenset[str]:
@@ -523,21 +652,30 @@ class P3DiffSlotGenerator:
                 ],
             },
         )
+        # 규칙 (가)(P3-62) — 구조화 모드에서만 검산 조건·풀이 단계를 구조화본으로 바꾼다.
+        raw_conditions: str | tuple[str, ...] = item.conditions
+        steps = list(steps_of(item).steps)
+        if final_step_structuring_enabled():
+            view = structured_view(item)
+            if view is not None:
+                raw_conditions, structured_steps = view
+                steps = list(structured_steps)
         # 조건이 1개면 문자열로 싣는다(섀도 채점 코퍼스 경로는 문자열 조건만 읽는다).
         conditions: str | list[str]
-        if isinstance(item.conditions, str):
-            conditions = item.conditions
-        elif len(item.conditions) == 1:
-            conditions = item.conditions[0]
+        if isinstance(raw_conditions, str):
+            conditions = raw_conditions
+        elif len(raw_conditions) == 1:
+            conditions = raw_conditions[0]
         else:
-            conditions = list(item.conditions)
+            conditions = list(raw_conditions)
         return CandidateProblem(
             problem=problem,
             provenance=provenance,
             conditions=conditions,
             answer_map=dict(item.answer_map),
             # 풀이 단계 — 도함수가 든 출발식에서 답(또는 근 목록)까지, 전이 전건 correct(Tier2).
-            solution_steps=list(steps_of(item).steps),
+            # 구조화 모드면 끝에 근 선택·정답 변수 값 진술(조건으로 증명된 해석 단계)이 붙는다.
+            solution_steps=steps,
             concept_tags=[
                 ConceptTag(
                     concept_src_id=self.concept_src_id,

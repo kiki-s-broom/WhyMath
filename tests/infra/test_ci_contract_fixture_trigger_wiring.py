@@ -971,3 +971,53 @@ def test_dead_flag_judge_detects_and_acquits() -> None:
         "always": {"steps": [{"name": "s", "if": "needs.changes.outputs.corpus == 'true'"}]}
     }
     assert _dead_flag_violations(unconditional) == []
+
+
+# ── 계약 ⑥-b : 저작 회차 산출물 루트(data/runs/) — EOS-198 P3-3 ─────────────────
+# `_BACKEND_INPUT_ROOTS`는 **실재 파일**에서 표본을 뽑는다. data/runs/는 첫 회차(EOS-197)가
+# 커밋되기 전까지 저장소에 없으므로 그 체계에 넣으면 계약 ⑥이 즉시 RED가 된다. 그래서 여기서
+# 따로 동결한다: 실재 파일이 있으면 그것을 표본으로, 없으면 저작 CLI가 쓰는 경로 모양
+# (`data/runs/<회차>/cu.jsonl`)을 표본으로 쓴다 — 회차가 커밋되는 순간 저절로 실물 표본으로
+# 바뀐다(가상 표본이 영구 면제가 되지 않게).
+_RUNS_ROOT = "data/runs/"
+_RUNS_SHAPE_SAMPLE = "data/runs/eos197-a6-local/cu.jsonl"
+
+
+def _runs_root_sample() -> str:
+    base = _REPO_ROOT / _RUNS_ROOT
+    if base.is_dir():
+        for path in sorted(base.rglob("*")):
+            if path.is_file():
+                return path.relative_to(_REPO_ROOT).as_posix()
+    return _RUNS_SHAPE_SAMPLE
+
+
+def test_backend_filter_covers_authoring_runs_root() -> None:
+    """data/runs/만 바꾸는 PR(EOS-197 산출물 커밋)에서 backend 잡이 깨어나야 한다.
+
+    backend 잡의 provenance_audit 스텝이 그 산출물을 검사하는 유일한 CI 지점이다(EOS-198 ④).
+    필터에서 빠지면 그 PR에서 잡이 SKIP돼 검사가 한 번도 돌지 않는다.
+    """
+    jobs = _load_ci_jobs()
+    sample = _runs_root_sample()
+    assert re.compile(_backend_filter(jobs)).search(sample), (
+        f"backend 필터가 저작 회차 산출물({sample})을 덮지 않는다 — 산출물만 커밋하는 PR에서 "
+        f"provenance_audit가 돌지 않는다.\n현재 backend 필터: {_backend_filter(jobs)!r}"
+    )
+
+
+def test_authoring_runs_root_rationale_is_backed_by_real_artifacts() -> None:
+    """등재 사유의 실물 근거 — backend 잡이 provenance_audit를 부르고, 그 CLI가 data/runs를 읽는다."""
+    jobs = _load_ci_jobs()
+    backend_job = jobs.get("backend")
+    assert isinstance(backend_job, dict), "ci.yml: backend 잡이 없다 — 계약 ⑥-b의 전제가 사라졌다."
+    runs = "\n".join(_iter_run_steps(backend_job))
+    assert (
+        "-m whymath_backend.ops.provenance_audit" in runs
+    ), "backend 잡에서 provenance_audit 스텝을 찾지 못했다 — data/runs/ 편입 사유가 사라졌다."
+    src = _REPO_ROOT / "src" / "backend" / "whymath_backend" / "ops" / "provenance_audit.py"
+    text = src.read_text(encoding="utf-8")
+    assert '/ "data" / "runs"' in text and '_RUN_RECORD_FILENAME = "cu.jsonl"' in text, (
+        f"{src}: 기본 회차 루트(data/runs)·회차 레코드 파일명을 찾지 못했다 — CLI가 더 이상 "
+        "data/runs를 읽지 않는다면 이 계약과 ci.yml 필터의 data/runs/를 함께 빼라."
+    )

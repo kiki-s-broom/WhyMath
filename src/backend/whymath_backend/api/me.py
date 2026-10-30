@@ -3327,11 +3327,6 @@ _BLUEPRINT_NOTE = (
     "백분위·합격예측 4개 예측 필드는 게임화 금기로 이 경로에서 의도적으로 채우지 않음(항상 null)."
 )
 
-_BLUEPRINT_CANDIDATE_FETCH_LIMIT = 3000
-"""청사진 조립에 먹일 후보 문항 fetch 상한 — `api/gating.py`의 후보 상한과 같은 값(코퍼스
-2,647건 + 여유). L6 조립기가 적격·제약·개수를 전부 판정하므로 이 상한은 "후보 풀 크기"일 뿐
-응답 크기가 아니다. 상한과 정확히 같은 건수를 읽으면 절단 의심이므로 경고 로그를 남긴다."""
-
 
 def _blueprint_pattern_diagnosis(assembly: AssembledTestSet) -> list[dict[str, Any]]:
     """조립 결과를 `pattern_diagnosis` JSONB 배열로 직렬화한다(세트 헤더 1 + 문항 N).

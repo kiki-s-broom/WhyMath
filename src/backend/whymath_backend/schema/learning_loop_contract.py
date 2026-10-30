@@ -316,7 +316,8 @@ def find_prerequisite_cycle(edges: Iterable[tuple[str, str]]) -> list[str] | Non
     `edges`는 (선행, 후행) 쌍이다. 반환값은 순환 경로이며 **닫힘 노드를 반복 포함**한다
     (예: ``["a", "b", "a"]``) — 사람이 읽고 어디를 끊을지 바로 알 수 있게 한다.
 
-    재귀가 아니라 **명시 스택**을 쓴다. 원자 백본은 2,683노드·2,210엣지 규모라 깊은 체인에서
+    재귀가 아니라 **명시 스택**을 쓴다. 원자 백본은 노드·엣지가 수천 건 규모라(값은
+    `docs/data/corpus_facts.md`의 `atom_graph.nodes`·`atom_graph.edges`) 깊은 체인에서
     재귀는 `RecursionError`로 죽는다 — 기존 집행 2지점이 같은 이유로 비재귀다. 세 구현이 같은
     판정을 내는지는 검사 ⑦-c가 대조한다.
 

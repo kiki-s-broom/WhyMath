@@ -223,37 +223,64 @@ class BackendEdgeStore:
             rows = conn.execute(stmt).all()
         return {row.code: row.concept_id for row in rows}
 
-    def populate(self, records: Sequence[BackendConceptEdgeRecord]) -> tuple[int, list[str]]:
+    def populate(
+        self,
+        records: Sequence[BackendConceptEdgeRecord],
+        *,
+        overwrite_cms_edits: bool = False,
+        conflicts: list[str] | None = None,
+    ) -> tuple[int, list[str]]:
         """선수엣지 레코드들을 backend `concept_edge`에 멱등 upsert (orphan skip·UUID 보존).
 
         ① code→UUID 맵 단일 구축 → ② 각 레코드의 src_code/dst_code를 UUID로 해석(하나라도 맵에
-        없으면 orphan skip) → ③ `ON CONFLICT(from,to,type) DO UPDATE`로 edge_strength만 갱신
-        (edge_id·created_at 미-SET·보존). 반환: (적재 행 수, orphan skip 메시지 목록). 입력이
+        없으면 orphan skip) → ③ **선수 그래프 잠금 + DB 인지 순환 검사**(P3-26 — DB의 CMS 관계와
+        합쳐
+        순환이면 `PrerequisiteCycleError`) → ④ `ON CONFLICT(from,to,type) DO UPDATE`로
+        edge_strength만
+        갱신(edge_id·created_at 미-SET·보존). 반환: (적재 행 수, orphan skip 메시지 목록). 입력이
         비면 (0, []). `edge_type`은 enum 값(문자열)으로 바인딩한다(PG enum 컬럼·use_enum_values
         등가).
+
+        **CMS 소유 보호(P3-26)**: CMS가 만든 관계(`cms_edited_at` 있음)와 같은 쌍인 레코드는
+        건너뛰고
+        `conflicts`에 `concept_edge:<선수>-><후행>`으로 보고한다 — 적재 행 수에는 포함하지 않는다.
         """
         if not records:
             return 0, []
 
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+        from whymath_backend.db.cms_edit_marker import format_conflict, upsert_guard, upsert_skipped
         from whymath_backend.db.models.concept import ConceptEdge
+        from whymath_backend.l1.concept_graph.prerequisite_guard import (
+            assert_acyclic_with_db,
+            lock_prerequisite_graph_sync,
+        )
 
         code_to_uuid = self._load_code_to_uuid()
+        uuid_to_code = {v: k for k, v in code_to_uuid.items()}
         loaded = 0
         skipped: list[str] = []
+        resolved: list[tuple[BackendConceptEdgeRecord, uuid.UUID, uuid.UUID]] = []
+        for record in records:
+            from_uuid = code_to_uuid.get(record.src_code)
+            to_uuid = code_to_uuid.get(record.dst_code)
+            if from_uuid is None or to_uuid is None:
+                # orphan — 노드 미적재 UC(FK 위반 방지·정직).
+                skipped.append(
+                    f"orphan edge skip: src={record.src_code}"
+                    f"({'있음' if from_uuid else '없음'}) → "
+                    f"dst={record.dst_code}({'있음' if to_uuid else '없음'})"
+                )
+                continue
+            resolved.append((record, from_uuid, to_uuid))
+        if not resolved:
+            return 0, skipped  # 쓸 것이 없으면 잠금·순환 검사도 필요 없다
+        where, release = upsert_guard(ConceptEdge, overwrite=overwrite_cms_edits)
         with self._get_engine().begin() as conn:
-            for record in records:
-                from_uuid = code_to_uuid.get(record.src_code)
-                to_uuid = code_to_uuid.get(record.dst_code)
-                if from_uuid is None or to_uuid is None:
-                    # orphan — 노드 미적재 UC(FK 위반 방지·정직).
-                    skipped.append(
-                        f"orphan edge skip: src={record.src_code}"
-                        f"({'있음' if from_uuid else '없음'}) → "
-                        f"dst={record.dst_code}({'있음' if to_uuid else '없음'})"
-                    )
-                    continue
+            lock_prerequisite_graph_sync(conn)
+            assert_acyclic_with_db(conn, [(f, t) for _r, f, t in resolved], uuid_to_code)
+            for record, from_uuid, to_uuid in resolved:
                 stmt = pg_insert(ConceptEdge).values(
                     from_concept_id=from_uuid,
                     to_concept_id=to_uuid,
@@ -262,15 +289,21 @@ class BackendEdgeStore:
                 )
                 # UNIQUE(from,to,type) 충돌 시 강도만 갱신 — edge_id(PK)·created_at은 SET 안 함
                 # (보존·재적재가 식별자 불변). typical_gap_signal·notes는 컬럼 미수록(NULL).
-                stmt = stmt.on_conflict_do_update(
+                upsert = stmt.on_conflict_do_update(
                     index_elements=[
                         ConceptEdge.from_concept_id,
                         ConceptEdge.to_concept_id,
                         ConceptEdge.edge_type,
                     ],
-                    set_={"edge_strength": stmt.excluded.edge_strength},
-                )
-                conn.execute(stmt)
+                    set_={"edge_strength": stmt.excluded.edge_strength, **release},
+                    where=where,
+                ).returning(ConceptEdge.edge_id)
+                if upsert_skipped(conn.execute(upsert)):
+                    if conflicts is not None:
+                        conflicts.append(
+                            format_conflict("concept_edge", f"{record.src_code}->{record.dst_code}")
+                        )
+                    continue
                 loaded += 1
         return loaded, skipped
 
@@ -281,6 +314,8 @@ def populate_backend_edges(
     engine: Engine | None = None,
     settings: Settings | None = None,
     store: BackendEdgeStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> int:
     """개념그래프 선수엣지를 backend `concept_edge` 런타임 관계로 멱등 upsert 적재. 반환=적재 행 수.
 
@@ -291,7 +326,9 @@ def populate_backend_edges(
     """
     resolved = settings if settings is not None else get_settings()
     edge_store = store if store is not None else BackendEdgeStore(engine=engine, settings=resolved)
-    loaded, _skipped = edge_store.populate(records)
+    loaded, _skipped = edge_store.populate(
+        records, overwrite_cms_edits=overwrite_cms_edits, conflicts=conflicts
+    )
     return loaded
 
 

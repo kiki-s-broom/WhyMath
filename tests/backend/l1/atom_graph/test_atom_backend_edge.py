@@ -56,6 +56,10 @@ class _FakeResult:
     def all(self) -> list[object]:
         return self._rows
 
+    def first(self) -> object | None:
+        # `INSERT … ON CONFLICT … RETURNING`(P3-25/26 가드): 행이 있으면 적재됨, 없으면 건너뜀.
+        return self._rows[0] if self._rows else None
+
 
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
@@ -77,11 +81,19 @@ class _FakeConnection:
         compiled = _compile(statement)
         if "SELECT" in compiled and "concept.code" in compiled and "INSERT" not in compiled:
             return _FakeResult(self._engine.code_rows)
+        if "INSERT" in compiled:
+            # RETURNING 1행 = 적재됨 / 0행 = CMS 소유 가드가 건너뜀(P3-26)
+            rows = [_Row("written", uuid.uuid4())] if self._engine.insert_written else []
+            return _FakeResult(rows)
+        if "SELECT" in compiled and "concept_edge" in compiled:
+            return _FakeResult(self._engine.db_edges)  # DB에 이미 있는 선수 엣지(순환 검사 재료)
         return _FakeResult([])
 
 
 class _FakeEngine:
     def __init__(self, code_rows: list[object] | None = None) -> None:
+        self.insert_written = True
+        self.db_edges: list[object] = []
         self.executed: list[object] = []
         self.code_rows: list[object] = (
             code_rows if code_rows is not None else [_Row(_PRE, _UUID_PRE), _Row(_POST, _UUID_POST)]
@@ -100,6 +112,13 @@ def _fake_store(
     engine = _FakeEngine(code_rows)
     store = AtomBackendEdgeStore(engine=engine)  # type: ignore[arg-type]
     return store, engine
+
+
+def _insert_sql(engine: _FakeEngine) -> str:
+    """실행된 문장 중 `INSERT`(upsert) 1건의 SQL — 잠금·순환 검사 SQL이 앞에 끼어도 위치에 안 기댄다."""
+    inserts = [_compile(s) for s in engine.executed if "INSERT" in _compile(s)]
+    assert len(inserts) == 1, inserts
+    return inserts[0]
 
 
 def _record(
@@ -217,8 +236,7 @@ class TestResolution:
         store, engine = _fake_store()
         loaded, skipped = store.populate([_record()])
         assert loaded == 1 and skipped == []
-        assert len(engine.executed) == 2  # SELECT + INSERT
-        assert "INSERT INTO concept_edge" in _compile(engine.executed[1])
+        assert "INSERT INTO concept_edge" in _insert_sql(engine)
 
     def test_orphan_skipped(self) -> None:
         store, engine = _fake_store()
@@ -244,7 +262,7 @@ class TestUpsert:
     def test_on_conflict_composite_and_subtype_set(self) -> None:
         store, engine = _fake_store()
         store.populate([_record()])
-        sql = _compile(engine.executed[1])
+        sql = _insert_sql(engine)
         assert "ON CONFLICT" in sql
         for col in ("from_concept_id", "to_concept_id", "edge_type"):
             assert col in sql
@@ -259,9 +277,75 @@ class TestUpsert:
     def test_omits_gap_signal_notes(self) -> None:
         store, engine = _fake_store()
         store.populate([_record()])
-        sql = _compile(engine.executed[1])
+        sql = _insert_sql(engine)
         assert "typical_gap_signal" not in sql
         assert "evidence" not in sql
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# ③-b CMS 소유 보호·DB 인지 순환 검사·잠금 (P3-26)
+# ──────────────────────────────────────────────────────────────────────────
+class TestCmsOwnershipAndCycleGuard:
+    def test_a_cms_owned_row_is_skipped_and_reported_as_a_conflict(self) -> None:
+        store, engine = _fake_store()
+        engine.insert_written = False  # 가드(WHERE cms_edited_at IS NULL)가 행을 건너뜀
+        conflicts: list[str] = []
+        loaded = populate_atom_edges([_record()], store=store, conflicts=conflicts)
+        assert loaded == 0, "건너뛴 행을 적재 건수에 셌다 — 적재가 일했다는 거짓 증거"
+        assert conflicts == [f"concept_edge:{_PRE}->{_POST}"]
+
+    def test_a_written_row_is_not_a_conflict(self) -> None:
+        store, _ = _fake_store()
+        conflicts: list[str] = []
+        assert populate_atom_edges([_record()], store=store, conflicts=conflicts) == 1
+        assert conflicts == []
+
+    def test_the_insert_carries_the_guard_where_and_overwrite_releases_the_marker(self) -> None:
+        store, engine = _fake_store()
+        store.populate([_record()])
+        guarded = _insert_sql(engine)
+        assert "cms_edited_at IS NULL" in guarded
+        assert "cms_edited_at" not in guarded.split("DO UPDATE SET", 1)[1].split("WHERE", 1)[0]
+
+        store2, engine2 = _fake_store()
+        store2.populate([_record()], overwrite_cms_edits=True)
+        released = _insert_sql(engine2)
+        assert "cms_edited_at IS NULL" not in released
+        assert "cms_edited_at" in released.split("DO UPDATE SET", 1)[1]  # 표지를 비운다
+
+    def test_the_graph_lock_is_taken_before_any_write(self) -> None:
+        store, engine = _fake_store()
+        store.populate([_record()])
+        sqls = [_compile(s) for s in engine.executed]
+        lock = next(i for i, s in enumerate(sqls) if "pg_advisory_xact_lock" in s)
+        insert = next(i for i, s in enumerate(sqls) if "INSERT" in s)
+        assert lock < insert
+
+    def test_a_file_edge_closing_a_cycle_with_a_db_edge_is_refused_before_any_insert(self) -> None:
+        """DB에 (CMS가 만든) PRE→POST 가 있는데 파일이 POST→PRE 를 가져왔다 — 합치면 순환."""
+        from whymath_backend.l1.concept_graph.prerequisite_guard import PrerequisiteCycleError
+
+        store, engine = _fake_store()
+        engine.db_edges = [(_UUID_PRE, _UUID_POST)]
+        with pytest.raises(PrerequisiteCycleError) as exc:
+            store.populate([_record(src=_POST, dst=_PRE)])
+        assert exc.value.cycle[0] == exc.value.cycle[-1]
+        assert {_PRE, _POST} <= set(exc.value.cycle), "오류 경로가 개념 코드가 아니라 UUID다"
+        assert not any(
+            "INSERT" in _compile(s) for s in engine.executed
+        ), "거부 전에 쓰기가 일어났다"
+
+    def test_a_non_cyclic_load_next_to_db_edges_passes(self) -> None:
+        """대조군 — DB에 엣지가 있어도 순환이 아니면 통과한다(거부가 과잉이 아니다)."""
+        store, engine = _fake_store()
+        engine.db_edges = [(_UUID_PRE, _UUID_POST)]
+        assert store.populate([_record()])[0] == 1
+
+    def test_nothing_to_write_takes_no_lock_and_runs_no_cycle_check(self) -> None:
+        store, engine = _fake_store()
+        loaded, _ = store.populate([_record(dst=_ORPHAN)])
+        assert loaded == 0
+        assert not any("pg_advisory_xact_lock" in _compile(s) for s in engine.executed)
 
 
 # ──────────────────────────────────────────────────────────────────────────

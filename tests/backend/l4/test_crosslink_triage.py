@@ -130,10 +130,15 @@ class TestCommittedQueueEndToEnd:
         # 오답 귀인으로 쓰기 시작해(`problem_bank_p3_calculus1_diff_v0`) 신호가 생겼고 성취기준
         # [12미적Ⅰ-02-03]이 일치해 corroborated 107→108·no_signal 4→3이다(auto_reject 4 불변).
         # corroborated는 *기계 일치*일 뿐 서명이 아니다 — 승인·적재는 여전히 Kiki 서명 게이트 몫.
+        # P3-61(선지 역추적 전용 kebab 4종: tangent-external-point-as-contact·mvt-conditions-unchecked·
+        # graph-sketch-few-points-only·velocity-sign-ignored)은 카탈로그 좌석과 pending 큐 행만 생겼고
+        # 승인 문항의 오답 보기가 아직 이 kebab을 가리키지 않아(2026-10-18 실측 0건) 같은 이유로
+        # no_signal 3→7건이다. corroborated 108·auto_reject 4는 불변 — 신호가 없는 행을 일치로 세지
+        # 않는다. 보기가 연결되면(P3-44·P3-57) 이 4건이 corroborated 또는 thin_disagree로 옮겨 간다.
         report = self._run()
         assert report.counts == {  # type: ignore[attr-defined]
             "corroborated": 108,
-            "no_signal": 3,
+            "no_signal": 7,
             "auto_reject": 4,
             "thin_disagree": 0,
         }

@@ -165,8 +165,16 @@ class AtomBackendConceptStore:
             self._engine = _build_sync_engine(self._resolved_settings)
         return self._engine
 
-    def upsert(self, record: AtomBackendConceptRecord) -> None:
+    def upsert(
+        self, record: AtomBackendConceptRecord, *, overwrite_cms_edits: bool = False
+    ) -> bool:
         """단일 노드를 backend `concept`에 upsert (멱등·`code` 충돌 갱신·UUID PK·parent 보존).
+
+        **CMS 소유 보호(P3-26)**: `cms_edited_at`이 채워진 행(CMS가 만든 개념)은 갱신하지 않고
+        False를
+        돌려준다(`overwrite_cms_edits=True`면 덮어쓰고 표지를 비운다 — 파일이 다시 소유). 적재가
+        새로 만든
+        행·갱신한 행은 True.
 
         `parent_concept_id`는 INSERT/SET 컬럼에 *없다* — 2-pass(`resolve_parents`)에서 별도 UPDATE
         한다(UUID 발급 순서 비의존). `description`·`formal_definition`도 컬럼에 없다(redaction).
@@ -174,6 +182,7 @@ class AtomBackendConceptStore:
         """
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+        from whymath_backend.db.cms_edit_marker import upsert_guard, upsert_skipped
         from whymath_backend.db.models.concept import Concept
 
         stmt = pg_insert(Concept).values(
@@ -182,16 +191,19 @@ class AtomBackendConceptStore:
             level=record.level.value,
             intrinsic_difficulty=record.intrinsic_difficulty,
         )
-        stmt = stmt.on_conflict_do_update(
+        where, release = upsert_guard(Concept, overwrite=overwrite_cms_edits)
+        upsert = stmt.on_conflict_do_update(
             index_elements=[Concept.code],
             set_={
                 "name_ko": stmt.excluded.name_ko,
                 "level": stmt.excluded.level,
                 "intrinsic_difficulty": stmt.excluded.intrinsic_difficulty,
+                **release,
             },
-        )
+            where=where,
+        ).returning(Concept.concept_id)
         with self._get_engine().begin() as conn:
-            conn.execute(stmt)
+            return not upsert_skipped(conn.execute(upsert))
 
     def load_code_to_uuid(self) -> dict[str, uuid.UUID]:
         """backend `concept` 전량을 단일 조회해 `{code: concept_id(UUID)}` 맵 구축(N+1 0).
@@ -225,6 +237,9 @@ class AtomBackendConceptStore:
         stmt = (
             update(Concept)
             .where(Concept.code == bindparam("b_code"))
+            # CMS 소유 행(P3-26)은 부모도 CMS가 정한다 — 건너뛴 행의 부모를 파일 값으로 덮지 않는다.
+            # 덮어쓰기 모드에서는 upsert가 표지를 먼저 비우므로 이 조건이 자연히 통과한다.
+            .where(Concept.cms_edited_at.is_(None))
             .values(parent_concept_id=bindparam("b_parent"))
         )
         with self._get_engine().begin() as conn:
@@ -247,20 +262,31 @@ def populate_atom_concepts(
     *,
     settings: Settings | None = None,
     store: AtomBackendConceptStore | None = None,
+    overwrite_cms_edits: bool = False,
+    conflicts: list[str] | None = None,
 ) -> tuple[int, list[str]]:
     """원자 백본 노드를 backend `concept`에 멱등 적재 + parent 해소. 반환=(적재 행 수, parent skip).
 
     ① 전 레코드 upsert(parent 없이) → ② `resolve_parents`로 parent_concept_id UPDATE. 멱등(재실행 시
     갱신·UUID 보존). store 미주입 시 슬3 sync 엔진 재사용 store를 만든다.
+
+    **CMS 소유 보호(P3-26)**: CMS가 만든 개념(`cms_edited_at` 있음)과 코드가 같은 레코드는 건너뛰고
+    `conflicts`에 `concept:<code>`로 보고한다 — 반환 행 수에는 포함하지 않는다.
     """
+    from whymath_backend.db.cms_edit_marker import format_conflict
+
     resolved_settings = settings if settings is not None else get_settings()
     concept_store = (
         store if store is not None else AtomBackendConceptStore(settings=resolved_settings)
     )
+    written = 0
     for record in records:
-        concept_store.upsert(record)
+        if concept_store.upsert(record, overwrite_cms_edits=overwrite_cms_edits):
+            written += 1
+        elif conflicts is not None:
+            conflicts.append(format_conflict("concept", record.code))
     _resolved, parent_skipped = concept_store.resolve_parents(records)
-    return len(records), parent_skipped
+    return written, parent_skipped
 
 
 __all__ = [

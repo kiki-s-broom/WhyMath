@@ -23,10 +23,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any, Final
 
 _REPO: Final[Path] = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO / "src" / "data-pipeline"))
+
+from data_pipeline.atom_graph.graph_history import APPENDED_AFTER_CROSS_BAND  # noqa: E402
+
 GRAPH_PATH: Final[Path] = _REPO / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 OUTPUT_PATH: Final[Path] = (
     _REPO / "data" / "corpus" / "atom_graph_v1" / "cross_band_edges_university_v1.json"
@@ -178,9 +183,11 @@ def _pre_merge_sha256(graph: dict[str, Any]) -> str:
     정본 병합(S4-60) 뒤에는 graph.json 파일 자체의 sha가 바뀌므로 파일 sha를 쓰면 이 스크립트의
     `--check`(바이트 동일 보증)가 병합 즉시 깨진다. 그래서 출처 태그 엣지를 뺀 병합 전 뷰를 정본
     직렬화로 찍는다. 병합이 끝에 덧붙이기였으므로 병합 전에는 파일 sha와 같은 값이다.
+    경계 병합 *뒤에* 덧붙여진 태그(KG-12 서술형 승격 v2 — `graph_history`)도 함께 벗긴다.
     """
+    drop = {EVIDENCE, *APPENDED_AFTER_CROSS_BAND}
     view = dict(graph)
-    view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") != EVIDENCE]
+    view["edges"] = [e for e in graph.get("edges", []) if e.get("evidence") not in drop]
     text = json.dumps(view, ensure_ascii=False, indent=2) + "\n"
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 

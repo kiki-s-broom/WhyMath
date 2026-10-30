@@ -23,7 +23,7 @@
 
 | 대상 | 게이트 | 강제 위치 |
 |---|---|---|
-| 백엔드 (`whymath_backend`) | 집계 ≥ 70% | `ci.yml` `--cov-fail-under=70` |
+| 백엔드 (`whymath_backend`) | 집계 ≥ 70% | `ci.yml` `backend-verdict` 잡 `coverage report --fail-under=70`(샤드 3개 합산 뒤 — 아래 ③) |
 | 데이터 파이프라인 (`data_pipeline` — L1) | 집계 ≥ 70% | `ci.yml` `--cov-fail-under=70` |
 | 웹 수학 코어 (`src/lib/**`) | 라인·함수·분기·구문 ≥ 70% | `vitest.config.js` `thresholds` |
 | Flutter (모바일) | 라인 ≥ 60% | `ci.yml` mobile 커버리지 게이트(awk) |
@@ -32,7 +32,7 @@
 
 백엔드는 L2~L5가 한 패키지(`whymath_backend`)로 묶여 집계 70%만으로는 한 계층이 낮아도
 평균에 묻힌다. 이를 막기 위해 **서브패키지별 라인 커버리지 바닥선을 별도 게이트로 강제**한다
-(`scripts/coverage/check_layer_coverage.py` · `ci.yml` "계층별 커버리지 게이트" 스텝 · 집계와 상보).
+(`scripts/coverage/check_layer_coverage.py` · `ci.yml` `backend-verdict` 잡의 "계층별 커버리지 게이트" 스텝 · 집계와 상보).
 바닥선의 **정본은 스크립트의 `LAYER_FLOORS`**다. 2026-07-25 CI 실측이 전 계층에서 선언 목표를
 상회해(아래 '실측' 열) **바닥선 = 선언 목표**로 강제한다(즉 아래 목표치가 곧 CI가 차단하는 하한):
 
@@ -50,6 +50,28 @@ privacy·whs)은 계층 게이트를 부여하지 않고 집계 70%로 커버한
 목표(=floor)는 **하향 금지·상향만 허용**한다(점진 강화) — 커버리지가 목표 아래로 내려가면 red.
 
 프로젝트 표준(CLAUDE.md "커버리지 70%+")의 집행이 위 게이트다.
+
+### ③ backend 스위트의 잡 단위 샤딩과 커버리지 합산 (OPS-83 · 2026-10-26)
+
+backend 스위트는 CI에서 **러너 3대에 파일 단위로 나뉘어** 돈다(`backend-pytest-1~3`). 각 샤드는
+`scripts/coverage/backend_shard_plugin.py`(`-p backend_shard_plugin --shard K/3`)가 pytest 자신의
+수집 결과에서 **파일 경로의 sha256 mod 3**으로 정해진 자기 몫 파일만 남기고(나머지 deselect —
+배정은 그 파일의 경로만의 함수라 새 파일이 생겨도 기존 파일의 샤드는 움직이지 않는다), 부분 커버리지 데이터와 배정
+보고서를 산출물로 올린다. 필수 체크 `backend — lint·type·test`는 집계 잡(`backend-verdict`)이
+가진다 — 정적 잡·샤드 3개를 `needs`로 기다려 ① 전부 success인지(실패·취소·건너뜀 전부 red)
+② 배정 보고서가 겹침 0·누락 0·항목 합 = 수집 우주인지(`backend_shard_verdict.py`) 판정한 뒤
+③ `coverage combine`으로 합산해 위 ①·②의 게이트를 건다.
+
+* **샤드 하나의 커버리지는 부분이다** — 샤드 잡에 `--cov-fail-under`를 걸지 않는다. 집계·계층
+  하한은 합산 뒤에만 의미가 있다.
+* **합산 = 단일 실행** — 합산 총계(구문·분기)가 샤딩 없는 실행과 한 자리도 다르지 않아야 한다.
+  OPS-83 ③이 실 스위트로 1회 대조했고, `tests/backend/test_backend_shard_plugin_e2e.py`가 소형
+  합성 패키지로 상시 봉인한다.
+* **로컬에서 샤드를 재현하려면** `cd src/backend` 후 CI 스텝과 같은 명령에 `--shard K/3`만 바꿔
+  세 번 돈다. 샤딩 없는 bare 실행(위 「로컬 실행」)은 그대로 전건이다 — 플러그인은 `--shard`가
+  없으면 아무것도 하지 않는다.
+* 배선 동결: `tests/infra/test_backend_shard_wiring.py`(needs 전수·`always()`·합산 목록·K/N 일치),
+  판정기 단위 검증: `tests/infra/test_backend_shard_verdict.py`.
 
 ## Python 테스트
 

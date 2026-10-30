@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-90
+title: "P3-56 미분 오답 서명 그림자 모드 운영 수집 — logconfig·켜기 런북·P3-66 판정 CLI 실행"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-66-signature-shadow-harvest-activation-cli
+requires_gates: []
+acceptance:
+  - "① 수집 배선 — 로거 whymath.api.attempt_scan_shadow.record 의 JSON 줄을 포매터 %(message)s 로 파일에 남기는 운영 logconfig·런북을 만든다(P3-66 입력 계약: 접두가 붙으면 첫 줄에서 측정 불가). 수집 파일이 이번 실행 것인지 확인할 수 있게 기간 필터·파일 위치를 명시한다.\n② 그림자 켜기 — l4_derivative_signature_mode=shadow 로 운영 서버를 띄우는 절차(Kiki 머신 · 사람 실행 단계)를 런북으로 만들고, 켠 뒤 /health/ready 의 sympy_isolation undecidable_ratio 를 확인한다(P3-56 판정문 §9.5). 학생 노출(on)은 하지 않는다.\n③ 판정 — 수집한 로그로 python -m whymath_backend.harness.attempt_scan_shadow_harvest 를 돌려 종료 코드(PASS 0 · FAIL 1 · 측정 불가 3)와 전 기준값을 게이트 G-p356-signature-activation 에 판정 기준 커밋과 함께 넘긴다. 측정 불가(오답 시도 n<300 등)는 통과가 아니다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-66 done 시 G-p356-signature-activation 판정 = FAIL(측정 불가 — 운영 그림자 관측 0건, main 8ed9e26a1 에서 빈 입력 CLI exit 3). 수집 배선은 P3-56 PR 이 의도적으로 만들지 않았다(판정문 §9.5). 운영 서버·Kiki 머신 단계가 포함된다."
+updated: 2026-10-27

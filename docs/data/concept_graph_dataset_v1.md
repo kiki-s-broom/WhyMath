@@ -1,7 +1,7 @@
 # 와이매스 개념그래프 데이터셋 v1 (자체작성) — 데이터 카드
 
 > **요약**: 한국 2022 개정 교육과정 전 범위(초등~고교 선택·고1 기본수학)를 덮는 **자체작성
-> 개념그래프** 시드. 437 개념 · 581 선수엣지 · 성취기준↔CCSS 코드 매핑 · 113 암기카드 · 13
+> 개념그래프** 시드. <!-- fact:concept_graph.concepts -->437<!-- /fact --> 개념 · <!-- fact:concept_graph.edges -->581<!-- /fact --> 선수엣지 · 성취기준↔CCSS 코드 매핑 · <!-- fact:concept_content.k12_flashcards -->113<!-- /fact --> 암기카드 · 13
 > 국제트랙(CCSS전용). 본 슬라이스(101)에서는 그중 **오개념 114건을 L4 오개념 카탈로그(22종)와
 > 교차검증**하는 데 사용했다(아래 §5). 전체 적재(L1 concept_graph 파이프라인)는 후속 슬라이스 결정 사항.
 >
@@ -231,7 +231,7 @@ geometric-series는 데이터셋 114에 직접 진술이 없음 — 추가 검�
 
 ### 5b.4 검증 리포트 (`validate.py` — §5 10 invariant, 실데이터)
 
-`transform-v1`이 정형화 직후 그래프 검증을 돌린다. **실데이터(403노드·541엣지) 결과: PASS** —
+`transform-v1`이 정형화 직후 그래프 검증을 돌린다. **실데이터(2026-06-12 당시 403노드·541엣지) 결과: PASS** —
 
 | 항목 | 결과 |
 |---|---|
@@ -789,7 +789,7 @@ geometric-series는 데이터셋 114에 직접 진술이 없음 — 추가 검�
 > **L5 통합 슬라이스(backend)**: L4 결선(§5k)이 진단 drill-in(`GET /v1/me/.../coaching`)에 선수 코칭을 노출했다면,
 > 이 슬라이스는 *학생이 실제 푸는* 상호작용 코칭 응답(`/v1/coach/sessions`)에도 선수 차단 신호를 함께 실어준다.
 >
-> **데이터 현실 확인(다른 후속 후보 기각)**: 데이터셋 v1 엣지는 **541 전량 prerequisite**(비-prereq relation 0)·
+> **데이터 현실 확인(다른 후속 후보 기각)**: 데이터셋 v1 엣지는 **541 전량 prerequisite**(2026-06-13 당시)(비-prereq relation 0)·
 > strength는 transform이 `_DEFAULT_EDGE_STRENGTH` **균일 합성**(소스 미보유·변별력 0) → "비-prereq EdgeType 적재"·
 > "edge_strength 임계 필터"는 v1에선 no-op이라 기각. `/v1/coach` 통합을 후속으로 선택.
 

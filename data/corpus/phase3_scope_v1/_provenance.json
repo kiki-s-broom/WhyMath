@@ -10,11 +10,11 @@
     "core_concepts": 10,
     "skills": 8,
     "core_misconceptions": 12,
-    "required_problem_types": 5,
+    "required_problem_types": 7,
     "total_min_distinct_problems": 60
   },
   "frozen_by_gate": "G-p301-scope-choice",
   "integrity_gate": "tests/backend/l1/test_phase3_scope_spec.py — 참조 실재(성취기준·Concept·원자·스킬·M-id·문제유형) + 빈 목록·산술 불일치 판정",
-  "provenance_note": "P3-01 acceptance ③ — 후보 문서(docs/reviews/p3_01_scope_candidates_2026-09-30.md) 실측과 Kiki 선택(2026-09-30)·P3-18 처분(2026-10-02)을 데이터로 옮긴 것이다. 핵심 오개념 선정 규칙과 필수 문제유형은 세션 제안이며 파일 머리말에 명시했다.",
+  "provenance_note": "P3-01 acceptance ③ — 후보 문서(docs/reviews/p3_01_scope_candidates_2026-09-30.md) 실측과 Kiki 선택(2026-09-30)·P3-18 처분(2026-10-02)을 데이터로 옮긴 것이다. 핵심 오개념 선정 규칙과 필수 문제유형은 세션 제안이며 파일 머리말에 명시했다. 필수 문제유형은 P3-05(2026-10-14)가 5종에서 7종으로 늘렸다(ptype.generalize-pattern · ptype.model-word-problem — 기존 5종으로는 스킬 2종을 행사할 수 없다는 실측).",
   "determinism": "결정론 — 손 편집 소스(생성 파이프라인 없음). 무결성은 CI 게이트가 판정한다."
 }

@@ -549,7 +549,7 @@ def _qa_world(control: pm.Bundle, n: int) -> pm.World:
 
 
 def _stub(passed: int, failed: int, skipped: int) -> Callable[..., ReverifyReport]:
-    def run(records: list[dict[str, object]], *, use_fuzz: bool) -> ReverifyReport:
+    def run(records: list[dict[str, object]]) -> ReverifyReport:
         failures = tuple((f"f{i}", "사유") for i in range(failed))
         return ReverifyReport(passed=passed, failed=failed, skipped=skipped, failures=failures)
 
@@ -621,7 +621,7 @@ class TestSolutionQa:
         assert pm._solution_qa(w, "scope", _stub(0, 0, 0)).state is pm.MetricState.UNMEASURED
 
     def test_reverify_exception_keeps_the_type_name(self, control: pm.Bundle) -> None:
-        def boom(records: list[dict[str, object]], *, use_fuzz: bool) -> ReverifyReport:
+        def boom(records: list[dict[str, object]]) -> ReverifyReport:
             raise MemoryError("x")
 
         o = pm._solution_qa(_qa_world(control, 10), "scope", boom)
@@ -1246,6 +1246,169 @@ class TestCli:
         assert pm.main(["--no-db"]) == 2
         out = capsys.readouterr().out
         assert "CoverageError" in out and "[ 미측정] 1." in out
+
+
+class TestHintsFromDb:
+    """P3-41 — `--hints-from-db` 가 ② 의 힌트 입력으로 실제 배선돼 있는가.
+
+    정상 입력에서 초록인 것은 배선의 증거가 아니다. 그래서 세 경우(플래그 없음 / 읽힘 / 못 읽음)가
+    서로 다른 판정을 내는지, 힌트를 지우는 주입이 ② 판정을 바꾸는지를 따로 고정한다.
+    """
+
+    @pytest.fixture
+    def spy(self, monkeypatch: pytest.MonkeyPatch, control: pm.Bundle) -> list[dict[str, Any]]:
+        """`load_corpus` 호출 인자를 기록하고, 받은 힌트 입력을 합성 코퍼스에 넣어 돌려준다."""
+        calls: list[dict[str, Any]] = []
+        base = _world(control).corpus
+
+        def fake_load_corpus(
+            spec: Any, root: Any = None, *, hint_problem_ids: frozenset[str] | None = None
+        ) -> p3c.CoverageCorpus:
+            calls.append({"hint_problem_ids": hint_problem_ids})
+            return replace(base, hint_problem_ids=hint_problem_ids)
+
+        monkeypatch.setattr(p3c, "load_corpus", fake_load_corpus)
+        return calls
+
+    @staticmethod
+    def _reader(monkeypatch: pytest.MonkeyPatch, ids: frozenset[str]) -> list[int]:
+        reads: list[int] = []
+
+        def fake() -> frozenset[str]:
+            reads.append(1)
+            return ids
+
+        monkeypatch.setattr(p3c, "read_hint_problem_ids_from_db", fake)
+        return reads
+
+    @staticmethod
+    def _completeness(tmp_path: Path, argv: list[str]) -> tuple[int, dict[str, Any]]:
+        out = tmp_path / "o.json"
+        code = pm.main([*argv, "--json", str(out)])
+        data = json.loads(out.read_text(encoding="utf-8"))
+        return code, {m["key"]: m for m in data["metrics"]}["concept_completeness"]
+
+    # ── 배선: 플래그 → load_world → load_corpus ────────────────────────────
+    def test_without_flag_hint_input_stays_none_and_db_is_not_read(
+        self, monkeypatch: pytest.MonkeyPatch, spy: list[dict[str, Any]]
+    ) -> None:
+        reads = self._reader(monkeypatch, frozenset({"x"}))
+        world = pm.load_world()
+        assert isinstance(world, pm.World), getattr(world, "reason", "")
+        assert spy == [{"hint_problem_ids": None}] and reads == []
+
+    def test_flag_passes_db_ids_through_to_the_corpus(
+        self, monkeypatch: pytest.MonkeyPatch, spy: list[dict[str, Any]]
+    ) -> None:
+        ids = frozenset({"prob-a", "prob-b"})
+        reads = self._reader(monkeypatch, ids)
+        world = pm.load_world(hints_from_db=True)
+        assert isinstance(world, pm.World), getattr(world, "reason", "")
+        assert reads == [1] and spy == [{"hint_problem_ids": ids}]
+
+    def test_empty_db_result_stays_an_empty_set_not_none(
+        self, monkeypatch: pytest.MonkeyPatch, spy: list[dict[str, Any]]
+    ) -> None:
+        """DB 를 읽었는데 0건 = 측정 가능한 '없음'. None(측정 불가)과 섞이면 판정이 거짓이 된다."""
+        self._reader(monkeypatch, frozenset())
+        assert isinstance(pm.load_world(hints_from_db=True), pm.World)
+        assert spy[0]["hint_problem_ids"] == frozenset()
+        assert spy[0]["hint_problem_ids"] is not None
+
+    def test_db_read_failure_is_a_hint_source_world_failure_before_corpus_load(
+        self, monkeypatch: pytest.MonkeyPatch, spy: list[dict[str, Any]]
+    ) -> None:
+        def boom() -> frozenset[str]:
+            raise p3c.CoverageError("DB 에서 검수 통과 힌트를 읽지 못했다: OSError: 접속 거부")
+
+        monkeypatch.setattr(p3c, "read_hint_problem_ids_from_db", boom)
+        failure = pm.load_world(hints_from_db=True)
+        assert isinstance(failure, pm.WorldFailure)
+        assert failure.stage == "hint_source" and failure.error_type == "CoverageError"
+        assert "OSError" in failure.reason  # 원인 예외 타입명이 사유에 남는다
+        assert spy == []  # 힌트를 못 읽었으면 코퍼스를 읽기 전에 멈춘다(헛수고 없음)
+
+    # ── CLI: exit code · 출력 ─────────────────────────────────────────────
+    def test_cli_read_failure_is_exit_2_with_type_names_in_output(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        spy: list[dict[str, Any]],
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        def boom() -> frozenset[str]:
+            raise p3c.CoverageError("DB 에서 검수 통과 힌트를 읽지 못했다: OSError: 접속 거부")
+
+        monkeypatch.setattr(p3c, "read_hint_problem_ids_from_db", boom)
+        assert pm.main(["--no-db", "--hints-from-db"]) == 2
+        out = capsys.readouterr().out
+        assert "hint_source" in out and "CoverageError" in out and "OSError" in out
+        assert "[ 미측정] 2." in out  # ② 가 0 도 통과도 아닌 미측정으로 보인다
+
+    def test_cli_flag_reaches_load_world(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        seen: list[dict[str, Any]] = []
+
+        def fake(spec_path: Any = None, repo_root: Any = None, **kw: Any) -> pm.WorldFailure:
+            seen.append(kw)
+            return pm.WorldFailure("corpus", "CoverageError", "스텁")
+
+        monkeypatch.setattr(pm, "load_world", fake)
+        pm.main(["--no-db"])
+        pm.main(["--no-db", "--hints-from-db"])
+        assert seen == [{}, {"hints_from_db": True}]
+
+    def test_self_check_rejects_the_flag(self) -> None:
+        assert pm.main(["--self-check", "--hints-from-db"]) == 3
+
+    # ── 판정: 힌트를 지우는 주입이 ② 를 실제로 바꾼다 ───────────────────────
+    def test_removing_hints_changes_the_completeness_verdict(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        spy: list[dict[str, Any]],
+        control: pm.Bundle,
+    ) -> None:
+        all_ids = frozenset(p.problem_id for p in _world(control).corpus.problems)
+        assert all_ids  # 치환 대상 존재
+
+        self._reader(monkeypatch, all_ids)
+        _, linked = self._completeness(tmp_path, ["--no-db", "--hints-from-db"])
+        assert linked["state"] == "measured" and linked["met"] is True  # 성공 방향 대조군
+
+        self._reader(monkeypatch, frozenset())  # 주입: 힌트를 전부 지운다
+        _, erased = self._completeness(tmp_path, ["--no-db", "--hints-from-db"])
+        assert erased["state"] == "measured" and erased["met"] is False
+
+        _, absent = self._completeness(tmp_path, ["--no-db"])  # 플래그 없음 = 측정 불가
+        assert absent["state"] == "unmeasured"
+
+        assert {linked["state"], erased["met"], absent["state"]} == {
+            "measured",
+            False,
+            "unmeasured",
+        }
+
+    def test_hint_seat_line_and_id_space_mismatch_note(self, control: pm.Bundle) -> None:
+        mismatch = _inject(
+            control, _corpus(control, hint_problem_ids=frozenset({"zz-not-in-bank"}))
+        )
+        o = _by_key(pm.evaluate_bundle(mismatch))[_K.CONCEPT_COMPLETENESS]
+        facts = dict(o.facts)
+        assert (
+            "DB 검수 통과 1문항" in facts["힌트 입력"]
+            and "범위 밖/ID 불일치 1" in facts["힌트 입력"]
+        )
+        assert "ID 공간" in o.reason  # 연결 0 이 '힌트 없음'이 아닐 수 있다는 단서
+
+        healthy = dict(_by_key(pm.evaluate_bundle(control))[_K.CONCEPT_COMPLETENESS].facts)
+        assert "ID 공간" not in _by_key(pm.evaluate_bundle(control))[_K.CONCEPT_COMPLETENESS].reason
+        assert "측정 불가" not in healthy["힌트 입력"]
+
+        none = dict(
+            _by_key(pm.evaluate_bundle(_corpus(control, hint_problem_ids=None)))[
+                _K.CONCEPT_COMPLETENESS
+            ].facts
+        )
+        assert "측정 불가" in none["힌트 입력"]
 
 
 class TestDbCollection:

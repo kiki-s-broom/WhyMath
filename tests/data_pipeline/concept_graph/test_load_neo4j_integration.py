@@ -34,7 +34,16 @@ _URI = os.environ.get("NEO4J_URI", "bolt://127.0.0.1:7687")
 _USER = os.environ.get("NEO4J_USER", "neo4j")
 _PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 
-_CORPUS = Path(__file__).resolve().parents[3] / "data" / "corpus" / "concept_graph_v1"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+_CORPUS = _REPO_ROOT / "data" / "corpus" / "concept_graph_v1"
+_NODES = _FACTS["concept_graph.concepts"]
+_EDGES = _FACTS["concept_graph.edges"]
 
 
 def _driver() -> "GraphDatabase.driver":  # type: ignore[name-defined]
@@ -102,7 +111,7 @@ def _constraint_exists(driver: "GraphDatabase.driver") -> bool:  # type: ignore[
 
 
 def test_load_is_idempotent_on_live_neo4j() -> None:
-    """실 Neo4j: 2회 적재 → 노드 437·엣지 581 불변(§5 #9) + 제약 존재."""
+    """실 Neo4j: 2회 적재 → 전 노드·전 엣지 불변(§5 #9 · 건수는 사실 파일) + 제약 존재."""
     if not _reachable():
         pytest.skip("Neo4j 미도달 — 통합 테스트 건너뜀 (NEO4J_URI/USER/PASSWORD 확인)")
 
@@ -117,10 +126,10 @@ def test_load_is_idempotent_on_live_neo4j() -> None:
 
         # 1회차 적재
         r1 = load_graph(result, driver=driver)
-        assert r1.nodes_merged == 437
-        assert r1.edges_merged == 581
+        assert r1.nodes_merged == _NODES
+        assert r1.edges_merged == _EDGES
         n1, e1 = _count_loaded(driver, ids)
-        assert (n1, e1) == (437, 581)
+        assert (n1, e1) == (_NODES, _EDGES)
 
         # 제약(§2.3) 존재
         assert _constraint_exists(driver)
@@ -128,7 +137,7 @@ def test_load_is_idempotent_on_live_neo4j() -> None:
         # 2회차 적재 — 멱등(MERGE): 노드·엣지 수 불변
         load_graph(result, driver=driver)
         n2, e2 = _count_loaded(driver, ids)
-        assert (n2, e2) == (437, 581), "재적재 후 노드·엣지 수가 변했다(멱등성 위반)"
+        assert (n2, e2) == (_NODES, _EDGES), "재적재 후 노드·엣지 수가 변했다(멱등성 위반)"
     finally:
         _cleanup(driver, ids)
         driver.close()

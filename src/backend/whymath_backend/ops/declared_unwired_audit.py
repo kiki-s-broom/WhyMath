@@ -18,7 +18,8 @@ writer 0건(`COLLAB-03`) · 성장 증거 도달(`PED-06`) · admin family 축 �
     (a) HTTP 라우트  ↔ 테스트/클라이언트 호출
     (b) EventType 생산자 ↔ 소비자(쿼리 필터)
     (c) TimescaleDB 집계 테이블 writer ↔ reader
-    (d) harness/ops CLI ↔ CI 실행(직접 + in-process import 전이)
+    (d) CLI(`main()` 보유 모듈·패키지 전체) ↔ `main()` 실행(CI·배포 스택 직접 실행 + `main` 참조
+        전이) — **import 는 도달이 아니다**(OPS-28)
 
 판정 규약 — 미도달 *수*가 아니라 *미분류*가 실패다
 -----------------------------------------------
@@ -67,6 +68,40 @@ red**다. `EVENT_DATA_CONTRACT ∪ _CONTRACT_EXEMPT == 전체`를 거버넌스 �
 오류(exit 2)**로 실패한다(`ops.reach_audit`류 선례 — "성공/실패 양쪽에서 같은 값을 내는 검사는
 검증이 아니라 위장"의 자기 적용).
 
+OPS-28 — 사각 3종 해소와, 해소하지 않고 **자기 선언**하는 한계
+-----------------------------------------------------------
+① CLI 축 범위. 대상이 `harness/`·`ops/` 최상위 파일뿐(비재귀 glob)이어서 `l1`·`l2`·`l3`·`l4`·
+   `privacy`·`whs` 아래의 CLI 48종이 감사 대상에도 못 들었다. 이제 패키지 트리 전체에서 `def main`
+   을
+   가진 모듈을 모은다(허용 목록이 아니라 기준이 "main 이 있는가"라 새 패키지도 자동 편입된다).
+② 도달의 두 얼굴. "도달"은 `main()` 이 **실행**되는 것이다 — ⑴CI `run:` 또는 배포 스택
+   (`docker-compose*.yml` 의 `command`)이 `python -m <모듈>` 로 직접 실행하거나 ⑵실행되는 모듈이 그
+   모듈의 `main` 을 참조(호출·콜백 전달)한다. 단순 import(함수·상수를 가져다 씀)는 `library_only`
+   이고 도달이 아니다. 이유는 P3-14 가 실측했다 — `ops.phase3_metrics` 가 `ops.validation_scorecard`
+   를 import 하자 그 폐포 5종의 유예가 `stale-waiver` 가 됐고 유예를 걷은 순간 미배선 경보가
+   사라졌다
+   (그 5종의 `main()` 은 CI 어디서도 실행되지 않는다). 걷었던 5건은 복원됐다.
+③ HTTP 축의 분리 컬럼. `reached` 판정은 클라(dart) ∪ 백엔드 테스트의 **합집합 그대로**다 — 합집합은
+   data_platform_module_gap_review.md §2 가 기록한 의도적 결정이라 뒤집지 않는다. 대신 각 항목에
+   `server_test_reached`·`client_reached` 를 따로 싣고 리포트가 "서버 테스트로만 도달" 수를 센다
+   (`POST /v1/generate`·`GET /v1/jobs` 처럼 서버 테스트만으로 도달한 라우트가 눈에 보이게).
+   클라 미도달을 위반으로 걸지 않는 이유: 콘텐츠 저작·운영 CRUD·법정 권리 표면처럼 학생 앱이 부르지
+   않는 것이 정상인 라우트가 대부분이라 걸면 즉시 영구 red 다(위 "판정 규약"과 같은 논리).
+
+자기 선언한 한계 — 해소하지 않는다(AST 수준 해소는 범위 밖으로 동결)
+  · dart 경로는 정규식 **리터럴 매칭**이다. 호출이 코드에 있다는 것과 그 호출을 쓰는 화면이 있다는
+  것은
+    다르다 — `verify_api.dart` 는 `POST /v1/verify-solution` 리터럴을 갖지만 `lib/` 에는 소비처가 0
+    이고
+    소비자는 `test/` 뿐이다. 그래도 이 축은 `client_reached` 로 센다(client-side 선언≠배선 미검출).
+  · CLI 는 `def main` 으로만 정의한다. `if __name__ == "__main__":` 블록만 있고 `main` 이 없는 모듈
+    (`l1.atom_graph.populate`·`l4.misconception.crosslink_candidates`)은 CLI 집합에 들지 않는다.
+  · `main` 참조는 이름으로만 푼다 — 다른 진입점 이름·`getattr`·`importlib` 동적 호출은 못 본다.
+    서브프로세스·`-m` 문자열로 CLI 를 띄우는 코드(`ops.observation_report_runner` 의 관측 대상)도
+    추적하지 않는다(해당 항목은 `_OBSERVED_BY_RUNNER` 유예로 의도를 선언한다).
+  · 실행 표면은 `ci.yml` 의 `run:` 과 `docker-compose*.yml` 의 `command`/`entrypoint` 뿐이다
+    (`scripts/`·셸·PowerShell·런북의 수동 실행은 보지 않는다 — 사람 경로라 의도 선언으로 갈음).
+
 사용:
     python -m whymath_backend.ops.declared_unwired_audit
     python -m whymath_backend.ops.declared_unwired_audit --json report.json
@@ -92,6 +127,11 @@ from whymath_backend.schema.enums import EventType
 
 __all__ = [
     "AXIS_CLI",
+    "COL_CLIENT",
+    "COL_EXECUTED",
+    "COL_LIBRARY",
+    "COL_SERVER_TEST",
+    "CliReach",
     "AXIS_EVENT",
     "AXIS_HTTP",
     "AXIS_TIMESERIES",
@@ -101,8 +141,12 @@ __all__ = [
     "Report",
     "app_route_entries",
     "build_report",
+    "cli_modules",
+    "cli_reach",
+    "compose_executed_modules",
     "consumed_event_types",
     "main",
+    "main_references",
     "produced_event_types",
     "render_report",
     "route_paths",
@@ -120,12 +164,22 @@ AXIS_EVENT = "event_consumers"
 AXIS_TIMESERIES = "timeseries_tables"
 AXIS_CLI = "harness_clis"
 
+# 관측 컬럼 이름(OPS-28) — `ItemVerdict.columns`의 키.
+COL_SERVER_TEST = "server_test_reached"
+COL_CLIENT = "client_reached"
+COL_EXECUTED = "main_executed"
+COL_LIBRARY = "library_imported_only"
+_LIBRARY_ONLY_NOTE = (
+    "라이브러리로 import 됐을 뿐 main() 은 어디서도 실행되지 않는다 — import 는 도달이 아니다"
+)
+
 # 수집기 파손 하한(exit 2) — 실측 대비 넉넉히 낮게 잡아 정상 변동에는 걸리지 않고 *추출기
 # 자체가 깨진*(0건·한 자릿수) 경우만 잡는다. 실측(2026-08-07): 라우트 81·호출 400+·
 # EventType 생산 6·타임시리즈 모델 3·CLI 45+.
 _FLOORS: dict[str, int] = {
     "routes": 40,
     "callers": 50,
+    "client_callers": 5,
     "event_types": 3,
     "timeseries_models": 1,
     "clis": 20,
@@ -726,21 +780,46 @@ def timeseries_usage(package_root: Path, models: tuple[str, ...]) -> dict[str, T
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 축 4 — harness/ops CLI ↔ CI 실행(직접 + in-process import 전이)
+# 축 4 — CLI(`main()` 보유 모듈) ↔ CI 실행 / 라이브러리 import 분리 (OPS-22 → OPS-28)
 # ──────────────────────────────────────────────────────────────────────────
-
-_CLI_PACKAGES = ("harness", "ops")
+#
+# OPS-28 이전에는 두 가지가 비어 있었다.
+#   ① 대상이 `harness/`·`ops/` 최상위 파일뿐이었다(비재귀 glob) — `l1`·`l2`·`l3`·`l4`·`privacy`·
+#      `whs` 아래의 CLI 48종은 감사 대상에도 들지 못했다. 이제 패키지 트리 **전체**를 재귀로 훑는
+#      다(허용 목록이 아니라 "`def main`을 가졌는가"가 기준이므로 새 패키지도 자동 편입된다).
+#   ② "도달"이 CI 직접 실행 ∪ **어떤 형태든 import**였다. 그래서 `ops.phase3_metrics`가
+#      `ops.validation_scorecard`의 상수·함수를 가져다 쓰자 그 import 폐포 5종(scorecard·
+#      qa_confusion_matrix·golden_benchmark·hit_cu_metrics·reviewer_sample_package)의 by-design
+# 유예가
+#      `stale-waiver`가 됐고, P3-14가 유예를 걷어 통과시켰다 — 그 5종의 `main()`은 여전히 CI에서
+#      한 번도 실행되지 않는데도 경보가 사라졌다(import는 CLI 실행이 아니다).
+#
+# 그래서 도달을 둘로 가른다.
+#   executed      `main()`이 실제로 돈다 — ⑴CI `run:`이 `python -m <모듈>`로 직접 실행하거나
+# ⑵실행되는
+#                 모듈(또는 서빙 경로 코드)이 그 모듈의 **`main`을 참조**(호출·콜백 전달)한다.
+#   library_only  import는 됐지만 `main` 참조는 없다 — 그 모듈의 *함수*를 가져다 쓸 뿐이다.
+# `executed`만 "도달"이다. `library_only`는 도달이 **아니다**(유예가 없으면 `unclassified`, 있으면
+# 유효한 유예로 남는다) — import 하나로 미배선 경보를 끌 수 없다.
+_TOOL_PACKAGES = ("harness", "ops")
+_MAIN_ENTRY_MODULE = "__main__"
 _CI_MODULE_RUN = re.compile(r"-m\s+(whymath_backend\.[\w.]+)")
 
 
+def _cli_key(package_root: Path, source: Path) -> str:
+    """CLI 모듈 키. `pkg/__main__.py`는 `python -m pkg`로 실행되므로 패키지명이 키다."""
+    dotted = _module_dotted_name(package_root, source)
+    suffix = f".{_MAIN_ENTRY_MODULE}"
+    return dotted[: -len(suffix)] if dotted.endswith(suffix) else dotted
+
+
 def cli_modules(package_root: Path) -> tuple[str, ...]:
-    """`harness/`·`ops/`에서 모듈 레벨 `def main(`을 가진 모듈(= 실행 가능한 CLI)."""
+    """패키지 트리 **전체**에서 모듈 레벨 `def main(`을 가진 모듈(= 실행 가능한 CLI)."""
     found: list[str] = []
-    for pkg in _CLI_PACKAGES:
-        for source in sorted((package_root / pkg).glob("*.py")):
-            module = _parse_module(source)
-            if any(isinstance(n, ast.FunctionDef) and n.name == "main" for n in module.body):
-                found.append(f"{pkg}.{source.stem}")
+    for source in _iter_python_sources(package_root):
+        module = _parse_module(source)
+        if any(isinstance(n, ast.FunctionDef) and n.name == "main" for n in module.body):
+            found.append(_cli_key(package_root, source))
     return tuple(sorted(found))
 
 
@@ -758,6 +837,53 @@ def ci_executed_modules(ci_path: Path) -> frozenset[str]:
     return frozenset(found)
 
 
+_COMPOSE_GLOB = "docker-compose*.yml"
+
+
+def compose_executed_modules(repo: Path) -> frozenset[str]:
+    """`docker-compose*.yml` 서비스의 `command`·`entrypoint`가 `python -m`으로 실행하는 모듈.
+
+    CI만 실행 표면으로 보면 **배포 스택이 상시 돌리는 CLI**가 미도달로 오판된다(OPS-28 실측:
+    `privacy.retention_purge_cli`·`l2.calibrate_items`는 `docker-compose.prod.yml`의 24h 루프로
+    돌고 있다). 배포 스택이 도는 것도 "main()이 실제로 실행된다"의 한 형태이므로 CI 와 같은 뿌리로
+    센다.
+    """
+    found: set[str] = set()
+    for path in sorted(repo.glob(_COMPOSE_GLOB)):
+        try:
+            spec: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            raise CollectorError(f"{path.name} 파싱 실패({type(exc).__name__})") from exc
+        for service in ((spec or {}).get("services") or {}).values():
+            for field in ("command", "entrypoint"):
+                value = (service or {}).get(field)
+                text = (
+                    " ".join(str(v) for v in value) if isinstance(value, list) else str(value or "")
+                )
+                for match in _CI_MODULE_RUN.finditer(text):
+                    found.add(match.group(1).removeprefix("whymath_backend."))
+    return frozenset(found)
+
+
+def _import_base(
+    node: ast.ImportFrom, package_prefix: str, package_parts: tuple[str, ...]
+) -> str | None:
+    """`from X import …`의 X를 패키지 상대 dotted name으로. 패키지 밖 import면 None."""
+    if node.level:  # 상대 import — 현재 패키지 기준으로 해석
+        base = list(package_parts[: len(package_parts) - (node.level - 1)])
+        if node.module:
+            base += node.module.split(".")
+        return ".".join(base)
+    if node.module and node.module.startswith(package_prefix):
+        return node.module.removeprefix(package_prefix)
+    return None
+
+
+def _package_parts(package_root: Path, source: Path) -> tuple[str, ...]:
+    rel_parts = source.relative_to(package_root).with_suffix("").parts
+    return rel_parts[:-1] if rel_parts[-1] != "__init__" else rel_parts
+
+
 def _module_imports(package_root: Path, source: Path) -> set[str]:
     """이 모듈이 import하는 패키지 내부 모듈(패키지 상대 dotted name).
 
@@ -767,26 +893,16 @@ def _module_imports(package_root: Path, source: Path) -> set[str]:
     조립하는 관례) — 모듈 경로만 세면 그런 CLI가 전부 "미도달"로 오탐된다. `<module>`과
     `<module>.<name>` 후보를 둘 다 낸다(실재하지 않는 후보는 대상 집합 교집합에서 자연히 걸러짐).
     """
-    package_name = package_root.name
-    package_prefix = f"{package_name}."
-    rel_parts = source.relative_to(package_root).with_suffix("").parts
-    package_parts = rel_parts[:-1] if rel_parts[-1] != "__init__" else rel_parts
+    package_prefix = f"{package_root.name}."
+    package_parts = _package_parts(package_root, source)
     out: set[str] = set()
-
-    def _emit(dotted: str, names: list[str]) -> None:
-        out.add(dotted)
-        out.update(f"{dotted}.{name}" for name in names)
 
     for node in ast.walk(_parse_module(source)):
         if isinstance(node, ast.ImportFrom):
-            names = [alias.name for alias in node.names]
-            if node.level:  # 상대 import — 현재 패키지 기준으로 해석
-                base = list(package_parts[: len(package_parts) - (node.level - 1)])
-                if node.module:
-                    base += node.module.split(".")
-                _emit(".".join(base), names)
-            elif node.module and node.module.startswith(package_prefix):
-                _emit(node.module.removeprefix(package_prefix), names)
+            base = _import_base(node, package_prefix, package_parts)
+            if base is not None:
+                out.add(base)
+                out.update(f"{base}.{alias.name}" for alias in node.names)
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.startswith(package_prefix):
@@ -794,37 +910,138 @@ def _module_imports(package_root: Path, source: Path) -> set[str]:
     return out
 
 
+def _attr_chain(node: ast.expr) -> str | None:
+    """`a.b.c` 형태의 Name/Attribute 사슬을 dotted 문자열로. 그 밖의 표현식이면 None."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def _normalize_cli_ref(dotted: str) -> str:
+    suffix = f".{_MAIN_ENTRY_MODULE}"
+    return dotted[: -len(suffix)] if dotted.endswith(suffix) else dotted
+
+
+def main_references(package_root: Path, source: Path) -> set[str]:
+    """이 모듈이 다른 모듈의 **`main`을 참조**하는 대상(패키지 상대 dotted name).
+
+    "import했다"가 아니라 "그 모듈의 `main`을 불렀다/넘겼다"를 본다 — CLI **실행**과 라이브러리
+    **사용**을 가르는 유일한 구조 신호다. 세 형태를 푼다.
+      ⑴ `from <패키지>.x import main [as m]` 후 `m` 을 읽는 모든 곳(호출·콜백 전달)
+      ⑵ `from <패키지> import x` / `import <패키지>.x as x` 후 `x.main`
+      ⑶ 별칭 없는 `<패키지>.x.main` 완전 경로
+    import 문만 있고 사용이 없으면(미사용 import·`__init__`의 재수출) 참조가 아니다.
+    함수·상수 이름은 보지 않는다 — `main` 한 이름이 이 저장소가 정의하는 CLI 진입점이다
+    (`cli_modules`가 같은 기준으로 CLI를 모은다). 정직한 잔여는 모듈 docstring 참조.
+    """
+    package_prefix = f"{package_root.name}."
+    package_parts = _package_parts(package_root, source)
+    module = _parse_module(source)
+    main_names: dict[str, str] = {}  # 로컬 이름 → `main`을 꺼내 온 모듈
+    module_names: dict[str, str] = {}  # 로컬 이름 → 모듈 후보
+
+    for node in ast.walk(module):
+        if isinstance(node, ast.ImportFrom):
+            base = _import_base(node, package_prefix, package_parts)
+            if base is None:
+                continue
+            for alias in node.names:
+                local = alias.asname or alias.name
+                if alias.name == "main":
+                    main_names[local] = base
+                else:
+                    module_names[local] = f"{base}.{alias.name}"
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.startswith(package_prefix) and alias.asname:
+                    module_names[alias.asname] = alias.name.removeprefix(package_prefix)
+
+    found: set[str] = set()
+    for node in ast.walk(module):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            origin = main_names.get(node.id)
+            if origin is not None:
+                found.add(_normalize_cli_ref(origin))
+        elif isinstance(node, ast.Attribute) and node.attr == "main":
+            chain = _attr_chain(node.value)
+            if chain is None:
+                continue
+            head, _, rest = chain.partition(".")
+            if head in module_names:
+                found.add(_normalize_cli_ref(module_names[head] + (f".{rest}" if rest else "")))
+            elif chain.startswith(package_prefix):
+                found.add(_normalize_cli_ref(chain.removeprefix(package_prefix)))
+    return found
+
+
+@dataclass(frozen=True, slots=True)
+class CliReach:
+    """CLI 도달의 두 얼굴 — `executed`만 "도달"이고 `library_only`는 아니다(위 블록 주석)."""
+
+    executed: frozenset[str]
+    library_only: frozenset[str]
+
+
+def cli_reach(package_root: Path, clis: tuple[str, ...], ci_roots: frozenset[str]) -> CliReach:
+    """CLI별 도달 분류.
+
+    executed 의 뿌리 — ⑴CI 직접 실행 ⑵**서빙 경로**(CLI도 도구 패키지도 아닌 모듈)가 `main`을 참조.
+    뿌리에서 `main` 참조 간선(`main_references`)만 따라 전이한다 — 이 저장소는 CLI를 subprocess로
+    부르지 않는 관례라(`qa_pipeline` docstring) 오케스트레이터가 하위 CLI의 `main`을 in-process로
+    부르는 것이 유일한 "CLI가 CLI를 돌리는" 형태다. 테스트의 참조는 세지 않는다(스코프는
+    `src/backend` — 테스트가 함수를 만진다는 것과 파이프라인에 배선됐다는 것은 다르다).
+
+    library_only — 같은 뿌리에서 **import 간선 전체**(OPS-22 이래 규약)로 닿지만 executed 가 아닌
+    CLI.
+    """
+    cli_set = frozenset(clis)
+    import_graph: dict[str, set[str]] = {}
+    main_graph: dict[str, set[str]] = {}
+    serving_import_roots: set[str] = set()
+    serving_main_roots: set[str] = set()
+    for source in _iter_python_sources(package_root):
+        rel = _cli_key(package_root, source)
+        imports = _module_imports(package_root, source)
+        refs = main_references(package_root, source)
+        import_graph[rel] = imports
+        main_graph[rel] = refs
+        if rel not in cli_set and not rel.startswith(_TOOL_PACKAGES):
+            serving_import_roots.update(imports & cli_set)
+            serving_main_roots.update(refs & cli_set)
+
+    def _closure(roots: set[str], graph: dict[str, set[str]]) -> set[str]:
+        seen = set(roots)
+        frontier = list(roots)
+        while frontier:
+            for target in graph.get(frontier.pop(), ()):  # 전이 폐포
+                if target in cli_set and target not in seen:
+                    seen.add(target)
+                    frontier.append(target)
+        return seen
+
+    ci_cli_roots = {m for m in ci_roots if m in cli_set}
+    executed = _closure(ci_cli_roots | serving_main_roots, main_graph)
+    imported = _closure(ci_cli_roots | serving_import_roots, import_graph)
+    return CliReach(
+        executed=frozenset(executed & cli_set),
+        library_only=frozenset((imported & cli_set) - executed),
+    )
+
+
 def reached_clis(
     package_root: Path, clis: tuple[str, ...], ci_roots: frozenset[str]
 ) -> frozenset[str]:
-    """도달한 CLI — ⑴ CI가 직접 실행 ⑵ 프로덕션 코드가 import ⑶ ⑴·⑵에서 전이 import.
+    """도달한 CLI = `main()`이 실제로 실행되는 CLI(`cli_reach(...).executed`).
 
-    ⑶이 핵심이다 — 이 저장소는 harness CLI를 subprocess로 부르지 않는 관례라(`qa_pipeline`
-    docstring 참조) `corpus_audit_eval` 같은 하위 CLI는 다른 CLI가 in-process import해서만
-    도달한다. 직접 실행만 세면 그런 모듈이 전부 "미도달"로 오탐된다. ⑵는 `harness`/`ops` 밖
-    (프로덕션 런타임)이 import하는 경우 — 서빙 경로에 들어가 있으면 CLI로 안 돌아도 죽은
-    코드가 아니다. 테스트의 import는 세지 않는다(스코프는 `src/backend`) — 테스트가 함수를
-    만진다는 것과 파이프라인에 배선됐다는 것은 다르다.
+    OPS-28 이전에는 "CI 직접 실행 ∪ import 전이"였다 — import 는 더 이상 도달이 아니다
+    (`cli_reach` 위 블록 주석). 라이브러리로만 쓰이는 CLI는 `cli_reach(...).library_only`.
     """
-    cli_set = set(clis)
-    graph: dict[str, set[str]] = {}
-    production_roots: set[str] = set()
-    for source in _iter_python_sources(package_root):
-        rel = _module_dotted_name(package_root, source)
-        imports = _module_imports(package_root, source)
-        graph[rel] = imports
-        if not rel.startswith(_CLI_PACKAGES):
-            production_roots.update(imports & cli_set)
-
-    reached: set[str] = {m for m in ci_roots if m in cli_set} | production_roots
-    frontier = list(reached)
-    while frontier:
-        current = frontier.pop()
-        for target in graph.get(current, ()):  # 전이 폐포
-            if target in cli_set and target not in reached:
-                reached.add(target)
-                frontier.append(target)
-    return frozenset(reached)
+    return cli_reach(package_root, clis, ci_roots).executed
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -906,6 +1123,55 @@ _PRIVILEGE_ESCALATION_CLI = (
     "§3 D1: 관리자 HTTP API·콘솔 UI는 범위 밖). 즉 '미도달'이 결함이 아니라 *의도한 봉인*이다 — "
     "인터넷에 열린 표면도, CI가 자동으로 돌리는 표면도 만들지 않고 운영자가 실 PG 앞에서 손으로 "
     "돌린다. CI 배선은 오히려 계약 위반이 된다"
+)
+
+# ── OPS-28(2026-10-12): CLI 축을 패키지 전체로 넓히며 편입된 CLI 와 "import 만으로 도달" 판정을
+# 잃은
+# CLI 의 사유. 문구는 추정이 아니라 모듈 docstring·`main()` 반환값·호출자·테스트 실측에 근거한다.
+_CORPUS_LOADER = (
+    "by-design:코퍼스 산출물 → 영속 저장소 멱등 적재 CLI — 코퍼스가 바뀌었을 때 운영자가 대상 DB "
+    "앞에서 "
+    "한 번 돌리는 배포 단위 작업이다. 대상이 운영 DB 이고 CI 는 운영 DB 에 쓰지 않으므로 CI 가 "
+    "부를 "
+    "대상이 없다"
+)
+_OPS_DB_WRITER = (
+    "by-design:운영 DB 에 쓰는 변이형 운영 배치(HTTP 미노출) — 대상이 운영 DB 라 CI 가 부를 수 "
+    "없고 "
+    "실행 시점은 운영자가 정한다. dry-run 기본인 도구는 `--apply` 를 명시해야 쓴다"
+)
+_ENVELOPE_BACKFILL = (
+    "by-design:평문 → 봉투 암호화 백필(변이형 ops CLI·HTTP 미노출) — 마스터 키·운영 DB 앞에서 "
+    "운영자가 "
+    "기존 평문 행을 점진 전환한다. 신규 행은 api 결선이 이미 암호화하므로 상시 루프가 아니라 키 "
+    "도입 "
+    "시점의 일회성 전환이며, CI 에는 대상 행도 마스터 키도 없다"
+)
+_DATASET_EXPORT = (
+    "by-design:학습 데이터셋 export ops CLI — 전 문제 풀이 트리를 읽어 JSONL 을 만드는 읽기 "
+    "도구로, "
+    "모델 학습 착수 시점에 운영자가 돌린다. 입력이 운영 DB 의 축적 데이터라 CI 에서는 비어 있다"
+)
+_SHADOW_HARVEST = (
+    "by-design:서빙 shadow 관측 JSONL 의 오프라인 집계·변환(비노출·DB 0) — 입력은 서빙 경로가 "
+    "남긴 관측 "
+    "로그를 운영이 수집한 파일이라 레포에 상주하지 않는다. 노출(on) 전환을 판단하기 직전에 "
+    "운영자가 "
+    "수확해 본다"
+)
+_CROSSLINK_ADVISORY = (
+    "by-design:오개념 crosswalk 검수 큐 보조 도구(read-only·advisory) — 큐는 전행 pending 으로 "
+    "봉인돼 "
+    "있고 승인은 사람 몫이다(자기승인 금지·초인간 검증 §3.3). 이 도구는 검수자가 순서·근거를 볼 "
+    "때 읽을 "
+    "뿐 큐를 바꾸지 않으므로 CI 가 돌릴 합격 판정이 없다"
+)
+_QA_PIPELINE_REUSED = (
+    "by-design:`harness.qa_pipeline`(ci.yml 직접 실행)이 이 모듈의 평가 로직을 in-process 로 "
+    "재사용해 "
+    "매 CI 에서 돈다 — 독립 `main()` 은 이 축 하나만 따로 볼 때의 진입점이고 CI 에서 실행되지는 "
+    "않는다"
+    "(OPS-28: import 는 도달이 아니다)"
 )
 
 _MANIFEST: dict[str, dict[str, str]] = {
@@ -1039,6 +1305,8 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.elementary_volume_measure_batch": _BATCH_GENERATOR,
         "harness.highschool_quotient_rule_batch": _BATCH_GENERATOR,
         "harness.p3_calculus1_diff_batch": _BATCH_GENERATOR,
+        "harness.p3_fill_batch": _BATCH_GENERATOR,
+        "harness.p3_differentiability_reach_batch": _BATCH_GENERATOR,
         "harness.linear_inequality_system_batch": _BATCH_GENERATOR,
         "harness.matrix_ops_batch": _BATCH_GENERATOR,
         "harness.measurement_unit_conversion_batch": _BATCH_GENERATOR,
@@ -1084,6 +1352,15 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # — 실 코퍼스에 `--check`와 같은 계산을 돌려 0건을 요구)가 이미 지킨다. `--check` 스텝을
         # `declared-unwired-audit` 잡에 얹는 것은 OPS-24 선례와 동형의 후속 제안(.github 변경 —
         # 얹히면 이 면제는 `stale-waiver`로 exit 1이 되어 제거 대상).
+        # P3-05 3단계 — 기존 문항 6슬롯 백필 CLI. 일회성 데이터 백필이라 변이형(제자리
+        # 갱신)은 CI 대상이 아니다. 드리프트(규칙이 가리키는데 태그가 안 달린 승인 문항)는
+        # CI backend 잡의 pytest 전수 가드(`test_problem_slot_backfill.py` 의
+        # `TestRealCorpus::test_no_pending_assignment_remains` — 실 코퍼스에 `--check`와
+        # 같은 계산을 돌려 0건을 요구)가 이미 지킨다.
+        "harness.problem_slot_backfill": (
+            "by-design:일회성 슬롯 백필(변이형) — 드리프트는 backend 잡 pytest 전수 가드가 "
+            "실 코퍼스로 지킨다(P3-05)"
+        ),
         "harness.problem_corpus_author_backfill": (
             "by-design:일회성 저작 서명 백필(변이형) — 드리프트는 backend 잡 pytest 전수 가드가 "
             "실 코퍼스로 지킨다(PB-17)"
@@ -1095,10 +1372,33 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "CLI, 다른 강등전류(S4-16 등)와 동형으로 상시 CI 대상 아님"
         ),
         "harness.root_aggregate_batch": _BATCH_GENERATOR,
-        # (reviewer_sample_package 유예는 2026-10-09 P3-14 에서 걷었다 — 아래 AXIS_CLI "P3-14" 주석)
+        # reviewer_sample_package — 2026-10-09 P3-14 가 걷었던 유예를 OPS-28(2026-10-12)이 복원했다
+        # (아래 "P3-14/OPS-28" 주석). 원 사유는 그대로 참이다.
+        "harness.reviewer_sample_package": _BATCH_GENERATOR,
         # 검수 세션(EOS-78) — 판정을 받으며 HIT 타이머를 생산한다. `reviewer_sample_package`
         # (표본 *제시*)와 달리 사람의 판정을 되받는 대면 도구라 배치 사유를 빌려 쓰지 않는다.
         "harness.review_session": _HUMAN_REVIEW_TOOL,
+        # 검수 창(EOS-199) — 위 review_session과 같은 기록을 버튼으로 남기는 Windows 창.
+        # 사람이 화면을 보며 판정하는 대면 도구라 CI가 원리적으로 못 돈다(같은 사유).
+        # 기록 경로는 review_session의 함수를 그대로 쓰며 pytest가 컨트롤러를 화면 없이 검증한다.
+        "harness.review_session_gui": _HUMAN_REVIEW_TOOL,
+        # 저작 회차 오케스트레이터(EOS-208) — Kiki가 PC에서 한 줄로 돌리는 런북 [A]~[L] 묶음.
+        # 라이브 LLM 저작(유료 좌석 포함)·검수 창(사람 판정)·원격 push를 차례로 부르므로 CI가
+        # 원리적으로 못 돈다(위 두 사유의 합). 단계 흐름·거부 가드·이어하기는 backend 잡이 수집하는
+        # tests/backend/harness/test_authoring_round*.py가 경계(자식 프로세스·HTTP)를 가짜로,
+        # git은 실물 임시 저장소로 상시 검증한다 — "안 도는 코드"가 아니라
+        # "사람이 PC에서 돌리는 운전자"다.
+        "harness.authoring_round": (
+            "by-design:사람이 PC에서 실행하는 저작 회차 운전자(EOS-208) — 라이브 LLM 저작·검수 창·"
+            "원격 push를 부르므로 CI 미도달이 정상이다. 흐름·거부 가드는 단위 테스트가 상시 검증"
+        ),
+        # 위 오케스트레이터가 자식 프로세스로만 부르는 탐침 — 저작 CLI가 받을 환경(PYTHONPATH·
+        # 타임아웃 주입)에서 라우팅·좌석을 묻는다. 실제 코드 대상 실행은 단위 테스트가 in-process로
+        # 본다.
+        "harness.authoring_round_probe": (
+            "by-design:저작 회차 오케스트레이터 전용 자식 탐침(EOS-208) — 독립 진입점이 아니라 "
+            "authoring_round가 회차 환경에서 부른다. run_probe는 단위 테스트가 실제 코드로 실행"
+        ),
         # P3-03(2026-10-08): 미분 은행 감사자 자격 측정(결함 주입 강등전). score·s5의 입력은
         # 저장소 밖에서 만든 LLM 판정자 라벨이라(판정자는 저장소에 접근하면 안 된다 — 블라인드)
         # CI가 원리적으로 못 돈다. emit·machine의 재현성(커밋된 시험지·기계 라벨과 바이트 대조)은
@@ -1167,12 +1467,13 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "ops.dialogue_encryption_preflight": _LIVE_DEPENDENT,
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,
         "harness.wh1_shadow_harvest": _LIVE_DEPENDENT,
-        # (S4-56) `harness.residue_cross_verify_eval`(v1)의 면제는 지웠다 — CI가 직접 실행하는
-        # v2(`--dry-run`·LLM 0)가 v1의 `load_pilot_records`·`select_sample`을 in-process
-        # import해 감사기 정의상(축 4 ⑶ 전이 폐포) v1이 도달했다. **v1의 라이브 `main()` 경로는
-        # 여전히 CI에서 돌지 않는다**(실 provider 필요) — 도달한 것은 코드 재사용이지 라이브
-        # 측정이 아니다. 면제를 지우는 이유는 감사기 규칙(stale-waiver 실패)이지 v1이 배선됐다는
-        # 주장이 아니다.
+        # S4-56/OPS-28: CI 가 직접 실행하는 v2(`--dry-run`·LLM 0)가 v1 의 `load_pilot_records`·
+        # `select_sample` 을 in-process import 한다. OPS-28 이전 정의(import 전이 = 도달)에서는
+        # v1 이 도달이 되어 S4-56 이 이 유예를 걷었다 — 그러나 **v1 의 라이브 `main()` 은 CI 에서
+        # 한 번도 실행되지 않는다**(실 provider 필요). 걷은 순간 그 미배선 경보만 사라졌다(P3-14 와
+        # 같은 유형). OPS-28 이 import 를 도달에서 갈랐으므로(축 4 블록 주석) 유예를 복원한다.
+        # 도달한 것은 코드 재사용이지 라이브 측정이 아니다.
+        "harness.residue_cross_verify_eval": _LIVE_DEPENDENT,
         # ARCH-49 — DeepSeek/OpenRouter 라이브 프로브. CI에서 원리적으로 못 도는 것이
         # *실측*됐다(2026-09-17 개발 컨테이너: 키 부재 + egress 프록시가
         # api.deepseek.com·openrouter.ai에 CONNECT 403). 이 CLI를 실제로 돌려 3축을
@@ -1200,7 +1501,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 판정 로직(Hard Gate 우선·F-Ⅳ 3/2 경계·미측정 비통과·단일 점수 금지)은 backend 잡이
         # 수집하는 tests/backend/ops/test_validation_scorecard.py가 상시 검증한다 —
         # "안 도는 코드"가 아니라 "실측이 있을 때 사람이 G5에서 돌리는 판정기"다.
-        # (ops.validation_scorecard 유예는 2026-10-09 P3-14 에서 걷었다 — 아래 "P3-14" 주석)
+        "ops.validation_scorecard": (
+            "by-design:12월 검증 결론 판정기(EOS-61) — 입력이 EOS-54/55/60 산출물이라 실측 축적 "
+            "전에는 전 지표 미측정(exit 1)이 설계값. G5(12/31) 판정 시점에 운영자가 "
+            "`--hit-cu-json`·`--qa-matrix-json`으로 생산자 산출을 직접 먹여 돌린다"
+        ),
         # EOS-08(2026-09-16): Phase 1 구조 지표 5종 리포터 — **판정기가 아니라 리포터**라
         # CI 차단 스텝에 넣지 않는다(넣으면 그 모듈이 스스로 못박은 "지표 값으로 합격을
         # 선언하지 않는다"를 배선이 배신한다 — 두 도구가 서로 다른 합격을 말하면 무엇을
@@ -1213,7 +1518,58 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "의미가 없고, 반대로 exit 1을 내게 바꾸면 validation_scorecard와 합격 판정이 갈린다. "
             "산출 로직은 tests/backend/ops/test_phase1_structure_report.py가 상시 검증"
         ),
-        # (ops.hit_cu_metrics 유예는 2026-10-09 P3-14 에서 걷었다 — 아래 "P3-14" 주석)
+        "ops.hit_cu_metrics": (
+            "by-design:검수 타이머 실표본 의존 판독기(EOS-54) — 계측 이벤트 축적 전에는 입력 0이 "
+            "측정 실패(exit 1)로 설계돼 CI 상시 실행 비대상. G2/G5 KPI 판정 시점에 운영자가 돌린다"
+        ),
+        # EOS-207(2026-10-29): G3 미측정 3항목 측정기 — 저작 회차 *실산출물*(data/runs/<회차>-*)
+        # 의존 판독기다. 현행 산출물에는 힌트가 실리지 않아(S4-11 hints 표 미내보내기) 힌트 축이
+        # 측정 대상 부재 → exit 2가 **정직한 설계값**이라 CI 차단 스텝으로 배선하면 상시 red다.
+        # 실데이터 첫 측정값(통과율 13/111·우회 22·메타 누락 0·F8 라벨 불일치 2)은 backend 잡이
+        # 수집하는 tests/backend/ops/test_g3_content_measures.py::TestEos197FirstMeasurement가
+        # 동결하고, 판정 분기(우회·누설 3상태·메타 필드별·종료 코드 0/1/2)도 같은 파일이 상시
+        # 검증한다. G3(11/22) 판정 시점에 운영자가 돌린다.
+        "ops.g3_content_measures": (
+            "by-design:G3 미측정 3항목 측정기(EOS-207) — 저작 회차 실산출물 의존 판독기. 힌트가 "
+            "실리지 않은 현행 회차에서는 측정 대상 부재(exit 2)가 설계값이라 CI 차단 스텝 비대상. "
+            "실데이터 값·판정 분기는 tests/backend/ops/test_g3_content_measures.py가 상시 동결. "
+            "G3(11/22) 판정 시점에 운영자가 돌린다"
+        ),
+        # EOS-210(2026-10-29): 힌트 누설 사람 판정 도구(표본 추출 sample + 맹검 판정 review).
+        # review는 사람이 키보드로 판정을 넣는 **대화형** CLI라 CI에서 돌 수 없고, sample도 저작
+        # 회차 실산출물(`cu.hints.jsonl` — EOS-211 라이브 실행 산출)이 있어야 의미가 있다.
+        # 판정 분기(맹검·입력 잠금·기록 실패 정지·재개·재판정 이력)는 backend 잡이 수집하는
+        # tests/backend/harness/test_hint_verdict_session.py가 상시 검증하고, 그 기록을 읽는 측정기
+        # 쪽은 tests/backend/ops/test_hint_human_verdicts.py가 동결한다. Kiki가 런북
+        # docs/ops/eos210_hint_human_verdict_runbook.md로 돌린다.
+        "harness.hint_verdict_session": (
+            "by-design:힌트 누설 사람 판정 대화형 CLI(EOS-210) — 사람이 판정을 입력하는 도구라 CI "
+            "실행 비대상. 판정 분기는 tests/backend/harness/test_hint_verdict_session.py가 상시 "
+            "동결. "
+            "G3 판정 전 Kiki가 런북 eos210_hint_human_verdict_runbook.md로 돌린다"
+        ),
+        # EOS-219(2026-10-30): 같은 힌트 누설 판정을 Windows 창(tkinter)에서 받고, 남은 판정을
+        # 모두 마친 세션 끝에만 AI 권고를 보여 준다. 사람이 창을 보고 버튼을 누르는 도구라
+        # CI에서 돌 수 없다.
+        # 제어기·권고 로더·불일치 보고(맹검 순서 포함)는 backend 잡이 수집하는
+        # tests/backend/harness/test_hint_verdict_gui.py가 tkinter 없이 상시 검증한다.
+        "harness.hint_verdict_gui": (
+            "by-design:힌트 누설 사람 판정 창(EOS-219) — 사람이 창에서 판정하는 도구라 CI 실행 "
+            "비대상. 판정·권고 공개 순서는 tests/backend/harness/test_hint_verdict_gui.py가 상시 "
+            "동결. G3 판정 전 Kiki가 런북으로 돌린다"
+        ),
+        # EOS-211(2026-10-29): CU 사후 LLM 힌트 패스 — 저장된 CU에 단계·L1·L2·L3를 붙이는 *라이브
+        # LLM 배치*다(Kiki PC 런북 1회 실행 · docs/ops/eos211_cu_hint_pass_runbook.md). CI에는 LLM
+        # 키·Ollama가 없어 상시 실행 대상이 아니다. 판정 분기(게이트 3종 통과분만 verified · 재시도·
+        # 타입명 기록 · 재개 중복 0 · 종료 코드 0/1/2 · EOS-207 측정기 입력 계약)는 backend 잡이
+        # 수집하는 tests/backend/l4/hint_content/test_cu_hint_pass.py가 가짜 provider로 상시
+        # 검증한다.
+        "harness.cu_hint_pass": (
+            "by-design:CU 사후 LLM 힌트 패스(EOS-211) — 라이브 LLM 배치라 CI 상시 실행 비대상. "
+            "운영자가 런북으로 회차 폴더마다 1회 돌리고, 산출 cu.hints.jsonl을 g3_content_measures "
+            "--hints-jsonl로 소급 측정한다. 판정 분기는 tests/backend/l4/hint_content/"
+            "test_cu_hint_pass.py가 가짜 provider로 상시 동결"
+        ),
         # EOS-60(2026-08-31): 골든 승격기 + QA 엔진 혼동행렬 — 둘 다 EOS-54 검수 *실이벤트*가
         # 입력이다(별도 라벨링 캠페인 금지 규약의 귀결). 검수 판정이 쌓이기 전에는 승격 0건 =
         # 측정 실패(exit 1)가 설계값이라 hit_cu_metrics와 같은 이유로 CI 상시 배선 비대상 —
@@ -1224,18 +1580,33 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 때 사람이 돌리는 판독기"다. 계약 정본 = docs/standards/golden_benchmark_contract.md.
         # (harness.golden_benchmark·ops.qa_confusion_matrix 유예도 같은 날 같은 사유로 걷었다)
         #
-        # P3-14(2026-10-09): `ops.phase3_metrics --self-check` 가 CI backend 잡에 직접
-        # 배선되고, 그 모듈이 `ops.validation_scorecard`(Hard Gate·임계 표 흡수)를
-        # in-process import 한다. 감사 정의(축 4 ⑶ 전이 import)상 scorecard 와 그 import
-        # 폐포(scorecard → qa_confusion_matrix → golden_benchmark →
-        # hit_cu_metrics·reviewer_sample_package)가 **도달**이 되어 위 5건의 `by-design`
-        # 유예가 `stale-waiver` 로 exit 1 이 됐다 — 걷는 것이 이 게이트의 정본 대응이다.
-        # **사실이 바뀐 것은 아니다**: 이 다섯 CLI 의 `main()` 은 여전히 CI 에서 실행되지
-        # 않으며(입력이 EOS-54/55/60 실산출물이라 실측 축적 전에는 측정 실패 exit 1 이
-        # 설계값, G5 판정 시점에 운영자가 돌린다) 원 사유는 그대로 참이다. 감사기가
-        # '라이브러리로 import 됨'과 'CLI 로 실행됨'을 구분하지 못하는 것은 이 게이트의
-        # 알려진 한계(`reached_clis` docstring ⑶)이며 여기서 고치지 않는다 — 구분하려면
-        # import 문의 사용 형태까지 보는 별도 설계가 필요하다.
+        # P3-14/OPS-28: `ops.phase3_metrics --self-check` 가 CI backend 잡에 직접 배선되고, 그
+        # 모듈이
+        # `ops.validation_scorecard`(Hard Gate·임계 표 흡수)를 in-process import 한다. OPS-28 이전의
+        # 감사 정의(import 전이 = 도달)에서는 scorecard 와 그 import 폐포(scorecard → qa_confusion_
+        # matrix → golden_benchmark → hit_cu_metrics·reviewer_sample_package)가 **도달**이 되어
+        # 아래 다섯 `by-design` 유예가 `stale-waiver` 로 exit 1 이 됐고, P3-14 는 유예를 걷어
+        # 통과시켰다.
+        # **사실이 바뀐 것은 아니었다** — 이 다섯 CLI 의 `main()` 은 여전히 CI 에서 실행되지
+        # 않으며(입력이
+        # EOS-54/55/60 실산출물이라 실측 축적 전에는 측정 실패 exit 1 이 설계값, G5 판정 시점에
+        # 운영자가
+        # 돌린다) 걷는 순간 이 다섯에 대한 미배선 경보만 사라졌다. OPS-28 이 도달을 `main()` 실행과
+        # 라이브러리 import 로 갈라(축 4 블록 주석) import 만으로는 경보를 끌 수 없게 했고, 걷었던
+        # 다섯
+        # 유예(reviewer_sample_package·validation_scorecard·hit_cu_metrics·golden_benchmark·
+        # qa_confusion_matrix)를 복원했다. 회귀 동결 =
+        # tests/backend/ops/test_declared_unwired_audit.py
+        # 의 `TestLibraryImportIsNotExecution` (실 저장소에서 이 다섯이 library_only 로 남음을
+        # 고정).
+        "harness.golden_benchmark": (
+            "by-design:검수 실이벤트 의존 골든 승격기(EOS-60) — 검수 판정 축적 전에는 승격 0건이 "
+            "측정 실패(exit 1)로 설계돼 CI 상시 실행 비대상. 검수와 함께 운영자가 돌린다"
+        ),
+        "ops.qa_confusion_matrix": (
+            "by-design:골든 실표본 의존 혼동행렬 판독기(EOS-60) — 골든 0건·평가쌍 0건이 측정 "
+            "실패(exit 1)로 설계돼 CI 상시 실행 비대상. G2/G5 KPI 판정 시점에 운영자가 돌린다"
+        ),
         # EOS-64(2026-09-01): 골든 승격 경로 게이트 — 입력이 *승격 제안*(사람이 "이것들을
         # 올리겠다"고 내미는 목록)이라 제안이 없는 시점에는 돌릴 대상 자체가 없다. CI가 매
         # 커밋마다 돌릴 성질이 아니고(제안 파일이 레포에 상주하지 않는다), 승격 판정 시점에
@@ -1338,6 +1709,26 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # docs/standards/incident_response_slo.md §4-1의 실패 유형과 /demo-doctor 카탈로그
         # W1행이 이 CLI를 1차 진단으로 지목한다.
         "ops.db_host_reachability": _LIVE_DEPENDENT,
+        # OPS-139(2026-10-14): 원자 백본 정본↔prod DB 패리티 프로브. 입력이 **살아 있는
+        # docker 데몬 +
+        # 실행 중인 prod 컨테이너(whymath-pg)**라 CI에는 둘 다 없다 — 상시 실행하면 전건 UNKNOWN
+        # (exit 2)만 난다(그것이 설계값이지 CI에서 확인할 값이 아니다). **판정 로직은 순수 코어로
+        # 분리돼 있고** tests/backend/ops/test_atom_graph_prod_parity.py가 MATCH/DRIFT(방향 3종)/
+        # UNKNOWN/입력오류를 전건 주입해 CI에서 상시 검증하며, *_mutation.py가 절 19종을 지웠을 때
+        # RED가 되는지를 상시 확인한다. 운영 배선은 사람 경로다 — docs/ops/atom_graph_parity_probe_
+        # runbook.md와 skb03 런북 [E]의 AFTER 판정, 정본 변경 PR 체크리스트가 이 CLI를 부른다
+        # (tests/infra/test_atom_graph_prod_parity_wiring.py가 동결).
+        "ops.atom_graph_prod_parity": _LIVE_DEPENDENT,
+        # P3-06(2026-10-17): 핵심 오개념 12개에 오답→교정 전략 체인이 도는지 재는 커버리지 CLI.
+        # 좌석 없는 오개념 5개(Kiki 결정 대기)가 있는 동안 종료 코드가 1이라 CI 스텝으로 걸면
+        # 상시 적색이 된다 — 그래서 직접 배선하지 않는다. 판정 로직(체인·표·종료 코드 계약)은
+        # backend 잡이 수집하는 tests/backend/ops/test_phase3_remediation.py 가 실 코퍼스로 매번
+        # in-process 실행하고, 결함 주입(서명 제거·오탐·사다리 경계 이동 등)이 RED 임을 확인한다.
+        "ops.phase3_remediation": (
+            "by-design:Phase 3 오답→교정 전략 커버리지 CLI(P3-06) — 막힘 5개가 풀리기 전까지 "
+            "종료 코드가 1이라 CI 스텝에 걸면 상시 적색이 된다. 판정 로직은 backend pytest 가 "
+            "실 코퍼스로 상시 실행하며 결함 주입 RED 를 확인한다"
+        ),
         # OPS-30(2026-10-09): 외부 업타임 프로브 — **서버 프로세스 밖**에서 1분마다 /health/ready를
         # 폴링하는 것이 존재 이유라(죽은 서버는 자기 죽음을 보고하지 못한다) 앱 코드가 부르면
         # 안 된다. 호출자는 Kiki 머신의 Windows 작업 스케줄러이고, 등록 절차는 사람 경로다 —
@@ -1431,6 +1822,120 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # S4-16(진행 중) 산출물 — 게이트 승격 조건 측정 도구, 승격 전까지는 CI 상시 배선 대상
         # 아님(LLM K=3 교차검증 라이브 의존)
         "harness.residue_gate_demotion_battle": "pending-task:S4-16-residue-gate-demotion-battle",
+        # ══ OPS-28(2026-10-12) 편입분 ══════════════════════════════════════════════════
+        # CLI 축을 `harness`·`ops` 최상위 파일에서 패키지 전체로 넓히며 처음 감사 대상이 된 CLI 와,
+        # "다른 모듈이 import 했다"는 이유만으로 도달 판정을 받던 CLI 의 분류다.
+        # `privacy.retention_purge_cli`·`l2.calibrate_items` 는 등재하지 않는다 —
+        # docker-compose.prod.yml
+        # 의 24h 루프가 `python -m` 으로 실행하므로(`compose_executed_modules`) 언제나 `reached` 다.
+        #
+        # ── import 만으로 도달 판정을 받던 라이브러리 재사용 CLI ──
+        "harness.banned_words_pii_eval": _QA_PIPELINE_REUSED,
+        "harness.corpus_audit_eval": _QA_PIPELINE_REUSED,
+        "harness.crosslink_demotion_eval": _QA_PIPELINE_REUSED,
+        "harness.attempt_grading_shadow_report": _NEEDS_LIVE_SAMPLE,
+        "ops.cost_report": (
+            "by-design:라이브 `l3_routing` 트레이스 판독기(S1 게이트②) — 입력이 실 Langfuse·PG "
+            "표본이라 "
+            "CI 에서 원리적으로 못 돈다. 게이트② 실측 때 운영자가 "
+            "돌린다(docs/ops/ops106_gate2_live_"
+            "sample_runbook.md · scripts/fill_live_cost_table.py). `api.admin_bff` 는 이 모듈의 "
+            "함수를 "
+            "재사용할 뿐 `main()` 을 실행하지 않는다"
+        ),
+        # ── l1 — 코퍼스 → DB 적재 CLI ──
+        # (아래 편입분 중 16종은 테스트·CI 어디서도 main() 이 실행되지 않는다 — 의도 선언과 별개로
+        #  진입점 동작은 OPS-132 가 스모크로 소유한다.)
+        "l1.atom_probe.populate": _CORPUS_LOADER,
+        "l1.concept_atom_crosswalk.populate": _CORPUS_LOADER,
+        "l1.concept_content.populate": _CORPUS_LOADER,
+        "l1.concept_graph.populate": _CORPUS_LOADER,
+        "l1.curriculum.populate": _CORPUS_LOADER,
+        "l1.formula_graph.populate": _CORPUS_LOADER,
+        "l1.misconception.populate": _CORPUS_LOADER,
+        "l1.misconception.populate_atom": _CORPUS_LOADER,
+        "l1.pedagogy.compile": _CORPUS_LOADER,
+        "l1.pedagogy.populate": _CORPUS_LOADER,
+        "l1.problem_bank.populate": _CORPUS_LOADER,
+        "l1.problem_type_graph.populate": _CORPUS_LOADER,
+        "l1.skill_graph.populate": _CORPUS_LOADER,
+        "l1.standards.criteria_loader": _CORPUS_LOADER,
+        "l1.standards.populate": _CORPUS_LOADER,
+        "l1.strategy_graph.populate": _CORPUS_LOADER,
+        "l1.atom_graph.dedup_candidates": _OFFLINE_REPORT,
+        # 무결성 게이트 판정 로직은 CI 에서 상시 돈다 — 독립 main() 만 CI 에서 안 돈다(아래 세 건).
+        "l1.standards.anchor_registry": (
+            "by-design:EOS 앵커 레지스트리 무결성 게이트(EOS-56) — 판정 로직은 backend 잡이 "
+            "수집하는 "
+            "tests/backend/l1/test_eos_anchor_registry.py 가 커밋된 레지스트리로 `main()` 을 "
+            "in-process "
+            "실행해 exit 0 을 요구하며 상시 검증한다. 별도 CI 스텝은 같은 판정을 한 번 더 돌릴 "
+            "뿐이다"
+        ),
+        "l1.standards.phase3_scope": (
+            "by-design:Phase 3 범위 명세 무결성 게이트(P3-01) — 판정 "
+            "로직(`load_scope_spec`·`verify_"
+            "spec`)을 `ops.phase3_metrics --self-check`(ci.yml 직접 실행)가 in-process 로 재사용해 "
+            "매 CI 에서 돈다. 독립 `main()` 은 이 게이트 하나만 따로 볼 때의 진입점이다(OPS-28: "
+            "import 는 도달이 아니다)"
+        ),
+        "l1.standards.phase3_coverage": (
+            "by-design:Phase 3 Coverage 계측기(P3-02) — 판정 로직을 `ops.phase3_metrics "
+            "--self-check`"
+            "(ci.yml 직접 실행)가 in-process 로 재사용해 매 CI 에서 돈다. 독립 `main()` 은 계측기 "
+            "하나만 따로 볼 때의 진입점이다(OPS-28: import 는 도달이 아니다)"
+        ),
+        # ── l3 ──
+        "l3.multi_solution": _BATCH_GENERATOR,
+        "l3.pregenerate": _BATCH_GENERATOR,
+        "l3.pedagogy.analogy_demand": _OFFLINE_REPORT,
+        "l3.pedagogy.diag_item_projector": _OPS_DB_WRITER,
+        # ── l4 ──
+        "l4.hint_content.populate": _OPS_DB_WRITER,
+        "l4.misconception.semantic.populate": _CORPUS_LOADER,
+        "l4.misconception.anchor_seat_gap": _OFFLINE_REPORT,
+        "l4.misconception.crosslink_coverage": _CROSSLINK_ADVISORY,
+        "l4.misconception.crosslink_machine_reject": _CROSSLINK_ADVISORY,
+        "l4.misconception.crosslink_review_aid": _CROSSLINK_ADVISORY,
+        "l4.misconception.crosslink_triage": _CROSSLINK_ADVISORY,
+        "l4.misconception.crosslink_review": (
+            "by-design:사람의 승인 판정이 입력인 승격·적재 도구(M1) — 서명된 승인이 없는 큐는 "
+            "승격 0건이 "
+            "정상이라 CI 무인 실행은 의미가 없고, 기계가 스스로 승인하는 것은 금지다(자기승인 "
+            "금지·초인간 "
+            "검증 §3.3)"
+        ),
+        "l4.misconception.crosslink_shadow_harvest": _SHADOW_HARVEST,
+        # ② judge_shadow_harvest — 생산자는 배선돼 있다: `api/coach.py` 가 플래그(`misconception_
+        # judge_shadow`)가 켜졌을 때 `observe_misconception_judge_shadow` 로 관측을 emit 한다. 이
+        # CLI 는 그 관측을 운영이 모은 파일의 소비 쪽이라 호출자가 사람뿐인 것이 설계다. 집계 로직은
+        # tests/backend/l4/test_judge_shadow_harvest.py 가 `main()` 포함 검증한다.
+        "l4.misconception.judge_shadow_harvest": _SHADOW_HARVEST,
+        "l4.misconception.semantic_shadow_harvest": _SHADOW_HARVEST,
+        "l4.misconception.wrong_form_shadow_harvest": _SHADOW_HARVEST,
+        # P3-66 — 미분 오답 서명 독법의 그림자 관측(`whymath.api.attempt_scan_shadow.record`)을
+        # 운영이 모은 파일의 소비 쪽 · 활성화 게이트 G-p356-signature-activation 판정 도구.
+        "harness.attempt_scan_shadow_harvest": _SHADOW_HARVEST,
+        "l4.step_shadow_harvest": _SHADOW_HARVEST,
+        "l4.misconception.semantic_eval": (
+            "by-design:오개념 의미 매칭 측정 하니스(slice 107) — 플립 결정의 구체 임계(R·F)를 "
+            "사람이 "
+            "라이브 임베딩 모델(Phaiakes9 bge-m3)로 측정한 뒤 확정한다고 모듈 docstring 이 "
+            "못박았다. "
+            "측정 자체가 사람 판단의 입력이라 상시 게이트가 아니다"
+        ),
+        "l4.step_shadow_eval": (
+            "by-design:사람 라벨 워크시트가 입력인 정밀도 측정 하니스 — A/B 후보를 사람이 라벨링한 "
+            "뒤에야 돌릴 수 있고(라벨은 `step_shadow_harvest` 가 만든 워크시트에 사람이 채운다) "
+            "라벨 없는 CI 에서는 입력이 없다"
+        ),
+        # ── privacy·whs ──
+        "privacy.dialogue_content_backfill": _ENVELOPE_BACKFILL,
+        "privacy.student_work_backfill": _ENVELOPE_BACKFILL,
+        "whs.corpus_replay": _OPS_DB_WRITER,
+        "whs.path_promotion": _OPS_DB_WRITER,
+        "whs.prm_builder_export_cli": _DATASET_EXPORT,
+        "whs.self_evolution_export_cli": _DATASET_EXPORT,
         # `ops.declared_unwired_audit`(이 모듈 자신)은 여기 등재하지 않는다 — 전용 CI 잡
         # (`declared-unwired-audit`)이 `-m`으로 직접 실행하므로 언제나 `reached`다. 등재해 두면
         # `_classify`가 즉시 `stale-waiver`로 잡는다(실측: 첫 CI 잡 배선 직후 전체 스위트가 그
@@ -1450,13 +1955,30 @@ class ItemVerdict:
     key: str
     status: str  # reached | by-design | pending-task | unclassified | expired-waiver | ...
     note: str
+    # 판정(`status`)을 바꾸지 않는 **관측 컬럼**(OPS-28) — 같은 "도달"을 어느 경로로 얻었는지
+    # 가른다.
+    # HTTP 축: server_test_reached(백엔드 테스트) · client_reached(dart). CLI 축: executed(main
+    # 실행) ·
+    # library_imported(import만). 판정은 기존 규약 그대로고 이 컬럼은 읽는 사람의 눈을 위한 것이다.
+    columns: tuple[tuple[str, bool], ...] = ()
 
     @property
     def is_violation(self) -> bool:
         return self.status not in {"reached", "by-design", "pending-task"}
 
-    def to_json(self) -> dict[str, str]:
-        return {"axis": self.axis, "key": self.key, "status": self.status, "note": self.note}
+    def column(self, name: str) -> bool | None:
+        return dict(self.columns).get(name)
+
+    def to_json(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "axis": self.axis,
+            "key": self.key,
+            "status": self.status,
+            "note": self.note,
+        }
+        if self.columns:
+            out["columns"] = dict(self.columns)
+        return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -1476,13 +1998,24 @@ class AxisResult:
     def violations(self) -> tuple[ItemVerdict, ...]:
         return tuple(v for v in self.verdicts if v.is_violation)
 
+    def column_count(self, name: str) -> int | None:
+        """컬럼 `name`이 참인 항목 수. 이 축이 그 컬럼을 갖지 않으면 None."""
+        values = [v.column(name) for v in self.verdicts]
+        if all(value is None for value in values):
+            return None
+        return sum(1 for value in values if value)
+
     def to_json(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "supplied": self.supplied,
             "reached": self.reached,
             "violations": [v.to_json() for v in self.violations],
             "items": [v.to_json() for v in self.verdicts],
         }
+        names = sorted({name for v in self.verdicts for name, _ in v.columns})
+        if names:
+            out["column_counts"] = {name: self.column_count(name) for name in names}
+        return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -1514,7 +2047,14 @@ def _task_status(backlog_tasks: Path, task_id: str) -> str | None:
     return str(status) if status is not None else None
 
 
-def _classify(axis: str, key: str, is_reached: bool, backlog_tasks: Path) -> ItemVerdict:
+def _classify(
+    axis: str,
+    key: str,
+    is_reached: bool,
+    backlog_tasks: Path,
+    *,
+    unreached_note: str = "미도달인데 의도 선언이 없다",
+) -> ItemVerdict:
     declared = _MANIFEST.get(axis, {}).get(key)
     if is_reached:
         if declared is not None:
@@ -1523,7 +2063,7 @@ def _classify(axis: str, key: str, is_reached: bool, backlog_tasks: Path) -> Ite
             return ItemVerdict(axis, key, "stale-waiver", note)
         return ItemVerdict(axis, key, "reached", "")
     if declared is None:
-        return ItemVerdict(axis, key, "unclassified", "미도달인데 의도 선언이 없다")
+        return ItemVerdict(axis, key, "unclassified", unreached_note)
     if declared.startswith(_BY_DESIGN):
         reason = declared[len(_BY_DESIGN) :].strip()
         if not reason:
@@ -1538,6 +2078,10 @@ def _classify(axis: str, key: str, is_reached: bool, backlog_tasks: Path) -> Ite
             return ItemVerdict(axis, key, "expired-waiver", f"유예 근거 태스크 완료됨: {task_id}")
         return ItemVerdict(axis, key, "pending-task", f"{task_id} ({status})")
     return ItemVerdict(axis, key, "malformed", f"알 수 없는 분류 값: {declared}")
+
+
+def _with_columns(verdict: ItemVerdict, columns: tuple[tuple[str, bool], ...]) -> ItemVerdict:
+    return ItemVerdict(verdict.axis, verdict.key, verdict.status, verdict.note, columns)
 
 
 def _timeseries_key_note(usage: TimeseriesUsage) -> str:
@@ -1561,9 +2105,12 @@ def build_report(root: Path | None = None) -> Report:
     backlog_tasks = base / "backlog" / "tasks"
 
     routes = app_route_entries()
-    callers = dart_call_entries(base / "src" / "mobile" / "lib") | test_call_entries(
-        base / "tests" / "backend"
-    )
+    # 서버 도달(백엔드 테스트)과 클라 도달(dart)을 **따로** 모은다(OPS-28 ③). `reached` 판정은 둘의
+    # 합집합 그대로다 — 합집합 판정은 data_platform_module_gap_review.md §2가 기록한 의도적 결정이라
+    # 뒤집지 않는다. 분리는 판정이 아니라 *관측 컬럼*이다(아래 `_http_columns`).
+    client_callers = dart_call_entries(base / "src" / "mobile" / "lib")
+    server_callers = test_call_entries(base / "tests" / "backend")
+    callers = client_callers | server_callers
     events = produced_event_types(package_root)
     ts_models = timeseries_models(package_root)
     clis = cli_modules(package_root)
@@ -1571,6 +2118,7 @@ def build_report(root: Path | None = None) -> Report:
     for label, count in (
         ("routes", len(routes)),
         ("callers", len(callers)),
+        ("client_callers", len(client_callers)),
         ("event_types", len(events)),
         ("timeseries_models", len(ts_models)),
         ("clis", len(clis)),
@@ -1583,15 +2131,23 @@ def build_report(root: Path | None = None) -> Report:
 
     consumed = consumed_event_types(package_root)
     ts_usage = timeseries_usage(package_root, ts_models)
-    ci_roots = ci_executed_modules(base / ".github" / "workflows" / "ci.yml")
-    reached_cli_set = reached_clis(package_root, clis, ci_roots)
+    ci_roots = ci_executed_modules(base / ".github" / "workflows" / "ci.yml") | (
+        compose_executed_modules(base)
+    )
+    cli_reach_result = cli_reach(package_root, clis, ci_roots)
 
     http = tuple(
-        _classify(
-            AXIS_HTTP,
-            f"{method} {normalize_server_path(path)}",
-            _route_reached(method, path, callers),
-            backlog_tasks,
+        _with_columns(
+            _classify(
+                AXIS_HTTP,
+                f"{method} {normalize_server_path(path)}",
+                _route_reached(method, path, callers),
+                backlog_tasks,
+            ),
+            (
+                (COL_SERVER_TEST, _route_reached(method, path, server_callers)),
+                (COL_CLIENT, _route_reached(method, path, client_callers)),
+            ),
         )
         for method, path in routes
     )
@@ -1607,7 +2163,26 @@ def build_report(root: Path | None = None) -> Report:
             note = f"{verdict.note} — {_timeseries_key_note(usage)}"
             verdict = ItemVerdict(verdict.axis, verdict.key, verdict.status, note)
         timeseries_verdicts.append(verdict)
-    cli = tuple(_classify(AXIS_CLI, name, name in reached_cli_set, backlog_tasks) for name in clis)
+    cli = tuple(
+        _with_columns(
+            _classify(
+                AXIS_CLI,
+                name,
+                name in cli_reach_result.executed,
+                backlog_tasks,
+                unreached_note=(
+                    _LIBRARY_ONLY_NOTE
+                    if name in cli_reach_result.library_only
+                    else "미도달인데 의도 선언이 없다"
+                ),
+            ),
+            (
+                (COL_EXECUTED, name in cli_reach_result.executed),
+                (COL_LIBRARY, name in cli_reach_result.library_only),
+            ),
+        )
+        for name in clis
+    )
 
     return Report(
         axes=(
@@ -1626,9 +2201,35 @@ def _dedup(verdicts: tuple[ItemVerdict, ...]) -> tuple[ItemVerdict, ...]:
     for verdict in verdicts:
         keying = (verdict.axis, verdict.key)
         current = seen.get(keying)
-        if current is None or (current.status != "reached" and verdict.status == "reached"):
+        if current is None:
             seen[keying] = verdict
+            continue
+        best = verdict if (current.status != "reached" and verdict.status == "reached") else current
+        merged = {name: value for name, value in current.columns}
+        for name, value in verdict.columns:
+            merged[name] = merged.get(name, False) or value
+        seen[keying] = ItemVerdict(
+            best.axis, best.key, best.status, best.note, tuple(sorted(merged.items()))
+        )
     return tuple(seen[k] for k in sorted(seen))
+
+
+def _column_lines(axis: AxisResult) -> list[str]:
+    """분리 컬럼 요약(OPS-28) — 판정에 쓰이지 않는 관측치. 컬럼이 없는 축은 빈 목록."""
+    if axis.axis == AXIS_HTTP:
+        client = axis.column_count(COL_CLIENT) or 0
+        server_only = sum(
+            1 for v in axis.verdicts if v.column(COL_SERVER_TEST) and not v.column(COL_CLIENT)
+        )
+        return [
+            f"    └ 도달 경로 분리: 클라(dart) 도달 {client} · 서버 테스트로만 도달 {server_only}"
+            " (판정은 합집합 — 클라 미도달이 곧 위반은 아니다)"
+        ]
+    if axis.axis == AXIS_CLI:
+        executed = axis.column_count(COL_EXECUTED) or 0
+        library = axis.column_count(COL_LIBRARY) or 0
+        return [f"    └ 도달 경로 분리: main() 실행 {executed} · import 만 됨(도달 아님) {library}"]
+    return []
 
 
 def render_report(report: Report) -> str:
@@ -1642,6 +2243,7 @@ def render_report(report: Report) -> str:
             f"[{axis.axis}] 공급 {axis.supplied} · 도달 {axis.reached} · 미도달 {unreached}"
             f" · 위반 {len(axis.violations)}"
         )
+        lines.extend(_column_lines(axis))
         for verdict in axis.violations:
             lines.append(f"    ✗ {verdict.status:16} {verdict.key} — {verdict.note}")
     lines.append("")

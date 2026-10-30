@@ -1,6 +1,6 @@
 """study 신호 조립 단위테스트 — grade_band 생산자 배선(PED-23 회수) + k_type 값 전달 동결.
 
-정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §4 — "신호 추가는 생산자 먼저"
+정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §4 — "신호 추가는 생산자 먼저"
 (04d §2.1). `_build_signals`가 `UserProfile.grade`(10~14 — `schema/user.py` 계약)를
 `grade_to_band`로 파생해 `StudentSignals.grade_band`에 싣는 배선을 검증한다(필드만 만들고
 항상 None이면 04d §2.1 위반 — 이 파일이 생산자 실배선의 증거다).

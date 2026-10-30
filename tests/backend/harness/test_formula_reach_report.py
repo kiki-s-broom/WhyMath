@@ -24,6 +24,13 @@ import pytest
 
 from whymath_backend.harness import formula_reach_report as frr
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 # ──────────────────────────────────────────────────────────────────────────
 # 가짜 트리 헬퍼 — hermetic 베이스라인(전 표면 미도달·최소 코퍼스)
 # ──────────────────────────────────────────────────────────────────────────
@@ -407,7 +414,7 @@ def test_real_corpus_smoke_all_surfaces_unreached_and_fill_counts() -> None:
     assert all(s.reach_count == 0 for s in report.surfaces)
 
     fill = report.corpus_fill
-    assert fill.total_formulas == 25
+    assert fill.total_formulas == _FACTS["formula_graph.formulas"]
     by_field = {f.field: f for f in fill.fields}
     assert by_field["constraints"].filled == 15
     assert by_field["mnemonic"].filled == 14

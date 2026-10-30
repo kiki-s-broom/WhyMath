@@ -231,6 +231,22 @@ def _deriv_cond(fn_sym: str, relation: str) -> str:
     return f"Derivative({fn_sym}, x).doit() {relation} 0"
 
 
+def _kind_basis(poly: Poly, kind: str) -> str:
+    """규칙 (가)(P3-62) 선택 근거 — 발문이 묻는 극값의 *종류*에서 나온 이계도함수 부호 조건.
+
+    극소를 물으면 f''(x) > 0, 극대를 물으면 f''(x) < 0(명시 다항식 — 판정기 허용 목록 꼴). 정답
+    x좌표에서 역산하지 않는다: 종류는 발문이 정하고, 이 조건을 만족하는 임계점이 하나인지는 공용
+    해석 판정이 조건만으로 증명한다(하나가 아니면 빌드가 멈춘다).
+    """
+    second = derivative_of(derivative_of(poly))
+    return f"{poly_to_sympy_str(second)} {'>' if kind == 'min' else '<'} 0"
+
+
+def _pin_cond(fn_sym: str, point: int) -> str:
+    """미지 계수를 정하는 조건 — 발문의 'x = p에서 극값'(f'(p) = 0). 미지 계수만 담는다."""
+    return f"Derivative({fn_sym}, x).doit().subs(x, {point}) = 0"
+
+
 def _item(
     *,
     slot: str,
@@ -245,6 +261,7 @@ def _item(
     choices: tuple[str, ...] | None = None,
     distractors: tuple[tuple[int, str], ...] = (),
     setup: str | None = None,
+    structured: tuple[str, ...] | None = None,
 ) -> ShapeItem:
     return ShapeItem(
         slot=slot,
@@ -260,6 +277,7 @@ def _item(
         distractors=distractors,
         answer_selection=selection,
         solution_setup=setup,
+        structured_conditions=structured,
     )
 
 
@@ -647,6 +665,13 @@ def _other_root_value_item(
         answer_map=(("x", str(q)), ("a", str(a)), ("y", str(value))),
         ptype=_OPT,
         explanation=explanation,
+        # 규칙 (가) — a 결정(f'(p) = 0) · a 대입 임계점 방정식 · 묻는 종류의 f'' 부호 · y 정의.
+        structured=(
+            _pin_cond(f_sym, p),
+            _deriv_cond(fn.sym, "="),
+            _kind_basis(poly, ask_kind),
+            f"y = {fn.sym}",
+        ),
     )
 
 
@@ -724,6 +749,13 @@ def _find_k_other_root_frame(
             answer_map=(("x", str(q)), ("k", str(k)), ("a", str(a))),
             ptype=_SOLVE,
             explanation=explanation,
+            # 규칙 (가) — a 결정 · a 대입 임계점 방정식 · 묻는 종류의 f'' 부호 · k 정의(f(x) = V).
+            structured=(
+                _pin_cond(f_sym, pp),
+                _deriv_cond(fn.sym, "="),
+                _kind_basis(base, ask_kind),
+                f"k = {value} - ({fn.sym})",
+            ),
         )
 
     return Frame(frame_id, tuple(seeded_order(seed, combos)), build)
@@ -832,6 +864,18 @@ def _quartic_k_frame(
             answer_map=(("x", str(target)), ("k", str(k)), ("y", str(value))),
             ptype=_OPT,
             explanation=explanation,
+            # 규칙 (가) — 가운데 극값만(바깥 두 극값은 같은 종류라 f'' 부호로 하나가
+            # 정해지지 않는다).
+            structured=(
+                (
+                    _pin_cond(f_sym, pinned),
+                    _deriv_cond(fn.sym, "="),
+                    _kind_basis(poly, fn.kinds[target]),
+                    f"y = {fn.sym}",
+                )
+                if ask == "middle"
+                else None
+            ),
         )
 
     return Frame(frame_id, tuple(seeded_order(seed, combos)), build)

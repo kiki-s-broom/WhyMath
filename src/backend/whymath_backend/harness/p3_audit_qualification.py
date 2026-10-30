@@ -61,6 +61,10 @@ from pydantic import ValidationError
 
 from whymath_backend.harness.corpus_reverify import reverify_corpus
 from whymath_backend.harness.p3_calculus1_diff_batch import GENERATORS
+from whymath_backend.harness.p3_differentiability_reach_batch import (
+    GENERATORS as REACH_GENERATORS,
+)
+from whymath_backend.harness.p3_fill_batch import GENERATORS as FILL_GENERATORS
 from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_bound
 from whymath_backend.l1.problem_bank.derived_form_rules import derived_form_violations
 from whymath_backend.l3.equivalent.acceptance import evaluate_equivalent_candidate
@@ -176,6 +180,7 @@ _BLIND_VERIFY_KEYS: Final = (
 )
 _MISCONCEPTIONS_V1: Final = Path("data/corpus/misconceptions_v1/misconceptions.json")
 _BANK_PATH: Final = Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl")
+_TASK_P303: Final = "P3-03-coverage-fill"
 _QUAL_DIR: Final = Path("docs/data/p3_calculus1_diff_audit/qualification")
 _BANK_AUDIT_DIR: Final = Path("docs/data/p3_calculus1_diff_audit/bank_audit")
 #: S5 1회차 감사(k = 68)를 받은 은행 v0의 동결 사본(sha256 cc7e9539…). 자격 시험지(emit)는
@@ -357,7 +362,15 @@ class BankSheets:
     manifest: str
 
 
-def build_bank_sheets(bank_path: Path, seed: int, n_shards: int) -> BankSheets:
+def build_bank_sheets(
+    bank_path: Path,
+    seed: int,
+    n_shards: int,
+    *,
+    expected_size: int = S5_BANK_SIZE,
+    task: str = _TASK_P303,
+    bank_label: str | None = None,
+) -> BankSheets:
     """은행 → 판정자 묶음(결정론). 은행 순서를 seed로 섞어 같은 크기로 나눈다.
 
     은행 파일 순서는 개념·슬롯별로 몰려 있다 — 그대로 자르면 묶음 하나가 한 개념만 담아 판정자의
@@ -367,9 +380,9 @@ def build_bank_sheets(bank_path: Path, seed: int, n_shards: int) -> BankSheets:
     bank_bytes = bank_path.read_bytes()
     bank = _read_jsonl(bank_path)
     ids = [str(r.get("problem_id") or "") for r in bank]
-    if len(set(ids)) != len(ids) or "" in ids or len(bank) != S5_BANK_SIZE:
+    if len(set(ids)) != len(ids) or "" in ids or len(bank) != expected_size:
         raise QualificationInputError(
-            f"은행 문항 {len(bank)}건(고유 id {len(set(ids))}) — 기준 {S5_BANK_SIZE}건과 다르다"
+            f"은행 문항 {len(bank)}건(고유 id {len(set(ids))}) — 기준 {expected_size}건과 다르다"
         )
     if n_shards <= 0 or len(bank) % n_shards:
         raise QualificationInputError(f"은행 {len(bank)}건을 묶음 {n_shards}개로 등분할 수 없다")
@@ -387,10 +400,10 @@ def build_bank_sheets(bank_path: Path, seed: int, n_shards: int) -> BankSheets:
         for index in range(n_shards)
     )
     manifest = {
-        "task": "P3-03-coverage-fill",
+        "task": task,
         "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
         "seed": seed,
-        "bank": str(_BANK_PATH),
+        "bank": bank_label if bank_label is not None else str(_BANK_PATH),
         "bank_sha256": _sha256(bank_bytes),
         "n_items": len(bank),
         "n_shards": n_shards,
@@ -409,7 +422,14 @@ def build_bank_sheets(bank_path: Path, seed: int, n_shards: int) -> BankSheets:
 
 
 def _cmd_bank_sheets(args: argparse.Namespace) -> int:
-    sheets = build_bank_sheets(Path(args.bank), args.seed, args.shards)
+    sheets = build_bank_sheets(
+        Path(args.bank),
+        args.seed,
+        args.shards,
+        expected_size=args.expected_size,
+        task=args.task,
+        bank_label=args.bank_label,
+    )
     manifest_path = Path(args.manifest)
     if args.check:
         same = (
@@ -474,6 +494,28 @@ def _cmd_emit(args: argparse.Namespace) -> int:
 # machine — 기계 게이트 전부
 # ──────────────────────────────────────────────────────────────────────────
 _GENERATOR_BY_CODE: Final = {g.standard_code: g for g in GENERATORS}
+#: 단위 코드로 생성기를 찾는다 — 빈 칸 채우기 은행(P3-05)은 같은 성취기준(02-03·02-10)에 생성기가
+#: 둘이라 성취기준 코드만으로는 어느 쪽 문항인지 가릴 수 없다(단위 코드는 생성기마다 고유하다).
+#: P3-65 스킬 도달 은행(`problem_bank_p3_differentiability_reach_v0`)의 생성기도 단위 코드로
+#: 찾는다 —
+#: [12미적Ⅰ-02-02]에 생성기가 둘(빈 칸 채우기 · 스킬 도달)이라 성취기준 코드로는 가릴 수 없다.
+_GENERATOR_BY_UNIT: Final = {
+    g.unit_code: g for g in (*GENERATORS, *FILL_GENERATORS, *REACH_GENERATORS)
+}
+_FILL_STANDARD_CODES: Final = {g.standard_code: g for g in FILL_GENERATORS}
+
+
+def _generator_for(record: Mapping[str, Any]) -> Any:
+    """문항 → 그 문항을 만든 생성기. 단위 코드(은행 행)로 먼저 찾고, 없으면(시험지) 성취기준으로."""
+    unit = str((record.get("unit_codes") or [""])[0])
+    code = str((record.get("achievement_standard_codes") or [""])[0])
+    return (
+        _GENERATOR_BY_UNIT.get(unit)
+        or _GENERATOR_BY_CODE.get(code)
+        or _FILL_STANDARD_CODES.get(code)
+    )
+
+
 _PROVENANCE: Final = ContentProvenance(
     generation_type=GenerationType.FULLY_GENERATED,
     license=LicenseType.WHYMATH_GENERATED,
@@ -491,7 +533,7 @@ def _slot_of(record: Mapping[str, Any]) -> str:
 def _problem_of(record: Mapping[str, Any], ident: str) -> Problem:
     """문항 필드 → 수용 게이트가 받는 `Problem`(시험지에 없는 메타는 개념 생성기에서 채운다)."""
     code = str((record.get("achievement_standard_codes") or [""])[0])
-    generator = _GENERATOR_BY_CODE.get(code)
+    generator = _generator_for(record)
     slot = _slot_of(record)
     if generator is None or slot not in generator.slot_difficulty:
         raise QualificationInputError(f"{ident}: 알 수 없는 개념·슬롯({code}·{slot})")
@@ -563,8 +605,7 @@ def machine_label(record: Mapping[str, Any], ident: str) -> dict[str, Any]:
         reasons.append(f"reverify: {report.failures[0][1][:120]}")
 
     if problem is not None:
-        code = str((record.get("achievement_standard_codes") or [""])[0])
-        spec = _GENERATOR_BY_CODE[code].spec_for(_slot_of(record))
+        spec = _generator_for(record).spec_for(_slot_of(record))
         verdict = evaluate_equivalent_candidate(
             spec,
             problem,
@@ -950,9 +991,9 @@ def s5_detection_lower(protocol: Mapping[str, Any]) -> float:
 def _cmd_s5(args: argparse.Namespace) -> int:
     bank = _read_jsonl(Path(args.bank))
     ids = {str(r.get("problem_id") or "") for r in bank}
-    if len(ids) != len(bank) or "" in ids or len(bank) != S5_BANK_SIZE:
+    if len(ids) != len(bank) or "" in ids or len(bank) != args.expected_size:
         raise QualificationInputError(
-            f"은행 문항 {len(bank)}건(고유 id {len(ids)}) — 기준 {S5_BANK_SIZE}건과 다르다"
+            f"은행 문항 {len(bank)}건(고유 id {len(ids)}) — 기준 {args.expected_size}건과 다르다"
         )
     try:
         qualification = json.loads(Path(args.qualification).read_text(encoding="utf-8"))
@@ -990,7 +1031,7 @@ def _cmd_s5(args: argparse.Namespace) -> int:
     corrected = corrected_upper_bound(k, n, detection_lower)
     passed = corrected <= S5_MAX_CORRECTED_UPPER
     print("=" * 72)
-    print("P3-03 미분 은행 S5 — 자격 통과 프로토콜 감사의 보정 결함률 상한")
+    print(f"{args.label} S5 — 자격 통과 프로토콜 감사의 보정 결함률 상한")
     print("=" * 72)
     print(f"  관측 결함(프로토콜 합집합) k = {k} / n = {n}")
     llm_k = sum(any(j[i] for j in judges) for i in ids)
@@ -1055,12 +1096,23 @@ def _parser() -> argparse.ArgumentParser:
     sheets.add_argument("--out-dir", default=None, help="묶음 파일 폴더(판정자 입력 — 저장소 밖)")
     sheets.add_argument("--manifest", default=str(root / _BANK_AUDIT_DIR / "manifest.json"))
     sheets.add_argument("--check", action="store_true", help="재생성해 커밋된 매니페스트와 대조")
+    sheets.add_argument(
+        "--expected-size", type=int, default=S5_BANK_SIZE, help="은행이 가져야 할 문항 수"
+    )
+    sheets.add_argument("--task", default=_TASK_P303, help="매니페스트에 적는 태스크 id")
+    sheets.add_argument(
+        "--bank-label", default=None, help="매니페스트에 적는 은행 경로(기본 = P3-03 은행 경로)"
+    )
 
     s5 = sub.add_parser("s5", help="은행 감사 라벨 → 보정 결함률 상한 판정")
     s5.add_argument("--bank", default=str(root / _BANK_PATH))
     s5.add_argument("--machine", required=True, help="은행 기계 라벨(item_id = problem_id)")
     s5.add_argument("--llm", action="append", help="은행 판정자별 라벨 파일(2개 이상)")
     s5.add_argument("--qualification", required=True, help="score --json-out 산출(프로토콜 합격)")
+    s5.add_argument(
+        "--expected-size", type=int, default=S5_BANK_SIZE, help="은행이 가져야 할 문항 수"
+    )
+    s5.add_argument("--label", default="P3-03 미분 은행", help="판정 출력 머리글의 은행 이름")
     return parser
 
 

@@ -15,6 +15,11 @@
 
 독립성: 조건 파싱만 `verify_answer._parse_condition`을 재사용(같은 L3 계층·표기 drift
 방지)하고, 근 탐색·판정은 심볼릭 solve를 전혀 쓰지 않는 순수 수치 경로다.
+
+원문 정의역(P3-79): 파싱한 잔차는 평가 파싱이 자동 약분한 식이라(`x*(x - 2)/(x - 2) = 2` → x - 2)
+원문에서 정의되지 않는 점(무연근)이 수치 근으로 잡힌다. 그래서 주장 정답과 선택 판정에 쓰는 근은
+`verify_answer.condition_definedness`(허용 목록·실행 없는 원문 평가)로 거른다 — 정의되지 않는 정답은
+반례, 판정 불가는 pass 로 단정하지 않는다.
 """
 
 from __future__ import annotations
@@ -28,7 +33,7 @@ from typing import Literal
 import sympy
 
 from whymath_backend.l3.safe_parse import safe_sympify
-from whymath_backend.l3.verify_answer import _parse_condition
+from whymath_backend.l3.verify_answer import _parse_condition, condition_definedness
 
 __all__ = ["FuzzVerdict", "fuzz_answer"]
 
@@ -45,6 +50,9 @@ _DEFAULT_RADIUS = 50.0
 _DEFAULT_TOL = 1e-7
 
 Selection = Literal["largest", "smallest", "unique"]
+
+# 수치 근을 정확값으로 맞출 때 차례로 쓰는 허용치(P3-79 — 정확 잔차 0 확인을 거친 값만 쓴다).
+_SNAP_TOLERANCES: tuple[float, ...] = (1e-30, 1e-12, 1e-7)
 
 
 @dataclass(slots=True, frozen=True)
@@ -164,6 +172,171 @@ def _find_roots(func: object, radius: float, trials: int, tol: float) -> tuple[l
     return merged, valid
 
 
+def _exact_residual_nonzero(
+    residual: sympy.Expr, symbol: sympy.Symbol, answer_exact: sympy.Expr
+) -> bool:
+    """정확값 답의 잔차가 정확히 0 이 아닌가(P3-79).
+
+    근사 소수가 섞이면 False(수치 판정에 맡긴다).
+    """
+    if answer_exact.has(sympy.Float) or residual.has(sympy.Float):
+        return False
+    try:
+        value = residual.subs(symbol, answer_exact)
+        return bool(not value.free_symbols and value.is_zero is False)
+    except Exception as exc:  # noqa: BLE001 — 정확 잔차 계산 불가는 수치 판정에 맡긴다
+        logger.debug("counterexample_fuzz 정확 잔차 회피: %s", type(exc).__name__)
+        return False
+
+
+def _polished(residual: sympy.Expr, symbol: sympy.Symbol, root: float) -> sympy.Expr:
+    """수치 근을 50자리로 다듬는다(무연근이면 그 점으로 수렴해 원문 분모가 사실상 0 이 된다)."""
+    try:
+        return sympy.Float(sympy.nsolve(residual, symbol, root, prec=50, verify=False), 50)
+    except Exception as exc:  # noqa: BLE001 — 다듬기 실패는 원래 근사값으로
+        logger.debug("counterexample_fuzz 근 다듬기 회피: %s", type(exc).__name__)
+        return sympy.Float(root, 50)
+
+
+def _root_point(residual: sympy.Expr, symbol: sympy.Symbol, root: float) -> sympy.Expr:
+    """원문 정의역 평가에 넣을 수치 근의 점 — 다듬은 근이 간단한 정확값(`0`·`2`·`sqrt(2)`)의 근이면
+    그 정확값, 아니면 50자리 근사 소수. 근사 소수 점은 0 에 가까운 밑·분모를 '못 가림'으로 둬서
+    (`x**2 - 5*x` 의 근 0) 정확값으로 맞출 수 있는 근은 맞춘다."""
+    polished = _polished(residual, symbol, root)
+    # 중근은 뉴턴 다듬기가 느리게 수렴한다(삼중근 0 이 1e-26 근처에 멈춘다) — 허용치를 넓혀 가며
+    # 맞춰 본다. 맞춘 값은 정확 잔차가 0 일 때만 쓰므로 넓은 허용치가 근이 아닌 값을 들이지 않는다.
+    for tolerance in _SNAP_TOLERANCES:
+        try:
+            # nsimplify 는 0 근방의 아주 작은 값을 0 으로 접지 않는다 — 0 은 따로 맞춰 본다.
+            snapped = (
+                sympy.Integer(0)
+                if abs(polished) < tolerance
+                else sympy.nsimplify(polished, tolerance=tolerance)
+            )
+            if not snapped.free_symbols and residual.subs(symbol, snapped).is_zero is True:
+                return snapped
+        except Exception as exc:  # noqa: BLE001 — 정확값 맞추기 실패는 다음 허용치·근사 소수로
+            logger.debug("counterexample_fuzz 정확값 맞추기 회피: %s", type(exc).__name__)
+    return polished
+
+
+def _defined_numeric_roots(
+    conditions: str,
+    residual: sympy.Expr,
+    symbol: sympy.Symbol,
+    roots: list[float],
+    answer_val: float,
+    tol: float,
+    step: float,
+) -> list[float] | None:
+    """수치 근 중 원문에서 정의되는 근만(P3-79). 판정 불가 근이 하나라도 있으면 None.
+
+    주장 정답 근방의 근은 위에서 정확값으로 원문 정의역을 이미 봤으므로 그대로 둔다. 나머지는
+    그 근의 점(`_root_point` — 정확값으로 맞춰지면 정확값, 아니면 50자리 근사 소수)에서
+    `condition_definedness` 를 본다. 무연근은 자동 약분된 분모의 영점이라 다듬기가 그 점(정확값
+    2 등)으로 수렴해 정의되지 않음으로 버려지고, 정확값으로 못 맞춘 근이 영점에 가까우면
+    정의됨으로 부르지 않아 판정 불가가 된다. `step` 은 탐색 격자 간격 — 무연근 군집 확인 창의
+    하한을 정한다(`_isolation_min_window`).
+    """
+    min_window = _isolation_min_window(step)
+    kept: list[float] = []
+    for root in roots:
+        if abs(root - answer_val) <= tol * 100:
+            kept.append(root)
+            continue
+        point = _root_point(residual, symbol, root)
+        state = condition_definedness(conditions, {str(symbol): point})
+        if state == "unknown":
+            return None
+        if state == "undefined" and not _isolated_exact_root(
+            residual, symbol, point, root, min_window
+        ):
+            # P3-79 재검토 P3-1 — 수치 근이 무연근 정확값으로 맞춰졌는데 그 근방(군집)에 다른 근이
+            # 숨어 있을 수 있다(`x*(x-2)**2*(x - 2 - 3*10**(-8))/(x-2)` 의 진짜 근 2 + 3e-8). 그
+            # 군집을 통째로 버리면 진짜 근이 사라져 거짓 pass 가 난다 — 판정 불가로 닫는다.
+            return None
+        if state == "defined":
+            kept.append(root)
+    return kept
+
+
+# 무연근 군집 확인(P3-79 재검토 P3-1) — 정확 근 주변을 이 창으로 본다(수치 근과의 거리의 배수·하한).
+_ISOLATION_FACTOR = 100
+_ISOLATION_MIN_WINDOW = sympy.Rational(1, 10**5)
+_ISOLATION_MAX_ORDER = 8
+# 창 하한 = 탐색 격자 간격의 이 배수(P3-83). 수치 탐색은 한 격자 칸 안(또는 이웃 두 칸)에 든 두 근을
+# 부호 변화로 나누지 못하고 하나로 합친다 — 합쳐진 두 근의 최대 간격을 순중복도 1·2, 격자 위 무연근
+# 위치 60곳, 간격 0.05~1.65 격자로 쟀더니 순중복도 1 은 0.95배, 2 는 1.6배(기본 격자 0.01 에서
+# 0.016)였다(`test_fuzz_isolation_window_covers_numeric_merge_radius` 가 같은 측정을 줄여 다시
+# 한다). 종전 하한(1e-5)은 이보다 천 배 좁아, 무연근과 2e-5~3e-3 떨어진 참 근이 무연근 군집으로
+# 취급돼 버려졌다(거짓 pass). 2배면 실측 합쳐짐 반경을 덮고 여유가 있다. 창 끝 비율 검사의 문턱이
+# 1/2 라 닫히는 참 근의 거리는 창의 2배(기본 약 0.04)까지다 — 수치로 따로 찾을 수 있는 0.016~0.04
+# 구간까지 판정 불가로 닫는 것은 안전이 아니라 확인 가능성의 비용이다.
+_ISOLATION_GRID_STEPS = 2
+
+
+def _isolation_min_window(step: float) -> sympy.Expr | None:
+    """군집 확인 창의 하한(P3-83) — 종전 절대 하한과 격자 간격의 `_ISOLATION_GRID_STEPS` 배 중 큼.
+
+    격자 간격이 유한한 양수가 아니면(0·음수·NaN·무한) 창을 정할 수 없다 — None(모른다)을 돌려주고
+    `_isolated_exact_root` 가 이를 '고립을 확인하지 못함'으로 닫는다(종전 하한으로 돌아가지 않는다).
+    """
+    if not (math.isfinite(step) and step > 0):
+        return None
+    return max(_ISOLATION_MIN_WINDOW, sympy.Rational(repr(step * _ISOLATION_GRID_STEPS)))
+
+
+def _isolated_exact_root(
+    residual: sympy.Expr,
+    symbol: sympy.Symbol,
+    point: sympy.Expr,
+    root: float,
+    min_window: sympy.Expr | None,
+) -> bool:
+    """정확값 `point` 가 잔차의 근이고, 그 근방에 다른 근이 없다고 확인되는가(P3-79 재검토 P3-1).
+
+    잔차를 `point` 에서 `(x - point)**m · g(x)`(g(point) ≠ 0, m 은 정확 도함수로 구한 중복도)로
+    보고, 수치 근이 있던 군집을 덮는 창 `point ± w` 의 양 끝에서 g 가 g(point) 의 절반 안에 머무는지
+    본다. 다른 근이 창 안에 있으면 g(point) 가 그만큼 작아 양 끝 값이 크게 벗어난다. 확인하지
+    못하면(중복도·0 여부 미정·평가 불가) False — 호출부가 판정 불가로 닫는다.
+    """
+    if min_window is None or point.free_symbols or point.has(sympy.Float):
+        return False
+    try:
+        derivative = residual
+        order = 0
+        lead: sympy.Expr | None = None
+        while order < _ISOLATION_MAX_ORDER:
+            order += 1
+            derivative = sympy.diff(derivative, symbol)
+            at_point = derivative.subs(symbol, point)
+            zero = at_point.is_zero
+            if zero is None:
+                return False
+            if not zero:
+                lead = at_point / sympy.factorial(order)
+                break
+        if lead is None:
+            return False
+        offset = sympy.Rational(abs(root - float(sympy.N(point, 30))))
+        window = max(offset * _ISOLATION_FACTOR, min_window)
+        lead_value = complex(sympy.N(lead, 30))
+        reference = abs(lead_value)
+        for sign in (1, -1):
+            edge = point + sign * window
+            value = complex(sympy.N(residual.subs(symbol, edge) / (sign * window) ** order, 30))
+            # 창 끝이 잔차의 극점이면 값이 zoo/NaN 이다 — NaN 은 아래 비교를 늘 False 로 만들어
+            # '벗어나지 않음'(고립됨)으로 접히므로 먼저 거른다(P3-83 — 모른다 ≠ 아니다).
+            if not (math.isfinite(value.real) and math.isfinite(value.imag)):
+                return False
+            if abs(value - lead_value) > reference / 2:
+                return False
+    except Exception as exc:  # noqa: BLE001 — 확인 불가는 False(판정 불가로 닫는다)
+        logger.debug("counterexample_fuzz 무연근 군집 확인 회피: %s", type(exc).__name__)
+        return False
+    return True
+
+
 def fuzz_answer(
     conditions: str,
     answer_map: Mapping[str, str],
@@ -201,6 +374,22 @@ def fuzz_answer(
     if answer_val is None:
         return FuzzVerdict("unverifiable", f"정답 수치화 불가: {answer_str!r}", 0)
 
+    # P3-79 ⑤(c) — 잔차는 평가 파싱이 자동 약분한 식이라(`x*(x - 2)/(x - 2) = 2` → x - 2) 수치
+    # 탐색이 원문에서 정의되지 않는 점(x = 2)을 근으로 찾는다. 주장 정답은 정확값으로 원문 정의역을
+    # 먼저 본다(`condition_definedness` — 허용 목록·실행 없음): 정의되지 않음이면 반례(무연근),
+    # 판정 불가면 pass 를 단정하지 않는다(반례는 그대로 반례다 — 아래 수치 탐색이 근이 아니라고 하면
+    # 정의역과 무관하게 근이 아니다).
+    try:
+        answer_exact = safe_sympify(answer_str)
+    except (sympy.SympifyError, TypeError, ValueError) as exc:
+        logger.debug("counterexample_fuzz 정답 정확값 회피: %s", type(exc).__name__)
+        return FuzzVerdict("unverifiable", "정답 정확값 파싱 불가", 0)
+    claim_state = condition_definedness(conditions, {str(symbol): answer_exact})
+    if claim_state == "undefined":
+        return FuzzVerdict(
+            "fail", "반례 — 주장 정답에서 원문 조건이 정의되지 않음(분모 0 등 — 무연근)", 0
+        )
+
     try:
         func = sympy.lambdify(symbol, residual, "math")
     except Exception as exc:  # noqa: BLE001 — lambdify 실패는 정직 폴백
@@ -225,7 +414,31 @@ def fuzz_answer(
             roots_tuple,
         )
 
-    # ② 근 선택이 옳은가 — largest/smallest/unique.
+    # ①-b 수치로 근처럼 보여도 정확값 잔차가 0 이 아니면 근이 아니다(P3-79 — 허수부가 아주
+    # 작은 근 `(x - 1)**2 + 10**(-20) = 0` 의 x = 1 을 수치 허용치로 근이라 부르지 않는다.
+    # Tier1 과 같은 규칙).
+    if _exact_residual_nonzero(residual, symbol, answer_exact):
+        return FuzzVerdict(
+            "fail",
+            f"반례 — 주장 정답 {answer_val:.6g}은 근이 아님(수치 허용치 안이나 정확 잔차 ≠ 0)",
+            valid,
+            roots_tuple,
+        )
+
+    # ② 근 선택이 옳은가 — largest/smallest/unique. 선택 판정에 쓰는 다른 근도 원문에서 정의되는
+    # 근만이다(P3-79 — 무연근이 '더 큰 근'·'둘째 근'으로 거짓 반례를 만들지 않게).
+    if answer_selection in ("largest", "smallest", "unique"):
+        defined_roots = _defined_numeric_roots(
+            conditions, residual, symbol, roots, answer_val, tol, (2.0 * radius) / (trials - 1)
+        )
+        if defined_roots is None:
+            return FuzzVerdict(
+                "unverifiable",
+                "탐색된 근 중 원문 정의역을 확정하지 못한 근이 있음(무연근 가능) — 선택 판정 회피",
+                valid,
+                roots_tuple,
+            )
+        roots = defined_roots
     if answer_selection == "largest" and any(r > answer_val + tol * 100 for r in roots):
         bigger = max(roots)
         return FuzzVerdict(
@@ -250,4 +463,11 @@ def fuzz_answer(
             roots_tuple,
         )
 
+    if claim_state == "unknown":
+        return FuzzVerdict(
+            "unverifiable",
+            "주장 정답에서 원문 정의역을 확정하지 못함(허용 구조 밖) — pass 단정 회피",
+            valid,
+            roots_tuple,
+        )
     return FuzzVerdict("pass", None, valid, roots_tuple)

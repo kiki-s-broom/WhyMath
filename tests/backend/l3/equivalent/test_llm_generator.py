@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from collections.abc import Mapping, Sequence
 
@@ -45,6 +46,7 @@ from whymath_backend.l3.models import (
     Usage,
 )
 from whymath_backend.l3.prompt_assets import prompt_text
+from whymath_backend.l3.providers.seat_failure import SeatHttpError
 from whymath_backend.l3.router import resolve_model
 from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.schema.enums import AnswerFormat, LicenseType, SourceType
@@ -558,6 +560,185 @@ class TestRootSelectionParsing:
 
 
 # ──────────────────────────────────────────────────────────────────────
+# EOS-23 ⑤: 근 집계(합/곱) 선언 — LLM 저작 경로가 answer_aggregate를 낼 수 있어야 한다.
+#
+# 배경: EOS-121 라이브 회차에서 anthropic 좌석의 quad-sum(두 근의 합) 거부 30행 중 29행이
+# "문항·답은 옳고 검산 계약이 합을 근으로 검산해 잔차 ≠ 0"이었다(ⓑ 표현 불일치·ⓐ 산술 오류 0).
+# 게이트의 집계 분기(verify_root_aggregate)는 이미 있는데 저작 경로가 그 필드를 낼 수 없었다.
+# 아래 두 테스트가 쌍이다 — 같은 문항·같은 답이 선언 없이는 거부되고 선언하면 통과한다. 통과
+# 테스트 하나만 있으면 "게이트가 원래 관대했다"와 구분되지 않아, 거부 짝(대조군)을 함께 둔다.
+# ──────────────────────────────────────────────────────────────────────
+def _sum_payload(**overrides: object) -> dict[str, object]:
+    """3x² − 7x − 6 = 0 (근 3·−2/3) 의 두 근의 합 7/3 — 판정 문서의 고유 문제 1번."""
+    payload: dict[str, object] = {
+        "question_text": "이차방정식 3x^2 - 7x - 6 = 0 의 두 근의 합을 구하시오.",
+        "answer": "7/3",
+        "answer_explanation": "근과 계수의 관계에서 두 근의 합은 7/3이다.",
+        "conditions": "3*x**2 - 7*x - 6 = 0",
+        "answer_map": {},
+        "answer_selection": "unique",
+        "answer_aggregate": "sum",
+        "difficulty_overall": 3.5,
+        "unit_codes": ["CAL-INT-DEF"],
+        "answer_format": "분수",
+        "achievement_standard_codes": [_STANDARD],
+        # 스펙의 겨냥 오개념과 맞춘다 — 비우면 동등성 점수가 0.70으로 떨어져 검수필요가 된다
+        # (이 테스트가 보려는 것은 정확성 축이므로 다른 축은 만점으로 고정한다).
+        "distractor_map": [{"choice_index": 1, "misconception_id": _MISCONCEPTION}],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _gate(candidate: CandidateProblem, **spec_overrides: object):  # type: ignore[no-untyped-def]
+    """후보를 실제 S2-a 게이트에 넣는다 — 결선 인자를 후보 필드에서 그대로 옮긴다."""
+    return evaluate_equivalent_candidate(
+        _spec(answer_format=AnswerFormat.분수, **spec_overrides),
+        candidate.problem,
+        provenance=candidate.provenance,
+        conditions=candidate.conditions,
+        answer_map=candidate.answer_map,
+        answer_selection=candidate.answer_selection,
+        answer_aggregate=candidate.answer_aggregate,
+        solution_steps=candidate.solution_steps,
+    )
+
+
+class TestRootAggregateDeclaration:
+    def test_declared_sum_is_carried_and_model_map_is_not_persisted(self) -> None:
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload())])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate == "sum"
+        assert candidate.answer_map == {}  # 결정론 집계 생성기와 같은 형태
+        assert candidate.answer_selection is None
+        assert candidate.problem.answer == "7/3"
+
+    def test_declared_sum_passes_the_real_gate(self) -> None:
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload())])).generate(_spec())
+        assert candidate is not None
+        verdict = _gate(candidate)
+        assert verdict.verification == "verified", verdict.reasons
+        assert verdict.accepted is True, verdict.reasons
+
+    def test_same_item_without_declaration_is_rejected_by_tier1(self) -> None:
+        """대조군 — 선언만 빼고 모든 것이 같다. EOS-121 라이브의 거부 형태를 그대로 재현한다.
+
+        기대 잔차 −6은 판정 문서의 기계 사유(`조건 위반 — 잔차 ≠ 0: -6`)와 같다. 이 단언이
+        깨지면 위 통과 테스트가 "게이트가 관대해서" 통과하는 것인지 가릴 수 없게 된다.
+        """
+        payload = _sum_payload(answer_map={"x": "7/3"})
+        del payload["answer_aggregate"]
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate is None
+        verdict = _gate(candidate)
+        assert verdict.verification == "failed"
+        assert any("잔차 ≠ 0: -6" in reason for reason in verdict.reasons), verdict.reasons
+
+    def test_wrong_sum_is_still_rejected(self) -> None:
+        """선언이 게이트를 느슨하게 만들지 않는다 — 틀린 합은 Vieta 대조에서 거부된다."""
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload(answer="1"))])).generate(_spec())
+        assert candidate is not None
+        verdict = _gate(candidate)
+        assert verdict.verification == "failed"
+        assert any("근 sum 불일치" in reason for reason in verdict.reasons), verdict.reasons
+
+    def test_root_value_declared_as_sum_is_rejected(self) -> None:
+        """합이라고 선언하고 근(큰 근 3)을 답으로 낸 오선언 — 근은 합이 아니므로 거부된다."""
+        candidate = _gen(FakeProvider([json.dumps(_sum_payload(answer="3"))])).generate(_spec())
+        assert candidate is not None
+        assert _gate(candidate).verification == "failed"
+
+    def test_product_declared_passes_the_real_gate(self) -> None:
+        payload = _sum_payload(
+            question_text="이차방정식 x^2 - 5x + 6 = 0 의 두 근의 곱을 구하시오.",
+            answer="6",
+            conditions="x**2 - 5*x + 6 = 0",
+            answer_aggregate="product",
+            answer_format="자연수",
+        )
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate == "product"
+        verdict = evaluate_equivalent_candidate(
+            _spec(),
+            candidate.problem,
+            provenance=candidate.provenance,
+            conditions=candidate.conditions,
+            answer_map=candidate.answer_map,
+            answer_selection=candidate.answer_selection,
+            answer_aggregate=candidate.answer_aggregate,
+        )
+        assert verdict.verification == "verified", verdict.reasons
+
+    def test_aggregate_ignores_model_supplied_map_and_selection(self) -> None:
+        """모델이 `{x: 합}`과 `largest`를 같이 보내도 읽지 않는다.
+
+        읽으면 두 가지가 터진다 — ① derive-and-verify가 합 7/3을 '큰 근 3'과 대조해 정답
+        문항을 ValueError로 버린다 ② `{x: 7/3}`이 영속돼 "x = 합"이라는 거짓 검산 재료가 남는다.
+        """
+        payload = _sum_payload(answer_map={"x": "7/3"}, answer_selection="largest")
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_map == {}
+        assert candidate.answer_selection is None
+        assert candidate.answer_aggregate == "sum"
+
+    def test_unknown_aggregate_value_falls_back_to_regular_path(self) -> None:
+        """미지 값은 조용히 None — 일반 경로로 가므로 answer_map 없는 문항은 생성 실패가 된다."""
+        no_map = _sum_payload(answer_aggregate="mean")
+        assert _gen(FakeProvider([json.dumps(no_map)])).generate(_spec()) is None
+        with_map = _sum_payload(answer_aggregate="mean", answer_map={"x": "7/3"})
+        candidate = _gen(FakeProvider([json.dumps(with_map)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate is None
+        assert _gate(candidate).verification == "failed"  # 오채택 없음
+
+    def test_regular_root_item_is_unchanged(self) -> None:
+        """회귀 0 — 선언 없는 기존 근 문항은 종전과 동일(answer_aggregate None·map 보존)."""
+        candidate = _gen(FakeProvider([_HAPPY])).generate(_spec())
+        assert candidate is not None
+        assert candidate.answer_aggregate is None
+        assert candidate.answer_map == {"x": "3"}
+        assert candidate.answer_selection == "largest"
+
+    def test_empty_answer_map_without_declaration_is_still_a_failure(self) -> None:
+        """`answer_map: {}` 허용은 **선언이 있을 때만**이다 — 선언 없는 빈 맵은 종전대로 실패."""
+        payload = json.loads(_HAPPY)
+        payload["answer_map"] = {}
+        assert _gen(FakeProvider([json.dumps(payload)])).generate(_spec()) is None
+
+    def test_schema_offers_aggregate_enum_but_does_not_require_it(self) -> None:
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        schema = provider.json_schemas[0]
+        assert schema is not None
+        props = schema["properties"]
+        assert isinstance(props, dict)
+        assert props["answer_aggregate"]["enum"] == ["product", "sum"]
+        assert "answer_aggregate" not in schema["required"]  # type: ignore[operator]
+
+    def test_system_prompt_instructs_the_declaration(self) -> None:
+        provider = FakeProvider([_HAPPY])
+        _gen(provider).generate(_spec())
+        _, system = provider.calls[0]
+        assert "answer_aggregate" in system
+        assert '"sum"' in system and '"product"' in system
+
+    def test_declaration_reaches_the_stored_corpus_record(self) -> None:
+        """생성기 → 게이트 → 저장 레코드까지 선언이 살아서 도달한다(끊기면 재검증이 일반 경로로 간다)."""
+        store = _FakeStore()
+        gen = _gen(FakeProvider([json.dumps(_sum_payload())]))
+        outcome = run_equivalent_generation(
+            _spec(answer_format=AnswerFormat.분수, difficulty_overall=3.5), gen, store=store
+        )
+        assert outcome.status == "accepted_stored", outcome
+        (records,) = store.calls
+        assert records[0].verify.answer_aggregate == "sum"
+        assert records[0].verify.answer_map == {}
+
+
+# ──────────────────────────────────────────────────────────────────────
 # S2-h: 저작용 로컬 패밀리 — 기본 GENERAL(qwen2.5)로 라우팅(qwen2-math mode collapse 회피).
 # ──────────────────────────────────────────────────────────────────────
 class TestAuthoringFamily:
@@ -702,6 +883,155 @@ class TestSafeFallback:
 class TestProviderFailure:
     def test_provider_exception_returns_none(self) -> None:
         assert _gen(RaisingProvider()).generate(_spec()) is None
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-202 — never-break 폴백 경고는 예외 *타입명*을 남기고 메시지 원문은 남기지 않는다.
+# 메시지 원문에는 공급사 응답 본문(SeatHttpError는 본문 최대 2000자)·LLM 입력값이 섞인다.
+# ──────────────────────────────────────────────────────────────────────
+_LOGGER_NAME = "whymath_backend.l3.equivalent.llm_generator"
+# 메시지 원문에만 있는 표지 — 로그에 이 문자열이 보이면 str(exc)가 새어 나간 것이다.
+_BODY_MARKER = "응답본문-SECRET-sk-or-v1-deadbeef"
+
+
+class _ScriptedRaisingProvider:
+    """지정한 예외를 그대로 던지는 provider 대역 — 예외 타입별 경고 형식 검증용."""
+
+    def __init__(self, exc: BaseException) -> None:
+        self._exc = exc
+
+    async def generate(
+        self, prompt: str, system: str, decision: RoutingDecision, **kwargs: object
+    ) -> GenerationResult:
+        raise self._exc
+
+
+class _HttpxLikeStatusError(Exception):
+    """httpx `HTTPStatusError`처럼 상태코드를 `response.status_code`에 싣는 예외 대역."""
+
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+
+        class _Resp:
+            pass
+
+        self.response = _Resp()
+        self.response.status_code = status_code  # type: ignore[attr-defined]
+
+
+def _warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == _LOGGER_NAME and r.levelno == logging.WARNING
+    ]
+
+
+class TestFallbackWarningCarriesTypeNotMessage:
+    def test_provider_failure_warning_has_type_name_without_message(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        provider = _ScriptedRaisingProvider(RuntimeError(f"provider 다운 {_BODY_MARKER}"))
+        assert _gen(provider).generate(_spec()) is None
+        msgs = [m for m in _warnings(caplog) if "provider 호출 실패" in m]
+        assert len(msgs) == 1, _warnings(caplog)
+        assert "provider 호출 실패(RuntimeError)" in msgs[0]
+        assert _BODY_MARKER not in caplog.text
+        assert "provider 다운" not in caplog.text
+
+    def test_seat_http_error_warning_has_status_code_but_not_body(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        exc = SeatHttpError(
+            f"OpenAI 호환 호출 실패 HTTP 429: {_BODY_MARKER} (시도 3회)", status_code=429
+        )
+        assert _gen(_ScriptedRaisingProvider(exc)).generate(_spec()) is None
+        msgs = [m for m in _warnings(caplog) if "provider 호출 실패" in m]
+        assert msgs == ["동등문제 생성 provider 호출 실패(SeatHttpError(HTTP 429)) — None 폴백"]
+        assert _BODY_MARKER not in caplog.text
+
+    def test_status_code_is_read_from_response_attribute(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        exc = _HttpxLikeStatusError(f"Server error {_BODY_MARKER}", status_code=503)
+        assert _gen(_ScriptedRaisingProvider(exc)).generate(_spec()) is None
+        assert any("_HttpxLikeStatusError(HTTP 503)" in m for m in _warnings(caplog))
+        assert _BODY_MARKER not in caplog.text
+
+    def test_status_code_is_never_read_from_message(self) -> None:
+        """상태코드는 **속성**에서만 — 메시지에 "HTTP 429"가 있어도 타입명만 낸다."""
+        assert llm_generator._safe_exc_summary(RuntimeError("HTTP 429 본문")) == "RuntimeError"
+
+    def test_bool_status_attribute_is_not_a_status_code(self) -> None:
+        exc = RuntimeError("x")
+        exc.status_code = True  # type: ignore[attr-defined]
+        assert llm_generator._safe_exc_summary(exc) == "RuntimeError"
+
+    def test_validation_error_summary_is_count_only(self) -> None:
+        """pydantic 검증 오류는 건수만 — 메시지의 `input_value=…`(LLM 입력값)는 빠진다."""
+        from pydantic import BaseModel, ValidationError
+
+        class _M(BaseModel):
+            n: int
+
+        with pytest.raises(ValidationError) as info:
+            _M(n=_BODY_MARKER)  # type: ignore[arg-type]
+        assert _BODY_MARKER in str(info.value)  # 원문에는 입력값이 실린다(전제 확인)
+        summary = llm_generator._safe_exc_summary(info.value)
+        assert summary == "ValidationError(errors=1)"
+        assert _BODY_MARKER not in summary
+
+    def test_provider_failure_generation_log_error_detail_format_unchanged(self) -> None:
+        """GenerationLog.error_detail 앞머리는 g3_content_measures가 분류하므로 무변경이다."""
+        logs: list[object] = []
+        provider = _ScriptedRaisingProvider(RuntimeError("provider 다운"))
+        assert _gen(provider, generation_log_sink=logs.append).generate(_spec()) is None
+        assert len(logs) == 1
+        detail = logs[0].error_detail  # type: ignore[attr-defined]
+        # 앞머리·타입명만 고정한다 — 꼬리(메시지 원문)를 줄이는 후속 EOS-212를 막지 않게(리뷰 P3).
+        assert detail.startswith("provider.generate failed: RuntimeError")
+
+    def test_safe_summary_never_raises_from_hostile_attributes(self) -> None:
+        """속성 접근이 예외를 던지는 예외 객체도 요약이 터지지 않는다 — 타입명으로 접힌다."""
+        from whymath_backend.l3.equivalent.llm_generator import _safe_exc_summary
+
+        class _HostileError(Exception):
+            @property
+            def response(self) -> object:
+                raise RuntimeError("응답 본문 비밀")
+
+        assert _safe_exc_summary(_HostileError("x")) == "_HostileError"
+
+    def test_assembly_failure_warning_has_type_name_without_message(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """derive-and-verify 불일치(ValueError) — 메시지에 실린 LLM 답·유도 정답은 로그에 없다."""
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        payload = json.loads(_HAPPY)
+        payload["conditions"] = "2*x**2 - 7*x + 3 = 0"
+        payload["answer_map"] = {"x": "3.5"}
+        payload["answer"] = "3.5"
+        assert _gen(FakeProvider([json.dumps(payload)])).generate(_spec()) is None
+        msgs = [m for m in _warnings(caplog) if "후보 조립 실패" in m]
+        assert msgs == ["동등문제 후보 조립 실패(ValueError) — None 폴백"]
+        assert "derive-and-verify 불일치" not in caplog.text
+        assert "3.5" not in caplog.text
+
+    def test_answer_evaluation_failure_is_logged_with_type_name(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """종전엔 로그 없이 삼키던 답 수치 평가 실패도 타입명으로 남는다(답 값 미출력)."""
+        caplog.set_level(logging.WARNING, logger=_LOGGER_NAME)
+        payload = json.loads(_HAPPY)
+        payload["answer_map"] = {"x": "이건-수식이-아님"}
+        _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        msgs = [m for m in _warnings(caplog) if "답 수치 평가 실패" in m]
+        assert len(msgs) == 1, _warnings(caplog)
+        assert re.search(r"답 수치 평가 실패\([A-Za-z_][A-Za-z0-9_]*\)", msgs[0])
+        assert "이건-수식이-아님" not in caplog.text
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-43-extremum-count-items-concept-mapping-review
+title: "P3-43 — 02-01 에 달린 '극값의 개수' 객관식 24건의 개념 소속 재검토 (P3-05 보류분)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-05-triangle-density
+requires_gates: []
+acceptance:
+  - "① 02-01([12미적Ⅰ-02-01])에 PRIMARY 로 달린 승인 문항 중 \"삼차함수 f(x) = (x - a)^3 (+ b) 의 극값의 개수를 구하시오\"류 객관식 24건(problem_bank_conceptual_v0, 오답 보기 = critical-point-implies-extremum)이 02-01 의 행동인지 02-07 의 행동인지 Kiki 가 판정한다. 근거 = P3-05 3단계 결정 ③ 과 docs/reviews/p3_05_slot_assignment_draft_2026-10-15.md 2절 발견 2.\n② 판정이 '02-07 소속'이면 개념 태깅 변경(승인 경로)을 요청 형태로 만든다 — 세션이 직접 바꾸지 않는다. '02-01 소속 유지'면 보류 규칙(hold-extremum-count-under-02-01)을 어느 슬롯으로 풀지 결정한다.\n③ 판정 후 phase3_coverage 를 같은 명령으로 다시 재서 슬롯 지표 변화(02-01·02-07 칸)를 전후로 보고한다."
+  - "③-정정(2026-10-16): 판정은 02-07 소속으로 확정됐지만 개념 태깅 변경은 승인 경로라 이 세션이 코퍼스를 바꾸지 않았다 — 따라서 phase3_coverage 의 실측 후값은 지금 존재하지 않는다. 이 태스크의 이행 = 실측 전값(main 674a92b1) + 메모리 시뮬 후값(파일 변경 0, 보류 해제 규칙 평가는 problem_slot_backfill dry-run 으로 실측) + 부작용 발견(02-01 Graph Connectivity 5/10 -> 4/10). 실측 전후는 P3-49 acceptance ③ 이 소유한다. 근거 문서 = docs/reviews/p3_43_extremum_count_concept_mapping_2026-10-16.md."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1660 — 판정 근거·변경 요청서 docs/reviews/p3_43_extremum_count_concept_mapping_2026-10-16.md (main 674a92b1 기준 실측 전값 + 시뮬 후값, 실측 후값은 P3-49 이관)"
+paths:
+  - data/corpus/problem_bank_conceptual_v0/problems.jsonl
+  - data/corpus/phase3_scope_v1/slot_assignment_rules.yaml
+session: null
+notes: |-
+  출처: P3-05 3단계(PR #1645) 보류분 분리. 24건은 현재 슬롯 규칙(data/corpus/phase3_scope_v1/slot_assignment_rules.yaml)의 hold 규칙에 걸려 어느 슬롯에도 세지 않는다. 사람 판단(개념 소속)이 필요해 세션이 대신하지 않는다.
+
+  [정정 2026-10-16] acceptance ③ 실측 후값은 코퍼스 변경 이후에만 가능 — 승인 경로(P3-49)로 이관, 이 태스크는 전값 실측+시뮬+부작용 발견으로 이행
+updated: 2026-10-16

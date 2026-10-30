@@ -148,7 +148,8 @@ class TestAdaptersAreConceptAgnostic:
         assert [noun for noun in _CONCEPT_NOUN_DENYLIST if noun in code] == []
 
     def test_adapter_count_scales_with_strategies_not_concepts(self) -> None:
-        # 등록 어댑터 수 ≤ 전략 수. 개념(원자 2,697)과 무관하게 상한이 걸린다.
+        # 등록 어댑터 수 ≤ 전략 수. 개념(원자 백본 노드 수 — corpus_facts `atom_graph.nodes`)과
+        # 무관하게 상한이 걸린다.
         assert len(registry.registered_strategies()) <= len(PedagogyStrategy)
 
     def test_one_adapter_per_strategy_no_duplicates(self) -> None:

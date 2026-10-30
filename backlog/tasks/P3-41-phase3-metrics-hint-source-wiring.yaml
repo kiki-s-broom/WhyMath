@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-41-phase3-metrics-hint-source-wiring
+title: "P3-41 - phase3_metrics 7종 측정 CLI 의 힌트 입력 배선 (P3-22 승계)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-22-coverage-hint-source-wiring
+requires_gates: []
+acceptance:
+  - "① ops/phase3_metrics.py 의 실코퍼스 적재(load_corpus(spec, root))가 힌트 입력 없이 호출돼 Concept Completeness(지표 ③)가 hint 연결 측정 불가로 고정된다. P3-22 가 phase3_coverage 에 만든 읽기 경로(--hints-from-db · read_hint_problem_ids_from_db)를 이 CLI 에 같은 이름의 플래그로 전달한다. 플래그가 없으면 종전처럼 None(측정 불가)을 유지한다 - 빈 집합으로 채우지 않는다.\n② DB 를 못 읽으면 exit 2 이고 예외 타입명이 출력에 남는다(측정 불가로 조용히 내려가지 않는다).\n③ 힌트를 지우는 주입에 지표 ③ 판정이 실제로 달라진다(뮤테이션으로 RED 확인, 주입 적용 단언 포함).\n④ docs/standards/phase3_metrics_contract.md 의 측정 불가 연결 절을 새 입력 경로에 맞게 갱신한다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1653"
+paths:
+  - src/backend/whymath_backend/ops/phase3_metrics.py
+  - tests/backend/ops/test_phase3_metrics.py
+  - docs/standards/phase3_metrics_contract.md
+session: null
+notes: "출처: P3-22 구현 중 발견(2026-10-14). P3-22 는 phase3_coverage CLI 만 배선했고(paths 범위), phase3_metrics 는 같은 load_corpus 를 쓰지만 힌트 입력을 받지 않는다. 계획서 지표 ③ 의 판정 CLI 가 hint 를 영구 측정 불가로 보고하는 상태를 방치하지 않기 위한 승계 좌석이다."
+updated: 2026-10-16

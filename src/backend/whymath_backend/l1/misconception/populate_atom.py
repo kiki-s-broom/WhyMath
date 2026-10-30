@@ -1,8 +1,9 @@
 """atom ①오개념 → backend 적재 CLI — `whymath_backend.l1.misconception.populate_atom`.
 
-Phase 1 산출 atom 백본 코퍼스(`data/corpus/atom_graph_v1/graph.json`)의 원자 ①오개념(1,837 원자)을
-backend 영속 `misconception_catalog` 테이블에 멱등 적재한다. `populate.py`(misconceptions_v1 적재
-CLI)의 *원자 짝*이며 같은 CLI 골격을 따른다(argparse·`main(argv)->int`·파일 부재 `return 2`·stdout
+Phase 1 산출 atom 백본 코퍼스(`data/corpus/atom_graph_v1/graph.json`)의 원자 ①오개념(세부개념
+원자 전부 — `docs/data/corpus_facts.md`의 `atom_graph.atoms`)을 backend 영속
+`misconception_catalog` 테이블에 멱등 적재한다. `populate.py`(misconceptions_v1 적재 CLI)의
+*원자 짝*이며 같은 CLI 골격을 따른다(argparse·`main(argv)->int`·파일 부재 `return 2`·stdout
 행수 보고). 오개념은 임베딩·pgvector와 무관(순수 RDB sync 적재)하므로 vector_store 게이트가 없다.
 
 적재 로직 0(얇은 래퍼): `load_atom_misconceptions`(atom_catalog)가 graph.json 투영·기존

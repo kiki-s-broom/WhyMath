@@ -49,7 +49,7 @@ WhyMath는 "답이 아닌, 이유를 묻는 수학"을 정체성으로 하는 �
 | Visualization DSL | `schema/visualization.py` | 🟢 완전 | 4종 typed spec, 클라 렌더만 |
 | LearningScene DSL | `l4/learning_scene.py` | 🟢 완전 | 6종 요소·검증 게이트(답미루기·낙인·참조 불변식) |
 | SolutionPath | `schemas/v1.1/solution_path.schema.yaml` | 🟡 구조 확정 | concept_sequence·steps·embedding, 동치성 = 휴리스틱 + 사람검수 |
-| L1 개념 그래프 | Neo4j | 🟡 v0 완성 | 503노드·541선수엣지·6관계유형 |
+| L1 개념 그래프 | Neo4j | 🟡 v0 완성 | 503노드·541선수엣지·6관계유형(2026-07-01 작성 기준) |
 | 오개념 카탈로그·진단 | `l4/misconception/` | 🟡 30종 | 3중 표현 부채(kebab / M-id / JSONB) |
 | WH-S 솔버 / WH-1 튜터 하네스 | `whs/`·docs | 🔄 진행중 | MCTS + 3Tier / 상태 외부화·가설 추적 |
 | L3 라우터(3축) | `l3/router` | 🟢 설계+구현 | CostTier × LocalModelTier × ModelFamily |

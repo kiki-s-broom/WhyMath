@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-58-core-kebab-op-code-gap
+title: "P3-58 — 좌석 있는 핵심 kebab 4개는 오류연산(op-code)이 없다: 오류 서명이 kebab 수준에서 끝남"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 현상 — P3-06 실측에서 좌석 있는 kebab 6개 중 4개(power-rule-step-omitted · product-rule-naive · critical-point-implies-extremum · continuity-implies-differentiability)는 DISTRACTOR_CATALOG에 op-code가 없고 해당 문항의 오답 보기 항목에도 op_code가 없다. 나머지 2개(extremum-max-min-confused · extremum-value-vs-point-confused)와 chain-rule은 있다. 그래서 오류 서명이 kebab 수준에서 끝나고 '어떤 오류연산'인지(예: 계수 누락 vs 지수 미감소)가 체인에 실리지 않는다.\n② 선택지: DISTRACTOR_CATALOG에 op-code 추가 + 문항 항목에 op_code 기입(승인 문항 수정 → 재승인 경로) / 카탈로그만 추가하고 역유도(misconception_mc_batch.build_kebab_distractor_codes)에 맡김 / 현상 유지.\n③ 주의 — 카탈로그에 op-code를 더하면 misconception_mc_batch의 op-code 역유도 결과가 바뀌어 이미 승인된 코퍼스의 재생성 결과와 어긋날 수 있다. 착수 전에 재생성 결정론 테스트를 먼저 실측한다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06(2026-10-17). 판정 기준: main 63fe19dd. P3-06은 승인 문항을 건드리지 않는 원칙으로 op-code를 추가하지 않았다. 표의 op_code 열은 사실 그대로(없으면 null) 낸다. 등재는 착수가 아니다."
+updated: 2026-10-17

@@ -14,14 +14,17 @@ from whymath_backend.l4.misconception.audit import (
     DomainAuditSummary,
     audit_catalog_coverage,
 )
-from whymath_backend.l4.misconception.catalog import CATALOG
+from whymath_backend.l4.misconception.catalog import BODY_CATALOG, CATALOG
 
 
 class TestReportShape:
     def test_total_matches_catalog(self) -> None:
         report = audit_catalog_coverage()
-        assert report.total == len(CATALOG)
-        assert len(report.items) == len(CATALOG)
+        # 감사 대상은 본문 채널 항목(P3-61: 선지 역추적 전용은 신호가 정의상 0이라 제외) — 전체 카탈로그보다
+        # 정확히 그만큼 적다(제외가 조용히 사라지거나 과다해지지 않게 차이를 함께 고정한다).
+        assert report.total == len(BODY_CATALOG)
+        assert len(report.items) == len(BODY_CATALOG)
+        assert len(CATALOG) - report.total == 4
 
     def test_report_field_set(self) -> None:
         assert set(CatalogAuditReport.model_fields) == {
@@ -90,10 +93,12 @@ class TestRates:
         # 시연된 regex_signals 종 수가 곧 regex_coverage·saturation 분자(현 카탈로그는
         # regex 보유 항목이 모두 signals>=2라 두 율이 일치).
         report = audit_catalog_coverage()
-        n_regex = sum(1 for m in CATALOG if len(m.regex_signals) >= 1)
-        assert report.regex_coverage_rate == n_regex / len(CATALOG)
-        n_saturated = sum(1 for m in CATALOG if len(m.signals) >= 2 and len(m.regex_signals) >= 1)
-        assert report.saturation_rate == n_saturated / len(CATALOG)
+        n_regex = sum(1 for m in BODY_CATALOG if len(m.regex_signals) >= 1)
+        assert report.regex_coverage_rate == n_regex / len(BODY_CATALOG)
+        n_saturated = sum(
+            1 for m in BODY_CATALOG if len(m.signals) >= 2 and len(m.regex_signals) >= 1
+        )
+        assert report.saturation_rate == n_saturated / len(BODY_CATALOG)
 
     def test_rates_match_item_counts(self) -> None:
         report = audit_catalog_coverage()
@@ -135,7 +140,7 @@ class TestByDomain:
     def test_per_domain_counts_accurate(self) -> None:
         report = audit_catalog_coverage()
         for summary in report.by_domain:
-            members = [m for m in CATALOG if m.domain == summary.domain]
+            members = [m for m in BODY_CATALOG if m.domain == summary.domain]
             assert summary.n == len(members)
             assert summary.n_signals_ge_min == sum(1 for m in members if len(m.signals) >= 2)
             assert summary.n_saturated == sum(

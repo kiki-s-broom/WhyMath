@@ -44,7 +44,7 @@ nodes:
   #   src/backend/whymath_backend/l1/concept_graph/populate.py:1-22 · 코퍼스 data/corpus/concept_graph_v1 (E3 ls)
   concept_graph: { needs: [standards] }
 
-  # [집행·E2] 원자 백본(2,683노드): transform-v1(xlsx→graph.json, --standards 성취기준 결선) src/data-pipeline/data_pipeline/atom_graph/__main__.py:1-20
+  # [집행·E2] 원자 백본(규모는 docs/data/corpus_facts.md의 atom_graph.nodes): transform-v1(xlsx→graph.json, --standards 성취기준 결선) src/data-pipeline/data_pipeline/atom_graph/__main__.py:1-20
   #   적재 ①concept ②parent ③선수엣지 ④⑤시각화 Overlay ⑥atom_node(SKB-03) src/backend/whymath_backend/l1/atom_graph/populate.py:1-22
   #   중복 원자 검수 게이트(사람 검수 후보·자동 병합 아님) src/backend/whymath_backend/l1/atom_graph/dedup_candidates.py:1-12
   #   사람 게이트: backlog/gates.yaml:903 G-skb03-atom-node-populate · 런북 docs/ops/skb03_atom_node_populate_runbook.md:1-12
@@ -81,7 +81,7 @@ nodes:
   curriculum_review: { needs: [standards_load, concept_graph, atom_graph, skill_graph, curriculum_overlay] }
 
   # ───────────── 오개념 ─────────────
-  # [집행·E2] 오개념 839 Collection 추출 src/data-pipeline/data_pipeline/misconception/__main__.py:1-9
+  # [집행·E2] 오개념 Collection 추출(원천 업로드 기준 839 · 현행 규모는 docs/data/corpus_facts.md의 misconceptions.count) src/data-pipeline/data_pipeline/misconception/__main__.py:1-9
   #   적재 src/backend/whymath_backend/l1/misconception/populate.py:1-14 · 코퍼스 data/corpus/misconceptions_v1 (E3 ls)
   #   (제안본 misconceptions 대응 — 선행은 concept_graph 가 아니라 전문가 원본이다)
   misconceptions: { needs: [expert_masters] }
@@ -192,7 +192,7 @@ nodes:
   #     (backend-migrations 통합 스텝이 `--ignore=../../tests/backend/l3` — 같은 명령 --collect-only 0건, 추적 OPS-137)
   #   미구현: 이 게이트를 부르는 운영 API·CLI는 0건(44 §12 CMS 버전 API 미착수) — 지금 호출자는 테스트뿐이다
   #   ※ 문항 판 짝(EOS-190): l3/problem_publish_gate.py — problem_version·problem.problem_version_id 의 유일한 쓰기 자리.
-  #     별도 노드를 두지 않는다(이 노드와 같은 "호출자 없는 writer" 상태 · 호출 표면 EOS-194). 집행 동결(AST)
+  #     별도 노드를 두지 않는다. 운영 호출자 = 관리자 CMS 문항 판 표면 api/admin_cms_problem_versions.py(EOS-194). 집행 동결(AST)
   #     tests/backend/l3/test_problem_publish_gate_enforcement.py · 실 PG 관통(CI가 수집하는 위치)
   #     tests/backend/db/test_problem_version_publish_integration.py · 설계 docs/architecture/eos190_problem_publish_writer.md
   concept_version_publish: { needs: [concept_graph] }

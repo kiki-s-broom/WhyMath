@@ -12,7 +12,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from whymath_backend.l2.remediation_policy import EscalationRung
 
@@ -21,6 +21,20 @@ MisconceptionDomain = Literal[
 ]
 """오개념 카탈로그 영역 — 정본 prompt doc 분류. 슬: 대수·기하·확률통계·함수 +
 수능 핵심(미적분·수열·삼각함수·벡터). doc `### N 영역` 섹션과 1:1."""
+
+BODY_CHANNEL_FIELDS: tuple[str, ...] = (
+    "signals",
+    "regex_signals",
+    "refuting_regex",
+    "canonical_wrong_form",
+    "correct_form",
+)
+"""학생 풀이 *본문*을 읽는 채널이 쓰는 재료 필드 — `choice_trace_only` 항목은 전부 비어야 한다.
+
+`signals`·`regex_signals`(양성 단편)·`refuting_regex`(반박)·`canonical_wrong_form`(기호 계산 오답형
+매칭)·`correct_form`(정정 형태 반박)이 각각 본문 채널의 한 부품이다. 하나라도 있으면 그 항목은
+본문으로도 후보가 될 수 있어 "선지 역추적 전용"이 아니다. 이 튜플이 정본이라 모델 검증과
+무결성 테스트가 같은 목록을 읽는다(둘이 따로 목록을 들면 한쪽만 늘어 조용히 갈라진다)."""
 
 
 class Misconception(BaseModel):
@@ -127,6 +141,46 @@ class Misconception(BaseModel):
             "오개념(distribution·log·곱미분·sin 합분배·a⁰)에만 단다."
         ),
     )
+    choice_trace_only: bool = Field(
+        default=False,
+        description=(
+            "**P3-61** — true면 이 항목은 학생 풀이 *본문*으로는 후보가 되지 않고, 객관식에서 "
+            "학생이 고른 오답 보기(`distractor_map`)로만 후보가 된다(`distractor_link` 채널). "
+            "정의·허용 "
+            "조건·격리 규칙의 정본은 `docs/prompts/misconception_diagnosis.md` "
+            '§"선지 역추적 전용 항목".\n\n'
+            "**이 플래그가 카탈로그 불변식 `signals ≥ 1`을 푸는 유일한 문이다.** 불변식은 "
+            "양방향으로 동결된다 — 플래그가 꺼진 항목은 `signals`가 1건 이상이어야 하고 "
+            "(부류 밖은 종전 그대로), "
+            "켜진 항목은 본문 채널 재료(`BODY_CHANNEL_FIELDS`)가 전부 비어 있어야 한다. 어느 쪽을 "
+            '어겨도 구성 시점에 거부되므로 "신호가 우연히 비어 본문 채널에서 조용히 죽은 항목"과 '
+            '"본문 채널과 선지 채널이 섞인 항목"이 모두 카탈로그에 들어올 수 없다.\n\n'
+            "본문 채널(`diagnose`·의미 매칭·정정 억제 평가·신호 포화 감사)은 이 플래그가 켜진 "
+            "항목을 "
+            "순회에서 제외한다(`catalog.body_detectable`). 미설정(기본 False)이면 기존 항목 동작 "
+            "완전 불변."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _enforce_signal_invariant(self) -> Misconception:
+        """`signals ≥ 1` 불변식을 `choice_trace_only` 한 곳에서만 푼다(양방향 동결)."""
+        if self.choice_trace_only:
+            present = [name for name in BODY_CHANNEL_FIELDS if getattr(self, name)]
+            if self.ambiguous_regex_signals:
+                present.append("ambiguous_regex_signals")
+            if present:
+                raise ValueError(
+                    f"선지 역추적 전용 오개념 {self.id!r}에 본문 채널 재료가 있다: {present} — "
+                    "choice_trace_only=True 항목은 본문 신호를 두지 않는다(두 채널이 섞인다)."
+                )
+        elif not self.signals:
+            raise ValueError(
+                f"오개념 {self.id!r}의 signals가 비어 있다 — 카탈로그 불변식은 signals ≥ 1이다. "
+                "본문 신호 없이 선지 역추적으로만 후보가 되는 항목이면 choice_trace_only=True를 "
+                "명시한다(허용 조건은 misconception_diagnosis.md §선지 역추적 전용 항목)."
+            )
+        return self
 
 
 class MisconceptionMatch(BaseModel):

@@ -38,6 +38,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # 서비스 컨테이너 이미지가 ghcr.io 미러 사본(비공개 패키지)이라 읽기가 필요하다 (OPS-135).
+  packages: read
 
 concurrency:
   # 매주 1회·수동 발화도 드묾 — 취소보다 직렬 대기가 항상 안전(harness-audit과 같은 판단).
@@ -65,7 +67,13 @@ jobs:
       postgres:
         # backend-migrations 잡과 동형(pgvector 프리설치·trust 인증) — 마이그레이션이
         # `CREATE EXTENSION vector`를 성공시켜야 "0건"이 진짜 빈 스키마 판정이 된다.
-        image: pgvector/pgvector:pg16
+        # 미러 사본(ghcr.io 비공개 패키지) — Docker Hub 익명 pull 한도 회피 (OPS-135).
+        # 사본이 없거나 로그인이 실패하면 이 잡의 `Initialize containers`에서 실패한다:
+        # docs/ops/ci_image_mirror_runbook.md §6 순서로 원인을 가린다.
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: whymath
           POSTGRES_DB: whymath
@@ -142,10 +150,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          if git diff --quiet -- ../../metrics/weekly.json 2>/dev/null; then
-            echo "metrics/weekly.json 변경 없음 — PR 생략(이번 실행이 이전과 완전히 동일한 행을 냈다는 뜻은 아니다. generated_at이 매번 갱신되므로 통상 항상 변경이 있다 — 변경 없음은 조사할 일이다)."
+          # 이 스텝의 working-directory는 src/backend라 git pathspec도 거기서 해석된다 —
+          # `metrics/weekly.json`(저장소 루트 상대)로 쓰면 src/backend/metrics/를 보게 돼 어떤
+          # 상태에서도 빈 출력(=무변경 오판)이 나온다. 반드시 ../../ 상대로 쓴다 (OPS-151 실측).
+          LEDGER="../../metrics/weekly.json"
+
+          # 0행 가드 (OPS-151) — 집계가 원장에 한 행도 남기지 못했다면 "변경 없음"으로 조용히
+          # 넘어가지 않고 이유를 적어 잡을 red로 만든다. 파일 없음·빈 파일·빈 배열이 모두 0행이다.
+          # 파싱 실패·배열 아님은 0행으로 접지 않고 그대로 실패한다(원인을 가리지 않는다).
+          if ! ROWS=$(python -c 'import json,pathlib,sys; p=pathlib.Path(sys.argv[1]); t=p.read_text(encoding="utf-8") if p.is_file() else ""; d=json.loads(t) if t.strip() else []; assert isinstance(d,list),"원장이 JSON 배열이 아니다"; print(len(d))' "$LEDGER"); then
+            echo "::error::주간 KPI 원장($LEDGER)을 읽지 못했다 — 위 예외가 원인이다. PR을 만들지 않는다."
+            exit 1
+          fi
+          if [ "$ROWS" -eq 0 ]; then
+            echo "::error::주간 KPI 집계가 원장에 0행을 남겼다(파일 없음·빈 배열) — 집계 스텝이 쓰지 못했다는 뜻이다. '변경 없음'이 아니라 실패다. PR을 만들지 않는다."
+            exit 1
+          fi
+
+          # 변경 판정은 `git status --porcelain`으로 한다 — 종전 `git diff --quiet`는 **추적되지
+          # 않는 파일에 항상 exit 0**이라 metrics/weekly.json이 한 번도 커밋된 적 없는 저장소에서
+          # 이 스텝이 매번 "변경 없음"으로 빠졌다(5회 success인데 산출물 0회 커밋). status는
+          # 미추적(??)·수정( M)·스테이지(A·M)를 모두 비어 있지 않은 출력으로 낸다.
+          # `CHANGED=$(...)`는 set -e 아래에서 git 자체의 실패를 그대로 전파한다(실패가 빈 출력으로 위장되지 않는다).
+          CHANGED=$(git status --porcelain -- "$LEDGER")
+          if [ -z "$CHANGED" ]; then
+            echo "metrics/weekly.json 변경 없음 — PR 생략(원장 ${ROWS}행 · 이번 실행이 이전과 완전히 동일한 행을 냈다는 뜻은 아니다. generated_at이 매번 갱신되므로 통상 항상 변경이 있다 — 변경 없음은 조사할 일이다)."
             exit 0
           fi
+          echo "metrics/weekly.json 변경 감지(${CHANGED}) — 원장 ${ROWS}행 · PR 생성."
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           BRANCH="ops/weekly-metrics-$(date -u +%Y%m%dT%H%M%SZ)"

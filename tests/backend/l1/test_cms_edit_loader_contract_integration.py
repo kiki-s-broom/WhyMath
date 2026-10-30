@@ -32,6 +32,7 @@ import pytest
 
 from whymath_backend.api.admin_cms_resources import apply_changes, get_resource, validate_changes
 from whymath_backend.config import Settings
+from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
 
 pytestmark = pytest.mark.integration
 
@@ -408,7 +409,12 @@ async def test_hint_cms_edit_survives_regeneration() -> None:
         transition_verified=True,
         concept=concept,
     )
-    ctx = GateContext(step_contents=steps, concept_name=concept.name, final_answer="123")
+    ctx = GateContext(
+        step_contents=steps,
+        concept_name=concept.name,
+        final_answer="123",
+        value_exposure=math_answer_value_exposure(),
+    )
     hints = [evaluate_gates(d, ctx) for d in generate_step_hints(source).drafts]
     assert len(hints) == 3
 

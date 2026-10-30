@@ -34,6 +34,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from whymath_backend.db.base import Base
+from whymath_backend.db.cms_edit_marker import CMS_EDIT_MARKER
 from whymath_backend.db.models._orm_enum import _pg_enum
 from whymath_backend.db.models._schema_seam import drop_unset_nulls
 from whymath_backend.schema.concept import Concept as SchemaConcept
@@ -164,6 +165,15 @@ class Concept(Base):
     created_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
     )
+    # CMS 소유 표지(P3-26) — **CMS가 만든 행**에만 채워진다(발행 게이트가 신규 개념을 실체화할 때).
+    # NULL = CLI 적재(graph.json)가 소유한 행. 적재는 이 값이 있는 행을 건너뛰고 삭제 API는 NULL
+    # 행을
+    # 거부한다(파일이 되살리므로). server_default·백필 금지 — 기본값을 달면 기존 행 전체가 "CMS가
+    # 만든 행"이 되어 소유권이 날조된다. 규약 정본:
+    # `docs/standards/cms_concept_graph_write_contract.md`.
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
 
     # ── 인덱스 (§4.2 CREATE INDEX + source_id 역조회) ──
     __table_args__ = (
@@ -185,8 +195,9 @@ class Concept(Base):
 
     def to_schema(self) -> SchemaConcept:
         """영속 ORM → `schema.Concept`(Pydantic 검증 복원)."""
+        # CMS 소유 표지는 운영 메타라 schema(extra=forbid)에 없다 — 복원 대상에서 뺀다(P3-26).
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
-        data = {key: getattr(self, key) for key in mapped_keys}
+        data = {key: getattr(self, key) for key in mapped_keys if key != CMS_EDIT_MARKER}
         return SchemaConcept.model_validate(
             drop_unset_nulls(data, SchemaConcept, orm_cls=type(self))
         )
@@ -244,6 +255,11 @@ class ConceptEdge(Base):
     created_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
     )
+    # CMS 소유 표지(P3-26) — CMS가 쓴 엣지에만 채워진다. NULL = graph.json 적재가 소유한 엣지.
+    # 적재는 표지가 있는 엣지를 건너뛰고, CMS 삭제는 NULL 엣지를 거부한다(파일이 되살리므로).
+    cms_edited_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
 
     # ── 제약·인덱스 (§4.2 UNIQUE + CREATE INDEX) ──
     __table_args__ = (
@@ -263,7 +279,7 @@ class ConceptEdge(Base):
     def to_schema(self) -> SchemaConceptEdge:
         """영속 ORM → `schema.ConceptEdge`(Pydantic 검증 복원)."""
         mapped_keys = {col.key for col in sa.inspect(type(self)).mapper.column_attrs}
-        data = {key: getattr(self, key) for key in mapped_keys}
+        data = {key: getattr(self, key) for key in mapped_keys if key != CMS_EDIT_MARKER}
         return SchemaConceptEdge.model_validate(
             drop_unset_nulls(data, SchemaConceptEdge, orm_cls=type(self))
         )

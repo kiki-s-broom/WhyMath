@@ -31,7 +31,7 @@
         [--dry-run | --check]
 
     python -m whymath_backend.harness.problem_corpus_review_status_backfill --all
-        (코퍼스 8종 전부를 제자리 갱신 — `KNOWN_CORPORA` 경로 고정, `AUDIT_LABEL_MAP`으로 판정)
+        (고정 코퍼스 전부를 제자리 갱신 — `KNOWN_CORPORA` 경로 고정, `AUDIT_LABEL_MAP`으로 판정)
 
     python -m whymath_backend.harness.problem_corpus_review_status_backfill --all --check
         (CI 드리프트 가드 — 아무것도 쓰지 않고, 미백필 레코드가 1건이라도 있으면 exit 1)
@@ -118,6 +118,10 @@ AUDIT_LABEL_MAP: dict[str, Path | None] = {
     # 이 파일은 그 합집합 라벨을 코퍼스 단위 백필 형식으로 옮긴 것이다
     # (보정 없는 Wilson 상한 0.0088).
     "p3_calculus1_diff_v0": Path("docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl"),
+    # P3-05 빈 칸 채우기 은행 204건 3회차 S5 감사의 전수 라벨 — 결함 0건. 승인의 정본 근거는
+    # 보정 상한 0.01907 ≤ 0.02(`p3_fill_audit/bank_audit_r3/s5_result.txt`)이고, 이 파일은 그 합집합
+    # 라벨을 코퍼스 단위 백필 형식으로 옮긴 것이다.
+    "p3_fill_v0": Path("docs/data/corpus_audit_p3_fill_v0.jsonl"),
     # 감사 라벨 없음 — 미평가 고정(pending). 신규 감사는 범위 밖.
     "probability_finite_v0": None,
     "v1": None,  # KNOWN_CORPORA의 "v1" = problem_bank_v1(4건). 감사 라벨 없음 — pending 고정.
@@ -345,7 +349,7 @@ def _default_audit_path(in_path: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     """CLI 엔트리 — 백필 후 리포트를 JSON으로 stdout에 낸다(결정론·멱등).
 
-    `--all`이면 `KNOWN_CORPORA` 8종을 순회해 각 코퍼스의 `AUDIT_LABEL_MAP` 판정을 적용한다.
+    `--all`이면 `KNOWN_CORPORA` 전부를 순회해 각 코퍼스의 `AUDIT_LABEL_MAP` 판정을 적용한다.
     단일 파일 처리는 `--in`(+ 필수 `--corpus`, 선택 `--out`/`--audit-out`)을 쓴다. 레포 루트에서
     실행 전제(상대경로 규약).
 

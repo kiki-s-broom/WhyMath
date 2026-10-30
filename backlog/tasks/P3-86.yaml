@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-86
+title: "개념형 검증기 남은 예외 누출 2종(주장값 파싱·범위 비교) + 숫자 나열 초월수 대조군"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `verify_answer.py`의 `_claimed_int`가 주장값을 `safe_sympify`로 try 없이 파싱해 `UnsafeExpressionError`가 새는 결함을 고친다 — `verify_mean_equals_median(\"1,2,3\", \"(\")`와 주장값 `\"nan\"`·`\"1e400\"`·`\"{1}\"`·`\"'1'\"`·`\"   \"`에서 이 헬퍼를 쓰는 개념형 검증기 전체가 예외 대신 판정 불가(unverifiable)를 내고 `acceptance._evaluate_verification`도 터지지 않는다 ② `verify_events_independent`·`verify_conditional_equal`의 범위 비교(`v < 0 or v > 1`)가 참·거짓을 정할 수 없는 Relational에서 `TypeError`를 내는 결함을 고친다 — 예: `verify_events_independent(\"cos(1)**2+sin(1)**2,1/2,1/2\", \"0\")`이 예외 없이 판정 불가 또는 올바른 판정을 낸다 ③ `tests/backend/l3/test_verify_answer_number_list_shape.py`의 정상 입력 대조군에 초월수(`pi`·`E`)를 넣어 그 과잉 거부 회귀(예 `or expr.is_algebraic is False`)가 RED가 되게 한다 ④ 정상 입력 판정은 바뀌지 않는다 — 개념 은행 360건 수정 전후 비교 0건 변화, 비교 도구 변별력 주입 확인"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - "tests/backend/l3/test_verify_answer*.py"
+session: null
+notes: "출처: PR #1747(P3-84) 독립 리뷰 P3-a·b·c. b와 c는 #1747 이전부터 main에 있던 결함이며 은행 해당 건은 0건이다. a는 #1747 신규 테스트의 대조군 공백으로 뮤테이션 13종 중 유일한 생존자였다."
+updated: 2026-10-26

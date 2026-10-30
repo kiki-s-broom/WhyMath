@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-152-nightly-ci-concurrency-group-split
+title: 야간 CI schedule 실행이 push 실행에 취소되지 않게 concurrency 그룹을 이벤트별로 분리
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① ci.yml 최상위 concurrency.group에 github.event_name을 넣어 schedule 실행과 push 실행이 서로 다른 그룹을 쓰게 한다. 현행 그룹은 ci-${{ github.workflow }}-${{ github.ref }}라 schedule(ref=refs/heads/main)과 main push가 같은 그룹이고, cancel-in-progress: true라 main에 push가 들어오면 진행 중인 야간 실행이 취소된다.\n② cancel-in-progress는 schedule 실행에서만 끈다(기존 PR·push 취소 동작은 유지 — 비용 절감 의도 보존).\n③ tests/infra/test_ci_job_coverage.py 계열에 schedule과 push의 group이 다르다를 ci.yml YAML 파싱으로 단언하는 테스트를 둔다. 그룹 식을 되돌리는 뮤테이션(적용 단언 mutated != original, 바이트 동일 원복)이 RED여야 하고 정상 대조군은 GREEN이어야 한다.\n④ PR 본문에 최근 야간 schedule 실행의 취소 증거(#6067 · #6032 · #5910 · #5763 cancelled)를 인용한다.\n⑤ 머지 뒤 다음 야간 실행 결과 확인은 통합 점검 계획 Step 1-E가 맡는다(이 태스크의 범위 밖).\n범위 밖: backend-serial-nightly 타임아웃 여유 2%는 통합 점검 계획 3-A #12가 소유한다."
+artifacts:
+  - "PR #1690 (squash fbe01ebfd) — ci.yml 최상위 concurrency.group을 ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}로, cancel-in-progress를 ${{ github.event_name != 'schedule' }}로 바꿔 schedule 실행이 main push와 같은 그룹을 쓰지 않게 했다. 테스트 tests/infra/test_ci_concurrency_group.py 14건(실제 ci.yml을 옛 그룹으로 되돌리면 4건 RED·복원 후 cmp 동일·사본 뮤테이션 5종 RED). 로컬 tests/infra 전체 3199 passed·27 skipped(exit 0), PR CI 22개 중 19 success·3 야간 전용 skipped·실패 0. acceptance ①~④ 충족. acceptance ⑤(머지 뒤 다음 야간 실행 결과 확인)는 이 태스크 범위 밖이며 통합 점검 계획 Step 1-E가 소유 — 아직 확인되지 않았다. 지시문의 cancel-in-progress는 push에만 은 PR·merge_group 취소(비용 절감)까지 꺼지므로 schedule에서만 끄는 것으로 해석했다."
+paths:
+  - ".github/workflows/ci.yml"
+  - tests/infra/test_ci_job_coverage.py
+session: null
+notes: "출처: docs/reviews/integrated_inspection_plan_2026-10-18.md §2-2 #11 · Step 0-4 (판정 기준 main 6f6684745). 등재 전 검색: backlog/tasks와 gates.yaml에서 concurrency.group·동시성 그룹으로 찾은 결과 0건(내가 찾은 방법으로는 0건)."
+updated: 2026-10-18

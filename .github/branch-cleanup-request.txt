@@ -387,3 +387,19 @@ claude/friendly-dijkstra-230lnm
 #       e1835c0c 원 OPS-19 done 등재 → 번호 OPS-19 재사용 금지(HARN-10)로 폐기
 #     OPS-67(B1)의 유일한 상세 근거였던 r2 §2-B1·부록 B1은 위 회수 문서가 main에 싣고 있으므로 이 브랜치 보존 사유가 없다.
 claude/whymath-ai-recommendation-review-q8tvcx
+
+# ── 2026-10-14 17차 배치 (0건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-10-14.md §3-③'·§3-④ ──
+# 직전 배치 집행 확인(2026-10-14 ls-remote 실측): 16차 1건(q8tvcx) **잔존 0/1**. 소멸 브랜치 2건:
+#   whymath-ai-recommendation-review-q8tvcx(16차 집행) · adoring-goodall-3dfsdi(QUAL-12 done · PR #1589 — 삭제 배치 경유 아님).
+# 이번 회차는 삭제 줄 0건이다(no-op) — 17회차와 같은 사유다. 삭제 가능 내용 소멸 브랜치 3건이 원격 claim 해제를 기다리고
+#   (claims reap --apply 미실행), 3건은 Kiki 판단이 필요하다. 삭제 전 head SHA 스냅샷(다음 배치가 이 값과 대조):
+#   blissful-lovelace-ubp9tw = d4e4b432 (OPS-123 done #1573 · claim OPS-96 TTL 초과)
+#   status-f6qz0c = e90d2d6f (ahead 0 · diff 0 · claim EOS-63 TTL 초과)
+#   stoic-hawking-vzumx5 = a54f628f (QUAL-10 착수 claim 기록뿐 · claim TTL 초과)
+# ⚠ Kiki 판단 대기(삭제 금지): friendly-pascal-mnmypk(c229d21c) · gracious-cannon-xwn0lh(4a51ab09) · status-f9lp65(d792c9d0)
+# ⚠ 회수 태스크가 등재된 브랜치는 의도적 제외(회수 완료 전 삭제 금지) — 신규: relaxed-keller-4wk0b2(bd22bf43) ·
+#   wonderful-allen-vhbdra(af36c2cf) = OPS-140(OPS-126 이중 구현 — 두 브랜치 모두 보존해야 기준 구현 비교가 가능하다) ·
+#   기존: brave-franklin-2999u5(MATH-07) · amazing-goldberg-1oc67i(OPS-129) · happy-turing-kmrd5z(OPS-130) ·
+#   nice-cray-mbg1mq(PED-45) · practical-maxwell-kuwl7x(OPS-122) · remaining-track-34zvse(HARN-212)
+#   승계 10건 유지: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79 · 5t5lmv · iws58k · 6eejrv · e98dw4 · 29ac1b
+# ⚠ 활성 claim 4건은 손대지 않는다: peaceful-bell-s7mlg8(MISC-61) · jolly-fermi-6km81l(EOS-194) · pensive-cerf-guowbr(EOS-195) · zen-ramanujan-mzr0ug(OPS-137)

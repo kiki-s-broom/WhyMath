@@ -34,6 +34,7 @@ from data_pipeline.atom_graph.cross_band_edges_merge import (
     serialize_graph,
     to_canonical_edge,
 )
+from data_pipeline.atom_graph.graph_history import APPENDED_AFTER_CROSS_BAND
 from data_pipeline.atom_graph.models import AtomEdge
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -42,8 +43,12 @@ GRAPH_PATH = _CORPUS / "graph.json"
 LEDGER_PATH = _CORPUS / "cross_band_edges_university_v1.json"
 PROVENANCE_PATH = _CORPUS / "_provenance.json"
 
-_N = 24
-_PRE_MERGE_SHA = "1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+
+_N = _FACTS["atom_graph.cross_band_edges_university"]
+_PRE_MERGE_SHA = "ea05b277ab40979d78be709daadb13d3427a72799a6a537561f1dc91c155601d"
 
 
 @pytest.fixture(scope="module")
@@ -63,11 +68,21 @@ def pre_graph(live_graph: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(pre_merge_view(live_graph))
 
 
+@pytest.fixture()
+def post_cross_band_view(live_graph: dict[str, Any]) -> dict[str, Any]:
+    """경계 병합 직후 정본 = 현재 정본에서 그 *뒤에* 덧붙여진 승격 v2 엣지만 뺀 것."""
+    view = dict(live_graph)
+    view["edges"] = [
+        e for e in live_graph["edges"] if e.get("evidence") not in APPENDED_AFTER_CROSS_BAND
+    ]
+    return copy.deepcopy(view)
+
+
 class TestReproducibility:
     def test_pre_merge_view_restores_original_snapshot(
         self, live_graph: dict[str, Any], ledger: dict[str, Any]
     ) -> None:
-        """태그 엣지를 빼면 병합 직전 정본(sha256 1821d31c…)이 바이트 단위로 복원된다."""
+        """태그 엣지를 빼면 병합 직전 정본(sha256 ea05b277… — KG-12 ① 체인 수리 반영 기준; KG-10 ② db3cd1c1… · KG-09 12936fb9… · S4-60 당시 1821d31c…)이 바이트 단위로 복원된다. KG-12 승격 v2 엣지(경계 병합 뒤 덧붙임)도 함께 벗긴다."""
         assert graph_sha256(pre_merge_view(live_graph)) == _PRE_MERGE_SHA
         assert ledger["_meta"]["source_graph_sha256"] == _PRE_MERGE_SHA
 
@@ -76,12 +91,22 @@ class TestReproducibility:
         assert serialize_graph(live_graph).encode("utf-8") == GRAPH_PATH.read_bytes()
 
     def test_remerge_reproduces_committed_graph_exactly(
-        self, pre_graph: dict[str, Any], ledger: dict[str, Any], live_graph: dict[str, Any]
+        self,
+        pre_graph: dict[str, Any],
+        ledger: dict[str, Any],
+        post_cross_band_view: dict[str, Any],
+        live_graph: dict[str, Any],
     ) -> None:
         result = merge_cross_band_edges(pre_graph, ledger)
-        assert (result.added, result.edges_before, result.edges_after) == (_N, 2210, 2234)
-        assert pre_graph == live_graph
-        assert serialize_graph(pre_graph).encode("utf-8") == GRAPH_PATH.read_bytes()
+        assert (result.added, result.edges_before, result.edges_after) == (
+            _N,
+            2195,
+            2219,
+        )  # KG-10 ② 경계 검수로 2,234→2,231 · KG-12 ① 체인 수리(제거 12·반전 4)로 2,231→2,219
+        assert pre_graph == post_cross_band_view
+        # 그 뒤 KG-12 승격 v2 59건이 끝에 덧붙어 현재 파일(2,281)이 된다
+        assert live_graph["edges"][: len(pre_graph["edges"])] == pre_graph["edges"]
+        assert len(live_graph["edges"]) == _FACTS["atom_graph.edges"]
 
     def test_existing_edges_are_untouched_and_new_ones_are_appended_last(
         self, pre_graph: dict[str, Any], ledger: dict[str, Any]
@@ -90,7 +115,7 @@ class TestReproducibility:
         merge_cross_band_edges(pre_graph, ledger)
         assert pre_graph["edges"][: len(before)] == before  # 기존 2,210건 순서·내용 불변
         assert all(e["evidence"] == PROPOSAL_EVIDENCE for e in pre_graph["edges"][len(before) :])
-        assert len(pre_graph["concepts"]) == 2683  # 노드 무변경
+        assert len(pre_graph["concepts"]) == _FACTS["atom_graph.nodes"]  # 노드 무변경
 
 
 class TestIdempotence:
@@ -212,12 +237,17 @@ class TestPostMergeMeasurements:
         level = {c["code"]: c["school_level"] for c in live_graph["concepts"]}
         edges = live_graph["edges"]
         crossing = [e for e in edges if level[e["from_code"]] != level[e["to_code"]]]
-        assert (len(crossing), len(edges)) == (44, 2234)
-        assert round(len(crossing) / len(edges) * 100, 2) == 1.97
+        assert (len(crossing), len(edges)) == (
+            47,
+            _FACTS["atom_graph.edges"],
+        )  # KG-09 v3 재생성 44 → 50 → KG-10 ② 경계 검수(반려 3·교체 1) → 47 · 엣지는 KG-12로 2,281
+        assert round(len(crossing) / len(edges) * 100, 2) == 2.06
         high_to_uni = [
             e for e in crossing if (level[e["from_code"]], level[e["to_code"]]) == ("고등", "대학")
         ]
-        assert len(high_to_uni) == _N
+        # KG-10 ② 교체 엣지(고등 10공수1-01-03-1 → CALC1-P21 · evidence "원자 백본 v1")는 S4-60 원장 밖의
+        # 고→대 경계 1건이라 원장 N(24)에 더해진다.
+        assert len(high_to_uni) == _N + 1
 
         adj: dict[str, list[str]] = defaultdict(list)
         for e in edges:
@@ -234,7 +264,10 @@ class TestPostMergeMeasurements:
             for c in live_graph["concepts"]
             if c["school_level"] == "대학" and c["level"] == "세부개념"
         }
-        assert (len(uni_atoms), len(uni_atoms & seen)) == (512, 198)
+        assert (len(uni_atoms), len(uni_atoms & seen)) == (
+            _FACTS["atom_graph.university_atoms"],
+            160,
+        )  # KG-12 ① 체인 수리 전 198
 
 
 class TestProvenance:
@@ -242,7 +275,9 @@ class TestProvenance:
         prov = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
         ids = [m["id"] for m in prov["post_transform_migrations"]]
         assert ids.count(PROVENANCE_MIGRATION_ID) == 1
-        assert prov["edge_counts"]["atom_id_edges"] == 2234
+        assert (
+            prov["edge_counts"]["atom_id_edges"] == _FACTS["atom_graph.edges"]
+        )  # KG-12 승격 v2 병합 뒤
         assert _PRE_MERGE_SHA in next(
             m["summary"]
             for m in prov["post_transform_migrations"]
@@ -258,7 +293,7 @@ class TestProvenance:
         snapshot = copy.deepcopy(prov)
         assert append_provenance(prov, result, merged_on="2026-10-09") is False
         assert prov == snapshot
-        assert prov["edge_counts"]["atom_id_edges"] == 2234
+        assert prov["edge_counts"]["atom_id_edges"] == 2219
 
 
 class TestCli:
@@ -291,14 +326,15 @@ class TestCli:
         assert graph.read_bytes() == before  # --check는 쓰지 않는다
 
     def test_default_run_merges_then_is_idempotent(
-        self, tmp_path: Path, live_graph: dict[str, Any]
+        self, tmp_path: Path, live_graph: dict[str, Any], post_cross_band_view: dict[str, Any]
     ) -> None:
         graph, ledger, prov = self._copy_corpus(tmp_path, live_graph)
         argv = ["--graph", str(graph), "--proposal", str(ledger), "--provenance", str(prov)]
         assert main(argv) == 0
-        assert graph.read_bytes() == GRAPH_PATH.read_bytes()  # 실파일과 바이트 동일
+        # 경계 병합 직후 정본과 바이트 동일(그 뒤 KG-12 승격 v2 엣지는 별도 병합기의 몫)
+        assert graph.read_bytes() == serialize_graph(post_cross_band_view).encode("utf-8")
         merged_prov = json.loads(prov.read_text(encoding="utf-8"))
-        assert merged_prov["edge_counts"]["atom_id_edges"] == 2234
+        assert merged_prov["edge_counts"]["atom_id_edges"] == 2219
         assert [m["id"] for m in merged_prov["post_transform_migrations"]] == [
             PROVENANCE_MIGRATION_ID
         ]

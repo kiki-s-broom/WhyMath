@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PB-26
+title: "문제 적재가 created_at·updated_at을 NULL로 덮어씀 — 정렬·신선도 신호 사망(적재 수정 + 기존 행 복원)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 원인 확정 — `problem.created_at`·`updated_at`은 server_default `now()`인데 적재(`l1/problem_bank/populate.py`)가 schema의 `created_at=None`(schema/problem.py 기본값)을 명시적으로 INSERT해 기본값을 덮는다. prod 1,703행·로컬 전량 14,742행 모두 NULL(2026-10-26 실측 · docs/architecture/problem_bank_candidate_fetch_limit_pb25.md)\n② 수정 — 값이 None이면 INSERT 열에서 빼서 server_default가 살게 한다. upsert 갱신 시 `updated_at`은 now()로 바뀌고 `created_at`은 보존(기존 '보존' 계약 유지). 다른 적재기(CMS 저장 등)도 같은 형태인지 전수 확인\n③ 기존 행 복원 — NULL 행을 채우는 1회성 경로(멱등 · 쓰기 블록 자가거부 가드 · Kiki 머신 런북)\n④ 회귀 테스트 — 실 PG 통합: 적재 직후 created_at·updated_at NOT NULL · 재적재 시 created_at 불변·updated_at 증가. 뮤테이션(None 그대로 INSERT) RED\n⑤ 영향 확인 — `created_at desc` 정렬에 기대는 소비처(api/gating.py 후보 순서 등)를 열거하고 동작 변화를 판정 문서에 적는다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+session: null
+notes: "발견 2026-10-26 PB-25 측정(prod·로컬 전 행 NULL). 세션 session_01P8SX4CbnEXJnwfqeCKRQkW"
+updated: 2026-10-26

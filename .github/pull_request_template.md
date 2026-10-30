@@ -21,6 +21,11 @@
      돌리지 못한 검증이 있으면 아래 '정직한 공백'에 옮긴다. -->
 
 - [ ] CI 잡이 이 변경을 실제로 실행한다 (신규 테스트 디렉터리·워크플로 추가 시 특히)
+- [ ] 원자 백본 정본 `data/corpus/atom_graph_v1/graph.json`을 바꿨다면, **prod 적재 후**
+      `python -m whymath_backend.ops.atom_graph_prod_parity`가 `STATUS=MATCH`(exit 0)임을
+      적재 완료 증적으로 붙였다 — 출력의 정본 sha256과 판정 기준 커밋 포함. 정본 병합만으로는
+      prod가 따라오지 않는다(S4-60: 정본 2,234 · prod 2,210). 절차 = `docs/ops/atom_graph_parity_probe_runbook.md`.
+      정본을 안 바꿨으면 이 줄은 "정본 미변경"이라고 쓴다.
 
 ## 변별력 — 무엇을 *깨뜨려* 확인했는가
 

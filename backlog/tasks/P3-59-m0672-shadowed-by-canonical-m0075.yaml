@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-59-m0672-shadowed-by-canonical-m0075
+title: "P3-59 — M0672가 같은 kebab의 canonical M0075에 가려진다: 리포트 id 가림의 처분"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 현상 — 핵심 오개념 M0075와 M0672는 같은 kebab(product-rule-naive)을 공유한다. 승인 크로스워크에서 M0075가 직접매핑 0.97, M0672가 직접매핑 0.85라 canonical 선정(select_canonical: strict 최대 단독)이 M0075만 고른다. 그래서 학생이 [12미적Ⅰ-02-04]의 곱의 미분 오답을 해도 리포트의 오개념 id는 M0075(02-01)로 나가고 M0672는 도달하지 않는다. P3-06 표에서는 M0672가 shadowed로 표기된다.\n② 선택지: M0672 전용 kebab 신설(카탈로그 개수 동결 테스트 연쇄 + 크로스링크 Kiki 서명) / 두 M-id를 한 오개념으로 인정(P3-01 명세의 핵심 오개념 목록 조정 — 분모 변경이라 Kiki 결정) / 현상 유지(리포트 id 가림을 수용).\n③ 분모를 바꾸는 선택은 세션이 임의 확정하지 않는다(P3-01 acceptance ②와 같은 이유)."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1680"
+paths: []
+session: null
+notes: |-
+  출처: P3-06(2026-10-17). 판정 기준: main 63fe19dd. 근거: crosslinks.json의 product-rule-naive 두 행(M0075 0.97 · M0672 0.85)과 l1/misconception/crosslink_resolve.select_canonical. 등재는 착수가 아니다.
+
+  [미러 면제 2026-10-18] 컨테이너에 ssh-keygen이 없어(apt 설치 후보 없음) 헌법 서명 검증(CONST-17)과 tests/constitution 33건이 측정 불가·실패로 계상됨. 그 외 backend(Pytest 1165s 포함)·infra-contracts·infra-shell·policy-guard·declared-unwired-audit 전 스텝 통과, harness-integrity 미실행 스텝 중 pipeline_check·ruff·black·tests/harness는 개별 실행해 통과. 이 PR은 서명 검사의 보호 경로(constitution/·서명자 목록·검증기·ci.yml)를 건드리지 않음. 서명 검증은 CI가 판정.
+updated: 2026-10-18

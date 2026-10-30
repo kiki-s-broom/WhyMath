@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-55-calc1-02-02-content-single-template-dependency
+title: "[12미적Ⅰ-02-02] Content Coverage가 단일 템플릿 24건(verify-claim)에만 의존 — 60건이 스킬 비연결인 이유 판정과 의존 해소"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현재 상태 재현 — 2026-10-17 재판정 실측(main e35692ef): [12미적Ⅰ-02-02]의 Content Coverage 연결은 problem_bank_conceptual_v0의 승인 문항 24건(전부 ptype.verify-claim · 한 틀 |x-a|+c · 정답 전부 0)에만 의존한다. 이 24건의 승인을 인정하지 않으면 Content Coverage가 9/10=90%로 내려가 P3-G1 기준(95%)을 못 채운다 — 개념 1개가 10%p다. 같은 개념의 승인 문항 84건 중 나머지 60건(problem_bank_p3_fill_v0: evaluate-expression 36 · solve-for-unknown 24)은 02-02 스킬(deductive-reasoning · graph-reading)에 매핑되지 않아 Content에 기여하지 않는다.\n② 원인 판정 — 60건이 스킬에 닿지 않는 것이 설계(유형↔스킬 매핑이 옳고 슬롯 채우기용 문항일 뿐)인지, 매핑 또는 문항 유형의 결함인지를 가른다. 판정 근거는 type_skills 매핑표와 02-02 스킬 목록이다.\n③ 결정 — (가) 02-02 스킬에 닿는 유형(verify-claim 외 prove-statement · infer-relationship · sketch-graph 등)의 승인 문항을 더 확보하거나 (나) 현 구조를 의도로 확정하고 단일 템플릿 의존을 위험으로 명시 기록한다. (가)의 새 문항은 감사 통과가 필요해 사람 게이트가 걸릴 수 있다 — 착수 시 MP-03 절차를 따른다.\n④ 이 태스크는 대표 과정 범위(미적분Ⅰ 미분) 안의 02-02만 다룬다. 다른 개념·단원은 채우지 않는다."
+artifacts:
+  - "PR #1681 (https://github.com/kiki-s-broom/WhyMath/pull/1681) · 판정문 docs/reviews/p3_55_calc1_02_02_content_single_template_judgment_2026-10-18.md · 결정 (나) 현 구조 확정 + 위험 R1~R4 명시 · 후속 P3-64·P3-65 등재 · 판정 기준 main d33ab2e4, 로컬 CI 미러 상시 잡 5개 exit 0"
+paths: []
+session: null
+notes: |-
+  출처: P3-53-week1-gate-rejudgment-2026-10-17 판정 중 발견한 별건(판정 전용이라 등재만). P3-31(PR 1591)의 정직한 공백이 이미 '24건은 한 틀·정답 전부 0이라 02-02의 문항 다양성은 얇다, 새 은행은 별건 후보'라고 적었으나 그 별건을 소유한 태스크가 대장에 없었다(02-02 · 다양성 문구 검색 결과 EOS-23 · P3-05 · P3-31 3건은 모두 다른 축). 이 판정의 PASS는 이 단일 템플릿 위에 서 있다.
+
+  [트리거 면제] 별건 등재 — 새 규칙 도입 아님
+updated: 2026-10-18

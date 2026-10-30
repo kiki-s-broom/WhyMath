@@ -9,6 +9,9 @@ P2d로 canonical(build_id_map)은 `math.<area>.<slug>`를 산출하고, 옛 `{TR
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from data_pipeline.concept_graph.idmap import (
     _AREA_SLUG_MAP,
@@ -25,6 +28,14 @@ from data_pipeline.concept_graph.models import (
     CONCEPT_ID_PATTERN,
     CURRICULUM_AXIS_PATTERN,
     LEGACY_UC_PATTERN,
+)
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
 )
 
 # 코퍼스 37개 category 전수(접두사 포함 원본) — area_map_total 검증·합성 픽스처 공용.
@@ -185,11 +196,11 @@ class TestTrackDerivation:
 class TestBuildIdMap:
     """canonical build_id_map — `math.<area>.<slug>` 결정론·충돌 접미·규약·override."""
 
-    def test_real_data_437_unique(self, concept_records: list[dict[str, object]]) -> None:
-        """실데이터 437 개념 → 437 유일 canonical ID(충돌 0)."""
+    def test_real_data_all_unique(self, concept_records: list[dict[str, object]]) -> None:
+        """실데이터 전 개념 → 전량 유일 canonical ID(충돌 0)."""
         id_map = build_id_map(concept_records)
-        assert len(id_map) == 437
-        assert len(set(id_map.values())) == 437  # 충돌 0
+        assert len(id_map) == _FACTS["concept_graph.concepts"]
+        assert len(set(id_map.values())) == _FACTS["concept_graph.concepts"]  # 충돌 0
 
     def test_real_data_all_pass_pattern(self, concept_records: list[dict[str, object]]) -> None:
         """모든 생성 ID가 CONCEPT_ID_PATTERN(`math.<area>.<slug>`) 통과."""
@@ -400,9 +411,9 @@ class TestBuildAliasMap:
     def test_real_data_every_concept_has_full_aliases(
         self, concept_records: list[dict[str, object]]
     ) -> None:
-        """실데이터 437건 모두 별칭에 교육과정축 코드·옛 UC·src_id 보존."""
+        """실데이터 전건 모두 별칭에 교육과정축 코드·옛 UC·src_id 보존."""
         alias_map = build_alias_map(concept_records)
-        assert len(alias_map) == 437
+        assert len(alias_map) == _FACTS["concept_graph.concepts"]
         for src_id, aliases in alias_map.items():
             assert src_id in aliases
             assert any(CURRICULUM_AXIS_PATTERN.match(a) for a in aliases)

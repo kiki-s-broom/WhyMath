@@ -880,6 +880,25 @@ alloc_tensor_range: failed to allocate ROCm0 buffer of size 4370558976   # 4.07 
    - 감사 파일: `data/audit/ops-48-moe-accuracy-battle-20260822_232452.jsonl`
    - 하니스: `src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py`
 
+   **OPS-50 중간 결과 — 파싱 실패 16%의 원인 (2026-10-09 · 감사 파일 재분류 · 라이브 호출 0)**: `--analyze-audit`로 위 감사 JSONL의 후보 미분류 16건을 다시 해부했다(`data/audit/ops-50-parse-failure-reclassification.txt`).
+   - **원인은 결함 클래스가 아니라 출력 상한 절단이다.** 16건 전부 `output_tokens = 512`(= `--num-predict` 기본값)에서 `reason` 문장이 끊겨 JSON이 닫히지 않았다. 클래스 편중(무결함 10/50 · broken_latex 4/7 · explanation_slip 1/7 · standard_tag_error 1/7)은 "자기반박 서술을 길게 늘어놓는 문항"이 그쪽에 몰린 증상이다. 따라서 클래스별 프롬프트 튜닝보다 **근거 길이 제한**이 1순위 가설이다.
+   - **잘린 응답 16건 전부 `{"has_defect": true`로 시작했다.** 무결함 10건도 그랬다(근거 서술은 "정답이 …이 맞으나"로 스스로 반박하면서도 판정은 true). 판정을 근거보다 먼저 쓰는 필드 순서(`has_defect` → `reason`)가 원인 후보다.
+   - **함의 — 파싱을 고치는 것만으로는 오경보 축이 좋아지지 않는다.** 위 표 C행(후보 오경보 12/50, 상한 0.351)은 가정이 아니라 잘린 응답이 실제로 말한 판정과 일치한다. 파싱 실패율을 5% 이하로 낮추되 무결함 문항의 `true` 판정이 그대로면 A집계 오경보 상한도 0.351 근처로 올라 OPS-48 판정(exit 0)이 깨진다. 그래서 OPS-50 ③은 **파싱 실패율 ≤ 5%와 오경보 상한 유지를 함께** 만족해야 하고, 변형 후보는 `short_reason`(절단 대응)과 `reason_first`(판정 선행 대응)를 먼저 본다.
+   - **OPS-48 판정 마진 주의**: 이 절의 "마진 0.05"와 달리 `run_moe_quality_battle.ps1`은 `--not-worse-margin`을 넘기지 않아(기본 0.0) 실제 비교는 오경보 상한 0.14033 ≤ 0.14094로 **0.0006 차**였다. 재측정은 `-NotWorseMargin 0.05`를 명시한다.
+
+   **OPS-50 재측정 절차 (Phaiakes9 · 후보만 재평가 · 변형은 한 번에 하나)** — 기준 27B는 위 감사 파일에서 재사용하므로 다시 돌리지 않는다(같은 시험지가 아니면 도구가 중단한다).
+
+   | 변형 | 바꾸는 것 | 겨냥하는 원인 |
+   |---|---|---|
+   | `baseline` | 없음(OPS-48 재현) | 재현성 확인 |
+   | `short_reason` | 근거 1문장 80자 + schema `maxLength` 100 | 출력 상한 절단 |
+   | `reason_first` | 근거를 판정보다 먼저 + 필수 필드 순서 | 판정 선행 후 자기반박 |
+   | `stage_split` | 1단계 `has_defect`만, 결함일 때만 2단계로 유형 | (a) 질문 분리 |
+   | `latex_check` | LaTeX 점검 지시 추가 | (b) broken_latex |
+   | `few_shot` | broken_latex 예시 1건 주입 | (c) 예시 — 오경보 증가 가능성 |
+
+   판정 지표는 리포트의 **A/B/C 병기**(A 미분류 제외 · B 결함 미분류=놓침 · C 무결함 미분류=오경보)와 `미분류 원인`(truncated·malformed·empty·transport)이다. `--unresolved-policy worst`로 돌리면 게이트 자체가 B·C로 판정한다.
+
 3. **로컬 vs OpenRouter 비교축** — t/s만으로 고르지 않는다. `detection accuracy` / `false alarm` / `왕복 지연` / `t/s` / `컨텍스트` / `비용` / `반복 실행 안정성` 7축으로 비교하고, **정확도 축은 결함 주입 강등전으로 판정**한다(`docs/standards/superhuman_verification_standard.md`). 로컬이 정확도에서 지더라도 지연·비용에서 이기는 구간이 있고, 그 반대도 있다.
 
 4. ✅ **ROCm 7.2.1 standalone 시도 — 배선 변경 보류 결정(OPS-52, 2026-08-23 실측 · 2026-09-10 문서 회수)** [실측]. 상세는 §5 "Phase 6 실측" 참조. DLL 교체 방식(진짜 standalone `llama-server`가 아닌 가벼운 변형)의 왕복 지연 단축은 12.9%로 §3 L4의 +20% 기준에 못 미쳤고, HIP 런타임 버전 선택을 우회하는 비공식 경로라는 리스크도 있다. **결정: Ollama 번들 유지, `l3/router.py`·`l3/providers/ollama.py`에 신규 provider 경로를 설계하는 태스크로 승격하지 않는다.** 정식 standalone `llama-server` 빌드·isolated 벤치(acceptance ②의 원래 요구)는 Phase 1~5가 이미 §2 기대 기준선을 충족한 상태에서 추가 투자 대비 기대값이 낮다고 판단해 보류한다 — 재검토 트리거는 Ollama의 ROCm 7.2 공식 지원 또는 §2 기대 기준선 미달 재발.

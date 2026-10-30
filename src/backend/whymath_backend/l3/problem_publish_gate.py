@@ -16,7 +16,7 @@ test_problem_publish_gate_enforcement.py`).
 1. **검증 파이프라인**(순수): `run_gate(version, gate, live_content_hash=...)`가 검사를 전부 돌리고
    하나라도 실패하면 `PublishGateError`. 검사: `schema_valid`·`schema_version_format`·
    `entity_type`('Problem')·`content_hash`·`governance_complete`·`qa_record_bound`, 그리고 이
-   모듈 고유의 **`live_content_current`**(PUBLISH 전용 — 아래).
+   모듈 고유의 **`live_content_current`**·**`problem_metadata_complete`**(둘 다 PUBLISH 전용).
 2. **전이 계획**(순수): `plan_transition`이 전이표를 조회해 새 스냅숏을 만든다.
 3. **전이 실행**(DB): `create_draft`·`apply_transition`. `problem_version` 행과
    `problem.problem_version_id`를 쓰는 **유일한 자리**.
@@ -30,6 +30,17 @@ test_problem_publish_gate_enforcement.py`).
 대조하지 못하면(라이브 행이 스냅숏 계약을 어김) 통과가 아니라 **실패**다(모른다 ≠ 통과).
 어긋나면 발행 대신 새 초안을 만들어 다시 승인받는다(수정은 항상 새 판 — 44 §1 원칙 3).
 
+## 이 모듈 고유의 검사 — `problem_metadata_complete` (P3-04)
+
+**7필드(난이도·스킬·개념·해설·정답·오개념 서명·힌트 전략) 중 하나라도 없으면 PUBLISH는 거부된다.**
+정의는 `schema/problem_metadata.py`가, 측정은 `l3/problem_metadata_evidence.py`가 소유하고 이
+모듈은 PUBLISH 게이트에서 그 판정을 부르기만 한다 — 문항이 Published가 되는 유일한 길이므로 여기
+한 곳에서 막으면 우회로가 없다(CMS는 `status`·`is_published`·`current_published_version_id`를 직접
+고칠 수 없다 — `api/admin_cms_resources.WORKFLOW_STATE_COLUMNS`).
+증거를 못 쟀으면(`metadata_evidence is None`) 통과가 아니라 **실패**다(모른다 ≠ 통과).
+7필드는 QA에서 요구하지 않는다 — 조건을 못 채운 판은 APPROVED에서 멈춘다(지시문 세트 16/20).
+이 검사는 *발행 순간*의 라이브 행을 잰다 — 발행 이후 편집이 필드를 비우는 경우는 EOS-195 소관이다.
+
 ## 트랜잭션 계약
 
 실행 함수는 `flush`까지만 하고 `commit`하지 않는다 — 호출자가 트랜잭션 경계를 가진다. 게이트가
@@ -37,8 +48,9 @@ test_problem_publish_gate_enforcement.py`).
 
 ## 이 모듈이 하지 않는 것 (추적: backlog 후속 태스크)
 
-- **운영 호출자 없음.** 이 모듈을 부르는 라우트·CLI는 아직 없다(관리자 CMS의 문항 발행 표면은
-  별도 태스크). 그래서 현재 운영에서 `outcome=pinned` 비율은 이 모듈이 *호출되기 전까지* 0이다.
+- **호출자는 이 모듈의 소유가 아니다.** 운영 호출자는 관리자 CMS의 문항 판 표면
+  (`api/admin_cms_problem_versions.py`, EOS-194)이며, 이 모듈은 그 표면의 권한·감사·HTTP 매핑을
+  모른다. `outcome=pinned` 비율은 운영자가 문항을 실제로 발행한 만큼만 0을 벗어난다.
 - **Rollback·Restore 없음.** 전이표의 복합 전용 간선(rollback·restore)은 호출 경로가 없어
   구현하지 않았다. 필요해지면 이 모듈에 더한다(포인터 쓰기 자리를 하나로 유지).
 - **발행 이후의 제자리 편집을 새 판으로 만들지 않는다(EOS-195 처분: 차단).**
@@ -70,7 +82,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.problem_version import ProblemVersion
+from whymath_backend.l3.problem_metadata_evidence import load_metadata_evidence
 from whymath_backend.l3.publish_gate import PublishGateError, StaleStatusError
+from whymath_backend.schema.problem_metadata import ProblemMetadataEvidence, evaluate_metadata
 from whymath_backend.schema.problem_version import ProblemVersion as SchemaProblemVersion
 from whymath_backend.schema.problem_version import ProblemVersionPayload
 from whymath_backend.schema.version_header import (
@@ -89,7 +103,7 @@ from whymath_backend.schema.version_lifecycle import UndefinedTransitionError, r
 logger = logging.getLogger("whymath.l3.problem_publish_gate")
 
 # 검사 묶음 버전 — 검사 항목·판정 규칙을 바꾸면 올린다(§9 `validator_bundle_version`).
-VALIDATOR_BUNDLE_VERSION = "eos190-problem-publish-gate@1"
+VALIDATOR_BUNDLE_VERSION = "eos190-problem-publish-gate@2"
 
 #: `create_draft`가 payload 스키마 태그를 따로 받지 않을 때 쓰는 값(ARCH-31 docstring 예시와 동일).
 PAYLOAD_SCHEMA_VERSION = "problem-schema@1"
@@ -178,11 +192,13 @@ def run_gate(
     gate: GateKind,
     *,
     live_content_hash: str | None = None,
+    metadata_evidence: ProblemMetadataEvidence | None = None,
 ) -> tuple[tuple[str, ...], str]:
     """게이트 검사를 **전부** 돌린다 — (통과 검사 이름들, 산출 해시). 하나라도 실패하면 예외.
 
-    `live_content_hash`는 PUBLISH 게이트에서만 쓰인다 — 잠금 후 라이브 문항의 스냅숏 해시.
-    PUBLISH인데 None이면 대조하지 못한 것이므로 **실패**다(모른다 ≠ 통과).
+    `live_content_hash`·`metadata_evidence`는 PUBLISH 게이트에서만 쓰인다 — 잠금 후 라이브 문항의
+    스냅숏 해시와 7필드 증거. PUBLISH인데 None이면 대조·측정하지 못한 것이므로 **실패**다
+    (모른다 ≠ 통과).
     """
     if gate not in _REQUIRED_GOVERNANCE:
         raise ValueError(f"이 모듈은 QA·PUBLISH 게이트만 소유한다: {gate!r}")
@@ -242,6 +258,15 @@ def run_gate(
         else:
             passed.append("live_content_current")
 
+        if metadata_evidence is None:
+            failures.append("problem_metadata_complete: 7필드를 측정하지 못했다")
+        else:
+            verdict = evaluate_metadata(metadata_evidence)
+            if verdict.complete:
+                passed.append("problem_metadata_complete")
+            else:
+                failures.extend(f"problem_metadata_complete: {line}" for line in verdict.failures())
+
     if failures:
         raise PublishGateError(gate, failures)
     return tuple(passed), content_hash
@@ -256,6 +281,7 @@ def plan_transition(
     *,
     actor: str,
     live_content_hash: str | None = None,
+    metadata_evidence: ProblemMetadataEvidence | None = None,
     now: datetime | None = None,
     allow_compound: bool = False,
 ) -> SchemaProblemVersion:
@@ -278,7 +304,12 @@ def plan_transition(
 
     update: dict[str, object] = {"status": row.target.value}
     if row.gate is not None:
-        checks, content_hash = run_gate(candidate, row.gate, live_content_hash=live_content_hash)
+        checks, content_hash = run_gate(
+            candidate,
+            row.gate,
+            live_content_hash=live_content_hash,
+            metadata_evidence=metadata_evidence,
+        )
         run_id = f"QA-{uuid.uuid4().hex[:12]}"
         record = GateRecord(
             gate=row.gate,
@@ -358,6 +389,19 @@ async def list_versions(session: AsyncSession, problem_id: uuid.UUID) -> list[Sc
         .order_by(ProblemVersion.version_no.desc())
     )
     return [_load_schema(row) for row in rows.scalars()]
+
+
+async def problem_exists(session: AsyncSession, problem_id: uuid.UUID) -> bool:
+    """문항이 있는가 — **읽기 전용**(잠금·엔티티 적재 없음, id 한 컬럼만 읽는다).
+
+    API 계층은 ORM을 직접 잡지 않는다(데이터 접근 baseline) — "없는 문항"(404)과 "판이 0건인 문항"
+    (빈 목록)을 구분하려는 호출자는 이 함수를 거친다. 엔티티를 세션에 올리지 않으므로 호출자의
+    트랜잭션 경계(commit 뒤 만료)에 영향을 주지 않는다.
+    """
+    found = (
+        await session.execute(select(Problem.problem_id).where(Problem.problem_id == problem_id))
+    ).scalar_one_or_none()
+    return found is not None
 
 
 async def get_version(session: AsyncSession, version_id: uuid.UUID) -> SchemaProblemVersion:
@@ -504,6 +548,27 @@ def _live_content_hash_if_needed(
         return None
 
 
+async def _metadata_evidence_if_needed(
+    session: AsyncSession,
+    problem: Problem,
+    action: TransitionAction | str,
+    current: SchemaProblemVersion,
+) -> ProblemMetadataEvidence | None:
+    """PUBLISH 게이트가 붙는 전이일 때만 7필드 증거를 읽는다(읽기 전용 · 문항 잠금 뒤).
+
+    다른 전이에서는 읽지 않는다 — 7필드는 발행의 조건이지 제출·검토의 조건이 아니다(조건을 못 채운
+    판은 APPROVED에서 멈춘다). 읽다가 DB 예외가 나면 그대로 올라가 전이를 중단한다 — 측정 실패가
+    "필드가 있다"로 위장되는 길은 없다.
+    """
+    try:
+        transition = resolve_transition(action, current.status)
+    except UndefinedTransitionError:
+        return None  # 미정의 전이는 plan_transition이 같은 예외로 거부한다
+    if transition.gate is not GateKind.PUBLISH:
+        return None
+    return await load_metadata_evidence(session, problem)
+
+
 async def create_draft(
     session: AsyncSession,
     *,
@@ -597,9 +662,15 @@ async def apply_transition(
         _refuse(stale, action, version_id)
         raise stale
     live_hash = _live_content_hash_if_needed(problem, action, current, version_id)
+    evidence = await _metadata_evidence_if_needed(session, problem, action, current)
     try:
         planned = plan_transition(
-            current, action, actor=actor, live_content_hash=live_hash, now=moment
+            current,
+            action,
+            actor=actor,
+            live_content_hash=live_hash,
+            metadata_evidence=evidence,
+            now=moment,
         )
     except Exception as exc:
         _refuse(exc, action, version_id)
@@ -642,6 +713,7 @@ __all__ = [
     "create_draft",
     "list_versions",
     "get_version",
+    "problem_exists",
     "PointerPair",
     "iter_pointer_filled",
     "apply_transition",

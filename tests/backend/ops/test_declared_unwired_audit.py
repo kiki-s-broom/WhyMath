@@ -640,16 +640,34 @@ class TestCliReachability:
         reached = dua.reached_clis(pkg, clis, frozenset())
         assert "harness.orphan" not in reached
 
-    def test_production_import_reaches_cli(self, tmp_path: Path) -> None:
+    def test_production_main_reference_reaches_cli(self, tmp_path: Path) -> None:
+        """서빙 경로가 `main` 을 참조(호출)하면 도달이다 — import 만으로는 아니다(OPS-28)."""
         pkg = self._make_pkg(tmp_path)
         (pkg / "harness" / "metrics.py").write_text("def main():\n    return 0\n", encoding="utf-8")
         (pkg / "api").mkdir()
         (pkg / "api" / "endpoint.py").write_text(
-            "from fakepkg.harness import metrics\n", encoding="utf-8"
+            "from fakepkg.harness import metrics\n\ndef handler():\n    return metrics.main()\n",
+            encoding="utf-8",
         )
         clis = dua.cli_modules(pkg)
         reached = dua.reached_clis(pkg, clis, frozenset())
         assert "harness.metrics" in reached
+
+    def test_production_import_alone_does_not_reach_cli(self, tmp_path: Path) -> None:
+        """대조군 — 함수만 가져다 쓰는 서빙 경로 import 는 도달이 아니라 `library_only` 다."""
+        pkg = self._make_pkg(tmp_path)
+        (pkg / "harness" / "metrics.py").write_text(
+            "def helper():\n    return 1\n\ndef main():\n    return 0\n", encoding="utf-8"
+        )
+        (pkg / "api").mkdir()
+        (pkg / "api" / "endpoint.py").write_text(
+            "from fakepkg.harness import metrics\n\ndef handler():\n    return metrics.helper()\n",
+            encoding="utf-8",
+        )
+        clis = dua.cli_modules(pkg)
+        reach = dua.cli_reach(pkg, clis, frozenset())
+        assert "harness.metrics" not in reach.executed
+        assert "harness.metrics" in reach.library_only
 
     def test_transitive_in_process_import_reaches_cli(self, tmp_path: Path) -> None:
         """`qa_pipeline`류 관용구 — CI가 orchestrator만 직접 실행해도, orchestrator가
@@ -821,3 +839,368 @@ class TestRealRepositoryConstantIndirectionDiscrimination:
             dua.repo_root() / "tests" / "backend"
         ) | dua.dart_call_entries(dua.repo_root() / "src" / "mobile" / "lib")
         assert dua._route_reached("GET", "/v1/me/skill-mastery", callers) is False
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# OPS-28 — CLI 축 사각 해소(패키지 전체 재귀·main 실행/라이브러리 import 분리·배포 스택 실행)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _cli(pkg: Path, rel: str, body: str = "def main():\n    return 0\n") -> None:
+    path = pkg / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+
+
+class TestCliPackageRecursion:
+    def test_cli_in_non_harness_packages_and_nested_dirs_collected(self, tmp_path: Path) -> None:
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "harness/a.py")
+        _cli(pkg, "l1/standards/populate.py")
+        _cli(pkg, "l4/misconception/semantic/populate.py")
+        _cli(pkg, "whs/export_cli.py")
+        _cli(pkg, "l3/lib_only.py", "def helper():\n    return 0\n")
+        clis = dua.cli_modules(pkg)
+        assert {
+            "harness.a",
+            "l1.standards.populate",
+            "l4.misconception.semantic.populate",
+            "whs.export_cli",
+        } <= set(clis)
+        assert "l3.lib_only" not in clis
+
+    def test_package_main_module_is_keyed_by_package_name(self, tmp_path: Path) -> None:
+        """`python -m pkg` 는 `pkg/__main__.py` 를 돌린다 — CI 의 `-m` 표기와 키가 맞아야 한다."""
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "l3/pregenerate/__main__.py")
+        clis = dua.cli_modules(pkg)
+        assert "l3.pregenerate" in clis
+        assert "l3.pregenerate.__main__" not in clis
+        assert "l3.pregenerate" in dua.reached_clis(pkg, clis, frozenset({"l3.pregenerate"}))
+
+    def test_unclassified_new_package_cli_is_a_violation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """확장의 핵심 — 새로 편입된 패키지의 미도달 CLI 는 선언 전까지 위반이다."""
+        monkeypatch.setitem(dua._MANIFEST, dua.AXIS_CLI, {})
+        verdict = dua._classify(dua.AXIS_CLI, "l4.misconception.new_tool", False, tmp_path)
+        assert verdict.status == "unclassified"
+        assert verdict.is_violation is True
+
+
+class TestMainReferences:
+    def _refs(self, tmp_path: Path, body: str) -> set[str]:
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "harness/target.py")
+        _cli(pkg, "ops/caller.py", body)
+        return dua.main_references(pkg, pkg / "ops" / "caller.py")
+
+    def test_from_import_main_then_call(self, tmp_path: Path) -> None:
+        refs = self._refs(
+            tmp_path,
+            "from fakepkg.harness.target import main\n\ndef run():\n    return main()\n",
+        )
+        assert refs == {"harness.target"}
+
+    def test_from_import_main_alias_then_call(self, tmp_path: Path) -> None:
+        refs = self._refs(
+            tmp_path,
+            "from fakepkg.harness.target import main as target_main\n"
+            "def run():\n    return target_main([])\n",
+        )
+        assert refs == {"harness.target"}
+
+    def test_module_attribute_main(self, tmp_path: Path) -> None:
+        refs = self._refs(
+            tmp_path,
+            "from fakepkg.harness import target\n\ndef run():\n    return target.main()\n",
+        )
+        assert refs == {"harness.target"}
+
+    def test_aliased_module_import_main(self, tmp_path: Path) -> None:
+        refs = self._refs(
+            tmp_path,
+            "import fakepkg.harness.target as t\n\ndef run():\n    return t.main()\n",
+        )
+        assert refs == {"harness.target"}
+
+    def test_fully_qualified_main(self, tmp_path: Path) -> None:
+        refs = self._refs(
+            tmp_path,
+            "import fakepkg.harness.target\n\ndef run():\n    return fakepkg.harness.target.main()\n",
+        )
+        assert refs == {"harness.target"}
+
+    def test_relative_import_main(self, tmp_path: Path) -> None:
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "ops/target.py")
+        _cli(pkg, "ops/caller.py", "from .target import main\n\ndef run():\n    return main()\n")
+        assert dua.main_references(pkg, pkg / "ops" / "caller.py") == {"ops.target"}
+
+    def test_callback_pass_counts_as_reference(self, tmp_path: Path) -> None:
+        refs = self._refs(
+            tmp_path,
+            "from fakepkg.harness import target\n\nHANDLERS = {'t': target.main}\n",
+        )
+        assert refs == {"harness.target"}
+
+    def test_import_without_use_is_not_a_reference(self, tmp_path: Path) -> None:
+        """음성 — 미사용 import·재수출은 `main` 참조가 아니다."""
+        refs = self._refs(
+            tmp_path,
+            "from fakepkg.harness.target import main as populate_main\n"
+            '__all__ = ["populate_main"]\n',
+        )
+        assert refs == set()
+
+    def test_rebinding_the_imported_name_is_not_a_reference(self, tmp_path: Path) -> None:
+        """음성 — 가져온 `main` 이름에 값을 *대입*만 하면 읽은 것이 아니다(Load 컨텍스트 절의 반례)."""
+        refs = self._refs(
+            tmp_path,
+            "from fakepkg.harness.target import main\n\nmain = None\n",
+        )
+        assert refs == set()
+
+    def test_function_import_is_not_a_reference(self, tmp_path: Path) -> None:
+        """음성 — 같은 모듈의 다른 함수를 부르는 것은 CLI 실행이 아니다."""
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "harness/target.py", "def helper():\n    return 1\n\ndef main():\n    return 0\n")
+        _cli(
+            pkg,
+            "ops/caller.py",
+            "from fakepkg.harness.target import helper\n\ndef run():\n    return helper()\n",
+        )
+        assert dua.main_references(pkg, pkg / "ops" / "caller.py") == set()
+
+    def test_unrelated_local_main_name_is_not_a_reference(self, tmp_path: Path) -> None:
+        refs = self._refs(tmp_path, "def main():\n    return 0\n\nresult = main()\n")
+        assert refs == set()
+
+
+class TestLibraryImportIsNotExecution:
+    def _pkg(self, tmp_path: Path) -> Path:
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "ops/scorecard.py", "def helper():\n    return 1\n\ndef main():\n    return 0\n")
+        _cli(
+            pkg,
+            "ops/metrics.py",
+            "from fakepkg.ops.scorecard import helper\n\ndef main():\n    return helper()\n",
+        )
+        return pkg
+
+    def test_import_of_helper_from_ci_run_cli_is_library_only(self, tmp_path: Path) -> None:
+        """P3-14 재현 — CI 가 `metrics` 를 돌리고 그것이 `scorecard` 의 함수를 쓴다."""
+        pkg = self._pkg(tmp_path)
+        clis = dua.cli_modules(pkg)
+        reach = dua.cli_reach(pkg, clis, frozenset({"ops.metrics"}))
+        assert reach.executed == {"ops.metrics"}
+        assert reach.library_only == {"ops.scorecard"}
+
+    def test_library_only_cli_without_waiver_stays_an_alarm(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setitem(dua._MANIFEST, dua.AXIS_CLI, {})
+        verdict = dua._classify(
+            dua.AXIS_CLI,
+            "ops.scorecard",
+            False,
+            tmp_path,
+            unreached_note=dua._LIBRARY_ONLY_NOTE,
+        )
+        assert verdict.status == "unclassified"
+        assert "import" in verdict.note
+
+    def test_library_only_cli_keeps_a_valid_waiver(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """유예가 있으면 import 때문에 stale-waiver 가 되지 않는다(P3-14 가 걷게 된 원인 차단)."""
+        monkeypatch.setitem(dua._MANIFEST, dua.AXIS_CLI, {"ops.scorecard": "by-design:실표본 의존"})
+        verdict = dua._classify(dua.AXIS_CLI, "ops.scorecard", False, tmp_path)
+        assert verdict.status == "by-design"
+
+    def test_main_call_from_executed_cli_is_execution(self, tmp_path: Path) -> None:
+        pkg = tmp_path / "fakepkg"
+        _cli(pkg, "ops/sub.py")
+        _cli(
+            pkg,
+            "ops/orch.py",
+            "from fakepkg.ops import sub\n\ndef main():\n    return sub.main()\n",
+        )
+        clis = dua.cli_modules(pkg)
+        reach = dua.cli_reach(pkg, clis, frozenset({"ops.orch"}))
+        assert reach.executed == {"ops.orch", "ops.sub"}
+        assert reach.library_only == set()
+
+    def test_unexecuted_cli_importing_another_does_not_reach_it(self, tmp_path: Path) -> None:
+        """실행되지 않는 CLI 가 다른 CLI 를 import 해도 그 CLI 는 library_only 조차 아니다."""
+        pkg = self._pkg(tmp_path)
+        clis = dua.cli_modules(pkg)
+        reach = dua.cli_reach(pkg, clis, frozenset())
+        assert reach.executed == set()
+        assert reach.library_only == set()
+
+
+class TestComposeExecutedModules:
+    def test_command_list_and_string_forms_detected(self, tmp_path: Path) -> None:
+        (tmp_path / "docker-compose.prod.yml").write_text(
+            "services:\n"
+            "  purge:\n"
+            "    command:\n"
+            "      - sh\n"
+            "      - -c\n"
+            '      - "while true; do python -m whymath_backend.privacy.retention_purge_cli; sleep 1; done"\n'
+            "  calib:\n"
+            '    command: "python -m whymath_backend.l2.calibrate_items"\n'
+            "  web:\n"
+            '    command: ["uvicorn", "whymath_backend.app:app"]\n',
+            encoding="utf-8",
+        )
+        assert dua.compose_executed_modules(tmp_path) == {
+            "privacy.retention_purge_cli",
+            "l2.calibrate_items",
+        }
+
+    def test_comment_mention_is_not_execution(self, tmp_path: Path) -> None:
+        (tmp_path / "docker-compose.yml").write_text(
+            "# python -m whymath_backend.ops.fake_cli 는 주석이다\nservices: {}\n",
+            encoding="utf-8",
+        )
+        assert dua.compose_executed_modules(tmp_path) == frozenset()
+
+    def test_malformed_compose_is_collector_error_not_silent_empty(self, tmp_path: Path) -> None:
+        (tmp_path / "docker-compose.yml").write_text("services: [unclosed\n", encoding="utf-8")
+        with pytest.raises(dua.CollectorError):
+            dua.compose_executed_modules(tmp_path)
+
+    def test_no_compose_files_is_empty(self, tmp_path: Path) -> None:
+        assert dua.compose_executed_modules(tmp_path) == frozenset()
+
+
+class TestHttpReachColumns:
+    def test_columns_serialized_in_json(self) -> None:
+        verdict = dua.ItemVerdict(
+            "ax", "GET /x", "reached", "", ((dua.COL_SERVER_TEST, True), (dua.COL_CLIENT, False))
+        )
+        assert verdict.to_json()["columns"] == {
+            dua.COL_SERVER_TEST: True,
+            dua.COL_CLIENT: False,
+        }
+
+    def test_item_without_columns_keeps_legacy_json_shape(self) -> None:
+        assert "columns" not in dua.ItemVerdict("ax", "k", "reached", "").to_json()
+
+    def test_dedup_ors_columns_of_merged_keys(self) -> None:
+        a = dua.ItemVerdict("ax", "k", "reached", "", ((dua.COL_CLIENT, False),))
+        b = dua.ItemVerdict("ax", "k", "reached", "", ((dua.COL_CLIENT, True),))
+        merged = dua._dedup((a, b))
+        assert len(merged) == 1
+        assert merged[0].column(dua.COL_CLIENT) is True
+
+
+class TestRealRepositoryOps28:
+    """실 저장소 동결 — 합성 픽스처가 못 보는 것(실제 분류·실제 실행 표면)을 고정한다."""
+
+    # P3-14 가 걷었다가 OPS-28 이 복원한 유예 5종 — import 폐포로 도달 판정을 받던 CLI.
+    _P3_14_FIVE = (
+        "harness.reviewer_sample_package",
+        "ops.validation_scorecard",
+        "ops.hit_cu_metrics",
+        "harness.golden_benchmark",
+        "ops.qa_confusion_matrix",
+    )
+
+    @staticmethod
+    def _real_reach() -> dua.CliReach:
+        root = dua.repo_root()
+        package_root = root / "src" / "backend" / "whymath_backend"
+        clis = dua.cli_modules(package_root)
+        ci = dua.ci_executed_modules(root / ".github" / "workflows" / "ci.yml")
+        return dua.cli_reach(package_root, clis, ci | dua.compose_executed_modules(root))
+
+    def test_p3_14_five_are_imported_but_never_executed(self) -> None:
+        reach = self._real_reach()
+        for key in self._P3_14_FIVE:
+            assert key in reach.library_only, key
+            assert key not in reach.executed, key
+
+    def test_s4_56_v1_is_imported_by_v2_but_never_executed(self) -> None:
+        """P3-14 와 같은 유형 — v2(CI 직접 실행)가 v1 의 함수를 import 해도 v1 `main()` 은 아니다."""
+        reach = self._real_reach()
+        key = "harness.residue_cross_verify_eval"
+        assert key in reach.library_only
+        assert key not in reach.executed
+        assert dua._MANIFEST[dua.AXIS_CLI][key].startswith("by-design:")
+
+    def test_p3_14_five_waivers_are_restored(self) -> None:
+        for key in self._P3_14_FIVE:
+            assert dua._MANIFEST[dua.AXIS_CLI][key].startswith("by-design:"), key
+
+    @pytest.mark.parametrize("key", _P3_14_FIVE)
+    def test_removing_a_restored_waiver_fails_the_audit(
+        self, key: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """위반 주입(P3-14 acceptance ③) — 유예를 걷으면 exit 1 이 돼야 경보가 살아 있는 것이다."""
+        trimmed = {k: v for k, v in dua._MANIFEST[dua.AXIS_CLI].items() if k != key}
+        monkeypatch.setitem(dua._MANIFEST, dua.AXIS_CLI, trimmed)
+        report = dua.build_report()
+        assert report.exit_code == 1
+        assert [(v.key, v.status) for v in report.violations] == [(key, "unclassified")]
+
+    def test_non_harness_packages_are_audited(self) -> None:
+        package_root = dua.repo_root() / "src" / "backend" / "whymath_backend"
+        clis = set(dua.cli_modules(package_root))
+        for key in (
+            "l1.standards.populate",
+            "l3.pregenerate",
+            "l4.misconception.judge_shadow_harvest",
+            "l4.misconception.crosslink_triage",
+            "privacy.student_work_backfill",
+            "whs.path_promotion",
+        ):
+            assert key in clis, key
+        assert len({c.split(".")[0] for c in clis}) >= 6
+
+    def test_two_zero_caller_clis_are_classified_by_design(self) -> None:
+        """② 호출자 0 실측 2건의 분류 확정 — 생산자(coach.py shadow 관측)는 배선돼 있다."""
+        manifest = dua._MANIFEST[dua.AXIS_CLI]
+        assert manifest["l4.misconception.judge_shadow_harvest"].startswith("by-design:")
+        assert manifest["l4.misconception.crosslink_triage"].startswith("by-design:")
+        coach = (
+            dua.repo_root() / "src" / "backend" / "whymath_backend" / "api" / "coach.py"
+        ).read_text(encoding="utf-8")
+        assert "observe_misconception_judge_shadow(" in coach
+
+    def test_build_report_counts_compose_run_clis_as_reached(self) -> None:
+        """`build_report` 배선 자체의 동결 — 도달 계산에 compose 가 빠지면 유예 없는 두 CLI 가
+        unclassified 로 돌아선다(위 테스트는 compose 를 직접 더해 이 배선을 우회한다)."""
+        cli_axis = {v.key: v for v in dua.build_report().axes[3].verdicts}
+        for key in ("privacy.retention_purge_cli", "l2.calibrate_items"):
+            assert cli_axis[key].status == "reached", key
+
+    def test_compose_run_clis_are_reached_without_a_waiver(self) -> None:
+        """배포 스택이 24h 루프로 돌리는 CLI 는 도달이다 — 유예를 두면 stale-waiver 가 된다."""
+        reach = self._real_reach()
+        for key in ("privacy.retention_purge_cli", "l2.calibrate_items"):
+            assert key in reach.executed, key
+            assert key not in dua._MANIFEST[dua.AXIS_CLI], key
+
+    def test_http_axis_separates_server_only_from_client_reach(self) -> None:
+        """③ 실사례 — 서버 테스트만으로 reached 인 라우트가 client_reached=False 로 드러난다."""
+        http = {v.key: v for v in dua.build_report().axes[0].verdicts}
+        for key in ("POST /v1/generate", "GET /v1/jobs/{param}"):
+            assert http[key].status == "reached", key
+            assert http[key].column(dua.COL_SERVER_TEST) is True, key
+            assert http[key].column(dua.COL_CLIENT) is False, key
+        assert http["POST /v1/verify-solution"].column(dua.COL_CLIENT) is True
+
+    def test_dart_literal_limitation_is_self_declared(self) -> None:
+        """④ 한계 자기 선언 — docstring 이 사실(verify_api.dart·lib/ 소비처 0)을 적고 있어야 한다."""
+        doc = dua.__doc__ or ""
+        assert "verify_api.dart" in doc and "리터럴" in doc
+        mobile_lib = dua.repo_root() / "src" / "mobile" / "lib"
+        consumers = [
+            p
+            for p in mobile_lib.rglob("*.dart")
+            if p.name != "verify_api.dart" and "verify_api" in p.read_text(encoding="utf-8")
+        ]
+        assert consumers == [], "선언한 한계(lib/ 소비처 0)가 사실이 아니게 됐다 — 문구를 갱신하라"

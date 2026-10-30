@@ -472,7 +472,7 @@ def test_rephrased_corpus_copyright_rail() -> None:
 # ──────────────────────────────────────────────────────────────────────
 def test_rephrased_corpus_all_records_have_identity_id() -> None:
     records = _rephrased_records()
-    assert len(records) >= 400  # 429건 실측 하한(여유 마진)
+    assert len(records) >= 400  # 실측 하한(여유 마진 — 현재 건수는 `problem_bank.rephrased_v0`)
     missing = [r.slug for r in records if r.problem.identity_id is None]
     assert not missing, f"identity_id 미부여 {len(missing)}건: {missing[:5]}"
 

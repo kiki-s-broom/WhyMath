@@ -2,7 +2,7 @@
 
 핵심 관심사:
   ① **grain 다리** — `concept_nodes`(atom code 배열)와 `atom_probe.code`의 직접 교집합이
-     정확히 동작하는지(04e §7.2 crosswalk 가정의 실측 정정 — `diag_item_projector` 모듈
+     정확히 동작하는지(04g §7.2 crosswalk 가정의 실측 정정 — `diag_item_projector` 모듈
      docstring 참조).
   ② **select-vs-generate** — 이미 검수 결정이 난 슬롯(PRESCREENED/APPROVED/REJECTED)은
      손대지 않고, 그 자리의 원자 후보도 소비하지 않는다.

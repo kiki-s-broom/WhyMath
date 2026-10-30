@@ -4,10 +4,10 @@
   "source_name": "fac16e6f-WhyMath_______.json",
   "uploaded": "2026-06-20",
   "counts": {
-    "misconceptions": 841,
+    "misconceptions": 843,
     "duplicates_skipped": 0,
-    "with_ccss": 773,
-    "with_error_type": 732
+    "with_ccss": 775,
+    "with_error_type": 738
   },
   "error_types": [
     "공식혼동",
@@ -23,16 +23,17 @@
   "license_notice": "와이매스 자체 저작물(오개념 서술·distractor 규칙·교정포인트). 성취기준·CCSS 코드는 구조 메타(공공·사실).",
   "post_extraction": [
     "L5_META.오개념 평탄화·한글 소스 키→안정 영문 키(데이터카드 §2).",
-    "mis_id 유일(첫 등장 우선 dedup)·개념/성취기준 코드는 원천 보존(해소는 백엔드 로더)."
+    "mis_id 유일(첫 등장 우선 dedup)·개념/성취기준 코드는 원천 보존(해소는 백엔드 로더).",
+    "QUAL-14(2026-10-12): canonical_statement 76건 절단 정정(40자 절단 71·소수점 분할 5) — student_wrong_thinking 첫 문장으로 복원, 별개 원천 concept_content_v1과 76/76 대조. 다른 필드·개수(843) 불변(데이터카드 docs/data/misconception_catalog_v1.md §8)."
   ],
   "phase4a_enrichment": {
     "authored": "2026-07-07",
     "quality": "ai_estimated",
     "severity_counts": {
-      "blocking": 344,
-      "local": 319,
+      "blocking": 346,
+      "local": 321,
       "cosmetic": 71,
-      "None": 109
+      "None": 105
     },
     "with_behavior_skills": 806,
     "total": 843,

@@ -167,8 +167,8 @@ class ProblemVersion(BaseModel):
 
     **전이 *실행*(게이트 경유)은 `l3/problem_publish_gate.py`가 소유한다**(EOS-190) — 이 모듈이
     `problem_version` 행과 `problem.problem_version_id`를 쓰는 유일한 운영 자리이고, AST 동결
-    테스트가 우회 쓰기를 막는다. 다만 그 모듈을 **부르는 운영 라우트·CLI는 아직 없다**(EOS-194).
-    이 파일의 계약은 여전히 스키마까지다.
+    테스트가 우회 쓰기를 막는다. 그 모듈의 운영 호출자는 관리자 CMS의 문항 판 표면
+    (`api/admin_cms_problem_versions.py`, EOS-194)이다. 이 파일의 계약은 여전히 스키마까지다.
     """
 
     model_config = ConfigDict(

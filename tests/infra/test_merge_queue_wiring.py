@@ -39,6 +39,9 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOC_PATH = _REPO_ROOT / ".github" / "branch-protection-setup.md"
 _CI_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+# ci.yml 밖에서 정의됐지만 문서의 required 목록에 오른 잡의 워크플로(HARN-313). required인데 큐에서
+# 안 돌면 큐가 영원히 기다리므로 이 워크플로도 `merge_group` 트리거를 가져야 한다.
+_EXTRA_REQUIRED_WORKFLOWS = (".github/workflows/release-freeze.yml",)
 
 _BEGIN = "<!-- REQUIRED_CHECKS_BEGIN"
 _END = "<!-- REQUIRED_CHECKS_END -->"
@@ -96,9 +99,12 @@ def _evaluate_under_merge_group(expression: str) -> bool:
         r"needs\.[A-Za-z0-9_]+\.outputs\.[A-Za-z0-9_]+", f"'{_MERGE_GROUP_OUTPUTS}'", expr
     )
     expr = expr.replace("||", " or ").replace("&&", " and ")
+    # `always()`(OPS-83 backend 집계 잡)는 선행 결과와 무관하게 참이다. 다른 상태 함수
+    # (success·failure·cancelled)는 선행 결과에 따라 갈리므로 풀지 않는다 — 아래에서 예외가 된다.
+    expr = re.sub(r"\balways\(\)", " True ", expr)
 
     # 남은 토큰이 전부 알려진 것인지 확인 — 모르는 것이 있으면 평가하지 않는다.
-    residue = re.sub(r"'[^']*'|==|!=|\bor\b|\band\b|[()\s]", "", expr)
+    residue = re.sub(r"'[^']*'|==|!=|\bor\b|\band\b|\bTrue\b|[()\s]", "", expr)
     if residue:
         raise AssertionError(
             f"지원하지 않는 표현식 토큰 {residue!r} — 표현식: {expression!r}. "
@@ -133,11 +139,18 @@ class TestRequiredChecksReportInQueue:
         """
         ci = _load_ci()
         jobs_by_name = {job.get("name", key): job for key, job in ci["jobs"].items()}
+        for rel in _EXTRA_REQUIRED_WORKFLOWS:
+            extra = yaml.safe_load((_REPO_ROOT / rel).read_text(encoding="utf-8"))
+            assert "merge_group" in _triggers(extra), (
+                f"{rel}: required 체크를 정의하는데 merge_group 트리거가 없다 — 큐가 이 체크를 "
+                "영원히 기다린다(무한 대기·에러 아님)"
+            )
+            jobs_by_name.update({job.get("name", key): job for key, job in extra["jobs"].items()})
 
         missing: list[str] = []
         for check in _documented_checks():
             assert check in jobs_by_name, (
-                f"문서가 required로 선언한 '{check}'에 대응하는 잡이 ci.yml에 없다 "
+                f"문서가 required로 선언한 '{check}'에 대응하는 잡이 워크플로에 없다 "
                 "(test_required_checks_doc.py가 이 축을 별도로 동결한다)"
             )
             condition = jobs_by_name[check].get("if")
@@ -192,6 +205,15 @@ class TestEvaluatorIsDiscriminating:
             "&& github.event_name != 'schedule'"
         )
         assert _evaluate_under_merge_group(actual) is True
+
+    def test_always_is_true_but_does_not_mask_the_rest(self) -> None:
+        """OPS-83 집계 잡 형태 — always()는 참이고, 뒤 조건이 merge_group을 배제하면 거짓이다."""
+        actual = (
+            "always() && ((github.event_name != 'pull_request' || "
+            "needs.changes.outputs.backend == 'true') && github.event_name != 'schedule')"
+        )
+        assert _evaluate_under_merge_group(actual) is True
+        assert _evaluate_under_merge_group("always() && github.event_name == 'schedule'") is False
 
     def test_unknown_token_raises_instead_of_passing(self) -> None:
         """★ 해석 못 한 표현식을 True로 접으면 이 테스트 전체가 위장이 된다."""

@@ -405,24 +405,30 @@ class TestRealCorpusLoad:
         corpus = repo_root / "data" / "corpus" / "concept_graph_v1" / "graph.json"
         if not corpus.exists():
             pytest.skip("실 코퍼스 미존재(data/corpus/concept_graph_v1/graph.json)")
+        # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+        # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+        facts = json.loads(
+            (repo_root / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
+        expected_concepts = facts["concept_graph.concepts"]
 
-        # ① 로더가 코퍼스 graph.json을 명시 인자로 받아 437 레코드 산출(기본 경로 무변경).
+        # ① 로더가 코퍼스 graph.json을 명시 인자로 받아 전건 레코드 산출(기본 경로 무변경).
         records = load_backend_concepts_from_graph_json(corpus)
-        assert len(records) == 437
+        assert len(records) == expected_concepts
 
         # 적재·정리 키는 코퍼스의 실 concept_id(=code) 전건.
         payload = json.loads(corpus.read_text(encoding="utf-8"))
         codes = [str(c["concept_id"]) for c in payload["concepts"]]
-        assert len(codes) == 437
+        assert len(codes) == expected_concepts
         # 대표 1건(source_id/aliases 직결 검증용) — 코퍼스 첫 행.
         first = payload["concepts"][0]
         first_code = str(first["concept_id"])
         first_src = first.get("source_id")
         first_aliases = first.get("aliases") or []
         try:
-            # ② 적재 count 437 + 재적재 멱등(행수 불변·UUID 보존).
+            # ② 적재 count 전건 + 재적재 멱등(행수 불변·UUID 보존).
             count = populate_backend_concepts(records, settings=Settings())
-            assert count == 437
+            assert count == expected_concepts
 
             engine = _sync_engine()
             try:
@@ -437,7 +443,7 @@ class TestRealCorpusLoad:
             recount = populate_backend_concepts(
                 load_backend_concepts_from_graph_json(corpus), settings=Settings()
             )
-            assert recount == 437  # 멱등(2회 적재 후에도 437 레코드)
+            assert recount == expected_concepts  # 멱등(2회 적재 후에도 전건 레코드)
 
             engine = _sync_engine()
             try:
@@ -474,7 +480,7 @@ class TestRealCorpusLoad:
                         .all()
                     )
                 # ② 멱등 — 437행·UUID PK 보존(브리지 안정성·FK 참조 보존).
-                assert total == 437
+                assert total == expected_concepts
                 assert row.concept_id == first_uuid
                 # ③ 재ID 추적성 직결(source_id·aliases TEXT[])·code=concept_id.
                 assert row.code == first_code
@@ -662,10 +668,16 @@ class TestRealCorpusEdgeLoad:
         corpus = repo_root / "data" / "corpus" / "concept_graph_v1" / "graph.json"
         if not corpus.exists():
             pytest.skip("실 코퍼스 미존재(data/corpus/concept_graph_v1/graph.json)")
+        # 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+        # 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+        facts = json.loads(
+            (repo_root / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+        )
+        expected_concepts = facts["concept_graph.concepts"]
 
         # 노드 437 — 엣지 FK(code→UUID)가 의존하므로 *선적재*해야 한다.
         node_records = load_backend_concepts_from_graph_json(corpus)
-        assert len(node_records) == 437
+        assert len(node_records) == expected_concepts
 
         # 엣지 레코드 + 로더 skip(비선수·self·UC 누락) — 라이브 계산(하드코딩 회피).
         edge_records, load_skips = load_backend_edges_from_graph_json(corpus)
@@ -675,7 +687,7 @@ class TestRealCorpusEdgeLoad:
         # 정리 키는 코퍼스 437 concept_id(=code) 전건(FK 안전 — 엣지 먼저 정리됨).
         payload = json.loads(corpus.read_text(encoding="utf-8"))
         codes = [str(c["concept_id"]) for c in payload["concepts"]]
-        assert len(codes) == 437
+        assert len(codes) == expected_concepts
 
         # ③ 방향성 검증용 — 코퍼스 첫 선수엣지(src=선수→dst=후행)·라이브 추출.
         sample = edge_records[0]
@@ -686,7 +698,7 @@ class TestRealCorpusEdgeLoad:
         try:
             # 노드 437 적재(엣지 FK 충족).
             node_count = populate_backend_concepts(node_records, settings=Settings())
-            assert node_count == 437
+            assert node_count == expected_concepts
 
             # 엣지 적재 — 반환=적재 행 수. 노드 437 전건 적재라 orphan skip은
             # graph 엣지가 437 밖 UC를 가리킬 때만 발생(실측·정직).

@@ -1,0 +1,1240 @@
+"""[12미적Ⅰ-02-06] 평균값 정리 — P3-44 새 문항 틀 프로토타입(스크래치패드 · 저장소 무수정).
+
+실행: cd /home/user/WhyMath/src/backend && python3 <이 파일>
+
+세 틀을 실제로 만들어 본다.
+  틀 A  "c의 개수" 객관식(다항식, ptype.count-solutions) — 오개념 선지 = 롤의 정리 혼동으로 센 개수.
+  틀 B  "평균값 정리의 조건을 만족시키는 함수의 개수" 객관식(ptype.condition-satisfaction) —
+        오개념 선지 = 조건 확인 없이 전부에 적용한 개수.
+  틀 K  (비교용) 절댓값 꺾인점 함수의 "c의 개수" — 검산 불가·정직한 연결이 Rolle 쪽뿐임을 실측.
+
+저장소 코드는 import만 한다. 판정기 확장은 '제안'이므로 이 파일 안의 함수(ext_*)로 흉내 낸다.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import functools
+import itertools
+import json
+import math
+import re
+import sys
+import time
+from collections import Counter
+from fractions import Fraction
+from pathlib import Path
+
+import numpy as np
+import sympy
+
+from whymath_backend.l3.equivalent import p3_diff_shortcut_guard as guard
+from whymath_backend.l3.equivalent.p3_diff_expr import (
+    Poly,
+    derivative_of,
+    eval_at,
+    poly_to_sympy,
+    poly_to_sympy_str,
+    render_difference,
+    render_factored,
+    render_poly,
+    with_eun_neun,
+    with_eul_reul,
+    with_i_ga,
+    with_wa_gwa,
+)
+from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
+    KindedDiffItem,
+    _bounds,
+    _minus,
+    _mvt_setup,
+    answer_format_of,
+    frac_text,
+)
+from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
+    ChoiceEntry,
+    DiffItem,
+    answer_format_for,
+    build_choices,
+    probe_of,
+    seeded_order,
+    skeleton_of,
+    steps_of,
+)
+from whymath_backend.lang.josa import euro_ro
+from whymath_backend.l3.verify_answer import verify_is_differentiable, verify_real_root_count
+
+REPO = Path("/home/user/WhyMath")
+STD = "[12미적Ⅰ-02-06]"
+MID = "M0674"
+X = sympy.Symbol("x")
+T0 = time.time()
+CHECKS: list[tuple[str, bool, str]] = []
+
+
+def check(name: str, ok: bool, detail: str = "") -> None:
+    """단언을 기록한다(실패해도 끝까지 돌고 마지막에 종합 — 어느 단언이 깨졌는지 보이게)."""
+    CHECKS.append((name, bool(ok), detail))
+    if not ok:
+        print(f"  !! 단언 실패: {name} {detail}")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 0. 기존 은행 — 근사 중복 비교용 (문면 골격·검산 조건)
+# ══════════════════════════════════════════════════════════════════════════
+def _load_bank(name: str) -> list[dict]:
+    path = REPO / "data" / "corpus" / name / "problems.jsonl"
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+
+BANKS = {n: _load_bank(n) for n in ("problem_bank_p3_calculus1_diff_v0", "problem_bank_p3_fill_v0")}
+
+
+def _cond_key(cond: object) -> str:
+    if isinstance(cond, str):
+        return cond
+    return "&&".join(cond) if isinstance(cond, (list, tuple)) else ""
+
+
+BANK_SKELETONS = {skeleton_of(r["question_text"]) for rows in BANKS.values() for r in rows}
+BANK_CONDS = {
+    _cond_key((r.get("verify") or {}).get("conditions", ""))
+    for rows in BANKS.values()
+    for r in rows
+    if r.get("verify")
+}
+BANK_CONCEPT_COUNT = sum(
+    1
+    for rows in BANKS.values()
+    for r in rows
+    if any(c.get("concept_src_id") == "H:12미적Ⅰ02-06" for c in r.get("concepts", []))
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 1. 틀 A — 다항식 "c의 개수" (정수 계수 · 근 판정은 정수/Fraction/SymPy 정확 산술)
+# ══════════════════════════════════════════════════════════════════════════
+@dataclasses.dataclass(frozen=True)
+class CountCase:
+    f: Poly  # 정수 계수 다항식(내림차순)
+    a: int
+    b: int
+    m: int  # 평균변화율(정수)
+    mvt_roots: tuple[Fraction, ...]  # f'(x) = m 의 (모두 유리) 근
+    n: int  # 열린구간 안의 개수 = 정답
+    rolle: int  # f'(x) = 0 의 열린구간 안 서로 다른 실근 수 = 롤의 정리 혼동 값
+    degree: int
+
+
+def _divisors(n: int) -> list[int]:
+    n = abs(n)
+    return [d for d in range(1, n + 1) if n % d == 0]
+
+
+def _rational_roots(coefs: list[int]) -> set[Fraction]:
+    """정수 계수 다항식(내림차순)의 서로 다른 유리 실근 — numpy로 후보를 만들고 Fraction으로 정확 확인."""
+    lead = coefs[0]
+    out: set[Fraction] = set()
+    for r in np.roots(coefs):
+        if abs(r.imag) > 1e-9:
+            continue
+        for v in _divisors(lead):
+            u = round(r.real * v)
+            cand = Fraction(u, v)
+            if sum(Fraction(c) * cand ** (len(coefs) - 1 - i) for i, c in enumerate(coefs)) == 0:
+                out.add(cand)
+    return out
+
+
+def _count_open(roots, a: int, b: int) -> int:
+    return sum(1 for r in roots if a < r < b)
+
+
+def _real_root_count_open(coefs: list[int], a: int, b: int) -> int | None:
+    """정수 계수 다항식의 열린구간 (a, b) 안 서로 다른 실근 수 — SymPy Sturm(정확). 끝점 근·중근이면 None."""
+    p = sympy.Poly(coefs, X)
+    if p.eval(a) == 0 or p.eval(b) == 0:
+        return None
+    if sympy.degree(sympy.gcd(p, p.diff(X)), X) > 0:
+        return None
+    return int(p.count_roots(a, b))
+
+
+def _mvt_eq_coefs(f: Poly, a: int, b: int) -> tuple[list[int], int]:
+    m = Fraction(eval_at(f, b) - eval_at(f, a), b - a)
+    assert m.denominator == 1
+    d = dict(derivative_of(f))
+    top = max(d)
+    coefs = [d.get(e, 0) for e in range(top, -1, -1)]
+    coefs[-1] -= int(m)
+    return coefs, int(m)
+
+
+_POOL_CACHE: dict[str, list[CountCase]] = {}
+
+
+def _mk(*terms: tuple[int, int]) -> Poly:
+    return tuple(sorted(((e, c) for e, c in terms if c), reverse=True))
+
+
+def count_cases(kind: str) -> list[CountCase]:
+    """kind='cubic' | 'quartic'. 방정식 f'(x) = m 의 근이 전부 유리·서로 달라야 하고 끝점 근이 없어야 한다."""
+    if kind in _POOL_CACHE:
+        return _POOL_CACHE[kind]
+    out: list[CountCase] = []
+    if kind == "cubic":
+        leads, prange, qrange = (1, -1, 2, -2, 3, -3), range(-8, 9), range(-14, 15)
+    else:
+        leads, prange, qrange = (1, -1, 2, -2), range(-8, 9), range(-16, 17)
+    for lead in leads:
+        for p in prange:
+            if kind == "quartic":
+                qs = list(qrange)
+            else:
+                qs = [None]
+            for q in qs:
+                for a in range(-4, 3):
+                    for b in range(a + 2, 7):
+                        # 방정식 (f' - m)은 선형항 계수 s·상수 t 와 무관 — 먼저 방정식을 정한다
+                        if kind == "cubic":
+                            h: Poly = _mk((3, lead), (2, p))
+                            hd = lambda x: lead * x**3 + p * x**2  # noqa: E731
+                        else:
+                            h = _mk((4, lead), (3, p), (2, q))
+                            hd = lambda x: lead * x**4 + p * x**3 + q * x**2  # noqa: E731
+                        num = hd(b) - hd(a)
+                        if num % (b - a):
+                            continue
+                        m = num // (b - a)
+                        if m == 0:
+                            continue
+                        d = dict(derivative_of(h))
+                        top = max(d)
+                        eq = [d.get(e, 0) for e in range(top, -1, -1)]
+                        eq[-1] -= m
+                        roots = _rational_roots(eq)
+                        if len(roots) != top:  # 서로 다른 유리근이 차수만큼(= 전부 유리·중근 없음)
+                            continue
+                        if any(r in (a, b) for r in roots):
+                            continue
+                        n = _count_open(roots, a, b)
+                        if kind == "cubic" and n not in (1, 2):
+                            continue
+                        if kind == "quartic" and n not in (1, 2, 3):
+                            continue
+                        out.append(CountCase(h, a, b, m, tuple(sorted(roots)), n, -1, top))
+    _POOL_CACHE[kind] = out
+    return out
+
+
+A_FEASIBLE: list = []
+A_ITEMS_ALL: list = []
+S_RANGE = 40  # 선형항 s 의 탐색 범위(±). 12 로 좁히면 n≥2 에서 롤 값이 거의 1 로만 나온다(아래 용량 보고 참조)
+
+
+def with_rolle(case: CountCase, seed: str) -> CountCase | None:
+    """선형항 s(·상수 t)를 정해 롤 혼동 값 r = #{f'(x)=0 근 ∈ (a,b)}가 1 이상이고 n 과 다르게 한다.
+
+    s 는 방정식 f'(x) = m 에 영향이 없다(f' 와 m 에 똑같이 s 가 더해져 상쇄) — 그래서 s 는 '정답은 그대로 두고
+    오개념 산출값만 움직이는' 자유도다. 유리근을 주는 s 를 우선한다(해설에 근을 적을 수 있다).
+    """
+    cands: list[tuple[int, int, bool]] = []
+    top = case.degree
+    base = dict(derivative_of(case.f))
+    for s in range(-S_RANGE, S_RANGE + 1):
+        d = dict(base)
+        d[0] = d.get(0, 0) + s
+        coefs = [d.get(e, 0) for e in range(top, -1, -1)]
+        r = _real_root_count_open(coefs, case.a, case.b)
+        if r is None or r < 1 or r == case.n or r > 3:
+            continue
+        rational = len(_rational_roots(coefs)) == _real_total(coefs)
+        cands.append((s, r, rational))
+    if not cands:
+        return None
+    pref = [c for c in cands if c[2]] or cands
+    s, r, _ = seeded_order(seed, pref)[0]
+    f = _mk(*(list(case.f) + [(1, s)]))
+    # s 를 더하면 평균변화율도 s 만큼 커진다(방정식 f'(x) = m 은 그대로). 해설이 보일 m 은 갱신한 값이어야 한다.
+    m_new = Fraction(eval_at(f, case.b) - eval_at(f, case.a), case.b - case.a)
+    assert m_new.denominator == 1 and m_new == case.m + s
+    return dataclasses.replace(case, f=f, rolle=r, m=int(m_new))
+
+
+def _real_total(coefs: list[int]) -> int:
+    return len(sympy.Poly(coefs, X).real_roots()) if coefs else 0
+
+
+# ── 표기·해설 ────────────────────────────────────────────────────────────
+def _fx(case: CountCase, t: int) -> str:
+    """식 표시용 — 상수항 t 를 얹는다(정답·롤 값과 무관)."""
+    return render_poly(_mk(*(list(case.f) + [(0, t)])))
+
+
+def _rate_clause(case: CountCase, fn: str = "f") -> str:
+    fa, fb = eval_at(case.f, case.a), eval_at(case.f, case.b)
+    return (
+        f"({fn}({case.b}) - {fn}({case.a}))/({_minus(case.b, case.a)}) = "
+        f"({render_difference(fb, fa)})/{case.b - case.a} = {case.m}"
+    )
+
+
+def _eq_poly(case: CountCase) -> Poly:
+    coefs, _ = _mvt_eq_coefs(case.f, case.a, case.b)
+    top = len(coefs) - 1
+    return tuple((top - i, c) for i, c in enumerate(coefs) if c)
+
+
+def _explanation(case: CountCase, *, note: str = "") -> str:
+    a, b = case.a, case.b
+    eq = _eq_poly(case)
+    roots = sorted(case.mvt_roots)
+    root_text = ", ".join(frac_text(r) for r in roots)
+    inside = [r for r in roots if a < r < b]
+    outside = [r for r in roots if not a < r < b]
+    head = (
+        f"{note}f'(x) = {render_poly(derivative_of(case.f))}이다. 구간 [{a}, {b}]에서의 평균변화율은 "
+        f"{_rate_clause(case)}이므로 f'(c) = {case.m}에서 {render_poly(eq, 'c')} = 0이고, "
+        f"{render_factored(eq, 'c')} = 0의 근은 c = {root_text}이다. "
+    )
+    if outside:
+        out_txt = ", ".join(frac_text(r) for r in outside)
+        pick = (
+            f"이 중 열린구간 ({a}, {b})에 속하는 것은 {len(inside)}개이고 "
+            f"{with_eun_neun(out_txt)} 속하지 않으므로 구하는 개수는 {case.n}이다."
+        )
+    else:
+        pick = f"세 근이 모두 열린구간 ({a}, {b})에 속하므로 구하는 개수는 {case.n}이다."
+    trap = (
+        f" 방정식 f'(c) = 0의 실근 중 열린구간 ({a}, {b})에 속하는 것을 센 값 "
+        f"{with_eun_neun(case.rolle)} 롤의 정리를 적용할 때 세는 값이다. 롤의 정리는 "
+        f"{with_wa_gwa(f'f({a})')} f({b})의 값이 같을 때만 쓸 수 있다. 여기서는 두 값이 다르므로 "
+        f"{with_eun_neun(case.rolle)} 답이 아니다."
+    )
+    return head + pick + trap
+
+
+def build_count_item(case: CountCase, frame: str, t: int) -> KindedDiffItem | None:
+    """틀 A 문항 1건 — 선지 {0,1,2,3}, 정답 n, 롤 값 r(=M0674), 나머지 둘은 미귀속."""
+    a, b = case.a, case.b
+    fx = _fx(case, t)
+    stems = {
+        "A1-interval-count": (
+            f"함수 f(x) = {fx}에 대하여 열린구간 ({a}, {b})에서 "
+            f"f'(c) = (f({b}) - f({a}))/({_minus(b, a)})를 만족시키는 실수 c의 개수는?"
+        ),
+        "A2-mvt-conclusion-count": (
+            f"함수 f(x) = {fx}에 대하여 닫힌구간 [{a}, {b}]에서 평균값 정리의 결론을 만족시키는 "
+            f"c의 값이 열린구간 ({a}, {b})에 몇 개 있는가?"
+        ),
+        "A3-parallel-tangent-count": (
+            f"곡선 y = {fx} 위의 두 점 A({a}, {eval_at(_mk(*(list(case.f) + [(0, t)])), a)}), "
+            f"B({b}, {eval_at(_mk(*(list(case.f) + [(0, t)])), b)})에 대하여, {a} < x < {b}인 "
+            "범위에서 접선이 직선 AB와 평행한 점의 개수는?"
+        ),
+    }
+    text = stems[frame]
+    note = ""
+    if frame == "A3-parallel-tangent-count":
+        note = "직선 AB의 기울기는 평균변화율과 같다. 조건을 만족시키는 점의 x좌표를 c라 하자. "
+    elif frame == "A1-interval-count":
+        note = ""
+    else:
+        note = ""
+    entries: list[ChoiceEntry] = []
+    for v in (0, 1, 2, 3):
+        if v == case.n:
+            entries.append(ChoiceEntry(str(v), is_correct=True, sort_key=float(v)))
+        elif v == case.rolle:
+            entries.append(ChoiceEntry(str(v), MID, sort_key=float(v)))
+        else:
+            entries.append(ChoiceEntry(str(v), sort_key=float(v)))
+    try:
+        choices, answer, distractors = build_choices(entries, shuffle_seed=text)
+    except ValueError:
+        return None
+    eq = _eq_poly(case)
+    expl = _explanation(dataclasses.replace(case, f=_mk(*(list(case.f) + [(0, t)]))), note=note)
+    return KindedDiffItem(
+        slot="misconception_trigger",
+        frame_id=frame,
+        question_text=text,
+        answer_text=answer,
+        explanation=expl,
+        conditions=(f"{poly_to_sympy_str(eq)} = 0", *_bounds_x(a, b)),
+        answer_map=(),
+        problem_type_code="ptype.count-solutions",
+        answer_format=answer_format_of(int(answer)),
+        choices=choices,
+        distractors=distractors,
+        solution_setup=_mvt_setup(_mk(*(list(case.f) + [(0, t)])), a, b),
+        answer_kind="real_root_count",
+    )
+
+
+def _bounds_x(a: int, b: int) -> tuple[str, str]:
+    return (f"x > {a}", f"x < {b}")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 2. 판정기 확장 제안 (프로토타입 안에서만 — 저장소 무수정)
+# ══════════════════════════════════════════════════════════════════════════
+def rolle_count_of_probe(probe: guard.ShortcutProbe) -> int | None:
+    """제안 A: 개수형(real_root_count) 문항에서 '롤의 정리 혼동 값' = F'(x) = 0 의 열린구간 안 서로 다른 실근 수.
+
+    F 는 발문의 다항식(visible_polynomials)에서, 구간은 검산 조건의 x > a, x < b 에서 읽는다.
+    읽지 못하면 None — '모른다'는 '아니다'가 아니라 위반이다(fail-closed).
+    """
+    if probe.answer_kind != "real_root_count":
+        return None
+    var = guard._answer_var(probe) or guard._variable_of(probe)
+    low, high = guard._open_bounds(probe, var)
+    if low is None or high is None:
+        return None
+    funcs = [p for p in guard.visible_polynomials(probe.question_text) if p.free_symbols == {var}]
+    funcs = [p for p in funcs if sympy.degree(p, var) >= 3]
+    if len(funcs) != 1:
+        return None
+    dp = sympy.Poly(sympy.diff(funcs[0], var), var)
+    if dp.eval(low) == 0 or dp.eval(high) == 0:
+        return None
+    if sympy.degree(sympy.gcd(dp, dp.diff(var)), var) > 0:
+        return None
+    return int(dp.count_roots(low, high))
+
+
+def ext_misconception_rules(probe: guard.ShortcutProbe) -> list[guard.ShortcutViolation]:
+    """제안 판정기: 기존 shortcut_violations 에서 M0674 개수형의 M-link-procedure 판정만 교체한다.
+
+    · 개수형(answer_kind == real_root_count)이 아니면 기존 판정 그대로.
+    · 개수형이면: 연결 선지 값 == rolle_count_of_probe(probe) 여야 하고, 그 값은 정답과 달라야 한다.
+    """
+    base = guard.shortcut_violations(probe)
+    linked = [
+        guard._rational(probe.choices[i]) if 0 <= i < len(probe.choices) else None
+        for i, mid in probe.distractors
+        if mid == MID
+    ]
+    if not linked or probe.answer_kind != "real_root_count":
+        return base
+    rest = [v for v in base if v.rule != "M-link-procedure"]
+    rolle = rolle_count_of_probe(probe)
+    answer = guard._answer_value(probe)
+    bad = (
+        rolle is None
+        or answer is None
+        or any(v is None or v != rolle for v in linked)
+        or rolle == answer
+        or rolle < 1  # 롤 산출이 0 이면 '존재하지 않는다'는 자기모순 — 오개념 상황으로 보지 않는다
+    )
+    if bad:
+        rest.append(
+            guard.ShortcutViolation(
+                "M-link-procedure",
+                f"[제안 판정] 연결 선지 {linked}이(가) f'(x) = 0 의 구간 안 실근 수({rolle})가 아니거나 "
+                "정답과 같다.",
+            )
+        )
+    return rest
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 3. 틀 A 실행
+# ══════════════════════════════════════════════════════════════════════════
+def run_frame_a() -> list[KindedDiffItem]:
+    print("\n══ 틀 A — 다항식 c의 개수 (롤 혼동 선지) ══")
+    cubic, quartic = count_cases("cubic"), count_cases("quartic")
+    print(f"  방정식 풀(유리근 전부·끝점 근 없음·m≠0): 삼차 {len(cubic)}건(n 분포 "
+          f"{dict(Counter(c.n for c in cubic))}), 사차 {len(quartic)}건(n 분포 {dict(Counter(c.n for c in quartic))})"
+          f"  [{time.time() - T0:.0f}s]")
+    # 방정식(= 검산 조건) 하나당 1문항 — 같은 방정식의 s·t 변형은 같은 수학 실체라 쓰지 않는다
+    frames = ["A1-interval-count", "A2-mvt-conclusion-count", "A3-parallel-tangent-count"]
+    feasible: list[CountCase] = []
+    for case in seeded_order("p3-44:0206:A", cubic + quartic):
+        c2 = with_rolle(case, f"s:{case.f}:{case.a}:{case.b}")
+        if c2 is None:
+            continue
+        key = _cond_key((f"{poly_to_sympy_str(_eq_poly(c2))} = 0", *_bounds_x(c2.a, c2.b)))
+        if key in BANK_CONDS:
+            continue
+        feasible.append(c2)
+    global A_FEASIBLE
+    A_FEASIBLE = feasible
+    strata: dict[tuple[int, int, int], list[CountCase]] = {}
+    for c2 in feasible:
+        strata.setdefault((c2.degree, c2.n, c2.rolle), []).append(c2)
+    print(f"  롤 값 r≥1·r≠n 을 줄 수 있는 선형항 s 가 있는 방정식(= 기존 은행과 검산 조건 비중복) {len(feasible)}건 "
+          f"(삼차 {sum(c.degree == 2 for c in feasible)}, 사차 {sum(c.degree == 3 for c in feasible)})"
+          f"  [{time.time() - T0:.0f}s]")
+    print("  층(차수f', 정답 n, 롤 값 r)별 방정식 수:", {k: len(v) for k, v in sorted(strata.items())})
+    sk_all = set()
+    for c2 in feasible:
+        for fr in frames:
+            it_ = build_count_item(c2, fr, (c2.a * 5 + c2.b * 3) % 9 - 4)
+            if it_ is not None:
+                sk_all.add(skeleton_of(it_.question_text))
+    print(f"  용량: 방정식 {len(feasible)}건 × 발문 틀 3종 → 최대 {len(feasible) * 3}문항(방정식당 1문항으로 제한하면 {len(feasible)}), "
+          f"서로 다른 문면 골격 {len(sk_all)}종")
+    # 층별 라운드로빈으로 48건 — 정답/롤 값 분포가 한쪽으로 쏠리지 않게
+    items: list[KindedDiffItem] = []
+    cases_used: list[CountCase] = []
+    queues = [list(v) for _, v in sorted(strata.items())]
+    fi = 0
+    while len(items) < 48 and any(queues):
+        for q in queues:
+            if not q or len(items) >= 48:
+                continue
+            c2 = q.pop(0)
+            t = (c2.a * 5 + c2.b * 3 + len(items)) % 9 - 4
+            item = build_count_item(c2, frames[fi % 3], t)
+            if item is None:
+                continue
+            items.append(item)
+            cases_used.append(c2)
+            fi += 1
+    print(f"  인스턴스 {len(items)}건 생성 (삼차 {sum(c.degree == 2 for c in cases_used)}, "
+          f"사차 {sum(c.degree == 3 for c in cases_used)})  [{time.time() - T0:.0f}s]")
+    probe0 = probe_of(STD, items[0])
+    print(f"  [실측] 개수형 표본의 _critical_roots(검산 조건의 Derivative 호출에서 f'=0 근을 모은 집합) = "
+          f"{guard._critical_roots(probe0)} — 개수형 조건에는 Derivative 가 없어 항상 공집합 → "
+          "M0674 규칙이 어떤 값이든 위반으로 읽는다")
+
+    viol_asis, viol_ext = Counter(), Counter()
+    for it, case in zip(items, cases_used, strict=True):
+        f = poly_to_sympy(_mk(*(list(case.f))))  # t(상수항)는 도함수·평균변화율과 무관
+        fp = sympy.diff(f, X)
+        a, b = case.a, case.b
+        m = (f.subs(X, b) - f.subs(X, a)) / (b - a)
+        # (1) 정답: 독립 경로 — sympy.solveset 으로 f'(x) = m 의 열린구간 안 해 집합 기수
+        n_independent = len(
+            {r for r in sympy.real_roots(sympy.Poly(sympy.expand(fp - m), X)) if a < r < b}
+        )
+        check("A 정답=real_roots", n_independent == int(it.answer_text), f"{it.question_text[:40]}")
+        # (2) 저장소 검산기 verify_real_root_count (Tier1 개념형) — 정답 pass, 오답 fail 둘 다
+        v_ok = verify_real_root_count(list(it.conditions), it.answer_text)
+        wrong = str((int(it.answer_text) + 1) % 4)
+        v_bad = verify_real_root_count(list(it.conditions), wrong)
+        check("A 검산기 정답 pass", v_ok.state == "pass", str(v_ok))
+        check("A 검산기 오답 fail", v_bad.state == "fail", str(v_bad))
+        # (3) 오개념 선지 값 == 롤 절차 산출 (독립 경로: real_roots 로 f'(x) = 0 의 열린구간 안 실근)
+        r_independent = len({r for r in sympy.real_roots(sympy.Poly(fp, X)) if a < r < b})
+        mis_idx = [i for i, mid in it.distractors if mid == MID]
+        check("A 연결 선지 1개", len(mis_idx) == 1, str(it.distractors))
+        mis_val = int(it.choices[mis_idx[0]])
+        check("A 오개념 선지==Rolle 산출(real_roots)", mis_val == r_independent, f"{mis_val} vs {r_independent}")
+        check("A 오개념 선지!=정답", mis_val != int(it.answer_text))
+        check("A 선지 4개 상이", len(set(it.choices)) == 4)
+        check("A 롤 상황 실재: f(a)!=f(b)", f.subs(X, a) != f.subs(X, b))
+        check("A 롤 산출 ≥1(자기모순 아님)", mis_val >= 1)
+        # (4) 풀이 단계 연쇄가 빌드 가드(steps_of)를 통과
+        try:
+            steps_of(it)
+            ok_steps = True
+        except ValueError as exc:
+            ok_steps = False
+            print("  steps_of 실패:", exc)
+        check("A steps_of 통과", ok_steps)
+        # (5) 판정기: 기존 vs 제안
+        probe = probe_of(STD, it)
+        for v in {x.rule for x in guard.shortcut_violations(probe)}:
+            viol_asis[v] += 1
+        for v in {x.rule for x in ext_misconception_rules(probe)}:
+            viol_ext[v] += 1
+        # (6) 중복
+        check("A 문면 골격 중복 0", skeleton_of(it.question_text) not in BANK_SKELETONS)
+        check("A 검산 조건 중복 0", _cond_key(it.conditions) not in BANK_CONDS)
+        check("A answer_format 규칙", it.answer_format == answer_format_for(it.answer_text))
+    print(f"  판정기(기존) 위반 규칙별 문항 수: {dict(viol_asis)}")
+    print(f"  판정기(제안 확장) 위반 규칙별 문항 수: {dict(viol_ext)}")
+    check("A 제안 판정기 위반 0", sum(viol_ext.values()) == 0, str(dict(viol_ext)))
+    check("A 기존 판정기는 개수형 M0674 연결을 전부 거부(확장 필요의 증거)",
+          viol_asis.get("M-link-procedure", 0) == len(items))
+    dist = Counter((int(i.answer_text), int(i.choices[[k for k, m in i.distractors if m == MID][0]]))
+                   for i in items)
+    print(f"  (정답, 롤 값) 분포: {dict(dist)}")
+    print(f"  프레임별 문면 골격 수: {len({skeleton_of(i.question_text) for i in items})} / {len(items)}")
+
+    # 변별력 주입 — 같은 M0674 id 를 롤 값이 아닌 선지에 붙이면 제안 판정기·프로토 단언이 잡는가
+    caught = {"leftover": 0, "total_roots": 0, "correct": 0}
+    tried = {"leftover": 0, "total_roots": 0, "correct": 0}
+    for it, case in zip(items, cases_used, strict=True):
+        ans = int(it.answer_text)
+        mis_idx = next(i for i, mid in it.distractors if mid == MID)
+        rolle = int(it.choices[mis_idx])
+        others = [i for i, c in enumerate(it.choices) if int(c) not in (ans, rolle)]
+        injections = {
+            "leftover": others[0],  # 무관한 오답에 라벨
+            "correct": it.choices.index(it.answer_text),  # 정답에 라벨
+        }
+        total = case.degree  # 구간을 무시하고 센 f'(x)=m 의 실근 수 — 그럴듯한 다른 오개념 값
+        if str(total) in it.choices and total not in (ans, rolle):
+            injections["total_roots"] = it.choices.index(str(total))
+        for kind, idx in injections.items():
+            tried[kind] += 1
+            bad_item = dataclasses.replace(it, distractors=((idx, MID),))
+            vs = ext_misconception_rules(probe_of(STD, bad_item))
+            if any(v.rule == "M-link-procedure" for v in vs):
+                caught[kind] += 1
+    print(f"  변별력 주입(시도/검출): { {k: (tried[k], caught[k]) for k in tried} }")
+    for k in tried:
+        check(f"A 주입 '{k}' 전건 검출", tried[k] > 0 and tried[k] == caught[k])
+    return items
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 4. 틀 B — 평균값 정리의 조건을 만족시키는 함수의 개수
+# ══════════════════════════════════════════════════════════════════════════
+@dataclasses.dataclass(frozen=True)
+class Fn:
+    show: str  # 학생 표기
+    sym: str  # SymPy 표기
+    kind: str  # poly | kink_in | kink_out | smooth_abs | kink_end
+
+
+def _fn_pool(a: int, b: int) -> list[Fn]:
+    """구간 [a, b] 에 대해 꺾인점의 위치가 정해지는 함수 후보 풀."""
+    pool: list[Fn] = []
+    pool += [
+        Fn("x^3 - 3x", "x**3 - 3*x", "poly"),
+        Fn("x^3 - x^2 - 2x", "x**3 - x**2 - 2*x", "poly"),
+        Fn("2x^3 - 3x^2 + 1", "2*x**3 - 3*x**2 + 1", "poly"),
+        Fn("x^4 - 2x^2", "x**4 - 2*x**2", "poly"),
+        Fn("x^3 + 2x", "x**3 + 2*x", "poly"),
+    ]
+    pool += [
+        Fn("x|x|", "x*Abs(x)", "smooth_abs"),
+        Fn("x^2|x|", "x**2*Abs(x)", "smooth_abs"),
+        Fn("|x^2 + 1|", "Abs(x**2 + 1)", "smooth_abs"),
+    ]
+    for k in range(a + 1, b):  # 꺾인점이 열린구간 안
+        pool.append(Fn(f"|x - {k}|" if k > 0 else (f"|x + {-k}|" if k < 0 else "|x|"),
+                       f"Abs(x - {k})", "kink_in"))
+        pool.append(Fn(f"x^2 + |x - {k}|" if k > 0 else (f"x^2 + |x + {-k}|" if k < 0 else "x^2 + |x|"),
+                       f"x**2 + Abs(x - {k})", "kink_in"))
+    for k in (b + 1, b + 2, a - 1, a - 2):  # 꺾인점이 구간 밖
+        pool.append(Fn(f"|x - {k}|" if k > 0 else (f"|x + {-k}|" if k < 0 else "|x|"),
+                       f"Abs(x - {k})", "kink_out"))
+    return pool
+
+
+@functools.lru_cache(maxsize=None)
+def mvt_hypotheses_hold(sym: str, a: int, b: int) -> bool:
+    """닫힌구간 [a,b]에서 연속 ∧ 열린구간 (a,b)에서 미분가능 — 독립 구현(절댓값 꺾인점의 좌·우 미분계수).
+
+    풀의 함수는 전부 ℝ에서 연속이다(다항식·절댓값의 합성). 열린구간 안의 꺾인점(절댓값 안 식의 실근)마다
+    좌·우 미분계수를 SymPy 극한으로 비교한다. 끝점의 꺾인점은 열린구간 밖이므로 보지 않는다.
+    """
+    expr = sympy.sympify(sym, locals={"Abs": sympy.Abs})
+    corners: set = set()
+    for term in expr.atoms(sympy.Abs):
+        for r in sympy.solve(sympy.Eq(term.args[0], 0), X):
+            if r.is_real and a < r < b:
+                corners.add(r)
+    for c in corners:
+        q = (expr - expr.subs(X, c)) / (X - c)
+        left, right = sympy.limit(q, X, c, "-"), sympy.limit(q, X, c, "+")
+        if left != right:
+            return False
+    return True
+
+
+def numeric_diff_check(sym: str, a: int, b: int) -> bool:
+    """제2의 독립 경로 — 꺾인점 위치를 모르는 채 열린구간을 훑는다.
+
+    h 보다 촘촘한 격자에서 이차 차분 |f(x+h) + f(x-h) - 2f(x)|/h 를 보면, 매끄러우면 O(h)(작다)이고
+    꺾이면 좌·우 기울기 차(≥ 1)가 그대로 나온다. 꺾인점이 격자 어디에 있어도 반경 h 안에 격자점이 있다.
+    """
+    f = sympy.lambdify(X, sympy.sympify(sym, locals={"Abs": sympy.Abs}), "numpy")
+    h = 1e-3
+    xs = np.arange(a + h, b - h, h / 2)
+    second = np.abs(f(xs + h) + f(xs - h) - 2 * f(xs)) / h
+    return bool(np.max(second) < 0.5)
+
+
+def fn_values_equal(sym: str, a: int, b: int) -> bool:
+    f = sympy.sympify(sym, locals={"Abs": sympy.Abs})
+    return bool(sympy.simplify(f.subs(X, a) - f.subs(X, b)) == 0)
+
+
+def _show(expr: sympy.Expr) -> str:
+    return sympy.sstr(expr).replace("**", "^").replace("*", "")
+
+
+def _pieces(sym: str) -> list[tuple[sympy.Expr, sympy.Expr, sympy.Expr]]:
+    """절댓값이 든 식을 꺾인점 하나 기준 (왼쪽 조각, 오른쪽 조각, 꺾인점 k) 로 나눈다(풀에는 꺾인점이 하나뿐)."""
+    expr = sympy.sympify(sym, locals={"Abs": sympy.Abs})
+    abs_term = next(iter(expr.atoms(sympy.Abs)))
+    arg = abs_term.args[0]
+    k = sympy.solve(sympy.Eq(arg, 0), X)[0] if sympy.degree(arg, X) == 1 else sympy.Integer(0)
+    if sympy.degree(arg, X) == 1:
+        sign = sympy.Poly(arg, X).LC()  # arg = sign*(x - k)
+        left = expr.subs(abs_term, -arg if sign > 0 else arg)
+        right = expr.subs(abs_term, arg if sign > 0 else -arg)
+    else:
+        left = right = expr.subs(abs_term, arg)
+    return [(left, right, k)]
+
+
+def _hyp_line(lab: str, nm: str, fn: Fn, holds: bool, a: int, b: int) -> str:
+    expr = sympy.sympify(fn.sym, locals={"Abs": sympy.Abs})
+    if fn.kind == "poly":
+        return (
+            f"{lab}. {nm}(x)는 다항함수이므로 연속이고 {nm}'(x) = "
+            f"{with_i_ga(_show(sympy.diff(expr, X)))} 모든 실수에서 존재하여 조건을 만족시킨다."
+        )
+    if fn.sym == "Abs(x**2 + 1)":
+        return (
+            f"{lab}. x^2 + 1 > 0이므로 {nm}(x) = x^2 + 1이고 {nm}'(x) = {with_i_ga('2x')} 모든 실수에서 "
+            "존재하여 조건을 만족시킨다."
+        )
+    (left, right, k), = _pieces(fn.sym)
+    dl, dr = sympy.diff(left, X), sympy.diff(right, X)
+    if fn.kind == "smooth_abs":
+        return (
+            f"{lab}. {nm}'(x) = {_show(dl)} (x < {k}), {_show(dr)} (x > {k})이고 x = {k}에서 좌·우 "
+            f"미분계수가 모두 {dl.subs(X, k)}으로 같아 미분가능하므로 조건을 만족시킨다."
+        )
+    if fn.kind == "kink_in":
+        return (
+            f"{lab}. {nm}'(x) = {_show(dl)} (x < {k}), {_show(dr)} (x > {k})이고 x = {k}에서 좌·우 "
+            f"미분계수가 {dl.subs(X, k)}, {dr.subs(X, k)}{euro_ro(str(dr.subs(X, k)))} 달라 열린구간 ({a}, {b}) 안에서 "
+            "미분가능하지 않으므로 조건을 만족시키지 않는다."
+        )
+    # kink_out — 꺾인점이 구간 밖
+    inside = left if k >= b else right
+    return (
+        f"{lab}. 열린구간 ({a}, {b})에서 {nm}(x) = {_show(inside)}이므로 {nm}'(x) = "
+        f"{with_i_ga(_show(sympy.diff(inside, X)))} 존재하여 조건을 만족시킨다"
+        f"(꺾이는 점 {with_eun_neun(f'x = {k}')} 구간 밖이다)."
+    )
+
+
+def _hyp_setup(fns: tuple[Fn, ...]) -> str:
+    """풀이 단계 출발식 — 첫 함수의 한 조각(다항식)에 대한 도함수 항등식(해설 첫 줄과 같은 계산)."""
+    fn = fns[0]
+    expr = sympy.sympify(fn.sym, locals={"Abs": sympy.Abs})
+    if expr.atoms(sympy.Abs):
+        (left, right, k), = _pieces(fn.sym)
+        expr = right if sympy.diff(right, X) != 0 else left
+    return f"Derivative({sympy.sstr(expr)}, x).doit() = {sympy.sstr(sympy.diff(expr, X))}"
+
+
+def build_hyp_item(fns: tuple[Fn, Fn, Fn], a: int, b: int, variant: int) -> KindedDiffItem | None:
+    holds = [mvt_hypotheses_hold(f.sym, a, b) for f in fns]
+    n = sum(holds)
+    total = len(fns)
+    if n not in (1, 2):  # 0 과 3 은 '절댓값이면 아니다/전부 맞다' 같은 단순 규칙이 통하므로 쓰지 않는다
+        return None
+    abs_hold = [f for f, h in zip(fns, holds) if h and "|" in f.show]
+    abs_fail = [f for f, h in zip(fns, holds) if not h]
+    if not abs_hold or not abs_fail:  # '절댓값이 있으면 불가'라는 우회로를 막는다
+        return None
+    labels = ["ㄱ", "ㄴ", "ㄷ"]
+    names = ["f", "g", "h"]
+    listing = ", ".join(f"{lab}. {nm}(x) = {fn.show}" for lab, nm, fn in zip(labels, names, fns, strict=True))
+    text = (
+        f"다음 함수 중 닫힌구간 [{a}, {b}]에서 평균값 정리의 조건(닫힌구간 [{a}, {b}]에서 연속이고 "
+        f"열린구간 ({a}, {b})에서 미분가능)을 만족시키는 것의 개수는? {listing}"
+    )
+    entries = []
+    for v in (0, 1, 2, 3):
+        if v == n:
+            entries.append(ChoiceEntry(str(v), is_correct=True, sort_key=float(v)))
+        elif v == total:
+            entries.append(ChoiceEntry(str(v), MID, sort_key=float(v)))
+        else:
+            entries.append(ChoiceEntry(str(v), sort_key=float(v)))
+    choices, answer, distractors = build_choices(entries, shuffle_seed=text)
+    lines = [_hyp_line(lab, nm, fn, h, a, b) for lab, nm, fn, h in zip(labels, names, fns, holds, strict=True)]
+    expl = (
+        " ".join(lines)
+        + f" 따라서 조건을 만족시키는 함수는 {n}개이다. 조건을 확인하지 않고 세 함수에 모두 평균값 정리를 "
+        f"적용하면 {total}개로 세게 되지만, 평균값 정리는 조건이 성립할 때만 쓸 수 있다."
+    )
+    setup = _hyp_setup(fns)
+    return KindedDiffItem(
+        slot="misconception_trigger",
+        frame_id=f"B{variant}-hypothesis-count",
+        question_text=text,
+        answer_text=answer,
+        explanation=expl,
+        conditions=tuple(f.sym for f in fns) + (f"x >= {a}", f"x <= {b}"),
+        answer_map=(),
+        problem_type_code="ptype.condition-satisfaction",
+        answer_format=answer_format_of(int(answer)),
+        choices=choices,
+        distractors=distractors,
+        answer_kind="mvt_hypothesis_count",  # ← 저장소에 없는 kind (제안)
+        solution_setup=setup,
+    )
+
+
+def ext_hyp_value(probe: guard.ShortcutProbe) -> int | None:
+    """제안 B: 조건 미확인 적용 값 = 나열된 함수의 총수(= 조건 확인 없이 전부에 적용)."""
+    if probe.answer_kind != "mvt_hypothesis_count":
+        return None
+    funcs = [c for c in probe.conditions if not re.match(r"x\s*[<>]=?\s*-?\d+$", c)]
+    return len(funcs) if funcs else None
+
+
+def ext_hyp_rules(probe: guard.ShortcutProbe) -> list[guard.ShortcutViolation]:
+    """제안 판정기(틀 B): answer_kind == mvt_hypothesis_count 이면 연결 선지 == 나열된 함수 총수 여야 통과."""
+    base = guard.shortcut_violations(probe)
+    if probe.answer_kind != "mvt_hypothesis_count":
+        return base
+    linked = [
+        guard._rational(probe.choices[i]) if 0 <= i < len(probe.choices) else None
+        for i, mid in probe.distractors
+        if mid == MID
+    ]
+    rest = [v for v in base if v.rule != "M-link-procedure"]
+    total = ext_hyp_value(probe)
+    answer = guard._answer_value(probe)
+    if total is None or answer is None or answer == total or any(v is None or v != total for v in linked):
+        rest.append(guard.ShortcutViolation("M-link-procedure", f"[제안 판정] 연결 선지 {linked} != 함수 총수 {total}"))
+    return rest
+
+
+def run_frame_b() -> list[KindedDiffItem]:
+    print("\n══ 틀 B — 평균값 정리 조건을 만족시키는 함수의 개수 ══")
+    items: list[KindedDiffItem] = []
+    seen_cond: set[str] = set()
+    import itertools
+
+    combos = []
+    for a, b in ((-2, 2), (-1, 3), (0, 4), (-3, 1), (-2, 3), (0, 3), (-3, 2), (-1, 2)):
+        pool = _fn_pool(a, b)
+        for trio in itertools.combinations(pool, 3):
+            combos.append((trio, a, b))
+    print(f"  후보 조합 {len(combos)}건 (구간 8종)")
+    valid = 0
+    skel: set[str] = set()
+    for trio, a, b in combos:
+        holds = [mvt_hypotheses_hold(f.sym, a, b) for f in trio]
+        n_ = sum(holds)
+        if n_ in (1, 2) and any(h and "|" in f.show for f, h in zip(trio, holds, strict=True)) \
+                and any((not h) for h in holds):
+            valid += 1
+            skel.add(skeleton_of(", ".join(f.show for f in trio) + f"[{a},{b}]"))
+    print(f"  유효 조합(조건 만족 1~2개·절댓값 함수 중 만족/불만족 둘 다 포함): {valid}건 — 순서 3! 배치를 곱하면 최대 {valid * 6}문항 "
+          f"(함수 집합 기준 서로 다른 문면 골격 {len(skel)}종)")
+    for trio, a, b in seeded_order("p3-44:0206:B", combos):
+        # 같은 3함수 집합이 다른 순서/구간으로 반복되지 않게 구간+함수 집합 키
+        key = f"{a},{b}|" + "|".join(sorted(f.sym for f in trio))
+        if key in seen_cond:
+            continue
+        # 순서는 시드 셔플
+        order = seeded_order(key, list(trio))
+        item = build_hyp_item(tuple(order), a, b, variant=len(items) % 2 + 1)  # type: ignore[arg-type]
+        if item is None:
+            continue
+        seen_cond.add(key)
+        items.append(item)
+        if len(items) >= 40:
+            break
+    print(f"  인스턴스 {len(items)}건 생성  [{time.time() - T0:.0f}s]")
+    viol_asis, viol_ext, viol_steps = Counter(), Counter(), 0
+    agree_repo = disagree_repo = 0
+    for it in items:
+        a = int(it.conditions[-2].split(">=")[1])
+        b = int(it.conditions[-1].split("<=")[1])
+        fns = it.conditions[:-2]
+        # 정답: 독립 경로 2개(좌·우 극한 / 수치 차분)가 일치해야 한다
+        sym_ok = [mvt_hypotheses_hold(s, a, b) for s in fns]
+        num_ok = [numeric_diff_check(s, a, b) for s in fns]
+        check("B 극한-수치 두 경로 일치", sym_ok == num_ok, f"{fns} {sym_ok} {num_ok}")
+        check("B 정답=조건 만족 함수 수", int(it.answer_text) == sum(sym_ok))
+        # 저장소 verify_is_differentiable (ℝ 전체 기준)과 교차: 꺾인점이 구간 안인 함수는 ℝ 기준도 '미분 불가'
+        for s, h in zip(fns, sym_ok, strict=True):
+            if h:
+                continue  # 만족하는 함수는 ℝ 기준과 의미가 다를 수 있다(구간 밖 꺾인점) — 아래에서 따로
+            r = verify_is_differentiable(s, "0")
+            if r.state == "pass":
+                agree_repo += 1
+            else:
+                disagree_repo += 1
+        mis = [i for i, m in it.distractors if m == MID]
+        check("B 연결 선지 1개", len(mis) == 1)
+        check("B 연결 선지==총수(조건 미확인)", int(it.choices[mis[0]]) == len(fns))
+        check("B 연결 선지!=정답", it.choices[mis[0]] != it.answer_text)
+        check("B 선지 4개 상이", len(set(it.choices)) == 4)
+        check("B 문면 골격 중복 0", skeleton_of(it.question_text) not in BANK_SKELETONS)
+        check("B 검산 조건 중복 0", _cond_key(it.conditions) not in BANK_CONDS)
+        probe = probe_of(STD, it)
+        for v in {x.rule for x in guard.shortcut_violations(probe)}:
+            viol_asis[v] += 1
+        for v in {x.rule for x in ext_hyp_rules(probe)}:
+            viol_ext[v] += 1
+        try:
+            steps_of(it)
+        except ValueError as exc:
+            viol_steps += 1
+            print("  steps_of 실패:", exc)
+    print(f"  판정기(기존) 위반 규칙별 문항 수: {dict(viol_asis)}")
+    print(f"  판정기(제안 확장 + kind 신설 가정) 위반 규칙별 문항 수: {dict(viol_ext)}")
+    check("B 제안 판정기 위반 0", sum(viol_ext.values()) == 0, str(dict(viol_ext)))
+    print(f"  steps_of(풀이 단계 도출) 실패 문항: {viol_steps}/{len(items)}")
+    check("B steps_of 통과(solution_setup 지정)", viol_steps == 0)
+    print(f"  저장소 verify_is_differentiable 교차(꺾인점이 구간 안인 '불만족' 함수): 일치 {agree_repo}, 불일치 {disagree_repo}")
+    check("B 저장소 is_differentiable 교차 불일치 0", disagree_repo == 0)
+    # 변별력 주입: 총수 아닌 값에 M0674
+    caught = tried = 0
+    for it in items:
+        ans = int(it.answer_text)
+        mis = next(i for i, m in it.distractors if m == MID)
+        other = next(i for i, c in enumerate(it.choices) if int(c) not in (ans, int(it.choices[mis])))
+        bad_item = dataclasses.replace(it, distractors=((other, MID),))
+        tried += 1
+        if any(v.rule == "M-link-procedure" for v in ext_hyp_rules(probe_of(STD, bad_item))):
+            caught += 1
+    print(f"  변별력 주입(무관 선지에 M0674 라벨) 시도/검출: {tried}/{caught}")
+    check("B 주입 전건 검출", tried > 0 and tried == caught)
+    # 골격 수
+    print(f"  서로 다른 문면 골격 수: {len({skeleton_of(i.question_text) for i in items})} / {len(items)}")
+    dist = Counter(int(i.answer_text) for i in items)
+    print(f"  정답 분포: {dict(dist)}")
+    return items
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 5. 틀 K — 단일 함수 꺾인점 "c의 개수" (출발 가설의 실측)
+# ══════════════════════════════════════════════════════════════════════════
+def run_frame_k() -> None:
+    print("\n══ 틀 K — 절댓값 꺾인점 함수의 'f′(c)=평균변화율인 c의 개수' (출발 가설 실측) ══")
+    # f(x) = P(x) + s|x - k| (P 삼차). 구간 [a,b] 안에 꺾인점 k.
+    rows = []
+    for lead in (1, -1):
+        for p in range(-3, 4):
+            for q in range(-6, 7):
+                for s in (1, 2, 3, -1, -2):
+                    for k in (-1, 0, 1, 2):
+                        for a, b in ((-3, 3), (-2, 3), (-2, 4), (-3, 2), (-1, 3)):
+                            if not a < k < b:
+                                continue
+                            P = lead * X**3 + p * X**2 + q * X
+                            f = P + s * sympy.Abs(X - k)
+                            m = sympy.Rational(f.subs(X, b) - f.subs(X, a), b - a)
+                            if m == 0:
+                                continue
+                            # 조각별 도함수 방정식
+                            left = sympy.Poly(sympy.diff(P, X) - s - m, X)  # x<k: |x-k| = k-x → 도함수 -s
+                            right = sympy.Poly(sympy.diff(P, X) + s - m, X)  # x>k
+                            cl = [r for r in sympy.real_roots(left) if a < r < k]
+                            cr = [r for r in sympy.real_roots(right) if k < r < b]
+                            true = len(set(cl)) + len(set(cr))
+                            # 롤 혼동: f'(x)=0 을 조각별로
+                            l0 = sympy.Poly(sympy.diff(P, X) - s, X)
+                            r0 = sympy.Poly(sympy.diff(P, X) + s, X)
+                            rolle = len({r for r in sympy.real_roots(l0) if a < r < k}) + len(
+                                {r for r in sympy.real_roots(r0) if k < r < b})
+                            rows.append((true, rolle, f, a, b, k, left.as_expr(), right.as_expr()))
+    print(f"  후보 {len(rows)}건. 참 개수 분포: {dict(Counter(r[0] for r in rows))}")
+    print(f"  그중 참 개수 0 이고 롤 값 ≥1 인 문항: {sum(1 for r in rows if r[0] == 0 and r[1] >= 1)}건")
+    # (a) 출발 가설 '조건 안 보고 적용하면 1' — 개수형에서 1 은 계산 산출이 아니다
+    zero = [r for r in rows if r[0] == 0][:1]
+    if zero:
+        t, ro, f, a, b, k = zero[0][:6]
+        print(f"  예) f(x) = {f}, [{a}, {b}] : 참 개수 {t}, 롤 값 {ro}. '평균값 정리가 존재를 보장하므로 1' 은 "
+              "방정식을 푼 값이 아니라 정리의 결론을 읽은 값이다 → 절차의 산출이 아니라 주장.")
+    # (b) 단일 다항식 검산(verify_real_root_count)으로 조각함수를 담을 수 있는가 — 곱 방정식 인코딩 반례
+    tried = 0
+    outcome = Counter()
+    ex = None
+    # 단일 다항식 검산(verify_real_root_count)의 유일한 인코딩 = 두 조각 방정식의 곱 + 구간 범위.
+    # 서로 다른 (조각 방정식, 구간, 꺾인점) 을 전수에서 균등 추출해 그 인코딩이 참 개수를 가리는지 본다.
+    uniq: dict[tuple, tuple] = {}
+    for true, rolle, f, a, b, k, left, right in rows:
+        uniq.setdefault((sympy.srepr(left), sympy.srepr(right), a, b, k), (true, f, a, b, k, left, right))
+    pool_k = list(uniq.values())
+    print(f"  서로 다른 조각 방정식 조합 {len(pool_k)}건 (선형항이 상쇄돼 f 의 수보다 적다)")
+    step = max(1, len(pool_k) // 300)
+    for true, f, a, b, k, left, right in pool_k[::step]:
+        prod = sympy.expand(left * right)
+        cond = [sympy.sstr(prod) + " = 0", f"x > {a}", f"x < {b}"]
+        states = {n_: verify_real_root_count(cond, str(n_)).state for n_ in range(0, 7)}
+        accepted = [n_ for n_, st in states.items() if st == "pass"]
+        tried += 1
+        if not accepted:
+            outcome["어떤 주장도 pass 못함(unverifiable/실패)"] += 1
+        elif accepted == [true]:
+            outcome["참 개수만 pass(인코딩이 우연히 정합)"] += 1
+        else:
+            outcome["참 개수 아님이 pass (거짓 통과)" if true not in accepted else "참 개수 pass + 다른 값도 pass"] += 1
+            if ex is None and true not in accepted:
+                ex = (str(f), f"[{a},{b}] 참 {true}", f"pass한 값 {accepted}")
+    print(f"  곱 방정식 인코딩 시도 {tried}건 결과: {dict(outcome)} 예: {ex}")
+    check("K 곱 인코딩은 거짓 통과를 낸다(단일 다항식 검산으로 조각함수 개수를 담을 수 없다)",
+          outcome["참 개수 아님이 pass (거짓 통과)"] > 0)
+    check("K 곱 인코딩이 참 개수만 통과시키는 비율은 100% 가 아니다", outcome["참 개수만 pass(인코딩이 우연히 정합)"] < tried)
+    # (c) 판정기: 꺾인점 함수 개수형 표본의 반응
+    f = sympy.Abs(X)  # 대표
+    probe = guard.ShortcutProbe(
+        standard_code=STD,
+        question_text="함수 f(x) = x^3 - 3x + 2|x - 1|에 대하여 열린구간 (-2, 3)에서 f'(c) = (f(3) - f(-2))/(3 - (-2))를 만족시키는 실수 c의 개수는?",
+        answer="2", explanation="f'(x)는 x < 1 에서 3x^2 - 5, x > 1 에서 3x^2 - 1 이다.",
+        choices=("0", "1", "2", "3"), conditions=("3*x**2 - 1 = 0", "x > 1", "x < 3"),
+        answer_kind="real_root_count", answer_format="자연수", distractors=((1, MID),),
+    )
+    print("  꺾인점 개수형 표본의 판정기(기존) 반응:", [v.rule for v in guard.shortcut_violations(probe)])
+    print("  visible_polynomials(발문) =", guard.visible_polynomials(probe.question_text))
+
+
+def run_frame_j() -> None:
+    """판정형 비교 — 선지가 함수식인 '평균값 정리의 결론이 성립하지 않는 함수는?' 형(distractor_rule 문면에 가장 가깝다)."""
+    print("\n══ 판정형(선지가 함수) — 비교 실측 ══")
+    a, b = -1, 2
+    cands = [("x^3 - 3x", "x**3 - 3*x"), ("|x|", "Abs(x)"), ("|x - 3|", "Abs(x - 3)"), ("x^2 + |x - 1|", "x**2 + Abs(x - 1)")]
+    # 결론(c 존재) 성립 여부를 SymPy 로 직접 판정 — 조각별 도함수 방정식
+    def conclusion_holds(sym: str) -> bool:
+        expr = sympy.sympify(sym, locals={"Abs": sympy.Abs})
+        m = sympy.Rational(expr.subs(X, b) - expr.subs(X, a), b - a)
+        if not expr.atoms(sympy.Abs):
+            return bool(sympy.real_roots(sympy.Poly(sympy.diff(expr, X) - m, X)))
+        (left, right, k), = _pieces(sym)
+        hits = [r for r in sympy.real_roots(sympy.Poly(sympy.diff(left, X) - m, X)) if a < r < min(k, b)] if k > a else []
+        hits += [r for r in sympy.real_roots(sympy.Poly(sympy.diff(right, X) - m, X)) if max(k, a) < r < b] if k < b else []
+        return bool(hits)
+    holds = [conclusion_holds(sym) for _, sym in cands]
+    print(f"  구간 [{a}, {b}] 에서 결론 성립: " + ", ".join(f"{show}={h}" for (show, _), h in zip(cands, holds, strict=True)))
+    probe = guard.ShortcutProbe(
+        standard_code=STD,
+        question_text=f"닫힌구간 [{a}, {b}]에서 f'(c) = (f({b}) - f({a}))/({b} - ({a}))를 만족시키는 c가 열린구간 ({a}, {b})에 존재하지 않는 함수 f(x)는?",
+        answer="|x|", explanation="f(x) = |x|이면 f'(x)는 -1 또는 1뿐이고 평균변화율은 1/3이라 같은 c가 없다.",
+        choices=tuple(show for show, _ in cands), conditions=("Abs(x)",), answer_format="실수", distractors=((3, MID),),
+    )
+    print("  판정기(기존) 반응:", [v.rule for v in guard.shortcut_violations(probe)],
+          "— 선지가 함수식이면 _rational() 이 None 이라 연결 선지는 항상 위반(규칙은 숫자 값만 읽는다)")
+    check("J 선지가 함수식이면 기존 판정기가 M0674 연결을 거부", any(v.rule == "M-link-procedure" for v in guard.shortcut_violations(probe)))
+
+
+def run_regression_existing() -> None:
+    """제안 확장이 기존 은행의 M0674 연결 문항(c값형)에 영향을 주지 않는가 — 기존 판정과 제안 판정의 위반 규칙 집합 비교."""
+    print("\n══ 회귀: 기존 은행의 M0674 연결 문항에 제안 확장 적용 ══")
+    rows = [r for r in BANKS["problem_bank_p3_calculus1_diff_v0"]
+            if any(d.get("misconception_id") == MID for d in (r.get("distractor_map") or []))]
+    same = 0
+    for r in rows:
+        probe = guard.probe_from_record(r)
+        a_ = sorted({v.rule for v in guard.shortcut_violations(probe)})
+        b_ = sorted({v.rule for v in ext_misconception_rules(probe)})
+        same += a_ == b_
+    print(f"  M0674 연결 문항 {len(rows)}건 중 기존 판정과 제안 판정이 같은 규칙 집합을 낸 문항 {same}건")
+    check("회귀: 기존 M0674 문항 판정 불변", rows and same == len(rows))
+
+
+def run_generator_e2e(b_items) -> None:
+    """실제 `P3DiffSlotGenerator` 하위 클래스로 틀 A·B 를 끝까지 흘려 본다 — 기존 판정기에서 빌드가 멈추는지,
+    제안 판정기로 바꾸면 12건이 서고 수용 게이트(`evaluate_equivalent_candidate`)가 무엇을 내는지.
+    """
+    from whymath_backend.l3.equivalent import p3_diff_skeleton_base as base
+    from whymath_backend.l3.equivalent.acceptance import evaluate_equivalent_candidate
+    from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import with_item_kinds
+    from whymath_backend.l3.equivalent.p3_diff_skeleton_base import Frame, P3DiffSlotGenerator, round_robin_items
+
+    print("\n══ 종단: P3DiffSlotGenerator 하위 클래스 + 수용 게이트 ══")
+    stems = ["A1-interval-count", "A2-mvt-conclusion-count", "A3-parallel-tangent-count"]
+    pool = [c for c in A_FEASIBLE if c.n >= 2]  # 권고 구성: '존재 보장 ⇒ 1' 추측이 통하는 n=1 은 뺀다
+
+    def mk_frame(fid: str) -> Frame:
+        def build(p):
+            c = p[0]
+            return build_count_item(c, fid, (c.a * 5 + c.b * 3) % 9 - 4)
+
+        return Frame(fid, tuple((c,) for c in seeded_order("e2e:" + fid, pool)), build)
+
+    class ProtoCountGen(P3DiffSlotGenerator):
+        standard_code = STD
+        concept_src_id = "H:12미적Ⅰ02-06"
+        unit_code = "P3-CALC1-DIFF-MEAN-VALUE-THEOREM"
+        slug_prefix = "wm-p3-proto-mvt"
+        slot_difficulty = {k: 3.0 for k in base.SLOT_IDS}
+        slot_count = 12
+        slots = ("misconception_trigger",)
+
+        @classmethod
+        def _slot_items(cls, slot, claimed):
+            return round_robin_items([mk_frame(f) for f in stems], 12, claimed=claimed, standard_code=cls.standard_code)
+
+        def _assemble(self, spec, item):
+            return with_item_kinds(super()._assemble(spec, item), item)
+
+    class ProtoHypGen(P3DiffSlotGenerator):
+        standard_code = STD
+        concept_src_id = "H:12미적Ⅰ02-06"
+        unit_code = "P3-CALC1-DIFF-MEAN-VALUE-THEOREM"
+        slug_prefix = "wm-p3-proto-mvt-b"
+        slot_difficulty = {k: 3.0 for k in base.SLOT_IDS}
+        slot_count = 12
+        slots = ("misconception_trigger",)
+
+        @classmethod
+        def _slot_items(cls, slot, claimed):
+            return list(b_items[:12])
+
+        def _assemble(self, spec, item):
+            return with_item_kinds(super()._assemble(spec, item), item)
+
+    def gate_all(items, label, expect_all=True):
+        """run_frame_a/b 가 만든 전 문항을 수용 게이트에 통과시킨다 — 해설 산술·위생·LaTeX 까지 저장소 게이트가 판정."""
+        class StaticGen(P3DiffSlotGenerator):
+            standard_code = STD
+            concept_src_id = "H:12미적Ⅰ02-06"
+            unit_code = "P3-CALC1-DIFF-MEAN-VALUE-THEOREM"
+            slug_prefix = "wm-p3-proto-static"
+            slot_difficulty = {k: 3.0 for k in base.SLOT_IDS}
+            slot_count = 12
+            slots = ("misconception_trigger",)
+
+            @classmethod
+            def _slot_items(cls, slot, claimed):
+                return list(items)
+
+            def _assemble(self, spec, item):
+                return with_item_kinds(super()._assemble(spec, item), item)
+
+        gen = StaticGen(slot="misconception_trigger")
+        spec = StaticGen.spec_for("misconception_trigger")
+        n = acc = 0
+        reasons = Counter()
+        while (cand := gen.generate(spec)) is not None:
+            n += 1
+            v = evaluate_equivalent_candidate(
+                spec, cand.problem, provenance=cand.provenance, conditions=cand.conditions,
+                answer_map=cand.answer_map, solution_steps=cand.solution_steps,
+                answer_kind=getattr(cand, "answer_kind", None),
+            )
+            acc += bool(v.accepted)
+            for r_ in v.reasons:
+                reasons[r_[:110]] += 1
+        print(f"  [{label}] 전수 수용 게이트: 후보 {n}건 중 accepted {acc}건" + (f" · 사유 {dict(reasons)}" if reasons else ""))
+        return n, acc
+
+    def gate(gen_cls, label):
+        gen = gen_cls(slot="misconception_trigger")
+        spec = gen_cls.spec_for("misconception_trigger")
+        verdicts = Counter()
+        accepted = 0
+        n = 0
+        while (cand := gen.generate(spec)) is not None:
+            n += 1
+            v = evaluate_equivalent_candidate(
+                spec, cand.problem, provenance=cand.provenance, conditions=cand.conditions,
+                answer_map=cand.answer_map, solution_steps=cand.solution_steps,
+                answer_kind=getattr(cand, "answer_kind", None),
+            )
+            accepted += bool(v.accepted)
+            verdicts[(v.verification, v.equivalence)] += 1
+        print(f"  [{label}] 후보 {n}건 · 게이트 accepted {accepted}건 · (정확성, 동등성) 분포 {dict(verdicts)}")
+        return n, accepted
+
+    # (1) 기존 판정기 — 빌드가 멈춰야 한다
+    for cls, label in ((ProtoCountGen, "A"), (ProtoHypGen, "B")):
+        try:
+            cls.items("misconception_trigger")
+            print(f"  [{label}] 기존 판정기로 빌드 통과(?)")
+            check(f"e2e {label}: 기존 판정기에서 빌드가 멈춘다", False)
+        except ValueError as exc:
+            msg = str(exc)
+            print(f"  [{label}] 기존 판정기로 빌드 → ValueError: {msg[:170]}...")
+            check(f"e2e {label}: 기존 판정기에서 빌드가 멈춘다(M-link-procedure)", "M-link-procedure" in msg)
+    # (2) 제안 판정기로 교체(프로세스 안 monkeypatch — 저장소 파일은 그대로)
+    original = base.shortcut_violations
+    try:
+        base.shortcut_violations = lambda probe: (
+            ext_hyp_rules(probe) if probe.answer_kind == "mvt_hypothesis_count" else ext_misconception_rules(probe)
+        )
+        items_a = ProtoCountGen.items("misconception_trigger")
+        print(f"  [A] 제안 판정기로 빌드: {len(items_a)}건 · 오개념 연결 집합 {ProtoCountGen.target_misconception_ids('misconception_trigger')}")
+        check("e2e A: 12건·연결 집합 {M0674}", len(items_a) == 12 and ProtoCountGen.target_misconception_ids("misconception_trigger") == frozenset({MID}))
+        gate(ProtoCountGen, "A 수용 게이트(12건 생성기 경로)")
+        n_all, acc_all = gate_all(A_ITEMS_ALL, "A 48건")
+        check("e2e A: 48건 전부 수용 게이트 accepted", n_all == acc_all == len(A_ITEMS_ALL))
+        items_b = ProtoHypGen.items("misconception_trigger")
+        print(f"  [B] 제안 판정기로 빌드: {len(items_b)}건")
+        check("e2e B: 12건", len(items_b) == 12)
+        gate(ProtoHypGen, "B 수용 게이트(answer_kind 미등록 상태)")
+    finally:
+        base.shortcut_violations = original
+
+
+def run_chain_closure(a_items, b_items) -> None:
+    """실제 계측기(`phase3_coverage.evaluate`)에 '승인됐다고 가정한' 합성 문항을 얹어 사슬이 닫히는지 본다.
+
+    대조군: 같은 문항의 문제유형을 solve-for-unknown(스킬 비중첩)으로 바꾸면 닫히지 않아야 한다 —
+    닫히는 원인이 오답 보기만이 아니라 '스킬이 겹치는 유형'임을 가른다. 이것은 가정(승인)을 둔 시뮬레이션이다:
+    실제 승인은 S5 감사 몫이다.
+    """
+    from whymath_backend.l1.standards import phase3_coverage as cov
+    from whymath_backend.l1.standards.phase3_scope import default_spec_path, load_reference_index, load_scope_spec
+
+    spec = load_scope_spec(default_spec_path())
+    index = load_reference_index(spec)
+    corpus = cov.load_corpus(spec)
+
+    def refs(items, ptype_override=None):
+        out = []
+        for i, it in enumerate(items):
+            out.append(
+                cov.ProblemRef(
+                    problem_id=f"synthetic-{it.frame_id}-{i}",
+                    primary_src_ids=frozenset({"H:12미적Ⅰ02-06"}),
+                    review_status="approved",
+                    has_explanation=True,
+                    has_steps=True,
+                    problem_type_codes=(ptype_override or it.problem_type_code,),
+                    distractor_ids=tuple(m for _, m in it.distractors),
+                )
+            )
+        return tuple(out)
+
+    def conn(extra):
+        c2 = dataclasses.replace(corpus, problems=corpus.problems + extra)
+        rep = cov.evaluate(spec, index, c2)
+        m = rep.metric("graph_connectivity_coverage")
+        return m.met_count, m.population, sorted(u.subject for u in m.unmet)
+
+    print("\n══ 사슬 닫힘 시뮬레이션 (실제 phase3_coverage.evaluate · 합성 문항을 approved 로 가정) ══")
+    base = conn(())
+    print("  기준선        :", base[:2], "미충족", base[2])
+    for label, extra in (
+        ("A만(count-solutions)", refs(a_items)),
+        ("B만(condition-satisfaction)", refs(b_items)),
+        ("A+B", refs(a_items) + refs(b_items)),
+        ("대조군: A를 solve-for-unknown 으로", refs(a_items, "ptype.solve-for-unknown")),
+        ("대조군: A를 evaluate-expression 으로", refs(a_items, "ptype.evaluate-expression")),
+    ):
+        r = conn(extra)
+        print(f"  {label:<34}:", r[:2], "미충족", r[2])
+    a_ok = conn(refs(a_items))[0] - base[0]
+    b_ok = conn(refs(b_items))[0] - base[0]
+    ctrl = conn(refs(a_items, "ptype.solve-for-unknown"))[0] - base[0]
+    check("사슬: A 만으로 02-06 이 닫힌다", a_ok == 1)
+    check("사슬: B 만으로 02-06 이 닫힌다", b_ok == 1)
+    check("사슬: 대조군(스킬 비중첩 유형)은 안 닫힌다", ctrl == 0)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+def main() -> int:
+    print(f"기존 은행 02-06 문항 {BANK_CONCEPT_COUNT}건 · 문면 골격 {len(BANK_SKELETONS)}종 · 검산 조건 {len(BANK_CONDS)}종 적재")
+    a_items = run_frame_a()
+    A_ITEMS_ALL.extend(a_items)
+    b_items = run_frame_b()
+    run_frame_k()
+    run_frame_j()
+    run_regression_existing()
+    run_generator_e2e(b_items)
+    run_chain_closure(a_items, b_items)
+    print("\n── 샘플 ──")
+    for it in (a_items[0], a_items[len(a_items) // 2], b_items[0]):
+        print(f"[{it.frame_id}] {it.question_text}\n   선지 {it.choices} 정답 {it.answer_text} 연결 {it.distractors}\n   조건 {it.conditions}\n   해설 {it.explanation}\n")
+    failed = [c for c in CHECKS if not c[1]]
+    by = Counter(c[0] for c in CHECKS)
+    print(f"\n단언 {len(CHECKS)}건 중 실패 {len(failed)}건 · 종류 {len(by)}")
+    for c in failed[:10]:
+        print("  실패:", c)
+    print(f"소요 {time.time() - T0:.0f}s")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

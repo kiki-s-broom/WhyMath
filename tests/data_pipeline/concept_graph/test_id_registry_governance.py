@@ -3,7 +3,7 @@
 정본: docs/standards/part9_id_policy_review.md(P2d ①③) + docs/data/concept_graph.md §2.4.
 
 이 테스트는 P2d 재ID(math.<area>.<slug>)의 하드게이트를 자동화한다:
-  - registry(ids.yaml)와 graph.json 노드가 437 1:1(고아 0).
+  - registry(ids.yaml)와 graph.json 노드가 전량 1:1(고아 0 · 건수는 사실 파일).
   - canonical에 학년/트랙 토큰·NCIC 코드조각이 없다(교육과정 독립 — Part 9 ①).
   - area가 학년 독립([중]기하·[고]기하 → geometry).
   - 별칭에 교육과정축 코드·옛 UC·src_id 3중 보존, migrations에 P2a·P2d 이벤트.
@@ -12,7 +12,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 import pytest
 from data_pipeline.concept_graph.idmap import build_id_map
@@ -28,6 +30,14 @@ from data_pipeline.concept_graph.registry import (
 )
 from data_pipeline.concept_graph.transform import transform_dataset
 from data_pipeline.concept_graph.validate import validate_registry
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 # 학년/트랙 토큰(교육과정 배치) — canonical에 등장 금지.
 _GRADE_TOKEN = re.compile(r"(?i)\b(elem|mid|high|rt|oly)\b")
@@ -45,12 +55,12 @@ def _rec(src_id: str, name_ko: str, category: str, **over: object) -> dict[str, 
 
 
 class TestRegistryGraphParity:
-    def test_registry_matches_graph_437(
+    def test_registry_matches_graph(
         self,
         concept_records: list[dict[str, object]],
         edge_records: list[dict[str, object]],
     ) -> None:
-        """registry canonical_id 집합 == graph concept_id 집합(437 1:1·고아 0)."""
+        """registry canonical_id 집합 == graph concept_id 집합(전량 1:1·고아 0)."""
         result = transform_dataset(concept_records=concept_records, edge_records=edge_records)
         registry = build_registry(concept_records)
         report = validate_registry(registry, result.concepts)
@@ -59,7 +69,7 @@ class TestRegistryGraphParity:
         reg_ids = {e["canonical_id"] for e in registry["concepts"]}
         graph_ids = {c.concept_id for c in result.concepts}
         assert reg_ids == graph_ids
-        assert len(reg_ids) == 437
+        assert len(reg_ids) == _FACTS["concept_graph.concepts"]
 
     def test_every_canonical_matches_regex(self, concept_records: list[dict[str, object]]) -> None:
         """모든 canonical_id가 신 규약(math.<area>.<slug>) 통과."""
@@ -196,11 +206,13 @@ class TestCollisionSuffix:
     def test_real_corpus_22_collision_groups(
         self, concept_records: list[dict[str, object]]
     ) -> None:
-        """실데이터 437 → 충돌 접미(-N)가 붙은 ID가 정확히 22건(기본↔공통 22군)."""
+        """실데이터 전량 → 충돌 접미(-N)가 붙은 ID가 정확히 22건(기본↔공통 22군)."""
         id_map = build_id_map(concept_records)
         suffixed = [cid for cid in id_map.values() if re.search(r"-\d+$", cid)]
         assert len(suffixed) == 22
-        assert len(set(id_map.values())) == 437  # 충돌 해소 후 전량 유일
+        assert (
+            len(set(id_map.values())) == _FACTS["concept_graph.concepts"]
+        )  # 충돌 해소 후 전량 유일
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-200
+title: "터미널 검수 — 사유 없는 메모·2000자 초과 입력 시 크래시를 쓰기 전 거부로"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 터미널 검수 `harness/review_session`이 수정승인(e)에서 사유를 비우고 메모만 넣으면 `ReviewTimerEvent` 스키마(사유 없는 메모 금지·메모 2000자 상한)의 `ValidationError`로 크래시하고 이벤트 파일에 started만 남는 기존 결함을 고친다 — 쓰기 전에 같은 규칙으로 거부하고 같은 항목을 다시 묻는다(검수 창 `review_session_gui.validate_submission`과 규칙 정본을 공유해 두 곳이 갈라지지 않게) ② 거부 시 무엇이 잘못됐는지 한국어로 출력하고 기록 0건 ③ 반례 테스트: 메모만 있는 수정승인 거부·2001자 거부·2000자 대조군·공백 메모 대조군, 각 가드 제거 뮤테이션 RED ④ 정상 입력의 터미널 기록은 바이트 동일(기존 동일성 테스트 유지)"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/review_session.py
+  - src/backend/whymath_backend/harness/review_session_gui.py
+  - "tests/backend/harness/test_review_session*.py"
+session: null
+notes: "출처: PR #1763(EOS-199) 독립 리뷰 1·2차가 main 사본에서 재현한 기존 결함. 검수 창은 같은 입력을 쓰기 전에 거부하므로 해당 없음 — 터미널 [J]로 검수할 때만 밟는다. 크래시 시 그 항목의 started만 남아 재개 시 다시 나오지만 HIT 표본에 열린 started가 섞인다."
+updated: 2026-10-28

@@ -174,15 +174,19 @@ def test_models_endpoint_reports_status_without_raising() -> None:
 
 
 #: 허용된 `/v1/admin/*` 쓰기 라우트 — **닫힌 목록**이다. 쓰기가 늘면 이 목록을 의식적으로 고쳐야 한다.
-#: ADMIN-07: 검수 상태 전이 1종 / P3-12: 관리자 CMS 12종(개념 버전 워크플로우 3 + 허용 목록
-#: 제자리 편집 PATCH 7 + 검수 표지 POST 2). `/v1/admin/cms/*`를 접두로 통째 허용하지 않는다 —
+#: ADMIN-07: 검수 상태 전이 1종 + ADMIN-18: 검수 착수(started 타이머) 1종 / P3-12: 관리자 CMS 12종(개념 버전 워크플로우 3 + 허용 목록
+#: 제자리 편집 PATCH 7 + 검수 표지 POST 2) / P3-26: 개념 그래프 쓰기 5종 / EOS-194: 문항 판 발행 호출
+#: 표면 2종(초안 생성 + 전이 — 롤백은 없다, EOS-196 소유). `/v1/admin/cms/*`를 접두로 통째 허용하지 않는다 —
 #: 접두 허용은 CMS에 라우트가 하나 더 붙어도 침묵하는 열린 목록이다.
 _ALLOWED_ADMIN_WRITES: frozenset[tuple[str, str]] = frozenset(
     {
         ("POST", "/v1/admin/review-queue/items/{problem_id}/transitions"),
+        ("POST", "/v1/admin/review-queue/items/{problem_id}/review-sessions"),
         ("POST", "/v1/admin/cms/concepts/{concept_id}/drafts"),
         ("POST", "/v1/admin/cms/versions/{version_id}/transitions"),
         ("POST", "/v1/admin/cms/concepts/{concept_id}/rollback"),
+        ("POST", "/v1/admin/cms/problems/{problem_id}/drafts"),
+        ("POST", "/v1/admin/cms/problem-versions/{version_id}/transitions"),
         ("PATCH", "/v1/admin/cms/curriculum_version/items/{pk}"),
         ("PATCH", "/v1/admin/cms/problem/items/{pk}"),
         ("PATCH", "/v1/admin/cms/problem_step/items/{pk}"),
@@ -192,6 +196,12 @@ _ALLOWED_ADMIN_WRITES: frozenset[tuple[str, str]] = frozenset(
         ("PATCH", "/v1/admin/cms/hint/items/{pk}"),
         ("POST", "/v1/admin/cms/strategy_node/items/{pk}/review"),
         ("POST", "/v1/admin/cms/concept_content/items/{pk}/review"),
+        # P3-26 개념 그래프 쓰기(`api/admin_cms_graph.py`) — 신규 개념 제안 2 + 개념 삭제 1 + 선수 관계 2.
+        ("POST", "/v1/admin/cms/concept-proposals"),
+        ("POST", "/v1/admin/cms/concept-proposals/{code}/drafts"),
+        ("DELETE", "/v1/admin/cms/concepts/{concept_id}"),
+        ("POST", "/v1/admin/cms/edges"),
+        ("DELETE", "/v1/admin/cms/edges/{edge_id}"),
     }
 )
 

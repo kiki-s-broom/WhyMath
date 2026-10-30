@@ -1,0 +1,100 @@
+Phase 3 Coverage 계측 — phase3-scope-v1 (동결 2026-10-02 · 게이트 G-p301-scope-choice)
+읽은 문항 행 14742건
+
+지표                          값                목표      판정
+Content Coverage Rate         10/10 = 100.0%      ≥95%      충족
+Curriculum Coverage           10/10 = 100.0%      ≥98%      충족
+Concept Completeness          0/10 = 0.0%        ≥95%      미달
+Graph Connectivity Coverage   4/10 = 40.0%       ≥95%      미달
+공급 가능 커버리지                    0/10 = 0.0%        —         목표 없음
+Concept Slot Coverage(6슬롯)    60/60 = 100.0%      —         목표 없음
+
+문제 메타데이터 7필드 (적격 문항 1121건)
+  difficulty               present 1121 · missing 0 · unknown 0
+  skill                    present 1121 · missing 0 · unknown 0
+  concept                  present 1121 · missing 0 · unknown 0
+  solution                 present 1121 · missing 0 · unknown 0
+  answer                   present 1121 · missing 0 · unknown 0
+  misconception_signature  present 1121 · missing 0 · unknown 0
+  hint_strategy            present 0 · missing 0 · unknown 1121
+  7필드 전부 충족: 0건 · 결손(missing) 없음: 1121건 · 오개념 서명이 개념 상속만인 문항: 885건
+  측정 불가 필드: hint_strategy
+
+연결별 충족 수 (핵심 개념 기준)
+  prerequisite   linked 10 · missing 0 · unmeasured 0
+  misconception  linked 10 · missing 0 · unmeasured 0
+  solution       linked 10 · missing 0 · unmeasured 0
+  hint           linked 0 · missing 0 · unmeasured 10
+  pedagogy       linked 10 · missing 0 · unmeasured 0
+  힌트 입력: 없음(측정 불가) — --hints-from-db 로 읽는다
+  측정 가능한 연결만 본 완전 개념(참고·판정 불참여): 10/10
+
+경로 깔때기(개념 → 스킬 → 문항 → 오개념 → 교수)
+  스킬 10 → 문항 10 → 오개념 4 → 교수 4
+
+[미충족 — Concept Completeness] 10건
+  [12미적Ⅰ-02-01]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-02]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-03]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-04]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-05]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-06]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-07]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-08]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-09]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+  [12미적Ⅰ-02-10]
+    · hint: 측정 불가 — 힌트 입력이 없다(좌석은 DB `hints.verified` · `--hints-from-db` 로 읽는다)
+
+[미충족 — Graph Connectivity Coverage] 6건
+  [12미적Ⅰ-02-01]
+    · problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+  [12미적Ⅰ-02-05]
+    · problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+  [12미적Ⅰ-02-06]
+    · problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+  [12미적Ⅰ-02-08]
+    · problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+  [12미적Ⅰ-02-09]
+    · problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+  [12미적Ⅰ-02-10]
+    · problem→misconception: 오답 보기가 핵심 오개념에 닿는 문항이 없다
+
+[미충족 — 공급 가능 커버리지] 10건
+  [12미적Ⅰ-02-01]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-02]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-03]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-04]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-05]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-06]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-07]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-08]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-09]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+  [12미적Ⅰ-02-10]
+    · 개념 콘텐츠 검수 상태가 'ai_estimated' 이다(reviewed 만 학생에게 공급된다)
+
+경고
+  ! 문제 메타데이터 측정 불가 필드: hint_strategy — 힌트 입력이 없어 7필드 전부 충족으로 셀 수 없다(측정 불가는 충족이 아니다). `--hints-from-db` 로 DB 의 verified 힌트를 읽으면 잰다
+  ! 연결은 10/10 이지만 학생 공급 가능은 0/10 이다 — 검수 승격(G-kg02) 전 개념 10개는 연결돼 있어도 학생에게 공급되지 않는다
+  ! 측정 불가 연결: hint — Concept Completeness 는 이 연결이 측정될 때까지 충족될 수 없다(측정 불가는 충족이 아니다)
+
+판정: 미달
+  - Concept Completeness: 0.0% < 목표 95.0% (0/10, 미충족 10건)
+  - Graph Connectivity Coverage: 40.0% < 목표 95.0% (4/10, 미충족 6건)

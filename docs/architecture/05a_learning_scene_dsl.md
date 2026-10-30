@@ -130,7 +130,7 @@ LearningScene
 통과 못 하면 학생 미노출(`InvalidLearningSceneError` → 422).
 
 1. **참조 무결성**
-   - `concept_id` ∈ 개념그래프(403 UC)
+   - `concept_id` ∈ 개념그래프(<!-- fact:concept_graph.concepts -->437<!-- /fact --> UC)
    - `misconception_id` ∈ 오개념 카탈로그(`l4/misconception/catalog.py` 30종)
    - `param_control.targets` ⊆ bound `Visualization.spec`의 파라미터 키
    - `bound_visualization_index` 가 `elements` 범위 내 `visualization` 요소를 가리킴
@@ -213,7 +213,7 @@ LearningScene
 | `Visualization`(요소 기반) | `schema/visualization.py`(4 타입·자유 JSON spec·`@model_validator`) | 🟡 **타입별 typed spec 없음**(S1) |
 | 시각화 명세 생성 | `l3/visualization.py`(`generate_visualization_spec`·`parse_visualization_spec` 게이트) | 🟢 단일요소 가동 |
 | 시각화 오케스트레이션 | `api/visualization.py`(약점개념→spec) | 🟢 가동(장면 합성은 S3) |
-| 개념 골격 입력 | `schema/concept.py`(`recommended_visual_styles` 16종·`common_misconceptions`·`cognitive_type`·UC 403) | 🟢 가동 |
+| 개념 골격 입력 | `schema/concept.py`(`recommended_visual_styles` 16종·`common_misconceptions`·`cognitive_type`·UC <!-- fact:concept_graph.concepts -->437<!-- /fact -->) | 🟢 가동 |
 | `step_panel` 콘텐츠 | `schemas/v1.1/solution_path.schema.yaml`(`concept_sequence`·`steps`) | 🟡 Python 구현 후속(Phase 2) |
 | `misconception_probe` | `l4/misconception/`(카탈로그 30종·`diagnose`·`InterventionPattern` 4종)·`misconception_hypothesis` ORM | 🟢 카탈로그·진단 가동 |
 | `socratic_prompt` | L4 `PolyaState`·`PedagogyDecision`·`recommend_coaching` | 🟡 코칭 결정 가동(요소화 후속) |

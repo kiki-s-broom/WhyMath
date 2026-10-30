@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-146-wh1-primary-timeout-cause-and-default-rejudgement
+title: "WH-1 primary 시간 초과 지배 원인 판정 + 기본 타임아웃 재판정 (OPS-141 ②③ 승계 — 라이브 수치 수령 후)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on:
+  - OPS-141-wh1-primary-timeout-live-decomposition
+requires_gates:
+  - G-ops141-wh1-timeout-live-decompose
+acceptance:
+  - "① 수치 수령 — 게이트 G-ops141-wh1-timeout-live-decompose 의 §8 요약(R1 memory 콜드·R2/R3 redis-down·R4/R5 redis-up)을 받아 MEMORY 결정 로그에 판정 기준 커밋(도구 PR 머지 해시)과 함께 원문 수치를 옮긴다. 계측 대조에 MISMATCH 가 있거나 프로바이더 호출 실패 경고가 있는 실행은 수치로 쓰지 않고 재측정을 요청한다.\n② 원인 가설 판정 — 수치로 시간 초과의 지배 원인을 가른다: (가) 모델 콜드 로드(R1 첫 턴 − 웜 중앙값) (나) 턴당 LLM 호출 수 × 호출당 지연이 15초를 구조적으로 넘음(R1 프로바이더 구간·호출 수) (다) Redis 캐시 대기(R2 대 R1·R4 의 캐시 구간 차이, 강등 대기 합) (라) 예산 안 비LLM 단계(나머지 구간). 어느 것이 지배적인지 수치로 적고 지배 원인이 없으면 없다고 적는다. 「나머지」가 크면 어느 단계에 계측을 더할지 판정해 태스크로 등재한다.\n③ 타임아웃 기본값 재판정 — 예산별 초과율 표와 R3/R5 폴백률로 wh1_primary_timeout_seconds 15초가 로컬 모델 조건에서 적정한지 판정한다. 원인이 Redis 면 값 변경이 아니라 캐시 경로 조치(예: 소켓 타임아웃·강등 시 캐시 우회)를 먼저 검토한다 — 원인을 두고 예산만 늘리는 것은 증상 처치다. 값을 바꾸면 config.py 기본값을 바꾸고 테스트로 동결하며(뮤테이션 RED 확인) MEMORY 결정 로그에 근거를 남긴다. 바꾸지 않으면 그 근거를 남긴다.\n④ OPS-98(턴 지연 분포·SLO 정합)과 범위 대조 — OPS-98 은 30턴 이상 분포와 SLO 선택지(가·나·다)를 Kiki 에게 제시하는 태스크이고 이 태스크는 시간 초과의 원인 분해다. 이 태스크가 값을 바꾸면 OPS-98 의 기준값이 달라지므로 결과를 OPS-98 notes 에 연결한다. 측정 도구 scripts/ops/wh1_primary_timeout_decompose.py 는 OPS-98 이 --reps 로 재사용할 수 있다(중복 구현 금지)."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1676 — MEMORY 결정 로그 2026-10-18 OPS-146 판정(①수치 원문·②지배 원인=캐시 대기 94~95%·③15초 유지 근거·④OPS-98 연결). 후속: OPS-149-redis-cache-degraded-bypass + 게이트 G-ops149-redis-bypass-r3-remeasure. 코드 변경 0건·기본 타임아웃 15초 미변경. 판정 기준 측정 코드 origin/main fc939a22. 로컬 CI 미러: 필수 상시 잡 5종 통과(backend는 40분 초과로 제외 — CI가 판정)."
+paths:
+  - src/backend/whymath_backend/config.py
+  - "tests/backend/harness/**"
+  - "docs/ops/**"
+session: null
+notes: "출처: OPS-141 acceptance ②③ 승계. OPS-141 은 측정 도구·실행 런북·사람 게이트(acceptance ④ 와 ① 의 도구 부분)를 착지했고, 라이브 수치가 있어야 하는 ②③ 은 게이트 통과 후의 판정이라 이 태스크로 분리했다. 코드 경로 실측으로 세운 가설(미검증): Redis 미기동 시 LLM 호출 1회가 캐시 연산 2회(get·set)를 부르고 연산마다 최대 redis_socket_timeout_s=2.0초를 기다려, 호출 3회 턴이면 캐시 대기만 최대 12초이다. 또 OPS-134 의 llm_ms_total 은 seam.generate 전체를 감싸 캐시 대기를 포함한다(그래서 기존 리포트로는 (가)(나)와 (다)를 못 가른다). 기본 15초는 이 태스크가 판정하기 전까지 바꾸지 않는다."
+updated: 2026-10-18

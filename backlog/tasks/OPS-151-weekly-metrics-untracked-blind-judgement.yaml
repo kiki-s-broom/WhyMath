@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-151-weekly-metrics-untracked-blind-judgement
+title: "weekly-metrics PR 단계 변경 판정이 미추적 파일을 못 본다 — 산출물 0회 커밋 수리"
+track: infra-debt
+stage: S3
+subject: math
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① PR 단계의 변경 판정을 `git status --porcelain -- metrics/weekly.json`이 비어 있지 않으면 변경으로 보도록 교체한다(미추적·수정·스테이지 모두 포함). 종전 `git diff --quiet`는 미추적 파일에 exit 0이라 PR 단계가 상시 생략됐다."
+  - "② 변별력 주입: 스크래치 git 저장소에서 (가)미추적 (나)수정된 추적 (다)무변경 세 상태 각각에 새 판정식과 종전 판정식을 실측해 PR 본문 '변별력' 절에 표로 기록한다. 종전 식이 (가)에서 오판함을 같은 표에서 재현한다."
+  - "③ 집계 후 원장이 0행(파일 없음·빈 배열)이면 PR을 만들지 않고 명시적 실패(exit 1 + 이유)를 낸다. 0행 가드도 실패 주입으로 RED를 확인한다."
+  - "④ tests/infra에 워크플로 문면 동결 테스트: 새 판정식 존재 · 종전 `git diff --quiet` 판정 부재 · 0행 가드 존재. 각 단언은 결함 주입(종전 식 복원·가드 삭제)에서 RED여야 한다."
+  - "⑤ 정직한 공백을 PR에 적는다: 과거 5회 집계값은 어느 브랜치에도 커밋된 적이 없어 복구 불가(실행 로그만 존재). 첫 실제 산출물 커밋은 다음 cron 또는 workflow_dispatch 실행에서만 확인되며 이 PR 머지 시점에는 미검증이다."
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1691 (#1691) · 커밋 28f4aa575"
+paths:
+  - ".github/workflows/weekly-metrics.yml"
+  - tests/infra/test_weekly_metrics_change_judgement.py
+  - metrics/weekly.json
+session: null
+notes: "출처: docs/reviews/integrated_inspection_plan_2026-10-18.md §2-2 #10 · Step 0-3 · Step 3-A. OPS-56(done) 산출물 실재성 결함의 재개봉이 아니라 신규 태스크로 등재 — OPS-56 acceptance는 이행됐고 결함은 PR 단계 판정식에 있다. 3-A 등재 ID가 저장소·원격 브랜치·예약 대장 어디에도 없어 이 세션이 add로 등재했다(역할 기반 복수 검색 결과 내가 찾은 방법으로는 0건)."
+updated: 2026-10-18

@@ -83,6 +83,93 @@ class TestExtractMisconceptions:
         assert records == [] and duplicates == 0
 
 
+_LOGGER = "data_pipeline.misconception.extract"
+
+
+def _one_row(**extra: object) -> list[dict[str, Any]]:
+    row: dict[str, Any] = {"mis_id": "M0001", "오개념": "x"}
+    row.update(extra)
+    return [{"L5_META": {"오개념": [row]}}]
+
+
+class TestDroppedKeyWarning:
+    """MISC-61 ② — 추출기가 읽지 않는 키의 값을 버릴 때 *키 이름과 함께* 경고한다.
+
+    경고가 나야 하는 입력(주입)과 나면 안 되는 대조군을 둘 다 둔다 — 항상 경고하거나 영영 경고하지
+    않는 추출기는 둘 중 하나가 깨져서 변별이 된다.
+    """
+
+    def test_value_under_unread_key_warns_with_key_name_and_count(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level("WARNING", logger=_LOGGER):
+            records, _ = extract_misconceptions(_one_row(오개념_원인="원인 본문 표지"))
+        warned = [r.getMessage() for r in caplog.records if r.name == _LOGGER]
+        assert len(warned) == 1
+        assert "오개념_원인=1행" in warned[0]  # 키 이름 + 행 수
+        assert "원인 본문 표지" not in warned[0]  # 값 본문은 로그에 남기지 않는다
+        # 반환값은 그대로다 — 경고는 관측 추가이지 동작 변경이 아니다
+        assert records[0]["student_wrong_thinking"] is None
+
+    def test_warning_is_one_aggregate_line_not_one_per_row(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        rows = [{"mis_id": f"M{n:04d}", "오개념_원인": "v"} for n in range(1, 4)]
+        with caplog.at_level("WARNING", logger=_LOGGER):
+            extract_misconceptions([{"L5_META": {"오개념": rows}}])
+        warned = [r for r in caplog.records if r.name == _LOGGER]
+        assert len(warned) == 1 and "오개념_원인=3행" in warned[0].getMessage()
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {},  # 미매핑 키 자체가 없다
+            {"오개념_원인": ""},  # 키는 있으나 값이 비었다
+            {"오개념_원인": None},
+            {"오개념_원인": "   "},
+            {
+                "출처": "공통",
+                "원본_영역": "a",
+                "성취기준요약": "b",
+                "매핑개념명_참조": "c",
+                "코드정밀도": "d",
+            },
+            {
+                "학생의_잘못된_사고": "읽는 키",
+                "distractor_규칙": "읽는 키",
+            },  # 읽는 키는 경고 대상이 아니다
+        ],
+    )
+    def test_control_no_warning_when_nothing_is_dropped(
+        self, caplog: pytest.LogCaptureFixture, extra: dict[str, object]
+    ) -> None:
+        with caplog.at_level("WARNING", logger=_LOGGER):
+            extract_misconceptions(_one_row(**extra))
+        assert [r for r in caplog.records if r.name == _LOGGER] == []
+
+    def test_duplicate_rows_are_not_counted_twice(self, caplog: pytest.LogCaptureFixture) -> None:
+        rows = [
+            {"mis_id": "M0001", "오개념_원인": "a"},
+            {"mis_id": "M0001", "오개념_원인": "b"},  # 중복 → skip, 버려진 값으로 세지 않는다
+        ]
+        with caplog.at_level("WARNING", logger=_LOGGER):
+            extract_misconceptions([{"L5_META": {"오개념": rows}}])
+        warned = [r.getMessage() for r in caplog.records if r.name == _LOGGER]
+        assert len(warned) == 1 and "오개념_원인=1행" in warned[0]
+
+    def test_cli_surfaces_the_warning_to_the_operator(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        src = tmp_path / "layers.json"
+        src.write_text(
+            json.dumps(_one_row(오개념_원인="원인"), ensure_ascii=False), encoding="utf-8"
+        )
+        with caplog.at_level("WARNING", logger=_LOGGER):
+            result = runner.invoke(app, ["--json", str(src), "--output-dir", str(tmp_path / "o")])
+        assert result.exit_code == 0, result.output  # 경고는 실패가 아니다
+        assert any("오개념_원인=1행" in r.getMessage() for r in caplog.records)
+
+
 class TestLoadJson:
     def test_rejects_non_array(self, tmp_path: Path) -> None:
         path = tmp_path / "bad.json"

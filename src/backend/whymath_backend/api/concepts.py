@@ -17,6 +17,9 @@ PG 행을 직접 만지지 않고 검증된 Pydantic 모델만 주고받는다.
 하며(검정교과서·EBS 본문 복제 금지) — 이 불변식은 schema.Concept 검수 단계 책임이고 이
 라우터는 이미 검증된 모델을 영속화할 뿐이다.
 
+P3-26: `POST`(직접 생성)는 **폐지(410)**했다 — 신규 개념은 CMS 제안·발행 워크플로우로만
+생기고, `DELETE`는 CMS와 같은 규칙(`_concept_graph_rules.concept_delete_block`)을 쓴다.
+
 인가(SEC-07 D1): POST/PATCH/DELETE 3개는 `RequireContentAdmin`(`Role.CONTENT_ADMIN`)로
 게이팅한다 — 이전엔 인증 의존성이 0건이라 누구나 개념을 생성·수정·삭제할 수 있었다(실측
 `docs/architecture/account_security_gap_review.md` D1). GET(단건·목록·엣지·의미검색)은
@@ -63,6 +66,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.api._auth import RequireContentAdmin
+from whymath_backend.api._concept_graph_rules import concept_delete_block
 from whymath_backend.api._concurrency import (
     ensure_if_match,
     etag_for,
@@ -340,9 +344,8 @@ def _publish_pointer_readonly() -> HTTPException:
 
 @router.post(
     "",
-    status_code=status.HTTP_201_CREATED,
-    response_model=ConceptSchema,
-    summary="개념 노드 생성",
+    status_code=status.HTTP_410_GONE,
+    summary="개념 노드 직접 생성 — 폐지(신규 개념은 CMS 제안·발행 워크플로우로)",
 )
 async def create_concept(
     body: ConceptSchema,
@@ -351,42 +354,23 @@ async def create_concept(
     admin: RequireContentAdmin,
     request: Request,
 ) -> ConceptSchema:
-    """검증된 schema.Concept를 영속화하고 복원해 반환한다(201). `Role.CONTENT_ADMIN` 전용.
+    """폐지됨(P3-26): 살아있는 `concept` 행을 검수 없이 만드는 길이라 막았다. 항상 410.
 
-    `code`는 UNIQUE이므로 중복이면 PG가 IntegrityError를 던진다 → 롤백 후 **409**로
-    명확히 보고한다(스택트레이스 노출 금지 — 시스템 경계 검증). commit은 핸들러 책임이며
-    여기서 명시적으로 부른다(get_session은 commit하지 않음). 응답에 ETag를 실어 이후
-    조건부 수정(If-Match)을 가능케 한다.
-
-    SEC-29: 성공 시 `record_content_mutation_audit`로 감사 행을 같은 트랜잭션에 합류시킨다
-    (IntegrityError로 롤백되면 감사 행도 함께 롤백 — 실패한 시도는 감사하지 않는다).
+    신규 개념은 `POST /v1/admin/cms/concept-proposals`로 제안하고 검토·QA·승인·발행(`POST
+    /v1/admin/cms/versions/{id}/transitions`)을 거쳐야 하며, 개념 행은 **발행하는 순간** 게이트가
+    만든다(`docs/standards/cms_concept_graph_write_contract.md`). 인증·권한 검사는 먼저 일어난다 —
+    권한 없는 호출자는 410이 아니라 401/403을 본다(이 라우트의 존재 여부를 흘리지 않는다).
     """
-    if body.current_published_version_id is not None:
-        raise _publish_pointer_readonly()  # 새 개념은 발행본이 있을 수 없다
-    orm = Concept.from_schema(body)
-    session.add(orm)
-    settings = get_settings()
-    record_content_mutation_audit(
-        session,
-        actor_user_id=admin.user_id,
-        resource_type=PrivacyAuditResourceType.concept,
-        resource_id=orm.concept_id,
-        action=PrivacyAuditAction.create,
-        ip=_client_ip(request, settings=settings),
-        settings=settings,
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "code": "concept_create_via_workflow",
+            "message": (
+                "개념 노드를 직접 생성하는 경로는 폐지되었습니다. 관리자 CMS의 신규 개념 제안"
+                "(/v1/admin/cms/concept-proposals)과 버전 발행을 사용하세요."
+            ),
+        },
     )
-    try:
-        await session.commit()
-    except IntegrityError as exc:
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"이미 존재하는 개념 code입니다: {body.code}",
-        ) from exc
-    await session.refresh(orm)
-    result = orm.to_schema()
-    response.headers["ETag"] = etag_for(result)
-    return result
 
 
 @router.get("/{concept_id}", response_model=ConceptSchema, summary="개념 단건 조회")
@@ -546,6 +530,14 @@ async def delete_concept(
             detail=f"개념을 찾을 수 없습니다: {concept_id}",
         )
     ensure_if_match(if_match, etag_for(existing.to_schema()))
+    # P3-26: 관리자 CMS와 같은 삭제 규칙 — graph.json이 소유한 개념(되살아남)과 발행본이 있는 개념은
+    # 지울 수 없다. 규칙은 한 곳(`_concept_graph_rules`)에 있어 두 라우트가 어긋나지 않는다.
+    block = await concept_delete_block(session, existing)
+    if block is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": block.code, "message": block.message, **block.extra},
+        )
     await session.delete(existing)
     settings = get_settings()
     record_content_mutation_audit(

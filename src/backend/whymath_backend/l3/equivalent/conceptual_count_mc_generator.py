@@ -34,6 +34,7 @@ from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.canonicalize import canonical_signature
 from whymath_backend.l3.equivalent.generator import CandidateProblem, deterministic_generator
+from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.lang.josa import eun_neun, euro_ro, i_ga, wa_gwa
 from whymath_backend.schema.enums import (
     AnswerFormat,
@@ -76,7 +77,9 @@ _COUNT_CHOICES: tuple[str, str, str, str] = ("0", "1", "2", "3")
 # 템플릿별 L1 메타(개념 원천 src_id·단원 코드). 성취기준 코드는 spec이 공급.
 _TEMPLATE_META: dict[CountTemplateKind, tuple[str, str]] = {
     "real_root_count": ("HK07", "DISC-COUNT"),
-    "extremum_count": ("H:12미적Ⅰ02-01", "EXTREMUM-COUNT"),
+    # 극값의 개수는 02-07(증가·감소, 극대·극소)의 행동이다 — P3-43 판정(Kiki 2026-10-16)·P3-49 적용.
+    # 02-01(미분계수)로 되돌리면 24건이 02-01 PRIMARY 로 되살아난다(테스트가 막는다).
+    "extremum_count": ("H:12미적Ⅰ02-07", "EXTREMUM-COUNT"),
     "is_one_to_one": ("10기수2-03-03", "FUNC-INVERSE"),
     "geometric_convergence": ("H:12미적Ⅱ01-05", "GEO-SERIES-CONV"),
     "limit_equals_value": ("H:12미적Ⅰ01-01", "LIMIT-VALUE"),
@@ -104,6 +107,9 @@ class _CountItem:
     question_text: str
     answer_explanation: str
     difficulty: float
+    # 풀이 단계(SymPy 식 문자열의 연쇄) — 기본 None(이 풀의 14밴드는 단계를 달지 않는다). P3-31:
+    # is_differentiable 밴드만 채운다(Phase 3 계측기 solution 연결 · `_is_differentiable_steps`).
+    solution_steps: tuple[str, ...] | None = None
 
 
 def _difficulty(seed: int) -> float:
@@ -317,6 +323,42 @@ def _build_limit_equals_value_pool() -> tuple[_CountItem, ...]:
     return tuple(pool)
 
 
+def _assert_abs_branches(a: int, c: int, right: sympy.Expr, left: sympy.Expr) -> None:
+    """`right`·`left` 가 |x−a|+c 의 x>a·x<a 가지 식인지 확인한다 — 아니면 ValueError.
+
+    두 가지는 x 의 일차식이라 서로 다른 두 점에서 값이 같으면 그 가지 전체에서 같다
+    (각 가지 3점을 본다).
+    """
+    x = sympy.Symbol("x")
+    f = sympy.Abs(x - a) + c
+    for k in (1, 2, 3):
+        if f.subs(x, a + k) != right.subs(x, a + k) or f.subs(x, a - k) != left.subs(x, a - k):
+            raise ValueError(f"가지 식이 |x - {a}| + {c} 와 어긋난다 (k={k})")
+
+
+def _is_differentiable_steps(a: int, c: int) -> tuple[str, ...]:
+    """f(x)=|x−a|+c 의 꺾인점 x=a 에서 우미분계수와 좌미분계수의 차를 구하는 SymPy 식 연쇄.
+
+    P3-31 — 개념 [12미적Ⅰ-02-02] 의 해설 연결(Phase 3 계측기 solution)을 위해 달린다. 두 가지
+    (x>a: x−a+c · x<a: −(x−a)+c)의 도함수를 한 식으로 묶어 `(우 − 좌).doit()` → `1 − (−1)` →
+    `2` 로 간다.
+    값이 0 이 아니라 2 라는 것이 곧 '좌·우 미분계수가 다르다'(미분 불가)의 식 표현이다. 연쇄는 Tier2
+    (`verify_solution`)의 전이 전건 correct 이며, 그 판정은 테스트가 동결한다.
+
+    **가지 식이 `Abs(x−a)+c` 와 같다는 것은 Tier2 가 모른다**(전이는 식↔식 항등만 본다). 그래서
+    `_assert_abs_branches` 가 직접 확인한다. 어긋나면 ValueError(조용히 틀린 연쇄를 달지 않는다).
+    """
+    right_text = f"x - {a} + {c}" if c else f"x - {a}"
+    left_text = f"-(x - {a}) + {c}" if c else f"-(x - {a})"
+    # 검사 대상은 연쇄에 실제로 실리는 문자열이다(식과 문자열이 따로 놀지 않게 문자열을 읽어 확인).
+    _assert_abs_branches(a, c, safe_sympify(right_text), safe_sympify(left_text))
+    return (
+        f"(Derivative({right_text}, x) - Derivative({left_text}, x)).doit()",
+        "1 - (-1)",
+        "2",
+    )
+
+
 def _build_is_differentiable_pool() -> tuple[_CountItem, ...]:
     """f(x)=|x−a|+c 가 ℝ에서 미분가능한지 뼈대 풀 — 절댓값 꺾인점(연속이나 미분불가·오개념 표적).
 
@@ -350,6 +392,7 @@ def _build_is_differentiable_pool() -> tuple[_CountItem, ...]:
                         "답한다."
                     ),
                     difficulty=_difficulty(a + c),
+                    solution_steps=_is_differentiable_steps(a, c),
                 )
             )
     return tuple(pool)
@@ -841,7 +884,7 @@ class ConceptualCountMCSkeletonGenerator:
             answer_selection=None,
             answer_aggregate=None,
             answer_kind=item.answer_kind,
-            solution_steps=None,
+            solution_steps=list(item.solution_steps) if item.solution_steps else None,
             concept_tags=list(self._concept_tags),
         )
 

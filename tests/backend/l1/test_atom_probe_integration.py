@@ -16,6 +16,7 @@ skip(misconception/concept_content 로더 통합테스트 동형).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -33,7 +34,14 @@ pytestmark = pytest.mark.integration
 # "코퍼스 미존재" skip(침묵 skip 결함 수정).
 _CORPUS = Path(__file__).resolve().parents[3] / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 # 원자 ②③ 전건(원자 1,823 전량이 진단문항·소크라테스 보유 — Phase 1 산출 정합).
-_EXPECTED_ROWS = 1823
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (Path(__file__).resolve().parents[3] / "docs" / "data" / "corpus_facts.json").read_text(
+        encoding="utf-8"
+    )
+)
+_EXPECTED_ROWS = _FACTS["atom_graph.atoms"]
 
 
 def _sync_engine() -> object:

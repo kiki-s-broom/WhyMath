@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-209
+title: "저작 회차 오케스트레이터 보완 — URL 자격증명 마스킹·낡은 잠금 판정·예약 풀기 거짓 성공·첫 Windows 실회차 확인"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 저작 회차 오케스트레이터(`harness/authoring_round*`, EOS-208 · #1767) 재리뷰 P3 잔여분 보완: (a) stderr 꼬리·원인 줄 마스킹을 키 패턴(sk-or-·sk-ant-·Bearer) 밖으로 넓혀 URL 내장 자격증명(`https://…:ghp_…@`·`x-access-token:…@`)도 가린다 (b) 낡은 단일 실행 잠금 — 잠금 파일의 pid가 살아 있는지 확인해, 죽은 pid면 사람이 지우는 대신 안내와 함께 안전하게 인수하거나 최소한 '낡은 잠금' 판정을 출력(창 X로 닫으면 finally가 돌지 않는 Windows CTRL_CLOSE 사례) (c) `--release-unevidenced`의 `RESERVATION_RELEASED` 줄이 상태 파일 저장 실패에도 출력되는 거짓 성공 — 저장 결과를 확인하고 실패면 실패 줄 (d) 중첩 가드 M15·M16(CommitVerificationFailed의 head_not_main·committed_round 절) 반례 테스트 ② 첫 실회차(Windows · Phaiakes9) 확인 항목을 런북에 체크리스트로 두고 결과를 이 태스크에 기록: PS 5.1 [S1]/[S2]·[R0]~[R3] 붙여넣기 파싱 · cp949 콘솔 한글·기호 표시 · Ctrl+C 전파와 자식 종료 · 검수 창 종료 코드 · Git Credential Manager 프롬프트 · O_EXCL 잠금 경로 표기 ③ 설계상 한계(genlog 파일을 사람이 지우면 예산 근거가 사라진다)를 런북 '알려진 한계'에 명시"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/harness/authoring_round*.py"
+  - "tests/backend/harness/test_authoring_round*.py"
+  - "docs/ops/authoring_round*"
+session: null
+notes: "출처: PR #1767(EOS-208) 독립 재리뷰 P3(머지 비차단)와 '확인하지 못한 것' 목록. 1차 리뷰 P1(예산 누수)은 #1767에서 해소·재현 시나리오 실호출 ≤ 30 확인. 이 태스크의 ②는 다음 실제 저작 회차(예: EOS-203 로컬 좌석 재측정)와 함께 수행하면 된다."
+updated: 2026-10-29

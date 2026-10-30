@@ -18,17 +18,17 @@
 
 ---
 
-## 0. 현재 구조 스냅샷
+## 0. 구조 스냅샷 (2026-06-30 작성 기준)
 
 | 항목 | 현황 | 근거 |
 |---|---|---|
-| L1 그래프 규모 | 노드 2,697(단원 217·소단원 643·원자 1,837) | `data/corpus/atom_graph_v1/graph.json` |
-| 엣지 | 2,213 — **전량 `PREREQUISITE`**, strength **0.8 균일** | `l1/atom_graph/atom_backend_edge.py` |
+| L1 그래프 규모 | (2026-06-30) 노드 2,697(단원 217·소단원 643·원자 1,837) | `data/corpus/atom_graph_v1/graph.json` |
+| 엣지 | (2026-06-30) 2,213 — **전량 `PREREQUISITE`**, strength **0.8 균일** | `l1/atom_graph/atom_backend_edge.py` |
 | Branching | 평균 out 1.25 / max out 7 / max in 4 (희소) | graph.json 실측 |
 | 순환 | 현재 **acyclic** — 단 적재 파이프라인에 **cycle 검출 게이트 없음**(self-loop만 차단) | `schema/concept.py:228-299`·`l1/atom_graph/populate.py` |
 | 시각화 spec | 렌더러 종속 필드 **0**(no fps/shader/canvas/pixel/color)·`extra="forbid"` | `schema/visualization.py:132-199` |
 | LearningScene | 6 element kind·불변식 3종·참조 무결성 게이트·interaction state 누출 **0** | `l4/learning_scene.py:79-312` |
-| 오개념 | **3중 표현**: kebab 30종(런타임)·M-id 839종(콘텐츠)·개념노드 JSONB 자유서술 — **FK 없음** | `l4/misconception/catalog.py`·`schema/misconception_catalog.py:9-12`·`schema/concept.py:213` |
+| 오개념 | (2026-06-30) **3중 표현**: kebab 30종(런타임)·M-id 839종(콘텐츠)·개념노드 JSONB 자유서술 — **FK 없음** | `l4/misconception/catalog.py`·`schema/misconception_catalog.py:9-12`·`schema/concept.py:213` |
 | 수식 동치 | 명시 AST 없음 — SymPy(py)·mathjs(js) **각자 파싱·정규화**. py 측 *입력 표기 정규화*(implicit mult·전각/NFKC·연산자·그리스·chained eq)는 `to_sympy_source` **단일 권위**로 일원화(2026-07-02·Part 4 항목4) | `l3/symbolic_equivalence.py`·`l3/verify_step.py`·`src/web/graphing-calculator/src/lib/graph2dSpec.js` |
 
 **한 줄 평**: *표현 계층은 invariant가 스키마로 박혀 견고, 그래프 위생은 아직 무방비, 오개념
@@ -83,7 +83,7 @@ namespace 분리·희소 그래프라 상대적으로 안전.
 
 ### Q4. 유지보수 지옥 가능성이 높은 구조
 "Single change → global rebuild" 후보 3:
-- **오개념 3중 표현**(kebab 30 / M-id 839 / JSONB) FK 없음 — 하나 고치면 나머지 침묵 drift.
+- **오개념 3중 표현**(2026-06-30 작성 당시 kebab 30 / M-id 839 / JSONB) FK 없음 — 하나 고치면 나머지 침묵 drift.
 - **교육과정 이중**(노드 내장 `grade_introduced`·`curriculum_version` + `CurriculumEntry` overlay)
   — 진실 출처 2개.
 - **수식 파서 이중**(SymPy + mathjs) — 동치 규칙이 두 언어에 따로.

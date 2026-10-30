@@ -24,5 +24,8 @@ paths:
   - "tests/backend/harness/**"
   - "scripts/perf/**"
 session: null
-notes: "출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-B·§5 R3 ①③④ (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. depends_on `SEC-34` 근거: 측정 머신(Phaiakes9)이 깨끗해야 지연 수치가 유효하다. `OPS-75`(감염 기간 벤치마크 전면 재실측, P2)는 이 태스크의 조건이 아니다 — 범위가 달라 병행할 수 있다. 등급 P1 근거: 12월 내부 테스트 계정 표본 수집에서 코치 대기 시간이 체감 품질을 크게 좌우하지만, 없어도 검증 자체는 성립한다. Kiki 머신 실행이 필요하며 런북은 6항목 브리핑 규칙을 따른다."
-updated: 2026-09-25
+notes: |-
+  출처: `docs/reviews/claude_ai_3x_perf_applicability_2026-09-25.md` §2-B·§5 R3 ①③④ (PR #1311). 2026-09-25 Kiki 지정 일괄 등재. depends_on `SEC-34` 근거: 측정 머신(Phaiakes9)이 깨끗해야 지연 수치가 유효하다. `OPS-75`(감염 기간 벤치마크 전면 재실측, P2)는 이 태스크의 조건이 아니다 — 범위가 달라 병행할 수 있다. 등급 P1 근거: 12월 내부 테스트 계정 표본 수집에서 코치 대기 시간이 체감 품질을 크게 좌우하지만, 없어도 검증 자체는 성립한다. Kiki 머신 실행이 필요하며 런북은 6항목 브리핑 규칙을 따른다. [OPS-146 연결 2026-10-18] WH-1 primary 시간 초과 원인 분해가 끝났다(MEMORY 결정 로그 2026-10-18 OPS-146): Redis 정상이면 qwen2.5:3b 합성 12턴이 15초의 4.6배 여유(최대 3.25초)로 끝났고, Redis 없음이면 캐시 대기가 턴 소요의 94~95%라 12/12 시간 초과였다. 따라서 이 태스크의 분포 실측은 반드시 Redis 정상 조건(redis-up)에서 하고 Redis 상태를 기준값 표에 병기한다 — Redis 없음 조건의 수치는 모델 지연이 아니라 캐시 소켓 타임아웃 2초 x 연산 15회를 잰 것이다. 측정 도구 scripts/ops/wh1_primary_timeout_decompose.py 는 --reps 로 재사용한다(중복 구현 금지). 원인 분해의 fallback_llm_degraded(Redis 없음 3/12·Redis 정상 1/12)는 설명되지 않았으니 이 분포에서 비율을 함께 본다. 타임아웃 기본값 15초는 OPS-146에서 바꾸지 않았다.
+
+  [정정 2026-10-18] notes 치환 — OPS-146 acceptance ④ — 원인 분해 결과를 분포 실측 태스크에 연결(기준값이 바뀌지 않았음을 명시)
+updated: 2026-10-18

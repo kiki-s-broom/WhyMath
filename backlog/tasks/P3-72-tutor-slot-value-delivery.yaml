@@ -1,0 +1,43 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-72-tutor-slot-value-delivery
+title: "P3-72 — 튜터 context 슬롯 값 전달(개념·스킬·숙달·팩 요약) — P3-08 승계·클라우드 LLM 전송 개인정보 판단(Kiki) 선행"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-08-tutor-context-builder
+requires_gates: []
+acceptance:
+  - "① 튜터 정책 입력에 개념·스킬·숙달·교수법 팩 *요약*(값의 비식별 축약 — 예: 개념 code·스킬 수·숙달 라벨)을 싣고, P3-08 매니페스트 delivered_to_tutor가 그 슬롯을 실제 전달로 표기한다(정책 delivered_context_slots 확장 — 핸들러 추정 금지).\n② 착수 전 Kiki 결정 게이트: 학생 숙달·θ 파생 정보를 클라우드 LLM(openrouter 좌석)에 보내는 개인정보 판단 — 로컬 좌석 한정 여부 포함. 결정 전 클라우드 전송 0.\n③ query_curriculum 등으로 실제 그래프 순회가 생기면 ARCH-11 traversal guard(depth ≤ 2·visited set·timeout·token budget) 동반. 프롬프트 예산(≤20 노드·≤3000 토큰) 불변 — 넘치면 요약·선택 규칙.\n④ coach_prose_leak·pedagogy_pack_fidelity 게이트 CLI exit 0 유지, 전달 슬롯을 뮤테이션으로 지우면 RED."
+  - "⑤ [Kiki 결정 (가) 2026-10-20] 튜터 LLM 프롬프트에 싣는 것은 개념·스킬·문제 내용·교수 정책(pack) 요약만이다. 학생 개인 학습 데이터(θ·숙달도·mastery 수치와 그 파생 라벨)는 클라우드 LLM에 보내지 않고 서버에만 둔다(미성년자 데이터 정책). 따라서 learner_state·mastery 슬롯의 delivered_to_tutor는 이 태스크 이후에도 false이며, 그 값이 프롬프트에 실리는 경로를 주입하면 RED가 되는 테스트로 동결한다. acceptance ① '숙달 라벨' 문구와 ②의 개인정보 판단 게이트는 이 결정으로 대체된다."
+  - "⑥ ⑤의 정정 — learner_state는 지금도 θ가 튜터 정책의 *사적* 입력(select_probe 정보량 계산 전용·LLM 프롬프트 미포함)으로 전달돼 delivered_to_tutor=true다. 결정 (가)의 집행 대상은 'LLM 프롬프트(클라우드로 나가는 문자열)에 실리는가'이므로, 동결 테스트는 프롬프트·시스템 프롬프트 문자열에 θ·숙달도 값과 그 파생 라벨이 없음을 단언한다(서버 측 사적 보유는 허용). mastery는 정책 입력이 아니므로 false를 유지한다."
+  - "⑦ (PR #1705 재검토 중1 승계) 매니페스트의 delivered_to_tutor 한 비트를 슬롯별 전달 경로로 분리한다 — prompt(LLM 프롬프트 문자열에 실림) · private_tool(정책이 사적 보유, 프롬프트 미포함: θ·학생 답안·풀이 단계) · output_guard(출력 후처리 필터: pack 금지모드 가드, 가드가 실제로 돈 턴만). 시스템 프롬프트의 context_not_delivered 설명을 '사적 보유분은 내용이 당신에게 보이지 않는다'가 드러나게 정정한다. ⑥의 집행(프롬프트 문자열에 θ·숙달 값이 없음)은 이 prompt 경로로 판정하고, 그 부재를 단언하는 테스트 1건 이상을 둔다(PR #1705 재검토 하3). 학년(grade) 전달 여부도 이 태스크에서 판정한다."
+  - "⑧ [Kiki 결정 2026-10-20] 오개념 가설 confidence 수치는 튜터 LLM 프롬프트에 싣지 않는다 — 가설 id(·카탈로그 라벨)만. 수치뿐 아니라 그 파생 등급·순위를 드러내는 표기도 금지하며, 렌더 순서는 confidence가 아니라 id 오름차순이다. 서버 측 사적 사용(노드 예산 선택·토큰 절단·select_probe)은 허용. 집행: `wh1_llm_policy._hypothesis_summary`(id·라벨만) · `_budget_context_nodes`(id 오름차순 렌더) · 동결 = `test_wh1_tutor_slot_delivery.py`의 키 트리 허용 목록(`active_hypotheses[].confidence` 부재)·수치 잎 감시·순서 불변 테스트(뮤테이션 C1~C6 RED)."
+  - "⑨ [PR #1709 재검토 중2 · Kiki 확인 대기] 프로즈 rephrase 프롬프트의 1위 가설 라벨(순위 누출) 처리는 Kiki 확인 후 — 프로즈 활성화(on) 전에 결정 필수. 사실: `wh1_primary.py`가 `hypothesis_label=outcome.hypotheses[0].misconception_id`(confidence 1위)를 넘기고 `wh1_prose.py` rephrase 프롬프트가 `의심 오개념 라벨`로 싣는다. 현재 노출 0(프로즈 기본 OFF·튜터 라우팅 LOCAL). 선택지: ⓐ id 최솟값 라벨 ⓑ 라벨 제거 ⓒ ⑧ 예외 명시. 근거: `docs/reviews/p3_72_tutor_slot_value_delivery_2026-10-20.md` §11 ⑤."
+  - "⑩ [Kiki 결정 2026-10-20 — ⑨ 확정] 프로즈 rephrase 프롬프트의 1위 가설 라벨 처리는 선택지 (c) '프로즈를 켤 때 다시 정한다'로 결정. 지금은 프로즈 기본 OFF·튜터 라우팅 LOCAL이라 노출 0이다. 프로즈를 on으로 바꾸는 변경(설정 기본값·활성화 게이트 clear)은 이 라벨 처리(id 최솟값·라벨 제거·예외 명시 중 택1)에 대한 Kiki 결정을 선행 조건으로 한다."
+artifacts:
+  - "#1709 (main) — 튜터 프롬프트에 개념·스킬·문제 구조·팩 요약 전달, 슬롯별 전달 경로(prompt/private_tool/output_guard/none), θ·숙달·학년·가설 confidence 프롬프트 미전송(Kiki 결정 (가)·(2)), 차분 불변 동결. ⑨⑩ 프로즈 라벨은 Kiki (c) — 프로즈 on 전 결정"
+paths: []
+session: null
+notes: |-
+  P3-08 승계(PR #1705 검토 상1). P3-08은 9종 조회(resolved)와 실제 튜터 전달(delivered_to_tutor)을 정직하게 표기하는 데까지만 했다 — 현재 튜터에 실리는 것은 학생 답안·풀이 단계·활성 가설·θ(·가드 ON 시 팩)뿐이고 개념·스킬·숙달·문제 내용은 not_delivered로 표기된다. 그 본체(값 전달)는 학생 데이터의 클라우드 LLM 전송이라는 개인정보 판단이 걸려 Kiki 결정 사안이므로 분리했다. 보고서: docs/reviews/p3_08_tutor_context_builder_2026-10-20.md.
+
+  [정정 2026-10-20] Kiki 결정 (가) 2026-10-20
+
+  [정정 2026-10-20] Kiki 결정 (가) 2026-10-20 — ⑤ 문구 정정(learner_state 사적 보유 사실)
+
+  [정정 2026-10-20] PR #1705 재검토 중1·하3 승계(머지 조건)
+
+  [정정 2026-10-20] Kiki 결정 2026-10-20 — 오개념 가설 confidence 미전달(PR #1709 보고서 §9-1 판단 요청에 대한 답)
+
+  [정정 2026-10-20] PR #1709 재검토 중2 — 프로즈 rephrase 1위 가설 라벨 순위 누출 기록(Kiki 확인 대기)
+
+  [정정 2026-10-20] Kiki 결정 (c) 2026-10-20
+
+  [미러 면제 2026-10-21] 구현 코드는 PR #1709에서 CI 전 잡 green으로 머지됨 — 이 커밋은 대장 상태 변경뿐
+updated: 2026-10-21

@@ -48,7 +48,11 @@ from whymath_backend.l3.verifier import ProblemVerifyInput, Verifier
 from whymath_backend.l3.verify_answer import AnswerVerdict, verify_answer
 from whymath_backend.l3.verify_answer_form import form_verdict_for
 from whymath_backend.l3.verify_final_answer import FinalAnswerResult, verify_final_answer
-from whymath_backend.l3.verify_solution import verify_solution
+from whymath_backend.l3.verify_solution import (
+    ValueExposureResult,
+    scan_value_exposure,
+    verify_solution,
+)
 from whymath_backend.l4.misconception.answer_signature import (
     AttemptMisconceptionScanResult,
     scan_attempt_answer,
@@ -65,6 +69,7 @@ from whymath_backend.schema.subject_adapter import (
 )
 from whymath_backend.schema.verification_capabilities import (
     AnswerFormVerifier,
+    AnswerValueExposure,
     AssessmentAnswerVerifier,
     AttemptMisconceptionDetector,
     ChainVerificationCounts,
@@ -327,6 +332,27 @@ def math_attempt_misconception_detector() -> MathAttemptMisconceptionDetector:
     return MathAttemptMisconceptionDetector()
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 선택적 능력 — 본문 값 노출 훑기 (P3-77)
+# ──────────────────────────────────────────────────────────────────────────
+class MathAnswerValueExposure:
+    """`AnswerValueExposure` 수학 구현 — `l3.verify_solution.scan_value_exposure`로 위임.
+
+    "문자 없는 산술식의 값이 정답과 같은가"는 수학 고유의 독법이다. 힌트 게이트(S4-11 B·④ —
+    CORE)는 본문과 목표를 불투명 문자열로 넘길 뿐이다. 변환 없음(설계 규칙 1): 결과 dataclass가
+    `ValueExposureScan`을 구조적으로 만족한다.
+    """
+
+    def scan_value_exposure(self, text: str, target: str) -> ValueExposureResult:
+        """3상태(exposed/clean/undecidable) 그대로 — 재해석 없음(판정은 전부 위임)."""
+        return scan_value_exposure(text, target)
+
+
+def math_answer_value_exposure() -> MathAnswerValueExposure:
+    """기본 주입용 팩토리."""
+    return MathAnswerValueExposure()
+
+
 if TYPE_CHECKING:
     # 구조적 적합성 증명 — SubjectAdapter와 동일 패턴(mypy --strict가 검사).
     _EQUIVALENCE_CONFORMANCE: ExpressionEquivalence = MathExpressionEquivalence()
@@ -338,3 +364,4 @@ if TYPE_CHECKING:
     _ATTEMPT_MISCONCEPTION_CONFORMANCE: AttemptMisconceptionDetector = (
         MathAttemptMisconceptionDetector()
     )
+    _VALUE_EXPOSURE_CONFORMANCE: AnswerValueExposure = MathAnswerValueExposure()

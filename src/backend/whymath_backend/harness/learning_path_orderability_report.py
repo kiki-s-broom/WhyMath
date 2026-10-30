@@ -138,8 +138,8 @@ class CorpusGraph:
     """원자 백본 코퍼스(`graph.json`) 투영 — 이 리포트 집계에 필요한 최소 뷰(code 문자열만).
 
     `concept_codes`는 레벨 무관 전체 개념 code다(`visualization_reach_report`의 "세부개념만"
-    필터와 달리 이 리포트는 분모를 좁히지 않는다 — 직접 선수 분포·356 population 재현이 전체
-    2,683 집합 자체를 분모로 삼기 때문·부록 실측 스크립트와 동형). `prerequisite_edges`는
+    필터와 달리 이 리포트는 분모를 좁히지 않는다 — 직접 선수 분포·population 재현이 전체
+    개념 집합 자체를 분모로 삼기 때문·부록 실측 스크립트와 동형). `prerequisite_edges`는
     `relation == "prerequisite"`인 `(from_code, to_code)` 쌍만(원자 백본 v1은 전량
     prerequisite이나 방어적으로 필터한다).
     """

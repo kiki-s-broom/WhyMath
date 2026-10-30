@@ -18,10 +18,13 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
 --------------------------------------------------
 6종 중 **2종은 이 저장소에 집계 대상 로그 자체가 없다**(실측, 2026-09-11):
   - **자동검증 1차 통과율** — Deterministic Gate pass/fail을 누적 기록하는 테이블이 없다.
+    **DB 경로에서는 여전히 그렇다.** 파일 입력 모드에서 `--authoring-run-dir`(저작 회차 폴더 —
+    `cu.jsonl`·`cu.review.jsonl`·`cu.genlog.jsonl`)를 주면 그 수용 게이트 로그로 산출한다
+    (EOS-207 — 정의·우회 검산식 제외 규칙은 `ops/g3_content_measures` 모듈 docstring (a)).
   - **재작업률** — Run 재생성 카운트 로그가 없다(EOS-55는 재현성 컬럼만 추가했고 재생성
     카운트 자체는 좌석 미착지 — `validation_scorecard.adapt_hit_cu_metrics` 독스트링 동일 판정).
-이 둘은 DB 연결 성공 여부와 무관하게 **항상** `measured=False`로 낸다 — "0%"이 아니라
-"측정 불가"다.
+이 둘은 DB 연결 성공 여부와 무관하게 `measured=False`로 낸다 — "0%"이 아니라
+"측정 불가"다(자동검증 1차 통과율만 위 `--authoring-run-dir` 예외).
 
 나머지 4종(HIT·처리량·단위비용·실패유형분포)은 `review_timer_event`·`generation_log`
 테이블에서 실시간 계산한다(집계 수식은 재발명하지 않고 `ops.hit_cu_metrics.aggregate`를
@@ -29,9 +32,10 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
 갖고 있는지에 따라 진짜 0(이번 주 활동 없음)과 미측정(DB 연결 자체 실패)이 갈린다 —
 후자만 `measured=False`로 낸다.
 
-**환경의 정직한 공백(중요)**: `review_timer_event`는 마이그레이션은 있지만 **쓰기 경로가
-아직 없다**(`ReviewTimerEvent.from_schema()` 호출처 0건 — 검수 UI(ADMIN-07)가 아직 이
-테이블에 쓰지 않는다). 그리고 이 저장소의 CI(GitHub Actions 호스팅 러너)가 붙는 Postgres는
+**환경의 정직한 공백(중요)**: `review_timer_event`의 쓰기 경로는 ADMIN-18이 Admin BFF
+(`POST …/review-sessions`·`POST …/transitions`)에 열었지만, 그 경로가 실제로 운영 DB에 닿아
+행이 쌓이기 전까지는 비어 있다(검수 화면 결선 = 웹 쪽 절반). 그리고 이 저장소의 CI
+(GitHub Actions 호스팅 러너)가 붙는 Postgres는
 `ci.yml`의 다른 실PG 잡들과 마찬가지로 **매 실행 새로 뜨는 빈 컨테이너**이지 Phaiakes9의
 실제 콘텐츠 제작 DB가 아니다 — 원격에서 그 DB로의 네트워크 경로 자체가 없다(비밀값
 `DEPLOY_SSH_*`는 배포 대상 서버용이지 Phaiakes9용이 아니다). 즉 **이 크론이 GitHub
@@ -45,6 +49,35 @@ Actions에서 도는 한, 4종 KPI는 당분간 정직하게 "0"(빈 스키마�
 `WHYMATH_DATABASE_URL` 환경변수 + 이 파일이 신설하는 GitHub Actions 스케줄(월 07:00
 KST)이 최소한으로 담당하되, **그 스케줄이 실제 프로덕션 데이터에 닿게 만드는 것**(러너가
 Phaiakes9에 도달하는 경로)은 `OPS-19`의 몫이다.
+
+파일 입력 모드 (EOS-198 ① — 공백 G-A)
+-------------------------------------
+DB 경로만 있으면 **DB에 적재되지 않는 회차는 원장에 영영 못 들어온다.** 저작 CLI
+(`harness/problem_corpus_accumulate`)는 GenerationLog를 `<out>.genlog.jsonl`에만, 검수 CLI
+(`harness/review_session`)는 타이머 이벤트를 `--events` JSONL에만 쓴다. 그 JSONL을 DB로
+옮기는 적재기는 없다(2026-10-27 실측 — ORM 쓰기는 Admin BFF 검수 전이 API뿐). 그래서
+`--events-jsonl`(반복)·`--generation-log-jsonl`(반복)을 주면 DB에 **연결하지 않고** 그
+파일을 입력으로 쓴다. 두 경로는 다음을 공유해 같은 입력에서 같은 레코드를 낸다:
+
+  ① 창 판정 — 이벤트는 `recorded_at`, 생성 로그는 `generated_at`이 `[week_start,
+     week_end)` 안인 것만 쓴다(DB 쿼리의 WHERE와 같은 규칙). 시각이 비면 창 밖으로 친다
+     (SQL 비교가 NULL을 제외하는 것과 같다) — 파일 모드는 그 건수를 stderr로 말한다.
+  ② 생성 로그 → 집계 행 변환(`_genlog_row_for_aggregate`) — 한 함수만 쓴다.
+  ③ 집계(`ops.hit_cu_metrics.aggregate`)·레코드 조립(`build_record_from_report`).
+
+회차가 실행 시각 기준 직전 7일 밖에 있을 수 있으므로 `--week-start`·`--week-end`로 창을
+지정할 수 있다(두 모드 공통). 입력 파일의 **파싱 실패가 1행이라도 있으면 4종을 미측정**으로
+낸다 — 깨진 행이 하필 느린 검수였다면 그 행이 빠진 채 측정치가 나온다(부분 입력 판정 금지 ·
+`hit_cu_metrics` CLI와 같은 기조). 파일이 없으면 역시 미측정이다(사유에 예외 타입명).
+
+cu_slug 조인 (EOS-198 ② — 공백 G-B)
+-----------------------------------
+배치 저작 행은 `problem_id=None`이다(문제 행이 아직 없다 — `l3/equivalent/llm_generator.py`).
+그 행의 비용이 CU에 붙는 유일한 열쇠가 `cu_slug`인데, 종전 DB 경로는 집계 행을
+`problem_id`·`cost_usd`·토큰 4키로만 만들어 **cu_slug를 버렸다** — DB에 행이 있어도
+`unit_cost_krw`가 "비용 계측 완료 CU 0건"으로 미측정이 되던 결함이다. 변환을
+`_genlog_row_for_aggregate` 하나로 모으고 cu_slug를 싣는다(회귀 테스트
+`test_weekly_metrics_file_input.py::TestCuSlugJoin`이 cu_slug 제거 뮤테이션을 RED로 잡는다).
 """
 
 from __future__ import annotations
@@ -57,7 +90,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -67,7 +100,12 @@ from whymath_backend.db.models.provenance import GenerationLog
 from whymath_backend.db.models.review_timer_event import (
     ReviewTimerEvent as OrmReviewTimerEvent,
 )
+from whymath_backend.harness.review_timer import load_events_jsonl
+from whymath_backend.l3.pregenerate.provenance_bridge import load_generation_logs_jsonl
+from whymath_backend.ops.g3_content_measures import load_run_dir, measure_auto_gate
 from whymath_backend.ops.hit_cu_metrics import HitCuReport, aggregate
+from whymath_backend.schema.provenance import GenerationLog as SchemaGenerationLog
+from whymath_backend.schema.review_timer import ReviewTimerEvent as SchemaReviewTimerEvent
 
 __all__ = [
     "HARNESS_METRIC_NAMES",
@@ -77,8 +115,12 @@ __all__ = [
     "load_incidents_summary",
     "KpiValue",
     "WeeklyRecord",
+    "auto_gate_kpi_from_run_dirs",
     "build_record_from_report",
     "collect",
+    "collect_from_files",
+    "FileInputSummary",
+    "report_from_files",
     "load_ledger",
     "append_record",
     "main",
@@ -102,7 +144,8 @@ KPI_NAMES: tuple[str, ...] = (
 # (모듈 docstring 참조). 값이 바뀌면(로그가 신설되면) 여기서 빼고 실제 계산으로 옮긴다.
 STRUCTURALLY_UNMEASURED: dict[str, str] = {
     "auto_gate_pass_rate": (
-        "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측)"
+        "Deterministic Gate pass/fail 누적 로그 없음 — 집계 대상 테이블 미존재(2026-09-11 실측) · "
+        "파일 입력 모드는 --authoring-run-dir로 수용 게이트 로그에서 산출(EOS-207)"
     ),
     "rework_rate": (
         "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 "
@@ -242,11 +285,14 @@ def build_record_from_report(
     krw_per_usd: float | None,
     db_failure_reason: str | None = None,
     harness: dict[str, KpiValue] | None = None,
+    auto_gate: KpiValue | None = None,
 ) -> WeeklyRecord:
     """`HitCuReport`(또는 DB 실패 시 `None`) → `WeeklyRecord`. 순수 함수 — I/O 0.
 
     `report is None`이면(DB 연결 실패) 4종(HIT·처리량·단위비용·실패분포) 전부
-    `db_failure_reason`으로 미측정 처리한다 — 나머지 2종은 원래도 항상 미측정이다.
+    `db_failure_reason`으로 미측정 처리한다 — 나머지 2종은 원래도 미측정이다.
+    `auto_gate`를 주면(파일 입력 모드 `--authoring-run-dir` · EOS-207) 자동검증 1차 통과율의
+    구조적 미측정을 그 값으로 바꾼다 — 그 값 자신이 `measured=False`일 수 있다(회계 불일치 등).
     """
     kpis: dict[str, KpiValue] = {}
 
@@ -263,8 +309,30 @@ def build_record_from_report(
             measured=False, value=None, unit="count_by_code", reason=reason
         )
     else:
+        # HIT 하한 가드(OPS-90) — 계측 CU의 절반 이상이 하한 미만이면 그 중앙값·처리량은 재입력·
+        # 스킵 세션의 값일 수 있어 `measured: true`로 계상하지 않는다(감리 W-04: 유효 실측 0건인데
+        # 무효 표본 15건이 있었다). 3상태(모른다 ≠ 아니다): `False`("검사했고 괜찮다")일 때만
+        # 계상한다. 계측 CU가 있는데 True(걸림)·None(하한 0=가드 끔으로 미검사)이면 미측정이다.
+        # 계측 CU 0건의 None은 정상 분기라 여기서 건드리지 않는다 — 아래 기존 "계측 완료 CU 0건"
+        # 사유가 그대로 나간다.
+        implausible_reason: str | None = None
+        if report.cu_measured > 0 and report.hit_implausible_majority is not False:
+            if report.hit_implausible_majority is True:
+                implausible_reason = (
+                    f"계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 "
+                    f"HIT 하한 {report.min_plausible_seconds:g}초 미만(절반 이상) — "
+                    "재입력·스킵 세션 의심(OPS-90)"
+                )
+            else:
+                implausible_reason = (
+                    "HIT 하한 가드 미검사(하한 0 이하) — 재입력·스킵 세션 여부를 알 수 없다(OPS-90)"
+                )
         # HIT — 중앙값(초). CU 표본이 없으면 median=None(0초 산입 금지, hit_cu_metrics 규약).
-        if report.cu_measured > 0 and report.hit_median_seconds is not None:
+        if implausible_reason is not None:
+            kpis["hit_seconds"] = KpiValue(
+                measured=False, value=None, unit="seconds_median", reason=implausible_reason
+            )
+        elif report.cu_measured > 0 and report.hit_median_seconds is not None:
             kpis["hit_seconds"] = KpiValue(
                 measured=True, value=report.hit_median_seconds, unit="seconds_median"
             )
@@ -277,7 +345,12 @@ def build_record_from_report(
             )
 
         # 처리량 — CU/h = measured CU 수 ÷ (HIT 합 시간). 분모 0이면 미산출.
-        if report.cu_measured > 0 and report.hit_total_seconds > 0:
+        # 분모가 같은 HIT 합이라 하한 가드에 걸린 회차는 처리량도 부풀려진다 — 함께 미측정.
+        if implausible_reason is not None:
+            kpis["throughput_cu_per_hour"] = KpiValue(
+                measured=False, value=None, unit="cu_per_hour", reason=implausible_reason
+            )
+        elif report.cu_measured > 0 and report.hit_total_seconds > 0:
             kpis["throughput_cu_per_hour"] = KpiValue(
                 measured=True,
                 value=report.cu_measured / (report.hit_total_seconds / 3600),
@@ -292,6 +365,10 @@ def build_record_from_report(
             )
 
         # 단위 비용 — KRW/CU. 환율 미지정이거나 비용 계측 CU가 0이면 미산출(하드코딩 금지).
+        # 분자·분모는 **같은 CU 집합(완전 계측 CU)**이다(EOS-198 P3-1): 비용 미기록 행이 섞인
+        # CU는 부분합(하한)이라 양쪽에서 뺀다. 종전엔 분자에 부분 기록 CU까지 든
+        # `cost_usd_total`을 써서 단가가 부풀었다. 뺀 CU가 있으면 measured=True를 유지하되
+        # reason에 "부분 표본"과 제외 수를 적는다(값이 무엇의 평균인지 원장에서 보이게).
         if krw_per_usd is None:
             kpis["unit_cost_krw"] = KpiValue(
                 measured=False,
@@ -299,11 +376,17 @@ def build_record_from_report(
                 unit="krw_per_cu",
                 reason="환율 미지정(--krw-per-usd) — 하드코딩된 기본 환율은 두지 않는다",
             )
-        elif report.cu_with_cost > 0 and report.cost_usd_total is not None:
+        elif report.cu_with_cost > 0 and report.cost_usd_complete_total is not None:
             kpis["unit_cost_krw"] = KpiValue(
                 measured=True,
-                value=(report.cost_usd_total * krw_per_usd) / report.cu_with_cost,
+                value=(report.cost_usd_complete_total * krw_per_usd) / report.cu_with_cost,
                 unit="krw_per_cu",
+                reason=(
+                    f"부분 표본 — 완전 계측 CU {report.cu_with_cost}건의 평균 · 비용 미기록 행이 "
+                    f"섞인 CU {report.cu_cost_incomplete}건은 분자·분모에서 제외"
+                    if report.cu_cost_incomplete > 0
+                    else None
+                ),
             )
         else:
             kpis["unit_cost_krw"] = KpiValue(
@@ -331,6 +414,8 @@ def build_record_from_report(
     # 구조적으로 항상 미측정인 2종 — DB 성패와 무관.
     for name, reason in STRUCTURALLY_UNMEASURED.items():
         kpis[name] = KpiValue(measured=False, value=None, unit="rate", reason=reason)
+    if auto_gate is not None:
+        kpis["auto_gate_pass_rate"] = auto_gate
 
     assert set(kpis) == set(KPI_NAMES), f"KPI 누락/초과: {set(kpis) ^ set(KPI_NAMES)}"
 
@@ -376,17 +461,280 @@ async def _fetch_report(
         .scalars()
         .all()
     )
-    genlog_rows: list[dict[str, Any]] = [
-        {
-            "problem_id": str(row.problem_id) if row.problem_id is not None else None,
-            "cost_usd": float(row.cost_usd) if row.cost_usd is not None else None,
-            "input_tokens": row.input_tokens,
-            "output_tokens": row.output_tokens,
-        }
-        for row in genlog_orm_rows
-    ]
+    genlog_rows = [_genlog_row_for_aggregate(row) for row in genlog_orm_rows]
 
     return aggregate(events, genlog_rows=genlog_rows)
+
+
+_PkRow = TypeVar("_PkRow", SchemaReviewTimerEvent, SchemaGenerationLog)
+
+
+class _GenlogLike(Protocol):
+    """집계 행 변환이 읽는 5속성 — ORM `GenerationLog`·schema `GenerationLog` 둘 다 만족한다."""
+
+    @property
+    def problem_id(self) -> Any: ...
+
+    @property
+    def cu_slug(self) -> str | None: ...
+
+    @property
+    def cost_usd(self) -> Any: ...
+
+    @property
+    def input_tokens(self) -> int | None: ...
+
+    @property
+    def output_tokens(self) -> int | None: ...
+
+
+def _genlog_row_for_aggregate(row: _GenlogLike) -> dict[str, Any]:
+    """생성 로그 1행 → `aggregate(genlog_rows=…)` 입력 dict. DB·파일 두 경로의 **유일한** 변환.
+
+    `cu_slug`가 핵심이다(EOS-198 ② · 공백 G-B): 배치 저작 행은 `problem_id=None`이라 이것이
+    없으면 비용이 CU에 조인되지 않는다(`hit_cu_metrics.aggregate`의 조인 규칙 = slug 우선 ·
+    problem_id 폴백). 값이 None인 필드는 None 그대로 둔다 — 0으로 바꾸면 미계측이 "$0 계측"으로
+    위장된다.
+    """
+    return {
+        "problem_id": str(row.problem_id) if row.problem_id is not None else None,
+        "cu_slug": row.cu_slug,
+        "cost_usd": float(row.cost_usd) if row.cost_usd is not None else None,
+        "input_tokens": row.input_tokens,
+        "output_tokens": row.output_tokens,
+    }
+
+
+def _in_window(moment: datetime | None, *, week_start: datetime, week_end: datetime) -> bool:
+    """`[week_start, week_end)` 판정 — DB 쿼리의 WHERE와 같은 규칙.
+
+    시각 없음은 창 밖이다(SQL 비교가 NULL을 제외하는 것과 같다).
+    """
+    if moment is None:
+        return False
+    aware = moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+    return week_start <= aware < week_end
+
+
+@dataclass(frozen=True, slots=True)
+class FileInputSummary:
+    """파일 입력 모드의 입력 회계 — 무엇을 읽고 무엇을 창 밖으로 뺐는가(stderr 보고용).
+
+    출력 레코드(`WeeklyRecord`)에는 싣지 않는다 — 원장 행 형태는 DB 경로와 같아야 한다.
+    """
+
+    event_rows: int
+    event_rows_in_window: int
+    event_rows_no_time: int
+    genlog_rows: int | None  # None = 생성 로그 입력 미지정(비용 KPI 미측정의 사유)
+    genlog_rows_in_window: int | None
+    genlog_rows_no_time: int | None
+    parse_errors: tuple[str, ...]
+    # 중복 제거 회계(EOS-198 P2-1) — 같은 PK의 재출현을 뺀 수. 0이 아니면 같은 파일을 두 번
+    # 줬거나 사이드카가 재기록된 것이다(값을 두 배로 만들지 않고 센다).
+    event_duplicates: int = 0
+    genlog_duplicates: int = 0
+
+
+def _rows_missing_key(path: Path, key: str) -> list[str]:
+    """원문 JSONL에서 `key`가 **없는** 객체 행 — 사유 목록(줄 번호·키 이름만, 값은 싣지 않는다).
+
+    왜 원문을 다시 읽는가: 스키마의 PK(`log_id`·`event_id`)는 `default_factory=uuid4`라, 키가
+    없는 행도 검증을 통과하며 **읽을 때마다 새 PK를 받는다.** 그러면 같은 행이 두 번 들어와도
+    PK가 달라 중복 제거가 불가능하고, 값이 조용히 두 배가 된다. 이 저장소의 생산자(저작 CLI의
+    `append_generation_log_jsonl`·검수 CLI의 `append_event_jsonl`)는 PK를 **항상** 쓰므로, PK가
+    없는 행은 손으로 만든·다른 도구가 만든 입력이다 — 중복 여부를 알 수 없으니 **입력 실패로
+    친다**(fail-closed). JSON 자체가 깨진 줄은 스키마 로더가 이미 사유로 냈으므로 여기서는 세지
+    않는다(같은 줄의 이중 계상 방지).
+    """
+    missing: list[str] = []
+    with path.open("r", encoding="utf-8") as fh:
+        for line_no, line in enumerate(fh, start=1):
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict) and parsed.get(key) is None:
+                missing.append(f"line {line_no}: MissingPrimaryKey({key}) — 중복 판정 불가")
+    return missing
+
+
+def _dedupe_by_pk(rows: list[_PkRow], pk: str) -> tuple[list[_PkRow], int, list[str]]:
+    """PK 기준 중복 제거(첫 관측 유지·순서 보존) → (행, 같은 내용 재출현 수, 충돌 사유)."""
+    first: dict[Any, _PkRow] = {}
+    kept: list[_PkRow] = []
+    duplicates = 0
+    conflicts: list[str] = []
+    for row in rows:
+        key = getattr(row, pk)
+        seen = first.get(key)
+        if seen is None:
+            first[key] = row
+            kept.append(row)
+        elif seen.model_dump() == row.model_dump():
+            duplicates += 1
+        else:
+            conflicts.append(f"{pk} {key} 충돌 — 같은 PK에 내용이 다른 행(재기록이 아니다)")
+    return kept, duplicates, conflicts
+
+
+def report_from_files(
+    *,
+    events_paths: list[Path],
+    genlog_paths: list[Path] | None,
+    week_start: datetime,
+    week_end: datetime,
+) -> tuple[HitCuReport | None, FileInputSummary | None, str | None]:
+    """회차 JSONL → (`HitCuReport` | None, 입력 회계, 실패 사유). DB에 연결하지 않는다.
+
+    실패(파일 없음·파싱 실패 ≥1행)면 report=None과 사유를 돌려준다 — 호출측이
+    `build_record_from_report(None, db_failure_reason=사유)`로 4종을 미측정 처리한다.
+    `genlog_paths=None`이면 비용 입력이 없다는 뜻이다(`aggregate(genlog_rows=None)` →
+    단위비용 미측정). 빈 리스트와 구분한다.
+    """
+    events: list[SchemaReviewTimerEvent] = []
+    errors: list[str] = []
+    try:
+        for path in events_paths:
+            loaded, errs = load_events_jsonl(path)
+            events.extend(loaded)
+            errors.extend(f"{path.name} {e}" for e in errs)
+            errors.extend(f"{path.name} {e}" for e in _rows_missing_key(path, "event_id"))
+        logs: list[SchemaGenerationLog] | None = None
+        if genlog_paths is not None:
+            logs = []
+            for path in genlog_paths:
+                loaded_logs, log_errs = load_generation_logs_jsonl(path)
+                logs.extend(loaded_logs)
+                errors.extend(f"{path.name} {e}" for e in log_errs)
+                errors.extend(f"{path.name} {e}" for e in _rows_missing_key(path, "log_id"))
+    except OSError as exc:  # FileNotFoundError 포함 — 타입명을 사유에 남긴다(침묵 실패 금지).
+        return None, None, f"입력 파일 읽기 실패 — {type(exc).__name__}: {exc}"
+
+    # ── PK 기준 중복 제거(EOS-198 P2-1) — DB 경로는 PK가 유일성을 보장하므로 파일 경로도
+    # 같은 성질을 가져야 같은 입력에서 같은 값이 난다. 같은 파일을 두 번 주면 종전엔 단위비용이
+    # 두 배인 채 measured:true였다(이벤트는 aggregate가 event_id로 이미 제거 — 비대칭이었다).
+    # 같은 PK인데 내용이 다르면 재기록이 아니라 충돌이다 — 어느 쪽이 맞는지 모르므로 판정하지
+    # 않는다(파싱 실패와 같은 실패로 친다).
+    events, event_duplicates, event_conflicts = _dedupe_by_pk(events, "event_id")
+    genlog_duplicates = 0
+    if logs is not None:
+        logs, genlog_duplicates, log_conflicts = _dedupe_by_pk(logs, "log_id")
+        errors.extend(log_conflicts)
+    errors.extend(event_conflicts)
+
+    kept_events = [
+        e for e in events if _in_window(e.recorded_at, week_start=week_start, week_end=week_end)
+    ]
+    kept_logs = (
+        None
+        if logs is None
+        else [
+            g for g in logs if _in_window(g.generated_at, week_start=week_start, week_end=week_end)
+        ]
+    )
+    summary = FileInputSummary(
+        event_rows=len(events),
+        event_rows_in_window=len(kept_events),
+        event_rows_no_time=sum(1 for e in events if e.recorded_at is None),
+        genlog_rows=None if logs is None else len(logs),
+        genlog_rows_in_window=None if kept_logs is None else len(kept_logs),
+        genlog_rows_no_time=(
+            None if logs is None else sum(1 for g in logs if g.generated_at is None)
+        ),
+        parse_errors=tuple(errors),
+        event_duplicates=event_duplicates,
+        genlog_duplicates=genlog_duplicates,
+    )
+    if errors:
+        # 부분 입력으로 판정하지 않는다 — 깨진 행이 하필 느린 검수·비싼 호출이었다면 그 행이
+        # 빠진 채 측정치가 나온다(hit_cu_metrics CLI ⑥과 같은 기조).
+        return (
+            None,
+            summary,
+            f"입력 파싱 실패 {len(errors)}행 — 부분 입력으로 판정하지 않는다(첫 사유: {errors[0]})",
+        )
+    genlog_rows = None if kept_logs is None else [_genlog_row_for_aggregate(g) for g in kept_logs]
+    return aggregate(kept_events, genlog_rows=genlog_rows), summary, None
+
+
+def auto_gate_kpi_from_run_dirs(
+    run_dirs: list[Path], *, week_start: datetime, week_end: datetime
+) -> KpiValue:
+    """저작 회차 폴더들 → 자동검증 1차 통과율 KPI(EOS-207). 창은 시도의 판정 시각 기준.
+
+    값 = 재계산 검증으로 게이트를 통과한 후보 ÷ 모델 응답 수(게이트 도달 + 파싱 거부 + 조립 거부 ·
+    우회 검산식 통과 제외 · 정의는 `ops/g3_content_measures` (a)). 입력·회계 오류·원인 분류 불가
+    생성 실패·우회 판정 불가가 있으면 미측정이다.
+    """
+    loaded = [load_run_dir(path) for path in run_dirs]
+    errors = [e for run in loaded for e in run.errors]
+    measure = measure_auto_gate(loaded, window=(week_start, week_end), input_errors=errors)
+    if not measure.measured:
+        return KpiValue(measured=False, value=None, unit="rate", reason=measure.reason)
+    return KpiValue(
+        measured=True,
+        value=measure.rate,
+        unit="rate",
+        reason=(
+            f"재계산 검증 통과 {measure.recomputed}/{measure.responded}(모델 응답 수) · 검산식 "
+            f"우회 통과 {measure.bypassed}건 제외(원시 통과율 {_fmt_rate(measure.rate_raw)}) · "
+            f"게이트 앞 결정론 거부(파싱·조립) {measure.deterministic_rejected}건은 분모 안 · "
+            f"미생성 {measure.failure_kinds.get('not_generated', 0)}건은 분모 밖 · "
+            f"게이트 도달 기준 {_fmt_rate(measure.rate_gate_reached)} · "
+            f"창 밖 {measure.outside_window}건"
+        ),
+    )
+
+
+def _fmt_rate(value: float | None) -> str:
+    """비율 표기 — 분모 0으로 산출 불가면 숫자 대신 그 사실을 적는다(0으로 위장하지 않는다)."""
+    return "산출 불가(분모 0)" if value is None else f"{value:.4f}"
+
+
+def collect_from_files(
+    *,
+    events_paths: list[Path],
+    genlog_paths: list[Path] | None,
+    week_start: datetime,
+    week_end: datetime,
+    generated_at: datetime,
+    krw_per_usd: float | None,
+    harness: dict[str, KpiValue] | None = None,
+    authoring_run_dirs: list[Path] | None = None,
+) -> tuple[WeeklyRecord, FileInputSummary | None]:
+    """파일 입력 모드의 `collect` — 같은 `build_record_from_report`로 같은 형태의 레코드를 낸다.
+
+    `authoring_run_dirs`(EOS-207)를 주면 자동검증 1차 통과율을 그 수용 게이트 로그로 낸다.
+    None이면 종전대로 구조적 미측정이다(빈 목록과 구분하지 않는다 — 둘 다 입력 없음).
+    """
+    auto_gate = (
+        auto_gate_kpi_from_run_dirs(authoring_run_dirs, week_start=week_start, week_end=week_end)
+        if authoring_run_dirs
+        else None
+    )
+    report, summary, failure = report_from_files(
+        events_paths=events_paths,
+        genlog_paths=genlog_paths,
+        week_start=week_start,
+        week_end=week_end,
+    )
+    if failure is not None:
+        _logger.error("weekly_metrics_report: 파일 입력 실패 — %s", failure)
+    record = build_record_from_report(
+        report,
+        week_start=week_start,
+        week_end=week_end,
+        generated_at=generated_at,
+        krw_per_usd=krw_per_usd,
+        db_failure_reason=failure,
+        harness=harness,
+        auto_gate=auto_gate,
+    )
+    return record, summary
 
 
 async def collect(
@@ -461,13 +809,54 @@ def _resolve_window(*, now: datetime) -> tuple[datetime, datetime]:
     return now - timedelta(days=7), now
 
 
+def _parse_window_moment(raw: str) -> datetime:
+    """창 경계 ISO 파싱 — 시간대 없으면 UTC로 본다(`hit_cu_metrics._parse_moment` 동형 ·
+    aware/naive 혼합 비교 방지)."""
+    moment = datetime.fromisoformat(raw)
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+def _report_file_input(
+    summary: FileInputSummary | None, *, week_start: datetime, week_end: datetime
+) -> None:
+    """파일 입력 회계를 stderr로 낸다 — 창 밖으로 뺀 행이 보여야 창을 잘못 잡은 것을 안다.
+
+    stdout은 레코드 JSON 전용이다(소비자 `json.load`가 깨지지 않게).
+    """
+    window = f"[{week_start.isoformat()}, {week_end.isoformat()})"
+    if summary is None:
+        print(
+            f"[파일 입력] 창 {window} — 입력을 읽지 못했다(사유는 레코드 reason)",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+    print(
+        f"[파일 입력] 창 {window} · 이벤트 {summary.event_rows}행 중 창 안 "
+        f"{summary.event_rows_in_window}행(시각 없음 {summary.event_rows_no_time}) · 생성 로그 "
+        + (
+            "미지정(단위비용 미측정)"
+            if summary.genlog_rows is None
+            else f"{summary.genlog_rows}행 중 창 안 {summary.genlog_rows_in_window}행"
+            f"(시각 없음 {summary.genlog_rows_no_time})"
+        )
+        + f" · 중복 제거 이벤트 {summary.event_duplicates}행"
+        + f"·생성 로그 {summary.genlog_duplicates}행"
+        + f" · 파싱 실패 {len(summary.parse_errors)}행",
+        file=sys.stderr,
+        flush=True,
+    )
+    for reason in summary.parse_errors:
+        print(f"  · 파싱 실패: {reason}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.ops.weekly_metrics_report",
         description=(
             "EOS-51 §6 기술 KPI 6종을 지난 7일 창으로 집계해 metrics/weekly.json에 "
-            "append한다(OPS-56). 자동검증 1차 통과율·재작업률은 이 저장소에 집계 대상 "
-            "로그가 아직 없어 구조적으로 항상 미측정이다."
+            "append한다(OPS-56). 재작업률은 이 저장소에 집계 대상 로그가 아직 없어 구조적으로 "
+            "미측정이다. 자동검증 1차 통과율은 파일 입력 모드의 --authoring-run-dir로만 산출한다."
         ),
     )
     parser.add_argument(
@@ -494,25 +883,99 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="집계만 하고 파일에 쓰지 않음(stdout에 출력)"
     )
+    # ── 파일 입력 모드(EOS-198 ① · 공백 G-A) ──
+    parser.add_argument(
+        "--events-jsonl",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "검수 타이머 이벤트 JSONL(반복 가능 · `review_session --events` 산출물). 주면 DB에 "
+            "연결하지 않는 파일 입력 모드가 된다"
+        ),
+    )
+    parser.add_argument(
+        "--generation-log-jsonl",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "GenerationLog JSONL(반복 가능 · 저작 CLI의 `<out>.genlog.jsonl`). --events-jsonl과 "
+            "함께만 쓴다. 미지정이면 단위비용 KPI는 미측정"
+        ),
+    )
+    parser.add_argument(
+        "--authoring-run-dir",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "저작 회차 폴더(반복 가능 · cu.jsonl·cu.review.jsonl·cu.genlog.jsonl). 주면 "
+            "자동검증 1차 통과율을 그 수용 게이트 로그로 산출한다(EOS-207). "
+            "--events-jsonl과 함께만 쓴다"
+        ),
+    )
+    parser.add_argument(
+        "--week-start",
+        default=None,
+        help=(
+            "집계 창 시작 ISO8601(포함 · 시간대 없으면 UTC). --week-end와 함께 준다. 미지정이면 "
+            "실행 시각 기준 직전 7일"
+        ),
+    )
+    parser.add_argument(
+        "--week-end", default=None, help="집계 창 끝 ISO8601(미포함 · --week-start와 함께)"
+    )
     args = parser.parse_args(argv)
 
+    if args.authoring_run_dir and not args.events_jsonl:
+        parser.error("--authoring-run-dir는 --events-jsonl과 함께만 쓸 수 있습니다(파일 입력 모드)")
+    if args.generation_log_jsonl and not args.events_jsonl:
+        parser.error(
+            "--generation-log-jsonl은 --events-jsonl과 함께만 쓸 수 있습니다(파일 입력 모드)"
+        )
+    if (args.week_start is None) != (args.week_end is None):
+        parser.error("--week-start와 --week-end는 함께 지정해야 합니다")
+
     now = datetime.now(UTC)
-    week_start, week_end = _resolve_window(now=now)
+    if args.week_start is not None:
+        try:
+            week_start = _parse_window_moment(args.week_start)
+            week_end = _parse_window_moment(args.week_end)
+        except ValueError as exc:
+            parser.error(f"--week-start/--week-end ISO8601 파싱 실패 — {type(exc).__name__}")
+        if not week_start < week_end:
+            parser.error("--week-start는 --week-end보다 앞이어야 합니다(빈 창은 판정 불가)")
+    else:
+        week_start, week_end = _resolve_window(now=now)
 
     summary, summary_failure = load_incidents_summary(args.incidents_summary)
     if summary_failure is not None:
         _logger.warning("weekly_metrics_report: 하네스 지표 미수집 — %s", summary_failure)
     harness = build_harness_metrics(summary, failure_reason=summary_failure)
 
-    record = asyncio.run(
-        collect(
+    if args.events_jsonl:
+        record, file_summary = collect_from_files(
+            events_paths=list(args.events_jsonl),
+            genlog_paths=list(args.generation_log_jsonl) if args.generation_log_jsonl else None,
             week_start=week_start,
             week_end=week_end,
             generated_at=now,
             krw_per_usd=args.krw_per_usd,
             harness=harness,
+            authoring_run_dirs=list(args.authoring_run_dir) if args.authoring_run_dir else None,
         )
-    )
+        _report_file_input(file_summary, week_start=week_start, week_end=week_end)
+    else:
+        record = asyncio.run(
+            collect(
+                week_start=week_start,
+                week_end=week_end,
+                generated_at=now,
+                krw_per_usd=args.krw_per_usd,
+                harness=harness,
+            )
+        )
 
     if args.dry_run:
         json.dump(record.to_json(), sys.stdout, ensure_ascii=False, indent=2)

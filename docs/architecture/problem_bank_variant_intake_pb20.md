@@ -23,7 +23,7 @@
 
 `problem.is_published`는 **읽는 코드가 0건**이다. 나오는 곳은 생성기 docstring, ORM·스키마 정의, 관리자 CMS 편집 허용 필드 목록(`api/admin_cms_resources.py`)뿐이고,
 `l3/dsl/models.py:25` 주석이 "별개의 게시 축이며 현재 읽는 코드가 없다(ADMIN-12)"고 자인한다.
-코퍼스 14,538행 전부 `False`지만 그 값이 노출을 막은 적은 없다. **그래서 `is_published=False`를 노출 방어로
+코퍼스 14,538행(2026-10-13 판정 기준) 전부 `False`지만 그 값이 노출을 막은 적은 없다. **그래서 `is_published=False`를 노출 방어로
 세지 않는다.** 실제로 노출을 막는 축은 `review_status` 하나다.
 
 ### 1.2 서빙 층 — 검수 공백 행이 학생에게 닿는가
@@ -46,7 +46,7 @@
 
 ### 1.3 발견 — 닫히지 않은 곳은 공개 카탈로그 하나다
 
-현 코퍼스는 14,538행 중 `approved` 2,984 · `pending` 158 · **공백 11,396**이다. 공백 11,396행은 승인된 적이
+판정 기준 시점(2026-10-13) 코퍼스는 14,538행 중 `approved` 2,984 · `pending` 158 · **공백 11,396**이다. 공백 11,396행은 승인된 적이
 없는데 이미 `problem_bank_*` 글롭 안(30종)에 있다. CAT·L6는 허용목록이라 이를 막지만, 공개 카탈로그는
 `quarantined`만 빼므로 이 행들이 나간다. 이 구멍은 `PB-08`(`todo`, 의존 없음)이 소유한다.
 
@@ -65,11 +65,14 @@
 | 빌드→런타임 | `src/backend/whymath_backend/harness/concept_assessment_index.py` | 개념 평가 재료 상속 후보 선별 | 닿을 수 있음 — **`approved`만**(L303) |
 | 코퍼스 변이 | `src/backend/whymath_backend/harness/problem_corpus_author_backfill.py` | `authored_by` 서명을 코퍼스에 제자리 기입 | 아님 (승격 후 대상이 됨 — §4) |
 | 측정(분자=승인) | `src/backend/whymath_backend/l1/standards/phase3_coverage.py` | Phase 3 커버리지 — `approved` 문항만 센다 | 아님 |
+| 측정(분자=승인) | `src/backend/whymath_backend/harness/ai_quality_eval_set.py` | P3-10 AI 품질 평가셋 — `approved` 이고 PRIMARY 개념이 대표 과정인 문항의 `verify`·보기·`distractor_map` 을 id로 해석하는 오프라인 평가기(학생 응답 경로가 아니다) | 아님 |
+| 측정(분자=승인) | `src/backend/whymath_backend/ops/phase3_remediation.py` | P3-06 오답→교정 전략 커버리지 — `approved` 객관식 문항의 보기·정답·distractor_map 만 읽는 오프라인 측정기(학생 응답 경로가 아니다) | 아님 |
 | 측정(분자=승인) | `src/backend/whymath_backend/ops/phase3_metrics.py` | Phase 3 지표 — `approved` 문항만 센다 | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/qa_pipeline.py` | CI QA 축(조건식 DSL 위반 순회) | 아님 — 단 분모에 들어가면 CI 판정이 바뀐다 |
 | 측정(CI 게이트) | `src/backend/whymath_backend/l3/notation_coverage.py` | 표기 커버리지 | 아님 — 단 게이트라 미검수 행의 표기 결손이 CI를 깬다 |
 | 측정(CI 게이트) | `src/backend/whymath_backend/l3/curriculum_notation_gate.py` | 교육과정 표기 게이트 | 아님 — 위와 같다 |
 | 측정 | `src/backend/whymath_backend/harness/attempt_grading_shadow_report.py` | 서버 채점 섀도 리포트 | 아님 |
+| 측정(분자=승인) | `src/backend/whymath_backend/harness/attempt_scan_shadow_harvest.py` | P3-66 미분 오답 서명 그림자 관측의 활성화 판정 — 로그의 문항 id로 `approved` 문항의 지문·정답만 읽어 우연 일치 기준선을 엔진으로 잰다(오프라인·학생 응답 경로가 아니다) | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/selective_grading_demotion_eval.py` | 채점 결함 주입 강등전 | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/crosslink_demotion_eval.py` | 오개념 크로스링크 강등전 | 아님 |
 | 측정 | `src/backend/whymath_backend/l4/misconception/crosslink_machine_reject.py` | 크로스링크 기계 거부 | 아님 |
@@ -81,6 +84,7 @@
 | 측정 | `src/backend/whymath_backend/ops/repeat_recommendation_report.py` | 반복 추천 리포트 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_variants.py` | 변형 파생 — 시드 signature로 코퍼스를 읽는다 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_lineage_links.py` | 계보만 걸기 — 시드 역인덱스로 코퍼스를 읽는다 | 아님 |
+| 분석 스크립트 | `scripts/analysis/corpus_facts.py` | 코퍼스 사실 단일 원천 — 은행별·전체 건수 계산(OPS-154) | 아님 |
 | 분석 스크립트 | `scripts/analysis/answer_form_requirement_scan.py` | 정답 형식 요건 스캔 | 아님 |
 | 분석 스크립트 | `scripts/analysis/eos_anchor_asset_audit.py` | EOS 앵커 자산 감사 | 아님 |
 | 분석 스크립트 | `scripts/analysis/measure_sympy_isolation_budget.py` | SymPy 격리 예산 실측 | 아님 |
@@ -103,6 +107,15 @@
 실측: 루트에서 `거부됨`, `src/backend`(CI 백엔드 잡의 cwd)에서 `None`. 운영 호출(루트)에서는 동작하고
 이 PR의 승격 보호(§4)도 루트 기준으로 동결했지만, **가드가 cwd에 따라 침묵으로 꺼진다**는 사실은 별도 태스크로
 등재한다(§6).
+
+**해소 (OPS-138)**: 원인은 `_REPO_CORPUS_DIR` 하나가 아니라 세 지점이었다 — 레포 코퍼스 디렉터리 판정·고정
+코퍼스 식별(`_is_known_fixed`)·제 짝 경로 비교가 모두 cwd에 붙어 있었다(`src/backend`에서 `classify_corpus`가
+고정 코퍼스를 `other`로 분류하는 것까지 실측). 세 지점을 모듈 파일 위치 기준 `_REPO_ROOT`로 앵커했다.
+같은 모양(상대 Path 상수를 cwd 의존 연산에 거는 코드)을 AST로 전수 스캔한 결과는 `src/backend/whymath_backend`·
+`scripts` 907파일에서 **침묵 오작동 0건**이며, 후보 11파일 중 대부분은 이미 `__file__` 기준 앵커이고
+`ci_job_coverage`·`ci_mirror`의 cwd 상대 `--workflow` 기본값은 파일이 없으면 `ScanEmptyError`로 소리 내어
+실패한다. 이 스캔은 별칭·함수 인자로 우회하는 모양은 보지 못하므로 회귀 가드로만 읽는다
+(`tests/backend/harness/test_relative_path_const_cwd_scan.py`).
 
 ## 2. 편입 결정 (acceptance ②)
 

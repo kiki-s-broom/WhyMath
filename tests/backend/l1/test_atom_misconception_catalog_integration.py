@@ -10,12 +10,13 @@ end-to-end 적재한다. CI `backend — 마이그레이션·통합 (실 PG)` �
   ① 실 코퍼스 적재 — atom ①오개념 1,823행(mis_id 'ATOM:' 접두)·전건 적재
   ② 멱등 — 재적재 시 행수·접두 행수 불변
   ③ 표본 행 — canonical_statement·error_type·concept_src_id(원자 code)·provenance 라운드트립
-  ④ 네임스페이스 분리 — 'ATOM:' 접두 행은 모두 provenance 'atom_graph_v1'(구 839과 무충돌)
-정리는 `mis_id LIKE 'ATOM:%'` 전건(구 misconceptions_v1 839 행을 건드리지 않는다 — additive 병존).
+  ④ 네임스페이스 분리 — 'ATOM:' 접두 행은 모두 provenance 'atom_graph_v1'(구 카탈로그 misconceptions_v1과 무충돌)
+정리는 `mis_id LIKE 'ATOM:%'` 전건(구 misconceptions_v1 행을 건드리지 않는다 — additive 병존).
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,14 @@ pytestmark = pytest.mark.integration
 # 에서 항상 "코퍼스 미존재" skip이 되어 적재 검증이 한 번도 실행되지 않았다(침묵 skip 결함 수정).
 _CORPUS = Path(__file__).resolve().parents[3] / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 # atom ①오개념 전건(원자 1,823 전량이 misconception 보유 — Phase 1 산출 정합).
-_EXPECTED_ROWS = 1823
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (Path(__file__).resolve().parents[3] / "docs" / "data" / "corpus_facts.json").read_text(
+        encoding="utf-8"
+    )
+)
+_EXPECTED_ROWS = _FACTS["atom_graph.atoms"]
 
 
 def _sync_engine() -> object:
@@ -64,7 +72,7 @@ def _reachable() -> bool:
 
 
 def _cleanup() -> None:
-    """atom 출처 행 정리 — 'ATOM:' 접두 전건(구 839은 비접두라 무관)."""
+    """atom 출처 행 정리 — 'ATOM:' 접두 전건(구 misconceptions_v1은 비접두라 무관)."""
     from sqlalchemy import text
 
     engine = _sync_engine()
@@ -123,7 +131,7 @@ class TestRealCorpusLoad:
                     assert db.concept_src_id == sample_row["concept_src_id"]
                     assert db.provenance_note == ATOM_PROVENANCE_NOTE
 
-                    # ④ 네임스페이스 분리 — 접두 행은 전부 atom 출처(구 839과 무충돌).
+                    # ④ 네임스페이스 분리 — 접두 행은 전부 atom 출처(구 카탈로그 misconceptions_v1과 무충돌).
                     provs = conn.execute(
                         text(
                             "SELECT DISTINCT provenance_note FROM misconception_catalog "

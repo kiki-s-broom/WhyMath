@@ -27,7 +27,7 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
 | **제품 완성도** | **Phase 3 지표 7종 (이 문서)** | `ops/phase3_metrics.py` | **대표 과정이 얼마나 채워졌나** | 대표 과정 범위 명세(`scope_spec.yaml`)가 동결한 노드·개념·스킬·승인 문항 | Phase 3 Release Gate · 판정기 | 이 문서 |
 
 **이름 충돌 주의 — "coverage"**. `harness/objective_coverage.py`(CUR-02)와 `harness/problem_bank_coverage.py`
-(ARCH-18)도 coverage 를 말하지만 분모가 다르다(성취기준 895건·문제은행 전체). 이 7종의 `Curriculum Coverage`
+(ARCH-18)도 coverage 를 말하지만 분모가 다르다(성취기준 <!-- fact:standards.k12 -->895<!-- /fact -->건·문제은행 전체). 이 7종의 `Curriculum Coverage`
 는 **대표 과정 10노드**가 분모이며, 출력 이름에 범위(`[대표 과정 10노드]`)를 박는다.
 
 경계를 코드가 지킨다: 출력 헤더와 JSON 에 평면 이름(`plane`·`other_plane`)이 박히고, 종합 점수를 만들지 않으며
@@ -45,7 +45,7 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
 | ① | Curriculum Coverage | Curriculum → Concept → Skill → Problem 경로가 있는 노드 | 대표 과정 교육과정 노드(10) | `l1.standards.phase3_coverage` (P3-02) **재사용** | 명세 `targets.curriculum_coverage` |
 | ② | Concept Completeness | 연결 5종(Prerequisite·Misconception·Solution·Hint·Pedagogy)이 **전부 linked** 인 핵심 개념 | 핵심 개념(10) | 같은 모듈 **재사용** — §3 재설계본 | 명세 `targets.concept_completeness` |
 | ③ | Problem Coverage | 승인 문항이 1건 이상 행사하는 스킬 | 명세 `skills`(8) | **신규 계산**(아래) | 명세 `targets.problem_coverage_by_skill` |
-| ④ | Solution QA Pass | 재검증 통과 문항 | 재검증 통과 + 실패 문항 | `harness.corpus_reverify.reverify_corpus` (승인 ∧ 대표 과정 PRIMARY 문항 전수) | `1 − ` 스코어카드 `수학적 오류율` ceiling (**흡수**) |
+| ④ | Solution QA Pass | 적용된 검사(C1~C5)가 모두 결정되어 통과한 문항 | 통과 + 실패 문항(검증 불가 제외) | `harness.solution_qa.run_solution_qa` (P3-07 · 승인 ∧ 대표 과정 PRIMARY 문항 전수) | `1 − ` 스코어카드 `수학적 오류율` ceiling (**흡수**) |
 | ⑤ | Learning Loop Success | `loop_kpi_gate` LOOP_COMPLETION 의 분자 | 같은 분모 | `ops.loop_kpi_gate` **그대로 재사용**(새 정의 없음) | `LOOP_KPI_SPECS` 의 임계(Wilson 하한) |
 | ⑥ | Critical Defect | 해당(triggered) Hard Gate 수 | Hard Gate **2종**(F-Ⅱ·F-Ⅴ) | `ops.validation_scorecard.evaluate_hard_gates` 의 F-Ⅱ·F-Ⅴ **그대로 흡수**(F-Ⅰ·Ⅲ·Ⅳ 는 범위 밖) | 0건 |
 | ⑦ | Graph Connectivity Coverage | Concept → Skill → Problem → Misconception → Pedagogy 가 **한 줄**로 이어지는 핵심 개념 | 핵심 개념(10) | P3-02 **재사용** | 명세 `targets.graph_connectivity_coverage` — **0.95**(2026-10-12 확정) |
@@ -62,12 +62,27 @@ Phase 3 실행 지시문 [19] 가 요구한 "지표 7종을 **한 명령**으로
   정확히 1개가 아니거나 방향이 ceiling 이 아니면 던진다(흡수 계약 파손을 조용히 넘기지 않는다).
 - **모집단이 다르다.** 스코어카드의 오류율은 *골든 항목의 FN*(독립 모델 심판 전수)이고, ④ 는 *대표 과정 승인 문항의
   SymPy 재검증 통과율*이다. 같은 숫자가 아니며 출력의 `모집단 주의` 줄이 이를 매번 적는다.
-- **skip 은 통과가 아니다.** 재검증 불가(verify 재료 없음·unverifiable)는 분자·분모에 넣지 않고 `검증 불가 비율`로
-  따로 낸다. 검증 가능한 문항이 0건이면 **측정 실패**다(0% 도 100% 도 아니다). 전수 계수(표본 추정 아님)이므로
-  Wilson 경계를 쓰지 않는다(P3-02 와 같은 입장).
-- 재검증 도구는 `corpus_reverify`(Tier1 답 검산 + Tier2 단계 연쇄, `--fuzz` 미사용)이다. P3-07(Solution QA
-  기계 검증)은 아직 `todo` 이므로 ④ 는 P3-07 착지 전까지 이 도구를 **대리**로 쓴다. P3-07 이 정의를 바꾸면
-  `_solution_qa` 한 지점만 갈아끼운다.
+- **검증 불가는 통과가 아니다.** 적용된 검사 중 하나라도 결정하지 못한 문항(풀이가 답 형태로 끝나지 않음·근 선택 규칙이
+  구조에 없음 등)은 분자·분모에 넣지 않고 `검증 불가 비율`로 따로 낸다. 검증 가능한 문항이 0건이면 **측정 실패**다
+  (0% 도 100% 도 아니다). 전수 계수(표본 추정 아님)이므로 Wilson 경계를 쓰지 않는다(P3-02 와 같은 입장).
+- **엔진 = `harness.solution_qa`(P3-07).** 문항마다 C1 정답↔조건(+`answer` 필드↔`answer_map`) · C2 풀이 최종 답↔정답 ·
+  C3 선택지에 정답이 정확히 한 번 · C4 풀이 단계 연쇄 동치 · C5 발문 독립 재유도↔정답(P3-63 · 인식기가 있는 문장 틀만 — 미적용은
+  통과로 세지 않고 보고서 `[C5 적용 범위]`에 따로 낸다)을 SymPy 단일 권위(`verify_answer`·`verify_final_answer`·
+  `verify_solution`)로 돌린다. 판정: 실패가 하나라도 있으면 FAIL, 없고 검증 불가가 하나라도 있으면 검증 불가, 아니면 통과.
+- **흡수 판정(P3-07 acceptance ④ · 2026-10-18).** 이원화하지 않는다 — 새 지표를 얹지 않고 이 ④ 가 곧 Solution QA Pass
+  이며 임계는 스코어카드 흡수값(99.5%)을 그대로 쓴다(지시문 원문 ≥ 99% 보다 엄격). 단독 CLI(`python -m
+  whymath_backend.harness.solution_qa`)는 같은 엔진·같은 모집단의 **상세 보기**(검사별 분포·사유별 건수·실패 목록·사람 검수 대기
+  목록)이고, ④ 는 그 집계를 7종 보고서에 싣는 어댑터다. **판정 방식은 의도적으로 다르다**: 단독 CLI·CI 게이트는 확정된 불일치
+  (FAIL)가 1건이라도 있으면 exit 1(영 허용 — 456건 중 1건은 통과율 99.78% 라 비율 판정이면 삼켜진다)이고, ④ 는 스코어카드 임계
+  (99.5%)로 비율 판정한다. `0 < 실패 ≤ 0.5%` 구간에서 두 표면의 판정이 갈리며, 어느 쪽으로 합칠지는 Kiki 결정이다.
+- **옛 대리(`corpus_reverify`)를 쓰지 않는 이유.** 그 표준 경로는 `verify.answer_map` 만 검산하고 레코드의 `answer` 필드는
+  비교하지 않아 `answer` 만 바뀐 변조를 놓쳤다(대표 과정 40건 변조 → 0/40 검출, 2026-10-18 실측). 풀이 최종 답·선택지 유일성도
+  보지 않는다. **[OPS-150 · 2026-10-21]** 야간 S6 은 이제 `answer` ↔ `answer_map` 을 C1 과 같은 공용 함수
+  (`l3.verify_solution.answer_map_vars_matching`)로 대조한다(불일치 → fail · 대조 불가 → skip 으로 따로 계상). 그래도 ④ 의
+  엔진은 바꾸지 않는다 — C2·C3 은 여전히 `solution_qa` 에만 있다.
+- **이 수치가 말하지 않는 것.** 통과율은 *검증 가능한 문항*에 대한 값이다(검증 가능 비율을 반드시 함께 읽는다). C1 은 정답이
+  `verify.conditions` 를 만족하는지를 보며, conditions 가 발문을 충실히 옮겼는지는 보지 않는다 — 정답에서 역산한 식을 conditions 로
+  쓰는 생성기 계열이 있어 통과율은 실제 정확도의 **상한**이다.
 
 ### ⑤ Learning Loop Success — Phase 2 KPI ① 과 같은 개념
 `loop_kpi_gate` 의 LOOP_COMPLETION(첫 시도 이후 Recommendation 까지 도달한 세션 비율)을 수집기·판정기째로
@@ -113,14 +128,25 @@ Hard Gate 5종 중 **제품 완성도 의미에 가까운 2종**만 흡수한다
 이지 Concept Completeness 가 아니다. 이 인용은 같은 결함 구조에 대한 **유추 적용**이며 ARCH-43 이 이 지표를
 직접 기각한 것은 아니다.
 
-**측정 불가 연결의 취급 (이 CLI 가 P3-02 위에 더한 규칙)**. P3-02 는 `hint` 연결을 "측정 불가"로 두고(힌트 저장
-좌석 부재 — ARCH-39·P3-22) 측정 불가를 충족으로 세지 않아 Completeness 가 0 이다. 이 CLI 는 "모른다 ≠ 아니다"를
+**힌트 입력 경로 (P3-41)**. 힌트는 DB `hints`(`verified=true`)에만 있다. 이 CLI 는 `phase3_coverage` 와 같은 이름·같은 읽기 함수
+(`--hints-from-db` · `read_hint_problem_ids_from_db`)로 그 집합을 코퍼스에 넣는다. 세 경우가 서로 다르다:
+플래그 없음 → 힌트 입력 `None` = **측정 불가**(빈 집합으로 채우지 않는다) · 플래그 있고 읽힘 → 집합이 입력이 되어 `hint` 연결은
+linked/missing 으로 판정(0건이면 측정 불가가 아니라 **missing**) · 플래그 있는데 못 읽음 → `hint_source` 단계 실패로
+대표 과정 세계 전체가 측정 실패(exit 2 · 출력에 `CoverageError` 와 원인 예외 타입명). 측정 불가로 조용히 내려가지 않는다.
+이 플래그는 ⑤ 의 `--no-db` 와 독립이다(`--no-db` 는 ⑤ 수집만 끈다). `--self-check` 와는 함께 쓸 수 없다(합성 세계만 본다).
+② 의 `힌트 입력` 사실 행이 DB 힌트 문항 수·범위 은행과의 겹침·적격 수를 보여 주며, 겹침이 0건이면 사유에 ID 공간 불일치
+가능성을 덧붙인다(연결 0 이 '힌트 없음'이 아닐 수 있다).
+
+**측정 불가 연결의 취급 (이 CLI 가 P3-02 위에 더한 규칙)**. P3-02 는 힌트 입력이 없는 실행에서 `hint` 연결을 "측정 불가"로 두고(힌트는
+DB `hints` 에만 있어 `--hints-from-db` 가 읽는다 — P3-22 · 이 CLI 는 P3-41) 측정 불가를 충족으로 세지 않아 Completeness 가 0 이다. 이 CLI 는 "모른다 ≠ 아니다"를
 구간으로 적용한다 — 확정 완전 `c` 와 'missing 연결이 없는'(= 최대 가능) `p` 로:
 `c/n ≥ 목표` → 충족 확정 · `p/n < 목표` → **미달 확정** · 그 사이 → **측정 불가(unmeasured)**.
 오늘의 실 코퍼스는 교수(pedagogy) 연결이 전 개념에서 끊겨 있어 `p = 0` 이므로 hint 가 어떻든 **미달 확정**이다
-(P3-02 와 같은 결론). 힌트 좌석이 생겨도 다른 연결이 모두 이어진 상태가 되면 그때 비로소 충족이 된다.
+(P3-02 와 같은 결론). 힌트를 읽어 hint 가 linked 가 돼도 다른 연결이 모두 이어진 상태가 되면 그때 비로소 충족이 된다.
 
 ---
+
+**Content Coverage 판정문의 견고성 병기 (P3-64 · 소비 절차)**. P3 게이트 판정문이 Content Coverage Rate 를 근거로 쓸 때는 `phase3_coverage` 보고서의 `link_robustness`(텍스트 「스킬 연결 견고성」 표 · `--json` 의 `link_robustness.concepts`)를 함께 옮겨 적고, `status: thin` 인 개념을 이름으로 적는다 — 연결 10/10 이 같은 사실 하나를 반복해 묻는 한 틀 위에 서 있는지를 판정문이 말하게 하려는 것이다. 이 필드는 **공개 전용**이라 met·exit code 를 바꾸지 않으며, 취약 기준(`LINK_THIN_MIN_DISTINCT_*`)은 잠정값이다(확정은 Kiki 결정 후보).
 
 ## 4. 상태·종합·종료 코드
 
@@ -192,8 +218,9 @@ P3-33.) 이를 결함으로 오인해 기본값을 채우면 이 CLI 가 막으�
    오류율)·F-Ⅴ(힌트 정답 누설)뿐이다. 즉 ⑥ 은 이름은 "제품 결함 0"이지만 실체는 생산 공정 게이트의 흡수였다.
    **해소(2026-10-12 Kiki 결정 · P3-33)**: F-Ⅱ·Ⅴ 만 남겼다(결함 심각도 필드를 새로 두는 안은 채택하지 않음).
 ② **Solution QA 임계.** 지시문 원문 ≥ 99%(P3-07) vs 이 CLI 0.995(스코어카드 흡수, acceptance ④). 더 엄격한 쪽을 따랐다.
-③ **P3-07 미착지.** 지시문은 "P3-02·P3-07·Phase 2 KPI 1 을 재사용"하라고 하나 P3-07 은 `todo` 다. ④ 는 `corpus_reverify` 를
-   대리로 쓰며 P3-07 착지 시 출처를 갈아끼운다.
+③ **P3-07 착지(2026-10-18).** ④ 의 출처를 `corpus_reverify` 대리에서 `harness.solution_qa` 로 갈아끼웠다(`_solution_qa` 의 판정 함수
+   주입 지점 하나). 값은 1121/1121(100%) → 456/456(100%) 이지만 분모의 뜻이 다르다: 종전엔 `answer_map` 만 검산한 문항 전부였고, 지금은
+   4검사가 모두 결정된 문항이며 나머지 665건(59.3%)은 검증 불가로 따로 나온다.
 ④ **종합 우선순위.** 위 §4 — 미측정이 위반보다 먼저(`loop_kpi_gate` 와 반대).
 ⑤ **`EOS-38`.** 그 태스크 notes 는 "P3-14 의 Learning Loop Success 가 KPI ① 을 재사용하면 거기에도 건다(재사용 여부 미확인)"고
    적었다. 재사용이 **확인**됐으므로 `EOS-38 → P3-14` 선행 부착 여부는 Kiki 판단이다(대장 조작은 사람 소유).

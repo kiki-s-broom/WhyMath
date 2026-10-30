@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-316
+title: "단일 에이전트 업무 매뉴얼 방법론 틀 — 인터뷰 생성·툴박스·완료 조건 자체 검사·매뉴얼 갱신 피드백 루프"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 방법론 정본 docs/standards/agent_manual_method.md — 단일 에이전트 + 업무 매뉴얼 4단계(인터뷰로 매뉴얼 명세화 → 툴박스 연동 → 완료 조건 자체 검사 → 오류 시 매뉴얼 갱신 피드백 루프)와 기존 장치(사고 대장·규칙 인덱스·카탈로그형 명령) 관계 명시.\n② 매뉴얼 저장소 manuals/ — 템플릿 manuals/_template/MANUAL.md, 실사용 예시 매뉴얼 1건(백로그 태스크 등재).\n③ 슬래시 명령 3종 .claude/commands/manual-interview.md·manual-run.md·manual-fix.md.\n④ 구조 검사기 scripts/manuals/manual_lint.py — 필수 절·툴박스 경로 실재·완료 조건 항목마다 확인 방법·변경 이력 존재·스캔 0건 실패. exit 0/1.\n⑤ 변별력 — tests/harness/test_manual_lint.py에 결함 주입 케이스와 대조군, 실제 manuals/ 전수 green.\n⑥ 배선 — tests/harness는 CI harness-integrity 잡이 수집함을 확인. CLAUDE.md 수정 없음(산문 등재 동결)."
+artifacts:
+  - "PR #1752 (02ece03f) — 방법론 정본·템플릿·예시 매뉴얼·명령 3종·manual.py·테스트 29건"
+paths:
+  - docs/standards/agent_manual_method.md
+  - "manuals/**"
+  - ".claude/commands/manual-*.md"
+  - "scripts/manuals/**"
+  - tests/harness/test_manual_lint.py
+session: null
+notes: "Kiki 요청(2026-10-26 세션): 단일 에이전트 + 체계적 매뉴얼 방식. D5 12/31 동결 규칙 2의 HARN 착수 금지에 대해 Kiki가 이 세션 질문에 '전체 구현 (예외 승인)'으로 답해 예외 승인."
+updated: 2026-10-27

@@ -14,7 +14,7 @@
 | D4 | `ARCH-18` | 대장 `status: done`. 재고 부족(난이도 사다리 부재·유형 0커버)은 R2 §0-③이 실측 |
 | D8 | `S4-14`·`S4-18` | 둘 다 `done`. 코퍼스 `relations` 행 **2,128건**(`유사` 1,707 · `변형` 421) — R3가 적은 1,024건에서 늘었다 |
 | 판정 잠금 해소 | `G-s4-14-variant-identity` | `backlog/gates.yaml`에 부재(0건). `S4-21`(`done`)이 선행 해소 |
-| 기록 좌석의 미사용 | `generation_type` | `problem_bank_*` 전 코퍼스 **14,034건이 전량 `FULLY_GENERATED`** — `VARIANT_*` 3종은 실사용 0건 |
+| 기록 좌석의 미사용 | `generation_type` | `problem_bank_*` 전 코퍼스 **14,034건이 전량 `FULLY_GENERATED`**(2026-10-08 실측) — `VARIANT_*` 3종은 실사용 0건 |
 
 정정 한 가지: R3·태스크 문구가 계보 소비처를 `api/me.py:1807`이라 적었으나 실제 소비 지점은
 `l2/recommendation_policy.py:817`(`load_sibling_ids`)이다. 위치가 옮겨졌을 뿐 소비 사실은 같다.

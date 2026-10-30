@@ -105,10 +105,14 @@ export interface CmsConceptList {
 }
 
 export interface CmsEdgeRow {
+  /** 관계 행의 id — 삭제 요청이 이것을 가리킨다. */
+  edge_id: string;
   other_concept_id: string;
   other_code: string;
   other_name_ko: string;
   edge_type: string;
+  /** false면 원천 파일(graph.json)이 정본이라 CMS가 지울 수 없다(P3-26). 판정은 서버. */
+  cms_owned: boolean;
 }
 
 export interface CmsConceptDetail {
@@ -117,9 +121,48 @@ export interface CmsConceptDetail {
   live: Record<string, unknown>;
   published_version_id: string | null;
   latest_version_no: number | null;
+  /** 이 개념의 **선수**(이 개념을 알기 위해 먼저 알아야 하는 개념)와의 관계. */
   incoming: CmsEdgeRow[];
+  /** 이 개념을 선수로 삼는 **후행** 개념과의 관계. */
   outgoing: CmsEdgeRow[];
   can_edit: boolean;
+  /** CMS가 만든 개념이면 true(DB가 정본). false면 원천 파일이 정본. */
+  cms_owned: boolean;
+  /** 관계 추가·삭제와 개념 삭제를 할 권한이 있는가(서버 판정 그대로). */
+  can_write_graph: boolean;
+  /** 이 개념을 지울 수 없는 사유 문구(지울 수 있으면 null) — 서버 판정 그대로. */
+  delete_blocked_reason: string | null;
+  /** 위 사유의 안정 식별자. */
+  delete_blocked_code: string | null;
+}
+
+/** 관계 추가 성공 응답. `from`이 `to`의 선수다. */
+export interface CmsEdgeCreated {
+  edge_id: string;
+  from_concept_id: string;
+  from_code: string;
+  to_concept_id: string;
+  to_code: string;
+  edge_type: string;
+  edge_strength: number | null;
+  cms_owned: boolean;
+}
+
+export interface CmsEdgeDeleted {
+  edge_id: string;
+  deleted: boolean;
+}
+
+export interface CmsConceptDeleted {
+  concept_code: string;
+  deleted: boolean;
+}
+
+/** 열린 신규 개념 제안 1건 — 아직 개념 행이 없고, 발행해야 개념이 만들어진다. */
+export interface CmsProposalRow {
+  summary: CmsVersionSummary;
+  name_ko: string;
+  level: string;
 }
 
 export interface CmsVersionSummary {
@@ -185,6 +228,8 @@ export interface CmsProblem {
   details: string[];
   /** 409 `stale_status`가 알려 주는 서버의 현재 상태. */
   currentStatus: string | null;
+  /** 422 `prerequisite_cycle`이 알려 주는 순환 경로(개념 코드 배열, 시작=끝). 없으면 빈 배열. */
+  path: string[];
 }
 
 /** 호출 종류와 무관한 실패. 사유마다 운영자가 해야 할 행동이 달라 합치지 않는다. */
@@ -221,6 +266,8 @@ const pInt: Parser<number> = (raw) =>
   typeof raw === "number" && Number.isInteger(raw) ? { v: raw } : null;
 const pIntOrNull: Parser<number | null> = (raw) =>
   raw === null || (typeof raw === "number" && Number.isInteger(raw)) ? { v: raw } : null;
+const pNumOrNull: Parser<number | null> = (raw) =>
+  raw === null || (typeof raw === "number" && Number.isFinite(raw)) ? { v: raw } : null;
 const pRecord: Parser<Record<string, unknown>> = (raw) => (isRecord(raw) ? { v: raw } : null);
 
 function pArray<T>(item: Parser<T>): Parser<T[]> {
@@ -324,10 +371,12 @@ const pConceptList = pObject<CmsConceptList>({
 });
 
 const pEdgeRow = pObject<CmsEdgeRow>({
+  edge_id: pStr,
   other_concept_id: pStr,
   other_code: pStr,
   other_name_ko: pStr,
   edge_type: pStr,
+  cms_owned: pBool,
 });
 
 const pConceptDetail = pObject<CmsConceptDetail>({
@@ -339,7 +388,26 @@ const pConceptDetail = pObject<CmsConceptDetail>({
   incoming: pArray(pEdgeRow),
   outgoing: pArray(pEdgeRow),
   can_edit: pBool,
+  cms_owned: pBool,
+  can_write_graph: pBool,
+  delete_blocked_reason: pStrOrNull,
+  delete_blocked_code: pStrOrNull,
 });
+
+const pEdgeCreated = pObject<CmsEdgeCreated>({
+  edge_id: pStr,
+  from_concept_id: pStr,
+  from_code: pStr,
+  to_concept_id: pStr,
+  to_code: pStr,
+  edge_type: pStr,
+  edge_strength: pNumOrNull,
+  cms_owned: pBool,
+});
+
+const pEdgeDeleted = pObject<CmsEdgeDeleted>({ edge_id: pStr, deleted: pBool });
+
+const pConceptDeleted = pObject<CmsConceptDeleted>({ concept_code: pStr, deleted: pBool });
 
 const pVersionSummary = pObject<CmsVersionSummary>({
   version_id: pStr,
@@ -354,6 +422,12 @@ const pVersionSummary = pObject<CmsVersionSummary>({
   created_at: pStrOrNull,
   published_at: pStrOrNull,
   allowed_actions: pArray(pStr),
+});
+
+const pProposalRow = pObject<CmsProposalRow>({
+  summary: pVersionSummary,
+  name_ko: pStr,
+  level: pStr,
 });
 
 const pGateRecord = pObject<CmsGateRecord>({
@@ -392,7 +466,14 @@ const pAudit = pObject<CmsAudit>({
 
 // ── 오류 본문 해석 ───────────────────────────────────────────────────────
 
-const EMPTY_PROBLEM: CmsProblem = { code: "", message: "", field: null, details: [], currentStatus: null };
+const EMPTY_PROBLEM: CmsProblem = {
+  code: "",
+  message: "",
+  field: null,
+  details: [],
+  currentStatus: null,
+  path: [],
+};
 
 /**
  * 오류 본문 → 사유. 서버는 `{detail:{code,message,...}}`를 주지만 모듈 가드의 403은 `{detail:"문자열"}`,
@@ -418,12 +499,18 @@ function readProblem(payload: unknown): CmsProblem {
       for (const item of value) if (typeof item === "string") details.push(item);
     }
   }
+  // 순환 경로는 문자열 배열일 때만 받는다. 모양이 다르면 빈 배열(문구는 서버 message가 이미 담고 있다).
+  const path: string[] = [];
+  if (Array.isArray(detail.path) && detail.path.every((item) => typeof item === "string")) {
+    for (const item of detail.path) path.push(item as string);
+  }
   return {
     code: typeof detail.code === "string" ? detail.code : "",
     message: typeof detail.message === "string" ? detail.message : "",
     field: typeof detail.field === "string" ? detail.field : null,
     details,
     currentStatus: typeof detail.current_status === "string" ? detail.current_status : null,
+    path,
   };
 }
 
@@ -442,7 +529,7 @@ type RawResult =
  */
 async function request(
   token: string,
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<RawResult> {
@@ -504,7 +591,7 @@ function statusFailure(raw: Extract<RawResult, { tag: "response" }>): CmsFailure
 /** 요청 1회 + 상태 판정 + 응답 검증. `what`은 계약 위반 사유에 넣을 호출 이름이다. */
 async function run<T>(
   token: string,
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
   parser: Parser<T>,
   what: string,
@@ -675,6 +762,90 @@ export function rollbackCmsConcept(
     pRollbackDone,
     "롤백",
     { expected_published_version_id: expectedPublishedVersionId },
+  );
+}
+
+// ── 개념 그래프 쓰기 (P3-26) ─────────────────────────────────────────────
+//
+// 순환·권한·파일 소유 판정은 전부 서버가 한다. 여기는 요청을 보내고 오류를 구분 가능한 값으로 돌려줄 뿐이다:
+// 403 → `forbidden` · 422 `prerequisite_cycle` → `validation`(problem.path에 순환 경로) ·
+// 409 `file_owned`/`has_*`/`edge_exists`/`code_taken` → `conflict`(problem.code로 분기).
+
+/**
+ * 선수 관계 추가. `fromConceptId`가 `toConceptId`의 **선수**다(from을 알아야 to를 안다).
+ * 강도는 비우면 보내지 않는다(서버 기본값).
+ */
+export function createCmsEdge(
+  token: string,
+  fromConceptId: string,
+  toConceptId: string,
+  edgeStrength: number | null,
+): Promise<CmsResult<CmsEdgeCreated>> {
+  const body: {
+    from_concept_id: string;
+    to_concept_id: string;
+    edge_type: string;
+    edge_strength?: number;
+  } = { from_concept_id: fromConceptId, to_concept_id: toConceptId, edge_type: "PREREQUISITE" };
+  if (edgeStrength !== null) body.edge_strength = edgeStrength;
+  return run(token, "POST", CMS_BASE + "/edges", pEdgeCreated, "관계 추가", body);
+}
+
+/** CMS가 만든 관계 삭제. 파일 소유 관계는 서버가 409 `file_owned`로 거부한다. */
+export function deleteCmsEdge(token: string, edgeId: string): Promise<CmsResult<CmsEdgeDeleted>> {
+  return run(token, "DELETE", CMS_BASE + "/edges/" + segment(edgeId), pEdgeDeleted, "관계 삭제");
+}
+
+/** 개념 삭제(되돌릴 수 없다). 지울 수 있는지는 서버가 판정한다. */
+export function deleteCmsConcept(
+  token: string,
+  conceptId: string,
+): Promise<CmsResult<CmsConceptDeleted>> {
+  return run(
+    token,
+    "DELETE",
+    CMS_BASE + "/concepts/" + segment(conceptId),
+    pConceptDeleted,
+    "개념 삭제",
+  );
+}
+
+// ── 신규 개념 제안 (P3-26) ───────────────────────────────────────────────
+//
+// 제안은 개념 행이 없는 초안이다. 제출·검토·승인·발행은 기존 `transitionCmsVersion`을 그대로 쓴다.
+
+export function fetchCmsProposals(token: string): Promise<CmsResult<CmsProposalRow[]>> {
+  return run(token, "GET", CMS_BASE + "/concept-proposals", pArray(pProposalRow), "열린 제안 목록");
+}
+
+/** 새 코드로 첫 초안 제안. `payload`는 서버가 검증한다(이름·계층 필수). */
+export function createCmsProposal(
+  token: string,
+  code: string,
+  payload: Record<string, unknown>,
+  reason: string | null,
+): Promise<CmsResult<CmsVersionSummary>> {
+  const body: { code: string; payload: Record<string, unknown>; reason?: string } = { code, payload };
+  if (reason !== null) body.reason = reason;
+  return run(token, "POST", CMS_BASE + "/concept-proposals", pVersionSummary, "신규 개념 제안", body);
+}
+
+/** 제안 수정 = 새 초안. */
+export function reviseCmsProposal(
+  token: string,
+  code: string,
+  changes: Record<string, unknown>,
+  reason: string | null,
+): Promise<CmsResult<CmsVersionSummary>> {
+  const body: { changes: Record<string, unknown>; reason?: string } = { changes };
+  if (reason !== null) body.reason = reason;
+  return run(
+    token,
+    "POST",
+    CMS_BASE + "/concept-proposals/" + segment(code) + "/drafts",
+    pVersionSummary,
+    "제안 수정",
+    body,
   );
 }
 

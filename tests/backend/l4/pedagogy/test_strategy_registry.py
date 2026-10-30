@@ -1,6 +1,6 @@
 """PED-05 교수전략 카탈로그 레지스트리 + enum↔YAML 1:1 거버넌스 — 실 코퍼스 스모크 포함.
 
-정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §3.1("enum ↔ YAML 1:1 거버넌스
+정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §3.1("enum ↔ YAML 1:1 거버넌스
 테스트로 동결" — `test_render_governance.py` 선례). 검증 축:
 
   ① 1:1 거버넌스 — YAML 파일 스템 == enum 값 소문자 10종(누락·잉여 즉시 적발)·registry 키 ==
@@ -145,7 +145,7 @@ class TestFullCatalogSmoke:
 
     def test_honest_gap_strategies_declare_empty_error_types(self) -> None:
         # 정직한 공백 — 특정 오류 유형 교정 축이 아닌 전략(동기/파지 스케줄링 축)은
-        # suitable_error_types를 비워둔다(억지 매핑 금지·04e §3.2 "자신 없으면 적게").
+        # suitable_error_types를 비워둔다(억지 매핑 금지·04g §3.2 "자신 없으면 적게").
         assert get_strategy(PedagogyStrategy.SPACING).suitable_error_types == []
         assert get_strategy(PedagogyStrategy.PROBLEM_BASED).suitable_error_types == []
 

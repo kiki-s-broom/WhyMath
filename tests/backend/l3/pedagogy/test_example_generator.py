@@ -101,7 +101,7 @@ class TestPlanRemainingSlots:
         assert all(t.slot_type != "diag_item" for t in targets)
 
     def test_fulfilled_slot_not_ordered(self) -> None:
-        """충족(승인≥발주) 슬롯은 발주 0 — 사전 대량 생성 금지(04e §6.4)."""
+        """충족(승인≥발주) 슬롯은 발주 0 — 사전 대량 생성 금지(04g §6.4)."""
         targets = plan_remaining_slots(
             self._WORK_ORDER, {(_OBJ, "example_pair"): 4, (_OBJ, "contrast_case"): 5}
         )

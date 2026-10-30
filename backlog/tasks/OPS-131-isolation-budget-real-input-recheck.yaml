@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-131-isolation-budget-real-input-recheck
+title: "SymPy 격리 상한·워커 수를 파일럿 실측 입력으로 재판정 — OPS-126 합성 대리 분포의 한계 승계"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - OPS-126-isolation-served-ratio-observability
+requires_gates: []
+acceptance:
+  - "① 실제 학생 단계 입력 분포로 상한 재판정 — OPS-126 ②는 교육과정 형태 합성 단계 354건(최대 0.157초)과 고차 방정식 스트레스 16건(상한 없이도 전부 unverifiable)까지만 실측했다. 합성 대리 분포이지 실제 학생 입력이 아니다. 파일럿이 verify-step·verify-solution 격리 호출을 최소 1,000건 쌓은 뒤 /health/ready 의 sympy_isolation 섹션(calls·timeouts·queue_waits·worker_deaths·fallbacks·undecidable_ratio)을 서버 프로세스별로 수집해, timeouts 가 0 이 아니면 그 입력이 상한 없이 돌렸을 때 correct·incorrect 로 끝났을지(= 상한이 판정 정보를 잃었는지)를 재현 가능한 입력으로 판정하고 sympy_isolation_timeout_s 를 유지·조정한다. 수집 단위는 프로세스이며 합산은 수집 측에서 한다(process_id 로 구분).\n② 워커 수 재판정 — queue_waits 가 0 이 아니면 sympy_isolation_max_workers 증설을 검토한다. OPS-126 ③ 실측: 느린 입력 2건이 워커 2개를 점유하는 동안 정상 요청 20건의 대기는 p50 5.77초·최대 5.80초이며 접힘은 0건(대기 상한 10초 안). 워커 1개당 RSS 73~76MB(Linux·Python 3.12·SymPy 1.14)이므로 증설 비용은 개당 약 75MB 이다. Windows 상주 메모리는 미측정이다.\n③ 파일럿 데이터가 없으면 이 태스크는 대기 상태로 두고 완료로 닫지 않는다(공허 통과 금지)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/config.py
+session: null
+notes: |-
+  출처: OPS-126 ② 승계. 합성 대리 분포 실측은 OPS-126 에서 완료했고 실제 학생 입력 분포만 파일럿 데이터가 필요해 분리했다. 판정 도구: scripts/analysis/measure_sympy_isolation_budget.py --mode steps (합성) · /health/ready sympy_isolation (실측). 출처: stray-code 18회차 — relaxed-keller-4wk0b2 브랜치에만 있던 태스크를 원 번호·원문 그대로 복원(원문 acceptance 1항(①②③ 세 문단)을 글자 단위로 보존). 번호 예약 reservations/OPS-131.json은 72시간 TTL(2026-10-15T13:05Z경 만료)이므로 이 PR이 그 전에 main에 착지해야 번호가 영구 귀속된다.
+
+  [정정 2026-10-14] notes 치환 — stray-code 18회차: 복원 notes의 항 수 오기 정정(원문은 1항 안에 세 문단)
+updated: 2026-10-14

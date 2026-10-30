@@ -30,7 +30,8 @@ projection-table 계열(`atom_node`·`skill_node`·`concept_content`·`strategy_
       `prompt_version`·`source_refs` 같은 자유 텍스트 provenance 컬럼을 두지 않는다(기존
       `content_provenance`+`generation_log`의 저작권 불변식을 우회하지 않는다).
   H2 (concept_nodes 네임스페이스): `unit_spec.concept_nodes`·`learning_objective.concept_nodes`는
-      원자 백본(`atom_node`·런타임 진실 2,697) 노드 code 배열이다. 봉인된 legacy 437/545
+      원자 백본(`atom_node`·런타임 진실 — 노드 수는 `docs/data/corpus_facts.md`의
+      `atom_graph.nodes`) 노드 code 배열이다. 봉인된 legacy 437/545
       그래프를 가리키지 않는다. FK/CHECK를 두지 않는다(존재 검증은 컴파일러 책임·house style).
       참조 축 확정은 ARCH-13(개념↔원자 입도 통합) 결론 대기(연성 의존).
 
@@ -90,7 +91,8 @@ class UnitSpec(Base):
     curriculum_rev: Mapped[str] = mapped_column(sa.Text, nullable=False)
     # 연결 NCIC 성취기준 *코드* 배열(코드는 사실정보·본문 statement 아님·atom_node 동형).
     standard_codes: Mapped[list[str]] = mapped_column(ARRAY(sa.Text), nullable=False)
-    # H2: 원자 백본(atom_node·런타임 진실 2,697) 노드 code 배열. legacy 437/545 아님.
+    # H2: 원자 백본(atom_node·런타임 진실 — 규모는 corpus_facts의 atom_graph.nodes) 노드
+    #     code 배열. legacy 437/545 아님.
     #     존재 검증은 컴파일러(데이터 파이프라인) 책임 — FK/CHECK 없음(house style).
     #     ARCH-13(개념↔원자 입도 통합) 결론 시 참조 축 확정(연성 의존).
     concept_nodes: Mapped[list[str]] = mapped_column(ARRAY(sa.Text), nullable=False)

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-204
+title: "저작 산출물 구조적 중복 사전 차단 — 검수 큐 진입 전 같은 좌석·좌석 간 중복 CU 제외"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 저작 산출물에서 검수 큐로 가기 전에 **같은 좌석 안·좌석 사이의 중복 CU**를 기계가 걸러낸다 — 판정 기준은 표면 문자열이 아니라 구조(함수식 정규화·조건값·정답의 조합; SymPy 정규화 재사용)이며, 걸린 CU는 큐에 넣지 않고 사유와 함께 별도 목록으로 남긴다 ② EOS-197 회차 실측 2쌍(검수 10번↔7번 · 30번↔26번 — 함수·접점·정답 완전 동일)을 회귀 픽스처로 넣어 검출됨을 고정하고, 함수만 같고 조건이 다른 대조군은 통과함을 단언 ③ 중복은 F1~F8 실패 코드 어느 것에도 해당하지 않으므로 검수자가 고르지 않게 하는 것이 목적이다 — EOS-197에서는 중복 2건이 F8(힌트 정답 누설)로 기록돼 실패 유형 분포가 왜곡됐다(원 기록은 위변조하지 않음). 실패 코드 체계(동결 계약) 자체를 바꾸지 않는다 ④ 큐 조립 단계(런북 [I])의 기존 좌석 간 중복 검사와 하나로 합치거나 그 앞에 둔다"
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/**"
+  - docs/ops/eos197_authoring_round_runbook.md
+session: null
+notes: |-
+  출처: EOS-197 A6 저작 회차(2026-10-28 · PR #1765) 검수에서 Kiki가 완전 중복 2쌍을 발견해 반려. 큐 조립은 좌석 사이 중복만 검사했고 같은 좌석(openrouter) 안 중복은 거르지 않았다.
+
+  큐 조립(런북 [I])의 기존 검사는 slug(발문·정답·성취기준 코드 해시) 일치만 보아 표현만 다른 구조적 중복을 통과시켰다.
+updated: 2026-10-28

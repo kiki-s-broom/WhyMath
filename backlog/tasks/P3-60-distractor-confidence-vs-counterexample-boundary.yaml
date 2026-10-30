@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-60-distractor-confidence-vs-counterexample-boundary
+title: "P3-60 — 선지 신뢰도 0.8이 반례 임계(>0.8)에 걸려 첫 오답은 항상 거꾸로 사고: 의도 판정"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 현상 — 선지 채널의 진단 신뢰도 DISTRACTOR_LINK_CONFIDENCE는 0.8인데 개입 결정 트리(intervene._HIGH_CONFIDENCE)는 '0.8 초과'에서 반례 유도를 고른다. 그래서 새 가설의 첫 오답은 항상 '거꾸로 사고'(reverse_reasoning)이고, 같은 오개념을 한 번 더 틀려 가설 신뢰가 0.939가 되어야 비로소 반례 유도(counterexample)가 나온다(P3-06 체인 실측: 1회 0.80 → 2회 0.939).\n② 의도된 설계인지 판정한다 — 선지 탭은 찍기·오터치 가능성이 있어 첫 회에 반례로 단정하지 않는 것이 의도일 수 있다. 의도라면 주석으로 근거를 남기고 경계를 동결하는 테스트를 더한다. 의도가 아니면 경계를 정한다. 어느 쪽이든 confidence 누적·감쇠 규칙(Phase 2)은 바꾸지 않고, 바꾸려면 Kiki 허락이 필요하다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06(2026-10-17). 판정 기준: main 63fe19dd. 마스터 프리앰블 4항: confidence 누적·감쇠 규칙은 Phase 2 것을 그대로 쓴다 — 바꾸고 싶으면 근거와 함께 Kiki에게 묻는다. 그래서 P3-06은 관찰만 기록하고 값을 바꾸지 않았다. 등재는 착수가 아니다."
+updated: 2026-10-17

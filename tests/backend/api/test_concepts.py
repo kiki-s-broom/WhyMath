@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from whymath_backend.api._auth import require_content_admin
 from whymath_backend.app import create_app
 from whymath_backend.config import Settings, get_settings
+from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.concept import Concept, ConceptEdge
 from whymath_backend.db.models.concept_content import ConceptContent
@@ -65,6 +66,13 @@ class _FakeResult:
 
     def scalars(self) -> _FakeScalars:
         return _FakeScalars(self._rows)
+
+    # P3-26 삭제 가능 판정(`concept_delete_block`)의 조회 — 발행본 없음·관계 0건·자식 0건으로 답한다.
+    def first(self) -> None:
+        return None
+
+    def scalar_one(self) -> int:
+        return 0
 
 
 class FakeSession:
@@ -143,6 +151,13 @@ def _sample_concept(code: str = "CAL-INT-FTC", name: str = "미적분학의 기�
     return Concept.from_schema(ConceptSchema(code=code, name_ko=name, level="단원"))
 
 
+def _cms_concept(code: str = "CMS-NEW-1") -> Concept:
+    """CMS가 만든 개념(소유 표지 있음) — 삭제가 허용되는 유일한 부류(P3-26)."""
+    concept = _sample_concept(code=code)
+    mark_cms_edited(concept)
+    return concept
+
+
 def _sample_edge(from_id: uuid.UUID, to_id: uuid.UUID) -> ConceptEdge:
     return ConceptEdge.from_schema(
         ConceptEdgeSchema(
@@ -180,24 +195,15 @@ def _sample_concept_content(
 
 
 class TestCreate:
-    def test_create_returns_201_and_commits(self) -> None:
-        """정상 생성 → 201 + code 에코 + commit 호출."""
+    def test_direct_create_is_gone_and_writes_nothing(self) -> None:
+        """P3-26: 살아있는 개념 행을 검수 없이 만드는 길은 폐지 — 410, 행·감사·commit 모두 0."""
         fake = FakeSession()
         resp = _client(fake).post("/v1/concepts", json=_VALID_BODY)
-        assert resp.status_code == 201, resp.text
-        assert resp.json()["code"] == "CAL-INT-FTC"
-        assert fake.committed is True
-        # SEC-29: Concept 본체 + 콘텐츠CUD 감사 행(PrivacyAudit) = 2건, 같은 트랜잭션.
-        assert len(fake.added) == 2
-
-    def test_create_duplicate_code_returns_409(self) -> None:
-        """code UNIQUE 충돌(IntegrityError) → 롤백 후 409(스택트레이스 없이)."""
-        err = IntegrityError("INSERT", {}, Exception("duplicate key value violates unique"))
-        fake = FakeSession(commit_error=err)
-        resp = _client(fake).post("/v1/concepts", json=_VALID_BODY)
-        assert resp.status_code == 409
-        assert fake.rolled_back is True
-        assert fake.committed is False
+        assert resp.status_code == 410, resp.text
+        detail = resp.json()["detail"]
+        assert detail["code"] == "concept_create_via_workflow"
+        assert "concept-proposals" in detail["message"]  # 가야 할 길을 알려 준다
+        assert fake.added == [] and fake.committed is False
 
     def test_create_invalid_body_returns_422(self) -> None:
         """필수 필드(name_ko·level) 누락 → 핸들러 전 422(검증은 시스템 경계)."""
@@ -321,12 +327,31 @@ class TestPatch:
 
 class TestDelete:
     def test_delete_returns_204(self) -> None:
-        concept = _sample_concept()
+        concept = _cms_concept()
         fake = FakeSession(get_map={concept.concept_id: concept})
         resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
         assert resp.status_code == 204
         assert fake.committed is True
         assert len(fake.deleted) == 1
+
+    def test_delete_refuses_a_file_owned_concept(self) -> None:
+        """graph.json이 소유한 개념(표지 없음)은 지워도 다음 적재가 되살린다 — 409 `file_owned`."""
+        concept = _sample_concept()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["detail"]["code"] == "file_owned"
+        assert fake.deleted == [] and fake.committed is False
+
+    def test_delete_refuses_a_concept_with_a_published_version(self) -> None:
+        """발행 포인터가 있는 개념은 CMS가 만든 것이어도 지울 수 없다 — 409 `has_published_version`."""
+        concept = _cms_concept()
+        concept.current_published_version_id = uuid.uuid4()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["detail"]["code"] == "has_published_version"
+        assert fake.deleted == [] and fake.committed is False
 
     def test_delete_404_when_missing(self) -> None:
         resp = _client(FakeSession()).delete(f"/v1/concepts/{uuid.uuid4()}")
@@ -334,7 +359,7 @@ class TestDelete:
 
     def test_delete_409_when_referenced(self) -> None:
         """참조(FK)로 IntegrityError → 롤백 후 409."""
-        concept = _sample_concept()
+        concept = _cms_concept()
         err = IntegrityError("DELETE", {}, Exception("FK violation"))
         fake = FakeSession(get_map={concept.concept_id: concept}, commit_error=err)
         resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
@@ -352,19 +377,12 @@ class TestContentMutationAudit:
     def _audit_rows(self, fake: FakeSession) -> list[PrivacyAudit]:
         return [obj for obj in fake.added if isinstance(obj, PrivacyAudit)]
 
-    def test_create_writes_content_mutation_audit_row(self) -> None:
+    def test_gone_create_writes_no_audit_row(self) -> None:
+        """P3-26: 폐지된 직접 생성은 아무것도 쓰지 않으므로 감사 행도 남기지 않는다."""
         fake = FakeSession()
         resp = _client(fake).post("/v1/concepts", json=_VALID_BODY)
-        assert resp.status_code == 201, resp.text
-        rows = self._audit_rows(fake)
-        assert len(rows) == 1
-        row = rows[0]
-        assert row.user_id == _ADMIN_USER.user_id
-        assert row.target_user_id is None
-        assert row.event_kind == AuditEventKind.content_mutation.value
-        assert row.resource_type == PrivacyAuditResourceType.concept.value
-        assert row.action == PrivacyAuditAction.create.value
-        assert str(row.resource_id) == resp.json()["concept_id"]
+        assert resp.status_code == 410, resp.text
+        assert self._audit_rows(fake) == []
 
     def test_patch_writes_content_mutation_audit_row(self) -> None:
         concept = _sample_concept()
@@ -379,43 +397,27 @@ class TestContentMutationAudit:
         assert rows[0].resource_id == concept.concept_id
 
     def test_delete_writes_content_mutation_audit_row(self) -> None:
-        concept = _sample_concept()
+        concept = _cms_concept()
         fake = FakeSession(get_map={concept.concept_id: concept})
         resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
         assert resp.status_code == 204
         rows = self._audit_rows(fake)
         assert len(rows) == 1
+        assert rows[0].user_id == _ADMIN_USER.user_id
+        assert rows[0].event_kind == AuditEventKind.content_mutation.value
+        assert rows[0].resource_type == PrivacyAuditResourceType.concept.value
         assert rows[0].action == PrivacyAuditAction.delete.value
         assert rows[0].resource_id == concept.concept_id
-
-    def test_failed_create_does_not_leave_committed_audit_row(self) -> None:
-        """IntegrityError로 롤백되면(409) 감사 행도 함께 롤백 대상(같은 트랜잭션).
-
-        `FakeSession`은 실제 롤백을 모사하지 않으므로(add된 객체를 지우지 않음) 여기서는
-        `rolled_back is True`(전체 트랜잭션이 롤백 호출을 받았다)만 확인한다 — 실 PG에서
-        ROLLBACK이 add()된 행까지 되돌린다는 것은 DB 트랜잭션의 기본 보장이라 별도 가정이
-        필요 없다(session.add는 flush 전까지 방문 상태일 뿐).
-        """
-        err = IntegrityError("INSERT", {}, Exception("duplicate key value violates unique"))
-        fake = FakeSession(commit_error=err)
-        resp = _client(fake).post("/v1/concepts", json=_VALID_BODY)
-        assert resp.status_code == 409
-        assert fake.rolled_back is True
-        # 감사 행은 add()는 됐으나(같은 트랜잭션 참여) commit은 되지 않았다.
-        assert len(self._audit_rows(fake)) == 1
-        assert fake.committed is False
 
 
 class TestConcurrency:
     """낙관적 동시성 — ETag 노출 + If-Match 조건부 변경."""
 
-    def test_get_and_post_expose_etag(self) -> None:
+    def test_get_exposes_etag(self) -> None:
         concept = _sample_concept()
         fake = FakeSession(get_map={concept.concept_id: concept})
         get_resp = _client(fake).get(f"/v1/concepts/{concept.concept_id}")
         assert get_resp.headers.get("ETag", "").startswith('"')
-        post_resp = _client(FakeSession()).post("/v1/concepts", json=_VALID_BODY)
-        assert post_resp.headers.get("ETag", "").startswith('"')
 
     def test_patch_with_matching_if_match_succeeds(self) -> None:
         """GET ETag를 If-Match로 보내면(그사이 미변경) 200."""
@@ -640,7 +642,8 @@ class TestAuthGate:
         assert resp.status_code == 403
 
     # ── CONTENT_ADMIN 실 토큰 → 정상 통과(엔드투엔드 결선 확인) ──
-    def test_content_admin_role_post_returns_201(self) -> None:
+    def test_content_admin_role_post_is_gone_after_auth(self) -> None:
+        """인증·인가 체인은 그대로 통과하고(401/403 아님) 폐지 응답 410을 본다(P3-26)."""
         admin = UserProfile(user_id=uuid.uuid4(), role=Role.CONTENT_ADMIN)
         fake = FakeSession(get_map={admin.user_id: admin})
         resp = self._client_real_auth(fake).post(
@@ -648,7 +651,7 @@ class TestAuthGate:
             json=_VALID_BODY,
             headers={"Authorization": f"Bearer {self._token_for(admin)}"},
         )
-        assert resp.status_code == 201, resp.text
+        assert resp.status_code == 410, resp.text
 
     # ── GET은 봉인 범위 밖 — 무인증 유지 회귀(과확대 방지) ──
     def test_unauthenticated_get_single_still_public(self) -> None:
@@ -717,13 +720,12 @@ class TestPublishPointerGuard:
         assert fake.committed is True
 
     def test_create_cannot_carry_a_publish_pointer(self) -> None:
-        """새 개념은 발행본이 있을 수 없다 — 존재하지 않는 판을 가리키는 포인터를 심지 못한다."""
+        """새 개념은 발행본이 있을 수 없다 — 생성 경로가 폐지(410)되어 포인터를 심을 길이 없다."""
         fake = FakeSession()
         resp = _client(fake).post(
             "/v1/concepts",
             json={**_VALID_BODY, "current_published_version_id": str(uuid.uuid4())},
         )
-        assert resp.status_code == 422, resp.text
-        assert resp.json()["detail"]["code"] == "publish_pointer_readonly"
+        assert resp.status_code == 410, resp.text
         assert fake.committed is False
         assert fake.added == []

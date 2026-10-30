@@ -48,7 +48,7 @@ from whymath_backend.l1.embedding_primitives import (
 from whymath_backend.l1.embedding_primitives import (
     provider_model_identity as _provider_model_identity,
 )
-from whymath_backend.l4.misconception.catalog import CATALOG
+from whymath_backend.l4.misconception.catalog import CATALOG, body_detectable
 from whymath_backend.l4.misconception.semantic.index import IndexHit
 from whymath_backend.l4.misconception.semantic.matcher import catalog_text
 
@@ -257,8 +257,10 @@ def populate_pgvector(
         else PgVectorIndex(provider_name=provider_name, model_name=model_name, settings=resolved)
     )
     # skip-if-unchanged 코어는 레이어-중립 프리미티브가 소유(개념·원자·오개념 공유·3중복 제거).
+    # P3-61 — 선지 역추적 전용 항목은 적재하지 않는다(`SemanticMatcher`와 같은 필터). 적재하면
+    # 영속 인덱스에 본문 채널 후보 재료가 생긴다. 필터는 순서를 보존하므로 적재 순서 규약은 불변.
     return embed_changed(
-        [(m.id, catalog_text(m)) for m in catalog],
+        [(m.id, catalog_text(m)) for m in body_detectable(catalog)],
         provider=provider,
         existing_hashes=idx.existing_text_hashes,
         upsert=lambda key, vec, text: idx.upsert_entry(key, vec, source_text=text),

@@ -1,0 +1,41 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-56-short-answer-no-misconception-channel
+title: "P3-56 — 단답형 885문항(79%)은 오답→오개념 후보 채널이 없다: 범위 결정과 선택지 정리"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 단답형 885문항(대표 과정 승인 문항의 79%)에서 오답이 오개념 후보로 이어지는 채널이 지금 0개임을 재확인한다(P3-06 실측: 오답 2,534회 투입 → 후보 0건, 훑기 상태 ran_no_candidate 2,508 · not_run 26).\n② 원인은 설계다 — 오류 서명 채널(answer_signature)은 문항 식 = 학생 답 형태의 등식을 만드는데, 숫자 하나를 답하는 문항은 등식이 되지 않는다.\n③ 선택지를 비교해 적는다: 문항별 '예측 오답값' 매처(SymPy 동치 권위 경유) / 단답형을 객관식 채널에 편입 / 범위 밖 유지. 예측 오답값 매처는 새 탐지기라 마스터 프리앰블이 금지한다 — Kiki의 명시적 허락이 있어야 구현 항목으로 승격한다.\n④ 결정 전에 구현하지 않는다."
+  - "⑤ 후보 구현의 지위(2026-10-18) — 미분 오답 서명 독법(예측 오답값 매처)의 후보 구현이 드래프트 PR로 제출됐다. 이것은 ③의 허락 이전에 만들어진 증거이며 구현 항목 승격이 아니다: 머지는 게이트 G-p356-signature-engine-approval의 Kiki 승인 뒤에만 한다. 증거 문서 docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md (오탐 0/3,188 · 뮤테이션 15종 전건 RED · 단답형 재현율은 측정 불가를 명시). 승인 시 후속 3건(단답 입력 체인 진입점 · 계측기 단답 경로 · 서빙 경로 확인)을 별도 태스크로 연다. 미분 서명 독법의 사정거리 확장(역문제·접선 y절편·속도)은 승인 뒤 별건이다."
+  - "⑥ 결정 반영(사용자 2026-10-18) — 이 엔진을 구현 항목으로 조건부 승인했다: 설정 l4_derivative_signature_mode 기본 off · 먼저 shadow(학생에게 가는 결과는 off 와 동일, 관측만 기록) · on 은 활성화 게이트 G-p356-signature-activation PASS 뒤. 사정거리 확장(P3-48)은 보류한다. 후속: P3-66(수확·판정 CLI) · P3-67(교정 체인 연결·게이트 뒤). 이 태스크의 done 조건 = PR #1677 머지(기본 off) + 위 후속 2건과 게이트 등재 완료. 승인 게이트 G-p356-signature-engine-approval 은 이 태스크가 done 이 된 뒤 clear 한다(게이트 입력이 이 태스크이므로 순서가 그렇다)."
+artifacts:
+  - "PR #1677 (kiki-s-broom/WhyMath#1677, 드래프트·머지 금지) · 판정 기준 main fc939a22b · 후보 구현 증거 문서 docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md · 승인 게이트 G-p356-signature-engine-approval"
+  - "PR #1677 (kiki-s-broom/WhyMath#1677) 머지 1b8bee5d4 — 단답형 미분 오답 서명 독법(기본 off·shadow 우선). 판정 문서 docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md"
+paths:
+  - src/backend/whymath_backend/l4/misconception/derivative_signature.py
+  - src/backend/whymath_backend/l4/misconception/answer_signature.py
+  - "data/corpus/wrong_answer_signatures_v1/**"
+  - "docs/reviews/p3_56_*.md"
+  - src/backend/whymath_backend/config.py
+  - src/backend/whymath_backend/api/_attempt_misconception_scan.py
+  - tests/backend/api/test_attempt_scan_shadow.py
+session: null
+notes: |-
+  출처: P3-06(2026-10-17) 실측. 판정 기준: main 63fe19dd. P3-06 결정 2(Kiki 2026-10-17): 이번 항목은 객관식+기존 채널만, 단답형은 범위 밖으로 명시하고 별건 등재. 측정 도구: python -m whymath_backend.ops.phase3_remediation 의 작동한 비율 절. 등재는 착수가 아니다.
+
+  [정정 2026-10-18] paths [] → ['src/backend/whymath_backend/l4/misconception/derivative_signature.py', 'src/backend/whymath_backend/l4/misconception/answer_signature.py', 'data/corpus/wrong_answer_signatures_v1/**', 'docs/reviews/p3_56_*.md']: P3-06 재구성 — 겹치는 구현은 버리고 단답형 엔진만 P3-56의 결정 증거로 제출. 후보 구현의 지위와 경로를 대장에 남긴다
+
+  [정정 2026-10-18] 후보 구현 드래프트 PR 번호 기록 — 머지는 Kiki 승인 뒤
+
+  [정정 2026-10-18] paths ['src/backend/whymath_backend/l4/misconception/derivative_signature.py', 'src/backend/whymath_backend/l4/misconception/answer_signature.py', 'data/corpus/wrong_answer_signatures_v1/**', 'docs/reviews/p3_56_*.md'] → ['src/backend/whymath_backend/l4/misconception/derivative_signature.py', 'src/backend/whymath_backend/l4/misconception/answer_signature.py', 'data/corpus/wrong_answer_signatures_v1/**', 'docs/reviews/p3_56_*.md', 'src/backend/whymath_backend/config.py', 'src/backend/whymath_backend/api/_attempt_misconception_scan.py', 'tests/backend/api/test_attempt_scan_shadow.py']: 사용자 조건부 승인(shadow 우선) 반영 — 구현 범위·done 조건·후속을 대장에 남긴다
+
+  [미러 면제 2026-10-18] squash 커밋 1b8bee5d4의 코드는 로컬 미러(exit 3: 실행 7잡 통과·data-pipeline 1스텝 미실행)와 GitHub CI 22/22 및 머지 큐를 통과한 2d826a3bf와 동일하다. 두 커밋의 트리 차이는 사이에 머지된 main 커밋 42dbc2b31(#1697)의 대장 변경 2파일(backlog/gates.yaml +12, 이벤트 1줄)뿐이며 코드 변경이 없다. 동일 코드의 재측정은 약 1시간 소요되어 생략한다.
+updated: 2026-10-18
