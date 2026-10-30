@@ -16,7 +16,7 @@
 
 ## 1. 과제 명칭
 
-대학 원자 KR 셀 적재 — 원자 백본의 대학 세부개념 512건을 `curriculum_entry`에 멱등 적재한다
+대학 원자 KR 셀 적재 — 원자 백본의 대학 세부개념 <!-- fact:atom_graph.university_atoms -->512<!-- /fact -->건을 `curriculum_entry`에 멱등 적재한다
 (학년 13~16 = 대학 1~4학년 · `required_depth`는 원자별 `cognitive_type`에서 도출).
 
 ## 2. 목적
@@ -37,7 +37,7 @@
 | E | AFTER 카운트 + 정합성 대조 | `AFTER_UNIV=512` | ~5초 |
 
 **부수 효과 고지(중요)**: 이 CLI의 본업은 canonical·원자 셀 적재이고 대학 셀은 세 번째 입력으로
-얹혔다. 따라서 D단계는 **canonical 437건·원자 1,311건도 함께 멱등 재적재한다.** 전부
+얹혔다. 따라서 D단계는 **canonical <!-- fact:concept_graph.concepts -->437<!-- /fact -->건·원자 <!-- fact:atom_graph.atoms_k12 -->1,311<!-- /fact -->건도 함께 멱등 재적재한다.** 전부
 `ON CONFLICT(entry_id) DO UPDATE`라 신규 행을 만들지 않고 같은 코퍼스로 값을 덮어쓰며
 `created_at`은 보존, `updated_at`만 갱신된다. 그래도 "대학 셀만 건드린다"고 오해하지 않도록
 명시한다. 기대 총 적재 건수는 437 + 1,311 + 512 = 2,260건이다.

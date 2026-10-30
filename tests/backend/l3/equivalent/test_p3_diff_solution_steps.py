@@ -55,7 +55,13 @@ from whymath_backend.l3.symbolic_equivalence import _parse, to_sympy_source
 from whymath_backend.l3.verify_solution import verify_solution
 from whymath_backend.whs.corpus_replay import load_replay_items
 
-_BANK = Path(__file__).resolve().parents[4] / "data" / "corpus" / CORPUS_DIR_NAME / "problems.jsonl"
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_BANK = _REPO_ROOT / "data" / "corpus" / CORPUS_DIR_NAME / "problems.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 _DERIVATIVE = "Derivative"
 #: 평균값 정리의 결론(f'(c) = 평균변화율)만 묻는 진단 틀 — 출발식에 도함수가 없는 틀은 이것뿐이다
 #: (`p3_diff_solution_steps` docstring '한계'). 함수식이 없어 미분할 함수가 없다. 함수식이 있는 짝(5회차
@@ -323,7 +329,7 @@ def test_final_solution_values_reads_only_assignments() -> None:
 # ② 커밋된 은행 — 소비처 계약(hermetic)
 # ──────────────────────────────────────────────────────────────────────────
 def test_every_record_carries_solution_steps(rows: list[dict[str, Any]]) -> None:
-    assert len(rows) == 504
+    assert len(rows) == _FACTS["problem_bank.p3_calculus1_diff_v0"]
     for row in rows:
         steps = row["verify"].get("solution_steps")
         assert isinstance(steps, list) and len(steps) >= 2, row["slug"]

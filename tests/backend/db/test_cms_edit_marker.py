@@ -27,6 +27,8 @@ from whymath_backend.api.admin_cms_resources import RESOURCES, ResourceSpec, che
 from whymath_backend.db.base import Base
 from whymath_backend.db.cms_edit_marker import (
     CMS_EDIT_MARKER,
+    CMS_MARKED_TABLES,
+    CMS_OWNED_TABLES,
     CMS_PROTECTED_TABLES,
     OVERWRITE_FLAG,
     conflict_summary,
@@ -46,6 +48,14 @@ _MIGRATION = (
     / "alembic"
     / "versions"
     / "20261009_0900_e7b2c4d8a1f6_cms_edited_at_marker.py"
+)
+_MIGRATION_P326 = (
+    _ROOT
+    / "src"
+    / "backend"
+    / "alembic"
+    / "versions"
+    / "20261012_0900_a8c4e1f7b3d9_cms_concept_graph_write.py"
 )
 
 # ── ① 헬퍼 ────────────────────────────────────────────────────────────────
@@ -107,17 +117,21 @@ class TestHelpers:
 
 
 class TestProtectedTablesAgree:
-    def test_orm_columns_exist_exactly_on_the_protected_tables(self) -> None:
+    def test_orm_columns_exist_exactly_on_the_marked_tables(self) -> None:
+        """표지 컬럼은 적재가 덮는 5종(P3-25) + CMS가 만든 행을 표시하는 2종(P3-26)에만 있다."""
         import whymath_backend.db.models  # noqa: F401  (모델 전부 등록)
 
         with_column = {
             name for name, table in Base.metadata.tables.items() if CMS_EDIT_MARKER in table.c
         }
-        assert with_column == set(CMS_PROTECTED_TABLES)
+        assert with_column == set(CMS_MARKED_TABLES)
+        assert CMS_MARKED_TABLES == CMS_PROTECTED_TABLES | CMS_OWNED_TABLES
+        assert not (CMS_PROTECTED_TABLES & CMS_OWNED_TABLES), "두 집합이 겹치면 의미가 섞인다"
+        assert CMS_OWNED_TABLES == {"concept", "concept_edge"}
 
     def test_marker_column_is_nullable_timestamptz_without_default(self) -> None:
         """기본값을 달면 PG가 기존 행 전체를 백필해 "전 행을 사람이 고쳤다"는 날조가 된다."""
-        for name in CMS_PROTECTED_TABLES:
+        for name in CMS_MARKED_TABLES:
             col = Base.metadata.tables[name].c[CMS_EDIT_MARKER]
             assert col.nullable is True, name
             assert isinstance(col.type, sa.DateTime) and col.type.timezone, name
@@ -139,6 +153,17 @@ class TestProtectedTablesAgree:
         dropped = set(re.findall(r'op\.drop_column\("(\w+)", "cms_edited_at"\)', text))
         assert added == set(CMS_PROTECTED_TABLES)
         assert dropped == set(CMS_PROTECTED_TABLES), "downgrade가 upgrade와 비대칭이다"
+        assert "server_default" not in text.split("def upgrade")[1].split("def downgrade")[0]
+
+    def test_p326_migration_adds_the_marker_to_exactly_the_owned_tables(self) -> None:
+        """개념·엣지의 소유 표지(P3-26)는 별도 리비전이 둔다 — 기본값·백필이 없어야 한다."""
+        text = _MIGRATION_P326.read_text(encoding="utf-8")
+        added = set(
+            re.findall(r'op\.add_column\(\s*"(\w+)",\s*sa\.Column\("cms_edited_at"', text, re.S)
+        )
+        dropped = set(re.findall(r'op\.drop_column\("(\w+)", "cms_edited_at"\)', text))
+        assert added == set(CMS_OWNED_TABLES)
+        assert dropped == set(CMS_OWNED_TABLES), "downgrade가 upgrade와 비대칭이다"
         assert "server_default" not in text.split("def upgrade")[1].split("def downgrade")[0]
 
     def test_check_specs_rejects_a_spec_whose_declaration_disagrees_with_the_registry(self) -> None:
@@ -184,7 +209,16 @@ class TestApplyChangesMarking:
 
 #: 보호 대상 ORM 클래스를 upsert할 때 쓰이는 이름(별칭 포함). 새 별칭이 생기면 여기에 더한다.
 _PROTECTED_CLASS_NAMES = frozenset(
-    {"Problem", "ProblemORM", "MisconceptionCatalogORM", "StrategyNode", "ConceptContent"}
+    {
+        "Problem",
+        "ProblemORM",
+        "MisconceptionCatalogORM",
+        "StrategyNode",
+        "ConceptContent",
+        # P3-26: CMS가 만든 개념·관계 행 — 개념 그래프 적재기 4종이 upsert한다.
+        "Concept",
+        "ConceptEdge",
+    }
 )
 
 
@@ -245,6 +279,11 @@ class TestEnforcementPoint:
             "l1/misconception/catalog_loader.py",
             "l1/strategy_graph/strategy_node_projection.py",
             "l1/concept_content/projection.py",
+            # P3-26 — 개념 그래프(원자 백본 + 레거시 437) 적재기 4종
+            "l1/atom_graph/atom_backend_concept.py",
+            "l1/atom_graph/atom_backend_edge.py",
+            "l1/concept_graph/backend_concept.py",
+            "l1/concept_graph/backend_edge.py",
         }, f"새 적재 경로가 생겼다 — 보호를 걸고 여기와 계약 문서 §2를 갱신하라: {sorted(found)}"
         for rel in found:
             problems = unguarded_protected_upserts((_PKG / rel).read_text(encoding="utf-8"))
@@ -395,7 +434,7 @@ class TestCliWiring:
         seen: list[bool] = []
 
         async def _run(
-            *, apply: bool, overwrite_cms_edits: bool = False
+            *, apply: bool, value_exposure: object, overwrite_cms_edits: bool = False
         ) -> populate.GenerationReport:
             seen.append(overwrite_cms_edits)
             return populate.summarize([], load=PathLoadReport(paths_seen=1), applied=apply)

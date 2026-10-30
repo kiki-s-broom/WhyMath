@@ -171,12 +171,12 @@ class TestProblemSolveTimeDistribution:
             p10_seconds=30,
             p50_seconds=90,
             p90_seconds=240,
-            sample_size=512,
+            sample_size=512,  # corpus-pin: 코퍼스 무관 — 합성 표본 크기
         )
         assert d.p10_seconds == 30
         assert d.p50_seconds == 90
         assert d.p90_seconds == 240
-        assert d.sample_size == 512
+        assert d.sample_size == 512  # corpus-pin: 코퍼스 무관 — 합성 표본 크기
 
     def test_persona_enum_value_serialization(self) -> None:
         """use_enum_values → persona가 문자열 값으로 직렬화(예: 'A_일반고고3')."""

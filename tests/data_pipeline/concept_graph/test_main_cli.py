@@ -16,6 +16,14 @@ from data_pipeline.ncic.load import write_json
 from data_pipeline.ncic.models import AchievementStandard
 from typer.testing import CliRunner
 
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+# 고정 지점이 사실 파일 한 곳이다 — 값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 runner = CliRunner()
 
 
@@ -158,9 +166,11 @@ class TestTransformV1:
             assert "name_ja" not in concept
         with idmap.open(encoding="utf-8-sig") as f:
             rows = list(csv.DictReader(f))
-        assert len(rows) == 437  # src_id → concept_id 매핑(공통 403 + 기본수학 34)
+        assert (
+            len(rows) == _FACTS["concept_graph.concepts"]
+        )  # src_id → concept_id 매핑(공통 403 + 기본수학 34)
         ko = json.loads((out / "locales" / "ko.json").read_text(encoding="utf-8"))
-        assert len(ko) == 437  # 표시이름은 locale(ko)로 분리
+        assert len(ko) == _FACTS["concept_graph.concepts"]  # 표시이름은 locale(ko)로 분리
 
     def test_missing_corpus_exits_2(self, tmp_path: Path) -> None:
         result = runner.invoke(app, ["transform-v1", "--corpus-dir", str(tmp_path / "nope")])
@@ -206,9 +216,9 @@ class TestGenIds:
         assert (dst / "ids.yaml").exists()
         registry = yaml.safe_load((dst / "ids.yaml").read_text(encoding="utf-8"))
         assert registry["version"] == 1
-        assert len(registry["concepts"]) == 437
+        assert len(registry["concepts"]) == _FACTS["concept_graph.concepts"]
         ko = json.loads((dst / "locales" / "ko.json").read_text(encoding="utf-8"))
-        assert len(ko) == 437
+        assert len(ko) == _FACTS["concept_graph.concepts"]
 
     def test_gen_ids_missing_graph_exits_2(self, corpus_dir: Path, tmp_path: Path) -> None:
         """graph.json 없으면 종료코드 2(검증 대상 부재)."""

@@ -523,7 +523,7 @@ class TestCalculusBand:
         assert stored["geo-sum"] == 20
         assert stored["trig-eq"] == 12
         assert stored["seq-inductive"] == 30
-        assert report.total_stored == 620 and report.fulfilled
+        assert report.total_stored == 620 and report.fulfilled  # corpus-pin: 생성기 계약
 
     def test_value_mc_records_have_calculus_metadata(self, tmp_path: Path) -> None:
         # calc-value-mc 밴드 산출물 — 극대·극소 태깅·객관식·4지선다·오답 오개념 2종 태깅.

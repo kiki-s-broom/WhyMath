@@ -6,7 +6,15 @@ import { randomBytes } from "node:crypto";
 import type { AddWorkspaceInput, Settings, Workspace, WorkspaceKind, WorkspaceOptions } from "../../shared/types";
 import { atomicWriteJson, readJson } from "./atomic";
 
-export const DEFAULT_OPTIONS: WorkspaceOptions = { remote: false, github: false };
+export const DEFAULT_OPTIONS: WorkspaceOptions = { remote: true, github: false, source: "trunk" };
+
+/** 저장된 옵션 읽기. `source`가 없는 항목은 HARN-306 이전에 저장된 것이다 — 그때 기본값(remote=false·작업 트리)은
+    "새로고침해도 변하지 않는" 원인이었으므로 새 기본값(최신 main + 원격 조회)으로 옮긴다. python·github 지정은 보존. */
+export function migrateOptions(o: Partial<WorkspaceOptions> | undefined): WorkspaceOptions {
+  const stored = o || {};
+  if (stored.source === undefined) return { ...DEFAULT_OPTIONS, ...stored, remote: true, source: "trunk" };
+  return { ...DEFAULT_OPTIONS, ...stored };
+}
 
 /** 폴더 종류 판정 — harness(scripts/harness/work_graph.py 있음) → git(.git 있음) → 거부 */
 export async function detectKind(root: string): Promise<{ kind: WorkspaceKind } | { kind: null; reason: string }> {
@@ -42,7 +50,7 @@ export class SettingsStore {
           name: w.name || path.basename(w.root),
           root: w.root,
           kind: w.kind === "git" ? "git" : "harness",
-          options: { ...DEFAULT_OPTIONS, ...(w.options || {}) },
+          options: migrateOptions(w.options),
         })),
     };
     return this.cache;

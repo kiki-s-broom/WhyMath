@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 
+import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
@@ -66,18 +67,21 @@ def test_concept_version_ddl_compiles_to_postgres() -> None:
     assert "UUID" in ddl
 
 
-def test_concept_id_fk_targets_concept_code_not_uuid_pk() -> None:
-    """Principle 1(Entity ID ≠ Version ID) — concept_id는 concept.code(의미 ID)를 FK로
-    가리킨다. concept.concept_id(UUID 대리키)를 가리키지 않는다(acceptance ① 핵심)."""
+def test_concept_id_is_the_semantic_code_and_has_no_fk() -> None:
+    """Principle 1(Entity ID ≠ Version ID) — concept_id는 concept.code(의미 ID)를 가리키는 Text다.
+
+    P3-26부터 **FK를 두지 않는다**: 아직 살아있는 개념 행이 없는 신규 개념 제안(초안·검토·승인)을
+    이 테이블에 담아야 하기 때문이다. 무결성은 DB 트리거 2종이 지킨다(alembic a8c4e1f7b3d9 — 실 DB
+    검증은 `tests/backend/l3/test_publish_gate_integration.py`). 그래도 UUID 대리키를 가리키는
+    FK가 되살아나면 안 된다(원 acceptance ①의 핵심은 유지).
+    """
     ddl = _pg_ddl(OrmConceptVersion.__table__)
-    assert "FOREIGN KEY(concept_id) REFERENCES concept (code)" in ddl
-    assert "FOREIGN KEY(concept_id) REFERENCES concept (concept_id)" not in ddl
+    assert "REFERENCES concept (code)" not in ddl, "신규 개념 제안을 담으려면 FK가 없어야 한다"
+    assert "REFERENCES concept (concept_id)" not in ddl, "UUID 대리키를 가리키면 안 된다"
 
     col = OrmConceptVersion.__table__.c.concept_id
-    fks = list(col.foreign_keys)
-    assert len(fks) == 1
-    assert fks[0].column.table.name == "concept"
-    assert fks[0].column.name == "code"
+    assert list(col.foreign_keys) == []
+    assert isinstance(col.type, sa.Text)
 
 
 def test_concept_version_self_fk_previous_version() -> None:

@@ -40,6 +40,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 _K12_CORPUS = _REPO_ROOT / "data" / "corpus" / "concept_content_v1" / "content.json"
 _UNIV_CORPUS = _REPO_ROOT / "data" / "corpus" / "concept_content_university_v1" / "content.json"
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+# 적재 총행 = K-12 콘텐츠 + 대학 콘텐츠(계산식이 드러나게 사실의 합으로 쓴다).
+_EXPECTED_TOTAL = _FACTS["concept_content.k12"] + _FACTS["concept_content.university"]
+
 
 def _sync_engine() -> object:
     from sqlalchemy import create_engine
@@ -108,9 +116,9 @@ class TestConceptContentProjectionLoad:
         from sqlalchemy.exc import SQLAlchemyError
 
         try:
-            # ① 적재 — K-12 437 + 대학 409 = 846.
+            # ① 적재 — K-12 + 대학 = 사실 파일의 두 건수 합.
             total = _load_all()
-            assert total == 846
+            assert total == _EXPECTED_TOTAL
 
             engine = _sync_engine()
             try:
@@ -119,9 +127,9 @@ class TestConceptContentProjectionLoad:
                         text("SELECT count(*) FROM concept_content WHERE code = ANY(:k)"),
                         {"k": codes},
                     ).scalar_one()
-                    assert count == 846
+                    assert count == _EXPECTED_TOTAL
 
-                    # ① scope 분포(K-12 437·대학 409).
+                    # ① scope 분포(K-12·대학 — 사실 파일의 건수).
                     scope_rows = conn.execute(
                         text(
                             "SELECT scope, count(*) AS n FROM concept_content "
@@ -130,8 +138,11 @@ class TestConceptContentProjectionLoad:
                         {"k": codes},
                     ).all()
                     by_scope = {r.scope: r.n for r in scope_rows}
-                    assert by_scope.get(CONTENT_SCOPE_K12) == 437
-                    assert by_scope.get(CONTENT_SCOPE_UNIVERSITY) == 409
+                    assert by_scope.get(CONTENT_SCOPE_K12) == _FACTS["concept_content.k12"]
+                    assert (
+                        by_scope.get(CONTENT_SCOPE_UNIVERSITY)
+                        == _FACTS["concept_content.university"]
+                    )
 
                     # ② flashcards JSONB·standard_codes TEXT[] 왕복(타입 보존).
                     sample = conn.execute(
@@ -165,7 +176,7 @@ class TestConceptContentProjectionLoad:
 
             # ⑤ 멱등 — 재적재 후 행수 불변.
             total2 = _load_all()
-            assert total2 == 846
+            assert total2 == _EXPECTED_TOTAL
             engine = _sync_engine()
             try:
                 with engine.connect() as conn:  # type: ignore[attr-defined]
@@ -173,7 +184,7 @@ class TestConceptContentProjectionLoad:
                         text("SELECT count(*) FROM concept_content WHERE code = ANY(:k)"),
                         {"k": codes},
                     ).scalar_one()
-                    assert count2 == 846  # 중복 0(멱등)
+                    assert count2 == _EXPECTED_TOTAL  # 중복 0(멱등)
             finally:
                 engine.dispose()  # type: ignore[attr-defined]
         finally:

@@ -290,9 +290,31 @@ def _dockerfile_directives() -> list[str]:
     ]
 
 
+def _resolved_froms() -> list[str]:
+    """FROM 줄을 첫 FROM 앞의 ARG 기본값으로 풀어서 돌려준다 (OPS-135).
+
+    베이스 이미지가 `ARG PYTHON_IMAGE=python:3.12-slim` + `FROM ${PYTHON_IMAGE}`로 바뀌어도
+    "기본 베이스는 python:3.12-slim"이라는 이 계약의 의도는 그대로 검사해야 한다 — 문자열이
+    FROM 줄에 직접 있는지만 보면 ARG화가 계약을 조용히 우회한다.
+    """
+    args: dict[str, str] = {}
+    resolved: list[str] = []
+    for line in _dockerfile_directives():
+        head = line.split(None, 1)
+        if head[0].upper() == "ARG" and not resolved and "=" in head[1]:
+            name, _, default = head[1].partition("=")
+            args[name.strip()] = default.strip()
+        elif head[0].upper() == "FROM":
+            text = line
+            for name, default in args.items():
+                text = text.replace("${" + name + "}", default).replace("$" + name, default)
+            resolved.append(text)
+    return resolved
+
+
 def test_dockerfile_is_multistage_on_slim_base() -> None:
     """④ 멀티스테이지 + python:3.12-slim — 빌드 도구가 런타임 이미지에 남지 않는다."""
-    froms = [line for line in _dockerfile_directives() if line.upper().startswith("FROM ")]
+    froms = _resolved_froms()
     assert len(froms) >= 2, f"멀티스테이지가 아니다(FROM {len(froms)}개)"
     assert all(
         "python:3.12-slim" in line for line in froms

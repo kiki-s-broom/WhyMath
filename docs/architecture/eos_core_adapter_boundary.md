@@ -20,6 +20,26 @@
 > - 따라서 이 문서의 존재를 근거로 "경계가 있다"고 말하면 안 된다. 지금 있는 것은 **경계의 정의**뿐이다.
 >
 > 대조 시점: 2026-08-31 · main `3f512962` 기준 · 스캔 대상 **556 모듈 / 155,435 LOC** · 스캔 오류 0.
+> (이 줄은 작성 시점 기록이다. **현행 수치는 §3 표** — 2026-10-23 main `0523e19e` 기준 **813 모듈**.)
+>
+> ## 능력 수는 이렇게 센다 (2026-10-23 통일 — `ARCH-104`)
+>
+> 이 문서와 코드 주석에는 "능력 5종/7종/8종"이 섞여 나온다. 서로 모순이 아니라 **세는 대상과
+> 시점이 다른 수치**다. 현행 기준은 아래 하나의 정의이고, 나머지는 그 부분집합이다.
+>
+> | 무엇을 센 수 | 현행 값 | 근거(재현 방법) |
+> |---|---:|---|
+> | **선택층 능력 Protocol** — `schema/verification_capabilities.py`에서 *메서드를 가진* 최상위 Protocol (결과 형태 Protocol 7개 `StepOutcome`·`ChainVerification`·`ChainVerificationCounts`·`FinalAnswerOutcome`·`SealOutcome`·`ValueExposureScan`·`AttemptMisconceptionScan`은 제외) | **8종** ← 이 문서의 "능력 N종"은 이 수다 | AST로 Protocol 클래스 중 `@property`가 아닌 메서드가 있는 것을 센다 |
+> | 그중 `app.state`에 등록되는 능력 | 7종 | `api/_subject_capability_state.py`의 `SUBJECT_CAPABILITY_KEYS`. 나머지 1종(`AnswerValueExposure`)은 오프라인 힌트 생성 CLI가 합성 루트에서 받아 내려 주는 PULL_ONLY 경로다(`pyproject.toml` layers 계약의 `l4.hint_content.populate -> composition` 면제 줄) |
+> | 합성 루트 `default_*` 팩토리 | 9개 | `composition.py` `__all__` — 능력 Protocol 8 + 오개념 거짓 항등식 shadow 관측 콜러블 1 |
+> | 수학 구현의 적합성 증명(`*_CONFORMANCE`) | 8개 | `l4/subject_adapter_math.py` — 능력 8종 각각에 하나 |
+> | 필수층 `SubjectAdapter` 메서드 | 3개 | `schema/subject_adapter.py` (Frozen unexercised, Core 호출자 0) |
+>
+> 옛 수치의 정체: **5종** = EOS-89(2026-09-07) 당시 등록 수(§9.2 표·`test_eos_dependency_direction.py` 주석에 당시 값으로
+> 남아 있다) · **7종** = COMP-01(`StepChainVerifier`)·EOS-104(`AttemptMisconceptionDetector`) 이후의 `app.state` 등록 수
+> (`_subject_capability_state.py` 첫 줄) · **8종** = 2026-09-27 시점의 `composition.py` 팩토리 수(능력 7 + 콜러블 1,
+> `schema/subject_adapter.py` "집행 상태" 절) 였고, 2026-10-22 `P3-77`(#1721)이 `AnswerValueExposure`를 더해 능력 Protocol이
+> 7→8종, 팩토리가 8→9개가 됐다. 코드 안 docstring의 옛 수치는 그 시점의 기록이라 이 태스크가 고치지 않았다.
 
 ---
 
@@ -54,7 +74,7 @@
 | Identity | `security` · `consent` · `consent_grant` · `db.models.user*` | INFRA로 분류(횡단) |
 | Curriculum | `l1.curriculum` · `l1.standards` · `db.models.curriculum_framework` | CORE ✓ |
 | Knowledge Graph | `l1.atom_graph` · `l1.concept_graph` · `l1.skill_graph` · `l1.concept_atom_crosswalk` | CORE ✓ |
-| Learning Model | `l2` 전체(22모듈) | CORE ✓ — 수학 신호 **0건** |
+| Learning Model | `l2` 전체(40모듈 · 2026-10-23 실측 / 작성 당시 22) | CORE ✓ — 수학 신호 **0건** |
 | Assessment | `l2.ability_estimation` · `l2.irt` · `l2.item_calibration` · `l3.pedagogy`(예심) | CORE ✓ |
 | Recommendation | `l2.prerequisite_recommendation` · `l2.weak_concept_recommendation` · `l2.learning_path` | CORE ✓ |
 | Content | `l1.concept_content` · `l1.problem_bank` · `l3.render` · `l3.dsl` | CORE(dsl은 MIXED) |
@@ -96,35 +116,44 @@
 > **2026-08-31 갱신**: `EOS-66` 착지로 2모듈이 `BOUNDARY_MAP`에 추가됐다 —
 > `schema.subject_adapter`(CORE·계약) · `l4.subject_adapter_math`(ADAPTER·구현). 그만큼
 > 합계가 늘었고 **위반 수는 15로 불변**이다(어댑터는 ADAPTER→CORE 방향으로만 의존).
+>
+> **2026-10-23 갱신 (`ARCH-104` · 판정 기준 main `0523e19e`)**: 아래 표를 `python3 scripts/analysis/eos_core_adapter_boundary_scan.py`
+> 실행값(813모듈 · 스캔 오류 0 · CORE→ADAPTER 위반 0)으로 교체했다. 직전 표(2026-08-31)의
+> 합계는 CORE 301 / ADAPTER 51 / MIXED 34 / INFRA 174였다 — 두 달 사이 CORE +97·ADAPTER +53이
+> 늘었다. 직전 표는 INFRA 합계(174)가 행 합(166)보다 8 컸다 — 패키지 루트 `.py`가 행에 없었다.
+> 이번 표는 스캔의 전 모듈을 행으로 나눴으므로 행 합이 스캔 요약과 정확히 같다.
 
 | 계층 | CORE | ADAPTER | MIXED | INFRA |
 |---|---|---|---|---|
-| `l1` 데이터 기반 | 75모듈 / 13,946 loc | — | 6 / 608 | — |
-| `l2` 학습자 모델 | **22 / 5,035** | — | — | — |
-| `l3` 생성·검증 | 39 / 8,910 | **39 / 19,938** | 15 / 3,019 | — |
-| `l4` 교수학 | **77 / 14,920** | 3 / 485 | 4 / 588 | — |
-| `l5` 상호작용 | 1 / 18 | 9 / 1,605 | — | — |
-| `l6` 응용 모드 | **17 / 2,837** | — | — | — |
-| `api` | 37 / 15,814 | — | 3 / 462 | — |
-| `schema` | 33 / 7,194 | — | 6 / 3,549 | — |
-| `db`·`ops`·`privacy`·`harness`·`whs` | — | — | — | 166 / 53,871 |
-| **합계** | **301 / 68,732** | **51 / 22,028** | **34 / 8,226** | **174 / 58,587** |
+| `l1` 데이터 기반 | 91 / 20,762 | — | 6 / 636 | — |
+| `l2` 학습자 모델 | **40 / 14,391** | — | — | — |
+| `l3` 생성·검증 | 57 / 16,177 | 90 / 55,947 | 16 / 4,286 | — |
+| `l4` 교수학 | 90 / 19,638 | 5 / 1,865 | 3 / 307 | — |
+| `l5` 상호작용 | 1 / 18 | 9 / 1,616 | — | — |
+| `l6` 응용 모드 | 18 / 3,019 | — | — | — |
+| `lang` | 2 / 275 | — | — | — |
+| `api` | 51 / 25,064 | — | 3 / 542 | 1 / 235 |
+| `schema` | 48 / 11,705 | — | 6 / 4,050 | — |
+| `db`·`ops`·`privacy`·`harness`·`whs` | — | — | — | 268 / 105,362 |
+| 패키지 루트 `.py`(`app`·`composition`·`config` 등) | — | — | 1 / 47 | 7 / 4,273 |
+| **합계** | **398 / 111,049** | **104 / 59,428** | **35 / 9,868** | **276 / 109,870** |
 
 > **이 표는 스냅샷이다** — 머지마다 수치가 바뀐다(2026-08-31만 해도 세 번 갱신했다).
 > 판정을 다시 뽑으려면 `python3 scripts/analysis/eos_core_adapter_boundary_scan.py`를
 > 돌린다. 표를 손으로 맞추기보다 **불변량**을 보는 편이 낫다 — CORE의 `sympy` import 0건,
-> `l2`·`l6`의 수학 신호 0건, 위반 15건(EOS-69가 줄인다).
+> `l2`·`l6`의 수학 신호 0건, 위반 0건(§4 — 착수 시점 15건은 EOS-69가 상환했다).
 
-**교차 검증 — CORE의 `sympy` import는 0건이다.** 전체 27건의 sympy import 중 ADAPTER 18 ·
-MIXED 7 · INFRA 2(하네스)로 갈렸고 CORE는 정확히 0이다. 배정을 손으로 했는데 독립 신호가
+**교차 검증 — CORE의 `sympy` import는 0건이다.** 전체 52건의 sympy import(2026-10-23 스캔) 중
+ADAPTER 33 · MIXED 15 · INFRA 4로 갈렸고 CORE는 정확히 0이다(2026-08-31에는 27건 = ADAPTER 18 ·
+MIXED 7 · INFRA 2). 배정을 손으로 했는데 독립 신호가
 경계와 일치했다는 뜻이라, 배정이 자의적이지 않다는 근거로 삼을 수 있다.
 
 **가장 깨끗한 계층**: `l2`(학습자 모델)와 `l6`(응용 모드)는 수학 어휘·sympy 전부 0이다.
 Physics를 붙일 때 **이 두 계층은 손대지 않아도 된다** — 계획서 100 §4-⑥의 합격 기준
 ("Math가 제대로 동작하고, Physics를 붙일 때 Core를 뜯지 않아도 되는 수준")이 이미 성립한 구역이다.
 
-**가장 섞인 계층**: `l3`. 한 계층에 AI 오케스트레이션(CORE)과 수학 검증(ADAPTER)이 39:39로
-동거한다. 경계선은 계층 사이가 아니라 **`l3` 한가운데를 지난다** — 7계층 축(현행 import-linter
+**가장 섞인 계층**: `l3`. 한 계층에 AI 오케스트레이션(CORE)과 수학 검증(ADAPTER)이 57:90(2026-10-23 · 2026-08-31에는
+39:39)으로 동거한다. 경계선은 계층 사이가 아니라 **`l3` 한가운데를 지난다** — 7계층 축(현행 import-linter
 계약)이 이 축을 볼 수 없는 이유이자, EOS-67이 별도 계약이어야 하는 이유다.
 
 ---
@@ -413,7 +442,7 @@ python3 scripts/analysis/eos_core_boundary_probe.py --json probe.json
 |---|---|---|---|
 | Application → Core | 허용 | `api`가 `l*`를 import(layers 최상단) | 7계층 layers 계약 |
 | Core → Subject Interface | 허용·권장 | CORE 소비자 4(`api.coach`·`l3.pedagogy.slot_generator`·`l3.render.adapters`·`l6.blueprint.assembly`)가 `schema.subject_adapter`/`verification_capabilities` 프로토콜을 import | — |
-| Math Adapter → Subject Interface | **필수**(화살표가 위로) | `l4.subject_adapter_math`가 두 인터페이스 모듈을 import하고 적합성 증명 `_CONFORMANCE_PROOF: SubjectAdapter = MathSubjectAdapter()`(L151) 보유. 선택층 5종도 동형 증명 | `test_math_adapter_points_up_at_the_interface` |
+| Math Adapter → Subject Interface | **필수**(화살표가 위로) | `l4.subject_adapter_math`가 두 인터페이스 모듈을 import하고 적합성 증명 `_CONFORMANCE_PROOF: SubjectAdapter = MathSubjectAdapter()`(현행 L184) 보유. 선택층 능력 8종도 동형 증명(`*_CONFORMANCE` 8개) | `test_math_adapter_points_up_at_the_interface` |
 | Subject Interface → Adapter | **금지** | 코드 import **0**(두 파일이 import하는 것은 `schema.answer_form`뿐). docstring이 구현체 이름을 2곳(`schema/subject_adapter.py` L12·L85) 언급 — 의존은 아니나 인터페이스 산문이 구현체를 안다 | EOS-67 계약 1 + 지연 import 검사 |
 | Core → Adapter 구현체(이름·문자열) | **금지** | CORE 코드 **0**(docstring 제외·`composition`은 정의상 제외) | `test_core_code_never_names_an_adapter_implementation` |
 | Core → Application | 금지 | CORE **0**. INFRA 운영 도구 8모듈(`ops.*` 4·`privacy.*` 3·`harness.*` 1)은 `api._crypto`·`api._auth`·`api.me` 등 헬퍼를 import — Application 쪽에 선 도구라 §3.8 대상 아님(9.2) | `test_core_never_imports_the_application` |
@@ -423,11 +452,11 @@ python3 scripts/analysis/eos_core_boundary_probe.py --json probe.json
 | 측정 | EOS-88(전) | EOS-89(후) |
 |---|---:|---:|
 | `app.py`가 `app.state`에 등록하는 키 | 13 | **18** |
-| 그중 **과목 능력**(`ExpressionEquivalence`·`FinalAnswerVerifier`·`AssessmentAnswerVerifier`·`ExpressionSeal`·`AnswerFormVerifier`) | **0** | **5** |
+| 그중 **과목 능력**(`ExpressionEquivalence`·`FinalAnswerVerifier`·`AssessmentAnswerVerifier`·`ExpressionSeal`·`AnswerFormVerifier`) — *2026-09-07 당시 값, 현행 등록 7종* | **0** | **5** |
 | 합성 루트에서 기본 구현을 **끌어오는(pull) CORE** 모듈 | **3** | **0** |
 | 합성 루트를 소비하는 **비-CORE** 모듈(엔트리포인트) | 0 | **2** — `app` · `harness.concept_assessment_index` |
 | layers 계약의 `-> composition` 면제 줄 | 2 | **0** |
-| 필수층 `MathSubjectAdapter`의 프로덕션 인스턴스화 | 0 | **0** (변화 없음 — 선택층 5종만 등록했다) |
+| 필수층 `MathSubjectAdapter`의 프로덕션 인스턴스화 | 0 | **0** (변화 없음 — 당시 선택층 5종만 등록했다 · 현행 등록 7종/능력 8종은 상단 「능력 수」 표) |
 
 **pull 3지점이 각각 어떻게 사라졌나**
 

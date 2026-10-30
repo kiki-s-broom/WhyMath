@@ -1,0 +1,907 @@
+{
+  "_meta": {
+    "task": "KG-12-university-chain-repair-and-word-match-guards",
+    "review_marker": "검수:AI 2인 블라인드 2026-10-20",
+    "source_graph_sha256": "721fe6ffd72f3634f6d211a739f5e262c58069b83a6d73b45915d63b6227d9e7",
+    "source_reference_v1_sha256": "24843a501fd4224794aec8d7c7df0b20dcfa4e86d5f686a6ca5be2d4550868a8",
+    "conflict_total": 40,
+    "consensus_counts": {
+      "A합의": 21,
+      "B합의": 16,
+      "보류": 3
+    },
+    "fix_edge_count": 16,
+    "fix_action_counts": {
+      "반전": 4,
+      "제거": 12
+    },
+    "note": "수리 원장 — A합의 행의 수정 엣지만 정본에 적용한다(원본 xlsx 선수엣지_통합 수정 → regenerate_atom_backbone_v3.sh 재생성). original_index·original_record는 수리 전 정본을 바이트 단위로 복원하기 위한 것(graph_history). 서술 엣지(candidate→to) 자체는 여기서 추가하지 않는다 — narrative_edge_addable_after_repair 행은 후속 낱말 매칭 재해소의 입력."
+  },
+  "rows": [
+    {
+      "row": "R01",
+      "narrative_index": 39,
+      "candidate": "CALC1-P08",
+      "to_code": "CALC1-C10",
+      "word": "연쇄법칙",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 CALC1-C27→CALC1-P06"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R02",
+      "narrative_index": 68,
+      "candidate": "CALC1-P14",
+      "to_code": "CALC1-P13",
+      "word": "부정적분",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 CALC1-R09→CALC1-C20"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R03",
+      "narrative_index": 135,
+      "candidate": "CALC2-R04",
+      "to_code": "CALC2-C08",
+      "word": "단면",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "반전 CALC2-C08→CALC2-R04"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R04",
+      "narrative_index": 178,
+      "candidate": "CALC2-P01",
+      "to_code": "CALC2-C19",
+      "word": "매개곡선",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 CALC2-C24→CALC2-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R05",
+      "narrative_index": 206,
+      "candidate": "LINA1-C06",
+      "to_code": "LINA1-C05",
+      "word": "행렬식",
+      "A": "A",
+      "B": "B",
+      "result": "보류",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R06",
+      "narrative_index": 210,
+      "candidate": "LINA1-C06",
+      "to_code": "LINA1-P05",
+      "word": "행렬식",
+      "A": "A",
+      "B": "B",
+      "result": "보류",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R07",
+      "narrative_index": 214,
+      "candidate": "LINA1-P08",
+      "to_code": "LINA1-C06",
+      "word": "여인수 전개",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R08",
+      "narrative_index": 215,
+      "candidate": "LINA1-P08",
+      "to_code": "LINA1-P07",
+      "word": "여인수 전개",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "반전 LINA1-P07→LINA1-P08"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R09",
+      "narrative_index": 229,
+      "candidate": "LINA1-C13",
+      "to_code": "LINA1-C10",
+      "word": "차원",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 LINA1-C10→LINA1-C11"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R10",
+      "narrative_index": 284,
+      "candidate": "SETLOG-P08",
+      "to_code": "SETLOG-C08",
+      "word": "멱집합",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R11",
+      "narrative_index": 286,
+      "candidate": "SETLOG-P10",
+      "to_code": "SETLOG-P08",
+      "word": "곱집합",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R12",
+      "narrative_index": 327,
+      "candidate": "ANAL1-P02",
+      "to_code": "ANAL1-C04",
+      "word": "ε-N",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R13",
+      "narrative_index": 344,
+      "candidate": "ANAL1-C10",
+      "to_code": "ANAL1-C09",
+      "word": "집적점",
+      "A": "A",
+      "B": "B",
+      "result": "보류",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R14",
+      "narrative_index": 397,
+      "candidate": "ANAL2-P02",
+      "to_code": "ANAL2-C10",
+      "word": "편미분",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 ANAL2-C12→ANAL2-P01",
+        "제거 ANAL2-P01→ANAL2-P02"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R15",
+      "narrative_index": 401,
+      "candidate": "ANAL2-P02",
+      "to_code": "ANAL2-C12",
+      "word": "편미분",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 ANAL2-C12→ANAL2-P01",
+        "제거 ANAL2-P01→ANAL2-P02"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R16",
+      "narrative_index": 527,
+      "candidate": "AALG1-C14",
+      "to_code": "AALG1-P03",
+      "word": "실로우",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "반전 AALG1-P03→AALG1-C14"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R17",
+      "narrative_index": 530,
+      "candidate": "AALG2-C03",
+      "to_code": "AALG2-C02",
+      "word": "아이디얼",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R18",
+      "narrative_index": 531,
+      "candidate": "AALG2-C04",
+      "to_code": "AALG2-C02",
+      "word": "몫환",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 AALG2-C03→AALG2-C04"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R19",
+      "narrative_index": 545,
+      "candidate": "AALG2-P01",
+      "to_code": "AALG2-C08",
+      "word": "기약",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R20",
+      "narrative_index": 547,
+      "candidate": "AALG2-C11",
+      "to_code": "AALG2-C09",
+      "word": "체",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R21",
+      "narrative_index": 598,
+      "candidate": "CXAN-R01",
+      "to_code": "CXAN-C01",
+      "word": "복소평면",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R22",
+      "narrative_index": 617,
+      "candidate": "CXAN-C12",
+      "to_code": "CXAN-C09",
+      "word": "특이점",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R23",
+      "narrative_index": 619,
+      "candidate": "CXAN-C12",
+      "to_code": "CXAN-C10",
+      "word": "특이점",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R24",
+      "narrative_index": 689,
+      "candidate": "MSTAT-P01",
+      "to_code": "MSTAT-C04",
+      "word": "우도",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 MSTAT-C07→MSTAT-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R25",
+      "narrative_index": 693,
+      "candidate": "MSTAT-P01",
+      "to_code": "MSTAT-C06",
+      "word": "우도",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 MSTAT-C07→MSTAT-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R26",
+      "narrative_index": 695,
+      "candidate": "MSTAT-P01",
+      "to_code": "MSTAT-C07",
+      "word": "우도",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 MSTAT-C07→MSTAT-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R27",
+      "narrative_index": 767,
+      "candidate": "FANAL-P01",
+      "to_code": "FANAL-C06",
+      "word": "작용소",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 FANAL-C11→FANAL-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R28",
+      "narrative_index": 772,
+      "candidate": "FANAL-P01",
+      "to_code": "FANAL-C09",
+      "word": "작용소",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 FANAL-C11→FANAL-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R29",
+      "narrative_index": 774,
+      "candidate": "FANAL-P01",
+      "to_code": "FANAL-C10",
+      "word": "작용소",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 FANAL-C11→FANAL-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R30",
+      "narrative_index": 776,
+      "candidate": "FANAL-P01",
+      "to_code": "FANAL-C11",
+      "word": "작용소",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 FANAL-C11→FANAL-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R31",
+      "narrative_index": 804,
+      "candidate": "ATOPO-C04",
+      "to_code": "ATOPO-C03",
+      "word": "피복",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R32",
+      "narrative_index": 824,
+      "candidate": "MFLD-C07",
+      "to_code": "MFLD-C06",
+      "word": "접속",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "반전 MFLD-C06→MFLD-C07"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R33",
+      "narrative_index": 846,
+      "candidate": "GALOIS-R01",
+      "to_code": "GALOIS-C06",
+      "word": "중간체",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R34",
+      "narrative_index": 870,
+      "candidate": "NUMT2-P01",
+      "to_code": "NUMT2-C01",
+      "word": "기호",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 NUMT2-C07→NUMT2-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R35",
+      "narrative_index": 890,
+      "candidate": "COMB-C05",
+      "to_code": "COMB-C03",
+      "word": "그래프",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R36",
+      "narrative_index": 892,
+      "candidate": "COMB-C05",
+      "to_code": "COMB-R01",
+      "word": "그래프",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R37",
+      "narrative_index": 910,
+      "candidate": "COMB-P01",
+      "to_code": "COMB-C11",
+      "word": "조합",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 COMB-C11→COMB-P01"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R38",
+      "narrative_index": 939,
+      "candidate": "CRYP-C10",
+      "to_code": "CRYP-C06",
+      "word": "거리",
+      "A": "A",
+      "B": "A",
+      "result": "A합의",
+      "fix_edges": [
+        "제거 CRYP-C06→CRYP-C07"
+      ],
+      "narrative_edge_addable_after_repair": true
+    },
+    {
+      "row": "R39",
+      "narrative_index": 941,
+      "candidate": "CRYP-C08",
+      "to_code": "CRYP-C07",
+      "word": "부호",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    },
+    {
+      "row": "R40",
+      "narrative_index": 956,
+      "candidate": "MLOG-C05",
+      "to_code": "MLOG-C04",
+      "word": "구조",
+      "A": "B",
+      "B": "B",
+      "result": "B합의",
+      "fix_edges": [],
+      "narrative_edge_addable_after_repair": false
+    }
+  ],
+  "fix_edges": [
+    {
+      "action": "반전",
+      "from_code": "AALG1-P03",
+      "to_code": "AALG1-C14",
+      "from_name": "실로우 부분군 개수 n_p 계산",
+      "to_name": "실로우 정리(존재·켤레·개수)",
+      "original_index": 1539,
+      "original_record": {
+        "from_code": "AALG1-P03",
+        "from_name": "실로우 부분군 개수 n_p 계산",
+        "to_code": "AALG1-C14",
+        "to_name": "실로우 정리(존재·켤레·개수)",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원내",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R16"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "AALG2-C03",
+      "to_code": "AALG2-C04",
+      "from_name": "소 아이디얼 ⇔ 몫이 정역",
+      "to_name": "몫환은 합동류의 환",
+      "original_index": 1543,
+      "original_record": {
+        "from_code": "AALG2-C03",
+        "from_name": "소 아이디얼 ⇔ 몫이 정역",
+        "to_code": "AALG2-C04",
+        "to_name": "몫환은 합동류의 환",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R18"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "ANAL2-C12",
+      "to_code": "ANAL2-P01",
+      "from_name": "음함수 정리도 국소 가용성",
+      "to_name": "수렴반경은 코시-아다마르",
+      "original_index": 1595,
+      "original_record": {
+        "from_code": "ANAL2-C12",
+        "from_name": "음함수 정리도 국소 가용성",
+        "to_code": "ANAL2-P01",
+        "to_name": "수렴반경은 코시-아다마르",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R14",
+        "R15"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "ANAL2-P01",
+      "to_code": "ANAL2-P02",
+      "from_name": "수렴반경은 코시-아다마르",
+      "to_name": "편미분 계산(한 변수 고정)",
+      "original_index": 1596,
+      "original_record": {
+        "from_code": "ANAL2-P01",
+        "from_name": "수렴반경은 코시-아다마르",
+        "to_code": "ANAL2-P02",
+        "to_name": "편미분 계산(한 변수 고정)",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R14",
+        "R15"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "CALC1-C27",
+      "to_code": "CALC1-P06",
+      "from_name": "매클로린은 a=0의 테일러",
+      "to_name": "곱의 미분은 미분의 곱이 아니다",
+      "original_index": 1633,
+      "original_record": {
+        "from_code": "CALC1-C27",
+        "from_name": "매클로린은 a=0의 테일러",
+        "to_code": "CALC1-P06",
+        "to_name": "곱의 미분은 미분의 곱이 아니다",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R01"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "CALC1-R09",
+      "to_code": "CALC1-C20",
+      "from_name": "넓이누적함수 A(x)의 그래프",
+      "to_name": "적분은 곱으로 분리되지 않는다",
+      "original_index": 1665,
+      "original_record": {
+        "from_code": "CALC1-R09",
+        "from_name": "넓이누적함수 A(x)의 그래프",
+        "to_code": "CALC1-C20",
+        "to_name": "적분은 곱으로 분리되지 않는다",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R02"
+      ]
+    },
+    {
+      "action": "반전",
+      "from_code": "CALC2-C08",
+      "to_code": "CALC2-R04",
+      "from_name": "z=x²+y²와 z²=x²+y²는 다르다",
+      "to_name": "이차곡면 식 ↔ 단면 그림",
+      "original_index": 1674,
+      "original_record": {
+        "from_code": "CALC2-C08",
+        "from_name": "z=x²+y²와 z²=x²+y²는 다르다",
+        "to_code": "CALC2-R04",
+        "to_name": "이차곡면 식 ↔ 단면 그림",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원내",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R03"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "CALC2-C24",
+      "to_code": "CALC2-P01",
+      "from_name": "스토크스는 경계곡선이 핵심",
+      "to_name": "매개곡선 기울기는 (dy/dt)/(dx/dt)",
+      "original_index": 1690,
+      "original_record": {
+        "from_code": "CALC2-C24",
+        "from_name": "스토크스는 경계곡선이 핵심",
+        "to_code": "CALC2-P01",
+        "to_name": "매개곡선 기울기는 (dy/dt)/(dx/dt)",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R04"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "COMB-C11",
+      "to_code": "COMB-P01",
+      "from_name": "블록설계는 균형을 요구",
+      "to_name": "조합 계산",
+      "original_index": 1724,
+      "original_record": {
+        "from_code": "COMB-C11",
+        "from_name": "블록설계는 균형을 요구",
+        "to_code": "COMB-P01",
+        "to_name": "조합 계산",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R37"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "CRYP-C06",
+      "to_code": "CRYP-C07",
+      "from_name": "해밍부호는 1비트 정정",
+      "to_name": "선형부호는 부분공간",
+      "original_index": 1733,
+      "original_record": {
+        "from_code": "CRYP-C06",
+        "from_name": "해밍부호는 1비트 정정",
+        "to_code": "CRYP-C07",
+        "to_name": "선형부호는 부분공간",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R38"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "FANAL-C11",
+      "to_code": "FANAL-P01",
+      "from_name": "무한차원선 스펙트럼≠고유값",
+      "to_name": "작용소 노름 계산",
+      "original_index": 1774,
+      "original_record": {
+        "from_code": "FANAL-C11",
+        "from_name": "무한차원선 스펙트럼≠고유값",
+        "to_code": "FANAL-P01",
+        "to_name": "작용소 노름 계산",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R27",
+        "R28",
+        "R29",
+        "R30"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "LINA1-C10",
+      "to_code": "LINA1-C11",
+      "from_name": "개수가 차원과 같아도 독립이어야 기저",
+      "to_name": "영벡터를 품으면 일차종속",
+      "original_index": 1799,
+      "original_record": {
+        "from_code": "LINA1-C10",
+        "from_name": "개수가 차원과 같아도 독립이어야 기저",
+        "to_code": "LINA1-C11",
+        "to_name": "영벡터를 품으면 일차종속",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원내",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R09"
+      ]
+    },
+    {
+      "action": "반전",
+      "from_code": "LINA1-P07",
+      "to_code": "LINA1-P08",
+      "from_name": "삼각행렬 행렬식은 대각성분의 곱",
+      "to_name": "3×3 행렬식은 여인수 전개",
+      "original_index": 1813,
+      "original_record": {
+        "from_code": "LINA1-P07",
+        "from_name": "삼각행렬 행렬식은 대각성분의 곱",
+        "to_code": "LINA1-P08",
+        "to_name": "3×3 행렬식은 여인수 전개",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원내",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R08"
+      ]
+    },
+    {
+      "action": "반전",
+      "from_code": "MFLD-C06",
+      "to_code": "MFLD-C07",
+      "from_name": "측지선은 가속도 0(접속)",
+      "to_name": "레비-치비타 접속은 유일",
+      "original_index": 1841,
+      "original_record": {
+        "from_code": "MFLD-C06",
+        "from_name": "측지선은 가속도 0(접속)",
+        "to_code": "MFLD-C07",
+        "to_name": "레비-치비타 접속은 유일",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R32"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "MSTAT-C07",
+      "to_code": "MSTAT-P01",
+      "from_name": "우도비검정",
+      "to_name": "최대우도추정(MLE)",
+      "original_index": 1859,
+      "original_record": {
+        "from_code": "MSTAT-C07",
+        "from_name": "우도비검정",
+        "to_code": "MSTAT-P01",
+        "to_name": "최대우도추정(MLE)",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R24",
+        "R25",
+        "R26"
+      ]
+    },
+    {
+      "action": "제거",
+      "from_code": "NUMT2-C07",
+      "to_code": "NUMT2-P01",
+      "from_name": "합동조건은 해의 필요조건",
+      "to_name": "르장드르 기호는 곱셈적",
+      "original_index": 1892,
+      "original_record": {
+        "from_code": "NUMT2-C07",
+        "from_name": "합동조건은 해의 필요조건",
+        "to_code": "NUMT2-P01",
+        "to_name": "르장드르 기호는 곱셈적",
+        "relation": "prerequisite",
+        "relation_subtype": "소단원간",
+        "school_link": false,
+        "strength": 0.8,
+        "evidence": "원자 백본 v1"
+      },
+      "rows": [
+        "R34"
+      ]
+    }
+  ]
+}

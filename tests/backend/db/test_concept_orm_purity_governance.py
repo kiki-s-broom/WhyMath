@@ -35,7 +35,8 @@ _SEMANTIC_COLUMNS = frozenset(
         "behavior_skills",  # 참조 키 배열(→ SkillNode) — 내장 아님
     }
 )
-_OPS_COLUMNS = frozenset({"created_at"})
+# `cms_edited_at`(P3-26): CMS가 만든 행의 소유 표지(시각 1개) — 개념 *내용*이 아니라 운영 메타다.
+_OPS_COLUMNS = frozenset({"created_at", "cms_edited_at"})
 # 판 관리 포인터(EOS-49 §6.4) — `concept_version.version_id`를 가리키는 느슨 참조일 뿐
 # 버전 payload 자체를 내장하지 않는다(behavior_skills와 동형 축 — 참조 키, 내장 아님).
 _VERSIONING_COLUMNS = frozenset({"current_published_version_id"})

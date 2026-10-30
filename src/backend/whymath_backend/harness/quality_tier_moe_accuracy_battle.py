@@ -79,6 +79,10 @@ class ModelOutcome(BaseModel):
     predicted_class: str | None = Field(description="모델이 말한 결함 유형(파싱된 경우).")
     parsed: bool = Field(description="응답 파싱 성공 여부.")
     parse_error: str | None = Field(default=None, description="파싱/호출 오류 기록.")
+    failure_kind: str | None = Field(
+        default=None,
+        description="미분류 원인(OPS-50) — truncated(출력 상한 절단)·malformed·empty·transport.",
+    )
     latency_ms: float | None = Field(default=None, description="해당 호출 실측 지연(ms).")
     input_tokens: int | None = Field(default=None)
     output_tokens: int | None = Field(default=None)
@@ -94,6 +98,9 @@ class DetectionMetrics:
     false_positives: int
     true_negatives: int
     unresolved: int
+    # OPS-50 ⑤ — 미분류를 정답지별로 나눠 센다(B·C 집계의 분모/분자). 기본 0은 구 호출부 호환.
+    unresolved_defective: int = 0
+    unresolved_clean: int = 0
 
     @property
     def defective_total(self) -> int:
@@ -115,10 +122,31 @@ class DetectionMetrics:
             return None
         return self.false_positives / self.clean_total
 
+    @property
+    def unresolved_rate(self) -> float | None:
+        total = self.defective_total + self.clean_total + self.unresolved
+        if total == 0:
+            return None
+        return self.unresolved / total
+
     def detection_lower_bound(self, confidence: float = 0.95) -> float | None:
         if self.defective_total == 0:
             return None
         return wilson_lower_bound(self.true_positives, self.defective_total, confidence)
+
+    def worst_case_detection_lower_bound(self, confidence: float = 0.95) -> float | None:
+        """B 집계 — 결함 문항의 미분류를 '놓침'으로 센 검출률 Wilson 하한."""
+        total = self.defective_total + self.unresolved_defective
+        if total == 0:
+            return None
+        return wilson_lower_bound(self.true_positives, total, confidence)
+
+    def worst_case_false_alarm_upper_bound(self, confidence: float = 0.95) -> float | None:
+        """C 집계 — 무결함 문항의 미분류를 '오경보'로 센 오경보율 Wilson 상한."""
+        total = self.clean_total + self.unresolved_clean
+        if total == 0:
+            return None
+        return wilson_upper_bound(self.false_positives + self.unresolved_clean, total, confidence)
 
     def false_alarm_upper_bound(self, confidence: float = 0.95) -> float | None:
         if self.clean_total == 0:
@@ -136,6 +164,7 @@ class ModelReport(BaseModel):
     metrics: DetectionMetrics
     latency_ms: dict[str, float | None]
     per_class: dict[str, tuple[int, int]]  # defect_class → (detected, total)
+    failure_kinds: dict[str, int] = Field(default_factory=dict)  # OPS-50: 미분류 원인별 건수
 
 
 class BattleReport(BaseModel):
@@ -151,6 +180,7 @@ class BattleReport(BaseModel):
     confidence: float
     baseline_model_id: str
     candidate_model_id: str
+    prompt_variant: str = "baseline"  # OPS-50: 후보에 적용한 프롬프트 변형
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -205,6 +235,163 @@ _JSON_SCHEMA: dict[str, Any] = {
     },
     "required": ["has_defect"],
 }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 프롬프트 변형 (OPS-50)
+#
+# OPS-48 감사 JSONL 재분류(OPS-50 ①): 후보 qwen3:30b-a3b 파싱 실패 16건은 전부
+# output_tokens == num_predict(512)에서 `reason`이 끊긴 **출력 상한 절단**이었다. 클래스 편중
+# (clean 10/50 · broken_latex 4/7)은 원인이 아니라 증상이다 — 잘린 16건은 전부 `"has_defect": true`
+# 로 시작해 "판정부터 박고 뒤늦게 자기반박"하는 서술을 끝없이 늘어놓았다. 변형은 한 번에 하나만
+# 바꾼다(--prompt-variant 단일 값).
+#
+#   baseline      OPS-48 프롬프트 그대로(재현 기준).
+#   short_reason  근거를 한 문장으로 제한(프롬프트 + schema maxLength) — 절단 직접 대응.
+#   reason_first  근거를 먼저 쓰고 판정을 뒤에 두는 필드 순서 — 판정 선행 패턴 대응.
+#   stage_split   (a) 1단계 has_defect만 묻고, 결함일 때만 2단계로 유형을 묻는다.
+#   latex_check   (b) LaTeX 형식 점검 지시를 추가한다.
+#   few_shot      (c) broken_latex 예시 1건을 주입한다(시험지에 없는 자작 문항).
+# ──────────────────────────────────────────────────────────────────────────
+PROMPT_VARIANTS: tuple[str, ...] = (
+    "baseline",
+    "short_reason",
+    "reason_first",
+    "stage_split",
+    "latex_check",
+    "few_shot",
+)
+
+# 기준 프롬프트에서 역할·결함 유형 목록(앞)과 출력 규약(뒤)을 가르는 표지.
+_FORMAT_MARKER = "응답 형식"
+
+# 근거 길이 상한(문자). 한글 1자 ≈ 1~2토큰이므로 100자 ≤ 200토큰 < num_predict 512.
+_SHORT_REASON_MAX_CHARS = 100
+_REASON_FIRST_MAX_CHARS = 160
+
+_SHORT_REASON_ADDENDUM = (
+    "\n\nreason은 반드시 한 문장(80자 이내)으로만 쓰세요. "
+    "계산 과정을 되풀이하거나 앞선 판단을 스스로 반박하지 마세요."
+)
+
+_LATEX_CHECK_ADDENDUM = """
+
+LaTeX 점검(수식이 있는 문항은 판정 전에 반드시 확인):
+- 발문·선택지·해설의 `$...$` 안에서 `{`와 `}`의 개수가 같은지 본다.
+- `\\frac`·`\\sqrt` 등 인자를 받는 명령에 `{}`가 빠짐없이 붙었는지 본다.
+- `\\left`와 `\\right`가 짝을 이루는지 본다.
+수식 표기가 깨졌으면 has_defect를 true, defect_class를 broken_latex로 하세요.
+수식 표기가 온전하면 broken_latex로 판정하지 마세요."""
+
+# 시험지(이차방정식 계열)와 겹치지 않는 자작 예시 — 거리 공식 문항의 `\sqrt{` 중괄호 미닫힘.
+_FEW_SHOT_ADDENDUM = """
+
+예시(참고용 — 아래 문항은 실제 검수 대상이 아닙니다):
+[문항 slug] example-distance
+[발문] 두 점 A(1, 2), B(4, 6) 사이의 거리를 구하시오.
+거리 공식은 $d=\\sqrt{(x_2-x_1)^2+(y_2-y_1)^2$ 이다.
+[정답] 5
+=> {"has_defect": true, "defect_class": "broken_latex", "reason": "sqrt의 중괄호가 닫히지 않음"}"""
+
+
+@dataclass(slots=True, frozen=True)
+class PromptVariant:
+    """한 변형의 호출 규약. `stage2_*`가 있으면 2단계 호출(stage_split)이다."""
+
+    name: str
+    system: str
+    json_schema: dict[str, Any]
+    stage2_system: str | None = None
+    stage2_json_schema: dict[str, Any] | None = None
+
+    @property
+    def two_stage(self) -> bool:
+        return self.stage2_system is not None
+
+
+def _prompt_head(base_system: str) -> str:
+    """기준 프롬프트의 '응답 형식' 이전 부분(역할·결함 유형 목록)."""
+    head, sep, _tail = base_system.partition(_FORMAT_MARKER)
+    if not sep:
+        # 기준 프롬프트 구조가 바뀌면 조용히 엉뚱한 프롬프트를 만들지 않고 즉시 멈춘다.
+        raise ValueError(f"기준 프롬프트에 '{_FORMAT_MARKER}' 표지가 없다 — 변형을 만들 수 없다.")
+    return head.rstrip() + "\n\n"
+
+
+def _object_schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
+    return {"type": "object", "properties": properties, "required": required}
+
+
+def build_variant(
+    name: str,
+    *,
+    base_system: str | None = None,
+    base_schema: dict[str, Any] | None = None,
+) -> PromptVariant:
+    """변형 이름 → 호출 규약. 알 수 없는 이름은 ValueError."""
+    system0 = _SYSTEM_PROMPT if base_system is None else base_system
+    schema0 = _JSON_SCHEMA if base_schema is None else base_schema
+
+    if name == "baseline":
+        return PromptVariant(name=name, system=system0, json_schema=schema0)
+
+    if name == "short_reason":
+        props = dict(schema0["properties"])
+        # reason을 null 허용 유니온 대신 단순 string으로 — 문법 제약이 단순할수록 안전하다.
+        props["reason"] = {"type": "string", "maxLength": _SHORT_REASON_MAX_CHARS}
+        return PromptVariant(
+            name=name,
+            system=system0 + _SHORT_REASON_ADDENDUM,
+            json_schema=_object_schema(props, list(schema0["required"])),
+        )
+
+    if name == "reason_first":
+        system = (
+            _prompt_head(system0)
+            + "응답 형식(반드시 JSON만, 키 순서 고정 — 근거를 먼저 쓰고 판정하세요):\n"
+            '{"reason": "근거 한 문장", "has_defect": true/false, '
+            '"defect_class": "answer_error" 또는 null}\n\n'
+            "reason은 한 문장(120자 이내)으로 쓰고, "
+            "has_defect가 false면 defect_class는 null로 하세요."
+        )
+        # 속성 선언 순서가 생성 순서다 — reason을 필수로 두어 항상 맨 앞에 나오게 한다.
+        props = {
+            "reason": {"type": "string", "maxLength": _REASON_FIRST_MAX_CHARS},
+            "has_defect": {"type": "boolean"},
+            "defect_class": {"type": ["string", "null"]},
+        }
+        return PromptVariant(
+            name=name, system=system, json_schema=_object_schema(props, ["reason", "has_defect"])
+        )
+
+    if name == "stage_split":
+        head = _prompt_head(system0)
+        stage1 = (
+            head + '응답 형식(반드시 JSON만): {"has_defect": true/false}\n'
+            "결함 유형은 묻지 않습니다. 결함이 있는지 없는지만 답하세요."
+        )
+        stage2 = (
+            head + '응답 형식(반드시 JSON만): {"defect_class": "<결함 유형 하나>"}\n'
+            "이 문항에는 결함이 있습니다. 위 결함 유형 중 가장 알맞은 하나만 고르세요."
+        )
+        return PromptVariant(
+            name=name,
+            system=stage1,
+            json_schema=_object_schema({"has_defect": {"type": "boolean"}}, ["has_defect"]),
+            stage2_system=stage2,
+            stage2_json_schema=_object_schema(
+                {"defect_class": {"type": "string", "enum": list(DEFECT_CLASSES)}},
+                ["defect_class"],
+            ),
+        )
+
+    if name == "latex_check":
+        return PromptVariant(name=name, system=system0 + _LATEX_CHECK_ADDENDUM, json_schema=schema0)
+
+    if name == "few_shot":
+        return PromptVariant(name=name, system=system0 + _FEW_SHOT_ADDENDUM, json_schema=schema0)
+
+    raise ValueError(f"알 수 없는 프롬프트 변형: {name!r} (허용: {', '.join(PROMPT_VARIANTS)})")
 
 
 _JSON_RE = re.compile(r"\{.*?\}", re.DOTALL)
@@ -279,48 +466,111 @@ def _quality_routing_decision() -> RoutingDecision:
     )
 
 
+_CLASS_RE = re.compile(r'"defect_class"\s*:\s*"([^"]+)"')
+
+
+def _classify_failure(text: str, output_tokens: int | None, num_predict: int | None) -> str:
+    """파싱 실패 원인 — 숫자가 아니라 원인이 남아야 실패가 정보가 된다(OPS-50)."""
+    if not text.strip():
+        return "empty"
+    if num_predict is not None and output_tokens is not None and output_tokens >= num_predict:
+        return "truncated"
+    return "malformed"
+
+
 async def _evaluate_one(
     provider: FixedModelOllamaProvider,
     item: SeededItem,
     *,
     semaphore: asyncio.Semaphore,
     json_schema: dict[str, Any] | None,
+    variant: PromptVariant | None = None,
+    num_predict: int | None = None,
 ) -> ModelOutcome:
-    """한 문항에 대해 LLM 호출 → 파싱 → ModelOutcome."""
+    """한 문항에 대해 LLM 호출 → 파싱 → ModelOutcome.
+
+    `provider.generate` 직접 호출 자리는 이 함수의 루프 안 1곳으로 동결돼 있다
+    (`test_authoring_traffic_surface_inventory`). stage_split 변형의 2단계 호출도 같은 루프다.
+    """
     prompt = "다음 문항을 검수하세요.\n\n" + _format_item(item)
-    async with semaphore:
-        try:
-            result: GenerationResult = await provider.generate(
-                prompt=prompt,
-                system=_SYSTEM_PROMPT,
-                decision=_quality_routing_decision(),
-                temperature=0.0,
-                json_schema=json_schema,
-            )
-        except Exception as exc:  # noqa: BLE001 — 네트워크·모델 오류는 unresolved로 기록
-            return ModelOutcome(
-                model_id=provider._model_id,  # noqa: SLF001 — 동일 클래스 내부 접근
-                slug=item.candidate.problem.slug or "",
-                ground_truth=item.defect_class,
-                detected=False,
-                predicted_class=None,
-                parsed=False,
-                parse_error=f"{type(exc).__name__}: {exc}",
+    if variant is None:
+        # 변형 미지정 — OPS-48 호출 규약 그대로(호출자가 준 schema를 쓴다).
+        stages: list[tuple[str, dict[str, Any] | None]] = [(_SYSTEM_PROMPT, json_schema)]
+    else:
+        use_schema = json_schema is not None  # --no-json-schema면 모든 단계에서 끈다
+        stages = [(variant.system, variant.json_schema if use_schema else None)]
+        if variant.stage2_system is not None:
+            stages.append(
+                (variant.stage2_system, variant.stage2_json_schema if use_schema else None)
             )
 
-    text = result.text
-    verdict, parsed, parse_error = _parse_response(text)
+    slug = item.candidate.problem.slug or ""
+    texts: list[str] = []
+    latency_total = 0.0
+    latency_seen = False
+    in_tokens = 0
+    out_tokens = 0
+    usage_seen = False
+    verdict = _ParsedVerdict(has_defect=False)
+    parsed = False
+    parse_error = ""
+    predicted_class: str | None = None
+
+    for index, (system, schema) in enumerate(stages):
+        async with semaphore:
+            try:
+                result: GenerationResult = await provider.generate(
+                    prompt=prompt,
+                    system=system,
+                    decision=_quality_routing_decision(),
+                    temperature=0.0,
+                    json_schema=schema,
+                )
+            except Exception as exc:  # noqa: BLE001 — 네트워크·모델 오류는 unresolved로 기록
+                return ModelOutcome(
+                    model_id=provider._model_id,  # noqa: SLF001 — 동일 클래스 내부 접근
+                    slug=slug,
+                    ground_truth=item.defect_class,
+                    detected=False,
+                    predicted_class=None,
+                    parsed=False,
+                    parse_error=f"{type(exc).__name__}: {exc}",
+                    failure_kind="transport",
+                    raw_response="\n---\n".join(texts),
+                )
+        texts.append(result.text)
+        if result.usage is not None:
+            usage_seen = True
+            latency_seen = latency_seen or result.usage.latency_ms is not None
+            latency_total += result.usage.latency_ms or 0.0
+            in_tokens += result.usage.input_tokens or 0
+            out_tokens += result.usage.output_tokens or 0
+        if index == 0:
+            verdict, parsed, parse_error = _parse_response(result.text)
+            predicted_class = verdict.defect_class
+            if not parsed or not verdict.has_defect:
+                break  # 미분류이거나 무결함 판정 — 2단계(유형 질문)는 결함일 때만
+        else:
+            match = _CLASS_RE.search(result.text)
+            predicted_class = match.group(1) if match else None
+            if predicted_class is None:
+                parse_error = "stage2 defect_class unparsed"
+
+    text = "\n---\n".join(texts)
     return ModelOutcome(
         model_id=provider._model_id,  # noqa: SLF001
-        slug=item.candidate.problem.slug or "",
+        slug=slug,
         ground_truth=item.defect_class,
         detected=verdict.has_defect,
-        predicted_class=verdict.defect_class,
+        predicted_class=predicted_class,
         parsed=parsed,
         parse_error=parse_error or None,
-        latency_ms=result.usage.latency_ms if result.usage else None,
-        input_tokens=result.usage.input_tokens if result.usage else None,
-        output_tokens=result.usage.output_tokens if result.usage else None,
+        failure_kind=(
+            None if parsed else _classify_failure(texts[0], out_tokens or None, num_predict)
+        ),
+        latency_ms=latency_total if latency_seen else None,
+        input_tokens=in_tokens if usage_seen else None,
+        output_tokens=out_tokens if usage_seen else None,
         raw_response=text,
     )
 
@@ -336,6 +586,7 @@ async def evaluate_model(
     concurrency: int = 1,
     json_schema: dict[str, Any] | None = None,
     client: _OllamaClient | None = None,
+    variant: PromptVariant | None = None,
 ) -> list[ModelOutcome]:
     """주어진 모델로 전체 시험지를 평가한다."""
     from whymath_backend.config import get_settings
@@ -353,7 +604,14 @@ async def evaluate_model(
     )
     semaphore = asyncio.Semaphore(max(1, concurrency))
     coros = [
-        _evaluate_one(provider, item, semaphore=semaphore, json_schema=json_schema)
+        _evaluate_one(
+            provider,
+            item,
+            semaphore=semaphore,
+            json_schema=json_schema,
+            variant=variant,
+            num_predict=num_predict,
+        )
         for item in items
     ]
     return await asyncio.gather(*coros)
@@ -365,6 +623,8 @@ async def evaluate_model(
 def _summarize(model_id: str, outcomes: list[ModelOutcome]) -> ModelReport:
     """ModelOutcome 리스트 → DetectionMetrics + per_class + latency."""
     tp = fn = fp = tn = unresolved = 0
+    unresolved_defective = unresolved_clean = 0
+    failure_kinds: dict[str, int] = {}
     per_class: dict[str, list[int]] = {name: [0, 0] for name in DEFECT_CLASSES}
     latencies: list[float] = []
     for o in outcomes:
@@ -374,6 +634,12 @@ def _summarize(model_id: str, outcomes: list[ModelOutcome]) -> ModelReport:
             per_class[o.ground_truth][0] += 1
         if not o.parsed:
             unresolved += 1
+            if o.ground_truth is None:
+                unresolved_clean += 1
+            else:
+                unresolved_defective += 1
+            kind = o.failure_kind or "unknown"
+            failure_kinds[kind] = failure_kinds.get(kind, 0) + 1
             continue
         if o.ground_truth is None:
             if o.detected:
@@ -394,6 +660,8 @@ def _summarize(model_id: str, outcomes: list[ModelOutcome]) -> ModelReport:
         false_positives=fp,
         true_negatives=tn,
         unresolved=unresolved,
+        unresolved_defective=unresolved_defective,
+        unresolved_clean=unresolved_clean,
     )
     latency_report: dict[str, float | None] = {
         "mean": statistics.mean(latencies) if latencies else None,
@@ -408,6 +676,7 @@ def _summarize(model_id: str, outcomes: list[ModelOutcome]) -> ModelReport:
         metrics=metrics,
         latency_ms=latency_report,
         per_class={name: (v[0], v[1]) for name, v in per_class.items()},
+        failure_kinds=failure_kinds,
     )
 
 
@@ -423,7 +692,13 @@ def _render_model_report(report: ModelReport, *, confidence: float) -> list[str]
     lines.append(
         f"  처리 문항: {report.n_items} (결함 {m.defective_total} / 무결함 {m.clean_total})"
     )
-    lines.append(f"  미분류/파싱실패: {m.unresolved}")
+    lines.append(
+        f"  미분류/파싱실패: {m.unresolved} (결함 {m.unresolved_defective} · "
+        f"무결함 {m.unresolved_clean} · 실패율 {_fmt(m.unresolved_rate)})"
+    )
+    if report.failure_kinds:
+        kinds = ", ".join(f"{k} {v}" for k, v in sorted(report.failure_kinds.items()))
+        lines.append(f"  미분류 원인: {kinds}")
     dlb = _fmt(m.detection_lower_bound(confidence))
     lines.append(
         f"  결함 검출률: {m.true_positives}/{m.defective_total} "
@@ -438,6 +713,16 @@ def _render_model_report(report: ModelReport, *, confidence: float) -> list[str]
     lines.append(
         f"  지연(ms): mean={_fmt(lat.get('mean'))} "
         f"median={_fmt(lat.get('median'))} max={_fmt(lat.get('max'))}"
+    )
+    # OPS-50 ⑤ — 미분류 처리 3종 병기. A는 판정에 쓰는 방식(미분류 제외)이다.
+    lines.append("  [미분류 처리 민감도 A/B/C]")
+    lines.append(f"    A 미분류 제외      검출 하한 {dlb} · 오경보 상한 {fau}")
+    lines.append(
+        f"    B 결함 미분류=놓침 검출 하한 {_fmt(m.worst_case_detection_lower_bound(confidence))}"
+    )
+    lines.append(
+        f"    C 무결함 미분류=오경보 오경보 상한 "
+        f"{_fmt(m.worst_case_false_alarm_upper_bound(confidence))}"
     )
     lines.append("  [결함류별(클래스 일치)]")
     for name in DEFECT_CLASSES:
@@ -454,6 +739,7 @@ def render_report(report: BattleReport) -> str:
     lines.append("=" * 72)
     lines.append("OPS-48 QUALITY 티어 dense ↔ MoE 정확도 축 강등전")
     lines.append("=" * 72)
+    lines.append(f"후보 프롬프트 변형(OPS-50): {report.prompt_variant}")
     lines.append(
         f"설정: 결함 {report.n_defective} · 무결함 {report.n_clean} "
         f"· seed {report.seed} · 신뢰수준 {pct}%"
@@ -495,6 +781,13 @@ def report_to_json(report: BattleReport) -> dict[str, object]:
                 "false_positives": m.metrics.false_positives,
                 "true_negatives": m.metrics.true_negatives,
                 "unresolved": m.metrics.unresolved,
+                "unresolved_defective": m.metrics.unresolved_defective,
+                "unresolved_clean": m.metrics.unresolved_clean,
+                "unresolved_rate": m.metrics.unresolved_rate,
+                "worst_case_detection_lower_bound": m.metrics.worst_case_detection_lower_bound(),
+                "worst_case_false_alarm_upper_bound": (
+                    m.metrics.worst_case_false_alarm_upper_bound()
+                ),
                 "detection_rate": m.metrics.detection_rate,
                 "false_alarm_rate": m.metrics.false_alarm_rate,
                 "detection_lower_bound": m.metrics.detection_lower_bound(),
@@ -502,6 +795,7 @@ def report_to_json(report: BattleReport) -> dict[str, object]:
             },
             "latency_ms": m.latency_ms,
             "per_class": dict(m.per_class),
+            "failure_kinds": dict(m.failure_kinds),
         }
 
     return {
@@ -511,6 +805,7 @@ def report_to_json(report: BattleReport) -> dict[str, object]:
         "n_clean": report.n_clean,
         "seed": report.seed,
         "confidence": report.confidence,
+        "prompt_variant": report.prompt_variant,
         "baseline": model_json(report.baseline),
         "candidate": model_json(report.candidate),
     }
@@ -519,6 +814,21 @@ def report_to_json(report: BattleReport) -> dict[str, object]:
 # ──────────────────────────────────────────────────────────────────────────
 # 감사 JSONL
 # ──────────────────────────────────────────────────────────────────────────
+def _outcome_json(o: ModelOutcome) -> dict[str, object]:
+    return {
+        "model_id": o.model_id,
+        "detected": o.detected,
+        "predicted_class": o.predicted_class,
+        "parsed": o.parsed,
+        "parse_error": o.parse_error,
+        "failure_kind": o.failure_kind,
+        "latency_ms": o.latency_ms,
+        "input_tokens": o.input_tokens,
+        "output_tokens": o.output_tokens,
+        "raw_response": o.raw_response,
+    }
+
+
 def _write_audit(
     audit_path: Path,
     baseline_outcomes: list[ModelOutcome],
@@ -534,28 +844,8 @@ def _write_audit(
                     {
                         "slug": baseline.slug,
                         "ground_truth": baseline.ground_truth,
-                        "baseline": {
-                            "model_id": baseline.model_id,
-                            "detected": baseline.detected,
-                            "predicted_class": baseline.predicted_class,
-                            "parsed": baseline.parsed,
-                            "parse_error": baseline.parse_error,
-                            "latency_ms": baseline.latency_ms,
-                            "input_tokens": baseline.input_tokens,
-                            "output_tokens": baseline.output_tokens,
-                            "raw_response": baseline.raw_response,
-                        },
-                        "candidate": {
-                            "model_id": candidate.model_id,
-                            "detected": candidate.detected,
-                            "predicted_class": candidate.predicted_class,
-                            "parsed": candidate.parsed,
-                            "parse_error": candidate.parse_error,
-                            "latency_ms": candidate.latency_ms,
-                            "input_tokens": candidate.input_tokens,
-                            "output_tokens": candidate.output_tokens,
-                            "raw_response": candidate.raw_response,
-                        },
+                        "baseline": _outcome_json(baseline),
+                        "candidate": _outcome_json(candidate),
                     },
                     ensure_ascii=False,
                 )
@@ -573,8 +863,111 @@ def _write_audit(
             "as_found_candidate_detection_lower_bound": c.detection_lower_bound(conf),
             "as_found_baseline_false_alarm_upper_bound": b.false_alarm_upper_bound(conf),
             "as_found_candidate_false_alarm_upper_bound": c.false_alarm_upper_bound(conf),
+            # OPS-50 — 변형·미분류 처리 3종(A는 위 as_found, B·C는 아래).
+            "prompt_variant": report.prompt_variant,
+            "candidate_unresolved_rate": c.unresolved_rate,
+            "candidate_worst_case_detection_lower_bound": c.worst_case_detection_lower_bound(conf),
+            "candidate_worst_case_false_alarm_upper_bound": (
+                c.worst_case_false_alarm_upper_bound(conf)
+            ),
         }
         fh.write(json.dumps(summary, ensure_ascii=False) + "\n")
+
+
+def load_baseline_outcomes(audit_path: Path, items: list[SeededItem]) -> list[ModelOutcome]:
+    """이전 감사 JSONL의 기준 모델 결과를 재사용한다(27B 재실행 생략 — OPS-50).
+
+    같은 시험지일 때만 재사용한다: 문항 수·slug 순서·정답지가 하나라도 다르면 ValueError.
+    (seed/개수가 다른 시험지의 기준 결과를 섞으면 대조가 무의미해진다.)
+    """
+    rows = [
+        json.loads(line)
+        for line in audit_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    rows = [r for r in rows if "slug" in r]
+    if len(rows) != len(items):
+        raise ValueError(f"감사 파일 문항 {len(rows)}건 ≠ 시험지 {len(items)}건 — 재사용 불가.")
+    outcomes: list[ModelOutcome] = []
+    for row, item in zip(rows, items, strict=True):
+        slug = item.candidate.problem.slug or ""
+        if row["slug"] != slug or row["ground_truth"] != item.defect_class:
+            raise ValueError(f"감사 파일 문항이 시험지와 다르다: {row['slug']!r} ≠ {slug!r}")
+        b = row["baseline"]
+        outcomes.append(
+            ModelOutcome(
+                model_id=b["model_id"],
+                slug=slug,
+                ground_truth=item.defect_class,
+                detected=b["detected"],
+                predicted_class=b["predicted_class"],
+                parsed=b["parsed"],
+                parse_error=b.get("parse_error"),
+                failure_kind=b.get("failure_kind"),
+                latency_ms=b.get("latency_ms"),
+                input_tokens=b.get("input_tokens"),
+                output_tokens=b.get("output_tokens"),
+                raw_response=b.get("raw_response", ""),
+            )
+        )
+    return outcomes
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 감사 JSONL 재분류 (OPS-50 ①) — 라이브 호출 없이 과거 감사 파일에서 미분류를 해부한다
+# ──────────────────────────────────────────────────────────────────────────
+def analyze_parse_failures(
+    audit_path: Path, *, side: str = "candidate", num_predict: int = 512
+) -> str:
+    """감사 JSONL의 미분류 문항을 정답지(클래스)·원인별로 재분류한 사람 가독 리포트.
+
+    구 감사 파일(OPS-48)에는 `failure_kind`가 없으므로 원문·출력 토큰으로 다시 추정한다:
+    출력 토큰 ≥ num_predict면 절단, 그 외 비어 있지 않으면 malformed.
+    """
+    rows = [
+        json.loads(line)
+        for line in audit_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    rows = [r for r in rows if "slug" in r]
+    if not rows:
+        raise ValueError(f"감사 파일에 문항이 없다: {audit_path}")  # 0건 스캔은 실패다
+    total: dict[str, int] = {}
+    failed: dict[str, int] = {}
+    kinds: dict[str, int] = {}
+    prefix_verdict: dict[tuple[str, str], int] = {}  # (클래스구분, 접두 판정) → 건수
+    for row in rows:
+        truth = row["ground_truth"] or "clean"
+        total[truth] = total.get(truth, 0) + 1
+        out = row[side]
+        if out["parsed"]:
+            continue
+        failed[truth] = failed.get(truth, 0) + 1
+        kind = out.get("failure_kind") or _classify_failure(
+            out.get("raw_response", ""), out.get("output_tokens"), num_predict
+        )
+        kinds[kind] = kinds.get(kind, 0) + 1
+        m = re.search(r'"has_defect"\s*:\s*(true|false)', out.get("raw_response", ""))
+        group = "clean" if truth == "clean" else "defective"
+        key = (group, m.group(1) if m else "unreadable")
+        prefix_verdict[key] = prefix_verdict.get(key, 0) + 1
+
+    n_fail = sum(failed.values())
+    lines = [
+        f"[OPS-50 ①] 파싱 실패 재분류 — {audit_path.name} · {side} · 문항 {len(rows)}건",
+        f"미분류 {n_fail}/{len(rows)} ({n_fail / len(rows):.1%})",
+        "",
+        "[정답지별]",
+    ]
+    for name in sorted(total):
+        lines.append(f"  {name:26s} {failed.get(name, 0):>3d}/{total[name]:<3d}")
+    lines.append("")
+    lines.append("[원인별] " + (", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) or "없음"))
+    lines.append("")
+    lines.append("[잘린 응답 앞부분에서 읽히는 판정 — 파싱 복구(접두 구제) 시 반사실]")
+    for (group, verdict), n in sorted(prefix_verdict.items()):
+        lines.append(f"  {group:9s} 문항 · has_defect={verdict:10s} {n}건")
+    return "\n".join(lines)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -626,12 +1019,50 @@ def main(argv: list[str] | None = None) -> int:
         help="'not worse' 판정 허용 마진(기본 0.0).",
     )
     parser.add_argument(
+        "--prompt-variant",
+        choices=PROMPT_VARIANTS,
+        default="baseline",
+        help="후보에 적용할 프롬프트 변형(OPS-50 — 한 번에 하나만). 기준 모델은 항상 baseline.",
+    )
+    parser.add_argument(
+        "--baseline-audit",
+        type=Path,
+        default=None,
+        help="기준 모델 결과를 이 감사 JSONL에서 재사용(27B 재실행 생략). 시험지가 다르면 exit 2.",
+    )
+    parser.add_argument(
+        "--analyze-audit",
+        type=Path,
+        default=None,
+        help="라이브 호출 없이 감사 JSONL의 후보 미분류를 재분류해 출력하고 종료(OPS-50 ①).",
+    )
+    parser.add_argument(
+        "--unresolved-policy",
+        choices=("exclude", "worst"),
+        default="exclude",
+        help="게이트의 미분류 처리 — exclude=A(OPS-48 방식) · worst=검출 B/오경보 C 최악 가정.",
+    )
+    parser.add_argument(
+        "--max-unresolved-rate",
+        type=float,
+        default=1.0,
+        help="후보 미분류율 상한 — 초과면 exit 1(기본 1.0=off, OPS-50 ③은 0.05).",
+    )
+    parser.add_argument(
         "--audit-out",
         type=Path,
         default=None,
         help="감사 JSONL 저장 경로(예: data/audit/ops-48-battle.jsonl).",
     )
     args = parser.parse_args(argv)
+
+    if args.analyze_audit is not None:
+        try:
+            print(analyze_parse_failures(args.analyze_audit, num_predict=args.num_predict))
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"오류: 감사 파일 분석 실패 — {type(exc).__name__}: {exc}", file=sys.stderr)
+            return _EXIT_INPUT_ERROR
+        return _EXIT_OK
 
     if args.n_defective <= 0 or args.n_clean <= 0:
         print("오류: --n-defective와 --n-clean은 1 이상이어야 합니다.", file=sys.stderr)
@@ -649,19 +1080,31 @@ def main(argv: list[str] | None = None) -> int:
         f"[OPS-48] 시험지 생성 완료: "
         f"결함 {args.n_defective} · 무결함 {args.n_clean} · seed {args.seed}"
     )
-    print(f"[OPS-48] 기준 모델 {args.baseline_model} 평가 시작...")
-    baseline_outcomes = asyncio.run(
-        evaluate_model(
-            args.baseline_model,
-            items,
-            ollama_host=args.ollama_host,
-            timeout=args.timeout,
-            num_ctx=args.num_ctx,
-            num_predict=args.num_predict,
-            concurrency=args.concurrency,
-            json_schema=json_schema,
+    if args.baseline_audit is not None:
+        try:
+            baseline_outcomes = load_baseline_outcomes(args.baseline_audit, items)
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"오류: 기준 결과 재사용 실패 — {type(exc).__name__}: {exc}", file=sys.stderr)
+            return _EXIT_INPUT_ERROR
+        baseline_model_id = baseline_outcomes[0].model_id
+        print(
+            f"[OPS-48] 기준 모델 {baseline_model_id} 결과를 {args.baseline_audit.name}에서 재사용"
         )
-    )
+    else:
+        baseline_model_id = args.baseline_model
+        print(f"[OPS-48] 기준 모델 {args.baseline_model} 평가 시작...")
+        baseline_outcomes = asyncio.run(
+            evaluate_model(
+                args.baseline_model,
+                items,
+                ollama_host=args.ollama_host,
+                timeout=args.timeout,
+                num_ctx=args.num_ctx,
+                num_predict=args.num_predict,
+                concurrency=args.concurrency,
+                json_schema=json_schema,
+            )
+        )
     print(f"[OPS-48] 후보 모델 {args.candidate_model} 평가 시작...")
     candidate_outcomes = asyncio.run(
         evaluate_model(
@@ -673,18 +1116,20 @@ def main(argv: list[str] | None = None) -> int:
             num_predict=args.num_predict,
             concurrency=args.concurrency,
             json_schema=json_schema,
+            variant=build_variant(args.prompt_variant),
         )
     )
 
     report = BattleReport(
-        baseline=_summarize(args.baseline_model, baseline_outcomes),
+        baseline=_summarize(baseline_model_id, baseline_outcomes),
         candidate=_summarize(args.candidate_model, candidate_outcomes),
         n_defective=args.n_defective,
         n_clean=args.n_clean,
         seed=args.seed,
         confidence=args.confidence,
-        baseline_model_id=args.baseline_model,
+        baseline_model_id=baseline_model_id,
         candidate_model_id=args.candidate_model,
+        prompt_variant=args.prompt_variant,
     )
 
     print(render_report(report))
@@ -695,20 +1140,49 @@ def main(argv: list[str] | None = None) -> int:
 
     # 게이트 판정
     exit_code = _EXIT_OK
-    candidate_dlb = report.candidate.metrics.detection_lower_bound(args.confidence)
+    worst = args.unresolved_policy == "worst"
+    cm = report.candidate.metrics
+    bm = report.baseline.metrics
+    candidate_dlb = (
+        cm.worst_case_detection_lower_bound(args.confidence)
+        if worst
+        else cm.detection_lower_bound(args.confidence)
+    )
     if args.min_detection_lower > 0.0 and (
         candidate_dlb is None or candidate_dlb < args.min_detection_lower
     ):
         exit_code = _EXIT_GATE_FAIL
-    candidate_fau = report.candidate.metrics.false_alarm_upper_bound(args.confidence)
+    candidate_fau = (
+        cm.worst_case_false_alarm_upper_bound(args.confidence)
+        if worst
+        else cm.false_alarm_upper_bound(args.confidence)
+    )
+    candidate_unresolved_rate = cm.unresolved_rate
+    if args.max_unresolved_rate < 1.0 and (
+        candidate_unresolved_rate is None or candidate_unresolved_rate > args.max_unresolved_rate
+    ):
+        print(
+            f"[OPS-50] 후보 미분류율 {_fmt(candidate_unresolved_rate)} > "
+            f"상한 {_fmt(args.max_unresolved_rate)}",
+            file=sys.stderr,
+        )
+        exit_code = _EXIT_GATE_FAIL
     if args.max_false_alarm_upper < 1.0 and (
         candidate_fau is None or candidate_fau > args.max_false_alarm_upper
     ):
         exit_code = _EXIT_GATE_FAIL
 
     if args.require_candidate_not_worse_than_baseline:
-        baseline_dlb = report.baseline.metrics.detection_lower_bound(args.confidence)
-        baseline_fau = report.baseline.metrics.false_alarm_upper_bound(args.confidence)
+        baseline_dlb = (
+            bm.worst_case_detection_lower_bound(args.confidence)
+            if worst
+            else bm.detection_lower_bound(args.confidence)
+        )
+        baseline_fau = (
+            bm.worst_case_false_alarm_upper_bound(args.confidence)
+            if worst
+            else bm.false_alarm_upper_bound(args.confidence)
+        )
         margin = args.not_worse_margin
         if candidate_dlb is None or (
             baseline_dlb is not None and candidate_dlb < baseline_dlb - margin

@@ -38,6 +38,53 @@
     통과가 아니라 측정 실패(exit 1)다.
   - **비용 미계측 분리**: 비용 행이 조인되지 않은 CU는 0원 산입이 아니라 분리 카운트.
 
+HIT 하한 가드 (OPS-90 — 게이트의 방향 대칭)
+-------------------------------------------
+`--max-median-minutes`는 **상한**만 본다. 그래서 경과가 0초에 가까울수록 무조건 통과한다 —
+재입력·스킵 세션(검토는 이미 다른 창에서 끝났고 결정만 다시 누른 세션)이 "목표 대비 40배
+달성"으로 읽히는 구조다. 이 모듈은 이미 "미측정 ≠ 0"과 "성공 지표가 실패를 가리는 구조를
+끊는다"(EOS-62)를 채택했는데, HIT 축만 0초 방향이 무방비였다.
+
+  - **측정 단위**: measured CU의 `hit_seconds`(그 CU 전 세션 경과 합)가 하한
+    (`--min-plausible-seconds`, 기본 `DEFAULT_MIN_PLAUSIBLE_SECONDS` = 30초) **미만**이면
+    "비현실적으로 짧은 CU"로 센다. 하한과 **정확히 같으면**(30.0초) 현실적이다(미만만 센다).
+  - **경고**: 그 CU가 계측 CU의 **절반 이상**이면(`2*k >= n`) HIT 중앙값 줄 옆에 경고를 붙이고
+    `hit_implausible_majority=True`로 표시한다. "과반(>50%)"이 아니라 "절반 이상"으로 잡은
+    이유: 정확히 절반이 하한 미만이면(짝수 n) 중앙값은 하한 미만 값과 그 이상 값의 *평균*이라
+    이미 오염됐는데, 엄밀한 과반 기준은 바로 그 지점에서 경고를 끈다(경계에서 열리는 게이트).
+  - **게이트(fail-closed)**: `--max-median-minutes`·`--max-p90-minutes` 중 하나라도 지정됐고
+    `hit_implausible_majority`가 True면 상한을 만족해도 **exit 1**이다. 상한 게이트가 아무리
+    잘 통과해도 그 중앙값이 재입력 세션의 값이면 "통과"는 측정이 아니라 위장이다. 미채택
+    대안(경고만 달고 통과)은 게이트를 읽는 사람(주간 KPI cron·완료 검사)이 경고 줄을 읽는다는
+    가정에 기대는데, 2026-09-22 회차가 정확히 그 가정이 깨진 사례다(증적에 자인으로 적어 막았으나
+    그것은 사람 규율이고 도구에는 집행 지점이 없었다). 게이트가 없는 계측 전용 실행은 경고만
+    내고 exit 0을 유지한다(측정 자체는 성립 — 해석이 틀릴 뿐).
+  - **소비자 연동**: 표본이 하한 가드에 걸린 회차를 `measured: true`로 계상하면 안 된다
+    (감리 W-04: HIT 유효 실측 0건인데 무효 표본 15건이 있었다). 주간 KPI
+    (`ops/weekly_metrics_report`)와 스코어카드 어댑터(`ops/validation_scorecard`)가
+    `hit_implausible_majority`를 읽어 HIT·처리량을 미측정으로 낸다.
+  - **3상태**: `hit_implausible_majority`는 계측 CU 0건이거나 하한이 0(가드 끔)이면 **None**
+    (모른다 ≠ 아니다)이다. False는 "검사했고 괜찮다"일 때만 낸다. 가드가 꺼졌을 때는
+    `cu_implausible_short_count`·`implausible_short_share`도 0이 아니라 **None**이다(검사하지
+    않은 것을 JSON에서 "0건·0%"로 읽지 않게). 소비자는 이 값이 **False일 때만** 이관한다 —
+    True(걸림)·None(미검사)·키 없음(가드 이전 산출물)은 전부 미측정으로 남긴다.
+
+**하한 기본값(30초)의 근거와 한계 — 정직하게**
+  - 실측 근거(2026-09-22 카나리 회차 · 게이트 `G-eos-first-run-canary-review` 증적): 고유 CU
+    15건(승인 13·반려 2) HIT 중앙값 **6초**·P90 **41초**. 이 세션은 재입력 세션이라 Kiki가
+    무효로 자인했다(여기까지가 게이트 증적에 있는 내용). 총합 **4분 6초(246초)**는 증적에는
+    없고 OPS-90 acceptance ④의 인용이다. 원 이벤트 JSONL(`mp02-out/…v3.jsonl`)은 코퍼스
+    데이터라 커밋되지 않아 이 저장소에서는 **요약 수치만** 확인 가능하다(CU별 분포는 미확인).
+  - 30초를 고른 이유(수치): 목표 중앙값 4분(240초)의 1/8이고, 무효로 판정된 회차의 중앙값(6초)의
+    5배·P90(41초)의 약 3/4다. 즉 그 회차는 이 하한으로 **확실히 걸린다**(중앙값이 하한의 1/5).
+    하한을 올릴수록 정상 검수를 무효로 버릴 위험이 커지고, 내릴수록(예: 10초) 6초 중앙값 같은
+    값이 경계 근처로 올라와 가드가 무력해진다. 정상 최초 검수의 경과 분포는 측정된 적이 없어
+    알 수 없으므로 어느 쪽 위험이 얼마나 되는지도 수치로 말할 수 없다.
+  - **한계**: 정상적인 *최초* 검수의 경과 분포는 이 저장소에 없다(측정된 적이 없다 — 다음 회차
+    EOS-197이 첫 유효 표본이다). 따라서 30초는 "무효 사례를 확실히 잡고 정상 검수를 버리지
+    않도록 보수적으로 낮춘" **판단값**이지 정상 분포에서 도출한 임계가 아니다. 첫 유효 표본이
+    쌓이면 CU별 분포(최소·하위 분위)로 재조정하고, 그때까지는 인자로 덮어쓸 수 있다.
+
 인프로세스 이중 회계 (`ops/cost_probe` 원칙 — SaaS 단독 의존 금지)
 ------------------------------------------------------------------
 비용·토큰의 판정 원천은 **인프로세스 영속**(`GenerationLog` — `db/models/provenance.py`,
@@ -57,13 +104,18 @@ JSONL export)이다. Langfuse 등 외부 관측 인프라에 일절 의존하지
 
 입력 형식
 ---------
-  --events   검수 타이머 이벤트 JSONL(`harness/review_timer.append_event_jsonl` 산출) [필수]
+  --events   검수 타이머 이벤트 JSONL(`harness/review_timer.append_event_jsonl` 산출)
+             [`--events`·`--from-db` 중 최소 하나 필수]
+  --from-db  **DB 직접 읽기(ADMIN-18)** — `review_timer_event`(검수 화면·CLI가 적재한 이벤트)와
+             `problem`의 판정 상태(approved/rejected)를 읽는다. `--verdicts` 파일이 없으면 이
+             DB 판정이 적재율 분모가 된다(식별자는 `problem.slug`, 없으면 problem_id 문자열 —
+             검수 착수 엔드포인트의 `cu_slug` 규칙과 같다). 접속은 `WHYMATH_DATABASE_URL`.
   --edit-aware-since  EOS-62 판정 3종화 착지 경계(ISO8601) — 승인 해상도 판별 축
   --verdicts 검수 판정 JSONL — 코퍼스 레코드(slug+review_status) 또는 #841 라벨(code+
              review_status) 형식. approved/rejected 행만 판정으로 센다(pending=미판정).
   --generation-log  GenerationLog 행 JSONL — slug 또는 problem_id + input_tokens/
-             output_tokens/cost_usd. DB 직접 조회 모드는 미구현(정직한 공백 — 현행 검수
-             흐름이 파일 기반이라 export 파일 입력으로 시작·후속 확장).
+             output_tokens/cost_usd. GenerationLog의 DB 직접 조회 모드는 미구현(정직한 공백 —
+             export 파일 입력으로 시작·후속 확장).
 
 exit code (게이트 CLI 관례 — cost_probe·corpus_audit_eval 동형)
 ---------------------------------------------------------------
@@ -72,18 +124,21 @@ exit code (게이트 CLI 관례 — cost_probe·corpus_audit_eval 동형)
 
 집행 별항(정본화≠집행 — acceptance ③)
 --------------------------------------
-생산자는 `harness/review_session` CLI가 맡는다(**EOS-78** — 착수 시점 이 계측기는 판독기만
-있고 생산자가 0이었다). 그 CLI로 검수하면 타이머·반려코드가 강제되지만, **강제는 그 경로에
-한정**된다 — 다른 경로로 들어온 판정은 타이머 없이 기록될 수 있고 그것이 적재율로 드러난다.
-전 경로 강제(판정 제출 자체를 불가하게)는 검수 UI(**ADMIN-07**) 몫이다. 이 리포트는 그
-잔여를 footer로 상시 명기한다 — 적재율이 100%가 되기 전까지 이 계측기는 "부분 배선"이다.
+생산자는 둘이다. `harness/review_session` CLI(**EOS-78**)와 Admin BFF의 검수 전이 API
+(**ADMIN-18** — `POST …/review-sessions` 착수 + `POST …/transitions`의 approve/reject가 같은
+트랜잭션에 finished 이벤트를 적재하며, 반려코드·세션 없는 판정은 422, `PATCH /v1/problems/{id}`의
+판정 전이는 409로 거부된다). 그래도 이 계측기가 보는 적재율은 **그 이전·그 밖 경로의 판정**
+(오프라인 코퍼스 적재·직접 DB 작업 등)을 분모에 그대로 세므로 100%는 보장되지 않는다 — 그것이
+바로 "작동한 비율"이다. 이 리포트는 그 잔여를 footer로 상시 명기한다.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import dataclasses
 import json
+import math
 import sys
 import uuid
 from collections.abc import Iterable, Sequence
@@ -102,6 +157,7 @@ from whymath_backend.schema.review_timer import (
 )
 
 __all__ = [
+    "DEFAULT_MIN_PLAUSIBLE_SECONDS",
     "CuSummary",
     "HitCuReport",
     "SessionSummary",
@@ -109,12 +165,19 @@ __all__ = [
     "classify_cus",
     "classify_sessions",
     "effective_moment",
+    "load_db_sources",
     "main",
     "render_report",
 ]
 
 _EXIT_OK = 0
 _EXIT_MEASUREMENT_FAIL = 1
+
+#: HIT 하한 가드의 기본값(초) — 이 값 *미만*인 CU는 "비현실적으로 짧은 검수"로 센다(OPS-90).
+#: 근거·한계는 모듈 docstring "HIT 하한 가드" 절 참조(요약: 무효로 자인된 2026-09-22 회차의
+#: 중앙값 6초·P90 41초 대비 확실히 걸리고, 목표 4분의 1/8로 정상 검수는 버리지 않도록 낮춘
+#: 판단값 — 정상 분포에서 도출한 값이 아니다).
+DEFAULT_MIN_PLAUSIBLE_SECONDS = 30.0
 
 # F-Ⅲ 판정 축(설계서 §4·§5) — 기계형/판단형 부분집합. 정본은 GenerationFailureCode docstring·
 # `test_generation_failure_code.py::test_judgment_type_subset_frozen`이 동결(여기는 소비).
@@ -446,7 +509,32 @@ class HitCuReport:
     cost_usd_per_cu_p50: float | None = None
     cost_usd_per_cu_p90: float | None = None
     cost_usd_total: float | None = None
+    """기록된 비용의 합 — **부분 기록 CU 포함**(하한). 단위비용의 분자로 쓰면 안 된다(아래)."""
+    cost_usd_complete_total: float | None = None
+    """**완전 계측 CU**(`cu_with_cost`개)만의 비용 합 — 단위비용(KRW/CU)의 분자(EOS-198 P3-1).
+
+    분자·분모는 같은 CU 집합이어야 한다. 종전 소비자(주간 KPI·스코어카드)는 분자에
+    `cost_usd_total`(부분 기록 CU 포함)을, 분모에 `cu_with_cost`(완전 계측 CU만)를 써서, 비용
+    미기록 행이 섞인 CU가 있으면 단가가 부풀었다. 부분 기록 CU의 합은 진짜 비용의 하한일 뿐이라
+    분자·분모 **양쪽에서** 뺀다(백분위 표본과 같은 규칙). None = 비용 입력 자체가 없었다.
+    """
     tokens_total: int | None = None
+
+    # ── HIT 하한 가드(OPS-90) — 비현실적으로 짧은 검수(재입력·스킵 세션)의 가시화 ──
+    min_plausible_seconds: float = DEFAULT_MIN_PLAUSIBLE_SECONDS
+    """적용된 하한(초). 0이면 가드 끔 — 리포트·JSON에 항상 남겨 어떤 하한으로 판정했는지 보이게."""
+    cu_implausible_short_count: int | None = None
+    """계측 CU 중 `hit_seconds < min_plausible_seconds`인 건수(정확히 하한이면 현실적).
+    **None = 가드 끔(하한 0)이라 세지 않았다** — 0건이 아니다."""
+    implausible_short_share: float | None = None
+    """위 건수 / 계측 CU 수. 계측 CU 0건이거나 가드 끔이면 None(0%가 아니라 모름)."""
+    hit_implausible_majority: bool | None = None
+    """하한 미만 CU가 계측 CU의 **절반 이상**(`2*k >= n`)인가 — True면 HIT 중앙값·P90을 신뢰할
+    수 없다(게이트 fail-closed·주간 KPI 미측정 처리의 근거).
+
+    **None = 모른다**: 계측 CU 0건이거나 하한이 0 이하(가드 끔)여서 검사하지 않았다. False는
+    "검사했고 괜찮다"일 때만 낸다(3상태를 2상태로 접으면 검사 안 한 것이 통과로 위장된다).
+    """
 
 
 def aggregate(
@@ -458,8 +546,13 @@ def aggregate(
     verdict_rows: Sequence[dict[str, Any]] | None = None,
     genlog_rows: Sequence[dict[str, Any]] | None = None,
     edit_aware_since: datetime | None = None,
+    min_plausible_seconds: float = DEFAULT_MIN_PLAUSIBLE_SECONDS,
 ) -> HitCuReport:
     """순수 집계 — 이벤트(+판정·비용 행) → HitCuReport. I/O 0.
+
+    `min_plausible_seconds` = HIT 하한 가드(OPS-90) — 계측 CU의 `hit_seconds`가 이 값 *미만*이면
+    비현실적으로 짧은 검수로 센다(모듈 docstring "HIT 하한 가드"). 0 이하면 가드를 끈다
+    (`hit_implausible_majority=None`). NaN은 비교가 전부 False라 가드가 조용히 꺼지므로 거부한다.
 
     `edit_aware_since` = EOS-62(판정 3종화) 착지 경계. 그 이전에 기록된 `approved`는 무손질
     인지 손질인지 알 수 없으므로(어휘가 없었다) **판별 불가**로 분리한다. 미지정이면 모든
@@ -474,6 +567,20 @@ def aggregate(
 
     measured = [c for c in cus if c.kind == "measured"]
     hit_samples = sorted(float(c.hit_seconds) for c in measured if c.hit_seconds is not None)
+
+    # ── HIT 하한 가드(OPS-90) — 상한만 보는 게이트의 0초 방향 보완 ──
+    if math.isnan(min_plausible_seconds) or min_plausible_seconds < 0:
+        # NaN은 비교가 전부 False, 음수는 아무것도 걸리지 않아 가드가 조용히 꺼진다 — 끄려면 0.
+        raise ValueError("min_plausible_seconds는 0 이상의 수여야 한다(0=가드 끔, NaN·음수 거부)")
+    # 가드 끔(하한 0)이면 건수·비율도 None — 검사하지 않은 것을 "0건·0%"로 읽지 않게 한다.
+    implausible_short_count: int | None = None
+    implausible_share: float | None = None
+    implausible_majority: bool | None = None
+    if min_plausible_seconds > 0:
+        implausible_short_count = sum(1 for sec in hit_samples if sec < min_plausible_seconds)
+        if hit_samples:
+            implausible_share = implausible_short_count / len(hit_samples)
+            implausible_majority = 2 * implausible_short_count >= len(hit_samples)
 
     # ── 적재율 — 판정 소스가 있을 때만(없으면 None=미산출 — 0%로 위장 금지) ──
     finished_slugs = {s.cu_slug for s in sessions if s.has_finish}
@@ -675,7 +782,12 @@ def aggregate(
         cost_usd_per_cu_p90=_percentile(per_cu_costs, 0.90),
         # 총액은 "기록된 비용의 합"(부분 기록 CU 포함) — 백분위와 달리 하한임을 렌더가 명기.
         cost_usd_total=sum(cost_by_cu.values()) if has_cost_input else None,
+        cost_usd_complete_total=(sum(complete_cost_by_cu.values()) if has_cost_input else None),
         tokens_total=sum(tokens_by_cu.values()) if has_cost_input else None,
+        min_plausible_seconds=min_plausible_seconds,
+        cu_implausible_short_count=implausible_short_count,
+        implausible_short_share=implausible_share,
+        hit_implausible_majority=implausible_majority,
     )
 
 
@@ -688,6 +800,28 @@ def _fmt_minutes(seconds: float | None) -> str:
     if seconds is None:
         return "미산출(표본 0)"
     return f"{seconds / 60.0:.2f}분 ({seconds:.0f}초)"
+
+
+def _implausible_lines(report: HitCuReport) -> list[str]:
+    """HIT 하한 가드 리포트 줄(OPS-90) — 건수·하한을 항상 내고, 절반 이상이면 경고를 붙인다."""
+    if report.hit_implausible_majority is None:
+        if report.min_plausible_seconds <= 0:
+            return ["- 하한 가드: **꺼짐**(하한 0초) — 비현실적으로 짧은 검수를 걸러내지 않는다."]
+        return ["- 하한 가드: 미산출(계측 CU 0건) — 0건 통과가 아니라 검사할 표본이 없다."]
+    share = report.implausible_short_share if report.implausible_short_share is not None else 0.0
+    lines = [
+        f"- 하한 가드: 계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건"
+        f"({share:.0%})이 하한 {report.min_plausible_seconds:g}초 미만 — 재입력·스킵 세션 "
+        "의심(하한과 정확히 같은 값은 현실적으로 센다)"
+    ]
+    if report.hit_implausible_majority:
+        lines.append(
+            "- ⚠ **경고: 하한 미만이 계측 CU의 절반 이상 — 위 HIT 중앙값·P90은 신뢰할 수 없다.** "
+            "목표(중앙값 4분 이하) 달성이 아니라, 검토를 이미 끝낸 뒤 결정만 다시 누른 세션처럼 "
+            "측정 대상이 다를 가능성이 크다(2026-09-22 회차가 이 경우). 이 회차는 HIT 달성 "
+            "근거로 쓰지 말고 최초 검토 시간을 다시 계측할 것."
+        )
+    return lines
 
 
 def render_report(report: HitCuReport) -> str:
@@ -706,10 +840,12 @@ def render_report(report: HitCuReport) -> str:
         "제외·분리 카운트(0초 산입 금지)",
         "",
         "## HIT (CU당 인간 개입 시간 — 목표 중앙값 ≤4분·P90 ≤8분)",
-        f"- 중앙값: {_fmt_minutes(report.hit_median_seconds)}",
+        f"- 중앙값: {_fmt_minutes(report.hit_median_seconds)}"
+        + (" ⚠ 신뢰 불가 — 아래 하한 가드 경고 참조" if report.hit_implausible_majority else ""),
         f"- P90: {_fmt_minutes(report.hit_p90_seconds)}",
         f"- 평균: {_fmt_minutes(report.hit_mean_seconds)} · 계측 총합 "
         f"{report.hit_total_seconds:.0f}초",
+        *_implausible_lines(report),
         "",
         "## 타이머 적재율 (작동한 비율 — 검수 판정 중 타이머 동반)",
     ]
@@ -861,9 +997,10 @@ def render_report(report: HitCuReport) -> str:
         "",
         "---",
         "집행 별항(정본화≠집행): 타이머 생산자는 `harness/review_session` CLI로 배선됐다"
-        "(EOS-78 — 그 경로로 검수한 CU는 이벤트가 남는다). 다만 강제는 *그 CLI를 쓸 때만* "
-        "성립한다 — 다른 경로로 들어온 판정은 여전히 타이머 없이 기록될 수 있고, 그것이 "
-        "적재율로 드러난다. 전 경로 강제(판정 제출 자체를 불가하게)는 검수 UI(ADMIN-07) 몫. "
+        "(EOS-78 — 그 경로로 검수한 CU는 이벤트가 남는다)와 Admin BFF 검수 전이 API로 배선됐다"
+        "(ADMIN-18 — approve/reject는 세션 없이 422·같은 트랜잭션에 finished 적재·PATCH 판정 "
+        "전이 409). 다만 그 이전에 적재된 판정과 이 API 밖(오프라인 코퍼스 적재·직접 DB 작업)의 "
+        "판정은 여전히 타이머 없이 기록되어 있을 수 있고, 그것이 적재율로 드러난다. "
         "따라서 적재율 100% 미만은 여전히 정상 관측이다 — 낮은 적재율을 숨기지 말 것.",
     ]
     return "\n".join(lines)
@@ -909,13 +1046,77 @@ def _parse_moment(raw: str) -> datetime:
     return _ensure_aware(datetime.fromisoformat(raw))
 
 
+async def load_db_sources(
+    *, database_url: str | None = None
+) -> tuple[list[ReviewTimerEvent], list[str], list[dict[str, Any]]]:
+    """DB에서 (타이머 이벤트, 파싱 실패 사유, 판정 행)을 읽는다(ADMIN-18 — `--from-db`).
+
+    이벤트는 `review_timer_event` 전건(시간 창은 호출자가 기존 필터로 건다). 행 → 스키마 재검증이
+    깨지면 그 행을 버리지 않고 **예외 타입명 + 행 번호**로 보고한다(값 미출력 — 파일 입력과 같은
+    규율). 판정 행은 `problem.review_status`가 approved/rejected인 문항이며, 식별자는 검수 착수
+    엔드포인트의 `cu_slug` 규칙(`slug`, 없으면 problem_id 문자열)과 같다 — 규칙이 갈라지면 적재된
+    타이머가 판정에 매칭되지 않아 적재율이 거짓으로 낮아진다.
+    `NullPool` 엔진을 직접 열고 닫는다(CLI 1회성 — 전역 엔진·이벤트 루프 재사용 충돌 회피).
+    """
+    # 지연 import — 파일 입력 모드(기본)에서 DB 스택을 끌어오지 않는다.
+    import sqlalchemy as sa
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from whymath_backend.config import get_settings
+    from whymath_backend.db.models.problem import Problem
+    from whymath_backend.db.models.review_timer_event import ReviewTimerEvent as OrmTimerEvent
+    from whymath_backend.schema.enums import ReviewStatus
+
+    url = database_url or get_settings().database_url
+    engine = create_async_engine(url, poolclass=NullPool)
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            orm_rows = (await session.execute(sa.select(OrmTimerEvent))).scalars().all()
+            problem_rows = (
+                await session.execute(
+                    sa.select(Problem.problem_id, Problem.slug, Problem.review_status).where(
+                        Problem.review_status.in_([ReviewStatus.approved, ReviewStatus.rejected])
+                    )
+                )
+            ).all()
+    finally:
+        await engine.dispose()
+
+    events: list[ReviewTimerEvent] = []
+    errors: list[str] = []
+    for idx, row in enumerate(orm_rows, start=1):
+        try:
+            events.append(row.to_schema())
+        except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지: 타입명+행 번호만 남긴다.
+            errors.append(f"db row {idx}: {type(exc).__name__}")
+    verdicts: list[dict[str, Any]] = [
+        {
+            "slug": r.slug or str(r.problem_id),
+            "review_status": getattr(r.review_status, "value", r.review_status),
+        }
+        for r in problem_rows
+    ]
+    return events, errors, verdicts
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hit_cu_metrics",
         description="HIT(CU당 인간 개입 시간)·CU당 토큰/비용·적재율·실패코드 분포 집계 "
         "(EOS-54 — exit 0/1)",
     )
-    parser.add_argument("--events", required=True, help="검수 타이머 이벤트 JSONL 경로(필수)")
+    parser.add_argument(
+        "--events",
+        default=None,
+        help="검수 타이머 이벤트 JSONL 경로(--from-db와 둘 중 하나는 필수)",
+    )
+    parser.add_argument(
+        "--from-db",
+        action="store_true",
+        help="DB(review_timer_event·problem 판정)를 직접 읽는다 — --verdicts가 없으면 DB 판정이 "
+        "적재율 분모(ADMIN-18). 접속은 WHYMATH_DATABASE_URL",
+    )
     parser.add_argument(
         "--verdicts", default=None, help="검수 판정 JSONL(코퍼스 review_status·#841 라벨)"
     )
@@ -935,6 +1136,15 @@ def main(argv: list[str] | None = None) -> int:
         "센다. 미지정이면 전건 판별불가(소급 재분류 금지·golden_benchmark 동일 기조)",
     )
     parser.add_argument(
+        "--min-plausible-seconds",
+        type=float,
+        default=DEFAULT_MIN_PLAUSIBLE_SECONDS,
+        help="HIT 하한 가드(초, 기본 %(default)s) — 계측 CU의 경과 합이 이 값 미만이면 "
+        "비현실적으로 짧은 검수로 센다. 절반 이상이면 경고하고, HIT 게이트"
+        "(--max-median-minutes/--max-p90-minutes)가 지정됐으면 exit 1(fail-closed). "
+        "0이면 가드 끔",
+    )
+    parser.add_argument(
         "--max-median-minutes",
         type=float,
         default=None,
@@ -951,17 +1161,41 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="리포트를 JSON으로 출력")
     args = parser.parse_args(argv)
+    if not args.events and not args.from_db:
+        parser.error("--events 또는 --from-db 중 하나는 필요합니다")
+    if not math.isfinite(args.min_plausible_seconds) or args.min_plausible_seconds < 0:
+        # NaN·inf·음수는 가드를 조용히 끄거나(NaN) 전건 걸러(inf) 의미를 잃는다 — 입력 오류로 거부.
+        parser.error("--min-plausible-seconds는 0 이상의 유한한 수여야 합니다(0=가드 끔)")
 
     # ── ① 타이머 이벤트 로드(측정 실패는 즉시·타입명과 함께) ──
-    events_path = Path(args.events)
-    try:
-        events, load_errors = load_events_jsonl(events_path)
-    except FileNotFoundError:
-        _say(f"[측정 실패] FileNotFoundError: 이벤트 파일 없음 — {events_path}")
-        return _EXIT_MEASUREMENT_FAIL
-    _say(f"[① 이벤트] 유효 {len(events)}건 · 파싱 실패 {len(load_errors)}건 — {events_path}")
-    for reason in load_errors:
-        _say(f"  · 파싱 실패: {reason}")
+    events: list[ReviewTimerEvent] = []
+    load_errors: list[str] = []
+    if args.events:
+        events_path = Path(args.events)
+        try:
+            events, load_errors = load_events_jsonl(events_path)
+        except FileNotFoundError:
+            _say(f"[측정 실패] FileNotFoundError: 이벤트 파일 없음 — {events_path}")
+            return _EXIT_MEASUREMENT_FAIL
+        _say(f"[① 이벤트] 유효 {len(events)}건 · 파싱 실패 {len(load_errors)}건 — {events_path}")
+        for reason in load_errors:
+            _say(f"  · 파싱 실패: {reason}")
+    db_verdict_rows: list[dict[str, Any]] | None = None
+    if args.from_db:
+        try:
+            db_events, db_errors, db_verdict_rows = asyncio.run(load_db_sources())
+        except Exception as exc:  # noqa: BLE001 — 침묵 실패 금지: 타입명을 반드시 출력.
+            # DB가 죽었을 때 "0건 통과"로 위장되면 안 된다 — 측정 실패(exit 1)다.
+            _say(f"[측정 실패] {type(exc).__name__}: DB 읽기 실패(--from-db)")
+            return _EXIT_MEASUREMENT_FAIL
+        _say(
+            f"[① 이벤트] DB 유효 {len(db_events)}건 · 파싱 실패 {len(db_errors)}건 · "
+            f"DB 판정 행 {len(db_verdict_rows)}건"
+        )
+        for reason in db_errors:
+            _say(f"  · 파싱 실패: {reason}")
+        events = [*events, *db_events]
+        load_errors = [*load_errors, *db_errors]
     if not events:
         _say("[측정 실패] 유효 이벤트 0건 — '성공 0'이 아니라 계측 부재다(acceptance ④)")
         return _EXIT_MEASUREMENT_FAIL
@@ -1020,6 +1254,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         for reason in verdict_load_errors:
             _say(f"  · 파싱 실패: {reason}")
+    elif db_verdict_rows is not None:
+        # DB 판정 행(problem 상태)이 적재율 분모다 — 명시 --verdicts 파일이 없을 때만.
+        verdict_rows = db_verdict_rows
     elif args.min_coverage is not None:
         _say(
             "[측정 실패] --min-coverage 게이트가 지정됐는데 --verdicts 소스가 없다 — 적재율을 "
@@ -1053,6 +1290,7 @@ def main(argv: list[str] | None = None) -> int:
         verdict_rows=verdict_rows,
         genlog_rows=genlog_rows,
         edit_aware_since=edit_aware_since,
+        min_plausible_seconds=args.min_plausible_seconds,
     )
     # 데이터는 stdout(단일 JSON 문서 또는 리포트 본문), 진행·판정은 stderr(_say) — 분리.
     if args.json:
@@ -1084,6 +1322,24 @@ def main(argv: list[str] | None = None) -> int:
         )
         return _EXIT_MEASUREMENT_FAIL
     failures: list[str] = []
+    if report.hit_implausible_majority:
+        # 경고는 게이트 유무와 무관하게 낸다(계측 전용 실행도 오독 방지).
+        _say(
+            f"[경고] 계측 CU {report.cu_measured}건 중 {report.cu_implausible_short_count}건이 "
+            f"하한 {report.min_plausible_seconds:g}초 미만 — HIT 중앙값·P90 신뢰 불가"
+            "(재입력·스킵 세션 의심)"
+        )
+    elif report.hit_implausible_majority is None and report.min_plausible_seconds <= 0:
+        _say("[경고] --min-plausible-seconds 0 — HIT 하한 가드가 꺼져 있다(0초 방향 무방비)")
+    hit_gate_requested = args.max_median_minutes is not None or args.max_p90_minutes is not None
+    if hit_gate_requested and report.hit_implausible_majority:
+        # fail-closed: 상한을 아무리 잘 만족해도 그 값이 재입력 세션의 것이면 통과는 위장이다.
+        failures.append(
+            f"HIT 하한 가드 — 계측 CU {report.cu_measured}건 중 "
+            f"{report.cu_implausible_short_count}건이 하한 {report.min_plausible_seconds:g}초 "
+            "미만(절반 이상)이라 HIT 게이트(상한)를 평가할 수 없다 — 상한 통과를 성공으로 "
+            "읽지 말 것"
+        )
     if args.max_median_minutes is not None and report.hit_median_seconds is not None:
         if report.hit_median_seconds > args.max_median_minutes * 60.0:
             failures.append(

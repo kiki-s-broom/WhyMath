@@ -580,8 +580,11 @@ def test_load_real_university_corpus_via_fake_engine() -> None:
         pytest.skip("대학 코퍼스 미존재(U1 산출 필요)")
     store, engine = _std_store()
     count = load_standards(None, corpus, store=store)
-    assert count == 409  # 대학 성취기준 전건
-    assert len(engine.executed) == 409  # 행마다 upsert statement
+    # 대학 성취기준 건수는 단일 원천의 기계용 사본에서 읽는다(OPS-154 — 손 고정 금지).
+    facts_path = Path(__file__).resolve().parents[3] / "docs" / "data" / "corpus_facts.json"
+    expected = json.loads(facts_path.read_text(encoding="utf-8"))["standards.university"]
+    assert count == expected  # 대학 성취기준 전건
+    assert len(engine.executed) == expected  # 행마다 upsert statement
     compiled = _compile(engine.executed[0])
     assert "INSERT INTO achievement_standard" in compiled
     assert "ON CONFLICT" in compiled

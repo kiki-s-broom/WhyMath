@@ -5,7 +5,7 @@
 미설정) ② `importorskip`로 이중 skip된다. 전용 `data-pipeline-neo4j` 잡(실 neo4j:5)에서만
 실제 적재가 돈다. Neo4j 미도달 시에도 graceful skip(concept_graph 통합 선례와 동형).
 
-검증: load_graph가 실 Neo4j에 ① 노드 2683·엣지 2234 적재 ② **멱등**(2회 적재 → 노드·엣지 수
+검증: load_graph가 실 Neo4j에 ① 노드 2683·엣지 2278 적재 ② **멱등**(2회 적재 → 노드·엣지 수
 불변) ③ atom_code_unique 유일 제약 존재. 격리를 위해 적재한 `code` 집합만 시작·종료 시 삭제한다
 (앱 그래프·구 :Concept 그래프를 건드리지 않음).
 """
@@ -36,7 +36,16 @@ _URI = os.environ.get("NEO4J_URI", "bolt://127.0.0.1:7687")
 _USER = os.environ.get("NEO4J_USER", "neo4j")
 _PASSWORD = os.environ.get("NEO4J_PASSWORD", "neo4j")
 
-_CORPUS = Path(__file__).resolve().parents[3] / "data" / "corpus" / "atom_graph_v1"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_CORPUS = _REPO_ROOT / "data" / "corpus" / "atom_graph_v1"
+
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+_NODES = _FACTS["atom_graph.nodes"]
+_EDGES = _FACTS["atom_graph.edges"]
 
 
 def _driver() -> "GraphDatabase.driver":  # type: ignore[name-defined]
@@ -103,7 +112,7 @@ def _constraint_exists(driver: "GraphDatabase.driver") -> bool:  # type: ignore[
 
 
 def test_load_is_idempotent_on_live_neo4j() -> None:
-    """실 Neo4j: 2회 적재 → 노드 2683·엣지 2234 불변(멱등) + atom_code_unique 제약 존재."""
+    """실 Neo4j: 2회 적재 → 전 노드·전 엣지 불변(멱등) + atom_code_unique 제약 존재(건수는 사실 파일)."""
     if not _reachable():
         pytest.skip("Neo4j 미도달 — 통합 테스트 건너뜀 (NEO4J_URI/USER/PASSWORD 확인)")
 
@@ -115,11 +124,11 @@ def test_load_is_idempotent_on_live_neo4j() -> None:
 
         # 1회차 적재
         r1 = load_graph(result, driver=driver)
-        assert r1.nodes_merged == 2683
-        assert r1.edges_merged == 2234
+        assert r1.nodes_merged == _NODES
+        assert r1.edges_merged == _EDGES
         assert r1.edges_skipped == 0
         n1, e1 = _count_loaded(driver, codes)
-        assert (n1, e1) == (2683, 2234)
+        assert (n1, e1) == (_NODES, _EDGES)
 
         # 제약 존재
         assert _constraint_exists(driver)
@@ -127,7 +136,7 @@ def test_load_is_idempotent_on_live_neo4j() -> None:
         # 2회차 적재 — 멱등(MERGE): 노드·엣지 수 불변
         load_graph(result, driver=driver)
         n2, e2 = _count_loaded(driver, codes)
-        assert (n2, e2) == (2683, 2234), "재적재 후 노드·엣지 수가 변했다(멱등성 위반)"
+        assert (n2, e2) == (_NODES, _EDGES), "재적재 후 노드·엣지 수가 변했다(멱등성 위반)"
     finally:
         _cleanup(driver, codes)
         driver.close()

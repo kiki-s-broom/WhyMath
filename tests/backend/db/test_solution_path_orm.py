@@ -203,7 +203,9 @@ class TestMigrationFileChain:
         # P3-12가 그 위에 c5e9f3a7b1d4(role_enum에 CMS 역할 3종 — 어휘만 확장)를 얹어 이동.
         # P3-25가 그 위에 e7b2c4d8a1f6(CMS 편집 표지 cms_edited_at 5컬럼)을 얹어 이동.
         # EOS-47이 그 위에 d6a2f8c4b1e7(problem_attempt 버전 고정 컬럼 2개)를 얹어 이동.
-        assert heads == {"d6a2f8c4b1e7"}
+        # P3-26이 그 위에 a8c4e1f7b3d9(concept·concept_edge CMS 소유 표지 + FK 해제 + 트리거 2종)를
+        # 얹어 이동.
+        assert heads == {"a8c4e1f7b3d9"}
 
     def test_gen_meta_migration_file_exists_with_symmetric_updown(self) -> None:
         """S4-10 `gen_meta` 마이그레이션 파일이 존재하고 up/down이 대칭(컬럼 add/drop)이다."""

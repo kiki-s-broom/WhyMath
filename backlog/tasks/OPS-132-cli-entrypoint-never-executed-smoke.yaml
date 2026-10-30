@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-132-cli-entrypoint-never-executed-smoke
+title: "main() 이 테스트·CI 어디서도 실행되지 않는 CLI 16종의 진입점 스모크 — 선언≠배선 감사기는 의도만 보고 동작은 보지 않는다 (OPS-28 발견)"
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P3
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "OPS-28 실측(2026-10-12): main() 보유 CLI 188종 중 테스트(tests/backend)도 CI도 main() 을 한 번도 실행하지 않는 16종 — l1.concept_graph.populate · l1.formula_graph.populate · l1.pedagogy.compile · l1.pedagogy.populate · l1.problem_type_graph.populate · l1.skill_graph.populate · l1.strategy_graph.populate · l3.pedagogy.diag_item_projector · l4.misconception.crosslink_coverage · l4.misconception.crosslink_machine_reject · l4.misconception.crosslink_triage · l4.misconception.semantic.populate · l4.misconception.semantic_eval · privacy.dialogue_content_backfill · privacy.student_work_backfill · whs.corpus_replay. 감사기는 이들을 by-design(운영자 실행 의도)으로 분류했으나 그것은 배선 의도일 뿐 진입점이 동작한다는 증거가 아니다.\n① 16종 각각의 main(argv) 을 in-process 로 한 번 실행하는 스모크 테스트를 둔다 — 입력 부재 exit 2 와 --help 파싱 성공은 DB·모델 없이 hermetic 으로 검증 가능하다. 실 DB 가 필요한 경로는 mock 이 아니라 기존 통합 테스트 마커를 따른다.\n② 스모크가 진입점 결선 결함(깨진 import·argparse 충돌·종료 코드 오용)을 실제로 잡는지 결함 주입으로 RED 를 확인한다(정상 입력에서 초록인 것은 보호의 증거가 아니다).\n③ 이 목록을 코드 동결로 고정한다: main() 이 어떤 테스트에서도 실행되지 않는 CLI 집합이 늘면 실패하는 가드를 둔다(감사기의 main_references 를 tests/backend 에 적용 — OPS-28 에서 실측에 쓴 방법)."
+artifacts: []
+paths:
+  - "tests/backend/ops/**"
+session: null
+notes: "OPS-28(선언≠배선 감사기 사각 해소) 작업 중 발견한 별건. 감사기 축 4 는 '운영자 실행 의도' 를 선언할 뿐 그 CLI 의 main() 이 동작하는지는 보지 않는다. 16종 목록은 감사기 main_references() 를 tests/backend 트리에 적용해 산출했다(2026-10-12 기준). 이 태스크는 감사기를 고치지 않는다."
+updated: 2026-10-12

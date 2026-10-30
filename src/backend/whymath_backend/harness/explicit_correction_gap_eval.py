@@ -66,7 +66,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from whymath_backend.l4.misconception.catalog import CATALOG, CATALOG_BY_ID
+from whymath_backend.l4.misconception.catalog import BODY_CATALOG, CATALOG_BY_ID
 from whymath_backend.l4.misconception.diagnose import diagnose, is_refuted
 from whymath_backend.l4.misconception.match_gate import apply_match_quality_gate
 from whymath_backend.l4.misconception.models import Misconception
@@ -151,7 +151,7 @@ def build_probes() -> tuple[CorrectionProbe, ...]:
             control=_control_text(m),
             refuted=tuple(_control_text(m) + phrase for phrase in CORRECTION_PHRASES),
         )
-        for m in CATALOG
+        for m in BODY_CATALOG
     )
 
 
@@ -219,7 +219,7 @@ def measure_over_suppression() -> tuple[OverSuppressionResult, ...]:
     없으므로 결과에서 빠진다 — 사각 축의 `unmeasurable`과 같은 이유다.
     """
     results: list[OverSuppressionResult] = []
-    for misconception in CATALOG:
+    for misconception in BODY_CATALOG:
         base = _control_text(misconception)
         if not _reaches_student(misconception.id, base):
             continue  # 대조군 미발화 — 억제 여부를 물을 수 없다
@@ -287,7 +287,7 @@ def measure_held_verdicts() -> tuple[HeldVerdictResult, ...]:
     그 대가를 감춘다.
     """
     results: list[HeldVerdictResult] = []
-    for misconception in CATALOG:
+    for misconception in BODY_CATALOG:
         base = _control_text(misconception)
         if not base.strip() or is_refuted(misconception, base):
             continue

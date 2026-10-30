@@ -1,14 +1,14 @@
-"""형성평가 `diag_item` 슬롯 채움 — 정본: `04e_pedagogy_strategy_catalog.md` §7.2(PED-10).
+"""형성평가 `diag_item` 슬롯 채움 — 정본: `04g_pedagogy_strategy_catalog.md` §7.2(PED-10).
 
-04e §7.2가 명시한 원천을 그대로 쓴다: **생성이 아니라 투영**이다. `atom_probe` 전량(원자 code 키
+04g §7.2가 명시한 원천을 그대로 쓴다: **생성이 아니라 투영**이다. `atom_probe` 전량(원자 code 키
 ②진단문항 — 발문 `diagnostic_item`·통과기준 `diagnostic_answer`·오답신호 `diagnostic_signal`)을
 목표(objective_id) grain의 `pedagogy_content_slot(slot_type='diag_item')`으로 투영한다. LLM 호출
 없음(검증된 기존 자산 재사용 — `analogy_generator`/`example_generator`와 달리 라우터 경유 불필요).
 
 ────────────────────────────────────────────────────────────────────────────
-grain 다리 — 04e §7.2 설계의 실측 정정 (crosswalk 불필요)
+grain 다리 — 04g §7.2 설계의 실측 정정 (crosswalk 불필요)
 ────────────────────────────────────────────────────────────────────────────
-04e §7.2는 "개념↔원자 crosswalk 경유"를 그리지만, 실측하면 그 다리가 이미 다른 곳에서 닫혀 있다.
+04g §7.2는 "개념↔원자 crosswalk 경유"를 그리지만, 실측하면 그 다리가 이미 다른 곳에서 닫혀 있다.
 `learning_objective.concept_nodes`는 H2 계약(`db/models/pedagogy_dsl.py`)상 **원자 백본(atom_node)
 code 배열 그 자체**이며(legacy 437/545 개념 그래프가 아니다), `l1/pedagogy/unit_compiler.py`가
 컴파일 시점에 `obj.concept_nodes`를 `valid_atom_codes`(원자 백본 전량)에 대조 검증한다 — 즉 저작
@@ -16,7 +16,7 @@ code 배열 그 자체**이며(legacy 437/545 개념 그래프가 아니다), `l
 0)이므로, 목표→원자의 다리는 **`concept_nodes`와 `atom_probe.code`의 직접 교집합**이다.
 `data/corpus/concept_atom_crosswalk_v1`(구 437-개념-id ↔ 원자 code)는 다른 소비처(예: 구 개념 그래프
 축의 콘텐츠 이관) 용이지 이 bridging에는 쓰이지 않는다 — 존재하지 않는 다리를 새로 놓지 않는다
-(04e §3.2의 "유령 참조 재사용 금지" G7과 동일 원칙).
+(04g §3.2의 "유령 참조 재사용 금지" G7과 동일 원칙).
 
 ────────────────────────────────────────────────────────────────────────────
 select-vs-generate — 이미 검수된 슬롯은 손대지 않는다
@@ -110,7 +110,7 @@ def plan_diag_item_targets(
     개입한 슬롯(PRESCREENED/APPROVED/REJECTED)은 건너뛰고 그 자리의 원자 후보도 소비하지 않는다**
     (그 슬롯은 이미 별도 콘텐츠로 채워진 것으로 본다). 후보(원자 code)는 `concept_nodes` 순서대로
     소진하며, 남은 DRAFT 슬롯 수보다 후보가 적으면 **부분 채움**으로 정직하게 끝난다(사전 대량
-    생성 금지·04e §6.4와 동일 원칙).
+    생성 금지·04g §6.4와 동일 원칙).
     """
     targets: list[DiagItemTarget] = []
     for obj in objectives:

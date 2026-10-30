@@ -3,7 +3,7 @@
 격리 브랜치의 원 구현(PED-06)을 현행 main 위에 재적용한 회수분이다 — 원 테스트를 현행 API에
 맞게 이식했다(동일 변별력 유지).
 
-정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §4(후보 필터)·§3.2(소비처 지정표).
+정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §4(후보 필터)·§3.2(소비처 지정표).
 검증 축(acceptance 3항목과 1:1):
 
   ① **후보 필터는 좁힘만** — 학년·난이도·k_type 축별 좁힘의 변별력, 공집합/후보 소진 시 규칙표
@@ -13,7 +13,7 @@
      supply() 생성 폴백 배선(플래그 OFF 미조회·ON 주입·조회 실패 시 예외 타입명 로그 후 진행·
      렌더 경로 미조회).
   ③ **gate() 카탈로그 부재 동결** — 정적(co_names·소스·시그니처)+런타임(레지스트리 봄베) 이중
-     동결. 카탈로그(효과 축)가 게이트(허용 축)를 우회하는 회귀를 차단한다(04e §4 불변식 ②).
+     동결. 카탈로그(효과 축)가 게이트(허용 축)를 우회하는 회귀를 차단한다(04g §4 불변식 ②).
 
 hermetic: 실 코퍼스는 저장소 YAML(네트워크·DB 0). 플래그 토글은 env+`get_settings.cache_clear()`
 (`test_pedagogy_pack_assembler.py` 관례).
@@ -351,8 +351,8 @@ class TestDecideThreading:
 # acceptance ③ — gate()는 카탈로그를 읽지 않는다(정적+런타임 이중 동결)
 # ──────────────────────────────────────────────────────────────────────────
 class TestGateCatalogAbsenceFrozen:
-    """04e §4 불변식 ② — 카탈로그(효과 축)가 gate(허용 축) 입력이 되면 코퍼스 편집만으로
-    "효과 ≤ 허용"이 우회된다. 이 클래스가 그 부재를 동결한다(깨려면 04e §4 개정이 선행)."""
+    """04g §4 불변식 ② — 카탈로그(효과 축)가 gate(허용 축) 입력이 되면 코퍼스 편집만으로
+    "효과 ≤ 허용"이 우회된다. 이 클래스가 그 부재를 동결한다(깨려면 04g §4 개정이 선행)."""
 
     _CATALOG_SYMBOLS = frozenset(
         {
@@ -402,7 +402,7 @@ class TestGateCatalogAbsenceFrozen:
         baseline = [gate(s, sig, pack=get_pack(kt) if kt else None) for (s, sig, kt) in scenarios]
 
         def _bomb(*_args: Any, **_kwargs: Any) -> Any:
-            raise AssertionError("gate()가 카탈로그를 읽음 — 04e §4 불변식 ② 위반")
+            raise AssertionError("gate()가 카탈로그를 읽음 — 04g §4 불변식 ② 위반")
 
         monkeypatch.setattr(strategy_registry, "get_pedagogy_strategies", _bomb)
         monkeypatch.setattr(strategy_registry, "get_strategy", _bomb)
@@ -421,7 +421,7 @@ class TestStrategyCardLayer:
         assert render_strategy_card(None) == ""
 
     def test_render_injects_summary_one_basis_line_only(self) -> None:
-        # 04e §3.2 — name_ko·description·research_basis **첫 1줄만**(attention 절약).
+        # 04g §3.2 — name_ko·description·research_basis **첫 1줄만**(attention 절약).
         card = _card(
             PedagogyStrategy.SOCRATIC,
             research_basis=("첫째 근거 (1945)", "둘째 근거 (1982)"),

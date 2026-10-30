@@ -1,9 +1,10 @@
 """오개념 crosswalk(kebab-id ↔ M-id) 링크 ORM 모델 (SQLAlchemy 2.0 영속 레이어).
 
 `concept_standard_link.py`(개념↔성취기준 N:M)의 *오개념* 짝이다. L4 런타임 탐지 정본 kebab-id 30종과
-콘텐츠 카탈로그 M-id 839종을 *FK로 묶지 않던* 두 체계 사이를 N:M 매핑으로 잇는다(오개념 정체성
-통합 골격 — `math_dsl_remediation_design.md` §1). 학생 데이터는 kebab-id를 보존하고(rekey 불필요)
-조회 시점에 이 테이블로 M-id를 해석한다(`l1/misconception/crosslink_resolve.py`).
+콘텐츠 카탈로그 M-id(건수는 `docs/data/corpus_facts.md`의 `misconceptions.count`)를 *FK로 묶지 않던*
+두 체계 사이를 N:M 매핑으로 잇는다(오개념 정체성 통합 골격 — `math_dsl_remediation_design.md` §1).
+학생 데이터는 kebab-id를 보존하고(rekey 불필요) 조회 시점에 이 테이블로 M-id를
+해석한다(`l1/misconception/crosslink_resolve.py`).
 
 PK·참조 판단(concept_standard_link 선례 그대로):
   - `link_id`(UUID PK·server_default gen_random_uuid()) — schema엔 link_id 없음(의미키는

@@ -1,0 +1,675 @@
+"""proto_02-08 — [12미적Ⅰ-02-08] 그래프 개형 × M0676 직접 연결 새 문항 틀 프로토타입 (저장소 무수정).
+
+실행: cd /home/user/WhyMath/src/backend && python3 <이 파일>
+틀 3종(전부 오개념 유발 슬롯·객관식·`ptype.optimize-extremum`):
+  F1 grid  — 정수 점만 찍어 이은 그래프의 꼭대기(M0676 전반부 '몇 점만 찍어 잇는다')
+  F2 zmid  — 영점만 찍어 이은 그래프의 꼭대기를 두 영점의 가운데로 본다(전반부의 다른 읽기)
+  F3 flat  — f'=0이지만 극값이 아닌 변곡점(M0676 후반부 '극값과 변곡점을 구분하지 않는다')
+제안 규칙 `M-link-m0676`(저장소에 없다)을 이 파일 안에 구현해 저장소 판정기와 나란히 돌린다.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from collections.abc import Sequence
+from dataclasses import replace
+from math import isqrt
+from pathlib import Path
+from typing import ClassVar
+
+import sympy
+
+from whymath_backend.l3.equivalent.acceptance import _evaluate_verification
+from whymath_backend.l3.equivalent.p3_diff_expr import (
+    Poly,
+    derivative_of,
+    poly_from_sympy,
+    poly_to_sympy,
+    poly_to_sympy_str,
+    render_factored,
+    render_poly,
+    with_eun_neun,
+)
+from whymath_backend.l3.equivalent.p3_diff_graph_shape_skeleton_generator import (
+    ShapeItem,
+    _analyze,
+    _explain,
+    _selection,
+)
+from whymath_backend.l3.equivalent.p3_diff_shortcut_guard import (
+    ShortcutProbe,
+    ShortcutViolation,
+    parameter_coincidences,
+    shortcut_violations,
+)
+from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
+    ChoiceEntry,
+    DiffItem,
+    Frame,
+    P3DiffSlotGenerator,
+    SlotId,
+    answer_format_for,
+    build_choices,
+    probe_of,
+    round_robin_items,
+    seeded_order,
+    skeleton_of,
+    steps_of,
+)
+from whymath_backend.lang.josa import i_ga
+
+MID = "M0676"
+OPT = "ptype.optimize-extremum"
+STD = "[12미적Ⅰ-02-08]"
+X = sympy.Symbol("x")
+R = sympy.Rational
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 1. 오개념 절차 — 선택지 값의 '단일 원천' (틀 빌더와 제안 규칙이 같은 함수를 쓴다)
+# ══════════════════════════════════════════════════════════════════════════
+def crit_table(f: sympy.Expr) -> dict[sympy.Rational, str]:
+    """f'=0의 실근 → 'max'|'min'|'flat'(부호가 안 바뀜) — SymPy가 f'의 부호를 직접 읽는다."""
+    d = sympy.diff(f, X)
+    roots = sorted(sympy.roots(sympy.Poly(d, X)).keys())
+    out: dict[sympy.Rational, str] = {}
+    for i, r in enumerate(roots):
+        left = r - 1 if i == 0 else (roots[i - 1] + r) / 2
+        right = r + 1 if i == len(roots) - 1 else (r + roots[i + 1]) / 2
+        sl, sr = sympy.sign(d.subs(X, left)), sympy.sign(d.subs(X, right))
+        out[sympy.Rational(r)] = "max" if (sl > 0 > sr) else "min" if (sl < 0 < sr) else "flat"
+    return out
+
+
+def grid_extremum(f: sympy.Expr, kind: str, lo: int = -40, hi: int = 40) -> list[int]:
+    """P_B: 정수 x에서의 함숫값만 비교해 '이웃 정수보다 높은(낮은) 점' — 모두 돌려준다."""
+    val = {n: f.subs(X, n) for n in range(lo - 1, hi + 2)}
+    if kind == "max":
+        return [n for n in range(lo, hi + 1) if val[n] > val[n - 1] and val[n] > val[n + 1]]
+    return [n for n in range(lo, hi + 1) if val[n] < val[n - 1] and val[n] < val[n + 1]]
+
+
+def zero_midpoint(f: sympy.Expr, kind: str) -> sympy.Rational | None:
+    """P_C: 영점만 찍어 이었을 때 꼭대기(골짜기)를 놓는 곳 = 극값을 둘러싼 두 영점의 가운데."""
+    zeros = sorted(sympy.roots(sympy.Poly(f, X)).keys())
+    table = crit_table(f)
+    cr = [r for r, k in table.items() if k == kind]
+    if len(cr) != 1 or len(zeros) < 2:
+        return None
+    r = cr[0]
+    below = [z for z in zeros if z < r]
+    above = [z for z in zeros if z > r]
+    if not below or not above:
+        return None
+    return sympy.Rational(max(below) + min(above), 2)
+
+
+def flat_inflection_points(f: sympy.Expr) -> set[sympy.Rational]:
+    """P_A: f'=0이지만 f'의 부호가 안 바뀌고(극값 아님) f''의 부호가 바뀌는 점(변곡점)."""
+    d2 = sympy.diff(f, X, 2)
+    out: set[sympy.Rational] = set()
+    for r, k in crit_table(f).items():
+        if k != "flat":
+            continue
+        if sympy.sign(d2.subs(X, r - R(1, 4))) * sympy.sign(d2.subs(X, r + R(1, 4))) < 0:
+            out.add(r)
+    return out
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 2. 제안 판정 규칙 M-link-m0676 — probe(발문·선지·검산 조건·해설)만 읽는다(저장소 규칙과 같은 입력)
+# ══════════════════════════════════════════════════════════════════════════
+_KIND_RE = re.compile(r"극댓값|극솟값|극대|극소")
+
+
+def _asked_kind(q: str) -> str | None:
+    m = _KIND_RE.search(q)
+    return None if m is None else ("max" if m.group(0) in ("극댓값", "극대") else "min")
+
+
+def _probe_function(probe: ShortcutProbe) -> sympy.Expr | None:
+    for cond in probe.conditions:
+        m = re.match(r"Derivative\((.*), x\)\.doit\(\) =", cond)
+        if m:
+            try:
+                return sympy.sympify(m.group(1).replace("^", "**"), locals={"x": X})
+            except sympy.SympifyError:
+                return None
+    return None
+
+
+def _rat(text: str) -> sympy.Rational | None:
+    try:
+        v = sympy.Rational(text)
+    except (TypeError, ValueError):
+        return None
+    return v
+
+
+def m0676_link_violations(probe: ShortcutProbe) -> list[ShortcutViolation]:
+    """제안 규칙: M0676 귀속 선지가 (A)(B)(C) 세 절차 중 해설이 보이는 절차의 산출인가.
+
+    검사 6종 — ① 귀속 선지가 정답이 아니다 ② 값이 절차 산출이다(절차 3종 중 해설이 신호어로 보이는
+    것만 허용) ③ 절차 B는 묻는 종류(극대/극소)가 있어야 한다 ④ 절차 A는 종류를 묻지 않는다
+    (기존 `critical-point-implies-extremum` 규칙의 asks_kind와 같은 이유) ⑤ 해설이 절차를 보인다
+    ⑥ 함수 F를 못 읽으면 위반(모른다 ≠ 아니다).
+    """
+    linked = [(i, m) for i, m in probe.distractors if m == MID]
+    if not linked:
+        return []
+    out: list[ShortcutViolation] = []
+
+    def bad(why: str) -> None:
+        out.append(ShortcutViolation("M-link-m0676", why))
+
+    f = _probe_function(probe)
+    if f is None:
+        bad("검산 조건에서 함수를 읽지 못해 귀속 선지가 절차의 값인지 판정할 수 없다.")
+        return out
+    kind = _asked_kind(probe.question_text)
+    expl = probe.explanation
+    shows_b = "정수" in expl and "가장 높" in expl or "정수" in expl and "가장 낮" in expl
+    shows_c = "영점" in expl and "가운데" in expl
+    shows_a = "변곡점" in expl and "부호가 바뀌지 않" in expl
+    allowed: set[sympy.Rational] = set()
+    if shows_a and kind is None:
+        allowed |= flat_inflection_points(f)
+    if shows_b and kind is not None:
+        g = grid_extremum(f, kind)
+        if len(g) == 1:  # 정수 점 꼭대기가 하나로 정해질 때만 '절차의 산출'이다
+            allowed.add(sympy.Rational(g[0]))
+    if shows_c and kind is not None:
+        mid = zero_midpoint(f, kind)
+        if mid is not None:
+            allowed.add(mid)
+    if not (shows_a or shows_b or shows_c):
+        bad("해설이 M0676 절차(정수 점만 찍기 · 영점만 찍기 · 극값과 변곡점 혼동 중 하나)를 보이지 "
+            "않는다 — 판정자가 귀속 선지 값을 재현할 수 없다.")
+    answer = _rat(probe.answer)
+    for index, _ in linked:
+        value = _rat(probe.choices[index]) if 0 <= index < len(probe.choices) else None
+        if value is None or (answer is not None and value == answer):
+            bad("귀속 선지가 정답이거나 수가 아니다.")
+        elif value not in allowed:
+            bad(f"귀속 선지 {value}가 M0676 절차(해설이 보이는 것)의 산출이 아니다.")
+    return out
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 3. 틀
+# ══════════════════════════════════════════════════════════════════════════
+def _fmt(v: sympy.Expr | int) -> str:
+    return str(sympy.Rational(v))
+
+
+def _poly_of(expr: sympy.Expr) -> Poly:
+    return poly_from_sympy(sympy.expand(expr))
+
+
+def _item(slot, frame_id, text, answer, f_poly, ptype, expl, selection, choices, distractors):
+    return ShapeItem(
+        slot=slot,
+        frame_id=frame_id,
+        question_text=text,
+        answer_text=answer,
+        explanation=expl,
+        conditions=f"Derivative({poly_to_sympy_str(f_poly)}, x).doit() = 0",
+        answer_map=(("x", answer),),
+        problem_type_code=ptype,
+        answer_format=answer_format_for(answer),
+        choices=choices,
+        distractors=distractors,
+        answer_selection=selection,
+    )
+
+
+def _pick_filler(forbid: set[sympy.Rational], pool: Sequence[sympy.Rational]) -> sympy.Rational | None:
+    return next((v for v in pool if v not in forbid), None)
+
+
+def _selection_of(f: sympy.Expr, target: sympy.Rational) -> str | None:
+    roots = sorted(crit_table(f))
+    if len(roots) < 2:
+        return None
+    return "smallest" if target == roots[0] else "largest" if target == roots[-1] else None
+
+
+def _kind_text(kind: str) -> str:
+    return "극댓값" if kind == "max" else "극솟값"
+
+
+# ── F1 grid ───────────────────────────────────────────────────────────────
+_F1_TEMPLATE = "삼차함수 f(x) = {f}{ga} {kind}을 갖는 x좌표는?"
+
+
+def _f1_pool() -> tuple[tuple[object, ...], ...]:
+    combos = []
+    for a in (4, -4, 8, -8):
+        for p in range(-7, 8):
+            for q in range(p + 3, 8):  # 두 임계점이 1.5 이상 떨어진다
+                for kind in ("max", "min"):
+                    for c in (-6, -3, 2, 5):
+                        combos.append((a, p, q, kind, c))
+    return tuple(seeded_order("p3-m0676:f1", combos))
+
+
+def _f1_build(p: tuple[object, ...]) -> DiffItem | None:
+    a, pp, qq, kind, c = (int(str(v)) if i != 3 else str(v) for i, v in enumerate(p))
+    k = 3 * a // 4
+    terms = [(3, a), (2, -k * (pp + qq)), (1, k * pp * qq), (0, c)]
+    poly: Poly = tuple((e, v) for e, v in terms if v != 0)
+    if max(abs(v) for _, v in poly) > 80:
+        return None
+    f = poly_to_sympy(poly)
+    table = crit_table(f)
+    wanted = [r for r, kd in table.items() if kd == kind]
+    if len(table) != 2 or len(wanted) != 1 or wanted[0].is_integer:
+        return None  # 묻는 종류의 극값 x좌표가 정수면 정수 점 읽기가 곧 정답이라 이 틀에 부적합
+    r = wanted[0]
+    grid = grid_extremum(f, kind)
+    if len(grid) != 1:
+        return None  # 정수 점 꼭대기가 하나로 안 정해진다
+    s = sympy.Rational(grid[0])
+    other = next(rr for rr in table if rr != r)
+    filler = _pick_filler({r, s, other}, [-r, r + 1, r - 1, 2 * r, -other])
+    if filler is None:
+        return None
+    selection = _selection_of(f, r)
+    if selection is None:
+        return None
+    try:
+        choices, answer, distractors = build_choices(
+            [
+                ChoiceEntry(_fmt(r), is_correct=True, sort_key=float(r)),
+                ChoiceEntry(_fmt(s), MID, sort_key=float(s)),
+                ChoiceEntry(_fmt(other), sort_key=float(other)),
+                ChoiceEntry(_fmt(filler), sort_key=float(filler)),
+            ],
+            shuffle_seed=f"f1:{p}",
+        )
+    except ValueError:
+        return None
+    fn = _analyze_rational(poly)
+    n = grid[0]
+    vals = [f.subs(X, t) for t in (n - 1, n, n + 1)]
+    expl = (
+        f"{fn} 정수 x = {n - 1}, {n}, {n + 1}에서 f(x)의 값은 {vals[0]}, {vals[1]}, {vals[2]}이므로 "
+        f"정수인 점만 찍어 이으면 x = {n}에서 가장 {'높' if kind == 'max' else '낮'}아 보이지만, "
+        f"f'({n}) = {sympy.diff(f, X).subs(X, n)} ≠ 0이므로 그 점은 "
+        f"{_kind_text(kind)}을 갖는 x좌표가 아니다. 따라서 {_kind_text(kind)}을 갖는 x좌표는 {_fmt(r)}이다."
+    )
+    text = _F1_TEMPLATE.format(f=render_poly(poly), ga=i_ga(render_poly(poly)), kind=_kind_text(kind))
+    return _item("misconception_trigger", "m0676-grid", text, answer, poly, OPT, expl, selection,
+                 choices, distractors)
+
+
+def _analyze_rational(poly: Poly) -> str:
+    """f'의 도함수식·인수분해·근·부호 변화 서술(분수 근 허용 — 기존 `_explain`은 정수 근 전용)."""
+    f = poly_to_sympy(poly)
+    d = derivative_of(poly)
+    table = crit_table(f)
+    parts = [
+        f"f'(x) = {render_poly(d)} = {render_factored(d)}이므로 f'(x) = 0의 근은 "
+        f"x = {', '.join(_fmt(r) for r in table)}이다."
+    ]
+    for r, kd in table.items():
+        if kd == "max":
+            parts.append(f"x = {_fmt(r)}의 좌우에서 f'(x)의 부호가 양에서 음으로 바뀌므로 극대이다.")
+        elif kd == "min":
+            parts.append(f"x = {_fmt(r)}의 좌우에서 f'(x)의 부호가 음에서 양으로 바뀌므로 극소이다.")
+    return " ".join(parts)
+
+
+# ── F2 zmid ───────────────────────────────────────────────────────────────
+_F2_TEMPLATE = "함수 f(x) = {f}{ga} {kind}을 갖는 x좌표는?"
+
+
+def _isq(n: int) -> bool:
+    return n >= 0 and isqrt(n) ** 2 == n
+
+
+def _f2_pool() -> tuple[tuple[object, ...], ...]:
+    combos = []
+    for a in (1, 2, -1, -2):
+        for z1 in range(-8, 5):
+            for d1 in range(1, 12):
+                for d2 in range(1, 12):
+                    if not _isq(d1 * d1 + d1 * d2 + d2 * d2):  # f'의 근이 유리수가 되는 영점 간격
+                        continue
+                    z2, z3 = z1 + d1, z1 + d1 + d2
+                    if z3 > 8:
+                        continue
+                    for kind in ("max", "min"):
+                        combos.append((a, z1, z2, z3, kind))
+    return tuple(seeded_order("p3-m0676:f2", combos))
+
+
+def _factored_text(a: int, zeros: Sequence[int]) -> str:
+    ordered = sorted(zeros, key=lambda z: (z != 0, z))  # x를 맨 앞에
+    parts = []
+    for z in ordered:
+        parts.append("x" if z == 0 else f"(x {'-' if z > 0 else '+'} {abs(z)})")
+    lead = "" if a == 1 else "-" if a == -1 else str(a)
+    return lead + "".join(parts)
+
+
+def _f2_build(p: tuple[object, ...]) -> DiffItem | None:
+    a, z1, z2, z3 = (int(str(v)) for v in p[:4])
+    kind = str(p[4])
+    f = sympy.expand(a * (X - z1) * (X - z2) * (X - z3))
+    poly = _poly_of(f)
+    table = crit_table(f)
+    wanted = [r for r, kd in table.items() if kd == kind]
+    if len(table) != 2 or len(wanted) != 1:
+        return None
+    r = wanted[0]
+    mid = zero_midpoint(f, kind)
+    if mid is None or mid == r:
+        return None
+    other = next(rr for rr in table if rr != r)
+    filler = _pick_filler({r, mid, other}, [-r, r + 1, r - 1, 2 * r, -other])
+    if filler is None:
+        return None
+    selection = _selection_of(f, r)
+    if selection is None:
+        return None
+    try:
+        choices, answer, distractors = build_choices(
+            [
+                ChoiceEntry(_fmt(r), is_correct=True, sort_key=float(r)),
+                ChoiceEntry(_fmt(mid), MID, sort_key=float(mid)),
+                ChoiceEntry(_fmt(other), sort_key=float(other)),
+                ChoiceEntry(_fmt(filler), sort_key=float(filler)),
+            ],
+            shuffle_seed=f"f2:{p}",
+        )
+    except ValueError:
+        return None
+    zs = sorted((z1, z2, z3))
+    enclosing = [z for z in zs if z < r][-1], [z for z in zs if z > r][0]
+    shown = _factored_text(a, zs)
+    expl = (
+        f"f(x) = {shown} = {render_poly(poly)}이다. {_analyze_rational(poly)} "
+        f"영점 x = {zs[0]}, {zs[1]}, {zs[2]}만 찍어 이으면 두 영점 {enclosing[0]}, {enclosing[1]}의 "
+        f"가운데 x = {_fmt(mid)}에서 가장 {'높' if kind == 'max' else '낮'}아 보이지만, "
+        f"f'({_fmt(mid)}) = {sympy.diff(f, X).subs(X, mid)} ≠ 0이므로 그 점은 "
+        f"{_kind_text(kind)}을 갖는 x좌표가 아니다. 따라서 {_kind_text(kind)}을 갖는 x좌표는 {_fmt(r)}이다."
+    )
+    text = _F2_TEMPLATE.format(f=shown, ga=i_ga(shown), kind=_kind_text(kind))
+    return _item("misconception_trigger", "m0676-zero-mid", text, answer, poly, OPT, expl,
+                 selection, choices, distractors)
+
+
+# ── F3 flat ───────────────────────────────────────────────────────────────
+_F3_TEMPLATE = "함수 f(x) = {f}{ga} 극값을 갖는 x좌표는?"
+
+
+def _f3_pool() -> tuple[tuple[object, ...], ...]:
+    combos = []
+    for a in (1, 2, 3, -1, -2, -3):
+        for p in range(-4, 5):
+            if p == 0:
+                continue
+            for q in range(-4, 5):
+                if q == p:
+                    continue
+                for c in (-5, -2, 3, 6):
+                    combos.append((a, p, q, c))
+    return tuple(seeded_order("p3-m0676:f3", combos))
+
+
+def _f3_build(p: tuple[object, ...]) -> DiffItem | None:
+    a, pp, qq, c = (int(str(v)) for v in p)
+    # f' = 4a(x - p)^2 (x - q) — 계수가 정수가 되려면 4a(2p+q)/3 이 정수
+    if (4 * a * (2 * pp + qq)) % 3:
+        return None
+    f_prime = 4 * a * (X - pp) ** 2 * (X - qq)
+    f = sympy.integrate(sympy.expand(f_prime), X) + c
+    poly = _poly_of(f)
+    if any(not float(v).is_integer() for _, v in poly) or max(abs(v) for _, v in poly) > 70:
+        return None
+    table = crit_table(f)
+    if table.get(sympy.Rational(pp)) != "flat" or sympy.Rational(qq) not in table:
+        return None
+    if sympy.Rational(pp) not in flat_inflection_points(f):
+        return None
+    fn = _analyze(poly)
+    if fn is None or tuple(fn.kinds) != (qq,) or fn.flat_roots != (pp,):
+        return None
+    selection = _selection(fn, qq)
+    if selection is None:
+        return None
+    filler = _pick_filler({R(pp), R(qq)}, [R(-qq), R(2 * qq), R(qq + 1), R(qq - 1), R(-pp)])
+    filler2 = _pick_filler({R(pp), R(qq), filler}, [R(-qq), R(2 * qq), R(qq + 1), R(qq - 1), R(-pp)])
+    if filler is None or filler2 is None:
+        return None
+    try:
+        choices, answer, distractors = build_choices(
+            [
+                ChoiceEntry(str(qq), is_correct=True, sort_key=float(qq)),
+                ChoiceEntry(str(pp), MID, sort_key=float(pp)),
+                ChoiceEntry(_fmt(filler), sort_key=float(filler)),
+                ChoiceEntry(_fmt(filler2), sort_key=float(filler2)),
+            ],
+            shuffle_seed=f"f3:{p}",
+        )
+    except ValueError:
+        return None
+    d2 = sympy.diff(f, X, 2)
+    d2_poly = _poly_of(d2)
+    expl = (
+        f"{_explain(fn)} 또 f''(x) = {render_poly(d2_poly)}이고 x = {pp}의 좌우에서 f''(x)의 부호가 "
+        f"바뀌므로 x = {pp}는 변곡점이지 극값이 아니다. 따라서 구하는 x좌표는 {qq}이다."
+    )
+    text = _F3_TEMPLATE.format(f=render_poly(poly), ga=i_ga(render_poly(poly)))
+    return _item("misconception_trigger", "m0676-flat", text, answer, poly, OPT, expl, selection,
+                 choices, distractors)
+
+
+FRAMES = [
+    Frame("m0676-grid", _f1_pool(), _f1_build),
+    Frame("m0676-zero-mid", _f2_pool(), _f2_build),
+    Frame("m0676-flat", _f3_pool(), _f3_build),
+]
+
+
+class P3DiffM0676Proto(P3DiffSlotGenerator):
+    """프로토타입 생성기 — 오개념 유발 슬롯만 담당(저장소 `items()` 불변식·판정기·풀이 단계 도출을 그대로 탄다)."""
+
+    standard_code: ClassVar[str] = STD
+    concept_src_id: ClassVar[str] = "H:12미적Ⅰ02-08"
+    unit_code: ClassVar[str] = "P3-CALC1-DIFF-GRAPH-SHAPE"
+    slug_prefix: ClassVar[str] = "wm-p3-diff-graphshape-m0676-proto"
+    slot_difficulty: ClassVar[dict[str, float]] = {"misconception_trigger": 3.5}
+    slot_count: ClassVar[int] = 45
+    slots: ClassVar[tuple[SlotId, ...]] = ("misconception_trigger",)
+
+    @classmethod
+    def _slot_items(cls, slot: str, claimed: set[str]) -> list[DiffItem]:
+        return round_robin_items(FRAMES, cls.slot_count, claimed=claimed, standard_code=STD)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 4. 검증·출력
+# ══════════════════════════════════════════════════════════════════════════
+def corpus_key_sets() -> tuple[set[str], set[str]]:
+    root = Path("/home/user/WhyMath/data/corpus")
+    folds: set[str] = set()
+    conds: set[str] = set()
+    for name in ("problem_bank_p3_calculus1_diff_v0", "problem_bank_p3_fill_v0"):
+        for line in (root / name / "problems.jsonl").read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            folds.add(skeleton_of(row["question_text"]))
+            c = row["verify"]["conditions"]
+            conds.add(c if isinstance(c, str) else "&&".join(c))
+    return folds, conds
+
+
+def check_item(item: DiffItem) -> list[str]:
+    """인스턴스 1건 단언 6종 — 실패 사유 목록(빈 목록이면 통과)."""
+    fails: list[str] = []
+    poly_f = _probe_function(probe_of(STD, item))
+    assert poly_f is not None
+    answer = sympy.Rational(item.answer_text)
+    table = crit_table(poly_f)
+    kind = _asked_kind(item.question_text)
+    # ① 정답이 SymPy로 옳다
+    if kind is None:
+        ok = table.get(answer) in ("max", "min")
+    else:
+        sel = getattr(item, "answer_selection", None)
+        cands = sorted(r for r, kd in table.items() if kd == kind)
+        ok = table.get(answer) == kind and cands and answer == (cands[0] if sel == "smallest" else cands[-1])
+    if not ok:
+        fails.append("정답이 극값 x좌표가 아니다")
+    # ②③ 오개념 선택지 값 == 절차 산출 · 정답과 다르다
+    assert item.choices is not None
+    linked = [sympy.Rational(item.choices[i]) for i, _ in item.distractors]
+    if len(linked) != 1:
+        fails.append(f"귀속 선지 수 {len(linked)}")
+    v = linked[0]
+    if item.frame_id == "m0676-grid":
+        procedure = grid_extremum(poly_f, kind or "max")
+        if procedure != [v]:
+            fails.append(f"grid 산출 {procedure} != {v}")
+    elif item.frame_id == "m0676-zero-mid":
+        if zero_midpoint(poly_f, kind or "max") != v:
+            fails.append("zmid 산출 불일치")
+    else:
+        if v not in flat_inflection_points(poly_f):
+            fails.append("flat 산출 불일치")
+    if v == answer:
+        fails.append("오개념 선지 == 정답")
+    # ④ 선택지 4개 서로 다름
+    if len(set(item.choices)) != 4:
+        fails.append("선지 중복")
+    # ⑤ Tier1: 정답 verified, 모든 오답 failed(게이트가 오답을 실제로 거른다)
+    sel = getattr(item, "answer_selection", None)
+    state, _ = _evaluate_verification(item.conditions, dict(item.answer_map), None, None, sel)
+    if state != "verified":
+        fails.append(f"Tier1 정답 {state}")
+    for ch in item.choices:
+        if ch == item.answer_text:
+            continue
+        st, _ = _evaluate_verification(item.conditions, {"x": ch}, None, None, sel)
+        if st == "verified":
+            fails.append(f"Tier1이 오답 {ch}를 통과시킴")
+    # ⑥ 저장소 우회로 판정기 + 제안 규칙 위반 0
+    probe = probe_of(STD, item)
+    repo = shortcut_violations(probe)
+    mine = m0676_link_violations(probe)
+    if repo:
+        fails.append("repo:" + ";".join(str(x) for x in repo))
+    if mine:
+        fails.append("proposed:" + ";".join(str(x) for x in mine))
+    return fails
+
+
+def main() -> int:
+    exit_code = 0
+    # ── A. 저장소 경로 그대로: 생성기 items()가 빌드 시점 가드를 전부 돈다 ──
+    items = P3DiffM0676Proto.items("misconception_trigger")
+    print(f"[A] items() 통과 문항 {len(items)}건 (저장소 _validate_slot: 슬롯 균일·판정기·풀이 단계 도출 포함)")
+    by_frame: dict[str, int] = {}
+    for it in items:
+        by_frame[it.frame_id] = by_frame.get(it.frame_id, 0) + 1
+    print("    틀별:", by_frame)
+    print("    슬롯의 오개념 연결 집합:", sorted(next(iter(items)).misconception_ids))
+
+    for fid in ("m0676-grid", "m0676-zero-mid", "m0676-flat"):
+        it = next(i for i in items if i.frame_id == fid)
+        st, _ = _evaluate_verification(it.conditions, dict(it.answer_map), None, None, getattr(it, "answer_selection", None))
+        bad_states = {ch: _evaluate_verification(it.conditions, {"x": ch}, None, None, getattr(it, "answer_selection", None))[0]
+                      for ch in it.choices or () if ch != it.answer_text}
+        print(f"    예) [{fid}] {it.question_text}\n        선지 {it.choices} 정답 {it.answer_text} 귀속 {it.distractors} "
+              f"selection={getattr(it, 'answer_selection', None)} ptype={it.problem_type_code}\n        해설: {it.explanation}\n"
+              f"        Tier1 정답={st} 오답={bad_states}")
+    # ── B. 인스턴스 단언 ──
+    fail_count = 0
+    for it in items:
+        fails = check_item(it)
+        if fails:
+            fail_count += 1
+            print("    FAIL", it.frame_id, it.question_text, fails)
+    print(f"[B] 단언 실패 {fail_count}건 / {len(items)}건 "
+          "(정답 SymPy·오개념 선지==절차 산출·≠정답·4개 상이·Tier1 정답 verified/오답 전부 failed·"
+          "저장소 판정기 0·제안 규칙 0)")
+    exit_code |= int(fail_count > 0)
+
+    # ── C. 기존 두 은행과의 중복 ──
+    folds, conds = corpus_key_sets()
+    dup_fold = sum(skeleton_of(it.question_text) in folds for it in items)
+    dup_cond = sum((it.conditions if isinstance(it.conditions, str) else "&&".join(it.conditions)) in conds
+                   for it in items)
+    print(f"[C] 기존 은행(504+204)과 문면 골격 중복 {dup_fold}건 · 검산 조건 중복 {dup_cond}건")
+    exit_code |= int(dup_fold > 0 or dup_cond > 0)
+    skeletons = {skeleton_of(it.question_text) for it in items}
+    print(f"    새 문항의 서로 다른 문면 골격(숫자 접기) {len(skeletons)}종")
+
+    # ── D. 변별 주입 ──
+    base = next(it for it in items if it.frame_id == "m0676-grid")
+    assert base.choices is not None
+    correct_idx = base.choices.index(base.answer_text)
+    linked_idx = base.distractors[0][0]
+    unlinked = [i for i in range(4) if i not in (correct_idx, linked_idx)]
+    injections = {
+        "I1 무관 오답(절차 산출 아님)에 M0676 라벨": replace(base, distractors=((unlinked[0], MID),)),
+        "I2 정답 선지에 M0676 라벨": replace(base, distractors=((correct_idx, MID),)),
+        "I3 해설에서 절차 문장 삭제": replace(base, explanation=base.explanation.split(" 정수 x =")[0]),
+    }
+    zm = next(it for it in items if it.frame_id == "m0676-zero-mid")
+    zm_unlinked = [i for i in range(4) if i not in (zm.choices.index(zm.answer_text), zm.distractors[0][0])]  # type: ignore[union-attr]
+    injections["I4 F2에서 다른 임계점(kind 바꿈)에 라벨"] = replace(zm, distractors=((zm_unlinked[0], MID),))
+    # 대조군: 기존 규칙이 있는 kebab(critical-point-implies-extremum)에 같은 잘못된 라벨을 달면 저장소가 잡는가
+    kebab_ctl = replace(
+        P3DiffM0676Proto.items("misconception_trigger")[0],
+        distractors=((unlinked[0], "critical-point-implies-extremum"),),
+    )
+    injections["I5(대조군) 같은 무관 오답에 critical-point-implies-extremum 라벨"] = kebab_ctl
+    fl = next(it for it in items if it.frame_id == "m0676-flat")
+    injections["I6 F3 발문을 '극댓값'(종류를 묻는 꼴)으로 바꾸고 변곡점 선지에 M0676 라벨"] = replace(
+        fl, question_text=fl.question_text.replace("극값을", "극댓값을")
+    )
+    print("[D] 변별 주입 — 저장소 판정기가 잡는가 / 제안 규칙이 잡는가 / 내 단언(check_item)이 잡는가")
+    for name, inj in injections.items():
+        pr = probe_of(STD, inj)
+        repo_hit = bool(shortcut_violations(pr))
+        mine_hit = bool(m0676_link_violations(pr))
+        # check_item은 frame_id 기준 절차 산출 대조도 하므로 별도 판정
+        try:
+            check_hit = bool(check_item(inj))
+        except Exception as exc:  # 주입이 예외로 드러나도 '잡힘'
+            check_hit = True
+            _ = exc
+        print(f"    {name}: 저장소={'잡음' if repo_hit else '통과'} · 제안규칙={'잡음' if mine_hit else '통과'} · "
+              f"단언={'잡음' if check_hit else '통과'}")
+        control = name.startswith("I5")
+        if control and not repo_hit:
+            exit_code = 1  # 대조군: 저장소가 기존 규칙으로 잡아야 하니스가 살아 있다
+        if not control and not (mine_hit and check_hit):
+            exit_code = 1
+
+    # ── E. 용량 ──
+    print("[E] 용량 (빌더가 None을 내지 않고 판정기·우연 일치 거부를 통과하는 파라미터 수)")
+    for fr in FRAMES:
+        built = [it for it in (fr.build(p) for p in fr.params) if it is not None]
+        ok = [it for it in built if not parameter_coincidences(probe_of(STD, it))
+              and not shortcut_violations(probe_of(STD, it)) and not m0676_link_violations(probe_of(STD, it))]
+        math_keys = {it.conditions if isinstance(it.conditions, str) else "&&".join(it.conditions) for it in ok}
+        # 수학적으로 서로 다른 것 = 상수항 c를 뺀 검산 함수(도함수) + 묻는 종류
+        derivs = set()
+        for it in ok:
+            fexpr = _probe_function(probe_of(STD, it))
+            assert fexpr is not None
+            derivs.add((sympy.diff(fexpr, X), _asked_kind(it.question_text)))
+        sk = {skeleton_of(it.question_text) for it in ok}
+        print(f"    {fr.frame_id}: 후보 파라미터 {len(fr.params)} → 빌더 통과 {len(built)} → 판정기 통과 {len(ok)}"
+              f" · 서로 다른 검산 조건 {len(math_keys)} · 상수항 c를 무시한 수학적 실체 {len(derivs)}"
+              f" · 문면 골격 {len(sk)}")
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

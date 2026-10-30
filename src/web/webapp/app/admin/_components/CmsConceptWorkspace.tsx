@@ -13,7 +13,15 @@ import {
 } from "../_lib/adminCmsApi";
 
 import { CmsConceptStudioPane } from "./CmsConceptStudioPane";
-import { CmsFailureBox, CmsSessionGate, describeCmsFailure, type NoteResult } from "./CmsCommon";
+import {
+  CmsFailureBox,
+  CmsNoticeView,
+  CmsSessionGate,
+  describeCmsFailure,
+  type CmsNotice,
+  type NoteResult,
+} from "./CmsCommon";
+import { CmsProposalPanel } from "./CmsProposalPanel";
 import { CmsVersionPane } from "./CmsVersionPane";
 
 import styles from "./Cms.module.css";
@@ -21,8 +29,9 @@ import styles from "./Cms.module.css";
 /**
  * 개념 작업대 — 개념 목록에서 하나를 골라 **모드에 따라** 다른 패널을 보인다 (P3-12).
  *
- *   studio   개념 편집: 현재 행·관계(읽기 전용) + 새 초안 만들기 + 스킬 연결
- *   versions 판 이력과 상태 전이: 제출·검토·승인·발행 등(서버가 허용한 것만)
+ *   studio   개념 편집: 현재 행 + 관계(선수·후행) 편집 + 새 초안 만들기 + 스킬 연결 + 개념 삭제
+ *            (목록 쪽에는 신규 개념 제안 — 만들기·심사)
+ *   versions 판 이력과 상태 전이: 제출·검토·승인·발행 등(서버가 허용한 것만, 열린 제안 목록 포함)
  *   deploy   발행과 롤백: 위와 같고 롤백 영역이 더해진다
  *
  * 모드는 **표시를 고르는 값**일 뿐이다. 어떤 처리가 가능한지는 모드가 아니라 서버가 준 값
@@ -55,6 +64,8 @@ function Body({ mode, token, note }: { mode: CmsWorkspaceMode; token: string; no
   const [offset, setOffset] = useState(0);
   const [list, setList] = useState<ListState>({ kind: "loading" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 개념 삭제 같은 화면 밖(선택 해제 뒤) 결과 안내
+  const [notice, setNotice] = useState<CmsNotice>(null);
   // 늦게 도착한 낡은 응답이 최신 화면을 덮지 않게 하는 요청 번호
   const listSeq = useRef(0);
 
@@ -86,6 +97,7 @@ function Body({ mode, token, note }: { mode: CmsWorkspaceMode; token: string; no
     setQ(typed.trim());
     setOffset(0);
     setSelectedId(null);
+    setNotice(null);
   }
 
   if (resources.kind === "loading") return <p className={styles.muted}>화면 구성을 불러오는 중…</p>;
@@ -108,6 +120,8 @@ function Body({ mode, token, note }: { mode: CmsWorkspaceMode; token: string; no
   return (
     <section className={styles.root}>
       <h2 className={styles.title}>{MODE_TITLE[mode]}</h2>
+
+      <CmsNoticeView notice={notice} />
 
       <div className={styles.columns}>
         <div className={styles.listPane}>
@@ -132,12 +146,23 @@ function Body({ mode, token, note }: { mode: CmsWorkspaceMode; token: string; no
           <ConceptList
             list={list}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setNotice(null);
+              setSelectedId(id);
+            }}
             onPage={setOffset}
             onRetry={() => {
               setList({ kind: "loading" });
               void loadList();
             }}
+          />
+
+          <CmsProposalPanel
+            token={token}
+            note={note}
+            showCreate={mode === "studio"}
+            capabilities={capabilities}
+            onChanged={() => void loadList()}
           />
         </div>
 
@@ -154,6 +179,12 @@ function Body({ mode, token, note }: { mode: CmsWorkspaceMode; token: string; no
               capabilities={capabilities}
               skillMeta={skillMeta}
               onListChanged={() => void loadList()}
+              onDeleted={(code) => {
+                // 지운 개념의 상세는 더 읽을 수 없다 — 선택을 풀고 서버 목록을 다시 읽는다.
+                setSelectedId(null);
+                setNotice({ tone: "info", text: "개념 " + code + "을(를) 삭제했습니다." });
+                void loadList();
+              }}
             />
           )}
         </div>
@@ -252,6 +283,7 @@ function ConceptPane(props: {
   capabilities: string[];
   skillMeta: CmsResources["resources"][number] | null;
   onListChanged: () => void;
+  onDeleted: (conceptCode: string) => void;
 }) {
   const { token, note, conceptId } = props;
   const [state, setState] = useState<DetailState>({ kind: "loading" });
@@ -302,6 +334,7 @@ function ConceptPane(props: {
           detail={detail}
           skillMeta={props.skillMeta}
           onChanged={refresh}
+          onDeleted={props.onDeleted}
         />
       ) : (
         <CmsVersionPane

@@ -22,7 +22,14 @@
 
 **설계**
   - 워커 `max_workers`개를 `spawn`으로 띄운다(Windows·Linux 공통 — fork는 다중 스레드 서버에서
-    위험하고 Windows에는 없다). 워커는 `preload` 모듈을 import한 뒤 `ready`를 보낸다.
+    위험하고 Windows에는 없다). 워커는 `preload` 모듈을 import하고 `warmup` 호출을 돌린 뒤
+    `ready`를 보낸다.
+  - **웜업(OPS-142)** — 라이브러리 일부는 *입력 종류별로* 첫 사용 때 하위 모듈을 지연 import한다
+    (실측은 호출부 웜업 함수 주석·설정 설명 참조 — 입력 종류마다 단독 ≈20~70ms, 워커 CPU 몫이
+    1/8로 줄면 최대 8배). 이 시간은 *계산 상한 안*이라, 상한이 짧거나 기계가 바쁘면 정상 입력이
+    판정 불가로 샌다. 게다가 상한 초과로 kill된 뒤의 교체 워커도 같은 콜드 상태다. `warmup`은 기동
+    단계(상한 밖)에서 대표 호출을 미리 돌려 그 비용을 `ready` 전에 치른다. 어떤 호출이 대표인지는
+    과목 어휘라 호출부가 정한다.
   - **상한은 계산 시간만 잰다** — 워커 기동과 호출 대상 복원(unpickle, 첫 호출 시 모듈 import
     수백 ms)은 상한 밖이다. 워커가 복원을 끝내고 `started`를 알린 뒤부터 잰다(실측: 이 분리가
     없으면 첫 호출의 정상 입력이 상한 0.5초에 걸려 판정 불가로 샜다).
@@ -105,14 +112,39 @@ class WorkerError(RuntimeError):
 # ── 워커 프로세스 쪽 ──────────────────────────────────────────────────────────────
 
 
-def _worker_main(conn: Any, preload: tuple[str, ...]) -> None:
+def _parse_warmup(spec: str) -> tuple[str, str]:
+    """`"모듈:함수"` 웜업 지정을 (모듈, 함수)로 쪼갠다 — 형식이 틀리면 `ValueError`."""
+    module_name, sep, attr = spec.partition(":")
+    if not sep or not module_name or not attr:
+        raise ValueError(f"warmup 항목은 '모듈:함수' 형식이어야 한다: {spec!r}")
+    return module_name, attr
+
+
+def _run_warmup(warmup: tuple[str, ...]) -> None:
+    """`warmup` 호출(인자 없는 함수)을 차례로 돌린다 — 실패해도 워커는 살린다.
+
+    웜업은 최적화일 뿐 정상 동작의 전제가 아니다. 한 항목이 실패(임포트 오류·예외)하면 그 항목만
+    건너뛰고 **예외 타입명을 경고 로그에 남긴다**(침묵 실패 금지·호출 인자는 싣지 않는다).
+    """
+    for spec in warmup:
+        module_name, attr = _parse_warmup(spec)
+        try:
+            getattr(importlib.import_module(module_name), attr)()
+        except Exception as exc:  # noqa: BLE001 — 웜업 실패가 워커 기동을 막으면 안 된다
+            logger.warning("격리 워커 웜업 실패(%s): %s — 건너뜀", type(exc).__name__, spec)
+
+
+def _worker_main(conn: Any, preload: tuple[str, ...], warmup: tuple[str, ...] = ()) -> None:
     """워커 루프 — `(fn, args, kwargs)` pickle을 받아 실행하고 결과·예외를 돌려준다.
 
     `preload` 모듈은 *첫 호출*이 아니라 여기서 미리 import해 `ready` 전에 기동 비용을 치른다.
-    부모가 죽거나 파이프가 닫히면(EOF) 조용히 끝난다 — 고아 워커를 남기지 않는다.
+    `warmup`은 그 뒤에 돌려 식 종류별 지연 import까지 `ready` 전에 치른다(OPS-142 — 교체 워커도
+    같은 `_worker_main`이라 함께 데워진다). 부모가 죽거나 파이프가 닫히면(EOF) 조용히 끝난다 —
+    고아 워커를 남기지 않는다.
     """
     for module_name in preload:
         importlib.import_module(module_name)
+    _run_warmup(warmup)
 
     conn.send(("ready", os.getpid()))
     while True:
@@ -164,13 +196,17 @@ class IsolatedCallPool:
         timeout_s: float = DEFAULT_TIMEOUT_S,
         queue_wait_s: float | None = None,
         preload: tuple[str, ...] = (),
+        warmup: tuple[str, ...] = (),
     ) -> None:
         if max_workers < 1:
             raise ValueError("max_workers는 1 이상이어야 한다.")
+        for spec in warmup:  # 형식 오류는 워커 안에서 조용히 사라지지 않게 부모가 먼저 거른다
+            _parse_warmup(spec)
         if timeout_s <= 0:
             raise ValueError("timeout_s는 0보다 커야 한다.")
         self._max_workers = max_workers
         self._preload = preload
+        self._warmup = warmup
         self.timeout_s = timeout_s
         # 대기열 상한 기본값 = 시간 상한 × 2 — 앞 호출이 상한까지 쓰는 최악을 한 번은 기다린다.
         self.queue_wait_s = queue_wait_s if queue_wait_s is not None else timeout_s * 2
@@ -215,6 +251,10 @@ class IsolatedCallPool:
         # 마감은 호출 진입 시각 기준 — 호출부의 시계(테스트의 가짜 시계 등)와 결합하지 않는다.
         deadline = None if budget_s is None else time.monotonic() + budget_s
         if budget_s is not None and budget_s <= 0:
+            # 입구 거절도 풀에 맡겨진 호출이다 — `calls`에 넣지 않으면 `deadlines`만 올라 접힘 수가
+            # 분모(`calls`)를 앞지르고 "작동한 비율"이 틀린다(OPS-140). 대기열 포화(`queue_waits`)가
+            # `calls`를 올린 뒤 접히는 것과 같은 회계다 — 호출 하나는 정확히 한 결과로 끝난다.
+            self.calls += 1
             self.deadlines += 1
             raise BudgetExceededError("deadline", budget_s)
         try:
@@ -286,7 +326,9 @@ class IsolatedCallPool:
 
     def _spawn(self) -> _Worker:
         parent, child = self._ctx.Pipe(duplex=True)
-        process = self._ctx.Process(target=_worker_main, args=(child, self._preload), daemon=True)
+        process = self._ctx.Process(
+            target=_worker_main, args=(child, self._preload, self._warmup), daemon=True
+        )
         process.start()
         child.close()  # 부모는 자식 쪽 끝을 닫아야 자식 종료 시 EOF를 본다
         worker = _Worker(process=process, conn=parent)

@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: CONST-16-guard-matcher-mcp-github-write
+title: "코딩 헌법 가드 보강 — MCP GitHub 쓰기 도구(push_files·create_or_update_file·delete_file)의 constitution/ 대상 차단"
+track: infra-debt
+stage: S4
+subject: math
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① .claude/settings.json 의 PreToolUse 가드 매처에 mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file 을 추가하고, guard_constitution.py 가 이 도구들의 tool_input 경로(push_files 는 files[].path, create_or_update_file·delete_file 은 path)가 저장소 최상위 constitution/ 아래이면 exit 2 로 차단한다(scripts/constitution/ 처럼 이름만 같은 폴더는 제외). ② 경로 필드가 없거나 형식이 달라 판정 불가면 통과가 아니라 '모른다' 로 로그에 남기고 차단한다(모른다≠아니다). ③ 집행 지점: 가드가 이 도구 호출을 실제로 받는지 selftest_guard.py·tests/infra/test_coding_constitution_guard.py 에 동결하고, 주입 검증(constitution/rules.yaml 대상 호출 RED · scripts/constitution/ 대상 호출 GREEN · 매처에서 도구 이름 제거 시 RED)을 전부 거친다. ④ 한계 명시: 이 가드는 Claude Code 도구 호출만 본다 — 다른 경로(웹 UI·외부 스크립트)는 CONST-17(서명 검증 CI)이 닫는다. ⑤ 게이트 G-const-protection-outside-claude 결정(2026-10-15 Kiki: 추천안 · 가드 보강 선행 + 서명 검증 CI)."
+artifacts:
+  - "PR #1652 https://github.com/kiki-s-broom/WhyMath/pull/1652 (열림 · CI 전 잡 통과 · 병합 대기 · 판정 기준 헤드 9d4b788b)"
+paths:
+  - ".claude/settings.json"
+  - ".claude/hooks/guard_constitution.py"
+  - scripts/constitution/selftest_guard.py
+  - tests/infra/test_coding_constitution_guard.py
+session: null
+notes: "게이트 G-const-protection-outside-claude 결정의 1단계(2026-10-15 Kiki 승인). 실측 근거: settings.json 가드 매처는 Edit|Write|MultiEdit|NotebookEdit|Bash 뿐이라 mcp__github__push_files 등으로 constitution/ 를 원격 브랜치에 쓰는 경로는 훅이 보지 못한다. R0-02(check_amendment)는 개정 기록 파일의 존재·형식만 보므로 AI 가 기록을 함께 올리면 통과한다."
+updated: 2026-10-16

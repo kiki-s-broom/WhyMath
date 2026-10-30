@@ -48,8 +48,8 @@ def test_behavior_skills_coverage_threshold() -> None:
     assert covered >= 350, f"behavior_skills 커버리지 급감 — {covered}/{len(concepts)}"
 
 
-def test_all_27_skills_are_reachable_vocabulary() -> None:
-    """매핑이 참조하는 스킬 집합이 27 vocabulary의 부분집합이며 다수를 실제 사용한다.
+def test_all_skills_are_reachable_vocabulary() -> None:
+    """매핑이 참조하는 스킬 집합이 스킬 vocabulary의 부분집합이며 다수를 실제 사용한다.
 
     (일부 스킬은 아직 미참조일 수 있으나) vocabulary 밖 토큰은 없어야 한다(오타·유령 skill 방지).
     """

@@ -4,8 +4,8 @@
 직접 승인한 매핑**을 promote 산출(로더 형식)해 커밋한 것이다(사람 사인오프·AI 자기승인 아님).
 2026-07-08 극값 2(M0864·M0865)·2026-07-10 트리아지 A 11 + B 8 + frac 1·2026-07-12 미매핑 Tier C
 Tier C 10 + period + root-loss + 843 트랜치1~5 각 6(신규 탐지 kebab·계산형)을 승인해
-**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-06 게이트 `G-misc40-new-crosslink-signature` 재판정으로 승인 4건(M0462·M0515·M0671·M0672)이 더해져 **68건**이다(보류 1건 M0599는 미적재). 이 테스트는 hermetic(DB 0)으로 봉인한다:
-① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈843 코퍼스(참조 무결성)
+**총 64건(탐지 카탈로그 64 전수 매핑)**이었고, 2026-10-06 게이트 `G-misc40-new-crosslink-signature` 재판정으로 승인 4건(M0462·M0515·M0671·M0672)이 더해져 68건이 되었고, 2026-10-16 보류였던 M0599가 승인(`G-misc40-deferred-m0599-redecision`)되어 **69건**이다. 이 테스트는 hermetic(DB 0)으로 봉인한다:
+① 로더 형식·게이트 통과(method=manual·검수 서명) ② kebab∈탐지 카탈로그·M-id∈M-id 코퍼스(misconceptions_v1·참조 무결성)
 ③ `select_canonical`이 각 kebab에 canonical M-id를 실제로 돌려줌(단절 해소·843→34 도달).
 """
 
@@ -31,6 +31,11 @@ from whymath_backend.schema.misconception_crosslink import MisconceptionCrosslin
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CROSSLINKS = _REPO_ROOT / "data" / "corpus" / "misconception_crosslinks_v1" / "crosslinks.json"
 _MISCONCEPTIONS = _REPO_ROOT / "data" / "corpus" / "misconceptions_v1" / "misconceptions.json"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
 
 # Kiki 승인분(MEMORY 정본·극값 2·A/B/frac 20·Tier C 10·period·root-loss·843 트랜치1~5 각 6)
 # — 탐지 카탈로그 64 전수 매핑·기대 매핑 동결.
@@ -115,29 +120,28 @@ def _corpus_mis_ids() -> set[str]:
 
 
 # 2026-10-06 게이트 G-misc40-new-crosslink-signature — Kiki가 5행을 재판정했다: 승인 4(M0462·M0515·M0671 직접매핑 +
-# M0672 직접매핑 0.85 상향) + 보류 1(M0599). 2026-10-05 판정(M0599 승인·M0671 보류·M0672 부분매핑)을 대체한다. 위 `_EXPECTED`(kebab당 1건)와 달리 `product-rule-naive`는
+# M0672 직접매핑 0.85 상향) + 보류 1(M0599). 2026-10-05 판정(M0599 승인·M0671 보류·M0672 부분매핑)을 대체했고,
+# 2026-10-16 M0599 보류가 승인으로 재판정되어 M0599가 돌아왔다. 위 `_EXPECTED`(kebab당 1건)와 달리 `product-rule-naive`는
 # M0075(0.97)에 더해 M0672가 붙어 kebab당 2건이 되므로 쌍 집합으로 따로 동결한다. 값 = (link_type, confidence).
 _MISC40_SIGNED: dict[tuple[str, str], tuple[str, float | None]] = {
     ("bigger-denominator-bigger-fraction", "M0462"): ("직접매핑", 0.9),
     ("ratio-order-swapped", "M0515"): ("직접매핑", 0.85),
     ("power-rule-step-omitted", "M0671"): ("직접매핑", 0.85),
     ("product-rule-naive", "M0672"): ("직접매핑", 0.85),
+    ("addition-multiplication-rule-confused", "M0599"): ("직접매핑", 0.9),
 }
-# 서명일 — M0462·M0515는 2026-10-05 서명 유지, 재판정으로 바뀐 M0671·M0672는 2026-10-06 재서명.
+# 서명일 — M0462·M0515는 2026-10-05 서명 유지, 재판정으로 바뀐 M0671·M0672는 2026-10-06 재서명, M0599는 2026-10-16 승인.
 _MISC40_SIGN_DATE: dict[str, str] = {
     "M0462": "2026-10-05",
     "M0515": "2026-10-05",
     "M0671": "2026-10-06",
     "M0672": "2026-10-06",
+    "M0599": "2026-10-16",
 }
-# 보류(deferred)라 코퍼스에 있으면 안 되는 쌍 — 서명 없이 적재된 흔적을 막는다.
-_MISC40_DEFERRED: frozenset[tuple[str, str]] = frozenset(
-    {("addition-multiplication-rule-confused", "M0599")}
-)
 
 
 def test_exact_approved_pairs() -> None:
-    # 승인 68건 = 기존 64건(kebab→M-id 동결) + 2026-10-05·06 서명 승인 4건 — 드리프트 시 즉시 실패.
+    # 승인 69건 = 기존 64건(kebab→M-id 동결) + 2026-10-05·06·16 서명 승인 5건 — 드리프트 시 즉시 실패.
     rows = _load_rows()
     pairs = {(r.kebab_id, r.mis_id) for r in rows}
     assert len(rows) == len(pairs), "중복 행 금지"
@@ -156,12 +160,11 @@ def test_misc40_signed_rows_carry_kiki_stamp_and_confidence() -> None:
     # M0671은 성취기준 원문을 확인하고 승인했다 — 그 사실이 note에서 지워지거나 미확인으로 되돌아가면 안 된다.
     m0671_note = by_pair[("power-rule-step-omitted", "M0671")].note
     assert m0671_note is not None and "원문 확인함" in m0671_note and "미확인" not in m0671_note
-
-
-def test_misc40_deferred_rows_are_not_in_the_approved_corpus() -> None:
-    # M0599는 보류 판정이다 — 승인 코퍼스에 있으면 서명 없는 적재이므로 즉시 실패해야 한다.
-    pairs = {(r.kebab_id, r.mis_id) for r in _load_rows()}
-    assert pairs.isdisjoint(_MISC40_DEFERRED)
+    # M0599는 세 필드가 AI 저작인 채로 승인됐다 — "원 출처에서 채워졌다"로 오독되지 않게 그 사실이 note에서 지워지면 안 된다.
+    m0599_note = by_pair[("addition-multiplication-rule-confused", "M0599")].note
+    assert (
+        m0599_note is not None and "AI 저작" in m0599_note and "원 출처 근거는 없음" in m0599_note
+    )
 
 
 def test_product_rule_naive_canonical_stays_m0075_after_m0672_direct_signature() -> None:
@@ -194,7 +197,7 @@ def test_load_gate_passes() -> None:
 def test_every_corpus_row_is_direct_mapping() -> None:
     # MISC-63 — 비직접 행이 하나라도 섞이면 전건 열거로 실패한다(스캔 0건 공허 통과 방지: 행 수도 단언).
     rows = _load_rows()
-    assert len(rows) == 68
+    assert len(rows) == _FACTS["misconception_crosslinks.count"]
     non_direct = [
         (r.kebab_id, r.mis_id, r.link_type) for r in rows if r.link_type != DIRECT_LINK_TYPE
     ]

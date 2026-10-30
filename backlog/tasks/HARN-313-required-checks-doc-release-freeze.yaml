@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-313-required-checks-doc-release-freeze
+title: "required 체크 문서·테스트가 release-freeze(별도 워크플로)를 모른다 - 라이브 18 vs 문서 17 드리프트"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 4
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 판정 기준 main 56f4ace3 · 2026-10-15 라이브 실측: 룰셋 16623542 required 체크 18건(게이트 G-release-freeze-labels-and-required 집행으로 release-freeze 추가됨). 문서 .github/branch-protection-setup.md REQUIRED_CHECKS 블록은 17건 - 라이브 18 vs 문서 17 드리프트.\n② 문서 블록에 release-freeze 체크 이름을 추가하고, tests/infra/test_required_checks_doc.py의 계약 ①(문서 이름이 실재해야 한다)이 ci.yml 외에 release-freeze.yml 잡 이름도 실재 근거로 인정하게 한다. 계약 ②(ci.yml 잡은 required 또는 제외)는 ci.yml 범위로 유지한다.\n③ 실패 주입: 문서에서 release-freeze 이름을 오타로 바꾸면 계약 ①이 RED, 문서에서 빼면 라이브-문서 대조(ruleset_drift)가 잡는다는 점을 주입으로 확인한다.\n④ 집행 지점 별항: ruleset_drift.py가 라이브 JSON과 문서 블록을 대조해 18=18로 PASS하는지 확인한다(라이브 JSON은 세션 조회분)."
+artifacts:
+  - "PR #1638 · f16da5c6"
+paths:
+  - ".github/branch-protection-setup.md"
+  - tests/infra/test_required_checks_doc.py
+session: null
+notes: "G-release-freeze-labels-and-required 집행(2026-10-15)이 드러낸 후속"
+updated: 2026-10-15

@@ -54,6 +54,10 @@ class _FakeResult:
     def all(self) -> list[object]:
         return self._rows
 
+    def first(self) -> object | None:
+        # `INSERT … ON CONFLICT … RETURNING`(P3-25/26 가드): 행이 있으면 적재됨, 없으면 건너뜀.
+        return self._rows[0] if self._rows else None
+
 
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
@@ -70,12 +74,18 @@ class _FakeConnection:
     ) -> None:
         return None
 
-    def execute(self, statement: object) -> _FakeResult:
+    def execute(self, statement: object, parameters: object = None) -> _FakeResult:
         self._engine.executed.append(statement)
         # code→UUID 조회(SELECT concept.code, concept.concept_id)면 맵 행을 돌려준다.
         compiled = str(statement.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
         if "SELECT" in compiled and "concept.code" in compiled and "INSERT" not in compiled:
             return _FakeResult(self._engine.code_rows)
+        if "INSERT" in compiled:
+            # RETURNING 1행 = 적재됨 / 0행 = CMS 소유 가드가 건너뜀(P3-26)
+            rows = [_Row("written", uuid.uuid4())] if self._engine.insert_written else []
+            return _FakeResult(rows)
+        if "SELECT" in compiled and "concept_edge" in compiled:
+            return _FakeResult(self._engine.db_edges)  # DB에 이미 있는 선수 엣지(순환 검사 재료)
         return _FakeResult([])
 
 
@@ -89,6 +99,8 @@ class _FakeEngine:
     """SQLAlchemy sync Engine 최소 흉내 — begin()/connect() + 실행 statement·code맵 제어."""
 
     def __init__(self, code_rows: list[object] | None = None) -> None:
+        self.insert_written = True
+        self.db_edges: list[object] = []
         self.executed: list[object] = []
         # code→UUID 조회가 돌려줄 행(name 튜플 흉내). 기본: 선수·후행 둘 다 적재됨.
         self.code_rows: list[object] = (
@@ -122,6 +134,13 @@ def _fake_store(
 
 def _compile(statement: object) -> str:
     return str(statement.compile(dialect=_pg_dialect()))  # type: ignore[attr-defined]
+
+
+def _insert_sql(engine: _FakeEngine) -> str:
+    """실행된 문장 중 `INSERT`(upsert) 1건의 SQL — 잠금·순환 검사 SQL이 앞에 끼어도 위치에 안 기댄다."""
+    inserts = [_compile(s) for s in engine.executed if "INSERT" in _compile(s)]
+    assert len(inserts) == 1, inserts
+    return inserts[0]
 
 
 def _record(
@@ -262,6 +281,49 @@ class TestLoadFromGraphJson:
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# ②-b CMS 소유 보호·DB 인지 순환 검사·잠금 (P3-26)
+# ──────────────────────────────────────────────────────────────────────────
+class TestCmsOwnershipAndCycleGuard:
+    def test_a_cms_owned_row_is_skipped_and_reported(self) -> None:
+        store, engine = _fake_store()
+        engine.insert_written = False
+        conflicts: list[str] = []
+        loaded = populate_backend_edges([_record()], store=store, conflicts=conflicts)
+        assert loaded == 0
+        assert conflicts == [f"concept_edge:{_NID_PRE}->{_NID_POST}"]
+
+    def test_the_insert_is_guarded_and_overwrite_releases_the_marker(self) -> None:
+        store, engine = _fake_store()
+        store.populate([_record()])
+        assert "cms_edited_at IS NULL" in _insert_sql(engine)
+        store2, engine2 = _fake_store()
+        store2.populate([_record()], overwrite_cms_edits=True)
+        assert "cms_edited_at IS NULL" not in _insert_sql(engine2)
+
+    def test_the_lock_comes_before_the_first_write(self) -> None:
+        store, engine = _fake_store()
+        store.populate([_record()])
+        sqls = [_compile(s) for s in engine.executed]
+        lock = next(i for i, s in enumerate(sqls) if "pg_advisory_xact_lock" in s)
+        insert = next(i for i, s in enumerate(sqls) if "INSERT" in s)
+        assert lock < insert
+
+    def test_a_cycle_with_a_db_edge_is_refused_before_any_insert(self) -> None:
+        from whymath_backend.l1.concept_graph.prerequisite_guard import PrerequisiteCycleError
+
+        store, engine = _fake_store()
+        engine.db_edges = [(_UUID_PRE, _UUID_POST)]
+        with pytest.raises(PrerequisiteCycleError):
+            store.populate([_record(src=_NID_POST, dst=_NID_PRE)])
+        assert not any("INSERT" in _compile(s) for s in engine.executed)
+
+    def test_a_non_cyclic_load_next_to_db_edges_passes(self) -> None:
+        store, engine = _fake_store()
+        engine.db_edges = [(_UUID_PRE, _UUID_POST)]
+        assert store.populate([_record()])[0] == 1
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # ② code→UUID 해석 — 단일 조회 맵·orphan skip
 # ──────────────────────────────────────────────────────────────────────────
 class TestCodeToUuidResolution:
@@ -271,9 +333,7 @@ class TestCodeToUuidResolution:
         loaded, skipped = store.populate([_record()])
         assert loaded == 1
         assert skipped == []
-        # code→UUID 조회 1 + INSERT 1 = 2 statement.
-        assert len(engine.executed) == 2
-        insert_sql = _compile(engine.executed[1])
+        insert_sql = _insert_sql(engine)
         assert "INSERT INTO concept_edge" in insert_sql
 
     def test_orphan_endpoint_skipped(self) -> None:
@@ -304,7 +364,7 @@ class TestUpsertStatement:
     def test_on_conflict_composite_key(self) -> None:
         store, engine = _fake_store()
         store.populate([_record()])
-        sql = _compile(engine.executed[1])
+        sql = _insert_sql(engine)
         assert "ON CONFLICT" in sql
         # 복합 충돌 키 — from·to·edge_type 셋 다.
         assert "from_concept_id" in sql
@@ -315,7 +375,7 @@ class TestUpsertStatement:
         # 멱등 보존: ON CONFLICT DO UPDATE SET이 edge_id(PK)·created_at을 *대입하지 않는다*.
         store, engine = _fake_store()
         store.populate([_record()])
-        sql = _compile(engine.executed[1])
+        sql = _insert_sql(engine)
         assert "DO UPDATE SET" in sql
         after_set = sql.split("DO UPDATE SET", 1)[1]
         set_clause = after_set.split("RETURNING", 1)[0]
@@ -328,7 +388,7 @@ class TestUpsertStatement:
         # 날조 회피: typical_gap_signal·notes는 INSERT 컬럼에 *없다*(NULL 유지).
         store, engine = _fake_store()
         store.populate([_record()])
-        sql = _compile(engine.executed[1])
+        sql = _insert_sql(engine)
         assert "typical_gap_signal" not in sql
         assert "notes" not in sql
         assert "evidence" not in sql
@@ -368,7 +428,7 @@ def test_edge_type_value_bound_as_enum_string() -> None:
     # PG enum 컬럼 — edge_type은 enum 값 문자열("PREREQUISITE")로 바인딩.
     store, engine = _fake_store()
     store.populate([_record()])
-    sql = _compile(engine.executed[1])
+    sql = _insert_sql(engine)
     assert "edge_type" in sql
 
 

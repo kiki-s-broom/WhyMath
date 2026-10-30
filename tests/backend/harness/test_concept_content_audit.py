@@ -31,6 +31,13 @@ from whymath_backend.harness.concept_content_audit import (
     render_report,
 )
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_FACTS = json.loads(
+    (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
 
 def _row(**overrides: object) -> ConceptRow:
     payload: dict[str, object] = {
@@ -259,14 +266,17 @@ def test_cli_input_error_is_not_silent_success(tmp_path: Path) -> None:
 
 
 def test_shipped_corpus_is_fully_ai_estimated_and_structurally_clean() -> None:
-    """실 코퍼스 437행 전량이 'ai_estimated' — 검수 승격 없이 학생에게 노출 중임을 동결한다.
+    """실 코퍼스 전 행이 'ai_estimated' — 검수 승격 없이 학생에게 노출 중임을 동결한다.
 
     이 값이 바뀌면(검수 승격) 테스트가 빨개져 사람이 의도적으로 갱신하게 된다 — 검수 상태가
-    조용히 바뀌는 것을 막는 장치다.
+    조용히 바뀌는 것을 막는 장치다. 행 수의 고정 지점은 사실 파일(`concept_content.k12`)이며,
+    값이 바뀌면 그 파일의 diff가 의식적 리뷰 지점이 된다.
     """
     report = audit_concepts(load_concepts(DEFAULT_CONCEPT_PATH))
-    assert report.total == 437
-    assert report.review_status_counts == {REVIEW_STATUS_AI_ESTIMATED: 437}
+    assert report.total == _FACTS["concept_content.k12"]
+    assert report.review_status_counts == {
+        REVIEW_STATUS_AI_ESTIMATED: _FACTS["concept_content.k12"]
+    }
     assert report.unreviewed_rate == 1.0
     assert report.defect_counts == {}, report.defect_counts
 

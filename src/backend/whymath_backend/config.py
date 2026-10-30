@@ -19,8 +19,10 @@ S2가 Redis 캐시 설정(redis_url)을 추가했으며, S3가 Langfuse 관측�
 
 from __future__ import annotations
 
+import ipaddress
 from functools import lru_cache
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -169,6 +171,50 @@ class Settings(BaseSettings):
         ),
     )
 
+    # PED-48: 학생 의도 섀도 관측 — 자체 호스팅 laya-serve(laya-ko-whymath)의 6종 의도·개인정보
+    # 판단을 규칙 분류기(`classify_student_intent`) 옆에 *로그로만* 남긴다. 4개 필드가 모두
+    # 갖춰져야 켜진다(하나라도 비면 외부 호출 0회) — 반쯤 설정된 상태가 조용히 실패하지 않게.
+    laya_intent_shadow_enabled: bool = Field(
+        default=False,
+        description=(
+            "학생 의도 섀도 관측(PED-48) 활성 여부. True이고 URL·API 키가 모두 설정돼 있으면 "
+            "/v1/coach 세션·턴 엔드포인트가 학생 턴 커밋 *뒤* laya-serve에 학생 발화를 보내 "
+            "6종 의도(concept·stuck·answer_only·hint·check·chitchat)·개인정보 확률을 받고, "
+            "규칙 분류기 결과와 나란히 구조화 레코드로만 기록한다. **비노출·비차단** — 응답·"
+            "DB 적재·교수 결정은 어느 쪽이든 불변이고 학생 원문은 레코드·로그에 남지 않는다. "
+            "**False(기본·opt-in)**. WHYMATH_LAYA_INTENT_SHADOW_ENABLED=true로 켠다."
+        ),
+    )
+
+    laya_intent_shadow_url: str = Field(
+        default="",
+        description=(
+            "laya-serve 기준 URL(예: http://127.0.0.1:18080 — 경로 없이). 비어 있으면 섀도 "
+            "관측은 켜지지 않는다. 학생 발화가 이 주소로 전송되므로 *자체 호스팅·내부망* 서버만 "
+            "가리킨다(미성년자 데이터 외부 공유 금지). WHYMATH_LAYA_INTENT_SHADOW_URL."
+        ),
+    )
+
+    laya_intent_shadow_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "laya-serve Bearer 키(LAYA_API_KEY와 같은 값). SecretStr — repr/로그에 평문 노출 "
+            "안 됨. 비어 있으면 섀도 관측은 켜지지 않는다(무인증 서버로의 전송 차단). "
+            "WHYMATH_LAYA_INTENT_SHADOW_API_KEY."
+        ),
+    )
+
+    laya_intent_shadow_timeout_s: float = Field(
+        default=2.0,
+        gt=0,
+        le=30,
+        description=(
+            "laya-serve 단일 호출 타임아웃(초). 섀도는 응답 뒤 백그라운드에서 돌아 학생 지연에 "
+            "더해지지 않지만, 무한 대기로 task가 쌓이지 않게 상한을 건다(CPU 실측 0.3~0.5초/건). "
+            "WHYMATH_LAYA_INTENT_SHADOW_TIMEOUT_S."
+        ),
+    )
+
     wh1_harness_shadow_enabled: bool = Field(
         default=False,
         description=(
@@ -277,7 +323,7 @@ class Settings(BaseSettings):
         description=(
             "교수법 팩 forbidden_modes 런타임 가드(`mode_guard.check_forbidden_modes`)를 WH-1 "
             "primary 학생-대면 발화 경로의 톤필터 *앞*에 걸지(PED-23 회수 — 정본 "
-            "docs/architecture/04e_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
+            "docs/architecture/04g_pedagogy_strategy_catalog.md §9). **False(기본·옵트인)** — "
             "OFF면 가드 블록 미실행으로 기존 서빙 경로와 비트동일(회귀 0·킬스위치). ON이면 팩이 "
             "해석된 턴에서 발화가 팩 금지 모드를 위반할 때 그 발화를 학생에게 보내지 않고 "
             "안전한 소크라테스식 재질문(결정론 템플릿·`fallback_reply_for`)으로 대체하며 "
@@ -298,13 +344,13 @@ class Settings(BaseSettings):
         description=(
             "교수전략 카탈로그(PED-05·PED-22 회수)의 적합성 필드(target_grade_bands·"
             "difficulty_range·target_k_types)를 `runtime_selector.select()`의 **후보 필터**로 "
-            "소비할지(PED-23 회수 — 정본 docs/architecture/04e_pedagogy_strategy_catalog.md §4). "
+            "소비할지(PED-23 회수 — 정본 docs/architecture/04g_pedagogy_strategy_catalog.md §4). "
             "**False(기본·옵트인)** — OFF면 카탈로그 미조회·규칙표 v1(R1~R5) 원판정 그대로(기존 "
             "선택 경로와 비트동일·킬스위치). ON이면 규칙표 적용 전에 후보 집합을 카탈로그 적합성"
             "으로 **좁히기만** 한다: 좁힌 결과가 공집합이거나 규칙표가 후보를 소진하면 필터를 "
             "무시하고 원판정으로 폴백하며 reason_code(CATALOG_FILTER_EMPTY/EXHAUSTED)를 구조화 "
             "로그로 남긴다(조용한 실패 금지). 카탈로그는 select 전용 — `gate()`는 플래그와 "
-            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04e §4 불변식 ②·테스트 동결). "
+            "무관하게 카탈로그를 읽지 않는다(효과≤허용 우회 차단·04g §4 불변식 ②·테스트 동결). "
             "GA flip(기본 True)은 측정+사인오프 후 별도 커밋(mode_guard 캔어리 선례). "
             "WHYMATH_PEDAGOGY_CATALOG_FILTER_ENABLED=false 킬스위치."
         ),
@@ -315,7 +361,7 @@ class Settings(BaseSettings):
         description=(
             "`supply()` 생성 폴백의 system 프롬프트에 선택된 교수전략의 카탈로그 카드"
             "(name_ko·description·research_basis 요약 1줄 — attention 절약)를 얹을지(PED-23 "
-            "회수 — 정본 04e §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
+            "회수 — 정본 04g §3.2 소비처 지정표). **False(기본·옵트인)** — OFF면 카탈로그 "
             "미조회·system 무변경으로 기존 생성 경로와 비트동일(프롬프트-해시 캐시 키도 불변·"
             "킬스위치). ON이면 `decide()`가 고른(게이트 통과 후) 전략의 카드를 조회해 "
             "`attach_strategy_card`로 system 뒤에 1블록을 덧붙인다 — 카드 조회 실패는 예외 "
@@ -372,6 +418,26 @@ class Settings(BaseSettings):
             "그것이 False면 이 플래그와 무관하게 통째로 not_run이다(같은 좌석에 쓰는 채널이라 "
             "상위 스위치가 거짓말하면 안 된다). 이 플래그는 *선지 채널만* 끄는 좁은 스위치이며, "
             "끄면 텍스트 채널은 그대로 돈다. WHYMATH_L4_DISTRACTOR_LINK_ENABLED=false로 끈다."
+        ),
+    )
+
+    l4_derivative_signature_mode: Literal["off", "shadow", "on"] = Field(
+        default="off",
+        description=(
+            "답안 훑기의 **미분 오답 서명 독법**(`l4.misconception.derivative_signature`·"
+            "P3-56 후보 구현)을 어떻게 쓸지. 3값: **`off`(기본·opt-in)** = 이 독법을 아예 "
+            "부르지 않는다 — 훑기는 종전과 비트동일하고 SymPy 비용도 늘지 않는다. "
+            "**`shadow`** = 독법을 *라이브로 돌리되* 학생에게 가는 결과·가설 갱신·교정은 "
+            "`off`와 똑같고, '켰다면 무엇이 달라졌는가'만 관측 레코드로 남긴다"
+            "(`whymath.api.attempt_scan_shadow.record` 로거에 JSON 한 줄·학생 답과 지문 "
+            "미포함·문항 id만). 켜기 전 **실제 학생 오답에서의 발화율을 우연 일치 "
+            "기준선과 비교**하는 근거 수집용이다. **`on`** = 독법의 후보를 기존 후보와 "
+            "합쳐 같은 품질 게이트(0.65)로 노출한다. `on`은 활성화 게이트"
+            "(`G-p356-signature-activation`)가 PASS하기 전에는 켜지 않는다. 모드는 워커 "
+            "프로세스 풀이 상주하므로 **앱 재기동으로** 바뀐다. "
+            "WHYMATH_L4_DERIVATIVE_SIGNATURE_MODE=shadow|on으로 켠다. 상위 킬 스위치 "
+            "`l4_attempt_misconception_scan_enabled`가 False면 이 값과 무관하게 훑기 "
+            "자체가 없다."
         ),
     )
 
@@ -473,8 +539,12 @@ class Settings(BaseSettings):
             "OPS-96 — SymPy 호출 1건의 계산 시간 상한(초·워커가 일을 받은 순간부터). 기본 5초는 "
             "`safe_parse` 구조 예산을 통과하는 *가장 느린* 입력(차수 20 방정식 ≈3.0초·실측 "
             "2026-10-02)보다 크고, 정상 문항(밀리초대)과는 3자릿수 차이다. 이 값을 낮추면 정상 "
-            "입력이 판정 불가로 떨어질 수 있으니 `sympy_isolation_budget_exceeded` 로그 비율을 "
-            "보고 조정한다."
+            "입력이 판정 불가로 떨어질 수 있으니 `/health/ready`의 `sympy_isolation."
+            "undecidable_ratio`(OPS-126)와 `isolation_budget_exceeded` 로그를 보고 조정한다. "
+            "OPS-126 ② 재판정(2026-10-12·OPS-140 재측정 2026-10-14) — 교육과정 형태 합성 단계 "
+            "354건 최대 0.18초, 고차 방정식 스트레스 16건은 상한 없이도 전부 unverifiable(상한은 "
+            "판정 정보를 잃지 않는다). 합성 대리 분포이며 실 학생 입력 분포는 파일럿 지표 누적 "
+            "뒤 재판정한다(OPS-131)."
         ),
     )
     sympy_isolation_preload_modules: list[str] = Field(
@@ -485,14 +555,32 @@ class Settings(BaseSettings):
             "요청이 느리다). 격리 장치 자체는 과목 어휘를 모르므로(Core) 이 목록을 설정이 정한다."
         ),
     )
+    sympy_isolation_warmup: list[str] = Field(
+        default_factory=lambda: [
+            "whymath_backend.l3.verify_step:warm_isolated_worker",
+            "whymath_backend.l3.verify_answer:warm_isolated_worker",
+        ],
+        description=(
+            "OPS-142 — SymPy 워커 프로세스가 `ready` 이전에 미리 돌릴 웜업 함수('모듈:함수'·인자 "
+            "없음). 식 종류별 첫 사용이 하위 모듈을 지연 import하는데(`simplify` 첫 호출 ≈68ms·"
+            "워커 CPU 몫 1/8에서 543~742ms — 실측 2026-10-14) 그 시간은 *계산 상한 안*이라, 상한이 "
+            "짧거나 기계가 바쁘면 정상 식이 판정 불가로 샌다. 기동 단계(상한 밖)에서 미리 치르면 "
+            "상한 초과로 kill된 뒤의 교체 워커도 데워진 채 뜬다. 비우면 종전(첫 요청이 비용을 "
+            "치름)이다. 웜업이 실패해도 워커는 뜨고 경고 로그에 예외 타입명이 남는다."
+        ),
+    )
     sympy_isolation_max_workers: int = Field(
         default=2,
         ge=1,
         le=16,
         description=(
             "OPS-96 — SymPy 워커 프로세스 수(= 동시 SymPy 계산 수). 각 워커는 SymPy를 import한 "
-            "상태로 상주한다(메모리 약 100~150MB/개 — 서버 워커 수 × 이 값 만큼 프로세스가 뜬다). "
-            "모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 판정 불가로 떨어진다."
+            "상태로 상주한다(실측 2026-10-12·14 OPS-126 ③·OPS-140 — Linux·SymPy 1.14에서 RSS "
+            "73~78MB/개(Python 3.12·3.13)·PSS 약 64~66MB, 무거운 계산 12회 뒤 약 78MB로 완만히 "
+            "증가·장기 상한과 Windows는 미측정이라 100MB 안팎으로 가정 — 서버 워커 수 × 이 값 "
+            "만큼 프로세스가 뜬다). 모두 바쁘면 호출은 대기하다 대기 상한(시간 상한 × 2)을 넘기면 "
+            "판정 불가로 떨어진다 — 늘릴 신호는 `/health/ready`의 `sympy_isolation.queue_waits > 0`"
+            "이다."
         ),
     )
 
@@ -1176,6 +1264,74 @@ class Settings(BaseSettings):
         if isinstance(value, str) and value.strip() == "":
             return False
         return value
+
+    @field_validator("laya_intent_shadow_url", mode="after")
+    @classmethod
+    def _laya_shadow_url_is_internal_base(cls, value: str) -> str:
+        """laya 섀도 URL은 *내부망 서버의 기준 URL*만 허용한다(PED-48 · 부팅 시 거부).
+
+        학생 발화(미성년자·개인정보 포함 가능)가 이 주소로 나가므로, 외부 호스트를 가리키는
+        설정은 문서 규율이 아니라 부팅 실패로 막는다(헌법 제8조 — 개인정보 유출은 자동 차단).
+        허용: http/https + 루프백·사설 IP 리터럴, `localhost`, 점 없는 단일 이름(Docker 서비스명).
+        경로·쿼리가 붙으면 `/v1/systemone`이 이중으로 붙으므로 거부한다. 빈 값은 '미설정'이다.
+        """
+        url = value.strip()
+        if not url:
+            return ""
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_URL은 http(s)://호스트[:포트] 형식이어야 합니다."
+            )
+        if parts.path not in ("", "/") or parts.query or parts.fragment:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_URL에는 경로·쿼리를 붙이지 않습니다(기준 URL만)."
+            )
+        host = parts.hostname
+        try:
+            ip = ipaddress.ip_address(host)
+            internal = ip.is_loopback or ip.is_private
+        except ValueError:
+            internal = host == "localhost" or "." not in host
+        if not internal:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_URL은 내부망 호스트(루프백·사설 IP·localhost·"
+                "Docker 서비스명)만 허용합니다 — 학생 발화를 외부로 보내지 않습니다."
+            )
+        return url.rstrip("/")
+
+    @field_validator("laya_intent_shadow_api_key", mode="after")
+    @classmethod
+    def _strip_laya_shadow_key(cls, value: SecretStr) -> SecretStr:
+        """키 앞뒤 공백 제거 — 검사(strip)와 전송값이 갈라지지 않게 저장값 자체를 정규화한다."""
+        return SecretStr(value.get_secret_value().strip())
+
+    @model_validator(mode="after")
+    def _laya_shadow_requires_url_and_key(self) -> "Settings":
+        """섀도를 켰는데 URL·키가 비었으면 부팅을 거부한다(반쯤 설정된 상태의 침묵 꺼짐 방지).
+
+        켜 놓고 아무 레코드도 안 나오면 사람은 "측정 중"으로 믿는다 — 그 상태를 조용히 두지
+        않는다(R8-03 필수 설정 누락 즉시 실패). 메시지에는 어느 항목이 비었는지만 적는다(값 미출력).
+        """
+        if not self.laya_intent_shadow_enabled:
+            return self
+        missing = [
+            name
+            for name, empty in (
+                ("WHYMATH_LAYA_INTENT_SHADOW_URL", not self.laya_intent_shadow_url),
+                (
+                    "WHYMATH_LAYA_INTENT_SHADOW_API_KEY",
+                    not self.laya_intent_shadow_api_key.get_secret_value(),
+                ),
+            )
+            if empty
+        ]
+        if missing:
+            raise ValueError(
+                "WHYMATH_LAYA_INTENT_SHADOW_ENABLED=true인데 다음 설정이 비어 있습니다: "
+                + ", ".join(missing)
+            )
+        return self
 
     @model_validator(mode="after")
     def _forbid_cors_wildcard_with_credentials(self) -> "Settings":

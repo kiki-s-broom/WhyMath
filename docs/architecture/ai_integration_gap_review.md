@@ -56,7 +56,7 @@
 | 13 | 클라우드 승급 (Sonnet 4.6 / Opus 4.7) | ✅ 프로바이더 완비 | 🚫 학생 도달 0 — `l3/escalation_defaults.py`가 전 학생 호출부에 `free`/`0원` 공급 → 라우터 규칙상 CLOUD 도달 불가 | ✅ 도달 관측은 OPS-18 착지 | ⏸ OPS-18(done) · 결제 배선은 §5-④ 유보 |
 | 14 | WH-S 솔버 하네스 (`whs/` — verdict·PRM 빌더·self-evolution) | ✅ by-design 오프라인 | ⚠️ 패키지 외부 호출자 0 + **CLI 3종(corpus_replay·prm_builder_export·self_evolution_export)의 실행 배선도 0**(CI·compose·스크립트 어디에도) | n/a | §4-② 정직한 공백. PRM 추론기는 ⏸ 의도적 미등재 승계(§5-⑤) |
 | 15 | CI 라이브 AI 경로 (provider·Langfuse·Celery·Redis·임베딩) | ✅ 테스트 존재 | ⏸ 실행 0회 — `_LIVE_DEPENDENT` 선언된 공백(P6) | — | 숨은 갭 아님 — 현행 유지 |
-| 16 | 선언≠배선 감사기 (`ops/declared_unwired_audit.py`) | ✅ 가동(CI 잡) | ⚠️ **사각 3종**: CLI 축 비재귀·2패키지 한정 / HTTP reached=dart\|테스트 합집합(클라 축 미분리 — `/v1/generate`·`/v1/jobs`가 서버 테스트만으로 reached) / dart 리터럴 매칭(lib/ 소비 화면 0인 `verify_api.dart`를 reached 판정) | — | **D5(`OPS-28`)** |
+| 16 | 선언≠배선 감사기 (`ops/declared_unwired_audit.py`) | ✅ 가동(CI 잡) | ⚠️ **사각 3종**: CLI 축 비재귀·2패키지 한정 / HTTP reached=dart\|테스트 합집합(클라 축 미분리 — `/v1/generate`·`/v1/jobs`가 서버 테스트만으로 reached) / dart 리터럴 매칭(lib/ 소비 화면 0인 `verify_api.dart`를 reached 판정) | — | **D5(`OPS-28`)** — ✅ 2026-10-12 해소(CLI 축 전 패키지·import≠도달·서버/클라 분리 컬럼·한계 자기 선언) |
 
 ---
 

@@ -133,14 +133,25 @@ from whymath_backend.schema.review_timer import (
 )
 
 __all__ = [
+    "CONCLUDING_ACTIONS",
+    "OpenReview",
     "ReviewItem",
     "SessionOutcome",
     "append_verdict_jsonl",
+    "close_review_item",
     "completed_slugs",
     "load_review_items",
     "main",
+    "open_review_item",
+    "prepare_session_items",
+    "render_item",
+    "render_summary",
     "run_review_session",
 ]
+
+#: 판정으로 **종결**되는 행동 — 이 셋만 `finished` + 판정 행을 남긴다. 나머지(보류·종료·EOF)는
+#: 전부 `aborted`다. 터미널 세션과 GUI(`review_session_gui`)가 이 한 집합을 공유한다.
+CONCLUDING_ACTIONS: frozenset[str] = frozenset({"approved", VERDICT_APPROVED_WITH_EDIT, "rejected"})
 
 # 판정 입력 키 — 폐쇄 집합. `q`는 세션 종료(현재 항목은 중단으로 기록된다).
 # 판정 키 — `EOS-62`가 종결 판정을 3종으로 넓혔으므로 입력 경로도 3종을 제공한다. `e`를
@@ -403,7 +414,7 @@ def _render_body(out: TextIO, item: ReviewItem) -> None:
         out.write(f"  기타 필드(값 있음·미표시): {', '.join(rest)}\n")
 
 
-def _render_item(out: TextIO, index: int, total: int, item: ReviewItem) -> None:
+def render_item(out: TextIO, index: int, total: int, item: ReviewItem) -> None:
     """검수 대상 1건의 근거 표시 — 판정은 하지 않는다(AI 자기승인 금지)."""
     out.write(f"\n[{index}/{total}] {item.slug}\n")
     if item.status is not None:
@@ -456,6 +467,114 @@ def _prompt_failure_code(
         out.write(f"  ! F1~F8 중 하나여야 합니다(입력: 무효). 유효값: {sorted(valid)}\n")
 
 
+@dataclass(frozen=True, slots=True)
+class OpenReview:
+    """화면에 띄운(= `started`를 적은) 항목 1건 — 종결할 때까지 들고 다니는 상태.
+
+    `t0_ns`는 `started`를 적은 **직후**의 단조 시계다. 경과 시간은 여기서부터 잰다
+    (터미널 세션의 기존 순서 그대로 — started append → t0 → 화면 → 입력 → 종결).
+    """
+
+    item: ReviewItem
+    review_session_id: uuid.UUID
+    fingerprint: str | None
+    t0_ns: int
+
+
+def open_review_item(
+    item: ReviewItem,
+    *,
+    events_path: Path,
+    reviewer_id: str,
+    monotonic_ns: Callable[[], int],
+    now_utc: Callable[[], datetime],
+) -> OpenReview:
+    """항목 1건을 연다 — `started` 이벤트를 **먼저** 적고 시계를 잰다.
+
+    started를 먼저 적는 이유: 검수 도중 프로세스가 죽어도 "이 CU를 보기 시작했다"는 사실이
+    남아야 `hit_cu_metrics`가 unfinished로 분류할 수 있다(2026-08-22 규칙 ①). 터미널 세션과
+    GUI가 이 함수 하나를 공유한다 — 두 경로의 기록이 갈라질 자리를 없애려는 것이다(EOS-199 ②).
+    """
+    # 검수자에게 보일 레코드의 지문 — 본문이 없으면 인증할 내용도 없다(None = 모름·EOS-27).
+    fingerprint = review_content_fingerprint(item.payload) if item.payload is not None else None
+    started = append_event_jsonl(
+        events_path,
+        start_review(
+            cu_slug=item.slug,
+            reviewer_id=reviewer_id,
+            content_fingerprint=fingerprint,
+            occurred_at=now_utc(),
+        ),
+    )
+    return OpenReview(
+        item=item,
+        review_session_id=started.review_session_id,
+        fingerprint=fingerprint,
+        t0_ns=monotonic_ns(),
+    )
+
+
+def close_review_item(
+    opened: OpenReview,
+    *,
+    action: str | None,
+    failure_code: GenerationFailureCode | None,
+    note: str | None,
+    events_path: Path,
+    verdicts_path: Path,
+    reviewer_id: str,
+    monotonic_ns: Callable[[], int],
+    now_utc: Callable[[], datetime],
+) -> str:
+    """연 항목을 종결한다 — 판정이면 `finished` + 판정 행, 아니면 `aborted`만.
+
+    반환값은 종결 종류다: 판정 3종(`CONCLUDING_ACTIONS`) 중 하나이거나 `"aborted"`.
+    보류·종료·EOF·창 닫기는 전부 중단이며 판정 파일에는 **쓰지 않는다**(pending은 판정이
+    아니다 — 분모 오염 방지). 반려의 실패코드 필수는 `finish_review`의 schema validator가
+    최종 집행한다(여기서 우회 경로를 만들지 않는다).
+    """
+    item = opened.item
+    elapsed_ms = (monotonic_ns() - opened.t0_ns) // 1_000_000
+    if action in CONCLUDING_ACTIONS:
+        verdict: Any = action
+        append_event_jsonl(
+            events_path,
+            finish_review(
+                review_session_id=opened.review_session_id,
+                cu_slug=item.slug,
+                reviewer_id=reviewer_id,
+                verdict=verdict,
+                elapsed_ms=elapsed_ms,
+                failure_code=failure_code,
+                failure_note=note,
+                content_fingerprint=opened.fingerprint,
+                occurred_at=now_utc(),
+            ),
+        )
+        append_verdict_jsonl(
+            verdicts_path,
+            slug=item.slug,
+            verdict=str(action),
+            reviewer_id=reviewer_id,
+            review_session_id=opened.review_session_id,
+            failure_code=failure_code,
+            failure_note=note,
+            content_fingerprint=opened.fingerprint,
+        )
+        return str(action)
+    append_event_jsonl(
+        events_path,
+        abort_review(
+            review_session_id=opened.review_session_id,
+            cu_slug=item.slug,
+            reviewer_id=reviewer_id,
+            elapsed_ms=elapsed_ms,
+            occurred_at=now_utc(),
+        ),
+    )
+    return "aborted"
+
+
 def run_review_session(
     items: list[ReviewItem],
     *,
@@ -486,20 +605,15 @@ def run_review_session(
     total = len(pending)
 
     for index, item in enumerate(pending, start=1):
-        # 검수자에게 보일 레코드의 지문 — 본문이 없으면 인증할 내용도 없다(None = 모름·EOS-27).
-        fingerprint = review_content_fingerprint(item.payload) if item.payload is not None else None
-        started = append_event_jsonl(
-            events_path,
-            start_review(
-                cu_slug=item.slug,
-                reviewer_id=reviewer_id,
-                content_fingerprint=fingerprint,
-                occurred_at=now_utc(),
-            ),
+        opened = open_review_item(
+            item,
+            events_path=events_path,
+            reviewer_id=reviewer_id,
+            monotonic_ns=monotonic_ns,
+            now_utc=now_utc,
         )
         events_written += 1
-        t0 = monotonic_ns()
-        _render_item(stream_out, index, total, item)
+        render_item(stream_out, index, total, item)
 
         action = _prompt_verdict(stream_in, stream_out)
 
@@ -515,56 +629,28 @@ def run_review_session(
                 note_raw = _read_line(stream_in, stream_out, _PROMPT_NOTE)
                 note = note_raw or None
 
-        elapsed_ms = (monotonic_ns() - t0) // 1_000_000
-
-        if action in ("approved", VERDICT_APPROVED_WITH_EDIT, "rejected"):
-            verdict: Any = action
-            append_event_jsonl(
-                events_path,
-                finish_review(
-                    review_session_id=started.review_session_id,
-                    cu_slug=item.slug,
-                    reviewer_id=reviewer_id,
-                    verdict=verdict,
-                    elapsed_ms=elapsed_ms,
-                    failure_code=failure_code,
-                    failure_note=note,
-                    content_fingerprint=fingerprint,
-                    occurred_at=now_utc(),
-                ),
-            )
-            events_written += 1
-            append_verdict_jsonl(
-                verdicts_path,
-                slug=item.slug,
-                verdict=action,
-                reviewer_id=reviewer_id,
-                review_session_id=started.review_session_id,
-                failure_code=failure_code,
-                failure_note=note,
-                content_fingerprint=fingerprint,
-            )
-            if action == "approved":
-                approved += 1
-            elif action == VERDICT_APPROVED_WITH_EDIT:
-                approved_with_edit += 1
-            else:
-                rejected += 1
-            continue
-
-        # 보류·종료·EOF·무효입력 — 전부 중단으로 남긴다. 판정이 없으므로 verdicts에는 안 쓴다
-        # (pending은 판정이 아니다 — 분모 오염 방지).
-        append_event_jsonl(
-            events_path,
-            abort_review(
-                review_session_id=started.review_session_id,
-                cu_slug=item.slug,
-                reviewer_id=reviewer_id,
-                elapsed_ms=elapsed_ms,
-                occurred_at=now_utc(),
-            ),
+        concluded = close_review_item(
+            opened,
+            action=action,
+            failure_code=failure_code,
+            note=note,
+            events_path=events_path,
+            verdicts_path=verdicts_path,
+            reviewer_id=reviewer_id,
+            monotonic_ns=monotonic_ns,
+            now_utc=now_utc,
         )
         events_written += 1
+        if concluded == "approved":
+            approved += 1
+            continue
+        if concluded == VERDICT_APPROVED_WITH_EDIT:
+            approved_with_edit += 1
+            continue
+        if concluded == "rejected":
+            rejected += 1
+            continue
+
         aborted += 1
         if action in ("quit", None):
             # quit=명시 종료 · None=EOF(파이프 닫힘·Ctrl+D). 둘 다 세션을 끝낸다.
@@ -582,7 +668,7 @@ def run_review_session(
     )
 
 
-def _render_summary(
+def render_summary(
     out: TextIO, outcome: SessionOutcome, *, events_path: Path, verdicts_path: Path
 ) -> None:
     """세션 요약 — 다음에 무엇을 할 수 있는지까지 알려준다(간접 신호 금지·자가검증 동봉).
@@ -606,6 +692,31 @@ def _render_summary(
     )
 
 
+def prepare_session_items(queue_path: Path, limit: int = 0) -> list[ReviewItem] | None:
+    """큐를 읽어 이번 세션의 항목을 낸다 — 입력 실패면 None(호출자가 exit 1).
+
+    터미널 세션과 GUI(`review_session_gui`)가 공유한다 — "파일 없음"·"대상 0건"의 판정과
+    메시지가 두 경로에서 갈라지지 않게 한다. 0건은 '0건 통과'가 아니라 측정 실패다.
+    """
+    try:
+        items, errors = load_review_items(queue_path)
+    except FileNotFoundError as exc:
+        # "파일 없음"과 "0건"은 다른 실패다 — 예외 타입명을 남긴다(침묵 실패 금지).
+        print(f"[입력 실패] {type(exc).__name__}: {queue_path}", file=sys.stderr)
+        return None
+
+    print(f"[① 큐] 대상 {len(items)}건 · 제외/실패 {len(errors)}건", flush=True)
+    for reason in errors:
+        print(f"  - {reason}", flush=True)
+    if not items:
+        print("[입력 실패] 검수 대상 0건 — '0건 통과'가 아니라 측정 실패다.", file=sys.stderr)
+        return None
+
+    if limit > 0:
+        items = items[:limit]
+    return items
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI 진입점 — exit 0 정상(중도 종료 포함) / 1 입력 실패."""
     parser = argparse.ArgumentParser(
@@ -626,23 +737,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=0, help="이번 세션에서 볼 최대 건수(0=전부)")
     args = parser.parse_args(argv)
 
-    queue_path = Path(args.queue)
-    try:
-        items, errors = load_review_items(queue_path)
-    except FileNotFoundError as exc:
-        # "파일 없음"과 "0건"은 다른 실패다 — 예외 타입명을 남긴다(침묵 실패 금지).
-        print(f"[입력 실패] {type(exc).__name__}: {queue_path}", file=sys.stderr)
+    items = prepare_session_items(Path(args.queue), args.limit)
+    if items is None:
         return 1
-
-    print(f"[① 큐] 대상 {len(items)}건 · 제외/실패 {len(errors)}건", flush=True)
-    for reason in errors:
-        print(f"  - {reason}", flush=True)
-    if not items:
-        print("[입력 실패] 검수 대상 0건 — '0건 통과'가 아니라 측정 실패다.", file=sys.stderr)
-        return 1
-
-    if args.limit > 0:
-        items = items[: args.limit]
 
     outcome = run_review_session(
         items,
@@ -653,7 +750,7 @@ def main(argv: list[str] | None = None) -> int:
         stream_out=sys.stdout,
         resume=args.resume,
     )
-    _render_summary(
+    render_summary(
         sys.stdout,
         outcome,
         events_path=Path(args.events),

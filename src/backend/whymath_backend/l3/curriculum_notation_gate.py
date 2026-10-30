@@ -16,7 +16,7 @@
      주입받고, 주입하는 CLI는 `harness/curriculum_notation_gate_cli.py`다
      (`l3/pedagogy/explanation_checker` ↔ `harness/explanation_f7_eval` 선례).
   ② 표기 토큰 전수 추출: `l3/notation_coverage`의 `extract_macros`·`extract_math_glyphs` +
-     이 모듈의 ASCII 함수 단어 축. 코퍼스 문항 14,034건에 LaTeX 매크로가 0건이고 표기가
+     이 모듈의 ASCII 함수 단어 축. 작성 당시 코퍼스 문항 14,034건에 LaTeX 매크로가 0건이고 표기가
      평문이라, 매크로·글리프만으로는 "초과 0건"이 실제 부재인지 측정기의 맹점인지 구분되지 않는다.
   ③ 토큰 → 구조 키 폐쇄 표: `data/curriculum_notation_ranges.json`(이 태스크가 신설).
      같은 매핑이 `l3/speech.py`의 `_gate()` 호출 12곳에 AST 노드 키로 암묵 존재하므로,

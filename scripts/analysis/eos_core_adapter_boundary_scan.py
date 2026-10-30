@@ -161,6 +161,13 @@ BOUNDARY_MAP: dict[str, tuple[Verdict, str]] = {
         "wrong_form_match와 같은 사유로 ADAPTER: '식을 이어 거짓 항등식을 읽는다'는 독법이 "
         "수학 고유다. Core는 schema.verification_capabilities의 선택층 Protocol만 안다",
     ),
+    "l4.misconception.derivative_signature": (
+        "ADAPTER",
+        "미분 오답 서명(문항 함수식 + 제출 답 → 규칙 적용 결과값) SymPy 정합 — "
+        "answer_signature의 두 번째 독법(P3-06). '함수식을 읽어 규칙을 적용한 값과 "
+        "답을 대조한다'는 독법이 수학 고유라 ADAPTER다 — answer_signature와 같은 사유. "
+        "규칙표(데이터)는 중립이고 변환·질문 추출기(코드)만 수학을 안다",
+    ),
     "l4.subject_adapter_math": (
         "ADAPTER",
         "MathSubjectAdapter(EOS-66) — SubjectAdapter 계약의 수학 구현. CORE인 l4에 살지만 "

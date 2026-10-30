@@ -38,6 +38,9 @@ from .test_concept_content_review_batch import _VerdictProvider
 
 _REPO = Path(__file__).resolve().parents[3]
 _CONTENT = _REPO / "data/corpus/concept_content_v1/content.json"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_REPO / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 
 def _link(*, confidence: float | None = 0.62, primary: str | None = "A-1") -> ContentLink:
@@ -59,8 +62,8 @@ class TestLoadContentLinks:
         links = load_content_links()
         content = json.loads(_CONTENT.read_text(encoding="utf-8"))["content"]
         codes = {r["code"] for r in content}
-        # 437 전건이 연결돼 있다 — 하나라도 빠지면 그 행은 연결 승인 요구 없이 reviewed가 된다.
-        assert len(codes) == 437
+        # 콘텐츠 전건이 연결돼 있다 — 하나라도 빠지면 그 행은 연결 승인 요구 없이 reviewed가 된다.
+        assert len(codes) == _FACTS["concept_content.k12"]
         assert set(links) == codes
 
     def test_every_linked_atom_has_a_name_and_the_status_is_shown(self) -> None:

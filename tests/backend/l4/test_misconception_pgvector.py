@@ -320,21 +320,22 @@ def _compile(statement: object) -> str:
 class TestPopulate:
     def test_populate_upserts_each_catalog_entry(self) -> None:
         # FakeEmbeddingProvider + 가짜 엔진 인덱스로 카탈로그 전 항목 upsert(실행 횟수=카탈로그 수).
-        from whymath_backend.l4.misconception.catalog import CATALOG
+        from whymath_backend.l4.misconception.catalog import BODY_CATALOG
 
         provider = FakeEmbeddingProvider()
         index, engine = _fake_pg_index(provider_name="fake", model_name="fake-hash")
         count = populate_pgvector(provider, index=index)
-        assert count == len(CATALOG)
+        # 적재 대상은 본문 채널 항목뿐이다(P3-61: 선지 역추적 전용은 영속 인덱스에 넣지 않는다).
+        assert count == len(BODY_CATALOG)
         # 1 read(existing_text_hashes·비어) + 항목당 1 upsert.
-        assert len(engine.executed) == len(CATALOG) + 1
+        assert len(engine.executed) == len(BODY_CATALOG) + 1
 
     def test_populate_skips_unchanged(self) -> None:
         # 모든 항목의 현행 text_hash가 표현과 일치 → provider 미호출·upsert 0·count 0(읽기 1회).
-        from whymath_backend.l4.misconception.catalog import CATALOG
+        from whymath_backend.l4.misconception.catalog import BODY_CATALOG
         from whymath_backend.l4.misconception.semantic.matcher import catalog_text
 
-        rows = [_FakeRow(m.id, text_hash=text_hash(catalog_text(m))) for m in CATALOG]
+        rows = [_FakeRow(m.id, text_hash=text_hash(catalog_text(m))) for m in BODY_CATALOG]
         provider = _SpyProvider()
         index, engine = _fake_pg_index(
             search_rows=rows, provider_name="fake", model_name="fake-hash"

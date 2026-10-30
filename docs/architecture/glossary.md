@@ -100,7 +100,7 @@
 |---|---|---|
 | **truth source** | 진실 원천 | 개념/원자/스킬 각각 정확히 1개만 — 이중화 금지 |
 | **legacy_snapshot** | 격하된 구 자산 | 구 437 개념그래프 (readonly·audit_only, 런타임 차단) |
-| **원자 백본** | Atom Backbone | 현 런타임 진실 원천 (원자 1,837·선수엣지 3,220) |
+| **원자 백본** | Atom Backbone | 현 런타임 진실 원천 (원자 <!-- fact:atom_graph.atoms -->1,823<!-- /fact -->·선수엣지 <!-- fact:atom_graph.prerequisite_total -->3,251<!-- /fact -->) |
 | **Concept Purity** | 개념 순수성 | 노드에 renderer·UI·prompt·오개념·임베딩 혼입 금지 |
 | **Minimal Reasoning Subgraph** | 최소 추론 부분그래프 | LLM엔 전체 그래프 금지 — depth≤2·nodes≤12~20·tokens≤3000 |
 | **7대 붕괴 연쇄** | 실패 시나리오 | 노드폭발→관계폭발→순환참조→유지보수지옥→성능병목→AI추론실패→교육일관성붕괴 |

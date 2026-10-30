@@ -317,6 +317,12 @@ class _ConditionEvaluator:
             return tok[1:-1]
         if tok in ("true", "false"):
             return tok == "true"
+        # `always()` — 선행 잡 결과와 무관하게 실행. 스코프 판정(이 변경이 잡을 깨우는가)에서는
+        # 항상 참이다(OPS-83 backend 집계 잡). 다른 상태 함수(success·failure·cancelled)는 결과에
+        # 따라 값이 갈리므로 여기서 풀지 않는다 — 아래 문맥 조회가 UNKNOWN을 낸다.
+        if tok == "always" and self.tokens[self.pos : self.pos + 2] == ["(", ")"]:
+            self.pos += 2
+            return True
         return self.context.get(tok, UNKNOWN_VALUE)
 
     @staticmethod
@@ -394,6 +400,11 @@ def describe_job_env(job: dict[str, Any]) -> JobEnv:
         if isinstance(uses, str) and uses.startswith("docker/"):
             env.reproducible_locally = False
             env.irreproducible_reason = f"docker 액션 사용: {uses}"
+        # 다른 잡의 산출물을 내려받아 판정하는 잡(OPS-83 backend 집계 잡)은 로컬에 그 산출물이
+        # 없다 — 미러가 돌리면 "산출물 없음"으로 거짓 실패하거나, 이전 실행 잔여물로 거짓 통과한다.
+        if isinstance(uses, str) and uses.startswith("actions/download-artifact"):
+            env.reproducible_locally = False
+            env.irreproducible_reason = f"다른 잡의 산출물 필요: {uses}"
 
     if env.services and env.reproducible_locally:
         env.reproducible_locally = False

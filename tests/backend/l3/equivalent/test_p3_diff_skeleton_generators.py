@@ -215,19 +215,21 @@ _EXEMPT: dict[str, dict[str, _Exempt]] = {
             ((_F_MVT_EQUATION, "test_kebab_seat_absence_is_a_tripwire"),),
         ),
     },
-    # 핵심 오개념 연결 정지 — 02-09의 핵심 M0677은 설명이 서술어 없이 끊긴 손상 문장이고 잘못된 *절차*를
-    # 적지 않아, 연결 선지가 그 오개념에서 나오는 값인지 판정할 수 없었다(5회차 은행 감사 2026-10-08 · 판정자
-    # 지적 12건 · 원문 정정 QUAL-14). 5회차 교정이 옮긴 M0615도 설명이 자기모순('두 개로 단정' 대 '(차수만큼
+    # 핵심 오개념 연결 정지 — 02-09의 핵심 M0677은 감사 당시 설명이 서술어 없이 끊긴 손상 문장이었고 잘못된
+    # *절차*를 적지 않아, 연결 선지가 그 오개념에서 나오는 값인지 판정할 수 없었다(5회차 은행 감사 2026-10-08 ·
+    # 판정자 지적 12건). QUAL-14가 2026-10-12 문장을 복원했으나('…관점을 못 쓴다') 관점의 부재(omission형)라
+    # 값을 내는 절차는 여전히 적혀 있지 않아 연결 정지는 그대로다. 5회차 교정이 옮긴 M0615도 설명이 자기모순('두 개로 단정' 대 '(차수만큼
     # 근)')이라 6회차 감사(은행 감사 2회차)에서 같은 12건이 지적돼, 이제 절차가 하나로 적힌 L4 kebab
     # `extremum-value-vs-point-confused`(극값·극점 혼동 — 크로스링크 직접매핑 M0865)에 연결한다(좌석이 있어
     # kebab_seat_absent 면제는 지웠다). stale 가드: 핵심 M0677이 다시 연결되면 red.
     "core_link_suspended": {
         _C09: _Exempt(
-            "핵심 M0677 설명 손상(QUAL-14) — 극값 자리에 극점 x좌표를 넣어 센 선지를 '극값·극점 혼동'에 연결.",
+            "핵심 M0677 절차 미기술(관점의 부재 — QUAL-14 재판정) — 극값 자리에 극점 x좌표를 넣어 센 선지를 "
+            "'극값·극점 혼동'에 연결.",
             (
                 (
                     _F_MVT_EQUATION,
-                    "test_equation_concept_links_extremum_point_until_m0677_is_repaired",
+                    "test_equation_concept_links_extremum_point_while_m0677_has_no_procedure",
                 ),
             ),
         ),

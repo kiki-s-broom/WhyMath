@@ -12,16 +12,21 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import functools
+import logging
 import os
 import time
 
 import pytest
 
+from whymath_backend.config import Settings
 from whymath_backend.l3.isolated_call import (
     BudgetExceededError,
     IsolatedCallPool,
+    _run_warmup,
 )
+from whymath_backend.l3.verify_answer import verify_answer
 from whymath_backend.l3.verify_step import verify_step
 
 # 구조 예산(`MAX_POLY_DEGREE=20`)을 통과하는 가장 느린 부류 — 이 환경 실측 약 3.0초.
@@ -287,6 +292,18 @@ class TestTotalBudget:
         assert info.value.reason == "deadline"
         assert not pool._all, "예산 소진인데 워커를 띄웠다"
 
+    async def test_exhausted_budget_counts_as_a_folded_call(self, pool: IsolatedCallPool) -> None:
+        """입구 거절도 `calls`에 들어간다 — `deadlines`만 오르면 접힘이 분모를 앞질러 '작동한 비율'이 틀린다(OPS-140).
+
+        다른 접힘 사유(대기 포화 등)는 `calls`를 올린 *뒤* 접힌다 — 호출 하나는 정확히 한 결과로 끝난다.
+        """
+        with pytest.raises(BudgetExceededError):
+            await pool.run(repr, "x", budget_s=0.0)
+        stats = pool.stats()
+        assert stats["calls"] == 1
+        assert stats["deadlines"] == 1
+        assert stats["deadlines"] <= stats["calls"]
+
 
 class TestFallback:
     async def test_unpicklable_callable_falls_back_to_thread_and_counts(
@@ -312,3 +329,133 @@ class TestThreadIsNotEnough:
         await asyncio.sleep(1.5)
         burned = time.process_time() - started_cpu
         assert burned > 1.5, f"스레드가 끊겼다면 CPU 사용이 이만큼 많을 수 없다({burned:.2f}s)"
+
+
+# ── 웜업(OPS-142) ────────────────────────────────────────────────────────────────
+
+_PROBE = "sorted(m for m in __import__('sys').modules if m.startswith('sympy'))"
+"""워커 안의 `sympy` 모듈 목록 — 첫 사용 때 지연 import가 일어났는지를 *시간이 아니라 사실로* 본다."""
+
+# 식 종류별로 첫 사용에 다른 SymPy 하위 모듈이 지연 import된다(OPS-142 실측): 덧셈 빠른 경로 →
+# combinatorics·tensor, `simplify` 폴백 → physics, 방정식 → assumptions·sets.
+_KINDS = (
+    ("2*(x+1)", "2*x+2"),
+    ("(a+b)^2", "a^2+2*a*b+b^2"),
+    ("x^2-5*x+6=0", "(x-2)*(x-3)=0"),
+)
+
+
+def _shipped_warmup() -> tuple[str, ...]:
+    """출하 기본 웜업 목록 — 설정 기본값을 그대로 쓴다(테스트가 따로 만든 목록이 아니다)."""
+    factory = Settings.model_fields["sympy_isolation_warmup"].default_factory
+    assert factory is not None
+    return tuple(factory())  # type: ignore[call-arg]
+
+
+async def _modules(p: IsolatedCallPool) -> list[str]:
+    return await p.run(builtins.eval, _PROBE)
+
+
+async def _exercise_every_kind(p: IsolatedCallPool) -> None:
+    for before, after in _KINDS:
+        await p.run(verify_step, before, after)
+    await p.run(verify_answer, "x**2 - 5*x + 6 = 0", {"x": "3"})
+    await p.run(verify_answer, ["x+y=3", "x-y=1"], {"x": "2", "y": "1"})
+
+
+class TestWarmup:
+    """워커가 `ready` 전에 대표 호출을 돌려, 첫 정상 요청이 지연 import 비용을 상한 안에서 치르지 않게 한다."""
+
+    async def test_shipped_warmup_leaves_no_first_use_import_for_known_kinds(self) -> None:
+        """웜업 뒤에는 어떤 식 종류를 처음 계산해도 새 `sympy` 모듈이 로드되지 않는다."""
+        p = IsolatedCallPool(max_workers=1, preload=("sympy",), warmup=_shipped_warmup())
+        try:
+            before = await _modules(p)
+            await _exercise_every_kind(p)
+            after = await _modules(p)
+        finally:
+            p.shutdown()
+        assert sorted(set(after) - set(before)) == []
+
+    async def test_control_without_warmup_the_same_calls_do_import_lazily(self) -> None:
+        """대조군 — 웜업이 없으면 같은 호출이 새 모듈을 끌어온다(위 테스트가 변별하는 이유)."""
+        p = IsolatedCallPool(max_workers=1, preload=("sympy",))
+        try:
+            before = await _modules(p)
+            await _exercise_every_kind(p)
+            after = await _modules(p)
+        finally:
+            p.shutdown()
+        new = set(after) - set(before)
+        assert any(m.startswith("sympy.physics") for m in new), sorted(new)[:5]
+        assert any(m.startswith("sympy.combinatorics") for m in new), sorted(new)[:5]
+
+    async def test_replacement_worker_after_timeout_is_also_warm(self) -> None:
+        """상한 초과로 kill된 뒤의 교체 워커도 데워져 뜬다 — 같은 비용이 다음 정상 요청에 반복되지 않는다."""
+        p = IsolatedCallPool(
+            max_workers=1, timeout_s=0.5, preload=("sympy",), warmup=_shipped_warmup()
+        )
+        try:
+            with pytest.raises(BudgetExceededError) as info:
+                await p.run(verify_step, *_SLOW)
+            assert info.value.reason == "timeout"
+            before = await _modules(p)  # 교체 워커에서 실행된다
+            await _exercise_every_kind(p)
+            after = await _modules(p)
+            assert p.stats()["timeouts"] == 1  # 위 호출들은 상한을 넘지 않았다
+        finally:
+            p.shutdown()
+        assert sorted(set(after) - set(before)) == []
+
+    def test_warmup_runs_before_ready(
+        self, tmp_path: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """웜업은 `ready`보다 먼저 끝난다 — `ready`를 받은 시점에 웜업의 흔적이 이미 있다."""
+        marker = tmp_path / "warm.marker"  # type: ignore[operator]
+        (tmp_path / "ops142_warm_probe.py").write_text(  # type: ignore[operator]
+            f"def warm():\n    open({str(marker)!r}, 'w').write('x')\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+        p = IsolatedCallPool(max_workers=1, warmup=("ops142_warm_probe:warm",))
+        worker = p._spawn()
+        try:
+            assert p._wait_ready(worker, 60.0) == "ready"
+            assert marker.exists()
+        finally:
+            p.shutdown()
+
+    @pytest.mark.parametrize("spec", ["no_colon", ":fn", "mod:", ""])
+    def test_malformed_warmup_spec_is_rejected_by_the_parent(self, spec: str) -> None:
+        """형식 오류는 워커 안에서 조용히 사라지지 않고 풀을 만들 때 부모가 거부한다."""
+        with pytest.raises(ValueError, match="모듈:함수"):
+            IsolatedCallPool(max_workers=1, warmup=(spec,))
+
+    async def test_failing_warmup_does_not_prevent_the_worker_from_serving(
+        self, tmp_path: object, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """웜업은 최적화일 뿐이다 — 예외를 던져도 워커는 뜨고 정상 호출을 처리한다."""
+        (tmp_path / "ops142_warm_boom.py").write_text(  # type: ignore[operator]
+            "def warm():\n    raise ValueError('boom')\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+        p = IsolatedCallPool(max_workers=1, warmup=("ops142_warm_boom:warm", "no_such_mod_142:f"))
+        try:
+            result = await p.run(verify_step, *_FAST)
+        finally:
+            p.shutdown()
+        assert result.state.value == "correct"
+
+    def test_warmup_failure_log_names_the_exception_type_only(
+        self, tmp_path: object, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """침묵 실패 금지 — 경고에 예외 *타입명*과 지정이 남고, 예외 메시지(값)는 싣지 않는다."""
+        (tmp_path / "ops142_warm_secret.py").write_text(  # type: ignore[operator]
+            "def warm():\n    raise ValueError('학생입력-SECRET')\n"
+        )
+        monkeypatch.syspath_prepend(str(tmp_path))
+        with caplog.at_level(logging.WARNING, logger="whymath.l3.isolated_call"):
+            _run_warmup(("ops142_warm_secret:warm", "no_such_mod_142:f"))
+        text = caplog.text
+        assert "ValueError" in text and "ops142_warm_secret:warm" in text
+        assert "ModuleNotFoundError" in text
+        assert "SECRET" not in text

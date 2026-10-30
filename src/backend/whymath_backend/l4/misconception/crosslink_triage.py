@@ -313,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
         description="crosswalk 검수 큐를 독립 구조 신호로 4버킷 트리아지(승인 아님·큐 무변경).",
     )
     parser.add_argument("--queue", default=None, help="검수 큐 JSON(기본 docs/data).")
-    parser.add_argument("--misconceptions", default=None, help="843 M-id 코퍼스 JSON.")
+    parser.add_argument("--misconceptions", default=None, help="M-id 코퍼스 JSON.")
     parser.add_argument("--floor", type=int, default=MACHINE_REJECT_EVIDENCE_FLOOR)
     parser.add_argument("--json", action="store_true", help="JSON 리포트 출력(기본 사람 가독).")
     parser.add_argument(

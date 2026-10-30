@@ -1,0 +1,1163 @@
+{
+ "label": "M0080",
+ "kebab": "critical-point-implies-extremum",
+ "attempts": [
+  {
+   "n": 1,
+   "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+   "choice_index": 1,
+   "http": 201,
+   "body": {
+    "attempt_id": "d80f3d0f-1f7d-420b-9f72-6e575e458ca4",
+    "is_correct": false,
+    "mastery_updates": [
+     {
+      "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+      "mastery": 0.15,
+      "sample_size": 1
+     }
+    ],
+    "skill_mastery_updates": [],
+    "calibration_coaching": null,
+    "misconception_review_coaching": {
+     "focus": "misconception_review",
+     "rationale": "'임계점 극값 단정' 쪽에서 같은 오류가 반복되는 정황이 있습니다(누적 가설 — 확정 진단 아님). 새 개념으로 넘어가기 전에 그 규칙이 항상 성립하는지 학생이 스스로 확인하게 하는 편이 좋습니다.",
+     "prompt": "혹시 '임계점 극값 단정' 쪽 규칙이 항상 성립하는지 한 번 같이 확인해 볼까? 간단한 수를 직접 넣어 보면 스스로 판단할 수 있어.",
+     "socratic_category": "assumption",
+     "focus_step_index": null,
+     "hint_level": null
+    },
+    "evidence": {
+     "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+     "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+     "attempt_id": "d80f3d0f-1f7d-420b-9f72-6e575e458ca4",
+     "correct": false,
+     "observed_at": "2026-10-18T11:28:16.680969Z",
+     "concept_evidence": [
+      {
+       "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+       "role": "PRIMARY",
+       "direction": "refuting",
+       "attribution": "primary_attribution"
+      }
+     ],
+     "skill_evidence": [],
+     "possible_misconceptions": [
+      {
+       "misconception_id": "critical-point-implies-extremum",
+       "confidence": 0.8,
+       "gate_passed": true,
+       "low_quality": false,
+       "attribution_unclear": false
+      }
+     ],
+     "coverage": {
+      "concept": "filled",
+      "skill": "empty_measured",
+      "misconception": "filled",
+      "misconception_scan": "ran_with_candidates",
+      "concept_count": 1,
+      "skill_count": 0,
+      "misconception_count": 1,
+      "filled_kinds": 2,
+      "unmeasured_kinds": []
+     }
+    },
+    "learning_state": {
+     "from_state": "NEW",
+     "to_state": "REMEDIATING",
+     "rule_id": "R3-wrong-misconception",
+     "next_action": "REMEDIATE_MISCONCEPTION",
+     "target_concept_id": null,
+     "target_misconception_id": "critical-point-implies-extremum",
+     "rejected_transition": null,
+     "entered_learning_from": "NEW"
+    }
+   },
+   "next_http": 200,
+   "next": {
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "theta": -4.0,
+    "selection_theta": -4.0,
+    "theta_boundary": "lower",
+    "difficulty": 2.7,
+    "standard_error": 6.2149463526345325,
+    "measurement_sufficient": false,
+    "weight_axes_applied": [],
+    "candidate_pool_size": 50,
+    "weak_concept_signal_count": 50,
+    "candidate_zero_reason": null,
+    "band_calibrated": false,
+    "action": "practice_current",
+    "target_concept": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+    "learning_state_directive": "applied",
+    "reason": {
+     "type": "misconception_remediation",
+     "confidence": 0.8,
+     "basis": "learning_state",
+     "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+     "mastery": 0.15
+    },
+    "intent_resolution": "direct"
+   }
+  },
+  {
+   "n": 2,
+   "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+   "choice_index": 1,
+   "http": 201,
+   "body": {
+    "attempt_id": "d93cc53d-f743-463f-bfbb-873326eb1d40",
+    "is_correct": false,
+    "mastery_updates": [
+     {
+      "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+      "mastery": 0.12,
+      "sample_size": 2
+     }
+    ],
+    "skill_mastery_updates": [],
+    "calibration_coaching": null,
+    "misconception_review_coaching": {
+     "focus": "misconception_review",
+     "rationale": "'임계점 극값 단정' 쪽에서 같은 오류가 반복되는 정황이 있습니다(누적 가설 — 확정 진단 아님). 새 개념으로 넘어가기 전에 그 규칙이 항상 성립하는지 학생이 스스로 확인하게 하는 편이 좋습니다.",
+     "prompt": "혹시 '임계점 극값 단정' 쪽 규칙이 항상 성립하는지 한 번 같이 확인해 볼까? 간단한 수를 직접 넣어 보면 스스로 판단할 수 있어.",
+     "socratic_category": "assumption",
+     "focus_step_index": null,
+     "hint_level": null
+    },
+    "evidence": {
+     "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+     "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+     "attempt_id": "d93cc53d-f743-463f-bfbb-873326eb1d40",
+     "correct": false,
+     "observed_at": "2026-10-18T11:28:17.016694Z",
+     "concept_evidence": [
+      {
+       "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+       "role": "PRIMARY",
+       "direction": "refuting",
+       "attribution": "primary_attribution"
+      }
+     ],
+     "skill_evidence": [],
+     "possible_misconceptions": [
+      {
+       "misconception_id": "critical-point-implies-extremum",
+       "confidence": 0.8,
+       "gate_passed": true,
+       "low_quality": false,
+       "attribution_unclear": false
+      }
+     ],
+     "coverage": {
+      "concept": "filled",
+      "skill": "empty_measured",
+      "misconception": "filled",
+      "misconception_scan": "ran_with_candidates",
+      "concept_count": 1,
+      "skill_count": 0,
+      "misconception_count": 1,
+      "filled_kinds": 2,
+      "unmeasured_kinds": []
+     }
+    },
+    "learning_state": {
+     "from_state": "REMEDIATING",
+     "to_state": "REMEDIATING",
+     "rule_id": "R3-wrong-misconception",
+     "next_action": "REMEDIATE_MISCONCEPTION",
+     "target_concept_id": null,
+     "target_misconception_id": "critical-point-implies-extremum",
+     "rejected_transition": null,
+     "entered_learning_from": null
+    }
+   },
+   "next_http": 200,
+   "next": {
+    "problem_id": "196d5259-217e-5968-8775-5e237c660f6e",
+    "theta": -4.0,
+    "selection_theta": -4.0,
+    "theta_boundary": "lower",
+    "difficulty": 1.3,
+    "standard_error": 4.497642367450568,
+    "measurement_sufficient": false,
+    "weight_axes_applied": [],
+    "candidate_pool_size": 50,
+    "weak_concept_signal_count": 0,
+    "candidate_zero_reason": null,
+    "band_calibrated": null,
+    "action": "diagnose",
+    "target_concept": "85b0625d-8c98-449b-9753-1eb0f85cfccc",
+    "learning_state_directive": "released_after_repeat",
+    "reason": {
+     "type": "unmeasured",
+     "confidence": 0.0,
+     "basis": "cold_start",
+     "concept_id": "85b0625d-8c98-449b-9753-1eb0f85cfccc",
+     "mastery": null
+    },
+    "intent_resolution": "direct"
+   }
+  },
+  {
+   "n": 3,
+   "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+   "choice_index": 1,
+   "http": 201,
+   "body": {
+    "attempt_id": "469d783a-2cca-4139-b584-f161479ab429",
+    "is_correct": false,
+    "mastery_updates": [
+     {
+      "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+      "mastery": 0.12,
+      "sample_size": 3
+     }
+    ],
+    "skill_mastery_updates": [],
+    "calibration_coaching": null,
+    "misconception_review_coaching": {
+     "focus": "misconception_review",
+     "rationale": "'임계점 극값 단정' 쪽에서 같은 오류가 반복되는 정황이 있습니다(누적 가설 — 확정 진단 아님). 새 개념으로 넘어가기 전에 그 규칙이 항상 성립하는지 학생이 스스로 확인하게 하는 편이 좋습니다.",
+     "prompt": "혹시 '임계점 극값 단정' 쪽 규칙이 항상 성립하는지 한 번 같이 확인해 볼까? 간단한 수를 직접 넣어 보면 스스로 판단할 수 있어.",
+     "socratic_category": "assumption",
+     "focus_step_index": null,
+     "hint_level": null
+    },
+    "evidence": {
+     "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+     "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+     "attempt_id": "469d783a-2cca-4139-b584-f161479ab429",
+     "correct": false,
+     "observed_at": "2026-10-18T11:28:17.101853Z",
+     "concept_evidence": [
+      {
+       "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+       "role": "PRIMARY",
+       "direction": "refuting",
+       "attribution": "primary_attribution"
+      }
+     ],
+     "skill_evidence": [],
+     "possible_misconceptions": [
+      {
+       "misconception_id": "critical-point-implies-extremum",
+       "confidence": 0.8,
+       "gate_passed": true,
+       "low_quality": false,
+       "attribution_unclear": false
+      }
+     ],
+     "coverage": {
+      "concept": "filled",
+      "skill": "empty_measured",
+      "misconception": "filled",
+      "misconception_scan": "ran_with_candidates",
+      "concept_count": 1,
+      "skill_count": 0,
+      "misconception_count": 1,
+      "filled_kinds": 2,
+      "unmeasured_kinds": []
+     }
+    },
+    "learning_state": {
+     "from_state": "REMEDIATING",
+     "to_state": "REMEDIATING",
+     "rule_id": "R5-repeated-failure",
+     "next_action": "OFFER_EXPLANATION_OR_HINT",
+     "target_concept_id": null,
+     "target_misconception_id": null,
+     "rejected_transition": null,
+     "entered_learning_from": null
+    }
+   },
+   "next_http": 200,
+   "next": {
+    "problem_id": "196d5259-217e-5968-8775-5e237c660f6e",
+    "theta": -4.0,
+    "selection_theta": -4.0,
+    "theta_boundary": "lower",
+    "difficulty": 1.3,
+    "standard_error": 3.6436196704344637,
+    "measurement_sufficient": false,
+    "weight_axes_applied": [],
+    "candidate_pool_size": 50,
+    "weak_concept_signal_count": 0,
+    "candidate_zero_reason": null,
+    "band_calibrated": null,
+    "action": "diagnose",
+    "target_concept": "85b0625d-8c98-449b-9753-1eb0f85cfccc",
+    "learning_state_directive": null,
+    "reason": {
+     "type": "unmeasured",
+     "confidence": 0.0,
+     "basis": "cold_start",
+     "concept_id": "85b0625d-8c98-449b-9753-1eb0f85cfccc",
+     "mastery": null
+    },
+    "intent_resolution": "direct"
+   }
+  },
+  {
+   "n": 4,
+   "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+   "choice_index": 1,
+   "http": 201,
+   "body": {
+    "attempt_id": "e399906f-1018-41be-8bba-28de410d2b04",
+    "is_correct": false,
+    "mastery_updates": [
+     {
+      "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+      "mastery": 0.12,
+      "sample_size": 4
+     }
+    ],
+    "skill_mastery_updates": [],
+    "calibration_coaching": null,
+    "misconception_review_coaching": {
+     "focus": "misconception_review",
+     "rationale": "'임계점 극값 단정' 쪽에서 같은 오류가 반복되는 정황이 있습니다(누적 가설 — 확정 진단 아님). 새 개념으로 넘어가기 전에 그 규칙이 항상 성립하는지 학생이 스스로 확인하게 하는 편이 좋습니다.",
+     "prompt": "혹시 '임계점 극값 단정' 쪽 규칙이 항상 성립하는지 한 번 같이 확인해 볼까? 간단한 수를 직접 넣어 보면 스스로 판단할 수 있어.",
+     "socratic_category": "assumption",
+     "focus_step_index": null,
+     "hint_level": null
+    },
+    "evidence": {
+     "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+     "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+     "attempt_id": "e399906f-1018-41be-8bba-28de410d2b04",
+     "correct": false,
+     "observed_at": "2026-10-18T11:28:17.176060Z",
+     "concept_evidence": [
+      {
+       "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+       "role": "PRIMARY",
+       "direction": "refuting",
+       "attribution": "primary_attribution"
+      }
+     ],
+     "skill_evidence": [],
+     "possible_misconceptions": [
+      {
+       "misconception_id": "critical-point-implies-extremum",
+       "confidence": 0.8,
+       "gate_passed": true,
+       "low_quality": false,
+       "attribution_unclear": false
+      }
+     ],
+     "coverage": {
+      "concept": "filled",
+      "skill": "empty_measured",
+      "misconception": "filled",
+      "misconception_scan": "ran_with_candidates",
+      "concept_count": 1,
+      "skill_count": 0,
+      "misconception_count": 1,
+      "filled_kinds": 2,
+      "unmeasured_kinds": []
+     }
+    },
+    "learning_state": {
+     "from_state": "REMEDIATING",
+     "to_state": "REMEDIATING",
+     "rule_id": "R5-repeated-failure",
+     "next_action": "OFFER_EXPLANATION_OR_HINT",
+     "target_concept_id": null,
+     "target_misconception_id": null,
+     "rejected_transition": null,
+     "entered_learning_from": null
+    }
+   },
+   "next_http": 200,
+   "next": {
+    "problem_id": "196d5259-217e-5968-8775-5e237c660f6e",
+    "theta": -4.0,
+    "selection_theta": -4.0,
+    "theta_boundary": "lower",
+    "difficulty": 1.3,
+    "standard_error": 3.1803134173762135,
+    "measurement_sufficient": false,
+    "weight_axes_applied": [],
+    "candidate_pool_size": 50,
+    "weak_concept_signal_count": 0,
+    "candidate_zero_reason": null,
+    "band_calibrated": null,
+    "action": "diagnose",
+    "target_concept": "85b0625d-8c98-449b-9753-1eb0f85cfccc",
+    "learning_state_directive": null,
+    "reason": {
+     "type": "unmeasured",
+     "confidence": 0.0,
+     "basis": "cold_start",
+     "concept_id": "85b0625d-8c98-449b-9753-1eb0f85cfccc",
+     "mastery": null
+    },
+    "intent_resolution": "direct"
+   }
+  }
+ ],
+ "learning_state_before": {
+  "current_state": "NEW",
+  "allowed_next_states": [
+   "DIAGNOSING",
+   "LEARNING"
+  ],
+  "transitions": []
+ },
+ "learning_state_after": {
+  "current_state": "REMEDIATING",
+  "allowed_next_states": [
+   "ASSESSING",
+   "LEARNING",
+   "PRACTICING"
+  ],
+  "transitions": [
+   {
+    "from_state": "ASSESSING",
+    "to_state": "REMEDIATING",
+    "trigger": "POLICY_REPEATED_FAILURE",
+    "rule_id": "R5-repeated-failure",
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:17.202074Z"
+   },
+   {
+    "from_state": "REMEDIATING",
+    "to_state": "ASSESSING",
+    "trigger": "ATTEMPT_SUBMITTED",
+    "rule_id": null,
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:17.197488Z"
+   },
+   {
+    "from_state": "ASSESSING",
+    "to_state": "REMEDIATING",
+    "trigger": "POLICY_REPEATED_FAILURE",
+    "rule_id": "R5-repeated-failure",
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:17.130883Z"
+   },
+   {
+    "from_state": "REMEDIATING",
+    "to_state": "ASSESSING",
+    "trigger": "ATTEMPT_SUBMITTED",
+    "rule_id": null,
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:17.126106Z"
+   },
+   {
+    "from_state": "ASSESSING",
+    "to_state": "REMEDIATING",
+    "trigger": "POLICY_REMEDIATE_MISCONCEPTION",
+    "rule_id": "R3-wrong-misconception",
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:17.051376Z"
+   },
+   {
+    "from_state": "REMEDIATING",
+    "to_state": "ASSESSING",
+    "trigger": "ATTEMPT_SUBMITTED",
+    "rule_id": null,
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:17.045662Z"
+   },
+   {
+    "from_state": "ASSESSING",
+    "to_state": "REMEDIATING",
+    "trigger": "POLICY_REMEDIATE_MISCONCEPTION",
+    "rule_id": "R3-wrong-misconception",
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:16.921193Z"
+   },
+   {
+    "from_state": "LEARNING",
+    "to_state": "ASSESSING",
+    "trigger": "ATTEMPT_SUBMITTED",
+    "rule_id": null,
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:16.918213Z"
+   },
+   {
+    "from_state": "NEW",
+    "to_state": "LEARNING",
+    "trigger": "LEARNING_STARTED",
+    "rule_id": null,
+    "concept_id": null,
+    "occurred_at": "2026-10-18T11:28:16.912172Z"
+   }
+  ]
+ },
+ "trace_http": 200,
+ "trace": {
+  "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+  "entries": [
+   {
+    "event_type": "concept_selected",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.680969Z",
+    "time_basis": "ingested",
+    "source": "learning_session",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "problem_attempted",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.680969Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "d80f3d0f-1f7d-420b-9f72-6e575e458ca4",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "assessment_failed",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.680969Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "d80f3d0f-1f7d-420b-9f72-6e575e458ca4",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "mastery_updated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.680969Z",
+    "time_basis": "ingested",
+    "source": "concept_mastery_history",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "d80f3d0f-1f7d-420b-9f72-6e575e458ca4",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": {
+     "mastery_before": null,
+     "mastery_after": 0.15,
+     "is_first_measurement": true,
+     "confidence": 0.17,
+     "sample_size": 1
+    },
+    "detail": null
+   },
+   {
+    "event_type": "misconception_detected",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.880746Z",
+    "time_basis": "ingested",
+    "source": "misconception_hypothesis",
+    "session_id": null,
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": "critical-point-implies-extremum",
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "confidence": 0.97,
+     "evidence_count": 4,
+     "is_active": true
+    }
+   },
+   {
+    "event_type": "skills_resolved",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.903943Z",
+    "time_basis": "ingested",
+    "source": "attempt_event",
+    "session_id": null,
+    "attempt_id": "d80f3d0f-1f7d-420b-9f72-6e575e458ca4",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "is_correct": false,
+     "source": "attempt_submit"
+    }
+   },
+   {
+    "event_type": "learner_state_created",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.959455Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "mastery_basis": "measured",
+     "ability_basis": "no_ability_snapshot",
+     "active_hypotheses": 1
+    }
+   },
+   {
+    "event_type": "recommendation_generated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:16.992158Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "policy_version": "cat_v2_state_remediation"
+    }
+   },
+   {
+    "event_type": "problem_attempted",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.016694Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "d93cc53d-f743-463f-bfbb-873326eb1d40",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "assessment_failed",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.016694Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "d93cc53d-f743-463f-bfbb-873326eb1d40",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "mastery_updated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.016694Z",
+    "time_basis": "ingested",
+    "source": "concept_mastery_history",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "d93cc53d-f743-463f-bfbb-873326eb1d40",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": {
+     "mastery_before": 0.15,
+     "mastery_after": 0.12,
+     "is_first_measurement": false,
+     "confidence": 0.29,
+     "sample_size": 2
+    },
+    "detail": null
+   },
+   {
+    "event_type": "skills_resolved",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.043012Z",
+    "time_basis": "ingested",
+    "source": "attempt_event",
+    "session_id": null,
+    "attempt_id": "d93cc53d-f743-463f-bfbb-873326eb1d40",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "is_correct": false,
+     "source": "attempt_submit"
+    }
+   },
+   {
+    "event_type": "learner_state_created",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.079521Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "mastery_basis": "measured",
+     "ability_basis": "no_ability_snapshot",
+     "active_hypotheses": 1
+    }
+   },
+   {
+    "event_type": "recommendation_generated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.090519Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": "196d5259-217e-5968-8775-5e237c660f6e",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "policy_version": "cat_v5"
+    }
+   },
+   {
+    "event_type": "problem_attempted",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.101853Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "469d783a-2cca-4139-b584-f161479ab429",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "assessment_failed",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.101853Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "469d783a-2cca-4139-b584-f161479ab429",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "mastery_updated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.101853Z",
+    "time_basis": "ingested",
+    "source": "concept_mastery_history",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "469d783a-2cca-4139-b584-f161479ab429",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": {
+     "mastery_before": 0.12,
+     "mastery_after": 0.12,
+     "is_first_measurement": false,
+     "confidence": 0.38,
+     "sample_size": 3
+    },
+    "detail": null
+   },
+   {
+    "event_type": "skills_resolved",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.123756Z",
+    "time_basis": "ingested",
+    "source": "attempt_event",
+    "session_id": null,
+    "attempt_id": "469d783a-2cca-4139-b584-f161479ab429",
+    "problem_id": "135fbda6-b52f-591e-9f10-0f523df4cebe",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "is_correct": false,
+     "source": "attempt_submit"
+    }
+   },
+   {
+    "event_type": "ability_measured",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.133184Z",
+    "time_basis": "ingested",
+    "source": "ability_snapshot",
+    "session_id": null,
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "theta": -4.0,
+     "response_count": 3
+    }
+   },
+   {
+    "event_type": "learner_state_created",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.156210Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "mastery_basis": "measured",
+     "ability_basis": "measured",
+     "active_hypotheses": 1
+    }
+   },
+   {
+    "event_type": "recommendation_generated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.164439Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": "196d5259-217e-5968-8775-5e237c660f6e",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "policy_version": "cat_v5"
+    }
+   },
+   {
+    "event_type": "problem_attempted",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.176060Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "e399906f-1018-41be-8bba-28de410d2b04",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "assessment_failed",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.176060Z",
+    "time_basis": "ingested",
+    "source": "problem_attempt",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "e399906f-1018-41be-8bba-28de410d2b04",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": false,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": null
+   },
+   {
+    "event_type": "mastery_updated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.176060Z",
+    "time_basis": "ingested",
+    "source": "concept_mastery_history",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": "e399906f-1018-41be-8bba-28de410d2b04",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": "efc69263-4c8b-4cd6-83fb-7b504de4d1e2",
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": {
+     "mastery_before": 0.12,
+     "mastery_after": 0.12,
+     "is_first_measurement": false,
+     "confidence": 0.44,
+     "sample_size": 4
+    },
+    "detail": null
+   },
+   {
+    "event_type": "skills_resolved",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.195434Z",
+    "time_basis": "ingested",
+    "source": "attempt_event",
+    "session_id": null,
+    "attempt_id": "e399906f-1018-41be-8bba-28de410d2b04",
+    "problem_id": "1e924953-5c42-52b4-850a-f3d411e03df9",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "is_correct": false,
+     "source": "attempt_submit"
+    }
+   },
+   {
+    "event_type": "learner_state_created",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.223906Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": null,
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "mastery_basis": "measured",
+     "ability_basis": "measured",
+     "active_hypotheses": 1
+    }
+   },
+   {
+    "event_type": "recommendation_generated",
+    "learner_id": "e0c49477-33a1-4b32-8c48-1e631c53c45c",
+    "occurred_at": "2026-10-18T11:28:17.232469Z",
+    "time_basis": "ingested",
+    "source": "evidence_event",
+    "session_id": "ea338c0e-1aad-4e20-b186-7da21ddbdce7",
+    "attempt_id": null,
+    "problem_id": "196d5259-217e-5968-8775-5e237c660f6e",
+    "concept_id": null,
+    "skill_id": null,
+    "misconception_id": null,
+    "correct": null,
+    "response_time_ms": null,
+    "mastery_change": null,
+    "detail": {
+     "policy_version": "cat_v5"
+    }
+   }
+  ],
+  "coverage": [
+   {
+    "event_type": "diagnostic_started",
+    "source": "assessment",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/me.py의 진단 capture·assemble이 Assessment.from_schema로 적재(started_at)."
+   },
+   {
+    "event_type": "diagnostic_completed",
+    "source": "assessment",
+    "availability": "produced",
+    "count": 0,
+    "reason": "같은 행의 completed_at — 미완료(NULL)면 이 이벤트는 나오지 않는다."
+   },
+   {
+    "event_type": "learner_state_created",
+    "source": "evidence_event",
+    "availability": "produced",
+    "count": 4,
+    "reason": "l2/recommendation_evidence.record_recommendation_treatment가 추천 처치 meta에 그 추천이 소비한 LearnerState의 근거 식별자(learner_state_basis — 최신 숙달 행 키·θ 스냅샷 id·활성 가설 id·조립 시각)를 싣는다(EOS-132). 조립 시각을 상태 생성 사건으로 투영하며, 학습자 결합은 추천과 같은 세션 조인이다. 범위는 추천이 소비한 상태뿐 — 학습·코치·상태 조회가 조립한 상태는 기록되지 않는다(LearnerState 비영속). 종전 원천 user_state_snapshot은 writer 0건 빈 좌석이었다."
+   },
+   {
+    "event_type": "concept_selected",
+    "source": "learning_session",
+    "availability": "produced",
+    "count": 1,
+    "reason": "l2/learning_session_writer가 인증된 학습 활동(/me/next-problem·/me/attempts·코치 턴)마다 서버 30분 유휴 규칙으로 learning_session을 잇거나 연다(EOS-131). 세션 개시(started_at)를 이 이벤트로 투영한다 — concept_id는 그 묶음에서 문항을 실은 첫 활동(시도·코치 턴)이 확인한 문항 대표 개념이다(P3-27 · 덮어쓰지 않으므로 '첫 확인 개념'이지 학습한 개념의 집합이 아니다). 추천 조회만 있었거나 문항이 개념에 매핑되지 않았으면 None이고, 그 None은 '개념을 확인한 활동이 아직 없는 묶음'이라는 사실이다. occurred_at은 세션 개시 시각이라 개념이 확인된 시각보다 앞설 수 있다."
+   },
+   {
+    "event_type": "content_viewed",
+    "source": "concept_content",
+    "availability": "dormant",
+    "count": 0,
+    "reason": "학습자별 콘텐츠 열람 로그가 없다 — concept_content는 조회 표면만 있고 '누가 언제 봤다'를 남기는 좌석이 0건이다(2026-09-16 실측)."
+   },
+   {
+    "event_type": "problem_attempted",
+    "source": "problem_attempt",
+    "availability": "produced",
+    "count": 4,
+    "reason": "api/me.py submit_attempt·api/coach.py 완료 확정이 ProblemAttempt를 적재."
+   },
+   {
+    "event_type": "assessment_failed",
+    "source": "problem_attempt",
+    "availability": "produced",
+    "count": 4,
+    "reason": "같은 attempt 행의 is_correct=False에서 파생 — 정답이면 나오지 않고 problem_attempted.correct가 그 사실을 운반한다(미채점 NULL은 둘 다 아님)."
+   },
+   {
+    "event_type": "misconception_detected",
+    "source": "misconception_hypothesis",
+    "availability": "produced",
+    "count": 1,
+    "reason": "l4/misconception/hypothesis_store.py가 가설 신설 시 적재(created_at)."
+   },
+   {
+    "event_type": "mastery_updated",
+    "source": "concept_mastery_history",
+    "availability": "produced",
+    "count": 4,
+    "reason": "l2/mastery_tracking.py가 채점마다 측정 1행 적재 — 변경 전후는 같은 (user, concept) 파티션의 직전 행에서 SQL lag로 복원한다."
+   },
+   {
+    "event_type": "recommendation_generated",
+    "source": "evidence_event",
+    "availability": "produced",
+    "count": 4,
+    "reason": "l2/recommendation_evidence.record_recommendation_treatment가 실 learning_session.session_id로 기록한다(EOS-131 — 종전 uuid4 placeholder). evidence_event에는 여전히 user_id가 없고 (구조적 차단 유지) 학습자 결합은 evidence_event.session_id → learning_session.user_id 조인으로 얻는다. 세션 기록이 실패한 드문 호출은 placeholder로 남아 이 시간선에 실리지 않는다."
+   },
+   {
+    "event_type": "skill_mastery_updated",
+    "source": "skill_mastery_history",
+    "availability": "produced",
+    "count": 0,
+    "reason": "l2/skill_mastery_tracking.py가 행동(스킬) 축 측정을 적재 — 전후 복원 방식 동일."
+   },
+   {
+    "event_type": "ability_measured",
+    "source": "ability_snapshot",
+    "availability": "produced",
+    "count": 1,
+    "reason": "api/me.py capture_ability_snapshot·세션 종료 자동 적재가 θ 스냅샷을 남긴다."
+   },
+   {
+    "event_type": "skills_resolved",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 4,
+    "reason": "l2/attempt_skill_event.py가 채점 확정 시 `문제시도` 이벤트로 해소 스킬을 적재."
+   },
+   {
+    "event_type": "verification_recorded",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/coach.py `검산결과` — 스테이트풀 코치의 풀이 제출 턴에만."
+   },
+   {
+    "event_type": "hint_provided",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/coach.py `힌트제공`(supply·hint_level 1~4)."
+   },
+   {
+    "event_type": "hint_requested",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/coach.py `힌트요청`(demand — 학생이 답을 요구한 발화)."
+   },
+   {
+    "event_type": "stuck_detected",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/coach.py `막힘`(turn_count ≥ 5 임계 도달)."
+   },
+   {
+    "event_type": "answer_submitted",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/coach.py `답입력`(직전 학생 턴 대비 서버 지연)."
+   },
+   {
+    "event_type": "visualization_interacted",
+    "source": "attempt_event",
+    "availability": "produced",
+    "count": 0,
+    "reason": "api/interactions.py `시각화조작` — payload 자유형이라 종류만 싣고 내부는 버린다."
+   }
+  ],
+  "since": null,
+  "until": null,
+  "truncated": false,
+  "limit": 200
+ }
+}

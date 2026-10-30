@@ -13,12 +13,13 @@
 고정하는 것 / 안 하는 것 (정직 기술)
 ────────────────────────────────────────────────────────────────────────────
 - `problem_version_id` ← `problem.problem_version_id`(현재 서빙 기준 판 포인터). 문항에 판이 없으면
-  **None**이다. 판을 쓰는 운영 writer(`l3/problem_publish_gate.py`, EOS-190)는 생겼지만 그것을
-  부르는 운영 표면이 아직 없어(EOS-194) 운영 DB의 포인터는 여전히 NULL이므로, 이 헬퍼가
-  운영에서 만드는 `problem_version_id`는 **지금도 전부 None**이다. 이것은 결함이 아니라 정확한
-  상태다 — 판 없는 문항에 판을 날조해 넣지 않는다. 문항이 발행되는 순간부터 이 헬퍼는 별도
-  수정 없이 값을 기록한다(`outcome=pinned` 비율이 "작동한 비율"이다 — 아래 로그. writer 경유
-  실증: `tests/backend/db/test_problem_version_publish_integration.py`).
+  **None**이다. 판을 쓰는 운영 writer(`l3/problem_publish_gate.py`, EOS-190)와 그것을 부르는
+  운영 표면(관리자 CMS `api/admin_cms_problem_versions.py`, EOS-194)이 생겼다. 다만 운영자가
+  문항을 실제로 발행하기 전까지 운영 DB의 포인터는 NULL이므로, 이 헬퍼가 운영에서 만드는
+  `problem_version_id`는 **발행된 문항에서만** 값이 있다. 판 없는 문항은 정확히 None이다 — 판 없는
+  문항에 판을 날조해 넣지 않는다. 문항이 발행되는 순간부터 이 헬퍼는 별도 수정 없이 값을
+  기록한다(`outcome=pinned` 비율이 "작동한 비율"이다 — 아래 로그. writer 경유 실증:
+  `tests/backend/db/test_problem_version_publish_integration.py`).
 - `evaluation_context` ← `schema/evaluation_context.py`의 `EVALUATION_CONTEXT_SOURCES` 표에서
   **출처가
   있는 키만** 채운다. 현재는 `curriculum_version` 하나뿐이고 나머지 4개 키는 `None`(기록 불가)이다.

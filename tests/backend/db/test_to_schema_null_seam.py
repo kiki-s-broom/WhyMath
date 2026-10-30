@@ -172,7 +172,15 @@ def _schema_of(orm_cls: type) -> type[BaseModel] | None:
 
 
 def _mismatches() -> list[tuple[type, type[BaseModel], str]]:
-    """(ORM, schema, 컬럼명) — nullable 컬럼 ↔ None 거부 + 기본값 보유 비-PK 필드."""
+    """(ORM, schema, 컬럼명) — nullable 컬럼 ↔ None 거부 + 기본값 보유 비-PK 필드.
+
+    **반환 순서는 결정적이어야 한다**(OPS-144). 이 목록이 아래 `parametrize`의 값이 되는데,
+    `Base.registry.mappers`는 `frozenset[Mapper]`라 순회 순서가 객체 주소 해시에 의존해
+    프로세스마다 달라진다. xdist는 워커끼리 수집한 테스트 목록을 *순서까지* 비교하므로
+    정렬하지 않으면 "Different tests were collected"로 수집 단계에서 실패한다.
+    CI가 이를 못 본 이유는 pytest-randomly가 nodeid 해시로 항목을 다시 정렬해 가렸기 때문이다
+    (`-p no:randomly`면 즉시 재현). 그래서 정렬은 플러그인이 아니라 여기서 보장한다.
+    """
     found: list[tuple[type, type[BaseModel], str]] = []
     for mapper in Base.registry.mappers:
         orm_cls = mapper.class_
@@ -192,7 +200,8 @@ def _mismatches() -> list[tuple[type, type[BaseModel], str]]:
                 TypeAdapter(field.annotation).validate_python(None)
             except Exception:  # noqa: BLE001
                 found.append((orm_cls, schema_cls, attr.key))
-    return found
+    # 클래스명만으로 정렬하면 서로 다른 모듈의 동명 클래스가 순서를 다투므로 모듈·한정명까지 키에 넣는다.
+    return sorted(found, key=lambda hit: (hit[0].__module__, hit[0].__qualname__, hit[2]))
 
 
 def test_scan_finds_targets_at_all() -> None:

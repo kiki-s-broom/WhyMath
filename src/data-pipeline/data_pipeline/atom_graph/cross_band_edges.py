@@ -1,9 +1,11 @@
 """고등→대학 학교급 경계 엣지 *제안* 검증 — S4-01 첫 슬라이스.
 
-배경(실측): 원자 백본 v1(`data/corpus/atom_graph_v1/graph.json`)은 개념 2,683·엣지 2,210이고
-학교급 경계를 넘는 엣지는 20건(0.90%)뿐이다. 그중 **고등→대학은 0건**이라 대학 원자 1,069개가
-K-12 쪽에서 도달 불가능한 섬으로 남아 있다. 이 모듈은 그 섬을 잇는 *제안 파일*
-(`cross_band_edges_university_v1.json`)을 검증한다.
+배경(S4-01 첫 슬라이스 착수 당시 실측): 원자 백본 v1(`data/corpus/atom_graph_v1/graph.json`)은
+당시 개념 2,683·엣지 2,210이었고 학교급 경계를 넘는 엣지는 20건(0.90%)뿐이었다. 그중
+**고등→대학은 0건**이라 대학 노드 1,069개(세부개념 512 포함)가 K-12 쪽에서 도달 불가능한 섬으로
+남아 있었다. 이 모듈은 그 섬을 잇는 *제안 파일*(`cross_band_edges_university_v1.json`)을
+검증한다. 제안은 2026-10-09 S4-60이 정본에 병합했다 — 현재 규모는 `docs/data/corpus_facts.md`의
+`atom_graph.edges`·`atom_graph.cross_band_edges_university`.
 
 **정본 무변경 원칙**: 제안은 graph.json과 별개 파일이며, 이 모듈은 어떤 파일도 *쓰지 않는다*
 (읽기·판정 전용). 정본 병합은 검수 승인 후 별도 세션 소관이다
@@ -166,7 +168,8 @@ def _find_prerequisite_cycle(pairs: Sequence[tuple[str, str]]) -> list[str] | No
 
     atom_graph/validate.py의 `_find_prerequisite_cycle`과 같은 알고리즘이되 입력이 모델이 아니라
     *원시 쌍*이다(제안은 아직 `AtomEdge`가 아니다 — 모듈 docstring의 구현 메모 참조).
-    재귀 대신 명시 스택: 원자 백본은 2,683 노드라 깊은 체인에서 재귀 한계를 피한다.
+    재귀 대신 명시 스택: 원자 백본은 수천 노드라(`atom_graph.nodes`) 깊은 체인에서 재귀 한계를
+    피한다.
 
     Returns: 사이클을 이루는 노드 경로(닫힘 노드 반복 포함) 또는 None.
     """

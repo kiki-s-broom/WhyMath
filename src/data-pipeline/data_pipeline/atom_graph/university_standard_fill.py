@@ -1,7 +1,8 @@
 """대학 원자 `standard_codes` 채움 — 커밋된 graph.json 후처리 (원자 백본 U2).
 
 원본 원자 xlsx(`원자_통합마스터`)는 휘발됐으므로 transform 재실행이 불가하다. 따라서 *커밋된*
-코퍼스 `data/corpus/atom_graph_v1/graph.json`을 **후처리**해 대학 원자 513개의 빈 `standard_codes`를
+코퍼스 `data/corpus/atom_graph_v1/graph.json`을 **후처리**해 대학 원자(세부개념 — 건수는
+`docs/data/corpus_facts.md`의 `atom_graph.university_atoms`)의 빈 `standard_codes`를
 채운다(handoff §6 허용 경로). 채움 근거는 U1 산출 `standards_university_v1` 코퍼스다 —
 소단원(링크 `concept_src_id`)↔성취기준(`norm_id`→`code`)이 1:1이라 소단원 코드 → 성취기준 코드 맵을
 만들고, 각 대학 원자(level=세부개념)의 `subunit_code`로 그 소단원의 성취기준 코드를 찾아 채운다.

@@ -3,7 +3,7 @@
 합성 큐로 승격 규칙(승인만 추출·서명 필수·직접매핑 conf<0.6 금지·kebab 실재·top key 오투입
 거부·전건 열거·exit 2)을 검증하고, 실 큐 파일(`docs/data/misconception_crosslink_review_queue.json`)
 은 초안(`misconception_crosslink_candidates.md` §2) 전사 충실성을 회귀 가드한다 — kebab 32 전원·
-M-id 실재(843 코퍼스·극값 MC 신규 저작 M0864·M0865 포함)·전행 pending·직접매핑 conf 초안 명시값
+M-id 실재(M-id 코퍼스 misconceptions_v1·극값 MC 신규 저작 M0864·M0865 포함)·전행 pending·직접매핑 conf 초안 명시값
 일치(전사 왜곡 방지 스팟).
 """
 
@@ -386,11 +386,22 @@ _MISC40_DIRECT: dict[str, set[tuple[str, float]]] = {
     "power-rule-step-omitted": {("M0671", 0.85)},
 }
 
+# P3-61 — 선지 역추적 전용 kebab 4종(같은 화이트리스트 계약·전행 pending·미서명). 2026-10-17 Kiki 결정
+# (게이트 G-misc40-unseated-concepts-disposition 안 A, 4개 개념 한정)의 집행이다. 이 등재는 승인을
+# 뜻하지 않는다 — 승인 크로스워크에는 여전히 행이 없어야 한다(test_p3_61_*).
+_P3_61_DIRECT: dict[str, set[tuple[str, float]]] = {
+    "tangent-external-point-as-contact": {("M0673", 0.8)},
+    "mvt-conditions-unchecked": {("M0674", 0.9)},
+    "graph-sketch-few-points-only": {("M0676", 0.85)},
+    "velocity-sign-ignored": {("M0678", 0.85)},
+}
+
 
 def test_real_queue_direct_top_confidences_match_draft(
     real_rows: list[dict[str, Any]],
 ) -> None:
-    # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 ∪ MISC-21 ∪ MISC-40 — 그 외 차단.
+    # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 ∪ MISC-21 ∪ MISC-40 ∪ P3-61
+    # — 그 외 차단.
     expected: dict[str, set[tuple[str, float]]] = {
         k: set(_DRAFT_DIRECT_TOPS.get(k, set()))
         | set(_REVIEWED_DIRECT_ALTS.get(k, set()))
@@ -403,6 +414,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_TRANCHE5_DIRECT.get(k, set()))
         | set(_MISC21_DIRECT.get(k, set()))
         | set(_MISC40_DIRECT.get(k, set()))
+        | set(_P3_61_DIRECT.get(k, set()))
         for k in set(_DRAFT_DIRECT_TOPS)
         | set(_REVIEWED_DIRECT_ALTS)
         | set(_S2P_DIRECT)
@@ -414,6 +426,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_TRANCHE5_DIRECT)
         | set(_MISC21_DIRECT)
         | set(_MISC40_DIRECT)
+        | set(_P3_61_DIRECT)
     }
     actual: dict[str, set[tuple[str, float]]] = {}
     for row in real_rows:
@@ -475,7 +488,12 @@ _MISC40_CONCEPT_MIDS: dict[str, str] = {
     "[12미적Ⅰ-02-10]": "M0678",
 }
 #: 의도적 미승격 — omission형(또는 문항 맥락 종속)이라 kebab도 큐 행도 만들지 않았다.
-_MISC40_NOT_PROMOTED = ("M0673", "M0674", "M0676", "M0677", "M0678")
+#: **P3-61(2026-10-17 Kiki 결정)이 MISC-40의 미승격 5건 중 4건(M0673·M0674·M0676·M0678)의 처분을 바꿨다** —
+#: 선지 역추적 전용 kebab과 pending 큐 행이 생겼다. 남은 것은 M0677 하나이며 그것은 별도 게이트
+#: (G-p345-m0677-link-disposition · P3-52) 소관이라 여전히 kebab도 큐 행도 없어야 한다.
+_MISC40_NOT_PROMOTED = ("M0677",)
+#: P3-61이 큐 행을 올린 4건 — 큐에는 pending으로 있되 **승인 크로스워크에는 없어야 한다**(자기승인 금지).
+_P3_61_QUEUED_MIDS = ("M0673", "M0674", "M0676", "M0678")
 #: 서명 게이트(G-misc40-new-crosslink-signature)에 올린 5행 = MISC-21 잔여 3 + MISC-40 신설 1 + 기존 부분매핑 1.
 _MISC40_SIGNATURE_PAIRS: tuple[tuple[str, str], ...] = (
     ("bigger-denominator-bigger-fraction", "M0462"),
@@ -504,6 +522,10 @@ def test_misc40_not_promoted_mids_have_no_crosswalk_seat(real_rows: list[dict[st
     for mid in _MISC40_NOT_PROMOTED:
         assert mid not in approved_mids, mid
         assert mid not in queued_mids, mid
+    # P3-61 — 큐에는 올랐지만 승인 코퍼스에는 없다. 서명은 사람 전용이라 세션이 승인 행을 만들지 않는다.
+    for mid in _P3_61_QUEUED_MIDS:
+        assert mid in queued_mids, mid
+        assert mid not in approved_mids, mid
 
 
 def test_misc40_new_kebab_has_single_pending_direct_row(real_rows: list[dict[str, Any]]) -> None:
@@ -542,3 +564,39 @@ def test_misc40_signature_table_in_judgment_doc_matches_queue(
     for kebab, mid in _MISC40_SIGNATURE_PAIRS:
         assert (kebab, mid) in queue_pairs, (kebab, mid)
         assert any(kebab in ln and mid in ln for ln in table_lines), (kebab, mid)
+
+
+# ── P3-61(2026-10-18) — 선지 역추적 전용 kebab 4종의 pending 큐 행 동결 ────────────────────────────
+# 판정 근거: docs/reviews/p3_06_wrong_answer_remediation_judgment_2026-10-17.md · 본문 정의:
+# docs/prompts/misconception_diagnosis.md §"선지 역추적 전용 항목". 승인(서명)은 사람 전용이다.
+_P3_61_KEBABS = tuple(_P3_61_DIRECT)
+
+
+def test_p3_61_each_new_kebab_has_single_pending_direct_row(
+    real_rows: list[dict[str, Any]],
+) -> None:
+    for kebab, expected in _P3_61_DIRECT.items():
+        rows = [r for r in real_rows if r["kebab_id"] == kebab]
+        assert len(rows) == 1, kebab
+        row = rows[0]
+        assert {(row["mis_id"], row["confidence"])} == expected, kebab
+        assert row["link_type"] == "직접매핑", kebab
+        assert row["status"] == "pending", kebab
+        assert row["reviewer"] is None and row["reviewed_on"] is None, kebab
+        assert kebab in CATALOG_BY_ID  # 큐 행이 가리키는 kebab이 실재한다
+        assert CATALOG_BY_ID[kebab].choice_trace_only  # 그리고 선지 역추적 전용이다
+
+
+def test_p3_61_rationale_states_the_scope_gap_for_the_narrower_kebab(
+    real_rows: list[dict[str, Any]],
+) -> None:
+    # M0673은 kebab이 M-id 주 진술보다 좁다 — 그 사실과 "부분매핑은 적재되지 않는다"는 결과를 서명자가
+    # 볼 수 있어야 한다(범위 차이를 숨기고 직접매핑으로만 올리면 서명이 과장된 주장에 대한 것이 된다).
+    row = next(r for r in real_rows if r["kebab_id"] == "tangent-external-point-as-contact")
+    assert "좁다" in row["rationale"]
+    assert "MISC-63" in row["rationale"]
+
+
+def test_p3_61_m0677_still_has_no_queue_row(real_rows: list[dict[str, Any]]) -> None:
+    # M0677은 P3-61 결정에서 제외됐다 — 이 PR이 조용히 그 행까지 올리지 않았음을 값으로 못 박는다.
+    assert not [r for r in real_rows if r["mis_id"] == "M0677"]

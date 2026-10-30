@@ -149,11 +149,54 @@ __all__ = ["LLMEquivalentProblemGenerator"]
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _safe_exc_summary(exc: BaseException) -> str:
+    """never-break 경고용 예외 요약 — **타입명 + 비내용 구조 필드**만 담는다(EOS-202).
+
+    `str(exc)`(예외 메시지 원문)는 넣지 않는다. 이 파일이 삼키는 예외의 메시지는 내용을 싣는다:
+      - provider 실패: `SeatHttpError`는 메시지에 공급사 **응답 본문 최대 2000자**를 붙이고
+        (`_openai_compat.py`), SDK 예외도 요청·응답 일부를 메시지에 담는다.
+      - 조립 실패: pydantic `ValidationError` 메시지는 LLM이 낸 **입력값**(`input_value=…`)을,
+        우리 `ValueError`는 LLM 답·조건식(`LLM 답({given})`)을 담는다.
+    경고 로그는 콘솔·수집기로 흘러가므로 그 본문이 거기 남지 않게 한다(CLAUDE.md 「침묵 실패
+    금지」 — 타입명 필수·시크릿·필드값 제외).
+
+    "안전한 요약"의 정의(값이 아니라 **구조**만):
+      ① 예외 타입명 — 실패 종류를 가르는 최소 정보(필수).
+      ② HTTP 상태코드 — **정수 속성**에서만 읽는다(`exc.status_code` · `exc.response.status_code`,
+         `seat_failure._http_status_of`와 같은 두 자리). 메시지에서 캐내지 않는다. 상태코드는
+         응답 내용이 아니라 프로토콜 분류값이라 429·5xx·4xx 구분(재시도할지·설정을 고칠지)을
+         로그만으로 가능하게 한다. bool은 int 하위지만 상태코드가 아니라 배제한다.
+      ③ pydantic 검증 오류 **건수** — 몇 군데가 틀렸는지만(필드 경로·입력값은 미포함).
+    """
+    name = type(exc).__name__
+    parts: list[str] = []
+    try:
+        candidates: list[object] = [getattr(exc, "status_code", None)]
+        response = getattr(exc, "response", None)
+        if response is not None:
+            candidates.append(getattr(response, "status_code", None))
+        for value in candidates:
+            if isinstance(value, int) and not isinstance(value, bool):
+                parts.append(f"HTTP {value}")
+                break
+        if isinstance(exc, ValidationError):
+            parts.append(f"errors={exc.error_count()}")
+    except Exception:  # noqa: BLE001 — 로그 요약이 never-break 폴백을 깨면 안 된다(리뷰 P3)
+        # 속성 접근이 AttributeError 아닌 예외를 던지는 객체(property 등) — 타입명만 남긴다.
+        return name
+    return f"{name}({', '.join(parts)})" if parts else name
+
+
 # 개념 태깅 role 유효값(ConceptRole) — LLM이 낸 role 문자열 검증용(schema는 최하위·import 허용).
 _VALID_ROLES: frozenset[str] = frozenset(r.value for r in ConceptRole)
 
 # 근 선택(S2-i) 유효값 — LLM이 낸 answer_selection 검증용. verify_root_selection 계약과 동일.
 _VALID_ROOT_SELECTIONS: frozenset[str] = frozenset({"largest", "smallest", "unique"})
+
+# 근 집계(S2 킬러) 유효값 — LLM이 낸 answer_aggregate 검증용. verify_root_aggregate 계약과 동일.
+# EOS-23 ⑤: 이 필드가 저작 경로에 없어 "두 근의 합" 문항이 게이트의 집계 분기에 닿을 수 없었다.
+_VALID_ROOT_AGGREGATES: frozenset[str] = frozenset({"sum", "product"})
 
 # ──────────────────────────────────────────────────────────────────────────
 # 출력 JSON 스키마(S2-j structured output) — 로컬(Ollama) 결정일 때 format= 제약 디코딩으로
@@ -178,6 +221,8 @@ _OUTPUT_JSON_SCHEMA: dict[str, object] = {
         },
         "answer_map": {"type": "object", "additionalProperties": {"type": "string"}},
         "answer_selection": {"type": "string", "enum": sorted(_VALID_ROOT_SELECTIONS)},
+        # 선택(required 아님) — 합/곱 문항만 선언한다. 선언하면 answer는 근이 아니라 집계값이다.
+        "answer_aggregate": {"type": "string", "enum": sorted(_VALID_ROOT_AGGREGATES)},
         "difficulty_overall": {"type": "number", "minimum": 1.0, "maximum": 5.0},
         "unit_codes": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         "answer_format": {"type": "string", "enum": [f.value for f in AnswerFormat]},
@@ -449,7 +494,12 @@ class LLMEquivalentProblemGenerator:
         try:
             generated = self._invoke(prompt, decision, seed=seed)
         except Exception as exc:  # noqa: BLE001 — provider 장애 시 배치 크래시 금지·안전 폴백.
-            _LOGGER.warning("동등문제 생성 provider 호출 실패 — None 폴백: %s", exc)
+            # 침묵실패 금지 — 타입명 + 안전 요약만(메시지 원문엔 응답 본문이 섞인다·EOS-202).
+            # 아래 GenerationLog.error_detail 형식은 g3_content_measures가 앞머리로
+            # 분류하므로 무변경.
+            _LOGGER.warning(
+                "동등문제 생성 provider 호출 실패(%s) — None 폴백", _safe_exc_summary(exc)
+            )
             # 실패한 호출 *시도*도 Run 이력이다(EOS-55) — usage 미상(None)·정직 실패 기록.
             self._emit_generation_log(
                 spec,
@@ -486,7 +536,8 @@ class LLMEquivalentProblemGenerator:
         except (ValidationError, ValueError, KeyError, TypeError) as exc:
             # Problem/Provenance 불변식 위반(저작권 게이트가 생성 거부)·필수 결측·타입 오류.
             # 조용히 통과시키지 않고 로그 + None(게이트에 도달하기 전 정직한 생성 실패).
-            _LOGGER.warning("동등문제 후보 조립 실패 — None 폴백: %s", exc)
+            # 메시지 원문은 LLM 입력값·답을 싣는다 — 타입명 + 오류 건수만(EOS-202).
+            _LOGGER.warning("동등문제 후보 조립 실패(%s) — None 폴백", _safe_exc_summary(exc))
             self._emit_generation_log(
                 spec,
                 prompt,
@@ -924,12 +975,25 @@ class LLMEquivalentProblemGenerator:
         answer = self._require_str(data, "answer")
         answer_explanation = self._opt_str(data, "answer_explanation")
         conditions = self._parse_conditions(data.get("conditions"))
-        answer_map = self._parse_answer_map(data.get("answer_map"))
-        answer_selection = self._parse_answer_selection(data.get("answer_selection"))
-        # derive-and-verify(S2-n) — 근 선택 문제는 정답을 우리가 유도해 대조·정확값 정규화.
-        answer, answer_map = self._derive_and_normalize(
-            answer, answer_map, conditions, answer_selection
-        )
+        answer_aggregate = self._parse_answer_aggregate(data.get("answer_aggregate"))
+        answer_map: dict[str, str]
+        answer_selection: str | None
+        if answer_aggregate is None:
+            answer_map = self._parse_answer_map(data.get("answer_map"))
+            answer_selection = self._parse_answer_selection(data.get("answer_selection"))
+            # derive-and-verify(S2-n) — 근 선택 문제는 정답을 우리가 유도해 대조·정확값 정규화.
+            answer, answer_map = self._derive_and_normalize(
+                answer, answer_map, conditions, answer_selection
+            )
+        else:
+            # EOS-23 ⑤ — 근 집계(합/곱) 문항: 답이 근이 아니라 집계값이라 근 치환맵·근 선택·
+            # derive-and-verify가 모두 성립하지 않는다. 결정론 집계 생성기와 같은 형태로 고정한다
+            # (answer_map 비움·answer_selection 없음). 모델이 보낸 두 필드는 **읽지 않는다** —
+            # `{x: 합}`을 영속하면 "x의 값이 합"이라는 거짓 검산 재료가 코퍼스에 남고, 선택(largest)
+            # 이 따라오면 derive-and-verify가 합을 틀린 근으로 오판해 정답 문항을 버린다.
+            # 집계값의 정오는 게이트(`verify_root_aggregate`·Vieta)가 독립 계산으로 판정한다.
+            answer_map = {}
+            answer_selection = None
         difficulty_overall = self._parse_difficulty(data.get("difficulty_overall"), spec)
         unit_codes = self._parse_unit_codes(data.get("unit_codes"))
         answer_format = self._parse_answer_format(data.get("answer_format"), spec)
@@ -978,6 +1042,7 @@ class LLMEquivalentProblemGenerator:
             conditions=conditions,
             answer_map=answer_map,
             answer_selection=answer_selection,
+            answer_aggregate=answer_aggregate,
             solution_steps=solution_steps,
             concept_tags=concept_tags,
         )
@@ -1052,7 +1117,12 @@ class LLMEquivalentProblemGenerator:
             # CONST-09: LLM 답은 신뢰 입력이 아니다 — 안전 진입점으로 파싱한다(거부는 아래 except).
             given_value = complex(safe_sympify(given).evalf())
             derived_value = complex(safe_sympify(derived).evalf())
-        except Exception:  # noqa: BLE001 — 답 파싱 불가는 정규화 포기(게이트 위임)
+        except Exception as exc:  # noqa: BLE001 — 답 파싱 불가는 정규화 포기(게이트 위임)
+            # 침묵실패 금지(EOS-202) — 종전엔 로그 없이 삼켰다. 타입명만 남긴다(LLM 답 값 미출력).
+            _LOGGER.warning(
+                "동등문제 답 수치 평가 실패(%s) — derive-and-verify 정규화 생략·게이트 위임",
+                _safe_exc_summary(exc),
+            )
             return answer, answer_map
         # 부동소수 표기 차이만 흡수(상대 1e-6) — 반올림 소수(1.33)·틀린 근은 불일치로 거부.
         tolerance = max(1e-6, 1e-6 * abs(derived_value))
@@ -1071,6 +1141,17 @@ class LLMEquivalentProblemGenerator:
         None으로 떨궈(오분류 방지) 다근 유일성 강등 경로에 맡긴다(조용한 오채택 금지).
         """
         if isinstance(value, str) and value.strip() in _VALID_ROOT_SELECTIONS:
+            return value.strip()
+        return None
+
+    @staticmethod
+    def _parse_answer_aggregate(value: object) -> str | None:
+        """근 집계(S2 킬러) — sum/product만 허용, 그 외·결측은 None(일반 문항).
+
+        미지 값을 조용히 None으로 떨구는 것은 안전 방향이다: 일반 문항 경로로 가면 answer_map이
+        필수라 집계 문항은 생성 실패가 되거나, 근이 아닌 답이 Tier1에서 거부된다(오채택 없음).
+        """
+        if isinstance(value, str) and value.strip() in _VALID_ROOT_AGGREGATES:
             return value.strip()
         return None
 

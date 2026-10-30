@@ -1,0 +1,18 @@
+{
+  "pool": "whymath-original",
+  "source_file": "eval_set.jsonl",
+  "upstream_source": null,
+  "source_citation": "P3-10 AI 품질 평가셋: 와이매스 자체작성. 대표 과정(P3-01 명세 phase3_scope_v1 — 미적분Ⅰ·미분) 승인 문항의 문항 ID·보기 인덱스·개념 ID·성취기준 코드만 참조하며 문항 본문·보기 본문·풀이는 담지 않는다(적재 시 승인 문항 코퍼스 problem_bank_* 에서 해석). 학생 신호 문장 3종은 합성 고정문이며 학생 데이터는 0건이다.",
+  "license_notice": "와이매스 자체 저작물. 참조하는 문항·개념·오개념 코퍼스는 각자의 사이드카 고지를 따른다.",
+  "counts": {
+    "cases": 244,
+    "hint_cases": 180,
+    "hint_ladders": 60,
+    "choice_cases": 64,
+    "choice_wrong": 37,
+    "choice_correct": 27
+  },
+  "integrity_gate": "tests/backend/harness/test_ai_quality_eval_set.py — 커밋본 = 결정론 생성 규칙 산출(바이트 동일) · 참조 실재(문항 승인·PRIMARY 개념·목표 단계·보기 범위) · 축별 판정 대상 수",
+  "provenance_note": "P3-10(2026-10-21). 선정 규칙은 whymath_backend/harness/ai_quality_eval_set.py 모듈 docstring 이 정본이다(힌트: 개념당 문항 6 × 사다리 L1~L3 · 선택: 개념당 객관식 3 × 오답 최대 2 + 정답 1). 오개념 라벨은 승인 distractor_map 에서 오며, 결정론 진단기와 같은 원천이라 그 점수는 독립 정확도가 아니라 회귀 감시다.",
+  "determinism": "결정론 — `python -m whymath_backend.harness.ai_quality_eval --build-eval-set <경로>` 의 산출을 그대로 커밋한다. 손 편집 금지(테스트가 바이트 비교로 막는다)."
+}

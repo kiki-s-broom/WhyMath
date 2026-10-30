@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  createReviewSession,
   fetchReviewDetail,
   fetchReviewList,
   REVIEW_LIST_STATUSES,
   submitReviewTransition,
-  type ReviewAction,
   type ReviewDetailResult,
   type ReviewFailure,
   type ReviewListResult,
   type ReviewListStatus,
+  type ReviewSessionResult,
+  type ReviewTransitionRequest,
+  type ReviewTransitionResult,
 } from "../_lib/adminReviewApi";
 import { clearOperatorToken, readOperatorToken } from "../_lib/adminSession";
 
@@ -128,14 +131,22 @@ export function ReviewQueue() {
     setNotice(null);
   }
 
-  async function handleTransition(
-    action: ReviewAction,
-    expectedStatus: string,
-    reason: string | null,
-  ): Promise<void> {
-    if (typeof token !== "string" || selectedId === null) return;
+  /** 문항을 열어 판정 작업을 시작할 때 서버에 착수(started) 세션을 만든다. */
+  async function handleStartSession(): Promise<ReviewSessionResult> {
+    if (typeof token !== "string" || selectedId === null) {
+      return { kind: "unreachable", reason: "선택된 문항 없음" };
+    }
+    const result = await createReviewSession(token, selectedId);
+    noteResult(result.kind);
+    return result;
+  }
+
+  async function handleTransition(req: ReviewTransitionRequest): Promise<ReviewTransitionResult> {
+    if (typeof token !== "string" || selectedId === null) {
+      return { kind: "unreachable", reason: "선택된 문항 없음" };
+    }
     const id = selectedId;
-    const result = await submitReviewTransition(token, id, action, expectedStatus, reason);
+    const result = await submitReviewTransition(token, id, req);
     noteResult(result.kind);
 
     if (result.kind === "ok") {
@@ -144,6 +155,14 @@ export function ReviewQueue() {
         text:
           "처리되었습니다 — " + statusLabel(result.data.from_status) + " → " +
           statusLabel(result.data.to_status) + " (감사 기록 " + String(result.data.audit_id) + ")",
+      });
+    } else if (result.kind === "conflict" && result.code === "invalid_review_session") {
+      // 세션이 만료됐거나 이미 쓰였다 — 상세가 새 세션을 만든다. 재시도는 사람이 확인 후 다시 누른다.
+      setNotice({
+        tone: "info",
+        text:
+          "검수 세션이 유효하지 않습니다 — " + result.message +
+          " 새 검수 세션을 시작했습니다. 준비되면 처리를 다시 선택해 확인을 눌러 주세요.",
       });
     } else if (result.kind === "conflict") {
       setNotice({
@@ -163,6 +182,7 @@ export function ReviewQueue() {
     if (result.kind === "ok" || result.kind === "conflict" || result.kind === "not-found") {
       await Promise.all([loadList(), loadDetail(id, true)]);
     }
+    return result;
   }
 
   if (token === undefined) return <p className={styles.muted}>세션 확인 중…</p>;
@@ -223,6 +243,7 @@ export function ReviewQueue() {
           <DetailPane
             detail={detail}
             onTransition={handleTransition}
+            onStartSession={handleStartSession}
             onRetry={() => selectedId !== null && void loadDetail(selectedId, false)}
           />
         </div>
@@ -265,7 +286,8 @@ function ListPane(props: {
 
 function DetailPane(props: {
   detail: DetailState;
-  onTransition: (a: ReviewAction, e: string, r: string | null) => Promise<void>;
+  onTransition: (req: ReviewTransitionRequest) => Promise<ReviewTransitionResult>;
+  onStartSession: () => Promise<ReviewSessionResult>;
   onRetry: () => void;
 }) {
   const { detail } = props;
@@ -279,6 +301,7 @@ function DetailPane(props: {
       key={detail.data.problem_id}
       detail={detail.data}
       onTransition={props.onTransition}
+      onStartSession={props.onStartSession}
     />
   );
 }

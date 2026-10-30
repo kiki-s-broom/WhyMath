@@ -1,6 +1,6 @@
 """원자 백본 `behavior_skills` 병합 — 커밋된 graph.json 후처리 (SKB-02).
 
-배경(SKB-01 게이트 점검 중 발견): 원자 백본 corpus(`data/corpus/atom_graph_v1/graph.json`·
+배경(SKB-01 게이트 점검 당시 발견): 원자 백본 corpus(`data/corpus/atom_graph_v1/graph.json`·
 2,683 concepts — `concept` 테이블 런타임 정본)에는 `behavior_skills` 필드가 전무했다. 반면
 구 437 코퍼스(`data/corpus/concept_graph_v1/concepts.jsonl`)에는 #419가 저작한 concept→skill
 매핑이 404/437건 실려 있다. 원자 백본 원본 xlsx(`원자_통합마스터`)는 휘발돼 transform-v1

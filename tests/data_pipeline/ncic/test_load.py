@@ -57,14 +57,14 @@ class TestWriteProvenance:
         digest = write_provenance(
             out,
             source_path=source,
-            counts={"standards": 895, "links": 443},
+            counts={"standards": 895, "links": 443},  # corpus-pin: 합성 픽스처
             notes=["테스트 노트"],
         )
         assert len(digest) == 64
         payload = json.loads(out.read_text(encoding="utf-8"))
         assert payload["source_sha256"] == digest
         assert payload["source_name"] == "file_a.xlsx"
-        assert payload["counts"] == {"standards": 895, "links": 443}
+        assert payload["counts"] == {"standards": 895, "links": 443}  # corpus-pin: 합성 픽스처
         assert payload["post_extraction"] == ["테스트 노트"]
         assert SOURCE_CITATION == payload["source_citation"]
         assert LICENSE_NOTICE == payload["license_notice"]

@@ -1,0 +1,41 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-144-xdist-collection-order-null-seam
+title: "파라미터화 테스트의 수집 순서가 프로세스마다 달라진다 — test_to_schema_null_seam이 xdist 워커 간 \"Different tests were collected\"로 수집 단계에서 실패 (순수 origin/main에서 재현)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 원인 확정과 재현 고정 — tests/backend/db/test_to_schema_null_seam.py 의 _mismatches() 가 Base.registry.mappers 를 순회해 parametrize 목록을 만든다. SQLAlchemy 2.0.54 에서 registry.mappers 는 frozenset[Mapper] 라(소스 확인) 순회 순서가 객체 주소 해시에 의존하고, 그래서 ids 순서가 프로세스마다 달라진다. 실측(2026-10-14): 순수 origin/main 복제본(PYTHONPATH 를 그 복제본으로 고정)에서 pytest -n 4 -p no:randomly 로 이 파일만 돌리면 3/3 회 수집 단계 오류(gw 간 'Different tests were collected'). 단일 프로세스는 PYTHONHASHSEED 1~4 에서 26건으로 안정이라 단일 프로세스 실행으로는 보이지 않는다. 수정 전에 이 재현 명령과 실패 줄을 notes 에 남긴다."
+  - "② 수정 — 파라미터 목록을 결정적 순서로 고정한다(예: ORM 클래스명·컬럼명 기준 정렬). 같은 수정이 이 파일 하나로 끝나는지, registry.mappers 를 순회해 테스트를 만드는 다른 모듈이 있는지 전수 확인해 같은 PR 에서 함께 고친다."
+  - "③ 전수 탐지 장치(수정과 별항) — 이 유형은 한 파일의 실수가 아니다. 같은 세션(P3-26)에서 랜덤 UUID 를 parametrize id 에 쓴 테스트도 같은 오류를 냈다. tests/backend 전체에서 parametrize 의 값·ids 가 set/frozenset/registry 순회 또는 uuid4 같은 비결정 원천에서 나오는 모듈을 AST 로 전수 탐지하는 거버넌스 테스트(또는 수집 일치 점검)를 만든다. 스캔 0건이면 실패로 판정한다(공허한 통과 금지)."
+  - "④ 변별력 — 수정 전 상태에서 ① 의 재현 명령이 RED, 수정 후 GREEN 임을 보인다. 정렬을 제거하는 뮤테이션을 주입해 ③ 의 탐지기가 RED 를 내는지 확인하고, 주입이 실제로 적용됐는지(mutated != original)와 바이트 동일 복원을 단언한다. 단일 프로세스 실행만으로 통과를 선언하지 않는다 — 반드시 -n 2 이상."
+  - "⑤ 미규명 사항 — 왜 CI 는 이 실패를 내지 않았는가. CI backend 잡은 pytest -n auto --dist loadfile 로 도는데 같은 파일이 통과해 왔다. 워커 수·수집 시점의 임포트 순서·mapper 등록 시점 중 무엇이 순서를 우연히 같게 만드는지 실측해 기록한다. 규명 전까지 CI 통과를 이 파일의 안전 근거로 쓰지 않는다. 같은 조건(-n auto --dist loadfile)에서 재현되는지도 함께 확인한다."
+  - "⑥ 배선 확인(정본화와 별항) — ③ 의 탐지 장치가 CI backend 잡에서 실제로 실행되는지 잡의 스텝 목록으로 확인하고, 그 확인을 완료 증적에 남긴다. 저장소에 존재하는 것과 CI 에서 도는 것은 다르다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1671"
+  - tests/backend/test_parametrize_collection_determinism.py
+paths:
+  - tests/backend/db/test_to_schema_null_seam.py
+  - tests/backend/test_parametrize_collection_determinism.py
+session: null
+notes: |-
+  발견 경위: 2026-10-14 P3-26(PR #1603) 의 main 병합 후 영향 범위 테스트를 pytest -n 4 로 돌리다 이 오류를 만났다. 이 PR 이 만든 문제가 아님을 순수 origin/main 복제본에서 3/3 재현해 확인했다(복제본이 이 PR 의 패키지를 임포트하지 않도록 PYTHONPATH 를 복제본으로 고정 — 첫 시도는 editable 설치가 작업 트리를 가리켜 순수 측정이 아니었다). 해당 테스트는 병합 기준 d873d064 에도 이미 존재했다(MATH-04, a1a1207f).
+  [재현 기록 · 수정 전 · 2026-10-17 · 이 브랜치 = origin/main e35692ef + 대장 등재 커밋뿐(코드 변경 0)] 환경: python 3.12 venv, CI 제약 파일 infra/ci/constraints-py312.txt로 설치 — sqlalchemy 2.0.54 · pytest 9.1.1 · pytest-xdist 3.8.0 · pytest-randomly 3.16.0 · nproc 4.
+  ① 재현 명령: cd src/backend && python -m pytest -c pyproject.toml ../../tests/backend/db/test_to_schema_null_seam.py -n 4 -p no:randomly -p no:cacheprovider → 3/3 회 EXIT=1, 줄 "Different tests were collected between gw1 and gw0. The difference is:" (gw 쌍마다 1줄씩 6줄) · 요약 "3 errors". 단 하나의 시도도 통과하지 않았다.
+  ⑤ 원인 규명(실측): 같은 파일·같은 -n 4에서 변수만 바꿨다. (A) randomly 켬 → 3/3 EXIT=0 "34 passed" · (B) randomly 켬 + --dist loadfile → 3/3 EXIT=0 · (C) randomly 끔 + --dist loadfile → 3/3 EXIT=1 "3 errors". 즉 --dist 모드는 무관하고 pytest-randomly 유무가 갈랐다. 메커니즘 = pytest-randomly 3.16.0 의 pytest_collection_modifyitems 가 항목을 md5(seed::nodeid) 키로 정렬한다(_shuffle_by_class, 소스 :255-272). 키가 nodeid 만의 함수라 워커마다 수집 순서가 달라도 정렬 결과가 같아져 비결정이 가려진다. randomly 는 src/backend dev extra 에 선언돼 CI 는 늘 켜져 있다. 전체 스위트(-m "not corpus_authoring" -n auto --dist loadfile, 21451 items) 수집 단계: randomly 켬 = 불일치 0건·테스트 진행 점 출력 / randomly 끔 = 불일치 6줄·진행 전 오류 중단. 주의: "workers [21451 items]" 줄은 두 경우 모두 나온다(항목 수만 합의) — 변별력 없는 신호이므로 판정에 쓰지 않았다. 또 --collect-only 는 xdist 가 dist=no 로 바꿔 단일 프로세스로 돈다(plugin.py :269·:313) — 그래서 수집만 보는 xdist 실험은 증거가 아니다.
+  전수 확인(②): -p no:randomly 로 전체 스위트를 독립 프로세스 3개에서 각각 --collect-only 해 순서를 비교했다(21451줄 · 집합 차이 0 · 순서 차이 4~6줄). 어긋난 줄 16개가 전부 test_to_schema_null_seam.py::test_every_nullable_nonoptional_column_round_trips 한 파일이다. 한계: 이 비교는 프로세스 간 주소 해시 차이가 순서를 흔들 때만 보이므로(3회 표본) 비결정 원천이 낮은 확률로 순서를 바꾸는 경우는 놓칠 수 있다 — 그래서 ③ 의 AST 탐지기가 필요하다.
+  범위 한계(정직): 원인은 소스로 확인한 사실(registry.mappers = frozenset)과 재현 실측까지다. CI 가 왜 통과해 왔는지는 규명하지 못했다(acceptance ⑤). 우선순위를 P2 로 둔 것은 단일 프로세스·CI 현행 설정에서는 통과하고 12월 검증 판정 경로에 닿지 않기 때문이며, ⑤ 에서 CI 재현이 되면 P1 로 올린다.
+
+  [정정 2026-10-17] notes 치환 — acceptance ① 이행 — 수정 전 재현 명령·실패 줄과 ⑤ 원인 규명 실측을 notes에 기록
+
+  [정정 2026-10-17] paths ['tests/backend/db/test_to_schema_null_seam.py'] → ['tests/backend/db/test_to_schema_null_seam.py', 'tests/backend/test_parametrize_collection_determinism.py']: ③ 전수 탐지 장치(거버넌스 테스트) 신규 파일을 태스크 범위에 편입(기존 경로 유지)
+
+  [미러 면제 2026-10-17] 컨테이너에 ssh-keygen 부재(apt 후보 없음)로 헌법 서명 검증 스텝 2건만 실패(backend tests/constitution 33건 전부 test_check_signed_changes.py·harness-integrity check_signed_changes.py exit 2 측정불가). 나머지 상시 잡 4개 통과·가려진 스텝 ruff/black/tests/harness 2307 passed 직접 통과·전체 백엔드 스위트 20802 passed. 서명 검증은 CI가 최종 판정. ⑥ 배선: 신규 테스트 53개가 backend 잡 Pytest 스텝(ci.yml 426행, -m 'not corpus_authoring' -n auto --dist loadfile, testpaths ../../tests/backend)과 같은 선택 조건의 collect-only에서 53 id로 수집됨
+updated: 2026-10-17

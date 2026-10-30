@@ -15,6 +15,7 @@ use_enum_values=True, str_strip_whitespace=True)` · 관계/출처는 `str`-Enum
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from enum import Enum
 from typing import Final
 
@@ -36,9 +37,34 @@ SOURCE_CITATION: Final[str] = "개념-성취기준 매핑 근거: " + build_ncic
 # 2026-06-16 P2a의 `{TRACK}-{AREA}-{NNN}`(학년대=교육과정 결합 안티패턴)을 *되돌린* breaking
 # 마이그레이션 — 옛 키(교육과정축 코드·UC)는 `aliases`·`ids.yaml` registry로 보존(추적·롤백).
 # ★ 영역어(place-value·ai-math 등)는 하이픈을 포함하므로 area 세그먼트도 하이픈 그룹을 허용한다.
-CONCEPT_ID_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"^math\.[a-z]+(-[a-z]+)*\.[a-z0-9]+(-[a-z0-9]+)*$"
-)
+#
+# [ADR-009 · ADR-003] 접두(subject)는 정규식 리터럴이 아니라 **코드 상수 집합**이다. 과목이 늘면
+# 아래 집합에 토큰 1개를 더하는 것으로 끝나야 하며, 패턴은 이 집합에서 조립한다. 집합을 비우면
+# 조립 단계에서 즉시 실패한다(빈 접두가 `.area.slug` 같은 ID를 통과시키는 것을 막는다).
+SUBJECT_PREFIXES: Final[frozenset[str]] = frozenset({"math"})
+
+_PREFIX_TOKEN = re.compile(r"[a-z]+")
+
+
+def build_concept_id_pattern(prefixes: Iterable[str]) -> re.Pattern[str]:
+    """접두 유효 집합에서 concept_id 패턴을 조립한다(`<접두>.<area>.<slug>`).
+
+    - 접두 토큰은 소문자 로마자(`[a-z]+`)만 허용한다 — 점·대문자·빈 문자열은 ValueError.
+    - 집합이 비어 있으면 ValueError(빈 alternation은 접두 없는 ID를 통과시킨다).
+    - 비캡처 그룹 `(?:…)`을 써서 area·slug 쪽 캡처 그룹 번호가 리터럴 시절과 같다.
+    - 정렬해서 조립하므로 같은 집합은 항상 같은 패턴 문자열이다(결정론).
+    """
+    tokens = sorted(set(prefixes))
+    if not tokens:
+        raise ValueError("concept_id 접두 집합이 비어 있다 — 최소 1개 필요(ADR-009)")
+    for token in tokens:
+        if not _PREFIX_TOKEN.fullmatch(token):
+            raise ValueError(f"concept_id 접두 토큰 규약 위반: {token!r} (소문자 [a-z]+만 허용)")
+    alternation = "|".join(tokens)
+    return re.compile(rf"^(?:{alternation})\.[a-z]+(-[a-z]+)*\.[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+CONCEPT_ID_PATTERN: Final[re.Pattern[str]] = build_concept_id_pattern(SUBJECT_PREFIXES)
 
 # 교육과정축 코드 규약(옛 P2a 형식 `{TRACK}-{AREA}-{NNN}`·예 'ELEM-GEO-001') — 이제 정본이 아니라
 # `aliases`에 보존하는 **오버레이/별칭("curriculum-axis code")**이다(curriculum_matrix '개념 축').

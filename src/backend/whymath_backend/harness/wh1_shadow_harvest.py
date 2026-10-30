@@ -36,6 +36,14 @@ S1-11(verify 게이트 primary 승격) flip의 전제 ①은 "실 트래픽에�
   Σ에 합산하고, 구판(카운트 필드 없음·파싱은 하위호환으로 성공)은 별도 건수로 표기한다.
   구판을 '전이 0'으로 합산하면 분포가 위조된다(0 위장 금지).
 
+- **primary 채택률(OPS-134 ②)은 분포와 분모를 섞지 않는다** — 하네스가 결과 없이 중단된 턴
+  (`status="aborted"`·타임아웃/예외)은 verdict가 없고 전이 카운트도 없어, 기존 분포에 섞으면
+  "verify 미호출 턴"과 "구판 레코드"로 오집계된다. 그래서 기존 분포(verdict·전이·형태·status)는
+  정상 완료 턴만으로 계산해 **변경 전과 같은 값**을 유지하고, 중단 턴은 채택률 절에서만 센다.
+  채택률의 분모는 결말(`primary_outcome`)을 기록한 primary 시도뿐이며, 결말이 없는 구판 primary
+  레코드는 분모에서 빼고 따로 센다 — 구판을 채택으로 세면 기록이 0줄이던 폴백이 사라진 채
+  비율이 위조된다.
+
 프라이버시: 관측 레코드 자체가 비식별(status·action_type·verdict·카운트·id뿐 — 학생 원문·풀이
 단계·발화 원문·정답 없음·`wh1_shadow.py` 규약)이므로 원장·리포트도 비식별이다.
 """
@@ -45,18 +53,27 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import sys
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypedDict, get_args
 
 from pydantic import BaseModel, ConfigDict
 
-from whymath_backend.harness.wh1_shadow import Wh1HarnessShadowObservation, record_logger
+from whymath_backend.harness.wh1_shadow import (
+    PRIMARY_ADOPTED,
+    PrimaryOutcome,
+    Wh1HarnessShadowObservation,
+    record_logger,
+)
 
 __all__ = [
+    "PRIMARY_OUTCOME_LABELS",
     "RECORD_LOGGER_NAME",
     "VERIFY_TARGET_LABELS",
+    "DurationSummary",
     "ParseAccounting",
     "Wh1ShadowDistributionSummary",
     "Wh1ShadowHarvestReport",
@@ -84,6 +101,14 @@ _VERDICT_LABELS: tuple[str, ...] = ("correct", "incorrect", "unverifiable", "non
 # 리포트 상단의 4-라벨 비율은 *전체* 분모라 그대로 읽으면 사전등록 비율과 다른 수가 된다 —
 # 그 오독을 막기 위해 같은 리포트에 모집단 분모를 병기한다(판정선은 여전히 내지 않는다).
 VERIFY_TARGET_LABELS: tuple[str, ...] = ("correct", "incorrect", "unverifiable")
+
+# primary 결말 라벨 전체 — 방출 측 닫힌 어휘(`PrimaryOutcome`)에서 그대로 유도한다(재타이핑 드리프트
+# 차단). 0건이어도 표기하는 고정 축이라 "그 사유가 한 번도 안 났다"와 "사유 집계가 없다"가
+# 구분된다.
+PRIMARY_OUTCOME_LABELS: tuple[str, ...] = get_args(PrimaryOutcome)
+
+# 하네스가 결과 없이 중단된 턴의 status(OPS-134 ②) — 기존 verdict/전이 분포의 분모에서 뺀다.
+_ABORTED_STATUS = "aborted"
 
 # 종료 코드 — 판정선이 아니라 도구 성공/입력 오류 구분(cost_probe CLI 관례의 절반만 차용).
 _EXIT_OK = 0
@@ -284,6 +309,29 @@ def _append_ledger(path: Path, observations: Sequence[Wh1HarnessShadowObservatio
             fh.write(obs.model_dump_json() + "\n")
 
 
+class DurationSummary(BaseModel):
+    """소요 시간(ms) 분포 요약 — 최근접 순위(nearest-rank) 백분위. 표본이 작으면 `n`도 읽는다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    n: int
+    p50: int
+    p90: int
+    max: int
+
+
+def _duration_summary(values: Sequence[int]) -> DurationSummary | None:
+    """값이 없으면 None — 표본 0을 0ms로 위장하지 않는다."""
+    if not values:
+        return None
+    ordered = sorted(values)
+
+    def pick(q: float) -> int:
+        return ordered[min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))]
+
+    return DurationSummary(n=len(ordered), p50=pick(0.5), p90=pick(0.9), max=ordered[-1])
+
+
 class Wh1ShadowDistributionSummary(BaseModel):
     """verdict 분포 요약 — S1-11 flip 전제 ①의 결정 변수(판정선 없음·분포 제시)."""
 
@@ -346,12 +394,74 @@ class Wh1ShadowDistributionSummary(BaseModel):
     observed_at_max: datetime | None
     """가장 늦은 관측 시각(관측 0건이면 None)."""
 
+    aborted_total: int = 0
+    """하네스가 결과 없이 중단된 턴 수(`status="aborted"`·타임아웃/예외·OPS-134 ②).
+
+    위 `total`과 모든 verdict/전이/형태/status 분포에는 **들어 있지 않다** — 그 분포는 정상 완료
+    턴의 것이고 변경 전과 같은 값이다. 중단 턴은 채택률 축(아래 `primary_*`)에서만 센다."""
+
+    primary_attempts: int = 0
+    """결말(`primary_outcome`)을 기록한 primary 시도 수 — **채택률의 분모**."""
+
+    primary_legacy_records: int = 0
+    """`primary=True`인데 결말 미기록인 구판 레코드 수 — 분모에서 빼고 따로 센다(0 위장 금지).
+    이 수가 0보다 크면 채택률은 결말 계측 이후 구간만의 값이다."""
+
+    primary_outcome_counts: dict[str, int] = {}
+    """결말 라벨별 건수 — 전 라벨을 0건이어도 담는다(시도 0건이면 빈 dict)."""
+
+    primary_adopted: int = 0
+    """결말이 `adopted`(하네스 발화 채택)인 시도 수 — **채택률의 분자**."""
+
+    primary_adoption_rate: float | None = None
+    """채택률 = 채택 / 시도. **시도 0건이면 None** — 0%가 아니라 "분모 없음"이다."""
+
+    elapsed_ms_adopted: DurationSummary | None = None
+    """채택된 턴의 소요(ms) 분포. 소요 기록 턴이 없으면 None."""
+
+    elapsed_ms_fallback: DurationSummary | None = None
+    """폴백된 턴(채택 외 전부)의 소요(ms) 분포. 타임아웃 턴은 예산 부근에 몰린다."""
+
+    llm_calls_accounted: int = 0
+    """LLM 호출 수를 기록한 시도 수 — 아래 호출 합계의 표본 회계(미기록 시도는 합산에서 빠진다)."""
+
+    llm_calls_in_adopted: int = 0
+    """채택된 턴이 시작한 LLM 호출 합."""
+
+    llm_calls_in_fallback: int = 0
+    """**폴백된 턴이 시작한 LLM 호출 합 — 출력이 학생에게 닿지 않은 호출**(OPS-134 ③). 이 호출은
+    Langfuse에 `traffic_surface=serving`으로 이미 전송됐으므로 학생 대면 비용 표본에 들어 있다."""
+
+    fallback_llm_call_share: float | None = None
+    """전체 LLM 호출 중 폴백된 턴이 쓴 비중 = fallback / (adopted + fallback). 호출 합 0이면 None.
+    게이트② 표본이 "출력이 버려진 호출"로 얼마나 채워져 있는지의 인프로세스 근사다."""
+
+    timeout_turns: int = 0
+    """결말이 `fallback_timeout`인 시도 수."""
+
+    timeout_elapsed_ms_total: int = 0
+    """타임아웃 턴 중 소요와 LLM 합을 **둘 다** 기록한 턴의 소요 합(ms)."""
+
+    timeout_llm_ms_total: int = 0
+    """같은 턴들의 끝난 LLM 호출 소요 합(ms). 소요 합에서 이 값을 뺀 나머지는 "취소된 호출 + 비LLM
+    단계(후보 조립·캐시 대기·도구 실행)"이며 이 둘은 서버 로그만으로 갈리지 않는다(①의 한계)."""
+
+    timeout_inflight_calls: int = 0
+    """타임아웃 턴에서 취소 시점에 비행 중이던 호출 수(시작 − 끝남)."""
+
 
 def summarize(
     observations: Sequence[Wh1HarnessShadowObservation],
 ) -> Wh1ShadowDistributionSummary:
-    """관측 리스트 → verdict/턴/status 분포 요약(순수·결정론·판정선 없음)."""
-    total = len(observations)
+    """관측 리스트 → verdict/턴/status 분포 요약(순수·결정론·판정선 없음).
+
+    기존 분포(verdict·전이·형태·status)는 **정상 완료 턴만**으로 계산한다 — 중단 턴(`aborted`)은
+    하네스 결과가 없어 그 분포의 어느 칸에도 속하지 않는다(모듈 docstring). 채택률 축은 중단 턴을
+    포함한 전체 primary 시도를 본다.
+    """
+    completed = [obs for obs in observations if obs.status != _ABORTED_STATUS]
+    aborted = [obs for obs in observations if obs.status == _ABORTED_STATUS]
+    total = len(completed)
     verdict_counts: dict[str, int] = {label: 0 for label in _VERDICT_LABELS}
     status_counts: dict[str, int] = {}
     turn_verdicts: dict[int, dict[str, int]] = {}
@@ -365,7 +475,7 @@ def summarize(
     dialogues: set[str] = set()
     observed_min: datetime | None = None
     observed_max: datetime | None = None
-    for obs in observations:
+    for obs in completed:
         label = _verdict_label(obs.verify_verdict)
         verdict_counts[label] = verdict_counts.get(label, 0) + 1
         status_counts[obs.status] = status_counts.get(obs.status, 0) + 1
@@ -393,6 +503,15 @@ def summarize(
             form_counts["mixed"] += obs.n_mixed_form_transitions or 0
             if obs.n_equation_transitions > 0:
                 equation_turns += 1
+        if obs.dialogue_id is not None:
+            dialogues.add(obs.dialogue_id)
+        if observed_min is None or obs.observed_at < observed_min:
+            observed_min = obs.observed_at
+        if observed_max is None or obs.observed_at > observed_max:
+            observed_max = obs.observed_at
+    # 중단 턴도 시각 범위·고유 dialogue에는 든다 — 관측 창과 세션 수는 "무슨 일이 있었나"의 축이라
+    # 하네스가 끝까지 돌았는지와 무관하다.
+    for obs in aborted:
         if obs.dialogue_id is not None:
             dialogues.add(obs.dialogue_id)
         if observed_min is None or obs.observed_at < observed_min:
@@ -431,7 +550,87 @@ def summarize(
         distinct_dialogues=len(dialogues),
         observed_at_min=observed_min,
         observed_at_max=observed_max,
+        aborted_total=len(aborted),
+        **_primary_accounting(observations),
     )
+
+
+class _PrimaryAccounting(TypedDict, total=False):
+    """`_primary_accounting`의 반환 — 요약 모델의 같은 이름 필드로 펼쳐진다(키별 타입 고정)."""
+
+    primary_attempts: int
+    primary_legacy_records: int
+    primary_outcome_counts: dict[str, int]
+    primary_adopted: int
+    primary_adoption_rate: float | None
+    elapsed_ms_adopted: DurationSummary | None
+    elapsed_ms_fallback: DurationSummary | None
+    llm_calls_accounted: int
+    llm_calls_in_adopted: int
+    llm_calls_in_fallback: int
+    fallback_llm_call_share: float | None
+    timeout_turns: int
+    timeout_elapsed_ms_total: int
+    timeout_llm_ms_total: int
+    timeout_inflight_calls: int
+
+
+def _primary_accounting(observations: Sequence[Wh1HarnessShadowObservation]) -> _PrimaryAccounting:
+    """primary 채택률·소요·폐기 호출 비중(OPS-134 ②③①) — 중단 턴을 포함한 전체 primary 시도 기준.
+
+    분모는 **결말을 기록한 primary 시도**다. 결말이 없는 구판 primary 레코드는 분모에서 빼고
+    `primary_legacy_records`로 따로 센다. shadow(비노출) 레코드는 학생에게 서빙된 턴이 아니므로
+    채택률과 무관하다. 시도 0건이면 비율은 None이다(0% 위장 금지).
+    """
+    attempts = [o for o in observations if o.primary and o.primary_outcome is not None]
+    legacy = sum(1 for o in observations if o.primary and o.primary_outcome is None)
+    if not attempts:
+        return {"primary_legacy_records": legacy}
+    counts: dict[str, int] = {label: 0 for label in PRIMARY_OUTCOME_LABELS}
+    for o in attempts:
+        outcome = o.primary_outcome
+        if outcome is not None:  # attempts 필터가 보장하지만 타입을 좁혀 둔다.
+            counts[outcome] += 1
+    adopted = counts[PRIMARY_ADOPTED]
+
+    adopted_obs = [o for o in attempts if o.primary_outcome == PRIMARY_ADOPTED]
+    fallback_obs = [o for o in attempts if o.primary_outcome != PRIMARY_ADOPTED]
+    calls_adopted = [o.llm_calls for o in adopted_obs if o.llm_calls is not None]
+    calls_fallback = [o.llm_calls for o in fallback_obs if o.llm_calls is not None]
+    total_calls = sum(calls_adopted) + sum(calls_fallback)
+
+    timeout_obs = [
+        o
+        for o in attempts
+        if o.primary_outcome == "fallback_timeout"
+        and o.elapsed_ms is not None
+        and o.llm_ms_total is not None
+    ]
+    return {
+        "primary_attempts": len(attempts),
+        "primary_legacy_records": legacy,
+        "primary_outcome_counts": counts,
+        "primary_adopted": adopted,
+        "primary_adoption_rate": adopted / len(attempts),
+        "elapsed_ms_adopted": _duration_summary(
+            [o.elapsed_ms for o in adopted_obs if o.elapsed_ms is not None]
+        ),
+        "elapsed_ms_fallback": _duration_summary(
+            [o.elapsed_ms for o in fallback_obs if o.elapsed_ms is not None]
+        ),
+        "llm_calls_accounted": len(calls_adopted) + len(calls_fallback),
+        "llm_calls_in_adopted": sum(calls_adopted),
+        "llm_calls_in_fallback": sum(calls_fallback),
+        "fallback_llm_call_share": (sum(calls_fallback) / total_calls if total_calls > 0 else None),
+        "timeout_turns": counts["fallback_timeout"],
+        "timeout_elapsed_ms_total": sum(o.elapsed_ms or 0 for o in timeout_obs),
+        "timeout_llm_ms_total": sum(o.llm_ms_total or 0 for o in timeout_obs),
+        "timeout_inflight_calls": sum(
+            (o.llm_calls or 0) - (o.llm_calls_finished or 0)
+            for o in attempts
+            if o.primary_outcome == "fallback_timeout"
+        ),
+    }
 
 
 class Wh1ShadowHarvestReport(BaseModel):
@@ -548,6 +747,60 @@ def _fmt_ratio(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
+def _fmt_duration(label: str, dur: DurationSummary | None) -> str:
+    if dur is None:
+        return f"  {label:<14}: (소요 기록 턴 없음)"
+    return f"  {label:<14}: n={dur.n} · p50 {dur.p50}ms · p90 {dur.p90}ms · max {dur.max}ms" + (
+        " ⚠ 표본이 작아 백분위가 거칠다" if dur.n < 20 else ""
+    )
+
+
+def _render_primary_section(s: Wh1ShadowDistributionSummary) -> list[str]:
+    """primary 채택률 절 — **작동한 비율**을 리포트가 직접 말한다(OPS-134 ②·작동 비율 원칙).
+
+    시도 0건이면 "0%"가 아니라 "분모 없음"을 쓴다. 구판 primary 레코드가 있으면 그 수와 함께
+    "이 비율은 결말 계측 이후 구간만의 값"임을 밝힌다.
+    """
+    lines = ["[primary 채택률 — 학생이 LLM 발화를 받은 턴 비율(OPS-134)]"]
+    if s.primary_attempts == 0:
+        lines.append("  (결말 기록 primary 시도 0건 — 채택률 산출 불가·0%로 위장하지 않음)")
+    else:
+        rate = s.primary_adoption_rate
+        lines.append(
+            f"  시도 n={s.primary_attempts} · 채택 {s.primary_adopted}건"
+            + (f" ({_fmt_ratio(rate)})" if rate is not None else "")
+        )
+        for label in PRIMARY_OUTCOME_LABELS:
+            lines.append(f"  {label:<26}: {s.primary_outcome_counts.get(label, 0)}건")
+        lines.append(_fmt_duration("소요(채택 턴)", s.elapsed_ms_adopted))
+        lines.append(_fmt_duration("소요(폴백 턴)", s.elapsed_ms_fallback))
+        share = s.fallback_llm_call_share
+        lines.append(
+            f"  LLM 호출: 채택 턴 {s.llm_calls_in_adopted}건 · 폴백 턴 {s.llm_calls_in_fallback}건"
+            + (f" — 폴백 턴 비중 {_fmt_ratio(share)}" if share is not None else "")
+            + f" (기록 시도 {s.llm_calls_accounted}/{s.primary_attempts})"
+        )
+        if s.llm_calls_in_fallback > 0:
+            lines.append(
+                "  ⚠ 폴백 턴의 LLM 호출은 출력이 학생에게 닿지 않았지만 Langfuse에는 serving"
+                " 표지로 전송돼 있다 — 게이트② 학생 대면 표본에 포함된 호출이다(제외하지 않고"
+                " 비중을 보고)."
+            )
+        if s.timeout_turns > 0:
+            other_ms = s.timeout_elapsed_ms_total - s.timeout_llm_ms_total
+            lines.append(
+                f"  타임아웃 {s.timeout_turns}턴: 소요 합 {s.timeout_elapsed_ms_total}ms 중"
+                f" 끝난 LLM 호출 {s.timeout_llm_ms_total}ms · 나머지 {other_ms}ms는 취소된 호출 "
+                f"({s.timeout_inflight_calls}건 비행 중)+비LLM 단계(둘은 로그만으로 갈리지 않음)"
+            )
+    if s.primary_legacy_records > 0:
+        lines.append(
+            f"  ⚠ 결말 미기록 구판 primary 레코드 {s.primary_legacy_records}건은 분모에서 제외"
+            " — 이 채택률은 결말 계측 이후 구간만의 값이다(구판은 폴백 기록이 0줄이었다)."
+        )
+    return lines
+
+
 def render_report(report: Wh1ShadowHarvestReport) -> str:
     """사람용 리포트 — 회계·분포를 표기하되 **판정선을 내지 않는다**(분포 제시가 목적)."""
     s = report.summary
@@ -576,11 +829,15 @@ def render_report(report: Wh1ShadowHarvestReport) -> str:
         )
     else:
         lines.append("[집계 구간] 미지정 — 원장/입력 전체 기준 분포(회차 분리 없음)")
-    lines.append(f"[관측 총 n] {s.total} · 고유 dialogue {s.distinct_dialogues}")
+    lines.append(
+        f"[관측 총 n] {s.total} · 고유 dialogue {s.distinct_dialogues}"
+        f" · 하네스 중단 턴 {s.aborted_total}건(아래 분포에는 불포함 — primary 채택률 절에서 센다)"
+    )
     if s.observed_at_min is not None and s.observed_at_max is not None:
         lines.append(
             f"[관측 시각] {s.observed_at_min.isoformat()} ~ {s.observed_at_max.isoformat()}"
         )
+    lines.extend(_render_primary_section(s))
     lines.append("[verify verdict 분포 — none=verify 미호출]")
     for label in _VERDICT_LABELS:
         count = s.verdict_counts.get(label, 0)

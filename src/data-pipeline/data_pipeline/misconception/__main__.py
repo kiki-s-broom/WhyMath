@@ -1,8 +1,9 @@
 """오개념 코퍼스 추출 CLI — `whymath-misconception`.
 
-7계층 본문 JSON → 정규화 오개념 839 **Collection JSON** + `_provenance.json`(원본 sha256·집계).
-`whymath-ncic extract`(성취기준 코퍼스) 선례와 동형이다 — 추출은 `extract_misconceptions`(순수)가
-담당하고 본 CLI는 경로 결선·직렬화·보고만 한다. 원본 JSON은 커밋하지 않고 산출물이 진실 원천이다.
+7계층 본문 JSON → 정규화 오개념(업로드 원천 기준 839행) **Collection JSON** +
+`_provenance.json`(원본 sha256·집계). `whymath-ncic extract`(성취기준 코퍼스) 선례와 동형이다 —
+추출은 `extract_misconceptions`(순수)가 담당하고 본 CLI는 경로 결선·직렬화·보고만 한다. 원본 JSON은
+커밋하지 않고 산출물이 진실 원천이다.
 
 사용(단일 명령 앱 — 서브명령명 불요):
     whymath-misconception --json <7계층.json> --output-dir data/corpus/misconceptions_v1

@@ -18,17 +18,17 @@
 > 우선순위표 중 **invariant ⑫(event_data 타입 스키마)는 완료**(`schema/event_data_contract.py`+
 > 게이트), **invariant ⑩(렌더 선택 단일 진실원)은 py/js 2/3 완료**(`data/render_contract.json`
 > 계약·잔여 Flutter 1/3은 MOB-14). §0 수치 스냅샷은 stale — 최신 실측은
-> `dsl_integration_gap_review.md` §5 정오표(그래프 2,683/2,210·kebab 64·M-id 843)가 정본.
+> `dsl_integration_gap_review.md` §5 정오표(2026-08-10 기준: 그래프 2,683/2,210·kebab 64·M-id 843)가 그 시점 정본이며, 현재 건수는 `docs/data/corpus_facts.md`가 정본.
 
 ---
 
-## 0. 배경 사실 (조사 확정 스냅샷)
+## 0. 배경 사실 (조사 확정 스냅샷 — 2026-07-01 작성 기준)
 
 | 구조 | 실측 |
 |---|---|
-| L1 그래프 | 노드 2,697(단원 217·소단원 643·원자 1,837), 엣지 2,213 **전량 `PREREQUISITE`·strength 0.8 균일** |
+| L1 그래프 | (2026-07-01) 노드 2,697(단원 217·소단원 643·원자 1,837), 엣지 2,213 **전량 `PREREQUISITE`·strength 0.8 균일** |
 | EdgeType | 6종 정의(`schema/enums.py`), **PREREQUISITE만 적재** — 약한 5종 load-time skip + 거버넌스 테스트(`test_edge_relation_governance.py`) |
-| 오개념 | 3중 표현 — kebab 30(런타임 정본 `l4/misconception/catalog.py`)·M-id 839(콘텐츠 `schema/misconception_catalog.py`)·JSONB(`Concept.common_misconceptions`, 런타임 미사용). **FK 없음**, crosswalk N:M + read-time resolver |
+| 오개념 | (2026-07-01) 3중 표현 — kebab 30(런타임 정본 `l4/misconception/catalog.py`)·M-id 839(콘텐츠 `schema/misconception_catalog.py`)·JSONB(`Concept.common_misconceptions`, 런타임 미사용). **FK 없음**, crosswalk N:M + read-time resolver |
 | 임베딩 | **단일 pgvector, namespace 분리 없음**(`l1/embedding_primitives.py`) — concept/atom/misconception 동일 벡터공간. 방향맹 매처(둘레↔넓이 코사인 동일) 실측, 과거 FP 45.5% *(→ 정정 2026-07-02 참조 — 두 문제의 융합 서술)* |
 | Cycle | load-time DFS 게이트(`l1/atom_graph/populate.py`) + 파이프라인 validate. 모델 불변식은 self-loop만. **런타임 reachability/SCC 게이트 없음** |
 | 렌더러 | spec 렌더러 독립(노드에 fps/shader/pixel 필드 0, `extra="forbid"`). 그러나 **렌더 선택 로직 3곳 산재**(`scene_renderer.dart`·`GraphingCalculator.jsx`·WebView) |

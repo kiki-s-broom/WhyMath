@@ -1,6 +1,6 @@
-"""목표별 실생활 예시 생성기 — 정본: `docs/architecture/04e_pedagogy_strategy_catalog.md` §6.
+"""목표별 실생활 예시 생성기 — 정본: `docs/architecture/04g_pedagogy_strategy_catalog.md` §6.
 
-`analogy_generator.py`(개념-grain 비유)의 *목표-grain* 짝이다. 04e §6.1 정본 좌석 선언:
+`analogy_generator.py`(개념-grain 비유)의 *목표-grain* 짝이다. 04g §6.1 정본 좌석 선언:
 **목표별 예시·보조 재료 = `pedagogy_content_slot`**(DRAFT→prescreen→review 상태기계 **재사용**),
 소비처 = 발주서(`required_slots`) 잔여 슬롯. 여기는 grain이 목표(objective_id)라 슬롯 테이블을
 *그대로* 쓴다 — 기존 `ContentSlotStore`(적재)·`PrescreenStore`/`ReviewStore`(전이)가 무수정
@@ -12,7 +12,7 @@
 동등문제 생성기(`l3/equivalent/llm_generator.py`) 계열의 소관으로 남긴다(정직한 분담 —
 이 생성기는 검증 불가능한 답을 지어내지 않는다).
 
-교수학 제약(04e §6.4·프롬프트 강제): 실생활 예시는 **스토리텔링 서술 형식**(독립 유형 아님)·
+교수학 제약(04g §6.4·프롬프트 강제): 실생활 예시는 **스토리텔링 서술 형식**(독립 유형 아님)·
 게임형 금지·정답 유출 금지·학년 레지스터는 파라미터(독립 생성기 금지)·자작(저작권).
 
 LLM 경로는 `analogy_generator`와 동일 선례(라우터 경유·provider 주입 seam·GENERAL 저작 스왑·
@@ -53,7 +53,7 @@ _REGISTERS: Final[frozenset[str]] = frozenset({"초등", "중학", "고등", "�
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 시스템 프롬프트 — 실생활 예시 교수학 제약(04e §6·스토리텔링은 서술 형식)
+# 시스템 프롬프트 — 실생활 예시 교수학 제약(04g §6·스토리텔링은 서술 형식)
 # ──────────────────────────────────────────────────────────────────────────
 EXAMPLE_SYSTEM_PROMPT: Final[
     str
@@ -111,7 +111,7 @@ def plan_remaining_slots(
     `work_order`는 컴파일러 발주서 `{objective_id, slot_type, count}` 리스트(unit_compiler ⑤),
     `approved_counts`는 `(objective_id, slot_type) → APPROVED 슬롯 수`(호출자가 DB에서 계수해
     주입 — 이 함수는 DB를 모른다·순수). 잔여 = 발주 count − 승인 수(0 이하는 표적 제외 —
-    이미 충족된 슬롯의 사전 대량 생성 금지·04e §6.4).
+    이미 충족된 슬롯의 사전 대량 생성 금지·04g §6.4).
 
     **숫자형 슬롯(`NUMERIC_SLOT_TYPES`)은 표적에서 제외**한다 — 문제·답 저작은 SymPy 검증
     재료가 필요해 동등문제 생성기 소관이다(모듈 docstring 분담). `statements`는 목표 id →

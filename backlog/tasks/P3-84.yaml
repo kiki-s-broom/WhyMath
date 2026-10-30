@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-84
+title: "자료 목록 검증기 형태 결함 정리 + 조건 형태 오류 메시지 값 미포함 고정"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `verify_answer.py`의 `_parse_number_list`가 `expr.is_number`를 try 밖에서 부르는 결함을 고친다 — `\"True\"`·`\"None\"`·`\"[1]\"`·`\"()\"`·`\"1,[2],3\"`·`\"1,2 == 3,4\"` 입력에서 평균=중앙값·독립·조건부확률·내적 검증기 4종이 AttributeError 대신 판정 불가(unverifiable)를 낸다. 정상 숫자 나열의 판정은 바뀌지 않는다(개념 은행 360건 수정 전후 비교 0건 변화) ② P3-80의 `_ConditionShapeError` 메시지에 조건 값이 실리지 않는다는 약속을 테스트로 고정한다 — 예: `fuzz_answer(\"1,2,3,4,9\", {\"x\":\"1\"}, \"unique\").reason`에 `1,2,3,4,9`가 없음을 단언하고, 메시지에 값을 싣는 뮤테이션이 RED임을 확인한다"
+artifacts:
+  - "#1747"
+paths:
+  - src/backend/whymath_backend/l3/verify_answer.py
+  - "tests/backend/l3/test_verify_answer*.py"
+session: null
+notes: |-
+  출처: PR #1737(P3-80) 독립 리뷰 P3-b·P3-c. P3-c는 #1737 이전부터 main에 있던 결함이며 은행 해당 건은 0건이다. P3-80이 고친 96건이 실제로 쓰는 검증기가 이 4종이라 같은 계열로 정리한다.
+
+  [미러 면제 2026-10-26] 머지 커밋 97b4132a(#1747)가 원격 main에 착지 — 미러 대상 없음
+updated: 2026-10-26

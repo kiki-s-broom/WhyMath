@@ -1,0 +1,45 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-219
+title: "힌트 사람 판정 Windows 팝업 창 + 힌트별 AI 권고 표시 · 권고 참조 판정 표기(EOS-210 후속 · Kiki 지시)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① Windows 팝업 판정 창(tkinter): EOS-210 맹검 세션과 같은 작업 목록·같은 기록 계약(hint_verdicts.jsonl append 전용·지문)으로 판정을 기록한다. 버튼 누설/누설 아님/건너뛰기/종료, 근거 입력란, 진행 수 표시. tkinter 없는 환경에서는 import 시점이 아니라 실행 시점에 명확한 오류로 멈춘다.\n② 힌트별 AI 권고 파일(data/runs/<회차>-review/hint_ai_recommendations.jsonl): hint_id·권고(leak|no_leak)·이유·작성자·작성 시각. 창은 권고를 판정 화면에 표시한다.\n③ 보조 판정 표기: 권고를 본 판정은 기록에 그 사실이 남는다(판정 행의 표기 필드 또는 근거 접두). 측정기 출력·결과 문서가 이 판정이 맹검이 아니라 AI 권고 참조 판정임을 숨기지 않는다.\n④ 논리층(작업 목록 구성·기록 쓰기·권고 결합)은 tkinter 없이 테스트한다. 권고 파일의 hint_id가 작업 목록에 없거나 형식이 틀리면 거부한다.\n⑤ 런북: Kiki PC에서 판정용 별도 워크트리로 실행하는 블록(공유 클론 브랜치 전환 사고 회피)과 6항목 브리핑."
+  - "[정정 2026-10-30 · 헌법 R19-01 충돌 해소 — Kiki 선택: 지시를 헌법에 맞게 변경] ②·③을 다음으로 대체한다. ②' AI 권고는 판정 입력 전에 화면에 내지 않는다. 판정 전에는 '무엇이 누설인가' 기준표만 표시한다. 판정이 기록 파일에 append된 직후에만 그 힌트의 AI 권고를 보여 주고, 사람 판정과 다르면 불일치로 표시한다. 권고는 판정 행에 쓰지 않고 별도 파일(hint_ai_recommendations.jsonl)에만 둔다. ③' 판정 행은 맹검 판정 그대로다(권고 공개 전에 기록됨). 공개 후 같은 창에서 재판정하는 경로는 두지 않는다(재판정은 맹검이 아니므로 기존 --rejudge 경로와 그 표기 규칙을 따른다). 세션 끝에 사람-AI 불일치 목록(hint_id·사람·AI)을 출력·파일로 남긴다. 집행: 권고 표시 함수가 기록 성공 이후에만 호출됨을 테스트로 동결한다(기록 실패·건너뛰기 시 권고 비공개)."
+  - "[정정 2026-10-30 2차 · 독립 검토 H1] ②'의 '기록 직후 그 힌트의 권고 공개'를 '세션의 남은 판정 대상을 모두 기록(또는 건너뜀)한 뒤 세션 끝에 한 번에 공개'로 바꾼다. 근거: 이번 회차 권고 45건이 전부 같은 판정이라 첫 공개 뒤 나머지 힌트의 AI 판정이 사실상 판정 전에 드러난다(R19-01의 취지 위반). 세션 중에는 판정 기록 확인만 보이고, 끝 화면에 일치 수와 불일치 목록(힌트 본문·사람 판정·AI 판정·AI 이유)을 보인다. 중간 종료 시에는 권고를 공개하지 않는다. 불일치 파일은 판정자별(hint_ai_disagreements.<판정자>.json)로 남긴다. 권고 이유에는 기계 판정·대상 선정 목적을 적지 않는다."
+artifacts:
+  - "#1778 cf923554"
+paths:
+  - src/backend/whymath_backend/harness/hint_verdict_gui.py
+  - src/backend/whymath_backend/harness/hint_verdict_session.py
+  - src/backend/whymath_backend/ops/hint_human_verdicts.py
+  - src/backend/whymath_backend/ops/declared_unwired_audit.py
+  - scripts/analysis/eos_feature_inventory_v2.py
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
+  - tests/backend/harness/test_hint_verdict_gui.py
+  - docs/ops/eos219_hint_verdict_gui_runbook.md
+  - data/runs/eos197-a6-review/hint_ai_recommendations.jsonl
+session: null
+notes: |-
+  Kiki 지시(2026-10-30): EOS-210 판정 화면을 Windows 팝업 창으로, 판정 전에 힌트별 AI 권고 제공. 세션이 맹검 약화(R19-01)와 G3 의미 축 증거력 약화를 설명했고 Kiki가 권고 선행을 선택했다. 그러므로 헌법 R19-01 충돌을 Kiki에게 보고했고 Kiki가 지시를 헌법에 맞게 변경하기로 선택했다 — 판정은 맹검 그대로이며 AI 권고는 세션 끝에만 공개한다.
+
+  [정정 2026-10-30] 헌법 R19-01 충돌 — Kiki가 지시 변경 선택
+
+  [정정 2026-10-30] paths ['src/backend/whymath_backend/harness/hint_verdict_gui.py', 'src/backend/whymath_backend/ops/hint_human_verdicts.py', 'src/backend/whymath_backend/harness/hint_verdict_session.py', 'tests/backend/harness/test_hint_verdict_gui.py', 'docs/ops/eos219_*', 'data/runs/eos197-a6-review/hint_ai_recommendations.jsonl'] → ['src/backend/whymath_backend/harness/hint_verdict_gui.py', 'src/backend/whymath_backend/harness/hint_verdict_session.py', 'src/backend/whymath_backend/ops/hint_human_verdicts.py', 'src/backend/whymath_backend/ops/declared_unwired_audit.py', 'scripts/analysis/eos_feature_inventory_v2.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py', 'tests/backend/harness/test_hint_verdict_gui.py', 'docs/ops/eos219_hint_verdict_gui_runbook.md', 'data/runs/eos197-a6-review/hint_ai_recommendations.jsonl']: 구현이 닿은 등록 장치 4건·런북 실명 반영
+  paths 제거 1건: ['docs/ops/eos219_*']
+
+  [정정 2026-10-30] 독립 검토 H1 — 균일 권고의 건별 공개가 사실상 사전 공개
+
+  [정정 2026-10-30] notes 치환 — 독립 검토 L7 — 낡은 notes 문장 정정
+
+  [미러 면제 2026-10-30] 대장 전용 PR — 구현은 #1778로 main 착지
+updated: 2026-10-30

@@ -28,6 +28,7 @@ alembic 시드 1회 `ON CONFLICT DO NOTHING`). 실측 근거는 계약 문서 §
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import UTC, datetime
 from typing import Any, Final
 
@@ -44,6 +45,28 @@ CMS_PROTECTED_TABLES: Final[frozenset[str]] = frozenset(
         "concept_content",
         "hints",
     }
+)
+
+#: CMS가 **만든** 행의 소유 표지를 두는 테이블 — P3-26. 위 5종이 "적재가 소유한 행을 사람이
+#: 고쳤다"를
+#: 말한다면, 이 둘은 "사람(CMS)이 만든 행이다"를 말한다: 개념 그래프의 정본이 행 단위로 갈린다
+#: (graph.json에 있는 행 = 파일이 정본 · CMS가 만든 행 = DB가 정본). 같은 컬럼·같은 `upsert_guard`를
+#: 쓰되
+#: 위 5종의 일치 동결(CMS 리소스 선언·마이그레이션 e7b2…)과 섞이지 않게 집합을 따로 둔다.
+#: 규약 정본: `docs/standards/cms_concept_graph_write_contract.md`.
+CMS_OWNED_TABLES: Final[frozenset[str]] = frozenset({"concept", "concept_edge"})
+
+#: 표지 컬럼이 있어야 하는 테이블 전체 — ORM 컬럼 존재의 동결 대상.
+CMS_MARKED_TABLES: Final[frozenset[str]] = CMS_PROTECTED_TABLES | CMS_OWNED_TABLES
+
+#: 선수(prerequisite) 그래프 쓰기를 직렬화하는 어드바이저리 잠금 키 — **CMS와 적재 CLI가 같은 키**를
+#: 쓴다.
+#: 두 요청이 각각 비순환이어도 *동시에* 들어오면 합쳐서 순환을 만들 수 있다(검사와 쓰기 사이의 틈).
+#: 모든 선수 엣지 쓰기는 트랜잭션 안에서 이 잠금을 잡고 그 안에서 순환 검사를 한다.
+#: 값은 문자열의 해시라 우연히 다른 잠금과 겹치지 않는다(고정 상수 — 바꾸면 두 쓰기 주체가
+#: 어긋난다).
+PREREQUISITE_GRAPH_LOCK_KEY: Final[int] = int.from_bytes(
+    hashlib.sha256(b"whymath.concept_edge.prerequisite_graph").digest()[:8], "big", signed=True
 )
 
 #: 적재 CLI의 덮어쓰기 옵션 이름 — 5개 CLI가 같은 글자를 쓴다.
@@ -123,8 +146,11 @@ def conflict_summary(conflicts: list[str]) -> str:
 
 __all__ = [
     "CMS_EDIT_MARKER",
+    "CMS_MARKED_TABLES",
+    "CMS_OWNED_TABLES",
     "CMS_PROTECTED_TABLES",
     "OVERWRITE_FLAG",
+    "PREREQUISITE_GRAPH_LOCK_KEY",
     "add_overwrite_argument",
     "conflict_summary",
     "format_conflict",

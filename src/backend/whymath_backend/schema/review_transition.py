@@ -32,6 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
+from typing import Literal
 
 from whymath_backend.schema.enums import ReviewStatus
 
@@ -73,6 +74,41 @@ _TRANSITIONS: MappingProxyType[ReviewTransitionAction, tuple[ReviewStatus, Revie
 
 #: 사유(`reason`)를 반드시 요구하는 액션 — 격리 계약 §3(격리 사유 기록 의무).
 _REASON_REQUIRED: frozenset[ReviewTransitionAction] = frozenset({ReviewTransitionAction.quarantine})
+
+
+#: 인간 *판정*(검수 타이머 `finished` 이벤트를 남겨야 하는) 액션 — approve·reject뿐(ADMIN-18).
+#: `ReviewVerdict`(approved|approved_with_edit|rejected)에 대응 값이 있는 액션이 이것이다.
+#: quarantine·release는 **사후 회수·복원**이지 새 검수 판정이 아니므로(ReviewVerdict에 값이 없고
+#: HIT는 "검수 한 건에 든 인간 시간"을 재는 지표다) 타이머 세션을 요구하지 않는다.
+_TIMER_VERDICT: MappingProxyType[ReviewTransitionAction, Literal["approved", "rejected"]] = (
+    MappingProxyType(
+        {
+            ReviewTransitionAction.approve: "approved",
+            ReviewTransitionAction.reject: "rejected",
+        }
+    )
+)
+
+#: 반려코드(GenerationFailureCode F1~F8)를 반드시 요구하는 액션 — 설계서 §4 "모든 검수 반려는 8코드
+#: 중 하나로 강제 분류". 함수 레벨 집행(`schema/review_timer.py`)을 HTTP 경계에서도 건다.
+_FAILURE_CODE_REQUIRED: frozenset[ReviewTransitionAction] = frozenset(
+    {ReviewTransitionAction.reject}
+)
+
+
+def verdict_for_action(action: ReviewTransitionAction) -> Literal["approved", "rejected"] | None:
+    """이 액션이 낳는 검수 판정(타이머 이벤트 `verdict`). 판정이 아닌 액션이면 None."""
+    return _TIMER_VERDICT.get(action)
+
+
+def action_requires_review_session(action: ReviewTransitionAction) -> bool:
+    """이 액션이 검수 세션(타이머)을 필수로 요구하는가(approve·reject만 True) — ADMIN-18."""
+    return action in _TIMER_VERDICT
+
+
+def action_requires_failure_code(action: ReviewTransitionAction) -> bool:
+    """이 액션이 반려코드(F1~F8)를 필수로 요구하는가(reject만 True) — ADMIN-18."""
+    return action in _FAILURE_CODE_REQUIRED
 
 
 def resolve_review_transition(
@@ -135,6 +171,23 @@ class QuarantineRecordLocked(ValueError):  # noqa: N818 — 계약상 이름(Err
     """
 
     code = "quarantine_record_immutable"
+
+
+class VerdictRequiresReviewSession(ValueError):  # noqa: N818 — 계약상 이름(Error 접미사 없음)
+    """목표 상태로 들어오는 표면(PATCH)이 인간 판정(approve·reject) 전이를 요구했다(ADMIN-18).
+
+    PATCH는 반려코드·검수 세션(타이머)을 실을 자리가 없다. 그대로 통과시키면 "반려코드 없는 반려",
+    "타이머 없는 판정"이 이 표면으로 새므로 거부하고 `POST …/transitions`로 안내한다.
+    """
+
+    code = "review_session_required"
+
+    def __init__(self, action: ReviewTransitionAction) -> None:
+        self.action = action
+        super().__init__(
+            f"{action.value} 판정은 반려코드·검수 세션(타이머)이 필요해 이 표면으로는 불가합니다. "
+            "POST /v1/admin/review-queue/items/{problem_id}/transitions 를 사용하세요."
+        )
 
 
 def action_for_status_change(

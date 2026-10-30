@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-148-batch-worklist-out-aliases-corpus-out
+title: "problem_corpus_batch: --worklist-out이 코퍼스 산출 경로(--out·기본 코퍼스 v0)와 같아도 통과 — 뷰 쓰기가 코퍼스 JSONL을 덮어씀(OPS-147 동형)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 가드 — `problem_corpus_batch.main()`이 인자 해석 직후·`run_corpus_batch` 호출 전에, `--worklist-out`의 해석 경로(절대화·`..` 정규화·Windows 대소문자 무시·samefile 동치)가 코퍼스 산출 경로와 같으면 exit 2로 거부하고 두 경로를 사유에 쓴다. 코퍼스 산출 경로는 `args.out`이고, `--out` 생략 시 기본값 `_default_out_path()`(저장소 생성 코퍼스 v0)로 해석한 경로와 비교해야 한다(None끼리 비교하면 기본 코퍼스를 뷰로 지정하는 경우를 놓친다). 거부 시 어떤 파일도 쓰지 않는다(코퍼스 바이트 불변). 동치 판정은 OPS-147이 main에 착지시킨 `problem_corpus_accumulate.worklist_aliases_review_queue`를 재사용하거나 일반화한다 — 두 경로 동치 판정의 이중 구현 금지."
+  - "② 실패 주입 — OPS-147 테스트(`tests/backend/harness/test_worklist_out_queue_alias_guard.py`)의 구조를 따른다: 가드를 끄면 같은 경로 테스트가 RED, 뮤테이션은 `mutated != original` 단언·원복 바이트 동일 단언 포함. 대조군 필수: 코퍼스와 다른 경로의 `--worklist-out`은 통과(과잉 차단 금지). 픽스처 4종을 각각 둔다: ⓐ 같은 경로 ⓑ `--out` 생략 + 기본 코퍼스 경로를 뷰로 지정 ⓒ 상대/절대·`..` 동치 ⓓ `--dry-run`과의 조합 — `--dry-run`은 코퍼스를 쓰지 않지만 뷰 쓰기(`write_text`)는 그대로 실행되므로 기존 코퍼스 파일이 있으면 덮어쓴다(dry-run이 면제 사유가 아님을 동결)."
+  - "③ 전수 확인 — `problem_corpus_batch --worklist-out`을 쓰는 런북·스크립트·워크플로를 저장소 전수 grep해 코퍼스 경로(`problems.jsonl` 등)를 뷰로 지정한 곳이 있으면 같은 PR에서 정정한다(2026-10-16 착수 시점 grep: 사용처는 문서 서술 3곳뿐이고 실행 명령 사용처는 0건 — 구현 시점에 재확인). 같은 부류의 다른 쓰기 경로(`problem_corpus_accumulate`의 `--generation-log`·`--worklist-out` vs `--out` 자체 동치, `.rounds.jsonl` 대장)에 같은 별칭 결함이 남았는지 확인해 결과를 notes에 기록하고, 남았으면 별도 태스크로 분리 등재한다(이 태스크에 섞지 않는다)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_batch.py
+  - tests/backend/harness/test_batch_worklist_out_corpus_alias_guard.py
+session: null
+notes: |-
+  등재 경위(2026-10-16): OPS-147(PR #1657 병합) ③ 전수 확인 중 발견한 범위 밖 관측. problem_corpus_accumulate는 --worklist-out이 큐 정본 <out>.review.jsonl과 같은 파일이면 거부하도록 막혔으나(OPS-147), problem_corpus_batch의 --worklist-out은 같은 가드가 없다. 코드 실측(main 51601954): batch는 (1) 코퍼스를 run_corpus_batch 안에서 sink.write(resolved_out)로 기존 파일 전면 교체 방식으로 쓰고(JsonlCorpusSink.write docstring: 기존 파일 전면 교체), (2) 그 뒤 main()이 --worklist-out 경로에 worklist_path.write_text로 마크다운 뷰를 쓴다. 두 경로가 같으면 코퍼스 JSONL이 마크다운으로 바뀐다. --out 생략 시 기본값이 저장소 생성 코퍼스 v0(_default_out_path)이라 --worklist-out에 그 파일을 주면 추적 중인 코퍼스를 덮어쓴다. --dry-run은 코퍼스는 안 쓰지만 뷰 쓰기는 그대로라 기존 파일이 있으면 덮어쓴다. 피해 크기는 OPS-147과 다르다: 이쪽은 결정론 배치의 산출물이고 코퍼스는 git으로 추적되는 경로라 복구 가능성이 높아 보이나(미확인 — 구현자가 실제 복구 경로를 확인해 기록), 소실 위험은 같은 구조다. 현재 실행 명령 사용처가 0건이라 실제 발생 이력은 없다(문서 서술 3곳뿐) — 그래서 P2. 재사용 대상: OPS-147의 worklist_aliases_review_queue(resolve+normcase+samefile)와 test_worklist_out_queue_alias_guard.py의 소스 변형 하네스. 위치 판단은 구현자 몫(accumulate에 두고 batch가 import할지, 공용 모듈로 승격할지 — import 방향이 7계층/lint-imports 계약을 건드리지 않는지 확인).
+
+  [정정 2026-10-16] notes 치환 — 클래스명 오기 정정(실측: problem_corpus_batch.py 373행 JsonlCorpusSink)
+updated: 2026-10-16

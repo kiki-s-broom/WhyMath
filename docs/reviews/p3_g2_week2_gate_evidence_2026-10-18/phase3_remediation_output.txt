@@ -1,0 +1,26 @@
+P3-06 오답 → 교정 전략 커버리지 — 핵심 오개념 7/12 산출 (미충족)
+
+M-id    개념            상태      kebab                                  보고id  오답/정답  신뢰  사다리(1~4회)
+M0075   [12미적Ⅰ-02-01]   served    product-rule-naive                     M0075   2/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+M0080   [12미적Ⅰ-02-01]   served    critical-point-implies-extremum        M0080   2/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+M0670   [12미적Ⅰ-02-02]   served    continuity-implies-differentiability   M0670   2/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+M0671   [12미적Ⅰ-02-03]   served    power-rule-step-omitted                M0671   4/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+M0672   [12미적Ⅰ-02-04]   shadowed  product-rule-naive                     M0075   2/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+          · product-rule-naive 의 canonical 이 M0075 — 리포트에는 그 id 로 나간다(한 kebab 으로는 M0672 와 변별 불가)
+M0673   [12미적Ⅰ-02-05]   blocked   -                                      -       -          -     -
+          · 좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다.
+M0674   [12미적Ⅰ-02-06]   blocked   -                                      -       -          -     -
+          · 좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다.
+M0864   [12미적Ⅰ-02-07]   served    extremum-max-min-confused              M0864   2/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+M0865   [12미적Ⅰ-02-07]   served    extremum-value-vs-point-confused       M0865   4/2        0.80  none→corrective explanation→easier problem→prerequisite concept
+M0676   [12미적Ⅰ-02-08]   blocked   -                                      -       -          -     -
+          · 좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다.
+M0677   [12미적Ⅰ-02-09]   blocked   -                                      -       -          -     -
+          · 좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다.
+M0678   [12미적Ⅰ-02-10]   blocked   -                                      -       -          -     -
+          · 좌석 없음 — 승인 크로스워크에 이 M-id 로 닿는 kebab 이 없다. 처분은 게이트 G-misc40-unseated-concepts-disposition 의 재판정(안 A~D) 몫이라 이 항목이 kebab·크로스링크를 만들지 않는다.
+
+작동한 비율 — 객관식 오답 보기를 실제로 골랐을 때 런타임이 후보를 내는가:
+  오답 보기 선택 378건 중 후보 산출 366건
+  카탈로그에 없는 id 라 조용히 버려진 12건: {'M0674': 12}
+  단답형 885문항: 채널 없음(범위 밖 — 숫자 하나를 답해 오류 서명 등식이 안 만들어진다)

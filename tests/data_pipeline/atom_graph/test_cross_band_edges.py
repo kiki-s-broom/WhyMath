@@ -40,9 +40,15 @@ PROPOSAL_PATH = CORPUS_DIR / "cross_band_edges_university_v1.json"
 GRAPH_PATH = CORPUS_DIR / "graph.json"
 BUILDER_PATH = _PROJECT_ROOT / "scripts" / "build_cross_band_edges_s4_01.py"
 
-_EXPECTED_EDGE_COUNT = 24
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads(
+    (_PROJECT_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
+)
+
+_EXPECTED_EDGE_COUNT = _FACTS["atom_graph.cross_band_edges_university"]
 #: 병합 직전(S4-60 이전) 정본 sha256 — 원장이 전제한 스냅샷. 상수로 박아 두 번째 증거로 삼는다.
-_PRE_MERGE_GRAPH_SHA256 = "1821d31c2614dc1b882b3f9b734736f1f4183e1097105675102c3541363b979f"
+_PRE_MERGE_GRAPH_SHA256 = "ea05b277ab40979d78be709daadb13d3427a72799a6a537561f1dc91c155601d"
 
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -168,8 +174,11 @@ class TestControlGroup:
         assert report.errors == [], report.report_text()
         assert report.success is True
         assert report.proposal_count == _EXPECTED_EDGE_COUNT
-        # 기존 엣지 수는 병합 전 뷰 기준 — 병합 후 정본의 태그 엣지 24건은 별도로 센다.
-        assert report.existing_edge_count == len(pre_merge_view(graph)["edges"])
+        # 기존 엣지 수 = 정본에서 이 제안의 태그 엣지 24건만 뺀 것(그 뒤 덧붙은 KG-12 승격 v2
+        # 엣지는 판정 시점의 "기존 엣지"다 — pre_merge_view 는 재현성 전용으로 그것까지 벗긴다).
+        assert report.existing_edge_count == len(
+            [e for e in graph["edges"] if e.get("evidence") != PROPOSAL_EVIDENCE]
+        )
         assert report.already_merged_count == _EXPECTED_EDGE_COUNT
 
     def test_pristine_proposal_has_no_subject_warning(

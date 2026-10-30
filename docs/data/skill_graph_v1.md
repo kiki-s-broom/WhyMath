@@ -3,7 +3,7 @@
 > **요약**: Skill을 `CognitiveType` enum 속성에서 **1급 노드로 승격**하는 정본 스킬 택소노미(리치
 > Part 2 Phase 2a·2026-07-03). 스킬은 개념이 *어떻게* 작동하는지(cognitive action)를 mastery
 > 독립추정 단위로 표현한다 — 개념(무엇)과 직교하는 축(어떻게). 폐쇄 6종 `BehaviorArea`와 그 아래
-> Skill Family로 조직된 **27개 스킬**(v1·compact·canonical). 전량 **와이매스 자체작성**(택소노미).
+> Skill Family로 조직된 **<!-- fact:skill_graph.skills -->27<!-- /fact -->개 스킬**(v1·compact·canonical). 전량 **와이매스 자체작성**(택소노미).
 >
 > **현황(Phase 2a)**: data-pipeline `data_pipeline.skill_graph`(models·transform·validate·CLI)가
 > 자체작성 `skills.jsonl`을 `graph.json`으로 정형화하고, backend `skill_node`(PG 프로젝션·skill_id
@@ -19,7 +19,7 @@
 |---|---|
 | 형태 | 자체작성 `skills.jsonl`(스킬 1행/줄) → `graph.json`(스킬 노드 배열) |
 | 저작 | **와이매스 자체작성**(행동영역·스킬 택소노미·검수필요) |
-| 규모 | **27 스킬** · 6 행동영역 · 12 Skill Family |
+| 규모 | **<!-- fact:skill_graph.skills -->27<!-- /fact --> 스킬** · <!-- fact:skill_graph.behavior_areas -->6<!-- /fact --> 행동영역 · <!-- fact:skill_graph.families -->16<!-- /fact --> Skill Family |
 | 산출 | `python -m data_pipeline.skill_graph transform-v1 -o data/corpus/skill_graph_v1` |
 | 결정성 | 동일 `skills.jsonl`(sha256) 2회 transform → byte 동일 `graph.json` |
 

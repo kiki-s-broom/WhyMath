@@ -1,0 +1,99 @@
+{
+ "_note": "Real POST /v1/systemone responses captured 2026-10-28 from laya-serve 0.4.15 serving laya-ko-whymath v1 (questions_v1, model=multilingual). Inputs were synthetic sentences with fake PII. Used by test_intent_shadow.py to check the boundary schema against the real surface, not hand-written mocks (PED-48 review #7).",
+ "responses": {
+  "pii": {
+   "model": "laya-rl-agent",
+   "answers": {
+    "intent": {
+     "type": "choice",
+     "choice": "answer_only",
+     "probabilities": {
+      "concept": 0.0,
+      "stuck": 0.0,
+      "answer_only": 1.0,
+      "hint": 0.0,
+      "check": 0.0,
+      "chitchat": 0.0
+     },
+     "confidence": 1.0,
+     "answer_confidence": 1.0,
+     "action": {
+      "act_probability": 1.0
+     },
+     "x_jev_confidence": 1.0
+    },
+    "pii": {
+     "type": "noul",
+     "noul": 1.0,
+     "confidence": 1.0,
+     "answer_confidence": 1.0,
+     "action": {
+      "act_probability": 1.0
+     }
+    }
+   },
+   "usage": {
+    "input_tokens": 213,
+    "output_tokens": 0,
+    "state_tokens": 33,
+    "state_tokens_dropped": 0,
+    "truncated": false,
+    "truncated_questions": []
+   },
+   "routing": {
+    "model": "multilingual",
+    "repo": "/home/claude/LayaKo/models/laya-ko-whymath-v1",
+    "reason": "explicit model='multilingual'",
+    "detection": null,
+    "workflow": null
+   }
+  },
+  "hint": {
+   "model": "laya-rl-agent",
+   "answers": {
+    "intent": {
+     "type": "choice",
+     "choice": "hint",
+     "probabilities": {
+      "concept": 0.0,
+      "stuck": 0.0,
+      "answer_only": 0.0,
+      "hint": 1.0,
+      "check": 0.0,
+      "chitchat": 0.0
+     },
+     "confidence": 1.0,
+     "answer_confidence": 1.0,
+     "action": {
+      "act_probability": 1.0
+     },
+     "x_jev_confidence": 1.0
+    },
+    "pii": {
+     "type": "noul",
+     "noul": 0.0,
+     "confidence": 1.0,
+     "answer_confidence": 1.0,
+     "action": {
+      "act_probability": 1.0
+     }
+    }
+   },
+   "usage": {
+    "input_tokens": 175,
+    "output_tokens": 0,
+    "state_tokens": 14,
+    "state_tokens_dropped": 0,
+    "truncated": false,
+    "truncated_questions": []
+   },
+   "routing": {
+    "model": "multilingual",
+    "repo": "/home/claude/LayaKo/models/laya-ko-whymath-v1",
+    "reason": "explicit model='multilingual'",
+    "detection": null,
+    "workflow": null
+   }
+  }
+ }
+}

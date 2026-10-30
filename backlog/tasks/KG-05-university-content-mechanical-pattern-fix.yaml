@@ -9,8 +9,7 @@ status: todo
 priority: 3
 eos_priority: P2
 owner: claude
-depends_on:
-  - KG-02-concept-content-review-promotion
+depends_on: []
 requires_gates: []
 acceptance:
   - "① flashcard mnemonic 409/409가 '주의: ' + 오개념 원문의 기계 복사임을 전수 실측 확인 후 처분 결정 — 틀린 문장을 암기카드에 반복 노출하는 설계는 교수학 위해(2026-08-13 감사). 제거·재작성·null화 중 근거 있는 처분을 택하고 판단 근거를 기록"
@@ -18,10 +17,11 @@ acceptance:
   - "③ 스키마 드리프트 해소: 대학 content.json에 review_status·standard_codes 필드 부재 — K-12와 동일 축을 갖추거나, 의도적 차이면 스키마·로더·문서에 자인 주석 (KG-02의 reviewed_only 소비 경로와 모순되지 않아야 함)"
   - "④ _provenance.json 갱신 + 변경 전후 샘플 10건 수기 검산(수학 정확성은 현재 양호하므로 훼손 금지)"
   - "⑤ 범위 밖: K-12 코퍼스(QUAL-06 소관), 카드 difficulty_tier 문자열 타입 정정(별도 관찰 필요 시 신규 등재)"
+  - "[정정 2026-10-15] 의존 해제 사유 보정(직전 정정의 사유 칸이 비어 기록돼 여기에 남긴다): 2026-10-15 Kiki 결정으로 사람 대상 내용 검토가 2026-12-31 이후로 이월돼 KG-02는 연말까지 열리지 않지만, 이 태스크의 일은 사람 검수 없이 내부에서 끝낼 수 있다. 검수 전 콘텐츠가 학생에게 나가는 위험은 태스크 순서가 아니라 집행 코드가 막는다: 공급 경로는 reviewed가 아니면 UNREVIEWED로 폴백하고(l4/content_supply.py, CONT-05 fail-closed), reviewed를 찍을 수 있는 서명은 사람 한 명뿐이다(review_gate.py HUMAN_REVIEWERS). 재서술을 먼저 하고 검수를 나중에 하면 같은 행을 두 번 검수하지 않는다. 사람 대상 단계는 이 태스크의 완료 조건이 아니라 이월된 게이트의 몫이다."
 artifacts: []
 paths:
   - "data/corpus/concept_content_university_v1/**"
   - "src/backend/whymath_backend/schema/**"
 session: null
-notes: "2026-08-13 감사 발견. 대학 콘텐츠 수학 정확성은 샘플 검산 통과(선형 ODE·제2동형정리·오일러 φ·블랙-숄즈 전부 정확) — 문제는 표현의 기계성뿐. KG-02(blocked) 해소 전 대량 재서술은 검수 없는 승격 위험이 있어 depends 처리.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필"
-updated: 2026-09-01
+notes: "2026-08-13 감사 발견. 대학 콘텐츠 수학 정확성은 샘플 검산 통과(선형 ODE·제2동형정리·오일러 φ·블랙-숄즈 전부 정확) — 문제는 표현의 기계성뿐. KG-02(blocked) 해소 전 대량 재서술은 검수 없는 승격 위험이 있어 depends 처리.\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-10-15] depends_on 제거 1건: \n\n[정정 2026-10-15] 의존 해제 사유 보정: 직전 정정의 사유 칸이 비어 기록됨"
+updated: 2026-10-15

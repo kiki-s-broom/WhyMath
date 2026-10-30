@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING, Callable
 if TYPE_CHECKING:
     from whymath_backend.schema.verification_capabilities import (
         AnswerFormVerifier,
+        AnswerValueExposure,
         AssessmentAnswerVerifier,
         AttemptMisconceptionDetector,
         ExpressionEquivalence,
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "default_answer_form_verifier",
+    "default_answer_value_exposure",
     "default_attempt_misconception_detector",
     "default_assessment_answer_verifier",
     "default_expression_equivalence",
@@ -98,6 +100,18 @@ def default_answer_form_verifier() -> AnswerFormVerifier:
     from whymath_backend.l4.subject_adapter_math import math_answer_form_verifier
 
     return math_answer_form_verifier()
+
+
+def default_answer_value_exposure() -> AnswerValueExposure:
+    """`AnswerValueExposure`(본문 속 식의 값이 목표와 같은가)의 기본 구현을 준다(P3-77).
+
+    소비자는 오프라인 힌트 생성 CLI(`l4.hint_content.populate.main`) 하나다 — 서빙 경로는 힌트를
+    만들지 않으므로 app.state에 등록하지 않는다(PULL_ONLY — `tests/infra/
+    test_eos_dependency_direction.py`가 그 사실을 동결한다).
+    """
+    from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
+
+    return math_answer_value_exposure()
 
 
 def default_step_chain_verifier() -> StepChainVerifier:

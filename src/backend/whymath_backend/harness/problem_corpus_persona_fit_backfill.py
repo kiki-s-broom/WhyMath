@@ -1,9 +1,9 @@
 """페르소나 적합도(`persona_fit`) 백필 후처리 CLI — 코퍼스 JSONL 제자리 갱신(S3-10).
 
-배치 CLI(`problem_corpus_batch` 등)는 생성 시점에 `persona_fit`을 채우지 않는다(전 2,667건
-`{}` — 2026-07-28 실측). 이 CLI는 **배치 밖 사후 백필**로, `l1/problem_bank/persona_fit_rules.py`
-(단일 권위)의 결정론 규칙을 코퍼스 6종에 적용한다(`problem_corpus_tag.py`의 시그니처 재태깅과
-동형 — 같은 비날조·바이트 계약 철학).
+배치 CLI(`problem_corpus_batch` 등)는 생성 시점에 `persona_fit`을 채우지 않는다(전 2,667건 `{}` —
+2026-07-28 실측). 이 CLI는 **배치 밖 사후 백필**로, `l1/problem_bank/persona_fit_rules.py`(단일
+권위)의 결정론 규칙을 고정 코퍼스(`KNOWN_CORPORA` 전부)에 적용한다(`problem_corpus_tag.py`의
+시그니처 재태깅과 동형 — 같은 비날조·바이트 계약 철학).
 
 바이트 계약(결정론·비날조·비파괴):
   - `persona_fit`이 **이미 비어 있지 않은** 레코드는 손대지 않는다(원문 줄 바이트 그대로) —
@@ -19,7 +19,7 @@
         --in <src.jsonl> [--out <dst.jsonl>] [--audit-out <audit.jsonl>] [--dry-run | --check]
 
     python -m whymath_backend.harness.problem_corpus_persona_fit_backfill --all
-        (코퍼스 6종 전부를 제자리 갱신 — `_KNOWN_CORPORA` 경로 고정)
+        (고정 코퍼스 전부를 제자리 갱신 — `KNOWN_CORPORA` 경로 고정)
 
     python -m whymath_backend.harness.problem_corpus_persona_fit_backfill --all --check
         (CI 드리프트 가드 — 아무것도 쓰지 않고, 미백필 레코드가 1건이라도 있으면 exit 1)
@@ -63,7 +63,8 @@ from whymath_backend.schema.problem import Problem
 
 __all__ = ["KNOWN_CORPORA", "PersonaFitBackfillReport", "main", "run_persona_fit_backfill"]
 
-# 코퍼스 6종 고정 경로(레포 루트 기준) — S3-10 원 구현(2026-07-29) 대상 전량(2,667건 = 2,663 + 4).
+# 고정 코퍼스 경로(레포 루트 기준). S3-10 원 구현(2026-07-29) 당시 대상은 6종 전량(2,667건 =
+# 2,663 + 4)이었고, 아래처럼 이후 추가분이 붙었다 — 현재 목록은 이 dict 자체가 정본이다.
 # S3-11(서지 정합)이 이 목록에 `_provenance.json`을 붙인다 — 이 CLI는 목록만 재사용한다.
 #
 # `probability_finite_v0`(34건)는 이 CLI가 원 구현될 당시엔 존재하지 않던 7번째 코퍼스다(S4-13
@@ -83,6 +84,10 @@ KNOWN_CORPORA: dict[str, Path] = {
     # 같아야 한다 — 그 결속은 `p3_calculus1_diff_batch.strip_backfill_stamps`와 은행 커버리지
     # 테스트가 동결한다.
     "p3_calculus1_diff_v0": Path("data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl"),
+    # P3-05 빈 칸 채우기 은행(204건) — 9번째. 같은 자격 통과 프로토콜의 3회차 S5 감사가 승인 근거를
+    # 냈다(`docs/data/p3_fill_audit/bank_audit_r3/`). 각인 두 키를 걷어 낸 바이트가 감사 동결 사본과
+    # 같아야 한다는 결속은 `tests/backend/l1/test_p3_fill_bank_coverage_link.py`가 동결한다.
+    "p3_fill_v0": Path("data/corpus/problem_bank_p3_fill_v0/problems.jsonl"),
 }
 
 _AUDIT_DIR = Path("docs/data/persona_fit_backfill_audit")
@@ -217,7 +222,7 @@ def _default_audit_path(in_path: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     """CLI 엔트리 — 백필 후 리포트를 JSON으로 stdout에 낸다(결정론·멱등).
 
-    `--all`이면 `KNOWN_CORPORA` 6종을 순회해 각각 백필하고 리포트 목록을 낸다. 단일 파일
+    `--all`이면 `KNOWN_CORPORA` 전부를 순회해 각각 백필하고 리포트 목록을 낸다. 단일 파일
     처리는 `--in`(+선택 `--out`/`--audit-out`)을 쓴다. 레포 루트에서 실행 전제(상대경로 규약).
 
     Returns:

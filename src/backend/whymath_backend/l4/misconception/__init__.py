@@ -12,7 +12,13 @@ slice 104: substring 거짓음성(패러프레이즈·동의어)을 보완하는
 
 from __future__ import annotations
 
-from whymath_backend.l4.misconception.catalog import CATALOG, CATALOG_BY_ID
+from whymath_backend.l4.misconception.catalog import (
+    BODY_CATALOG,
+    CATALOG,
+    CATALOG_BY_ID,
+    CHOICE_TRACE_ONLY_IDS,
+    body_detectable,
+)
 from whymath_backend.l4.misconception.combined import combine_diagnoses, combined_diagnose
 from whymath_backend.l4.misconception.diagnose import (
     correct_form_present,
@@ -55,8 +61,10 @@ from whymath_backend.l4.misconception.validate import (
 from whymath_backend.l4.misconception.visualize import visualize_misconception
 
 __all__ = [
+    "BODY_CATALOG",
     "CATALOG",
     "CATALOG_BY_ID",
+    "CHOICE_TRACE_ONLY_IDS",
     "DISTRACTOR_LINK_CONFIDENCE",
     "EmbeddingProvider",
     "FakeEmbeddingProvider",
@@ -70,6 +78,7 @@ __all__ = [
     "OpenAIEmbeddingProvider",
     "SemanticMatcher",
     "VectorIndex",
+    "body_detectable",
     "build_provider",
     "combine_diagnoses",
     "combined_diagnose",

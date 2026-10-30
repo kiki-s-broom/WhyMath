@@ -45,6 +45,22 @@ _NID_B = "HIGH-ALG-002"
 # ──────────────────────────────────────────────────────────────────────────
 # 가짜 sync 엔진 — begin() 컨텍스트 + execute() (PG 없이 배선 관찰)
 # ──────────────────────────────────────────────────────────────────────────
+def _compile(statement: object) -> str:
+    from sqlalchemy.dialects import postgresql
+
+    return str(statement.compile(dialect=postgresql.dialect()))  # type: ignore[attr-defined]
+
+
+class _Written:
+    """`INSERT … ON CONFLICT … RETURNING` 결과 흉내 — 1행이면 '적재됨', None이면 '건너뜀'(P3-26 가드)."""
+
+    def __init__(self, written: bool = True) -> None:
+        self._written = written
+
+    def first(self) -> object | None:
+        return ("written",) if self._written else None
+
+
 class _FakeConnection:
     def __init__(self, engine: _FakeEngine) -> None:
         self._engine = engine
@@ -60,8 +76,9 @@ class _FakeConnection:
     ) -> None:
         return None
 
-    def execute(self, statement: object) -> None:
+    def execute(self, statement: object) -> _Written:
         self._engine.executed.append(statement)
+        return _Written(self._engine.insert_written)
 
 
 class _FakeEngine:
@@ -69,6 +86,7 @@ class _FakeEngine:
 
     def __init__(self) -> None:
         self.executed: list[object] = []
+        self.insert_written = True
 
     def begin(self) -> _FakeConnection:
         return _FakeConnection(self)
@@ -369,6 +387,34 @@ class TestUpsertStatement:
 # ──────────────────────────────────────────────────────────────────────────
 # ④ populate — 전 레코드 upsert·멱등
 # ──────────────────────────────────────────────────────────────────────────
+class TestCmsOwnership:
+    """P3-26 — CMS가 만든 개념(`cms_edited_at` 있음)은 같은 코드의 파일 레코드가 덮지 못한다."""
+
+    def test_the_upsert_is_guarded_and_overwrite_releases_the_marker(self) -> None:
+        store, engine = _fake_store()
+        store.upsert(_record())
+        sql = _compile(engine.executed[0])
+        assert "cms_edited_at IS NULL" in sql
+        store2, engine2 = _fake_store()
+        store2.upsert(_record(), overwrite_cms_edits=True)
+        sql2 = _compile(engine2.executed[0])
+        assert "cms_edited_at IS NULL" not in sql2
+        assert "cms_edited_at" in sql2.split("DO UPDATE SET", 1)[1]
+
+    def test_a_skipped_row_is_reported_and_not_counted(self) -> None:
+        store, engine = _fake_store()
+        engine.insert_written = False
+        conflicts: list[str] = []
+        count = populate_backend_concepts([_record(_NID_A)], store=store, conflicts=conflicts)
+        assert count == 0 and conflicts == [f"concept:{_NID_A}"]
+
+    def test_a_written_row_is_not_a_conflict(self) -> None:
+        store, _ = _fake_store()
+        conflicts: list[str] = []
+        assert populate_backend_concepts([_record(_NID_A)], store=store, conflicts=conflicts) == 1
+        assert conflicts == []
+
+
 class TestPopulate:
     def test_populate_upserts_each_record(self) -> None:
         store, engine = _fake_store()

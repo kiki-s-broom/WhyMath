@@ -220,6 +220,28 @@ class LangfuseSink:
         경우에도 예외를 던지지 않아 상위 생성 파이프라인을 깨지 않는다(모듈 docstring
         의 never-break 보장 — CLAUDE.md 우선순위 #1 ≫ #6).
         """
+        self._emit(_EVENT_NAME, fields)
+
+    def record_event(self, name: str, fields: dict[str, object]) -> None:
+        """`l3_routing`이 아닌 **다른 이름**의 관측 이벤트 1건을 기록한다(P3-73 — 이벤트명 인자).
+
+        `record()`는 이벤트명을 `l3_routing`으로 고정한다. 비용 판독(`ops/cost_report.py`)은 바로 그
+        이름으로만 조회하므로, 라우팅 결정이 아닌 기록(예: 튜터 context 구성 요약)을 `record()`로
+        보내면 비용 게이트② 표본이 오염된다. 그런 기록은 이 메서드로 **자기 이름**을 달아 보낸다.
+
+        `name`이 `l3_routing`이면 거부한다(WARNING·기록 0) — 이 메서드로 비용 표본에 끼어드는 길을
+        막는다. 라우팅 결정은 `record()`만 쓴다. 안전 방침(미설정 no-op·오류 삼킴·예외 타입명
+        로그)은 `record()`와 같다.
+        """
+        if not isinstance(name, str) or not name.strip() or name == _EVENT_NAME:
+            logger.warning(
+                "Langfuse record_event 거부 — 이벤트명이 비었거나 l3_routing(비용 표본 보호)"
+            )
+            return
+        self._emit(name, fields)
+
+    def _emit(self, name: str, fields: dict[str, object]) -> None:
+        """이벤트 1건 전송 — `record`·`record_event` 공용(never-break)."""
         client = self._get_client()
         if client is None:
             return  # 미설정 → no-op (네트워크·클라이언트 없음)
@@ -232,13 +254,13 @@ class LangfuseSink:
             create_event = getattr(client, "create_event", None)
             if callable(create_event):
                 create_event(
-                    name=_EVENT_NAME,
+                    name=name,
                     metadata=_to_metadata(fields),
                     level="DEFAULT",
                 )
             else:
                 # langfuse v2 폴백 — event(name=, metadata=). level은 v2 기본값 사용.
-                cast(Any, client).event(name=_EVENT_NAME, metadata=_to_metadata(fields))
+                cast(Any, client).event(name=name, metadata=_to_metadata(fields))
         except Exception as exc:  # noqa: BLE001 — 관측성 장애가 학생 생성을 깨면 안 됨
             # 시크릿·PII 없이 *예외 타입명만* 경고 로그(필드·키 값은 남기지 않는다).
             # 타입명이 없던 종전엔 v2 AttributeError 전멸이 무증상이었다(침묵 실패 방지).

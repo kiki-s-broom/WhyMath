@@ -53,6 +53,11 @@ _CONSUMERS: dict[str, tuple[str, str]] = {
         _REPORTS,
         "arm_readiness의 미비 사유(detail) — --check-only가 사람에게 출력한다",
     ),
+    "harness/authoring_round_probe.py": (
+        _BRANCH_ONLY,
+        "저작 회차 준비 점검(EOS-208)이 'Anthropic 좌석이 꺼져 있다'를 확인하는 조건으로만 쓴다 — "
+        "False가 기대값이며 '키 없음'으로 번역해 사람에게 원인을 말하지 않는다",
+    ),
 }
 
 

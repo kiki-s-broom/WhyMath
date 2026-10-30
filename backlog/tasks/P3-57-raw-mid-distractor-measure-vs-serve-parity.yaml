@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-57-raw-mid-distractor-measure-vs-serve-parity
+title: "P3-57 — 오답 보기의 raw M-id 12건: 계측은 닿음으로 세고 서빙은 조용히 버린다 (P3-44 원인 미규명 항목의 답)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-06-wrong-answer-remediation-pipeline
+requires_gates: []
+acceptance:
+  - "① 현상 재확인 — 승인 문항 12건의 오답 보기가 카탈로그 kebab이 아니라 M-id(M0674)를 그대로 가리킨다. P3-02 계측기(phase3_coverage._reached_misconceptions)는 M-id 형태를 그대로 '닿음'으로 세지만, 서빙 경로(distractor_link_matches)는 CATALOG_BY_ID에 없는 id를 조용히 버려 후보가 0건이다. 측정은 연결됐다고 말하고 서빙은 아무것도 안 하는 구간이다(오답 보기 선택 378건 중 12건).\n② P3-44 acceptance ②의 '02-06은 M0674를 직접 기입했는데도 미충족' 원인 규명에 이 발견을 연결한다 — 이 태스크는 P3-44를 대체하지 않고 입력만 준다.\n③ 처분 선택지를 적는다: 계측기가 raw M-id를 닿음으로 세지 않게 정렬 / 서빙이 raw M-id를 크로스워크 역방향으로 해소 / 문항 오답 보기를 kebab으로 교체(승인 문항 수정이라 재승인 경로 필요 — P3-44 ④). 크로스워크 신설은 Kiki 서명이 필요하므로 세션이 대신 정하지 않는다.\n④ 변별력 — raw M-id 보기를 하나 주입했을 때 계측 수치와 서빙 후보가 같은 방향으로 움직이는지 확인한다(둘이 어긋나는 상태가 재발하지 않게)."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-06(2026-10-17). 판정 기준: main 63fe19dd. 범위 규율상 이 항목이 승인 문항 내용을 건드리지 않아 P3-06에서는 등재만 한다. 같은 불일치의 '작동한 비율' 수치는 python -m whymath_backend.ops.phase3_remediation 출력에 있다(오답 보기 선택 378건 중 후보 산출 366건, 카탈로그에 없는 id로 버려진 12건). 등재는 착수가 아니다."
+updated: 2026-10-17

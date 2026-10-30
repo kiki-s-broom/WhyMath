@@ -36,6 +36,10 @@ _SKILLS_JSONL = _ROOT / "data" / "corpus" / "skill_graph_v1" / "skills.jsonl"
 _K12_CONTENT = _ROOT / "data" / "corpus" / "concept_content_v1" / "content.json"
 _UNIV_CONTENT = _ROOT / "data" / "corpus" / "concept_content_university_v1" / "content.json"
 
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+
 
 def _derived_atom_skills() -> dict[str, tuple[str, ...]]:
     crosswalk = load_crosswalk_records(_CROSSWALK)
@@ -81,7 +85,7 @@ def test_corpora_exist() -> None:
 # ── ① 전파 스킬 ⊆ 27 스킬 정본 (dangling 0) ────────────────────────────────
 def test_propagated_skills_subset_of_skill_graph() -> None:
     universe = _skill_universe()
-    assert len(universe) == 27  # 스킬 정본 27종(#419·skill_graph_v1)
+    assert len(universe) == _FACTS["skill_graph.skills"]  # 스킬 정본(#419·skill_graph_v1)
     derived = _derived_atom_skills()
     dangling = {s for skills in derived.values() for s in skills} - universe
     assert dangling == set(), f"스킬 정본에 없는 skill_id 전파(dangling): {sorted(dangling)}"
@@ -100,9 +104,9 @@ def test_k12_content_fully_covered_and_atoms_valid() -> None:
     payload = json.loads(_K12_CONTENT.read_text(encoding="utf-8"))
     k12_codes = {str(c["code"]) for c in payload["content"]}
     derived = _derived_content_atoms()
-    # 키 집합 일치 — K-12 437행 전량이 원자 연결을 받는다(누락 0·잉여 0).
+    # 키 집합 일치 — K-12 콘텐츠 행 전량이 원자 연결을 받는다(누락 0·잉여 0).
     assert set(derived) == k12_codes
-    assert len(derived) == 437
+    assert len(derived) == _FACTS["concept_content.k12"]
     atoms = _atom_universe()
     dangling = {a for codes in derived.values() for a in codes} - atoms
     assert dangling == set(), f"세부개념에 없는 atom_codes(dangling): {sorted(dangling)}"
@@ -114,7 +118,7 @@ def test_k12_content_fully_covered_and_atoms_valid() -> None:
 def test_university_codes_disjoint_from_transfer_keys() -> None:
     payload = json.loads(_UNIV_CONTENT.read_text(encoding="utf-8"))
     univ_codes = {str(c["code"]) for c in payload["content"]}
-    assert len(univ_codes) == 409
+    assert len(univ_codes) == _FACTS["concept_content.university"]
     derived = _derived_content_atoms()
     # 대학 code(소단원코드)는 유도 키(구 437 개념코드)와 키 공간이 겹치지 않는다 —
     # scope='K-12' SQL 필터에 더해 데이터 축 자체가 분리돼 있음을 동결(이중 방어).
@@ -129,4 +133,5 @@ def test_skill_coverage_lower_bound() -> None:
     assert len(derived) >= 1_300
     assert nonempty >= 1_000
     unique_skills = {s for skills in derived.values() for s in skills}
-    assert len(unique_skills) == 27  # 27종 전부가 최소 한 원자에 닿는다
+    # 스킬 정본 전부가 최소 한 원자에 닿는다.
+    assert len(unique_skills) == _FACTS["skill_graph.skills"]

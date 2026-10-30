@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-214
+title: "CU 사후 힌트의 단계 목록 SymPy 검산 — L3 시연 식이 틀리면 verified 금지(EOS-211 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① EOS-211 사후 힌트 패스(`l4/hint_content/cu_hint_pass.py`)가 LLM에서 받은 **단계 목록**(`cu.hints.context.jsonl`의 steps)은 지금 기계 검산 없이 게이트 문맥(`GateContext.step_contents`)으로만 쓰인다 — L3 힌트가 첫 단계 식을 글자 그대로 시연하므로, 그 식이 틀리면 틀린 계산이 verified 힌트로 학생에게 나갈 수 있다(학생 제공 전 검증 원칙). 인접 단계 전이를 SymPy로 검산해(동치·도출 가능성) 검산 실패·판정 불가 단계를 시연하는 힌트는 verified=false로 둔다(판정 불가 ≠ 통과) ② 마지막 단계(`변수 = 정답` 꼴)가 CU의 `answer`와 SymPy로 일치하는지 대조한다 ③ 검산 결과를 산출물에 남겨 재현 가능하게 한다(어느 전이가 통과·실패·판정 불가였는지) ④ 기존 회차(EOS-211 첫 라이브 산출물)에 소급해 verified 변화량을 실측 보고"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/hint_content/cu_hint_pass.py
+  - "tests/backend/l4/hint_content/**"
+session: null
+notes: "출처: EOS-211 구현(2026-10-29) — Kiki 결정 '사후 LLM 힌트 패스'에서 단계 계산 SymPy 검증은 범위 밖으로 분리."
+updated: 2026-10-29

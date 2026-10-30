@@ -35,6 +35,18 @@ _ROOT = Path(__file__).resolve().parents[3]
 _QUAL = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "qualification"
 #: 시험지·1회차 감사 묶음을 만든 은행 v0의 동결 사본 — 현 은행은 생성기 교정으로 바뀔 수 있다.
 _BANK = _ROOT / "docs" / "data" / "p3_calculus1_diff_audit" / "bank_audit" / "audited_bank.jsonl"
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
+
+_M0677_CUT = "f(x)=k의 근의 개수를 그래프와 가로선 y=k의 교점으로 보는 관점을"
+#: 판정자가 시험지·묶음에서 본 오개념 설명 중, 측정 뒤 코퍼스가 정정되어 지금은 달라진 것(오개념 id → 측정
+#: 당시 문구). 시험지·묶음 도구는 설명을 *살아 있는* 코퍼스에서 읽으므로(`_misconception_statements`)
+#: 코퍼스를 고치면 커밋된 시험지·매니페스트와 바이트가 어긋난다. 이미 라벨을 받은 시험지는 조용히
+#: 재생성하지 않는다 — 재현 검사만 측정 당시 문구로 고정해 "시험지는 판정자가 본 그대로"를 계속 증명한다.
+#: QUAL-14(2026-10-12)가 M0677의 절단 문장('…관점을')을 복원했다. 새 시험·새 묶음은 이 고정 없이
+#: 정정된 코퍼스 문구로 만든다(고정은 이 테스트 파일 안에만 산다).
+_AS_JUDGED_STATEMENTS: dict[str, str] = {"M0677": f"{_M0677_CUT} — {_M0677_CUT} 못 쓴다."}
 
 #: 합성 정답지의 종류별 결함 수 — 15건 종류를 두어 0.80 경계(12/15)를 정확히 밟는다.
 _SIZES = dict(zip(BANK_DEFECT_CLASSES, (15, 15, 15, 15, 15, 15, 30), strict=True))
@@ -535,12 +547,38 @@ def test_committed_artifacts_are_mutually_consistent() -> None:
     assert [r["item_id"] for r in machine] == ids
 
 
+@pytest.fixture()
+def as_judged_statements(monkeypatch: pytest.MonkeyPatch) -> None:
+    """재현 검사 동안 시험지·묶음 도구가 판정자가 본 문구를 쓰게 한다(코퍼스 정정과 시험지를 분리)."""
+    live = qual._misconception_statements
+
+    def pinned() -> dict[str, str]:
+        return {**live(), **_AS_JUDGED_STATEMENTS}
+
+    monkeypatch.setattr(qual, "_misconception_statements", pinned)
+
+
+def test_as_judged_pins_are_what_the_raters_saw_and_the_corpus_has_moved_on() -> None:
+    """고정한 문구는 ① 판정자가 본 시험지에 실제로 박혀 있고 ② 지금 코퍼스와 실제로 다르다.
+
+    ①이 어긋나면 고정이 지어낸 문구다(재현을 거짓으로 만든다). ②가 어긋나면 고정이 죽었다 — 지운다.
+    둘 다 "고정은 실재하는 드리프트 하나당 하나"라는 전제의 집행이다.
+    """
+    blind = (_QUAL / "blind_240.jsonl").read_text("utf-8")
+    live = qual._misconception_statements()
+    assert _AS_JUDGED_STATEMENTS
+    for mid, text in _AS_JUDGED_STATEMENTS.items():
+        assert json.dumps(text, ensure_ascii=False)[1:-1] in blind, mid
+        assert live[mid] != text, mid
+
+
 @pytest.mark.corpus_authoring
-def test_emit_check_reproduces_the_committed_test() -> None:
+def test_emit_check_reproduces_the_committed_test(as_judged_statements: None) -> None:
     """같은 seed·같은 은행으로 재생성하면 커밋된 시험지·지문·매니페스트와 바이트가 같다.
 
     RED면 시험지를 만드는 코드(주입기·판정기·스캐너)나 은행이 바뀐 것이다. 이미 이 시험지로 판정자
     라벨을 받았다면 조용히 재생성하지 말고 README에 드리프트를 적은 뒤 새 시험으로 다시 잰다.
+    오개념 설명은 코퍼스가 측정 뒤 정정된 몫만 `_AS_JUDGED_STATEMENTS`로 고정한다(QUAL-14).
     """
     assert qual.main(["emit", "--check"]) == 0
 
@@ -553,6 +591,12 @@ _KNOWN_INSTRUMENT_DRIFT: dict[str, tuple[str, str]] = {
     "q056": ("acceptance", "M0677"),
     "q181": ("acceptance", "M0677"),
 }
+
+#: OPS-150(2026-10-21) — 야간 재검산(`corpus_reverify`)이 `answer` 필드 ↔ answer_map 을 대조하게 되어,
+#: 측정 당시 기계가 놓쳤던 **답만 +1 변조**(정답지 `variant: answer_only`) 4건을 지금은 잡는다. 계기가
+#: 좋아진 방향(놓친 결함 → 검출)의 드리프트다. 채점은 측정 당시 라벨(커밋본)로 이미 했고 바꾸지 않는다 —
+#: 자격 측정 기록을 재생성하면 그 측정이 무엇을 쟀는지가 사라진다. 이 목록도 정답지로 조건을 검산한다.
+_OPS150_ANSWER_FIELD_DRIFT: frozenset[str] = frozenset({"q027", "q034", "q131", "q180"})
 
 
 @pytest.mark.corpus_authoring
@@ -575,7 +619,20 @@ def test_machine_labels_reproduce_except_pinned_instrument_drift() -> None:
     }
     assert set(now) == set(committed)
     drifted = {i for i in now if now[i] != committed[i]}
-    assert drifted == set(_KNOWN_INSTRUMENT_DRIFT)
+    assert drifted == set(_KNOWN_INSTRUMENT_DRIFT) | _OPS150_ANSWER_FIELD_DRIFT
+    key = {
+        row["item_id"]: row
+        for row in map(json.loads, (_QUAL / "answer_key.jsonl").read_text("utf-8").splitlines())
+    }
+    for ident in _OPS150_ANSWER_FIELD_DRIFT:
+        # ① 측정 당시 놓쳤고 ② 지금은 재검산 하나만 answer 불일치로 걸며 ③ 정답지상 답만 바꾼 결함이다.
+        assert committed[ident]["verdict"] == "ok", ident
+        assert now[ident]["fired"] == ["reverify"], ident
+        assert all("answer≠answer_map" in why for why in now[ident]["reasons"]), ident
+        assert key[ident]["is_defective"] is True and key[ident]["variant"] == "answer_only", ident
+    # 반대 방향(정상 문항에 새 오경보) 드리프트는 이 목록에 들어올 수 없다 — 위 ③이 막는다.
+    answer_only = {i for i, row in key.items() if row.get("variant") == "answer_only"}
+    assert answer_only == _OPS150_ANSWER_FIELD_DRIFT  # 답만 변조 전건을 지금 기계가 잡는다
     by_id = {r["item_id"]: r for r in blind}
     for ident, (gate, old_mid) in _KNOWN_INSTRUMENT_DRIFT.items():
         assert committed[ident]["verdict"] == "ok"
@@ -609,7 +666,7 @@ def test_bank_sheets_partition_the_bank_with_the_blind_field_set() -> None:
     assert [len(s) for s in shards] == [63] * 8
     ids = [r["item_id"] for s in shards for r in s]
     bank_ids = [json.loads(line)["problem_id"] for line in _BANK.read_text("utf-8").splitlines()]
-    assert len(ids) == len(set(ids)) == 504
+    assert len(ids) == len(set(ids)) == 504  # corpus-pin: 시점 고정 — 은행 v0 감사 동결 사본
     assert set(ids) == set(bank_ids)
     blind_keys = list(json.loads((_QUAL / "blind_240.jsonl").read_text("utf-8").splitlines()[0]))
     assert all(list(r) == blind_keys for s in shards for r in s)
@@ -623,8 +680,11 @@ def test_bank_sheets_partition_the_bank_with_the_blind_field_set() -> None:
     assert again == sheets  # 결정론
 
 
-def test_bank_sheets_manifest_is_committed_and_reproducible() -> None:
-    """커밋된 매니페스트 = 재생성 결과. RED면 은행·지침·묶음 코드가 판정 뒤에 바뀐 것이다."""
+def test_bank_sheets_manifest_is_committed_and_reproducible(as_judged_statements: None) -> None:
+    """커밋된 매니페스트 = 재생성 결과. RED면 은행·지침·묶음 코드가 판정 뒤에 바뀐 것이다.
+
+    오개념 설명은 코퍼스가 측정 뒤 정정된 몫만 `_AS_JUDGED_STATEMENTS`로 고정한다(QUAL-14).
+    """
     manifest = json.loads((_BANK_AUDIT / "manifest.json").read_text("utf-8"))
     assert manifest["bank_sha256"] == hashlib.sha256(_BANK.read_bytes()).hexdigest()
     protocol = (_QUAL / "rater_protocol.md").read_bytes()
@@ -643,3 +703,98 @@ def test_bank_sheets_input_errors(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert qual.main(["bank-sheets", "--manifest", str(manifest)]) == 2  # --out-dir 없음
     assert not out.exists() and not manifest.exists()  # 입력 오류에서 아무것도 쓰지 않는다
     assert "입력 오류" in capsys.readouterr().err
+
+
+# ── 빈 칸 채우기 은행(P3-05) — 같은 프로토콜을 다른 은행에 쓰는 일반화 ─────────────
+_FILL_BANK = _ROOT / "data" / "corpus" / "problem_bank_p3_fill_v0" / "problems.jsonl"
+_FILL_SIZE = _FACTS["problem_bank.p3_fill_v0"]  # 현 은행(동결 사본이 아니다)의 문항 수
+
+
+def _fill_rows() -> list[dict[str, Any]]:
+    return [json.loads(line) for line in _FILL_BANK.read_text("utf-8").splitlines() if line]
+
+
+def test_generator_is_resolved_by_unit_code_not_by_standard_code() -> None:
+    """02-03·02-10은 승인 은행(P3-03)과 빈 칸 채우기 은행에 생성기가 하나씩이다 — 단위 코드가 가른다."""
+    rows = _fill_rows()
+    assert rows
+    for row in rows:
+        assert qual._generator_for(row).unit_code == row["unit_codes"][0]
+    pattern = next(r for r in rows if r["unit_codes"][0] == "P3-CALC1-DIFF-POWER-PATTERN")
+    assert qual._generator_for(pattern).__name__ == "P3DiffPowerPatternGenerator"
+    # 시험지 레코드에는 단위 코드가 없다 — 성취기준 코드로 P3-03 생성기를 찾는 종전 동작을 지킨다.
+    blind = {k: v for k, v in pattern.items() if k != "unit_codes"}
+    assert qual._generator_for(blind).__name__ == "P3DiffPowerDerivativeGenerator"
+    unknown = {"unit_codes": ["NO-SUCH-UNIT"], "achievement_standard_codes": ["[없음]"]}
+    assert qual._generator_for(unknown) is None
+
+
+def test_machine_gates_pass_every_row_of_the_fill_bank() -> None:
+    """빈 칸 채우기 은행 전건에 기계 게이트 전부가 결함을 걸지 않는다(회귀 동결 — 1회차 감사 전 정리)."""
+    flagged = [
+        (row["problem_id"], qual.machine_label(row, row["problem_id"])["reasons"])
+        for row in _fill_rows()
+        if qual.machine_label(row, row["problem_id"])["verdict"] != "ok"
+    ]
+    assert flagged == [], flagged[:3]
+
+
+def test_machine_label_rejects_an_unknown_unit_and_slot() -> None:
+    row = dict(_fill_rows()[0])
+    row["unit_codes"] = ["NO-SUCH-UNIT"]
+    row["achievement_standard_codes"] = ["[없음]"]
+    with pytest.raises(qual.QualificationInputError, match="알 수 없는 개념·슬롯"):
+        qual.machine_label(row, "x")
+
+
+def test_bank_sheets_take_an_explicit_size_task_and_label() -> None:
+    sheets = qual.build_bank_sheets(
+        _FILL_BANK,
+        qual.BANK_AUDIT_SEED,
+        4,
+        expected_size=_FILL_SIZE,
+        task="P3-05-triangle-density",
+        bank_label="data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
+    )
+    shards = [[json.loads(line) for line in text.splitlines()] for text in sheets.shards]
+    assert [len(s) for s in shards] == [_FILL_SIZE // 4] * 4
+    ids = [r["item_id"] for s in shards for r in s]
+    assert len(ids) == len(set(ids)) == _FILL_SIZE
+    manifest = json.loads(sheets.manifest)
+    assert manifest["task"] == "P3-05-triangle-density"
+    assert manifest["bank"] == "data/corpus/problem_bank_p3_fill_v0/problems.jsonl"
+    assert manifest["n_items"] == _FILL_SIZE and manifest["shard_size"] == _FILL_SIZE // 4
+    with pytest.raises(qual.QualificationInputError, match="기준 504건"):
+        qual.build_bank_sheets(_FILL_BANK, qual.BANK_AUDIT_SEED, 4)  # 기본 기준은 P3-03 은행 504건
+    default = json.loads(qual.build_bank_sheets(_BANK, qual.BANK_AUDIT_SEED, 8).manifest)
+    assert default["task"] == "P3-03-coverage-fill"
+    assert default["bank"] == "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl"
+
+
+def test_s5_takes_an_explicit_bank_size_and_label(tmp_path: Path) -> None:
+    """204건 은행에서는 k = 0만 통과한다(0.0191 ≤ 0.02, k = 1은 0.0281) — 규칙 자체는 코드가 계산한다."""
+    ids = [r["problem_id"] for r in _fill_rows()]
+    good = _qualification(tmp_path / "q.json", passed=True)
+
+    def run(defects: set[str]) -> int:
+        machine = _bank_labels(tmp_path / "m.jsonl", ids, set())
+        a = _bank_labels(tmp_path / "a.jsonl", ids, defects)
+        b = _bank_labels(tmp_path / "b.jsonl", ids, set())
+        return qual.main(
+            [
+                "s5",
+                "--bank", str(_FILL_BANK),
+                "--machine", str(machine),
+                "--llm", str(a),
+                "--llm", str(b),
+                "--qualification", str(good),
+                "--expected-size", str(_FILL_SIZE),
+                "--label", "P3-05 빈 칸 채우기 은행",
+            ]
+        )  # fmt: skip
+
+    assert run(set()) == 0
+    assert run({ids[0]}) == 1
+    assert (
+        qual.main(["s5", "--bank", str(_FILL_BANK), "--machine", "x", "--qualification", "y"]) == 2
+    )

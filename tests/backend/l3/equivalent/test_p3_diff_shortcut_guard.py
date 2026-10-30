@@ -174,7 +174,7 @@ def test_audited_bank_fixture_is_the_round3_audit_target(
     audited: dict[str, dict[str, object]], verdicts: dict[str, list[str]]
 ) -> None:
     """원문 스냅샷이 3회차 라벨과 같은 504건을 덮는다(라벨 id 전부가 원문에 있다)."""
-    assert len(audited) == 504
+    assert len(audited) == 504  # corpus-pin: 시점 고정 — 3회차 감사 동결 사본
     assert set(verdicts) == set(audited)
     assert all(len(v) == 2 for v in verdicts.values())  # 문항마다 판정자 2명
 
@@ -231,7 +231,7 @@ def test_audited_bank_fixture_is_the_round4_audit_target(
     audited4: dict[str, dict[str, object]], verdicts4: dict[str, list[str]]
 ) -> None:
     """원문 스냅샷이 4회차 라벨과 같은 504건을 덮는다(문항마다 판정자 2명)."""
-    assert len(audited4) == 504
+    assert len(audited4) == 504  # corpus-pin: 시점 고정 — 4회차 감사 동결 사본
     assert set(verdicts4) == set(audited4)
     assert all(len(v) == 2 for v in verdicts4.values())
 

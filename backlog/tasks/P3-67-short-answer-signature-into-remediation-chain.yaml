@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-67-short-answer-signature-into-remediation-chain
+title: "P3-67 — 단답형 오답 서명 후보를 main 의 교정 체인에 잇는다 (P3-56 조건부 승인의 후속 ②·활성화 게이트 뒤)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - P3-66-signature-shadow-harvest-activation-cli
+requires_gates:
+  - G-p356-signature-activation
+acceptance:
+  - "① 선행 조건 — 게이트 G-p356-signature-activation 이 PASS 여야 착수한다(requires_gates). 그림자 수확 판정(P3-66)이 기준을 통과하기 전에는 이 태스크를 시작하지 않는다.\n② 단답 입력 체인 진입점 — main 의 run_choice_chain(l4/misconception/remediation_strategy.py)은 보기 선택(distractor_map + 선택 인덱스)만 입력으로 받는다. 답안 텍스트 채널(scan_attempt_answer 결과)의 후보를 입력으로 받는 진입점을 더하고, 후보 이후(가설·개입·사다리·교정) 단계는 재사용한다 — 재구현 금지.\n③ 계측기 단답 경로 — ops/phase3_remediation 이 단답형 경로의 '작동한 비율'(질문을 읽은 비율 · 후보가 난 비율 · 교정까지 이어진 비율)을 말하게 한다. 읽지 못한 문항은 후보 없음이 아니라 '볼 수 없음'으로 센다.\n④ 서빙 경로 확인 — api/_attempt_misconception_scan 이 단답형 답안을 이 독법으로 훑는 상태(mode=on)에서 두 채점 경로(/v1/me/attempts · 코치 서버 판정)가 같은 결과를 내는지 실제 서빙 함수로 확인한다.\n⑤ 변별력 — 정답 시도에서 후보가 교정까지 이어지지 않는지, 읽지 못한 질문이 교정으로 새지 않는지 주입으로 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l4/misconception/remediation_strategy.py
+  - src/backend/whymath_backend/ops/phase3_remediation.py
+session: null
+notes: "출처: P3-56 판정 문서 §5(승인돼도 남는 일). 활성화 게이트가 PASS 하기 전에는 시작하지 않는다 — shadow 는 후보를 교정 체인에 보내지 않는다."
+updated: 2026-10-18

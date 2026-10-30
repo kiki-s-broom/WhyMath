@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-314-brief-mine-ignores-origin-main-done-takeover
+title: "SessionStart 브리핑이 origin/main 에서 이미 done 이거나 다른 세션에 인수된 태스크를 이 브랜치의 진행 중 태스크로 계속 표시한다 — 소유 세션이 이틀간 완료된 태스크 위에 구현을 쌓았다(P3-06 병렬 중복)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: blocked
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 재현(사실 고정) — 2026-10-16 06:45Z claude/beautiful-gates-fuajv6이 P3-06을 착수(remote=ok)했고, 2026-10-17 08:01Z 다른 세션이 start_ignored_sibling_in_progress 2회 뒤 claim_release 후 착수해 같은 날 PR #1673으로 done까지 냈다. 그 뒤에도 원 세션의 SessionStart 브리핑은 이틀간 '이 브랜치의 진행 중 태스크: P3-06'을 계속 표시했고, 세션은 이미 끝난 태스크 위에 구현을 쌓았다(커밋 8개 중복·재구성 비용). 원인 코드: scripts/harness/report.py 의 mine 계산이 로컬 대장(status==in_progress and session==branch)만 본다.\n② 대책 — cmd_brief 가 mine 후보마다 origin/main 의 같은 태스크 상태를 조회해 done 이거나 원격 claim 소유자가 이 브랜치가 아니면 '진행 중' 대신 경고 줄을 낸다: '이 태스크는 origin/main 에서 done(또는 다른 세션 소유) — 이 브랜치의 작업은 중복 위험, 착수 전 확인'. 조회 실패(shallow·offline)는 '아니다'가 아니라 '판정 보류'로 표시한다(모른다 ≠ 아니다).\n③ 변별력 — tests/harness 에 (i) 로컬 in_progress + main done (ii) 로컬 in_progress + main in_progress + claim 소유자 불일치 (iii) 로컬 in_progress + main 동일 상태(대조군: 경고 없음) (iv) 조회 실패(판정 보류) 4경우를 두고, 대책 제거 뮤테이션이 (i)(ii)를 RED로 만드는지 확인한다(주입 적용 단언·바이트 동일 원복 포함).\n④ 배선 — 신규 테스트가 CI harness-integrity 잡에서 수집되는지 실측한다. CLAUDE.md 는 수정하지 않는다(2026-09-20 새 산문 규칙 등재 동결)."
+artifacts: []
+paths:
+  - scripts/harness/report.py
+  - "tests/harness/**"
+session: null
+notes: |-
+  출처: 2026-10-18 P3-06 재구성 중 이벤트 대장 실측. HARN-311(claim 쓰기 error 시 fail-open 착수)과 다른 경로 — 여기서는 claim 이 ok 였다가 풀려 인수됐고 소유 세션이 그 사실을 보지 못했다. 관련: HARN-198(done 직후 무주 todo)·HARN-47(고립 브랜치).
+
+  [차단 2026-10-19] D5 12/31 동결(docs/strategy/internal_verification_period_policy_2026-12-31.md 규칙 2) — 해제 2027-01-01
+updated: 2026-10-19

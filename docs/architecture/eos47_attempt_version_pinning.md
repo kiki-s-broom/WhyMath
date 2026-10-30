@@ -53,7 +53,7 @@
 
 ## 6. 후속 (이 변경이 소유하지 않는 것)
 
-- **`EOS-190-problem-version-publish-writer`** (P1) — **착지**: 문항 발행 경로(writer)가 `problem_version`에 행을 쓰는 유일한 자리가 됐다. 호출 표면은 `EOS-194`가 소유하며, 그것이 착지해야 §5-1(운영 값 NULL)이 실제로 해소된다.
+- **`EOS-190-problem-version-publish-writer`** (P1) — **착지**: 문항 발행 경로(writer)가 `problem_version`에 행을 쓰는 유일한 자리가 됐다. 호출 표면은 `EOS-194`가 소유한다 — **2026-10-13 정정: 호출 표면(관리자 CMS 문항 판 라우트 4개)이 착지했다**(`eos194_problem_publish_caller_surface.md`). 다만 §5-1(운영 값 NULL)이 실제로 해소됐는지는 운영 DB 측정이 있어야 말할 수 있고, 그 측정은 아직 하지 않았다(같은 문서 §5.2).
 - **`EOS-191-serve-time-version-stamping`** (P2, EOS-190 선행) — 출제 시점 판 확정. §5-2(접수 ≠ 출제) 해소.
 - **`EOS-192-evaluation-context-source-wiring`** (P2) — §3에서 `None`인 4키를 정본 소유자가 값을 만든 뒤 키 단위로 연결.
 - **`EOS-193-attempt-version-pin-reach-report`** (P2, EOS-190 선행) — 고정이 실제로 일한 비율 리포트(0%가 정상처럼 보이지 않게).

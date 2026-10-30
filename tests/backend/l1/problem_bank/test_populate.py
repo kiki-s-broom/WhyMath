@@ -947,10 +947,12 @@ def test_discover_finds_every_problem_bank_corpus() -> None:
 def test_discover_excludes_non_problem_bank_corpora(tmp_path: Path) -> None:
     """`problem_bank_` 접두 절의 **반례**로 검증한다 — 합성 트리가 필요한 이유.
 
-    실 저장소에는 `data/corpus/<problem_bank_ 아님>/problems.jsonl`이 **0건**이라(2026-09-22
-    실측), 위 테스트만으로는 글롭을 `data/corpus/*/problems.jsonl`로 넓혀도 통과한다
-    (뮤테이션 `glob_wide` 생존으로 발각). 즉 그 절을 한 번도 밟지 않았다. 여기서 반례를
-    만들어 절을 실제로 실행시킨다(CLAUDE.md "픽스처가 그 절을 실제로 밟는가").
+    2026-09-22 실측 당시 실 저장소에는 `data/corpus/<problem_bank_ 아님>/problems.jsonl`이
+    **0건**이라, 위 테스트만으로는 글롭을 `data/corpus/*/problems.jsonl`로 넓혀도 통과했다
+    (뮤테이션 `glob_wide` 생존으로 발각). 즉 그 절을 한 번도 밟지 않았다. 지금은
+    `problem_variants_staging_v0`이 그런 반례로 실재해 위 테스트도 그 절을 밟지만, 실 저장소
+    상태에 기대지 않도록 여기서 반례를 만들어 절을 실제로 실행시킨다(CLAUDE.md "픽스처가 그 절을
+    실제로 밟는가").
     """
     from whymath_backend.l1.problem_bank.populate import discover_problem_corpora
 

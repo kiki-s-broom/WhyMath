@@ -1,0 +1,38 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-147-worklist-out-aliases-review-queue-store
+title: "problem_corpus_accumulate: --worklist-out이 검수 큐 정본(<out>.review.jsonl)과 같은 경로여도 통과 — 회차 끝 마크다운 뷰가 JSONL 정본을 덮어씀(EOS-121 사고)"
+track: infra-debt
+stage: S3
+subject: math
+layer: backend
+status: done
+priority: 2
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 가드 — 인자 해석 직후·첫 LLM 호출 전에 `--worklist-out`의 해석 경로(절대화·`..` 정규화·Windows 대소문자 무시·samefile 동치)가 큐 정본 `default_review_queue_path(args.out)`와 같으면 exit 2로 거부하고 두 경로를 사유에 쓴다. 거부 시 어떤 파일도 쓰지 않는다(정본에 한 줄도 append되기 전)."
+  - "② 실패 주입 — 가드를 끄면 같은 경로 테스트가 RED가 되는 것을 확인한다(뮤테이션은 `mutated != original` 단언·원복 바이트 동일 단언 포함). 대조군 필수: 기본 워크리스트 경로(`<out>.worklist.md`)와 다른 이름의 `--worklist-out`은 통과한다(과잉 차단 금지). 상대/절대 경로 동치와 대소문자 변형 픽스처를 각각 둔다."
+  - "③ 같은 결함의 전수 확인 — `problem_corpus_batch --worklist-out`은 큐 정본 사이드카가 없는 회차 메모리 뷰라 같은 덮어쓰기가 불가능함을 코드로 확인해 기록한다. `--worklist-out`을 쓰는 다른 런북·스크립트(저장소 전수 grep)에서 `.review.jsonl` 경로를 뷰에 지정한 곳이 있으면 같은 PR에서 정정한다."
+  - "④ 런북 정정 — `docs/ops/eos121_seat_generation_diversity_runbook.md`의 `--worklist-out`(두 좌석 두 곳)을 마크다운 확장자 경로(`.review.md`)로 바꾸고, 회차 직후 정본이 JSONL로 남았는지 보는 자가검증 스텝(첫 비공백 문자가 `{`)을 동봉한다. 그 스텝은 정본이 덮어쓰인 상태에서 실제로 실패 신호를 내는지 확인된 것만 쓴다. `docs/ops/eos23_rejected_quad_sum_classification_runbook.md` §8의 \"입력 매체\" 서술도 정정한다."
+  - "⑤ 피해 범위 고정 — EOS-121 회차(`6ea0b38ab0f840e5b70bae6b1ba7dd77`)에서 anthropic·openrouter 좌석(및 run1-topp·pilot)의 큐 정본 JSONL이 마크다운 뷰로 바뀌었다. 현존 자산으로 복원 가능한 것(수용 행 = `<seat>.jsonl`, 회차 대장 = `<seat>.rounds.jsonl`, 호출 메타 = `<seat>.genlog.jsonl`)과 불가능한 것(비수용 후보의 구조화 payload — 뷰의 문항·정답·해설·검산 조건 요약만 남음)을 이 태스크 notes에 고정한다."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1657"
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - tests/backend/harness/test_worklist_out_queue_alias_guard.py
+  - docs/ops/eos121_seat_generation_diversity_runbook.md
+  - docs/ops/eos23_rejected_quad_sum_classification_runbook.md
+  - docs/ops/eos121_seat_generation_diversity_verdict.md
+session: null
+notes: |-
+  등재 경위(2026-10-15): 게이트 G-eos23-rejected-quad-sum-classification 실행 중 Kiki 머신의 anthropic.review.jsonl이 JSONL이 아니라 마크다운 뷰임이 드러났다(분류기 CLASSIFY_EXIT=2 · 257줄 전건 JSONDecodeError). 원인 = EOS-121 런북이 --out anthropic.jsonl과 --worklist-out anthropic.review.jsonl을 같은 경로로 지정(큐 정본 기본 경로 = <out>.review.jsonl)해, 회차 끝 worklist_path.write_text(problem_corpus_accumulate.py)가 정본을 덮어씀. 코드에는 두 경로의 동치를 막는 장치가 없었다. 분류 결과와 한계는 docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md. 정본 소실로 EOS-23 ③은 분류기 대신 뷰 기반 수작업 분류로 판정됐다 — 향후 회차에서 같은 일이 없도록 이 태스크가 코드로 막는다. [2026-10-16 구현 기록] ③ 전수 확인(코드 실측): problem_corpus_batch.py의 --worklist-out은 build_worklist(report.review_outcomes) 회차 메모리 뷰를 write_text로 쓰는 경로이며, 같은 파일에 큐 정본 관련 호출(default_review_queue_path·append_review_queue_jsonl)이 0건이다 — 큐 정본 덮어쓰기는 구조적으로 불가능하다. 다만 이 경로는 --out(코퍼스 JSONL)과 같은 경로를 줘도 막지 않는다(코퍼스 덮어쓰기 가능) — 이 태스크 범위 밖 관측으로만 기록한다. --worklist-out 사용처 전수(저장소 grep): src 2곳(accumulate·batch), 런북 2곳(EOS-121 D·E 블록), 문서 서술 2곳(eos23 런북 8절·EOS-121 판정문). 뷰에 .review.jsonl 경로를 지정한 곳은 EOS-121 D·E 블록뿐이었고 .review.md로 정정했다. ⑤ 피해 범위 고정: [확인됨] anthropic 좌석 — Kiki 머신 anthropic.review.jsonl이 마크다운 뷰였다(21,666바이트·첫 줄 '# S2 검수 큐 워크리스트'·분류기 257줄 전건 JSONDecodeError, docs/reviews/eos23_quad_sum_rejection_classification_2026-10-15.md 2절). [미확인 — 이 세션은 파일을 열지 못했다] openrouter 좌석·run1-topp·pilot — EOS-121 런북 D 블록이 같은 인자 구조라 같은 덮어쓰기가 예상되지만 실파일 확인 전이다; 확인법 = 각 .review.jsonl의 첫 비공백 문자가 '{'인지(런북 자가검증과 같은 스니펫). 복원 가능(덮어쓰기 대상이 아니었던 자산): 수용 행 = <seat>.jsonl(--out 코퍼스), 회차 대장 = <seat>.rounds.jsonl(회차 단위 outcome 분포·좌석·인자), 호출 메타 = <seat>.genlog.jsonl(모델·좌석·토큰·비용·지연·성공 여부·입력 스냅샷 — GenerationLog 스키마에 출력 본문 필드가 없다). 현존 뷰에 남은 것: 문항·정답·해설·검산 조건 요약·기계 사유·행 참조·출현 횟수. 복원 불가능: 비수용 후보의 구조화 payload 전문(candidate_payload의 verify.answer_map·answer_selection 등 뷰에 안 실린 필드)과 큐 행 메타(payload_sha256·run_id·recorded_at) — 생성기 출력 원문은 어디에도 영속되지 않았다(genlog는 입력 쪽만 담는다). 재생성은 ARCH-66 정지 중이라 라이브 호출 0건 원칙에서 계획하지 않는다. 구현: worklist_aliases_review_queue(resolve+normcase+samefile)를 main()의 인자 검증 직후·첫 LLM 호출 전에 걸어 exit 2로 거부한다(테스트 test_worklist_out_queue_alias_guard.py — 거부 5종·대조군 3종·변형 6종이 정확히 기대 시나리오만 RED).
+
+  [정정 2026-10-16] paths ['src/backend/whymath_backend/harness/problem_corpus_accumulate.py', 'tests/backend/harness/test_worklist_out_queue_alias_guard.py', 'docs/ops/eos121_seat_generation_diversity_runbook.md', 'docs/ops/eos23_rejected_quad_sum_classification_runbook.md'] → ['src/backend/whymath_backend/harness/problem_corpus_accumulate.py', 'tests/backend/harness/test_worklist_out_queue_alias_guard.py', 'docs/ops/eos121_seat_generation_diversity_runbook.md', 'docs/ops/eos23_rejected_quad_sum_classification_runbook.md', 'docs/ops/eos121_seat_generation_diversity_verdict.md']: 구현 기록(③ 전수 확인·⑤ 피해 범위 고정) 기재 + 판정문 정정 경로 편입
+  notes 치환 — 구현 기록(③ 전수 확인·⑤ 피해 범위 고정) 기재 + 판정문 정정 경로 편입
+
+  [미러 면제 2026-10-16] 컨테이너 venv(uv)에 pip가 없어 로컬 미러 설치 스텝이 막힘. 대신 같은 커밋 a9bc6164의 원격 CI 22잡 전수 확인: 실패 0건(통과 13·skipped 9 — 2026-10-16 집계 정정), backend lint·type·test 포함 전 필수 잡 success, PR mergeable_state=clean
+
+  [정정 2026-10-16] notes 치환 — 미러 면제 사유의 잡 집계 정정(검사 결과는 불변: 실패 0건)
+updated: 2026-10-16

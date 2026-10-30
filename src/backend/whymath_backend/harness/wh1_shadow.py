@@ -30,12 +30,17 @@ import re
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from whymath_backend.harness.wh1_llm_policy import LLMTutorPolicy
-from whymath_backend.harness.wh1_loop import ToolResult, TurnOutcome, run_tutoring_turn
+from whymath_backend.harness.wh1_loop import (
+    CONCEPT_ID_REJECT_DETAIL,
+    ToolResult,
+    TurnOutcome,
+    run_tutoring_turn,
+)
 from whymath_backend.harness.wh1_probe_supply import assemble_probe_candidate_pool
 from whymath_backend.l3.interfaces import LLMProvider
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
@@ -44,7 +49,14 @@ from whymath_backend.l4.session_recall import SessionRecall
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-__all__ = ["Wh1HarnessShadowObservation", "emit_wh1_observation", "observe_wh1_harness_shadow"]
+__all__ = [
+    "PRIMARY_ADOPTED",
+    "PrimaryOutcome",
+    "Wh1HarnessShadowObservation",
+    "emit_wh1_aborted_observation",
+    "emit_wh1_observation",
+    "observe_wh1_harness_shadow",
+]
 
 logger = logging.getLogger("whymath.harness.wh1_shadow")  # judge shadow 네이밍 동형
 # 구조화 레코드 JSON 한 줄(harvest 입력) — 평문 로그와 분리된 자식 로거(shadow.record 미러).
@@ -54,6 +66,32 @@ record_logger = logging.getLogger("whymath.harness.wh1_shadow.record")
 # `last_verdict`를 `TurnOutcome`에 노출하지 않으므로(하네스 무변경 원칙) 트레이스로 관측한다.
 # 'incorrect'가 'correct'를 부분 포함하므로 정규식으로 토큰 경계를 정확히 잡는다.
 _VERIFY_VERDICT_RE = re.compile(r"검증 (correct|incorrect|unverifiable)")
+
+
+PrimaryOutcome = Literal[
+    "adopted",
+    "fallback_timeout",
+    "fallback_exception",
+    "fallback_llm_degraded",
+    "fallback_budget_exhausted",
+    "fallback_no_utterance",
+    "fallback_prose_gate",
+    "fallback_mode_guard",
+    "fallback_output_schema",
+]
+"""primary 한 턴의 **결말** 닫힌 어휘(OPS-134 ②) — 학생이 LLM 발화를 받았는가, 왜 못 받았는가.
+
+`adopted` 외는 전부 LLM 발화가 학생에게 닿지 않은 턴이다(결정론 템플릿이 서빙된다).
+`fallback_llm_degraded`는 하네스가 정상 종료했지만 **턴을 끝낸 행동이 정책의 안전 강등**이었던
+경우다 — provider 실패·파싱 불가를 정책이 흡수해 `ended`로 돌려주므로, 이 라벨이 없으면 LLM이
+죽어도 채택으로 센다. `fallback_output_schema`는 학생 대면 튜터 출력(`TutorTurnOutput`·P3-09)이
+스키마 검증을 통과하지 못해 결정론 발화로 돌아간 턴이다(사유 코드는 `tutor_output_reason_code`).
+
+어휘를 닫아 둔 이유: 열린 문자열이면 오타가 새 사유로 집계되고, 분모(시도)와 분자(채택)의 정의가
+호출 지점마다 달라진다."""
+
+PRIMARY_ADOPTED: PrimaryOutcome = "adopted"
+"""채택 = 하네스 발화가 (톤필터만 거쳐) 그대로 서빙된 결말. 채택률의 분자."""
 
 
 class Wh1HarnessShadowObservation(BaseModel):
@@ -120,8 +158,9 @@ class Wh1HarnessShadowObservation(BaseModel):
     이 값이 0보다 큰 턴은 `curate_hypothesis`가 감쇠만 했고 `log_evidence`가 거부된 턴이다 — 보류가
     실사용에서 얼마나 자주 발동하는지는 이 분포로만 알 수 있다(CLAUDE.md '작동한 비율' 원칙)."""
 
-    tool_calls: int
-    """총 도구 호출 횟수(하네스 트레이스 길이·거동 프로파일)."""
+    tool_calls: int | None
+    """총 도구 호출 횟수(하네스 트레이스 길이·거동 프로파일). **None=턴이 중단돼 알 수 없음**
+    (`status="aborted"` — 타임아웃 취소는 하네스 결과를 남기지 않는다). 0으로 위장하지 않는다."""
 
     hypothesis_count: int
     """턴 종료 시점 활성 오개념 가설 수(id 아님·수만·비식별)."""
@@ -163,7 +202,60 @@ class Wh1HarnessShadowObservation(BaseModel):
     None=프로즈 계층 미경유(플래그 OFF·shadow) 또는 승격 성공. 문자열이면 wh1_prose의
     REASON_* 코드(NOT_REPHRASABLE·PROSE_EQUATION 등 — 코드만·발화 원문 미포함)."""
 
+    primary_outcome: PrimaryOutcome | None = None
+    """primary 한 턴의 결말(OPS-134 ②) — **채택률의 단일 분류축**. **None=구판·shadow 레코드**(결말
+    미기록)로 "채택"과 구분한다: 구판 primary 레코드를 채택으로 세면 시간 초과로 기록이 0줄이던
+    턴이 분모에서 빠진 채 비율이 위조된다. 수확기는 None을 분모에서 빼고 따로 센다."""
+
+    elapsed_ms: int | None = None
+    """primary 한 턴이 시작부터 이 레코드를 낼 때까지 걸린 벽시계 시간(ms·OPS-134 ①). 타임아웃으로
+    끊긴 턴은 설정 예산에 가까운 값이 된다. None=구판·shadow(미계측)."""
+
+    llm_calls: int | None = None
+    """이 턴이 시작한 LLM 호출 수(취소로 끝나지 못한 호출 포함·OPS-134 ③). 폐기된 턴이 LLM을 얼마나
+    썼는지 — 서빙 표지가 붙은 호출이 버려진 출력인지 — 를 서버 로그 단독으로 세는 좌석이다."""
+
+    llm_calls_finished: int | None = None
+    """그중 값 또는 예외로 끝난 호출 수. 둘의 차이가 취소 시점에 비행 중이던 호출이다."""
+
+    llm_ms_total: int | None = None
+    """끝난 LLM 호출의 소요 합(ms·OPS-134 ①). `elapsed_ms`와 대조하면 예산이 LLM 안에서 소진됐는지
+    밖(캐시 대기·후보 조립·도구 실행)에서 소진됐는지 가려진다. 취소된 호출 소요는 몰라 제외."""
+
+    context_missing: list[str] | None = None
+    """P3-08 — 이 턴에 **얻지 못한** 튜터 context 슬롯 이름(9종 중·`wh1_tutor_context`의
+    `TutorContextSlot` 값). **None=구판·shadow 레코드**(매니페스트 미전달)로 "누락 0"(=`[]`)과
+    구분한다. 슬롯 *이름*만 — 값·id·원문은 없다(비식별)."""
+
+    context_not_delivered: list[str] | None = None
+    """P3-08 — 얻었으나 **튜터에 실리지 않은** 슬롯 이름(개념·스킬·숙달 등). None=구판."""
+
+    context_coverage_gap: list[str] | None = None
+    """P3-08 — 못 얻은 원인이 데이터 커버리지 공백(미매핑·팩 미보유 단원)인 슬롯 이름 — 로그는
+    INFO라 경보가 되지 않으므로 이 필드로 집계한다. None=구판."""
+
+    llm_output_rejections: int | None = None
+    """P3-09 — 이 턴에 정책이 **스키마 위반으로 거부한** LLM 도구 출력 수(깨진 JSON·필드 누락·타입
+    오류·상태 권위 주장·환각 id). 거부는 매번 안전 강등으로 이어진다. **None=구판·shadow·정책 생성
+    전 중단**(미계측)으로 "거부 0건"(=0)과 구분한다 — 검증기가 실사용에서 몇 번 작동했는지의 분자.
+    """
+
+    concept_id_tool_rejections: int | None = None
+    """P3-09 — 허용 집합 밖 개념 id로 **그 도구만** 실패한 횟수(`read_student_state`·
+    `query_curriculum` · `wh1_loop.CONCEPT_ID_REJECT_DETAIL`). 턴은 계속된다. None=구판·shadow(검사
+    없음 — shadow는 내용 요약을 싣지 않아 허용 집합이 없고, 기존 동작 그대로 검사하지 않는다)."""
+
+    tutor_output_reason_code: str | None = None
+    """P3-09 — 학생 대면 튜터 출력이 스키마 검증에서 거부된 사유 코드(`wh1_tutor_output`의
+    `REASON_*` 또는 `SCHEMA_<pydantic 오류 type>`). None=검증 통과 또는 검증 단계 미도달.
+    값·발화 원문은 담지 않는다."""
+
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def _names(values: Sequence[str] | None) -> list[str] | None:
+    """P3-08 슬롯 이름 목록 — None(구판)은 None 그대로, 그 밖은 list로."""
+    return list(values) if values is not None else None
 
 
 def _extract_verify_verdict(trace: Sequence[ToolResult]) -> str | None:
@@ -273,6 +365,16 @@ def emit_wh1_observation(
     tone_violations: int = 0,
     prose_rephrased: bool = False,
     prose_reason_code: str | None = None,
+    primary_outcome: PrimaryOutcome | None = None,
+    elapsed_ms: int | None = None,
+    llm_calls: int | None = None,
+    llm_calls_finished: int | None = None,
+    llm_ms_total: int | None = None,
+    context_missing: Sequence[str] | None = None,
+    context_not_delivered: Sequence[str] | None = None,
+    context_coverage_gap: Sequence[str] | None = None,
+    llm_output_rejections: int | None = None,
+    tutor_output_reason_code: str | None = None,
 ) -> None:
     """하네스 한 턴 결과를 관측 레코드로 emit — shadow·primary *공통* 단일 좌석(S1-11).
 
@@ -333,6 +435,70 @@ def emit_wh1_observation(
             tone_violations=tone_violations,
             prose_rephrased=prose_rephrased,
             prose_reason_code=prose_reason_code,
+            primary_outcome=primary_outcome,
+            elapsed_ms=elapsed_ms,
+            llm_calls=llm_calls,
+            llm_calls_finished=llm_calls_finished,
+            llm_ms_total=llm_ms_total,
+            context_missing=_names(context_missing),
+            context_not_delivered=_names(context_not_delivered),
+            context_coverage_gap=_names(context_coverage_gap),
+            llm_output_rejections=llm_output_rejections,
+            # shadow는 허용 집합을 하네스에 넘기지 않아 검사 자체가 없다 — 0이 아니라 None(미계측).
+            concept_id_tool_rejections=(
+                sum(1 for r in outcome.trace if not r.ok and r.detail == CONCEPT_ID_REJECT_DETAIL)
+                if primary
+                else None
+            ),
+            tutor_output_reason_code=tutor_output_reason_code,
+        ).model_dump_json()
+    )
+
+
+def emit_wh1_aborted_observation(
+    *,
+    reason: Literal["fallback_timeout", "fallback_exception"],
+    dialogue_id: str | None = None,
+    turn_index: int = 1,
+    problem_id: str | None = None,
+    elapsed_ms: int | None = None,
+    llm_calls: int | None = None,
+    llm_calls_finished: int | None = None,
+    llm_ms_total: int | None = None,
+    context_missing: Sequence[str] | None = None,
+    context_not_delivered: Sequence[str] | None = None,
+    context_coverage_gap: Sequence[str] | None = None,
+    llm_output_rejections: int | None = None,
+) -> None:
+    """하네스가 **결과를 남기지 못하고 중단된** primary 턴의 레코드를 emit한다(OPS-134 ②).
+
+    타임아웃 취소·예외는 `TurnOutcome`을 만들지 못해 `emit_wh1_observation`을 못 부른다 — 그래서
+    이 경로는 이전까지 기록이 0줄이었고, 15턴 중 14턴이 폴백한 라이브 실측(2026-10-12)에서도
+    primary 기록 파일은 1줄이었다. 이 레코드가 그 결손을 메워 "primary가 작동한 비율"의 분모를
+    정직하게 만든다. 결과가 없으므로 status는 `aborted`·action_type/verify는 None·tool_calls는
+    None(0 위장 금지)이다. 원인은 **예외 타입명 수준의 닫힌 어휘**로만 싣는다 — 메시지·트레이스백은
+    학생 발화를 담을 수 있어 레코드에 들어올 자리가 없다(`extra="forbid"`).
+    """
+    record_logger.info(
+        Wh1HarnessShadowObservation(
+            status="aborted",
+            action_type=None,
+            verify_verdict=None,
+            tool_calls=None,
+            hypothesis_count=0,
+            dialogue_id=dialogue_id,
+            turn_index=turn_index,
+            problem_id=problem_id,
+            primary=True,
+            primary_outcome=reason,
+            elapsed_ms=elapsed_ms,
+            llm_calls=llm_calls,
+            llm_calls_finished=llm_calls_finished,
+            llm_ms_total=llm_ms_total,
+            context_missing=_names(context_missing),
+            context_not_delivered=_names(context_not_delivered),
+            context_coverage_gap=_names(context_coverage_gap),
+            llm_output_rejections=llm_output_rejections,
         ).model_dump_json()
     )
 

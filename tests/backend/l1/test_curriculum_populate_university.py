@@ -37,10 +37,14 @@ _REAL_GRAPH = _ROOT / "data" / "corpus" / "concept_graph_v1" / "graph.json"
 _REAL_CROSSWALK = _ROOT / "data" / "corpus" / "concept_atom_crosswalk_v1" / "crosswalk.jsonl"
 _REAL_ATOM_GRAPH = _ROOT / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 _NOW = datetime(2026, 10, 9, 12, 0, 0, tzinfo=timezone.utc)
+# 코퍼스 건수는 손으로 박지 않고 단일 원천의 기계용 사본에서 읽는다(OPS-154).
+# 원본이 바뀌면 `python3 scripts/analysis/corpus_facts.py sync`가 이 파일을 갱신한다.
+_FACTS = json.loads((_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8"))
 
 # 2026-10-09 실측(atom_graph_v1): 대학 원자 1,069건 중 grade_band가 채워진 세부개념 512건의
 # cognitive_type 분포. 코퍼스가 재생성돼 이 수치가 바뀌면 여기서 잡는다(날조 아닌 실측 동결).
-_EXPECT_UNIVERSITY = 512
+# 총건수는 사실 파일에서 읽는다 — 분포(사실 파일에 없는 파생 측정값)는 아래 손 동결을 유지한다.
+_EXPECT_UNIVERSITY = _FACTS["atom_graph.university_atoms"]
 _EXPECT_BY_COGNITIVE = {"개념": 360, "절차": 108, "표상": 44}
 _EXPECT_BY_DEPTH = {"conceptual": 360, "procedural": 108, None: 44}
 
@@ -142,9 +146,17 @@ class TestPopulateCliRealCorpus:
         univ = [e for e in loaded if e.introduced_grade is not None and e.introduced_grade >= 13]
         assert len(univ) == _EXPECT_UNIVERSITY
         assert {e.introduced_grade for e in univ} == {13, 14, 15, 16}
-        # canonical(437) + 원자(1,311) + 대학(512) = 2,260, entry_id 충돌 0 — 덮어쓰기 오염 없음.
+        # canonical + 원자(초·중·고) + 대학 = 사실 3종의 합, entry_id 충돌 0 — 덮어쓰기 오염 없음.
         entry_ids = [e.entry_id for e in loaded]
-        assert len(entry_ids) == len(set(entry_ids)) == 437 + 1311 + _EXPECT_UNIVERSITY
+        assert (
+            len(entry_ids)
+            == len(set(entry_ids))
+            == (
+                _FACTS["concept_graph.concepts"]
+                + _FACTS["atom_graph.atoms_k12"]
+                + _EXPECT_UNIVERSITY
+            )
+        )
         out = capsys.readouterr().out
         assert f"{len(entry_ids)}건" in out
 
@@ -154,8 +166,8 @@ class TestPopulateCliRealCorpus:
         """조용한 무동작 금지 — 대학 건수가 canonical·원자와 *별도로* 보고된다."""
         assert populate_cli.main(_real_args()) == 0
         out = capsys.readouterr().out
-        assert "canonical 437건" in out
-        assert "원자 1311건" in out
+        assert f"canonical {_FACTS['concept_graph.concepts']}건" in out
+        assert f"원자 {_FACTS['atom_graph.atoms_k12']}건" in out
         assert f"대학 {_EXPECT_UNIVERSITY}건" in out
 
     def test_default_atom_graph_path_is_the_repo_corpus(self) -> None:

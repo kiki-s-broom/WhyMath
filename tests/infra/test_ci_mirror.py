@@ -167,12 +167,16 @@ def _write_old_format_result(path: Path) -> None:
 
 #: CI를 막을 수 있어도 "환경 전제"로 세는 것이 정직한 액션 — 준비(체크아웃·런타임 설치)와
 #: 보관(산출물 업로드)뿐이다. 검사 액션을 여기에 넣으면 미러가 그 검사를 숨긴다.
+#: `actions/download-artifact`(OPS-83 backend 집계 잡)는 업로드의 짝인 **반입** 준비다 — 판정은
+#: 뒤의 run 스텝(`backend_shard_verdict.py`·`coverage combine`)이 한다. 그 잡 자체는
+#: ci_job_coverage가 "다른 잡의 산출물 필요"로 재현 불가 표기해 미러 대상에서 뺀다.
 _INFRA_ACTIONS = frozenset(
     {
         "actions/checkout",
         "actions/setup-python",
         "actions/setup-node",
         "actions/upload-artifact",
+        "actions/download-artifact",
         "subosito/flutter-action",
     }
 )
