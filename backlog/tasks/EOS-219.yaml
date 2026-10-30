@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-219
+title: "힌트 사람 판정 Windows 팝업 창 + 힌트별 AI 권고 표시 · 권고 참조 판정 표기(EOS-210 후속 · Kiki 지시)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① Windows 팝업 판정 창(tkinter): EOS-210 맹검 세션과 같은 작업 목록·같은 기록 계약(hint_verdicts.jsonl append 전용·지문)으로 판정을 기록한다. 버튼 누설/누설 아님/건너뛰기/종료, 근거 입력란, 진행 수 표시. tkinter 없는 환경에서는 import 시점이 아니라 실행 시점에 명확한 오류로 멈춘다.\n② 힌트별 AI 권고 파일(data/runs/<회차>-review/hint_ai_recommendations.jsonl): hint_id·권고(leak|no_leak)·이유·작성자·작성 시각. 창은 권고를 판정 화면에 표시한다.\n③ 보조 판정 표기: 권고를 본 판정은 기록에 그 사실이 남는다(판정 행의 표기 필드 또는 근거 접두). 측정기 출력·결과 문서가 이 판정이 맹검이 아니라 AI 권고 참조 판정임을 숨기지 않는다.\n④ 논리층(작업 목록 구성·기록 쓰기·권고 결합)은 tkinter 없이 테스트한다. 권고 파일의 hint_id가 작업 목록에 없거나 형식이 틀리면 거부한다.\n⑤ 런북: Kiki PC에서 판정용 별도 워크트리로 실행하는 블록(공유 클론 브랜치 전환 사고 회피)과 6항목 브리핑."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/hint_verdict_gui.py
+  - src/backend/whymath_backend/ops/hint_human_verdicts.py
+  - src/backend/whymath_backend/harness/hint_verdict_session.py
+  - tests/backend/harness/test_hint_verdict_gui.py
+  - "docs/ops/eos219_*"
+  - data/runs/eos197-a6-review/hint_ai_recommendations.jsonl
+session: claude/eos-210-gui-ai-assist
+notes: "Kiki 지시(2026-10-30): EOS-210 판정 화면을 Windows 팝업 창으로, 판정 전에 힌트별 AI 권고 제공. 세션이 맹검 약화(R19-01)와 G3 의미 축 증거력 약화를 설명했고 Kiki가 권고 선행을 선택했다. 그러므로 이번 회차 사람 판정은 독립 맹검 판정이 아니라 AI 권고 참조 판정으로 기록·보고한다."
+updated: 2026-10-30
