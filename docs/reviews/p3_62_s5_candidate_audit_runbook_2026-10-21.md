@@ -98,6 +98,7 @@ P3-62의 허용 경로 밖(`docs/data/`·승인 각인 백필)을 건드리므�
 1. 감사 기록을 새 회차 폴더에 둔다.
    - calc: `docs/data/p3_calculus1_diff_audit/bank_audit_r6/`
    - fill: `docs/data/p3_fill_audit/bank_audit_r4/`
+   - **[정정 2026-10-31]** 위 두 폴더는 2026-10-31 실행 회차(calc 통과 · fill 불합격 · 승격 안 함)의 as-found 기록으로 이미 찼다. 다음 승격은 **다음 빈 회차 번호**(calc r7 이후 · fill r5 이후)에 둔다 — 기존 폴더를 덮어쓰지 않는다. 보고서 §C · `P3-91`.
    - 각 폴더에 `audited_bank.jsonl`(= §1 후보 바이트), `manifest.json`, `machine_labels.jsonl`, `llm_labels/`, `s5_result.txt`, `README.md`를 둔다.
 2. 결속 테스트의 동결 사본 경로를 새 회차로 바꾼다.
    - 대상: `tests/backend/l1/test_p3_calculus1_diff_bank_coverage_link.py`·`test_p3_fill_bank_coverage_link.py`의 `_AUDITED_BANK`.
