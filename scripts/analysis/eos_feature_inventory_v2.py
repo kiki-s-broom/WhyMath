@@ -1355,6 +1355,10 @@ CATALOG: tuple[Spec, ...] = (
        # 결함 주입 자가 점검으로 변별력을 상시 봉인하는 판정 가족이라 같은 행에 귀속한다.
        "harness.ai_quality_eval", "harness.ai_quality_eval_set", "harness.ai_quality_judges",
        "harness.ai_quality_candidates", "harness.ai_quality_registry",
+       # P3-78 — 같은 8축 평가의 *라이브 후보 수집기*(WH-1 primary 러너를 평가 사례마다 돌려
+       # `--responses` 입력을 만든다)와 그 조립 좌석(provider·관측 — 호출 0). 판정기 입력을
+       # 공급하는 짝이라 같은 행에 귀속한다.
+       "harness.ai_quality_live_collect", "harness.ai_quality_live_seat",
        "harness.problem_duplication_audit", "harness.pedagogical_rubric",
        # QUAL-08 — 코퍼스가 아니라 *생성기 공간*을 전수 열거해 발문 겹침을 판정하는 게이트.
        # `problem_duplication_audit`(코퍼스=공간의 표본)의 상류 짝이라 같은 행에 귀속한다.

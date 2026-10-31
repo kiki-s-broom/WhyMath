@@ -15,8 +15,10 @@
    - 구조체: P3-09 빌더 `wh1_tutor_output.build_tutor_output`(진단·전략·다음 행동·
      `mastery_update_allowed`).
    이것이 hermetic 환경에서 잴 수 있는 **유일한 실제 튜터 출력**이다.
-2. **`--responses <jsonl>`(외부)** — 라이브 LLM 튜터를 같은 평가 사례에 돌려 모은 응답. 이
-   컨테이너에는 LLM이 없어 수집하지 않는다(승계 태스크). 형식은 `RESPONSE_SCHEMA` 한 줄 한 응답.
+2. **`--responses <jsonl>`(외부)** — 라이브 LLM 튜터를 같은 평가 사례에 돌려 모은 응답. 수집
+   도구는 `ai_quality_live_collect`(P3-78)이며, 이 모듈의 서버 측 재료(`engine_hint_level`·
+   `case_hypotheses`)를 그대로 써서 결정론 후보와 같은 진단·힌트 단계로 구조체를 조립한다.
+   형식은 `RESPONSE_SCHEMA` 한 줄 한 응답.
 3. **주입(`inject`)** — 위 둘 중 하나에 축별로 나쁜 응답을 넣은 음성 대조군. 판정기가 실패 상태에서
    실제로 실패 신호를 내는지(변별력) 보는 데만 쓴다.
 
@@ -55,6 +57,7 @@ from whymath_backend.l4.misconception.catalog import CATALOG_BY_ID
 from whymath_backend.l4.misconception.distractor_link import distractor_link_matches
 from whymath_backend.l4.misconception.hypothesis import MisconceptionHypothesis
 from whymath_backend.l4.misconception.intervene import select_intervention
+from whymath_backend.l4.misconception.models import MisconceptionMatch
 from whymath_backend.l4.subject_adapter_math import math_answer_value_exposure
 
 __all__ = [
@@ -63,7 +66,9 @@ __all__ = [
     "RESPONSE_SCHEMA",
     "CandidateError",
     "build_eos_candidate",
+    "case_hypotheses",
     "dump_responses",
+    "engine_hint_level",
     "inject",
     "load_responses",
     "parse_responses",
@@ -77,6 +82,53 @@ ResponseMap = dict[str, TutorResponse]
 
 class CandidateError(RuntimeError):
     """후보 응답 생성·적재 실패 — 측정 실패로 올린다."""
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 서버 측 재료 — 결정론 후보와 라이브 수집(P3-78)이 함께 쓰는 단일 원천
+# ──────────────────────────────────────────────────────────────────────────
+def engine_hint_level(case: EvalCase) -> int:
+    """사례의 결정론 엔진 힌트 단계(`decide_hint_level`) — LLM은 힌트 단계를 정하지 않는다.
+
+    힌트 사례는 사례의 학생 신호로, 선택 사례는 신호 없는 첫 턴(빈 입력·1턴·직전 없음)으로 정한다.
+    코치가 러너에 넘기는 `decision.hint_level`과 같은 함수다.
+    """
+    if case.kind == KIND_HINT:
+        assert case.signals is not None
+        return decide_hint_level(
+            student_input=case.signals.student_input,
+            turn_count=case.signals.turn_count,
+            prev_hint_level=case.signals.prev_hint_level,
+        )
+    return decide_hint_level(student_input="", turn_count=1, prev_hint_level=None)
+
+
+def _choice_match(case: EvalCase, eval_set: EvalSet) -> MisconceptionMatch | None:
+    """고른 보기의 오답 매핑 진단(품질 게이트 포함) 최상위 — 없으면 None."""
+    material = eval_set.materials[case.problem_id]
+    matches = distractor_link_matches(list(material.distractor_map), case.selected_choice_index)
+    return matches[0] if matches else None
+
+
+def _hypothesis_of(match: MisconceptionMatch) -> MisconceptionHypothesis:
+    return MisconceptionHypothesis(
+        misconception_id=match.misconception.id,
+        confidence=match.confidence,
+        turns_since_evidence=0,
+        evidence_count=1,
+    )
+
+
+def case_hypotheses(case: EvalCase, eval_set: EvalSet) -> tuple[MisconceptionHypothesis, ...]:
+    """코치가 큐레이션해 러너에 넘기는 *초기 활성 가설*에 해당하는 것 — 결정론 진단만.
+
+    힌트 사례는 빈 튜플(이번 턴 오답 진단 재료가 없다), 선택 사례는 오답 매핑 진단 최상위 1건.
+    구조체의 `diagnosis`는 이 가설에서만 온다(LLM은 진단을 결정하지 않는다 — P3-09).
+    """
+    if case.kind == KIND_HINT:
+        return ()
+    match = _choice_match(case, eval_set)
+    return () if match is None else (_hypothesis_of(match),)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -107,11 +159,7 @@ def _hint_turn(
     case: EvalCase, eval_set: EvalSet, registry: Registry, cache: dict[str, tuple[Hint, ...]]
 ) -> tuple[str, EndTurnType, int, str | None]:
     assert case.signals is not None and case.target_step is not None
-    level = decide_hint_level(
-        student_input=case.signals.student_input,
-        turn_count=case.signals.turn_count,
-        prev_hint_level=case.signals.prev_hint_level,
-    )
+    level = engine_hint_level(case)
     hints = cache.get(case.problem_id)
     if hints is None:
         material = eval_set.materials[case.problem_id]
@@ -156,19 +204,11 @@ def _hint_turn(
 def _choice_turn(
     case: EvalCase, eval_set: EvalSet
 ) -> tuple[str, EndTurnType, tuple[MisconceptionHypothesis, ...]]:
-    material = eval_set.materials[case.problem_id]
-    matches = distractor_link_matches(list(material.distractor_map), case.selected_choice_index)
-    if matches:
-        match = matches[0]
-        hypothesis = MisconceptionHypothesis(
-            misconception_id=match.misconception.id,
-            confidence=match.confidence,
-            turns_since_evidence=0,
-            evidence_count=1,
-        )
+    match = _choice_match(case, eval_set)
+    if match is not None:
         decision = select_intervention(match)
         prompt = decision.prompt if decision is not None else NEUTRAL_GUIDE_UTTERANCE
-        return prompt, "질문", (hypothesis,)
+        return prompt, "질문", (_hypothesis_of(match),)
     if case.verdict == "correct":
         return ENCOURAGE_FALLBACK_UTTERANCE, "격려", ()
     return NEUTRAL_GUIDE_UTTERANCE, "질문", ()
@@ -185,7 +225,7 @@ def build_eos_candidate(eval_set: EvalSet, registry: Registry) -> ResponseMap:
             hypotheses: tuple[MisconceptionHypothesis, ...] = ()
         else:
             text, action, hypotheses = _choice_turn(case, eval_set)
-            level = decide_hint_level(student_input="", turn_count=1, prev_hint_level=None)
+            level = engine_hint_level(case)
         built = _assemble(
             case, explanation=text, action=action, hint_level=level, hypotheses=hypotheses
         )

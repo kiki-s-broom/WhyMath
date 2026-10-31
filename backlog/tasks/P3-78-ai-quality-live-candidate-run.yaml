@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/harness/ai_quality_*.py"
-session: null
+session: claude/p3-78-ai-quality-live-run
 notes: "출처: P3-10 acceptance ① 의 남은 축 — 평가 CLI 는 외부 응답(--responses)을 받지만 이 컨테이너에는 LLM·Ollama 가 없어 라이브 응답을 모으지 못했다(docs/reviews/p3_10_ai_quality_eval_suite_2026-10-21.md §7). P3-10 은 hermetic 후보(현재 코드의 결정론 출력)로만 실측했다. 실행 환경은 Phaiakes9 또는 클라우드 키가 있는 세션. 수집 경로(러너 호출 방식)는 착수 시 저장소에서 먼저 확인한다 — 가정 기반 런북 금지."
-updated: 2026-10-21
+updated: 2026-10-31
