@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -74,16 +75,7 @@ def _cleanup(engine: object) -> None:
         conn.execute(text("DELETE FROM unit_spec WHERE unit_id = :u"), {"u": _UNIT_ID})
 
 
-# OPS-137이 이 파일을 CI에 편입하며 실 PG 실행으로 확인한 결함: 연속 2회 실행하면 diag_item 슬롯이
-# 4행 → 8행이 된다(1회차에 PRESCREENED가 된 슬롯 0을 건너뛰되 후보 원자를 소비하지 않아 같은 원자가
-# 슬롯 1에 다시 채워진다). 판정·수정은 PED-46이 소유한다. strict라서 결함이 고쳐져 통과(XPASS)하면
-# 이 표식을 지우라고 CI가 red로 알린다 — `raises`로 다른 종류의 실패(DB 오류 등)는 가리지 않는다.
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="PED-46: run_diag_item_fill 재실행이 같은 원자를 다음 슬롯에 중복 채움(4행→8행)",
-)
-def test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge() -> None:
+def _skip_unless_ready() -> None:
     if not asyncio.run(_pg_reachable()):
         pytest.skip("실 PG 미도달 — WHYMATH_DATABASE_URL 확인(통합 잡에서 실행)")
     fixtures_exist = (
@@ -92,35 +84,35 @@ def test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge() -> None
     if not fixtures_exist:
         pytest.skip("파일럿 고정물(units_v1/atom_graph_v1/standards_v1/pedagogy_packs_v1) 미존재")
 
-    settings = _settings()
-    engine = create_engine(settings.sync_database_url)
-    try:
-        _cleanup(engine)
 
-        # ── ① atom_probe 시드 — 실 원자 백본 코퍼스(이 소단원의 3개 atom code가 실제로 보유). ──
-        probe_records = load_atom_probes_from_json(_GRAPH)
-        populate_atom_probes(probe_records, store=AtomProbeStore(engine=engine))
+def _seed_unit(engine: object) -> None:
+    """atom_probe·팩·unit_spec/objective를 심는다(4목표 — diag_item count=2씩 발주)."""
+    # ── ① atom_probe 시드 — 실 원자 백본 코퍼스(이 소단원의 3개 atom code가 실제로 보유). ──
+    probe_records = load_atom_probes_from_json(_GRAPH)
+    populate_atom_probes(probe_records, store=AtomProbeStore(engine=engine))
 
-        # ── ② 팩 시드 + 컴파일 + unit_spec/objective 시드(4목표 — diag_item count=2씩 발주). ──
-        load_packs(None, _PACKS_DIR, store=PedagogyPackStore(engine=engine))
-        compiled = compile_unit(
-            _UNIT_YAML.read_text(encoding="utf-8"),
-            packs=load_packs_mem(_PACKS_DIR),
-            valid_atom_codes=load_valid_atom_codes(_GRAPH),
-            statements_by_code=load_statements_by_code(_STANDARDS),
-        )
-        assert len(compiled.objective_rows) == 4
-        UnitSpecStore(engine=engine).seed(compiled)
+    # ── ② 팩 시드 + 컴파일 + unit_spec/objective 시드. ──────────────────────────────
+    load_packs(None, _PACKS_DIR, store=PedagogyPackStore(engine=engine))
+    compiled = compile_unit(
+        _UNIT_YAML.read_text(encoding="utf-8"),
+        packs=load_packs_mem(_PACKS_DIR),
+        valid_atom_codes=load_valid_atom_codes(_GRAPH),
+        statements_by_code=load_statements_by_code(_STANDARDS),
+    )
+    assert len(compiled.objective_rows) == 4
+    UnitSpecStore(engine=engine).seed(compiled)
 
-        # ── ③ PED-10 실행 — 슬롯을 미리 만들지 않은 채(블랭크) 직접 채운다. ──────────────
-        report = run_diag_item_fill(engine=engine)
 
-        # 각 목표 concept_nodes는 atom code 1개뿐이라(발주 2 中) 부분 채움 1건씩 = 4건.
-        assert report.filled == 4
-        assert report.prescreen_pass_rate == 1.0  # 평문 한국어·구조 3요건 충족 → 전건 통과.
+def _unit_slot_rows(engine: object) -> list[Any]:
+    """**이 소단원**의 diag_item 슬롯 행.
 
-        with engine.connect() as conn:  # type: ignore[attr-defined]
-            rows = conn.execute(
+    `run_diag_item_fill`은 learning_objective를 전량 조회하므로 리포트(`filled` 등)는 공유 DB의
+    다른 단원까지 센 전역 값이다. 다른 통합 테스트가 단원을 남기면 전역 값이 달라지므로, 이
+    파일의 단언은 전역 리포트가 아니라 이 소단원으로 좁힌 DB 행으로 한다(OPS-137 검토 반영).
+    """
+    with engine.connect() as conn:  # type: ignore[attr-defined]
+        return list(
+            conn.execute(
                 text(
                     "SELECT id, payload, status FROM pedagogy_content_slot "
                     "WHERE objective_id LIKE :p AND slot_type = 'diag_item' "
@@ -128,26 +120,64 @@ def test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge() -> None
                 ),
                 {"p": f"{_UNIT_ID}:%"},
             ).all()
-            assert len(rows) == 4
-            for row in rows:
-                assert row.id.endswith(":diag_item:0")  # 슬롯 인덱스 0만 채워짐(1은 후보 소진).
-                assert row.status == "PRESCREENED"  # prescreen까지 이 함수가 수행.
-                assert row.payload["generated_by"] == DIAG_ITEM_PROJECTOR_TAG
-                assert row.payload["atom_code"].startswith("10공수1-02-06-")
-                assert row.payload["body"]  # 실 atom_probe 발문(빈 문자열 아님).
+        )
 
-        # ── ④ 멱등 — 재실행해도 같은 4건(같은 id upsert·중복 생성 0). ─────────────────
-        report2 = run_diag_item_fill(engine=engine)
-        assert report2.filled == 4
-        with engine.connect() as conn:  # type: ignore[attr-defined]
-            total = conn.execute(
-                text(
-                    "SELECT count(*) FROM pedagogy_content_slot "
-                    "WHERE objective_id LIKE :p AND slot_type = 'diag_item'"
-                ),
-                {"p": f"{_UNIT_ID}:%"},
-            ).scalar_one()
-            assert total == 4  # 재실행이 새 행을 늘리지 않는다.
+
+def test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge() -> None:
+    """1회차 — 4목표가 atom code 직접 교집합으로 슬롯 0을 채우고 prescreen까지 통과한다."""
+    _skip_unless_ready()
+    engine = create_engine(_settings().sync_database_url)
+    try:
+        _cleanup(engine)
+        _seed_unit(engine)
+
+        # ── ③ PED-10 실행 — 슬롯을 미리 만들지 않은 채(블랭크) 직접 채운다. ──────────────
+        report = run_diag_item_fill(engine=engine)
+
+        # 각 목표 concept_nodes는 atom code 1개뿐이라(발주 2 中) 부분 채움 1건씩 = 이 단원 4건.
+        # 리포트는 전역 값이라 하한만 본다 — 이 단원의 사실은 아래 DB 행이 정본이다.
+        assert report.filled >= 4
+        rows = _unit_slot_rows(engine)
+        assert len(rows) == 4
+        for row in rows:
+            assert row.id.endswith(":diag_item:0")
+            assert row.status == "PRESCREENED"  # prescreen까지 이 함수가 수행.
+            payload = row.payload
+            assert payload["generated_by"] == DIAG_ITEM_PROJECTOR_TAG
+            assert payload["atom_code"].startswith("10공수1-02-06-")
+            assert payload["body"]  # 실 atom_probe 발문(빈 문자열 아님).
+    finally:
+        _cleanup(engine)
+        engine.dispose()
+
+
+# OPS-137이 이 파일을 CI에 편입하며 실 PG 실행으로 확인한 결함: 연속 2회 실행하면 이 단원의
+# diag_item 슬롯이 4행 → 8행이 된다(1회차에 PRESCREENED가 된 슬롯 0을 건너뛰되 후보 원자를
+# 소비하지 않아 같은 원자가 슬롯 1에 다시 채워진다). 판정·수정은 PED-46이 소유한다.
+# 표식은 **재실행 단언만** 덮는다 — 1회차 사실은 위 테스트가 표식 없이 단언하고, 이 테스트의
+# 전제(1회차 4행)가 깨지면 `pytest.fail`(AssertionError가 아니다)로 XFAIL이 아닌 FAIL이 된다.
+# strict라서 결함이 고쳐져 통과(XPASS)하면 표식을 지우라고 CI가 red로 알린다.
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="PED-46: run_diag_item_fill 재실행이 같은 원자를 다음 슬롯에 중복 채움(4행→8행)",
+)
+def test_diag_item_fill_rerun_is_idempotent() -> None:
+    """④ 멱등 — 재실행해도 이 단원은 같은 4건(같은 id upsert·중복 생성 0)."""
+    _skip_unless_ready()
+    engine = create_engine(_settings().sync_database_url)
+    try:
+        _cleanup(engine)
+        _seed_unit(engine)
+        run_diag_item_fill(engine=engine)
+        first = _unit_slot_rows(engine)
+        if len(first) != 4:
+            pytest.fail(f"전제 붕괴 — 1회차 이 단원 슬롯 {len(first)}행(기대 4). 멱등 판정 불가")
+
+        run_diag_item_fill(engine=engine)
+        second = _unit_slot_rows(engine)
+        assert len(second) == 4  # 재실행이 새 행을 늘리지 않는다.
+        assert [r.id for r in second] == [r.id for r in first]
     finally:
         _cleanup(engine)
         engine.dispose()

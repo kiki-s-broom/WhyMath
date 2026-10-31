@@ -46,6 +46,8 @@ _SLUG = "it-orch-s2d-quad-root"
 # S2-03 원자 재연결 이후 저장 경로는 `{src_id → 크로스워크 primary 원자 code → concept.code}`로
 # 개념을 찾는다(구 `concept.source_id` 직조회는 폐기). 그래서 실 크로스워크에 있는 src를 쓰고,
 # 그 src의 원자 code를 코퍼스에서 *유도*해 같은 code의 개념 행을 심는다(코드 하드코딩 금지).
+# 알려진 한계: A1의 원자는 초등 뺄셈 원자라 이 이차방정식 후보와 내용이 맞지 않는다. 이 테스트가
+# 보는 것은 저장 경로(src → 원자 → concept 행 → problem_concept)이지 태깅의 의미가 아니다.
 _CONCEPT_SRC = "A1"
 _CONCEPT_NAME = "통합테스트 개념 S2D"  # 정리 시 이 이름의 행만 지운다(공유 DB의 실 원자 행 보호).
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -145,6 +147,12 @@ def _atom_code() -> str:
     mapping = derive_src_to_primary_atom(
         load_crosswalk_records(_CROSSWALK), load_concept_src_bridge(_CONCEPT_GRAPH)
     )
+    if _CONCEPT_SRC not in mapping:
+        # 맨 KeyError로는 원인이 안 보인다 — 크로스워크 재생성으로 이 src가 빠진 경우다.
+        raise RuntimeError(
+            f"{_CONCEPT_SRC}의 primary 원자가 크로스워크에 없다({_CROSSWALK}) — 크로스워크가 "
+            "재생성됐으면 실 크로스워크에 있는 src로 `_CONCEPT_SRC`를 바꿔라"
+        )
     return mapping[_CONCEPT_SRC]
 
 
@@ -158,6 +166,7 @@ def _store(settings: Settings) -> ProblemBankStore:
 def _seed_concept() -> None:
     from sqlalchemy import text
 
+    atom_code = _atom_code()
     engine = _sync_engine()
     try:
         with engine.begin() as conn:  # type: ignore[attr-defined]
@@ -167,7 +176,7 @@ def _seed_concept() -> None:
                     "VALUES (:cid, :code, :name, '세부개념') "
                     "ON CONFLICT (code) DO NOTHING"
                 ),
-                {"cid": uuid.uuid4(), "code": _atom_code(), "name": _CONCEPT_NAME},
+                {"cid": uuid.uuid4(), "code": atom_code, "name": _CONCEPT_NAME},
             )
     finally:
         engine.dispose()  # type: ignore[attr-defined]
@@ -176,6 +185,8 @@ def _seed_concept() -> None:
 def _cleanup() -> None:
     from sqlalchemy import text
 
+    # 트랜잭션 **밖에서** 먼저 계산한다 — 안에서 실패하면 앞선 DELETE까지 롤백돼 잔여 행이 남는다.
+    atom_code = _atom_code()
     engine = _sync_engine()
     try:
         with engine.begin() as conn:  # type: ignore[attr-defined]
@@ -192,7 +203,7 @@ def _cleanup() -> None:
             # 건너뛰어진 경우) 지우지 않는다.
             conn.execute(
                 text("DELETE FROM concept WHERE code = :code AND name_ko = :name"),
-                {"code": _atom_code(), "name": _CONCEPT_NAME},
+                {"code": atom_code, "name": _CONCEPT_NAME},
             )
     finally:
         engine.dispose()  # type: ignore[attr-defined]

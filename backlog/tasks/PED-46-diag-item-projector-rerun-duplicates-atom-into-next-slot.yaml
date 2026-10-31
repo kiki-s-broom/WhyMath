@@ -14,14 +14,18 @@ requires_gates: []
 acceptance:
   - "실측(2026-10-13 OPS-137): 실 PG에서 run_diag_item_fill을 연속 2회 실행하면 diag_item 슬롯이 4행에서 8행이 된다. 1회차에 슬롯 diag_item:0이 PRESCREENED가 되고, 2회차 plan_diag_item_targets는 그 슬롯을 건너뛰되 후보 원자를 소비하지 않아(candidate_idx 미증가) 같은 원자가 diag_item:1에 다시 채워진다. 같은 원자가 슬롯 0과 1에 중복 투영되는 것이 의도인지 결함인지 판정한다 — 모듈 docstring은 건너뛴 슬롯의 후보를 소비하지 않는다고 적고, tests/backend/l3/pedagogy/test_diag_item_projector_integration.py 는 재실행 멱등(4건 유지)을 단언해 둘이 충돌한다.\n처분: 결함이면 plan_diag_item_targets가 재실행에서 같은 원자를 다른 슬롯에 다시 채우지 않게 고치고(자기가 채운 슬롯의 원자는 소비한 것으로 본다), 의도면 통합 테스트 단언과 04e 문서를 그에 맞게 정정한다. 어느 쪽이든 순수 함수 단위 테스트에 연속 2회 실행 반례를 추가하고, 실 PG 통합 테스트가 CI에서 통과하게 한다.\n해소 조건: CI backend-migrations 통합 스텝의 --deselect(test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge)를 제거하고 tests/infra 배선 테스트의 추적 항목을 지운다 — OPS-137이 만든 예외 장부가 이 태스크 완료 전에는 유효하고 완료 후에는 red가 된다."
   - "정정(OPS-137 최종안): 위 해소 조건의 --deselect는 채택하지 않았다. 대신 tests/backend/l3/pedagogy/test_diag_item_projector_integration.py 의 test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge 에 xfail(strict=True, raises=AssertionError, reason에 PED-46)을 달았고, 같은 파일의 두 번째 테스트는 그대로 통과한다. 해소 조건 = 결함을 고치거나 단언을 정정한 뒤 그 xfail 표식을 지우고 tests/infra/test_gate_harness_marker_reach_wiring.py 의 L3_TRACKED_XFAILS 항목을 지운다. 결함이 고쳐졌는데 표식이 남으면 strict라서 XPASS로 red가 되고, 이 태스크가 done이 됐는데 표식·장부가 남아도 배선 테스트가 red가 된다."
+  - "정정(2026-10-31 OPS-137 회수 · 독립 검토 반영): xfail 표식이 테스트 본문 전체(1회차 단언 약 10개)를 덮어 투영기 회귀까지 XFAIL로 가리던 문제를 고쳐, 재실행 멱등 단언만 별도 테스트 `test_diag_item_fill_rerun_is_idempotent`로 떼어 그 테스트에만 xfail(strict=True, raises=AssertionError, reason에 PED-46)을 달았다. 1회차 사실은 `test_diag_item_slots_filled_from_atom_probe_via_direct_code_bridge`가 표식 없이 단언한다(전역 리포트가 아니라 이 소단원으로 좁힌 DB 행으로). 해소 조건 = 결함을 고치거나 단언을 정정한 뒤 `test_diag_item_fill_rerun_is_idempotent`의 xfail 표식을 지우고 `tests/infra/test_gate_harness_marker_reach_wiring.py`의 `L3_TRACKED_XFAILS` 항목을 지운다. 장부가 비어도 그 검사 테스트는 지우지 않는다(역방향 검사 — 수집 파일의 xfail 표식 ⊆ 장부 — 가 빈 장부를 정상 상태로 받는다)."
 artifacts: []
 paths:
   - src/backend/whymath_backend/l3/pedagogy/diag_item_projector.py
   - tests/backend/l3/pedagogy/test_diag_item_projector_integration.py
   - tests/backend/l3/pedagogy/
+  - tests/infra/test_gate_harness_marker_reach_wiring.py
 session: null
 notes: |-
   출처: OPS-137 작업 중 발견. tests/backend/l3 통합 파일이 CI에서 수집되지 않는 동안 노후화된 것을 수집 편입 전 실 PG 실행으로 확인했다. 같은 파일의 두 번째 테스트(승인 슬롯 불변)는 통과한다. 코드 회귀인지 테스트 노후화인지는 이 태스크가 판정한다.
 
   [정정 2026-10-13] OPS-137 최종안이 --deselect 대신 strict xfail로 확정되어 해소 조건 정정
-updated: 2026-10-13
+
+  [정정 2026-10-31] paths ['src/backend/whymath_backend/l3/pedagogy/diag_item_projector.py', 'tests/backend/l3/pedagogy/test_diag_item_projector_integration.py', 'tests/backend/l3/pedagogy/'] → ['src/backend/whymath_backend/l3/pedagogy/diag_item_projector.py', 'tests/backend/l3/pedagogy/test_diag_item_projector_integration.py', 'tests/backend/l3/pedagogy/', 'tests/infra/test_gate_harness_marker_reach_wiring.py']: OPS-137 회수 독립 검토 반영 — xfail 대상 테스트 분리·해소 조건의 대상 함수명 정정·빈 장부 허용, 해소 시 편집하는 배선 테스트를 paths에 편입
+updated: 2026-10-31

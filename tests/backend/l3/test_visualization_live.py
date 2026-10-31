@@ -1,8 +1,9 @@
 """L3 시각화 명세 생성 *라이브* 평가 — 패밀리 비교 (Phaiakes9 전용·작업 I).
 
 기본 SKIP. 실행하려면 `WHYMATH_RUN_INTEGRATION=1`(+ 필요 시 `WHYMATH_OLLAMA_HOST`)을
-설정한다. CI는 이 변수를 설정하지 않고(conftest 게이트), 통합잡도 `--ignore=.../l3`라
-이 테스트를 *실행하지 않는다* — 실 모델·GPU가 필요하기 때문(test_ollama_integration과 동일).
+설정한다. CI 단위 잡은 이 변수를 설정하지 않고(conftest 게이트), 통합잡은 이 파일을 **파일 단위로**
+`--ignore`해 *실행하지 않는다*(OPS-137 — 제외 사유 장부 `L3_EXTERNAL_SERVICE_EXCLUSIONS`) — 실
+모델·GPU가 필요하기 때문(test_ollama_integration과 동일).
 
 무엇을 검증하나:
     H가 보강한 ① `SimulationSpec.outcomes` 스키마와 ② L3 프롬프트 예시로, 로컬 LLM이 실제로
