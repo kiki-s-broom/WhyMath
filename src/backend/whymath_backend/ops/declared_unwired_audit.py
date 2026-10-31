@@ -1686,6 +1686,13 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # tests/backend/harness/test_attempt_skill_event_reach_report.py가 CI에서 상시 검증한다
         # — 즉 "안 도는 코드"가 아니라 "라이브 입력이 있을 때 사람이 돌리는 관측기"다.
         "harness.attempt_skill_event_reach_report": _NEEDS_LIVE_SAMPLE,
+        # EOS-195(2026-10-13): 발행 문항 판-라이브 드리프트 리포트 — 분모가 실 PG의
+        # *발행 포인터가 채워진 문항*이다. CI의 PG는 매 잡 비어 있어 상시 실행하면
+        # "측정 불성립(분모 0)"만 낸다(그렇게 렌더하는 것이 설계값). 판정 로직(3상태 변별·
+        # 분모 0·값 유출 금지·CLI exit 0/2·키셋 페이지네이션)은
+        # tests/backend/harness/test_published_problem_drift_report.py가 상시 검증하고,
+        # 실 SQL은 통합 테스트가 본다. 주기 실행은 관측 리포트 러너(CLASS_DB)에 등록했다.
+        "harness.published_problem_drift_report": _NEEDS_LIVE_SAMPLE,
         # OPS-68(2026-09-07): 위 리포트의 짝 — 게이트 G-eos63-skill-event-reach-sample이
         # 요구하는 *표본을 만드는* 프로브다. CI가 절대 돌려서는 안 되는 유일한 이유가 미도달
         # 사유이기도 하다 — 이 도구는 대상 DB에 채점 행을 **쓴다**(problem_attempt·

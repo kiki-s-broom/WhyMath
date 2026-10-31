@@ -69,6 +69,10 @@ from whymath_backend.db.models.concept import Concept, ConceptEdge
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.skill_node import SkillNode
 from whymath_backend.db.models.user import UserProfile
+from whymath_backend.db.published_edit_guard import (
+    PUBLISHED_EDIT_BLOCKED_MESSAGE,
+    has_published_version,
+)
 from whymath_backend.db.session import get_session
 from whymath_backend.l3 import publish_gate as gate
 from whymath_backend.privacy.audit import record_content_mutation_audit
@@ -944,10 +948,17 @@ async def _edit_block_reason(
     같은 이유로 막는다.
     `lock_parent`면 부모 행에 공유 잠금을 걸어, 수정 중에 부모가 승인되는 틈(검사-쓰기 사이)을
     막는다.
+
+    **발행된 판이 있는 문항도 막는다(EOS-195)** — 문항 행은 판(`problem_version`)과 별개로 서빙되는
+    원본이라, 발행 뒤 제자리 수정은 학생이 실제로 푼 문항과 EOS-47이 시도에 고정한 판의 payload를
+    조용히 갈라놓는다. 이 검사는 검수 상태와 **독립**이다(격리해도 판은 그대로 발행 상태다). 수정
+    경로는 판 폐기 → 수정 → 새 판 발행이며, 막힌 사유 문구가 그 순서를 말한다.
     """
     if spec.edit_guard == "none":
         return None
     if spec.edit_guard == "problem_not_approved":
+        if has_published_version(row):
+            return PUBLISHED_EDIT_BLOCKED_MESSAGE
         if row.review_status == ReviewStatus.approved:
             return "승인된 문항입니다. 먼저 검수 큐에서 격리한 뒤 수정하세요."
         return None

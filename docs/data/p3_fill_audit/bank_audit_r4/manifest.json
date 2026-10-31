@@ -1,0 +1,29 @@
+{
+  "task": "P3-62-solution-qa-unverifiable-structuring",
+  "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+  "seed": 20261008,
+  "bank": "candidate/problem_bank_p3_fill_v0/problems.jsonl",
+  "bank_sha256": "8ae08bd8beb088f77fc7ead40eb0d17b7b3bc3165fb839e5ba0ea7fb7b81082e",
+  "n_items": 204,
+  "n_shards": 4,
+  "shard_size": 51,
+  "shards": [
+    {
+      "file": "shard1.jsonl",
+      "sha256": "b865b460c98f396954c1f081126cd50cfe0fcaf053228274795e4d89802422c5"
+    },
+    {
+      "file": "shard2.jsonl",
+      "sha256": "e475452227e2849e18c1f7d1da3c6856243ab1a8bf719996fa64a9f8c1550b59"
+    },
+    {
+      "file": "shard3.jsonl",
+      "sha256": "a603e4ff8916b62b6a49471c4745462d71689b8d65c6c762bc15143277511620"
+    },
+    {
+      "file": "shard4.jsonl",
+      "sha256": "bb17b7993a1886c799060a6d5fb13e9b72a126502ab07c196510e265f1e02ede"
+    }
+  ],
+  "rater_protocol_sha256": "3046a901033ea2eadd7c3aafbc32e2a94c3c241551f7d8e6fa50eb2c606ee27a"
+}

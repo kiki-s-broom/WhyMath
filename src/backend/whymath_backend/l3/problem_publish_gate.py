@@ -39,7 +39,10 @@ test_problem_publish_gate_enforcement.py`).
 고칠 수 없다 — `api/admin_cms_resources.WORKFLOW_STATE_COLUMNS`).
 증거를 못 쟀으면(`metadata_evidence is None`) 통과가 아니라 **실패**다(모른다 ≠ 통과).
 7필드는 QA에서 요구하지 않는다 — 조건을 못 채운 판은 APPROVED에서 멈춘다(지시문 세트 16/20).
-이 검사는 *발행 순간*의 라이브 행을 잰다 — 발행 이후 편집이 필드를 비우는 경우는 EOS-195 소관이다.
+이 검사는 *발행 순간*의 라이브 행을 잰다. 발행 이후 EOS-195가 막는 것은 판 payload의 원천 12필드
+(`db/published_edit_guard.SERVED_CONTENT_FIELDS`)뿐이다 — payload 밖의 7필드 증거(개념 연결·스킬·
+`distractor_map`·슬롯 태그·힌트)가 발행 뒤 비는 경우는 막지 않는다
+(소유 태스크 없음 · EOS-195 회수 보고).
 
 ## 트랜잭션 계약
 
@@ -53,8 +56,15 @@ test_problem_publish_gate_enforcement.py`).
   모른다. `outcome=pinned` 비율은 운영자가 문항을 실제로 발행한 만큼만 0을 벗어난다.
 - **Rollback·Restore 없음.** 전이표의 복합 전용 간선(rollback·restore)은 호출 경로가 없어
   구현하지 않았다. 필요해지면 이 모듈에 더한다(포인터 쓰기 자리를 하나로 유지).
-- **발행 이후의 제자리 편집을 새 판으로 만들지 않는다.** CMS가 `problem` 행을 직접 고치면 발행된
-  판의 payload와 라이브 행이 갈라진다 — `live_content_current`는 *발행 순간*만 막는다.
+- **발행 이후의 제자리 편집을 새 판으로 만들지 않는다(EOS-195 처분: 차단).**
+  `live_content_current`는 *발행 순간*만 막으므로, 발행 뒤 라이브 행을 고치는 경로를
+  이 모듈 밖에서 막는다 — CMS 편집
+  (`api/admin_cms._edit_block_reason`)·`PATCH /v1/problems`(`api/problems.patch_problem`)·
+  코퍼스 재적재(`l1/problem_bank/populate`의 upsert WHERE)가
+  발행 포인터가 있는 문항을 건드리지 않는다. 고치려면 판 폐기 → 수정 → 새 판 발행이다. 이 모듈은
+  그 차단이 *뚫렸는지*를 보는 읽기 전용 조회(`iter_pointer_filled`)만 제공하고, 수치는
+  `harness/published_problem_drift_report`가 낸다(직접 SQL 등 두 경로 밖의 쓰기는 그 리포트로만
+  보인다).
 - **학생 노출 판정을 하지 않는다.** 문항 노출은 `review_status`·저작권 두 축이 소유한다. 이 모듈은
   `ReviewStatus`·`review_status`·`is_published`·`publish_at`을 읽지도 쓰지도 않는다(AST 동결 B1).
 """
@@ -66,6 +76,8 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
@@ -406,6 +418,63 @@ async def get_version(session: AsyncSession, version_id: uuid.UUID) -> SchemaPro
     return _load_schema(row)
 
 
+@dataclass(frozen=True)
+class PointerPair:
+    """발행 포인터가 채워진 문항 1건과 그 포인터가 가리키는 판.
+
+    `version`이 None이면 판을 읽지 못한 것이다 — 행이 없거나(FK가 막으므로 방어용) 저장된 판이
+    스키마 계약을 어긴 경우이며, 이유는 `version_error`에 예외 **타입명**으로 남는다(값은 싣지
+    않는다). 읽지 못한 판을 "일치"로도 "어긋남"으로도 세지 않는 것은 호출자의 몫이다
+    (모른다 ≠ 아니다).
+    """
+
+    problem: Problem
+    version: SchemaProblemVersion | None
+    version_error: str | None = None
+
+
+async def iter_pointer_filled(
+    session: AsyncSession, *, batch_size: int = 500
+) -> AsyncIterator[PointerPair]:
+    """발행 포인터가 채워진 문항을 `problem_id` 순으로 훑는다. **읽기 전용**(잠금·쓰기 없음).
+
+    API·하네스는 ORM `ProblemVersion`을 import할 수 없다(AST 동결 R1) — 판을 함께 읽는 조회도 이
+    모듈을 거친다(`list_versions`와 같은 이유). 키셋 페이지네이션이라 문항이 많아도 한 번에 메모리에
+    올리지 않는다. 판 계약 위반은 건너뛰지 않고 `version_error`로 알린다(조용한 누락 금지).
+    """
+    if batch_size < 1:
+        raise ValueError(f"batch_size는 1 이상이어야 한다: {batch_size}")
+    last: uuid.UUID | None = None
+    while True:
+        stmt = (
+            select(Problem, ProblemVersion)
+            .outerjoin(ProblemVersion, ProblemVersion.version_id == Problem.problem_version_id)
+            .where(Problem.problem_version_id.is_not(None))
+            .order_by(Problem.problem_id)
+            .limit(batch_size)
+        )
+        if last is not None:
+            stmt = stmt.where(Problem.problem_id > last)
+        rows = (await session.execute(stmt)).all()
+        for problem, version_row in rows:
+            if version_row is None:
+                yield PointerPair(problem, None, "LookupError")
+                continue
+            try:
+                yield PointerPair(problem, version_row.to_schema())
+            except ValidationError as exc:
+                logger.warning(
+                    "problem_publish_gate: 저장된 판이 스키마 계약 위반 — 드리프트 대조 불가 "
+                    "(%s, version_id=%s)",
+                    type(exc).__name__,
+                    version_row.version_id,
+                )
+                yield PointerPair(problem, None, type(exc).__name__)
+        if len(rows) < batch_size:
+            return
+        last = rows[-1][0].problem_id
+
+
 async def _lock_problem(session: AsyncSession, problem_id: uuid.UUID) -> Problem:
     # `populate_existing`: 잠금을 잡은 뒤의 값을 **항상 새로 읽는다**. 이미 세션에 올라온 엔티티가
     # 있으면 `FOR UPDATE`만으로는 속성이 갱신되지 않아, 호출자가 앞서 읽어 둔 낡은 문항 내용으로
@@ -649,5 +718,7 @@ __all__ = [
     "list_versions",
     "get_version",
     "problem_exists",
+    "PointerPair",
+    "iter_pointer_filled",
     "apply_transition",
 ]

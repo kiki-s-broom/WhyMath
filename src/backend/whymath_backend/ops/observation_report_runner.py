@@ -115,7 +115,8 @@ class ReportSpec:
     args: tuple[str, ...] = ()
 
 
-# 러너가 자동 실행하는 리포트 17건(최초 16건 + 병합 시 PB-10이 추가한 item_calibration 1건).
+# 러너가 자동 실행하는 리포트 18건(최초 16건 + PB-10 item_calibration 1건 + EOS-195
+# published_problem_drift 1건).
 # 새 `*_report.py`를 만들면 여기·ELSEWHERE·INPUT_DEPENDENT 중 한 곳에 반드시 귀속해야 한다 —
 # `tests/backend/ops/test_observation_report_registry.py`가 전수 강제한다.
 REPORTS: tuple[ReportSpec, ...] = (
@@ -131,6 +132,7 @@ REPORTS: tuple[ReportSpec, ...] = (
     ReportSpec("harness.attempt_skill_event_reach_report", CLASS_DB),
     ReportSpec("harness.distractor_signal_dormancy_report", CLASS_DB),
     ReportSpec("harness.item_calibration_reach_report", CLASS_DB),
+    ReportSpec("harness.published_problem_drift_report", CLASS_DB),
     ReportSpec("harness.recommendation_outcome_report", CLASS_DB),
     ReportSpec("harness.standard_attainment_report", CLASS_DB),
     # 접속 실패를 잡지 못하고 트레이스백으로 죽는다(rc=1) — 그래도 비-0이라 `run_failed`로 구분된다.

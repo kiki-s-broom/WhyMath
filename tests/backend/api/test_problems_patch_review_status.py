@@ -9,7 +9,8 @@ ADMIN-07이 전이표(`schema/review_transition.py`)와 감사 1행을 `POST …
   ③ 격리는 *이번 요청의* 사유가 필요하다(과거 격리의 낡은 사유 재사용 금지) · 시각은 서버 시계
   ④ 격리가 아닌 전이는 격리 기록(사유·시각)을 함께 바꿀 수 없다 · 해제는 기록을 보존한다
   ⑤ 상태가 그대로인 요청(GET 본문 왕복 포함)은 전이가 아니라 기존 `update` 경로다
-  ⑥ 상태를 바꾸려는 요청만 행을 잠근다(전이 라우트와 같은 직렬화) — 나머지는 읽기 불변
+  ⑥ 모든 PATCH가 행을 잠근다(전이 라우트와 같은 직렬화) — EOS-195 이전에는 상태를 바꾸려는 요청만
+     잠갔으나, 발행 포인터 덮어쓰기·발행 판 보호 판정 경쟁을 막으려고 전부 잠그는 것으로 바뀌었다
   ⑦ 우회 시도는 WARNING으로 남되 자유 텍스트(사유)는 싣지 않는다
   ⑨ [ADMIN-18] 인간 판정(pending→approved·pending→rejected)은 이 표면으로 거부한다 — 반려코드·
      검수 세션(타이머)을 실을 자리가 없다. 409 `review_session_required` + POST 경로 안내 · 쓰기 0
@@ -403,10 +404,17 @@ def test_status_bearing_patch_locks_the_row_like_the_transition_route() -> None:
     assert fake.get_kwargs == [{"with_for_update": True, "populate_existing": True}]
 
 
-def test_patch_without_a_status_key_reads_exactly_as_before() -> None:
+def test_patch_without_a_status_key_also_locks_the_row_for_the_publish_guard() -> None:
+    """EOS-195가 뒤집은 계약 — 상태 키가 없는 PATCH도 행을 잠근다.
+
+    종전에는 "상태를 건드리지 않는 PATCH까지 잠그는 것은 불필요한 직렬화"라 잠그지 않았다. 그런데
+    이 PATCH는 `session.merge`로 스키마의 *모든* 값(발행 포인터 포함)을 행에 쓰고, 발행 판 보호
+    판정(포인터가 채워졌는가)도 발행 전이와 경쟁한다. 잠그지 않으면 잠금 없이 읽은 낡은 포인터가
+    그 사이 발행된 포인터를 덮어쓴다 — 그래서 직렬화가 불필요하지 않게 됐다.
+    """
     fake = _Session(_problem(A))
     assert _patch(fake, {"answer": "42"}).status_code == 200
-    assert fake.get_kwargs == [{}], "상태를 건드리지 않는 PATCH까지 행을 잠갔다(불필요한 직렬화)"
+    assert fake.get_kwargs == [{"with_for_update": True, "populate_existing": True}]
 
 
 def test_missing_problem_with_a_status_key_is_404_without_audit() -> None:
