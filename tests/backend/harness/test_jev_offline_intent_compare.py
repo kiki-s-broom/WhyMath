@@ -162,3 +162,21 @@ def test_skip_jev_runs_rule_only_without_key(tmp_path, monkeypatch):
     out = tmp_path / "o.json"
     assert mod.main(["--input", str(path), "--output", str(out), "--skip-jev"]) == 0
     assert "jev" not in json.loads(out.read_text(encoding="utf-8"))
+
+
+def test_jev_real_shape_without_answer_confidence(tmp_path, monkeypatch, patch_client):
+    """실물 Jev 응답 모양(2026-10-31 연결 시험) — answer_confidence 없이 confidence만 온다."""
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    jev_body = {
+        "model": "jev-1.13.0",
+        "answers": {"intent": {"choice": "answer_only", "confidence": 1.0}, "pii": {"noul": 0.02}},
+        "usage": {"input_tokens": 456},
+    }
+    patch_client(lambda r: httpx.Response(200, json=jev_body))
+    path = _write(tmp_path, [{"text": "a", "label": "answer_only", "synthetic": True}])
+    out = tmp_path / "o.json"
+    assert mod.main(["--input", str(path), "--output", str(out)]) == 0
+    rep = json.loads(out.read_text(encoding="utf-8"))
+    assert rep["jev"]["accuracy"] == 1.0
+    assert rep["rows"][0]["jev"]["conf"] == 1.0  # confidence로 대체됐다
+    assert rep["jev"]["input_tokens_total"] == 456

@@ -155,8 +155,10 @@ async def systemone_predict(
             label = intent["choice"]
             if label not in LABELS:
                 raise ValueError("보기 밖 응답")
-            # Jev·laya-serve 모두 answer_confidence를 준다(실물 응답 픽스처 확인).
-            # 없으면 confidence로 대체한다.
+            # laya-serve는 answer_confidence와 confidence를 둘 다 주지만, 실물 Jev(jev-1.13.0,
+            # 2026-10-31 Kiki 머신 연결 시험)는 answer_confidence 없이 confidence만 줬다.
+            # 그래서 answer_confidence가 없으면 confidence로 대체한다 — 두 판정기의 확신도는
+            # 같은 필드가 아닐 수 있으니 기준값 보정(P3)에서 따로 본다.
             conf = intent.get("answer_confidence", intent.get("confidence"))
             usage = body.get("usage") or {}
             return Prediction(
