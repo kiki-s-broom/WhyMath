@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,7 +16,8 @@ acceptance:
   - "발행 이후 제자리 편집 드리프트: CMS가 problem 행을 직접 고치면(P3-12 api/admin_cms.py) 발행된 판의 payload와 라이브 행이 갈라진다. EOS-190의 live_content_current 검사는 발행하는 순간만 막으므로, 발행 뒤의 편집은 EOS-47이 시도에 고정하는 판이 학생이 실제로 푼 문항과 달라지게 만든다."
   - "실측 리포트(읽기 전용): 포인터가 채워진 문항 중 snapshot_payload(라이브) 해시가 포인터 판의 payload 해시와 다른 문항 수를 분자로, 포인터가 채워진 전체 문항 수를 분모로 보고한다. 분모가 0이면 통과가 아니라 측정 불성립으로 표기한다(0건 통과 위장 금지)."
   - "처분 판정: 편집 시 자동으로 새 DRAFT 생성 / 발행본 편집 차단 / 드리프트 표지만 남김 중 하나를 근거와 함께 고른다. 고른 처분의 집행 지점은 정본화와 별항으로 적고, 서빙·편집 코드가 그 지점을 실제로 경유함을 AST 또는 통합 테스트로 동결한다."
-artifacts: []
+artifacts:
+  - "#1783 d994dc07"
 paths:
   - src/backend/whymath_backend/harness/published_problem_drift_report.py
   - tests/backend/harness/test_published_problem_drift_report.py
@@ -33,9 +34,11 @@ paths:
   - tests/backend/api/test_problems_patch_published_guard.py
   - tests/backend/l3/test_problem_publish_gate_enforcement.py
   - docs/architecture/eos194_problem_publish_caller_surface.md
-session: claude/pensive-cerf-guowbr
+session: null
 notes: |-
   출처: EOS-190 착지 시 발견. l3/problem_publish_gate 모듈 docstring의 '발행 이후의 제자리 편집을 새 판으로 만들지 않는다' 항목. 선행: EOS-190(대장 depends_on으로 집행).
 
   [정정 2026-10-31] paths ['src/backend/whymath_backend/harness/published_problem_drift_report.py', 'tests/backend/harness/test_published_problem_drift_report.py'] → ['src/backend/whymath_backend/harness/published_problem_drift_report.py', 'tests/backend/harness/test_published_problem_drift_report.py', 'src/backend/whymath_backend/db/published_edit_guard.py', 'src/backend/whymath_backend/api/problems.py', 'src/backend/whymath_backend/api/admin_cms.py', 'src/backend/whymath_backend/api/admin_cms_resources.py', 'src/backend/whymath_backend/api/admin_cms_problem_versions.py', 'src/backend/whymath_backend/l1/problem_bank/populate.py', 'src/backend/whymath_backend/l3/problem_publish_gate.py', 'tests/backend/db/test_published_edit_guard.py', 'tests/backend/db/test_published_problem_edit_guard_integration.py', 'tests/backend/db/test_problem_version_publish_integration.py', 'tests/backend/api/test_problems_patch_published_guard.py', 'tests/backend/l3/test_problem_publish_gate_enforcement.py', 'docs/architecture/eos194_problem_publish_caller_surface.md']: EOS-195 회수: 실제 수정 범위로 paths 교체(기존 2건 유지 + 차단 집행 지점 3곳·판정 모듈·게이트 docstring·통합 테스트) — scope_drift 경고 해소, 다른 세션 겹침 감지용
+
+  [미러 면제 2026-10-31] 대장 전용 PR — 구현은 #1783으로 main 착지(머지 전 CI 미러 11잡 exit 0 · 커밋 a60685e8)
 updated: 2026-10-31
