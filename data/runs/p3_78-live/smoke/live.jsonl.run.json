@@ -1,0 +1,170 @@
+{
+  "schema": "ai-quality-live-run/v2",
+  "responses": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-01B-p378\\data\\runs\\p3_78-live\\smoke\\live.jsonl",
+  "eval_set": {
+    "source": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-01B-p378\\data\\corpus\\ai_quality_eval_v1\\eval_set.jsonl",
+    "sha256": "0950d44ef8d3571f06813d77c36af8461f1d8ce625820ebbbacd0a60a9ab36a1",
+    "cases": 244
+  },
+  "file_totals": {
+    "cases": 244,
+    "responses": 3,
+    "remaining": 241,
+    "complete": false,
+    "by_origin": {
+      "wh1-live:degraded": 1,
+      "wh1-live:harness": 2
+    },
+    "live": 0,
+    "live_rate": 0.0,
+    "distinct_first_prompts": {
+      "total": 3,
+      "hint": 3
+    },
+    "effective_sample_upper_bound": 3
+  },
+  "runs": [
+    {
+      "run_id": "29c149a599e0448ca4cea0c582d0f7da",
+      "started_at": "2026-10-31T12:34:51Z",
+      "finished_at": "2026-10-31T12:35:04Z",
+      "status": "finished",
+      "git": {
+        "head": "699626e33f8f4079490f46ccf2c283c1bf3f4ca0",
+        "dirty_src": false
+      },
+      "args": {
+        "limit": 3,
+        "timeout": null,
+        "resume": false,
+        "min_live_rate": 0.5
+      },
+      "config": {
+        "declared_models": {
+          "cloud_seat": "openrouter",
+          "cloud_mid": "deepseek/deepseek-v4.1-flash",
+          "cloud_high": "deepseek/deepseek-v4-pro",
+          "local_matrix": {
+            "general/fast": "qwen2.5:3b",
+            "general/mid": "qwen2.5:7b",
+            "math/fast": "qwen2-math:1.5b",
+            "math/mid": "qwen2-math:7b",
+            "vision/fast": "qwen3-vl:8b"
+          },
+          "local_quality": "qwen3:30b-a3b",
+          "ollama_host": "http://127.0.0.1:11434"
+        },
+        "turn_timeout_seconds": 15.0,
+        "outer_timeout_seconds": 28.0,
+        "wh1_prose_rephrase_enabled": false,
+        "wh1_prose_timeout_seconds": 3.0,
+        "mode_guard_runtime_enabled": false,
+        "ollama_request_timeout_s": 120.0,
+        "misconception_semantic_mode": "off",
+        "misconception_judge_enabled": false,
+        "l4_distractor_link_enabled": true
+      },
+      "config_fingerprint": "b002c6b83df9327c1e0ffd42010da6e96690a414925c42992b07fff966418afc",
+      "declared_models": {
+        "cloud_seat": "openrouter",
+        "cloud_mid": "deepseek/deepseek-v4.1-flash",
+        "cloud_high": "deepseek/deepseek-v4-pro",
+        "local_matrix": {
+          "general/fast": "qwen2.5:3b",
+          "general/mid": "qwen2.5:7b",
+          "math/fast": "qwen2-math:1.5b",
+          "math/mid": "qwen2-math:7b",
+          "vision/fast": "qwen3-vl:8b"
+        },
+        "local_quality": "qwen3:30b-a3b",
+        "ollama_host": "http://127.0.0.1:11434"
+      },
+      "supplied": [
+        "concept",
+        "problem_brief",
+        "initial_hypotheses",
+        "hint_level"
+      ],
+      "unsupplied": [
+        "skills",
+        "pedagogy_pack",
+        "tutor_context_manifest",
+        "session(select_probe 후보)",
+        "session_recall",
+        "warmstart_outside_mids",
+        "theta",
+        "grade",
+        "mastery"
+      ],
+      "unreproduced": [],
+      "problem_briefs": {
+        "found": 81,
+        "load_errors": {}
+      },
+      "mode_guard": {
+        "configured": false,
+        "effective": false,
+        "reason": "pack 미공급 — 금지모드 가드 블록은 돌지 않는다(설정값과 무관)"
+      },
+      "trace": {
+        "sink": "LangfuseSink",
+        "configured": true,
+        "surface": "probe",
+        "emit_warnings": 0,
+        "flush": "ok"
+      },
+      "cache": "사례마다 새 InMemoryCache",
+      "pending_before": 244,
+      "exit_code": 1,
+      "counts": {
+        "attempted": 3,
+        "live": 0,
+        "harness": 2,
+        "degraded": 1,
+        "degraded_causes": {
+          "output_schema": 1
+        },
+        "fallback": 0,
+        "unclassified": 0,
+        "failed": 0,
+        "failure_kinds": {},
+        "skipped_resume": 0,
+        "rebuild_rejected": 0,
+        "provider_calls": 25,
+        "trace_records": 25,
+        "cache_hits": 0,
+        "provider_faults": 0,
+        "run_json_write_errors": 0,
+        "live_rate": 0.0,
+        "explanation_source_by_kind": {
+          "hint": {
+            "harness_template": 3
+          }
+        }
+      },
+      "primary_outcomes": {
+        "adopted": 2,
+        "fallback_llm_degraded": 1
+      },
+      "observed_models": [
+        {
+          "cost_tier": "local",
+          "local_family": "general",
+          "local_model": "fast",
+          "served_model": "qwen2.5:3b",
+          "cloud_seat": null,
+          "calls": 25
+        }
+      ],
+      "first_prompts": {
+        "aq-h-01-01-l1": "94db61f43036bde655dc22394515be1050111036d6ffe9fd0b2486686ef18147",
+        "aq-h-01-01-l2": "30119eecd8a76d62eeffd6e74cffdd9180fc42ac7d424442e4aa5665e75f980e",
+        "aq-h-01-01-l3": "a7ee753eba29ae439c467deb0149214d39b2ece123f2239fb03606149d890c3c"
+      },
+      "distinct_first_prompts": {
+        "total": 3,
+        "hint": 3
+      }
+    }
+  ]
+}
