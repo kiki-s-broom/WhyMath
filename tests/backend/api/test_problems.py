@@ -131,7 +131,8 @@ class FakeSession:
     async def merge(self, obj: Any) -> Any:
         return obj
 
-    async def get(self, model: Any, pk: uuid.UUID) -> Problem | None:
+    async def get(self, model: Any, pk: uuid.UUID, **kwargs: Any) -> Problem | None:
+        # 실제 `AsyncSession.get`처럼 `with_for_update`·`populate_existing` 등 키워드를 받는다.
         return self._get_map.get(pk)
 
     async def execute(self, stmt: Any) -> _FakeResult:

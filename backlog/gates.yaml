@@ -464,8 +464,12 @@ gates:
     notes: "[판정 근거 2026-10-19] 원문 조건과 처분: 무개입 루프 3연속 → 유지(앵커 A6, Phase 3 Gate A와 동일 회차; 2026-09-19 FAIL 이력) · 테스트 계정 ≥20 → 유지(EOS-135, 신규 결정 아님) · P0 0 → 유지. 추가: 누적 60 CU·자동검증≥70%(G2에서 이동). ADR-007."
     corrections:
       - "[2026-10-19] notes +167자 — ADR-007 조건 명세 보존"
+      - "[2026-10-30] depends_on +EOS-227 — WP 소유 태스크 연결(레인 01-D · 판정 기준 main 3a83ed64): G4 측정 문서(EOS-227)를 판정 입력으로 잇는다 — 판정 재료가 산문이 아니라 대장 간선으로 보이게"
+      - "[2026-10-30] depends_on +P3-17-week3-release-gate-judgment — PR #1781 독립 검토: G4 조건 'A6 깊이앵커 무개입 루프 3연속'은 Phase 3 Gate A와 같은 회차(ADR-007 결정 3)로 판정하므로 그 판정 회차 P3-17을 입력으로 잇는다(게이트는 스테이지 제약이 없다 — 측정 문서 EOS-227은 S3라 S4인 P3-17에 직접 의존할 수 없다)"
     depends_on:
       - EOS-155-qa-engine-golden-rotation1-defect-sample
+      - EOS-227
+      - P3-17-week3-release-gate-judgment
   - id: G-eos-g5
     title: "G5 동결→판정 (12/27→12/31) — (판정 게이트) Go/Conditional/No-Go + 2027 범위 결정"
     kind: decision
@@ -482,8 +486,10 @@ gates:
     corrections:
       - "[2026-10-19] notes +92자 — ADR-007"
       - "[2026-10-25] notes +145자 — 감리 R-11 이행 — 신규 게이트 없이 기존 G5 판정 입력으로 연결"
+      - "[2026-10-30] depends_on +EOS-228 — WP 소유 태스크 연결(레인 01-D · 판정 기준 main 3a83ed64): notes가 증거 문서를 WP-G로만 적던 것을 소유 태스크 EOS-228 입력 간선으로 집행"
     depends_on:
       - ARCH-67-required-tier-unexercised-watch-r2
+      - EOS-228
   - id: G-eos-ip-separation-evidence
     title: "겸직 IP 귀속 분리 증빙 — ①개인 장비·개인 계정·개인 시간 작업 사실 증빙(커밋 타임스탬프 등) ②재직사 자산·데이터 무사용 확인서 자체 작성·보관 ③신설 법인 설립 시 IP 양도 계약 예정 기록. 12/31 산출물 전체의 귀속 리스크·투자 실사 항목(전환 설계서 §1.1-b, 2h 소요)"
     kind: human
@@ -734,8 +740,10 @@ gates:
       - "[2026-10-19] notes +94자 — WP-A"
       - "[2026-10-23] title: \"12/31 내부 프로젝트 완성 판정 (2026-09-28 Kiki 결정 · 정의) — 내부 완성 = ① Phase 3 Release Gate A~E PASS(G-p3-w3-release-merged) ② EOS G5 판정(12/27 데이터 동결 → 12/31 Go/Conditional Go/No-Go) 완료 ③ 12월 검증 P0 태스크 전건 종결(done 또는 cancel). 학생(실사용자)·변호사·Anthropic API 없이 성립하는 조건만으로 구성한다 — 그 셋은 이 판정 *이후*에 재개한다(참조 게이트: G-student-work-after-internal-completion · G-external-counsel-restart-after-internal-completion · G-arch66-anthropic-api-pause-review · G-s302-free-use-remeasure-restart · G-web01-landing-legal-review). 여는 작업 = P3-17(Phase 3 Release 판정 회차). 판정 3택: ①완성(clear → 재개 게이트 5종을 차례로 판정) ②미완(FAIL 기록 + 미이행 조건의 소유 태스크 부착 · 기한 연장) ③범위 재정의. 12/31은 목표이지 하한이 아니다(build_harness §3a) — 조건이 채워지면 앞당겨 판정한다. 근거 = MEMORY 2026-09-28 결정 로그 · EOS 선언 §0-2(12/31 = 외부 출시일이 아니라 내부 검증 판정일) · ARCH-66 ⑥. 등재 이유: 이 정의가 저장소 어디에도 없어 '내부 완성 이후'를 전제한 게이트 5종이 판정 불능 상태였다(2026-09-28 실측 — 제가 찾은 방법으로는 정의 0건).\" → \"12/31 내부 프로젝트 완성 판정 (2026-09-28 Kiki 결정 · 정의) — 내부 완성 = ① Phase 3 Release Gate A~E PASS(G-p3-w3-release-merged) ② EOS G5 판정(12/27 데이터 동결 → 12/31 Go/Conditional Go/No-Go) 완료 ③ [D4 2026-10-23 Kiki 교체] EOS 생산 물증 커밋 존재 — WP-C·F의 LLM 저작 회차 산출물(data/runs/*/cu.jsonl)과 주간 KPI(metrics/weekly.json, 측정된 KPI 포함)가 main에 커밋돼 있음(종전: 12월 검증 P0 태스크 전건 종결 — P0 26건이 이미 전부 done이라 아무것도 거르지 못함). 학생(실사용자)·변호사·Anthropic API 없이 성립하는 조건만으로 구성한다 — 그 셋은 이 판정 *이후*에 재개한다(참조 게이트: G-student-work-after-internal-completion · G-external-counsel-restart-after-internal-completion · G-arch66-anthropic-api-pause-review · G-s302-free-use-remeasure-restart · G-web01-landing-legal-review). 여는 작업 = P3-17(Phase 3 Release 판정 회차). 판정 3택: ①완성(clear → 재개 게이트 5종을 차례로 판정) ②미완(FAIL 기록 + 미이행 조건의 소유 태스크 부착 · 기한 연장) ③범위 재정의. 12/31은 목표이지 하한이 아니다(build_harness §3a) — 조건이 채워지면 앞당겨 판정한다. 근거 = MEMORY 2026-09-28 결정 로그 · EOS 선언 §0-2(12/31 = 외부 출시일이 아니라 내부 검증 판정일) · ARCH-66 ⑥. 등재 이유: 이 정의가 저장소 어디에도 없어 '내부 완성 이후'를 전제한 게이트 5종이 판정 불능 상태였다(2026-09-28 실측 — 제가 찾은 방법으로는 정의 0건).\" · notes +182자 — D4 Kiki 결정 (a) — 감리 W-25"
       - "[2026-10-23] notes +74자 — D4 소유 태스크 확정"
+      - "[2026-10-30] depends_on +EOS-229 — WP 소유 태스크 연결(레인 01-D · 판정 기준 main 3a83ed64): 12/31 판정문(EOS-229 · WP-H)을 판정 입력으로 잇는다"
     depends_on:
       - P3-17-week3-release-gate-judgment
+      - EOS-229
   - id: G-kg02-review-promotion-llm-session
     title: "KG-02 검수 승격 회차 — 보류 확정(2026-10-15 Kiki 결정: 사람 대상 내용 검토는 2026-12-31 이후로 미룬다 = 재판정 3택 중 ⓑ 보류 유지). 재판정 시점은 2027-01-01 이후(독촉 102일 = 요청일 2026-09-21 기준 2027-01-01 · 그 전에는 /gates·브리핑에 독촉으로 뜨지 않는다). 이 기간에 사람 서명 승격은 없으므로 학생 /study 공급은 CONT-05 fail-closed 그대로 reviewed 0건이라 개념 콘텐츠가 학생에게 나가지 않는다(의도된 상태). 입력 작업 CONT-05·CONT-06(역조회 · PR 1427)·CONT-08(연결 승인 게이트 · PR 1459) 모두 완료 — 재개 시 선행 작업은 없고 Kiki 서명 회차만 남는다. 재개 때 첫 대상 후보: 파일럿 학습목표가 가리키는 K-12 2행(10기수1-02-05 · HK11 이차함수의 최대·최소), 대학 409는 KG-05 재작성 후순위. 재개 전 확인: 운영 DB에서 학생 요청이 그 2행에 실제로 닿는지(CONT-06 실측은 저장소 코퍼스 기준이고 운영 DB는 미실측). 2026-09-25 정정 사실 3건 유지: ①승격 서명 권한은 HUMAN_REVIEWERS=kiki 한 명(LLM 검수 배치는 선별 보조) ②검색 표면 /v1/concepts/search는 atom_node를 읽어 승격에 무반응 — 확인 표면은 /v1/concepts/content?reviewed_only=true ③승격은 코퍼스 커밋까지가 한 동작. 이 결정이 닿지 않는 것: LLM 검수 배치 재측정(KG-08 대조군 추가 후 미실시)은 사람 대상이 아니므로 이 이월에 포함하지 않았다. 부수 영향: KG-05(대학 409 기계 패턴 수정)가 KG-02 task를 선행으로 걸고 있어 같은 기간 막힌다. 판정문 = docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md §6 · docs/reviews/kg02_gate_premise_recheck_2026-09-25.md · docs/reviews/cont06_study_content_lookup_crosswalk_2026-10-02.md · docs/reviews/cont08_review_input_link_visibility_2026-10-03.md"
     kind: human

@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-224
+title: "EOS 감리 WP-E — 저작권 가이드 Tier 0~3 ↔ LicenseType 대응표 + 어긋남 검사 (enums.py 미변경)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 저작권 가이드 v2(docs/legal/copyright_guide_v2.md)의 Tier 0~3 정의와 schema/enums.py LicenseType 값의 대응표를 docs/data/licensing_safety.md에 둔다. 값마다 어느 Tier인지, 대응이 없으면 빈칸이 아니라 '대응 없음 + 이유'를 적는다.\n② schema/enums.py는 바꾸지 않는다(12/31 내부 검증 기간 방침 규칙 3 — CORE 모듈 상수).\n③ 표와 enum이 어긋나면 잡는 검사를 둔다 — LicenseType 값 집합과 표의 값 집합을 대조해 빠지거나 남는 값이 있으면 RED. 값 하나를 빼는 주입으로 RED를 확인한다.\n④ 이미 쓰이는 등급 표기(licensing_safety.md의 A·B 등급, 가이드의 Tier)와 충돌하면 충돌 자체를 기록하고 정리 방향은 Kiki 판단으로 남긴다."
+artifacts: []
+paths:
+  - docs/data/licensing_safety.md
+  - tests/infra/test_license_tier_mapping.py
+session: null
+notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-E 소유 태스크 등재(판정 기준 main 3a83ed64). schema/enums.py는 12/31 방침 규칙 3의 CORE 상수 파일이라 이 태스크는 문서와 검사만 만든다."
+updated: 2026-10-30

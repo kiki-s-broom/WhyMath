@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-318
+title: "대장 전용 PR에도 상시 CI 잡 목록 고지 — push_mirror_notice 면제 A가 잡 판정 고지까지 꺼서 손 판정 제외 근거가 PR 본문에 다시 등장(ci-local-repro-gap 10회차)"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 대장 전용 변경(push_mirror_notice 면제 A — 트렁크 대비 기여가 backlog/events/·backlog/tasks/뿐)이어도 PR 생성 시점에는 ci_job_coverage scope가 계산한 상시 잡 목록을 고지하고, PR 본문에 그 잡 목록이 적혔는지 확인한다. 면제 A는 푸시 차단만 면제하고 잡 판정 고지까지 끄지 않는다.\n② 고지는 차단이 아니다 — 대장 전용 PR의 푸시를 막지 않는 종전 설계(harn308 판정 문서)는 유지한다.\n③ 변별력: 대장 전용 PR 본문에 상시 잡 하나를 '안 닿는다'고 적은 픽스처에서 고지가 나오고, 상시 잡 6개를 모두 적은 대조군에서는 나오지 않음을 테스트로 고정한다.\n④ 착수는 12/31 내부 검증 기간 방침 규칙 2(HARN 신규 착수 동결)에 따라 2027-01 이후다."
+artifacts: []
+paths:
+  - scripts/harness/push_mirror_notice.py
+  - ".claude/hooks/push_mirror_notice.py"
+  - "tests/harness/test_push_mirror_notice*.py"
+session: null
+notes: "출처: 2026-10-30 PR #1780(레인 01-D · 판정 태스크 의존 간선 추가 · 대장 전용 변경). 세션이 CI 잡 목록을 전수 열거했지만 ci_job_coverage scope를 쓰지 않고 손으로 'infra-contracts도 닿지 않는다'를 PR 본문에 적었다 — 그 잡은 needs: changes 게이팅이 없어 모든 PR에서 돌고 tests/infra 6개 파일이 backlog를 읽는다. 대장 전용 변경이라 푸시·PR 훅이 면제 A로 침묵해 도구를 쓰라는 고지가 없었다. 세션이 CI 체크 목록을 보고 스스로 발견해 본문을 정정했고, 로컬 재현 결과 tests/infra 3453 passed(exit 0)라 CI red 피해는 없었다."
+updated: 2026-10-30

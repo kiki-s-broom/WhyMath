@@ -188,6 +188,7 @@ BASELINE: dict[str, frozenset[str]] = {
             "harness/distractor_signal_dormancy_report.py",
             "harness/item_calibration_reach_report.py",
             "harness/learning_metrics_rollup_cli.py",
+            "harness/published_problem_drift_report.py",
             "harness/pilot_kpi_baseline.py",
             "harness/qa_pipeline.py",
             "harness/recommendation_outcome_report.py",
