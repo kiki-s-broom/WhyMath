@@ -343,6 +343,11 @@
 - **무엇을**: `eos194_measure.py preflight`(읽기 전용)로 운영 `whymath-pg`를 쟀다 — 스키마 head 일치 · 노출 1,699 · 포인터 채움 0 · PUBLISHED 판 0 · 검증된 힌트 보유 노출 문항 0 · 7필드 충족 후보 0(표본 50: hint_strategy 50 · 오개념 서명 39 · 스킬 5). 쓰기 블록은 스스로 거부 조건에 걸려 미실행.
 - **값·처분**: 인수 조건 ③ 미충족 — EOS-194는 `review` 유지, 선행 `P3-32-core-concept-hint-link`(blocked)를 CLI로 부착. EOS-195 드리프트 리포트 운영 분모도 0 = 측정 불성립.
 - **근거 커밋**: 측정 코드 `14557bbe` · 기록 `docs/reviews/eos194_acceptance3_2026-10-31.md`.
+### 2026-10-31 (결정 · D11·D16 — Kiki): **Solution QA 검증 가능 비율 하한 55% · AI 품질 판정 대상 = LLM이 쓴 문장** (Kiki 결정, claude 기록) — 판정 기준: main `7e9dc999`
+- D11: 하한 55%(분모 1,121 불변). 현 0.48885 미달 · P3-62 후보 승격 시 0.52542도 미달 · 구조적 상한 0.5575 — 도달하려면 `P3-91` 착지 + 남은 VAR 대부분 해소가 필요하다.
+- D16(판정 대상만): 8축은 LLM이 쓴 문장을 잰다. P3-78 라이브 측정은 LLM 문장 0/244라 이 기준의 표본이 없다. 제안 임계 6개 값·`--min-live-rate` 0.5는 미확정.
+- 기록 위치: `backlog/gates.yaml` `G-p3-w3-release-merged` notes(새 게이트 없음).
+
 ### 2026-10-31 (측정 · P3-78 AI 품질 8축 라이브 후보): (claude 측정·Kiki PC 수집, 임계는 D16 Kiki 결정 대기) — 수집 코드 `699626e3`
 - 무엇을: P3-10 평가셋 244사례에 WH-1 primary 라이브 튜터(로컬 `qwen2.5:3b` · 라우터 경유 · Langfuse PROBE)를 돌려 `ai_quality_eval --responses`로 8축을 쟀다.
 - 값: LLM 저자 발화가 학생 본문으로 나간 사례 **0/244**(하네스 템플릿 채택 156 · 출력 계약 위반 강등 77 · 예산 폴백 9 · 타임아웃 2). 8축은 Hint 적절성 3.9%(결정론 99.4%) FAIL, 정답 누설·hallucination FAIL은 응답 누락 2건 때문(실제 0), 나머지 PASS. 유효 표본 상한 66.
