@@ -1,0 +1,1851 @@
+{
+  "schema": "ai-quality-report/v1",
+  "eval_set": {
+    "source": "/home/user/WhyMath-p378/data/corpus/ai_quality_eval_v1/eval_set.jsonl",
+    "sha256": "29307d97f50d433fd3333438282ba07879eab5efeca70b95e5f0b821c2a11566",
+    "cases": 244,
+    "kinds": {
+      "hint": 180,
+      "choice": 64
+    }
+  },
+  "candidate": "external:../../data/runs/p3_78-live/live.jsonl",
+  "injection": null,
+  "missing_responses": 2,
+  "axes": [
+    {
+      "axis": "math_correctness",
+      "name_ko": "수학적 정확성",
+      "decision": "래핑 — KPI 판정기(qa_confusion_matrix)는 골든 CU 혼동행렬이라 튜터 턴에 못 쓴다. 판정 권위(SymPy verify_step·arithmetic_validator)를 그대로 호출하고 주장 추출만 더한다",
+      "kpi_mapping": "KPI 수학적 오류율 ≤0.5% · Hard Gate F-Ⅱ(검수 통과 CU 오류율 >2%) · SymPy 단일 권위",
+      "reuse": "l3.verify_step.verify_step · l3.pregenerate.validator.arithmetic_validator",
+      "threshold": {
+        "direction": "ceiling",
+        "value": 0.05,
+        "basis": "제안값(Kiki 확인 전). KPI '수학적 오류율 ≤0.5%'는 CU 단위·독립 모델 심판 전수 지표라 그대로 쓰면 실패 0건으로도 표본 540건 미만에서 통과가 불가능하다(0/540 상한 0.0050)."
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 3,
+      "n_pass": 1,
+      "n_fail": 2,
+      "n_errors": 0,
+      "pass_rate": 0.3333333333333333,
+      "wilson_bound": 0.9217342736662715,
+      "observed": "66.67% · Wilson 상한 92.17%",
+      "reachable": false,
+      "verdict": "UNMEASURED",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {
+        "claims_checked": 2,
+        "claims_false": 0,
+        "unverifiable": 0
+      },
+      "blind_spots": [
+        "본문의 '좌변 = 우변' 관계만 본다 — 등호 없는 서술('x^4의 도함수는 3x^3')은 판정하지 않는다.",
+        "문항 조건과의 대조(verify_step)는 힌트 사례에만 쓴다. 선택 사례는 문맥 무관 산술만 본다 — 예시를 드는 발화(반례)의 변수는 문항 변수가 아니기 때문이다.",
+        "판정 불가(unverifiable) 주장은 통과도 실패도 아니다 — 판정한 주장이 1건도 없는 응답은 이 축의 분모에서 빠진다."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "axis": "answer_leak",
+      "name_ko": "정답 누설",
+      "decision": "재사용 + 래핑 — detect_answer_leakage(문자열) 재사용, 동치 산술식·정답 선언·최종 단계 문자열 검출을 더한다(지시문 ③ '정답 문자열·동치식 포함 여부')",
+      "kpi_mapping": "KPI 힌트 누설률 L1·L2 (무관용 0%) · Hard Gate F-Ⅴ(의미적 누설 ≥10%)",
+      "reuse": "harness.pedagogical_rubric.detect_answer_leakage · l3.safe_parse.safe_sympify",
+      "threshold": {
+        "direction": "ceiling",
+        "value": 0.05,
+        "basis": "제안값(Kiki 확인 전). KPI '힌트 누설률 L1·L2 무관용 0%'를 따라 실패 1건이면 FAIL(무관용) + 표본 충분성으로 실패율 Wilson 상한 ≤ 0.05(실패 0건이면 표본 53건 이상)."
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 217,
+      "n_pass": 215,
+      "n_fail": 2,
+      "n_errors": 0,
+      "pass_rate": 0.9907834101382489,
+      "wilson_bound": 0.027465917016844348,
+      "observed": "0.92% · Wilson 상한 2.75%",
+      "reachable": true,
+      "verdict": "FAIL",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {
+        "string": 0,
+        "declaration": 0,
+        "equivalent_expr": 0,
+        "equivalent_expr_undecidable": 0,
+        "final_step": 0
+      },
+      "blind_spots": [
+        "정답이 1자(예: '7')면 문자열 판정이 유보된다(detect_answer_leakage 규약) — 선언 어구·동치 산술식·최종 단계 문자열이 대신 잡는다. 말로 풀어 쓴 정답('일곱')은 못 잡는다.",
+        "동치식은 문자 없는 순수 산술식만 본다 — 'f(3)'처럼 함수 표기로 정답을 말하는 것은 못 잡는다."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "axis": "misconception_accuracy",
+      "name_ko": "오개념 판정 정확도",
+      "decision": "재사용(임계) + 래핑(라벨 대조) — EOS-60 채점기는 골든 F6 라벨 축이 0건이라 소비 지점이 없다(CONTENT_KPI_CONSUMERS consumer_module=None). 라벨 = 승인 distractor_map",
+      "kpi_mapping": "KPI 오개념 op-code 라벨 정확도 ≥85% · EOS-60 혼동행렬 FN율",
+      "reuse": "ops.validation_scorecard.CONTENT_KPI_THRESHOLDS · harness.wilson",
+      "threshold": {
+        "direction": "floor",
+        "value": 0.85,
+        "basis": "KPI 재사용 — validation_scorecard.CONTENT_KPI_THRESHOLDS['오개념 op-code 라벨 정확도 ≥85%'] (floor 0.85)"
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 64,
+      "n_pass": 63,
+      "n_fail": 1,
+      "n_errors": 0,
+      "pass_rate": 0.984375,
+      "wilson_bound": 0.9329515543744263,
+      "observed": "98.4% · Wilson 하한 93.3%",
+      "reachable": true,
+      "verdict": "PASS",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {},
+      "blind_spots": [
+        "라벨과 결정론 진단기가 같은 원천(승인 distractor_map)을 읽는다 — 결정론 후보로 잰 점수는 회귀 감시이지 독립 정확도가 아니다.",
+        "객관식 채널만 잰다 — 단답형 오답은 오류 서명이 없다(P3-06 범위 밖 결정 승계)."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "axis": "hint_appropriateness",
+      "name_ko": "Hint 적절성",
+      "decision": "신설 — 판정 부품은 재사용: 단계 = decide_hint_level · 단계-노출 정합 = S4-11 게이트 A(check_level_reveals) · 더한 것 = 사다리 노출 단조성",
+      "kpi_mapping": "대응 KPI 없음 — 누설(정답 누설 축)만 재고 '적절성' 지표는 0건(§11-5)",
+      "reuse": "l4.hint_deferral.decide_hint_level · l4.hint_content.gates.check_level_reveals",
+      "threshold": {
+        "direction": "floor",
+        "value": 0.9,
+        "basis": "제안값(Kiki 확인 전) — 대응 KPI 없음(§11-5 '부분 대응')"
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 180,
+      "n_pass": 7,
+      "n_fail": 173,
+      "n_errors": 0,
+      "pass_rate": 0.03888888888888889,
+      "wilson_bound": 0.021220086796516418,
+      "observed": "3.9% · Wilson 하한 2.1%",
+      "reachable": true,
+      "verdict": "FAIL",
+      "failures_not_blocked_by_p309": 172,
+      "counters": {
+        "level_mismatch": 0,
+        "exposure_mismatch": 172,
+        "non_monotone": 6
+      },
+      "blind_spots": [
+        "단계-노출 정합은 S4-11 게이트 A의 문자열 규칙이다 — L1은 개념 이름의 정확한 포함, L2는 단계 흐름 표지('N단계' 등), L3는 풀이 단계 식의 포함을 요구한다. 동의어·풀어 쓴 흐름은 인정하지 않는다.",
+        "힌트의 교수학적 질(발문의 좋음)은 재지 않는다 — 노출량의 단계 정합과 단조성만 본다."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-01-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-01-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-01-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-01-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-01-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-01-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-01-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-h-02-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-02-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-02-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-03-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-03-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-04-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-04-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-04-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-04-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-04-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-04-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-04-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-05-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-05-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "사다리 노출 역행(이 턴 0 < 앞 턴 최대 1)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)",
+            "사다리 노출 역행(이 턴 0 < 앞 턴 최대 1)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-06-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-06-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "사다리 노출 역행(이 턴 0 < 앞 턴 최대 1)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)",
+            "사다리 노출 역행(이 턴 0 < 앞 턴 최대 1)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-06-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-06-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-06-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-07-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-07-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-07-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-07-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-07-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-07-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-08-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-08-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "사다리 노출 역행(이 턴 0 < 앞 턴 최대 1)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-08-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-08-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)",
+            "사다리 노출 역행(이 턴 0 < 앞 턴 최대 2)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-08-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-08-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-09-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-09-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-09-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-09-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-09-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-01-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-01-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-01-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-02-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-02-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-02-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-03-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-03-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-03-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-04-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-04-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-04-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-05-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-05-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-05-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-06-l1",
+          "reasons": [
+            "단계-노출 불일치: 개념 이름 노출 선언=True이나 본문 파생=False"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        },
+        {
+          "case_id": "aq-h-10-06-l2",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)"
+          ],
+          "blocked_by_p309": false,
+          "note": "하네스 결정론 발화(fallback_llm_degraded · 원인 output_schema) — LLM 발화가 아니다"
+        },
+        {
+          "case_id": "aq-h-10-06-l3",
+          "reasons": [
+            "단계-노출 불일치: 흐름 노출 선언=True이나 본문 파생=False(흐름 표지 기준)",
+            "단계-노출 불일치: 부분 시연을 선언했으나 본문에 단계 식이 없다(과대 선언)"
+          ],
+          "blocked_by_p309": false,
+          "note": "채택됐지만 본문이 하네스 파생 템플릿이다(LLM은 행위만 골랐다) — 라이브로 세지 않는다"
+        }
+      ]
+    },
+    {
+      "axis": "explanation_consistency",
+      "name_ko": "설명 일관성",
+      "decision": "신설 — 구조 일관성은 P3-09 TutorTurnOutput 스키마를 재사용, 다음 행동·발화 극성·진단을 검증 판정과 대조하는 규칙을 더한다",
+      "kpi_mapping": "인접 KPI 풀이 비약 지적률 ≤10%(LLM 심판 κ≥0.5) — 동일 축 아님(§11-5 '부분 대응')",
+      "reuse": "harness.wh1_tutor_output.TutorTurnOutput",
+      "threshold": {
+        "direction": "floor",
+        "value": 0.9,
+        "basis": "제안값(Kiki 확인 전) — 인접 KPI '풀이 비약 지적률 ≤10%'와 같은 눈금"
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 244,
+      "n_pass": 242,
+      "n_fail": 2,
+      "n_errors": 0,
+      "pass_rate": 0.9918032786885246,
+      "wilson_bound": 0.9755358436569492,
+      "observed": "99.2% · Wilson 하한 97.6%",
+      "reachable": true,
+      "verdict": "PASS",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {
+        "schema": 0,
+        "next_action": 0,
+        "polarity": 0,
+        "diagnosis_on_correct": 0
+      },
+      "blind_spots": [
+        "발화 극성은 어휘 목록으로 본다 — 목록 밖 표현('그 방향 좋네')의 긍정·부정은 못 잡는다.",
+        "설명 본문의 의미가 진단·풀이와 맞는지(의미적 일관성)는 재지 않는다 — 구조·판정 대조만 본다."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "axis": "student_level_fit",
+      "name_ko": "학생 수준 적합성",
+      "decision": "래핑 — 표기 구조 ↔ 학년 밴드는 MATH-04 부품 재사용, 아직 배우지 않은 개념(선수 그래프 후손)·개념 학교급 대조를 더한다",
+      "kpi_mapping": "KPI 난이도 타당도(깊이 Spearman ρ≥0.5·폭 ρ≥0.6) — 문항 축이라 튜터 턴에 직접 대응하지 않는다(§7-4 12월 내 미검증 자인)",
+      "reuse": "l3.curriculum_notation_gate.extract_range_tokens · harness.curriculum_notation_gate_cli.constructs_by_band",
+      "threshold": {
+        "direction": "floor",
+        "value": 0.9,
+        "basis": "제안값(Kiki 확인 전). KPI '난이도 타당도'는 문항 순위 상관(ρ)이라 튜터 턴 비율 임계로 옮길 수 없다"
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 244,
+      "n_pass": 242,
+      "n_fail": 2,
+      "n_errors": 0,
+      "pass_rate": 0.9918032786885246,
+      "wilson_bound": 0.9755358436569492,
+      "observed": "99.2% · Wilson 하한 97.6%",
+      "reachable": true,
+      "verdict": "PASS",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {
+        "notation": 0,
+        "not_yet_learned": 0,
+        "concept_band": 0
+      },
+      "blind_spots": [
+        "평가셋 학생은 전부 고등 밴드다 — 표기 구조 검사(MATH-04)와 개념 학교급 검사는 이 평가셋에서 실패를 낼 수 없다(고등이 전 구조 도입·개념 그래프에 대학 밴드 없음). 이 축의 변별력은 '아직 배우지 않은 개념' 검사에서 나온다. 두 검사의 작동은 단위 테스트(중등 밴드)가 봉인한다.",
+        "본문 개념 언급은 개념 이름 정확 일치(4자 이상)만 잡는다 — 약칭·동의어는 못 잡는다.",
+        "원시 SymPy 코드 표기(`Derivative(4*x - 3, x)`·`.doit()` 등)를 학생 대면 표기로 보지 않는다 — L3 힌트가 이 표기를 그대로 보여 줘도 이 축은 통과한다(2026-10-21 리뷰 실측: aq-h-06-04-l3 계열)."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "axis": "hallucination",
+      "name_ko": "hallucination",
+      "decision": "재사용 + 래핑 — P3-09 카탈로그·개념 id 검사와 정본 색인을 그대로 쓰고, 본문 속 id 모양 문자열 추출을 더한다",
+      "kpi_mapping": "PRM/도구 검증 필수 계약 + 수학적 오류율(§11-5) — 비율 KPI는 없다",
+      "reuse": "l4.misconception.catalog.CATALOG_BY_ID · l1.standards.phase3_scope.load_reference_index · harness.wh1_tutor_output.validate_tutor_output(노출 경로 판정)",
+      "threshold": {
+        "direction": "ceiling",
+        "value": 0.05,
+        "basis": "제안값(Kiki 확인 전) — 존재하지 않는 id 참조는 무관용(실패 1건이면 FAIL) + 표본 충분성으로 실패율 Wilson 상한 ≤ 0.05"
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 244,
+      "n_pass": 242,
+      "n_fail": 2,
+      "n_errors": 0,
+      "pass_rate": 0.9918032786885246,
+      "wilson_bound": 0.02446415634305075,
+      "observed": "0.82% · Wilson 상한 2.45%",
+      "reachable": true,
+      "verdict": "FAIL",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {
+        "concept_id": 0,
+        "misconception_id": 0,
+        "standard_code": 0,
+        "m_id": 0
+      },
+      "blind_spots": [
+        "id 모양 문자열(개념 code·성취기준 코드·M-id)과 구조 참조만 본다 — 본문에 지어낸 개념 *이름*(예: '미분 역류 정리')은 실재 목록과 대조할 근거가 없어 못 잡는다."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    },
+    {
+      "axis": "curriculum_scope",
+      "name_ko": "Curriculum 범위 이탈",
+      "decision": "래핑 — KPI 채점기는 미착지(CONTENT_KPI_CONSUMERS consumer_module=None)라 임계값만 재사용하고, 판정은 P3-01 명세(+선수 조상 깊이 2)로 한다",
+      "kpi_mapping": "KPI 교육과정 정합률 ≥92%(블라인드 역매핑) + MATH-04(표기 범위 게이트)",
+      "reuse": "l1.standards.phase3_scope.load_scope_spec · ops.validation_scorecard 임계값",
+      "threshold": {
+        "direction": "floor",
+        "value": 0.92,
+        "basis": "KPI 재사용 — '교육과정 정합률 ≥92%'(floor 0.92) 값"
+      },
+      "min_n": 30,
+      "n_cases": 244,
+      "n_applicable": 244,
+      "n_pass": 242,
+      "n_fail": 2,
+      "n_errors": 0,
+      "pass_rate": 0.9918032786885246,
+      "wilson_bound": 0.9755358436569492,
+      "observed": "99.2% · Wilson 하한 97.6%",
+      "reachable": true,
+      "verdict": "PASS",
+      "failures_not_blocked_by_p309": 0,
+      "counters": {
+        "concept": 0,
+        "standard_code": 0,
+        "mention": 0
+      },
+      "blind_spots": [
+        "본문 개념 언급은 개념 이름 정확 일치만 잡는다 — 이름이 아닌 서술로 범위 밖 내용을 가르치는 것은 못 잡는다."
+      ],
+      "failures": [
+        {
+          "case_id": "aq-h-02-01-l1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        },
+        {
+          "case_id": "aq-c-02-03-w1",
+          "reasons": [
+            "응답 누락"
+          ],
+          "blocked_by_p309": true,
+          "note": null
+        }
+      ]
+    }
+  ],
+  "verdict": "UNMEASURED",
+  "exit_code": 2
+}
