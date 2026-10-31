@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-91-p3-62-candidate-promotion-fill-template-fix
+title: "P3-91 — P3-62 후보 승격: fill 은행 템플릿 문장 5종 교정·새 회차 감사 후 두 은행 승격"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-62-solution-qa-unverifiable-structuring
+requires_gates: []
+acceptance:
+  - "① fill 은행 템플릿 문장 5종을 생성기에서 교정한다 — 2026-10-31 S5 4회차(docs/data/p3_fill_audit/bank_audit_r4/README.md)가 짚은 11건의 원인: 해설 차분몫 문장의 대상 누락(x가 어디에 가까워지는지) 4 · 발문 고정 문구 \"(a는 상수)가\"의 조사 3 · 단위 뒤 조사(\"cm/초^2였다고\") 2 · 해설 \"구하는 극한값\" 1 · 줄임표 뒤 조사 1. 같은 글자가 현재 승인 은행(bank_audit_r3)에도 있으므로 기본 모드와 구조화 모드 출력이 함께 바뀐다. 문항마다 정답 값은 바꾸지 않는다(정답 오류 0건이었다) — 바뀐 레코드의 정답·answer_map 불변을 테스트로 단언한다.\n② 교정한 은행을 새 회차로 감사한다(런북 docs/reviews/p3_62_s5_candidate_audit_runbook_2026-10-21.md §1~§4 · 같은 지침 sha256 3046a901… · 같은 시드 · 판정자 A·B). 같은 은행을 다시 채점하지 않는다(as-found).\n③ 승격(런북 §5)은 두 은행 모두 exit 0일 때 한 PR로 한다 — calc 후보는 6회차(bank_audit_r6)에서 이미 통과했으나, 교정이 calc 생성기 출력도 바꾸면 calc도 새 회차가 필요하다(감사받은 바이트 = 승격할 바이트). calc만 먼저 승격하는 것은 런북 조건의 예외라 Kiki 결정(D11 보고에 포함)을 받은 경우에만 한다.\n④ 승격 후 python -m whymath_backend.harness.solution_qa 로 검증 가능 비율을 다시 재고(분모 1,121 불변 확인), 기대값(두 은행 0.52542 · calc만 0.51115 — docs/reviews/p3_62_sqa_candidate_merge_2026-10-31.json)과 대조해 docs/reviews에 기록한다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/p3_diff_*.py"
+  - src/backend/whymath_backend/harness/p3_fill_batch.py
+  - src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py
+  - data/corpus/problem_bank_p3_fill_v0/
+  - data/corpus/problem_bank_p3_calculus1_diff_v0/
+  - docs/data/p3_fill_audit/
+  - docs/data/p3_calculus1_diff_audit/
+session: null
+notes: "출처: P3-62 3단계(2026-10-31 · 판정 기준 main 3a83ed64)의 S5 감사 결과 — calc 후보 통과(k = 1) · fill 후보 불합격(k = 11). fill 결함 11건은 전부 구조화와 무관한 기존 문항(승인 동결본과 바이트 동일)이라 승인 은행의 잔여 문장 결함이기도 하다(판정자 지침 \"채점 규칙\": 기록해 은행 교정에 넘긴다). 보고서 docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C."
+updated: 2026-10-31

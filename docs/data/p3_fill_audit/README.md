@@ -20,6 +20,7 @@ P3-03(`../p3_calculus1_diff_audit/`)과 같은 프로토콜을 그대로 쓴다 
 | 1 | `b5e4ace8…` | 0 | 17 | 9 | **19** | 0.14539 | 불합격 | `bank_audit/` |
 | 2 | `c4e1b62c…` | 0 | 0 | 2 | **2** | 0.03616 | 불합격 | `bank_audit_r2/` |
 | **3** | `a4b7823d…` | 0 | 0 | 0 | **0** | **0.01907** | **통과** | `bank_audit_r3/` |
+| 4 | `8ae08bd8…` | 0 | 10 | 4 | **11** | 0.09697 | 불합격 — P3-62 규칙 (가) 후보(2026-10-31). 결함 11건은 전부 구조화와 무관한 문항(3회차 승인본과 바이트 동일)의 문장 표기 | `bank_audit_r4/` |
 
 각 회차 폴더: `audited_bank.jsonl`(감사받은 은행 동결 사본) · `machine_labels.jsonl` · `manifest.json`(묶음별 sha256) ·
 `llm_labels/`(판정자별 합본 `rater_A.jsonl`·`rater_B.jsonl`, 묶음별 원본·근거 `shard*_rater*_defects.md`) ·

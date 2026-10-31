@@ -181,6 +181,7 @@ T09-no-application·T10-linear-position. 4회차 감사 대상 원문 `round4/au
 | 3 | `bank_audit_r3/` | 11 | 0.03989 | 불합격 |
 | 4 | `bank_audit_r4/` | 5 | 0.02375 | 불합격 |
 | 5 | `bank_audit_r5/` | **1** | **0.01151** | **승인 근거 성립** (2026-10-09 · 은행 sha256 `3abfc4e6…`) |
+| 6 | `bank_audit_r6/` | 1 | 0.01151 | 통과 — **승격 안 함**(2026-10-31 · P3-62 규칙 (가) 후보 · sha256 `c4f3ad11…` · 짝 fill 은행 불합격이라 런북 §5 조건 미충족) |
 
 1~4회차 불합격은 as-found로 남는다. 승인 대상은 5회차가 감사한 504건 그대로다(`bank_audit_r5/audited_bank.jsonl`).
 
