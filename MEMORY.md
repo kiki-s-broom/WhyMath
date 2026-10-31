@@ -338,7 +338,7 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
-### 2026-10-31 (측정 · P3-62 3단계 — S5 후보 감사·검증 가능 비율 재측정): (claude 측정, 하한은 D11 Kiki 결정 대기) — 판정 기준: main `3a83ed64`
+### 2026-10-31 (측정 · P3-62 3단계 — S5 후보 감사·검증 가능 비율 재측정): (claude 측정, 하한은 D11 = `G-p3-w3-release-merged`의 검증 가능 비율 하한 · Kiki 결정 대기) — 판정 기준: main `3a83ed64`
 - 무엇을: 규칙 (가) 후보 은행 두 개를 런북 §1~§4대로 S5 감사(판정자 서브에이전트 24명) — calc 통과(k = 1/504 · 보정 상한 0.01151) · fill 불합격(k = 11/204 · 0.09697). fill 결함 11건은 전부 구조화와 무관한 기존 문항(승인 동결본과 바이트 동일)의 템플릿 문장이라 승격하지 않았다(런북 §5: 두 은행 모두 통과 시에만) → 승계 `P3-91`.
 - 값: 현 main 검증 가능 비율 **0.48885**(548/1,121 · 실패 0) · 후보 두 은행 승격 시 0.52542 · calc만 0.51115 · 구조적 상한 0.5575.
 - 근거: `docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md` §C · `docs/reviews/p3_62_sqa_main_2026-10-31.json` · `docs/reviews/p3_62_sqa_candidate_merge_2026-10-31.json` · 감사 기록 `docs/data/p3_calculus1_diff_audit/bank_audit_r6/`·`docs/data/p3_fill_audit/bank_audit_r4/`.
