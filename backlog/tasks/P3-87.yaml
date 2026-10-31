@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -18,9 +18,9 @@ acceptance:
 artifacts: []
 paths:
   - "docs/data/p3_differentiability_reach_audit/**"
-session: null
+session: claude/serene-planck-g6jhey
 notes: |-
   출처: P3-65 판정문 §④ 감사 런북 · 등재 요청(Kiki 승인 2026-10-26). 감사 실행은 에이전트를 띄울 수 있는 세션 몫이며 Kiki 머신은 필요 없다.
 
   [정정 2026-10-27] 은행 재생성으로 sha256 변경 — 감사 대상 바이트 지문 정정
-updated: 2026-10-27
+updated: 2026-10-31

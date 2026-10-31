@@ -1,0 +1,37 @@
+{
+  "task": "P3-65-calc1-02-02-skill-reaching-bank",
+  "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+  "seed": 20261008,
+  "bank": "data/corpus/problem_bank_p3_differentiability_reach_v0/problems.jsonl",
+  "bank_sha256": "fa365f31caacfc3db9cdd1dc53f894267603c3a718c949847b31664364f8e934",
+  "n_items": 300,
+  "n_shards": 6,
+  "shard_size": 50,
+  "shards": [
+    {
+      "file": "shard1.jsonl",
+      "sha256": "3574fcc355bbc3a7b95b26cf966f09aa0637123ac29252307274b6f55fc3f775"
+    },
+    {
+      "file": "shard2.jsonl",
+      "sha256": "ddf7c03f630a19767f467563e7822f6d4184fd9bdfef7c92224bd82edd5803db"
+    },
+    {
+      "file": "shard3.jsonl",
+      "sha256": "e9ae8dbef05bfe9b8268649b6b307e0ebddd2d3cda0b81edbb2a9f2528a593f9"
+    },
+    {
+      "file": "shard4.jsonl",
+      "sha256": "60497abd17c106388e24b39d2058372a8f2fbfc2327ebe0e513553c55d3f1a7d"
+    },
+    {
+      "file": "shard5.jsonl",
+      "sha256": "81afad869120f81f9d132129081747d0571d0abf1770c2e2e639ab5e5874c14e"
+    },
+    {
+      "file": "shard6.jsonl",
+      "sha256": "b1f2814fe93ab8bb9d0f6a424f8f4760dd8c992b2442a32d822e7945c7057cdc"
+    }
+  ],
+  "rater_protocol_sha256": "3046a901033ea2eadd7c3aafbc32e2a94c3c241551f7d8e6fa50eb2c606ee27a"
+}
