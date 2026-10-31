@@ -353,6 +353,11 @@ _WH1_PRIMARY_RUNNER_ALLOWLIST: frozenset[str] = frozenset(
         # 학생 노출 표면이 아니라 측정 하네스(hermetic·FakeProvider)이며, 우회 경로가 아니라
         # 봉인 대상 경로 자체를 측정하는 소비자라 의식적으로 등재한다(2026-07-21 리뷰).
         "harness/coach_prose_leak_eval.py",
+        # P3-78 측정 CLI — AI 품질 평가 사례마다 *실제 서빙 러너 그대로*를 돌려 8축 평가기의
+        # `--responses` 입력을 만든다. 산출은 평가 파일(`<out>`)뿐이라 학생 노출 표면이 아니며,
+        # 러너 결과도 코치와 같이 승격 직전 재검증(`check_deliverable`)을 거친다. 봉인 대상 경로
+        # 자체를 측정하는 소비자라 위 S4-04 측정 CLI와 같은 근거로 등재한다(P3-78 리뷰).
+        "harness/ai_quality_live_collect.py",
         # PED-23(회수): 사후 가드 정본 모듈의 docstring 참조만(비호출) — mode_guard가 실제로
         # 호출되는 좌석은 여전히 `harness/wh1_primary.py` 톤필터 직전 1곳뿐이다(가드 배선 자체는
         # 그 안쪽 계층이라 새 학생 표면이 아님 — 봉인 ③의 취지(우회 배선 차단)와 무관).
@@ -418,6 +423,9 @@ _WH1_PROSE_FLAG_ALLOWLIST: frozenset[str] = frozenset(
     {
         "config.py",  # 플래그 정의(기본 OFF canary — 봉인 ③ serving invariant가 False 동결).
         "harness/wh1_primary.py",  # 소비: 유일 표면 안쪽의 프로즈 계층 게이트.
+        # P3-78 측정 CLI — 값을 실행 식별(`<out>.run.json`)에 *기록만* 한다(분기 0 · 발화 경로
+        # 무관). 프로즈 ON/OFF가 측정된 발화를 바꾸므로 그 회차가 어느 설정이었는지 남기는 용도.
+        "harness/ai_quality_live_collect.py",
     }
 )
 _WH1_PROSE_ENTRY_ALLOWLIST: frozenset[str] = frozenset(

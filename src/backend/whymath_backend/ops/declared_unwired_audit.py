@@ -1488,6 +1488,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # `tests/backend/harness/test_provider_accuracy_battle.py`가 CI에서 돈다 —
         # 즉 *라이브에 갔을 때 옳은 것을 재는가*는 검사되고, *라이브에서 도는가*만 미도달이다.
         "harness.provider_accuracy_battle": _LIVE_DEPENDENT,
+        # P3-78 — AI 품질 8종 라이브 후보 수집(WH-1 primary 러너 × 평가 244사례). 로컬 Ollama·
+        # Langfuse 키가 있는 Phaiakes9에서 사람이 돌린다 — CI에는 LLM이 없어 원리적으로 못 돈다.
+        # 수집 계약(실패 기록·폴백 표지·재개·공허 수집 exit 1)은 스크립트 provider로
+        # `tests/backend/harness/test_ai_quality_live_collect.py`가 CI에서 동결한다.
+        "harness.ai_quality_live_collect": _LIVE_DEPENDENT,
         # EOS-54(2026-08-30): HIT·CU 생산 계측 판독기 — 검수 타이머 *실이벤트*(JSONL) 의존.
         # 계측 표본이 쌓이기 전에는 입력 0 = 측정 실패(exit 1)가 설계값(미측정≠0 승격)이라 CI
         # 상시 배선 비대상 — G2(10/25) 기준선·G5 판정 시점에 운영자가 돌린다(answer_distribution_
