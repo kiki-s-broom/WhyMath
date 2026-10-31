@@ -12,6 +12,7 @@ owner: claude
 depends_on:
   - EOS-190-problem-version-publish-writer
   - EOS-195-published-problem-edit-drift
+  - P3-32-core-concept-hint-link
 requires_gates: []
 acceptance:
   - "문항 발행 호출 표면: l3/problem_publish_gate의 운영 호출자를 만든다. EOS-190은 problem_version의 유일한 writer 모듈을 만들었지만 이 모듈을 부르는 라우트·CLI가 0건이라 운영 DB의 problem.problem_version_id는 여전히 전부 NULL이고 EOS-47의 outcome=pinned 비율은 0이다. 이 태스크가 그 마지막 연결이다. 표면은 관리자 CMS 라우트(P3-12 api/admin_cms.py의 권한 가드 재사용)와 운영 CLI 중 판정 근거와 함께 하나를 고른다. 호출자는 게이트 모듈의 공개 함수만 부르고 ORM ProblemVersion을 import하지 않는다(AST 동결 R1이 이미 강제)."
@@ -29,4 +30,6 @@ notes: |-
   [정정 2026-10-14] PR 증적 기록 — 인수 조건 1·2 충족, 조건 3(운영 DB 실측)은 Kiki 실행 과제로 남아 done 보류
 
   [정정 2026-10-30] EOS-195 회수: 발행 후 편집 차단이 EOS-194 마무리의 선행
-updated: 2026-10-30
+
+  [정정 2026-10-31] EOS-194 ③ 운영 측정(2026-10-31) 결과 발행 가능 후보 0/1,699 — 노출 문항에 검증된 힌트 0건으로 P3-04 7필드 게이트가 전부 막는다. 발행으로 pinned를 확인하려면 P3-32(핵심 개념 hint 연결) 착지가 선행
+updated: 2026-10-31
