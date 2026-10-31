@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-49-jev-offline-intent-compare
+title: "Jev 오프라인 의도 비교 — 합성 시험셋으로 규칙·Laya·Jev 3자 판정 비교(학생 데이터 외부 전송 0)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on:
+  - PED-48-laya-intent-shadow
+requires_gates: []
+acceptance:
+  - "① 합성 행(synthetic=true)만 받는다 — 한 행이라도 아니면 외부 호출 0회로 중단"
+  - "② 질문지는 _intent_shadow.LAYA_QUESTIONS 재사용(questions_v1 동일성)"
+  - "③ 규칙·Laya·Jev 각 결과·정답 대비 정확도·혼동표·지연 p50/p95·입력 토큰 합계를 JSON으로 출력, 원문은 출력에 미포함"
+  - "④ 키는 환경변수(TYPESAFE_API_KEY·LAYA_API_KEY)로만, 실패는 타입명으로 기록(침묵 실패 금지)"
+  - "⑤ 범위 밖: 실학생 트래픽에 Jev 연결 없음(CLAUDE.md 내부망 원칙·R26-02)"
+artifacts: []
+paths:
+  - scripts/analysis/jev_offline_intent_compare.py
+  - tests/backend/harness/test_jev_offline_intent_compare.py
+session: null
+notes: "2026-10-31 Kiki 선택: 실학생 섀도 대신 합성 272건 오프라인 비교. 시험셋은 저장소 밖(Phaiakes9)"
+updated: 2026-10-31
