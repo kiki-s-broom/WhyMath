@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-225
+title: "EOS 감리 WP-F — A4(중3 이차방정식) 2회차 LLM 저작 ≥30 CU 산출물·GenerationLog·주간 KPI 커밋 (G4 누적 60 CU)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P0
+owner: claude
+depends_on:
+  - EOS-220
+  - EOS-203
+  - EOS-204
+  - EOS-205
+  - EOS-212
+requires_gates: []
+acceptance:
+  - "① ADR-007 결정 3(G4): 두 번째 앵커 A4(중3 이차방정식 · 앵커 레지스트리 data/corpus/eos_anchor_set_v1/anchors.yaml id A4 범위)로 LLM 저작 회차를 1회 돌려 수락 CU ≥30건을 만든다. A6 회차(EOS-197) 30 CU와 합쳐 누적 ≥60 CU가 G4 조건이다.\n② 좌석은 EOS-203 실측 결과로 정한다. openrouter 좌석은 학생 데이터 0 조건에서만 쓰고, Anthropic 좌석은 12/31까지 API 사용 중단(ARCH-66)이라 쓰지 않는다.\n③ 산출물: data/runs/<A4 회차>/cu.jsonl(≥30행) · GenerationLog(model_name·prompt_version·seed·input_sha256) · 검수 JSONL(타이머 ON) · python -m whymath_backend.ops.provenance_audit exit 0 · metrics/weekly.json 회차 레코드(WP-K 경로로 자동검증 1차 통과율 measured:true 포함).\n④ 실행은 저작 회차 오케스트레이터(EOS-208)로 하고, EOS-209 ②의 첫 Windows 실회차 확인 항목을 이 회차에서 함께 수행해 결과를 EOS-209에 기록한다.\n⑤ 측정 1건 = 런북 1회 실행 + 결과 파일 커밋 + MEMORY 결정 로그 3줄(12/31 내부 검증 기간 방침 4항). 실패 회차도 산출물과 원인을 남긴다."
+  - "⑥ 정정(2026-10-30 독립 검토): ④는 이 회차를 오케스트레이터로 실행하라는 뜻까지만이다. 첫 Windows 실회차 확인 항목의 기록과 런북 수정은 그 소유 태스크(WP-L 오케스트레이터 보완)가 한다 — 이 태스크는 회차 로그·상태 파일 경로를 남겨 그쪽이 읽을 수 있게만 한다(작업 1건 = WP 하나). 그 태스크의 URL 내장 자격증명 마스킹이 아직 착지하지 않았으면, round_state.json 등 상태 파일을 커밋하기 전에 자격증명 문자열(ghp_ · x-access-token · sk- · Bearer)이 없음을 grep으로 확인하고 결과를 남긴다.\n⑦ 정정(2026-10-30 독립 검토): ③의 검수 JSONL을 만드는 첫 검수는 AI 보조 없이 진행한다 — 사람 단독 HIT 표본(EOS-226)은 같은 CU의 첫 검수에서만 잰다(재검수는 익숙해져 HIT가 짧게 나와 F-Ⅰ 판정이 유리하게 기운다)."
+artifacts: []
+paths:
+  - "data/runs/eos-a4-*/**"
+  - metrics/weekly.json
+session: null
+notes: |-
+  출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-F 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = WP-K 측정(EOS-220)과 A6 회차에서 드러난 저작 경로 결함 4건(EOS-203·204·205·212). 오케스트레이터 보완 태스크의 첫 Windows 실회차 확인 항목은 이 회차 실행 중에 함께 수행한다(acceptance ④). A4 범위 정본 = data/corpus/eos_anchor_set_v1/anchors.yaml id A4 [9수02-20].
+
+  [정정 2026-10-30] PR #1781 독립 검토 지적 반영(정정 항 append)
+updated: 2026-10-30

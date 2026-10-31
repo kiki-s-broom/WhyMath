@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-221
+title: "EOS 감리 WP-L — Kiki PC(Phaiakes9) 실행 표준 문서: 저작·검수·측정 런북 공통 실행 규약 색인"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① Kiki PC(Phaiakes9) 실행 표준 문서 1장 — docs/ops/kiki_pc_execution_standard.md. 저작·검수·측정 런북이 공통으로 쓰는 실행 규약을 한 곳에 모은다: 진입 경로(Windows PowerShell · 작업 디렉터리 C:\\Users\\kiki\\Desktop\\__AI\\WhyMath), 실행기 호출(python -m pip · python -m pytest), 공유 작업 사본 우회(git worktree add --detach), 쓰기 블록 자가거부 가드, 붙여넣기 블록 자리표시자 금지, 시크릿 등록 직후 자가검증, 셸 출력 수집(cmd /c 경유), 6항목 사전 브리핑 템플릿, 로컬 LLM 요청 타임아웃(WHYMATH_OLLAMA_REQUEST_TIMEOUT_S · EOS-203).\n② 새 규칙을 만들지 않는다 — 각 항목은 CLAUDE.md·기존 런북의 출처를 인용하는 색인이다(CLAUDE.md 산문 규칙 등재 동결 · CLAUDE.md 변경 금지).\n③ 저작 회차 런북(docs/ops/eos197_authoring_round_runbook.md)과 EOS-209 ② 첫 Windows 실회차 체크리스트가 이 문서를 가리키게 한다.\n④ 문서 안 실행 블록은 scripts/ops/check_runbook_blocks.py 규칙을 만족한다(파일명이 런북 글롭에 걸리지 않으면 수동으로 같은 검사를 돌려 결과를 PR에 적는다)."
+artifacts: []
+paths:
+  - docs/ops/kiki_pc_execution_standard.md
+  - docs/ops/eos197_authoring_round_runbook.md
+session: null
+notes: |-
+  출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-L 소유 태스크 등재(판정 기준 main 3a83ed64). WP-L의 저작 경로 결함 몫은 기존 EOS-203·204·205·209·212가 소유한다(docs/reviews/eos_wp_owner_tasks_2026-11.md). 이 태스크는 그중 실행 표준 문서만 맡는다.
+
+  [정정 2026-10-30] paths ['docs/ops/kiki_pc_execution_standard.md'] → ['docs/ops/kiki_pc_execution_standard.md', 'docs/ops/eos197_authoring_round_runbook.md']: PR #1781 독립 검토: acceptance ③이 저작 회차 런북 수정을 요구하는데 paths에 없었다
+updated: 2026-10-30
