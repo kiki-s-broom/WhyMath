@@ -1,0 +1,1 @@
+{"ts": "2026-10-31T12:58:54+00:00", "actor": "claude/eos-194-acceptance3-measure", "action": "amend", "id": "EOS-194-problem-publish-caller-surface", "reason": "EOS-194 ③ 운영 측정(2026-10-31) 결과 발행 가능 후보 0/1,699 — 노출 문항에 검증된 힌트 0건으로 P3-04 7필드 게이트가 전부 막는다. 발행으로 pinned를 확인하려면 P3-32(핵심 개념 hint 연결) 착지가 선행", "changed": ["depends_on +P3-32-core-concept-hint-link"]}
