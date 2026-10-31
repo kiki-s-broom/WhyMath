@@ -20,6 +20,22 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/harness/published_problem_drift_report.py
   - tests/backend/harness/test_published_problem_drift_report.py
+  - src/backend/whymath_backend/db/published_edit_guard.py
+  - src/backend/whymath_backend/api/problems.py
+  - src/backend/whymath_backend/api/admin_cms.py
+  - src/backend/whymath_backend/api/admin_cms_resources.py
+  - src/backend/whymath_backend/api/admin_cms_problem_versions.py
+  - src/backend/whymath_backend/l1/problem_bank/populate.py
+  - src/backend/whymath_backend/l3/problem_publish_gate.py
+  - tests/backend/db/test_published_edit_guard.py
+  - tests/backend/db/test_published_problem_edit_guard_integration.py
+  - tests/backend/db/test_problem_version_publish_integration.py
+  - tests/backend/api/test_problems_patch_published_guard.py
+  - tests/backend/l3/test_problem_publish_gate_enforcement.py
+  - docs/architecture/eos194_problem_publish_caller_surface.md
 session: claude/pensive-cerf-guowbr
-notes: "출처: EOS-190 착지 시 발견. l3/problem_publish_gate 모듈 docstring의 '발행 이후의 제자리 편집을 새 판으로 만들지 않는다' 항목. 선행: EOS-190(대장 depends_on으로 집행)."
-updated: 2026-10-13
+notes: |-
+  출처: EOS-190 착지 시 발견. l3/problem_publish_gate 모듈 docstring의 '발행 이후의 제자리 편집을 새 판으로 만들지 않는다' 항목. 선행: EOS-190(대장 depends_on으로 집행).
+
+  [정정 2026-10-31] paths ['src/backend/whymath_backend/harness/published_problem_drift_report.py', 'tests/backend/harness/test_published_problem_drift_report.py'] → ['src/backend/whymath_backend/harness/published_problem_drift_report.py', 'tests/backend/harness/test_published_problem_drift_report.py', 'src/backend/whymath_backend/db/published_edit_guard.py', 'src/backend/whymath_backend/api/problems.py', 'src/backend/whymath_backend/api/admin_cms.py', 'src/backend/whymath_backend/api/admin_cms_resources.py', 'src/backend/whymath_backend/api/admin_cms_problem_versions.py', 'src/backend/whymath_backend/l1/problem_bank/populate.py', 'src/backend/whymath_backend/l3/problem_publish_gate.py', 'tests/backend/db/test_published_edit_guard.py', 'tests/backend/db/test_published_problem_edit_guard_integration.py', 'tests/backend/db/test_problem_version_publish_integration.py', 'tests/backend/api/test_problems_patch_published_guard.py', 'tests/backend/l3/test_problem_publish_gate_enforcement.py', 'docs/architecture/eos194_problem_publish_caller_surface.md']: EOS-195 회수: 실제 수정 범위로 paths 교체(기존 2건 유지 + 차단 집행 지점 3곳·판정 모듈·게이트 docstring·통합 테스트) — scope_drift 경고 해소, 다른 세션 겹침 감지용
+updated: 2026-10-31

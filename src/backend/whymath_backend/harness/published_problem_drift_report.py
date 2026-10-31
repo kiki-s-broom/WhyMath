@@ -2,9 +2,10 @@
 
 **존재 이유**: 문항 판(`problem_version`)은 *스냅숏*이고 학생에게 서빙되는 원본은 여전히 라이브
 `problem` 행이다. 발행 뒤 라이브 행이 바뀌면 EOS-47이 시도에 고정한 판의 payload가 학생이 실제로 푼
-문항과 달라진다. EOS-195는 그 변경 경로 둘(CMS 편집·코퍼스 재적재)을 **차단**하는 처분을 골랐다
-(`api/admin_cms._edit_block_reason` · `l1/problem_bank/populate`의 upsert WHERE). 이 리포트는
-그 차단이 *실제로 지켜지는지*를 보는 **탐지 통제**다 — 차단 두 경로 밖의 쓰기(직접 SQL·새 writer·
+문항과 달라진다. EOS-195는 그 변경 경로 셋(CMS 편집·`PATCH /v1/problems`·코퍼스 재적재)을
+**차단**하는 처분을 골랐다(`api/admin_cms._edit_block_reason` · `api/problems.patch_problem` ·
+`l1/problem_bank/populate`의 upsert WHERE). 이 리포트는
+그 차단이 *실제로 지켜지는지*를 보는 **탐지 통제**다 — 차단 세 경로 밖의 쓰기(직접 SQL·새 writer·
 차단 이전 시기에 생긴 드리프트)는 이 숫자로만 보인다.
 
 **분자·분모(acceptance ②)**: 분모 = 발행 포인터(`problem.problem_version_id`)가 채워진 문항 수.
@@ -194,8 +195,15 @@ class DriftReport:
 
     @property
     def drift_rate(self) -> float | None:
-        """어긋남 비율(분자=어긋남·분모=포인터 채워진 전체). 분모 0이면 **None**(0% 위장 금지)."""
-        return None if self.pointer_filled == 0 else self.drifted / self.pointer_filled
+        """어긋남 비율(분자=어긋남·분모=포인터 채워진 전체). **None**이면 비율을 말할 수 없다.
+
+        분모가 0이거나, 분모는 있어도 해시를 **한 건도 대조하지 못했으면**(전부 판정 불가)
+        None이다 —
+        후자를 0%로 내면 JSON 소비자가 "측정됨·어긋남 0%"로 읽는다(0건 통과 위장 금지).
+        """
+        if self.pointer_filled == 0 or self.verified == 0:
+            return None
+        return self.drifted / self.pointer_filled
 
     @property
     def verified(self) -> int:
@@ -278,7 +286,8 @@ def render_report(report: DriftReport) -> str:
         "# 발행 문항 판-라이브 드리프트 리포트 (EOS-195 ②)",
         "",
         "> 관측 리포트다 — **exit 게이트가 아니다**(어긋남이 있어도 실패시키지 않는다).",
-        "> 차단은 쓰기 경로(CMS 편집·코퍼스 재적재)가 한다. 이 숫자는 그 차단 밖의 쓰기를 본다.",
+        "> 차단은 쓰기 경로(CMS 편집·`PATCH /v1/problems`·코퍼스 재적재)가 한다. "
+        "이 숫자는 그 차단 밖의 쓰기를 본다.",
         "",
         f"- 전체 문항: **{report.problems_total}**",
         f"- 발행 포인터가 채워진 문항(분모): **{report.pointer_filled}**",

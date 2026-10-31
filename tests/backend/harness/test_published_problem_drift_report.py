@@ -279,6 +279,22 @@ def test_empty_denominator_json_marks_unmeasurable() -> None:
     assert data["pointer_filled"] == 0 and data["problems_total"] == 1234
 
 
+def test_all_indeterminate_has_no_rate_even_with_a_denominator() -> None:
+    """분모는 있어도 해시를 한 건도 대조하지 못했으면 비율은 None이다 — JSON이 0.0을 내면 소비자가
+    "측정됨·어긋남 0%"로 읽는다(독립 검토 지적 #5 · 0건 통과 위장 금지)."""
+    report = aggregate(
+        _verdicts(
+            _indet(IndeterminateReason.VERSION_UNREADABLE),
+            _indet(IndeterminateReason.LIVE_SNAPSHOT_INVALID),
+        ),
+        problems_total=5,
+    )
+    assert report.pointer_filled == 2 and report.verified == 0
+    assert report.drift_rate is None
+    assert report_to_json(report)["drift_rate"] is None
+    assert "0.0%" not in render_report(report)
+
+
 def test_a_clean_but_populated_report_does_report_zero_percent() -> None:
     """대조군 — 분모가 있고 어긋남이 0이면 '0.0%'를 말한다. 위 테스트가 문자열 부재만 보는 것이
     아니라 측정 여부에 따라 갈린다는 증거."""

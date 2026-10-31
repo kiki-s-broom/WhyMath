@@ -39,7 +39,10 @@ test_problem_publish_gate_enforcement.py`).
 고칠 수 없다 — `api/admin_cms_resources.WORKFLOW_STATE_COLUMNS`).
 증거를 못 쟀으면(`metadata_evidence is None`) 통과가 아니라 **실패**다(모른다 ≠ 통과).
 7필드는 QA에서 요구하지 않는다 — 조건을 못 채운 판은 APPROVED에서 멈춘다(지시문 세트 16/20).
-이 검사는 *발행 순간*의 라이브 행을 잰다 — 발행 이후 편집이 필드를 비우는 경우는 EOS-195 소관이다.
+이 검사는 *발행 순간*의 라이브 행을 잰다. 발행 이후 EOS-195가 막는 것은 판 payload의 원천 12필드
+(`db/published_edit_guard.SERVED_CONTENT_FIELDS`)뿐이다 — payload 밖의 7필드 증거(개념 연결·스킬·
+`distractor_map`·슬롯 태그·힌트)가 발행 뒤 비는 경우는 막지 않는다
+(소유 태스크 없음 · EOS-195 회수 보고).
 
 ## 트랜잭션 계약
 
@@ -56,7 +59,8 @@ test_problem_publish_gate_enforcement.py`).
 - **발행 이후의 제자리 편집을 새 판으로 만들지 않는다(EOS-195 처분: 차단).**
   `live_content_current`는 *발행 순간*만 막으므로, 발행 뒤 라이브 행을 고치는 경로를
   이 모듈 밖에서 막는다 — CMS 편집
-  (`api/admin_cms._edit_block_reason`)과 코퍼스 재적재(`l1/problem_bank/populate`의 upsert WHERE)가
+  (`api/admin_cms._edit_block_reason`)·`PATCH /v1/problems`(`api/problems.patch_problem`)·
+  코퍼스 재적재(`l1/problem_bank/populate`의 upsert WHERE)가
   발행 포인터가 있는 문항을 건드리지 않는다. 고치려면 판 폐기 → 수정 → 새 판 발행이다. 이 모듈은
   그 차단이 *뚫렸는지*를 보는 읽기 전용 조회(`iter_pointer_filled`)만 제공하고, 수치는
   `harness/published_problem_drift_report`가 낸다(직접 SQL 등 두 경로 밖의 쓰기는 그 리포트로만

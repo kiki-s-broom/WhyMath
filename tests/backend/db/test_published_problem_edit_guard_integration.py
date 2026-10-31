@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import importlib.util
+import sys
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -50,6 +53,30 @@ _ROOT = Path(__file__).resolve().parents[3]
 _PROBLEM_CORPUS = _ROOT / "data" / "corpus" / "problem_bank_v1" / "problems.jsonl"
 _ADMIN = UserProfile(user_id=uuid.uuid4(), role=Role.CONTENT_ADMIN)
 _V1, _V2, _HUMAN = "코퍼스 v1 정답", "코퍼스 v2 정답", "사람이 고친 정답"
+_META_PATH = _ROOT / "tests" / "backend" / "db" / "test_problem_version_publish_integration.py"
+_META_HELPERS = ("_P", "_seed_complete_metadata", "_drop_metadata_seed")
+
+
+def _load_meta() -> ModuleType:
+    """P3-04 7필드 시드 헬퍼를 재사용한다 — 복제하면 "발행 가능한 문항"의 정의가 둘이 된다.
+
+    발행 게이트(P3-04)는 문항 필수 7필드를 요구한다. 이 파일이 재는 것은 발행 이후의 편집 차단이지
+    메타데이터가 아니므로, 발행 직전에 EOS-190 통합 테스트의 시드 헬퍼로 7필드를 채운다
+    (EOS-194 통합 테스트 `_load_meta`와 같은 방식 · 페르소나 하네스 `_P`도 그 모듈의 것을 쓴다).
+    """
+    spec = importlib.util.spec_from_file_location("_eos195_meta_seed", _META_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"7필드 시드 헬퍼 스펙 생성 실패: {_META_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    missing = [name for name in _META_HELPERS if not hasattr(module, name)]
+    if missing:
+        raise RuntimeError(f"7필드 시드 헬퍼가 사라졌다: {missing}")
+    return module
+
+
+_M = _load_meta()
 
 
 def _settings() -> Settings:
@@ -127,6 +154,32 @@ class _Corpus:
         # 개념 해석 맵은 이 시나리오의 관심사가 아니다 — 빈 맵으로 둔다.
         monkeypatch.setattr(self.store, "_load_source_id_to_concept_id", lambda: {})
         self.slugs: list[str] = []
+        # 7필드 시드(P3-04) — 발행하는 문항에만 심고, 정리는 문항 삭제보다 먼저 한다.
+        self._content: Any = None
+        self._cid: uuid.UUID | None = None
+        self._seeds: list[tuple[Any, uuid.UUID]] = []
+
+    def make_publishable(self, problem_id: uuid.UUID) -> None:
+        """발행 게이트의 7필드(P3-04)를 채운다 — 개념(PRIMARY)·스킬·해설·오개념·검증된 힌트."""
+        if self._content is None:
+            self._content, _journal = _M._P._begin("EOS-195")
+            self._cid, _code = _M._P._seed_concept(self._content, "e195", "발행 편집 차단")
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO problem_concept (problem_id, concept_id, role) "
+                    "VALUES (:p, :c, 'PRIMARY')"
+                ),
+                {"p": problem_id, "c": self._cid},
+            )
+        seed = _M._seed_complete_metadata(
+            self._content.sfx,
+            f"e195{len(self._seeds)}",
+            self._cid,
+            self._content.skill_ids[-1],
+            [problem_id],
+        )
+        self._seeds.append((seed, problem_id))
 
     def slug(self, name: str) -> str:
         slug = f"it-eos195-{self.tag}-{name}"
@@ -161,26 +214,44 @@ class _Corpus:
             ).scalar_one()
 
     def cleanup(self) -> None:
-        with self.engine.begin() as conn:
-            ids = [
-                r[0]
-                for r in conn.execute(
-                    text("SELECT problem_id FROM problem WHERE slug = ANY(:s)"), {"s": self.slugs}
-                )
-            ]
-            if not ids:
-                return
-            conn.execute(
-                text("UPDATE problem SET problem_version_id = NULL WHERE problem_id = ANY(:i)"),
-                {"i": ids},
-            )
-            # 시도가 판을 FK로 잡는 시나리오는 이 파일에 없다. 판 → 원장·연결 → 문항 순으로 지운다.
-            conn.execute(text("DELETE FROM problem_version WHERE problem_id = ANY(:i)"), {"i": ids})
-            conn.execute(text("DELETE FROM problem_concept WHERE problem_id = ANY(:i)"), {"i": ids})
-            conn.execute(
-                text("DELETE FROM content_provenance WHERE problem_id = ANY(:i)"), {"i": ids}
-            )
-            conn.execute(text("DELETE FROM problem WHERE problem_id = ANY(:i)"), {"i": ids})
+        """포인터·판 → 7필드 시드(힌트·풀이 경로·오개념) → 연결·원장·문항 → 개념·스킬 순서로 지운다."""
+        try:
+            with self.engine.connect() as conn:
+                ids = [
+                    r[0]
+                    for r in conn.execute(
+                        text("SELECT problem_id FROM problem WHERE slug = ANY(:s)"),
+                        {"s": self.slugs},
+                    )
+                ]
+            if ids:
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "UPDATE problem SET problem_version_id = NULL "
+                            "WHERE problem_id = ANY(:i)"
+                        ),
+                        {"i": ids},
+                    )
+                    # 시도가 판을 FK로 잡는 시나리오는 이 파일에 없다.
+                    conn.execute(
+                        text("DELETE FROM problem_version WHERE problem_id = ANY(:i)"), {"i": ids}
+                    )
+            for seed, pid in self._seeds:
+                _M._drop_metadata_seed(seed, [pid])  # 힌트 → 풀이 경로 → 오개념 행
+            if ids:
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text("DELETE FROM problem_concept WHERE problem_id = ANY(:i)"), {"i": ids}
+                    )
+                    conn.execute(
+                        text("DELETE FROM content_provenance WHERE problem_id = ANY(:i)"),
+                        {"i": ids},
+                    )
+                    conn.execute(text("DELETE FROM problem WHERE problem_id = ANY(:i)"), {"i": ids})
+        finally:
+            if self._content is not None:
+                self._content.teardown()  # 학습자(멱등) → 개념·스킬(연결 행을 먼저 지웠다)
 
 
 @pytest.fixture
@@ -195,8 +266,9 @@ def corpus(engine: Any, monkeypatch: pytest.MonkeyPatch) -> Iterator[_Corpus]:
 _PIPELINE = ((_A.SUBMIT, "author"), (_A.PASS_REVIEW, "reviewer"), (_A.APPROVE, "approver"))
 
 
-def _publish(problem_id: uuid.UUID) -> uuid.UUID:
-    """writer만 통과시켜 발행한다 — 초안 → 제출 → 검토 → 승인 → 발행."""
+def _publish(corpus: _Corpus, problem_id: uuid.UUID) -> uuid.UUID:
+    """writer만 통과시켜 발행한다 — 7필드 시드(P3-04) → 초안 → 제출 → 검토 → 승인 → 발행."""
+    corpus.make_publishable(problem_id)
 
     async def _go(session: AsyncSession) -> uuid.UUID:
         draft = await gate.create_draft(session, problem_id=problem_id, created_by="author")
@@ -244,7 +316,7 @@ def test_reload_does_not_overwrite_a_published_problem(engine: Any, corpus: _Cor
     report = corpus.store.populate([corpus.rec(published, _V1), corpus.rec(control, _V1)])
     assert report.problems_loaded == 2
     pid = corpus.problem_id(published)
-    version_id = _publish(pid)
+    version_id = _publish(corpus, pid)
     assert _pointer(engine, pid) == version_id
 
     report = corpus.store.populate([corpus.rec(published, _V2), corpus.rec(control, _V2)])
@@ -263,7 +335,7 @@ def test_overwrite_flag_does_not_unlock_a_published_problem(engine: Any, corpus:
     slug = corpus.slug("pub")
     corpus.store.populate([corpus.rec(slug, _V1)])
     pid = corpus.problem_id(slug)
-    _publish(pid)
+    _publish(corpus, pid)
 
     report = corpus.store.populate([corpus.rec(slug, _V2)], overwrite_cms_edits=True)
 
@@ -279,7 +351,7 @@ def test_cms_edited_and_published_problem_is_reported_as_published_conflict(
     slug = corpus.slug("both")
     corpus.store.populate([corpus.rec(slug, _V1)])
     pid = corpus.problem_id(slug)
-    _publish(pid)
+    _publish(corpus, pid)
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE problem SET cms_edited_at = now() WHERE problem_id = :p"), {"p": pid}
@@ -296,7 +368,7 @@ def test_deprecating_the_version_reopens_reload(engine: Any, corpus: _Corpus) ->
     slug = corpus.slug("pub")
     corpus.store.populate([corpus.rec(slug, _V1)])
     pid = corpus.problem_id(slug)
-    version_id = _publish(pid)
+    version_id = _publish(corpus, pid)
 
     _deprecate(version_id)
     assert _pointer(engine, pid) is None
@@ -322,7 +394,7 @@ def _published_problem(engine: Any, corpus: _Corpus) -> tuple[uuid.UUID, uuid.UU
         conn.execute(
             text("UPDATE problem SET review_status = 'approved' WHERE problem_id = :p"), {"p": pid}
         )
-    return pid, _publish(pid)
+    return pid, _publish(corpus, pid)
 
 
 def test_patch_cannot_change_served_content_of_a_published_problem(
@@ -358,7 +430,7 @@ def test_patch_cannot_forge_the_publish_pointer(engine: Any, corpus: _Corpus) ->
     pid = corpus.problem_id(slug)
     other_pid_slug = corpus.slug("other")
     corpus.store.populate([corpus.rec(other_pid_slug, _V1)])
-    other_version = _publish(corpus.problem_id(other_pid_slug))
+    other_version = _publish(corpus, corpus.problem_id(other_pid_slug))
 
     with _problems_client() as client:
         resp = client.patch(f"/v1/problems/{pid}", json={"problem_version_id": str(other_version)})
@@ -427,7 +499,7 @@ def test_report_flow_unmeasurable_then_in_sync_then_drifted(engine: Any, corpus:
     assert before.problems_total >= 1
 
     # 2) 발행 직후 — 분모에 들어가고 일치한다. 같은 DB의 다른 문항이 있을 수 있어 '증가분'을 본다.
-    _publish(pid)
+    _publish(corpus, pid)
     synced = _read_only(drift.collect_report)
     assert synced.pointer_filled == before.pointer_filled + 1
     assert synced.in_sync == before.in_sync + 1
@@ -457,7 +529,7 @@ def test_keyset_pagination_returns_every_pointer_filled_problem_once(
         slug = corpus.slug(f"pg{n}")
         corpus.store.populate([corpus.rec(slug, _V1)])
         pid = corpus.problem_id(slug)
-        _publish(pid)
+        _publish(corpus, pid)
         ids.append(pid)
 
     async def _scan(session: AsyncSession) -> list[uuid.UUID]:
