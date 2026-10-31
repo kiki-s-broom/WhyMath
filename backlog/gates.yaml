@@ -409,11 +409,11 @@ gates:
     title: "EOS G2(10/25 → 재판정 11/8) — ADR-007 개정: A6 LLM 저작 회차 1회 ≥30 CU 산출물(GenerationLog 포함) 저장소 커밋 + HIT 측정 체계(OPS-90 하한 가드) 착지. 10/25 시점 미측정 기록"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-10-19
     remind_after_days: 20
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 4ec479e6 (#1765) · Kiki PASS 2026-10-28 · 단서: HIT는 AI 보조 검수 조건, 좌석 비교 로컬 3 : openrouter 27(로컬 사실상 실패 → EOS-203), F8 2건은 중복 표기(EOS-204)"
+    cleared_by: claude
     notes: "[판정 근거 2026-10-19] 원문 조건과 처분(ADR-007 명세표): A3 60 CU → 2027-01 이월 · A4 60 CU → G4 두 번째 앵커 30 CU로 축소·이동 · HIT≤8분 → G3로 이동(+유효 표본 ≥15) · 자동검증≥70% → G4로 이동. 기준 완화."
     corrections:
       - "[2026-10-19] notes +140자 — ADR-007 조건 명세 보존"

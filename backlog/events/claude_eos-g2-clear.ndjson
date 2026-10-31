@@ -1,0 +1,1 @@
+{"ts": "2026-10-31T14:28:30+00:00", "actor": "claude/eos-g2-clear", "action": "gate_clear", "id": "G-eos-g2", "evidence": "판정 기준: main 4ec479e6 (#1765) · Kiki PASS 2026-10-28 · 단서: HIT는 AI 보조 검수 조건, 좌석 비교 로컬 3 : openrouter 27(로컬 사실상 실패 → EOS-203), F8 2건은 중복 표기(EOS-204)", "reason": null, "blocked_attached": [], "blocked_notes_ref": [], "cleared_by": "claude"}
