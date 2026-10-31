@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-223
+title: "EOS 감리 WP-E — KICE 평가기준·성취수준 보고서 라이선스 확인 결과를 licensing_safety.md에 반영 (근거 없으면 미확인 유지)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① KICE 평가기준·성취수준 개발 연구 보고서 본문 서술의 라이선스는 docs/data/licensing_safety.md에 '미확인(보류)'로 남아 있다(공공누리 유형 텍스트 미발견). 확인 결과를 근거와 함께 반영한다 — 근거는 원문 표기 캡처·KICE 회신·공식 페이지 스냅샷 중 하나이며 날짜를 붙인다.\n② 근거를 얻지 못하면 '미확인'을 유지하고, 시도한 확인 경로와 날짜를 기록한다(추론 등재 금지).\n③ 확인 결과가 '사용 불가'면 그 자료를 쓰는 코퍼스·태스크 목록(CUR-03·CUR-05 등)과 영향 범위를 함께 적는다. 구조 메타(코드·단원 계층·등급 라벨) 행은 사실정보라 그대로 둔다.\n④ 법률 판단(변호사 검토가 필요한 해석)은 하지 않는다 — 외부 자문은 G-external-counsel-restart-after-internal-completion 이후다."
+artifacts: []
+paths:
+  - docs/data/licensing_safety.md
+session: null
+notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-E 소유 태스크 등재(판정 기준 main 3a83ed64). 현황: docs/data/licensing_safety.md의 KICE 본문 서술 행이 미확인(보류) — 표지 무단 복제 금지 문구만 확인·공공누리 유형 텍스트 미발견."
+updated: 2026-10-30
