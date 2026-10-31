@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,9 +14,13 @@ depends_on:
 requires_gates: []
 acceptance:
   - "① 라이브 튜터(WH-1 primary · 라우터 경유 · Langfuse 추적)를 P3-10 평가셋 244사례(data/corpus/ai_quality_eval_v1/eval_set.jsonl)에 돌려 ai-quality-response/v1 JSONL 을 만든다. 학생 데이터가 아니라 합성 사례이며, 응답 원문은 평가 산출물로만 둔다(관측 레코드·로그에 싣지 않는다).\n② python -m whymath_backend.harness.ai_quality_eval --responses <파일> --json <리포트> 로 8축을 잰다. 축별 점수·Wilson 경계·실패 사례·P3-09 노출 경로(차단/노출)를 리포트로 남기고, 결정론 후보(eos-deterministic) 기준선과 나란히 적는다.\n③ 수집 도구는 실패해도 증거가 남게 한다 — 사례마다 즉시 기록, 실패 사례는 예외 타입명과 원인(HTTP 본문·타임아웃), 이번 실행 식별(평가셋 sha256·모델 핀·시각).\n④ 완료 판정 — 라이브 후보 8축 리포트가 저장소에 남고, 임계 제안값(P3-10 보고서 §2)에 대한 Kiki 확정 입력으로 쓰인다."
-artifacts: []
+artifacts:
+  - "#1789 #1793 0279412c"
 paths:
   - "src/backend/whymath_backend/harness/ai_quality_*.py"
-session: claude/p3-78-ai-quality-live-run
-notes: "출처: P3-10 acceptance ① 의 남은 축 — 평가 CLI 는 외부 응답(--responses)을 받지만 이 컨테이너에는 LLM·Ollama 가 없어 라이브 응답을 모으지 못했다(docs/reviews/p3_10_ai_quality_eval_suite_2026-10-21.md §7). P3-10 은 hermetic 후보(현재 코드의 결정론 출력)로만 실측했다. 실행 환경은 Phaiakes9 또는 클라우드 키가 있는 세션. 수집 경로(러너 호출 방식)는 착수 시 저장소에서 먼저 확인한다 — 가정 기반 런북 금지."
+session: null
+notes: |-
+  출처: P3-10 acceptance ① 의 남은 축 — 평가 CLI 는 외부 응답(--responses)을 받지만 이 컨테이너에는 LLM·Ollama 가 없어 라이브 응답을 모으지 못했다(docs/reviews/p3_10_ai_quality_eval_suite_2026-10-21.md §7). P3-10 은 hermetic 후보(현재 코드의 결정론 출력)로만 실측했다. 실행 환경은 Phaiakes9 또는 클라우드 키가 있는 세션. 수집 경로(러너 호출 방식)는 착수 시 저장소에서 먼저 확인한다 — 가정 기반 런북 금지.
+
+  [미러 면제 2026-10-31] 대장 전용 PR — 구현·리포트는 #1789·#1793로 main 착지
 updated: 2026-10-31
