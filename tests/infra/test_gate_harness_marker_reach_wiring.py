@@ -26,7 +26,7 @@ alembic upgrade head): 6종 전부 **실행·통과**, SKIPPED 0 · FAILED 0
 -----------------------------
 "돈다"는 확인됐지만 **그것을 동결하는 가드가 0건**이었다. 지금 도는 것은 세 조건이 우연히
 겹쳐 있기 때문이다 — ⑴ `testpaths`가 `tests/backend` 전체 ⑵ 6종이 `integration` 마커 보유
-⑶ `--ignore`가 `l3`만 제외. 셋 중 **아무거나 하나**가 바뀌면(예: `--ignore`에 `api` 추가,
+⑶ `--ignore`가 그 하네스 디렉터리를 제외하지 않음(당시 `l3` 디렉터리 일괄 · 2026-10-31 이후 파일 단위 — OPS-137). 셋 중 **아무거나 하나**가 바뀌면(예: `--ignore`에 `api` 추가,
 마커 변경, `testpaths` 축소, `WHYMATH_RUN_INTEGRATION` 제거) 6종은 조용히 skip으로 돌아가고
 skip은 exit 0이다. 즉 `EOS-21`이 막으려던 상태가 **아무 경고 없이** 재생산된다.
 
@@ -59,8 +59,11 @@ EOS-21 측정(2026-09-23) 뒤에 착지한 Gate 2 상시 증거 2종이 목록�
 from __future__ import annotations
 
 import ast
+import fnmatch
 import importlib.util
 import pathlib
+import posixpath
+import re
 import shlex
 import sys
 from collections.abc import Mapping
@@ -160,62 +163,202 @@ def _pytest_tokens(script: str) -> list[list[str]] | None:
     return calls or None
 
 
-def _collects_by_marker(tokens: list[str], *, harness_path: str) -> bool:
+#: 수집 범위를 바꾸지 않는다고 확인한 옵션. **이 밖의 옵션은 "수집을 증명하지 못한다"로 본다**
+#: (OPS-137 검토 반영 — 모르는 옵션을 건너뛰면 `--deselect=…`·`--ignore-glob`·`-o testpaths=…`
+#: 처럼 수집에서 빼는 옵션을 "수집함"으로 읽는다. 모르는 것을 통과로 접지 않는다).
+_SAFE_FLAGS = frozenset(
+    {"-q", "--quiet", "-v", "--verbose", "-x", "--exitfirst", "--strict-markers"}
+)
+#: 값을 하나 받지만 수집 범위를 바꾸지 않는 옵션(`--tb short`·`--tb=short` 두 형태).
+_SAFE_VALUE_OPTIONS = frozenset({"--tb", "--durations"})
+#: 수집 범위를 바꿀 수 있는 옵션 — 있으면 "수집을 증명하지 못한다"(False).
+_SCOPE_CHANGING_OPTIONS = frozenset(
+    {
+        "-k",
+        "-o",
+        "--override-ini",
+        "-c",
+        "--config-file",
+        "--rootdir",
+        "--pyargs",
+        "--co",
+        "--collect-only",
+        "--lf",
+        "--last-failed",
+        "--sw",
+        "--stepwise",
+    }
+)
+
+
+def _option_value(tokens: list[str], i: int, name: str) -> tuple[str | None, int]:
+    """`name X`·`name=X` 두 형태에서 값과 다음 인덱스. 이 옵션이 아니면 (None, i)."""
+    token = tokens[i]
+    if token == name:
+        return (tokens[i + 1] if i + 1 < len(tokens) else ""), i + 2
+    if token.startswith(name + "="):
+        return token.split("=", 1)[1], i + 1
+    return None, i
+
+
+def _marker_selects_integration(expression: str) -> bool:
+    """`-m` 식이 `integration` 마커만 단 파일을 고르는가 — `not integration`은 False다.
+
+    식 문법(`and`·`or`·`not`·괄호·식별자)을 작은 재귀 하강으로 계산한다. 하네스 파일이
+    `integration` 말고 다른 마커를 다는지는 모르므로 다른 식별자는 False로 둔다. 문법을
+    벗어난 식(따옴표·인자 호출 등)은 계산하지 않고 False다 — 모르면 수집을 증명하지 못한다.
+    """
+    tokens = re.findall(r"\(|\)|[^\s()]+", expression)
+    pos = 0
+
+    def parse_or() -> bool:
+        nonlocal pos
+        value = parse_and()
+        while pos < len(tokens) and tokens[pos] == "or":
+            pos += 1
+            rhs = parse_and()
+            value = value or rhs
+        return value
+
+    def parse_and() -> bool:
+        nonlocal pos
+        value = parse_not()
+        while pos < len(tokens) and tokens[pos] == "and":
+            pos += 1
+            rhs = parse_not()
+            value = value and rhs
+        return value
+
+    def parse_not() -> bool:
+        nonlocal pos
+        if pos < len(tokens) and tokens[pos] == "not":
+            pos += 1
+            return not parse_not()
+        return parse_atom()
+
+    def parse_atom() -> bool:
+        nonlocal pos
+        if pos >= len(tokens):
+            raise ValueError("식이 끝났다")
+        token = tokens[pos]
+        pos += 1
+        if token == "(":
+            value = parse_or()
+            if pos >= len(tokens) or tokens[pos] != ")":
+                raise ValueError("괄호 불일치")
+            pos += 1
+            return value
+        if token in {"and", "or", ")"} or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token):
+            raise ValueError(f"식별자가 아니다: {token}")
+        return token == "integration"
+
+    try:
+        result = parse_or()
+    except ValueError:
+        return False
+    return result if pos == len(tokens) else False
+
+
+def _resolve(path: str, workdir: str) -> str:
+    """pytest가 보는 경로 — 작업 디렉터리 기준으로 푼 저장소 상대 경로."""
+    return posixpath.normpath(posixpath.join(workdir, path))
+
+
+def _covers(prefix: str, harness_path: str) -> bool:
+    """`prefix`가 하네스 파일 자체이거나 그 상위 디렉터리인가."""
+    prefix = prefix.rstrip("/")
+    return bool(prefix) and (harness_path == prefix or harness_path.startswith(prefix + "/"))
+
+
+def _deselect_hits(value: str, harness_path: str) -> bool:
+    """`--deselect` 값(노드 id 접두)이 하네스 파일의 일부라도 빼는가 — 보수적으로 판정한다.
+
+    노드 id의 기준점(rootdir)과 작업 디렉터리가 달라 정확한 해석이 어렵다. 그래서 경로 부분의
+    앞쪽 `./`·`../` 를 걷어 낸 꼴이 하네스 경로의 상위이거나 하네스 경로의 꼬리와 같으면 뺀다고 본다.
+    """
+    path_part = value.split("::", 1)[0]
+    stripped = re.sub(r"^(?:\.{1,2}/)+", "", path_part).rstrip("/")
+    if not stripped:
+        return True  # 빈 접두는 전부를 뺀다.
+    return _covers(stripped, harness_path) or harness_path.endswith("/" + stripped)
+
+
+def _collects_by_marker(
+    tokens: list[str], *, harness_path: str, workdir: str = _BACKEND_WORKDIR
+) -> bool:
     """이 pytest 호출이 `harness_path`를 **마커 수집**으로 잡는가.
 
-    세 조건을 모두 본다:
-      ⑴ `-m` 값에 `integration`이 들어 있다 (마커로 거른다)
+    조건을 모두 본다:
+      ⑴ `-m` 식이 `integration` 마커 파일을 고른다(`not integration`은 아니다)
       ⑵ 위치 인자(경로)를 주지 않는다 — 주면 testpaths가 무시되고 그 경로만 돈다
-      ⑶ `--ignore` 값이 이 하네스의 디렉터리를 배제하지 않는다
+      ⑶ `--ignore`·`--ignore-glob`·`--deselect`가 이 하네스(파일 또는 상위 디렉터리)를 빼지 않는다.
+         경로는 **작업 디렉터리 기준으로** 푼다 — `src/backend`에서 `--ignore=tests/backend/...`는
+         `src/backend/tests/backend/...`를 가리켜 실제로는 아무것도 빼지 않는다
+      ⑷ 수집 범위를 바꿀 수 있는 옵션(`-k`·`-o`·`--collect-only` 등)과 **모르는 옵션**이 없다
 
-    ⑶이 이 판정의 급소다. 지금 `--ignore=../../tests/backend/l3` 하나가 붙어 있는데,
-    거기에 `api`가 추가되는 순간 6종은 전부 수집에서 빠지고 스텝은 여전히 초록이다.
+    ⑶이 이 판정의 급소다. 2026-10-13까지 통합 스텝은 `--ignore=../../tests/backend/l3` 디렉터리
+    일괄 제외였고, 그 한 줄이 l3 하위 PG 통합 파일까지 통째로 가렸다(OPS-137). 지금은 파일 단위다.
     """
-    marker_value = ""
+    marker_value: str | None = None
     ignores: list[str] = []
-    positionals: list[str] = []
-    i = 0
+    ignore_globs: list[str] = []
+    deselects: list[str] = []
     # `pytest` 토큰 이후만 본다 — 그 앞은 `python -m` 같은 런처다.
-    start = next(
+    i = next(
         (idx + 1 for idx, t in enumerate(tokens) if pathlib.Path(t).name == "pytest"),
         len(tokens),
     )
-    i = start
     while i < len(tokens):
         token = tokens[i]
         if token == "-m":
             marker_value = tokens[i + 1] if i + 1 < len(tokens) else ""
             i += 2
             continue
-        if token.startswith("-m") and len(token) > 2:
+        if token.startswith("-m") and not token.startswith("--") and len(token) > 2:
             marker_value = token[2:]
             i += 1
             continue
-        if token == "--ignore":
-            if i + 1 < len(tokens):
-                ignores.append(tokens[i + 1])
-            i += 2
+        matched = False
+        for name, sink in (
+            ("--ignore", ignores),
+            ("--ignore-glob", ignore_globs),
+            ("--deselect", deselects),
+        ):
+            value, nxt = _option_value(tokens, i, name)
+            if value is not None:
+                sink.append(value)
+                i = nxt
+                matched = True
+                break
+        if matched:
             continue
-        if token.startswith("--ignore="):
-            ignores.append(token.split("=", 1)[1])
+        if token in _SAFE_FLAGS or (token.startswith("-r") and len(token) > 2):
             i += 1
+            continue
+        safe_value = next(
+            (n for n in _SAFE_VALUE_OPTIONS if token == n or token.startswith(n + "=")), None
+        )
+        if safe_value is not None:
+            i += 2 if token == safe_value else 1
             continue
         if token.startswith("-"):
-            i += 1
-            continue
-        positionals.append(token)
-        i += 1
+            # 수집 범위를 바꾸는 옵션이든 모르는 옵션이든 — 수집을 증명하지 못한다.
+            return False
+        return False  # 위치 인자(경로) — testpaths가 무시된다.
 
-    if "integration" not in marker_value:
+    if marker_value is None or not _marker_selects_integration(marker_value):
         return False
-    if positionals:
+    if any(_covers(_resolve(p, workdir), harness_path) for p in ignores):
         return False
-    for ignored in ignores:
-        normalized = ignored.lstrip("./").removeprefix("../../")
-        if normalized and harness_path.startswith(normalized.rstrip("/") + "/"):
+    parents = [harness_path] + [
+        str(parent.as_posix()) for parent in pathlib.PurePosixPath(harness_path).parents
+    ]
+    for pattern in ignore_globs:
+        resolved = _resolve(pattern, workdir)
+        if any(fnmatch.fnmatch(candidate, resolved) for candidate in parents):
             return False
-        if normalized.rstrip("/") == harness_path:
-            return False
+    if any(_deselect_hits(value, harness_path) for value in deselects):
+        return False
     return True
 
 
@@ -567,3 +710,503 @@ def test_strict_xfail_checker_discriminates(source: str, expect: list[str]) -> N
     assert len(found) == len(expect), found
     for needle, message in zip(expect, found, strict=True):
         assert needle in message, (needle, message)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# OPS-137 — tests/backend/l3 통합 파일의 CI 수집 장부
+#
+# 결함: 통합 스텝이 `--ignore=../../tests/backend/l3` 디렉터리 일괄이라 l3 하위 integration 마커
+# 파일 9개가 어떤 CI 스텝에서도 수집되지 않았다(같은 명령 --collect-only 0건 실측 2026-10-13). 그중
+# PG만 필요한 3개(EOS-50 Publish Gate 통합 포함)까지 가려졌고, 수집되지 않는 동안 둘은 노후화돼
+# 있었다(orchestrator = 수용 게이트 강화·원자 재연결 이후 후보/시드 불일치, diag_item = 재실행 중복
+# 결함). 디렉터리 일괄 제외가 원인이므로 처방은 **파일 단위 제외 + 사유 장부**다 — 새 l3 통합 파일이
+# 생기면 장부(수집/제외)에 올리기 전까지 이 파일이 red다.
+# ══════════════════════════════════════════════════════════════════════════
+_L3_DIR = "tests/backend/l3"
+
+#: PG(+pgvector)만 필요해 CI 통합 스텝이 **수집해야 하는** l3 통합 파일. 값 = 외부 의존 판정 근거.
+L3_PG_ONLY_COLLECTED: dict[str, str] = {
+    "tests/backend/l3/test_publish_gate_integration.py": (
+        "실 PG + alembic head(concept_version.qa). Ollama·Redis·Langfuse·Anthropic·Celery 참조 0건."
+        " 8건 통과(2026-10-13 실 PG 실측)."
+    ),
+    "tests/backend/l3/equivalent/test_orchestrator_integration.py": (
+        "실 PG + pgvector(FakeEmbeddingProvider = 라이브 모델 불요). 외부 서비스 참조 0건. 편입 전 "
+        "노후화 2건 수정(근 선택 명시 · 원자 재연결 방식 개념 시드/코퍼스 절대경로 주입) 후 통과."
+    ),
+    "tests/backend/l3/pedagogy/test_diag_item_projector_integration.py": (
+        "실 PG + data/corpus 고정물. LLM 0·외부 서비스 참조 0건. 3건 중 재실행 멱등 1건만 실제 "
+        "결함으로 XFAIL(L3_TRACKED_XFAILS · PED-46) — 1회차 사실·승인 슬롯 불변 2건은 표식 없이 통과."
+    ),
+}
+
+#: 라이브 외부 서비스가 있어야 검증이 성립해 CI 통합 스텝이 **파일 단위로 제외하는** l3 통합 파일.
+#: 값 = 제외 사유와 **서비스가 없을 때 실제 동작**(2026-10-31 파일별 실측 — 하드 실패 2건·skip·외부 전송).
+#: 수집해도 skip뿐인 파일은 검증 0건이라 넣을 이유가 없고, 하드 실패·외부 전송 파일은 넣으면 해롭다.
+L3_EXTERNAL_SERVICE_EXCLUSIONS: dict[str, str] = {
+    "tests/backend/l3/test_anthropic_integration.py": (
+        "실제 Anthropic API 호출(WHYMATH_ANTHROPIC_API_KEY · 유료 · CI 시크릿 없음 · ARCH-66으로 "
+        "2026-12-31까지 사용 중단). 키가 없으면 3건 모두 skip — 수집해도 검증 0건."
+    ),
+    "tests/backend/l3/test_celery_integration.py": (
+        "실제 Celery + Redis broker/result backend 필요. 미도달이면 2건 모두 skip — 수집해도 검증 0건."
+    ),
+    "tests/backend/l3/test_langfuse_integration.py": (
+        "실제 Langfuse 인스턴스·키 필요. 키가 없으면 1건 skip, 나머지 1건은 가짜 키로 "
+        "cloud.langfuse.com에 **실제 네트워크 전송** — CI에서 외부로 내보내지 않는다."
+    ),
+    "tests/backend/l3/test_ollama_integration.py": (
+        "실제 Ollama 데몬 필요(Phaiakes9 전용). 도달성 단언 1건은 미도달이면 **하드 실패**한다."
+    ),
+    "tests/backend/l3/test_redis_integration.py": (
+        "실제 Redis 데몬 필요(CI 통합 잡에 Redis 서비스 없음). ping 단언 1건은 미도달이면 **하드 "
+        "실패**하고 나머지 3건은 skip."
+    ),
+    "tests/backend/l3/test_visualization_live.py": (
+        "실 모델·GPU가 필요한 라이브 평가(Ollama 패밀리 비교 · Phaiakes9 전용). 미도달이면 skip — "
+        "수집해도 검증 0건."
+    ),
+}
+
+#: 수집되지만 **알려진 결함**으로 strict xfail인 테스트 → 추적 태스크. 값 = 태스크 id 접두.
+#: 키 = (파일, 함수). 태스크가 done/cancelled가 되면 이 장부 항목과 표식이 남아 있는 한 red다.
+L3_TRACKED_XFAILS: dict[tuple[str, str], str] = {
+    (
+        "tests/backend/l3/pedagogy/test_diag_item_projector_integration.py",
+        "test_diag_item_fill_rerun_is_idempotent",
+    ): "PED-46",
+}
+
+_TASKS_DIR = _REPO_ROOT / "backlog" / "tasks"
+_CLOSED_STATUSES = frozenset({"done", "cancelled"})
+
+
+def _is_integration_mark(node: ast.AST) -> bool:
+    """`<무엇>.mark.integration` 또는 `mark.integration` — `pytest` 별칭·`from pytest import mark`도 잡는다.
+
+    `pytest.mark.integration`만 보면 `import pytest as pt`·`from pytest import mark` 형태를 놓친다
+    (2026-10-31 저장소 사용 0건이지만 놓치면 새 파일이 장부 밖에서 조용히 CI 밖에 놓인다).
+    """
+    if not (isinstance(node, ast.Attribute) and node.attr == "integration"):
+        return False
+    owner = node.value
+    return (isinstance(owner, ast.Name) and owner.id == "mark") or (
+        isinstance(owner, ast.Attribute) and owner.attr == "mark"
+    )
+
+
+def integration_marked(source: str) -> bool:
+    """소스가 integration 마커를 쓰는가 (순수 함수 · AST — docstring 언급에는 걸리지 않는다)."""
+    return any(_is_integration_mark(node) for node in ast.walk(ast.parse(source)))
+
+
+def l3_integration_files(root: pathlib.Path) -> set[str]:
+    """`tests/backend/l3` 아래에서 integration 마커를 쓰는 파일 — AST로 센다.
+
+    문자열 검색이면 docstring의 "integration 마커" 언급에 걸린다.
+    """
+    return {
+        path.relative_to(root).as_posix()
+        for path in sorted((root / _L3_DIR).rglob("*.py"))
+        if integration_marked(path.read_text(encoding="utf-8"))
+    }
+
+
+def l3_ledger_violations(
+    found: set[str], collected: Mapping[str, str], excluded: Mapping[str, str]
+) -> list[str]:
+    """실제 l3 통합 파일 집합과 (수집 ∪ 제외) 장부가 정확히 일치하는가 (순수 함수)."""
+    violations: list[str] = []
+    both = sorted(set(collected) & set(excluded))
+    if both:
+        violations.append(f"수집 장부와 제외 장부에 동시에 있다: {both}")
+    ledger = set(collected) | set(excluded)
+    if not ledger:
+        violations.append("장부가 비어 있다 — 공허한 통과 금지")
+    unclassified = sorted(found - ledger)
+    if unclassified:
+        violations.append(
+            f"장부에 없는 l3 통합 파일(수집/제외를 결정해 올려라 — PG만 필요하면 수집 장부, "
+            f"라이브 서비스가 필요하면 제외 장부 + ci.yml의 --ignore): {unclassified}"
+        )
+    stale = sorted(ledger - found)
+    if stale:
+        violations.append(
+            f"장부에만 있고 실제로는 통합 마커 파일이 아니다(삭제·마커 제거?): {stale}"
+        )
+    blank = sorted(p for p, why in {**collected, **excluded}.items() if not why.strip())
+    if blank:
+        violations.append(f"사유가 비어 있다: {blank}")
+    return violations
+
+
+def ci_collects_path(spec: Mapping[str, Any], path: str) -> bool:
+    """`src/backend` 작업 디렉터리의 마커 수집 pytest 호출이 `path`를 수집하는가 (순수 함수)."""
+    for job in (spec.get("jobs") or {}).values():
+        if not isinstance(job, dict):
+            continue
+        for step in job.get("steps") or []:
+            if not isinstance(step, dict) or not step.get("run"):
+                continue
+            if _workdir_of(job, step) != _BACKEND_WORKDIR:
+                continue
+            for call in _pytest_tokens(str(step["run"])) or []:
+                if _collects_by_marker(call, harness_path=path, workdir=_BACKEND_WORKDIR):
+                    return True
+    return False
+
+
+def _task_status(task_id: str) -> str | None:
+    """`backlog/tasks/<task_id>*.yaml`의 status. 태스크 파일이 없으면 None(= 모른다)."""
+    matches = sorted(_TASKS_DIR.glob(f"{task_id}-*.yaml")) + sorted(
+        _TASKS_DIR.glob(f"{task_id}.yaml")
+    )
+    if not matches:
+        return None
+    data: Any = yaml.safe_load(matches[0].read_text(encoding="utf-8"))
+    return str(data.get("status")) if isinstance(data, dict) else None
+
+
+#: xfail `raises`로 쓰면 모든 실패를 삼키는 넓은 예외.
+_BROAD_EXCEPTIONS = frozenset({"Exception", "BaseException"})
+
+
+def _narrow_raises(node: ast.AST) -> bool:
+    """`raises=`가 구체 예외 이름(또는 그 튜플)인가 — 넓은 예외·모르는 식은 False."""
+    items = node.elts if isinstance(node, ast.Tuple) else [node]
+    return bool(items) and all(
+        isinstance(item, ast.Name) and item.id not in _BROAD_EXCEPTIONS for item in items
+    )
+
+
+def xfail_functions(source: str) -> set[str]:
+    """소스에서 `@pytest.mark.xfail(...)`(호출·비호출 모두) 데코레이터를 단 테스트 함수 이름."""
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        for deco in node.decorator_list:
+            target = deco.func if isinstance(deco, ast.Call) else deco
+            if _is_pytest_attr(target, "mark", "xfail"):
+                names.add(node.name)
+    return names
+
+
+def untracked_xfail_violations(
+    sources: Mapping[str, str], tracked: Mapping[tuple[str, str], str]
+) -> list[str]:
+    """수집 장부 파일의 xfail 표식은 전부 추적 장부에 있다 (순수 함수 · 역방향).
+
+    정방향(장부 → 표식)만 보면 장부 밖에 새로 단 xfail은 만료 장치 없이 결함을 영구히 가린다.
+    이 역방향 검사가 있어서 추적 장부가 **비어도** 검사는 공허하지 않다 — 수집 파일 전수를 스캔한다.
+    """
+    out: list[str] = []
+    for rel, source in sorted(sources.items()):
+        for func in sorted(xfail_functions(source)):
+            if (rel, func) not in tracked:
+                out.append(
+                    f"{rel}::{func} 에 xfail 표식이 있으나 추적 장부(L3_TRACKED_XFAILS)에 없다 — "
+                    "추적 태스크를 등재하고 장부에 올려라(만료 없는 표식 금지)"
+                )
+    return out
+
+
+def tracked_xfail_violations(
+    source: str, *, path: str, func: str, task_id: str, task_status: str | None
+) -> list[str]:
+    """알려진 결함 xfail이 (1) 엄격하고 (2) 추적 태스크를 사유에 달고 (3) 만료되지 않았는가."""
+    tree = ast.parse(source)
+    fn = next(
+        (
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name == func
+        ),
+        None,
+    )
+    if fn is None:
+        return [f"{path}::{func} 가 없다 — 장부 항목이 낡았다"]
+    marks = [
+        d
+        for d in fn.decorator_list
+        if isinstance(d, ast.Call) and _is_pytest_attr(d.func, "mark", "xfail")
+    ]
+    if not marks:
+        return [
+            f"{path}::{func} 에 xfail 표식이 없다 — 장부는 알려진 결함이라 하는데 표식이 사라졌다"
+        ]
+    kw = {k.arg: k.value for k in marks[0].keywords if k.arg}
+    out: list[str] = []
+    strict = kw.get("strict")
+    if not (isinstance(strict, ast.Constant) and strict.value is True):
+        out.append(f"{path}::{func} xfail에 strict=True가 없다 — 결함이 고쳐져도 초록이다")
+    if "raises" not in kw:
+        out.append(f"{path}::{func} xfail에 raises가 없다 — 다른 종류의 실패까지 가린다")
+    elif not _narrow_raises(kw["raises"]):
+        out.append(
+            f"{path}::{func} xfail raises가 넓다(Exception·BaseException 또는 이름이 아닌 식) "
+            "— DB 오류 같은 다른 종류의 실패까지 XFAIL로 가린다"
+        )
+    reason = kw.get("reason")
+    if not (
+        isinstance(reason, ast.Constant)
+        and isinstance(reason.value, str)
+        and task_id in reason.value
+    ):
+        out.append(f"{path}::{func} xfail reason에 추적 태스크 {task_id}가 없다")
+    if task_status is None:
+        out.append(f"추적 태스크 {task_id} 파일을 찾지 못했다 — 모르는 상태를 통과로 읽지 않는다")
+    elif task_status in _CLOSED_STATUSES:
+        out.append(
+            f"추적 태스크 {task_id}가 {task_status}인데 {path}::{func} 의 xfail 표식과 장부 항목이 "
+            "남아 있다 — 표식을 지우고 장부(L3_TRACKED_XFAILS)에서도 뺀다"
+        )
+    return out
+
+
+# ── 실 저장소·실 워크플로 판정 ────────────────────────────────────────────
+def test_l3_integration_files_are_all_classified() -> None:
+    """l3 통합 파일 전수가 수집/제외 장부에 있다 — 새 파일이 조용히 CI 밖에 놓이지 않는다."""
+    found = l3_integration_files(_REPO_ROOT)
+    assert found, "l3 통합 파일을 하나도 못 찾았다 — 스캔이 위장 통과할 수 없다"
+    violations = l3_ledger_violations(found, L3_PG_ONLY_COLLECTED, L3_EXTERNAL_SERVICE_EXCLUSIONS)
+    assert violations == [], "l3 통합 파일 장부 위반:\n" + "\n".join(f"- {v}" for v in violations)
+
+
+def test_l3_pg_only_integration_files_are_collected_in_ci() -> None:
+    """PG만 필요한 l3 통합 파일은 CI 마커 수집에 실제로 도달한다(스텝·마커·PG 서비스 포함)."""
+    spec = _load_workflow()
+    problems = [
+        v
+        for path in L3_PG_ONLY_COLLECTED
+        for v in marker_reach_violations(spec, harness_paths=(path,))
+    ]
+    assert problems == [], "PG-only l3 통합 파일이 CI에서 수집되지 않는다:\n" + "\n".join(
+        f"- {v}" for v in problems
+    )
+
+
+def test_l3_external_service_files_are_excluded_by_file_in_ci() -> None:
+    """제외 장부의 파일은 CI 명령에서 실제로 제외된다 — 장부가 CI보다 앞서 낡지 않는다.
+
+    제외가 풀리면(= 수집되면) 파일마다 결과가 다르다 — ollama·redis는 도달성 단언이 하드 실패하고,
+    langfuse는 가짜 키로 외부에 실제 전송하며, 나머지는 skip이라 검증 0건이다(장부 사유 참고).
+    어느 쪽이든 장부와 CI가 어긋난 것이므로 red여야 한다.
+    """
+    spec = _load_workflow()
+    wrongly_collected = [p for p in L3_EXTERNAL_SERVICE_EXCLUSIONS if ci_collects_path(spec, p)]
+    assert wrongly_collected == [], (
+        f"제외 장부에 있으나 CI가 수집하는 파일: {wrongly_collected} — ci.yml의 --ignore를 "
+        "되돌리거나, 외부 서비스 없이 도는 파일이 됐다면 수집 장부로 옮겨라."
+    )
+
+
+def test_l3_tracked_xfails_are_strict_and_unexpired() -> None:
+    """알려진 결함 xfail은 엄격하고 추적 태스크를 달고 있으며 그 태스크가 닫히면 red가 된다.
+
+    장부가 비어도 이 테스트는 지우지 않는다 — 역방향 검사(수집 파일의 표식 ⊆ 장부)가 공허하지
+    않게 만든다. 해소 절차 = 표식을 지우고 장부 항목을 지운다(빈 장부는 정상 상태다).
+    """
+    sources = {rel: (_REPO_ROOT / rel).read_text(encoding="utf-8") for rel in L3_PG_ONLY_COLLECTED}
+    assert sources, "수집 장부가 비었다 — 역방향 검사가 공허하다"
+    violations = untracked_xfail_violations(sources, L3_TRACKED_XFAILS)
+    for (rel, func), task_id in L3_TRACKED_XFAILS.items():
+        violations += tracked_xfail_violations(
+            (_REPO_ROOT / rel).read_text(encoding="utf-8"),
+            path=rel,
+            func=func,
+            task_id=task_id,
+            task_status=_task_status(task_id),
+        )
+    assert violations == [], "알려진 결함 xfail 위반:\n" + "\n".join(f"- {v}" for v in violations)
+
+
+# ── 변별력 봉인 — 원 결함·반례를 합성 입력으로 주입한다 ───────────────────
+_DIR_WIDE_RUN = "pytest -m integration --ignore=../../tests/backend/l3"
+_PG_FILE = "tests/backend/l3/test_publish_gate_integration.py"
+_EXT_FILE = "tests/backend/l3/test_redis_integration.py"
+_FILE_LEVEL_RUN = (
+    "pytest -m integration \\\n"
+    "  --ignore=../../tests/backend/l3/test_redis_integration.py \\\n"
+    "  --ignore=../../tests/backend/l3/test_ollama_integration.py"
+)
+
+
+def test_original_defect_directory_wide_ignore_hides_pg_only_file() -> None:
+    """원 결함의 재현 — 디렉터리 일괄 --ignore는 PG-only 파일을 가리고 배선 판정이 red를 낸다."""
+    spec = _synthetic(run=_DIR_WIDE_RUN)
+    assert ci_collects_path(spec, _PG_FILE) is False
+    assert marker_reach_violations(spec, harness_paths=(_PG_FILE,)) != []
+
+
+def test_file_level_ignore_collects_pg_only_and_excludes_external() -> None:
+    """양성 대조 — 파일 단위 제외는 PG-only를 수집하고 제외한 파일만 뺀다(무차별 red/green 아님)."""
+    spec = _synthetic(run=_FILE_LEVEL_RUN)
+    assert ci_collects_path(spec, _PG_FILE) is True
+    assert marker_reach_violations(spec, harness_paths=(_PG_FILE,)) == []
+    assert ci_collects_path(spec, _EXT_FILE) is False
+
+
+def test_ci_collects_path_requires_backend_workdir_and_marker() -> None:
+    """작업 디렉터리·마커 축 반례 — 어느 하나만 틀려도 수집으로 보지 않는다."""
+    assert (
+        ci_collects_path(_synthetic(workdir="src/data-pipeline", run=_FILE_LEVEL_RUN), _PG_FILE)
+        is False
+    )
+    assert (
+        ci_collects_path(_synthetic(run="pytest --ignore=../../tests/backend/api"), _PG_FILE)
+        is False
+    )
+
+
+def test_ledger_detects_unclassified_overlap_stale_and_blank() -> None:
+    """장부 판정의 축마다 반례 — 각 분기를 한 번씩 밟는다."""
+    ok = l3_ledger_violations({"a", "b"}, {"a": "pg"}, {"b": "live"})
+    assert ok == []
+    assert l3_ledger_violations({"a", "b", "new"}, {"a": "pg"}, {"b": "live"}) != []  # 미분류 신규
+    assert l3_ledger_violations({"a"}, {"a": "pg"}, {"a": "live"}) != []  # 양쪽 동시
+    assert l3_ledger_violations({"a"}, {"a": "pg", "gone": "x"}, {}) != []  # 낡은 장부
+    assert l3_ledger_violations({"a"}, {"a": "  "}, {}) != []  # 빈 사유
+    assert l3_ledger_violations(set(), {}, {}) != []  # 공허
+
+
+_XFAIL_OK = (
+    "import pytest\n"
+    "@pytest.mark.xfail(strict=True, raises=AssertionError, reason='PED-46: dup')\n"
+    "def test_x():\n    assert False\n"
+)
+
+
+def _tx(source: str = _XFAIL_OK, status: str | None = "todo", task: str = "PED-46") -> list[str]:
+    return tracked_xfail_violations(
+        source, path="t.py", func="test_x", task_id=task, task_status=status
+    )
+
+
+def test_tracked_xfail_checker_detects_each_axis() -> None:
+    """추적 xfail 판정의 축마다 반례 — 만료 축(태스크 done)이 이 장부의 핵심이다."""
+    assert _tx() == []
+    assert _tx(status="done") != []  # 태스크가 닫혔는데 표식이 남음 → 만료
+    assert _tx(status="cancelled") != []
+    assert _tx(status=None) != []  # 모르는 상태는 통과가 아니다
+    assert _tx(_XFAIL_OK.replace("strict=True, ", "")) != []  # 느슨한 xfail
+    assert _tx(_XFAIL_OK.replace("raises=AssertionError, ", "")) != []  # 다른 실패까지 가림
+    assert _tx(_XFAIL_OK.replace("PED-46", "other")) != []  # 추적 태스크 미표기
+    assert (
+        _tx(
+            _XFAIL_OK.replace(
+                "@pytest.mark.xfail(strict=True, raises=AssertionError, reason='PED-46: dup')\n", ""
+            )
+        )
+        != []
+    )  # 표식 소실
+    assert _tx(_XFAIL_OK.replace("test_x", "test_y")) != []  # 함수 소실
+
+
+# ── OPS-137 검토 반영 — 파서 절마다 그 절을 밟는 반례 (2026-10-31) ─────────────
+# 원 파서는 모르는 옵션을 건너뛰었다. 그래서 수집에서 빼는 옵션을 "수집함"으로 읽었다.
+# 아래 반례는 절마다 **그 절이 없으면 통과해 버리는 입력**이다.
+_COLLECT_OK = "pytest -m integration --ignore=../../tests/backend/l3/test_redis_integration.py"
+
+
+def _collects(run: str, path: str = _PG_FILE) -> bool:
+    return ci_collects_path(_synthetic(run=run), path)
+
+
+def test_positive_control_hardened_parser_keeps_real_shape() -> None:
+    """양성 대조 — 실제 CI 꼴(여러 줄 · 파일 단위 --ignore)과 무해한 옵션은 여전히 수집으로 본다."""
+    assert _collects(_FILE_LEVEL_RUN) is True
+    assert _collects(_COLLECT_OK + " -q --tb=short -rxXs --durations 10") is True
+    assert _collects("pytest -m 'integration and not slow'") is True
+    assert _collects("pytest -m '(integration or db)'") is True
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        # --deselect: `=` 결합형 · 공백형 · 노드 id 꼬리형
+        "pytest -m integration --deselect=../../tests/backend/l3/test_publish_gate_integration.py",
+        "pytest -m integration --deselect ../../tests/backend/l3/test_publish_gate_integration.py",
+        "pytest -m integration --deselect=l3/test_publish_gate_integration.py::test_x",
+        # --ignore-glob: 파일 · 상위 디렉터리
+        "pytest -m integration --ignore-glob=../../tests/backend/l3/*_integration.py",
+        "pytest -m integration --ignore-glob ../../tests/backend/l*",
+        # 수집 범위를 바꾸는 옵션 · 모르는 옵션
+        "pytest -m integration -k 'not publish'",
+        "pytest -m integration -o testpaths=../../tests/backend/api",
+        "pytest -m integration --override-ini=testpaths=../../tests/backend/api",
+        "pytest -m integration --collect-only",
+        "pytest -m integration --some-unknown-plugin-flag",
+        # 마커 식이 integration을 고르지 않는다
+        "pytest -m 'not integration'",
+        "pytest -m 'db and not integration'",
+        "pytest -m 'integration and'",
+    ],
+)
+def test_hardened_parser_rejects_collection_excluding_options(run: str) -> None:
+    """각 형태는 PG-only 파일을 수집에서 빼거나 수집을 증명하지 못한다 — 수집으로 읽으면 RED."""
+    assert _collects(run) is False
+
+
+def test_ignore_is_resolved_against_working_directory() -> None:
+    """`--ignore`는 작업 디렉터리(`src/backend`) 기준이다 — 저장소 루트 기준으로 쓴 경로는 아무것도
+    빼지 않으므로 제외 장부 파일이 실제로는 수집된다(원 파서는 이것을 "제외됨"으로 읽었다)."""
+    run = "pytest -m integration --ignore=tests/backend/l3/test_redis_integration.py"
+    assert ci_collects_path(_synthetic(run=run), _EXT_FILE) is True
+    assert ci_collects_path(_synthetic(run=_FILE_LEVEL_RUN), _EXT_FILE) is False
+
+
+def test_marker_expression_evaluator_discriminates() -> None:
+    """마커 식 계산 — `not`·`and`·`or`·괄호 각 분기와 문법 밖 식."""
+    assert _marker_selects_integration("integration") is True
+    assert _marker_selects_integration("not integration") is False
+    assert _marker_selects_integration("integration and not slow") is True
+    assert _marker_selects_integration("slow and integration") is False
+    assert _marker_selects_integration("slow or integration") is True
+    assert _marker_selects_integration("not (slow or integration)") is False
+    assert _marker_selects_integration("(integration") is False  # 괄호 불일치
+    assert _marker_selects_integration("integration slow") is False  # 남는 토큰
+    assert _marker_selects_integration("") is False
+
+
+@pytest.mark.parametrize(
+    ("source", "expect"),
+    [
+        ("import pytest\npytestmark = pytest.mark.integration\n", True),
+        ("import pytest as pt\npytestmark = pt.mark.integration\n", True),
+        ("from pytest import mark\npytestmark = mark.integration\n", True),
+        ("import pytest\npytestmark = [pytest.mark.integration, pytest.mark.slow]\n", True),
+        ('"""integration 마커 언급만 있는 docstring."""\nimport pytest\n', False),
+        ("import pytest\npytestmark = pytest.mark.slow\n", False),
+    ],
+)
+def test_integration_mark_scan_catches_alias_forms(source: str, expect: bool) -> None:
+    """AST 스캔 — 별칭·`from pytest import mark` 형태도 잡고, docstring 언급은 잡지 않는다."""
+    assert integration_marked(source) is expect
+
+
+@pytest.mark.parametrize(
+    "raises",
+    ["Exception", "BaseException", "(AssertionError, Exception)", "errors.ANY"],
+)
+def test_tracked_xfail_rejects_broad_raises(raises: str) -> None:
+    """`raises`가 넓으면 다른 종류의 실패까지 XFAIL로 가린다 — 있기만 하면 통과하던 축."""
+    source = _XFAIL_OK.replace("raises=AssertionError", f"raises={raises}")
+    assert source != _XFAIL_OK
+    assert any("raises가 넓다" in v for v in _tx(source))
+
+
+def test_tracked_xfail_accepts_narrow_tuple() -> None:
+    """양성 대조 — 구체 예외의 튜플은 허용한다."""
+    source = _XFAIL_OK.replace("raises=AssertionError", "raises=(AssertionError, KeyError)")
+    assert _tx(source) == []
+
+
+def test_untracked_xfail_in_collected_file_is_detected() -> None:
+    """역방향 — 수집 파일에 장부 밖 xfail을 새로 달면 RED. 비호출 데코레이터 꼴도 잡는다."""
+    called = "import pytest\n@pytest.mark.xfail(strict=True, raises=AssertionError)\ndef test_a():\n    pass\n"
+    bare = "import pytest\n@pytest.mark.xfail\ndef test_b():\n    pass\n"
+    assert untracked_xfail_violations({"f.py": called}, {}) != []
+    assert untracked_xfail_violations({"f.py": bare}, {}) != []
+    assert untracked_xfail_violations({"f.py": called}, {("f.py", "test_a"): "PED-46"}) == []
+    assert untracked_xfail_violations({"f.py": "def test_c():\n    pass\n"}, {}) == []
