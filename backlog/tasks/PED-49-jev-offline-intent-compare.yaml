@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -18,10 +18,14 @@ acceptance:
   - "③ 규칙·Laya·Jev 각 결과·정답 대비 정확도·혼동표·지연 p50/p95·입력 토큰 합계를 JSON으로 출력, 원문은 출력에 미포함"
   - "④ 키는 환경변수(TYPESAFE_API_KEY·LAYA_API_KEY)로만, 실패는 타입명으로 기록(침묵 실패 금지)"
   - "⑤ 범위 밖: 실학생 트래픽에 Jev 연결 없음(CLAUDE.md 내부망 원칙·R26-02)"
-artifacts: []
+artifacts:
+  - "PR #1791 (head 7e750c1e · CI green) — scripts/analysis/jev_offline_intent_compare.py + 테스트 7건. 2026-11-01 Kiki 머신 실측: 합성 403문장 의도 정확도 Jev 0.926 / Laya v3 0.908(보고서 0.909 재현) · 섀도 12문장 둘 다 전부 정답 · 실패 0/433 · Jev 입력 200,561토큰"
 paths:
   - scripts/analysis/jev_offline_intent_compare.py
   - tests/backend/harness/test_jev_offline_intent_compare.py
 session: null
-notes: "2026-10-31 Kiki 선택: 실학생 섀도 대신 합성 272건 오프라인 비교. 시험셋은 저장소 밖(Phaiakes9)"
-updated: 2026-10-31
+notes: |-
+  2026-10-31 Kiki 선택: 실학생 섀도 대신 합성 272건 오프라인 비교. 시험셋은 저장소 밖(Phaiakes9)
+
+  [미러 면제 2026-11-01] 같은 head 7e750c1e의 GitHub CI 전 잡 success(backend 샤드 3/3·infra-contracts·harness-integrity 등)로 원격 실측 완료 — 로컬 미러 재현은 생략
+updated: 2026-11-01
