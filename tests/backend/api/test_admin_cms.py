@@ -1194,6 +1194,67 @@ class TestProblemEditGuard:
         assert resp.status_code == 422
         assert resp.json()["detail"]["code"] == "type"
 
+    # ── EOS-195: 발행된 판이 있는 문항은 제자리 수정이 막힌다 ──────────────────────────────────
+    @staticmethod
+    def _published(state: ReviewStatus | None) -> Problem:
+        row = _problem_row(state)
+        row.problem_version_id = uuid.uuid4()
+        return row
+
+    @pytest.mark.parametrize(
+        "field", ["question_text", "answer", "answer_explanation", "difficulty_overall"]
+    )
+    def test_problem_with_a_published_version_cannot_be_edited_in_place(self, field: str) -> None:
+        """CMS가 고칠 수 있는 4필드가 전부 판 payload의 원천이다 — 하나도 빠지면 안 된다."""
+        row = self._published(ReviewStatus.pending)
+        before = getattr(row, field)
+        value: Any = 3.5 if field == "difficulty_overall" else "바뀐 값"
+        resp, fake = self._patch(row, {field: value})
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["detail"]["code"] == "edit_blocked"
+        assert getattr(row, field) == before
+        assert fake.commits == 0 and fake.audit_rows == []
+
+    @pytest.mark.parametrize(
+        "state", [None, ReviewStatus.pending, ReviewStatus.rejected, ReviewStatus.quarantined]
+    )
+    def test_published_block_is_independent_of_review_status(
+        self, state: ReviewStatus | None
+    ) -> None:
+        """격리해도 판은 그대로 발행 상태다 — 승인 가드(격리 먼저)로는 이 입구가 안 닫힌다."""
+        row = self._published(state)
+        resp, fake = self._patch(row, {"answer": "고친 정답"})
+        assert resp.status_code == 409, resp.text
+        assert row.answer != "고친 정답"
+        assert fake.commits == 0
+
+    def test_published_block_message_names_the_way_out(self) -> None:
+        row = self._published(ReviewStatus.pending)
+        resp, _ = self._patch(row, {"answer": "x"})
+        message = resp.json()["detail"]["message"]
+        assert "폐기" in message and "발행" in message
+
+    def test_published_approved_problem_is_told_the_version_block_first(self) -> None:
+        """승인+발행 문항에서 '격리 먼저'만 알려 주면 격리한 뒤 또 막히는 왕복이 생긴다."""
+        row = self._published(ReviewStatus.approved)
+        resp, _ = self._patch(row, {"answer": "x"})
+        assert "폐기" in resp.json()["detail"]["message"]
+
+    def test_detail_explains_a_published_problem_is_not_editable(self) -> None:
+        row = self._published(ReviewStatus.pending)
+        fake = FakeSession(results=[_Result(rows=[row])])
+        resp = _client(_EDITOR, fake).get(f"/v1/admin/cms/problem/items/{row.problem_id}")
+        assert resp.status_code == 200, resp.text
+        assert "폐기" in resp.json()["edit_blocked_reason"]
+
+    def test_clearing_the_pointer_reopens_editing(self) -> None:
+        """대조군 — 판을 폐기해 포인터가 비면 같은 입력이 통과한다(막힘이 입력 탓이 아님)."""
+        row = self._published(ReviewStatus.pending)
+        row.problem_version_id = None
+        resp, _ = self._patch(row, {"answer": "고친 정답"})
+        assert resp.status_code == 200, resp.text
+        assert row.answer == "고친 정답"
+
 
 class TestProblemStepEditGuard:
     def _patch(self, parent_state: ReviewStatus | None, *, orphan: bool = False) -> Any:

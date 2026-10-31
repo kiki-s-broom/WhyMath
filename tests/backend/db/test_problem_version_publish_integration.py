@@ -542,11 +542,16 @@ def test_corpus_reload_does_not_erase_the_publish_pointer(monkeypatch: pytest.Mo
         assert _pointer(a_id) == a_version and _pointer(b_id) is None
 
         # 코퍼스 값을 v2로 바꿔 다시 적재한다 — 일반 갱신 경로(표지 보호가 막지 않는 행).
-        store.populate([rec(slugs[0], "v2"), rec(slugs[1], "v2")])
+        reloaded = store.populate([rec(slugs[0], "v2"), rec(slugs[1], "v2")])
 
-        # 대조군 — 적재기는 여전히 내용 컬럼을 갱신한다(포인터만 보존하는 것이지 적재를 막는 게 아니다).
+        # EOS-195 처분(차단) — 발행된 A는 재적재로 내용이 바뀌지 않고 따로 보고된다(판 payload와
+        # 라이브 행이 갈라지지 않게). 발행하지 않은 B는 대조군으로 여전히 갱신된다 — 적재 자체를
+        # 막는 것이 아니라 발행된 문항만 건너뛴다는 것을 이 대조가 보인다.
+        # (EOS-190 당시 이 자리는 "A도 v2로 갱신"을 단언했다 — EOS-195가 그 계약을 의도적으로 뒤집었다.)
         answers = dict(_rows("SELECT slug, answer FROM problem WHERE slug = ANY(:s)", {"s": slugs}))
-        assert answers[slugs[0]] == "v2" and answers[slugs[1]] == "v2"
+        assert answers[slugs[0]] == "v1", "발행된 문항의 내용을 재적재가 바꿨다(EOS-195 차단 위반)"
+        assert answers[slugs[1]] == "v2", "발행하지 않은 대조군까지 갱신이 막혔다"
+        assert reloaded.published_version_conflicts == [f"problem:{slugs[0]}"]
         # 핵심 — 발행 포인터는 재적재를 견딘다.
         assert _pointer(a_id) == a_version, "코퍼스 재적재가 발행 포인터를 NULL로 되돌렸다"
         assert _pointer(b_id) is None

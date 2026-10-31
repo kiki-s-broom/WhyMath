@@ -64,6 +64,12 @@ from whymath_backend.config import get_settings
 from whymath_backend.db.cms_edit_marker import mark_cms_edited
 from whymath_backend.db.models.problem import Problem, ProblemRelation, ProblemStep
 from whymath_backend.db.models.provenance import ContentProvenance as ContentProvenanceORM
+from whymath_backend.db.published_edit_guard import (
+    POINTER_OWNED_MESSAGE,
+    PUBLISHED_EDIT_BLOCKED_MESSAGE,
+    changed_served_fields,
+    has_published_version,
+)
 from whymath_backend.db.session import get_session
 from whymath_backend.l1.problem_bank.provenance_gate import (
     ProvenanceInput,
@@ -570,15 +576,12 @@ async def patch_problem(
     행을 잠그고 최신 값으로 판정한다. 상태가 그대로인 요청(GET 본문을 되돌려 보내는 왕복 포함)은
     전이가 아니라 기존 `update` 경로다.
     """
-    # 상태를 바꾸려는 요청이면 행을 잠가 최신 값으로 판정한다 — 전이 라우트가 FOR UPDATE로
-    # 직렬화하는 것과 같은 이유다(잠그지 않으면 두 표면이 같은 낡은 상태를 보고 각자 합법이라
-    # 판정해 전이가 이중 기록된다). 상태를 건드리지 않는 요청은 종전과 같은 읽기를 유지한다.
-    if "review_status" in body:
-        existing = await session.get(
-            Problem, problem_id, with_for_update=True, populate_existing=True
-        )
-    else:
-        existing = await session.get(Problem, problem_id)
+    # 행을 **항상** 잠가 최신 값으로 판정한다. ① 전이 라우트가 FOR UPDATE로 직렬화하는 것과 같은
+    # 이유 — 잠그지 않으면 두 표면이 같은 낡은 상태를 보고 각자 합법이라 판정해 전이가 이중
+    # 기록된다. ② EOS-195 — 이 PATCH는 `session.merge`로 스키마의 *모든* 값을 행에 쓴다. 잠금 없이
+    # 읽은 낡은 발행 포인터가 그 사이 발행된 포인터를 덮어쓸 수 있고, 발행 여부 판정(아래 가드)도
+    # 발행 전이(문항 행 잠금)와 경쟁한다. 발행 게이트가 문항 행을 먼저 잠그므로 교착은 없다.
+    existing = await session.get(Problem, problem_id, with_for_update=True, populate_existing=True)
     if existing is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -599,6 +602,26 @@ async def patch_problem(
                 "errors": [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()],
             },
         ) from exc
+
+    # EOS-195 — 발행 판 보호. 발행 포인터는 발행 게이트만 바꾼다(본문에 실어 보내도 병합으로
+    # 쓰이므로 여기서 거부), 그리고 발행된 판이 있는 문항은 서빙되는 내용을 바꾸는 수정을 막는다.
+    # 격리(`review_status`·`quarantine_*`)는 서빙 내용이 아니라 긴급 정지 수단이라 그대로 통과한다.
+    if validated.problem_version_id != current_schema.problem_version_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "publish_pointer_owned", "message": POINTER_OWNED_MESSAGE},
+        )
+    if has_published_version(current_schema):
+        blocked_fields = changed_served_fields(current_schema, validated)
+        if blocked_fields:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "published_version_edit_blocked",
+                    "message": PUBLISHED_EDIT_BLOCKED_MESSAGE,
+                    "fields": list(blocked_fields),
+                },
+            )
 
     current_status = _as_review_status(current_schema.review_status)
     target_status = _as_review_status(validated.review_status)

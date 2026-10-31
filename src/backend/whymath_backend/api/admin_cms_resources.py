@@ -199,6 +199,8 @@ def _validate_problem_merge(row: Any, changes: Mapping[str, object]) -> None:
 
 
 #: 편집 허용 조건 — 라우터가 세션으로 평가한다. 위반은 409.
+#: `problem_not_approved`는 이름과 달리 두 조건을 함께 건다: 승인 상태가 아니어야 하고(검수 축),
+#: 발행된 판 포인터가 없어야 한다(판 축 — EOS-195). 이름은 바꾸지 않는다(스펙·테스트 전반 파급).
 EditGuard = Literal["none", "problem_not_approved", "parent_problem_not_approved"]
 
 
