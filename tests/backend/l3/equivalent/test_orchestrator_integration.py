@@ -16,6 +16,7 @@ skip. 저작권: 후보는 자작(자체생성·WHYMATH_GENERATED)이다.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -42,7 +43,16 @@ pytestmark = pytest.mark.integration
 # 통합 전용 결정론 식별자(정리 대상·실 데이터와 충돌 무관한 전용 네임스페이스).
 _PID = uuid.UUID("cccc0000-0000-0000-0000-00000000000d")
 _SLUG = "it-orch-s2d-quad-root"
-_CONCEPT_SRC = "IT-ORCH-S2D"
+# S2-03 원자 재연결 이후 저장 경로는 `{src_id → 크로스워크 primary 원자 code → concept.code}`로
+# 개념을 찾는다(구 `concept.source_id` 직조회는 폐기). 그래서 실 크로스워크에 있는 src를 쓰고,
+# 그 src의 원자 code를 코퍼스에서 *유도*해 같은 code의 개념 행을 심는다(코드 하드코딩 금지).
+# 알려진 한계: A1의 원자는 초등 뺄셈 원자라 이 이차방정식 후보와 내용이 맞지 않는다. 이 테스트가
+# 보는 것은 저장 경로(src → 원자 → concept 행 → problem_concept)이지 태깅의 의미가 아니다.
+_CONCEPT_SRC = "A1"
+_CONCEPT_NAME = "통합테스트 개념 S2D"  # 정리 시 이 이름의 행만 지운다(공유 DB의 실 원자 행 보호).
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_CROSSWALK = _REPO_ROOT / "data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl"
+_CONCEPT_GRAPH = _REPO_ROOT / "data/corpus/concept_graph_v1/graph.json"
 _STANDARD = "[12미적01-01]"
 _MISCONCEPTION = "distribution-over-power"
 
@@ -83,6 +93,9 @@ def _candidate() -> CandidateProblem:
         provenance=provenance,
         conditions="x**2 - 5*x + 6 = 0",
         answer_map={"x": "3"},
+        # 실근이 2·3 두 개라 근 선택을 명시해야 정답이 유일해진다(수용 게이트 S2-i 강화 후 필수 —
+        # 미명시면 `검수필요`로 빠져 저장 경로가 닫히지 않는다. OPS-137: CI 미수집 중 노후화).
+        answer_selection="largest",
         concept_tags=[ConceptTag(concept_src_id=_CONCEPT_SRC, role="PRIMARY", relevance=0.9)],
     )
 
@@ -123,24 +136,47 @@ def _skip_if_unreachable() -> None:
         )
 
 
+def _atom_code() -> str:
+    """`_CONCEPT_SRC`의 primary 원자 code — 저장 경로(`ProblemBankStore`)와 같은 유도를 쓴다."""
+    from whymath_backend.l1.problem_bank.populate import (
+        derive_src_to_primary_atom,
+        load_concept_src_bridge,
+        load_crosswalk_records,
+    )
+
+    mapping = derive_src_to_primary_atom(
+        load_crosswalk_records(_CROSSWALK), load_concept_src_bridge(_CONCEPT_GRAPH)
+    )
+    if _CONCEPT_SRC not in mapping:
+        # 맨 KeyError로는 원인이 안 보인다 — 크로스워크 재생성으로 이 src가 빠진 경우다.
+        raise RuntimeError(
+            f"{_CONCEPT_SRC}의 primary 원자가 크로스워크에 없다({_CROSSWALK}) — 크로스워크가 "
+            "재생성됐으면 실 크로스워크에 있는 src로 `_CONCEPT_SRC`를 바꿔라"
+        )
+    return mapping[_CONCEPT_SRC]
+
+
+def _store(settings: Settings) -> ProblemBankStore:
+    """코퍼스 경로를 절대경로로 고정한 저장소 — 기본값은 cwd 상대라 `src/backend`에서 못 연다."""
+    return ProblemBankStore(
+        settings=settings, crosswalk_path=_CROSSWALK, concept_graph_path=_CONCEPT_GRAPH
+    )
+
+
 def _seed_concept() -> None:
     from sqlalchemy import text
 
+    atom_code = _atom_code()
     engine = _sync_engine()
     try:
         with engine.begin() as conn:  # type: ignore[attr-defined]
             conn.execute(
                 text(
-                    "INSERT INTO concept (concept_id, code, name_ko, level, source_id) "
-                    "VALUES (:cid, :code, :name, '세부개념', :src) "
+                    "INSERT INTO concept (concept_id, code, name_ko, level) "
+                    "VALUES (:cid, :code, :name, '세부개념') "
                     "ON CONFLICT (code) DO NOTHING"
                 ),
-                {
-                    "cid": uuid.uuid4(),
-                    "code": f"IT-ORCH-{_CONCEPT_SRC}",
-                    "name": "통합테스트 개념 S2D",
-                    "src": _CONCEPT_SRC,
-                },
+                {"cid": uuid.uuid4(), "code": atom_code, "name": _CONCEPT_NAME},
             )
     finally:
         engine.dispose()  # type: ignore[attr-defined]
@@ -149,6 +185,8 @@ def _seed_concept() -> None:
 def _cleanup() -> None:
     from sqlalchemy import text
 
+    # 트랜잭션 **밖에서** 먼저 계산한다 — 안에서 실패하면 앞선 DELETE까지 롤백돼 잔여 행이 남는다.
+    atom_code = _atom_code()
     engine = _sync_engine()
     try:
         with engine.begin() as conn:  # type: ignore[attr-defined]
@@ -161,7 +199,12 @@ def _cleanup() -> None:
                 text("DELETE FROM content_provenance WHERE problem_id = :pid"), {"pid": _PID}
             )
             conn.execute(text("DELETE FROM problem WHERE slug = :slug"), {"slug": _SLUG})
-            conn.execute(text("DELETE FROM concept WHERE source_id = :src"), {"src": _CONCEPT_SRC})
+            # 이름까지 맞는 행만 — 같은 code의 실 원자 행이 이미 있으면(ON CONFLICT로 시드가
+            # 건너뛰어진 경우) 지우지 않는다.
+            conn.execute(
+                text("DELETE FROM concept WHERE code = :code AND name_ko = :name"),
+                {"code": atom_code, "name": _CONCEPT_NAME},
+            )
     finally:
         engine.dispose()  # type: ignore[attr-defined]
 
@@ -186,7 +229,7 @@ class TestEndToEnd:
             _cleanup()  # 선행 잔여 제거
             _seed_concept()
 
-            store = ProblemBankStore(settings=settings)
+            store = _store(settings)
             index = ProblemEmbeddingIndex(
                 provider_name="fake", model_name="fake-hash", settings=settings
             )

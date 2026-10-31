@@ -1,0 +1,57 @@
+{
+  "task": "P3-62-solution-qa-unverifiable-structuring",
+  "measured": "2026-10-31",
+  "base_commit": "main 3a83ed64",
+  "population": "대표 과정 승인 문항 1121건(pm.load_world qa_records) — P3 두 은행 행만 후보 행으로 교체(problem_id 대조)",
+  "candidate_sha256": {
+    "calc": "c4f3ad11232cdafd4b02e29e454e7c74ffb42d655a9d7c28f7227536d07786a9",
+    "fill": "8ae08bd8beb088f77fc7ead40eb0d17b7b3bc3165fb839e5ba0ea7fb7b81082e"
+  },
+  "rows": [
+    {
+      "label": "baseline_main_banks",
+      "replaced_rows": 0,
+      "total": 1121,
+      "passed": 548,
+      "failed": 0,
+      "unverifiable": 573,
+      "decidable_ratio": 0.48885,
+      "unverifiable_reasons": {
+        "C2_FINAL_STEP_NOT_ANSWER_FORM": 361,
+        "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR": 77,
+        "C2_NO_STEPS": 72,
+        "C2_ROOT_CHOICE_UNSTRUCTURED": 63
+      }
+    },
+    {
+      "label": "candidate_both",
+      "replaced_rows": 708,
+      "total": 1121,
+      "passed": 589,
+      "failed": 0,
+      "unverifiable": 532,
+      "decidable_ratio": 0.52542,
+      "unverifiable_reasons": {
+        "C2_FINAL_STEP_NOT_ANSWER_FORM": 361,
+        "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR": 39,
+        "C2_NO_STEPS": 72,
+        "C2_ROOT_CHOICE_UNSTRUCTURED": 60
+      }
+    },
+    {
+      "label": "candidate_calc_only",
+      "replaced_rows": 504,
+      "total": 1121,
+      "passed": 573,
+      "failed": 0,
+      "unverifiable": 548,
+      "decidable_ratio": 0.51115,
+      "unverifiable_reasons": {
+        "C2_FINAL_STEP_NOT_ANSWER_FORM": 361,
+        "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR": 54,
+        "C2_NO_STEPS": 72,
+        "C2_ROOT_CHOICE_UNSTRUCTURED": 61
+      }
+    }
+  ]
+}

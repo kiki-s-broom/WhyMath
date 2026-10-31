@@ -54,6 +54,10 @@ GATE_CALLERS: dict[str, str] = {
     "harness/misconception_false_positive_eval.py": "measurement — 정답 해설 FP 측정",
     "harness/anchor_detection_channel_eval.py": "measurement — 앵커 탐지 채널 측정",
     "harness/explicit_correction_gap_eval.py": "measurement — 명시 정정 갭 측정",
+    "harness/ai_quality_live_collect.py": (
+        "measurement — P3-78 라이브 품질 수집기가 코치 텍스트 채널(`_compute_matches` off 경로)을 "
+        "처음 보는 학생 기준으로 재현해 러너 초기 가설을 만든다(산출은 평가 파일·학생 비노출)"
+    ),
 }
 
 # 학생 대면 경로가 게이트를 부르는 *함수* — 같은 모듈의 다른 곳에서 부르면서 이 지점은 빠지는

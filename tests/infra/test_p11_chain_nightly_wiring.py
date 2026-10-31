@@ -14,7 +14,8 @@ CI 잡에서도 실제로 돈 적이 없다**(별건 등재 — 이 파일의 �
 [정정 2026-09-23 · EOS-21 재측정 — 판정 기준 main `f4926588`] 바로 위 문단의 "어느 CI
 잡에서도 실제로 돈 적이 없다"는 **거짓이다.** 그 하네스들은 `backend — 마이그레이션·통합
 (실 PG)` 잡에서 돈다 — 그 잡은 파일명이 아니라 **마커로 수집**하기 때문이다
-(`cd src/backend && pytest -m integration --ignore=../../tests/backend/l3` ·
+(당시 명령 `cd src/backend && pytest -m integration --ignore=../../tests/backend/l3` — 2026-10-31부터
+`l3`는 파일 단위 제외(OPS-137) ·
 `testpaths = ["../../tests/backend"]`). 파일명 grep 0건은 "이름으로 안 부른다"이지
 "안 돈다"가 아니다. 실 PG·`WHYMATH_RUN_INTEGRATION=1`을 갖춘 그 잡에서 6종 전부
 실행·통과함을 명령 재현으로 실측했다.

@@ -1194,6 +1194,7 @@ gates:
       - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
       - "[2026-10-20] depends_on +P3-62-solution-qa-unverifiable-structuring — D9 하한 값은 P3-62 재측정 뒤 확정 — notes 산문 선행을 대장 depends로 집행(PR #1702 독립 검토 중1)"
       - "[2026-10-20] notes +181자 — Kiki 결정 (다): 하한 값 확정 시점"
+      - "[2026-10-31] input done · P3-62-solution-qa-unverifiable-structuring · 판정 무관: 게이트 판정은 Kiki 몫(D11 — 검증 가능 비율 하한 미결). 이 태스크는 판정 입력(실측 0.48885 · 후보 0.52542/0.51115 · 구조적 상한 0.5575 — docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C, 판정 기준 main 3a83ed64, 착지 5d309758)만 넘기고 판정을 내리지 않는다 — done P3-62-solution-qa-unverifiable-structuring 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring

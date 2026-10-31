@@ -1,0 +1,39 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-91-p3-62-candidate-promotion-fill-template-fix
+title: "P3-91 — P3-62 후보 승격: fill 은행 템플릿 문장 5종 교정·새 회차 감사 후 두 은행 승격"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-62-solution-qa-unverifiable-structuring
+requires_gates: []
+acceptance:
+  - "① fill 은행 템플릿 문장 5종을 생성기에서 교정한다 — 2026-10-31 S5 4회차(docs/data/p3_fill_audit/bank_audit_r4/README.md)가 짚은 11건의 원인: 해설 차분몫 문장의 대상 누락(x가 어디에 가까워지는지) 4 · 발문 고정 문구 \"(a는 상수)가\"의 조사 3 · 단위 뒤 조사(\"cm/초^2였다고\") 2 · 해설 \"구하는 극한값\" 1 · 줄임표 뒤 조사 1. 같은 글자가 현재 승인 은행(bank_audit_r3)에도 있으므로 기본 모드와 구조화 모드 출력이 함께 바뀐다. 문항마다 정답 값은 바꾸지 않는다(정답 오류 0건이었다) — 바뀐 레코드의 정답·answer_map 불변을 테스트로 단언한다.\n② 교정한 은행을 새 회차로 감사한다(런북 docs/reviews/p3_62_s5_candidate_audit_runbook_2026-10-21.md §1~§4 · 같은 지침 sha256 3046a901… · 같은 시드 · 판정자 A·B). 같은 은행을 다시 채점하지 않는다(as-found).\n③ 승격(런북 §5)은 두 은행 모두 exit 0일 때 한 PR로 한다 — calc 후보는 6회차(bank_audit_r6)에서 이미 통과했으나, 교정이 calc 생성기 출력도 바꾸면 calc도 새 회차가 필요하다(감사받은 바이트 = 승격할 바이트). calc만 먼저 승격하는 것은 런북 조건의 예외라 Kiki 결정(D11 보고에 포함)을 받은 경우에만 한다.\n④ 승격 후 python -m whymath_backend.harness.solution_qa 로 검증 가능 비율을 다시 재고(분모 1,121 불변 확인), 기대값(두 은행 0.52542 · calc만 0.51115 — docs/reviews/p3_62_sqa_candidate_merge_2026-10-31.json)과 대조해 docs/reviews에 기록한다."
+  - "정정(2026-10-31 · P3-62 독립 검토 반영): ⓐ 교정 범위는 짚힌 11건이 아니라 같은 템플릿이 든 **27건**이다 — \"구하는 극한값\" 8(생성기 두 자리) · 앞 식이 받침으로 끝나는 \"(a는 상수)가\" 8 · \"cm/초^2였다고\" 3 · \"2, 4, 6, ...로\" 4 · 차분몫 문장의 대상 누락 4. 판정자 3명이 짚은 교육과정 밖 낱말 '차분몫'(10건)도 함께 고친다. 완료 기준 = 재생성한 은행(기본·구조화 두 모드)에서 옛 문구 검색 0건. ⓑ 발문을 고치면 slug(발문·정답·코드의 sha256)와 problem_id(uuid5)가 바뀐다 — 바뀐 id 목록을 기록하고, id로 묶인 감사 라벨(`docs/data/corpus_audit_p3_fill_v0.jsonl`)·DB 재적재 시 옛 행 처리(고아 행)·측정 대조 방식을 함께 다룬다. ⓒ 기본 모드 출력이 바뀌므로 `tests/backend/harness/test_p3_fill_batch.py`의 재생성 동일성 검사 때문에 ①~④를 **한 PR**로 낸다(생성기 교정만 먼저 내면 backend 잡 red). ⓓ 승격 기록 폴더는 런북 §5-1의 r6/r4가 아니라 다음 빈 회차다 — r6(calc)·r4(fill)는 2026-10-31 승격하지 않은 회차의 as-found 기록이라 덮어쓰지 않는다. ⓔ \"cm/초^2였다고\"를 고치면 `src/backend/whymath_backend/harness/question_rederive.py`의 C5 재유도 정규식(`cm/초(?:\\^2)?였다고`)이 그 3건을 조용히 놓친다 — 정규식을 함께 고치고 C5 적용 1121/1121 유지를 확인한다. ⓕ ①의 \"현재 승인 은행(bank_audit_r3)\"은 부정확하다 — r3는 감사 동결 사본이고 승인 은행은 `data/corpus/problem_bank_p3_fill_v0`다(본문 같음 · 각인 차이). ⓖ ③의 \"D11\"은 `G-p3-w3-release-merged`의 Solution QA 검증 가능 비율 하한 결정(EOS 감리 지시문 2026-10-30의 결정 번호)을 가리킨다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/p3_diff_*.py"
+  - src/backend/whymath_backend/harness/p3_fill_batch.py
+  - src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py
+  - data/corpus/problem_bank_p3_fill_v0/
+  - data/corpus/problem_bank_p3_calculus1_diff_v0/
+  - docs/data/p3_fill_audit/
+  - docs/data/p3_calculus1_diff_audit/
+  - src/backend/whymath_backend/harness/question_rederive.py
+  - tests/backend/l1/test_p3_fill_bank_coverage_link.py
+  - tests/backend/l1/test_p3_calculus1_diff_bank_coverage_link.py
+  - tests/backend/harness/test_p3_fill_batch.py
+  - docs/data/corpus_audit_p3_fill_v0.jsonl
+  - docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl
+  - docs/reviews/
+session: null
+notes: |-
+  출처: P3-62 3단계(2026-10-31 · 판정 기준 main 3a83ed64)의 S5 감사 결과 — calc 후보 통과(k = 1) · fill 후보 불합격(k = 11). fill 결함 11건은 전부 구조화와 무관한 기존 문항(승인 동결본과 바이트 동일)이라 승인 은행의 잔여 문장 결함이기도 하다(판정자 지침 "채점 규칙": 기록해 은행 교정에 넘긴다). 보고서 docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C.
+
+  [정정 2026-10-31] paths ['src/backend/whymath_backend/l3/equivalent/p3_diff_*.py', 'src/backend/whymath_backend/harness/p3_fill_batch.py', 'src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py', 'data/corpus/problem_bank_p3_fill_v0/', 'data/corpus/problem_bank_p3_calculus1_diff_v0/', 'docs/data/p3_fill_audit/', 'docs/data/p3_calculus1_diff_audit/'] → ['src/backend/whymath_backend/l3/equivalent/p3_diff_*.py', 'src/backend/whymath_backend/harness/p3_fill_batch.py', 'src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py', 'data/corpus/problem_bank_p3_fill_v0/', 'data/corpus/problem_bank_p3_calculus1_diff_v0/', 'docs/data/p3_fill_audit/', 'docs/data/p3_calculus1_diff_audit/', 'src/backend/whymath_backend/harness/question_rederive.py', 'tests/backend/l1/test_p3_fill_bank_coverage_link.py', 'tests/backend/l1/test_p3_calculus1_diff_bank_coverage_link.py', 'tests/backend/harness/test_p3_fill_batch.py', 'docs/data/corpus_audit_p3_fill_v0.jsonl', 'docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl', 'docs/reviews/']: P3-62 독립 검토 반영 — 교정 범위 27건·완료 기준, 발문 변경 시 id 변경, 한 PR 제약, 승격 폴더 번호, C5 정규식, 승인 은행 명칭, D11 정의
+updated: 2026-10-31

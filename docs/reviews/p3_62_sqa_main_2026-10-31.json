@@ -1,0 +1,280 @@
+{
+  "scope": "대표 과정 승인 문항 1121건 (P3-14 ④ 와 같은 모집단)",
+  "target": 0.995,
+  "total": 1121,
+  "passed": 548,
+  "failed": 0,
+  "unverifiable": 573,
+  "pass_rate": 1.0,
+  "decidable_ratio": 0.4888492417484389,
+  "check_matrix": {
+    "C1": {
+      "pass": 1121
+    },
+    "C2": {
+      "unverifiable": 573,
+      "pass": 548
+    },
+    "C3": {
+      "pass": 236,
+      "not_applicable": 885
+    },
+    "C4": {
+      "not_applicable": 72,
+      "pass": 1049
+    },
+    "C5": {
+      "pass": 1121
+    }
+  },
+  "fail_reasons": {},
+  "unverifiable_reasons": {
+    "C2:C2_FINAL_STEP_NOT_ANSWER_FORM": 361,
+    "C2:C2_FINAL_STEP_VAR_NOT_ANSWER_VAR": 77,
+    "C2:C2_NO_STEPS": 72,
+    "C2:C2_ROOT_CHOICE_UNSTRUCTURED": 63
+  },
+  "unit_breakdown": {
+    "CALC-CHAIN": {
+      "unverifiable": 24
+    },
+    "CALC-EXTREMUM": {
+      "unverifiable": 77
+    },
+    "CALC-EXTREMUM-IRR": {
+      "unverifiable": 30
+    },
+    "CALC-EXTREMUM-MC": {
+      "unverifiable": 56
+    },
+    "CALC-EXTREMUM-VALUE": {
+      "unverifiable": 74
+    },
+    "CALC-PRODUCT": {
+      "unverifiable": 24
+    },
+    "CALC-TANGENT": {
+      "unverifiable": 80
+    },
+    "DIFFERENTIABILITY": {
+      "unverifiable": 24
+    },
+    "EXTREMUM-COUNT": {
+      "unverifiable": 24
+    },
+    "P3-CALC1-DIFF-COEFFICIENT": {
+      "pass": 48
+    },
+    "P3-CALC1-DIFF-DIFFERENTIABILITY": {
+      "pass": 60
+    },
+    "P3-CALC1-DIFF-EQUATION-APPLICATION": {
+      "unverifiable": 72
+    },
+    "P3-CALC1-DIFF-GRAPH-SHAPE": {
+      "pass": 40,
+      "unverifiable": 32
+    },
+    "P3-CALC1-DIFF-MEAN-VALUE-THEOREM": {
+      "pass": 60,
+      "unverifiable": 12
+    },
+    "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM": {
+      "pass": 20,
+      "unverifiable": 28
+    },
+    "P3-CALC1-DIFF-MOTION-WORD": {
+      "pass": 16,
+      "unverifiable": 8
+    },
+    "P3-CALC1-DIFF-POLYNOMIAL-RULES": {
+      "pass": 72
+    },
+    "P3-CALC1-DIFF-POWER": {
+      "pass": 66,
+      "unverifiable": 6
+    },
+    "P3-CALC1-DIFF-POWER-PATTERN": {
+      "pass": 24
+    },
+    "P3-CALC1-DIFF-TANGENT-LINE": {
+      "pass": 72
+    },
+    "P3-CALC1-DIFF-VELOCITY-ACCELERATION": {
+      "pass": 70,
+      "unverifiable": 2
+    }
+  },
+  "multivar_membership": 86,
+  "c5_coverage": {
+    "CALC-CHAIN": {
+      "applied": 24
+    },
+    "CALC-EXTREMUM": {
+      "applied": 77
+    },
+    "CALC-EXTREMUM-IRR": {
+      "applied": 30
+    },
+    "CALC-EXTREMUM-MC": {
+      "applied": 56
+    },
+    "CALC-EXTREMUM-VALUE": {
+      "applied": 74
+    },
+    "CALC-PRODUCT": {
+      "applied": 24
+    },
+    "CALC-TANGENT": {
+      "applied": 80
+    },
+    "DIFFERENTIABILITY": {
+      "applied": 24
+    },
+    "EXTREMUM-COUNT": {
+      "applied": 24
+    },
+    "P3-CALC1-DIFF-COEFFICIENT": {
+      "applied": 48
+    },
+    "P3-CALC1-DIFF-DIFFERENTIABILITY": {
+      "applied": 60
+    },
+    "P3-CALC1-DIFF-EQUATION-APPLICATION": {
+      "applied": 72
+    },
+    "P3-CALC1-DIFF-GRAPH-SHAPE": {
+      "applied": 72
+    },
+    "P3-CALC1-DIFF-MEAN-VALUE-THEOREM": {
+      "applied": 72
+    },
+    "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM": {
+      "applied": 48
+    },
+    "P3-CALC1-DIFF-MOTION-WORD": {
+      "applied": 24
+    },
+    "P3-CALC1-DIFF-POLYNOMIAL-RULES": {
+      "applied": 72
+    },
+    "P3-CALC1-DIFF-POWER": {
+      "applied": 72
+    },
+    "P3-CALC1-DIFF-POWER-PATTERN": {
+      "applied": 24
+    },
+    "P3-CALC1-DIFF-TANGENT-LINE": {
+      "applied": 72
+    },
+    "P3-CALC1-DIFF-VELOCITY-ACCELERATION": {
+      "applied": 72
+    }
+  },
+  "c5_by_family": {
+    "local_extremum_value": 130,
+    "local_extremum_x": 115,
+    "derivative_at_point": 109,
+    "tangent_slope_pick": 80,
+    "extremum_points": 66,
+    "mean_value_c": 49,
+    "extremum_parameter": 46,
+    "real_root_count": 39,
+    "tangent_at_point": 35,
+    "difference_quotient_limit": 33,
+    "inequality_minimum": 30,
+    "motion_at_time": 28,
+    "differentiable_flag": 24,
+    "differentiable_parameter": 24,
+    "extremum_count": 24,
+    "one_sided_derivative": 24,
+    "product_derivative_at_point": 24,
+    "train_motion": 24,
+    "derivative_equation_root": 19,
+    "derivative_parameter": 19,
+    "motion_time_when": 17,
+    "power_derivative_form": 14,
+    "mean_value_parameter": 13,
+    "mean_value_bounds": 12,
+    "derivative_combination": 11,
+    "derivative_constant_term": 10,
+    "power_exponent_unknown": 10,
+    "derivative_coefficient_sum": 8,
+    "motion_direction_change": 8,
+    "tangent_relation_to_unknown_point": 8,
+    "motion_velocity_plus_acceleration": 7,
+    "motion_parameter": 6,
+    "tangent_parameter": 6,
+    "tangent_unknown_point": 6,
+    "linear_combination_derivative": 5,
+    "tangent_slope_sum_diff": 4,
+    "derivative_ratio": 3,
+    "instantaneous_rate": 3,
+    "motion_position_count": 3,
+    "tangent_at_axis_crossing": 3,
+    "tangent_by_height": 3,
+    "tangent_by_slope": 3,
+    "motion_velocity_change": 2,
+    "motion_velocity_when_zero_acceleration": 2,
+    "shifted_function_difference": 2,
+    "tangent_from_outside_point": 2,
+    "tangent_line_parameter": 2,
+    "tangent_parallel_other_point": 2,
+    "tangent_second_intersection": 2,
+    "tangent_two_curves_parameter": 2
+  },
+  "c5_family_titles": {
+    "local_extremum_value": "극댓값·극솟값",
+    "local_extremum_x": "극대·극소가 되는 x의 값(좌표)",
+    "derivative_at_point": "x = a 에서의 미분계수 f'(a)",
+    "tangent_slope_pick": "접선의 기울기가 K인 점의 x좌표 (큰/작은 쪽)",
+    "extremum_points": "극값·증감 전환점의 x좌표",
+    "mean_value_c": "평균값 정리·롤의 정리·평균속도로 구하는 c",
+    "extremum_parameter": "극값 조건으로 매개변수를 정한 뒤의 극댓값·극솟값",
+    "real_root_count": "방정식·곡선의 서로 다른 실근(교점) 개수",
+    "tangent_at_point": "접점이 주어진 접선의 기울기·절편·방정식",
+    "difference_quotient_limit": "차분몫의 극한 (f(a+ch)-f(a))/(dh)",
+    "inequality_minimum": "부등식을 보이려 할 때의 최솟값",
+    "motion_at_time": "t = a 에서의 속도·가속도",
+    "differentiable_flag": "실수 전체에서 미분가능하면 1, 아니면 0",
+    "differentiable_parameter": "x = r 에서 미분가능할 때 상수 a(또는 f'(c))",
+    "extremum_count": "극값의 개수",
+    "one_sided_derivative": "x = a 에서의 우·좌미분계수(와 그 차)",
+    "product_derivative_at_point": "두 함수 곱의 x = a 에서의 미분계수",
+    "train_motion": "열차 운동(방향 전환·매개변수)",
+    "derivative_equation_root": "f'(a) 가 주어진 값이 되는 a",
+    "derivative_parameter": "미분계수 조건으로 정하는 매개변수",
+    "motion_time_when": "속도·가속도가 c 가 되는 시각",
+    "power_derivative_form": "x^n 의 도함수 cx^m 꼴의 c+m · c·m",
+    "mean_value_parameter": "평균값 정리의 c 값이 주어질 때 매개변수·끝점",
+    "mean_value_bounds": "평균값 정리로 구하는 k · 함숫값의 한계",
+    "derivative_combination": "여러 함수의 미분계수 합·차",
+    "derivative_constant_term": "도함수 f'(x)의 상수항",
+    "power_exponent_unknown": "x^n 에서 지수 n 을 정하는 틀",
+    "derivative_coefficient_sum": "도함수의 모든 계수의 합",
+    "motion_direction_change": "운동 방향을 바꾸는 시각·위치·가속도",
+    "tangent_relation_to_unknown_point": "접선이 직선과 평행·수직이거나 한 점을 지날 때의 접점 a",
+    "motion_velocity_plus_acceleration": "t = a 에서의 속도와 가속도의 합",
+    "motion_parameter": "운동 조건으로 정하는 매개변수",
+    "tangent_parameter": "접선 조건으로 정하는 곡선의 매개변수",
+    "tangent_unknown_point": "접선의 기울기 조건으로 접점 매개변수 a 구하기",
+    "linear_combination_derivative": "αf ± βg 의 x = a 에서의 미분계수",
+    "tangent_slope_sum_diff": "두 접점의 접선 기울기의 합·차",
+    "derivative_ratio": "f'(a) 는 f(a) 의 몇 배",
+    "instantaneous_rate": "x = a 에서의 순간변화율",
+    "motion_position_count": "위치가 c 가 되는 서로 다른 시각의 개수",
+    "tangent_at_axis_crossing": "x축과 만나는 점 중 가장 큰 x좌표에서의 접선 기울기",
+    "tangent_by_height": "y좌표가 c 인 (하나뿐인) 점의 접선 기울기",
+    "tangent_by_slope": "접선의 기울기가 k 인 (하나뿐인) 점의 x좌표",
+    "motion_velocity_change": "속도의 변화량",
+    "motion_velocity_when_zero_acceleration": "가속도가 0 인 시각의 속도",
+    "shifted_function_difference": "g = f + c 일 때 g'(a) - f'(a)",
+    "tangent_from_outside_point": "곡선 밖의 점에서 그은 접선의 기울기",
+    "tangent_line_parameter": "직선이 곡선에 접하도록 하는 상수",
+    "tangent_parallel_other_point": "접선과 평행한 접선을 갖는 또 다른 점",
+    "tangent_second_intersection": "접선이 곡선과 다시 만나는 점",
+    "tangent_two_curves_parameter": "두 곡선이 한 점에서 접할 때의 상수"
+  },
+  "c5_not_covered": [],
+  "failures": []
+}

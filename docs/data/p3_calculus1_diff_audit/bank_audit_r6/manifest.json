@@ -1,0 +1,45 @@
+{
+  "task": "P3-62-solution-qa-unverifiable-structuring",
+  "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+  "seed": 20261008,
+  "bank": "candidate/problem_bank_p3_calculus1_diff_v0/problems.jsonl",
+  "bank_sha256": "c4f3ad11232cdafd4b02e29e454e7c74ffb42d655a9d7c28f7227536d07786a9",
+  "n_items": 504,
+  "n_shards": 8,
+  "shard_size": 63,
+  "shards": [
+    {
+      "file": "shard1.jsonl",
+      "sha256": "2d7224c5998cdeb66aa0c134018e52f6bfdba6137b5e8b61a127a0ad698f3741"
+    },
+    {
+      "file": "shard2.jsonl",
+      "sha256": "90b1fec5c39c5532c267a484028fe084e28e39a6db8780bebd8bd3ef3046cf94"
+    },
+    {
+      "file": "shard3.jsonl",
+      "sha256": "9a7c2d3670db3e94a14d20c19f3ad547f25ac72b1f1ed570139c375cf637a3d6"
+    },
+    {
+      "file": "shard4.jsonl",
+      "sha256": "77d4ec4940d7a4b4d5fa85ac81dcef1fd075d1937b35bf40bbd1de8882d6e318"
+    },
+    {
+      "file": "shard5.jsonl",
+      "sha256": "8c3e2af69a375ca0a8bb5cd179f5673736e63e4287cc514e2d93d1feb568fc50"
+    },
+    {
+      "file": "shard6.jsonl",
+      "sha256": "1a4614956babb1e3b24ad32ed402440b78fcace06d7d28d37ee5f041a29a9862"
+    },
+    {
+      "file": "shard7.jsonl",
+      "sha256": "74f87f8ea8920088e5d99549d10bda46ab9c768cf1fc31e1ef43d5fadbadc4be"
+    },
+    {
+      "file": "shard8.jsonl",
+      "sha256": "8ee5d3e35f21f9cd489a78712888e8b4aec0b06e855490481d42aaeafbcf3ab7"
+    }
+  ],
+  "rater_protocol_sha256": "3046a901033ea2eadd7c3aafbc32e2a94c3c241551f7d8e6fa50eb2c606ee27a"
+}
