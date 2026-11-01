@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-159
+title: "2026-12-31 만료 유예 처분 — 런북 쓰기 블록 자가거부 유예 6건(check_runbook_blocks) · 12/27 동결 전"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① scripts/ops/check_runbook_blocks.py의 RUNBOOK_WAIVERS 6건(until 2026-12-31: eos63_skill_event_reach_sample · eos_relevance_triage_gate · g_skb01_concept_behavior_skills_populate · g_skb01_skill_node_populate · kice_pdf_history_purge · skb04_concept_content_populate 런북)을 12/27(G5 동결) 전에 처분한다. 만료 후에는 검사기가 그 런북의 쓰기 블록 위반을 그대로 내고, CI infra-contracts 잡이 이 검사를 돌린다.\n② 런북마다 셋 중 하나: (a) 쓰기 블록에 자가거부 가드를 넣어 유예 없이 통과 (b) 이미 끝난 일회성 런북이면 보관 처리(검사 대상 밖으로 옮기되 기록은 남김) (c) 의식적 연장(새 until + 사유).\n③ 변별력: 처분 뒤 해당 런북의 가드를 지우는 주입에서 검사가 실패하는지 확인한다.\n④ 완료 판정: check_runbook_blocks.py exit 0 · 남은 유예의 until이 전부 2027-01-01 이후."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - docs/ops/eos63_skill_event_reach_sample_runbook.md
+  - docs/ops/eos_relevance_triage_gate_runbook.md
+  - "docs/ops/g_skb01_*_runbook.md"
+  - docs/ops/kice_pdf_history_purge_runbook.md
+  - docs/ops/skb04_concept_content_populate_runbook.md
+session: null
+notes: "출처: D13 Kiki 결정(2026-11-01) 4번 — 2026-12-31 만료 12곳의 소유 태스크 등재, 12/27 동결 전 처분 목표. 근거 = docs/reviews/eos_followup_triage_2026-11.md §4-1(판정 기준 main 3a83ed64)."
+updated: 2026-11-01

@@ -7,7 +7,7 @@ subject: math
 layer: backend
 status: todo
 priority: 2
-eos_priority: P1
+eos_priority: P2
 owner: claude
 depends_on: []
 requires_gates: []
@@ -19,5 +19,8 @@ paths:
   - src/backend/whymath_backend/harness/review_session_gui.py
   - "tests/backend/harness/test_review_session*.py"
 session: null
-notes: "출처: PR #1763(EOS-199) 독립 리뷰 1·2차가 main 사본에서 재현한 기존 결함. 검수 창은 같은 입력을 쓰기 전에 거부하므로 해당 없음 — 터미널 [J]로 검수할 때만 밟는다. 크래시 시 그 항목의 started만 남아 재개 시 다시 나오지만 HIT 표본에 열린 started가 섞인다."
-updated: 2026-10-28
+notes: |-
+  출처: PR #1763(EOS-199) 독립 리뷰 1·2차가 main 사본에서 재현한 기존 결함. 검수 창은 같은 입력을 쓰기 전에 거부하므로 해당 없음 — 터미널 [J]로 검수할 때만 밟는다. 크래시 시 그 항목의 started만 남아 재개 시 다시 나오지만 HIT 표본에 열린 started가 섞인다.
+
+  [정정 2026-11-01] eos_priority P1 → P2: D13 Kiki 결정
+updated: 2026-11-01
