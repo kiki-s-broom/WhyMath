@@ -481,10 +481,17 @@ async def promote_verified_solutions(session: AsyncSession) -> PromotionPlan:
                 created_at=planned.path.created_at,
             )
         )
-        # 단계(problem_step additive) — schema↔db seam(from_schema) 경유·검증 통과분만.
+    # 헤더를 먼저 DB에 보낸다 — `problem_step.solution_path_id`가 `solution_paths`를 외래 키로
+    # 가리키는데 ORM에 relationship()이 없어 SQLAlchemy가 두 테이블의 INSERT 순서를 보장하지
+    # 않는다. 한 flush에 섞으면 단계가 먼저 나가 외래 키 위반으로 배치 전체가 롤백된다
+    # (P3-32 실 PG 실측 · 회귀 동결 = tests/backend/whs/test_path_promotion_integration.py).
+    if plan.planned:
+        await session.flush()
+    # 단계(problem_step additive) — schema↔db seam(from_schema) 경유·검증 통과분만.
+    for planned in plan.planned:
         for step_schema in planned.step_schemas:
             session.add(ProblemStep.from_schema(step_schema))
-    if plan.planned:
+    if any(planned.step_schemas for planned in plan.planned):
         await session.flush()
     return plan
 

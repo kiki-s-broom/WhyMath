@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-93
+title: "개수형 답(real_root_count) WH-S finalize 지원 — 12미적Ⅰ-02-09 재생 풀이 0건 해소"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결손 고정 — 12미적Ⅰ-02-09 문항군(wm-p3-diff-eqapp-*, 적격 72건)은 verify.answer_map이 비어 있고 answer_kind=real_root_count라 whs.corpus_replay 재생 39건이 전부 finalize=ended/None으로 끝나 검증 풀이 0건이다. 그래서 P3-32 샌드박스 실측에서 이 개념만 hint missing으로 남았다(docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md §4 ③ · 판정 기준 main d81cfd7a).\n② 개수형 답(실근의 개수)을 결정론으로 검증하는 finalize 지원 또는 이 문항군 전용 검증 경로를 만든다. 정답을 추측하지 않고 SymPy로 증명 가능한 것만 verified로 둔다(검증 권위 서열 ①).\n③ 완료 판정 — 로컬 PG 샌드박스에서 eqapp 은행 재생 시 verified ≥1건, path_promotion·hint populate 후 phase3_coverage --hints-from-db에서 12미적Ⅰ-02-09 hint linked. 다른 문항군의 재생 결과가 줄지 않음."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/whs/**"
+session: null
+notes: "출처: P3-32 샌드박스 실측(2026-11-01) — 힌트 연결 10/10의 마지막 1건"
+updated: 2026-11-01
