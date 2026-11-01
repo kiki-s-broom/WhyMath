@@ -189,3 +189,33 @@ def test_missing_file_is_measurement_failure(registry: Registry, tmp_path: Path)
 def test_registry_missing_corpus_is_measurement_failure(tmp_path: Path) -> None:
     with pytest.raises(RegistryError):
         load_registry(tmp_path)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-92 — 평가셋 지문은 줄바꿈에 무관하고 내용에는 민감하다
+# ──────────────────────────────────────────────────────────────────────────
+def test_eval_set_fingerprint_ignores_line_endings_but_not_content() -> None:
+    import hashlib
+
+    from whymath_backend.harness.ai_quality_eval_set import eval_set_fingerprint
+
+    lf = '{"case_id": "a"}\n{"case_id": "b"}\n'.encode()
+    crlf = lf.replace(b"\n", b"\r\n")
+    cr = lf.replace(b"\n", b"\r")
+    assert crlf != lf
+    assert eval_set_fingerprint(crlf) == eval_set_fingerprint(lf) == eval_set_fingerprint(cr)
+    # LF 원본은 원시 sha256과 같다 — 기존 기록 지문이 그대로 유효하다
+    assert eval_set_fingerprint(lf) == hashlib.sha256(lf).hexdigest()
+    # 변별력 대조군: 내용이 한 글자만 달라도 지문이 다르다
+    assert eval_set_fingerprint(lf.replace(b'"b"', b'"c"')) != eval_set_fingerprint(lf)
+
+
+def test_canonical_eval_set_fingerprint_is_unchanged_by_normalization() -> None:
+    import hashlib
+
+    from whymath_backend.harness.ai_quality_eval_set import DEFAULT_EVAL_SET, eval_set_fingerprint
+    from whymath_backend.harness.ai_quality_registry import default_repo_root
+
+    raw = (default_repo_root() / DEFAULT_EVAL_SET).read_bytes()
+    assert b"\r" not in raw
+    assert eval_set_fingerprint(raw) == hashlib.sha256(raw).hexdigest()
