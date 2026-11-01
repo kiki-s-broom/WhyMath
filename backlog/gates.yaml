@@ -44,12 +44,13 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-06
-    remind_after_days: 50
+    remind_after_days: 120
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '시점 트리거(재확인 지점 2026-10-26 W8 종료 직후) — 판정 재료는 그 시점의 코드 상태이고 먼저 끝나야 할 태스크가 없다. 재확인 작업은 이 게이트를 기다리는 ARCH-40이 한다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
+      - "[2026-11-01] remind_after_days: 50 → 120 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "시점 트리거(재확인 지점 2026-10-26 W8 종료 직후) — 판정 재료는 그 시점의 코드 상태이고 먼저 끝나야 할 태스크가 없다. 재확인 작업은 이 게이트를 기다리는 ARCH-40이 한다"
   - id: G-arch56-availability-trigger
     title: "ARCH-56 착수 트리거 확인 — OpenRouter 가용성 축을 지금 재는 것이 맞는가 (ARCH-55 판정 기준 (d) 보류분). 배경: 4회차 429 실패율이 30%→15%→0%로 흔들렸고 실패 원인이 전부 limit_source=upstream_provider_shared_pool·is_byok=false(공유 풀)다 — 공유 풀은 배포 대상 구성이 아니므로 그 대기열 통계는 채택 후를 대표하지 않는다. 2026-09-18 Kiki 판단으로 BYOK을 개발 단계에서 미채택했다(\"우리는 일단 개발과정에 사용할건데 byok까지 할 거 있나?\"). 판정 3택: ①보류 유지(트리거 미발동 — 기본값. 이 게이트를 재생성해 감시 지속) ②착수(발동 조건 중 하나가 실현됨) ③영구 종결(이 경로를 쓰지 않기로 결정). 발동 조건 3종 중 먼저 오는 것: ⓐ OpenRouter 경로가 학생 대면 또는 상시 배치 트래픽을 받기로 결정된 때 ⓑ openrouter_allowed_providers 기본값을 바꾸려는 판정이 생긴 때 ⓒ 개발 단계 측정에서 429 실패율이 한 회차 50% 이상으로 오른 때. 등재 이유: 발동 조건을 태스크 acceptance 산문에만 두면 selector.py가 그것을 읽지 않아(depends_on만 본다) ARCH-55 완료 즉시 착수 후보로 계산된다 — 실측으로 확인했다(backlog.py done 출력이 \"ARCH-56 착수 가능\"을 냈다). G-arch38-verdict-recheck 선례 동형"
@@ -57,12 +58,13 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-18
-    remind_after_days: 90
+    remind_after_days: 108
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '발동 조건 트리거(학생 대면·상시 배치 결정 · allowed_providers 기본값 변경 판정 · 429 실패율 50% 이상) — 사람 결정과 외부 관측이며 먼저 끝나야 할 태스크가 없다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
+      - "[2026-11-01] remind_after_days: 90 → 108 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "발동 조건 트리거(학생 대면·상시 배치 결정 · allowed_providers 기본값 변경 판정 · 429 실패율 50% 이상) — 사람 결정과 외부 관측이며 먼저 끝나야 할 태스크가 없다"
   - id: G-arch66-anthropic-api-pause-review
     title: "Anthropic API 사용 중단 방침 재판정 (ARCH-66 만료 지점 · 2026-12-31) — 2026-09-24 Kiki 결정으로 12/31(내부 프로젝트 완성 시점)까지 Anthropic API를 쓰지 않고 Claude는 Claude Max 구독(개발 도구)으로만 쓴다. 백엔드는 anthropic_api_enabled=False(기본)로 Anthropic 좌석을 꺼 둔다. 날짜가 지나도 자동 재개하지 않는다 — 이 게이트가 판정한다. 판정 3택: ①재개(WHYMATH_ANTHROPIC_API_ENABLED=true + 키 과금 경로 확정 — G-opus5-billing-path-prod-recheck와 함께) ②연장(새 기한으로 이 게이트 재생성) ③전환(클라우드 좌석을 비-Anthropic으로 확정 — ARCH-64 기본값 전환 등). 이 판정에 묶여 보류된 것: API 라이브 호출이 필요한 ARCH-50·ARCH-56·ARCH-63·EOS-23·OPS-89의 라이브 측정 축, 게이트 G-eos02-default-flip-recheck. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그."
@@ -70,12 +72,13 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-24
-    remind_after_days: 98
+    remind_after_days: 102
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '방침 만료 지점(2026-12-31 내부 완성) — Kiki 방침 재판정이며 먼저 끝나야 할 태스크가 없다. 묶인 라이브 측정 축은 이 게이트를 기다리는 쪽이다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
+      - "[2026-11-01] remind_after_days: 98 → 102 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "방침 만료 지점(2026-12-31 내부 완성) — Kiki 방침 재판정이며 먼저 끝나야 할 태스크가 없다. 묶인 라이브 측정 축은 이 게이트를 기다리는 쪽이다"
   - id: G-arch71-cutover-live-run
     title: "ARCH-64 컷오버 라이브 대조 1회차(ARCH-71 acceptance ③) — Kiki 머신에서 저작 런북(docs/ops/eos118_seat_signal_live_runbook.md [A]~[C])과 학생 대면 런북(docs/ops/arch71_student_facing_cloud_mid_live_runbook.md)을 각 1회 실행한다. 확인: cloud_seat=openrouter · 관측 모델 · 기록 원가(좌석 단가 약 0.354원) · 학생 대면은 verdict(pass / degraded_cause_recorded / 그 밖)와 강등 원인(local_degraded·degrade_reason·provider_errors). 실패·강등 회차도 폐기하지 않고 기록한다. seat_primary_success_rate는 ARCH-63 전까지 None(미산출)이 정상이며 0으로 적지 않는다. 강등·429가 잦으면 G-cloud-mid-seat-cutover 판정 한계대로 openrouter_allowed_providers 이중화를 재질의한다. clear 증적 = 두 런북의 결과 JSON 판정 줄 + 판정 기준 커밋."
@@ -212,8 +215,9 @@ gates:
     remind_after_days: null
     evidence: null
     cleared_by: null
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
+    corrections:
+      - "[2026-11-01] notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-diagnosis-s00-s10-run
     title: "260927 EOS 통합정밀진단 S00~S10을 Kiki 머신에서 실행해 이식 완성 결과를 독립 검증한다(공통규칙: 읽기 전용·증거 등급·단계마다 새 세션·S09는 다른 모델). 이 저장소에 이식된 헌법·집행 장치가 진단의 기준(기준/헌법·기준_코딩규칙)에 비춰 어디까지 충족되는지 S02·S07이 판정하고, S08이 'Phase 2 완료' 주장을 Gate 2 증거로 대조한다(저장소 기록: 계획서 300 Gate 2 판정 3회 FAIL — 9/19·9/24·9/25, 미충족 1축). 세션 측 사전 검증(기계 축)은 docs/standards/coding_constitution_transplant.md §5 프로토콜대로 CI가 상시 수행한다. evidence = 결과/S10_통합진단서.md 경로 + 기준 커밋 해시 + 차단·높음 건수."
@@ -263,9 +267,10 @@ gates:
     remind_after_days: null
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-10-15] title: \"R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). 3택: A 방향 뒤집기(Pydantic→model_json_schema 내보내기+드리프트 검사, 규칙 문장 개정 — 권고) / B 생성기 도입(대·비권고) / C 철회·단계 6 이월. 근거·비용은 A0005 초안 「R4-02」절.\" → \"R4-02 결정 — 규칙('데이터 모델은 schemas/ JSON Schema 에서 자동 생성')의 전제가 저장소와 다르다(schemas/v1.1/*.yaml 은 JSON Schema 가 아니라 fields: 구조이고 머리말이 '구본 명세(비정본)·미구현'을 선언, Python 모델은 손 Pydantic). [2026-10-15 정정] 등재 시점의 3택(A/B/C)은 낡았다 — 문서 기록상 Kiki 가 2026-10-06 에 (나)안(규칙 문구를 '스키마 YAML 필드 ↔ 모델 필드 일치 검사'로 개정, 어긋남은 만료 2026-12-31 로 동결)으로 결정했고 그 내용은 A0005 패치에 들어 있다. 이 게이트는 A0005 채택(G-const-a0005-part1-corrections) 뒤 audit.py --stage 3 에서 R4-02 가 통과로 바뀐 결과를 evidence 로 닫는다. 근거는 A0005 초안 「R4-02」절.\" — 제목이 등재 시점(2026-10-06) 3택을 그대로 담아 실제 결정((나)안)과 어긋남 - 문서 기록 기준으로 정정. 결정 사실 자체는 대장 증거가 없고 coding_constitution_transplant.md 와 A0005 초안의 서술에 의존한다. 판정 기준 main bb8122f4."
+      - "[2026-11-01] notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "판정 재료(초안·패치·실측)가 CONST-03 P4 PR에 이미 있어 선행 작업이 없다 — Kiki 결정 대기"
   - id: G-const-signing-key-register
     title: "헌법 서명 검증 무장 - Kiki 서명 키를 만들어 공개키를 서명자 목록(constitution_signers/allowed_signers)에 등록하는 PR을 직접 만들고 머지한다. 이 PR이 머지되기 전까지 서명 검증은 미무장이라 어떤 서명 요건도 강제되지 않는다(키 등록 전 부트스트랩 상태). 절차와 음성 시험은 docs/ops/constitution_signing_runbook.md 의 과제 S, T, U. 등록 PR은 AI가 아니라 Kiki가 직접 만든다 - AI가 올린 등록 PR을 내용 확인 없이 승인하면 AI 키가 등록된다."
@@ -529,15 +534,16 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-21
-    remind_after_days: 60
+    remind_after_days: 105
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] depends_on +OPS-89-cache-breakpoint-placement-shared-prefix — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 게이트 제목의 발동 조건이 'OPS-89가 main에 착지한 때'다 — 산문에만 있던 발동 조건을 입력 간선으로 옮긴다"
       - "[2026-10-02] verdict PASS · inputs: OPS-89-cache-breakpoint-placement-shared-prefix · evidence: 판정 기준 커밋 4d8262545(PR 1425·미머지 — 머지 전에는 발동 조건 충족으로 읽지 말 것). PASS의 뜻은 브레이크포인트 이동 코드와 모사·SDK 표면 검증이 완성돼 재판정 입력이 갖춰졌다는 것이지 기본값 전환 근거가 갖춰졌다는 뜻이 아님: 실제 API cache_read 라이브 증거는 없고(ARCH-66·G-arch66 전까지 미수행), cross_verify 경로는 system이 최소 캐시 토큰 미만이라 위치를 고쳐도 캐시 무효(OPS-104 소유). 따라서 ①기본값 True 전환은 라이브 실측 전 근거 부족. 결정은 게이트 담당자 몫. 판정문 docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md — done OPS-89-cache-breakpoint-placement-shared-prefix 인계"
       - "[2026-10-02] depends_on +OPS-104-cross-verify-cache-prefix-below-minimum — 개발기간(2026-09-24~2026-12-31) N/A 처리 — Kiki 결정(2026-10-02). 개발은 Claude Max 구독으로 진행하고 백엔드 Anthropic API 좌석은 꺼져 있다(ARCH-66). 구독 세션(Claude Code)의 캐싱은 자동이라 우리가 cache_control 위치·기본값을 제어할 수 없어, 이 게이트가 묻는 anthropic_prompt_caching 전역 기본값 전환의 대응물이 구독 쪽에 없다. 따라서 기본값 전환 재판정은 API 재개 판정(G-arch66-anthropic-api-pause-review) 이후로 미룬다. 그 전까지 라이브 cache_read 증거는 수행 불가이고 cross_verify 경로 프리픽스 미달(OPS-104)도 미해소다. 결정은 여전히 Kiki 몫이며 이 amend는 판정이 아니다. 근거: MEMORY 2026-09-24 ARCH-66 경계 절, docs/reviews/ops89_cache_breakpoint_placement_2026-10-02.md"
       - "[2026-10-03] title: 'EOS-02 acceptance ③ 기본값 전환 재판정 — anthropic_prompt_caching 을 전역 기본값 True 로 바꿀지 다시 판정한다. 2026-09-21 라이브 회차는 저작 배치 경로에서 적중률 89.9%(입력 78.4% 절감)를 실측했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. 최상위 자동 캐싱은 브레이크포인트를 가변 꼬리 뒤에 놓으므로, 안정 프리픽스 + 가변 꼬리 형태인 cross_verify · multi_solution 두 경로에서는 적중 0 에 쓰기 할증 1.25배만 남는다. 발동 조건: OPS-89(브레이크포인트를 system 끝 명시 지점으로 이동)가 main 에 착지한 때. 그때 이 판정의 전제(한 경로만 이득)가 사라진다. 판정 3택: ①기본값 True 전환(MEMORY 결정 로그에 실측 적중률·절감 추정 기재 — EOS-99 ④ 승계) ②보류 유지(이 게이트를 재생성해 감시 지속) ③경로별 플래그로 분리 재설계. 근거 = docs/ops/eos02_prompt_cache_live_verdict.md §4. 등재 이유: 발동 조건을 판정문 산문에만 두면 selector 가 그것을 읽지 않아(depends_on 만 본다) 재판정이 영영 안 돌아온다 — 만료 없는 유예 금지. G-arch56-availability-trigger 선례 동형.' → '[2026-10-03 Kiki 판정 ②보류 유지 — 기본값은 False 그대로 · 재판정 시점 = API 재개 판정 G-arch66-anthropic-api-pause-review 이후 · 그때 OPS-104 처리와 라이브 cache_read 실측을 선행한다] EOS-02 acceptance ③ 기본값 전환 재판정 — anthropic_prompt_caching 을 전역 기본값 True 로 바꿀지 다시 판정한다. 2026-09-21 라이브 회차는 저작 배치 경로에서 적중률 89.9%(입력 78.4% 절감)를 실측했으나, 그것이 성립한 이유가 그 회차의 user 프롬프트가 사실상 상수였기 때문(호출당 미캐시 3토큰)이라 전체 경로를 대표하지 않는다. 최상위 자동 캐싱은 브레이크포인트를 가변 꼬리 뒤에 놓으므로, 안정 프리픽스 + 가변 꼬리 형태인 cross_verify · multi_solution 두 경로에서는 적중 0 에 쓰기 할증 1.25배만 남는다. 발동 조건: OPS-89(브레이크포인트를 system 끝 명시 지점으로 이동)가 main 에 착지한 때. 그때 이 판정의 전제(한 경로만 이득)가 사라진다. 판정 3택: ①기본값 True 전환(MEMORY 결정 로그에 실측 적중률·절감 추정 기재 — EOS-99 ④ 승계) ②보류 유지(이 게이트를 재생성해 감시 지속) ③경로별 플래그로 분리 재설계. 근거 = docs/ops/eos02_prompt_cache_live_verdict.md §4. 등재 이유: 발동 조건을 판정문 산문에만 두면 selector 가 그것을 읽지 않아(depends_on 만 본다) 재판정이 영영 안 돌아온다 — 만료 없는 유예 금지. G-arch56-availability-trigger 선례 동형.' — Kiki가 선택지 2(보류 유지)로 판정했다(2026-10-03 세션 대화). 근거: 실 API cache_read 라이브 증거를 ARCH-66 방침(2026-12-31까지 Anthropic API 미사용)상 지금 얻을 수 없고, OPS-104(cross_verify 프리픽스 최소 캐시 토큰 미달)가 미해소다. 게이트는 pending으로 유지하며 입력(OPS-89·OPS-104)은 그대로 둔다. 판정 기준 main 12242694."
+      - "[2026-11-01] remind_after_days: 60 → 105 · notes +30자 — D13 Kiki 결정"
     depends_on:
       - OPS-89-cache-breakpoint-placement-shared-prefix
       - OPS-104-cross-verify-cache-prefix-below-minimum
@@ -693,11 +699,12 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-28
-    remind_after_days: 95
+    remind_after_days: 98
     evidence: null
     cleared_by: null
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
+    corrections:
+      - "[2026-11-01] remind_after_days: 95 → 98 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "방침 만료 지점(2026-12-31 내부 완성 판정 이후) — 외부 작업 재개는 대장의 단일 태스크가 아니라 Kiki 판정이며 먼저 끝나야 할 태스크가 없다(G-student-work-after-internal-completion과 동형)"
   - id: G-harn121-constitution-token-measure
     title: "헌법 토큰 실측 (HARN-121 ①) — Phaiakes9에서 실 Anthropic 키로 CLAUDE.md·AGENTS.md·SessionStart 브리핑의 count_tokens 측정. 런북 = docs/ops/harn121_constitution_token_measurement_runbook.md. 회신 = 블록 3 출력 전문(표 + 합계 줄, 미측정 사유 포함). 산출물 = metrics/constitution_tokens.json. 이 수치가 3분리(②)의 전후 비교 기준선이며, 목표 \"코어 ≤ 1.5만 토큰\"의 분모다. 문자 수 대체 금지 — 스크립트가 키 없으면 exit 2로 거부한다."
@@ -958,14 +965,15 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-20
-    remind_after_days: 100
+    remind_after_days: 106
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '시점 트리거(v1.0 12월 출시 이후 첫 계획 세션) — 재개·폐기·유지 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
       - "[2026-09-28] title: 'Not Now List 12종 재확인 지점 — v1.0(12월 출시) 이후 첫 계획 세션에서 재개·폐기·유지 3택 판정. 11월(Phase 3 기간 2026-10-26~11-22) 착수 금지의 집행 지점이며, 이 게이트가 pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다. 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)' → 'Not Now List 12종 재확인 지점 — 12/31 내부 완성 판정 이후 첫 계획 세션에서 유지·재개·폐기 3택 판정. 12/31은 외부 출시일이 아니다(외부 출시는 2027년 · EOS 전환 선언 2026-08-30 §0-2). Not Now 범위 결정의 집행 지점이며, 잠금은 달력(11월·Phase 3 기간)이 아니라 이 게이트 판정까지 간다(build_harness §3a): pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다(E1-01은 트랙 게이트 G-s5-subject-expansion이 따로 한 번 더 잠근다). 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 재개 제약: NOTNOW 11건 acceptance ③은 재개 근거로 v1.0 운영 실측(학생 표본·KPI·비용)을 요구하는데, ARCH-66 ⑥(2026-09-24)으로 학생 참여 과정 전부가 12/31 이후로 연기돼(G-student-work-after-internal-completion) 연말 회차에는 그 실측이 없다 — 그 회차의 실질 선택지는 ①·③이고, ②는 파일럿(S3-01) 실측이 나온 뒤이거나 그 조건 자체를 먼저 바꾸는 결정이 있어야 한다. 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)' · no_inputs_reason: '시점 트리거(v1.0 12월 출시 이후 첫 계획 세션) — 재개·폐기·유지 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다' → '시점 트리거(12/31 내부 완성 판정 이후 첫 계획 세션) — 유지·폐기 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다. 재개(②)만은 파일럿(S3-01) 실측이 사실상 선행이지만 입력 간선으로 걸지 않는다 — 걸면 유지·폐기 판정까지 파일럿 완료에 묶인다(2026-09-28 Kiki 선택: 보류 + 문구 정정)' — 게이트 전제 재점검(2026-09-28 · Kiki 선택: 보류 + 문구 정정 · 판정 기준 main 919865d4) — 등재(09-20) 문면의 낡은 사실 3건 정정: ⓐ 'v1.0(12월 출시)' → 12/31은 외부 출시일이 아니라 내부 검증 판정일(EOS 전환 선언 2026-08-30 §0-2) ⓑ '11월(Phase 3 기간 2026-10-26~11-22) 착수 금지' → Phase 3 최종 판정은 11/15로 통합(G-p3-w3-release-merged)됐고 이 게이트의 실질은 범위 결정(build_harness §3a) ⓒ ARCH-66 ⑥(09-24)으로 학생 참여 과정이 12/31 이후로 연기돼 연말 회차에 재개 근거(v1.0 운영 실측)가 없다는 사실 명시. 잠금 실측: 착수 후보 218건 중 부착 12건 0건 · 격리 사본 clear 주입 시 NOTNOW 11/11 등장(E1-01은 G-s5-subject-expansion 2차 잠금) · 원복 바이트 동일. 상태·독촉(100일=2026-12-29)·부착 태스크 무변경"
       - "[2026-09-28] title: 'Not Now List 12종 재확인 지점 — 12/31 내부 완성 판정 이후 첫 계획 세션에서 유지·재개·폐기 3택 판정. 12/31은 외부 출시일이 아니다(외부 출시는 2027년 · EOS 전환 선언 2026-08-30 §0-2). Not Now 범위 결정의 집행 지점이며, 잠금은 달력(11월·Phase 3 기간)이 아니라 이 게이트 판정까지 간다(build_harness §3a): pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다(E1-01은 트랙 게이트 G-s5-subject-expansion이 따로 한 번 더 잠근다). 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 재개 제약: NOTNOW 11건 acceptance ③은 재개 근거로 v1.0 운영 실측(학생 표본·KPI·비용)을 요구하는데, ARCH-66 ⑥(2026-09-24)으로 학생 참여 과정 전부가 12/31 이후로 연기돼(G-student-work-after-internal-completion) 연말 회차에는 그 실측이 없다 — 그 회차의 실질 선택지는 ①·③이고, ②는 파일럿(S3-01) 실측이 나온 뒤이거나 그 조건 자체를 먼저 바꾸는 결정이 있어야 한다. 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)' → 'Not Now List 12종 재확인 지점 — 12/31 내부 완성 판정(G-internal-completion-2026-12-31) 이후 첫 계획 세션에서 유지·재개·폐기 3택 판정. 12/31은 외부 출시일이 아니다(외부 출시는 2027년 · EOS 전환 선언 2026-08-30 §0-2). Not Now 범위 결정의 집행 지점이며, 잠금은 달력(11월·Phase 3 기간)이 아니라 이 게이트 판정까지 간다(build_harness §3a): pending인 동안 부착 태스크는 selector 착수 후보에서 제외된다(E1-01은 트랙 게이트 G-s5-subject-expansion이 따로 한 번 더 잠근다). 판정 3택: ①유지(다음 재확인 지점을 새 게이트로 재생성) ②재개(해당 태스크의 acceptance를 실제 설계로 갱신 후 착수 허용) ③폐기(태스크 cancel). 재개 제약: NOTNOW 11건 acceptance ③은 재개 근거로 v1.0 운영 실측(학생 표본·KPI·비용)을 요구하는데, ARCH-66 ⑥(2026-09-24)으로 학생 참여 과정 전부가 12/31 이후로 연기돼(G-student-work-after-internal-completion) 연말 회차에는 그 실측이 없다 — 그 회차의 실질 선택지는 ①·③이고, ②는 파일럿(S3-01) 실측이 나온 뒤이거나 그 조건 자체를 먼저 바꾸는 결정이 있어야 한다. 등재 이유: Phase 3 실행계획 범위 규율(Not Now List)을 notes 산문이 아니라 대장이 집행하게 — selector는 notes를 읽지 않는다(CLAUDE.md 만료 없는 유예 금지)' — 2026-09-28 병합 후 재정정 — main본(de3f5487 · Kiki 판정) 문면은 그대로 두고 '12/31 내부 완성 판정'에 정의 게이트 ID(G-internal-completion-2026-12-31)만 삽입. 판정 기준 main 09501c5f"
+      - "[2026-11-01] remind_after_days: 100 → 106 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "시점 트리거(12/31 내부 완성 판정 이후 첫 계획 세션) — 유지·폐기 판정은 사람 결정이며 먼저 끝나야 할 태스크가 없다. 재개(②)만은 파일럿(S3-01) 실측이 사실상 선행이지만 입력 간선으로 걸지 않는다 — 걸면 유지·폐기 판정까지 파일럿 완료에 묶인다(2026-09-28 Kiki 선택: 보류 + 문구 정정)"
   - id: G-operator-seat-first-grant
     title: "운영자 좌석 1호 발급 (whymath-pg) — 1~3단계 완료(2026-08-31 원본 볼륨 복귀·stamp 확정 a9b8c7d6e5f4·백업 확보). 4단계 실행 대기: stamp→upgrade head→운영자 부트스트랩→content_admin grant — 복붙 블록은 notes에 전문 수록"
@@ -1048,12 +1056,13 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-21
-    remind_after_days: 90
+    remind_after_days: 105
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '발동 조건 트리거(프로덕션 배포 판정 또는 학생 대면 트래픽이 개발 좌석을 넘을 때) — 사람 결정이며 먼저 끝나야 할 태스크가 없다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
+      - "[2026-11-01] remind_after_days: 90 → 105 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "발동 조건 트리거(프로덕션 배포 판정 또는 학생 대면 트래픽이 개발 좌석을 넘을 때) — 사람 결정이며 먼저 끝나야 할 태스크가 없다"
   - id: G-orphan-prod-run
     title: "orphan 진단 스크립트 prod 실행 (scripts/diagnose_atom_orphans.py)"
@@ -1318,12 +1327,13 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-10-18
-    remind_after_days: 14
+    remind_after_days: 78
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-10-27] depends_on +P3-90 · verdict FAIL · owners: P3-90 · inputs: P3-66-signature-shadow-harvest-activation-cli · evidence: 판정 기준 main 8ed9e26a1 (#1744 머지) — 운영 그림자 관측 레코드 0건: 빈 입력에 attempt_scan_shadow_harvest exit 3(측정 불가 · 미분 서명 레코드 0건). 활성화 기준 C1(오답 시도 n≥300) 미충족 — 측정 불가는 PASS가 아니다(게이트 문면). 수집 배선은 P3-56이 의도적으로 만들지 않았다(판정문 §9.5). — done P3-66-signature-shadow-harvest-activation-cli 인계"
+      - "[2026-11-01] remind_after_days: 14 → 78 · notes +30자 — D13 Kiki 결정"
     depends_on:
       - P3-66-signature-shadow-harvest-activation-cli
       - P3-90
@@ -1347,12 +1357,13 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-10-18
-    remind_after_days: 7
+    remind_after_days: 78
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-10-18] verdict PASS · inputs: P3-59-m0672-shadowed-by-canonical-m0075 · evidence: 판정문 docs/reviews/p3_59_m0672_shadowed_disposition_2026-10-18.md §5·§6 · 판정 기준 main d33ab2e4 · 커밋 8fa4660c · PR #1680. PASS의 뜻은 결정 입력(선택지 3안의 비용 연쇄·실측 영향 36문항·재판정 조건 2건)이 완성돼 Kiki의 결정이 가능해졌다는 것이며 어느 안을 택할지는 게이트 담당자 몫이다. 세션 의견은 안 3 현상 유지. 분모를 바꾸는 안 2와 신규 kebab 안 1은 세션이 확정하지 않았다(acceptance 3). 신규 발견: M0672를 0.97로 재서명하면 동률로 M0075까지 canonical을 잃는다(select_canonical 실측). — done P3-59-m0672-shadowed-by-canonical-m0075 인계"
+      - "[2026-11-01] remind_after_days: 7 → 78 · notes +30자 — D13 Kiki 결정"
     depends_on:
       - P3-59-m0672-shadowed-by-canonical-m0075
   - id: G-p361-choice-trace-crosslink-signature
@@ -1572,13 +1583,14 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-22
-    remind_after_days: 100
+    remind_after_days: 104
     evidence: null
     cleared_by: null
-    notes: ""
+    notes: "[판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님"
     corrections:
       - "[2026-09-25] depends_on +S3-51-free-use-remeasurement-observability — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 재측정 도구(회차 구간 필터·판정 모집단 분모·등호 전이 축)를 만든 작업이 S3-51이다(done) — 재개 판정의 선택지 ①이 그 도구를 쓴다"
       - "[2026-09-27] depends_on -S3-51-free-use-remeasurement-observability · no_inputs_reason: None → '시점 트리거 게이트 — 재개 판정 3택은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 한다. 측정 도구는 S3-51(done · PR #1273)로 준비 완료이며 그 도구 제작은 판정이 아니다' — HARN-177 ② 표시 정직성 착지 후 실측 정정 — 이 게이트의 입력 S3-51은 재측정 도구를 만든 작업(done)이지 판정 태스크가 아니다. 재개 판정(3택)은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 하는 시점 판정이라 여는 작업이 대장에 없다. HARN-174 v2-9 백필이 도구 제작을 입력으로 걸었는데, HARN-177 이후 '입력 전부 done · 판정 기록 없음'은 판정 결과 미기록으로 표시되므로 사실(시점 트리거·사람 직접 판정)에 맞게 입력 없음 사유로 옮긴다. 도구 준비 완료 사실은 title에 그대로 있다(S3-51 · PR #1273). 판정 기준 main 8138f19a"
+      - "[2026-11-01] remind_after_days: 100 → 104 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "시점 트리거 게이트 — 재개 판정 3택은 연기 만료 지점(2026-12-31 이후)에 Kiki가 직접 한다. 측정 도구는 S3-51(done · PR #1273)로 준비 완료이며 그 도구 제작은 판정이 아니다"
   - id: G-s401-inter-course-edge-review
     title: "S4-01 대학 과목간 선수 엣지 137건의 교육적 타당성 검수 — 승인 시에만 정본 graph.json 병합. 제안 파일 data/corpus/atom_graph_v1/inter_course_edges_university_v1.json 과 표 문서 docs/data/inter_course_edges_university_v1.md §7 의 137행(from 선수 과목 원자 · to 후속 과목 원자 · 근거)을 보고 승인/반려/보류로 판정한다. 과목 쌍(문서 표의 묶음, 66쌍·쌍당 최대 4건) 단위로 판정해도 된다. 기계로 검증된 것(양끝 실재·대학 과목 간·세부개념 수준·중복 없음·쌍당 상한·병합 시 DAG 비순환·과목 계열 정합)은 테스트로 동결돼 있으므로 검수 대상이 아니다. 검수 대상은 오직 \"이 개념이 저 개념의 선수인가\"라는 교수학적 판단이다. 이 제안은 슬라이스 1(고→대 24건, G-s401-uni-boundary-edge-review)과 함께일 때만 효과가 있다 — 측정: 정본 0/512 → 슬라이스1 198/512 → 슬라이스1+본 제안 466/512(91.0%). 부분 승인이 정상이다."
@@ -1638,9 +1650,13 @@ gates:
     remind_after_days: null
     evidence: null
     cleared_by: null
-    notes: "수학 K-12 완성 전 어떤 과목도 착수 금지 (불변 전제)"
+    notes: |-
+      수학 K-12 완성 전 어떤 과목도 착수 금지 (불변 전제)
+
+      [판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님
     corrections:
       - "[2026-09-25] depends_on +S5-01-expansion-gate-judgement — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: E축 체크리스트 전수 판정 태스크가 S5-01이다(제목이 '통과 시 이 게이트 clear') — 진입 게이트가 트랙 전체를 막으므로 S5-01의 해금 수가 E축 전체로 보이게 된다"
+      - "[2026-11-01] notes +30자 — D13 Kiki 결정"
     depends_on:
       - S5-01-expansion-gate-judgement
   - id: G-skb01-bridge-populate
@@ -1737,14 +1753,18 @@ gates:
     assignee: kiki
     status: pending
     requested: 2026-09-24
-    remind_after_days: 98
+    remind_after_days: 102
     evidence: null
     cleared_by: null
-    notes: "[판정 근거 2026-10-19] [D2] Phase 3 Release Gate A 원문 조건('실제 학생 계정' 폐쇄루프 무개입 완주) 이관 — 내부 완성 이후 재개 시 Gate A를 실제 학생으로 재판정"
+    notes: |-
+      [판정 근거 2026-10-19] [D2] Phase 3 Release Gate A 원문 조건('실제 학생 계정' 폐쇄루프 무개입 완주) 이관 — 내부 완성 이후 재개 시 Gate A를 실제 학생으로 재판정
+
+      [판정 근거 2026-11-01] [D13] 2027 보류 — 12/31 판정 입력 아님
     corrections:
       - "[2026-09-25] no_inputs_reason: None → '방침 만료 지점(2026-12-31 내부 완성 확인) — 내부 완성은 대장의 단일 태스크가 아니라 Kiki 판정이며 먼저 끝나야 할 태스크가 없다' — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 입력 없음 사유 명시"
       - "[2026-09-28] title: \"학생 참여 과정 재개 판정 (ARCH-66 ⑥ · 2026-12-31 내부 프로젝트 완성 이후) — 2026-09-24 Kiki 결정으로 학생(실사용자)과 함께 해야 하는 모든 과정(파일럿·코호트·베타·사용자 테스트·실사용 KPI 측정·실제 동의 수집)을 12/31 내부 프로젝트 완성 이후로 연기한다. 이 게이트가 부착된 태스크는 selector 착수 후보에서 빠진다. 날짜가 지나도 자동 재개하지 않는다 — 내부 완성 확인 후 이 게이트를 clear해야 풀린다. 부착 = S3-01(파일럿 코호트)·S4-15(실응답 난이도 루프)·E5-01·E6-01(과목 팩 파일럿). 학생 없이 가능한 축은 막지 않는다: ASM-11은 ⑵ ASM-10 분기로, P3-13 ①은 테스트용 학생 계정으로 진행. 판정 3택: ①재개(파일럿 착수) ②연기 연장(새 기한으로 재생성) ③범위 축소 재개(예: 지인 학생 소수 먼저). 함께 판정할 것: EOS 선언 G4(12-13) 차단 조건 '학생 표본 ≥20명'은 이 연기로 12/31 전 충족 불가 — G4 조건 재정의 또는 12/31 이후 이동. 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.\" → \"학생 참여 과정 재개 판정 (ARCH-66 ⑥ · 2026-12-31 내부 프로젝트 완성 이후) — 2026-09-24 Kiki 결정으로 학생(실사용자)과 함께 해야 하는 모든 과정(파일럿·코호트·베타·사용자 테스트·실사용 KPI 측정·실제 동의 수집)을 12/31 내부 프로젝트 완성 이후로 연기한다. 이 게이트가 부착된 태스크는 selector 착수 후보에서 빠진다. 날짜가 지나도 자동 재개하지 않는다 — 내부 완성 판정(G-internal-completion-2026-12-31 · 정의: Phase 3 Release PASS + EOS G5 판정 + 12월 검증 P0 전건 종결) 뒤에 이 게이트를 clear해야 풀린다. 부착 = S3-01(파일럿 코호트)·S4-15(실응답 난이도 루프)·E5-01·E6-01(과목 팩 파일럿). 학생 없이 가능한 축은 막지 않는다: ASM-11은 ⑵ ASM-10 분기로, P3-13 ①은 테스트용 학생 계정으로 진행. 판정 3택: ①재개(파일럿 착수) ②연기 연장(새 기한으로 재생성) ③범위 축소 재개(예: 지인 학생 소수 먼저). 이 게이트로 이관된 판정 항목: 실제 학생 표본 ≥20명 — EOS 선언 G4의 원 조건이었고, 2026-09-24 EOS-135(PR #1304)로 G4는 '내부 테스트 계정 표본 ≥20건'으로 교체·판정일 12-13 유지로 종결됐다(종전 문면의 'G4 조건 재정의 또는 이동을 함께 판정할 것'은 이미 결정된 사항이라 2026-09-28 정정). 근거 = MEMORY 2026-09-24 ARCH-66 결정 로그.\" — 2026-09-28 정리 — 문면의 G4 미결 문장은 EOS-135로 이미 결정됨 · 내부 완성 정의 게이트 참조 추가. 판정 기준 main 6c880b67"
       - "[2026-10-19] notes +96자 — D2 이관 기록"
+      - "[2026-11-01] remind_after_days: 98 → 102 · notes +30자 — D13 Kiki 결정"
     no_inputs_reason: "방침 만료 지점(2026-12-31 내부 완성 확인) — 내부 완성은 대장의 단일 태스크가 아니라 Kiki 판정이며 먼저 끝나야 할 태스크가 없다"
   - id: G-web01-landing-legal-review
     title: "공개 랜딩 v1 공개 전 변호사 검토 (WEB-01 acceptance ③ · web_strategy.md §3.4) — 기계 대체 금지. 검토 항목 3종: ①광고·마케팅 규제(regulatory_checklist.md §4) — RCT 검증 전 \"성적이 오른다\" 류 효과 단정 금지·비교 광고 자문. 현행 카피는 효과 단정을 피하도록 작성했고 tests/infra/test_webapp_landing_governance.py가 금지 문구를 보조 탐지하지만, 문자열 열거는 표현 변형에서 뚫리므로 최종 판정은 사람이 한다 ②웹접근성 — 지능정보화기본법 §46은 문언상 '웹사이트' 중심이라 웹을 개설하는 순간 적용 범위가 실제로 변동한다(법률 판단 사항). 코드 쪽 선결(lang=\"ko\"·본문 바로가기·대비비 4.5:1 초과·확대 제한 없음·prefers-reduced-motion)은 착지했으나 KWCAG 적합성 판정은 아니다 ③개인정보 — 베타 신청은 v1에서 외부 폼 '링크'만 쓰므로(백엔드 호출 0·랜딩 수집 표면 0) 폼 URL을 채우는 순간 처리위탁 고지 대상이 된다. 현재 NEXT_PUBLIC_BETA_FORM_URL 미설정이라 CTA가 \"준비 중\"으로 렌더되며 링크 자체가 존재하지 않는다. 처리방침·수집 최소화 문구도 함께 검토. 검토 대상 산출물: src/web/webapp/ 랜딩 1페이지 전문(app/(public)/) + 법정 표시 푸터 자리. 판정 3택: ①현행 카피로 공개 승인 ②수정 요구 항목 회신 후 재검토 ③공개 보류. 이 게이트가 pending인 동안 랜딩은 비공개다 — 배포는 WEB-02가 소유하며 이 게이트 통과가 그 선결이다."

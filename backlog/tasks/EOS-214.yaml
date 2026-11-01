@@ -7,7 +7,7 @@ subject: math
 layer: backend
 status: todo
 priority: 2
-eos_priority: P1
+eos_priority: P2
 owner: claude
 depends_on: []
 requires_gates: []
@@ -18,5 +18,8 @@ paths:
   - src/backend/whymath_backend/l4/hint_content/cu_hint_pass.py
   - "tests/backend/l4/hint_content/**"
 session: null
-notes: "출처: EOS-211 구현(2026-10-29) — Kiki 결정 '사후 LLM 힌트 패스'에서 단계 계산 SymPy 검증은 범위 밖으로 분리."
-updated: 2026-10-29
+notes: |-
+  출처: EOS-211 구현(2026-10-29) — Kiki 결정 '사후 LLM 힌트 패스'에서 단계 계산 SymPy 검증은 범위 밖으로 분리.
+
+  [정정 2026-11-01] eos_priority P1 → P2: D13 Kiki 결정
+updated: 2026-11-01
