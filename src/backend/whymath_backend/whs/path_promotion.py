@@ -10,7 +10,9 @@
     (`promote_verified_solutions`)는 조회·적재만 한다(hermetic 테스트 가능 분해).
   - **approach_type 매핑**: 폐쇄 6종 영문 정확 일치 + 한글 라벨(대수적/기하적/조합적/귀납적/
     시각적/역방향 — yaml enum 한글 설명·§2.4 docstring 표기와 1:1) 결정론 번역만. 그 외
-    (예: "corpus-replay")는 추측하지 않고 **사람 검수 큐**로(AI 자기승인 금지).
+    (예: "corpus-replay")는 추측하지 않고 **사람 검수 큐**로(AI 자기승인 금지). 단 "corpus-replay"는
+    사람이 승인한 문항군 표(`CORPUS_REPLAY_APPROACH_BY_FAMILY` · P3-94)에 있는 문항만 그 표의 값으로
+    매핑한다 — 행마다 추측하는 것이 아니라 생성기 단위로 한 번 판정된 값이다.
   - **개념 ID 매칭**: 표현식 문자열→개념 노드의 결정론 매칭 유틸이 코드베이스에 없고(의미
     매칭은 임베딩·LLM 축 — L3 5개 핵심 호출지점 중 4번), LLM 0 제약이라 **매칭을 시도하지
     않는다** — 전 스텝을 `concept_node_id=NULL`(검수 대기)로 적재하고 전건을 사람 검수 큐에
@@ -59,7 +61,7 @@ import asyncio
 import json
 import sys
 import uuid
-from collections.abc import Callable, Coroutine, Sequence, Set
+from collections.abc import Callable, Coroutine, Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -107,6 +109,72 @@ def map_strategy_tag_to_approach(strategy_tag: str | None) -> str | None:
     """
     parsed = parse_approach_label(strategy_tag)
     return parsed.value if parsed is not None else None
+
+
+#: `whs/corpus_replay`가 모든 재생 풀이에 다는 태그 — 풀이 유형이 아니라 *출처* 표지다.
+CORPUS_REPLAY_STRATEGY_TAG = "corpus-replay"
+
+#: 코퍼스 재생 풀이의 풀이 유형 — 생성기 문항군(slug 접두) 단위 결정론 표.
+#: **사람 승인 표다**(게이트 G-p332-corpus-replay-approach · Kiki 2026-11-01 A안). AI가 행마다
+#: 추측하는 것이 아니라, 생성기가 만드는 풀이 단계의 형태를 문항군 단위로 한 번 판정해 고정한다.
+#: 범위 = 핵심 개념 은행 5개(p3_calculus1_diff_v0·generated_v0·p3_fill_v0·rephrased_v0·
+#: conceptual_v0)의 풀이 단계 보유 문항군 28개 전수. 표에 없는 문항군은 지금처럼 검수 큐로 간다.
+#:   - inductive: wm-indseq — 같은 항을 나열한 합에서 일반항 공식으로 일반화한다.
+#:   - algebraic: 나머지 — 미분·인수분해·대입·공식 계산의 식 변형 연쇄다.
+#: 근거 표본 = docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md §5.
+CORPUS_REPLAY_APPROACH_BY_FAMILY: dict[str, str] = {
+    # generated_v0 · rephrased_v0 (rephrased는 `<문항군>-<해시>-rephrased` 꼴)
+    "wm-skel": "algebraic",
+    "wm-calc-ext": "algebraic",
+    "wm-calc-extirr": "algebraic",
+    "wm-calc-extmc": "algebraic",
+    "wm-calc-extv": "algebraic",
+    "wm-calc-tan": "algebraic",
+    "wm-exp": "algebraic",
+    "wm-log": "algebraic",
+    "wm-arseq": "algebraic",
+    "wm-arsum": "algebraic",
+    "wm-geseq": "algebraic",
+    "wm-gesum": "algebraic",
+    "wm-indseq": "inductive",
+    "wm-trig": "algebraic",
+    "wm-trigeq": "algebraic",
+    # conceptual_v0
+    "wm-count-mc": "algebraic",
+    # p3_calculus1_diff_v0
+    "wm-p3-diff-power": "algebraic",
+    "wm-p3-diff-polyrules": "algebraic",
+    "wm-p3-diff-tangent": "algebraic",
+    "wm-p3-diff-mvt": "algebraic",
+    "wm-p3-diff-graphshape": "algebraic",
+    "wm-p3-diff-eqapp": "algebraic",
+    "wm-p3-diff-velocity": "algebraic",
+    # p3_fill_v0
+    "wm-p3-diff-coefficient": "algebraic",
+    "wm-p3-diff-differentiability": "algebraic",
+    "wm-p3-diff-monotonicity": "algebraic",
+    "wm-p3-diff-power-pattern": "algebraic",
+    "wm-p3-diff-motion-word": "algebraic",
+}
+
+
+def corpus_replay_approach_for_slug(slug: str | None) -> str | None:
+    """문항 slug → 승인 표의 풀이 유형. 표에 없으면 None(검수 큐행 — 추측 금지).
+
+    문항군 경계는 `-`다: slug가 문항군 이름과 같거나 `문항군-`로 시작해야 한다. 그래서
+    `wm-trig`가 `wm-trigeq-…`를, `wm-calc-ext`가 `wm-calc-extv-…`를 잡지 않는다. 여러 문항군이
+    맞으면 가장 긴 것을 쓴다(`wm-p3-diff-power` vs `wm-p3-diff-power-pattern-…`).
+    """
+    if not slug:
+        return None
+    matches = [
+        family
+        for family in CORPUS_REPLAY_APPROACH_BY_FAMILY
+        if slug == family or slug.startswith(family + "-")
+    ]
+    if not matches:
+        return None
+    return CORPUS_REPLAY_APPROACH_BY_FAMILY[max(matches, key=len)]
 
 
 def extract_plain_steps(solution_path: dict[str, Any]) -> list[str] | None:
@@ -197,6 +265,8 @@ class PromotionReport:
     steps_skipped_additional_path: int = 0  # 대표 경로가 이미 단계 실체화 — 헤더만(UNIQUE 불변)
     steps_skipped_step_conflict: int = 0  # 레거시 problem_step 선점 — 헤더만(클로버 금지)
     queued_approach_unmappable: int = 0  # approach 미확정 → 검수 큐(승격 차단)
+    # 코퍼스 재생 태그를 승인 표(문항군)로 매핑한 수 — 표가 실제로 작동한 비율의 분자.
+    approach_from_corpus_family: int = 0
     queued_concept_unmatched_steps: int = 0  # 개념 매칭 검수 대기 스텝 수(승격은 진행)
     pydantic_rejected: int = 0  # Pydantic invariant 위반(방어적 — 정상 데이터면 0)
     failures: list[str] = field(default_factory=list)
@@ -219,6 +289,7 @@ class PromotionReport:
             "steps_skipped_additional_path": self.steps_skipped_additional_path,
             "steps_skipped_step_conflict": self.steps_skipped_step_conflict,
             "queued_approach_unmappable": self.queued_approach_unmappable,
+            "approach_from_corpus_family": self.approach_from_corpus_family,
             "queued_concept_unmatched_steps": self.queued_concept_unmatched_steps,
             "pydantic_rejected": self.pydantic_rejected,
             # Pydantic 통과율 — 시도 0건이면 None(0/0을 1.0으로 위장하지 않음).
@@ -304,6 +375,7 @@ def plan_promotion(
     already_promoted_path_ids: Set[str],
     problem_ids_with_steps: Set[uuid.UUID],
     now: datetime,
+    slug_by_problem: Mapping[uuid.UUID, str] | None = None,
 ) -> PromotionPlan:
     """승격 계획 수립 — **순수 결정론**(DB·LLM 0). 판정 순서는 아래 주석 번호 그대로.
 
@@ -314,6 +386,9 @@ def plan_promotion(
     S4-10 재론: 구 시그니처의 `problem_ids_with_path`(문제당 1경로 가드)는 제거됐다 —
     헤더는 N경로 허용이라 경로 존재가 새 경로를 막지 않고, 단계 좌석만
     `problem_ids_with_steps`(레거시 포함 problem_step 실재)로 가드한다.
+
+    `slug_by_problem`(P3-94): `corpus-replay` 태그 행의 풀이 유형을 승인 표
+    (`CORPUS_REPLAY_APPROACH_BY_FAMILY`)에서 찾을 때 쓰는 문항 slug. 없거나 표에 없으면 큐행.
     """
     plan = PromotionPlan()
     report = plan.report
@@ -355,6 +430,11 @@ def plan_promotion(
             continue
         # ⑥ approach 매핑 — 불가면 사람 검수 큐(NOT NULL 좌석을 추측으로 채우지 않는다).
         approach = map_strategy_tag_to_approach(row.strategy_tag)
+        if approach is None and row.strategy_tag == CORPUS_REPLAY_STRATEGY_TAG:
+            # 재생 태그는 출처 표지라 유형을 모른다 — 사람 승인 표(문항군)에서만 찾는다.
+            approach = corpus_replay_approach_for_slug((slug_by_problem or {}).get(row.problem_id))
+            if approach is not None:
+                report.approach_from_corpus_family += 1
         if approach is None:
             report.queued_approach_unmappable += 1
             plan.queue_entries.append(_queue_approach_entry(row, steps))
@@ -460,12 +540,28 @@ async def promote_verified_solutions(session: AsyncSession) -> PromotionPlan:
             if step_problem_id is not None
         }
 
+    # 코퍼스 재생 행이 있을 때만 slug를 읽는다 — 승인 표(문항군)로 풀이 유형을 찾는 재료(P3-94).
+    slug_by_problem: dict[uuid.UUID, str] = {}
+    replay_problem_ids = {
+        row.problem_id for row in rows if row.strategy_tag == CORPUS_REPLAY_STRATEGY_TAG
+    }
+    if replay_problem_ids:
+        slug_result = await session.execute(
+            select(Problem.problem_id, Problem.slug).where(
+                Problem.problem_id.in_(replay_problem_ids)
+            )
+        )
+        slug_by_problem = {
+            problem_id: slug for problem_id, slug in slug_result.all() if slug is not None
+        }
+
     plan = plan_promotion(
         rows,
         existing_problem_ids=existing_problem_ids,
         already_promoted_path_ids=already_promoted_path_ids,
         problem_ids_with_steps=problem_ids_with_steps,
         now=datetime.now(tz=UTC),
+        slug_by_problem=slug_by_problem,
     )
 
     for planned in plan.planned:

@@ -67,3 +67,28 @@
 ### 운영 DB 사실(런북에서 먼저 확인할 것)
 
 운영 `problem`은 1,703행이고 로컬 전 코퍼스 적재는 15,042행이다. 적격 1,121건(핵심 개념 10종)이 운영에 같은 `problem_id`로 있는지는 아직 모른다. `corpus_replay`·`path_promotion`은 문항 행이 없으면 `skipped_problem_missing`으로 건너뛰므로, 운영 런북은 적재 전에 이 겹침을 세고 0이면 쓰기를 거부해야 한다.
+
+## 5. 결정 집행 — 게이트 ② A안 (P3-94 · 2026-11-01)
+
+Kiki가 게이트 `G-p332-corpus-replay-approach`에서 **A안**(생성기 단위 결정론 매핑 표를 사람이 승인해 코드에 고정)을 골랐다. 표는 `whs/path_promotion.py`의 `CORPUS_REPLAY_APPROACH_BY_FAMILY`에 있고, `corpus-replay` 태그 행만 문항 slug의 문항군으로 찾는다. 표에 없는 문항군은 지금처럼 검수 큐로 간다.
+
+| 문항군 | 은행 | 유형 | 표본 풀이 단계 |
+|---|---|---|---|
+| `wm-indseq` | generated_v0 | **inductive** | `7 + 6 + … + 6` → `7 + (12 - 1)*6` → `73` (항 나열에서 일반항 공식으로 일반화) |
+| `wm-skel` | generated_v0 · rephrased_v0 | algebraic | `x**2 - 5*x` → `(x)*(x - 5)` (인수분해) |
+| `wm-calc-ext` · `-extv` · `-extmc` · `-extirr` · `wm-calc-tan` | generated_v0 · rephrased_v0 | algebraic | `3*x**2 - 36*x + 96` → `3*(x - 4)*(x - 8)` |
+| `wm-exp` · `wm-log` | generated_v0 · rephrased_v0 | algebraic | `log(25, 5)` → `2` · `5**2` → `25` |
+| `wm-arseq` · `wm-arsum` · `wm-geseq` · `wm-gesum` | generated_v0 · rephrased_v0 | algebraic | `1 + (11 - 1)*3` → `31` (공식 대입) |
+| `wm-trig` · `wm-trigeq` | generated_v0 · rephrased_v0 | algebraic | `sin(210*pi/180)` → `sin(7*pi/6)` → `-1/2` |
+| `wm-count-mc` | conceptual_v0 | algebraic | `(Derivative(x - 1, x) - Derivative(-(x - 1), x)).doit()` → `1 - (-1)` → `2` |
+| `wm-p3-diff-*` 12종(power · polyrules · tangent · mvt · graphshape · eqapp · velocity · coefficient · differentiability · monotonicity · power-pattern · motion-word) | p3_calculus1_diff_v0 · p3_fill_v0 | algebraic | `Derivative(...).doit().subs(x, 2) = y` → 도함수 → 대입 → 값 |
+
+문항군 28개 = 위 5개 은행의 풀이 단계 보유 문항 전수(테스트 `test_table_covers_every_stepped_problem_in_covered_banks`가 동결 — 새 문항군이 생기면 red가 나고 사람이 유형을 정한다).
+
+### 재측정 (우회 없이 · 샌드박스 상태를 운영과 같게 되돌린 뒤)
+
+| 단계 | 결과 |
+|---|---|
+| `path_promotion --apply` | 승격 1,507 · `approach_from_corpus_family` 1,507 · `queued_approach_unmappable` **0** · algebraic 1,477 / inductive 30 |
+| `hint_content.populate --apply` | 생성 6,359 · 검수 통과 5,975(L1 2,622 / L2 2,622 / L3 731) |
+| `phase3_coverage --hints-from-db` | hint **linked 9 · missing 1**(12미적Ⅰ-02-09 → P3-93) · 다른 연결 4종 각 10/10 |

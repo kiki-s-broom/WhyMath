@@ -14,6 +14,7 @@ depends_on:
   - P3-22-coverage-hint-source-wiring
   - P3-42-coverage-hint-baseline-live-measurement
   - P3-93
+  - P3-94
 requires_gates:
   - G-p332-corpus-replay-approach
 acceptance:
@@ -49,4 +50,6 @@ notes: |-
   [정정 2026-11-01] FK 순서 버그 수정·샌드박스 실측 PR
 
   [차단 2026-11-01] 결정 게이트 G-p332-corpus-replay-approach(corpus-replay 풀이 유형) + 후속 P3-93(개수형 답 finalize) 대기 — FK 순서 버그는 #1801로 수정, 샌드박스 9/10 실측
+
+  [정정 2026-11-01] 게이트 A안 집행 태스크를 선행으로 연결
 updated: 2026-11-01
