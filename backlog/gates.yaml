@@ -1189,12 +1189,16 @@ gates:
       [판정 근거 2026-10-20] [D9 2026-10-20] Solution QA 검증 가능 비율 하한 조건 추가 — 값은 P3-62 착지 후 Kiki 확정(후보 60%). 현재 40.7%. 근거 G-p307 evidence
 
       [판정 근거 2026-10-20] [Kiki 2026-10-20] 검증 가능 비율 하한 값은 (다) P3-62 실측 후 결정. 참고: P3-71 머지 후 0.48885, P3-62 규칙 (가) 전량 적용 시 상한 0.5575(후보 60% 미달) — docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md 재개 절
+
+      [판정 근거 2026-10-31] [D11 2026-10-31 Kiki 결정] Solution QA 검증 가능 비율 하한 = 55%(분모 1,121 불변 · 분모 축소로 맞추지 않는다). 판정 기준 main 7e9dc999 실측: 현 승인 은행 0.48885(548/1,121 · 미달) · P3-62 후보 두 은행 승격 시 0.52542(여전히 미달) · 허용 경로 안 구조적 상한 0.5575. 55%는 상한과 0.75%p 차이라 P3-91(fill 템플릿 교정·재감사·승격) 착지에 더해 남은 VAR 사례 대부분의 해소가 필요하다. 근거 docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C · PR #1787.
+      [D16 2026-10-31 Kiki 결정 — 판정 대상만] AI 품질 8축의 판정 대상 = LLM이 쓴 문장(WH-1 경로 출력 전체가 아니다). P3-78 라이브 측정(PR #1793 · docs/reviews/p3_78_ai_quality_live_run_2026-10-31.md)은 LLM 저자 발화가 학생 본문으로 나간 경우 0/244라 이 기준의 표본이 없다 — LLM 문장이 본문에 실리는 측정 경로가 먼저 필요하다. 임계값 8개 중 제안값 6개의 값과 수집기 --min-live-rate 0.5는 미확정(결정 대기 유지).
     corrections:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
       - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
       - "[2026-10-20] depends_on +P3-62-solution-qa-unverifiable-structuring — D9 하한 값은 P3-62 재측정 뒤 확정 — notes 산문 선행을 대장 depends로 집행(PR #1702 독립 검토 중1)"
       - "[2026-10-20] notes +181자 — Kiki 결정 (다): 하한 값 확정 시점"
       - "[2026-10-31] input done · P3-62-solution-qa-unverifiable-structuring · 판정 무관: 게이트 판정은 Kiki 몫(D11 — 검증 가능 비율 하한 미결). 이 태스크는 판정 입력(실측 0.48885 · 후보 0.52542/0.51115 · 구조적 상한 0.5575 — docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C, 판정 기준 main 3a83ed64, 착지 5d309758)만 넘기고 판정을 내리지 않는다 — done P3-62-solution-qa-unverifiable-structuring 인계"
+      - "[2026-10-31] notes +657자 — Kiki 결정 기록(2026-10-31 채팅 응답 \"55%\" · \"LLM이 쓴 문장\") — D11 하한 값과 D16 판정 대상. 판정 기준 main 7e9dc999. 게이트 상태·의존 무변경"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
