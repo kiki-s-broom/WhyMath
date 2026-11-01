@@ -182,3 +182,103 @@ def test_input_errors_exit_2(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     (run / "cu.rounds.jsonl").write_text("{깨진 json\n", encoding="utf-8")
     assert m.main(["run", str(run), "--root", str(root)]) == 2
     assert "JSONDecodeError" in capsys.readouterr().err
+
+
+# ── 독립 검토 반영(EOS-222 r2) ─────────────────────────────────────────────
+
+
+def _set_inputs(run: Path, digests: dict[str, str] | None) -> None:
+    row: dict[str, object] = {} if digests is None else {"dedup_input_digests": digests}
+    _write_jsonl(run / "cu.rounds.jsonl", [row])
+
+
+@pytest.mark.parametrize("digests", [None, {}])
+def test_no_comparison_input_is_unmeasurable_not_zero(
+    tmp_path: Path, digests: dict[str, str] | None
+) -> None:
+    """입력 기록이 없거나 비면 0%가 아니라 '비교 원본 0건'으로 측정 불가."""
+    root, run = _repo(tmp_path)
+    _set_inputs(run, digests)
+    report = m.build_run_report(run, root)
+    for row in report["results"]:  # type: ignore[union-attr]
+        for rec in row["fields"].values():
+            assert rec == {"status": "unmeasurable", "reason": "비교 원본 0건"}
+    s = report["summary"]
+    assert s["fields_measured"] == 0 and s["max_overlap"] is None
+    assert any("비교 원본 0건" in w for w in s["comparison_warnings"])  # type: ignore[union-attr]
+
+
+def test_missing_corpus_is_warned_and_unmeasurable(tmp_path: Path) -> None:
+    root, run = _repo(tmp_path)
+    _set_inputs(run, {"C:\\x\\data\\corpus\\gone_bank\\problems.jsonl": "a" * 64})
+    report = m.build_run_report(run, root)
+    assert report["comparison_set"][0]["status"] == "missing_in_repo"  # type: ignore[index]
+    warns = report["summary"]["comparison_warnings"]  # type: ignore[index]
+    assert any("gone_bank" in w for w in warns)
+    assert report["summary"]["fields_measured"] == 0  # type: ignore[index]
+
+
+def test_skipped_inputs_are_recorded_not_dropped(tmp_path: Path) -> None:
+    root, run = _repo(tmp_path)
+    report = m.build_run_report(run, root)
+    reasons = {Path(x["path"].replace("\\", "/")).name: x["reason"] for x in report["skipped_inputs"]}  # type: ignore[union-attr,index]
+    assert reasons == {"cu.jsonl": "회차 자기 산출물"}
+    _set_inputs(
+        run,
+        {
+            "C:\\x\\data\\corpus\\bank_a\\problems.jsonl": "0" * 64,
+            "C:\\x\\data\\runs\\other\\cu.jsonl": "1" * 64,
+        },
+    )
+    skipped = m.build_run_report(run, root)["skipped_inputs"]
+    assert [x["reason"] for x in skipped] == ["problems.jsonl이 아닌 입력 — 대조 미지원"]  # type: ignore[union-attr,index]
+
+
+def test_self_slug_in_comparison_corpus_is_excluded(tmp_path: Path) -> None:
+    """회차 뒤 그 CU가 비교 코퍼스에 병합돼도 자기 자신과의 1.0을 세지 않는다."""
+    root, run = _repo(tmp_path)
+    corpus = root / "data" / "corpus" / "bank_a" / "problems.jsonl"
+    _write_jsonl(
+        corpus,
+        [
+            {"slug": "orig-1", "question_text": _ORIGINAL_Q},
+            {"slug": "cu-fresh", "question_text": _FRESH_Q},  # 병합된 자기 자신
+        ],
+    )
+    rec = _by_slug(m.build_run_report(run, root))["cu-fresh"]["question_text"]
+    assert float(rec["overlap"]) < m.THRESHOLD  # type: ignore[arg-type]
+
+
+def test_whitespace_variant_underestimate_is_documented(tmp_path: Path) -> None:
+    """공백 토큰화의 과소평가는 고치지 않은 한계다 — 산출물이 그 방향을 적는지 동결."""
+    root, run = _repo(tmp_path)
+    _write_jsonl(
+        run / "cu.jsonl",
+        [{"slug": "cu-ws", "question_text": _ORIGINAL_Q.replace("x^3 - 3x", "x^3-3x")}],
+    )
+    report = m.build_run_report(run, root)
+    rec = _by_slug(report)["cu-ws"]["question_text"]
+    assert float(rec["overlap"]) < 1.0  # type: ignore[arg-type]
+    assert "과소평가" in str(report["limitation"]) and "띄어쓰기" in str(report["limitation"])
+    assert "과소평가" in str(report["method"]["tokenizer_bias"])  # type: ignore[index]
+
+
+def test_lf_equivalent_digest(tmp_path: Path) -> None:
+    root, run = _repo(tmp_path)
+    corpus = root / "data" / "corpus" / "bank_a" / "problems.jsonl"
+    lf_digest = hashlib.sha256(corpus.read_bytes()).hexdigest()
+    corpus.write_bytes(corpus.read_bytes().replace(b"\n", b"\r\n"))  # 저장소 쪽이 CRLF
+    _set_inputs(run, {"C:\\x\\data\\corpus\\bank_a\\problems.jsonl": lf_digest})
+    assert m.build_run_report(run, root)["comparison_set"][0]["digest_match"] == "lf_equivalent"  # type: ignore[index]
+
+
+def test_corpus_against_outside_root_does_not_crash(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _ = _repo(tmp_path)
+    outside = tmp_path / "elsewhere" / "bank_x"
+    _write_jsonl(outside / "problems.jsonl", [{"slug": "x-1", "question_text": _ORIGINAL_Q}])
+    target = root / "data" / "corpus" / "bank_a"
+    assert m.main(["corpus", str(target), "--against", str(outside), "--root", str(root)]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["comparison_set"][0]["documents"] == 1

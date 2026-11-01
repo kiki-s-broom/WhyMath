@@ -9,6 +9,8 @@
     "threshold_rule": "overlap >= threshold 이면 at_or_above_threshold=true (기록만 — 차단 없음)",
     "formula": "|8gram(G) ∩ 8gram(O)| / |8gram(G)| 의 원본별 최댓값",
     "tokenizer": "nfkc-whitespace-v1",
+    "tokenizer_bias": "공백 분리라 띄어쓰기만 바꾼 복사도 일치율이 낮게 나온다(과소평가 방향)",
+    "self_slug_excluded": true,
     "fields": [
       "question_text",
       "answer_explanation"
@@ -20,26 +22,35 @@
       "corpus": "problem_bank_generated_v0",
       "path": "data/corpus/problem_bank_generated_v0/problems.jsonl",
       "sha256": "828efc0663db0f58171b311165030fe55aef6e8e48d89478260e1bdfc00889d9",
+      "run_paths": [
+        "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\corpus\\problem_bank_generated_v0\\problems.jsonl"
+      ],
       "run_digests": [
         "7285ff1425d4824be0e15deb025017e2f7260e514efee54ab2520f335d6b29b7"
       ],
       "digest_match": "crlf_equivalent",
-      "documents": 1238
+      "documents": 1187
     },
     {
       "corpus": "problem_bank_p3_calculus1_diff_v0",
       "path": "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl",
       "sha256": "7dc942426235ea55646be52b366de6a521457e523caf14f814b9960b4ce348cc",
+      "run_paths": [
+        "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\corpus\\problem_bank_p3_calculus1_diff_v0\\problems.jsonl"
+      ],
       "run_digests": [
         "8cd4aea13e6685b25c702000e5c137525359f8b960bcc9480675a84e4be392b8"
       ],
       "digest_match": "crlf_equivalent",
-      "documents": 1008
+      "documents": 1000
     },
     {
       "corpus": "problem_bank_p3_fill_v0",
       "path": "data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
       "sha256": "0685d116a767a7d4c8079c4f67ba33db5e5cbe0e3a0abbe5bd025b04a14f7737",
+      "run_paths": [
+        "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\corpus\\problem_bank_p3_fill_v0\\problems.jsonl"
+      ],
       "run_digests": [
         "867036e6683e0187c741abd35d2e1b07218b9f61d6051d040880974ccdca4c97"
       ],
@@ -48,12 +59,18 @@
     }
   ],
   "comparison_set_rule": "그 회차가 실제로 읽은 입력 코퍼스(cu.rounds.jsonl dedup_input_digests)에서 회차 자기 산출물을 뺀 것",
+  "skipped_inputs": [
+    {
+      "path": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\runs\\eos197-a6-local\\cu.jsonl",
+      "reason": "회차 자기 산출물"
+    }
+  ],
   "not_compared": [
     "평가원 기출 본문(저장소 미보유 — 구조 메타만 보유)",
     "EBS 교재·강의 본문(저장소 미보유)",
     "검정교과서 본문·문제·풀이(저장소 미보유)"
   ],
-  "limitation": "일치율이 낮다는 것은 위 comparison_set과 다르다는 뜻일 뿐이다 — not_compared의 원본과는 대조하지 않았다.",
+  "limitation": "일치율이 낮다는 것은 comparison_set과 다르다는 뜻일 뿐이다 — not_compared의 원본과는 대조하지 않았다. 또 공백 분리 토큰화라 띄어쓰기만 바꾼 복사도 낮게 나오고(과소평가), 토큰 8개 미만 필드는 잴 수 없다(unmeasurable). 낮은 값은 '다르다'의 증거가 아니다.",
   "summary": {
     "records": 3,
     "fields_measured": 3,
@@ -74,7 +91,8 @@
         "flagged_count": 0
       }
     },
-    "flagged": []
+    "flagged": [],
+    "comparison_warnings": []
   },
   "results": [
     {

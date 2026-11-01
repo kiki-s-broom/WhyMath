@@ -49,6 +49,8 @@
       "threshold_rule": "overlap >= threshold 이면 at_or_above_threshold=true (기록만 — 차단 없음)",
       "formula": "|8gram(G) ∩ 8gram(O)| / |8gram(G)| 의 원본별 최댓값",
       "tokenizer": "nfkc-whitespace-v1",
+      "tokenizer_bias": "공백 분리라 띄어쓰기만 바꾼 복사도 일치율이 낮게 나온다(과소평가 방향)",
+      "self_slug_excluded": true,
       "fields": [
         "question_text",
         "answer_explanation"
@@ -60,7 +62,7 @@
         "corpus": "problem_bank_generated_v0",
         "path": "data/corpus/problem_bank_generated_v0/problems.jsonl",
         "sha256": "828efc0663db0f58171b311165030fe55aef6e8e48d89478260e1bdfc00889d9",
-        "documents": 1238
+        "documents": 1187
       }
     ],
     "not_compared": [
@@ -68,6 +70,7 @@
       "EBS 교재·강의 본문(저장소 미보유)",
       "검정교과서 본문·문제·풀이(저장소 미보유)"
     ],
+    "limitation": "일치율이 낮다는 것은 comparison_set과 다르다는 뜻일 뿐이다 — not_compared의 원본과는 대조하지 않았다. 또 공백 분리 토큰화라 띄어쓰기만 바꾼 복사도 낮게 나오고(과소평가), 토큰 8개 미만 필드는 잴 수 없다(unmeasurable). 낮은 값은 '다르다'의 증거가 아니다.",
     "summary": {
       "records": 421,
       "fields_measured": 790,

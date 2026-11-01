@@ -10,17 +10,30 @@
 `flagged`에 CU slug와 함께 적힌다. 재생성 여부는 사람이 이 기록을 보고 정한다(감리 지시:
 "차단이 아니라 기록").
 
-일치율의 정의 (가이드 예시 코드와 같은 식)
------------------------------------------
+일치율의 정의 (가이드 예시 코드의 식 · 경계만 다름)
+---------------------------------------------------
     overlap(G, O) = |8gram(G) ∩ 8gram(O)| / |8gram(G)|
 
 G는 생성 필드 하나, O는 비교 원본 문서 하나다. 원본마다 계산해 **최댓값**과 그 원본을
-기록한다. 토큰화는 NFKC 정규화 뒤 공백 분리다(`TOKENIZER_ID`) — 가이드가 토큰화를 정하지
-않았으므로 무엇으로 쟀는지를 산출물에 남긴다.
+기록한다. 기준 비교는 `overlap >= 0.70`이다 — 가이드 예시 코드는 `> threshold`지만 태스크
+acceptance와 가이드 본문이 "70% 이상"이라 경계값 0.70을 기준 이상으로 센다.
+
+토큰화는 NFKC 정규화 뒤 공백 분리다(`TOKENIZER_ID`) — 가이드가 토큰화를 정하지 않았으므로
+무엇으로 쟀는지를 산출물에 남긴다. **이 토큰화는 일치율을 낮게 잡는 쪽으로 틀린다**: 띄어쓰기
+하나(`x 의`→`x의`, `y = x`→`y=x`)가 그 토큰을 지나는 8-gram을 전부 지우므로, 띄어쓰기만 바꾼
+복사도 기준 아래로 내려갈 수 있다. 그래서 낮은 값은 "다르다"의 증거가 아니다(산출물 `limitation`).
+
+회차 뒤 코퍼스에 병합된 자기 자신과의 일치는 세지 않는다 — 비교 원본 중 CU와 slug가 같은
+문서는 제외한다(`method.self_slug_excluded`).
 
 측정하지 않은 것을 0%로 쓰지 않는다
 -----------------------------------
 - 필드가 없거나 토큰이 8개 미만이면 `status="unmeasurable"`과 이유를 적는다(값 없음).
+- 비교 원본 문서가 0건이면(입력 기록 없음·코퍼스가 저장소에 없음) 전 필드가
+  `unmeasurable`("비교 원본 0건")이다 — 대조하지 않은 것을 0%로 쓰지 않는다.
+- 입력 중 대조하지 않은 경로(회차 자기 산출물·`problems.jsonl`이 아닌 입력)는
+  `skipped_inputs`에, 해시가 회차 기록과 다르거나 저장소에 없는 코퍼스는
+  `summary.comparison_warnings`에 남는다(조용히 버리지 않는다).
 - 비교 원본은 **저장소에 실재하는 것만** 쓴다: 그 회차가 실제로 읽은 입력 코퍼스
   (`cu.rounds.jsonl`의 `dedup_input_digests`)에서 회차 자기 산출물을 뺀 것.
 - 평가원·EBS·검정교과서 본문은 저장소에 없어서(본문 복제 금지) **대조하지 못한다**. 이
@@ -58,6 +71,12 @@ TOKENIZER_ID: Final = "nfkc-whitespace-v1"
 GUIDE_REF: Final = "docs/legal/copyright_guide_v2.md (n-gram 가드레일 · 8-gram · 70% 이상 재생성)"
 SIDECAR_NAME: Final = "cu.ngram_overlap.json"
 FIELDS: Final = ("question_text", "answer_explanation")
+
+LIMITATION: Final = (
+    "일치율이 낮다는 것은 comparison_set과 다르다는 뜻일 뿐이다 — not_compared의 원본과는"
+    " 대조하지 않았다. 또 공백 분리 토큰화라 띄어쓰기만 바꾼 복사도 낮게 나오고(과소평가),"
+    " 토큰 8개 미만 필드는 잴 수 없다(unmeasurable). 낮은 값은 '다르다'의 증거가 아니다."
+)
 
 # 저장소에 본문이 없어 대조할 수 없는 원본 — 산출물에 그대로 적는다.
 NOT_COMPARED: Final = (
@@ -97,11 +116,18 @@ class OriginalIndex:
             for g in doc.grams:
                 self._index[g].append(i)
 
-    def best_match(self, grams: set[tuple[str, ...]]) -> tuple[float, OriginalDoc | None]:
-        """가장 많이 겹치는 원본과 그 일치율. 겹침이 없으면 (0.0, None)."""
+    def best_match(
+        self, grams: set[tuple[str, ...]], exclude_slug: str | None = None
+    ) -> tuple[float, OriginalDoc | None]:
+        """가장 많이 겹치는 원본과 그 일치율. 겹침이 없으면 (0.0, None).
+
+        `exclude_slug`와 slug가 같은 원본은 세지 않는다(회차 뒤 병합된 자기 자신).
+        """
         counts: dict[int, int] = defaultdict(int)
         for g in grams:
             for i in self._index.get(g, ()):
+                if exclude_slug is not None and self.docs[i].slug == exclude_slug:
+                    continue
                 counts[i] += 1
         if not counts:
             return 0.0, None
@@ -109,15 +135,19 @@ class OriginalIndex:
         return counts[best_i] / len(grams), self.docs[best_i]
 
 
-def measure_field(text: object, index: OriginalIndex) -> dict[str, object]:
+def measure_field(
+    text: object, index: OriginalIndex, self_slug: str | None = None
+) -> dict[str, object]:
     """필드 하나의 일치율 기록. 측정할 수 없으면 값 없이 이유만 적는다."""
+    if not index.docs:
+        return {"status": "unmeasurable", "reason": "비교 원본 0건"}
     if not isinstance(text, str) or not text.strip():
         return {"status": "unmeasurable", "reason": "필드 없음"}
     tokens = tokenize(text)
     grams = ngrams(tokens)
     if not grams:
         return {"status": "unmeasurable", "reason": f"토큰 {len(tokens)}개 < {N}"}
-    overlap, doc = index.best_match(grams)
+    overlap, doc = index.best_match(grams, exclude_slug=self_slug)
     return {
         "status": "measured",
         "overlap": round(overlap, 4),
@@ -194,7 +224,7 @@ def measure_records(
     }
     for row in records:
         slug = str(row.get("slug", ""))
-        fields = {f: measure_field(row.get(f), index) for f in FIELDS}
+        fields = {f: measure_field(row.get(f), index, self_slug=slug or None) for f in FIELDS}
         for f, rec in fields.items():
             bf = by_field[f]
             if rec["status"] == "measured":
@@ -232,32 +262,51 @@ def _method() -> dict[str, object]:
         ),
         "formula": "|8gram(G) ∩ 8gram(O)| / |8gram(G)| 의 원본별 최댓값",
         "tokenizer": TOKENIZER_ID,
+        "tokenizer_bias": "공백 분리라 띄어쓰기만 바꾼 복사도 일치율이 낮게 나온다(과소평가 방향)",
+        "self_slug_excluded": True,
         "fields": list(FIELDS),
         "guide": GUIDE_REF,
     }
 
 
-def _run_input_corpora(run_dir: Path, repo_root: Path) -> list[dict[str, object]]:
-    """회차가 실제로 읽은 입력 코퍼스(자기 산출물 제외)를 저장소 경로로 되짚는다."""
+def _run_input_corpora(
+    run_dir: Path, repo_root: Path
+) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
+    """회차가 실제로 읽은 입력 코퍼스(자기 산출물 제외)를 저장소 경로로 되짚는다.
+
+    대조하지 않은 입력은 버리지 않고 (경로, 이유)로 돌려준다.
+    """
     rounds_path = run_dir / "cu.rounds.jsonl"
     if not rounds_path.exists():
         raise InputError(f"{rounds_path} 없음 — 회차 입력 코퍼스를 알 수 없다")
     recorded: dict[str, set[str]] = defaultdict(set)
+    raw_paths: dict[str, set[str]] = defaultdict(set)
+    skipped: dict[str, str] = {}
     for row in _read_jsonl(rounds_path):
         digests = row.get("dedup_input_digests") or {}
         if not isinstance(digests, dict):
             continue
         for raw_path, digest in digests.items():
             parts = str(raw_path).replace("\\", "/").split("/")
+            if len(parts) >= 2 and parts[-2] == run_dir.name and parts[-1] == "cu.jsonl":
+                skipped[str(raw_path)] = "회차 자기 산출물"
+                continue
             if len(parts) < 2 or parts[-1] != "problems.jsonl":
-                continue  # 회차 자기 산출물(cu.jsonl) 등 — 비교 원본이 아니다
+                skipped[str(raw_path)] = "problems.jsonl이 아닌 입력 — 대조 미지원"
+                continue
             recorded[parts[-2]].add(str(digest))
+            raw_paths[parts[-2]].add(str(raw_path))
     corpora: list[dict[str, object]] = []
     for name in sorted(recorded):
         path = repo_root / "data" / "corpus" / name / "problems.jsonl"
         if not path.exists():
             corpora.append(
-                {"corpus": name, "status": "missing_in_repo", "run_digests": sorted(recorded[name])}
+                {
+                    "corpus": name,
+                    "status": "missing_in_repo",
+                    "run_paths": sorted(raw_paths[name]),
+                    "run_digests": sorted(recorded[name]),
+                }
             )
             continue
         sha = _sha256(path)
@@ -266,11 +315,13 @@ def _run_input_corpora(run_dir: Path, repo_root: Path) -> list[dict[str, object]
                 "corpus": name,
                 "path": path.relative_to(repo_root).as_posix(),
                 "sha256": sha,
+                "run_paths": sorted(raw_paths[name]),
                 "run_digests": sorted(recorded[name]),
                 "digest_match": digest_match(path, recorded[name]),
             }
         )
-    return corpora
+    skipped_list = [{"path": k, "reason": v} for k, v in sorted(skipped.items())]
+    return corpora, skipped_list
 
 
 def build_run_report(run_dir: Path, repo_root: Path) -> dict[str, object]:
@@ -278,14 +329,25 @@ def build_run_report(run_dir: Path, repo_root: Path) -> dict[str, object]:
     cu_path = run_dir / "cu.jsonl"
     if not cu_path.exists():
         raise InputError(f"{cu_path} 없음")
-    corpora = _run_input_corpora(run_dir, repo_root)
+    corpora, skipped = _run_input_corpora(run_dir, repo_root)
     docs: list[OriginalDoc] = []
+    warnings: list[str] = []
     for c in corpora:
-        if "path" in c:
-            docs.extend(load_corpus_docs(repo_root / str(c["path"]), str(c["corpus"])))
-            c["documents"] = sum(1 for d in docs if d.corpus == c["corpus"])
+        if "path" not in c:
+            warnings.append(f"{c['corpus']}: 저장소에 없음 — 대조 못 함")
+            continue
+        loaded = load_corpus_docs(repo_root / str(c["path"]), str(c["corpus"]))
+        docs.extend(loaded)
+        c["documents"] = sum(1 for d in loaded if d.grams)  # 실제로 대조한 문서 수
+        if c.get("digest_match") == "mismatch":
+            warnings.append(
+                f"{c['corpus']}: 회차가 읽은 판과 내용이 다름 — 지금 저장소 판으로 쟀다"
+            )
     index = OriginalIndex(docs)
+    if not index.docs:
+        warnings.append("비교 원본 0건 — 전 필드 측정 불가")
     results, summary = measure_records(_read_jsonl(cu_path), index)
+    summary["comparison_warnings"] = warnings
     return {
         "kind": "whymath.ngram_overlap_record",
         "task": "EOS-222",
@@ -297,11 +359,9 @@ def build_run_report(run_dir: Path, repo_root: Path) -> dict[str, object]:
             "그 회차가 실제로 읽은 입력 코퍼스(cu.rounds.jsonl dedup_input_digests)에서"
             " 회차 자기 산출물을 뺀 것"
         ),
+        "skipped_inputs": skipped,
         "not_compared": list(NOT_COMPARED),
-        "limitation": (
-            "일치율이 낮다는 것은 위 comparison_set과 다르다는 뜻일 뿐이다"
-            " — not_compared의 원본과는 대조하지 않았다."
-        ),
+        "limitation": LIMITATION,
         "summary": summary,
         "results": results,
     }
@@ -322,12 +382,18 @@ def build_corpus_summary(
             raise InputError(f"{path} 없음")
         loaded = load_corpus_docs(path, a.name)
         docs.extend(loaded)
+        resolved = path.resolve()
+        shown = (
+            resolved.relative_to(repo_root).as_posix()
+            if resolved.is_relative_to(repo_root)
+            else resolved.as_posix()
+        )
         comparison.append(
             {
                 "corpus": a.name,
-                "path": path.resolve().relative_to(repo_root).as_posix(),
+                "path": shown,
                 "sha256": _sha256(path),
-                "documents": len(loaded),
+                "documents": sum(1 for d in loaded if d.grams),
             }
         )
     _, summary = measure_records(_read_jsonl(target), OriginalIndex(docs))
@@ -342,6 +408,7 @@ def build_corpus_summary(
         "method": _method(),
         "comparison_set": comparison,
         "not_compared": list(NOT_COMPARED),
+        "limitation": LIMITATION,
         "summary": summary,
     }
 
