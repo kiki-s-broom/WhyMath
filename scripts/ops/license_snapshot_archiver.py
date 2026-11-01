@@ -194,9 +194,13 @@ TIER1_SOURCES: tuple[Tier1Source, ...] = (
     Tier1Source(
         source_id="minif2f",
         name_ko="miniF2F",
-        license_label="MIT",
+        license_label="폴더별 상이(lean·isabelle=Apache 2.0 · metamath=MIT · hollight=FreeBSD)",
         # LICENSE 파일 부재 실측(2026-08-30 404) — README §License 절이 라이선스 선언
-        # 원문(폴더별: lean=Apache · metamath=MIT · hollight=FreeBSD)
+        # 원문(폴더별 4종: lean=Apache · isabelle=Apache · metamath=MIT · hollight=FreeBSD).
+        # 우리가 쓰는 488 Lean 문항은 Apache 2.0이다(LIC-08 — 종전 'MIT' 단일 표기 정정).
+        # 기존 스냅샷 meta(9b6de2b0a301c318.meta.json)의 license_label='MIT'는 첫 수집
+        # 시점의 선언 기록이라 고치지 않는다 — 이 도구는 스냅샷이 이미 있으면 meta를
+        # 다시 쓰지 않으며, 재생성하려면 증거 스냅샷을 지워야 한다(증거 불변 우선).
         url="https://raw.githubusercontent.com/openai/miniF2F/HEAD/README.md",
         url_origin=_ORIGIN_REPO,
     ),

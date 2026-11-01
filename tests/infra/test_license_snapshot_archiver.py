@@ -332,3 +332,25 @@ def test_cli_end_to_end_with_injected_fetch(
     out = capsys.readouterr().out
     assert "수집 성공 2/2곳" in out
     assert len(_audit_lines(tmp_path)) == 2
+
+
+def test_minif2f_label_matches_readme_folder_licenses(arc: Any) -> None:
+    """LIC-08 — miniF2F 라벨이 README §License의 폴더별 선언 전부를 드러내는지 동결.
+
+    miniF2F는 LICENSE 파일이 없고 README가 폴더마다 다른 라이선스를 선언한다.
+    종전 'MIT' 단일 표기는 우리가 쓰는 lean 폴더(Apache)에서 틀렸다.
+    증거 스냅샷에서 폴더 선언을 직접 읽어 대조하므로, 폴더 하나라도 빠지면 RED.
+    """
+    import re
+
+    src = next(s for s in arc.TIER1_SOURCES if s.source_id == "minif2f")
+    readme = (
+        _REPO_ROOT / "data" / "licenses" / "snapshots" / "minif2f" / "9b6de2b0a301c318.txt"
+    ).read_text(encoding="utf-8")
+    # "The `lean` folder is released under the Apache License" 형태의 선언 줄
+    decls = re.findall(r"The `(\w+)` folder is released under the (\w+) License", readme)
+    assert len(decls) == 4, decls  # 스캔 0건은 실패(공허한 통과 방지)
+    for folder, lic in decls:
+        assert folder in src.license_label, f"{folder} 폴더가 라벨에 없음"
+        assert lic in src.license_label, f"{lic} 라이선스가 라벨에 없음"
+    assert src.license_label != "MIT"
