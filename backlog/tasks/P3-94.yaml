@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 결정 집행 — 게이트 G-p332-corpus-replay-approach에서 Kiki가 A안(생성기 단위 결정론 매핑 표 승인·코드 고정)을 골랐다(2026-11-01). whs.corpus_replay 풀이(strategy_tag=corpus-replay)를 path_promotion이 문항 slug의 생성기 문항군으로 풀이 유형에 결정론 매핑한다. 표에 없는 문항군은 지금처럼 사람 검수 큐로 보낸다(추측 금지 유지).\n② 표 = 핵심 개념 은행 5개(p3_calculus1_diff_v0·generated_v0·p3_fill_v0·rephrased_v0·conceptual_v0)의 풀이 단계 보유 문항군 28개 전수. wm-indseq만 inductive(항 나열에서 일반항 공식으로 일반화), 나머지 27개는 algebraic(미분·인수분해·대입·공식 계산 식 변형 연쇄). 근거 표본은 docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md.\n③ 검증 — 단위 테스트(문항군 경계: wm-trig vs wm-trigeq, wm-calc-ext vs wm-calc-extv, rephrased 접미), 실 PG 통합 테스트, 로컬 PG 샌드박스에서 path_promotion 승격 1,507·approach_unmappable 0 재측정."
-artifacts: []
+artifacts:
+  - "#1801"
 paths:
   - src/backend/whymath_backend/whs/path_promotion.py
   - "tests/backend/whs/test_path_promotion*.py"
   - docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md
-session: claude/kind-archimedes-74s4m7
+session: null
 notes: "출처: P3-32 게이트 결정(Kiki 2026-11-01 A안)"
 updated: 2026-11-01
