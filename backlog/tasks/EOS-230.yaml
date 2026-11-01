@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-230
+title: "저작 회차 오케스트레이터 Ctrl+C 전파 실물 확인(EOS-209 체크리스트 C3 잔여)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 다음 실제 저작 회차(Kiki PC · Phaiakes9)에서 `docs/ops/authoring_round_runbook.md` 체크리스트 C3(Ctrl+C 전파와 자식 종료)를 확인한다: 저작 단계 도중 Ctrl+C 한 번에 `STAGE_INTERRUPTED`와 `ROUND_EXIT=130`이 나오는지, 그 한 줄 블록의 나머지(`ROUND_EXIT=` 출력)가 PowerShell에서 멈추는지, 자식 `python.exe`가 남지 않는지(`PY_PROCS_LEFT=0`), 같은 블록을 다시 붙여넣으면 이어지는지. ② 결과를 이 태스크 증적에 남긴다. 실패면 원인을 실측하고 수정 태스크를 등재한다. ③ 확인용 유료 회차를 따로 만들지 않는다 — 다른 목적의 실제 저작 회차(예: EOS-203 로컬 좌석 재측정)에 끼워 확인한다."
+artifacts: []
+paths:
+  - docs/ops/authoring_round_runbook.md
+session: null
+notes: "출처: EOS-209 ② 첫 Windows 실회차(2026-11-01 · PR #1806 브랜치 head a9d02928 · 산출물 브랜치 eos209/first-windows-round-output 75ad7c69). C1·C2·C4~C7은 통과했으나 저작이 첫 회차(5시도)에 목표를 채워 Ctrl+C로 끊을 구간이 없었다 — C3만 미확인. 미확인 항목을 '다음엔 확인'으로만 남기지 않으려고 등재한다."
+updated: 2026-11-01
