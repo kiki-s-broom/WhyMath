@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-93
+title: "Solution QA 검증 불가 잔여 VAR 해소 — 하한 55%(617/1,121) 도달"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-91-p3-62-candidate-promotion-fill-template-fix
+requires_gates: []
+acceptance:
+  - "① 목표: Solution QA 검증 가능 비율 ≥ 0.55(D11 · 분모 1,121 불변 → 통과 617건 이상). P3-91 착지(후보 두 은행 승격 시 589건 · 0.52542) 뒤 남는 C2_FINAL_STEP_VAR_NOT_ANSWER_VAR 39건(GRAPH-SHAPE 12 · MONO 14 · EQ-APP 11 · VELOCITY 2 — 보고서 docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C 표) 중 28건 이상을 허용 경로 안에서 판정 가능하게 만든다. ② 금지: 분모 축소·문항 제외·판정기 완화로 맞추지 않는다. 판정기를 넓히면(미지수 a·b 연립, 같은 종류 두 극값 중 큰/작은 값, 사차함수 전역 최솟값, '처음' 방향 전환) 그 꼴마다 결함 주입 테스트로 RED를 확인한다. ③ 바뀐 은행은 S5 새 회차 감사를 통과한 바이트만 승격한다(감사받은 바이트 = 승격할 바이트). ④ 측정은 solution_qa 명령 exit 코드와 판정 기준 커밋 해시를 함께 기록한다. 시한(11/15)까지 617건에 못 닿으면 범위를 깎지 않고 실측값과 미해소 목록으로 FAIL 보고하고 done 처리한다(build_harness §3a)."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/p3_diff_*.py"
+  - src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py
+  - data/corpus/problem_bank_p3_calculus1_diff_v0/
+  - docs/data/p3_calculus1_diff_audit/
+  - docs/reviews/
+session: null
+notes: "D11(Kiki 2026-10-31 · 하한 55%) 승계. 구조적 상한 0.5575라 여유는 약 8건이다. 2026-11-01 Kiki 승인: 권장안(승계 등재 · 미적분 단독 선승격 안 함). 판정 기준 main d81cfd7a."
+updated: 2026-11-01

@@ -622,6 +622,20 @@ def test_resume_rejects_a_different_eval_set(tmp_path: Path) -> None:
     assert out.read_bytes() == before
 
 
+def test_resume_accepts_the_same_eval_set_with_crlf_line_endings(tmp_path: Path) -> None:
+    """P3-92: Windows 체크아웃(CRLF)에서 시작한 수집을 LF 체크아웃에서 이어 받는다 — 내용이 같으면 같은 평가셋."""
+    lf = _small_eval(tmp_path / "eval.jsonl")
+    crlf = tmp_path / "eval_crlf.jsonl"
+    crlf.write_bytes(lf.read_bytes().replace(b"\n", b"\r\n"))
+    assert crlf.read_bytes() != lf.read_bytes()  # 주입이 실제로 들어갔다
+    out = tmp_path / "live.jsonl"
+    first, _ = _run(out, crlf, _Scripted(), "--limit", "1")
+    assert first == live.EXIT_INCOMPLETE_LIMIT
+    code, _ = _run(out, lf, _Scripted(), "--resume")
+    assert code == live.EXIT_OK
+    assert sorted(load_responses(out)) == sorted(_ids(lf))
+
+
 def test_resume_rejects_changed_settings(tmp_path: Path) -> None:
     small = _small_eval(tmp_path / "eval.jsonl")
     out = tmp_path / "live.jsonl"
