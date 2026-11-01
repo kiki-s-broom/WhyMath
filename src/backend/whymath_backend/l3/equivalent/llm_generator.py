@@ -111,6 +111,15 @@ from whymath_backend.l1.problem_bank.populate import ConceptTag
 from whymath_backend.l3.cross_verify import llm_author
 from whymath_backend.l3.data_grade_defaults import SELF_AUTHORED_CORPUS
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
+from whymath_backend.l3.equivalent.authoring_guard import (
+    CurriculumScopeError,
+    GroundingState,
+    TautologicalConditionError,
+    curriculum_method_violation,
+    grounding_verdict,
+    normalize_answer_key,
+    standard_unit_codes,
+)
 from whymath_backend.l3.equivalent.canonicalize import condition_dsl_violation
 from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.escalation_defaults import default_student_escalation_signals
@@ -201,11 +210,11 @@ _VALID_ROOT_AGGREGATES: frozenset[str] = frozenset({"sum", "product"})
 # ──────────────────────────────────────────────────────────────────────────
 # 출력 JSON 스키마(S2-j structured output) — 로컬(Ollama) 결정일 때 format= 제약 디코딩으로
 # 강제한다. 자유 텍스트·코드펜스·LaTeX 이스케이프·필수 필드 누락을 *문법 수준에서 원천 차단*.
-# 필수(required)는 결측 시 어차피 생성 실패(None 폴백)가 되는 4필드 + unit_codes만 최소로
-# 잡는다(과잉 제약은 모델과 싸움). enum(answer_format·answer_selection)·수치 범위(난이도)도
-# 문법으로 제약한다. 이 스키마는 *형식*만 보장한다 — 관대 파서(_extract_json)·조립 검증
-# (_assemble)·S2-a 게이트는 그대로 유지된다(이중 방어: 클라우드 경로·의미 오류는 여전히
-# 파서·게이트 소관).
+# 필수(required)는 결측 시 어차피 생성 실패(None 폴백)가 되는 필드만 최소로 잡는다(과잉 제약은
+# 모델과 싸움). unit_codes는 EOS-205 ③부터 코드가 성취기준에서 유도하므로 스키마에서 뺐다.
+# enum(answer_format·answer_selection)·수치 범위(난이도)도 문법으로 제약한다. 이 스키마는
+# *형식*만 보장한다 — 관대 파서(_extract_json)·조립 검증(_assemble)·S2-a 게이트는 그대로
+# 유지된다(이중 방어: 클라우드 경로·의미 오류는 여전히 파서·게이트 소관).
 # ──────────────────────────────────────────────────────────────────────────
 _OUTPUT_JSON_SCHEMA: dict[str, object] = {
     "type": "object",
@@ -224,7 +233,6 @@ _OUTPUT_JSON_SCHEMA: dict[str, object] = {
         # 선택(required 아님) — 합/곱 문항만 선언한다. 선언하면 answer는 근이 아니라 집계값이다.
         "answer_aggregate": {"type": "string", "enum": sorted(_VALID_ROOT_AGGREGATES)},
         "difficulty_overall": {"type": "number", "minimum": 1.0, "maximum": 5.0},
-        "unit_codes": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         "answer_format": {"type": "string", "enum": [f.value for f in AnswerFormat]},
         "achievement_standard_codes": {"type": "array", "items": {"type": "string"}},
         "distractor_map": {"type": "array", "items": {"type": "object"}},
@@ -241,7 +249,6 @@ _OUTPUT_JSON_SCHEMA: dict[str, object] = {
         "conditions",
         "answer_map",
         "answer_selection",
-        "unit_codes",
     ],
 }
 
@@ -341,7 +348,7 @@ class LLMEquivalentProblemGenerator:
         subject: Subject = Subject.공통,
         curriculum_version: Curriculum = Curriculum.REVISION_2022,
         valid_from_year: int = 2022,
-        fallback_unit_codes: Sequence[str] = (),
+        unit_codes: Sequence[str] = (),
         generation_log_sink: Callable[[GenerationLog], None] | None = None,
         seed_source: SeedSource | None = None,
     ) -> None:
@@ -416,7 +423,8 @@ class LLMEquivalentProblemGenerator:
                 하나씩 만든다).
             slug_prefix: 안정 slug 접두사(결정론 해시와 결합해 멱등 upsert 키 생성).
             subject·curriculum_version·valid_from_year: Problem 필수 메타 기본값(스펙 밖·저작 배선).
-            fallback_unit_codes: LLM이 unit_codes를 안 주면 쓰는 폴백(비면 결측 시 생성 실패).
+            unit_codes: 운영자가 고정할 단원 코드(EOS-205 ③). 비면 성취기준 코드에서 유도한다
+                (`[12미적Ⅰ-02-05]` → `12미적Ⅰ-02-05`). LLM이 낸 unit_codes는 읽지 않는다.
             generation_log_sink: **생성 Run 재현 로그 싱크**(EOS-55 집행 별항). LLM 호출
                 1건마다 `GenerationLog`(모델·prompt_version·seed 좌석·입력 스냅샷 해시+참조)를
                 조립해 흘린다 — provider 예외·파싱/조립 실패도 success=False로 기록한다
@@ -474,7 +482,7 @@ class LLMEquivalentProblemGenerator:
         self._subject = subject
         self._curriculum_version = curriculum_version
         self._valid_from_year = valid_from_year
-        self._fallback_unit_codes = list(fallback_unit_codes)
+        self._unit_codes = list(unit_codes)
 
     # ── EquivalentProblemGenerator 좌석 ────────────────────────────────
     def generate(self, spec: EquivalenceSpec) -> CandidateProblem | None:
@@ -994,10 +1002,29 @@ class LLMEquivalentProblemGenerator:
             # 집계값의 정오는 게이트(`verify_root_aggregate`·Vieta)가 독립 계산으로 판정한다.
             answer_map = {}
             answer_selection = None
+        # EOS-205 ① — 검산식이 문항을 다시 계산하는가(재진술·중간값 하드코딩·역산 식 거부).
+        # 거부는 TautologicalConditionError(ValueError 하위)라 error_detail에 타입명으로 남는다.
+        verdict = grounding_verdict(question_text, conditions, answer_map)
+        if verdict.rejected:
+            raise TautologicalConditionError(f"검산식 근거 없음({verdict.state.value})")
+        if verdict.state is GroundingState.UNKNOWN:
+            # 모른다 ≠ 아니다 — 발문 수식을 못 읽어 판정 불가. 거부하지 않되 흔적은 남긴다.
+            _LOGGER.warning("동등문제 검산식 근거 판정 불가(%s) — 통과", verdict.reason)
+        # EOS-205 ② — 답이 근이 아닌 문항의 정답 키를 `answer`로 고정(근 문항의 x는 유지).
+        conditions, answer_map = normalize_answer_key(question_text, conditions, answer_map)
         difficulty_overall = self._parse_difficulty(data.get("difficulty_overall"), spec)
-        unit_codes = self._parse_unit_codes(data.get("unit_codes"))
         answer_format = self._parse_answer_format(data.get("answer_format"), spec)
         standard_codes = self._parse_standard_codes(data.get("achievement_standard_codes"), spec)
+        # EOS-205 ③ — 단원 코드는 LLM 출력을 읽지 않고 고정한다(운영자 지정 > 성취기준 유도).
+        unit_codes = self._unit_codes_for(sorted(spec.achievement_standard_codes))
+        # EOS-205 ④ — 해설·발문이 성취기준의 교육과정 범위 밖 방법(미적분Ⅰ의 이계도함수 등)을
+        # 쓰면 거부한다. 판정 근거는 스펙이 아니라 *조립된* 성취기준(게이트가 스펙과 대조한다).
+        scope = curriculum_method_violation(
+            [*standard_codes, *sorted(spec.achievement_standard_codes)],
+            (answer_explanation, question_text),
+        )
+        if scope is not None:
+            raise CurriculumScopeError(scope)
         distractor_map = self._parse_distractor_map(data.get("distractor_map"), spec)
         # 저작 LLM은 *검증 가능한 Tier2 심볼릭 체인*(expr_before ≡ expr_after)을 만들지 않는다 —
         # 모델이 내는 solution_steps는 산문 설명("인수분해하면…")이라 Tier2(verify_solution)에
@@ -1174,15 +1201,20 @@ class LLMEquivalentProblemGenerator:
             return min(5.0, max(1.0, float(value)))
         return spec.difficulty_overall
 
-    def _parse_unit_codes(self, value: object) -> list[str]:
-        """단원 코드 — 문자열 배열(최소 1). 없으면 폴백, 폴백도 비면 ValueError."""
-        if isinstance(value, list):
-            codes = [str(v).strip() for v in value if isinstance(v, str) and str(v).strip()]
-            if codes:
-                return codes
-        if self._fallback_unit_codes:
-            return list(self._fallback_unit_codes)
-        raise ValueError("unit_codes 결측 — Problem은 단원 코드 최소 1개가 필요합니다.")
+    def _unit_codes_for(self, standard_codes: Sequence[str]) -> list[str]:
+        """단원 코드 — LLM 출력은 읽지 않는다(EOS-205 ③ · 저작권 메타와 같은 구조적 강제).
+
+        EOS-197 회차에서 LLM이 지은 단원 코드가 회차 하나에 15종 넘게 갈렸다(`CALC1-TANGENT`·
+        `CAL-TANGENT`·`MI-CALC-EXTREMA` …). 운영자가 `unit_codes`를 지정했으면 그것을, 아니면
+        성취기준 코드에서 유도한 표준 표기(`[12미적Ⅰ-02-05]` → `12미적Ⅰ-02-05`)를 쓴다. 둘 다
+        비면 ValueError(Problem은 단원 코드 최소 1개가 필요하다).
+        """
+        if self._unit_codes:
+            return list(self._unit_codes)
+        codes = standard_unit_codes(standard_codes)
+        if codes:
+            return codes
+        raise ValueError("unit_codes 결측 — 성취기준 코드가 없어 단원 코드를 유도할 수 없습니다.")
 
     def _parse_answer_format(self, value: object, spec: EquivalenceSpec) -> AnswerFormat | None:
         """답 형태 — 유효 enum 값이면 그대로, 무효면 스펙 답형태로 폴백."""

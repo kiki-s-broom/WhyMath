@@ -966,6 +966,9 @@ async def bank_candidates(
 
         # ── ③ 대표 경로 단계(problem_step) — 좌석이 빈 문제의 첫 경로만(UNIQUE 불변). ──
         if candidate.seed.problem_id not in problems_with_steps:
+            # 헤더를 먼저 DB에 보낸다 — problem_step → solution_paths 외래 키에 relationship()이
+            # 없어 한 flush에 섞으면 INSERT 순서가 보장되지 않는다(P3-32 · whs/path_promotion 동형).
+            await session.flush()
             problems_with_steps.add(candidate.seed.problem_id)
             for step in path.steps:
                 session.add(

@@ -383,9 +383,13 @@ class TestStructuredOutput:
             "conditions",
             "answer_map",
             "answer_selection",
-            "unit_codes",
         ):
             assert field in required
+        # EOS-205 ③ — 단원 코드는 코드가 정하므로 모델에게 요구하지 않는다(스키마에서 제외).
+        properties = schema["properties"]
+        assert isinstance(properties, dict)
+        assert "unit_codes" not in properties
+        assert "unit_codes" not in required
 
     def test_schema_omits_solution_steps(self) -> None:
         # S2-k: 저작 산문은 Tier2 심볼릭 체인이 아니므로 스키마가 solution_steps를 유도하지 않는다.
@@ -491,6 +495,7 @@ class TestDeriveAndVerify:
         # 부동소수 표기(1.3333…)는 유도 정확값 '4/3'으로 정규화 — display·검산 모두 canonical.
         payload = json.loads(_HAPPY)
         payload["conditions"] = "3*x**2 - 7*x + 4 = 0"
+        payload["question_text"] = _question_for(payload["conditions"])
         payload["answer_map"] = {"x": "1.3333333333333333"}
         payload["answer"] = "1.3333333333333333"
         candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
@@ -502,6 +507,7 @@ class TestDeriveAndVerify:
         # 이미 정확값이면 그대로(4/3→4/3) + 게이트 verified·accepted(정규화가 검산을 돕는다).
         payload = json.loads(_HAPPY)
         payload["conditions"] = "3*x**2 - 7*x + 4 = 0"
+        payload["question_text"] = _question_for(payload["conditions"])
         payload["answer_map"] = {"x": "4/3"}
         payload["answer"] = "1.333"
         payload["answer_format"] = "분수"
@@ -863,18 +869,24 @@ class TestSafeFallback:
         assert candidate is not None
         assert candidate.problem.distractor_map is None
 
-    def test_missing_unit_codes_without_fallback_returns_none(self) -> None:
-        payload = json.loads(_HAPPY)
-        del payload["unit_codes"]
-        assert _gen(FakeProvider([json.dumps(payload)])).generate(_spec()) is None
+    def test_llm_unit_codes_are_ignored_and_derived_from_standard(self) -> None:
+        # EOS-205 ③ — LLM이 낸 비표준 단원 코드(`CAL-INT-DEF`)는 읽지 않고 성취기준에서 유도한다.
+        candidate = _gen(FakeProvider([_HAPPY])).generate(_spec())
+        assert candidate is not None
+        assert candidate.problem.unit_codes == ["12미적01-01"]
 
-    def test_missing_unit_codes_with_fallback_assembles(self) -> None:
+    def test_missing_unit_codes_still_assembles(self) -> None:
         payload = json.loads(_HAPPY)
         del payload["unit_codes"]
-        gen = _gen(FakeProvider([json.dumps(payload)]), fallback_unit_codes=["CAL-INT-DEF"])
+        candidate = _gen(FakeProvider([json.dumps(payload)])).generate(_spec())
+        assert candidate is not None
+        assert candidate.problem.unit_codes == ["12미적01-01"]
+
+    def test_operator_unit_codes_override(self) -> None:
+        gen = _gen(FakeProvider([_HAPPY]), unit_codes=["QUAD-EQ"])
         candidate = gen.generate(_spec())
         assert candidate is not None
-        assert candidate.problem.unit_codes == ["CAL-INT-DEF"]
+        assert candidate.problem.unit_codes == ["QUAD-EQ"]
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1238,7 +1250,15 @@ def _happy_with(conditions: str, answer: str) -> str:
     data["conditions"] = conditions
     data["answer"] = answer
     data["answer_map"] = {"x": answer}
+    # 발문도 같은 방정식으로 맞춘다 — EOS-205 ①부터 발문과 무관한 검산식은 생성 단계에서 거부된다.
+    data["question_text"] = _question_for(conditions)
     return json.dumps(data, ensure_ascii=False)
+
+
+def _question_for(conditions: str) -> str:
+    """SymPy 표기 방정식 → 그 방정식을 묻는 발문(`x**2 - 3*x + 2 = 0` → `x^2 - 3x + 2 = 0`)."""
+    display = conditions.replace("**", "^").replace("*", "")
+    return f"이차방정식 {display} 의 두 근 중 큰 근을 구하시오."
 
 
 _AVOID_MARKER = "이번에 이미 만든 방정식"
@@ -1373,3 +1393,136 @@ class TestStandardCodeCopyTrap:
             if not expected:
                 assert verdict.equivalence == "검수필요"
                 assert any("성취기준 0.00" in reason for reason in verdict.reasons)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-205 — 생성 단계 거부(검산식 근거·정답 키·단원 코드·교육과정 범위) 배선
+# ──────────────────────────────────────────────────────────────────────
+_CALC1_STANDARD = "[12미적Ⅰ-02-05]"
+_CALC1_EXTREMUM_STANDARD = "[12미적Ⅰ-02-07]"
+
+
+def _tangent_payload(conditions: str, answer_map: dict[str, str]) -> str:
+    """미적분Ⅰ 접선의 y절편 문항(정답 -14) — 검산식만 바꿔 끼운다."""
+    return json.dumps(
+        {
+            "question_text": (
+                "삼차함수 f(x) = x^3 - 5x + 2 의 그래프 위의 점 (2, 0) 에서의 접선의 y절편을 구하시오."
+            ),
+            "answer": "-14",
+            "answer_explanation": "f'(x) = 3x^2 - 5, f'(2) = 7 이므로 접선은 y = 7(x - 2), y절편은 -14.",
+            "conditions": conditions,
+            "answer_map": answer_map,
+            "answer_selection": "unique",
+            "unit_codes": ["CALC1-TANGENT"],  # 비표준 — 코드가 읽지 않아야 한다
+            "answer_format": "실수",
+            "achievement_standard_codes": [_CALC1_STANDARD],
+        },
+        ensure_ascii=False,
+    )
+
+
+def _calc1_spec(standard: str = _CALC1_STANDARD) -> EquivalenceSpec:
+    return _spec(
+        achievement_standard_codes=frozenset({standard}),
+        target_misconception_ids=frozenset(),
+        answer_format=AnswerFormat.실수,
+    )
+
+
+class TestEos205AuthoringGuard:
+    def test_restatement_is_refused_and_logged_with_type_name(self) -> None:
+        logs: list[object] = []
+        provider = FakeProvider([_tangent_payload("b + 14 = 0", {"b": "-14"})])
+        gen = _gen(provider, generation_log_sink=logs.append)
+        assert gen.generate(_calc1_spec()) is None
+        assert len(logs) == 1
+        # 측정기가 "동어반복으로 버린 건수"를 셀 수 있게 사유가 예외 타입명으로 남는다.
+        assert logs[0].error_detail == "후보 조립 실패: TautologicalConditionError"  # type: ignore[attr-defined]
+
+    def test_hardcoded_slope_is_refused(self) -> None:
+        provider = FakeProvider([_tangent_payload("b = 7*(0 - 2)", {"b": "-14"})])
+        assert _gen(provider).generate(_calc1_spec()) is None
+
+    def test_grounded_recompute_assembles_with_standard_key_and_unit(self) -> None:
+        provider = FakeProvider(
+            [_tangent_payload("b == (2**3 - 5*2 + 2) - 2*(3*2**2 - 5)", {"b": "-14"})]
+        )
+        candidate = _gen(provider).generate(_calc1_spec())
+        assert candidate is not None
+        assert candidate.answer_map == {"answer": "-14"}  # ② 정답 키 고정
+        assert candidate.conditions == "answer == (2**3 - 5*2 + 2) - 2*(3*2**2 - 5)"
+        assert candidate.problem.unit_codes == ["12미적Ⅰ-02-05"]  # ③ 비표준 코드 무시
+        # 이름을 바꾼 검산식도 수용 게이트의 Tier1을 그대로 통과한다(정답 -14 검산).
+        verdict = evaluate_equivalent_candidate(
+            _calc1_spec(),
+            candidate.problem,
+            provenance=candidate.provenance,
+            conditions=candidate.conditions,
+            answer_map=candidate.answer_map,
+            answer_selection=candidate.answer_selection,
+            solution_steps=candidate.solution_steps,
+        )
+        assert verdict.verification == "verified"
+
+    def test_second_derivative_explanation_is_refused_for_calculus1(self) -> None:
+        logs: list[object] = []
+        payload = json.loads(
+            _tangent_payload("answer == (-1)**3 - 3*(-1)**2 - 9*(-1) + 10", {"answer": "15"})
+        )
+        payload["question_text"] = "삼차함수 y = x^3 - 3x^2 - 9x + 10 의 극댓값을 구하시오."
+        payload["answer"] = "15"
+        payload["answer_explanation"] = (
+            "f''(x) = 6x - 6 이고 f''(-1) = -12 < 0 이므로 x = -1에서 극대."
+        )
+        payload["achievement_standard_codes"] = [_CALC1_EXTREMUM_STANDARD]
+        provider = FakeProvider([json.dumps(payload, ensure_ascii=False)])
+        gen = _gen(provider, generation_log_sink=logs.append)
+        assert gen.generate(_calc1_spec(_CALC1_EXTREMUM_STANDARD)) is None
+        assert logs[0].error_detail == "후보 조립 실패: CurriculumScopeError"  # type: ignore[attr-defined]
+
+    def test_sign_change_explanation_passes_for_calculus1(self) -> None:
+        """대조군 — 같은 문항을 f′ 부호 변화로 해설하면 통과한다(과잉 거부 방지)."""
+        payload = json.loads(
+            _tangent_payload("answer == (-1)**3 - 3*(-1)**2 - 9*(-1) + 10", {"answer": "15"})
+        )
+        payload["question_text"] = "삼차함수 y = x^3 - 3x^2 - 9x + 10 의 극댓값을 구하시오."
+        payload["answer"] = "15"
+        payload["answer_explanation"] = (
+            "f'(x) = 3x^2 - 6x - 9 = 3(x+1)(x-3), x = -1 좌우에서 f'의 부호가 + 에서 - 로 바뀌어 극대."
+        )
+        payload["achievement_standard_codes"] = [_CALC1_EXTREMUM_STANDARD]
+        provider = FakeProvider([json.dumps(payload, ensure_ascii=False)])
+        assert _gen(provider).generate(_calc1_spec(_CALC1_EXTREMUM_STANDARD)) is not None
+
+
+class TestEos205PromptVersion:
+    _EOS197_PROMPT_VERSION = "l3.equivalent@sha256:4da254e24507"  # 회차 cu.genlog.jsonl 실측값
+
+    def test_prompt_version_moved_from_eos197_round(self) -> None:
+        """⑤ 프롬프트 정본을 고쳤으므로 식별자가 회차 기록값과 달라야 한다(같으면 문면 미반영)."""
+        assert llm_generator._prompt_version() != self._EOS197_PROMPT_VERSION
+
+    def test_generation_log_carries_current_prompt_version(self) -> None:
+        logs: list[object] = []
+        _gen(FakeProvider([_HAPPY]), generation_log_sink=logs.append).generate(_spec())
+        assert logs[0].prompt_version == llm_generator._prompt_version()  # type: ignore[attr-defined]
+
+    def test_prompt_canon_states_the_new_rules(self) -> None:
+        system = prompt_text("l3.equivalent.system")
+        assert "정답 변수 이름은 **반드시 `answer`**" in system
+        assert "이계도함수(f″)를 쓰지 마세요" in system
+        assert "단원 코드(unit_codes)는 넣지 마세요" in system
+
+
+def test_unit_codes_come_from_spec_not_llm_standard_codes() -> None:
+    """검토 8 — LLM이 성취기준 코드를 바꿔 내도 단원 코드는 스펙에서 유도한다."""
+    payload = json.loads(
+        _tangent_payload("answer == (2**3 - 5*2 + 2) - 2*(3*2**2 - 5)", {"answer": "-14"})
+    )
+    payload["achievement_standard_codes"] = ["[99가짜-01-01]"]
+    candidate = _gen(FakeProvider([json.dumps(payload, ensure_ascii=False)])).generate(
+        _calc1_spec()
+    )
+    assert candidate is not None
+    assert candidate.problem.unit_codes == ["12미적Ⅰ-02-05"]

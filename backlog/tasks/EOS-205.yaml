@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/equivalent/**"
-session: null
+session: claude/eos-205-generator-output-defects
 notes: "출처: EOS-197 A6 저작 회차(2026-10-28 · PR #1765) 수정승인 27건의 검수 메모에 반복된 결함. 검수는 AI 보조 검수였고 판정·메모는 Kiki가 확정했다. 겹침 고지: EOS-23(세션 claude/optimistic-tesla-njo0v1)·EOS-202·EOS-203이 같은 생성기 파일을 작업 경로로 잡고 있다 — 착수 전 상태 확인."
-updated: 2026-10-28
+updated: 2026-11-01

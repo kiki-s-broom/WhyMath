@@ -1,0 +1,660 @@
+{
+  "kind": "whymath.ngram_overlap_record",
+  "task": "EOS-222",
+  "run": "eos197-a6-openrouter",
+  "cu_sha256": "02aef3ce08063ccced6eb48c92371e301478193ec77c28d623440bf4249cc708",
+  "method": {
+    "n": 8,
+    "threshold": 0.7,
+    "threshold_rule": "overlap >= threshold 이면 at_or_above_threshold=true (기록만 — 차단 없음)",
+    "formula": "|8gram(G) ∩ 8gram(O)| / |8gram(G)| 의 원본별 최댓값",
+    "tokenizer": "nfkc-whitespace-v1",
+    "tokenizer_bias": "공백 분리라 띄어쓰기만 바꾼 복사도 일치율이 낮게 나온다(과소평가 방향)",
+    "self_slug_excluded": true,
+    "fields": [
+      "question_text",
+      "answer_explanation"
+    ],
+    "guide": "docs/legal/copyright_guide_v2.md (n-gram 가드레일 · 8-gram · 70% 이상 재생성)"
+  },
+  "comparison_set": [
+    {
+      "corpus": "problem_bank_generated_v0",
+      "path": "data/corpus/problem_bank_generated_v0/problems.jsonl",
+      "sha256": "828efc0663db0f58171b311165030fe55aef6e8e48d89478260e1bdfc00889d9",
+      "run_paths": [
+        "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\corpus\\problem_bank_generated_v0\\problems.jsonl"
+      ],
+      "run_digests": [
+        "7285ff1425d4824be0e15deb025017e2f7260e514efee54ab2520f335d6b29b7"
+      ],
+      "digest_match": "crlf_equivalent",
+      "documents": 1187
+    },
+    {
+      "corpus": "problem_bank_p3_calculus1_diff_v0",
+      "path": "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl",
+      "sha256": "7dc942426235ea55646be52b366de6a521457e523caf14f814b9960b4ce348cc",
+      "run_paths": [
+        "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\corpus\\problem_bank_p3_calculus1_diff_v0\\problems.jsonl"
+      ],
+      "run_digests": [
+        "8cd4aea13e6685b25c702000e5c137525359f8b960bcc9480675a84e4be392b8"
+      ],
+      "digest_match": "crlf_equivalent",
+      "documents": 1000
+    },
+    {
+      "corpus": "problem_bank_p3_fill_v0",
+      "path": "data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
+      "sha256": "0685d116a767a7d4c8079c4f67ba33db5e5cbe0e3a0abbe5bd025b04a14f7737",
+      "run_paths": [
+        "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\corpus\\problem_bank_p3_fill_v0\\problems.jsonl"
+      ],
+      "run_digests": [
+        "867036e6683e0187c741abd35d2e1b07218b9f61d6051d040880974ccdca4c97"
+      ],
+      "digest_match": "crlf_equivalent",
+      "documents": 408
+    }
+  ],
+  "comparison_set_rule": "그 회차가 실제로 읽은 입력 코퍼스(cu.rounds.jsonl dedup_input_digests)에서 회차 자기 산출물을 뺀 것",
+  "skipped_inputs": [
+    {
+      "path": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-eos197\\data\\runs\\eos197-a6-openrouter\\cu.jsonl",
+      "reason": "회차 자기 산출물"
+    }
+  ],
+  "not_compared": [
+    "평가원 기출 본문(저장소 미보유 — 구조 메타만 보유)",
+    "EBS 교재·강의 본문(저장소 미보유)",
+    "검정교과서 본문·문제·풀이(저장소 미보유)"
+  ],
+  "limitation": "일치율이 낮다는 것은 comparison_set과 다르다는 뜻일 뿐이다 — not_compared의 원본과는 대조하지 않았다. 또 공백 분리 토큰화라 띄어쓰기만 바꾼 복사도 낮게 나오고(과소평가), 토큰 8개 미만 필드는 잴 수 없다(unmeasurable). 낮은 값은 '다르다'의 증거가 아니다.",
+  "summary": {
+    "records": 27,
+    "fields_measured": 54,
+    "fields_unmeasurable": 0,
+    "max_overlap": 0.3636,
+    "flagged_count": 0,
+    "by_field": {
+      "question_text": {
+        "measured": 27,
+        "unmeasurable": 0,
+        "max_overlap": 0.3636,
+        "flagged_count": 0
+      },
+      "answer_explanation": {
+        "measured": 27,
+        "unmeasurable": 0,
+        "max_overlap": 0.037,
+        "flagged_count": 0
+      }
+    },
+    "flagged": [],
+    "comparison_warnings": []
+  },
+  "results": [
+    {
+      "slug": "wm-gen-calc1-fa7021b73e67",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 11,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 33,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-ef3b1971fcd3",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.2,
+          "ngram_count": 5,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-eqapp-d3e1f33d6241",
+            "field": "answer_explanation"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.037,
+          "ngram_count": 27,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-eqapp-2bedcffed537",
+            "field": "answer_explanation"
+          }
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-2235de23fd8e",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0833,
+          "ngram_count": 12,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-8b3ea9434fef",
+            "field": "answer_explanation"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 42,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-580d11379fec",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 18,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 22,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-a523bca97be2",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.2083,
+          "ngram_count": 24,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-4d1d8fa35e15",
+            "field": "question_text"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 36,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-40f00a8f57ca",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 16,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 36,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-9e4ec39eaadd",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 19,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 30,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-1c97770a69ff",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 12,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 5,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-1c39b6c014e0",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0476,
+          "ngram_count": 21,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-8a19e8b7a0bf",
+            "field": "question_text"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 25,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-377ef98133ed",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 15,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 35,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-91e9545d2a4b",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 13,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 32,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-d943d7f6f5ba",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 18,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 36,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-4dc5bdbfc524",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 10,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 28,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-60f3df347c07",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 18,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 49,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-0b70422616db",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 6,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0217,
+          "ngram_count": 46,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-graphshape-157000e44a8f",
+            "field": "answer_explanation"
+          }
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-adc6c358b6cb",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 12,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 41,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-89cc30aac3f0",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 12,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 41,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-1f3f6d5385e7",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 13,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 18,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-24b776c9512d",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0909,
+          "ngram_count": 11,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-6223f4533b52",
+            "field": "question_text"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 24,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-ea0344f69c14",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 18,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 46,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-e7c73d651ae3",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 6,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0333,
+          "ngram_count": 30,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-graphshape-066f49e76f84",
+            "field": "answer_explanation"
+          }
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-f76acdd14d39",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.3636,
+          "ngram_count": 22,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-eqapp-44c9e0691821",
+            "field": "question_text"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 44,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-cf311fa5bf53",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 14,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0156,
+          "ngram_count": 64,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-8b3ea9434fef",
+            "field": "answer_explanation"
+          }
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-635a543509ae",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 14,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 1,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-90e491183fea",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0476,
+          "ngram_count": 21,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-8a19e8b7a0bf",
+            "field": "question_text"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 26,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-0a6ce7e7b20b",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 10,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 4,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-c42808b25a8f",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0769,
+          "ngram_count": 13,
+          "at_or_above_threshold": false,
+          "best_match": {
+            "corpus": "problem_bank_p3_calculus1_diff_v0",
+            "slug": "wm-p3-diff-mvt-8b3ea9434fef",
+            "field": "answer_explanation"
+          }
+        },
+        "answer_explanation": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 23,
+          "at_or_above_threshold": false,
+          "best_match": null
+        }
+      }
+    }
+  ]
+}
