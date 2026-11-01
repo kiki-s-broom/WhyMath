@@ -194,7 +194,10 @@ if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$
 if ($Py -and $Wt -and $Cfg -and (Test-Path $Cfg)) { cd $Wt; $env:PYTHONPATH = "$Wt\src\backend"; & $Py -m whymath_backend.harness.authoring_round --config $Cfg --worktree $Wt --release-unevidenced; "ROUND_EXIT=$LASTEXITCODE" } else { "RUN_REFUSED=True — Py=[$Py] Wt=[$Wt] Cfg=[$Cfg] — 새 창이면 [R0]·[R1]부터" }
 ```
 
-`RESERVATION_RELEASED seat=… from=… to=…` 줄이 풀어 준 수다.
+`RESERVATION_RELEASED seat=… from=… to=…` 줄이 풀어 준 수다. 이 줄은 상태 파일에 **저장된 뒤에만** 나온다 —
+저장에 실패하면 `RESERVATION_RELEASE_SAVED=False`와 `STAGE_FAILED stage=release-unevidenced
+error=ReservationReleaseNotSaved`가 나오고 아무것도 풀리지 않은 채 멈춘다(저작으로 넘어가지 않는다).
+풀 것이 없으면 `RESERVATION_RELEASED=none`이 나오고 그대로 이어서 실행한다.
 
 ## [K-1] 키 입력 — `OPENROUTER_KEY_SHAPE_OK=False`가 나올 때만 · 이 블록만 단독으로
 
@@ -241,6 +244,29 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
 
 ---
 
+## 첫 Windows 실회차 확인 체크리스트 (EOS-209 ②)
+
+CI·개발 세션에는 Windows·PowerShell 5.1·검수 창이 없다. 아래 항목은 **Phaiakes9에서 한 번 실제로 돌려야만**
+확인된다. 확인용 최소 회차 설정 = `docs/ops/authoring_round_eos209-first-windows.yaml`(유료 좌석 1개 · 목표 2 CU ·
+시도 상한 20회 · 비용 상한 약 $0.08). 실행 블록은 세션이 값(검증 대상 커밋 해시 포함)을 채워 채팅으로 준다.
+결과는 세션이 태스크 `EOS-209` notes에 기록한다(`backlog.py amend`).
+
+| # | 확인 항목 | 어떻게 보이면 통과 | 어떻게 보이면 실패 |
+|---|---|---|---|
+| C1 | PS 5.1 붙여넣기 파싱 — [R1]·[R2-D]·[R2]·[R3]형 한 줄 `if (…) { … } else { … }` | 각 블록이 `ParserError`·`CommandNotFoundException` 없이 판정 줄을 낸다 | 붉은 오류 글자 · 판정 줄 없음 |
+| C2 | cp949 콘솔 한글·기호 표시 | `▶` 요약 줄의 한글과 `—`·`·`가 깨지지 않는다 | `?`·`�`·물음표 상자 |
+| C3 | Ctrl+C 전파와 자식 종료 | 저작 도중 Ctrl+C 한 번에 `STAGE_INTERRUPTED`(또는 `STAGE_FAILED`)와 `ROUND_EXIT=1`이 나오고, 작업 관리자에 `python.exe` 자식이 남지 않는다. 다시 붙여넣으면 이어진다 | 창이 멈춘 채 안 돌아옴 · 자식 python이 남아 계속 호출 |
+| C4 | 창 X로 닫은 뒤 낡은 잠금 인수(Windows `OpenProcess` 경로 — CI 미검증) | 새 창에서 다시 실행하면 `LOCK_STALE=True … HOLDER_ALIVE=False` → `LOCK_TAKEN_OVER=True` | `HOLDER_ALIVE=True`·`None`으로 거부 |
+| C5 | 검수 창 종료 코드 | 판정을 마치고 창을 닫으면 `REVIEW_DONE=True` · 중간에 닫으면 `REVIEW_DONE=False`(정상) | `ReviewToolFailed`(창이 정상 종료했는데) |
+| C6 | Git Credential Manager 프롬프트 | push 때 로그인 창이 뜨면 로그인 후 `PUSH_VERIFIED=True` · 이미 로그인돼 있으면 창 없이 통과 | 무한 대기(5분 상한 뒤 `GitPushFailed` · 원인 줄에 토큰이 보이면 즉시 회신) |
+| C7 | O_EXCL 잠금 경로 표기 | `LOCK_ACQUIRED=True path=…\.git\worktrees\…\whymath_authoring_round_….lock`처럼 워크트리의 git 디렉터리 안 경로가 그대로 읽힌다 | 경로가 깨짐 · `LOCK_REFUSED` |
+
+**C1 범위**: [R0]은 `Read-Host` 입력 창이라 확인 회차에서는 세션이 회차 이름을 채운 블록으로 대신한다 — [R0] 자체의
+붙여넣기는 이 체크리스트가 확인하지 않는다. EOS-197 런북의 [S1]·[S2]는 이 런북 [R1]·[R2]와 같은 한 줄 구조라
+C1의 결과를 그대로 적용한다(그 런북의 다음 실회차에서 다시 본다).
+
+---
+
 ## 거부·실패 줄 읽는 법
 
 | 줄에 보이는 항목(False·실패) | 뜻 | 조치 |
@@ -256,7 +282,9 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
 | `AUTHOR_FROZEN`(거부 아님) | 검수 큐가 이미 있어 저작을 덧붙이지 않고 건너뛰었다 | 정상 — 더 저작하려면 세션에 새 회차를 요청 |
 | `…_BUDGET_EVIDENCED` · `AUTHOR_UNEVIDENCED` | 시도 예산이 **호출 기록 없는 예약**으로 찼다(시작 직후 실패 · 중간에 끊긴 회차의 나머지 · 요청보다 적게 시도한 회차) | 끊긴 원인(`STAGE_FAILED`·`STAGE_INTERRUPTED` 줄)을 확인한 뒤 「예약 풀기」 한 줄 |
 | `…_ALLOWED_PROVIDERS` | OpenRouter 허용 공급사 목록이 설정(`expected_allowed_providers`)과 다르다 | 멈추고 회신 |
-| `LOCK_HELD=True` | 같은 회차가 다른 창에서 이미 돌고 있다(또는 앞 실행이 강제 종료돼 잠금이 남았다) | 다른 창 확인 → 정말 없으면 같은 줄의 `Remove-Item` 경로를 지운 뒤 [R2] |
+| `LOCK_HELD=True … HOLDER_ALIVE=True` | 같은 회차가 다른 창에서 이미 돌고 있다 | 그 창이 끝나기를 기다린다. 다른 창이 정말 없으면 회신(번호가 재사용된 다른 프로그램일 수 있다) |
+| `LOCK_HELD=True … HOLDER_ALIVE=None` | 잠금 주인을 판정하지 못했다(잠금 내용이 비었거나 깨짐 · OS가 답하지 않음) — 그래서 지우지 않았다 | 다른 창 확인 → 정말 없으면 같은 줄의 `Remove-Item` 경로를 지운 뒤 [R2] |
+| `LOCK_STALE=True` → `LOCK_TAKEN_OVER=True`(거부 아님) | 앞 실행이 창 X 닫기 등으로 끝나 잠금만 남았다(주인 pid가 죽음) — 옆으로 치우고(`…lock.stale-<시각>-<pid>` 파일로 보존) 이어서 실행했다 | 정상 — 조치 없음 |
 | `BRANCH_NAME_VALID` | 설정의 산출물 브랜치 이름이 git 규칙에 어긋난다 | 회신 |
 | `SPEC_PLAN_UNCHANGED` | 회차 도중 spec이 바뀌었다 | 회신 |
 | `REVIEW_COMPLETE` · `JUDGED<QUEUE_LINES` | 검수가 남았다 — 업로드하지 않는다 | [R2]를 다시(검수 창이 남은 것부터) |
@@ -267,7 +295,8 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
 | `STAGE_FAILED … error=CommitVerificationFailed` · `RemoteMismatch` | 커밋에 산출물 밖 파일이 섞였거나 push 뒤 원격 끝이 그 커밋이 아니다 | 회신(push하지 않았거나 대조 실패) |
 | `STAGE_FAILED … error=ProbeFailed` | 탐침이 import부터 실패했다(원인 예외 타입이 CAUSE 줄에) | 회신 |
 | `STAGE_FAILED … error=ArtifactCheckFailed` | GenerationLog 4필드 결손·감사 실패·합계 미달 | `SEAT_CHECK`·`PROVENANCE_…` 줄을 회신 |
-| `STAGE_FAILED … error=GitPushFailed` | push 인증·네트워크 실패(커밋은 워크트리에 남는다) | [R2]를 다시 — 커밋을 그대로 보낸다 |
+| `STAGE_FAILED … error=GitPushFailed` | push 인증·네트워크 실패(커밋은 워크트리에 남는다) — 원인 줄의 URL 자격증명은 `https://***@…`로 가려진다 | [R2]를 다시 — 커밋을 그대로 보낸다 |
+| `STAGE_FAILED … error=ReservationReleaseNotSaved` | 「예약 풀기」를 상태 파일에 쓰지 못했다 — 아무것도 풀리지 않았다 | 상태 파일(`…-review\round_state.json`)을 연 프로그램을 닫고 같은 줄을 다시 |
 | `CONFIG_ERROR=` | 설정 파일 형식 오류(exit 2) | 그 줄을 회신 |
 
 **회신**: [R2] 출력 전체를 **자르지 말고** 준다(잘린 출력으로는 분모가 조용히 줄어든 것을 놓친다).
@@ -288,3 +317,14 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
   적었을 수 있다). `STATE_MISMATCH seat=…` 줄이 그 차이를 보여 준다. 그 예약만으로 예산이 차서 거부되면
   「예약 풀기」 한 줄로 실물 근거까지만 되돌린다(끊긴 순간 진행 중이던 호출 1건은 근거에 안 잡혀 풀릴 수 있다).
   예산 자체를 늘리려면 설정에서 올린다.
+- **genlog 파일을 사람이 지우면 예산 근거가 사라진다(설계상 한계 — EOS-209 ③).** 시도 소진은 상태 파일의 예약과
+  좌석 폴더의 `cu.genlog.jsonl`·`cu.rounds.jsonl`(실물 근거) 둘로 센다. genlog·대장을 지우거나 비우면 실제로 호출한
+  시도가 근거에서 빠져, 「예약 풀기」가 그만큼을 **다시 쓸 수 있는 예산으로 되돌린다** — 같은 유료 예산을 두 번 쓸 수
+  있게 된다. 상태 파일까지 함께 지우면 예약도 사라져 막을 장치가 없다. 좌석 폴더의 파일은 손으로 지우거나 고치지
+  않는다(회차를 새로 하려면 세션에 새 회차 이름을 요청한다).
+- **낡은 잠금 인수의 판정 한계**: 주인 pid가 죽었는지는 OS에 묻는다. 그 번호를 다른 프로그램이 재사용 중이면 '살아
+  있음'으로 읽혀 인수하지 않는다(안전한 쪽의 오판 — `HOLDER_ALIVE=True`로 거부되면 회신). Windows에서 종료 코드
+  259로 끝난 프로세스도 같은 이유로 '살아 있음'으로 읽힌다.
+- **시크릿 가림의 범위**: 화면·상태 파일에 남는 자식 stderr 꼬리·원인 줄에서 `sk-or-`·`sk-ant-`·Bearer 토큰·
+  GitHub 토큰 접두(`ghp_` 등)·URL에 박힌 자격증명(`https://…@`·`x-access-token:…@`)을 `***`로 가린다. 이 모양이
+  아닌 비밀(임의 문자열 비밀번호 등)은 가리지 못한다 — 원인 줄을 회신하기 전에 한 번 훑어본다.

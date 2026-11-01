@@ -29,6 +29,7 @@ from whymath_backend.harness.authoring_round_ports import (
     RunResult,
     SubprocessRunner,
     mask_secrets,
+    pid_alive,
 )
 from whymath_backend.harness.authoring_round_probe import run_probe
 
@@ -154,6 +155,58 @@ def test_mask_secrets_hides_key_shapes() -> None:
         "sk-or-v1" not in masked and "sk-ant-api03" not in masked and "abcdefghijkl" not in masked
     )
     assert mask_secrets("sk-or- 로 시작") == "sk-or- 로 시작"  # 안내 문구의 접두만은 그대로
+
+
+@pytest.mark.parametrize(
+    ("text", "secret", "kept"),
+    [
+        # git push 실패 줄이 원격 URL을 그대로 보이는 유형(EOS-209 ①(a))
+        (
+            "fatal: unable to access 'https://x-access-token:ghs_AbCdEf1234567890@github.com/o/r.git/': 403",
+            "ghs_AbCdEf1234567890",
+            "https://***@github.com/o/r.git/",
+        ),
+        (
+            "remote: https://kiki:ghp_abcdefgh12345678@github.com/a/b",
+            "ghp_abcdefgh12345678",
+            "github.com/a/b",
+        ),
+        (
+            "https://ghp_abcdefgh12345678@github.com/a",
+            "ghp_abcdefgh12345678",
+            "https://***@github.com/a",
+        ),
+        ("x-access-token:abc123secret@github.com", "abc123secret", "x-access-token:***@github.com"),
+        ("token ghp_abcdefgh12345678 leaked", "ghp_abcdefgh12345678", "leaked"),
+        ("pat github_pat_11ABCDEFG0123456789_xyz", "github_pat_11ABCDEFG", "pat ***"),
+    ],
+)
+def test_mask_secrets_hides_url_embedded_credentials(text: str, secret: str, kept: str) -> None:
+    masked = mask_secrets(text)
+    assert secret not in masked
+    assert kept in masked  # 구조(호스트·경로)는 남긴다 — 어디서 실패했는지는 읽혀야 한다
+
+
+def test_mask_secrets_keeps_non_credential_at_signs() -> None:
+    """대조군 — 경로 속 `@`·이메일은 자격증명이 아니다(과잉 마스킹이면 원인 줄을 못 읽는다)."""
+    text = "see https://github.com/a/b/blob/x@y and kiki@example.invalid"
+    assert mask_secrets(text) == text
+
+
+def test_pid_alive_reports_live_dead_and_unknown() -> None:
+    import os
+    import subprocess
+
+    assert pid_alive(os.getpid()) is True
+    done = subprocess.run(
+        [sys.executable, "-c", "import os; print(os.getpid())"],  # noqa: S603
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert pid_alive(int(done.stdout.strip())) is False  # 끝난 자식(번호 재사용 전)
+    assert pid_alive(0) is None  # 판정 불가 — 잠금을 존중하는 쪽
+    assert pid_alive(-5) is None
 
 
 def test_bool_is_not_accepted_as_int() -> None:

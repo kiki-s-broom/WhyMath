@@ -417,6 +417,8 @@ class Harness:
     cfg_path: Path
     module_file: Path
     http: FakeHttp
+    # 잠금 주인 생존 판정 — 기본은 '살아 있음'(남의 잠금은 존중). 낡은 잠금 테스트가 바꾼다.
+    pid_alive: Callable[[int], bool | None] = lambda pid: True
 
     def make(
         self, *, dry_run: bool = False, data: dict[str, Any] | None = None
@@ -434,6 +436,7 @@ class Harness:
             python="python",
             out=self.out,
             module_file=self.module_file,
+            pid_alive=self.pid_alive,
         )
         return ar.AuthoringRound(cfg, io_, dry_run=dry_run)
 
@@ -917,6 +920,7 @@ def test_lock_held_refuses_and_tells_how_to_clear(h: Harness) -> None:
     lock.write_text('{"pid": 1, "started_at": "x"}', encoding="utf-8")
     assert h.run() == 1
     assert "LOCK_HELD=True" in h.text
+    assert "HOLDER_ALIVE=True" in h.text
     assert f'Remove-Item "{lock}"' in h.text
     assert h.world.calls == []
     assert lock.exists()  # 남의 잠금은 지우지 않는다
@@ -1062,3 +1066,149 @@ def test_reservation_save_failure_blocks_the_paid_call(h: Harness) -> None:
     assert "ReservationNotSaved" in h.text
     genlog = h.runs() / "t1-openrouter" / "cu.genlog.jsonl"
     assert not genlog.exists()  # 호출 0
+
+
+# ── EOS-209 — 재리뷰 P3 잔여분 ─────────────────────────────────────────────
+
+
+def test_url_credentials_in_push_failure_are_masked(h: Harness) -> None:
+    """push 실패 줄이 원격 URL에 박힌 토큰을 그대로 보여도 화면·상태 파일에 남지 않는다(①(a))."""
+    token = "ghs_AbCdEf1234567890xyz"
+    stderr = f"fatal: unable to access 'https://x-access-token:{token}@github.com/o/r.git/': 403"
+    h.world.git_hook = lambda argv: RunResult(128, "", stderr) if "push" in argv else None
+    assert h.run() == 1
+    assert "STAGE_FAILED stage=deliver error=GitPushFailed" in h.text
+    assert token not in h.text
+    assert "https://***@github.com/o/r.git/" in h.text  # 어디로 보내다 실패했는지는 읽힌다
+    state = (h.runs() / "t1-review" / "round_state.json").read_text(encoding="utf-8")
+    assert token not in state
+
+
+def _write_lock(h: Harness, body: str) -> Path:
+    lock = _lock_path(h)
+    lock.write_text(body, encoding="utf-8")
+    return lock
+
+
+def _stale_files(h: Harness) -> list[Path]:
+    return sorted(_lock_path(h).parent.glob("whymath_authoring_round_t1.lock.stale-*"))
+
+
+def test_stale_lock_of_dead_pid_is_taken_over_and_preserved(h: Harness) -> None:
+    """창 X로 닫혀 남은 잠금(pid 죽음)은 사람이 지우지 않아도 인수한다 — 옛 잠금은 옆에 보존(①(b))."""
+    body = '{"pid": 424242, "started_at": "2026-10-28T11:00:00+00:00"}'
+    _write_lock(h, body)
+    seen: list[int] = []
+    h.pid_alive = lambda pid: (seen.append(pid), False)[1]
+    assert h.run(only="author-local") == 0, h.text
+    assert seen == [424242]
+    assert "LOCK_STALE=True" in h.text and "HOLDER_ALIVE=False" in h.text
+    assert "LOCK_TAKEN_OVER=True" in h.text and "LOCK_ACQUIRED=True" in h.text
+    stale = _stale_files(h)
+    assert len(stale) == 1 and stale[0].read_text(encoding="utf-8") == body
+    assert not _lock_path(h).exists()  # 이번 실행의 잠금은 끝나며 풀렸다
+
+
+@pytest.mark.parametrize(
+    ("body", "alive", "asked"),
+    [
+        ('{"pid": 424242, "started_at": "x"}', None, True),  # OS가 답하지 않음
+        ("", None, False),  # 만들자마자 끊겨 내용이 빈 잠금 — 주인을 모른다
+        ('{"pid": "abc"}', None, False),
+    ],
+)
+def test_lock_with_unknown_holder_is_respected(
+    h: Harness, body: str, alive: bool | None, asked: bool
+) -> None:
+    """모른다 ≠ 죽었다 — 판정할 수 없는 잠금은 지우지도 옮기지도 않는다."""
+    lock = _write_lock(h, body)
+    seen: list[int] = []
+    h.pid_alive = lambda pid: (seen.append(pid), alive)[1]
+    assert h.run() == 1
+    assert "LOCK_HELD=True" in h.text and "HOLDER_ALIVE=None" in h.text
+    assert "LOCK_TAKEN_OVER" not in h.text
+    assert bool(seen) is asked
+    assert lock.read_text(encoding="utf-8") == body and _stale_files(h) == []
+    assert h.world.calls == []
+
+
+def test_stale_lock_with_own_reused_pid_is_taken_over(h: Harness) -> None:
+    """잠금의 pid가 하필 이 프로세스 번호(재사용)여도 '살아 있음'으로 읽어 영영 막히지 않는다."""
+    import os
+
+    _write_lock(h, json.dumps({"pid": os.getpid(), "started_at": "x"}))
+    assert h.run(only="author-local") == 0, h.text
+    assert "LOCK_TAKEN_OVER=True" in h.text
+
+
+def test_stale_lock_takeover_backs_off_when_another_run_relocks(h: Harness) -> None:
+    """판정과 이름 바꾸기 사이에 다른 실행이 새 잠금을 만들었으면, 옮긴 것을 되돌리고 물러선다."""
+    lock = _write_lock(h, '{"pid": 424242, "started_at": "x"}')
+    fresh = '{"pid": 777, "started_at": "new"}'
+
+    def racing(pid: int) -> bool:
+        # 옛 주인은 죽었지만, 판정 직후 다른 실행이 잠금을 새로 잡는다(내용이 바뀐다)
+        lock.unlink()
+        lock.write_text(fresh, encoding="utf-8")
+        return False
+
+    h.pid_alive = racing
+    assert h.run() == 1
+    assert "RESTORED=True" in h.text
+    assert lock.read_text(encoding="utf-8") == fresh  # 남의 새 잠금은 제자리에 그대로
+    assert _stale_files(h) == []
+    assert h.world.calls == []
+
+
+def test_release_unevidenced_save_failure_prints_no_success_line(h: Harness) -> None:
+    """상태 파일에 못 쓴 해제는 다음 실행에서 되살아난다 — RESERVATION_RELEASED를 내면 거짓 성공(①(c))."""
+    state = _write_state(h, {"openrouter": {"reserved_attempts": 10}})
+    blocker = state.with_suffix(".json.tmp")
+    blocker.mkdir()  # 원자적 쓰기의 임시 파일 자리를 디렉터리로 막는다
+    rc = h.make().run(only="author-cloud", release_unevidenced=True)
+    assert rc == 1
+    assert "STATE_WRITE_FAILED=True" in h.text
+    assert "RESERVATION_RELEASE_SAVED=False seats=openrouter" in h.text
+    assert "STAGE_FAILED stage=release-unevidenced error=ReservationReleaseNotSaved" in h.text
+    assert "RESERVATION_RELEASED seat=" not in h.text
+    reserved = json.loads(state.read_text(encoding="utf-8"))["seats"]["openrouter"]
+    assert reserved["reserved_attempts"] == 10  # 디스크에서는 아무것도 풀리지 않았다
+    assert h.world.module_calls("whymath_backend.harness.problem_corpus_accumulate") == []
+
+
+def test_release_unevidenced_with_nothing_to_release_says_so(h: Harness) -> None:
+    assert h.make().run(only="author-local", release_unevidenced=True) == 0, h.text
+    assert "RESERVATION_RELEASED=none" in h.text
+
+
+def test_commit_verification_refuses_when_no_commit_was_made(h: Harness) -> None:
+    """M15 반례 — 커밋이 만들어지지 않아 HEAD가 main 그대로인데, HEAD 커밋의 파일이 하필 전부 회차
+    폴더 안으로 보이는 경우. 앞 두 절(산출물 밖 파일·회차 파일 0건)은 통과하므로 `head_not_main`
+    절만 이것을 막는다 — 막지 못하면 main을 산출물 브랜치로 push하고 '원격 대조 일치'를 보고한다."""
+
+    def hook(argv: Sequence[str]) -> RunResult | None:
+        if "commit" in argv:
+            return RunResult(0, "", "")  # 0으로 끝났지만 커밋은 없다
+        if "show" in argv and "--name-only" in argv:
+            return RunResult(0, "data/runs/t1-review/canary_review_queue.jsonl\0", "")
+        return None
+
+    h.world.git_hook = hook
+    assert h.run() == 1
+    assert "HEAD_NOT_MAIN=False" in h.text
+    assert "COMMITTED_ROUND_FILES=1 COMMITTED_FILES=1" in h.text
+    assert "STAGE_FAILED stage=deliver error=CommitVerificationFailed" in h.text
+    assert not _remote_has_branch(h.repo, "round/t1-output")
+
+
+def test_commit_verification_refuses_commit_with_no_files(h: Harness) -> None:
+    """M16 반례 — 커밋은 생겼는데(HEAD≠main) 그 커밋에 파일이 하나도 없는 경우. 산출물 밖 파일 수
+    대조는 0 = 0으로 통과하므로 `committed_round` 절만 이것을 막는다."""
+    h.world.git_hook = lambda argv: (
+        RunResult(0, "", "") if "show" in argv and "--name-only" in argv else None
+    )
+    assert h.run() == 1
+    assert "HEAD_NOT_MAIN=True" in h.text
+    assert "COMMITTED_ROUND_FILES=0 COMMITTED_FILES=0" in h.text
+    assert "STAGE_FAILED stage=deliver error=CommitVerificationFailed" in h.text
+    assert not _remote_has_branch(h.repo, "round/t1-output")

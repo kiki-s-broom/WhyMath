@@ -1,0 +1,66 @@
+# 저작 회차 설정 — EOS-209 ② 첫 Windows 실회차 확인용 최소 회차
+#
+# 목적: 산출물이 아니라 **오케스트레이터가 Windows(Phaiakes9)에서 실제로 도는지** 확인한다
+# (런북 docs/ops/authoring_round_runbook.md 「첫 Windows 실회차 확인 체크리스트」).
+# 그래서 범위를 최소로 둔다 — 유료 좌석 1개 · 목표 2 CU · 시도 상한 20회 · 큐 하한 1건.
+#
+# 비용 상한(시도 상한 기준): 20회 × 1회 약 $0.004 = 약 $0.08.
+#   1회 단가의 근거 = EOS-197 실측(data/runs/eos197-a6-openrouter/cu.genlog.jsonl — 85회 cost_usd 합 $0.343).
+#   시도 상한 20은 체크리스트가 일부러 한 번씩 끊는 두 회차(Ctrl+C·창 X 닫기, 각 5회 예약)를 치르고도
+#   목표 2 CU에 닿을 여유다(EOS-197 유료 좌석 수용률 27/85 ≈ 32%).
+# 로컬 좌석은 넣지 않는다 — EOS-197에서 45회에 3 CU(수용률 약 7%)라 최소 회차에서 큐에 닿지 못할 수 있고,
+# 로컬 좌석 수용률 자체는 EOS-203이 따로 잰다.
+#
+# 산출물 브랜치(eos209/first-windows-round-output)는 확인용이다 — 주간 KPI 원장에 넣지 않는다.
+schema_version: 1
+round_name: eos209-first-windows
+task_id: EOS-209
+worktree: C:\Users\kiki\Desktop\__AI\WhyMath-eos209-first-windows
+output_root: data/runs
+ollama_request_timeout_s: 180
+
+seats:
+  - name: openrouter
+    kind: cloud
+    provider: openrouter
+    model: deepseek/deepseek-v4.1-flash
+    subscription: premium
+    budget_krw: 5000              # 라우팅 티어 입력이지 지출 상한이 아니다(지출 상한 = attempt_budget)
+    expected_jurisdiction: us
+    expected_allowed_providers: [deepinfra]
+    target_cu: 2
+    attempt_budget: 20
+
+# EOS-197 A6 spec 2종을 그대로 쓴다(새 spec을 만들지 않는다 — 확인 회차라 내용은 바뀌지 않아도 된다).
+anchors:
+  - spec_id: a6-tangent
+    standard_code: "[12미적Ⅰ-02-05]"
+    difficulty: 2.5
+    topic_hint: "고2 미적분Ⅰ 접선의 방정식 — 다항함수 그래프 위의 한 점에서 그은 접선의 y절편을 구하는 형태(답 하나·정수)"
+  - spec_id: a6-extremum
+    standard_code: "[12미적Ⅰ-02-07]"
+    difficulty: 3.0
+    topic_hint: "고2 미적분Ⅰ 극대와 극소 — 삼차함수의 극댓값을 구하는 형태(답 하나·정수)"
+
+seeds:
+  - data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl
+  - data/corpus/problem_bank_p3_fill_v0/problems.jsonl
+  - data/corpus/problem_bank_generated_v0/problems.jsonl
+
+authoring_args:
+  avoid_recent: 10
+  canary: 0
+  abort_window: 0
+
+expected_subject: 미적분
+expected_slug_prefix: wm-gen-calc1
+min_queue_cu: 1
+
+review:
+  reviewer_id: kiki
+  ui: gui
+  timeout_s: 3600
+
+deliver:
+  branch: eos209/first-windows-round-output
+  commit_message: "EOS-209: 첫 Windows 실회차 확인 산출물 (Kiki 머신 · 확인용 — KPI 원장 미반영)"
