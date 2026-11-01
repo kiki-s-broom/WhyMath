@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,11 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 평가셋 지문(`EvalSet.sha256`)을 줄바꿈 정규화(CRLF·CR → LF) 뒤의 바이트로 계산한다 — LF 원본의 지문은 바뀌지 않는다(기존 기록 `29307d97…` 유지). ② 같은 내용을 CRLF로 저장한 파일과 LF 파일의 지문이 같고, 내용이 한 글자라도 다르면 지문이 다르다는 테스트(변별력 대조군 포함). ③ 수집기 `--resume`이 CRLF 체크아웃에서 만든 run.json을 LF 체크아웃에서 이어 받을 수 있음을 테스트로 고정."
-artifacts: []
+artifacts:
+  - "#1799"
 paths:
   - src/backend/whymath_backend/harness/ai_quality_eval_set.py
   - tests/backend/harness/test_ai_quality_live_collect.py
   - "tests/backend/harness/test_ai_quality_eval*.py"
-session: claude/p3-eval-set-crlf-fingerprint
-notes: "P3-78 라이브 측정(PR #1793)에서 발견: Kiki PC(Windows) 체크아웃의 평가셋 sha256 `0950d44e…`가 저장소 원본 `29307d97…`와 달랐다 — 내용은 같고 git autocrlf가 줄바꿈만 바꿨다. 그래서 OS를 바꿔 --resume하면 '평가셋 지문 불일치'로 거부되고, 리포트 지문 대조도 거짓 불일치를 낸다. 리포트 §해석과 한계 6 참조."
-updated: 2026-10-31
+session: null
+notes: |-
+  P3-78 라이브 측정(PR #1793)에서 발견: Kiki PC(Windows) 체크아웃의 평가셋 sha256 `0950d44e…`가 저장소 원본 `29307d97…`와 달랐다 — 내용은 같고 git autocrlf가 줄바꿈만 바꿨다. 그래서 OS를 바꿔 --resume하면 '평가셋 지문 불일치'로 거부되고, 리포트 지문 대조도 거짓 불일치를 낸다. 리포트 §해석과 한계 6 참조.
+
+  [미러 면제 2026-11-01] P3-92 코드는 이미 측정됨: 구현 커밋 b82d5e16 미러(실행 스텝 전부 통과 · 코퍼스 조건부 1건 미실행) + PR #1799 CI 전 잡 green 후 머지. 현재 커밋 9f62c12e는 그 머지된 main을 병합한 대장 브랜치라 새 코드 변경 없음
+updated: 2026-11-01
