@@ -23,10 +23,12 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
     (EOS-207 — 정의·우회 검산식 제외 규칙은 `ops/g3_content_measures` 모듈 docstring (a)).
   - **재작업률** — Run 재생성 카운트 로그가 없다(EOS-55는 재현성 컬럼만 추가했고 재생성
     카운트 자체는 좌석 미착지 — `validation_scorecard.adapt_hit_cu_metrics` 독스트링 동일 판정).
-    **DB 경로에서는 여전히 그렇다.** 파일 입력 모드의 `--authoring-run-dir`를 주면 저작 회차의
-    생성 로그를 좌석×생성 주제 슬롯별 시도열로 줄 세워 센다(EOS-220 — 정의 `measure_rework`).
+    **파일 입력 모드에서도 아직 그렇다.** `--authoring-run-dir`의 회차 폴더에 슬롯 기록
+    `cu.slots.jsonl`이 있으면 센다(EOS-220 — 정의 `measure_rework`). 저작 CLI가 그 파일을 아직
+    쓰지 않으므로 지금 회차들은 사유를 단 미측정이다(생성 로그만으로 세면 배치 순서에 좌우된다).
 이 둘은 DB 연결 성공 여부와 무관하게 `measured=False`로 낸다 — "0%"이 아니라
-"측정 불가"다(위 두 `--authoring-run-dir` 예외만 산출).
+"측정 불가"다(파일 입력 모드의 `--authoring-run-dir` 예외만 산출 — 재작업률은 슬롯 기록이
+있을 때만).
 
 두 KPI의 레코드에는 `detail`(분자·분모·Wilson 단측 95% 경계·근거 회차 경로)이 붙는다 —
 1차 통과율은 하한(G4 판정 입력), 재작업률은 상한이다(`harness/wilson` 규약). 판정은 하지 않는다.
@@ -173,8 +175,8 @@ STRUCTURALLY_UNMEASURED: dict[str, str] = {
     ),
     "rework_rate": (
         "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 "
-        "좌석 미착지(2026-09-11 실측) · 파일 입력 모드는 --authoring-run-dir로 생성 로그의 "
-        "슬롯별 시도열에서 산출(EOS-220)"
+        "좌석 미착지(2026-09-11 실측) · 파일 입력 모드는 --authoring-run-dir 회차 폴더의 "
+        "cu.slots.jsonl(슬롯 기록)에서 산출(EOS-220)"
     ),
 }
 
@@ -751,11 +753,16 @@ def _fmt_rate(value: float | None) -> str:
 # ──────────────────────────────────────────────────────────────────────────
 # 재작업률 (EOS-220 ②) — 정의는 아래 `measure_rework` docstring이 정본
 # ──────────────────────────────────────────────────────────────────────────
-_CU_STATUS = "accepted_stored"  # 저장된 후보 = CU(`cu.jsonl` 1행). 회차의 CU 30건이 이것이다.
-_FAILED_STATUS = "generation_failed"
-# 같은 slug에 결과가 여럿일 때 순서를 정할 수 있는 유일한 혼합 — 저장 뒤의 중복 거부.
-# slug는 후보 내용의 지문이라, 같은 내용이면 게이트 결과도 같다(중복 거부만 예외).
-_ORDERABLE_MIX = frozenset({_CU_STATUS, "rejected_duplicate"})
+#: 회차 폴더의 슬롯 기록 좌석(append-only JSONL). **생성기가 아직 쓰지 않는다** — 쓰기 배선은
+#: 저작 쪽(l3/equivalent · harness/authoring_round) 소관이라 이 태스크 범위 밖이다(EOS-220 인계).
+SLOT_LOG_FILE = "cu.slots.jsonl"
+_CU_FILE_NAME = "cu.jsonl"
+_SLOT_OUTCOMES = frozenset({"cu", "not_cu"})
+_NO_SLOT_SEAT_REASON = (
+    f"슬롯 기록 좌석 없음({SLOT_LOG_FILE}) — 저작 CLI는 주제마다 시도를 독립 배치로 뽑고 "
+    "'몇 번째 CU를 위한 시도인가'를 남기지 않아 CU별 재생성 수가 정의되지 않는다"
+    "(생성 로그만으로 세면 값이 배치 안 순서에 좌우된다 · EOS-220)"
+)
 
 
 def _moment(raw: object) -> datetime | None:
@@ -773,11 +780,11 @@ def _moment(raw: object) -> datetime | None:
 class ReworkMeasure:
     """재작업률 측정 결과. `measured=False`면 `rate`는 None이다(0으로 위장 금지)."""
 
-    cu_count: int = 0  # 분모 — 창 안에서 생성된 CU 수
+    cu_count: int = 0  # 분모 — 창 안에서 채워진(CU가 나온) 슬롯 수
     rework_cu: int = 0  # 재생성 ≥1 CU
     repeat_cu: int = 0  # 재생성 ≥2 CU (§6 "2회+ 재생성")
-    regenerations: int = 0  # 창 안 CU에 귀속된 재생성 시도 합
-    abandoned_attempts: int = 0  # CU를 내지 못하고 슬롯 끝에 남은 시도(창 안 시각)
+    regenerations: int = 0  # 창 안 CU의 재생성 합
+    open_slots: int = 0  # 아직 CU가 나오지 않은 슬롯(비율 밖 · 따로 센다)
     outside_window_cu: int = 0
     slots: int = 0
     distribution: dict[int, int] = field(default_factory=dict)  # 재생성 횟수 → CU 수
@@ -807,113 +814,114 @@ class ReworkMeasure:
         return None
 
 
+def _slot_rows(run: RunDirInput, path: Path, errors: list[str]) -> list[dict[str, Any]]:
+    """슬롯 기록 1개 좌석 → 검증된 행. 오류는 `errors`에 남기고 그 행은 버린다(호출측이 미측정)."""
+    if not path.is_file():
+        errors.append(f"{run.name}: {_NO_SLOT_SEAT_REASON}")
+        return []
+    rows: list[dict[str, Any]] = []
+    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        where = f"{run.name}/{SLOT_LOG_FILE}:{line_no}"
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{where} JSON 파싱 실패 — {type(exc).__name__}")
+            continue
+        if not isinstance(row, dict):
+            errors.append(f"{where} 객체가 아님({type(row).__name__})")
+            continue
+        slot_id, attempt, outcome = row.get("slot_id"), row.get("attempt"), row.get("outcome")
+        if not isinstance(slot_id, str) or not slot_id.strip():
+            errors.append(f"{where} slot_id 없음")
+        elif isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+            errors.append(f"{where} attempt가 1 이상 정수가 아님({attempt!r})")
+        elif outcome not in _SLOT_OUTCOMES:
+            errors.append(f"{where} outcome이 cu/not_cu가 아님({outcome!r})")
+        elif _moment(row.get("recorded_at")) is None:
+            errors.append(f"{where} recorded_at 없음·형식 오류")
+        elif outcome == "cu" and not isinstance(row.get("cu_slug"), str):
+            errors.append(f"{where} CU 행에 cu_slug 없음")
+        else:
+            rows.append(row)
+    return rows
+
+
 def measure_rework(
-    run_dirs: list[RunDirInput], *, window: tuple[datetime, datetime] | None = None
+    run_dirs: list[Path], *, window: tuple[datetime, datetime] | None = None
 ) -> ReworkMeasure:
-    """저작 회차 폴더들 → 재작업률. 순수 함수 — I/O 0.
+    """저작 회차 폴더들 → 재작업률.
 
-    정의 (EOS-51 §6 동결 측정법 "Run 로그 재생성 카운트"의 이 저장소 판독)
-    ------------------------------------------------------------------
-    - **CU 슬롯** = 좌석(회차 폴더) × 생성 주제(`input_snapshot.topic_hint` — 저작 계획의 spec 1건).
-      저작 CLI는 시도에 "몇 번째 CU를 위한 것인가"라는 번호를 남기지 않는다. 그래서 한 좌석이 같은
-      주제로 낸 시도를 **생성 시각 순서로** 줄 세우고, CU가 나올 때마다 슬롯 하나가 채워진 것으로
-      본다. 같은 좌석의 보충 라운드(같은 계획을 다시 돌린 것)도 같은 줄에 이어진다 — 앞 라운드에서
-      못 채운 슬롯을 다시 만든 것이기 때문이다.
-    - **재생성** = 직전 CU(또는 줄의 시작) 이후 그 CU가 나오기 전까지의 CU가 아닌 시도 수. CU가
-      아닌 시도 = 생성 실패(미생성 포함 — 시도는 일어났다)·게이트 거부·검수 대기(`needs_review`)·
-      중복 거부. 미생성을 빼는 1차 통과율 분모와 다르다 — 재작업은 *다시 돌린 횟수*를 센다.
-    - **재작업률** = 재생성 ≥1인 CU ÷ CU 수. **2회+ 재생성률** = 재생성 ≥2인 CU ÷ CU 수.
-    - **버려진 시도** = 줄 끝에서 CU를 내지 못한 시도. 어느 CU에도 귀속되지 않으므로 비율에 넣지
-      않되 따로 센다(재작업 비용이 비율 밖에서 사라지지 않게).
-    - **창** = CU의 생성 시각으로 판정한다. 귀속되는 앞 시도는 창 밖이어도 센다(재생성은 CU의
-      속성이다). 버려진 시도는 그 시도의 시각으로 판정한다.
+    정의 (EOS-51 §6 동결 측정법 "Run 로그 재생성 카운트")
+    -------------------------------------------------
+    - **CU 슬롯** = 생성기가 "CU 1건을 만들려고" 연 자리. 슬롯 안의 시도는 직전 시도가 CU가
+      되지 못해서 **다시 돌린 것**이다(독립 추출이 아니다).
+    - **재생성** = CU가 나온 슬롯의 (CU가 나온 시도 번호 − 1). **재작업률** = 재생성 ≥1 CU ÷ CU
+      수. **2회+ 재생성률** = 재생성 ≥2 CU ÷ CU 수. CU가 아직 안 나온 슬롯은 비율 밖이고 따로 센다.
+    - **창** = CU 행의 `recorded_at`으로 판정한다.
 
-    범위 밖(명시): "검수 반려 후 재저작"은 §6 동결 측정법이 아니고, 회차 산출물에 반려된 CU와 다시
-    만든 CU를 잇는 기록이 없다 — 이 값에 들지 않는다(사유에 적는다).
+    근거 로그 = 회차 폴더의 `cu.slots.jsonl`(append-only · 1행 1시도):
+    `{"slot_id": str, "attempt": int(1부터), "outcome": "cu"|"not_cu", "cu_slug": str|null,
+    "recorded_at": ISO8601}`. 생성 로그(`cu.genlog.jsonl`)로는 세지 않는다 — 저작 CLI는 주제마다
+    시도를 독립 배치로 뽑으므로, 생성 시각 순서로 "CU 앞의 실패"를 재생성이라 부르면 값이 배치 안
+    순서라는 우연에 좌우된다(2026-11-01 독립 검토 실측 · EOS-220). 검수 대기(`needs_review`)도
+    사람 승인으로 나중에 CU가 될 수 있어 "다시 돌린 시도"가 아니다.
 
-    측정 실패(`measured=False`): 입력·회계 오류(1차 통과율 측정기와 **같은** 대조를 재사용) ·
-    생성 시각 없음(순서를 정할 수 없다) · 주제 없음(슬롯을 정할 수 없다) · 같은 slug의 결과 순서
-    판정 불가 · 창 안 CU 0건.
+    측정 실패(`measured=False`): 좌석 없음 · 행 형식 오류 · 슬롯의 시도 번호가 1..k로 이어지지
+    않음 · CU가 슬롯의 마지막 시도가 아님 · 한 슬롯에 CU 2건 · CU 행 slug 다중집합 ≠ `cu.jsonl`
+    slug 다중집합 · 회차 폴더 로드 오류 · 창 안 CU 0건. 범위 밖: "검수 반려 후 재저작"은 §6 동결
+    측정법이 아니고 기록 좌석도 없다.
     """
     measure = ReworkMeasure()
-    # 회계 — 1차 통과율 측정기의 대조를 그대로 쓴다(성공 호출 slug 다중집합 = 게이트 기록 ·
-    # 실패 호출 수 = generation_failed 행 수). 이중 구현하지 않는다.
-    measure.errors.extend(measure_auto_gate(run_dirs).errors)
     distribution: Counter[int] = Counter()
-    for run in run_dirs:
-        # slug → 결과 대기열. 저장분은 시각이 없어 앞에, 비저장분은 기록 시각 순서로 뒤에 둔다.
-        queues: dict[str, list[str]] = {}
-        for row in run.cu_rows:
-            slug = row.get("slug")
-            if isinstance(slug, str):
-                queues.setdefault(slug, []).append(_CU_STATUS)
-        review = [
-            r
-            for r in run.review_rows
-            if r.get("status") != _FAILED_STATUS and isinstance(r.get("slug"), str)
-        ]
-        review.sort(key=lambda r: str(r.get("recorded_at") or ""))
-        for row in review:
-            queues.setdefault(str(row["slug"]), []).append(str(row.get("status")))
-        for slug, statuses in queues.items():
-            if len(set(statuses)) > 1 and not set(statuses) <= _ORDERABLE_MIX:
+    for path in run_dirs:
+        run = load_run_dir(path)
+        measure.errors.extend(run.errors)
+        rows = _slot_rows(run, path / SLOT_LOG_FILE, measure.errors)
+        by_slot: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            by_slot.setdefault(str(row["slot_id"]), []).append(row)
+        cu_slugs: Counter[str] = Counter()
+        for slot_id, attempts in by_slot.items():
+            numbers = sorted(int(r["attempt"]) for r in attempts)
+            if numbers != list(range(1, len(numbers) + 1)):
                 measure.errors.append(
-                    f"{run.name} slug {slug} 결과 순서 판정 불가 — {sorted(set(statuses))}"
-                )
-
-        attempts: list[tuple[datetime, int, str, str]] = []  # (시각, 파일 순번, 슬롯, 결과)
-        used: Counter[str] = Counter()
-        for idx, row in enumerate(run.genlog_rows):
-            moment = _moment(row.get("generated_at"))
-            snapshot = row.get("input_snapshot")
-            topic = snapshot.get("topic_hint") if isinstance(snapshot, dict) else None
-            if moment is None:
-                measure.errors.append(
-                    f"{run.name} 생성 로그 {idx + 1}행 생성 시각 없음 — 순서 불가"
+                    f"{run.name} 슬롯 {slot_id} 시도 번호가 1..k로 이어지지 않음({numbers})"
                 )
                 continue
-            if not isinstance(topic, str) or not topic.strip():
-                measure.errors.append(f"{run.name} 생성 로그 {idx + 1}행 주제 없음 — 슬롯 불가")
+            cus = [r for r in attempts if r["outcome"] == "cu"]
+            if len(cus) > 1:
+                measure.errors.append(f"{run.name} 슬롯 {slot_id} CU {len(cus)}건")
                 continue
-            if row.get("success") is True:
-                raw_slug = row.get("cu_slug")
-                slug = raw_slug if isinstance(raw_slug, str) else ""
-                queue = queues.get(slug, [])
-                if used[slug] >= len(queue):
-                    measure.errors.append(
-                        f"{run.name} 생성 로그 {idx + 1}행 결과 없음({raw_slug!r})"
-                    )
-                    continue
-                status = queue[used[slug]]
-                used[slug] += 1
-            else:
-                status = _FAILED_STATUS
-            attempts.append((moment, idx, topic, status))
-
-        by_slot: dict[str, list[tuple[datetime, str]]] = {}
-        for moment, _, topic, status in sorted(attempts):
-            by_slot.setdefault(topic, []).append((moment, status))
-        measure.slots += len(by_slot)
-        for sequence in by_slot.values():
-            pending: list[datetime] = []  # 직전 CU 이후의 CU가 아닌 시도 시각
-            for moment, status in sequence:
-                if status != _CU_STATUS:
-                    pending.append(moment)
-                    continue
-                regen = len(pending)
-                pending = []
-                if window is not None and not (window[0] <= moment < window[1]):
-                    measure.outside_window_cu += 1
-                    continue
-                measure.cu_count += 1
-                measure.regenerations += regen
-                distribution[regen] += 1
-                if regen >= 1:
-                    measure.rework_cu += 1
-                if regen >= 2:
-                    measure.repeat_cu += 1
-            measure.abandoned_attempts += sum(
-                1 for m in pending if window is None or window[0] <= m < window[1]
+            measure.slots += 1
+            if not cus:
+                measure.open_slots += 1
+                continue
+            cu = cus[0]
+            if int(cu["attempt"]) != len(numbers):
+                measure.errors.append(f"{run.name} 슬롯 {slot_id} CU 뒤에 시도가 더 있음")
+                continue
+            cu_slugs[str(cu["cu_slug"])] += 1
+            moment = _moment(cu["recorded_at"])
+            if window is not None and not (moment is not None and window[0] <= moment < window[1]):
+                measure.outside_window_cu += 1
+                continue
+            regen = int(cu["attempt"]) - 1
+            measure.cu_count += 1
+            measure.regenerations += regen
+            distribution[regen] += 1
+            if regen >= 1:
+                measure.rework_cu += 1
+            if regen >= 2:
+                measure.repeat_cu += 1
+        stored: Counter[str] = Counter(
+            r["slug"] for r in run.cu_rows if isinstance(r.get("slug"), str)
+        )
+        if rows and cu_slugs != stored:
+            measure.errors.append(
+                f"{run.name} 회계 불일치 — 슬롯 CU {sum(cu_slugs.values())}건 ↔ "
+                f"{_CU_FILE_NAME} {sum(stored.values())}건"
             )
     measure.distribution = dict(sorted(distribution.items()))
     return measure
@@ -923,9 +931,7 @@ def rework_kpi_from_run_dirs(
     run_dirs: list[Path], *, week_start: datetime, week_end: datetime
 ) -> KpiValue:
     """저작 회차 폴더들 → 재작업률 KPI(EOS-220). 정의는 `measure_rework` docstring."""
-    loaded = [load_run_dir(path) for path in run_dirs]
-    measure = measure_rework(loaded, window=(week_start, week_end))
-    measure.errors[:0] = [e for run in loaded for e in run.errors]
+    measure = measure_rework(run_dirs, window=(week_start, week_end))
     if not measure.measured:
         return KpiValue(measured=False, value=None, unit="rate", reason=measure.reason)
     return KpiValue(
@@ -943,20 +949,17 @@ def rework_kpi_from_run_dirs(
             "wilson_sided": "one-sided",
             "regenerations": measure.regenerations,
             "regeneration_distribution": {str(k): v for k, v in measure.distribution.items()},
-            "abandoned_attempts": measure.abandoned_attempts,
+            "open_slots": measure.open_slots,
             "slots": measure.slots,
             "outside_window_cu": measure.outside_window_cu,
             "run_dirs": [str(path) for path in run_dirs],
             "definition": "ops/weekly_metrics_report.measure_rework docstring · EOS-220",
-            "review_reauthoring": (
-                "미포함 — 검수 반려 후 재저작은 §6 동결 측정법 밖이고 회차 산출물에 기록 좌석 없음"
-            ),
         },
         reason=(
             f"재생성 ≥1 CU {measure.rework_cu}/{measure.cu_count} · 2회+ 재생성 "
             f"{measure.repeat_cu}/{measure.cu_count}({_fmt_rate(measure.repeat_rate)}) · "
-            f"CU를 내지 못한 시도 {measure.abandoned_attempts}건은 비율 밖 · "
-            "슬롯 = 좌석×생성 주제 · 검수 반려 후 재저작은 기록 좌석 없어 미포함"
+            f"CU 미산출 슬롯 {measure.open_slots}건은 비율 밖 · "
+            "검수 반려 후 재저작은 기록 좌석 없어 미포함"
         ),
     )
 
@@ -975,7 +978,7 @@ def collect_from_files(
     """파일 입력 모드의 `collect` — 같은 `build_record_from_report`로 같은 형태의 레코드를 낸다.
 
     `authoring_run_dirs`(EOS-207)를 주면 자동검증 1차 통과율을 그 수용 게이트 로그로 낸다.
-    재작업률도 같은 폴더의 생성 로그 시도열로 낸다(EOS-220). None이면 종전대로 구조적
+    재작업률도 같은 폴더의 슬롯 기록(`cu.slots.jsonl`)으로 낸다(EOS-220). None이면 종전대로 구조적
     미측정이다(빈 목록과 구분하지 않는다 — 둘 다 입력 없음).
     """
     auto_gate = (
@@ -1184,8 +1187,8 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             "저작 회차 폴더(반복 가능 · cu.jsonl·cu.review.jsonl·cu.genlog.jsonl). 주면 "
-            "자동검증 1차 통과율을 그 수용 게이트 로그로(EOS-207), 재작업률을 생성 로그의 "
-            "슬롯별 시도열로(EOS-220) 산출한다. "
+            "자동검증 1차 통과율을 그 수용 게이트 로그로(EOS-207), 재작업률을 슬롯 기록 "
+            "cu.slots.jsonl로(EOS-220 · 없으면 미측정) 산출한다. "
             "--events-jsonl과 함께만 쓴다"
         ),
     )

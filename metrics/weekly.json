@@ -200,7 +200,7 @@
   {
     "week_start": "2026-10-27T14:06:14.101338+00:00",
     "week_end": "2026-10-28T07:52:53.299873+00:00",
-    "generated_at": "2026-11-01T14:18:33.989109+00:00",
+    "generated_at": "2026-11-01T14:26:01.402495+00:00",
     "kpis": {
       "hit_seconds": {
         "measured": true,
@@ -259,38 +259,10 @@
         }
       },
       "rework_rate": {
-        "measured": true,
-        "value": 0.6333333333333333,
+        "measured": false,
+        "value": null,
         "unit": "rate",
-        "reason": "재생성 ≥1 CU 19/30 · 2회+ 재생성 10/30(0.3333) · CU를 내지 못한 시도 49건은 비율 밖 · 슬롯 = 좌석×생성 주제 · 검수 반려 후 재저작은 기록 좌석 없어 미포함",
-        "detail": {
-          "numerator": 19,
-          "denominator": 30,
-          "wilson_upper_95": 0.7613432814865113,
-          "repeat_numerator": 10,
-          "repeat_rate": 0.3333333333333333,
-          "repeat_wilson_upper_95": 0.48340450854590433,
-          "wilson_sided": "one-sided",
-          "regenerations": 57,
-          "regeneration_distribution": {
-            "0": 11,
-            "1": 9,
-            "2": 4,
-            "3": 1,
-            "6": 2,
-            "7": 2,
-            "11": 1
-          },
-          "abandoned_attempts": 49,
-          "slots": 8,
-          "outside_window_cu": 0,
-          "run_dirs": [
-            "data/runs/eos197-a6-local",
-            "data/runs/eos197-a6-openrouter"
-          ],
-          "definition": "ops/weekly_metrics_report.measure_rework docstring · EOS-220",
-          "review_reauthoring": "미포함 — 검수 반려 후 재저작은 §6 동결 측정법 밖이고 회차 산출물에 기록 좌석 없음"
-        }
+        "reason": "입력·회계 오류 2건 — 부분 입력으로 판정하지 않는다(첫 사유: eos197-a6-local: 슬롯 기록 좌석 없음(cu.slots.jsonl) — 저작 CLI는 주제마다 시도를 독립 배치로 뽑고 '몇 번째 CU를 위한 시도인가'를 남기지 않아 CU별 재생성 수가 정의되지 않는다(생성 로그만으로 세면 값이 배치 안 순서에 좌우된다 · EOS-220))"
       }
     },
     "harness": {
