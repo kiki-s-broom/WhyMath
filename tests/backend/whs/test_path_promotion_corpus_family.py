@@ -1,4 +1,4 @@
-"""코퍼스 재생 풀이의 풀이 유형 승인 표(`whs/path_promotion` · P3-94) — hermetic.
+"""코퍼스 재생 풀이의 풀이 유형 승인 표(`whs/path_promotion` · P3-96) — hermetic.
 
 `whs/corpus_replay`는 모든 풀이에 출처 표지 `corpus-replay`를 단다. 이 태그만으로는 풀이 유형을
 모르므로 승격이 전부 사람 검수 큐로 갔다(로컬 PG 샌드박스 실측 1,507/1,507). Kiki가 게이트

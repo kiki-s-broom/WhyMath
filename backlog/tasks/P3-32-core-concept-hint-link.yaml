@@ -13,8 +13,8 @@ depends_on:
   - P3-04-problem-metadata-and-slots
   - P3-22-coverage-hint-source-wiring
   - P3-42-coverage-hint-baseline-live-measurement
-  - P3-93
-  - P3-94
+  - P3-95
+  - P3-96
 requires_gates:
   - G-p332-corpus-replay-approach
 acceptance:
@@ -23,6 +23,7 @@ acceptance:
   - "[재판정 2026-10-14 · 착수 세션 실측 · 기준 main a4942eac] ① 재측정 전 기준선(python -m whymath_backend.l1.standards.phase3_coverage, exit 1): Concept Completeness 0/10 · hint unmeasured 10 · 문제 메타 hint_strategy unknown 917(적격 문항 917건) · prerequisite/misconception/solution/pedagogy 각 linked 10/10 · Content Coverage 10/10 · Curriculum Coverage 10/10 · Graph Connectivity 5/10. 완료 판정(④)은 이 표와 비교한다. ② P3-04 의존은 불필요하다 — P3-04는 done이고 hint_strategy(Problem 7번째 필드)와 hints 본문 좌석은 별개다. 실제 선행은 P3-22다: 측정 CLI의 main이 load_corpus를 hint_problem_ids 없이 호출하므로 hints 테이블을 아무리 채워도 hint 연결은 unmeasured로 남는다(배선 없이는 채우기 결과를 볼 수 없다). 그래서 depends_on에 P3-22를 붙였다. ③ 승인 근거 판정: review_content_fingerprint는 최상위 키 블랙리스트 방식이라 문항 JSONL 레코드에 힌트 키를 더하면 지문이 바뀌어 재검수 대상이 된다. 힌트는 hints 테이블(별도 행)에만 두면 레코드 지문은 불변이다 — 문항 JSONL 편집 금지, hints 경유만. ④ 채우기 실행 조건: DB에 problem 행이 적재돼 있고 solution_paths가 승격돼 있어야 한다(whs.path_promotion --apply 후 l4.hint_content.populate --apply). 클라우드 세션에는 Postgres·Docker가 없어 실행할 수 없다 — Kiki 머신의 whymath-pg(5433)에서 실행하며, 적격 917건이 DB에 적재돼 있는지는 아직 미확인이다(P3-22 착수 시 첫 실측)."
   - "[정정 2026-10-16 · 재확인 · 기준 main 674a92b1] 앞선 2026-10-14 재판정 ②의 \"실제 선행은 P3-22(측정 배선 미착지)\"는 그날 기준으로만 맞았고 지금은 낡았다 — P3-22는 PR #1632(dd2c55b1)로 착지해 phase3_coverage --hints-from-db 가 있고, phase3_metrics 배선은 P3-41(#1653)이 맡았다. 재확인 실측: 기본 실행은 hint unmeasured 10 · Concept Completeness 0/10 · exit 1 로 기준선과 같고, --hints-from-db 는 DB 가 없는 이 환경에서 ConnectionRefusedError 로 exit 2(CoverageError) 하며 측정 불가로 조용히 내려가지 않는다 — 배선은 정상이다. 따라서 이 태스크를 막는 것은 측정 도구가 아니라 운영 DB 사실이다: (a) 적격 917건의 problem_id 가 DB problem 행으로 적재돼 있는지(ID 공간 일치) (b) DB 의 verified 힌트가 지금 몇 문항인지. 둘 다 P3-42(Kiki 머신 · whymath-pg 5433)가 실측하므로 P3-42 를 선행으로 붙인다. P3-42 결과가 '겹침 0'이면 채우기(③) 전에 ID 공간 불일치 규명이 먼저다. 2026-10-14 재판정 ③(힌트는 hints 테이블 경유만 — 문항 JSONL 편집은 내용 지문을 바꿔 재검수 유발)과 ④(채우기는 whs.path_promotion --apply 후 l4.hint_content.populate --apply, Kiki 머신)는 그대로 유효하다."
   - "[재판정 2026-11-01 · 로컬 PG 샌드박스 실측 · 기준 main d81cfd7a] 원천 경로(corpus_replay → path_promotion → hint_content.populate)를 실제 PG에서 끝까지 돌려 운영 힌트 0건의 원인을 셋으로 확정했다. ① path_promotion --apply와 multi_solution 적재가 헤더(solution_paths)보다 단계(problem_step)를 먼저 INSERT해 외래 키 위반으로 전체 롤백되는 코드 버그 — 이 세션 PR에서 수정하고 실 PG 통합 테스트 2건으로 동결(수정 되돌리면 RED). ② corpus_replay 풀이 1,507건 전부 strategy_tag=corpus-replay라 approach_unmappable로 승격 0건 — 사람 결정 게이트 G-p332-corpus-replay-approach를 requires_gates에 부착. ③ 12미적Ⅰ-02-09(answer_kind=real_root_count) 재생 39건 전부 finalize 실패 — 후속 P3-93을 depends_on에 부착. ①을 고치고 ②를 샌드박스에서만 우회하면 hint linked 9/10 · Concept Completeness 9/10 · 다른 연결(prerequisite·misconception·solution·pedagogy 각 10/10)은 줄지 않음. 남은 1건이 ③이다. 운영 적용 런북은 ②의 결정 뒤에 만든다 — 결정 전 런북은 승격 0건으로 끝난다. 운영 problem 1,703행에 적격 1,121건이 같은 problem_id로 있는지는 미확인이라 런북 첫 단계에서 세고 0이면 쓰기를 거부해야 한다. 근거: docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md."
+  - "[정정 2026-11-01] 위 2026-11-01 재판정·차단 기록의 후속 번호는 main(#1800)과의 번호 충돌로 rename됐다: P3-93(개수형 답 finalize) → P3-95, P3-94(풀이 유형 승인 표 집행) → P3-96. depends_on은 CLI rename이 이미 갱신했다."
 artifacts:
   - "#1801"
 paths:
@@ -52,4 +53,6 @@ notes: |-
   [차단 2026-11-01] 결정 게이트 G-p332-corpus-replay-approach(corpus-replay 풀이 유형) + 후속 P3-93(개수형 답 finalize) 대기 — FK 순서 버그는 #1801로 수정, 샌드박스 9/10 실측
 
   [정정 2026-11-01] 게이트 A안 집행 태스크를 선행으로 연결
+
+  [정정 2026-11-01] 번호 충돌 rename 정정 기록
 updated: 2026-11-01

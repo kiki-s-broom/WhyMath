@@ -1292,8 +1292,9 @@ gates:
     remind_after_days: null
     evidence: "Kiki 결정 2026-11-01(채팅): 'A안으로 진행하고 pr' — A안 = 생성기 문항군 단위 결정론 매핑 표. 집행 = P3-94(whs/path_promotion.CORPUS_REPLAY_APPROACH_BY_FAMILY · 28문항군 · wm-indseq만 inductive) · PR #1801 · 판정 기준 main d81cfd7a · 샌드박스 재측정 approach_unmappable 1507→0"
     cleared_by: claude
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-11-01] [정정 2026-11-01] evidence의 P3-94는 번호 충돌 rename으로 P3-96이 됐다(main #1800이 P3-94를 먼저 등재)."
+    corrections:
+      - "[2026-11-01] notes +84자 — 번호 충돌 rename 정정"
     no_inputs_reason: "사람 결정 — 판정 재료(샌드박스 실측·선택지)는 이미 docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md에 있고 먼저 끝나야 할 태스크가 없다"
   - id: G-p344-frame-interpretation-and-bank-size
     title: P3-44 새 틀의 오개념 절차 해석 인정 범위와 보강 은행 규모 결정

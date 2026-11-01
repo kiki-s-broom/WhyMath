@@ -68,7 +68,7 @@
 
 운영 `problem`은 1,703행이고 로컬 전 코퍼스 적재는 15,042행이다. 적격 1,121건(핵심 개념 10종)이 운영에 같은 `problem_id`로 있는지는 아직 모른다. `corpus_replay`·`path_promotion`은 문항 행이 없으면 `skipped_problem_missing`으로 건너뛰므로, 운영 런북은 적재 전에 이 겹침을 세고 0이면 쓰기를 거부해야 한다.
 
-## 5. 결정 집행 — 게이트 ② A안 (P3-94 · 2026-11-01)
+## 5. 결정 집행 — 게이트 ② A안 (P3-96 · 2026-11-01)
 
 Kiki가 게이트 `G-p332-corpus-replay-approach`에서 **A안**(생성기 단위 결정론 매핑 표를 사람이 승인해 코드에 고정)을 골랐다. 표는 `whs/path_promotion.py`의 `CORPUS_REPLAY_APPROACH_BY_FAMILY`에 있고, `corpus-replay` 태그 행만 문항 slug의 문항군으로 찾는다. 표에 없는 문항군은 지금처럼 검수 큐로 간다.
 
@@ -91,4 +91,4 @@ Kiki가 게이트 `G-p332-corpus-replay-approach`에서 **A안**(생성기 단�
 |---|---|
 | `path_promotion --apply` | 승격 1,507 · `approach_from_corpus_family` 1,507 · `queued_approach_unmappable` **0** · algebraic 1,477 / inductive 30 |
 | `hint_content.populate --apply` | 생성 6,359 · 검수 통과 5,975(L1 2,622 / L2 2,622 / L3 731) |
-| `phase3_coverage --hints-from-db` | hint **linked 9 · missing 1**(12미적Ⅰ-02-09 → P3-93) · 다른 연결 4종 각 10/10 |
+| `phase3_coverage --hints-from-db` | hint **linked 9 · missing 1**(12미적Ⅰ-02-09 → P3-95) · 다른 연결 4종 각 10/10 |

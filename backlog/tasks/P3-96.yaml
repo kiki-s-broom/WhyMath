@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: P3-94
+id: P3-96
 title: "코퍼스 재생 풀이 유형 결정론 매핑 표 집행 (게이트 G-p332 A안)"
 track: math-completion
 stage: S3
@@ -20,5 +20,8 @@ paths:
   - "tests/backend/whs/test_path_promotion*.py"
   - docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md
 session: null
-notes: "출처: P3-32 게이트 결정(Kiki 2026-11-01 A안)"
+notes: |-
+  출처: P3-32 게이트 결정(Kiki 2026-11-01 A안)
+
+  [개명 2026-11-01] P3-94 → P3-96: main(#1800)이 같은 번호를 먼저 등재 — 번호 충돌 해소
 updated: 2026-11-01

@@ -11,7 +11,7 @@
   - **approach_type 매핑**: 폐쇄 6종 영문 정확 일치 + 한글 라벨(대수적/기하적/조합적/귀납적/
     시각적/역방향 — yaml enum 한글 설명·§2.4 docstring 표기와 1:1) 결정론 번역만. 그 외
     (예: "corpus-replay")는 추측하지 않고 **사람 검수 큐**로(AI 자기승인 금지). 단 "corpus-replay"는
-    사람이 승인한 문항군 표(`CORPUS_REPLAY_APPROACH_BY_FAMILY` · P3-94)에 있는 문항만 그 표의 값으로
+    사람이 승인한 문항군 표(`CORPUS_REPLAY_APPROACH_BY_FAMILY` · P3-96)에 있는 문항만 그 표의 값으로
     매핑한다 — 행마다 추측하는 것이 아니라 생성기 단위로 한 번 판정된 값이다.
   - **개념 ID 매칭**: 표현식 문자열→개념 노드의 결정론 매칭 유틸이 코드베이스에 없고(의미
     매칭은 임베딩·LLM 축 — L3 5개 핵심 호출지점 중 4번), LLM 0 제약이라 **매칭을 시도하지
@@ -387,7 +387,7 @@ def plan_promotion(
     헤더는 N경로 허용이라 경로 존재가 새 경로를 막지 않고, 단계 좌석만
     `problem_ids_with_steps`(레거시 포함 problem_step 실재)로 가드한다.
 
-    `slug_by_problem`(P3-94): `corpus-replay` 태그 행의 풀이 유형을 승인 표
+    `slug_by_problem`(P3-96): `corpus-replay` 태그 행의 풀이 유형을 승인 표
     (`CORPUS_REPLAY_APPROACH_BY_FAMILY`)에서 찾을 때 쓰는 문항 slug. 없거나 표에 없으면 큐행.
     """
     plan = PromotionPlan()
@@ -540,7 +540,7 @@ async def promote_verified_solutions(session: AsyncSession) -> PromotionPlan:
             if step_problem_id is not None
         }
 
-    # 코퍼스 재생 행이 있을 때만 slug를 읽는다 — 승인 표(문항군)로 풀이 유형을 찾는 재료(P3-94).
+    # 코퍼스 재생 행이 있을 때만 slug를 읽는다 — 승인 표(문항군)로 풀이 유형을 찾는 재료(P3-96).
     slug_by_problem: dict[uuid.UUID, str] = {}
     replay_problem_ids = {
         row.problem_id for row in rows if row.strategy_tag == CORPUS_REPLAY_STRATEGY_TAG
