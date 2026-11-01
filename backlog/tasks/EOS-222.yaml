@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/ops/ngram_overlap_report.py
   - tests/backend/ops/test_ngram_overlap_report.py
-session: null
+session: claude/eos-222-ngram-overlap-record
 notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-E 소유 태스크 등재(판정 기준 main 3a83ed64). 저장소에 8-gram 일치율 산출 코드는 0건(docs/legal/copyright_guide_v2.md의 예시 코드뿐 — 2026-10-30 grep). 같은 WP의 라이선스 레지스트리 정정은 기존 LIC-08이 소유한다."
-updated: 2026-10-30
+updated: 2026-11-01

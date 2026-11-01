@@ -321,6 +321,24 @@ sources:
 - 스크립트: `scripts/ops/license_snapshot_archiver.py` · 보관소: `data/licenses/` (append-only 감사로그 + content-addressed 스냅샷)
 - 주기 재수집(cron)은 OPS-56 축 후속 — 현재는 수동 실행(아래 분기 점검 시 함께)
 
+## LLM 저작 산출물 8-gram 일치율 기록 (EOS-222 · 2026-11-01)
+
+가이드 v2.0의 n-gram 가드레일(8-gram · 일치율 70% 이상이면 재생성)을 **기록**으로 집행한다 —
+차단하지 않는다. 도구 = `python -m whymath_backend.ops.ngram_overlap_report`(정의·토큰화·종료 코드는
+모듈 설명). 저작 회차마다 회차 폴더에 `cu.ngram_overlap.json`을 남기고, 코퍼스는 사이드카의
+`similarity_8gram` 필드에 요약을 남긴다.
+
+- **비교 원본 = 저장소에 실재하는 것만.** 회차는 그 회차가 실제로 읽은 입력 코퍼스
+  (`cu.rounds.jsonl`의 `dedup_input_digests` — 자체 저작·법적 안전 코퍼스), 코퍼스는 명시한 부모 코퍼스.
+- **대조하지 못한 것(한계).** 평가원 기출·EBS 교재·검정교과서 본문은 저장소에 없으므로(본문 복제 금지)
+  이 기록은 그것들과의 일치율을 **재지 않았다**. 산출물의 `not_compared`에 적혀 있으며, 낮은 일치율을
+  "그 원본들과 다르다"로 읽으면 안 된다.
+- **측정 불가는 0%가 아니다.** 필드가 없거나 토큰이 8개 미만이면 값 없이 `unmeasurable`과 이유를 적는다.
+- **첫 값(소급 · 2026-11-01).** `eos197-a6-openrouter` 27 CU 54필드 최고 36.4% · `eos197-a6-local`
+  3 CU 발문 3필드 0%(해설 3필드는 필드 없음으로 측정 불가) — 두 회차 모두 70% 이상 **0건**.
+  `problem_bank_rephrased_v0`(부모 `generated_v0`와 대조)는 발문 236건이 70% 이상이고 해설은 설계상
+  부모 복사라 전건 100%다 — 둘 다 자체 저작물끼리라 저작권 판정이 아니라 발문 다양화 강도의 기록이다.
+
 ## Review 주기
 
 - 매 분기 1회 라이선스 점검

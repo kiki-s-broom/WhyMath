@@ -1241,7 +1241,10 @@ CATALOG: tuple[Spec, ...] = (
        "harness.hint_verdict_gui"),
     _o("WM-O-906", "콘텐츠 출처·라이선스 감사 게이트·사이드카", "Admin", "Content", "P0",
        "ARCH-20·PB-11 — 저작권 레일 · EOS-97 리콜(genlog 사이드카 선별·처분)",
-       "ops.provenance_audit", "ops.corpus_provenance_sidecar", "ops.generation_recall"),
+       "ops.provenance_audit", "ops.corpus_provenance_sidecar", "ops.generation_recall",
+       # EOS-222: 저작 산출물 8-gram 일치율 기록기 — 같은 저작권 레일의 관측 축(차단 없음)이라
+       # 출처·라이선스 감사 좌석에 귀속한다.
+       "ops.ngram_overlap_report"),
     _o("WM-O-907", "선언≠배선 감사·추천/슬롯 도달 리포트·Phase 1 구조 지표", "Admin", "QA", "P1",
        "OPS-22·REC-01/06·PED-06 — '작동한 비율'", "ops.declared_unwired_audit",
        "ops.recommendation_reach_report", "ops.repeat_recommendation_report",

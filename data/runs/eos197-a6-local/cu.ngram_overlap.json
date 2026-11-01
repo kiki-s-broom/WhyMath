@@ -1,0 +1,129 @@
+{
+  "kind": "whymath.ngram_overlap_record",
+  "task": "EOS-222",
+  "run": "eos197-a6-local",
+  "cu_sha256": "f7c3af20b03a9c7b8c41fec3760973e79d1418283e6022d006bd80c55cd5bdb9",
+  "method": {
+    "n": 8,
+    "threshold": 0.7,
+    "threshold_rule": "overlap >= threshold 이면 at_or_above_threshold=true (기록만 — 차단 없음)",
+    "formula": "|8gram(G) ∩ 8gram(O)| / |8gram(G)| 의 원본별 최댓값",
+    "tokenizer": "nfkc-whitespace-v1",
+    "fields": [
+      "question_text",
+      "answer_explanation"
+    ],
+    "guide": "docs/legal/copyright_guide_v2.md (n-gram 가드레일 · 8-gram · 70% 이상 재생성)"
+  },
+  "comparison_set": [
+    {
+      "corpus": "problem_bank_generated_v0",
+      "path": "data/corpus/problem_bank_generated_v0/problems.jsonl",
+      "sha256": "828efc0663db0f58171b311165030fe55aef6e8e48d89478260e1bdfc00889d9",
+      "run_digests": [
+        "7285ff1425d4824be0e15deb025017e2f7260e514efee54ab2520f335d6b29b7"
+      ],
+      "digest_match": "crlf_equivalent",
+      "documents": 1238
+    },
+    {
+      "corpus": "problem_bank_p3_calculus1_diff_v0",
+      "path": "data/corpus/problem_bank_p3_calculus1_diff_v0/problems.jsonl",
+      "sha256": "7dc942426235ea55646be52b366de6a521457e523caf14f814b9960b4ce348cc",
+      "run_digests": [
+        "8cd4aea13e6685b25c702000e5c137525359f8b960bcc9480675a84e4be392b8"
+      ],
+      "digest_match": "crlf_equivalent",
+      "documents": 1008
+    },
+    {
+      "corpus": "problem_bank_p3_fill_v0",
+      "path": "data/corpus/problem_bank_p3_fill_v0/problems.jsonl",
+      "sha256": "0685d116a767a7d4c8079c4f67ba33db5e5cbe0e3a0abbe5bd025b04a14f7737",
+      "run_digests": [
+        "867036e6683e0187c741abd35d2e1b07218b9f61d6051d040880974ccdca4c97"
+      ],
+      "digest_match": "crlf_equivalent",
+      "documents": 408
+    }
+  ],
+  "comparison_set_rule": "그 회차가 실제로 읽은 입력 코퍼스(cu.rounds.jsonl dedup_input_digests)에서 회차 자기 산출물을 뺀 것",
+  "not_compared": [
+    "평가원 기출 본문(저장소 미보유 — 구조 메타만 보유)",
+    "EBS 교재·강의 본문(저장소 미보유)",
+    "검정교과서 본문·문제·풀이(저장소 미보유)"
+  ],
+  "limitation": "일치율이 낮다는 것은 위 comparison_set과 다르다는 뜻일 뿐이다 — not_compared의 원본과는 대조하지 않았다.",
+  "summary": {
+    "records": 3,
+    "fields_measured": 3,
+    "fields_unmeasurable": 3,
+    "max_overlap": 0.0,
+    "flagged_count": 0,
+    "by_field": {
+      "question_text": {
+        "measured": 3,
+        "unmeasurable": 0,
+        "max_overlap": 0.0,
+        "flagged_count": 0
+      },
+      "answer_explanation": {
+        "measured": 0,
+        "unmeasurable": 3,
+        "max_overlap": null,
+        "flagged_count": 0
+      }
+    },
+    "flagged": []
+  },
+  "results": [
+    {
+      "slug": "wm-gen-calc1-443f1ed59b71",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 9,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "unmeasurable",
+          "reason": "필드 없음"
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-5f6175401a1f",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 11,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "unmeasurable",
+          "reason": "필드 없음"
+        }
+      }
+    },
+    {
+      "slug": "wm-gen-calc1-8e2d59861b36",
+      "fields": {
+        "question_text": {
+          "status": "measured",
+          "overlap": 0.0,
+          "ngram_count": 10,
+          "at_or_above_threshold": false,
+          "best_match": null
+        },
+        "answer_explanation": {
+          "status": "unmeasurable",
+          "reason": "필드 없음"
+        }
+      }
+    }
+  ]
+}
