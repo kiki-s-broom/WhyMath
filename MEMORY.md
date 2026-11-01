@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-01 (측정·EOS-222 소급 — LLM 저작 산출물 8-gram 일치율 첫 기록): **기존 저작 회차 2개 모두 70% 이상 0건 (최고 36.4%) — 기록만, 차단 없음** (claude 측정·기록)
+
+- **무엇을**: `python -m whymath_backend.ops.ngram_overlap_report run data/runs/eos197-a6-local data/runs/eos197-a6-openrouter`(가이드 v2 n-gram 가드레일 · 8-gram · 공백 토큰화 · 비교 원본 = 회차가 읽은 입력 코퍼스 generated_v0·p3_fill_v0·p3_calculus1_diff_v0 · 평가원·EBS·교과서 본문은 저장소에 없어 미대조)와 `corpus data/corpus/problem_bank_rephrased_v0 --against data/corpus/problem_bank_generated_v0`.
+- **값**: `eos197-a6-openrouter` 27 CU·54필드 최고 0.3636 · `eos197-a6-local` 3 CU 발문 3필드 0.0(해설 3필드 측정 불가 — 필드 없음) · 두 회차 70% 이상 0건 · 입력 해시는 회차 기록과 줄바꿈만 다름(`crlf_equivalent`) · rephrased_v0는 부모 대비 발문 236/421건 ≥70%·해설 421/421 = 1.0(설계상 부모 복사 — 자체 저작물끼리라 저작권 판정 아님) · 공백 토큰화는 과소평가 방향이라 낮은 값은 "다르다"의 증거가 아님.
+- **근거 커밋**: 구현·결과 파일 `e89212d1`(#1807) — `data/runs/eos197-a6-*/cu.ngram_overlap.json` · `data/corpus/problem_bank_rephrased_v0/_provenance.json`의 `similarity_8gram`.
+
 ### 2026-10-31 (측정·EOS-194 ③): **운영 DB 발행 가능 후보 0/1,699 — 문항 발행으로 `outcome=pinned`를 운영에서 확인할 수 없었다(쓰기 0건).** (Kiki 실행, claude 기록)
 
 - **무엇을**: `eos194_measure.py preflight`(읽기 전용)로 운영 `whymath-pg`를 쟀다 — 스키마 head 일치 · 노출 1,699 · 포인터 채움 0 · PUBLISHED 판 0 · 검증된 힌트 보유 노출 문항 0 · 7필드 충족 후보 0(표본 50: hint_strategy 50 · 오개념 서명 39 · 스킬 5). 쓰기 블록은 스스로 거부 조건에 걸려 미실행.
