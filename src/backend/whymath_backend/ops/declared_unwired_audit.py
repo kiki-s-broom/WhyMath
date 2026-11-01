@@ -1817,6 +1817,10 @@ _MANIFEST: dict[str, dict[str, str]] = {
         # 계약을 만족하는 파일을 만들어 주는 도구가 저장소에 0개였던 부재를 메운다 — 저자가 손으로
         # 돌리는 쓰기 도구이므로 CI 상시 실행 대상이 아니다(사유 상수 참조).
         "ops.corpus_provenance_sidecar": _CORPUS_AUTHORING_WRITER,
+        # EOS-222(2026-11-01): 저작 회차 산출물의 8-gram 일치율 기록기. 감리 지시가 "차단이 아니라
+        # 기록"이므로 게이트로 배선하지 않는다 — 저자가 회차 뒤에 손으로 돌려 회차 폴더에 사이드카를
+        # 남기는 기록 도구다(CI가 리포 데이터를 재작성하면 안 되는 것도 같은 사유).
+        "ops.ngram_overlap_report": _CORPUS_AUTHORING_WRITER,
         # EOS-38(2026-10-03): 루프 KPI ①②④ 판정 표본 — 판정 하네스가 스스로 지운 데이터 위에서
         # Gate 2 판정이 4회 공전한 것에 대한 (나) 결정론 합성 부하 경로. 사유 상수 참조.
         "ops.loop_kpi_sample_load": _JUDGMENT_SAMPLE_LOADER,
