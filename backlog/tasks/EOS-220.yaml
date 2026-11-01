@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P0
 owner: claude
@@ -19,9 +19,12 @@ paths:
   - src/backend/whymath_backend/ops/weekly_metrics_report.py
   - "tests/backend/ops/test_weekly_metrics*.py"
   - metrics/weekly.json
-session: null
+  - docs/reviews/eos220_weekly_kpi_round1_2026-11-01.md
+session: claude/eos-220-weekly-auto-gate-rework
 notes: |-
   출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-K 소유 태스크 등재(판정 기준 main 3a83ed64). 현황: metrics/weekly.json 최신 레코드(2026-10-28 07:57:24Z)에서 auto_gate_pass_rate·rework_rate 둘 다 measured:false. EOS-207이 파일 입력 경로와 첫 값(1차 통과율 0.1171 = 13/111)을 냈으나 weekly.json에는 아직 기록되지 않았다. WP-F A4 2회차 저작(G4)이 이 태스크를 선행으로 기다린다.
 
   [정정 2026-10-30] PR #1781 독립 검토 지적 반영(정정 항 append)
-updated: 2026-10-30
+
+  [정정 2026-11-01] paths ['src/backend/whymath_backend/ops/weekly_metrics_report.py', 'tests/backend/ops/test_weekly_metrics*.py', 'metrics/weekly.json'] → ['src/backend/whymath_backend/ops/weekly_metrics_report.py', 'tests/backend/ops/test_weekly_metrics*.py', 'metrics/weekly.json', 'docs/reviews/eos220_weekly_kpi_round1_2026-11-01.md']: EOS-220 측정 기록 문서(정의·cron 판정·인계) 추가 — HARN-59 scope_drift 경고 정정
+updated: 2026-11-01
