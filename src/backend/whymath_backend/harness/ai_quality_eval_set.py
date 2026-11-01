@@ -513,6 +513,17 @@ def _material(row: Mapping[str, Any]) -> ProblemMaterial:
     )
 
 
+def eval_set_fingerprint(raw: bytes) -> str:
+    """평가셋 파일 지문 — 줄바꿈을 LF로 통일한 뒤의 sha256.
+
+    Windows 체크아웃(git autocrlf)은 같은 내용을 CRLF로 내려받는다. 원본 바이트로 해시하면 OS마다
+    지문이 달라져 `--resume`이 "평가셋 지문 불일치"로 거부되고 리포트 대조도 거짓 불일치를
+    낸다(P3-78 실측: 원본 `29307d97…` vs Windows `0950d44e…`).
+    저장소 원본은 LF라 정규화해도 지문이 그대로다.
+    """
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")).hexdigest()
+
+
 def load_eval_set(
     registry: Registry, path: Path | None = None, *, repo_root: Path | None = None
 ) -> EvalSet:
@@ -566,5 +577,5 @@ def load_eval_set(
         cases=cases,
         materials=found,
         source=str(target),
-        sha256=hashlib.sha256(raw).hexdigest(),
+        sha256=eval_set_fingerprint(raw),
     )
