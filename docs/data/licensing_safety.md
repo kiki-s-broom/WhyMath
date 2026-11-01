@@ -347,6 +347,75 @@ sources:
   `problem_bank_rephrased_v0`(부모 `generated_v0`와 대조)는 발문 236건이 70% 이상이고 해설은 설계상
   부모 복사라 전건 100%다 — 둘 다 자체 저작물끼리라 저작권 판정이 아니라 발문 다양화 강도의 기록이다.
 
+## Tier 0~3 ↔ LicenseType 매핑 (EOS-224)
+
+> **D6 = (b) Kiki 결정 · 2026-11-02(KST).** 새 필드를 만들지 않고 문서 한 장으로 대응만 둔다.
+> `schema/enums.py`는 바꾸지 않는다(12/31 내부 검증 기간 방침 규칙 3 — CORE 상수). 이 표는 판정 도구가
+> 아니라 **대응 기록**이다. 코드(`provenance_gate`·Rights Policy Engine)는 이 표를 읽지 않는다.
+
+**두 분류의 축이 다르다.** 가이드 v2(`docs/legal/copyright_guide_v2.md` §6.3)의 Tier는 *외부 데이터를 어떻게
+쓰는가*(평가 격리 · 즉시 학습 · 사실/표현 분리 · 협상 후 활용)이고, `LicenseType`은 *권리 상태*다. 그래서 1:1로
+맞지 않는 값이 많다. 아래 표는 가이드가 **명시한** 대응만 Tier로 적고, 가이드에 없거나 가이드 안에서 서로
+어긋나는 값은 추정하지 않고 **판정 필요**로 둔다. Tier 정의:
+Tier 0 = 평가 전용 격리(학습·서비스 금지) · Tier 1 = 즉시 도입 학습 데이터 · Tier 2 = 사실/표현 분리 paraphrase
+(SA 우회) · Tier 3 = 정식 라이선싱 협상 후 활용.
+
+<!-- tier-map:license:begin -->
+| LicenseType | Tier | 근거 |
+|---|---|---|
+| `PUBLIC_DOMAIN` | 판정 필요 | 이름은 퍼블릭 도메인이나 enum 설명은 "평가원 공개 — 본문 영리사용은 별도 금지"라 Tier 1(즉시 학습)과 충돌 |
+| `KOGL_0` | Tier 1 | 자유이용 — 가이드 Tier 1이 공공 자료(NCIC 등)를 즉시 도입으로 둠 |
+| `KOGL_1` | Tier 1 | 출처표시만 — 위와 같음 |
+| `KOGL_2` | 판정 필요 | 상업적 이용금지(NC) — 가이드 안에서 NC 처리가 엇갈림(아래 충돌 ①) |
+| `KOGL_3` | 판정 필요 | 변경금지(ND) — 가이드가 ND의 Tier를 정하지 않음 |
+| `KOGL_4` | 판정 필요 | NC + ND — 충돌 ① 및 ND 미정 |
+| `CC0` | Tier 1 | 퍼블릭 도메인 dedication — 조건 없음 |
+| `CC_BY` | Tier 1 | 출처표시만 — 가이드 Tier 1 데이터셋 다수가 이 조건 |
+| `CC_BY_SA` | Tier 2 | 가이드 명시 — "CC BY-SA → Tier 2 강제(paraphrase 필수)" |
+| `CC_BY_NC` | 판정 필요 | NC — 충돌 ① |
+| `CC_BY_ND` | 판정 필요 | ND — 가이드가 ND의 Tier를 정하지 않음 |
+| `CC_BY_NC_SA` | 판정 필요 | NC + SA — 충돌 ①(SA만 보면 Tier 2, NC만 보면 거부 또는 Tier 0) |
+| `CC_BY_NC_ND` | 판정 필요 | NC + ND — 충돌 ① 및 ND 미정 |
+| `INTERNAL_OWNED` | 대응 없음 | 자체 저작물 — Tier는 외부 데이터 활용 분류라 대상 아님 |
+| `WHYMATH_GENERATED` | 대응 없음 | 자체 생성물 — Tier 2 paraphrase의 *산출물* 쪽 라벨이지 입력 분류가 아님 |
+| `USER_GENERATED` | 대응 없음 | 학생 자작 — 저작권 Tier가 아니라 명시적 동의 체계(CLAUDE.md 데이터 금기)가 지배 |
+| `AIHUB_OPEN` | Tier 1 | 가이드 Tier 1 "한국어 보강 — AI Hub 71718 등" 명시 |
+| `CONTRACT_LICENSED` | Tier 3 | 계약 기반 — Tier 3(정식 라이선싱 협상 후 활용)와 같은 뜻 |
+| `DIRECT_PERMISSION` | 판정 필요 | 개별 이용허락 — 허락 범위가 건마다 달라 하나의 Tier로 묶을 수 없음 |
+| `THIRD_PARTY_LICENSED` | Tier 3 | 사설 모의고사 제휴 — 협상 타결분 |
+| `UNKNOWN` | 대응 없음 | 권리 미확인 — Tier 판정 *이전* 단계(fail-closed). 확인되면 해당 값으로 바뀜 |
+| `RESTRICTED` | 대응 없음 | 명시적 제한 — 가이드 분류 코드의 "사용 불가(rejected)"에 해당하며 Tier가 아님 |
+| `EBS_LICENSED` | Tier 3 | 공식 제휴(협상) 전제 — 제휴 전까지 미사용(enum 설명) |
+<!-- tier-map:license:end -->
+
+pool(`ContentPool` 3종 · `docs/legal/copyright_gradient.md` §4.2)과의 대응:
+
+<!-- tier-map:pool:begin -->
+| pool | Tier | 근거 |
+|---|---|---|
+| `whymath-original` | Tier 1 | 등급 1(공공·합법 · SA 의무 없음) + 자체 저작 — 즉시 활용 |
+| `external-sharealike` | Tier 2 | 등급 2(CC BY-SA) — 가이드 Tier 2와 같은 대상 |
+| `external-licensed` | Tier 3 | 등급 3 협상 타결분 — 가이드 Tier 3와 같은 대상 |
+<!-- tier-map:pool:end -->
+
+Tier 0(평가 전용 격리)에 대응하는 pool은 **없다** — Tier 0은 격리 컨테이너·영구 저장 금지(tmpfs)라 저장소 코퍼스가
+되지 않는다. 지금 저장소에 Tier 0 자료는 없다.
+
+**판정 필요 목록(Kiki 판단 · 11건)**: `PUBLIC_DOMAIN`·`KOGL_2`·`KOGL_3`·`KOGL_4`·`CC_BY_NC`·`CC_BY_ND`·`CC_BY_NC_SA`·`CC_BY_NC_ND`·`DIRECT_PERMISSION` (9건) + 아래 충돌 ①·② (2건).
+
+**기존 등급 표기와의 충돌(정리 방향은 Kiki 판단)**:
+- ① **NC 자료의 처리가 가이드 안에서 두 갈래다.** §6.3 Tier 0 표는 "SA·NC·추출금지 자료 → 평가 전용"이라 하고,
+  같은 문서의 분류 코드(`quarantine_sa_nc`)는 상업 불가(NC)를 **사용 불가(rejected)**로 보낸다. 그래서 NC 계열 5값이
+  판정 필요다.
+- ② **이 문서의 A~E 등급과 가이드 분류 코드가 Tier 0의 경계를 다르게 긋는다.** 분류 코드는 등급 A+/A/A-만 Tier 1로,
+  그 밖(SA 아닌 B·C·D·E)은 Tier 0으로 보낸다. 반면 이 문서의 등급은 B=SA(Tier 2 대상)·C=NC·D=독점을 뜻해, C·D를
+  Tier 0(평가 격리)으로 볼지 사용 금지로 볼지가 정해지지 않았다. `copyright_gradient.md`의 등급 1~4(등급 4 = 절대 금지)와도
+  이 지점이 겹친다.
+- 등급 3(협상 필요 · 타결 전 사용 금지)과 Tier 3(협상 후 활용)은 같은 대상을 *타결 전·후*로 본 것이라 충돌이 아니다.
+
+어긋남 검사: `tests/infra/test_license_tier_mapping.py` — 위 두 표의 값 집합이 `LicenseType`·`ContentPool` 값 집합과
+정확히 같지 않으면(빠지거나 남는 값) RED. enum을 바꾸는 PR은 이 표도 함께 고쳐야 한다.
+
 ## Review 주기
 
 - 매 분기 1회 라이선스 점검
