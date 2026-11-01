@@ -738,6 +738,11 @@ L3_PG_ONLY_COLLECTED: dict[str, str] = {
         "실 PG + data/corpus 고정물. LLM 0·외부 서비스 참조 0건. 3건 중 재실행 멱등 1건만 실제 "
         "결함으로 XFAIL(L3_TRACKED_XFAILS · PED-46) — 1회차 사실·승인 슬롯 불변 2건은 표식 없이 통과."
     ),
+    "tests/backend/l3/test_multi_solution_bank_integration.py": (
+        "실 PG + alembic head(solution_paths·problem_step 외래 키). 라우터·LLM 호출 없이"
+        " evaluate_response → bank_candidates만 부른다 — 외부 서비스 참조 0건. 1건 통과"
+        "(2026-11-01 로컬 PG 16 실측 · P3-32 FK 순서 회귀 동결)."
+    ),
 }
 
 #: 라이브 외부 서비스가 있어야 검증이 성립해 CI 통합 스텝이 **파일 단위로 제외하는** l3 통합 파일.

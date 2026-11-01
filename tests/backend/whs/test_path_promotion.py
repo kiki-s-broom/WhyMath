@@ -355,7 +355,8 @@ class TestPromoteVerifiedSolutions:
         assert headers[0].verified_by_human is False
         assert {s.solution_path_id for s in steps} == {solution_path_id_for(row.id)}
         assert sorted(s.step_order for s in steps) == [1, 2]
-        assert session.flushed == 1
+        # 헤더 flush → 단계 flush 2회(외래 키 순서 — 실 PG 회귀는 *_integration.py가 잡는다).
+        assert session.flushed == 2
 
     @pytest.mark.asyncio
     async def test_additional_path_writes_header_without_steps(self) -> None:
