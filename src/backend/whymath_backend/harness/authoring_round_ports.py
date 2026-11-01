@@ -44,12 +44,22 @@ _SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     # URL에 박힌 자격증명 — `https://사용자:토큰@호스트`·`https://토큰@호스트`(git push 실패 줄이
     # 원격 URL을 그대로 보인다 — EOS-209 ①(a)). 사용자 칸에 `/`가 없어야 해서
     # 경로의 `@`는 건드리지 않는다.
-    (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s/@'\"<>]+@"), r"\1***@"),
+    # 사용자 칸은 마지막 `@`까지 탐욕적으로 잡는다(비밀번호 속 날것의 `@`) — `?`·`#`에서 멈춰
+    # 쿼리 속 `@`(`https://host?r=a@b`)는 자격증명으로 읽지 않는다.
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s/'\"<>?#]+@"), r"\1***@"),
     # 스킴 없이 나오는 GitHub 앱 토큰 자리(`x-access-token:<토큰>@`).
     (re.compile(r"(?i)\bx-access-token:[^\s@'\"<>]+@"), "x-access-token:***@"),
     # GitHub 토큰 접두(개인·OAuth·사용자-서버·서버-서버·갱신·세분화 PAT) —
     # URL 밖에 홀로 나와도 가린다.
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,})"), "***"),
+    # 쿼리 파라미터 토큰(`?access_token=…`·`&key=…`) — 값만 가리고 이름은 남긴다.
+    (
+        re.compile(
+            r"(?i)([?&](?:access_token|refresh_token|token|api_key|apikey|key|password|secret)=)"
+            r"[^&\s'\"<>#]+"
+        ),
+        r"\1***",
+    ),
     (re.compile(r"sk-(?:or|ant)-[A-Za-z0-9_\-]{4,}"), "***"),
     (re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"), "***"),
 )
@@ -59,7 +69,9 @@ def mask_secrets(text: str) -> str:
     """키처럼 보이는 문자열을 `***`로 가린다.
 
     대상: URL 내장 자격증명(`스킴://…@`)·`x-access-token:…@`·GitHub 토큰 접두(`ghp_` 등)·
-    OpenRouter/Anthropic 키 접두(`sk-or-`·`sk-ant-`)·Bearer 토큰.
+    쿼리 파라미터 토큰(`?access_token=…` 등)·OpenRouter/Anthropic 키 접두(`sk-or-`·`sk-ant-`)·
+    Bearer 토큰. **자르기 전에** 불러야 한다 — 잘린 경계가 `스킴://`이나 `@`를 끊으면 URL 패턴이
+    맞지 않아 가리지 못한다.
     """
     for pattern, repl in _SECRET_PATTERNS:
         text = pattern.sub(repl, text)
@@ -85,8 +97,8 @@ def pid_alive(pid: int) -> bool | None:
         return False
     except PermissionError:
         return True  # 남의 프로세스 — 있기는 하다
-    except OSError:
-        return None
+    except (OSError, OverflowError, ValueError):
+        return None  # 범위 밖 번호 등 — 판정 불가
     return True
 
 
@@ -94,6 +106,7 @@ if (
     sys.platform == "win32"
 ):  # pragma: no cover — CI는 Linux다(첫 Windows 실회차 체크리스트에서 확인)
     import ctypes
+    from ctypes import wintypes
 
     _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     _STILL_ACTIVE = 259
@@ -102,7 +115,17 @@ if (
 
     def _pid_alive_win32(pid: int) -> bool | None:
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        # 타입을 명시한다 — 기본 restype(c_int)은 64비트 HANDLE을 32비트로 자른다.
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+        kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        try:
+            handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        except (ctypes.ArgumentError, OverflowError):
+            return None  # DWORD 범위 밖 번호 — 판정 불가
         if not handle:
             err = ctypes.get_last_error()
             if err == _ERROR_INVALID_PARAMETER:
@@ -111,7 +134,7 @@ if (
                 return True
             return None
         try:
-            code = ctypes.c_ulong()
+            code = wintypes.DWORD()
             if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
                 return None
             # 종료 코드 259로 끝난 프로세스도 '살아 있음'으로 읽힌다 — 잠금을 지키는 쪽의 오판이다.
@@ -145,9 +168,9 @@ class RunResult:
         if self.timed_out:
             return "TimeoutExpired(타임아웃으로 중단)"
         last = next((ln for ln in reversed(self.stderr_tail.splitlines()) if ln.strip()), "")
-        return mask_secrets(
-            f"exit {self.returncode}" + (f" — {last.strip()[:300]}" if last else "")
-        )
+        # 가린 다음 자른다 — 자른 경계가 URL을 끊으면 URL 패턴이 맞지 않는다.
+        shown = mask_secrets(last.strip())[:300]
+        return f"exit {self.returncode}" + (f" — {shown}" if shown else "")
 
 
 class ProcessRunner(Protocol):

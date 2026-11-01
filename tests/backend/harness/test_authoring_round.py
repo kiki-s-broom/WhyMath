@@ -917,7 +917,7 @@ def _lock_path(h: Harness) -> Path:
 
 def test_lock_held_refuses_and_tells_how_to_clear(h: Harness) -> None:
     lock = _lock_path(h)
-    lock.write_text('{"pid": 1, "started_at": "x"}', encoding="utf-8")
+    lock.write_text(_lock_body(1), encoding="utf-8")
     assert h.run() == 1
     assert "LOCK_HELD=True" in h.text
     assert "HOLDER_ALIVE=True" in h.text
@@ -1084,6 +1084,21 @@ def test_url_credentials_in_push_failure_are_masked(h: Harness) -> None:
     assert token not in state
 
 
+def _lock_body(pid: int, **over: Any) -> str:
+    """이 실행과 같은 호스트·플랫폼이 만든 잠금 본문(인수 판정 대상)."""
+    import socket
+    import sys
+
+    data: dict[str, Any] = {
+        "pid": pid,
+        "started_at": "2026-10-28T11:00:00+00:00",
+        "host": socket.gethostname(),
+        "platform": sys.platform,
+    }
+    data.update(over)
+    return json.dumps(data)
+
+
 def _write_lock(h: Harness, body: str) -> Path:
     lock = _lock_path(h)
     lock.write_text(body, encoding="utf-8")
@@ -1096,7 +1111,7 @@ def _stale_files(h: Harness) -> list[Path]:
 
 def test_stale_lock_of_dead_pid_is_taken_over_and_preserved(h: Harness) -> None:
     """창 X로 닫혀 남은 잠금(pid 죽음)은 사람이 지우지 않아도 인수한다 — 옛 잠금은 옆에 보존(①(b))."""
-    body = '{"pid": 424242, "started_at": "2026-10-28T11:00:00+00:00"}'
+    body = _lock_body(424242)
     _write_lock(h, body)
     seen: list[int] = []
     h.pid_alive = lambda pid: (seen.append(pid), False)[1]
@@ -1112,9 +1127,15 @@ def test_stale_lock_of_dead_pid_is_taken_over_and_preserved(h: Harness) -> None:
 @pytest.mark.parametrize(
     ("body", "alive", "asked"),
     [
-        ('{"pid": 424242, "started_at": "x"}', None, True),  # OS가 답하지 않음
+        (_lock_body(424242), None, True),  # OS가 답하지 않음
         ("", None, False),  # 만들자마자 끊겨 내용이 빈 잠금 — 주인을 모른다
         ('{"pid": "abc"}', None, False),
+        (_lock_body(99999999999), False, False),  # 범위 밖 번호 — traceback 대신 판정 불가
+        # 다른 OS 이름공간(WSL·컨테이너)이 만든 잠금 — 그 pid는 이쪽에서 '없음'으로 보인다
+        (_lock_body(424242, platform="win32-other"), False, False),
+        (_lock_body(424242, host="other-host"), False, False),
+        # 호스트·플랫폼이 없는 이전 형식 — 확인할 수 없으면 인수하지 않는다
+        ('{"pid": 424242, "started_at": "x"}', False, False),
     ],
 )
 def test_lock_with_unknown_holder_is_respected(
@@ -1136,15 +1157,15 @@ def test_stale_lock_with_own_reused_pid_is_taken_over(h: Harness) -> None:
     """잠금의 pid가 하필 이 프로세스 번호(재사용)여도 '살아 있음'으로 읽어 영영 막히지 않는다."""
     import os
 
-    _write_lock(h, json.dumps({"pid": os.getpid(), "started_at": "x"}))
+    _write_lock(h, _lock_body(os.getpid()))
     assert h.run(only="author-local") == 0, h.text
     assert "LOCK_TAKEN_OVER=True" in h.text
 
 
 def test_stale_lock_takeover_backs_off_when_another_run_relocks(h: Harness) -> None:
     """판정과 이름 바꾸기 사이에 다른 실행이 새 잠금을 만들었으면, 옮긴 것을 되돌리고 물러선다."""
-    lock = _write_lock(h, '{"pid": 424242, "started_at": "x"}')
-    fresh = '{"pid": 777, "started_at": "new"}'
+    lock = _write_lock(h, _lock_body(424242))
+    fresh = _lock_body(777, started_at="new")
 
     def racing(pid: int) -> bool:
         # 옛 주인은 죽었지만, 판정 직후 다른 실행이 잠금을 새로 잡는다(내용이 바뀐다)
@@ -1212,3 +1233,71 @@ def test_commit_verification_refuses_commit_with_no_files(h: Harness) -> None:
     assert "COMMITTED_ROUND_FILES=0 COMMITTED_FILES=0" in h.text
     assert "STAGE_FAILED stage=deliver error=CommitVerificationFailed" in h.text
     assert not _remote_has_branch(h.repo, "round/t1-output")
+
+
+def test_release_unevidenced_first_save_failure_leaves_disk_unreleased(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """첫 저장만 실패하고 뒤따르는 실패 기록 저장은 성공하는 경우(백신이 임시 파일을 순간 잡음) —
+    메모리의 해제분을 되돌리지 않으면 실패 기록에 실려 '아무것도 풀리지 않았다'가 거짓이 된다."""
+    state = _write_state(h, {"openrouter": {"reserved_attempts": 10}})
+    real_save = ar.AuthoringRound._save_state
+    calls = {"n": 0}
+
+    def flaky(self: ar.AuthoringRound) -> bool:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            self.kv("STATE_WRITE_FAILED=True error=PermissionError path=x")
+            return False
+        return real_save(self)
+
+    monkeypatch.setattr(ar.AuthoringRound, "_save_state", flaky)
+    assert h.make().run(only="author-cloud", release_unevidenced=True) == 1
+    assert calls["n"] >= 2  # 실패 기록 저장이 실제로 성공 경로를 탔다
+    disk = json.loads(state.read_text(encoding="utf-8"))
+    assert disk["seats"]["openrouter"]["reserved_attempts"] == 10
+    assert not any(
+        e.get("stage") == "release-unevidenced" and e.get("status") == "released"
+        for e in disk["history"]
+    )
+
+
+def test_release_unevidenced_outside_worktree_names_real_cause(h: Harness) -> None:
+    """격리 워크트리 밖 실행이면 '파일을 다른 프로그램이 잡음'이 아니라 진짜 원인으로 거부한다."""
+    _write_state(h, {"openrouter": {"reserved_attempts": 10}})
+    h.module_file = h.repo.main / "src" / "backend" / "whymath_backend" / "harness" / "x.py"
+    assert h.make().run(release_unevidenced=True) == 1
+    assert "WRITE_REFUSED=True stage=release-unevidenced FALSE: CODE_FROM_WORKTREE=False" in h.text
+    assert "ReservationReleaseNotSaved" not in h.text
+    assert "RESERVATION_RELEASED" not in h.text
+
+
+def test_release_lock_does_not_delete_someone_elses_lock(h: Harness) -> None:
+    """끝날 때 잠금 내용이 내 것이 아니면(그 사이 남이 인수함) 지우지 않는다."""
+    rnd = h.make()
+    assert rnd.acquire_lock()
+    other = _lock_body(777, started_at="other")
+    _lock_path(h).write_text(other, encoding="utf-8")
+    rnd.release_lock()
+    assert "LOCK_RELEASE_SKIPPED=True reason=NotOwner" in h.text
+    assert _lock_path(h).read_text(encoding="utf-8") == other
+
+
+def test_stale_lock_unreadable_after_move_backs_off_without_claiming_race(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """옮긴 파일을 다시 읽지 못하면 경합이라 단정하지 않고 물러선다(죽은 잠금을 되돌려 놓지 않는다)."""
+    _write_lock(h, _lock_body(424242))
+    h.pid_alive = lambda pid: False
+    real_read = Path.read_bytes
+
+    def read_bytes(self: Path) -> bytes:
+        if ".stale-" in self.name:
+            raise PermissionError("held")
+        return real_read(self)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    assert h.run() == 1
+    assert "LOCK_TAKEOVER_FAILED=True error=StaleReadFailed(PermissionError)" in h.text
+    assert "인수 경합" not in h.text
+    assert not _lock_path(h).exists() and len(_stale_files(h)) == 1

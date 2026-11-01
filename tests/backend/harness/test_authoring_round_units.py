@@ -187,6 +187,29 @@ def test_mask_secrets_hides_url_embedded_credentials(text: str, secret: str, kep
     assert kept in masked  # 구조(호스트·경로)는 남긴다 — 어디서 실패했는지는 읽혀야 한다
 
 
+def test_mask_secrets_password_with_raw_at_and_query_tokens() -> None:
+    assert "ss@" not in mask_secrets("https://u:p@ss@host.example/x")
+    masked = mask_secrets("GET https://api.example/v1?access_token=abcd1234&page=2")
+    assert "abcd1234" not in masked and "page=2" in masked
+
+
+def test_mask_secrets_query_at_sign_is_not_credential() -> None:
+    """대조군 — 쿼리 속 `@`는 자격증명이 아니다(호스트가 가려지면 원인 줄을 못 읽는다)."""
+    text = "redirect https://example.com?r=a@b"
+    assert mask_secrets(text) == text
+
+
+def test_failure_reason_masks_before_truncating() -> None:
+    """자른 뒤 가리면 잘린 경계가 URL을 끊어 비밀이 남는다 — 가린 다음 자른다."""
+    url_head = " https://kiki:pw123456secret"
+    # 300자 경계가 비밀번호 끝과 `@` 사이에 걸리게 둔다 — 자른 뒤 가리면 `@`가 잘려 URL 패턴이
+    # 맞지 않고 비밀이 그대로 남는다(경계가 비밀 앞이면 비밀이 잘려 나가 이 절을 밟지 않는다).
+    line = "x" * (300 - len(url_head)) + url_head + "@host.example/r.git"
+    assert line[:300].endswith("secret")  # 픽스처가 그 경계를 실제로 밟는다
+    reason = RunResult(128, "", line).failure_reason()
+    assert "pw123456secret" not in reason
+
+
 def test_mask_secrets_keeps_non_credential_at_signs() -> None:
     """대조군 — 경로 속 `@`·이메일은 자격증명이 아니다(과잉 마스킹이면 원인 줄을 못 읽는다)."""
     text = "see https://github.com/a/b/blob/x@y and kiki@example.invalid"
@@ -204,8 +227,12 @@ def test_pid_alive_reports_live_dead_and_unknown() -> None:
         text=True,
         check=True,
     )
-    assert pid_alive(int(done.stdout.strip())) is False  # 끝난 자식(번호 재사용 전)
+    dead = int(done.stdout.strip())
+    # 끝난 자식 — 그 사이 번호가 재사용됐으면(/proc에 다시 있으면) 이 단언은 뜻이 없어 건너뛴다.
+    if not Path(f"/proc/{dead}").exists():
+        assert pid_alive(dead) is False
     assert pid_alive(0) is None  # 판정 불가 — 잠금을 존중하는 쪽
+    assert pid_alive(10**20) is None  # 범위 밖 번호는 traceback이 아니라 판정 불가
     assert pid_alive(-5) is None
 
 

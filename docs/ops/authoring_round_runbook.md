@@ -254,8 +254,8 @@ CI·개발 세션에는 Windows·PowerShell 5.1·검수 창이 없다. 아래 �
 | # | 확인 항목 | 어떻게 보이면 통과 | 어떻게 보이면 실패 |
 |---|---|---|---|
 | C1 | PS 5.1 붙여넣기 파싱 — [R1]·[R2-D]·[R2]·[R3]형 한 줄 `if (…) { … } else { … }` | 각 블록이 `ParserError`·`CommandNotFoundException` 없이 판정 줄을 낸다 | 붉은 오류 글자 · 판정 줄 없음 |
-| C2 | cp949 콘솔 한글·기호 표시 | `▶` 요약 줄의 한글과 `—`·`·`가 깨지지 않는다 | `?`·`�`·물음표 상자 |
-| C3 | Ctrl+C 전파와 자식 종료 | 저작 도중 Ctrl+C 한 번에 `STAGE_INTERRUPTED`(또는 `STAGE_FAILED`)와 `ROUND_EXIT=1`이 나오고, 작업 관리자에 `python.exe` 자식이 남지 않는다. 다시 붙여넣으면 이어진다 | 창이 멈춘 채 안 돌아옴 · 자식 python이 남아 계속 호출 |
+| C2 | cp949 콘솔 한글·기호 표시 | `▶` 요약 줄의 한글과 `—`·`·`가 깨지지 않는다 | `?`·검은 마름모 속 물음표(대체 문자)·빈 상자 |
+| C3 | Ctrl+C 전파와 자식 종료 | 저작 도중 Ctrl+C 한 번에 `STAGE_INTERRUPTED`와 `ROUND_EXIT=130`이 나오고(`STAGE_FAILED`로 끝났으면 `ROUND_EXIT=1`), 자식 `python.exe`가 남지 않는다. 다시 붙여넣으면 이어진다. **`ROUND_EXIT=` 줄 자체가 안 나와도 기록한다** — PowerShell이 Ctrl+C로 그 한 줄의 나머지까지 멈췄는지가 확인 대상이다 | 창이 멈춘 채 안 돌아옴 · 자식 python이 남아 계속 호출 |
 | C4 | 창 X로 닫은 뒤 낡은 잠금 인수(Windows `OpenProcess` 경로 — CI 미검증) | 새 창에서 다시 실행하면 `LOCK_STALE=True … HOLDER_ALIVE=False` → `LOCK_TAKEN_OVER=True` | `HOLDER_ALIVE=True`·`None`으로 거부 |
 | C5 | 검수 창 종료 코드 | 판정을 마치고 창을 닫으면 `REVIEW_DONE=True` · 중간에 닫으면 `REVIEW_DONE=False`(정상) | `ReviewToolFailed`(창이 정상 종료했는데) |
 | C6 | Git Credential Manager 프롬프트 | push 때 로그인 창이 뜨면 로그인 후 `PUSH_VERIFIED=True` · 이미 로그인돼 있으면 창 없이 통과 | 무한 대기(5분 상한 뒤 `GitPushFailed` · 원인 줄에 토큰이 보이면 즉시 회신) |
@@ -285,6 +285,9 @@ C1의 결과를 그대로 적용한다(그 런북의 다음 실회차에서 다�
 | `LOCK_HELD=True … HOLDER_ALIVE=True` | 같은 회차가 다른 창에서 이미 돌고 있다 | 그 창이 끝나기를 기다린다. 다른 창이 정말 없으면 회신(번호가 재사용된 다른 프로그램일 수 있다) |
 | `LOCK_HELD=True … HOLDER_ALIVE=None` | 잠금 주인을 판정하지 못했다(잠금 내용이 비었거나 깨짐 · OS가 답하지 않음) — 그래서 지우지 않았다 | 다른 창 확인 → 정말 없으면 같은 줄의 `Remove-Item` 경로를 지운 뒤 [R2] |
 | `LOCK_STALE=True` → `LOCK_TAKEN_OVER=True`(거부 아님) | 앞 실행이 창 X 닫기 등으로 끝나 잠금만 남았다(주인 pid가 죽음) — 옆으로 치우고(`…lock.stale-<시각>-<pid>` 파일로 보존) 이어서 실행했다 | 정상 — 조치 없음 |
+| `LOCK_HELD=True holder=(인수 직후 다른 실행이 먼저 잡음)`·`holder=(인수 경합)` | 낡은 잠금을 치우는 사이 다른 창의 실행이 먼저 잠금을 잡았다 | 그 창이 끝나기를 기다린다. `RESTORED=False`가 보이면 다른 창을 모두 확인하고 출력 전체를 회신 |
+| `LOCK_TAKEOVER_FAILED=True` | 낡은 잠금을 옆으로 치우지 못했다(파일을 다른 프로그램이 잡음 등 — 원인 타입이 `error=`에) | 같은 줄의 `Remove-Item` 경로를 지운 뒤 [R2] |
+| `LOCK_RELEASE_SKIPPED=True reason=NotOwner`(거부 아님) | 끝날 때 잠금 내용이 이 실행 것이 아니었다(그 사이 다른 실행이 인수) — 남의 잠금이라 지우지 않았다 | 다른 창이 돌고 있는지 확인 |
 | `BRANCH_NAME_VALID` | 설정의 산출물 브랜치 이름이 git 규칙에 어긋난다 | 회신 |
 | `SPEC_PLAN_UNCHANGED` | 회차 도중 spec이 바뀌었다 | 회신 |
 | `REVIEW_COMPLETE` · `JUDGED<QUEUE_LINES` | 검수가 남았다 — 업로드하지 않는다 | [R2]를 다시(검수 창이 남은 것부터) |
@@ -296,7 +299,8 @@ C1의 결과를 그대로 적용한다(그 런북의 다음 실회차에서 다�
 | `STAGE_FAILED … error=ProbeFailed` | 탐침이 import부터 실패했다(원인 예외 타입이 CAUSE 줄에) | 회신 |
 | `STAGE_FAILED … error=ArtifactCheckFailed` | GenerationLog 4필드 결손·감사 실패·합계 미달 | `SEAT_CHECK`·`PROVENANCE_…` 줄을 회신 |
 | `STAGE_FAILED … error=GitPushFailed` | push 인증·네트워크 실패(커밋은 워크트리에 남는다) — 원인 줄의 URL 자격증명은 `https://***@…`로 가려진다 | [R2]를 다시 — 커밋을 그대로 보낸다 |
-| `STAGE_FAILED … error=ReservationReleaseNotSaved` | 「예약 풀기」를 상태 파일에 쓰지 못했다 — 아무것도 풀리지 않았다 | 상태 파일(`…-review\round_state.json`)을 연 프로그램을 닫고 같은 줄을 다시 |
+| `STAGE_FAILED … error=ReservationReleaseNotSaved` | 「예약 풀기」를 상태 파일에 쓰지 못했다(위 `STATE_WRITE_FAILED` 줄에 원인 타입) — 아무것도 풀리지 않았다 | 상태 파일(`…-review\round_state.json`)을 연 프로그램을 닫고 같은 줄을 다시 |
+| `WRITE_REFUSED=True stage=release-unevidenced` | 「예약 풀기」를 격리 워크트리 밖에서(또는 다른 코드로) 실행했다 — 풀지 않았다 | 새 창에서 [R0]·[R1] 뒤 「예약 풀기」 |
 | `CONFIG_ERROR=` | 설정 파일 형식 오류(exit 2) | 그 줄을 회신 |
 
 **회신**: [R2] 출력 전체를 **자르지 말고** 준다(잘린 출력으로는 분모가 조용히 줄어든 것을 놓친다).
@@ -322,9 +326,12 @@ C1의 결과를 그대로 적용한다(그 런북의 다음 실회차에서 다�
   시도가 근거에서 빠져, 「예약 풀기」가 그만큼을 **다시 쓸 수 있는 예산으로 되돌린다** — 같은 유료 예산을 두 번 쓸 수
   있게 된다. 상태 파일까지 함께 지우면 예약도 사라져 막을 장치가 없다. 좌석 폴더의 파일은 손으로 지우거나 고치지
   않는다(회차를 새로 하려면 세션에 새 회차 이름을 요청한다).
-- **낡은 잠금 인수의 판정 한계**: 주인 pid가 죽었는지는 OS에 묻는다. 그 번호를 다른 프로그램이 재사용 중이면 '살아
+- **낡은 잠금 인수의 판정 한계**: 잠금은 만든 실행의 호스트 이름·플랫폼을 함께 적고, 그것이 이 실행과 **같을 때만**
+  pid를 판정한다 — 같은 워크트리를 WSL·컨테이너가 함께 쓰면 상대 pid가 이쪽에서 '없음'으로 보이기 때문이다.
+  다르거나 적혀 있지 않으면(EOS-209 이전 형식 잠금) `HOLDER_ALIVE=None`으로 인수하지 않는다. 주인 pid가 죽었는지는 OS에 묻는다. 그 번호를 다른 프로그램이 재사용 중이면 '살아
   있음'으로 읽혀 인수하지 않는다(안전한 쪽의 오판 — `HOLDER_ALIVE=True`로 거부되면 회신). Windows에서 종료 코드
   259로 끝난 프로세스도 같은 이유로 '살아 있음'으로 읽힌다.
 - **시크릿 가림의 범위**: 화면·상태 파일에 남는 자식 stderr 꼬리·원인 줄에서 `sk-or-`·`sk-ant-`·Bearer 토큰·
-  GitHub 토큰 접두(`ghp_` 등)·URL에 박힌 자격증명(`https://…@`·`x-access-token:…@`)을 `***`로 가린다. 이 모양이
+  GitHub 토큰 접두(`ghp_` 등)·URL에 박힌 자격증명(`https://…@`·`x-access-token:…@`)·쿼리 토큰(`?access_token=…`·
+  `&key=…` 등)을 `***`로 가린다(자르기 전에 가린다). 이 모양이
   아닌 비밀(임의 문자열 비밀번호 등)은 가리지 못한다 — 원인 줄을 회신하기 전에 한 번 훑어본다.
