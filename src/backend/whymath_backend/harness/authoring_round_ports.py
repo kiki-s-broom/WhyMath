@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -38,17 +39,108 @@ RunMode = Literal["capture", "stream", "inherit"]
 _TAIL_LINES = 40
 
 # 자식 stderr·원인 줄에 키가 섞여 나와도 화면·상태 파일에 남기지 않는다(시크릿 미출력).
-_SECRET_PATTERNS = (
-    re.compile(r"sk-(?:or|ant)-[A-Za-z0-9_\-]{4,}"),
-    re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
+# (패턴, 바꿀 문자열) — URL 패턴은 구조(스킴·@ 뒤 호스트)를 남기고 자격증명 자리만 가린다.
+_SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    # URL에 박힌 자격증명 — `https://사용자:토큰@호스트`·`https://토큰@호스트`(git push 실패 줄이
+    # 원격 URL을 그대로 보인다 — EOS-209 ①(a)). 사용자 칸에 `/`가 없어야 해서
+    # 경로의 `@`는 건드리지 않는다.
+    # 사용자 칸은 마지막 `@`까지 탐욕적으로 잡는다(비밀번호 속 날것의 `@`) — `?`·`#`에서 멈춰
+    # 쿼리 속 `@`(`https://host?r=a@b`)는 자격증명으로 읽지 않는다.
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s/'\"<>?#]+@"), r"\1***@"),
+    # 스킴 없이 나오는 GitHub 앱 토큰 자리(`x-access-token:<토큰>@`).
+    (re.compile(r"(?i)\bx-access-token:[^\s@'\"<>]+@"), "x-access-token:***@"),
+    # GitHub 토큰 접두(개인·OAuth·사용자-서버·서버-서버·갱신·세분화 PAT) —
+    # URL 밖에 홀로 나와도 가린다.
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,})"), "***"),
+    # 쿼리 파라미터 토큰(`?access_token=…`·`&key=…`) — 값만 가리고 이름은 남긴다.
+    (
+        re.compile(
+            r"(?i)([?&](?:access_token|refresh_token|token|api_key|apikey|key|password|secret)=)"
+            r"[^&\s'\"<>#]+"
+        ),
+        r"\1***",
+    ),
+    (re.compile(r"sk-(?:or|ant)-[A-Za-z0-9_\-]{4,}"), "***"),
+    (re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"), "***"),
 )
 
 
 def mask_secrets(text: str) -> str:
-    """키처럼 보이는 문자열을 `***`로 가린다(OpenRouter·Anthropic 키 접두·Bearer 토큰)."""
-    for pattern in _SECRET_PATTERNS:
-        text = pattern.sub("***", text)
+    """키처럼 보이는 문자열을 `***`로 가린다.
+
+    대상: URL 내장 자격증명(`스킴://…@`)·`x-access-token:…@`·GitHub 토큰 접두(`ghp_` 등)·
+    쿼리 파라미터 토큰(`?access_token=…` 등)·OpenRouter/Anthropic 키 접두(`sk-or-`·`sk-ant-`)·
+    Bearer 토큰. **자르기 전에** 불러야 한다 — 잘린 경계가 `스킴://`이나 `@`를 끊으면 URL 패턴이
+    맞지 않아 가리지 못한다.
+    """
+    for pattern, repl in _SECRET_PATTERNS:
+        text = pattern.sub(repl, text)
     return text
+
+
+def pid_alive(pid: int) -> bool | None:
+    """그 pid의 프로세스가 살아 있는가 — True 살아 있음 · False 없음 · None 판정 불가.
+
+    낡은 잠금 판정(EOS-209 ①(b))에 쓴다. 판정할 수 없으면 None을 돌려 **잠금을 존중**하게 한다
+    (모른다 ≠ 죽었다). Windows에서 `os.kill(pid, 0)`은 생존 확인이 아니라 **그 프로세스를 끝낸다**
+    (TerminateProcess) — 그래서 Windows는 OpenProcess·GetExitCodeProcess로 묻는다.
+    pid가 재사용돼 다른 프로그램이 같은 번호를 쓰면 True(살아 있음)로 나온다 —
+    잠금을 지키는 쪽의 오판이라 안전하다.
+    """
+    if pid <= 0:
+        return None
+    if sys.platform == "win32":
+        return _pid_alive_win32(pid)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # 남의 프로세스 — 있기는 하다
+    except (OSError, OverflowError, ValueError):
+        return None  # 범위 밖 번호 등 — 판정 불가
+    return True
+
+
+if (
+    sys.platform == "win32"
+):  # pragma: no cover — CI는 Linux다(첫 Windows 실회차 체크리스트에서 확인)
+    import ctypes
+    from ctypes import wintypes
+
+    _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    _STILL_ACTIVE = 259
+    _ERROR_ACCESS_DENIED = 5
+    _ERROR_INVALID_PARAMETER = 87  # 그런 pid의 프로세스가 없다
+
+    def _pid_alive_win32(pid: int) -> bool | None:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        # 타입을 명시한다 — 기본 restype(c_int)은 64비트 HANDLE을 32비트로 자른다.
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+        kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        try:
+            handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        except (ctypes.ArgumentError, OverflowError):
+            return None  # DWORD 범위 밖 번호 — 판정 불가
+        if not handle:
+            err = ctypes.get_last_error()
+            if err == _ERROR_INVALID_PARAMETER:
+                return False
+            if err == _ERROR_ACCESS_DENIED:
+                return True
+            return None
+        try:
+            code = wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return None
+            # 종료 코드 259로 끝난 프로세스도 '살아 있음'으로 읽힌다 — 잠금을 지키는 쪽의 오판이다.
+            return code.value == _STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
 
 
 @dataclass(frozen=True)
@@ -76,9 +168,9 @@ class RunResult:
         if self.timed_out:
             return "TimeoutExpired(타임아웃으로 중단)"
         last = next((ln for ln in reversed(self.stderr_tail.splitlines()) if ln.strip()), "")
-        return mask_secrets(
-            f"exit {self.returncode}" + (f" — {last.strip()[:300]}" if last else "")
-        )
+        # 가린 다음 자른다 — 자른 경계가 URL을 끊으면 URL 패턴이 맞지 않는다.
+        shown = mask_secrets(last.strip())[:300]
+        return f"exit {self.returncode}" + (f" — {shown}" if shown else "")
 
 
 class ProcessRunner(Protocol):

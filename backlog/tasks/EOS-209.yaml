@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,6 +18,6 @@ paths:
   - "src/backend/whymath_backend/harness/authoring_round*.py"
   - "tests/backend/harness/test_authoring_round*.py"
   - "docs/ops/authoring_round*"
-session: null
+session: claude/new-session-ap0eyt
 notes: "출처: PR #1767(EOS-208) 독립 재리뷰 P3(머지 비차단)와 '확인하지 못한 것' 목록. 1차 리뷰 P1(예산 누수)은 #1767에서 해소·재현 시나리오 실호출 ≤ 30 확인. 이 태스크의 ②는 다음 실제 저작 회차(예: EOS-203 로컬 좌석 재측정)와 함께 수행하면 된다."
-updated: 2026-10-29
+updated: 2026-11-01
