@@ -1,1 +1,1 @@
-{"branch": "claude/kind-archimedes-74s4m7", "harness": "2.0", "task": "P3-32-core-concept-hint-link", "ts": "2026-11-01T02:59:29Z"}
+{"branch": "claude/kind-archimedes-74s4m7", "harness": "2.0", "kind": "block", "reason": "결정 게이트 G-p332-corpus-replay-approach(corpus-replay 풀이 유형) + 후속 P3-93(개수형 답 finalize) 대기 — FK 순서 버그는 #1801로 수정, 샌드박스 9/10 실측", "task": "P3-32-core-concept-hint-link", "ts": "2026-11-01T05:17:29Z"}
