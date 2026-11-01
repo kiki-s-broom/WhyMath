@@ -350,7 +350,15 @@ def test_minif2f_label_matches_readme_folder_licenses(arc: Any) -> None:
     # "The `lean` folder is released under the Apache License" 형태의 선언 줄
     decls = re.findall(r"The `(\w+)` folder is released under the (\w+) License", readme)
     assert len(decls) == 4, decls  # 스캔 0건은 실패(공허한 통과 방지)
+    # 라벨을 '·'로 나눈 구간마다 '폴더[·폴더]=라이선스' — 폴더↔라이선스 짝까지 대조한다
+    # (폴더명·라이선스명이 따로따로 들어 있기만 하면 짝이 뒤바뀐 라벨도 통과하므로)
+    body = src.license_label.split("(", 1)[1].rstrip(")")
+    pairs: dict[str, str] = {}
+    for seg in body.split(" · "):
+        folders, lic_text = seg.split("=", 1)
+        for f in folders.split("·"):
+            pairs[f.strip()] = lic_text.strip()
+    assert set(pairs) == {f for f, _ in decls}, pairs
     for folder, lic in decls:
-        assert folder in src.license_label, f"{folder} 폴더가 라벨에 없음"
-        assert lic in src.license_label, f"{lic} 라이선스가 라벨에 없음"
+        assert lic in pairs[folder], f"{folder} 폴더 라벨 {pairs[folder]!r}에 {lic} 없음"
     assert src.license_label != "MIT"
