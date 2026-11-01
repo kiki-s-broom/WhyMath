@@ -50,7 +50,8 @@
 ## 출력 형식 — JSON 객체 하나만 (코드펜스·설명 없이)
 필드(필수): question_text(발문·한국어), answer(단일 값 문자열), conditions(정답 검산용
 조건식·SymPy 표기·여러 개면 배열), answer_map(조건에 답을 대입할 치환맵),
-answer_selection(largest/smallest/unique — 항상 넣으세요), unit_codes(단원 코드 배열·최소 1개).
+answer_selection(largest/smallest/unique — 항상 넣으세요). 단원 코드(unit_codes)는 넣지 마세요 —
+시스템이 성취기준 코드에서 정합니다.
 필드(권장): answer_explanation(간결 해설), difficulty_overall(1.0~5.0 숫자),
 answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기준 코드 배열 — **참고 스펙의
 `achievement_standard_codes` 값을 한 글자도 바꾸지 말고 그대로 복사**).
@@ -82,9 +83,27 @@ answer_format(자연수/분수/실수/식), achievement_standard_codes(성취기
   "answer_map": {"x": "4"},
   "answer_selection": "largest",
   "difficulty_overall": 2.0,
-  "unit_codes": ["QUAD-EQ"],
   "answer_format": "자연수"
 }
+
+## 답이 방정식의 근이 아닌 문제 (접선의 y절편·극값·속도·개수 등)
+- 정답 변수 이름은 **반드시 `answer`** 입니다(`b`·`v`·`n`·`M`·`y` 금지). `answer_map`은
+  `{"answer": "정답"}`, `answer_selection`은 `"unique"`.
+- `conditions`는 **문항의 함수에 점을 대입해 정답을 다시 계산하는 식**이어야 합니다. 함수식을
+  괄호로 묶어 점을 대입한 형태 그대로 쓰세요 — 기계가 그 식이 문항의 함수에서 나왔는지 확인합니다.
+  - ⭕ `f(x) = x^3 - 5x + 2`의 점 (2, 0)에서의 접선의 y절편 →
+    `"answer == (2**3 - 5*2 + 2) - 2*(3*2**2 - 5)"` (f(2) − 2·f′(2), f′(x) = 3x^2 − 5)
+  - ⭕ `s(t) = 2t^2 + 7t + 4`의 t = 3일 때 속도 → `"answer == 4*3 + 7"` (s′(t) = 4t + 7에 t = 3)
+  - ⭕ 극댓값(극대가 x = −1) → `"answer == (-1)**3 - 3*(-1)**2 - 9*(-1) + 10"` (f(−1))
+- **정답을 그대로 다시 적는 식은 버려집니다**: ❌ `"answer = 3"` ❌ `"answer - 24 = 0"`.
+- **미리 구한 중간값(기울기 등)을 숫자로 박은 식도 버려집니다**: ❌ `"answer == 7*(0 - 2)"`
+  (기울기 7을 f′에서 계산하지 않음) ❌ `"answer**2 - answer - 182 = 0"` (정답이 근이 되게 거꾸로
+  만든 식). 중간값도 함수식에 점을 대입한 형태(`(3*2**2 - 5)`)로 쓰세요.
+
+## 교육과정 범위 (해설 방법)
+- 해설은 그 성취기준의 교육과정 안의 방법만 쓰세요. **미적분Ⅰ(`12미적Ⅰ`) 문항에서는
+  이계도함수(f″)를 쓰지 마세요** — 극대·극소는 **f′(x)의 부호 변화**(+ → −면 극대, − → +면
+  극소)로 판정합니다. 이계도함수를 쓴 문항은 버려집니다.
 
 ## 규칙
 - 수식은 SymPy 표기(`**`=거듭제곱·`*`=곱)로. `conditions`·`answer_map`은 기계 검산에 쓰이니 정확히.
