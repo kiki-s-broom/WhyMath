@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-158
+title: "2026-12-31 만료 유예 처분 — 프로바이더 직접 호출 유예 4건(check_provider_seat_contract) · 12/27 동결 전"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① scripts/ops/check_provider_seat_contract.py의 PROVIDER_DIRECT_WAIVERS 4건(until 2026-12-31: harness/concept_content_review_batch.py · harness/quality_tier_moe_accuracy_battle.py · harness/generation_seed_replay_probe.py · scripts/demo/wh1_primary_probe.py)을 12/27(G5 동결) 전에 처분한다. 만료 후에는 검사기가 위반으로 기록하고 exit 1을 내며, CI backend 잡이 이 검사를 돌린다.\n② 파일마다 셋 중 하나: (a) 라우터 경유로 전환(직접 호출 금지 원칙) (b) 파일이 더 쓰이지 않으면 삭제 (c) 의식적 연장(새 until + 사유). 연장은 Anthropic API 사용 중단(ARCH-66) 등 라이브 검증이 막힌 이유가 있을 때만 쓴다.\n③ 변별력: 처분 뒤 유예를 하나 지우면 해당 파일이 위반으로 잡히는지(전환·삭제한 파일은 잡히지 않는지) 확인한다.\n④ 완료 판정: check_provider_seat_contract.py exit 0 · 남은 유예의 until이 전부 2027-01-01 이후."
+artifacts: []
+paths:
+  - scripts/ops/check_provider_seat_contract.py
+  - src/backend/whymath_backend/harness/concept_content_review_batch.py
+  - src/backend/whymath_backend/harness/quality_tier_moe_accuracy_battle.py
+  - src/backend/whymath_backend/harness/generation_seed_replay_probe.py
+  - scripts/demo/wh1_primary_probe.py
+session: null
+notes: "출처: D13 Kiki 결정(2026-11-01) 4번 — 2026-12-31 만료 12곳의 소유 태스크 등재, 12/27 동결 전 처분 목표. 근거 = docs/reviews/eos_followup_triage_2026-11.md §4-1(판정 기준 main 3a83ed64)."
+updated: 2026-11-01

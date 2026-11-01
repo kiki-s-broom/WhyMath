@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-157
+title: "2026-12-31 만료 유예 처분 — 스키마 YAML↔모델 일치 검사(test_schema_model_sync EXPIRES) · 12/27 동결 전"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① tests/constitution/test_schema_model_sync.py의 EXPIRES = 2026-12-31 유예를 12/27(G5 동결) 전에 처분한다. 2027-01-01부터 date.today() <= EXPIRES 단언이 RED가 된다. 처분 대상은 REGISTRY의 유예 항목(frozen 어긋남 · 대응 모델 미확정) 전부다 — 2026-10 기준 실측 어긋남 5(SolutionPath·Hint·Concept·ConceptEdge·Problem)·모델 없음 2(MasteryState·StudentProfile), 착수 시점에 다시 센다.\n② 항목마다 셋 중 하나를 택하고 근거를 남긴다: (a) 스키마 YAML 갱신(모델이 현행이면) (b) 모델 수정(YAML이 맞으면 — 단 12/31 내부 검증 기간 방침 규칙 3의 CORE 상수 파일은 건드리지 않는다) (c) 의식적 연장(새 만료일 + 사유 — 만료 없는 유예 금지).\n③ 연장이면 EXPIRES 상수만 고치고, 연장 사유와 새 재확인 지점을 테스트 주석과 MEMORY 결정 로그에 남긴다.\n④ 이 유예의 원천은 게이트 G-const-r4-02-decision의 (나)안이다(D13에서 그 게이트는 2027 보류). 게이트 판정을 대신하지 않는다 — 이 태스크는 만료 처분만 한다.\n⑤ 완료 판정: tests/constitution 통과 · 만료일이 2027-01-01 이후이거나 유예 0건."
+artifacts: []
+paths:
+  - tests/constitution/test_schema_model_sync.py
+  - "schemas/v1.1/*.yaml"
+session: null
+notes: "출처: D13 Kiki 결정(2026-11-01) 4번 — 2026-12-31 만료 12곳의 소유 태스크 등재, 12/27 동결 전 처분 목표. 근거 = docs/reviews/eos_followup_triage_2026-11.md §4-1(판정 기준 main 3a83ed64)."
+updated: 2026-11-01
