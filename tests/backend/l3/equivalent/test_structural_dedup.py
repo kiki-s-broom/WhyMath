@@ -213,3 +213,111 @@ def test_acceleration_is_not_also_counted_as_velocity() -> None:
         {"question_text": "s(t) = t^3 - 6t^2 + 9t + 2 일 때 t = 1에서의 가속도", "answer": "-6"}
     )
     assert sig is not None and sig[0] == ("가속도",)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 독립 검토 지적 회귀 — 과잉 병합·미탐·견고성 반례를 픽스처로 고정
+# ──────────────────────────────────────────────────────────────────────
+def _sig(question: str, answer: str) -> object:
+    return structural_signature({"question_text": question, "answer": answer})
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        # 1 — 핵심어가 없어도 미분계수와 함숫값(상수항만 다른 함수·정답 우연 일치)은 다르다
+        (
+            ("f(x) = x^2 - 4x 의 x=1에서의 미분계수", "-2"),
+            ("f(x) = x^2 - 4x + 1 에 대하여 f(1)의 값", "-2"),
+        ),
+        (("f(x) = x^2 - 4x 에서 f'(1)의 값", "-2"), ("f(x) = x^2 - 4x + 1 에서 f(1)의 값", "-2")),
+        # 2 — 점의 부호(x=2와 x=-2의 접선 기울기가 둘 다 9)
+        (
+            ("f(x) = x^3 - 3x 의 x = 2인 점에서의 접선의 기울기", "9"),
+            ("f(x) = x^3 - 3x 의 x = -2인 점에서의 접선의 기울기", "9"),
+        ),
+        # 9 — 실근 개수는 매개변수 조건이 없으면 상수항을 접지 않는다
+        (
+            ("f(x) = x^3 - 3x^2 - 1 의 실근의 개수", "1"),
+            ("f(x) = x^3 - 3x^2 + 5 의 실근의 개수", "1"),
+        ),
+    ],
+)
+def test_review_over_merge_cases_stay_apart(a: tuple[str, str], b: tuple[str, str]) -> None:
+    assert _sig(*a) is not None and _sig(*a) != _sig(*b)
+
+
+def test_real_point_equal_to_some_function_value_is_kept() -> None:
+    """3 — 좌표쌍이 아닌 진짜 점은 다른 수의 함숫값과 같아도 지우지 않는다."""
+    from whymath_backend.l3.equivalent.authoring_guard import extract_question_relations
+
+    relations = extract_question_relations(
+        "f(x) = x^2 + 2 에서 f(1) = 3 일 때 x = 3인 점에서의 접선의 기울기"
+    )
+    assert {1, 3} <= set(relations.point_numbers)
+    two_points = extract_question_relations(
+        "f(x) = x^2 위 x = 2인 점과 x = 4인 점을 잇는 직선의 기울기"
+    )
+    assert set(two_points.point_numbers) == {2, 4}
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        # 4 — 방정식 변수 이름만 다름
+        (
+            ("이차방정식 x^2 - 5x + 6 = 0 의 큰 근", "3"),
+            ("이차방정식 t^2 - 5t + 6 = 0 의 큰 근", "3"),
+        ),
+        # 5 — 정답 표기(유니코드 빼기·`x = 2` 꼴)
+        (
+            ("이차방정식 x^2 + x - 6 = 0 의 작은 근", "−3"),
+            ("이차방정식 x^2 + x - 6 = 0 의 작은 근", "-3"),
+        ),
+        (
+            ("이차방정식 x^2 - 4x + 4 = 0 의 큰 근", "x = 2"),
+            ("이차방정식 x^2 - 4x + 4 = 0 의 큰 근", "2"),
+        ),
+    ],
+)
+def test_review_missed_duplicates_now_match(a: tuple[str, str], b: tuple[str, str]) -> None:
+    assert _sig(*a) is not None and _sig(*a) == _sig(*b)
+
+
+def test_approximate_decimal_is_not_merged_with_exact_value() -> None:
+    """5 — 근삿값 소수를 정확값으로 바꿔 합치지 않는다."""
+    q = "이차방정식 x^2 - 2 = 0 의 큰 근"
+    assert _sig(q, "1.41421356") != _sig(q, "sqrt(2)")
+
+
+def test_unreadable_rows_do_not_kill_the_queue() -> None:
+    """6 — 깨진 JSON·객체가 아닌 행은 큐에서 빼고 사유를 남긴다(큐 전체가 죽지 않는다)."""
+    good = _row("g", TestSignature._TANGENT_A, "9")
+    kept, dropped = split_structural_duplicates([["{깨짐", "[1, 2]", good]])
+    assert [json.loads(k)["slug"] for k in kept] == ["g"]
+    assert [d.reason for d in dropped] == ["unreadable_row", "unreadable_row"]
+
+
+def test_rows_without_slug_are_not_merged_by_slug() -> None:
+    """8 — slug가 없는 행끼리 `None` 문자열로 묶이지 않는다."""
+    a = json.dumps({"question_text": TestSignature._TANGENT_A, "answer": "9"}, ensure_ascii=False)
+    b = json.dumps({"question_text": "f(x) = x^2 의 극솟값", "answer": "0"}, ensure_ascii=False)
+    kept, dropped = split_structural_duplicates([[a, b]])
+    assert len(kept) == 2 and dropped == []
+
+
+def test_cli_creates_dropped_parent_and_leaves_no_queue_on_failure(tmp_path: Path) -> None:
+    """7 — 제외 목록 경로의 부모가 없어도 만든다. 큐는 제외 목록을 쓴 뒤에만 생긴다."""
+    seat = tmp_path / "cu.jsonl"
+    seat.write_text(_row("a", TestSignature._TANGENT_A, "9") + "\n", encoding="utf-8")
+    queue, dropped = tmp_path / "q.jsonl", tmp_path / "새폴더" / "d.jsonl"
+    assert main(["--seat", str(seat), "--queue", str(queue), "--dropped", str(dropped)]) == 0
+    assert queue.exists() and dropped.exists()
+    assert not list(tmp_path.rglob("*.tmp"))
+
+
+def test_derivative_value_and_function_value_stay_apart() -> None:
+    """f(x) = x²에서 f′(2)와 f(2)는 둘 다 4다 — 함수·점·정답이 같아도 묻는 것이 다르다(E16)."""
+    a = _sig("f(x) = x^2 에서 f'(2)의 값을 구하시오.", "4")
+    b = _sig("f(x) = x^2 에서 f(2)의 값을 구하시오.", "4")
+    assert a is not None and b is not None and a != b

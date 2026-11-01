@@ -316,27 +316,52 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
     )
 
 
+# 부호 있는 수 — 앞이 숫자·문자·닫는 괄호면 이항 연산의 빼기라 부호로 읽지 않는다.
+_SIGNED_NUMBER = re.compile(r"(?<![\^\d.A-Za-z)])(-?)\s*(\d+(?:\.\d+)?(?:/\d+)?)")
+_NUMBER_TOKEN = r"-?\s*\d+(?:\.\d+)?(?:/\d+)?"
+# 좌표쌍 `(a, b)` — 둘째 성분이 f(a)면 함수에서 유도되는 값이라 점 집합에 따로 세지 않는다.
+_COORDINATE_PAIR = re.compile(rf"\(\s*({_NUMBER_TOKEN})\s*,\s*({_NUMBER_TOKEN})\s*\)")
+
+
+def _as_number(token: str) -> sympy.Expr | None:
+    try:
+        return sympy.nsimplify(token.replace(" ", ""))
+    except (sympy.SympifyError, ValueError, TypeError, ZeroDivisionError):
+        return None
+
+
 def _point_numbers(
     blanked: str, functions: Sequence[tuple[str, sympy.Expr]]
 ) -> frozenset[sympy.Expr]:
-    """함수식 밖의 수 중 **함수에서 유도되는 값**(`점 (2, 3)`의 3 = f(2))을 뺀 것.
+    """함수식·방정식 밖의 수(부호 포함) — 좌표쌍 `(a, f(a))`의 둘째 성분은 뺀다.
 
     같은 문항을 `x좌표가 2인 점`과 `점 (2, 3)`으로 다르게 적어도 같은 점 집합 {2}가 되게 한다.
+    유도값은 **좌표쌍의 둘째 성분일 때만** 뺀다 — 어떤 수가 우연히 다른 수의 함숫값과 같다는 이유로
+    지우면 `f(1)=3 … x=3인 점`의 진짜 점 3이 사라진다. 부호를 지키는 이유: `x=2`와 `x=-2`는
+    다른 점이다.
     """
-    numbers = set(_question_numbers(blanked))
-    derived: set[sympy.Expr] = set()
-    for value in numbers:
+    text = blanked.replace("−", "-")
+    derived_spans: list[tuple[int, int]] = []
+    for pair in _COORDINATE_PAIR.finditer(text):
+        first, second = _as_number(pair.group(1)), _as_number(pair.group(2))
+        if first is None or second is None:
+            continue
         for var, body in functions:
-            for other in numbers - {value}:
-                # 수는 절댓값이라 점·값의 부호를 모두 본다(`(-1, 3)`·`(1, -3)`).
-                for point in (other, -other):
-                    try:
-                        image = sympy.simplify(body.subs(sympy.Symbol(var), point))
-                    except (TypeError, ValueError, ZeroDivisionError):
-                        continue
-                    if image in (value, -value):
-                        derived.add(value)
-    return frozenset(numbers - derived)
+            try:
+                image = sympy.simplify(body.subs(sympy.Symbol(var), first))
+            except (TypeError, ValueError, ZeroDivisionError):
+                continue
+            if sympy.simplify(image - second) == 0:
+                derived_spans.append(pair.span(2))
+                break
+    numbers: set[sympy.Expr] = set()
+    for match in _SIGNED_NUMBER.finditer(text):
+        if any(start <= match.start(2) < end for start, end in derived_spans):
+            continue
+        value = _as_number(match.group(1) + match.group(2))
+        if value is not None:
+            numbers.add(value)
+    return frozenset(numbers)
 
 
 # ── 검산식 근거 판정 ─────────────────────────────────────────────────────
