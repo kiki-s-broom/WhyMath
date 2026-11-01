@@ -502,7 +502,7 @@ if ($HaveH) { & $Py -c $SeatCheckPy "$Runs\eos197-a6-local"; "---"; & $Py -c $Se
 
 ## [I] 검수 큐 조립 — 창 ① (쓰기 · 큐 파일 1개 · 즉시)
 
-두 좌석 산출물을 **한 건씩 번갈아** 한 큐로 묶는다 — 한 좌석을 몰아서 보면 피로·익숙함이 한쪽 HIT에만 실린다. 같은 slug는 한 번만 싣는다. 큐 파일이 이미 있으면 **덮어쓰지 않는다**(앞 검수의 분모가 바뀌기 때문이다 — 이어서 검수하려면 [J-2]의 `--resume`을 쓴다).
+두 좌석 산출물을 **한 건씩 번갈아** 한 큐로 묶는다 — 한 좌석을 몰아서 보면 피로·익숙함이 한쪽 HIT에만 실린다. 같은 slug는 한 번만 싣고, **표기만 다른 같은 문항**(구조 서명 = 묻는 것·문항 함수의 도함수·발문 방정식·점·정답이 같음)도 큐에 넣지 않는다(EOS-204 · `l3/equivalent/structural_dedup.py`). 뺀 CU는 사유와 함께 `queue_dropped_duplicates.jsonl`에 남는다 — 중복은 F1~F8 어느 실패 코드도 아니므로 검수자가 고르지 않게 하려는 것이다(EOS-197에서는 중복 2건이 F8로 기록돼 분포가 왜곡됐다). 큐 파일이 이미 있으면 **덮어쓰지 않는다**(앞 검수의 분모가 바뀌기 때문이다 — 이어서 검수하려면 [J-2]의 `--resume`을 쓴다).
 
 > 큐는 저작 산출물(`cu.jsonl`, 전건 수용분)이다. 카나리 절단 CLI(`harness/canary_slice`)는 쓰지 않는다 — 그 CLI는 회차 대장의 `canary_size`가 필요한데 이 회차는 `--canary 0`이라 그 값이 없어 exit 1이 난다(MP-07 런북 §7). 검수 CLI는 코퍼스 JSONL을 그대로 큐로 받는다(`review_session --queue` 도움말).
 
@@ -511,35 +511,13 @@ if ($HaveH) { & $Py -c $SeatCheckPy "$Runs\eos197-a6-local"; "---"; & $Py -c $Se
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
 $ReviewDir = "$Runs\eos197-a6-review"
 $Queue = "$ReviewDir\canary_review_queue.jsonl"
-$QueuePy = "import json,sys,pathlib,itertools
-a=pathlib.Path(sys.argv[1]); b=pathlib.Path(sys.argv[2]); q=pathlib.Path(sys.argv[3])
-def rows(p):
-    return [l for l in p.read_text(encoding='utf-8').splitlines() if l.strip()] if p.exists() else []
-ra=rows(a); rb=rows(b)
-if q.exists():
-    print('QUEUE_WRITTEN=False REASON=queue_file_already_exists')
-    raise SystemExit(1)
-out=[]; seen=set(); dup=0
-for x in itertools.chain.from_iterable(itertools.zip_longest(ra, rb)):
-    if x is None:
-        continue
-    s=json.loads(x).get('slug')
-    if s in seen:
-        dup+=1
-        continue
-    seen.add(s); out.append(x)
-q.parent.mkdir(parents=True, exist_ok=True)
-q.write_text(''.join(l+chr(10) for l in out), encoding='utf-8')
-back=sum(1 for l in q.read_text(encoding='utf-8').splitlines() if l.strip())
-print('LOCAL_ROWS=%d OPENROUTER_ROWS=%d CROSS_SEAT_DUP_SLUGS=%d' % (len(ra), len(rb), dup))
-print('QUEUE_WRITTEN=True QUEUE_LINES=%d' % back)"
 $TotalI = [int](& $Py -c $CountPy "$Runs\eos197-a6-local\cu.jsonl") + [int](& $Py -c $CountPy "$Runs\eos197-a6-openrouter\cu.jsonl")
 $QueueExistedI = Test-Path $Queue
 "PRECHECK_I TotalCuLines=$TotalI QueueExisted=$QueueExistedI"
-if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -c $QueuePy "$Runs\eos197-a6-local\cu.jsonl" "$Runs\eos197-a6-openrouter\cu.jsonl" $Queue; "QUEUE_EXIT=$LASTEXITCODE"; "QUEUE_FILE_LINES=$(& $Py -c $CountPy $Queue)" } else { "WRITE_REFUSED=True — 큐를 만들지 않았다. TotalCuLines=$TotalI(15 이상이어야 — HIT 유효 표본 하한) QueueExisted=$QueueExistedI(False여야 — 이미 있으면 [J-2]로 이어서 검수)" }
+if (($TotalI -ge 15) -and (-not $QueueExistedI)) { & $Py -m whymath_backend.l3.equivalent.structural_dedup --seat "$Runs\eos197-a6-local\cu.jsonl" --seat "$Runs\eos197-a6-openrouter\cu.jsonl" --queue $Queue --dropped "$ReviewDir\queue_dropped_duplicates.jsonl"; "QUEUE_EXIT=$LASTEXITCODE"; "QUEUE_FILE_LINES=$(& $Py -c $CountPy $Queue)" } else { "WRITE_REFUSED=True — 큐를 만들지 않았다. TotalCuLines=$TotalI(15 이상이어야 — HIT 유효 표본 하한) QueueExisted=$QueueExistedI(False여야 — 이미 있으면 [J-2]로 이어서 검수)" }
 ```
 
-**판정**: `QUEUE_WRITTEN=True`와 `QUEUE_LINES=` 뒤의 숫자 · `QUEUE_EXIT=0` · `QUEUE_FILE_LINES`가 같은 숫자. **그 숫자가 검수 완주 분모다** — 적어 두십시오. `CROSS_SEAT_DUP_SLUGS`는 보통 0이다(slug가 발문·정답·성취기준 코드의 해시라 좌석이 달라도 같은 글이면 같아진다 — `l3/equivalent/llm_generator.py:1210-1218` · 0이 아니면 회신에 적는다).
+**판정**: `QUEUE_WRITTEN=True`와 `QUEUE_LINES=` 뒤의 숫자 · `QUEUE_EXIT=0` · `QUEUE_FILE_LINES`가 같은 숫자. **그 숫자가 검수 완주 분모다** — 적어 두십시오. `SLUG_DUP`·`STRUCT_DUP`는 큐에서 뺀 건수다 — 0이 아니면 그 줄과 `queue_dropped_duplicates.jsonl` 줄 수를 회신에 적는다(EOS-197 산출물에 이 블록을 돌리면 `STRUCT_DUP=2 · QUEUE_LINES=28`이 나온다 — 검수 큐 7↔10·26↔30).
 
 ---
 

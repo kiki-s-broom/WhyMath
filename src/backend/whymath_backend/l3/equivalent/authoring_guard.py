@@ -141,6 +141,10 @@ class QuestionRelations:
     equations: tuple[str, ...]
     variables: frozenset[str]
     numbers: frozenset[sympy.Expr] = frozenset()
+    # 함수 정의 식 밖에 적힌 수(접점·시각 등)와, 함수 적용이 아닌 발문 고유 방정식 — 구조 중복
+    # 판정(EOS-204 `structural_dedup`)의 재료. 함수식의 계수는 `functions`가 이미 담는다.
+    point_numbers: frozenset[sympy.Expr] = frozenset()
+    own_equations: tuple[str, ...] = ()
 
     @property
     def empty(self) -> bool:
@@ -254,12 +258,16 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
     functions: list[tuple[str, sympy.Expr]] = []
     defined: dict[str, tuple[str, sympy.Expr]] = {}
     equations: list[str] = []
+    own_equations: list[str] = []
     variables: set[str] = set()
     text = _preprocess_question(question_text)
+    blanked = list(text)  # 함수 정의 식을 지운 사본 — 그 밖의 수가 '점'이다
     for match in re.finditer(r"(?<![<>!=])=(?!=)", text):
         pos = match.start()
-        lhs_raw = _strip_open(_scan(text, pos - 1, -1))
-        rhs_raw = _UNIT_TAIL.sub("", _scan(text, pos + 1, 1).strip())
+        lhs_span = _scan(text, pos - 1, -1)
+        rhs_span = _scan(text, pos + 1, 1)
+        lhs_raw = _strip_open(lhs_span)
+        rhs_raw = _UNIT_TAIL.sub("", rhs_span.strip())
         if not lhs_raw or not rhs_raw:
             continue
         head = _FUNCTION_HEAD.match(lhs_raw)
@@ -272,6 +280,8 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
                 # 함수 정의 `f(x) = …` — 매개변수(a·b)가 섞여도 된다.
                 functions.append((arg, rhs))
                 defined[name] = (arg, rhs)
+                for i in range(pos - len(lhs_span), pos + 1 + len(rhs_span)):
+                    blanked[i] = " "
                 continue
             if name in defined:
                 # 함수 적용 `f(a) = 10`·`f(1) = 0` — 정의된 함수에 인자를 넣은 방정식이다.
@@ -288,11 +298,45 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
         residual = sympy.expand(lhs - rhs)
         if not residual.free_symbols:
             continue
-        equations.append(f"{sympy.sstr(lhs)} = {sympy.sstr(rhs)}")
+        equation = f"{sympy.sstr(lhs)} = {sympy.sstr(rhs)}"
+        equations.append(equation)
+        if head is None and lhs_raw != "y":
+            own_equations.append(equation)
+            # 방정식의 계수는 정규형(`own_equations`)이 담는다 — 점 집합에 다시 세지 않는다.
+            for i in range(pos - len(lhs_span), pos + 1 + len(rhs_span)):
+                blanked[i] = " "
         variables.update(str(s) for s in residual.free_symbols)
     return QuestionRelations(
-        tuple(functions), tuple(equations), frozenset(variables), _question_numbers(text)
+        tuple(functions),
+        tuple(equations),
+        frozenset(variables),
+        _question_numbers(text),
+        _point_numbers("".join(blanked), functions),
+        tuple(own_equations),
     )
+
+
+def _point_numbers(
+    blanked: str, functions: Sequence[tuple[str, sympy.Expr]]
+) -> frozenset[sympy.Expr]:
+    """함수식 밖의 수 중 **함수에서 유도되는 값**(`점 (2, 3)`의 3 = f(2))을 뺀 것.
+
+    같은 문항을 `x좌표가 2인 점`과 `점 (2, 3)`으로 다르게 적어도 같은 점 집합 {2}가 되게 한다.
+    """
+    numbers = set(_question_numbers(blanked))
+    derived: set[sympy.Expr] = set()
+    for value in numbers:
+        for var, body in functions:
+            for other in numbers - {value}:
+                # 수는 절댓값이라 점·값의 부호를 모두 본다(`(-1, 3)`·`(1, -3)`).
+                for point in (other, -other):
+                    try:
+                        image = sympy.simplify(body.subs(sympy.Symbol(var), point))
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        continue
+                    if image in (value, -value):
+                        derived.add(value)
+    return frozenset(numbers - derived)
 
 
 # ── 검산식 근거 판정 ─────────────────────────────────────────────────────
