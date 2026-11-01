@@ -879,7 +879,10 @@ CATALOG: tuple[Spec, ...] = (
        # EOS-207 검산식 우회(동어반복) 판정 — 수용 게이트 통과가 실제 재계산이었는가를 가르는
        # 순수 판정기. 자동검증 1차 통과율(ops.g3_content_measures)이 소비하고 EOS-205가 생성
        # 단계 거부에 재사용한다(같은 생산 사슬의 검증 축).
-       "l3.equivalent.verify_bypass"),
+       "l3.equivalent.verify_bypass",
+       # EOS-205 LLM 저작 생성 단계 거부 규칙 — 검산식 근거(문항 함수 재계산)·정답 키 `answer`·
+       # 성취기준 유도 단원 코드·교육과정 범위 밖 방법. 소비자는 l3.equivalent.llm_generator.
+       "l3.equivalent.authoring_guard"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
        "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
