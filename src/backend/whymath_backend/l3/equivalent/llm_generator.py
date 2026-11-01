@@ -1016,7 +1016,7 @@ class LLMEquivalentProblemGenerator:
         answer_format = self._parse_answer_format(data.get("answer_format"), spec)
         standard_codes = self._parse_standard_codes(data.get("achievement_standard_codes"), spec)
         # EOS-205 ③ — 단원 코드는 LLM 출력을 읽지 않고 고정한다(운영자 지정 > 성취기준 유도).
-        unit_codes = self._unit_codes_for(standard_codes)
+        unit_codes = self._unit_codes_for(sorted(spec.achievement_standard_codes))
         # EOS-205 ④ — 해설·발문이 성취기준의 교육과정 범위 밖 방법(미적분Ⅰ의 이계도함수 등)을
         # 쓰면 거부한다. 판정 근거는 스펙이 아니라 *조립된* 성취기준(게이트가 스펙과 대조한다).
         scope = curriculum_method_violation(

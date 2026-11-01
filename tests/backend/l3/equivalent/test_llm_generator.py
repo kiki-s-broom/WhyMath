@@ -1513,3 +1513,16 @@ class TestEos205PromptVersion:
         assert "정답 변수 이름은 **반드시 `answer`**" in system
         assert "이계도함수(f″)를 쓰지 마세요" in system
         assert "단원 코드(unit_codes)는 넣지 마세요" in system
+
+
+def test_unit_codes_come_from_spec_not_llm_standard_codes() -> None:
+    """검토 8 — LLM이 성취기준 코드를 바꿔 내도 단원 코드는 스펙에서 유도한다."""
+    payload = json.loads(
+        _tangent_payload("answer == (2**3 - 5*2 + 2) - 2*(3*2**2 - 5)", {"answer": "-14"})
+    )
+    payload["achievement_standard_codes"] = ["[99가짜-01-01]"]
+    candidate = _gen(FakeProvider([json.dumps(payload, ensure_ascii=False)])).generate(
+        _calc1_spec()
+    )
+    assert candidate is not None
+    assert candidate.problem.unit_codes == ["12미적Ⅰ-02-05"]

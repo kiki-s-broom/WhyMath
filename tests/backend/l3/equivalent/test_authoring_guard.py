@@ -144,7 +144,11 @@ class TestGrounding:
 
     def test_latex_parenthesis_wrapper_is_read(self) -> None:
         relations = extract_question_relations("이차방정식 \\( x^2 - 5x + 6 = 0 \\)의 해는?")
-        assert relations.equations  # 짝 없는 여는 괄호를 벗겨 방정식을 읽는다
+        # 짝 없는 여는 괄호를 벗겨 방정식을 읽는다 — 비어 있지 않은 것만이 아니라 내용까지 본다.
+        assert relations.equations == ("x**2 - 5*x + 6 = 0",)
+        function_only = extract_question_relations("함수 \\( f(x) = x^3 - 3x \\)의 극댓값")
+        assert function_only.equations == ()  # `f*x = …` 방정식으로 오독하지 않는다
+        assert [str(expr) for _, expr in function_only.functions] == ["x**3 - 3*x"]
 
 
 class TestAnswerKey:
@@ -218,3 +222,99 @@ class TestCurriculumScope:
     def test_other_standards_are_not_checked(self) -> None:
         """범위 표가 없는 성취기준은 검사하지 않는다(미적분Ⅱ에서는 이계도함수가 범위 안)."""
         assert curriculum_method_violation(["[12미적Ⅱ-02-03]"], ["이계도함수 f''(x)"]) is None
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 독립 검토 지적 회귀(PR 전 검토 1~9번) — 과잉 거부·미탐 반례를 픽스처로 고정
+# ──────────────────────────────────────────────────────────────────────
+_TANGENT2_Q = (
+    "삼차함수 f(x) = x^3 - 6x^2 + 9x + 4 의 그래프 위의 점 (2, f(2))에서의 접선의 y절편을 구하시오."
+)
+
+
+class TestReviewRegressions:
+    @pytest.mark.parametrize(
+        ("question", "condition", "answer_map"),
+        [
+            # 1 — `^` 표기(오프셋이 밀려 부분식이 잘리던 결함)
+            (_TANGENT_Q, "answer == (2^3 - 5*2 + 2) - 2*(3*2^2 - 5)", {"answer": "-14"}),
+            # 3 — 점이 1이면 재진술 판정기가 0·1을 버려 정당한 식을 재진술로 읽던 결함
+            ("함수 f(x) = 2x^2 + 3 에서 f'(1)의 값", "answer == 4*1", {"answer": "4"}),
+            ("함수 f(x) = x^2 + 1 에서 f(1)의 값", "answer == 1**2 + 1", {"answer": "2"}),
+            ("이차방정식 x^2 - 2x - 3 = 0 의 큰 근", "(x - 3)*(x + 1) = 0", {"x": "3"}),
+            # 4 — LaTeX 구분자·중괄호·매개변수 함수
+            (
+                "함수 \\( f(x) = x^3 - 3x \\)의 극댓값",
+                "answer == (-1)**3 - 3*(-1)",
+                {"answer": "2"},
+            ),
+            ("함수 $f(x) = x^{3} - 3x$의 극댓값", "answer == (-1)**3 - 3*(-1)", {"answer": "2"}),
+            (
+                "f(x) = x^2 + ax + b 에 대하여 f(1) = 0, f(2) = 3 일 때",
+                ["1 + a + b = 0", "4 + 2*a + b = 3"],
+                {"a": "2", "b": "-3"},
+            ),
+            # 5 — 함수 적용 `f(a) = 10`(검산식 변수가 함수 변수와 다름)
+            ("f(x) = x^2 + 3x 에서 f(a) = 10인 양수 a", "a**2 + 3*a - 10 = 0", {"a": "2"}),
+            # 2의 대조군 — 기울기도 f′에 점을 대입해 쓰면 통과
+            (
+                _TANGENT2_Q,
+                "b == (2**3 - 6*2**2 + 9*2 + 4) - 2*(3*2**2 - 12*2 + 9)",
+                {"b": "12"},
+            ),
+        ],
+    )
+    def test_legitimate_recomputation_is_grounded(
+        self, question: str, condition: str | list[str], answer_map: dict[str, str]
+    ) -> None:
+        assert grounding_verdict(question, condition, answer_map).state is GroundingState.GROUNDED
+
+    @pytest.mark.parametrize(
+        ("question", "condition", "answer_map"),
+        [
+            # 2 — 근거 부분식 하나에 기대 중간값·정답을 박은 식
+            (_TANGENT2_Q, "b == (2**3 - 6*2**2 + 9*2 + 4) - (-3)*2", {"b": "12"}),
+            (_TANGENT2_Q, "b == (2**3 - 6*2**2 + 9*2 + 4) - 99 + 105", {"b": "12"}),
+            (_TANGENT2_Q, "b == 0*(2**3 - 6*2**2 + 9*2 + 4) + 12", {"b": "12"}),
+            # 6 — 발문의 `t = 3`(점 지정)을 방정식으로 끼워 넣어 재진술을 통과시키던 결함
+            (_VELOCITY_Q, ["t = 3", "v == 19"], {"v": "19"}),
+        ],
+    )
+    def test_padding_with_hardcoded_numbers_is_rejected(
+        self, question: str, condition: str | list[str], answer_map: dict[str, str]
+    ) -> None:
+        assert grounding_verdict(question, condition, answer_map).rejected is True
+
+    def test_function_variable_answer_is_renamed(self) -> None:
+        """7 — 극값을 함수 변수 `x`로 적은 답은 근이 아니므로 `answer`로 바꾼다."""
+        conditions, answer_map = normalize_answer_key(
+            "삼차함수 f(x) = x^3 - 3x의 극댓값을 구하시오.", "x == (-1)**3 - 3*(-1)", {"x": "2"}
+        )
+        assert answer_map == {ANSWER_KEY: "2"}
+        assert conditions == "answer == (-1)**3 - 3*(-1)"
+
+    @pytest.mark.parametrize(
+        "text",
+        ['f"(x) < 0', "h''(x) < 0", "d^2y/dx^2 < 0", "두 번 미분하면", "f^{\\prime\\prime}(x)"],
+    )
+    def test_second_derivative_notation_variants(self, text: str) -> None:
+        """9 — 표기 변형으로 교육과정 범위 검사를 우회하지 못한다."""
+        assert curriculum_method_violation(["[12미적Ⅰ-02-07]"], [text]) is not None
+
+    def test_ascii_roman_numeral_standard_is_checked(self) -> None:
+        assert curriculum_method_violation(["[12미적I-02-07]"], ["이계도함수"]) is not None
+
+
+def test_every_equation_must_be_grounded() -> None:
+    """등식 전부가 근거를 가져야 한다 — 근거 등식 하나에 재진술 등식을 덧붙인 반례(M14)."""
+    verdict = grounding_verdict(
+        _VELOCITY_Q, ["answer == 4*3 + 7", "answer == 19"], {"answer": "19"}
+    )
+    assert verdict.rejected is True
+
+
+def test_point_assignment_is_not_a_root_variable() -> None:
+    """발문의 `t=3`은 점 지정이지 방정식이 아니다 — 속도 답을 `t`로 적으면 `answer`로 바꾼다(M15)."""
+    conditions, answer_map = normalize_answer_key(_VELOCITY_Q, "t == 4*3 + 7", {"t": "19"})
+    assert answer_map == {ANSWER_KEY: "19"}
+    assert conditions == "answer == 4*3 + 7"
