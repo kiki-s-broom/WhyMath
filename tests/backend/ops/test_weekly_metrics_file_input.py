@@ -618,7 +618,9 @@ class TestAuthoringRunDirAutoGate:
         assert without.kpis["auto_gate_pass_rate"].measured is False  # 대조군 — 종전 그대로
         assert "EOS-207" in (without.kpis["auto_gate_pass_rate"].reason or "")
         assert with_dirs.kpis["auto_gate_pass_rate"].measured is True
-        assert with_dirs.kpis["rework_rate"].measured is False  # 다른 구조적 미측정은 그대로
+        # EOS-220: 같은 회차 폴더로 재작업률도 산출된다 — 대조군(폴더 없음)은 종전 그대로 미측정.
+        assert without.kpis["rework_rate"].measured is False
+        assert with_dirs.kpis["rework_rate"].measured is True
 
     def test_window_outside_round_is_unmeasured_not_zero(self) -> None:
         kpi = wmr.auto_gate_kpi_from_run_dirs(

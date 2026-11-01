@@ -196,5 +196,122 @@
         "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
       }
     }
+  },
+  {
+    "week_start": "2026-10-27T14:06:14.101338+00:00",
+    "week_end": "2026-10-28T07:52:53.299873+00:00",
+    "generated_at": "2026-11-01T14:18:33.989109+00:00",
+    "kpis": {
+      "hit_seconds": {
+        "measured": true,
+        "value": 53.2405,
+        "unit": "seconds_median",
+        "reason": null
+      },
+      "throughput_cu_per_hour": {
+        "measured": true,
+        "value": 40.856828216330854,
+        "unit": "cu_per_hour",
+        "reason": null
+      },
+      "unit_cost_krw": {
+        "measured": true,
+        "value": 5.232447733333333,
+        "unit": "krw_per_cu",
+        "reason": null
+      },
+      "failure_type_distribution": {
+        "measured": true,
+        "value": {
+          "F1": 0,
+          "F2": 0,
+          "F3": 0,
+          "F4": 0,
+          "F5": 0,
+          "F6": 0,
+          "F7": 0,
+          "F8": 2
+        },
+        "unit": "count_by_code",
+        "reason": null
+      },
+      "auto_gate_pass_rate": {
+        "measured": true,
+        "value": 0.11711711711711711,
+        "unit": "rate",
+        "reason": "재계산 검증 통과 13/111(모델 응답 수) · 검산식 우회 통과 22건 제외(원시 통과율 0.3153) · 게이트 앞 결정론 거부(파싱·조립) 22건은 분모 안 · 미생성 25건은 분모 밖 · 게이트 도달 기준 0.1461 · 창 밖 0건",
+        "detail": {
+          "numerator": 13,
+          "denominator": 111,
+          "denominator_basis": "모델 응답 수(게이트 도달 + 파싱 거부 + 조립 거부)",
+          "wilson_lower_95": 0.07579594073828778,
+          "wilson_sided": "one-sided",
+          "rate_raw": 0.3153153153153153,
+          "rate_gate_reached": 0.14606741573033707,
+          "bypassed": 22,
+          "not_generated_excluded": 25,
+          "outside_window": 0,
+          "run_dirs": [
+            "data/runs/eos197-a6-local",
+            "data/runs/eos197-a6-openrouter"
+          ],
+          "definition": "ops/g3_content_measures 모듈 docstring (a) · EOS-207"
+        }
+      },
+      "rework_rate": {
+        "measured": true,
+        "value": 0.6333333333333333,
+        "unit": "rate",
+        "reason": "재생성 ≥1 CU 19/30 · 2회+ 재생성 10/30(0.3333) · CU를 내지 못한 시도 49건은 비율 밖 · 슬롯 = 좌석×생성 주제 · 검수 반려 후 재저작은 기록 좌석 없어 미포함",
+        "detail": {
+          "numerator": 19,
+          "denominator": 30,
+          "wilson_upper_95": 0.7613432814865113,
+          "repeat_numerator": 10,
+          "repeat_rate": 0.3333333333333333,
+          "repeat_wilson_upper_95": 0.48340450854590433,
+          "wilson_sided": "one-sided",
+          "regenerations": 57,
+          "regeneration_distribution": {
+            "0": 11,
+            "1": 9,
+            "2": 4,
+            "3": 1,
+            "6": 2,
+            "7": 2,
+            "11": 1
+          },
+          "abandoned_attempts": 49,
+          "slots": 8,
+          "outside_window_cu": 0,
+          "run_dirs": [
+            "data/runs/eos197-a6-local",
+            "data/runs/eos197-a6-openrouter"
+          ],
+          "definition": "ops/weekly_metrics_report.measure_rework docstring · EOS-220",
+          "review_reauthoring": "미포함 — 검수 반려 후 재저작은 §6 동결 측정법 밖이고 회차 산출물에 기록 좌석 없음"
+        }
+      }
+    },
+    "harness": {
+      "incident_count": {
+        "measured": false,
+        "value": null,
+        "unit": "count",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      },
+      "max_series_nth": {
+        "measured": false,
+        "value": null,
+        "unit": "count",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      },
+      "rule_only_fix_ratio": {
+        "measured": false,
+        "value": null,
+        "unit": "ratio",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      }
+    }
   }
 ]
