@@ -183,8 +183,10 @@
 > `isabelle`(Apache License)이 빠져 있었다. 같은 오류가 문서 **4곳**에 있었고 전부 정정했다:
 > 이 표 · `license_snapshot_archive.md` 14행 · `01_data_foundation.md` L1 데이터셋 표 ·
 > `copyright_gradient.md` 등급 1 표. 코드측(`scripts/ops/license_snapshot_archiver.py`의
-> `license_label="MIT"`와 폴더 3종 주석)은 **아직 남아 있으며 `LIC-08`이 소유한다** —
-> 그 라벨은 `meta.json`에 기록되므로 스냅샷 메타 재생성 판정이 함께 걸려 문서 정정과 분리했다.
+> `license_label="MIT"`와 폴더 3종 주석)은 `LIC-08`이 정정했다(2026-11-01) — 라벨은 폴더별 4종
+> 표기가 됐고, 기존 스냅샷 `9b6de2b0a301c318.meta.json`의 `license_label="MIT"`는 첫 수집
+> 시점의 선언 기록이라 **고치지 않았다**(도구가 기존 스냅샷의 meta를 다시 쓰지 않으며, 재생성은
+> 증거 스냅샷 삭제를 요구한다). 즉 그 meta 한 건은 레지스트리와 의도적으로 어긋나 있다.
 > `copyright_guide_v2.md`의 "miniF2F / PutnamBench (MIT/Apache)"는 두 벤치마크를 묶은 표기라
 > 거짓이 아니므로 **의도적으로 두었다**.
 
