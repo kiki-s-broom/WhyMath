@@ -1,0 +1,1 @@
+{"ts": "2026-11-02T04:25:06+00:00", "actor": "claude/incident-bg-mirror-killed", "action": "incident_add", "id": "session-background-job-lifecycle", "cat": "B", "nth": 1, "fix_form": "none", "fix_ref": "", "title": "Bash 호출 안에서 &로 띄운 미러가 셸 종료와 함께 중단 — 로그만 남고 종료 기록 없음"}
