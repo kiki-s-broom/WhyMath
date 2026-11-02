@@ -23,8 +23,25 @@ eos_plan52_crosswalk_2026-09.md`·`docs/strategy/eos_transition_declaration_2026
     (EOS-207 — 정의·우회 검산식 제외 규칙은 `ops/g3_content_measures` 모듈 docstring (a)).
   - **재작업률** — Run 재생성 카운트 로그가 없다(EOS-55는 재현성 컬럼만 추가했고 재생성
     카운트 자체는 좌석 미착지 — `validation_scorecard.adapt_hit_cu_metrics` 독스트링 동일 판정).
+    **파일 입력 모드에서도 아직 그렇다.** `--authoring-run-dir`의 회차 폴더에 슬롯 기록
+    `cu.slots.jsonl`이 있으면 센다(EOS-220 — 정의 `measure_rework`). 저작 CLI가 그 파일을 아직
+    쓰지 않으므로 지금 회차들은 사유를 단 미측정이다(생성 로그만으로 세면 배치 순서에 좌우된다).
 이 둘은 DB 연결 성공 여부와 무관하게 `measured=False`로 낸다 — "0%"이 아니라
-"측정 불가"다(자동검증 1차 통과율만 위 `--authoring-run-dir` 예외).
+"측정 불가"다(파일 입력 모드의 `--authoring-run-dir` 예외만 산출 — 재작업률은 슬롯 기록이
+있을 때만).
+
+두 KPI의 레코드에는 `detail`(분자·분모·Wilson 단측 95% 경계·근거 회차 경로)이 붙는다 —
+1차 통과율은 하한(G4 판정 입력), 재작업률은 상한이다(`harness/wilson` 규약). 판정은 하지 않는다.
+
+주간 cron과 회차 측정의 관계 (EOS-220 ⑥ 판정)
+---------------------------------------------
+cron(`weekly-metrics.yml`)은 **DB 모드로 둔다** — `--authoring-run-dir`를 읽게 바꾸지 않는다.
+근거: ① cron 창은 실행 시각 기준 직전 7일인데 저작 회차 폴더는 회차가 끝난 뒤 PR로 커밋된다 —
+창과 커밋 시점이 어긋나 대부분의 주에 "창 안 응답 0건" 미측정이 나온다(값이 없는 행만 늘어난다)
+② 파일 입력 모드는 검수 이벤트 파일(`--events-jsonl`)을 함께 요구하는데 cron에는 그 입력을 고를
+기준이 없다 ③ 회차 측정은 회차의 창(산출물 시각의 최소~최대)으로 재야 의미가 있다. 그래서 회차
+측정은 **회차마다 파일 입력 모드로 한 번** 원장에 기록하고, 그 레코드를 `generated_at`으로
+지목한다(EOS-197 ⑦(d) 선례). cron이 덧붙이는 레코드는 두 KPI가 미측정이어도 정상이다.
 
 나머지 4종(HIT·처리량·단위비용·실패유형분포)은 `review_timer_event`·`generation_log`
 테이블에서 실시간 계산한다(집계 수식은 재발명하지 않고 `ops.hit_cu_metrics.aggregate`를
@@ -87,6 +104,7 @@ import asyncio
 import json
 import logging
 import sys
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -101,8 +119,13 @@ from whymath_backend.db.models.review_timer_event import (
     ReviewTimerEvent as OrmReviewTimerEvent,
 )
 from whymath_backend.harness.review_timer import load_events_jsonl
+from whymath_backend.harness.wilson import wilson_upper_bound
 from whymath_backend.l3.pregenerate.provenance_bridge import load_generation_logs_jsonl
-from whymath_backend.ops.g3_content_measures import load_run_dir, measure_auto_gate
+from whymath_backend.ops.g3_content_measures import (
+    RunDirInput,
+    load_run_dir,
+    measure_auto_gate,
+)
 from whymath_backend.ops.hit_cu_metrics import HitCuReport, aggregate
 from whymath_backend.schema.provenance import GenerationLog as SchemaGenerationLog
 from whymath_backend.schema.review_timer import ReviewTimerEvent as SchemaReviewTimerEvent
@@ -116,6 +139,9 @@ __all__ = [
     "KpiValue",
     "WeeklyRecord",
     "auto_gate_kpi_from_run_dirs",
+    "ReworkMeasure",
+    "measure_rework",
+    "rework_kpi_from_run_dirs",
     "build_record_from_report",
     "collect",
     "collect_from_files",
@@ -149,27 +175,36 @@ STRUCTURALLY_UNMEASURED: dict[str, str] = {
     ),
     "rework_rate": (
         "Run 재생성 카운트 로그 없음 — EOS-55는 재현성 컬럼만 추가·재생성 카운트 로그는 "
-        "좌석 미착지(2026-09-11 실측)"
+        "좌석 미착지(2026-09-11 실측) · 파일 입력 모드는 --authoring-run-dir 회차 폴더의 "
+        "cu.slots.jsonl(슬롯 기록)에서 산출(EOS-220)"
     ),
 }
 
 
 @dataclass(frozen=True, slots=True)
 class KpiValue:
-    """KPI 1건의 판정 — `measured=False`면 `value`는 항상 `None`(0으로 위장 금지)."""
+    """KPI 1건의 판정 — `measured=False`면 `value`는 항상 `None`(0으로 위장 금지).
+
+    `detail`(EOS-220)은 값의 근거(분자·분모·Wilson 경계·근거 회차 경로)를 구조로 싣는다.
+    **있을 때만** JSON에 나간다 — 종전 레코드와 4종 KPI의 4키 모양을 바꾸지 않기 위해서다.
+    """
 
     measured: bool
     value: float | dict[str, int] | None
     unit: str
     reason: str | None = None
+    detail: dict[str, Any] | None = None
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "measured": self.measured,
             "value": self.value,
             "unit": self.unit,
             "reason": self.reason,
         }
+        if self.detail is not None:
+            out["detail"] = self.detail
+        return out
 
 
 # 하네스 지표 3종 (HARN-118 ③) — EOS-51 §6의 "기술 KPI 6종"과 **별개 블록**이다.
@@ -286,6 +321,7 @@ def build_record_from_report(
     db_failure_reason: str | None = None,
     harness: dict[str, KpiValue] | None = None,
     auto_gate: KpiValue | None = None,
+    rework: KpiValue | None = None,
 ) -> WeeklyRecord:
     """`HitCuReport`(또는 DB 실패 시 `None`) → `WeeklyRecord`. 순수 함수 — I/O 0.
 
@@ -293,6 +329,7 @@ def build_record_from_report(
     `db_failure_reason`으로 미측정 처리한다 — 나머지 2종은 원래도 미측정이다.
     `auto_gate`를 주면(파일 입력 모드 `--authoring-run-dir` · EOS-207) 자동검증 1차 통과율의
     구조적 미측정을 그 값으로 바꾼다 — 그 값 자신이 `measured=False`일 수 있다(회계 불일치 등).
+    `rework`(EOS-220)도 같은 규칙으로 재작업률을 바꾼다.
     """
     kpis: dict[str, KpiValue] = {}
 
@@ -416,6 +453,8 @@ def build_record_from_report(
         kpis[name] = KpiValue(measured=False, value=None, unit="rate", reason=reason)
     if auto_gate is not None:
         kpis["auto_gate_pass_rate"] = auto_gate
+    if rework is not None:
+        kpis["rework_rate"] = rework
 
     assert set(kpis) == set(KPI_NAMES), f"KPI 누락/초과: {set(kpis) ^ set(KPI_NAMES)}"
 
@@ -679,6 +718,22 @@ def auto_gate_kpi_from_run_dirs(
         measured=True,
         value=measure.rate,
         unit="rate",
+        # G4 판정 입력(EOS-220 ①) — 판정 형식은 Wilson 단측 95% 하한(높을수록 좋은 지표).
+        # 판정 자체는 하지 않는다(문턱은 게이트가 정한다).
+        detail={
+            "numerator": measure.recomputed,
+            "denominator": measure.responded,
+            "denominator_basis": "모델 응답 수(게이트 도달 + 파싱 거부 + 조립 거부)",
+            "wilson_lower_95": measure.wilson_lower,
+            "wilson_sided": "one-sided",
+            "rate_raw": measure.rate_raw,
+            "rate_gate_reached": measure.rate_gate_reached,
+            "bypassed": measure.bypassed,
+            "not_generated_excluded": measure.failure_kinds.get("not_generated", 0),
+            "outside_window": measure.outside_window,
+            "run_dirs": [str(path) for path in run_dirs],
+            "definition": "ops/g3_content_measures 모듈 docstring (a) · EOS-207",
+        },
         reason=(
             f"재계산 검증 통과 {measure.recomputed}/{measure.responded}(모델 응답 수) · 검산식 "
             f"우회 통과 {measure.bypassed}건 제외(원시 통과율 {_fmt_rate(measure.rate_raw)}) · "
@@ -695,6 +750,220 @@ def _fmt_rate(value: float | None) -> str:
     return "산출 불가(분모 0)" if value is None else f"{value:.4f}"
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 재작업률 (EOS-220 ②) — 정의는 아래 `measure_rework` docstring이 정본
+# ──────────────────────────────────────────────────────────────────────────
+#: 회차 폴더의 슬롯 기록 좌석(append-only JSONL). **생성기가 아직 쓰지 않는다** — 쓰기 배선은
+#: 저작 쪽(l3/equivalent · harness/authoring_round) 소관이라 이 태스크 범위 밖이다(EOS-220 인계).
+SLOT_LOG_FILE = "cu.slots.jsonl"
+_CU_FILE_NAME = "cu.jsonl"
+_SLOT_OUTCOMES = frozenset({"cu", "not_cu"})
+_NO_SLOT_SEAT_REASON = (
+    f"슬롯 기록 좌석 없음({SLOT_LOG_FILE}) — 저작 CLI는 주제마다 시도를 독립 배치로 뽑고 "
+    "'몇 번째 CU를 위한 시도인가'를 남기지 않아 CU별 재생성 수가 정의되지 않는다"
+    "(생성 로그만으로 세면 값이 배치 안 순서에 좌우된다 · EOS-220)"
+)
+
+
+def _moment(raw: object) -> datetime | None:
+    """ISO8601 → aware datetime. 비었거나 형식이 틀리면 None(호출측이 측정 실패로 친다)."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        moment = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+@dataclass(slots=True)
+class ReworkMeasure:
+    """재작업률 측정 결과. `measured=False`면 `rate`는 None이다(0으로 위장 금지)."""
+
+    cu_count: int = 0  # 분모 — 창 안에서 채워진(CU가 나온) 슬롯 수
+    rework_cu: int = 0  # 재생성 ≥1 CU
+    repeat_cu: int = 0  # 재생성 ≥2 CU (§6 "2회+ 재생성")
+    regenerations: int = 0  # 창 안 CU의 재생성 합
+    open_slots: int = 0  # 아직 CU가 나오지 않은 슬롯(비율 밖 · 따로 센다)
+    outside_window_cu: int = 0
+    slots: int = 0
+    distribution: dict[int, int] = field(default_factory=dict)  # 재생성 횟수 → CU 수
+    errors: list[str] = field(default_factory=list)
+
+    @property
+    def measured(self) -> bool:
+        return not self.errors and self.cu_count > 0
+
+    @property
+    def rate(self) -> float | None:
+        return self.rework_cu / self.cu_count if self.measured else None
+
+    @property
+    def repeat_rate(self) -> float | None:
+        return self.repeat_cu / self.cu_count if self.measured else None
+
+    @property
+    def reason(self) -> str | None:
+        if self.errors:
+            return (
+                f"입력·회계 오류 {len(self.errors)}건 — 부분 입력으로 판정하지 않는다"
+                f"(첫 사유: {self.errors[0]})"
+            )
+        if self.cu_count == 0:
+            return "창 안 CU 0건 — 분모 0(재작업률 미산출)"
+        return None
+
+
+def _slot_rows(run: RunDirInput, path: Path, errors: list[str]) -> list[dict[str, Any]]:
+    """슬롯 기록 1개 좌석 → 검증된 행. 오류는 `errors`에 남기고 그 행은 버린다(호출측이 미측정)."""
+    if not path.is_file():
+        errors.append(f"{run.name}: {_NO_SLOT_SEAT_REASON}")
+        return []
+    rows: list[dict[str, Any]] = []
+    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        where = f"{run.name}/{SLOT_LOG_FILE}:{line_no}"
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{where} JSON 파싱 실패 — {type(exc).__name__}")
+            continue
+        if not isinstance(row, dict):
+            errors.append(f"{where} 객체가 아님({type(row).__name__})")
+            continue
+        slot_id, attempt, outcome = row.get("slot_id"), row.get("attempt"), row.get("outcome")
+        if not isinstance(slot_id, str) or not slot_id.strip():
+            errors.append(f"{where} slot_id 없음")
+        elif isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+            errors.append(f"{where} attempt가 1 이상 정수가 아님({attempt!r})")
+        elif outcome not in _SLOT_OUTCOMES:
+            errors.append(f"{where} outcome이 cu/not_cu가 아님({outcome!r})")
+        elif _moment(row.get("recorded_at")) is None:
+            errors.append(f"{where} recorded_at 없음·형식 오류")
+        elif outcome == "cu" and not isinstance(row.get("cu_slug"), str):
+            errors.append(f"{where} CU 행에 cu_slug 없음")
+        else:
+            rows.append(row)
+    return rows
+
+
+def measure_rework(
+    run_dirs: list[Path], *, window: tuple[datetime, datetime] | None = None
+) -> ReworkMeasure:
+    """저작 회차 폴더들 → 재작업률.
+
+    정의 (EOS-51 §6 동결 측정법 "Run 로그 재생성 카운트")
+    -------------------------------------------------
+    - **CU 슬롯** = 생성기가 "CU 1건을 만들려고" 연 자리. 슬롯 안의 시도는 직전 시도가 CU가
+      되지 못해서 **다시 돌린 것**이다(독립 추출이 아니다).
+    - **재생성** = CU가 나온 슬롯의 (CU가 나온 시도 번호 − 1). **재작업률** = 재생성 ≥1 CU ÷ CU
+      수. **2회+ 재생성률** = 재생성 ≥2 CU ÷ CU 수. CU가 아직 안 나온 슬롯은 비율 밖이고 따로 센다.
+    - **창** = CU 행의 `recorded_at`으로 판정한다.
+
+    근거 로그 = 회차 폴더의 `cu.slots.jsonl`(append-only · 1행 1시도):
+    `{"slot_id": str, "attempt": int(1부터), "outcome": "cu"|"not_cu", "cu_slug": str|null,
+    "recorded_at": ISO8601}`. 생성 로그(`cu.genlog.jsonl`)로는 세지 않는다 — 저작 CLI는 주제마다
+    시도를 독립 배치로 뽑으므로, 생성 시각 순서로 "CU 앞의 실패"를 재생성이라 부르면 값이 배치 안
+    순서라는 우연에 좌우된다(2026-11-01 독립 검토 실측 · EOS-220). 검수 대기(`needs_review`)도
+    사람 승인으로 나중에 CU가 될 수 있어 "다시 돌린 시도"가 아니다.
+
+    측정 실패(`measured=False`): 좌석 없음 · 행 형식 오류 · 슬롯의 시도 번호가 1..k로 이어지지
+    않음 · CU가 슬롯의 마지막 시도가 아님 · 한 슬롯에 CU 2건 · CU 행 slug 다중집합 ≠ `cu.jsonl`
+    slug 다중집합 · 회차 폴더 로드 오류 · 창 안 CU 0건. 범위 밖: "검수 반려 후 재저작"은 §6 동결
+    측정법이 아니고 기록 좌석도 없다.
+    """
+    measure = ReworkMeasure()
+    distribution: Counter[int] = Counter()
+    for path in run_dirs:
+        run = load_run_dir(path)
+        measure.errors.extend(run.errors)
+        rows = _slot_rows(run, path / SLOT_LOG_FILE, measure.errors)
+        by_slot: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            by_slot.setdefault(str(row["slot_id"]), []).append(row)
+        cu_slugs: Counter[str] = Counter()
+        for slot_id, attempts in by_slot.items():
+            numbers = sorted(int(r["attempt"]) for r in attempts)
+            if numbers != list(range(1, len(numbers) + 1)):
+                measure.errors.append(
+                    f"{run.name} 슬롯 {slot_id} 시도 번호가 1..k로 이어지지 않음({numbers})"
+                )
+                continue
+            cus = [r for r in attempts if r["outcome"] == "cu"]
+            if len(cus) > 1:
+                measure.errors.append(f"{run.name} 슬롯 {slot_id} CU {len(cus)}건")
+                continue
+            measure.slots += 1
+            if not cus:
+                measure.open_slots += 1
+                continue
+            cu = cus[0]
+            if int(cu["attempt"]) != len(numbers):
+                measure.errors.append(f"{run.name} 슬롯 {slot_id} CU 뒤에 시도가 더 있음")
+                continue
+            cu_slugs[str(cu["cu_slug"])] += 1
+            moment = _moment(cu["recorded_at"])
+            if window is not None and not (moment is not None and window[0] <= moment < window[1]):
+                measure.outside_window_cu += 1
+                continue
+            regen = int(cu["attempt"]) - 1
+            measure.cu_count += 1
+            measure.regenerations += regen
+            distribution[regen] += 1
+            if regen >= 1:
+                measure.rework_cu += 1
+            if regen >= 2:
+                measure.repeat_cu += 1
+        stored: Counter[str] = Counter(
+            r["slug"] for r in run.cu_rows if isinstance(r.get("slug"), str)
+        )
+        if rows and cu_slugs != stored:
+            measure.errors.append(
+                f"{run.name} 회계 불일치 — 슬롯 CU {sum(cu_slugs.values())}건 ↔ "
+                f"{_CU_FILE_NAME} {sum(stored.values())}건"
+            )
+    measure.distribution = dict(sorted(distribution.items()))
+    return measure
+
+
+def rework_kpi_from_run_dirs(
+    run_dirs: list[Path], *, week_start: datetime, week_end: datetime
+) -> KpiValue:
+    """저작 회차 폴더들 → 재작업률 KPI(EOS-220). 정의는 `measure_rework` docstring."""
+    measure = measure_rework(run_dirs, window=(week_start, week_end))
+    if not measure.measured:
+        return KpiValue(measured=False, value=None, unit="rate", reason=measure.reason)
+    return KpiValue(
+        measured=True,
+        value=measure.rate,
+        unit="rate",
+        # 낮을수록 좋은 지표 — 판정 형식은 Wilson 단측 95% **상한**(harness/wilson 규약).
+        detail={
+            "numerator": measure.rework_cu,
+            "denominator": measure.cu_count,
+            "wilson_upper_95": wilson_upper_bound(measure.rework_cu, measure.cu_count),
+            "repeat_numerator": measure.repeat_cu,
+            "repeat_rate": measure.repeat_rate,
+            "repeat_wilson_upper_95": wilson_upper_bound(measure.repeat_cu, measure.cu_count),
+            "wilson_sided": "one-sided",
+            "regenerations": measure.regenerations,
+            "regeneration_distribution": {str(k): v for k, v in measure.distribution.items()},
+            "open_slots": measure.open_slots,
+            "slots": measure.slots,
+            "outside_window_cu": measure.outside_window_cu,
+            "run_dirs": [str(path) for path in run_dirs],
+            "definition": "ops/weekly_metrics_report.measure_rework docstring · EOS-220",
+        },
+        reason=(
+            f"재생성 ≥1 CU {measure.rework_cu}/{measure.cu_count} · 2회+ 재생성 "
+            f"{measure.repeat_cu}/{measure.cu_count}({_fmt_rate(measure.repeat_rate)}) · "
+            f"CU 미산출 슬롯 {measure.open_slots}건은 비율 밖 · "
+            "검수 반려 후 재저작은 기록 좌석 없어 미포함"
+        ),
+    )
+
+
 def collect_from_files(
     *,
     events_paths: list[Path],
@@ -709,10 +978,16 @@ def collect_from_files(
     """파일 입력 모드의 `collect` — 같은 `build_record_from_report`로 같은 형태의 레코드를 낸다.
 
     `authoring_run_dirs`(EOS-207)를 주면 자동검증 1차 통과율을 그 수용 게이트 로그로 낸다.
-    None이면 종전대로 구조적 미측정이다(빈 목록과 구분하지 않는다 — 둘 다 입력 없음).
+    재작업률도 같은 폴더의 슬롯 기록(`cu.slots.jsonl`)으로 낸다(EOS-220). None이면 종전대로 구조적
+    미측정이다(빈 목록과 구분하지 않는다 — 둘 다 입력 없음).
     """
     auto_gate = (
         auto_gate_kpi_from_run_dirs(authoring_run_dirs, week_start=week_start, week_end=week_end)
+        if authoring_run_dirs
+        else None
+    )
+    rework = (
+        rework_kpi_from_run_dirs(authoring_run_dirs, week_start=week_start, week_end=week_end)
         if authoring_run_dirs
         else None
     )
@@ -733,6 +1008,7 @@ def collect_from_files(
         db_failure_reason=failure,
         harness=harness,
         auto_gate=auto_gate,
+        rework=rework,
     )
     return record, summary
 
@@ -855,8 +1131,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m whymath_backend.ops.weekly_metrics_report",
         description=(
             "EOS-51 §6 기술 KPI 6종을 지난 7일 창으로 집계해 metrics/weekly.json에 "
-            "append한다(OPS-56). 재작업률은 이 저장소에 집계 대상 로그가 아직 없어 구조적으로 "
-            "미측정이다. 자동검증 1차 통과율은 파일 입력 모드의 --authoring-run-dir로만 산출한다."
+            "append한다(OPS-56). 자동검증 1차 통과율·재작업률은 DB에 집계 대상 로그가 없어 "
+            "파일 입력 모드의 --authoring-run-dir로만 산출한다(EOS-207·EOS-220)."
         ),
     )
     parser.add_argument(
@@ -911,7 +1187,8 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             "저작 회차 폴더(반복 가능 · cu.jsonl·cu.review.jsonl·cu.genlog.jsonl). 주면 "
-            "자동검증 1차 통과율을 그 수용 게이트 로그로 산출한다(EOS-207). "
+            "자동검증 1차 통과율을 그 수용 게이트 로그로(EOS-207), 재작업률을 슬롯 기록 "
+            "cu.slots.jsonl로(EOS-220 · 없으면 미측정) 산출한다. "
             "--events-jsonl과 함께만 쓴다"
         ),
     )
