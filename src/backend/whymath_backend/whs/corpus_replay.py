@@ -87,6 +87,10 @@ class ReplayItem:
     conditions: str
     answer_map: dict[str, str]
     steps: tuple[str, ...]  # 길이 ≥ 2(전이 ≥ 1) — 로더가 필터
+    # P3-95: 개념형 답(예 real_root_count — 답이 근이 아니라 개수)은 answer_map이 비어 있다.
+    # 그때 finalize는 `answer_kind` 검증기로 레코드의 `answer`(주장 답)를 검산한다.
+    answer_kind: str | None = None
+    claimed_answer: str | None = None
 
 
 def load_replay_items(jsonl_text: str) -> list[ReplayItem]:
@@ -119,9 +123,27 @@ def load_replay_items(jsonl_text: str) -> list[ReplayItem]:
                 conditions=conditions,
                 answer_map={str(k): str(v) for k, v in answer_map.items()},
                 steps=tuple(str(s) for s in steps),
+                answer_kind=_answer_kind(verify),
+                claimed_answer=_claimed_answer(record, verify),
             )
         )
     return items
+
+
+def _answer_kind(verify: dict[str, Any]) -> str | None:
+    """`verify.answer_kind`(개념형 검증기 키) — 문자열이 아니거나 비면 None(값형)."""
+    kind = verify.get("answer_kind")
+    return kind if isinstance(kind, str) and kind.strip() else None
+
+
+def _claimed_answer(record: dict[str, Any], verify: dict[str, Any]) -> str | None:
+    """개념형 문항의 주장 답 = 레코드 최상위 `answer` 원문. 값형이면 None(answer_map이 맡는다)."""
+    if _answer_kind(verify) is None:
+        return None
+    answer = record.get("answer")
+    if isinstance(answer, bool) or not isinstance(answer, (str, int)):
+        return None
+    return str(answer)
 
 
 def corrupt_final_step(steps: tuple[str, ...] | list[str]) -> str | None:
@@ -242,6 +264,8 @@ class ChainReplayPolicy:
                 answer=dict(self._item.answer_map),
                 steps=list(self._item.steps),
                 strategy_tag="corpus-replay",
+                answer_kind=self._item.answer_kind,
+                claimed_answer=self._item.claimed_answer,
             )
         raise AssertionError(f"미지 명세: {spec!r}")  # pragma: no cover - 빌더와 짝
 
