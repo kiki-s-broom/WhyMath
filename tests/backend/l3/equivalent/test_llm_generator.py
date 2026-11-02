@@ -1563,21 +1563,28 @@ class TestEos212ErrorDetail:
         assert detail == "후보 조립 실패: ValueError"
         assert "LLM 답" not in detail
 
-    def test_new_details_classify_like_old_ones(self) -> None:
-        """② — 측정기 앞머리 분류는 꼬리가 바뀌어도 같다(옛 형식·새 형식 짝 대조)."""
+    def test_generator_outputs_classify_into_the_three_kinds(self) -> None:
+        """② — **실제 생성기가 낸** error_detail이 측정기 분류 세 갈래로 간다(손으로 쓴 문자열 아님)."""
         from whymath_backend.ops.g3_content_measures import classify_failure
 
-        pairs = [
-            ("provider.generate failed: ReadTimeout: ", "provider.generate failed: ReadTimeout"),
-            (
-                f"provider.generate failed: SeatHttpError: HTTP 429: {_BODY_MARKER}",
-                "provider.generate failed: SeatHttpError(HTTP 429)",
-            ),
-            ("후보 조립 실패: ValidationError", "후보 조립 실패: ValidationError(errors=2)"),
-            ("응답 JSON 파싱 실패", "응답 JSON 파싱 실패"),
+        def detail_of(provider: object) -> str:
+            logs: list[object] = []
+            assert _gen(provider, generation_log_sink=logs.append).generate(_spec()) is None
+            return str(logs[0].error_detail)  # type: ignore[attr-defined]
+
+        http = SeatHttpError(f"HTTP 429: {_BODY_MARKER}", status_code=429)
+        mismatch = json.loads(_HAPPY)
+        mismatch["answer_map"] = {"x": "2"}  # derive-and-verify 불일치 → 조립 실패
+        cases = [
+            (_ScriptedRaisingProvider(http), "not_generated"),
+            (_ScriptedRaisingProvider(RuntimeError(_BODY_MARKER)), "not_generated"),
+            (FakeProvider(["이건 JSON이 아니다"]), "parse_rejected"),
+            (FakeProvider([json.dumps(mismatch, ensure_ascii=False)]), "assembly_rejected"),
         ]
-        for old, new in pairs:
-            assert classify_failure(old) == classify_failure(new) != "unknown"
+        for provider, kind in cases:
+            detail = detail_of(provider)
+            assert classify_failure(detail) == kind, detail
+            assert _BODY_MARKER not in detail
 
     def test_recorded_eos197_round_classification_is_pinned(self) -> None:
         """② — 기존 회차 산출물의 분류 결과를 고정한다(형식 변경이 과거 측정을 바꾸지 않는다)."""
@@ -1622,3 +1629,18 @@ def test_assembly_validation_failure_records_error_count_not_input(
     detail = logs[0].error_detail  # type: ignore[attr-defined]
     assert detail == "후보 조립 실패: ValidationError(errors=1)"
     assert _BODY_MARKER not in detail
+
+
+def test_status_code_subclass_is_folded_to_plain_int() -> None:
+    """검토 4 — `__str__`을 바꾼 int 하위 클래스 상태코드가 요약에 임의 문자열을 싣지 못한다."""
+
+    class _LoudInt(int):
+        def __str__(self) -> str:
+            return _BODY_MARKER
+
+        def __format__(self, spec: str) -> str:
+            return _BODY_MARKER
+
+    exc = RuntimeError("x")
+    exc.status_code = _LoudInt(503)  # type: ignore[attr-defined]
+    assert llm_generator._safe_exc_summary(exc) == "RuntimeError(HTTP 503)"

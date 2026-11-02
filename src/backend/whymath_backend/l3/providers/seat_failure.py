@@ -133,7 +133,8 @@ def http_status_of(exc: BaseException) -> int | None:
         candidates.append(getattr(response, "status_code", None))
     for value in candidates:
         if isinstance(value, int) and not isinstance(value, bool):
-            return value
+            # int 하위 클래스가 `__str__`을 바꿔도 로그에 임의 문자열이 찍히지 않게 정수로 접는다.
+            return int(value)
     return None
 
 
