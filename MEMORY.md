@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-02 (측정·결정 · EOS-203 로컬 좌석 사고 모드 켬/끔): **켬 5/12(41.7%) · 끔 7/12(58.3%) — 기본값 유지(종전 동작) · `/no_think` 소프트 스위치는 토큰 비 0.935로 사실상 무효 → 후속 `EOS-235`** (Kiki PC 실행, claude 기록) — 판정 기준: main `910e7644`
+
+- **무엇을**: `python -m whymath_backend.harness.local_thinking_probe`로 EOS-197 A6 스펙 4종 × 3회 × 2모드(default·off) = 24회를 로컬 `qwen3:30b-a3b`(Ollama 타임아웃 180초)에서 번갈아 실행(`run_id=c51b5fbadc85` · `PROBE_EXIT=0`). 같은 실행으로 EOS-205 수정 후 수치도 쟀다.
+- **값**: 켬 5/12 · 중앙 64.4초 · 토큰 3,388.5 · 실패 ReadTimeout 2·ValueError 1 / 끔 7/12 · 55.8초 · 3,167 · JSON 파싱 1 / Fisher p = 0.68(차이 판정 불가) · 토큰 비 0.935 · 합계 12/24(50.0%, 수정 전 EOS-197 로컬 3/45 — 타임아웃 변경 동반이라 원인 분리 불가) · 동어반복·교육과정 밖 거부 0건.
+- **근거 커밋**: 기록 `docs/reviews/eos203_local_seat_thinking_probe_2026-11-02.md` · EOS-205 리뷰 3절 갱신 · 구현 `910e7644`(#1825).
+
 ### 2026-11-02 (결정 · D6 후속 — Kiki 권고 승인): **`KOGL_1`·`CC_BY` = Tier 1 · `CC_BY_SA` = Tier 2 · SA 충돌 정리(긁어 온 SA = Tier 0, 정상 취득 SA = Tier 2) · `EOS-231` P2 유지** (Kiki 결정, claude 기록) — 판정 기준: main `2c6357e3`
 
 - **무엇을**: EOS-224 대응표(`docs/data/licensing_safety.md` 「Tier 0~3 ↔ LicenseType 매핑」)의 판정 필요 중 실제로 쓰일 3값을 세션 권고대로 확정. 판정 필요는 LicenseType 16→13값.
