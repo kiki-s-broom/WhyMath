@@ -885,7 +885,7 @@ CATALOG: tuple[Spec, ...] = (
        "l3.equivalent.authoring_guard",
        # EOS-204 저작 산출물 구조적 중복 사전 차단 — 검수 큐 진입 전 같은 좌석·좌석 간 중복 CU를
        # 구조 서명(묻는 것·도함수·방정식·점·정답)으로 걸러 제외 목록과 함께 낸다. 소비자는 런북 [I]
-       # 수동 경로 CLI(기본 경로 harness.authoring_round 연결은 PR #1806 머지 뒤).
+       # 수동 경로 CLI와 기본 경로 harness.authoring_round(stage_queue·assemble_queue).
        "l3.equivalent.structural_dedup"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
        "Admin", "Math Engine", "P0",

@@ -277,6 +277,17 @@ def test_assemble_queue_interleaves_and_dedupes() -> None:
     assert dup == 1
 
 
+def test_assemble_queue_drops_structural_duplicates() -> None:
+    """EOS-204 — slug가 달라도 표기만 다른 같은 문항(구조 서명 일치)은 한 번만 싣는다."""
+    same_a = "y = x^3 - 6x^2 + 9x + 1 의 그래프 위의 점 중 x좌표가 2인 점에서의 접선의 y절편"
+    same_b = "f(x) = x^3 - 6x^2 + 9x + 1 의 그래프 위의 점 (2, 3)에서 그은 접선의 y절편"
+    a = [json.dumps({"slug": "p", "question_text": same_a, "answer": "9"}, ensure_ascii=False)]
+    b = [json.dumps({"slug": "q", "question_text": same_b, "answer": "9"}, ensure_ascii=False)]
+    out, dup = ar.assemble_queue([a, b])
+    assert [json.loads(x)["slug"] for x in out] == ["p"]
+    assert dup == 1
+
+
 def test_parse_porcelain_z_handles_rename_and_untracked() -> None:
     raw = "?? data/runs/x/cu.jsonl\0R  new.txt\0old.txt\0 M README.md\0"
     assert ar.parse_porcelain_z(raw) == [
