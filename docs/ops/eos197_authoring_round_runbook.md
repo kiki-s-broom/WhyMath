@@ -365,11 +365,15 @@ if ($Py -and $Runs) { "LOCAL_LINES=$(& $Py -c $CountPy $LocalOut) LOCAL_FILES=$(
 
 - **목표 15행**에 닿을 때까지 회차를 덧붙인다. 회차 크기 = `min(20, (15 − 현재 행 수) × 2)`(최소 5) · **시도 상한 45건**(수용률이 낮아도 끝없이 돌지 않는다).
 - 인자: `--authoring-tier quality`(라우터 규칙이 로컬 QUALITY = `qwen3:30b-a3b`를 고른다 · MP-02 실측 채택) · `--avoid-recent 10`(회차 내 자기 중복 회피 · MP-02 3회차에서 중복 0) · `--spec-file`(A6 spec 4종 순환) · `--seed` 3종(기존 A6·미적분 자산과의 중복 차단) · `--canary 0 --abort-window 0`(회차가 20건 이하라 두 관문이 판정하지 않는다 — 꺼 둔 사실을 회차 대장에 그대로 남긴다).
+- **Ollama 요청 타임아웃 180초**(EOS-203 ③): 기본 30초로는 첫 회차가 `ReadTimeout`으로 공전했다(사고 모드 출력 4,400~8,100토큰). 이 블록이 `WHYMATH_OLLAMA_REQUEST_TIMEOUT_S`를 180으로 두고, **설정이 실제로 읽는 값**(`get_settings().ollama_request_timeout_s`)을 다시 읽어 180 이상일 때만 실행한다 — 환경변수가 먹지 않아 30초로 남으면 `TimeoutS=30`으로 보이고 거부된다. 값은 한 줄 실행 설정(`docs/ops/authoring_round_eos197.yaml`의 `ollama_request_timeout_s: 180`)과 같다. 판정은 파이썬이 비교한 `True`/`False`로 한다(숫자를 PowerShell에서 변환하지 않는다 — 경고 줄이 섞이면 변환이 깨진다). **이 환경변수는 같은 창의 다음 블록([G] 등)에도 남는다** — 클라우드 좌석은 Ollama를 쓰지 않으므로 영향이 없고, 창을 닫으면 사라진다.
 - `--subscription`·`--budget-krw`를 **주지 않는다** — 그러면 라우터가 로컬로 강제한다([C]의 `CLOUD_REACH_DEFAULT=False`가 그 증거). 이 블록은 그 사실을 **쓰기 직전에 다시 계산**한다(`LocalOnly` — `authoring_can_reach_cloud(None, None)`이 False이고, [F]와 같은 조립 함수의 라우팅 결정이 `local`인가). [C] 이후 환경변수가 바뀌어도 그 상태로는 돌지 않는다.
 
 ```powershell
 # Windows PowerShell (= Phaiakes9) · 창 ① — [F] 좌석 1: 로컬 qwen3:30b-a3b 저작 (쓰기 · 로컬 LLM 호출)
 cd C:\Users\kiki\Desktop\__AI\WhyMath-eos197
+$env:WHYMATH_OLLAMA_REQUEST_TIMEOUT_S = "180"
+$TimeoutF = & $Py -c "from whymath_backend.config import get_settings; print(get_settings().ollama_request_timeout_s)"
+$TimeoutOkF = & $Py -c "from whymath_backend.config import get_settings; print(get_settings().ollama_request_timeout_s >= 180)"
 $LocalOut = "$Runs\eos197-a6-local\cu.jsonl"
 $CodeFileF = & $Py -c "import whymath_backend.harness.problem_corpus_accumulate as m; print(m.__file__)"
 $CodeOkF = [bool]($CodeFileF -and $CodeFileF.StartsWith($Wt))
@@ -378,8 +382,8 @@ $PlanOkF = Test-Path $Plan
 $SeedsOkF = (@($Seeds | Where-Object { Test-Path $_ }).Count -eq 3)
 $G198F = & $Py -c $G198Py
 $LocalOnlyF = & $Py -c $LocalOnlyPy
-"PRECHECK_F CodeOk=$CodeOkF Model=$ModelF PlanExists=$PlanOkF SeedsOk=$SeedsOkF Eos198Code=$G198F LocalOnly=$LocalOnlyF WorktreeHead=$(git rev-parse --short HEAD)"
-if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -and ($G198F -eq "True") -and ($LocalOnlyF -eq "True")) {
+"PRECHECK_F CodeOk=$CodeOkF Model=$ModelF PlanExists=$PlanOkF SeedsOk=$SeedsOkF Eos198Code=$G198F LocalOnly=$LocalOnlyF TimeoutS=$TimeoutF TimeoutOk=$TimeoutOkF WorktreeHead=$(git rev-parse --short HEAD)"
+if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -and ($G198F -eq "True") -and ($LocalOnlyF -eq "True") -and ($TimeoutOkF -eq "True")) {
   New-Item -ItemType Directory -Force -Path (Split-Path $LocalOut) | Out-Null
   $TriedF = 0
   $LinesF = [int](& $Py -c $CountPy $LocalOut)
@@ -394,7 +398,7 @@ if ($CodeOkF -and $PlanOkF -and $SeedsOkF -and ($ModelF -eq "qwen3:30b-a3b") -an
     if ($RoundExitF -eq 2) { "ROUND_STOP=exit2 — 연속 무진전 알람 또는 설정 오류입니다. 위 stderr 문구를 회신하세요"; break }
   }
   "LOCAL_DONE lines=$LinesF tried=$TriedF target=15 budget=45"
-} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkF(True여야) Model=$ModelF(qwen3:30b-a3b여야) PlanExists=$PlanOkF(True여야) SeedsOk=$SeedsOkF(True여야) Eos198Code=$G198F(True여야 — EOS-198 이전 코드면 A6 CU가 공통·wm-gen-quad로 기록된다) LocalOnly=$LocalOnlyF(True여야 — False면 신호 없는 저작이 클라우드에 닿을 수 있다: 유료 호출 위험) · 새 창이면 [B]부터, 아니면 [B]·[D]를 다시 확인하세요" }
+} else { "WRITE_REFUSED=True — 호출하지 않았다. CodeOk=$CodeOkF(True여야) Model=$ModelF(qwen3:30b-a3b여야) PlanExists=$PlanOkF(True여야) SeedsOk=$SeedsOkF(True여야) Eos198Code=$G198F(True여야 — EOS-198 이전 코드면 A6 CU가 공통·wm-gen-quad로 기록된다) LocalOnly=$LocalOnlyF(True여야 — False면 신호 없는 저작이 클라우드에 닿을 수 있다: 유료 호출 위험) TimeoutOk=$TimeoutOkF(True여야 — TimeoutS=$TimeoutF가 30이면 환경변수가 설정에 먹지 않은 것이다) · 새 창이면 [B]부터, 아니면 [B]·[D]를 다시 확인하세요" }
 ```
 
 **예상 출력**: 회차마다 진행 로그 → 리포트 JSON → `ROUND_END … exit=0`(이번 회차에 1건 이상 붙음) 또는 `exit=1`(이번 회차 무진전 — 다음 회차로 넘어간다). 끝에 `LOCAL_DONE lines=15 이상`.

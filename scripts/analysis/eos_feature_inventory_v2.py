@@ -1287,6 +1287,9 @@ CATALOG: tuple[Spec, ...] = (
        # 귀속한다(검수·집계 CLI도 부르지만 그것들의 소유는 각자의 행이 유지한다).
        "harness.authoring_round", "harness.authoring_round_config",
        "harness.authoring_round_ports", "harness.authoring_round_probe",
+       # EOS-203 — 로컬 좌석 사고 모드 켬/끔 실측 탐침. 저작 CLI의 생성기 조립 함수를 그대로 써
+       # 같은 스펙 표본으로 수락률·지연·출력 토큰을 번갈아 잰다(사람 PC·Ollama).
+       "harness.local_thinking_probe",
        "harness.binomial_distribution_batch",
        "harness.calculus1_integral_batch", "harness.calculus2_trig_integral_batch",
        "harness.combination_binomial_batch", "harness.complex_number_arithmetic_batch",

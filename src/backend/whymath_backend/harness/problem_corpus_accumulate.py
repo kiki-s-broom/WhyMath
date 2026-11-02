@@ -1031,6 +1031,10 @@ def top_p_seat_precheck(
     )
 
 
+# `--thinking` 선택지 → 생성기 `thinking` 값(EOS-203). default는 미지정(종전 동작)이다.
+THINKING_CHOICES: dict[str, bool | None] = {"default": None, "off": False, "on": True}
+
+
 def _build_live_generator(
     topic_hint: str,
     *,
@@ -1042,6 +1046,7 @@ def _build_live_generator(
     avoid_recent: int = 0,
     subject: str = _DEFAULT_AUTHORING_SUBJECT[0],
     slug_prefix: str = _DEFAULT_AUTHORING_SUBJECT[1],
+    thinking: bool | None = None,
 ) -> EquivalentProblemGenerator:
     """라이브 LLM 생성기 조립(조성 루트) — L4 카탈로그 라벨 주입·표준 CompositeProvider.
 
@@ -1092,6 +1097,10 @@ def _build_live_generator(
     # 회피 목록(MP-02 재회차) — 0(기본)이면 키를 싣지 않아 종전 프롬프트와 바이트 동일하다.
     if avoid_recent:
         routing_overrides["avoid_recent"] = avoid_recent
+    # 사고 모드 지시(EOS-203) — None(기본)이면 키를 싣지 않아 종전 프롬프트와 바이트 동일하다.
+    # 지시어를 붙일지는 라우터가 정한다(`router.thinking_soft_switch` — 하이브리드 사고 모델만).
+    if thinking is not None:
+        routing_overrides["thinking"] = thinking
 
     return LLMEquivalentProblemGenerator(
         # 표준 CompositeProvider 지연 구성 — 라이브 환경 전제. 클라우드 좌석은
@@ -1164,6 +1173,17 @@ def main(argv: list[str] | None = None) -> int:
             "(qwen2.5:7b). quality=비동기 라우팅 → 라우터 규칙 2가 로컬 QUALITY 티어 "
             "(router.QUALITY_MODEL_ID·현 qwen3:30b-a3b)를 고른다. 오프라인 배치라 학생 대기가 "
             "없으므로 동기일 필요가 없다. 실제로 쓰인 모델은 genlog·회차 대장 manifest에 남는다."
+        ),
+    )
+    parser.add_argument(
+        "--thinking",
+        choices=sorted(THINKING_CHOICES),
+        default="default",
+        help=(
+            "사고 모드 지시(EOS-203). default(기본)=지시 없음 — 종전과 바이트 동일. off=라우터가 "
+            "하이브리드 사고 모델(qwen3)로 보낼 때만 사용자 프롬프트 끝에 /no_think, on=/think. "
+            "비대상 모델(qwen2.5·클라우드)에는 붙지 않는다. 기본값은 켬/끔 실측"
+            "(harness.local_thinking_probe) 전에는 바꾸지 않는다."
         ),
     )
     parser.add_argument(
@@ -1472,6 +1492,7 @@ def main(argv: list[str] | None = None) -> int:
                 avoid_recent=args.avoid_recent,
                 subject=subject_value,
                 slug_prefix=slug_prefix,
+                thinking=THINKING_CHOICES[args.thinking],
             )
     spec_seats = [
         SpecSeat(
