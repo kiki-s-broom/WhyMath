@@ -43,7 +43,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import itertools
 import json
 import os
 import socket
@@ -73,6 +72,7 @@ from whymath_backend.harness.authoring_round_ports import (
     mask_secrets,
     pid_alive,
 )
+from whymath_backend.l3.equivalent.structural_dedup import split_structural_duplicates
 
 STAGES: tuple[str, ...] = (
     "preflight",
@@ -260,20 +260,14 @@ def seat_artifact_stats(seat_dir: Path) -> dict[str, Any]:
 
 
 def assemble_queue(seat_rows: Sequence[Sequence[str]]) -> tuple[list[str], int]:
-    """좌석 산출물 줄들을 **한 건씩 번갈아** 섞고 같은 slug는 한 번만 싣는다(런북 [I])."""
-    out: list[str] = []
-    seen: set[str] = set()
-    dup = 0
-    for raw in itertools.chain.from_iterable(itertools.zip_longest(*seat_rows)):
-        if raw is None:
-            continue
-        slug = json.loads(raw).get("slug")
-        if slug in seen:
-            dup += 1
-            continue
-        seen.add(slug)
-        out.append(raw)
-    return out, dup
+    """좌석 산출물 줄들을 **한 건씩 번갈아** 섞고 중복은 한 번만 싣는다(런북 [I]).
+
+    EOS-204부터 중복 판정은 `l3.equivalent.structural_dedup`이 한다 — slug 일치에 더해 **표기만
+    다른 같은 문항**(구조 서명 일치)도 뺀다. 순서·반환 형태(큐 줄, 뺀 건수)는 종전과 같다. 뺀 CU의
+    사유 목록이 필요하면 `split_structural_duplicates`를 직접 부른다(`stage_queue`).
+    """
+    out, dropped = split_structural_duplicates(seat_rows)
+    return out, len(dropped)
 
 
 def parse_porcelain_z(raw: str) -> list[str]:
@@ -1074,22 +1068,41 @@ class AuthoringRound:
             )
             for s in self.cfg.seats
         ]
-        out, dup = assemble_queue(rows)
+        out, dropped = split_structural_duplicates(rows)
+        dup = len(dropped)
         if self.dry_run:
             self.kv(f"DRY_RUN_PLAN stage=queue lines={len(out)} cross_seat_dup={dup}")
             return StageOutcome("incomplete", {"dry_run": True})
         queue.parent.mkdir(parents=True, exist_ok=True)
+        # EOS-204 — 뺀 CU를 사유와 함께 남긴다(중복은 F1~F8 어느 실패 코드도 아니라 검수자가 고르지
+        # 않게 큐에서 뺀다). 큐보다 먼저 쓴다 — 큐 파일의 존재가 '조립 완료' 표지다.
+        dropped_path = queue.parent / "queue_dropped_duplicates.jsonl"
+        dropped_tmp = dropped_path.with_suffix(".jsonl.tmp")
+        dropped_tmp.write_text(
+            "".join(json.dumps(d.to_json(), ensure_ascii=False) + "\n" for d in dropped),
+            encoding="utf-8",
+        )
+        os.replace(dropped_tmp, dropped_path)
+        struct_dup = sum(1 for d in dropped if d.reason == "structural_duplicate")
+        slug_dup = sum(1 for d in dropped if d.reason == "slug_duplicate")
+        unreadable = sum(1 for d in dropped if d.reason == "unreadable_row")
         tmp = queue.with_suffix(".jsonl.tmp")
         tmp.write_text("".join(ln + "\n" for ln in out), encoding="utf-8")
         os.replace(tmp, queue)
         back = count_lines(queue)
-        self.kv(f"QUEUE_WRITTEN=True QUEUE_LINES={back} CROSS_SEAT_DUP_SLUGS={dup}")
+        self.kv(
+            f"QUEUE_WRITTEN=True QUEUE_LINES={back} CROSS_SEAT_DUP_SLUGS={slug_dup} "
+            f"STRUCT_DUP={struct_dup} UNREADABLE={unreadable}"
+        )
         if back != len(out):
             raise StageFailedError(
                 "queue", "QueueReadbackMismatch", f"썼다 {len(out)} 읽었다 {back}"
             )
         self.say(f"검수 큐 {back}건을 만들었습니다 — 이 숫자가 검수 완주 분모입니다")
-        return StageOutcome("done", {"queue_lines": back, "cross_seat_dup": dup, **detail})
+        return StageOutcome(
+            "done",
+            {"queue_lines": back, "cross_seat_dup": dup, "struct_dup": struct_dup, **detail},
+        )
 
     def stage_review(self) -> StageOutcome:
         total, judged = self.judged_count()

@@ -490,6 +490,9 @@ def test_full_round_runs_every_stage_and_pushes_verified(h: Harness) -> None:
     # 한국어 요약 줄과 기계 판정 줄이 함께 나온다.
     assert "▶ 검수 완주" in h.text
     assert "QUEUE_WRITTEN=True QUEUE_LINES=12" in h.text
+    # EOS-204 — 구조 중복 판정이 큐 조립에 연결돼 있고, 뺀 목록 파일이 큐 옆에 남는다.
+    assert "STRUCT_DUP=0" in h.text
+    assert (h.make().cfg.queue_path().parent / "queue_dropped_duplicates.jsonl").exists()
 
 
 def test_author_child_gets_timeout_env_and_worktree_pythonpath(h: Harness) -> None:

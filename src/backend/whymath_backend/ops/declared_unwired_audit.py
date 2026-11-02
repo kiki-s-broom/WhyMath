@@ -1901,7 +1901,8 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "l3.pedagogy.diag_item_projector": _OPS_DB_WRITER,
         "l3.equivalent.structural_dedup": (
             "by-design:저작 회차 검수 큐 조립(EOS-204) — 런북 [I] 수동 경로에서 사람이 PC의 회차 "
-            "산출물로 돌린다. main()·판정 함수는 test_structural_dedup가 in-process로 상시 실행"
+            "산출물로 돌린다(기본 경로는 harness.authoring_round가 함수로 부른다). main()·판정 "
+            "함수는 test_structural_dedup가 in-process로 상시 실행"
         ),
         # ── l4 ──
         "l4.hint_content.populate": _OPS_DB_WRITER,
