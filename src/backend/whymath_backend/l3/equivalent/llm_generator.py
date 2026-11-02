@@ -501,9 +501,7 @@ class LLMEquivalentProblemGenerator:
         except Exception as exc:  # noqa: BLE001 — provider 장애 시 배치 크래시 금지·안전 폴백.
             # 침묵실패 금지 — 타입명 + 안전 요약만(메시지 원문엔 응답 본문이 섞인다·EOS-202).
             summary = _safe_exc_summary(exc)
-            _LOGGER.warning(
-                "동등문제 생성 provider 호출 실패(%s) — None 폴백", summary
-            )
+            _LOGGER.warning("동등문제 생성 provider 호출 실패(%s) — None 폴백", summary)
             # 실패한 호출 *시도*도 Run 이력이다(EOS-55) — usage 미상(None)·정직 실패 기록.
             self._emit_generation_log(
                 spec,
