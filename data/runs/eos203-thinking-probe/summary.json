@@ -1,0 +1,44 @@
+{
+  "run_id": "c51b5fbadc85",
+  "modes": {
+    "default": {
+      "attempts": 12,
+      "accepted": 5,
+      "acceptance_rate": 0.4167,
+      "statuses": {
+        "accepted": 5,
+        "generation_failed": 3,
+        "needs_review": 1,
+        "rejected_gate": 3
+      },
+      "failure_kinds": {
+        "ReadTimeout": 2,
+        "ValueError": 1
+      },
+      "median_wall_s": 64.37,
+      "max_wall_s": 180.03,
+      "median_output_tokens": 3388.5,
+      "token_samples": 10
+    },
+    "off": {
+      "attempts": 12,
+      "accepted": 7,
+      "acceptance_rate": 0.5833,
+      "statuses": {
+        "accepted": 7,
+        "generation_failed": 1,
+        "rejected_gate": 4
+      },
+      "failure_kinds": {
+        "응답 JSON 파싱 실패": 1
+      },
+      "median_wall_s": 55.785,
+      "max_wall_s": 110.44,
+      "median_output_tokens": 3167.0,
+      "token_samples": 12
+    }
+  },
+  "off_to_default_token_ratio": 0.935,
+  "ollama_request_timeout_s": 180.0,
+  "plan": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-02b\\docs\\ops\\eos197_a6_spec_plan.jsonl"
+}

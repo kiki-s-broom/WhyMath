@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-235
+title: "로컬 좌석 사고 모드를 Ollama 네이티브 think 인자로 끄기 — 소프트 스위치 효과 판정 불가(EOS-203 실측) 후속"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① Ollama 공급사 어댑터(`l3/providers/ollama.py`)가 요청 본문에 Ollama 네이티브 `think` 인자(false/true)를 실어 보낼 수 있게 하고, 라우터 결정(EOS-203 `thinking` 오버라이드) 경유로만 켠다(직접 호출 금지 불변) — 소프트 스위치(`/no_think` 프롬프트 접두)와 둘 중 하나만 쓰이게 한다 ② 응답에서 사고 블록 길이(또는 `thinking` 필드 길이)를 직접 재서, 끈 상태에서 사고 출력이 실제로 줄었는지를 토큰 비가 아니라 직접 지표로 확인한다 ③ EOS-203 탐침(`harness/local_thinking_probe.py`)으로 같은 스펙 표본(`docs/ops/eos197_a6_spec_plan.jsonl`)에서 켬/끔 수락률·지연·출력 토큰을 모드당 12건 이상 다시 실측하고, 차이가 표본으로 판정 가능할 때만 저작 기본값을 바꾼다 ④ 학생 대면 서빙 경로 설정은 바꾸지 않는다(저작 한정)"
+  - "[정정 — ③ 표본 하한] ③의 \"모드당 12건 이상\"은 부족하다. EOS-203 실측에서 12건 대 12건은 차이를 판정하지 못했다(Fisher 양측 p = 0.68). 수락률 차이를 판정할 수 있는 크기를 실행 전에 정한다(예: 기대 차이 15%p를 검출하려면 모드당 수십 건 단위). 같은 크기로 끝나면 결론은 다시 \"판정 불가\"다. 아울러 ②의 직접 지표는 ReadTimeout으로 끊긴 시도를 집계에서 빼지 않는다 — 가장 긴 출력이 빠지면 켬/끔 비가 1 쪽으로 치우친다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/providers/ollama.py
+  - src/backend/whymath_backend/l3/router.py
+  - src/backend/whymath_backend/harness/local_thinking_probe.py
+session: null
+notes: |-
+  출처: EOS-203 실측(2026-11-02 Kiki PC · run_id c51b5fbadc85 · 기록 docs/reviews/eos203_local_seat_thinking_probe_2026-11-02.md). `/no_think` 소프트 스위치의 출력 토큰 비 off/default = 0.935 — 켬 쪽 ReadTimeout 2건이 집계에서 빠져 이 비는 1 쪽으로 치우치므로 효과 유무를 판정하지 못했다. 수락률 켬 5/12 · 끔 7/12(Fisher p = 0.68)라 기본값은 유지했다. ollama.py는 json_schema format 사용 시 Qwen3 출력이 `thinking` 필드로 갈 수 있어 fallback으로 읽고 있다(144~157행) — `think` 인자를 끄면 이 fallback 경로의 동작도 함께 확인해야 한다. EOS-203 레인(02-B)의 고칠 수 있는 경로 밖이라 등재만 했다.
+
+  [정정 2026-11-02] 독립 검토 지적 8 — ③ 표본 하한이 같은 커밋의 기록 문서(12건으로는 판정 불가)와 모순
+
+  [정정 2026-11-02] notes 치환 — 독립 검토 지적 6 — 토큰 비 단정 정정
+
+  [정정 2026-11-02] title '로컬 좌석 사고 모드를 Ollama 네이티브 think 인자로 끄기 — 소프트 스위치 무효 실측(토큰 비 0.935) 후속' → '로컬 좌석 사고 모드를 Ollama 네이티브 think 인자로 끄기 — 소프트 스위치 효과 판정 불가(EOS-203 실측) 후속': 독립 검토 지적 6 — 제목의 '무효' 단정 정정
+updated: 2026-11-02
