@@ -1,7 +1,7 @@
 # EOS-203 로컬 좌석 사고 모드 켬/끔 실측 — 2026-11-02
 
 > 판정 기준: main `910e7644`(EOS-203 구현 #1825) · 실행 = Kiki PC(Phaiakes9) 별도 worktree `WhyMath-02b`
-> 실행자: Kiki · 기록: claude · 원자료 위치: Kiki PC `data/runs/eos203-thinking-probe/`(rows.jsonl · summary.json — 저장소 미커밋). 아래 이번 회차 숫자는 실행 화면의 `PROBE_` 줄을 옮겨 적은 것이고, 기준선 숫자는 저장소의 `data/runs/eos197-a6-local/`에서 다시 셌다.
+> 실행자: Kiki · 기록: claude · 요약 원자료: `data/runs/eos203-thinking-probe/summary.json`(Kiki PC 파일을 원문 그대로 옮김) · 시도별 rows.jsonl(24줄)은 Kiki PC에만 있다. 기준선 숫자는 저장소의 `data/runs/eos197-a6-local/`에서 다시 셌다.
 
 ## 1. 결론
 
@@ -42,7 +42,8 @@
 | 합계 | 12/24 | 50.0% | 31.4% ~ 68.6% | — | — | 4 |
 
 - 출력 토큰 중앙값은 사용량(`output_tokens`)이 기록된 시도만 센다. ReadTimeout은 응답이 없어 빠지고, 조립 실패·JSON 파싱 실패는 응답이 있어 포함된다.
-- 수락이 아닌 12건 중 4건은 위 생성 실패이고, 나머지 8건(켬 4 · 끔 4)은 **수락되지 않은 시도**라는 것까지만 안다. 실행 화면에 상태별 내역이 출력되지 않아 게이트 거부·검수 필요·구조 중복 중 무엇인지는 원자료(rows.jsonl의 `status`·`reasons`)에서만 확인된다.
+- 상태별 내역(`summary.json`의 `statuses`): 켬 = 수락 5 · 게이트 거부 3 · 검수 필요 1 · 생성 실패 3 / 끔 = 수락 7 · 게이트 거부 4 · 생성 실패 1. **구조 중복 거부는 0건**이다. 게이트 거부 사유별 내역은 rows.jsonl의 `reasons`에 있고 이 문서에는 옮기지 않았다.
+- 벽시계 최댓값은 켬 180.03초(타임아웃 한계) · 끔 110.44초다.
 - **EOS-205 동어반복 거부(`TautologicalConditionError`)·교육과정 밖 거부(`CurriculumScopeError`)는 두 모드 모두 0건이다.** 시도당 생성 호출은 1회이고, 조립 실패는 예외 타입명이 그대로 기록되므로(EOS-212 `_safe_exc_summary`) 하위 클래스였다면 그 이름으로 집계됐다. `ValueError` 1건은 이 둘이 아니다(근거 판정 이전 단계의 필드 검사에서 났을 수도 있다).
 
 ### 3.2 기준선(EOS-197 A6 로컬 좌석)과 비교
