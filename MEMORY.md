@@ -338,6 +338,17 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-02 (결정 · EOS-221 — Kiki 승인): **Kiki PC 블록의 `Read-Host`는 금지하지 않고 CLAUDE.md의 세 방법을 유지 — 단 ③은 단독 한 줄·①②가 가능하면 쓰지 않음** (Kiki 결정, claude 기록) — 판정 기준: main `57d05c55`
+
+- **무엇을**: EOS 감리 지시문 v3(02-C)의 실행 표준 3항 "Read-Host 금지"가 CLAUDE.md 「확장 — 붙여넣기 블록의 자리표시자 전면 금지」(2026-09-06)의 방법 ③(Read-Host 허용)·`check_runbook_blocks.py`의 의도적 제외와 충돌해 보고 → Kiki가 권고안(CLAUDE.md 기준 유지)을 승인했다.
+- **값**: 값 공급 순서 ① 세션이 채움 ② 블록이 찾음 ③ `Read-Host`(그 한 줄만 단독). CLAUDE.md 서술("통째로 붙여넣어도 그 줄에서 정지")과 런북 실측(EOS-219 2026-10-30 · 저작 회차 [R0] — 다음 줄을 입력으로 삼켜 빈 값)이 어긋나므로 운용 조건은 실측을 따른다. CLAUDE.md 문구 정정은 하지 않았다(Kiki 몫 · 산문 동결 아래 '정정'은 허용 범주).
+- **근거**: 색인 `docs/ops/kiki_pc_execution_standard.md` C1 · 태스크 `EOS-221`.
+### 2026-11-01 (측정·EOS-222 소급 — LLM 저작 산출물 8-gram 일치율 첫 기록): **기존 저작 회차 2개 모두 70% 이상 0건 (최고 36.4%) — 기록만, 차단 없음** (claude 측정·기록)
+
+- **무엇을**: `python -m whymath_backend.ops.ngram_overlap_report run data/runs/eos197-a6-local data/runs/eos197-a6-openrouter`(가이드 v2 n-gram 가드레일 · 8-gram · 공백 토큰화 · 비교 원본 = 회차가 읽은 입력 코퍼스 generated_v0·p3_fill_v0·p3_calculus1_diff_v0 · 평가원·EBS·교과서 본문은 저장소에 없어 미대조)와 `corpus data/corpus/problem_bank_rephrased_v0 --against data/corpus/problem_bank_generated_v0`.
+- **값**: `eos197-a6-openrouter` 27 CU·54필드 최고 0.3636 · `eos197-a6-local` 3 CU 발문 3필드 0.0(해설 3필드 측정 불가 — 필드 없음) · 두 회차 70% 이상 0건 · 입력 해시는 회차 기록과 줄바꿈만 다름(`crlf_equivalent`) · rephrased_v0는 부모 대비 발문 236/421건 ≥70%·해설 421/421 = 1.0(설계상 부모 복사 — 자체 저작물끼리라 저작권 판정 아님) · 공백 토큰화는 과소평가 방향이라 낮은 값은 "다르다"의 증거가 아님.
+- **근거 커밋**: 구현·결과 파일 `e89212d1`(#1807) — `data/runs/eos197-a6-*/cu.ngram_overlap.json` · `data/corpus/problem_bank_rephrased_v0/_provenance.json`의 `similarity_8gram`.
+
 ### 2026-11-01 (측정 · EOS-220 WP-K): **자동검증 1차 통과율 13/111 = 0.1171(Wilson 단측 하한 0.0758)을 주간 원장에 measured로 기록 · 재작업률은 슬롯 기록 좌석이 없어 미측정** (claude 측정·기록) — 판정 기준: main `15364290`
 
 - **무엇을**: `weekly_metrics_report` 파일 입력 모드(`--authoring-run-dir`)로 EOS-197 A6 1회차(CU 30건)를 10/28 레코드와 같은 창·입력·환율로 다시 돌려 `metrics/weekly.json`에 append했다(레코드 `generated_at` = `2026-11-01T14:26:01.402495+00:00`). 1차 통과율 레코드에 분자·분모·Wilson 하한·근거 경로(`detail`)를 싣는다. cron은 DB 모드 유지로 판정했다(회차 커밋 시점과 7일 창이 어긋남).

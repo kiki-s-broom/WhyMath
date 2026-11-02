@@ -141,6 +141,10 @@ class QuestionRelations:
     equations: tuple[str, ...]
     variables: frozenset[str]
     numbers: frozenset[sympy.Expr] = frozenset()
+    # 함수 정의 식 밖에 적힌 수(접점·시각 등)와, 함수 적용이 아닌 발문 고유 방정식 — 구조 중복
+    # 판정(EOS-204 `structural_dedup`)의 재료. 함수식의 계수는 `functions`가 이미 담는다.
+    point_numbers: frozenset[sympy.Expr] = frozenset()
+    own_equations: tuple[str, ...] = ()
 
     @property
     def empty(self) -> bool:
@@ -254,12 +258,16 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
     functions: list[tuple[str, sympy.Expr]] = []
     defined: dict[str, tuple[str, sympy.Expr]] = {}
     equations: list[str] = []
+    own_equations: list[str] = []
     variables: set[str] = set()
     text = _preprocess_question(question_text)
+    blanked = list(text)  # 함수 정의 식을 지운 사본 — 그 밖의 수가 '점'이다
     for match in re.finditer(r"(?<![<>!=])=(?!=)", text):
         pos = match.start()
-        lhs_raw = _strip_open(_scan(text, pos - 1, -1))
-        rhs_raw = _UNIT_TAIL.sub("", _scan(text, pos + 1, 1).strip())
+        lhs_span = _scan(text, pos - 1, -1)
+        rhs_span = _scan(text, pos + 1, 1)
+        lhs_raw = _strip_open(lhs_span)
+        rhs_raw = _UNIT_TAIL.sub("", rhs_span.strip())
         if not lhs_raw or not rhs_raw:
             continue
         head = _FUNCTION_HEAD.match(lhs_raw)
@@ -272,6 +280,8 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
                 # 함수 정의 `f(x) = …` — 매개변수(a·b)가 섞여도 된다.
                 functions.append((arg, rhs))
                 defined[name] = (arg, rhs)
+                for i in range(pos - len(lhs_span), pos + 1 + len(rhs_span)):
+                    blanked[i] = " "
                 continue
             if name in defined:
                 # 함수 적용 `f(a) = 10`·`f(1) = 0` — 정의된 함수에 인자를 넣은 방정식이다.
@@ -288,11 +298,70 @@ def extract_question_relations(question_text: str) -> QuestionRelations:
         residual = sympy.expand(lhs - rhs)
         if not residual.free_symbols:
             continue
-        equations.append(f"{sympy.sstr(lhs)} = {sympy.sstr(rhs)}")
+        equation = f"{sympy.sstr(lhs)} = {sympy.sstr(rhs)}"
+        equations.append(equation)
+        if head is None and lhs_raw != "y":
+            own_equations.append(equation)
+            # 방정식의 계수는 정규형(`own_equations`)이 담는다 — 점 집합에 다시 세지 않는다.
+            for i in range(pos - len(lhs_span), pos + 1 + len(rhs_span)):
+                blanked[i] = " "
         variables.update(str(s) for s in residual.free_symbols)
     return QuestionRelations(
-        tuple(functions), tuple(equations), frozenset(variables), _question_numbers(text)
+        tuple(functions),
+        tuple(equations),
+        frozenset(variables),
+        _question_numbers(text),
+        _point_numbers("".join(blanked), functions),
+        tuple(own_equations),
     )
+
+
+# 부호 있는 수 — 앞이 숫자·문자·닫는 괄호면 이항 연산의 빼기라 부호로 읽지 않는다.
+_SIGNED_NUMBER = re.compile(r"(?<![\^\d.A-Za-z)])(-?)\s*(\d+(?:\.\d+)?(?:/\d+)?)")
+_NUMBER_TOKEN = r"-?\s*\d+(?:\.\d+)?(?:/\d+)?"
+# 좌표쌍 `(a, b)` — 둘째 성분이 f(a)면 함수에서 유도되는 값이라 점 집합에 따로 세지 않는다.
+_COORDINATE_PAIR = re.compile(rf"\(\s*({_NUMBER_TOKEN})\s*,\s*({_NUMBER_TOKEN})\s*\)")
+
+
+def _as_number(token: str) -> sympy.Expr | None:
+    try:
+        return sympy.nsimplify(token.replace(" ", ""))
+    except (sympy.SympifyError, ValueError, TypeError, ZeroDivisionError):
+        return None
+
+
+def _point_numbers(
+    blanked: str, functions: Sequence[tuple[str, sympy.Expr]]
+) -> frozenset[sympy.Expr]:
+    """함수식·방정식 밖의 수(부호 포함) — 좌표쌍 `(a, f(a))`의 둘째 성분은 뺀다.
+
+    같은 문항을 `x좌표가 2인 점`과 `점 (2, 3)`으로 다르게 적어도 같은 점 집합 {2}가 되게 한다.
+    유도값은 **좌표쌍의 둘째 성분일 때만** 뺀다 — 어떤 수가 우연히 다른 수의 함숫값과 같다는 이유로
+    지우면 `f(1)=3 … x=3인 점`의 진짜 점 3이 사라진다. 부호를 지키는 이유: `x=2`와 `x=-2`는
+    다른 점이다.
+    """
+    text = blanked.replace("−", "-")
+    derived_spans: list[tuple[int, int]] = []
+    for pair in _COORDINATE_PAIR.finditer(text):
+        first, second = _as_number(pair.group(1)), _as_number(pair.group(2))
+        if first is None or second is None:
+            continue
+        for var, body in functions:
+            try:
+                image = sympy.simplify(body.subs(sympy.Symbol(var), first))
+            except (TypeError, ValueError, ZeroDivisionError):
+                continue
+            if sympy.simplify(image - second) == 0:
+                derived_spans.append(pair.span(2))
+                break
+    numbers: set[sympy.Expr] = set()
+    for match in _SIGNED_NUMBER.finditer(text):
+        if any(start <= match.start(2) < end for start, end in derived_spans):
+            continue
+        value = _as_number(match.group(1) + match.group(2))
+        if value is not None:
+            numbers.add(value)
+    return frozenset(numbers)
 
 
 # ── 검산식 근거 판정 ─────────────────────────────────────────────────────
