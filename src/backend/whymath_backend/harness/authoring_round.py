@@ -42,9 +42,11 @@ Ollama 기본 타임아웃 30초 공전, 목표 미달 시 블록 재작성 왕�
 from __future__ import annotations
 
 import argparse
+import copy
 import itertools
 import json
 import os
+import socket
 import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
@@ -69,6 +71,7 @@ from whymath_backend.harness.authoring_round_ports import (
     SystemClock,
     UrllibHttp,
     mask_secrets,
+    pid_alive,
 )
 
 STAGES: tuple[str, ...] = (
@@ -135,6 +138,8 @@ class Boundaries:
     python: str
     out: TextIO
     module_file: Path
+    # 잠금 주인 pid의 생존 판정(True·False·None=판정 불가) — 낡은 잠금 인수에만 쓴다(EOS-209 ①(b)).
+    pid_alive: Callable[[int], bool | None] = pid_alive
 
 
 def default_boundaries() -> Boundaries:
@@ -327,6 +332,7 @@ class AuthoringRound:
         self._state_writable = False
         self._state_corrupt = False
         self._lock_path: Path | None = None
+        self._lock_body: str | None = None
         self.state: dict[str, Any] = self._load_state()
 
     # ── 출력 ──
@@ -468,7 +474,9 @@ class AuthoringRound:
             raise StageFailedError("probe", "ProbeFailed", result.failure_reason())
         parsed = last_json_object(result.stdout)
         if parsed is None:
-            raise StageFailedError("probe", "ProbeOutputUnreadable", result.stdout.strip()[-200:])
+            raise StageFailedError(
+                "probe", "ProbeOutputUnreadable", mask_secrets(result.stdout.strip())[-200:]
+            )
         return parsed
 
     # ── 공통 가드 ──
@@ -905,7 +913,27 @@ class AuthoringRound:
         return {"outcome": outcome, **prog}
 
     def release_unevidenced(self) -> None:
-        """사람이 명시적으로 근거 없는 예약을 실물 근거로 되돌린다(`--release-unevidenced`)."""
+        """사람이 명시적으로 근거 없는 예약을 실물 근거로 되돌린다(`--release-unevidenced`).
+
+        `RESERVATION_RELEASED` 줄은 상태 파일 저장이 **성공한 뒤에만** 낸다(EOS-209 ①(c)). 저장에
+        실패하면 풀린 것은 이 프로세스 메모리뿐이라 다음 실행에서 예약이 되살아난다 —
+        그런데도 풀렸다고 출력하면 거짓 성공이다. 실패면
+        `StageFailedError(ReservationReleaseNotSaved)`로 멈춘다(이어서
+        저작으로 가지 않는다 — 기록되지 않은 해제 위에서 유료 호출을 하지 않는다).
+        """
+        # 상태 파일을 쓸 수 없는 실행(격리 워크트리 밖)이면 풀기 전에 진짜 원인으로 거부한다 —
+        # 그렇지 않으면 저장 실패가 '파일을 다른 프로그램이 잡음'처럼 읽힌다.
+        base = self.base_guard()
+        self.refuse_unless(
+            "release-unevidenced",
+            base,
+            "예약을 풀지 않았다 — 이 명령은 격리 워크트리에서 그 워크트리의 코드로 돌아야 한다"
+            "(런북 [R1]·[R2])",
+        )
+        # 저장에 실패하면 메모리의 해제분도 되돌린다 — 뒤따르는 `_fail`의 상태 기록이 성공하면
+        # 해제분이 디스크에 실려 "아무것도 풀리지 않았다"가 거짓이 된다(독립 검토 P2).
+        before_state = copy.deepcopy(self.state)
+        released: list[tuple[str, int, int]] = []
         for seat in self.cfg.seats:
             prog = self.seat_progress(seat)
             if prog["unevidenced"] <= 0:
@@ -922,11 +950,23 @@ class AuthoringRound:
                     "evidenced": prog["evidenced"],
                 }
             )
-            self.kv(
-                f"RESERVATION_RELEASED seat={seat.name} from={prog['reserved_attempts']} "
-                f"to={prog['evidenced']}"
+            released.append((seat.name, prog["reserved_attempts"], prog["evidenced"]))
+        if not released:
+            self.kv("RESERVATION_RELEASED=none — 근거 없는 예약이 없다(바꾼 것 없음)")
+            return
+        if not self._save_state():
+            self.state = before_state
+            names = ",".join(name for name, _, _ in released)
+            self.kv(f"RESERVATION_RELEASE_SAVED=False seats={names}")
+            raise StageFailedError(
+                "release-unevidenced",
+                "ReservationReleaseNotSaved",
+                "예약 해제를 상태 파일에 쓰지 못했다(위 STATE_WRITE_FAILED 줄) — "
+                "아무것도 풀리지 않았다. "
+                "상태 파일을 다른 프로그램이 잡고 있지 않은지 확인한 뒤 같은 줄을 다시 실행하세요",
             )
-        self._save_state()
+        for name, before, after in released:
+            self.kv(f"RESERVATION_RELEASED seat={name} from={before} to={after}")
 
     def check_core(self) -> tuple[bool, dict[str, Any]]:
         """런북 [H] — 좌석별 4필드·과목·slug 계수 + provenance_audit --require-runs."""
@@ -1383,34 +1423,160 @@ class AuthoringRound:
             )
             return False
         body = json.dumps(
-            {"pid": os.getpid(), "started_at": self.io.clock.now().isoformat()}, ensure_ascii=False
+            {
+                "pid": os.getpid(),
+                "started_at": self.io.clock.now().isoformat(),
+                # pid는 이 OS의 이름공간에서만 뜻이 있다 — 같은 워크트리를 WSL·컨테이너가 함께 쓰면
+                # 남의 pid는 이쪽에 '없음'으로 보인다. 호스트·플랫폼이 다르면 판정하지 않는다.
+                "host": socket.gethostname(),
+                "platform": sys.platform,
+            },
+            ensure_ascii=False,
         )
-        try:
-            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
+        fd: int | None = None
+        for attempt in (1, 2):
             try:
-                held = path.read_text(encoding="utf-8").strip()
+                fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except FileExistsError:
+                if attempt == 2:
+                    # 낡은 잠금을 치운 직후 다른 실행이 먼저 잡았다 — 그쪽이 주인이다.
+                    self.kv(
+                        f"LOCK_HELD=True path={path} holder=(인수 직후 다른 실행이 먼저 잡음) "
+                        "HOLDER_ALIVE=True"
+                    )
+                    self._lock_held_message(path)
+                    return False
+                if not self._take_over_stale_lock(path):
+                    return False
             except OSError as exc:
-                held = f"(읽기 실패 {type(exc).__name__})"
-            self.kv(f"LOCK_HELD=True path={path} holder={held}")
-            self.say(
-                "같은 회차가 이미 실행 중입니다(다른 창 확인). 실행 중인 창이 정말 없으면"
-                "(앞 실행이 "
-                f'강제 종료됨) 이 파일을 지운 뒤 다시 실행하세요: Remove-Item "{path}"'
-            )
-            return False
-        except OSError as exc:
-            self.kv(f"LOCK_REFUSED=True reason={type(exc).__name__} path={path}")
-            return False
+                self.kv(f"LOCK_REFUSED=True reason={type(exc).__name__} path={path}")
+                return False
+        assert fd is not None
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(body)
         self._lock_path = path
+        self._lock_body = body
         self.kv(f"LOCK_ACQUIRED=True path={path}")
         return True
 
+    def _lock_held_message(self, path: Path) -> None:
+        self.say(
+            "같은 회차가 이미 실행 중입니다(다른 창 확인). 실행 중인 창이 정말 없으면"
+            "(앞 실행이 "
+            f'강제 종료됨) 이 파일을 지운 뒤 다시 실행하세요: Remove-Item "{path}"'
+        )
+
+    def _take_over_stale_lock(self, path: Path) -> bool:
+        """이미 있는 잠금이 **죽은 pid의 것**이면 옆으로 치우고 True(다시 잡기 시도) — 아니면 False.
+
+        창 X로 닫으면(Windows CTRL_CLOSE) `finally`가 돌지 않아 잠금이 남는다(EOS-209 ①(b)).
+        그때 사람이
+        파일을 지우게 하는 대신, 잠금의 pid가 **확실히 죽었을 때만**(`pid_alive` False) 인수한다.
+        살아 있거나 판정할 수 없으면(None — 내용이 깨졌거나 OS가 답하지 않음) 잠금을 존중한다.
+
+        인수는 지우기가 아니라 **이름 바꾸기**(`<잠금>.stale-<시각>-<pid>`)다 — 원자적이라 두 실행이
+        동시에 인수해도 하나만 옮기고, 옮긴 파일은 증거로 남는다. 판정한 뒤 다른 실행이
+        새 잠금을 만들어
+        그것을 옮겼다면(옮긴 내용이 판정한 내용과 다름) 제자리로 되돌리고 물러선다.
+        """
+        try:
+            raw = path.read_bytes()
+        except FileNotFoundError:
+            return True  # 사이에 주인이 잠금을 풀었다 — 다시 잡기를 시도한다
+        except OSError as exc:
+            self.kv(
+                f"LOCK_HELD=True path={path} holder=(읽기 실패 {type(exc).__name__}) "
+                "HOLDER_ALIVE=None"
+            )
+            self._lock_held_message(path)
+            return False
+        held = raw.decode("utf-8", errors="replace").strip()
+        pid = _lock_pid(held)
+        if pid is None or not _lock_same_namespace(held):
+            alive: bool | None = None
+        elif pid == os.getpid():
+            alive = False  # 이 프로세스는 아직 잠금을 만들지 않았다 — 같은 번호는 재사용된 옛 pid다
+        else:
+            alive = self.io.pid_alive(pid)
+        if alive is not False:
+            self.kv(f"LOCK_HELD=True path={path} holder={held} HOLDER_ALIVE={alive}")
+            if alive is None:
+                self.say(
+                    "잠금 주인이 살아 있는지 판정하지 못했습니다"
+                    "(잠금 내용이 깨졌거나 OS가 답하지 않음) — "
+                    "그래서 지우지 않습니다."
+                )
+            self._lock_held_message(path)
+            return False
+        self.kv(f"LOCK_STALE=True path={path} holder={held} HOLDER_ALIVE=False")
+        stamp = self.io.clock.now().strftime("%Y%m%dT%H%M%S")
+        stale = path.with_name(f"{path.name}.stale-{stamp}-{os.getpid()}")
+        try:
+            os.rename(path, stale)
+        except FileNotFoundError:
+            return True  # 다른 실행이 먼저 치웠다 — 다시 잡기에서 승자가 갈린다
+        except OSError as exc:
+            self.kv(
+                f"LOCK_TAKEOVER_FAILED=True error={type(exc).__name__} path={path} "
+                "HOLDER_ALIVE=False"
+            )
+            self._lock_held_message(path)
+            return False
+        try:
+            moved = stale.read_bytes()
+        except OSError as exc:
+            # 옮긴 것이 판정한 그 잠금인지 확인할 수 없다 — 경합이라 단정하지 않고 물러선다
+            # (옮긴 파일은 그대로 둔다 — 자리는 비었으니 다음 실행이 정상으로 잡는다).
+            self.kv(
+                f"LOCK_TAKEOVER_FAILED=True error=StaleReadFailed({type(exc).__name__}) "
+                f"moved_to={stale}"
+            )
+            return False
+        if moved != raw:
+            # 판정과 이름 바꾸기 사이에 다른 실행이 새 잠금을 만들었고, 그것을 옮겼다 — 되돌린다.
+            # link는 자리에 이미 파일이 있으면 실패한다(덮어쓰지 않는다 —
+            # rename은 POSIX에서 덮어쓴다).
+            try:
+                os.link(stale, path)
+                stale.unlink()
+                restored = "True"
+            except OSError as exc:
+                restored = f"False({type(exc).__name__}) moved_to={stale}"
+            self.kv(
+                f"LOCK_HELD=True path={path} holder=(인수 경합) HOLDER_ALIVE=True "
+                f"RESTORED={restored}"
+            )
+            if not restored.startswith("True"):
+                self.say(
+                    "경고: 다른 실행의 잠금을 제자리로 되돌리지 못했습니다"
+                    "(세 실행이 동시에 시작됨) — "
+                    "다른 창들을 모두 확인하고 출력 전체를 회신하세요"
+                )
+            self._lock_held_message(path)
+            return False
+        self.kv(f"LOCK_TAKEN_OVER=True path={path} stale_moved_to={stale}")
+        self.say(
+            f"앞 실행(pid {pid})은 끝났는데 잠금이 남아 있었습니다(창을 X로 닫은 경우 등) — "
+            "그 잠금을 "
+            "옆으로 치우고(파일은 보존) 이어서 실행합니다"
+        )
+        return True
+
     def release_lock(self) -> None:
+        """내 잠금이면 지운다. 내용이 내 것이 아니면(그 사이 남이 인수함) 지우지 않는다."""
         path = self._lock_path
         if path is None:
+            return
+        try:
+            current = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            self.kv(f"LOCK_RELEASE_FAILED=True error={type(exc).__name__} path={path}")
+            self._lock_path = None
+            return
+        if current != self._lock_body:
+            self.kv(f"LOCK_RELEASE_SKIPPED=True reason=NotOwner path={path}")
+            self._lock_path = None
             return
         try:
             path.unlink()
@@ -1438,10 +1604,19 @@ class AuthoringRound:
             if release_unevidenced and not self.dry_run:
                 try:
                     self.release_unevidenced()
+                except StageRefusedError as exc:
+                    bad = " ".join(f"{k}={v}" for k, v in exc.checks.items() if v is False)
+                    self.kv(f"WRITE_REFUSED=True stage=release-unevidenced FALSE: {bad}")
+                    self.say(f"[release-unevidenced] 거부 — {exc.hint}")
+                    return 1
+                except StageFailedError as exc:
+                    return self._fail(exc)
                 # 깨진 대장·genlog 등 — 단계 이름·타입명을 남기고 멈춘다(침묵 실패 금지).
                 except Exception as exc:  # noqa: BLE001
                     return self._fail(
-                        StageFailedError("release-unevidenced", type(exc).__name__, str(exc)[:300])
+                        StageFailedError(
+                            "release-unevidenced", type(exc).__name__, mask_secrets(str(exc))[:300]
+                        )
                     )
             return self._run_plan(only=only, start=start)
         finally:
@@ -1467,7 +1642,9 @@ class AuthoringRound:
             return self._fail(exc)
         # 실물 판정 중 깨진 파일 등도 타입명을 남기고 멈춘다(침묵 실패 금지).
         except Exception as exc:  # noqa: BLE001
-            return self._fail(StageFailedError("plan", type(exc).__name__, str(exc)[:300]))
+            return self._fail(
+                StageFailedError("plan", type(exc).__name__, mask_secrets(str(exc))[:300])
+            )
         if only is None and start is None and pending:
             first = next(s for s in STAGES if s in pending)
             self.kv(f"RESUME_FROM={first}")
@@ -1494,7 +1671,8 @@ class AuthoringRound:
             # 예기치 못한 실패도 단계·타입명을 남기고 멈춘다(traceback으로 흐름을 잃지 않게).
             except Exception as exc:  # noqa: BLE001
                 return self._fail(
-                    StageFailedError(stage, type(exc).__name__, str(exc)[:300]), stage=stage
+                    StageFailedError(stage, type(exc).__name__, mask_secrets(str(exc))[:300]),
+                    stage=stage,
                 )
             self._record(stage, outcome.status, outcome.detail)
             self.kv(f"STAGE_END stage={stage} status={outcome.status}")
@@ -1527,6 +1705,35 @@ class AuthoringRound:
             "고친 뒤 같은 한 줄로 이어갑니다"
         )
         return 1
+
+
+_PID_MAX = 2**32 - 1  # Windows pid는 DWORD — 그보다 크면 어느 OS의 pid도 아니다
+
+
+def _lock_pid(held: str) -> int | None:
+    """잠금 파일 내용(`{"pid": …, "started_at": …}`)에서 pid — 읽지 못하면 None(판정 불가)."""
+    try:
+        data = json.loads(held)
+    except ValueError:
+        return None
+    pid = data.get("pid") if isinstance(data, dict) else None
+    if isinstance(pid, bool) or not isinstance(pid, int) or not 0 < pid <= _PID_MAX:
+        return None
+    return pid
+
+
+def _lock_same_namespace(held: str) -> bool:
+    """잠금을 만든 실행이 이 실행과 같은 호스트·플랫폼인가 — 아니면 그 pid는 판정할 수 없다.
+
+    호스트·플랫폼이 적히지 않은 잠금(이 판정 이전 형식)도 False — 확인할 수 없으면 인수하지 않는다.
+    """
+    try:
+        data = json.loads(held)
+    except ValueError:
+        return False
+    if not isinstance(data, dict):
+        return False
+    return data.get("host") == socket.gethostname() and data.get("platform") == sys.platform
 
 
 def _jsonable(checks: Mapping[str, object]) -> dict[str, Any]:

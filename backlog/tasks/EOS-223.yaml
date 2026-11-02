@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - docs/data/licensing_safety.md
-session: null
+session: claude/eos-223-kice-license
 notes: "출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-E 소유 태스크 등재(판정 기준 main 3a83ed64). 현황: docs/data/licensing_safety.md의 KICE 본문 서술 행이 미확인(보류) — 표지 무단 복제 금지 문구만 확인·공공누리 유형 텍스트 미발견."
-updated: 2026-10-30
+updated: 2026-11-01
