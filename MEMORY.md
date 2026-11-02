@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-02 (결정 · D6 후속 — Kiki 권고 승인): **`KOGL_1`·`CC_BY` = Tier 1 · `CC_BY_SA` = Tier 2 · SA 충돌 정리(긁어 온 SA = Tier 0, 정상 취득 SA = Tier 2) · `EOS-231` P2 유지** (Kiki 결정, claude 기록) — 판정 기준: main `2c6357e3`
+
+- **무엇을**: EOS-224 대응표(`docs/data/licensing_safety.md` 「Tier 0~3 ↔ LicenseType 매핑」)의 판정 필요 중 실제로 쓰일 3값을 세션 권고대로 확정. 판정 필요는 LicenseType 16→13값.
+- **근거**: 약관 아카이버 `TIER1_SOURCES`가 공공누리 1유형·CC BY 소스를 이미 Tier1로 둠 · 가이드 분류 코드 "CC BY-SA → Tier 2". 결정 시점 실측 = 코퍼스 67개 전부 pool `whymath-original`·문항 15,355건 전부 `WHYMATH_GENERATED`(외부 라이선스 콘텐츠 0건 → 현재 코퍼스 영향 없음).
+- **하지 않은 것**: 저작 런북에 8-gram 기록 줄 추가 — 다른 레인 소유 파일이고 쓰기 블록 가드가 필요해 `EOS-231` 범위로 둠. pool 3값·NC 계열은 여전히 판정 필요.
+
 ### 2026-11-02 (결정 · EOS-221 — Kiki 승인): **Kiki PC 블록의 `Read-Host`는 금지하지 않고 CLAUDE.md의 세 방법을 유지 — 단 ③은 단독 한 줄·①②가 가능하면 쓰지 않음** (Kiki 결정, claude 기록) — 판정 기준: main `57d05c55`
 
 - **무엇을**: EOS 감리 지시문 v3(02-C)의 실행 표준 3항 "Read-Host 금지"가 CLAUDE.md 「확장 — 붙여넣기 블록의 자리표시자 전면 금지」(2026-09-06)의 방법 ③(Read-Host 허용)·`check_runbook_blocks.py`의 의도적 제외와 충돌해 보고 → Kiki가 권고안(CLAUDE.md 기준 유지)을 승인했다.

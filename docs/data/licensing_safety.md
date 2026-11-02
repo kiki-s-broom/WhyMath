@@ -350,6 +350,9 @@ sources:
 ## Tier 0~3 ↔ LicenseType 매핑 (EOS-224)
 
 > **D6 = (b) Kiki 결정 · 2026-11-02(KST).** 새 필드를 만들지 않고 문서 한 장으로 대응만 둔다.
+> **후속 결정(Kiki · 2026-11-02 · 세션 권고 승인)**: `KOGL_1`·`CC_BY` = Tier 1, `CC_BY_SA` = Tier 2, 충돌 ①의 SA 쪽 정리.
+> 결정 시점 실측: 저장소 코퍼스 67개 전부 pool `whymath-original` · 문항 15,355건 전부 `WHYMATH_GENERATED` — 외부 라이선스 콘텐츠 0건이라
+> 이 결정이 현재 코퍼스에 미치는 영향은 없고, 외부 자료를 들여올 때부터 적용된다.
 > `schema/enums.py`는 바꾸지 않는다(12/31 내부 검증 기간 방침 규칙 3 — CORE 상수). 이 표는 판정 도구가
 > 아니라 **대응 기록**이다. 코드(`provenance_gate`·Rights Policy Engine)는 이 표를 읽지 않는다.
 
@@ -366,13 +369,13 @@ Tier 1 = 즉시 도입 학습 데이터 · Tier 2 = 사실/표현 분리 paraphr
 |---|---|---|
 | `PUBLIC_DOMAIN` | 판정 필요 | 이름은 퍼블릭 도메인이나 enum 설명은 "평가원 공개 — 본문 영리사용은 별도 금지". 가이드에 대응 명시 없음 |
 | `KOGL_0` | 판정 필요 | 가이드는 공공누리 유형을 Tier에 대응시키지 않음(Tier 1 표는 NCIC 성취기준을 데이터셋 이름으로만 적음) |
-| `KOGL_1` | 판정 필요 | 위와 같음 |
+| `KOGL_1` | Tier 1 | Kiki 결정 2026-11-02 — 세션 권고 승인: 출처표시만 요구 · 약관 아카이버 `TIER1_SOURCES`가 공공누리 1유형 소스를 이미 Tier1로 둠 · 가이드 Tier 1 표의 NCIC 성취기준과 같은 성격 |
 | `KOGL_2` | 판정 필요 | 상업적 이용금지(NC) — 가이드 안에서 NC 처리가 엇갈림(충돌 ①) |
 | `KOGL_3` | 판정 필요 | 변경금지(ND) — 가이드가 ND를 다루지 않음 |
 | `KOGL_4` | 판정 필요 | NC + ND — 충돌 ① · ND 미정 |
 | `CC0` | 판정 필요 | 가이드에 대응 명시 없음 |
-| `CC_BY` | 판정 필요 | 가이드에 대응 명시 없음(Tier 1 표의 PhET 등이 이 조건이지만 데이터셋 단위 명시일 뿐) |
-| `CC_BY_SA` | 판정 필요 | 가이드 안에서 엇갈림 — 분류 코드는 Tier 2, §6.3 Tier 0 표는 SA 자원(Wikipedia·Stack Exchange)을 Tier 0(충돌 ①) |
+| `CC_BY` | Tier 1 | Kiki 결정 2026-11-02 — 세션 권고 승인: 출처표시만 요구 · `TIER1_SOURCES`의 CC BY 소스 4곳(OpenStax·Siyavula·Illustrative Math·PhET) · PhET는 가이드 Tier 1 표 명시 |
+| `CC_BY_SA` | Tier 2 | Kiki 결정 2026-11-02 — 세션 권고 승인: 가이드 분류 코드 'CC BY-SA → Tier 2' · 정상 취득한 SA 자료 기준(긁어 온 SA 자원은 Tier 0 — 충돌 ① 정리) |
 | `CC_BY_NC` | 판정 필요 | NC — 충돌 ① |
 | `CC_BY_ND` | 판정 필요 | ND — 가이드가 ND를 다루지 않음 |
 | `CC_BY_NC_SA` | 판정 필요 | NC + SA — 충돌 ① |
@@ -395,24 +398,26 @@ pool(`ContentPool` 3종 · `docs/legal/copyright_gradient.md` §4.2)과의 대�
 | pool | Tier | 근거 |
 |---|---|---|
 | `whymath-original` | 판정 필요 | 자체 저작(위 표에서 '대응 없음')과 등급 1 사실정보 소스(공공누리 등 — 위 표에서 '판정 필요')가 섞인 풀이라 하나의 Tier로 못 묶음 |
-| `external-sharealike` | 판정 필요 | CC BY-SA 풀 — `CC_BY_SA`와 같은 가이드 내부 충돌(①) |
+| `external-sharealike` | 판정 필요 | CC BY-SA 풀 — `CC_BY_SA`는 Tier 2로 정해졌으나 pool 대응은 이번 결정 범위 밖(결정 대상 3값만) |
 | `external-licensed` | 판정 필요 | 등급 3 협상 타결분 — 가이드 Tier 3 표는 특정 기관만 명시하고 pool을 대응시키지 않음 |
 <!-- tier-map:pool:end -->
 
 Tier 0(평가 전용 격리)은 격리 컨테이너·영구 저장 금지(tmpfs)를 전제하므로 저장소 코퍼스 pool과 대응하지 않는다.
 
 <!-- tier-map:pending:begin -->
-**판정 필요 목록(Kiki 판단)** — LicenseType 16값: `PUBLIC_DOMAIN`·`KOGL_0`·`KOGL_1`·`KOGL_2`·`KOGL_3`·`KOGL_4`·`CC0`·`CC_BY`·`CC_BY_SA`·`CC_BY_NC`·`CC_BY_ND`·`CC_BY_NC_SA`·`CC_BY_NC_ND`·`CONTRACT_LICENSED`·`DIRECT_PERMISSION`·`THIRD_PARTY_LICENSED` / pool 3값: `whymath-original`·`external-sharealike`·`external-licensed`.
+**판정 필요 목록(Kiki 판단)** — LicenseType 13값: `PUBLIC_DOMAIN`·`KOGL_0`·`KOGL_2`·`KOGL_3`·`KOGL_4`·`CC0`·`CC_BY_NC`·`CC_BY_ND`·`CC_BY_NC_SA`·`CC_BY_NC_ND`·`CONTRACT_LICENSED`·`DIRECT_PERMISSION`·`THIRD_PARTY_LICENSED` / pool 3값: `whymath-original`·`external-sharealike`·`external-licensed`.
 <!-- tier-map:pending:end -->
 
 **기존 표기와의 충돌(정리 방향은 Kiki 판단)** — 값 목록과 별개로 센다:
 - ① **가이드 안에서 SA·NC 처리가 두 갈래다.** §6.3 Tier 0 표는 "SA·NC·추출금지 자료(MathNet·NRICH 스타일·Wikipedia·Stack Exchange) →
   평가 전용"이라 하고, 같은 문서의 분류 코드(`quarantine_sa_nc`)는 상업 불가면 **사용 불가(rejected)**, SA면 **Tier 2(paraphrase)**로 보낸다.
+  **SA 쪽 정리(Kiki 결정 2026-11-02 — 세션 권고 승인)**: 두 서술은 *자료를 얻은 방식*이 다르다고 본다 — 웹에서 긁어 온 SA 자원
+  (Wikipedia·Stack Exchange 덤프 등)은 Tier 0(평가 전용 격리), 정상 취득한 SA 자료는 Tier 2(사실/표현 분리 paraphrase). NC 쪽은 미정.
 - ② **이 문서의 등급(A+·A·A-·B=SA·C=NC·D=독점)과 분류 코드의 경계가 다르다.** 분류 코드는 ⓐ상업 불가 → rejected ⓑSA → Tier 2
   ⓒA+/A/A- → Tier 1 ⓓ그 밖 → Tier 0 순서로 판정한다. 그래서 C(NC)는 ⓐ에서 rejected가 되고, D(독점)는 상업 가능으로 표기되면 ⓓ의 Tier 0이
   된다. D를 Tier 0(평가 격리)으로 둘지 사용 금지로 둘지가 이 문서에 정해져 있지 않다.
 - ③ **기존 Tier1 수집 목록과 라벨 체계가 다르다.** 약관 아카이버 레지스트리(`scripts/ops/license_snapshot_archiver.py` `TIER1_SOURCES` 20곳)는
-  "US Gov Work (퍼블릭 도메인)"·"공개"·"공공누리 1유형" 소스를 이미 Tier1로 묶는데, 이 표는 `PUBLIC_DOMAIN`·`KOGL_1`을 판정 필요로 둔다.
+  "US Gov Work (퍼블릭 도메인)"·"공개"·"공공누리 1유형" 소스를 이미 Tier1로 묶는데, 이 표는 `PUBLIC_DOMAIN`을 판정 필요로 둔다(`KOGL_1`은 2026-11-02 Tier 1로 정리).
   또 레지스트리의 "공공누리 AI (2026-01)" 유형에 해당하는 `LicenseType` 값이 23값 안에 없다.
 - 등급 3(협상 필요 · 타결 전 사용 금지)과 Tier 3(협상 후 활용)은 같은 대상을 *타결 전·후*로 본 것이라 충돌이 아니다.
 
