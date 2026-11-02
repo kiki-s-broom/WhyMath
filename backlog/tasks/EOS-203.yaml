@@ -18,9 +18,13 @@ paths:
   - src/backend/whymath_backend/l3/equivalent/llm_generator.py
   - src/backend/whymath_backend/l3/router.py
   - docs/ops/eos197_authoring_round_runbook.md
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+  - src/backend/whymath_backend/harness/local_thinking_probe.py
 session: claude/eos-203-local-seat-thinking
 notes: |-
   출처: EOS-197 A6 저작 회차(2026-10-28) 로컬 좌석 결과. Kiki가 런북 밖에서 타임아웃 180초를 수동 설정해 재실행했다. 비용 0원 좌석이라 수락률이 오르면 클라우드 좌석 비용(이번 회차 약 $0.34)을 줄일 수 있다.
 
   겹침 고지: EOS-23(세션 claude/optimistic-tesla-njo0v1)이 llm_generator.py를 작업 경로로 잡고 있다 — 착수 전 그쪽 상태 확인.
+
+  [정정 2026-11-02] paths ['src/backend/whymath_backend/l3/equivalent/llm_generator.py', 'src/backend/whymath_backend/l3/router.py', 'docs/ops/eos197_authoring_round_runbook.md'] → ['src/backend/whymath_backend/l3/equivalent/llm_generator.py', 'src/backend/whymath_backend/l3/router.py', 'docs/ops/eos197_authoring_round_runbook.md', 'src/backend/whymath_backend/harness/problem_corpus_accumulate.py', 'src/backend/whymath_backend/harness/local_thinking_probe.py']: Kiki 승인(2026-11-02): 저작 CLI --thinking 플래그와 실측 탐침을 harness에 둔다(실제 저작 경로와 같은 조립)
 updated: 2026-11-02

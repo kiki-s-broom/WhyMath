@@ -766,7 +766,7 @@ class LLMEquivalentProblemGenerator:
         시드도 담지 않는다 — `GenerationLog.seed` 전용 컬럼이 정본이고, 스냅샷에 사본을 두면
         둘이 갈라졌을 때 어느 쪽이 실제로 보낸 값인지 알 수 없게 된다(단일 진실 원천).
         """
-        return {
+        snapshot: dict[str, object] = {
             "kind": "l3.equivalent.llm_generate",
             "prompt": prompt,
             "system": _system_prompt(),
@@ -781,9 +781,13 @@ class LLMEquivalentProblemGenerator:
             "topic_hint": self._topic_hint,
             "temperature": self._temperature,
             "top_p": self._top_p,
-            # EOS-203 — 사고 모드 지시(None=미지정). 실제로 붙은 지시어는 위 `prompt` 전문에 있다.
-            "thinking": self._thinking,
         }
+        if self._thinking is not None:
+            # EOS-203 — 지정했을 때만 싣는다. 미지정(None)에 키를 더하면 프롬프트는 같아도
+            # 스냅샷 해시(input_snapshot_sha256)가 종전 실행과 달라진다. 붙은 지시어는 `prompt`
+            # 전문에 있다.
+            snapshot["thinking"] = self._thinking
+        return snapshot
 
     def _emit_generation_log(
         self,

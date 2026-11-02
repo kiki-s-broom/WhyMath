@@ -1326,6 +1326,11 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "harness.finite_probability_batch": _BATCH_GENERATOR,
         "harness.misconception_mc_batch": _BATCH_GENERATOR,
         "harness.problem_corpus_accumulate": _BATCH_GENERATOR,
+        "harness.local_thinking_probe": (
+            "by-design:로컬 LLM 실측 탐침(EOS-203) — 사람 PC의 Ollama로 사고 모드 켬/끔을 같은 "
+            "스펙 표본에서 비교한다. CI에는 LLM이 없어 미도달이 정상. main()·판정 함수는 "
+            "test_local_thinking_probe가 가짜 provider로 in-process 실행"
+        ),
         "harness.problem_corpus_batch": _BATCH_GENERATOR,
         "harness.problem_corpus_rephrase": _BATCH_GENERATOR,
         "harness.problem_corpus_rephrase_diagnose": _BATCH_GENERATOR,
@@ -1899,11 +1904,6 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "l3.pregenerate": _BATCH_GENERATOR,
         "l3.pedagogy.analogy_demand": _OFFLINE_REPORT,
         "l3.pedagogy.diag_item_projector": _OPS_DB_WRITER,
-        "l3.equivalent.local_thinking_probe": (
-            "by-design:로컬 LLM 실측 탐침(EOS-203) — 사람 PC의 Ollama로 사고 모드 켬/끔을 같은 "
-            "스펙 표본에서 비교한다. CI에는 LLM이 없어 미도달이 정상. main()·판정 함수는 "
-            "test_local_thinking_probe가 가짜 provider로 in-process 실행"
-        ),
         "l3.equivalent.structural_dedup": (
             "by-design:저작 회차 검수 큐 조립(EOS-204) — 런북 [I] 수동 경로에서 사람이 PC의 회차 "
             "산출물로 돌린다. main()·판정 함수는 test_structural_dedup가 in-process로 상시 실행"
