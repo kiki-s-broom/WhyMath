@@ -136,7 +136,15 @@ _PSQL_INVOCATION = re.compile(r"\bpsql\b", re.IGNORECASE)
 # 저장소 적재 진입점 — `promote --load`·`load_crosslinks`는 DB를 쓴다(2026-10-07 HARN-214: 이 형태가
 # 어휘에 없어 적재 블록이 "쓰기 0개"로 판정됐다). 변수에 가려진 호출(`& $LoadPy`)은 텍스트
 # 스캔으로 탐지할 수 없다 — 한계는 모듈 docstring.
-_LOADER_ENTRYPOINT = re.compile(r"\bload_crosslinks\b|\bpromote\b[^\n]*\s--load\b", re.IGNORECASE)
+# P3-32: WH-S 재생(`corpus_replay` — 호출 자체가 verified_solutions·solution_nodes를
+# 쓴다)과 경로 승격(`path_promotion --apply` — `--apply` 없으면 dry-run)도 같은 부류다.
+# `cmd /c "…"` 안에 감싸여도 본다.
+_LOADER_ENTRYPOINT = re.compile(
+    r"\bload_crosslinks\b|\bpromote\b[^\n]*\s--load\b"
+    # `corpus_replay.py`(파일 경로 — Get-Content로 내용을 읽는 것)는 실행이 아니다.
+    r"|\bcorpus_replay\b(?!\.py)|\bpath_promotion\b[^\n]*\s--apply\b",
+    re.IGNORECASE,
+)
 
 
 def _code_text(line: str) -> str:
@@ -365,12 +373,18 @@ def write_hits(block: Block) -> list[WriteHit]:
                 break
         if found:
             continue
-        # 저장소 적재 진입점(`promote --load`·`load_crosslinks`) — 문자열 속 호출도 본다.
+        # 저장소 적재 진입점(`promote --load`·`load_crosslinks`·`corpus_replay`·
+        # `path_promotion --apply`) — 문자열 속 호출도 본다.
         code_text = _code_text(line)
         loader = _LOADER_ENTRYPOINT.search(code_text)
         if loader:
             hits.append(
-                WriteHit(line_no, loader.start(), "적재 CLI(promote --load / load_crosslinks)")
+                WriteHit(
+                    line_no,
+                    loader.start(),
+                    "적재 CLI(promote --load / load_crosslinks / corpus_replay /"
+                    " path_promotion --apply)",
+                )
             )
             continue
         # SQL 변이만은 문자열 *안*을 본다(psql -c "…"의 위험은 거기 있다). `cmd /c "…psql…"`처럼

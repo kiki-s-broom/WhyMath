@@ -43,13 +43,16 @@ import hashlib
 import json
 import sys
 import uuid
+from collections.abc import Iterable, Set
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from whymath_backend.config import get_settings
+from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.solution_node import NodeVerifyStatus
 from whymath_backend.l3.verify_step import verify_step
 from whymath_backend.whs import node_store
@@ -291,6 +294,9 @@ class ReplayReport:
     labeled_bad: int = 0
     labeled_unverified: int = 0
     bad_skipped: int = 0  # 오분기 비동치 증명 실패로 미주입(날조 금지)
+    # P3-32: --only-existing-problems 로 거른 대상 중 DB problem 행이 없어 재생하지 않은 수.
+    # 옵션을 안 쓰면 0(거르지 않았다). total_records 는 거른 *뒤* 재생 대상 수다.
+    skipped_problem_missing: int = 0
     failures: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
@@ -304,6 +310,7 @@ class ReplayReport:
             "labeled_bad": self.labeled_bad,
             "labeled_unverified": self.labeled_unverified,
             "bad_skipped": self.bad_skipped,
+            "skipped_problem_missing": self.skipped_problem_missing,
             "failures": self.failures,
             "note": (
                 "finalize 통과율은 파이프라인 무결성 지표다(생성기 construction trace의 "
@@ -358,6 +365,36 @@ async def replay_one(
     return outcome, counts
 
 
+def keep_existing(
+    items: Iterable[ReplayItem], existing_ids: Set[uuid.UUID]
+) -> tuple[list[ReplayItem], int]:
+    """DB에 problem 행이 있는 대상만 남긴다 → (남긴 대상, 건너뛴 수). 순서는 보존한다.
+
+    `verified_solutions.problem_id`는 FK가 아니라 느슨참조라(WH-S 오프라인 독립성), 문항이 없는
+    DB에 재생하면 가리킬 문항이 없는 풀이 행이 쌓인다. 운영 DB처럼 코퍼스 일부만 적재된 곳에서는
+    이 필터로 그런 행을 만들지 않는다(P3-32).
+    """
+    kept: list[ReplayItem] = []
+    skipped = 0
+    for item in items:
+        if item.problem_id in existing_ids:
+            kept.append(item)
+        else:
+            skipped += 1
+    return kept, skipped
+
+
+async def fetch_existing_problem_ids(
+    session: AsyncSession, problem_ids: Iterable[uuid.UUID]
+) -> set[uuid.UUID]:
+    """주어진 ID 중 `problem` 테이블에 행이 있는 것(읽기 전용)."""
+    wanted = list(set(problem_ids))
+    if not wanted:
+        return set()
+    result = await session.execute(select(Problem.problem_id).where(Problem.problem_id.in_(wanted)))
+    return set(result.scalars().all())
+
+
 async def run_replay_batch(
     sessionmaker: async_sessionmaker[AsyncSession],
     items: list[ReplayItem],
@@ -401,6 +438,14 @@ def main(argv: list[str] | None = None) -> int:
         help="결함 주입 오분기 끄기(기본 ON — PRM bad 라벨 공급).",
     )
     parser.add_argument("--json", dest="json_path", default=None, help="JSON 리포트 저장 경로.")
+    parser.add_argument(
+        "--only-existing-problems",
+        action="store_true",
+        help=(
+            "DB problem 행이 있는 대상만 재생한다(없는 문항의 고아 풀이 행 방지 · 운영 DB용). "
+            "건너뛴 수는 skipped_problem_missing 으로 보고한다."
+        ),
+    )
     args = parser.parse_args(argv)
 
     items: list[ReplayItem] = []
@@ -415,13 +460,35 @@ def main(argv: list[str] | None = None) -> int:
     engine = create_async_engine(get_settings().database_url)
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
 
-    async def _run() -> ReplayReport:
+    async def _run() -> ReplayReport | None:
         try:
-            return await run_replay_batch(sessionmaker, items, bad_branch=not args.no_bad_branch)
+            targets = items
+            skipped = 0
+            if args.only_existing_problems:
+                async with sessionmaker() as session:
+                    existing = await fetch_existing_problem_ids(
+                        session, (item.problem_id for item in items)
+                    )
+                targets, skipped = keep_existing(items, existing)
+                if not targets:
+                    return None
+            report = await run_replay_batch(
+                sessionmaker, targets, bad_branch=not args.no_bad_branch
+            )
+            report.skipped_problem_missing = skipped
+            return report
         finally:
             await engine.dispose()
 
-    report = asyncio.run(_run())
+    maybe_report = asyncio.run(_run())
+    if maybe_report is None:
+        # 대상이 하나도 DB에 없다 — 0건 재생을 성공으로 보고하지 않는다(스캔 0건은 실패).
+        print(
+            f"replay 대상 0건 — 코퍼스 대상 {len(items)}건 중 DB problem 행이 있는 문항이 없습니다"
+            " (--only-existing-problems)."
+        )
+        return 1
+    report = maybe_report
     payload = report.to_json()
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if args.json_path:
