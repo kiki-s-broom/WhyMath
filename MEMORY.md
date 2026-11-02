@@ -338,6 +338,11 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-02 (결정 · EOS-221 — Kiki 승인): **Kiki PC 블록의 `Read-Host`는 금지하지 않고 CLAUDE.md의 세 방법을 유지 — 단 ③은 단독 한 줄·①②가 가능하면 쓰지 않음** (Kiki 결정, claude 기록) — 판정 기준: main `57d05c55`
+
+- **무엇을**: EOS 감리 지시문 v3(02-C)의 실행 표준 3항 "Read-Host 금지"가 CLAUDE.md 「확장 — 붙여넣기 블록의 자리표시자 전면 금지」(2026-09-06)의 방법 ③(Read-Host 허용)·`check_runbook_blocks.py`의 의도적 제외와 충돌해 보고 → Kiki가 권고안(CLAUDE.md 기준 유지)을 승인했다.
+- **값**: 값 공급 순서 ① 세션이 채움 ② 블록이 찾음 ③ `Read-Host`(그 한 줄만 단독). CLAUDE.md 서술("통째로 붙여넣어도 그 줄에서 정지")과 런북 실측(EOS-219 2026-10-30 · 저작 회차 [R0] — 다음 줄을 입력으로 삼켜 빈 값)이 어긋나므로 운용 조건은 실측을 따른다. CLAUDE.md 문구 정정은 하지 않았다(Kiki 몫 · 산문 동결 아래 '정정'은 허용 범주).
+- **근거**: 색인 `docs/ops/kiki_pc_execution_standard.md` C1 · 태스크 `EOS-221`.
 ### 2026-11-01 (측정·EOS-222 소급 — LLM 저작 산출물 8-gram 일치율 첫 기록): **기존 저작 회차 2개 모두 70% 이상 0건 (최고 36.4%) — 기록만, 차단 없음** (claude 측정·기록)
 
 - **무엇을**: `python -m whymath_backend.ops.ngram_overlap_report run data/runs/eos197-a6-local data/runs/eos197-a6-openrouter`(가이드 v2 n-gram 가드레일 · 8-gram · 공백 토큰화 · 비교 원본 = 회차가 읽은 입력 코퍼스 generated_v0·p3_fill_v0·p3_calculus1_diff_v0 · 평가원·EBS·교과서 본문은 저장소에 없어 미대조)와 `corpus data/corpus/problem_bank_rephrased_v0 --against data/corpus/problem_bank_generated_v0`.

@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-319
+title: "런북 쓰기 가드 검사기 오판정 — 변수 이름 속 commit 거짓 위반 · worktree add·저작 회차 실행 놓침"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 거짓 위반 제거 — `scripts/ops/check_runbook_blocks.py`의 쓰기 명령 짝 판정(`_WRITE_COMMAND_PAIRS`의 `(\"git\", \"commit\")` 등)이 변수 이름 속 글자(예: `$HaveCommit`)를 `git commit`으로 읽지 않게 한다. 반례 픽스처: `$HaveCommit = [bool](git cat-file -t $X 2>$null)` 줄은 쓰기 0개. ② 놓침 보강 — `git worktree add`(작업 폴더 생성)와 `& $Py -m whymath_backend.harness.authoring_round`(저작 회차 실행 — 유료 호출·push 포함)를 쓰기로 인식해 자가거부 가드를 요구한다(단 `--dry-run`이 붙은 실행은 쓰기가 아니다). ③ 두 축 모두 뮤테이션으로 RED를 확인하고, 기존 런북 45건의 판정 변화를 PR에 적는다(새로 위반이 되는 런북은 고치거나 만료 있는 유예로 둔다). ④ 이 파일을 함께 바꾸는 열린 PR(#1377 · HARN-115)과 충돌하지 않게, 그 PR이 머지·종결된 뒤 착수한다."
+artifacts: []
+paths:
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
+session: null
+notes: "출처: EOS-209 첫 Windows 실회차 블록 검증(2026-11-01). Kiki PC용 [E1] 블록에서 변수 `$HaveCommit`이 `git commit` 쓰기로 오판정돼 거짓 위반이 났고(변수 이름을 `$HaveObj`로 바꿔 우회), 반대로 같은 블록의 `git worktree add`와 오케스트레이터 실행([E3] — 유료 호출·push)은 쓰기 0개로 판정됐다. 쓰기 가드 검사기의 변별력 결함(거짓 양성 1·거짓 음성 2). 보고 승인: Kiki 2026-11-02 '등재'."
+updated: 2026-11-02

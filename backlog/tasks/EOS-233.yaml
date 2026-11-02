@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-233
+title: "저작 CLI dedup 지문 계산 — 첫 회차의 출력 파일 없음을 '실패' 경고로 내지 않기"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 4
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `src/backend/whymath_backend/harness/problem_corpus_accumulate.py`의 dedup 입력 지문 계산에서, 아직 없는 출력 파일(첫 회차의 `--out` 대상 — `FileNotFoundError`)은 '실패' 경고가 아니라 '없음(첫 회차)' 정보로 구분한다. 다른 예외(권한 거부·읽기 오류 등)는 지금처럼 예외 타입명을 담은 경고로 남긴다(침묵 실패 금지). ② 대장 기록값의 의미를 바꾸지 않는다 — 없음과 실패 모두 지금처럼 None으로 남기되, 둘을 구분할 수 있게 사유를 함께 남길지 결정해 적는다. ③ 반례 테스트: 없는 경로는 경고 0건 · 읽기 실패 경로는 타입명 포함 경고 1건."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+session: null
+notes: |-
+  출처: EOS-209 첫 Windows 실회차(2026-11-01 · 산출물 75ad7c69)의 첫 저작 회차 출력 `dedup 입력 지문 계산 실패(FileNotFoundError) — 경로 …\cu.jsonl는 None=미기록으로 대장에 남는다`. 출력 파일이 아직 없는 정상 상황을 '실패'로 보여 사람이 오류로 읽는다(회차 판정에는 영향 없음). 보고 승인: Kiki 2026-11-02 '등재'.
+
+  [번호 정정] 처음 EOS-231로 등재했으나(커밋 faececd8) 같은 번호가 이미 main 57d05c55(#1813)에 다른 태스크로 머지돼 있었다 — 등재 시점의 브랜치 기준(19291d3e)이 그보다 앞서 보지 못했다. main을 병합해 그쪽 EOS-231을 살리고 이 태스크를 CLI로 다시 등재했다.
+updated: 2026-11-02
