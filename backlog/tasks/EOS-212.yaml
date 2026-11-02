@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/equivalent/llm_generator.py
   - src/backend/whymath_backend/l3/providers/seat_failure.py
-session: null
+session: claude/eos-212-genlog-error-detail
 notes: "출처: EOS-202 구현 보고(2026-10-29) — EOS-202는 콘솔 경고만 범위였고 error_detail 형식은 측정기 분류 계약 때문에 의도적으로 무변경. 같은 파일 llm_generator.py를 EOS-205·EOS-211·EOS-203이 작업 경로로 잡고 있다 — 착수 전 상태 확인."
-updated: 2026-10-29
+updated: 2026-11-02

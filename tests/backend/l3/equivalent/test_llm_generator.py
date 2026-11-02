@@ -1526,3 +1526,99 @@ def test_unit_codes_come_from_spec_not_llm_standard_codes() -> None:
     )
     assert candidate is not None
     assert candidate.problem.unit_codes == ["12미적Ⅰ-02-05"]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# EOS-212 — GenerationLog error_detail에서 공급사 응답 본문 제거(타입명 + 안전 요약)
+# ──────────────────────────────────────────────────────────────────────
+class TestEos212ErrorDetail:
+    def test_provider_failure_detail_has_status_but_not_body(self) -> None:
+        logs: list[object] = []
+        exc = SeatHttpError(
+            f"OpenAI 호환 호출 실패 HTTP 429: {_BODY_MARKER} (시도 3회)", status_code=429
+        )
+        gen = _gen(_ScriptedRaisingProvider(exc), generation_log_sink=logs.append)
+        assert gen.generate(_spec()) is None
+        detail = logs[0].error_detail  # type: ignore[attr-defined]
+        assert detail == "provider.generate failed: SeatHttpError(HTTP 429)"
+        assert _BODY_MARKER not in detail
+
+    def test_provider_failure_without_status_keeps_type_only(self) -> None:
+        logs: list[object] = []
+        gen = _gen(
+            _ScriptedRaisingProvider(RuntimeError(_BODY_MARKER)), generation_log_sink=logs.append
+        )
+        assert gen.generate(_spec()) is None
+        assert logs[0].error_detail == "provider.generate failed: RuntimeError"  # type: ignore[attr-defined]
+
+    def test_assembly_failure_uses_same_criterion(self) -> None:
+        """③ — 조립 실패도 타입명 + 안전 요약(검증 오류 건수)만. LLM 입력값은 남지 않는다."""
+        logs: list[object] = []
+        payload = json.loads(_HAPPY)
+        payload["difficulty_overall"] = 3.0
+        payload["answer_map"] = {"x": "2"}  # derive-and-verify 불일치 → ValueError(메시지에 LLM 답)
+        provider = FakeProvider([json.dumps(payload, ensure_ascii=False)])
+        assert _gen(provider, generation_log_sink=logs.append).generate(_spec()) is None
+        detail = logs[0].error_detail  # type: ignore[attr-defined]
+        assert detail == "후보 조립 실패: ValueError"
+        assert "LLM 답" not in detail
+
+    def test_new_details_classify_like_old_ones(self) -> None:
+        """② — 측정기 앞머리 분류는 꼬리가 바뀌어도 같다(옛 형식·새 형식 짝 대조)."""
+        from whymath_backend.ops.g3_content_measures import classify_failure
+
+        pairs = [
+            ("provider.generate failed: ReadTimeout: ", "provider.generate failed: ReadTimeout"),
+            (
+                f"provider.generate failed: SeatHttpError: HTTP 429: {_BODY_MARKER}",
+                "provider.generate failed: SeatHttpError(HTTP 429)",
+            ),
+            ("후보 조립 실패: ValidationError", "후보 조립 실패: ValidationError(errors=2)"),
+            ("응답 JSON 파싱 실패", "응답 JSON 파싱 실패"),
+        ]
+        for old, new in pairs:
+            assert classify_failure(old) == classify_failure(new) != "unknown"
+
+    def test_recorded_eos197_round_classification_is_pinned(self) -> None:
+        """② — 기존 회차 산출물의 분류 결과를 고정한다(형식 변경이 과거 측정을 바꾸지 않는다)."""
+        from collections import Counter
+        from pathlib import Path
+
+        from whymath_backend.ops.g3_content_measures import classify_failure
+
+        runs = Path(__file__).resolve().parents[4] / "data" / "runs"
+        counts: Counter[str] = Counter()
+        for run in ("eos197-a6-local", "eos197-a6-openrouter"):
+            for line in (runs / run / "cu.genlog.jsonl").read_text(encoding="utf-8").splitlines():
+                detail = json.loads(line).get("error_detail")
+                if detail:
+                    counts[classify_failure(detail)] += 1
+        assert sum(counts.values()) == 47  # 표본 크기부터 고정(스캔 0건 방지)
+        assert "unknown" not in counts
+        assert counts == Counter(
+            {"not_generated": 25, "parse_rejected": 11, "assembly_rejected": 11}
+        )
+
+
+def test_assembly_validation_failure_records_error_count_not_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """③의 변별 픽스처 — pydantic 검증 실패는 건수만 남고 LLM 입력값은 남지 않는다."""
+    from pydantic import BaseModel, ValidationError
+
+    class _M(BaseModel):
+        n: int
+
+    def _raise(self: object, spec: object, data: object) -> object:
+        try:
+            _M(n=_BODY_MARKER)  # type: ignore[arg-type]
+        except ValidationError as exc:
+            raise exc
+        raise AssertionError("unreachable")
+
+    monkeypatch.setattr(LLMEquivalentProblemGenerator, "_assemble", _raise)
+    logs: list[object] = []
+    assert _gen(FakeProvider([_HAPPY]), generation_log_sink=logs.append).generate(_spec()) is None
+    detail = logs[0].error_detail  # type: ignore[attr-defined]
+    assert detail == "후보 조립 실패: ValidationError(errors=1)"
+    assert _BODY_MARKER not in detail

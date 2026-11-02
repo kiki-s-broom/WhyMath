@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-233
+title: "생성 로그·사전 생성 기록의 예외 메시지 원문 제거 — prewarmer·시드 재현 탐침·CU 힌트 패스의 요약을 공용 정의로"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `l3/pregenerate/prewarmer.py`(error=`provider.generate failed: {타입}: {exc}`)와 `harness/generation_seed_replay_probe.py`(같은 형식)가 예외 메시지 원문을 기록에 싣는다 — `SeatHttpError`는 공급사 응답 본문 최대 2000자를 메시지에 붙이므로 그 본문이 기록에 남는다. EOS-212가 `l3/equivalent/llm_generator.py`에 적용한 기준(타입명 + 안전 요약 · 앞머리 유지)으로 꼬리를 줄인다 ② `l4/hint_content/cu_hint_pass.py`의 `_safe_exc_summary`(세 번째 중복 구현)를 공용 정의(`l3/providers/seat_failure.http_status_of` 기반)로 합칠지 판정한다 ③ 각 기록의 소비자가 꼬리를 파싱하지 않는지 확인하고 테스트로 고정한다 ④ 실패 주입으로 본문 표지가 기록에 남지 않음을 RED→GREEN으로 확인한다"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/pregenerate/prewarmer.py
+  - src/backend/whymath_backend/harness/generation_seed_replay_probe.py
+  - src/backend/whymath_backend/l4/hint_content/cu_hint_pass.py
+session: null
+notes: "출처: EOS-212 구현 중 범위 밖 발견(2026-11-02 · 레인 02-B). 세 파일 모두 레인 02-B의 고쳐도 되는 곳 밖이라 고치지 않고 등재만 했다(l4/hint_content는 EOS-214~217 소유 경로)."
+updated: 2026-11-02

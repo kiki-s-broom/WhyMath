@@ -139,6 +139,7 @@ from whymath_backend.l3.pregenerate.provenance_bridge import (
     model_name_for_decision,
 )
 from whymath_backend.l3.prompt_assets import fill, prompt_text
+from whymath_backend.l3.providers.seat_failure import http_status_of
 from whymath_backend.l3.router import Router, _as_cost_tier, actual_cost_krw, langfuse_fields
 from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import derive_selected_root
@@ -173,7 +174,7 @@ def _safe_exc_summary(exc: BaseException) -> str:
     "안전한 요약"의 정의(값이 아니라 **구조**만):
       ① 예외 타입명 — 실패 종류를 가르는 최소 정보(필수).
       ② HTTP 상태코드 — **정수 속성**에서만 읽는다(`exc.status_code` · `exc.response.status_code`,
-         `seat_failure._http_status_of`와 같은 두 자리). 메시지에서 캐내지 않는다. 상태코드는
+         `seat_failure.http_status_of` 공용 정의). 메시지에서 캐내지 않는다. 상태코드는
          응답 내용이 아니라 프로토콜 분류값이라 429·5xx·4xx 구분(재시도할지·설정을 고칠지)을
          로그만으로 가능하게 한다. bool은 int 하위지만 상태코드가 아니라 배제한다.
       ③ pydantic 검증 오류 **건수** — 몇 군데가 틀렸는지만(필드 경로·입력값은 미포함).
@@ -181,14 +182,10 @@ def _safe_exc_summary(exc: BaseException) -> str:
     name = type(exc).__name__
     parts: list[str] = []
     try:
-        candidates: list[object] = [getattr(exc, "status_code", None)]
-        response = getattr(exc, "response", None)
-        if response is not None:
-            candidates.append(getattr(response, "status_code", None))
-        for value in candidates:
-            if isinstance(value, int) and not isinstance(value, bool):
-                parts.append(f"HTTP {value}")
-                break
+        # 상태코드 읽기는 좌석 실패 분류와 같은 정의를 쓴다(EOS-212 ④ — 중복 구현 통합).
+        status = http_status_of(exc)
+        if status is not None:
+            parts.append(f"HTTP {status}")
         if isinstance(exc, ValidationError):
             parts.append(f"errors={exc.error_count()}")
     except Exception:  # noqa: BLE001 — 로그 요약이 never-break 폴백을 깨면 안 된다(리뷰 P3)
@@ -503,10 +500,9 @@ class LLMEquivalentProblemGenerator:
             generated = self._invoke(prompt, decision, seed=seed)
         except Exception as exc:  # noqa: BLE001 — provider 장애 시 배치 크래시 금지·안전 폴백.
             # 침묵실패 금지 — 타입명 + 안전 요약만(메시지 원문엔 응답 본문이 섞인다·EOS-202).
-            # 아래 GenerationLog.error_detail 형식은 g3_content_measures가 앞머리로
-            # 분류하므로 무변경.
+            summary = _safe_exc_summary(exc)
             _LOGGER.warning(
-                "동등문제 생성 provider 호출 실패(%s) — None 폴백", _safe_exc_summary(exc)
+                "동등문제 생성 provider 호출 실패(%s) — None 폴백", summary
             )
             # 실패한 호출 *시도*도 Run 이력이다(EOS-55) — usage 미상(None)·정직 실패 기록.
             self._emit_generation_log(
@@ -515,7 +511,11 @@ class LLMEquivalentProblemGenerator:
                 decision,
                 usage=None,
                 success=False,
-                error_detail=f"provider.generate failed: {type(exc).__name__}: {exc}",
+                # EOS-212 ① — 꼬리는 타입명 + 안전 요약(HTTP 상태코드 등)만. 종전 `{exc}`는
+                # SeatHttpError가 붙이는 공급사 응답 본문(최대 2000자)을 생성 로그(DB·회차
+                # JSONL)에 남겼다. 앞머리 `provider.generate failed:`는 g3_content_measures가
+                # 분류에 쓰므로 그대로 둔다(② — 꼬리는 아무도 파싱하지 않는다).
+                error_detail=f"provider.generate failed: {summary}",
                 # 호출을 *시도한* 좌표는 남긴다 — 같은 시드로 재시도해 실패를 재현할 수 있다.
                 seed=seed,
             )
@@ -545,14 +545,18 @@ class LLMEquivalentProblemGenerator:
             # Problem/Provenance 불변식 위반(저작권 게이트가 생성 거부)·필수 결측·타입 오류.
             # 조용히 통과시키지 않고 로그 + None(게이트에 도달하기 전 정직한 생성 실패).
             # 메시지 원문은 LLM 입력값·답을 싣는다 — 타입명 + 오류 건수만(EOS-202).
-            _LOGGER.warning("동등문제 후보 조립 실패(%s) — None 폴백", _safe_exc_summary(exc))
+            summary = _safe_exc_summary(exc)
+            _LOGGER.warning("동등문제 후보 조립 실패(%s) — None 폴백", summary)
             self._emit_generation_log(
                 spec,
                 prompt,
                 decision,
                 usage=generated.usage,
                 success=False,
-                error_detail=f"후보 조립 실패: {type(exc).__name__}",
+                # EOS-212 ③ — provider 실패와 같은 기준(타입명 + 안전 요약). 종전도 타입명만이라
+                # 본문 누출은 없었지만, 같은 함수를 쓰면 pydantic 검증 오류 건수가 남고(원인 구분)
+                # 두 경로의 기준이 갈라지지 않는다. 앞머리 `후보 조립 실패:`는 그대로다.
+                error_detail=f"후보 조립 실패: {summary}",
                 seed=seed,
             )
             return None

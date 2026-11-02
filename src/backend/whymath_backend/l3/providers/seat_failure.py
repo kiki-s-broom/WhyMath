@@ -49,6 +49,7 @@ __all__ = [
     "SeatHttpError",
     "SeatNotConfiguredError",
     "classify_seat_failure",
+    "http_status_of",
     "seat_local_degrade_rate",
 ]
 
@@ -114,8 +115,11 @@ def _timeout_types() -> tuple[type[BaseException], ...]:
     return tuple(types)
 
 
-def _http_status_of(exc: BaseException) -> int | None:
+def http_status_of(exc: BaseException) -> int | None:
     """예외가 나르는 HTTP 상태코드 — 없으면 None.
+
+    좌석 실패 분류와 생성 로그의 안전 요약(`l3.equivalent.llm_generator._safe_exc_summary`)이
+    **같은 정의**를 쓰도록 공개한다(EOS-212 ④ — 두 곳에 같은 구현이 따로 있던 것을 합침).
 
     읽는 자리는 셋이며 전부 **속성**이다(메시지는 읽지 않는다):
       ① `SeatHttpError.status_code`(우리 전송기)
@@ -167,7 +171,7 @@ def classify_seat_failure(exc: BaseException) -> DegradeReason | None:
         return "not_configured"
     if isinstance(exc, _timeout_types()):
         return "timeout"
-    status = _http_status_of(exc)
+    status = http_status_of(exc)
     if status is None:
         return None
     return _reason_for_status(status)
