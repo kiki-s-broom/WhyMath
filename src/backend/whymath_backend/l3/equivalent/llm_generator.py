@@ -140,7 +140,13 @@ from whymath_backend.l3.pregenerate.provenance_bridge import (
 )
 from whymath_backend.l3.prompt_assets import fill, prompt_text
 from whymath_backend.l3.providers.seat_failure import http_status_of
-from whymath_backend.l3.router import Router, _as_cost_tier, actual_cost_krw, langfuse_fields
+from whymath_backend.l3.router import (
+    Router,
+    _as_cost_tier,
+    actual_cost_krw,
+    langfuse_fields,
+    thinking_soft_switch,
+)
 from whymath_backend.l3.safe_parse import safe_sympify
 from whymath_backend.l3.verify_answer import derive_selected_root
 from whymath_backend.schema.enums import (
@@ -348,6 +354,7 @@ class LLMEquivalentProblemGenerator:
         unit_codes: Sequence[str] = (),
         generation_log_sink: Callable[[GenerationLog], None] | None = None,
         seed_source: SeedSource | None = None,
+        thinking: bool | None = None,
     ) -> None:
         """생성기 구성.
 
@@ -429,6 +436,12 @@ class LLMEquivalentProblemGenerator:
                 인프로세스 이중 회계 축이다. None(기본)이면 종전 동작 그대로(기존 호출부
                 무영향) — 배치 CLI(`harness/problem_corpus_accumulate`)가 JSONL appender를
                 배선한다.
+            thinking: **사고 모드 지시**(EOS-203 · 저작 한정). None(기본)이면 프롬프트를 바꾸지
+                않아 종전과 바이트 단위로 같다. False면 라우터가 이 결정을 하이브리드 사고 모델
+                (Qwen3)로 보낼 때만 사용자 프롬프트 끝에 `/no_think`를, True면 `/think`를 붙인다
+                (`router.thinking_soft_switch` — 모델을 아는 것은 라우터다). EOS-197 회차에서 로컬
+                `qwen3:30b-a3b`가 사고 모드로 출력 4,400~8,100토큰을 내 컨텍스트·타임아웃을 넘겼다.
+                **기본값은 실측 비교(`local_thinking_probe`) 전에는 바꾸지 않는다**(acceptance ②).
             seed_source: **샘플링 시드 공급자**(EOS-73). LLM 호출마다 여기서 시드를 뽑아
                 provider로 실어 보내고 *같은 값을* GenerationLog.seed에 기록한다 — 좌석만 있고
                 값이 전무하던 상태(전 경로 NULL)의 해소. None(기본)이면
@@ -475,6 +488,7 @@ class LLMEquivalentProblemGenerator:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._generation_log_sink = generation_log_sink
         self._seed_source = seed_source
+        self._thinking = thinking
         self._slug_prefix = slug_prefix
         self._subject = subject
         self._curriculum_version = curriculum_version
@@ -492,8 +506,8 @@ class LLMEquivalentProblemGenerator:
         시드(EOS-73)는 결정 직후 *한 번만* 뽑아 provider 호출과 GenerationLog 기록이 **같은 값**을
         보게 한다 — 종단마다 다시 뽑으면 기록된 좌표로 재투입해도 재현되지 않는다.
         """
-        prompt = self._build_user_prompt(spec)
         decision = self._decide_routing(spec)
+        prompt = self._apply_thinking(self._build_user_prompt(spec), decision)
         # LOCAL이면 시드 1개, 클라우드면 None(Messages API에 seed 파라미터 부재 — 구조적 불가).
         seed = seed_for_decision(decision, source=self._seed_source)
         try:
@@ -575,6 +589,16 @@ class LLMEquivalentProblemGenerator:
         )
         self._remember_conditions(candidate.conditions)
         return candidate
+
+    def _apply_thinking(self, prompt: str, decision: RoutingDecision) -> str:
+        """사고 모드 지시어를 사용자 프롬프트 끝에 붙인다(EOS-203).
+
+        미지정(None)이거나 라우터가 지시어를 주지 않는 결정(비대상 모델)이면 그대로 돌려준다.
+        """
+        if self._thinking is None:
+            return prompt
+        switch = thinking_soft_switch(decision, enabled=self._thinking)
+        return prompt if switch is None else f"{prompt}\n{switch}"
 
     def _author_signature(self, decision: RoutingDecision) -> str | None:
         """후보에 찍을 저작 서명 `llm:<모델 id>` — 해석 실패는 None(미기록)이다.
@@ -757,6 +781,8 @@ class LLMEquivalentProblemGenerator:
             "topic_hint": self._topic_hint,
             "temperature": self._temperature,
             "top_p": self._top_p,
+            # EOS-203 — 사고 모드 지시(None=미지정). 실제로 붙은 지시어는 위 `prompt` 전문에 있다.
+            "thinking": self._thinking,
         }
 
     def _emit_generation_log(

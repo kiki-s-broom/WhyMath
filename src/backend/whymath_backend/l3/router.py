@@ -420,6 +420,31 @@ def resolve_model(
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# 사고 모드 소프트 스위치 (EOS-203 — 저작 경로 한정)
+# ──────────────────────────────────────────────────────────────────────────
+# 하이브리드 사고 모델(Qwen3 계열)은 사용자 메시지의 `/no_think`·`/think` 지시로 사고 모드를 끄고
+# 켠다. 어떤 결정이 그 모델로 가는지는 라우터만 안다 — 그래서 생성기가 모델 ID를 직접 보지 않고 이
+# 함수에 묻는다(모델 선택·직접 호출 금지 불변). 시각 모델(`qwen3-vl`)과 클라우드는 대상이 아니다.
+_THINKING_SWITCH_MODEL_PREFIXES: Final[tuple[str, ...]] = ("qwen3:",)
+
+
+def thinking_soft_switch(decision: RoutingDecision, *, enabled: bool) -> str | None:
+    """결정이 하이브리드 사고 모델로 가면 사고 모드 지시어(`/think`·`/no_think`), 아니면 None.
+
+    None은 "이 결정에는 사고 모드 축이 없다"는 뜻이다(클라우드·비하이브리드 로컬 모델). 호출부는
+    None이면 프롬프트를 바꾸지 않는다 — 지원하지 않는 모델에 지시어를 붙이면 발문 오염만 남는다.
+    """
+    try:
+        model_id = resolve_model(decision.local_family, decision.local_model)
+    except ValueError:
+        # 클라우드 결정(local_model None)은 여기서 걸러진다 — 로컬 모델 축이 없으면 지시어도 없다.
+        return None
+    if not model_id.startswith(_THINKING_SWITCH_MODEL_PREFIXES):
+        return None
+    return "/think" if enabled else "/no_think"
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # 추정기 (estimators)
 # ──────────────────────────────────────────────────────────────────────────
 def local_latency(local: LocalModelTier) -> int:

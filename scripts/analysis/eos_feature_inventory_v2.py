@@ -886,7 +886,10 @@ CATALOG: tuple[Spec, ...] = (
        # EOS-204 저작 산출물 구조적 중복 사전 차단 — 검수 큐 진입 전 같은 좌석·좌석 간 중복 CU를
        # 구조 서명(묻는 것·도함수·방정식·점·정답)으로 걸러 제외 목록과 함께 낸다. 소비자는 런북 [I]
        # 수동 경로 CLI(기본 경로 harness.authoring_round 연결은 PR #1806 머지 뒤).
-       "l3.equivalent.structural_dedup"),
+       "l3.equivalent.structural_dedup",
+       # EOS-203 로컬 좌석 사고 모드 켬/끔 실측 탐침 — 같은 스펙 표본으로 수락률·지연·출력 토큰을
+       # 번갈아 재어 생성기 `thinking` 기본값 판정의 근거를 낸다(사람 PC·Ollama).
+       "l3.equivalent.local_thinking_probe"),
     _e("WM-E-352", "단원별 스켈레톤 생성기 41종(초·중·고·대) + P3 미분 개념별 생성기",
        "Admin", "Math Engine", "P0",
        "B7 코퍼스 30종 생성기 — PB-13", "l3.equivalent.binomial_distribution_skeleton_generator",
