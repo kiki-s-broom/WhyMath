@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -16,9 +16,9 @@ acceptance:
 artifacts: []
 paths:
   - "src/backend/whymath_backend/whs/**"
-session: null
+session: claude/eos-194-48wivk
 notes: |-
   출처: P3-32 샌드박스 실측(2026-11-01) — 힌트 연결 10/10의 마지막 1건
 
   [개명 2026-11-01] P3-93 → P3-95: main(#1800)이 같은 번호를 먼저 등재 — 번호 충돌 해소
-updated: 2026-11-01
+updated: 2026-11-02

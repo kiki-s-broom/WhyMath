@@ -52,7 +52,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.verified_solution import WhsSolutionGrade
-from whymath_backend.l3.verify_answer import verify_answer
+from whymath_backend.l3.equivalent.acceptance import _CONCEPTUAL_VERIFIERS
+from whymath_backend.l3.verify_answer import AnswerVerdict, verify_answer
 from whymath_backend.l3.verify_solution import verify_solution
 from whymath_backend.whs import dead_end_store, lemma_store, node_store, solution_bank
 from whymath_backend.whs.verdict import WhsGrade, final_verdict
@@ -162,6 +163,11 @@ class FinalizeAction(_ActionBase):
     steps: list[str] = Field(default_factory=list)
     strategy_tag: str | None = None
     source_root_id: uuid.UUID | None = None
+    # P3-95: 답이 값이 아니라 *개수·판정*인 개념형 문항(예: real_root_count — "서로 다른 실근의
+    # 개수")은 `answer` 치환맵으로 검산할 수 없다. 그때 `answer_kind`(개념형 검증기 키)와
+    # `claimed_answer`(주장 답 원문, 예 "1")를 함께 주면 Tier1을 개념형 검증기로 돌린다.
+    answer_kind: str | None = None
+    claimed_answer: str | None = None
 
 
 class EndSearchAction(_ActionBase):
@@ -274,9 +280,49 @@ class ScriptedPolicy:
 # ──────────────────────────────────────────────────────────────────────
 
 
-def _run_verify(conditions: list[str], answer: dict[str, str], steps: list[str]) -> WhsGrade:
+def _tier1(
+    conditions: list[str],
+    answer: dict[str, str],
+    *,
+    answer_kind: str | None,
+    claimed_answer: str | None,
+) -> AnswerVerdict:
+    """Tier1 답 검산 — 값형은 `verify_answer`(치환 대입), 개념형은 `_CONCEPTUAL_VERIFIERS`(P3-95).
+
+    개념형 판정은 `l3/equivalent/acceptance`와 같은 표를 쓴다(검증기 단일 원천). 알 수 없는 키·
+    주장 답 없음은 pass로 위장하지 않고 unverifiable로 둔다 — final_verdict가 unverified(격리)로
+    매긴다.
+    """
+    if answer_kind is None:
+        return verify_answer(conditions, answer)
+    verifier = _CONCEPTUAL_VERIFIERS.get(answer_kind)
+    if verifier is None:
+        return AnswerVerdict(
+            state="unverifiable",
+            reason=f"개념형 검증기 없음({answer_kind}) — 안전 회피",
+            samples_checked=0,
+        )
+    if claimed_answer is None or not claimed_answer.strip():
+        return AnswerVerdict(
+            state="unverifiable",
+            reason=f"개념형({answer_kind}) 주장 답 없음 — 안전 회피",
+            samples_checked=0,
+        )
+    return verifier(conditions, claimed_answer)
+
+
+def _run_verify(
+    conditions: list[str],
+    answer: dict[str, str],
+    steps: list[str],
+    *,
+    answer_kind: str | None = None,
+    claimed_answer: str | None = None,
+) -> WhsGrade:
     """검증기 스택 실행 → 최종 등급(§4). 답 검산(Tier1) + 단계 동치(Tier2) → final_verdict."""
-    answer_verdict = verify_answer(conditions, answer)
+    answer_verdict = _tier1(
+        conditions, answer, answer_kind=answer_kind, claimed_answer=claimed_answer
+    )
     steps_result = verify_solution(steps)
     return final_verdict(answer_verdict, steps_result).grade
 
@@ -362,7 +408,13 @@ async def _exec(session: AsyncSession, state: SolverState, action: Action) -> To
 
     if isinstance(action, FinalizeAction):
         # verify 없는 finalize 거부(§3) — finalize는 항상 검증기 스택을 돌린다.
-        grade = _run_verify(action.conditions, action.answer, action.steps)
+        grade = _run_verify(
+            action.conditions,
+            action.answer,
+            action.steps,
+            answer_kind=action.answer_kind,
+            claimed_answer=action.claimed_answer,
+        )
         state.last_verify_grade = grade
         if grade == "failed":
             # failed 차단(§4·R-S2) — 적재하지 않는다. 검색은 종료되지 않음(정책 재시도 가능).
@@ -382,13 +434,11 @@ async def _exec(session: AsyncSession, state: SolverState, action: Action) -> To
             session,
             problem_id=state.problem_id,
             grade=bank_grade,
-            solution_path={
-                "conditions": action.conditions,
-                "answer": action.answer,
-                "steps": action.steps,
-            },
+            solution_path=_solution_path_json(action),
             strategy_tag=action.strategy_tag,
-            answer=_answer_str(action.answer),
+            answer=(
+                _answer_str(action.answer) if action.answer_kind is None else action.claimed_answer
+            ),
             source_root_id=action.source_root_id or state.root_id,
             dedup=True,
         )
@@ -405,6 +455,19 @@ async def _exec(session: AsyncSession, state: SolverState, action: Action) -> To
 
     # EndSearchAction은 run_solver가 루프에서 직접 처리(여기 도달하지 않음).
     raise AssertionError(f"미처리 액션: {action!r}")  # pragma: no cover - 유니온 가드
+
+
+def _solution_path_json(action: FinalizeAction) -> dict[str, Any]:
+    """적재 JSONB — 값형은 종전 3키 그대로(dedup 정확 일치 불변), 개념형만 2키를 더한다."""
+    path: dict[str, Any] = {
+        "conditions": action.conditions,
+        "answer": action.answer,
+        "steps": action.steps,
+    }
+    if action.answer_kind is not None:
+        path["answer_kind"] = action.answer_kind
+        path["claimed_answer"] = action.claimed_answer
+    return path
 
 
 def _answer_str(answer: dict[str, str]) -> str | None:
