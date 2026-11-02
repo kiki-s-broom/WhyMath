@@ -62,7 +62,7 @@
 
 - `docs/ops/authoring_round_runbook.md` — 저작 회차 한 줄 실행(모든 회차 공통) · 「첫 Windows 실회차 확인 체크리스트」(EOS-209 ②)
 - `docs/ops/eos219_hint_verdict_gui_runbook.md` — 힌트 누설 판정 창
-- `docs/ops/eos197_authoring_round_runbook.md` — EOS-197 회차(수동 대안 블록 포함). **이 색인 참조 추가는 그 런북을 고치는 열린 PR(#1816 · 02-B 레인)이 머지된 뒤**에 한다(EOS-221 ③ 잔여).
+- `docs/ops/eos197_authoring_round_runbook.md` — EOS-197 회차(수동 대안 블록 포함). 참조는 그 런북을 고치던 #1816(EOS-204)이 머지된 뒤에 넣었다(EOS-203은 미착수 — Kiki 2026-11-02 승인으로 먼저 반영).
 
 ## 알려진 한계
 
