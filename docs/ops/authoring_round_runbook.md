@@ -248,8 +248,8 @@ if ($Safe) { git worktree remove $Wt; "WORKTREE_REMAINS=$(Test-Path $Wt)" } else
 
 ## 첫 Windows 실회차 확인 체크리스트 (EOS-209 ②)
 
-> 확인 회차 블록은 `docs/ops/kiki_pc_execution_standard.md`의 규약대로 준다(특히 B3 작업 폴더 · B4 HEAD 대조 · C1 자리표시자 0 · C3 쓰기 블록 자가거부).
-> 2026-11-01 결과: C1·C2·C4~C7 통과 · C3(Ctrl+C) 미확인 → `EOS-230`(기록 = 태스크 `EOS-209` 증적).
+> 확인 회차 블록은 `docs/ops/kiki_pc_execution_standard.md`의 규약대로 준다(특히 그 문서의 B3 작업 폴더 · B4 HEAD 자가검증 · C1 자리표시자 0 · C3 쓰기 블록 자가거부 — 아래 표의 C1~C7과는 다른 번호다).
+> 2026-11-01 결과(아래 표 기준): C1·C2·C4~C7 통과 · C3(Ctrl+C) 미확인 → `EOS-230`(기록 = 태스크 `EOS-209` 증적).
 
 CI·개발 세션에는 Windows·PowerShell 5.1·검수 창이 없다. 아래 항목은 **Phaiakes9에서 한 번 실제로 돌려야만**
 확인된다. 확인용 최소 회차 설정 = `docs/ops/authoring_round_eos209-first-windows.yaml`(유료 좌석 1개 · 목표 2 CU ·
