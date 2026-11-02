@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,9 +17,9 @@ artifacts: []
 paths:
   - "src/backend/whymath_backend/l3/equivalent/**"
   - docs/ops/eos197_authoring_round_runbook.md
-session: null
+session: claude/eos-204-structural-dedup
 notes: |-
   출처: EOS-197 A6 저작 회차(2026-10-28 · PR #1765) 검수에서 Kiki가 완전 중복 2쌍을 발견해 반려. 큐 조립은 좌석 사이 중복만 검사했고 같은 좌석(openrouter) 안 중복은 거르지 않았다.
 
   큐 조립(런북 [I])의 기존 검사는 slug(발문·정답·성취기준 코드 해시) 일치만 보아 표현만 다른 구조적 중복을 통과시켰다.
-updated: 2026-10-28
+updated: 2026-11-01
