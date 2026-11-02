@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-232
+title: "problem_bank_rephrased_v0 발문 다양화 강도 판정 — 부모 대비 8-gram 70% 이상 236/421건 표본 검토 (처분은 Kiki 판단)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① problem_bank_rephrased_v0 발문 중 부모(generated_v0)와 8-gram 일치율 0.70 이상인 236/421건(EOS-222 기록 · data/corpus/problem_bank_rephrased_v0/_provenance.json의 similarity_8gram.summary.flagged_question_text_slugs)을 표본 판정해, 발문 다양화가 실질적으로 이루어졌는지(문장 구조·어휘 변화)와 학습 효과상 문제가 되는지를 기록한다. 저작권 판정이 아니다(부모·자식 모두 WHYMATH_GENERATED).\n② 처분 방향(재서술 재생성·은퇴·현행 유지)은 근거와 함께 제안만 하고, 코퍼스 수정은 Kiki 판단 이후에 한다.\n③ 8토큰 미만이라 측정 불가였던 발문 52건은 별도로 집계하고, 공백 토큰화가 일치율을 낮게 잡는 한계를 판정에 반영한다."
+artifacts: []
+paths:
+  - "docs/reviews/rephrased_v0_paraphrase_strength_*.md"
+session: null
+notes: "출처: EOS-222 소급 측정 2026-11-01(#1807 e89212d1) — rephrased_v0 발문 236/421건이 부모 대비 8-gram 일치율 70% 이상. 저작권 문제는 아니지만 '발문 다양화' 목적이 약하게 달성됐다는 신호다. Kiki 등재 지시 2026-11-01."
+updated: 2026-11-02
