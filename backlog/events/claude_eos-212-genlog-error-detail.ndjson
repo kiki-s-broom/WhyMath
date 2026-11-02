@@ -34,3 +34,4 @@
 {"ts": "2026-11-02T02:09:02+00:00", "actor": "claude/eos-212-genlog-error-detail", "action": "add", "id": "EOS-233", "eos_priority": "P1"}
 {"ts": "2026-11-02T02:15:21+00:00", "actor": "claude/eos-212-genlog-error-detail", "action": "amend", "id": "EOS-233", "reason": "EOS-212 독립 검토의 추가 발견 2곳과 문서 표류 반영", "changed": ["acceptance +1 (⑤ (EOS-212 독립 검토 추가 발견 · 같은 범주인지 판정 필요) …)"]}
 {"ts": "2026-11-02T04:40:54+00:00", "actor": "claude/eos-212-genlog-error-detail", "action": "rename", "id": "EOS-234", "previous_id": "EOS-233", "reason": "번호 충돌 해소 — 병렬 세션이 같은 번호로 다른 태스크를 main에 먼저 착지(#1817). 이쪽은 미머지라 옮기는 편이 싸다", "updated_dependents": [], "updated_gates": []}
+{"ts": "2026-11-02T04:42:35+00:00", "actor": "claude/eos-212-genlog-error-detail", "action": "incident_add", "id": "task-id-collision", "cat": "F", "nth": 17, "fix_form": "task", "fix_ref": "HARN-213", "title": "후속 태스크 등재 번호 EOS-233이 병렬 세션 #1817과 충돌 — 머지 큐 이탈 1회"}
