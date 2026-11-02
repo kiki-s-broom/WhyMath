@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: blocked
+status: todo
 priority: 3
 eos_priority: P1
 owner: claude
@@ -55,4 +55,4 @@ notes: |-
   [정정 2026-11-01] 게이트 A안 집행 태스크를 선행으로 연결
 
   [정정 2026-11-01] 번호 충돌 rename 정정 기록
-updated: 2026-11-01
+updated: 2026-11-02
