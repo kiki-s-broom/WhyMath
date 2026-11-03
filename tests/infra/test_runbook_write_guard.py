@@ -155,6 +155,17 @@ cmd /c "$Py -m whymath_backend.l1.problem_bank.populate --problems $Rel 1> $Log 
 "LOAD_EXIT=$LASTEXITCODE"
 """
 
+# EOS-194 — 측정 스크립트 publish 모드는 쓰기다. preflight 모드는 대조군(읽기).
+_EOS194_PUBLISH_UNGUARDED = """
+& $Py "$Wt\\docs\\reviews\\eos194_acceptance3_2026-10-31\\eos194_measure.py" publish
+"PUBLISH_EXIT=$LASTEXITCODE"
+"""
+
+_EOS194_PREFLIGHT_READ = """
+& $Py "$Wt\\docs\\reviews\\eos194_acceptance3_2026-10-31\\eos194_measure.py" preflight
+"PREFLIGHT_EXIT=$LASTEXITCODE"
+"""
+
 # 대조군 — `--apply` 없는 승격은 dry-run(쓰기 없음)이다. `--apply` 조건을 지우면 이것이 red가 된다.
 _PATH_PROMOTION_DRY_RUN = """
 cmd /c "$Py -m whymath_backend.whs.path_promotion 1> $Q 2> $J"
@@ -339,6 +350,7 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("corpus_replay", _CORPUS_REPLAY_UNGUARDED),
         ("path_promotion_apply_wrapped", _PATH_PROMOTION_APPLY_WRAPPED_UNGUARDED),
         ("wrapped_populate", _WRAPPED_POPULATE_UNGUARDED),
+        ("eos194_publish", _EOS194_PUBLISH_UNGUARDED),
         ("stray_brace_else_depth_zero", _STRAY_BRACE_ELSE_AT_DEPTH_ZERO),
     ],
 )
@@ -366,6 +378,7 @@ def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
         ("path_promotion_dry_run", _PATH_PROMOTION_DRY_RUN),
         ("corpus_replay_guarded", _CORPUS_REPLAY_GUARDED),
         ("corpus_replay_source_path_read", _CORPUS_REPLAY_SOURCE_PATH_READ),
+        ("eos194_preflight_read", _EOS194_PREFLIGHT_READ),
     ],
 )
 def test_legitimate_forms_pass(tmp_path: Path, name: str, body: str) -> None:
