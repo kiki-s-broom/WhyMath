@@ -15,6 +15,7 @@ depends_on:
   - P3-42-coverage-hint-baseline-live-measurement
   - P3-95
   - P3-96
+  - P3-97
 requires_gates:
   - G-p332-corpus-replay-approach
 acceptance:
@@ -69,4 +70,6 @@ notes: |-
   [정정 2026-11-03] 운영 DB 실측 2/10 기록
 
   [차단 2026-11-03] 운영 DB에 8개 핵심 개념 문항 0건 — 미적분 은행 운영 적재 여부(학생 노출 집합 확대) Kiki 결정 대기. 실측 2/10(02-01·02-07)
+
+  [정정 2026-11-03] 운영 DB 문항 적재(P3-97) 선행 — Kiki 결정 2026-11-03
 updated: 2026-11-03

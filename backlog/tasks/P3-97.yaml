@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-97
+title: "운영 DB 미적분 문제은행 적재 — P3-32 핵심 개념 8종 문항 0건 해소 (Kiki 결정 2026-11-03)"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결손 고정: 운영 DB(whymath-pg 5433 · 문항 1,703행)에 대표 과정 핵심 개념 8종(12미적Ⅰ-02-02~02-06 · 02-08~02-10)의 적격 문항이 0건이다(P3-32 운영 실측 2026-11-03 · 판정 기준 main 37e32712 · docs/ops/p3_32_hint_link_runbook.md §10). 그래서 hint 연결이 2/10에서 멈췄다.\n② 결정(Kiki 2026-11-03): 미적분 문제은행을 운영 DB에 적재한다. 학생 노출 승인 문항 집합이 넓어지는 결정임을 알고 내린 것이다.\n③ 적재 전 읽기 전용 계산: 은행별 신규 행·갱신 행 수와 그중 review_status=approved(학생 노출 후보) 수를 개념별로 낸다. 쓰기 전에 Kiki가 그 수를 본다.\n④ Kiki 머신 런북: 백업 · 시험 실행 · APPLY 확인 · 자가거부 가드 · 적재 후 실측(P3-32 프로브 VERDICT가 READY가 되는지). --overwrite-cms-edits는 쓰지 않는다.\n⑤ 완료 판정: 적재 후 P3-32 런북 재실행 결과 hint 연결 10/10은 P3-32 소관이고, 이 태스크는 운영 DB의 8개 개념 ELIGIBLE_IN_DB가 0에서 양수가 됨을 실측으로 보인다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-32 운영 실측(2026-11-03) — 2/10. 결정: Kiki 적재 진행 선택(세션 질의 응답)."
+updated: 2026-11-03
