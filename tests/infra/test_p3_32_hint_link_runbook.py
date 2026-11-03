@@ -351,3 +351,12 @@ def test_summary_empty_file_is_unmeasured(
     path.write_text("", encoding="utf-8")
     assert probe.main(["summary", "--kind", "replay", "--json", str(path)]) == probe.EXIT_UNMEASURED
     assert "PROBE_ERROR=" in capsys.readouterr().out
+
+
+def test_catalog_scan_covers_all_levels(runbook: str) -> None:
+    # 2026-11-03 운영 실측: L3가 전부 게이트에서 거부된 DB에서 `--levels 3`만 보면 판정 대상 0건(exit 2)으로
+    # 누설 판정이 측정 실패가 됐다. 검수 통과 힌트 전 레벨을 판정해야 0건이 "누설 없음"을 말할 수 있다.
+    code = "\n".join(_powershell(runbook))
+    scans = re.findall(r"catalog-scan --levels (\S+)", code)
+    assert scans, "카탈로그 스캔 명령이 없다"
+    assert all(set(s.split(",")) == {"1", "2", "3"} for s in scans), scans

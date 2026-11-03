@@ -142,7 +142,10 @@ _PSQL_INVOCATION = re.compile(r"\bpsql\b", re.IGNORECASE)
 _LOADER_ENTRYPOINT = re.compile(
     r"\bload_crosslinks\b|\bpromote\b[^\n]*\s--load\b"
     # `corpus_replay.py`(파일 경로 — Get-Content로 내용을 읽는 것)는 실행이 아니다.
-    r"|\bcorpus_replay\b(?!\.py)|\bpath_promotion\b[^\n]*\s--apply\b",
+    r"|\bcorpus_replay\b(?!\.py)|\bpath_promotion\b[^\n]*\s--apply\b"
+    # P3-97: `-m whymath_backend.….populate`를 `cmd /c "…"`로 감싸면
+    # 토큰 검사(마스킹 텍스트)가 못 본다.
+    r"|-m\s+whymath_backend\.[\w.]*\.populate\b",
     re.IGNORECASE,
 )
 

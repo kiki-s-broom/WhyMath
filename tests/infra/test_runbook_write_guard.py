@@ -149,6 +149,12 @@ cmd /c "$Py -m whymath_backend.whs.path_promotion --apply 1> $Q 2> $J"
 "PROMO_EXIT=$LASTEXITCODE"
 """
 
+# P3-97 — 적재 모듈을 cmd /c 문자열에 감싸면 토큰 검사가 못 본다(첫 판 런북이 "쓰기 0개"였다).
+_WRAPPED_POPULATE_UNGUARDED = """
+cmd /c "$Py -m whymath_backend.l1.problem_bank.populate --problems $Rel 1> $Log 2>&1"
+"LOAD_EXIT=$LASTEXITCODE"
+"""
+
 # 대조군 — `--apply` 없는 승격은 dry-run(쓰기 없음)이다. `--apply` 조건을 지우면 이것이 red가 된다.
 _PATH_PROMOTION_DRY_RUN = """
 cmd /c "$Py -m whymath_backend.whs.path_promotion 1> $Q 2> $J"
@@ -332,6 +338,7 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("load_crosslinks_call", _LOAD_CROSSLINKS_CALL_UNGUARDED),
         ("corpus_replay", _CORPUS_REPLAY_UNGUARDED),
         ("path_promotion_apply_wrapped", _PATH_PROMOTION_APPLY_WRAPPED_UNGUARDED),
+        ("wrapped_populate", _WRAPPED_POPULATE_UNGUARDED),
         ("stray_brace_else_depth_zero", _STRAY_BRACE_ELSE_AT_DEPTH_ZERO),
     ],
 )

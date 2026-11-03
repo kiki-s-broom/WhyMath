@@ -393,7 +393,7 @@ Select-String -Path $CovFile -Pattern "Concept Completeness|hint  |Graph Connect
 "COVERAGE_EXIT=$CovExit (1 = 목표 미달 지표가 하나라도 있음 · 2 = 측정 실패)"
 $ServeLines = & $Py $HintProbe serve-sample --problems 300
 $ServeExit = $LASTEXITCODE
-$ScanLines = & $Py $HintProbe catalog-scan --levels 3
+$ScanLines = & $Py $HintProbe catalog-scan --levels 1,2,3
 $ScanExit = $LASTEXITCODE
 @($ServeLines + $ScanLines) | Where-Object { $_ -match '^(SERVE|SCAN)_(JUDGED|LEAK_EXPOSED|LEAK_HINT)' }
 if ($ServeLines) { [IO.File]::WriteAllLines("$OutDir\serve.kv", [string[]]$ServeLines) }
@@ -417,6 +417,9 @@ $LinkOk = ($AfterExit -eq 0) -and ($CovExit -ne 2) -and ($Linked -ge 0) -and ($L
   못했다(승격 대기열·힌트 게이트 전량 거부 등). `after.kv`의 `CONCEPT_Cnn_*` 줄로 어느 단계에서 끊겼는지 보인다.
 - `COVERAGE_EXIT=1`은 **실패가 아니다** — Graph Connectivity(오답 보기↔오개념) 등 다른 지표가 미달이어도 1이다.
   hint 줄과 Concept Completeness 줄을 본다.
+- 카탈로그 전수 판정은 **L1~L3 전체**를 본다. L3만 보면 이번처럼 L3가 전부 게이트에서 거부된 DB에서 판정 대상이
+  0건이 돼 exit 2(측정 실패)로 `LEAK_CHECK_OK=False`가 된다(2026-11-03 운영 실측: L3 생성 43건 전부 값 노출로
+  거부 → `SCAN_JUDGED=0`). 누설이 아니라 측정 대상이 없던 것이다.
 - 누설 판정 exit `1`이면 `*_LEAK_HINT=` 줄(`hint_id`·사유)을 전달한다. exit `2`는 측정 실패다(`*_JUDGED=0`이면
   통과가 아니다).
 
@@ -460,9 +463,35 @@ if ($Wt -and ($Wt -like "C:\Users\kiki\Desktop\__AI\WhyMath_wt_*") -and (Test-Pa
   대상이 전부 없으면 exit 1을 낸다(실 PG 통합 테스트 · 뮤테이션 2종 RED).
 - 재생 → 승격 → 힌트 생성 순서 자체는 P3-95 샌드박스 실측(14개 은행 · 3,833건)에서 끝까지 돌았다.
 
+**운영 실측(2026-11-03 · Kiki 머신 · 판정 기준 main `37e32712`)**: §10에 기록했다.
+
 **검증하지 못한 것**:
 - **PowerShell 블록 자체는 실행하지 못했다**(세션은 Linux다). 블록의 형식(가드·자리표시자·펜스)은
   `scripts/ops/check_runbook_blocks.py`와 `tests/infra/test_p3_32_hint_link_runbook.py`가 정적으로 검사한다.
 - **운영 DB의 적격 문항 겹침**: 모른다. 이 런북의 [C]가 처음 잰다.
 - **백업 복원**: 복원 명령을 실행해 보지 않았다.
 - **운영 규모 소요 시간**.
+
+## 10. 운영 실측 기록 (2026-11-03 · 판정 기준 main `37e32712`)
+
+[A]~[I] 실행 · 쓰기 3단계 전부 정상 종료 · 백업 `work\p3_32_37e32712\p3_32_before.dump`(12,987바이트 · 목차 5표).
+
+| 키 | BEFORE | AFTER |
+|---|---:|---:|
+| `DB_PROBLEM_ROWS` | 1,703 | 1,703 |
+| `ELIGIBLE` / `ELIGIBLE_IN_DB` | 1,121 / 228 | 1,121 / 228 |
+| `REPLAYABLE_IN_DB` | 180 | 180 |
+| `DB_VERIFIED_SOLUTIONS` · `DB_SOLUTION_PATHS` | 0 · 0 | 619 · 619 |
+| `DB_HINTS_VERIFIED` | 0 | 1,324 |
+| `WITH_VERIFIED_HINT`(적격 문항) | 0 | 180 |
+| `CONCEPTS_HINT_LINKED` | 0 | **2** (02-01 · 02-07) |
+| 계측기 hint 연결 · Concept Completeness | linked 0 | **linked 2 · missing 8 · 2/10** |
+
+- 재생: `REPLAY_BANKS`=`problem_bank_generated_v0` 1개 · 619/619 verified · 17초.
+- 승격: 619 승격 · 대기열 0 · 형식 거부 0.
+- 힌트: 생성 1,367 · 검수 통과 1,324(96.9%) · L1 662 / L2 662 / **L3 0**(생성 43건 전부 값 노출로 거부) · CMS 충돌 0.
+- 누설: 서빙 표본 `SERVE_JUDGED=1866 · LEAK_EXPOSED=0` · 카탈로그 전 레벨 `SCAN_JUDGED=1324 · LEAK_EXPOSED=0`(L3만 본
+  첫 실행은 판정 대상 0건으로 exit 2 — 런북을 L1~L3로 정정).
+- **10/10이 아닌 이유**: 운영 DB에 나머지 8개 개념(02-02~02-06 · 02-08~02-10)의 적격 문항이 **한 건도 없다**
+  (`CONCEPT_Cnn_IN_DB=0`). 미적분 은행(`problem_bank_p3_calculus1_diff_v0` 등)이 운영 DB에 적재된 적이 없다. 그 문항
+  적재는 노출 집합을 바꾸는 별도 결정이라 이 런북의 범위 밖이다(§8).

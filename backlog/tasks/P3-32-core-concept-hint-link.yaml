@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: in_progress
+status: blocked
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,6 +15,7 @@ depends_on:
   - P3-42-coverage-hint-baseline-live-measurement
   - P3-95
   - P3-96
+  - P3-97
 requires_gates:
   - G-p332-corpus-replay-approach
 acceptance:
@@ -24,6 +25,7 @@ acceptance:
   - "[정정 2026-10-16 · 재확인 · 기준 main 674a92b1] 앞선 2026-10-14 재판정 ②의 \"실제 선행은 P3-22(측정 배선 미착지)\"는 그날 기준으로만 맞았고 지금은 낡았다 — P3-22는 PR #1632(dd2c55b1)로 착지해 phase3_coverage --hints-from-db 가 있고, phase3_metrics 배선은 P3-41(#1653)이 맡았다. 재확인 실측: 기본 실행은 hint unmeasured 10 · Concept Completeness 0/10 · exit 1 로 기준선과 같고, --hints-from-db 는 DB 가 없는 이 환경에서 ConnectionRefusedError 로 exit 2(CoverageError) 하며 측정 불가로 조용히 내려가지 않는다 — 배선은 정상이다. 따라서 이 태스크를 막는 것은 측정 도구가 아니라 운영 DB 사실이다: (a) 적격 917건의 problem_id 가 DB problem 행으로 적재돼 있는지(ID 공간 일치) (b) DB 의 verified 힌트가 지금 몇 문항인지. 둘 다 P3-42(Kiki 머신 · whymath-pg 5433)가 실측하므로 P3-42 를 선행으로 붙인다. P3-42 결과가 '겹침 0'이면 채우기(③) 전에 ID 공간 불일치 규명이 먼저다. 2026-10-14 재판정 ③(힌트는 hints 테이블 경유만 — 문항 JSONL 편집은 내용 지문을 바꿔 재검수 유발)과 ④(채우기는 whs.path_promotion --apply 후 l4.hint_content.populate --apply, Kiki 머신)는 그대로 유효하다."
   - "[재판정 2026-11-01 · 로컬 PG 샌드박스 실측 · 기준 main d81cfd7a] 원천 경로(corpus_replay → path_promotion → hint_content.populate)를 실제 PG에서 끝까지 돌려 운영 힌트 0건의 원인을 셋으로 확정했다. ① path_promotion --apply와 multi_solution 적재가 헤더(solution_paths)보다 단계(problem_step)를 먼저 INSERT해 외래 키 위반으로 전체 롤백되는 코드 버그 — 이 세션 PR에서 수정하고 실 PG 통합 테스트 2건으로 동결(수정 되돌리면 RED). ② corpus_replay 풀이 1,507건 전부 strategy_tag=corpus-replay라 approach_unmappable로 승격 0건 — 사람 결정 게이트 G-p332-corpus-replay-approach를 requires_gates에 부착. ③ 12미적Ⅰ-02-09(answer_kind=real_root_count) 재생 39건 전부 finalize 실패 — 후속 P3-93을 depends_on에 부착. ①을 고치고 ②를 샌드박스에서만 우회하면 hint linked 9/10 · Concept Completeness 9/10 · 다른 연결(prerequisite·misconception·solution·pedagogy 각 10/10)은 줄지 않음. 남은 1건이 ③이다. 운영 적용 런북은 ②의 결정 뒤에 만든다 — 결정 전 런북은 승격 0건으로 끝난다. 운영 problem 1,703행에 적격 1,121건이 같은 problem_id로 있는지는 미확인이라 런북 첫 단계에서 세고 0이면 쓰기를 거부해야 한다. 근거: docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md."
   - "[정정 2026-11-01] 위 2026-11-01 재판정·차단 기록의 후속 번호는 main(#1800)과의 번호 충돌로 rename됐다: P3-93(개수형 답 finalize) → P3-95, P3-94(풀이 유형 승인 표 집행) → P3-96. depends_on은 CLI rename이 이미 갱신했다."
+  - "[운영 실측 2026-11-03 · 판정 기준 main 37e32712 · Kiki 머신 · 런북 docs/ops/p3_32_hint_link_runbook.md §10] 쓰기 3단계 정상 종료: 재생 619/619 verified · 승격 619 · 힌트 생성 1,367 · 검수 통과 1,324(L1 662 / L2 662 / L3 0 — L3 43건 전부 값 노출 거부) · CMS 충돌 0 · 누설 0(서빙 표본 1,866 · 카탈로그 전 레벨 1,324). 운영 DB hint 연결 0/10 → 2/10(02-01 · 02-07), Concept Completeness 2/10. acceptance ③ 미충족: 운영 DB(문항 1,703행)에 나머지 8개 개념(02-02~02-06 · 02-08~02-10)의 적격 문항이 0건이다(적격 1,121 중 DB에 있는 것 228건 · 전부 02-01/02-07). 미적분 은행이 운영 DB에 적재된 적이 없어서이며, 그 적재는 학생 노출 집합을 넓히는 결정이라 Kiki 판단이 선행이다. 적재 후 같은 런북을 다시 돌리면 된다(재생·승격·힌트 모두 멱등)."
 artifacts:
   - "#1801"
 paths:
@@ -39,7 +41,7 @@ paths:
   - tests/infra/test_runbook_write_guard.py
   - tests/infra/test_p3_32_hint_link_runbook.py
   - docs/ops/p3_32_hint_link_runbook.md
-session: claude/eos-194-48wivk
+session: null
 notes: |-
   출처: P3-03 완료(2026-10-10) 시 acceptance ② 잔여 승계. 같은 승계의 다른 축(02-02 해설 연결)은 P3-31.
 
@@ -64,4 +66,10 @@ notes: |-
   [정정 2026-11-01] 번호 충돌 rename 정정 기록
 
   [정정 2026-11-02] paths ['src/backend/whymath_backend/whs/path_promotion.py', 'src/backend/whymath_backend/l3/multi_solution.py', 'tests/backend/whs/test_path_promotion*.py', 'tests/backend/l3/test_multi_solution_bank_integration.py', 'docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md'] → ['src/backend/whymath_backend/whs/path_promotion.py', 'src/backend/whymath_backend/l3/multi_solution.py', 'tests/backend/whs/test_path_promotion*.py', 'tests/backend/l3/test_multi_solution_bank_integration.py', 'docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md', 'src/backend/whymath_backend/whs/corpus_replay.py', 'tests/backend/whs/test_corpus_replay_existing.py', 'scripts/ops/p3_32_hint_link_probe.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py', 'tests/infra/test_p3_32_hint_link_runbook.py', 'docs/ops/p3_32_hint_link_runbook.md']: 운영 DB 적용 런북·프로브·재생 존재 필터 착수
-updated: 2026-11-02
+
+  [정정 2026-11-03] 운영 DB 실측 2/10 기록
+
+  [차단 2026-11-03] 운영 DB에 8개 핵심 개념 문항 0건 — 미적분 은행 운영 적재 여부(학생 노출 집합 확대) Kiki 결정 대기. 실측 2/10(02-01·02-07)
+
+  [정정 2026-11-03] 운영 DB 문항 적재(P3-97) 선행 — Kiki 결정 2026-11-03
+updated: 2026-11-03
