@@ -285,3 +285,13 @@ P3-32 전 과정(재생·승격·힌트)을 돌렸다. 결과는 PR 본문과 `d
 
 **검증하지 못한 것**: PowerShell 블록 자체(세션은 Linux · 형식은 `check_runbook_blocks.py`와
 `tests/infra/test_p3_97_bank_load_runbook.py`가 정적으로 검사) · 운영 DB의 실제 slug 충돌 여부 · 백업 복원.
+
+## 10. 운영 실행 기록 (2026-11-03 · 판정 기준 main `c4ef20c2`)
+
+[A]~[C]·[H] 실행. [C] 미리보기가 **`LOAD_VERDICT=NOTHING_NEW`** — 두 은행 864행이 이미 같은 id로 운영 DB에 있었다
+(`IN_DB_SAME_ID` 504 + 360 · `SLUG_CONFLICT=0` · `PROTECTED=0` · `DB_PROBLEM_ROWS=2567` = 1,703 + 864). 런북 설계대로
+`PREVIEW_OK=False`가 되어 [D]~[G]는 실행하지 않았고 **이 런북으로 쓴 행은 0이다.** 적재는 다른 세션(원격 claim
+`P3-98-core-bank-prod-problem-load`, 저장소 기록 없음)이 이 런북 밖에서 먼저 한 것으로 보이며, 그 적재 전 백업 유무는
+확인되지 않는다. 적재 결과의 정합(같은 id · 충돌 0)은 이 미리보기가 독립 확인했다. 이어진 P3-32 재실측에서 hint 연결
+10/10(`docs/ops/p3_32_hint_link_runbook.md` §11).
+

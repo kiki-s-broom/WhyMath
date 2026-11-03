@@ -495,3 +495,26 @@ if ($Wt -and ($Wt -like "C:\Users\kiki\Desktop\__AI\WhyMath_wt_*") -and (Test-Pa
 - **10/10이 아닌 이유**: 운영 DB에 나머지 8개 개념(02-02~02-06 · 02-08~02-10)의 적격 문항이 **한 건도 없다**
   (`CONCEPT_Cnn_IN_DB=0`). 미적분 은행(`problem_bank_p3_calculus1_diff_v0` 등)이 운영 DB에 적재된 적이 없다. 그 문항
   적재는 노출 집합을 바꾸는 별도 결정이라 이 런북의 범위 밖이다(§8).
+
+## 11. 운영 재실측 — 10/10 (2026-11-03 · 판정 기준 main `c4ef20c2`)
+
+P3-97(미적분 은행 적재) 뒤 같은 런북을 [A]~[I]로 다시 돌렸다. 백업 `work\p3_32_c4ef20c2\p3_32_before.dump`(637,930바이트 · 목차 5표).
+
+| 키 | 결과 |
+|---|---:|
+| `DB_PROBLEM_ROWS` | 2,567 (1,703 + 864) |
+| `ELIGIBLE_IN_DB` · `REPLAYABLE_IN_DB` | 780 · 540 |
+| `CONCEPTS_REPLAYABLE` · `REPLAY_BANK_COUNT` · `VERDICT` | 10 · 3 · READY |
+| 재생 | 979/979 verified · 38초 · 실패 0 |
+| 승격 | 979 전부 `already_promoted` · 대기열 0 |
+| 힌트 | 생성 4,421 · 검수 통과 4,147(L1 1,800 / L2 1,800 / **L3 547**) · 쓰기 전부 `unchanged` · CMS 충돌 0 |
+| **hint 연결 · Concept Completeness** | **linked 10 · missing 0 · 10/10** |
+| 누설 | 서빙 표본 2,538 · 카탈로그 전 레벨 4,147 · 노출 0 |
+
+**이 실행이 새로 쓴 행은 없다.** [C](적재 전)에서 이미 `CONCEPTS_HINT_LINKED=10` · 검증 풀이 979 · 검수 힌트
+4,147이었다 — 이 런북의 리허설 수치와 정확히 같다. 문항 적재(P3-97 [C]가 `NOTHING_NEW`로 확인)와 그 뒤의 재생·승격·
+힌트를 **다른 세션**(원격 claim `P3-98-core-bank-prod-problem-load`, 저장소 기록 없음)이 먼저 운영에 반영한 것으로 본다.
+그 세션의 적재 전 백업 유무는 확인되지 않는다. 이 실행은 그 결과를 같은 계측기로 **독립 재측정**했고, 세 쓰기 단계가
+운영에서 멱등임(재사용·already·unchanged)을 확인했다.
+
+Graph Connectivity 4/10은 이 태스크의 지표가 아니다(오답 보기↔핵심 오개념 연결 · 코퍼스만 쓰는 기본 실행에서도 같다).

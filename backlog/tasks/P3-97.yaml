@@ -14,6 +14,7 @@ requires_gates: []
 acceptance:
   - "① 결손 고정: 운영 DB(whymath-pg 5433 · 문항 1,703행)에 대표 과정 핵심 개념 8종(12미적Ⅰ-02-02~02-06 · 02-08~02-10)의 적격 문항이 0건이다(P3-32 운영 실측 2026-11-03 · 판정 기준 main 37e32712 · docs/ops/p3_32_hint_link_runbook.md §10). 그래서 hint 연결이 2/10에서 멈췄다.\n② 결정(Kiki 2026-11-03): 미적분 문제은행을 운영 DB에 적재한다. 학생 노출 승인 문항 집합이 넓어지는 결정임을 알고 내린 것이다.\n③ 적재 전 읽기 전용 계산: 은행별 신규 행·갱신 행 수와 그중 review_status=approved(학생 노출 후보) 수를 개념별로 낸다. 쓰기 전에 Kiki가 그 수를 본다.\n④ Kiki 머신 런북: 백업 · 시험 실행 · APPLY 확인 · 자가거부 가드 · 적재 후 실측(P3-32 프로브 VERDICT가 READY가 되는지). --overwrite-cms-edits는 쓰지 않는다.\n⑤ 완료 판정: 적재 후 P3-32 런북 재실행 결과 hint 연결 10/10은 P3-32 소관이고, 이 태스크는 운영 DB의 8개 개념 ELIGIBLE_IN_DB가 0에서 양수가 됨을 실측으로 보인다."
   - "[결정 2026-11-03 · Kiki 세션 응답] 적재 범위 = p3_calculus1_diff_v0(504행) + conceptual_v0(360행). p3_fill_v0는 현재 승인본에 문장 결함(조사 24 · 줄임표 뒤 조사 12 · 차분몫 10 · 구하는 극한값 8 · 단위 조사 3)이 남아 있고 P3-91 교정 때 문항 ID가 바뀌므로 제외한다. [리허설 2026-11-03 · 판정 기준 main 37e32712] 운영 모사 DB(1,699행)에 두 은행 적재 → P3-32 전 과정에서 hint linked 10/10 · Concept Completeness 10/10(docs/reviews/p3_97_bank_load_rehearsal_2026-11-03.md). 운영 실행 런북 = docs/ops/p3_97_bank_load_runbook.md."
+  - "[운영 실행 2026-11-03 · 판정 기준 main c4ef20c2 · 런북 docs/ops/p3_97_bank_load_runbook.md §10] ⑤ 충족: 8개 개념 ELIGIBLE_IN_DB 0 → 양수(02-02 24 · 02-03 72 · 02-04 72 · 02-05 72 · 02-06 72 · 02-08 72 · 02-09 72 · 02-10 72). 운영 문항 1,703 → 2,567(+864 · 두 은행 전부 같은 id · slug 충돌 0 · 보호 행 0). 이 런북 자체는 NOTHING_NEW로 쓰기 0 — 적재는 다른 세션(claim P3-98)이 먼저 했으며 그 적재 전 백업 유무는 미확인. 미리보기가 적재 결과의 정합을 독립 확인했다."
 artifacts: []
 paths:
   - scripts/ops/p3_97_bank_load_probe.py
@@ -27,4 +28,6 @@ notes: |-
   출처: P3-32 운영 실측(2026-11-03) — 2/10. 결정: Kiki 적재 진행 선택(세션 질의 응답).
 
   [정정 2026-11-03] paths [] → ['scripts/ops/p3_97_bank_load_probe.py', 'docs/ops/p3_97_bank_load_runbook.md', 'tests/infra/test_p3_97_bank_load_runbook.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py', 'docs/reviews/p3_97_bank_load_rehearsal_2026-11-03.md']: 범위 결정·리허설·런북 착지
+
+  [정정 2026-11-03] 운영 실행 기록
 updated: 2026-11-03
