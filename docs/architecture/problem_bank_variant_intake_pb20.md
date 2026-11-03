@@ -82,6 +82,7 @@
 | 측정 | `src/backend/whymath_backend/harness/problem_bank_coverage.py` | 커버리지 리포트 | 아님 |
 | 측정 | `src/backend/whymath_backend/harness/curriculum_revision_crosswalk_report.py` | 개정판 어휘 crosswalk 관측 | 아님 |
 | 측정 | `src/backend/whymath_backend/ops/repeat_recommendation_report.py` | 반복 추천 리포트 | 아님 |
+| 측정(읽기 전용 운영 프로브) | `scripts/ops/p3_32_hint_link_probe.py` | P3-32 운영 DB 힌트 연결 런북용 — 풀이 단계 보유 은행을 재생 후보로 세고, 핵심 개념 적격 문항(계측기의 `approved` 판정 재사용)과 DB를 대조한다. DB는 읽기 전용 트랜잭션 | 아님 — 단 런북이 이 목록의 은행을 재생하므로, 미검수 행도 DB에 문항 행이 있으면 검증 풀이가 적재된다(재생은 `review_status`를 보지 않는다) |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_variants.py` | 변형 파생 — 시드 signature로 코퍼스를 읽는다 | 아님 |
 | PB-09/PB-20 | `src/backend/whymath_backend/harness/problem_corpus_lineage_links.py` | 계보만 걸기 — 시드 역인덱스로 코퍼스를 읽는다 | 아님 |
 | 분석 스크립트 | `scripts/analysis/corpus_facts.py` | 코퍼스 사실 단일 원천 — 은행별·전체 건수 계산(OPS-154) | 아님 |

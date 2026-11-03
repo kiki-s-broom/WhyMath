@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: review
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,13 +15,16 @@ acceptance:
   - "① 결손 고정 — 12미적Ⅰ-02-09 문항군(wm-p3-diff-eqapp-*, 적격 72건)은 verify.answer_map이 비어 있고 answer_kind=real_root_count라 whs.corpus_replay 재생 39건이 전부 finalize=ended/None으로 끝나 검증 풀이 0건이다. 그래서 P3-32 샌드박스 실측에서 이 개념만 hint missing으로 남았다(docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md §4 ③ · 판정 기준 main d81cfd7a).\n② 개수형 답(실근의 개수)을 결정론으로 검증하는 finalize 지원 또는 이 문항군 전용 검증 경로를 만든다. 정답을 추측하지 않고 SymPy로 증명 가능한 것만 verified로 둔다(검증 권위 서열 ①).\n③ 완료 판정 — 로컬 PG 샌드박스에서 eqapp 은행 재생 시 verified ≥1건, path_promotion·hint populate 후 phase3_coverage --hints-from-db에서 12미적Ⅰ-02-09 hint linked. 다른 문항군의 재생 결과가 줄지 않음."
 artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1828"
+  - "d92b3b50 (#1828)"
 paths:
   - "src/backend/whymath_backend/whs/**"
-session: claude/eos-194-48wivk
+session: null
 notes: |-
   출처: P3-32 샌드박스 실측(2026-11-01) — 힌트 연결 10/10의 마지막 1건
 
   [개명 2026-11-01] P3-93 → P3-95: main(#1800)이 같은 번호를 먼저 등재 — 번호 충돌 해소
 
   [정정 2026-11-02] PR 증적 기록
+
+  [미러 면제 2026-11-02] 대장 전용 커밋 — 구현은 #1828(d92b3b50)로 main 착지·머지 큐 CI 통과, PR 머리 4811b6e5에서 로컬 미러 전 잡 통과
 updated: 2026-11-02

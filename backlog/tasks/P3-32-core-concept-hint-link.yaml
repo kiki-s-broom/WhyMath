@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: blocked
+status: in_progress
 priority: 3
 eos_priority: P1
 owner: claude
@@ -32,7 +32,14 @@ paths:
   - "tests/backend/whs/test_path_promotion*.py"
   - tests/backend/l3/test_multi_solution_bank_integration.py
   - docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md
-session: null
+  - src/backend/whymath_backend/whs/corpus_replay.py
+  - tests/backend/whs/test_corpus_replay_existing.py
+  - scripts/ops/p3_32_hint_link_probe.py
+  - scripts/ops/check_runbook_blocks.py
+  - tests/infra/test_runbook_write_guard.py
+  - tests/infra/test_p3_32_hint_link_runbook.py
+  - docs/ops/p3_32_hint_link_runbook.md
+session: claude/eos-194-48wivk
 notes: |-
   출처: P3-03 완료(2026-10-10) 시 acceptance ② 잔여 승계. 같은 승계의 다른 축(02-02 해설 연결)은 P3-31.
 
@@ -55,4 +62,6 @@ notes: |-
   [정정 2026-11-01] 게이트 A안 집행 태스크를 선행으로 연결
 
   [정정 2026-11-01] 번호 충돌 rename 정정 기록
-updated: 2026-11-01
+
+  [정정 2026-11-02] paths ['src/backend/whymath_backend/whs/path_promotion.py', 'src/backend/whymath_backend/l3/multi_solution.py', 'tests/backend/whs/test_path_promotion*.py', 'tests/backend/l3/test_multi_solution_bank_integration.py', 'docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md'] → ['src/backend/whymath_backend/whs/path_promotion.py', 'src/backend/whymath_backend/l3/multi_solution.py', 'tests/backend/whs/test_path_promotion*.py', 'tests/backend/l3/test_multi_solution_bank_integration.py', 'docs/reviews/p3_32_hint_pipeline_sandbox_2026-11-01.md', 'src/backend/whymath_backend/whs/corpus_replay.py', 'tests/backend/whs/test_corpus_replay_existing.py', 'scripts/ops/p3_32_hint_link_probe.py', 'scripts/ops/check_runbook_blocks.py', 'tests/infra/test_runbook_write_guard.py', 'tests/infra/test_p3_32_hint_link_runbook.py', 'docs/ops/p3_32_hint_link_runbook.md']: 운영 DB 적용 런북·프로브·재생 존재 필터 착수
+updated: 2026-11-02

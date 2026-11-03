@@ -137,6 +137,35 @@ _LOAD_CROSSLINKS_CALL_UNGUARDED = """
 "LOAD_EXIT=$LASTEXITCODE"
 """
 
+# P3-32 — WH-S 재생·경로 승격도 DB를 쓴다. 각 픽스처는 그 정규식 가지가 없으면 통과하는 형태다.
+_CORPUS_REPLAY_UNGUARDED = """
+& $Py -m whymath_backend.whs.corpus_replay @Banks --no-bad-branch --only-existing-problems --json $Out
+"REPLAY_EXIT=$LASTEXITCODE"
+"""
+
+_PATH_PROMOTION_APPLY_WRAPPED_UNGUARDED = """
+# 표준오류를 파일로 받으려고 cmd /c 문자열에 감쌌다 — 마스킹 텍스트는 그 안을 가린다.
+cmd /c "$Py -m whymath_backend.whs.path_promotion --apply 1> $Q 2> $J"
+"PROMO_EXIT=$LASTEXITCODE"
+"""
+
+# 대조군 — `--apply` 없는 승격은 dry-run(쓰기 없음)이다. `--apply` 조건을 지우면 이것이 red가 된다.
+_PATH_PROMOTION_DRY_RUN = """
+cmd /c "$Py -m whymath_backend.whs.path_promotion 1> $Q 2> $J"
+"PROMO_DRY_EXIT=$LASTEXITCODE"
+"""
+
+# 대조군 — 소스 파일 *경로*를 읽는 것은 실행이 아니다. `(?!\.py)`를 지우면 이것이 red가 된다.
+_CORPUS_REPLAY_SOURCE_PATH_READ = """
+$HasFlag = ((Get-Content "$Wt\\src\\backend\\whymath_backend\\whs\\corpus_replay.py" -Raw) -match "only-existing")
+"HAS_FLAG=$HasFlag"
+"""
+
+_CORPUS_REPLAY_GUARDED = """
+$Ready = $BackupOk -and $ConfirmOk
+if ($Ready) { & $Py -m whymath_backend.whs.corpus_replay @Banks --only-existing-problems --json $Out; "REPLAY_EXIT=$LASTEXITCODE" } else { "WRITE_REFUSED=True — BACKUP_OK=$BackupOk CONFIRMED=$ConfirmOk" }
+"""
+
 # 파서 축의 *깊이 0* 절 — 닫힌 if 바로 다음 줄이 `} else {`로 시작하고 그 `}`가 닫을 바깥 가지가
 # 없다. 중첩 정상 형태를 풀어 주는 `depth_before == 0` 조건을 지우면 이것이 통과해 버린다.
 _STRAY_BRACE_ELSE_AT_DEPTH_ZERO = """
@@ -301,6 +330,8 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("wrapped_psql_delete", _WRAPPED_PSQL_DELETE_UNGUARDED),
         ("load_cli", _LOAD_CLI_UNGUARDED),
         ("load_crosslinks_call", _LOAD_CROSSLINKS_CALL_UNGUARDED),
+        ("corpus_replay", _CORPUS_REPLAY_UNGUARDED),
+        ("path_promotion_apply_wrapped", _PATH_PROMOTION_APPLY_WRAPPED_UNGUARDED),
         ("stray_brace_else_depth_zero", _STRAY_BRACE_ELSE_AT_DEPTH_ZERO),
     ],
 )
@@ -325,6 +356,9 @@ def test_each_defect_is_caught(tmp_path: Path, name: str, body: str) -> None:
         ("wrapped_psql_guarded", _WRAPPED_PSQL_DELETE_GUARDED),
         ("load_cli_guarded", _LOAD_CLI_GUARDED),
         ("commented_sql", _COMMENTED_SQL_IS_NOT_A_WRITE),
+        ("path_promotion_dry_run", _PATH_PROMOTION_DRY_RUN),
+        ("corpus_replay_guarded", _CORPUS_REPLAY_GUARDED),
+        ("corpus_replay_source_path_read", _CORPUS_REPLAY_SOURCE_PATH_READ),
     ],
 )
 def test_legitimate_forms_pass(tmp_path: Path, name: str, body: str) -> None:
