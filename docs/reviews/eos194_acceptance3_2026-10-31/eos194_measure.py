@@ -38,7 +38,9 @@ from whymath_backend.schema.user import UserProfile as UserProfileSchema  # noqa
 from whymath_backend.security import create_access_token  # noqa: E402
 
 STATE = Path(os.environ.get("EOS194_STATE", "eos194_state.json"))
-SCAN_LIMIT = 300
+# 0 = no limit. A limited scan made PUBLISHABLE=0 ambiguous (truncated != absent) -
+# scan every exposed problem with a verified hint and print SCAN_TRUNCATED (2026-11-03).
+SCAN_LIMIT = int(os.environ.get("EOS194_SCAN_LIMIT", "0"))
 PIN_LOGGER = "whymath_backend.l2.attempt_version_pin"
 # persona enum value "A_\uc77c\ubc18\uace0\uace03" written with escapes to stay ASCII
 PERSONA_A = "A_\uc77c\ubc18\uace0\uace03"
@@ -100,15 +102,10 @@ async def scan_candidates(session):
     with_hint = (
         await session.execute(select(func.count()).select_from(Problem).where(*base, has_hint))
     ).scalar_one()
-    rows = (
-        (
-            await session.execute(
-                select(Problem).where(*base, has_hint).order_by(Problem.problem_id).limit(SCAN_LIMIT)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    stmt = select(Problem).where(*base, has_hint).order_by(Problem.problem_id)
+    if SCAN_LIMIT > 0:
+        stmt = stmt.limit(SCAN_LIMIT)
+    rows = (await session.execute(stmt)).scalars().all()
     complete, missing_by_field = [], {}
     if not rows:
         # no candidate has a verified hint - sample the rest so the blocking fields are visible
@@ -166,6 +163,7 @@ async def preflight():
     out("EXPOSED_WITHOUT_POINTER", exposed_no_ptr)
     out("EXPOSED_WITH_VERIFIED_HINT", with_hint)
     out("SCANNED", scanned)
+    out("SCAN_TRUNCATED", scanned < with_hint)
     out("PUBLISHABLE", len(complete))
     out("NOT_PUBLISHABLE_REASONS", json.dumps(missing, sort_keys=True))
     out("TARGET_PROBLEM_ID", complete[0] if complete else "none")

@@ -145,7 +145,9 @@ _LOADER_ENTRYPOINT = re.compile(
     r"|\bcorpus_replay\b(?!\.py)|\bpath_promotion\b[^\n]*\s--apply\b"
     # P3-97: `-m whymath_backend.….populate`를 `cmd /c "…"`로 감싸면
     # 토큰 검사(마스킹 텍스트)가 못 본다.
-    r"|-m\s+whymath_backend\.[\w.]*\.populate\b",
+    r"|-m\s+whymath_backend\.[\w.]*\.populate\b"
+    # EOS-194: 측정 스크립트의 publish·deprecate 모드는 운영 DB에 쓴다(read 모드 preflight는 아님).
+    r"|eos194_measure\.py\"?\s+(?:publish|deprecate)\b",
     re.IGNORECASE,
 )
 
