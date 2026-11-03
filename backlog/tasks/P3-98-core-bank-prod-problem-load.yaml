@@ -1,0 +1,31 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-98-core-bank-prod-problem-load
+title: "핵심 개념 문항은행 운영 DB 적재 런북 — P3-32 힌트 연결 2/10 → 10/10의 선행"
+track: math-completion
+stage: S3
+subject: math
+layer: docs
+status: cancelled
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결손 고정(2026-11-03 Kiki 머신 P3-32 런북 [C] 실측 · main 37e32712) — 운영 DB problem 1,703행에 핵심 개념 10종 적격 문항 1,121건 중 228건만 있고(02-01 88 · 02-07 140), 나머지 8개 개념은 0건이다. 그래서 힌트 런북은 2/10에서 멈춘다(런북 §8: 문항 적재는 노출 문항 집합을 바꾸는 별도 결정).\n② 결정 — Kiki가 2026-11-03 채팅으로 \"문항은행 운영 DB 적재 런북 만들어줘\"를 지시했다(적재 진행 결정).\n③ 산출물 — Kiki 머신 실행 런북(docs/ops)과 읽기 전용 사전·사후 프로브: 적재 대상 은행 한정(핵심 개념 적격 문항이 있는 은행만 · --all 금지), 쓰기 블록 자가거부 가드, 실행 코드 출처 확인, 공유 작업 사본 우회(worktree --detach), 쓰기 전 백업, 적재 전후 행 수·개념별 IN_DB 대조.\n④ 완료 판정 — 적재 후 P3-32 링크 프로브의 ELIGIBLE_IN_DB·CONCEPTS_REPLAYABLE가 늘어나는지(목표 10/10) Kiki 실행 출력으로 확인."
+artifacts:
+  - "#1833"
+paths:
+  - "docs/ops/p3_98_*"
+  - "scripts/ops/p3_98_*"
+  - "tests/infra/test_p3_98_*"
+session: null
+notes: |-
+  출처: P3-32 런북 실행(2026-11-03) VERDICT=PARTIAL · Kiki 지시
+
+  [정정 2026-11-03] 런북·프로브 PR
+
+  [차단 2026-11-03] 중복 — P3-97(#1831, main 머지)이 같은 목적의 적재 런북을 먼저 냈고, p3_fill_v0(문장 결함·P3-91에서 ID 변경)를 빼 범위가 더 낫다. PR #1833 닫음(Kiki 승인 2026-11-03)
+
+  [취소 2026-11-03] 중복 — P3-97(#1831, main 머지)이 같은 목적의 적재 런북을 먼저 냈고, p3_fill_v0(문장 결함·P3-91에서 ID 변경)를 빼 범위가 더 낫다. PR #1833 닫음(Kiki 승인 2026-11-03)
+updated: 2026-11-03
