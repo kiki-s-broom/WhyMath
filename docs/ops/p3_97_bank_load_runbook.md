@@ -285,3 +285,11 @@ P3-32 전 과정(재생·승격·힌트)을 돌렸다. 결과는 PR 본문과 `d
 
 **검증하지 못한 것**: PowerShell 블록 자체(세션은 Linux · 형식은 `check_runbook_blocks.py`와
 `tests/infra/test_p3_97_bank_load_runbook.py`가 정적으로 검사) · 운영 DB의 실제 slug 충돌 여부 · 백업 복원.
+
+## 10. 운영 실행 기록 (2026-11-03 · 판정 기준 main `c4ef20c2`)
+
+- **적재 실행**: 문항 1,703 → 2,567행(+864 = [C] 예측과 일치) · slug 충돌 0 · 개념 연결 누락 0 · [G] `VERDICT=READY` ·
+  `CONCEPTS_REPLAYABLE=10`. 기록은 대장 PR #1834.
+- **재실행(확인)**: 그 뒤 [A]~[C]를 다시 돌리자 [C]가 **`LOAD_VERDICT=NOTHING_NEW`**를 냈다(`IN_DB_SAME_ID` 504 + 360 ·
+  `SLUG_CONFLICT=0` · `PROTECTED=0` · `DB_PROBLEM_ROWS=2567`). 런북 설계대로 `PREVIEW_OK=False`로 [D]~[G]가 실행되지 않아
+  이 재실행의 쓰기는 0이다 — 이미 적재된 상태를 가드가 정확히 판정한 사례다.
