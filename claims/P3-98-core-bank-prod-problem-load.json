@@ -1,1 +1,1 @@
-{"branch": "claude/kind-archimedes-74s4m7", "harness": "2.0", "task": "P3-98-core-bank-prod-problem-load", "ts": "2026-11-03T02:55:11Z"}
+{"branch": "claude/kind-archimedes-74s4m7", "harness": "2.0", "kind": "block", "reason": "중복 — P3-97(#1831, main 머지)이 같은 목적의 적재 런북을 먼저 냈고, p3_fill_v0(문장 결함·P3-91에서 ID 변경)를 빼 범위가 더 낫다. PR #1833 닫음(Kiki 승인 2026-11-03)", "task": "P3-98-core-bank-prod-problem-load", "ts": "2026-11-03T04:50:37Z"}
