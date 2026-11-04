@@ -23,6 +23,11 @@ EOS-194가 만든 발행 표면(CMS 라우트 4개)이 운영 데이터에서 �
 않는 것이다(`l3/problem_metadata_evidence.py` 모듈 한계에 명시). 운영 DB도 같은 원자 백본 적재를 썼으므로 **같은 결과가 나올
 가능성이 높다** — [C]가 `PUBLISHABLE=0`이면 거기서 멈추고 출력을 전달한다. 쓰기 블록은 스스로 거부한다.
 
+**P3-99 이후(2026-11-04)**: 발행 게이트가 개념 `code`로도 오개념을 상속한다. 원자 유래 오개념(`ATOM:<code>` 1,823행)이
+카탈로그에 있으면 원자 개념 문항이 상속으로 인정된다(오개념 유발 슬롯 문항은 규칙상 제외). 리허설 DB에서 그 행을 적재한 뒤
+`PUBLISHABLE`이 0 → 861이 됐다. [C]가 `ATOM_MISCONCEPTION_ROWS=0`과 `PUBLISHABLE=0`을 함께 내면 [C2](백업 후 원자 오개념
+적재)를 실행하고 [C]를 다시 돌린다.
+
 ## 3. 구체적 절차
 
 | 단계 | 무엇이 일어나는가 | DB 쓰기 | 기대 출력(판정값) |
@@ -30,6 +35,7 @@ EOS-194가 만든 발행 표면(CMS 라우트 4개)이 운영 데이터에서 �
 | A | Docker Desktop·`whymath-pg` 기동 확인 | 없음 | `DOCKER_OK=True` |
 | B | main 기준 임시 worktree(공유 클론 무변경) | 없음 | `WT_OK=True` |
 | C | 환경 · 코드 출처 · DB 도달 · **발행 가능 후보 점검** | 없음 | `PREFLIGHT_OK=True` 또는 `PUBLISHABLE=0`(멈춤) |
+| C2 | (조건부) 백업 후 원자 유래 오개념 1,823행 적재 → [C] 다시 | **있음**(`misconception_catalog`만 · 멱등) | `ATOM_LOAD_OK=True` |
 | D | 운영 DB 전체 백업 | 없음(파일만) | `BACKUP_OK=True` |
 | E | 발행 확인 입력(`APPLY` 한 단어) | 없음 | — |
 | F | **발행 측정** — 측정 계정 2개 · 판 1개 발행 · 시도 1건 | **있음** | `EOS194_ACCEPTANCE3_OK=True` |
@@ -144,8 +150,30 @@ $PreflightOk = ($PreExit -eq 0) -and ($PreMap["SCHEMA_AT_HEAD"] -eq "True") -and
 **확인**: `REACH_EXIT=0` · `CODE_OK=True`. 그리고 둘 중 하나다.
 
 - `PREFLIGHT_OK=True` — 발행 가능 후보가 있다. [D]로 진행한다.
-- `PUBLISHABLE=0`(`PREFLIGHT_OK=False`) — **여기서 멈춘다.** `NOT_PUBLISHABLE_REASONS` 줄을 포함한 화면 전체를 전달한 뒤 [H]로 정리한다.
-  리허설 예측은 `{"misconception_signature": <힌트 붙은 문항 수>}`다.
+- `PUBLISHABLE=0`이고 `ATOM_MISCONCEPTION_ROWS=0` — [C2]로 원자 오개념을 적재한 뒤 [C]를 다시 붙여넣는다.
+- `PUBLISHABLE=0`이고 `ATOM_MISCONCEPTION_ROWS`가 1 이상 — **여기서 멈춘다.** `NOT_PUBLISHABLE_REASONS` 줄을 포함한 화면
+  전체를 전달한 뒤 [H]로 정리한다.
+
+### [C2] (조건부) 백업 후 원자 유래 오개념 적재
+
+[C]가 `ATOM_MISCONCEPTION_ROWS=0`과 `PUBLISHABLE=0`을 함께 낼 때만 실행한다. 블록이 그 조건을 다시 확인하고, 맞지 않으면
+스스로 거부한다. 쓰는 곳은 `misconception_catalog` 한 테이블이고 `mis_id` 기준 멱등 upsert라 다시 실행해도 같은 결과다.
+끝나면 [C]를 다시 붙여넣는다.
+
+```powershell
+# [Windows PowerShell · Phaiakes9] 같은 창 · C2 원자 오개념 적재 (쓰기 · 조건 미충족이면 스스로 거부)
+cd $Wt
+$AtomRowsBefore = Get-KvInt $PreMap "ATOM_MISCONCEPTION_ROWS"
+$AtomReady = $WtOk -and $CodeOk -and ($ReachExit -eq 0) -and ($AtomRowsBefore -eq 0) -and ((Get-KvInt $PreMap "PUBLISHABLE") -eq 0) -and ($Wt -notmatch '\s')
+"ATOM_READY=$AtomReady · WT_OK=$WtOk CODE_OK=$CodeOk REACH_EXIT=$ReachExit ATOM_ROWS_BEFORE=$AtomRowsBefore"
+if ($AtomReady) { docker exec whymath-pg pg_dump -U whymath -d whymath -Fc -f /tmp/eos194_atomload_before.dump; $ADumpExit = $LASTEXITCODE; docker cp whymath-pg:/tmp/eos194_atomload_before.dump "$OutDir\eos194_atomload_before.dump"; $ACopyExit = $LASTEXITCODE; docker exec whymath-pg pg_restore -l /tmp/eos194_atomload_before.dump *> $null; $AListExit = $LASTEXITCODE; $ABackupOk = ($ADumpExit -eq 0) -and ($ACopyExit -eq 0) -and ($AListExit -eq 0) -and (Test-Path "$OutDir\eos194_atomload_before.dump"); "ATOM_BACKUP_OK=$ABackupOk" } else { $ABackupOk = $false; "WRITE_REFUSED=True — ATOM_READY=False · [C]가 ATOM_MISCONCEPTION_ROWS=0 과 PUBLISHABLE=0 을 함께 냈을 때만 적재합니다" }
+if ($ABackupOk) { & $Py -m whymath_backend.l1.misconception.populate_atom --graph "$Wt\data\corpus\atom_graph_v1\graph.json"; $AtomLoadExit = $LASTEXITCODE; "ATOM_LOAD_EXIT=$AtomLoadExit" } else { $AtomLoadExit = -1; "ATOM_LOAD_SKIPPED=True — 백업이 확인되지 않아 적재하지 않습니다" }
+$AtomRowsAfter = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT count(*) FROM misconception_catalog WHERE mis_id LIKE 'ATOM:%';"
+"ATOM_ROWS_AFTER=$AtomRowsAfter · ATOM_LOAD_OK=" + (($AtomLoadExit -eq 0) -and ("$AtomRowsAfter".Trim() -eq "1823"))
+```
+
+**확인**: `ATOM_LOAD_OK=True` · `ATOM_ROWS_AFTER=1823`. 그다음 [C]를 다시 붙여넣는다. 되돌리려면
+`$OutDir\eos194_atomload_before.dump`로 복원한다.
 
 ### [D] 운영 DB 전체 백업 (DB 읽기 전용 · 파일 생성)
 
