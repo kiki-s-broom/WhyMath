@@ -363,4 +363,10 @@ laya-ko-whymath v1(6종 의도·개인정보 확률)의 판단 쌍. 교체(승�
 answer_only→포기 · stuck→막힘표현 · concept→질문 · check→답시도 · hint→막힘표현 · chitchat→이해확인.
 일치도 집계에만 쓰고 Laya 6종을 5종으로 줄이지 않는다(hint↔stuck 구분이 Laya를 재는 이유).
 
-**아직 없는 것(후속)**: 레코드를 위 대응표로 일치도 표·오류 사례로 집계하는 harvest CLI.
+**수확 (PED-51)** — `src/backend`에서:
+`python -m whymath_backend.harness.intent_shadow_harvest intent_shadow_records.log [--since ISO] [--until ISO] [--json 경로]`
+리포트 순서: ① 작동 비율(실패도 분모) ② 대응표 기준 일치율(Wilson 단측 95% 하한·상한)·교차표·laya 라벨별·
+확신 구간별·풀이 동반별 ③ 개인정보 겹침 2×2(laya p≥0.5 × 규칙 백스톱 — 레코드 v1·규칙 실패는 '규칙 미기록')
+④ 지연 중앙값·p95. 판정선 없음(분포 제시만). 집계 대상 0건·입력 파일 없음은 exit 2. 레코드에 식별자가
+없어 줄 단위 중복 제거는 못 하며, 같은 내용(sha256)의 파일만 한 번으로 센다 — 같은 로그를 이름만 바꿔
+두 번 넣으면 막지만, 이어 쓴 로그와 그 앞부분 사본을 함께 넣으면 이중으로 센다(구간 옵션으로 나눌 것).
