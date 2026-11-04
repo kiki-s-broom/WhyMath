@@ -19,7 +19,11 @@
   · 문항 자체: `distractor_map`의 `misconception_id` 중 **등록된 오개념에 닿는 것**(kebab은
     `misconception_crosslink`, M-id는 `misconception_catalog`). P3-02 계측기의
     `_reached_misconceptions`와 같은 기준이다.
-  · 소속 개념: PRIMARY 개념의 `source_id`를 `misconception_catalog.concept_src_id`로 가진 오개념
+  · 소속 개념: PRIMARY 개념의 `source_id` **또는 `code`** 를
+    `misconception_catalog.concept_src_id`로
+    가진 오개념. 구 카탈로그(M-id)는 `concept_src_id`에 원천 src_id(`H:12미적Ⅰ02-01`)를 적고, 원자
+    유래 행(`ATOM:<code>` · `l1/misconception/atom_catalog.py`)은 원자 `code`를 적는다. 원자 백본
+    개념 행은 `source_id`가 비어 있으므로 `code`를 보지 않으면 상속이 성립하지 않는다(P3-99).
 - hint_strategy — `hints`의 `problem_id` 일치 + `verified = true` 행 수
 
 ## 한계 (정직하게)
@@ -27,8 +31,10 @@
 - `distractor_map`의 id가 L4 카탈로그(`CATALOG_BY_ID`)에 있는지는 보지 않는다. l3은 l4를 import할
   수 없다(7계층 단방향). 대신 DB의 크로스링크·카탈로그로 "등록된 오개념에 닿는가"를 본다. 닿지
   못하는 id는 문항 자체 증거로 세지 않는다(없는 오개념으로 서명이 있는 척하지 않는다).
-- 개념의 오개념 상속은 `concept.source_id` ↔ `misconception_catalog.concept_src_id` 문자열 일치에
-  기댄다. `source_id`가 비어 있는 개념은 상속 증거가 없는 것으로 센다(빈 튜플 — 측정했고 없다).
+- 개념의 오개념 상속은 `concept.source_id`·`concept.code` ↔ `misconception_catalog.concept_src_id`
+  문자열 일치에 기댄다. 둘 다 카탈로그에 없으면 상속 증거가 없는 것으로 센다(빈 튜플 — 측정했고
+  없다). 원자 유래 오개념은 원자마다 1건씩 있어 변별력이 낮다 — 그래서 이 인정은 트리거 슬롯이
+  아닌 문항에만 쓰이고(`schema/problem_metadata.py`), 출처가 `misconception_source`에 남는다.
 """
 
 from __future__ import annotations
@@ -100,7 +106,7 @@ async def load_metadata_evidence(
 
     primary = (
         await session.execute(
-            select(Concept.concept_id, Concept.source_id, Concept.behavior_skills)
+            select(Concept.concept_id, Concept.code, Concept.source_id, Concept.behavior_skills)
             .join(ProblemConcept, ProblemConcept.concept_id == Concept.concept_id)
             .where(
                 ProblemConcept.problem_id == problem_id,
@@ -121,7 +127,8 @@ async def load_metadata_evidence(
 
     own = await _reachable_misconceptions(session, _distractor_ids(problem))
 
-    source_ids = _non_blank(row.source_id for row in primary)
+    # 상속 키 — 원천 src_id(구 카탈로그)와 개념 code(원자 유래 카탈로그) 둘 다 본다.
+    source_ids = _non_blank([row.source_id for row in primary] + [row.code for row in primary])
     inherited: tuple[str, ...] = ()
     if source_ids:
         inherited_rows = await session.execute(

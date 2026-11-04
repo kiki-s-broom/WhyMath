@@ -40,6 +40,7 @@ from whymath_backend.security import create_access_token  # noqa: E402
 STATE = Path(os.environ.get("EOS194_STATE", "eos194_state.json"))
 # 0 = no limit. A limited scan made PUBLISHABLE=0 ambiguous (truncated != absent) -
 # scan every exposed problem with a verified hint and print SCAN_TRUNCATED (2026-11-03).
+# preflight also prints ATOM_MISCONCEPTION_ROWS (P3-99, 2026-11-04).
 SCAN_LIMIT = int(os.environ.get("EOS194_SCAN_LIMIT", "0"))
 PIN_LOGGER = "whymath_backend.l2.attempt_version_pin"
 # persona enum value "A_\uc77c\ubc18\uace0\uace03" written with escapes to stay ASCII
@@ -157,6 +158,13 @@ async def preflight():
             counts = await runbook_counts(session)
             for k, v in counts.items():
                 out(k.upper(), v)
+            # P3-99: atom-backbone misconceptions (ATOM:<code>) are what atom concepts inherit.
+            atom_rows = (
+                await session.execute(
+                    text("SELECT count(*) FROM misconception_catalog WHERE mis_id LIKE 'ATOM:%'")
+                )
+            ).scalar_one()
+            out("ATOM_MISCONCEPTION_ROWS", atom_rows)
             exposed_no_ptr, with_hint, scanned, complete, missing = await scan_candidates(session)
     finally:
         await eng.dispose()

@@ -161,6 +161,12 @@ _EOS194_PUBLISH_UNGUARDED = """
 "PUBLISH_EXIT=$LASTEXITCODE"
 """
 
+# P3-99 — 접미가 붙은 적재 모듈(`populate_atom`)을 `cmd /c` 문자열로 감싼 형태도 쓰기다.
+_WRAPPED_POPULATE_ATOM_UNGUARDED = """
+cmd /c "$Py -m whymath_backend.l1.misconception.populate_atom --graph $G 1> $Log 2>&1"
+"ATOM_LOAD_EXIT=$LASTEXITCODE"
+"""
+
 _EOS194_PREFLIGHT_READ = """
 & $Py "$Wt\\docs\\reviews\\eos194_acceptance3_2026-10-31\\eos194_measure.py" preflight
 "PREFLIGHT_EXIT=$LASTEXITCODE"
@@ -351,6 +357,7 @@ def _scan(tmp_path: Path, name: str, body: str, *, extra: list[str] | None = Non
         ("path_promotion_apply_wrapped", _PATH_PROMOTION_APPLY_WRAPPED_UNGUARDED),
         ("wrapped_populate", _WRAPPED_POPULATE_UNGUARDED),
         ("eos194_publish", _EOS194_PUBLISH_UNGUARDED),
+        ("wrapped_populate_atom", _WRAPPED_POPULATE_ATOM_UNGUARDED),
         ("stray_brace_else_depth_zero", _STRAY_BRACE_ELSE_AT_DEPTH_ZERO),
     ],
 )

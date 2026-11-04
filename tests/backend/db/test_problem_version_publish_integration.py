@@ -840,3 +840,39 @@ def test_an_unverified_hint_is_not_a_hint_strategy() -> None:
         assert _with_session(lambda s: _evidence_of(s, pid)).verified_hint_count == 1
     finally:
         sc.teardown()
+
+
+def test_atom_concept_inherits_a_catalog_row_keyed_by_its_code_not_source_id() -> None:
+    """원자 개념은 `source_id`가 비어 있다 — `ATOM:<code>` 행은 개념 `code`로 상속돼야 한다(P3-99).
+
+    운영 모사 DB에서 힌트 붙은 979건이 전부 이 경로 부재로 오개념 서명 결손이었다. 대조군: 개념
+    `code`와 다른 키를 가진 행은 상속되지 않는다(아무 행이나 세지 않는다).
+    """
+    sc = _Scenario("e399a", [3.0])
+    (pid,) = sc.pids
+    code = _rows("SELECT code FROM concept WHERE concept_id = :c", {"c": sc.cid})[0][0]
+    atom_mis = f"ATOM:p399-{uuid.uuid4().hex[:8]}"
+    stray_mis = f"ATOM:p399-{uuid.uuid4().hex[:8]}"
+    try:
+        # 원자 백본처럼 만든다 — source_id 공백 · 구 카탈로그 행 연결 끊음.
+        _exec("UPDATE concept SET source_id = NULL WHERE concept_id = :c", {"c": sc.cid})
+        _exec(
+            "INSERT INTO misconception_catalog (mis_id, concept_src_id) VALUES (:m, :s)",
+            {"m": stray_mis, "s": f"{code}-not-this-concept"},
+        )
+        before = _with_session(lambda s: _evidence_of(s, pid))
+        assert before.concept_misconception_ids == (), "다른 개념의 행이 상속됐다"
+
+        _exec(
+            "INSERT INTO misconception_catalog (mis_id, concept_src_id) VALUES (:m, :s)",
+            {"m": atom_mis, "s": code},
+        )
+        after = _with_session(lambda s: _evidence_of(s, pid))
+        assert after.concept_misconception_ids == (atom_mis,)
+        assert FieldState.PRESENT is evaluate_metadata(after).states[_FIELD.MISCONCEPTION_SIGNATURE]
+    finally:
+        _exec(
+            "DELETE FROM misconception_catalog WHERE mis_id = ANY(CAST(:m AS text[]))",
+            {"m": [atom_mis, stray_mis]},
+        )
+        sc.teardown()
