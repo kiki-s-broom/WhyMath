@@ -3167,7 +3167,7 @@ def _active_p0(backlog: Backlog) -> list[str]:
 
 
 def _id_number_conflict(
-    root: Path, backlog: object, new_id: str, *, verb: str = "add"
+    root: Path, backlog: object, new_id: str, *, verb: str = "add", title: str | None = None
 ) -> tuple[str | None, bool]:
     """`new_id`의 `<PREFIX>-<번호>`가 이미 점유돼 있으면 **거부 문구**를 돌려준다 (HARN-10).
 
@@ -3176,6 +3176,9 @@ def _id_number_conflict(
     왜 함수로 빼는가 — 이 판정은 이제 `add`(신규 등재)와 `rename`(개명) **두 곳**이 쓴다.
     같은 판정을 두 벌로 두면 한쪽만 고쳐지고, 그때 갈라지는 것은 *번호 충돌을 막는 규칙*
     자체다(HARN-100). `verb`는 거부 문구 안의 재실행 안내에만 쓴다 — 판정 자체는 동일하다.
+
+    `title`은 맨 번호 ID(슬러그 없음)의 정체 판정에 쓴다(HARN-317): 같은 full ID라도 다른
+    세션이 다른 제목으로 잡았으면 충돌이다(`number_guard.foreign_bare_holder`).
     """
     # 규약 밖 ID(번호 없음)는 검사 대상이 아니다 — 그 경우에도 반환 계약은 지켜야 하므로
     # 루프 밖에서 초기화한다(안 하면 `return None, remote_ok`가 NameError로 터진다).
@@ -3211,11 +3214,30 @@ def _id_number_conflict(
             )
         owner, source = taken.get(number, ("", ""))
         # 같은 full ID의 재등재(다른 클론에서의 시딩 등)는 충돌이 아니다 — 슬러그가
-        # 다를 때만 번호 참조가 모호해진다.
-        if owner and owner != new_id:
+        # 다를 때만 번호 참조가 모호해진다. **단 맨 번호 ID는 글자가 같을 수밖에 없어** 그
+        # 근거가 되지 못한다 — 다른 세션이 다른 제목으로 잡았는지 출처별로 다시 본다(HARN-317).
+        bare_hit: tuple[str, str] | None = None
+        if owner == new_id and number_guard.is_bare_id(new_id):
+            bare_view = (
+                number_guard.current_view(root) if getattr(policy, "remote_claims", False) else None
+            )
+            bare_hit = number_guard.foreign_bare_holder(
+                root,
+                bare_view,
+                new_id,
+                number_guard.title_fingerprint(title),
+                store.current_branch(root),
+            )
+        if owner and (owner != new_id or bare_hit):
             prefix = number.rsplit("-", 1)[0]
             verdict = _suggest_number(prefix, taken, lambda p: _historically_used_numbers(root, p))
             base = f"태스크 ID 번호 충돌: '{number}' 는 이미 {owner}({source}) 가 쓰고 있다. "
+            if bare_hit is not None:
+                base = (
+                    f"태스크 ID 번호 충돌: 맨 번호 ID '{number}' 를 다른 세션"
+                    f"({bare_hit[1] or '?'} · {bare_hit[0]})이 다른 태스크로 쓰고 있다 — 슬러그가 "
+                    "없으면 글자가 같아 같은 태스크인지 가릴 수 없다(HARN-317). "
+                )
             tail = "(같은 번호를 나눠 쓰면 문서·커밋의 번호 참조가 결정 불가가 된다 — HARN-10)"
             if verdict.suggestion is not None and verdict.history == "not_needed":
                 return _no(base + f"다음 빈 번호 제안: {verdict.suggestion}. " + tail)
@@ -3296,9 +3318,17 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
             f"(허용: {list(EOS_PRIORITIES)})"
         )
 
-    err, remote_ok = _id_number_conflict(root, backlog, args.id)
+    err, remote_ok = _id_number_conflict(root, backlog, args.id, title=args.title)
     if err:
         return _fail(err)
+    if number_guard.is_bare_id(args.id):
+        # HARN-317 ④ — 막지는 않는다(맨 번호 ID 태스크가 이미 다수 실재한다). 다만 슬러그가
+        # 없으면 병렬 세션의 같은 번호를 제목 지문으로만 가릴 수 있어 판정이 보수적이 된다.
+        print(
+            f"  ⚠ 슬러그 없는 ID '{args.id}' — 권장: '{args.id}-<짧은-영문-슬러그>'. 슬러그가 "
+            "있어야 다른 세션의 같은 번호와 글자로 구별된다(HARN-317)",
+            file=sys.stderr,
+        )
     if not remote_ok:
         # HARN-111 — 종전엔 이 안내가 `return` 뒤에 있어 **한 번도 실행될 수 없었다**.
         print("  · 번호 충돌 검사: 원격을 다 보지 못한 부분 판정 — 머지 시 validate가 2선 방어한다")
@@ -3395,10 +3425,10 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         return 1
     # [HARN-111 ⓐ] 쓰기 직전에 번호를 원격에 예약한다(CAS) — push 전 사각(EOS-108 24초)을 닫는다.
     # 경합에서 지면 번호 가드를 다시 돌려 **다음 빈 번호 제안이 담긴** 표준 거부로 끝낸다.
-    reservation = number_guard.reserve_for(root, task.id, policy, verb="add")
+    reservation = number_guard.reserve_for(root, task.id, policy, verb="add", title=task.title)
     if reservation.status == "conflict":
         del backlog.tasks[task.id]  # 자기 자신이 '로컬 점유'로 잡혀 재판정이 통과하지 않게
-        err, _ = _id_number_conflict(root, backlog, args.id)
+        err, _ = _id_number_conflict(root, backlog, args.id, title=task.title)
         return _fail(err or number_guard.describe_conflict(task.id, reservation))
     path = store.save_task(root, task)
     store.append_event(root, "add", task.id, eos_priority=task.eos_priority)
@@ -4159,14 +4189,16 @@ def cmd_rename(root: Path, args: argparse.Namespace) -> int:
         return _fail(
             f"새 ID '{args.new_id}' 가 ID 규약을 벗어난다 — " f"형식: {TASK_ID_RE.pattern}"
         )
-    err, remote_ok = _id_number_conflict(root, backlog, args.new_id, verb="rename")
+    err, remote_ok = _id_number_conflict(root, backlog, args.new_id, verb="rename", title=old.title)
     if err:
         return _fail(err)
     # [HARN-111 ⓐ] 새 번호도 원격에 예약한다 — rename은 add와 같은 번호 배정 경로다.
     policy, _ = store.load_policy(root)
-    reservation = number_guard.reserve_for(root, args.new_id, policy, verb="rename")
+    reservation = number_guard.reserve_for(
+        root, args.new_id, policy, verb="rename", title=old.title
+    )
     if reservation.status == "conflict":
-        err, _ = _id_number_conflict(root, backlog, args.new_id, verb="rename")
+        err, _ = _id_number_conflict(root, backlog, args.new_id, verb="rename", title=old.title)
         return _fail(err or number_guard.describe_conflict(args.new_id, reservation))
 
     old_path = store.backlog_dir(root) / "tasks" / f"{old.id}.yaml"
