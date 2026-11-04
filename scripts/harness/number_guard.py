@@ -72,6 +72,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -219,6 +220,7 @@ class Reservation:
     branch: str
     ts: str
     blob_sha: str = ""
+    fingerprint: str = ""  # 제목 지문(HARN-317) — 이 판 이전 예약에는 없다
 
     def expired(self, now: datetime, ttl_hours: int) -> bool:
         """TTL을 넘겼는가. **시각을 모르면 만료가 아니다**(모른다 ≠ 아니다) — 파손 레코드가
@@ -266,6 +268,7 @@ def _reservations_at(root: Path, sha: str) -> list[Reservation]:
                 branch=str(meta.get("branch") or ""),
                 ts=str(meta.get("ts") or ""),
                 blob_sha=blob_sha,
+                fingerprint=str(meta.get("title_fp") or ""),
             )
         )
     return found
@@ -315,8 +318,51 @@ def _same_session(a: str, b: str) -> bool:
     return bool(a) and a == b and a not in ("unknown", "HEAD")
 
 
+# ── HARN-317 · 맨 번호 ID의 정체 판정 ──────────────────────────────────────────
+#
+# 사고(task-id-collision 14·15회차): 두 세션이 슬러그 없는 같은 ID(`EOS-209`·`P3-93`)로 **서로
+# 다른** 태스크를 add했다. 예약·번호 가드는 "full ID가 같으면 같은 태스크의 재등재(시딩·복제)"로
+# 보고 통과시켰고, 뒤 세션이 앞 세션의 예약을 덮어썼다. 슬러그가 있으면 full ID가 같다는 것이
+# 같은 태스크라는 근거가 되지만, 맨 번호 ID는 글자가 같을 수밖에 없어 근거가 되지 못한다.
+# 그래서 맨 번호 ID는 **제목 지문**이 같을 때만 같은 태스크로 본다. 지문을 모르면(옛 예약·
+# 읽기 실패) 같다고 보지 않는다 — 모른다 ≠ 같다.
+
+
+def is_bare_id(task_id: str) -> bool:
+    """슬러그 없이 번호만 있는 ID인가(`P3-93` 예 · `P3-93-slug` 아니오)."""
+    number = store.id_number_of(task_id)
+    return bool(number) and task_id == number
+
+
+def title_fingerprint(title: str | None) -> str:
+    """제목의 정체 지문 — 공백 정규화 후 SHA-256 앞 16자리. 제목이 없으면 빈 문자열."""
+    text = " ".join(str(title or "").split())
+    if not text:
+        return ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def same_task(task_id: str, other_id: str, fingerprint: str, other_fingerprint: str) -> bool:
+    """`other_id`(다른 세션이 잡은 것)가 `task_id`와 **같은 태스크**인가.
+
+    - full ID가 다르면 다른 태스크다.
+    - 슬러그가 있는 같은 full ID는 같은 태스크다(시딩·복제 세션 — HARN-10 규칙 승계).
+    - 맨 번호 ID는 양쪽 제목 지문이 있고 같을 때만 같은 태스크다.
+    """
+    if task_id != other_id:
+        return False
+    if not is_bare_id(task_id):
+        return True
+    return bool(fingerprint) and fingerprint == other_fingerprint
+
+
 def reserve(
-    root: Path, task_id: str, branch: str, *, ttl_hours: int = RESERVATION_TTL_HOURS
+    root: Path,
+    task_id: str,
+    branch: str,
+    *,
+    ttl_hours: int = RESERVATION_TTL_HOURS,
+    fingerprint: str = "",
 ) -> ReserveResult:
     """`task_id`의 번호를 원격에 CAS로 예약한다 (ⓐ).
 
@@ -325,7 +371,9 @@ def reserve(
       · 같은 번호의 claim(착수·차단 홀드) — 번호 가드가 읽은 뒤 누가 착수했을 수 있다.
     같은 full ID의 재예약(다른 클론의 시딩·재실행)과 같은 브랜치의 번호 재사용(실패한 add의
     잔재를 다른 슬러그로 다시 잡는 것)은 충돌이 아니다 — 번호 가드의 "슬러그가 다를 때만
-    충돌" 규칙(HARN-10)과 같은 판정이다.
+    충돌" 규칙(HARN-10)과 같은 판정이다. **단 맨 번호 ID(슬러그 없음)는 full ID가 같아도
+    다른 태스크일 수 있으므로**, 다른 세션의 예약은 제목 지문(`fingerprint`)이 같을 때만
+    통과하고 다른 세션의 claim은 충돌이다(HARN-317 · `same_task`).
 
     쓰기마다 만료 예약을 걷는다(지연 청소) — 별도 청소 잡 없이 대장이 TTL 안의 것만 담는다.
     """
@@ -347,7 +395,9 @@ def reserve(
             for held in current:
                 if held.number != number or held.expired(now, ttl_hours):
                     continue
-                if held.task_id == task_id or _same_session(held.branch, branch):
+                if _same_session(held.branch, branch):
+                    continue
+                if same_task(task_id, held.task_id, fingerprint, held.fingerprint):
                     continue
                 return ReserveResult(
                     "conflict",
@@ -356,7 +406,11 @@ def reserve(
                     source="예약",
                 )
             for claim in remote_claims._read_claims(root, base_sha):
-                if claim.task_id != task_id and store.id_number_of(claim.task_id) == number:
+                if store.id_number_of(claim.task_id) != number:
+                    continue
+                # claim에는 제목 지문이 없다 — 맨 번호 ID의 같은 full ID는 다른 세션이면 충돌.
+                foreign_bare = is_bare_id(task_id) and not _same_session(claim.branch, branch)
+                if claim.task_id != task_id or foreign_bare:
                     return ReserveResult(
                         "conflict", holder=claim.task_id, holder_branch=claim.branch, source="claim"
                     )
@@ -369,6 +423,8 @@ def reserve(
                 "harness": "2.0",
                 "kind": "reserve",
             }
+            if fingerprint:
+                mine["title_fp"] = fingerprint
             commit = _write_reservations(
                 root, base_sha, kept, mine, f"reserve {number} ({task_id} · {branch})"
             )
@@ -389,7 +445,9 @@ def reserve(
         return ReserveResult(f"error:{type(exc).__name__}", message=_stderr_line(str(exc)))
 
 
-def reserve_for(root: Path, task_id: str, policy: object, *, verb: str = "add") -> ReserveResult:
+def reserve_for(
+    root: Path, task_id: str, policy: object, *, verb: str = "add", title: str | None = None
+) -> ReserveResult:
     """CLI 진입점 — 정책 확인 · 예약 · 비정상 상태의 경고와 이벤트까지 한 번에.
 
     conflict는 여기서 거부 문구를 만들지 않는다 — 호출부가 번호 가드를 다시 돌려 **다음 빈
@@ -402,6 +460,7 @@ def reserve_for(root: Path, task_id: str, policy: object, *, verb: str = "add") 
         task_id,
         store.current_branch(root),
         ttl_hours=int(getattr(policy, "claim_ttl_hours", RESERVATION_TTL_HOURS)),
+        fingerprint=title_fingerprint(title),
     )
     number = store.id_number_of(task_id) or task_id
     if result.status == "ok":
@@ -436,6 +495,51 @@ def reserve_for(root: Path, task_id: str, policy: object, *, verb: str = "add") 
             detail=result.message,
         )
     return result
+
+
+def _title_of(text: str) -> str:
+    """태스크 YAML 원문의 title — 읽지 못하면 빈 문자열(모른다 → 같은 태스크로 보지 않는다)."""
+    if not text or store.yaml is None:
+        return ""
+    try:
+        data = store.yaml.safe_load(text)
+    except Exception as exc:  # 파손 사본은 판정 불가 — 타입명만 남긴다
+        _LOG.warning("원격 태스크 사본 파싱 실패: %s", type(exc).__name__)
+        return ""
+    return str(data.get("title") or "") if isinstance(data, dict) else ""
+
+
+def foreign_bare_holder(
+    root: Path, view: "RemoteView | None", task_id: str, fingerprint: str, branch: str
+) -> tuple[str, str] | None:
+    """맨 번호 ID `task_id`를 **다른 세션이 다른 태스크로** 잡고 있으면 `(출처, 브랜치)`.
+
+    번호 가드(`_id_number_conflict`)는 같은 full ID를 '같은 태스크'로 보고 넘긴다. 맨 번호 ID는
+    그 판단의 근거가 없으므로 여기서 출처별로 다시 본다(HARN-317). 슬러그 있는 ID·관측 없음은
+    `None`(종전 판정 유지).
+
+    - 예약: 제목 지문이 같을 때만 같은 태스크(같은 세션 예약은 관측이 이미 뺐다).
+    - claim: 지문이 없으므로 다른 세션이면 다른 태스크로 본다.
+    - 원격 브랜치 사본: 그 사본의 제목 지문을 읽어 비교한다. 못 읽으면 다른 태스크로 본다.
+    """
+    if view is None or not is_bare_id(task_id):
+        return None
+    for held in view.reservations:
+        if held.task_id == task_id and not same_task(
+            task_id, held.task_id, fingerprint, held.fingerprint
+        ):
+            return "원격 번호 예약", held.branch
+    for claim in view.claims:
+        if claim.task_id == task_id and not _same_session(claim.branch, branch):
+            return "원격 claim", claim.branch
+    for item in view.task_files:
+        if item.task_id != task_id or _same_session(item.branch, branch):
+            continue
+        texts, _, status = remote_claims.read_remote_task_texts(root, [item])
+        other = _title_of(texts.get(task_id, "")) if status == "ok" else ""
+        if not same_task(task_id, item.task_id, fingerprint, title_fingerprint(other)):
+            return "원격 브랜치 backlog/tasks", item.branch
+    return None
 
 
 def describe_conflict(task_id: str, result: ReserveResult) -> str:
