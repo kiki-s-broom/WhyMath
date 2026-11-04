@@ -23,6 +23,12 @@
   경유는 내부망 전송 약속을 깬다.
 - **보조 신호**: 개인정보 확률은 관측값일 뿐 PII 보호 절차를 대체하지 않는다(법령 유래 절차의
   기계 대체 금지). 이 레코드를 근거로 무언가를 자동으로 가리거나 차단하지 않는다.
+- **규칙 개인정보 백스톱 (PED-50)**: laya v4.1이 동 단위 주소("해운대구 우동")를 놓치는 것이
+  실측돼, 결정론 정규식(상세 주소·휴대전화·이메일)의 판정을 같은 레코드에 `pii_rule`·
+  `pii_rule_kinds`(종류 코드만 — 일치 문자열·원문 없음)로 함께 남긴다. laya 호출이 실패하거나
+  건너뛰어도 규칙 결과는 남는다. 이것도 *관측*이다 — 승격 시 "laya OR 규칙" 정책을 쓸지는 이
+  두 신호의 겹침을 재 본 뒤 별도 결정한다. 미성년자 서비스라 놓침이 오탐보다 위험하므로 규칙은
+  재현율 쪽으로 기울이되, 수학 문장 오탐(평행이동·다시·분모로 2를…)은 대조군 테스트로 막는다.
 
 **측정 범위**: 발화가 빈 턴(풀이만 제출 — 규칙 분류 `답시도`)은 판정할 문장이 없어 관측하지 않는다.
 비교는 *발화가 있는 학생 턴*에 한정된다.
@@ -39,6 +45,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import ssl
 import time
 from collections.abc import Callable, Coroutine
@@ -51,6 +58,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.l4.misconception.shadow import _spawn
+from whymath_backend.ops.log_scrubber import PII_SHAPE_PATTERNS
 from whymath_backend.schema.enums import StudentIntent
 
 logger = logging.getLogger("whymath.api.intent_shadow")
@@ -58,7 +66,7 @@ logger = logging.getLogger("whymath.api.intent_shadow")
 record_logger = logging.getLogger("whymath.api.intent_shadow.record")
 
 # 레코드 형식 버전 — 필드가 바뀌면 올린다(수집기가 버전별로 읽을 수 있게 · R6-03).
-RECORD_SCHEMA_VERSION = 1
+RECORD_SCHEMA_VERSION = 2  # 2 = PED-50 규칙 개인정보 백스톱 필드(pii_rule·pii_rule_kinds) 추가
 
 # laya-ko-whymath v1이 학습한 질문지와 *글자 하나까지* 같아야 한다 — 질문 문구가 바뀌면 모델이
 # 학습 때와 다른 입력을 보게 되어 정확도 근거(0.893)가 성립하지 않는다. 바꾸려면 재학습과 함께
@@ -104,6 +112,224 @@ _in_flight = 0
 
 # 넘침으로 건너뛴 턴의 실패 이름 — 예외 타입명이 아니라 이 모듈이 정한 사유 코드다.
 OVERLOADED = "Overloaded"
+
+# 5종↔6종 대응표 — *일치도 측정용*(Kiki 결정 2026-11-04 · PED-50). 섀도 레코드의 rule_intent와
+# laya_intent를 같은 칸에서 비교할 때만 쓴다. Laya 6종을 5종으로 줄이는 데 쓰지 않는다 — hint와
+# stuck을 가르는 것이 Laya를 재는 이유다. hint는 "도움 요청"이라 막힘표현에, chitchat은 규칙 쪽
+# 잔여 범주인 이해확인에 둔다(2026-11-03 실측 15건은 전부 답시도↔check로 일치).
+LAYA_TO_RULE_INTENT: dict[str, StudentIntent] = {
+    "answer_only": StudentIntent.포기,
+    "stuck": StudentIntent.막힘표현,
+    "concept": StudentIntent.질문,
+    "check": StudentIntent.답시도,
+    "hint": StudentIntent.막힘표현,
+    "chitchat": StudentIntent.이해확인,
+}
+
+
+# ── 규칙 개인정보 백스톱 (PED-50) ─────────────────────────────────────────────
+# 휴대전화·이메일은 로그 스크러버의 패턴을 그대로 쓴다(진실 원천 하나 — 표기가 갈라지지 않게).
+# 주소는 스크러버에 없으므로 여기서 정의한다. 기준 = laya 라벨 기준표 v1.4 §B-1: 시·도·시군구까지는
+# 개인정보가 아니고, 동·읍·면 / 도로명 / 번지 / 아파트 동·호수 중 하나라도 있으면 개인정보다.
+PiiRuleKind = Literal["address", "email", "phone"]
+_EMAIL_PATTERN, _PHONE_PATTERN = PII_SHAPE_PATTERNS
+
+# 수학·일상 낱말 중 "…동/읍/면"으로 끝나는 것 — 주소 동이 아니다(오탐 대조군과 짝).
+_NOT_DONG = frozenset(
+    {
+        "이동",
+        "운동",
+        "행동",
+        "활동",
+        "변동",
+        "연동",
+        "자동",
+        "공동",
+        "진동",
+        "작동",
+        "감동",
+        "파동",
+        "유동",
+        "부동",
+        "협동",
+        "구동",
+        "가동",
+        "기동",
+        "능동",
+        "수동",
+        "요동",
+        "출동",
+        "혼동",
+        "충동",
+        "노동",
+        "발동",
+        "동동",
+        "평행이동",
+        "대칭이동",
+        "회전이동",
+        "반동",
+        "측면",
+        "단면",
+        "평면",
+        "곡면",
+        "정면",
+        "옆면",
+        "윗면",
+        "밑면",
+        "겉면",
+        "전면",
+        "후면",
+        "반면",
+        "이면",
+        "표면",
+        "화면",
+        "장면",
+        "방면",
+        "국면",
+        "체면",
+        "앞면",
+        "뒷면",
+        "외면",
+        "내면",
+        "대면",
+        "직면",
+        "당면",
+        "지면",
+        "수면",
+        "사면",
+        "다면",
+        "양면",
+        "일면",
+        "그러면",
+        "하면",
+        "이러면",
+        "저러면",
+        "되면",
+        "보면",
+        "오면",
+        "가면",
+        "면",
+        "우리",
+        "거리",
+        "머리",
+        "자리",
+        "소리",
+        "다리",
+        "요리",
+        "정리",
+        "처리",
+        "원리",
+        "논리",
+        "무리",
+        "유리",
+        "관리",
+        "수리",
+        "진리",
+        "심리",
+        "물리",
+        "근처리",
+        "리",
+    }
+)
+# "…시/군/구"로 끝나지만 행정구역이 아닌 낱말("다시 평행이동"·"탐구 이동" 오탐 방지).
+_NOT_ADMIN = frozenset(
+    {
+        "다시",
+        "동시",
+        "표시",
+        "제시",
+        "지시",
+        "무시",
+        "역시",
+        "당시",
+        "잠시",
+        "혹시",
+        "즉시",
+        "수시",
+        "암시",
+        "명시",
+        "게시",
+        "개시",
+        "감시",
+        "교시",
+        "일시",
+        "시시",
+        "도시",
+        "항시",
+        "탐구",
+        "연구",
+        "요구",
+        "친구",
+        "도구",
+        "입구",
+        "출구",
+        "가구",
+        "구구",
+        "공구",
+        "추구",
+        "장군",
+        "아군",
+        "적군",
+        "대군",
+        "구",
+    }
+)
+_RESIDE = r"(?:살아|살고|살아요|삽니다|살음|살아용|사는|산다|살|거주|이사|자취)"
+# ① 아파트·빌라 + 동 / 동 + 호 — 가장 강한 신호
+_APT_PATTERN = re.compile(
+    r"(?:아파트|빌라|맨션|오피스텔|빌리지|타운|주공)\s*\d{1,4}\s*동"
+    r"|(?<!\d)\d{1,4}\s*동\s*\d{1,5}\s*호(?![가-힣])"
+)
+# ② 도로명 + 번호 + (번길 | -부번) — "분모로 2를"처럼 수학의 "~로 + 숫자"는 번길·하이픈이 없다
+_ROAD_PATTERN = re.compile(r"(?<![가-힣])[가-힣]{2,8}(?:대로|로|길)\s?\d{1,4}(?:\s?번길|-\d{1,4})")
+# ③ 도로명 + 번호, 거주 표현이 함께 있을 때만("햇살로 12 살아요")
+_ROAD_LOOSE_PATTERN = re.compile(r"(?<![가-힣])[가-힣]{2,8}(?:대로|로|길)\s?\d{1,4}(?![\d가-힣])")
+_RESIDE_PATTERN = re.compile(_RESIDE + r"|주소|우리\s?집|번지")
+# ④ 동·읍·면·리 + 거주 표현("한빛동 살아요"·"새솔읍에서 살고")
+_DONG_RESIDE_PATTERN = re.compile(
+    r"(?<![가-힣])([가-힣]{1,5}(?:동|읍|면|리))\s*(?:에서|에|쪽에)?\s*" + _RESIDE
+)
+# ⑤ 시·군·구 + 동·읍·면(·N가) — "해운대구 우동"·"성남시 분당구 정자동"
+_ADMIN_DONG_PATTERN = re.compile(
+    r"(?<![가-힣])([가-힣]{1,6}(?:시|군|구))(?:에서|의)?\s*"
+    r"([가-힣]{1,5}(?:동|읍|면)|[가-힣]{1,4}\d{1,2}가)"
+    # 뒤가 끝·비한글이거나 조사·거주 표현일 때만("우동인데"·"정자동이에요"·"정자동 살아")
+    # — "동생"처럼 낱말 중간에서 끊긴 것은 제외
+    r"(?=$|[^가-힣]|이|인|에|쪽|근처|사|살|으로)"
+)
+
+
+def detect_pii_rule(text: str) -> list[PiiRuleKind]:
+    """학생 발화 → 규칙으로 찾은 개인정보 *종류 코드* 목록(정렬·중복 없음).
+
+    원문 조각은 돌려주지 않는다.
+
+    결정론·LLM 0회. 실패하지 않는 순수 함수지만, 호출자는 관측 방어선 안에서 부른다.
+    """
+    kinds: set[PiiRuleKind] = set()
+    if _EMAIL_PATTERN.search(text):
+        kinds.add("email")
+    if _PHONE_PATTERN.search(text):
+        kinds.add("phone")
+    if _address_hit(text):
+        kinds.add("address")
+    return sorted(kinds)
+
+
+def _address_hit(text: str) -> bool:
+    if _APT_PATTERN.search(text) or _ROAD_PATTERN.search(text):
+        return True
+    if _ROAD_LOOSE_PATTERN.search(text) and _RESIDE_PATTERN.search(text):
+        return True
+    for m in _DONG_RESIDE_PATTERN.finditer(text):
+        if m.group(1) not in _NOT_DONG and not m.group(1).endswith("이동"):
+            return True
+    for m in _ADMIN_DONG_PATTERN.finditer(text):
+        admin, place = m.group(1), m.group(2)
+        if admin in _NOT_ADMIN or place in _NOT_DONG or place.endswith("이동"):
+            continue
+        return True
+    return False
 
 
 class _IntentAnswer(BaseModel):
@@ -193,6 +419,22 @@ class IntentShadowObservation(BaseModel):
     observed_at: datetime = Field(default_factory=_observed_hour)
     """관측 시각(UTC, *시 단위 절삭*)."""
 
+    pii_rule: bool | None = None
+    """규칙 백스톱 판정(PED-50) — laya 성공·실패와 무관하게 채운다. None = 규칙 판정 자체가 실패."""
+
+    pii_rule_kinds: list[PiiRuleKind] = Field(default_factory=list)
+    """규칙이 찾은 종류 코드(address·email·phone) — 일치 문자열·원문은 담지 않는다."""
+
+
+def _rule_fields(student_input: str) -> tuple[bool | None, list[PiiRuleKind]]:
+    """규칙 백스톱 (판정, 종류) — 실패하면 타입명만 남기고 판정 None(모름 ≠ 아님)."""
+    try:
+        kinds = detect_pii_rule(student_input)
+    except Exception as exc:  # noqa: BLE001 — 관측 방어선(본류 불변)
+        logger.warning("의도 섀도 규칙 개인정보 판정 실패: %s", type(exc).__name__)
+        return None, []
+    return bool(kinds), kinds
+
 
 @lru_cache(maxsize=1)
 def _shared_ssl_context() -> ssl.SSLContext:
@@ -267,6 +509,7 @@ def spawn_intent_shadow(
         if not shadow_configured(settings) or not student_input.strip():
             return
         if _in_flight >= MAX_IN_FLIGHT:
+            pii_rule, pii_rule_kinds = _rule_fields(student_input)
             _emit(
                 IntentShadowObservation(
                     route=route,
@@ -274,6 +517,8 @@ def spawn_intent_shadow(
                     has_solution=has_solution,
                     latency_ms=0.0,
                     failure=OVERLOADED,
+                    pii_rule=pii_rule,
+                    pii_rule_kinds=pii_rule_kinds,
                 )
             )
             return
@@ -345,6 +590,7 @@ async def observe_intent_shadow(
     finally:
         _in_flight = max(0, _in_flight - 1)
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
+    pii_rule, pii_rule_kinds = _rule_fields(student_input)
 
     try:
         observation = IntentShadowObservation(
@@ -358,6 +604,8 @@ async def observe_intent_shadow(
             latency_ms=latency_ms,
             failure=failure,
             http_status=http_status,
+            pii_rule=pii_rule,
+            pii_rule_kinds=pii_rule_kinds,
         )
     except Exception as exc:  # noqa: BLE001 — 레코드 조립 실패도 본류를 깨지 않는다
         logger.warning("의도 섀도 레코드 조립 실패: %s", type(exc).__name__)

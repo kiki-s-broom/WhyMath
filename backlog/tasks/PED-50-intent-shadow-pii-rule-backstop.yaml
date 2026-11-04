@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: PED-50-intent-shadow-pii-rule-backstop
+title: "학생 의도 섀도에 규칙 개인정보 백스톱(상세 주소·휴대전화·이메일) + 5↔6 의도 대응표(측정용)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 규칙 개인정보 백스톱 — 학생 발화에서 결정론 정규식으로 상세 주소(동·읍·면·리+거주 표현 / 시·군·구 + 동·읍·면 / 도로명+번호+번길·하이픈 / 아파트·빌라+동·호)·휴대전화(010-)·이메일을 찾아 섀도 레코드에 pii_rule(bool)·pii_rule_kinds(종류 코드 목록)로 남긴다. 원문·일치 문자열은 레코드에 넣지 않는다(종류 코드만). laya 호출이 실패·건너뜀(Overloaded)이어도 규칙 결과는 기록한다"
+  - "② 오탐 대조군 — 수학 문장(평행이동·이동·운동·다시·동시·분모로 2를·3으로 나누면·02-123-4567 계산·시·군·구까지만 적은 주소)은 pii_rule=false로 동결. 놓침 대조군 — 해운대구 우동·한빛동 살아요·햇살로 12번길·푸른아파트 103동·103동 1204호·010-1234-5678·이메일은 true로 동결. 패턴 절마다 뮤테이션 RED"
+  - "③ 5종↔6종 대응표(측정용) — LAYA_TO_RULE_INTENT 상수(answer_only→포기·stuck→막힘표현·concept→질문·check→답시도·hint→막힘표현·chitchat→이해확인, Kiki 결정 2026-11-04). 일치도 집계에만 쓰고 Laya 6종을 줄이지 않는다. 6키 전수·값이 StudentIntent 실재 값임을 테스트로 동결. 런북의 '사람 결정이 먼저' 문구를 결정 기록으로 갱신"
+  - "④ 범위 밖(명시) — 비노출 불변 유지: 규칙 결과로 학생 응답·DB 적재·가리기를 바꾸지 않는다(PED-48 ⑥ 동형 — 승격 시 laya OR 규칙 정책은 별도 태스크·Kiki 결정). RECORD_SCHEMA_VERSION 1→2"
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/_intent_shadow.py
+  - tests/backend/api/test_intent_shadow.py
+  - docs/architecture/shadow_measurement_runbook.md
+session: claude/ped-50-intent-shadow-pii-rule
+notes: "배경: laya-ko-whymath v4.1 교체(2026-11-03) 후에도 동 단위 주소(해운대구 우동)를 놓침. 미성년자 서비스라 놓침이 오탐보다 위험 — 결정론 규칙을 섀도 레코드에 함께 남겨 승격 시 laya OR 규칙 정책의 적용 범위를 측정 가능하게 한다. Kiki 지시 2026-11-04 '추천대로 진행'"
+updated: 2026-11-04

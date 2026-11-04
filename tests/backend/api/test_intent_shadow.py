@@ -396,6 +396,8 @@ _EXPECTED_FIELDS = {
     "failure",
     "http_status",
     "observed_at",
+    "pii_rule",
+    "pii_rule_kinds",
 }
 
 
@@ -759,3 +761,156 @@ def test_coach_handler_spawns_shadow_after_commit_with_stored_intent(
     assert call_value.func.id == "classify_student_intent"
     ckw = {k.arg: k.value for k in call_value.keywords}
     assert _is_body_student_input(ckw["student_input"])
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# PED-50 — 규칙 개인정보 백스톱 · 5종↔6종 대응표(측정용)
+# ──────────────────────────────────────────────────────────────────────────
+
+# 놓침 대조군 — 기준표 v1.4 §B-1의 "예" 범위. 첫 줄이 laya v4.1이 실제로 놓친 형태다(2026-11-03).
+_PII_ADDRESS_CASES = [
+    "부산 해운대구 우동인데 이거 답만",
+    "해운대구 우동 살아요 힌트 줘",
+    "성남시 분당구 정자동이에요",
+    "종로구 종로1가 살아",
+    "한빛동 살아요 근의 공식이 뭐예요",
+    "새솔읍에서 살고 있어요 첫 단계만",
+    "햇살로 12번길 사는데 x=3 맞아?",
+    "햇살로 12-3 이에요",
+    "햇살로 12 살아요",
+    "푸른아파트 103동 사는 중2",
+    "103동 1204호 사는 초2인데 덧셈 답만",
+]
+# 오탐 대조군 — 수학·일상 문장. 시·군·구까지만 적은 주소는 기준표상 개인정보가 아니다.
+_NOT_PII_CASES = [
+    "다시 평행이동해봤어",
+    "그래프를 x축 방향으로 평행이동하면",
+    "이동한 거리 구하는 법",
+    "운동 에너지 공식이 뭐예요",
+    "동시에 두 식을 풀면",
+    "분모로 2를 곱하면 돼?",
+    "3으로 나누면 x=5",
+    "x로 2를 나누면",
+    "02-123-4567 계산했더니 -4688 나옴",
+    "경기도 성남시 분당구 살아요",
+    "부산 해운대구 살아요 힌트",
+    "1교시 이동수업 끝",
+    "측면 넓이 구하는 법",
+    "그러면 살 수 있어?",
+    "우리 동네 수학학원",
+    "이 거리에 살짝 더하면",
+    "탐구 이동 문제",
+    "강남구 동생이랑 공부",
+    "2x+3=7 이므로 2x=4",
+]
+
+
+@pytest.mark.parametrize("text", _PII_ADDRESS_CASES)
+def test_rule_backstop_catches_detailed_addresses(text: str) -> None:
+    assert shadow.detect_pii_rule(text) == ["address"]
+
+
+@pytest.mark.parametrize("text", _NOT_PII_CASES)
+def test_rule_backstop_does_not_flag_math_or_city_level_text(text: str) -> None:
+    assert shadow.detect_pii_rule(text) == []
+
+
+def test_rule_backstop_reuses_scrubber_phone_and_email_patterns() -> None:
+    """휴대전화·이메일은 로그 스크러버 패턴 재사용 — 순서가 바뀌면 종류 코드가 뒤바뀌므로 동결."""
+    assert shadow.detect_pii_rule("제 번호 010-1234-5678 이에요") == ["phone"]
+    assert shadow.detect_pii_rule("메일 kid@test.com 으로 보내줘") == ["email"]
+    assert shadow.detect_pii_rule(_STUDENT_TEXT) == ["phone"]
+    assert shadow.detect_pii_rule("한빛동 살아요 010-1234-5678 kid@test.com") == [
+        "address",
+        "email",
+        "phone",
+    ]
+
+
+def test_rule_fields_are_recorded_on_success_without_matched_text(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    text = "부산 해운대구 우동인데 이거 답만"
+    _use_transport(lambda _r: httpx.Response(200, json=_OK_BODY))
+    with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        _run(student_input=text)
+    (rec,) = _records(caplog)
+    assert rec["schema_version"] == 2
+    assert rec["pii_rule"] is True
+    assert rec["pii_rule_kinds"] == ["address"]
+    # 종류 코드만 — 일치한 지명 조각이 레코드 어디에도 없다
+    raw = json.dumps(rec, ensure_ascii=False)
+    for fragment in ("해운대", "우동", "답만"):
+        assert fragment not in raw
+
+
+def test_rule_fields_are_recorded_even_when_laya_fails(caplog: pytest.LogCaptureFixture) -> None:
+    """laya가 죽어도 규칙 백스톱은 남는다 — 백스톱의 존재 이유."""
+    _use_transport(lambda _r: httpx.Response(503, text="down"))
+    with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        _run(student_input="한빛동 살아요")
+    (rec,) = _records(caplog)
+    assert rec["failure"] == "HTTPStatusError"
+    assert rec["laya_intent"] is None
+    assert rec["pii_rule"] is True
+    assert rec["pii_rule_kinds"] == ["address"]
+
+
+def test_rule_fields_are_recorded_on_overload(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    _configure(monkeypatch)
+    _capture_spawn(monkeypatch)
+    shadow._in_flight = shadow.MAX_IN_FLIGHT
+    with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        shadow.spawn_intent_shadow(
+            student_input="푸른아파트 103동 사는 중2",
+            rule_intent=StudentIntent.이해확인,
+            has_solution=False,
+            route="append_turns",
+        )
+    (rec,) = _records(caplog)
+    assert rec["failure"] == shadow.OVERLOADED
+    assert (rec["pii_rule"], rec["pii_rule_kinds"]) == (True, ["address"])
+
+
+def test_rule_negative_is_false_not_none(caplog: pytest.LogCaptureFixture) -> None:
+    _use_transport(lambda _r: httpx.Response(200, json=_OK_BODY))
+    with caplog.at_level(logging.INFO, logger=_RECORD_LOGGER):
+        _run(student_input="다시 평행이동해봤어")
+    (rec,) = _records(caplog)
+    assert (rec["pii_rule"], rec["pii_rule_kinds"]) == (False, [])
+
+
+def test_rule_failure_is_unknown_not_negative_and_logs_type(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """규칙 판정이 터지면 None(모름) — False(아님)로 접지 않고, 타입명을 남긴다."""
+
+    def _boom(_t: str) -> list[str]:
+        raise RuntimeError("regex broke")
+
+    monkeypatch.setattr(shadow, "detect_pii_rule", _boom)
+    _use_transport(lambda _r: httpx.Response(200, json=_OK_BODY))
+    with caplog.at_level(logging.INFO):
+        _run(student_input="한빛동 살아요")
+    (rec,) = _records(caplog)
+    assert rec["pii_rule"] is None
+    assert rec["pii_rule_kinds"] == []
+    assert rec["laya_intent"] is not None  # 규칙 실패가 laya 관측을 깨지 않는다
+    assert "RuntimeError" in _all_log_text(caplog)
+
+
+def test_laya_to_rule_intent_mapping_covers_all_six_labels() -> None:
+    """대응표(Kiki 결정 2026-11-04) — 6종 전수·값은 실재 StudentIntent. 질문지 보기와 같은 키 집합."""
+    criteria = shadow.LAYA_QUESTIONS["intent"]["criteria"]  # type: ignore[index]
+    assert set(shadow.LAYA_TO_RULE_INTENT) == set(criteria)
+    assert all(isinstance(v, StudentIntent) for v in shadow.LAYA_TO_RULE_INTENT.values())
+    assert shadow.LAYA_TO_RULE_INTENT == {
+        "answer_only": StudentIntent.포기,
+        "stuck": StudentIntent.막힘표현,
+        "concept": StudentIntent.질문,
+        "check": StudentIntent.답시도,
+        "hint": StudentIntent.막힘표현,
+        "chitchat": StudentIntent.이해확인,
+    }

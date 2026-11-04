@@ -350,9 +350,17 @@ laya-ko-whymath v1(6종 의도·개인정보 확률)의 판단 쌍. 교체(승�
 
 **레코드 필드**: `schema_version`·`route`(create_session/append_turns)·`rule_intent`·`has_solution`·
 `laya_intent`·`laya_confidence`·`pii_prob`·`routed_model`·`questions_version`·`latency_ms`·`failure`·
-`http_status`·`observed_at`(시 단위 절삭). 학생 원문·해시·식별자는 없다. `failure`가 있는 레코드도
+`http_status`·`observed_at`(시 단위 절삭)·`pii_rule`·`pii_rule_kinds`(v2). 학생 원문·해시·식별자는 없다. `failure`가 있는 레코드도
 분모다 — 작동 비율 = `failure`가 null인 레코드 / 전체 레코드. `Overloaded`는 동시 판정 상한(4)
 초과로 호출을 건너뛴 턴이다.
 
-**아직 없는 것(후속)**: 레코드를 일치도 표·오류 사례로 집계하는 harvest CLI. 집계 기준(두 라벨
-체계의 대응표 — 6종 ↔ 5종)은 기계적으로 정할 수 없어 사람 결정이 먼저다.
+**규칙 개인정보 백스톱 (PED-50 · 레코드 v2)**: `pii_rule`(bool · None=규칙 판정 실패)·`pii_rule_kinds`
+(`address`·`email`·`phone` 종류 코드만 — 일치 문자열·원문 없음). laya가 실패·`Overloaded`여도 채워진다.
+상세 주소 기준은 laya 기준표 v1.4 §B-1(시·군·구까지는 아님 / 동·읍·면·도로명+번길·아파트 동·호는
+개인정보). 이것도 관측이다 — 승격 시 "laya OR 규칙" 정책 채택은 두 신호의 겹침을 본 뒤 별도 결정.
+
+**5종↔6종 대응표 (Kiki 결정 2026-11-04 · 측정 전용)** — 정본 `_intent_shadow.LAYA_TO_RULE_INTENT`:
+answer_only→포기 · stuck→막힘표현 · concept→질문 · check→답시도 · hint→막힘표현 · chitchat→이해확인.
+일치도 집계에만 쓰고 Laya 6종을 5종으로 줄이지 않는다(hint↔stuck 구분이 Laya를 재는 이유).
+
+**아직 없는 것(후속)**: 레코드를 위 대응표로 일치도 표·오류 사례로 집계하는 harvest CLI.
