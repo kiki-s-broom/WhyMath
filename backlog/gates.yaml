@@ -1211,11 +1211,21 @@ gates:
       - "[2026-10-31] input done · P3-62-solution-qa-unverifiable-structuring · 판정 무관: 게이트 판정은 Kiki 몫(D11 — 검증 가능 비율 하한 미결). 이 태스크는 판정 입력(실측 0.48885 · 후보 0.52542/0.51115 · 구조적 상한 0.5575 — docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C, 판정 기준 main 3a83ed64, 착지 5d309758)만 넘기고 판정을 내리지 않는다 — done P3-62-solution-qa-unverifiable-structuring 인계"
       - "[2026-10-31] notes +657자 — Kiki 결정 기록(2026-10-31 채팅 응답 \"55%\" · \"LLM이 쓴 문장\") — D11 하한 값과 D16 판정 대상. 판정 기준 main 7e9dc999. 게이트 상태·의존 무변경"
       - "[2026-11-01] depends_on +P3-93 · depends_on +P3-94 · notes +474자 — Kiki 2026-11-01 권장안 승인 기록 — D16 해석 정정 · 임계값 보류 · 미적분 단독 승격 안 함 · 승계 태스크 P3-93/P3-94를 입력으로 연결. 판정 기준 main d81cfd7a"
+      - "[2026-11-05] depends_on +P3-44-graph-connectivity-misconception-edge · depends_on +P3-50-calc-02-01-misconception-chain-restore · depends_on +P3-52-m0677-link-disposition-execution · depends_on +P3-91-p3-62-candidate-promotion-fill-template-fix · depends_on +PED-17-study-generate-fallback-decision · depends_on +P3-100-concept-revision-serving · depends_on +P3-101-release-gate-a-chain-harness · depends_on +P3-102-prod-misconception-signature-gap · verdict FAIL · owners: P3-44-graph-connectivity-misconception-edge, P3-50-calc-02-01-misconception-chain-restore, P3-52-m0677-link-disposition-execution, P3-91-p3-62-candidate-promotion-fill-template-fix, PED-17-study-generate-fallback-decision, P3-100-concept-revision-serving, P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap · inputs: P3-62-solution-qa-unverifiable-structuring · evidence: docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1 · Week3 FAIL(AI 품질 6축 임계 미확정·LLM 문장 표본 0/244) · Release FAIL(Gate A 학습 단계 404 · Gate B Graph 4/10·검증가능 48.9%<55% · Gate C 개념 수정판 서빙 미연결·운영 문항 903/979 발행 불가 · D·E 충족 · Q1 NO Q2 NO Q3 YES) — P3-17 통합 판정 회차 FAIL 기록 — 미충족 조건별 소유 태스크 연결"
+      - "[2026-11-05] verdict FAIL · owners: P3-100-concept-revision-serving, P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap, P3-94, P3-93 · inputs: P3-17-week3-release-gate-judgment, P3-62-solution-qa-unverifiable-structuring · evidence: docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1 — done P3-17-week3-release-gate-judgment 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
       - P3-93
       - P3-94
+      - P3-44-graph-connectivity-misconception-edge
+      - P3-50-calc-02-01-misconception-chain-restore
+      - P3-52-m0677-link-disposition-execution
+      - P3-91-p3-62-candidate-promotion-fill-template-fix
+      - PED-17-study-generate-fallback-decision
+      - P3-100-concept-revision-serving
+      - P3-101-release-gate-a-chain-harness
+      - P3-102-prod-misconception-signature-gap
   - id: G-p301-scope-choice
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
