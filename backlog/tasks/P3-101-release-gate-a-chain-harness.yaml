@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-101-release-gate-a-chain-harness
+title: "Release Gate A 10단계 단일 관통 하네스 — 진단부터 다음 추천까지 한 테스트에서 연속 실행 (P3-17 판정 재현 수단)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 내부 테스트 계정 1개로 Release Gate A 10단계(진단 → 추천 → 학습 → 문제 → 답안 → 채점 → 오개념 → Hint/Tutor → Mastery Update → Next Recommendation)를 사람의 DB 수정 없이 한 테스트에서 연속으로 밟는 실 PG 하네스를 둔다. 지금은 조각만 있다 — 3루프(test_e2e_three_consecutive_loops)에는 학습·힌트/튜터가 없고, 코치는 week3 게이트, 학습(/study)은 페르소나 여정에만 있다. ② 각 단계의 성공 판정은 응답 코드가 아니라 그 단계 산출물(이벤트·상태 행)로 하고, 출력 끝에 단계별 도달 여부 줄을 낸다. ③ 학습 단계가 실제 콘텐츠 없이 404로 끝나는 현행(PED-17 소유)은 skip으로 숨기지 않고 끊긴 단계로 보고한다. ④ CI backend-integration 잡이 마커로 수집하는지 배선 테스트로 동결."
+artifacts: []
+paths:
+  - tests/backend/api/test_release_gate_a_chain.py
+session: null
+notes: "출처: P3-17 통합 판정(docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1) Gate A. 판정 회차가 10단계 관통을 하나의 실행으로 재현할 수단이 없어 조각 테스트 4개를 이어 붙여 읽어야 했다 — 다음 판정 회차의 재현 수단."
+updated: 2026-11-05
