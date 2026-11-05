@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-100-concept-revision-serving
+title: "개념 수정판 발행의 학생 서빙 연결 — concept_version 두 번째 이후 판이 학생 화면에 닿게 (Gate C · P3-17 판정 끊긴 지점)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 개념 판(concept_version)의 수정판(두 번째 이후 판)을 CMS로 발행하면 학생 서빙 경로가 그 판의 내용을 읽는다 — 지금은 l3/publish_gate.py docstring이 적듯 이후 판은 개념 행을 바꾸지 않아(서빙 경로 미연결) 수정 발행이 학생 화면에 닿지 않는다. ② 실 PG 통합 테스트 1건이 수정 → QA → 승인 → 발행 → 학생 조회 응답에 새 내용이 보이는 것을 한 줄로 단언하고, 서빙 연결을 끊는 뮤테이션에서 RED. ③ 첫 판(P3-26 cms_create) 경로와 PUBLISHED 불변 트리거(EOS-49) 회귀 없음."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/publish_gate.py
+session: claude/elegant-goldberg-wtocxg
+notes: "출처: P3-17 통합 판정(docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1) Gate C·성공 기준 Q2의 끊긴 지점. P3-17 입력 점검(2026-10-31) §2 (나)-3이 '소유자 없음'으로 기록한 항목이며, 이번 판정에서 대장 미완료 태스크를 다시 검색해도(서빙 경로 미연결·개념 판 서빙·concept_version 서빙) 0건이었다."
+updated: 2026-11-05

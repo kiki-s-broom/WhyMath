@@ -430,6 +430,86 @@ class TestConceptWorkflowEndToEnd:
         )
 
 
+def _publish_edit(client: TestClient, world: _World, cid: str, changes: dict[str, Any]) -> str:
+    """편집 → 제출 → 검토 통과 → 승인 → 발행을 실제 역할 토큰으로 한 번에 밟는다. 판 id를 돌려준다."""
+    editor = world.user(f"editor-{uuid.uuid4().hex[:6]}", Role.CONTENT_EDITOR)
+    reviewer = world.user(f"reviewer-{uuid.uuid4().hex[:6]}", Role.CONTENT_REVIEWER)
+    publisher = world.user(f"publisher-{uuid.uuid4().hex[:6]}", Role.CONTENT_PUBLISHER)
+    r = client.post(
+        f"/v1/admin/cms/concepts/{cid}/drafts", headers=editor, json={"changes": changes}
+    )
+    assert r.status_code == 201, r.text
+    vid = str(r.json()["version_id"])
+    assert _transition(client, editor, vid, "submit", "DRAFT").status_code == 200
+    assert _transition(client, reviewer, vid, "pass_review", "IN_REVIEW").status_code == 200
+    assert _transition(client, reviewer, vid, "approve", "IN_QA").status_code == 200
+    published = _transition(client, publisher, vid, "publish", "APPROVED")
+    assert published.status_code == 200, published.text
+    return vid
+
+
+class TestPublishedRevisionReachesStudents:
+    """P3-100 — 발행된 개념 수정판이 학생 조회 응답에 닿는다(Gate C · P3-17 판정의 끊긴 지점).
+
+    학생 서빙 경로(`GET /v1/concepts/{id}`)는 개념 행을 읽는다. 발행 게이트가 판 payload를 그 행에
+    투영하지 않으면(서빙 연결을 끊는 뮤테이션) 아래 단언이 RED다.
+    """
+
+    def test_edit_qa_approve_publish_is_what_the_student_sees(
+        self, world: _World, client: TestClient
+    ) -> None:
+        student = world.user("student", Role.STUDENT)
+        concept = world.concept()
+        cid, code = str(concept.concept_id), concept.code
+        before = client.get(f"/v1/concepts/{cid}", headers=student)
+        assert before.status_code == 200 and before.json()["name_ko"] == "통합 개념"
+
+        # 첫 판(기존 개념의 v1)과 두 번째 판(v2)이 차례로 발행된다 — 둘 다 학생에게 닿아야 한다.
+        v1 = _publish_edit(client, world, cid, {"name_ko": "고친 이름", "aliases": ["옛 이름"]})
+        assert client.get(f"/v1/concepts/{cid}", headers=student).json()["name_ko"] == "고친 이름"
+        v2 = _publish_edit(
+            client, world, cid, {"name_ko": "두 번째 고친 이름", "exam_frequency": 0.4}
+        )
+
+        seen = client.get(f"/v1/concepts/{cid}", headers=student).json()
+        assert seen["name_ko"] == "두 번째 고친 이름", "발행된 수정판이 학생 화면에 닿지 않았다"
+        assert seen["aliases"] == ["옛 이름"] and seen["exam_frequency"] == 0.4  # 누적 기준 유지
+        assert _pointer_of(code) == v2 and _status_of(v1) == "DEPRECATED"
+        # 검수·발행된 내용은 사람이 소유한다 — 다음 graph.json 적재가 조용히 덮지 못한다(P3-25).
+        marker = _run(_sql("SELECT cms_edited_at FROM concept WHERE code = :c", c=code))[0][0]
+        assert marker is not None
+
+        # 롤백하면 학생 화면도 직전 발행본으로 돌아간다.
+        publisher = world.user("publisher-rb", Role.CONTENT_PUBLISHER)
+        rb = client.post(
+            f"/v1/admin/cms/concepts/{cid}/rollback",
+            headers=publisher,
+            json={"expected_published_version_id": v2},
+        )
+        assert rb.status_code == 200, rb.text
+        assert client.get(f"/v1/concepts/{cid}", headers=student).json()["name_ko"] == "고친 이름"
+
+    def test_unpublished_draft_does_not_reach_the_student(
+        self, world: _World, client: TestClient
+    ) -> None:
+        """대조군 — 승인까지 가도 발행 전에는 학생 화면이 그대로다(투영은 발행 순간에만)."""
+        student = world.user("student", Role.STUDENT)
+        editor = world.user("editor", Role.CONTENT_EDITOR)
+        reviewer = world.user("reviewer", Role.CONTENT_REVIEWER)
+        concept = world.concept()
+        cid = str(concept.concept_id)
+        r = client.post(
+            f"/v1/admin/cms/concepts/{cid}/drafts",
+            headers=editor,
+            json={"changes": {"name_ko": "아직 발행 안 함"}},
+        )
+        vid = str(r.json()["version_id"])
+        _transition(client, editor, vid, "submit", "DRAFT")
+        _transition(client, reviewer, vid, "pass_review", "IN_REVIEW")
+        assert _transition(client, reviewer, vid, "approve", "IN_QA").status_code == 200
+        assert client.get(f"/v1/concepts/{cid}", headers=student).json()["name_ko"] == "통합 개념"
+
+
 class TestInPlaceEditEndToEnd:
     def test_edit_lowers_the_review_mark_and_only_a_reviewer_raises_it(
         self, world: _World, client: TestClient

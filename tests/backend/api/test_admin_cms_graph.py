@@ -466,6 +466,16 @@ def _concept(*, cms_owned: bool, pointer: bool = False) -> Concept:
 
 
 class TestConceptDelete:
+    @pytest.fixture(autouse=True)
+    def _cms_born(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """판 이력 조회(`gate.is_cms_created`)를 대체한다 — 기본은 'CMS 제안으로 태어난 개념'."""
+        self.born_by_cms = True
+
+        async def _is_cms_created(session: Any, code: str) -> bool:
+            return self.born_by_cms
+
+        monkeypatch.setattr(gate, "is_cms_created", _is_cms_created)
+
     def _delete(self, concept: Concept, *results: _Result) -> tuple[Any, FakeSession]:
         fake = FakeSession([_Result(rows=[concept]), *results])
         resp = _client(_PUBLISHER, fake).delete(f"/v1/admin/cms/concepts/{concept.concept_id}")
@@ -484,6 +494,13 @@ class TestConceptDelete:
 
     def test_file_owned_concept_is_refused(self) -> None:
         resp, fake = self._delete(_concept(cms_owned=False))
+        assert resp.status_code == 409 and resp.json()["detail"]["code"] == "file_owned"
+        assert fake.deleted == [] and fake.commits == 0
+
+    def test_a_marked_concept_not_born_in_the_cms_is_refused(self) -> None:
+        """수정판 발행(P3-100)은 graph.json 개념에도 표지를 채운다 — 표지만 보는 오구현을 막는다."""
+        self.born_by_cms = False
+        resp, fake = self._delete(_concept(cms_owned=True))
         assert resp.status_code == 409 and resp.json()["detail"]["code"] == "file_owned"
         assert fake.deleted == [] and fake.commits == 0
 
