@@ -59,3 +59,32 @@
 - **발행 표면 자체**는 샌드박스 실 PG에서 6시나리오 통과(§2) — 막힌 것은 표면이 아니라 운영 데이터의 7필드다.
 - EOS-195 드리프트 리포트의 운영 분모도 0이라 **측정 불성립**(통과 아님).
 - EOS-194는 `review`에 둔다(done 아님). P3-32 착지 뒤 같은 블록([A]→[B]→[W])을 다시 실행하면 된다.
+
+## 5. 재측정 — 인수 조건 ③ 충족 (2026-11-05 · Kiki 실행)
+
+> **판정 기준: main `920cc624`**(런북 `docs/ops/eos194_publish_measure_runbook.md` · 측정 코드 같은 커밋) · 운영 DB `whymath-pg`(5433)
+> · 선행 착지: P3-32·P3-97(#1834 · 검증 힌트 연결) · P3-99(#1839 · 원자 개념 `code` 상속)
+
+[A]~[F]를 임시 worktree `WhyMath_wt_920cc624`에서 실행했다. 백업 `eos194_before.dump`(2,220,090바이트) 뒤 발행했다.
+증거 파일: Kiki 머신 `work\eos194_920cc624\publish.kv`·`eos194_state.json`·`preflight_before.kv`.
+
+**발행 전(`publish.kv` 앞부분)**: 전체 문항 2,567 · 노출 2,563 · 포인터 0 · PUBLISHED 판 0 · 검증 힌트 보유 노출 문항 979 ·
+`SCANNED=979` · `SCAN_TRUNCATED=False` · **`PUBLISHABLE=76`** · `NOT_PUBLISHABLE_REASONS={"misconception_signature": 903}` ·
+`ATOM_MISCONCEPTION_ROWS=0`.
+
+**발행 측정**: 대상 문항 `03cd2daa-a36c-52c9-bd6b-ddb9caf67a48` · 판 `511a4720-2572-4f39-85b0-7e40bdaef86a`(2026-11-05 01:22:27Z) ·
+초안 201 → 제출·검토 통과·승인·발행 각 200 · 측정 학습자 시도 201(`c9a18ae4-5fb3-400f-bb70-9681be901ebf`) ·
+`LOG_OUTCOME_PINNED=True` · `VERSION_STATUS=PUBLISHED` · `PROBLEM_POINTER_MATCH=True` · `ATTEMPT_PIN_MATCH=True` ·
+`DRIFT={"drifted": 0, "in_sync": 1, …}` · **`EOS194_ACCEPTANCE3_OK=True`**.
+
+**인수 조건 ③ 보고값**: 포인터 채워진 노출 문항 **1 / 2,563**(전체 포인터 1 · PUBLISHED 판 1). 발행 후 [C]를 다시 돌린 결과도
+`PUBLISHED_VERSIONS=1`·`EXPOSED_WITH_POINTER=1`로 일치했다(12:04 · 그때 `PUBLISHABLE=75` — 발행된 1건이 후보에서 빠졌다).
+
+**정직한 단서**
+
+- 운영 DB에는 원자 유래 오개념(`ATOM:`)이 **0행**이다. 그래서 운영의 발행 가능 76건은 P3-99의 `code` 상속 경로를 거치지 않고,
+  문항 자체 서명이나 구 카탈로그 상속으로 통과한 것으로 본다(문항별 출처는 측정하지 않았다). P3-99 경로는 리허설 DB에서만
+  실증됐다(`docs/reviews/p3_99_atom_inheritance_rehearsal_2026-11-04.md` · 0 → 861).
+- 나머지 903건은 여전히 오개념 서명 결손이다. 런북 [C2](원자 오개념 적재)는 `PUBLISHABLE=0`일 때만 실행되도록 막혀 있어 이번에는
+  스스로 거부했다(쓰기 0). 적재 여부는 Kiki 판단으로 남긴다.
+- 발행된 판 1건은 운영 DB에 그대로 있다. 되돌리기 [G]는 실행하지 않았다(선택 · Kiki 판단).
