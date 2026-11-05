@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -17,17 +17,20 @@ acceptance:
   - "② 일치도 표 — 작동 비율(failure 없음/전체)·실패 타입별 건수를 먼저 내고, 성공 레코드로 rule_intent×laya_intent 교차표와 LAYA_TO_RULE_INTENT 기준 일치율(Wilson 단측 95% 하한·상한)·laya 라벨별 일치·확신 구간별 일치·풀이 동반 여부별 일치를 낸다. rule_intent 없음은 분모에서 빼고 따로 센다. 판정선 없음(분포 제시만)"
   - "③ 개인정보 겹침 — pii_prob≥0.5(laya)와 pii_rule(규칙)의 2×2(둘 다·laya만·규칙만·둘 다 아님)와 규칙 종류별 건수. 레코드 v1(규칙 필드 없음)·규칙 판정 실패(None)는 0으로 접지 않고 '규칙 미기록'으로 따로 센다. 지연 중앙값·p95"
   - "④ 실물 표면 — 2026-11-03 Phaiakes9 실측 레코드 15건(v1·원문 없음)을 픽스처로 넣어 파싱·일치 15/15를 동결. 런북 '아직 없는 것' 절을 실행 절차로 갱신. 원문·식별자 미출력(레코드 자체에 없음)"
-artifacts: []
+artifacts:
+  - "PR #1840 — harness/intent_shadow_harvest.py(작동 비율·대응표 일치도 Wilson·교차표·pii 2x2·지연) + 실측 픽스처 15건 15/15 + 선언≠배선 의도 선언 + 인벤토리 귀속 + 런북. 테스트 16·뮤테이션 10종 RED"
 paths:
   - src/backend/whymath_backend/harness/intent_shadow_harvest.py
   - tests/backend/harness/test_intent_shadow_harvest.py
   - tests/backend/harness/fixtures/intent_shadow_records_v41_20261103.ndjson
   - docs/architecture/shadow_measurement_runbook.md
   - scripts/analysis/eos_feature_inventory_v2.py
-session: claude/ped-51-intent-shadow-harvest
+session: null
 notes: |-
   Kiki 지시 2026-11-05. PED-50 대응표·규칙 백스톱 필드를 소비하는 집계기. 런북 '아직 없는 것(후속)' 해소
 
   [정정 2026-11-05] paths ['src/backend/whymath_backend/harness/intent_shadow_harvest.py', 'tests/backend/harness/test_intent_shadow_harvest.py', 'tests/backend/harness/fixtures/intent_shadow_records_v41_20261103.log', 'docs/architecture/shadow_measurement_runbook.md'] → ['src/backend/whymath_backend/harness/intent_shadow_harvest.py', 'tests/backend/harness/test_intent_shadow_harvest.py', 'tests/backend/harness/fixtures/intent_shadow_records_v41_20261103.ndjson', 'docs/architecture/shadow_measurement_runbook.md', 'scripts/analysis/eos_feature_inventory_v2.py']: 픽스처 확장자 .log는 .gitignore(*.log)에 걸려 CI에 안 올라감 → .ndjson으로 변경 · 기능 인벤토리 귀속 파일 추가
   paths 제거 1건: ['tests/backend/harness/fixtures/intent_shadow_records_v41_20261103.log']
+
+  [미러 면제 2026-11-05] 로컬 CI 미러(약 1시간)가 컨테이너 재시작으로 2회 중단돼 결과 없음. 같은 커밋 7bd90bfb의 GitHub CI는 backend 정적검사·샤드 1~3·infra-contracts·harness-integrity·declared-unwired-audit·policy-guard 전부 success
 updated: 2026-11-05
