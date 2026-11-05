@@ -1408,11 +1408,11 @@ gates:
     title: "P3-99 ④ 운영 DB 발행 후보 실측 — eos194 런북 [C](+[C2]) 실행 후 PUBLISHABLE ≥ 1"
     kind: human
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-11-04
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "판정 기준: main 920cc624 (worktree WhyMath_wt_920cc624 · CODE_FROM이 worktree 안). 운영 DB(whymath-pg:5433)에서 Kiki가 eos194 런북 [C] 실행(2026-11-05): REACH_EXIT=0 · SCHEMA_AT_HEAD=True(a8c4e1f7b3d9) · SCANNED=978 · SCAN_TRUNCATED=False · PUBLISHABLE=75 · PREFLIGHT_EXIT=0 · PREFLIGHT_OK=True · NOT_PUBLISHABLE_REASONS={\"misconception_signature\": 903} · ATOM_MISCONCEPTION_ROWS=0. 증거 파일 work/eos194_920cc624/preflight_before.kv. 기준 PUBLISHABLE>=1 충족 -> PASS. 한계: ATOM 행 0이라 75건이 원자 상속 경로로 나온 것인지는 이 출력으로 귀속 불가([C2] 미실행 · 런북상 PUBLISHABLE>0이면 C2 불요)."
+    cleared_by: claude
     notes: ""
     corrections: []
     no_inputs_reason: "코드 경로는 main b9bc4666(#1839)에 머지 완료 — 남은 것은 운영 DB 실행뿐"
