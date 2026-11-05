@@ -1404,6 +1404,18 @@ gates:
     corrections: []
     depends_on:
       - P3-87
+  - id: G-p399-prod-publishable
+    title: "P3-99 ④ 운영 DB 발행 후보 실측 — eos194 런북 [C](+[C2]) 실행 후 PUBLISHABLE ≥ 1"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-11-04
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    no_inputs_reason: "코드 경로는 main b9bc4666(#1839)에 머지 완료 — 남은 것은 운영 DB 실행뿐"
   - id: G-path04-learning-path-xlsx
     title: "PATH-04 선행 — 7주체 S1~S7 학습경로 xlsx(8시트) 원본 제공. sha256 앞16 f4ee650b734ac854 일치 확인 후 data/corpus/learning_paths_v1/source/ 로 브랜치 push (데이터 카드 docs/data/concept_content_corpus_v1.md B.1). 자산 없이 store만 만들면 dead table이라 코드 선행 불가"
     kind: human
