@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -19,6 +19,6 @@ artifacts: []
 paths:
   - src/backend/whymath_backend/l3/problem_publish_gate.py
   - tests/backend/l3/test_problem_publish_gate.py
-session: null
+session: claude/eos-196-u9rkwv
 notes: "출처: EOS-190 착지 시 분리. 호출 표면(EOS-194)이 없으면 가치가 없어 depends_on으로 집행한다."
-updated: 2026-10-13
+updated: 2026-11-05

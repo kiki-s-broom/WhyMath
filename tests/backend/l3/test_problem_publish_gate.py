@@ -19,6 +19,8 @@ import pytest
 from pydantic import ValidationError
 
 from whymath_backend.db.models.problem import Problem
+from whymath_backend.db.published_edit_guard import SERVED_CONTENT_FIELDS
+from whymath_backend.l3 import problem_publish_gate as pgate
 from whymath_backend.l3.problem_publish_gate import (
     PAYLOAD_SCHEMA_VERSION,
     VALIDATOR_BUNDLE_VERSION,
@@ -283,10 +285,131 @@ def test_gate_collects_all_failures_in_one_report() -> None:
     assert "problem_metadata_complete" in joined, "증거가 없으면 7필드 검사도 실패로 보고된다"
 
 
-def test_gate_other_than_qa_publish_is_not_owned_by_this_module() -> None:
-    """RESTORE는 rollback과 함께 범위 밖이다 — 조용히 통과시키지 않고 거부한다."""
-    with pytest.raises(ValueError, match="QA·PUBLISH 게이트만 소유"):
-        run_gate(_approved(), GateKind.RESTORE)
+def test_gate_outside_the_ownership_table_is_refused_not_passed() -> None:
+    """소유하지 않는 게이트 이름은 조용히 통과시키지 않고 거부한다(RESTORE는 EOS-196부터 소유)."""
+    with pytest.raises(ValueError, match="소유하지 않는 게이트"):
+        run_gate(_approved(), "deploy")  # type: ignore[arg-type]
+
+
+# ── RESTORE (EOS-196) — 롤백의 복원 간선 ─────────────────────────────────────
+def _deprecated_after_publish() -> ProblemVersion:
+    """발행 → 폐기된 판 — 롤백이 되살리는 직전 발행본의 모양."""
+    approved = _approved()
+    published = plan_transition(
+        approved,
+        _A.PUBLISH,
+        actor="publisher",
+        live_content_hash=_live(approved),
+        metadata_evidence=_COMPLETE,
+        now=_NOW,
+    )
+    return plan_transition(published, _A.DEPRECATE, actor="publisher", now=_NOW)
+
+
+def _restore(version: ProblemVersion, live: str | None) -> ProblemVersion:
+    return plan_transition(
+        version,
+        _A.RESTORE,
+        actor="rollbacker",
+        live_content_hash=live,
+        now=_NOW,
+        allow_compound=True,
+    )
+
+
+def test_restore_passes_control_and_keeps_first_published_at() -> None:
+    old = _deprecated_after_publish()
+    restored = _restore(old, _live(old))
+    assert VersionStatus(restored.status) is VersionStatus.PUBLISHED
+    assert restored.published_at == old.published_at, "published_at은 '처음 발행된 시각'이다"
+    assert restored.payload == old.payload
+    last = restored.qa.records[-1]
+    assert (last.gate, last.action) == (GateKind.RESTORE.value, _A.RESTORE.value)
+    assert {"previously_published", "live_content_current", "qa_record_bound"} <= set(last.checks)
+    # 7필드는 RESTORE에 걸지 않는다(모듈 docstring 근거) — 증거 없이도 통과한다.
+    assert "problem_metadata_complete" not in last.checks
+
+
+def test_restore_without_live_hash_is_refused_not_passed() -> None:
+    with pytest.raises(PublishGateError, match="live_content_current: 라이브 문항 내용을 대조"):
+        _restore(_deprecated_after_publish(), None)
+
+
+def test_restore_refuses_when_rewritten_live_row_differs_from_the_version() -> None:
+    old = _deprecated_after_publish()
+    other = compute_content_hash(_payload("다른 발문"))
+    with pytest.raises(PublishGateError, match="복원본을 라이브 문항에 되쓴 결과가 판과 다르다"):
+        _restore(old, other)
+
+
+def test_restore_refuses_payload_changed_while_deprecated() -> None:
+    """DEPRECATED 판의 payload는 DB 트리거가 보호하지 않는다 — 해시 재계산이 막는다."""
+    old = _deprecated_after_publish()
+    tampered = old.model_copy(update={"payload": _payload("내려간 동안 바뀐 발문")})
+    with pytest.raises(PublishGateError, match="content_hash: 승인 이후 payload가 바뀌었다"):
+        _restore(tampered, compute_content_hash(tampered.payload))
+
+
+def test_restore_refuses_a_version_that_was_never_published() -> None:
+    old = _deprecated_after_publish().model_copy(update={"published_at": None})
+    with pytest.raises(PublishGateError) as exc_info:
+        _restore(old, _live(old))
+    failures = exc_info.value.failures
+    assert [f for f in failures if f.startswith("previously_published")], failures
+    assert all(f.startswith("previously_published") for f in failures), failures
+
+
+def test_restore_is_compound_only() -> None:
+    old = _deprecated_after_publish()
+    with pytest.raises(CompoundOnlyTransitionError):
+        plan_transition(old, _A.RESTORE, actor="x", live_content_hash=_live(old), now=_NOW)
+
+
+# ── 복원 되쓰기 — 라이브 행에 쓸 값과 그 해시 ───────────────────────────────────
+def test_restored_fields_are_exactly_the_served_content_fields() -> None:
+    fields = pgate._restored_live_fields(snapshot_payload(_problem()))
+    assert set(fields) == set(SERVED_CONTENT_FIELDS)
+
+
+def test_restored_fields_drift_from_served_fields_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """뮤테이션 — 서빙 내용 필드가 늘었는데 되쓰기가 따라가지 않으면 복원을 거부한다(부분 복원 금지)."""
+    monkeypatch.setattr(pgate, "SERVED_CONTENT_FIELDS", (*SERVED_CONTENT_FIELDS, "new_field"))
+    with pytest.raises(RuntimeError, match="new_field"):
+        pgate._restored_live_fields(snapshot_payload(_problem()))
+
+
+def test_restored_live_row_hashes_equal_to_the_version_it_came_from() -> None:
+    """대조군 — 라이브 행에서 만든 판을 되쓰면 같은 해시가 나온다(정상 롤백이 거짓 거부되지 않는다)."""
+    row = _problem(difficulty_overall=Decimal("3.47"), choices=["1", "2", "3", "4", "5"])
+    payload = snapshot_payload(row)
+    fields = pgate._restored_live_fields(payload)
+    assert fields["difficulty_overall"] == Decimal("3.47")
+    assert fields["source_type"] is SourceType.자체생성
+    assert pgate._restored_live_hash(fields, uuid.uuid4()) == compute_content_hash(payload)
+
+
+def test_restored_live_hash_catches_derived_hash_inconsistent_with_text() -> None:
+    """파생 해시가 본문과 어긋난 payload는 되쓴 행의 스냅숏과 달라진다 — 게이트가 거부할 근거."""
+    payload = snapshot_payload(_problem()).model_copy(update={"stem_hash": "sha256:forged"})
+    fields = pgate._restored_live_fields(payload)
+    assert pgate._restored_live_hash(fields, uuid.uuid4()) != compute_content_hash(payload)
+
+
+def test_restored_live_hash_catches_precision_lost_in_the_numeric_column() -> None:
+    """`Numeric(3, 2)`가 담지 못하는 난이도는 되쓴 뒤 값이 달라진다 — 쓰기 전에 그 차이를 본다."""
+    payload = snapshot_payload(_problem()).model_copy(update={"difficulty_at_publish": 3.456})
+    fields = pgate._restored_live_fields(payload)
+    assert fields["difficulty_overall"] == Decimal("3.46")
+    assert pgate._restored_live_hash(fields, uuid.uuid4()) != compute_content_hash(payload)
+
+
+def test_restored_live_hash_is_none_when_the_rewritten_row_breaks_the_snapshot_contract() -> None:
+    """되쓴 행이 스냅숏 계약을 어기면 None — RESTORE 게이트가 '대조 불가'로 **실패** 판정한다."""
+    fields = pgate._restored_live_fields(snapshot_payload(_problem()))
+    fields["source_type"] = SourceType.평가원  # 본문이 있는 평가원 출처 = 저작권 교정 위반
+    assert pgate._restored_live_hash(fields, uuid.uuid4()) is None
 
 
 # ── 전이표 조회 — 도착 상태를 이 모듈이 고르지 않는다 ─────────────────────────
