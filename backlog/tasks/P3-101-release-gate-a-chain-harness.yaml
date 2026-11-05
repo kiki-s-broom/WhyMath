@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -16,6 +16,6 @@ acceptance:
 artifacts: []
 paths:
   - tests/backend/api/test_release_gate_a_chain.py
-session: null
+session: claude/keen-davinci-t7w1t9
 notes: "출처: P3-17 통합 판정(docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1) Gate A. 판정 회차가 10단계 관통을 하나의 실행으로 재현할 수단이 없어 조각 테스트 4개를 이어 붙여 읽어야 했다 — 다음 판정 회차의 재현 수단."
 updated: 2026-11-05
