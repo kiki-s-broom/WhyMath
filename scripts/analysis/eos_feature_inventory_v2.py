@@ -504,8 +504,8 @@ CATALOG: tuple[Spec, ...] = (
        "GET /concept-proposals", "POST /concept-proposals",
        "POST /concept-proposals/{code}/drafts", "DELETE /concepts/{concept_id}",
        "POST /edges", "DELETE /edges/{edge_id}"),
-    _s("WM-S-058", "관리자 CMS — 문항 판 발행 호출 표면(초안·제출·검토·승인·발행·내리기·롤백)", "Admin",
-       "Versioning", "P1",
+    _s("WM-S-058", "관리자 CMS — 문항 판 발행 호출 표면(초안·제출·검토·승인·발행·내리기·롤백)",
+       "Admin", "Versioning", "P1",
        "EOS-194 — `l3.problem_publish_gate`(EOS-190)의 운영 호출자. 초안은 항상 지금 라이브 문항의 "
        "스냅숏이고(내용을 호출자가 정하는 입구 없음), 전이는 권한(편집·검수·배포)을 DB 접근 전에 "
        "검사하며 전이 1건마다 감사 1행을 남긴다. 발행 포인터 전환이 시도 버전 고정(EOS-47)이 읽는 "
