@@ -1472,6 +1472,10 @@ _MANIFEST: dict[str, dict[str, str]] = {
         "ops.dialogue_encryption_preflight": _LIVE_DEPENDENT,
         "ops.wh1_shadow_probe": _LIVE_DEPENDENT,
         "harness.wh1_shadow_harvest": _LIVE_DEPENDENT,
+        # PED-51: 의도 섀도 수확기 — 입력이 라이브 서버가 남긴 intent_shadow_records.log(실학생·합성
+        # 트래픽 표본)라 CI에는 읽을 로그가 없다. 코어 집계는 tests/backend/harness/
+        # test_intent_shadow_harvest.py가 실측 픽스처로 main()까지 돌려 동결한다.
+        "harness.intent_shadow_harvest": _NEEDS_LIVE_SAMPLE,
         # S4-56/OPS-28: CI 가 직접 실행하는 v2(`--dry-run`·LLM 0)가 v1 의 `load_pilot_records`·
         # `select_sample` 을 in-process import 한다. OPS-28 이전 정의(import 전이 = 도달)에서는
         # v1 이 도달이 되어 S4-56 이 이 유예를 걷었다 — 그러나 **v1 의 라이브 `main()` 은 CI 에서
