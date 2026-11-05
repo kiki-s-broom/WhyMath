@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-102-prod-misconception-signature-gap
+title: "운영 DB 오개념 서명 결손 문항 처분 — 발행 게이트 7필드 미충족 903/979건 (Gate C · P3-17 판정 끊긴 지점)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 운영 DB 노출 문항 중 오개념 서명(misconception_signature) 결손으로 발행 게이트 7필드를 못 채우는 문항(EOS-194 §5 실측 903/979 · 2026-11-05)의 처분을 정한다 — 원자 오개념 적재(P3-99 런북 [C2] — 지금은 PUBLISHABLE=0일 때만 실행되게 막혀 있다)·문항 단위 서명 보강·범위 제외 중 무엇으로 갈지 Kiki 결정을 받는다. ② 결정한 경로를 실행한 뒤 같은 런북 [C]로 PUBLISHABLE을 다시 재고 그 수를 기록한다. ③ 처분 전후 값을 판정문에 남긴다."
+artifacts: []
+paths:
+  - "docs/reviews/p3_102_*.md"
+session: null
+notes: "출처: P3-17 통합 판정(docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1) Gate C. EOS-194 재측정(docs/reviews/eos194_acceptance3_2026-10-31.md §5)이 '나머지 903건은 오개념 서명 결손, 적재 여부는 Kiki 판단'으로 남겼고 소유 태스크가 없었다. 발행 게이트를 지나지 못하는 문항은 오류 수정 뒤에도 Publish 단계에 들어갈 수 없다."
+updated: 2026-11-05
