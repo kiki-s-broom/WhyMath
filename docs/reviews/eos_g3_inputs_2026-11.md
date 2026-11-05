@@ -14,12 +14,12 @@
 | ④ | 힌트 의미 누설 0 | 표본 30건 누설 0(`HINT_SEMANTIC_N=30` `K=0`) · Wilson 단측 95% 상한 0.0827 · 기계 축 L1·L2 누설 0 / 89힌트 | **충족** | `g3_content_measures` `HINT_SEMANTIC_AXIS=PASS` `HINT_MACHINE_AXIS=PASS` · 사람 판정 45행(`hint_verdicts.jsonl` · #1792) · 표본 `hvs-6bfbb1baa75f6e34` 매니페스트 밖 0 · 판정 누락 0 | EOS-210(done) · EOS-211(done) |
 | ⑤ | 메타 누락 0 | CU 30건 누락 0(`META_CU_MISSING=0`) · seed 비대상 27건(openrouter 좌석이 seed를 받지 않음 — EOS-197 ⑥ 인정) | **충족** | `g3_content_measures` `META_AXIS=PASS` · `provenance_audit --require-runs` EXIT=0 | EOS-207(done) |
 
-요약: **충족 5/5**(미충족 0 · 측정 실패 0). 단, ②는 AI 보조 검수 조건의 값이라 판정문에 그 조건을 명시해야 한다(결정 D12 — 미수신). `g3_content_measures` 종합 `MACHINE_VERDICT=PASS` · `EXIT=0`. 전체 리포트 = `data/runs/eos197-a6-review/g3_content_measures_g3prep_2026-11-05.json`(이 세션 커밋 · 10/31 EOS-211 소급 리포트 `g3_content_measures_eos211.json`은 사람 판정 전이라 exit 2였고, 사람 판정 반영 후 exit 0으로 바뀐 것이 유일한 차이).
+요약: **충족 5/5**(미충족 0 · 측정 실패 0). 단, ②는 AI 보조 검수 조건의 값이라 판정문에 그 조건을 명시해야 한다(결정 D12 — 미수신). `g3_content_measures` 종합 `MACHINE_VERDICT=PASS` · `EXIT=0`. 전체 리포트 = `data/runs/eos197-a6-review/g3_content_measures_g3prep_2026-11-05.json`(이 세션 커밋 · 10/29 EOS-211 소급 리포트 `g3_content_measures_eos211.json`(#1775 · `8f6d1024`)은 사람 판정 전이라 exit 2였고, 사람 판정 반영 후 exit 0으로 바뀐 것이 유일한 차이).
 
 ### 1-1. 초안(10/31 · `a91ffcf7`) 대비 바뀐 것
 
 - ③ 주간 원장: 초안은 "`metrics/weekly.json`에는 아직 measured:false(WP-K 소관)"였다. EOS-220(#1805 · 11/01)이 `generated_at` 2026-11-01 레코드에 measured true 0.1171을 정식 기록했으므로 **원장 값과 측정 CLI 값이 일치**한다(병기 완료).
-- 그 밖의 측정값(①②④⑤)은 초안과 동일하다. 입력 파일(`data/runs/eos197-a6-*` · `eos197-a6-review`)은 `a91ffcf7` 이후 main에서 바뀌지 않았다(`git log a91ffcf7..a150cdef -- data/runs` 0건 — 이 세션이 커밋하는 리포트 JSON 1건 제외).
+- 그 밖의 측정값(①②④⑤)은 초안과 동일하다. 측정기 4종(`g3_content_measures`·`hit_cu_metrics`·`weekly_metrics_report`·`provenance_audit`)이 읽는 입력 파일(`cu.jsonl`·`cu.genlog.jsonl`·`cu.hints.jsonl`·`cu.review.jsonl`·`canary_review_*`·`hint_verdicts.jsonl`·`hint_sample_manifest.json`)은 `a91ffcf7` 이후 main에서 바뀌지 않았다. `a91ffcf7..a150cdef` 구간의 `data/runs` 변경은 측정기가 읽지 않는 파일뿐이다 — `eos197-a6-*/cu.ngram_overlap.json` 2건(EOS-222 #1807) · `eos203-thinking-probe/`(#1827) · `p3_78-live/`(#1796) — 그리고 `metrics/weekly.json`(EOS-220 #1805 · 위 ③). 확인 = GitHub compare API(이 세션 클론은 shallow라 로컬 `git log`로는 구간을 볼 수 없다 — 독립 검토가 잡아 정정).
 
 ## 2. 재현 명령 (저장소 루트 · main `a150cdef` · 2026-11-05 이 세션 실측)
 
@@ -61,7 +61,7 @@ cd src/backend && python -m whymath_backend.ops.provenance_audit --require-runs
 - ④ 표본 모집단은 1회차 30 CU의 L1·L2 힌트 60건 중 30건 — 2회차(A4·`EOS-225`) 이후 표본은 별도.
 - ③ 통과율 0.1171은 '산출됨'(계측 가능성) 조건만 충족한다. G4 조건 "≥70%"와는 거리가 멀다(Wilson 하한 0.0758) — G3 판정과 무관하나 G4 준비 세션이 알아야 한다.
 - `LABEL_MISMATCH=2`(`wm-gen-calc1-c42808b25a8f` · `wm-gen-calc1-9e4ec39eaadd`): 검수 라벨 F8 ↔ 기계 미결 — F8 중복 표기 문제로 EOS-204 소관(10/28 G2 판정 단서와 같은 건). 누설이 아니다.
-- 판정 기준 해시 이후 main이 바뀌어도 입력 파일(`data/runs/eos197-a6-*`)이 바뀌지 않는 한 값은 같다. 11/22 판정 직전에 `git log a150cdef..origin/main -- data/runs metrics/weekly.json`이 0건인지 확인하고, 0건이 아니면 §2를 다시 돌린다.
+- 판정 기준 해시 이후 main이 바뀌어도 입력 파일(`data/runs/eos197-a6-*`)이 바뀌지 않는 한 값은 같다. 11/22 판정 직전에 `git log a150cdef..origin/main -- data/runs/eos197-a6-local data/runs/eos197-a6-openrouter data/runs/eos197-a6-review metrics/weekly.json`(full 클론 또는 GitHub compare API)로 **측정기가 읽는 파일**(위 §1-1 목록)의 변경이 0건인지 확인하고, 0건이 아니면 §2를 다시 돌리고 이 문서의 판정 기준 해시를 그 main 해시로 바꾼다.
 
 ## 4. 남은 결정과 기록 절차
 
@@ -72,4 +72,4 @@ cd src/backend && python -m whymath_backend.ops.provenance_audit --require-runs
 python3 scripts/harness/backlog.py gates amend G-eos-g3 --verdict PASS --evidence "판정 기준: main a150cdef · docs/reviews/eos_g3_inputs_2026-11.md · Kiki 판정 <날짜>" --reason "Kiki G3 판정 기록"
 ```
 
-FAIL이면 `--verdict FAIL`에 `--owner <미종결 소유 태스크>`를 붙인다(현재 5조건 전부 충족이라 FAIL 사유가 나오면 그 사유의 소유 태스크를 그때 등재한다 — 이 문서 §1의 소유 태스크는 전부 done).
+`--evidence`의 판정 기준 해시는 §3대로 재측정했으면 그때의 main 해시로 교체한다(이 문서 상단 해시와 같아야 한다). FAIL이면 `--verdict FAIL`에 `--owner <미종결 소유 태스크>`를 붙인다(현재 5조건 전부 충족이라 FAIL 사유가 나오면 그 사유의 소유 태스크를 그때 등재한다 — 이 문서 §1의 소유 태스크는 전부 done).
