@@ -25,8 +25,9 @@ EOS-194가 만든 발행 표면(CMS 라우트 4개)이 운영 데이터에서 �
 
 **P3-99 이후(2026-11-04)**: 발행 게이트가 개념 `code`로도 오개념을 상속한다. 원자 유래 오개념(`ATOM:<code>` 1,823행)이
 카탈로그에 있으면 원자 개념 문항이 상속으로 인정된다(오개념 유발 슬롯 문항은 규칙상 제외). 리허설 DB에서 그 행을 적재한 뒤
-`PUBLISHABLE`이 0 → 861이 됐다. [C]가 `ATOM_MISCONCEPTION_ROWS=0`과 `PUBLISHABLE=0`을 함께 내면 [C2](백업 후 원자 오개념
-적재)를 실행하고 [C]를 다시 돌린다.
+`PUBLISHABLE`이 0 → 861이 됐다. [C]가 `ATOM_MISCONCEPTION_ROWS=0`을 내면 `PUBLISHABLE` 값과 무관하게 [C2](백업 후 원자
+오개념 적재)를 실행하고 [C]를 다시 돌린다(P3-102 · Kiki 결정 2026-11-05 — 운영은 `PUBLISHABLE=76`인데 903건이 오개념 서명
+결손이라, 이전 조건 `PUBLISHABLE=0`이 적재를 막았다).
 
 ## 3. 구체적 절차
 
@@ -150,29 +151,31 @@ $PreflightOk = ($PreExit -eq 0) -and ($PreMap["SCHEMA_AT_HEAD"] -eq "True") -and
 **확인**: `REACH_EXIT=0` · `CODE_OK=True`. 그리고 둘 중 하나다.
 
 - `PREFLIGHT_OK=True` — 발행 가능 후보가 있다. [D]로 진행한다.
-- `PUBLISHABLE=0`이고 `ATOM_MISCONCEPTION_ROWS=0` — [C2]로 원자 오개념을 적재한 뒤 [C]를 다시 붙여넣는다.
+- `ATOM_MISCONCEPTION_ROWS=0` — `PUBLISHABLE` 값과 무관하게 [C2]로 원자 오개념을 적재한 뒤 [C]를 다시 붙여넣는다
+  (P3-102). 다시 잰 [C]가 `PREFLIGHT_OK=True`면 [D]로 간다.
 - `PUBLISHABLE=0`이고 `ATOM_MISCONCEPTION_ROWS`가 1 이상 — **여기서 멈춘다.** `NOT_PUBLISHABLE_REASONS` 줄을 포함한 화면
   전체를 전달한 뒤 [H]로 정리한다.
 
 ### [C2] (조건부) 백업 후 원자 유래 오개념 적재
 
-[C]가 `ATOM_MISCONCEPTION_ROWS=0`과 `PUBLISHABLE=0`을 함께 낼 때만 실행한다. 블록이 그 조건을 다시 확인하고, 맞지 않으면
-스스로 거부한다. 쓰는 곳은 `misconception_catalog` 한 테이블이고 `mis_id` 기준 멱등 upsert라 다시 실행해도 같은 결과다.
+[C]가 `ATOM_MISCONCEPTION_ROWS=0`을 낼 때만 실행한다(`PUBLISHABLE` 값과는 무관 — P3-102 · Kiki 결정 2026-11-05). 블록이
+그 조건을 다시 확인하고, 맞지 않으면 스스로 거부한다. 이미 원자 행이 있으면(1 이상) 다시 적재하지 않는다. 쓰는 곳은 `misconception_catalog` 한 테이블이고 `mis_id` 기준 멱등 upsert라 다시 실행해도 같은 결과다.
 끝나면 [C]를 다시 붙여넣는다.
 
 ```powershell
 # [Windows PowerShell · Phaiakes9] 같은 창 · C2 원자 오개념 적재 (쓰기 · 조건 미충족이면 스스로 거부)
 cd $Wt
 $AtomRowsBefore = Get-KvInt $PreMap "ATOM_MISCONCEPTION_ROWS"
-$AtomReady = $WtOk -and $CodeOk -and ($ReachExit -eq 0) -and ($AtomRowsBefore -eq 0) -and ((Get-KvInt $PreMap "PUBLISHABLE") -eq 0) -and ($Wt -notmatch '\s')
+$AtomReady = $WtOk -and $CodeOk -and ($ReachExit -eq 0) -and ($AtomRowsBefore -eq 0) -and ($Wt -notmatch '\s')
 "ATOM_READY=$AtomReady · WT_OK=$WtOk CODE_OK=$CodeOk REACH_EXIT=$ReachExit ATOM_ROWS_BEFORE=$AtomRowsBefore"
-if ($AtomReady) { docker exec whymath-pg pg_dump -U whymath -d whymath -Fc -f /tmp/eos194_atomload_before.dump; $ADumpExit = $LASTEXITCODE; docker cp whymath-pg:/tmp/eos194_atomload_before.dump "$OutDir\eos194_atomload_before.dump"; $ACopyExit = $LASTEXITCODE; docker exec whymath-pg pg_restore -l /tmp/eos194_atomload_before.dump *> $null; $AListExit = $LASTEXITCODE; $ABackupOk = ($ADumpExit -eq 0) -and ($ACopyExit -eq 0) -and ($AListExit -eq 0) -and (Test-Path "$OutDir\eos194_atomload_before.dump"); "ATOM_BACKUP_OK=$ABackupOk" } else { $ABackupOk = $false; "WRITE_REFUSED=True — ATOM_READY=False · [C]가 ATOM_MISCONCEPTION_ROWS=0 과 PUBLISHABLE=0 을 함께 냈을 때만 적재합니다" }
+if ($AtomReady) { Copy-Item "$OutDir\preflight_before.kv" "$OutDir\preflight_before_atomload.kv" -Force; docker exec whymath-pg pg_dump -U whymath -d whymath -Fc -f /tmp/eos194_atomload_before.dump; $ADumpExit = $LASTEXITCODE; docker cp whymath-pg:/tmp/eos194_atomload_before.dump "$OutDir\eos194_atomload_before.dump"; $ACopyExit = $LASTEXITCODE; docker exec whymath-pg pg_restore -l /tmp/eos194_atomload_before.dump *> $null; $AListExit = $LASTEXITCODE; $ABackupOk = ($ADumpExit -eq 0) -and ($ACopyExit -eq 0) -and ($AListExit -eq 0) -and (Test-Path "$OutDir\eos194_atomload_before.dump"); "ATOM_BACKUP_OK=$ABackupOk" } else { $ABackupOk = $false; "WRITE_REFUSED=True — ATOM_READY=False · [C]가 ATOM_MISCONCEPTION_ROWS=0 을 냈을 때만 적재합니다(이미 있으면 재적재 안 함)" }
 if ($ABackupOk) { & $Py -m whymath_backend.l1.misconception.populate_atom --graph "$Wt\data\corpus\atom_graph_v1\graph.json"; $AtomLoadExit = $LASTEXITCODE; "ATOM_LOAD_EXIT=$AtomLoadExit" } else { $AtomLoadExit = -1; "ATOM_LOAD_SKIPPED=True — 백업이 확인되지 않아 적재하지 않습니다" }
 $AtomRowsAfter = docker exec -i whymath-pg psql -U whymath -d whymath -t -A -c "SELECT count(*) FROM misconception_catalog WHERE mis_id LIKE 'ATOM:%';"
 "ATOM_ROWS_AFTER=$AtomRowsAfter · ATOM_LOAD_OK=" + (($AtomLoadExit -eq 0) -and ("$AtomRowsAfter".Trim() -eq "1823"))
 ```
 
-**확인**: `ATOM_LOAD_OK=True` · `ATOM_ROWS_AFTER=1823`. 그다음 [C]를 다시 붙여넣는다. 되돌리려면
+**확인**: `ATOM_LOAD_OK=True` · `ATOM_ROWS_AFTER=1823`. 적재 전 [C] 증거는 `preflight_before_atomload.kv`로 보존된다(다시 돌린
+[C]가 `preflight_before.kv`를 덮어쓰므로). 그다음 [C]를 다시 붙여넣는다. 되돌리려면
 `$OutDir\eos194_atomload_before.dump`로 복원한다.
 
 ### [D] 운영 DB 전체 백업 (DB 읽기 전용 · 파일 생성)
