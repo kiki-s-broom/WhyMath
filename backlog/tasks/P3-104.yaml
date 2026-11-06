@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-104
+title: "운영 DB 오개념 서명 잔여 결손 12건 원인 분류·처분 (P3-102 후속)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 운영 DB(whymath-pg)에서 발행 게이트를 오개념 서명(misconception_signature) 결손으로 못 지나는 노출 문항 12건(P3-102 실측 · 2026-11-05 · main 0877e573 · SCANNED=977 중)의 problem_id를 전수 열거하고, 문항마다 원인을 분류한다 — (가) 오개념 유발 슬롯 문항(p3-slot:misconception_trigger · 규칙상 문항 자체 서명 필요) (나) 연결 개념에 원자 오개념이 없음(code 불일치·원자 아님 등) (다) 그 밖. 분류는 읽기 전용 쿼리·측정 스크립트 출력으로만 하고 추론으로 채우지 않는다. ② 분류별 처분을 정한다 — (가)는 문항 단위 서명 저작 대상 목록, (나)·(다)는 원인별 수정 경로. 처분에 문항 재저작이나 운영 DB 쓰기가 필요하면 Kiki 결정을 받는다. ③ 결정한 처분을 실행한 뒤 EOS-194 런북 [C]로 PUBLISHABLE과 NOT_PUBLISHABLE_REASONS를 다시 재고, 전후 값을 판정문에 남긴다(판정 기준 커밋 해시 포함)."
+artifacts: []
+paths:
+  - "docs/reviews/p3_104_*.md"
+session: null
+notes: "출처: P3-102 판정문 docs/reviews/p3_102_atom_misconception_load_2026-11-05.md §5 정직한 단서. 원자 오개념 1,823행 적재 뒤 운영 PUBLISHABLE 74 → 965, 서명 결손 903 → 12. 리허설(P3-99 · docs/reviews/p3_99_atom_inheritance_rehearsal_2026-11-04.md §3)에서는 남은 118건이 전부 오개념 유발 슬롯 문항이었으나, 운영 12건의 문항별 출처는 측정하지 않았다. 오개념 유발 슬롯 문항은 Kiki 결정(2026-10-14)상 상속 대신 문항 자체 서명이 필요하다."
+updated: 2026-11-06

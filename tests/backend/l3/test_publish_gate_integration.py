@@ -360,3 +360,119 @@ async def test_db_trigger_still_guards_published_payload(
                 {"v": v1},
             )
         await s.rollback()
+
+
+# ── P3-100 수정판 서빙 — 발행·복원 = 개념 행 투영 ─────────────────────────────────
+async def _live(sessions: async_sessionmaker[AsyncSession], code: str) -> dict[str, Any]:
+    async with sessions() as s:
+        row = (
+            (
+                await s.execute(
+                    text(
+                        "SELECT name_ko, aliases, intrinsic_difficulty, parent_concept_id, "
+                        "cms_edited_at FROM concept WHERE code = :c"
+                    ),
+                    {"c": code},
+                )
+            )
+            .mappings()
+            .one()
+        )
+    return dict(row)
+
+
+async def test_publish_projects_the_revision_onto_the_served_concept_row(
+    sessions: async_sessionmaker[AsyncSession], concept_code: str
+) -> None:
+    assert (await _live(sessions, concept_code))["cms_edited_at"] is None  # graph.json 소유로 시작
+    v1 = await _new_version(sessions, concept_code, "고친 이름")
+    await _walk(sessions, v1, *_TO_APPROVED)
+    assert (await _live(sessions, concept_code))[
+        "name_ko"
+    ] == "EOS-50 sentinel"  # 승인만으론 안 닿는다
+    await _walk(sessions, v1, _A.PUBLISH)
+    live = await _live(sessions, concept_code)
+    assert (live["name_ko"], live["aliases"], live["intrinsic_difficulty"]) == (
+        "고친 이름",
+        ["고친 이름-별칭"],
+        2.5,
+    )
+    assert live["cms_edited_at"] is not None  # 다음 적재가 조용히 덮지 못한다
+    async with sessions() as s:
+        # 표지가 붙었어도 CMS 제안으로 태어난 개념은 아니다 — 삭제 판정이 이것으로 가른다.
+        assert await gate.is_cms_created(s, concept_code) is False
+
+    # 폐기는 투영하지 않는다 — 발행본이 사라져도 개념 행은 마지막 발행 내용을 유지한다.
+    await _walk(sessions, v1, _A.DEPRECATE)
+    assert (await _live(sessions, concept_code))["name_ko"] == "고친 이름"
+
+
+async def test_revision_with_a_vanished_parent_is_refused_before_any_write(
+    sessions: async_sessionmaker[AsyncSession], concept_code: str
+) -> None:
+    async with sessions() as s:
+        created = await gate.create_draft(
+            s,
+            concept_code=concept_code,
+            payload=ConceptVersionPayload(
+                name_ko="없는 부모", level=ConceptLevel.세부개념, parent_concept_id=uuid.uuid4()
+            ),
+            schema_version="concept-payload@1",
+            created_by="author",
+        )
+        await s.commit()
+    await _walk(sessions, created.version_id, *_TO_APPROVED)
+    async with sessions() as s:
+        with pytest.raises(gate.PublishGateError, match="parent_exists"):
+            await gate.apply_transition(s, created.version_id, _A.PUBLISH, actor="x")
+        await s.rollback()
+    assert (await _row(sessions, created.version_id))["status"] == "APPROVED"
+    assert await _pointer(sessions, concept_code) is None
+    live = await _live(sessions, concept_code)
+    assert (live["name_ko"], live["cms_edited_at"]) == ("EOS-50 sentinel", None)
+
+
+async def test_is_cms_created_tells_the_marker_origin_apart_by_version_history(
+    sessions: async_sessionmaker[AsyncSession], concept_code: str
+) -> None:
+    """표지의 출처 판정 세 경우(P3-100) — 삭제 판정(`concept_delete_block`)이 이것으로 가른다.
+
+    ① 판이 하나도 없는 표지 개념(P3-26 이전 직접 생성 부류) → True. 이것을 False로 접으면 CMS가 만든
+    개념을 영영 지울 수 없다(PR #1846 1차 CI의 `test_concept_patch_delete_roundtrip_on_live_pg` 409).
+    ② 첫 판이 제안(`cms_create`)인 개념 → True. ③ 판이 있는데 첫 판이 제안이 아닌 개념(수정판 투영으로
+    표지가 붙은 graph.json 개념) → False — 위 `test_publish_projects_…`가 실제 발행 경로로 단언한다.
+    """
+    # ① 판 없음 — 표지만 직접 채운다(판 이력이 없는 CMS 생성 행).
+    async with sessions() as s:
+        await s.execute(
+            text("UPDATE concept SET cms_edited_at = now() WHERE code = :c"), {"c": concept_code}
+        )
+        await s.commit()
+    async with sessions() as s:
+        assert await gate.is_cms_created(s, concept_code) is True
+
+    # ③ 같은 개념에 판이 생기면(첫 판 = 기존 개념의 수정 초안) 출처가 CMS 생성이 아니게 된다.
+    await _new_version(sessions, concept_code, "수정 초안")
+    async with sessions() as s:
+        assert await gate.is_cms_created(s, concept_code) is False
+
+    # ② 제안으로 태어난 개념 — 개념 행이 아직 없어도 첫 판이 제안이면 True.
+    proposed = f"HIGH-P3100-{uuid.uuid4().hex[:8]}"
+    try:
+        async with sessions() as s:
+            await gate.create_proposal(
+                s,
+                concept_code=proposed,
+                payload=_payload("제안 개념"),
+                schema_version="concept-payload@1",
+                created_by="author",
+            )
+            await s.commit()
+        async with sessions() as s:
+            assert await gate.is_cms_created(s, proposed) is True
+    finally:
+        async with sessions() as s:
+            await s.execute(
+                text("DELETE FROM concept_version WHERE concept_id = :c"), {"c": proposed}
+            )
+            await s.commit()
