@@ -565,6 +565,12 @@ def extract_draft(raw: str) -> tuple[str | None, str | None]:
     return utterance, action if isinstance(action, str) else None
 
 
+def _is_policy_route(decision: RoutingDecision) -> bool:
+    """튜터 정책 호출의 라우터 결정(LOCAL·GENERAL·FAST)인가 — 좌석 교체의 유일한 대상."""
+    keys = ("cost_tier", "local_family", "local_model")
+    return tuple(_plain(getattr(decision, k)) for k in keys) == _POLICY_ROUTE
+
+
 def seat_decision(decision: RoutingDecision, seat: str) -> RoutingDecision | None:
     """측정 전용 좌석 교체(P3-94 ⑥) — 교체한 결정, 또는 교체 대상이 아니면 None.
 
@@ -573,12 +579,7 @@ def seat_decision(decision: RoutingDecision, seat: str) -> RoutingDecision | Non
     막은 결정이면 하지 않는다 — 측정이라도 게이트를 넘지 않는다(호출자가 거부 건수를 센다).
     새 결정은 `RoutingDecision` 검증(불변식 4종)을 다시 통과해야 만들어진다.
     """
-    if seat == POLICY_SEAT_ROUTE:
-        return None
-    route = tuple(
-        _plain(getattr(decision, k)) for k in ("cost_tier", "local_family", "local_model")
-    )
-    if route != _POLICY_ROUTE:
+    if seat == POLICY_SEAT_ROUTE or not _is_policy_route(decision):
         return None
     updates = _SEAT_UPDATES[seat]
     payload = decision.model_dump()
@@ -612,7 +613,8 @@ class RecordingProvider:
         self._policy_seat = policy_seat
 
     def _seat(self, decision: RoutingDecision) -> RoutingDecision:
-        if self._policy_seat == POLICY_SEAT_ROUTE:
+        # 교체 대상(정책 경로)이 아니면 거부로도 세지 않는다 — 거부 건수는 "교체했을 호출" 중에서만.
+        if self._policy_seat == POLICY_SEAT_ROUTE or not _is_policy_route(decision):
             return decision
         if (
             _SEAT_UPDATES[self._policy_seat]["cost_tier"] != CostTier.LOCAL

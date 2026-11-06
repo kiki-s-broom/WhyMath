@@ -1185,6 +1185,18 @@ def test_cloud_swap_respects_the_data_export_gate() -> None:
     local = live.RecordingProvider(provider, live._Scope(), policy_seat="local-mid")
     asyncio.run(local.generate("p", "s", blocked))  # 로컬 교체는 게이트 대상이 아니다
     assert live._plain(provider.decisions[-1].local_model) == "mid"
+    # 정책 경로가 아닌 차단 결정은 교체 대상이 아니므로 거부로도 세지 않는다(회계 과대 방지).
+    other_scope = live._Scope()
+    other = _policy_decision(
+        local_family=ModelFamily.MATH, data_export_blocked=True, data_export_reason="test"
+    )
+    asyncio.run(
+        live.RecordingProvider(provider, other_scope, policy_seat="cloud-mid").generate(
+            "p", "s", other
+        )
+    )
+    assert (other_scope.ledger.seat_refused, other_scope.ledger.seat_overrides) == (0, 0)
+    assert provider.decisions[-1] == other
 
 
 def test_unknown_policy_seat_is_rejected() -> None:
