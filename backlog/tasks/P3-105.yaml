@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-105
+title: "Phase 3 성공 기준 Q1 문면 처분 — '실제 학생 100명'은 D2 미교체라 12/31 전 구조적 YES 불가 (Kiki 결정 정리)"
+track: math-completion
+stage: S4
+subject: math
+layer: docs
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 결손 고정: Phase 3 성공 기준 Q1('내일부터 실제 중·고등학생 100명을 넣어도 …', docs/strategy/phase3_math_eos_completion_plan_source.md §Phase 3의 진짜 성공 기준)은 D2(2026-10-19)가 Gate A의 계정 종류만 '내부 테스트 계정'으로 바꿨고 Q1 문면은 바꾸지 않았다. 학생 참여는 ARCH-66 ⑥으로 12/31 이후라, 문면 그대로면 Q1은 어떤 재판정에서도 NO이고 G-p3-w3-release-merged와 G-internal-completion-2026-12-31 조건 ①이 구조적으로 충족 불가다(P3-17 판정 §3 성공 기준 표가 사실은 적었으나 처분 경로를 등재하지 않았다).\n② 처분안 문서: 선택지 (A) Q1을 D2와 같은 방식으로 내부 테스트 계정 기준으로 바꾼다(표본 수 기준은 G4 ≥20 · EOS-135 소유를 따른다) (B) Q1 원문을 G-student-work-after-internal-completion 이후 판정으로 이관하고 이 게이트의 성공 기준을 Q2·Q3로 한정한다 — 각 선택지가 Gate A·12/31 정의·하류 게이트에 주는 영향을 표로 정리해 Kiki께 올린다. 새 decision 게이트를 만들지 않고, 결정은 G-p3-w3-release-merged notes에 판정 근거로 기록한다.\n③ 완료 판정: Kiki 결정이 게이트 notes에 기록되고, 채택안이 원 문서 해당 줄에 D2와 같은 교체 표기로 반영된다(원문 보존). 결정 전에는 이 태스크를 done 처리하지 않는다."
+artifacts: []
+paths: []
+session: null
+notes: "출처: P3-17 판정 독립 검토(docs/reviews/p3_17_verdict_review_2026-11-06.md · 검토 기준 main 6cccb547). 게이트 G-p3-w3-release-merged 입력."
+updated: 2026-11-06
