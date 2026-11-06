@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -14,12 +14,20 @@ requires_gates: []
 acceptance:
   - "① 운영 DB 노출 문항 중 오개념 서명(misconception_signature) 결손으로 발행 게이트 7필드를 못 채우는 문항(EOS-194 §5 실측 903/979 · 2026-11-05)의 처분을 정한다 — 원자 오개념 적재(P3-99 런북 [C2] — 지금은 PUBLISHABLE=0일 때만 실행되게 막혀 있다)·문항 단위 서명 보강·범위 제외 중 무엇으로 갈지 Kiki 결정을 받는다. ② 결정한 경로를 실행한 뒤 같은 런북 [C]로 PUBLISHABLE을 다시 재고 그 수를 기록한다. ③ 처분 전후 값을 판정문에 남긴다."
   - "④ Kiki 결정(2026-11-05 채팅): 처분 방향 = (가) 원자 오개념 일괄 적재(P3-99 런북 [C2]). 지금 [C2] 블록은 PUBLISHABLE=0이고 ATOM_MISCONCEPTION_ROWS=0일 때만 실행되고 그 밖에는 스스로 거부한다(운영 실측 PUBLISHABLE=75~76이라 거부됨). 이 태스크는 그 실행 조건을 PUBLISHABLE 값과 무관하게 ATOM_MISCONCEPTION_ROWS=0이면 실행되도록 바꾸고(백업 선행·mis_id 멱등 upsert 유지·자가거부 가드는 ATOM_MISCONCEPTION_ROWS 축으로 남긴다), 바뀐 가드의 거부 조건을 주입으로 RED 확인한 뒤 Kiki 머신 실행 런북을 낸다. 실행 후 [C]를 다시 재서 PUBLISHABLE 전후값(76 → ?)과 남은 NOT_PUBLISHABLE_REASONS를 기록한다. 리허설 근거 = docs/reviews/p3_99_atom_inheritance_rehearsal_2026-11-04.md(0 → 861)."
-artifacts: []
+artifacts:
+  - "#1847"
+  - "docs/reviews/p3_102_atom_misconception_load_2026-11-05.md §5 (운영 PUBLISHABLE 74→965 · 결손 903→12)"
 paths:
   - "docs/reviews/p3_102_*.md"
+  - docs/ops/eos194_publish_measure_runbook.md
+  - tests/infra/test_p3_102_atom_load_guard.py
 session: null
 notes: |-
   출처: P3-17 통합 판정(docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1) Gate C. EOS-194 재측정(docs/reviews/eos194_acceptance3_2026-10-31.md §5)이 '나머지 903건은 오개념 서명 결손, 적재 여부는 Kiki 판단'으로 남겼고 소유 태스크가 없었다. 발행 게이트를 지나지 못하는 문항은 오류 수정 뒤에도 Publish 단계에 들어갈 수 없다.
 
   [정정 2026-11-05] Kiki 결정 2026-11-05: P3-102 처분 = 원자 오개념 일괄 적재(①) — PR #1843 채팅 응답
+
+  [정정 2026-11-05] paths ['docs/reviews/p3_102_*.md'] → ['docs/reviews/p3_102_*.md', 'docs/ops/eos194_publish_measure_runbook.md']: Kiki A안 실행에 EOS-194 런북 [C2] 실행 조건 개정이 필요
+
+  [정정 2026-11-05] paths ['docs/reviews/p3_102_*.md', 'docs/ops/eos194_publish_measure_runbook.md'] → ['docs/reviews/p3_102_*.md', 'docs/ops/eos194_publish_measure_runbook.md', 'tests/infra/test_p3_102_atom_load_guard.py']: [C2] 실행 조건 동결 테스트 추가
 updated: 2026-11-05

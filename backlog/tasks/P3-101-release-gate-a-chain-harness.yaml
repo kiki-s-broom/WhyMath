@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 내부 테스트 계정 1개로 Release Gate A 10단계(진단 → 추천 → 학습 → 문제 → 답안 → 채점 → 오개념 → Hint/Tutor → Mastery Update → Next Recommendation)를 사람의 DB 수정 없이 한 테스트에서 연속으로 밟는 실 PG 하네스를 둔다. 지금은 조각만 있다 — 3루프(test_e2e_three_consecutive_loops)에는 학습·힌트/튜터가 없고, 코치는 week3 게이트, 학습(/study)은 페르소나 여정에만 있다. ② 각 단계의 성공 판정은 응답 코드가 아니라 그 단계 산출물(이벤트·상태 행)로 하고, 출력 끝에 단계별 도달 여부 줄을 낸다. ③ 학습 단계가 실제 콘텐츠 없이 404로 끝나는 현행(PED-17 소유)은 skip으로 숨기지 않고 끊긴 단계로 보고한다. ④ CI backend-integration 잡이 마커로 수집하는지 배선 테스트로 동결."
-artifacts: []
+artifacts:
+  - "PR #1845 (커밋 692bbcae)"
 paths:
   - tests/backend/api/test_release_gate_a_chain.py
 session: null

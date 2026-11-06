@@ -441,6 +441,8 @@ gates:
       [판정 근거 2026-10-19] 원문 조건과 처분: 앵커 전부 60 CU+(폭 확장) → 2027-01 이월(폭 확장 목적 소실) · 4급 중 3급 HIT≤6분 → 2027-01 이월 · 누설 0·메타 누락 0 → 유지. '자동검증 1차 통과율 산출됨'은 원문 외 추가 조건(계측 가능성 확인). 기준 완화(ADR-007).
 
       [판정 근거 2026-10-28] [Kiki 결정 2026-10-28] 11/22까지 판정 보류. 입력 EOS-197 done(#1765 4ec479e6) 기준 현황: A6 ≥30 CU 충족(30) · HIT 중앙값 ≤8분·표본 ≥15 충족(53.24초·30건 — AI 보조 검수 조건) · 자동검증 1차 통과율 미산출(weekly.json auto_gate_pass_rate measured false — Deterministic Gate 누적 로그 없음) · 힌트 의미 누설 0과 메타 누락 0은 이번 회차에서 따로 측정하지 않음(F8 2건은 누설이 아니라 중복 표기 — EOS-197 ⑦). 판정 전에 미측정 3항목의 측정 경로를 마련해야 한다.
+
+      [판정 근거 2026-11-05] [판정 준비 2026-11-05 · 폴더 04] 판정 기준 main a150cdef에서 5조건 재측정 — 충족 5/5 · 미충족 0 · 측정 실패 0. ① A6 30 CU(provenance_audit --require-runs exit 0) ② HIT 중앙값 53.24초 n=30(AI 보조 검수 조건 — 사람 단독 미측정) ③ 자동검증 1차 통과율 0.1171=13/111 산출됨(weekly.json 11/01 레코드 measured true · EOS-220 #1805로 원장 병기 완료) ④ 힌트 의미 누설 0/30(Wilson 상한 0.0827 · HINT_SEMANTIC_AXIS=PASS) ⑤ 메타 누락 0/30(META_AXIS=PASS). 근거 문서 docs/reviews/eos_g3_inputs_2026-11.md(최종본) · 리포트 data/runs/eos197-a6-review/g3_content_measures_g3prep_2026-11-05.json. D12(HIT AI 보조 조건 명시 여부 · 기한 11/20) 결정문은 미수신 — 받으면 그 명령 그대로 이 notes에 붙인다. 판정·clear는 Kiki 몫(11/22 보류 결정 유지).
     corrections:
       - "[2026-10-19] notes +163자 — ADR-007 조건 명세 보존"
       - "[2026-10-24] depends_on +EOS-197 — G3 조건(유효 HIT 표본·산출물)의 소유 태스크를 입력으로 연결"
@@ -451,6 +453,7 @@ gates:
       - "[2026-10-29] depends_on +EOS-211 · depends_on +EOS-210 — Kiki 결정(2026-10-29): G3 조건 '힌트 의미 누설 0'은 힌트가 있어야(EOS-211) 하고 의미 누설은 사람 표본(EOS-210)으로만 잰다 — 둘 다 G3 판정 전 입력으로 연결"
       - "[2026-10-29] input done · EOS-210 · 판정 무관: 사람 판정 좌석(기록 계약·표본·맹검 CLI·의미 축)만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 의미 축 값은 Kiki 맹검 판정 실행 뒤 산출(main 2b65315e) — done EOS-210 인계"
       - "[2026-10-29] input done · EOS-211 · 판정 무관: 힌트 생성 경로와 첫 실행 산출물·소급 측정값만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 의미 축은 EOS-210 사람 판정 실행 뒤 산출(main 8f6d1024) — done EOS-211 인계"
+      - "[2026-11-05] notes +600자 — G3 판정 준비 — main a150cdef 재측정 결과 기록(폴더 04)"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
@@ -1213,6 +1216,8 @@ gates:
       - "[2026-11-01] depends_on +P3-93 · depends_on +P3-94 · notes +474자 — Kiki 2026-11-01 권장안 승인 기록 — D16 해석 정정 · 임계값 보류 · 미적분 단독 승격 안 함 · 승계 태스크 P3-93/P3-94를 입력으로 연결. 판정 기준 main d81cfd7a"
       - "[2026-11-05] depends_on +P3-44-graph-connectivity-misconception-edge · depends_on +P3-50-calc-02-01-misconception-chain-restore · depends_on +P3-52-m0677-link-disposition-execution · depends_on +P3-91-p3-62-candidate-promotion-fill-template-fix · depends_on +PED-17-study-generate-fallback-decision · depends_on +P3-100-concept-revision-serving · depends_on +P3-101-release-gate-a-chain-harness · depends_on +P3-102-prod-misconception-signature-gap · verdict FAIL · owners: P3-44-graph-connectivity-misconception-edge, P3-50-calc-02-01-misconception-chain-restore, P3-52-m0677-link-disposition-execution, P3-91-p3-62-candidate-promotion-fill-template-fix, PED-17-study-generate-fallback-decision, P3-100-concept-revision-serving, P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap · inputs: P3-62-solution-qa-unverifiable-structuring · evidence: docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1 · Week3 FAIL(AI 품질 6축 임계 미확정·LLM 문장 표본 0/244) · Release FAIL(Gate A 학습 단계 404 · Gate B Graph 4/10·검증가능 48.9%<55% · Gate C 개념 수정판 서빙 미연결·운영 문항 903/979 발행 불가 · D·E 충족 · Q1 NO Q2 NO Q3 YES) — P3-17 통합 판정 회차 FAIL 기록 — 미충족 조건별 소유 태스크 연결"
       - "[2026-11-05] verdict FAIL · owners: P3-100-concept-revision-serving, P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap, P3-94, P3-93 · inputs: P3-17-week3-release-gate-judgment, P3-62-solution-qa-unverifiable-structuring · evidence: docs/reviews/p3_17_week3_release_judgment_2026-11-05.md · 판정 기준 main 036286a1 — done P3-17-week3-release-gate-judgment 인계"
+      - "[2026-11-05] verdict FAIL · owners: PED-17-study-generate-fallback-decision · inputs: P3-101-release-gate-a-chain-harness, P3-17-week3-release-gate-judgment, P3-62-solution-qa-unverifiable-structuring · evidence: Gate A 10단계 단일 관통 실측 — tests/backend/api/test_release_gate_a_chain.py · GATE_A_CHAIN_VERDICT 도달=9/10 · 끊김=학습(PED-17 · /study 404 콘텐츠 미적재) · 봉인위반=0 · 판정 기준 커밋 692bbcae(main 036286a1 + PR #1843) · PR #1845 — done P3-101-release-gate-a-chain-harness 인계"
+      - "[2026-11-05] verdict FAIL · owners: P3-100-concept-revision-serving · inputs: P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap, P3-17-week3-release-gate-judgment, P3-62-solution-qa-unverifiable-structuring · evidence: docs/reviews/p3_102_atom_misconception_load_2026-11-05.md §5 · 판정 기준 main 0877e573 — Gate C 운영 발행 불가 903건은 12건으로 해소, Gate C 개념 수정판 서빙 미연결은 미해소 — done P3-102-prod-misconception-signature-gap 인계"
       - "[2026-11-05] input done · P3-100-concept-revision-serving · 판정 무관: 수정 태스크 — Gate C의 끊긴 지점 중 개념 수정판 서빙 1건만 해소(PR #1846). 게이트 재판정은 별도 판정 회차가 하며, Gate C의 나머지(운영 문항 903/979 발행 불가)는 P3-102가 소유한다 — done P3-100-concept-revision-serving 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
