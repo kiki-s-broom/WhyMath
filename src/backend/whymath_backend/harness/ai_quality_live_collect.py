@@ -11,6 +11,10 @@
     python -m whymath_backend.harness.ai_quality_live_collect --out smoke.jsonl --limit 3
     python -m whymath_backend.harness.ai_quality_eval --responses runs/p3_78/live.jsonl \\
         --json runs/p3_78/live.report.json
+    # P3-94 — 측정 전용 좌석 교체 + LLM 초안 평가(문장 축 6개)
+    python -m whymath_backend.harness.ai_quality_live_collect --out runs/p3_94/mid.jsonl \\
+        --policy-seat local-mid --limit 20
+    python -m whymath_backend.harness.ai_quality_eval --drafts runs/p3_94/mid.jsonl.drafts.jsonl
 
 무엇을 부르는가
 --------------
@@ -116,12 +120,36 @@ prompt의 sha256 — 원문은 남기지 않는다)을 `run.json`에 남기고, 
 --------------------------------------------------------------
 - 0 — 완결(평가 사례 전부 응답) ∧ 라이브 비율 ≥ `--min-live-rate`(기본 0.5 — 제안값, Kiki 확인 전)
 - 1 — 측정 실패: 준비 실패(레지스트리·평가셋·기존 산출물 충돌·손상·`run.json` 없음·지문/HEAD
-  불일치·좌석 조립·최종 `run.json` 쓰기 실패) 또는 공허(파일 전체 라이브 0건)
+  불일치·좌석 조립·최종 `run.json` 쓰기 실패) 또는 공허(파일 전체 라이브 0건 **그리고** LLM 초안
+  0건 — 초안이 있으면 측정 재료가 있으므로 공허가 아니다 · P3-94)
 - 2 — 인자 오류(argparse)
 - 3 — 미완결 + 이번 실행에 실패가 있다 → 원인을 보고 `--resume`
 - 4 — 완결이지만 라이브 비율 < `--min-live-rate` → 리포트는 낼 수 있으나 라이브 후보로 읽기엔 LLM
   발화 비중이 낮다
 - 5 — 미완결 + 이번 실행 실패 0(`--limit`로 멈춤) → 남은 사례 수를 출력, `--resume`으로 이어서
+
+LLM 초안 측정 경로(P3-94 · D16 ⓐ — 서빙 무변경)
+---------------------------------------------
+P3-78 라이브 측정에서 LLM이 쓴 문장이 학생 본문으로 나간 사례는 0/244였다 — 정책 발화는 정답
+억제 백스톱·출력 스키마 강등·예산 소진 폴백에서 버려진다. 그래서 "LLM이 쓴 문장"(D16 판정 대상)은
+학생 경로에서는 표본이 생기지 않는다. 이 도구는 provider 래퍼(`RecordingProvider`)가 받은 **원시
+출력**에서 `end_turn` 발화(`extract_draft`)를 꺼내 사례 결말과 무관하게 `<out>.drafts.jsonl`
+(`drafts_path`)에 쓴다. 학생 응답 경로·러너·정책 코드는 바꾸지 않는다 — 초안은 이 파일에만 있고
+학생에게 가지 않는다.
+- 본문 = 사례의 **마지막** `end_turn` 초안, 저자 = `llm`, 나머지 구조 필드 = 라이브 응답과 같은
+  빌더·재료(`draft_response`). origin = `wh1-draft:<사례 결말>`(harness·degraded·fallback 등).
+- 실패 사례(응답 없음)는 초안도 쓰지 않는다 — `--resume`이 그 사례를 다시 돈다.
+- `run.json`에는 건수만(`counts.drafts` — 결말별·종류별). 원문 0.
+- 평가: `ai_quality_eval --drafts <out>.drafts.jsonl` — 문장 축 6개만 잰다(오개념 판정·Curriculum
+  범위는 결정론·경로 축이라 대상 아님 · D16 해석 2026-11-01). 초안 0건이면 측정 불가(exit 2).
+
+**측정 전용 튜터 좌석 교체**(`--policy-seat` · P3-94 ⑥ · Kiki 2026-11-06 승인): 튜터 정책 호출의
+라우터 결정(LOCAL·GENERAL·FAST = `qwen2.5:3b`)만 `local-mid`(`qwen2.5:7b`) 또는 `cloud-mid`
+(클라우드 MID 좌석 — 기본 openrouter `deepseek-v4.1-flash`)로 바꿔 provider에 넘긴다
+(`seat_decision`). 교체는 이 프로세스 안에서만 일어나고, 클라우드 교체는 데이터 등급 게이트가 막은
+결정이면 하지 않는다. 설정 지문에 좌석이 들어가므로 좌석이 다른 실행은 한 파일에 섞이지 않는다.
+`run.json`은 좌석별 비교 입력(교체 호출 수 · 턴 지연 중앙값·p95 · 턴당 provider 호출 수 · 토큰)을
+싣는다.
 
 프라이버시·비용·타임아웃
 ------------------------
@@ -153,7 +181,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast, get_args
 
 from whymath_backend.config import Settings, get_settings
 from whymath_backend.harness.ai_quality_candidates import (
@@ -209,7 +237,13 @@ from whymath_backend.l3.interfaces import (
     NamedEventSink,
     TraceSink,
 )
-from whymath_backend.l3.models import GenerationResult, RoutingDecision
+from whymath_backend.l3.models import (
+    CostTier,
+    GenerationResult,
+    LocalModelTier,
+    ModelFamily,
+    RoutingDecision,
+)
 from whymath_backend.l4.hint_deferral import decide_hint_level
 from whymath_backend.l4.misconception import CATALOG, diagnose, reject_refuted
 from whymath_backend.l4.misconception.distractor_link import distractor_link_matches
@@ -223,6 +257,7 @@ from whymath_backend.l4.misconception.models import MisconceptionMatch
 __all__ = [
     "DEFAULT_MIN_LIVE_RATE",
     "DEGRADED_ORIGIN",
+    "DRAFT_ORIGIN_PREFIX",
     "EXIT_INCOMPLETE_FAILED",
     "EXIT_INCOMPLETE_LIMIT",
     "EXIT_LOW_LIVE",
@@ -232,6 +267,8 @@ __all__ = [
     "FALLBACK_ORIGIN",
     "HARNESS_ORIGIN",
     "LIVE_ORIGIN",
+    "POLICY_SEATS",
+    "POLICY_SEAT_ROUTE",
     "RUN_SCHEMA",
     "UNCLASSIFIED_ORIGIN",
     "CaseLedger",
@@ -241,10 +278,14 @@ __all__ = [
     "RecordingTrace",
     "coach_hypotheses",
     "default_deps",
+    "draft_response",
+    "drafts_path",
     "exit_code_for",
+    "extract_draft",
     "live_turn_inputs",
     "main",
     "output_paths",
+    "seat_decision",
 ]
 
 LIVE_ORIGIN: Final = "wh1-live"
@@ -261,6 +302,34 @@ EXIT_INCOMPLETE_FAILED: Final = 3
 EXIT_LOW_LIVE: Final = 4
 EXIT_INCOMPLETE_LIMIT: Final = 5
 DEFAULT_MIN_LIVE_RATE: Final = 0.5
+
+DRAFT_ORIGIN_PREFIX: Final = "wh1-draft"
+"""측정 전용 LLM 초안 응답의 origin 머리말 — 뒤에 사례 결말이 붙는다(`wh1-draft:harness` 등)."""
+POLICY_SEAT_ROUTE: Final = "route"
+"""튜터 정책 좌석 = 라우터 결정 그대로(교체 없음 · 기본값 · P3-78과 같은 동작)."""
+POLICY_SEATS: Final = (POLICY_SEAT_ROUTE, "local-fast", "local-mid", "cloud-mid")
+"""측정 전용 좌석 선택지(P3-94 ⑥ · Kiki 2026-11-06 승인 후보 3개 + 교체 없음)."""
+
+_POLICY_ROUTE: Final = (CostTier.LOCAL.value, ModelFamily.GENERAL.value, LocalModelTier.FAST.value)
+"""튜터 정책 호출의 라우터 결정(`classify` → LOCAL·GENERAL·FAST) — 이 결정만 교체한다."""
+_SEAT_UPDATES: Final[Mapping[str, Mapping[str, object]]] = {
+    "local-fast": {
+        "cost_tier": CostTier.LOCAL,
+        "local_family": ModelFamily.GENERAL,
+        "local_model": LocalModelTier.FAST,
+    },
+    "local-mid": {
+        "cost_tier": CostTier.LOCAL,
+        "local_family": ModelFamily.GENERAL,
+        "local_model": LocalModelTier.MID,
+    },
+    "cloud-mid": {
+        "cost_tier": CostTier.CLOUD_MID,
+        "local_family": None,
+        "local_model": None,
+        "mode": "sync",
+    },
+}
 
 _EXCERPT_CHARS: Final = 300
 _OUTER_GRACE_SECONDS: Final = 10.0
@@ -336,6 +405,14 @@ class CaseLedger:
     calls: list[dict[str, object]] = field(default_factory=list)
     observations: list[dict[str, object]] = field(default_factory=list)
     warnings: list[dict[str, object]] = field(default_factory=list)
+    drafts: list[dict[str, str | None]] = field(default_factory=list)
+    """LLM 원시 출력 속 `end_turn` 발화 초안(호출 순서) — 원문은 초안 파일에만 쓴다(P3-94 ①)."""
+    seat_overrides: int = 0
+    """측정 전용 좌석 교체가 적용된 provider 호출 수(P3-94 ⑥)."""
+    seat_refused: int = 0
+    """데이터 등급 게이트(`data_export_blocked`) 때문에 클라우드 교체를 거부한 호출 수."""
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class _Scope:
@@ -447,18 +524,118 @@ def _fingerprint(system: str, prompt: str) -> str:
     return hashlib.sha256(f"{system}\x1f{prompt}".encode()).hexdigest()
 
 
+def _json_object(raw: str) -> dict[str, object] | None:
+    """원시 텍스트 → JSON 객체(코드펜스·주변 산문 허용). 아니면 None.
+
+    정책 `LLMTutorPolicy._extract_json`과 **같은 관대 추출 규칙의 사본**이다(정책 쪽 비공개 함수를
+    가져다 쓰지 않으려고 둔 사본 — 서빙 코드 무변경). 두 함수의 동치는 테스트가 대조해 동결한다.
+    """
+    text = raw.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    candidates = [text]
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        candidates.append(text[start : end + 1])
+    for candidate in candidates:
+        try:
+            obj = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
+
+
+def extract_draft(raw: str) -> tuple[str | None, str | None]:
+    """LLM 원시 출력 1건 → (`end_turn` 발화 초안, 행위 유형). 초안이 아니면 (None, None).
+
+    정책의 스키마 판정 **전** 원문을 본다 — 출력 스키마 위반(존재하지 않는 오개념 id 등)으로
+    강등될 출력의 발화도, 정답 억제 백스톱이 버릴 발화도 초안으로 남는다. 이것이 D16 ⓐ의 "결말과
+    무관하게"다(P3-94 ①). 발화가 비었거나 문자열이 아니면 초안이 아니다(공허 초안 0).
+    """
+    data = _json_object(raw)
+    if data is None or data.get("kind") != "end_turn":
+        return None, None
+    utterance = data.get("utterance")
+    if not isinstance(utterance, str) or not utterance.strip():
+        return None, None
+    action = data.get("action_type")
+    return utterance, action if isinstance(action, str) else None
+
+
+def seat_decision(decision: RoutingDecision, seat: str) -> RoutingDecision | None:
+    """측정 전용 좌석 교체(P3-94 ⑥) — 교체한 결정, 또는 교체 대상이 아니면 None.
+
+    교체 대상은 **튜터 정책 호출의 라우터 결정(LOCAL·GENERAL·FAST)뿐**이다. 다른 결정(다른 호출
+    지점)은 손대지 않는다. 클라우드 교체는 라우터의 데이터 등급 게이트(`data_export_blocked`)가
+    막은 결정이면 하지 않는다 — 측정이라도 게이트를 넘지 않는다(호출자가 거부 건수를 센다).
+    새 결정은 `RoutingDecision` 검증(불변식 4종)을 다시 통과해야 만들어진다.
+    """
+    if seat == POLICY_SEAT_ROUTE:
+        return None
+    route = tuple(
+        _plain(getattr(decision, k)) for k in ("cost_tier", "local_family", "local_model")
+    )
+    if route != _POLICY_ROUTE:
+        return None
+    updates = _SEAT_UPDATES[seat]
+    payload = decision.model_dump()
+    payload.update({k: _plain(v) for k, v in updates.items()})
+    payload["reason"] = f"{decision.reason} · 측정 전용 좌석 교체({seat} · P3-94)".strip(" ·")
+    return RoutingDecision.model_validate(payload)
+
+
 class RecordingProvider:
-    """안쪽 provider로 **그대로 전달**하며 이번 사례의 호출 지문·예외를 기록한다.
+    """안쪽 provider로 전달하며 이번 사례의 호출 지문·예외·초안·사용량을 기록한다.
 
     이 래퍼는 호출을 만들지 않는다 — `l3.pipeline`이 라우터 결정(`decision`)을 실어 부른 것을
-    받은 그대로 넘긴다. 선택 인자는 받은 것만 넘긴다. 좌석 표면(`cloud_seat` 등)은 안쪽 것을
+    받아 넘긴다. 선택 인자는 받은 것만 넘긴다. 좌석 표면(`cloud_seat` 등)은 안쪽 것을
     그대로 보인다(`__getattr__`) — 파이프라인의 원가 좌석 판정이 래퍼 때문에 바뀌지 않게.
     프롬프트는 **지문(sha256)만** 남긴다(원문 0).
+
+    **측정 전용 좌석 교체**(`policy_seat` ≠ `route` · P3-94 ⑥): 튜터 정책 호출의 결정만
+    `seat_decision`으로 바꿔 넘긴다. 교체는 이 수집기 프로세스 안에서만 일어난다 — 서빙 라우팅은
+    무변경이다. 한계(명시): 파이프라인이 Langfuse·트레이스에 싣는 `cost_tier`·원가는 **원래 결정**의
+    것이다(교체는 파이프라인 바깥에서 일어나므로). 실제로 답한 모델은 provider 사용량의
+    `served_model`로, 교체 건수는 `run.json`의 `policy_seat_calls`로 따로 센다.
     """
 
-    def __init__(self, inner: LLMProvider, scope: _Scope) -> None:
+    def __init__(
+        self, inner: LLMProvider, scope: _Scope, *, policy_seat: str = POLICY_SEAT_ROUTE
+    ) -> None:
+        if policy_seat not in POLICY_SEATS:
+            raise ValueError(f"알 수 없는 좌석 {policy_seat!r} — {POLICY_SEATS} 중 하나")
         self._inner = inner
         self._scope = scope
+        self._policy_seat = policy_seat
+
+    def _seat(self, decision: RoutingDecision) -> RoutingDecision:
+        if self._policy_seat == POLICY_SEAT_ROUTE:
+            return decision
+        if (
+            _SEAT_UPDATES[self._policy_seat]["cost_tier"] != CostTier.LOCAL
+            and decision.data_export_blocked
+        ):
+            self._scope.ledger.seat_refused += 1
+            return decision
+        swapped = seat_decision(decision, self._policy_seat)
+        if swapped is None:
+            return decision
+        self._scope.ledger.seat_overrides += 1
+        return swapped
+
+    def _observe(self, result: GenerationResult) -> None:
+        """응답 1건의 사용량·초안을 회계에 옮긴다(원문은 초안 목록에만)."""
+        ledger = self._scope.ledger
+        usage = result.usage
+        if usage is not None:
+            ledger.input_tokens += usage.input_tokens or 0
+            ledger.output_tokens += usage.output_tokens or 0
+        utterance, action = extract_draft(result.text)
+        if utterance is not None:
+            ledger.drafts.append({"utterance": utterance, "action_type": action})
 
     async def generate(
         self,
@@ -484,8 +661,9 @@ class RecordingProvider:
             if value is not None
         }
         self._scope.ledger.prompt_fingerprints.append(_fingerprint(system, prompt))
+        decision = self._seat(decision)
         try:
-            return await self._inner.generate(prompt, system, decision, **optional)
+            result = await self._inner.generate(prompt, system, decision, **optional)
         except asyncio.CancelledError as exc:
             # 러너 타임아웃이 비행 중 호출을 끊은 경우 — '타임아웃 여부'의 직접 증거다.
             self._scope.ledger.faults.append(describe_fault(exc, decision, cancelled=True))
@@ -493,6 +671,8 @@ class RecordingProvider:
         except Exception as exc:
             self._scope.ledger.faults.append(describe_fault(exc, decision))
             raise
+        self._observe(result)
+        return result
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
@@ -744,6 +924,14 @@ class CaseResult:
     rebuild_rejected: bool = False
     cause: str | None = None
     """degraded 원인(output_schema/mode_guard/unknown) 또는 실패 종류."""
+    draft: TutorResponse | None = None
+    """LLM 초안 응답(측정 전용 · `<out>.drafts.jsonl`) — 실패 사례는 만들지 않는다(P3-94 ①)."""
+    draft_count: int = 0
+    """이 사례 provider 응답 속 `end_turn` 초안 수(검증 의무 거부 등으로 2건 이상일 수 있다)."""
+    seat_overrides: int = 0
+    seat_refused: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 def _primary_observation(observations: Sequence[Mapping[str, object]]) -> Mapping[str, object]:
@@ -800,6 +988,56 @@ def _rebuild(
     return rebuilt.model_dump(mode="json"), None
 
 
+def draft_response(
+    case: EvalCase,
+    inputs: LiveTurnInputs | None,
+    ledger: CaseLedger,
+    *,
+    category: str,
+    eos: TutorResponse,
+) -> TutorResponse | None:
+    """이 사례의 LLM 초안 → 평가기가 읽는 응답 1건(측정 전용 · 학생 미노출). 초안이 없으면 None.
+
+    본문 = **마지막** `end_turn` 초안(턴을 끝낸 발화에 가장 가깝다), 저자 = `llm`. 나머지 필드는
+    라이브 응답과 같은 빌더·같은 서버 재료(사례 판정·초기 가설·엔진 힌트 단계)로 조립한다 — 축
+    판정이 본문 말고 다른 차이를 보지 않게. 빌더가 거부하면(행위 유형이 4종 밖 등) 결정론
+    구조체에 초안 본문만 넣고 그 사실을 주석에 적는다 — 초안을 버리지 않는다(버리면 나쁜 초안일수록
+    표본에서 빠지는 편향이 생긴다).
+    """
+    if inputs is None or not ledger.drafts:
+        return None
+    last = ledger.drafts[-1]
+    utterance = last["utterance"] or ""
+    action = last.get("action_type")
+    action_type = cast(EndTurnType, action) if action in get_args(EndTurnType) else None
+    built = build_tutor_output(
+        explanation=utterance,
+        explanation_source="llm",
+        action_type=action_type,
+        mode_guard_replaced=False,
+        verify_verdict=case.verdict,
+        hypotheses=inputs.active_hypotheses,
+        concept_id=case.concept_id,
+        known_concept_ids=frozenset({case.concept_id}),
+        hint_level=inputs.hint_level,
+    )
+    note = (
+        f"LLM 초안(측정 전용 · 학생 미노출) — 사례 결말 {category} · end_turn 초안 "
+        f"{len(ledger.drafts)}건 중 마지막"
+    )
+    if isinstance(built, str):
+        tutor_output = {**eos.tutor_output, "explanation": utterance, "explanation_source": "llm"}
+        note = f"{note} · 구조체 조립을 P3-09가 거부({built}) — 결정론 구조체에 초안 본문만 넣었다"
+    else:
+        tutor_output = built.model_dump(mode="json")
+    return TutorResponse(
+        case_id=case.case_id,
+        tutor_output=tutor_output,
+        origin=f"{DRAFT_ORIGIN_PREFIX}:{category}",
+        note=note,
+    )
+
+
 def classify_case(
     case: EvalCase,
     inputs: LiveTurnInputs | None,
@@ -820,6 +1058,13 @@ def classify_case(
     first_prompt = ledger.prompt_fingerprints[0] if ledger.prompt_fingerprints else None
 
     def _result(category: str, response: TutorResponse | None, **extra: Any) -> CaseResult:
+        # 초안은 결말과 무관하게 남긴다 — 단 실패 사례는 응답이 없고 `--resume`이 다시 돌므로
+        # 초안도 쓰지 않는다(같은 사례의 초안이 두 번 쓰이지 않게).
+        draft = (
+            None
+            if category == "failed"
+            else draft_response(case, inputs, ledger, category=category, eos=eos)
+        )
         return CaseResult(
             case_id=case.case_id,
             kind=case.kind,
@@ -831,6 +1076,12 @@ def classify_case(
             calls=calls,
             provider_calls=len(ledger.prompt_fingerprints),
             first_prompt=first_prompt,
+            draft=draft,
+            draft_count=len(ledger.drafts),
+            seat_overrides=ledger.seat_overrides,
+            seat_refused=ledger.seat_refused,
+            input_tokens=ledger.input_tokens,
+            output_tokens=ledger.output_tokens,
             **extra,
         )
 
@@ -964,6 +1215,15 @@ def output_paths(out: Path) -> tuple[Path, Path]:
     return out.with_name(out.name + ".failures.jsonl"), out.with_name(out.name + ".run.json")
 
 
+def drafts_path(out: Path) -> Path:
+    """LLM 초안 파일(`ai-quality-response/v1` · 측정 전용 · P3-94 ①) — 응답 파일 옆에 둔다.
+
+    원문은 이 파일에만 있다(`run.json`에는 건수만). 평가는
+    `ai_quality_eval --drafts <이 파일>`로 문장 축 6개만 잰다.
+    """
+    return out.with_name(out.name + ".drafts.jsonl")
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -1003,6 +1263,27 @@ class _Existing:
     done: dict[str, TutorResponse]
     prior_runs: list[object]
     prompts: dict[str, str]
+    drafts: dict[str, TutorResponse] = field(default_factory=dict)
+
+
+def _load_drafts(out: Path, done: Mapping[str, TutorResponse]) -> dict[str, TutorResponse]:
+    """`--resume`: 이미 쓴 초안. 응답 없는 사례의 초안은 손상이다(응답 → 초안 순서로 쓴다)."""
+    path = drafts_path(out)
+    if not path.exists() or not path.read_text(encoding="utf-8").strip():
+        return {}
+    try:
+        drafts = parse_responses(path.read_text(encoding="utf-8"), source=str(path))
+    except CandidateError as exc:
+        raise _SetupError(
+            f"기존 초안 파일이 손상됐다({exc}) — 마지막 줄이 잘렸다면 그 줄만 지우고 다시 --resume"
+        ) from exc
+    orphans = sorted(set(drafts) - set(done))
+    if orphans:
+        raise _SetupError(
+            f"초안 파일에 응답 없는 사례 {len(orphans)}건: {orphans[:3]} — 응답 파일과 짝이 맞지 "
+            "않는다(새 --out 으로)"
+        )
+    return drafts
 
 
 def _load_existing(
@@ -1066,7 +1347,7 @@ def _load_existing(
     for run in runs:
         if isinstance(run, dict) and isinstance(run.get("first_prompts"), dict):
             prompts.update({str(k): str(v) for k, v in run["first_prompts"].items()})
-    return _Existing(done=done, prior_runs=runs, prompts=prompts)
+    return _Existing(done=done, prior_runs=runs, prompts=prompts, drafts=_load_drafts(out, done))
 
 
 def _git_identity(root: Path) -> dict[str, object]:
@@ -1162,6 +1443,15 @@ class _RunCounts:
     primary_outcomes: Counter[str] = field(default_factory=Counter)
     explanation_sources: dict[str, Counter[str]] = field(default_factory=dict)
     models: Counter[tuple[object, ...]] = field(default_factory=Counter)
+    drafts: int = 0
+    end_turn_drafts: int = 0
+    drafts_by_outcome: Counter[str] = field(default_factory=Counter)
+    drafts_by_kind: Counter[str] = field(default_factory=Counter)
+    seat_overrides: int = 0
+    seat_refused: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    elapsed_ms: list[int] = field(default_factory=list)
 
     def add(self, result: CaseResult) -> None:
         self.attempted += 1
@@ -1169,6 +1459,16 @@ class _RunCounts:
         self.rebuild_rejected += int(result.rebuild_rejected)
         self.primary_outcomes[result.primary_outcome or "none"] += 1
         self.provider_calls += result.provider_calls
+        self.end_turn_drafts += result.draft_count
+        if result.draft is not None:
+            self.drafts += 1
+            self.drafts_by_outcome[result.category] += 1
+            self.drafts_by_kind[result.kind] += 1
+        self.seat_overrides += result.seat_overrides
+        self.seat_refused += result.seat_refused
+        self.input_tokens += result.input_tokens
+        self.output_tokens += result.output_tokens
+        self.elapsed_ms.append(result.elapsed_ms)
         if result.category == "degraded" and result.cause:
             self.degraded_causes[result.cause] += 1
         if result.failure is not None:
@@ -1208,7 +1508,36 @@ class _RunCounts:
                 kind: dict(sorted(c.items()))
                 for kind, c in sorted(self.explanation_sources.items())
             },
+            # P3-94 ①⑦ — 초안 회계(원문 0 · 건수만).
+            "drafts": {
+                "cases_with_draft": self.drafts,
+                "end_turn_drafts": self.end_turn_drafts,
+                "by_outcome": dict(sorted(self.drafts_by_outcome.items())),
+                "by_kind": dict(sorted(self.drafts_by_kind.items())),
+            },
+            # P3-94 ⑥ — 좌석 비교 입력.
+            "policy_seat_calls": {
+                "overridden": self.seat_overrides,
+                "refused_data_export": self.seat_refused,
+            },
+            "tokens": {"input": self.input_tokens, "output": self.output_tokens},
+            "turn_latency_ms": latency_summary(self.elapsed_ms),
+            "provider_calls_per_case": (
+                self.provider_calls / self.attempted if self.attempted else None
+            ),
         }
+
+
+def latency_summary(values: Sequence[int]) -> dict[str, object]:
+    """턴 지연 요약 — 건수·중앙값·p95(최근접 순위). 0건이면 값 None(0으로 접지 않는다)."""
+    ordered = sorted(values)
+    n = len(ordered)
+    if not n:
+        return {"n": 0, "median_ms": None, "p95_ms": None, "max_ms": None}
+    middle = n // 2
+    median = ordered[middle] if n % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    rank = max(1, -(-95 * n // 100))  # ceil(0.95·n) — 최근접 순위
+    return {"n": n, "median_ms": median, "p95_ms": ordered[rank - 1], "max_ms": ordered[-1]}
 
 
 def _distinct(prompts: Mapping[str, str], cases: Sequence[EvalCase]) -> dict[str, int]:
@@ -1236,6 +1565,8 @@ class _Run:
     """case_id → 첫 정책 프롬프트 지문(파일 전체 — 이전 실행분 포함)."""
     counts: _RunCounts = field(default_factory=_RunCounts)
     run_prompts: dict[str, str] = field(default_factory=dict)
+    drafts: dict[str, str] = field(default_factory=dict)
+    """case_id → 초안 origin(파일 전체 — 이전 실행분 포함 · P3-94)."""
 
     def file_totals(self) -> dict[str, object]:
         n = len(self.eval_set.cases)
@@ -1250,6 +1581,8 @@ class _Run:
             "by_origin": dict(sorted(origins.items())),
             "live": live,
             "live_rate": live / n if n else None,
+            "drafts": len(self.drafts),
+            "drafts_by_origin": dict(sorted(Counter(self.drafts.values()).items())),
             "distinct_first_prompts": _distinct(self.prompts, answered),
             "effective_sample_upper_bound": _distinct(self.prompts, answered)["total"],
         }
@@ -1293,9 +1626,16 @@ class _Run:
 def exit_code_for(
     totals: Mapping[str, object], *, failed_this_run: int, min_live_rate: float
 ) -> int:
-    """종료 코드 규약(모듈 docstring) — 응답 파일 전체 상태로 판정한다."""
+    """종료 코드 규약(모듈 docstring) — 응답 파일 전체 상태로 판정한다.
+
+    공허 = 라이브 0건 **그리고** 초안 0건이다. 초안이 있으면 라이브 0건이어도 측정 재료가 있으므로
+    공허가 아니다(P3-94 — 라이브 비율 판정은 그대로 남아 exit 4로 드러난다).
+    """
     live = totals.get("live")
-    if not isinstance(live, int) or live == 0:
+    drafts = totals.get("drafts")
+    has_live = isinstance(live, int) and live > 0
+    has_drafts = isinstance(drafts, int) and drafts > 0
+    if not (has_live or has_drafts):
         return EXIT_MEASUREMENT
     if totals.get("complete") is not True:
         return EXIT_INCOMPLETE_FAILED if failed_this_run > 0 else EXIT_INCOMPLETE_LIMIT
@@ -1407,6 +1747,11 @@ async def _collect(run: _Run, ctx: _Context, pending: Sequence[EvalCase], stream
         if result.response is not None:
             _append_line(run.out, dump_responses({case.case_id: result.response}))
             run.responses[case.case_id] = result.response.origin
+            # 초안은 응답 **뒤에** 쓴다 — 사이에서 멈추면 초안 1건을 잃을 뿐, 응답 없는 초안(고아)은
+            # 생기지 않는다(`--resume`이 고아를 손상으로 거부한다).
+            if result.draft is not None:
+                _append_line(drafts_path(run.out), dump_responses({case.case_id: result.draft}))
+                run.drafts[case.case_id] = result.draft.origin
         if result.failure is not None:
             _append_line(failures_path, json.dumps(result.failure, ensure_ascii=False) + "\n")
         if result.first_prompt is not None:
@@ -1460,6 +1805,13 @@ def _parser() -> argparse.ArgumentParser:
         help=f"완결 파일의 라이브 비율 하한(기본 {DEFAULT_MIN_LIVE_RATE} — 미만이면 exit 4)",
     )
     parser.add_argument("--resume", action="store_true", help="응답 파일에 없는 사례만 이어서 돈다")
+    parser.add_argument(
+        "--policy-seat",
+        choices=POLICY_SEATS,
+        default=POLICY_SEAT_ROUTE,
+        help="튜터 정책 호출 좌석 — 측정 전용 교체(P3-94 ⑥ · 서빙 무변경). route=라우터 결정 그대로"
+        "(기본) · local-fast=qwen2.5:3b · local-mid=qwen2.5:7b · cloud-mid=클라우드 MID 좌석",
+    )
     return parser
 
 
@@ -1474,10 +1826,15 @@ def _ensure_warning_output() -> None:
 
 
 def _config(
-    settings: Settings, deps: LiveDeps, turn_timeout: float, outer: float
+    settings: Settings,
+    deps: LiveDeps,
+    turn_timeout: float,
+    outer: float,
+    policy_seat: str = POLICY_SEAT_ROUTE,
 ) -> dict[str, object]:
     """응답을 바꿀 수 있는 설정 — 이 묶음의 지문이 `--resume` 동일성 판정에 쓰인다."""
     return {
+        "policy_seat": policy_seat,
         "declared_models": dict(deps.declared_models),
         "turn_timeout_seconds": turn_timeout,
         "outer_timeout_seconds": outer,
@@ -1524,7 +1881,7 @@ def main(
         stage = "평가셋 적재"
         eval_set = load_eval_set(registry, args.eval_set)
         stage = "기존 산출물 확인"
-        existing_paths = [p for p in (out, failures_path, run_path) if p.exists()]
+        existing_paths = [p for p in (out, failures_path, run_path, drafts_path(out)) if p.exists()]
         if existing_paths and not args.resume:
             raise _SetupError(
                 f"이전 실행 산출물이 있다({', '.join(str(p) for p in existing_paths)}) — 이어서 "
@@ -1536,7 +1893,7 @@ def main(
             args.timeout if args.timeout is not None else settings.wh1_primary_timeout_seconds
         )
         outer_timeout = turn_timeout + settings.wh1_prose_timeout_seconds + _OUTER_GRACE_SECONDS
-        config = _config(settings, deps, turn_timeout, outer_timeout)
+        config = _config(settings, deps, turn_timeout, outer_timeout, args.policy_seat)
         fingerprint = _config_fingerprint(config)
         git = _git_identity(default_repo_root())
         head = git.get("head")
@@ -1578,6 +1935,7 @@ def main(
             "timeout": args.timeout,
             "resume": args.resume,
             "min_live_rate": args.min_live_rate,
+            "policy_seat": args.policy_seat,
         },
         "config": config,
         "config_fingerprint": fingerprint,
@@ -1611,6 +1969,7 @@ def main(
         record=record,
         responses={cid: r.origin for cid, r in done.items()},
         prompts=dict(existing.prompts),
+        drafts={cid: r.origin for cid, r in existing.drafts.items()},
     )
     run.counts.skipped_resume = len(done)
     scope = _Scope()
@@ -1620,7 +1979,7 @@ def main(
         eos=eos,
         briefs=briefs,
         settings=settings,
-        provider=RecordingProvider(deps.provider, scope),
+        provider=RecordingProvider(deps.provider, scope, policy_seat=args.policy_seat),
         trace=RecordingTrace(deps.trace, scope),
         cache_factory=deps.cache_factory,
         scope=scope,
@@ -1631,7 +1990,8 @@ def main(
     print(
         f"실행 {run_id[:12]} · 평가셋 {eval_set.source} · sha256 {eval_set.sha256[:12]} · 사례 "
         f"{len(eval_set.cases)} · 이미 수집 {len(done)} · 이번 {len(pending)} · 한 턴 "
-        f"{turn_timeout:g}s · 관측 {type(deps.trace).__name__}(구성={deps.trace_configured})",
+        f"{turn_timeout:g}s · 관측 {type(deps.trace).__name__}(구성={deps.trace_configured}) · "
+        f"튜터 좌석 {args.policy_seat}",
         file=out_stream,
         flush=True,
     )
@@ -1689,11 +2049,28 @@ def main(
     print(
         f"파일 전체 — 응답 {totals['responses']}/{totals['cases']} · 남은 사례 "
         f"{totals['remaining']} · 라이브 {totals['live']} (비율 {totals['live_rate']}) · "
+        f"LLM 초안 {totals['drafts']} {totals['drafts_by_origin']} · "
         f"유효 표본 상한(서로 다른 첫 프롬프트) {totals['effective_sample_upper_bound']} "
         f"→ exit {code}",
         file=out_stream,
         flush=True,
     )
+    latency = c.to_json()["turn_latency_ms"]
+    assert isinstance(latency, dict)
+    print(
+        f"튜터 좌석 {args.policy_seat} — 교체 호출 {c.seat_overrides} · 교체 거부(데이터 등급) "
+        f"{c.seat_refused} · 턴 지연 중앙값 {latency['median_ms']}ms · p95 {latency['p95_ms']}ms · "
+        f"토큰 입력 {c.input_tokens} · 출력 {c.output_tokens}",
+        file=out_stream,
+        flush=True,
+    )
+    if totals["drafts"]:
+        print(
+            f"초안 평가: python -m whymath_backend.harness.ai_quality_eval --drafts "
+            f"{drafts_path(out)} --json {out.with_name(out.name + '.drafts.report.json')}",
+            file=out_stream,
+            flush=True,
+        )
     if c.failed:
         print(f"실패 원인: {failures_path} — --resume 으로 다시 돈다", file=out_stream, flush=True)
     return code
