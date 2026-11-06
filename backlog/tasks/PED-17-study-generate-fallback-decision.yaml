@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: todo
 priority: 2
 eos_priority: P1
 owner: claude
@@ -24,6 +24,6 @@ paths:
   - src/backend/whymath_backend/l4/content_supply.py
   - "tests/backend/api/**"
   - "tests/backend/l4/**"
-session: claude/new-session-yfujem
+session: null
 notes: "ai_integration_gap_review.md D4(2026-08-10). study.py:29-30이 유보를 정직하게 선언했으나 추적 태스크가 없었다 — SEC-15 등재 선례('docstring 자백·추적 부재→태스크化')와 동형. MOB-13 paths(api/study.py) 의도적 겹침 — 겹침 경고는 대기 신호, MOB-13 착지 후 착수 권장(기능 의존 아님).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-27] CONT-05 ⓐ 연동 — 생성 폴백 개방 시 UNREVIEWED 사유 처리 판정 항 추가\n\n[정정 2026-11-06] PED-17 계획 T0 — 2026-11-06 Kiki 결정(C안 조건부 개방)의 결정 기록을 acceptance에 연결(ped17/산출물/T0/결정기록.md)\n\n[정정 2026-11-06] priority 3 → 2: Release Gate A·Q1 핵심 경로 — P3-17 판정(main 036286a1) 끊긴 지점. 2027 이월 표기와 실제 경로 불일치\neos_priority P2 → P1: Release Gate A·Q1 핵심 경로 — P3-17 판정(main 036286a1) 끊긴 지점. 2027 이월 표기와 실제 경로 불일치\n\n[정정 2026-11-06] C안 대응 판정·② 이행 기록 연결 (P3R-01)"
 updated: 2026-11-06
