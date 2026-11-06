@@ -90,7 +90,11 @@ def _candidates(slot: str) -> list[CandidateProblem]:
 def bank(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, list[dict[str, object]]]:
     """임시 배치 — 등록부를 건드리지 않고 이 생성기만 JSONL로 낸다(배치 공개 함수 재사용)."""
     out = tmp_path_factory.mktemp("graph_shape_bank") / "problems.jsonl"
-    report = run_p3_calculus1_diff_batch(generators=(_GEN,), out_path=out)
+    # 저작 원형(구판 최종 단계)으로 낸다 — 이 파일은 발문·출발식 조건 자체의 계약을 본다.
+    # 구조화 조건(값 비교·b 정의 등식)은 test_p3_93_var_structuring·Solution QA가 따로 검증한다.
+    report = run_p3_calculus1_diff_batch(
+        generators=(_GEN,), out_path=out, structure_final_step=False
+    )
     assert report.total_stored == report.total_requested == 72, report.to_json()
     rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line]
     return out, rows

@@ -74,6 +74,38 @@ def _all_items(generator_cls: type[P3DiffSlotGenerator]) -> list[DiffItem]:
     return [item for slot in SLOT_IDS for item in generator_cls.items(slot)]
 
 
+def _without_answer_definition(item: DiffItem) -> DiffItem:
+    """정의 등식 분리(P3-91 calc 8회차 접선 교정) — 답 y가 `y = g(s)` 정의로 붙은 문항을 s 문제로 되돌린다.
+
+    교점 Q의 접선 기울기 틀은 미지수 s(교점의 x좌표)를 풀고 답 y를 정의 등식 `y = g(s)`로 얻는다
+    (answer_map = (s, y)). 단일 미지수 계약·유일해 재계산은 **s 문제**에 대해 그대로 적용하고, 정의
+    등식은 따로 대조한다 — g가 s만의 식이고 g(정답 s) = 기록된 y = answer_text여야 한다. 그 꼴이 아니면
+    문항을 그대로 돌려준다(다른 문항의 검사는 바뀌지 않는다).
+    """
+    if len(item.answer_map) != 2 or isinstance(item.conditions, str):
+        return item
+    (s_key, s_val), (y_key, y_val) = item.answer_map
+    prefix = f"{y_key} = "
+    defs = [c for c in item.conditions if c.startswith(prefix)]
+    if len(defs) != 1:
+        return item
+    s_sym = sympy.Symbol(s_key)
+    g = sympy.sympify(defs[0].removeprefix(prefix))
+    assert g.free_symbols == {s_sym}, (defs[0], item.question_text)
+    assert sympy.simplify(g.subs(s_sym, sympy.sympify(s_val)) - sympy.sympify(y_val)) == 0, (
+        defs[0],
+        item.answer_map,
+    )
+    assert y_val == item.answer_text, (item.answer_map, item.answer_text)
+    rest = tuple(c for c in item.conditions if c != defs[0])
+    return dataclasses.replace(
+        item,
+        conditions=rest if len(rest) > 1 else rest[0],
+        answer_map=((s_key, s_val),),
+        answer_text=s_val,
+    )
+
+
 def _candidates(generator_cls: type[P3DiffSlotGenerator], slot: str) -> list[CandidateProblem]:
     spec = generator_cls.spec_for(slot)
     generator = generator_cls(slot=slot)
@@ -210,6 +242,7 @@ def _independent_problems(item: DiffItem) -> list[str]:
     (`a > 0`·`b != 4`·`s < 6` 꼴). 게이트(Tier1)는 "답이 조건을 만족하는가"만 보므로 *다른 해가 보호를
     통과해 정답이 모호해지는* 문항은 여기서 처음 걸린다.
     """
+    item = _without_answer_definition(item)
     conds = [item.conditions] if isinstance(item.conditions, str) else list(item.conditions)
     problems: list[str] = []
     ((symbol_name, answer_text),) = item.answer_map
@@ -312,7 +345,8 @@ def test_conditions_obey_the_single_unknown_contract_of_shadow_grading(
 ) -> None:
     """섀도 채점 계약(NLP-09) — 문자열 조건의 자유기호가 정확히 하나이고 answer_map의 유일한 키다."""
     str_checked = 0
-    for item in _all_items(generator_cls):
+    for raw in _all_items(generator_cls):
+        item = _without_answer_definition(raw)
         if isinstance(item.conditions, str):
             parsed = shadow._parse_for_derivation(item.conditions)
             assert parsed is not None, item.conditions
@@ -703,7 +737,7 @@ _FIXED_TOUCH_SHAPES = (
 
 
 def _single_unknown(item: DiffItem) -> sympy.Symbol:
-    ((key, _),) = item.answer_map
+    ((key, _),) = _without_answer_definition(item).answer_map
     return sympy.Symbol(key)
 
 
