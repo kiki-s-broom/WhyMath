@@ -2072,8 +2072,8 @@ Phase 3의 목표는 새 EOS 기능이 아니라, Phase 2에서 닫은 학습 �
  E 아키텍처: EOS Core → Subject Contract → Math Adapter → WhyMath UI 경계 가드가 이번 CI에서 실행되고 초록
 
 그리고 아래 3문항에 YES/NO로 답하고 근거를 적어라:
- Q1 내일부터 실제 중·고등학생 100명을 넣어도 개발자가 학생별 데이터를 직접 만지지 않고 학습이 돌아가는가?
-    (근거: Learning Loop Success·Manual Intervention KPI + 100명 규모 시뮬레이션 또는 그 불가 사유)
+ Q1 개발자가 학생별 데이터를 직접 만지지 않고, AI가 학습 루프 Gate A 10단계(진단 → 추천 → 학습 → 문제 → 답안 → 채점 → 오개념 → Hint/Tutor → Mastery Update → Next Recommendation) 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 학습이 돌아감을 보일 수 있는가?
+    (근거: Learning Loop Success·Manual Intervention KPI + Gate A 관통 하네스 실행 결과 + 그 결과를 AI 판정 세션이 검토해 끊긴 단계마다 원인 분석·소유 태스크·해결 확인을 남긴 판정문. 학생 수 조건 없음 — Kiki 결정 2026-11-06, 종전 문면 "실제 중·고등학생 100명"·"100명 규모 시뮬레이션" 삭제)
  Q2 수학 콘텐츠 오류를 개발자 배포 없이 콘텐츠 운영자가 수정·검수·배포할 수 있는가? (근거: Gate C 실행)
  Q3 Physics를 붙일 때 EOS Core를 다시 뜯지 않고 Physics Adapter를 만들 수 있는가?
     (근거: Subject Contract에 math 전용 가정이 남아 있는지 목록화. **Physics Adapter를 실제로 구현하지는 마라** — 동결 대상이다)
@@ -2519,8 +2519,8 @@ Phase 3의 목표는 새 EOS 기능이 아니라, Phase 2에서 닫은 학습 �
  E 아키텍처: EOS Core → Subject Contract → Math Adapter → WhyMath UI 경계 가드가 이번 CI에서 실행되고 초록
 
 그리고 아래 3문항에 YES/NO로 답하고 근거를 적어라:
- Q1 내일부터 실제 중·고등학생 100명을 넣어도 개발자가 학생별 데이터를 직접 만지지 않고 학습이 돌아가는가?
-    (근거: Learning Loop Success·Manual Intervention KPI + 100명 규모 시뮬레이션 또는 그 불가 사유)
+ Q1 개발자가 학생별 데이터를 직접 만지지 않고, AI가 학습 루프 Gate A 10단계(진단 → 추천 → 학습 → 문제 → 답안 → 채점 → 오개념 → Hint/Tutor → Mastery Update → Next Recommendation) 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 학습이 돌아감을 보일 수 있는가?
+    (근거: Learning Loop Success·Manual Intervention KPI + Gate A 관통 하네스 실행 결과 + 그 결과를 AI 판정 세션이 검토해 끊긴 단계마다 원인 분석·소유 태스크·해결 확인을 남긴 판정문. 학생 수 조건 없음 — Kiki 결정 2026-11-06, 종전 문면 "실제 중·고등학생 100명"·"100명 규모 시뮬레이션" 삭제)
  Q2 수학 콘텐츠 오류를 개발자 배포 없이 콘텐츠 운영자가 수정·검수·배포할 수 있는가? (근거: Gate C 실행)
  Q3 Physics를 붙일 때 EOS Core를 다시 뜯지 않고 Physics Adapter를 만들 수 있는가?
     (근거: Subject Contract에 math 전용 가정이 남아 있는지 목록화. **Physics Adapter를 실제로 구현하지는 마라** — 동결 대상이다)
