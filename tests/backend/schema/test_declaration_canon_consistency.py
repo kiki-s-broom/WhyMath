@@ -173,9 +173,9 @@ class TestG4ConditionFreeze:
         삭제 기록 안의 인용("종전 이관 항목 …")은 허용하고, 조건 문면으로 되살아나는 것만 막는다.
         """
         row = self._g4_row(declaration)
-        assert "실제 학생 표본 ≥20명은 12/31 이후" not in row, (
-            "실제 학생 표본 ≥20명이 다시 이관 판정 조건으로 적혔다 — 2026-11-06 삭제 결정의 조용한 복원"
-        )
+        assert (
+            "실제 학생 표본 ≥20명은 12/31 이후" not in row
+        ), "실제 학생 표본 ≥20명이 다시 이관 판정 조건으로 적혔다 — 2026-11-06 삭제 결정의 조용한 복원"
         assert "판정 조건에서 삭제" in row
 
     def test_real_student_sample_deletion_is_recorded(self, declaration: str):
