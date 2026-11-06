@@ -2324,7 +2324,7 @@ def _train_motion(m: re.Match[str]) -> sympy.Expr:
         equation = acc.subs(_T, _rat(g["a"]))
     elif g := re.fullmatch(
         rf"열차의 (?P<q>속도|가속도)가 출발한 지 (?P<a>\d+)초 후에 (?P<v>{_NUM}) "
-        r"cm/초(?:\^2)?였다고 할 때, "
+        r"cm/초(?:\^2)?(?:이었|였)다고 할 때, "
         rf"{m['p']}의 값을 구하시오\.",
         tail,
     ):

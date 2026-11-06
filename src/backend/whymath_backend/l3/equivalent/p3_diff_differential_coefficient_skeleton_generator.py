@@ -231,7 +231,13 @@ def _rep_frames() -> list[Frame]:
             ),
             poly=poly,
             point=a,
-            lead=_REP_LEAD.format(a=a),
+            # P3-91 — 발문이 '평균변화율을 구한 뒤'라고 단계를 정했으므로 해설도 평균변화율 식부터 쓴다
+            # (4회차 감사 판정자 기록: 해설이 평균변화율 식을 건너뛴다 · 127bf12b·3856c5f7).
+            lead=(
+                f"x의 값이 {a}에서 {_arg(a, 'h')}까지 변할 때의 평균변화율은 "
+                f"(f({_arg(a, 'h')}) - f({a})) / h이고, h가 0에 한없이 가까워질 때 이 값의 "
+                f"극한값은 미분계수의 정의에 따라 f'({a})이다."
+            ),
         )
 
     def instantaneous(p: tuple[object, ...]) -> DiffItem | None:
@@ -410,7 +416,7 @@ def _diag_frames() -> list[Frame]:
             2,
             "(f({p2}) - f({a}))",
             "h",
-            "분자의 증분은 2h인데 분모는 h이므로, 이 식은 정의 꼴 (f({p2}) - f({a})) / (2h)의 "
+            "x의 증분은 2h인데 분모는 h이므로, 이 식은 정의 꼴 (f({p2}) - f({a})) / (2h)의 "
             "2배이다. 따라서 극한값은 f'({a})의 2배이다.",
         ),
         build_frame(
@@ -418,15 +424,15 @@ def _diag_frames() -> list[Frame]:
             1,
             "(f({p3}) - f({a}))",
             "(3h)",
-            "분자의 증분 3h와 분모 3h가 같으므로 정의 꼴이다. 따라서 극한값은 f'({a})이다.",
+            "x의 증분 3h와 분모 3h가 같으므로 정의 꼴이다. 따라서 극한값은 f'({a})이다.",
         ),
         build_frame(
             "diag-symmetric-over-2h",
             1,
             "(f({p1}) - f({m1}))",
             "(2h)",
-            "f({p1}) - f({m1}) = (f({p1}) - f({a})) + (f({a}) - f({m1}))이므로 이 식은 두 차분몫 "
-            "(f({p1}) - f({a})) / h와 (f({m1}) - f({a})) / (-h)의 평균이고, 두 차분몫이 모두 "
+            "f({p1}) - f({m1}) = (f({p1}) - f({a})) + (f({a}) - f({m1}))이므로 이 식은 두 평균변화율 "
+            "(f({p1}) - f({a})) / h와 (f({m1}) - f({a})) / (-h)의 평균이고, 두 평균변화율이 모두 "
             "f'({a})에 한없이 가까워진다. 따라서 극한값은 f'({a})이다.",
         ),
         build_frame(
@@ -434,8 +440,8 @@ def _diag_frames() -> list[Frame]:
             2,
             "(f({p1}) - f({m1}))",
             "h",
-            "f({p1}) - f({m1}) = (f({p1}) - f({a})) + (f({a}) - f({m1}))이므로 이 식은 두 차분몫 "
-            "(f({p1}) - f({a})) / h와 (f({m1}) - f({a})) / (-h)의 합이고, 두 차분몫이 모두 "
+            "f({p1}) - f({m1}) = (f({p1}) - f({a})) + (f({a}) - f({m1}))이므로 이 식은 두 평균변화율 "
+            "(f({p1}) - f({a})) / h와 (f({m1}) - f({a})) / (-h)의 합이고, 두 평균변화율이 모두 "
             "f'({a})에 한없이 가까워진다. 따라서 극한값은 f'({a})의 2배이다.",
         ),
     ]
@@ -468,7 +474,7 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(a_true),
             explanation=(
-                f"구하는 극한값은 f'({point})이다. f'(x) = {3 * c3}x^2 + 2ax"
+                f"주어진 극한값은 f'({point})이다. f'(x) = {3 * c3}x^2 + 2ax"
                 + (f" {'+' if c1 > 0 else '-'} {abs(c1)}" if c1 else "")
                 + f"이므로 f'({point}) = {3 * c3 * point**2} + {2 * point}a"
                 + (f" {'+' if c1 > 0 else '-'} {abs(c1)}" if c1 else "")
@@ -495,7 +501,8 @@ def _mastery_frames() -> list[Frame]:
             ),
             answer_text=str(a_true),
             explanation=(
-                f"증분이 {m}h이므로 구하는 극한값은 {m}f'({point})이다. f'(x) = {3 * c3}x^2 + 2ax"
+                f"x의 증분이 {m}h이므로 주어진 극한값은 {m}f'({point})이다. "
+                f"f'(x) = {3 * c3}x^2 + 2ax"
                 + (f" {'+' if c1 > 0 else '-'} {abs(c1)}" if c1 else "")
                 + f"이므로 {m}f'({point}) = {m}({3 * c3 * point**2} + {2 * point}a"
                 + (f" {'+' if c1 > 0 else '-'} {abs(c1)}" if c1 else "")

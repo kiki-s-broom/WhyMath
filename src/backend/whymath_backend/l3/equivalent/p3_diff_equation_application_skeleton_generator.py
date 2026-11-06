@@ -87,6 +87,7 @@ QUAL-07 — 같은 수학 실체 중복 금지: 한 수준선 풀을 여러 틀�
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -694,6 +695,46 @@ def _min_item(
         answer_map=((var, str(case.at)), ("y", str(case.value))),
         problem_type_code=_OPT,
         answer_format=answer_format_for(str(case.value)),
+        structured_conditions=_min_rank_conditions(case, sym, domain, var),
+    )
+
+
+_DOMAIN_LOWER: Final = re.compile(r"^([a-z]) (>=|>) (-?\d+)$")
+
+
+def _min_rank_conditions(
+    case: _Min, sym: str, domain: str | None, var: str
+) -> tuple[str, ...] | None:
+    """P3-93 선택 근거 — '최솟값' = 범위 안 후보(임계점 + 범위 경계) 전부보다 값이 크지 않은 점.
+
+    범위 안 임계점이 둘 이상이면 도메인 부등식만으로는 근이 하나로 정해지지 않는다(W자 사차의 두
+    극솟값·x ≥ 0의 경계 임계점 0). 그때만 후보 **전부**와 값을 비교하는 다항 부등식
+    `f(x) - f(c) <= 0`을 더한다 — 비교 대상은 범위 안 임계점 전부와 경계이고 최솟점을 따로 고르지
+    않는다(정답 역산 없음 · `_global_min_on`이 쓰는 후보 집합과 같다). 하나로 정해지는지는 공용 해석
+    판정이 조건만으로 증명한다(하나가 아니면 빌드가 멈춘다). 범위 표기를 읽지 못하면 구조화하지
+    않는다(None — 종전 조건·단계).
+    """
+    lower: int | None = None
+    strict = False
+    if domain is not None:
+        matched = _DOMAIN_LOWER.match(domain)
+        if matched is None or matched.group(1) != var:
+            return None
+        lower, strict = int(matched.group(3)), matched.group(2) == ">"
+    inside = sorted(
+        c
+        for c in set(case.crit)
+        if lower is None or (c > lower if strict else c >= lower)
+    )
+    if len(inside) < 2:
+        return None  # 범위 안 임계점이 하나뿐 — 도메인 부등식만으로 정해진다(규칙 (가) 종전 경로)
+    points = sorted({*inside, *(() if lower is None else (lower,))})
+    ranks = tuple(f"{sym} - ({eval_at(case.poly, c)}) <= 0" for c in points)
+    return (
+        f"Derivative({sym}, {var}).doit() = 0",
+        *(() if domain is None else (domain,)),
+        *ranks,
+        f"y = {sym}",
     )
 
 

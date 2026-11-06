@@ -53,6 +53,7 @@ import sympy
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.p3_diff_expr import Poly, render_poly
+from whymath_backend.lang.josa import euro_ro, i_ga
 from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
     KindedDiffItem,
     with_item_kinds,
@@ -449,7 +450,7 @@ def _unknown_constant(
         slot=slot,
         frame_id=frame_id,
         question_text=(
-            f"함수 f(x) = {f_text} (a는 상수)가 x = {point}에서 미분가능할 때, "
+            f"함수 f(x) = {f_text} (a는 상수){i_ga(f_text)} x = {point}에서 미분가능할 때, "
             "상수 a의 값을 구하시오."
         ),
         answer_text=str(a_true),
@@ -575,7 +576,7 @@ def _diag_frames() -> list[Frame]:
             f_text=_join([head, render_poly(r)]),
             f_expr=f_expr,
             point=point,
-            why=f"곱 꼴 항은 x = {point} 둘레에서 한쪽은 제곱, 다른 쪽은 제곱에 -1을 곱한 식이다.",
+            why=f"곱 꼴 항은 x = {point} 근처에서 한쪽은 제곱, 다른 쪽은 제곱에 -1을 곱한 식이다.",
         )
 
     def abs_of_square(p: tuple[object, ...]) -> DiffItem | None:
@@ -600,8 +601,9 @@ def _diag_frames() -> list[Frame]:
             f_expr=f_expr,
             point=point,
             why=(
-                f"|{_shift(point)}|^3의 차분몫은 크기가 |{_shift(point)}|^2이라 "
-                "x가 가까워지면 0에 한없이 가까워진다."
+                f"|{_shift(point)}|^3을 {_shift(point)}{euro_ro(_shift(point))} 나눈 값의 크기는 "
+                f"|{_shift(point)}|^2이므로 x가 {point}에 한없이 가까워지면 이 값은 0에 한없이 "
+                "가까워진다."
             ),
         )
 
@@ -640,7 +642,8 @@ def _then_derivative(
         slot="mastery_check",
         frame_id=frame_id,
         question_text=(
-            f"함수 f(x) = {f_text} (a는 상수)가 x = {point}에서 미분가능할 때, f'({query})의 값을 "
+            f"함수 f(x) = {f_text} (a는 상수){i_ga(f_text)} x = {point}에서 미분가능할 때, "
+            f"f'({query})의 값을 "
             "구하시오."
         ),
         answer_text=str(value),

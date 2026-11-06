@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: docs
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -31,9 +31,9 @@ paths:
   - docs/data/corpus_audit_p3_fill_v0.jsonl
   - docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl
   - docs/reviews/
-session: null
+session: claude/p3-91-93-solution-qa-55
 notes: |-
   출처: P3-62 3단계(2026-10-31 · 판정 기준 main 3a83ed64)의 S5 감사 결과 — calc 후보 통과(k = 1) · fill 후보 불합격(k = 11). fill 결함 11건은 전부 구조화와 무관한 기존 문항(승인 동결본과 바이트 동일)이라 승인 은행의 잔여 문장 결함이기도 하다(판정자 지침 "채점 규칙": 기록해 은행 교정에 넘긴다). 보고서 docs/reviews/p3_62_solution_qa_structuring_2026-10-20.md §C.
 
   [정정 2026-10-31] paths ['src/backend/whymath_backend/l3/equivalent/p3_diff_*.py', 'src/backend/whymath_backend/harness/p3_fill_batch.py', 'src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py', 'data/corpus/problem_bank_p3_fill_v0/', 'data/corpus/problem_bank_p3_calculus1_diff_v0/', 'docs/data/p3_fill_audit/', 'docs/data/p3_calculus1_diff_audit/'] → ['src/backend/whymath_backend/l3/equivalent/p3_diff_*.py', 'src/backend/whymath_backend/harness/p3_fill_batch.py', 'src/backend/whymath_backend/harness/p3_calculus1_diff_batch.py', 'data/corpus/problem_bank_p3_fill_v0/', 'data/corpus/problem_bank_p3_calculus1_diff_v0/', 'docs/data/p3_fill_audit/', 'docs/data/p3_calculus1_diff_audit/', 'src/backend/whymath_backend/harness/question_rederive.py', 'tests/backend/l1/test_p3_fill_bank_coverage_link.py', 'tests/backend/l1/test_p3_calculus1_diff_bank_coverage_link.py', 'tests/backend/harness/test_p3_fill_batch.py', 'docs/data/corpus_audit_p3_fill_v0.jsonl', 'docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl', 'docs/reviews/']: P3-62 독립 검토 반영 — 교정 범위 27건·완료 기준, 발문 변경 시 id 변경, 한 PR 제약, 승격 폴더 번호, C5 정규식, 승인 은행 명칭, D11 정의
-updated: 2026-10-31
+updated: 2026-11-06
