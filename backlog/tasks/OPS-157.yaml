@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -17,6 +17,6 @@ artifacts: []
 paths:
   - tests/constitution/test_schema_model_sync.py
   - "schemas/v1.1/*.yaml"
-session: null
+session: claude/adoring-ritchie-ju2x99
 notes: "출처: D13 Kiki 결정(2026-11-01) 4번 — 2026-12-31 만료 12곳의 소유 태스크 등재, 12/27 동결 전 처분 목표. 근거 = docs/reviews/eos_followup_triage_2026-11.md §4-1(판정 기준 main 3a83ed64)."
-updated: 2026-11-01
+updated: 2026-11-06

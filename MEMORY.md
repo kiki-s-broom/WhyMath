@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-06 (처분 · OPS-157 — D13 4번 후속): **스키마 YAML↔모델 일치 검사 유예 7건 처분 — 해소 2(짝짓기 오류) · 연장 5(만료 2026-12-31 → 2027-03-31)** (claude 실행·기록) — 판정 기준: main `ce8c2165`
+- **착수 시점 재측정**: 어긋남 5(SolutionPath 1 · Hint 2 · Concept 7 · ConceptEdge 6 · Problem 12) · 모델 없음 2(MasteryState · StudentProfile) — 2026-10 실측과 같다.
+- **해소 2 — concept·edge**: 어긋남의 원인은 YAML도 모델도 아니라 등록부의 짝짓기였다. 두 YAML은 `data_pipeline.concept_graph.models`의 `Concept`·`ConceptEdge`와 필드가 정확히 같다(YAML에만 있는 필드 0). 그 모듈 docstring이 두 YAML을 정본으로 적고, 소비자(`validate.py`)도 그쪽이다. 등록부는 백엔드 `schema.concept`(DB 평면 — 필드 체계가 다름)에 짝지어 있었다. 등록부 짝을 바로잡아 동결 목록 13필드를 비웠다.
+- **연장 5 — 해소 경로가 별도 판정에 묶여 있다**: solution_path `embedding`(도입 여부 = `S4-12`) · hint `created_at`(ORM에만 있는 행 시각)·`generated_by_tier`(템플릿 생성기라 의도적 부재 — YAML note) · problem 12(YAML이 2026-07-28부터 '구본 명세(비정본)' 선언 — 갱신 여부는 `G-const-r4-02-decision` 몫, D13에서 2027 보류) · mastery_state·student_profile(모델 없음). 이 태스크는 게이트 판정을 대신하지 않는다.
+- **새 만료일 근거**: 릴리스 동결 창(2026-12-14~2027-01-15)을 피하고, 2027로 미룬 게이트 판정 뒤 1분기 안에 재확인한다. 재확인 지점 = 2027-03-31 + `G-const-r4-02-decision`. CORE 상수 파일(방침 규칙 3) 무변경 — 바꾼 파일은 테스트 1개뿐이다.
+- **검증**: 주입 3종 전건 RED(concept 옛 짝 복원 · 만료일 어제 · edge YAML 필드 주입) · 원복 바이트 동일 · `tests/constitution` 73 passed(exit 0) · 위헌 심사 래칫 exit 0 · 차단 0건.
+
 ### 2026-11-06 (측정·승격 · P3-91·P3-93 합본 — Kiki 결정 2건): **Solution QA 검증 가능 비율 0.48885 → 0.55843(626/1,121) — D11 하한 55% 충족(여유 9건)** (claude 실행·기록, Kiki 결정) — 판정 기준: 브랜치 `claude/p3-91-93-solution-qa-55`(main `6cccb547` 위)
 - **Kiki 결정 ①(2026-11-06)**: P3-91(fill 문장 교정·후보 승격)과 P3-93(잔여 VAR)을 한 후보·한 S5 감사로 합본. **결정 ②**: calc 7회차 불합격(k = 6 — 전부 '불확실'·기존 문항 4틀) 뒤 "4틀 고치고 재감사".
 - **P3-93**: 판정기 무변경 — 생성기가 조건을 더 정확히 싣는다. a·b 연립 18(소거형 b 정의 등식 + a 단일 방정식 · 새 필드 `DiffItem.structured_setup`) · 같은 종류 두 극값 8 · 범위 최솟값 9(후보 **전부**와의 값 비교 부등식 — 정답 역산 없음) · 평평한 임계점 2(f'' ≠ 0). E '처음' 방향 전환 2건은 answer_map 변경이 필요해 범위 밖. 뮤테이션 8/8 RED(1차 6/8 — 픽스처가 경계 비교·기록 대조 절을 안 밟음 → 반례 2건 추가).
