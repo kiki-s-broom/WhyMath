@@ -126,6 +126,10 @@ class TestG4ConditionFreeze:
     실제 학생 표본은 12/31 이후 게이트로 이관). 그 결정이 되돌려지는 것은 **의식적
     개정**이어야지 조용한 복원이면 안 된다.
 
+    **2026-11-06 개정(Kiki 결정)**: 이관됐던 '실제 학생 표본 ≥20명'은 판정 조건에서 *삭제*됐고,
+    내부 테스트 계정 표본은 AI 시뮬레이션 계정을 인정한다. 선언 밖 문서의 같은 결정은
+    `tests/infra/test_real_user_conditions_removed.py`가 동결한다.
+
     **동결하지 않는 것**: 실패정의 F-Ⅰ~F-Ⅴ와 검증설계서 §5 해시는 여전히
     `test_failure_definition_freeze.py` 소유다. EOS-135는 그것을 건드리지 않았고,
     `test_failure_definitions_require_no_sample`이 그 사실을 단언한다 — 표본 조건이
@@ -167,16 +171,27 @@ class TestG4ConditionFreeze:
         """
         assert "AI 시뮬레이션 계정 인정" in self._g4_row(declaration)
 
+    @staticmethod
+    def _g4_condition(row: str) -> str:
+        """G4 행의 조건 문면만 — 셋째 칸에서 ' — ' 앞부분(뒤는 결정 경위 서술이라 옛 조건 인용이 정당하다)."""
+        cells = [c.strip() for c in row.split("|")]
+        assert len(cells) >= 4, "G4 행의 칸 구조가 바뀌었다"
+        return cells[3].split(" — ")[0]
+
     def test_g4_has_no_real_student_count_condition(self, declaration: str):
         """2026-11-06 Kiki 결정 — 실제 학생 수는 판정 조건이 아니다(12/31 이후 포함).
 
-        삭제 기록 안의 인용("종전 이관 항목 …")은 허용하고, 조건 문면으로 되살아나는 것만 막는다.
+        조건 문면에 학생 수가 다시 들어가거나(표현 무관), 행 어디든 이관처 게이트가 다시
+        적히면 RED다. 결정 경위 서술 속 옛 조건 인용("원 조건 '학생 표본 ≥20명'")은 허용한다.
         """
         row = self._g4_row(declaration)
+        cond = self._g4_condition(row)
+        assert "학생" not in cond and not re.search(
+            r"\d+\s*명", cond
+        ), f"G4 조건 문면에 사람 수 조건이 되살아났다: {cond!r} — 2026-11-06 삭제 결정의 조용한 복원"
         assert (
-            "실제 학생 표본 ≥20명은 12/31 이후" not in row
-        ), "실제 학생 표본 ≥20명이 다시 이관 판정 조건으로 적혔다 — 2026-11-06 삭제 결정의 조용한 복원"
-        assert "판정 조건에서 삭제" in row
+            "G-student-work-after-internal-completion" not in row
+        ), "실제 학생 표본이 다시 이관 판정 대상으로 적혔다 — 2026-11-06 결정은 이관이 아니라 삭제다"
 
     def test_real_student_sample_deletion_is_recorded(self, declaration: str):
         """실제 학생 표본의 처분이 G4 행에 결정으로 남아야 한다.
