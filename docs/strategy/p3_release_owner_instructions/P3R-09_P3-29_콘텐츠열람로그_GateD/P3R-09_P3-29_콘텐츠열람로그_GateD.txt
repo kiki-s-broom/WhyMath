@@ -1,21 +1,8 @@
-# [07] P3-106 — Phase 3 지표 ⑤ Learning Loop Success 운영 실측
+[세션 이름] P3R-09_P3-29_콘텐츠열람로그_GateD
+- 가장 먼저 이 세션의 제목을 위 이름으로 바꾼다. 세션 제목을 바꾸는 도구가 있으면 쓴다(예: claude-code-remote의 set_session_title —
+  session_id는 get_session을 인자 없이 불러 얻는다). 도구가 없으면 건너뛰고, 사용자에게 보내는 첫 보고의 첫 줄에 이 이름을 적는다.
+- 이 세션이 여는 PR 제목과 판정·기록 문서 상단에도 이 이름을 앞에 붙여 어느 지시문에서 나온 작업인지 추적되게 한다.
 
-| 구분 | 내용 |
-|---|---|
-| 순서 | 07 / 10 |
-| 막는 곳 | Release 축 Gate B ⑤(목표 0.95 · G-p314 확정) · 새 Q1의 근거 KPI |
-| 작성 시점 상태 | PR #1854에서 등재 — 작성 시점에는 main에 없다 |
-| 시작 조건 | PR #1854 머지(main에 태스크 파일이 있어야 start가 된다) |
-| 완료 판정 | 운영 DB 기준 ⑤의 값·분모·목표·PASS/FAIL, 또는 측정 실패 사유가 판정 기준 커밋과 함께 docs/reviews에 커밋됨 |
-| 규모 | 소~중 + Kiki PC 1회 |
-
-**붙이는 법**: 새 세션 첫 메시지로 아래 블록 전체를 그대로 붙여넣는다. PR #1854가 아직 머지되지 않았으면 블록은 착수하지 않고 끝난다.
-
----
-
-## 붙여넣을 지시문 (복사 범위: 아래 블록 전체)
-
-```text
 [WhyMath 소유 태스크 공통 프리앰블 — 이번 세션 전체에 적용]
 
 너는 WhyMath 저장소(kiki-s-broom/WhyMath)에서 통합 게이트 `G-p3-w3-release-merged`(Week 3 + Phase 3 Release 통합 판정)의
@@ -102,37 +89,31 @@ FAIL을 해소하는 소유 태스크 하나를 맡는 엔지니어다. 이번 �
   main 머지는 사용자가 "pr"이라고 하거나 Kiki가 판단할 때만 한다.
 - 완료는 `python3 scripts/harness/backlog.py done <id> --artifact <PR 번호> --artifact <머지 커밋>`이다. 소유 태스크는 decision 게이트
   `G-p3-w3-release-merged`의 입력이라 CLI가 판정 인계를 요구한다. 판정을 내리지 말고
-  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 파일 10번만 예외).
+  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 P3R-10만 예외).
 - 완료 보고에 `python scripts/constitution/audit_ratchet.py`의 종료 코드와 차단 건수를 넣는다.
 - 세션 끝에 다음 5줄을 보고한다: ①완료 판정(충족/미충족 · 근거 커밋) ②PR 링크 ③남긴 것과 이유
   ④Kiki께 넘길 결정·행동(선택지 포함) ⑤재판정에 넘길 실측값(명령 · exit code · 값 · 판정 기준 해시).
 
-[이번 세션 항목 — P3-106 지표 ⑤ Learning Loop Success 운영 실측 경로]
+[이번 세션 항목 — P3-29 콘텐츠 열람 로그 좌석 (Gate D)]
 
-대상 태스크: P3-106-phase3-learning-loop-success-prod-measure
+대상 태스크: P3-29-content-view-log-seat-decision
 
-착수 조건: `git show origin/main:backlog/tasks/` 아래에 이 태스크 파일이 있어야 한다(PR #1854 머지). 없으면 착수 불가로 보고하고 끝낸다.
+착수 조건: PR #1854가 main에 머지돼 있어야 한다(이 태스크 파일의 Gate D 연결·우선순위 정정이 그 PR에 있다).
+머지 전이면 착수하지 않고 보고하고 끝낸다.
 
-1. `start`. ops/phase3_metrics.py의 ⑤ 수집 경로를 코드에서 읽는다 — DB 접속 설정(환경 변수 이름) · `--since-hours` 관측창 ·
-   `--input` 주입 형식 · `--sample-basis` · 분모 정의. 추측하지 않는다.
-2. 클라우드 세션에서 수집 경로가 살아 있음을 보인다: CI 방식의 실 PG(PostgreSQL 16 + pgvector · alembic upgrade head)에서
-   P3-101 하네스(tests/backend/api/test_release_gate_a_chain.py)가 남기는 루프 기록으로 ⑤가 계산되는지, 그리고 루프 기록이 0건일 때
-   "측정 불가"가 나오는지(0건 통과 위장 금지)를 실측한다.
-3. Kiki PC 런북을 만든다: 운영 DB whymath-pg(127.0.0.1:5433 · user/db whymath · trust)에서 읽기 전용으로
-   `python -m whymath_backend.ops.phase3_metrics --json <출력>`을 돈다(⑤를 재야 하므로 `--no-db`를 쓰지 않는다). 프리앰블의 Kiki PC 규율을
-   따르고, 결과 파일을 세션이 받는 방법(브랜치 push 등)까지 블록에 넣는다. 운영 DB에 쓰지 않는다. 런북 파일을 docs/에 두면 저장소의
-   런북 가드 테스트(tests/infra/test_runbook_write_guard.py · tests/infra/test_ps_guard_runbook_rules.py)를 통과해야 한다.
-4. 결과를 기록한다: 값 · 분모 · 목표 · PASS/FAIL. 내부 테스트 계정(D2)의 루프 표본이 0이면 "측정 실패 — 루프 표본 부재"로 적고,
-   누가 루프를 돌려야 표본이 생기는지(끊긴 지점)를 보고한다. 새 Q1은 "AI가 학습 루프를 검토·점검한 기록"을 근거로 하므로, 표본을
-   AI 관통 하네스 실행으로 만드는 경로가 없으면 별건으로 `add` 등재만 한다. 이 태스크는 운영 DB에 학습 기록을 쓰지 않는다.
-5. `done P3-106-phase3-learning-loop-success-prod-measure --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: ⑤ 운영 실측(main <해시>)을 재판정 입력으로 넘긴다"`.
-```
+근거: docs/reviews/p3_17_verdict_review_2026-11-06.md §3(Gate D는 미충족으로 본다 — concept_viewed를 concept_selected로만 대응,
+개념 콘텐츠 열람 이벤트 생산자 0건). l2/learning_event_trace.py에 CONTENT_VIEWED는 정의만 있다.
 
----
-
-## 세션 종료 후 체크 (Kiki용)
-
-- [ ] PR #1854 머지 여부를 확인하고 시작했는가
-- [ ] 클라우드 실 PG에서 수집 경로 생존과 0건 측정 불가를 보였는가
-- [ ] Kiki PC 블록이 6항목 브리핑 · 기대 해시 · 자리표시자 0으로 왔는가 → **Kiki PC 실행 필요**
-- [ ] ⑤의 값·분모·목표·판정(또는 측정 실패 사유)이 docs/reviews에 있는가
+1. `start`. acceptance ①: 새 Entity·DB 스키마가 정말 필요한지부터 실측한다 — 기존 이벤트 평면(learning_event_trace · 기존 이벤트
+   테이블과 writer)으로 학습자별 열람을 남길 수 있는지 코드에서 확인한다.
+2. 새 테이블·스키마가 필요하면 Phase 3 범위 규율의 예외(Release Blocker)다. 근거(Gate D 정의 · 검토 문서 §3 · 재판정 영향)와
+   선택지 — (가) 새 좌석 신설 (나) 기존 이벤트 평면 재사용(가능하다면) (다) 12월 이후 이월(Gate D 미충족 유지 → Release FAIL 지속) —
+   를 결정 문서로 만들고 프리앰블의 결정 규율대로 게이트를 등재한다. 그다음 `unblock`하고 끝낸다.
+   새 스키마 없이 가능하면 바로 3으로 간다.
+3. 구현: 학생이 개념 콘텐츠를 받는 표면(/v1/me/objectives/{id}/study 등)에서 content_viewed를 생산한다. content_version 기록 방법은
+   EOS-47-attempt-version-pinning 소유다 — 열람 시점의 판을 기록하는 원천이 없으면 서빙 판 포인터로 채우지 않는다(날조 금지).
+   PED-17이 아직이면 /study가 404라 실제 열람이 일어나지 않는다. 테스트는 supply 대역으로 열람 경로를 재현하되, 실제 경로는
+   PED-17 뒤에야 열린다는 한계를 보고에 적는다.
+4. 검증: tests/backend/scenarios/test_gate_d_event_role_census.py의 content_viewed DORMANT 동결 단언을 "생산자 ≥1" 단언으로 승격하고,
+   scripts/ops/verify_gate_de_discrimination.py의 기록 차단 주입이 RED인지 실측한다.
+5. `done P3-29-content-view-log-seat-decision --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: Gate D content_viewed 생산 실측(main <해시>)을 재판정 입력으로 넘긴다"`.

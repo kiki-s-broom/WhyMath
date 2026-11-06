@@ -1,21 +1,8 @@
-# [03] P3-91·P3-93 — Solution QA 검증 가능 비율 55% 승격 마무리
+[세션 이름] P3R-06_P3-52_02-09_M0677처분
+- 가장 먼저 이 세션의 제목을 위 이름으로 바꾼다. 세션 제목을 바꾸는 도구가 있으면 쓴다(예: claude-code-remote의 set_session_title —
+  session_id는 get_session을 인자 없이 불러 얻는다). 도구가 없으면 건너뛰고, 사용자에게 보내는 첫 보고의 첫 줄에 이 이름을 적는다.
+- 이 세션이 여는 PR 제목과 판정·기록 문서 상단에도 이 이름을 앞에 붙여 어느 지시문에서 나온 작업인지 추적되게 한다.
 
-| 구분 | 내용 |
-|---|---|
-| 순서 | 03 / 10 |
-| 막는 곳 | Release 축 Gate B ④' Solution QA 검증 가능 비율 하한 55%(D11 · 617/1,121) |
-| 작성 시점 상태 | PR #1856 열림(브랜치 `claude/p3-91-93-solution-qa-55` · 2026-11-06 활동) — 0.48885 → 0.55843(626/1,121) 보고. main 대장은 둘 다 `todo`, 원격 claim은 P3-91에 있다 |
-| 시작 조건 | 원 세션이 끝내지 못했을 때만. PR이 열려 있고 활동 중이면 손대지 않는다 |
-| 완료 판정 | main 기준 solution_qa 재측정에서 검증 가능 비율 ≥ 0.55 · 분모 1,121 불변 · P3-91·P3-93 done |
-| 규모 | 소(마무리). PR이 멈췄으면 사용자 판단이 먼저다 |
-
-**붙이는 법**: 새 세션 첫 메시지로 아래 블록 전체를 그대로 붙여넣는다. PR #1856이 원 세션에서 정상 머지·done까지 끝났다면 이 파일은 쓸 일이 없다(블록이 "이미 완료"로 끝난다).
-
----
-
-## 붙여넣을 지시문 (복사 범위: 아래 블록 전체)
-
-```text
 [WhyMath 소유 태스크 공통 프리앰블 — 이번 세션 전체에 적용]
 
 너는 WhyMath 저장소(kiki-s-broom/WhyMath)에서 통합 게이트 `G-p3-w3-release-merged`(Week 3 + Phase 3 Release 통합 판정)의
@@ -102,40 +89,34 @@ FAIL을 해소하는 소유 태스크 하나를 맡는 엔지니어다. 이번 �
   main 머지는 사용자가 "pr"이라고 하거나 Kiki가 판단할 때만 한다.
 - 완료는 `python3 scripts/harness/backlog.py done <id> --artifact <PR 번호> --artifact <머지 커밋>`이다. 소유 태스크는 decision 게이트
   `G-p3-w3-release-merged`의 입력이라 CLI가 판정 인계를 요구한다. 판정을 내리지 말고
-  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 파일 10번만 예외).
+  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 P3R-10만 예외).
 - 완료 보고에 `python scripts/constitution/audit_ratchet.py`의 종료 코드와 차단 건수를 넣는다.
 - 세션 끝에 다음 5줄을 보고한다: ①완료 판정(충족/미충족 · 근거 커밋) ②PR 링크 ③남긴 것과 이유
   ④Kiki께 넘길 결정·행동(선택지 포함) ⑤재판정에 넘길 실측값(명령 · exit code · 값 · 판정 기준 해시).
 
-[이번 세션 항목 — P3-91·P3-93 승격 마무리 확인 (원 세션이 끝내지 못했을 때만)]
+[이번 세션 항목 — P3-52 02-09(M0677) 처분 집행]
 
-대상 태스크: P3-91-p3-62-candidate-promotion-fill-template-fix · P3-93
+대상 태스크: P3-52-m0677-link-disposition-execution
 
-상황별로 한다:
-(1) PR #1856 열림 + 24시간 안 활동 → 아무것도 하지 않는다. "원 세션 진행 중"으로 보고하고 끝낸다.
-(2) PR #1856 열림 + 72시간 넘게 활동 없음, 또는 CI red로 멈춤 → 남의 PR 브랜치에 푸시하지 않는다. 실패한 잡·스텝을 읽어
-    원인만 진단하고, 사용자에게 "이어받아 고칠까요?"를 선택지로 묻는다. 허락을 받으면 그 브랜치에서 최소 수정 → ci_mirror → 푸시한다.
-(3) PR #1856 머지됨 →
-  a. main에서 `python -m whymath_backend.harness.solution_qa --json <출력 파일>`로 재측정한다(경로 인자 없음 = 대표 과정 승인 문항 전수).
-     exit code · 검증 가능 비율 · 분모(1,121 불변) · 검증 불가 사유 분포를 적는다.
-  b. 두 태스크가 done이 아니면 acceptance를 main 실파일로 전수 대조한다(이행 / 미이행 / 의도적 제외). 특히
-     P3-91 정정 ⓐ 옛 문구 검색 0건(기본·구조화 두 모드) · ⓔ C5 재유도 1121/1121 유지 · P3-93 ② 금지 사항(분모 축소·문항 제외·
-     판정기 완화 없음) · ③ 감사받은 바이트만 승격. 미이행이 있으면 승계 태스크를 `add`로 등재한다.
-  c. 상태 전이는 CLI 안내를 따른다(원 세션 claim이 남아 있으면 stale 확인 뒤 `unblock` → `start`). 그다음
-     `done <id> --artifact "#1856" --artifact <머지 커밋> --no-verdict "판정 무관: ④' 실측(<비율> · main <해시>)을 재판정 입력으로 넘긴다"`.
-     P3-93은 P3-91을 선행으로 두므로 P3-91부터 닫는다.
-  d. 재측정 결과(판정 기준 main 해시 · 명령 · exit code · 값)를 docs/reviews/에 남기고,
-     `gates amend G-p3-w3-release-merged --note "..."`로 한 줄 기록한다(판정은 내리지 않는다).
+입력: docs/reviews/p3_44_graph_connectivity_root_cause_2026-10-16.md(판정 기준 main a91ea311). 02-09의 핵심 오개념 M0677은 설명에
+잘못된 절차가 적히지 않은 omission형이라, l3/equivalent/p3_diff_shortcut_guard.py의 _UNDESCRIBED_MISCONCEPTIONS가 연결을 금지한다
+(규칙 M-link-undescribed). 처분 후보 4택은 태스크 acceptance ②와 같다.
 
-금지: 판정기 완화·분모 축소·문항 제외로 55%를 맞추지 않는다. 같은 은행을 다시 채점하지 않는다.
-```
-
----
-
-## 세션 종료 후 체크 (Kiki용)
-
-- [ ] 상황 (1)·(2)·(3) 중 어느 것이었는가
-- [ ] (2)였다면 진단 결과와 "이어받을지" 질문이 왔는가 → **Kiki 판단 필요**
-- [ ] (3)이었다면 `solution_qa` exit code · 비율 · 분모 1,121이 보고됐는가
-- [ ] acceptance 전수 대조표가 있는가
-- [ ] done 증적에 PR 번호가 있는가
+분기:
+(1) G-p345가 pending → 착수할 수 없다(start가 거부된다). 읽기 전용으로 결정 요청을 만든다. 처분 4택
+    (가) M0677 설명에 잘못된 절차를 적는 오개념 코퍼스 정정(QUAL-14 계열) 뒤 판정기 금지 목록 갱신
+    (나) 판정기 정책 변경
+    (다) 동결 명세 scope_spec.yaml의 02-09 핵심 오개념을 절차가 적힌 다른 M-id로 교체(명세 변경 PR)
+    (라) 보류
+    을 선택지별 영향 표(⑦ 10/10 가능 여부 · 소요 · 누가 서명하나 · 되돌리기)와 권고 1개로 채팅에 보여 준다.
+    (라)를 고르면 ⑦은 최대 9/10이라 Release 축이 FAIL로 남는다는 점을 적는다. (다)는 P3-50 Q1 가와 같은 명세 변경이라
+    한 PR로 묶기를 권할 수 있다. 파일을 쓰지 않는다 — 조사 전용(PR 예외 ①). 끝낸다.
+(2) G-p345가 cleared인데 P3-44가 done이 아님 → 착수하지 않는다(대장 depends). 다만 Kiki가 고른 처분이 P3-44 은행과 무관하게 집행
+    가능하면(예: (가)·(다)), 사용자에게 `amend P3-52-m0677-link-disposition-execution --remove-depends P3-44-graph-connectivity-misconception-edge --reason "..."`로
+    선행을 뗄지 묻는다. 대장 변경은 사용자 동의 뒤에만 한다.
+(3) 둘 다 충족 → `start` → 처분을 집행한다. 연결은 라벨만이 아니라 선택지 값이 그 절차로 실제로 나오는지 SymPy로 확인한다(P3-44 ⑩ 기준).
+    신규 문항이 필요하면 P3-44의 보강 은행 경로(S1~S5 · 감사받은 바이트만 승격)를 따르되, P3-44 은행 240건에 02-09를 섞지 않는다.
+    판정기 정책을 바꾸면 바뀐 규칙마다 주입 RED/GREEN과 기존 은행 소급 위반 0을 보인다. 코퍼스·명세 변경은 게이트 evidence(Kiki 결정)를
+    PR 본문에 인용한다.
+    완료: `python -m whymath_backend.l1.standards.phase3_coverage --json`을 전후 같은 명령으로 낸다.
+    `done P3-52-m0677-link-disposition-execution --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: ⑦ 02-09 실측(main <해시>)을 재판정 입력으로 넘긴다"`.

@@ -1,21 +1,8 @@
-# [04] P3-94 — AI 품질 LLM 초안 측정: 좌석 비교 → 본 수집 → 임계값 결정 입력
+[세션 이름] P3R-07_P3-106_학습루프성공률_운영실측
+- 가장 먼저 이 세션의 제목을 위 이름으로 바꾼다. 세션 제목을 바꾸는 도구가 있으면 쓴다(예: claude-code-remote의 set_session_title —
+  session_id는 get_session을 인자 없이 불러 얻는다). 도구가 없으면 건너뛰고, 사용자에게 보내는 첫 보고의 첫 줄에 이 이름을 적는다.
+- 이 세션이 여는 PR 제목과 판정·기록 문서 상단에도 이 이름을 앞에 붙여 어느 지시문에서 나온 작업인지 추적되게 한다.
 
-| 구분 | 내용 |
-|---|---|
-| 순서 | 04 / 10 |
-| 막는 곳 | Week 3 축 — AI 품질 8종 중 문장 축 6개(임계값 미확정 · LLM 문장 표본 0/244) |
-| 작성 시점 상태 | `in_progress`(원격 claim `claude/p3-94-llm-draft-measure`). 구현·런북 PR #1853 머지(`638450d2`). 남은 순서: Kiki PC 좌석 3개 비교 수집 → 평가·비교표 → Kiki 튜터 좌석 결정 → 본 수집(244사례) → 평가 → Kiki 임계값 6개·`--min-live-rate` 결정 |
-| 시작 조건 | 원 세션 claim이 stale일 때만 인수. 각 단계는 그 재료(Kiki가 올린 수집 데이터)가 있어야 한다 |
-| 완료 판정 | P3-94 acceptance ①~⑦ — 특히 ④ 8축 리포트 · ⑥ 좌석 비교표 · ⑦ 결말별·축별 표기. 임계값 자체는 Kiki가 정한다 |
-| 규모 | 중 — 대부분 Kiki PC 왕복 대기 |
-
-**붙이는 법**: 새 세션 첫 메시지로 아래 블록 전체를 그대로 붙여넣는다. 블록이 재료 유무를 보고 A~E 단계 중 하나를 고른다.
-
----
-
-## 붙여넣을 지시문 (복사 범위: 아래 블록 전체)
-
-```text
 [WhyMath 소유 태스크 공통 프리앰블 — 이번 세션 전체에 적용]
 
 너는 WhyMath 저장소(kiki-s-broom/WhyMath)에서 통합 게이트 `G-p3-w3-release-merged`(Week 3 + Phase 3 Release 통합 판정)의
@@ -102,49 +89,27 @@ FAIL을 해소하는 소유 태스크 하나를 맡는 엔지니어다. 이번 �
   main 머지는 사용자가 "pr"이라고 하거나 Kiki가 판단할 때만 한다.
 - 완료는 `python3 scripts/harness/backlog.py done <id> --artifact <PR 번호> --artifact <머지 커밋>`이다. 소유 태스크는 decision 게이트
   `G-p3-w3-release-merged`의 입력이라 CLI가 판정 인계를 요구한다. 판정을 내리지 말고
-  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 파일 10번만 예외).
+  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 P3R-10만 예외).
 - 완료 보고에 `python scripts/constitution/audit_ratchet.py`의 종료 코드와 차단 건수를 넣는다.
 - 세션 끝에 다음 5줄을 보고한다: ①완료 판정(충족/미충족 · 근거 커밋) ②PR 링크 ③남긴 것과 이유
   ④Kiki께 넘길 결정·행동(선택지 포함) ⑤재판정에 넘길 실측값(명령 · exit code · 값 · 판정 기준 해시).
 
-[이번 세션 항목 — P3-94 LLM 초안 측정의 다음 단계]
+[이번 세션 항목 — P3-106 지표 ⑤ Learning Loop Success 운영 실측 경로]
 
-대상 태스크: P3-94
+대상 태스크: P3-106-phase3-learning-loop-success-prod-measure
 
-입력: docs/reviews/p3_94_seat_compare_runbook_2026-11-06.md(런북 — 블록 본문은 세션이 채팅으로 준다) ·
-src/backend/whymath_backend/harness/ai_quality_live_collect.py · harness/ai_quality_eval.py(`--drafts` 모드) ·
-data/runs/p3_94/seat_compare_eval_20.jsonl · D16 결정 기록(게이트 G-p3-w3-release-merged notes 2026-10-31·2026-11-01).
+착수 조건: `git show origin/main:backlog/tasks/` 아래에 이 태스크 파일이 있어야 한다(PR #1854 머지). 없으면 착수 불가로 보고하고 끝낸다.
 
-단계 판정(main과 원격 브랜치에서 실측):
-A. 좌석 비교 데이터 없음 — `git ls-remote origin`에서 p3-94·p3_94가 든 브랜치를 찾고, 후보 브랜치에 data/runs/p3_94/seat-*/가
-   없으면 → Kiki PC 수집 안내. 런북의 블록 1~4를 이번 세션 기준 커밋 해시를 채운 완성형으로 준다(6항목 브리핑 · worktree --detach ·
-   HEAD 대조 · 자리표시자 0 · 쓰기 블록 자가거부 · 블록 하나씩 붙여넣기). 블록을 주기 전에 블록이 쓰는 모듈·인자·파일이 그 커밋에
-   실재하는지 확인한다. 안내하고 끝낸다.
-B. 좌석 비교 데이터 있음 + 비교표 없음 → 좌석마다
-   `python -m whymath_backend.harness.ai_quality_eval --eval-set data/runs/p3_94/seat_compare_eval_20.jsonl --drafts data/runs/p3_94/seat-<좌석>/live.jsonl.drafts.jsonl --json <출력>`
-   을 돌린다. 비교표(결말 분포 채택·강등·폴백·실패 · 출력 계약 위반율 · 초안 수 · 축별 관측 비율과 판정 대상 수·판정 불가 수 ·
-   턴 지연 중앙값·p95 · 턴당 provider 호출 수 · 토큰)를 docs/reviews/p3_94_seat_compare_report_<날짜>.md로 커밋한다.
-   20건은 축별 최소 표본(30) 미달이라 축 판정은 "측정 불가"가 정상이다 — 통과로 접지 않는다. 런북의 '측정 한계' 절을 리포트에 옮긴다.
-   채팅으로 Kiki께 튜터 좌석 선택(local-fast · local-mid · cloud-mid) 결정을 표와 권고로 요청한다. 튜터 모델 확정과 MEMORY 결정
-   기록은 Kiki 몫이다. 서빙 라우팅 변경이 필요해지면 별건 태스크로 `add`만 한다(P3-94는 측정 전용 · 서빙 무변경).
-C. Kiki 좌석 결정이 기록됨 + 본 수집 없음 → 본 수집(평가셋 244사례 · 선택한 좌석 1개) 블록을 A와 같은 규율로 안내한다.
-D. 본 수집 데이터 있음 + 8축 리포트 없음 → 8축 리포트를 docs/reviews에 커밋한다. 문장 축 6개는 LLM 초안 기준으로 판정하고,
-   오개념 판정·Curriculum 2축은 "대상 아님"으로 표기한다. 초안 0건이면 exit 비0 측정 불가다. 결말별·사례 종류별 초안 수와
-   축별 판정 대상 수·불가 수를 적는다. 이 분포로 D16 임계값 6개와 `--min-live-rate`의 제안값 표를 만들어 Kiki 결정을 요청한다
-   (세션이 값을 확정하지 않는다). Kiki 채팅 승인이 오면 그 문면 그대로 `gates amend G-p3-w3-release-merged --note "..."`로 기록한다.
-E. 리포트까지 착지 → acceptance ①~⑦ 전수 대조 →
-   `done P3-94 --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: Week 3 축 입력(8축 리포트 · main <해시>)을 재판정 입력으로 넘긴다"`.
-
-비용: cloud-mid 좌석은 OpenRouter 과금이다(Kiki 2026-11-06 승인 범위 = 좌석 비교·본 수집). Anthropic API는 2026-12-31까지 사용 중단
-(ARCH-66)이라 좌석 후보에 넣지 않는다.
-```
-
----
-
-## 세션 종료 후 체크 (Kiki용)
-
-- [ ] 단계 A~E 중 어디였는가
-- [ ] A·C였다면: 6항목 브리핑 · 기대 해시 · 자리표시자 0인 블록이 왔는가 → **Kiki PC 실행 필요**
-- [ ] B·D였다면: 측정 불가를 통과로 접지 않았는가 · 측정 한계 절이 리포트에 있는가
-- [ ] Kiki 결정 요청(튜터 좌석 또는 임계값 6개)이 표와 권고로 왔는가 → **Kiki 결정 필요**
-- [ ] PR 링크가 있는가
+1. `start`. ops/phase3_metrics.py의 ⑤ 수집 경로를 코드에서 읽는다 — DB 접속 설정(환경 변수 이름) · `--since-hours` 관측창 ·
+   `--input` 주입 형식 · `--sample-basis` · 분모 정의. 추측하지 않는다.
+2. 클라우드 세션에서 수집 경로가 살아 있음을 보인다: CI 방식의 실 PG(PostgreSQL 16 + pgvector · alembic upgrade head)에서
+   P3-101 하네스(tests/backend/api/test_release_gate_a_chain.py)가 남기는 루프 기록으로 ⑤가 계산되는지, 그리고 루프 기록이 0건일 때
+   "측정 불가"가 나오는지(0건 통과 위장 금지)를 실측한다.
+3. Kiki PC 런북을 만든다: 운영 DB whymath-pg(127.0.0.1:5433 · user/db whymath · trust)에서 읽기 전용으로
+   `python -m whymath_backend.ops.phase3_metrics --json <출력>`을 돈다(⑤를 재야 하므로 `--no-db`를 쓰지 않는다). 프리앰블의 Kiki PC 규율을
+   따르고, 결과 파일을 세션이 받는 방법(브랜치 push 등)까지 블록에 넣는다. 운영 DB에 쓰지 않는다. 런북 파일을 docs/에 두면 저장소의
+   런북 가드 테스트(tests/infra/test_runbook_write_guard.py · tests/infra/test_ps_guard_runbook_rules.py)를 통과해야 한다.
+4. 결과를 기록한다: 값 · 분모 · 목표 · PASS/FAIL. 내부 테스트 계정(D2)의 루프 표본이 0이면 "측정 실패 — 루프 표본 부재"로 적고,
+   누가 루프를 돌려야 표본이 생기는지(끊긴 지점)를 보고한다. 새 Q1은 "AI가 학습 루프를 검토·점검한 기록"을 근거로 하므로, 표본을
+   AI 관통 하네스 실행으로 만드는 경로가 없으면 별건으로 `add` 등재만 한다. 이 태스크는 운영 DB에 학습 기록을 쓰지 않는다.
+5. `done P3-106-phase3-learning-loop-success-prod-measure --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: ⑤ 운영 실측(main <해시>)을 재판정 입력으로 넘긴다"`.

@@ -1,21 +1,8 @@
-# [09] P3-29 — Gate D: 학습자별 콘텐츠 열람 로그(content_viewed) 좌석
+[세션 이름] P3R-03_P3-91-93_검증비율55_마무리
+- 가장 먼저 이 세션의 제목을 위 이름으로 바꾼다. 세션 제목을 바꾸는 도구가 있으면 쓴다(예: claude-code-remote의 set_session_title —
+  session_id는 get_session을 인자 없이 불러 얻는다). 도구가 없으면 건너뛰고, 사용자에게 보내는 첫 보고의 첫 줄에 이 이름을 적는다.
+- 이 세션이 여는 PR 제목과 판정·기록 문서 상단에도 이 이름을 앞에 붙여 어느 지시문에서 나온 작업인지 추적되게 한다.
 
-| 구분 | 내용 |
-|---|---|
-| 순서 | 09 / 10 |
-| 막는 곳 | Release 축 Gate D(독립 검토 의견: 미충족 — content_viewed 생산자 0건) |
-| 작성 시점 상태 | main에서 `todo`. PR #1854가 Gate D 소유자로 연결하고 우선순위를 P2 → P1로 올린다. 새 테이블이 필요하면 Phase 3 범위 규율의 예외(Release Blocker) 판정이 필요하다 |
-| 시작 조건 | PR #1854 머지 — 같은 태스크 파일을 그 PR이 고치므로 먼저 착수하면 대장 충돌이 난다. 새 스키마가 필요하면 구현은 범위 예외 결정 뒤 |
-| 완료 판정 | content_viewed 생산자 ≥1 · Gate D 역할 조사 테스트의 DORMANT 동결 승격 · 기록 차단 주입 RED |
-| 규모 | 중 — 범위 예외 결정 시 1회 왕복 |
-
-**붙이는 법**: PR #1854가 머지된 뒤 새 세션 첫 메시지로 아래 블록 전체를 그대로 붙여넣는다. 새 스키마가 필요하다고 판정되면 블록은 결정 요청을 등재하고 멈춘다.
-
----
-
-## 붙여넣을 지시문 (복사 범위: 아래 블록 전체)
-
-```text
 [WhyMath 소유 태스크 공통 프리앰블 — 이번 세션 전체에 적용]
 
 너는 WhyMath 저장소(kiki-s-broom/WhyMath)에서 통합 게이트 `G-p3-w3-release-merged`(Week 3 + Phase 3 Release 통합 판정)의
@@ -102,42 +89,29 @@ FAIL을 해소하는 소유 태스크 하나를 맡는 엔지니어다. 이번 �
   main 머지는 사용자가 "pr"이라고 하거나 Kiki가 판단할 때만 한다.
 - 완료는 `python3 scripts/harness/backlog.py done <id> --artifact <PR 번호> --artifact <머지 커밋>`이다. 소유 태스크는 decision 게이트
   `G-p3-w3-release-merged`의 입력이라 CLI가 판정 인계를 요구한다. 판정을 내리지 말고
-  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 파일 10번만 예외).
+  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 P3R-10만 예외).
 - 완료 보고에 `python scripts/constitution/audit_ratchet.py`의 종료 코드와 차단 건수를 넣는다.
 - 세션 끝에 다음 5줄을 보고한다: ①완료 판정(충족/미충족 · 근거 커밋) ②PR 링크 ③남긴 것과 이유
   ④Kiki께 넘길 결정·행동(선택지 포함) ⑤재판정에 넘길 실측값(명령 · exit code · 값 · 판정 기준 해시).
 
-[이번 세션 항목 — P3-29 콘텐츠 열람 로그 좌석 (Gate D)]
+[이번 세션 항목 — P3-91·P3-93 승격 마무리 확인 (원 세션이 끝내지 못했을 때만)]
 
-대상 태스크: P3-29-content-view-log-seat-decision
+대상 태스크: P3-91-p3-62-candidate-promotion-fill-template-fix · P3-93
 
-착수 조건: PR #1854가 main에 머지돼 있어야 한다(이 태스크 파일의 Gate D 연결·우선순위 정정이 그 PR에 있다).
-머지 전이면 착수하지 않고 보고하고 끝낸다.
+상황별로 한다:
+(1) PR #1856 열림 + 24시간 안 활동 → 아무것도 하지 않는다. "원 세션 진행 중"으로 보고하고 끝낸다.
+(2) PR #1856 열림 + 72시간 넘게 활동 없음, 또는 CI red로 멈춤 → 남의 PR 브랜치에 푸시하지 않는다. 실패한 잡·스텝을 읽어
+    원인만 진단하고, 사용자에게 "이어받아 고칠까요?"를 선택지로 묻는다. 허락을 받으면 그 브랜치에서 최소 수정 → ci_mirror → 푸시한다.
+(3) PR #1856 머지됨 →
+  a. main에서 `python -m whymath_backend.harness.solution_qa --json <출력 파일>`로 재측정한다(경로 인자 없음 = 대표 과정 승인 문항 전수).
+     exit code · 검증 가능 비율 · 분모(1,121 불변) · 검증 불가 사유 분포를 적는다.
+  b. 두 태스크가 done이 아니면 acceptance를 main 실파일로 전수 대조한다(이행 / 미이행 / 의도적 제외). 특히
+     P3-91 정정 ⓐ 옛 문구 검색 0건(기본·구조화 두 모드) · ⓔ C5 재유도 1121/1121 유지 · P3-93 ② 금지 사항(분모 축소·문항 제외·
+     판정기 완화 없음) · ③ 감사받은 바이트만 승격. 미이행이 있으면 승계 태스크를 `add`로 등재한다.
+  c. 상태 전이는 CLI 안내를 따른다(원 세션 claim이 남아 있으면 stale 확인 뒤 `unblock` → `start`). 그다음
+     `done <id> --artifact "#1856" --artifact <머지 커밋> --no-verdict "판정 무관: ④' 실측(<비율> · main <해시>)을 재판정 입력으로 넘긴다"`.
+     P3-93은 P3-91을 선행으로 두므로 P3-91부터 닫는다.
+  d. 재측정 결과(판정 기준 main 해시 · 명령 · exit code · 값)를 docs/reviews/에 남기고,
+     `gates amend G-p3-w3-release-merged --note "..."`로 한 줄 기록한다(판정은 내리지 않는다).
 
-근거: docs/reviews/p3_17_verdict_review_2026-11-06.md §3(Gate D는 미충족으로 본다 — concept_viewed를 concept_selected로만 대응,
-개념 콘텐츠 열람 이벤트 생산자 0건). l2/learning_event_trace.py에 CONTENT_VIEWED는 정의만 있다.
-
-1. `start`. acceptance ①: 새 Entity·DB 스키마가 정말 필요한지부터 실측한다 — 기존 이벤트 평면(learning_event_trace · 기존 이벤트
-   테이블과 writer)으로 학습자별 열람을 남길 수 있는지 코드에서 확인한다.
-2. 새 테이블·스키마가 필요하면 Phase 3 범위 규율의 예외(Release Blocker)다. 근거(Gate D 정의 · 검토 문서 §3 · 재판정 영향)와
-   선택지 — (가) 새 좌석 신설 (나) 기존 이벤트 평면 재사용(가능하다면) (다) 12월 이후 이월(Gate D 미충족 유지 → Release FAIL 지속) —
-   를 결정 문서로 만들고 프리앰블의 결정 규율대로 게이트를 등재한다. 그다음 `unblock`하고 끝낸다.
-   새 스키마 없이 가능하면 바로 3으로 간다.
-3. 구현: 학생이 개념 콘텐츠를 받는 표면(/v1/me/objectives/{id}/study 등)에서 content_viewed를 생산한다. content_version 기록 방법은
-   EOS-47-attempt-version-pinning 소유다 — 열람 시점의 판을 기록하는 원천이 없으면 서빙 판 포인터로 채우지 않는다(날조 금지).
-   PED-17이 아직이면 /study가 404라 실제 열람이 일어나지 않는다. 테스트는 supply 대역으로 열람 경로를 재현하되, 실제 경로는
-   PED-17 뒤에야 열린다는 한계를 보고에 적는다.
-4. 검증: tests/backend/scenarios/test_gate_d_event_role_census.py의 content_viewed DORMANT 동결 단언을 "생산자 ≥1" 단언으로 승격하고,
-   scripts/ops/verify_gate_de_discrimination.py의 기록 차단 주입이 RED인지 실측한다.
-5. `done P3-29-content-view-log-seat-decision --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: Gate D content_viewed 생산 실측(main <해시>)을 재판정 입력으로 넘긴다"`.
-```
-
----
-
-## 세션 종료 후 체크 (Kiki용)
-
-- [ ] 새 스키마 필요 여부를 실측으로 판정했는가
-- [ ] 필요했다면 범위 예외 결정 요청(선택지 표와 권고)이 왔는가 → **Kiki 결정 필요**
-- [ ] 구현했다면 DORMANT 동결 승격과 차단 주입 RED 결과가 있는가
-- [ ] PED-17 미착지에 따른 한계가 적혀 있는가
-- [ ] PR 링크가 있는가
+금지: 판정기 완화·분모 축소·문항 제외로 55%를 맞추지 않는다. 같은 은행을 다시 채점하지 않는다.

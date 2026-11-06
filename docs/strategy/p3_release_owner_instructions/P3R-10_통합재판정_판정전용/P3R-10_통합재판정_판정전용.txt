@@ -1,21 +1,8 @@
-# [08] P3-107 — Phase 3 지표 ⑥ Critical Defect 입력 수집기
+[세션 이름] P3R-10_통합재판정_판정전용
+- 가장 먼저 이 세션의 제목을 위 이름으로 바꾼다. 세션 제목을 바꾸는 도구가 있으면 쓴다(예: claude-code-remote의 set_session_title —
+  session_id는 get_session을 인자 없이 불러 얻는다). 도구가 없으면 건너뛰고, 사용자에게 보내는 첫 보고의 첫 줄에 이 이름을 적는다.
+- 이 세션이 여는 PR 제목과 판정·기록 문서 상단에도 이 이름을 앞에 붙여 어느 지시문에서 나온 작업인지 추적되게 한다.
 
-| 구분 | 내용 |
-|---|---|
-| 순서 | 08 / 10 |
-| 막는 곳 | Release 축 Gate B ⑥(F-Ⅱ 검수 통과 CU 수학 오류율 · F-Ⅴ 힌트 정답 누설 — 목표 확정, payload 수집기 없음) |
-| 작성 시점 상태 | PR #1854에서 등재 — 작성 시점에는 main에 없다 |
-| 시작 조건 | PR #1854 머지 |
-| 완료 판정 | main 기준으로 ⑥의 값·목표·PASS/FAIL이 phase3_metrics 출력으로 재현되고, 결과 파일과 판정 기준 커밋이 docs/reviews에 남음 |
-| 규모 | 중 |
-
-**붙이는 법**: 새 세션 첫 메시지로 아래 블록 전체를 그대로 붙여넣는다. PR #1854가 아직 머지되지 않았으면 블록은 착수하지 않고 끝난다.
-
----
-
-## 붙여넣을 지시문 (복사 범위: 아래 블록 전체)
-
-```text
 [WhyMath 소유 태스크 공통 프리앰블 — 이번 세션 전체에 적용]
 
 너는 WhyMath 저장소(kiki-s-broom/WhyMath)에서 통합 게이트 `G-p3-w3-release-merged`(Week 3 + Phase 3 Release 통합 판정)의
@@ -102,35 +89,45 @@ FAIL을 해소하는 소유 태스크 하나를 맡는 엔지니어다. 이번 �
   main 머지는 사용자가 "pr"이라고 하거나 Kiki가 판단할 때만 한다.
 - 완료는 `python3 scripts/harness/backlog.py done <id> --artifact <PR 번호> --artifact <머지 커밋>`이다. 소유 태스크는 decision 게이트
   `G-p3-w3-release-merged`의 입력이라 CLI가 판정 인계를 요구한다. 판정을 내리지 말고
-  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 파일 10번만 예외).
+  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 P3R-10만 예외).
 - 완료 보고에 `python scripts/constitution/audit_ratchet.py`의 종료 코드와 차단 건수를 넣는다.
 - 세션 끝에 다음 5줄을 보고한다: ①완료 판정(충족/미충족 · 근거 커밋) ②PR 링크 ③남긴 것과 이유
   ④Kiki께 넘길 결정·행동(선택지 포함) ⑤재판정에 넘길 실측값(명령 · exit code · 값 · 판정 기준 해시).
 
-[이번 세션 항목 — P3-107 지표 ⑥ Critical Defect payload 수집기]
+[이번 세션 항목 — Week 3 + Phase 3 Release 통합 재판정 (판정 전용)]
 
-대상 태스크: P3-107-phase3-critical-defect-payload-collector
+이 세션은 판정 전용이다. production code를 고치지 않는다. 조건을 맞추려고 고치지 않고, 발견한 결함은 `add`로 등재만 한다.
+프리앰블 [산출 규율]의 `--no-verdict` 인계는 이 회차에 적용하지 않는다 — 이 회차가 판정을 기록한다.
 
-착수 조건: main에 이 태스크 파일이 있어야 한다(PR #1854 머지). 없으면 착수 불가로 보고하고 끝낸다.
-
-1. `start`. ⑥의 정의를 코드와 대장에서 확인한다 — phase3_metrics의 `--hard-gate-input` payload 스키마(스코어카드),
-   F-Ⅱ·F-Ⅴ의 목표(게이트 G-p314-phase3-metric-targets · P3-33).
-2. 입력 원천을 실측한다 — 저장소에 커밋된 산출물(data/runs/*/cu.jsonl 검수 결과 · EOS-211 힌트 누설 측정 산출물 등). 원천이 무엇이고
-   각각 몇 건인지 적는다. 0건이면 0건이라고 적는다.
-3. 수집기를 만든다: 같은 입력이면 같은 바이트의 payload를 내는 결정론 경로다. 입력 0건이면 unmeasured(exit 비0)를 내고 그 사실을
-   출력에 남긴다(0건 통과 위장 금지). 위치는 기존 ops·harness 관례를 따르고, 신규 모듈은 scripts/analysis/eos_feature_inventory_v2.py에
-   귀속한다(infra-contracts 잡이 검사한다).
-4. 주입 시험: F-Ⅱ 위반 payload → ⑥ FAIL · F-Ⅴ 위반 → FAIL · 입력 부재 → unmeasured · 정상 → PASS(대조군). 주입이 실제로
-   적용됐는지(mutated != original) 단언한다.
-5. main 기준 실행 결과 파일과 판정 기준 커밋을 docs/reviews에 커밋한다.
-6. `done P3-107-phase3-critical-defect-payload-collector --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: ⑥ 실측(main <해시>)을 재판정 입력으로 넘긴다"`.
-```
-
----
-
-## 세션 종료 후 체크 (Kiki용)
-
-- [ ] 입력 원천과 건수가 실측으로 보고됐는가
-- [ ] 주입 4종(F-Ⅱ 위반 · F-Ⅴ 위반 · 입력 부재 · 정상 대조군) 결과가 있는가
-- [ ] ⑥ 값·목표·판정과 판정 기준 커밋이 docs/reviews에 있는가
-- [ ] PR 링크가 있는가
+1. 판정 태스크 정하기: P3-17-week3-release-gate-judgment는 done이라 재사용하지 않는다. 대장에서 이 게이트의 재판정 태스크가 이미
+   있는지 찾는다(제목·notes에 재판정 · G-p3-w3-release-merged). 없으면 `add`로 등재한다 — ID는 CLI가 배정한다. acceptance는 P3-17의
+   ①~⑥을 승계하고 아래 4의 보완을 더한다. `gates amend G-p3-w3-release-merged --depends <새 ID>`로 게이트 입력에 잇는다.
+   그 태스크에 이 게이트를 requires_gates로 걸지 않는다(순환이며 CLI가 거부한다).
+2. `start` 후 판정문 docs/reviews/<새 ID 소문자>_release_rejudgment_<날짜>.md 상단에 `판정 기준: main <해시>`를 적는다.
+3. 재실측(전부 명령 · exit code · 값):
+   - `python -m whymath_backend.ops.phase3_metrics --no-db` — ①~④·⑦. ⑤는 P3-106의 운영 실측 기록을, ⑥은 P3-107 수집기 출력
+     (`--hard-gate-input`)을 쓴다. 기록이 없으면 "측정 실패"다.
+   - `python -m whymath_backend.l1.standards.phase3_coverage --json` — ⑦. 끊긴 개념마다 소유 태스크를 적는다
+     (02-01 = P3-50 · 02-09 = P3-52 · 02-05/06/08/10 = P3-44).
+   - `python -m whymath_backend.harness.solution_qa` — ④' 검증 가능 비율(하한 55% · 분모 1,121).
+   - `python -m whymath_backend.harness.ai_quality_eval --self-test`와 P3-94 8축 리포트 — Kiki가 확정한 임계값 6개와 대조한다.
+     임계값이 아직 미확정이면 Week 3 축은 "측정 실패"다.
+   - 실 PG(CI 방식 · WHYMATH_RUN_INTEGRATION=1)로 tests/backend/api/test_release_gate_a_chain.py(GATE_A_CHAIN_VERDICT)와
+     P3-17 판정문 §1의 13개 파일.
+   - `lint-imports`(src/backend) · `python scripts/constitution/audit_ratchet.py` · `python -m alembic upgrade head` 뒤
+     `python -m whymath_backend.ops.integrity_violations_gate`.
+4. 판정 기준 보완(독립 검토 2026-11-06 · docs/reviews/p3_17_verdict_review_2026-11-06.md):
+   - ⑤·⑥ 미측정은 "측정 실패"다 — PASS로 세지 않는다.
+   - Gate D는 content_viewed 생산자가 0건이면 미충족이다(P3-29).
+   - AI 품질 축은 임계값 미확정·표본 0이면 "측정 실패"로 표기한다.
+   - 성공 기준 Q1은 새 문면으로 판정한다(학생 수 조건 없음). 근거 = Learning Loop Success · Manual Intervention KPI · AI 관통 하네스
+     실행 기록. Q2 = Gate C(P3-100 착지 반영 — 개념 수정판 서빙 연결 PR #1846). 운영 발행 불가 잔여(P3-104 · 12건)도 확인한다.
+     Q3 = Gate E.
+5. 최종 한 줄은 PASS 또는 FAIL이다. 조건부 PASS는 없다. 두 축을 따로 판정하고, 하나라도 FAIL이면 FAIL이다. 미충족 조건마다
+   끊긴 지점 · 남은 작업량 추정 · 소유 태스크를 적는다.
+6. 기록:
+   - PASS → 판정문 경로와 기준 해시로 Kiki께 clear를 요청한다(채팅). `--as kiki`로 대행하지 않는다.
+   - FAIL → 판정 태스크를 done하며 verdict를 기록한다:
+     `done <새 ID> --artifact <PR> --verdict FAIL --evidence "<판정문 경로> · 판정 기준 main <해시>" --owner <이미 게이트 상류에 있는 미종결 소유 태스크> --attach <새로 붙일 소유 태스크>`
+     (옵션 이름과 반복 지정 방식은 `done -h`·`gates -h`의 현재 정의를 따른다. 소유 태스크를 잇지 않은 FAIL은 CLI가 거부한다.)
+   - 하류: G-internal-completion-2026-12-31 조건 ①에 미치는 영향을 판정문에 한 줄로 적는다.
