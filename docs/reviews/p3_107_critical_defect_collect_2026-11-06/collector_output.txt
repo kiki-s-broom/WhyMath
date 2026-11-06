@@ -1,0 +1,6 @@
+[Phase 3 ⑥ Critical Defect 입력 수집기 — P3-107]
+  회차 1개 · 입력 파일 7개 · exit 2
+  F-Ⅱ: unmeasured — 판정 0건 — 검증 불가를 오류 0으로 세지 않는다 · eos197-a6: 검수 통과 28(낡은 지문 0) → SymPy 재검증 PASS 0 · FAIL 0 · 검증 불가 28(C2:C2_NO_STEPS 28)
+  F-Ⅴ: measured — 0/30 · eos197-a6: 의미 축 PASS 표본 hvs-6bfbb1baa75f6e34 n=30 k=0
+  F8 라벨(F-Ⅴ 미산입): CU 검수 F8 2건 — 표본 검수가 아닌 CU 단위 반려 사유라 F-Ⅴ 에 넣지 않는다
+  payload: {"content": {"hint_leak_hits": 0, "hint_leak_sample": 30}}
