@@ -32,3 +32,11 @@
 5. P3-106 · P3-107 — ⑤·⑥ 실측. P3-105 — Q1 처분(Kiki).
 
 검토 기준 시점에 위 소유 태스크 중 다수가 todo라 11/29 재판정까지 전부 착지는 빠듯하다.
+
+## Q1 처분 — Kiki 결정 (2026-11-06)
+
+검토 직후 Kiki가 처분을 정했다: **학생 수 조건 전면 삭제**(검토가 제시한 선택지 A·B가 아니다). 새 Q1은 "개발자가 학생별 데이터를 직접 만지지 않고, AI가 학습 루프 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 학습이 돌아감을 보일 수 있는가"다. 같은 결정으로 Phase 1 게이트의 "β 사용자 100명" 조건 5곳도 지웠다.
+
+- 반영: `phase3_math_eos_completion_plan_source.md` · `phase3_math_eos_completion_instruction_set.md`(2곳) · `ROADMAP.md` · `current_phase_checklist.md` · `06_application_modes.md` · `business_plan_master_v1.md` · `execution_bridge_2026-07.md`
+- 대장: P3-105 acceptance 정정 · `G-p3-w3-release-merged`·`G-internal-completion-2026-12-31` notes
+- 지우지 않은 것(조건이 아니라서): IRT 표본 수 같은 통계 설명(`02_learner_model.md` 등) · 마케팅 계획("강남 어머니 100명 베타") · 사업 지표("결제 사용자 100명") · 날짜가 박힌 과거 판정·검토 문서(기록 보존)
