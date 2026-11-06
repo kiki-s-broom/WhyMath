@@ -752,11 +752,14 @@ gates:
       [판정 근거 2026-10-23] [D4 2026-10-23 Kiki 결정 (a)] 조건 ③ 교체: 12월 검증 P0 태스크 전건 종결 -> WP-C·F 산출물(cu.jsonl·weekly.json) 커밋 존재. 근거 감리 W-25(P0 26건 전부 done, 미결 0 — 걸러내는 것이 없음). 소유 태스크는 WP-C 이행 태스크(등재 예정)와 OPS-90.
 
       [판정 근거 2026-10-23] D4 조건 ③의 소유 태스크 = EOS-197 (WP-C: A6 LLM 저작 회차) · WP-F 이행 태스크는 WP-C 착지 후 등재
+
+      [판정 근거 2026-11-06] [Kiki 결정 2026-11-06] 조건 ①이 기대는 Phase 3 성공 기준 Q1에서 '실제 중·고등학생 100명' 조건을 삭제했다 — ①은 학생 참여 없이 AI 검증 기록으로 충족 가능하다(종전 문면은 12/31 전 구조적 충족 불가였다). 상세 G-p3-w3-release-merged notes 2026-11-06.
     corrections:
       - "[2026-10-19] notes +94자 — WP-A"
       - "[2026-10-23] title: \"12/31 내부 프로젝트 완성 판정 (2026-09-28 Kiki 결정 · 정의) — 내부 완성 = ① Phase 3 Release Gate A~E PASS(G-p3-w3-release-merged) ② EOS G5 판정(12/27 데이터 동결 → 12/31 Go/Conditional Go/No-Go) 완료 ③ 12월 검증 P0 태스크 전건 종결(done 또는 cancel). 학생(실사용자)·변호사·Anthropic API 없이 성립하는 조건만으로 구성한다 — 그 셋은 이 판정 *이후*에 재개한다(참조 게이트: G-student-work-after-internal-completion · G-external-counsel-restart-after-internal-completion · G-arch66-anthropic-api-pause-review · G-s302-free-use-remeasure-restart · G-web01-landing-legal-review). 여는 작업 = P3-17(Phase 3 Release 판정 회차). 판정 3택: ①완성(clear → 재개 게이트 5종을 차례로 판정) ②미완(FAIL 기록 + 미이행 조건의 소유 태스크 부착 · 기한 연장) ③범위 재정의. 12/31은 목표이지 하한이 아니다(build_harness §3a) — 조건이 채워지면 앞당겨 판정한다. 근거 = MEMORY 2026-09-28 결정 로그 · EOS 선언 §0-2(12/31 = 외부 출시일이 아니라 내부 검증 판정일) · ARCH-66 ⑥. 등재 이유: 이 정의가 저장소 어디에도 없어 '내부 완성 이후'를 전제한 게이트 5종이 판정 불능 상태였다(2026-09-28 실측 — 제가 찾은 방법으로는 정의 0건).\" → \"12/31 내부 프로젝트 완성 판정 (2026-09-28 Kiki 결정 · 정의) — 내부 완성 = ① Phase 3 Release Gate A~E PASS(G-p3-w3-release-merged) ② EOS G5 판정(12/27 데이터 동결 → 12/31 Go/Conditional Go/No-Go) 완료 ③ [D4 2026-10-23 Kiki 교체] EOS 생산 물증 커밋 존재 — WP-C·F의 LLM 저작 회차 산출물(data/runs/*/cu.jsonl)과 주간 KPI(metrics/weekly.json, 측정된 KPI 포함)가 main에 커밋돼 있음(종전: 12월 검증 P0 태스크 전건 종결 — P0 26건이 이미 전부 done이라 아무것도 거르지 못함). 학생(실사용자)·변호사·Anthropic API 없이 성립하는 조건만으로 구성한다 — 그 셋은 이 판정 *이후*에 재개한다(참조 게이트: G-student-work-after-internal-completion · G-external-counsel-restart-after-internal-completion · G-arch66-anthropic-api-pause-review · G-s302-free-use-remeasure-restart · G-web01-landing-legal-review). 여는 작업 = P3-17(Phase 3 Release 판정 회차). 판정 3택: ①완성(clear → 재개 게이트 5종을 차례로 판정) ②미완(FAIL 기록 + 미이행 조건의 소유 태스크 부착 · 기한 연장) ③범위 재정의. 12/31은 목표이지 하한이 아니다(build_harness §3a) — 조건이 채워지면 앞당겨 판정한다. 근거 = MEMORY 2026-09-28 결정 로그 · EOS 선언 §0-2(12/31 = 외부 출시일이 아니라 내부 검증 판정일) · ARCH-66 ⑥. 등재 이유: 이 정의가 저장소 어디에도 없어 '내부 완성 이후'를 전제한 게이트 5종이 판정 불능 상태였다(2026-09-28 실측 — 제가 찾은 방법으로는 정의 0건).\" · notes +182자 — D4 Kiki 결정 (a) — 감리 W-25"
       - "[2026-10-23] notes +74자 — D4 소유 태스크 확정"
       - "[2026-10-30] depends_on +EOS-229 — WP 소유 태스크 연결(레인 01-D · 판정 기준 main 3a83ed64): 12/31 판정문(EOS-229 · WP-H)을 판정 입력으로 잇는다"
+      - "[2026-11-06] notes +181자 — Kiki 결정 하류 반영 — 조건 ①의 구조적 충족 불가 해소"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - EOS-229
@@ -1212,6 +1215,10 @@ gates:
       [D16 2026-10-31 Kiki 결정 — 판정 대상만] AI 품질 8축의 판정 대상 = LLM이 쓴 문장(WH-1 경로 출력 전체가 아니다). P3-78 라이브 측정(PR #1793 · docs/reviews/p3_78_ai_quality_live_run_2026-10-31.md)은 LLM 저자 발화가 학생 본문으로 나간 경우 0/244라 이 기준의 표본이 없다 — LLM 문장이 본문에 실리는 측정 경로가 먼저 필요하다. 임계값 8개 중 제안값 6개의 값과 수집기 --min-live-rate 0.5는 미확정(결정 대기 유지).
 
       [판정 근거 2026-11-01] [Kiki 2026-11-01 권장안 승인] ① D16 해석 정정: 'LLM이 쓴 문장' 기준은 문장 축 6개(수학적 정확성 · 정답 누설 · Hint 적절성 · 설명 일관성 · 학생 수준 적합성 · hallucination)에 적용한다. 오개념 판정 정확도(결정론 진단)와 Curriculum 범위 이탈(경로 출력)은 이 기준의 대상이 아니다. ② D16 임계값 6개와 --min-live-rate는 지금 정하지 않는다 — P3-94(LLM 초안 측정 경로)가 낸 초안 분포를 보고 정한다. ③ 미적분 은행 단독 선승격은 하지 않는다(런북 §5 '두 은행 모두 통과' 유지 — 51.1%로도 55%에 못 닿고, P3-91이 미적분 생성기 출력까지 바꾸면 재감사가 필요하다). ④ 승계 입력 2건: P3-93(D11 · 잔여 VAR 39건 중 28건 이상 해소로 617/1,121) · P3-94(D16 ⓐ). 판정 기준 main d81cfd7a.
+
+      [판정 근거 2026-11-06] [P3-17 판정 검토 2026-11-06 · 판정 기준 main 6cccb547 · docs/reviews/p3_17_verdict_review_2026-11-06.md] 판정 FAIL 결론 유지. 보완 3건: ① Gate B ⑤ Learning Loop Success·⑥ Critical Defect는 목표가 확정돼 있는데(G-p314) 판정문이 목표 '—'·미측정으로 적고 소유자를 두지 않았다 → 측정 실패로 정정, 소유 P3-106(⑤)·P3-107(⑥) ② 성공 기준 Q1 문면('실제 학생 100명')은 D2가 바꾸지 않아 12/31 전 구조적으로 YES 불가 → 처분안 소유 P3-105(Kiki 결정 필요 · 새 게이트 없음) ③ Gate D '충족(단서)'은 content_viewed 생산자 0건·/study 404라 미충족으로 본다 → 소유 P3-29(P2→P1 상향). 표기: AI 품질 축은 FAIL보다 '측정 실패(임계값 미확정·표본 0)'가 정확하다(PASS로 세지 않는 결과는 같음).
+
+      [판정 근거 2026-11-06] [Kiki 결정 2026-11-06 — 학생 수 조건 전면 삭제] 성공 기준 Q1의 "내일부터 실제 중·고등학생 100명을 넣어도" 문면을 삭제했다. 새 Q1 = 개발자가 학생별 데이터를 직접 만지지 않고, AI가 학습 루프(진단 → … → 다음 추천) 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 학습이 돌아감을 보일 수 있는가(근거: Learning Loop Success·Manual Intervention KPI + AI 관통 하네스 실행 기록 · 학생 수 조건 없음). 이유: WhyMath의 기본 방향은 AI가 검토·점검·해결하는 것이며, 실사용자 수 조건을 연기만 하다 반복해서 판정 불능을 낳았다. 반영 문서: docs/strategy/phase3_math_eos_completion_plan_source.md §Phase 3의 진짜 성공 기준 · phase3_math_eos_completion_instruction_set.md Q1 2곳 · Phase 1 게이트의 "β 사용자 100명" 5곳(ROADMAP.md · current_phase_checklist.md · 06_application_modes.md · business_plan_master_v1.md · execution_bridge_2026-07.md). 재판정은 새 Q1로 판정하며 P3-17 판정문(2026-11-05)의 Q1 NO 근거 중 "문면상 12/31 전 YES 불가" 부분은 소멸했다(학습 단계 404 · PED-17 근거는 유효).
     corrections:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
       - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
@@ -1225,6 +1232,9 @@ gates:
       - "[2026-11-05] verdict FAIL · owners: PED-17-study-generate-fallback-decision · inputs: P3-101-release-gate-a-chain-harness, P3-17-week3-release-gate-judgment, P3-62-solution-qa-unverifiable-structuring · evidence: Gate A 10단계 단일 관통 실측 — tests/backend/api/test_release_gate_a_chain.py · GATE_A_CHAIN_VERDICT 도달=9/10 · 끊김=학습(PED-17 · /study 404 콘텐츠 미적재) · 봉인위반=0 · 판정 기준 커밋 692bbcae(main 036286a1 + PR #1843) · PR #1845 — done P3-101-release-gate-a-chain-harness 인계"
       - "[2026-11-05] verdict FAIL · owners: P3-100-concept-revision-serving · inputs: P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap, P3-17-week3-release-gate-judgment, P3-62-solution-qa-unverifiable-structuring · evidence: docs/reviews/p3_102_atom_misconception_load_2026-11-05.md §5 · 판정 기준 main 0877e573 — Gate C 운영 발행 불가 903건은 12건으로 해소, Gate C 개념 수정판 서빙 미연결은 미해소 — done P3-102-prod-misconception-signature-gap 인계"
       - "[2026-11-05] input done · P3-100-concept-revision-serving · 판정 무관: 수정 태스크 — Gate C의 끊긴 지점 중 개념 수정판 서빙 1건만 해소(PR #1846). 게이트 재판정은 별도 판정 회차가 하며, Gate C의 나머지(운영 문항 903/979 발행 불가)는 P3-102가 소유한다 — done P3-100-concept-revision-serving 인계"
+      - "[2026-11-06] depends_on +P3-106-phase3-learning-loop-success-prod-measure · depends_on +P3-107-phase3-critical-defect-payload-collector · depends_on +P3-105 · depends_on +P3-29-content-view-log-seat-decision · notes +512자 — P3-17 판정 독립 검토 보완 3건의 소유 태스크를 게이트 입력으로 연결 · 검토 기준 main 6cccb547"
+      - "[2026-11-06] notes +748자 — Kiki 결정 기록 — 성공 기준 Q1 학생 수 조건 삭제 · 검토 기준 main 6cccb547"
+      - "[2026-11-06] input done · P3-105 · 판정 무관: 게이트 판정은 Kiki 몫 — 이 태스크는 Q1 처분 결정의 문서 반영만 넘긴다 — done P3-105 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
@@ -1238,6 +1248,10 @@ gates:
       - P3-100-concept-revision-serving
       - P3-101-release-gate-a-chain-harness
       - P3-102-prod-misconception-signature-gap
+      - P3-106-phase3-learning-loop-success-prod-measure
+      - P3-107-phase3-critical-defect-payload-collector
+      - P3-105
+      - P3-29-content-view-log-seat-decision
   - id: G-p301-scope-choice
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
