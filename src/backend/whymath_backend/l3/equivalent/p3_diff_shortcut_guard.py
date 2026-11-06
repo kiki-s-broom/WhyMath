@@ -137,6 +137,13 @@ m·f'(1) · 대칭 근) ④ 상수항을 옮기면 인수분해·부호만으로
   T05-given-coordinate*   (02-05) 정답이 발문에 적힌 점의 y좌표.
   M-link-procedure        오개념 귀속 선지가 그 오개념 절차(M0615 차수 · 임계점=극값 · M0674 f'(c) =
                           0)의 값이 아니거나, 묻는 대상(극대·극소)이 그 절차의 산출과 다르다.
+                          [P3-44] 보강 은행 4개 개념 절(같은 규칙 id · 설계 p3_44 §4):
+                          M0673 곡선 밖의 점을 접점으로 삼은 기울기·y절편·g(s) ·
+                          M0674 개수형 f'(c) = 0의 열린구간 안 근 수(롤 혼동) ·
+                          M0676 해설이 보이는 정수 점·영점 찍기의 꼭대기(골짜기 —
+                          변곡점 틀은 Kiki 결정으로 제외) · M0678 속력을 그대로 속도로
+                          놓은 값(|v| 또는 '속도식 = +K'의 해). 공통: 발문·검산 조건만
+                          읽어 다시 구하고, 못 읽으면 위반, 연결 선지가 정답이면 위반.
   M-link-undescribed      설명에 절차가 적히지 않은 오개념(M0677 — 관점의 부재·omission형)에 귀속.
   V05-touch-verify-mismatch
                           (02-05) 접점이 발문에서 고정된 문항(두 곡선이 x = a에서 접함 · 위의 점/
@@ -1931,7 +1938,7 @@ def _misconception_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
             value is None or value not in roots
             for value in linked["critical-point-implies-extremum"]
         )
-    if "M0674" in linked:
+    if "M0674" in linked and probe.answer_kind != _REAL_ROOT_COUNT:
         roots = _critical_roots(probe)
         bad |= any(value is None or value not in roots for value in linked["M0674"])
     if bad:
@@ -1943,6 +1950,16 @@ def _misconception_rules(probe: ShortcutProbe) -> list[ShortcutViolation]:
                 "대상(극대·극소)이 그 절차의 산출과 다르다.",
             )
         )
+    # [P3-44] 보강 은행 4개 개념의 오개념 절차 — 같은 규칙 id로 개념별 사유를 따로 낸다.
+    answer = _answer_value(probe)
+    for mid, check in _P344_LINK_CHECKS:
+        if mid not in linked:
+            continue
+        if mid == "M0674" and probe.answer_kind != _REAL_ROOT_COUNT:
+            continue  # 근 값형 M0674는 위 기존 절이 본다
+        reason = check(probe, linked[mid], answer)
+        if reason is not None:
+            out.append(ShortcutViolation("M-link-procedure", f"[{mid}] {reason}"))
     return out
 
 
@@ -1961,6 +1978,300 @@ def _critical_roots(probe: ShortcutProbe) -> set[sympy.Expr]:
                 continue
             roots |= _solutions(sympy.diff(body, v), v, ())
     return roots
+
+
+# ── [P3-44] 보강 은행 4개 개념의 오개념 절차 판정 ─────────────────────────────
+# 설계: docs/reviews/p3_44_new_frames_design_2026-10-16.md §4 (Kiki 결정 2026-10-17 "제안 승인").
+# 공통 원칙 — ① 절차 값은 생성기의 정답·오답 계산을 쓰지 않고 발문·검산 조건만 읽어 *다시* 구한다
+# ② 읽지 못하면 위반이다(모른다 ≠ 아니다 · fail-closed) ③ 연결 선지가 정답이면 위반이다.
+# 각 검사는 위반 사유(문자열) 또는 None(통과)을 돌려준다.
+
+_LinkValues = Sequence[sympy.Rational | None]
+
+#: M0673 발문 — '점 (p, q)에서 곡선 y = F에 그은 접선'(곡선 밖의 점에서 그은 접선).
+_OUTER_TANGENT = re.compile(
+    r"점 \((?P<p>-?\d+), (?P<q>-?\d+)\)에서 곡선 y = (?P<f>[^에]+?)에 그은 접선"
+)
+_TANGENT_VALUE_AT = re.compile(r"y = g\(x\)라 할 때, g\((?P<s>-?\d+)\)의 값")
+
+
+def _outer_tangent_procedure_value(question: str) -> sympy.Expr | None:
+    """M0673 절차 값 — 접점을 미지수로 두지 않고 주어진 점 (p, q)를 접점으로 삼는다.
+
+    기울기를 물으면 f'(p) · y절편이면 q - p·f'(p) · 'y = g(x)라 할 때 g(s)'면 q + f'(p)(s - p).
+    점이 곡선 위에 있으면(M0673의 상황이 생기지 않는다) 묻는 대상이 하나로 안 정해지면 None.
+    """
+    match = _OUTER_TANGENT.search(question)
+    if match is None:
+        return None
+    x = sympy.Symbol("x")
+    curve = _parse_student(match.group("f"))
+    if curve is None or curve.free_symbols != {x}:
+        return None
+    p, q = sympy.Integer(match.group("p")), sympy.Integer(match.group("q"))
+    if sympy.expand(curve.subs(x, p) - q) == 0:
+        return None
+    slope = sympy.diff(curve, x).subs(x, p)
+    tail = question[match.end() :]
+    value_at = _TANGENT_VALUE_AT.search(tail)
+    kinds = [value_at is not None, "y절편" in tail, "기울기" in tail]
+    if sum(kinds) != 1:
+        return None
+    if value_at is not None:
+        return sympy.expand(q + slope * (sympy.Integer(value_at.group("s")) - p))
+    if "y절편" in tail:
+        return sympy.expand(q - p * slope)
+    return sympy.expand(slope)
+
+
+def _m0673_check(
+    probe: ShortcutProbe, values: _LinkValues, answer: sympy.Rational | None
+) -> str | None:
+    star = _outer_tangent_procedure_value(probe.question_text)
+    if star is None:
+        return (
+            "발문에서 '곡선 밖의 점 (p, q)에서 그은 접선'과 묻는 대상(기울기·y절편·g(s) 중 "
+            "하나)을 읽지 못했거나 그 점이 곡선 위에 있다 — 주어진 점을 접점으로 삼는 절차의 "
+            "값을 정할 수 없다."
+        )
+    if any(value is None or value != star or value == answer for value in values):
+        return (
+            f"연결 선지가 '주어진 점을 접점으로 삼아 그 점의 미분계수를 기울기로 쓰는' 절차의 값 "
+            f"{star}이(가) 아니거나 정답과 같다."
+        )
+    return None
+
+
+def _open_interval_function(
+    probe: ShortcutProbe,
+) -> tuple[sympy.Poly, sympy.Expr, sympy.Expr] | None:
+    """개수형 평균값 정리 문항의 (F'(x) 다항식, 하한, 상한) — 발문의 삼차 이상 함수 하나와
+    열린구간."""
+    var = _variable_of(probe)
+    low, high = _open_bounds(probe, var)
+    if low is None or high is None or not low < high:
+        return None
+    shown: list[sympy.Expr] = []
+    for poly in visible_polynomials(probe.question_text):
+        if poly.free_symbols != {var} or sympy.degree(poly, var) < 3:
+            continue
+        if not any(sympy.expand(poly - other) == 0 for other in shown):
+            shown.append(poly)
+    if len(shown) != 1:
+        return None
+    return sympy.Poly(sympy.diff(shown[0], var), var), low, high
+
+
+def _rolle_count(probe: ShortcutProbe) -> int | None:
+    """M0674 개수형 절차 값 — 롤의 정리처럼 f'(c) = 0을 풀어 열린구간 안의 서로 다른 실근을 센다.
+
+    끝점이 근이거나 중근이 있으면 '센 값'이 판독에 따라 갈리므로 None(판정 불가)이다.
+    """
+    found = _open_interval_function(probe)
+    if found is None:
+        return None
+    derivative, low, high = found
+    if derivative.eval(low) == 0 or derivative.eval(high) == 0:
+        return None
+    if sympy.degree(sympy.gcd(derivative, derivative.diff()), derivative.gen) > 0:
+        return None
+    return int(derivative.count_roots(low, high))
+
+
+def _m0674_count_check(
+    probe: ShortcutProbe, values: _LinkValues, answer: sympy.Rational | None
+) -> str | None:
+    rolle = _rolle_count(probe)
+    if rolle is None or answer is None:
+        return (
+            "개수형 문항에서 발문의 함수(삼차 이상 하나)·열린구간·정답을 읽지 못했거나 f'(x) = 0의 "
+            "근이 끝점·중근이라 '롤의 정리처럼 센 값'이 정해지지 않는다."
+        )
+    if rolle < 1:
+        return (
+            "f'(x) = 0의 근이 열린구간 안에 없다 — 롤의 정리 혼동이 0을 낳는 문항은 오개념 "
+            "상황이 아니다."
+        )
+    if any(value is None or value != rolle or value == answer for value in values):
+        return (
+            f"연결 선지가 '롤의 정리처럼 f'(c) = 0을 풀어 구간 안의 근을 센' 값 {rolle}이(가) "
+            "아니거나 정답과 같다."
+        )
+    return None
+
+
+_ASKED_KIND = re.compile(r"극댓값|극솟값|극대|극소")
+
+
+def _asked_extremum_kind(question: str) -> str | None:
+    kinds = {"max" if k in ("극댓값", "극대") else "min" for k in _ASKED_KIND.findall(question)}
+    return next(iter(kinds)) if len(kinds) == 1 else None
+
+
+def _graph_function(probe: ShortcutProbe) -> sympy.Expr | None:
+    """검산 조건의 1계 미분 대상 함수(x의 다항식 하나) — 02-08 문항의 f(x)."""
+    x = sympy.Symbol("x")
+    bodies: list[sympy.Expr] = []
+    for condition in probe.conditions:
+        for call in _derivative_calls(condition):
+            if call.order != 1 or call.var != "x" or "Derivative" in call.body:
+                continue
+            body = _sym(call.body)
+            if body is None or body.free_symbols != {x} or not body.is_polynomial(x):
+                continue
+            if not any(sympy.expand(body - b) == 0 for b in bodies):
+                bodies.append(sympy.expand(body))
+    return bodies[0] if len(bodies) == 1 else None
+
+
+def _extremum_points_of(curve: sympy.Expr, kind: str) -> list[sympy.Expr]:
+    """f'(x) = 0의 실근 중 부호가 실제로 바뀌는(극대 '+→-'·극소 '-→+') 것."""
+    x = sympy.Symbol("x")
+    derivative = sympy.diff(curve, x)
+    roots = sorted(set(sympy.real_roots(sympy.Poly(derivative, x))), key=float)
+    out: list[sympy.Expr] = []
+    for i, root in enumerate(roots):
+        left = float(root) - 1 if i == 0 else (float(roots[i - 1]) + float(root)) / 2
+        right = float(root) + 1 if i == len(roots) - 1 else (float(root) + float(roots[i + 1])) / 2
+        sl, sr = float(derivative.subs(x, left)), float(derivative.subs(x, right))
+        if (kind == "max" and sl > 0 > sr) or (kind == "min" and sl < 0 < sr):
+            out.append(root)
+    return out
+
+
+#: M0676 정수 점 절차가 비교하는 정수 범위(생성기 수치 한도 안 — 삼차의 정수 꼭대기는 임계점
+#: 근처에만 있다).
+_GRID_RANGE: Final = range(-40, 41)
+
+
+def _grid_extremum(curve: sympy.Expr, kind: str) -> sympy.Integer | None:
+    """M0676 절차 ① — 정수 x에서의 함숫값만 비교해 이웃 정수보다 높은(낮은) 점. 하나일 때만."""
+    x = sympy.Symbol("x")
+    values = {n: curve.subs(x, n) for n in range(_GRID_RANGE.start - 1, _GRID_RANGE.stop + 1)}
+    if kind == "max":
+        hits = [n for n in _GRID_RANGE if values[n] > values[n - 1] and values[n] > values[n + 1]]
+    else:
+        hits = [n for n in _GRID_RANGE if values[n] < values[n - 1] and values[n] < values[n + 1]]
+    return sympy.Integer(hits[0]) if len(hits) == 1 else None
+
+
+def _zero_midpoint(curve: sympy.Expr, kind: str) -> sympy.Expr | None:
+    """M0676 절차 ② — 영점만 찍어 이었을 때 꼭대기(골짜기)를 놓는 곳: 극값을 둘러싼 두 영점의
+    가운데."""
+    x = sympy.Symbol("x")
+    points = _extremum_points_of(curve, kind)
+    if len(points) != 1:
+        return None
+    zeros = sorted(set(sympy.real_roots(sympy.Poly(curve, x))), key=float)
+    below = [z for z in zeros if z < points[0]]
+    above = [z for z in zeros if z > points[0]]
+    if not below or not above:
+        return None
+    return sympy.nsimplify((below[-1] + above[0]) / 2)
+
+
+def _m0676_check(
+    probe: ShortcutProbe, values: _LinkValues, answer: sympy.Rational | None
+) -> str | None:
+    """M0676(증감표 없이 몇 점만 찍어 잇는다) — 해설이 보이는 절차(정수 점·영점)의 산출만 인정한다.
+
+    변곡점 혼동 틀(설계 F3)은 Kiki 결정(2026-10-17)으로 제외했으므로 절차로 인정하지 않는다.
+    """
+    curve = _graph_function(probe)
+    kind = _asked_extremum_kind(probe.question_text)
+    if curve is None or kind is None:
+        return (
+            "검산 조건에서 함수 f(x)를 읽지 못했거나 발문이 극대·극소 중 하나를 묻지 않는다 — "
+            "점을 찍어 잇는 절차의 꼭대기(골짜기)를 정할 수 없다."
+        )
+    explanation = probe.explanation
+    peak = "가장 높" if kind == "max" else "가장 낮"
+    allowed: set[sympy.Expr] = set()
+    shown = False
+    if "정수" in explanation and peak in explanation:
+        shown = True
+        grid = _grid_extremum(curve, kind)
+        if grid is not None:
+            allowed.add(grid)
+    if "영점" in explanation and "가운데" in explanation and peak in explanation:
+        shown = True
+        mid = _zero_midpoint(curve, kind)
+        if mid is not None:
+            allowed.add(mid)
+    if not shown:
+        return (
+            "해설이 M0676 절차(정수인 점만 찍어 잇기 · 영점만 찍어 잇기)를 보이지 않는다 — "
+            "판정자가 연결 선지의 값을 재현할 수 없다."
+        )
+    if any(value is None or value not in allowed or value == answer for value in values):
+        return "연결 선지가 해설이 보이는 점 찍기 절차의 꼭대기(골짜기) 값이 아니거나 정답과 같다."
+    return None
+
+
+def _velocity_relation(
+    probe: ShortcutProbe,
+) -> tuple[sympy.Expr, sympy.Expr, sympy.Symbol] | None:
+    """속도 조건 '위치를 한 번 미분해 시각을 넣은 식 = 우변'의 (속도식, 우변, 미지수)."""
+    var = _answer_var(probe)
+    if var is None:
+        return None
+    for rel in _main_relations(probe):
+        call = rel.call
+        if call.order != 1 or call.point is None or "Derivative" in call.body:
+            continue
+        body, point = _sym(call.body), _sym(call.point)
+        if body is None or point is None:
+            continue
+        v = sympy.Symbol(call.var)
+        velocity = sympy.expand(sympy.diff(body, v).subs(v, point))
+        if rel.other == var and not velocity.free_symbols:
+            return velocity, rel.other, var
+        if rel.other.is_number and var in velocity.free_symbols:
+            return velocity, rel.other, var
+    return None
+
+
+def _m0678_check(
+    probe: ShortcutProbe, values: _LinkValues, answer: sympy.Rational | None
+) -> str | None:
+    """M0678(속도의 부호를 무시하고 속력으로만 본다).
+
+    값 문항(속도 = y): 연결 선지는 |v|이고 v < 0이어야 한다. 방정식 문항(속도식 = -K, K > 0): 연결
+    선지는 '속도식 = +K'(속력을 그대로 속도로 놓음)의 해(보호 조건 유지)이고 정답과 달라야 한다.
+    """
+    found = _velocity_relation(probe)
+    if found is None:
+        return (
+            "검산 조건에서 속도 조건(위치를 미분해 시각을 넣은 식)을 읽지 못했다 — 절차 값을 정할 "
+            "수 없다."
+        )
+    velocity, rhs, var = found
+    if rhs == var:
+        if not velocity < 0:
+            return (
+                f"속도 {velocity}이(가) 음수가 아니다 — 부호를 떼도 값이 같아 오개념 상황이 "
+                "아니다."
+            )
+        wrong = {-velocity}
+    else:
+        if not rhs < 0:
+            return f"속도 조건의 우변 {rhs}이(가) 음수가 아니다 — 부호를 떼도 같은 식이다."
+        wrong = _solutions(sympy.expand(velocity + rhs), var, _side_filters(probe, var))
+    if any(value is None or value not in wrong or value == answer for value in values):
+        return (
+            f"연결 선지가 '속력을 그대로 속도로 놓은' 절차의 값({sorted(wrong, key=float)})이 "
+            "아니거나 정답과 같다."
+        )
+    return None
+
+
+#: [P3-44] 보강 은행 연결 검사(오개념 id → 검사) — `_misconception_rules`가 순서대로 부른다.
+_P344_LINK_CHECKS: Final = (
+    ("M0673", _m0673_check),
+    ("M0674", _m0674_count_check),
+    ("M0676", _m0676_check),
+    ("M0678", _m0678_check),
+)
 
 
 # ── [5회차] 해설 ──────────────────────────────────────────────────────────

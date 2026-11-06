@@ -22,7 +22,9 @@ acceptance:
 artifacts: []
 paths:
   - "docs/reviews/p3_44_*"
-session: claude/gracious-noether-ikmlwq
+  - src/backend/whymath_backend/l3/equivalent/p3_diff_shortcut_guard.py
+  - tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_p344_links.py
+session: claude/new-session-sbww7j
 notes: |-
   출처: P3-05 결정 ④(Kiki 2026-10-14 채택) — 삼각의 오개념 변(Graph Connectivity)을 완료 판정에 포함하되 일정은 분리하고, 크로스링크 추가는 Kiki 서명이 필요하므로 오답 보기 재연결을 먼저 진행한다. P3-05 는 슬롯 60/60·Problem Coverage 8/8 로 done 처리됐으나 Graph Connectivity 는 5/10 으로 남았고, 분리된 일정을 받는 태스크가 대장에 없었다.
 
@@ -37,4 +39,6 @@ notes: |-
   [정정 2026-10-16] 설계 결과 기록 + 구현 착수 전 Kiki 결정 게이트 부착
 
   [정정 2026-10-17] Kiki 결정 확정(제안 승인) 기록
-updated: 2026-10-17
+
+  [정정 2026-11-06] paths ['docs/reviews/p3_44_*'] → ['docs/reviews/p3_44_*', 'src/backend/whymath_backend/l3/equivalent/p3_diff_shortcut_guard.py', 'tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_p344_links.py']: S1 판정기 확장(설계 §6) 작업 파일 범위 선언 — 기존 문서 범위 유지
+updated: 2026-11-06
