@@ -1575,31 +1575,37 @@ def _mastery_frames() -> list[Frame]:
         m, fa, k = _tangent(f, a)
         fp = derivative_of(f)
         diff_poly = poly_from_sympy(sympy.expand(poly_to_sympy(f) - (m * _X + k)))
+        # P3-91 후속(calc 7회차 감사 · bc466173 '미분 없이 풀림') — 교점 Q의 x좌표만 물으면 삼차방정식
+        # 근과 계수의 관계(접점 a는 중근 → 2a + Q = -b/lead)로 접선 없이 풀린다. Q에서의 곡선의 접선의
+        # 기울기 f'(Q)를 묻는다 — 답에 도함수가 반드시 쓰인다.
+        slope_q = eval_at(fp, s_root)
+        if slope_q in (m, s_root):
+            return None  # 처음 접선의 기울기·Q의 x좌표와 같은 값이면 다른 경로가 같은 답을 낸다
         return DiffItem(
             slot=slot,
             frame_id="mastery-tangent-meets-curve-again",
             question_text=(
                 f"곡선 y = {render_poly(f)} 위의 점 ({a}, {fa})에서의 접선이 이 곡선과 만나는 점 "
-                "중 "
-                "접점이 아닌 점의 x좌표를 구하시오."
+                "중 접점이 아닌 점을 Q라 할 때, 점 Q에서의 이 곡선의 접선의 기울기를 구하시오."
             ),
-            answer_text=str(s_root),
+            answer_text=str(slope_q),
             explanation=(
                 f"f'(x) = {render_poly(fp)}이므로 접점의 x좌표가 {a}일 때 접선의 기울기는 "
                 f"f'({a})의 값인 {m}이고 접선은 "
                 f"{_pt_slope(m, a, fa)}, 즉 y = {_line(m, k)}이다. 곡선과 접선을 연립하면 "
                 f"{render_poly(diff_poly)} = 0이고, 접점의 x좌표 {with_eun_neun(a)} 이 방정식의 "
                 "중근이므로 "
-                f"{render_factored(diff_poly)} = 0이다. 따라서 접점이 아닌 교점의 x좌표는 "
-                f"{s_root}이다."
+                f"{render_factored(diff_poly)} = 0이다. 따라서 점 Q의 x좌표는 {s_root}이고, "
+                f"점 Q에서의 접선의 기울기는 f'({s_root})의 값인 {slope_q}이다."
             ),
             conditions=(
                 f"{poly_to_sympy_str(f, 's')} - ({m}*s + ({k})) = 0",
                 f"s != {a}",
+                f"y = {poly_to_sympy_str(fp, 's')}",
             ),
-            answer_map=(("s", str(s_root)),),
+            answer_map=(("s", str(s_root)), ("y", str(slope_q))),
             problem_type_code=_SOLVE,
-            answer_format=_fmt(s_root),
+            answer_format=_fmt(slope_q),
             # 곡선 f(s)와 접선 f'(a)(s - a) + f(a)를 연립 — 접선의 기울기를 미분으로 되돌린 같은 식.
             solution_setup=(
                 f"({poly_to_sympy_str(f, 's')} - ({poly_to_sympy_str(f)}"

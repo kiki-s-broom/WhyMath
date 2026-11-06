@@ -1444,26 +1444,26 @@ def _shift_to_zero(case: _Case) -> _Case:
 
 def _diagnostic_frames() -> list[Frame]:
     def d5(p: tuple[object, ...]) -> DiffItem | None:
+        # P3-91 후속(calc 7회차 감사 · a4f83881·846b97d1 '미분 없이 풀림') — 종전 틀은 두 함숫값만
+        # 주고 f'(c) = k의 k를 물어 평균변화율 대입으로 끝났다. 진단 대상(평균값 정리의 결론 형태 —
+        # 도함수의 값 = 평균변화율)은 그대로 두고, 도함수를 주어 c를 풀게 한다(평균변화율 계산 →
+        # f'(c) = 평균변화율 → 구간 판정).
         c = _case_of(p[0])
         fa, fb = eval_at(c.f, c.a), eval_at(c.f, c.b)
-        m = Fraction(fb - fa, c.b - c.a)
-        return DiffItem(
+        deriv = derivative_of(c.f)
+        return _c_item(
             slot="diagnostic",
             frame_id="diag-value-of-derivative-at-c",
-            question_text=(
+            text=(
                 f"함수 f는 닫힌구간 [{c.a}, {c.b}]에서 연속이고 열린구간 ({c.a}, {c.b})에서 "
-                f"미분가능하며 f({c.a}) = {fa}, f({c.b}) = {fb}이다. 평균값 정리에 의하여 "
-                "f'(c) = k인 c가 이 열린구간에 존재할 때, k의 값을 구하시오."
+                f"미분가능하며 f({c.a}) = {fa}, f({c.b}) = {fb}이고, f'(x) = {render_poly(deriv)}"
+                "이다. 평균값 정리에 의하여 f'(c)가 이 구간에서의 f(x)의 평균변화율과 같아지는 "
+                f"c가 열린구간 ({c.a}, {c.b})에 존재할 때, c의 값을 구하시오."
             ),
-            answer_text=frac_text(m),
-            explanation=(
-                f"평균값 정리의 결론은 f'(c) = (f({c.b}) - f({c.a}))/({_minus(c.b, c.a)})이므로 "
-                f"k는 ({render_difference(fb, fa)})/{c.b - c.a} = {frac_text(m)}이다."
+            case=c,
+            equation_override=(
+                f"{poly_to_sympy_str(deriv, 'c')} = {_rate_str(c.f, c.a, c.b)}"
             ),
-            conditions=f"({_paren(fb)} - {_paren(fa)})/({_paren(c.b)} - {_paren(c.a)}) = k",
-            answer_map=(("k", frac_text(m)),),
-            problem_type_code=_EVAL,
-            answer_format=answer_format_of(m),
         )
 
     def d8(p: tuple[object, ...]) -> DiffItem | None:

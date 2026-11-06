@@ -67,7 +67,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
-from whymath_backend.lang.josa import eul_reul
+from whymath_backend.lang.josa import eul_reul, wa_gwa
 from whymath_backend.schema.enums import AnswerFormat
 
 __all__ = ["P3DiffPolynomialRulesGenerator"]
@@ -1014,8 +1014,14 @@ def _diagnostic_frames() -> list[Frame]:
                 "상수 k의 값을 구하시오."
             ),
             answer_text=str(k),
+            # P3-91 후속(calc 7회차 감사 · 2e2868aa·4882cd3f) — 결론만 적지 않고 곱의 미분법을
+            # 적용한 중간식(두 인수의 도함수가 1 → 다른 인수 둘의 합)을 쓴다(판정 기준 5 '핵심 중간 단계').
             explanation=(
-                f"곱의 미분법에 따라 f'(x)는 {render_poly(derivative_of(prod))}이므로 k는 {k}이다."
+                f"({render_poly(f1)}){wa_gwa(render_poly(f1))} ({render_poly(f2)})의 도함수는 "
+                "모두 1이다. 곱의 미분법에 따라 f'(x)는 앞 인수의 도함수에 뒤 인수를 곱한 것과 "
+                "앞 인수에 뒤 인수의 도함수를 곱한 것의 합이므로 "
+                f"f'(x) = ({render_poly(f2)}) + ({render_poly(f1)}) = "
+                f"{render_poly(derivative_of(prod))}이다. 따라서 k는 {k}이다."
             ),
             # 도함수 전체 항등식은 자유기호가 x·k 둘이라 x = 0에서의 값으로 k 하나만 남긴다.
             conditions=_deriv_sym(product_to_sympy_str((f1, f2)), "0") + " = k",

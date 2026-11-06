@@ -1446,7 +1446,9 @@ def _misconception_frames() -> list[Frame]:
         ),
         _flat_frame(
             "mc-derivative-zero-which-extremum",
-            "방정식 f'(x) = 0의 해 중에서 함수 f(x) = {f}{ga} 극값을 갖는 x좌표는?",
+            # P3-91 후속(calc 7회차 감사 · f832f55b) — 발문이 f(x)를 정의하기 전에 f'(x)를 썼다.
+            # 함수를 먼저 소개하고 방정식 f'(x) = 0을 말한다(묻는 대상·정답 불변).
+            "함수 f(x) = {f}에 대하여 방정식 f'(x) = 0의 해 중에서 f(x)가 극값을 갖는 x좌표는?",
             "p3-shape:mc4",
             slot=slot,
             role="any",
