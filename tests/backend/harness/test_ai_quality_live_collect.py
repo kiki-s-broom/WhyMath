@@ -926,3 +926,332 @@ def test_response_lines_use_the_shared_schema(tmp_path: Path) -> None:
         "origin",
         "note",
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-94 — LLM 초안 측정 경로(D16 ⓐ · 서빙 무변경) + 측정 전용 튜터 좌석 교체(⑥)
+#
+# 각 테스트는 그 절이 **없으면 통과해 버리는 입력**을 쓴다:
+#   - 계약 위반 출력(행위 유형 4종 밖)은 정책이 강등해 학생 본문은 하네스 템플릿이 된다 — 원시 출력을
+#     보지 않으면 초안 0건이다(결말과 무관하게 남긴다는 절).
+#   - 실패 사례는 `--resume`이 다시 돈다 — 실패에도 초안을 쓰면 같은 사례 초안이 두 번 쓰인다.
+#   - 좌석 교체가 결정 필터 없이 모든 호출을 바꾸면 다른 호출 지점도 바뀐다 — 필터 절.
+#   - 클라우드 교체가 데이터 등급 게이트를 보지 않으면 측정이 게이트를 넘는다 — 거부 절.
+# ──────────────────────────────────────────────────────────────────────────
+_DRAFT_MARKER = "초안표지P394"
+_OFF_CONTRACT = json.dumps(
+    {"kind": "end_turn", "action_type": "설명", "utterance": f"{_DRAFT_MARKER} 정리해 보자."},
+    ensure_ascii=False,
+)
+"""행위 유형 4종 밖 — 정책 스키마 판정이 거부해 강등되지만 원시 출력에는 발화가 있다."""
+
+
+class _Capturing(_Scripted):
+    """받은 라우팅 결정을 기록하는 스크립트 provider(좌석 교체 단언용)."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.decisions: list[RoutingDecision] = []
+
+    async def generate(
+        self, prompt: str, system: str, decision: RoutingDecision, **kwargs: Any
+    ) -> GenerationResult:
+        self.decisions.append(decision)
+        return await super().generate(prompt, system, decision, **kwargs)
+
+
+def _drafts(out: Path) -> dict[str, Any]:
+    return dict(load_responses(live.drafts_path(out)))
+
+
+def _policy_decision(**overrides: Any) -> RoutingDecision:
+    fields: dict[str, Any] = {
+        "cost_tier": CostTier.LOCAL,
+        "local_family": ModelFamily.GENERAL,
+        "local_model": LocalModelTier.FAST,
+        "est_latency_ms": 1010,
+        "reason": "classify",
+    }
+    fields.update(overrides)
+    return RoutingDecision(**fields)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        _SAY,
+        _SILENT,
+        _OFF_CONTRACT,
+        f"```json\n{_SAY}\n```",
+        f"설명 먼저: {_SAY} 끝",
+        "이건 JSON 객체가 아니다",
+        "[1, 2]",
+        '{"kind": "end_turn", "utterance": ',
+        "",
+    ],
+)
+def test_draft_json_extraction_matches_the_policy(raw: str) -> None:
+    """초안 추출 규칙은 정책 `_extract_json`의 사본이다 — 둘이 갈라지면 초안이 정책과 다른 것을 본다."""
+    from whymath_backend.harness.wh1_llm_policy import LLMTutorPolicy
+
+    assert live._json_object(raw) == LLMTutorPolicy._extract_json(raw)
+
+
+def test_extract_draft_keeps_only_nonempty_end_turn_utterances() -> None:
+    assert live.extract_draft(_SAY) == (f"{_MARKER} 어떤 규칙을 떠올렸어?", "질문")
+    assert live.extract_draft(_OFF_CONTRACT)[0] == f"{_DRAFT_MARKER} 정리해 보자."
+    assert live.extract_draft(_SILENT) == (None, None)  # 발화 없는 end_turn
+    blank = json.dumps({"kind": "end_turn", "action_type": "질문", "utterance": "  "})
+    assert live.extract_draft(blank) == (None, None)  # 공허 초안 0
+    other = json.dumps({"kind": "verify_step", "utterance": "x"})
+    assert live.extract_draft(other) == (None, None)  # end_turn이 아니면 초안이 아니다
+    assert live.extract_draft("이건 JSON 객체가 아니다") == (None, None)
+
+
+def test_drafts_are_kept_even_when_the_turn_is_degraded(tmp_path: Path) -> None:
+    """계약 위반 출력 → 학생 본문은 하네스 템플릿(강등)이지만 LLM 초안은 측정 파일에 남는다."""
+    small = _small_eval(tmp_path / "eval.jsonl")
+    out = tmp_path / "live.jsonl"
+    code, printed = _run(out, small, _Scripted(reply=_OFF_CONTRACT))
+    responses = load_responses(out)
+    assert {r.origin for r in responses.values()} == {live.DEGRADED_ORIGIN}
+    for response in responses.values():  # 학생 대면 본문에는 초안이 없다(서빙 무변경)
+        assert _DRAFT_MARKER not in str(response.tutor_output["explanation"])
+    drafts = _drafts(out)
+    assert sorted(drafts) == sorted(_ids(small))
+    for draft in drafts.values():
+        assert draft.origin == f"{live.DRAFT_ORIGIN_PREFIX}:degraded"
+        assert draft.tutor_output["explanation_source"] == "llm"
+        assert _DRAFT_MARKER in str(draft.tutor_output["explanation"])
+        assert "P3-09가 거부" in str(draft.note)  # 4종 밖 행위 — 결정론 구조체에 본문만
+    # 라이브 0이어도 초안이 있으면 공허가 아니다 — 완결 · 라이브 비율 미달(exit 4)
+    assert code == live.EXIT_LOW_LIVE
+    payload = _run_json(out)
+    counts = payload["runs"][-1]["counts"]
+    assert counts["drafts"]["cases_with_draft"] == len(drafts)
+    assert counts["drafts"]["by_outcome"] == {"degraded": len(drafts)}
+    assert payload["file_totals"]["drafts"] == len(drafts)
+    raw = json.dumps(payload, ensure_ascii=False)
+    assert _DRAFT_MARKER not in raw  # run.json에는 건수만 — 원문 0
+    assert f"LLM 초안 {len(drafts)}" in printed
+    assert "--drafts" in printed
+
+
+def test_live_turn_draft_matches_the_served_utterance(tmp_path: Path) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl")
+    out = tmp_path / "live.jsonl"
+    code, _ = _run(out, small, _Scripted())
+    assert code == live.EXIT_OK
+    responses, drafts = load_responses(out), _drafts(out)
+    assert sorted(drafts) == sorted(responses)
+    for case_id, draft in drafts.items():
+        assert draft.origin == f"{live.DRAFT_ORIGIN_PREFIX}:live"
+        served = responses[case_id].tutor_output
+        assert draft.tutor_output["explanation"] == served["explanation"]
+        assert draft.tutor_output["response_strategy"] == served["response_strategy"]
+
+
+def test_no_drafts_without_llm_utterances_is_still_vacuous(tmp_path: Path) -> None:
+    """발화 없는 end_turn만 — 초안 0 ∧ 라이브 0 = 공허(exit 1). 초안 파일도 만들지 않는다."""
+    small = _small_eval(tmp_path / "eval.jsonl")
+    out = tmp_path / "live.jsonl"
+    code, _ = _run(out, small, _Scripted(reply=_SILENT))
+    assert code == live.EXIT_MEASUREMENT
+    assert not live.drafts_path(out).exists()
+    assert _run_json(out)["file_totals"]["drafts"] == 0
+
+
+def test_failed_case_writes_no_draft_but_other_outcomes_do(
+    tmp_path: Path, registry: Registry
+) -> None:
+    """초안이 회계에 있어도 실패 사례는 초안을 내지 않는다(`--resume`이 다시 돈다 — 중복 방지).
+
+    같은 회계로 폴백 결말이면 초안을 낸다 — 결말과 무관하게 남긴다는 절의 대조군.
+    """
+    small = _small_eval(tmp_path / "eval.jsonl", with_choices=False)
+    eval_set = load_eval_set(registry, small)
+    [case] = eval_set.cases
+    inputs = live.live_turn_inputs(case, eval_set, registry, settings=live.get_settings())
+    eos = build_eos_candidate(eval_set, registry)[case.case_id]
+
+    def _classify(outer: tuple[str, str | None] | None) -> Any:
+        ledger = live.CaseLedger()
+        ledger.drafts.append({"utterance": f"{_DRAFT_MARKER} 초안", "action_type": "질문"})
+        return live.classify_case(
+            case,
+            inputs,
+            utterance=None,
+            receipt=TutorOutputReceipt(),
+            ledger=ledger,
+            eos=eos,
+            outer_error=outer,
+            elapsed_ms=1,
+        )
+
+    failed = _classify(("outer_timeout", "TimeoutError"))
+    assert (failed.category, failed.draft, failed.draft_count) == ("failed", None, 1)
+    fallback = _classify(None)
+    assert fallback.category == "fallback"
+    assert fallback.draft is not None
+    assert fallback.draft.origin == f"{live.DRAFT_ORIGIN_PREFIX}:fallback"
+    assert _DRAFT_MARKER in str(fallback.draft.tutor_output["explanation"])
+
+
+def test_resume_rejects_orphan_drafts(tmp_path: Path) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl")
+    out = tmp_path / "live.jsonl"
+    ids = _ids(small)
+    _run(out, small, _Scripted(reply=_OFF_CONTRACT), "--limit", "1")
+    assert set(_drafts(out)) == {ids[0]}
+    lines = live.drafts_path(out).read_text(encoding="utf-8")
+    row = json.loads(lines.splitlines()[0])
+    row["case_id"] = ids[1]  # 응답 파일에 없는 사례의 초안
+    live.drafts_path(out).write_text(
+        lines + json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    code, _ = _run(out, small, _Scripted(reply=_OFF_CONTRACT), "--resume")
+    assert code == live.EXIT_MEASUREMENT
+
+
+def test_existing_drafts_file_alone_blocks_a_fresh_run(tmp_path: Path) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl")
+    out = tmp_path / "live.jsonl"
+    live.drafts_path(out).write_text("", encoding="utf-8")
+    code, _ = _run(out, small, _Scripted())
+    assert code == live.EXIT_MEASUREMENT  # 초안 파일만 남아 있어도 덮지 않는다
+
+
+@pytest.mark.parametrize(
+    ("seat", "expected"),
+    [
+        ("local-mid", ("local", "general", "mid")),
+        ("cloud-mid", ("cloud_mid", None, None)),
+        ("local-fast", ("local", "general", "fast")),
+    ],
+)
+def test_policy_seat_swaps_only_the_policy_route(
+    tmp_path: Path, seat: str, expected: tuple[Any, ...]
+) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl", with_choices=False)
+    out = tmp_path / "live.jsonl"
+    provider = _Capturing()
+    _run(out, small, provider, "--policy-seat", seat)
+    assert provider.decisions
+    seen = {
+        tuple(live._plain(getattr(d, k)) for k in ("cost_tier", "local_family", "local_model"))
+        for d in provider.decisions
+    }
+    assert seen == {expected}
+    assert all(f"측정 전용 좌석 교체({seat}" in d.reason for d in provider.decisions)
+    record = _run_json(out)["runs"][-1]
+    assert record["config"]["policy_seat"] == seat
+    assert record["args"]["policy_seat"] == seat
+    assert record["counts"]["policy_seat_calls"] == {
+        "overridden": len(provider.decisions),
+        "refused_data_export": 0,
+    }
+
+
+def test_default_route_leaves_decisions_untouched(tmp_path: Path) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl", with_choices=False)
+    out = tmp_path / "live.jsonl"
+    provider = _Capturing()
+    _run(out, small, provider)
+    assert provider.decisions
+    assert all("측정 전용" not in d.reason for d in provider.decisions)
+    assert {live._plain(d.local_model) for d in provider.decisions} == {"fast"}
+    counts = _run_json(out)["runs"][-1]["counts"]
+    assert counts["policy_seat_calls"]["overridden"] == 0
+
+
+def test_seat_decision_ignores_other_call_sites() -> None:
+    other = _policy_decision(local_family=ModelFamily.MATH)
+    assert live.seat_decision(other, "cloud-mid") is None
+    mid = _policy_decision(local_model=LocalModelTier.MID)
+    assert live.seat_decision(mid, "local-mid") is None  # 정책 경로(FAST)만 대상
+    assert live.seat_decision(_policy_decision(), live.POLICY_SEAT_ROUTE) is None
+    swapped = live.seat_decision(_policy_decision(), "cloud-mid")
+    assert swapped is not None and live._plain(swapped.cost_tier) == "cloud_mid"
+
+
+def test_cloud_swap_respects_the_data_export_gate() -> None:
+    blocked = _policy_decision(data_export_blocked=True, data_export_reason="test")
+    scope = live._Scope()
+    provider = _Capturing()
+    recorder = live.RecordingProvider(provider, scope, policy_seat="cloud-mid")
+    asyncio.run(recorder.generate("p", "s", blocked))
+    assert provider.decisions == [blocked]  # 게이트가 막은 결정은 그대로 넘긴다
+    assert (scope.ledger.seat_refused, scope.ledger.seat_overrides) == (1, 0)
+    local = live.RecordingProvider(provider, live._Scope(), policy_seat="local-mid")
+    asyncio.run(local.generate("p", "s", blocked))  # 로컬 교체는 게이트 대상이 아니다
+    assert live._plain(provider.decisions[-1].local_model) == "mid"
+    # 정책 경로가 아닌 차단 결정은 교체 대상이 아니므로 거부로도 세지 않는다(회계 과대 방지).
+    other_scope = live._Scope()
+    other = _policy_decision(
+        local_family=ModelFamily.MATH, data_export_blocked=True, data_export_reason="test"
+    )
+    asyncio.run(
+        live.RecordingProvider(provider, other_scope, policy_seat="cloud-mid").generate(
+            "p", "s", other
+        )
+    )
+    assert (other_scope.ledger.seat_refused, other_scope.ledger.seat_overrides) == (0, 0)
+    assert provider.decisions[-1] == other
+
+
+def test_unknown_policy_seat_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        live.RecordingProvider(_Scripted(), live._Scope(), policy_seat="cloud-high")
+    with pytest.raises(SystemExit):
+        live._parser().parse_args(["--out", "x.jsonl", "--policy-seat", "cloud-high"])
+
+
+def test_latency_summary_uses_nearest_rank() -> None:
+    assert live.latency_summary([]) == {"n": 0, "median_ms": None, "p95_ms": None, "max_ms": None}
+    assert live.latency_summary([400, 100, 300, 200]) == {
+        "n": 4,
+        "median_ms": 250.0,
+        "p95_ms": 400,
+        "max_ms": 400,
+    }
+    twenty = list(range(1, 21))
+    assert live.latency_summary(twenty)["p95_ms"] == 19  # ceil(0.95·20)=19번째
+
+
+def test_exit_code_vacuity_needs_both_live_and_drafts_zero() -> None:
+    base = {"complete": True, "live_rate": 0.0}
+    assert live.exit_code_for(
+        {**base, "live": 0, "drafts": 0}, failed_this_run=0, min_live_rate=0.5
+    ) == (live.EXIT_MEASUREMENT)
+    assert live.exit_code_for(
+        {**base, "live": 0, "drafts": 3}, failed_this_run=0, min_live_rate=0.5
+    ) == (live.EXIT_LOW_LIVE)
+
+
+def test_draft_mode_evaluates_the_collected_drafts(tmp_path: Path) -> None:
+    """수집 → `--drafts` 평가가 끝까지 이어진다. 문장 축 6개만 · 2축은 '대상 아님' 표기."""
+    small = _small_eval(tmp_path / "eval.jsonl")
+    out = tmp_path / "live.jsonl"
+    _run(out, small, _Scripted(reply=_OFF_CONTRACT))
+    report_path = tmp_path / "drafts.report.json"
+    code = cli.main(
+        [
+            "--eval-set",
+            str(small),
+            "--drafts",
+            str(live.drafts_path(out)),
+            "--json",
+            str(report_path),
+        ]
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert [a["axis"] for a in report["axes"]] == list(cli.SENTENCE_AXES)
+    assert {n["axis"] for n in report["not_applicable"]} == {
+        "misconception_accuracy",
+        "curriculum_scope",
+    }
+    coverage = report["draft_coverage"]
+    assert coverage["drafts"] == len(_ids(small))
+    assert coverage["by_origin"] == {f"{live.DRAFT_ORIGIN_PREFIX}:degraded": len(_ids(small))}
+    assert code == 2  # 축별 최소 표본(30) 미만 — 측정 실패가 정답이다
+    assert cli._DRAFT_ORIGIN_PREFIX == live.DRAFT_ORIGIN_PREFIX

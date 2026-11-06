@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,13 +13,21 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 수집기(harness/ai_quality_live_collect.py)가 WH-1 primary에서 LLM이 생성한 초안 본문을 결말(채택·강등·폴백)과 무관하게 측정 전용 파일에 저장한다 — 학생 응답 경로·서빙 코드는 바꾸지 않는다(측정 전용 · 노출 0). 원문은 그 파일에만 두고 run.json에는 건수만. ② ai_quality_eval이 그 초안을 후보로 읽는 모드를 가진다. 문장 축 6개(수학적 정확성 · 정답 누설 · Hint 적절성 · 설명 일관성 · 학생 수준 적합성 · hallucination)를 LLM 초안 기준으로 판정하고, 결정론·경로 축 2개(오개념 판정 정확도 · Curriculum 범위 이탈)는 대상이 아님을 리포트에 표기한다(D16 해석 2026-11-01). ③ 초안이 0건이면 PASS가 아니라 '측정 불가'로 exit 비0 — 테스트로 동결(0건 공허 통과 금지). ④ Kiki PC 재수집 런북(6항목 브리핑 · worktree · HEAD 대조 · 쓰기 블록 자가거부)과 8축 리포트. ⑤ 리포트의 LLM 초안 분포는 D16 임계값 6개 확정의 입력이다 — 임계값 자체는 이 태스크가 정하지 않는다."
-artifacts: []
+  - "⑥ [Kiki 2026-11-06 승인] 튜터 정책 좌석 비교 — 수집기에 측정 전용 좌석 선택(--policy-seat local-fast|local-mid|cloud-mid)을 둔다. 서빙 라우팅·학생 응답 경로는 바꾸지 않는다(측정 전용 · 수집기 프로세스 안에서만 적용). 후보 3개 = qwen2.5:3b(현행 LOCAL GENERAL FAST) · qwen2.5:7b(LOCAL GENERAL MID) · deepseek/deepseek-v4.1-flash(CLOUD_MID · openrouter 좌석). 클라우드 호출 비용 사용 승인. 본 수집 전에 같은 20사례로 3좌석 시험 수집을 하고, 리포트에 좌석별 결말 분포(채택·강등·폴백·실패) · 출력 형식 위반율 · 초안 건수 · 문장 축 6개 결과 · 턴 지연(중앙값·p95) · 턴당 provider 호출 수를 나란히 낸다. 튜터 모델 확정과 MEMORY 결정 기록은 Kiki 몫이며 이 태스크는 비교 입력만 낸다."
+  - "⑦ 리포트는 초안 건수를 결말별·사례 종류별로 나누어 표기하고, 축별 판정 대상 수·판정 불가 수를 함께 적는다(축 min_n 미달은 측정 불가로 표기 — 통과로 접지 않는다)."
+artifacts:
+  - "#1853"
 paths:
   - src/backend/whymath_backend/harness/ai_quality_live_collect.py
   - src/backend/whymath_backend/harness/ai_quality_eval.py
   - tests/backend/harness/test_ai_quality_live_collect.py
   - tests/backend/harness/test_ai_quality_eval.py
   - docs/reviews/
-session: null
-notes: "D16(Kiki 2026-10-31 · 판정 대상 = LLM이 쓴 문장) 승계 — 2026-11-01 Kiki 승인 권장안 ⓐ(측정용 초안 저장 · 서빙 무변경). 근거: P3-78 라이브 측정(PR #1793)에서 LLM 문장이 본문에 나간 경우 0/244 — 현 경로로는 이 기준의 표본이 없다. 인접 태스크 PED-18은 작동 비율 관측이라 초안 평가를 하지 않는다. 판정 기준 main d81cfd7a."
-updated: 2026-11-01
+session: claude/p3-94-llm-draft-measure
+notes: |-
+  D16(Kiki 2026-10-31 · 판정 대상 = LLM이 쓴 문장) 승계 — 2026-11-01 Kiki 승인 권장안 ⓐ(측정용 초안 저장 · 서빙 무변경). 근거: P3-78 라이브 측정(PR #1793)에서 LLM 문장이 본문에 나간 경우 0/244 — 현 경로로는 이 기준의 표본이 없다. 인접 태스크 PED-18은 작동 비율 관측이라 초안 평가를 하지 않는다. 판정 기준 main d81cfd7a.
+
+  [정정 2026-11-06] Kiki 2026-11-06 채팅 승인 — 튜터 후보 3좌석 비교 + 클라우드 비용 사용
+
+  [정정 2026-11-06] PR 증적 연결 — 구현·런북 PR(라이브 수집은 Kiki PC 대기)
+updated: 2026-11-06
