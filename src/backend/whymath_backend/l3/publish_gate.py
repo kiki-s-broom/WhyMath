@@ -467,22 +467,40 @@ async def has_published_version(session: AsyncSession, concept_code: str) -> boo
 
 
 async def is_cms_created(session: AsyncSession, concept_code: str) -> bool:
-    """이 개념이 CMS 신규 제안(`cms_create`)으로 태어났는가. **읽기 전용**(P3-100).
+    """CMS 표지가 있는 개념이 CMS에서 태어났는가. **읽기 전용**(P3-100).
+
+    전제: 호출자는 표지(`cms_edited_at`)가 **있는** 개념에 대해서만 묻는다 — 표지가 없으면 이미
+    적재 소유로 판정이 끝난다(`concept_delete_block`). 이 함수가 가르는 것은 "표지의 출처"다.
 
     수정판 발행은 graph.json이 만든 개념에도 CMS 표지를 채우므로(투영 — 모듈 docstring) 표지만으로는
-    "CMS가 만든 개념"을 가를 수 없다. 첫 판(`version_no=1`)의 변경 유형으로 가른다 — 첫 판이
-    제안이면 CMS가 만든 개념, 아니면(또는 판이 없으면) 다른 경로가 만든 개념이다.
+    "CMS가 만든 개념"을 가를 수 없다. 판 이력으로 세 경우를 가른다:
+
+    - 첫 판(`version_no=1`)이 제안(`cms_create`) → CMS가 만든 개념(True).
+    - 판이 있는데 첫 판이 제안이 아니다(또는 첫 판이 비었다) → 다른 경로가 만든 개념에 수정판이
+      투영돼 표지가 붙었다(False). 이 개념을 지우면 다음 적재가 되살린다.
+    - 판이 **하나도 없다** → 투영은 판 발행·복원에서만 일어나므로 표지는 투영에서 오지 않았다.
+      P3-26 이전 직접 생성(`POST /v1/concepts`, 지금은 410)처럼 CMS가 판 없이 만든 개념이다(True).
+      이 경우를 False로 접으면 그런 개념을 영영 지울 수 없게 된다.
     """
-    first = (
+    first_change = (
         await session.execute(
             select(ConceptVersion.change)
             .where(ConceptVersion.concept_id == concept_code, ConceptVersion.version_no == 1)
             .limit(1)
         )
     ).scalar_one_or_none()
-    if not isinstance(first, dict):
-        return False
-    return first.get("change_type") == CMS_CREATE_CHANGE_TYPE
+    if isinstance(first_change, dict):
+        return first_change.get("change_type") == CMS_CREATE_CHANGE_TYPE
+    # 첫 판이 없거나 형식이 깨졌다 — 판이 하나라도 있으면 출처를 모르므로
+    # 지우지 않는 쪽(False)으로 둔다.
+    any_version = (
+        await session.execute(
+            select(ConceptVersion.version_id)
+            .where(ConceptVersion.concept_id == concept_code)
+            .limit(1)
+        )
+    ).first()
+    return any_version is None
 
 
 #: 신규 개념 제안이 "열려 있다"고 보는 상태 — 아직 발행(개념 행 실체화) 전이다.

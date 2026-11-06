@@ -17,7 +17,7 @@
 | 폐기(deprecate) | 포인터 비움 | 그대로(투영 없음 — 개념 행은 마지막 발행 내용 유지) |
 | 신규 개념 첫 발행(P3-26) | `_materialize_concept`가 필드를 직접 옮김 | 같은 `_project_payload`를 거침(첫 판과 이후 판이 다른 필드를 옮기는 어긋남 제거) |
 | 투영된 행의 소유 표지 | 신규 개념만 `cms_edited_at` | 투영된 모든 행에 `cms_edited_at` — 다음 graph.json 적재가 조용히 덮지 않고 충돌로 보고(P3-25 규약) |
-| 개념 삭제 판정 | 표지 있음 = CMS가 만든 개념 | 표지 **그리고** 첫 판이 `cms_create`여야 CMS가 만든 개념(`gate.is_cms_created`). 수정판이 발행된 graph.json 개념은 여전히 `file_owned`로 거부 |
+| 개념 삭제 판정 | 표지 있음 = CMS가 만든 개념 | 표지 **그리고** 판 이력이 CMS 생성을 말해야 CMS가 만든 개념(`gate.is_cms_created` — 첫 판이 `cms_create`이거나 판이 하나도 없음). 판이 있는데 첫 판이 제안이 아닌 개념(수정판이 발행된 graph.json 개념)은 `file_owned`로 거부. *정정(2026-11-06)*: 1차안은 "판 없음"도 거부해 P3-26 이전 부류의 CMS 개념을 지울 수 없게 했고, 실 PG 통합 `test_concept_patch_delete_roundtrip_on_live_pg`가 409로 잡았다 |
 
 서빙 코드는 바꾸지 않았다. 학생 경로는 여전히 개념 행만 읽고 `concept_version`을 직접 읽지 않는다 — 대신 **개념 행에 쓰는 길이 발행 게이트를 지나는 길 하나로 늘었다.** 결과적으로 D축(판 상태 + Publish Gate)의 결과가 학생 노출에 닿는다. B5의 전제("D는 학생 노출이 아니다")가 깨졌으므로 재판정한다.
 

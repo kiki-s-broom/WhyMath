@@ -60,7 +60,9 @@ POST /concept-proposals  ──▶ concept_version v1 (DRAFT, change_type=cms_cr
 - 심사 중 같은 코드를 graph.json 적재가 선점하면 발행은 `concept_code_free` 게이트 실패로 거부된다(적재 소유 개념을 덮지 않는다).
 - **기존 개념의 수정 판은 발행·복원될 때 개념 행에 투영된다(P3-100)** — 발행으로 행이 *생기는* 것은 여전히 신규 개념뿐이고,
   기존 개념은 같은 함수(`publish_gate._project_payload`)가 payload 11필드를 행에 옮기고 `cms_edited_at`을 채운다. 그래서 표지만으로는
-  "CMS가 만든 개념"을 가를 수 없어, 삭제 판정은 첫 판이 `cms_create`인지(`gate.is_cms_created`)를 함께 본다.
+  "CMS가 만든 개념"을 가를 수 없어, 삭제 판정은 판 이력(`gate.is_cms_created`)을 함께 본다 — 첫 판이 `cms_create`면 CMS 생성,
+  판이 있는데 첫 판이 제안이 아니면 투영으로 표지가 붙은 적재 개념(거부), 판이 **하나도 없으면** 투영에서 온 표지가 아니므로
+  CMS 생성(P3-26 이전 직접 생성 부류 — 이것까지 거부하면 그런 개념을 영영 지울 수 없다).
   축 재판정: `docs/reviews/p3_100_concept_revision_serving_b5_rejudgment_2026-11-05.md`.
 - 직접 생성 경로 `POST /v1/concepts`는 **폐지(410)**했다 — 남겨 두면 위 모든 것을 우회한다. 인증·권한은 먼저 검사되므로
   권한 없는 호출자는 410이 아니라 401/403을 본다.
