@@ -1235,6 +1235,8 @@ gates:
       - "[2026-11-06] depends_on +P3-106-phase3-learning-loop-success-prod-measure · depends_on +P3-107-phase3-critical-defect-payload-collector · depends_on +P3-105 · depends_on +P3-29-content-view-log-seat-decision · notes +512자 — P3-17 판정 독립 검토 보완 3건의 소유 태스크를 게이트 입력으로 연결 · 검토 기준 main 6cccb547"
       - "[2026-11-06] notes +748자 — Kiki 결정 기록 — 성공 기준 Q1 학생 수 조건 삭제 · 검토 기준 main 6cccb547"
       - "[2026-11-06] input done · P3-105 · 판정 무관: 게이트 판정은 Kiki 몫 — 이 태스크는 Q1 처분 결정의 문서 반영만 넘긴다 — done P3-105 인계"
+      - "[2026-11-06] input done · P3-91-p3-62-candidate-promotion-fill-template-fix · 판정 무관: 구현 입력 태스크라 게이트 전체 판정을 내리지 않는다 — 게이트는 판정 회차 분리 집행(구현 세션과 다른 세션)이고 다른 입력(P3-94 등)이 미완이다. 이 태스크가 낸 D11 축 실측: solution_qa exit 0 · 626/1,121 = 0.55843 ≥ 55%(617) · 기준 PR #1856 head 977f0ed7(승격 커밋 ce745bb6) · 보고서 docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md — done P3-91-p3-62-candidate-promotion-fill-template-fix 인계"
+      - "[2026-11-06] input done · P3-93 · 판정 무관: 구현 입력 태스크라 게이트 전체 판정을 내리지 않는다 — 게이트는 판정 회차 분리 집행(구현 세션과 다른 세션)이고 다른 입력(P3-94 등)이 미완이다. 이 태스크가 낸 D11 축 실측: solution_qa exit 0 · 626/1,121 = 0.55843 ≥ 55%(617) · 기준 PR #1856 head 977f0ed7(승격 커밋 ce745bb6) · 보고서 docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md — done P3-93 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring

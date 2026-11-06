@@ -1093,6 +1093,11 @@ def _extremum_points(m: re.Match[str]) -> sympy.Expr:
 @_rule(
     "extremum_points",
     "극값·증감 전환점의 x좌표",
+    rf"{_FN}(?P<f>{_E})에 대하여 방정식 f'\(x\) = 0의 해 중에서 f\(x\)가 극값을 갖는 x좌표는\?",
+)
+@_rule(
+    "extremum_points",
+    "극값·증감 전환점의 x좌표",
     rf"{_FN}(?P<f>{_E})의 그래프 위의 점 \(a, f\(a\)\)에서 함수 f\(x\)가 극값을 가질 때, "
     r"이 점의 x좌표 a의 값은\?",
 )
@@ -1547,6 +1552,23 @@ def _extremum_value_with_stated_roots(m: re.Match[str]) -> sympy.Expr:
 def _mvt_k(m: re.Match[str]) -> sympy.Expr:
     lo, hi = _bounds(m)
     return (_rat(m["b"]) - _rat(m["a"])) / (hi - lo)
+
+
+@_rule(
+    "mean_value_c",
+    _MVT_TITLE,
+    rf"함수 f는 닫힌구간 \[(?P<lo>{_NUM}), (?P<hi>{_NUM})\]에서 연속이고 열린구간 "
+    r"\((?P=lo), (?P=hi)\)에서 "
+    rf"미분가능하며 f\((?P=lo)\) = (?P<a>{_NUM}), f\((?P=hi)\) = (?P<b>{_NUM})이고, "
+    rf"f'\(x\) = (?P<d>{_E})이다\. 평균값 정리에 의하여 f'\(c\)가 이 구간에서의 f\(x\)의 "
+    r"평균변화율과 같아지는 c가 열린구간 \((?P=lo), (?P=hi)\)에 존재할 때, c의 값을 구하시오\.",
+)
+def _mvt_c_from_derivative(m: re.Match[str]) -> sympy.Expr:
+    """발문이 준 두 함숫값의 평균변화율 = 발문이 준 도함수 — 열린구간 안의 근 하나."""
+    lo, hi = _bounds(m)
+    rate = (_rat(m["b"]) - _rat(m["a"])) / (hi - lo)
+    roots = [r for r in _real_roots(_read_expr(m["d"]) - rate) if lo < r < hi]
+    return _single(roots, "MVT_C_IN_INTERVAL")
 
 
 @_rule(
@@ -2242,6 +2264,19 @@ def _tangent_second_intersection(m: re.Match[str]) -> sympy.Expr:
 
 
 @_rule(
+    "tangent_second_intersection",
+    "접선이 곡선과 다시 만나는 점",
+    rf"곡선 y = (?P<f>{_E}) 위의 점 \((?P<a>{_NUM}), (?P<b>{_NUM})\)에서의 접선이 "
+    r"이 곡선과 만나는 점 중 접점이 아닌 점을 Q라 할 때, 점 Q에서의 이 곡선의 접선의 기울기를 "
+    r"구하시오\.",
+)
+def _tangent_slope_at_second_intersection(m: re.Match[str]) -> sympy.Expr:
+    """접점 a의 접선과 곡선의 다른 교점 Q(하나)에서의 곡선의 기울기 f'(Q)."""
+    q = _tangent_second_intersection(m)
+    return sympy.diff(_read_expr(m["f"]), _X).subs(_X, q)
+
+
+@_rule(
     "tangent_from_outside_point",
     "곡선 밖의 점에서 그은 접선의 기울기",
     rf"점 \((?P<px>{_NUM}), (?P<py>{_NUM})\)에서 곡선 y = (?P<f>{_E})에 그은 접선은 하나뿐이다\. "
@@ -2324,7 +2359,7 @@ def _train_motion(m: re.Match[str]) -> sympy.Expr:
         equation = acc.subs(_T, _rat(g["a"]))
     elif g := re.fullmatch(
         rf"열차의 (?P<q>속도|가속도)가 출발한 지 (?P<a>\d+)초 후에 (?P<v>{_NUM}) "
-        r"cm/초(?:\^2)?였다고 할 때, "
+        r"cm/초(?:\^2)?(?:이었|였)다고 할 때, "
         rf"{m['p']}의 값을 구하시오\.",
         tail,
     ):

@@ -42,7 +42,8 @@ def _expr(text: str) -> sympy.Expr:
 
 def _function(question: str) -> sympy.Expr:
     cleaned = question.replace(" (a는 상수)", "")
-    m = re.search(r"f\(x\) = ([^가-힣]+?)(?:에 대하여| ?가 x|$)", cleaned)
+    # P3-91 — 발문 조사를 괄호 앞 식의 받침에 맞춘다('(a는 상수)이'·'가') — 둘 다 읽는다.
+    m = re.search(r"f\(x\) = ([^가-힣]+?)(?:에 대하여| ?(?:이|가) x|$)", cleaned)
     assert m, question
     return _expr(m.group(1).strip())
 

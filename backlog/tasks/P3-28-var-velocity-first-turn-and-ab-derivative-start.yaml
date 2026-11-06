@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-28-var-velocity-first-turn-and-ab-derivative-start
+title: "Solution QA 잔여 VAR 2건(운동 방향 '처음') + a·b 소거형 출발식 도함수화"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 남은 C2_FINAL_STEP_VAR_NOT_ANSWER_VAR 2건(velocity '처음 운동 방향을 바꿀 때의 위치' 틀 · p3_diff_velocity_acceleration_skeleton_generator.py k2)을 판정 가능하게 한다. 실측: 구조화 조건(Derivative(x(t)) = 0 · t > 0 · a(t) != 0 · 부호 바뀌는 근 전부와의 t 비교 · y = x(t))만으로는 C1이 FAIL이다 — answer_map에 시각 t가 없다. answer_map에 t를 넣는 것은 기본·구조화 공통 필드 변경이라 은행 바이트가 바뀐다 → 새 회차 S5 감사 동반. ② a·b 소거형 6건의 연쇄 출발식에 Derivative를 담는다(b 정의 등식을 -Derivative(...).subs(x, r) 꼴로) — test_p3_diff_solution_steps의 '출발식 도함수 없음' 부류 6을 0으로. ③ 두 변경을 한 후보로 묶어 calc 새 회차 감사 후 승격(런북 §5)."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/p3_diff_*.py"
+  - data/corpus/problem_bank_p3_calculus1_diff_v0/
+  - docs/data/p3_calculus1_diff_audit/
+session: null
+notes: "출처: P3-91·P3-93 승격(2026-11-06 · 브랜치 claude/p3-91-93-solution-qa-55) 보고서 §5·§7-5. 이 PR은 DB를 건드리지 않는다."
+updated: 2026-11-06

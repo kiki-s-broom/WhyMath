@@ -41,7 +41,7 @@
         "mastery_check": 12
       },
       "distinct_frames": 18,
-      "distinct_skeletons": 51,
+      "distinct_skeletons": 52,
       "generator": "p3_diff_differentiability_skeleton_generator.P3DiffDifferentiabilityGenerator"
     },
     "[12미적Ⅰ-02-07]": {
@@ -82,7 +82,7 @@
   },
   "approval_status": {
     "note": "이 도구는 review_status를 쓰지 않는다(키 부재). 승인은 자격 통과 프로토콜 감사 (n ≥ 200 · Wilson 상한 ≤ 0.02) 뒤 코퍼스 단위 백필이 쓴다.",
-    "sample_review": "204건 전수 — 자격 통과 프로토콜(기계 ∪ LLM 판정자 A ∪ B) 3회차 S5 감사, 결함 0건 · 보정 상한 0.01907 ≤ 0.02",
-    "evidence": "docs/data/p3_fill_audit/bank_audit_r3/ (라벨·동결 사본) · docs/data/corpus_audit_p3_fill_v0.jsonl (코퍼스 단위 라벨) · is_published=False 유지"
+    "sample_review": "204건 전수 — 자격 통과 프로토콜(기계 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, 결함 0건 · 보정 상한 0.01907 ≤ 0.02 (P3-91 — 템플릿 문장 교정·규칙 (가) 승격)",
+    "evidence": "docs/data/p3_fill_audit/bank_audit_r5/ (라벨·동결 사본) · docs/data/corpus_audit_p3_fill_v0.jsonl (코퍼스 단위 라벨) · is_published=False 유지"
   }
 }

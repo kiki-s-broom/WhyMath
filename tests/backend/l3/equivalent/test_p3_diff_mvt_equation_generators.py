@@ -569,6 +569,9 @@ def _c_find_items() -> list[DiffItem]:
     ]
 
 
+_MVT_RATE = re.compile(r" = \(\(-?\d+\) - \(-?\d+\)\)/\(\((?P<b>-?\d+)\) - \((?P<a>-?\d+)\)\)$")
+
+
 def test_mvt_c_items_carry_the_open_interval_in_the_p3_19_format() -> None:
     items = _c_find_items()
     assert len(items) >= 30, len(items)
@@ -581,6 +584,11 @@ def test_mvt_c_items_carry_the_open_interval_in_the_p3_19_format() -> None:
         assert a < b
         if "Derivative(" in eq:  # 미분 평가는 조건당 1회·맨몸(Tier1 제약)
             assert ".doit().subs(" in eq and eq.count("Derivative") == 1
+        elif "f'(x) = " in item.question_text:  # 발문이 f'(x)를 주는 진단형(P3-91 calc 8회차)
+            # 좌변 = 주어진 f'(c) · 우변 = 평균변화율 (f(b) - f(a))/(b - a) — 분모가 구간 양끝이다
+            rate = _MVT_RATE.search(eq)
+            assert rate is not None, eq
+            assert (int(rate["b"]), int(rate["a"])) == (b, a), eq
         else:  # 문면의 방정식을 c에 대한 다항식으로 그대로 쓴 진단 문항
             assert eq.endswith(" = 0"), eq
         answer = _answer_value(item)

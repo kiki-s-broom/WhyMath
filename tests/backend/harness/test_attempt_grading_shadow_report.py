@@ -916,7 +916,10 @@ class TestCorpusVerifyBlockSupply:
         # 24건만 로더가 읽는다(나머지 24건은 극값의 값·미지 상수형이라 연립 목록 조건 — 로더가 건너뛴다).
         # 13,949 → 13,987(+38): 5단계 02-03 규칙 일반화 24건(전부 문자열 조건 1개)과 02-10 문장제 24건 가운데
         # 단일 조건 14건만 로더가 읽는다(02-10의 방향 전환 시각·값형 10건은 연립 목록 조건이라 건너뛴다).
-        assert len(blocks) == 13987
+        # 13,987 → 13,984(-3): P3-91 후속(calc 7회차 감사 처분)이 02-06 평균값 정리 진단 틀을 '두 함숫값만 주고
+        # f'(c)의 값'(문자열 조건 1개)에서 '도함수를 주고 c'(방정식 + 열린구간 경계 목록)로 바꿨다 — 이 3건이
+        # 문자열 조건 계약상 블록에서 빠진다(승인 5회차 동결본과 행별 대조로 정확히 그 3건 · 다른 변화 0).
+        assert len(blocks) == 13984
 
     def test_corpus_slug_derives_when_conditions_parsed_empty(self) -> None:
         """DB conditions_parsed가 비어 있어도 코퍼스 slug 매칭 시 파생 재료가 생긴다.
@@ -1161,4 +1164,5 @@ class TestCorpusCeilingReportDiscriminates:
         # 12,561 → 12,621(+60): 02-02 미분가능성 5슬롯 × 12건도 전부 같은 형태.
         # 12,621 → 12,645(+24): 02-07 중 문자열 조건 24건(연립 목록 조건 24건은 이 버킷이 아니다).
         # 12,645 → 12,683(+38): 5단계 중 문자열 조건 38건(위 블록 +38과 같은 사유).
-        assert report.bucket_counts["condition_formal_derivable"] == 12683
+        # 12,683 → 12,680(-3): 위 블록 -3과 같은 사유(평균값 정리 진단 3건이 목록 조건으로).
+        assert report.bucket_counts["condition_formal_derivable"] == 12680

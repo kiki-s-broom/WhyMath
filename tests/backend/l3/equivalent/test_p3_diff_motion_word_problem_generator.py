@@ -94,7 +94,7 @@ def _recompute(item) -> str:  # type: ignore[no-untyped-def]
         (u,) = sympy.solve(sympy.diff(f, _T).subs(_T, time) - speed, _U)
         return str(u)
     if fid == "word-rail-constant-from-acceleration":
-        time, accel = (int(v) for v in re.search(r"(\d+)초 후에 (-?\d+) cm/초\^2였다", text).groups())  # type: ignore[union-attr]
+        time, accel = (int(v) for v in re.search(r"(\d+)초 후에 (-?\d+) cm/초\^2(?:이었|였)다", text).groups())  # type: ignore[union-attr]
         (u,) = sympy.solve(sympy.diff(f, _T, 2).subs(_T, time) - accel, _U)
         return str(u)
     raise AssertionError(f"독립 재계산 경로가 없는 틀: {fid}")

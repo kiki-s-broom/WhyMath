@@ -904,17 +904,38 @@ def _real_domain_root_choice() -> Record | None:
 
 
 def _real_substitution_candidate() -> Record | None:
-    """마지막 단계가 x 후보 나열이고 정답 변수가 y 이며 조건에 x 도메인이 있는 실 레코드(극값의 값형)."""
+    """마지막 단계가 x 후보 나열이고 정답 변수가 y 이며 조건에 x 도메인이 있는 실 레코드(극값의 값형).
+
+    P3-91·P3-93 승격(2026-11-06) 뒤 승인 은행에는 이 모양(검증 불가로 남은 레코드)이 없다 — 규칙 (가)가
+    풀이 끝에 '근 선택 → 정답 변수 값' 두 줄을 이미 붙였다. 그런 승인 레코드에서 그 두 줄을 걷어 내면
+    같은 실 레코드의 진술 전 모양(근 후보 나열로 끝남)이 그대로 돌아온다 — 그 모양을 쓴다(합성 아님).
+    """
     for path in (P3_DIFF_BANK, P3_FILL_BANK):
         for record in _iter_bank(path):
-            item = qa.judge_record(record)
             if record.get("review_status") != "approved":
                 continue
-            if item.checks["C2"].code != "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR":
+            verify = record.get("verify") or {}
+            conditions = verify.get("conditions") or []
+            if not any(c.strip().startswith("x >") for c in conditions):
                 continue
-            conditions = (record.get("verify") or {}).get("conditions") or []
-            if any(c.strip().startswith("x >") for c in conditions):
+            item = qa.judge_record(record)
+            if item.checks["C2"].code == "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR":
                 return record
+            steps = verify.get("solution_steps") or []
+            if (
+                item.verdict is qa.Verdict.PASS
+                and len(steps) >= 3
+                and str(steps[-2]).startswith("x = ")
+                and "," in str(steps[-3])
+                and not str(steps[-1]).startswith("x ")
+            ):
+                stripped = copy.deepcopy(record)
+                stripped["verify"]["solution_steps"] = list(steps[:-2])
+                if (
+                    qa.judge_record(stripped).checks["C2"].code
+                    == "C2_FINAL_STEP_VAR_NOT_ANSWER_VAR"
+                ):
+                    return stripped
     return None
 
 

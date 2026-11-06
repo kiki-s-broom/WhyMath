@@ -49,7 +49,13 @@ def _variant(extra: list[str], conditions: list[str] | None = None) -> Record:
     record = copy.deepcopy(_real_record())
     verify = record["verify"]
     verify["conditions"] = list(conditions if conditions is not None else _GA_CONDITIONS)
-    verify["solution_steps"] = [*verify["solution_steps"], *extra]
+    # P3-91·P3-93 승격(2026-11-06) 뒤 승인 레코드는 이미 규칙 (가) 두 줄(근 선택·정답 변수 값)로
+    # 끝난다. 변형은 진술 전 연쇄(근 후보 나열로 끝나는 같은 실 레코드의 앞부분) 위에 붙인다.
+    base = list(verify["solution_steps"])
+    while base and "," not in base[-1]:
+        base.pop()
+    assert base, "근 후보 나열 단계가 없다 — 이 실 레코드로는 변형을 만들 수 없다"
+    verify["solution_steps"] = [*base, *extra]
     assert record != _real_record(), "변형이 레코드를 바꾸지 못했다"
     return record
 

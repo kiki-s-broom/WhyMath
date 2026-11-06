@@ -207,6 +207,12 @@ class DiffItem:
     #: 구조화 모드(`final_step_structuring`)에서만 후보에 실린다 — 기본 모드의 은행 바이트는 이
     #: 필드와 무관하다.
     structured_conditions: tuple[str, ...] | None = None
+    #: P3-93 — 구조화 모드 풀이의 **출발식**(정답 쪽 미지수의 단일 방정식). 미지수 두 개를 연립해야
+    #: 하는 틀(a·b)은 종전 연쇄가 임계점 x의 근 목록으로 끝나 정답 변수에 닿지 않는다. 그 틀은
+    #: 연립을 소거한 조건(다른 미지수의 정의 등식 + 남은 미지수 하나의 방정식)을
+    #: `structured_conditions`에 싣고, 이 출발식에서 연쇄를 새로 푼다. None이면 종전 연쇄
+    #: (`steps_of`)에 규칙 (가) 두 줄을 붙인다. 구조화 모드에서만 쓰인다(기본 모드 바이트 무관).
+    structured_setup: str | None = None
 
     @property
     def misconception_ids(self) -> frozenset[str]:
@@ -387,6 +393,55 @@ def _answer_variable(item: DiffItem, pick_variable: str) -> str | None:
     return names[0] if len(names) == 1 else None
 
 
+def _structured_setup_view(item: DiffItem) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """P3-93 — 소거한 조건·출발식에서 연쇄를 새로 풀어 정답 변수 값까지 진술한다.
+
+    · 연쇄는 `solution_steps`가 구조화 조건 위에서 푼다(전이 전건 correct가 아니면 ValueError).
+    · 연쇄가 정답 변수의 값 하나로 끝나면 그대로 쓴다(`a = -3`). 다른 미지수로 끝나면
+      (`a = -8` 다음에 b를 묻는 틀) 규칙 (가)와 같은 `final_statement_steps`로 정의 등식 대입
+      한 줄을
+      붙인다 — 그 대입도 조건만으로 증명돼야 한다(정답·answer_map을 넘기는 자리가 없다).
+    · 진술값이 정답 기록과 다르면 ValueError(저작 결함). 실패를 조용히 종전 단계로 돌리지 않는다 —
+      구조화 출발식을 단 틀은 증명이 안 되면 틀 설계 결함이다.
+    """
+    conditions = item.structured_conditions
+    setup = item.structured_setup
+    if conditions is None or setup is None:
+        raise ValueError(f"{item.frame_id}: 구조화 출발식에는 구조화 조건이 함께 있어야 한다")
+    chain = solution_steps(
+        conditions=conditions, answer_map=dict(item.answer_map), setup=setup
+    ).steps
+    tail = final_solution_values(chain[-1])
+    if tail is None or len(tail[1]) != 1:
+        raise ValueError(
+            f"{item.frame_id}: 구조화 출발식의 연쇄가 값 하나로 끝나지 않는다 {chain!r}"
+        )
+    variable = tail[0]
+    recorded_map = dict(item.answer_map)
+    if variable in recorded_map and _same_number(recorded_map[variable], item.answer_text):
+        steps: tuple[str, ...] = tuple(chain)
+        target = variable
+    else:
+        found = _answer_variable(item, variable)
+        if found is None:
+            raise ValueError(f"{item.frame_id}: 구조화 조건이 있는데 정답 변수를 하나로 못 정한다")
+        target = found
+        attached = final_statement_steps(chain, conditions=conditions, target=target)
+        if attached is None:
+            raise ValueError(
+                f"{item.frame_id}: 구조화 조건으로 정답 변수 대입을 증명하지 못했다 — "
+                f"{conditions!r}"
+            )
+        steps = attached
+    stated = steps[-1].split("=", 1)[1].strip()
+    if not _same_number(stated, recorded_map[target]):
+        raise ValueError(
+            f"{item.frame_id}: 풀이 끝 진술값 {target} = {stated} ≠ 정답 기록 "
+            f"{recorded_map[target]} — 저작 결함"
+        )
+    return conditions, steps
+
+
 @functools.lru_cache(maxsize=None)
 def structured_view(item: DiffItem) -> tuple[str | tuple[str, ...], tuple[str, ...]] | None:
     """규칙 (가)를 적용한 (검산 조건, 풀이 단계) — 붙일 수 없으면 None(종전 조건·단계를 쓴다).
@@ -396,6 +451,8 @@ def structured_view(item: DiffItem) -> tuple[str | tuple[str, ...], tuple[str, .
       않는다). 생성기가 `structured_conditions`를 달았는데 증명이 안 되면 그것도 ValueError(틀 설계
       결함 — 근거 조건이 판정기 허용 목록 밖).
     """
+    if item.structured_setup is not None:
+        return _structured_setup_view(item)
     chain = steps_of(item).steps
     tail = final_solution_values(chain[-1])
     if tail is None:

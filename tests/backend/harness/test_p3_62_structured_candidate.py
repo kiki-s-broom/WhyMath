@@ -62,7 +62,8 @@ def test_structured_items_exist_and_are_provable() -> None:
         assert view is not None
         stated.add(view[1][-1].split(" = ", 1)[0])
     # 극값의 값(y)을 묻는 틀과 상수 k를 묻는 틀이 둘 다 구조화돼 있다(한쪽 빌더만 남으면 RED).
-    assert stated == {"y", "k"}
+    # P3-93 — a·b 연립 틀(a를 묻는 틀 · b를 묻는 틀)도 구조화된다(소거형 출발식 · 네 빌더 중 하나만 빠져도 RED).
+    assert stated == {"y", "k", "a", "b"}
 
 
 def test_candidate_is_deterministic_and_keeps_the_item_set() -> None:
@@ -95,9 +96,10 @@ def test_candidate_is_deterministic_and_keeps_the_item_set() -> None:
     assert changed > 0
 
 
-def test_candidate_provenance_is_marked_and_default_is_not() -> None:
-    marked = batch.build_provenance(_GENERATORS, structured=True)
+def test_legacy_provenance_is_marked_and_default_is_not() -> None:
+    """P3-91·P3-93 승격 뒤 — 구조화가 승인 형태라 표기는 구판 출력에만 붙는다."""
+    marked = batch.build_provenance(_GENERATORS, legacy=True)
     plain = batch.build_provenance(_GENERATORS)
-    assert marked["solution_structuring"] == batch.STRUCTURING_NOTE
+    assert marked["solution_structuring"] == batch.LEGACY_NOTE
     assert "solution_structuring" not in plain
     assert {k: v for k, v in marked.items() if k != "solution_structuring"} == plain

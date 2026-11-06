@@ -69,13 +69,33 @@ def test_baseline_is_measurable_on_every_axis(baseline: cli.EvalReport) -> None:
         assert axis.n_errors == 0
 
 
-def test_p3_77_measured_cases_are_resolved_or_explained(baseline: cli.EvalReport, base) -> None:
+def _hint_case_of(eval_set: EvalSet, problem_id: str, ladder_pos: int) -> str:
+    """사례 번호가 아니라 *문항*으로 사례를 찾는다 — 은행 승격으로 id가 바뀐 문항이 정렬상 앞에 끼면
+    같은 개념의 사다리 번호가 밀린다(P3-91·93 승격에서 `aq-h-10-05` → `aq-h-10-06` 실측).
+    결함은 문항에 붙어 있으므로 문항 id로 고정하고, 정확히 1건인지 단언한다(0건·중복을 통과로 접지 않는다).
+    """
+    found = [
+        c.case_id
+        for c in eval_set.cases
+        if c.kind == "hint" and c.problem_id == problem_id and c.ladder_pos == ladder_pos
+    ]
+    assert len(found) == 1, (problem_id, ladder_pos, found)
+    return found[0]
+
+
+#: P3-10이 L3 공백을 잰 문항(장난감 열차 — 운동 방향을 바꾸는 순간의 가속도 · fill 은행)
+_L3_GAP_PROBLEM = "0c19ec07-e181-5edf-b017-12c3e5794f86"
+
+
+def test_p3_77_measured_cases_are_resolved_or_explained(
+    baseline: cli.EvalReport, base, eval_set: EvalSet
+) -> None:
     """P3-77 회귀 동결 — P3-10이 잰 실결함 2건의 *현재 처분*을 사례 단위로 고정한다.
 
     ① `aq-h-06-04-l3`(동치 산술식 누설)은 정답 누설 축 실패에서 사라진다 — 게이트 B 값 축이 그
        L3를 거부하고 사다리가 1단계 L3(앞 단계 대체)를 낸다.
-    ② `aq-h-10-05-l3`(L3 공백)은 L2 정직 하향으로 처분된다 — 엔진 단계(3)와 표시(2)가 달라 Hint 적절성
-       실패로 *남되*, 그 이유가 리포트에 후보 주석으로 실린다(acceptance ④ '의도적 제외 사유').
+    ② L3 공백 문항(`_L3_GAP_PROBLEM` — 잴 때 `aq-h-10-05-l3`, P3-91·93 승격 뒤 `aq-h-10-06-l3`)은
+       L2 정직 하향으로 처분된다 — 엔진 단계(3)와 표시(2)가 달라 Hint 적절성 실패로 *남되*, 그 이유가 리포트에 후보 주석으로 실린다(acceptance ④ '의도적 제외 사유').
     종합 exit code 전체는 동결하지 않는다 — 임계 6개가 Kiki 확정 전 제안값이라 실측 판정을 CI에
     걸지 않는다는 P3-10 결정(§8)을 그대로 따른다. 여기서 잠그는 것은 두 사례의 처분뿐이다.
     """
@@ -88,9 +108,10 @@ def test_p3_77_measured_cases_are_resolved_or_explained(baseline: cli.EvalReport
     )
     assert mvt.note is not None and "earlier_step_partial" in mvt.note
     hint_failures = {f.case_id: f for f in baseline.axis("hint_appropriateness").failures}
-    gap = hint_failures.get("aq-h-10-05-l3")
+    gap_case = _hint_case_of(eval_set, _L3_GAP_PROBLEM, 3)
+    gap = hint_failures.get(gap_case)
     assert gap is not None and gap.note is not None and "의도적 제외" in gap.note
-    assert base["aq-h-10-05-l3"].tutor_output["hint_level"] == 2  # 표시 = 본문(L2)
+    assert base[gap_case].tutor_output["hint_level"] == 2  # 표시 = 본문(L2)
     assert all("역행" not in r for r in gap.reasons)  # 종전 사다리 역행(L2→0)은 해소
 
 

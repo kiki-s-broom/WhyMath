@@ -247,6 +247,32 @@ def _pin_cond(fn_sym: str, point: int) -> str:
     return f"Derivative({fn_sym}, x).doit().subs(x, {point}) = 0"
 
 
+def _value_rank_conds(poly: Poly, points: Sequence[int], *, pick: str) -> tuple[str, ...]:
+    """P3-93 선택 근거 — 같은 종류 극점 여럿 중 *값이* 가장 작은(큰) 점을 고르는 조건.
+
+    `points`(묻는 종류의 극점 **전부** — 정답 극점만이 아니다) 각각과 값을 비교하는 다항 부등식
+    `f(x) - f(r) <= 0`(작은 값) · `>= 0`(큰 값)을 만든다. 정답 x좌표에서 역산하지 않는다: 비교
+    대상은 발문이 묻는 종류의 극점 집합 전체이고, 그 조건을 만족하는 임계점이 정확히 하나인지는 공용
+    해석 판정이 조건만으로 증명한다(하나가 아니면 빌드가 멈춘다 — 값이 같은 두 극값은 통과하지
+    못한다). f'' 부호 조건(`_kind_basis`)과 함께 쓰면 다른 종류 극점은 거기서 빠진다.
+    """
+    op = "<=" if pick == "smaller" else ">="
+    sym = poly_to_sympy_str(poly)
+    return tuple(f"{sym} - ({eval_at(poly, r)}) {op} 0" for r in points)
+
+
+def _turning_basis(poly: Poly) -> str:
+    """P3-93 선택 근거 — '극값'(종류 무관): 이계도함수가 0이 아닌 임계점(부호가 바뀌는 단순근).
+
+    평평한 임계점(f'의 중근 — 부호가 바뀌지 않는다)은 f''도 0이라 이 조건에서 빠진다. 호출부는 이
+    조건이 극값 임계점과 평평한 임계점을 실제로 가르는지(평평한 근에서 f'' = 0 · 극값 근에서
+    f'' ≠ 0)
+    먼저 확인한 뒤에만 단다.
+    """
+    second = derivative_of(derivative_of(poly))
+    return f"{poly_to_sympy_str(second)} != 0"
+
+
 def _item(
     *,
     slot: str,
@@ -262,6 +288,7 @@ def _item(
     distractors: tuple[tuple[int, str], ...] = (),
     setup: str | None = None,
     structured: tuple[str, ...] | None = None,
+    structured_setup: str | None = None,
 ) -> ShapeItem:
     return ShapeItem(
         slot=slot,
@@ -278,6 +305,7 @@ def _item(
         answer_selection=selection,
         solution_setup=setup,
         structured_conditions=structured,
+        structured_setup=structured_setup,
     )
 
 
@@ -508,6 +536,21 @@ def _judged_value_item(
         listed = ", ".join(f"x = {r}에서 {values[r]}" for r in sorted(targets))
         size = "작은" if pick == "smaller" else "큰"
         tail = f"두 {kind_word}은 {listed}이고, 이 중 {size} 값은 {value}이다."
+    # P3-93 — '극값'(종류 무관)을 묻고 평평한 임계점이 섞인 형태: 극값 임계점이 하나이고, 평평한
+    # 임계점에서는 f''가 0·극값 임계점에서는 f''가 0이 아닐 때만 f'' ≠ 0을 선택 근거로 싣는다(그
+    # 조건이 두 부류를 실제로 가르는지 SymPy로 먼저 확인 — 아니면 구조화하지 않고 종전 검증 불가로
+    # 둔다). 근 하나로 정해지는지는 공용 해석 판정이 조건만으로 다시 증명한다.
+    structured: tuple[str, ...] | None = None
+    second = poly_to_sympy(derivative_of(derivative_of(fn.poly)))
+    if (
+        word == "any"
+        and pick is None
+        and len(targets) == 1
+        and fn.flat_roots
+        and all(second.subs(_X, r) == 0 for r in fn.flat_roots)
+        and second.subs(_X, target) != 0
+    ):
+        structured = (_deriv_cond(fn.sym, "="), _turning_basis(fn.poly), f"y = {fn.sym}")
     return _item(
         slot=slot,
         frame_id=frame_id,
@@ -525,6 +568,7 @@ def _judged_value_item(
         explanation=f"{_explain(fn)} {tail}",
         # 검산 조건의 f'(x) = 0은 도함수를 미리 풀어 쓴 다항식 — 풀이 단계는 미분에서 출발한다.
         setup=f"Derivative({fn.sym}, x).doit() = 0",
+        structured=structured,
     )
 
 
@@ -864,17 +908,24 @@ def _quartic_k_frame(
             answer_map=(("x", str(target)), ("k", str(k)), ("y", str(value))),
             ptype=_OPT,
             explanation=explanation,
-            # 규칙 (가) — 가운데 극값만(바깥 두 극값은 같은 종류라 f'' 부호로 하나가
-            # 정해지지 않는다).
+            # 규칙 (가) — 가운데 극값은 f'' 부호만으로 하나가 정해진다. 바깥 두 극값은 같은 종류라
+            # f'' 부호로 둘 다 남으므로(P3-62 §B-5), P3-93이 그 둘 전부와의 값 비교 조건을 더한다
+            # (`_value_rank_conds` — 비교 대상은 바깥 극점 둘 다이고 정답 극점을 따로 고르지
+            # 않는다).
             structured=(
-                (
-                    _pin_cond(f_sym, pinned),
-                    _deriv_cond(fn.sym, "="),
-                    _kind_basis(poly, fn.kinds[target]),
-                    f"y = {fn.sym}",
-                )
-                if ask == "middle"
-                else None
+                _pin_cond(f_sym, pinned),
+                _deriv_cond(fn.sym, "="),
+                _kind_basis(poly, fn.kinds[target]),
+                *(
+                    ()
+                    if ask == "middle"
+                    else _value_rank_conds(
+                        poly,
+                        targets,
+                        pick="smaller" if ask == "outer-smaller" else "larger",
+                    )
+                ),
+                f"y = {fn.sym}",
             ),
         )
 
@@ -1144,6 +1195,14 @@ def _find_ab_item(
         f"x = {r}에서 실제로 {_kind_word(kind)} {with_eul_reul(value)} 가지므로 "
         f"구하는 {ask}의 값은 {answer}이다."
     )
+    # P3-93 — 연립 {f'(r) = 0, f(r) = v}의 소거형. f'(r) = 3·lead·r^2 + 2r·a + b = 0을 b에 대해
+    # 풀어 b의 정의 등식으로 두고, f(r) = v에 대입해 a 하나의 방정식을 만든다(같은 연립의 동치
+    # 변형). 극값의 종류(발문의 극대·극소 — SymPy 부호 분석 결과)는 f''(r)의 부호로 싣는다. 풀이는
+    # a 방정식에서 출발하고, b를 묻는 틀은 a 값을 b 정의 등식에 대입하는 한 줄이 붙는다.
+    a_sym = sympy.Symbol("a")
+    b_def = sympy.expand(-3 * lead * r * r - 2 * r * a_sym)
+    a_equation = f"({lead})*({r})**3 + a*({r})**2 + ({b_def})*({r}) + ({c}) = {value}"
+    second_at_r = sympy.expand(6 * lead * r + 2 * a_sym)
     return _item(
         slot=slot,
         frame_id=frame_id,
@@ -1165,6 +1224,12 @@ def _find_ab_item(
         ),
         ptype=_SOLVE,
         explanation=explanation,
+        structured=(
+            f"b = {b_def}",
+            a_equation,
+            f"{second_at_r} {'>' if kind == 'min' else '<'} 0",
+        ),
+        structured_setup=a_equation,
     )
 
 
@@ -1383,7 +1448,9 @@ def _misconception_frames() -> list[Frame]:
         ),
         _flat_frame(
             "mc-derivative-zero-which-extremum",
-            "방정식 f'(x) = 0의 해 중에서 함수 f(x) = {f}{ga} 극값을 갖는 x좌표는?",
+            # P3-91 후속(calc 7회차 감사 · f832f55b) — 발문이 f(x)를 정의하기 전에 f'(x)를 썼다.
+            # 함수를 먼저 소개하고 방정식 f'(x) = 0을 말한다(묻는 대상·정답 불변).
+            "함수 f(x) = {f}에 대하여 방정식 f'(x) = 0의 해 중에서 f(x)가 극값을 갖는 x좌표는?",
             "p3-shape:mc4",
             slot=slot,
             role="any",
@@ -1545,6 +1612,14 @@ def _find_b_quartic_frame(frame_id: str, template: str, seed: str, *, slot: str)
             answer_map=(("x", str(q)), ("b", str(c)), ("a", str(a))),
             ptype=_SOLVE,
             explanation=explanation,
+            # P3-93 — f'(q) = 0은 a만 담으므로 a를 먼저 정하고(출발식), f(q) = v를 b의 정의 등식
+            # b = v - (q^4 + a·q^3)으로 둔다. 극소는 f''(q) = 12q^2 + 6aq > 0으로 싣는다.
+            structured=(
+                _pin_cond(base_sym, q),
+                f"b = {value} - (({q})**4 + a*({q})**3)",
+                f"{sympy.expand(12 * q * q + 6 * q * sympy.Symbol('a'))} > 0",
+            ),
+            structured_setup=_pin_cond(base_sym, q),
         )
 
     return Frame(frame_id, combos, build)

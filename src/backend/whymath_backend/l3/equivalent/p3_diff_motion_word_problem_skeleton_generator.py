@@ -345,7 +345,7 @@ def _acceleration_constant(p: tuple[object, ...]) -> DiffItem | None:
         frame_id="word-rail-constant-from-acceleration",
         text=(
             f"{_RAIL} s(t) = t^3 - ut^2 + 5t (cm)이다 (u는 상수). 열차의 가속도가 출발한 지 "
-            f"{t0}초 후에 {accel} cm/초^2였다고 할 때, u의 값을 구하시오."
+            f"{t0}초 후에 {accel} cm/초^2이었다고 할 때, u의 값을 구하시오."
         ),
         condition=f"Derivative(x**3 - u*x**2 + 5*x, x, x).doit().subs(x, {t0}) = {accel}",
         answer=u,

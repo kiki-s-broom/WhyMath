@@ -85,10 +85,10 @@ __all__ = [
     "BACKFILL_STAMP_DEFAULTS",
     "CORPUS_DIR_NAME",
     "GENERATORS",
-    "STRUCTURING_NOTE",
+    "LEGACY_NOTE",
     "build_provenance",
     "drift_against",
-    "refuses_structured_write",
+    "refuses_legacy_write",
     "main",
     "run_p3_calculus1_diff_batch",
     "strip_backfill_stamps",
@@ -114,11 +114,14 @@ _GENERATED_DATE: Final = "2026-10-06"
 _PROBLEMS_FILE: Final = "problems.jsonl"
 _PROVENANCE_FILE: Final = "_provenance.json"
 
-#: 규칙 (가) 후보 은행 사이드카 표기(P3-62) — 이 키가 있는 은행은 감사받지 않은 **후보**다.
-STRUCTURING_NOTE: Final[dict[str, str]] = {
-    "rule": "P3-62 규칙 (가) — 풀이 끝에 근 선택·정답 변수 값 진술(조건으로 증명된 해석 단계)",
-    "status": "후보 은행 — 새 회차 S5 감사 전에는 승인 은행을 대체하지 않는다",
-    "cli_flag": "--structure-final-step",
+#: 구판(P3-62 이전) 출력 사이드카 표기 — 이 키가 있는 은행은 **승인 은행이 아니다**.
+#: P3-91·P3-93(2026-11-06)부터 규칙 (가) 구조화(풀이 끝 정답 변수 값 진술)가 승인 형태다(런북
+#: `docs/reviews/p3_62_s5_candidate_audit_runbook_2026-10-21.md` §5-4 — 기본값을 구조화로). 구판은
+#: 비교·재현(주입이 실제로 들어갔는지 대조)용으로만 남는다.
+LEGACY_NOTE: Final[dict[str, str]] = {
+    "rule": "P3-62 이전 형태 — 풀이 끝 정답 변수 값 진술(규칙 (가))·P3-93 구조화 없음",
+    "status": "비교·재현용 — 승인 은행이 아니다(승인 은행 자리에 쓰지 않는다)",
+    "cli_flag": "--legacy-final-step",
 }
 
 
@@ -127,11 +130,14 @@ def _corpus_root() -> Path:
     return Path(__file__).resolve().parents[4] / "data" / "corpus"
 
 
-def refuses_structured_write(out_dir: Path, corpus_root: Path | None = None) -> str | None:
-    """구조화 후보를 승인 은행 영역(`data/corpus` 아래 어디든)에 쓰려 하면 거부 사유(아니면 None).
+def refuses_legacy_write(out_dir: Path, corpus_root: Path | None = None) -> str | None:
+    """구판(승인 형태가 아닌) 출력을 승인 은행 영역(`data/corpus` 아래 어디든)에 쓰려 하면 거부
+    사유(아니면 None).
 
+    P3-62 때는 감사 전 *구조화 후보*를 막던 가드다. P3-91·P3-93 승격으로 구조화가 승인 형태가 되어
+    막는 대상을 뒤집었다 — 이제 승인되지 않은 쪽은 구판이다(보호 장치를 없애지 않고 방향만 바꾼다).
     승인 은행은 각인을 걷어 낸 바이트가 감사 동결 사본과 결속돼 있다.
-    후보를 그 자리에 쓰면 결속 테스트가 깨지고, 감사 없이 승인을 새 내용으로 옮기는 셈이다.
+    승인되지 않은 출력을 그 자리에 쓰면 결속 테스트가 깨지고, 감사 없이 승인을 옮기는 셈이다.
     자기 은행만 막으면 다른 배치의 은행 경로로 덮어쓸 수 있다
     (예: `p3_fill_batch --out-dir <미적분 은행>`). 그래서 `data/corpus` 전체를 막는다.
     비교는 `resolve()` 뒤 경로 포함 관계로 한다. 문자열 접두 비교가 아니므로
@@ -142,8 +148,8 @@ def refuses_structured_write(out_dir: Path, corpus_root: Path | None = None) -> 
     target = out_dir.resolve()
     if target == root or target.is_relative_to(root):
         return (
-            f"--structure-final-step 후보를 승인 은행 영역({root}) 안({out_dir})에 쓰지 않는다 — "
-            "--out-dir 로 저장소 밖 디렉터리를 지정하라(승격은 새 회차 S5 감사 뒤 런북 절차)."
+            f"--legacy-final-step 구판 출력을 승인 은행 영역({root}) 안({out_dir})에 쓰지 않는다 — "
+            "--out-dir 로 저장소 밖 디렉터리를 지정하라(구판은 비교·재현용이다)."
         )
     return None
 
@@ -166,7 +172,7 @@ def run_p3_calculus1_diff_batch(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
     out_path: Path | None = None,
     write: bool = True,
-    structure_final_step: bool = False,
+    structure_final_step: bool = True,
 ) -> CorpusBatchReport:
     """등록부의 개념 × 6슬롯을 돌려 게이트(Tier1 SymPy 검산)를 통과한 문항을 적재한다.
 
@@ -174,13 +180,14 @@ def run_p3_calculus1_diff_batch(
     오개념 유발 슬롯만 스펙이 kebab 집합을 요구하고, 나머지는 공집합이라 동등성 점수가 1.0이다.
     `signature_index=None`으로 호출한다(구조 dedup이 해값 기반이라 서로 다른 문항을 오탐).
 
-    `structure_final_step`이면 규칙 (가)(P3-62)를 적용한 **후보 은행**을 만든다(문항 집합은 같고
-    검산 조건·풀이 단계만 다르다 — `p3_diff_skeleton_base.final_step_structuring`).
+    기본(`structure_final_step=True`)이 승인 형태다 — 규칙 (가)(P3-62)·P3-93 구조화를 적용한다
+    (문항 집합은 구판과 같고 검산 조건·풀이 단계만 다르다 — `p3_diff_skeleton_base.
+    final_step_structuring`). False면 구판 출력이며 승인 은행 자리에는 쓰지 않는다.
     """
-    if structure_final_step and write:
+    if not structure_final_step and write:
         # CLI 가드만 있으면 라이브러리 호출(`out_path=None` → 기본 승인 은행)이 그대로 덮어쓴다.
         target = out_path if out_path is not None else _default_out_dir() / _PROBLEMS_FILE
-        refusal = refuses_structured_write(target.parent)
+        refusal = refuses_legacy_write(target.parent)
         if refusal is not None:
             raise ValueError(refusal)
     with final_step_structuring(structure_final_step):
@@ -248,15 +255,15 @@ def _run_batch(
 def build_provenance(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
     *,
-    structured: bool = False,
+    legacy: bool = False,
 ) -> dict[str, Any]:
     """사이드카(`_provenance.json`) 내용 — 생성기 문항 목록에서 결정론으로 계산한다(시계 의존 0).
 
-    `structured`면 후보 은행 표기(`solution_structuring`)를 끝에 더한다 — 기본 사이드카 바이트 불변.
+    `legacy`면 구판 표기(`solution_structuring`)를 끝에 더한다 — 승인 사이드카 바이트 불변.
     """
     provenance = _build_provenance(generators)
-    if structured:
-        provenance["solution_structuring"] = dict(STRUCTURING_NOTE)
+    if legacy:
+        provenance["solution_structuring"] = dict(LEGACY_NOTE)
     return provenance
 
 
@@ -313,11 +320,11 @@ def _build_provenance(generators: Sequence[type[P3DiffSlotGenerator]]) -> dict[s
                 "라벨로 쓴다. 각인을 걷어 낸 은행 바이트가 감사 동결 사본과 같아야 승인이 유효하다."
             ),
             "sample_review": (
-                "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, "
-                "결함 1건 · 보정 상한 0.01151 ≤ 0.02"
+                "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 8회차 S5 감사, "
+                "결함 1건 · 보정 상한 0.01151 ≤ 0.02 (P3-91·P3-93 — 규칙 (가)·P3-93 구조화 승격)"
             ),
             "evidence": (
-                "docs/data/p3_calculus1_diff_audit/bank_audit_r5/ (사전 등록·라벨·동결 사본) · "
+                "docs/data/p3_calculus1_diff_audit/bank_audit_r8/ (사전 등록·라벨·동결 사본) · "
                 "docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl (코퍼스 단위 라벨) · "
                 "is_published=False 유지"
             ),
@@ -353,13 +360,10 @@ def strip_backfill_stamps(text: str) -> str:
 
 
 def _render_provenance(
-    generators: Sequence[type[P3DiffSlotGenerator]], *, structured: bool = False
+    generators: Sequence[type[P3DiffSlotGenerator]], *, legacy: bool = False
 ) -> str:
     return (
-        json.dumps(
-            build_provenance(generators, structured=structured), ensure_ascii=False, indent=2
-        )
-        + "\n"
+        json.dumps(build_provenance(generators, legacy=legacy), ensure_ascii=False, indent=2) + "\n"
     )
 
 
@@ -426,23 +430,23 @@ def main(argv: list[str] | None = None) -> int:
         "--check", action="store_true", help="재생성 결과가 저장소 은행과 바이트 동일한지 검사."
     )
     parser.add_argument(
-        "--structure-final-step",
+        "--legacy-final-step",
         action="store_true",
-        help="규칙 (가)(P3-62) 후보 은행 — 승인 은행 자리에는 쓰지 않는다(--out-dir 필수).",
+        help="구판(P3-62 이전) 출력 — 비교·재현용, 승인 은행 자리에는 쓰지 않는다(--out-dir 필수).",
     )
     args = parser.parse_args(argv)
     out_dir = Path(args.out_dir) if args.out_dir else _default_out_dir()
 
     if args.check:
-        if args.structure_final_step:
+        if args.legacy_final_step:
             print(
-                "--check 는 승인 은행 드리프트 검사다 — 구조화 후보와 함께 쓰지 않는다.",
+                "--check 는 승인 은행 드리프트 검사다 — 구판 출력과 함께 쓰지 않는다.",
                 file=sys.stderr,
             )
             return 2
         return _check(GENERATORS, out_dir)
-    if args.structure_final_step and not args.dry_run:
-        refusal = refuses_structured_write(out_dir)
+    if args.legacy_final_step and not args.dry_run:
+        refusal = refuses_legacy_write(out_dir)
         if refusal is not None:
             print(f"WRITE_REFUSED — {refusal}", file=sys.stderr)
             return 2
@@ -451,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
     report = run_p3_calculus1_diff_batch(
         out_path=out_dir / _PROBLEMS_FILE,
         write=not args.dry_run,
-        structure_final_step=args.structure_final_step,
+        structure_final_step=not args.legacy_final_step,
     )
     print(json.dumps(report.to_json(), ensure_ascii=False, indent=2))
     rejected = sum(len(b.failure_reasons) for b in report.bands)
@@ -461,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return 0 if report.total_stored > 0 else 1
     (out_dir / _PROVENANCE_FILE).write_text(
-        _render_provenance(GENERATORS, structured=args.structure_final_step), encoding="utf-8"
+        _render_provenance(GENERATORS, legacy=args.legacy_final_step), encoding="utf-8"
     )
     return 0 if report.total_stored > 0 else 1
 

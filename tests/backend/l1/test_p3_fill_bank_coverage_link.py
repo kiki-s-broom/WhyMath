@@ -39,9 +39,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CORPUS = _REPO_ROOT / "data" / "corpus"
 _BANK_NAME = "problem_bank_p3_fill_v0"
 _BANK = _CORPUS / _BANK_NAME
-#: 승인 근거가 된 감사 — 3회차 S5(자격 통과 프로토콜 · 결함 0/204 · 보정 상한 0.01907 ≤ 0.02).
+#: 승인 근거가 된 감사 — 5회차 S5(자격 통과 프로토콜 · 결함 0/204 · 보정 상한 0.01907 ≤ 0.02 ·
+#: P3-91 승격 — 템플릿 문장 교정·규칙 (가)).
 _AUDITED_BANK = (
-    _REPO_ROOT / "docs" / "data" / "p3_fill_audit" / "bank_audit_r3" / "audited_bank.jsonl"
+    _REPO_ROOT / "docs" / "data" / "p3_fill_audit" / "bank_audit_r5" / "audited_bank.jsonl"
 )
 #: 이 은행이 있어야 8/8이 되는 두 스킬(P3-05 설계 메모 §2) — 다른 어떤 코퍼스의 승인 문항도 행사하지 않는다.
 _FILL_ONLY_SKILLS = ("skill.pattern-generalization", "skill.word-problem-modeling")
