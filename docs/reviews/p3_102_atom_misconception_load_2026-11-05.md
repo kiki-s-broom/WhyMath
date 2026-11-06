@@ -67,13 +67,32 @@ EOS-194 런북에서 **[A] → [B] → [C] → [C2] → [C] 다시 → [H]** 만
 
 전달할 것: 두 [C] 화면 전체(또는 `work\eos194_<sha>\preflight_before_atomload.kv`·`preflight_before.kv`)와 [C2] 화면.
 
-## 5. 결과 (인수 조건 ②·③ — Kiki 실행 뒤 채움)
+## 5. 결과 (인수 조건 ②·③ — 2026-11-05 Kiki 실행)
+
+> **판정 기준: main `0877e573`**(#1847 머지 · 바뀐 [C2]) · 운영 DB `whymath-pg`(5433) · 임시 worktree `WhyMath_wt_0877e573`
+> · 증거 파일: Kiki 머신 `work\eos194_0877e573\preflight_before_atomload.kv`(처분 전) · `preflight_before.kv`(처분 후 — 다시 돌린 [C]가 덮어씀)
+> · 백업 `eos194_atomload_before.dump`(약 2.22MB · `pg_restore -l` 통과)
 
 | 값 | 처분 전 | 처분 후 |
 |---|---|---|
-| `ATOM_MISCONCEPTION_ROWS` | 0 | (미측정) |
-| `SCANNED` · `SCAN_TRUNCATED` | 979 · False | (미측정) |
-| `PUBLISHABLE` | 76(발행 1건 뒤 75) | (미측정) |
-| `NOT_PUBLISHABLE_REASONS` | `{"misconception_signature": 903}` | (미측정) |
+| `ATOM_MISCONCEPTION_ROWS` | 0 | **1,823** |
+| `EXPOSED_WITH_VERIFIED_HINT` · `SCANNED` · `SCAN_TRUNCATED` | 977 · 977 · False | 977 · 977 · False |
+| `PUBLISHABLE` | 74 | **965** |
+| `NOT_PUBLISHABLE_REASONS` | `{"misconception_signature": 903}` | `{"misconception_signature": 12}` |
 
-처분 전 출처: EOS-194 §5(2026-11-05 · Kiki 실행 · 측정 기준 main `920cc624`).
+[C2] 출력: `ATOM_READY=True` · `ATOM_BACKUP_OK=True` · 적재기 "atom ①오개념 적재 완료: 1823건" · `ATOM_LOAD_EXIT=0` ·
+`ATOM_ROWS_AFTER=1823` · `ATOM_LOAD_OK=True`. 노출 문항(2,563)·포인터(2)·발행 판(2)은 적재 전후 같다 — 적재는 카탈로그만 바꿨다.
+
+**판정**: 발행 게이트를 오개념 서명 결손으로 못 지나던 903건 중 891건이 풀렸다. 검사한 977건 중 965건(98.8%)이 발행 가능하다.
+
+**정직한 단서**
+
+- **남은 12건은 원인을 확인하지 않았다.** 리허설(P3-99)에서는 남은 118건이 전부 오개념 유발 슬롯 문항(`p3-slot:misconception_trigger`
+  — 규칙상 문항 자체 서명 필요)이었다. 운영에서 12건인 것은 운영 DB의 그 슬롯 문항 중 검증 힌트를 가진 것이 적어서로 *보이지만*
+  문항별 출처는 측정하지 않았다. 이 12건을 발행하려면 문항 단위 서명이 필요한지 확인해야 한다(후속 후보).
+- **처분 전 값이 EOS-194 §5(PUBLISHABLE 76 · 힌트 979)와 다르다.** 같은 날 두 차례 [D]~[F](발행 측정)가 추가로 실행돼 문항 2건이
+  발행되며 후보에서 빠졌다(76 → 75 → 74). 그중 1건(`06efd327-0510-5ddd-bfb9-3a34f57a6dba` · 판 `09e112be-…`)은 이 태스크
+  안내 중에 [D]~[F]가 함께 붙여넣어져 생겼다 — 측정용 staff·learner 계정 2개와 시도 1건이 함께 남았다. 되돌리기 [G]는 실행하지 않았다.
+- **바뀐 가드가 실제로 거부하는 것도 운영에서 봤다.** #1847 머지 전 옛 블록을 두 번 실행했을 때 `PUBLISHABLE=75`·`74`에서
+  `WRITE_REFUSED=True`·`ATOM_ROWS_AFTER=0`으로 쓰기 없이 멈췄다.
+- §3의 영향(튜터 웜스타트 탐색 후보에 원자 오개념 편입)이 이 시점부터 운영에서 유효하다.
