@@ -4964,6 +4964,28 @@ def _read_hook_stdin() -> str:
     return sys.stdin.buffer.read().decode("utf-8", errors="replace")
 
 
+def cmd_check_prompt(root: Path, args: argparse.Namespace) -> int:
+    """UserPromptSubmit 훅 — 요청마다 이 세션의 claim·범위·언급 ID 상태를 주입한다 (HARN-321).
+
+    안내 전용이다: 어떤 입력·예외에서도 exit 0 으로 끝난다(관측 실패가 작업 실패가 되면 안
+    된다). 대신 예외를 삼킬 때는 타입명을 출력해 침묵 실패를 피한다(CLAUDE.md AI·신뢰).
+    """
+    try:
+        import prompt_scope  # 실패도 아래 except 가 타입명으로 보고한다
+
+        try:
+            payload = json.loads(_read_hook_stdin() or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+        prompt = str(payload.get("prompt") or "") if isinstance(payload, dict) else ""
+        lines = prompt_scope.build_context(root, store.current_branch(root), prompt)
+    except Exception as exc:  # noqa: BLE001 — 훅은 절대 작업을 막지 않는다
+        print(f"[요청 범위 대조 · HARN-321] 판정 불가 — {type(exc).__name__} (작업은 계속)")
+        return 0
+    print("\n".join(lines))
+    return 0
+
+
 def cmd_check_stop(root: Path, args: argparse.Namespace) -> int:
     """Stop 훅 — 진행 중 태스크가 있는데 상태 갱신 없이 세션이 끝나면 차단(exit 2).
 
@@ -6123,6 +6145,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("check-edit", help="PostToolUse 훅 — backlog 직접 편집 검증")
     p.set_defaults(func=cmd_check_edit)
+
+    p = sub.add_parser("check-prompt", help="UserPromptSubmit 훅 — 요청 범위 대조 안내 (HARN-321)")
+    p.set_defaults(func=cmd_check_prompt)
 
     p = sub.add_parser("claims", help="원격 claim(harness-claims 브랜치) 조회·해제·청소")
     p.add_argument("claims_action", nargs="?", default="list", choices=["list", "release", "reap"])
