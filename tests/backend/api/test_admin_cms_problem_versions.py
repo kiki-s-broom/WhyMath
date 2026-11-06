@@ -16,8 +16,10 @@ EOS-190이 `problem_version`의 유일한 writer(`l3/problem_publish_gate`)를 �
    게이트는 불리지 않는다(발행될 수 없는 초안·발행 포인터를 직접 쓰는 입구가 없다).
 ④ **오류 매핑** — 게이트 예외가 안정적인 `code`로 번역되고, 거부 시 rollback 1·commit 0·감사 0이다.
 ⑤ **트랜잭션 경계 뒤 사용자 접근 금지** — 응답을 commit 뒤에 만들 때 만료된 사용자 객체를 읽지 않는다.
+⑦ **롤백(EOS-196)** — 배포 권한만 부르고(편집·검수는 DB 접근 전 403), 감사 대상은 내려간 판이며,
+   화면이 본 발행본을 게이트에 그대로 넘긴다. 게이트 예외는 개념 롤백과 같은 `code`로 번역된다.
 ⑥ **집행 경계(AST)** — 이 모듈은 ORM `ProblemVersion`을 import하지 않고, 발행 포인터를 쓰지 않으며,
-   게이트 모듈의 **공개 함수 5개만** 부르고, 권한표를 자기 안에 다시 적지 않는다. 정상 코드가 0건인 것은
+   게이트 모듈의 **공개 함수 6개만** 부르고, 권한표를 자기 안에 다시 적지 않는다. 정상 코드가 0건인 것은
    증거가 아니므로 위반 코드를 주입해 RED를 확인한다.
 """
 
@@ -40,7 +42,13 @@ from whymath_backend.app import create_app
 from whymath_backend.db.models.audit import PrivacyAudit
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
-from whymath_backend.l3.publish_gate import PublishGateError, StaleStatusError
+from whymath_backend.l3.problem_publish_gate import ProblemRollbackResult
+from whymath_backend.l3.publish_gate import (
+    PublishGateError,
+    RollbackUnavailableError,
+    StalePublishedPointerError,
+    StaleStatusError,
+)
 from whymath_backend.schema.enums import (
     Curriculum,
     PrivacyAuditAction,
@@ -233,6 +241,28 @@ class GateSpy:
         self.list_error: Exception | None = None
         self.exists_calls: list[uuid.UUID] = []
         self.problem_exists_result = True
+        self.rollback_calls: list[dict[str, Any]] = []
+        self.rollback_effect: Callable[[], ProblemRollbackResult] | None = None
+
+    async def rollback(
+        self,
+        session: Any,
+        problem_id: uuid.UUID,
+        *,
+        actor: str,
+        now: Any = None,
+        expected_current_version_id: uuid.UUID | None = None,
+    ) -> ProblemRollbackResult:
+        self.rollback_calls.append(
+            {
+                "problem_id": problem_id,
+                "actor": actor,
+                "expected_current_version_id": expected_current_version_id,
+            }
+        )
+        if self.rollback_effect is None:
+            raise LookupError("스파이: 문항 없음")
+        return self.rollback_effect()
 
     async def problem_exists(self, session: Any, problem_id: uuid.UUID) -> bool:
         self.exists_calls.append(problem_id)
@@ -290,6 +320,7 @@ def spy(monkeypatch: pytest.MonkeyPatch) -> GateSpy:
     monkeypatch.setattr(gate, "list_versions", s.list_versions)
     monkeypatch.setattr(gate, "get_version", s.get_version)
     monkeypatch.setattr(gate, "problem_exists", s.problem_exists)
+    monkeypatch.setattr(gate, "rollback", s.rollback)
     return s
 
 
@@ -312,6 +343,7 @@ _PROBLEM_VERSION_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/v1/admin/cms/problems/{problem_id}/versions"),
         ("GET", "/v1/admin/cms/problem-versions/{version_id}"),
         ("POST", "/v1/admin/cms/problem-versions/{version_id}/transitions"),
+        ("POST", "/v1/admin/cms/problems/{problem_id}/rollback"),
     }
 )
 
@@ -331,8 +363,8 @@ def _served_problem_version_routes() -> set[tuple[str, str]]:
     return out
 
 
-def test_served_routes_are_exactly_the_four_declared_ones() -> None:
-    """분모 — 라우트가 사라져도, 선언 밖 라우트(롤백 등)가 늘어도 RED다."""
+def test_served_routes_are_exactly_the_declared_ones() -> None:
+    """분모 — 라우트가 사라져도, 선언 밖 라우트가 늘어도 RED다."""
     assert _served_problem_version_routes() == set(_PROBLEM_VERSION_ROUTES)
 
 
@@ -341,6 +373,8 @@ def _call(client: TestClient, method: str, path: str) -> Any:
     body: dict[str, Any] = {}
     if url.endswith("/transitions"):
         body = {"action": "submit", "expected_status": "DRAFT"}
+    if url.endswith("/rollback"):
+        body = {"expected_published_version_id": str(_VID)}
     return client.request(method, url, json=body if method != "GET" else None)
 
 
@@ -361,7 +395,9 @@ def test_student_is_403_without_touching_the_db(method: str, path: str, spy: Gat
     resp = _call(_client(_STUDENT, fake), method, path)
     assert resp.status_code == 403, resp.text
     assert not fake.touched_db, "거부된 요청이 DB를 건드렸다"
-    assert not (spy.apply_calls or spy.draft_calls or spy.list_calls or spy.get_calls)
+    assert not (
+        spy.apply_calls or spy.draft_calls or spy.list_calls or spy.get_calls or spy.rollback_calls
+    )
 
 
 def test_routes_use_registry_derived_module_guards() -> None:
@@ -778,6 +814,128 @@ class TestReads:
 # ═══════════════════════════════════════════════════════════════════════════════════════
 
 
+_ROLLED = uuid.uuid4()
+_RESTORED = uuid.uuid4()
+
+
+def _rollback_result() -> ProblemRollbackResult:
+    return ProblemRollbackResult(
+        problem_id=_PID, rolled_back_version_id=_ROLLED, restored_version_id=_RESTORED
+    )
+
+
+def _post_rollback(client: TestClient, body: dict[str, Any] | None = None) -> Any:
+    return client.post(
+        f"/v1/admin/cms/problems/{_PID}/rollback",
+        json=body if body is not None else {"expected_published_version_id": str(_ROLLED)},
+    )
+
+
+class TestRollback:
+    @pytest.mark.parametrize("user", (_PUBLISHER, _ADMIN), ids=lambda u: u.role.value)
+    def test_deployment_role_rolls_back_with_one_audit_row(
+        self, user: UserProfile, spy: GateSpy
+    ) -> None:
+        spy.rollback_effect = _rollback_result
+        fake = FakeSession()
+        resp = _post_rollback(_client(user, fake))
+        assert resp.status_code == 200, resp.text
+        assert resp.json() == {
+            "problem_id": str(_PID),
+            "rolled_back_version_id": str(_ROLLED),
+            "restored_version_id": str(_RESTORED),
+        }
+        assert spy.rollback_calls == [
+            {
+                "problem_id": _PID,
+                "actor": str(user.user_id),
+                "expected_current_version_id": _ROLLED,
+            }
+        ]
+        assert fake.commits == 1 and fake.rollbacks == 0
+        assert fake.audit_at_commit == 1, "감사 행이 commit과 같은 트랜잭션에 합류하지 않았다"
+        (row,) = fake.audit_rows
+        assert row.resource_type == PrivacyAuditResourceType.problem_version.value
+        assert row.resource_id == _ROLLED, "감사 대상은 내려간 판이다"
+        assert row.action == PrivacyAuditAction.rollback.value
+        assert row.user_id == user.user_id
+
+    @pytest.mark.parametrize("user", (_EDITOR, _REVIEWER), ids=lambda u: u.role.value)
+    def test_editor_and_reviewer_are_403_before_anything_runs(
+        self, user: UserProfile, spy: GateSpy
+    ) -> None:
+        spy.rollback_effect = _rollback_result
+        fake = FakeSession()
+        resp = _post_rollback(_client(user, fake))
+        assert resp.status_code == 403, resp.text
+        assert resp.json()["detail"]["code"] == "capability_required"
+        assert not spy.rollback_calls and not fake.touched_db
+
+    def test_body_requires_the_expected_pointer_and_rejects_extra_keys(self, spy: GateSpy) -> None:
+        for body in ({}, {"expected_published_version_id": str(_ROLLED), "target": "x"}):
+            fake = FakeSession()
+            resp = _post_rollback(_client(_ADMIN, fake), body)
+            assert resp.status_code == 422, resp.text
+            assert not spy.rollback_calls and not fake.touched_db
+
+    @pytest.mark.parametrize(
+        ("error", "status_code", "code"),
+        [
+            (LookupError("x"), 404, "not_found"),
+            (StalePublishedPointerError(_ROLLED, _RESTORED), 409, "stale_pointer"),
+            (RollbackUnavailableError("x"), 409, "rollback_unavailable"),
+            (UndefinedTransitionError("x"), 409, "illegal_transition"),
+            (PublishGateError(GateKind.RESTORE, ["live_content_current: x"]), 422, "gate_failed"),
+        ],
+        ids=lambda v: type(v).__name__ if isinstance(v, Exception) else str(v),
+    )
+    def test_gate_errors_map_to_stable_codes_without_audit(
+        self, error: Exception, status_code: int, code: str, spy: GateSpy
+    ) -> None:
+        def _raise() -> ProblemRollbackResult:
+            raise error
+
+        spy.rollback_effect = _raise
+        fake = FakeSession()
+        resp = _post_rollback(_client(_ADMIN, fake))
+        assert resp.status_code == status_code, resp.text
+        assert resp.json()["detail"]["code"] == code
+        assert fake.rollbacks == 1 and fake.commits == 0 and not fake.audit_rows
+
+    def test_stale_pointer_reports_the_actual_published_version(self, spy: GateSpy) -> None:
+        def _raise() -> ProblemRollbackResult:
+            raise StalePublishedPointerError(_ROLLED, _RESTORED)
+
+        spy.rollback_effect = _raise
+        resp = _post_rollback(_client(_ADMIN, FakeSession()))
+        assert resp.json()["detail"]["published_version_id"] == str(_RESTORED)
+
+    def test_gate_failure_carries_the_failures(self, spy: GateSpy) -> None:
+        def _raise() -> ProblemRollbackResult:
+            raise PublishGateError(GateKind.RESTORE, ["live_content_current: x"])
+
+        spy.rollback_effect = _raise
+        detail = _post_rollback(_client(_ADMIN, FakeSession())).json()["detail"]
+        assert detail["gate"] == GateKind.RESTORE.value
+        assert detail["failures"] == ["live_content_current: x"]
+
+    def test_unexpected_error_rolls_back_and_propagates(self, spy: GateSpy) -> None:
+        def _raise() -> ProblemRollbackResult:
+            raise RuntimeError("boom")
+
+        spy.rollback_effect = _raise
+        fake = FakeSession()
+        with pytest.raises(RuntimeError, match="boom"):
+            _post_rollback(_client(_ADMIN, fake))
+        assert fake.rollbacks == 1 and fake.commits == 0
+
+    def test_responds_after_commit_without_touching_the_user(self, spy: GateSpy) -> None:
+        spy.rollback_effect = _rollback_result
+        fake = FakeSession()
+        resp = _post_rollback(_expiring_client(_ADMIN, fake))
+        assert resp.status_code == 200, resp.text
+
+
 class TestNoUserAccessAfterTheTransactionBoundary:
     def test_transition_responds_after_commit_without_touching_the_user(self, spy: GateSpy) -> None:
         spy.apply_effect = lambda: _version(status_=_S.IN_REVIEW)
@@ -824,7 +982,14 @@ def _load_enforcement() -> Any:
 
 _E = _load_enforcement()
 _GATE_PUBLIC_FUNCTIONS = frozenset(
-    {"create_draft", "list_versions", "get_version", "problem_exists", "apply_transition"}
+    {
+        "create_draft",
+        "list_versions",
+        "get_version",
+        "problem_exists",
+        "apply_transition",
+        "rollback",
+    }
 )
 
 
@@ -861,7 +1026,7 @@ class TestEnforcementBoundary:
         assert mutated != src
         assert any(v.startswith("R3") for v in _E.scan_source(_MODULE_REL, mutated))
 
-    def test_only_the_five_public_gate_functions_are_used(self) -> None:
+    def test_only_the_public_gate_functions_are_used(self) -> None:
         tree = ast.parse(_source())
         used = {
             node.attr

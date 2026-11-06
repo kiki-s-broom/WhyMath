@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-160
+title: isolated_call CPU 시간 테스트 부하 의존 제거
+track: infra-debt
+stage: S4
+subject: cross
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "tests/backend/l3/test_isolated_call.py::TestThreadIsNotEnough::test_thread_cannot_stop_the_computation이 병렬 실행(-n auto · 4코어)이나 동시 실행 검사와 CPU를 다툴 때 실패하지 않는다. 판정은 '스레드가 끊기지 않았다'는 사실만 보고, 벽시계 1.5초 안에 CPU 1.5초 이상을 썼는가처럼 러너 부하에 따라 결과가 갈리는 임계값에 기대지 않는다(예: 스레드가 남긴 진행 카운터가 대기 뒤에도 증가하는지). 뮤테이션 — 스레드를 실제로 멈추는 구현을 주입하면 RED."
+artifacts: []
+paths:
+  - tests/backend/l3/test_isolated_call.py
+session: null
+notes: "출처: EOS-196 전체 스위트(2026-11-05)에서 24,236건 중 이 1건만 실패, 단독 3회 통과. 같은 실패가 P3-10 리뷰(docs/reviews/p3_10_ai_quality_eval_suite_2026-10-21.md §315)에도 기록돼 2회째 — 반복이라 등재. CI 샤드에서도 러너 부하에 따라 거짓 red를 낼 수 있다."
+updated: 2026-11-05

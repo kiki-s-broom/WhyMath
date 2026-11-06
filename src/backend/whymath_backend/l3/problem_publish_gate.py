@@ -16,9 +16,10 @@ test_problem_publish_gate_enforcement.py`).
 1. **검증 파이프라인**(순수): `run_gate(version, gate, live_content_hash=...)`가 검사를 전부 돌리고
    하나라도 실패하면 `PublishGateError`. 검사: `schema_valid`·`schema_version_format`·
    `entity_type`('Problem')·`content_hash`·`governance_complete`·`qa_record_bound`, 그리고 이
-   모듈 고유의 **`live_content_current`**·**`problem_metadata_complete`**(둘 다 PUBLISH 전용).
+   모듈 고유의 **`live_content_current`**(PUBLISH·RESTORE)·**`problem_metadata_complete`**
+   (PUBLISH 전용), 그리고 RESTORE의 `previously_published`.
 2. **전이 계획**(순수): `plan_transition`이 전이표를 조회해 새 스냅숏을 만든다.
-3. **전이 실행**(DB): `create_draft`·`apply_transition`. `problem_version` 행과
+3. **전이 실행**(DB): `create_draft`·`apply_transition`·`rollback`. `problem_version` 행과
    `problem.problem_version_id`를 쓰는 **유일한 자리**.
 
 ## 이 모듈 고유의 검사 — `live_content_current`
@@ -44,6 +45,32 @@ test_problem_publish_gate_enforcement.py`).
 `distractor_map`·슬롯 태그·힌트)가 발행 뒤 비는 경우는 막지 않는다
 (소유 태스크 없음 · EOS-195 회수 보고).
 
+## Rollback·Restore (EOS-196) — RESTORE의 `live_content_current` 판정
+
+`rollback`은 개념 판 `l3/publish_gate.rollback`과 동형이다 — 현재 발행본을 RETIRED로 내리고(결함
+판정), 직전 발행본(DEPRECATED·발행 이력 있음·`version_no`가 더 작은 가장 최근 판)을 RESTORE 게이트를
+통과시켜 PUBLISHED로 되살리며, 발행 포인터를 한 번에 옮긴다. 호출자는 관리자 CMS
+(`POST /v1/admin/cms/problems/{problem_id}/rollback`)다.
+
+**RESTORE에도 `live_content_current`를 건다. 단 대조 대상은 "지금의 라이브 행"이 아니라 "복원을
+반영한 뒤의 라이브 행"이다.** 근거:
+
+- *지금의* 라이브 행과 비교하면 롤백은 정상 경우에 **항상** 실패한다. 발행 중에는 라이브 행이 현재
+  발행본과 같도록 묶여 있다(PUBLISH의 `live_content_current` + EOS-195 제자리 편집 차단). 그래서
+  "복원본 == 지금 라이브"는 두 판의 내용이 같을 때만 참이고, 그런 롤백은 할 이유가 없다.
+- 검사를 *면제*하면 포인터만 옛 판으로 가고 학생은 결함 판 내용을 계속 본다. EOS-47이 시도에 박는
+  "그 학생이 푼 판"이 실제로 본 문항과 갈라진다 — 발행에서 막은 바로 그 상태를 롤백이 만든다.
+- 그래서 롤백은 복원본 payload의 원천 필드(`db/published_edit_guard.SERVED_CONTENT_FIELDS` 12개)를
+  라이브 행에 **되쓰고**, 그 결과를 스냅숏한 해시가 복원본 해시와 같은지를 **쓰기 전에** 계산해
+  RESTORE 게이트에 넘긴다. 같지 않으면(파생 해시가 본문과 어긋난 payload·`Numeric(3,2)` 왕복으로
+  난이도가 바뀌는 값·출처 저작권 위반 등) 아무 것도 쓰지 않고 거부한다. 통과하면 롤백 뒤
+  "포인터가 가리키는 판의 payload == 라이브 행 스냅숏"이 성립한다(드리프트 리포트 기준 일치).
+
+`problem_metadata_complete`(7필드)는 RESTORE에 걸지 않는다. 7필드는 payload 밖이라 롤백이 바꾸지
+않으며, 결함 판을 내리는 응급 조치를 그와 무관한 메타 결손으로 막지 않는다. 롤백은 7필드·난이도
+5축·검수 상태 등 payload 밖 컬럼을 건드리지 않는다(되쓰는 것은 위 12필드뿐 — 그중
+`difficulty_overall`은 복원본의 `difficulty_at_publish`로 돌아간다).
+
 ## 트랜잭션 계약
 
 실행 함수는 `flush`까지만 하고 `commit`하지 않는다 — 호출자가 트랜잭션 경계를 가진다. 게이트가
@@ -54,8 +81,6 @@ test_problem_publish_gate_enforcement.py`).
 - **호출자는 이 모듈의 소유가 아니다.** 운영 호출자는 관리자 CMS의 문항 판 표면
   (`api/admin_cms_problem_versions.py`, EOS-194)이며, 이 모듈은 그 표면의 권한·감사·HTTP 매핑을
   모른다. `outcome=pinned` 비율은 운영자가 문항을 실제로 발행한 만큼만 0을 벗어난다.
-- **Rollback·Restore 없음.** 전이표의 복합 전용 간선(rollback·restore)은 호출 경로가 없어
-  구현하지 않았다. 필요해지면 이 모듈에 더한다(포인터 쓰기 자리를 하나로 유지).
 - **발행 이후의 제자리 편집을 새 판으로 만들지 않는다(EOS-195 처분: 차단).**
   `live_content_current`는 *발행 순간*만 막으므로, 발행 뒤 라이브 행을 고치는 경로를
   이 모듈 밖에서 막는다 — CMS 편집
@@ -79,6 +104,9 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
+from types import SimpleNamespace
+from typing import Any, cast
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -86,8 +114,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from whymath_backend.db.models.problem import Problem
 from whymath_backend.db.models.problem_version import ProblemVersion
+from whymath_backend.db.published_edit_guard import SERVED_CONTENT_FIELDS
 from whymath_backend.l3.problem_metadata_evidence import load_metadata_evidence
-from whymath_backend.l3.publish_gate import PublishGateError, StaleStatusError
+from whymath_backend.l3.publish_gate import (
+    PublishGateError,
+    RollbackUnavailableError,
+    StalePublishedPointerError,
+    StaleStatusError,
+)
+from whymath_backend.schema.enums import (
+    AnswerFormat,
+    Curriculum,
+    QuestionFormat,
+    SourceType,
+    Subject,
+)
 from whymath_backend.schema.problem_metadata import ProblemMetadataEvidence, evaluate_metadata
 from whymath_backend.schema.problem_version import ProblemVersion as SchemaProblemVersion
 from whymath_backend.schema.problem_version import ProblemVersionPayload
@@ -107,7 +148,7 @@ from whymath_backend.schema.version_lifecycle import UndefinedTransitionError, r
 logger = logging.getLogger("whymath.l3.problem_publish_gate")
 
 # 검사 묶음 버전 — 검사 항목·판정 규칙을 바꾸면 올린다(§9 `validator_bundle_version`).
-VALIDATOR_BUNDLE_VERSION = "eos190-problem-publish-gate@2"
+VALIDATOR_BUNDLE_VERSION = "eos190-problem-publish-gate@3"
 
 #: `create_draft`가 payload 스키마 태그를 따로 받지 않을 때 쓰는 값(ARCH-31 docstring 예시와 동일).
 PAYLOAD_SCHEMA_VERSION = "problem-schema@1"
@@ -119,11 +160,16 @@ _SCHEMA_VERSION_RE = re.compile(r"^[a-z][a-z0-9_-]*@\d+(\.\d+)?$")
 _ENTITY_TYPE = "Problem"
 
 # 게이트별 필수 거버넌스 필드 — QA 시점엔 승인자가 아직 없다(승인이 그 게이트의 결과다).
-# 이 모듈은 QA·PUBLISH만 소유한다(RESTORE는 rollback과 함께 범위 밖 — 모듈 docstring).
+# RESTORE는 한 번 승인·발행된 판을 되살리므로 PUBLISH와 같은 서명을 요구한다(개념 판과 동일).
 _REQUIRED_GOVERNANCE: dict[GateKind, tuple[str, ...]] = {
     GateKind.QA: ("created_by", "reviewed_by"),
     GateKind.PUBLISH: ("created_by", "reviewed_by", "approved_by"),
+    GateKind.RESTORE: ("created_by", "reviewed_by", "approved_by"),
 }
+
+#: 라이브 `difficulty_overall` 컬럼의 정밀도(`Numeric(3, 2)`).
+#: 복원 되쓰기가 DB와 같은 값으로 반올림한다.
+_DIFFICULTY_QUANTUM = Decimal("0.01")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -200,12 +246,14 @@ def run_gate(
 ) -> tuple[tuple[str, ...], str]:
     """게이트 검사를 **전부** 돌린다 — (통과 검사 이름들, 산출 해시). 하나라도 실패하면 예외.
 
-    `live_content_hash`·`metadata_evidence`는 PUBLISH 게이트에서만 쓰인다 — 잠금 후 라이브 문항의
-    스냅숏 해시와 7필드 증거. PUBLISH인데 None이면 대조·측정하지 못한 것이므로 **실패**다
-    (모른다 ≠ 통과).
+    `live_content_hash`는 PUBLISH·RESTORE에서 쓰인다 — PUBLISH는 잠금 후 라이브 문항의 스냅숏
+    해시, RESTORE는 **복원을 반영한 뒤의** 라이브 문항 스냅숏 해시
+    (모듈 docstring "Rollback·Restore").
+    `metadata_evidence`(7필드)는 PUBLISH 전용이다. 필요한데 None이면 대조·측정하지 못한 것이므로
+    **실패**다(모른다 ≠ 통과).
     """
     if gate not in _REQUIRED_GOVERNANCE:
-        raise ValueError(f"이 모듈은 QA·PUBLISH 게이트만 소유한다: {gate!r}")
+        raise ValueError(f"이 모듈이 소유하지 않는 게이트다: {gate!r}")
     failures: list[str] = []
     passed: list[str] = []
 
@@ -247,7 +295,7 @@ def run_gate(
     else:
         passed.append("governance_complete")
 
-    if gate is GateKind.PUBLISH:
+    if gate in (GateKind.PUBLISH, GateKind.RESTORE):
         if _qa_record_bound(checked, content_hash):
             passed.append("qa_record_bound")
         else:
@@ -258,10 +306,19 @@ def run_gate(
         elif live_content_hash != content_hash:
             failures.append(
                 "live_content_current: 승인 이후 라이브 문항이 바뀌었다(새 초안으로 다시 승인)"
+                if gate is GateKind.PUBLISH
+                else "live_content_current: 복원본을 라이브 문항에 되쓴 결과가 판과 다르다"
             )
         else:
             passed.append("live_content_current")
 
+    if gate is GateKind.RESTORE:
+        if checked.published_at is not None:
+            passed.append("previously_published")
+        else:
+            failures.append("previously_published: 발행된 적 없는 판은 복원 대상이 아니다")
+
+    if gate is GateKind.PUBLISH:
         if metadata_evidence is None:
             failures.append("problem_metadata_complete: 7필드를 측정하지 못했다")
         else:
@@ -707,6 +764,156 @@ async def apply_transition(
     return planned
 
 
+@dataclass(frozen=True)
+class ProblemRollbackResult:
+    """롤백 결과 — 내려간 판(RETIRED)과 복원된 판(PUBLISHED, 지금 포인터가 가리키는 판)."""
+
+    problem_id: uuid.UUID
+    rolled_back_version_id: uuid.UUID
+    restored_version_id: uuid.UUID
+
+
+def _restored_live_fields(payload: ProblemVersionPayload) -> dict[str, Any]:
+    """복원본 payload → 라이브 행에 되쓸 원천 필드 값(ORM 타입). 키 = `SERVED_CONTENT_FIELDS`.
+
+    payload는 enum을 값으로 담는다(`use_enum_values`) — ORM 컬럼 타입으로 되돌린다. 난이도는
+    컬럼 정밀도(`Numeric(3, 2)`)로 반올림해 DB가 실제로 저장할 값과 같게 만든다(그래야 쓰기 전
+    계산한 해시가 쓴 뒤의 행과 일치한다).
+    """
+    difficulty = payload.difficulty_at_publish
+    fields: dict[str, Any] = {
+        "source_type": SourceType(payload.source_type),
+        "subject": Subject(payload.subject),
+        "curriculum_version": Curriculum(payload.curriculum_version),
+        "unit_codes": list(payload.unit_codes),
+        "question_format": (
+            QuestionFormat(payload.question_format) if payload.question_format is not None else None
+        ),
+        "answer_format": (
+            AnswerFormat(payload.answer_format) if payload.answer_format is not None else None
+        ),
+        "points": payload.points,
+        "question_text": payload.question_text,
+        "choices": list(payload.choices) if payload.choices is not None else None,
+        "answer": payload.answer,
+        "answer_explanation": payload.answer_explanation,
+        "difficulty_overall": (
+            Decimal(str(difficulty)).quantize(_DIFFICULTY_QUANTUM)
+            if difficulty is not None
+            else None
+        ),
+    }
+    # 되쓰는 필드 = 발행 뒤 차단되는 필드 = 스냅숏 원천 필드. 갈라지면 복원이 일부만 되돌린다.
+    if set(fields) != set(SERVED_CONTENT_FIELDS):
+        diff = sorted(set(fields) ^ set(SERVED_CONTENT_FIELDS))
+        raise RuntimeError(f"복원 필드가 서빙 내용 필드와 다르다: {diff}")
+    return fields
+
+
+def _restored_live_hash(fields: dict[str, Any], version_id: uuid.UUID) -> str | None:
+    """복원 필드를 반영한 라이브 행의 스냅숏 해시 — **쓰기 전에** 계산한다(라이브 행 불변).
+
+    `snapshot_payload`가 읽는 속성만 가진 가상 행으로 같은 함수를 부른다(스냅숏 규칙을 복제하지
+    않는다). 스냅숏 계약을 어기면 None → RESTORE 게이트가 **실패**로 판정한다(모른다 ≠ 통과).
+    """
+    try:
+        return compute_content_hash(snapshot_payload(cast(Problem, SimpleNamespace(**fields))))
+    except ValidationError as exc:
+        logger.warning(
+            "problem_publish_gate: 복원본이 라이브 스냅숏 계약 위반 — 복원 거부 "
+            "(%s, version_id=%s)",
+            type(exc).__name__,
+            version_id,
+        )
+        return None
+
+
+async def rollback(
+    session: AsyncSession,
+    problem_id: uuid.UUID,
+    *,
+    actor: str,
+    now: datetime | None = None,
+    expected_current_version_id: uuid.UUID | None = None,
+) -> ProblemRollbackResult:
+    """현재 발행본을 내리고 직전 발행본을 복원한다 — 개념 판 `publish_gate.rollback`과 동형.
+
+    - 내려간 판은 RETIRED(결함 판정 — 전이표 `rollback`)라 이후 롤백의 복원 후보가 되지 않는다.
+    - 복원 대상 = 현재 발행본보다 `version_no`가 작은 판 중, 발행된 적이 있고(`published_at`) 지금
+      DEPRECATED인 가장 최근 판. DEPRECATED 판의 payload는 DB 트리거가 보호하지 않으므로 RESTORE
+      게이트가 해시를 재계산해 내려가 있는 동안의 변조를 거부한다.
+    - 라이브 문항 행의 서빙 내용 12필드를 복원본으로 되쓴다(모듈 docstring "Rollback·Restore").
+    - `expected_current_version_id`를 주면 **문항 행 잠금 후** 실제 포인터와 비교해 다르면
+      `StalePublishedPointerError`로 거부한다(화면이 본 발행본이 그사이 바뀐 경우).
+
+    게이트가 실패하면 **아무 것도 쓰기 전에** 예외가 난다. 잠금 순서는 문항 → 판이다.
+    """
+    moment = now or datetime.now(UTC)
+    problem = await _lock_problem(session, problem_id)
+    pointer = problem.problem_version_id
+    if expected_current_version_id is not None and pointer != expected_current_version_id:
+        stale = StalePublishedPointerError(expected_current_version_id, pointer)
+        _refuse(stale, TransitionAction.ROLLBACK, expected_current_version_id)
+        raise stale
+    if pointer is None:
+        raise RollbackUnavailableError(f"problem {problem_id}: 현재 발행본이 없다")
+    current_row = await _lock_version(session, pointer)
+    current = _load_schema(current_row)
+    if VersionStatus(current.status) is not VersionStatus.PUBLISHED:
+        raise RollbackUnavailableError(
+            f"problem {problem_id}: 발행 포인터가 PUBLISHED가 아닌 판을 가리킨다({current.status})"
+        )
+
+    target_row = (
+        await session.execute(
+            select(ProblemVersion)
+            .where(
+                ProblemVersion.problem_id == problem_id,
+                ProblemVersion.status == VersionStatus.DEPRECATED,
+                ProblemVersion.published_at.is_not(None),
+                ProblemVersion.version_no < current_row.version_no,
+            )
+            .order_by(ProblemVersion.version_no.desc())
+            .limit(1)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if target_row is None:
+        raise RollbackUnavailableError(f"problem {problem_id}: 복원할 직전 발행본이 없다")
+    target = _load_schema(target_row)
+
+    try:
+        fields = _restored_live_fields(target.payload)
+        restored = plan_transition(
+            target,
+            TransitionAction.RESTORE,
+            actor=actor,
+            live_content_hash=_restored_live_hash(fields, target_row.version_id),
+            now=moment,
+            allow_compound=True,
+        )
+        rolled_back = plan_transition(
+            current, TransitionAction.ROLLBACK, actor=actor, now=moment, allow_compound=True
+        )
+    except Exception as exc:
+        _refuse(exc, TransitionAction.RESTORE, target_row.version_id)
+        raise
+
+    # 계획을 전부 끝낸 뒤에 쓴다 — 중간 실패가 반쯤 쓴 상태를 남기지 않게.
+    _write_back(current_row, rolled_back)
+    _write_back(target_row, restored)
+    for name, value in fields.items():
+        setattr(problem, name, value)
+    problem.problem_version_id = target_row.version_id
+    await session.flush()
+    return ProblemRollbackResult(
+        problem_id=problem_id,
+        rolled_back_version_id=current_row.version_id,
+        restored_version_id=target_row.version_id,
+    )
+
+
 __all__ = [
     "VALIDATOR_BUNDLE_VERSION",
     "PAYLOAD_SCHEMA_VERSION",
@@ -721,4 +928,8 @@ __all__ = [
     "PointerPair",
     "iter_pointer_filled",
     "apply_transition",
+    "ProblemRollbackResult",
+    "RollbackUnavailableError",
+    "StalePublishedPointerError",
+    "rollback",
 ]

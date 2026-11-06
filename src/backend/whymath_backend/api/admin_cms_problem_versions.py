@@ -11,6 +11,7 @@
   - GET  /problems/{problem_id}/versions            : 변경이력(판 목록, 최신 판부터)
   - GET  /problem-versions/{version_id}             : 판 상세(payload·게이트 통과 기록)
   - POST /problem-versions/{version_id}/transitions : 제출·검토·승인·발행·폐기·은퇴
+  - POST /problems/{problem_id}/rollback            : 현재 발행본을 내리고 직전 발행본 복원(EOS-196)
 
 ## 왜 CMS 라우트이고 CLI가 아닌가
 
@@ -33,7 +34,10 @@
   409로 막힌다**(EOS-195) — 먼저 판을 폐기(`deprecate`)해 포인터를 비운 뒤 고친다. payload를
   따로 받으면 발행될 수 없는 초안을 만드는 입구가 된다.
 - **판 경로가 `/versions/{id}`가 아니라 `/problem-versions/{id}`다.** 앞의 것은 개념 판이 쓴다.
-- **롤백이 없다.** 문항 판 Rollback·Restore는 `EOS-196` 소유다(호출 경로 없는 코드를 두지 않는다).
+- **롤백이 라이브 문항 내용까지 되돌린다.** 개념 판 롤백은 포인터만 옮기면 되지만, 문항은 라이브
+  행이 서빙 원본이라 복원본의 서빙 내용 12필드를 라이브 행에 되쓴다 — 판정 근거는
+  `l3/problem_publish_gate` docstring "Rollback·Restore"(EOS-196). 권한은 개념 롤백과 같은
+  `ROLLBACK_CAPABILITY`(배포)다.
 
 ## 집행 경계 (정본화 ≠ 집행)
 
@@ -69,9 +73,19 @@ from whymath_backend.api.admin_cms import (
 )
 from whymath_backend.api.admin_cms import _problem as _http_error
 from whymath_backend.l3 import problem_publish_gate as pgate
-from whymath_backend.l3.publish_gate import PublishGateError, StaleStatusError
+from whymath_backend.l3.publish_gate import (
+    PublishGateError,
+    RollbackUnavailableError,
+    StalePublishedPointerError,
+    StaleStatusError,
+)
 from whymath_backend.privacy.audit import record_content_mutation_audit
-from whymath_backend.schema.cms_access import CmsCapability, has_capability, required_capability
+from whymath_backend.schema.cms_access import (
+    ROLLBACK_CAPABILITY,
+    CmsCapability,
+    has_capability,
+    required_capability,
+)
 from whymath_backend.schema.enums import PrivacyAuditAction, PrivacyAuditResourceType, Role
 from whymath_backend.schema.problem_version import ProblemVersion as SchemaProblemVersion
 from whymath_backend.schema.version_header import TransitionAction, VersionChange, VersionStatus
@@ -137,6 +151,22 @@ class CmsProblemTransitionRequest(BaseModel):
     expected_status: VersionStatus = Field(
         ..., description="화면이 본 상태 — 그사이 바뀌었으면 409(stale_status)."
     )
+
+
+class CmsProblemRollbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_published_version_id: uuid.UUID = Field(
+        ..., description="화면이 본 현재 발행본 — 그사이 바뀌었으면 409(stale_pointer)."
+    )
+
+
+class CmsProblemRollbackResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    problem_id: uuid.UUID
+    rolled_back_version_id: uuid.UUID
+    restored_version_id: uuid.UUID
 
 
 # ── 도우미 ──────────────────────────────────────────────────────────────────────────────
@@ -369,3 +399,78 @@ async def transition_problem_version(
         await session.rollback()
         raise
     return _summary(version, role)
+
+
+@router.post(
+    "/problems/{problem_id}/rollback",
+    response_model=CmsProblemRollbackResponse,
+    summary="문항 롤백 — 현재 발행본을 내리고 직전 발행본과 그 내용으로 복구(배포 권한)",
+)
+async def rollback_problem(
+    problem_id: uuid.UUID,
+    body: CmsProblemRollbackRequest,
+    request: Request,
+    user: RequireContentVersion,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CmsProblemRollbackResponse:
+    """권한 검사 → (문항 잠금 후 포인터 비교 · 복원 대상 RESTORE 게이트) → 감사 1행 → commit 1회.
+
+    감사 행의 대상은 **내려간 판**이다(개념 롤백과 같은 규칙) — 복원된 판은 응답에 실린다.
+    """
+    _require(user, ROLLBACK_CAPABILITY)
+    actor, actor_id = _actor(user), user.user_id  # commit 뒤에는 읽지 않는다
+    try:
+        result = await pgate.rollback(
+            session,
+            problem_id,
+            actor=actor,
+            expected_current_version_id=body.expected_published_version_id,
+        )
+        record_content_mutation_audit(
+            session,
+            actor_user_id=actor_id,
+            resource_type=PrivacyAuditResourceType.problem_version,
+            resource_id=result.rolled_back_version_id,
+            action=PrivacyAuditAction.rollback,
+            ip=_client_ip(request, settings=settings),
+            settings=settings,
+        )
+        await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise _http_error(
+            status.HTTP_404_NOT_FOUND, "not_found", "문항을 찾을 수 없습니다."
+        ) from exc
+    except StalePublishedPointerError as exc:
+        await session.rollback()
+        raise _http_error(
+            status.HTTP_409_CONFLICT,
+            "stale_pointer",
+            "화면의 발행본이 최신이 아닙니다. 새로고침 후 다시 시도하세요.",
+            published_version_id=str(exc.actual) if exc.actual else None,
+        ) from exc
+    except RollbackUnavailableError as exc:
+        await session.rollback()
+        raise _http_error(
+            status.HTTP_409_CONFLICT, "rollback_unavailable", "롤백할 수 없는 상태입니다."
+        ) from exc
+    except UndefinedTransitionError as exc:
+        await session.rollback()
+        raise _http_error(
+            status.HTTP_409_CONFLICT, "illegal_transition", "허용되지 않는 전이입니다."
+        ) from exc
+    except PublishGateError as exc:
+        await session.rollback()
+        raise _gate_failed(
+            exc,
+            "복원 대상이 검증 게이트를 통과하지 못했습니다(내려간 동안 내용이 바뀌었을 수 있음).",
+        ) from exc
+    except Exception:
+        await session.rollback()
+        raise
+    return CmsProblemRollbackResponse(
+        problem_id=result.problem_id,
+        rolled_back_version_id=result.rolled_back_version_id,
+        restored_version_id=result.restored_version_id,
+    )
