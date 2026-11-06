@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-11-p3-bank-renamed-ids-db-orphans
+title: "P3 두 은행 발문 변경 18건 — 운영 DB 옛 problem_id 비노출 처리"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 운영 DB(whymath-pg)에 남은 P3 두 은행의 옛 problem_id 18건(P3-91·P3-93 승격으로 발문이 바뀌어 slug·uuid5가 바뀐 문항 — 목록은 docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md §5 표)이 학생에게 노출되지 않게 한다. 은행 적재는 problem_id 기준 upsert라 옛 행이 고아로 남는다. ② 처리 경로는 기존 적재 런북(P3-97 계열)의 쓰기 가드 형식을 따르고, 처리 전후 옛 id 18건의 노출 적격 건수를 읽기 전용 쿼리로 재서 18 → 0을 기록한다. ③ 새 id 18건이 적재되어 노출 적격인지 같은 방식으로 확인한다."
+artifacts: []
+paths:
+  - docs/reviews/
+  - docs/ops/
+session: null
+notes: "출처: P3-91·P3-93 승격(2026-11-06 · 브랜치 claude/p3-91-93-solution-qa-55) 보고서 §5·§7-5. 이 PR은 DB를 건드리지 않는다."
+updated: 2026-11-06

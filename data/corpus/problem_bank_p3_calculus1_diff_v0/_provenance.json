@@ -74,7 +74,7 @@
         "mastery_check": 12
       },
       "distinct_frames": 32,
-      "distinct_skeletons": 68,
+      "distinct_skeletons": 69,
       "generator": "p3_diff_mean_value_theorem_skeleton_generator.P3DiffMeanValueTheoremGenerator"
     },
     "[12미적Ⅰ-02-08]": {
@@ -125,7 +125,7 @@
   },
   "approval_status": {
     "note": "이 도구는 review_status를 쓰지 않는다(키 부재). 승인 각인은 코퍼스 단위 백필(problem_corpus_review_status_backfill · 코퍼스 키 p3_calculus1_diff_v0)이 감사 라벨로 쓴다. 각인을 걷어 낸 은행 바이트가 감사 동결 사본과 같아야 승인이 유효하다.",
-    "sample_review": "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, 결함 1건 · 보정 상한 0.01151 ≤ 0.02",
-    "evidence": "docs/data/p3_calculus1_diff_audit/bank_audit_r5/ (사전 등록·라벨·동결 사본) · docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl (코퍼스 단위 라벨) · is_published=False 유지"
+    "sample_review": "504건 전수 — 자격 통과 프로토콜(기계 게이트 ∪ LLM 판정자 A ∪ B) 8회차 S5 감사, 결함 1건 · 보정 상한 0.01151 ≤ 0.02 (P3-91·P3-93 — 규칙 (가)·P3-93 구조화 승격)",
+    "evidence": "docs/data/p3_calculus1_diff_audit/bank_audit_r8/ (사전 등록·라벨·동결 사본) · docs/data/corpus_audit_p3_calculus1_diff_v0.jsonl (코퍼스 단위 라벨) · is_published=False 유지"
   }
 }

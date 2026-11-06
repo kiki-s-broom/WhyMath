@@ -63,12 +63,15 @@ _FACTS = json.loads(
     (_REPO_ROOT / "docs" / "data" / "corpus_facts.json").read_text(encoding="utf-8")
 )
 _DERIVATIVE = "Derivative"
-#: 평균값 정리의 결론(f'(c) = 평균변화율)만 묻는 진단 틀 — 출발식에 도함수가 없는 틀은 이것뿐이다
-#: (`p3_diff_solution_steps` docstring '한계'). 함수식이 없어 미분할 함수가 없다. 함수식이 있는 짝(5회차
-#: 감사 교정으로 넣은 'f'(c)의 값을 구하시오')은 8회차(은행 감사 4회차) 처분으로 삭제했다 — 주어진 식을
-#: 미분하지 않고 평균변화율 대입만으로 답이 나왔다(판정기 T06-unused-function).
-_NO_FUNCTION_STEM = "f'(c) = k인 c가"
-_CONCLUSION_STEMS = (_NO_FUNCTION_STEM,)
+#: 평균값 정리의 결론(f'(c) = 평균변화율)을 진단하는 틀 — 출발식에 도함수(`Derivative`)가 없는 생성기 틀은
+#: 이것뿐이다(`p3_diff_solution_steps` docstring '한계'). 발문이 도함수 f'(x)를 직접 주므로 미분할 함수가 없다.
+#: 2026-11-06(P3-91 후속 · calc 7회차 감사 a4f83881·846b97d1) — 종전 틀('f'(c) = k인 c가 … k의 값')은 두
+#: 함숫값만 주어 평균변화율 대입으로 끝났다. 도함수를 주고 c를 묻게 바꿨다(어간도 바뀌었다).
+_MVT_DERIVATIVE_GIVEN_STEM = "평균변화율과 같아지는 c가"
+_CONCLUSION_STEMS = (_MVT_DERIVATIVE_GIVEN_STEM,)
+#: P3-93 a·b 연립 삼차 틀 — 승인 은행(구조화)의 연쇄는 연립을 소거한 a 단일 방정식에서 출발한다. 미분은 b의
+#: 정의 등식(f'(r) = 0을 b에 대해 푼 식)을 만들 때 쓰였고 출발식에는 남지 않는다(조건에 b 정의 등식이 있다).
+_AB_ELIMINATION_STEM = "(단, a, b는 상수이다.)"
 _OPS = (("<=", "le"), (">=", "ge"), ("!=", "ne"), ("<", "lt"), (">", "gt"))
 
 #: 마지막 단계의 끝맺음 분포 — 스냅숏(값만 갱신 가능 · 이유를 주석으로 남긴다 · 약화 금지).
@@ -86,13 +89,16 @@ _OPS = (("<=", "le"), (">=", "ge"), ("!=", "ne"), ("<", "lt"), (">", "gt"))
 #: 2026-10-08 확인(8회차 · 은행 감사 4회차 교정): 건수 불변, 구성만 바뀌었다. 02-06 'f'(c)의 값' 진단
 #: 틀(정답 1개로 끝나는 평균변화율 산술 3건)을 지우고 '왼쪽 끝값 하한' 진단 틀(f(a) ≥ f(b) - M(b - a))을
 #: 넣었다 — 라운드로빈이 그 3자리를 하한 틀 1건·왼쪽 끝값 하한 틀 2건(모두 정답 1개)으로 채웠다.
+#: 2026-11-06 갱신(P3-91·P3-93 승격 · 은행 감사 8회차): 정답 1개 252 → 299, 근 목록·선택 128 → 129,
+#: 근 목록·연립 48 → 0(합 428 불변 · 위반 0). 규칙 (가)(P3-62)·P3-93 구조화가 연립 48건 전부의 풀이 끝에
+#: 근 선택·정답 변수 값 진술을 붙여 정답 변수의 값 하나로 끝나게 했다(공용 해석 판정이 조건만으로 증명) —
+#: '연립' 분류가 사라진 것은 약화가 아니라 그 48건(graph_shape 26 · eq_app 22)이 더 강한 끝맺음(정답 진술)
+#: 으로 옮겨 간 것이다. 같은 승격의 7회차 감사 처분 2틀도 움직였다(실측 — 승인 5회차 동결본과 행별 대조):
+#: 평균값 정리 진단 3건(f'(c)의 값 → c) 정답 1개 → 근 목록·선택 · 접선 Q의 기울기 2건 근 목록·선택 → 정답 1개.
 _ENDING_SNAPSHOT: dict[str, int] = {
-    "정답 1개(u = 정답)": 252,
+    "정답 1개(u = 정답)": 299,
     # 단일 미지수 근 목록 — 보호 조건(a > 0 등) 또는 answer_selection이 정답 하나만 남긴다.
-    "근 목록 · 선택 조건이 정답 하나를 고름": 128,
-    # 정답 사전에 다른 미지수(y·a·b·k)가 함께 있는 연립 — 근 선택은 그 미지수의 조건(극값의 값 등)이
-    # 맡는다. 여기서는 정답이 보호 조건을 통과하는지만 본다.
-    "근 목록 · 연립(다른 미지수 조건이 고름)": 48,
+    "근 목록 · 선택 조건이 정답 하나를 고름": 129,
     "정답 대입 검산 연쇄(B)": 12,
     "도함수 식 연쇄(C · 허근 인수 임계점)": 8,
     "경계점(정답은 증감 구간 안 정수)": 6,
@@ -400,10 +406,18 @@ def test_first_step_differentiates_except_the_function_free_mvt_diagnostic(
     without = [r for r in rows if _DERIVATIVE not in r["verify"]["solution_steps"][0]]
     # 3 → 6(5회차 감사 교정): 함수식이 있는 결론 진단 틀 3문항이 더해졌다 — 틀마다 3문항씩.
     # 6 → 3(8회차 · 은행 감사 4회차 교정): 함수식이 있는 짝 틀을 지웠다(T06-unused-function).
-    assert len(without) == 3
-    assert all(any(stem in str(r["question_text"]) for stem in _CONCLUSION_STEMS) for r in without)
-    for stem in _CONCLUSION_STEMS:
-        assert sum(stem in str(r["question_text"]) for r in without) == 3, stem
+    # 3 → 9(2026-11-06 · P3-91·P3-93 승격 — 감사 8회차): 평균값 정리 진단 3(도함수를 주고 c를 묻는다)
+    # + a·b 연립 삼차 6(P3-93 소거형 출발식 — 미분은 b 정의 등식에 들어 있다). 부류마다 건수를 동결한다.
+    assert len(without) == 9
+    mvt = [r for r in without if _MVT_DERIVATIVE_GIVEN_STEM in str(r["question_text"])]
+    ab = [
+        r
+        for r in without
+        if _AB_ELIMINATION_STEM in str(r["question_text"])
+        and any(str(c).startswith("b = ") for c in _conditions(r))
+    ]
+    assert len(mvt) == 3 and len(ab) == 6
+    assert len(mvt) + len(ab) == len(without)
 
 
 def test_loader_meter_and_replay_consume_the_steps(rows: list[dict[str, Any]]) -> None:

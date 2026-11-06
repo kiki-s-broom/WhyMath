@@ -338,6 +338,13 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-06 (측정·승격 · P3-91·P3-93 합본 — Kiki 결정 2건): **Solution QA 검증 가능 비율 0.48885 → 0.55843(626/1,121) — D11 하한 55% 충족(여유 9건)** (claude 실행·기록, Kiki 결정) — 판정 기준: 브랜치 `claude/p3-91-93-solution-qa-55`(main `6cccb547` 위)
+- **Kiki 결정 ①(2026-11-06)**: P3-91(fill 문장 교정·후보 승격)과 P3-93(잔여 VAR)을 한 후보·한 S5 감사로 합본. **결정 ②**: calc 7회차 불합격(k = 6 — 전부 '불확실'·기존 문항 4틀) 뒤 "4틀 고치고 재감사".
+- **P3-93**: 판정기 무변경 — 생성기가 조건을 더 정확히 싣는다. a·b 연립 18(소거형 b 정의 등식 + a 단일 방정식 · 새 필드 `DiffItem.structured_setup`) · 같은 종류 두 극값 8 · 범위 최솟값 9(후보 **전부**와의 값 비교 부등식 — 정답 역산 없음) · 평평한 임계점 2(f'' ≠ 0). E '처음' 방향 전환 2건은 answer_map 변경이 필요해 범위 밖. 뮤테이션 8/8 RED(1차 6/8 — 픽스처가 경계 비교·기록 대조 절을 안 밟음 → 반례 2건 추가).
+- **S5**: fill 5회차 k = 0/204(통과) · calc 7회차 k = 6/504(불합격 · as-found) · calc 8회차 k = 1/504(통과). 승격 = 배치 기본값 구조화 + 쓰기 가드 방향 반전(구판 `--legacy-final-step` 거부) · 백필 708건 `approved`.
+- **사고·교훈(대책 = 기록·코드)**: 같은 지침·시드인데 calc 회차별 k가 1·1·6·1로 움직였다 — 판정자 표본 변동이 승격 일정을 좌우한다(측정 타당성 단서를 감사 README에 명기). 발문을 바꾼 18건은 slug·problem_id가 바뀌어 운영 DB에 옛 행이 남는다(이 PR은 DB 무변경 — 비노출 처리는 승계).
+- **근거**: 보고서 `docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md` · 감사 `docs/data/p3_fill_audit/bank_audit_r5/` · `docs/data/p3_calculus1_diff_audit/bank_audit_r7/`·`bank_audit_r8/`.
+
 ### 2026-11-05 (측정 · G3 판정 준비 — 폴더 04): **`G-eos-g3` 5조건을 main `a150cdef`에서 재측정 — 충족 5/5 · 판정·clear는 Kiki 몫(11/22)** (claude 측정·기록) — 판정 기준: main `a150cdef`
 
 - **무엇을**: 지시문(EOS 감리 이행 지시문 v3 · 폴더 04)대로 `ops/g3_content_measures`·`ops/hit_cu_metrics`·`ops/weekly_metrics_report --dry-run`·`ops/provenance_audit --require-runs`를 main `a150cdef`에서 돌려 01-A 초안(`a91ffcf7` · #1794)을 최종본으로 갱신하고, `G-eos-g3` notes에 재측정 결과를 `gates amend --note`로 남겼다. **D12**(HIT AI 보조 조건 명시 여부 · 기한 11/20) 결정문은 미수신이라 notes에 붙이지 못했다 — 받으면 결정문의 명령 그대로 붙인다.

@@ -1,5 +1,5 @@
-# P3-03 미분 은행 감사 라벨 — 5회차 S5 감사(docs/data/p3_calculus1_diff_audit/bank_audit_r5/)의 프로토콜 합집합(기계 ∪ 판정자 A ∪ B)
-# 은행 sha256 3abfc4e65c5d2b809bb849064fee979e5dbf8c30c243b8186334acb75b949bf3 · S5 보정 상한 0.01151 ≤ 0.02 · as-found = 이 감사 그대로(교정 없음)
+# P3-03 미분 은행 감사 라벨 — 8회차 S5 감사(docs/data/p3_calculus1_diff_audit/bank_audit_r8/)의 프로토콜 합집합(기계 ∪ 판정자 A ∪ B) · P3-91·P3-93 승격
+# 은행 sha256 2701743840f86183276cdd31cbfd81419c9e58fa07098abed8b89b3347ebfa4c · S5 보정 상한 0.01151 ≤ 0.02 · as-found = 이 감사 그대로(교정 없음)
 {"as_found_n": 504, "as_found_defects": 1}
 {"problem_id": "0f510e63-cae5-587d-881a-7b0e8798ef15", "verdict": "ok", "defect_class": ""}
 {"problem_id": "3492169d-7c5a-5ba0-9fd3-6f2db6e5b74c", "verdict": "ok", "defect_class": ""}
@@ -112,7 +112,7 @@
 {"problem_id": "bd5b0906-e96a-5f33-86a9-2257a868e2dc", "verdict": "ok", "defect_class": ""}
 {"problem_id": "481f057b-c0dd-58a0-8ee2-e9ae43ee5914", "verdict": "ok", "defect_class": ""}
 {"problem_id": "59301d60-ef03-5f20-94d4-91cd64869dff", "verdict": "ok", "defect_class": ""}
-{"problem_id": "6c404b8c-ab67-564e-a6ea-12d2ba5c1152", "verdict": "ok", "defect_class": ""}
+{"problem_id": "6c404b8c-ab67-564e-a6ea-12d2ba5c1152", "verdict": "defect", "defect_class": "해 불명확"}
 {"problem_id": "67ede4a1-ee66-56e5-8f47-98cced055917", "verdict": "ok", "defect_class": ""}
 {"problem_id": "f0a03423-d1cf-510c-89e3-35368a7e36e2", "verdict": "ok", "defect_class": ""}
 {"problem_id": "d0109a4d-c962-5c88-802a-8f122023c060", "verdict": "ok", "defect_class": ""}
@@ -206,13 +206,13 @@
 {"problem_id": "c964fc7b-a297-5bd2-9bf0-10eac8c22a1d", "verdict": "ok", "defect_class": ""}
 {"problem_id": "5d731e4b-ca16-5723-ba38-342130880de1", "verdict": "ok", "defect_class": ""}
 {"problem_id": "a78ae907-94eb-5c7f-a874-2a44c93c7d8d", "verdict": "ok", "defect_class": ""}
-{"problem_id": "91c78e39-697f-5f26-8d9a-d6e3759ea4d0", "verdict": "ok", "defect_class": ""}
+{"problem_id": "b2a8cef8-1bb0-55a9-b920-e08d44291e35", "verdict": "ok", "defect_class": ""}
 {"problem_id": "44991509-424e-5041-b432-b77daea40076", "verdict": "ok", "defect_class": ""}
 {"problem_id": "2ad6490a-16d6-5a6e-ae13-a55a4be715ea", "verdict": "ok", "defect_class": ""}
 {"problem_id": "22dacea5-0c2f-5eed-8214-01e04bfd1ad3", "verdict": "ok", "defect_class": ""}
 {"problem_id": "e8e159b7-b417-596d-838c-df2712c76413", "verdict": "ok", "defect_class": ""}
 {"problem_id": "c8a92c31-132d-56b1-b514-178543cba9be", "verdict": "ok", "defect_class": ""}
-{"problem_id": "bc466173-df04-5e39-a2da-84c9e4b72415", "verdict": "ok", "defect_class": ""}
+{"problem_id": "e3f2c0b7-7a29-5755-9ac0-49f5511d4b4c", "verdict": "ok", "defect_class": ""}
 {"problem_id": "31273676-7ab9-578c-8e54-ada54dde968d", "verdict": "ok", "defect_class": ""}
 {"problem_id": "9f1ad6c2-9c9a-5521-88f0-f66f8e0c70a8", "verdict": "ok", "defect_class": ""}
 {"problem_id": "c81bbd30-1727-5609-9ed0-0cf4c2562997", "verdict": "ok", "defect_class": ""}
@@ -265,17 +265,17 @@
 {"problem_id": "b32897f6-605b-5de6-9f74-8aa6f1d4da25", "verdict": "ok", "defect_class": ""}
 {"problem_id": "4c1ef0bf-ff70-5182-a478-98958d7a5b15", "verdict": "ok", "defect_class": ""}
 {"problem_id": "98d93de4-94fc-5e2e-af11-b348758cc09e", "verdict": "ok", "defect_class": ""}
-{"problem_id": "846b97d1-54d0-5b77-bc18-f5aa033bab4f", "verdict": "ok", "defect_class": ""}
+{"problem_id": "d6976761-93da-5f6f-9dc9-8e0cc27be8cb", "verdict": "ok", "defect_class": ""}
 {"problem_id": "c0daa3d7-deb7-5ff1-9726-520cc97e74e2", "verdict": "ok", "defect_class": ""}
 {"problem_id": "22cb808b-faf4-5866-a4db-17b357594418", "verdict": "ok", "defect_class": ""}
 {"problem_id": "6782eb62-adea-52c2-bceb-9a320c55cecf", "verdict": "ok", "defect_class": ""}
 {"problem_id": "78716d01-4ab5-5a9a-b3d6-b2c4255f9c29", "verdict": "ok", "defect_class": ""}
-{"problem_id": "4c5c1d90-79a3-5741-b3a1-9e73f882f65d", "verdict": "ok", "defect_class": ""}
+{"problem_id": "bd64cf22-3cfe-5131-befe-c56e36b8bd05", "verdict": "ok", "defect_class": ""}
 {"problem_id": "592dfc82-d797-53bb-bc91-a8184d82b39e", "verdict": "ok", "defect_class": ""}
 {"problem_id": "a0abdb61-ceff-59bc-b33d-81fb8928d4b4", "verdict": "ok", "defect_class": ""}
 {"problem_id": "1be2510b-9e14-584a-8361-a404e4a997fa", "verdict": "ok", "defect_class": ""}
 {"problem_id": "d9ed9365-2396-545b-a1c8-a7bd461d917b", "verdict": "ok", "defect_class": ""}
-{"problem_id": "a4f83881-b066-5179-acb9-1d8616927972", "verdict": "ok", "defect_class": ""}
+{"problem_id": "1fecf79f-c1c0-5b02-9f7f-cf61b214472f", "verdict": "ok", "defect_class": ""}
 {"problem_id": "792ce11f-e96e-578e-9a90-f6d81bdf3f23", "verdict": "ok", "defect_class": ""}
 {"problem_id": "16c3230e-67fd-546d-9091-0489da12d285", "verdict": "ok", "defect_class": ""}
 {"problem_id": "ff9c0ada-d1c2-5517-b4af-bb79f2306bc6", "verdict": "ok", "defect_class": ""}
@@ -328,12 +328,12 @@
 {"problem_id": "559db5a7-50c6-5be7-8547-e8e241a87018", "verdict": "ok", "defect_class": ""}
 {"problem_id": "03cd2daa-a36c-52c9-bd6b-ddb9caf67a48", "verdict": "ok", "defect_class": ""}
 {"problem_id": "cbba7d02-24de-56b5-8b47-7943c8527b56", "verdict": "ok", "defect_class": ""}
-{"problem_id": "f832f55b-0c6e-5c88-97cd-c67635aae594", "verdict": "ok", "defect_class": ""}
+{"problem_id": "294f256e-1b1b-5cf9-ac85-053037fa6e30", "verdict": "ok", "defect_class": ""}
 {"problem_id": "47504423-fa0b-5623-991e-8e1ffb4f3643", "verdict": "ok", "defect_class": ""}
 {"problem_id": "d6c9003b-9abe-5285-addd-d778ac9d173b", "verdict": "ok", "defect_class": ""}
 {"problem_id": "3d400cf8-9580-5319-b1ba-2a7c97fbe330", "verdict": "ok", "defect_class": ""}
 {"problem_id": "b2d3bc4b-ef50-5fb4-a363-e1051eb800e9", "verdict": "ok", "defect_class": ""}
-{"problem_id": "62cfcd03-30d2-539e-aab4-70442fd73cb1", "verdict": "ok", "defect_class": ""}
+{"problem_id": "c06be01d-92f4-596b-8dbe-5c3108d92b1d", "verdict": "ok", "defect_class": ""}
 {"problem_id": "ab3080e0-eb93-5fac-8ae0-2cc39d8d3dc7", "verdict": "ok", "defect_class": ""}
 {"problem_id": "c0aa802d-8017-58f4-8049-6771b7963671", "verdict": "ok", "defect_class": ""}
 {"problem_id": "61f24c9a-6513-54de-841e-832bd7ae9a96", "verdict": "ok", "defect_class": ""}
@@ -487,7 +487,7 @@
 {"problem_id": "1be95c26-c641-5523-8000-80d4387b2c22", "verdict": "ok", "defect_class": ""}
 {"problem_id": "fb9ec6bc-36d7-5634-bd8e-3d4c936608bb", "verdict": "ok", "defect_class": ""}
 {"problem_id": "34c8e0da-a6bb-54c0-909a-2c950edfda43", "verdict": "ok", "defect_class": ""}
-{"problem_id": "3294c5cf-877c-58e9-b8e7-0cc158342dc1", "verdict": "defect", "defect_class": "미분 없이 풀림"}
+{"problem_id": "3294c5cf-877c-58e9-b8e7-0cc158342dc1", "verdict": "ok", "defect_class": ""}
 {"problem_id": "feccf907-bf81-55d8-aaa5-b63821cb35d2", "verdict": "ok", "defect_class": ""}
 {"problem_id": "a72ffbb0-8743-5103-879a-932a24fbf344", "verdict": "ok", "defect_class": ""}
 {"problem_id": "9a338f4a-0fe1-5d17-a114-ed1b6e4f3fb1", "verdict": "ok", "defect_class": ""}

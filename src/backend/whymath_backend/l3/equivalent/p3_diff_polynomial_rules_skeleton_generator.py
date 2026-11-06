@@ -1015,7 +1015,8 @@ def _diagnostic_frames() -> list[Frame]:
             ),
             answer_text=str(k),
             # P3-91 후속(calc 7회차 감사 · 2e2868aa·4882cd3f) — 결론만 적지 않고 곱의 미분법을
-            # 적용한 중간식(두 인수의 도함수가 1 → 다른 인수 둘의 합)을 쓴다(판정 기준 5 '핵심 중간 단계').
+            # 적용한 중간식(두 인수의 도함수가 1 → 다른 인수 둘의 합)을 쓴다(판정 기준 5
+            # '핵심 중간 단계').
             explanation=(
                 f"({render_poly(f1)}){wa_gwa(render_poly(f1))} ({render_poly(f2)})의 도함수는 "
                 "모두 1이다. 곱의 미분법에 따라 f'(x)는 앞 인수의 도함수에 뒤 인수를 곱한 것과 "

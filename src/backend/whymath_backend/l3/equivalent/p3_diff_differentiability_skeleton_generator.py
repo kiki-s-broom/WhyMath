@@ -53,7 +53,6 @@ import sympy
 from whymath_backend.l3.equivalent.acceptance import EquivalenceSpec
 from whymath_backend.l3.equivalent.generator import CandidateProblem
 from whymath_backend.l3.equivalent.p3_diff_expr import Poly, render_poly
-from whymath_backend.lang.josa import euro_ro, i_ga
 from whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator import (
     KindedDiffItem,
     with_item_kinds,
@@ -67,6 +66,7 @@ from whymath_backend.l3.equivalent.p3_diff_skeleton_base import (
     round_robin_items,
     seeded_order,
 )
+from whymath_backend.lang.josa import euro_ro, i_ga
 
 __all__ = [
     "P3DiffDifferentiabilityGenerator",

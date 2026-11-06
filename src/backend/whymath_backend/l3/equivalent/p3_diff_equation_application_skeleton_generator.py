@@ -722,9 +722,7 @@ def _min_rank_conditions(
             return None
         lower, strict = int(matched.group(3)), matched.group(2) == ">"
     inside = sorted(
-        c
-        for c in set(case.crit)
-        if lower is None or (c > lower if strict else c >= lower)
+        c for c in set(case.crit) if lower is None or (c > lower if strict else c >= lower)
     )
     if len(inside) < 2:
         return None  # 범위 안 임계점이 하나뿐 — 도메인 부등식만으로 정해진다(규칙 (가) 종전 경로)

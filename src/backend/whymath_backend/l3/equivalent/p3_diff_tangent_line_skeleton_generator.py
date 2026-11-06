@@ -1575,9 +1575,9 @@ def _mastery_frames() -> list[Frame]:
         m, fa, k = _tangent(f, a)
         fp = derivative_of(f)
         diff_poly = poly_from_sympy(sympy.expand(poly_to_sympy(f) - (m * _X + k)))
-        # P3-91 후속(calc 7회차 감사 · bc466173 '미분 없이 풀림') — 교점 Q의 x좌표만 물으면 삼차방정식
-        # 근과 계수의 관계(접점 a는 중근 → 2a + Q = -b/lead)로 접선 없이 풀린다. Q에서의 곡선의 접선의
-        # 기울기 f'(Q)를 묻는다 — 답에 도함수가 반드시 쓰인다.
+        # P3-91 후속(calc 7회차 감사 · bc466173 '미분 없이 풀림') — 교점 Q의 x좌표만 물으면
+        # 삼차방정식 근과 계수의 관계(접점 a는 중근 → 2a + Q = -b/lead)로 접선 없이 풀린다.
+        # Q에서의 곡선의 접선의 기울기 f'(Q)를 묻는다 — 답에 도함수가 반드시 쓰인다.
         slope_q = eval_at(fp, s_root)
         if slope_q in (m, s_root):
             return None  # 처음 접선의 기울기·Q의 x좌표와 같은 값이면 다른 경로가 같은 답을 낸다

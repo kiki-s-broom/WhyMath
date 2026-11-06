@@ -156,6 +156,29 @@ def test_a_authoring_defect_stops_the_build() -> None:
         structured_view.__wrapped__(broken)  # type: ignore[attr-defined]
 
 
+def test_b_recorded_wrong_while_a_chain_is_right_stops_the_build() -> None:
+    """저작 결함(진술값 ↔ 정답 기록 대조 절) — a 연쇄는 맞고 b 기록만 틀리면, 조건이 정한 b와 달라 멈춘다.
+
+    a를 묻는 틀의 기록 오류는 연쇄 도출(`solution_steps`의 정답 도달 검사)이 먼저 잡으므로 이 절에 닿지
+    않는다. b를 묻는 틀은 연쇄가 a에서 끝나고 b는 정의 등식 대입으로 계산되므로 이 절만이 잡는다
+    (뮤테이션 M7이 살아남아 드러난 픽스처 공백 — 이 반례가 그 절을 밟는다).
+    """
+    frame = _find_b_quartic_frame(
+        "t-quartic-b",
+        "사차함수 f(x) = {f}{ga} x = {r}에서 {kind} {v}{veul} 가질 때, 상수 {p}의 값을 구하시오. "
+        "(단, a, b는 상수이다.)",
+        "seed",
+        slot="mastery_check",
+    )
+    item = frame.build((3, 5))  # 참값 a = -4 · b = 5
+    assert item is not None
+    broken = dataclasses.replace(
+        item, answer_text="6", answer_map=(("x", "3"), ("b", "6"), ("a", "-4"))
+    )
+    with pytest.raises(ValueError, match="저작 결함"):
+        structured_view.__wrapped__(broken)  # type: ignore[attr-defined]
+
+
 def test_a_setup_requires_structured_conditions() -> None:
     item = dataclasses.replace(_cubic_find_a(), structured_conditions=None)
     with pytest.raises(ValueError, match="구조화 조건이 함께"):
@@ -276,6 +299,29 @@ def test_c_min_on_half_line_boundary_critical_point_red() -> None:
     # 결함 주입 — 경계이자 임계점인 x = 0(값 12)을 고르면 FAIL.
     bad = (*steps[:-2], "x = 0", "y = 12")
     assert _judge("12", conditions, {"x": "0", "y": "12"}, bad)["C4"] == "fail"
+
+
+def test_c_true_minimum_at_boundary_is_not_misstated() -> None:
+    """범위 경계 비교 절 — 진짜 최솟값이 경계(x = 0)에 있는데 극솟점을 최솟값으로 적은 저작 결함을 막는다.
+
+    f(x) = 2x^3 - 9x^2 + 12x + 1은 x ≥ 0에서 임계점 1·2(극대 6·극소 5)이지만 경계 f(0) = 1이 더 작다. 경계와의
+    비교 조건이 있으면 조건을 만족하는 임계점이 없어 구조화가 멈춘다. 경계 비교가 빠지면 극소 x = 2가 '최솟값'
+    으로 증명돼 틀린 기록(5)을 그대로 통과시킨다(뮤테이션 M6이 살아남아 드러난 픽스처 공백 — 앞 픽스처는 경계
+    0이 마침 임계점이라 이 절을 밟지 않았다).
+    """
+    poly: Poly = ((3, 2), (2, -9), (1, 12), (0, 1))
+    item = _min_item(
+        slot="applied",
+        frame_id="t-boundary",
+        text="x ≥ 0에서 f(x)의 최솟값을 구하시오.",
+        case=_Min(poly, (1, 2), 2, 5),  # 저작 결함 — 참 최솟값은 x = 0에서 1
+        explanation="-",
+        domain="x >= 0",
+    )
+    assert item.structured_conditions is not None
+    assert any(c.endswith("- (1) <= 0") for c in item.structured_conditions)  # 경계 f(0) = 1 비교
+    with pytest.raises(ValueError):
+        structured_view.__wrapped__(item)  # type: ignore[attr-defined]
 
 
 def test_c_single_inside_critical_point_keeps_previous_path() -> None:

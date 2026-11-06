@@ -45,7 +45,7 @@ from whymath_backend.harness.p3_calculus1_diff_batch import (
 )
 from whymath_backend.harness.p3_calculus1_diff_batch import (
     drift_against,
-    refuses_structured_write,
+    refuses_legacy_write,
     run_p3_calculus1_diff_batch,
 )
 from whymath_backend.l3.equivalent.p3_diff_differentiability_skeleton_generator import (
@@ -95,11 +95,11 @@ def run_p3_fill_batch(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
     out_path: Path | None = None,
     write: bool = True,
-    structure_final_step: bool = False,
+    structure_final_step: bool = True,
 ) -> Any:
     """등록부의 (개념 × 담당 슬롯)을 돌려 게이트(Tier1 SymPy 검산)를 통과한 문항을 적재한다.
 
-    `structure_final_step`이면 규칙 (가)(P3-62) 후보 은행(기존 배치와 같은 스위치).
+    기본이 승인 형태(규칙 (가)·P3-93 구조화)다 — False면 구판 출력(기존 배치와 같은 스위치·가드).
     """
     resolved = out_path if out_path is not None else _default_out_dir() / _PROBLEMS_FILE
     return run_p3_calculus1_diff_batch(
@@ -113,10 +113,10 @@ def run_p3_fill_batch(
 def build_provenance(
     generators: Sequence[type[P3DiffSlotGenerator]] = GENERATORS,
     *,
-    structured: bool = False,
+    legacy: bool = False,
 ) -> dict[str, Any]:
     """사이드카 내용 — 기존 배치의 계산에 이 은행의 이름·출처 문구를 덮어쓴다(시계 의존 0)."""
-    provenance = _base_provenance(generators, structured=structured)
+    provenance = _base_provenance(generators, legacy=legacy)
     provenance.update(
         {
             "corpus_name": CORPUS_DIR_NAME,
@@ -135,11 +135,11 @@ def build_provenance(
                     "(n ≥ 200 · Wilson 상한 ≤ 0.02) 뒤 코퍼스 단위 백필이 쓴다."
                 ),
                 "sample_review": (
-                    "204건 전수 — 자격 통과 프로토콜(기계 ∪ LLM 판정자 A ∪ B) 3회차 S5 감사, "
-                    "결함 0건 · 보정 상한 0.01907 ≤ 0.02"
+                    "204건 전수 — 자격 통과 프로토콜(기계 ∪ LLM 판정자 A ∪ B) 5회차 S5 감사, "
+                    "결함 0건 · 보정 상한 0.01907 ≤ 0.02 (P3-91 — 템플릿 문장 교정·규칙 (가) 승격)"
                 ),
                 "evidence": (
-                    "docs/data/p3_fill_audit/bank_audit_r3/ (라벨·동결 사본) · "
+                    "docs/data/p3_fill_audit/bank_audit_r5/ (라벨·동결 사본) · "
                     "docs/data/corpus_audit_p3_fill_v0.jsonl (코퍼스 단위 라벨) · "
                     "is_published=False 유지"
                 ),
@@ -150,13 +150,10 @@ def build_provenance(
 
 
 def _render_provenance(
-    generators: Sequence[type[P3DiffSlotGenerator]], *, structured: bool = False
+    generators: Sequence[type[P3DiffSlotGenerator]], *, legacy: bool = False
 ) -> str:
     return (
-        json.dumps(
-            build_provenance(generators, structured=structured), ensure_ascii=False, indent=2
-        )
-        + "\n"
+        json.dumps(build_provenance(generators, legacy=legacy), ensure_ascii=False, indent=2) + "\n"
     )
 
 
@@ -194,23 +191,23 @@ def main(argv: list[str] | None = None) -> int:
         "--check", action="store_true", help="재생성 결과가 저장소 은행과 바이트 동일한지 검사."
     )
     parser.add_argument(
-        "--structure-final-step",
+        "--legacy-final-step",
         action="store_true",
-        help="규칙 (가)(P3-62) 후보 은행 — 승인 은행 자리에는 쓰지 않는다(--out-dir 필수).",
+        help="구판(P3-62 이전) 출력 — 비교·재현용, 승인 은행 자리에는 쓰지 않는다(--out-dir 필수).",
     )
     args = parser.parse_args(argv)
     out_dir = Path(args.out_dir) if args.out_dir else _default_out_dir()
 
     if args.check:
-        if args.structure_final_step:
+        if args.legacy_final_step:
             print(
-                "--check 는 승인 은행 드리프트 검사다 — 구조화 후보와 함께 쓰지 않는다.",
+                "--check 는 승인 은행 드리프트 검사다 — 구판 출력과 함께 쓰지 않는다.",
                 file=sys.stderr,
             )
             return 2
         return _check(GENERATORS, out_dir)
-    if args.structure_final_step and not args.dry_run:
-        refusal = refuses_structured_write(out_dir)
+    if args.legacy_final_step and not args.dry_run:
+        refusal = refuses_legacy_write(out_dir)
         if refusal is not None:
             print(f"WRITE_REFUSED — {refusal}", file=sys.stderr)
             return 2
@@ -218,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     report = run_p3_fill_batch(
         out_path=out_dir / _PROBLEMS_FILE,
         write=not args.dry_run,
-        structure_final_step=args.structure_final_step,
+        structure_final_step=not args.legacy_final_step,
     )
     print(json.dumps(report.to_json(), ensure_ascii=False, indent=2))
     rejected = sum(len(b.failure_reasons) for b in report.bands)
@@ -229,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.total_stored > 0 else 1
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / _PROVENANCE_FILE).write_text(
-        _render_provenance(GENERATORS, structured=args.structure_final_step), encoding="utf-8"
+        _render_provenance(GENERATORS, legacy=args.legacy_final_step), encoding="utf-8"
     )
     return 0 if report.total_stored > 0 else 1
 

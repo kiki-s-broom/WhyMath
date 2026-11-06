@@ -103,13 +103,14 @@ def test_committed_bank_shape_per_concept_and_slot() -> None:
         assert len({skeleton_of(str(r["question_text"])) for r in mine}) >= 30
 
 
-#: 승인 근거가 된 감사 — 5회차 S5(자격 통과 프로토콜 · 결함 1/504 · 보정 상한 0.01151 ≤ 0.02).
+#: 승인 근거가 된 감사 — 8회차 S5(자격 통과 프로토콜 · 결함 1/504 · 보정 상한 0.01151 ≤ 0.02 ·
+#: P3-91·P3-93 승격 — 규칙 (가)·P3-93 구조화 + calc 7회차 불합격 4틀 교정).
 _AUDITED_BANK = (
     _REPO_ROOT
     / "docs"
     / "data"
     / "p3_calculus1_diff_audit"
-    / "bank_audit_r5"
+    / "bank_audit_r8"
     / "audited_bank.jsonl"
 )
 

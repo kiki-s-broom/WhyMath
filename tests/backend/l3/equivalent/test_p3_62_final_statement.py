@@ -177,7 +177,9 @@ def test_mode_is_off_by_default_and_scoped() -> None:
 
 
 # ── ⑥ 쓰기 자가거부 ──────────────────────────────────────────────────────
-def test_structured_write_into_approved_area_is_refused(tmp_path: Path) -> None:
+# P3-91·P3-93 승격(2026-11-06)으로 구조화가 승인 형태가 됐다 — 가드는 없애지 않고 막는 대상을 뒤집었다:
+# 이제 승인되지 않은 쪽(구판 `--legacy-final-step`·`structure_final_step=False`)을 승인 영역에 쓰지 않는다.
+def test_legacy_write_into_approved_area_is_refused(tmp_path: Path) -> None:
     root = tmp_path / "data" / "corpus"
     own = root / batch.CORPUS_DIR_NAME
     other = root / fill_batch.CORPUS_DIR_NAME
@@ -185,15 +187,15 @@ def test_structured_write_into_approved_area_is_refused(tmp_path: Path) -> None:
     other.mkdir()
     # 자기 은행·다른 배치의 은행·영역 자체·하위 폴더·`..` 경유 — 전부 거부.
     for target in (own, other, root, own / "nested", root / "x" / ".." / batch.CORPUS_DIR_NAME):
-        refusal = batch.refuses_structured_write(target, root)
+        refusal = batch.refuses_legacy_write(target, root)
         assert refusal is not None and "승인 은행" in refusal, target
     # 심볼릭 링크로 영역 안을 가리켜도 거부(문자열이 아니라 resolve 뒤 경로로 본다).
     link = tmp_path / "alias"
     link.symlink_to(other, target_is_directory=True)
-    assert batch.refuses_structured_write(link, root) is not None
+    assert batch.refuses_legacy_write(link, root) is not None
     # 대조군 — 저장소 밖·이름 접두만 같은 형제 디렉터리는 허용(과잉 거부 아님).
-    assert batch.refuses_structured_write(tmp_path / "candidate", root) is None
-    assert batch.refuses_structured_write(tmp_path / "data" / "corpus_candidate", root) is None
+    assert batch.refuses_legacy_write(tmp_path / "candidate", root) is None
+    assert batch.refuses_legacy_write(tmp_path / "data" / "corpus_candidate", root) is None
 
 
 @pytest.fixture
@@ -207,14 +209,14 @@ def fake_corpus(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.mark.parametrize("module", [batch, fill_batch])
-def test_cli_refuses_structured_without_out_dir(
+def test_cli_refuses_legacy_without_out_dir(
     module: object, fake_corpus: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`--out-dir` 없이 구조화 후보를 쓰려 하면 생성 전에 exit 2(승인 은행 무변경)."""
+    """`--out-dir` 없이 구판 출력을 쓰려 하면 생성 전에 exit 2(승인 은행 무변경)."""
     main = module.main  # type: ignore[attr-defined]
-    assert main(["--structure-final-step"]) == 2
+    assert main(["--legacy-final-step"]) == 2
     assert "WRITE_REFUSED" in capsys.readouterr().err
-    assert main(["--structure-final-step", "--check"]) == 2
+    assert main(["--legacy-final-step", "--check"]) == 2
     assert not list(fake_corpus.rglob("problems.jsonl"))
 
 
@@ -222,26 +224,26 @@ def test_cli_refuses_structured_without_out_dir(
     ("module", "other_bank"),
     [(batch, fill_batch.CORPUS_DIR_NAME), (fill_batch, batch.CORPUS_DIR_NAME)],
 )
-def test_cli_refuses_structured_into_the_other_batchs_bank(
+def test_cli_refuses_legacy_into_the_other_batchs_bank(
     module: object, other_bank: str, fake_corpus: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """교차 은행 — 한 배치가 *다른* 배치의 승인 은행 경로로 후보를 쓰려 해도 exit 2."""
+    """교차 은행 — 한 배치가 *다른* 배치의 승인 은행 경로로 구판을 쓰려 해도 exit 2."""
     main = module.main  # type: ignore[attr-defined]
     target = fake_corpus / other_bank
-    assert main(["--structure-final-step", "--out-dir", str(target)]) == 2
+    assert main(["--legacy-final-step", "--out-dir", str(target)]) == 2
     assert "WRITE_REFUSED" in capsys.readouterr().err
     assert not (target / "problems.jsonl").exists()
 
 
-def test_library_refuses_structured_write_into_approved_bank(fake_corpus: Path) -> None:
-    """CLI 밖 라이브러리 호출(`out_path=None` → 기본 승인 은행)도 쓰기 전에 멈춘다."""
+def test_library_refuses_legacy_write_into_approved_bank(fake_corpus: Path) -> None:
+    """CLI 밖 라이브러리 호출(`out_path=None` → 기본 승인 은행)도 구판이면 쓰기 전에 멈춘다."""
     with pytest.raises(ValueError, match="승인 은행"):
-        batch.run_p3_calculus1_diff_batch(structure_final_step=True)
+        batch.run_p3_calculus1_diff_batch(structure_final_step=False)
     with pytest.raises(ValueError, match="승인 은행"):
-        fill_batch.run_p3_fill_batch(structure_final_step=True)
+        fill_batch.run_p3_fill_batch(structure_final_step=False)
     with pytest.raises(ValueError, match="승인 은행"):
         batch.run_p3_calculus1_diff_batch(
-            structure_final_step=True,
+            structure_final_step=False,
             out_path=fake_corpus / fill_batch.CORPUS_DIR_NAME / "problems.jsonl",
         )
     assert not list(fake_corpus.rglob("problems.jsonl"))

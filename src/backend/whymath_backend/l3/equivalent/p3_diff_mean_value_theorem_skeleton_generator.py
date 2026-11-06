@@ -1461,9 +1461,7 @@ def _diagnostic_frames() -> list[Frame]:
                 f"c가 열린구간 ({c.a}, {c.b})에 존재할 때, c의 값을 구하시오."
             ),
             case=c,
-            equation_override=(
-                f"{poly_to_sympy_str(deriv, 'c')} = {_rate_str(c.f, c.a, c.b)}"
-            ),
+            equation_override=(f"{poly_to_sympy_str(deriv, 'c')} = {_rate_str(c.f, c.a, c.b)}"),
         )
 
     def d8(p: tuple[object, ...]) -> DiffItem | None:

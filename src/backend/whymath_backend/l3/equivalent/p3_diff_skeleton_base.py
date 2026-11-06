@@ -398,7 +398,8 @@ def _structured_setup_view(item: DiffItem) -> tuple[tuple[str, ...], tuple[str, 
 
     · 연쇄는 `solution_steps`가 구조화 조건 위에서 푼다(전이 전건 correct가 아니면 ValueError).
     · 연쇄가 정답 변수의 값 하나로 끝나면 그대로 쓴다(`a = -3`). 다른 미지수로 끝나면
-      (`a = -8` 다음에 b를 묻는 틀) 규칙 (가)와 같은 `final_statement_steps`로 정의 등식 대입 한 줄을
+      (`a = -8` 다음에 b를 묻는 틀) 규칙 (가)와 같은 `final_statement_steps`로 정의 등식 대입
+      한 줄을
       붙인다 — 그 대입도 조건만으로 증명돼야 한다(정답·answer_map을 넘기는 자리가 없다).
     · 진술값이 정답 기록과 다르면 ValueError(저작 결함). 실패를 조용히 종전 단계로 돌리지 않는다 —
       구조화 출발식을 단 틀은 증명이 안 되면 틀 설계 결함이다.
@@ -412,7 +413,9 @@ def _structured_setup_view(item: DiffItem) -> tuple[tuple[str, ...], tuple[str, 
     ).steps
     tail = final_solution_values(chain[-1])
     if tail is None or len(tail[1]) != 1:
-        raise ValueError(f"{item.frame_id}: 구조화 출발식의 연쇄가 값 하나로 끝나지 않는다 {chain!r}")
+        raise ValueError(
+            f"{item.frame_id}: 구조화 출발식의 연쇄가 값 하나로 끝나지 않는다 {chain!r}"
+        )
     variable = tail[0]
     recorded_map = dict(item.answer_map)
     if variable in recorded_map and _same_number(recorded_map[variable], item.answer_text):
