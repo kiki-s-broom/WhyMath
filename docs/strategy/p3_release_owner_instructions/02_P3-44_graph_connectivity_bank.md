@@ -1,0 +1,165 @@
+# [02] P3-44 — 보강 은행으로 4개 개념(02-05·02-06·02-08·02-10)의 오개념 변 닫기
+
+| 구분 | 내용 |
+|---|---|
+| 순서 | 02 / 10 |
+| 막는 곳 | Release 축 Gate B ⑦ Graph Connectivity(현재 4/10 · 목표 0.95 = 10/10) 중 4개 개념 |
+| 작성 시점 상태 | `in_progress`(2026-10-17부터) — 대장 session `claude/gracious-noether-ikmlwq`는 원격에 없고 원격 claim도 없다(주인 없는 in_progress). 게이트 G-p344 cleared(10/17). 설계 완료 · 구현 S1~S5 미착수(판정기에 M0673·M0676·M0678 규칙 없음) |
+| 시작 조건 | 0단계 인수 절차. S1은 지금 가능. S2부터는 PR #1856(P3-91·P3-93 — p3_diff 생성기 9개 수정)이 머지된 main 위에서 |
+| 완료 판정 | S5 승인 각인 뒤 phase3_coverage에서 4개 개념 충족(기대 8/10 — 02-01은 P3-50, 02-09는 P3-52 몫) |
+| 규모 | 대 — 5단계 · PR 4~5개 · 감사 회차 포함. **한 세션 = 한 단계** |
+
+**붙이는 법**: 새 세션 첫 메시지로 아래 블록 전체를 그대로 붙여넣는다. 블록이 main에서 어느 단계까지 착지했는지 보고 다음 단계 하나만 한다. 단계가 끝날 때마다 같은 블록을 새 세션에 다시 붙인다.
+
+---
+
+## 붙여넣을 지시문 (복사 범위: 아래 블록 전체)
+
+```text
+[WhyMath 소유 태스크 공통 프리앰블 — 이번 세션 전체에 적용]
+
+너는 WhyMath 저장소(kiki-s-broom/WhyMath)에서 통합 게이트 `G-p3-w3-release-merged`(Week 3 + Phase 3 Release 통합 판정)의
+FAIL을 해소하는 소유 태스크 하나를 맡는 엔지니어다. 이번 세션은 맨 아래 [이번 세션 항목] 하나만 다룬다.
+
+[배경]
+- P3-17 통합 판정(2026-11-05 · 판정 기준 main 036286a1 · docs/reviews/p3_17_week3_release_judgment_2026-11-05.md)은 FAIL이었다.
+  독립 검토(docs/reviews/p3_17_verdict_review_2026-11-06.md · PR #1854로 main에 들어온다 — 미머지면 그 PR 브랜치에서 읽는다)는
+  결론에 동의하고 재판정을 11/29로 제안했다.
+- 성공 기준 Q1은 Kiki 결정(2026-11-06)으로 학생 수 조건이 삭제됐다. 새 Q1 = "개발자가 학생별 데이터를 직접 만지지 않고,
+  AI가 학습 루프 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 학습이 돌아감을 보일 수 있는가". 반영 PR은 #1854다.
+- 이 지시문은 main 2a694f71(2026-11-06) 기준으로 썼다. 그 뒤 상태가 바뀌었을 수 있다 — 아래 0단계의 실측이 정본이다.
+
+[0단계 — 착수 전 상태 확인 (대장·git 조회만 · 대상 코드는 아직 열지 않는다)]
+1. `git fetch origin main` 후 `git log origin/main -1 --oneline`. 이 해시가 이번 세션의 판정 기준이다.
+2. 대상 태스크 상태를 main 대장에서 읽는다(`python3 scripts/harness/backlog.py status` 또는
+   `git show origin/main:backlog/tasks/<파일>`). 이미 done이면 아무것도 바꾸지 말고 "이미 완료 — 증적 <PR>"만 보고하고 끝낸다.
+3. 다른 세션의 claim: `python3 scripts/harness/backlog.py claims list --verbose`. 대상에 남의 claim이나 대장 session이 있으면
+   그 브랜치의 마지막 커밋 시각(`git ls-remote origin <브랜치>` → fetch → `git log -1 --format=%cI FETCH_HEAD`)과 열린 PR
+   (`gh api -X GET search/issues -f q='repo:kiki-s-broom/WhyMath is:pr is:open head:<브랜치>'`)을 본다.
+   - 24시간 안에 커밋이 있거나 PR이 열려 있으면: 착수하지 않는다. 근거를 보고하고 끝낸다.
+   - 72시간 넘게 커밋이 없고 열린 PR도 없거나 원격 브랜치가 사라졌으면: stale이다. 근거(마지막 커밋 시각·PR 0건)를 보고에 적고
+     `python3 scripts/harness/backlog.py unblock <id>`(claim·session 해제) → `start <id>`로 인수한다. 원격 claim 때문에 start가
+     거부되면 stale을 확인한 뒤에만 `start <id> --ignore-remote-claim`을 쓴다.
+   - 그 사이(24~72시간)면: 착수하지 말고 사용자에게 인수 여부를 묻는다.
+4. 항목의 [착수 조건]을 main에서 확인한다. 조건이 안 되면 착수하지 않고, 무엇이 막는지와 누가 풀어야 하는지
+   (Kiki 결정이면 선택지 표와 권고까지)를 보고하고 끝낸다. 이것은 실패가 아니라 정상 종료다(PR 예외 ① 조사 전용).
+
+[착수 규율]
+- 대장 조회 다음의 첫 행위는 `python3 scripts/harness/backlog.py start <태스크ID>`다. claim 전에 대상 코드를 열거나 쓰지 않는다.
+- 결정 대기나 단계 완료로 세션을 끝낼 때 태스크가 아직 done이 아니면 `unblock <id>`로 claim을 놓는다. 주인 없는 in_progress를
+  남기지 않는다(P3-44가 2026-10-17부터 사라진 세션의 in_progress로 남아 있던 선례).
+- 코드 작업 전에 그 작업이 닿는 규칙을 `constitution/rules.yaml`에서 확인한다. `constitution/` 폴더는 읽기만 한다.
+- 판정 근거는 main 실측이다. 보고와 판정 문서 상단에 `판정 기준: main <해시>`를 적는다. 미머지 브랜치를 근거로 조건을 닫지 않는다.
+- 부재를 단정하기 전에 ①역할 기반 재검색 ②호출측 역추적 ③그래도 0건이면 "내가 찾은 방법으로는 0건"이라고 범위를 밝힌다.
+- 새 태스크는 `backlog.py add`로만 등재한다(번호를 눈으로 고르지 않는다). 대장 YAML을 손으로 고치지 않는다 — `amend`·`gates amend`를
+  쓴다. 백틱이 든 한국어 산문을 CLI 인자로 넘길 때는 인용 heredoc(<<'EOF')으로 파일에 쓰고 "$(cat 파일)"로 넘긴 뒤,
+  대장을 다시 읽어 내용이 보존됐는지 대조한다.
+
+[범위 규율 — Phase 3]
+- EOS Core 신규 Entity / 대규모 DB 스키마 변경 / 새 AI Agent / 새 Subject Adapter / 대규모 UI 구조 변경은 원칙적으로 금지다
+  (예외는 Release Blocker뿐). 이번 항목이 그것을 요구하는 것처럼 읽히면 구현하지 말고 결정 요청으로 바꾼다.
+- 대표 과정(미적분Ⅰ 미분 10개 개념) 밖의 콘텐츠를 채우지 않는다. 발견한 별건은 `backlog.py add`로 등재만 한다.
+
+[아키텍처·콘텐츠 규율]
+- LLM은 학습 상태를 바꾸지 않는다. 모든 LLM 호출은 라우터(l3/router.py) 경유 + Langfuse 추적이다. 학생에게 가는 LLM 응답은
+  PRM 또는 도구 검증을 통과해야 한다. 수학 동치·정답 검증은 SymPy 단일 권위 경로만 쓴다.
+- 오개념을 LLM 초기 context에 preload하지 않는다. 콘텐츠는 데이터다 — 소스 코드에 하드코딩하지 않는다.
+- 동결 명세(data/corpus/phase3_scope_v1/scope_spec.yaml)·오개념 코퍼스·크로스링크 서명(검수:kiki)은 Kiki 결정 없이 바꾸거나
+  대신 서명하지 않는다.
+- 승인된 문항 은행은 제자리 수정하지 않는다. 감사받은 바이트 = 승격할 바이트다. 라벨만 바꿔 지표를 올리는 재연결은 금지다 —
+  선택지 값이 그 오개념 절차로 실제로 나오는지 SymPy로 확인한다.
+
+[결정 규율]
+- decision 게이트는 Kiki 몫이다. 에이전트가 `gates clear --as kiki`로 대행하지 않는다.
+- 결정이 필요하면 선택지 2~4개, 선택지별 영향(어느 게이트 축이 언제 풀리는가·비용·학생 안전·되돌리기), 권고 1개를 문서로 만든다.
+  게이트가 없으면 `gates add <G-id> --kind decision --assignee kiki --title "..." --no-inputs "..."`로 등재하고
+  `amend <태스크> --gate <G-id> --reason "..."`로 붙인다. 이미 있으면 `gates amend <G-id> --note "..."`로 근거만 보강한다. 그리고 멈춘다.
+- 사용자에게 결정을 물을 때는 채팅에 선택지 표와 권고를 그대로 보여 준다. 문서 링크만 주지 않는다.
+
+[검증 규율]
+- 새 가드·테스트·계측기는 막으려는 상태를 실제로 주입해 RED를 확인한 뒤에만 "보호된다"고 말한다. 주입이 실제로 적용됐는지
+  (mutated != original), 원복이 바이트 동일한지를 단언한다. 대조군(정상 입력)이 GREEN인지도 함께 본다.
+- 판정은 exit code로 한다. `-q`나 `| tail`로 출력을 자르지 않는다. 래퍼는 검사 명령의 종료 코드를 그대로 돌려준다.
+- 백엔드 소스·테스트를 건드렸으면 전체 스위트를 돌린다. 못 돌렸으면 "전체는 확인하지 못했다"고 적는다.
+- 푸시 전에 `python3 scripts/harness/ci_mirror.py run`을 돌린다(변경이 닿는 CI 잡을 자동 선택한다). exit 0만 통과다 —
+  3(미실행 검사 있음)·4(실행 중 작업 트리 변경)는 통과가 아니다. 검증이 도는 동안 작업 트리를 바꾸지 않는다.
+- 측정 실패를 0건 통과로 위장하지 않는다. 표본 0·분모 0은 "측정 불가"로 적는다.
+
+[Kiki PC 실행이 필요할 때 — 운영 DB·Ollama]
+- 명령 블록 앞에 6항목 브리핑(과제 명칭·목적·절차와 예상 시간·성공 기준과 실패 시 대처·실행 환경·창 구분)을 준다.
+  Windows PowerShell 기준이고, 작업 장소는 C:\Users\kiki\Desktop\__AI\WhyMath다. 운영 DB는 docker whymath-pg(127.0.0.1:5433)다.
+- 공유 클론의 브랜치를 옮기지 않는다. `git worktree add --detach <별도 폴더> <커밋>`에서 실행하고 HEAD를 기대 해시와 대조한다.
+  실행기는 `python -m pip`·`python -m pytest`처럼 부른다. 블록이 쓰는 모듈·인자·파일이 그 커밋에 실재하는지 먼저 확인한다.
+- 블록에 자리표시자를 하나도 두지 않는다(세션이 채우거나, 블록이 스스로 찾거나, Read-Host로 묻는다). 쓰기 블록은 선행 판정값을
+  블록 안에서 다시 계산해 단일 `if (...) { ... } else { "WRITE_REFUSED=True — 이유" }`로 스스로 거부한다. elseif 체인을 쓰지 않는다.
+
+[채팅 형식]
+- 사용자에게 보내는 메시지의 코드 펜스는 실행용 전용이며 언어 태그(bash·powershell 등)를 붙인다. 커밋 해시·식별자는 인라인 백틱,
+  명령 결과는 요약 문장 + 인용문으로 쓴다.
+
+[산출 규율]
+- 커밋이 있으면 PR을 연다. 예외는 조사 전용 / 미완·게이트 대기 / CI red / Kiki 보류뿐이며, 예외로 끝내면 어느 것인지 1줄로 말한다.
+  main 머지는 사용자가 "pr"이라고 하거나 Kiki가 판단할 때만 한다.
+- 완료는 `python3 scripts/harness/backlog.py done <id> --artifact <PR 번호> --artifact <머지 커밋>`이다. 소유 태스크는 decision 게이트
+  `G-p3-w3-release-merged`의 입력이라 CLI가 판정 인계를 요구한다. 판정을 내리지 말고
+  `--no-verdict "판정 무관: <무엇>을 재판정 입력으로 넘긴다"`로 인계한다(재판정 회차 파일 10번만 예외).
+- 완료 보고에 `python scripts/constitution/audit_ratchet.py`의 종료 코드와 차단 건수를 넣는다.
+- 세션 끝에 다음 5줄을 보고한다: ①완료 판정(충족/미충족 · 근거 커밋) ②PR 링크 ③남긴 것과 이유
+  ④Kiki께 넘길 결정·행동(선택지 포함) ⑤재판정에 넘길 실측값(명령 · exit code · 값 · 판정 기준 해시).
+
+[이번 세션 항목 — P3-44 보강 은행으로 4개 개념의 오개념 변 닫기 (한 세션 = 한 단계)]
+
+대상 태스크: P3-44-graph-connectivity-misconception-edge
+
+먼저 읽을 입력: docs/reviews/p3_44_graph_connectivity_root_cause_2026-10-16.md(원인 3종) ·
+docs/reviews/p3_44_new_frames_design_2026-10-16.md(§4 판정기 확장 · §5 은행 구성 · §6 구현 단계 · §7 감사 설계 · §8 결정 기록) ·
+docs/reviews/p3_44_design_attachments/(프로토타입 — 규범 아님). 태스크 YAML acceptance ⑨~⑫가 정본이다.
+
+확정된 결정(G-p344 · 2026-10-17 Kiki "제안 승인"): 4개 개념의 오개념 절차를 해당 M-id(M0673·M0674·M0676·M0678)의 절차로 인정한다.
+02-08 F3(변곡점 틀)는 제외한다. 보강 은행은 240건(4개념 × 60)이다. 기존 504건 은행(problem_bank_p3_calculus1_diff_v0)은 제자리
+수정하지 않는다. 02-09는 넣지 않는다(P3-52 몫). 감사에서 해석 위험이 드러나면 M-id 설명 보강(코퍼스 정정 · Kiki 소유)으로
+전환한다 — 세션이 코퍼스를 고치지 않는다.
+
+[인수 — 0단계 3의 특수형]
+`git ls-remote origin claude/gracious-noether-ikmlwq`(빈 출력이어야 한다), claims list에 P3-44가 없는지,
+P3-44를 언급하는 열린 PR이 없는지(`gh api -X GET search/issues -f q='repo:kiki-s-broom/WhyMath is:pr is:open P3-44'`)를 확인한다.
+셋 다 비어 있으면 근거를 적고 `unblock P3-44-graph-connectivity-misconception-edge` → `start P3-44-graph-connectivity-misconception-edge`.
+하나라도 살아 있으면 착수하지 않고 보고한다.
+
+[단계 판정 — main에서 어디까지 왔는가]
+- S1 착지: l3/equivalent/p3_diff_shortcut_guard.py의 _misconception_rules에 M0673·M0676·M0678(그리고 M0674 개수형) 연결 검증 규칙과
+  규칙별 변별 테스트가 있다.
+- S2 착지: 4개 개념 생성기(P3DiffSlotGenerator 하위 · 슬롯 misconception_trigger)가 l3/equivalent/에 있다.
+- S3 착지: 배치 CLI + data/corpus/problem_bank_p3_<이름>_v0/(240건 · review_status 없음) + 결속 테스트 + 인벤토리 귀속이 있다.
+- S4 착지: 감사 폴더에 S5 감사 회차(기계 ∪ 판정자 A·B) 통과 기록이 있다.
+- S5 착지: 승인 각인과 재측정 기록이 있다.
+착지하지 않은 첫 단계 하나만 이번 세션에서 한다. 단계마다 PR 1개다.
+
+[단계별 할 일]
+- S1 판정기 확장(설계 §4): 규칙마다 변별 주입 RED/GREEN(라벨을 무관 오답·정답 선지에 붙인 주입이 RED), 기존 두 은행
+  (calculus1_diff_v0 · fill_v0) 소급 위반 0, 기존 판정기 테스트 전체 통과. PR #1856과 파일이 겹치지 않으므로 지금 할 수 있다.
+- S2 생성기 4개: PR #1856이 머지된 main 위에서만 시작한다. 열려 있으면 이 단계를 하지 않고 보고한다. 선택지 값이 오개념 절차의
+  산출임을 SymPy로 못 박는다. 02-06은 스킬이 겹치는 판정형 유형으로 단다(거짓 유형으로 맞추지 않는다). 프로토타입이 import하던
+  비공개 헬퍼(_dv 등)는 공개 창구로 승격한다.
+- S3 배치·은행: `--check` 바이트 동일 재생성, 선례 p3_fill_batch · tests/backend/l1/test_p3_fill_bank_coverage_link.py 형 결속 테스트,
+  review_status를 쓰지 않는다(이 단계까지 지표가 오르지 않는 것이 정상이다). 신규 모듈을 scripts/analysis/eos_feature_inventory_v2.py에
+  귀속한다(infra-contracts 잡이 신규 모듈 귀속을 검사한다).
+- S4 감사: docs/reviews/p3_62_s5_candidate_audit_runbook_2026-10-21.md 절차(같은 지침 sha256 · 시드 · 판정자 A·B · as-found —
+  같은 은행을 다시 채점하지 않는다). 불합격이면 교정해 새 은행 바이트로 새 회차를 돈다. 이전 회차 기록은 덮어쓰지 않는다.
+- S5 승인 각인·재측정: 감사받은 바이트만 승격한다. `python -m whymath_backend.l1.standards.phase3_coverage --json`과
+  `python -m whymath_backend.ops.phase3_metrics --no-db`를 전후 같은 명령으로 내고 기대(8/10)와 대조해 docs/reviews/p3_44_*에 기록한다.
+  02-01(P3-50)·02-09(P3-52) 미충족으로 목표 95%에 못 닿는 것은 사유와 함께 그대로 적는다.
+  변별(acceptance ⑤): 오답 보기 하나를 다른 개념의 오개념으로 되돌리는 주입이 그 개념을 다시 미충족으로 만들고, 원본은 충족인지 확인한다.
+- 다음 단계가 남았으면 done 하지 않는다. PR이 머지되면 `unblock`으로 claim을 놓고 다음 단계의 시작 조건을 보고한다.
+  S5까지 끝난 세션만 `done P3-44-graph-connectivity-misconception-edge --artifact <PR> --artifact <머지 커밋> --no-verdict "판정 무관: ⑦ 4개 개념 실측(phase3_coverage · main <해시>)을 재판정 입력으로 넘긴다"`.
+```
+
+---
+
+## 세션 종료 후 체크 (Kiki용)
+
+- [ ] 인수 근거(원격 브랜치·claim·열린 PR 0건)가 보고됐는가
+- [ ] 이번 세션이 S1~S5 중 어느 단계였고, 그 전 단계의 main 착지를 어떻게 확인했는가
+- [ ] 주입 RED·대조군 GREEN, 기존 두 은행 소급 위반 0이 보고됐는가
+- [ ] S5였다면 `phase3_coverage` 전후 값과 exit code가 있는가
+- [ ] PR 링크가 있고, 단계가 남았으면 claim을 놓았는가
