@@ -1,0 +1,29 @@
+{
+  "task": "P3-91-p3-62-candidate-promotion-fill-template-fix",
+  "purpose": "은행 감사(S5) 판정자 묶음 — 자격 측정과 같은 필드·같은 지침(rater_protocol.md)",
+  "seed": 20261008,
+  "bank": "candidate/problem_bank_p3_fill_v0/problems.jsonl",
+  "bank_sha256": "02cdbbd4a00e6f9f1f87e747cdf88fe5080c24dd56652300e8c2277093f9c175",
+  "n_items": 204,
+  "n_shards": 4,
+  "shard_size": 51,
+  "shards": [
+    {
+      "file": "shard1.jsonl",
+      "sha256": "2d19c05b83ce2d5b0c92cd5f22deea5929cb38fe2ad4029b1c85212531de82c6"
+    },
+    {
+      "file": "shard2.jsonl",
+      "sha256": "34616128a9b0934a2998d22d7ab81c453cca53b065376ed6d6e46239b02e9b0c"
+    },
+    {
+      "file": "shard3.jsonl",
+      "sha256": "94157657c22d998966b7fe308de6be709d9f74c244f548a9191a37443e255292"
+    },
+    {
+      "file": "shard4.jsonl",
+      "sha256": "7ea398f11ca0d37c5db0370ddb08aa5d91b5dd9647672eb3236e53bd5cd45a85"
+    }
+  ],
+  "rater_protocol_sha256": "3046a901033ea2eadd7c3aafbc32e2a94c3c241551f7d8e6fa50eb2c606ee27a"
+}
