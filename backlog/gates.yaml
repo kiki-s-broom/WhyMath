@@ -1356,6 +1356,19 @@ gates:
     notes: ""
     corrections: []
     no_inputs_reason: "판정 재료는 이미 저장소에 있다(P3-44 조사 문서 5절·p3_diff_shortcut_guard 의 M-link-undescribed). 먼저 끝나야 할 태스크 없음 - 사람 결정"
+  - id: G-p350-02-01-core-and-route
+    title: "02-01 핵심 오개념과 보강 경로 결정 — Q1 02-01 핵심 오개념(가: M0075·M0080을 M0669 한 행으로 교체, 권고 / 나: M0080만 삭제하고 M0075 유지 / 다: 현행 유지, M0075가 걸려 있으므로 G-p359-m0672-shadow-disposition과 함께 정한다) · Q2 보강 경로(A 정직한 재귀속+새 객관식 문항, 권고 / B 스킬 정렬로 기존 24건 인정, 내용이 거짓인 채 숫자만 오르므로 비권고 / C 현상 수용) · Q3 M0669용 선지 역추적 전용 kebab을 별건 태스크로 신설할지(원래 질문은 P3-61에 5번째로 합칠지였으나 P3-61은 2026-10-18에 4개 kebab으로 done이라 합류 선택지는 소멸, 카탈로그·동결 테스트 연쇄를 새로 한 번 치르게 된다). 세션 의견은 Q1 가·Q2 A·Q3 별건 신설(Q2에서 A를 택할 때만 의미). 근거 docs/reviews/p3_50_02_01_chain_restore_2026-10-18.md §4~§7 (판정 기준 main fb27e49d)"
+    kind: decision
+    assignee: kiki
+    status: pending
+    requested: 2026-11-06
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-50-calc-02-01-misconception-chain-restore
   - id: G-p356-signature-activation
     title: "P3-56 — 미분 오답 서명 독법을 shadow 에서 on(학생 노출)으로 올릴 것인가: PASS / 보류 / 반려. 입력 = P3-66 수확·판정 CLI 결과 (오답 시도 n≥300 · 정답 오발화 0 · 발화율 Wilson 95% 단측 하한 ≥ 5×우연 기준선 · 한 문항 쏠림 ≤30%). 기준 수치는 제안이며 이 게이트에서 확정한다. 근거 = docs/reviews/p3_56_derivative_signature_candidate_2026-10-18.md §9.3. 측정 불가(표본 부족)는 PASS 가 아니다."
     kind: decision
