@@ -1549,6 +1549,19 @@ _MANIFEST: dict[str, dict[str, str]] = {
             "실데이터 값·판정 분기는 tests/backend/ops/test_g3_content_measures.py가 상시 동결. "
             "G3(11/22) 판정 시점에 운영자가 돌린다"
         ),
+        # P3-107(2026-11-06): 지표 ⑥ 입력 수집기. 커밋된 회차 산출물(`data/runs`)의
+        # 판독기라 g3 측정기와 같은 이유로 CI 차단 스텝 비대상이다 — 오늘 실데이터에서
+        # F-Ⅱ 판정 0건이라 exit 2 가 정직한 설계값이고, 차단 스텝으로 걸면 상시 red 다.
+        # 판정 분기·결정론·`main()`(CLI exit 0/2)은 backend 잡이 수집하는
+        # tests/backend/ops/test_critical_defect_collector.py 가 in-process 로 상시 검증한다.
+        # 운영 진입은 `ops.phase3_metrics --critical-defect-from-runs` 다(재판정 J1 이 돌린다).
+        "ops.critical_defect_collector": (
+            "by-design:Phase 3 ⑥ 입력 수집기(P3-107) — 저작 회차 실산출물 판독기. 현행 회차는 "
+            "F-Ⅱ 판정 0건이라 측정 실패(exit 2)가 설계값이므로 CI 차단 스텝 비대상. "
+            "분기·결정론·main()은 "
+            "tests/backend/ops/test_critical_defect_collector.py가 상시 검증. 운영 진입은 "
+            "`ops.phase3_metrics --critical-defect-from-runs`(재판정 시점)"
+        ),
         # EOS-210(2026-10-29): 힌트 누설 사람 판정 도구(표본 추출 sample + 맹검 판정 review).
         # review는 사람이 키보드로 판정을 넣는 **대화형** CLI라 CI에서 돌 수 없고, sample도 저작
         # 회차 실산출물(`cu.hints.jsonl` — EOS-211 라이브 실행 산출)이 있어야 의미가 있다.
