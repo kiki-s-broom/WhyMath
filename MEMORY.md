@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-06 (결정 · G3 — Kiki): **`G-eos-g3` PASS — 판정 기준 main `a150cdef` · 5조건 충족 5/5 · clear는 Kiki 몫** (Kiki 판정, claude 기록) — 판정 기준: main `a150cdef`
+
+- **무엇을**: Kiki가 G3를 PASS로 판정했고 세션이 `backlog.py gates amend G-eos-g3 --verdict PASS`로 기록했다(status는 pending 유지 — clear는 담당자 몫).
+- **값**: ① A6 30 CU · ② HIT 중앙값 53.24초 n=30(**AI 보조 검수 조건** — 사람 단독 HIT 미측정) · ③ 자동검증 1차 통과율 0.1171=13/111 산출됨 · ④ 힌트 의미 누설 0/30 · ⑤ 메타 누락 0/30. 판정 직전 `a150cdef` 이후 측정 입력 변경 0건(GitHub compare).
+- **근거**: `docs/reviews/eos_g3_inputs_2026-11.md` · 근거 정리 PR #1848 `a4afad51` · 이 기록 PR. D12(HIT AI 보조 조건 명시) 결정문은 여전히 미수신 — 판정 evidence에 조건을 적어 두었다.
+
 ### 2026-11-05 (측정 · G3 판정 준비 — 폴더 04): **`G-eos-g3` 5조건을 main `a150cdef`에서 재측정 — 충족 5/5 · 판정·clear는 Kiki 몫(11/22)** (claude 측정·기록) — 판정 기준: main `a150cdef`
 
 - **무엇을**: 지시문(EOS 감리 이행 지시문 v3 · 폴더 04)대로 `ops/g3_content_measures`·`ops/hit_cu_metrics`·`ops/weekly_metrics_report --dry-run`·`ops/provenance_audit --require-runs`를 main `a150cdef`에서 돌려 01-A 초안(`a91ffcf7` · #1794)을 최종본으로 갱신하고, `G-eos-g3` notes에 재측정 결과를 `gates amend --note`로 남겼다. **D12**(HIT AI 보조 조건 명시 여부 · 기한 11/20) 결정문은 미수신이라 notes에 붙이지 못했다 — 받으면 결정문의 명령 그대로 붙인다.

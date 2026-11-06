@@ -454,6 +454,7 @@ gates:
       - "[2026-10-29] input done · EOS-210 · 판정 무관: 사람 판정 좌석(기록 계약·표본·맹검 CLI·의미 축)만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 의미 축 값은 Kiki 맹검 판정 실행 뒤 산출(main 2b65315e) — done EOS-210 인계"
       - "[2026-10-29] input done · EOS-211 · 판정 무관: 힌트 생성 경로와 첫 실행 산출물·소급 측정값만 공급(판정 아님) — G3 판정은 Kiki 결정으로 11/22까지 보류, 의미 축은 EOS-210 사람 판정 실행 뒤 산출(main 8f6d1024) — done EOS-211 인계"
       - "[2026-11-05] notes +600자 — G3 판정 준비 — main a150cdef 재측정 결과 기록(폴더 04)"
+      - "[2026-11-06] verdict PASS · inputs: EOS-197, EOS-207, EOS-210, EOS-211, OPS-90-hit-lower-bound-implausible-review · evidence: 판정 기준: main a150cdef · docs/reviews/eos_g3_inputs_2026-11.md · Kiki 판정 2026-11-06 PASS (근거 정리 PR #1848 a4afad51 머지). 5조건 충족 5/5: ① A6 30 CU ② HIT 중앙값 53.24초 n=30(AI 보조 검수 조건 — 사람 단독 HIT 미측정) ③ 자동검증 1차 통과율 0.1171=13/111 산출됨 ④ 힌트 의미 누설 0/30(Wilson 상한 0.0827) ⑤ 메타 누락 0/30. 판정 직전 확인: a150cdef 이후 측정 입력 변경 0건(GitHub compare — 변경은 이 판정의 리포트 JSON 1건뿐). — Kiki G3 판정 기록"
     depends_on:
       - OPS-90-hit-lower-bound-implausible-review
       - EOS-197
