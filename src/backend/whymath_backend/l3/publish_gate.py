@@ -27,7 +27,14 @@
    **신규 개념(P3-26)**: `create_proposal`은 살아있는 `concept` 행 없이 첫 DRAFT 판을 만든다
    (`change_type="cms_create"`). 개념 행은 그 판이 **발행되는 순간 `apply_transition`이 만든다** —
    다른 어떤 경로도 CMS 쪽에서 개념 행을 만들지 못한다(검수 없이 학생이 읽는 행이 생기지 않는다).
-   이후 판(수정)은 기존대로 개념 행을 바꾸지 않는다(서빙 경로 미연결 — 판정 문서 F2·B5).
+
+   **수정판 서빙(P3-100)**: 이미 살아있는 개념의 판을 발행(publish)하거나 롤백으로 복원(restore)하면
+   그 판의 payload를 **개념 행에 투영**한다(`_project_payload`). 학생 서빙 경로(`GET /v1/concepts/…`
+   등)는 개념 행을 읽으므로, 발행된 수정이 학생 화면에 닿는 길은 이 투영 하나다. 투영한 행에는
+   CMS 표지(`cms_edited_at`)를 채운다 — 사람이 검수·발행한 내용이 다음 graph.json 적재에 조용히
+   덮이지 않게(적재는 표지가 있는 행을 건너뛰고 충돌로 보고한다, P3-25). 폐기(deprecate)는 투영하지
+   않는다 — 발행본이 사라질 뿐 개념 행은 마지막 발행 내용을 유지한다. 축 재판정(B5):
+   `docs/reviews/p3_100_concept_revision_serving_b5_rejudgment_2026-11-05.md`.
 
 ## 트랜잭션 계약
 
@@ -459,6 +466,43 @@ async def has_published_version(session: AsyncSession, concept_code: str) -> boo
     return found is not None
 
 
+async def is_cms_created(session: AsyncSession, concept_code: str) -> bool:
+    """CMS 표지가 있는 개념이 CMS에서 태어났는가. **읽기 전용**(P3-100).
+
+    전제: 호출자는 표지(`cms_edited_at`)가 **있는** 개념에 대해서만 묻는다 — 표지가 없으면 이미
+    적재 소유로 판정이 끝난다(`concept_delete_block`). 이 함수가 가르는 것은 "표지의 출처"다.
+
+    수정판 발행은 graph.json이 만든 개념에도 CMS 표지를 채우므로(투영 — 모듈 docstring) 표지만으로는
+    "CMS가 만든 개념"을 가를 수 없다. 판 이력으로 세 경우를 가른다:
+
+    - 첫 판(`version_no=1`)이 제안(`cms_create`) → CMS가 만든 개념(True).
+    - 판이 있는데 첫 판이 제안이 아니다(또는 첫 판이 비었다) → 다른 경로가 만든 개념에 수정판이
+      투영돼 표지가 붙었다(False). 이 개념을 지우면 다음 적재가 되살린다.
+    - 판이 **하나도 없다** → 투영은 판 발행·복원에서만 일어나므로 표지는 투영에서 오지 않았다.
+      P3-26 이전 직접 생성(`POST /v1/concepts`, 지금은 410)처럼 CMS가 판 없이 만든 개념이다(True).
+      이 경우를 False로 접으면 그런 개념을 영영 지울 수 없게 된다.
+    """
+    first_change = (
+        await session.execute(
+            select(ConceptVersion.change)
+            .where(ConceptVersion.concept_id == concept_code, ConceptVersion.version_no == 1)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if isinstance(first_change, dict):
+        return first_change.get("change_type") == CMS_CREATE_CHANGE_TYPE
+    # 첫 판이 없거나 형식이 깨졌다 — 판이 하나라도 있으면 출처를 모르므로
+    # 지우지 않는 쪽(False)으로 둔다.
+    any_version = (
+        await session.execute(
+            select(ConceptVersion.version_id)
+            .where(ConceptVersion.concept_id == concept_code)
+            .limit(1)
+        )
+    ).first()
+    return any_version is None
+
+
 #: 신규 개념 제안이 "열려 있다"고 보는 상태 — 아직 발행(개념 행 실체화) 전이다.
 _OPEN_PROPOSAL_STATES: tuple[VersionStatus, ...] = (
     VersionStatus.DRAFT,
@@ -682,11 +726,20 @@ async def revise_proposal(
     )
 
 
-async def _check_can_realize(session: AsyncSession, planned: SchemaConceptVersion) -> None:
-    """신규 개념을 실체화하기 전 마지막 확인 — 부모가 아직 있는가. 어떤 쓰기보다 먼저 부른다."""
+async def _check_can_realize(
+    session: AsyncSession, planned: SchemaConceptVersion, *, self_id: uuid.UUID | None = None
+) -> None:
+    """판을 개념 행에 쓰기 전 마지막 확인 — 부모가 아직 있는가(그리고 자기 자신이 아닌가).
+
+    신규 개념 실체화와 수정판 투영(P3-100)이 같이 쓴다. 어떤 쓰기보다 먼저 부른다.
+    """
     parent_id = planned.payload.parent_concept_id
     if parent_id is None:
         return
+    if self_id is not None and parent_id == self_id:
+        raise PublishGateError(
+            GateKind.PUBLISH, [f"parent_exists: 부모 개념이 자기 자신({parent_id})입니다"]
+        )
     found = (
         await session.execute(select(Concept.concept_id).where(Concept.concept_id == parent_id))
     ).first()
@@ -697,30 +750,37 @@ async def _check_can_realize(session: AsyncSession, planned: SchemaConceptVersio
         )
 
 
+def _project_payload(concept: Concept, payload: ConceptVersionPayload) -> None:
+    """발행되는 판의 payload → 살아있는 개념 행(학생 서빙 원본). 필드 11개를 전부 옮긴다(P3-100).
+
+    payload에 있는 정체성·특성 필드만 옮긴다(본문·오버레이는 payload에 없다 — 따로 서빙된다).
+    옮긴 행에는 CMS 표지를 채운다: 검수·발행된 내용이 다음 적재에 조용히 덮이지 않게 한다.
+    """
+    concept.name_ko = payload.name_ko
+    concept.name_en = payload.name_en
+    concept.level = ConceptLevel(payload.level)
+    concept.parent_concept_id = payload.parent_concept_id
+    concept.aliases = list(payload.aliases)
+    concept.is_signature_korean = payload.is_signature_korean
+    concept.cognitive_type = [CognitiveType(c) for c in payload.cognitive_type]
+    concept.behavior_skills = list(payload.behavior_skills)
+    concept.intrinsic_difficulty = payload.intrinsic_difficulty
+    concept.exam_frequency = payload.exam_frequency
+    concept.weight_in_curriculum = payload.weight_in_curriculum
+    mark_cms_edited(concept)
+
+
 def _materialize_concept(planned: SchemaConceptVersion) -> Concept:
     """발행되는 신규 개념 제안 판 → 살아있는 `Concept` 행(CMS 소유 표지 포함).
 
-    payload의 정체성·특성 필드만 옮긴다(본문·오버레이는 payload에 없다). 부모 개념은 제안 때
-    검증됐지만
-    발행까지 시간이 흘렀으므로 호출자가 존재를 다시 확인한다.
+    필드 옮기기는 수정판 투영과 같은 함수(`_project_payload`)가 한다 — 첫 판과 이후 판이 서로 다른
+    필드를 옮기는 어긋남이 생기지 않게. 부모 개념은 제안 때 검증됐지만 발행까지 시간이 흘렀으므로
+    호출자가 존재를 다시 확인한다.
     """
     p = planned.payload
-    concept = Concept(
-        code=planned.concept_id,
-        name_ko=p.name_ko,
-        name_en=p.name_en,
-        level=ConceptLevel(p.level),
-        parent_concept_id=p.parent_concept_id,
-        aliases=list(p.aliases),
-        is_signature_korean=p.is_signature_korean,
-        cognitive_type=[CognitiveType(c) for c in p.cognitive_type],
-        behavior_skills=list(p.behavior_skills),
-        intrinsic_difficulty=p.intrinsic_difficulty,
-        exam_frequency=p.exam_frequency,
-        weight_in_curriculum=p.weight_in_curriculum,
-    )
+    concept = Concept(code=planned.concept_id, name_ko=p.name_ko, level=ConceptLevel(p.level))
     # CMS가 만든 행 — 적재가 건드리지 않고, 삭제 API가 허용하는 유일한 부류다.
-    mark_cms_edited(concept)
+    _project_payload(concept, p)
     return concept
 
 
@@ -800,6 +860,10 @@ async def apply_transition(
                 GateKind.PUBLISH,
                 [f"concept_code_free: {concept_code}는 그사이 적재가 만든 개념의 코드입니다"],
             )
+        else:
+            # 이미 살아있는 개념의 판 발행(P3-100) — 실패할 수 있는 검사를 쓰기보다 먼저 끝낸다.
+            await _check_can_realize(session, planned, self_id=concept.concept_id)
+            _project_payload(concept, planned.payload)
         for sibling, plan in zip(siblings, superseded, strict=True):
             _write_back(sibling, plan)
         _write_back(row, planned)
@@ -882,12 +946,16 @@ async def rollback(
         rolled_back = plan_transition(
             current, TransitionAction.ROLLBACK, actor=actor, now=moment, allow_compound=True
         )
+        # 복원 대상의 부모가 그사이 사라졌을 수 있다 — 쓰기 전에 확인한다(P3-100).
+        await _check_can_realize(session, restored, self_id=concept.concept_id)
     except Exception as exc:
         _refuse(exc, TransitionAction.RESTORE, target_row.version_id)
         raise
 
     _write_back(current_row, rolled_back)
     _write_back(target_row, restored)
+    # 복원된 판의 내용이 학생 서빙 원본(개념 행)에 다시 닿는다(P3-100).
+    _project_payload(concept, restored.payload)
     concept.current_published_version_id = target_row.version_id
     await session.flush()
     return RollbackResult(
@@ -914,6 +982,7 @@ __all__ = [
     "revise_proposal",
     "has_any_version",
     "has_published_version",
+    "is_cms_created",
     "list_open_proposals",
     "list_versions",
     "get_version",

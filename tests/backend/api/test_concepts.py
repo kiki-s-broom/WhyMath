@@ -23,6 +23,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy.exc import IntegrityError
@@ -36,6 +37,7 @@ from whymath_backend.db.models.concept import Concept, ConceptEdge
 from whymath_backend.db.models.concept_content import ConceptContent
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
+from whymath_backend.l3 import publish_gate as gate
 from whymath_backend.schema.concept import Concept as ConceptSchema
 from whymath_backend.schema.concept import ConceptEdge as ConceptEdgeSchema
 from whymath_backend.schema.enums import (
@@ -156,6 +158,24 @@ def _cms_concept(code: str = "CMS-NEW-1") -> Concept:
     concept = _sample_concept(code=code)
     mark_cms_edited(concept)
     return concept
+
+
+class _CmsBorn:
+    """`gate.is_cms_created`의 답 — 표지가 있는 개념이 CMS 제안으로 태어났는가(P3-100)."""
+
+    value = True
+
+
+@pytest.fixture(autouse=True)
+def cms_born(monkeypatch: pytest.MonkeyPatch) -> _CmsBorn:
+    """삭제 판정이 부르는 판 이력 조회를 대체한다 — 기본은 'CMS가 만든 개념'."""
+    holder = _CmsBorn()
+
+    async def _is_cms_created(session: Any, code: str) -> bool:
+        return holder.value
+
+    monkeypatch.setattr(gate, "is_cms_created", _is_cms_created)
+    return holder
 
 
 def _sample_edge(from_id: uuid.UUID, to_id: uuid.UUID) -> ConceptEdge:
@@ -337,6 +357,18 @@ class TestDelete:
     def test_delete_refuses_a_file_owned_concept(self) -> None:
         """graph.json이 소유한 개념(표지 없음)은 지워도 다음 적재가 되살린다 — 409 `file_owned`."""
         concept = _sample_concept()
+        fake = FakeSession(get_map={concept.concept_id: concept})
+        resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["detail"]["code"] == "file_owned"
+        assert fake.deleted == [] and fake.committed is False
+
+    def test_delete_refuses_a_revised_file_concept_even_with_the_marker(
+        self, cms_born: _CmsBorn
+    ) -> None:
+        """수정판 발행(P3-100)은 graph.json 개념에도 표지를 채운다 — 그 개념은 지워도 적재가 되살린다."""
+        cms_born.value = False
+        concept = _cms_concept()
         fake = FakeSession(get_map={concept.concept_id: concept})
         resp = _client(fake).delete(f"/v1/concepts/{concept.concept_id}")
         assert resp.status_code == 409, resp.text

@@ -40,8 +40,8 @@ import styles from "./Cms.module.css";
  * ② 낡은 화면 판정은 서버가 한다 — 화면이 본 상태(`expected_status`)·발행본(`expected_published_*`)을
  *    그대로 보내고, 그사이 바뀌었으면 409를 받아 최신 값을 다시 읽는다.
  * ③ 낙관적 갱신 금지 — 전이·롤백 뒤에는 목록·상세를 **서버에서 다시 읽어** 그 값만 보인다.
- * ④ 발행·롤백은 학생이 보는 데이터를 바꾸지 않는다(서빙 경로가 이 테이블을 읽지 않는다) — 이 화면의
- *    "발행"은 콘텐츠 버전 대장의 상태다. 이 사실을 화면이 숨기지 않는다.
+ * ④ 발행·롤백은 학생이 보는 개념을 바꾼다(P3-100 — 서버가 발행된 판의 내용을 개념에 옮겨 쓴다).
+ *    이 사실을 화면이 숨기지 않는다. 폐기는 발행본만 내리고 학생이 보는 개념은 그대로 둔다.
  */
 
 type Loadable<T> = { kind: "loading" } | CmsResult<T>;
@@ -175,8 +175,8 @@ export function CmsVersionPane({ token, note, detail, capabilities, emphasis, on
         {" · "}최신 판 번호: {detail.latest_version_no === null ? "없음" : "v" + String(detail.latest_version_no)}
       </p>
       <p className={styles.hint}>
-        이 화면의 발행·롤백은 콘텐츠 버전 대장의 상태 변경입니다. 학생에게 서빙되는 데이터는 이 대장을
-        읽지 않으므로 여기서 바꿔도 학생 화면이 달라지지 않습니다.
+        이 화면에서 판을 발행하거나 롤백하면 그 판의 내용이 곧바로 학생 화면에 보입니다. 폐기는 발행본만
+        내리고, 학생이 보는 개념은 마지막으로 발행된 내용 그대로 남습니다.
       </p>
 
       {emphasis === "deploy" && !capabilities.includes("publish") && (

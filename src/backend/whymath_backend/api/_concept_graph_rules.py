@@ -120,10 +120,13 @@ def edge_delete_block(edge: ConceptEdge) -> WriteBlock | None:
 async def concept_delete_block(session: AsyncSession, concept: Concept) -> WriteBlock | None:
     """개념 행을 지워도 되는가. 허용하는 것은 **CMS가 만들었고 더는 쓰이지 않는 개념**뿐이다.
 
-    판정 순서(앞이 우선): 적재 소유 → 발행본 있음 → 관계 있음 → 자식 있음. 그 밖의 참조(학습 기록·
-    문항 연결 등)는 DB 외래키가 마지막 방어선이다 — 호출자가 `IntegrityError`를 409로 바꾼다.
+    판정 순서(앞이 우선): 적재 소유(CMS가 만들지 않은 개념 포함) → 발행본 있음 → 관계 있음 →
+    자식 있음. 그 밖의 참조(학습 기록·문항 연결 등)는 DB 외래키가 마지막 방어선이다 —
+    호출자가 `IntegrityError`를 409로 바꾼다.
     """
-    if concept.cms_edited_at is None:
+    # 표지가 있어도 CMS가 *만든* 개념이 아닐 수 있다 — 수정판 발행(P3-100)은 graph.json이 만든
+    # 개념에도 표지를 채운다. 그런 개념을 지우면 다음 적재가 되살리므로 적재 소유와 같이 막는다.
+    if concept.cms_edited_at is None or not await gate.is_cms_created(session, concept.code):
         return WriteBlock(
             "file_owned",
             "이 개념은 graph.json(원천 파일)이 정본이라 CMS에서 지울 수 없습니다. "
