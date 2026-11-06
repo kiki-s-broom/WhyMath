@@ -263,15 +263,17 @@ async def post_study_unit(
     # 평균에 묻히지 않게 한다. 학생 원문·식별자는 싣지 않는다(개념 code·전략·경로만).
     logger.info(
         "study supply — concept=%s content=%s via=%s strategy=%s source=%s fallback=%s "
-        "dsl_render_rate=%s strategy_render_rate=%s",
+        "served=%s dsl_render_rate=%s strategy_render_rate=%s served_rate=%s",
         concept_code,
         result.content_code,
         result.lookup_via,
         result.strategy.value,
         result.content_source,
         result.fallback_reason,
+        result.served,
         tally.dsl_render_rate,
         tally.strategy_render_rate(result.strategy.value),
+        tally.served_rate,
     )
     if result.rendered is None:
         # 생성 폴백을 켜지 않았으므로 렌더 실패 = 공급 불가. 처치도 기록하지 않는다 —

@@ -5,9 +5,9 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
-priority: 3
-eos_priority: P2
+status: in_progress
+priority: 2
+eos_priority: P1
 owner: claude
 depends_on: []
 requires_gates: []
@@ -17,12 +17,13 @@ acceptance:
   - "③ MOB-13(클라이언트 호출 배선·타 세션 in-flight)과 축 분리 — 본 태스크는 서버 좌석 판정·배선만, 클라 배선은 범위 밖"
   - "[CONT-05 연동 2026-09-27 · 판정 기준 main `0e7b4f6b`] ①에서 생성 폴백을 개방(a)한다면, 검수 전 콘텐츠(폴백 사유 `UNREVIEWED` — CONT-05 ⓐ가 `NO_DSL`과 같게 처리하되 사유만 분리)도 LLM 생성으로 보낼지 명시 판정한다. 지금 `supply()`는 두 사유를 같은 폴백 경로로 보낸다 — 개방 시 검수 전 개념이 사람 검수 없이 생성 응답으로 학생에게 가는 경로가 된다(생성 응답 자체의 PRM/도구 검증은 전제). 근거 = `docs/reviews/cont05_concept_content_supply_review_gate_2026-09-27.md` §2.2"
   - "[결정 기록 2026-11-06 · Kiki 승인 · PED-17 계획 T0 · 판정 기준 main `2a694f71`] ①이 소유한 '후속 결정'에 대해 Kiki가 C안(조건부 개방)을 채택했다 — 검수 안 된 개념은 AI가 미리 생성하고 자동 검증을 통과한 것만 단계적으로 학생에게 공개하며, 1차 범위는 기계로 정답을 검산할 수 있는 개념이다. 같은 날 카나리 공개와 모든 사람 개입을 AI가 대신하도록 수정했고, 긴급 정지 권한만 Kiki에게 남겼다(발동 기준: 심각 오류 신고 1건). 결정 기록 정본 = `ped17/산출물/T0/결정기록.md`(결정 7가지·안전장치 7가지·승인 기록 표) · 계획서 https://claude.ai/artifact/1RBmZ7iWk2P8Ca76xkaBEy. 이 항은 ①의 (a)/(b) 대응과 CONT-05 연동 항(UNREVIEWED)의 판정을 정하지 않는다 — 그 판정은 이 결정 기록을 입력으로 후속 작업이 한다"
+  - "[대응 판정 2026-11-06 · 판정 기준 main `ce8c2165` · P3R-01] C안 결정 기록을 입력으로 ①과 CONT-05 연동 항을 판정했다 — ① (a) 요청 시점 생성 배선·(b) 404 유지 모두 미채택, (다) 계열 사전 생성·검증·저장 경로로 확정(이행 = C안 계획 작업). UNREVIEWED는 사전 생성 대상(요청 시점 생성 아님). ①은 `/study`가 B6 관문 통과 공개본을 읽는 배선 + 공개본 유무 양방향 실측으로 닫는다. ②는 served 축으로 이행(`SupplyResult.served`·`SupplyTally.by_served`·`unserved_by_source`). 정본 = `docs/reviews/ped17_study_supply_decision_2026-11-06.md`"
 artifacts: []
 paths:
   - src/backend/whymath_backend/api/study.py
   - src/backend/whymath_backend/l4/content_supply.py
   - "tests/backend/api/**"
   - "tests/backend/l4/**"
-session: null
-notes: "ai_integration_gap_review.md D4(2026-08-10). study.py:29-30이 유보를 정직하게 선언했으나 추적 태스크가 없었다 — SEC-15 등재 선례('docstring 자백·추적 부재→태스크化')와 동형. MOB-13 paths(api/study.py) 의도적 겹침 — 겹침 경고는 대기 신호, MOB-13 착지 후 착수 권장(기능 의존 아님).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-27] CONT-05 ⓐ 연동 — 생성 폴백 개방 시 UNREVIEWED 사유 처리 판정 항 추가\n\n[정정 2026-11-06] PED-17 계획 T0 — 2026-11-06 Kiki 결정(C안 조건부 개방)의 결정 기록을 acceptance에 연결(ped17/산출물/T0/결정기록.md)"
+session: claude/new-session-yfujem
+notes: "ai_integration_gap_review.md D4(2026-08-10). study.py:29-30이 유보를 정직하게 선언했으나 추적 태스크가 없었다 — SEC-15 등재 선례('docstring 자백·추적 부재→태스크化')와 동형. MOB-13 paths(api/study.py) 의도적 겹침 — 겹침 경고는 대기 신호, MOB-13 착지 후 착수 권장(기능 의존 아님).\n\n[정정 2026-09-01] eos_priority null → P2: 판정표 N/이월 — 2027 이월(폐기 아님·선언 §6-5). EOS-80 일괄 백필\n\n[정정 2026-09-27] CONT-05 ⓐ 연동 — 생성 폴백 개방 시 UNREVIEWED 사유 처리 판정 항 추가\n\n[정정 2026-11-06] PED-17 계획 T0 — 2026-11-06 Kiki 결정(C안 조건부 개방)의 결정 기록을 acceptance에 연결(ped17/산출물/T0/결정기록.md)\n\n[정정 2026-11-06] priority 3 → 2: Release Gate A·Q1 핵심 경로 — P3-17 판정(main 036286a1) 끊긴 지점. 2027 이월 표기와 실제 경로 불일치\neos_priority P2 → P1: Release Gate A·Q1 핵심 경로 — P3-17 판정(main 036286a1) 끊긴 지점. 2027 이월 표기와 실제 경로 불일치\n\n[정정 2026-11-06] C안 대응 판정·② 이행 기록 연결 (P3R-01)"
 updated: 2026-11-06

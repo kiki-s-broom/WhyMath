@@ -718,6 +718,99 @@ class TestSupplyTally:
         assert "dsl_render_rate_lower" in payload
 
 
+class TestSupplyTallyServedAxis:
+    """PED-17 ② — 생성을 건너뛴 결과(학생 404)와 실제 생성(학생 수신)을 회계가 가른다.
+
+    두 경로는 `content_source="generate"`·같은 전략·같은 폴백 사유를 갖는다. 그래서 기존 세 축
+    (경로·전략·사유)만으로는 같은 숫자가 나온다 — 아래 첫 테스트가 그 사실을 먼저 단언한 뒤,
+    served 축만이 둘을 가른다는 것을 보인다(같은 키로 되돌리는 뮤테이션에서 RED여야 한다).
+    """
+
+    @staticmethod
+    async def _run(*, with_generate_deps: bool) -> tuple[SupplyTally, Any]:
+        tally = SupplyTally()
+        kwargs: dict[str, Any] = {}
+        if with_generate_deps:
+            kwargs = {
+                "generate_request": _routing_request(),
+                "provider": _FakeProvider(),
+                "trace": _RecordingTrace(),
+            }
+        result = await supply(
+            code="MISSING",
+            signals=StudentSignals(),
+            session=_FakeSession(),  # 콘텐츠 없음 → NO_DSL
+            cache=_FakeCache(),
+            tally=tally,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
+            **kwargs,
+        )
+        return tally, result
+
+    @pytest.mark.asyncio
+    async def test_old_axes_cannot_tell_skip_from_generate(self) -> None:
+        # 전제 확인 — 기존 축은 두 경로에서 같은 값을 낸다(이게 결함의 정의다).
+        skipped, _ = await self._run(with_generate_deps=False)
+        generated, _ = await self._run(with_generate_deps=True)
+        assert skipped.counts == generated.counts == {"generate": 1}
+        assert skipped.by_strategy == generated.by_strategy
+        assert skipped.by_fallback_reason == generated.by_fallback_reason == {REASON_NO_DSL: 1}
+
+    @pytest.mark.asyncio
+    async def test_served_axis_separates_skip_from_generate(self) -> None:
+        skipped, skipped_result = await self._run(with_generate_deps=False)
+        generated, generated_result = await self._run(with_generate_deps=True)
+
+        assert skipped_result.served is False
+        assert generated_result.served is True
+        assert skipped.by_served == {"unserved": 1}
+        assert generated.by_served == {"served": 1}
+        # "generate로 집계되나 학생은 못 봄"의 크기가 경로별로 바로 읽힌다.
+        assert skipped.unserved_by_source == {"generate": 1}
+        assert generated.unserved_by_source == {}
+        assert skipped.served_rate == 0.0
+        assert generated.served_rate == 1.0
+        assert skipped.to_json()["unserved_by_source"] == {"generate": 1}
+        assert skipped.to_json() != generated.to_json()
+
+    @pytest.mark.asyncio
+    async def test_render_path_counts_as_served(self) -> None:
+        # 대조군 — 렌더 성공은 학생 수신이다.
+        tally = SupplyTally()
+        result = await supply(
+            code="A1",
+            signals=StudentSignals(),
+            session=_session_with_content(),
+            cache=_FakeCache(),
+            tally=tally,
+            seal=default_expression_seal(),
+            assessment_verifier=default_assessment_answer_verifier(),
+        )
+        assert result.content_source == "dsl_render"
+        assert result.served is True
+        assert tally.by_served == {"served": 1}
+        assert tally.unserved_by_source == {}
+
+    def test_unknown_served_is_not_counted(self) -> None:
+        # 수신 여부를 모르는 기록(배치·사전 점검)은 분모에도 넣지 않는다 — 미상 ≠ 0%.
+        tally = SupplyTally()
+        tally.record("generate")
+        assert tally.total == 1
+        assert tally.by_served == {}
+        assert tally.served_known == 0
+        assert tally.served_rate is None
+        assert tally.served_rate_lower is None
+
+    def test_wilson_lower_is_below_point_estimate(self) -> None:
+        tally = SupplyTally()
+        for _ in range(4):
+            tally.record("dsl_render", served=True)
+        assert tally.served_rate == 1.0
+        lower = tally.served_rate_lower
+        assert lower is not None and lower < 1.0
+
+
 class TestSupplyTracing:
     """관측 — 렌더 경로도 기록된다(라우팅 결정이 없어도)."""
 
