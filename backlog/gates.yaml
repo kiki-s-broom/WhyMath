@@ -1381,8 +1381,9 @@ gates:
     remind_after_days: null
     evidence: null
     cleared_by: null
-    notes: ""
-    corrections: []
+    notes: "[판정 근거 2026-11-06] [Kiki 결정 2026-11-06 · 채팅 응답 · 판정 기준 main ce8c2165] Q1 가 — 02-01 핵심 오개념 M0075·M0080 두 행을 M0669 한 행으로 교체(scope_spec.yaml 항 6과 misconceptions.json 귀속 정정은 같은 PR — 문서 §4 요청 1·2). Q2 A — 정직한 재귀속과 새 객관식 문항(새 은행 승인 단위 n≥200 · raw M-id 금지 · 승인 문항 제자리 수정 금지 · 판정기 M0669 검증 선결, 문서 §5 제약 1~4). Q3 — M0669용 선지 역추적 전용 kebab을 별건 태스크로 신설(카탈로그 68→69·개수 동결 테스트 연쇄). 미결: Q1 가는 M0075를 빼므로 G-p359-m0672-shadow-disposition 판정과 정합을 다시 본다. 게이트 clear는 P3-50 done(후속 태스크 분리 등재) 뒤에 한다."
+    corrections:
+      - "[2026-11-06] notes +458자 — Kiki 결정 기록"
     depends_on:
       - P3-50-calc-02-01-misconception-chain-restore
   - id: G-p356-signature-activation
