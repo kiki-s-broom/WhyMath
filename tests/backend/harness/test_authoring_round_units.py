@@ -88,6 +88,32 @@ def test_example_config_matches_runbook_spec_plan() -> None:
         assert (_REPO / seed).is_file(), seed
 
 
+def test_eos_a4_config_stays_in_anchor_a4_scope() -> None:
+    """EOS-225 A4 회차 설정 — spec 코드가 앵커 A4 범위 안이고, 좌석·과목·산출 폴더가 태스크 계약과 맞는다."""
+    from whymath_backend.harness.problem_corpus_accumulate import authoring_subject_for_codes
+    from whymath_backend.l1.standards.anchor_registry import load_anchor_registry
+
+    cfg = load_round_config(_REPO / "docs" / "ops" / "authoring_round_eos-a4.yaml")
+    a4 = load_anchor_registry().by_id("A4")
+    # 모든 spec 코드가 A4 codes 안에 있다 — 제외 코드([9수02-19]·[9수02-21]·[9수02-22])가 끼면 실패한다.
+    assert {a.standard_code for a in cfg.anchors} <= set(a4.codes)
+    assert not {a.standard_code for a in cfg.anchors} & set(a4.excluded)
+    # acceptance ⑧: 클라우드(openrouter) 좌석만 — 로컬·Anthropic 좌석 없음.
+    assert [(s.kind, s.provider) for s in cfg.seats] == [("cloud", "openrouter")]
+    # 과목·slug 기대값이 생성기의 코드 규칙과 같다(check 단계가 CU 전건에 요구하는 값).
+    assert (cfg.expected_subject, cfg.expected_slug_prefix) == authoring_subject_for_codes(
+        a.standard_code for a in cfg.anchors
+    )
+    # 산출 폴더가 태스크 paths(data/runs/eos-a4-*/**) 아래로 떨어진다.
+    assert cfg.seat_dir(cfg.seats[0]).name.startswith("eos-a4-")
+    assert cfg.review_dir().name.startswith("eos-a4-")
+    # 완료 조건(수락 ≥30 CU) 미달이면 큐를 만들지 않아 저작이 얼지 않게 한다.
+    assert cfg.min_queue_cu >= 30
+    assert sum(s.target_cu for s in cfg.seats) >= 30
+    for seed in cfg.seeds:
+        assert (_REPO / seed).is_file(), seed
+
+
 def test_cloud_seat_without_attempt_budget_is_rejected() -> None:
     data = _base()
     del data["seats"][0]["attempt_budget"]

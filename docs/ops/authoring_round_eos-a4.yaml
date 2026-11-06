@@ -1,0 +1,90 @@
+# 저작 회차 설정 — EOS-225 A4(중3 이차방정식) 2회차 LLM 저작 (G4 누적 60 CU)
+#
+# 읽는 쪽 = `python -m whymath_backend.harness.authoring_round --config <이 파일>`
+# (런북 docs/ops/authoring_round_runbook.md — [R0]에 회차 이름 `eos-a4`를 친다).
+#
+# 판정 기준: main `ce8c2165`.
+#
+# 범위 — 앵커 레지스트리 data/corpus/eos_anchor_set_v1/anchors.yaml id A4 = `[9수02-20]` 단일 코드
+#   ("이차방정식을 풀 수 있고, 이를 활용하여 문제를 해결할 수 있다." — standards_v1).
+#   같은 레지스트리가 제외한 [9수02-19](인수분해 소단원)·[9수02-21]·[9수02-22](이차함수)는 spec에 넣지 않는다.
+#   근과 계수의 관계·판별식은 고1([10공수1-02-…]) 범위라 topic_hint에서 쓰지 말라고 적는다.
+#
+# 좌석 — EOS-225 acceptance ⑧(D14 Kiki 결정 (a)): 클라우드 좌석(openrouter)만 쓴다.
+#   로컬 좌석은 EOS-203 실측(종전 기본 5/12 = 41.7%)으로 주 좌석에서 뺐다 — 재도입은 EOS-235 실측 뒤.
+#   Anthropic 좌석은 12/31까지 API 사용 중단(ARCH-66)이라 쓰지 않는다.
+#   학생 데이터 0 조건: 모델 입력은 spec(성취기준 코드·난이도·주제 힌트)뿐이다. seeds는 중복 판정에만 쓰인다.
+#
+# 목표·예산 — 수락 ≥30 CU가 완료 조건이라 여유를 둔다.
+#   target_cu 34: 검수 큐가 slug·구조 중복을 빼고도 30건 이상 남게 하는 여유 4건.
+#   attempt_budget 120: EOS-197 유료 좌석 수용률 27/85(약 32%) 기준 34 CU에 약 107시도가 든다.
+#   비용 상한(시도 상한 기준): 120회 × 1회 약 $0.00404 = 약 $0.48 ≈ 750원(USD_TO_KRW 1540).
+#     1회 단가 근거 = data/runs/eos197-a6-openrouter/cu.genlog.jsonl 85회 cost_usd 합 $0.3433.
+#
+# 과목·slug — `[9수…]`는 authoring_subject_for_codes 규칙 밖이라 종전 이차방정식 경로 값
+#   `공통`·`wm-gen-quad`가 나온다(problem_corpus_accumulate._DEFAULT_AUTHORING_SUBJECT).
+#
+# 검수 — EOS-225 ⑦: 첫 검수는 AI 보조 없이 사람 단독으로 한다(EOS-226 HIT 표본이 이 첫 검수에서 잰다).
+schema_version: 1
+round_name: eos-a4
+task_id: EOS-225
+worktree: C:\Users\kiki\Desktop\__AI\WhyMath-eos-a4
+output_root: data/runs
+ollama_request_timeout_s: 180
+
+seats:
+  - name: openrouter
+    kind: cloud
+    provider: openrouter
+    model: deepseek/deepseek-v4.1-flash
+    subscription: premium
+    budget_krw: 5000              # 라우팅 티어 입력이지 지출 상한이 아니다(지출 상한 = attempt_budget)
+    expected_jurisdiction: us
+    expected_allowed_providers: [deepinfra]
+    target_cu: 34
+    attempt_budget: 120
+
+anchors:
+  - spec_id: a4-factor
+    standard_code: "[9수02-20]"
+    difficulty: 2.0
+    topic_hint: "중3 이차방정식 — 인수분해로 풀리는 이차방정식 x에 대한 식의 두 근 중 큰 근을 구하는 형태(답 하나·정수 · 근과 계수의 관계·판별식은 쓰지 않는다)"
+  - spec_id: a4-formula
+    standard_code: "[9수02-20]"
+    difficulty: 2.5
+    topic_hint: "중3 이차방정식 — 완전제곱식이나 근의 공식으로 푸는 이차방정식의 두 근 중 작은 근을 구하는 형태(답 하나·정수 또는 분수 · 근과 계수의 관계·판별식은 쓰지 않는다)"
+  - spec_id: a4-one-root
+    standard_code: "[9수02-20]"
+    difficulty: 3.0
+    topic_hint: "중3 이차방정식 — 한 근이 주어진 이차방정식에서 상수를 먼저 구한 뒤 나머지 한 근을 구하는 형태(답 하나·정수 · 근과 계수의 관계는 쓰지 않는다)"
+  - spec_id: a4-word
+    standard_code: "[9수02-20]"
+    difficulty: 3.0
+    topic_hint: "중3 이차방정식의 활용 — 연속하는 자연수의 곱·직사각형의 넓이처럼 상황을 이차방정식으로 세우고 조건에 맞는 양수 근을 구하는 형태(답 하나·자연수)"
+
+# 기존 자산과의 중복 판정에만 쓰인다(모델 입력이 아니다 — 학생 데이터 0 조건).
+# [9수02-20] 문항이 실재하는 은행 3종(generated 184·rephrased 146·conceptual 48행).
+seeds:
+  - data/corpus/problem_bank_generated_v0/problems.jsonl
+  - data/corpus/problem_bank_rephrased_v0/problems.jsonl
+  - data/corpus/problem_bank_conceptual_v0/problems.jsonl
+
+authoring_args:
+  avoid_recent: 10
+  canary: 0
+  abort_window: 0
+
+expected_subject: 공통
+expected_slug_prefix: wm-gen-quad
+# 검수 큐를 만드는 최소 합계 CU — 완료 조건(≥30)과 같게 둔다. 30에 못 미치면 큐를 만들지 않으므로
+# 저작이 얼지 않고, 설정의 target_cu·attempt_budget을 올려 같은 [R2]로 이어 저작할 수 있다.
+min_queue_cu: 30
+
+review:
+  reviewer_id: kiki
+  ui: gui
+  timeout_s: 28800   # 검수 창 최대 8시간 — 넘으면 창을 닫고 이어하기(기록은 건마다 즉시 남는다)
+
+deliver:
+  branch: eos225/a4-authoring-output
+  commit_message: "EOS-225: A4 저작 회차 산출물 — openrouter 좌석 cu.jsonl·생성 로그·회차 대장·검수 기록 (Kiki 머신 실행분)"
