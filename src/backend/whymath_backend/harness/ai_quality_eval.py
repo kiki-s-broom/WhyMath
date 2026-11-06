@@ -12,6 +12,8 @@ hallucination · Curriculum 범위 이탈. 축 정의·재사용 판정·사각�
     python -m whymath_backend.harness.ai_quality_eval
     # 라이브 튜터 응답(JSONL)을 잰다
     python -m whymath_backend.harness.ai_quality_eval --responses responses.jsonl
+    # LLM 초안(수집기 <out>.drafts.jsonl)의 문장 축 6개만 잰다(P3-94 · D16 ⓐ)
+    python -m whymath_backend.harness.ai_quality_eval --drafts runs/p3_94/mid.jsonl.drafts.jsonl
     # 축 하나에 나쁜 응답을 넣어 잰다(음성 대조군)
     python -m whymath_backend.harness.ai_quality_eval --inject answer_leak
     # 변별력 자가 점검 — 8축 각각에 주입해 그 축 점수가 떨어지고 판정이 FAIL로 바뀌는지(CI 스텝)
@@ -32,6 +34,8 @@ hallucination · Curriculum 범위 이탈. 축 정의·재사용 판정·사각�
 - 0 — 8축 전부 PASS (`--self-test`: 8축 전부 주입이 점수 하락 + FAIL 전환을 만들었다)
 - 1 — 하나라도 FAIL (`--self-test`: 하나라도 무반응·주입 미적용)
 - 2 — 측정 실패(적재 실패·판정 대상 부족·판정기 예외). 1과 2 모두 CI를 빨갛게 한다.
+  `--drafts`: 초안 0건·평가셋 밖 사례·초안이 아닌 응답도 2다(공허 통과 금지 · P3-94 ③). 초안이
+  없는 사례는 표본 밖이고(실패 아님), 오개념 판정·Curriculum 범위 2축은 '대상 아님'으로 표기한다.
   `--self-test`에서 2는 적재 실패뿐이다 — 판정 대상 부족·판정기 예외는 그 축이 UNMEASURED가 되어
   FAIL 전환을 못 하므로 '무반응'으로 계상돼 1이 된다.
 
@@ -57,7 +61,7 @@ import json
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Final
 
@@ -93,10 +97,15 @@ from whymath_backend.harness.wilson import wilson_lower_bound, wilson_upper_boun
 from whymath_backend.ops.validation_scorecard import KpiThreshold
 
 __all__ = [
+    "DRAFT_NOT_APPLICABLE",
+    "SENTENCE_AXES",
     "AxisResult",
+    "DraftLoadError",
     "EvalReport",
     "SelfTestReport",
     "evaluate",
+    "evaluate_drafts",
+    "load_drafts",
     "main",
     "render_report",
     "render_self_test",
@@ -109,6 +118,25 @@ _EXIT_FAIL: Final = 1
 _EXIT_MEASUREMENT: Final = 2
 _CONFIDENCE: Final = 0.95
 REPORT_SCHEMA: Final = "ai-quality-report/v1"
+
+SENTENCE_AXES: Final[tuple[str, ...]] = (
+    "math_correctness",
+    "answer_leak",
+    "hint_appropriateness",
+    "explanation_consistency",
+    "student_level_fit",
+    "hallucination",
+)
+"""LLM 초안 모드가 재는 문장 축 6개 — D16 해석(Kiki 2026-11-01): 'LLM이 쓴 문장' 기준의 대상."""
+DRAFT_NOT_APPLICABLE: Final[Mapping[str, str]] = {
+    "misconception_accuracy": "결정론 진단 축 — 오개념 판정은 진단기 출력이지 LLM이 쓴 "
+    "문장이 아니다(D16 해석 2026-11-01)",
+    "curriculum_scope": "경로 출력 축 — 범위 판정 대상은 WH-1 경로 산출이지 LLM이 쓴 "
+    "문장이 아니다(D16 해석 2026-11-01)",
+}
+"""LLM 초안 모드에서 판정하지 않는 축과 그 사유 — 리포트에 그대로 싣는다(P3-94 ②)."""
+_DRAFT_ORIGIN_PREFIX: Final = "wh1-draft"
+"""초안 응답 origin 머리말 — 수집기 `DRAFT_ORIGIN_PREFIX`와 같은 값(테스트가 대조)."""
 
 
 @dataclass(frozen=True)
@@ -158,6 +186,10 @@ class EvalReport:
     injection: str | None
     axes: tuple[AxisResult, ...]
     missing_responses: int
+    not_applicable: Mapping[str, str] = field(default_factory=dict)
+    """판정하지 않은 축 → 사유(LLM 초안 모드 · P3-94 ②). 8축 모드에서는 비어 있다."""
+    draft_coverage: Mapping[str, Any] | None = None
+    """LLM 초안 모드의 표본 회계 — 초안 수·평가셋 사례 수·결말별·종류별(P3-94 ⑦)."""
 
     @property
     def verdict(self) -> str:
@@ -253,12 +285,13 @@ def evaluate(
     candidate: str,
     injection: str | None = None,
     stream: Any = None,
+    axes_to_judge: Sequence[str] = AXES,
 ) -> EvalReport:
-    """8축 판정 — `stream`이 있으면 축 결과를 계산되는 대로 한 줄씩 즉시 쓴다."""
+    """축 판정(기본 8축) — `stream`이 있으면 축 결과를 계산되는 대로 한 줄씩 즉시 쓴다."""
     ctx = JudgeContext(registry=registry, eval_set=eval_set)
     prepare_ladder_tiers(ctx, responses)
     axes: list[AxisResult] = []
-    for axis in AXES:
+    for axis in axes_to_judge:
         result = _judge_axis(AXIS_SPECS[axis], eval_set, responses, ctx)
         axes.append(result)
         if stream is not None:
@@ -274,6 +307,73 @@ def evaluate(
         axes=tuple(axes),
         missing_responses=sum(1 for c in eval_set.cases if c.case_id not in responses),
     )
+
+
+class DraftLoadError(RuntimeError):
+    """LLM 초안 파일을 측정 재료로 쓸 수 없다 — 0건·평가셋 밖 사례·초안이 아닌 응답(측정 불가)."""
+
+
+def load_drafts(path: Path, eval_set: EvalSet) -> dict[str, TutorResponse]:
+    """초안 파일(`<out>.drafts.jsonl`) 적재 — 측정 재료가 아니면 `DraftLoadError`.
+
+    세 가지를 거부한다(전부 측정 불가 · exit 2): ① 0건 — PASS가 아니다(공허 통과 금지 · P3-94 ③)
+    ② 평가셋에 없는 사례 ③ origin이 `wh1-draft`가 아닌 응답 — 라이브 응답 파일을 초안 파일로 잘못
+    넘기면 하네스 템플릿 본문을 'LLM이 쓴 문장'으로 재게 된다.
+    """
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    if not text.strip():
+        raise DraftLoadError(
+            f"LLM 초안 0건({path}) — 측정 불가(공허 통과 금지). 수집기가 초안을 하나도 쓰지 못했다"
+        )
+    drafts = load_responses(path)
+    known = {c.case_id for c in eval_set.cases}
+    unknown = sorted(set(drafts) - known)
+    if unknown:
+        raise DraftLoadError(f"평가셋에 없는 사례의 초안 {len(unknown)}건: {unknown[:3]}")
+    foreign = sorted(
+        cid for cid, r in drafts.items() if not r.origin.startswith(_DRAFT_ORIGIN_PREFIX)
+    )
+    if foreign:
+        raise DraftLoadError(
+            f"초안이 아닌 응답 {len(foreign)}건(origin이 {_DRAFT_ORIGIN_PREFIX}* 아님): "
+            f"{foreign[:3]} — 응답 파일이 아니라 <out>.drafts.jsonl 을 넘겨라"
+        )
+    return drafts
+
+
+def evaluate_drafts(
+    eval_set: EvalSet,
+    registry: Registry,
+    drafts: Mapping[str, TutorResponse],
+    *,
+    candidate: str,
+    stream: Any = None,
+) -> EvalReport:
+    """LLM 초안 모드 — 초안이 있는 사례만 분모로, 문장 축 6개만 판정한다(P3-94 ②).
+
+    초안이 없는 사례는 '응답 누락 실패'가 아니라 **표본 밖**이다(LLM이 그 사례에서 발화를 쓰지
+    않았다). 그 대신 표본 크기·결말별·종류별 분포를 `draft_coverage`로 함께 낸다 — 축별 `min_n`
+    미달은 기존 규칙대로 측정 불가(UNMEASURED)다(통과로 접지 않는다).
+    """
+    subset = EvalSet(
+        cases=tuple(c for c in eval_set.cases if c.case_id in drafts),
+        materials=eval_set.materials,
+        source=eval_set.source,
+        sha256=eval_set.sha256,
+    )
+    report = evaluate(
+        subset, registry, drafts, candidate=candidate, stream=stream, axes_to_judge=SENTENCE_AXES
+    )
+    kinds = Counter(c.kind for c in subset.cases)
+    coverage = {
+        "drafts": len(drafts),
+        "eval_set_cases": len(eval_set.cases),
+        "draft_rate": len(drafts) / len(eval_set.cases) if eval_set.cases else None,
+        "by_origin": dict(sorted(Counter(r.origin for r in drafts.values()).items())),
+        "by_kind": dict(sorted(kinds.items())),
+        "eval_set_kinds": dict(sorted(Counter(c.kind for c in eval_set.cases).items())),
+    }
+    return replace(report, not_applicable=dict(DRAFT_NOT_APPLICABLE), draft_coverage=coverage)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -366,14 +466,31 @@ def _outcome_line(o: InjectionOutcome) -> str:
 
 
 def render_report(report: EvalReport, *, failures: int = 5) -> str:
+    cov = report.draft_coverage
+    title = (
+        "AI 품질 — LLM 초안 문장 축 6개 (P3-94 · 측정 전용 · 학생 미노출)"
+        if cov is not None
+        else "AI 품질 평가 8종 (P3-10)"
+    )
     lines = [
-        "AI 품질 평가 8종 (P3-10)",
+        title,
         f"평가셋 {report.eval_source} · sha256 {report.eval_sha256[:12]} · 사례 {report.n_cases} "
         f"{dict(report.kinds)}",
         f"후보 {report.candidate} · 주입 {report.injection or '없음'} · 응답 누락 "
         f"{report.missing_responses}",
-        "",
     ]
+    if cov is not None:
+        lines.append(
+            f"초안 표본 {cov['drafts']}/{cov['eval_set_cases']} (비율 {_pct(cov['draft_rate'])}) · "
+            f"결말별 {cov['by_origin']} · 종류별 {cov['by_kind']} (평가셋 {cov['eval_set_kinds']})"
+        )
+        lines.append(
+            "  초안이 없는 사례는 표본 밖이다(실패로 세지 않는다) — 축 분모는 초안이 있는 "
+            "사례 중 그 축의 판정 대상이다"
+        )
+        for axis, reason in report.not_applicable.items():
+            lines.append(f"[대상 아님 ] {AXIS_SPECS[axis].name_ko:<14} {reason}")
+    lines.append("")
     for a in report.axes:
         lines.append(_axis_line(a))
         lines.append(f"    판정 권위: {a.spec.reuse}")
@@ -466,6 +583,11 @@ def to_json(report: EvalReport) -> dict[str, Any]:
         "injection": report.injection,
         "missing_responses": report.missing_responses,
         "axes": [_axis_json(a) for a in report.axes],
+        "not_applicable": [
+            {"axis": axis, "name_ko": AXIS_SPECS[axis].name_ko, "reason": reason}
+            for axis, reason in report.not_applicable.items()
+        ],
+        "draft_coverage": dict(report.draft_coverage) if report.draft_coverage else None,
         "verdict": report.verdict,
         "exit_code": report.exit_code,
     }
@@ -508,6 +630,13 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help=f"외부 후보 응답 JSONL(없으면 {CANDIDATE_EOS} — 현재 코드의 결정론 튜터 출력)",
     )
+    parser.add_argument(
+        "--drafts",
+        type=Path,
+        default=None,
+        help="LLM 초안 파일(수집기 <out>.drafts.jsonl) — 문장 축 6개만 판정"
+        "(P3-94 · 0건이면 exit 2)",
+    )
     parser.add_argument("--inject", choices=AXES, default=None, help="축 하나에 나쁜 응답 주입")
     parser.add_argument("--self-test", action="store_true", help="8축 주입 변별력 자가 점검")
     parser.add_argument("--json", type=Path, default=None, help="JSON 리포트 출력 경로")
@@ -525,7 +654,14 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.drafts is not None and (
+        args.responses is not None or args.inject is not None or args.self_test
+    ):
+        parser.error("--drafts 는 --responses·--inject·--self-test 와 함께 쓸 수 없다")
+    if args.drafts is not None:
+        return _main_drafts(args)
     stage = "레지스트리"
     try:
         registry = load_registry()
@@ -574,6 +710,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = evaluate(
         eval_set, registry, responses, candidate=candidate, injection=injection, stream=sys.stdout
     )
+    print("", flush=True)
+    print(render_report(report, failures=args.failures), flush=True)
+    if args.json is not None:
+        _write_json(args.json, to_json(report))
+    return report.exit_code
+
+
+def _main_drafts(args: argparse.Namespace) -> int:
+    """`--drafts` — LLM 초안 문장 축 6개(P3-94). 초안 0건·적재 실패는 측정 불가(exit 2)."""
+    stage = "레지스트리"
+    try:
+        registry = load_registry()
+        stage = "평가셋 적재"
+        eval_set = load_eval_set(registry, args.eval_set)
+        stage = "초안 적재"
+        drafts = load_drafts(args.drafts, eval_set)
+    except (RegistryError, EvalSetError, CandidateError, DraftLoadError, OSError) as exc:
+        print(f"측정 불가 — {stage} 단계: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        return _EXIT_MEASUREMENT
+    candidate = f"llm-draft:{args.drafts}"
+    print(
+        f"평가셋 {eval_set.source} · sha256 {eval_set.sha256[:12]} · 사례 {len(eval_set.cases)} · "
+        f"후보 {candidate} · 초안 {len(drafts)}건",
+        flush=True,
+    )
+    report = evaluate_drafts(eval_set, registry, drafts, candidate=candidate, stream=sys.stdout)
     print("", flush=True)
     print(render_report(report, failures=args.failures), flush=True)
     if args.json is not None:

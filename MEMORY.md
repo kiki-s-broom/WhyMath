@@ -344,6 +344,17 @@
 - **S5**: fill 5회차 k = 0/204(통과) · calc 7회차 k = 6/504(불합격 · as-found) · calc 8회차 k = 1/504(통과). 승격 = 배치 기본값 구조화 + 쓰기 가드 방향 반전(구판 `--legacy-final-step` 거부) · 백필 708건 `approved`.
 - **사고·교훈(대책 = 기록·코드)**: 같은 지침·시드인데 calc 회차별 k가 1·1·6·1로 움직였다 — 판정자 표본 변동이 승격 일정을 좌우한다(측정 타당성 단서를 감사 README에 명기). 발문을 바꾼 18건은 slug·problem_id가 바뀌어 운영 DB에 옛 행이 남는다(이 PR은 DB 무변경 — 비노출 처리는 승계).
 - **근거**: 보고서 `docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md` · 감사 `docs/data/p3_fill_audit/bank_audit_r5/` · `docs/data/p3_calculus1_diff_audit/bank_audit_r7/`·`bank_audit_r8/`.
+### 2026-11-06 (결정 · D12 — Kiki · G3 clear): **D12 (a) — G3는 AI 보조 HIT로 판정하되 판정문에 조건 명시 + G4 전 사람 단독 표본 ≥15 측정 · `G-eos-g3` cleared(주체 kiki)** (Kiki 결정, claude 기록) — 판정 기준: main `a150cdef`
+
+- **무엇을**: D12 결정문을 `G-eos-g3` notes에 원문대로 붙이고, Kiki 지시("G3 clear 해 주세요")로 `gates clear G-eos-g3 --as kiki`를 실행했다. D12의 "G4 전 사람 단독 표본 ≥15"는 소유 태스크 `EOS-226`(todo · depends `EOS-225`)이 어떤 게이트의 입력도 아니어서 산문뿐이었다 — `gates amend G-eos-g4 --depends EOS-226`으로 G4 판정 입력에 연결했다.
+- **값**: G3 = PASS · cleared · 5조건 충족 5/5. 근거(D12 원문): X-01 — 원문 F-Ⅰ의 HIT는 사람 검수 시간이며, 조건을 숨기면 12/31 판정의 근거가 약해진다. G4 입력은 4건(EOS-155 blocked · EOS-227 todo · P3-17 done · EOS-226 todo).
+- **근거**: `backlog/gates.yaml` `G-eos-g3` evidence·notes · `G-eos-g4` corrections · `docs/reviews/eos_g3_inputs_2026-11.md` · PR #1848 `a4afad51` · #1850 `f4b62079` · 이 기록 PR.
+
+### 2026-11-06 (결정 · G3 — Kiki): **`G-eos-g3` PASS — 판정 기준 main `a150cdef` · 5조건 충족 5/5 · clear는 Kiki 몫** (Kiki 판정, claude 기록) — 판정 기준: main `a150cdef`
+
+- **무엇을**: Kiki가 G3를 PASS로 판정했고 세션이 `backlog.py gates amend G-eos-g3 --verdict PASS`로 기록했다(status는 pending 유지 — clear는 담당자 몫).
+- **값**: ① A6 30 CU · ② HIT 중앙값 53.24초 n=30(**AI 보조 검수 조건** — 사람 단독 HIT 미측정) · ③ 자동검증 1차 통과율 0.1171=13/111 산출됨 · ④ 힌트 의미 누설 0/30 · ⑤ 메타 누락 0/30. 판정 직전 `a150cdef` 이후 측정 입력 변경 0건(GitHub compare).
+- **근거**: `docs/reviews/eos_g3_inputs_2026-11.md` · 근거 정리 PR #1848 `a4afad51` · 이 기록 PR. D12(HIT AI 보조 조건 명시) 결정문은 여전히 미수신 — 판정 evidence에 조건을 적어 두었다.
 
 ### 2026-11-05 (측정 · G3 판정 준비 — 폴더 04): **`G-eos-g3` 5조건을 main `a150cdef`에서 재측정 — 충족 5/5 · 판정·clear는 Kiki 몫(11/22)** (claude 측정·기록) — 판정 기준: main `a150cdef`
 

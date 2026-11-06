@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-103-legacy-concept-patch-published-drift
+title: "발행된 개념의 레거시 PATCH 직접 수정 차단 — 개념 행과 발행 판 어긋남 방지 (P3-100 후속)"
+track: math-completion
+stage: S4
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 발행 포인터(current_published_version_id)가 있는 개념에 대해 레거시 PATCH /v1/concepts/{id}가 payload 11필드(name_ko·name_en·level·parent_concept_id·aliases·is_signature_korean·cognitive_type·behavior_skills·intrinsic_difficulty·exam_frequency·weight_in_curriculum) 중 하나라도 바꾸려 하면 거부한다(문항 EOS-195 처분과 같은 형태 — 고치려면 CMS 새 판 → 검수 → 발행). ② hermetic 테스트가 거부·허용(발행 포인터 없는 개념) 양쪽을 단언하고, 거부 분기를 지우는 뮤테이션에서 RED. ③ 이미 발행 포인터가 있으나 개념 행이 발행 판 payload와 어긋난 개념(P3-100 배포 전 발행분)의 건수를 읽기 전용으로 내는 조회를 두고, 운영 DB 실측은 Kiki 런북으로 넘긴다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/api/concepts.py
+session: null
+notes: "출처: P3-100 B5 재판정 docs/reviews/p3_100_concept_revision_serving_b5_rejudgment_2026-11-05.md §4-1·§4-4. P3-100이 발행·롤백을 개념 행에 투영하면서 '개념 행 = 마지막 발행 판'이라는 기대가 생겼는데, 레거시 PATCH(CONTENT_ADMIN)는 판 없이 행을 직접 고쳐 그 기대를 조용히 깬다. 이 경로는 P3-100 이전부터 있었고 새 노출은 아니다. 미완료 태스크 검색(PATCH /v1/concepts · patch_concept · 레거시 CRUD) 0건이라 등재."
+updated: 2026-11-05

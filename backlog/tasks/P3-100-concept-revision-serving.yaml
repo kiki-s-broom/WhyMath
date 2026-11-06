@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: todo
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,7 +13,9 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 개념 판(concept_version)의 수정판(두 번째 이후 판)을 CMS로 발행하면 학생 서빙 경로가 그 판의 내용을 읽는다 — 지금은 l3/publish_gate.py docstring이 적듯 이후 판은 개념 행을 바꾸지 않아(서빙 경로 미연결) 수정 발행이 학생 화면에 닿지 않는다. ② 실 PG 통합 테스트 1건이 수정 → QA → 승인 → 발행 → 학생 조회 응답에 새 내용이 보이는 것을 한 줄로 단언하고, 서빙 연결을 끊는 뮤테이션에서 RED. ③ 첫 판(P3-26 cms_create) 경로와 PUBLISHED 불변 트리거(EOS-49) 회귀 없음."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1846"
+  - 956268be
 paths:
   - src/backend/whymath_backend/l3/publish_gate.py
 session: null

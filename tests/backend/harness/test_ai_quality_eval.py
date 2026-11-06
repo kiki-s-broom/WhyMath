@@ -399,3 +399,95 @@ def test_expected_parse_failure_is_still_unverifiable() -> None:
     """대조군 — 해석 불가인 산술식(SympifyError 계열)은 예외 없이 '판정 불가'(None)로 접힌다."""
     assert judges._closed_numeric("(1 + ") is None
     assert judges._closed_numeric("2 + 3") == 5
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-94 — LLM 초안 모드(`--drafts`): 문장 축 6개 · 2축 '대상 아님' · 0건 = 측정 불가
+# ──────────────────────────────────────────────────────────────────────────
+def _as_drafts(responses: Mapping[str, TutorResponse]) -> dict[str, TutorResponse]:
+    """응답을 초안 모양으로(origin만 바꾼다) — 판정기는 본문을 보므로 결과가 같아야 한다."""
+    return {cid: dataclasses.replace(r, origin="wh1-draft:harness") for cid, r in responses.items()}
+
+
+def test_draft_mode_judges_only_sentence_axes(eval_set, registry, base) -> None:
+    report = cli.evaluate_drafts(eval_set, registry, _as_drafts(base), candidate="drafts")
+    assert [a.spec.axis for a in report.axes] == list(cli.SENTENCE_AXES)
+    assert set(cli.SENTENCE_AXES) | set(cli.DRAFT_NOT_APPLICABLE) == set(AXES)
+    assert not set(cli.SENTENCE_AXES) & set(cli.DRAFT_NOT_APPLICABLE)
+    assert report.not_applicable == cli.DRAFT_NOT_APPLICABLE
+    assert report.draft_coverage is not None
+    assert report.draft_coverage["drafts"] == len(eval_set.cases)
+    assert report.missing_responses == 0
+
+
+def test_draft_mode_detects_a_leaking_draft(eval_set, registry, base) -> None:
+    """초안 본문이 판정 대상이다 — 누설 주입 초안이면 정답 누설 축이 FAIL로 바뀐다."""
+    clean = cli.evaluate_drafts(eval_set, registry, _as_drafts(base), candidate="drafts")
+    assert clean.axis("answer_leak").verdict == "PASS"
+    leaked, changed = candidates.inject("answer_leak", eval_set, registry, base)
+    assert changed > 0
+    report = cli.evaluate_drafts(eval_set, registry, _as_drafts(leaked), candidate="drafts")
+    assert report.axis("answer_leak").verdict == "FAIL"
+    assert report.verdict == "FAIL" and report.exit_code == 1
+
+
+def test_draft_mode_scores_only_cases_with_drafts(eval_set, registry, base) -> None:
+    """초안이 없는 사례는 표본 밖이다 — 응답 누락 실패로 세면 안 된다(8축 모드와 다른 점)."""
+    some = dict(list(_as_drafts(base).items())[:40])
+    report = cli.evaluate_drafts(eval_set, registry, some, candidate="drafts")
+    assert report.n_cases == 40
+    assert all(a.n_cases == 40 for a in report.axes)
+    for a in report.axes:
+        assert not any("응답 누락" in r for f in a.failures for r in f.reasons)
+    assert report.draft_coverage is not None
+    assert report.draft_coverage["eval_set_cases"] == len(eval_set.cases)
+
+
+def test_main_drafts_zero_is_measurement_failure(tmp_path: Path, capsys) -> None:
+    """초안 0건 → PASS가 아니라 측정 불가(exit 2) — 공허 통과 금지(P3-94 ③)."""
+    empty = tmp_path / "live.jsonl.drafts.jsonl"
+    empty.write_text("", encoding="utf-8")
+    assert cli.main(["--drafts", str(empty)]) == 2
+    assert "LLM 초안 0건" in capsys.readouterr().err
+    assert cli.main(["--drafts", str(tmp_path / "nope.jsonl")]) == 2
+    assert "LLM 초안 0건" in capsys.readouterr().err
+
+
+def test_main_drafts_rejects_a_non_draft_file(base, tmp_path: Path, capsys) -> None:
+    """응답 파일을 초안 파일로 잘못 넘기면 템플릿 본문을 'LLM 문장'으로 잰다 — 거부한다."""
+    responses = tmp_path / "live.jsonl"
+    responses.write_text(dump_responses(base), encoding="utf-8")
+    assert cli.main(["--drafts", str(responses)]) == 2
+    assert "초안이 아닌 응답" in capsys.readouterr().err
+
+
+def test_main_drafts_rejects_unknown_cases(base, tmp_path: Path, capsys) -> None:
+    case_id, response = next(iter(_as_drafts(base).items()))
+    stray = {"aq-unknown-case": dataclasses.replace(response, case_id="aq-unknown-case")}
+    path = tmp_path / "drafts.jsonl"
+    path.write_text(dump_responses(stray), encoding="utf-8")
+    assert case_id
+    assert cli.main(["--drafts", str(path)]) == 2
+    assert "평가셋에 없는 사례" in capsys.readouterr().err
+
+
+def test_main_drafts_writes_report(base, tmp_path: Path, capsys) -> None:
+    path = tmp_path / "drafts.jsonl"
+    path.write_text(dump_responses(_as_drafts(base)), encoding="utf-8")
+    out = tmp_path / "drafts.report.json"
+    code = cli.main(["--drafts", str(path), "--json", str(out)])
+    payload: dict[str, Any] = json.loads(out.read_text(encoding="utf-8"))
+    assert code == payload["exit_code"]
+    assert payload["candidate"] == f"llm-draft:{path}"
+    assert [a["axis"] for a in payload["axes"]] == list(cli.SENTENCE_AXES)
+    assert [n["axis"] for n in payload["not_applicable"]] == list(cli.DRAFT_NOT_APPLICABLE)
+    assert payload["draft_coverage"]["drafts"] == len(base)
+    stdout = capsys.readouterr().out
+    assert "LLM 초안 문장 축 6개" in stdout and "[대상 아님 ]" in stdout
+
+
+@pytest.mark.parametrize("other", [["--responses", "x.jsonl"], ["--inject", "answer_leak"]])
+def test_main_drafts_is_exclusive(other: list[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--drafts", "d.jsonl", *other])
+    assert exc.value.code == 2
