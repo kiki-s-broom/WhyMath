@@ -159,9 +159,34 @@ class TestG4ConditionFreeze:
         assert "수동 개입 0 루프 3연속" in row, "G4의 핵심 조건이 함께 사라졌다"
         assert "P0 결함 0" in row, "G4의 P0 결함 조건이 함께 사라졌다"
 
-    def test_real_student_sample_is_deferred_to_the_named_gate(self, declaration: str):
-        """이관처가 이름으로 남아야 한다 — 없으면 '테스트 계정으로 충분하다'는 오독이 열린다."""
-        assert "G-student-work-after-internal-completion" in self._g4_row(declaration)
+    def test_g4_accepts_ai_simulated_accounts(self, declaration: str):
+        """2026-11-06 Kiki 결정 — 내부 테스트 계정은 AI 시뮬레이션 계정을 인정한다.
+
+        이 단서가 사라지면 '≥20건'이 사람 계정으로 읽혀 학생 참여 연기(ARCH-66 ⑥)와 다시
+        충돌하고, '학생 100명'처럼 판정 불능 조건이 된다.
+        """
+        assert "AI 시뮬레이션 계정 인정" in self._g4_row(declaration)
+
+    def test_g4_has_no_real_student_count_condition(self, declaration: str):
+        """2026-11-06 Kiki 결정 — 실제 학생 수는 판정 조건이 아니다(12/31 이후 포함).
+
+        삭제 기록 안의 인용("종전 이관 항목 …")은 허용하고, 조건 문면으로 되살아나는 것만 막는다.
+        """
+        row = self._g4_row(declaration)
+        assert "실제 학생 표본 ≥20명은 12/31 이후" not in row, (
+            "실제 학생 표본 ≥20명이 다시 이관 판정 조건으로 적혔다 — 2026-11-06 삭제 결정의 조용한 복원"
+        )
+        assert "판정 조건에서 삭제" in row
+
+    def test_real_student_sample_deletion_is_recorded(self, declaration: str):
+        """실제 학생 표본의 처분이 G4 행에 결정으로 남아야 한다.
+
+        종전(EOS-135, 2026-09-24)에는 '실제 학생 표본 ≥20명'을 12/31 이후 게이트로 *이관*했고
+        이 테스트는 이관처 이름을 단언했다. 2026-11-06 Kiki 결정으로 그 조건은 이관이 아니라
+        *삭제*됐다 — 학생 수는 어떤 판정 조건도 아니다. 의식적 개정이므로 단언을 결정 기록으로 바꾼다.
+        """
+        row = self._g4_row(declaration)
+        assert "2026-11-06 Kiki 결정" in row and "판정 조건에서 삭제" in row
 
     def test_failure_definitions_require_no_sample(self, declaration: str):
         """경계 보존 — 이 교체가 G0 동결(실패정의)을 건드리지 않았다는 근거를 코드에 남긴다."""
