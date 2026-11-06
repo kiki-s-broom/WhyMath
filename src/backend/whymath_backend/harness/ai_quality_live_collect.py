@@ -151,6 +151,14 @@ P3-78 라이브 측정에서 LLM이 쓴 문장이 학생 본문으로 나간 사
 `run.json`은 좌석별 비교 입력(교체 호출 수 · 턴 지연 중앙값·p95 · 턴당 provider 호출 수 · 토큰)을
 싣는다.
 
+**측정 전용 프롬프트 변형**(`--policy-prompt utterance-required` · P3-94 ⑧ · Kiki 2026-11-06 1안
+승인): 2026-11-06 좌석 비교(`docs/reviews/p3_94_seat_compare_report_2026-11-06.md`)에서 로컬 모델
+초안이 0/20이었다 — 서빙 정책 프롬프트가 "학생에게 직접 말하지 말라"·"발화는 선택"으로 안내하기
+때문이다. 이 변형은 그 세 문구만 바꿔(`measurement_policy_prompt`) "LLM이 말한다면 무엇을 쓰는가"를
+잰다. 정책 호출(서빙 원문과 바이트 동일한 system)에만 적용하고, 문구가 정확히 1건씩 없으면 실행을
+거부한다(exit 1). 설정 지문에 변형 이름과 보낸 프롬프트 sha256이 들어가고, `run.json`의
+`policy_prompt_calls`가 실제 적용 건수(작동 신호)를 센다.
+
 프라이버시·비용·타임아웃
 ------------------------
 평가 사례는 합성(학생 데이터 0)이지만 응답 원문은 `<out>`에만 둔다 — 진행 출력·stderr·실패 파일·
@@ -211,6 +219,7 @@ from whymath_backend.harness.ai_quality_registry import (
     default_repo_root,
     load_registry,
 )
+from whymath_backend.harness.wh1_llm_policy import _SYSTEM_PROMPT as _POLICY_SYSTEM_PROMPT
 from whymath_backend.harness.wh1_loop import EndTurnType
 from whymath_backend.harness.wh1_primary import run_wh1_primary_turn
 from whymath_backend.harness.wh1_shadow import PRIMARY_ADOPTED
@@ -267,6 +276,8 @@ __all__ = [
     "FALLBACK_ORIGIN",
     "HARNESS_ORIGIN",
     "LIVE_ORIGIN",
+    "POLICY_PROMPTS",
+    "POLICY_PROMPT_SERVING",
     "POLICY_SEATS",
     "POLICY_SEAT_ROUTE",
     "RUN_SCHEMA",
@@ -284,6 +295,7 @@ __all__ = [
     "extract_draft",
     "live_turn_inputs",
     "main",
+    "measurement_policy_prompt",
     "output_paths",
     "seat_decision",
 ]
@@ -309,6 +321,28 @@ POLICY_SEAT_ROUTE: Final = "route"
 """튜터 정책 좌석 = 라우터 결정 그대로(교체 없음 · 기본값 · P3-78과 같은 동작)."""
 POLICY_SEATS: Final = (POLICY_SEAT_ROUTE, "local-fast", "local-mid", "cloud-mid")
 """측정 전용 좌석 선택지(P3-94 ⑥ · Kiki 2026-11-06 승인 후보 3개 + 교체 없음)."""
+POLICY_PROMPT_SERVING: Final = "serving"
+"""튜터 정책 시스템 프롬프트 = 서빙과 같은 원문(기본값 · 교체 없음)."""
+POLICY_PROMPTS: Final = (POLICY_PROMPT_SERVING, "utterance-required")
+"""측정 전용 프롬프트 변형 선택지(P3-94 ⑧ · Kiki 2026-11-06 1안 승인)."""
+_UTTERANCE_REQUIRED_EDITS: Final[tuple[tuple[str, str], ...]] = (
+    (
+        "학생에게 직접 말하거나 문제를 풀지 마세요",
+        "문제를 대신 풀지 마세요(학생에게 할 말은 end_turn의 utterance에만 씁니다)",
+    ),
+    (
+        "utterance(문자열, 선택 — 비우면 하네스의 소크라테스 개입 발화가 대신 말합니다).",
+        "utterance(문자열, **필수** — 학생에게 할 말을 직접 1~3문장으로 쓰세요. 정답은 쓰지 "
+        "마세요).",
+    ),
+    (
+        '{"kind": "end_turn", "action_type": "질문"}',
+        '{"kind": "end_turn", "action_type": "질문", "utterance": "어떤 규칙을 떠올렸는지 '
+        '말해 줄래?"}',
+    ),
+)
+"""`utterance-required` 변형 = 서빙 프롬프트에서 "말하지 말라·발화는 선택·발화 없는 예시" 세 곳만
+바꾼다. 그 밖의 불변식(verify 의무·정답 억제·내부 도구 침묵·개념 id 규칙)은 원문 그대로다."""
 
 _POLICY_ROUTE: Final = (CostTier.LOCAL.value, ModelFamily.GENERAL.value, LocalModelTier.FAST.value)
 """튜터 정책 호출의 라우터 결정(`classify` → LOCAL·GENERAL·FAST) — 이 결정만 교체한다."""
@@ -413,6 +447,8 @@ class CaseLedger:
     """데이터 등급 게이트(`data_export_blocked`) 때문에 클라우드 교체를 거부한 호출 수."""
     input_tokens: int = 0
     output_tokens: int = 0
+    prompt_variant_calls: int = 0
+    """측정 전용 프롬프트 변형이 적용된 정책 호출 수(P3-94 ⑧)."""
 
 
 class _Scope:
@@ -588,6 +624,30 @@ def seat_decision(decision: RoutingDecision, seat: str) -> RoutingDecision | Non
     return RoutingDecision.model_validate(payload)
 
 
+def measurement_policy_prompt(variant: str) -> str | None:
+    """측정 전용 정책 시스템 프롬프트(P3-94 ⑧) — `serving`이면 None(교체 없음).
+
+    `utterance-required`는 서빙 원문(`wh1_llm_policy._SYSTEM_PROMPT`)의 세 문구만 바꾼다
+    (`_UTTERANCE_REQUIRED_EDITS`). **바꿀 문구가 정확히 1건씩 없으면 `ValueError`** — 서빙
+    프롬프트가 바뀌어 변형이 조용히 무의미해지는(아무것도 안 바꾸고 "발화 필수"로 기록되는) 측정을
+    막는다.
+    """
+    if variant == POLICY_PROMPT_SERVING:
+        return None
+    if variant not in POLICY_PROMPTS:
+        raise ValueError(f"알 수 없는 프롬프트 변형 {variant!r} — {POLICY_PROMPTS} 중 하나")
+    text = _POLICY_SYSTEM_PROMPT
+    for old, new in _UTTERANCE_REQUIRED_EDITS:
+        count = text.count(old)
+        if count != 1:
+            raise ValueError(
+                f"프롬프트 변형 대상 문구가 {count}건 — 정책 프롬프트가 바뀌었다(변형 갱신 필요): "
+                f"{old[:30]}…"
+            )
+        text = text.replace(old, new)
+    return text
+
+
 class RecordingProvider:
     """안쪽 provider로 전달하며 이번 사례의 호출 지문·예외·초안·사용량을 기록한다.
 
@@ -604,13 +664,20 @@ class RecordingProvider:
     """
 
     def __init__(
-        self, inner: LLMProvider, scope: _Scope, *, policy_seat: str = POLICY_SEAT_ROUTE
+        self,
+        inner: LLMProvider,
+        scope: _Scope,
+        *,
+        policy_seat: str = POLICY_SEAT_ROUTE,
+        policy_system: str | None = None,
     ) -> None:
         if policy_seat not in POLICY_SEATS:
             raise ValueError(f"알 수 없는 좌석 {policy_seat!r} — {POLICY_SEATS} 중 하나")
         self._inner = inner
         self._scope = scope
         self._policy_seat = policy_seat
+        self._policy_system = policy_system
+        """정책 시스템 프롬프트의 측정 전용 변형(None = 서빙 원문 그대로 · P3-94 ⑧)."""
 
     def _seat(self, decision: RoutingDecision) -> RoutingDecision:
         # 교체 대상(정책 경로)이 아니면 거부로도 세지 않는다 — 거부 건수는 "교체했을 호출" 중에서만.
@@ -662,6 +729,11 @@ class RecordingProvider:
             )
             if value is not None
         }
+        # 측정 전용 프롬프트 변형 — 정책 호출(서빙 원문과 바이트 동일한 system)만 바꾼다. 지문은
+        # 실제로 보낸 프롬프트의 것이다(변형이 유효 표본 상한 계산에 그대로 반영된다).
+        if self._policy_system is not None and system == _POLICY_SYSTEM_PROMPT:
+            system = self._policy_system
+            self._scope.ledger.prompt_variant_calls += 1
         self._scope.ledger.prompt_fingerprints.append(_fingerprint(system, prompt))
         decision = self._seat(decision)
         try:
@@ -934,6 +1006,7 @@ class CaseResult:
     seat_refused: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    prompt_variant_calls: int = 0
 
 
 def _primary_observation(observations: Sequence[Mapping[str, object]]) -> Mapping[str, object]:
@@ -1084,6 +1157,7 @@ def classify_case(
             seat_refused=ledger.seat_refused,
             input_tokens=ledger.input_tokens,
             output_tokens=ledger.output_tokens,
+            prompt_variant_calls=ledger.prompt_variant_calls,
             **extra,
         )
 
@@ -1453,6 +1527,7 @@ class _RunCounts:
     seat_refused: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    prompt_variant_calls: int = 0
     elapsed_ms: list[int] = field(default_factory=list)
 
     def add(self, result: CaseResult) -> None:
@@ -1470,6 +1545,7 @@ class _RunCounts:
         self.seat_refused += result.seat_refused
         self.input_tokens += result.input_tokens
         self.output_tokens += result.output_tokens
+        self.prompt_variant_calls += result.prompt_variant_calls
         self.elapsed_ms.append(result.elapsed_ms)
         if result.category == "degraded" and result.cause:
             self.degraded_causes[result.cause] += 1
@@ -1523,6 +1599,8 @@ class _RunCounts:
                 "refused_data_export": self.seat_refused,
             },
             "tokens": {"input": self.input_tokens, "output": self.output_tokens},
+            # P3-94 ⑧ — 측정 전용 프롬프트 변형이 실제로 적용된 정책 호출 수(작동 신호).
+            "policy_prompt_calls": {"variant_applied": self.prompt_variant_calls},
             "turn_latency_ms": latency_summary(self.elapsed_ms),
             "provider_calls_per_case": (
                 self.provider_calls / self.attempted if self.attempted else None
@@ -1814,6 +1892,14 @@ def _parser() -> argparse.ArgumentParser:
         help="튜터 정책 호출 좌석 — 측정 전용 교체(P3-94 ⑥ · 서빙 무변경). route=라우터 결정 그대로"
         "(기본) · local-fast=qwen2.5:3b · local-mid=qwen2.5:7b · cloud-mid=클라우드 MID 좌석",
     )
+    parser.add_argument(
+        "--policy-prompt",
+        choices=POLICY_PROMPTS,
+        default=POLICY_PROMPT_SERVING,
+        help="튜터 정책 시스템 프롬프트 — 측정 전용 변형(P3-94 ⑧ · 서빙 무변경). "
+        "serving=서빙 원문(기본) · utterance-required=end_turn 발화를 필수로 요구"
+        "(정답 억제 등 나머지 불변식 그대로)",
+    )
     return parser
 
 
@@ -1833,10 +1919,15 @@ def _config(
     turn_timeout: float,
     outer: float,
     policy_seat: str = POLICY_SEAT_ROUTE,
+    policy_prompt: str = POLICY_PROMPT_SERVING,
+    policy_system: str | None = None,
 ) -> dict[str, object]:
     """응답을 바꿀 수 있는 설정 — 이 묶음의 지문이 `--resume` 동일성 판정에 쓰인다."""
+    sent = policy_system if policy_system is not None else _POLICY_SYSTEM_PROMPT
     return {
         "policy_seat": policy_seat,
+        "policy_prompt": policy_prompt,
+        "policy_prompt_sha256": hashlib.sha256(sent.encode()).hexdigest(),
         "declared_models": dict(deps.declared_models),
         "turn_timeout_seconds": turn_timeout,
         "outer_timeout_seconds": outer,
@@ -1895,7 +1986,17 @@ def main(
             args.timeout if args.timeout is not None else settings.wh1_primary_timeout_seconds
         )
         outer_timeout = turn_timeout + settings.wh1_prose_timeout_seconds + _OUTER_GRACE_SECONDS
-        config = _config(settings, deps, turn_timeout, outer_timeout, args.policy_seat)
+        stage = "프롬프트 변형"
+        policy_system = measurement_policy_prompt(args.policy_prompt)
+        config = _config(
+            settings,
+            deps,
+            turn_timeout,
+            outer_timeout,
+            args.policy_seat,
+            args.policy_prompt,
+            policy_system,
+        )
         fingerprint = _config_fingerprint(config)
         git = _git_identity(default_repo_root())
         head = git.get("head")
@@ -1938,6 +2039,7 @@ def main(
             "resume": args.resume,
             "min_live_rate": args.min_live_rate,
             "policy_seat": args.policy_seat,
+            "policy_prompt": args.policy_prompt,
         },
         "config": config,
         "config_fingerprint": fingerprint,
@@ -1981,7 +2083,12 @@ def main(
         eos=eos,
         briefs=briefs,
         settings=settings,
-        provider=RecordingProvider(deps.provider, scope, policy_seat=args.policy_seat),
+        provider=RecordingProvider(
+            deps.provider,
+            scope,
+            policy_seat=args.policy_seat,
+            policy_system=policy_system,
+        ),
         trace=RecordingTrace(deps.trace, scope),
         cache_factory=deps.cache_factory,
         scope=scope,
@@ -1993,7 +2100,7 @@ def main(
         f"실행 {run_id[:12]} · 평가셋 {eval_set.source} · sha256 {eval_set.sha256[:12]} · 사례 "
         f"{len(eval_set.cases)} · 이미 수집 {len(done)} · 이번 {len(pending)} · 한 턴 "
         f"{turn_timeout:g}s · 관측 {type(deps.trace).__name__}(구성={deps.trace_configured}) · "
-        f"튜터 좌석 {args.policy_seat}",
+        f"튜터 좌석 {args.policy_seat} · 정책 프롬프트 {args.policy_prompt}",
         file=out_stream,
         flush=True,
     )
@@ -2061,7 +2168,8 @@ def main(
     assert isinstance(latency, dict)
     print(
         f"튜터 좌석 {args.policy_seat} — 교체 호출 {c.seat_overrides} · 교체 거부(데이터 등급) "
-        f"{c.seat_refused} · 턴 지연 중앙값 {latency['median_ms']}ms · p95 {latency['p95_ms']}ms · "
+        f"{c.seat_refused} · 프롬프트 변형 적용 {c.prompt_variant_calls} · "
+        f"턴 지연 중앙값 {latency['median_ms']}ms · p95 {latency['p95_ms']}ms · "
         f"토큰 입력 {c.input_tokens} · 출력 {c.output_tokens}",
         file=out_stream,
         flush=True,
