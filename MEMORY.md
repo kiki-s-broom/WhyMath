@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-05 (측정 · G3 판정 준비 — 폴더 04): **`G-eos-g3` 5조건을 main `a150cdef`에서 재측정 — 충족 5/5 · 판정·clear는 Kiki 몫(11/22)** (claude 측정·기록) — 판정 기준: main `a150cdef`
+
+- **무엇을**: 지시문(EOS 감리 이행 지시문 v3 · 폴더 04)대로 `ops/g3_content_measures`·`ops/hit_cu_metrics`·`ops/weekly_metrics_report --dry-run`·`ops/provenance_audit --require-runs`를 main `a150cdef`에서 돌려 01-A 초안(`a91ffcf7` · #1794)을 최종본으로 갱신하고, `G-eos-g3` notes에 재측정 결과를 `gates amend --note`로 남겼다. **D12**(HIT AI 보조 조건 명시 여부 · 기한 11/20) 결정문은 미수신이라 notes에 붙이지 못했다 — 받으면 결정문의 명령 그대로 붙인다.
+- **값**: ① A6 30 CU(local 3 · openrouter 27) · ② HIT 중앙값 53.24초 n=30(AI 보조 검수 조건 · 사람 단독 미측정) · ③ 자동검증 1차 통과율 0.1171=13/111 산출됨(Wilson 단측 하한 0.0758 · 주간 원장 11/01 레코드 measured true — EOS-220 #1805) · ④ 힌트 의미 누설 0/30(Wilson 상한 0.0827 · 기계 축 0/89) · ⑤ 메타 누락 0/30. 초안과 값 전부 동일, ③의 원장 기록 상태만 바뀜.
+- **근거**: `docs/reviews/eos_g3_inputs_2026-11.md`(최종본) · 리포트 `data/runs/eos197-a6-review/g3_content_measures_g3prep_2026-11-05.json`(`EXIT=0` · `MACHINE_VERDICT=PASS`) · 이 PR의 머지 커밋.
+
 ### 2026-11-03 (결정 · D14 — Kiki): **2회차 저작(WP-F · `EOS-225`)은 로컬 좌석을 주 좌석으로 쓰지 않고 클라우드(openrouter) 좌석으로 한다 — 선택지 (a)** (Kiki 결정, claude 기록) — 판정 기준: main `37e32712`
 
 - **무엇을**: 감리 지시문 v3 02-B의 D14 결정. 지시문 문면은 "로컬 수락률 50% 미만이면 (a) 추천"이고, 선택지 본문은 저장소에 없어 claude가 맥락으로 요약한 "(a) = 2회차 저작에서 로컬 좌석 대신 클라우드 좌석"을 Kiki가 맞다고 확인했다(2026-11-03). `EOS-225` acceptance ⑧로 대장에 반영(openrouter 조건은 ② 그대로 — 학생 데이터 0 · Anthropic 좌석 미사용).
