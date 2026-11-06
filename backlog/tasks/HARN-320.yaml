@@ -5,7 +5,7 @@ track: infra-debt
 stage: S3
 subject: cross
 layer: infra
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,9 +19,9 @@ artifacts: []
 paths:
   - scripts/harness/backlog.py
   - tests/harness/test_number_guard.py
-session: null
+session: claude/sleepy-bohr-4w4j8j
 notes: |-
   출처: 2026-11-02 EOS-221 작업 중 사고. 상대 세션(claude/eos-222-followups)이 EOS-231을 01:17에 등재 → PR #1813이 02:16:40에 머지(예약 해제). 이 세션은 02:17:53에 같은 번호로 다른 태스크를 add — 로컬 main 사본은 머지 직전 상태(19291d3e)였고 원격 예약은 이미 풀려 두 검사 모두 통과했다. 독립 검토 서브에이전트가 PR 전에 발견, main 병합 후 이쪽 태스크를 EOS-233으로 재등재해 해소(피해: 미push 커밋 1건 정정). 기존 번호 사고(HARN-111·HARN-317)와 원인이 다른 축이다.
 
   [정정 2026-11-04] HARN-317과 범위 경계·순서 고정(중복 병행 차단)
-updated: 2026-11-04
+updated: 2026-11-06

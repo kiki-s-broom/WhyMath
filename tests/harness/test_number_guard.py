@@ -560,3 +560,161 @@ class TestRootTreePreservation:
         assert "reservations/S9-50.json" in paths, "보존 절이 예약을 옮기지 않았다"
         assert "claims/S2-02.json" in paths
         assert not [p for p in paths if "\r" in p], f"CR 오염이 옮겨졌다: {paths!r}"
+
+
+# ── HARN-320 · 방금 받은 origin/main 대장 대조 — EOS-231(머지 73초 뒤) ─────────────
+
+
+def _merge_upstream(clone, monkeypatch, task_id: str, title: str = "상대 세션의 태스크") -> Path:
+    """상대 세션이 task_id를 등재·push한 뒤 PR이 머지된 상태 — main 반영 + 브랜치 삭제.
+
+    예약은 남기지 않는다(`_legacy_add`) — 머지로 예약이 풀린 상태의 모사다.
+    """
+    other = _session(clone, monkeypatch, "other")
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            number_guard, "reserve", lambda *a, **k: number_guard.ReserveResult("skipped")
+        )
+        assert _add(task_id, title=title) == 0
+    _push(other, "claude/other")
+    assert _git(other, "push", "-q", "origin", "claude/other:main").returncode == 0
+    assert _git(other, "push", "-q", "origin", "--delete", "claude/other").returncode == 0
+    return other
+
+
+def _fail_trunk_fetch(monkeypatch) -> None:
+    """trunk 표적 fetch만 실패시킨다 — 나머지 원격 조회는 그대로 성공한다."""
+    real = remote_claims._git
+
+    def fake(root, *argv, **kw):
+        if argv and argv[0] == "fetch" and number_guard.TRUNK_REFSPEC in argv:
+            return subprocess.CompletedProcess(["git", *argv], 128, "", _OFFLINE_STDERR)
+        return real(root, *argv, **kw)
+
+    monkeypatch.setattr(remote_claims, "_git", fake)
+
+
+def _stale_main_lacks(repo: Path, task_id: str) -> None:
+    """전제(변별력): 이 클론의 로컬 대장과 origin/main 사본 어디에도 그 태스크가 없다."""
+    assert not (repo / "backlog" / "tasks" / f"{task_id}.yaml").exists()
+    listed = _git(repo, "ls-tree", "-r", "--name-only", "origin/main").stdout.split()
+    assert (
+        f"backlog/tasks/{task_id}.yaml" not in listed
+    ), "origin/main ref가 이미 최신이면 재현이 아니다"
+
+
+class TestTrunkLedgerAfterMerge:
+    def test_merged_number_is_refused_even_when_the_full_refresh_fails(
+        self, bare_remote, monkeypatch, capsys
+    ):
+        """머지로_브랜치·예약이_사라진_번호를_낡은_main에서_add하면_거부하고_다음_번호를_제안한다"""
+        _, clone = bare_remote
+        mine = _session(clone, monkeypatch, "mine")  # 상대 머지 전에 클론 — 로컬 main은 낡는다
+        _merge_upstream(clone, monkeypatch, "S9-40-theirs")
+        monkeypatch.chdir(mine)
+        number_guard.forget(mine)
+        _stale_main_lacks(mine, "S9-40-theirs")
+        _fail_heads_fetch(monkeypatch)  # 전체 갱신 실패 — 종전엔 낡은 ref로 판정하고 통과했다
+        capsys.readouterr()
+        assert _add("S9-40-mine", title="전혀 다른 제목") == 1
+        err = capsys.readouterr().err
+        assert number_guard.TRUNK_SOURCE in err, err
+        assert "S9-40-theirs" in err and "다음 빈 번호 제안: S9-41" in err, err
+        assert not (mine / "backlog" / "tasks" / "S9-40-mine.yaml").exists()
+
+    def test_bare_id_on_local_main_branch_is_refused(self, bare_remote, monkeypatch, capsys):
+        """로컬_main_브랜치_세션도_trunk_사본을_내_것으로_건너뛰지_않는다(맨_번호_ID)"""
+        _, clone = bare_remote
+        mine = _session(clone, monkeypatch, "mine")
+        assert _git(mine, "checkout", "-q", "main").returncode == 0
+        _merge_upstream(clone, monkeypatch, "S9-42", title="상대 세션의 맨 번호 태스크")
+        monkeypatch.chdir(mine)
+        number_guard.forget(mine)
+        _stale_main_lacks(mine, "S9-42")
+        capsys.readouterr()
+        assert _add("S9-42", title="같은 번호의 다른 태스크") == 1
+        assert number_guard.TRUNK_SOURCE in capsys.readouterr().err
+
+    def test_number_absent_from_trunk_passes(self, bare_remote, monkeypatch, capsys):
+        """대조군 — 원격_main에도_없는_번호는_통과한다"""
+        _, clone = bare_remote
+        mine = _session(clone, monkeypatch, "mine")
+        _merge_upstream(clone, monkeypatch, "S9-43-theirs")
+        monkeypatch.chdir(mine)
+        number_guard.forget(mine)
+        _fail_heads_fetch(monkeypatch)
+        assert _add("S9-44-mine", title="다른 번호") == 0
+        view = number_guard.current_view(mine)
+        assert view is not None and view.trunk_status == "ok", view
+        assert any(
+            f.task_id == "S9-43-theirs" for f in view.trunk_files
+        ), "trunk를 실제로 봤어야 한다"
+
+    def test_same_bare_task_reseeded_from_trunk_passes(self, bare_remote, monkeypatch):
+        """대조군 — 맨_번호_ID라도_trunk_사본과_제목이_같으면_같은_태스크(재등재)다"""
+        _, clone = bare_remote
+        mine = _session(clone, monkeypatch, "mine")
+        assert _git(mine, "checkout", "-q", "main").returncode == 0
+        _merge_upstream(clone, monkeypatch, "S9-45", title="같은 태스크의 재등재")
+        monkeypatch.chdir(mine)
+        number_guard.forget(mine)
+        assert _add("S9-45", title="같은 태스크의 재등재") == 0
+
+    def test_trunk_unreachable_is_unmeasurable_not_a_pass(self, bare_remote, monkeypatch, capsys):
+        """trunk를_못_받으면_측정_불가로_거부하고_낡은_origin_main으로_판정하지_않는다"""
+        _, clone = bare_remote
+        n = _session(clone, monkeypatch, "n")
+        _fail_trunk_fetch(monkeypatch)
+        capsys.readouterr()
+        assert _add("S9-46-offline") == 1
+        err = capsys.readouterr().err
+        assert "측정 불가" in err and "--trunk-unverified" in err and "<url>" in err, err
+        view = number_guard.current_view(n)
+        assert view is not None and not view.trunk_seen and not view.trunk_files, view
+        assert not view.complete
+        rows = _events(n, "trunk_ledger_unavailable")
+        assert rows and rows[-1]["status"] == "offline"
+
+    def test_human_reason_lets_it_through_and_is_recorded(self, bare_remote, monkeypatch):
+        """사유를_적으면_진행하되_사유가_notes와_이벤트에_남는다"""
+        _, clone = bare_remote
+        n = _session(clone, monkeypatch, "n")
+        _fail_trunk_fetch(monkeypatch)
+        argv = [
+            "add",
+            "--eos-priority",
+            "P2",
+            "--id",
+            "S9-47-offline",
+            "--title",
+            "오프라인 등재",
+            "--track",
+            "math-completion",
+            "--stage",
+            "S2",
+            "--trunk-unverified",
+            "기내 오프라인 — 착륙 후 validate로 재확인",
+        ]
+        assert cli.main(argv) == 0
+        text = (n / "backlog" / "tasks" / "S9-47-offline.yaml").read_text(encoding="utf-8")
+        assert "HARN-320" in text and "기내 오프라인" in text
+        rows = _events(n, "add_trunk_unverified")
+        assert rows and "기내 오프라인" in rows[-1]["reason"]
+
+    def test_trunk_without_ledger_is_an_observed_zero_not_a_failure(self, bare_remote, monkeypatch):
+        """대조군 — trunk_커밋은_읽히는데_backlog_폴더가_없으면_0건_관측(no-ledger)"""
+        _, clone = bare_remote
+        n = clone("n")
+        files, status, _ = number_guard.trunk_task_files(n)
+        assert (files, status) == ([], number_guard.NO_LEDGER)
+        # ref를 못 읽으면(missing) 0건 관측이 아니라 실패다 — 위와 같은 색이면 안 된다
+        real = remote_claims._git
+
+        def fake(root, *argv, **kw):
+            if argv and argv[0] == "cat-file":
+                return subprocess.CompletedProcess(["git", *argv], 128, "", "fatal: bad object\n")
+            return real(root, *argv, **kw)
+
+        monkeypatch.setattr(remote_claims, "_git", fake)
+        files, status, _ = number_guard.trunk_task_files(n)
+        assert status == "missing" and status not in number_guard.QUIET_STATES
