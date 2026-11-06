@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-06 (결정 · D12 — Kiki · G3 clear): **D12 (a) — G3는 AI 보조 HIT로 판정하되 판정문에 조건 명시 + G4 전 사람 단독 표본 ≥15 측정 · `G-eos-g3` cleared(주체 kiki)** (Kiki 결정, claude 기록) — 판정 기준: main `a150cdef`
+
+- **무엇을**: D12 결정문을 `G-eos-g3` notes에 원문대로 붙이고, Kiki 지시("G3 clear 해 주세요")로 `gates clear G-eos-g3 --as kiki`를 실행했다. D12의 "G4 전 사람 단독 표본 ≥15"는 소유 태스크 `EOS-226`(todo · depends `EOS-225`)이 어떤 게이트의 입력도 아니어서 산문뿐이었다 — `gates amend G-eos-g4 --depends EOS-226`으로 G4 판정 입력에 연결했다.
+- **값**: G3 = PASS · cleared · 5조건 충족 5/5. 근거(D12 원문): X-01 — 원문 F-Ⅰ의 HIT는 사람 검수 시간이며, 조건을 숨기면 12/31 판정의 근거가 약해진다. G4 입력은 4건(EOS-155 blocked · EOS-227 todo · P3-17 done · EOS-226 todo).
+- **근거**: `backlog/gates.yaml` `G-eos-g3` evidence·notes · `G-eos-g4` corrections · `docs/reviews/eos_g3_inputs_2026-11.md` · PR #1848 `a4afad51` · #1850 `f4b62079` · 이 기록 PR.
+
 ### 2026-11-06 (결정 · G3 — Kiki): **`G-eos-g3` PASS — 판정 기준 main `a150cdef` · 5조건 충족 5/5 · clear는 Kiki 몫** (Kiki 판정, claude 기록) — 판정 기준: main `a150cdef`
 
 - **무엇을**: Kiki가 G3를 PASS로 판정했고 세션이 `backlog.py gates amend G-eos-g3 --verdict PASS`로 기록했다(status는 pending 유지 — clear는 담당자 몫).
