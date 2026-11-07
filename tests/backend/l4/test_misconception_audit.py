@@ -20,11 +20,11 @@ from whymath_backend.l4.misconception.catalog import BODY_CATALOG, CATALOG
 class TestReportShape:
     def test_total_matches_catalog(self) -> None:
         report = audit_catalog_coverage()
-        # 감사 대상은 본문 채널 항목(P3-61: 선지 역추적 전용은 신호가 정의상 0이라 제외) — 전체 카탈로그보다
+        # 감사 대상은 본문 채널 항목(P3-61·P3-109: 선지 역추적 전용은 신호가 정의상 0이라 제외) — 전체 카탈로그보다
         # 정확히 그만큼 적다(제외가 조용히 사라지거나 과다해지지 않게 차이를 함께 고정한다).
         assert report.total == len(BODY_CATALOG)
         assert len(report.items) == len(BODY_CATALOG)
-        assert len(CATALOG) - report.total == 4
+        assert len(CATALOG) - report.total == 5
 
     def test_report_field_set(self) -> None:
         assert set(CatalogAuditReport.model_fields) == {

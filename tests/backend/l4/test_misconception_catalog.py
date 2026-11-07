@@ -22,12 +22,13 @@ from whymath_backend.l4.misconception.match_gate import _DEFAULT_CONFIDENCE_FLOO
 class TestCatalogShape:
     def test_thirty_two_entries_doc_explicit_only(self) -> None:
         # doc 명시·상세화: 대수 37 + 기하 8 + 확률통계 7 + 함수 3
-        #                 + 미적분 12 + 수열 2 + 삼각함수 2 + 벡터 1 = 72
+        #                 + 미적분 13 + 수열 2 + 삼각함수 2 + 벡터 1 = 73
         #                 (Phase 1 30 + S2-p 2 + 극값 MC 2 + 843 트랜치1~4 각 6 + 트랜치5 6
         #                  + MISC-21 3(앵커 A1·A2·A3 좌석 보강 — doc #65-67)
         #                  + MISC-40 1(미분 대단원 좌석 판정 — 미적분 doc #68)
-        #                  + P3-61 4(선지 역추적 전용 — 미적분 doc #69-72))
-        assert len(CATALOG) == 72
+        #                  + P3-61 4(선지 역추적 전용 — 미적분 doc #69-72)
+        #                  + P3-109 1(선지 역추적 전용 M0669 — 미적분 doc #73))
+        assert len(CATALOG) == 73
 
     def test_all_ids_unique(self) -> None:
         ids = [m.id for m in CATALOG]
@@ -177,15 +178,16 @@ class TestMisc40PowerRuleSeat:
         # 순서 안정성 — 신규 항목은 도메인 기존 항목 *뒤*에 붙인다(진단 동률 정렬 회귀 가드).
         calculus = [m.id for m in CATALOG if m.domain == "미적분"]
         assert calculus[0] == "chain-rule-inner-derivative-omitted"
-        # P3-61 선지 역추적 전용 4종이 이 항목 *뒤*에 붙는다(같은 순서 규율) — 마지막 자리는 그 4종의 몫.
+        # P3-61 선지 역추적 전용 4종 + P3-109 1종이 이 항목 *뒤*에 붙는다(같은 순서 규율).
         assert calculus.index(self._ID) == 7
         assert calculus[8:] == [
             "tangent-external-point-as-contact",
             "mvt-conditions-unchecked",
             "graph-sketch-few-points-only",
             "velocity-sign-ignored",
+            "average-rate-as-instantaneous-rate",
         ]
-        assert len(calculus) == 12
+        assert len(calculus) == 13
 
     def test_counterexample_numbers_are_correct(self) -> None:
         # 반례의 수치(12·4·24)는 손으로 쓴 값이다 — SymPy로 실제 값을 확인해 문자열과 대조한다.

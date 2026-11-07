@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "round_name": "eos-a4",
+  "stages": {
+    "preflight": {
+      "status": "done",
+      "at": "2026-11-07T08:02:59.347326+00:00",
+      "detail": {
+        "checks": {
+          "CHILD_CODE_FROM_WORKTREE": true,
+          "CLI_FLAGS_OK": true,
+          "SPEC_PLAN_OK": true,
+          "SUBJECT_OK": true,
+          "SLUG_PREFIX_OK": true,
+          "SEEDS_PRESENT": true,
+          "SEEDS_MISSING": 0,
+          "TK_OK": true
+        }
+      }
+    },
+    "author-cloud": {
+      "status": "done",
+      "at": "2026-11-07T07:16:38.608921+00:00",
+      "detail": {
+        "seats": {
+          "openrouter": {
+            "outcome": "target_met",
+            "lines": 34,
+            "ledger_rounds": 4,
+            "ledger_attempts": 65,
+            "unrecorded_calls": 0,
+            "evidenced": 65,
+            "reserved_attempts": 65,
+            "tried": 65,
+            "unevidenced": 0
+          }
+        }
+      }
+    },
+    "check": {
+      "status": "done",
+      "at": "2026-11-07T08:02:59.971830+00:00",
+      "detail": {
+        "openrouter": {
+          "cu_lines": 34,
+          "ok": true,
+          "missing": {
+            "genlog": 0,
+            "model_name": 0,
+            "prompt_version": 0,
+            "seed": 34,
+            "input_sha256": 0
+          }
+        },
+        "total_cu": 34,
+        "provenance_exit": 0
+      }
+    },
+    "queue": {
+      "status": "done",
+      "at": "2026-11-07T07:16:40.022272+00:00",
+      "detail": {
+        "queue_lines": 34,
+        "cross_seat_dup": 0,
+        "struct_dup": 0,
+        "openrouter": {
+          "cu_lines": 34,
+          "ok": true,
+          "missing": {
+            "genlog": 0,
+            "model_name": 0,
+            "prompt_version": 0,
+            "seed": 34,
+            "input_sha256": 0
+          }
+        },
+        "total_cu": 34,
+        "provenance_exit": 0
+      }
+    },
+    "review": {
+      "status": "done",
+      "at": "2026-11-07T08:08:28.176245+00:00",
+      "detail": {
+        "judged": 34,
+        "queue_lines": 34
+      }
+    },
+    "summarize": {
+      "status": "done",
+      "at": "2026-11-07T08:08:31.724805+00:00",
+      "detail": {
+        "hit_openrouter": {
+          "cu_measured": 34,
+          "hit_median_seconds": 34.452,
+          "hit_implausible_majority": false
+        },
+        "preview_hit_seconds": {
+          "measured": true,
+          "value": 34.452
+        },
+        "preview_unit_cost_krw": {
+          "measured": true,
+          "value": 2.342095411764706
+        },
+        "window": [
+          "2026-11-07T07:01:13.029027+00:00",
+          "2026-11-07T08:08:26.002467+00:00"
+        ]
+      }
+    },
+    "deliver": {
+      "status": "running",
+      "at": "2026-11-07T08:08:32.994400+00:00",
+      "detail": {
+        "judged": 34,
+        "queue_lines": 34
+      }
+    }
+  },
+  "seats": {
+    "openrouter": {
+      "reserved_attempts": 65
+    }
+  },
+  "history": [
+    {
+      "at": "2026-11-07T07:01:01.548634+00:00",
+      "stage": "preflight",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T07:16:38.608921+00:00",
+      "stage": "author-cloud",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T07:16:39.237378+00:00",
+      "stage": "check",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T07:16:40.022272+00:00",
+      "stage": "queue",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T07:30:42.058258+00:00",
+      "stage": "review",
+      "status": "incomplete"
+    },
+    {
+      "at": "2026-11-07T07:33:07.609863+00:00",
+      "stage": "preflight",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T07:33:08.249496+00:00",
+      "stage": "check",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T08:02:37.501225+00:00",
+      "stage": "review",
+      "status": "incomplete"
+    },
+    {
+      "at": "2026-11-07T08:02:59.347326+00:00",
+      "stage": "preflight",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T08:02:59.971830+00:00",
+      "stage": "check",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T08:08:28.176245+00:00",
+      "stage": "review",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T08:08:31.724805+00:00",
+      "stage": "summarize",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-07T08:08:32.994400+00:00",
+      "stage": "deliver",
+      "status": "running"
+    }
+  ],
+  "updated_at": "2026-11-07T08:08:32.994701+00:00",
+  "config_sha256": "b89c2d634f13191d62948478576240a29bd633f67b0b0fa5b231a36dbb2b5f87"
+}

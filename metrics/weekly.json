@@ -285,5 +285,93 @@
         "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
       }
     }
+  },
+  {
+    "week_start": "2026-11-07T07:01:13.029027+00:00",
+    "week_end": "2026-11-07T08:08:26.002467+00:00",
+    "generated_at": "2026-11-07T08:10:13.721057+00:00",
+    "kpis": {
+      "hit_seconds": {
+        "measured": true,
+        "value": 34.452,
+        "unit": "seconds_median",
+        "reason": null
+      },
+      "throughput_cu_per_hour": {
+        "measured": true,
+        "value": 41.84456589852488,
+        "unit": "cu_per_hour",
+        "reason": null
+      },
+      "unit_cost_krw": {
+        "measured": true,
+        "value": 2.342095411764706,
+        "unit": "krw_per_cu",
+        "reason": null
+      },
+      "failure_type_distribution": {
+        "measured": true,
+        "value": {
+          "F1": 0,
+          "F2": 0,
+          "F3": 0,
+          "F4": 0,
+          "F5": 0,
+          "F6": 0,
+          "F7": 0,
+          "F8": 4
+        },
+        "unit": "count_by_code",
+        "reason": null
+      },
+      "auto_gate_pass_rate": {
+        "measured": true,
+        "value": 0.6461538461538462,
+        "unit": "rate",
+        "reason": "재계산 검증 통과 42/65(모델 응답 수) · 검산식 우회 통과 0건 제외(원시 통과율 0.6462) · 게이트 앞 결정론 거부(파싱·조립) 17건은 분모 안 · 미생성 0건은 분모 밖 · 게이트 도달 기준 0.8750 · 창 밖 0건",
+        "detail": {
+          "numerator": 42,
+          "denominator": 65,
+          "denominator_basis": "모델 응답 수(게이트 도달 + 파싱 거부 + 조립 거부)",
+          "wilson_lower_95": 0.5445500799152057,
+          "wilson_sided": "one-sided",
+          "rate_raw": 0.6461538461538462,
+          "rate_gate_reached": 0.875,
+          "bypassed": 0,
+          "not_generated_excluded": 0,
+          "outside_window": 0,
+          "run_dirs": [
+            "data/runs/eos-a4-openrouter"
+          ],
+          "definition": "ops/g3_content_measures 모듈 docstring (a) · EOS-207"
+        }
+      },
+      "rework_rate": {
+        "measured": false,
+        "value": null,
+        "unit": "rate",
+        "reason": "입력·회계 오류 1건 — 부분 입력으로 판정하지 않는다(첫 사유: eos-a4-openrouter: 슬롯 기록 좌석 없음(cu.slots.jsonl) — 저작 CLI는 주제마다 시도를 독립 배치로 뽑고 '몇 번째 CU를 위한 시도인가'를 남기지 않아 CU별 재생성 수가 정의되지 않는다(생성 로그만으로 세면 값이 배치 안 순서에 좌우된다 · EOS-220))"
+      }
+    },
+    "harness": {
+      "incident_count": {
+        "measured": false,
+        "value": null,
+        "unit": "count",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      },
+      "max_series_nth": {
+        "measured": false,
+        "value": null,
+        "unit": "count",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      },
+      "rule_only_fix_ratio": {
+        "measured": false,
+        "value": null,
+        "unit": "ratio",
+        "reason": "사고 요약 미지정(--incidents-summary) — 하네스 지표는 이번 실행에서 미수집"
+      }
+    }
   }
 ]

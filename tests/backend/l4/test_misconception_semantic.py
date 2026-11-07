@@ -435,9 +435,9 @@ class TestMatcherCatalogBuild:
         # 1회차: 카탈로그 배치 임베딩(1) + 질의(1) = 2. 2회차: 질의(1)만 += → 카탈로그 재적재 없음
         assert first == 2
         assert second == 3
-        # 적재 대상은 본문 채널 항목뿐이다(P3-61: 선지 역추적 전용은 임베딩하지 않는다).
+        # 적재 대상은 본문 채널 항목뿐이다(P3-61·P3-109: 선지 역추적 전용은 임베딩하지 않는다).
         assert len(index) == len(BODY_CATALOG)
-        assert len(index) == len(CATALOG_BY_ID) - 4
+        assert len(index) == len(CATALOG_BY_ID) - 5
 
     def test_provider_length_mismatch_raises(self) -> None:
         # provider.embed가 카탈로그 개수와 다른 길이를 내면 RuntimeError(좌석 계약 fail-loud).
