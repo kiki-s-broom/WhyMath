@@ -12873,3 +12873,7 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **무엇을**: 성공 기준 Q1의 "실제 중·고등학생 100명" 문면과 Phase 1 게이트의 "β 사용자 100명" 5곳을 지웠다. 새 Q1 = AI가 학습 루프 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 판정(학생 수 조건 없음).
 - **왜(값)**: 종전 문면은 학생 참여가 12/31 이후(ARCH-66 ⑥)라 어떤 재판정에서도 YES 불가였고, `G-internal-completion-2026-12-31` 조건 ①까지 구조적으로 막았다. Kiki: "AI가 검토·점검·해결하는 것이 WhyMath의 기본 방향".
 - **근거**: `docs/reviews/p3_17_verdict_review_2026-11-06.md` · 대장 P3-105 · 게이트 notes 2건 · 판정 기준 main `6cccb547`.
+### 2026-11-06 — 실사용자 조건 판정 제외 2차: G4 계정 AI 시뮬레이션 인정 · 실제 학생 ≥20명 삭제 · 7일 재방문율 30% 삭제 (Kiki 결정)
+- **무엇을**: G4(12/13)의 "내부 테스트 계정 표본 ≥20건"에 AI 시뮬레이션 계정 인정을 명시했다. 12/31 이후로 이관돼 있던 "실제 학생 표본 ≥20명"을 판정 조건에서 지웠다. Phase 1 게이트의 "7일 재방문율 30%"를 4곳(ROADMAP·current_phase_checklist·business_plan_master_v1·execution_bridge)에서 지웠다.
+- **왜(값)**: 같은 날 "학생 100명" 삭제(PR #1854) 뒤 검토에서 같은 구조의 연기 조건 3건이 남아 있었다. 특히 G4 ≥20건은 사람 계정으로 해석되면 12/13에 판정 불능이 된다.
+- **근거**: 선언 `docs/strategy/eos_transition_declaration_2026-08-30.md` 부록 E G4 행·개정 이력 · 동결 `tests/backend/schema/test_declaration_canon_consistency.py`(AI 시뮬레이션 단서 제거 주입 시 RED 확인) · 게이트 `G-eos-g4`·`G-student-work-after-internal-completion` 제목 정정.
