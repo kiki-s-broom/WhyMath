@@ -119,9 +119,9 @@ def main() -> int:
         raise SystemExit(f"채점 불완전 — A 누락 {missing_a} · B 누락 {missing_b}")
     adj: dict[int, dict] = {}
     if args.adjudication is not None:
-        adj = {
-            i["번호"]: i for i in json.loads(args.adjudication.read_text(encoding="utf-8"))["items"]
-        }
+        # 같은 번호에 칸이 여럿이면 항목도 여럿이다 — 덮어쓰지 않고 칸별로 합친다
+        for i in json.loads(args.adjudication.read_text(encoding="utf-8"))["items"]:
+            adj.setdefault(int(i["번호"]), {}).update(i)
     packet: dict[int, dict] = {}
     if args.packet is not None:
         for line in args.packet.read_text(encoding="utf-8").splitlines():
