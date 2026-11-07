@@ -338,6 +338,10 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-06 (결정 · G-p345 — Kiki): **02-09 핵심 오개념 처분 = (가)+(다) 변형 — M0677 원문 유지, 절차가 적힌 02-09 귀속 신규 M-id를 만들어 핵심 오개념을 교체** (Kiki 결정, claude 기록) — 판정 기준: main `ce8c2165`
+
+**왜**: M0677은 '관점을 못 쓴다'는 omission형이라 판정기 규칙 `M-link-undescribed`가 연결을 막는다. 코퍼스 843건 중 02-09 귀속 M-id는 M0677 1건뿐이라 기존 M-id로 바꿀 후보가 0건이다. (가) 단독은 같은 ID의 뜻을 바꿔 동결 시험지 q056·q181 라벨과 어긋나고, (나)는 검증 없는 연결, (라)는 Graph Connectivity 최대 9/10으로 목표 0.95 FAIL이라 기각.
+**집행**: `P3-52-m0677-link-disposition-execution` acceptance ⑤ — 신규 M-id 신설(이 결정이 신설 서명을 겸함)·판정기 값 규칙 추가·`scope_spec.yaml` 02-09 교체·SymPy 확인. P3-44 done 뒤 착수.
 ### 2026-11-06 (처분 · OPS-157 — D13 4번 후속): **스키마 YAML↔모델 일치 검사 유예 7건 처분 — 해소 2(짝짓기 오류) · 연장 5(만료 2026-12-31 → 2027-03-31)** (claude 실행·기록) — 판정 기준: main `ce8c2165`
 - **착수 시점 재측정**: 어긋남 5(SolutionPath 1 · Hint 2 · Concept 7 · ConceptEdge 6 · Problem 12) · 모델 없음 2(MasteryState · StudentProfile) — 2026-10 실측과 같다.
 - **해소 2 — concept·edge**: 어긋남의 원인은 YAML도 모델도 아니라 등록부의 짝짓기였다. 두 YAML은 `data_pipeline.concept_graph.models`의 `Concept`·`ConceptEdge`와 필드가 정확히 같다(YAML에만 있는 필드 0). 그 모듈 docstring이 두 YAML을 정본으로 적고, 소비자(`validate.py`)도 그쪽이다. 등록부는 백엔드 `schema.concept`(DB 평면 — 필드 체계가 다름)에 짝지어 있었다. 등록부 짝을 바로잡아 동결 목록 13필드를 비웠다.
