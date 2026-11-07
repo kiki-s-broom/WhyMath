@@ -38,6 +38,13 @@ CONT-09 `unit_codes` 표 30종 = 36종 — 2026-10-12 기준 14,034건)와 계�
 `Problem.subject`(코퍼스 전량 "공통"·카디널리티 1)는 과목 축으로 무효라 쓰지 않고, 고시코드
 prefix 파싱도 신설하지 않는다(대장 필드가 유일한 원천 — hermetic 원칙 유지). "과목별 빠진 부분"
 관측의 정본 축이며 저작 우선순위 입력이다(`subject_content_coverage_gap_review.md` §3 D1).
+**대학 축(W1·2026-08-05, 학년축 최단경로 계획 §3)**: K-12 성취기준(`--standards`, 기본
+"2022 개정")과는 *다른 대장*(`--university-standards`, 기본
+`data/corpus/standards_university_v1/standards.json`·자체작성 409건·`curriculum_revision`
+고정값 "대학")을 유형 카탈로그와 동일한 보조 축 계약으로 적재한다 — 못 읽어도 exit 코드에
+영향 없이 §1.6이 "미측정"으로 빠진다. K-12 §1의 헤드라인 분모(target_codes_total 등)에는
+합산되지 않고 완전히 독립된 분모로 §1.6에 낸다. 학교급별 표(§1.1)에는 "대학교" 행이 K-12
+행과 나란히 병합돼 4학교급(초·중·고·대)이 한 표에 보인다.
 
 사용:
     python -m whymath_backend.harness.problem_bank_coverage
@@ -91,6 +98,11 @@ DEFAULT_STANDARDS_PATH = DEFAULT_CORPUS_ROOT / "standards_v1" / "standards.json"
 # 상수는 참조하지 않는다(관측 도구가 조성 층의 매핑표에 의존하면 안 된다 — 매핑표가 바뀌어도 이 관측
 # 도구는 카탈로그 파일만 보고 그대로 돈다).
 DEFAULT_PROBLEM_TYPES_PATH = DEFAULT_CORPUS_ROOT / "problem_type_graph_v1" / "problem_types.jsonl"
+# 대학 성취기준 대장(W1 — 학년축 최단경로 계획 §3) — K-12 표준과 *다른 파일*이다. problem_types와
+# 동일한 보조 축 계약(soft-fail·기본 경로가 실 코퍼스를 직접 가리킴)을 그대로 따른다.
+DEFAULT_UNIVERSITY_STANDARDS_PATH = (
+    DEFAULT_CORPUS_ROOT / "standards_university_v1" / "standards.json"
+)
 
 # 문제 코퍼스 디렉터리 패턴 — `data/corpus/problem_bank*/problems.jsonl` 관례.
 CORPUS_DIR_GLOB = "problem_bank*"
@@ -98,6 +110,10 @@ CORPUS_FILE_NAME = "problems.jsonl"
 
 # 문항 코퍼스의 `curriculum_version`이 2022_REVISION이라 기본 분모는 2022 개정 성취기준이다.
 DEFAULT_REVISION = "2022 개정"
+# 대학 성취기준 코퍼스의 curriculum_revision 고정값 — K-12처럼 국가 교육과정 개정 체계를 따르지
+# 않는 와이매스 자체작성 대장이라(standards_university_v1/standards.json source_citation) 값이
+# 하나뿐이다. `--revision`처럼 CLI 옵션화하지 않는다(사용자가 바꿀 이유 없음 — 대장 자체가 고정).
+UNIVERSITY_REVISION = "대학"
 
 # ──────────────────────────────────────────────────────────────────────────
 # 난이도 밴드 — 기존 정의 재사용(신설 아님)
@@ -459,6 +475,15 @@ class CoverageReport:
     # 유형(problem_type) × 단원 축 (S3-27)
     problem_types_catalog: tuple[str, ...]  # 카탈로그 로드 실패/미지정 시 빈 튜플(정직 회계).
     type_unit_matrix: dict[str, dict[str, int]]
+    # 대학 축 (W1 — 학년축 최단경로 계획 §3). K-12 §1 헤드라인(revision·target_codes_total 등)과는
+    # 완전히 독립된 분모다 — 대학 코드가 K-12 target_codes_total에 합산되지 않는다(problem_types
+    # 축과 동일한 "완전 별도 보조 축" 계약). `university_catalog` 미제공/로드 실패 시
+    # `university_target_codes_total=0`·나머지 빈 컬렉션(정직 회계 — "카탈로그 미상"과 동형).
+    university_target_codes_total: int
+    university_covered_codes: tuple[str, ...]
+    university_zero_coverage_codes: tuple[str, ...]
+    university_problems_per_covered_code: dict[str, int]
+    university_coverage_by_domain: dict[str, tuple[int, int]]  # 대학 "과목"(예: 미적분학 I)별.
     # 정직 회계
     problems_without_standard_codes: int
     problems_without_unit_codes: int
@@ -487,6 +512,17 @@ class CoverageReport:
         return tuple(
             sorted(s for s, (cov, tot) in self.coverage_by_subject.items() if tot > 0 and cov == 0)
         )
+
+    @property
+    def university_covered_code_count(self) -> int:
+        return len(self.university_covered_codes)
+
+    @property
+    def university_coverage_rate(self) -> float | None:
+        """대학 축 커버율 — 분모(대학 성취기준 고유 코드 수) 0이면 None(카탈로그 미상과 동형)."""
+        if self.university_target_codes_total == 0:
+            return None
+        return self.university_covered_code_count / self.university_target_codes_total
 
     @property
     def unit_totals(self) -> dict[str, int]:
@@ -533,6 +569,7 @@ def build_report(
     *,
     revision: str,
     problem_types: tuple[str, ...] = (),
+    university_catalog: StandardsCatalog | None = None,
 ) -> CoverageReport:
     """코퍼스 적재 결과 + 성취기준 대장 → `CoverageReport`(순수·부작용 0).
 
@@ -540,13 +577,28 @@ def build_report(
     유형만으로 채워지고 `zero_coverage_types`는 항상 빈 튜플이다(카탈로그를 모르면 "0커버"를
     단정할 수 없다 — 정직 회계). 기존 호출자(카탈로그 없이 `build_report(loads, catalog,
     revision=...)`만 쓰는 코드)는 그대로 동작한다(하위호환).
+
+    `university_catalog`(W1)도 같은 계약의 선택 인자다 — 미지정(기본 None)이면 대학 축 전
+    필드가 빈 값(정직 회계, 카탈로그 미상과 동형)이고 **§1(K-12) 헤드라인은 바이트 단위로
+    무변경**이다. 제공되면 `UNIVERSITY_REVISION`("대학") 코드를 `catalog`의 `revision`(K-12,
+    보통 "2022 개정") target_codes와 *완전히 별도*로 집계한다 — 대학 코드가 K-12
+    `target_codes_total`에 합산되지 않는다(두 대장이 서로 다른 코드 namespace라 실무상 충돌은
+    없지만, 개념적으로도 독립 분모를 유지하는 것이 "정직 회계"에 부합한다).
+    `coverage_by_school_type`에는 대학 school_type("대학교") 행이 K-12 행과 나란히 병합된다
+    (같은 구조 — 학교급별 커버율 표 하나로 4축을 함께 보여주는 것이 W1의 목적).
     """
     target_codes = catalog.codes_for(revision)
     all_codes = catalog.unique_codes
+    uni_target_codes = (
+        university_catalog.codes_for(UNIVERSITY_REVISION)
+        if university_catalog is not None
+        else frozenset[str]()
+    )
 
     per_code: Counter[str] = Counter()
     other_revision: Counter[str] = Counter()
     unknown: Counter[str] = Counter()
+    uni_per_code: Counter[str] = Counter()
     unit_matrix: dict[str, Counter[str]] = {}
     band_totals: Counter[str] = Counter()
     per_corpus_bands: dict[str, Counter[str]] = {}
@@ -583,12 +635,16 @@ def build_report(
             for ptype in rec.problem_type_codes:
                 for unit in units:
                     type_unit_matrix.setdefault(ptype, Counter())[unit] += 1
-            # 성취기준 — 대장에 있는지, 있다면 대상 개정인지 3분류(미지 코드를 조용히 버리지 않음).
+            # 성취기준 — K-12 대상 개정 → 대학 → 그 외 대장 존재 → 미지, 4분류(미지 코드를
+            # 조용히 버리지 않음). 대학을 K-12보다 먼저 두지 않는 이유: K-12가 기존 정본
+            # 계약(§1 헤드라인)이라 우선순위를 바꾸면 회귀가 된다 — 대학 축은 *가산*일 뿐이다.
             if not rec.standard_codes:
                 no_std += 1
             for code in rec.standard_codes:
                 if code in target_codes:
                     per_code[code] += 1
+                elif code in uni_target_codes:
+                    uni_per_code[code] += 1
                 elif code in all_codes:
                     other_revision[code] += 1
                 else:
@@ -596,6 +652,8 @@ def build_report(
 
     covered = tuple(sorted(per_code))
     zero = tuple(sorted(target_codes - set(covered)))
+    uni_covered = tuple(sorted(uni_per_code))
+    uni_zero = tuple(sorted(uni_target_codes - set(uni_covered)))
 
     # 학교급·영역·과목별 커버(분모=해당 개정 고유 코드, 분자=그중 커버된 코드).
     by_school: dict[str, list[int]] = {}
@@ -620,6 +678,23 @@ def build_report(
     per_subject: Counter[str] = Counter()
     for code, count in per_code.items():
         per_subject[subject_of[code]] += count
+
+    # 대학 과목별 커버(K-12 영역과 granularity가 달라 by_domain에 섞지 않고 독립 축으로 유지) +
+    # 대학 school_type("대학교")는 K-12와 *같은* by_school 딕셔너리에 병합(§1.1 표 4행 통합 —
+    # W1의 목적). university_catalog 미제공이면 두 루프 모두 대상이 없어(entries_for가 빈
+    # 튜플) by_school에 아무 것도 추가되지 않는다(회귀 0).
+    uni_by_domain: dict[str, list[int]] = {}
+    uni_covered_set = set(uni_covered)
+    if university_catalog is not None:
+        for entry in university_catalog.entries_for(UNIVERSITY_REVISION):
+            slot = by_school.setdefault(entry.school_type or "(미상)", [0, 0])
+            slot[1] += 1
+            if entry.code in uni_covered_set:
+                slot[0] += 1
+            dom_slot = uni_by_domain.setdefault(entry.domain or "(미상)", [0, 0])
+            dom_slot[1] += 1
+            if entry.code in uni_covered_set:
+                dom_slot[0] += 1
 
     return CoverageReport(
         revision=revision,
@@ -646,6 +721,11 @@ def build_report(
         format_totals=dict(format_totals),
         problem_types_catalog=tuple(problem_types),
         type_unit_matrix={ptype: dict(units) for ptype, units in type_unit_matrix.items()},
+        university_target_codes_total=len(uni_target_codes),
+        university_covered_codes=uni_covered,
+        university_zero_coverage_codes=uni_zero,
+        university_problems_per_covered_code=dict(uni_per_code),
+        university_coverage_by_domain={k: (v[0], v[1]) for k, v in uni_by_domain.items()},
         problems_without_standard_codes=no_std,
         problems_without_unit_codes=no_unit,
         problems_without_difficulty=no_diff,
@@ -679,7 +759,8 @@ def render_report(report: CoverageReport, *, max_zero_codes: int = 40) -> str:
         "# 문제은행 커버리지 관측 리포트 (D4)",
         "",
         "> 관측 리포트다 — **exit 게이트가 아니다**(커버율 임계로 실패시키지 않는다).",
-        "> S4-01 초·중 확장의 저작 우선순위 입력. 유형(problem_type) × 단원 축은 §2.5(S3-27).",
+        "> S4-01 초·중 확장의 저작 우선순위 입력. 유형(problem_type) × 단원 축은 §2.5(S3-27). "
+        "대학 축은 §1.6(W1).",
         "",
         "## 0. 입력 요약",
         "",
@@ -774,6 +855,52 @@ def render_report(report: CoverageReport, *, max_zero_codes: int = 40) -> str:
             lines.append(
                 f"- …외 **{remainder}**건(전량은 `--json` 산출물의 `zero_coverage_codes`)."
             )
+
+    # ── 1.6 대학 커버리지(W1) — K-12(§1)와 완전히 별도 분모. 학교급별 표(§1.1)의 "대학교" 행은
+    # 이미 병합돼 나왔으므로 여기서는 대학 축 자체의 상세(과목별·0커버 목록)만 낸다.
+    lines += [
+        "",
+        "## 1.6 대학 커버리지",
+        "",
+        '> K-12(§1)와 독립된 분모다 — 대학 성취기준(자체작성, `curriculum_revision="'
+        f'{UNIVERSITY_REVISION}"`)은 §1의 target_codes_total에 합산되지 않는다. '
+        "학교급별 표(§1.1)의 '대학교' 행이 이 축의 요약이다.",
+        "",
+    ]
+    if report.university_target_codes_total == 0:
+        lines.append(
+            "- 대학 성취기준 대장 미측정(로드 실패 또는 `--university-standards` 미지정) — "
+            "이 축은 관측 불가로 표시."
+        )
+    else:
+        lines += [
+            f"- 분모(대학 고유 코드) **{report.university_target_codes_total}**",
+            f"- 커버된 코드: **{report.university_covered_code_count}** "
+            f"({_pct(report.university_covered_code_count, report.university_target_codes_total)})",
+            f"- 0커버 코드: **{len(report.university_zero_coverage_codes)}**",
+            "",
+            "### 1.6.1 과목별 커버율",
+            "",
+            "| 과목 | 커버 | 분모 | 커버율 |",
+            "|---|---:|---:|---:|",
+        ]
+        for subject, (cov, tot) in sorted(
+            report.university_coverage_by_domain.items(), key=lambda kv: (-kv[1][1], kv[0])
+        ):
+            lines.append(f"| {subject} | {cov} | {tot} | {_pct(cov, tot)} |")
+
+        uni_shown = report.university_zero_coverage_codes[:max_zero_codes]
+        uni_remainder = len(report.university_zero_coverage_codes) - len(uni_shown)
+        lines += ["", "### 1.6.2 0커버 코드 목록", ""]
+        if not report.university_zero_coverage_codes:
+            lines.append("- 없음(대학 전 코드가 1문 이상 커버됨).")
+        else:
+            lines.append("- " + " ".join(f"`{c}`" for c in uni_shown))
+            if uni_remainder > 0:
+                lines.append(
+                    f"- …외 **{uni_remainder}**건(전량은 `--json` 산출물의 "
+                    "`university.zero_coverage_codes`)."
+                )
 
     lines += [
         "",
@@ -941,6 +1068,23 @@ def report_to_json(report: CoverageReport) -> dict[str, Any]:
             "zero_coverage_types": list(report.zero_coverage_types),
             "zero_coverage_type_count": len(report.zero_coverage_types),
         },
+        # 대학 축(W1) — K-12(위 "standards")와 완전히 독립된 분모. target_codes_total==0은
+        # "미측정"(카탈로그 미상)과 "측정됐으나 0"을 구분하지 않는다(problem_types 축과 동일
+        # 정직 회계 관례). 이 축은 §1.6(마크다운)에 대응.
+        "university": {
+            "revision": UNIVERSITY_REVISION,
+            "target_codes_total": report.university_target_codes_total,
+            "covered_code_count": report.university_covered_code_count,
+            "coverage_rate": report.university_coverage_rate,
+            "zero_coverage_code_count": len(report.university_zero_coverage_codes),
+            "covered_codes": list(report.university_covered_codes),
+            "zero_coverage_codes": list(report.university_zero_coverage_codes),
+            "problems_per_covered_code": report.university_problems_per_covered_code,
+            "coverage_by_domain": {
+                k: {"covered": v[0], "total": v[1]}
+                for k, v in report.university_coverage_by_domain.items()
+            },
+        },
         "honest_accounting": {
             "parse_error_lines": len(report.parse_errors),
             "parse_errors": [
@@ -1001,8 +1145,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m whymath_backend.harness.problem_bank_coverage",
         description=(
-            "문제은행 커버리지 관측 리포트(D4) — 성취기준 커버율·0커버 목록, unit_code×난이도 "
-            "밴드 매트릭스, 코퍼스별·질문형식별 분해. 결정론·게이트 아님(exit 0/2)."
+            "문제은행 커버리지 관측 리포트(D4) — 성취기준 커버율·0커버 목록(K-12+대학), "
+            "unit_code×난이도 밴드 매트릭스, 코퍼스별·질문형식별 분해. "
+            "결정론·게이트 아님(exit 0/2)."
         ),
     )
     parser.add_argument(
@@ -1040,6 +1185,15 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=DEFAULT_PROBLEM_TYPES_PATH,
         help=f"유형(problem_type) 카탈로그 JSONL 경로(기본 {DEFAULT_PROBLEM_TYPES_PATH}).",
+    )
+    parser.add_argument(
+        "--university-standards",
+        type=Path,
+        default=DEFAULT_UNIVERSITY_STANDARDS_PATH,
+        help=(
+            "대학 성취기준 JSON 경로(W1·기본 "
+            f"{DEFAULT_UNIVERSITY_STANDARDS_PATH}). K-12 --standards와 별도 분모(§1.6)."
+        ),
     )
     parser.add_argument(
         "--json",
@@ -1080,8 +1234,28 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
+    # 대학 성취기준(W1)도 *보조 축*이다 — problem_types와 동일 계약(못 읽어도 exit 2로 막지
+    # 않는다·경고만·§1.6 대신 "미측정"으로 표시). K-12 --standards와 달리 §1 헤드라인 분모의
+    # 필수 선결 조건이 아니다.
+    university_catalog: StandardsCatalog | None = None
+    try:
+        uni_payload = json.loads(args.university_standards.read_text(encoding="utf-8"))
+        university_catalog = load_standards(uni_payload)
+    except Exception as exc:  # noqa: BLE001 — 보조 축 실패는 경고만(예외 타입명 포함)하고 계속
+        print(
+            f"경고 — 대학 성취기준 대장 적재 실패({type(exc).__name__}): {exc} "
+            "— 대학 축(§1.6)은 '미측정'으로 표시됩니다.",
+            file=sys.stderr,
+        )
+
     loads, problems = _resolve_loads(args.corpus_root, args.corpus)
-    report = build_report(loads, catalog, revision=args.revision, problem_types=problem_types)
+    report = build_report(
+        loads,
+        catalog,
+        revision=args.revision,
+        problem_types=problem_types,
+        university_catalog=university_catalog,
+    )
     print(render_report(report, max_zero_codes=args.max_zero_codes))
     if args.json_path is not None:
         args.json_path.parent.mkdir(parents=True, exist_ok=True)
