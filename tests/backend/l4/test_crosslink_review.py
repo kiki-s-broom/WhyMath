@@ -396,11 +396,17 @@ _P3_61_DIRECT: dict[str, set[tuple[str, float]]] = {
     "velocity-sign-ignored": {("M0678", 0.85)},
 }
 
+# P3-109(2026-11-07) — 같은 부류 1종(게이트 G-p350-02-01-core-and-route Q3). 서명 대기 = G-p3109.
+_P3_109_DIRECT: dict[str, set[tuple[str, float]]] = {
+    "average-rate-as-instantaneous-rate": {("M0669", 0.85)},
+}
+
 
 def test_real_queue_direct_top_confidences_match_draft(
     real_rows: list[dict[str, Any]],
 ) -> None:
     # ④ non-null 직접매핑 = 초안 ∪ 검수 ∪ S2-p ∪ 극값 MC ∪ 843 트랜치1~5 ∪ MISC-21 ∪ MISC-40 ∪ P3-61
+    # ∪ P3-109
     # — 그 외 차단.
     expected: dict[str, set[tuple[str, float]]] = {
         k: set(_DRAFT_DIRECT_TOPS.get(k, set()))
@@ -415,6 +421,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_MISC21_DIRECT.get(k, set()))
         | set(_MISC40_DIRECT.get(k, set()))
         | set(_P3_61_DIRECT.get(k, set()))
+        | set(_P3_109_DIRECT.get(k, set()))
         for k in set(_DRAFT_DIRECT_TOPS)
         | set(_REVIEWED_DIRECT_ALTS)
         | set(_S2P_DIRECT)
@@ -427,6 +434,7 @@ def test_real_queue_direct_top_confidences_match_draft(
         | set(_MISC21_DIRECT)
         | set(_MISC40_DIRECT)
         | set(_P3_61_DIRECT)
+        | set(_P3_109_DIRECT)
     }
     actual: dict[str, set[tuple[str, float]]] = {}
     for row in real_rows:
@@ -575,7 +583,8 @@ _P3_61_KEBABS = tuple(_P3_61_DIRECT)
 def test_p3_61_each_new_kebab_has_single_pending_direct_row(
     real_rows: list[dict[str, Any]],
 ) -> None:
-    for kebab, expected in _P3_61_DIRECT.items():
+    # P3-109의 1종도 같은 규칙(단일 pending 직접매핑 행)으로 동결한다.
+    for kebab, expected in {**_P3_61_DIRECT, **_P3_109_DIRECT}.items():
         rows = [r for r in real_rows if r["kebab_id"] == kebab]
         assert len(rows) == 1, kebab
         row = rows[0]
