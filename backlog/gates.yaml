@@ -1241,6 +1241,7 @@ gates:
       - "[2026-11-06] input done · P3-93 · 판정 무관: 구현 입력 태스크라 게이트 전체 판정을 내리지 않는다 — 게이트는 판정 회차 분리 집행(구현 세션과 다른 세션)이고 다른 입력(P3-94 등)이 미완이다. 이 태스크가 낸 D11 축 실측: solution_qa exit 0 · 626/1,121 = 0.55843 ≥ 55%(617) · 기준 PR #1856 head 977f0ed7(승격 커밋 ce745bb6) · 보고서 docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md — done P3-93 인계"
       - "[2026-11-06] depends_on +P3-110-calc-02-01-m0669-chain-execution — P3-50 done(판정 입력 완성)로 02-01 ⑦ 칸의 열린 소유가 사라져서, 실제 보강을 맡는 집행 태스크 P3-110을 통합 게이트 입력으로 붙인다 — 02-01은 P3-110 완료 전까지 미충족(main ce8c2165 기준 4/10)"
       - "[2026-11-06] notes +166자 — P3-50 done의 이 게이트 판정 무관 사유 기록"
+      - "[2026-11-07] input done · P3-106-phase3-learning-loop-success-prod-measure · 판정 무관: 판정 무관: 지표 ⑤ 운영 DB 실측(24시간 0/0 측정 실패 · 전 기간 0/2 FAIL · 측정 기준 main cc1233d0)을 재판정 입력으로 넘긴다 — done P3-106-phase3-learning-loop-success-prod-measure 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
