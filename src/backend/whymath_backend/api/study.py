@@ -59,6 +59,7 @@ from whymath_backend.config import Settings, get_settings
 from whymath_backend.db.models.pedagogy_dsl import LearningObjective
 from whymath_backend.db.models.user import UserProfile
 from whymath_backend.db.session import get_session
+from whymath_backend.l2.concept_exposure import record_concept_exposure
 from whymath_backend.l2.irt import theta_to_mastery_proxy
 from whymath_backend.l2.learner_state import get_state
 from whymath_backend.l2.learner_state_store import (
@@ -84,6 +85,11 @@ logger = logging.getLogger("whymath.api.study")
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 # 설정 의존성 — SEC-24(원 SEC-16) 세션↔사용자 바인딩(HMAC 키 = jwt_secret)에 필요(`_auth.py` 관례).
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+# 이 응답이 "AI가 만든 설명" 라벨을 담는가(PED-17 A1 노출 기록의 `ai_label_shown`). 응답 스키마
+# (`StudyUnitResponse`)에 라벨 필드가 아직 없으므로 **False가 사실**이다 — 없는 라벨을 있다고 적지
+# 않는다. 라벨 표시 기능(안전장치 5)이 응답에 라벨을 싣는 작업이 이 상수를 바꾼다(한 곳).
+AI_LABEL_SHOWN_IN_RESPONSE: bool = False
 
 
 class StudySegment(BaseModel):
@@ -295,6 +301,22 @@ async def post_study_unit(
         content_source=result.content_source,
         concept_code=concept_code,
         gate_reason_code=result.gate_reason_code,
+    )
+    # PED-17 A1: 학생이 이 개념을 열었다 — 노출 1건을 처치 기록과 **같은 트랜잭션**에 남긴다(둘 중
+    # 하나만
+    # 남는 중간 상태 없음). 서빙한 행 code를 쓴다(역조회면 요청 원자 code가 아니다). `rendered`가
+    # 있는데
+    # `content_code`가 없는 경로는 구조상 없지만, 있다면 조용히 기록을 빼먹지 않고 실패시킨다.
+    if result.content_code is None:
+        raise RuntimeError(
+            "학생에게 렌더된 응답에 서빙 콘텐츠 행 code가 없다 — 노출을 기록할 수 없다"
+        )
+    await record_concept_exposure(
+        session,
+        concept_code=result.content_code,
+        user_id=user.user_id,
+        settings=settings,
+        ai_label_shown=AI_LABEL_SHOWN_IN_RESPONSE,
     )
     await session.commit()
 
