@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-111
+title: "WH-1 3단계 힌트 부분 시연 재료 — 튜터에 무엇을 공급할지 설계 결정 + 집행 (P3-94 ⑨ 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 근거 — P3-94 ⑨ AI 패널(docs/reviews/p3_94_ai_panel_scoring_2026-11-07.md): 발화 필수 변형 초안의 3단계 힌트가 두 좌석(qwen2.5:7b · deepseek-v4.1-flash) 모두 전부 단계 부적합(부분 시연 0건). 원인 = 튜터 정책 프롬프트에 문항 본문·풀이 단계가 없다(P3-72 설계) — 모델 교체로 풀리지 않는 구조 문제. ② 설계 결정 게이트(Kiki) — 선택지: (A) 3단계 힌트 본문은 하네스가 검수 힌트 DB(select_ladder_hint)에서 쓰고 LLM 발화는 1·2단계에만 허용 (B) 정답을 제외한 부분 풀이 재료(첫 풀이 단계 식 등)를 하네스가 골라 정책 상태에 비식별로 공급 — 정답 억제 백스톱·톤필터·P3-09 게이트는 그대로 (C) 현행 유지(3단계는 하네스 템플릿) + Hint 적절성 축의 대상에서 LLM 3단계를 제외. 각 안의 정답 누설 위험·교수학 근거·변경 범위를 결정 문서로 비교한다. ③ 결정안 집행 — 서빙 경로 변경이 있으면 집행 지점(어느 코드 경로가 새 재료를 실제로 쓰는가)을 별항으로 적고 테스트로 동결한다. ④ 재측정 — P3-94 수집기(--policy-prompt utterance-required)로 3단계 힌트의 단계 적합을 AI 패널로 다시 재고, 정답 누설 무관용(0건) 유지를 확인한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/wh1_llm_policy.py
+  - src/backend/whymath_backend/harness/wh1_tutor_context.py
+  - src/backend/whymath_backend/harness/wh1_primary.py
+  - docs/reviews/
+session: null
+notes: "출처: P3-94 ⑨ AI 패널 리포트 다음 단계 3 — Kiki 2026-11-07 '권장대로 진행'"
+updated: 2026-11-07
