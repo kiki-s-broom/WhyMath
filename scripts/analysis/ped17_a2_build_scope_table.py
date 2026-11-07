@@ -6,13 +6,15 @@
 쓰기: `ped17/산출물/A2/범위표.csv`, `ped17/산출물/A2/요약.md`.
 
 판정 단위와 규칙:
-  - 세부개념(1,823개): 판정 원자료의 판정을 그대로 쓴다(사람이 읽듯 개념마다 내용을 읽고 판정한 결과).
+  - 세부개념(1,823개): 판정 원자료의 판정을 그대로 쓴다(개념마다 내용을 읽고 판정한 결과).
   - 소단원·단원(860개): 이름만 있는 묶음 노드라 내용 판정 근거가 없다. 하위 세부개념
     *전부*가 "검산 가능"일 때만 "검산 가능", 하나라도 아니면 "검산 불가"로 모은다(애매하면 불가).
     하위 세부개념이 하나도 없으면 "미확인".
-  - 2단계 판정: 1차(`분류_원자료/`)에서 "가능"이 나온 세부개념은 엄격한 2차 심사자(`분류_2차검토/`)가
+  - 2단계 판정: 1차(`분류_원자료/`)에서 "가능"이 나온 세부개념은
+    엄격한 2차 심사자(`분류_2차검토/`)가
     다시 읽는다. *두 번 모두 가능*일 때만 "검산 가능"이고, 2차가 불가로 뒤집으면 "검산 불가"다
-    (애매하면 불가 · 틀린 개념이 학생에게 가는 쪽이 더 위험하다). 1차가 불가인 개념은 2차 대상이 아니다.
+    (애매하면 불가 · 틀린 개념이 학생에게 가는 쪽이 더 위험하다).
+    1차가 불가인 개념은 2차 대상이 아니다.
     2차 기록이 없는 1차 "가능"은 검사 실패로 센다(조용히 가능으로 두지 않는다).
   - 어느 판정에서 왔는지 "판정 출처"와 "2차 검토" 열(확인 / 뒤집힘 / 대상 아님)에 남긴다.
 
@@ -100,7 +102,11 @@ def _rollup(
         return UNKNOWN, "하위 세부개념이 없어 내용을 판정할 근거가 없음", "해당 없음"
     n_ok = sum(1 for c in leaves if leaf_class[c] == POSSIBLE)
     if n_ok == len(leaves):
-        return POSSIBLE, f"하위 세부개념 {len(leaves)}개 전부 검산 가능", "하위 세부개념의 검산 방법을 따름"
+        return (
+            POSSIBLE,
+            f"하위 세부개념 {len(leaves)}개 전부 검산 가능",
+            "하위 세부개념의 검산 방법을 따름",
+        )
     return (
         IMPOSSIBLE,
         f"하위 세부개념 {len(leaves)}개 중 {n_ok}개만 검산 가능(전부 가능해야 가능)",
@@ -132,12 +138,22 @@ def _build_rows() -> list[dict]:
             cls, reason, method, border, src = UNKNOWN, "판정 원자료에 없음", "해당 없음", "", ""
         else:
             cls = RAW_TO_CLASS[rec["cls"]]
-            reason, method, border, src = rec["reason"], rec["method"], rec["border"], rec["_source"]
+            reason, method, border, src = (
+                rec["reason"],
+                rec["method"],
+                rec["border"],
+                rec["_source"],
+            )
             if cls == POSSIBLE:
                 rec2 = second.get(n["code"])
                 if rec2 is None:
                     # 2차 기록이 없는 가능은 확정하지 않는다 — 미확인으로 두고 검사에서 실패시킨다
-                    cls, reason, method, review = UNKNOWN, "1차 가능이나 2차 검토 기록 없음", "해당 없음", ""
+                    cls, reason, method, review = (
+                        UNKNOWN,
+                        "1차 가능이나 2차 검토 기록 없음",
+                        "해당 없음",
+                        "",
+                    )
                 elif rec2["cls"] == "불가":
                     cls, method, border, review = IMPOSSIBLE, "해당 없음", True, SECOND_FLIPPED
                     reason = "2차 검토에서 뒤집음: " + rec2["reason"]
@@ -160,7 +176,14 @@ def _build_rows() -> list[dict]:
 
 
 def _row(
-    n: dict, cls: str, reason: str, method: str, border: str, src: str, study_first: set, review: str
+    n: dict,
+    cls: str,
+    reason: str,
+    method: str,
+    border: str,
+    src: str,
+    study_first: set,
+    review: str,
 ) -> dict:
     return {
         "개념 ID": n["code"],
@@ -185,7 +208,9 @@ def _summary_line(label: str, rows: list[dict]) -> str:
     unk = sum(1 for r in rows if r["분류"] == UNKNOWN)
     pct = (ok / n * 100) if n else 0.0
     tail = f", 미확인 {unk}개" if unk else ""
-    return f"{label}: 전체 {n:,}개, 검산 가능 {ok:,}개, 검산 불가 {no:,}개{tail}, 가능 비율 {pct:.1f}%"
+    return (
+        f"{label}: 전체 {n:,}개, 검산 가능 {ok:,}개, 검산 불가 {no:,}개{tail}, 가능 비율 {pct:.1f}%"
+    )
 
 
 def _validate(rows: list[dict]) -> list[str]:
@@ -212,15 +237,28 @@ def _validate(rows: list[dict]) -> list[str]:
     bad = [r["개념 ID"] for r in rows if r["분류"] not in (POSSIBLE, IMPOSSIBLE, UNKNOWN)]
     if bad:
         errors.append(f"분류 값 오류 {len(bad)}건: {bad[:5]}")
-    unreviewed = [r["개념 ID"] for r in rows if r["분류"] == UNKNOWN and r["노드 단계"] == "세부개념"]
+    unreviewed = [
+        r["개념 ID"] for r in rows if r["분류"] == UNKNOWN and r["노드 단계"] == "세부개념"
+    ]
     if unreviewed:
-        errors.append(f"세부개념 중 미확인 {len(unreviewed)}건(판정 또는 2차 검토 누락): {unreviewed[:5]}")
+        errors.append(
+            f"세부개념 중 미확인 {len(unreviewed)}건(판정 또는 2차 검토 누락): {unreviewed[:5]}"
+        )
     ok_without_review = [
-        r["개념 ID"] for r in rows if r["노드 단계"] == "세부개념" and r["분류"] == POSSIBLE and r["2차 검토"] != SECOND_CONFIRMED
+        r["개념 ID"]
+        for r in rows
+        if r["노드 단계"] == "세부개념"
+        and r["분류"] == POSSIBLE
+        and r["2차 검토"] != SECOND_CONFIRMED
     ]
     if ok_without_review:
-        errors.append(f"2차 확인 없이 가능으로 남은 세부개념 {len(ok_without_review)}건: {ok_without_review[:5]}")
-    no_method = [r["개념 ID"] for r in rows if r["분류"] == POSSIBLE and r["검산 방법"] == "해당 없음"]
+        errors.append(
+            f"2차 확인 없이 가능으로 남은 세부개념 {len(ok_without_review)}건: "
+            f"{ok_without_review[:5]}"
+        )
+    no_method = [
+        r["개념 ID"] for r in rows if r["분류"] == POSSIBLE and r["검산 방법"] == "해당 없음"
+    ]
     if no_method:
         errors.append(f"검산 가능인데 검산 방법이 '해당 없음' {len(no_method)}건: {no_method[:5]}")
     return errors
@@ -248,28 +286,33 @@ def main() -> int:
         _summary_line("② 세부개념만(학습 단위)", leaf),
         _summary_line("③ Gate A 학습목표 첫 개념", study),
     ]
-    # 학습목표(= /study 요청 단위) 34개 기준 — 첫 개념이 가능인 학습목표 수 (T1 집계의 학습목표 상세)
+    # 학습목표(= /study 요청 단위) 34개 기준 — 첫 개념이 가능인 학습목표 수
+    # (T1 집계의 학습목표 상세를 쓴다)
     t1 = json.loads(T1_JSON.read_text(encoding="utf-8"))
     cls_of = {r["개념 ID"]: r["분류"] for r in reread}
     obj_first = [x["concept"] for x in t1["범위1_학습목표"]["상세"]]
     obj_ok = sum(1 for c in obj_first if cls_of.get(c) == POSSIBLE)
     lines.append(
-        f"④ 학습목표(/study 요청 단위): 전체 {len(obj_first)}개, 첫 개념이 검산 가능인 학습목표 {obj_ok}개, "
+        f"④ 학습목표(/study 요청 단위): 전체 {len(obj_first)}개, "
+        f"첫 개념이 검산 가능인 학습목표 {obj_ok}개, "
         f"검산 불가 {len(obj_first) - obj_ok}개, 가능 비율 {obj_ok / len(obj_first) * 100:.1f}%"
     )
     for level in LEVEL_ORDER:
-        lines.append(_summary_line(f"   · 세부개념 {level}", [r for r in leaf if r["학교급"] == level]))
+        lines.append(
+            _summary_line(f"   · 세부개념 {level}", [r for r in leaf if r["학교급"] == level])
+        )
     border_n = sum(1 for r in leaf if r["경계 사례"] == "Y")
     lines.append(f"   · 세부개념 중 경계 사례(애매해서 불가로 둠): {border_n:,}개")
     flipped = sum(1 for r in leaf if r["2차 검토"] == SECOND_FLIPPED)
     confirmed = sum(1 for r in leaf if r["2차 검토"] == SECOND_CONFIRMED)
     lines.append(
-        f"   · 2차 검토 대상(1차 가능) {flipped + confirmed:,}개 중 확인 {confirmed:,}개, 불가로 뒤집음 {flipped:,}개"
+        f"   · 2차 검토 대상(1차 가능) {flipped + confirmed:,}개 중 "
+        f"확인 {confirmed:,}개, 불가로 뒤집음 {flipped:,}개"
     )
 
     print("\n".join(lines))
     OUT_MD.write_text(
-        "# A2 요약 (자동 생성)\n\n" + "\n".join(f"- {l.strip()}" for l in lines) + "\n",
+        "# A2 요약 (자동 생성)\n\n" + "\n".join(f"- {text.strip()}" for text in lines) + "\n",
         encoding="utf-8",
     )
     if errors:
