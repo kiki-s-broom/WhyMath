@@ -60,12 +60,14 @@ from whymath_backend.l4.misconception.validate import validate_distractor_map
 from whymath_backend.ops import phase3_remediation as pr
 from whymath_backend.schema.problem import DistractorEntry
 
-#: 2026-10-17 Kiki 결정이 지정한 4개 개념의 kebab — 이 부류의 **전체 범위**다(독립 정의).
+#: 이 부류의 **전체 범위**다(독립 정의) — 결정마다 늘어난다. 2026-10-17 Kiki 결정(P3-61)의 4개 개념 +
+#: 2026-11-06 게이트 G-p350-02-01-core-and-route Q3 결정(P3-109)의 M0669.
 _EXPECTED: dict[str, str] = {
     "tangent-external-point-as-contact": "M0673",
     "mvt-conditions-unchecked": "M0674",
     "graph-sketch-few-points-only": "M0676",
     "velocity-sign-ignored": "M0678",
+    "average-rate-as-instantaneous-rate": "M0669",
 }
 _TRACE_ONLY = sorted(_EXPECTED)
 
@@ -97,8 +99,8 @@ def _base_kwargs(**over: Any) -> dict[str, Any]:
 # 1. 불변식 — 양방향 동결
 # ──────────────────────────────────────────────────────────────────────────
 class TestInvariantBothDirections:
-    def test_scope_is_exactly_the_four_decided_concepts(self) -> None:
-        """이 부류를 넓히려면 새 결정이 필요하다 — 다섯 번째 항목이 조용히 들어오면 RED."""
+    def test_scope_is_exactly_the_decided_concepts(self) -> None:
+        """이 부류를 넓히려면 새 결정이 필요하다 — 결정 없는 여섯 번째 항목이 조용히 들어오면 RED."""
         assert CHOICE_TRACE_ONLY_IDS == frozenset(_EXPECTED)
         assert {m.id for m in CATALOG if m.choice_trace_only} == set(_EXPECTED)
 
@@ -113,7 +115,7 @@ class TestInvariantBothDirections:
 
     def test_body_catalog_is_catalog_minus_class_in_original_order(self) -> None:
         assert BODY_CATALOG == tuple(m for m in CATALOG if m.id not in _EXPECTED)
-        assert len(BODY_CATALOG) == len(CATALOG) - 4
+        assert len(BODY_CATALOG) == len(CATALOG) - 5
 
     def test_body_detectable_filters_any_catalog_and_preserves_order(self) -> None:
         a = Misconception(**_base_kwargs(id="a-item"))
@@ -212,6 +214,23 @@ class TestCounterexamplesAreRealRefutations:
         ce = CATALOG_BY_ID["velocity-sign-ignored"].counterexample
         assert "t²−4t" in ce and "−2" in ce and "속력은 2" in ce
 
+    def test_average_rate_differs_from_instantaneous_rate_at_both_endpoints(self) -> None:
+        """P3-109 · M0669 — 두 점 사이 평균변화율이 어느 끝점의 순간변화율과도 같지 않다."""
+        x = sp.symbols("x", real=True)
+        f = x**2
+        average = (f.subs(x, 2) - f.subs(x, 0)) / (2 - 0)
+        assert average == 2
+        fprime = sp.diff(f, x)
+        # 순간변화율을 미분 공식이 아니라 정의(극한)로도 한 번 더 구해 둘이 같음을 확인한다.
+        h = sp.symbols("h", real=True)
+        for a, expected in ((0, 0), (2, 4)):
+            assert fprime.subs(x, a) == expected
+            assert sp.limit((f.subs(x, a + h) - f.subs(x, a)) / h, h, 0) == expected
+            assert expected != average
+        ce = CATALOG_BY_ID["average-rate-as-instantaneous-rate"].counterexample
+        assert "x²" in ce and "[0, 2]" in ce and "평균변화율은 2" in ce
+        assert "x=0에서의 순간변화율은 0" in ce and "x=2에서는 4" in ce
+
     @pytest.mark.parametrize("kebab", _TRACE_ONLY)
     def test_counterexample_does_not_hand_over_the_procedure(self, kebab: str) -> None:
         """개입 발화에 그대로 닿는 문자열이라 정답식·올바른 절차를 적지 않는다(답 미루기)."""
@@ -223,6 +242,8 @@ class TestCounterexamplesAreRealRefutations:
             "mvt-conditions-unchecked": ("롤의 정리",),
             "graph-sketch-few-points-only": ("증감표를",),
             "velocity-sign-ignored": ("v=2t", "2t−4"),
+            # 도함수 공식·극한 절차를 적으면 정답 계산법을 건네는 것이다.
+            "average-rate-as-instantaneous-rate": ("2x", "lim", "h→0", "h=0"),
         }[kebab]
         for phrase in forbidden:
             assert phrase not in m.counterexample, (kebab, phrase)
@@ -434,8 +455,18 @@ class TestCounterfactualServing:
     def test_as_committed_nothing_is_served_through_the_class(
         self, base_report: pr.RemediationReport
     ) -> None:
-        """서명 전에는 served 가 아니라 blocked 다 — pending 을 served 로 보고하지 않는다."""
+        """서명 전에는 served 가 아니라 blocked 다 — pending 을 served 로 보고하지 않는다.
+
+        M0669(P3-109)는 아직 표에 **행 자체가 없다** — 02-01 핵심 행을 M0669로 바꾸는 것은
+        P3-110 ①(scope_spec 교체)의 몫이다. 행이 생기면 이 단언이 깨지고, 그때 M0669도 나머지와
+        같이 blocked 검사로 옮긴다(표에 없는 것을 blocked로 위장하지 않는다).
+        """
+        pending_row_owner = {"M0669": "P3-110"}
+        present = {r.mis_id for r in base_report.rows}
         for mis_id in _EXPECTED.values():
+            if mis_id in pending_row_owner:
+                assert mis_id not in present, (mis_id, pending_row_owner[mis_id])
+                continue
             assert _row(base_report, mis_id).status is pr.RowStatus.BLOCKED, mis_id
         served_kebabs = {r.kebab_id for r in base_report.rows if r.status is pr.RowStatus.SERVED}
         assert served_kebabs.isdisjoint(CHOICE_TRACE_ONLY_IDS)
