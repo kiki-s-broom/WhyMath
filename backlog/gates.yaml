@@ -1242,6 +1242,7 @@ gates:
       - "[2026-11-06] depends_on +P3-110-calc-02-01-m0669-chain-execution — P3-50 done(판정 입력 완성)로 02-01 ⑦ 칸의 열린 소유가 사라져서, 실제 보강을 맡는 집행 태스크 P3-110을 통합 게이트 입력으로 붙인다 — 02-01은 P3-110 완료 전까지 미충족(main ce8c2165 기준 4/10)"
       - "[2026-11-06] notes +166자 — P3-50 done의 이 게이트 판정 무관 사유 기록"
       - "[2026-11-07] input done · P3-106-phase3-learning-loop-success-prod-measure · 판정 무관: 판정 무관: 지표 ⑤ 운영 DB 실측(24시간 0/0 측정 실패 · 전 기간 0/2 FAIL · 측정 기준 main cc1233d0)을 재판정 입력으로 넘긴다 — done P3-106-phase3-learning-loop-success-prod-measure 인계"
+      - "[2026-11-07] depends_on +P3-111 · depends_on +P3-112 · depends_on +P3-113 · verdict FAIL · owners: P3-111, P3-112, P3-113 · inputs: P3-100-concept-revision-serving, P3-101-release-gate-a-chain-harness, P3-102-prod-misconception-signature-gap, P3-105, P3-106-phase3-learning-loop-success-prod-measure, P3-17-week3-release-gate-judgment, P3-50-calc-02-01-misconception-chain-restore, P3-62-solution-qa-unverifiable-structuring, P3-91-p3-62-candidate-promotion-fill-template-fix, P3-93, P3-94 · evidence: [P3-94 판정 입력 · 축 (가) AI 품질 8종 — 문장 축 6개] FAIL(현 시점). 근거 = docs/reviews/p3_94_full_collect_report_2026-11-07.md(PR #1886 · 판정 기준 main e8db3ef6 + 브랜치 HEAD 657beb82 · 수집 코드 main 0627d8ce). 리포트의 D16 결정안(제안 임계)을 적용하면 cloud-mid는 정답 누설·수학·일관성·학생 수준·hallucination 5축 PASS, Hint 적절성 FAIL(패널 통과 65/174 · 2단계 8/58 · 3단계 0/58)이다. local-mid는 Hint 외에 hallucination(지어낸 내용 8/241 · 무관용)과 학생 수준(중국어 혼용 2건)도 FAIL이다. 미충족 소유: Hint 2·3단계 문항 재료 공급 설계 = P3-111, 일관성·hallucination 의미 판정 게이트 = P3-112, 문자 혼용 검출 = P3-113. 임계값 6개 확정은 여전히 Kiki 결정(이 판정은 제안 임계 기준이다). — done P3-94 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
@@ -1260,6 +1261,9 @@ gates:
       - P3-105
       - P3-29-content-view-log-seat-decision
       - P3-110-calc-02-01-m0669-chain-execution
+      - P3-111
+      - P3-112
+      - P3-113
   - id: G-p301-scope-choice
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
