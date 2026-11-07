@@ -628,6 +628,48 @@ class TestTransitionFunctionAgainstRealDb:
             await engine.dispose()
 
 
+class TestExposureWriterAgainstRealDb:
+    """노출 기록 writer의 ORM 모델이 실제 테이블과 맞는가 — 가짜 세션으로는 볼 수 없는 축.
+
+    `record_concept_exposure`를 실 세션으로 커밋하고 raw SQL로 읽어 온다. 컬럼명·타입·가명 CHECK
+    (소문자 16진 64자)를 실제 HMAC 값이 통과하는지까지 본다. 학생 원본 user_id가 행 어디에도 없는지도 본다.
+    """
+
+    async def test_writer_commits_one_row_with_pseudonym_only(self, clean: None) -> None:
+        from pydantic import SecretStr
+
+        from whymath_backend.l2.concept_exposure import record_concept_exposure, student_pseudonym
+
+        settings = Settings(jwt_secret_key=SecretStr("integration-secret-0123456789-abcdef"))
+        user_id = uuid.uuid4()
+        code = _code("EXP-W")
+        engine, maker = _async_session_factory()
+        try:
+            async with maker() as session:
+                await record_concept_exposure(
+                    session,
+                    concept_code=code,
+                    user_id=user_id,
+                    settings=settings,
+                    ai_label_shown=False,
+                )
+                await session.commit()
+        finally:
+            await engine.dispose()
+
+        rows = _exec(
+            "SELECT concept_code, student_pseudonym, ai_label_shown, exposed_at "
+            "FROM concept_exposure_event WHERE concept_code = :c",
+            c=code,
+        )
+        assert len(rows) == 1  # 완료 기준 3: 열면 노출 기록이 정확히 1건.
+        assert rows[0][1] == student_pseudonym(user_id, settings=settings)
+        assert rows[0][2] is False
+        assert rows[0][3] is not None  # 시각은 DB 기본값(now())이 채웠다.
+        flat = " ".join(str(v) for v in rows[0])
+        assert str(user_id) not in flat and user_id.hex not in flat
+
+
 # ── ⑧ 되돌리기 왕복 + 백필 분류 ──────────────────────────────────────────────────────────
 
 
