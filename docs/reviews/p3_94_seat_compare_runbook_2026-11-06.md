@@ -1,6 +1,6 @@
 # P3-94 튜터 좌석 3개 비교 수집 런북 (Kiki PC · Phaiakes9)
 
-판정 기준: 브랜치 `claude/p3-94-llm-draft-measure` — 이 런북을 싣는 커밋과 수집 코드가 같다. 정확한 커밋 해시는
+판정 기준: 브랜치 `claude/p3-94-llm-draft-measure` — 이 런북을 싣는 커밋과 수집 코드가 같다. **실행 기록(2026-11-06)**: PR #1853 머지 후 main `638450d2`(코드 동일)에서 실행 · 결과 커밋 `04171bba` · 리포트 `docs/reviews/p3_94_seat_compare_report_2026-11-06.md`. 정확한 커밋 해시는
 세션이 채팅으로 주는 블록 1의 기대값(`$Expect`)이 정본이다(문서에 해시를 적으면 이 문서를 싣는 커밋과 순환한다).
 
 P3-94(D16 ⓐ)의 **LLM 초안 측정 경로**로 튜터 정책 좌석 3개를 같은 20사례에서 비교한다. 결과는 Kiki의 **튜터 모델 결정**의 입력이고,
@@ -46,7 +46,7 @@ P3-94(D16 ⓐ)의 **LLM 초안 측정 경로**로 튜터 정책 좌석 3개를 �
 - 블록 1: 공유 클론에서 브랜치 fetch → worktree가 없으면 `git worktree add --detach`, 있으면 그 폴더만 기대 커밋으로
   `checkout --detach` → `HEAD_OK`.
 - 블록 2: HEAD 재대조 · 공유 클론 `.venv` 파이썬 + `PYTHONPATH`(worktree 코드) · `whymath_backend.__file__`이 worktree인지 ·
-  Ollama `/api/tags`에 두 모델 · `.env`를 worktree로 복사(없을 때만 · git 제외 대상) · OpenRouter 키는 **존재와 길이만** 출력 ·
+  Ollama `/api/tags`에 두 모델 · `.env`를 worktree로 복사(공유 클론에 원본이 **있을 때만** · git 제외 대상 — 2026-11-06 실측: 공유 클론에 `.env`가 없고 키는 사용자 환경변수였다. 그 회차 블록 2는 원본 존재를 확인하지 않아 `Copy-Item`·`Select-String` 오류 2건을 냈다 — 키는 환경변수로 찾아 `READY=True`였으므로 판정 영향은 없었다. 다음 회차 블록은 원본 존재를 먼저 확인하고 없으면 `ENV_FILE=absent(환경변수 사용)`을 출력한다) · OpenRouter 키는 **존재와 길이만** 출력 ·
   비교 평가셋 파일 존재 → `READY`.
 - 블록 3: 조건(HEAD·READY 재료) 재계산 후 단일 `if … { … } else { WRITE_REFUSED … }` 안에서 좌석 3개를 차례로
   `--eval-set data\runs\p3_94\seat_compare_eval_20.jsonl --policy-seat <좌석>`으로 `data\runs\p3_94\seat-<좌석>\live.jsonl`에 수집하고,

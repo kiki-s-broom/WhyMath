@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: SEC-45-fervent-maxwell-sec34-rotation-runbook-recovery
+title: "fervent-maxwell 회수 — SEC-34 자격증명 전량 폐기·재발급 런북(920줄)이 PR 없이 브랜치에 고립: main 변화 대조 갱신 후 파일 단위 이식"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — origin/claude/fervent-maxwell-2b4w10 head `95576896`(ahead 2 · behind 173 · 판정 기준 main `ce8c2165`). 고유 커밋 2건: `f4351d44` 런북 신설 `docs/ops/sec34_phaiakes9_credential_rotation_runbook.md`(920줄 · 작성 기준 main `e30984983`) · `95576896` 이벤트 샤드 1줄. main 언급 0건 — 재현: `git grep -n -E 'fervent-maxwell|sec34_phaiakes9|credential_rotation_runbook' origin/main` → 0줄. 비밀값 패턴(ghp_·sk-·pk-lf-·AKIA·BEGIN 키) 스캔 0건(19회차 감사)."
+  - "② 이식 방식 = 파일 단위 — 런북 1파일만 main에 옮긴다(브랜치 통째 머지 금지 · 이벤트 샤드는 옮기지 않는다). 작성 시점(`e30984983`) 이후 main 변화를 대조해 런북을 갱신한다: ⓐ ARCH-66(Anthropic API 2026-12-31까지 미사용 — 회전 대신 revoke) ⓑ 런북이 지목한 시크릿 이름(`PR_AUTO_RESYNC_TOKEN`·`DEPLOY_SSH_*`·`WHYMATH_JWT_SECRET_KEY` 등)이 지금 `config.py`·`.github/workflows/`에 실재하는지 ⓒ 저장소 조직 이관(kiki-s-broom) 이후 경로·권한 ⓓ CLAUDE.md Kiki 머신 안내 규칙(자리표시자 0건 · 쓰기 블록 자가거부 · 펜스 언어 태그 · 6항목 브리핑). 갱신한 판정 기준 해시를 런북 상단에 다시 박는다."
+  - "③ 집행 지점(정본화와 별항) — SEC-34 acceptance ②의 실행 정본이 이 런북임을 `backlog.py amend SEC-34-phaiakes9-cryptominer-incident-response --acceptance`로 연결한다(SEC-34는 owner kiki — 착수·done은 Kiki 몫이며 세션은 `--as kiki`로 대신하지 않는다). 런북에 적힌 시크릿 이름 집합이 저장소 실재 이름의 부분집합인지 기계 대조하는 테스트를 두거나, 둘 수 없으면 그 이유를 판정 문서에 적는다. 런북 실행 자체(자격증명 폐기·재발급)는 이 태스크 범위 밖이다."
+artifacts: []
+paths:
+  - docs/ops/sec34_phaiakes9_credential_rotation_runbook.md
+session: null
+notes: "출처: stray-code 19회차(docs/reviews/unmerged_branch_audit_2026-11-06.md §3-①). 보안·법령 축이라 priority 1(의사결정 우선순위 2번). 회수 완료 전 원 브랜치 claude/fervent-maxwell-2b4w10 삭제 금지. SEC-34 acceptance ②(자격증명 로테이션)는 2026-09-10 등재 이후 미이행이며 이 런북이 유일한 실행 준비물이다."
+updated: 2026-11-06

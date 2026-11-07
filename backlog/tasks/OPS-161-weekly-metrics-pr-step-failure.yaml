@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-161-weekly-metrics-pr-step-failure
+title: "weekly-metrics 예약 실행이 3회 연속 실패 — 산출 브랜치만 push되고 PR이 안 열려 11-02 KPI 행이 main에 누락·브랜치 3건 고립"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 고립 실측 고정 — `weekly-metrics` 예약 실행 3회 연속 conclusion=failure: #6 run `39178788886`(2026-10-19) · #7 `40247052035`(10-25) · #8 `41372114016`(11-02). 세 실행 모두 `ops/weekly-metrics-<ts>` 브랜치 push까지는 성공했고(head `49d350f0` · `bee15501` · `d93b1475`, 각 `metrics/weekly.json` 1행 append) PR은 0건이다. #4·#5(10-05·10-12)는 success. OPS-151(산출물 0회 커밋 수리) 착지 직후부터 실패가 시작됐다 — 수리가 \"PR 단계에 도달\"까지만 고치고 그 단계 자체의 성공은 검증하지 못한 형태다. 10-19·10-25 행은 EOS-197 PR #1765가 수동으로 main에 실었고, **11-02 행(window 2026-10-26~11-02)은 main에 없다**. 재현: `git show origin/main:metrics/weekly.json`의 행 4개 대 브랜치 `ops/weekly-metrics-20261102T012320Z`의 추가 행."
+  - "② 원인 실측 — 실패한 스텝과 오류 메시지를 실행 로그에서 확정해 판정 문서에 인용한다(19회차 감사는 로그 끝 25~80줄에서 정리 단계만 봐 원인을 확정하지 못했다 — \"gh pr create가 GITHUB_TOKEN으로 PR 생성을 거부\" 가설은 **미확인**). 저장소 설정(Actions의 PR 생성 허용)이 원인이면 그것은 사람 소유 설정이므로 Kiki 실행 명령으로 넘기고, 코드로 우회하지 않는다."
+  - "③ 수리 + 변별력 — 원인에 맞게 고치고, 그 실패 상태를 주입했을 때 실패 신호가 나오는지(주입 적용·원복 바이트 동일 단언) 확인한다. 수리 후 `workflow_dispatch` 1회 실행으로 PR이 실제로 열리는지를 산출물(PR 번호)로 확인한다 — 브랜치 push나 잡 success는 간접 신호라 성공 근거가 아니다."
+  - "④ 누락 행 회수 + 고립 브랜치 처분 — 11-02 행을 파일 단위로 main 원장에 싣는다(중복 행 금지 · 행 순서는 window 기준). 산출 브랜치 3건(`ops/weekly-metrics-20261019T000122Z` · `...20261025T235900Z` · `...20261102T012320Z`)은 `branch-cleanup.yml` 허용 패턴(claude/* · tmp-* · worktree-agent-*) 밖이라 자동 삭제 배치에 넣을 수 없다 — 패턴을 넓힐지, 워크플로가 PR 머지 후 스스로 정리할지, Kiki 수동 삭제로 둘지를 정해 적는다."
+  - "⑤ 집행 지점(경보 경로) — 예약 실행 실패가 3주간 무증상이었다. `ci-timeout-headroom.yml` 주석이 \"GitHub 기본 저장소 알림을 최소 경보로 쓴다\"고 적은 경로가 실제로 누구에게 도달하는지 실측하고, 도달하지 않으면 세션 브리핑·야간 리포트처럼 사람이 매번 보는 표면에 \"예약 워크플로 최근 N회 실패\"를 노출하는 배선을 둔다(배선이 불가하면 이유를 적는다)."
+artifacts: []
+paths:
+  - ".github/workflows/weekly-metrics.yml"
+  - metrics/weekly.json
+session: null
+notes: "출처: stray-code 19회차(docs/reviews/unmerged_branch_audit_2026-11-06.md §3-①). 소유 태스크 OPS-56·OPS-151은 done이라 재개봉하지 않고 신규 등재. 시스템 결함 대책 등재(12/31 방침 '실수 관리 의무 유지' 허용 범위). 회수 완료 전 ops/weekly-metrics-20261102T012320Z 삭제 금지(11-02 행의 유일한 사본)."
+updated: 2026-11-06
