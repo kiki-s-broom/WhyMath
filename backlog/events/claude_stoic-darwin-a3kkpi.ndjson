@@ -1,0 +1,1 @@
+{"ts": "2026-11-07T20:51:44+00:00", "actor": "claude/stoic-darwin-a3kkpi", "action": "incident_add", "id": "memory-md-append-github-dirty", "cat": "C", "nth": 5, "fix_form": "task", "fix_ref": "HARN-210-memory-md-concurrent-append-github-dirty · HARN-211-server-merge-probe-merge-driver-off", "title": "PR 1877이 MEMORY.md 동시 삽입으로 GitHub dirty 12시간 정체 — 로컬 merge-tree는 충돌 0으로 오판"}
