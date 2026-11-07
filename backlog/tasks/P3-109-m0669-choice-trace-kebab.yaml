@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -15,11 +15,12 @@ requires_gates:
   - G-p350-02-01-core-and-route
 acceptance:
   - "① M0669(평균변화율·순간변화율 혼동, `[12미적Ⅰ-02-01]`)용 선지 역추적 전용 kebab을 `l4/misconception/catalog.py`에 신설한다(P3-61 방식 · 카탈로그 68→69). ② 개수 동결 테스트(약 14곳)를 새 개수로 갱신하되, 각 갱신 지점이 개수를 단언한다는 것을 주입(카탈로그에서 1개 제거 → RED, 원본 → GREEN)으로 확인한다. ③ 진단 프롬프트 문서·크로스링크 검수 큐에 M0669 행을 올리고, 크로스링크 서명은 게이트 `G-p3109-m0669-crosslink-signature`(Kiki)로 넘긴다 — 세션이 서명하지 않는다. ④ raw M-id를 문항 `distractor_map`에 직접 적지 않는다(P3-57 계측-서빙 불일치). 근거: 게이트 `G-p350-02-01-core-and-route` Q3 결정(2026-11-06 · 별건 신설)."
-artifacts: []
+artifacts:
+  - "PR https://github.com/kiki-s-broom/WhyMath/pull/1880 (#1880) · 커밋 fe8919fe·76b26962 · CI 미러 10잡 통과(76b26962) · 주입 19 RED · 서명은 G-p3109-m0669-crosslink-signature(Kiki)"
 paths:
   - src/backend/whymath_backend/l4/misconception/catalog.py
   - docs/prompts/misconception_diagnosis.md
   - docs/data/misconception_crosslink_review_queue.json
-session: claude/youthful-darwin-llliaw
+session: null
 notes: "출처: P3R 작업 G2 · 게이트 G-p350 Q3 별건 신설 결정(Kiki 2026-11-06)."
 updated: 2026-11-07
