@@ -88,8 +88,8 @@ def _rules(
 ) -> list[dict[str, Any]]:
     """`gh api .../rules/branches/main` 응답 형태(규칙 배열)를 만든다.
 
-    승인 축 기본값이 문서 선언과 다른 것(0/false/false)은 **실측 그대로**다 — 1인 개발 단계의
-    의도적 유예이며 문서에 만료일과 함께 등재돼 있다.
+    승인 축 기본값(0/false/false)은 **실측 그대로**이며 2026-11-07 Kiki 결정 이후 문서 선언도
+    같다(1인 개발 — 자기 승인 불가). 유예 메커니즘 검증은 합성 문서로 한다(`_doc_with_grace`).
     """
     rules: list[dict[str, Any]] = [
         {"type": "deletion"},
@@ -152,6 +152,7 @@ def _run(
     today: date = _TODAY,
     *,
     full: Any = _SENTINEL,
+    doc: Path | None = None,
 ) -> int:
     """CLI를 실제로 통과시켜 **exit code로** 판정한다(출력 문자열 눈대중 금지).
 
@@ -167,13 +168,19 @@ def _run(
         full_path = tmp_path / "ruleset-full.json"
         full_path.write_text(json.dumps(full, ensure_ascii=False), encoding="utf-8")
         argv += ["--ruleset-full", str(full_path)]
+    if doc is not None:
+        argv += ["--doc", str(doc)]
     return ruleset_drift.main(argv)
 
 
 def _report(
-    payload: Any, today: date = _TODAY, *, full: dict[str, Any] | None = None
+    payload: Any,
+    today: date = _TODAY,
+    *,
+    full: dict[str, Any] | None = None,
+    doc_path: Path | None = None,
 ) -> ruleset_drift.Report:
-    doc = ruleset_drift.parse_doc(_DOC)
+    doc = ruleset_drift.parse_doc(doc_path or _DOC)
     live = ruleset_drift.parse_live(payload)
     live = ruleset_drift.merge_ruleset_full(
         live, ruleset_drift.parse_ruleset_full(full or _full(), doc.ruleset_id)
@@ -434,32 +441,103 @@ def test_as_found_2026_09_03_state_is_reported_exactly(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_approval_axis_is_waived_before_expiry_but_visible(tmp_path: Path) -> None:
-    """승인 축(문서 1명 vs 라이브 0)은 만료 전까지 유예 — 단 **보고에는 보인다**.
+_GRACE_KEYS = (
+    ("required_approving_review_count", "`0`", "`1`"),
+    ("dismiss_stale_reviews_on_push", "`false`", "`true`"),
+    ("require_code_owner_review", "`false`", "`true`"),
+)
 
-    문서를 라이브에 맞춰 낮추지 않으면서(문서=의도) 1인 개발 현실을 반영하는 방법이다.
+
+def _doc_with_grace(tmp_path: Path) -> Path:
+    """실제 문서에 **승인 축 유예 3건**을 되살린 합성 문서.
+
+    2026-11-07 Kiki 결정으로 실제 문서의 유예는 0건이 됐다. 그렇다고 유예 메커니즘(만료 승격·
+    제거 권고)의 검증을 지우면, 다음에 누군가 유예를 다시 쓸 때 그 장치가 살아 있는지 아무도
+    모른다. 그래서 2026-09-03~11-06의 실제 상태(선언 1/true/true · 유예 3건)를 재현해 검증한다.
+    치환 대상이 정확히 1건씩인지 단언한다 — 조용히 미적용된 주입은 검증이 아니다.
+    """
+    text = _DOC.read_text(encoding="utf-8")
+    for key, live_val, intent_val in _GRACE_KEYS:
+        old = f"- `{key}` = {live_val}\n"
+        assert text.count(old) == 1, f"합성 문서 주입 대상 `{key}` = {live_val}가 1건이 아니다"
+        text = text.replace(old, f"- `{key}` = {intent_val}\n")
+    marker = "<!-- RULESET_DEVIATIONS_END -->"
+    assert text.count(marker) == 1
+    grace = "".join(
+        f"- `{key}` until `2026-12-31` — 합성 픽스처 사유\n" for key, _, _ in _GRACE_KEYS
+    )
+    text = text.replace(marker, grace + marker)
+    path = tmp_path / "doc_with_grace.md"
+    path.write_text(text, encoding="utf-8")
+    parsed = ruleset_drift.parse_doc(path)
+    assert set(parsed.deviations) == {k for k, _, _ in _GRACE_KEYS}, "합성 유예가 파싱되지 않았다"
+    return path
+
+
+def test_approval_axis_matches_live_without_grace(tmp_path: Path) -> None:
+    """2026-11-07 Kiki 결정의 동결 — 문서 선언 = 실측(0/false/false), 유예 0건.
+
+    승인 축이 유예가 아니라 **선언 일치**로 통과해야 한다. 누군가 선언을 `1`로 되돌리면
+    라이브(0)와 어긋나 아래 단언이 깨진다(재판정 지점: 사람 기여자 2명 이상 — 문서 참조).
+    """
+    doc = ruleset_drift.parse_doc(_DOC)
+    assert doc.params["required_approving_review_count"] == 0
+    assert doc.params["dismiss_stale_reviews_on_push"] is False
+    assert doc.params["require_code_owner_review"] is False
+    assert not doc.deviations, f"유예가 남아 있다: {sorted(doc.deviations)}"
+    assert _run(_rules(_healthy_checks()), tmp_path) == 0
+    report = _report(_rules(_healthy_checks()))
+    assert not report.waived and not report.violations
+
+
+def test_approval_axis_raised_live_is_violation(tmp_path: Path) -> None:
+    """선언 0인데 라이브가 1로 바뀌면 위반 — 결정이 감시되지 않는 축이 되면 안 된다."""
+    payload = _rules(_healthy_checks(), approvals=1)
+    assert _run(payload, tmp_path) == 1
+    assert any("required_approving_review_count" in v for v in _report(payload).violations)
+
+
+def test_grace_is_waived_before_expiry_but_visible(tmp_path: Path) -> None:
+    """유예 축(선언 1 vs 라이브 0)은 만료 전까지 유예 — 단 **보고에는 보인다**.
+
     조용히 무시하면 그것이 곧 '만료 없는 유예'다.
     """
-    assert _run(_rules(_healthy_checks()), tmp_path, today=_TODAY) == 0
-    report = _report(_rules(_healthy_checks()), today=_TODAY)
+    doc = _doc_with_grace(tmp_path)
+    assert _run(_rules(_healthy_checks()), tmp_path, today=_TODAY, doc=doc) == 0
+    report = _report(_rules(_healthy_checks()), today=_TODAY, doc_path=doc)
     assert any("required_approving_review_count" in w for w in report.waived)
     assert not any("required_approving_review_count" in v for v in report.violations)
 
 
-def test_approval_axis_becomes_violation_after_expiry(tmp_path: Path) -> None:
+def test_grace_becomes_violation_after_expiry(tmp_path: Path) -> None:
     """만료일이 지나면 유예가 **위반으로 승격**된다 (CLAUDE.md '만료 없는 유예 금지')."""
-    assert _run(_rules(_healthy_checks()), tmp_path, today=_AFTER_EXPIRY) == 1
-    report = _report(_rules(_healthy_checks()), today=_AFTER_EXPIRY)
+    doc = _doc_with_grace(tmp_path)
+    assert _run(_rules(_healthy_checks()), tmp_path, today=_AFTER_EXPIRY, doc=doc) == 1
+    report = _report(_rules(_healthy_checks()), today=_AFTER_EXPIRY, doc_path=doc)
     assert any("만료" in v and "required_approving_review_count" in v for v in report.violations)
 
 
-def test_every_deviation_carries_an_expiry_and_reason() -> None:
-    """문서의 유예 선언 자체가 만료·사유를 갖추는지 — 무기한 유예를 구조적으로 막는다."""
-    doc = ruleset_drift.parse_doc(_DOC)
-    assert doc.deviations, "유예 블록 파싱 결과가 비었다 — 형식이 깨졌을 수 있다"
-    for key, dev in doc.deviations.items():
-        assert dev.reason.strip(), f"유예 `{key}`에 사유가 없다"
-        assert isinstance(dev.until, date), f"유예 `{key}`에 만료일이 없다"
+def test_every_deviation_carries_an_expiry_and_reason(tmp_path: Path) -> None:
+    """유예 선언 자체가 만료·사유를 갖추는지 — 무기한 유예를 구조적으로 막는다.
+
+    실제 문서(현재 0건)와 합성 문서(3건) 양쪽에 건다 — 실제 문서가 0건이면 루프가 공허하므로
+    합성 쪽이 이 검사의 변별력을 지킨다.
+    """
+    for path in (_DOC, _doc_with_grace(tmp_path)):
+        for key, dev in ruleset_drift.parse_doc(path).deviations.items():
+            assert dev.reason.strip(), f"{path.name}: 유예 `{key}`에 사유가 없다"
+            assert isinstance(dev.until, date), f"{path.name}: 유예 `{key}`에 만료일이 없다"
+
+
+def test_deviation_without_expiry_is_not_parsed_as_grace(tmp_path: Path) -> None:
+    """만료일 없는 유예 줄은 유예로 인정되지 않는다 — 형식이 곧 집행이다."""
+    text = _DOC.read_text(encoding="utf-8").replace(
+        "<!-- RULESET_DEVIATIONS_END -->",
+        "- `required_approving_review_count` — 만료 없는 사유\n<!-- RULESET_DEVIATIONS_END -->",
+    )
+    path = tmp_path / "no_expiry.md"
+    path.write_text(text, encoding="utf-8")
+    assert "required_approving_review_count" not in ruleset_drift.parse_doc(path).deviations
 
 
 def test_satisfied_deviation_is_flagged_for_removal(tmp_path: Path) -> None:
@@ -468,9 +546,10 @@ def test_satisfied_deviation_is_flagged_for_removal(tmp_path: Path) -> None:
     유예 선언이 그 자리에 남아 있으면, 나중에 같은 축이 다시 어긋났을 때 만료 전까지 조용히
     면제된다. 만료일만으로는 그 창을 막지 못한다.
     """
+    doc = _doc_with_grace(tmp_path)
     payload = _rules(_healthy_checks(), approvals=1, dismiss=True, codeowner=True)
-    assert _run(payload, tmp_path) == 0
-    report = _report(payload)
+    assert _run(payload, tmp_path, doc=doc) == 0
+    report = _report(payload, doc_path=doc)
     stale = [a for a in report.advisories if "유예 불필요" in a]
     assert len(stale) == 3, f"충족된 유예 3건이 제거 권고로 보고되지 않았다: {report.advisories}"
 

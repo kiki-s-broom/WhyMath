@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-07 (결정 · HARN-63 ⑤ 종결 — Kiki): **브랜치 보호 승인 축 3건은 "문서를 현실에 맞춘다" — 선언 0/false/false로 정정 · 유예 3건 삭제** (Kiki 결정, claude 기록) — 판정 기준: main `a282dafb`
+- **결정**: Kiki가 두 선택지(문서를 현실에 맞춘다 / 설정을 문서대로 켠다) 중 앞쪽을 택했다(2026-11-07 채팅). `.github/branch-protection-setup.md` RULESET_POLICY의 `required_approving_review_count` 1→0 · `dismiss_stale_reviews_on_push` true→false · `require_code_owner_review` true→false, RULESET_DEVIATIONS 3건(만료 2026-12-31) 삭제.
+- **근거**: 사람 개발자 1명 — GitHub는 작성자 자기 승인을 세지 않아 승인 1명 요구는 모든 PR을 머지 불가로 만든다. 머지 전 품질은 required check 16건 + merge queue 재검증, 머지 판단은 `"pr"` 지시·Kiki 판단이 맡는다. 같은 날 라이브 재확인(`ruleset_drift.py --record`, #1873)에서 라이브는 0/false/false이고 위반 0.
+- **재판정 지점**: 쓰기 권한을 가진 사람 기여자가 2명 이상이 되면 3줄을 1/true/true로 올린다(문서에 명시). CLAUDE.md "만료 없는 유예 금지"와의 관계 — 유예가 아니라 의도 선언 자체를 바꾼 것이므로 만료일 대신 이 재판정 조건을 둔다.
+- **검증**: `tests/infra/test_ruleset_drift.py` + `test_ruleset_pin_plan.py` 125 passed(exit 0). 유예 메커니즘 테스트 4건은 합성 문서(유예 3건 재현)로 옮겨 장치 검증을 유지했다. 주입 2종 RED — 선언을 1로 되돌림(14건 RED) · 만료 승격 무력화(1건 RED), 원복 바이트 동일.
+
 ### 2026-11-06 (처분 · OPS-157 — D13 4번 후속): **스키마 YAML↔모델 일치 검사 유예 7건 처분 — 해소 2(짝짓기 오류) · 연장 5(만료 2026-12-31 → 2027-03-31)** (claude 실행·기록) — 판정 기준: main `ce8c2165`
 - **착수 시점 재측정**: 어긋남 5(SolutionPath 1 · Hint 2 · Concept 7 · ConceptEdge 6 · Problem 12) · 모델 없음 2(MasteryState · StudentProfile) — 2026-10 실측과 같다.
 - **해소 2 — concept·edge**: 어긋남의 원인은 YAML도 모델도 아니라 등록부의 짝짓기였다. 두 YAML은 `data_pipeline.concept_graph.models`의 `Concept`·`ConceptEdge`와 필드가 정확히 같다(YAML에만 있는 필드 0). 그 모듈 docstring이 두 YAML을 정본으로 적고, 소비자(`validate.py`)도 그쪽이다. 등록부는 백엔드 `schema.concept`(DB 평면 — 필드 체계가 다름)에 짝지어 있었다. 등록부 짝을 바로잡아 동결 목록 13필드를 비웠다.
