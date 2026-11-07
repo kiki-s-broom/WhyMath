@@ -621,10 +621,18 @@ CATALOG: tuple[Spec, ...] = (
        # 같은 연결을 본다). 이전(transfer)과 같은 도출 규칙·같은 다리를 쓰는 형제 모듈이다.
        "l1.concept_atom_crosswalk.content_link",
        pipelines=("concept_atom_crosswalk",)),
-    _e("WM-E-104", "개념 콘텐츠 4종 적재·해석", "Platform", "Content", "P0",
-       "Gate2 ⑤ — 정의·비유·예시·직관", "l1.concept_content.populate",
+    _e("WM-E-104", "개념 콘텐츠 4종 적재·해석·생애 상태·학생 노출 기록", "Platform", "Content",
+    "P0",
+       "Gate2 ⑤ — 정의·비유·예시·직관 · PED-17 A1 — 초안/검증됨/공개됨/회수됨 생애 상태·"
+       "전환 함수·상태 변경 기록·학생 노출 기록",
+       "l1.concept_content.populate",
        "l1.concept_content.projection", "l1.concept_content.resolve",
        "l1.concept_content.review_gate",
+       # PED-17 A1 — 학생 공개 관문 술어 + 상태 전환 함수(유일한 lifecycle_status 쓰기 지점) ·
+       # 노출 기록 writer · 어휘/전환표 · 기록 테이블 2종 ORM. 공개 관문과 같은 책임이라 한 행에
+       # 둔다.
+       "l1.concept_content.lifecycle", "l2.concept_exposure",
+       "schema.concept_lifecycle", "db.models.concept_lifecycle_log",
        pipelines=("concept_content", "concept_content_university")),
     _e("WM-E-105", "교육과정 프레임워크 로더·해석", "Platform", "Curriculum", "P0",
        "B1 — CUR-10", "l1.curriculum.curriculum_loader", "l1.curriculum.curriculum_resolve",

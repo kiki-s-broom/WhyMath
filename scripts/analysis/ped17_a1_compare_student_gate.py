@@ -1,7 +1,8 @@
 """학생 경로 관문 출력 스냅샷 — A1 변경 전/후 비교용 (PED-17 완료 기준 2).
 
 `concept_content`의 모든 행에 대해 학생 `/study` 경로의 유일한 관문(`resolve_concept_content`)을
-호출하고, 결과를 JSON으로 낸다. 변경 전 코드(옛 스키마)와 변경 후 코드(새 스키마)에서 같은 스크립트를
+호출하고, 결과를 JSON으로 낸다. 변경 전 코드(옛 스키마)와 변경 후 코드(새 스키마)에서 같은
+스크립트를
 돌려 `diff`로 대조한다 — 다르면 학생 화면이 바뀐 것이다.
 
 비교하는 값(코드별):
@@ -12,7 +13,7 @@
 
 사용(DB URL은 환경변수로 주입 — 자격증명을 코드에 두지 않는다):
     WHYMATH_DATABASE_URL=postgresql+asyncpg://... \
-    python ped17/산출물/A1/compare_student_gate.py > before.json
+    python scripts/analysis/ped17_a1_compare_student_gate.py > before.json
 
 exit code: 0 정상 / 1 DB 접속·조회 실패 (실패를 빈 스냅샷으로 위장하지 않는다)
 """
@@ -38,7 +39,12 @@ async def _snapshot() -> dict[str, dict[str, object]]:
     try:
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as session:
-            codes = [r[0] for r in (await session.execute(text("SELECT code FROM concept_content ORDER BY code")))]
+            codes = [
+                r[0]
+                for r in (
+                    await session.execute(text("SELECT code FROM concept_content ORDER BY code"))
+                )
+            ]
             for code in codes:
                 # 코드마다 새 캐시 — 캐시 적중이 게이트 결과를 가리지 않게 한다.
                 res = await resolve_concept_content(code, session=session, cache=InMemoryCache())
