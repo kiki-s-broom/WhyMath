@@ -344,6 +344,10 @@
 - **값**: 수용 34/65(52%, 1회차 유료 좌석 27/85=32%) · 비용 $0.136(전체) · HIT 중앙 34.45초 · 처리량 41.8 CU/h · 단위비용 2.34원/CU · 자동검증 1차 통과율 42/65 = 0.6462(Wilson 단측 하한 0.5446 · measured:true · G4 ≥70% 미달) · 반려 F8 4 · 재작업률 미측정(`cu.slots.jsonl` 쓰기 배선 없음 — EOS-220 인계분) · provenance_audit exit 0 · 8-gram ≥70% 1건(0.75 · 자체 코퍼스 대비 정형 발문 · 기록만) · spec별 수락 인수분해 11·근의 공식 12·활용 11·**한 근 주어짐 0(16/16 TautologicalConditionError — 검산식 중간값 하드코딩 거부)** · 수정승인 20번 `answer_format` 결손 1건.
 - **근거 커밋**: 설정 `c6bf4ee3`(#1875) · 산출물 `1d30508d` · 원장·결정 로그 = 이 PR · 검수 보고서 공통 이슈 후속 = `EOS-236`(answer_format·같은 방정식 중복) · `EOS-237`(유형 다양성) · `EOS-238`(두 단계 spec) · `EOS-239`(해설·난이도·표기).
 
+### 2026-11-06 (결정 · G-p345 — Kiki): **02-09 핵심 오개념 처분 = (가)+(다) 변형 — M0677 원문 유지, 절차가 적힌 02-09 귀속 신규 M-id를 만들어 핵심 오개념을 교체** (Kiki 결정, claude 기록) — 판정 기준: main `ce8c2165`
+
+**왜**: M0677은 '관점을 못 쓴다'는 omission형이라 판정기 규칙 `M-link-undescribed`가 연결을 막는다. 코퍼스 843건 중 02-09 귀속 M-id는 M0677 1건뿐이라 기존 M-id로 바꿀 후보가 0건이다. (가) 단독은 같은 ID의 뜻을 바꿔 동결 시험지 q056·q181 라벨과 어긋나고, (나)는 검증 없는 연결, (라)는 Graph Connectivity 최대 9/10으로 목표 0.95 FAIL이라 기각.
+**집행**: `P3-52-m0677-link-disposition-execution` acceptance ⑤ — 신규 M-id 신설(이 결정이 신설 서명을 겸함)·판정기 값 규칙 추가·`scope_spec.yaml` 02-09 교체·SymPy 확인. P3-44 done 뒤 착수.
 ### 2026-11-06 (처분 · OPS-157 — D13 4번 후속): **스키마 YAML↔모델 일치 검사 유예 7건 처분 — 해소 2(짝짓기 오류) · 연장 5(만료 2026-12-31 → 2027-03-31)** (claude 실행·기록) — 판정 기준: main `ce8c2165`
 - **착수 시점 재측정**: 어긋남 5(SolutionPath 1 · Hint 2 · Concept 7 · ConceptEdge 6 · Problem 12) · 모델 없음 2(MasteryState · StudentProfile) — 2026-10 실측과 같다.
 - **해소 2 — concept·edge**: 어긋남의 원인은 YAML도 모델도 아니라 등록부의 짝짓기였다. 두 YAML은 `data_pipeline.concept_graph.models`의 `Concept`·`ConceptEdge`와 필드가 정확히 같다(YAML에만 있는 필드 0). 그 모듈 docstring이 두 YAML을 정본으로 적고, 소비자(`validate.py`)도 그쪽이다. 등록부는 백엔드 `schema.concept`(DB 평면 — 필드 체계가 다름)에 짝지어 있었다. 등록부 짝을 바로잡아 동결 목록 13필드를 비웠다.
@@ -12879,3 +12883,12 @@ HARN-37) 이후 같은 계열 3회차라 태스크 + 사고 대장 등재.
 - **무엇을**: 성공 기준 Q1의 "실제 중·고등학생 100명" 문면과 Phase 1 게이트의 "β 사용자 100명" 5곳을 지웠다. 새 Q1 = AI가 학습 루프 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 판정(학생 수 조건 없음).
 - **왜(값)**: 종전 문면은 학생 참여가 12/31 이후(ARCH-66 ⑥)라 어떤 재판정에서도 YES 불가였고, `G-internal-completion-2026-12-31` 조건 ①까지 구조적으로 막았다. Kiki: "AI가 검토·점검·해결하는 것이 WhyMath의 기본 방향".
 - **근거**: `docs/reviews/p3_17_verdict_review_2026-11-06.md` · 대장 P3-105 · 게이트 notes 2건 · 판정 기준 main `6cccb547`.
+
+## 2026-11-06: 미머지 브랜치 전수 감사 19회차 — SEC-34 런북 고립(`SEC-45`) · weekly-metrics PR 단계 3회 연속 실패(`OPS-161`) · 삭제 3
+
+- **판정 기준 main `ce8c2165`**. 정본 = `docs/reviews/unmerged_branch_audit_2026-11-06.md`. 원격 ref 74 − 제외 3 − 머지 큐 1 − 열린 PR 30 = 감사 대상 40(유령 PR 0). 18회차 이월 25건 head 전부 불변 · 신규 15건.
+- **회수 등재 2건**: `SEC-45`(priority 1 — `claude/fervent-maxwell-2b4w10`의 SEC-34 자격증명 폐기·재발급 런북 920줄이 main 언급 0건으로 고립, SEC-34 ②는 09-10 등재 뒤 미이행) · `OPS-161`(weekly-metrics 예약 실행 #6~#8이 브랜치 push 후 PR을 못 열어 실패 — OPS-151 착지 직후부터 3주 무증상, 11-02 KPI 행 main 누락, 원인 미확정).
+- **삭제하지 않은 판단**: `OPS-140`은 done이지만 미완료 `HARN-311` ①이 keller·allen 두 브랜치의 이벤트 샤드(main 부재)를 사고 증거로 지목한다 — 회수 태스크 완료만 보고 지웠다면 증거가 소실됐다. `eos-compiler-pack-check`는 ADR-010 D8=(가)가 보존을 명시.
+- **삭제 배치 18차 3건**: `jolly-fermi-6km81l`(EOS-194) · `ops-83-inject-shard-failure`(고의 실패 주입) · `p3-50-02-01-chain-restore`(판정 main 회수). **수동 삭제 후보 5건**은 `branch-cleanup.yml` 허용 패턴 밖(`p3-78/`·`eos197/`·`eos211/`·`ops/weekly-metrics-*`).
+- **Kiki 판단 요청 4건**: 신규 `laughing-edison-rb5hgl`(CLAUDE.md 「한 줄 정의」 대학·초등 범위 수정안 — 12/31 방침이 신규 decision 게이트를 금지해 태스크·게이트 없이 판정 문서로만 요청) + 17회차부터 미답변 3건.
+- **정직한 공백**: `claims reap` dry-run이 권한 분류기에 거부돼 claim 트리를 직접 읽었다. `OPS-161` 실패 원인은 로그 끝부분만 봐 미확정. 부재 줄 대조는 줄 전체 일치라 상한이다.

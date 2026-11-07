@@ -1,0 +1,226 @@
+{
+  "schema": "ai-quality-live-run/v2",
+  "responses": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-01B-p394\\data\\runs\\p3_94\\utter-cloud-mid\\live.jsonl",
+  "eval_set": {
+    "source": "C:\\Users\\kiki\\Desktop\\__AI\\WhyMath-01B-p394\\data\\runs\\p3_94\\seat_compare_eval_20.jsonl",
+    "sha256": "a756289cdab5b845cd579bce02377a422ab5318f23ad09c23779f13d6948d60f",
+    "cases": 20
+  },
+  "file_totals": {
+    "cases": 20,
+    "responses": 20,
+    "remaining": 0,
+    "complete": true,
+    "by_origin": {
+      "wh1-live": 20
+    },
+    "live": 20,
+    "live_rate": 1.0,
+    "drafts": 20,
+    "drafts_by_origin": {
+      "wh1-draft:live": 20
+    },
+    "distinct_first_prompts": {
+      "total": 20,
+      "choice": 6,
+      "hint": 14
+    },
+    "effective_sample_upper_bound": 20
+  },
+  "runs": [
+    {
+      "run_id": "b8687c1ad25443968eb1ba48ec6330e0",
+      "started_at": "2026-11-07T07:07:05Z",
+      "finished_at": "2026-11-07T07:08:56Z",
+      "status": "finished",
+      "git": {
+        "head": "ae9edbfecb8673901045f6c8ba03d58c2584b992",
+        "dirty_src": false
+      },
+      "args": {
+        "limit": null,
+        "timeout": null,
+        "resume": false,
+        "min_live_rate": 0.5,
+        "policy_seat": "cloud-mid",
+        "policy_prompt": "utterance-required"
+      },
+      "config": {
+        "policy_seat": "cloud-mid",
+        "policy_prompt": "utterance-required",
+        "policy_prompt_sha256": "31e7065042c11337dde330abb855e20a3be581fb5706dd923c315ea56d3c683e",
+        "declared_models": {
+          "cloud_seat": "openrouter",
+          "cloud_mid": "deepseek/deepseek-v4.1-flash",
+          "cloud_high": "deepseek/deepseek-v4-pro",
+          "local_matrix": {
+            "general/fast": "qwen2.5:3b",
+            "general/mid": "qwen2.5:7b",
+            "math/fast": "qwen2-math:1.5b",
+            "math/mid": "qwen2-math:7b",
+            "vision/fast": "qwen3-vl:8b"
+          },
+          "local_quality": "qwen3:30b-a3b",
+          "ollama_host": "http://127.0.0.1:11434"
+        },
+        "turn_timeout_seconds": 15.0,
+        "outer_timeout_seconds": 28.0,
+        "wh1_prose_rephrase_enabled": false,
+        "wh1_prose_timeout_seconds": 3.0,
+        "mode_guard_runtime_enabled": false,
+        "ollama_request_timeout_s": 180.0,
+        "misconception_semantic_mode": "off",
+        "misconception_judge_enabled": false,
+        "l4_distractor_link_enabled": true
+      },
+      "config_fingerprint": "c21762c522b0444eeed2035e05dace3209e7b8378c5991af2d1184d8d6b3c686",
+      "declared_models": {
+        "cloud_seat": "openrouter",
+        "cloud_mid": "deepseek/deepseek-v4.1-flash",
+        "cloud_high": "deepseek/deepseek-v4-pro",
+        "local_matrix": {
+          "general/fast": "qwen2.5:3b",
+          "general/mid": "qwen2.5:7b",
+          "math/fast": "qwen2-math:1.5b",
+          "math/mid": "qwen2-math:7b",
+          "vision/fast": "qwen3-vl:8b"
+        },
+        "local_quality": "qwen3:30b-a3b",
+        "ollama_host": "http://127.0.0.1:11434"
+      },
+      "supplied": [
+        "concept",
+        "problem_brief",
+        "initial_hypotheses",
+        "hint_level"
+      ],
+      "unsupplied": [
+        "skills",
+        "pedagogy_pack",
+        "tutor_context_manifest",
+        "session(select_probe 후보)",
+        "session_recall",
+        "warmstart_outside_mids",
+        "theta",
+        "grade",
+        "mastery"
+      ],
+      "unreproduced": [],
+      "problem_briefs": {
+        "found": 11,
+        "load_errors": {}
+      },
+      "mode_guard": {
+        "configured": false,
+        "effective": false,
+        "reason": "pack 미공급 — 금지모드 가드 블록은 돌지 않는다(설정값과 무관)"
+      },
+      "trace": {
+        "sink": "LangfuseSink",
+        "configured": true,
+        "surface": "probe",
+        "emit_warnings": 0,
+        "flush": "ok"
+      },
+      "cache": "사례마다 새 InMemoryCache",
+      "pending_before": 20,
+      "exit_code": 0,
+      "counts": {
+        "attempted": 20,
+        "live": 20,
+        "harness": 0,
+        "degraded": 0,
+        "degraded_causes": {},
+        "fallback": 0,
+        "unclassified": 0,
+        "failed": 0,
+        "failure_kinds": {},
+        "skipped_resume": 0,
+        "rebuild_rejected": 0,
+        "provider_calls": 28,
+        "trace_records": 28,
+        "cache_hits": 0,
+        "provider_faults": 0,
+        "run_json_write_errors": 0,
+        "live_rate": 1.0,
+        "explanation_source_by_kind": {
+          "choice": {
+            "llm": 6
+          },
+          "hint": {
+            "llm": 14
+          }
+        },
+        "drafts": {
+          "cases_with_draft": 20,
+          "end_turn_drafts": 20,
+          "by_outcome": {
+            "live": 20
+          },
+          "by_kind": {
+            "choice": 6,
+            "hint": 14
+          }
+        },
+        "policy_seat_calls": {
+          "overridden": 28,
+          "refused_data_export": 0
+        },
+        "tokens": {
+          "input": 37322,
+          "output": 12292
+        },
+        "policy_prompt_calls": {
+          "variant_applied": 28
+        },
+        "turn_latency_ms": {
+          "n": 20,
+          "median_ms": 4807.0,
+          "p95_ms": 8795,
+          "max_ms": 9885
+        },
+        "provider_calls_per_case": 1.4
+      },
+      "primary_outcomes": {
+        "adopted": 20
+      },
+      "observed_models": [
+        {
+          "cost_tier": "local",
+          "local_family": "general",
+          "local_model": "fast",
+          "served_model": "deepseek/deepseek-v4.1-flash",
+          "cloud_seat": null,
+          "calls": 28
+        }
+      ],
+      "first_prompts": {
+        "aq-c-01-01-w0": "8b28cf14ddf6c2ce6c46379d2157dd78f6fb647ec6e0add50d2c65aa0af95f63",
+        "aq-c-02-01-w1": "da49d77f60016e2c02e258a5f308ee53ab4251ad1a4d747c92aa80b671cbac37",
+        "aq-c-03-01-w0": "fadbbf5f19fa5161ef25075613b518408db4c7e11e341aa3e0393e51d4b84bd4",
+        "aq-c-04-01-w0": "86d7e1dcc4354f2a60ff986f42407b59ec2f2eaa55a2bd572a5beded5d70cada",
+        "aq-c-05-01-c0": "535fd263c3c43d0104b63a89ed85790e588165750a9233bdf2188dd4d58d6400",
+        "aq-c-07-01-c0": "7ec43cdea9cfee2a32766f8a5ecd6e5cc299ac299385c439898313e8363463e1",
+        "aq-h-01-01-l1": "1a66e3132a0d63af0b7bb1bf1bf2a0152b0daa06f3385ae304d11451f15d992e",
+        "aq-h-01-01-l2": "e609d166e512c1a9e2c0c7c5e87781efac3682905e0c7cf021aea4fd1ad68ced",
+        "aq-h-01-01-l3": "07005cfcc5ccc24deee9c23ad1b8b4703ccf37b2dec6d01581d63620f143549f",
+        "aq-h-02-01-l1": "f2568934d41743aa423540c63e26220ace08f9f0d29a269307ae04da052ffa58",
+        "aq-h-02-01-l2": "b0271b88c9875582e121e362d27014a0469d0399dfecb01b76bfa38332199094",
+        "aq-h-02-01-l3": "89ae0a9d957dbcdef7df09d1bf5e21ae16073bd7e6c5d8df438a4f6ad5715354",
+        "aq-h-03-01-l1": "bd108ae6085cf5de07428172cf7dc51fd2028f9bcfbe576d3fdd387673fdb717",
+        "aq-h-03-01-l2": "808342ee48081e8f9df50b6924723071e748996650e11bf8cac9e9324175be82",
+        "aq-h-03-01-l3": "4783e8c4efb5c3ebc4eeeb9ebb6b2e3c9084a6bb789ed92a9f00e2b878c06cca",
+        "aq-h-04-01-l1": "a24beb590a8aa69c284e5fac383b48e81af1f1c7a8f8182b1359dd37bbe1d588",
+        "aq-h-04-01-l2": "abe61a10e004f193eeb88095a001eb2e313e1bb0a4419e3f87b1b305d91bb403",
+        "aq-h-04-01-l3": "fe94b61153e2a4afbc92ab8ba5169a0e2bff8f3c86aab4f7f64f168f10e85d6e",
+        "aq-h-05-01-l1": "b96b848d9889fc8ad5812232ed69b25287c7b7357f20ef4882dceb7a1e5d400f",
+        "aq-h-05-01-l2": "b2ea312d51636a88b87e95e44e80872e3837743ccfc5d2a0577db8f9fc1f102c"
+      },
+      "distinct_first_prompts": {
+        "total": 20,
+        "choice": 6,
+        "hint": 14
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-110-calc-02-01-m0669-chain-execution
+title: "02-01 오개념 사슬 집행 — 명세 M0669 교체 + 새 객관식 은행(n≥200) S1~S5 · G-p350 Q1 가·Q2 A"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - P3-50-calc-02-01-misconception-chain-restore
+  - P3-109-m0669-choice-trace-kebab
+requires_gates:
+  - G-p350-02-01-core-and-route
+  - G-p3109-m0669-crosslink-signature
+acceptance:
+  - "① 명세 변경: `data/corpus/phase3_scope_v1/scope_spec.yaml` 항 6 `core_misconceptions`의 02-01 행 `M0075`·`M0080`을 `M0669` 한 행으로 교체한다(게이트 `G-p350-02-01-core-and-route` Q1 가 — PR 본문에 그 evidence를 인용). `python -m whymath_backend.l1.standards.phase3_coverage --json`이 명세 교체 뒤에도 exit 2(측정 거부) 없이 도는지 확인하고, 거부되면 코퍼스 귀속 정정(문서 §4 요청 2)을 별도 Kiki 결정으로 올리고 멈춘다. P3-06 표의 `len(rows) == 12` 단언 등 연쇄 갱신 지점을 함께 고친다. ② 새 객관식 문항 은행(승인 단위 n ≥ 200)을 새로 만든다 — G1(P3-44)의 은행 240에 섞지 않는다. 02-01 PRIMARY · 02-01 스킬(`equation-rearrangement`/`graph-reading`) · 객관식 · 오답 보기가 M0669 절차(평균변화율을 순간변화율로 씀)로 실제로 나온 값이며, 각 보기 값을 SymPy로 재계산해 단언한다. 오답 보기는 P3-109 kebab으로만 가리킨다(raw M-id 금지). ③ 은행·감사·승격은 G1과 같은 S1~S5를 한 세션 한 단계로 한다. 승인 문항 은행은 제자리 수정하지 않는다. ④ 완료 판정: `phase3_coverage --json`을 집행 전후 같은 명령으로 내고, 02-01 칸이 충족임을 보인다."
+  - "[G-p359 정합 · 2026-11-07 추가 · 판정 기준 main a282dafb] ①의 명세 교체 PR을 내기 전에 게이트 `G-p359-m0672-shadow-disposition` 상태를 확인한다. 두 결정이 같은 단언을 바꾼다 — 명세 핵심 오개념 수(`tests/backend/l1/test_phase3_scope_spec.py:113` `== 12`)와 P3-06 표 행수(`tests/backend/ops/test_phase3_remediation.py:77` `== 12`). G-p350 Q1 가가 12→11로 줄이고, G-p359를 ②(분모 축소)로 정하면 한 번 더 줄어든다. 또 Q1 가로 `M0075`가 명세 핵심 오개념에서 빠지면 G-p359 ②의 '별칭' 안이 가리키는 대상이 핵심이 아닌 id가 된다. 그러므로 (가) G-p359가 그사이 결정됐으면 두 결정을 반영한 값으로 단언을 맞추고 (나) 아직 pending이면 교체 뒤 P3-06을 다시 돌려 02-04 `M0672` 행이 여전히 shadowed인지 실측해 그 결과를 G-p359 corrections에 넘긴다(canonical M-id는 명세가 아니라 승인 크로스워크가 정하므로 그대로 shadowed일 것으로 읽힌다 — 실행해서 확인하지는 않았다)."
+artifacts: []
+paths:
+  - data/corpus/phase3_scope_v1/scope_spec.yaml
+  - "data/corpus/problem_bank_p3_0201_*/**"
+session: null
+notes: |-
+  출처: P3R 작업 G2 · 게이트 G-p350 결정(Kiki 2026-11-06). 명세 교체(①)는 kebab 이전에도 할 수 있으나 측정 효과는 은행 승격 뒤에만 난다. G3이 02-09에서 scope_spec.yaml 교체를 택하면 같은 PR로 묶어 감사 왕복을 줄인다.
+
+  [정정 2026-11-07] G-p350 Q1 가와 G-p359의 정합 확인 누락 보강 (PR #1864 대체 처리 중 발견)
+updated: 2026-11-07
