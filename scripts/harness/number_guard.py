@@ -101,10 +101,20 @@ HEADS_FETCH_TIMEOUT = remote_claims.SCAN_FETCH_TIMEOUT
 STAMP_FILE = "whymath-branch-scan.json"
 # 번호 가드가 남긴 관측을 같은 프로세스의 뒤 단계(고지)가 재사용하는 유효 시간.
 VIEW_MAX_AGE_SECONDS = 600
+# HARN-320 — trunk 대장 대조. 전체 브랜치 갱신(ⓓ)과 **별도로** main 하나만 받는다.
+TRUNK_BRANCH = "main"
+TRUNK_REF = f"refs/remotes/origin/{TRUNK_BRANCH}"
+TRUNK_REFSPEC = f"+refs/heads/{TRUNK_BRANCH}:{TRUNK_REF}"
+TRUNK_FETCH_TIMEOUT = 30
+# trunk 대장 출처 라벨 — 거부 문구·테스트가 같은 글자를 쓴다.
+TRUNK_SOURCE = f"방금 받은 origin/{TRUNK_BRANCH} 대장"
 
 NO_REMOTE = "no-remote"
+# trunk를 받았고 그 커밋도 읽히는데 backlog/tasks/가 없다 — '머지된 태스크 0건'이라는 관측된
+# 사실이다(못 본 것이 아니다). 커밋을 못 읽는 경우(`missing`)와 구분한다 — HARN-320.
+NO_LEDGER = "no-ledger"
 # 경고할 것이 없는 상태 — ok와 "원격 자체가 없음"(로컬 전용 클론 · 병렬 세션이 없다).
-QUIET_STATES = frozenset({"ok", NO_REMOTE})
+QUIET_STATES = frozenset({"ok", NO_REMOTE, NO_LEDGER})
 
 # 경고에 싣는 stderr 한 줄에서 URL을 가린다 — 자격 증명이 URL에 박힌 원격도 있을 수 있다.
 _URL = re.compile(r"[a-z][a-z0-9+.-]*://[^\s'\"]+", re.IGNORECASE)
@@ -206,6 +216,63 @@ def refresh_remote_heads(root: Path) -> tuple[str, str]:
         return ("error" if kind == "lease" else kind), _stderr_line(out.stderr or "")
     _write_stamp(root)
     return "ok", ""
+
+
+# ── HARN-320 · trunk 대장 대조 ─────────────────────────────────────────────────
+#
+# 사고(2026-11-02 · EOS-231): 상대 세션의 등재가 PR로 main에 머지되면 ①그 브랜치는 지워지고
+# ②번호 예약도 풀린다. 그 직후(73초 뒤) 낡은 로컬 main 사본에서 같은 번호를 add하면 그 번호는
+# **이제 main에만** 있다. 전체 브랜치 파일명 스캔(ⓓ)이 원리상 main도 보지만, 세 경우에 놓친다:
+#   ⑴ 전체 갱신이 실패하면(타임아웃·프록시) 이 클론의 **낡은** origin/main으로 판정하고 경고 후 통과
+#   ⑵ 세션이 로컬 `main` 브랜치에 있으면 맨 번호 ID 판정이 origin/main 사본을 '같은 세션'으로 건너뜀
+#   ⑶ 스캔은 ls-tree 실패 ref를 조용히 건너뛰고, ref 목록을 이름순 상한(`SCAN_MAX_REFS`)으로 자른다
+#      — `main`은 `claude/*` 뒤에 정렬되므로 브랜치가 많아지면 가장 먼저 잘린다
+# 그래서 main은 **전용 경로**로 본다: 표적 fetch(30초) → `ls-tree origin/main:backlog/tasks`.
+# 실패는 '없음'이 아니라 판정 불가이며, `add`는 사람이 사유를 적기 전까지 진행하지 않는다.
+
+
+def trunk_task_files(root: Path) -> tuple[list, str, str]:
+    """origin/main을 **방금** 받아 그 대장의 태스크 파일명을 읽는다. 반환 `(파일들, 상태, 원인)`.
+
+    상태: `ok` · `no-remote` · `offline` · `timeout` · `error` · `error:<예외 타입>` ·
+    `no-ledger`(커밋은 읽히는데 backlog/tasks/가 없다 — 머지된 태스크 0건) ·
+    `missing`(받은 ref의 커밋을 못 읽는다) · `empty`(폴더는 있는데 yaml 0건 — 판정 불가).
+    fetch가 실패하면 이 클론의 옛 origin/main을 읽지 **않는다** — 낡은 사본으로 판정하는 것이
+    바로 이 사각이다.
+    """
+    if not remote_claims.has_remote(root):
+        return [], NO_REMOTE, ""
+    try:
+        out = remote_claims._git(
+            root, "fetch", "--quiet", "origin", TRUNK_REFSPEC, timeout=TRUNK_FETCH_TIMEOUT
+        )
+        if out.returncode != 0:
+            kind = remote_claims._classify_failure(out.stderr or "")
+            return [], ("error" if kind == "lease" else kind), _stderr_line(out.stderr or "")
+        tree = remote_claims._git(
+            root, "ls-tree", "--name-only", f"{TRUNK_REF}:backlog/tasks", timeout=10
+        )
+        commit = (
+            remote_claims._git(root, "cat-file", "-t", TRUNK_REF, timeout=10)
+            if tree.returncode != 0
+            else None
+        )
+    except subprocess.TimeoutExpired:
+        return [], "timeout", f"{TRUNK_FETCH_TIMEOUT}초 초과"
+    except Exception as exc:
+        return [], f"error:{type(exc).__name__}", ""
+    if tree.returncode != 0:
+        if commit is not None and commit.returncode == 0 and commit.stdout.strip() == "commit":
+            return [], NO_LEDGER, ""
+        return [], "missing", _stderr_line(tree.stderr or "")
+    files = [
+        remote_claims.RemoteTaskFile(
+            task_id=name.strip()[: -len(".yaml")], ref=TRUNK_REF, branch=TRUNK_BRANCH
+        )
+        for name in tree.stdout.splitlines()
+        if name.strip().endswith(".yaml")
+    ]
+    return files, ("ok" if files else "empty"), ""
 
 
 # ── ⓐ 번호 예약 ────────────────────────────────────────────────────────────
@@ -521,9 +588,19 @@ def foreign_bare_holder(
     - 예약: 제목 지문이 같을 때만 같은 태스크(같은 세션 예약은 관측이 이미 뺐다).
     - claim: 지문이 없으므로 다른 세션이면 다른 태스크로 본다.
     - 원격 브랜치 사본: 그 사본의 제목 지문을 읽어 비교한다. 못 읽으면 다른 태스크로 본다.
+    - trunk 대장(HARN-320): 원격 브랜치 사본과 같되 **세션 예외가 없다** — main은 한 세션의
+      작업 공간이 아니라 머지된 대장이다. 로컬 `main` 브랜치에서 일하는 세션이 그 사본을
+      '내 것'으로 건너뛰면 머지된 남의 태스크와 같은 번호를 그대로 쓴다.
     """
     if view is None or not is_bare_id(task_id):
         return None
+    for item in view.trunk_files:
+        if item.task_id != task_id:
+            continue
+        texts, _, status = remote_claims.read_remote_task_texts(root, [item])
+        other = _title_of(texts.get(task_id, "")) if status == "ok" else ""
+        if not same_task(task_id, item.task_id, fingerprint, title_fingerprint(other)):
+            return TRUNK_SOURCE, TRUNK_BRANCH
     for held in view.reservations:
         if held.task_id == task_id and not same_task(
             task_id, held.task_id, fingerprint, held.fingerprint
@@ -569,10 +646,18 @@ class RemoteView:
     task_files: list = field(default_factory=list)
     files_status: str = "disabled"
     refs_seen: int = 0
+    trunk_files: list = field(default_factory=list)
+    trunk_status: str = "disabled"
+    trunk_detail: str = ""
+
+    @property
+    def trunk_seen(self) -> bool:
+        """방금 받은 trunk 대장을 봤는가(또는 원격이 아예 없는가) — HARN-320."""
+        return self.trunk_status in QUIET_STATES
 
     @property
     def complete(self) -> bool:
-        """네 출처가 전부 봤는가(또는 원격이 아예 없는가). False면 번호 가드는 부분 판정이다."""
+        """다섯 출처가 전부 봤는가(또는 원격이 아예 없는가). False면 번호 가드는 부분 판정이다."""
         return all(
             s in QUIET_STATES
             for s in (
@@ -580,6 +665,7 @@ class RemoteView:
                 self.claims_status,
                 self.reservations_status,
                 self.files_status,
+                self.trunk_status,
             )
         )
 
@@ -612,6 +698,14 @@ class RemoteView:
             out.append(
                 f"원격 브랜치 backlog/tasks/ 파일명 스캔 실패({self.files_status}) — 등재만 되고 "
                 "아직 claim되지 않은 원격 번호는 놓칠 수 있다"
+            )
+        if not self.trunk_seen:
+            detail = f" · {self.trunk_detail}" if self.trunk_detail else ""
+            out.append(
+                f"origin/{TRUNK_BRANCH} 대장 조회 실패({self.trunk_status}{detail}) — "
+                "**측정 불가**: "
+                "방금 머지돼 예약이 풀린 번호는 로컬 main 사본이 낡아 있으면 어디에도 안 보인다"
+                "(EOS-231 형태 · HARN-320)"
             )
         return out
 
@@ -693,6 +787,16 @@ def observe(root: Path, *, ttl_hours: int = RESERVATION_TTL_HOURS) -> RemoteView
         view.refs_seen = _count_remote_refs(root)
         if not view.task_files:
             view.files_status = "empty"
+    # HARN-320 — main은 전용 경로로 다시 본다(전체 갱신·스캔의 성패와 무관하게).
+    view.trunk_files, view.trunk_status, view.trunk_detail = trunk_task_files(root)
+    if not view.trunk_seen:
+        store.append_event(
+            root,
+            "trunk_ledger_unavailable",
+            "-",
+            status=view.trunk_status,
+            detail=view.trunk_detail,
+        )
     _VIEWS[_key(root)] = (time.monotonic(), view)
     return view
 
