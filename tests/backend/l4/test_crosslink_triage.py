@@ -135,10 +135,12 @@ class TestCommittedQueueEndToEnd:
         # 승인 문항의 오답 보기가 아직 이 kebab을 가리키지 않아(2026-10-18 실측 0건) 같은 이유로
         # no_signal 3→7건이다. corroborated 108·auto_reject 4는 불변 — 신호가 없는 행을 일치로 세지
         # 않는다. 보기가 연결되면(P3-44·P3-57) 이 4건이 corroborated 또는 thin_disagree로 옮겨 간다.
+        # P3-109(average-rate-as-instantaneous-rate · M0669)도 같은 부류·같은 이유로 no_signal 7→8건이다
+        # — 이 kebab을 가리키는 보기는 P3-110의 새 은행이 만든다.
         report = self._run()
         assert report.counts == {  # type: ignore[attr-defined]
             "corroborated": 108,
-            "no_signal": 7,
+            "no_signal": 8,
             "auto_reject": 4,
             "thin_disagree": 0,
         }

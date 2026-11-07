@@ -124,9 +124,9 @@ main
 <!-- RULESET_POLICY_BEGIN — scripts/harness/ruleset_drift.py가 라이브 JSON과 대조한다. tests/infra/test_ruleset_drift.py가 이 블록의 실재를 동결한다. -->
 - `required_check_integration_id` = `15368`
 - `strict_required_status_checks_policy` = `false`
-- `required_approving_review_count` = `1`
-- `dismiss_stale_reviews_on_push` = `true`
-- `require_code_owner_review` = `true`
+- `required_approving_review_count` = `0`
+- `dismiss_stale_reviews_on_push` = `false`
+- `require_code_owner_review` = `false`
 - `required_review_thread_resolution` = `true`
 - `required_linear_history` = `true`
 - `deletion` = `true`
@@ -144,6 +144,19 @@ merge queue가 켜져 있으면 큐가 PR을 최신 `main` 위에 얹어 **전�
 막혀 `main` 수동 병합을 3회 반복했고 그때마다 CI가 처음부터 다시 돌았다(실측).
 **보호를 낮춘 것이 아니라 집행 지점을 큐로 옮긴 것이다**: 낡은 base에서 통과한 CI로
 머지되는 일은 큐가 막는다. 이 선언이 `true`로 되돌아가면 그 마찰도 함께 돌아온다.
+
+**승인 축 3줄이 `0`·`false`·`false`인 이유** (2026-11-07 Kiki 결정 · `HARN-63` ⑤ 종결):
+이 저장소는 사람 개발자가 Kiki 한 명이다. GitHub는 PR 작성자의 자기 승인을 승인으로 세지
+않으므로, 승인 1명을 요구하면 **모든 PR이 구조적으로 머지 불가**가 된다. Code Owner 리뷰도
+Code Owner = 작성자라 같은 이유로 충족할 수 없고, 승인 요구가 0이면 stale 승인 해제는
+단독으로 의미가 없다. 그래서 2026-09-03부터 이 3축을 `2026-12-31` 만료 유예로 두었고, 만료를
+앞두고 Kiki가 "설정을 문서대로 켠다"가 아니라 **"문서를 현실에 맞춘다"**를 택했다.
+**보호를 없앤 것이 아니라 집행 지점이 다른 곳에 있다는 것을 선언으로 옮긴 것이다** — 머지
+전 품질은 required check 16건 + merge queue 재검증이, 되돌리기 어려운 머지 판단은 `"pr"`
+지시 또는 Kiki 판단(CLAUDE.md「완료·병합」)이 맡는다. **재판정 지점**: 쓰기 권한을 가진
+사람 기여자가 2명 이상이 되는 순간 이 3줄은 다시 `1`·`true`·`true`로 올린다 — 그때부터는
+자기 승인 불가가 장애가 아니라 의도한 보호가 된다. 이 선언이 그 전에 `1`로 바뀌면 판정기는
+라이브(0)와의 불일치를 위반으로 보고한다.
 
 `required_check_integration_id`는 GitHub Actions 앱의 id다 — required check 항목을 이 앱으로
 pin해야 *다른 주체*가 같은 컨텍스트 이름으로 성공을 보고해도 충족되지 않는다.
@@ -190,10 +203,10 @@ pin해야 *다른 주체*가 같은 컨텍스트 이름으로 성공을 보고�
 ``- `키` until `YYYY-MM-DD` — 사유``
 
 <!-- RULESET_DEVIATIONS_BEGIN — 만료 없는 유예 금지. 만료일이 지나면 ruleset_drift.py가 위반으로 승격한다. -->
-- `required_approving_review_count` until `2026-12-31` — 1인 개발 단계에서 승인 1명을 요구하면 자가승인이 불가해 머지가 막힌다. 문서를 현실에 맞출지 설정을 문서에 맞출지는 Kiki 판단 사안(HARN-63 ⑤). 만료 시 재판정.
-- `dismiss_stale_reviews_on_push` until `2026-12-31` — 위와 같은 승인 축 일괄. 승인 요구가 0인 상태에서 stale dismiss는 단독으로 의미가 없다.
-- `require_code_owner_review` until `2026-12-31` — 위와 같은 승인 축 일괄. 1인 단계에서는 Code Owner = 작성자라 충족이 구조적으로 불가하다.
 <!-- RULESET_DEVIATIONS_END -->
+
+*현재 유예 0건.* 승인 축 3건은 2026-11-07 Kiki 결정으로 유예가 아니라 선언 자체를 라이브에
+맞췄다(위「정책 파라미터 선언」의 승인 축 사유 참조).
 
 ### 재발 탐지 실행법 (HARN-63 — 조회는 사람·판정은 기계)
 
@@ -319,6 +332,8 @@ echo "EXIT=$LASTEXITCODE"
 >   적었으나 라이브는 전부 off(`required_approving_review_count: 0`)다. **의도적으로 바꾸지
 >   않았다** — 1인 개발에서 승인 1명을 요구하면 자가승인이 불가해 머지가 막힌다. 문서를
 >   현실에 맞출지 설정을 문서에 맞출지는 Kiki 판단 사안이다(`HARN-63` ⑤).
+>   *[후속 2026-11-07] Kiki가 "문서를 현실에 맞춘다"로 결정했다 — 현행 선언은
+>   「정책 파라미터 선언」 블록이 정본이다.*
 
 > #### 왜 기존 방어가 못 잡았나 — 저장소 경계 밖이라서
 >
@@ -546,8 +561,8 @@ PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **�
 | `allow_force_pushes` | `false` | `non_fast_forward` ✔ |
 | `allow_deletions` | `false` | `deletion` ✔ |
 | `required_conversation_resolution` | `true` | `required_review_thread_resolution` ✔ |
-| `required_approving_review_count` | `0` | `0` (동일·유예 중) |
-| `require_code_owner_reviews` | `false` | `false` (동일·유예 중) |
+| `required_approving_review_count` | `0` | `0` (동일·2026-11-07부터 선언도 `0`) |
+| `require_code_owner_reviews` | `false` | `false` (동일·2026-11-07부터 선언도 `false`) |
 | `required_signatures` | `false` | 원래 꺼져 있었다 — 소실 없음 |
 | `block_creations` · `lock_branch` · `allow_fork_syncing` | `false` | 전부 꺼져 있었다 |
 | `restrictions` | **키 자체 부재** | 없었으므로 소실 없음 |
@@ -555,7 +570,7 @@ PR을 최신 `main` 위에 얹어 재검증하므로 'up to date 요구'가 **�
   관리자에게도 규칙이 그대로 적용된다. 소실 없음 |
 
 `dismiss_stale_reviews`만 클래식 `true` vs 룰셋 `false`인데, 승인 요구가 0인 상태에서는
-단독으로 의미가 없다(문서의 유예 3건 중 하나가 같은 축을 이미 다룬다).
+단독으로 의미가 없다(2026-11-07 결정으로 선언도 `false`다).
 
 **12축 대조 결과: 소실 0.** 마지막 미확인 칸(`enforce_admins`)은 게이트
 `G-ruleset-bypass-actors-read`로 분리해 Kiki 머신에서 1회 조회로 닫았다.
