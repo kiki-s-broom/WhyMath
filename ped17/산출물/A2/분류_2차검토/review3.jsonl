@@ -1,0 +1,154 @@
+{"code": "12수문01-04-2", "cls": "가능", "reason": "프레임÷fps 나눗셈 한 값으로 정해짐", "method": "sympy.Rational 연산 720/24", "border": false}
+{"code": "12수문02-01-2", "cls": "가능", "reason": "안타÷타수 소수 계산으로 0.300 확정", "method": "sympy.Rational 연산 12/40", "border": false}
+{"code": "12수문02-02-2", "cls": "가능", "reason": "두 주사위 합 7의 경우 수 열거로 1/6 확정", "method": "itertools.product 열거 + sympy.Rational", "border": false}
+{"code": "12수문02-03-2", "cls": "가능", "reason": "십진수→이진수 변환 결과가 하나로 정해짐", "method": "bin(13) / 반복 나눗셈 몫·나머지 검산", "border": false}
+{"code": "12수문03-01-2", "cls": "가능", "reason": "내각×개수=360 비교로 참거짓 판정", "method": "sympy.Rational 연산 120*3==360", "border": false}
+{"code": "12수문03-01-3", "cls": "가능", "reason": "비 약분과 비례식 값이 하나로 정해짐", "method": "sympy.Rational 약분 + sympy.solve 비례식", "border": false}
+{"code": "12수문03-02-1", "cls": "불가", "reason": "맥락·부호 설계 이해가 핵심, 계산은 2^6 하나", "method": "해당 없음", "border": true}
+{"code": "12수문03-02-3", "cls": "가능", "reason": "2^n≥40 최소 n 탐색은 정수 연산", "method": "sympy.ceiling(sympy.log(40,2)) / 정수 반복 탐색", "border": false}
+{"code": "12수문03-03-3", "cls": "불가", "reason": "원그래프로 나타내기가 핵심, 계산은 부수적", "method": "해당 없음", "border": true}
+{"code": "12수문03-04-2", "cls": "가능", "reason": "단위가격 나눗셈 비교로 판정 확정", "method": "sympy.Rational 연산 가격/용량 비교", "border": false}
+{"code": "12수문04-01-3", "cls": "불가", "reason": "띠그래프 표현이 핵심, 길이 계산은 부수적", "method": "해당 없음", "border": true}
+{"code": "12인수02-01-3", "cls": "가능", "reason": "단어 빈도 세기 결과 벡터가 하나로 정해짐", "method": "collections.Counter 로 어휘 순서 벡터 계산", "border": false}
+{"code": "12인수02-03-2", "cls": "가능", "reason": "내적·노름 계산으로 코사인 값 확정", "method": "sympy.Matrix.dot / norm 으로 1/sqrt(2)", "border": false}
+{"code": "12인수04-01-3", "cls": "가능", "reason": "텍스트 표의 도수÷전체 확률 계산", "method": "sympy.Rational 연산 20/100", "border": false}
+{"code": "12인수04-02-3", "cls": "가능", "reason": "두 점 지나는 직선식이 유일하게 정해짐", "method": "sympy.solve 연립 또는 sympy.Line 방정식", "border": false}
+{"code": "12인수04-03-2", "cls": "가능", "reason": "오차 제곱합은 정수 연산으로 확정", "method": "정수/sympy 연산 sum((a-b)**2)", "border": false}
+{"code": "12직수01-01-1", "cls": "가능", "reason": "곱셈 한 번의 정수 값", "method": "정수 연산 12*7", "border": false}
+{"code": "12직수01-01-3", "cls": "불가", "reason": "상황을 식으로 옮기기, 값 일치만으로 식 구조 검증 불가", "method": "해당 없음", "border": true}
+{"code": "12직수01-02-1", "cls": "가능", "reason": "백의 자리 반올림 결과가 하나로 정해짐", "method": "sympy.Integer round / 정수 연산 round(2870,-2)", "border": false}
+{"code": "12직수01-02-3", "cls": "불가", "reason": "수직선에서 가까운 쪽을 설명하는 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "12직수01-03-1", "cls": "가능", "reason": "고정 비율 단위 환산 곱셈", "method": "단위 환산표 곱셈 규칙 2.5*1000", "border": false}
+{"code": "12직수01-03-3", "cls": "가능", "reason": "텍스트로 주어진 환산 관계를 연쇄 곱셈", "method": "단위 환산표 곱셈 규칙 2.5*1000*1000", "border": false}
+{"code": "12직수02-01-1", "cls": "가능", "reason": "비례 관계로 미지량 하나가 정해짐", "method": "sympy.solve 비례식 2/3=x/9", "border": false}
+{"code": "12직수02-01-2", "cls": "가능", "reason": "비례식 풀이 값이 하나로 정해짐", "method": "sympy.solve Eq(1/5, 40/x 의 역수)", "border": false}
+{"code": "12직수02-02-1", "cls": "가능", "reason": "소수↔백분율 변환은 곱셈 100", "method": "sympy.Rational 연산 0.03*100", "border": false}
+{"code": "12직수02-03-2", "cls": "가능", "reason": "표의 곱셈 규칙을 식으로 두고 값 확인", "method": "sympy.solve 규칙 y=4x + Eq 동치 확인", "border": false}
+{"code": "12직수02-03-3", "cls": "가능", "reason": "규칙에 따른 표 값이 하나로 정해짐", "method": "sympy 식 대입 2000*h", "border": false}
+{"code": "12직수02-04-3", "cls": "가능", "reason": "텍스트로 주어진 두 값의 평균변화율", "method": "sympy.Rational 연산 (100-40)/2", "border": false}
+{"code": "12직수02-05-1", "cls": "가능", "reason": "부등식 정수해 최댓값이 하나로 정해짐", "method": "sympy.solve_univariate_inequality + floor", "border": false}
+{"code": "12직수02-05-3", "cls": "가능", "reason": "세운 부등식의 해집합 동치로 검산", "method": "sympy.solve_univariate_inequality 해집합 비교", "border": false}
+{"code": "12직수03-03-1", "cls": "가능", "reason": "축척 비율 곱셈과 단위 환산", "method": "sympy.Rational 연산 3*100/100", "border": false}
+{"code": "12직수03-03-3", "cls": "가능", "reason": "축척 곱셈과 cm→m 환산", "method": "sympy.Rational 연산 3*1000/100", "border": false}
+{"code": "12직수03-04-1", "cls": "가능", "reason": "직사각형 넓이 곱셈", "method": "sympy 정수 연산 4*3", "border": false}
+{"code": "12직수03-05-1", "cls": "가능", "reason": "직육면체 부피 곱셈", "method": "sympy 정수 연산 2*1*1", "border": false}
+{"code": "12직수03-05-3", "cls": "가능", "reason": "치수가 텍스트로 주어진 겉넓이 합산", "method": "sympy 연산 2*(4*3+4*2+3*2)", "border": false}
+{"code": "12직수04-01-1", "cls": "가능", "reason": "곱의 법칙으로 경우의 수 확정", "method": "정수 연산 3*4 / itertools.product 열거", "border": false}
+{"code": "12직수04-02-2", "cls": "가능", "reason": "경우의 비로 분수·백분율 확정", "method": "sympy.Rational 연산 5/20", "border": false}
+{"code": "12확통01-01-1", "cls": "가능", "reason": "같은 것이 있는 순열 수 확정", "method": "sympy.factorial 연산 3!/2!", "border": false}
+{"code": "12확통01-02-2", "cls": "가능", "reason": "중복조합 값이 하나로 정해짐", "method": "sympy.binomial(7,5)", "border": false}
+{"code": "12확통01-03-2", "cls": "가능", "reason": "이항전개 특정 항 계수 확정", "method": "sympy.expand((x+1)**4).coeff(x,2)", "border": false}
+{"code": "12확통02-01-2", "cls": "가능", "reason": "경우의 비 계산으로 확률 확정", "method": "sympy.Rational 연산 2/6", "border": false}
+{"code": "12확통02-02-2", "cls": "가능", "reason": "확률 덧셈정리 대입 계산", "method": "sympy.Rational 연산 0.5+0.4-0.2", "border": false}
+{"code": "12확통02-04-2", "cls": "가능", "reason": "조건부확률 공식 대입 계산", "method": "sympy.Rational 연산 0.2/0.5", "border": false}
+{"code": "12확통02-05-2", "cls": "가능", "reason": "곱 일치 여부로 독립 참거짓 판정", "method": "sympy.Rational 비교 P(A)P(B)==P(A∩B)", "border": false}
+{"code": "12확통03-01-2", "cls": "가능", "reason": "분포표 확률과 합 1을 열거로 검산", "method": "itertools.product 열거 + sympy.Rational 합", "border": false}
+{"code": "12확통03-02-2", "cls": "가능", "reason": "기댓값·분산·표준편차 정확값 계산", "method": "sympy.stats 또는 sympy.Rational 합산, sqrt", "border": false}
+{"code": "12확통03-04-2", "cls": "가능", "reason": "표준화 z 값은 대입 계산", "method": "sympy.Rational 연산 (70-50)/10", "border": false}
+{"code": "12확통03-07-2", "cls": "가능", "reason": "신뢰구간 끝점이 대입으로 정해짐", "method": "sympy.Rational 연산 50±1.96*10/sqrt(100)", "border": false}
+{"code": "FINM-C01", "cls": "가능", "reason": "현재가치 공식 FV/(1+r) 대입으로 확정", "method": "sympy.Rational 연산 110/1.1", "border": false}
+{"code": "ODE-C02", "cls": "가능", "reason": "완전성 판정과 퍼텐셜 풀이가 식으로 닫힘", "method": "sympy.diff 로 My==Nx 확인 + sympy.integrate", "border": false}
+{"code": "ODE-C04", "cls": "불가", "reason": "합성곱 vs 곱 구분은 성질 이해, 반례 하나가 전부", "method": "해당 없음", "border": true}
+{"code": "ODE-C07", "cls": "불가", "reason": "안정/불안정 정성 분류가 핵심", "method": "해당 없음", "border": true}
+{"code": "ODE-P01", "cls": "가능", "reason": "변수분리 미분방정식 해가 식으로 정해짐", "method": "sympy.dsolve(ics={y(0):1})", "border": false}
+{"code": "ODE-P02", "cls": "가능", "reason": "적분인자 선형 1계 해가 식으로 정해짐", "method": "sympy.dsolve + simplify 동치 확인", "border": false}
+{"code": "ODE-P04", "cls": "가능", "reason": "중근 특성방정식 일반해가 식으로 정해짐", "method": "sympy.dsolve 2계 제차", "border": false}
+{"code": "ODE-P06", "cls": "가능", "reason": "부분분수 후 역라플라스 변환 결과 확정", "method": "sympy.inverse_laplace_transform + apart", "border": false}
+{"code": "ODE-P07", "cls": "가능", "reason": "라플라스로 초깃값 문제 해 확정", "method": "sympy.laplace_transform / dsolve(ics)", "border": false}
+{"code": "CALC1-C10", "cls": "가능", "reason": "x^x 로그미분 도함수가 식으로 정해짐", "method": "sympy.diff(x**x) + simplify", "border": false}
+{"code": "CALC1-C11", "cls": "불가", "reason": "f''과 (f')² 구분은 정의 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC1-C17", "cls": "불가", "reason": "리만 합이 근사임을 설명하는 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC1-C18", "cls": "불가", "reason": "부호 있는 합의 의미 해석이 핵심", "method": "해당 없음", "border": false}
+{"code": "CALC1-C20", "cls": "불가", "reason": "적분이 곱으로 분리 안 됨은 성질 구분이 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC1-C21", "cls": "가능", "reason": "회전체 부피 정적분 값이 식으로 닫힘", "method": "sympy.integrate(pi*x, (x,0,1))", "border": false}
+{"code": "CALC1-C22", "cls": "가능", "reason": "호의 길이 적분 값이 식으로 닫힘", "method": "sympy.integrate(sqrt(1+diff(y)**2))", "border": false}
+{"code": "CALC1-P01", "cls": "가능", "reason": "0/0 극한을 약분해 값이 정해짐", "method": "sympy.limit((x**2-4)/(x-2), x, 2)", "border": false}
+{"code": "CALC1-P03", "cls": "불가", "reason": "∞를 수로 보면 안 됨은 개념 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC1-P04", "cls": "가능", "reason": "최고차항 비로 극한값 확정", "method": "sympy.limit(..., x, oo)", "border": false}
+{"code": "CALC1-P05", "cls": "가능", "reason": "차분몫 극한으로 도함수 식 확정", "method": "sympy.limit 차분몫 + sympy.diff 동치 확인", "border": false}
+{"code": "CALC1-P06", "cls": "가능", "reason": "곱의 미분 공식 결과가 식으로 정해짐", "method": "sympy.diff(f*g) 와 simplify 동치 확인", "border": false}
+{"code": "CALC1-P07", "cls": "가능", "reason": "몫의 미분 공식 결과가 식으로 정해짐", "method": "sympy.diff(f/g) + simplify", "border": false}
+{"code": "CALC1-P08", "cls": "가능", "reason": "합성함수 도함수가 식으로 정해짐", "method": "sympy.diff(sin(3*x))", "border": false}
+{"code": "CALC1-P09", "cls": "가능", "reason": "음함수 도함수가 식으로 정해짐", "method": "sympy.idiff(x**2+y**2-25, y, x)", "border": false}
+{"code": "CALC1-P10", "cls": "가능", "reason": "닫힌구간 최값이 수로 정해짐", "method": "sympy.diff + solve 임계점, 끝점 함숫값 비교", "border": false}
+{"code": "CALC1-P11", "cls": "불가", "reason": "로피탈 적용 가능 여부 판단이 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC1-P12", "cls": "가능", "reason": "반복 로피탈로 극한값 확정", "method": "sympy.limit((1-cos(x))/x**2, x, 0)", "border": false}
+{"code": "CALC1-P13", "cls": "가능", "reason": "기본정리로 정적분 값 확정", "method": "sympy.integrate(3*x**2,(x,0,2))", "border": false}
+{"code": "CALC1-P15", "cls": "가능", "reason": "치환적분 결과 부정적분이 식으로 정해짐", "method": "sympy.integrate(2*x*cos(x**2), x)", "border": false}
+{"code": "CALC1-P16", "cls": "가능", "reason": "치환 한계와 정적분 값이 정해짐", "method": "sympy.integrate(2*x*x**6,(x,0,1))", "border": false}
+{"code": "CALC1-P17", "cls": "가능", "reason": "두 곡선 사이 넓이가 수로 정해짐", "method": "sympy.solve 교점 + sympy.integrate", "border": false}
+{"code": "CALC1-P20", "cls": "가능", "reason": "삼각치환 적분 결과가 식으로 정해짐", "method": "sympy.integrate(1/sqrt(1-x**2), x)", "border": false}
+{"code": "CALC1-P22", "cls": "가능", "reason": "비판정 극한과 급수 수렴 여부 확정", "method": "sympy.limit 비율 + Sum.is_convergent", "border": true}
+{"code": "CALC1-P24", "cls": "가능", "reason": "테일러 계수는 도함수 값으로 정해짐", "method": "sympy.series(exp(x),x,0,4)", "border": false}
+{"code": "CALC2-C04", "cls": "불가", "reason": "내적 결과가 스칼라라는 유형 구분이 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC2-C10", "cls": "가능", "reason": "속도 벡터와 크기 계산이 식으로 정해짐", "method": "sympy.diff + sympy.sqrt/simplify 크기", "border": false}
+{"code": "CALC2-C11", "cls": "불가", "reason": "속력 일정해도 가속도 존재는 성질 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC2-C12", "cls": "불가", "reason": "곡률이 f''만이 아님은 인식 구분이 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC2-C16", "cls": "불가", "reason": "기울기 벡터 수직 성질 인지가 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC2-C18", "cls": "불가", "reason": "삼중적분의 의미 해석이 핵심", "method": "해당 없음", "border": false}
+{"code": "CALC2-C19", "cls": "불가", "reason": "경로 의존이라는 정성적 성질 인지가 핵심", "method": "해당 없음", "border": true}
+{"code": "CALC2-P01", "cls": "가능", "reason": "매개곡선 기울기가 식으로 정해짐", "method": "sympy.diff(y,t)/sympy.diff(x,t)", "border": false}
+{"code": "CALC2-P02", "cls": "가능", "reason": "극좌표 넓이 적분 값 확정", "method": "sympy.integrate(r**2/2,(t,0,2*pi))", "border": false}
+{"code": "CALC2-P03", "cls": "가능", "reason": "3차원 거리 제곱합 제곱근 값", "method": "sympy.sqrt(1+4+4)", "border": false}
+{"code": "CALC2-P04", "cls": "가능", "reason": "외적 순서 교환 결과 벡터 확정", "method": "sympy.Matrix.cross 로 a×b, b×a 비교", "border": false}
+{"code": "CALC2-P05", "cls": "가능", "reason": "외적 행렬식 전개 결과 확정", "method": "sympy.Matrix.cross / det 전개", "border": false}
+{"code": "CALC2-P06", "cls": "가능", "reason": "곡률 공식 대입 값 확정", "method": "sympy.diff 이계 + 공식 대입 simplify", "border": false}
+{"code": "CALC2-P07", "cls": "가능", "reason": "편도함수가 식으로 정해짐", "method": "sympy.diff(f, x), sympy.diff(f, y)", "border": false}
+{"code": "CALC2-P08", "cls": "가능", "reason": "다변수 연쇄법칙 도함수가 식으로 정해짐", "method": "sympy.diff 합성 대입 후 simplify", "border": false}
+{"code": "CALC2-P09", "cls": "가능", "reason": "라그랑주 조건 연립 최댓값 확정", "method": "sympy.solve 연립 ∇f=λ∇g, g=0", "border": false}
+{"code": "CALC2-P10", "cls": "가능", "reason": "라그랑주 연립 후보점 확정", "method": "sympy.solve 연립", "border": false}
+{"code": "CALC2-P12", "cls": "가능", "reason": "극좌표 이중적분 값 확정", "method": "sympy.integrate(r,(r,0,1),(t,0,2*pi))", "border": false}
+{"code": "CALC2-P13", "cls": "가능", "reason": "원기둥좌표 삼중적분 값 확정", "method": "sympy.integrate(r,(z,0,2),(r,0,1),(t,0,2*pi))", "border": false}
+{"code": "CALC2-P14", "cls": "가능", "reason": "구면좌표 삼중적분 값 확정", "method": "sympy.integrate(rho**2*sin(phi), ...)", "border": false}
+{"code": "CALC2-P15", "cls": "가능", "reason": "야코비안 행렬식이 수로 정해짐", "method": "sympy.Matrix.jacobian().det()", "border": false}
+{"code": "CXAN-C01", "cls": "가능", "reason": "복소수 극형식 크기·편각 확정", "method": "sympy.Abs, sympy.arg, sympy.polar_lift", "border": false}
+{"code": "CXAN-C05", "cls": "불가", "reason": "유계 여부는 정성적 성질, cos(i) 계산은 예시", "method": "해당 없음", "border": true}
+{"code": "CXAN-P01", "cls": "가능", "reason": "극점에서 유수가 수로 정해짐", "method": "sympy.residue(f, z, 0)", "border": false}
+{"code": "LINA1-C01", "cls": "불가", "reason": "행연산이 해집합 보존은 정리 이해, 예 하나뿐", "method": "해당 없음", "border": true}
+{"code": "LINA1-C05", "cls": "가능", "reason": "행렬식 0 여부로 역행렬 존재 판정", "method": "sympy.Matrix.det, is_invertible", "border": true}
+{"code": "LINA1-C06", "cls": "불가", "reason": "det 가법 불성립은 성질 구분, 반례 하나뿐", "method": "해당 없음", "border": true}
+{"code": "LINA1-C07", "cls": "가능", "reason": "det(kA)=k^n det A 대칭행렬로 식 검증", "method": "sympy.Matrix.det 기호행렬 simplify", "border": false}
+{"code": "LINA1-C10", "cls": "가능", "reason": "두 벡터 독립 여부를 rank 로 판정", "method": "sympy.Matrix.rank", "border": false}
+{"code": "LINA1-C11", "cls": "가능", "reason": "영벡터 포함 집합 rank 로 종속 판정", "method": "sympy.Matrix.rank", "border": false}
+{"code": "LINA1-C12", "cls": "불가", "reason": "기저의 정의(독립∧생성) 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "LINA1-C13", "cls": "가능", "reason": "평면 영공간 차원이 수로 정해짐", "method": "sympy.Matrix.nullspace 차원", "border": false}
+{"code": "LINA1-C14", "cls": "가능", "reason": "투영 사상 핵이 부분공간으로 정해짐", "method": "sympy.Matrix.nullspace", "border": false}
+{"code": "LINA1-C15", "cls": "가능", "reason": "선형사상 상이 열공간으로 정해짐", "method": "sympy.Matrix.columnspace", "border": false}
+{"code": "LINA1-P01", "cls": "가능", "reason": "가우스 소거 연립 해 확정", "method": "sympy.linsolve / Matrix.rref", "border": false}
+{"code": "LINA1-P02", "cls": "가능", "reason": "행렬곱 AB, BA 값이 정해짐", "method": "sympy.Matrix 곱 비교", "border": false}
+{"code": "LINA1-P05", "cls": "가능", "reason": "2×2 역행렬이 식으로 정해짐", "method": "sympy.Matrix.inv", "border": false}
+{"code": "LINA1-P07", "cls": "가능", "reason": "삼각행렬 행렬식 값 확정", "method": "sympy.Matrix.det", "border": false}
+{"code": "LINA1-P08", "cls": "가능", "reason": "3×3 행렬식 값 확정", "method": "sympy.Matrix.det", "border": false}
+{"code": "LINA1-P10", "cls": "가능", "reason": "크라메르 공식 해가 수로 정해짐", "method": "sympy.Matrix.det 비 / linsolve 동치", "border": false}
+{"code": "LINA1-P11", "cls": "가능", "reason": "행렬식 0 여부로 독립 판정", "method": "sympy.Matrix.det, rank", "border": false}
+{"code": "LINA1-P12", "cls": "가능", "reason": "rank·nullity 가 수로 정해짐", "method": "sympy.Matrix.rank, nullspace", "border": false}
+{"code": "LINA2-P01", "cls": "가능", "reason": "특성다항식 근 고유값이 정해짐", "method": "sympy.Matrix.eigenvals", "border": false}
+{"code": "LINA2-P02", "cls": "가능", "reason": "정규직교기저가 식으로 정해짐", "method": "sympy.GramSchmidt(normalize=True)", "border": false}
+{"code": "MSTAT-P01", "cls": "불가", "reason": "MLE 유도 서술과 일반 원리가 핵심", "method": "해당 없음", "border": true}
+{"code": "NUMER-P02", "cls": "가능", "reason": "보간 다항식이 유일하게 정해짐", "method": "sympy.interpolate / lagrange 후 simplify", "border": false}
+{"code": "RANAL-P01", "cls": "가능", "reason": "켤레지수 q는 1/p+1/q=1 계산", "method": "sympy.Rational 연산 1/(1-1/2)", "border": false}
+{"code": "CRYP-C10", "cls": "가능", "reason": "정정 오류수는 floor((d-1)/2) 정수 계산", "method": "정수 연산 (5-1)//2", "border": true}
+{"code": "NUMT1-C05", "cls": "가능", "reason": "뫼비우스 함수 값이 정수로 정해짐", "method": "sympy.ntheory.mobius", "border": false}
+{"code": "NUMT1-C07", "cls": "가능", "reason": "φ(n) 거듭제곱 mod 값이 정해짐", "method": "sympy.totient + pow(3,4,10)", "border": false}
+{"code": "NUMT1-P01", "cls": "가능", "reason": "유클리드 호제법 gcd 값 확정", "method": "sympy.gcd", "border": false}
+{"code": "NUMT1-P02", "cls": "가능", "reason": "연립합동 해가 유일하게 정해짐", "method": "sympy.ntheory.modular.crt", "border": false}
+{"code": "NUMT1-P03", "cls": "가능", "reason": "오일러 φ 값이 정수로 정해짐", "method": "sympy.totient(12)", "border": false}
+{"code": "NUMT1-P04", "cls": "가능", "reason": "르장드르 기호 값이 ±1로 정해짐", "method": "sympy.ntheory.legendre_symbol(2,7)", "border": false}
+{"code": "NUMT2-P01", "cls": "가능", "reason": "르장드르 기호 곱셈성 값 확정", "method": "sympy.ntheory.legendre_symbol(6,7)", "border": false}
+{"code": "COMB-P01", "cls": "가능", "reason": "조합 수 값이 정해짐", "method": "sympy.binomial(5,2)", "border": false}
+{"code": "COMB-P02", "cls": "가능", "reason": "포함배제 합집합 크기 계산", "method": "sympy.FiniteSet 연산 또는 정수 10+10-4", "border": false}
+{"code": "SETLOG-C08", "cls": "가능", "reason": "유한집합 멱집합 원소 열거로 확정", "method": "sympy.FiniteSet.powerset", "border": true}
+{"code": "SETLOG-P01", "cls": "가능", "reason": "명제 진리표 행이 열거로 정해짐", "method": "sympy.logic.boolalg 진리표 product", "border": false}
+{"code": "SETLOG-P07", "cls": "가능", "reason": "유한집합 드모르간 결과 확정", "method": "sympy.Set 연산 Union/Complement", "border": false}
+{"code": "SETLOG-P08", "cls": "가능", "reason": "멱집합 원소 수 2^n 계산", "method": "sympy.FiniteSet.powerset 길이 / 2**3", "border": false}
+{"code": "SETLOG-P09", "cls": "가능", "reason": "부분집합 8개 열거가 정해짐", "method": "sympy.FiniteSet.powerset", "border": false}
+{"code": "SETLOG-P10", "cls": "가능", "reason": "곱집합 순서쌍 비교가 정해짐", "method": "sympy.ProductSet 비교", "border": false}
+{"code": "SETLOG-P11", "cls": "가능", "reason": "합성함수 값 두 개가 정해짐", "method": "sympy 함수 대입 f(g(2)), g(f(2))", "border": false}
+{"code": "FANAL-P01", "cls": "가능", "reason": "행렬 작용소 노름이 정확값으로 정해짐", "method": "sympy.Matrix.singular_values 최대값", "border": false}
+{"code": "ANAL1-P05", "cls": "가능", "reason": "비판정 극한으로 수렴반경 확정", "method": "sympy.limit 비율, sympy.oo", "border": false}
+{"code": "ANAL2-P01", "cls": "가능", "reason": "코시-아다마르로 수렴반경 확정", "method": "sympy.limit(abs(a_n)**(1/n)) 역수", "border": false}
+{"code": "ANAL2-P02", "cls": "가능", "reason": "편도함수가 식으로 정해짐", "method": "sympy.diff(x**2*y+sin(y), x)", "border": false}
+{"code": "AALG1-P01", "cls": "불가", "reason": "부분군 판정은 군론 구조 성질 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "AALG1-P02", "cls": "가능", "reason": "ℤ10 원소 위수가 정수로 정해짐", "method": "sympy.ntheory.n_order 또는 반복 덧셈 탐색", "border": false}
+{"code": "AALG1-P03", "cls": "가능", "reason": "두 조건으로 n_3 후보가 열거로 정해짐", "method": "sympy.divisors + mod 조건 필터", "border": false}
+{"code": "PROB-P01", "cls": "가능", "reason": "베이즈 대입 계산으로 확률 확정", "method": "sympy.Rational 연산 0.9*0.01/0.1", "border": false}

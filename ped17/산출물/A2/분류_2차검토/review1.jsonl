@@ -1,0 +1,155 @@
+{"code": "2수03-08-2", "cls": "가능", "reason": "1시간=60분 고정 비율 환산, 값이 하나로 정해짐", "method": "단위 환산표(60분) 곱셈·divmod 규칙", "border": false}
+{"code": "2수03-09-2", "cls": "가능", "reason": "주=7일, 년=12개월 고정 환산 곱셈", "method": "단위 환산표(고정 비율) 곱셈 규칙", "border": false}
+{"code": "2수03-11-3", "cls": "가능", "reason": "m와 cm를 100 기준으로 양방향 환산, 정답 유일", "method": "단위 환산표(100) 곱셈·divmod 규칙", "border": false}
+{"code": "2수03-13-1", "cls": "가능", "reason": "cm 단위로 통일해 덧셈 후 m·cm로 재표기", "method": "단위 환산 후 정수 덧셈, divmod(100)", "border": false}
+{"code": "4수03-14-1", "cls": "가능", "reason": "초 단위 합산 후 60초=1분 받아올림, 값 유일", "method": "초로 환산 후 정수 덧셈, divmod(60)", "border": false}
+{"code": "4수03-16-3", "cls": "가능", "reason": "cm↔mm, km↔m 고정 비율 환산", "method": "단위 환산표(10, 1000) 곱셈·divmod 규칙", "border": false}
+{"code": "4수03-18-3", "cls": "가능", "reason": "L↔mL 1000 기준 환산, 정답 유일", "method": "단위 환산표(1000) 곱셈·divmod 규칙", "border": false}
+{"code": "4수03-19-1", "cls": "가능", "reason": "mL로 합산 후 1000mL 받아올림 환산", "method": "mL 환산 후 정수 덧셈, divmod(1000)", "border": false}
+{"code": "4수03-21-3", "cls": "가능", "reason": "kg↔g 1000 기준 환산, 정답 유일", "method": "단위 환산표(1000) 곱셈·divmod 규칙", "border": false}
+{"code": "4수03-22-2", "cls": "가능", "reason": "t↔kg 1000 기준 환산, 정답 유일", "method": "단위 환산표(1000) 곱셈·divmod 규칙", "border": false}
+{"code": "4수03-23-1", "cls": "가능", "reason": "g으로 합산 후 1000g 받아올림 환산", "method": "g 환산 후 정수 덧셈, divmod(1000)", "border": false}
+{"code": "6수03-11-2", "cls": "가능", "reason": "변 길이가 수로 주어진 직사각형 둘레 공식 계산", "method": "sympy 식 대입: 2*(가로+세로)", "border": false}
+{"code": "6수03-12-2", "cls": "가능", "reason": "m²→cm² 환산 결과 30000이 하나로 정해짐", "method": "단위 환산표 100**2 곱셈 규칙", "border": false}
+{"code": "6수03-13-2", "cls": "가능", "reason": "정사각형 넓이는 한 변 제곱으로 유일", "method": "sympy 식 대입: 변**2", "border": false}
+{"code": "6수03-14-2", "cls": "가능", "reason": "밑변·높이가 수로 주어진 삼각형 넓이 공식", "method": "sympy.Rational(1,2)*밑변*높이", "border": false}
+{"code": "6수03-16-2", "cls": "가능", "reason": "반지름과 원주율 3.14가 주어져 원 넓이가 유일", "method": "sympy.Rational 연산: 3.14*r**2", "border": false}
+{"code": "6수03-17-2", "cls": "가능", "reason": "정육면체 겉넓이는 6a² 로 유일", "method": "sympy 식 대입: 6*a**2", "border": false}
+{"code": "6수03-18-1", "cls": "불가", "reason": "단위 관계의 이해가 핵심이라 설명이 중심", "method": "해당 없음", "border": true}
+{"code": "6수03-18-2", "cls": "가능", "reason": "m³→cm³ 환산 2000000으로 유일", "method": "단위 환산표 100**3 곱셈 규칙", "border": false}
+{"code": "6수03-19-2", "cls": "가능", "reason": "가로·세로·높이 곱으로 부피가 유일", "method": "sympy 정수 곱셈", "border": false}
+{"code": "4수02-03-1", "cls": "불가", "reason": "등호의 의미 이해가 핵심, 계산은 예시일 뿐", "method": "해당 없음", "border": true}
+{"code": "4수02-03-2", "cls": "가능", "reason": "7+5=□+4 일차 빈칸 풀이, 해 8이 유일", "method": "sympy.solve(Eq(7+5, x+4), x)", "border": false}
+{"code": "6수02-01-3", "cls": "불가", "reason": "표에서 규칙을 찾는 패턴 인식이 핵심, 표 의존", "method": "해당 없음", "border": true}
+{"code": "6수02-03-2", "cls": "가능", "reason": "비율을 분수·소수·백분율로 정확 변환", "method": "sympy.Rational 변환 후 소수·백분율 환산", "border": false}
+{"code": "6수02-03-3", "cls": "가능", "reason": "비교량÷기준량 약분한 분수가 유일", "method": "sympy.Rational(5,20) 기약분수 확인", "border": false}
+{"code": "6수02-04-1", "cls": "불가", "reason": "비례식 성질이라는 원리 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "6수02-04-2", "cls": "가능", "reason": "5:2=□:8 비례식 풀이, 해 20이 유일", "method": "sympy.solve(Eq(5*8, 2*x), x)", "border": false}
+{"code": "6수02-05-2", "cls": "가능", "reason": "전체를 비로 나눈 몫 6과 9가 유일", "method": "sympy.Rational: 전체*비/비의합", "border": false}
+{"code": "2수01-01-3", "cls": "불가", "reason": "말로 이어 세기라 수 세기 감각이 핵심", "method": "해당 없음", "border": true}
+{"code": "2수01-02-1", "cls": "불가", "reason": "묶음 조작으로 십진 구조를 이해하는 개념", "method": "해당 없음", "border": true}
+{"code": "2수01-02-2", "cls": "불가", "reason": "위치적 기수법의 의미 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "2수01-02-6", "cls": "가능", "reason": "자릿값 합으로 펼치기·합치기 결과가 유일", "method": "자릿수 분해 sum(d*10**k) 정수 연산", "border": false}
+{"code": "2수01-03-1", "cls": "가능", "reason": "10씩 뛰어 세기는 등차수열 항 계산", "method": "sympy 등차수열 a+(n-1)d 계산", "border": false}
+{"code": "2수01-03-3", "cls": "가능", "reason": "두 정수 크기 비교, 참거짓이 유일", "method": "sympy 정수 부등식 324>318 판정", "border": false}
+{"code": "2수01-04-1", "cls": "불가", "reason": "가르기는 분해 방식이 여럿인 개념 이해", "method": "해당 없음", "border": true}
+{"code": "2수01-04-2", "cls": "가능", "reason": "10-8=2 보수 계산, 정답 유일", "method": "정수 뺄셈 10-8", "border": false}
+{"code": "2수01-05-5", "cls": "가능", "reason": "한 자리 덧셈·뺄셈 값이 하나로 정해짐", "method": "정수 사칙연산", "border": false}
+{"code": "2수01-06-1", "cls": "가능", "reason": "23+45 받아올림 없는 덧셈, 68 유일", "method": "정수 덧셈", "border": false}
+{"code": "2수01-06-3", "cls": "가능", "reason": "27+15 받아올림 덧셈, 42 유일", "method": "정수 덧셈", "border": false}
+{"code": "2수01-06-4", "cls": "가능", "reason": "57-24 받아내림 없는 뺄셈, 33 유일", "method": "정수 뺄셈", "border": false}
+{"code": "2수01-06-6", "cls": "가능", "reason": "52-27 받아내림 뺄셈, 25 유일", "method": "정수 뺄셈", "border": false}
+{"code": "2수01-07-1", "cls": "불가", "reason": "역연산 관계 이해가 핵심, 계산은 예시", "method": "해당 없음", "border": true}
+{"code": "2수01-08-1", "cls": "가능", "reason": "7+3+6 세 수 합 16이 유일", "method": "정수 덧셈", "border": false}
+{"code": "2수01-08-2", "cls": "가능", "reason": "10-4+3 앞에서부터 계산 값 9 유일", "method": "sympy 정수 사칙연산", "border": false}
+{"code": "2수01-09-2", "cls": "가능", "reason": "□+5=12 일차 방정식 해 7이 유일", "method": "sympy.solve(Eq(x+5, 12), x)", "border": false}
+{"code": "2수01-09-3", "cls": "가능", "reason": "12-□=5 일차 방정식 해 7이 유일", "method": "sympy.solve(Eq(12-x, 5), x)", "border": false}
+{"code": "2수01-10-5", "cls": "불가", "reason": "묶어 세기와 식 표현 방식이 핵심, 서술 다양", "method": "해당 없음", "border": true}
+{"code": "2수01-11-2", "cls": "가능", "reason": "7×8 곱셈 결과 56이 유일", "method": "정수 곱셈", "border": false}
+{"code": "2수01-11-3", "cls": "불가", "reason": "곱셈의 성질을 이해하는 개념이 핵심", "method": "해당 없음", "border": true}
+{"code": "4수01-01-1", "cls": "불가", "reason": "자릿값 의미를 묻는 개념 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "4수01-02-1", "cls": "불가", "reason": "크기 비교의 까닭을 설명하는 서술이 포함", "method": "해당 없음", "border": true}
+{"code": "4수01-03-1", "cls": "가능", "reason": "487+256 세 자리 덧셈, 743 유일", "method": "정수 덧셈", "border": false}
+{"code": "4수01-03-2", "cls": "가능", "reason": "305-167 세 자리 뺄셈, 138 유일", "method": "정수 뺄셈", "border": false}
+{"code": "4수01-04-1", "cls": "불가", "reason": "곱셈 원리(분배) 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "4수01-04-2", "cls": "가능", "reason": "248×3 곱셈 값 744가 유일", "method": "정수 곱셈", "border": false}
+{"code": "4수01-04-3", "cls": "가능", "reason": "34×26 곱셈 값 884가 유일", "method": "정수 곱셈", "border": false}
+{"code": "4수01-05-2", "cls": "불가", "reason": "곱셈·나눗셈 관계 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "4수01-05-3", "cls": "가능", "reason": "35÷7 몫 5와 곱셈식 7×5=35가 유일", "method": "정수 나눗셈 divmod, 곱셈식 검증", "border": false}
+{"code": "4수01-06-1", "cls": "가능", "reason": "84÷3 몫 28이 유일", "method": "정수 나눗셈 divmod", "border": false}
+{"code": "4수01-07-1", "cls": "가능", "reason": "156÷12 몫 13이 유일", "method": "정수 나눗셈 divmod", "border": false}
+{"code": "4수01-07-3", "cls": "가능", "reason": "22×4+7=95와 나머지<제수 참거짓 판정", "method": "정수 연산 22*4+7==95 및 7<22 확인", "border": false}
+{"code": "4수01-10-3", "cls": "가능", "reason": "대분수→가분수 변환 7/3이 유일", "method": "sympy.Rational(2*3+1, 3) 비교", "border": false}
+{"code": "4수01-11-1", "cls": "가능", "reason": "분모 같은 두 분수 크기 비교 참거짓", "method": "sympy.Rational 비교", "border": false}
+{"code": "4수01-12-3", "cls": "가능", "reason": "7/10↔0.7 분수·소수 양방향 변환", "method": "sympy.Rational 변환 및 동치 확인", "border": false}
+{"code": "4수01-13-1", "cls": "불가", "reason": "소수 자릿값 의미 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "4수01-13-3", "cls": "가능", "reason": "0.327 자릿값별 합 분해가 하나로 정해짐", "method": "sympy.Rational 자릿수 분해 후 합 확인", "border": false}
+{"code": "4수01-14-2", "cls": "가능", "reason": "소수 세 개 내림차순 정렬 결과가 유일", "method": "sympy.Rational 정렬", "border": false}
+{"code": "4수01-15-2", "cls": "가능", "reason": "5/8+6/8=11/8 분수 덧셈 값 유일", "method": "sympy.Rational 덧셈", "border": false}
+{"code": "4수01-16-2", "cls": "가능", "reason": "3.4-1.65=1.75 소수 뺄셈 값 유일", "method": "sympy.Rational 뺄셈", "border": false}
+{"code": "6수01-01-2", "cls": "가능", "reason": "괄호 포함 사칙 혼합 계산 값 2가 유일", "method": "sympy 정수 사칙연산 우선순위 평가", "border": false}
+{"code": "6수01-02-3", "cls": "가능", "reason": "15 이상 20 미만 자연수 집합이 유일", "method": "sympy.Set 연산 / range(15,20)", "border": false}
+{"code": "6수01-03-2", "cls": "가능", "reason": "3548 반올림 백의 자리 3500이 유일", "method": "정수 반올림 round(x,-2) 규칙", "border": false}
+{"code": "6수01-04-2", "cls": "가능", "reason": "18과 24의 최대공약수 6이 유일", "method": "sympy.gcd(18,24)", "border": false}
+{"code": "6수01-05-2", "cls": "가능", "reason": "6과 8의 최소공배수 24가 유일", "method": "sympy.lcm(6,8)", "border": false}
+{"code": "6수01-06-2", "cls": "불가", "reason": "통분은 공통분모 선택이 여럿이라 답이 유일하지 않음", "method": "해당 없음", "border": true}
+{"code": "6수01-07-1", "cls": "가능", "reason": "2/3과 3/5 크기 비교 참거짓 유일", "method": "sympy.Rational 비교", "border": false}
+{"code": "6수01-08-2", "cls": "가능", "reason": "1/2+1/3=5/6 분수 덧셈 값 유일", "method": "sympy.Rational 덧셈", "border": false}
+{"code": "6수01-09-2", "cls": "가능", "reason": "2/3×4/5=8/15 분수 곱셈 값 유일", "method": "sympy.Rational 곱셈", "border": false}
+{"code": "6수01-10-3", "cls": "가능", "reason": "5÷8의 몫을 분수 5/8로 표기, 값 유일", "method": "sympy.Rational(5,8) 동치 확인", "border": false}
+{"code": "6수01-11-2", "cls": "가능", "reason": "2/3÷4/5=5/6 분수 나눗셈 값 유일", "method": "sympy.Rational 나눗셈", "border": false}
+{"code": "6수01-12-1", "cls": "가능", "reason": "3/4↔0.75 분수·소수 양방향 변환", "method": "sympy.Rational 변환 및 동치 확인", "border": false}
+{"code": "6수01-12-2", "cls": "가능", "reason": "2/5와 0.5 크기 비교 참거짓 유일", "method": "sympy.Rational 비교", "border": false}
+{"code": "6수01-13-2", "cls": "가능", "reason": "1.4×0.5=0.7 소수 곱셈 값 유일", "method": "sympy.Rational 곱셈", "border": false}
+{"code": "6수01-14-1", "cls": "가능", "reason": "3÷4 몫 0.75가 유일", "method": "sympy.Rational(3,4) 소수 전개", "border": false}
+{"code": "6수01-15-2", "cls": "가능", "reason": "4.5÷1.5=3 소수 나눗셈 값 유일", "method": "sympy.Rational 나눗셈", "border": false}
+{"code": "6수04-01-2", "cls": "가능", "reason": "자료 4개의 평균 8이 유일", "method": "sympy.Rational 합/개수 계산", "border": false}
+{"code": "6수04-05-3", "cls": "가능", "reason": "짝수 카드 2장/전체 4장 확률 1/2 계산", "method": "sympy.Rational(2,4) 확률 계산", "border": false}
+{"code": "9수03-05-2", "cls": "가능", "reason": "정육각형 내각합 720°, 한 각 120° 공식 계산", "method": "sympy 180*(n-2), 나누기 n", "border": false}
+{"code": "9수03-06-2", "cls": "가능", "reason": "반지름 6, 중심각 60° 호 길이 2π 공식 계산", "method": "sympy 2*pi*r*Rational(60,360) simplify", "border": false}
+{"code": "9수03-08-2", "cls": "가능", "reason": "원기둥 부피 πr²h=45π 공식 계산", "method": "sympy pi*r**2*h", "border": false}
+{"code": "9수03-09-2", "cls": "가능", "reason": "꼭지각 40° 이등변삼각형 밑각 70° 유일", "method": "sympy Rational((180-40),2)", "border": false}
+{"code": "9수03-12-2", "cls": "가능", "reason": "닮음 기호 대응과 비례식으로 EF=12 유일", "method": "sympy.solve(Eq(6/9, 8/x), x)", "border": false}
+{"code": "9수03-13-2", "cls": "불가", "reason": "닮음 판별은 기하 추론이라 계산만으로 확인 불가", "method": "해당 없음", "border": true}
+{"code": "9수03-15-2", "cls": "가능", "reason": "직각삼각형 빗변 √(3²+4²)=5 유일", "method": "sympy.sqrt(3**2+4**2)", "border": false}
+{"code": "9수03-16-2", "cls": "가능", "reason": "특수각 sin30°, cos60° 값이 1/2로 유일", "method": "sympy.sin(pi/6), sympy.cos(pi/3)", "border": false}
+{"code": "9수03-18-2", "cls": "가능", "reason": "반지름 5, 거리 3인 현 길이 8이 유일", "method": "sympy.sqrt(5**2-3**2)*2", "border": false}
+{"code": "9수03-19-2", "cls": "불가", "reason": "원주각이 어느 호 위인지 그림 의존, 값 모호", "method": "해당 없음", "border": true}
+{"code": "9수02-01-2", "cls": "가능", "reason": "a=-2 대입 시 a², -a² 값 유일", "method": "sympy subs 및 evaluate", "border": false}
+{"code": "9수02-02-2", "cls": "가능", "reason": "일차식 덧뺄 결과 2x+7로 하나로 정해짐", "method": "sympy.expand 후 simplify 동치 확인", "border": false}
+{"code": "9수02-03-2", "cls": "가능", "reason": "x=2, 3을 대입해 해 여부 참거짓 판정", "method": "sympy 좌변·우변 subs 비교", "border": false}
+{"code": "9수02-04-1", "cls": "가능", "reason": "2x+3=11 일차방정식 해 4가 유일", "method": "sympy.solve(Eq(2*x+3, 11), x)", "border": false}
+{"code": "9수02-07-3", "cls": "가능", "reason": "비례상수와 y=3x, y=18/x 식이 유일", "method": "sympy.solve로 상수 구하고 Eq+simplify 동치", "border": false}
+{"code": "9수02-08-2", "cls": "가능", "reason": "(a²)³=a⁶, a⁵÷a²=a³ 지수법칙 결과 유일", "method": "sympy.simplify 후 Eq 동치 확인", "border": false}
+{"code": "9수02-09-1", "cls": "가능", "reason": "다항식 뺄셈 결과 x²+4x가 유일", "method": "sympy.expand 후 동치 확인", "border": false}
+{"code": "9수02-10-1", "cls": "가능", "reason": "단항식×다항식, ÷단항식 결과가 유일", "method": "sympy.expand, sympy.cancel", "border": false}
+{"code": "9수02-11-2", "cls": "가능", "reason": "x=1, 4를 2x-1<5에 대입한 참거짓 판정", "method": "sympy 부등식 subs 참거짓 평가", "border": false}
+{"code": "9수02-12-1", "cls": "가능", "reason": "3x-2≥7 해 x≥3이 유일", "method": "sympy.solve_univariate_inequality / solve", "border": false}
+{"code": "9수02-13-2", "cls": "가능", "reason": "연립방정식 해 x=3, y=2가 유일", "method": "sympy.solve([x+y-5, x-y-1], [x,y])", "border": false}
+{"code": "9수02-14-2", "cls": "가능", "reason": "f(x)=2x+3 함숫값 f(-1)=1, f(0)=3 유일", "method": "sympy subs 평가", "border": false}
+{"code": "9수02-16-2", "cls": "가능", "reason": "기울기 3, 점 (1,5)로 y=3x+2가 유일", "method": "sympy.solve 후 Eq+simplify 동치 확인", "border": false}
+{"code": "9수02-17-2", "cls": "가능", "reason": "2x+y-4=0을 y=-2x+4로 정리, 식 유일", "method": "sympy.solve(Eq, y) 후 동치 확인", "border": false}
+{"code": "9수02-18-2", "cls": "가능", "reason": "두 직선 교점 (2,3)이 연립으로 유일", "method": "sympy.solve([y-x-1, y+x-5], [x,y])", "border": false}
+{"code": "9수02-19-1", "cls": "불가", "reason": "전개와 인수분해의 관계 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "9수02-19-2", "cls": "가능", "reason": "x²+5x+6 인수분해 결과가 하나로 정해짐", "method": "sympy.factor", "border": false}
+{"code": "9수02-20-2", "cls": "가능", "reason": "x²-5x+6=0 두 근 2, 3이 유일", "method": "sympy.solve", "border": false}
+{"code": "9수02-20-3", "cls": "가능", "reason": "근과 대입값이 모두 계산으로 결정됨", "method": "sympy.solve 및 후보 subs 값 비교", "border": false}
+{"code": "9수02-21-2", "cls": "가능", "reason": "y=x²-2x에 x=-2 대입 값 8이 유일", "method": "sympy subs 평가", "border": false}
+{"code": "9수01-01-2", "cls": "가능", "reason": "60=2²×3×5 소인수분해가 유일", "method": "sympy.factorint(60)", "border": false}
+{"code": "9수01-02-1", "cls": "가능", "reason": "12와 18의 GCD 6, LCM 36이 유일", "method": "sympy.gcd, sympy.lcm", "border": false}
+{"code": "9수01-02-3", "cls": "가능", "reason": "소인수 지수로 구한 GCD 6, LCM 36이 유일", "method": "sympy.factorint 지수 min/max 비교", "border": false}
+{"code": "9수01-04-2", "cls": "가능", "reason": "-3/4와 -2/3 대소 참거짓 판정 유일", "method": "sympy.Rational 비교", "border": false}
+{"code": "9수01-05-2", "cls": "가능", "reason": "정수 사칙 계산 (-6)÷2×(-3)=9 유일", "method": "sympy 정수 사칙연산", "border": false}
+{"code": "9수01-06-2", "cls": "가능", "reason": "0.4545…의 분수 값 5/11이 유일", "method": "sympy.Rational 순환소수 방정식 solve", "border": false}
+{"code": "9수01-07-1", "cls": "불가", "reason": "제곱근의 뜻·성질 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "9수01-07-2", "cls": "가능", "reason": "√36, (√7)², √((-5)²) 값이 하나로 정해짐", "method": "sympy.sqrt 평가 및 simplify", "border": false}
+{"code": "9수01-09-1", "cls": "가능", "reason": "√5와 2 대소 참거짓 판정 유일", "method": "sympy 제곱근 부등식 비교", "border": false}
+{"code": "9수01-10-2", "cls": "가능", "reason": "근호식 3√2+√2-√8=2√2 값이 유일", "method": "sympy.simplify / radsimp", "border": false}
+{"code": "9수04-01-2", "cls": "가능", "reason": "중앙값 3과 최빈값 1이 유일", "method": "sympy.stats 또는 statistics.median/mode", "border": false}
+{"code": "9수04-02-3", "cls": "가능", "reason": "계급별 도수 1,3,4,2와 합 10이 결정됨", "method": "구간별 정수 카운트 및 합 비교", "border": false}
+{"code": "9수04-03-2", "cls": "불가", "reason": "비율 개념을 설명하는 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수04-03-3", "cls": "가능", "reason": "도수 15와 나머지 상대도수 0.2가 유일", "method": "sympy.Rational 곱셈·1에서 빼기", "border": false}
+{"code": "9수04-05-2", "cls": "가능", "reason": "동전×주사위 곱의 법칙 12가 유일", "method": "정수 곱셈, itertools.product 개수", "border": false}
+{"code": "9수04-06-2", "cls": "가능", "reason": "짝수가 나올 확률 1/2가 유일", "method": "sympy.Rational(3,6)", "border": false}
+{"code": "9수04-08-3", "cls": "가능", "reason": "정렬과 최솟값·중앙값·사분위수가 결정됨", "method": "정렬 후 반분 중앙값 직접 계산", "border": false}
+{"code": "12경수01-01-2", "cls": "가능", "reason": "변화율 공식 5%가 유일", "method": "sympy.Rational (105-100)/100*100", "border": false}
+{"code": "12경수01-02-1", "cls": "가능", "reason": "100달러×1300=130000원 환산 유일", "method": "정수 곱셈 환율 규칙", "border": false}
+{"code": "12경수01-03-1", "cls": "가능", "reason": "소득 100만×10% 세액 10만 유일", "method": "sympy.Rational 곱셈", "border": false}
+{"code": "12경수01-03-3", "cls": "가능", "reason": "구간별 세율 조각함수 식을 동치로 확인 가능", "method": "sympy.Piecewise 정의 후 구간별 simplify 비교", "border": false}
+{"code": "12경수01-04-2", "cls": "가능", "reason": "현재가치 110/1.1=100 유일", "method": "sympy.Rational 110/(1+r)**n", "border": false}
+{"code": "12경수01-05-3", "cls": "가능", "reason": "연금 현재가치 등비합 폐쇄식 동치 확인", "method": "sympy.summation 후 simplify 동치", "border": false}
+{"code": "12경수02-01-3", "cls": "가능", "reason": "통화요금 y=10x+5000 일차식이 유일", "method": "sympy Eq+simplify 동치 확인", "border": false}
+{"code": "12경수02-02-2", "cls": "가능", "reason": "두 점으로 수요직선 Q=-P/100+30 유일", "method": "sympy.solve 두 점 직선, Eq+simplify 동치", "border": false}
+{"code": "12경수02-03-2", "cls": "가능", "reason": "한계효용 24-18=6 증가분 계산 유일", "method": "정수 뺄셈", "border": false}
+{"code": "12경수02-04-2", "cls": "가능", "reason": "수요=공급 연립해 P=30, Q=40 유일", "method": "sympy.solve(Eq(Qd, Qs), P)", "border": false}
+{"code": "12경수02-05-2", "cls": "가능", "reason": "세금 반영 공급식과 새 균형 80/3 유일", "method": "sympy.solve, sympy.Rational", "border": false}
+{"code": "12경수03-02-3", "cls": "가능", "reason": "행렬식 0이면 역행렬 없음 참거짓 판정", "method": "sympy.Matrix([[2,4],[1,2]]).det()", "border": false}
+{"code": "12경수04-02-3", "cls": "불가", "reason": "증감표로 개형을 그리는 것이 핵심, 표·그래프 중심", "method": "해당 없음", "border": true}
+{"code": "12경수04-03-2", "cls": "가능", "reason": "탄력성 |-20/10|=2가 유일", "method": "sympy.Rational 변화율 비", "border": false}
+{"code": "12경수04-03-3", "cls": "가능", "reason": "점탄력성 |(dQ/dP)(P/Q)|=2/3 유일", "method": "sympy.diff 후 Rational 대입", "border": false}
+{"code": "10공수1-01-01-2", "cls": "가능", "reason": "다항식 뺄셈 결과 3x가 유일", "method": "sympy.expand 후 동치 확인", "border": false}
+{"code": "10공수1-01-01-3", "cls": "가능", "reason": "(x+2)(x²+3x+1) 전개 결과가 유일", "method": "sympy.expand 후 Eq+simplify", "border": false}
+{"code": "10공수1-01-02-3", "cls": "불가", "reason": "나머지정리를 점값으로 보는 표상 연결이 핵심", "method": "해당 없음", "border": true}
+{"code": "10공수1-01-03-1", "cls": "가능", "reason": "x²-9 인수분해 (x+3)(x-3)이 유일", "method": "sympy.factor", "border": false}
+{"code": "10공수1-02-01-2", "cls": "가능", "reason": "(1+2i)(1-2i)=5 복소수 곱셈 유일", "method": "sympy.expand with I", "border": false}
+{"code": "10공수1-02-01-3", "cls": "가능", "reason": "실수부·허수부·켤레복소수가 계산으로 결정됨", "method": "sympy.re, sympy.im, sympy.conjugate", "border": false}

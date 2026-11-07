@@ -248,6 +248,15 @@ def main() -> int:
         _summary_line("② 세부개념만(학습 단위)", leaf),
         _summary_line("③ Gate A 학습목표 첫 개념", study),
     ]
+    # 학습목표(= /study 요청 단위) 34개 기준 — 첫 개념이 가능인 학습목표 수 (T1 집계의 학습목표 상세)
+    t1 = json.loads(T1_JSON.read_text(encoding="utf-8"))
+    cls_of = {r["개념 ID"]: r["분류"] for r in reread}
+    obj_first = [x["concept"] for x in t1["범위1_학습목표"]["상세"]]
+    obj_ok = sum(1 for c in obj_first if cls_of.get(c) == POSSIBLE)
+    lines.append(
+        f"④ 학습목표(/study 요청 단위): 전체 {len(obj_first)}개, 첫 개념이 검산 가능인 학습목표 {obj_ok}개, "
+        f"검산 불가 {len(obj_first) - obj_ok}개, 가능 비율 {obj_ok / len(obj_first) * 100:.1f}%"
+    )
     for level in LEVEL_ORDER:
         lines.append(_summary_line(f"   · 세부개념 {level}", [r for r in leaf if r["학교급"] == level]))
     border_n = sum(1 for r in leaf if r["경계 사례"] == "Y")
