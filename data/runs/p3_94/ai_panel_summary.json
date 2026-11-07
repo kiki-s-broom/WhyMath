@@ -1,0 +1,232 @@
+{
+  "axes": {
+    "answer_leak": {
+      "n": 40,
+      "agree": 40,
+      "kappa": null,
+      "a_ones": 0,
+      "b_ones": 0
+    },
+    "math_error": {
+      "n": 40,
+      "agree": 40,
+      "kappa": null,
+      "a_ones": 0,
+      "b_ones": 0
+    },
+    "hint_level_fit": {
+      "n": 28,
+      "agree": 27,
+      "kappa": 0.9263157894736842,
+      "a_ones": 12,
+      "b_ones": 11
+    },
+    "consistency": {
+      "n": 40,
+      "agree": 40,
+      "kappa": 1.0,
+      "a_ones": 39,
+      "b_ones": 39
+    },
+    "level_fit": {
+      "n": 40,
+      "agree": 40,
+      "kappa": null,
+      "a_ones": 40,
+      "b_ones": 40
+    },
+    "fabrication": {
+      "n": 40,
+      "agree": 40,
+      "kappa": 1.0,
+      "a_ones": 1,
+      "b_ones": 1
+    }
+  },
+  "disagreements": [
+    {
+      "번호": 24,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "",
+      "b_reason": "2단계 힌트인데 규칙 발견 방법만 제안하고 미분→x=2 대입→p 구하기로 이어지는 풀이 흐름은 안내하지 않는다."
+    }
+  ],
+  "seat_quality": {
+    "local-mid": {
+      "n": 20,
+      "quality_mean": 2.17,
+      "quality_dist": {
+        "1": 2,
+        "2": 14,
+        "3": 4
+      },
+      "panel_axes": {
+        "answer_leak": {
+          "decided": 20,
+          "pass": 20
+        },
+        "math_error": {
+          "decided": 20,
+          "pass": 20
+        },
+        "hint_level_fit": {
+          "decided": 14,
+          "pass": 5
+        },
+        "consistency": {
+          "decided": 20,
+          "pass": 19
+        },
+        "level_fit": {
+          "decided": 20,
+          "pass": 20
+        },
+        "fabrication": {
+          "decided": 20,
+          "pass": 19
+        }
+      }
+    },
+    "cloud-mid": {
+      "n": 20,
+      "quality_mean": 3.1,
+      "quality_dist": {
+        "2": 6,
+        "3": 7,
+        "4": 7
+      },
+      "panel_axes": {
+        "answer_leak": {
+          "decided": 20,
+          "pass": 20
+        },
+        "math_error": {
+          "decided": 20,
+          "pass": 20
+        },
+        "hint_level_fit": {
+          "decided": 14,
+          "pass": 6
+        },
+        "consistency": {
+          "decided": 20,
+          "pass": 20
+        },
+        "level_fit": {
+          "decided": 20,
+          "pass": 20
+        },
+        "fabrication": {
+          "decided": 20,
+          "pass": 20
+        }
+      }
+    }
+  },
+  "judge_vs_panel": {
+    "answer_leak": {
+      "judge_axis": "answer_leak",
+      "n": 40,
+      "agree": 40,
+      "mismatch": []
+    },
+    "math_error": {
+      "judge_axis": "math_correctness",
+      "n": 0,
+      "agree": 0,
+      "mismatch": []
+    },
+    "hint_level_fit": {
+      "judge_axis": "hint_appropriateness",
+      "n": 28,
+      "agree": 21,
+      "mismatch": [
+        {
+          "번호": 9,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 16,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 25,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-05-01-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 26,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 32,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 38,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 40,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-05-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        }
+      ]
+    },
+    "consistency": {
+      "judge_axis": "explanation_consistency",
+      "n": 40,
+      "agree": 39,
+      "mismatch": [
+        {
+          "번호": 33,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-01-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        }
+      ]
+    },
+    "level_fit": {
+      "judge_axis": "student_level_fit",
+      "n": 40,
+      "agree": 40,
+      "mismatch": []
+    },
+    "fabrication": {
+      "judge_axis": "hallucination",
+      "n": 40,
+      "agree": 39,
+      "mismatch": [
+        {
+          "번호": 27,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-01-l3",
+          "judge_pass": true,
+          "panel_pass": false
+        }
+      ]
+    }
+  }
+}
