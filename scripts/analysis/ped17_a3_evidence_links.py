@@ -276,13 +276,23 @@ def main() -> int:
     fake = "2022_가짜_99_99"  # 변별력 확인용 — 존재하면 안 된다
     fake_detected = not _raw_exists(fake, origin)
 
-    head = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+    # 판정 기준 = main과의 분기점(작업 브랜치 커밋이 아니라 main 기준으로 적는다).
+    # origin/main이 없으면 HEAD로 대신한다.
+    base = subprocess.run(
+        ["git", "-C", str(ROOT), "merge-base", "HEAD", "origin/main"],
         capture_output=True,
         text=True,
-        encoding="utf-8",
-        check=True,
-    ).stdout.strip()
+        encoding="utf-8",  # HARN-19 — 로케일(cp949) 디코드 금지
+    )
+    head = base.stdout.strip() if base.returncode == 0 else ""
+    if not head:
+        head = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        ).stdout.strip()
     summary = {
         "판정_기준_커밋": head,
         "404_원자개념_수": len(reasons),
@@ -315,7 +325,8 @@ def main() -> int:
         and not parsed_missing
     )
     print(f"판정 기준 커밋: {head}")
-    print(f"404 원자 {len(reasons)}개 · 표 {len(atom_rows)}행 · 누락 {len(missing_atoms)}")
+    print(f"404 개념(원자 그래프 노드) {len(reasons)}개 · 표 {len(atom_rows)}행")
+    print(f"표에서 빠진 404 개념 {len(missing_atoms)}개")
     print(f"404 아님 후보 {len(not_404)}")
     print(f"판정별: {dict(verdicts)}")
     print(f"학습목표 {len(obj_rows)}행 · 누락 {len(missing_objs)}")
