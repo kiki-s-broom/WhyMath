@@ -1,6 +1,7 @@
 """P3-94 ⑨ — AI 채점 패널 분석: 채점자 간 κ · 불일치 · 판정기-패널 일치율 · 좌석별 품질.
 
-사용: python ai_panel_analysis.py <data/runs/p3_94 경로> [--adjudication <파일>] [--json <출력>]
+사용: python3 scripts/analysis/p3_94_ai_panel_analysis.py data/runs/p3_94
+      [--adjudication <파일>] [--json <출력>]
 판정 대응(규칙 판정기 축 → 패널 칸):
   answer_leak→answer_leak(1=실패) · math_correctness→math_error(1=실패)
   hint_appropriateness→hint_level_fit(1=통과)

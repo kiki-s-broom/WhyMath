@@ -26,7 +26,7 @@
 - 채점자 A(고등학교 수학 교사 관점) · 채점자 B(교수설계·학습과학 연구자 관점) — 서로 독립 실행, 같은 루브릭, 묶음 파일 1개만 읽도록 지시(두 채점자 모두 그 파일만 읽었다고 보고).
 - 루브릭 7칸: ①정답 누설 ②수학 오류 ③단계 적합(L1 개념 주의 환기 · L2 풀이 흐름 안내 · L3 부분 시연 — 글자 아닌 의미로) ④상황·흐름과 일관 ⑤고등학생 수준 ⑥지어낸 내용 ⑦전반 품질(1~5).
 - 불일치 칸만 3번째 판정자 C가 두 의견과 이유를 보고 판정(KG-12 AI 2인 검수 → 3인째 판정 선례).
-- 산출물: `ai_scoring_reviewer_a.json` · `ai_scoring_reviewer_b.json` · `ai_scoring_adjudication.json` · 분석 `ai_panel_summary.json`(스크립트 `ai_panel_analysis.py` — 재실행 가능).
+- 산출물: `ai_scoring_reviewer_a.json` · `ai_scoring_reviewer_b.json` · `ai_scoring_adjudication.json` · 분석 `ai_panel_summary.json`(스크립트 `scripts/analysis/p3_94_ai_panel_analysis.py` — 재실행 가능).
 
 ## 좌석별 패널 판정
 
