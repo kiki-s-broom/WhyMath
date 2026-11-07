@@ -725,6 +725,17 @@ ref를 하나도 못 찾으면 `empty` = 판정 불가**다. 네트워크 실패
 진행하되(fail-open) 경고와 이벤트(`number_reserve_unavailable`·`remote_heads_refresh_failed`)를
 남긴다 — 이벤트가 있어야 상시 실패를 셀 수 있다.
 
+**trunk 대장 대조(HARN-320)**: 다섯 번째 출처는 **방금 받은 origin/main 대장**이다. 상대 세션의 등재가
+PR로 머지되면 그 브랜치는 지워지고 예약도 풀려, 번호가 **main에만** 남는다(2026-11-02 EOS-231 —
+머지 73초 뒤 낡은 로컬 main에서 같은 번호 add가 통과). 파일명 스캔도 원리상 main을 보지만 ①전체 갱신
+실패 시 낡은 ref로 판정하고 ②로컬 `main` 브랜치 세션은 맨 번호 ID 판정에서 그 사본을 '같은 세션'으로
+건너뛰며 ③ls-tree 실패 ref는 조용히 빠지고 이름순 상한에서 `main`이 먼저 잘린다. 그래서 `add`는
+`git fetch origin main`(30초) → `ls-tree origin/main:backlog/tasks`를 따로 돌리고, trunk 사본에는 세션
+예외를 두지 않는다. 이 출처만은 실패 시 **진행하지 않는다** — 경고 후 진행하면 그 사각 전체가 열린 채라서다.
+오프라인 등재가 정당하면 `--trunk-unverified <사유>`로 사람이 정하며, 사유는 notes와 이벤트
+(`add_trunk_unverified`)에 남는다. 조회 실패 자체는 `trunk_ledger_unavailable` 이벤트로 센다. trunk 커밋은
+읽히는데 `backlog/tasks/`가 없으면 `no-ledger`(머지된 태스크 0건 관측)이고, 커밋을 못 읽으면 `missing`(실패)이다.
+
 **신선도 스탬프(⑦(다))**: `remote_refs_age_seconds`는 `FETCH_HEAD`를 보므로 claim fetch·표적 fetch가
 그것을 '방금'으로 만든다(판별 실측: 3시간 → claim 조회 1회 뒤 0초). 그 함수는 main 낡음을 재는
 `main_watch`가 그대로 쓰므로 두고, 번호 가드는 **전체 브랜치 fetch가 성공했을 때만** 쓰는 전용

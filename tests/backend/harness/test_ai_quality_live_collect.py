@@ -1255,3 +1255,95 @@ def test_draft_mode_evaluates_the_collected_drafts(tmp_path: Path) -> None:
     assert coverage["by_origin"] == {f"{live.DRAFT_ORIGIN_PREFIX}:degraded": len(_ids(small))}
     assert code == 2  # 축별 최소 표본(30) 미만 — 측정 실패가 정답이다
     assert cli._DRAFT_ORIGIN_PREFIX == live.DRAFT_ORIGIN_PREFIX
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# P3-94 ⑧ — 측정 전용 프롬프트 변형(`--policy-prompt utterance-required`)
+#   - 변형이 없으면 "말하지 말라·발화는 선택" 원문이 그대로 가서 초안 0건이 된다(2026-11-06 실측).
+#   - 정책 프롬프트가 바뀌어 대상 문구가 사라지면 변형은 아무것도 안 바꾸고 "발화 필수"로 기록된다
+#     — 그래서 대상 문구 부재는 실행 거부다.
+#   - 정책이 아닌 호출(다른 system)은 바꾸면 안 된다.
+# ──────────────────────────────────────────────────────────────────────────
+class _SystemCapturing(_Scripted):
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.systems: list[str] = []
+
+    async def generate(
+        self, prompt: str, system: str, decision: RoutingDecision, **kwargs: Any
+    ) -> GenerationResult:
+        self.systems.append(system)
+        return await super().generate(prompt, system, decision, **kwargs)
+
+
+def test_utterance_required_variant_changes_only_the_three_phrases() -> None:
+    assert live.measurement_policy_prompt(live.POLICY_PROMPT_SERVING) is None
+    variant = live.measurement_policy_prompt("utterance-required")
+    assert variant is not None and variant != _SYSTEM_PROMPT
+    assert "학생에게 직접 말하거나 문제를 풀지 마세요" not in variant
+    assert "선택 — 비우면" not in variant
+    assert '"utterance": "' in variant  # 예시에도 발화가 있다
+    assert "**필수**" in variant
+    # 나머지 불변식은 원문 그대로
+    for invariant in ("verify 의무", "정답 억제·Polya 우선", "내부 도구는 침묵", "개념 id"):
+        assert invariant in variant
+    expected = len(_SYSTEM_PROMPT) + sum(
+        len(new) - len(old) for old, new in live._UTTERANCE_REQUIRED_EDITS
+    )
+    assert len(variant) == expected  # 세 문구 말고는 바뀐 것이 없다
+
+
+def test_variant_refuses_when_policy_prompt_drifted(monkeypatch: pytest.MonkeyPatch) -> None:
+    drifted = _SYSTEM_PROMPT.replace("utterance(문자열, 선택", "utterance(문자열, 옵션")
+    monkeypatch.setattr(live, "_POLICY_SYSTEM_PROMPT", drifted)
+    with pytest.raises(ValueError, match="0건"):
+        live.measurement_policy_prompt("utterance-required")
+    with pytest.raises(ValueError):
+        live.measurement_policy_prompt("speak-freely")
+
+
+def test_drifted_policy_prompt_is_a_setup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl", with_choices=False)
+    out = tmp_path / "live.jsonl"
+    drifted = _SYSTEM_PROMPT.replace("utterance(문자열, 선택", "utterance(문자열, 옵션")
+    monkeypatch.setattr(live, "_POLICY_SYSTEM_PROMPT", drifted)
+    provider = _Scripted()
+    code, _ = _run(out, small, provider, "--policy-prompt", "utterance-required")
+    assert code == live.EXIT_MEASUREMENT
+    assert provider.calls == 0  # 거부는 호출 전에 난다
+
+
+def test_variant_is_sent_only_on_policy_calls_and_counted(tmp_path: Path) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl", with_choices=False)
+    out = tmp_path / "live.jsonl"
+    provider = _SystemCapturing()
+    _run(out, small, provider, "--policy-prompt", "utterance-required")
+    variant = live.measurement_policy_prompt("utterance-required")
+    assert provider.systems and set(provider.systems) == {variant}
+    record = _run_json(out)["runs"][-1]
+    assert record["config"]["policy_prompt"] == "utterance-required"
+    assert (
+        record["config"]["policy_prompt_sha256"]
+        == hashlib.sha256(str(variant).encode()).hexdigest()
+    )
+    assert record["counts"]["policy_prompt_calls"] == {"variant_applied": len(provider.systems)}
+    # 정책이 아닌 system은 그대로 넘긴다
+    scope = live._Scope()
+    other = _SystemCapturing()
+    recorder = live.RecordingProvider(other, scope, policy_system=variant)
+    asyncio.run(recorder.generate("p", "다른 호출 지점의 system", _policy_decision()))
+    assert other.systems == ["다른 호출 지점의 system"]
+    assert scope.ledger.prompt_variant_calls == 0
+
+
+def test_serving_prompt_is_the_default(tmp_path: Path) -> None:
+    small = _small_eval(tmp_path / "eval.jsonl", with_choices=False)
+    out = tmp_path / "live.jsonl"
+    provider = _SystemCapturing()
+    _run(out, small, provider)
+    assert provider.systems and set(provider.systems) == {_SYSTEM_PROMPT}
+    record = _run_json(out)["runs"][-1]
+    assert record["config"]["policy_prompt"] == live.POLICY_PROMPT_SERVING
+    assert record["counts"]["policy_prompt_calls"] == {"variant_applied": 0}

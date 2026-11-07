@@ -2765,7 +2765,9 @@ def _taken_id_numbers(root: Path, backlog: object, policy: object) -> dict[str, 
         view = number_guard.observe(root, ttl_hours=getattr(policy, "claim_ttl_hours", 72))
         for warning in view.warnings():
             print(f"  ⚠ {warning}", file=sys.stderr)
-        occupants = [(c.task_id, "원격 claim") for c in view.claims]
+        # HARN-320 — 방금 받은 origin/main 대장이 먼저다(머지로 브랜치·예약이 사라진 번호).
+        occupants = [(f.task_id, number_guard.TRUNK_SOURCE) for f in view.trunk_files]
+        occupants += [(c.task_id, "원격 claim") for c in view.claims]
         occupants += [
             (r.task_id or f"{r.number}-예약-레코드-파손", f"원격 번호 예약({r.branch or '?'})")
             for r in view.reservations
@@ -3321,6 +3323,9 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
     err, remote_ok = _id_number_conflict(root, backlog, args.id, title=args.title)
     if err:
         return _fail(err)
+    trunk_refusal = _trunk_unverified_refusal(root, args)
+    if trunk_refusal:
+        return _fail(trunk_refusal)
     if number_guard.is_bare_id(args.id):
         # HARN-317 ④ — 막지는 않는다(맨 번호 ID 태스크가 이미 다수 실재한다). 다만 슬러그가
         # 없으면 병렬 세션의 같은 번호를 제목 지문으로만 가릴 수 있어 판정이 보수적이 된다.
@@ -3346,7 +3351,7 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         requires_gates=args.gates or [],
         acceptance=args.acceptance or [],
         paths=args.paths or [],
-        notes=_notes_with_trigger_exemption(args),
+        notes=_notes_with_trunk_unverified(_notes_with_trigger_exemption(args), args),
         updated=_today(),
     )
     # [프리플라이트] 파일 범위 겹침 — 등재 시점에도 todo·in-flight 중복을 검출
@@ -3431,6 +3436,10 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
         err, _ = _id_number_conflict(root, backlog, args.id, title=task.title)
         return _fail(err or number_guard.describe_conflict(task.id, reservation))
     path = store.save_task(root, task)
+    if args.trunk_unverified:
+        store.append_event(
+            root, "add_trunk_unverified", task.id, reason=args.trunk_unverified.strip()
+        )
     store.append_event(root, "add", task.id, eos_priority=task.eos_priority)
     print(f"＋ {task.id} 추가 → {path.relative_to(root)} [EOS {task.eos_priority}]")
     if swapped:
@@ -3452,6 +3461,46 @@ def cmd_add(root: Path, args: argparse.Namespace) -> int:
     # HARN-51 — 번호가 아니라 *의미*가 겹치는 태스크를 고지한다(차단 아님).
     _print_similar_notice(root, backlog, task, policy)
     return 0
+
+
+def _trunk_unverified_refusal(root: Path, args: argparse.Namespace) -> str | None:
+    """origin/main 대장을 방금 보지 못했으면 거부 문구 — 사람이 사유를 적으면 통과 (HARN-320).
+
+    번호 가드의 다른 출처 실패는 경고 후 진행(fail-open)이지만 trunk만은 멈춘다: 머지로 브랜치와
+    예약이 사라진 번호는 **trunk에만** 남으므로, 그것을 못 본 판정은 '부분'이 아니라 그 사각
+    전체를 연 채다. 오프라인 작업은 정당할 수 있으므로 막지 않고 **결정을 사람에게 넘긴다** —
+    `--trunk-unverified <사유>`의 사유는 notes와 이벤트(`add_trunk_unverified`)에 남는다.
+    원격 claim을 끈 정책(`remote_claims: false`)·원격 없는 클론은 관측이 없으므로 대상이 아니다.
+    """
+    view = number_guard.current_view(root)
+    if view is None or view.trunk_seen:
+        return None
+    reason = (getattr(args, "trunk_unverified", None) or "").strip()
+    if reason:
+        print(
+            f"  ⚠ origin/{number_guard.TRUNK_BRANCH} 대장 미확인 상태로 등재 — 사유: {reason} "
+            "(머지 시 validate가 2선 방어한다 · HARN-320)",
+            file=sys.stderr,
+        )
+        return None
+    detail = f" · {view.trunk_detail}" if view.trunk_detail else ""
+    return (
+        f"{args.id}: 번호 충돌 검사 측정 불가 — origin/{number_guard.TRUNK_BRANCH} 대장을 "
+        "방금 받지 "
+        f"못했다({view.trunk_status}{detail}). 다른 세션의 등재가 막 머지돼 브랜치·예약이 사라진 "
+        "번호는 trunk에만 있어, 낡은 로컬 main 사본으로는 보이지 않는다(EOS-231 사고 · HARN-320).\n"
+        "    네트워크를 복구한 뒤 같은 add를 다시 실행하라. 오프라인 등재가 정말 필요하면 "
+        "--trunk-unverified <사유> 를 붙여라(사유는 notes·이벤트에 남는다)."
+    )
+
+
+def _notes_with_trunk_unverified(notes: str, args: argparse.Namespace) -> str:
+    """`--trunk-unverified` 사유를 notes에 남긴다 — 남지 않는 탈출구는 검사를 끄는 것과 같다."""
+    reason = (getattr(args, "trunk_unverified", None) or "").strip()
+    if not reason:
+        return notes
+    marker = f"[trunk 대장 미확인 등재 · HARN-320] {reason}"
+    return f"{notes}\n\n{marker}" if notes else marker
 
 
 def _notes_with_trigger_exemption(args: argparse.Namespace) -> str:
@@ -4964,6 +5013,28 @@ def _read_hook_stdin() -> str:
     return sys.stdin.buffer.read().decode("utf-8", errors="replace")
 
 
+def cmd_check_prompt(root: Path, args: argparse.Namespace) -> int:
+    """UserPromptSubmit 훅 — 요청마다 이 세션의 claim·범위·언급 ID 상태를 주입한다 (HARN-321).
+
+    안내 전용이다: 어떤 입력·예외에서도 exit 0 으로 끝난다(관측 실패가 작업 실패가 되면 안
+    된다). 대신 예외를 삼킬 때는 타입명을 출력해 침묵 실패를 피한다(CLAUDE.md AI·신뢰).
+    """
+    try:
+        import prompt_scope  # 실패도 아래 except 가 타입명으로 보고한다
+
+        try:
+            payload = json.loads(_read_hook_stdin() or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+        prompt = str(payload.get("prompt") or "") if isinstance(payload, dict) else ""
+        lines = prompt_scope.build_context(root, store.current_branch(root), prompt)
+    except Exception as exc:  # noqa: BLE001 — 훅은 절대 작업을 막지 않는다
+        print(f"[요청 범위 대조 · HARN-321] 판정 불가 — {type(exc).__name__} (작업은 계속)")
+        return 0
+    print("\n".join(lines))
+    return 0
+
+
 def cmd_check_stop(root: Path, args: argparse.Namespace) -> int:
     """Stop 훅 — 진행 중 태스크가 있는데 상태 갱신 없이 세션이 끝나면 차단(exit 2).
 
@@ -5913,6 +5984,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="작업 파일 범위 glob (겹침 검사용 — 반복 지정 가능)",
     )
     p.add_argument("--notes")
+    p.add_argument(
+        "--trunk-unverified",
+        dest="trunk_unverified",
+        default=None,
+        metavar="사유",
+        help="origin/main 대장을 받지 못해도 등재한다(사유 필수 · notes·이벤트에 기록 — HARN-320)",
+    )
     p.set_defaults(func=cmd_add)
 
     p = sub.add_parser(
@@ -6123,6 +6201,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("check-edit", help="PostToolUse 훅 — backlog 직접 편집 검증")
     p.set_defaults(func=cmd_check_edit)
+
+    p = sub.add_parser("check-prompt", help="UserPromptSubmit 훅 — 요청 범위 대조 안내 (HARN-321)")
+    p.set_defaults(func=cmd_check_prompt)
 
     p = sub.add_parser("claims", help="원격 claim(harness-claims 브랜치) 조회·해제·청소")
     p.add_argument("claims_action", nargs="?", default="list", choices=["list", "release", "reap"])

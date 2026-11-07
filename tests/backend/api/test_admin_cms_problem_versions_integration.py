@@ -551,6 +551,76 @@ def test_republish_via_the_surface_moves_the_pointer_and_stale_status_is_409(wor
         _P._erase_learner(client)
 
 
+# ── F. 롤백(EOS-196) — 운영 표면만으로 직전 발행본과 그 내용이 돌아온다 ────────────────
+def _rollback(client: Any, headers: dict[str, str], pid: uuid.UUID, expected: str) -> Any:
+    return client.post(
+        f"/v1/admin/cms/problems/{pid}/rollback",
+        headers=headers,
+        json={"expected_published_version_id": expected},
+    )
+
+
+def _answer(pid: uuid.UUID) -> str:
+    return str(_rows("SELECT answer FROM problem WHERE problem_id = :p", {"p": pid})[0][0])
+
+
+def test_rollback_via_the_surface_restores_the_previous_version_and_its_content(
+    world: _World,
+) -> None:
+    target, _sibling = world.pids
+    editor = world.staff("editor", Role.CONTENT_EDITOR)
+    reviewer = world.staff("reviewer", Role.CONTENT_REVIEWER)
+    publisher = world.staff("publisher", Role.CONTENT_PUBLISHER)
+
+    with _P._client() as client:
+        original = _answer(target)
+        v1 = _drive_to_approved(client, editor, reviewer, target)
+        assert _move(client, publisher, v1, "publish", "APPROVED").status_code == 200
+        _exec(
+            "UPDATE problem SET answer = :a WHERE problem_id = :p", {"a": "결함정답", "p": target}
+        )
+        v2 = _drive_to_approved(client, editor, reviewer, target)
+        assert _move(client, publisher, v2, "publish", "APPROVED").status_code == 200
+        audit_before = _rows("SELECT count(*) FROM privacy_audit WHERE action = 'rollback'")[0][0]
+
+        # 편집자·검수자는 롤백할 수 없다 — 아무 것도 바뀌지 않는다.
+        for headers in (editor, reviewer):
+            denied = _rollback(client, headers, target, v2)
+            assert denied.status_code == 403, denied.text
+        # 낡은 화면(v1이 발행 중이라고 본 화면) → 409, 아무 것도 바뀌지 않는다.
+        stale = _rollback(client, publisher, target, v1)
+        assert stale.status_code == 409, stale.text
+        assert stale.json()["detail"]["code"] == "stale_pointer"
+        assert stale.json()["detail"]["published_version_id"] == v2
+        assert _pointer(target) == uuid.UUID(v2) and _answer(target) == "결함정답"
+        assert (
+            _rows("SELECT count(*) FROM privacy_audit WHERE action = 'rollback'")[0][0]
+            == audit_before
+        )
+
+        done = _rollback(client, publisher, target, v2)
+        assert done.status_code == 200, done.text
+        assert done.json() == {
+            "problem_id": str(target),
+            "rolled_back_version_id": v2,
+            "restored_version_id": v1,
+        }
+        assert (_status(v1), _status(v2)) == ("PUBLISHED", "RETIRED")
+        assert _pointer(target) == uuid.UUID(v1)
+        assert _answer(target) == original, "라이브 문항이 복원본 내용으로 돌아오지 않았다"
+        audit = _rows(
+            "SELECT user_id, resource_type FROM privacy_audit "
+            "WHERE action = 'rollback' AND resource_id = CAST(:v AS uuid)",
+            {"v": v2},
+        )
+        assert audit == [(world.users["publisher"], "problem_version")], audit
+
+        # 복원할 판이 더 없다(v2는 결함 판정 RETIRED) → 409.
+        again = _rollback(client, publisher, target, v1)
+        assert again.status_code == 409 and again.json()["detail"]["code"] == "rollback_unavailable"
+        _P._erase_learner(client)
+
+
 # ── E. 없는 문항·판 ────────────────────────────────────────────────────────────────────
 def test_unknown_ids_are_404(world: _World) -> None:
     editor = world.staff("editor", Role.CONTENT_EDITOR)

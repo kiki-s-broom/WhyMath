@@ -1,0 +1,212 @@
+{
+  "판정_기준_커밋": "ce8c2165f8175d549575ce71b8fc06c9f3d18537",
+  "방법": "저장소 코퍼스 위에서 resolve_concept_content ①~③ 재현(DB·로그 미사용)",
+  "K12_atom_codes_부착_행": 437,
+  "범위1_학습목표": {
+    "총": 34,
+    "사유별": {
+      "UNREVIEWED": 34
+    },
+    "상세": [
+      {
+        "objective_id": "12미적Ⅰ-미분-미분계수:OBJ-01",
+        "concept": "12미적Ⅰ-02-01-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-미분계수:OBJ-02",
+        "concept": "12미적Ⅰ-02-01-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-미분계수:OBJ-03",
+        "concept": "12미적Ⅰ-02-01-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-미분가능성과연속성:OBJ-01",
+        "concept": "12미적Ⅰ-02-02-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-미분가능성과연속성:OBJ-02",
+        "concept": "12미적Ⅰ-02-02-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-미분가능성과연속성:OBJ-03",
+        "concept": "12미적Ⅰ-02-02-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-xn의도함수:OBJ-01",
+        "concept": "12미적Ⅰ-02-03-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-xn의도함수:OBJ-02",
+        "concept": "12미적Ⅰ-02-03-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-xn의도함수:OBJ-03",
+        "concept": "12미적Ⅰ-02-03-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-다항함수의도함수:OBJ-01",
+        "concept": "12미적Ⅰ-02-04-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-다항함수의도함수:OBJ-02",
+        "concept": "12미적Ⅰ-02-04-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-다항함수의도함수:OBJ-03",
+        "concept": "12미적Ⅰ-02-04-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-접선의방정식:OBJ-01",
+        "concept": "12미적Ⅰ-02-05-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-접선의방정식:OBJ-02",
+        "concept": "12미적Ⅰ-02-05-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-접선의방정식:OBJ-03",
+        "concept": "12미적Ⅰ-02-05-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-평균값정리:OBJ-01",
+        "concept": "12미적Ⅰ-02-06-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-평균값정리:OBJ-02",
+        "concept": "12미적Ⅰ-02-06-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-평균값정리:OBJ-03",
+        "concept": "12미적Ⅰ-02-06-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-증감과극값:OBJ-01",
+        "concept": "12미적Ⅰ-02-07-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-증감과극값:OBJ-02",
+        "concept": "12미적Ⅰ-02-07-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-증감과극값:OBJ-03",
+        "concept": "12미적Ⅰ-02-07-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-그래프개형:OBJ-01",
+        "concept": "12미적Ⅰ-02-08-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-그래프개형:OBJ-02",
+        "concept": "12미적Ⅰ-02-08-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-방정식부등식활용:OBJ-01",
+        "concept": "12미적Ⅰ-02-09-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-방정식부등식활용:OBJ-02",
+        "concept": "12미적Ⅰ-02-09-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-방정식부등식활용:OBJ-03",
+        "concept": "12미적Ⅰ-02-09-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-속도와가속도:OBJ-01",
+        "concept": "12미적Ⅰ-02-10-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-속도와가속도:OBJ-02",
+        "concept": "12미적Ⅰ-02-10-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-속도와가속도:OBJ-03",
+        "concept": "12미적Ⅰ-02-10-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "12미적Ⅰ-미분-속도와가속도:OBJ-04",
+        "concept": "12미적Ⅰ-02-10-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "10공수1-이차함수-최대최소:OBJ-01",
+        "concept": "10공수1-02-06-1",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "10공수1-이차함수-최대최소:OBJ-02",
+        "concept": "10공수1-02-06-2",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "10공수1-이차함수-최대최소:OBJ-03",
+        "concept": "10공수1-02-06-3",
+        "reason": "UNREVIEWED"
+      },
+      {
+        "objective_id": "10공수1-이차함수-최대최소:OBJ-04",
+        "concept": "10공수1-02-06-2",
+        "reason": "UNREVIEWED"
+      }
+    ]
+  },
+  "범위2_원자개념": {
+    "총": 2683,
+    "사유별": {
+      "UNREVIEWED": 1720,
+      "NO_DSL": 963
+    },
+    "학교급별": {
+      "고등": {
+        "UNREVIEWED": 749,
+        "NO_DSL": 176
+      },
+      "대학": {
+        "NO_DSL": 660,
+        "UNREVIEWED": 409
+      },
+      "중학": {
+        "UNREVIEWED": 180,
+        "NO_DSL": 45
+      },
+      "초등": {
+        "UNREVIEWED": 382,
+        "NO_DSL": 82
+      }
+    }
+  },
+  "범위3_콘텐츠행": {
+    "K-12|ai_estimated": 437,
+    "대학|ai_estimated": 409
+  }
+}

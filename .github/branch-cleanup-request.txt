@@ -403,3 +403,26 @@ claude/whymath-ai-recommendation-review-q8tvcx
 #   nice-cray-mbg1mq(PED-45) · practical-maxwell-kuwl7x(OPS-122) · remaining-track-34zvse(HARN-212)
 #   승계 10건 유지: 7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79 · 5t5lmv · iws58k · 6eejrv · e98dw4 · 29ac1b
 # ⚠ 활성 claim 4건은 손대지 않는다: peaceful-bell-s7mlg8(MISC-61) · jolly-fermi-6km81l(EOS-194) · pensive-cerf-guowbr(EOS-195) · zen-ramanujan-mzr0ug(OPS-137)
+
+# ── 2026-11-06 18차 배치 (3건) — 판정 정본: docs/reviews/unmerged_branch_audit_2026-11-06.md §3-③ ──
+# 직전 배치 집행 확인(2026-11-06 ls-remote 실측): 17차는 0건(no-op)이라 확인 대상 없음 · 16차 q8tvcx **잔존 0/1** 재확인.
+# 삭제 전 head SHA 스냅샷(복구 경로 = GitHub API commits/<sha>·contents?ref=<sha>):
+#   jolly-fermi-6km81l = 636896a4 (EOS-194 done · 잔여 16줄은 main이 뒤에 갱신한 줄의 옛 판 · 이벤트 샤드 main 동일)
+#   ops-83-inject-shard-failure = e8912657 (OPS-83 done · PR #1754 닫힘 · 잔여는 "머지 금지" 고의 실패 주입 5줄 + 옛 문면 4줄)
+#   p3-50-02-01-chain-restore = 4098266c (판정 문서·게이트·정정 항이 main에 회수됨 · 이벤트 샤드 13줄은 착수 기록뿐)
+# ⚠ 회수·증거가 걸린 브랜치는 의도적 제외(회수 완료 전 삭제 금지) —
+#   신규: fervent-maxwell-2b4w10(SEC-45 — SEC-34 런북의 유일한 사본) ·
+#   relaxed-keller-4wk0b2·wonderful-allen-vhbdra(OPS-140은 done이나 HARN-311 ①이 두 이벤트 샤드를 사고 증거로 지목 — 샤드 main 부재) ·
+#   eos-compiler-pack-check(ADR-010 D8=(가) 보존 · 2027-01 재검토)
+#   승계: brave-franklin-2999u5(MATH-07) · amazing-goldberg-1oc67i(OPS-129) · practical-maxwell-kuwl7x(OPS-122) · remaining-track-34zvse(HARN-212) ·
+#   7n9n72(**삭제 절대 금지**) · trjg5x · k20m0w · gdmwhk/uqyg79 · 5t5lmv · iws58k · 6eejrv · e98dw4 · 29ac1b
+# ⚠ claim 해제 대기(내용 소멸) 5건: blissful-lovelace-ubp9tw · status-f6qz0c · stoic-hawking-vzumx5 · happy-turing-kmrd5z(OPS-130 done) ·
+#   nice-cray-mbg1mq(PED-45 done · claim PED-26 todo)
+# ⚠ Kiki 판단 대기(삭제 금지): laughing-edison-rb5hgl(62eb4503 · CLAUDE.md 대학 범위 수정안) · friendly-pascal-mnmypk · gracious-cannon-xwn0lh · status-f9lp65
+# ⚠ 허용 패턴 밖이라 이 목록에 넣을 수 없는 삭제 가능 5건(Kiki 수동 삭제 — 내용 전부 main에 있음):
+#   p3-78/live-output-20261031(ea8b9123) · eos197/a6-authoring-output(a786bb70) · eos211/cu-hint-output(cf9fb1cc) ·
+#   ops/weekly-metrics-20261019T000122Z(49d350f0) · ops/weekly-metrics-20261025T235900Z(bee15501)
+#   ops/weekly-metrics-20261102T012320Z(d93b1475)는 삭제 금지 — 11-02 행의 유일한 사본(OPS-161)
+claude/jolly-fermi-6km81l
+claude/ops-83-inject-shard-failure
+claude/p3-50-02-01-chain-restore

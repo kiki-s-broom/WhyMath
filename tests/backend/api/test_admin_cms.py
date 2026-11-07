@@ -335,9 +335,10 @@ _ROUTES = _cms_routes()
 def test_route_inventory_is_not_vacuous() -> None:
     """분모 — 라우트가 통째로 사라져도 아래 전수 검사는 공허하게 통과하므로 개수를 고정한다."""
     # 34건(P3-12) + 개념 그래프 쓰기 6건(P3-26: 제안 목록·제안·제안 수정·개념 삭제·관계 추가·관계 삭제)
-    # + EOS-194 문항 판 호출 표면 4건(읽기 2 + 쓰기 2) = 44. 쓰기는 12 + 5 + 2 = 19.
-    assert len(_ROUTES) == 44, f"CMS 라우트 {len(_ROUTES)}건"
-    assert sum(1 for m, _ in _ROUTES if m != "GET") == 19
+    # + EOS-194 문항 판 호출 표면 4건(읽기 2 + 쓰기 2) + EOS-196 문항 판 롤백 1건 = 45.
+    # 쓰기는 12 + 5 + 2 + 1 = 20.
+    assert len(_ROUTES) == 45, f"CMS 라우트 {len(_ROUTES)}건"
+    assert sum(1 for m, _ in _ROUTES if m != "GET") == 20
 
 
 @pytest.mark.parametrize(("method", "path"), _ROUTES, ids=lambda v: str(v))
@@ -1715,6 +1716,8 @@ _CONCEPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/v1/admin/cms/problems/{problem_id}/versions"),
         ("GET", "/v1/admin/cms/problem-versions/{version_id}"),
         ("POST", "/v1/admin/cms/problem-versions/{version_id}/transitions"),
+        # EOS-196 — 문항 판 롤백(같은 모듈 · 동작 계약은 같은 테스트 파일).
+        ("POST", "/v1/admin/cms/problems/{problem_id}/rollback"),
     }
 )
 
@@ -1776,4 +1779,4 @@ class TestRouteDeclarationParity:
         derived = {r for r in _expected_resource_routes() if r[0] != "GET"}
         concept_writes = {r for r in _CONCEPT_ROUTES if r[0] != "GET"}
         assert writes == derived | concept_writes
-        assert len(writes) == 19
+        assert len(writes) == 20

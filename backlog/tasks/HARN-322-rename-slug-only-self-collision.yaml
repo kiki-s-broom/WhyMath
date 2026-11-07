@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-322-rename-slug-only-self-collision
+title: "슬러그만 붙이는 rename이 자기 자신과 번호 충돌로 거부된다 — add 경고가 권하는 정정 경로가 막힘"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① `backlog.py rename <ID> <ID>-<슬러그>`(번호는 같고 슬러그만 붙이는 개명)가 번호 충돌로 거부되지 않는다 — 충돌 검사가 개명 대상 자신(old_id)을 충돌 상대로 세지 않게 한다. ② 재현 테스트: 슬러그 없는 `X-N`을 add한 직후 `rename X-N X-N-slug --reason …`이 exit 0으로 통과하고 파일·이벤트·원격 번호 예약이 새 ID로 옮겨진다(뮤테이션으로 RED 확인). ③ 대조군: 다른 태스크가 이미 쓰는 번호로의 개명은 계속 거부된다."
+artifacts: []
+paths:
+  - scripts/harness/backlog.py
+  - scripts/harness/number_guard.py
+session: null
+notes: "출처: 2026-11-06 HARN-321 등재 직후 실측. add가 \"슬러그 없는 ID — 권장: HARN-321-<슬러그>\"(HARN-317)라고 경고해 그 권장대로 `rename HARN-321 HARN-321-prompt-scope-check --reason \"슬러그 부여(HARN-317 권장)\"`를 실행했더니 \"번호 충돌: 'HARN-321' 는 이미 HARN-321(로컬 백로그) 가 쓰고 있다 … HARN-322 제안\"으로 exit 1. 즉 add의 경고가 권하는 정정 경로가 막혀 있다 — 고칠 수 없는 위반을 지적하는 경고는 사람이 경고를 무시하게 만든다. 피해: 슬러그 없는 ID로 진행(가벼움). D5 방침상 등재만 하고 착수는 2027-01 이후."
+updated: 2026-11-06

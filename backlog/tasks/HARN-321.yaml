@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-321
+title: "요청 단계 범위 대조 훅 — UserPromptSubmit에 claim 태스크·범위·언급 ID 상태 주입"
+track: infra-debt
+stage: S3
+subject: cross
+layer: infra
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① UserPromptSubmit 훅에 `backlog.py check-prompt`를 배선한다 — 매 요청마다 이 세션(현재 브랜치)이 claim한 in_progress 태스크의 ID·제목·paths를 한 덩어리(최대 6줄)로 주입하고, 요청이 그 범위 밖이면 착수 전에 사용자에게 대장 등록(add/amend) 여부를 먼저 확인하라고 안내한다. claim이 없으면 \"코드·문서 변경 요청이면 start가 첫 행위\"(착수 순서 규칙)를 안내한다. ② 결정적 신호: 요청 본문에 태스크 ID가 있으면 대조해 (a) 다른 세션이 claim 중 (b) done/cancelled (c) 대장에 없음 (d) 내 claim과 다른 todo 를 구분해 표기한다. ③ 절대 차단하지 않는다 — 어떤 입력·예외에서도 exit 0(관측 실패가 작업 실패가 되면 안 된다). 예외를 삼킬 때는 예외 타입명을 출력한다(침묵 실패 금지). ④ 지연: 대장 전체 로드(실측 3.1초)를 하지 않고 session 줄 텍스트 스캔 + 해당 파일만 파싱한다 — 1,302건 기준 0.5초 이내를 테스트로 동결. ⑤ 실패 주입: 각 분기(claim 있음/없음·ID 4상태·깨진 stdin·대장 부재)를 픽스처로 밟고, 핵심 분기를 뮤테이션해 RED를 확인한다."
+  - "[D5 예외 2026-11-06 Kiki 승인] 12/31 내부 검증 기간 방침은 신규 HARN 착수를 금지하나, 구현 완료 후 세션이 충돌을 보고했고 Kiki가 \"예외 승인, PR 진행\"을 선택했다. 머지는 \"pr\" 지시 또는 Kiki 판단을 기다린다. 경위: 세션이 구현을 제안하기 전에 D5를 확인하지 않았다(제안 시점 확인 누락)."
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1871"
+  - 01c82dc1
+paths:
+  - scripts/harness/prompt_scope.py
+  - scripts/harness/backlog.py
+  - ".claude/settings.json"
+  - tests/harness/test_check_prompt.py
+session: null
+notes: |-
+  출처: 2026-11-06 Kiki 질의(작업 일관성·목표-실행 갭 축소) 조사 결과. 기존 하네스는 세션 시작(brief)·편집 후(check-edit scope_drift)·종료(check-stop)에서 검사하지만 요청을 받는 순간의 범위 대조가 없어, 범위 밖 요청이 편집이 일어난 뒤에야 경고로 드러났다. LLM 판정(prompt 타입 훅) 대신 결정적 검사를 택한 이유: 재현성(같은 입력→같은 출력)·비용 0·CCR 환경 의존 없음.
+
+  [정정 2026-11-06] D5 예외 승인 기록
+updated: 2026-11-06

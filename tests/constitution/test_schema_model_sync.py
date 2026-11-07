@@ -29,8 +29,22 @@ from pydantic import BaseModel, create_model
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA_DIR = REPO / "schemas" / "v1.1"
 
-# 어긋남·미확정 유예의 재확인 기한 — 12월 검증(G0~G5) 직전. 늦추려면 이 상수만 고친다.
-EXPIRES = date(2026, 12, 31)
+# 어긋남·미확정 유예의 재확인 기한. 늦추려면 이 상수만 고친다.
+#
+# [OPS-157 · 2026-11-06 처분] 처음 기한(2026-12-31)을 2027-03-31 로 의식적으로 연장했다.
+#   해소 2건 — concept·edge: 어긋남의 원인은 YAML 도 모델도 아니라 *짝짓기 오류*였다. 두 YAML 은
+#     data_pipeline.concept_graph.models(저작 평면 · 그 모듈 docstring 이 이 두 YAML 을 정본으로
+#     명시)와 필드가 정확히 같고, 등록부가 백엔드 schema.concept(DB 평면)에 잘못 짝지어 있었다.
+#   연장 5건 — 해소 경로가 별도 판정에 묶여 있어 이 태스크가 대신 정하지 않는다:
+#     · solution_path `embedding` — 도입 여부는 S4-12 가 판정한다(모델 docstring 에 명시).
+#     · hint `created_at`·`generated_by_tier` — 앞은 ORM(db/models/hint.py)에만 있는 행 시각,
+#       뒤는 템플릿 생성기(LLM 호출 0)라 의도적으로 두지 않은 칸(YAML note 에 명시).
+#     · problem 12 — YAML 이 2026-07-28 부터 "구본 명세(비정본)"를 머리말에 선언했다. 갱신
+#       여부는 R4-02 결정 게이트(G-const-r4-02-decision · D13 에서 2027 보류)의 몫이다.
+#     · mastery_state·student_profile — 대응 Pydantic 모델이 아직 없다.
+#   새 날짜 근거: 릴리스 동결 창(2026-12-14~2027-01-15 · check_release_freeze.py)을 피하고,
+#   2027 로 미룬 게이트 판정 뒤 1분기 안에 다시 본다. 재확인 지점 = 이 날짜 + 그 게이트.
+EXPIRES = date(2027, 3, 31)
 
 
 @dataclass(frozen=True)
@@ -52,33 +66,10 @@ REGISTRY: dict[str, Entry] = {
         "whymath_backend.l4.hint_content.models:Hint",
         frozenset({"created_at", "generated_by_tier"}),
     ),
-    "concept": Entry(
-        "whymath_backend.schema.concept:Concept",
-        frozenset(
-            {
-                "domain",
-                "grade_band_hint",
-                "misconception_codes",
-                "notes",
-                "prerequisite_concept_ids",
-                "standard_codes",
-                "visualization_card_keys",
-            }
-        ),
-    ),
-    "edge": Entry(
-        "whymath_backend.schema.concept:ConceptEdge",
-        frozenset(
-            {
-                "dst_concept_id",
-                "evidence",
-                "evidence_source",
-                "relation",
-                "src_concept_id",
-                "strength",
-            }
-        ),
-    ),
+    # concept·edge 의 짝은 저작 평면 모델이다(OPS-157 — 백엔드 schema.concept 는 DB 평면이라
+    # 필드 체계가 다르다). 두 YAML 의 소비자도 data_pipeline.concept_graph(validate.py)다.
+    "concept": Entry("data_pipeline.concept_graph.models:Concept"),
+    "edge": Entry("data_pipeline.concept_graph.models:ConceptEdge"),
     "problem": Entry(
         "whymath_backend.schema.problem:Problem",
         frozenset(

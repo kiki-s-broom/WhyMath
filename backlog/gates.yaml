@@ -1219,6 +1219,8 @@ gates:
       [판정 근거 2026-11-06] [P3-17 판정 검토 2026-11-06 · 판정 기준 main 6cccb547 · docs/reviews/p3_17_verdict_review_2026-11-06.md] 판정 FAIL 결론 유지. 보완 3건: ① Gate B ⑤ Learning Loop Success·⑥ Critical Defect는 목표가 확정돼 있는데(G-p314) 판정문이 목표 '—'·미측정으로 적고 소유자를 두지 않았다 → 측정 실패로 정정, 소유 P3-106(⑤)·P3-107(⑥) ② 성공 기준 Q1 문면('실제 학생 100명')은 D2가 바꾸지 않아 12/31 전 구조적으로 YES 불가 → 처분안 소유 P3-105(Kiki 결정 필요 · 새 게이트 없음) ③ Gate D '충족(단서)'은 content_viewed 생산자 0건·/study 404라 미충족으로 본다 → 소유 P3-29(P2→P1 상향). 표기: AI 품질 축은 FAIL보다 '측정 실패(임계값 미확정·표본 0)'가 정확하다(PASS로 세지 않는 결과는 같음).
 
       [판정 근거 2026-11-06] [Kiki 결정 2026-11-06 — 학생 수 조건 전면 삭제] 성공 기준 Q1의 "내일부터 실제 중·고등학생 100명을 넣어도" 문면을 삭제했다. 새 Q1 = 개발자가 학생별 데이터를 직접 만지지 않고, AI가 학습 루프(진단 → … → 다음 추천) 전 과정을 검토·점검해 문제를 분석·해결한 기록으로 학습이 돌아감을 보일 수 있는가(근거: Learning Loop Success·Manual Intervention KPI + AI 관통 하네스 실행 기록 · 학생 수 조건 없음). 이유: WhyMath의 기본 방향은 AI가 검토·점검·해결하는 것이며, 실사용자 수 조건을 연기만 하다 반복해서 판정 불능을 낳았다. 반영 문서: docs/strategy/phase3_math_eos_completion_plan_source.md §Phase 3의 진짜 성공 기준 · phase3_math_eos_completion_instruction_set.md Q1 2곳 · Phase 1 게이트의 "β 사용자 100명" 5곳(ROADMAP.md · current_phase_checklist.md · 06_application_modes.md · business_plan_master_v1.md · execution_bridge_2026-07.md). 재판정은 새 Q1로 판정하며 P3-17 판정문(2026-11-05)의 Q1 NO 근거 중 "문면상 12/31 전 YES 불가" 부분은 소멸했다(학습 단계 404 · PED-17 근거는 유효).
+
+      [판정 근거 2026-11-06] [2026-11-06 G2] 입력 P3-50 done은 이 통합 게이트에 대해 판정 무관이다 — P3-50은 02-01 귀속 판정·결정 입력(G-p350)을 넘겼을 뿐 ⑦ 02-01 칸을 채우지 않았다. 02-01 칸의 소유는 P3-110(집행)으로 넘어갔다. 판정 기준 main ce8c2165.
     corrections:
       - "[2026-09-25] depends_on +P3-17-week3-release-gate-judgment — HARN-174 v2-9 백필 · 판정 기준 main ff7c9dcb — 여는 작업 연결: 통합 판정(Week 3 + Release)을 소유할 태스크가 없어 신규 등재했다 — 2026-09-23 사고 2의 당사자 게이트로, 판정 대상 작업 묶음은 판정 태스크의 선행으로 걸었다"
       - "[2026-10-20] notes +107자 — D9: 하한을 P3-G2에서 통합 판정으로 이동"
@@ -1237,6 +1239,8 @@ gates:
       - "[2026-11-06] input done · P3-105 · 판정 무관: 게이트 판정은 Kiki 몫 — 이 태스크는 Q1 처분 결정의 문서 반영만 넘긴다 — done P3-105 인계"
       - "[2026-11-06] input done · P3-91-p3-62-candidate-promotion-fill-template-fix · 판정 무관: 구현 입력 태스크라 게이트 전체 판정을 내리지 않는다 — 게이트는 판정 회차 분리 집행(구현 세션과 다른 세션)이고 다른 입력(P3-94 등)이 미완이다. 이 태스크가 낸 D11 축 실측: solution_qa exit 0 · 626/1,121 = 0.55843 ≥ 55%(617) · 기준 PR #1856 head 977f0ed7(승격 커밋 ce745bb6) · 보고서 docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md — done P3-91-p3-62-candidate-promotion-fill-template-fix 인계"
       - "[2026-11-06] input done · P3-93 · 판정 무관: 구현 입력 태스크라 게이트 전체 판정을 내리지 않는다 — 게이트는 판정 회차 분리 집행(구현 세션과 다른 세션)이고 다른 입력(P3-94 등)이 미완이다. 이 태스크가 낸 D11 축 실측: solution_qa exit 0 · 626/1,121 = 0.55843 ≥ 55%(617) · 기준 PR #1856 head 977f0ed7(승격 커밋 ce745bb6) · 보고서 docs/reviews/p3_91_93_solution_qa_55_2026-11-06.md — done P3-93 인계"
+      - "[2026-11-06] depends_on +P3-110-calc-02-01-m0669-chain-execution — P3-50 done(판정 입력 완성)로 02-01 ⑦ 칸의 열린 소유가 사라져서, 실제 보강을 맡는 집행 태스크 P3-110을 통합 게이트 입력으로 붙인다 — 02-01은 P3-110 완료 전까지 미충족(main ce8c2165 기준 4/10)"
+      - "[2026-11-06] notes +166자 — P3-50 done의 이 게이트 판정 무관 사유 기록"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
@@ -1254,6 +1258,7 @@ gates:
       - P3-107-phase3-critical-defect-payload-collector
       - P3-105
       - P3-29-content-view-log-seat-decision
+      - P3-110-calc-02-01-m0669-chain-execution
   - id: G-p301-scope-choice
     title: "P3-01 대표 과정 선택 — 후보 3개 중 1개 + 질문 3개 판정: 후보1 미적분Ⅰ '미분'(고2·2028 수능 공통 · 437 삼각 30% · 신규 문항 44건 이상 · 세션 추천) / 후보2 공통수학1 '방정식과 부등식'(고1 · 75% · 42건 이상 · 수능 범위 밖) / 후보3 확률과 통계 '확률'(고2 · 100%이나 문면 12개 착시 · 24건 이상). Q1 시장(고3 수능) 대 밀도(고1) · Q2 핵심 개념 분모를 성취기준별 대표 원자 1개로 둘지 원자 리프 전부로 둘지(후자는 문항→원자 귀속 규칙 변경 선행 — 현재 천장 33~37%) · Q3 대단원 1개 대 과목 전체(신규 문항 하한 약 2배). 선택 결과가 P3-02 Coverage 분모가 된다"
     kind: decision
@@ -1292,6 +1297,19 @@ gates:
       - "[2026-10-18] input done · P3-07-solution-qa-machine-verification · 판정 무관: G-p307-solution-qa-judgement-rules 는 Kiki 결정 게이트다 — CLI 영 허용 vs 비율 판정·검증 가능 비율 하한·99% vs 99.5% 판정은 사람 소유이며 이 태스크는 판정 입력(실측·보고서)을 만들었을 뿐 판정하지 않는다 — done P3-07-solution-qa-machine-verification 인계"
     depends_on:
       - P3-07-solution-qa-machine-verification
+  - id: G-p3109-m0669-crosslink-signature
+    title: "M0669 kebab(P3-109) 크로스링크 서명 — kebab↔M0669 매핑을 검수:kiki로 서명한다. 동결 자산이라 세션이 대신 서명하지 않는다. 입력 = P3-109의 크로스링크 검수 큐 행"
+    kind: human
+    assignee: kiki
+    status: pending
+    requested: 2026-11-06
+    remind_after_days: null
+    evidence: null
+    cleared_by: null
+    notes: ""
+    corrections: []
+    depends_on:
+      - P3-109-m0669-choice-trace-kebab
   - id: G-p314-phase3-metric-targets
     title: "Phase 3 지표 7종 목표 수치 확정 — ops.phase3_metrics 가 읽는 목표(Curriculum Coverage 98% · Concept Completeness 95% · Problem Coverage 95% · Solution QA Pass 99.5%(스코어카드 ceiling 흡수) · Learning Loop Success Wilson 하한 95% · Critical Defect 0건)는 지시문의 목표 예시이며 확정값이 아니다. Graph Connectivity Coverage 는 명세에서 목표가 null 이라 판정 자체가 없다. P3-02·P3-10 의 실측 기준선을 본 뒤 Kiki 가 지표별로 (가) 이 값으로 확정 (나) 값 변경 (다) 지표 폐기를 정한다. 오늘 기준선: Curriculum 3/10 · Concept Completeness 0/10 · Problem Coverage 6/8 · Graph Connectivity 0/10. 판정 재료와 불일치 기록(Critical Defect 출처: Hard Gate F-Ⅰ~Ⅴ 흡수 vs 지시문의 백로그 P0/P1 분류 — 저장소에 결함 심각도 필드가 없음) = docs/standards/phase3_metrics_contract.md · docs/reviews/p3_14_phase3_metrics_2026-10-09.md. 목표를 확정하지 않으면 Week 1~3 게이트 판정(P3-15~17)의 수치 기준이 예시값 그대로 남는다."
     kind: decision
@@ -1376,13 +1394,14 @@ gates:
     title: "02-01 핵심 오개념과 보강 경로 결정 — Q1 02-01 핵심 오개념(가: M0075·M0080을 M0669 한 행으로 교체, 권고 / 나: M0080만 삭제하고 M0075 유지 / 다: 현행 유지, M0075가 걸려 있으므로 G-p359-m0672-shadow-disposition과 함께 정한다) · Q2 보강 경로(A 정직한 재귀속+새 객관식 문항, 권고 / B 스킬 정렬로 기존 24건 인정, 내용이 거짓인 채 숫자만 오르므로 비권고 / C 현상 수용) · Q3 M0669용 선지 역추적 전용 kebab을 별건 태스크로 신설할지(원래 질문은 P3-61에 5번째로 합칠지였으나 P3-61은 2026-10-18에 4개 kebab으로 done이라 합류 선택지는 소멸, 카탈로그·동결 테스트 연쇄를 새로 한 번 치르게 된다). 세션 의견은 Q1 가·Q2 A·Q3 별건 신설(Q2에서 A를 택할 때만 의미). 근거 docs/reviews/p3_50_02_01_chain_restore_2026-10-18.md §4~§7 (판정 기준 main fb27e49d)"
     kind: decision
     assignee: kiki
-    status: pending
+    status: cleared
     requested: 2026-11-06
     remind_after_days: null
-    evidence: null
-    cleared_by: null
+    evidence: "Kiki 결정(2026-11-06 세션 채팅 · 에이전트 중계 기록 — 세션 claude/new-session-cwj4cc): Q1 가 — scope_spec.yaml 02-01 핵심 오개념 M0075·M0080 두 행을 M0669 한 행으로 교체 · Q2 A — 정직한 재귀속 + 새 객관식 문항(오답 보기 = M0669 절차 산출값, SymPy 확인), 새 은행 승인 단위 n≥200 경로로 G1 은행 240과 섞지 않음 · Q3 별건 신설 — M0669용 선지 역추적 전용 kebab을 별도 태스크로 등재, 크로스링크 서명은 Kiki 게이트로 분리. 세션 권고안과 같다. 근거 docs/reviews/p3_50_02_01_chain_restore_2026-10-18.md §4~§7 · 판정 기준 main ce8c2165 · 입력 P3-50 done(#1855, 2a694f71). 코퍼스(misconceptions.json) M0075·M0080 귀속 정정(§4 요청 2)은 이 결정에 포함하지 않았다 — 명세 교체만으로 측정이 거부되면 그때 별도 결정으로 올린다."
+    cleared_by: claude
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-11-06] verdict PASS · inputs: P3-50-calc-02-01-misconception-chain-restore · evidence: 판정문 docs/reviews/p3_50_02_01_chain_restore_2026-10-18.md §4~§7 (판정 기준 main fb27e49d, 회수 재대조 main 034a8bfb, PR #1855 머지 커밋 2a694f71). PASS의 뜻은 결정 입력(Q1 귀속 판정·Q2 보강 경로 3안 비용·Q3 kebab 위치)이 완성돼 Kiki 결정이 가능해졌다는 것이다. acceptance ③은 '불가능하면 이유를 적는다' 가지로 충족(§5) — 실제 보강(새 객관식 문항·M0669 kebab)은 게이트 결정 뒤 별도 집행 태스크가 소유한다. 인수 근거: 원 claim 세션 claude/p3-50-02-01-judgment-recovery는 PR #1855 머지 후 브랜치가 삭제됐고 열린 PR 0건, Kiki가 2026-11-06 채팅으로 인수를 지시했다. — done P3-50-calc-02-01-misconception-chain-restore 인계"
     depends_on:
       - P3-50-calc-02-01-misconception-chain-restore
   - id: G-p356-signature-activation

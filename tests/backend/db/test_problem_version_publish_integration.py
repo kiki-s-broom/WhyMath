@@ -14,6 +14,11 @@ writer가 없어 값이 전부 NULL이었다. 이 파일은 **writer가 생긴 �
      mapper에서 동적으로 뽑아 포인터까지 코퍼스 값(None)으로 덮어쓰고 있었다. writer가 0건이던 동안은
      덮을 값이 없어 무해했고, 첫 writer가 생기는 순간 현실이 되는 결함이다(AST 스캔은 못 본다).
 
+  G. (EOS-196) **롤백** — 현재 발행본이 RETIRED로 내려가고 직전 발행본이 RESTORE 게이트를 거쳐
+     되살아나며, 포인터가 가리키는 판의 payload가 복원 대상의 스냅숏과 **바이트 단위로** 같고
+     라이브 문항 행도 그 판의 내용으로 돌아간다(새 시도는 복원된 판에 고정된다). 내려가 있는 동안
+     payload가 바뀌었거나 화면이 본 발행본이 낡았으면 아무 것도 쓰이지 않는다.
+
   F. (P3-04) **7필드 집행** — 실제 행을 하나씩 망가뜨리면 발행이 거부되고 아무 것도 쓰이지 않으며,
      고치면 같은 경로로 발행된다. 오개념 서명은 슬롯별 규칙(트리거 슬롯은 문항 자체 연결 필수)을 본다.
 
@@ -39,9 +44,15 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from whymath_backend.config import Settings
+from whymath_backend.db.models.problem import Problem
 from whymath_backend.l3 import problem_publish_gate as gate
 from whymath_backend.l3.problem_metadata_evidence import load_metadata_evidence
-from whymath_backend.l3.publish_gate import PublishGateError, StaleStatusError
+from whymath_backend.l3.publish_gate import (
+    PublishGateError,
+    RollbackUnavailableError,
+    StalePublishedPointerError,
+    StaleStatusError,
+)
 from whymath_backend.schema.problem_metadata import (
     FieldState,
     ProblemMetadataField,
@@ -487,6 +498,186 @@ def test_stale_expected_status_is_refused_without_writing() -> None:
             )
         assert _status(version_id) == VersionStatus.APPROVED.value
         assert _pointer(pid) is None
+    finally:
+        sc.teardown()
+
+
+# ── G. 롤백 (EOS-196) — 복원본 판·라이브 행·포인터를 한 번에 되돌린다 ──────────────────
+def _payload_text(version_id: uuid.UUID) -> str:
+    """판 payload의 저장 바이트(JSONB 정규 텍스트) — 바이트 단위 비교의 기준."""
+    return str(
+        _rows("SELECT payload::text FROM problem_version WHERE version_id = :v", {"v": version_id})[
+            0
+        ][0]
+    )
+
+
+def _published_at(version_id: uuid.UUID) -> Any:
+    return _rows(
+        "SELECT published_at FROM problem_version WHERE version_id = :v", {"v": version_id}
+    )[0][0]
+
+
+def _live_snapshot_hash(problem_id: uuid.UUID) -> str:
+    """지금 라이브 문항 행의 스냅숏 해시 — 게이트가 PUBLISH에서 대조하는 것과 같은 함수."""
+
+    async def _go(session: AsyncSession) -> str:
+        row = await session.get(Problem, problem_id, populate_existing=True)
+        assert row is not None
+        return gate.compute_content_hash(gate.snapshot_payload(row))
+
+    return _with_session(_go)  # type: ignore[no-any-return]
+
+
+def _version_hash(version_id: uuid.UUID) -> str:
+    async def _go(session: AsyncSession) -> str:
+        return gate.compute_content_hash((await gate.get_version(session, version_id)).payload)
+
+    return _with_session(_go)  # type: ignore[no-any-return]
+
+
+def _live_answer(problem_id: uuid.UUID) -> str:
+    return str(_rows("SELECT answer FROM problem WHERE problem_id = :p", {"p": problem_id})[0][0])
+
+
+def _rollback(problem_id: uuid.UUID, expected: uuid.UUID | None) -> Any:
+    return _with_session(
+        lambda s: gate.rollback(
+            s, problem_id, actor="rollbacker", expected_current_version_id=expected
+        )
+    )
+
+
+def _republished(pid: uuid.UUID, new_answer: str) -> tuple[uuid.UUID, uuid.UUID]:
+    """v1 발행 → 라이브 정답 정정 → v2 발행. (v1, v2)."""
+    v1 = _publish(pid)
+    _exec("UPDATE problem SET answer = :a WHERE problem_id = :p", {"a": new_answer, "p": pid})
+    v2 = _publish(pid)
+    return v1, v2
+
+
+def test_rollback_restores_the_previous_version_byte_for_byte_and_the_live_row() -> None:
+    sc = _Scenario("e196a", [3.0])
+    (pid,) = sc.pids
+    try:
+        with _P._client() as client:
+            _P._erase_learner(client)
+            auth = _P._login(client)
+            v1_answer = _live_answer(pid)
+            v1, v2 = _republished(pid, "결함있는정답")
+            v1_bytes = _payload_text(v1)  # 복원 대상의 스냅숏(롤백 전 저장 바이트)
+            v1_first_published = _published_at(v1)
+            assert _status(v1) == VersionStatus.DEPRECATED.value and _pointer(pid) == v2
+            assert _live_answer(pid) == "결함있는정답"
+
+            result = _rollback(pid, v2)
+
+            assert (result.rolled_back_version_id, result.restored_version_id) == (v2, v1)
+            assert _status(v2) == VersionStatus.RETIRED.value, "롤백으로 내린 판은 결함 판정이다"
+            assert _status(v1) == VersionStatus.PUBLISHED.value
+            assert _pointer(pid) == v1, "롤백이 포인터를 옮기지 않았다"
+            # acceptance ② — 포인터가 가리키는 판의 payload가 복원 대상 스냅숏과 바이트 단위로 같다.
+            assert _payload_text(_pointer(pid)) == v1_bytes  # type: ignore[arg-type]
+            assert _published_at(v1) == v1_first_published, "published_at은 처음 발행 시각이다"
+            # 라이브 행도 복원본 내용으로 돌아간다 — 포인터 판 payload == 라이브 스냅숏(드리프트 0).
+            assert _live_answer(pid) == v1_answer
+            assert _live_snapshot_hash(pid) == _version_hash(v1)
+            # RESTORE 게이트 통과 기록이 남는다(어떤 검사를 통과했는지).
+            checks = _rows(
+                "SELECT qa->'records'->-1->'checks' FROM problem_version WHERE version_id = :v",
+                {"v": v1},
+            )[0][0]
+            assert {"previously_published", "live_content_current", "content_hash"} <= set(checks)
+
+            # 새 시도는 복원된 판에 고정된다(학생이 보는 문항 = 고정된 판).
+            assert _attempt_pin(_submit(client, auth, pid))[0] == v1
+
+            # 결함 판은 RETIRED라 다음 롤백의 복원 후보가 아니다 — 되살아나지 않는다.
+            with pytest.raises(RollbackUnavailableError):
+                _rollback(pid, v1)
+            assert _status(v2) == VersionStatus.RETIRED.value and _pointer(pid) == v1
+    finally:
+        sc.teardown()
+
+
+def test_a_rolled_back_version_never_comes_back_even_when_it_is_older_than_the_current_one() -> (
+    None
+):
+    """v1 → v2(결함) → 롤백(v2 RETIRED) → v3 발행 → 다시 롤백하면 v1이 돌아와야 한다.
+
+    결함 판 v2는 v3보다 번호가 작으므로 `version_no` 조건만으로는 걸러지지 않는다 — 상태(RETIRED)가
+    후보에서 빼야 한다. 앞 테스트의 두 번째 롤백은 결함 판이 현재 판보다 *큰* 번호라 이 절을 밟지 않는다.
+    """
+    sc = _Scenario("e196e", [3.0])
+    (pid,) = sc.pids
+    try:
+        v1_answer = _live_answer(pid)
+        v1, v2 = _republished(pid, "결함있는정답")
+        _rollback(pid, v2)
+        _exec("UPDATE problem SET answer = :a WHERE problem_id = :p", {"a": "세번째정답", "p": pid})
+        v3 = _publish(pid)
+        assert (_status(v1), _status(v2), _status(v3)) == (
+            VersionStatus.DEPRECATED.value,
+            VersionStatus.RETIRED.value,
+            VersionStatus.PUBLISHED.value,
+        )
+
+        result = _rollback(pid, v3)
+
+        assert result.restored_version_id == v1, "롤백으로 내린 결함 판이 되살아났다"
+        assert _status(v2) == VersionStatus.RETIRED.value
+        assert _pointer(pid) == v1 and _live_answer(pid) == v1_answer
+    finally:
+        sc.teardown()
+
+
+def test_rollback_refuses_a_payload_changed_while_deprecated_and_writes_nothing() -> None:
+    """DEPRECATED 판의 payload는 DB 트리거가 보호하지 않는다 — RESTORE의 해시 재검증이 막는다."""
+    sc = _Scenario("e196b", [3.0])
+    (pid,) = sc.pids
+    try:
+        v1, v2 = _republished(pid, "결함있는정답")
+        _exec(
+            "UPDATE problem_version SET payload = jsonb_set(payload, '{answer}', '\"변조\"') "
+            "WHERE version_id = :v",
+            {"v": v1},
+        )
+        with pytest.raises(PublishGateError, match="content_hash"):
+            _rollback(pid, v2)
+        assert _status(v1) == VersionStatus.DEPRECATED.value
+        assert _status(v2) == VersionStatus.PUBLISHED.value
+        assert _pointer(pid) == v2
+        assert _live_answer(pid) == "결함있는정답", "거부된 롤백이 라이브 행을 고쳤다"
+    finally:
+        sc.teardown()
+
+
+def test_rollback_with_a_stale_expected_pointer_writes_nothing() -> None:
+    sc = _Scenario("e196c", [3.0])
+    (pid,) = sc.pids
+    try:
+        v1, v2 = _republished(pid, "결함있는정답")
+        with pytest.raises(StalePublishedPointerError):
+            _rollback(pid, v1)  # 화면은 v1이 발행 중이라고 봤다 — 실제는 v2
+        assert (_status(v1), _status(v2)) == (
+            VersionStatus.DEPRECATED.value,
+            VersionStatus.PUBLISHED.value,
+        )
+        assert _pointer(pid) == v2 and _live_answer(pid) == "결함있는정답"
+    finally:
+        sc.teardown()
+
+
+def test_rollback_without_a_previous_publication_is_unavailable() -> None:
+    sc = _Scenario("e196d", [3.0])
+    (pid,) = sc.pids
+    try:
+        with pytest.raises(RollbackUnavailableError, match="현재 발행본이 없다"):
+            _rollback(pid, None)
+        v1 = _publish(pid)
+        with pytest.raises(RollbackUnavailableError, match="직전 발행본이 없다"):
+            _rollback(pid, v1)
+        assert _status(v1) == VersionStatus.PUBLISHED.value and _pointer(pid) == v1
     finally:
         sc.teardown()
 
