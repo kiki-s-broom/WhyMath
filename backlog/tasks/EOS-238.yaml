@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-238
+title: "두 단계 문항 spec(한 근 주어짐) 생성 실패 16/16 — 검산식 표현 한계 처분"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 두 단계 문항(한 근이 주어진 이차방정식에서 상수를 먼저 구한 뒤 다른 근)을 현재 검산식 형식이 표현하지 못하는 원인을 실측으로 확정한다. 근거: EOS-225 A4 회차 spec a4-one-root 16시도 16건 전부 generation_failed · 사유 TautologicalConditionError(검산식에 중간값 하드코딩 — authoring_guard) · 회차 시도의 25%(16/65)가 이 spec에서 소진됐다.\n② 처분을 하나 고른다: (a) 다단계 검산(중간 미지수 포함 연립)을 지원 (b) 이 유형을 단일 등식 형태로 바꾸는 spec 문안 (c) 저작 spec에서 제외하고 회차 설정 주석에 근거를 남김. 고른 근거를 적는다.\n③ (a)·(b)라면 같은 spec으로 소규모 실측(≥10시도)을 돌려 수락률이 0이 아님을 보이고, (c)라면 회차 설정 검사 테스트가 그 spec 재도입을 막거나 사유를 요구하게 한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/l3/equivalent/authoring_guard.py
+session: null
+notes: "출처: EOS-225 A4 2회차 사람 검수(Kiki 2026-11-07) 보고서 §5 공통 이슈 12건 중 저장소 실측으로 확인된 것. 산출물 data/runs/eos-a4-openrouter·eos-a4-review."
+updated: 2026-11-07

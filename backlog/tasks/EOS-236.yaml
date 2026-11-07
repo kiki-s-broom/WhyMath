@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-236
+title: "LLM 저작 저장 전 검증 — answer_format 결손 거부 · 같은 방정식/같은 수치 상황 중복 차단"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① LLM 저작 경로(l3/equivalent/llm_generator.py → problem_corpus_accumulate)가 answer_format 없는 CU를 저장하지 않는다 — 결손이면 저장 전 거부하고 거부 사유가 회차 대장 outcome_counts에 남는다. 근거: EOS-225 A4 회차 wm-gen-quad-d5abe3457553(cu.jsonl에 키 자체 없음 · 34건 중 1건 · 사람 검수가 눈으로 잡음).\n② 같은 회차·기존 코퍼스 안에서 \"방정식이 같고 묻는 근만 다른\" 쌍과 \"같은 수치 상황\"(예: 곱 272 → 작은 수/큰 수)을 저장 전 중복으로 판정한다. 근거: A4 회차 5번↔27번(3x²−x−10=0 작은 근/큰 근) · 9번↔21번(연속 자연수 곱 272) — EOS-204 구조 중복 차단을 통과했고 사람 검수가 반려(F8)했다. 판정 기준(정규화한 다항식 동치 등)과 오탐 상한은 구현 태스크가 정해 적는다.\n③ 두 검사 모두 결함 주입 픽스처로 RED를 확인하고, 정상 CU 대조군이 통과함을 함께 동결한다."
+artifacts: []
+paths:
+  - "src/backend/whymath_backend/l3/equivalent/**"
+session: null
+notes: "출처: EOS-225 A4 2회차 사람 검수(Kiki 2026-11-07) 보고서 §5 공통 이슈 12건 중 저장소 실측으로 확인된 것. 산출물 data/runs/eos-a4-openrouter·eos-a4-review."
+updated: 2026-11-07
