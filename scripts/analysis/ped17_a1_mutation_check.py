@@ -178,8 +178,16 @@ def _run(mut: Mutation) -> tuple[bool, str]:
         missing = [t for t in mut.tests if not (ROOT / t).exists()]
         if missing:
             return False, f"하네스 오류: 테스트 파일 없음 {missing}"
+        # 인코딩을 명시한다(HARN-19) — Windows 한국어 로케일의 기본 cp949로 pytest 출력을
+        # 디코드하지 않게.
         proc = subprocess.run(
-            [*PYTEST, *mut.tests], cwd=ROOT, capture_output=True, text=True, timeout=900
+            [*PYTEST, *mut.tests],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=900,
         )
         detected = proc.returncode == 1  # 1 = 테스트 실패(RED). 0 = 생존, 2+ = 수집/설정 오류.
         tail = [ln for ln in proc.stdout.splitlines() if ("passed" in ln or "failed" in ln)][-1:]
