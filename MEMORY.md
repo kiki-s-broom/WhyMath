@@ -344,6 +344,12 @@
 - **값**: 수용 34/65(52%, 1회차 유료 좌석 27/85=32%) · 비용 $0.136(전체) · HIT 중앙 34.45초 · 처리량 41.8 CU/h · 단위비용 2.34원/CU · 자동검증 1차 통과율 42/65 = 0.6462(Wilson 단측 하한 0.5446 · measured:true · G4 ≥70% 미달) · 반려 F8 4 · 재작업률 미측정(`cu.slots.jsonl` 쓰기 배선 없음 — EOS-220 인계분) · provenance_audit exit 0 · 8-gram ≥70% 1건(0.75 · 자체 코퍼스 대비 정형 발문 · 기록만) · spec별 수락 인수분해 11·근의 공식 12·활용 11·**한 근 주어짐 0(16/16 TautologicalConditionError — 검산식 중간값 하드코딩 거부)** · 수정승인 20번 `answer_format` 결손 1건.
 - **근거 커밋**: 설정 `c6bf4ee3`(#1875) · 산출물 `1d30508d` · 원장·결정 로그 = 이 PR · 검수 보고서 공통 이슈 후속 = `EOS-236`(answer_format·같은 방정식 중복) · `EOS-237`(유형 다양성) · `EOS-238`(두 단계 spec) · `EOS-239`(해설·난이도·표기).
 
+### 2026-11-07 (결정 · HARN-63 ⑤ 종결 — Kiki): **브랜치 보호 승인 축 3건은 "문서를 현실에 맞춘다" — 선언 0/false/false로 정정 · 유예 3건 삭제** (Kiki 결정, claude 기록) — 판정 기준: main `a282dafb`
+- **결정**: Kiki가 두 선택지(문서를 현실에 맞춘다 / 설정을 문서대로 켠다) 중 앞쪽을 택했다(2026-11-07 채팅). `.github/branch-protection-setup.md` RULESET_POLICY의 `required_approving_review_count` 1→0 · `dismiss_stale_reviews_on_push` true→false · `require_code_owner_review` true→false, RULESET_DEVIATIONS 3건(만료 2026-12-31) 삭제.
+- **근거**: 사람 개발자 1명 — GitHub는 작성자 자기 승인을 세지 않아 승인 1명 요구는 모든 PR을 머지 불가로 만든다. 머지 전 품질은 required check 16건 + merge queue 재검증, 머지 판단은 `"pr"` 지시·Kiki 판단이 맡는다. 같은 날 라이브 재확인(`ruleset_drift.py --record`, #1873)에서 라이브는 0/false/false이고 위반 0.
+- **재판정 지점**: 쓰기 권한을 가진 사람 기여자가 2명 이상이 되면 3줄을 1/true/true로 올린다(문서에 명시). CLAUDE.md "만료 없는 유예 금지"와의 관계 — 유예가 아니라 의도 선언 자체를 바꾼 것이므로 만료일 대신 이 재판정 조건을 둔다.
+- **검증**: `tests/infra/test_ruleset_drift.py` + `test_ruleset_pin_plan.py` 125 passed(exit 0). 유예 메커니즘 테스트 4건은 합성 문서(유예 3건 재현)로 옮겨 장치 검증을 유지했다. 주입 2종 RED — 선언을 1로 되돌림(14건 RED) · 만료 승격 무력화(1건 RED), 원복 바이트 동일.
+
 ### 2026-11-06 (결정 · G-p345 — Kiki): **02-09 핵심 오개념 처분 = (가)+(다) 변형 — M0677 원문 유지, 절차가 적힌 02-09 귀속 신규 M-id를 만들어 핵심 오개념을 교체** (Kiki 결정, claude 기록) — 판정 기준: main `ce8c2165`
 
 **왜**: M0677은 '관점을 못 쓴다'는 omission형이라 판정기 규칙 `M-link-undescribed`가 연결을 막는다. 코퍼스 843건 중 02-09 귀속 M-id는 M0677 1건뿐이라 기존 M-id로 바꿀 후보가 0건이다. (가) 단독은 같은 ID의 뜻을 바꿔 동결 시험지 q056·q181 라벨과 어긋나고, (나)는 검증 없는 연결, (라)는 Graph Connectivity 최대 9/10으로 목표 0.95 FAIL이라 기각.

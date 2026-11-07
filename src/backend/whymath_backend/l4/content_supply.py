@@ -157,6 +157,17 @@ class SupplyResult:
         """LLM 비용이 0인 경로인가(렌더·프롬프트캐시 히트)."""
         return self.content_source in ("dsl_render", "prompt_cache")
 
+    @property
+    def served(self) -> bool:
+        """학생에게 보여줄 산출물이 실제로 있는가(렌더 결과 또는 생성 본문).
+
+        `content_source`는 *어느 경로로 갔는가*(비용 축)이고, 이것은 *학생이 무엇을 받았는가*다.
+        생성 인자가 없어 폴백을 건너뛴 결과도 `content_source="generate"`라서, 경로만 보면
+        "생성했다"와 "생성하려다 아무것도 못 줬다(학생 404)"가 구분되지 않는다(PED-17 ②).
+        저장 필드가 아니라 산출물에서 유도한다 — 따로 적는 값은 산출물과 어긋날 수 있다.
+        """
+        return self.rendered is not None or self.text is not None
+
 
 @dataclass(slots=True)
 class SupplyTally:
@@ -182,6 +193,17 @@ class SupplyTally:
     by_lookup_via: dict[str, int] = field(default_factory=dict)
     """콘텐츠 행 조회 경로(`LOOKUP_*`) → 건수. 크로스워크 역조회가 일한 횟수(CONT-06)."""
 
+    by_served: dict[str, int] = field(default_factory=dict)
+    """학생 수신 여부(`served`·`unserved`) → 건수. 수신 여부를 모르는 기록은 세지 않는다.
+
+    PED-17 ②: 생성 인자 없이 폴백을 건너뛴 결과(학생 404)와 실제 생성(학생 수신)이 같은
+    (`content_source="generate"`, 전략, 폴백 사유) 키로 합산돼 회계에서 수신 여부가 사라졌다.
+    이 축이 그 둘을 가른다."""
+
+    unserved_by_source: dict[str, int] = field(default_factory=dict)
+    """경로 → 학생이 아무것도 받지 못한 건수. `generate` 칸이 곧 "generate로 집계되나 학생은 못
+    봄"의 크기다(`counts["generate"]`와 나란히 읽는다)."""
+
     def record(
         self,
         source: ContentSource,
@@ -189,14 +211,21 @@ class SupplyTally:
         strategy: str | None = None,
         fallback_reason: str | None = None,
         lookup_via: str | None = None,
+        served: bool | None = None,
     ) -> None:
         """공급 1건 집계 — 경로는 항상, 전략·폴백 사유는 알려진 경우에만 분해에 더한다.
 
         `strategy`·`fallback_reason`이 선택인 이유는 호출자가 그 축을 모르는 경우(사전 점검·
         경로만 세는 배치)에도 경로 회계가 성립해야 하기 때문이다. 모르는 값을 "기타" 같은
-        기본치로 채우면 분해가 근거 없는 숫자를 만든다(모르면 모른다).
+        기본치로 채우면 분해가 근거 없는 숫자를 만든다(모르면 모른다). `served`도 같다 —
+        None(모름)은 수신·미수신 어느 쪽에도 넣지 않는다.
         """
         self.counts[source] = self.counts.get(source, 0) + 1
+        if served is not None:
+            served_key = "served" if served else "unserved"
+            self.by_served[served_key] = self.by_served.get(served_key, 0) + 1
+            if not served:
+                self.unserved_by_source[source] = self.unserved_by_source.get(source, 0) + 1
         if strategy is not None:
             per_strategy = self.by_strategy.setdefault(strategy, {})
             per_strategy[source] = per_strategy.get(source, 0) + 1
@@ -235,6 +264,25 @@ class SupplyTally:
             return None
         return wilson_lower_bound(self.counts.get("dsl_render", 0), self.total)
 
+    @property
+    def served_known(self) -> int:
+        """수신 여부가 기록된 건수(분모). `total`과 다를 수 있다 — 모르는 기록은 빠진다."""
+        return sum(self.by_served.values())
+
+    @property
+    def served_rate(self) -> float | None:
+        """학생 수신 비율(점추정). 수신 여부가 기록된 표본이 0이면 None(미상 ≠ 0%)."""
+        if self.served_known == 0:
+            return None
+        return self.by_served.get("served", 0) / self.served_known
+
+    @property
+    def served_rate_lower(self) -> float | None:
+        """학생 수신 비율의 Wilson 단측 95% 하한. 표본 0이면 None."""
+        if self.served_known == 0:
+            return None
+        return wilson_lower_bound(self.by_served.get("served", 0), self.served_known)
+
     def to_json(self) -> dict[str, object]:
         """사람·자동화가 읽는 요약(미상은 None으로 남긴다) — 어댑터별 분해 포함.
 
@@ -252,6 +300,10 @@ class SupplyTally:
             },
             "by_fallback_reason": dict(sorted(self.by_fallback_reason.items())),
             "by_lookup_via": dict(sorted(self.by_lookup_via.items())),
+            "by_served": dict(sorted(self.by_served.items())),
+            "unserved_by_source": dict(sorted(self.unserved_by_source.items())),
+            "served_rate": self.served_rate,
+            "served_rate_lower": self.served_rate_lower,
         }
 
 
@@ -278,6 +330,8 @@ def reset_process_tally() -> None:
     _PROCESS_TALLY.by_strategy.clear()
     _PROCESS_TALLY.by_fallback_reason.clear()
     _PROCESS_TALLY.by_lookup_via.clear()
+    _PROCESS_TALLY.by_served.clear()
+    _PROCESS_TALLY.unserved_by_source.clear()
 
 
 @dataclass(frozen=True, slots=True)
@@ -497,7 +551,10 @@ async def supply(
             trace.record(_render_trace_fields(code, strategy, resolution))
         if tally is not None:
             tally.record(
-                result.content_source, strategy=strategy.value, lookup_via=resolution.lookup_via
+                result.content_source,
+                strategy=strategy.value,
+                lookup_via=resolution.lookup_via,
+                served=result.served,
             )
         return result
 
@@ -513,11 +570,13 @@ async def supply(
             lookup_candidates=resolution.candidates,
         )
         if tally is not None:
+            # 생성을 건너뛴 결과다 — 경로는 generate지만 학생은 아무것도 받지 못한다(served=False).
             tally.record(
                 result.content_source,
                 strategy=strategy.value,
                 fallback_reason=reason,
                 lookup_via=resolution.lookup_via,
+                served=result.served,
             )
         return result
 
@@ -568,6 +627,7 @@ async def supply(
             strategy=strategy.value,
             fallback_reason=reason,
             lookup_via=resolution.lookup_via,
+            served=result.served,
         )
     return result
 

@@ -40,8 +40,9 @@ class TestSummarize:
 
     def test_coverage_accounting_uses_real_catalog(self) -> None:
         report = ev.summarize([], _KEBAB_STANDARDS, _MID_STANDARDS)
-        # 실 카탈로그 72종(843 트랜치1~5 + MISC-21 3 + MISC-40 1 + P3-61 선지 역추적 전용 4 포함)
-        assert report.kebabs_total == 72
+        # 실 카탈로그 73종(843 트랜치1~5 + MISC-21 3 + MISC-40 1 + P3-61 선지 역추적 전용 4
+        # + P3-109 선지 역추적 전용 1 포함)
+        assert report.kebabs_total == 73
         assert report.kebabs_decidable == 2  # 신호 부여한 2 kebab
 
 
@@ -76,7 +77,7 @@ class TestCliEndToEnd:
         # cross-standard 전건 거부(구조 신호 정확)·정답 오거부 0.
         assert report.cross_detected == report.cross_total and report.cross_total > 0
         assert report.positive_false_reject == 0
-        # same-standard는 못 잡음(false accept·인간 존치)·커버 65/72
+        # same-standard는 못 잡음(false accept·인간 존치)·커버 65/73
         # (843 트랜치1~4 24종 신규 탐지 kebab 포함·전수 machine-decidable). MISC-21 3종
         # (bigger-denominator-bigger-fraction·ratio-order-swapped·
         # addition-multiplication-rule-confused)은 아직 문항 코퍼스에 등장하지 않아
@@ -88,8 +89,9 @@ class TestCliEndToEnd:
         # graph-sketch-few-points-only·velocity-sign-ignored)은 카탈로그 좌석만 생겼고 승인 문항의
         # 오답 보기가 아직 이 kebab을 가리키지 않아(2026-10-18 실측 0건) kebab_standards가 비어 있다
         # → total만 68→72로 늘고 decidable은 65 그대로, human-only 7건으로 정직 집계된다(MISC-21과
-        # 같은 이유 — 문항 연계는 이번 태스크 범위 밖).
+        # 같은 이유 — 문항 연계는 이번 태스크 범위 밖). P3-109의 같은 부류 1종(M0669)도 같은 이유로
+        # total 72→73·decidable 65 그대로·human-only 8건이다.
         assert report.same_detected == 0
-        assert report.kebabs_decidable == 65 and report.kebabs_total == 72
+        assert report.kebabs_decidable == 65 and report.kebabs_total == 73
         text = ev.format_report(report, confidence=0.95, human_reject_rate=None)
         assert "인간 존치" in text and "machine-decidable" in text
