@@ -190,7 +190,8 @@ KNOWN_REVISIONS: tuple[str, ...] = (
     # docs/standards/cms_concept_graph_write_contract.md.
     "b1a4d7c92e05",  # PED-17 A1: concept_content.lifecycle_status(초안/검증됨/공개됨/회수됨)·
     # content_origin 컬럼 + 상태 변경 기록 concept_state_transition(추가 전용 트리거) + 학생 노출
-    # 기록 concept_exposure_event + 허용 전환 5쌍 트리거. 기존 reviewed 행은 공개됨/사람 검수로 이월.
+    # 기록 concept_exposure_event + 허용 전환 5쌍 트리거. 기존 reviewed 행은 공개됨/사람 검수로
+    # 이월.
     # 되돌리기: ped17/산출물/A1/마이그레이션_되돌리기.md (기록 테이블 DROP 전 내보내기 필수).
 )
 
