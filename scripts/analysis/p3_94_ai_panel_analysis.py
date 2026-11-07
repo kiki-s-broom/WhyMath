@@ -176,7 +176,11 @@ def main() -> int:
         for axis in AXES:
             decided = [n for n in nums if axis in panel[n]]
             p = sum(passed(axis, panel[n][axis]) for n in decided)
-            axes_pass[axis] = {"decided": len(decided), "pass": p, **_rate_bound(axis, p, len(decided))}
+            axes_pass[axis] = {
+                "decided": len(decided),
+                "pass": p,
+                **_rate_bound(axis, p, len(decided)),
+            }
         seat_out: dict = {
             "n": len(nums),
             "quality_mean": round(sum(q) / len(q), 2) if q else None,
