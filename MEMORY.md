@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-07 (측정 · EOS-225 WP-F — A4 2회차 LLM 저작): **A4(중3 이차방정식 `[9수02-20]`) openrouter 단독 좌석 65시도 → 게이트 통과 CU 34 → 사람 단독 첫 검수 수락 30(승인 24·수정승인 6·반려 4) · A6 1회차 30과 합쳐 G4 누적 60 CU** (Kiki PC 실행, claude 기록) — 판정 기준: main `f419e985`
+
+- **무엇을**: 회차 설정 `docs/ops/authoring_round_eos-a4.yaml`(#1875 · spec 4종 · 목표 34/예산 120 · 큐 하한 30)을 오케스트레이터 한 줄 실행(EOS-208)으로 Phaiakes9에서 돌렸다. 산출물 브랜치 `eos225/a4-authoring-output` `1d30508d` → `data/runs/eos-a4-openrouter`·`eos-a4-review`(상태 파일 `round_state.json` 자격증명 문자열 grep 0건). 주간 원장은 미리보기와 같은 창·파일·환율 1540으로 append. 검수 = 사람 단독 판정(Kiki 확인 2026-11-07 — 검수 보고서만 사후에 Claude로 작성 · 사본 `docs/reviews/eos225_a4_round2_review_report_2026-11-07.md`).
+- **값**: 수용 34/65(52%, 1회차 유료 좌석 27/85=32%) · 비용 $0.136(전체) · HIT 중앙 34.45초 · 처리량 41.8 CU/h · 단위비용 2.34원/CU · 자동검증 1차 통과율 42/65 = 0.6462(Wilson 단측 하한 0.5446 · measured:true · G4 ≥70% 미달) · 반려 F8 4 · 재작업률 미측정(`cu.slots.jsonl` 쓰기 배선 없음 — EOS-220 인계분) · provenance_audit exit 0 · 8-gram ≥70% 1건(0.75 · 자체 코퍼스 대비 정형 발문 · 기록만) · spec별 수락 인수분해 11·근의 공식 12·활용 11·**한 근 주어짐 0(16/16 TautologicalConditionError — 검산식 중간값 하드코딩 거부)** · 수정승인 20번 `answer_format` 결손 1건.
+- **근거 커밋**: 설정 `c6bf4ee3`(#1875) · 산출물 `1d30508d` · 원장·결정 로그 = 이 PR · 검수 보고서 공통 이슈 후속 = `EOS-236`(answer_format·같은 방정식 중복) · `EOS-237`(유형 다양성) · `EOS-238`(두 단계 spec) · `EOS-239`(해설·난이도·표기).
+
 ### 2026-11-07 (결정 · HARN-63 ⑤ 종결 — Kiki): **브랜치 보호 승인 축 3건은 "문서를 현실에 맞춘다" — 선언 0/false/false로 정정 · 유예 3건 삭제** (Kiki 결정, claude 기록) — 판정 기준: main `a282dafb`
 - **결정**: Kiki가 두 선택지(문서를 현실에 맞춘다 / 설정을 문서대로 켠다) 중 앞쪽을 택했다(2026-11-07 채팅). `.github/branch-protection-setup.md` RULESET_POLICY의 `required_approving_review_count` 1→0 · `dismiss_stale_reviews_on_push` true→false · `require_code_owner_review` true→false, RULESET_DEVIATIONS 3건(만료 2026-12-31) 삭제.
 - **근거**: 사람 개발자 1명 — GitHub는 작성자 자기 승인을 세지 않아 승인 1명 요구는 모든 PR을 머지 불가로 만든다. 머지 전 품질은 required check 16건 + merge queue 재검증, 머지 판단은 `"pr"` 지시·Kiki 판단이 맡는다. 같은 날 라이브 재확인(`ruleset_drift.py --record`, #1873)에서 라이브는 0/false/false이고 위반 0.

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: EOS-237
+title: "LLM 저작 회차 유형 다양성 — 측정 지표 · spec 유형 쿼터/정답 값 분산 규칙"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 한 저작 회차 안에서 유형 다양성을 측정하는 지표를 정의하고 회차 대장에 남긴다(spec별 수락 수 · 정답 값 분포 · 같은 상황 틀 반복 수).\n② spec 순환에 유형 쿼터 또는 정답 값 분산 규칙을 두는 안을 설계하고, 다음 회차 설정에서 쓸 수 있게 한다. 근거: EOS-225 A4 회차 34건 — 계산형 '두 근 중 큰/작은 근' 22건(67%) · 직사각형 넓이 8건(모두 '가로가 세로보다 k cm 긴' 틀, 정답 7~12) · 정답 3회 중복 4값(4·7·8·−3/2) · 근과 계수의 관계·근으로 식 세우기 0건(Kiki 검수 보고서 2026-11-07 §4).\n③ 측정만으로 끝내지 않는다 — 규칙 적용 전후 회차를 같은 지표로 비교해 효과를 숫자로 보인다(EOS-225 A4 회차가 적용 전 기준선)."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/problem_corpus_accumulate.py
+session: null
+notes: "출처: EOS-225 A4 2회차 사람 검수(Kiki 2026-11-07) 보고서 §5 공통 이슈 12건 중 저장소 실측으로 확인된 것. 산출물 data/runs/eos-a4-openrouter·eos-a4-review."
+updated: 2026-11-07
