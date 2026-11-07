@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-113
+title: "AI 품질 학생 수준 축 — 비한국어 문자 혼용 결정론 검출 (P3-94 본 수집 후속)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 근거 — P3-94 본 수집(244×2) AI 패널: local-mid(qwen2.5:7b) 초안 2건이 문장에 중국어를 섞었다(#246 \"미분가능性和连续性之间的关系你考虑了吗？\" · #439 \"생각해보了吗？\"). 규칙 판정기 student_level_fit 축은 둘 다 통과시켰다(거짓 통과 — 표기 범위 토큰만 본다). 학생이 읽을 수 없는 문장은 수준 문제가 아니라 노출 금지 결함이다. ② student_level_fit 축(또는 별도 결정론 검사)에 비한국어 문자 검출을 둔다 — 한글·라틴·숫자·수식 기호·허용 목록 밖의 한자·가나 등 문자를 실패로 판정하고 작동 회계(검출 건수)를 리포트한다. 수식(LaTeX·SymPy 표기)은 오탐 대상에서 뺀다. ③ 실패 주입 검증 — 위 2건을 포함한 혼용 문장 픽스처는 RED, 수식·영문 용어(예: f'(x), Rolle)만 있는 정상 문장 대조군은 GREEN을 단언하고, 뮤테이션으로 검사 절마다 RED를 확인한다. ④ 무관용 여부와 학생 경로(P3-09 노출 게이트) 적용 여부는 D16 결정 문서에서 Kiki가 정한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/ai_quality_judges.py
+  - tests/backend/harness/test_ai_quality_judges.py
+session: null
+notes: "출처: P3-94 본 수집 AI 패널 리포트(2026-11-07) — 규칙 판정기 학생 수준 축 거짓 통과 3건 중 2건"
+updated: 2026-11-07
