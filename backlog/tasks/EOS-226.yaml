@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 2
 eos_priority: P1
 owner: claude
@@ -19,11 +19,11 @@ artifacts: []
 paths:
   - "data/runs/eos-a4-*/cu.review*.jsonl"
   - docs/reviews/eos_a4_human_hit_2026-12.md
-session: null
+session: claude/stoic-darwin-a3kkpi
 notes: |-
   출처: EOS 감리 지시문 세트 2026-10-30(v3) 레인 01-D — WP-F 소유 태스크 등재(판정 기준 main 3a83ed64). depends_on = A4 2회차 저작(EOS-225) — 검수할 CU가 그 회차에서 나온다. 앵커 레지스트리 주석이 A3·A4를 F-Ⅰ 판정 대상(기준선 앵커)으로 적는다.
 
   [정정 2026-10-30] PR #1781 독립 검토 지적 반영(정정 항 append)
 
   [정정 2026-10-30] eos_priority P0 → P1: PR #1781 독립 검토: G4 조건 'P0 결함 0'을 비종결 P0 태스크로 읽으면 G4 판정일(12/13) 뒤에 끝나는 판정 작업이 G4를 자동 FAIL로 만든다(종전 G-internal-completion ③ 문면이 그렇게 읽은 선례). 순서는 게이트 입력 간선이 집행하므로 등급은 P1로 둔다
-updated: 2026-10-30
+updated: 2026-11-07
