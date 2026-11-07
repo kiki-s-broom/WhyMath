@@ -37,8 +37,13 @@ REND-01(렌더 어댑터)과 PED-02(교수법 선택·게이트)를 잇는 마�
 ────────────────────────────────────────────────────────────────────────────
 검수 게이트 — 캐시보다 먼저, 매 호출 (CONT-05 ⓐ · 2026-09-27)
 ────────────────────────────────────────────────────────────────────────────
-학생 공급은 `review_status == "reviewed"`인 콘텐츠 행만 통과시킨다(술어 정본 =
-`l1/concept_content/review_gate.is_supply_eligible`). `ai_estimated`는 DSL 없음과 같게 처리해 기존
+학생 공급은 **학생 공개 상태인 콘텐츠 행만** 통과시킨다. PED-17 A1부터 술어 정본은
+`l1/concept_content/lifecycle.is_student_visible`이다: 생애 상태가 '공개됨'이어야 하고, 출처가
+'사람 검수'인
+행은 CONT-05 때와 같이 `review_status == "reviewed"`도 유지돼야
+한다(`review_gate.is_supply_eligible`을
+그 안에서 재사용). 지금 열려 있던 행은 마이그레이션이 '공개됨'+'사람 검수'로 이월하므로 학생 화면은
+불변이다. `ai_estimated`는 DSL 없음과 같게 처리해 기존
 폴백·404로 가되, 폴백 사유는 `UNREVIEWED`로 따로 센다 — 게이트가 몇 번 막았는지가 집계에 보여야
 한다(작동한 비율 원칙). 판정은 **캐시 조회보다 먼저** DB의 현재 상태로 한다: DSL 캐시(TTL 24h)에
 판정을 맡기면 강등된 행이 TTL 동안 계속 공급된다. 그래서 캐시 적중도 PK 조회 1회를 치른다 — 학생
@@ -76,7 +81,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from whymath_backend.config import get_settings
 from whymath_backend.harness.wilson import wilson_lower_bound
 from whymath_backend.l1.concept_content import find_k12_contents_by_atom, get_concept_content
-from whymath_backend.l1.concept_content.review_gate import is_supply_eligible
+from whymath_backend.l1.concept_content.lifecycle import row_is_student_visible
 from whymath_backend.l3 import pipeline
 from whymath_backend.l3.interfaces import CacheBackend, LLMProvider, TraceSink
 from whymath_backend.l3.models import RoutingRequest
@@ -309,7 +314,9 @@ async def resolve_concept_content(
       ① PK로 행을 읽는다. 비었으면 K-12 `atom_codes` 역조회로 후보를 모은다 — 후보도 없으면
          `(None, REASON_NO_DSL)`.
       ② 행을 하나 고른다(PK 적중이면 그 행 · 역조회면 *검수 통과 행 우선*, `code` 오름차순).
-      ③ 검수 게이트 — 공급 가능 상태(`is_supply_eligible`)가 아니면 `(None, REASON_UNREVIEWED)`.
+      ③ 공개 게이트 — 학생 공개 상태(`row_is_student_visible`: 생애 '공개됨' + 출처별 검수 조건,
+         PED-17 A1)가 아니면 `(None, REASON_UNREVIEWED)`. 사유 상수 이름은 CONT-05 때 그대로다 —
+         "검수 전"뿐 아니라 초안·검증됨·회수됨도 같은 사유로 막는다(학생에겐 모두 "준비 중").
          PK 경로와 역조회 경로가 **같은 한 곳**을 지난다(경로별로 게이트를 복제하지 않는다).
       ④ 그다음에야 캐시를 본다 — 키는 *서빙 행의 code*다(요청 원자 code가 아니다). 같은 행을 여러
          원자가 공유하므로 원자별로 캐시를 쪼개면 같은 본문이 중복 적재되고, 행 단위로 강등될 때
@@ -343,7 +350,7 @@ async def resolve_concept_content(
         via = LOOKUP_CROSSWALK
         candidates = tuple(r.code for r in found)
         # 대표 선택 — 검수 통과 행 우선, 없으면 첫 행(아래 게이트가 막고 UNREVIEWED로 보고한다).
-        row = next((r for r in found if is_supply_eligible(r.review_status)), found[0])
+        row = next((r for r in found if row_is_student_visible(r)), found[0])
         logger.info(
             "콘텐츠 크로스워크 역조회 — atom=%s selected=%s candidates=%s review_status=%s",
             code,
@@ -352,7 +359,7 @@ async def resolve_concept_content(
             row.review_status,
         )
 
-    if not is_supply_eligible(row.review_status):
+    if not row_is_student_visible(row):
         return ContentResolution(None, REASON_UNREVIEWED, row.code, via, candidates)
 
     key = f"{DSL_CACHE_PREFIX}{row.code}"

@@ -114,10 +114,38 @@ class ConceptContent(Base):
         sa.DateTime(timezone=True), nullable=True
     )
 
+    # 학생 공개 생애 상태(PED-17 A1) — 초안·검증됨·공개됨·회수됨 4값
+    # 고정(`schema/concept_lifecycle.py`).
+    # `review_status`(사람 검수 라벨)와 **다른 축**이다. 학생 경로는 이 값이 '공개됨'일 때만 연다.
+    # server_default '초안' = **fail-closed**: 코퍼스 적재기처럼 이 컬럼을 모르는 쓰기 경로가 새
+    # 행을
+    # 만들어도 학생에게 나가지 않는다. 값을 바꾸는 유일한 코드는 `l1/concept_content/lifecycle.py`의
+    # `transition_concept_state`이고(AST 거버넌스 테스트가 동결), DB 트리거가 허용 전환 5쌍 밖의
+    # UPDATE를 거부한다. ORM 객체를 flush 전에 만들면 이 속성은 None이며, 관문은 None을 거부한다.
+    lifecycle_status: Mapped[str] = mapped_column(
+        sa.Text, nullable=False, server_default=sa.text("'초안'")
+    )
+    # 콘텐츠 출처(PED-17 A1) — '사람 검수' | 'AI 생성'. 출처가 '사람 검수'인 행은 공개됨이어도
+    # `review_status == reviewed`가 유지돼야 학생에게 나간다(코퍼스 재적재 강등 즉시 차단·CONT-05
+    # ③).
+    content_origin: Mapped[str] = mapped_column(
+        sa.Text, nullable=False, server_default=sa.text("'AI 생성'")
+    )
+
     __table_args__ = (
         # scope(K-12/대학)·subject(과목) 필터 보조 인덱스(콘텐츠 서빙·검수 빈번).
         sa.Index("ix_concept_content_scope", "scope"),
         sa.Index("ix_concept_content_subject", "subject"),
+        # 어휘 고정 — 오타·표기 변형('Published'·'공개')이 DB에 들어오면 관문이 아니라 쓰기에서
+        # 막는다.
+        sa.CheckConstraint(
+            "lifecycle_status IN ('초안', '검증됨', '공개됨', '회수됨')",
+            name="lifecycle_status",
+        ),
+        sa.CheckConstraint(
+            "content_origin IN ('사람 검수', 'AI 생성')",
+            name="content_origin",
+        ),
     )
 
     def to_schema(self) -> ConceptContentSchema:
