@@ -122,10 +122,15 @@ def test_process_tally_is_a_singleton_and_resettable() -> None:
     try:
         assert get_process_tally() is get_process_tally()
         get_process_tally().record("dsl_render", strategy="DIRECT")
-        assert get_process_tally().total == 1
+        get_process_tally().record("generate", served=False)
+        assert get_process_tally().total == 2
+        assert get_process_tally().unserved_by_source == {"generate": 1}
     finally:
         reset_process_tally()
     assert get_process_tally().total == 0
+    # served 축도 함께 비워져야 한다 — 남으면 다음 시간창의 수신율이 이전 창에 오염된다.
+    assert get_process_tally().by_served == {}
+    assert get_process_tally().unserved_by_source == {}
 
 
 # ── supply 경로에서의 기록 ─────────────────────────────────────────
