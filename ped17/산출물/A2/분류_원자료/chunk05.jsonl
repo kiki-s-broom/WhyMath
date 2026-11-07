@@ -1,0 +1,152 @@
+{"code": "12경수04-02-2", "cls": "불가", "reason": "도함수 부호와 증감의 관계를 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수04-02-3", "cls": "가능", "reason": "x³−3x의 극값과 증감 구간이 식으로 닫힘", "method": "sympy.diff + sympy.solve + 극값 대입", "border": false}
+{"code": "12경수04-03-1", "cls": "불가", "reason": "탄력성이 무엇의 비인지 묻는 용어 정의", "method": "해당 없음", "border": false}
+{"code": "12경수04-03-2", "cls": "가능", "reason": "변화율 20%/10%로 탄력성 크기 2가 정해짐", "method": "sympy.Rational 연산 + abs", "border": false}
+{"code": "12경수04-03-3", "cls": "가능", "reason": "Q=-2P+100에서 점탄력성 2/3이 미분으로 정해짐", "method": "sympy.diff + subs + Rational 연산", "border": false}
+{"code": "12경수04-04-1", "cls": "불가", "reason": "이윤 최대 산출을 찾는 방법을 말로 설명하는 문항", "method": "해당 없음", "border": false}
+{"code": "12경수04-04-2", "cls": "불가", "reason": "MR=MC 조건을 이해하고 수입 최대와 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수04-04-3", "cls": "불가", "reason": "그래프 부호 변화로 극대를 판별하는 서술 중심", "method": "해당 없음", "border": false}
+{"code": "10공수1-01-01-1", "cls": "불가", "reason": "동류항 결합 가능 여부를 묻는 개념 판단이 핵심", "method": "해당 없음", "border": true}
+{"code": "10공수1-01-01-2", "cls": "가능", "reason": "(x²+2x)−(x²−x)=3x 다항식 계산이 하나로 정해짐", "method": "sympy.expand + simplify", "border": false}
+{"code": "10공수1-01-01-3", "cls": "가능", "reason": "(x+2)(x²+3x+1) 전개 결과가 하나로 정해짐", "method": "sympy.expand", "border": false}
+{"code": "10공수1-01-02-1", "cls": "불가", "reason": "항등식과 방정식의 용어 구분 문제", "method": "해당 없음", "border": false}
+{"code": "10공수1-01-02-2", "cls": "불가", "reason": "나머지가 P(a)임을 묻는 정리 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "10공수1-01-02-3", "cls": "가능", "reason": "x³−2x+5를 x−2로 나눈 나머지 9가 정해짐", "method": "sympy.rem 또는 subs로 P(2) 계산", "border": false}
+{"code": "10공수1-01-03-1", "cls": "가능", "reason": "x²−9 인수분해 결과가 하나로 정해짐", "method": "sympy.factor", "border": false}
+{"code": "10공수1-01-03-2", "cls": "불가", "reason": "인수분해의 정의에 비춘 오류 설명 서술", "method": "해당 없음", "border": false}
+{"code": "10공수1-01-03-3", "cls": "불가", "reason": "세제곱공식을 부피 도형으로 해석하는 설명", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-01-1", "cls": "불가", "reason": "복소수 i의 뜻을 정의하는 용어 중심 개념", "method": "해당 없음", "border": true}
+{"code": "10공수1-02-01-2", "cls": "가능", "reason": "(1+2i)(1−2i)=5 복소수 연산이 정해짐", "method": "sympy.expand with I", "border": false}
+{"code": "10공수1-02-01-3", "cls": "가능", "reason": "실수부·허수부·켤레복소수가 값으로 정해짐", "method": "sympy.re / sympy.im / sympy.conjugate", "border": false}
+{"code": "10공수1-02-02-1", "cls": "불가", "reason": "D<0일 때 근의 종류를 이해하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-02-2", "cls": "가능", "reason": "x²−4x+5=0의 판별식 D=−4와 근의 종류가 정해짐", "method": "sympy.discriminant + sympy.solve", "border": false}
+{"code": "10공수1-02-02-3", "cls": "불가", "reason": "판별식 값은 계산되나 그림으로 설명하는 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "10공수1-02-03-1", "cls": "불가", "reason": "근과 계수 관계 일반식을 진술하는 정리 서술", "method": "해당 없음", "border": true}
+{"code": "10공수1-02-03-2", "cls": "가능", "reason": "2x²−6x+1=0의 두 근의 합 3, 곱 1/2이 정해짐", "method": "sympy.Poly 계수 비교 + solve 합·곱 확인", "border": false}
+{"code": "10공수1-02-03-3", "cls": "불가", "reason": "포물선 그래프에서 합·곱 관계를 읽고 설명", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-04-1", "cls": "불가", "reason": "방정식의 근이 x절편에 대응한다는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-04-2", "cls": "가능", "reason": "x²−x−6=0의 해 3, −2가 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "10공수1-02-04-3", "cls": "불가", "reason": "근 없음을 그래프 그림과 연결해 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-05-1", "cls": "불가", "reason": "교점 수를 판별식으로 판단하는 방법 서술", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-05-2", "cls": "불가", "reason": "판별식으로 위치관계를 알 수 있는 이유 설명", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-05-3", "cls": "가능", "reason": "접하는 조건 D=0에서 k=−1이 정해짐", "method": "sympy.discriminant + sympy.solve", "border": false}
+{"code": "10공수1-02-06-1", "cls": "불가", "reason": "정의역 제한 시 끝값 비교 여부를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-06-2", "cls": "가능", "reason": "y=x²−4x+1의 최솟값 −3이 정해짐", "method": "sympy.diff + solve + subs", "border": false}
+{"code": "10공수1-02-06-3", "cls": "가능", "reason": "구간 [1,5]에서 최댓값 6, 최솟값 −3이 정해짐", "method": "sympy.calculus.util.minimum / maximum (Interval)", "border": false}
+{"code": "10공수1-02-07-1", "cls": "가능", "reason": "x³−1=0의 실근 x=1이 정해짐", "method": "sympy.solve / sympy.factor", "border": false}
+{"code": "10공수1-02-07-2", "cls": "불가", "reason": "곱이 0이면 인수가 0이라는 원리의 설명 서술", "method": "해당 없음", "border": true}
+{"code": "10공수1-02-07-3", "cls": "가능", "reason": "x⁴−5x²+4=0의 실근 ±1, ±2가 정해짐", "method": "sympy.solve", "border": false}
+{"code": "10공수1-02-08-1", "cls": "가능", "reason": "y=x와 x²+y²=2 연립해 x=±1이 정해짐", "method": "sympy.solve (연립방정식)", "border": false}
+{"code": "10공수1-02-08-2", "cls": "불가", "reason": "연립해가 동시 만족임을 말로 설명하는 문항", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-08-3", "cls": "가능", "reason": "y=x²와 y=x+2의 교점 (2,4),(−1,1)이 정해짐", "method": "sympy.solve (연립방정식)", "border": false}
+{"code": "10공수1-02-09-1", "cls": "불가", "reason": "연립부등식이 교집합인지 묻는 개념 구분", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-09-2", "cls": "가능", "reason": "2x−1>3, x≤4의 공통해 2<x≤4가 정해짐", "method": "sympy.reduce_inequalities / solve_univariate_inequality", "border": false}
+{"code": "10공수1-02-09-3", "cls": "가능", "reason": "연립부등식의 해 −1≤x<2가 하나로 정해짐", "method": "sympy.reduce_inequalities", "border": false}
+{"code": "10공수1-02-10-1", "cls": "가능", "reason": "|2x−1|≤5의 해 −2≤x≤3이 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수1-02-10-2", "cls": "불가", "reason": "절댓값을 거리로 해석해 정당화하는 서술", "method": "해당 없음", "border": false}
+{"code": "10공수1-02-10-3", "cls": "가능", "reason": "|x−1|≥2의 해 x≤−1 또는 x≥3이 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수1-02-11-1", "cls": "불가", "reason": "그래프로 부등식 해를 판단하는 방법 중심 개념", "method": "해당 없음", "border": true}
+{"code": "10공수1-02-11-2", "cls": "가능", "reason": "x²−5x+6<0의 해 2<x<3이 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수1-02-11-3", "cls": "가능", "reason": "x²−x−6>0의 해 x<−2 또는 x>3이 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수1-03-01-1", "cls": "불가", "reason": "합·곱의 법칙 중 무엇을 썼는지 구분하는 개념", "method": "해당 없음", "border": true}
+{"code": "10공수1-03-01-2", "cls": "가능", "reason": "곱 4×3=12, 합 4+3=7로 경우의 수가 정해짐", "method": "정수 연산 (곱·합 계산)", "border": false}
+{"code": "10공수1-03-01-3", "cls": "불가", "reason": "수형도를 그려 경우를 나열하는 그림 작업", "method": "해당 없음", "border": false}
+{"code": "10공수1-03-02-1", "cls": "불가", "reason": "순서 중요 여부를 묻는 순열 개념이 함께 핵심", "method": "해당 없음", "border": true}
+{"code": "10공수1-03-02-2", "cls": "가능", "reason": "₇P₃=210 순열 값이 하나로 정해짐", "method": "sympy.ff 또는 math.perm", "border": false}
+{"code": "10공수1-03-02-3", "cls": "가능", "reason": "4명 중 3명 순서 배열 4×3×2=24가 정해짐", "method": "math.perm / sympy.ff 정수 연산", "border": false}
+{"code": "10공수1-03-03-1", "cls": "불가", "reason": "순열과 조합 중 어느 것인지 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "10공수1-03-03-2", "cls": "가능", "reason": "5명 중 2명 선택 ₅C₂=10이 정해짐", "method": "sympy.binomial", "border": false}
+{"code": "10공수1-03-03-3", "cls": "가능", "reason": "4개 중 2개 선택 ₄C₂=6이 정해짐", "method": "sympy.binomial", "border": false}
+{"code": "10공수1-04-01-1", "cls": "불가", "reason": "행렬의 행·열 용어와 크기 표기 정의", "method": "해당 없음", "border": false}
+{"code": "10공수1-04-01-2", "cls": "불가", "reason": "표를 읽어 행렬로 옮기는 상황 해석 위주", "method": "해당 없음", "border": true}
+{"code": "10공수1-04-01-3", "cls": "불가", "reason": "행렬 성분을 현실 항목 말로 풀어 설명", "method": "해당 없음", "border": false}
+{"code": "10공수1-04-02-1", "cls": "불가", "reason": "AB≠BA와 곱 크기 조건을 서술하는 성질 개념", "method": "해당 없음", "border": false}
+{"code": "10공수1-04-02-2", "cls": "가능", "reason": "2×2 행렬 덧셈 결과가 하나로 정해짐", "method": "sympy.Matrix 덧셈", "border": false}
+{"code": "10공수1-04-02-3", "cls": "불가", "reason": "행렬 합의 의미를 표 상황으로 해석하는 서술", "method": "해당 없음", "border": true}
+{"code": "10공수2-01-01-1", "cls": "가능", "reason": "A(0), B(6)의 1:2 내분점 2가 정해짐", "method": "sympy.Rational 내분점 공식 계산", "border": false}
+{"code": "10공수2-01-01-2", "cls": "불가", "reason": "내분의 뜻을 길이 비로 설명하는 정의", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-01-3", "cls": "가능", "reason": "A(2), B(8)의 1:2 내분점 4가 정해짐", "method": "sympy.Rational 내분점 공식 계산", "border": false}
+{"code": "10공수2-01-02-1", "cls": "불가", "reason": "평행·수직 조건을 진술하고 예외를 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-02-2", "cls": "가능", "reason": "y=2x+1에 수직이고 (4,3)을 지나는 직선이 정해짐", "method": "sympy.Eq + simplify로 식 동치 확인", "border": false}
+{"code": "10공수2-01-02-3", "cls": "불가", "reason": "평행·수직선을 그래프로 그려 비교 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-03-1", "cls": "가능", "reason": "(0,0)과 3x+4y−10=0 사이 거리 2가 정해짐", "method": "sympy.sqrt + abs 거리 공식 계산", "border": false}
+{"code": "10공수2-01-03-2", "cls": "불가", "reason": "점과 직선 거리가 수선 길이인 이유 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-03-3", "cls": "가능", "reason": "(1,1)과 3x+4y−2=0 사이 거리 1이 정해짐", "method": "sympy.sqrt + abs 거리 공식 계산", "border": false}
+{"code": "10공수2-01-04-1", "cls": "가능", "reason": "(x−1)²+(y−2)²=9의 중심 (1,2), 반지름 3이 정해짐", "method": "sympy.Circle 또는 sympy.expand 계수 비교", "border": false}
+{"code": "10공수2-01-04-2", "cls": "가능", "reason": "일반형을 표준형으로 바꾼 중심 (2,−3), 반지름 4", "method": "sympy.Eq + expand/simplify 동치 확인", "border": false}
+{"code": "10공수2-01-04-3", "cls": "불가", "reason": "원을 좌표평면에 직접 그리는 작도 작업", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-05-1", "cls": "불가", "reason": "거리 d와 반지름 r 비교 판단법을 서술", "method": "해당 없음", "border": true}
+{"code": "10공수2-01-05-2", "cls": "불가", "reason": "위치관계 판정 원리를 세 경우로 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-05-3", "cls": "불가", "reason": "d와 r 비교를 세 그림으로 그리는 작업", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-06-1", "cls": "불가", "reason": "일반 함수 f에서 이동 부호를 묻는 추상 규칙 개념", "method": "해당 없음", "border": true}
+{"code": "10공수2-01-06-2", "cls": "가능", "reason": "y=x² 평행이동 식 y=(x−3)²−2가 정해짐", "method": "sympy.Eq + simplify로 식 동치 확인", "border": false}
+{"code": "10공수2-01-06-3", "cls": "불가", "reason": "이동을 그래프에 화살표로 표시하는 그림 작업", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-07-1", "cls": "가능", "reason": "(3,2)의 y=x 대칭점 (2,3)이 정해짐", "method": "좌표 교환 규칙 (sympy.Point 반사)", "border": false}
+{"code": "10공수2-01-07-2", "cls": "불가", "reason": "대칭이동의 뜻을 수직이등분선으로 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-01-07-3", "cls": "가능", "reason": "점 (1,3), 직선 x=2y 즉 y=x/2로 대칭 결과가 정해짐", "method": "x↔y 치환 + sympy.Eq simplify 동치 확인", "border": false}
+{"code": "10공수2-02-01-1", "cls": "불가", "reason": "집합의 조건을 모호성으로 판단하는 개념", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-01-2", "cls": "가능", "reason": "12의 양의 약수 집합 {1,2,3,4,6,12}가 정해짐", "method": "sympy.divisors", "border": false}
+{"code": "10공수2-02-01-3", "cls": "불가", "reason": "조건제시법 답이 여러 가지이고 벤 그림을 그림", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-02-1", "cls": "불가", "reason": "부분집합 개념(공집합 포함)과 개수가 함께 핵심", "method": "해당 없음", "border": true}
+{"code": "10공수2-02-02-2", "cls": "가능", "reason": "{a,b,c}의 부분집합 8개, 진부분집합 7개가 정해짐", "method": "2**n 정수 연산 또는 powerset 길이", "border": false}
+{"code": "10공수2-02-02-3", "cls": "불가", "reason": "포함관계를 벤 다이어그램으로 그리고 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-03-1", "cls": "불가", "reason": "교집합·합집합의 뜻과 벤 위치를 묻는 정의", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-03-2", "cls": "불가", "reason": "합·교·여집합의 뜻을 말로 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-03-3", "cls": "불가", "reason": "벤 다이어그램에 영역을 색칠하는 그림 작업", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-04-1", "cls": "불가", "reason": "전체·존재 명제의 참거짓 이해를 묻는 개념", "method": "해당 없음", "border": true}
+{"code": "10공수2-02-04-2", "cls": "불가", "reason": "한정명제의 부정 문장을 서술하는 문항", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-04-3", "cls": "가능", "reason": "x²<4의 진리집합 −2<x<2가 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수2-02-05-1", "cls": "불가", "reason": "역·대우의 참거짓 관계를 묻는 논리 개념", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-05-2", "cls": "불가", "reason": "역·대우 명제 문장을 만드는 서술형", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-05-3", "cls": "불가", "reason": "대우의 참을 벤 다이어그램으로 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-06-1", "cls": "불가", "reason": "충분·필요조건의 방향을 구분하는 용어 개념", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-06-2", "cls": "불가", "reason": "충분·필요 판정과 이유 서술이 함께 요구됨", "method": "해당 없음", "border": true}
+{"code": "10공수2-02-06-3", "cls": "불가", "reason": "진리집합 포함관계를 벤 그림으로 나타냄", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-07-1", "cls": "불가", "reason": "귀류법의 논리 구조를 묻는 증명 개념", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-07-2", "cls": "불가", "reason": "√2 무리수 귀류법 증명 절차를 서술", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-07-3", "cls": "불가", "reason": "증명 논리 흐름을 화살표 흐름도로 표현", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-08-1", "cls": "불가", "reason": "절대부등식 증명의 핵심 아이디어를 서술", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-08-2", "cls": "불가", "reason": "절대부등식의 뜻을 예로 설명하는 정의", "method": "해당 없음", "border": false}
+{"code": "10공수2-02-08-3", "cls": "불가", "reason": "부등식 성립을 증명하고 도형으로 시각화", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-01-1", "cls": "불가", "reason": "세로선 판정으로 함수 여부를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-01-2", "cls": "가능", "reason": "유한 대응 1→a, 2→a, 3→b의 함수 여부가 정해짐", "method": "파이썬 dict로 각 원소 대응 1개 검사", "border": false}
+{"code": "10공수2-03-01-3", "cls": "불가", "reason": "대응도를 좌표 그래프로 옮겨 그리는 작업", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-02-1", "cls": "가능", "reason": "f(g(x))=2x+1과 g(f(x))=2x+2의 불일치가 확인됨", "method": "sympy.simplify(f(g(x))-g(f(x)))", "border": false}
+{"code": "10공수2-03-02-2", "cls": "가능", "reason": "f(x)=x², g(x)=x−1의 (f∘g)(3)=4가 정해짐", "method": "sympy.subs 순차 대입", "border": false}
+{"code": "10공수2-03-02-3", "cls": "가능", "reason": "g:1→2, f:2→5의 합성값 5가 정해짐", "method": "파이썬 dict 합성", "border": false}
+{"code": "10공수2-03-03-1", "cls": "불가", "reason": "역함수와 1/f의 차이, 존재 조건을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-03-2", "cls": "가능", "reason": "f(x)=2x+1의 역함수 (x−1)/2가 정해짐", "method": "sympy.solve로 x에 대해 정리 후 simplify", "border": false}
+{"code": "10공수2-03-03-3", "cls": "불가", "reason": "역함수 그래프의 y=x 대칭을 그림으로 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-04-1", "cls": "불가", "reason": "유리함수 그래프를 평행이동해 그리는 작도", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-04-2", "cls": "불가", "reason": "점근선의 의미와 이유를 말로 설명", "method": "해당 없음", "border": false}
+{"code": "10공수2-03-04-3", "cls": "가능", "reason": "(2x+3)/(x+1)=1/(x+1)+2 변형과 점근선이 정해짐", "method": "sympy.apart", "border": false}
+{"code": "10공수2-03-05-1", "cls": "가능", "reason": "y=√(x−1)의 정의역 x≥1이 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수2-03-05-2", "cls": "가능", "reason": "y=√(−2x+4)+1의 정의역 x≤2가 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10공수2-03-05-3", "cls": "불가", "reason": "무리함수 그래프 개형을 그리고 비교 설명", "method": "해당 없음", "border": false}
+{"code": "10기수1-01-01-1", "cls": "가능", "reason": "(2x+3)+(x−5)=3x−2 계산이 정해짐", "method": "sympy.expand + simplify", "border": false}
+{"code": "10기수1-01-01-2", "cls": "불가", "reason": "동류항이 무엇인지 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "10기수1-01-01-3", "cls": "가능", "reason": "(3x+2)−(x−1)=2x+3 계산이 정해짐", "method": "sympy.expand", "border": false}
+{"code": "10기수1-01-02-1", "cls": "가능", "reason": "2x(x+3)=2x²+6x 전개가 정해짐", "method": "sympy.expand", "border": false}
+{"code": "10기수1-01-02-2", "cls": "불가", "reason": "지수가 왜 더해지는지 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "10기수1-01-02-3", "cls": "불가", "reason": "곱셈을 직사각형 넓이로 그려 해석", "method": "해당 없음", "border": true}
+{"code": "10기수1-01-03-1", "cls": "가능", "reason": "x²−16 인수분해 (x+4)(x−4)가 정해짐", "method": "sympy.factor", "border": false}
+{"code": "10기수1-01-03-2", "cls": "불가", "reason": "인수분해가 전개의 역임을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "10기수1-01-03-3", "cls": "가능", "reason": "x²+5x+6=(x+2)(x+3) 인수분해가 정해짐", "method": "sympy.factor", "border": false}
+{"code": "10기수1-02-01-1", "cls": "가능", "reason": "x²−5x+6=0의 해 2, 3이 정해짐", "method": "sympy.solve", "border": false}
+{"code": "10기수1-02-01-2", "cls": "불가", "reason": "곱이 0이면 한 인수가 0인 이유 설명", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-01-3", "cls": "가능", "reason": "x²−4=0의 해 ±2가 x절편과 일치함이 확인됨", "method": "sympy.solve", "border": false}
+{"code": "10기수1-02-02-1", "cls": "불가", "reason": "D가 음수일 때 실근 개수를 묻는 개념", "method": "해당 없음", "border": true}
+{"code": "10기수1-02-02-2", "cls": "가능", "reason": "x²−3x+2=0의 판별식 값 1이 정해짐", "method": "sympy.discriminant", "border": false}
+{"code": "10기수1-02-02-3", "cls": "불가", "reason": "판별식 부호와 교점 개수를 표로 짝짓는 개념", "method": "해당 없음", "border": true}
+{"code": "10기수1-02-03-1", "cls": "불가", "reason": "이차함수 그래프 모양과 볼록 방향을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-03-2", "cls": "가능", "reason": "y=(x−2)²+3의 꼭짓점 (2,3)이 정해짐", "method": "sympy.diff + solve + subs", "border": false}
+{"code": "10기수1-02-03-3", "cls": "불가", "reason": "표 값 외에 그래프 모양 설명이 요구됨", "method": "해당 없음", "border": true}
+{"code": "10기수1-02-04-1", "cls": "불가", "reason": "교점 계산에 더해 방정식 해와의 관계 해석이 핵심", "method": "해당 없음", "border": true}
+{"code": "10기수1-02-04-2", "cls": "가능", "reason": "y=x²−x−6의 x절편 3, −2가 정해짐", "method": "sympy.solve", "border": false}
+{"code": "10기수1-02-04-3", "cls": "불가", "reason": "중근 외에 접하는 모습을 그림말로 설명", "method": "해당 없음", "border": true}
+{"code": "10기수1-02-05-2", "cls": "불가", "reason": "꼭짓점이 최대인지 최소인지 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-05-3", "cls": "가능", "reason": "y=(x−1)²+2의 표 값과 최솟값 2(x=1)가 정해짐", "method": "sympy.subs 값 계산 + min", "border": false}
+{"code": "10기수1-02-06-1", "cls": "가능", "reason": "−2x<6의 해 x>−3이 하나로 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10기수1-02-06-2", "cls": "가능", "reason": "4−3x≥10의 해 x≤−2가 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10기수1-02-06-3", "cls": "불가", "reason": "x>2를 수직선에 그려 표시하는 그림 작업", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-07-1", "cls": "가능", "reason": "x>1, x≤4의 공통해 1<x≤4가 정해짐", "method": "sympy.reduce_inequalities", "border": false}

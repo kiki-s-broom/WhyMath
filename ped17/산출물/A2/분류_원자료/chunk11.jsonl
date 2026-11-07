@@ -1,0 +1,152 @@
+{"code":"LINA1-C16","cls":"불가","reason":"기저 의존성이라는 개념 이해와 서술이 핵심","method":"해당 없음","border":false}
+{"code":"LINA1-C17","cls":"불가","reason":"차원정리의 의미 이해가 핵심, 계산은 부수적","method":"해당 없음","border":true}
+{"code":"LINA1-P01","cls":"가능","reason":"2원 연립일차방정식 해가 (2,1)로 하나로 정해짐","method":"sympy.linsolve / sympy.solve","border":false}
+{"code":"LINA1-P02","cls":"가능","reason":"주어진 두 2×2 행렬의 곱 AB, BA가 정확히 계산됨","method":"sympy.Matrix 곱 후 AB==BA 비교","border":false}
+{"code":"LINA1-P03","cls":"불가","reason":"전개가 2AB가 아닌 이유를 설명하는 서술형","method":"해당 없음","border":true}
+{"code":"LINA1-P04","cls":"불가","reason":"역행렬 곱 순서의 이유 설명이 요구되는 서술형","method":"해당 없음","border":true}
+{"code":"LINA1-P05","cls":"가능","reason":"[[1,2],[3,4]]의 역행렬이 하나로 정해짐","method":"sympy.Matrix.inv / det","border":false}
+{"code":"LINA1-P06","cls":"불가","reason":"LU분해 가능 여부 판단 및 이유 인지가 핵심","method":"해당 없음","border":true}
+{"code":"LINA1-P07","cls":"가능","reason":"상삼각 2×2 행렬식이 6으로 정해짐","method":"sympy.Matrix.det","border":false}
+{"code":"LINA1-P08","cls":"가능","reason":"3×3 정수 행렬의 행렬식 값이 1로 정해짐","method":"sympy.Matrix.det","border":false}
+{"code":"LINA1-P09","cls":"불가","reason":"det=0일 때 어떤 일이 생기는지 서술하는 조건 이해","method":"해당 없음","border":false}
+{"code":"LINA1-P10","cls":"가능","reason":"크라메르로 구한 연립방정식 해가 x=2,y=1로 정해짐","method":"sympy.solve / Matrix.det 비율","border":false}
+{"code":"LINA1-P11","cls":"가능","reason":"두 벡터를 열로 한 행렬식 0 여부로 독립성 판정","method":"sympy.Matrix.det 후 ==0 판정","border":false}
+{"code":"LINA1-P12","cls":"가능","reason":"행렬의 rank 1과 nullity 2가 정확히 계산됨","method":"sympy.Matrix.rank / nullspace","border":false}
+{"code":"LINA1-R01","cls":"불가","reason":"직선 그림으로 해의 개수를 읽는 그림 기반 과제","method":"해당 없음","border":false}
+{"code":"LINA1-R02","cls":"불가","reason":"변환을 그려 식별하는 그림 기반 과제","method":"해당 없음","border":false}
+{"code":"LINA1-R03","cls":"불가","reason":"격자 그림에서 좌표를 읽는 그림 기반 과제","method":"해당 없음","border":false}
+{"code":"LINA1-R04","cls":"불가","reason":"변환 그림을 그리고 핵을 표시하는 시각화 과제","method":"해당 없음","border":false}
+{"code":"LINA2-C01","cls":"불가","reason":"고유값과 대각성분이 다름을 인지하는 개념 이해","method":"해당 없음","border":true}
+{"code":"LINA2-C02","cls":"불가","reason":"대각화 조건(독립 고유벡터 n개)의 개념 이해가 핵심","method":"해당 없음","border":true}
+{"code":"LINA2-C03","cls":"불가","reason":"케일리-해밀턴 올바른 표기 형태를 쓰는 개념 과제","method":"해당 없음","border":false}
+{"code":"LINA2-C04","cls":"불가","reason":"사영식의 기하적 의미를 서술하는 개념 과제","method":"해당 없음","border":false}
+{"code":"LINA2-C05","cls":"불가","reason":"계수를 구하는 식 자체를 말하는 개념 서술","method":"해당 없음","border":false}
+{"code":"LINA2-C06","cls":"불가","reason":"스펙트럼 정리 조건을 이해하는 개념 판정","method":"해당 없음","border":true}
+{"code":"LINA2-C07","cls":"불가","reason":"고유값이 실수인 이유를 증명 수준으로 서술","method":"해당 없음","border":false}
+{"code":"LINA2-C08","cls":"불가","reason":"조르당 표준형의 의미 이해가 핵심인 개념","method":"해당 없음","border":true}
+{"code":"LINA2-C09","cls":"불가","reason":"최소다항식과 특성다항식의 차이를 구분하는 개념","method":"해당 없음","border":true}
+{"code":"LINA2-C10","cls":"불가","reason":"합동과 닮음 관계의 차이를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"LINA2-C11","cls":"불가","reason":"관성법칙의 이유를 서술하는 정리 이해","method":"해당 없음","border":false}
+{"code":"LINA2-C12","cls":"불가","reason":"양의정부호 판정조건에 대한 개념 이해가 핵심","method":"해당 없음","border":true}
+{"code":"LINA2-P01","cls":"가능","reason":"특성방정식의 근 -1,-2가 정확히 정해짐","method":"sympy.Matrix.eigenvals / charpoly","border":false}
+{"code":"LINA2-P02","cls":"가능","reason":"(1,1),(1,0)의 정규직교화 결과가 정확히 정해짐","method":"sympy.GramSchmidt(orthonormal=True)","border":false}
+{"code":"LINA2-R01","cls":"불가","reason":"등위곡선 그림을 고유값으로 해석하는 표상 과제","method":"해당 없음","border":false}
+{"code":"MLOG-C01","cls":"불가","reason":"진리표로 보이는 방법 설명이 요구되는 서술","method":"해당 없음","border":true}
+{"code":"MLOG-C02","cls":"불가","reason":"완전성과 불완전성이 공존하는 이유 설명","method":"해당 없음","border":false}
+{"code":"MLOG-C03","cls":"불가","reason":"구문론과 의미론 구분이라는 용어·개념 설명","method":"해당 없음","border":false}
+{"code":"MLOG-C04","cls":"불가","reason":"모델에 따라 진리값이 달라지는 이유 해석","method":"해당 없음","border":false}
+{"code":"MLOG-C05","cls":"불가","reason":"모델 다양성에 대한 추상적 정성 개념","method":"해당 없음","border":false}
+{"code":"MLOG-C06","cls":"불가","reason":"괴델 완전성 정리의 의미를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"MLOG-C07","cls":"불가","reason":"괴델 문장의 의미 해석이 핵심인 개념","method":"해당 없음","border":false}
+{"code":"MLOG-C08","cls":"불가","reason":"제2 불완전성 정리의 의미를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"MSTAT-C01","cls":"불가","reason":"카이제곱 분포의 정의와 받침을 말하는 개념","method":"해당 없음","border":false}
+{"code":"MSTAT-C02","cls":"불가","reason":"소표본에서 t분포를 쓰는 이유를 설명","method":"해당 없음","border":false}
+{"code":"MSTAT-C03","cls":"불가","reason":"F분포가 비대칭인 이유를 서술하는 개념","method":"해당 없음","border":false}
+{"code":"MSTAT-C04","cls":"불가","reason":"충분통계량의 의미 해석이 핵심인 개념","method":"해당 없음","border":false}
+{"code":"MSTAT-C05","cls":"불가","reason":"신뢰구간의 빈도 해석을 말로 설명","method":"해당 없음","border":false}
+{"code":"MSTAT-C06","cls":"불가","reason":"p값의 정확한 의미를 해석하는 개념","method":"해당 없음","border":false}
+{"code":"MSTAT-C07","cls":"불가","reason":"점근분포와 조건을 서술하는 정성적 이해","method":"해당 없음","border":false}
+{"code":"MSTAT-P01","cls":"가능","reason":"베르누이 로그우도 미분=0의 해 p=k/n이 닫힌 식","method":"sympy.diff + sympy.solve","border":true}
+{"code":"MSTAT-P02","cls":"불가","reason":"적률법 절차를 서술하는 문항, 수치가 없음","method":"해당 없음","border":false}
+{"code":"NUMER-C01","cls":"불가","reason":"절단오차의 종류를 구분하는 개념 설명","method":"해당 없음","border":false}
+{"code":"NUMER-C02","cls":"불가","reason":"부동소수점 반올림오차의 원인을 서술하는 개념","method":"해당 없음","border":false}
+{"code":"NUMER-C03","cls":"불가","reason":"조건수 크기가 주는 위험을 해석하는 개념","method":"해당 없음","border":false}
+{"code":"NUMER-C04","cls":"불가","reason":"방법의 장단점을 비교하는 서술형","method":"해당 없음","border":false}
+{"code":"NUMER-C06","cls":"불가","reason":"수렴 조건을 말로 설명하는 개념","method":"해당 없음","border":false}
+{"code":"NUMER-C07","cls":"불가","reason":"룽게 현상의 진동 거동을 판단하는 수치해석","method":"해당 없음","border":false}
+{"code":"NUMER-C08","cls":"불가","reason":"스플라인이 나은 이유를 서술하는 개념","method":"해당 없음","border":false}
+{"code":"NUMER-C09","cls":"불가","reason":"회귀선이 점을 지나지 않는 이유를 설명","method":"해당 없음","border":false}
+{"code":"NUMER-C10","cls":"불가","reason":"근사 곡선의 차이를 비교하는 개념 설명","method":"해당 없음","border":false}
+{"code":"NUMER-C11","cls":"불가","reason":"오차 증폭 거동을 판단하는 수치해석 개념","method":"해당 없음","border":false}
+{"code":"NUMER-C12","cls":"불가","reason":"반복법의 수렴·발산 거동을 말로 설명","method":"해당 없음","border":false}
+{"code":"NUMER-C13","cls":"불가","reason":"두 반복법의 차이를 한 줄로 서술","method":"해당 없음","border":false}
+{"code":"NUMER-P01","cls":"불가","reason":"구체 함수 없이 이분 절차를 서술하는 문항","method":"해당 없음","border":false}
+{"code":"NUMER-P02","cls":"가능","reason":"두 점 라그랑주 보간 다항식 1+2x가 유일하게 정해짐","method":"sympy.interpolate / Eq + simplify","border":false}
+{"code":"NUMER-P03","cls":"불가","reason":"함수 없이 사다리꼴 공식 형태를 쓰는 문항","method":"해당 없음","border":false}
+{"code":"RANAL-C01","cls":"불가","reason":"외측도의 가법성 여부를 말하는 정성 개념","method":"해당 없음","border":false}
+{"code":"RANAL-C02","cls":"불가","reason":"비가측집합 존재라는 존재 논증","method":"해당 없음","border":false}
+{"code":"RANAL-C03","cls":"불가","reason":"보렐집합과 르베그가측집합 포함관계 개념","method":"해당 없음","border":false}
+{"code":"RANAL-C04","cls":"불가","reason":"단순함수 근사의 이유를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"RANAL-C05","cls":"불가","reason":"거의 어디서나의 의미 해석이 핵심","method":"해당 없음","border":false}
+{"code":"RANAL-C06","cls":"불가","reason":"단조수렴정리 가설의 필요성을 논증","method":"해당 없음","border":false}
+{"code":"RANAL-C07","cls":"불가","reason":"지배수렴정리 가설 위배를 설명하는 논증","method":"해당 없음","border":false}
+{"code":"RANAL-C08","cls":"불가","reason":"파투 보조정리의 부등식 반례를 설명","method":"해당 없음","border":false}
+{"code":"RANAL-C09","cls":"불가","reason":"민코프스키 부등식 성질을 서술하는 개념","method":"해당 없음","border":false}
+{"code":"RANAL-C10","cls":"불가","reason":"Lᵖ 완비성이라는 추상 구조 성질","method":"해당 없음","border":false}
+{"code":"RANAL-C11","cls":"불가","reason":"칸토어 함수 반례를 설명하는 정성 논증","method":"해당 없음","border":false}
+{"code":"RANAL-C12","cls":"불가","reason":"라돈-니코딤 조건을 설명하는 정리 이해","method":"해당 없음","border":false}
+{"code":"RANAL-P01","cls":"가능","reason":"1/p+1/q=1에서 p=2일 때 q=2가 하나로 정해짐","method":"sympy.solve(Rational(1,2)+1/q-1,q)","border":false}
+{"code":"CRYP-C01","cls":"불가","reason":"블록암호가 가역 치환인 이유를 서술","method":"해당 없음","border":false}
+{"code":"CRYP-C02","cls":"불가","reason":"대칭키와 비대칭키 구조 차이를 설명","method":"해당 없음","border":false}
+{"code":"CRYP-C03","cls":"불가","reason":"RSA 안전성의 근거를 서술하는 개념","method":"해당 없음","border":false}
+{"code":"CRYP-C04","cls":"불가","reason":"이산로그가 어려운 이유를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"CRYP-C05","cls":"불가","reason":"ECC 키 길이 이점의 이유를 서술","method":"해당 없음","border":false}
+{"code":"CRYP-C06","cls":"불가","reason":"오류 검출과 정정의 차이를 구분하는 개념","method":"해당 없음","border":false}
+{"code":"CRYP-C07","cls":"불가","reason":"선형성이 복호를 쉽게 하는 이유를 서술","method":"해당 없음","border":false}
+{"code":"CRYP-C08","cls":"불가","reason":"생성행렬과 검사행렬 역할을 구분하는 개념","method":"해당 없음","border":false}
+{"code":"CRYP-C09","cls":"불가","reason":"신드롬이 오류 위치를 주는 원리 설명","method":"해당 없음","border":false}
+{"code":"CRYP-C10","cls":"가능","reason":"최소거리 5의 정정 오류 수 floor((5-1)/2)=2가 정해짐","method":"정수 연산 (5-1)//2 또는 sympy.floor","border":false}
+{"code":"CRYP-C11","cls":"불가","reason":"한계정리의 의미를 해석하는 개념","method":"해당 없음","border":false}
+{"code":"TOPO1-C01","cls":"불가","reason":"위상공간 공리와 열린집합 성질 논증","method":"해당 없음","border":false}
+{"code":"TOPO1-C02","cls":"불가","reason":"기저 정의를 설명하는 위상 개념","method":"해당 없음","border":false}
+{"code":"TOPO1-C03","cls":"불가","reason":"부분기저에서 기저를 얻는 연산을 말하는 개념","method":"해당 없음","border":false}
+{"code":"TOPO1-C04","cls":"불가","reason":"연속의 위상적 정의를 쓰는 정의형 과제","method":"해당 없음","border":false}
+{"code":"TOPO1-C05","cls":"불가","reason":"위상동형 판정과 역사상 연속성 논증","method":"해당 없음","border":false}
+{"code":"TOPO1-C06","cls":"불가","reason":"상대 위상에서 열림 여부를 해석하는 개념","method":"해당 없음","border":false}
+{"code":"TOPO1-C07","cls":"불가","reason":"곱위상과 상자위상 차이를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"TOPO1-C08","cls":"불가","reason":"연결공간 판정은 위상 논증이 핵심","method":"해당 없음","border":false}
+{"code":"TOPO1-C09","cls":"불가","reason":"경로연결과 연결의 관계를 반례로 논증","method":"해당 없음","border":false}
+{"code":"TOPO1-C10","cls":"불가","reason":"컴팩트성 정의와 덮개 논증","method":"해당 없음","border":false}
+{"code":"TOPO1-C11","cls":"불가","reason":"점렬컴팩트와 컴팩트 동치 조건의 정성 이해","method":"해당 없음","border":false}
+{"code":"TOPO1-C12","cls":"불가","reason":"티호노프 정리의 주장과 전제를 서술","method":"해당 없음","border":false}
+{"code":"TOPO1-R01","cls":"불가","reason":"커피잔과 도넛 그림으로 설명하는 표상 과제","method":"해당 없음","border":false}
+{"code":"TOPO1-R02","cls":"불가","reason":"끝점을 붙여 원이 되는 그림 시각화 과제","method":"해당 없음","border":false}
+{"code":"TOPO2-C01","cls":"불가","reason":"분리공리 위계와 차이를 설명하는 개념","method":"해당 없음","border":false}
+{"code":"TOPO2-C02","cls":"불가","reason":"극한 유일성의 위상적 성질 논증","method":"해당 없음","border":false}
+{"code":"TOPO2-C03","cls":"불가","reason":"우리손 보조정리의 존재 조건 서술","method":"해당 없음","border":false}
+{"code":"TOPO2-C04","cls":"불가","reason":"거리화 가능성 조건을 설명하는 정리","method":"해당 없음","border":false}
+{"code":"TOPO2-C05","cls":"불가","reason":"완비성이 위상불변이 아님을 설명하는 개념","method":"해당 없음","border":false}
+{"code":"TOPO2-C06","cls":"불가","reason":"베어 범주정리 적용을 논증하는 정리","method":"해당 없음","border":false}
+{"code":"TOPO2-C07","cls":"불가","reason":"호모토피 여부를 위상적으로 논증","method":"해당 없음","border":false}
+{"code":"TOPO2-C08","cls":"불가","reason":"기본군이라는 추상 구조의 성질","method":"해당 없음","border":false}
+{"code":"NUMT1-C01","cls":"불가","reason":"합동식 소거 조건 개념, 이유 이해가 핵심","method":"해당 없음","border":true}
+{"code":"NUMT1-C02","cls":"불가","reason":"산술의 기본정리 유일성을 설명하는 개념","method":"해당 없음","border":false}
+{"code":"NUMT1-C03","cls":"불가","reason":"소수 무한성의 증명 서술","method":"해당 없음","border":false}
+{"code":"NUMT1-C04","cls":"불가","reason":"φ의 곱셈성 조건을 비교 설명하는 개념","method":"해당 없음","border":true}
+{"code":"NUMT1-C05","cls":"가능","reason":"μ(12)=0, μ(30)=-1이 정수로 하나로 정해짐","method":"sympy.ntheory.mobius","border":false}
+{"code":"NUMT1-C06","cls":"불가","reason":"페르마 소정리 역이 거짓임을 이해하는 개념","method":"해당 없음","border":true}
+{"code":"NUMT1-C07","cls":"가능","reason":"mod 10에서 3^φ(10)=81≡1 값이 하나로 정해짐","method":"sympy.totient + pow(3, 4, 10)","border":false}
+{"code":"NUMT1-P01","cls":"가능","reason":"gcd(48,18)=6이 정수로 하나로 정해짐","method":"sympy.gcd","border":false}
+{"code":"NUMT1-P02","cls":"가능","reason":"연립합동 x≡8 (mod 15)가 유일하게 정해짐","method":"sympy.ntheory.modular.crt","border":false}
+{"code":"NUMT1-P03","cls":"가능","reason":"φ(12)=4가 정수로 하나로 정해짐","method":"sympy.totient","border":false}
+{"code":"NUMT1-P04","cls":"가능","reason":"르장드르 기호 (2/7)=1이 정수로 정해짐","method":"sympy.ntheory.legendre_symbol","border":false}
+{"code":"NUMT2-C01","cls":"불가","reason":"야코비 기호 +1의 한계를 이해하는 개념","method":"해당 없음","border":true}
+{"code":"NUMT2-C02","cls":"불가","reason":"정수환이 더 큰 이유를 설명하는 대수 개념","method":"해당 없음","border":false}
+{"code":"NUMT2-C03","cls":"불가","reason":"아이디얼 유일분해의 의미를 설명하는 추상 구조","method":"해당 없음","border":false}
+{"code":"NUMT2-C04","cls":"불가","reason":"해석접속의 의미 해석이 핵심인 개념","method":"해당 없음","border":false}
+{"code":"NUMT2-C05","cls":"불가","reason":"소수 밀도의 점근적 의미를 설명","method":"해당 없음","border":false}
+{"code":"NUMT2-C06","cls":"불가","reason":"펠 방정식 해가 무한한 이유를 설명","method":"해당 없음","border":false}
+{"code":"NUMT2-C07","cls":"불가","reason":"합동으로 해의 비존재를 보이는 논증","method":"해당 없음","border":false}
+{"code":"NUMT2-P01","cls":"가능","reason":"(6/7)=-1이 곱셈성으로 정수로 정해짐","method":"sympy.ntheory.legendre_symbol","border":false}
+{"code":"COMB-C01","cls":"불가","reason":"순열과 조합의 구분이라는 개념 이해","method":"해당 없음","border":true}
+{"code":"COMB-C02","cls":"불가","reason":"생성함수 의미를 해석하는 개념","method":"해당 없음","border":false}
+{"code":"COMB-C03","cls":"불가","reason":"경로와 보행 용어를 구분하는 정의형","method":"해당 없음","border":false}
+{"code":"COMB-C04","cls":"불가","reason":"회로와 경로 용어를 구분하는 정의형","method":"해당 없음","border":false}
+{"code":"COMB-C05","cls":"불가","reason":"오일러 회로 불가능 이유를 서술","method":"해당 없음","border":false}
+{"code":"COMB-C06","cls":"불가","reason":"해밀턴 문제의 난이도를 비교 설명","method":"해당 없음","border":false}
+{"code":"COMB-C07","cls":"불가","reason":"트리 성질을 이해하는 그래프 개념","method":"해당 없음","border":true}
+{"code":"COMB-C08","cls":"불가","reason":"쿠라토프스키 정리로 평면성을 논증","method":"해당 없음","border":false}
+{"code":"COMB-C09","cls":"불가","reason":"4색정리를 이해하는 정성적 그래프 개념","method":"해당 없음","border":false}
+{"code":"COMB-C10","cls":"불가","reason":"라틴방진 정의 확인이 핵심인 개념","method":"해당 없음","border":true}
+{"code":"COMB-C11","cls":"불가","reason":"BIBD 균형의 의미를 서술하는 개념","method":"해당 없음","border":false}
+{"code":"COMB-P01","cls":"가능","reason":"C(5,2)=10이 정수로 하나로 정해짐","method":"sympy.binomial","border":false}
+{"code":"COMB-P02","cls":"가능","reason":"|A∪B|=10+10-4=16이 정수로 정해짐","method":"정수 연산 / sympy.Set 연산","border":false}
+{"code":"COMB-R01","cls":"불가","reason":"그래프 그림과 인접행렬을 대응시키는 표상 과제","method":"해당 없음","border":false}
+{"code":"COMB-R02","cls":"불가","reason":"교차 없이 그려 평면성을 판정하는 그림 시도","method":"해당 없음","border":false}
+{"code":"CAPST-P01","cls":"불가","reason":"논문 주제 범위 설정이라는 서술형 절차","method":"해당 없음","border":false}
+{"code":"CAPST-P02","cls":"불가","reason":"논문 읽기 순서라는 서술형 절차","method":"해당 없음","border":false}
+{"code":"CAPST-P03","cls":"불가","reason":"발표 우선순위라는 열린 서술형 과제","method":"해당 없음","border":false}
+{"code":"CAPST-P04","cls":"불가","reason":"논문 구성요소를 서술하는 열린 과제","method":"해당 없음","border":false}
+{"code":"SETLOG-C01","cls":"불가","reason":"공허한 참을 진리표로 설명하는 서술형","method":"해당 없음","border":false}
+{"code":"SETLOG-C02","cls":"불가","reason":"조건문과 쌍조건문 차이를 인지하는 개념","method":"해당 없음","border":true}
+{"code":"SETLOG-C03","cls":"불가","reason":"논증 타당성과 오류를 설명하는 서술","method":"해당 없음","border":false}

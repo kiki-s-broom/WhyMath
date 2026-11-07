@@ -1,0 +1,152 @@
+{"code":"ODE-C01","cls":"불가","reason":"변수분리 가능 여부는 개념 구분 서술이 핵심","method":"해당 없음","border":true}
+{"code":"ODE-C02","cls":"가능","reason":"M,N 편미분 비교와 퍼텐셜 F 산출이 식으로 정해짐","method":"sympy.diff로 ∂M/∂y,∂N/∂x 비교 + sympy.integrate로 F 구성","border":false}
+{"code":"ODE-C03","cls":"불가","reason":"미정계수법이 안 되는 이유와 대안 서술이 핵심","method":"해당 없음","border":false}
+{"code":"ODE-C04","cls":"가능","reason":"L{t²}=2/s³와 (1/s²)² 값 비교가 정확히 계산됨","method":"sympy.laplace_transform + sympy.simplify로 두 식 비교","border":false}
+{"code":"ODE-C05","cls":"불가","reason":"프로베니우스 필요 여부를 말로 판단하는 문항","method":"해당 없음","border":false}
+{"code":"ODE-C06","cls":"불가","reason":"일반해의 형태를 서술하는 문항이라 하나로 확정 어려움","method":"해당 없음","border":false}
+{"code":"ODE-C07","cls":"가능","reason":"고유값 실수부 부호로 안정성이 하나로 정해짐","method":"sympy.re로 실수부 부호 판정(고유값은 Matrix.eigenvals)","border":false}
+{"code":"ODE-P01","cls":"가능","reason":"y'=xy, y(0)=1의 해가 하나로 정해짐","method":"sympy.dsolve(ics 지정) 후 simplify","border":false}
+{"code":"ODE-P02","cls":"가능","reason":"선형 1계 방정식 일반해가 식으로 닫힘","method":"sympy.dsolve 후 sympy.simplify로 동치 확인","border":false}
+{"code":"ODE-P03","cls":"불가","reason":"적분인자의 형태를 서술하는 문항이라 개념 설명 성격","method":"해당 없음","border":true}
+{"code":"ODE-P04","cls":"가능","reason":"중근 2계 제차 방정식 일반해가 식으로 정해짐","method":"sympy.dsolve 후 sympy.simplify로 동치 확인","border":false}
+{"code":"ODE-P05","cls":"불가","reason":"시도해가 실패하는 이유 설명이 핵심","method":"해당 없음","border":false}
+{"code":"ODE-P06","cls":"가능","reason":"역라플라스 변환 결과가 식으로 정해짐","method":"sympy.inverse_laplace_transform + sympy.apart","border":false}
+{"code":"ODE-P07","cls":"가능","reason":"초깃값 문제의 해 y=2e^{-t}가 하나로 정해짐","method":"sympy.dsolve(ics) 또는 laplace_transform 경유 확인","border":false}
+{"code":"ODE-P08","cls":"불가","reason":"점화식 세우는 과정은 식 형태가 다양해 비교 모호","method":"해당 없음","border":true}
+{"code":"ODE-R01","cls":"불가","reason":"상평면 궤적 그리기와 그림 해석이 핵심","method":"해당 없음","border":false}
+{"code":"CALC1-C01","cls":"불가","reason":"함수성 판정 이유를 설명하는 개념 문항","method":"해당 없음","border":false}
+{"code":"CALC1-C02","cls":"불가","reason":"조각함수도 함수인 이유 설명이 핵심","method":"해당 없음","border":false}
+{"code":"CALC1-C03","cls":"불가","reason":"극한과 함숫값의 독립을 설명하는 것이 핵심","method":"해당 없음","border":true}
+{"code":"CALC1-C04","cls":"불가","reason":"0.999…=1을 설명으로 이해시키는 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC1-C05","cls":"불가","reason":"연속 판정 근거를 서술하는 개념 문항","method":"해당 없음","border":false}
+{"code":"CALC1-C06","cls":"불가","reason":"연속과 미분가능의 관계 구분이 핵심","method":"해당 없음","border":true}
+{"code":"CALC1-C07","cls":"불가","reason":"향함과 도달의 의미 구분은 해석 문항","method":"해당 없음","border":false}
+{"code":"CALC1-C08","cls":"불가","reason":"dy/dx 기호의 의미 설명이 핵심","method":"해당 없음","border":false}
+{"code":"CALC1-C09","cls":"불가","reason":"미분가능과 도함수 연속의 구분 서술이 핵심","method":"해당 없음","border":true}
+{"code":"CALC1-C10","cls":"가능","reason":"x^x 도함수가 식으로 하나로 정해짐","method":"sympy.diff + sympy.simplify로 x**x*(log(x)+1)과 동치 확인","border":false}
+{"code":"CALC1-C11","cls":"가능","reason":"x³의 f''=6x와 (f')²=9x⁴ 계산이 정해짐","method":"sympy.diff 두 번 적용 후 Eq로 비교","border":false}
+{"code":"CALC1-C12","cls":"불가","reason":"임계점이 극값인지 판단하는 개념 이해 문항","method":"해당 없음","border":true}
+{"code":"CALC1-C13","cls":"불가","reason":"평균값 정리 가설 위배를 서술하는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-C14","cls":"불가","reason":"증가와 볼록 정보의 구분이 핵심인 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC1-C15","cls":"불가","reason":"f''=0과 변곡점의 관계 판단이 개념 이해","method":"해당 없음","border":true}
+{"code":"CALC1-C16","cls":"불가","reason":"뉴턴법의 수렴·발산 거동 판단이 핵심","method":"해당 없음","border":false}
+{"code":"CALC1-C17","cls":"가능","reason":"n=2 오른끝 리만 합 0.75와 적분 0.5가 정확값","method":"sympy.Rational 합산 + sympy.integrate","border":false}
+{"code":"CALC1-C18","cls":"가능","reason":"sin 정적분 0과 넓이 4가 정확값으로 정해짐","method":"sympy.integrate(sin(x),(x,0,2*pi)) 및 절댓값 적분","border":false}
+{"code":"CALC1-C19","cls":"불가","reason":"FTC 적용이 틀린 이유를 설명하는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-C20","cls":"가능","reason":"∫x·x=1/3와 (1/2)²=1/4 비교가 정확값","method":"sympy.integrate + sympy.Rational 비교","border":false}
+{"code":"CALC1-C21","cls":"가능","reason":"회전체 부피 π/2가 적분으로 정해짐","method":"sympy.integrate(pi*sqrt(x)**2,(x,0,1))","border":false}
+{"code":"CALC1-C22","cls":"가능","reason":"직선 호의 길이 √2가 적분으로 정해짐","method":"sympy.integrate(sqrt(1+diff(x,x)**2),(x,0,1))","border":false}
+{"code":"CALC1-C23","cls":"불가","reason":"이상적분 발산을 극한으로 설명하는 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC1-C24","cls":"불가","reason":"필요조건과 충분조건 구분이 핵심인 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC1-C25","cls":"불가","reason":"끝점 수렴 여부를 개별 판정하는 서술 성격","method":"해당 없음","border":true}
+{"code":"CALC1-C26","cls":"불가","reason":"테일러 급수와 원함수 불일치 반례 이해가 핵심","method":"해당 없음","border":false}
+{"code":"CALC1-C27","cls":"불가","reason":"매클로린과 테일러의 포함관계 이해가 핵심","method":"해당 없음","border":true}
+{"code":"CALC1-P01","cls":"가능","reason":"0/0 극한값 4가 하나로 정해짐","method":"sympy.limit((x**2-4)/(x-2), x, 2)","border":false}
+{"code":"CALC1-P02","cls":"불가","reason":"세 조건 점검 서술이 핵심이라 판정 근거가 설명형","method":"해당 없음","border":true}
+{"code":"CALC1-P03","cls":"가능","reason":"x²−x의 무한대 극한 ∞가 정해짐","method":"sympy.limit(x**2-x, x, oo)","border":false}
+{"code":"CALC1-P04","cls":"가능","reason":"유리식 무한대 극한 3/2가 하나로 정해짐","method":"sympy.limit((3*x**2+1)/(2*x**2-x), x, oo)","border":false}
+{"code":"CALC1-P05","cls":"가능","reason":"차분몫 극한으로 도함수 2x가 정해짐","method":"sympy.limit((f(x+h)-f(x))/h, h, 0)","border":false}
+{"code":"CALC1-P06","cls":"가능","reason":"곱의 미분 5x⁴ 결과가 하나로 정해짐","method":"sympy.diff(x**2*x**3, x) 와 f'g' 비교","border":false}
+{"code":"CALC1-P07","cls":"가능","reason":"몫의 미분 (f/g)'=1 결과가 정해짐","method":"sympy.diff(x**2/x, x) 와 f'/g' 비교","border":false}
+{"code":"CALC1-P08","cls":"가능","reason":"sin(3x) 도함수 3cos(3x)가 정해짐","method":"sympy.diff(sin(3*x), x)","border":false}
+{"code":"CALC1-P09","cls":"가능","reason":"원 방정식의 음함수 도함수 −x/y가 정해짐","method":"sympy.idiff(x**2+y**2-25, y, x)","border":false}
+{"code":"CALC1-P10","cls":"가능","reason":"닫힌구간 최댓값 2, 최솟값 −2가 정해짐","method":"sympy.solve(diff(f,x)) + 끝점 대입 비교","border":false}
+{"code":"CALC1-P11","cls":"가능","reason":"원래 극한 1/2와 잘못 적용한 값 1 비교가 정확값","method":"sympy.limit 으로 원식과 도함수 비 극한 비교","border":false}
+{"code":"CALC1-P12","cls":"가능","reason":"(1−cos x)/x² 극한 1/2가 정해짐","method":"sympy.limit((1-cos(x))/x**2, x, 0)","border":false}
+{"code":"CALC1-P13","cls":"가능","reason":"정적분 값 8이 정확히 계산됨","method":"sympy.integrate(3*x**2,(x,0,2))","border":false}
+{"code":"CALC1-P14","cls":"불가","reason":"+C가 필요한 이유를 설명하는 것이 핵심","method":"해당 없음","border":true}
+{"code":"CALC1-P15","cls":"가능","reason":"치환적분 결과 sin(x²)+C가 식으로 정해짐","method":"sympy.integrate(2*x*cos(x**2), x) 후 미분 동치 확인","border":false}
+{"code":"CALC1-P16","cls":"가능","reason":"정적분 값 1/4가 정확히 계산됨","method":"sympy.integrate(2*x*(x**2)**3,(x,0,1))","border":false}
+{"code":"CALC1-P17","cls":"가능","reason":"두 곡선 사이 넓이 1/6이 정해짐","method":"sympy.solve로 교점 + sympy.integrate(x-x**2,(x,0,1))","border":false}
+{"code":"CALC1-P18","cls":"불가","reason":"겉넓이·부피 공식 식 구분을 서술하는 문항","method":"해당 없음","border":true}
+{"code":"CALC1-P19","cls":"불가","reason":"부분적분 선택 오류를 진단하는 서술 문항","method":"해당 없음","border":false}
+{"code":"CALC1-P20","cls":"가능","reason":"삼각치환 결과 arcsin x + C가 정해짐","method":"sympy.integrate(1/sqrt(1-x**2), x)","border":false}
+{"code":"CALC1-P21","cls":"불가","reason":"부분분수 항의 형태를 쓰는 문항이라 답이 미정계수형","method":"해당 없음","border":true}
+{"code":"CALC1-P22","cls":"가능","reason":"비판정 극한 비 1/2<1로 수렴 판정이 정해짐","method":"sympy.limit(a(n+1)/a(n), n, oo)","border":false}
+{"code":"CALC1-P23","cls":"불가","reason":"항별 미분과 수렴반경 보존을 설명하는 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC1-P24","cls":"가능","reason":"eˣ 테일러 3차까지 계수가 정해짐","method":"sympy.series(exp(x), x, 0, 4)","border":false}
+{"code":"CALC1-R01","cls":"불가","reason":"식·그래프·표 표상 간 대응 설명이 핵심","method":"해당 없음","border":false}
+{"code":"CALC1-R02","cls":"불가","reason":"그래프를 보고 극한을 읽는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R03","cls":"불가","reason":"그래프를 보고 불연속 유형을 분류하는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R04","cls":"불가","reason":"점근선을 그리고 그림과 식을 대응시키는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R05","cls":"불가","reason":"f 그래프에서 f′ 그래프 개형을 그리는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R06","cls":"불가","reason":"겹친 세 곡선 그림에서 f,f′,f″를 지목하는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R07","cls":"불가","reason":"부호표로 그래프 개형을 그리는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R08","cls":"불가","reason":"리만 직사각형 그림과 합의 식 대응 설명 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R09","cls":"불가","reason":"넓이누적함수 그래프를 그림으로 설명하는 문항","method":"해당 없음","border":false}
+{"code":"CALC1-R10","cls":"불가","reason":"영역 그림에서 위·아래를 읽어 식을 세우는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C01","cls":"불가","reason":"서로 다른 극좌표 표현 쓰기는 정답이 열려 있음","method":"해당 없음","border":false}
+{"code":"CALC2-C02","cls":"불가","reason":"음의 r 해석과 양의 r 재표기는 표현이 여러 가지","method":"해당 없음","border":true}
+{"code":"CALC2-C03","cls":"불가","reason":"적분식을 세우는 문항이라 식 표현 비교가 모호","method":"해당 없음","border":true}
+{"code":"CALC2-C04","cls":"가능","reason":"내적 a·b=11 값이 정확히 계산됨","method":"sympy.Matrix([1,2]).dot(sympy.Matrix([3,4]))","border":false}
+{"code":"CALC2-C05","cls":"불가","reason":"내적 0의 의미를 해석하는 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC2-C06","cls":"불가","reason":"꼬인 위치 여부를 서술로 구분하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C07","cls":"불가","reason":"법선벡터의 의미 해석이 핵심인 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC2-C08","cls":"불가","reason":"두 곡면 모양 구분은 단면을 보고 판단하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C09","cls":"불가","reason":"곡선을 z=f(x,y)로 쓸 수 없는 이유 서술 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C10","cls":"가능","reason":"속도벡터와 속력 1이 미분으로 정해짐","method":"sympy.diff + sympy.Matrix.norm + simplify","border":false}
+{"code":"CALC2-C11","cls":"가능","reason":"등속원운동 가속도 벡터가 식으로 정해짐","method":"sympy.diff 두 번 적용 후 simplify","border":false}
+{"code":"CALC2-C12","cls":"가능","reason":"y=x² 곡률 κ(0)=2, κ(1)=2/5^{3/2}가 정확값","method":"sympy.diff + 곡률 공식 대입 후 sympy.Rational 비교","border":false}
+{"code":"CALC2-C13","cls":"불가","reason":"경로 의존으로 극한 부재를 논증하는 개념 문항","method":"해당 없음","border":true}
+{"code":"CALC2-C14","cls":"불가","reason":"편미분 존재와 미분가능의 관계를 논증하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C15","cls":"불가","reason":"클레로 정리 조건을 한 줄로 서술하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C16","cls":"가능","reason":"∇f=(2,0)와 접선 (0,1)의 내적 0 확인이 정해짐","method":"sympy.diff 기울기 + Matrix.dot 으로 직교 확인","border":false}
+{"code":"CALC2-C17","cls":"불가","reason":"이중적분이 곱으로 분리되는 조건을 설명하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C18","cls":"가능","reason":"단위정육면체 삼중적분 값 1이 정확값","method":"sympy.integrate(1,(x,0,1),(y,0,1),(z,0,1))","border":false}
+{"code":"CALC2-C19","cls":"가능","reason":"반원 경로 선적분 π와 −π가 정확값","method":"매개화 후 sympy.integrate 로 두 경로 비교","border":false}
+{"code":"CALC2-C20","cls":"불가","reason":"일반 f와 곡선에 대한 성질 서술이라 값이 안 정해짐","method":"해당 없음","border":false}
+{"code":"CALC2-C21","cls":"불가","reason":"향 반전 시 부호 변화를 설명하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C22","cls":"불가","reason":"그린 정리 적용 조건을 서술하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C23","cls":"불가","reason":"발산 정리의 폐곡면 조건을 서술하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-C24","cls":"불가","reason":"스토크스 정리의 경계 의존을 설명하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-P01","cls":"가능","reason":"매개곡선 기울기 3/2가 정해짐","method":"sympy.diff(y,t)/sympy.diff(x,t) 후 t=1 대입","border":false}
+{"code":"CALC2-P02","cls":"가능","reason":"극좌표 넓이 π가 정확값으로 정해짐","method":"sympy.integrate(Rational(1,2)*1**2,(t,0,2*pi))","border":false}
+{"code":"CALC2-P03","cls":"가능","reason":"3차원 거리 3이 정확값으로 정해짐","method":"sympy.sqrt(sum 제곱) 또는 Matrix.norm","border":false}
+{"code":"CALC2-P04","cls":"가능","reason":"외적 (0,0,1)과 (0,0,−1) 계산이 정해짐","method":"sympy.Matrix.cross","border":false}
+{"code":"CALC2-P05","cls":"가능","reason":"외적 (0,0,1)이 행렬식 전개로 정해짐","method":"sympy.Matrix.cross 와 3×3 det 전개 비교","border":false}
+{"code":"CALC2-P06","cls":"가능","reason":"x=0에서 곡률 2가 공식으로 정해짐","method":"sympy.diff 후 곡률 공식 대입","border":false}
+{"code":"CALC2-P07","cls":"가능","reason":"편도함수 2xy와 x²+3y²가 식으로 정해짐","method":"sympy.diff(f, x), sympy.diff(f, y)","border":false}
+{"code":"CALC2-P08","cls":"가능","reason":"다변수 연쇄법칙 결과 2t+4t³가 정해짐","method":"sympy.diff 합성 후 simplify 동치 확인","border":false}
+{"code":"CALC2-P09","cls":"가능","reason":"원 위 x+y 최댓값 √2와 점이 정해짐","method":"sympy.solve 로 ∇f=λ∇g 연립","border":false}
+{"code":"CALC2-P10","cls":"가능","reason":"xy의 제약 최대점 x=y=1/2가 정해짐","method":"sympy.solve 로 라그랑주 연립","border":false}
+{"code":"CALC2-P11","cls":"불가","reason":"적분 한계를 식으로 쓰는 문항이라 표현이 다양","method":"해당 없음","border":true}
+{"code":"CALC2-P12","cls":"가능","reason":"극좌표 이중적분 값 π가 정확값","method":"sympy.integrate(r,(r,0,1),(t,0,2*pi))","border":false}
+{"code":"CALC2-P13","cls":"가능","reason":"원기둥 부피 2π가 정확값으로 정해짐","method":"sympy.integrate(r,(z,0,2),(r,0,1),(t,0,2*pi))","border":false}
+{"code":"CALC2-P14","cls":"가능","reason":"구의 부피 4π/3가 정확값으로 정해짐","method":"sympy.integrate(rho**2*sin(phi), ...)","border":false}
+{"code":"CALC2-P15","cls":"가능","reason":"야코비안 |J|=6이 행렬식으로 정해짐","method":"sympy.Matrix.jacobian + det","border":false}
+{"code":"CALC2-R01","cls":"불가","reason":"매개식 자취를 그래프로 그리는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-R02","cls":"불가","reason":"극방정식 도형을 그려 식별하는 문항","method":"해당 없음","border":true}
+{"code":"CALC2-R03","cls":"불가","reason":"내적 식과 사영 그림 대응을 설명하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-R04","cls":"불가","reason":"단면을 그려 곡면을 식별하는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-R05","cls":"불가","reason":"등위선과 기울기 화살표를 그리는 문항","method":"해당 없음","border":false}
+{"code":"CALC2-R06","cls":"불가","reason":"영역 그림에서 적분한계를 읽는 문항","method":"해당 없음","border":false}
+{"code":"CXAN-C01","cls":"가능","reason":"1+i의 극형식 크기 √2, 편각 π/4가 정해짐","method":"sympy.Abs, sympy.arg","border":false}
+{"code":"CXAN-C02","cls":"불가","reason":"코시-리만의 필요·충분 관계 서술이 핵심","method":"해당 없음","border":false}
+{"code":"CXAN-C03","cls":"불가","reason":"복소지수의 성질을 논증하는 개념 문항","method":"해당 없음","border":false}
+{"code":"CXAN-C04","cls":"불가","reason":"다가함수의 모든 값을 집합으로 서술하는 문항","method":"해당 없음","border":true}
+{"code":"CXAN-C05","cls":"가능","reason":"cos(i)=cosh 1≈1.54가 정확값으로 정해짐","method":"sympy.cos(sympy.I) 후 simplify, N","border":false}
+{"code":"CXAN-C06","cls":"불가","reason":"분지절단의 필요성을 서술하는 문항","method":"해당 없음","border":false}
+{"code":"CXAN-C07","cls":"불가","reason":"코시 정리가 안 되는 이유를 설명하는 문항","method":"해당 없음","border":true}
+{"code":"CXAN-C08","cls":"불가","reason":"강체성이라는 성질을 서술하는 문항","method":"해당 없음","border":false}
+{"code":"CXAN-C09","cls":"불가","reason":"수렴반경이 특이점에 의해 정해짐을 설명하는 문항","method":"해당 없음","border":true}
+{"code":"CXAN-C10","cls":"불가","reason":"로랑 급수 종류를 말로 답하는 문항","method":"해당 없음","border":false}
+{"code":"CXAN-C11","cls":"불가","reason":"영점과 극의 위수 대응 이해가 핵심","method":"해당 없음","border":true}
+{"code":"CXAN-C12","cls":"불가","reason":"특이점 종류를 분류하는 개념 문항","method":"해당 없음","border":false}
+{"code":"CXAN-P01","cls":"가능","reason":"z=0 유수 −1이 정확값으로 정해짐","method":"sympy.residue(1/(z**2*(z-1)), z, 0)","border":false}
+{"code":"CXAN-P02","cls":"불가","reason":"유수정리로 푸는 개요를 서술하는 문항","method":"해당 없음","border":true}
+{"code":"CXAN-R01","cls":"불가","reason":"점을 평면에 찍고 극형식으로 옮기는 표상 문항","method":"해당 없음","border":true}
+{"code":"LINA1-C01","cls":"가능","reason":"행연산 전후 연립의 해 (1,2) 비교가 정해짐","method":"sympy.linsolve 로 두 연립 해집합 비교","border":false}
+{"code":"LINA1-C02","cls":"불가","reason":"열연산이 해 해석을 바꾸는 이유 서술 문항","method":"해당 없음","border":false}
+{"code":"LINA1-C03","cls":"불가","reason":"RREF 조건을 말로 판단하는 문항","method":"해당 없음","border":false}
+{"code":"LINA1-C04","cls":"불가","reason":"해의 개수 삼분법을 설명하는 개념 문항","method":"해당 없음","border":true}
+{"code":"LINA1-C05","cls":"가능","reason":"특이행렬 det=0이라 역행렬 부재가 정해짐","method":"sympy.Matrix.det 후 inv 가능 여부 확인","border":false}
+{"code":"LINA1-C06","cls":"가능","reason":"det(2I)=4와 detI+detI=2 비교가 정확값","method":"sympy.Matrix.det 로 값 비교","border":false}
+{"code":"LINA1-C07","cls":"가능","reason":"2×2에서 det(3A)=9detA 관계가 식으로 정해짐","method":"기호 행렬로 sympy.det 계산 후 simplify","border":false}
+{"code":"LINA1-C08","cls":"불가","reason":"부분공간 조건 판단을 설명하는 개념 문항","method":"해당 없음","border":true}
+{"code":"LINA1-C09","cls":"불가","reason":"합집합이 부분공간이 아닌 이유를 논증하는 문항","method":"해당 없음","border":false}
+{"code":"LINA1-C10","cls":"가능","reason":"(1,1),(2,2)의 계수 1<2로 기저 아님이 정해짐","method":"sympy.Matrix.rank","border":false}
+{"code":"LINA1-C11","cls":"가능","reason":"영벡터 포함 집합의 일차종속이 계수로 정해짐","method":"sympy.Matrix.rank 와 열 개수 비교","border":false}
+{"code":"LINA1-C12","cls":"가능","reason":"벡터 3개가 ℝ²에서 종속임이 계수로 정해짐","method":"sympy.Matrix.rank 와 벡터 개수 비교","border":false}
+{"code":"LINA1-C13","cls":"가능","reason":"평면 x+y+z=0의 차원 2가 정해짐","method":"sympy.Matrix.nullspace 의 기저 개수","border":false}
+{"code":"LINA1-C14","cls":"가능","reason":"투영 사상의 핵이 y축 전체로 정해짐","method":"sympy.Matrix.nullspace","border":false}
+{"code":"LINA1-C15","cls":"가능","reason":"상이 xy평면이며 계수 2<3임이 정해짐","method":"sympy.Matrix.columnspace 와 rank","border":false}

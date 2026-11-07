@@ -10,8 +10,11 @@
   - 소단원·단원(860개): 이름만 있는 묶음 노드라 내용 판정 근거가 없다. 하위 세부개념
     *전부*가 "검산 가능"일 때만 "검산 가능", 하나라도 아니면 "검산 불가"로 모은다(애매하면 불가).
     하위 세부개념이 하나도 없으면 "미확인".
-  - 원자료가 여러 파일이면 파일명 순서대로 읽고, 같은 code가 다시 나오면 *뒤 파일이 이긴다*
-    (`재판정.jsonl`이 `chunk*.jsonl`보다 뒤). 어느 파일에서 왔는지 "판정 출처" 열에 남긴다.
+  - 2단계 판정: 1차(`분류_원자료/`)에서 "가능"이 나온 세부개념은 엄격한 2차 심사자(`분류_2차검토/`)가
+    다시 읽는다. *두 번 모두 가능*일 때만 "검산 가능"이고, 2차가 불가로 뒤집으면 "검산 불가"다
+    (애매하면 불가 · 틀린 개념이 학생에게 가는 쪽이 더 위험하다). 1차가 불가인 개념은 2차 대상이 아니다.
+    2차 기록이 없는 1차 "가능"은 검사 실패로 센다(조용히 가능으로 두지 않는다).
+  - 어느 판정에서 왔는지 "판정 출처"와 "2차 검토" 열(확인 / 뒤집힘 / 대상 아님)에 남긴다.
 
 완료 기준(검사 실패 시 종료 코드 1):
   1. 404 개념 전부(그래프 2,683개)가 표에 정확히 한 번씩 있다.
@@ -35,6 +38,7 @@ GRAPH = ROOT / "data" / "corpus" / "atom_graph_v1" / "graph.json"
 T1_JSON = ROOT / "ped17" / "산출물" / "T1" / "study_404_count.json"
 A2_DIR = ROOT / "ped17" / "산출물" / "A2"
 RAW_DIR = A2_DIR / "분류_원자료"
+RAW2_DIR = A2_DIR / "분류_2차검토"
 OUT_CSV = A2_DIR / "범위표.csv"
 OUT_MD = A2_DIR / "요약.md"
 
@@ -54,14 +58,18 @@ FIELDS = [
     "경계 사례",
     "Gate A 학습목표 첫 개념",
     "판정 출처",
+    "2차 검토",
 ]
+SECOND_CONFIRMED = "확인"
+SECOND_FLIPPED = "뒤집힘"
+SECOND_NA = "대상 아님"
 
 
-def _load_raw() -> tuple[dict[str, dict], Counter]:
+def _load_raw(directory: Path = RAW_DIR) -> tuple[dict[str, dict], Counter]:
     """원자료 JSONL → code별 판정(뒤 파일이 이김). 형식 오류는 즉시 예외."""
     judged: dict[str, dict] = {}
     per_file: Counter = Counter()
-    for path in sorted(RAW_DIR.glob("*.jsonl")):
+    for path in sorted(directory.glob("*.jsonl")):
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if not line.strip():
                 continue
@@ -104,6 +112,7 @@ def _build_rows() -> list[dict]:
     graph = json.loads(GRAPH.read_text(encoding="utf-8"))
     nodes = graph["concepts"]
     judged, _ = _load_raw()
+    second, _ = _load_raw(RAW2_DIR) if RAW2_DIR.exists() else ({}, Counter())
     t1 = json.loads(T1_JSON.read_text(encoding="utf-8"))
     study_first = {x["concept"] for x in t1["범위1_학습목표"]["상세"]}
 
@@ -118,26 +127,41 @@ def _build_rows() -> list[dict]:
         if n["level"] != "세부개념":
             continue
         rec = judged.get(n["code"])
+        review = SECOND_NA
         if rec is None:
             cls, reason, method, border, src = UNKNOWN, "판정 원자료에 없음", "해당 없음", "", ""
         else:
             cls = RAW_TO_CLASS[rec["cls"]]
             reason, method, border, src = rec["reason"], rec["method"], rec["border"], rec["_source"]
+            if cls == POSSIBLE:
+                rec2 = second.get(n["code"])
+                if rec2 is None:
+                    # 2차 기록이 없는 가능은 확정하지 않는다 — 미확인으로 두고 검사에서 실패시킨다
+                    cls, reason, method, review = UNKNOWN, "1차 가능이나 2차 검토 기록 없음", "해당 없음", ""
+                elif rec2["cls"] == "불가":
+                    cls, method, border, review = IMPOSSIBLE, "해당 없음", True, SECOND_FLIPPED
+                    reason = "2차 검토에서 뒤집음: " + rec2["reason"]
+                    src = f"{src}→{rec2['_source']}"
+                else:
+                    review = SECOND_CONFIRMED
+                    src = f"{src}+{rec2['_source']}"
         leaf_class[n["code"]] = cls
-        rows.append(_row(n, cls, reason, method, "Y" if border else "", src, study_first))
+        rows.append(_row(n, cls, reason, method, "Y" if border else "", src, study_first, review))
 
     # 묶음 노드 — 세부개념 판정이 다 나온 뒤에 모은다
     for n in nodes:
         if n["level"] == "세부개념":
             continue
         cls, reason, method = _rollup(n, kids, leaf_class)
-        rows.append(_row(n, cls, reason, method, "", "묶음 규칙", study_first))
+        rows.append(_row(n, cls, reason, method, "", "묶음 규칙", study_first, SECOND_NA))
 
     rows.sort(key=lambda r: (LEVEL_ORDER[r["학교급"]], r["_area"], r["개념 ID"]))
     return rows
 
 
-def _row(n: dict, cls: str, reason: str, method: str, border: str, src: str, study_first: set) -> dict:
+def _row(
+    n: dict, cls: str, reason: str, method: str, border: str, src: str, study_first: set, review: str
+) -> dict:
     return {
         "개념 ID": n["code"],
         "이름": n["name"],
@@ -149,6 +173,7 @@ def _row(n: dict, cls: str, reason: str, method: str, border: str, src: str, stu
         "경계 사례": border,
         "Gate A 학습목표 첫 개념": "Y" if n["code"] in study_first else "",
         "판정 출처": src,
+        "2차 검토": review,
         "_area": n.get("subject_area") or "",
     }
 
@@ -187,6 +212,14 @@ def _validate(rows: list[dict]) -> list[str]:
     bad = [r["개념 ID"] for r in rows if r["분류"] not in (POSSIBLE, IMPOSSIBLE, UNKNOWN)]
     if bad:
         errors.append(f"분류 값 오류 {len(bad)}건: {bad[:5]}")
+    unreviewed = [r["개념 ID"] for r in rows if r["분류"] == UNKNOWN and r["노드 단계"] == "세부개념"]
+    if unreviewed:
+        errors.append(f"세부개념 중 미확인 {len(unreviewed)}건(판정 또는 2차 검토 누락): {unreviewed[:5]}")
+    ok_without_review = [
+        r["개념 ID"] for r in rows if r["노드 단계"] == "세부개념" and r["분류"] == POSSIBLE and r["2차 검토"] != SECOND_CONFIRMED
+    ]
+    if ok_without_review:
+        errors.append(f"2차 확인 없이 가능으로 남은 세부개념 {len(ok_without_review)}건: {ok_without_review[:5]}")
     no_method = [r["개념 ID"] for r in rows if r["분류"] == POSSIBLE and r["검산 방법"] == "해당 없음"]
     if no_method:
         errors.append(f"검산 가능인데 검산 방법이 '해당 없음' {len(no_method)}건: {no_method[:5]}")
@@ -219,6 +252,11 @@ def main() -> int:
         lines.append(_summary_line(f"   · 세부개념 {level}", [r for r in leaf if r["학교급"] == level]))
     border_n = sum(1 for r in leaf if r["경계 사례"] == "Y")
     lines.append(f"   · 세부개념 중 경계 사례(애매해서 불가로 둠): {border_n:,}개")
+    flipped = sum(1 for r in leaf if r["2차 검토"] == SECOND_FLIPPED)
+    confirmed = sum(1 for r in leaf if r["2차 검토"] == SECOND_CONFIRMED)
+    lines.append(
+        f"   · 2차 검토 대상(1차 가능) {flipped + confirmed:,}개 중 확인 {confirmed:,}개, 불가로 뒤집음 {flipped:,}개"
+    )
 
     print("\n".join(lines))
     OUT_MD.write_text(

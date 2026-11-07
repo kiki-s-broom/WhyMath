@@ -1,0 +1,152 @@
+{"code": "6수03-13-3", "cls": "불가", "reason": "넓이 식과 모눈 그림을 오가며 설명하는 표상 활동", "method": "해당 없음", "border": false}
+{"code": "6수03-14-1", "cls": "불가", "reason": "삼각형 넓이 공식이 나온 까닭을 말로 설명", "method": "해당 없음", "border": false}
+{"code": "6수03-14-2", "cls": "가능", "reason": "밑변 8, 높이 5 삼각형 넓이가 20으로 정해짐", "method": "sympy.Rational 연산 (밑변*높이/2)", "border": false}
+{"code": "6수03-14-3", "cls": "불가", "reason": "도형을 붙여 공식 까닭과 높이 위치를 설명", "method": "해당 없음", "border": false}
+{"code": "6수03-15-1", "cls": "불가", "reason": "원주율이 근삿값인 이유를 이해하는 개념 문항", "method": "해당 없음", "border": false}
+{"code": "6수03-15-2", "cls": "불가", "reason": "측정값 기반 식과 순서 서술, 근삿값 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "6수03-15-3", "cls": "불가", "reason": "측정표를 읽고 일정함을 말로 서술", "method": "해당 없음", "border": false}
+{"code": "6수03-16-1", "cls": "불가", "reason": "원주와 넓이 공식의 구별을 묻는 용어 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-16-2", "cls": "가능", "reason": "반지름 5, 원주율 3.14로 원 넓이 78.5 계산", "method": "sympy.Rational 연산 (5**2*3.14)", "border": false}
+{"code": "6수03-16-3", "cls": "불가", "reason": "원을 잘라 붙인 그림으로 공식을 설명", "method": "해당 없음", "border": false}
+{"code": "6수03-17-1", "cls": "불가", "reason": "겉넓이의 뜻과 단위를 말하는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "6수03-17-2", "cls": "가능", "reason": "한 모서리 3인 정육면체 겉넓이 54 계산", "method": "정수 연산 (6*3**2)", "border": false}
+{"code": "6수03-17-3", "cls": "불가", "reason": "전개도의 합동 면을 짝지어 설명하는 표상", "method": "해당 없음", "border": true}
+{"code": "6수03-18-1", "cls": "가능", "reason": "1㎥를 ㎤로 환산하는 고정 비율 곱셈", "method": "단위 환산표(고정 비율) 곱셈 규칙 (100**3)", "border": false}
+{"code": "6수03-18-2", "cls": "가능", "reason": "2㎥를 ㎤로 바꾸면 2000000으로 정해짐", "method": "단위 환산표(고정 비율) 곱셈 규칙 (2*100**3)", "border": false}
+{"code": "6수03-18-3", "cls": "불가", "reason": "쌓기 그림을 떠올려 단위 관계를 설명", "method": "해당 없음", "border": true}
+{"code": "6수03-19-1", "cls": "불가", "reason": "부피 원리 이해가 핵심이고 계산은 부수적", "method": "해당 없음", "border": true}
+{"code": "6수03-19-2", "cls": "가능", "reason": "5×4×3 직육면체 부피 60 계산", "method": "정수 연산 (5*4*3)", "border": false}
+{"code": "6수03-19-3", "cls": "불가", "reason": "쌓기 그림과 식을 짝지어 설명하는 표상", "method": "해당 없음", "border": true}
+{"code": "2수02-01-1", "cls": "불가", "reason": "모양 반복 규칙을 그림으로 찾는 문항", "method": "해당 없음", "border": false}
+{"code": "2수02-01-2", "cls": "불가", "reason": "모양을 그리는 활동이 포함된 규칙 잇기", "method": "해당 없음", "border": true}
+{"code": "2수02-01-3", "cls": "불가", "reason": "그림 수 말을 오가며 규칙을 서술", "method": "해당 없음", "border": false}
+{"code": "2수02-02-1", "cls": "불가", "reason": "색 구슬을 규칙대로 배열하는 열린 활동", "method": "해당 없음", "border": false}
+{"code": "2수02-02-2", "cls": "불가", "reason": "규칙이 일관된 약속임을 이유와 함께 서술", "method": "해당 없음", "border": false}
+{"code": "2수02-02-3", "cls": "불가", "reason": "내가 정한 규칙을 기호 그림으로 배열", "method": "해당 없음", "border": false}
+{"code": "4수02-01-1", "cls": "불가", "reason": "수열 규칙을 말로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "4수02-01-2", "cls": "불가", "reason": "규칙을 □ 식으로 표현, 식 형태가 다양해 애매", "method": "해당 없음", "border": true}
+{"code": "4수02-01-3", "cls": "불가", "reason": "규칙 찾는 과정 서술이 핵심, 다음 수는 부수", "method": "해당 없음", "border": true}
+{"code": "4수02-02-1", "cls": "불가", "reason": "식 배열의 규칙을 추측하는 패턴 문항", "method": "해당 없음", "border": true}
+{"code": "4수02-02-2", "cls": "불가", "reason": "배열식 규칙을 말로 설명하고 추측하는 문항", "method": "해당 없음", "border": true}
+{"code": "4수02-02-3", "cls": "불가", "reason": "식 배열을 말로 옮기는 서술 활동", "method": "해당 없음", "border": false}
+{"code": "4수02-03-1", "cls": "가능", "reason": "7+5=□+9 에서 □=3 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "4수02-03-2", "cls": "가능", "reason": "7+5=□+4 에서 □=8 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "4수02-03-3", "cls": "불가", "reason": "양팔저울 그림과 등식을 오가는 표상", "method": "해당 없음", "border": false}
+{"code": "6수02-01-1", "cls": "불가", "reason": "상황에서 대응 규칙을 찾아 설명하는 문항", "method": "해당 없음", "border": true}
+{"code": "6수02-01-2", "cls": "불가", "reason": "문장 상황을 기호 식으로 옮기는 모델링", "method": "해당 없음", "border": true}
+{"code": "6수02-01-3", "cls": "가능", "reason": "표의 모든 쌍에 맞는 식이 △=□×4로 정해짐", "method": "sympy.Eq + simplify로 동치 확인, 표 값 대입 검산", "border": false}
+{"code": "6수02-02-1", "cls": "불가", "reason": "비의 순서와 표기를 묻는 개념 문항", "method": "해당 없음", "border": true}
+{"code": "6수02-02-2", "cls": "불가", "reason": "상황을 해석해 비로 쓰는 표기 문항", "method": "해당 없음", "border": true}
+{"code": "6수02-02-3", "cls": "불가", "reason": "그림 개수를 비와 말로 옮기는 표상", "method": "해당 없음", "border": false}
+{"code": "6수02-03-1", "cls": "불가", "reason": "비와 비율의 의미 구분이 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "6수02-03-2", "cls": "가능", "reason": "3/4을 소수 0.75, 백분율 75%로 변환", "method": "sympy.Rational 연산", "border": false}
+{"code": "6수02-03-3", "cls": "가능", "reason": "5/20 약분 결과 1/4로 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "6수02-04-1", "cls": "가능", "reason": "2:3=4:□ 에서 □=6 비례식 풀이", "method": "sympy.solve (Eq(2*x, 3*4))", "border": false}
+{"code": "6수02-04-2", "cls": "가능", "reason": "5:2=□:8 에서 □=20 비례식 풀이", "method": "sympy.solve (Eq(2*x, 5*8))", "border": false}
+{"code": "6수02-04-3", "cls": "불가", "reason": "문장 상황을 비례식으로 세우는 모델링", "method": "해당 없음", "border": true}
+{"code": "6수02-05-1", "cls": "불가", "reason": "비례배분 원리 이해가 핵심인 개념 문항", "method": "해당 없음", "border": true}
+{"code": "6수02-05-2", "cls": "가능", "reason": "15를 2:3으로 나누면 6과 9로 정해짐", "method": "sympy.Rational 연산 (전체*비/비의 합)", "border": false}
+{"code": "6수02-05-3", "cls": "불가", "reason": "칸으로 나눈 그림으로 비례배분을 표현", "method": "해당 없음", "border": false}
+{"code": "2수01-01-1", "cls": "불가", "reason": "그림 속 별을 눈으로 세는 활동", "method": "해당 없음", "border": false}
+{"code": "2수01-01-2", "cls": "불가", "reason": "기수 원리 이해를 묻는 개념 문항", "method": "해당 없음", "border": false}
+{"code": "2수01-01-3", "cls": "가능", "reason": "29 다음 세 수가 30, 31, 32로 정해짐", "method": "파이썬 range 연산 (정수 연산)", "border": false}
+{"code": "2수01-01-4", "cls": "불가", "reason": "한글 수말 읽기와 숫자 쓰기 표기 변환", "method": "해당 없음", "border": true}
+{"code": "2수01-02-1", "cls": "가능", "reason": "23을 10씩 묶으면 2묶음 3낱개로 정해짐", "method": "파이썬 divmod(23, 10)", "border": false}
+{"code": "2수01-02-2", "cls": "가능", "reason": "234에서 십의 자리 3의 값 30 계산", "method": "정수 연산 (자릿수*10**자리)", "border": false}
+{"code": "2수01-02-3", "cls": "불가", "reason": "자리지기 0의 의미를 이해하는 개념 문항", "method": "해당 없음", "border": false}
+{"code": "2수01-02-4", "cls": "불가", "reason": "한글 수말과 숫자를 오가는 읽기 표기", "method": "해당 없음", "border": true}
+{"code": "2수01-02-5", "cls": "불가", "reason": "수를 소리 내어 읽는 한글 표기 문항", "method": "해당 없음", "border": true}
+{"code": "2수01-02-6", "cls": "가능", "reason": "2406 자릿값 펼치기와 4000+50+7=4057 합치기", "method": "정수 연산 (자릿값 분해 후 합 비교)", "border": false}
+{"code": "2수01-03-1", "cls": "가능", "reason": "10씩 뛰어 세기 60, 70 등차 계산", "method": "파이썬 range / 정수 연산", "border": false}
+{"code": "2수01-03-2", "cls": "불가", "reason": "높은 자리부터 비교하는 원리와 까닭 설명", "method": "해당 없음", "border": false}
+{"code": "2수01-03-3", "cls": "가능", "reason": "324와 318 크기 비교 결과가 > 로 정해짐", "method": "정수 비교 (sympy.Rational 대소 비교)", "border": false}
+{"code": "2수01-03-4", "cls": "불가", "reason": "수직선 위치로 비교하는 표상 문항", "method": "해당 없음", "border": true}
+{"code": "2수01-04-1", "cls": "가능", "reason": "7을 3과 □로 가르면 □=4", "method": "sympy.solve (Eq(3+x, 7))", "border": false}
+{"code": "2수01-04-2", "cls": "가능", "reason": "8에 더해 10이 되는 수 2 계산", "method": "정수 연산 (10-8)", "border": false}
+{"code": "2수01-04-3", "cls": "불가", "reason": "구슬 그림과 가르기 모으기 표현을 연결", "method": "해당 없음", "border": false}
+{"code": "2수01-05-1", "cls": "불가", "reason": "덧셈이 쓰이는 상황을 분류하는 개념", "method": "해당 없음", "border": false}
+{"code": "2수01-05-2", "cls": "불가", "reason": "상황을 식으로, 식을 이야기로 바꾸는 활동", "method": "해당 없음", "border": false}
+{"code": "2수01-05-3", "cls": "불가", "reason": "뺄셈이 쓰이는 상황을 분류하는 개념", "method": "해당 없음", "border": false}
+{"code": "2수01-05-4", "cls": "불가", "reason": "상황을 식으로, 식을 이야기로 바꾸는 활동", "method": "해당 없음", "border": false}
+{"code": "2수01-05-5", "cls": "가능", "reason": "5+3=8, 8-3=5 한 자리 덧뺄셈 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-06-1", "cls": "가능", "reason": "23+45=68 받아올림 없는 덧셈 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-06-2", "cls": "불가", "reason": "받아올림이 왜 필요한지 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "2수01-06-3", "cls": "가능", "reason": "27+15=42 받아올림 덧셈 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-06-4", "cls": "가능", "reason": "57-24=33 받아내림 없는 뺄셈 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-06-5", "cls": "불가", "reason": "받아내림이 왜 필요한지 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "2수01-06-6", "cls": "가능", "reason": "52-27=25 받아내림 뺄셈 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-06-7", "cls": "불가", "reason": "수모형 그림과 세로셈으로 표시하는 표상", "method": "해당 없음", "border": false}
+{"code": "2수01-07-1", "cls": "가능", "reason": "8+5=13 이용해 13-5=8 역연산 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-07-2", "cls": "불가", "reason": "식 두 개를 만드는 서술형, 답 형태가 다양", "method": "해당 없음", "border": true}
+{"code": "2수01-07-3", "cls": "불가", "reason": "부분 전체 띠 그림을 보고 식을 쓰는 표상", "method": "해당 없음", "border": false}
+{"code": "2수01-08-1", "cls": "가능", "reason": "7+3+6=16 세 수 덧셈 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-08-2", "cls": "가능", "reason": "10-4+3=9 앞에서부터 계산한 값", "method": "정수 연산 (sympy 식 평가)", "border": false}
+{"code": "2수01-08-3", "cls": "불가", "reason": "덧셈 교환 가능과 뺄셈 불가를 구분하는 개념", "method": "해당 없음", "border": true}
+{"code": "2수01-08-4", "cls": "불가", "reason": "수직선 점프로 계산을 표현하는 표상", "method": "해당 없음", "border": true}
+{"code": "2수01-09-1", "cls": "불가", "reason": "문장 상황을 □ 식으로 세우는 모델링", "method": "해당 없음", "border": true}
+{"code": "2수01-09-2", "cls": "가능", "reason": "□+5=12 에서 □=7 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "2수01-09-3", "cls": "가능", "reason": "12-□=5 에서 □=7 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "2수01-09-4", "cls": "불가", "reason": "□가 모르는 수임을 설명하는 개념 문항", "method": "해당 없음", "border": true}
+{"code": "2수01-10-1", "cls": "불가", "reason": "곱셈으로 나타낼 상황을 고르는 개념", "method": "해당 없음", "border": false}
+{"code": "2수01-10-2", "cls": "불가", "reason": "반복덧셈과 곱셈식을 바꿔 쓰는 표기 변환", "method": "해당 없음", "border": true}
+{"code": "2수01-10-3", "cls": "불가", "reason": "몇 배의 의미를 고르는 개념 문항", "method": "해당 없음", "border": false}
+{"code": "2수01-10-4", "cls": "불가", "reason": "배 표현을 곱셈식으로 옮기는 표기 중심", "method": "해당 없음", "border": true}
+{"code": "2수01-10-5", "cls": "가능", "reason": "3개씩 4봉지는 3×4=12개로 정해짐", "method": "정수 연산 (3*4)", "border": false}
+{"code": "2수01-11-1", "cls": "불가", "reason": "곱셈구구 한 단의 규칙을 이해하는 개념", "method": "해당 없음", "border": true}
+{"code": "2수01-11-2", "cls": "가능", "reason": "7×8=56 곱셈구구 계산", "method": "정수 연산", "border": false}
+{"code": "2수01-11-3", "cls": "가능", "reason": "6×1=6, 6×0=0, 3×4=4×3 참 판정", "method": "정수 연산 + sympy.Eq 동치 확인", "border": false}
+{"code": "2수01-11-4", "cls": "불가", "reason": "배열과 수직선 뛰어세기로 곱셈을 표현", "method": "해당 없음", "border": true}
+{"code": "4수01-01-1", "cls": "가능", "reason": "35000에서 숫자 3의 자릿값 30000 계산", "method": "정수 연산 (자릿수*10**자리)", "border": false}
+{"code": "4수01-01-2", "cls": "불가", "reason": "큰 수를 한글로 읽고 쓰는 표기 변환", "method": "해당 없음", "border": true}
+{"code": "4수01-01-3", "cls": "불가", "reason": "한글 수말을 숫자로 쓰는 표기 변환", "method": "해당 없음", "border": true}
+{"code": "4수01-02-1", "cls": "가능", "reason": "1029999와 1030000 중 큰 수 판정", "method": "정수 비교 (max)", "border": false}
+{"code": "4수01-02-2", "cls": "불가", "reason": "앞자리부터 비교하는 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-02-3", "cls": "불가", "reason": "수직선에 점을 찍는 표상 활동", "method": "해당 없음", "border": false}
+{"code": "4수01-03-1", "cls": "가능", "reason": "487+256=743 연속 받아올림 덧셈", "method": "정수 연산", "border": false}
+{"code": "4수01-03-2", "cls": "가능", "reason": "305-167=138 연쇄 받아내림 뺄셈", "method": "정수 연산", "border": false}
+{"code": "4수01-03-3", "cls": "불가", "reason": "받아올림 1의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-03-4", "cls": "불가", "reason": "동전 그림으로 받아내림을 표현하는 표상", "method": "해당 없음", "border": false}
+{"code": "4수01-04-1", "cls": "가능", "reason": "23×4를 80과 12로 나눠 합 92 계산", "method": "정수 연산 (20*4, 3*4, 합)", "border": false}
+{"code": "4수01-04-2", "cls": "가능", "reason": "248×3=744 곱셈 계산", "method": "정수 연산", "border": false}
+{"code": "4수01-04-3", "cls": "가능", "reason": "34×26=884 두 자리 곱셈 계산", "method": "정수 연산", "border": false}
+{"code": "4수01-04-4", "cls": "불가", "reason": "넓이 모눈 그림의 칸과 부분곱을 대응", "method": "해당 없음", "border": true}
+{"code": "4수01-05-1", "cls": "불가", "reason": "등분 포함 두 상황을 나눗셈으로 인식하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-05-2", "cls": "가능", "reason": "3×4=12 이용해 12÷3=4, 12÷4=3 계산", "method": "정수 연산", "border": false}
+{"code": "4수01-05-3", "cls": "가능", "reason": "35÷7=5 몫이 하나로 정해짐", "method": "sympy.solve (Eq(7*x, 35))", "border": false}
+{"code": "4수01-05-4", "cls": "불가", "reason": "묶음을 그림으로 그려 나눗셈식과 연결", "method": "해당 없음", "border": false}
+{"code": "4수01-06-1", "cls": "가능", "reason": "84÷3=28 나눗셈 계산", "method": "정수 연산", "border": false}
+{"code": "4수01-06-2", "cls": "불가", "reason": "나머지가 나누는 수보다 작은 까닭을 설명", "method": "해당 없음", "border": true}
+{"code": "4수01-06-3", "cls": "불가", "reason": "묶는 그림으로 나머지를 표현하는 표상", "method": "해당 없음", "border": false}
+{"code": "4수01-07-1", "cls": "가능", "reason": "156÷12=13 나눗셈 계산", "method": "정수 연산", "border": false}
+{"code": "4수01-07-2", "cls": "불가", "reason": "몫을 어림하는 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-07-3", "cls": "가능", "reason": "22×4+7=95 이고 7<22 인지 참거짓 판정", "method": "파이썬 divmod(95, 22) 비교", "border": false}
+{"code": "4수01-08-1", "cls": "불가", "reason": "어림 자리 기준에 따라 답이 달라지는 어림셈", "method": "해당 없음", "border": true}
+{"code": "4수01-08-2", "cls": "불가", "reason": "어림이 왜 편리한지 서술하는 문항", "method": "해당 없음", "border": false}
+{"code": "4수01-08-3", "cls": "불가", "reason": "수직선에 표시해 가까운 몇십을 찾는 표상", "method": "해당 없음", "border": true}
+{"code": "4수01-09-1", "cls": "불가", "reason": "똑같이 나눈 그림이 분수인지 고르는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-09-2", "cls": "불가", "reason": "분수 표기와 한글 읽기를 묻는 표상", "method": "해당 없음", "border": true}
+{"code": "4수01-09-3", "cls": "불가", "reason": "원을 나눠 색칠하는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "4수01-10-1", "cls": "불가", "reason": "진분수 가분수 대분수 용어 분류 문항", "method": "해당 없음", "border": true}
+{"code": "4수01-10-2", "cls": "불가", "reason": "띠 그림을 가분수 대분수로 표기하는 표상", "method": "해당 없음", "border": false}
+{"code": "4수01-10-3", "cls": "가능", "reason": "2와 1/3을 가분수 7/3으로 변환", "method": "sympy.Rational 연산 (2+Rational(1,3))", "border": false}
+{"code": "4수01-11-1", "cls": "가능", "reason": "3/7과 5/7 중 큰 분수 5/7 판정", "method": "sympy.Rational 대소 비교", "border": false}
+{"code": "4수01-11-2", "cls": "불가", "reason": "단위분수 크기와 그 까닭을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "4수01-11-3", "cls": "불가", "reason": "분수 띠 그림에 표시해 비교하는 표상", "method": "해당 없음", "border": false}
+{"code": "4수01-12-1", "cls": "불가", "reason": "0.1의 의미를 묻는 정의 중심 문항", "method": "해당 없음", "border": true}
+{"code": "4수01-12-2", "cls": "불가", "reason": "소수 읽기가 포함된 표기 변환 문항", "method": "해당 없음", "border": true}
+{"code": "4수01-12-3", "cls": "가능", "reason": "7/10=0.7, 0.4=4/10 분수 소수 변환", "method": "sympy.Rational 연산", "border": false}
+{"code": "4수01-13-1", "cls": "가능", "reason": "0.25에서 숫자 5의 값 0.05 계산", "method": "sympy.Rational 연산 (자릿수/10**자리)", "border": false}
+{"code": "4수01-13-2", "cls": "불가", "reason": "소수를 한글로 읽고 쓰는 표기 변환", "method": "해당 없음", "border": true}
+{"code": "4수01-13-3", "cls": "가능", "reason": "0.327을 자릿값별로 분해한 합이 정해짐", "method": "sympy.Rational 연산 (분해 합 동치 확인)", "border": false}
+{"code": "4수01-14-1", "cls": "불가", "reason": "자릿수가 아닌 자릿값 비교 원리와 까닭 설명", "method": "해당 없음", "border": true}
+{"code": "4수01-14-2", "cls": "가능", "reason": "0.7, 0.68, 0.702 내림차순 정렬", "method": "sympy.Rational 정렬 (sorted)", "border": false}
+{"code": "4수01-14-3", "cls": "불가", "reason": "100칸 모눈에 색칠해 크기를 비교하는 표상", "method": "해당 없음", "border": false}
+{"code": "4수01-15-1", "cls": "불가", "reason": "분모를 그대로 두는 까닭을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-15-2", "cls": "가능", "reason": "5/8+6/8=11/8=1과 3/8 계산", "method": "sympy.Rational 연산", "border": false}
+{"code": "4수01-15-3", "cls": "불가", "reason": "띠에 색칠해 분수 합을 나타내는 표상", "method": "해당 없음", "border": false}
+{"code": "4수01-16-1", "cls": "불가", "reason": "소수점을 맞춰야 하는 까닭을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "4수01-16-2", "cls": "가능", "reason": "3.4-1.65=1.75 소수 뺄셈 계산", "method": "sympy.Rational 연산", "border": false}
+{"code": "4수01-16-3", "cls": "불가", "reason": "모눈 색칠로 소수 덧셈을 표현하는 표상", "method": "해당 없음", "border": true}
+{"code": "6수01-01-1", "cls": "불가", "reason": "혼합 계산 순서의 까닭을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "6수01-01-2", "cls": "가능", "reason": "12-(3+2)×2=2 사칙 혼합 계산", "method": "sympy.sympify 식 평가", "border": false}
+{"code": "6수01-01-3", "cls": "불가", "reason": "괄호와 순서 번호를 표시하는 활동이 핵심", "method": "해당 없음", "border": true}

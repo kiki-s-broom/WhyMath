@@ -1,0 +1,152 @@
+{"code": "10기수1-02-07-2", "cls": "불가", "reason": "교집합이 왜 해인지 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-07-3", "cls": "불가", "reason": "수직선에 그려 겹치는 구간을 읽는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-08-1", "cls": "가능", "reason": "|x|≤2 같은 절댓값 부등식의 해 구간이 하나로 정해짐", "method": "sympy.solve_univariate_inequality / sympy.solveset", "border": false}
+{"code": "10기수1-02-08-2", "cls": "불가", "reason": "절댓값=거리라는 의미 해석이 핵심이라 서술 성격이 큼", "method": "해당 없음", "border": true}
+{"code": "10기수1-02-08-3", "cls": "불가", "reason": "해를 수직선에 나타내고 칠하는 위치를 설명하는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-09-1", "cls": "가능", "reason": "x²−4<0 이차부등식의 해 구간이 하나로 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "10기수1-02-09-2", "cls": "불가", "reason": "곱이 음수가 되는 이유를 말로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수1-02-09-3", "cls": "불가", "reason": "그래프에서 x축 아래 구간을 눈으로 읽는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수1-03-01-1", "cls": "불가", "reason": "합·곱 법칙 중 무엇을 쓸지 구분하는 개념 설명이 핵심", "method": "해당 없음", "border": true}
+{"code": "10기수1-03-01-2", "cls": "불가", "reason": "상황에서 더할지 곱할지 모델링을 고르는 문제", "method": "해당 없음", "border": true}
+{"code": "10기수1-03-01-3", "cls": "불가", "reason": "수형도를 그려 경우를 세는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "10기수1-03-02-2", "cls": "가능", "reason": "3명 일렬 배열 수 3×2×1=6이 정수로 정해짐", "method": "sympy.factorial / 정수 곱셈", "border": false}
+{"code": "10기수1-03-02-3", "cls": "불가", "reason": "AB와 BA가 다른 이유를 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수1-03-03-2", "cls": "가능", "reason": "4명 중 2명 뽑는 조합 수 6이 정수로 정해짐", "method": "sympy.binomial(4,2)", "border": false}
+{"code": "10기수1-03-03-3", "cls": "불가", "reason": "묶음을 나열하고 순서 무관의 이유를 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수1-04-01-2", "cls": "가능", "reason": "행렬의 2행 1열 성분 값이 하나로 정해짐", "method": "sympy.Matrix 인덱싱 M[1,0]", "border": false}
+{"code": "10기수1-04-01-3", "cls": "불가", "reason": "표를 행렬로 옮기고 성분의 뜻을 해석하는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수1-04-02-2", "cls": "불가", "reason": "행렬 덧셈 규칙의 이유를 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수1-04-02-3", "cls": "불가", "reason": "문장을 행렬로 옮기는 모델링과 뜻 설명이 섞임", "method": "해당 없음", "border": true}
+{"code": "10기수2-01-01-1", "cls": "가능", "reason": "두 점 사이 거리 5가 하나의 수로 정해짐", "method": "sympy.Point.distance / sympy.sqrt", "border": false}
+{"code": "10기수2-01-01-2", "cls": "불가", "reason": "거리 공식이 빗변이 되는 까닭을 말로 설명", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-01-3", "cls": "불가", "reason": "점을 찍고 가로·세로 칸을 그림에 표시하는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-02-1", "cls": "불가", "reason": "수직선의 방정식 꼴(x=a)을 말하는 형태 서술", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-02-2", "cls": "가능", "reason": "기울기와 한 점으로 직선 y=2x+1이 정해짐", "method": "sympy.Eq + simplify로 동치 확인 / sympy.solve", "border": false}
+{"code": "10기수2-01-02-3", "cls": "불가", "reason": "점을 찍어 그래프를 그리고 그림에서 가리키는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-03-1", "cls": "불가", "reason": "평행·수직 조건 구분과 기울기 없는 직선 설명이 섞임", "method": "해당 없음", "border": true}
+{"code": "10기수2-01-03-2", "cls": "가능", "reason": "평행·수직인 직선의 방정식이 식으로 정해짐", "method": "sympy.Eq + simplify로 동치 확인 / sympy.Rational", "border": false}
+{"code": "10기수2-01-03-3", "cls": "불가", "reason": "그래프에서 기울기를 눈으로 읽는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-04-2", "cls": "가능", "reason": "중심과 반지름으로 원의 방정식이 하나로 정해짐", "method": "sympy.expand + sympy.Eq로 동치 확인", "border": false}
+{"code": "10기수2-01-04-3", "cls": "불가", "reason": "원을 그리고 그림에서 읽어 식과 잇는 표상 활동", "method": "해당 없음", "border": true}
+{"code": "10기수2-01-05-2", "cls": "불가", "reason": "거리 d와 r 비교로 교점 수가 정해지는 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-05-3", "cls": "불가", "reason": "그래프를 보고 위치 관계를 부등호로 옮기는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-06-1", "cls": "가능", "reason": "점과 직선의 평행이동 결과가 좌표·식으로 정해짐", "method": "sympy.subs(x, x-3) + simplify로 동치 확인", "border": false}
+{"code": "10기수2-01-06-3", "cls": "불가", "reason": "그림의 이동을 읽어 식으로 옮기는 그래프 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-07-1", "cls": "가능", "reason": "점의 대칭이동 좌표가 규칙대로 하나로 정해짐", "method": "sympy.Point.reflect / 좌표 부호 변환 규칙", "border": false}
+{"code": "10기수2-01-07-2", "cls": "불가", "reason": "거울에 빗대어 대칭이동을 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수2-01-07-3", "cls": "불가", "reason": "점을 찍고 그림에서 좌표를 읽는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-01-1", "cls": "불가", "reason": "집합의 정의(기준 명확성)를 묻는 개념 판단", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-01-3", "cls": "불가", "reason": "집합을 세 가지 표현과 벤 그림으로 나타내는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-02-1", "cls": "가능", "reason": "유한 집합의 부분집합 목록이 하나로 정해짐", "method": "sympy.FiniteSet.powerset()", "border": false}
+{"code": "10기수2-02-02-2", "cls": "가능", "reason": "유한 집합 A⊂B 참거짓이 정해짐", "method": "sympy.FiniteSet.is_subset", "border": false}
+{"code": "10기수2-02-02-3", "cls": "불가", "reason": "벤다이어그램을 그리는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-03-1", "cls": "불가", "reason": "A∩B 기호의 뜻을 말하는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-03-2", "cls": "불가", "reason": "교집합·합집합의 뜻을 말로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-03-3", "cls": "불가", "reason": "벤 그림에서 영역을 색칠하는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-04-1", "cls": "불가", "reason": "명제의 정의(참거짓 분명)로 판단하는 용어 문항", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-04-2", "cls": "불가", "reason": "자연어 문장이 명제인지 가려내는 해석 문항", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-04-3", "cls": "가능", "reason": "유한 전체집합에서 조건의 진리집합이 정해짐", "method": "sympy.FiniteSet 필터 / 파이썬 집합 내포", "border": false}
+{"code": "10기수2-02-05-1", "cls": "불가", "reason": "자연어 명제의 역·대우 참거짓과 이유 설명", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-05-2", "cls": "불가", "reason": "자연어 명제의 역·대우 문장을 만드는 서술", "method": "해당 없음", "border": false}
+{"code": "10기수2-02-05-3", "cls": "불가", "reason": "기호로 역·대우를 쓰는 표기 중심, 정답 형태가 고정되지 않음", "method": "해당 없음", "border": true}
+{"code": "10기수2-03-01-1", "cls": "불가", "reason": "함수의 정의(세로선 판정)를 묻는 개념 문항", "method": "해당 없음", "border": false}
+{"code": "10기수2-03-01-3", "cls": "불가", "reason": "대응을 표로 정리하고 점을 찍는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-03-02-1", "cls": "가능", "reason": "f(g(5))=11, g(f(5))=12로 값이 정해짐", "method": "sympy 함수 합성 subs + 값 비교", "border": false}
+{"code": "10기수2-03-02-2", "cls": "가능", "reason": "(f∘g)(3)=7이 하나의 수로 정해짐", "method": "sympy.Lambda 합성 / subs", "border": false}
+{"code": "10기수2-03-02-3", "cls": "불가", "reason": "합성 과정을 화살표 그림으로 나타내는 활동", "method": "해당 없음", "border": false}
+{"code": "10기수2-03-03-1", "cls": "불가", "reason": "역함수와 1/f의 차이를 구분하는 개념 문항", "method": "해당 없음", "border": false}
+{"code": "10기수2-03-03-2", "cls": "가능", "reason": "f(x)=2x+1의 역함수 식이 하나로 정해짐", "method": "sympy.solve로 x에 대해 풀고 Eq 동치 확인", "border": false}
+{"code": "10기수2-03-03-3", "cls": "가능", "reason": "유한 대응표의 역대응이 하나로 정해짐", "method": "파이썬 딕셔너리 키·값 뒤집기", "border": false}
+{"code": "10기수2-03-04-2", "cls": "불가", "reason": "점근선이 생기는 이유를 말로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "10기수2-03-04-3", "cls": "가능", "reason": "y=2/x의 대입 값표가 수로 정해짐", "method": "sympy.Rational 대입 / subs", "border": false}
+{"code": "10기수2-03-05-1", "cls": "가능", "reason": "y=√x의 정의역 x≥0이 부등식으로 정해짐", "method": "sympy.continuous_domain / solve_univariate_inequality", "border": false}
+{"code": "10기수2-03-05-2", "cls": "가능", "reason": "√x의 대입 값 0,1,2가 정해짐", "method": "sympy.sqrt 대입", "border": false}
+{"code": "10기수2-03-05-3", "cls": "불가", "reason": "점을 찍고 그래프 모양을 그리는 활동", "method": "해당 없음", "border": false}
+{"code": "12기하01-01-1", "cls": "불가", "reason": "포물선의 정의를 말하는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "12기하01-01-2", "cls": "가능", "reason": "초점·준선에서 포물선 방정식 y²=8x가 정해짐", "method": "sympy.solve / expand로 거리 같음 식 정리 후 Eq 동치", "border": false}
+{"code": "12기하01-01-3", "cls": "불가", "reason": "초점·준선을 좌표평면에 표시하고 설명하는 활동", "method": "해당 없음", "border": true}
+{"code": "12기하01-02-1", "cls": "불가", "reason": "타원의 정의(거리의 합)를 말하는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "12기하01-02-2", "cls": "가능", "reason": "초점·거리합에서 타원 방정식이 하나로 정해짐", "method": "sympy.Eq + simplify로 동치 확인 / sympy.solve", "border": false}
+{"code": "12기하01-02-3", "cls": "불가", "reason": "장축·단축·초점을 그림에 표시하고 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "12기하01-03-1", "cls": "불가", "reason": "쌍곡선의 정의(거리의 차)를 말하는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "12기하01-03-2", "cls": "가능", "reason": "초점·거리차에서 쌍곡선 방정식이 하나로 정해짐", "method": "sympy.Eq + simplify로 동치 확인 / sympy.solve", "border": false}
+{"code": "12기하01-03-3", "cls": "불가", "reason": "점근선·꼭짓점을 그림에 표시하고 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "12기하01-04-1", "cls": "불가", "reason": "접할 조건을 어떻게 판단하는지 방법을 묻는 서술", "method": "해당 없음", "border": true}
+{"code": "12기하01-04-2", "cls": "불가", "reason": "접함이 중근 조건임을 의미로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "12기하01-04-3", "cls": "불가", "reason": "접선 계산에 접점 그림 의미 설명이 섞인 표상 문항", "method": "해당 없음", "border": true}
+{"code": "12기하02-01-1", "cls": "불가", "reason": "공간 직선의 위치 관계(꼬인 위치) 개념 판단", "method": "해당 없음", "border": false}
+{"code": "12기하02-01-2", "cls": "불가", "reason": "위치 관계 정리를 증명하는 논증", "method": "해당 없음", "border": false}
+{"code": "12기하02-01-3", "cls": "불가", "reason": "직육면체 그림에서 꼬인 모서리를 지목하는 활동", "method": "해당 없음", "border": false}
+{"code": "12기하02-02-1", "cls": "불가", "reason": "삼수선 정리를 말하는 정리 서술", "method": "해당 없음", "border": false}
+{"code": "12기하02-02-2", "cls": "불가", "reason": "삼수선 정리를 이용한 증명 절차 서술", "method": "해당 없음", "border": false}
+{"code": "12기하02-02-3", "cls": "불가", "reason": "입체 그림에 직각 표시를 하는 활동", "method": "해당 없음", "border": false}
+{"code": "12기하02-03-1", "cls": "불가", "reason": "정사영 넓이 관계(cosθ배)를 말하는 정리 서술", "method": "해당 없음", "border": false}
+{"code": "12기하02-03-2", "cls": "가능", "reason": "정사영 넓이 8cos30°=4√3이 정확값으로 정해짐", "method": "sympy.cos + sympy.Rational/simplify", "border": false}
+{"code": "12기하02-03-3", "cls": "불가", "reason": "그림자를 그리고 cosθ배 이유를 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "12기하02-04-1", "cls": "가능", "reason": "공간 두 점 사이 거리 3이 정해짐", "method": "sympy.Point3D.distance", "border": false}
+{"code": "12기하02-04-2", "cls": "불가", "reason": "공간 거리 공식의 z항이 추가되는 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "12기하02-04-3", "cls": "가능", "reason": "공간 내분점 좌표 (3,4,5)가 정해짐", "method": "sympy.Point3D + sympy.Rational 내분 공식", "border": false}
+{"code": "12기하02-05-1", "cls": "불가", "reason": "구의 방정식 일반형을 말하는 공식 회상 문항", "method": "해당 없음", "border": true}
+{"code": "12기하02-05-2", "cls": "가능", "reason": "구의 식에서 중심·반지름이 완전제곱으로 정해짐", "method": "sympy.expand + sympy.solve / complete_square", "border": false}
+{"code": "12기하02-05-3", "cls": "불가", "reason": "중심·반지름 읽기에 단면 설명이 섞인 표상 문항", "method": "해당 없음", "border": true}
+{"code": "12기하03-01-1", "cls": "불가", "reason": "벡터는 크기·방향으로 정해진다는 정의 판단", "method": "해당 없음", "border": false}
+{"code": "12기하03-01-2", "cls": "불가", "reason": "삼각형법으로 벡터를 잇는 방법을 말로 서술", "method": "해당 없음", "border": false}
+{"code": "12기하03-01-3", "cls": "불가", "reason": "벡터 합 계산에 화살표 그림 표현이 섞인 표상 문항", "method": "해당 없음", "border": true}
+{"code": "12기하03-02-1", "cls": "불가", "reason": "점과 위치벡터 대응을 묻는 표기 이해 문항", "method": "해당 없음", "border": true}
+{"code": "12기하03-02-2", "cls": "불가", "reason": "위치벡터의 뜻을 말로 설명하는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "12기하03-02-3", "cls": "가능", "reason": "벡터 AB=OB−OA 성분 (3,4)가 정해짐", "method": "sympy.Matrix 뺄셈", "border": false}
+{"code": "12기하03-03-1", "cls": "불가", "reason": "내적이 스칼라이고 수직이면 0이라는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12기하03-03-2", "cls": "가능", "reason": "내적 (1,2)·(3,4)=11이 정해짐", "method": "sympy.Matrix.dot", "border": false}
+{"code": "12기하03-03-3", "cls": "가능", "reason": "성분 내적과 |a||b|cosθ 값 3의 일치가 계산됨", "method": "sympy.Matrix.dot + norm + simplify로 동치 확인", "border": false}
+{"code": "12기하03-04-1", "cls": "불가", "reason": "벡터 직선식 P=A+td 형태를 말하는 표기 문항", "method": "해당 없음", "border": false}
+{"code": "12기하03-04-2", "cls": "불가", "reason": "직선에 필요한 정보와 t의 의미를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12기하03-04-3", "cls": "가능", "reason": "매개변수식에서 t를 소거해 직선 방정식이 정해짐", "method": "sympy.solve로 t 소거 + Eq 동치 확인", "border": false}
+{"code": "12기하03-05-1", "cls": "불가", "reason": "법선벡터라는 용어와 내적 조건을 묻는 서술", "method": "해당 없음", "border": false}
+{"code": "12기하03-05-2", "cls": "불가", "reason": "평면식 계수가 법선벡터인 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12기하03-05-3", "cls": "불가", "reason": "법선·구 읽기에 위치 관계 설명이 섞인 표상 문항", "method": "해당 없음", "border": true}
+{"code": "12대수01-01-1", "cls": "가능", "reason": "√((−5)²)=5 값이 하나로 정해짐", "method": "sympy.sqrt / sympy.Abs 동치 확인", "border": false}
+{"code": "12대수01-01-2", "cls": "가능", "reason": "⁴√81=3, ³√(−27)=−3 실근 값이 정해짐", "method": "sympy.real_root", "border": false}
+{"code": "12대수01-01-3", "cls": "불가", "reason": "그래프 교점으로 거듭제곱근 의미를 말로 설명", "method": "해당 없음", "border": false}
+{"code": "12대수01-02-1", "cls": "불가", "reason": "a^(1/2)의 뜻을 묻는 정의 문항", "method": "해당 없음", "border": false}
+{"code": "12대수01-02-2", "cls": "가능", "reason": "8^(2/3)=4가 정확값으로 정해짐", "method": "sympy.Rational 지수 계산 / sympy.simplify", "border": false}
+{"code": "12대수01-02-3", "cls": "불가", "reason": "수표를 만들고 지수 확장 의미를 설명하는 활동", "method": "해당 없음", "border": true}
+{"code": "12대수01-03-1", "cls": "가능", "reason": "a²·a³=a⁵ 및 (a+b)² 전개 결과가 식으로 정해짐", "method": "sympy.simplify / sympy.expand", "border": false}
+{"code": "12대수01-03-2", "cls": "가능", "reason": "지수법칙으로 (a²)³×a⁴÷a³=a⁷이 정해짐", "method": "sympy.simplify / powsimp", "border": false}
+{"code": "12대수01-03-3", "cls": "불가", "reason": "지수법칙을 곱한 횟수로 말로 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12대수01-04-1", "cls": "가능", "reason": "log₂8=3 및 log(a+b)≠log a+log b가 확인됨", "method": "sympy.log / sympy.expand_log로 동치 확인", "border": false}
+{"code": "12대수01-04-2", "cls": "가능", "reason": "log₂12−log₂3=2가 정확값으로 정해짐", "method": "sympy.logcombine / sympy.simplify", "border": false}
+{"code": "12대수01-04-3", "cls": "불가", "reason": "지수식과 로그식 사이 표기 변환, 정답 형태가 고정되지 않음", "method": "해당 없음", "border": true}
+{"code": "12대수01-05-1", "cls": "가능", "reason": "log₁₀1000=3이 정확값으로 정해짐", "method": "sympy.log(1000, 10)", "border": false}
+{"code": "12대수01-05-2", "cls": "불가", "reason": "상용로그의 밑과 의미를 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "12대수01-05-3", "cls": "불가", "reason": "log 200 계산에 정수·소수 부분 의미 설명이 섞임", "method": "해당 없음", "border": true}
+{"code": "12대수01-06-1", "cls": "불가", "reason": "지수·로그함수가 역함수 관계임을 말하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12대수01-06-2", "cls": "가능", "reason": "y=2ˣ의 역함수 y=log₂x가 식으로 정해짐", "method": "sympy.solve로 역함수 구하고 Eq 동치 확인", "border": false}
+{"code": "12대수01-06-3", "cls": "불가", "reason": "대응점과 y=x 대칭을 그래프 표상으로 설명", "method": "해당 없음", "border": true}
+{"code": "12대수01-07-1", "cls": "불가", "reason": "밑에 따른 증가·감소 성질을 말하는 정성적 개념", "method": "해당 없음", "border": false}
+{"code": "12대수01-07-2", "cls": "가능", "reason": "2^x, log₂x의 점근선이 극한으로 정해짐", "method": "sympy.limit", "border": false}
+{"code": "12대수01-07-3", "cls": "가능", "reason": "평행이동 매개값과 점근선 y=3이 정해짐", "method": "sympy.limit + subs로 동치 확인", "border": false}
+{"code": "12대수01-08-1", "cls": "가능", "reason": "2^x=8의 해 x=3이 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "12대수01-08-2", "cls": "불가", "reason": "지수함수로 나타내는 이유를 말로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "12대수01-08-3", "cls": "불가", "reason": "반감기 값 계산에 그래프 설명이 섞인 해석 문항", "method": "해당 없음", "border": true}
+{"code": "12대수02-01-1", "cls": "가능", "reason": "180°=π 라디안 변환이 정확값으로 정해짐", "method": "sympy.rad / 비례 변환 sympy.pi", "border": false}
+{"code": "12대수02-01-2", "cls": "가능", "reason": "150°=5π/6, 5π/6=150° 변환이 정해짐", "method": "sympy.rad / sympy.deg", "border": false}
+{"code": "12대수02-01-3", "cls": "불가", "reason": "동경을 좌표평면에 나타내는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "12대수02-02-1", "cls": "가능", "reason": "sin x의 주기 2π, 최대 1, 최소 −1이 정해짐", "method": "sympy.periodicity / sympy.maximum, minimum", "border": false}
+{"code": "12대수02-02-2", "cls": "가능", "reason": "tan x의 점근선 위치가 방정식 해로 정해짐", "method": "sympy.solveset(cos(x), x)", "border": false}
+{"code": "12대수02-02-3", "cls": "가능", "reason": "y=2sin2x의 최대·최소·주기가 정해짐", "method": "sympy.periodicity + sympy.maximum/minimum", "border": false}
+{"code": "12대수02-03-1", "cls": "불가", "reason": "조건에 맞는 법칙을 고르는 선택 문항", "method": "해당 없음", "border": false}
+{"code": "12대수02-03-2", "cls": "가능", "reason": "코사인법칙으로 a=7이 정확값으로 정해짐", "method": "sympy.solve / sympy.sqrt, cos(pi/3)", "border": false}
+{"code": "12대수02-03-3", "cls": "불가", "reason": "삼각형을 그리고 사용할 법칙을 고르는 활동", "method": "해당 없음", "border": false}
+{"code": "12대수03-01-1", "cls": "불가", "reason": "a_n이 제n항임을 말하는 용어 문항", "method": "해당 없음", "border": false}
+{"code": "12대수03-01-2", "cls": "가능", "reason": "일반항 2n+1의 제1항 3, 제5항 11이 정해짐", "method": "sympy.Lambda / subs", "border": false}
+{"code": "12대수03-01-3", "cls": "불가", "reason": "표로 정리해 일반항을 추측하는 패턴 추론", "method": "해당 없음", "border": true}
+{"code": "12대수03-02-1", "cls": "가능", "reason": "등차수열 일반항과 제5항 11이 정해짐", "method": "sympy.simplify + 일반항 대입", "border": false}
+{"code": "12대수03-02-2", "cls": "가능", "reason": "등차수열의 합 55가 정수로 정해짐", "method": "sympy.summation / 공식 정수 연산", "border": false}
+{"code": "12대수03-02-3", "cls": "불가", "reason": "가우스 방식으로 합 공식의 근거를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12대수03-03-1", "cls": "가능", "reason": "공비 −3인 등비수열 제3항 18이 정해짐", "method": "sympy.Rational 거듭제곱 계산", "border": false}
+{"code": "12대수03-03-2", "cls": "가능", "reason": "등비수열의 합 15가 정수로 정해짐", "method": "sympy.summation / 등비합 공식", "border": false}
+{"code": "12대수03-03-3", "cls": "불가", "reason": "점을 찍어 그래프 모양을 등차와 비교하는 활동", "method": "해당 없음", "border": false}
+{"code": "12대수03-04-1", "cls": "불가", "reason": "Σ상수 계산에 곱의 분리 불가 판단이 섞인 개념 문항", "method": "해당 없음", "border": true}
+{"code": "12대수03-04-2", "cls": "가능", "reason": "Σk의 합 공식 n(n+1)/2이 식으로 정해짐", "method": "sympy.summation + simplify로 동치 확인", "border": false}
+{"code": "12대수03-04-3", "cls": "가능", "reason": "Σ(2k+1) k=1~4의 합 24가 정해짐", "method": "sympy.summation", "border": false}
+{"code": "12대수03-05-1", "cls": "불가", "reason": "어떤 변형을 쓸지 방법을 묻는 서술형", "method": "해당 없음", "border": true}

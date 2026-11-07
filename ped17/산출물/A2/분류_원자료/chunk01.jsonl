@@ -1,0 +1,152 @@
+{"code": "2수03-01-1", "cls": "불가", "reason": "실물 모양을 보고 입체도형으로 분류하는 직관 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-01-2", "cls": "불가", "reason": "굴러가는지 쌓이는지 성질 관찰로 분류하는 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-01-3", "cls": "불가", "reason": "실물과 도형 이름을 짝짓는 연결 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-02-1", "cls": "불가", "reason": "쌓기나무 조작과 위치를 말로 설명하는 열린 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-02-2", "cls": "불가", "reason": "위치어의 상대성을 이해하는 개념 과제", "method": "해당 없음", "border": true}
+{"code": "2수03-02-3", "cls": "불가", "reason": "쌓기나무 그림을 보고 가린 개수까지 세는 과제", "method": "해당 없음", "border": true}
+{"code": "2수03-03-1", "cls": "불가", "reason": "그림을 보고 삼각형 모양을 가려내는 직관 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-03-2", "cls": "불가", "reason": "도형 모양을 변 수로 분류하는 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-03-3", "cls": "불가", "reason": "점 잇기와 실물 연결 등 작도형 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-04-1", "cls": "불가", "reason": "도형을 직접 그리는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-04-2", "cls": "불가", "reason": "도형을 정하는 조건을 말로 제시하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "2수03-04-3", "cls": "불가", "reason": "모눈에 같은 도형을 옮겨 그리는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-05-1", "cls": "불가", "reason": "도형의 공통점을 말로 설명하는 열린 서술", "method": "해당 없음", "border": false}
+{"code": "2수03-05-2", "cls": "불가", "reason": "도형의 변·꼭짓점 수는 정의 사실 암기에 가까움", "method": "해당 없음", "border": true}
+{"code": "2수03-05-3", "cls": "불가", "reason": "표에 표시하며 공통점을 비교하는 서술 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-06-1", "cls": "불가", "reason": "양을 직접 비교하는 방법을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "2수03-06-2", "cls": "불가", "reason": "맞대어 길이를 비교하는 실물 조작 절차", "method": "해당 없음", "border": false}
+{"code": "2수03-06-3", "cls": "불가", "reason": "많다·적다 말로 표현하는 서술 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-07-1", "cls": "불가", "reason": "시계 바늘 그림을 읽는 과제", "method": "해당 없음", "border": true}
+{"code": "2수03-07-2", "cls": "불가", "reason": "시침과 분침의 역할을 말하는 용어 개념", "method": "해당 없음", "border": false}
+{"code": "2수03-07-3", "cls": "불가", "reason": "시계 눈금을 읽는 과제로 그림 해석이 핵심", "method": "해당 없음", "border": true}
+{"code": "2수03-08-1", "cls": "불가", "reason": "1시간=60분 관계를 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "2수03-08-2", "cls": "가능", "reason": "시간과 분 환산은 60 기준 정수 연산으로 정해짐", "method": "divmod와 정수 곱셈(1시간=60분)", "border": false}
+{"code": "2수03-08-3", "cls": "불가", "reason": "띠에 색칠하며 시간을 표현하는 표상 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-09-1", "cls": "불가", "reason": "시간 단위 관계를 아는지 묻는 사실 개념", "method": "해당 없음", "border": true}
+{"code": "2수03-09-2", "cls": "가능", "reason": "주·일·개월 고정 비율 곱셈으로 환산값이 정해짐", "method": "단위 환산표(1주=7일, 1년=12개월) 곱셈 규칙", "border": false}
+{"code": "2수03-09-3", "cls": "불가", "reason": "달력을 보고 기간을 읽는 그림 해석 과제", "method": "해당 없음", "border": true}
+{"code": "2수03-10-1", "cls": "불가", "reason": "자로 실제 길이를 재는 측정 도구 사용", "method": "해당 없음", "border": false}
+{"code": "2수03-10-2", "cls": "불가", "reason": "측정의 의미를 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "2수03-10-3", "cls": "불가", "reason": "눈금을 읽고 단위를 골라 쓰는 측정 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-11-1", "cls": "불가", "reason": "자 그림을 보고 두 표기로 쓰는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "2수03-11-2", "cls": "불가", "reason": "1m=100cm의 의미를 눈금으로 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "2수03-11-3", "cls": "가능", "reason": "m·cm와 cm 환산은 100 기준 정수 연산으로 정해짐", "method": "divmod와 정수 곱셈(1m=100cm)", "border": false}
+{"code": "2수03-12-1", "cls": "불가", "reason": "양감으로 길이를 어림하는 열린 과제", "method": "해당 없음", "border": false}
+{"code": "2수03-12-2", "cls": "불가", "reason": "어림의 의미와 방법을 고르는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "2수03-12-3", "cls": "불가", "reason": "어림값과 실제값의 비교 표현이 핵심인 과제", "method": "해당 없음", "border": true}
+{"code": "2수03-13-1", "cls": "가능", "reason": "길이 덧셈뺄셈은 받아올림 포함 정수 연산으로 정해짐", "method": "cm 환산 후 정수 덧셈·뺄셈과 divmod", "border": false}
+{"code": "2수03-13-2", "cls": "불가", "reason": "같은 단위끼리 계산하는 원리를 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "2수03-13-3", "cls": "불가", "reason": "띠 그림으로 덧셈을 표현하는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-01-1", "cls": "불가", "reason": "직선·선분·반직선 용어를 구별하는 정의 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-01-2", "cls": "불가", "reason": "자로 선분을 긋는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-01-3", "cls": "불가", "reason": "그림과 용어를 줄로 잇는 연결 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-02-1", "cls": "불가", "reason": "각의 종류와 벌어진 정도를 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-02-2", "cls": "불가", "reason": "삼각자를 대어 각을 비교하는 실물 조작", "method": "해당 없음", "border": false}
+{"code": "4수03-02-3", "cls": "불가", "reason": "각 그림과 용어를 잇는 연결 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-03-1", "cls": "불가", "reason": "수직과 평행의 정의를 구별하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-03-2", "cls": "불가", "reason": "삼각자로 수직선을 긋는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-03-3", "cls": "불가", "reason": "도형 그림에서 수직·평행 변을 읽는 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-04-1", "cls": "불가", "reason": "밀기·뒤집기·돌리기를 구별하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-04-2", "cls": "불가", "reason": "도형을 뒤집고 돌려 그리는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-04-3", "cls": "불가", "reason": "바뀐 모양을 보고 이동을 판단하는 그림 해석", "method": "해당 없음", "border": false}
+{"code": "4수03-05-1", "cls": "불가", "reason": "모눈에 이동한 점을 표시하는 작도 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-05-2", "cls": "불가", "reason": "방향과 칸 수가 위치를 정함을 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-05-3", "cls": "불가", "reason": "모눈에서 점을 옮겨 표시하는 조작 절차", "method": "해당 없음", "border": true}
+{"code": "4수03-06-1", "cls": "불가", "reason": "원의 용어와 성질을 이해하는 개념, 계산은 부수", "method": "해당 없음", "border": true}
+{"code": "4수03-06-2", "cls": "불가", "reason": "원에서 중심을 찾고 자로 재는 측정 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-06-3", "cls": "불가", "reason": "원 그림에 이름표를 붙이는 용어 연결", "method": "해당 없음", "border": false}
+{"code": "4수03-07-1", "cls": "불가", "reason": "컴퍼스로 원을 직접 그리는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-07-2", "cls": "불가", "reason": "컴퍼스 폭이 반지름인 이유를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-07-3", "cls": "불가", "reason": "컴퍼스 동작을 말로 옮기는 서술 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-08-1", "cls": "불가", "reason": "삼각형 분류와 포함관계를 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-08-2", "cls": "불가", "reason": "삼각형 변을 자로 재어 분류하는 측정 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-08-3", "cls": "불가", "reason": "같은 변 빗금 표시를 그림에 그리는 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-09-1", "cls": "불가", "reason": "각 기준 삼각형 분류의 용어 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-09-2", "cls": "불가", "reason": "직각자로 각을 비교해 삼각형을 분류하는 조작", "method": "해당 없음", "border": false}
+{"code": "4수03-09-3", "cls": "불가", "reason": "각 그림과 삼각형 이름을 잇는 연결 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-10-1", "cls": "불가", "reason": "사각형 분류와 포함관계를 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-10-2", "cls": "불가", "reason": "변과 각을 조사해 사각형을 분류하는 측정 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-10-3", "cls": "불가", "reason": "평행·직각 기호를 그림에 표시하는 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-11-1", "cls": "불가", "reason": "다각형과 정다각형의 정의 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-11-2", "cls": "불가", "reason": "다각형을 조사해 정다각형을 판정하는 그림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-11-3", "cls": "불가", "reason": "변 수로 다각형 이름을 붙이는 용어 연결", "method": "해당 없음", "border": false}
+{"code": "4수03-12-1", "cls": "불가", "reason": "도형으로 바닥을 채우는 모양 만들기 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-12-2", "cls": "불가", "reason": "빈틈없이 채워지는 까닭을 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "4수03-12-3", "cls": "불가", "reason": "만든 모양을 조각으로 설명하는 서술 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-13-1", "cls": "불가", "reason": "시계의 세 바늘 그림을 읽는 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-13-2", "cls": "불가", "reason": "1분이 60초인 까닭을 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "4수03-13-3", "cls": "불가", "reason": "시계 바늘을 시·분·초로 읽는 그림 해석", "method": "해당 없음", "border": true}
+{"code": "4수03-14-1", "cls": "가능", "reason": "분·초 덧셈은 60초 받아올림 정수 연산으로 정해짐", "method": "초 단위 정수 덧셈 후 divmod(60)", "border": false}
+{"code": "4수03-14-2", "cls": "불가", "reason": "60진법 자릿값의 의미를 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "4수03-14-3", "cls": "불가", "reason": "시간 띠에 화살표로 표시하는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-15-1", "cls": "불가", "reason": "상황에 맞는 길이 단위를 고르는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-15-2", "cls": "불가", "reason": "대상 크기에 맞는 단위를 고르는 이유 서술", "method": "해당 없음", "border": false}
+{"code": "4수03-15-3", "cls": "불가", "reason": "1mm와 1km를 실물에 연결하는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-16-1", "cls": "불가", "reason": "자 눈금을 읽어 두 표기로 쓰는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-16-2", "cls": "불가", "reason": "단위 배수가 다른 까닭을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "4수03-16-3", "cls": "가능", "reason": "cm·mm, km·m 환산은 고정 배수 정수 연산으로 정해짐", "method": "단위 환산표(1cm=10mm, 1km=1000m) 곱셈과 divmod", "border": false}
+{"code": "4수03-17-1", "cls": "불가", "reason": "상황에 맞는 들이 단위를 고르는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-17-2", "cls": "불가", "reason": "들이의 의미를 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "4수03-17-3", "cls": "불가", "reason": "1L와 1mL를 실물에 연결하는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-18-1", "cls": "불가", "reason": "비커 눈금 그림을 두 표기로 쓰는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-18-2", "cls": "불가", "reason": "1L=1000mL의 의미를 설명하는 개념 서술", "method": "해당 없음", "border": true}
+{"code": "4수03-18-3", "cls": "가능", "reason": "L·mL 환산은 1000 기준 정수 연산으로 정해짐", "method": "단위 환산표(1L=1000mL) 곱셈과 divmod", "border": false}
+{"code": "4수03-19-1", "cls": "가능", "reason": "들이 덧셈뺄셈은 1000mL 받아올림 정수 연산", "method": "mL 환산 후 정수 덧셈·뺄셈과 divmod(1000)", "border": false}
+{"code": "4수03-19-2", "cls": "불가", "reason": "받아올림 의미를 설명하는 개념 서술", "method": "해당 없음", "border": true}
+{"code": "4수03-19-3", "cls": "불가", "reason": "눈금 위에 합을 표시하는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-20-1", "cls": "불가", "reason": "상황에 맞는 무게 단위를 고르는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-20-2", "cls": "불가", "reason": "무게의 의미를 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "4수03-20-3", "cls": "불가", "reason": "1g과 1kg을 실물에 연결하는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-21-1", "cls": "불가", "reason": "저울 눈금 그림을 두 표기로 쓰는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-21-2", "cls": "불가", "reason": "1kg=1000g의 의미를 설명하는 개념 서술", "method": "해당 없음", "border": true}
+{"code": "4수03-21-3", "cls": "가능", "reason": "kg·g 환산은 1000 기준 정수 연산으로 정해짐", "method": "단위 환산표(1kg=1000g) 곱셈과 divmod", "border": false}
+{"code": "4수03-22-1", "cls": "불가", "reason": "1t=1000kg 관계와 단위 선택을 묻는 개념", "method": "해당 없음", "border": true}
+{"code": "4수03-22-2", "cls": "가능", "reason": "t·kg 환산은 1000 기준 정수 연산으로 정해짐", "method": "단위 환산표(1t=1000kg) 곱셈과 divmod", "border": false}
+{"code": "4수03-22-3", "cls": "불가", "reason": "1t을 실물에 연결하는 어림 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-23-1", "cls": "가능", "reason": "무게 덧셈뺄셈은 1000g 받아올림 정수 연산", "method": "g 환산 후 정수 덧셈·뺄셈과 divmod(1000)", "border": false}
+{"code": "4수03-23-2", "cls": "불가", "reason": "같은 단위끼리 더하는 원리를 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "4수03-23-3", "cls": "불가", "reason": "저울 눈금에 바늘 위치를 표시하는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "4수03-24-1", "cls": "불가", "reason": "각도기로 각을 재는 측정 도구 사용", "method": "해당 없음", "border": false}
+{"code": "4수03-24-2", "cls": "불가", "reason": "각의 크기가 벌어진 정도임을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수03-24-3", "cls": "불가", "reason": "각의 크기를 어림하는 열린 과제", "method": "해당 없음", "border": false}
+{"code": "4수03-25-1", "cls": "불가", "reason": "내각의 합이 일정함을 이해하는 정리 개념", "method": "해당 없음", "border": true}
+{"code": "4수03-25-2", "cls": "불가", "reason": "도형을 나눠 내각 합을 추론하는 논증 과정", "method": "해당 없음", "border": true}
+{"code": "4수03-25-3", "cls": "불가", "reason": "세 각을 모아 일직선임을 보이는 조작 설명", "method": "해당 없음", "border": false}
+{"code": "6수03-01-1", "cls": "불가", "reason": "합동의 뜻과 성질을 이해하는 정의 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-01-2", "cls": "불가", "reason": "도형을 포개어 합동을 확인하는 실물 조작", "method": "해당 없음", "border": false}
+{"code": "6수03-01-3", "cls": "불가", "reason": "대응변과 대응각을 짝짓는 용어 연결", "method": "해당 없음", "border": true}
+{"code": "6수03-02-1", "cls": "불가", "reason": "선대칭과 점대칭을 구별하는 정의 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-02-2", "cls": "불가", "reason": "대칭 도형을 그리는 작도 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-02-3", "cls": "불가", "reason": "대칭 성질을 그림에서 말로 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "6수03-03-1", "cls": "불가", "reason": "직육면체 구성요소와 성질을 아는 개념", "method": "해당 없음", "border": true}
+{"code": "6수03-03-2", "cls": "불가", "reason": "입체 그림에서 요소를 빠짐없이 세는 과제", "method": "해당 없음", "border": true}
+{"code": "6수03-03-3", "cls": "불가", "reason": "겨냥도 그림에서 평행·수직 면을 찾는 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-04-1", "cls": "불가", "reason": "전개도가 맞는지 그림으로 판단하는 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-04-2", "cls": "불가", "reason": "겨냥도와 전개도의 차이를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-04-3", "cls": "불가", "reason": "실선·점선으로 겨냥도를 그리는 작도 규칙", "method": "해당 없음", "border": false}
+{"code": "6수03-05-1", "cls": "불가", "reason": "각기둥과 각뿔의 구성요소를 구별하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-05-2", "cls": "불가", "reason": "밑면 수로 입체를 구별하는 분류 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-05-3", "cls": "불가", "reason": "밑면 모양에 따른 입체 이름 붙이기", "method": "해당 없음", "border": false}
+{"code": "6수03-06-1", "cls": "불가", "reason": "각기둥 전개도를 그림으로 구성하는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "6수03-06-2", "cls": "불가", "reason": "전개도에 모든 면이 들어가야 하는 까닭 서술", "method": "해당 없음", "border": false}
+{"code": "6수03-06-3", "cls": "불가", "reason": "접어 만나는 모서리 맞춤을 그리는 작도 절차", "method": "해당 없음", "border": false}
+{"code": "6수03-07-1", "cls": "불가", "reason": "원기둥·원뿔·구의 성질로 구별하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-07-2", "cls": "불가", "reason": "입체를 굴려 곡면을 확인하는 실물 조작", "method": "해당 없음", "border": false}
+{"code": "6수03-07-3", "cls": "불가", "reason": "회전체의 모양을 떠올려 연결하는 표상 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-08-1", "cls": "불가", "reason": "원기둥 전개도의 옆면 모양을 묻는 표상 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-08-2", "cls": "불가", "reason": "옆면이 직사각형인 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-08-3", "cls": "불가", "reason": "옆면 가로를 원주에 맞춰 그리는 작도 절차", "method": "해당 없음", "border": false}
+{"code": "6수03-09-1", "cls": "불가", "reason": "쌓기나무 그림에서 숨은 개수를 세는 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-09-2", "cls": "불가", "reason": "안 보이는 나무가 있는 이유를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-09-3", "cls": "불가", "reason": "그림을 층별로 나눠 세는 표상 과제", "method": "해당 없음", "border": false}
+{"code": "6수03-10-1", "cls": "불가", "reason": "위·앞·옆 모양과 입체를 연결하는 그림 해석", "method": "해당 없음", "border": false}
+{"code": "6수03-10-2", "cls": "불가", "reason": "세 방향이 입체의 단서임을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-10-3", "cls": "불가", "reason": "위 모양 칸에 높이를 적는 그림 기반 절차", "method": "해당 없음", "border": false}
+{"code": "6수03-11-1", "cls": "불가", "reason": "둘레와 넓이의 뜻을 구별하는 정의 개념", "method": "해당 없음", "border": false}
+{"code": "6수03-11-2", "cls": "가능", "reason": "직사각형 둘레는 변 길이 합으로 하나의 값이 정해짐", "method": "sympy.Rational 연산(변 길이 합, (가로+세로)*2)", "border": false}
+{"code": "6수03-11-3", "cls": "불가", "reason": "둘레 식을 그림과 짝지어 말로 설명하는 서술", "method": "해당 없음", "border": true}
+{"code": "6수03-12-1", "cls": "불가", "reason": "넓이 단위 관계의 의미를 이해하는 개념", "method": "해당 없음", "border": true}
+{"code": "6수03-12-2", "cls": "가능", "reason": "넓이 단위 환산은 제곱 비율 곱셈으로 정해짐", "method": "단위 환산표(1m²=10000cm²) 곱셈 규칙", "border": false}
+{"code": "6수03-12-3", "cls": "불가", "reason": "단위넓이를 그림으로 떠올려 설명하는 표상 과제", "method": "해당 없음", "border": true}
+{"code": "6수03-13-1", "cls": "불가", "reason": "넓이가 단위정사각형 채움임을 이해하는 원리 개념", "method": "해당 없음", "border": true}
+{"code": "6수03-13-2", "cls": "가능", "reason": "직사각형·정사각형 넓이는 가로×세로로 정해짐", "method": "sympy.Rational 연산(가로*세로)", "border": false}

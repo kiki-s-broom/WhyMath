@@ -1,0 +1,151 @@
+{"code": "SETLOG-C04", "cls": "불가", "reason": "예시와 증명의 차이를 말하는 논증 개념", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C05", "cls": "불가", "reason": "대우와 역의 구분이라는 논리 개념 이해", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C06", "cls": "불가", "reason": "이 명제의 비동치를 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C07", "cls": "불가", "reason": "귀류법의 시작 가정이 무엇인지 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C08", "cls": "가능", "reason": "유한집합 {1,2}의 멱집합 원소가 하나로 정해짐", "method": "sympy.FiniteSet.powerset 결과와 비교", "border": false}
+{"code": "SETLOG-C09", "cls": "불가", "reason": "단사가 아닐 수 있다는 성질 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "SETLOG-C10", "cls": "불가", "reason": "전사의 의미(공역=치역) 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "SETLOG-C11", "cls": "불가", "reason": "단사·전사·전단사 개념 구분 서술", "method": "해당 없음", "border": true}
+{"code": "SETLOG-C12", "cls": "불가", "reason": "합성함수 정의 조건을 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C13", "cls": "불가", "reason": "동치관계 세 조건의 의미 이해와 서술", "method": "해당 없음", "border": true}
+{"code": "SETLOG-C14", "cls": "불가", "reason": "동치류 분할 성질을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C15", "cls": "불가", "reason": "전단사 구성으로 크기가 같음을 보이는 논증", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C16", "cls": "불가", "reason": "유리수의 가산성을 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C17", "cls": "불가", "reason": "대각선 논법으로 비가산을 설명하는 증명", "method": "해당 없음", "border": false}
+{"code": "SETLOG-C18", "cls": "불가", "reason": "칸토어 정리의 대각선 증명 서술", "method": "해당 없음", "border": false}
+{"code": "SETLOG-P01", "cls": "가능", "reason": "P∧¬Q의 진리표 4행이 하나로 정해짐", "method": "sympy.logic.boolalg 진리표 열거(itertools 조합)", "border": false}
+{"code": "SETLOG-P02", "cls": "불가", "reason": "한정기호 순서에 따른 의미 차이 서술", "method": "해당 없음", "border": false}
+{"code": "SETLOG-P03", "cls": "불가", "reason": "직접증명 서술이 핵심이라 기계 검산 어려움", "method": "해당 없음", "border": false}
+{"code": "SETLOG-P04", "cls": "불가", "reason": "귀납법 기저단계 필요성을 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "SETLOG-P05", "cls": "불가", "reason": "귀납단계 필요성을 말로 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "SETLOG-P06", "cls": "불가", "reason": "귀납법 증명 서술이 핵심", "method": "해당 없음", "border": false}
+{"code": "SETLOG-P07", "cls": "가능", "reason": "유한 전체집합에서 여집합·합집합 결과가 정해짐", "method": "sympy.FiniteSet 합·교·차집합 연산으로 비교", "border": false}
+{"code": "SETLOG-P08", "cls": "가능", "reason": "|A|=3일 때 멱집합 개수 8이 하나로 정해짐", "method": "정수 거듭제곱 2**n, FiniteSet.powerset 길이 대조", "border": false}
+{"code": "SETLOG-P09", "cls": "가능", "reason": "{a,b,c}의 부분집합 8개 나열이 유일함", "method": "sympy.FiniteSet.powerset 비교", "border": false}
+{"code": "SETLOG-P10", "cls": "가능", "reason": "유한집합 곱집합 A×B와 B×A가 정해짐", "method": "sympy.ProductSet 또는 itertools.product 비교", "border": false}
+{"code": "SETLOG-P11", "cls": "가능", "reason": "(f∘g)(2)=5, (g∘f)(2)=9 값 계산", "method": "sympy 식 치환(subs)으로 합성 계산", "border": false}
+{"code": "SETLOG-P12", "cls": "불가", "reason": "전단사 구성으로 가산 증명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "SETLOG-R01", "cls": "불가", "reason": "표·식·말 사이 표상 변환 서술", "method": "해당 없음", "border": false}
+{"code": "SETLOG-R02", "cls": "불가", "reason": "한정기호 자연어 번역은 해석 서술", "method": "해당 없음", "border": false}
+{"code": "SETLOG-R03", "cls": "불가", "reason": "벤다이어그램 그림을 칠하고 읽는 과제", "method": "해당 없음", "border": false}
+{"code": "SETLOG-R04", "cls": "불가", "reason": "화살표 그림을 읽어 판정하는 과제", "method": "해당 없음", "border": false}
+{"code": "SETLOG-R05", "cls": "불가", "reason": "분할 그림과 동치류를 옮기는 그림 과제", "method": "해당 없음", "border": false}
+{"code": "SETLOG-R06", "cls": "불가", "reason": "대각선 논법 그림을 논증으로 서술", "method": "해당 없음", "border": false}
+{"code": "SET-C01", "cls": "불가", "reason": "ZFC와 러셀 역설의 의미 설명", "method": "해당 없음", "border": false}
+{"code": "SET-C02", "cls": "불가", "reason": "외연 공리의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "SET-C03", "cls": "불가", "reason": "정칙성 공리의 근거를 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "SET-C04", "cls": "불가", "reason": "정렬집합 정의와 반례 설명", "method": "해당 없음", "border": false}
+{"code": "SET-C05", "cls": "불가", "reason": "무한 기수산술의 의미 이해, 정확값 계산 아님", "method": "해당 없음", "border": false}
+{"code": "SET-C06", "cls": "불가", "reason": "연속체 가설 독립성이라는 메타 서술", "method": "해당 없음", "border": false}
+{"code": "SET-C07", "cls": "불가", "reason": "초른 보조정리와 선택공리 동치 관계 서술", "method": "해당 없음", "border": false}
+{"code": "SET-C08", "cls": "불가", "reason": "정렬정리의 존재성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "SET-P01", "cls": "불가", "reason": "초한귀납 극한단계 필요성을 서술하는 논증", "method": "해당 없음", "border": false}
+{"code": "PDE-C01", "cls": "불가", "reason": "특성곡선법의 원리를 말로 설명", "method": "해당 없음", "border": false}
+{"code": "PDE-C02", "cls": "불가", "reason": "분류 개념 이해가 핵심, 식 입력 파싱 필요", "method": "해당 없음", "border": true}
+{"code": "PDE-C03", "cls": "불가", "reason": "포물형의 확산 의미를 서술하는 정성 개념", "method": "해당 없음", "border": false}
+{"code": "PDE-C04", "cls": "불가", "reason": "쌍곡형의 유한속도 전파를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "PDE-C05", "cls": "불가", "reason": "달랑베르 해의 진행파 의미 서술", "method": "해당 없음", "border": false}
+{"code": "PDE-C06", "cls": "불가", "reason": "에너지법으로 유일성을 보이는 논증", "method": "해당 없음", "border": false}
+{"code": "PDE-C07", "cls": "불가", "reason": "변수분리와 평활화 의미를 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "PDE-C08", "cls": "불가", "reason": "평균값 성질과 최대원리의 정성적 설명", "method": "해당 없음", "border": false}
+{"code": "PDE-C09", "cls": "불가", "reason": "최대원리라는 정리의 내용을 서술", "method": "해당 없음", "border": false}
+{"code": "PDE-C10", "cls": "불가", "reason": "그린함수의 의미와 의존성 서술", "method": "해당 없음", "border": false}
+{"code": "PDE-P01", "cls": "불가", "reason": "함수 미지정, 계수식 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "FANAL-C01", "cls": "불가", "reason": "바나흐 공간 완비성을 설명하는 추상 개념", "method": "해당 없음", "border": false}
+{"code": "FANAL-C02", "cls": "불가", "reason": "노름 동치의 추상 성질 서술", "method": "해당 없음", "border": false}
+{"code": "FANAL-C03", "cls": "불가", "reason": "직교사영의 기하적 의미 서술", "method": "해당 없음", "border": false}
+{"code": "FANAL-C04", "cls": "불가", "reason": "위상적 기저라는 추상 구조 설명", "method": "해당 없음", "border": false}
+{"code": "FANAL-C05", "cls": "불가", "reason": "리스 표현정리 성립 이유 서술", "method": "해당 없음", "border": false}
+{"code": "FANAL-C06", "cls": "불가", "reason": "수반작용소 정의 이유를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "FANAL-C07", "cls": "불가", "reason": "한-바나흐 확장의 비유일성 서술", "method": "해당 없음", "border": false}
+{"code": "FANAL-C08", "cls": "불가", "reason": "열린사상 정리의 조건을 서술하는 정리", "method": "해당 없음", "border": false}
+{"code": "FANAL-C09", "cls": "불가", "reason": "균등유계 원리의 근거 서술", "method": "해당 없음", "border": false}
+{"code": "FANAL-C10", "cls": "불가", "reason": "콤팩트작용소의 추상 성질 서술", "method": "해당 없음", "border": false}
+{"code": "FANAL-C11", "cls": "불가", "reason": "스펙트럼 종류의 정성적 설명", "method": "해당 없음", "border": false}
+{"code": "FANAL-P01", "cls": "가능", "reason": "행렬 A의 ℓ² 작용소 노름 2가 정확히 계산됨", "method": "sympy.Matrix.singular_values 최댓값 또는 A.norm(2)", "border": false}
+{"code": "ANAL1-C01", "cls": "불가", "reason": "상한과 최댓값의 구별이라는 개념 이해", "method": "해당 없음", "border": true}
+{"code": "ANAL1-C02", "cls": "불가", "reason": "완비성 공리의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C03", "cls": "불가", "reason": "아르키메데스 성질로 설명하는 존재 논증", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C04", "cls": "불가", "reason": "수렴 정의의 ε 의미 이해와 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C05", "cls": "불가", "reason": "발산수열의 부분수열 성질 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C06", "cls": "불가", "reason": "코시수열 조건의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C07", "cls": "불가", "reason": "유계와 수렴의 차이를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C08", "cls": "불가", "reason": "열린집합 정의를 점 단위로 설명", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C09", "cls": "불가", "reason": "열림·닫힘이 배타적이지 않음을 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C10", "cls": "불가", "reason": "집적점 개념의 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "ANAL1-C11", "cls": "불가", "reason": "컴팩트성 정리를 설명하는 위상 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C12", "cls": "불가", "reason": "ε-δ 의존성이라는 정의 이해", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C13", "cls": "불가", "reason": "균등연속과 점별연속 구분 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C14", "cls": "불가", "reason": "중간값 정리가 보장하는 것의 해석", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C15", "cls": "불가", "reason": "최대·최소 정리 조건을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C16", "cls": "불가", "reason": "절대수렴과 조건수렴의 구분 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL1-C17", "cls": "불가", "reason": "리만 재배열 정리의 이유 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL1-P01", "cls": "불가", "reason": "일반 집합의 sup·inf는 기계 판정이 불안정", "method": "해당 없음", "border": true}
+{"code": "ANAL1-P02", "cls": "불가", "reason": "ε-N 수렴 증명 서술이 핵심", "method": "해당 없음", "border": false}
+{"code": "ANAL1-P03", "cls": "불가", "reason": "ε-δ 연속 증명 서술이 핵심", "method": "해당 없음", "border": false}
+{"code": "ANAL1-P04", "cls": "불가", "reason": "판정법 선택과 결론 해석이 핵심", "method": "해당 없음", "border": true}
+{"code": "ANAL1-P05", "cls": "가능", "reason": "Σxⁿ/n!의 수렴반경 ∞가 극한으로 정해짐", "method": "sympy.limit 비판정 극한 계산", "border": false}
+{"code": "ANAL1-R01", "cls": "불가", "reason": "점그래프에 띠를 그려 읽는 그림 과제", "method": "해당 없음", "border": false}
+{"code": "ANAL1-R02", "cls": "불가", "reason": "수직선에 구간을 그리는 그림 과제", "method": "해당 없음", "border": false}
+{"code": "ANAL1-R03", "cls": "불가", "reason": "그래프에 ε-δ 박스를 그리는 과제", "method": "해당 없음", "border": false}
+{"code": "ANAL1-R04", "cls": "불가", "reason": "곡선 그림으로 중간값 정리를 이해", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C01", "cls": "불가", "reason": "평균값 정리의 가설 확인 서술", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C02", "cls": "불가", "reason": "테일러 나머지항의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C03", "cls": "불가", "reason": "로피탈 적용 조건 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "ANAL2-C04", "cls": "불가", "reason": "적분가능 조건을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C05", "cls": "불가", "reason": "기본정리 가설을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C06", "cls": "불가", "reason": "점별수렴의 한계를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C07", "cls": "불가", "reason": "균등수렴 정의를 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C08", "cls": "불가", "reason": "극한·적분 교환 조건을 서술하는 정리", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C09", "cls": "불가", "reason": "항별 미적분과 반경 보존의 성질 서술", "method": "해당 없음", "border": true}
+{"code": "ANAL2-C10", "cls": "불가", "reason": "전미분과 편미분의 차이를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C11", "cls": "불가", "reason": "역함수 정리의 국소성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "ANAL2-C12", "cls": "불가", "reason": "음함수 정리의 국소 조건 설명", "method": "해당 없음", "border": false}
+{"code": "ANAL2-P01", "cls": "가능", "reason": "Σ2ⁿxⁿ의 수렴반경 1/2가 정해짐", "method": "sympy.limit 코시-아다마르 공식 계산", "border": false}
+{"code": "ANAL2-P02", "cls": "가능", "reason": "f=x²y+sin y의 ∂f/∂x가 식으로 정해짐", "method": "sympy.diff(f, x) 후 simplify로 동치 확인", "border": false}
+{"code": "ANAL2-R01", "cls": "불가", "reason": "상자 그림을 상·하적분과 잇는 그림 과제", "method": "해당 없음", "border": false}
+{"code": "ANAL2-R02", "cls": "불가", "reason": "튜브 그림으로 균등성을 판정하는 과제", "method": "해당 없음", "border": false}
+{"code": "AALG1-C01", "cls": "불가", "reason": "군 공리와 가환성의 구별 개념", "method": "해당 없음", "border": false}
+{"code": "AALG1-C02", "cls": "불가", "reason": "부분군 조건 이해가 핵심인 개념", "method": "해당 없음", "border": true}
+{"code": "AALG1-C03", "cls": "불가", "reason": "무한 순환군 존재를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "AALG1-C04", "cls": "불가", "reason": "위수와 군 위수 관계의 정리 서술", "method": "해당 없음", "border": true}
+{"code": "AALG1-C05", "cls": "불가", "reason": "잉여류 분할 성질을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "AALG1-C06", "cls": "불가", "reason": "라그랑주 역이 거짓임을 보이는 반례 개념", "method": "해당 없음", "border": false}
+{"code": "AALG1-C07", "cls": "불가", "reason": "몫군에 정규성이 필요한 이유 서술", "method": "해당 없음", "border": false}
+{"code": "AALG1-C08", "cls": "불가", "reason": "동형정리의 내용을 서술하는 정리", "method": "해당 없음", "border": false}
+{"code": "AALG1-C09", "cls": "불가", "reason": "제2 동형정리의 조건 서술", "method": "해당 없음", "border": false}
+{"code": "AALG1-C10", "cls": "불가", "reason": "제3 동형정리를 동형으로 서술", "method": "해당 없음", "border": false}
+{"code": "AALG1-C11", "cls": "불가", "reason": "군작용의 궤도·안정자 관계 이해", "method": "해당 없음", "border": true}
+{"code": "AALG1-C12", "cls": "불가", "reason": "류방정식 약수 이유를 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "AALG1-C13", "cls": "불가", "reason": "p-군 중심의 추상 성질 서술", "method": "해당 없음", "border": false}
+{"code": "AALG1-C14", "cls": "불가", "reason": "실로우 정리 서술과 구조 추론이 핵심", "method": "해당 없음", "border": true}
+{"code": "AALG1-P01", "cls": "가능", "reason": "ℤ₆의 H={0,3} 닫힘·역원 여부가 참거짓으로 정해짐", "method": "파이썬 mod 연산으로 닫힘·역원 전수 검사", "border": false}
+{"code": "AALG1-P02", "cls": "가능", "reason": "ℤ₁₀에서 4의 위수 5가 정수로 정해짐", "method": "n/gcd(4,n) 또는 sympy.gcd, 거듭 더하기 반복 계산", "border": false}
+{"code": "AALG1-P03", "cls": "가능", "reason": "위수 12에서 n_3 가능값이 약수·합동 조건으로 정해짐", "method": "sympy.divisors 후 n≡1(mod p) 필터", "border": false}
+{"code": "AALG1-R01", "cls": "불가", "reason": "원형 배치 그림으로 생성원을 보는 과제", "method": "해당 없음", "border": false}
+{"code": "AALG2-C01", "cls": "불가", "reason": "정역과 영인자 개념의 이해 서술", "method": "해당 없음", "border": false}
+{"code": "AALG2-C02", "cls": "불가", "reason": "극대 아이디얼과 체의 동치를 서술하는 정리", "method": "해당 없음", "border": false}
+{"code": "AALG2-C03", "cls": "불가", "reason": "소 아이디얼과 정역의 관계 서술", "method": "해당 없음", "border": false}
+{"code": "AALG2-C04", "cls": "불가", "reason": "몫환이 합동류 환이라는 정의 설명", "method": "해당 없음", "border": false}
+{"code": "AALG2-C05", "cls": "불가", "reason": "PID 정의와 반례를 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "AALG2-C06", "cls": "불가", "reason": "UFD 아님을 보이는 추상 구조 성질", "method": "해당 없음", "border": false}
+{"code": "AALG2-C07", "cls": "불가", "reason": "ED⊂PID⊂UFD 포함 관계의 추상 서술", "method": "해당 없음", "border": false}
+{"code": "AALG2-C08", "cls": "불가", "reason": "가우스 보조정리의 내용 서술", "method": "해당 없음", "border": false}
+{"code": "AALG2-C09", "cls": "불가", "reason": "대수적 원소와 최소다항식 개념 설명", "method": "해당 없음", "border": false}
+{"code": "AALG2-C10", "cls": "불가", "reason": "초월적 확장의 무한차원을 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "AALG2-C11", "cls": "불가", "reason": "분해체의 정의를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "AALG2-C12", "cls": "불가", "reason": "유한체 위수 존재 조건을 서술하는 정리", "method": "해당 없음", "border": false}
+{"code": "AALG2-P01", "cls": "불가", "reason": "진단이 판정 방법 서술이라 정답이 식이 아님", "method": "해당 없음", "border": true}
+{"code": "PROB-C01", "cls": "불가", "reason": "표본공간이 무엇인지 말하는 정의 개념", "method": "해당 없음", "border": false}
+{"code": "PROB-C02", "cls": "불가", "reason": "사건과 σ-대수의 정의를 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "PROB-C03", "cls": "불가", "reason": "콜모고로프 공리의 필요성을 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "PROB-C04", "cls": "불가", "reason": "조건부확률의 방향 차이를 이해하는 개념", "method": "해당 없음", "border": true}
+{"code": "PROB-C05", "cls": "불가", "reason": "PMF 정규화 조건의 의미를 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "PROB-C06", "cls": "불가", "reason": "연속분포 한 점 확률의 의미 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "PROB-C07", "cls": "불가", "reason": "CDF 성질을 서술하는 개념", "method": "해당 없음", "border": false}
+{"code": "PROB-C08", "cls": "불가", "reason": "분산 가법성의 독립 조건 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "PROB-C09", "cls": "불가", "reason": "적률생성함수의 분포 결정 성질 서술", "method": "해당 없음", "border": false}
+{"code": "PROB-C10", "cls": "불가", "reason": "큰 수의 법칙의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "PROB-C11", "cls": "불가", "reason": "중심극한정리의 의미를 서술하는 정리", "method": "해당 없음", "border": false}
+{"code": "PROB-P01", "cls": "가능", "reason": "베이즈 정리로 P(A|B)=0.09가 정확히 계산됨", "method": "sympy.Rational 연산으로 분수 계산", "border": false}
+{"code": "PROB-R01", "cls": "불가", "reason": "분포 변화를 그림으로 그리는 시각화 과제", "method": "해당 없음", "border": false}

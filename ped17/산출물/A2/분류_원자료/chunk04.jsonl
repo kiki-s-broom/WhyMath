@@ -1,0 +1,152 @@
+{"code": "9수02-06-3", "cls": "불가", "reason": "상황을 그래프로 그리는 작도·모양 서술이 핵심", "method": "해당 없음", "border": false}
+{"code": "9수02-07-1", "cls": "불가", "reason": "정비례·반비례에서 일정한 양을 말로 구별하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수02-07-2", "cls": "불가", "reason": "그래프 모양(직선·쌍곡선) 구별 서술", "method": "해당 없음", "border": false}
+{"code": "9수02-07-3", "cls": "가능", "reason": "비례상수와 식이 하나로 정해지는 방정식 풀이", "method": "sympy.solve + sympy.Eq 동치 확인", "border": false}
+{"code": "9수02-08-1", "cls": "불가", "reason": "지수법칙의 원리 이해가 핵심이라 개념 설명 위주", "method": "해당 없음", "border": true}
+{"code": "9수02-08-2", "cls": "가능", "reason": "지수법칙으로 식을 간단히 하는 결과가 하나로 정해짐", "method": "sympy.simplify / powsimp", "border": false}
+{"code": "9수02-08-3", "cls": "불가", "reason": "곱셈 나열로 지수를 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "9수02-09-1", "cls": "가능", "reason": "다항식 덧셈·뺄셈 정리 결과가 유일함", "method": "sympy.expand + simplify", "border": false}
+{"code": "9수02-09-2", "cls": "불가", "reason": "동류항만 더하는 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "9수02-09-3", "cls": "불가", "reason": "타일 그림 모형을 보고 모으는 표상 활동", "method": "해당 없음", "border": true}
+{"code": "9수02-10-1", "cls": "가능", "reason": "단항식×다항식, 나눗셈 결과가 하나로 정해짐", "method": "sympy.expand / cancel", "border": false}
+{"code": "9수02-10-2", "cls": "불가", "reason": "분배법칙이 필요한 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "9수02-10-3", "cls": "불가", "reason": "직사각형 넓이 분할 그림으로 전개를 설명", "method": "해당 없음", "border": true}
+{"code": "9수02-11-1", "cls": "불가", "reason": "부등호 방향이 바뀌는 성질의 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "9수02-11-2", "cls": "가능", "reason": "대입해 부등식 참·거짓을 판정하는 계산", "method": "sympy 대입 후 관계식 평가 (subs)", "border": false}
+{"code": "9수02-11-3", "cls": "불가", "reason": "해를 수직선에 그려 표시하는 작도", "method": "해당 없음", "border": false}
+{"code": "9수02-12-1", "cls": "가능", "reason": "일차부등식의 해 구간이 유일하게 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "9수02-12-2", "cls": "불가", "reason": "방향이 바뀌는 단계를 이유와 함께 설명", "method": "해당 없음", "border": true}
+{"code": "9수02-12-3", "cls": "불가", "reason": "수직선에 해를 그려 읽는 표상 활동이 포함", "method": "해당 없음", "border": true}
+{"code": "9수02-13-1", "cls": "불가", "reason": "연립방정식 해의 뜻을 말하는 정의", "method": "해당 없음", "border": false}
+{"code": "9수02-13-2", "cls": "가능", "reason": "연립일차방정식의 해가 하나로 정해짐", "method": "sympy.solve / linsolve", "border": false}
+{"code": "9수02-13-3", "cls": "불가", "reason": "값의 표를 만들어 공통 행을 찾는 표 해석", "method": "해당 없음", "border": true}
+{"code": "9수02-14-1", "cls": "불가", "reason": "함수의 정의를 판별하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "9수02-14-2", "cls": "가능", "reason": "함숫값 대입 계산 결과가 정수로 정해짐", "method": "sympy.Function 대입 (subs)", "border": false}
+{"code": "9수02-14-3", "cls": "불가", "reason": "좌표평면에 점을 찍는 작도", "method": "해당 없음", "border": false}
+{"code": "9수02-15-1", "cls": "불가", "reason": "기울기·절편의 뜻을 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수02-15-2", "cls": "불가", "reason": "절편·기울기로 그래프를 그리는 작도", "method": "해당 없음", "border": false}
+{"code": "9수02-15-3", "cls": "불가", "reason": "두 점을 잡아 직선을 그리는 작도 과정", "method": "해당 없음", "border": true}
+{"code": "9수02-16-1", "cls": "불가", "reason": "기울기 부호와 증감 방향을 말로 답하는 성질", "method": "해당 없음", "border": false}
+{"code": "9수02-16-2", "cls": "가능", "reason": "기울기와 한 점으로 일차함수 식이 유일하게 정해짐", "method": "sympy.solve (y=ax+b 대입)", "border": false}
+{"code": "9수02-16-3", "cls": "불가", "reason": "그래프를 읽는 활동이라 표상 해석이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수02-17-1", "cls": "불가", "reason": "일차방정식과 직선의 대응을 말로 이해", "method": "해당 없음", "border": true}
+{"code": "9수02-17-2", "cls": "가능", "reason": "y에 대해 정리한 식이 하나로 정해짐", "method": "sympy.solve(eq, y)", "border": false}
+{"code": "9수02-17-3", "cls": "불가", "reason": "x=k, y=k 그래프를 그리고 평행 방향 설명", "method": "해당 없음", "border": false}
+{"code": "9수02-18-1", "cls": "불가", "reason": "교점이 연립방정식의 해라는 의미 이해", "method": "해당 없음", "border": false}
+{"code": "9수02-18-2", "cls": "가능", "reason": "두 직선 교점 좌표가 연립으로 유일하게 정해짐", "method": "sympy.solve / linsolve", "border": false}
+{"code": "9수02-18-3", "cls": "불가", "reason": "직선 위치로 해의 개수를 설명하는 그래프 해석", "method": "해당 없음", "border": true}
+{"code": "9수02-19-1", "cls": "가능", "reason": "전개와 인수분해 결과가 각각 하나로 정해짐", "method": "sympy.expand / sympy.factor", "border": false}
+{"code": "9수02-19-2", "cls": "가능", "reason": "이차식 인수분해 결과가 유일함", "method": "sympy.factor", "border": false}
+{"code": "9수02-19-3", "cls": "불가", "reason": "넓이 그림으로 곱셈공식을 설명하는 표상", "method": "해당 없음", "border": false}
+{"code": "9수02-20-1", "cls": "불가", "reason": "양변을 x로 나누면 안 되는 까닭을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "9수02-20-2", "cls": "가능", "reason": "이차방정식의 두 근이 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "9수02-20-3", "cls": "가능", "reason": "인수분해로 근을 구하고 후보 대입값이 정확히 계산됨", "method": "sympy.solve + subs 대입", "border": false}
+{"code": "9수02-21-1", "cls": "불가", "reason": "이차함수 그래프 모양과 a≠0 조건의 개념", "method": "해당 없음", "border": false}
+{"code": "9수02-21-2", "cls": "가능", "reason": "이차함수 함숫값 대입 결과가 8로 정해짐", "method": "sympy subs 대입", "border": false}
+{"code": "9수02-21-3", "cls": "불가", "reason": "표에서 대칭성을 읽어 설명하는 해석", "method": "해당 없음", "border": true}
+{"code": "9수02-22-1", "cls": "불가", "reason": "포물선 작도와 볼록 방향 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수02-22-2", "cls": "불가", "reason": "a 부호와 폭 변화를 말로 설명하는 성질", "method": "해당 없음", "border": false}
+{"code": "9수02-22-3", "cls": "불가", "reason": "평행이동을 방향·크기로 설명하는 절차 서술", "method": "해당 없음", "border": true}
+{"code": "9수01-01-1", "cls": "불가", "reason": "소수의 정의로 까닭을 말하는 개념", "method": "해당 없음", "border": true}
+{"code": "9수01-01-2", "cls": "가능", "reason": "소인수분해 결과가 유일하게 정해짐", "method": "sympy.factorint", "border": false}
+{"code": "9수01-01-3", "cls": "불가", "reason": "인수나무 가지치기 그림이 핵심 활동", "method": "해당 없음", "border": true}
+{"code": "9수01-02-1", "cls": "가능", "reason": "최대공약수·최소공배수 값이 정수로 정해짐", "method": "sympy.gcd / sympy.lcm", "border": false}
+{"code": "9수01-02-2", "cls": "불가", "reason": "공약수·공배수 용어 구별과 이유 설명", "method": "해당 없음", "border": false}
+{"code": "9수01-02-3", "cls": "가능", "reason": "지수표에서 GCD·LCM 값이 정수로 정해짐", "method": "sympy.factorint + gcd / lcm", "border": false}
+{"code": "9수01-03-1", "cls": "불가", "reason": "음수·유리수 개념과 0의 위치 이해", "method": "해당 없음", "border": false}
+{"code": "9수01-03-2", "cls": "불가", "reason": "수 집합 분류 규칙 적용이라 애매해 보수적으로 제외", "method": "해당 없음", "border": true}
+{"code": "9수01-03-3", "cls": "불가", "reason": "수직선에 점을 찍고 절댓값을 설명하는 작도", "method": "해당 없음", "border": false}
+{"code": "9수01-04-1", "cls": "불가", "reason": "음수 대소의 까닭을 수직선으로 설명", "method": "해당 없음", "border": true}
+{"code": "9수01-04-2", "cls": "가능", "reason": "분수 대소 비교 결과가 하나로 정해짐", "method": "sympy.Rational 비교", "border": false}
+{"code": "9수01-04-3", "cls": "불가", "reason": "수직선에 놓고 나열하는 표상 활동", "method": "해당 없음", "border": true}
+{"code": "9수01-05-1", "cls": "불가", "reason": "음수×음수가 양수인 까닭 설명이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수01-05-2", "cls": "가능", "reason": "정수 사칙 혼합계산 값이 9로 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "9수01-05-3", "cls": "불가", "reason": "수직선 화살표 이동 그림으로 설명", "method": "해당 없음", "border": false}
+{"code": "9수01-06-1", "cls": "불가", "reason": "유한소수·순환소수와 유리수의 관계 설명", "method": "해당 없음", "border": true}
+{"code": "9수01-06-2", "cls": "가능", "reason": "순환소수를 기약분수로 바꾼 값이 유일함", "method": "sympy.solve(100x-x=45) / Rational", "border": false}
+{"code": "9수01-06-3", "cls": "불가", "reason": "나눗셈 전개에서 순환마디 점 표기를 하는 표상", "method": "해당 없음", "border": true}
+{"code": "9수01-07-1", "cls": "가능", "reason": "제곱근 값과 등식 성립 여부가 정해짐", "method": "sympy.sqrt + Eq 확인", "border": false}
+{"code": "9수01-07-2", "cls": "가능", "reason": "제곱근 성질로 구한 값이 하나로 정해짐", "method": "sympy.sqrt / simplify", "border": false}
+{"code": "9수01-07-3", "cls": "불가", "reason": "정사각형 넓이 그림으로 제곱근 대소를 설명", "method": "해당 없음", "border": false}
+{"code": "9수01-08-1", "cls": "불가", "reason": "무리수의 뜻과 이유를 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수01-08-2", "cls": "불가", "reason": "무리수 판별의 텍스트 입력이 애매해 보수적 제외", "method": "해당 없음", "border": true}
+{"code": "9수01-08-3", "cls": "불가", "reason": "수직선 위 작도로 √2 위치를 나타냄", "method": "해당 없음", "border": false}
+{"code": "9수01-09-1", "cls": "가능", "reason": "√5와 2의 대소가 하나로 정해짐", "method": "sympy 부등식 비교 (sqrt(5) > 2)", "border": false}
+{"code": "9수01-09-2", "cls": "불가", "reason": "실수의 완비성과 수직선 대응을 설명", "method": "해당 없음", "border": false}
+{"code": "9수01-09-3", "cls": "불가", "reason": "근삿값 수직선 위치와 근거 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수01-10-1", "cls": "불가", "reason": "근호 계산 원리와 틀린 이유 설명이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수01-10-2", "cls": "가능", "reason": "근호식 사칙계산 결과가 2√2로 정해짐", "method": "sympy.simplify / radsimp", "border": false}
+{"code": "9수01-10-3", "cls": "불가", "reason": "막대그림·표로 근호 합을 설명하는 표상", "method": "해당 없음", "border": false}
+{"code": "9수04-01-1", "cls": "불가", "reason": "대푯값 선택의 적절함을 판단하는 해석", "method": "해당 없음", "border": false}
+{"code": "9수04-01-2", "cls": "가능", "reason": "중앙값·최빈값이 자료에서 하나로 정해짐", "method": "statistics.median / multimode", "border": false}
+{"code": "9수04-01-3", "cls": "불가", "reason": "그래프 치우침을 읽고 적절한 대푯값 판단", "method": "해당 없음", "border": false}
+{"code": "9수04-02-1", "cls": "불가", "reason": "계급·도수 용어와 히스토그램 모양 설명", "method": "해당 없음", "border": false}
+{"code": "9수04-02-2", "cls": "불가", "reason": "계급·도수 의미와 정보 손실을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "9수04-02-3", "cls": "가능", "reason": "자료로 도수분포표 도수가 정확히 정해짐", "method": "numpy.histogram / collections.Counter 구간 집계", "border": false}
+{"code": "9수04-03-1", "cls": "불가", "reason": "상대도수 용도와 정의를 말하는 서술", "method": "해당 없음", "border": true}
+{"code": "9수04-03-2", "cls": "가능", "reason": "상대도수 12/30, 12/25 비교가 정확값으로 정해짐", "method": "sympy.Rational 계산·비교", "border": false}
+{"code": "9수04-03-3", "cls": "가능", "reason": "상대도수로 도수 역산, 총합 1로 나머지 계산", "method": "sympy.Rational 연산", "border": false}
+{"code": "9수04-04-1", "cls": "불가", "reason": "통계적 탐구에서 문제 설정의 이유 서술", "method": "해당 없음", "border": false}
+{"code": "9수04-04-2", "cls": "불가", "reason": "탐구 단계 배열과 표본 주의점 서술", "method": "해당 없음", "border": false}
+{"code": "9수04-04-3", "cls": "불가", "reason": "탐구 목적에 맞는 그래프 선택 판단", "method": "해당 없음", "border": false}
+{"code": "9수04-05-1", "cls": "불가", "reason": "합·곱의 법칙을 구분하는 개념 이해", "method": "해당 없음", "border": true}
+{"code": "9수04-05-2", "cls": "가능", "reason": "동전·주사위 경우의 수가 12로 정해짐", "method": "정수 곱셈 / itertools.product 열거", "border": false}
+{"code": "9수04-05-3", "cls": "불가", "reason": "수형도를 그리고 곱셈식과 연결해 설명", "method": "해당 없음", "border": false}
+{"code": "9수04-06-1", "cls": "불가", "reason": "확률은 전체에 대한 비율임을 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "9수04-06-2", "cls": "가능", "reason": "주사위 짝수 확률 1/2가 정확값으로 정해짐", "method": "sympy.Rational", "border": false}
+{"code": "9수04-06-3", "cls": "불가", "reason": "확률을 수직선 위에 표시하는 표상", "method": "해당 없음", "border": false}
+{"code": "9수04-07-1", "cls": "불가", "reason": "분산의 크기가 뜻하는 바를 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수04-07-2", "cls": "불가", "reason": "자료 없이 분산과 표준편차 관계를 말로 답함", "method": "해당 없음", "border": true}
+{"code": "9수04-07-3", "cls": "불가", "reason": "분포 퍼짐으로 표준편차 크기를 설명", "method": "해당 없음", "border": false}
+{"code": "9수04-08-1", "cls": "불가", "reason": "상자그림 상자가 뜻하는 비율을 말하는 표상", "method": "해당 없음", "border": false}
+{"code": "9수04-08-2", "cls": "불가", "reason": "상자그림 요소의 의미 해석과 설명", "method": "해당 없음", "border": false}
+{"code": "9수04-08-3", "cls": "가능", "reason": "정렬 후 최솟값·사분위수 값이 정해짐", "method": "statistics.median 으로 하위·상위 절반 중앙값", "border": false}
+{"code": "9수04-09-1", "cls": "불가", "reason": "상관과 인과를 구분하는 해석", "method": "해당 없음", "border": false}
+{"code": "9수04-09-2", "cls": "불가", "reason": "산점도에 점을 찍는 작도가 핵심", "method": "해당 없음", "border": true}
+{"code": "9수04-09-3", "cls": "불가", "reason": "산점도 점 모양을 보고 상관을 말로 분류", "method": "해당 없음", "border": false}
+{"code": "12경수01-01-1", "cls": "불가", "reason": "명목·실질 지표의 의미 해석", "method": "해당 없음", "border": false}
+{"code": "12경수01-01-2", "cls": "가능", "reason": "물가상승률 5%가 공식으로 정해짐", "method": "sympy.Rational 연산 (변화율 공식)", "border": false}
+{"code": "12경수01-01-3", "cls": "불가", "reason": "꺾은선 그래프 기울기로 가파름을 읽는 해석", "method": "해당 없음", "border": true}
+{"code": "12경수01-02-1", "cls": "가능", "reason": "환율 곱셈으로 환산 금액이 정해짐", "method": "정수 곱셈 (sympy.Rational)", "border": false}
+{"code": "12경수01-02-2", "cls": "불가", "reason": "환율 상승의 의미를 이유로 설명", "method": "해당 없음", "border": false}
+{"code": "12경수01-02-3", "cls": "불가", "reason": "환율 그래프 기울기 의미를 읽는 표상", "method": "해당 없음", "border": false}
+{"code": "12경수01-03-1", "cls": "가능", "reason": "세율을 곱한 세액이 정해짐", "method": "sympy.Rational 곱셈", "border": false}
+{"code": "12경수01-03-2", "cls": "불가", "reason": "누진세 구조를 말로 설명하는 개념", "method": "해당 없음", "border": true}
+{"code": "12경수01-03-3", "cls": "가능", "reason": "세금 조각함수 식이 정해져 동치 확인 가능", "method": "sympy.Piecewise + simplify 동치 확인", "border": false}
+{"code": "12경수01-04-1", "cls": "불가", "reason": "복리와 단리의 차이를 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수01-04-2", "cls": "가능", "reason": "현재가치 100만원이 공식으로 정해짐", "method": "sympy.Rational 연산 (FV/(1+r)^n)", "border": false}
+{"code": "12경수01-04-3", "cls": "불가", "reason": "표를 읽어 식으로 쓰는 표상이라 애매해 제외", "method": "해당 없음", "border": true}
+{"code": "12경수01-05-1", "cls": "불가", "reason": "연금 현재가치를 합으로 구한다는 서술", "method": "해당 없음", "border": true}
+{"code": "12경수01-05-2", "cls": "불가", "reason": "현재가치가 작은 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12경수01-05-3", "cls": "가능", "reason": "등비수열 합 폐쇄형 식이 정해짐", "method": "sympy.summation + simplify 동치 확인", "border": false}
+{"code": "12경수02-01-1", "cls": "불가", "reason": "경제 관계를 함수로 표현하는 서술", "method": "해당 없음", "border": false}
+{"code": "12경수02-01-2", "cls": "불가", "reason": "함수 여부를 상황으로 판별하고 이유 설명", "method": "해당 없음", "border": false}
+{"code": "12경수02-01-3", "cls": "가능", "reason": "통화요금 일차식 y=10x+5000이 정해짐", "method": "sympy.Eq + simplify 동치 확인", "border": false}
+{"code": "12경수02-02-1", "cls": "불가", "reason": "수요·공급 곡선의 방향과 의미 서술", "method": "해당 없음", "border": false}
+{"code": "12경수02-02-2", "cls": "가능", "reason": "두 점으로 수요 직선식이 유일하게 정해짐", "method": "sympy.solve (직선 계수)", "border": false}
+{"code": "12경수02-02-3", "cls": "불가", "reason": "수요·공급 그래프 축 관례 해석", "method": "해당 없음", "border": false}
+{"code": "12경수02-03-1", "cls": "불가", "reason": "한계효용 체감의 의미를 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수02-03-2", "cls": "가능", "reason": "총효용 차로 한계효용 6이 정해짐", "method": "정수 뺄셈", "border": false}
+{"code": "12경수02-03-3", "cls": "불가", "reason": "효용 그래프 기울기의 의미 해석", "method": "해당 없음", "border": false}
+{"code": "12경수02-04-1", "cls": "불가", "reason": "균형가격이 교점에서 결정됨을 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수02-04-2", "cls": "가능", "reason": "수요=공급 연립으로 균형가격·거래량 정해짐", "method": "sympy.solve", "border": false}
+{"code": "12경수02-04-3", "cls": "불가", "reason": "그래프에서 균형과 초과공급을 읽는 해석", "method": "해당 없음", "border": false}
+{"code": "12경수02-05-1", "cls": "불가", "reason": "수요곡선 이동 방향을 말로 답하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수02-05-2", "cls": "가능", "reason": "세금 후 공급식과 새 균형가격이 정해짐", "method": "sympy.solve", "border": false}
+{"code": "12경수02-05-3", "cls": "불가", "reason": "곡선 이동과 균형 변화 방향을 그래프로 해석", "method": "해당 없음", "border": false}
+{"code": "12경수02-06-1", "cls": "불가", "reason": "부등식 영역의 위치를 말로 답하는 해석", "method": "해당 없음", "border": true}
+{"code": "12경수02-06-2", "cls": "불가", "reason": "제약을 영역으로 이해하고 식으로 옮기는 모델링", "method": "해당 없음", "border": true}
+{"code": "12경수02-06-3", "cls": "불가", "reason": "영역을 부등식으로 대응시키는 해석", "method": "해당 없음", "border": true}
+{"code": "12경수03-01-1", "cls": "불가", "reason": "행렬 표현 연산의 이름을 답하는 개념", "method": "해당 없음", "border": true}
+{"code": "12경수03-01-2", "cls": "불가", "reason": "행과 열의 의미를 정하는 모델링 해석", "method": "해당 없음", "border": false}
+{"code": "12경수03-01-3", "cls": "불가", "reason": "표를 행렬로 옮기고 성분 위치를 말하는 표상", "method": "해당 없음", "border": true}
+{"code": "12경수03-02-1", "cls": "불가", "reason": "역행렬 존재 조건을 말로 답하는 개념", "method": "해당 없음", "border": true}
+{"code": "12경수03-02-2", "cls": "불가", "reason": "역행렬의 정의와 성분 역수 오개념 설명", "method": "해당 없음", "border": false}
+{"code": "12경수03-02-3", "cls": "가능", "reason": "행렬식 값으로 역행렬 존재 여부가 정해짐", "method": "sympy.Matrix.det / inv", "border": false}
+{"code": "12경수03-03-1", "cls": "불가", "reason": "AX=B의 해법을 말로 답하는 서술", "method": "해당 없음", "border": true}
+{"code": "12경수03-03-2", "cls": "불가", "reason": "역행렬을 곱하는 이유를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12경수03-03-3", "cls": "불가", "reason": "상황을 행렬방정식으로 옮기는 모델링이라 제외", "method": "해당 없음", "border": true}
+{"code": "12경수04-01-1", "cls": "불가", "reason": "비용함수의 미분 의미를 해석하는 서술", "method": "해당 없음", "border": false}
+{"code": "12경수04-01-2", "cls": "불가", "reason": "한계비용과 순간변화율 관계를 설명", "method": "해당 없음", "border": false}
+{"code": "12경수04-01-3", "cls": "불가", "reason": "접선 기울기와 할선 구분을 해석하는 표상", "method": "해당 없음", "border": false}
+{"code": "12경수04-02-1", "cls": "불가", "reason": "도함수 0의 지점을 그래프로 해석하는 개형", "method": "해당 없음", "border": false}

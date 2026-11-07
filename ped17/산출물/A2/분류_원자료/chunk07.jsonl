@@ -1,0 +1,152 @@
+{"code": "12대수03-05-2", "cls": "불가", "reason": "부분분수로 쪼개는 이유를 서술하는 설명형", "method": "해당 없음", "border": false}
+{"code": "12대수03-05-3", "cls": "불가", "reason": "소거 과정을 항 나열로 보이는 서술 표상이 핵심", "method": "해당 없음", "border": true}
+{"code": "12대수03-06-1", "cls": "가능", "reason": "점화식 반복 적용으로 a3=5가 하나로 정해짐", "method": "sympy.rsolve 또는 점화식 반복 정수 계산", "border": false}
+{"code": "12대수03-06-2", "cls": "가능", "reason": "점화식을 반복해 a2=5, a3=8을 계산", "method": "점화식 반복 정수 연산 / sympy.rsolve", "border": false}
+{"code": "12대수03-06-3", "cls": "불가", "reason": "점화식을 일상어로 옮기는 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "12대수03-07-1", "cls": "불가", "reason": "귀납법 두 단계의 의미를 말하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12대수03-07-2", "cls": "불가", "reason": "귀납법 증명 절차를 서술하는 증명형", "method": "해당 없음", "border": false}
+{"code": "12대수03-07-3", "cls": "불가", "reason": "도미노 비유로 설명하는 그림·말 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-01-1", "cls": "불가", "reason": "극한값과 함숫값의 관계를 묻는 개념 해석", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-01-2", "cls": "가능", "reason": "좌극한·우극한 값이 계산으로 정해져 비교 가능", "method": "sympy.limit(dir='-') / sympy.limit(dir='+') 비교", "border": false}
+{"code": "12미적Ⅰ-01-01-3", "cls": "불가", "reason": "그래프의 점을 보고 극한값을 읽는 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-02-1", "cls": "가능", "reason": "0/0꼴 극한값 4가 하나로 정해짐", "method": "sympy.limit", "border": false}
+{"code": "12미적Ⅰ-01-02-2", "cls": "불가", "reason": "극한 성질의 적용 조건을 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-02-3", "cls": "불가", "reason": "표의 경향으로 극한을 추정하고 근거를 쓰는 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-01-03-1", "cls": "불가", "reason": "연속의 세 조건을 말하는 정의 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-03-2", "cls": "가능", "reason": "함숫값과 극한값을 비교해 연속 여부가 참거짓으로 정해짐", "method": "sympy.limit + 함숫값 대입 후 Eq 비교", "border": false}
+{"code": "12미적Ⅰ-01-03-3", "cls": "불가", "reason": "그래프 모양으로 불연속 유형을 분류하는 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-04-1", "cls": "불가", "reason": "사잇값 정리의 조건·결론을 묻는 정리 이해", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-01-04-2", "cls": "불가", "reason": "사잇값정리로 근 존재를 보이는 증명 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-01-04-3", "cls": "불가", "reason": "그래프 비교로 최대최소 보장 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-01-1", "cls": "불가", "reason": "미분계수의 기하적 의미를 말하는 개념 해석", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-01-2", "cls": "가능", "reason": "정의식 극한으로 f'(2)=4가 정해짐", "method": "sympy.limit((f(2+h)-f(2))/h, h, 0)", "border": false}
+{"code": "12미적Ⅰ-02-01-3", "cls": "불가", "reason": "평균변화율 계산에 할선 의미 서술이 함께 필요", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-02-02-1", "cls": "불가", "reason": "미분가능성과 연속성의 관계를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-02-2", "cls": "가능", "reason": "좌·우 미분계수 -1, 1을 각각 계산해 비교", "method": "sympy.limit 좌우 방향 극한 비교", "border": false}
+{"code": "12미적Ⅰ-02-02-3", "cls": "불가", "reason": "꺾인점 그래프를 그리고 설명하는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-03-1", "cls": "가능", "reason": "x^5의 도함수 5x^4가 하나로 정해짐", "method": "sympy.diff", "border": false}
+{"code": "12미적Ⅰ-02-03-2", "cls": "불가", "reason": "미분계수와 도함수의 차이를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-03-3", "cls": "불가", "reason": "f와 f'의 그래프 대응을 설명하는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-04-1", "cls": "가능", "reason": "다항함수 도함수 6x-2가 하나로 정해짐", "method": "sympy.diff", "border": false}
+{"code": "12미적Ⅰ-02-04-2", "cls": "불가", "reason": "곱의 미분이 틀린 이유를 반례로 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-04-3", "cls": "불가", "reason": "그래프 비교로 실수배 미분을 설명하는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-05-1", "cls": "가능", "reason": "x=1에서 접선 y=2x-1이 식으로 정해짐", "method": "sympy.diff + 점-기울기 직선식 Eq 비교", "border": false}
+{"code": "12미적Ⅰ-02-05-2", "cls": "불가", "reason": "접점에서 기울기를 평가하는 이유 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-05-3", "cls": "불가", "reason": "접선 식 계산에 접하는 모습 설명이 함께 필요", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-02-06-1", "cls": "불가", "reason": "평균값 정리가 보장하는 점의 의미를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-06-2", "cls": "가능", "reason": "f'(c)=평균변화율 방정식으로 c=1이 정해짐", "method": "sympy.solve + 구간 내 확인", "border": false}
+{"code": "12미적Ⅰ-02-06-3", "cls": "불가", "reason": "할선과 접선의 관계를 그래프로 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-07-1", "cls": "불가", "reason": "f'=0이어도 극값이 아닐 수 있다는 개념 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-07-2", "cls": "가능", "reason": "x^3-3x의 극댓값 2가 하나로 정해짐", "method": "sympy.diff + sympy.solve + 대입", "border": false}
+{"code": "12미적Ⅰ-02-07-3", "cls": "불가", "reason": "증감표를 보고 그래프 모양을 말하는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-08-1", "cls": "불가", "reason": "그래프 개형에 표시할 항목을 묻는 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-08-2", "cls": "불가", "reason": "극값과 최대·최소 구분을 이유와 함께 설명", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-02-08-3", "cls": "불가", "reason": "그래프 개형을 그리는 작도 절차", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-09-1", "cls": "불가", "reason": "실근 개수 판단 방법을 말로 묻는 문제", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-02-09-2", "cls": "불가", "reason": "실근 개수와 교점 개수의 원리 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-09-3", "cls": "불가", "reason": "부등식을 그래프로 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-10-1", "cls": "불가", "reason": "속도·가속도의 명칭을 묻는 용어 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-02-10-2", "cls": "가능", "reason": "위치를 미분해 v(2)=0, a(2)=6이 정해짐", "method": "sympy.diff 두 번 + 대입", "border": false}
+{"code": "12미적Ⅰ-02-10-3", "cls": "불가", "reason": "위치-시간 그래프에서 속도를 읽는 해석", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-01-1", "cls": "가능", "reason": "∫2x dx = x²+C로 정해짐", "method": "sympy.integrate + 미분 검산", "border": false}
+{"code": "12미적Ⅰ-03-01-2", "cls": "가능", "reason": "적분 후 미분해 피적분함수와 일치 확인", "method": "sympy.integrate + sympy.diff + Eq 비교", "border": false}
+{"code": "12미적Ⅰ-03-01-3", "cls": "불가", "reason": "곡선군 의미를 그래프로 해석하는 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-02-1", "cls": "가능", "reason": "∫(3x²+1)dx = x³+x+C로 정해짐", "method": "sympy.integrate", "border": false}
+{"code": "12미적Ⅰ-03-02-2", "cls": "불가", "reason": "적분 공식이 성립하는 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-02-3", "cls": "불가", "reason": "초기조건 계산에 곡선군 선택 설명이 함께 필요", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-03-03-1", "cls": "불가", "reason": "정적분의 의미와 부호를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-03-2", "cls": "가능", "reason": "구간 합 성질로 6, -6이 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "12미적Ⅰ-03-03-3", "cls": "불가", "reason": "부호 있는 넓이를 그래프로 해석하는 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-04-1", "cls": "불가", "reason": "기본정리가 성립하는 까닭을 묻는 정리 이해", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-04-2", "cls": "가능", "reason": "∫0^2 2x dx = 4가 하나로 정해짐", "method": "sympy.integrate(정적분)", "border": false}
+{"code": "12미적Ⅰ-03-04-3", "cls": "불가", "reason": "넓이함수의 그래프적 의미를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-05-1", "cls": "불가", "reason": "아래 구간 넓이 처리 방식을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-05-2", "cls": "불가", "reason": "무엇을 적분하는지 방법을 말로 답하는 문제", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅰ-03-05-3", "cls": "불가", "reason": "그래프로 위·아래 함수를 확인해 식 세우는 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-06-1", "cls": "불가", "reason": "속도 적분이 변위인지 거리인지 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅰ-03-06-2", "cls": "가능", "reason": "변위 -3/2, 이동거리 5/2가 적분으로 정해짐", "method": "sympy.integrate / Abs 구간 분할 적분", "border": false}
+{"code": "12미적Ⅰ-03-06-3", "cls": "불가", "reason": "속도그래프 넓이를 변위·거리로 해석하는 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-01-1", "cls": "불가", "reason": "진동하는 수열의 수렴·발산을 정성 판정", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-01-01-2", "cls": "불가", "reason": "항을 나열해 발산을 판정하는 정성 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-01-01-3", "cls": "불가", "reason": "수직선 그림과 말·식을 서로 옮기는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-02-1", "cls": "가능", "reason": "∞/∞꼴 수열 극한값 2가 정해짐", "method": "sympy.limit(n→oo)", "border": false}
+{"code": "12미적Ⅱ-01-02-2", "cls": "불가", "reason": "극한 합 성질의 전제와 반례를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-02-3", "cls": "불가", "reason": "표의 경향으로 극한을 추정하는 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-03-1", "cls": "불가", "reason": "rⁿ 수렴 범위를 묻는 개념 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-01-03-2", "cls": "가능", "reason": "r=3/2 발산, r=2/3 은 0 수렴으로 정해짐", "method": "sympy.limit(Rational(3,2)**n, n, oo)", "border": false}
+{"code": "12미적Ⅱ-01-03-3", "cls": "불가", "reason": "그래프 거동에서 r 범위를 읽는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-04-1", "cls": "불가", "reason": "일반항 극한과 급수 수렴의 관계를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-04-2", "cls": "가능", "reason": "Σ1/(n(n+1)) 의 합 1이 정해짐", "method": "sympy.summation(…, (n,1,oo))", "border": false}
+{"code": "12미적Ⅱ-01-04-3", "cls": "불가", "reason": "부분합 그래프를 보고 수렴 여부를 읽는 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-05-1", "cls": "불가", "reason": "등비급수 수렴 조건과 공식을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-01-05-2", "cls": "가능", "reason": "1+1/2+1/4+… 의 합 2가 정해짐", "method": "sympy.summation 또는 Rational 등비급수 공식", "border": false}
+{"code": "12미적Ⅱ-01-05-3", "cls": "불가", "reason": "도형 분할 그림과 식을 연결하는 표상", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-02-01-1", "cls": "가능", "reason": "(e^x)'=e^x, (ln x)'=1/x가 정해짐", "method": "sympy.diff", "border": false}
+{"code": "12미적Ⅱ-02-01-2", "cls": "불가", "reason": "e에서 미분이 자기 자신인 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-01-3", "cls": "불가", "reason": "그래프와 식으로 접선 기울기를 비교 설명", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-02-02-1", "cls": "가능", "reason": "sin(a+b) 전개식이 항등식으로 확인됨", "method": "sympy.expand_trig + simplify로 동치 확인", "border": false}
+{"code": "12미적Ⅱ-02-02-2", "cls": "가능", "reason": "sin75°=(√6+√2)/4가 정확값으로 정해짐", "method": "sympy.sin(75*pi/180) + nsimplify/simplify", "border": false}
+{"code": "12미적Ⅱ-02-02-3", "cls": "불가", "reason": "단위원 회전 그림과 식을 연결하는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-03-1", "cls": "가능", "reason": "lim sin x/x = 1이 정해짐", "method": "sympy.limit", "border": false}
+{"code": "12미적Ⅱ-02-03-2", "cls": "가능", "reason": "(sin x)'=cos x, (cos x)'=-sin x", "method": "sympy.diff", "border": false}
+{"code": "12미적Ⅱ-02-03-3", "cls": "불가", "reason": "그래프의 구멍과 극한을 연결해 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-04-1", "cls": "가능", "reason": "몫의 미분 공식이 기호 미분과 일치하는지 확인", "method": "sympy.diff(f(x)/g(x)) 후 simplify로 동치 확인", "border": false}
+{"code": "12미적Ⅱ-02-04-2", "cls": "불가", "reason": "f'/g'가 틀린 이유를 반례로 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-04-3", "cls": "불가", "reason": "도함수 식과 그래프 감소를 연결해 확인하는 표상", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-02-05-1", "cls": "가능", "reason": "(2x+1)³ 도함수 6(2x+1)²가 정해짐", "method": "sympy.diff + simplify", "border": false}
+{"code": "12미적Ⅱ-02-05-2", "cls": "가능", "reason": "sin(2x)의 도함수 2cos(2x)가 정해짐", "method": "sympy.diff", "border": false}
+{"code": "12미적Ⅱ-02-05-3", "cls": "불가", "reason": "연쇄법칙을 변화율 사슬로 말로 설명", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-02-06-1", "cls": "가능", "reason": "매개변수 dy/dx=3t/2가 정해짐", "method": "sympy.diff(y,t)/sympy.diff(x,t) + simplify", "border": false}
+{"code": "12미적Ⅱ-02-06-2", "cls": "불가", "reason": "매개변수 미분이 성립하는 이유와 조건 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-06-3", "cls": "가능", "reason": "t=1에서 점 (1,1)과 기울기 3/2가 정해짐", "method": "sympy.diff 매개 미분 + 대입", "border": false}
+{"code": "12미적Ⅱ-02-07-1", "cls": "가능", "reason": "x²+y²=1 음함수 미분 -x/y가 정해짐", "method": "sympy.idiff", "border": false}
+{"code": "12미적Ⅱ-02-07-2", "cls": "불가", "reason": "음함수 미분에서 연쇄법칙이 쓰이는 이유 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-07-3", "cls": "불가", "reason": "역함수 기울기를 그래프 대칭으로 설명", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-02-08-1", "cls": "불가", "reason": "접선 기울기를 무엇으로 구하는지 묻는 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-08-2", "cls": "불가", "reason": "접선의 의미와 필요 정보를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-08-3", "cls": "불가", "reason": "접선 식 계산에 그래프 접함 설명이 함께 필요", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-02-09-1", "cls": "불가", "reason": "2차 도함수로 판단하는 것을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-09-2", "cls": "불가", "reason": "f'와 f''의 역할을 구분해 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-09-3", "cls": "불가", "reason": "그래프 개형을 그리는 작도 절차", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-10-1", "cls": "불가", "reason": "실근 개수 판단 방법을 말로 묻는 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-10-2", "cls": "불가", "reason": "실근 개수와 교점 개수의 관계 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-10-3", "cls": "불가", "reason": "부등식 해를 그래프 상하 관계로 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-11-1", "cls": "불가", "reason": "속도와 속력의 정의를 구분하는 용어 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-02-11-2", "cls": "가능", "reason": "속도벡터 (2,3)과 속력 √13이 정해짐", "method": "sympy.diff 성분 미분 + sqrt 크기", "border": false}
+{"code": "12미적Ⅱ-02-11-3", "cls": "불가", "reason": "궤적 그림에서 속도벡터 방향을 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-01-1", "cls": "가능", "reason": "∫1/x dx, ∫sin x dx 결과가 정해짐", "method": "sympy.integrate", "border": false}
+{"code": "12미적Ⅱ-03-01-3", "cls": "불가", "reason": "정적분 값과 실제 넓이의 차이를 설명", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-03-02-1", "cls": "불가", "reason": "치환에서 dx 변환을 묻는 개념 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-03-02-2", "cls": "불가", "reason": "치환 변수 선택을 묻는 방법 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-03-02-3", "cls": "불가", "reason": "구간 변환을 보이는 과정 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-03-03-1", "cls": "불가", "reason": "부분적분 공식을 묻는 공식 암기형", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-03-2", "cls": "가능", "reason": "∫x eˣ dx = x eˣ − eˣ + C가 정해짐", "method": "sympy.integrate + 미분 검산", "border": false}
+{"code": "12미적Ⅱ-03-03-3", "cls": "불가", "reason": "u, dv 선택을 표로 정리하는 과정 서술", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-03-04-1", "cls": "불가", "reason": "정적분이 직사각형 합의 극한이라는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-04-2", "cls": "불가", "reason": "합을 정적분으로 바꾸는 절차를 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-04-3", "cls": "불가", "reason": "직사각형 그림과 합의 식을 연결하는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-05-1", "cls": "가능", "reason": "y=sin x와 x축 사이 넓이 2가 정해짐", "method": "sympy.integrate(sin(x), (x,0,pi))", "border": false}
+{"code": "12미적Ⅱ-03-05-2", "cls": "불가", "reason": "(위-아래)를 적분하는 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-05-3", "cls": "불가", "reason": "그래프로 적분식을 세우는 과정이 핵심", "method": "해당 없음", "border": true}
+{"code": "12미적Ⅱ-03-06-1", "cls": "불가", "reason": "부피=단면적 적분이라는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-06-2", "cls": "불가", "reason": "단면적분 부피 절차를 서술하는 문제", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-06-3", "cls": "불가", "reason": "회전체 단면을 그림·식으로 나타내는 표상", "method": "해당 없음", "border": false}
+{"code": "12미적Ⅱ-03-07-2", "cls": "가능", "reason": "변위 1, 이동거리 3이 적분으로 정해짐", "method": "sympy.integrate / Abs 구간 분할 적분", "border": false}
+{"code": "12미적Ⅱ-03-07-3", "cls": "불가", "reason": "v-t 그래프 넓이를 변위·거리로 해석", "method": "해당 없음", "border": false}
+{"code": "12수문01-01-1", "cls": "불가", "reason": "음악 속 수학을 설명하는 문화 서술", "method": "해당 없음", "border": false}
+{"code": "12수문01-01-2", "cls": "가능", "reason": "264×3/2=396Hz로 비율 곱셈이 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "12수문01-01-3", "cls": "가능", "reason": "음표를 분수로 바꿔 1/2와 4개가 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "12수문01-02-1", "cls": "불가", "reason": "미술 속 수학을 설명하는 문화 서술", "method": "해당 없음", "border": false}
+{"code": "12수문01-02-2", "cls": "불가", "reason": "소실점 작도 순서를 설명하는 작도 문제", "method": "해당 없음", "border": false}
+{"code": "12수문01-02-3", "cls": "불가", "reason": "대칭 좌표 계산에 거울 그림 설명이 함께 필요", "method": "해당 없음", "border": true}
+{"code": "12수문01-03-1", "cls": "불가", "reason": "문학 속 수학을 설명하는 문화 서술", "method": "해당 없음", "border": false}
+{"code": "12수문01-03-2", "cls": "불가", "reason": "시조 음절을 세어 음수율을 판정하는 텍스트 분석", "method": "해당 없음", "border": false}
+{"code": "12수문01-03-3", "cls": "불가", "reason": "이야기 긴장도 곡선을 해석하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문01-04-1", "cls": "불가", "reason": "영화 속 수학을 설명하는 문화 서술", "method": "해당 없음", "border": false}
+{"code": "12수문01-04-2", "cls": "가능", "reason": "720프레임÷24fps=30초로 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "12수문01-04-3", "cls": "불가", "reason": "삼분할 좌표 계산에 위치 설명이 함께 필요", "method": "해당 없음", "border": true}
+{"code": "12수문02-01-1", "cls": "불가", "reason": "스포츠 속 수학을 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문02-01-2", "cls": "가능", "reason": "타율 12÷40=0.300으로 정해짐", "method": "sympy.Rational 연산", "border": false}
+{"code": "12수문02-01-3", "cls": "불가", "reason": "그래프 종류 선택과 이유를 묻는 판단 문제", "method": "해당 없음", "border": false}
+{"code": "12수문02-02-1", "cls": "불가", "reason": "게임 속 수학을 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문02-02-2", "cls": "가능", "reason": "두 주사위 합 7의 확률 1/6이 정해짐", "method": "itertools 전수 열거 + sympy.Rational", "border": false}

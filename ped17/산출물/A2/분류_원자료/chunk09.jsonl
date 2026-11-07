@@ -1,0 +1,152 @@
+{"code": "12직수01-03-2", "cls": "불가", "reason": "표준단위가 필요한 까닭을 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "12직수01-03-3", "cls": "가능", "reason": "2.5t를 g로 바꾸는 단위 환산 값이 하나로 정해짐", "method": "단위 환산표(고정 비율) 곱셈 규칙", "border": false}
+{"code": "12직수02-01-1", "cls": "가능", "reason": "물:가루=2:3에서 가루 9컵일 때 물 6컵이 정해짐", "method": "sympy.Rational 연산 (비례 계산)", "border": false}
+{"code": "12직수02-01-2", "cls": "가능", "reason": "1:5=40:x 비례식의 해 200이 하나로 정해짐", "method": "sympy.solve(Eq(1/5, 40/(40+x)) 또는 비례식 Eq)", "border": false}
+{"code": "12직수02-01-3", "cls": "불가", "reason": "비를 칸 그림·표로 나타내는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "12직수02-02-1", "cls": "가능", "reason": "비율 0.03을 백분율 3%로 바꾸는 값이 정해짐", "method": "sympy.Rational 연산 (×100)", "border": false}
+{"code": "12직수02-02-2", "cls": "불가", "reason": "백분율에서 기준량이 무엇인지 지목하는 개념 설명", "method": "해당 없음", "border": false}
+{"code": "12직수02-02-3", "cls": "불가", "reason": "띠그래프를 그려 표현하는 작도·그림 활동", "method": "해당 없음", "border": false}
+{"code": "12직수02-03-1", "cls": "불가", "reason": "표에서 규칙을 발견해 말·식으로 표현, 답 유일성 불확실", "method": "해당 없음", "border": true}
+{"code": "12직수02-03-2", "cls": "가능", "reason": "상자 10개일 때 사과 40개를 곱셈 규칙으로 계산", "method": "sympy.Eq + 일차식 대입 (sympy.Rational)", "border": false}
+{"code": "12직수02-03-3", "cls": "가능", "reason": "주차 요금 규칙을 시간 1·2·3에 대입한 값이 정해짐", "method": "sympy 일차식 대입(요금=2000·t)", "border": false}
+{"code": "12직수02-04-1", "cls": "불가", "reason": "그래프의 평평한 구간을 말로 해석하는 활동", "method": "해당 없음", "border": false}
+{"code": "12직수02-04-2", "cls": "불가", "reason": "그래프 변화 유형을 구분하고 의미를 해석하는 활동", "method": "해당 없음", "border": false}
+{"code": "12직수02-04-3", "cls": "가능", "reason": "두 점 값의 차를 구간으로 나눈 평균 변화량 30", "method": "sympy.Rational 연산 ((100-40)/(4-2))", "border": false}
+{"code": "12직수02-05-1", "cls": "가능", "reason": "8000x≤500000을 만족하는 최대 정수 62가 정해짐", "method": "sympy.solve_univariate_inequality + floor", "border": false}
+{"code": "12직수02-05-2", "cls": "불가", "reason": "등식과 부등식을 쓰는 까닭을 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12직수02-05-3", "cls": "가능", "reason": "1500x≥30000의 해 x≥20이 하나로 정해짐", "method": "sympy.solve_univariate_inequality", "border": false}
+{"code": "12직수03-01-1", "cls": "불가", "reason": "전개도를 접어 입체를 확인하는 도형 조작", "method": "해당 없음", "border": false}
+{"code": "12직수03-01-2", "cls": "불가", "reason": "전개도가 면 6개여야 하는 까닭을 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12직수03-01-3", "cls": "불가", "reason": "전개도에서 마주 보는 면을 찾는 도형 조작", "method": "해당 없음", "border": false}
+{"code": "12직수03-02-1", "cls": "불가", "reason": "위·앞·옆 모양으로 입체를 판별하는 그림 읽기", "method": "해당 없음", "border": false}
+{"code": "12직수03-02-2", "cls": "불가", "reason": "투상에서 높이가 사라지는 원리를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12직수03-02-3", "cls": "불가", "reason": "쌓기나무를 본 모양을 직접 그리는 작도 활동", "method": "해당 없음", "border": false}
+{"code": "12직수03-03-1", "cls": "가능", "reason": "축척 1:100에서 3cm가 실제 3m로 정해짐", "method": "단위 환산표(고정 비율) 곱셈 규칙", "border": false}
+{"code": "12직수03-03-2", "cls": "불가", "reason": "합동과 닮음의 차이를 구분해 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12직수03-03-3", "cls": "가능", "reason": "축척 1:1000에서 3cm가 실제 30m로 정해짐", "method": "단위 환산표(고정 비율) 곱셈 규칙", "border": false}
+{"code": "12직수03-04-1", "cls": "가능", "reason": "가로 4m 세로 3m 직사각형 넓이 12㎡ 계산", "method": "sympy 정수 연산 (가로×세로)", "border": false}
+{"code": "12직수03-04-2", "cls": "불가", "reason": "둘레와 넓이 중 무엇이 필요한지 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "12직수03-04-3", "cls": "불가", "reason": "복합 도형을 분할하는 방법이 여러 가지인 그림 표현", "method": "해당 없음", "border": true}
+{"code": "12직수03-05-1", "cls": "가능", "reason": "가로 2 세로 1 높이 1 직육면체 부피 2㎥ 계산", "method": "sympy 정수 연산 (가로×세로×높이)", "border": false}
+{"code": "12직수03-05-2", "cls": "불가", "reason": "겉넓이와 부피 중 필요한 것을 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "12직수03-05-3", "cls": "가능", "reason": "4×3×2 직육면체 겉넓이 52㎠가 하나로 정해짐", "method": "sympy 정수 연산 (2(ab+bc+ca))", "border": false}
+{"code": "12직수04-01-1", "cls": "가능", "reason": "상의 3종 하의 4종의 조합 수 12가 정해짐", "method": "sympy 정수 연산 (곱의 법칙)", "border": false}
+{"code": "12직수04-01-2", "cls": "불가", "reason": "합의 법칙과 곱의 법칙을 구분해 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12직수04-01-3", "cls": "불가", "reason": "수형도를 그려 경우를 나열하는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "12직수04-02-1", "cls": "불가", "reason": "반반 가능성을 수로 나타내는 개념 수준 질문", "method": "해당 없음", "border": true}
+{"code": "12직수04-02-2", "cls": "가능", "reason": "제비 20개 중 당첨 5개의 가능성 1/4=25%", "method": "sympy.Rational 연산", "border": false}
+{"code": "12직수04-02-3", "cls": "불가", "reason": "가능성을 수직선 위 위치로 표시하는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "12직수04-03-1", "cls": "불가", "reason": "목적에 맞는 그래프 종류를 고르는 판단", "method": "해당 없음", "border": false}
+{"code": "12직수04-03-2", "cls": "불가", "reason": "그래프 종류 선택과 근거를 서술하는 판단", "method": "해당 없음", "border": false}
+{"code": "12직수04-03-3", "cls": "불가", "reason": "도수분포표 만드는 절차를 서술하는 활동", "method": "해당 없음", "border": false}
+{"code": "12직수04-04-1", "cls": "불가", "reason": "막대그래프 눈금 읽기가 핵심이라 그래프 판독", "method": "해당 없음", "border": true}
+{"code": "12직수04-04-2", "cls": "불가", "reason": "그래프 왜곡을 비판적으로 읽는 해석 활동", "method": "해당 없음", "border": false}
+{"code": "12직수04-04-3", "cls": "불가", "reason": "그래프를 문장으로 해석하는 서술 활동", "method": "해당 없음", "border": false}
+{"code": "12직수04-05-1", "cls": "불가", "reason": "자료에 맞는 표현을 고르는 판단과 의사결정", "method": "해당 없음", "border": false}
+{"code": "12직수04-05-2", "cls": "불가", "reason": "평균 외에 무엇을 볼지 판단하는 서술형", "method": "해당 없음", "border": false}
+{"code": "12직수04-05-3", "cls": "불가", "reason": "주장 근거 자료와 그래프를 제시하는 열린 문제", "method": "해당 없음", "border": false}
+{"code": "12확통01-01-1", "cls": "가능", "reason": "0,0,1 같은 것이 있는 순열 수 3이 정해짐", "method": "sympy.factorial 연산 (3!/2!)", "border": false}
+{"code": "12확통01-01-2", "cls": "불가", "reason": "중복 허용이 경우를 늘리는 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12확통01-01-3", "cls": "불가", "reason": "2!로 나누는 이유를 그림·말로 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12확통01-02-1", "cls": "불가", "reason": "조합과 중복조합 중 유형을 판별하는 개념 분류", "method": "해당 없음", "border": true}
+{"code": "12확통01-02-2", "cls": "가능", "reason": "3H5=7C5=21 중복조합 값이 정해짐", "method": "sympy.binomial(7,5)", "border": false}
+{"code": "12확통01-02-3", "cls": "불가", "reason": "칸막이 모형을 배열로 나타내 식과 연결하는 표현", "method": "해당 없음", "border": false}
+{"code": "12확통01-03-1", "cls": "불가", "reason": "이항계수가 nCr임을 묻는 정의 확인 수준", "method": "해당 없음", "border": true}
+{"code": "12확통01-03-2", "cls": "가능", "reason": "(x+1)^4에서 x² 계수 6이 정해짐", "method": "sympy.expand + Poly.coeff_monomial", "border": false}
+{"code": "12확통01-03-3", "cls": "불가", "reason": "파스칼 삼각형과 전개식 계수 일치를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12확통02-01-1", "cls": "불가", "reason": "독립 시행과 도박사 오류를 설명하는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12확통02-01-2", "cls": "가능", "reason": "주사위 3의 배수 확률 1/3이 정해짐", "method": "sympy.Rational 연산 (경우의 수 비)", "border": false}
+{"code": "12확통02-01-3", "cls": "불가", "reason": "확률을 수직선에 표시하고 의미를 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "12확통02-02-1", "cls": "불가", "reason": "덧셈정리가 성립하는 조건을 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12확통02-02-2", "cls": "가능", "reason": "P(A∪B)=0.5+0.4-0.2=0.7 계산", "method": "sympy.Rational 연산 (덧셈정리)", "border": false}
+{"code": "12확통02-02-3", "cls": "불가", "reason": "벤다이어그램으로 교집합을 빼는 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "12확통02-03-1", "cls": "불가", "reason": "적어도 문제에 여사건을 쓴다는 방법 선택 설명", "method": "해당 없음", "border": true}
+{"code": "12확통02-03-2", "cls": "불가", "reason": "여사건이 편리한 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12확통02-03-3", "cls": "불가", "reason": "여사건 확률을 그림으로 설명하는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "12확통02-04-1", "cls": "불가", "reason": "조건부확률의 방향 차이를 설명하는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12확통02-04-2", "cls": "가능", "reason": "P(A|B)=0.2/0.5=0.4 조건부확률 계산", "method": "sympy.Rational 연산 (P(A∩B)/P(B))", "border": false}
+{"code": "12확통02-04-3", "cls": "불가", "reason": "분할표에서 행을 짚어 비율을 읽는 표 해석", "method": "해당 없음", "border": false}
+{"code": "12확통02-05-1", "cls": "불가", "reason": "배반과 독립의 차이를 설명하는 개념 구분", "method": "해당 없음", "border": false}
+{"code": "12확통02-05-2", "cls": "가능", "reason": "P(A)P(B)=P(A∩B)=1/6 여부로 독립 판정", "method": "sympy.Rational 연산 + 등식 참거짓 판정", "border": false}
+{"code": "12확통02-05-3", "cls": "불가", "reason": "독립과 배반을 벤다이어그램·말로 구분하는 설명", "method": "해당 없음", "border": false}
+{"code": "12확통02-06-1", "cls": "불가", "reason": "곱셈정리 공식이 무엇인지 묻는 식 기억 확인", "method": "해당 없음", "border": true}
+{"code": "12확통02-06-2", "cls": "불가", "reason": "조건부확률을 곱하는 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12확통02-06-3", "cls": "불가", "reason": "나무그림 경로 확률을 곱하는 까닭 설명", "method": "해당 없음", "border": false}
+{"code": "12확통03-01-1", "cls": "불가", "reason": "확률변수·확률분포 용어의 뜻을 묻는 정의", "method": "해당 없음", "border": false}
+{"code": "12확통03-01-2", "cls": "가능", "reason": "동전 2개 앞면 수 분포 1/4,2/4,1/4 확정", "method": "sympy.stats.Binomial + density", "border": false}
+{"code": "12확통03-01-3", "cls": "불가", "reason": "분포표를 막대그래프로 옮기고 의미를 설명", "method": "해당 없음", "border": false}
+{"code": "12확통03-02-1", "cls": "불가", "reason": "기댓값이 실제값이 아님을 설명하는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12확통03-02-2", "cls": "가능", "reason": "E(X)=4, V(X)=3, σ=√3 정확값 계산", "method": "sympy.stats.FiniteRV + E / variance / std", "border": false}
+{"code": "12확통03-02-3", "cls": "불가", "reason": "기댓값을 무게중심으로 해석해 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "12확통03-03-1", "cls": "불가", "reason": "이항분포 평균 공식 np를 문자식으로 묻는 공식 확인", "method": "해당 없음", "border": true}
+{"code": "12확통03-03-2", "cls": "불가", "reason": "이항분포 성립 조건을 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12확통03-03-3", "cls": "불가", "reason": "이항분포 그래프의 대칭 이유를 설명하는 활동", "method": "해당 없음", "border": false}
+{"code": "12확통03-04-1", "cls": "불가", "reason": "모든 분포가 정규분포인지 판단하는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12확통03-04-2", "cls": "가능", "reason": "N(50,10²)에서 X=70의 z=2 계산", "method": "sympy.Rational 연산 ((x-m)/σ)", "border": false}
+{"code": "12확통03-04-3", "cls": "불가", "reason": "정규곡선 넓이가 확률임을 그래프로 설명", "method": "해당 없음", "border": false}
+{"code": "12확통03-05-1", "cls": "불가", "reason": "모집단·표본 용어와 추출의 필요성을 설명", "method": "해당 없음", "border": false}
+{"code": "12확통03-05-2", "cls": "불가", "reason": "임의추출 절차를 서술하는 활동", "method": "해당 없음", "border": false}
+{"code": "12확통03-05-3", "cls": "불가", "reason": "모집단·표본과 기호 m, X̄를 짝짓는 용어 정의", "method": "해당 없음", "border": false}
+{"code": "12확통03-06-1", "cls": "불가", "reason": "표본평균이 표본마다 다름을 말로 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "12확통03-06-2", "cls": "불가", "reason": "문자 m, σ, n으로 표본평균 분포를 쓰는 기호 식 도출", "method": "해당 없음", "border": true}
+{"code": "12확통03-06-3", "cls": "불가", "reason": "n이 커질 때 분포 변화를 그림으로 설명", "method": "해당 없음", "border": false}
+{"code": "12확통03-07-1", "cls": "불가", "reason": "신뢰구간의 올바른 해석을 말로 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12확통03-07-2", "cls": "가능", "reason": "50±1.96×10/√100의 구간 (48.04, 51.96) 계산", "method": "sympy.Rational / sqrt 연산 (X̄±z·σ/√n)", "border": false}
+{"code": "12확통03-07-3", "cls": "불가", "reason": "95% 신뢰구간의 의미와 오해를 말로 설명", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C01", "cls": "불가", "reason": "분해체의 정의 이해, 추상 체확장 성질", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C02", "cls": "불가", "reason": "정규확장 동치 조건을 말로 논증하는 추상 성질", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C03", "cls": "불가", "reason": "비분리확장이 생기는 이유를 설명하는 추상 구조", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C04", "cls": "불가", "reason": "갈루아군이 근을 치환하는 이유를 설명하는 군 성질", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C05", "cls": "불가", "reason": "부분군과 고정체의 대응을 설명하는 추상 개념", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C06", "cls": "불가", "reason": "갈루아 대응의 포함 역순을 설명하는 추상 정리", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C07", "cls": "불가", "reason": "5차 방정식 근호해 불가의 군론적 논증", "method": "해당 없음", "border": false}
+{"code": "GALOIS-C08", "cls": "불가", "reason": "작도 불가능의 대수적 이유를 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "GALOIS-R01", "cls": "불가", "reason": "부분군 격자와 중간체 격자를 그림으로 대응", "method": "해당 없음", "border": false}
+{"code": "FINM-C01", "cls": "가능", "reason": "110원을 연 10%로 할인한 현재가치 100원 계산", "method": "sympy.Rational 연산 (110/1.1)", "border": false}
+{"code": "FINM-C02", "cls": "불가", "reason": "듀레이션 차이를 말로 설명하는 개념 해석", "method": "해당 없음", "border": false}
+{"code": "FINM-C03", "cls": "불가", "reason": "브라운 운동의 비미분성을 설명하는 정성적 성질", "method": "해당 없음", "border": false}
+{"code": "FINM-C04", "cls": "불가", "reason": "이토 보조정리 2차항의 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "FINM-C05", "cls": "불가", "reason": "블랙-숄즈가 μ를 안 쓰는 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "FINM-C06", "cls": "불가", "reason": "위험중립측도가 실제 확률이 아닌 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "FINM-C07", "cls": "불가", "reason": "델타헤지의 목적을 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "FINM-C08", "cls": "불가", "reason": "델타 0.5의 의미를 해석하는 개념 설명", "method": "해당 없음", "border": false}
+{"code": "AGEO-C01", "cls": "불가", "reason": "대수집합 여부를 판단하는 정성적 구분", "method": "해당 없음", "border": false}
+{"code": "AGEO-C02", "cls": "불가", "reason": "자리스키 위상의 닫힌집합 성질을 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "AGEO-C03", "cls": "불가", "reason": "힐베르트 영점정리의 근기 성질을 설명하는 추상 논증", "method": "해당 없음", "border": false}
+{"code": "AGEO-C04", "cls": "불가", "reason": "사영평면에서 무한원점이 생기는 이유 설명", "method": "해당 없음", "border": false}
+{"code": "AGEO-C05", "cls": "불가", "reason": "사영다양체에 동차다항식이 필요한 이유 설명", "method": "해당 없음", "border": false}
+{"code": "AGEO-C06", "cls": "불가", "reason": "정칙사상이 연속사상보다 강한 이유 설명", "method": "해당 없음", "border": false}
+{"code": "AGEO-C07", "cls": "불가", "reason": "다양체 차원의 정의와 이유를 설명하는 추상 개념", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C01", "cls": "불가", "reason": "기본군의 정의와 의미를 설명하는 위상 개념", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C02", "cls": "불가", "reason": "반 캄펀 정리로 기본군을 설명하는 추상 논증", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C03", "cls": "불가", "reason": "피복 올림의 유일성을 설명하는 위상 논증", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C04", "cls": "불가", "reason": "보편피복이 단순연결인 이유를 설명하는 위상 성질", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C05", "cls": "불가", "reason": "경계의 경계가 0인 이유를 설명하는 추상 논증", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C06", "cls": "불가", "reason": "호몰로지와 기본군의 관계를 설명하는 추상 성질", "method": "해당 없음", "border": false}
+{"code": "ATOPO-C07", "cls": "불가", "reason": "호몰로지가 위상불변량인 이유를 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "ATOPO-P01", "cls": "불가", "reason": "마이어-피토리스 도구를 고르는 추상 위상 절차", "method": "해당 없음", "border": false}
+{"code": "ATOPO-R01", "cls": "불가", "reason": "단체복합체 그림과 사슬을 대응시키는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "DGEO-C01", "cls": "불가", "reason": "호장 매개와 단위속력 개념 설명이 핵심, 계산은 부수", "method": "해당 없음", "border": true}
+{"code": "DGEO-C02", "cls": "불가", "reason": "프레네 공식의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "DGEO-C03", "cls": "불가", "reason": "곡률의 의미(직선은 0)를 묻는 정의 확인", "method": "해당 없음", "border": true}
+{"code": "DGEO-C04", "cls": "불가", "reason": "평면곡선 열률이 0임을 묻는 정의 확인", "method": "해당 없음", "border": true}
+{"code": "DGEO-C05", "cls": "불가", "reason": "접평면이 없는 이유를 설명하는 정칙성 논증", "method": "해당 없음", "border": false}
+{"code": "DGEO-C06", "cls": "불가", "reason": "제1기본형식의 내재성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "DGEO-C07", "cls": "불가", "reason": "제2기본형식의 외재성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "DGEO-C08", "cls": "불가", "reason": "가우스 곡률 부호와 곡면 모양을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "DGEO-C09", "cls": "불가", "reason": "평균곡률의 외재성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "DGEO-C10", "cls": "불가", "reason": "가우스 절묘정리의 내재성을 설명하는 정리", "method": "해당 없음", "border": false}
+{"code": "DGEO-C11", "cls": "불가", "reason": "측지선이 국소 최단임을 설명하는 정성적 성질", "method": "해당 없음", "border": false}
+{"code": "DGEO-C12", "cls": "불가", "reason": "가우스-보네 정리의 위상 불변성을 설명하는 논증", "method": "해당 없음", "border": false}
+{"code": "DGEO-R01", "cls": "불가", "reason": "매개표현과 곡면 그림을 오가는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "MFLD-C01", "cls": "불가", "reason": "구면이 전역 좌표로 안 덮이는 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "MFLD-C02", "cls": "불가", "reason": "도표로 매끄러움을 정의하는 추상 개념", "method": "해당 없음", "border": false}
+{"code": "MFLD-C03", "cls": "불가", "reason": "접공간을 내재적으로 정의하는 추상 개념", "method": "해당 없음", "border": false}
+{"code": "MFLD-C04", "cls": "불가", "reason": "리 괄호의 비가환성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "MFLD-C05", "cls": "불가", "reason": "d²=0이 코호몰로지를 정의하는 이유 설명", "method": "해당 없음", "border": false}
+{"code": "MFLD-C06", "cls": "불가", "reason": "측지선이 좌표상 직선이 아닌 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "MFLD-C07", "cls": "불가", "reason": "레비-치비타 접속의 유일성 조건을 설명하는 정리", "method": "해당 없음", "border": false}
+{"code": "MFLD-C08", "cls": "불가", "reason": "곡률텐서가 필요한 이유를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "MFLD-C09", "cls": "불가", "reason": "리치 곡률의 차원 의존 특수성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "MFLD-C10", "cls": "불가", "reason": "스칼라 곡률의 정보 손실을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "MFLD-C11", "cls": "불가", "reason": "스토크스 정리의 통합 관계를 설명하는 추상 정리", "method": "해당 없음", "border": false}

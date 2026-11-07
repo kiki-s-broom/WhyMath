@@ -1,0 +1,152 @@
+{"code": "6수01-02-1", "cls": "불가", "reason": "이상·초과 용어의 뜻을 말하는 개념 설명", "method": "해당 없음", "border": false}
+{"code": "6수01-02-2", "cls": "불가", "reason": "수직선과 부등호로 나타내는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-02-3", "cls": "가능", "reason": "범위에 속하는 자연수 집합이 하나로 정해짐", "method": "sympy.Interval 또는 range로 정수 나열 후 집합 비교", "border": false}
+{"code": "6수01-03-1", "cls": "불가", "reason": "상황에 맞는 어림 방법을 고르는 판단", "method": "해당 없음", "border": false}
+{"code": "6수01-03-2", "cls": "가능", "reason": "반올림 결과 3500이 하나로 정해짐", "method": "Decimal.quantize(ROUND_HALF_UP) 또는 정수 연산", "border": false}
+{"code": "6수01-03-3", "cls": "불가", "reason": "수직선에 점을 찍는 표시 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-04-1", "cls": "불가", "reason": "약수 용어의 뜻 이해가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수01-04-2", "cls": "가능", "reason": "두 수의 최대공약수가 하나로 정해짐", "method": "sympy.gcd", "border": false}
+{"code": "6수01-04-3", "cls": "불가", "reason": "직사각형 배열과 약수를 연결하는 표상 활동", "method": "해당 없음", "border": true}
+{"code": "6수01-05-1", "cls": "불가", "reason": "배수·공배수 용어의 뜻 이해가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수01-05-2", "cls": "가능", "reason": "두 수의 최소공배수가 하나로 정해짐", "method": "sympy.lcm", "border": false}
+{"code": "6수01-05-3", "cls": "불가", "reason": "수직선에 점프를 표시하는 활동이 핵심", "method": "해당 없음", "border": true}
+{"code": "6수01-06-1", "cls": "불가", "reason": "크기가 같은 이유를 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수01-06-2", "cls": "가능", "reason": "약분 결과와 최소공배수 통분이 정해짐", "method": "sympy.Rational 약분과 sympy.lcm으로 통분", "border": false}
+{"code": "6수01-06-3", "cls": "불가", "reason": "띠에 색칠하는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-07-1", "cls": "가능", "reason": "두 분수의 크기 비교 결과가 하나로 정해짐", "method": "sympy.Rational 비교 연산", "border": false}
+{"code": "6수01-07-2", "cls": "불가", "reason": "예상한 까닭을 설명하는 서술이 핵심", "method": "해당 없음", "border": false}
+{"code": "6수01-07-3", "cls": "불가", "reason": "수직선 위에 위치를 찍는 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-08-1", "cls": "불가", "reason": "계산이 틀린 이유를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수01-08-2", "cls": "가능", "reason": "분모 다른 분수의 합이 하나로 정해짐", "method": "sympy.Rational 덧셈", "border": false}
+{"code": "6수01-08-3", "cls": "불가", "reason": "띠를 나눠 색칠하는 표상 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-09-1", "cls": "불가", "reason": "곱해도 작아지는 까닭 설명이 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수01-09-2", "cls": "가능", "reason": "분수 곱셈 결과가 하나로 정해짐", "method": "sympy.Rational 곱셈", "border": false}
+{"code": "6수01-09-3", "cls": "불가", "reason": "정사각형을 나눠 겹쳐 색칠하는 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-10-1", "cls": "불가", "reason": "등분 그림을 나눗셈식으로 옮기고 설명", "method": "해당 없음", "border": false}
+{"code": "6수01-10-2", "cls": "불가", "reason": "나눗셈 몫이 분수인 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수01-10-3", "cls": "가능", "reason": "5÷8의 몫이 분수 하나로 정해짐", "method": "sympy.Rational(5, 8) 비교", "border": false}
+{"code": "6수01-11-1", "cls": "불가", "reason": "몇 번 들어가나 이해가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수01-11-2", "cls": "가능", "reason": "분수 나눗셈 결과가 하나로 정해짐", "method": "sympy.Rational 나눗셈", "border": false}
+{"code": "6수01-11-3", "cls": "불가", "reason": "띠를 나누어 표시하는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-12-1", "cls": "가능", "reason": "분수와 소수 변환 값이 하나로 정해짐", "method": "sympy.Rational 과 Decimal 변환", "border": false}
+{"code": "6수01-12-2", "cls": "가능", "reason": "분수와 소수의 대소 결과가 정해짐", "method": "sympy.Rational 비교 연산", "border": false}
+{"code": "6수01-12-3", "cls": "불가", "reason": "같은 수인 까닭을 자릿값으로 설명", "method": "해당 없음", "border": false}
+{"code": "6수01-13-1", "cls": "불가", "reason": "자리 수 합의 원리 이해가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수01-13-2", "cls": "가능", "reason": "소수 곱셈 결과가 하나로 정해짐", "method": "sympy.Rational 또는 Decimal 곱셈", "border": false}
+{"code": "6수01-13-3", "cls": "불가", "reason": "모눈에 색칠하는 활동이 핵심", "method": "해당 없음", "border": true}
+{"code": "6수01-14-1", "cls": "가능", "reason": "3÷4의 소수 몫이 하나로 정해짐", "method": "sympy.Rational(3, 4) 소수 환산", "border": false}
+{"code": "6수01-14-2", "cls": "불가", "reason": "0.75가 되는 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "6수01-14-3", "cls": "불가", "reason": "수직선에 몫을 찍는 활동", "method": "해당 없음", "border": false}
+{"code": "6수01-15-1", "cls": "불가", "reason": "소수점 이동이 되는 까닭을 설명", "method": "해당 없음", "border": false}
+{"code": "6수01-15-2", "cls": "가능", "reason": "소수 나눗셈 결과가 하나로 정해짐", "method": "sympy.Rational 나눗셈", "border": false}
+{"code": "6수01-15-3", "cls": "불가", "reason": "띠에 표시해 세는 활동이 핵심", "method": "해당 없음", "border": false}
+{"code": "2수04-01-1", "cls": "불가", "reason": "분류 기준의 원칙을 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "2수04-01-2", "cls": "불가", "reason": "분류 활동으로 주어진 수를 옮기는 수준", "method": "해당 없음", "border": true}
+{"code": "2수04-01-3", "cls": "불가", "reason": "그림으로 묶어 나타내는 표현 활동", "method": "해당 없음", "border": false}
+{"code": "2수04-02-1", "cls": "불가", "reason": "표에 필요한 칸을 말하는 표 작성 개념", "method": "해당 없음", "border": false}
+{"code": "2수04-02-2", "cls": "불가", "reason": "표의 편리함을 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "2수04-02-3", "cls": "불가", "reason": "표 작성이 핵심이며 합계는 단순 덧셈", "method": "해당 없음", "border": true}
+{"code": "2수04-03-1", "cls": "불가", "reason": "그래프 기호의 약속을 묻는 표상", "method": "해당 없음", "border": false}
+{"code": "2수04-03-2", "cls": "불가", "reason": "그래프의 편리함을 설명하는 서술형", "method": "해당 없음", "border": false}
+{"code": "2수04-03-3", "cls": "불가", "reason": "○를 쌓아 그래프를 그리는 활동", "method": "해당 없음", "border": false}
+{"code": "4수04-01-1", "cls": "불가", "reason": "막대그래프 작성과 읽기가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "4수04-01-2", "cls": "불가", "reason": "그래프를 쓰는 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수04-01-3", "cls": "불가", "reason": "눈금 정하고 그리는 순서 서술", "method": "해당 없음", "border": false}
+{"code": "4수04-02-1", "cls": "불가", "reason": "꺾은선그래프 해석 서술", "method": "해당 없음", "border": false}
+{"code": "4수04-02-2", "cls": "불가", "reason": "점을 잇는 까닭을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "4수04-02-3", "cls": "불가", "reason": "점 찍고 선 잇는 작성 절차", "method": "해당 없음", "border": false}
+{"code": "4수04-03-1", "cls": "불가", "reason": "상황에 맞는 그래프 선택 판단", "method": "해당 없음", "border": false}
+{"code": "4수04-03-2", "cls": "불가", "reason": "자료 수집·정리 순서를 서술", "method": "해당 없음", "border": false}
+{"code": "4수04-03-3", "cls": "불가", "reason": "그래프 종류를 고르고 까닭을 설명", "method": "해당 없음", "border": false}
+{"code": "6수04-01-1", "cls": "불가", "reason": "평균의 의미 설명이 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수04-01-2", "cls": "가능", "reason": "자료의 평균값이 하나로 정해짐", "method": "sympy.Rational(sum, n) 또는 statistics.mean", "border": false}
+{"code": "6수04-01-3", "cls": "불가", "reason": "막대를 고르게 하는 그림 설명이 핵심", "method": "해당 없음", "border": true}
+{"code": "6수04-02-1", "cls": "불가", "reason": "원그래프 작성과 해석 개념", "method": "해당 없음", "border": false}
+{"code": "6수04-02-2", "cls": "불가", "reason": "그래프를 고르는 까닭을 설명", "method": "해당 없음", "border": false}
+{"code": "6수04-02-3", "cls": "불가", "reason": "그리는 절차 중심이라 계산만으론 애매", "method": "해당 없음", "border": true}
+{"code": "6수04-03-1", "cls": "불가", "reason": "탐구 목적에 맞는 그래프 선택 판단", "method": "해당 없음", "border": false}
+{"code": "6수04-03-2", "cls": "불가", "reason": "탐구 절차를 순서대로 서술", "method": "해당 없음", "border": false}
+{"code": "6수04-03-3", "cls": "불가", "reason": "그래프를 고르고 까닭을 쓰는 서술", "method": "해당 없음", "border": false}
+{"code": "6수04-04-1", "cls": "불가", "reason": "가능성을 말로 표현하는 정성적 판단", "method": "해당 없음", "border": false}
+{"code": "6수04-04-2", "cls": "불가", "reason": "가능성을 말로 비교하고 까닭을 서술", "method": "해당 없음", "border": true}
+{"code": "6수04-04-3", "cls": "불가", "reason": "가능성 말을 띠에 배치하는 활동", "method": "해당 없음", "border": false}
+{"code": "6수04-05-1", "cls": "불가", "reason": "상황 해석이 필요한 가능성 표현이라 애매", "method": "해당 없음", "border": true}
+{"code": "6수04-05-2", "cls": "불가", "reason": "0과 1의 뜻을 말하는 개념 설명", "method": "해당 없음", "border": false}
+{"code": "6수04-05-3", "cls": "가능", "reason": "짝수 카드 비율이 분수 하나로 정해짐", "method": "sympy.Rational(짝수 개수, 전체) 계산", "border": false}
+{"code": "6수04-06-1", "cls": "불가", "reason": "자료 근거로 가능성을 판단하는 서술", "method": "해당 없음", "border": false}
+{"code": "6수04-06-2", "cls": "불가", "reason": "자료로 예상하는 판단이 핵심", "method": "해당 없음", "border": true}
+{"code": "6수04-06-3", "cls": "불가", "reason": "표를 읽어 말로 옮기는 해석 활동", "method": "해당 없음", "border": true}
+{"code": "9수03-01-1", "cls": "불가", "reason": "직선의 위치 관계 용어를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-01-2", "cls": "불가", "reason": "입체의 교선을 세는 구조 판단이라 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-01-3", "cls": "불가", "reason": "그림에서 꼬인 위치 모서리를 찾는 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-02-1", "cls": "불가", "reason": "동위각과 엇각 용어를 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-02-2", "cls": "불가", "reason": "그림 위치 관계에 의존해 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-02-3", "cls": "불가", "reason": "그림에서 엇각을 찾는 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-03-1", "cls": "불가", "reason": "작도 순서를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "9수03-03-2", "cls": "불가", "reason": "삼각형 결정조건을 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-03-3", "cls": "불가", "reason": "작도 순서를 읽는 그림 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-04-1", "cls": "불가", "reason": "합동 조건을 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-04-2", "cls": "불가", "reason": "합동 조건을 서술하는 판별", "method": "해당 없음", "border": false}
+{"code": "9수03-04-3", "cls": "불가", "reason": "합동 기호의 대응을 읽는 표기 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-05-1", "cls": "불가", "reason": "내각·외각 합 원리 이해가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-05-2", "cls": "가능", "reason": "정육각형 내각의 합과 한 각이 정해짐", "method": "sympy.Rational 로 180*(n-2) 계산", "border": false}
+{"code": "9수03-05-3", "cls": "불가", "reason": "그림에서 대각선을 그어 식과 연결", "method": "해당 없음", "border": false}
+{"code": "9수03-06-1", "cls": "불가", "reason": "비례 관계 이해를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-06-2", "cls": "가능", "reason": "부채꼴 호의 길이가 하나로 정해짐", "method": "sympy.pi 와 Rational로 호 길이 계산", "border": false}
+{"code": "9수03-06-3", "cls": "불가", "reason": "그림을 보고 식을 세우는 표상이라 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-07-1", "cls": "불가", "reason": "회전체 종류를 가려내는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-07-2", "cls": "불가", "reason": "단면 모양을 말하는 도형 분류", "method": "해당 없음", "border": false}
+{"code": "9수03-07-3", "cls": "불가", "reason": "그림에서 회전 도형과 축을 지목", "method": "해당 없음", "border": false}
+{"code": "9수03-08-1", "cls": "불가", "reason": "뿔과 기둥의 부피 관계 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "9수03-08-2", "cls": "가능", "reason": "원기둥 부피가 하나로 정해짐", "method": "sympy.pi 로 부피 공식 계산", "border": false}
+{"code": "9수03-08-3", "cls": "불가", "reason": "전개도를 떠올려 식을 세우는 표상", "method": "해당 없음", "border": true}
+{"code": "9수03-09-1", "cls": "불가", "reason": "성질을 논리적으로 정당화하는 증명", "method": "해당 없음", "border": false}
+{"code": "9수03-09-2", "cls": "가능", "reason": "꼭지각이 주어진 밑각이 정해짐", "method": "sympy.Rational 로 (180-40)/2 계산", "border": false}
+{"code": "9수03-09-3", "cls": "불가", "reason": "그림에 기호를 표시하는 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-10-1", "cls": "불가", "reason": "외심과 내심을 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-10-2", "cls": "불가", "reason": "외심의 정의를 적용하는 수준이라 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-10-3", "cls": "불가", "reason": "작도 흔적을 읽는 그림 판독", "method": "해당 없음", "border": false}
+{"code": "9수03-11-1", "cls": "불가", "reason": "사각형 조건을 말로 설명하는 정당화", "method": "해당 없음", "border": false}
+{"code": "9수03-11-2", "cls": "불가", "reason": "합동을 보이는 증명 서술", "method": "해당 없음", "border": false}
+{"code": "9수03-11-3", "cls": "불가", "reason": "포함관계를 그림으로 나타내는 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-12-1", "cls": "불가", "reason": "닮음비와 넓이비 관계 이해가 핵심이라 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-12-2", "cls": "가능", "reason": "대응변이 주어진 닮음비 비례식이 정해짐", "method": "sympy.solve 로 비례식 풀이", "border": false}
+{"code": "9수03-12-3", "cls": "불가", "reason": "그림 표시와 기호 연결 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-13-1", "cls": "불가", "reason": "닮음 조건을 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-13-2", "cls": "가능", "reason": "닮음비로 대응변 길이가 하나로 정해짐", "method": "sympy.solve 로 비례식 풀이", "border": false}
+{"code": "9수03-13-3", "cls": "불가", "reason": "그림 표시에서 닮음 조건을 설명", "method": "해당 없음", "border": false}
+{"code": "9수03-14-1", "cls": "불가", "reason": "일반적인 비례 성질을 말로 답하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-14-2", "cls": "불가", "reason": "평행이 필요한 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "9수03-14-3", "cls": "불가", "reason": "그림에서 선분을 짝짓는 활동이 포함돼 애매", "method": "해당 없음", "border": true}
+{"code": "9수03-15-1", "cls": "불가", "reason": "정리가 성립하는 조건을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-15-2", "cls": "가능", "reason": "직각삼각형 빗변 길이가 하나로 정해짐", "method": "sympy.sqrt 로 a**2+b**2 계산", "border": false}
+{"code": "9수03-15-3", "cls": "불가", "reason": "넓이 그림과 식을 연결하는 설명이 포함", "method": "해당 없음", "border": true}
+{"code": "9수03-16-1", "cls": "불가", "reason": "삼각비 정의를 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-16-2", "cls": "가능", "reason": "특수각 삼각비 값이 하나로 정해짐", "method": "sympy.sin / sympy.cos 에 pi/6 대입", "border": false}
+{"code": "9수03-16-3", "cls": "불가", "reason": "그림에서 변을 짚고 설명하는 활동", "method": "해당 없음", "border": true}
+{"code": "9수03-17-1", "cls": "불가", "reason": "어떤 삼각비를 쓸지 고르는 판단", "method": "해당 없음", "border": true}
+{"code": "9수03-17-2", "cls": "불가", "reason": "삼각비로 측정되는 원리를 설명", "method": "해당 없음", "border": false}
+{"code": "9수03-17-3", "cls": "불가", "reason": "상황을 직각삼각형으로 모델링하는 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-18-1", "cls": "불가", "reason": "현과 접선 성질을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "9수03-18-2", "cls": "가능", "reason": "중심에서 현까지 거리로 현 길이가 정해짐", "method": "sympy.sqrt 로 2*sqrt(5**2-3**2) 계산", "border": false}
+{"code": "9수03-18-3", "cls": "불가", "reason": "성질을 그림에 표시하는 활동", "method": "해당 없음", "border": false}
+{"code": "9수03-19-1", "cls": "불가", "reason": "원주각과 중심각 관계 이해가 핵심", "method": "해당 없음", "border": true}
+{"code": "9수03-19-2", "cls": "가능", "reason": "중심각으로 원주각 크기가 정해짐", "method": "sympy.Rational 로 100/2 계산", "border": false}
+{"code": "9수03-19-3", "cls": "불가", "reason": "그림에서 각을 기호로 찾는 활동", "method": "해당 없음", "border": false}
+{"code": "9수02-01-1", "cls": "불가", "reason": "문자식 표기 규칙을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "9수02-01-2", "cls": "가능", "reason": "문자식에 값을 대입한 결과가 정해짐", "method": "sympy.Symbol 과 subs", "border": false}
+{"code": "9수02-01-3", "cls": "불가", "reason": "상황과 식을 말로 옮기는 해석 활동", "method": "해당 없음", "border": false}
+{"code": "9수02-02-1", "cls": "불가", "reason": "동류항 개념과 까닭을 묻는 설명", "method": "해당 없음", "border": true}
+{"code": "9수02-02-2", "cls": "가능", "reason": "일차식 뺄셈 결과가 하나로 정해짐", "method": "sympy.expand 후 simplify 비교", "border": false}
+{"code": "9수02-02-3", "cls": "불가", "reason": "그림과 식을 대응시키는 표상", "method": "해당 없음", "border": false}
+{"code": "9수02-03-1", "cls": "불가", "reason": "해와 등식의 성질을 말하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수02-03-2", "cls": "가능", "reason": "대입해 해 여부가 참거짓으로 정해짐", "method": "sympy.Eq 와 subs 로 좌우변 비교", "border": false}
+{"code": "9수02-03-3", "cls": "불가", "reason": "저울 그림으로 표현하는 활동", "method": "해당 없음", "border": false}
+{"code": "9수02-04-1", "cls": "가능", "reason": "일차방정식 해가 하나로 정해짐", "method": "sympy.solve", "border": false}
+{"code": "9수02-04-2", "cls": "불가", "reason": "이항의 근거를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "9수02-04-3", "cls": "불가", "reason": "문장을 식으로 옮기는 모델링이 핵심", "method": "해당 없음", "border": true}
+{"code": "9수02-05-1", "cls": "불가", "reason": "좌표평면에 점을 찍는 표시 활동", "method": "해당 없음", "border": false}
+{"code": "9수02-05-2", "cls": "불가", "reason": "순서쌍의 순서가 필요한 이유를 설명", "method": "해당 없음", "border": false}
+{"code": "9수02-05-3", "cls": "불가", "reason": "점을 찍고 좌표를 읽는 작도 활동", "method": "해당 없음", "border": false}
+{"code": "9수02-06-1", "cls": "불가", "reason": "그래프 모양을 해석하는 활동", "method": "해당 없음", "border": false}
+{"code": "9수02-06-2", "cls": "불가", "reason": "그래프가 뜻하는 상황을 설명하는 해석", "method": "해당 없음", "border": false}

@@ -1,0 +1,152 @@
+{"code": "12수문02-02-3", "cls": "불가", "reason": "36칸 계산에 표의 이점 서술이 함께 요구됨", "method": "해당 없음", "border": true}
+{"code": "12수문02-03-1", "cls": "불가", "reason": "디지털 기술 속 수학을 말로 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12수문02-03-2", "cls": "가능", "reason": "십진수를 이진수로 바꾼 결과가 하나로 정해짐", "method": "파이썬 format(13,'b') / bin() 정수 연산", "border": false}
+{"code": "12수문02-03-3", "cls": "불가", "reason": "순서도 판단 기호의 조건을 서술하는 표상 문제", "method": "해당 없음", "border": false}
+{"code": "12수문02-04-1", "cls": "불가", "reason": "집계 방식이 결과에 영향을 준다는 의미 이해", "method": "해당 없음", "border": false}
+{"code": "12수문02-04-2", "cls": "불가", "reason": "과반 판정은 계산이나 결선 절차 설명이 핵심", "method": "해당 없음", "border": true}
+{"code": "12수문02-04-3", "cls": "불가", "reason": "선호 표를 만들어 집계 방식을 비교 서술", "method": "해당 없음", "border": false}
+{"code": "12수문03-01-1", "cls": "불가", "reason": "문화 산물 속 대칭·비례 원리를 탐구하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문03-01-2", "cls": "가능", "reason": "내각 120도 곱하기 3이 360도인지 참거짓 판정", "method": "sympy.Rational로 (n-2)*180/n 계산 후 360 나눗셈 확인", "border": false}
+{"code": "12수문03-01-3", "cls": "가능", "reason": "비를 약분하고 비례식으로 8m를 구함", "method": "sympy.Rational 약분 + sympy.solve 비례식", "border": false}
+{"code": "12수문03-02-1", "cls": "가능", "reason": "6개 점의 경우의 수 2^6=64가 정수로 정해짐", "method": "정수 거듭제곱 2**6 (sympy.Integer)", "border": false}
+{"code": "12수문03-02-2", "cls": "불가", "reason": "곱의 원리로 2^6이 되는 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문03-02-3", "cls": "가능", "reason": "2^n이 40 이상인 최소 n=6이 정수로 정해짐", "method": "sympy.ceiling(sympy.log(40,2)) 또는 정수 반복 검사", "border": false}
+{"code": "12수문03-03-1", "cls": "불가", "reason": "뉴스 그래프를 점검할 항목을 나열하는 비판적 해석", "method": "해당 없음", "border": false}
+{"code": "12수문03-03-2", "cls": "불가", "reason": "증가율 해석의 문제점을 서술하는 상황 해석", "method": "해당 없음", "border": false}
+{"code": "12수문03-03-3", "cls": "가능", "reason": "비율 30퍼센트의 원그래프 중심각 108도가 정해짐", "method": "sympy.Rational(30,100)*360 분수 연산", "border": false}
+{"code": "12수문03-04-1", "cls": "불가", "reason": "가치소비를 위해 무엇을 비교할지 묻는 의사결정", "method": "해당 없음", "border": false}
+{"code": "12수문03-04-2", "cls": "가능", "reason": "1L당 가격 두 값을 계산해 대소가 정해짐", "method": "sympy.Rational 나눗셈 후 대소 비교", "border": false}
+{"code": "12수문03-04-3", "cls": "불가", "reason": "가중치가 표에서 어떻게 반영되는지 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문04-01-1", "cls": "불가", "reason": "식단 분석에서 따질 요소를 말하는 열린 서술", "method": "해당 없음", "border": false}
+{"code": "12수문04-01-2", "cls": "불가", "reason": "기준량이 다른 비율을 직접 비교 못하는 이유 설명", "method": "해당 없음", "border": false}
+{"code": "12수문04-01-3", "cls": "가능", "reason": "전체 길이 10cm에 비율 30퍼센트를 곱해 3cm", "method": "sympy.Rational(30,100)*10 분수 연산", "border": false}
+{"code": "12수문04-02-1", "cls": "불가", "reason": "미세먼지 자료 분석 방법을 제안하는 열린 서술", "method": "해당 없음", "border": false}
+{"code": "12수문04-02-2", "cls": "불가", "reason": "농도 단위의 뜻과 부피 관계를 말로 설명", "method": "해당 없음", "border": false}
+{"code": "12수문04-02-3", "cls": "불가", "reason": "꺾은선 그래프의 기울기를 읽는 그래프 해석", "method": "해당 없음", "border": false}
+{"code": "12수문04-03-1", "cls": "불가", "reason": "사막화 분석에 쓰는 수학을 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문04-03-2", "cls": "불가", "reason": "변화율의 의미를 설명하는 개념 서술이 핵심", "method": "해당 없음", "border": true}
+{"code": "12수문04-03-3", "cls": "불가", "reason": "식 세우기와 그래프 모양 설명이 섞여 있음", "method": "해당 없음", "border": true}
+{"code": "12수문04-04-1", "cls": "불가", "reason": "생물다양성 자료를 다루는 방법을 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수문04-04-2", "cls": "불가", "reason": "표본조사로 전체를 추정하는 원리와 한계 설명", "method": "해당 없음", "border": false}
+{"code": "12수문04-04-3", "cls": "불가", "reason": "막대그래프를 보고 다양성을 해석하는 그래프 읽기", "method": "해당 없음", "border": false}
+{"code": "12수과01-01-1", "cls": "불가", "reason": "과제 탐구의 의미를 설명하는 정의형 개념", "method": "해당 없음", "border": false}
+{"code": "12수과01-01-2", "cls": "불가", "reason": "탐구 단계 순서를 서술하는 절차 설명", "method": "해당 없음", "border": false}
+{"code": "12수과01-01-3", "cls": "불가", "reason": "탐구 필요성을 흐름도로 그리는 표상 서술", "method": "해당 없음", "border": false}
+{"code": "12수과01-02-1", "cls": "불가", "reason": "연구윤리와 표절 인용에 대한 가치 판단", "method": "해당 없음", "border": false}
+{"code": "12수과01-02-2", "cls": "불가", "reason": "출처 인용 처리 순서를 말하는 서술형 절차", "method": "해당 없음", "border": false}
+{"code": "12수과01-02-3", "cls": "불가", "reason": "직접·간접 인용의 표기 방식을 서술", "method": "해당 없음", "border": false}
+{"code": "12수과02-01-1", "cls": "불가", "reason": "문헌 조사 시 주의할 점을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12수과02-01-2", "cls": "불가", "reason": "문헌 조사 진행 순서를 말로 나열하는 절차", "method": "해당 없음", "border": false}
+{"code": "12수과02-01-3", "cls": "불가", "reason": "비교표의 열 항목을 설계하는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12수과02-02-1", "cls": "불가", "reason": "사례 조사의 핵심을 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12수과02-02-2", "cls": "불가", "reason": "사례 조사 수행 단계를 서술하는 절차 설명", "method": "해당 없음", "border": false}
+{"code": "12수과02-02-3", "cls": "불가", "reason": "사례의 공통 패턴을 그래프나 그림으로 표현", "method": "해당 없음", "border": false}
+{"code": "12수과02-03-1", "cls": "불가", "reason": "수학 실험에 필요한 조건을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12수과02-03-2", "cls": "불가", "reason": "실험 진행 단계를 서술하는 절차 설명", "method": "해당 없음", "border": false}
+{"code": "12수과02-03-3", "cls": "불가", "reason": "표의 규칙을 식이나 그래프로 옮기는 열린 서술", "method": "해당 없음", "border": false}
+{"code": "12수과02-04-1", "cls": "불가", "reason": "개발 연구의 특징을 말하는 정의형 개념", "method": "해당 없음", "border": false}
+{"code": "12수과02-04-2", "cls": "불가", "reason": "개발 연구 단계를 서술하는 절차 설명", "method": "해당 없음", "border": false}
+{"code": "12수과02-04-3", "cls": "불가", "reason": "설계도나 순서도를 그리는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12수과03-01-1", "cls": "불가", "reason": "좋은 탐구 주제의 조건을 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수과03-01-2", "cls": "불가", "reason": "주제 조건을 설명하는 개념으로 정답이 열려 있음", "method": "해당 없음", "border": false}
+{"code": "12수과03-01-3", "cls": "불가", "reason": "탐구 계획표 항목을 설계하는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12수과03-02-1", "cls": "불가", "reason": "탐구 수행 시 지킬 점을 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수과03-02-2", "cls": "불가", "reason": "방법과 주제의 적합성을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12수과03-02-3", "cls": "불가", "reason": "수행 기록 형태를 고르는 열린 서술", "method": "해당 없음", "border": false}
+{"code": "12수과03-03-1", "cls": "불가", "reason": "산출물과 발표에 담을 내용을 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수과03-03-2", "cls": "불가", "reason": "발표의 목적을 설명하는 가치 판단형 개념", "method": "해당 없음", "border": false}
+{"code": "12수과03-03-3", "cls": "불가", "reason": "산출물 제작 순서를 말로 나열하는 절차", "method": "해당 없음", "border": false}
+{"code": "12수과03-04-1", "cls": "불가", "reason": "탐구 후 반성·평가 항목을 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12수과03-04-2", "cls": "불가", "reason": "반성·평가 점검 순서를 서술하는 절차", "method": "해당 없음", "border": false}
+{"code": "12수과03-04-3", "cls": "불가", "reason": "루브릭 표나 척도를 설계하는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12실통01-01-1", "cls": "불가", "reason": "통계의 필요성을 설명하는 정의형 개념", "method": "해당 없음", "border": false}
+{"code": "12실통01-01-2", "cls": "불가", "reason": "통계로 답할 질문을 고르고 절차를 서술", "method": "해당 없음", "border": false}
+{"code": "12실통01-01-3", "cls": "불가", "reason": "막연한 말을 수치로 바꾸는 방법을 서술", "method": "해당 없음", "border": false}
+{"code": "12실통01-02-1", "cls": "불가", "reason": "통계적 문제해결 단계를 묻는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12실통01-02-2", "cls": "불가", "reason": "단계 배열은 계산이 아닌 개념 순서 암기", "method": "해당 없음", "border": false}
+{"code": "12실통01-02-3", "cls": "불가", "reason": "순환 고리 그림의 의미를 해석하는 서술", "method": "해당 없음", "border": false}
+{"code": "12실통01-03-1", "cls": "불가", "reason": "모집단·표본의 대표성을 이해하는 개념", "method": "해당 없음", "border": false}
+{"code": "12실통01-03-2", "cls": "불가", "reason": "단순임의추출의 절차와 이유를 서술", "method": "해당 없음", "border": false}
+{"code": "12실통01-03-3", "cls": "불가", "reason": "모집단과 표본의 포함관계를 그림으로 표현", "method": "해당 없음", "border": false}
+{"code": "12실통02-01-1", "cls": "불가", "reason": "질적·양적 자료 구분이라는 용어 분류 개념", "method": "해당 없음", "border": false}
+{"code": "12실통02-01-2", "cls": "불가", "reason": "자료를 질적·양적으로 나누는 기준 설명", "method": "해당 없음", "border": false}
+{"code": "12실통02-01-3", "cls": "불가", "reason": "자료 종류에 맞는 그래프와 요약값을 짝짓는 서술", "method": "해당 없음", "border": false}
+{"code": "12실통02-02-1", "cls": "불가", "reason": "상황에 맞는 자료 수집 방법을 고르는 판단", "method": "해당 없음", "border": false}
+{"code": "12실통02-02-2", "cls": "불가", "reason": "수집 방법 선택 이유를 서술하는 절차", "method": "해당 없음", "border": false}
+{"code": "12실통02-02-3", "cls": "불가", "reason": "유도 질문을 중립 표현으로 고쳐 쓰는 열린 서술", "method": "해당 없음", "border": false}
+{"code": "12실통02-03-1", "cls": "불가", "reason": "자료 특성에 맞는 그래프 종류를 고르는 표상", "method": "해당 없음", "border": false}
+{"code": "12실통02-03-2", "cls": "불가", "reason": "그래프별 목적 차이를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12실통02-03-3", "cls": "불가", "reason": "히스토그램 작성 순서를 서술하는 절차", "method": "해당 없음", "border": false}
+{"code": "12실통02-04-1", "cls": "불가", "reason": "대푯값과 산포도의 의미를 묻는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12실통02-04-2", "cls": "불가", "reason": "중앙값 계산이 있으나 극단값 대표성 판단이 핵심", "method": "해당 없음", "border": true}
+{"code": "12실통02-04-3", "cls": "불가", "reason": "평균이 같아도 퍼짐이 다름을 그래프로 설명", "method": "해당 없음", "border": false}
+{"code": "12실통03-01-1", "cls": "불가", "reason": "정규분포와 t분포의 쓰임을 구분하는 개념", "method": "해당 없음", "border": false}
+{"code": "12실통03-01-2", "cls": "불가", "reason": "공학 도구 입력 절차를 서술하는 문제", "method": "해당 없음", "border": true}
+{"code": "12실통03-01-3", "cls": "불가", "reason": "곡선 모양 차이를 읽고 해석하는 그래프 문제", "method": "해당 없음", "border": false}
+{"code": "12실통03-02-1", "cls": "불가", "reason": "신뢰구간이 필요한 이유를 말하는 서술", "method": "해당 없음", "border": false}
+{"code": "12실통03-02-2", "cls": "불가", "reason": "신뢰구간의 참뜻을 설명하는 해석 문제", "method": "해당 없음", "border": false}
+{"code": "12실통03-02-3", "cls": "불가", "reason": "신뢰구간을 수직선에 옮기고 폭 관계를 서술", "method": "해당 없음", "border": false}
+{"code": "12실통03-03-1", "cls": "불가", "reason": "표본오차가 빠졌다는 점을 짚는 서술", "method": "해당 없음", "border": false}
+{"code": "12실통03-03-2", "cls": "불가", "reason": "표본비율과 모비율의 구분을 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12실통03-03-3", "cls": "불가", "reason": "오차막대 겹침을 읽어 해석하는 그래프 판단", "method": "해당 없음", "border": false}
+{"code": "12실통03-04-1", "cls": "불가", "reason": "p값의 의미를 해석하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12실통03-04-2", "cls": "불가", "reason": "가설검정 순서를 말로 나열하는 절차 서술", "method": "해당 없음", "border": false}
+{"code": "12실통03-04-3", "cls": "불가", "reason": "p값을 분포 꼬리 넓이로 읽는 그래프 해석", "method": "해당 없음", "border": false}
+{"code": "12실통04-01-1", "cls": "불가", "reason": "의사결정의 근거가 자료임을 묻는 개념", "method": "해당 없음", "border": false}
+{"code": "12실통04-01-2", "cls": "불가", "reason": "근거 기반 결정 절차를 열린 서술로 제시", "method": "해당 없음", "border": false}
+{"code": "12실통04-01-3", "cls": "불가", "reason": "결정에 맞는 표현 방식을 고르는 가치 판단", "method": "해당 없음", "border": false}
+{"code": "12실통04-02-1", "cls": "불가", "reason": "통계 결과를 비판적으로 점검하는 가치 판단", "method": "해당 없음", "border": false}
+{"code": "12실통04-02-2", "cls": "불가", "reason": "탐구 결과 점검 항목을 나열하는 서술", "method": "해당 없음", "border": false}
+{"code": "12실통04-02-3", "cls": "불가", "reason": "왜곡된 그래프를 비판하는 그래프 해석", "method": "해당 없음", "border": false}
+{"code": "12인수01-01-1", "cls": "불가", "reason": "인공지능 학습의 의미를 설명하는 개념", "method": "해당 없음", "border": false}
+{"code": "12인수01-01-2", "cls": "불가", "reason": "예측·비교·수정 과정을 서술하는 절차 설명", "method": "해당 없음", "border": false}
+{"code": "12인수01-01-3", "cls": "불가", "reason": "학습 과정을 흐름도로 그리는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12인수01-02-1", "cls": "불가", "reason": "AI 속 수학의 역사적 토대를 묻는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수01-02-2", "cls": "불가", "reason": "사례에서 수학 개념을 추출하는 서술형 문제", "method": "해당 없음", "border": false}
+{"code": "12인수01-02-3", "cls": "불가", "reason": "사례와 수학 도구를 표로 정리하는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수01-03-1", "cls": "불가", "reason": "빅데이터 3V의 정의를 묻는 용어 개념", "method": "해당 없음", "border": false}
+{"code": "12인수01-03-2", "cls": "불가", "reason": "상황을 3V 특성에 대응시키는 분류 문제", "method": "해당 없음", "border": false}
+{"code": "12인수01-03-3", "cls": "불가", "reason": "빅데이터 특성을 비교표로 도식화하는 표상", "method": "해당 없음", "border": false}
+{"code": "12인수02-01-1", "cls": "불가", "reason": "텍스트를 벡터로 표현한다는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12인수02-01-2", "cls": "불가", "reason": "텍스트를 벡터로 바꾸는 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수02-01-3", "cls": "가능", "reason": "단어 빈도 벡터 (2,1)이 하나로 정해짐", "method": "파이썬 collections.Counter로 단어 빈도 집계 후 sympy.Matrix", "border": false}
+{"code": "12인수02-02-1", "cls": "불가", "reason": "빈도수벡터라는 용어의 이름과 뜻을 묻는 정의", "method": "해당 없음", "border": false}
+{"code": "12인수02-02-2", "cls": "불가", "reason": "빈도 벡터가 알려주는 바를 해석하는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수02-02-3", "cls": "불가", "reason": "빈도 벡터를 막대그래프로 묘사하는 그래프 표상", "method": "해당 없음", "border": false}
+{"code": "12인수02-03-1", "cls": "불가", "reason": "벡터 유사도로 문서를 비교한다는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12인수02-03-2", "cls": "가능", "reason": "두 벡터의 코사인 유사도 1/√2가 정해짐", "method": "sympy.Matrix.dot / norm 으로 코사인 계산", "border": false}
+{"code": "12인수02-03-3", "cls": "불가", "reason": "유사한 벡터의 사잇각을 그림으로 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수03-01-1", "cls": "불가", "reason": "이미지가 행렬로 표현된다는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12인수03-01-2", "cls": "불가", "reason": "픽셀과 숫자의 관계를 말로 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수03-01-3", "cls": "불가", "reason": "이미지를 행렬로 옮기는 배치 문제로 계산이 아님", "method": "해당 없음", "border": true}
+{"code": "12인수03-02-1", "cls": "불가", "reason": "이미지를 밝게 하는 연산을 말로 답하는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수03-02-2", "cls": "불가", "reason": "행렬 덧셈이 사진에 주는 변화를 설명", "method": "해당 없음", "border": false}
+{"code": "12인수03-02-3", "cls": "불가", "reason": "반전 행렬과 그림을 함께 설명하는 표상 문제", "method": "해당 없음", "border": true}
+{"code": "12인수03-03-1", "cls": "불가", "reason": "이미지 분류 근거를 묻는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12인수03-03-2", "cls": "불가", "reason": "주어진 거리 비교와 이유 서술이 섞인 분류 문제", "method": "해당 없음", "border": true}
+{"code": "12인수03-03-3", "cls": "불가", "reason": "분류 경계를 그림으로 나타내는 표상 문제", "method": "해당 없음", "border": false}
+{"code": "12인수04-01-1", "cls": "불가", "reason": "상대빈도로 확률을 추정한다는 방법 설명", "method": "해당 없음", "border": false}
+{"code": "12인수04-01-2", "cls": "불가", "reason": "상대빈도의 의미를 해석하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12인수04-01-3", "cls": "가능", "reason": "도수 20을 전체 100으로 나눠 확률 0.2", "method": "sympy.Rational(20,100) 분수 연산", "border": false}
+{"code": "12인수04-02-1", "cls": "불가", "reason": "추세선의 이름과 의미를 묻는 정의형 문제", "method": "해당 없음", "border": false}
+{"code": "12인수04-02-2", "cls": "불가", "reason": "추세선의 역할을 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12인수04-02-3", "cls": "가능", "reason": "두 점을 지나는 직선 y=2x+1이 하나로 정해짐", "method": "sympy.solve 연립방정식 또는 sympy.Line 기울기·절편", "border": false}
+{"code": "12인수04-03-1", "cls": "불가", "reason": "손실함수가 측정하는 바를 묻는 정의형 개념", "method": "해당 없음", "border": false}
+{"code": "12인수04-03-2", "cls": "가능", "reason": "오차제곱합 손실 값 1이 정수 연산으로 정해짐", "method": "파이썬 정수 연산 sum((a-b)**2) / sympy.Integer", "border": false}
+{"code": "12인수04-03-3", "cls": "불가", "reason": "오차 간격과 손실의 관계를 그림으로 설명", "method": "해당 없음", "border": false}
+{"code": "12인수04-04-1", "cls": "불가", "reason": "경사하강법의 이동 방향을 묻는 개념 이해", "method": "해당 없음", "border": false}
+{"code": "12인수04-04-2", "cls": "불가", "reason": "기울기 부호와 이동 방향을 이유와 함께 설명", "method": "해당 없음", "border": true}
+{"code": "12인수04-04-3", "cls": "불가", "reason": "공이 언덕을 굴러가는 비유를 그림으로 묘사", "method": "해당 없음", "border": false}
+{"code": "12인수05-01-1", "cls": "불가", "reason": "AI 결과의 한계를 고려하는 비판적 서술", "method": "해당 없음", "border": false}
+{"code": "12인수05-01-2", "cls": "불가", "reason": "문제를 모델로 푸는 단계를 말로 나열", "method": "해당 없음", "border": false}
+{"code": "12인수05-01-3", "cls": "불가", "reason": "입력-처리-출력 도식을 그리는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12인수05-02-1", "cls": "불가", "reason": "AI 주제 탐구의 핵심을 묻는 서술", "method": "해당 없음", "border": false}
+{"code": "12인수05-02-2", "cls": "불가", "reason": "탐구 주제를 좁히는 단계를 서술하는 열린 문제", "method": "해당 없음", "border": false}
+{"code": "12인수05-02-3", "cls": "불가", "reason": "측정값을 표와 그래프로 나타내는 열린 표상", "method": "해당 없음", "border": false}
+{"code": "12직수01-01-1", "cls": "가능", "reason": "12개씩 7상자의 총개수 84가 정해짐", "method": "sympy.Integer 정수 곱셈 12*7", "border": false}
+{"code": "12직수01-01-2", "cls": "불가", "reason": "곱셈을 쓰는 이유를 설명하는 개념 서술", "method": "해당 없음", "border": false}
+{"code": "12직수01-01-3", "cls": "가능", "reason": "8000-2500*2 식의 값 3000이 하나로 정해짐", "method": "sympy.sympify로 식 평가 및 Eq 동치 확인", "border": false}
+{"code": "12직수01-02-1", "cls": "가능", "reason": "2870을 백의 자리로 반올림한 값 2900", "method": "파이썬 round(2870,-2) 또는 sympy 정수 연산", "border": false}
+{"code": "12직수01-02-2", "cls": "불가", "reason": "어림이 필요한 이유를 설명하는 서술", "method": "해당 없음", "border": false}
+{"code": "12직수01-02-3", "cls": "가능", "reason": "4870을 백의 자리로 반올림한 값 4900", "method": "파이썬 round(4870,-2) / 중간점 4850 비교", "border": false}
+{"code": "12직수01-03-1", "cls": "가능", "reason": "2.5kg의 g 환산값 2500이 고정 비율로 정해짐", "method": "단위 환산표(1kg=1000g) 곱셈 sympy.Rational", "border": false}
