@@ -75,6 +75,13 @@ _INTENTIONAL_EXCLUSIONS: dict[str, str] = {
         "초록·빨강이 된다 — 일부러 PR 경로 밖에 둔다(OPS-121). 정적 검사 본체는 required인 "
         "infra-contracts 잡이 돌고, 야간 배선은 tests/infra/test_ci_constraints.py가 동결한다."
     ),
+    # GOLD-01(골든 패스 S2 · 2026-11-08) — 만료 지점: S5가 처음 초록으로 만든 뒤 Kiki가 룰셋에
+    # 등록하면서 이 줄을 지우고 위 문서(branch-protection-setup.md)의 required 목록으로 옮긴다.
+    "golden-path — 골든 패스 e2e (GOLD-01)": (
+        "S2가 일부러 빨간불(ImportError)로 심었고 S5가 처음 초록으로 만든다. 그 전에 required로 "
+        "걸면 모든 PR 머지가 막힌다. S5 첫 초록 뒤 Kiki가 룰셋 required check에 등록하고 이 제외를 "
+        "문서 목록으로 옮긴다(golden/reports_no_students/S2/보고.md)."
+    ),
 }
 
 
