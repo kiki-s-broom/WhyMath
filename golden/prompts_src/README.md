@@ -25,3 +25,12 @@ python3 scripts/golden_prompts/build_prompts.py golden/prompts_src/spec_no_stude
 `spec.md`의 S1~S8을 고쳤으면 같은 절을 `spec_no_students.md`에도 그대로 반영한다(두 파일의 S1~S8 절은 글자 그대로 같아야 한다).
 
 고칠 때의 규칙: 숫자·정의를 바꾸면 `spec.md`의 공유 계약을 고친다(모든 세션 파일에 같은 내용이 들어가므로 한 곳만 고치면 된다). 작업을 추가하면 `config.json`의 `tasks`에 번호·`deps`를 넣고 `spec.md`에 `### <번호>. <제목>` 절을 쓴다. 병렬 가능 여부는 `deps`에서 자동 계산된다.
+
+## 세션 이름 자동 등록
+
+지시문 파일의 첫 줄은 `세션 이름: GP-단계03-S4-API3개-튜터`처럼 파일 이름과 같다. 그 파일을 새 세션에 붙여 넣으면 두 가지가 자동으로 일어난다.
+
+1. 저장소 훅 `.claude/hooks/golden_session_register.py`(UserPromptSubmit)가 첫 줄을 읽어 `golden/SESSIONS.md` 등록부에 시각·세션 이름·작업 번호·묶음·session_id 앞 12자를 한 줄로 적는다(같은 세션은 중복 기록 없음). 지시문이 아닌 보통 프롬프트에는 아무것도 하지 않는다.
+2. 같은 훅이 AI에게 "첫 행위로 세션 제목을 이 이름으로 바꿔라"를 알려 준다. 클라우드 세션(claude.ai/code)은 AI가 `set_session_title` 도구로 스스로 제목을 바꾼다. 터미널 Claude Code에는 그 도구가 없어서 AI가 `/rename <이름>` 한 줄을 안내하면 사용자가 쳐 준다.
+
+훅 계약은 `tests/infra/test_golden_session_register.py`가 동결한다(지시문 첫 줄 형식·등록부 멱등성·깨진 입력에도 exit 0·생성된 지시문 전부가 첫 줄 형식을 갖는지).
