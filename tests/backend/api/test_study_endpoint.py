@@ -33,6 +33,7 @@ from whymath_backend.api import study as study_module
 from whymath_backend.api._auth import get_consented_user
 from whymath_backend.app import create_app
 from whymath_backend.db.models.concept_content import ConceptContent
+from whymath_backend.db.models.concept_lifecycle_log import ConceptExposureEvent
 from whymath_backend.db.models.evidence_event import EvidenceEvent
 from whymath_backend.db.models.learner_state import LearnerStateRecord
 from whymath_backend.db.models.pedagogy_dsl import LearningObjective
@@ -252,6 +253,8 @@ def _supply_result(rendered: bool = True) -> SupplyResult:
         strategy=PedagogyStrategy.SOCRATIC,
         rendered=unit,
         gate_reason_code=None,
+        # 실제 `supply()`는 렌더 성공 시 서빙 행 code를 항상 채운다(노출 기록의 입력 · PED-17 A1).
+        content_code=_CONCEPT_CODE if rendered else None,
     )
 
 
@@ -408,9 +411,13 @@ class TestOutcomeEndpointReach:
             "/v1/me/objectives/obj-mob13/outcome", json={"session_id": session_id, "correct": False}
         )
         assert outcome.status_code == 201
-        # 처치 1행 + 결과 1행이 같은 세션 축으로 stage됐다.
-        assert len(fake.added) == 2
-        assert {str(getattr(row, "session_id", "")) for row in fake.added} == {session_id}
+        # 처치 1행 + 결과 1행이 같은 세션 축으로 stage됐다(증거 이벤트만 센다 — PED-17 A1부터
+        # `/study`는 노출 기록 1행도 같은 트랜잭션에 남기지만 그것은 세션 축의 행이 아니다).
+        evidence = [row for row in fake.added if isinstance(row, EvidenceEvent)]
+        assert len(evidence) == 2
+        assert {str(getattr(row, "session_id", "")) for row in evidence} == {session_id}
+        exposures = [row for row in fake.added if isinstance(row, ConceptExposureEvent)]
+        assert len(exposures) == 1
 
     def test_outcome_404_when_objective_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """목표 없음 → 404."""
@@ -500,7 +507,12 @@ class TestStudyRequiresLearnerState:
         assert len(calls) == 1
 
 
-def _content_client(review_status: str) -> tuple[TestClient, _FakeSession]:
+def _content_client(
+    review_status: str,
+    *,
+    lifecycle_status: str = "공개됨",
+    content_origin: str = "사람 검수",
+) -> tuple[TestClient, _FakeSession]:
     """`supply()`를 대역으로 바꾸지 **않는** 클라이언트 — 세션 대역에 콘텐츠 행만 심는다.
 
     위 `_client`는 `supply()`를 대역으로 바꿔 라우터 배선만 본다. 이 클라이언트는 실 공급 사슬
@@ -522,6 +534,9 @@ def _content_client(review_status: str) -> tuple[TestClient, _FakeSession]:
         atom_codes=[],
         flashcards=[],
         review_status=review_status,
+        # PED-17 A1: 마이그레이션이 `reviewed` 행에 매기는 값 — 이미 학생에게 나가던 개념의 모습.
+        lifecycle_status=lifecycle_status,
+        content_origin=content_origin,
     )
     get_map: dict[Any, Any] = {
         _OBJECTIVE_ID: _objective(),
@@ -565,6 +580,104 @@ class TestStudyReviewGateReach:
         assert not any(isinstance(row, EvidenceEvent) for row in fake.added)
 
 
+_STUDY_URL = "/v1/me/objectives/obj-mob13/study"
+_EXPECTED_RESPONSE_KEYS = {
+    "session_id",
+    "objective_id",
+    "concept_code",
+    "strategy",
+    "content_source",
+    "gate_reason_code",
+    "segments",
+}
+
+
+class TestStudyLifecycleGateReach:
+    """PED-17 A1 — 학생 경로는 생애 상태 '공개됨'일 때만 개념을 연다(서빙 경로 도달 증명).
+
+    같은 콘텐츠 행에서 생애 상태·출처·검수 라벨 중 **한 축만** 바꿔 201/404가 뒤집히는지 본다.
+    `_content_client`는 `supply()`를 대역으로 덮지 않고 실제 공급 체인을 태운다.
+    """
+
+    @pytest.mark.parametrize("lifecycle", ["초안", "검증됨", "회수됨"])
+    @pytest.mark.parametrize(
+        ("origin", "review"),
+        [("사람 검수", "reviewed"), ("AI 생성", "ai_estimated"), ("AI 생성", "reviewed")],
+    )
+    def test_not_published_is_never_returned_to_the_student(
+        self, lifecycle: str, origin: str, review: str
+    ) -> None:
+        # 검수 라벨이 reviewed여도 생애가 공개됨이 아니면 404 — "공개됨이 아닌 개념은 반환되지 않는다".
+        client, fake = _content_client(review, lifecycle_status=lifecycle, content_origin=origin)
+        resp = client.post(_STUDY_URL, json={})
+        assert resp.status_code == 404, resp.text
+        assert not any(isinstance(row, EvidenceEvent) for row in fake.added)  # 처치 0
+        assert not any(isinstance(row, ConceptExposureEvent) for row in fake.added)  # 노출 0
+
+    def test_published_human_reviewed_is_served_control(self) -> None:
+        # 대조군 — 위 404가 "전부 차단"이 아님을 보인다(이미 학생에게 나가던 개념의 모습).
+        client, _fake = _content_client("reviewed")
+        assert client.post(_STUDY_URL, json={}).status_code == 201
+
+    def test_published_ai_generated_is_served_without_human_review(self) -> None:
+        # C안 경로 — 사람 검수 없이(ai_estimated) 자동 검증을 거쳐 공개됨이 된 개념.
+        client, _fake = _content_client("ai_estimated", content_origin="AI 생성")
+        assert client.post(_STUDY_URL, json={}).status_code == 201
+
+    def test_published_human_reviewed_but_demoted_label_is_refused(self) -> None:
+        # CONT-05 ③ 보존 — 코퍼스 재적재로 review_status가 되돌려지면 공개됨이어도 닫힌다.
+        client, _fake = _content_client("ai_estimated", content_origin="사람 검수")
+        assert client.post(_STUDY_URL, json={}).status_code == 404
+
+    def test_published_ai_generated_but_human_rejected_is_refused(self) -> None:
+        client, _fake = _content_client("rejected", content_origin="AI 생성")
+        assert client.post(_STUDY_URL, json={}).status_code == 404
+
+
+class TestStudyExposureRecord:
+    """PED-17 A1 완료 기준 3 — 학생이 개념을 열면 노출 기록이 정확히 1건 남는다."""
+
+    def test_opening_a_concept_records_exactly_one_exposure(self) -> None:
+        client, fake = _content_client("reviewed")
+        resp = client.post(_STUDY_URL, json={})
+        assert resp.status_code == 201, resp.text
+        exposures = [row for row in fake.added if isinstance(row, ConceptExposureEvent)]
+        assert len(exposures) == 1
+        assert exposures[0].concept_code == _CONCEPT_CODE
+        assert (
+            exposures[0].ai_label_shown is False
+        )  # 응답에 AI 라벨 필드가 없으므로 False가 사실이다.
+        assert fake.commits == 1  # 처치와 노출이 같은 커밋에 들어간다.
+
+    def test_exposure_stores_pseudonym_only_never_the_user_id(self) -> None:
+        client, fake = _content_client("reviewed")
+        client.post(_STUDY_URL, json={})
+        (exposure,) = [row for row in fake.added if isinstance(row, ConceptExposureEvent)]
+        assert len(exposure.student_pseudonym) == 64
+        assert str(_USER_ID) not in exposure.student_pseudonym
+        assert _USER_ID.hex not in exposure.student_pseudonym
+
+    def test_refused_request_records_no_exposure(self) -> None:
+        # 학생이 아무것도 보지 못했으면 노출이 아니다(처치와 같은 원칙).
+        client, fake = _content_client("ai_estimated")
+        assert client.post(_STUDY_URL, json={}).status_code == 404
+        assert not any(isinstance(row, ConceptExposureEvent) for row in fake.added)
+
+    def test_two_opens_record_two_exposures_with_the_same_pseudonym(self) -> None:
+        client, fake = _content_client("reviewed")
+        client.post(_STUDY_URL, json={})
+        client.post(_STUDY_URL, json={})
+        exposures = [row for row in fake.added if isinstance(row, ConceptExposureEvent)]
+        assert len(exposures) == 2
+        assert exposures[0].student_pseudonym == exposures[1].student_pseudonym
+
+    def test_student_response_shape_is_unchanged(self) -> None:
+        # 완료 기준 2 (화면 불변): 응답 키 집합이 변경 전과 같다 — 라벨 등 새 필드를 얹지 않았다.
+        client, _fake = _content_client("reviewed")
+        body = client.post(_STUDY_URL, json={}).json()
+        assert set(body) == _EXPECTED_RESPONSE_KEYS
+
+
 _PILOT_ATOM = (
     "10공수1-02-06-2"  # 파일럿 소단원 세부개념 원자 — 콘텐츠 PK(구 437 코드)와 겹치지 않는다.
 )
@@ -591,6 +704,9 @@ def _crosswalk_client(review_status: str) -> tuple[TestClient, _FakeSession]:
         atom_codes=[_PILOT_ATOM],
         flashcards=[],
         review_status=review_status,
+        # PED-17 A1: 마이그레이션이 `reviewed` 행에 매기는 값 — 이미 학생에게 나가던 개념의 모습.
+        lifecycle_status="공개됨",
+        content_origin="사람 검수",
     )
     get_map: dict[Any, Any] = {
         _OBJECTIVE_ID: _objective(concept_nodes=[_PILOT_ATOM]),

@@ -43,6 +43,12 @@ Hint 좌석의 1번째 테이블로 세워 82→83 테이블로 늘었다. §3-B
 좌석 편입이며 `ContentVersion` 좌석은 계속 비어 있다) — §2 표·합계·아래 ① 행을 84로 갱신했다.
 설계·`identity_id`(변형 계열)와의 관계는 `docs/architecture/arch31_problem_version.md`.
 
+※ [갱신 2026-11-07] `PED-17 A1`이 `concept_state_transition`(개념 상태 변경 원장 — 초안·검증됨·공개됨·회수됨)을
+**Content 좌석의 3번째 테이블**로, `concept_exposure_event`(학생이 개념을 본 사건 — 가명 해시)를
+**LearningEvent 좌석의 12번째 테이블**로 추가해 84→86 테이블로 늘었다. 새 엔티티가 아니라 기존 좌석
+편입이다: 전자는 `concept_content` 행의 생애를 담는 이력이라 Content 좌석, 후자는 attempt_event·
+hint_usage와 같은 "학생에게 일어난 일"이라 LearningEvent 좌석이다. §2 표·합계·아래 ① 행을 86으로 갱신했다.
+
 ---
 
 ## ⚖️ 집행 고지 (정본화 ≠ 집행)
@@ -54,7 +60,7 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 
 | # | 검사 | 깨지면 |
 |---|---|---|
-| ① | 84테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
+| ① | 86테이블 **전수 귀속** — 좌석 또는 핵심-외 중 정확히 한쪽 | 신규 테이블이 생기면 **RED** |
 | ② | 19종 **좌석 실재** + 엔티티 개수 19 고정 | 좌석 삭제·개명, 20번째 엔티티 추가 시 **RED** |
 | ③ | **좌석 부재 3종** — 예약 이름 금지 + **좌석 tuple이 비어 있음** (§3) | `assessment_result`는 물론 우회 이름으로 좌석을 등재해도 **RED** (Hint는 S4-11이 실체화 — 본문 좌석 단일은 ③-c 컬럼 가드가 동결) |
 | ④ | **문서 ↔ 상수 배정 대조** — §2-A·§2-B 표를 파싱해 1:1 확인 | 배정을 옮기거나(예: `skill_node`를 Skill→Content) 표에서 행이 빠지면 **RED** |
@@ -218,17 +224,17 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | 8 | **Problem** | `problem` · `problem_step` · `problem_version` | 3 |
 | 9 | **Solution** | `solution_paths` · `solution_nodes` · `verified_solutions` · `verified_lemmas` | 4 |
 | 10 | **Hint** | `hints` | 1 |
-| 11 | **Content** | `concept_content` · `pedagogy_content_slot` | 2 |
+| 11 | **Content** | `concept_content` · `pedagogy_content_slot` · `concept_state_transition` | 3 |
 | 12 | **Learner** | `user_profile` | 1 |
 | 13 | **LearnerState** | `user_state_snapshot` · `learner_state` · `learning_state_transition` | 3 |
 | 14 | **MasteryState** | `concept_mastery_history` · `skill_mastery_history` · `ability_snapshot` | 3 |
 | 15 | **Assessment** | `assessment` | 1 |
 | 16 | **AssessmentResult** | — **좌석 부재**(§3) | 0 |
-| 17 | **LearningEvent** | `attempt_event` · `evidence_event` · `review_timer_event` · `hint_usage` · `answer_submission` · `problem_attempt` · `learning_session` · `student_solution_step` · `dead_end_log` · `dialogue` · `dialogue_turn` | 11 |
+| 17 | **LearningEvent** | `attempt_event` · `evidence_event` · `review_timer_event` · `hint_usage` · `answer_submission` · `problem_attempt` · `learning_session` · `student_solution_step` · `dead_end_log` · `dialogue` · `dialogue_turn` · `concept_exposure_event` | 12 |
 | 18 | **PedagogyStrategy** | `strategy_node` · `pedagogy_pack` | 2 |
 | 19 | **ContentVersion** | — **좌석 부재**(§3) | 0 |
 
-**좌석 합계 = 46**
+**좌석 합계 = 48**
 
 ### §2-B. 핵심 외 — 38테이블
 
@@ -277,7 +283,9 @@ CLAUDE.md "정본화를 집행으로 착각한 완료 선언 금지"에 따라 *
 | `user_persona_history` | 사용자 이력(페르소나 변경) — LearnerState 아님 |
 | `user_track_history` | 사용자 이력(트랙 변경) — LearnerState 아님 |
 
-**핵심-외 합계 = 38** · 46 + 38 = **84** ✓(ARCH-31 `problem_version`을 Problem 좌석에 추가 —
+**핵심-외 합계 = 38** · 48 + 38 = **86** ✓(PED-17 A1 `concept_state_transition`을 Content 좌석에,
+`concept_exposure_event`를 LearningEvent 좌석에 추가 — 2026-11-07. 그 이전 46 + 38 = 84는
+ARCH-31 `problem_version`을 Problem 좌석에 추가 —
 2026-10-08. 그 이전 45 + 38 = 83은 S4-11 `hints`를 Hint 좌석에 추가 — 2026-09-29.
 그 이전 44 + 38 = 82는 EOS-103 `learner_state` + EOS-105
 `learning_state_transition`을 LearnerState 좌석에 추가 — 둘은 서로 다른 브랜치에서 각각 +1로

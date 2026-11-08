@@ -208,6 +208,13 @@ BASELINE: dict[str, frozenset[str]] = {
             "l1/atom_graph/embedding.py",
             "l1/atom_probe/projection.py",
             "l1/concept_atom_crosswalk/transfer.py",
+            # PED-17 A1 — 개념 생애 상태 전환 함수. `concept_content.lifecycle_status`를 쓰는
+            # **유일한**
+            # 코드(AST 거버넌스 테스트가 동결)라 상태 읽기(행 잠금)·변경·기록 INSERT를 한
+            # 트랜잭션에서
+            # 해야 한다. 기존 baseline 파일(projection·resolve)은 적재/조회 전용이라 재사용할 수
+            # 없다.
+            "l1/concept_content/lifecycle.py",
             "l1/concept_content/projection.py",
             "l1/concept_content/resolve.py",
             "l1/concept_graph/backend_concept.py",
@@ -263,6 +270,10 @@ BASELINE: dict[str, frozenset[str]] = {
             "l2/ability_snapshot_capture.py",
             "l2/ability_tracking.py",
             "l2/attempt_skill_event.py",
+            # PED-17 A1 — 학생 개념 노출 기록 writer. 쓰기 1건(`session.add`)뿐이고 읽기는 0이다.
+            # `api/study.py`가 처치 기록과 같은 트랜잭션에서 부르므로 세션을 인자로 받는다 — 기존
+            # baseline 파일에는 노출 기록 좌석이 없어 재사용할 수 없다.
+            "l2/concept_exposure.py",
             # EOS-47: 시도 접수 시점의 문항 판 포인터·교육과정 라벨을 PK 조회 1건
             # (`session.get(Problem)`)으로 읽는 새 접근점. 쓰기 0 · 기존 baseline 파일에
             # 문항 단건 조회 함수가 없어 재사용 불가.

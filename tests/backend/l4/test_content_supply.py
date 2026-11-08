@@ -60,6 +60,10 @@ class _FakeRow:
     # 렌더·폴백·집계 테스트는 검수 통과 행을 전제한다(CONT-05 공급 게이트 통과). 게이트 자체는
     # `TestSupplyReviewGate`가 `ai_estimated`를 명시해 검사한다 — 실 코퍼스 846행은 전부 ai_estimated다.
     review_status: str = "reviewed"
+    # PED-17 A1: 학생 공개 관문은 생애 상태·출처도 본다. 기본값 = 마이그레이션이 `reviewed` 행에 매기는
+    # 값('공개됨'+'사람 검수') — 즉 "이미 학생에게 나가던 개념". 게이트 검사는 이 둘을 명시해 바꾼다.
+    lifecycle_status: str = "공개됨"
+    content_origin: str = "사람 검수"
     # 역조회(CONT-06)는 K-12 행만 본다 — 대학 행은 code가 이미 원자 소단원이라 PK로 닿는다.
     scope: str = "K-12"
 
@@ -336,6 +340,72 @@ class TestSupplyReviewGate:
         assert await run("ai_estimated") == REASON_UNREVIEWED
 
 
+# ── 생애 상태 게이트 (PED-17 A1) ─────────────────────────────────
+
+_NOT_PUBLISHED = ["초안", "검증됨", "회수됨"]
+
+
+class TestLifecycleGate:
+    """학생 공개 관문은 생애 상태 '공개됨'일 때만 연다 — 같은 행에서 한 축만 바꿔 결과가 뒤집힌다."""
+
+    @pytest.mark.asyncio
+    async def test_published_control_is_served(self) -> None:
+        # 성공 방향 대조 — 아래 거부가 "전부 차단"이 아님을 보인다.
+        dsl, reason = await resolve_concept_dsl(
+            "A1", session=_FakeSession({"A1": _FakeRow()}), cache=_FakeCache()
+        )
+        assert dsl is not None and reason is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("lifecycle", _NOT_PUBLISHED)
+    @pytest.mark.parametrize("origin", ["사람 검수", "AI 생성"])
+    async def test_lifecycle_alone_flips_outcome(self, lifecycle: str, origin: str) -> None:
+        # review_status는 reviewed 그대로 두고 생애 상태만 바꿨다 — 그것만으로 닫힌다.
+        row = _FakeRow(review_status="reviewed", lifecycle_status=lifecycle, content_origin=origin)
+        dsl, reason = await resolve_concept_dsl(
+            "A1", session=_FakeSession({"A1": row}), cache=_FakeCache()
+        )
+        assert (dsl, reason) == (None, REASON_UNREVIEWED)
+
+    @pytest.mark.asyncio
+    async def test_withdrawal_is_immediate_even_with_a_warm_dsl_cache(self) -> None:
+        # 킬스위치 즉시성 — 공개됨일 때 적재된 DSL 캐시(TTL 24h)가 남아 있어도, 회수되는 순간
+        # 다음 요청부터 막힌다. 판정은 캐시보다 먼저 DB의 현재 상태로 한다.
+        row = _FakeRow()
+        session, cache = _FakeSession({"A1": row}), _FakeCache()
+        assert await get_concept_dsl("A1", session=session, cache=cache) is not None
+        assert f"{DSL_CACHE_PREFIX}A1" in cache.store  # 전제 — 캐시가 채워져 있다.
+
+        row.lifecycle_status = "회수됨"
+        dsl, reason = await resolve_concept_dsl("A1", session=session, cache=cache)
+        assert (dsl, reason) == (None, REASON_UNREVIEWED)
+
+    @pytest.mark.asyncio
+    async def test_blocked_row_is_not_written_to_the_cache(self) -> None:
+        row = _FakeRow(lifecycle_status="검증됨")
+        session, cache = _FakeSession({"A1": row}), _FakeCache()
+        await resolve_concept_dsl("A1", session=session, cache=cache)
+        assert cache.store == {}
+
+    @pytest.mark.asyncio
+    async def test_ai_generated_published_is_served_without_human_review(self) -> None:
+        # C안 경로: 사람 검수(ai_estimated) 없이 자동 검증을 거쳐 공개됨이 된 개념은 열린다.
+        row = _FakeRow(review_status="ai_estimated", content_origin="AI 생성")
+        dsl, reason = await resolve_concept_dsl(
+            "A1", session=_FakeSession({"A1": row}), cache=_FakeCache()
+        )
+        assert dsl is not None and reason is None
+
+    @pytest.mark.asyncio
+    async def test_unflushed_row_with_none_lifecycle_is_refused(self) -> None:
+        # flush 전 ORM 행처럼 server_default 컬럼이 None이면 모른다 → 닫는다(fail-closed).
+        row = _FakeRow(lifecycle_status=None, content_origin=None)  # type: ignore[arg-type]
+        dsl, reason = await resolve_concept_dsl(
+            "A1", session=_FakeSession({"A1": row}), cache=_FakeCache()
+        )
+        assert (dsl, reason) == (None, REASON_UNREVIEWED)
+
+
 # ── 크로스워크 역조회(CONT-06) ────────────────────────────────────
 
 _ATOM = "10공수1-02-06-2"  # 파일럿 소단원의 세부개념 원자 — 콘텐츠 PK(구 437 코드)와 겹치지 않는다.
@@ -343,6 +413,34 @@ _ATOM = "10공수1-02-06-2"  # 파일럿 소단원의 세부개념 원자 — �
 
 def _k12_row(code: str, *, status: str = "reviewed", atoms: tuple[str, ...] = (_ATOM,)) -> _FakeRow:
     return _FakeRow(code=code, name=f"{code} 콘텐츠", atom_codes=list(atoms), review_status=status)
+
+
+class TestCrosswalkPrefersPublishedCandidate:
+    """역조회 후보 선택도 공개 상태를 본다 — 낮은 code의 비공개 후보가 공개 후보를 가리지 않는다."""
+
+    @pytest.mark.asyncio
+    async def test_published_candidate_beats_lower_code_withdrawn_one(self) -> None:
+        withdrawn = _k12_row("10기수1-02-05")
+        withdrawn.lifecycle_status = "회수됨"
+        published = _k12_row("HK11")
+        res = await resolve_concept_content(
+            _ATOM,
+            session=_FakeSession({"10기수1-02-05": withdrawn, "HK11": published}),
+            cache=_FakeCache(),
+        )
+        assert res.dsl is not None
+        assert res.content_code == "HK11"
+
+    @pytest.mark.asyncio
+    async def test_all_candidates_not_published_reports_unreviewed(self) -> None:
+        a, b = _k12_row("10기수1-02-05"), _k12_row("HK11")
+        a.lifecycle_status, b.lifecycle_status = "초안", "검증됨"
+        res = await resolve_concept_content(
+            _ATOM,
+            session=_FakeSession({"10기수1-02-05": a, "HK11": b}),
+            cache=_FakeCache(),
+        )
+        assert (res.dsl, res.reason) == (None, REASON_UNREVIEWED)
 
 
 class TestCrosswalkReverseLookup:
