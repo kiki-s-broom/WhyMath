@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-01
+title: "GOLD-01 골든 패스 스켈레톤 — 중2 일차함수 30문항 GP-1~GP-6 e2e"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "완료 정의(2026-11-08 Kiki): 학생 1명(학생 없는 변형은 대체 피험자)이 Flutter 앱에서 중2 일차함수 문항 1개를 소크라테스 대화로 끝까지 풀고 숙련도 숫자 하나가 PostgreSQL golden 스키마에 갱신된다 — 판정 = tests/golden 초록(S5 첫 초록 이후 빨간불 머지 금지)"
+  - "범위 고정: 문항 30개(golden/data/problems_linear_fn.json) · 학생 경로 GP-1~GP-6 · HTTP 엔드포인트 3개(POST /golden/session · GET /golden/next · POST /golden/answer) · 새 코드는 golden/ · src/backend/golden/ · src/mobile/lib/golden/ · tests/golden/ 에만(옛 코드 수정 금지 — 필요하면 복사 후 golden/HARVEST.md 기록)"
+  - "집행 지점: CI 잡 golden-path(ruff · black · mypy --strict golden · pytest ../../tests/golden)가 매 PR에서 실행되고, 브랜치 룰셋 required check에 golden-path 등록(Kiki) — 등록 전까지 빨간불 머지 차단은 미집행"
+artifacts: []
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "src/mobile/lib/golden/**"
+  - src/mobile/lib/main_golden.dart
+  - "tests/golden/**"
+session: claude/new-session-98qno0
+notes: "골든 패스 스켈레톤 3주(학생 없는 변형) — 지시서 원본 golden/prompts_no_students/ · 세션 S1~S15가 이 태스크 하나를 공유한다(S2가 등재). 세션별 보고 = golden/reports_no_students/<번호>/보고.md"
+updated: 2026-11-08

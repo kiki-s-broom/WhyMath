@@ -173,7 +173,9 @@ requires = ["hatchling>=1.25.0,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["whymath_backend"]
+packages = ["whymath_backend", "golden"]
+# `golden` — 골든 패스 스켈레톤(GOLD-01 · 2026-11-08 Kiki 지시 · S2 배선). 옛 코드(whymath_backend)를
+# import만 하고 고치지 않는 새 경로다. 반대 방향 import는 아래 import-linter 계약이 막는다.
 # 패키지 데이터(라벨 프로브셋 JSONL) — 설치된 wheel에서도 `importlib.resources`로 로드 가능하게
 # 명시 포함한다(WH-1 ② 오프라인 진단정확도·semantic_eval 프로브 단일 source of truth).
 artifacts = ["whymath_backend/l4/misconception/probes_v1.jsonl"]
@@ -221,7 +223,10 @@ warn_required_dynamic_aliases = true
 # harness·whs)는 계약 밖(무제약) — harness/whs는 L3/L4 하네스라 상위 호출이 정상이고, config·db·
 # privacy는 횡단 인프라다. `lint-imports`(CI lint 잡)가 위반을 차단한다.
 [tool.importlinter]
-root_package = "whymath_backend"
+# GOLD-01(S2 · 2026-11-08): 골든 패스 패키지 `golden`을 그래프에 넣기 위해 `root_package` 한 줄을
+# `root_packages` 목록으로 바꿨다. 기존 4계약의 판정은 바뀌지 않는다(전환 전후 KEPT 4건 동일 —
+# 실측 2026-11-08, S2 보고 golden/reports_no_students/S2/보고.md).
+root_packages = ["whymath_backend", "golden"]
 # ARCH-48: 외부 패키지(`sqlalchemy`)를 forbidden 대상으로 쓰려면 필수다. 기존 3계약의 판정은
 # 바뀌지 않는다(전부 whymath_backend 내부 간선만 본다 — 도입 전후 KEPT 동일, 실측 2026-09-16).
 include_external_packages = true
@@ -514,6 +519,19 @@ forbidden_modules = [
     "sqlalchemy",
     "whymath_backend.db",
 ]
+
+# ──────────────────────────────────────────────────────────────────────
+# 골든 패스 격리 (GOLD-01 · S2 · 2026-11-08 Kiki 지시) — 스트랭글러 피그 방향 강제.
+# 새 경로 `golden`은 옛 코드를 import할 수 있지만, 옛 코드는 `golden`을 몰라야 한다. 그래야
+# 골든 패스가 끝나고 옛 코드를 걷어내거나 골든을 지울 때 서로 엮인 곳이 없다.
+# Flutter 쪽 같은 방향 검사 = tests/golden/test_import_direction.py
+# ──────────────────────────────────────────────────────────────────────
+
+[[tool.importlinter.contracts]]
+name = "옛 코드는 golden을 모른다 (golden → whymath_backend 허용, 역방향 금지)"
+type = "forbidden"
+source_modules = ["whymath_backend"]
+forbidden_modules = ["golden"]
 
 # ──────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
