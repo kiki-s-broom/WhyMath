@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-08 (결정 · D16 — Kiki): **AI 품질 문장 축 6개 임계값 확정 — P3-94 결정안 6행 그대로 승인 · 값·방향·무관용 불변 · 측정 권위는 축마다 분리** (Kiki 결정, claude 기록) — 판정 기준: main `b8904b77`
+- **결정**: Kiki가 `docs/reviews/p3_94_full_collect_report_2026-11-07.md` §D16 임계값 결정안을 "1. 승인"으로 확정했다(2026-11-08 채팅). ① 정답 누설 = 무관용 + 실패율 Wilson 상한 ≤ 5% · 판정기 단독 ② 수학적 정확성 = 실패율 상한 ≤ 5% · 등식 주장은 SymPy, 말로 한 정의·용어는 AI 패널 보조 ③ Hint 적절성 = 단계별(L1·L2·L3 각각) 통과율 하한 ≥ 90% · 측정 권위 AI 패널 · 현재 FAIL 인정(기준을 낮추지 않는다) ④ 설명 일관성 = 하한 ≥ 90% · 판정기 AND 패널 ⑤ 학생 수준 적합성 = 하한 ≥ 90% + 비한국어 문자 혼용 무관용 ⑥ hallucination = 무관용 + 상한 ≤ 5% · 판정기 AND 패널.
+- **근거**: P3-94 본 수집(244×2 · 초안 477건) AI 패널 — 판정기를 단독으로 믿을 수 있는 축은 정답 누설뿐(477/477 일치). 거짓 통과 = 지어낸 내용 8 · 일관성 15 · 학생 수준 3, Hint는 거짓 실패 59. 결정안 적용 시 cloud-mid는 Hint 외 5축 PASS, local-mid는 hallucination·문자 혼용 FAIL(#1886).
+- **집행·미집행**: 값·출처는 `ai_quality_judges.AXIS_SPECS` threshold_basis로 확정 표기(P3-114 · 회귀 동결 `test_d16_sentence_axis_thresholds_are_confirmed`). 아직 코드가 없는 측정 권위 = 패널 의미 판정 게이트 `P3-112` · 문자 혼용 검출 `P3-113` · Hint 단계별 분리 판정은 `P3-111`(문항 재료 공급 설계) 결정 뒤. 그 전까지 판정기 단독 결과는 정답 누설 외 축에서 참고치다.
+- **범위 밖**: 수집기 `--min-live-rate 0.5`(제안값)는 이번 결정안에 없어 미확정으로 남는다.
+
 ### 2026-11-07 (측정 · EOS-226 WP-F — 사람 단독 첫 검수 HIT 표본): **A4 2회차 34 CU 중 유효 표본 18건 — 중앙값 61.5초 · P90 343.5초(전체 계측 34건은 34.5초 · 210.7초) · 판정은 G5 몫** (claude 집계 · 검수 Kiki) — 판정 기준: main `f27e3a73`
 
 - **무엇을**: EOS-225 첫 검수 이벤트(`data/runs/eos-a4-review/canary_review_events.jsonl`)를 CU별로 묶어 유효 표본 규칙(사람 단독 · 첫 검수 · 다시 보기 미사용 · 계측 성립 · OPS-90 하한 30초 이상)을 적용했다. HIT 정의는 `ops/hit_cu_metrics` 그대로이며 전체 계측 값이 공식 계측기와 같음을 스크립트가 대조한다(`scripts/analysis/eos226_a4_human_hit.py` · CU별 기록 `cu.review_human_hit.jsonl` · 조건 표기 `review_condition: human_only`·`ai_assist: false`).
