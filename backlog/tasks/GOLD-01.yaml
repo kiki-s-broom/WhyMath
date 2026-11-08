@@ -22,6 +22,6 @@ paths:
   - "src/mobile/lib/golden/**"
   - src/mobile/lib/main_golden.dart
   - "tests/golden/**"
-session: claude/new-session-98qno0
+session: claude/new-session-0zj97r
 notes: "골든 패스 스켈레톤 3주(학생 없는 변형) — 지시서 원본 golden/prompts_no_students/ · 세션 S1~S15가 이 태스크 하나를 공유한다(S2가 등재). 세션별 보고 = golden/reports_no_students/<번호>/보고.md"
 updated: 2026-11-08

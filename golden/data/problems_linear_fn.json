@@ -1,0 +1,29 @@
+[
+  {
+    "id": "LF-01",
+    "stem": "일차함수 $f(x) = -3x + 3$에 대하여 $f(5)$를 구하시오.",
+    "answer": "-12",
+    "answer_kind": "number",
+    "hint1": "$f(5)$는 식의 $x$ 자리에 무엇을 넣으라는 뜻일까?",
+    "concept": "[9수02-14]",
+    "source": "corpus:problem_bank_middle_function_v0:9305bbd0-146d-572f-845c-343a9f2cf009"
+  },
+  {
+    "id": "LF-02",
+    "stem": "일차함수 $f(x) = -3x - 4$일 때, $f(4)$의 값을 구하시오.",
+    "answer": "-16",
+    "answer_kind": "number",
+    "hint1": "$-3x$에 $x = 4$를 넣으면 곱셈이 먼저일까, 뺄셈이 먼저일까?",
+    "concept": "[9수02-14]",
+    "source": "corpus:problem_bank_middle_function_v0:56674809-913b-5765-9d4b-97f30518ab7d"
+  },
+  {
+    "id": "LF-03",
+    "stem": "일차함수 $f(x) = x + 4$에 대하여 $f(-3)$을 구하시오.",
+    "answer": "1",
+    "answer_kind": "number",
+    "hint1": "음수를 대입할 때 부호를 어떻게 다루면 좋을까?",
+    "concept": "[9수02-14]",
+    "source": "corpus:problem_bank_middle_function_v0:f21392c4-251b-5db0-aeda-bcb2889b3633"
+  }
+]
