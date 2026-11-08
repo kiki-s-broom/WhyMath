@@ -1,0 +1,92 @@
+{
+  "errors": [],
+  "exit_code": 2,
+  "gates": {
+    "F-Ⅱ": {
+      "code": "F-Ⅱ",
+      "hits": 0,
+      "reason": "판정 0건 — 검증 불가를 오류 0으로 세지 않는다 · eos197-a6: 검수 통과 28(낡은 지문 0) → SymPy 재검증 PASS 0 · FAIL 0 · 검증 불가 28(C2:C2_NO_STEPS 28)",
+      "state": "unmeasured",
+      "trials": 0
+    },
+    "F-Ⅴ": {
+      "code": "F-Ⅴ",
+      "hits": 0,
+      "reason": "0/30 · eos197-a6: 의미 축 PASS 표본 hvs-6bfbb1baa75f6e34 n=30 k=0",
+      "state": "measured",
+      "trials": 30
+    }
+  },
+  "payload": {
+    "content": {
+      "hint_leak_hits": 0,
+      "hint_leak_sample": 30
+    }
+  },
+  "rounds": [
+    {
+      "errors": [],
+      "f2": {
+        "cu_review_f8_labels_not_counted": 2,
+        "errors": [],
+        "fail_slugs": [],
+        "reviewed_passed": 28,
+        "solution_qa_fail": 0,
+        "solution_qa_pass": 0,
+        "solution_qa_unverifiable": 28,
+        "stale_fingerprint": 0,
+        "unverifiable_reasons": {
+          "C2:C2_NO_STEPS": 28
+        },
+        "verdict_file": true,
+        "verdict_rows": 30
+      },
+      "f5": {
+        "errors": [],
+        "hint_files": 2,
+        "k": 0,
+        "manifest_file": true,
+        "n": 30,
+        "sample_id": "hvs-6bfbb1baa75f6e34",
+        "semantic_status": "PASS"
+      },
+      "round": "eos197-a6",
+      "run_dirs": [
+        "eos197-a6-local",
+        "eos197-a6-openrouter"
+      ]
+    }
+  ],
+  "runtime_error": null,
+  "schema_version": "p3-107/1",
+  "sources": [
+    {
+      "path": "eos197-a6-local/cu.hints.jsonl",
+      "sha256": "4c9c4386742514039422609c19d53a654d78c990bd1015ca789dcde9cc38da0e"
+    },
+    {
+      "path": "eos197-a6-local/cu.jsonl",
+      "sha256": "f7c3af20b03a9c7b8c41fec3760973e79d1418283e6022d006bd80c55cd5bdb9"
+    },
+    {
+      "path": "eos197-a6-openrouter/cu.hints.jsonl",
+      "sha256": "a8f5e9ceb4670dc0e0d6a38ad8c8540ad7d8f16b97bf85437dd5cda3785cd344"
+    },
+    {
+      "path": "eos197-a6-openrouter/cu.jsonl",
+      "sha256": "02aef3ce08063ccced6eb48c92371e301478193ec77c28d623440bf4249cc708"
+    },
+    {
+      "path": "eos197-a6-review/canary_review_verdicts.jsonl",
+      "sha256": "29747eef094f3618cf430a6076c25c1ceee8b32e7ab37198bb8eb5c9835d8abb"
+    },
+    {
+      "path": "eos197-a6-review/hint_sample_manifest.json",
+      "sha256": "c416be9e07f755c3bac82ed68c5ef08dd0434961999881cdc4ce93ce3132f731"
+    },
+    {
+      "path": "eos197-a6-review/hint_verdicts.jsonl",
+      "sha256": "fa07b25e40e6257ea72c331714aefbee36f6d2f76d1743fe07a0d438c177c6ef"
+    }
+  ]
+}

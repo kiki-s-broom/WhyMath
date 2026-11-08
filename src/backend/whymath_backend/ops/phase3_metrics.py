@@ -89,6 +89,7 @@ Concept Completeness 를 필드 채움으로 만들지 않은 이유 (acceptance
     python -m whymath_backend.ops.phase3_metrics                       # 실 코퍼스 + DB(⑤)
     python -m whymath_backend.ops.phase3_metrics --no-db --json out/p3_metrics.json
     python -m whymath_backend.ops.phase3_metrics --hints-from-db       # ② 힌트 연결을 DB 에서
+    python -m whymath_backend.ops.phase3_metrics --no-db --critical-defect-from-runs  # ⑥ 수집
     python -m whymath_backend.ops.phase3_metrics --self-check          # CI 게이트(결정론)
     # 숫자 주입(측정이 아니다 — 표본 기준을 반드시 명시해야 한다):
     python -m whymath_backend.ops.phase3_metrics --no-db --sample-basis synthetic \\
@@ -106,7 +107,10 @@ Concept Completeness 를 필드 채움으로 만들지 않은 이유 (acceptance
   신호라 이 지표에서 판정하지 않는다 — 위반이 나도 ⑥ 은 반응하지 않고, 입력이 없어도 ⑥ 을 측정
   실패로 만들지 않는다(그 판정은 `ops.validation_scorecard` 가 소유한다). 지시문의 'P0/P1 결함'
   출처는 저장소에 심각도 필드가 없어 채택하지 않았다(문서 §불일치 기록).
-· 이 CLI 는 ⑥의 입력 payload 수집기를 갖지 않는다(`--hard-gate-input` 으로 받는다).
+· ⑥ 의 입력은 `--critical-defect-from-runs` 가 커밋된 회차 산출물(`data/runs/`)에서
+  결정론으로 만든다(`ops.critical_defect_collector` · P3-107). 플래그가 없으면 종전대로
+  `--hard-gate-input`(주입)으로만 받고, 둘 다 없으면 ⑥ 은 측정 실패다. 두 플래그를 함께 주면
+  거부한다(exit 3 — 측정과 주입을 섞지 않는다).
 """
 
 from __future__ import annotations
@@ -137,6 +141,7 @@ from whymath_backend.l1.standards.phase3_scope import (
     load_scope_spec,
     verify_spec,
 )
+from whymath_backend.ops import critical_defect_collector as cdc
 from whymath_backend.ops import loop_kpi_gate as lkg
 from whymath_backend.ops.validation_scorecard import (
     CONTENT_KPI_THRESHOLDS,
@@ -994,12 +999,20 @@ def _gate_state(gate: HardGateResult) -> str:
     return "미해당" if gate.measurable else "판정 불가"
 
 
-def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> MetricOutcome:
+def _critical_defect(
+    payload: Mapping[str, Any] | None,
+    *,
+    injected: bool,
+    source_facts: tuple[tuple[str, str], ...] = (),
+) -> MetricOutcome:
     """⑥ — 흡수한 2종(F-Ⅱ·F-Ⅴ) 중 해당(triggered)이 있으면 확정 위반, 판정 불가가 남으면 측정 실패.
 
     '해당 없음'과 '판정 불가'는 다르다: 입력이 없는 게이트를 해당 없음으로 접으면 0건 통과가 된다.
     F-Ⅰ·Ⅲ·Ⅳ 는 스코어카드가 함께 계산하지만 여기서는 **버린다** — 그 3종이 해당이어도 ⑥ 은
     반응하지 않고, 판정 불가여도 ⑥ 을 측정 실패로 만들지 않는다(생산 공정 평면 소관).
+
+    `source_facts` 는 입력 수집기(`ops.critical_defect_collector`)가 남긴 원천·건수 사실이다 —
+    판정에는 쓰지 않고 출력에만 붙인다(측정 실패일 때 '왜 0건인가'가 그 자리에서 보이게).
     """
     key = MetricKey.CRITICAL_DEFECT
     basis = BASIS_INJECTED if injected else BASIS_MEASURED
@@ -1008,9 +1021,11 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
             key,
             _DEFECT_SCOPE,
             "입력 payload 가 없다 — 흡수한 Hard Gate 2종(F-Ⅱ·F-Ⅴ) 전부 판정 불가. "
-            "이 CLI 는 payload 수집기를 갖지 않는다(--hard-gate-input). 0 이 아니라 '측정 불가'다.",
+            "--critical-defect-from-runs(수집) 또는 --hard-gate-input(주입)으로 준다. "
+            "0 이 아니라 '측정 불가'다.",
             unit=Unit.COUNT,
             basis=basis,
+            facts=source_facts,
         )
     try:
         gates: tuple[HardGateResult, ...] = evaluate_hard_gates(dict(payload))
@@ -1022,6 +1037,7 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
             unit=Unit.COUNT,
             error_type=type(exc).__name__,
             basis=basis,
+            facts=source_facts,
         )
     if tuple(g.code for g in gates) != _SCORECARD_GATE_CODES:
         return _unmeasured(
@@ -1034,7 +1050,7 @@ def _critical_defect(payload: Mapping[str, Any] | None, *, injected: bool) -> Me
     absorbed = tuple(g for g in gates if g.code in _ABSORBED_GATE_CODES)
     triggered = [g for g in absorbed if g.triggered]
     undecidable = [g for g in absorbed if not g.measurable]
-    facts = tuple((g.code, f"{_gate_state(g)} · {g.observed}") for g in absorbed)
+    facts = tuple((g.code, f"{_gate_state(g)} · {g.observed}") for g in absorbed) + source_facts
     unmet = tuple(f"{g.code}: {g.definition}" for g in triggered)
     if not triggered and undecidable:
         return _unmeasured(
@@ -1086,6 +1102,7 @@ def evaluate_all(
     sample_basis: str,
     reverify: ReverifyFn = run_solution_qa,
     emit: EmitFn = _noop_emit,
+    defect_facts: tuple[tuple[str, str], ...] = (),
 ) -> tuple[MetricOutcome, ...]:
     """7종 전부를 ①~⑦ 순서로 산출한다. 어느 지표도 조용히 빠지지 않는다.
 
@@ -1109,7 +1126,9 @@ def evaluate_all(
     defect = _guarded(
         MetricKey.CRITICAL_DEFECT,
         _DEFECT_SCOPE,
-        lambda: _critical_defect(defect_payload, injected=defect_injected),
+        lambda: _critical_defect(
+            defect_payload, injected=defect_injected, source_facts=defect_facts
+        ),
     )
     by_key[defect.key] = defect
     emit(defect)
@@ -1816,6 +1835,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="⑥ 스코어카드 payload JSON(주입)",
     )
     parser.add_argument(
+        "--critical-defect-from-runs",
+        action="store_true",
+        help=(
+            "⑥ 입력을 커밋된 회차 산출물에서 수집한다(ops.critical_defect_collector · P3-107). "
+            "주입이 아니라 측정이다 — --hard-gate-input 과 함께 쓸 수 없다."
+        ),
+    )
+    parser.add_argument(
+        "--runs-root",
+        type=Path,
+        default=None,
+        help="--critical-defect-from-runs 의 회차 루트(기본 data/runs)",
+    )
+    parser.add_argument(
         "--sample-basis",
         choices=lkg.SAMPLE_BASES,
         default=None,
@@ -1883,6 +1916,7 @@ _SELF_CHECK_INCOMPATIBLE: Final[tuple[str, ...]] = (
     "input_path",
     "hard_gate_path",
     "sample_basis",
+    "runs_root",
 )
 
 
@@ -1914,6 +1948,8 @@ def _run(argv: list[str] | None) -> int:
         bad = [n for n in _SELF_CHECK_INCOMPATIBLE if getattr(args, n) is not None]
         if args.hints_from_db:  # store_true 라 `is not None` 검사에 걸리지 않는다
             bad.append("hints_from_db")
+        if args.critical_defect_from_runs:
+            bad.append("critical_defect_from_runs")
         if bad or args.no_db:
             print(
                 "[phase3_metrics] --self-check 는 측정 옵션과 함께 쓸 수 없다"
@@ -1939,6 +1975,20 @@ def _run(argv: list[str] | None) -> int:
             if code:
                 return code
         return result.exit_code
+
+    if args.critical_defect_from_runs and args.hard_gate_path is not None:
+        print(
+            "[phase3_metrics] --critical-defect-from-runs(측정)와 --hard-gate-input(주입)은 "
+            "함께 쓸 수 없다 — ⑥ 의 입력이 둘이면 어느 쪽 값인지 결정할 수 없다.",
+            file=sys.stderr,
+        )
+        return EXIT_RUNTIME_ERROR
+    if args.runs_root is not None and not args.critical_defect_from_runs:
+        print(
+            "[phase3_metrics] --runs-root 는 --critical-defect-from-runs 와 함께만 쓴다.",
+            file=sys.stderr,
+        )
+        return EXIT_RUNTIME_ERROR
 
     injecting = args.input_path is not None or args.hard_gate_path is not None
     if injecting and args.sample_basis is None:
@@ -1992,6 +2042,20 @@ def _run(argv: list[str] | None) -> int:
             return EXIT_RUNTIME_ERROR
         injected_loop = parsed.get(lkg.LoopKpi.LOOP_COMPLETION)
     defect_payload: dict[str, Any] | None = None
+    defect_facts: tuple[tuple[str, str], ...] = ()
+    if args.critical_defect_from_runs:
+        collected = cdc.collect(args.runs_root)
+        defect_facts = collected.summary_facts()
+        # 실행 오류(회차 루트 부재)는 ⑥ 의 측정 실패다(⑤ 의 DB 접속 실패와 같은 규칙 — exit 3 아님).
+        defect_payload = None if collected.runtime_error else collected.payload()
+        evidence.record(
+            kpi=None,
+            phase="defect_collected",
+            ok=collected.exit_code == cdc.EXIT_COMPLETE,
+            collector_exit=collected.exit_code,
+            f2=collected.f2.state,
+            f5=collected.f5.state,
+        )
     if args.hard_gate_path:
         defect_payload = _read_json_object(args.hard_gate_path, "--hard-gate-input")
         if defect_payload is None:
@@ -2040,11 +2104,12 @@ def _run(argv: list[str] | None) -> int:
         loop_observation=loop_observation,
         loop_injected=injected_loop is not None,
         defect_payload=defect_payload,
-        defect_injected=defect_payload is not None,
+        defect_injected=args.hard_gate_path is not None,
         window=window,
         run_id=run_id,
         sample_basis=sample_basis,
         emit=record_metric,
+        defect_facts=defect_facts,
     )
     spec_id = None
     if isinstance(world, World):

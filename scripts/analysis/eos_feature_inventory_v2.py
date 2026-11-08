@@ -1421,7 +1421,9 @@ CATALOG: tuple[Spec, ...] = (
     # 만들지 않는다. 정본 경계: docs/standards/phase3_metrics_contract.md.
     _o("WM-O-917", "Phase 3 지표 7종 일괄 CLI(제품 완성도 평면·위반 주입 자가 점검)", "Admin", "QA",
        "P1", "P3-14 — 대표 과정 Coverage·QA·루프·결함 한 명령 · 미측정≠통과 판정기",
-       "ops.phase3_metrics"),
+       # P3-107 — ⑥ 입력(F-Ⅱ·F-Ⅴ) 수집기. 이 행의 CLI 가 `--critical-defect-from-runs` 로 부르는
+       # 입력 생산 경로라 같은 행에 귀속한다(새 판정 정의 없음 — 기존 정본 3종을 그대로 호출).
+       "ops.phase3_metrics", "ops.critical_defect_collector"),
     # P3-06 — 핵심 오개념 12개에 오답→후보·신뢰도→교정 전략 체인이 실제로 도는지 재는 CLI.
     # 위 지표 7종과 분모(핵심 오개념)·성격(체인 실행 + 결함 주입)이 달라 별도 행이다.
     # 체인 본체는 WM-E 오개념 행의 `l4.misconception.remediation_strategy`,
