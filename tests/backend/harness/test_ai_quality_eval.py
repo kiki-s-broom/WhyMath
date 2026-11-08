@@ -96,8 +96,9 @@ def test_p3_77_measured_cases_are_resolved_or_explained(
        L3를 거부하고 사다리가 1단계 L3(앞 단계 대체)를 낸다.
     ② L3 공백 문항(`_L3_GAP_PROBLEM` — 잴 때 `aq-h-10-05-l3`, P3-91·93 승격 뒤 `aq-h-10-06-l3`)은
        L2 정직 하향으로 처분된다 — 엔진 단계(3)와 표시(2)가 달라 Hint 적절성 실패로 *남되*, 그 이유가 리포트에 후보 주석으로 실린다(acceptance ④ '의도적 제외 사유').
-    종합 exit code 전체는 동결하지 않는다 — 임계 6개가 Kiki 확정 전 제안값이라 실측 판정을 CI에
-    걸지 않는다는 P3-10 결정(§8)을 그대로 따른다. 여기서 잠그는 것은 두 사례의 처분뿐이다.
+    종합 exit code 전체는 동결하지 않는다 — 임계 6개는 D16으로 확정됐으나(Kiki 2026-11-08) 측정
+    권위 일부가 아직 AI 패널이라(P3-112·P3-113) 판정기 단독 실측 판정을 CI에 걸지 않는다는 P3-10
+    결정(§8)을 그대로 따른다. 여기서 잠그는 것은 두 사례의 처분뿐이다.
     """
     leak_failures = {f.case_id for f in baseline.axis("answer_leak").failures}
     assert "aq-h-06-04-l3" not in leak_failures

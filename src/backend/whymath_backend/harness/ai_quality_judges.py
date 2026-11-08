@@ -105,7 +105,7 @@ class AxisSpec:
     """`ceiling` = 실패율 Wilson 상한 ≤ 임계 · `floor` = 통과율 Wilson 하한 ≥ 임계."""
     threshold: float
     threshold_basis: str
-    """임계의 출처 — KPI 재사용인지, 이 태스크의 **제안값**(Kiki 확인 전)인지."""
+    """임계의 출처 — KPI 재사용인지, D16 확정값(Kiki 2026-11-08 승인)인지와 측정 권위."""
     kpi_mapping: str
     """2회차 §11-5 대응 KPI·Hard Gate."""
     decision: str
@@ -118,6 +118,12 @@ class AxisSpec:
     흡수하지 않는다. Wilson 상한만 쓰면 199건 중 4건 누설이 '통과'가 된다 — 2026-10-21 실측)."""
 
 
+_D16_CONFIRMED: Final[str] = (
+    "확정(Kiki 2026-11-08 D16 승인 · docs/reviews/p3_94_full_collect_report_2026-11-07.md "
+    "§D16 결정안)"
+)
+"""D16 문장 축 6개 임계의 확정 출처 — 값·방향·무관용은 P3-94 이전 제안값 그대로 유지됐다."""
+
 AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
     "math_correctness": AxisSpec(
         axis="math_correctness",
@@ -125,8 +131,12 @@ AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
         direction="ceiling",
         threshold=0.05,
         threshold_basis=(
-            "제안값(Kiki 확인 전). KPI '수학적 오류율 ≤0.5%'는 CU 단위·독립 모델 심판 전수 지표라 "
-            "그대로 쓰면 실패 0건으로도 표본 540건 미만에서 통과가 불가능하다(0/540 상한 0.0050)."
+            f"{_D16_CONFIRMED} — 실패율 Wilson 상한 ≤ 0.05. 측정 권위: 등식 주장 = SymPy(이 "
+            "판정기) · "
+            "말로 한 정의·용어 오류 = AI 패널 보조(판정기는 못 본다). KPI '수학적 오류율 ≤0.5%'는 "
+            "CU "
+            "단위·독립 모델 심판 전수 지표라 그대로 쓰면 실패 0건으로도 표본 540건 미만에서 통과가 "
+            "불가능하다(0/540 상한 0.0050)."
         ),
         kpi_mapping="KPI 수학적 오류율 ≤0.5% · Hard Gate F-Ⅱ(검수 통과 CU 오류율 >2%) · SymPy 단일 "
         "권위",
@@ -140,9 +150,10 @@ AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
         direction="ceiling",
         threshold=0.05,
         threshold_basis=(
-            "제안값(Kiki 확인 전). KPI '힌트 누설률 L1·L2 무관용 0%'를 따라 실패 "
-            "1건이면 FAIL(무관용) "
-            "+ 표본 충분성으로 실패율 Wilson 상한 ≤ 0.05(실패 0건이면 표본 53건 이상)."
+            f"{_D16_CONFIRMED} — KPI '힌트 누설률 L1·L2 무관용 0%'를 따라 실패 1건이면 "
+            "FAIL(무관용) + 표본 충분성으로 실패율 Wilson 상한 ≤ 0.05(실패 0건이면 표본 53건 "
+            "이상). "
+            "측정 권위: 이 판정기 단독(본 수집 패널 대비 477/477 일치)."
         ),
         kpi_mapping="KPI 힌트 누설률 L1·L2 (무관용 0%) · Hard Gate F-Ⅴ(의미적 누설 ≥10%)",
         decision="재사용 + 래핑 — detect_answer_leakage(문자열) 재사용, 동치 산술식·정답 선언·최종 "
@@ -167,7 +178,12 @@ AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
         name_ko="Hint 적절성",
         direction="floor",
         threshold=0.90,
-        threshold_basis="제안값(Kiki 확인 전) — 대응 KPI 없음(§11-5 '부분 대응')",
+        threshold_basis=(
+            f"{_D16_CONFIRMED} — 통과율 Wilson 하한 ≥ 0.90을 단계별(L1·L2·L3 각각)로 적용한다. "
+            "측정 권위: AI 패널(이 판정기는 글자 표지를 요구해 거짓 실패가 많다 — 본 수집 59건). "
+            "단계별 분리 판정은 P3-111(문항 재료 공급 설계) 결정 뒤. 대응 KPI 없음(§11-5 '부분 "
+            "대응')"
+        ),
         kpi_mapping="대응 KPI 없음 — 누설(정답 누설 축)만 재고 '적절성' 지표는 0건(§11-5)",
         decision="신설 — 판정 부품은 재사용: 단계 = decide_hint_level · 단계-노출 정합 = S4-11 "
         "게이트 A(check_level_reveals) · 더한 것 = 사다리 노출 단조성",
@@ -178,7 +194,11 @@ AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
         name_ko="설명 일관성",
         direction="floor",
         threshold=0.90,
-        threshold_basis="제안값(Kiki 확인 전) — 인접 KPI '풀이 비약 지적률 ≤10%'와 같은 눈금",
+        threshold_basis=(
+            f"{_D16_CONFIRMED} — 통과율 Wilson 하한 ≥ 0.90. 측정 권위: 이 판정기 AND AI 패널(어느 "
+            "쪽이든 실패면 실패 — 판정기는 의미 일관성을 못 본다 · 패널 게이트 = P3-112). 인접 KPI "
+            "'풀이 비약 지적률 ≤10%'와 같은 눈금"
+        ),
         kpi_mapping="인접 KPI 풀이 비약 지적률 ≤10%(LLM 심판 κ≥0.5) — 동일 축 아님(§11-5 '부분 "
         "대응')",
         decision="신설 — 구조 일관성은 P3-09 TutorTurnOutput 스키마를 재사용, 다음 행동·발화 극성·"
@@ -191,8 +211,10 @@ AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
         direction="floor",
         threshold=0.90,
         threshold_basis=(
-            "제안값(Kiki 확인 전). KPI '난이도 타당도'는 문항 순위 상관(ρ)이라 튜터 턴 비율 임계로 "
-            "옮길 수 없다"
+            f"{_D16_CONFIRMED} — 통과율 Wilson 하한 ≥ 0.90 + 비한국어 문자 혼용은 무관용(검출 = "
+            "P3-113). 측정 권위: 이 판정기 + 문자 혼용 결정론 검사 + AI 패널. KPI '난이도 "
+            "타당도'는 "
+            "문항 순위 상관(ρ)이라 튜터 턴 비율 임계로 옮길 수 없다"
         ),
         kpi_mapping="KPI 난이도 타당도(깊이 Spearman ρ≥0.5·폭 ρ≥0.6) — 문항 축이라 튜터 턴에 직접 "
         "대응하지 않는다(§7-4 12월 내 미검증 자인)",
@@ -206,9 +228,11 @@ AXIS_SPECS: Final[Mapping[str, AxisSpec]] = {
         name_ko="hallucination",
         direction="ceiling",
         threshold=0.05,
-        threshold_basis="제안값(Kiki 확인 전) — 존재하지 않는 id 참조는 "
-        "무관용(실패 1건이면 FAIL) + "
-        "표본 충분성으로 실패율 Wilson 상한 ≤ 0.05",
+        threshold_basis=(
+            f"{_D16_CONFIRMED} — 무관용(실패 1건이면 FAIL) + 표본 충분성으로 실패율 Wilson 상한 "
+            "≤ 0.05. 측정 권위: 이 판정기(존재하지 않는 id 참조) AND AI 패널(지어낸 맥락 — "
+            "패널 게이트 = P3-112)"
+        ),
         kpi_mapping="PRM/도구 검증 필수 계약 + 수학적 오류율(§11-5) — 비율 KPI는 없다",
         decision="재사용 + 래핑 — P3-09 카탈로그·개념 id 검사와 정본 색인을 그대로 쓰고, 본문 속 "
         "id 모양 문자열 추출을 더한다",

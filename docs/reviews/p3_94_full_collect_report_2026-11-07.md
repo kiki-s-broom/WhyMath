@@ -113,6 +113,8 @@ B(교수설계 연구자 관점)가 묶음마다 독립 실행했고(채점 에�
 
 ## D16 임계값 결정안 (결정권 = Kiki · P3-94 acceptance ⑤)
 
+> **결정 2026-11-08 (Kiki): 아래 6행 그대로 승인.** 코드 반영 = `P3-114`(`ai_quality_judges.AXIS_SPECS` 확정 표기) · 결정 기록 = MEMORY 결정 로그 · 게이트 `G-p3-w3-release-merged` notes. 수집기 `--min-live-rate 0.5`는 이 결정 범위 밖이라 미확정이다.
+
 현행 제안값(`ai_quality_eval`의 `threshold`)을 기준으로, 이번 자료가 권하는 결정이다. 원칙: **임계값을 지금 성적에 맞춰 낮추지 않는다**
 (시한에 요건이 모자라면 범위를 깎지 않고 FAIL로 판정 — CLAUDE.md 기본방침). 측정 권위는 축마다 따로 정한다.
 

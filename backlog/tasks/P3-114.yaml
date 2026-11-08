@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: P3-114
+title: "D16 임계값 6개 확정 반영 — AI 품질 문장 축 threshold_basis 제안값→확정 (Kiki 2026-11-08 승인)"
+track: math-completion
+stage: S3
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① [Kiki 2026-11-08 승인 — D16 결정안 \"1. 승인\"] docs/reviews/p3_94_full_collect_report_2026-11-07.md §D16 임계값 결정안 6행을 확정한다. ai_quality_judges.AXIS_SPECS의 문장 축 6개(math_correctness · answer_leak · hint_appropriateness · explanation_consistency · student_level_fit · hallucination) threshold_basis에서 \"제안값(Kiki 확인 전)\"을 걷고 확정 출처(결정일·리포트 경로)와 측정 권위를 적는다. 임계 숫자·방향·무관용 여부는 바꾸지 않는다(결정안이 현행 값을 유지했다). ② 측정 권위 중 아직 코드가 없는 것은 소유 태스크를 basis에 명기한다 — 패널 의미 판정 게이트 = P3-112, 문자 혼용 무관용 = P3-113, Hint 단계별(L1·L2·L3) 판정 = P3-111 결정 뒤. ③ 회귀 동결 — 문장 축 6개 basis에 \"제안값\"이 남거나 \"확정\" 출처가 빠지면 RED인 테스트, 뮤테이션으로 RED 확인. ④ 결정 기록 = MEMORY 결정 로그 + 게이트 G-p3-w3-release-merged notes. 수집기 --min-live-rate 0.5는 이번 결정 범위 밖이라 미확정으로 남긴다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/harness/ai_quality_judges.py
+  - src/backend/whymath_backend/harness/ai_quality_eval.py
+  - tests/backend/harness/test_ai_quality_judges.py
+  - tests/backend/harness/test_ai_quality_eval.py
+  - MEMORY.md
+  - docs/reviews/p3_94_full_collect_report_2026-11-07.md
+session: claude/p3-94-llm-draft-measure
+notes: "출처: Kiki 2026-11-08 채팅 '1. 승인'(P3-94 D16 결정안)"
+updated: 2026-11-08

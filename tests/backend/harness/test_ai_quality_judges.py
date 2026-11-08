@@ -626,6 +626,32 @@ class TestCommon:
             assert 0 < spec.threshold < 1
             assert spec.threshold_basis and spec.kpi_mapping and spec.decision and spec.reuse
 
+    def test_d16_sentence_axis_thresholds_are_confirmed(self) -> None:
+        """D16 확정(Kiki 2026-11-08) — 문장 축 6개는 제안값 표기가 사라지고 승인된 값 그대로다.
+
+        승인된 결정안은 값·방향·무관용을 바꾸지 않았다. 누가 값을 바꾸면서 출처를 그대로 두거나,
+        제안값 표기를 되살리면 이 테스트가 잡는다(결정과 코드가 조용히 갈라지지 않게).
+        """
+        approved = {
+            "math_correctness": ("ceiling", 0.05, False),
+            "answer_leak": ("ceiling", 0.05, True),
+            "hint_appropriateness": ("floor", 0.90, False),
+            "explanation_consistency": ("floor", 0.90, False),
+            "student_level_fit": ("floor", 0.90, False),
+            "hallucination": ("ceiling", 0.05, True),
+        }
+        for axis, (direction, threshold, zero_tol) in approved.items():
+            spec = judges.AXIS_SPECS[axis]
+            assert (spec.direction, spec.threshold, spec.zero_tolerance) == (
+                direction,
+                threshold,
+                zero_tol,
+            ), axis
+            assert spec.threshold_basis.startswith("확정(Kiki 2026-11-08 D16 승인"), axis
+            assert "p3_94_full_collect_report_2026-11-07.md" in spec.threshold_basis, axis
+            assert "제안값" not in spec.threshold_basis, axis
+            assert "측정 권위" in spec.threshold_basis, axis
+
     def test_kpi_reuse_thresholds_track_scorecard(self) -> None:
         """재사용이라 적은 임계는 스코어카드 정본과 같은 값이어야 한다(조용히 빗나가지 않게)."""
         from whymath_backend.ops.validation_scorecard import CONTENT_KPI_THRESHOLDS
