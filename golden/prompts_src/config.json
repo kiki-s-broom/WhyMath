@@ -1,0 +1,55 @@
+{
+  "project": "WhyMath 골든 패스",
+  "session_prefix": "GP",
+  "role_line": "WhyMath(와이매스) 골든 패스 스켈레톤 3주 프로젝트",
+  "plan_url": "저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본) · 지시서 원본 `golden/prompts_src/spec.md`",
+  "repo_location": "GitHub `kiki-s-broom/whymath` · Kiki 머신 `C:\\Users\\kiki\\Desktop\\__AI\\WhyMath`(PowerShell) · 클라우드 세션 `/home/user/WhyMath`",
+  "output_root": "golden/reports",
+  "branch_prefix": "golden",
+  "background": [
+    "WhyMath(와이매스)는 한국 중·고등학생용 AI 수학 학습 앱이다(\"답이 아닌, 이유를 묻는 수학\"). 저장소에는 PR 1,800여 건·백엔드 테스트 파일 1,100여 개·7계층 아키텍처 문서가 쌓였지만, **실제 학생 1명이 문제 1개를 끝까지 푸는 경로가 돌아가는지는 확인된 적이 없다.**",
+    "2026-11-08 결정(Kiki): 3주(작업 세션 15회, 세션당 2~4시간) 안에 경로 하나만 완성한다 — **실제 학생 1명이 Flutter 앱에서 중2 일차함수 문제 1개를 소크라테스 대화로 끝까지 풀고, 숙련도 숫자 하나가 PostgreSQL에 갱신된다.** 이것이 완료 정의이고 그 밖의 모든 것은 \"지금이 아니다\".",
+    "방식은 스트랭글러 피그다. 옛 코드는 한 줄도 고치지 않고 import만 한다. 새 코드는 `golden/`(문서·데이터), `src/backend/golden/`(파이썬), `src/mobile/lib/golden/`(Flutter), `tests/golden/`(테스트)에만 쓴다. 옛 코드를 고쳐야 돌아가면 `golden/` 아래로 복사해서 고치고 `golden/HARVEST.md`에 한 줄 적는다.",
+    "학생 경로는 여섯 단계다: GP-1 세션 시작(닉네임만) → GP-2 문제 제시(30문항 순서대로) → GP-3 텍스트 답변 → GP-4 튜터 되묻기(LLM 1회 호출·최대 3턴) → GP-5 정답 판정(SymPy 비교) → GP-6 숙련도 갱신(+0.10/−0.05) → 다시 GP-2. HTTP 엔드포인트는 3개뿐이다.",
+    "완료 기준은 `tests/golden/` 초록 하나다. S2가 일부러 빨간불 e2e 테스트를 심고, S5가 처음 초록으로 만든다. 그 뒤로 빨간불인 채 머지되는 PR은 없다. 범위를 넓히려는 제안에는 \"§5(3주간 하지 않을 것)\"라고만 답한다 — 지식 추적(BKT)·OCR·의도 분류·다과목·회원가입·옛 코드 리팩토링은 전부 그 목록에 있다.",
+    "일정: 1주차 백엔드(S1~S5), 2주차 Flutter와 첫 학생(S6~S9), 3주차 학생 5명과 수확(S10~S15). 11/9(월) 시작이면 11/29(토) 종료. 한 세션에 산출물 하나. 산출물이 안 나오면 다음 세션은 같은 번호를 반복하되 범위를 넓혀 만회하지 않는다.",
+    "가장 큰 리스크는 1,800개 PR을 만든 습관이 \"이왕 하는 김에\"라는 말로 돌아오는 것이다. 그 말이 나오면 세션을 끝내고 다음 날 다시 연다."
+  ],
+  "tasks": {
+    "S1":  {"short": "상태측정",        "lane": "측정·격리",        "deps": []},
+    "H1":  {"short": "학생섭외-Kiki",   "lane": "사람이 하는 일",    "deps": []},
+    "S2":  {"short": "격리-빨간불e2e",  "lane": "측정·격리",        "deps": ["S1"]},
+    "S3":  {"short": "문항30개",        "lane": "백엔드 스켈레톤",   "deps": ["S2"]},
+    "S4":  {"short": "API3개-튜터",     "lane": "백엔드 스켈레톤",   "deps": ["S2"]},
+    "S5":  {"short": "판정숙련도-e2e초록", "lane": "백엔드 스켈레톤", "deps": ["S3", "S4"]},
+    "S6":  {"short": "Flutter화면1",    "lane": "Flutter 스켈레톤",  "deps": ["S4"]},
+    "S7":  {"short": "Flutter화면2",    "lane": "Flutter 스켈레톤",  "deps": ["S5", "S6"]},
+    "S8":  {"short": "앱통합-체크12",   "lane": "Flutter 스켈레톤",  "deps": ["S7"]},
+    "S9":  {"short": "학생1명",         "lane": "학생 검증",         "deps": ["S8", "H1"]},
+    "S10": {"short": "로그수정",        "lane": "학생 검증",         "deps": ["S9"]},
+    "S11": {"short": "학생2-3",         "lane": "학생 검증",         "deps": ["S10"]},
+    "S12": {"short": "학생4-5",         "lane": "학생 검증",         "deps": ["S11"]},
+    "S13": {"short": "로그분석",        "lane": "수확·회고",         "deps": ["S12"]},
+    "S14": {"short": "개선1개",         "lane": "수확·회고",         "deps": ["S13"]},
+    "S15": {"short": "격리회고",        "lane": "수확·회고",         "deps": ["S14"]}
+  },
+  "gates": {"S2": "①", "S5": "②", "S8": "③"},
+  "gate_table": [
+    ["①", "S2 격리", "PR의 golden-path CI 잡이 **빨강**(ImportError)이고 lint-imports는 초록 — 빨강이 go다"],
+    ["②", "S5 판정·숙련도", "`pytest tests/golden` exit 0 · CI golden-path 잡 초록 · 뮤테이션 1종이 빨강을 냈다가 원복"],
+    ["③", "S8 앱 통합", "CHECKLIST.md 12/12 ✅ · Kiki가 앱으로 문제 3개를 끝까지 풀었다"]
+  ],
+  "readme_notes": [
+    "단계 번호는 선행 관계로 계산한 \"가장 빨리 시작할 수 있는 순서\"다. 계획서의 S번호(1주차 S1~S5, 2주차 S6~S9, 3주차 S10~S15)는 달력 순서이고, 여기서는 **병렬 가능한 묶음**을 보이기 위해 단계로 다시 묶었다: S3∥S4(둘 다 S2만 기다린다), S5∥S6(S6은 S4의 API 계약만 있으면 된다), H1은 S1과 함께 시작해 S9 전까지만 끝나면 된다.",
+    "S9·S11·S12는 실제 학생이 앱을 쓰는 세션이라 AI 혼자 할 수 없다. 그 지시문은 Kiki가 관찰·기록하는 절차와, AI 세션이 로그를 정리하는 절차를 함께 담고 있다.",
+    "어느 세션이든 완료 기준을 못 채우면 다음 세션은 **같은 번호를 반복**한다(범위를 넓혀 만회하지 않는다)."
+  ],
+  "human_tasks": [
+    "H1 (Kiki): 중2 학생 5명 섭외·보호자 동의 — S1과 함께 시작, S9 전 1명·S11 전 3명·S12 전 5명",
+    "S2 뒤 (Kiki): 브랜치 룰셋 required check에 CI 잡 `golden-path` 추가(머지 차단 완성) · Alembic 대신 create_all로 golden 스키마를 만드는 제안값 확인",
+    "S8 (Kiki): 런북대로 서버·앱을 띄워 직접 문제 3개를 끝까지 풀고 CHECKLIST 12항목 체크",
+    "S9·S11·S12 (Kiki): 학생 옆에서 20분 관찰·기록(수학 힌트 금지), 관찰 기록을 AI 세션에 전달",
+    "S15 (Kiki): 미참조 옛 모듈의 /legacy 이동 진행 여부 결정",
+    "매 세션 (Kiki): PR 머지는 Kiki가 한다. tests/golden 빨강인 PR은 머지하지 않는다"
+  ]
+}
