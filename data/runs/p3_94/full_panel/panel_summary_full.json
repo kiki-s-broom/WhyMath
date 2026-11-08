@@ -1,0 +1,1152 @@
+{
+  "n_items": 477,
+  "axes": {
+    "answer_leak": {
+      "n": 477,
+      "agree": 477,
+      "kappa": null,
+      "a_ones": 0,
+      "b_ones": 0
+    },
+    "math_error": {
+      "n": 477,
+      "agree": 476,
+      "kappa": 0.8561085972850649,
+      "a_ones": 3,
+      "b_ones": 4
+    },
+    "hint_level_fit": {
+      "n": 351,
+      "agree": 339,
+      "kappa": 0.9227467811158798,
+      "a_ones": 117,
+      "b_ones": 115
+    },
+    "consistency": {
+      "n": 477,
+      "agree": 460,
+      "kappa": 0.46640784365335375,
+      "a_ones": 461,
+      "b_ones": 460
+    },
+    "level_fit": {
+      "n": 477,
+      "agree": 477,
+      "kappa": 1.0,
+      "a_ones": 474,
+      "b_ones": 474
+    },
+    "fabrication": {
+      "n": 477,
+      "agree": 475,
+      "kappa": 0.8550151975683907,
+      "a_ones": 7,
+      "b_ones": 7
+    }
+  },
+  "disagreements": [
+    {
+      "번호": 105,
+      "axis": "math_error",
+      "a": 0,
+      "b": 1,
+      "a_reason": "극소는 극값의 일종이라 '극값과 극소의 차이'라는 질문이 개념적으로 모호해 학생을 혼란시킬 수 있음.",
+      "b_reason": "극소는 극값의 일종인데 '극값과 극소의 차이'를 물어 용어를 혼동했다."
+    },
+    {
+      "번호": 88,
+      "axis": "hint_level_fit",
+      "a": 0,
+      "b": 1,
+      "a_reason": "1단계로서 떠올릴 개념이나 구할 대상을 가리키지 않는 막연한 '어떤 접근 방법' 질문.",
+      "b_reason": "개념명만 되풀이한 '어떤 접근 방법' 질문이라 막연하다."
+    },
+    {
+      "번호": 109,
+      "axis": "hint_level_fit",
+      "a": 0,
+      "b": 1,
+      "a_reason": "1단계로서 떠올릴 개념(도함수·극값)을 가리키지 않는 막연한 질문.",
+      "b_reason": "개념명을 되풀이한 막연한 질문이다."
+    },
+    {
+      "번호": 221,
+      "axis": "hint_level_fit",
+      "a": 0,
+      "b": 1,
+      "a_reason": "2단계인데 각 항 처리를 묻는 질문에 그쳐 풀이 흐름(미분→x=-1 대입→a 구하기) 안내가 부족함.",
+      "b_reason": ""
+    },
+    {
+      "번호": 246,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "문장 절반이 중국어로 되어 있어 한국 학생이 읽을 수 없다.",
+      "b_reason": "문장 중간에 중국어가 섞여 학생이 읽을 수 없는 깨진 문장이다."
+    },
+    {
+      "번호": 288,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "도함수로 실근 개수를 따지는 문항인데 미지수를 놓는 문장제 전략으로 잘못 안내한다.",
+      "b_reason": "이미 x에 대한 방정식인 문항을 문장제처럼 미지수 설정으로 안내해 문항과 어긋난다."
+    },
+    {
+      "번호": 296,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "",
+      "b_reason": "2단계인데 확인 조건만 묻고 기울기 계산으로 가는 풀이 순서를 안내하지 않는다."
+    },
+    {
+      "번호": 313,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "",
+      "b_reason": "2단계인데 극한 정의를 떠올리라는 질문뿐 풀이 순서 안내가 없다."
+    },
+    {
+      "번호": 356,
+      "axis": "hint_level_fit",
+      "a": 0,
+      "b": 1,
+      "a_reason": "존댓말·반말이 섞였고, 다항함수에 해당 없는 점근선까지 후보로 나열하며 순서는 학생에게 넘겨 2단계 흐름 안내가 부족하다.",
+      "b_reason": "'확인해야 할까요?'(존댓말)와 '말해 줄래?'(반말)가 섞였고, 삼차함수에 점근선을 확인 목록에 넣어 초점이 흐리다."
+    },
+    {
+      "번호": 361,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "",
+      "b_reason": "L2인데 정리의 조건 점검만 묻고 풀이 단계 순서는 안내하지 않는다."
+    },
+    {
+      "번호": 374,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "",
+      "b_reason": "L2인데 규칙 발견(L1 수준)만 권하고 대입까지의 풀이 흐름은 안내하지 않는다."
+    },
+    {
+      "번호": 386,
+      "axis": "hint_level_fit",
+      "a": 1,
+      "b": 0,
+      "a_reason": "'문제네요'와 '말해 줄래?'로 존댓말·반말이 섞였다.",
+      "b_reason": "L1인데 '평균변화율을 세워 시작하라'는 첫 절차까지 제시해 넘치고, '문제네요'와 '말해 줄래?'로 말투가 섞였다."
+    },
+    {
+      "번호": 388,
+      "axis": "hint_level_fit",
+      "a": 0,
+      "b": 1,
+      "a_reason": "'그래프 형태를 어떻게 생각했나'는 무엇을 떠올릴지 가리키지 못하는 막연한 질문이다.",
+      "b_reason": "'그래프 형태를 어떻게 생각했나?'라는 막연하고 딱딱한 한 줄이다."
+    },
+    {
+      "번호": 6,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "정답을 고른 학생에게 확인 없이 처음부터 쓸 규칙을 고르게 해 상황과 맞지 않음.",
+      "b_reason": "정답을 고른 직후인데 확인·근거 성찰 없이 처음부터 풀 것처럼 막연히 묻는다."
+    },
+    {
+      "번호": 13,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "내용 없는 격려와 막연한 질문뿐으로 L2 흐름 안내가 전혀 없고 문장도 어색함.",
+      "b_reason": "수학 내용이 전혀 없는 공허한 격려·질문이라 문항·개념과 동떨어지고 2단계 안내도 없다."
+    },
+    {
+      "번호": 18,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "정답을 고른 학생에게 정답 확인 없이 처음 접근하듯 물어 상황과 맞지 않음.",
+      "b_reason": "정답 선택 직후인데 확인 없이 '가장 먼저 어떤 정보를'이라며 풀이 시작 단계처럼 묻는다."
+    },
+    {
+      "번호": 28,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "'방정식·부등식에의 활용'을 방정식 세우기로 오해해 도함수 활용으로 주의를 돌리지 못함.",
+      "b_reason": "'방정식·부등식에의 활용'(도함수로 실근 개수 판단)을 '어떤 방정식을 활용할지'로 오독해 핵심 개념으로 주의를 돌리지 못한다."
+    },
+    {
+      "번호": 38,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "정답 학생에게 확인 없이 처음부터 접근하자고 하고 '~네요'와 반말이 섞임.",
+      "b_reason": "정답 선택 직후인데 확인 없이 처음부터 접근하자고 하며 '~네요'와 '줄래?'로 존댓말·반말이 섞였다."
+    },
+    {
+      "번호": 45,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "정답 학생에게 처음 풀듯 미지수 설정을 권해 상황·문항과 맞지 않음.",
+      "b_reason": "정답 선택 직후인데 확인 없이 처음부터 풀이를 시작하게 하고, 실근 개수 문제에 '미지수로 둘 양'을 묻는 등 방향도 어긋난다."
+    },
+    {
+      "번호": 57,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "L3인데 막연하고 방향이 어긋난 질문만 함.",
+      "b_reason": "3단계인데 부분 시연이 없고, '방정식·부등식에의 활용'을 '어떤 방정식이 떠올랐나'로 오독해 개념과 어긋난다."
+    },
+    {
+      "번호": 71,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "정답을 고른 학생에게 '함께 풀어보자'며 처음부터 시작해 상황과 어긋남.",
+      "b_reason": "정답 선택 직후인데 확인 없이 '함께 풀어보자'며 처음부터 정의를 묻는다."
+    },
+    {
+      "번호": 274,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "막힌 문항에 힌트 대신 다른 문제를 풀자고 제안해 상황과 동떨어진다.",
+      "b_reason": "3단계인데 현재 문항의 부분 풀이 대신 다른 문제를 풀자고 제안한다."
+    },
+    {
+      "번호": 288,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "도함수로 실근 개수를 따지는 문항인데 미지수를 놓는 문장제 전략으로 잘못 안내한다.",
+      "b_reason": "이미 x에 대한 방정식인 문항을 문장제처럼 미지수 설정으로 안내해 문항과 어긋난다."
+    },
+    {
+      "번호": 351,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "'이전에 시도했던 문항들'이라는 없는 맥락을 지어냈고 흐름 안내 없이 '다른 관점'만 막연하게 말한다.",
+      "b_reason": "없던 '이전에 시도했던 문항들'을 지어내고 문장도 비문이며 문항과 무관해 힌트 구실을 못 한다."
+    },
+    {
+      "번호": 413,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "실근 개수 문항에 '무엇을 미지수로 둘지'라는 동떨어진 일반 질문만 하고 2단계 풀이 흐름을 안내하지 않는다.",
+      "b_reason": "도함수로 실근 개수를 따지는 문항을 '무엇을 미지수로 둘지'라는 문장제 틀로 다뤄 개념과 어긋나고, L2 흐름 안내가 없음"
+    },
+    {
+      "번호": 415,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "x^8 문항에 정답을 고른 학생에게 n=2 경우를 묻는 등 상황과 동떨어지고 정답 선택에 대한 반응이 없다.",
+      "b_reason": "정답을 고른 학생에게 기억이 있는지를 과한 높임말로 묻고, 문항(x^8)과 무관한 n=2 경우를 짚음"
+    },
+    {
+      "번호": 440,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "실근 개수 문항에 '무엇을 미지수로 둘지'라는 동떨어진 질문을 하며 2단계 풀이 흐름을 안내하지 않는다.",
+      "b_reason": "실근 개수 문항을 '어떤 양을 미지수로 둘지'라는 문장제 틀로 다뤄 개념과 어긋나고, L2 흐름 안내가 없음"
+    },
+    {
+      "번호": 441,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "실근 개수를 구하는 문항에 '그 값을 x로 두라'는 맞지 않는 방향을 제시하고 문장도 비문('값을 무엇인지')이다.",
+      "b_reason": "이미 x에 관한 방정식이 주어진 실근 개수 문항에 '그 값을 x로 두면'이라는 문장제 틀을 적용해 개념과 어긋나고 문법 오류('값을 무엇인지')가 있음"
+    },
+    {
+      "번호": 464,
+      "axis": "consistency",
+      "a": 0,
+      "b": 1,
+      "a_reason": "이미 정답을 고른 학생에게 '한번 시작해 봐'라며 아직 풀지 않은 것처럼 말해 상황과 맞지 않는다.",
+      "b_reason": "이미 정답을 고른 학생에게 '한번 시작해 봐'라며 처음부터 규칙을 찾게 해 상황 반영이 부족함"
+    },
+    {
+      "번호": 473,
+      "axis": "consistency",
+      "a": 1,
+      "b": 0,
+      "a_reason": "실근 개수 문항에 '무엇을 미지수로 둘지'라는 맞지 않는 일반 질문을 덧붙여 실마리가 흐려진다.",
+      "b_reason": "도함수로 실근 개수를 따지는 문항을 '어떤 양을 미지수로 둘지'라는 문장제 틀로 다뤄 개념과 어긋남"
+    },
+    {
+      "번호": 354,
+      "axis": "fabrication",
+      "a": 1,
+      "b": 0,
+      "a_reason": "문항에 그래프가 없는데 '그래프를 보고'라고 전제했고, 3단계 부분 시연이 없다.",
+      "b_reason": "L3인데 부분 시연이 없고, 그래프가 주어지지 않은 문항에 '그래프를 보고'라고 전제해 어색하다."
+    },
+    {
+      "번호": 389,
+      "axis": "fabrication",
+      "a": 0,
+      "b": 1,
+      "a_reason": "학생에게 말하면서 '이미 학생이 ~알고 있다고 보이는데'라는 3인칭 내부 판단이 노출돼 부자연스럽다.",
+      "b_reason": "근거 없이 '이미 학생이 규칙을 알고 있다고 보인다'고 관찰을 지어냈고 학생을 3인칭으로 지칭해 어색하다."
+    }
+  ],
+  "unresolved": [],
+  "seat_quality": {
+    "local-mid": {
+      "n": 241,
+      "quality_mean": 2.17,
+      "quality_dist": {
+        "1": 13,
+        "2": 181,
+        "3": 45,
+        "4": 2
+      },
+      "panel_axes": {
+        "answer_leak": {
+          "decided": 241,
+          "pass": 241,
+          "rate": 0.0,
+          "bound": 0.0111,
+          "bound_kind": "fail_rate_upper"
+        },
+        "math_error": {
+          "decided": 241,
+          "pass": 238,
+          "rate": 0.0124,
+          "bound": 0.0307,
+          "bound_kind": "fail_rate_upper"
+        },
+        "hint_level_fit": {
+          "decided": 177,
+          "pass": 51,
+          "rate": 0.2881,
+          "bound": 0.2357,
+          "bound_kind": "pass_rate_lower"
+        },
+        "consistency": {
+          "decided": 241,
+          "pass": 234,
+          "rate": 0.971,
+          "bound": 0.9473,
+          "bound_kind": "pass_rate_lower"
+        },
+        "level_fit": {
+          "decided": 241,
+          "pass": 238,
+          "rate": 0.9876,
+          "bound": 0.9693,
+          "bound_kind": "pass_rate_lower"
+        },
+        "fabrication": {
+          "decided": 241,
+          "pass": 233,
+          "rate": 0.0332,
+          "bound": 0.058,
+          "bound_kind": "fail_rate_upper"
+        }
+      },
+      "by_slot": {
+        "choice": {
+          "n": 64,
+          "quality_mean": 2.33,
+          "hint_level_fit_pass": 0,
+          "hint_level_fit_decided": 0
+        },
+        "hint-L1": {
+          "n": 58,
+          "quality_mean": 2.36,
+          "hint_level_fit_pass": 51,
+          "hint_level_fit_decided": 58
+        },
+        "hint-L2": {
+          "n": 59,
+          "quality_mean": 1.99,
+          "hint_level_fit_pass": 0,
+          "hint_level_fit_decided": 59
+        },
+        "hint-L3": {
+          "n": 60,
+          "quality_mean": 1.98,
+          "hint_level_fit_pass": 0,
+          "hint_level_fit_decided": 60
+        }
+      }
+    },
+    "cloud-mid": {
+      "n": 236,
+      "quality_mean": 2.86,
+      "quality_dist": {
+        "2": 85,
+        "3": 107,
+        "4": 42,
+        "5": 2
+      },
+      "panel_axes": {
+        "answer_leak": {
+          "decided": 236,
+          "pass": 236,
+          "rate": 0.0,
+          "bound": 0.0113,
+          "bound_kind": "fail_rate_upper"
+        },
+        "math_error": {
+          "decided": 236,
+          "pass": 236,
+          "rate": 0.0,
+          "bound": 0.0113,
+          "bound_kind": "fail_rate_upper"
+        },
+        "hint_level_fit": {
+          "decided": 174,
+          "pass": 65,
+          "rate": 0.3736,
+          "bound": 0.3156,
+          "bound_kind": "pass_rate_lower"
+        },
+        "consistency": {
+          "decided": 236,
+          "pass": 228,
+          "rate": 0.9661,
+          "bound": 0.9408,
+          "bound_kind": "pass_rate_lower"
+        },
+        "level_fit": {
+          "decided": 236,
+          "pass": 236,
+          "rate": 1.0,
+          "bound": 0.9887,
+          "bound_kind": "pass_rate_lower"
+        },
+        "fabrication": {
+          "decided": 236,
+          "pass": 236,
+          "rate": 0.0,
+          "bound": 0.0113,
+          "bound_kind": "fail_rate_upper"
+        }
+      },
+      "by_slot": {
+        "choice": {
+          "n": 62,
+          "quality_mean": 2.91,
+          "hint_level_fit_pass": 0,
+          "hint_level_fit_decided": 0
+        },
+        "hint-L1": {
+          "n": 58,
+          "quality_mean": 3.2,
+          "hint_level_fit_pass": 57,
+          "hint_level_fit_decided": 58
+        },
+        "hint-L2": {
+          "n": 58,
+          "quality_mean": 2.83,
+          "hint_level_fit_pass": 8,
+          "hint_level_fit_decided": 58
+        },
+        "hint-L3": {
+          "n": 58,
+          "quality_mean": 2.52,
+          "hint_level_fit_pass": 0,
+          "hint_level_fit_decided": 58
+        }
+      }
+    }
+  },
+  "judge_vs_panel": {
+    "answer_leak": {
+      "judge_axis": "answer_leak",
+      "n": 477,
+      "agree": 477,
+      "false_pass": 0,
+      "false_fail": 0,
+      "mismatch": []
+    },
+    "math_error": {
+      "judge_axis": "math_correctness",
+      "n": 0,
+      "agree": 0,
+      "false_pass": 0,
+      "false_fail": 0,
+      "mismatch": []
+    },
+    "hint_level_fit": {
+      "judge_axis": "hint_appropriateness",
+      "n": 351,
+      "agree": 287,
+      "false_pass": 5,
+      "false_fail": 59,
+      "mismatch": [
+        {
+          "번호": 1,
+          "seat": "local-mid",
+          "case_id": "aq-h-08-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 2,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-07-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 25,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-02-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 35,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-07-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 36,
+          "seat": "local-mid",
+          "case_id": "aq-h-07-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 40,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 60,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-07-03-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 69,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 75,
+          "seat": "local-mid",
+          "case_id": "aq-h-08-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 82,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 86,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-02-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 88,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 103,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 109,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 121,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 124,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 126,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 133,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 142,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-02-02-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 147,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-07-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 149,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-07-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 157,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 159,
+          "seat": "local-mid",
+          "case_id": "aq-h-07-02-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 177,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-07-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 202,
+          "seat": "local-mid",
+          "case_id": "aq-h-07-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 205,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 207,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 217,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 232,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 239,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-02-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 246,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 247,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 262,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-02-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 280,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 283,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 286,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 287,
+          "seat": "local-mid",
+          "case_id": "aq-h-10-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 288,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-06-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 290,
+          "seat": "local-mid",
+          "case_id": "aq-h-03-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 297,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-08-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 299,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 309,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-06-05-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 324,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-05-02-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 331,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 338,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-05-05-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 343,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-08-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 359,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-01-02-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 375,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 377,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-06-06-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 385,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 388,
+          "seat": "local-mid",
+          "case_id": "aq-h-08-04-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 389,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-02-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 391,
+          "seat": "local-mid",
+          "case_id": "aq-h-07-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 393,
+          "seat": "local-mid",
+          "case_id": "aq-h-07-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 394,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 401,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-03-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 405,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-05-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 410,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-03-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 411,
+          "seat": "local-mid",
+          "case_id": "aq-h-08-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 432,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-04-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 433,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-04-06-l2",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 441,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-01-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 473,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-02-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        },
+        {
+          "번호": 474,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-03-06-l1",
+          "judge_pass": false,
+          "panel_pass": true
+        }
+      ]
+    },
+    "consistency": {
+      "judge_axis": "explanation_consistency",
+      "n": 477,
+      "agree": 462,
+      "false_pass": 15,
+      "false_fail": 0,
+      "mismatch": [
+        {
+          "번호": 27,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-02-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 45,
+          "seat": "cloud-mid",
+          "case_id": "aq-c-09-02-c1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 48,
+          "seat": "cloud-mid",
+          "case_id": "aq-c-10-01-c2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 90,
+          "seat": "local-mid",
+          "case_id": "aq-c-09-02-c1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 111,
+          "seat": "cloud-mid",
+          "case_id": "aq-c-03-02-c2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 251,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-01-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 288,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-06-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 325,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-06-l3",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 351,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-01-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 401,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-03-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 413,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-05-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 434,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-06-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 440,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-02-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 441,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-01-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 473,
+          "seat": "cloud-mid",
+          "case_id": "aq-h-09-02-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        }
+      ]
+    },
+    "level_fit": {
+      "judge_axis": "student_level_fit",
+      "n": 477,
+      "agree": 474,
+      "false_pass": 3,
+      "false_fail": 0,
+      "mismatch": [
+        {
+          "번호": 166,
+          "seat": "local-mid",
+          "case_id": "aq-h-01-02-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 246,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-05-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 439,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-02-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        }
+      ]
+    },
+    "fabrication": {
+      "judge_axis": "hallucination",
+      "n": 477,
+      "agree": 469,
+      "false_pass": 8,
+      "false_fail": 0,
+      "mismatch": [
+        {
+          "번호": 27,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-02-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 85,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-05-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 186,
+          "seat": "local-mid",
+          "case_id": "aq-h-07-06-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 251,
+          "seat": "local-mid",
+          "case_id": "aq-h-02-01-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 325,
+          "seat": "local-mid",
+          "case_id": "aq-h-06-06-l3",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 351,
+          "seat": "local-mid",
+          "case_id": "aq-h-09-01-l2",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 354,
+          "seat": "local-mid",
+          "case_id": "aq-h-08-04-l3",
+          "judge_pass": true,
+          "panel_pass": false
+        },
+        {
+          "번호": 389,
+          "seat": "local-mid",
+          "case_id": "aq-h-04-02-l1",
+          "judge_pass": true,
+          "panel_pass": false
+        }
+      ]
+    }
+  }
+}

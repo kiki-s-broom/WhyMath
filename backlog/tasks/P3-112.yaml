@@ -13,6 +13,7 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 근거 — P3-94 ⑨ AI 패널: 규칙 판정기가 지어낸 맥락(#27 \"이전 문제에서 연속성을 논의했으니\")을 hallucination 축에서, 상황 불일치(#33 막힌 학생에게 \"이론 복습\")를 설명 일관성 축에서 각각 통과시켰다(거짓 통과). hallucination 축은 무관용 축이라 거짓 통과가 특히 위험하다. ② ai_quality_judges에 의미 판정 보조 모드를 둔다 — LLM 심판 2개 독립 판정(라우터 경유 · 측정 전용 · 학생 경로 미사용 · 캐시)으로 지어낸 맥락·상황 불일치를 판정하고, 규칙 판정기 결과와 합쳐(OR 실패) 축 판정을 낸다. 심판 프롬프트·루브릭은 P3-94 ⑨ 채점 루브릭을 승계한다. ③ 측정 통과 기계 게이트 요건(CLAUDE.md 검증 권위) — 결함 주입 강등전: 지어낸 맥락·상황 불일치 문장을 주입한 음성 대조군에서 검출률 Wilson 하한과 정상 문장 오검출률 Wilson 상한을 CLI exit 0/1로 판정하고, 두 심판 간 Cohen κ를 리포트한다. 임계 값은 결정 문서에서 Kiki가 정한다. ④ 한계 명시 — 심판 오류율은 사람 기준으로 측정되지 않았다(P3-94 ⑨ Kiki 결정 승계) · 같은 계열 모델 편향 공유 가능."
+  - "⑤ [근거 보강 2026-11-07 · P3-94 본 수집 477건 AI 패널] 규칙 판정기 대 패널 — hallucination 축 거짓 통과 8건(전부 local-mid: 근거 없는 \"이해하고 있네요\" 단정·\"이전에 시도했던 문항들\"·문항에 없는 \"그래프를 보고\" 등), 설명 일관성 축 거짓 통과 15건(local 7 · cloud 8 — cloud 8건 중 6건은 실근 개수 문항에 \"무엇을 미지수로 둘지\"라는 문장제 안내). 두 축 모두 거짓 실패는 0건이다. 패널 기준 hallucination 실패율 local 3.3%(Wilson 상한 5.8%) · cloud 0%(상한 1.1%). 리포트 = docs/reviews/p3_94_full_collect_report_2026-11-07.md."
 artifacts: []
 paths:
   - src/backend/whymath_backend/harness/ai_quality_judges.py
@@ -20,5 +21,8 @@ paths:
   - tests/backend/harness/test_ai_quality_judges.py
   - docs/reviews/
 session: null
-notes: "출처: P3-94 ⑨ AI 패널 리포트 다음 단계 3 — Kiki 2026-11-07 '권장대로 진행'"
+notes: |-
+  출처: P3-94 ⑨ AI 패널 리포트 다음 단계 3 — Kiki 2026-11-07 '권장대로 진행'
+
+  [정정 2026-11-07] P3-94 본 수집 AI 패널 근거 보강
 updated: 2026-11-07

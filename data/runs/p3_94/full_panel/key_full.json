@@ -1,0 +1,2390 @@
+{
+ "seed": 20261107,
+ "items": [
+  {
+   "번호": 1,
+   "case_id": "aq-h-08-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 2,
+   "case_id": "aq-h-07-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 3,
+   "case_id": "aq-h-01-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 4,
+   "case_id": "aq-h-10-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 5,
+   "case_id": "aq-h-10-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 6,
+   "case_id": "aq-c-04-01-c3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 7,
+   "case_id": "aq-h-06-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 8,
+   "case_id": "aq-h-02-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 9,
+   "case_id": "aq-c-03-01-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 10,
+   "case_id": "aq-h-02-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 11,
+   "case_id": "aq-h-02-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 12,
+   "case_id": "aq-h-07-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 13,
+   "case_id": "aq-h-02-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 14,
+   "case_id": "aq-h-04-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 15,
+   "case_id": "aq-h-07-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 16,
+   "case_id": "aq-h-10-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 17,
+   "case_id": "aq-h-04-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 18,
+   "case_id": "aq-c-10-02-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 19,
+   "case_id": "aq-h-05-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 20,
+   "case_id": "aq-c-04-01-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 21,
+   "case_id": "aq-h-10-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 22,
+   "case_id": "aq-h-08-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 23,
+   "case_id": "aq-h-01-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 24,
+   "case_id": "aq-h-01-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 25,
+   "case_id": "aq-h-04-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 26,
+   "case_id": "aq-h-08-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 27,
+   "case_id": "aq-h-09-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 28,
+   "case_id": "aq-h-09-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 29,
+   "case_id": "aq-h-06-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 30,
+   "case_id": "aq-h-08-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 31,
+   "case_id": "aq-c-10-01-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 32,
+   "case_id": "aq-h-05-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 33,
+   "case_id": "aq-h-05-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 34,
+   "case_id": "aq-h-05-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 35,
+   "case_id": "aq-h-07-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 36,
+   "case_id": "aq-h-07-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 37,
+   "case_id": "aq-h-02-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 38,
+   "case_id": "aq-c-10-02-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 39,
+   "case_id": "aq-h-07-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 40,
+   "case_id": "aq-h-04-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 41,
+   "case_id": "aq-h-01-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 42,
+   "case_id": "aq-h-09-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 43,
+   "case_id": "aq-h-04-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 44,
+   "case_id": "aq-c-08-02-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 45,
+   "case_id": "aq-c-09-02-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 46,
+   "case_id": "aq-h-02-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 47,
+   "case_id": "aq-c-05-02-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 48,
+   "case_id": "aq-c-10-01-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 49,
+   "case_id": "aq-h-07-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 50,
+   "case_id": "aq-c-03-03-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 51,
+   "case_id": "aq-c-02-01-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 52,
+   "case_id": "aq-h-10-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 53,
+   "case_id": "aq-h-10-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 54,
+   "case_id": "aq-h-03-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 55,
+   "case_id": "aq-h-10-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 56,
+   "case_id": "aq-h-06-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 57,
+   "case_id": "aq-h-09-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 58,
+   "case_id": "aq-h-04-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 59,
+   "case_id": "aq-c-02-02-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 60,
+   "case_id": "aq-h-07-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 61,
+   "case_id": "aq-h-08-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 62,
+   "case_id": "aq-h-01-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 63,
+   "case_id": "aq-h-10-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 64,
+   "case_id": "aq-h-02-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 65,
+   "case_id": "aq-h-07-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 66,
+   "case_id": "aq-h-03-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 67,
+   "case_id": "aq-h-06-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 68,
+   "case_id": "aq-h-10-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 69,
+   "case_id": "aq-h-09-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 70,
+   "case_id": "aq-h-05-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 71,
+   "case_id": "aq-c-01-01-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 72,
+   "case_id": "aq-c-03-02-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 73,
+   "case_id": "aq-h-03-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 74,
+   "case_id": "aq-h-03-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 75,
+   "case_id": "aq-h-08-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 76,
+   "case_id": "aq-h-08-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 77,
+   "case_id": "aq-h-01-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 78,
+   "case_id": "aq-h-08-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 79,
+   "case_id": "aq-h-05-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 80,
+   "case_id": "aq-h-04-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 81,
+   "case_id": "aq-c-05-02-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 82,
+   "case_id": "aq-h-03-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 83,
+   "case_id": "aq-c-07-02-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 84,
+   "case_id": "aq-c-09-03-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 85,
+   "case_id": "aq-h-06-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 86,
+   "case_id": "aq-h-04-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 87,
+   "case_id": "aq-c-04-03-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 88,
+   "case_id": "aq-h-09-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 89,
+   "case_id": "aq-h-08-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 90,
+   "case_id": "aq-c-09-02-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 91,
+   "case_id": "aq-h-05-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 92,
+   "case_id": "aq-c-05-03-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 93,
+   "case_id": "aq-h-01-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 94,
+   "case_id": "aq-c-05-01-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 95,
+   "case_id": "aq-h-09-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 96,
+   "case_id": "aq-h-05-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 97,
+   "case_id": "aq-h-01-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 98,
+   "case_id": "aq-c-10-03-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 99,
+   "case_id": "aq-h-04-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 100,
+   "case_id": "aq-c-08-03-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 101,
+   "case_id": "aq-h-05-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 102,
+   "case_id": "aq-h-10-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 103,
+   "case_id": "aq-h-04-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 104,
+   "case_id": "aq-c-01-01-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 105,
+   "case_id": "aq-c-07-01-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 106,
+   "case_id": "aq-h-01-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 107,
+   "case_id": "aq-h-02-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 108,
+   "case_id": "aq-h-04-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 109,
+   "case_id": "aq-h-09-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 110,
+   "case_id": "aq-c-07-03-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 111,
+   "case_id": "aq-c-03-02-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 112,
+   "case_id": "aq-h-10-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 113,
+   "case_id": "aq-h-09-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 114,
+   "case_id": "aq-c-03-02-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 115,
+   "case_id": "aq-c-07-03-c3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 116,
+   "case_id": "aq-h-08-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 117,
+   "case_id": "aq-c-02-03-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 118,
+   "case_id": "aq-h-02-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 119,
+   "case_id": "aq-h-01-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 120,
+   "case_id": "aq-c-05-02-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 121,
+   "case_id": "aq-h-09-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 122,
+   "case_id": "aq-h-03-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 123,
+   "case_id": "aq-h-01-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 124,
+   "case_id": "aq-h-04-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 125,
+   "case_id": "aq-h-09-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 126,
+   "case_id": "aq-h-03-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 127,
+   "case_id": "aq-c-03-01-w2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 128,
+   "case_id": "aq-h-02-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 129,
+   "case_id": "aq-c-10-02-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 130,
+   "case_id": "aq-c-08-02-w2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 131,
+   "case_id": "aq-h-01-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 132,
+   "case_id": "aq-h-04-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 133,
+   "case_id": "aq-h-04-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 134,
+   "case_id": "aq-h-02-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 135,
+   "case_id": "aq-c-07-01-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 136,
+   "case_id": "aq-h-08-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 137,
+   "case_id": "aq-h-01-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 138,
+   "case_id": "aq-h-06-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 139,
+   "case_id": "aq-h-05-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 140,
+   "case_id": "aq-h-03-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 141,
+   "case_id": "aq-h-09-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 142,
+   "case_id": "aq-h-02-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 143,
+   "case_id": "aq-h-08-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 144,
+   "case_id": "aq-h-05-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 145,
+   "case_id": "aq-h-04-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 146,
+   "case_id": "aq-c-04-01-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 147,
+   "case_id": "aq-h-07-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 148,
+   "case_id": "aq-h-02-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 149,
+   "case_id": "aq-h-07-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 150,
+   "case_id": "aq-c-02-02-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 151,
+   "case_id": "aq-h-04-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 152,
+   "case_id": "aq-h-10-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 153,
+   "case_id": "aq-h-07-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 154,
+   "case_id": "aq-c-08-01-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 155,
+   "case_id": "aq-c-09-02-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 156,
+   "case_id": "aq-h-08-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 157,
+   "case_id": "aq-h-04-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 158,
+   "case_id": "aq-h-09-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 159,
+   "case_id": "aq-h-07-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 160,
+   "case_id": "aq-h-03-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 161,
+   "case_id": "aq-h-05-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 162,
+   "case_id": "aq-h-10-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 163,
+   "case_id": "aq-h-01-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 164,
+   "case_id": "aq-h-09-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 165,
+   "case_id": "aq-h-03-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 166,
+   "case_id": "aq-h-01-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 167,
+   "case_id": "aq-h-10-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 168,
+   "case_id": "aq-h-06-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 169,
+   "case_id": "aq-c-08-03-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 170,
+   "case_id": "aq-h-05-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 171,
+   "case_id": "aq-c-03-01-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 172,
+   "case_id": "aq-c-01-03-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 173,
+   "case_id": "aq-h-01-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 174,
+   "case_id": "aq-h-04-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 175,
+   "case_id": "aq-h-01-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 176,
+   "case_id": "aq-c-08-01-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 177,
+   "case_id": "aq-h-07-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 178,
+   "case_id": "aq-c-08-03-w2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 179,
+   "case_id": "aq-h-05-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 180,
+   "case_id": "aq-h-02-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 181,
+   "case_id": "aq-h-05-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 182,
+   "case_id": "aq-c-09-02-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 183,
+   "case_id": "aq-c-04-02-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 184,
+   "case_id": "aq-h-02-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 185,
+   "case_id": "aq-c-07-03-c3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 186,
+   "case_id": "aq-h-07-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 187,
+   "case_id": "aq-h-07-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 188,
+   "case_id": "aq-c-02-01-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 189,
+   "case_id": "aq-c-10-03-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 190,
+   "case_id": "aq-h-01-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 191,
+   "case_id": "aq-h-06-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 192,
+   "case_id": "aq-h-05-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 193,
+   "case_id": "aq-h-06-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 194,
+   "case_id": "aq-h-02-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 195,
+   "case_id": "aq-h-05-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 196,
+   "case_id": "aq-c-08-02-w2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 197,
+   "case_id": "aq-h-03-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 198,
+   "case_id": "aq-c-01-03-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 199,
+   "case_id": "aq-c-09-01-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 200,
+   "case_id": "aq-h-06-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 201,
+   "case_id": "aq-h-05-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 202,
+   "case_id": "aq-h-07-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 203,
+   "case_id": "aq-c-03-03-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 204,
+   "case_id": "aq-h-09-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 205,
+   "case_id": "aq-h-03-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 206,
+   "case_id": "aq-h-04-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 207,
+   "case_id": "aq-h-03-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 208,
+   "case_id": "aq-c-07-01-w2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 209,
+   "case_id": "aq-h-10-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 210,
+   "case_id": "aq-h-01-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 211,
+   "case_id": "aq-h-02-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 212,
+   "case_id": "aq-h-01-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 213,
+   "case_id": "aq-h-06-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 214,
+   "case_id": "aq-h-05-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 215,
+   "case_id": "aq-c-03-01-w2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 216,
+   "case_id": "aq-c-02-03-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 217,
+   "case_id": "aq-h-03-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 218,
+   "case_id": "aq-c-02-03-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 219,
+   "case_id": "aq-h-06-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 220,
+   "case_id": "aq-h-07-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 221,
+   "case_id": "aq-h-04-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 222,
+   "case_id": "aq-h-04-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 223,
+   "case_id": "aq-c-02-01-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 224,
+   "case_id": "aq-c-04-02-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 225,
+   "case_id": "aq-h-10-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 226,
+   "case_id": "aq-c-03-01-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 227,
+   "case_id": "aq-c-05-02-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 228,
+   "case_id": "aq-c-05-01-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 229,
+   "case_id": "aq-h-09-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 230,
+   "case_id": "aq-h-05-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 231,
+   "case_id": "aq-c-07-01-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 232,
+   "case_id": "aq-h-04-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 233,
+   "case_id": "aq-h-08-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 234,
+   "case_id": "aq-h-08-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 235,
+   "case_id": "aq-h-03-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 236,
+   "case_id": "aq-c-02-02-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 237,
+   "case_id": "aq-h-05-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 238,
+   "case_id": "aq-h-10-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 239,
+   "case_id": "aq-h-03-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 240,
+   "case_id": "aq-h-02-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 241,
+   "case_id": "aq-h-06-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 242,
+   "case_id": "aq-c-07-03-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 243,
+   "case_id": "aq-h-08-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 244,
+   "case_id": "aq-h-07-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 245,
+   "case_id": "aq-h-10-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 246,
+   "case_id": "aq-h-02-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 247,
+   "case_id": "aq-h-04-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 248,
+   "case_id": "aq-c-05-03-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 249,
+   "case_id": "aq-h-02-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 250,
+   "case_id": "aq-h-06-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 251,
+   "case_id": "aq-h-02-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 252,
+   "case_id": "aq-c-04-03-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 253,
+   "case_id": "aq-c-05-02-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 254,
+   "case_id": "aq-c-04-02-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 255,
+   "case_id": "aq-h-08-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 256,
+   "case_id": "aq-h-08-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 257,
+   "case_id": "aq-h-09-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 258,
+   "case_id": "aq-h-04-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 259,
+   "case_id": "aq-c-02-03-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 260,
+   "case_id": "aq-h-10-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 261,
+   "case_id": "aq-h-06-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 262,
+   "case_id": "aq-h-03-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 263,
+   "case_id": "aq-h-07-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 264,
+   "case_id": "aq-h-01-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 265,
+   "case_id": "aq-c-04-03-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 266,
+   "case_id": "aq-c-10-03-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 267,
+   "case_id": "aq-h-04-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 268,
+   "case_id": "aq-h-05-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 269,
+   "case_id": "aq-h-10-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 270,
+   "case_id": "aq-h-05-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 271,
+   "case_id": "aq-h-02-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 272,
+   "case_id": "aq-h-08-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 273,
+   "case_id": "aq-c-08-01-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 274,
+   "case_id": "aq-h-02-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 275,
+   "case_id": "aq-h-07-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 276,
+   "case_id": "aq-h-08-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 277,
+   "case_id": "aq-h-02-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 278,
+   "case_id": "aq-c-10-01-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 279,
+   "case_id": "aq-h-03-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 280,
+   "case_id": "aq-h-04-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 281,
+   "case_id": "aq-h-03-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 282,
+   "case_id": "aq-h-03-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 283,
+   "case_id": "aq-h-03-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 284,
+   "case_id": "aq-c-05-01-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 285,
+   "case_id": "aq-h-03-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 286,
+   "case_id": "aq-h-09-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 287,
+   "case_id": "aq-h-10-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 288,
+   "case_id": "aq-h-09-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 289,
+   "case_id": "aq-h-10-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 290,
+   "case_id": "aq-h-03-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 291,
+   "case_id": "aq-h-08-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 292,
+   "case_id": "aq-h-07-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 293,
+   "case_id": "aq-c-01-02-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 294,
+   "case_id": "aq-h-02-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 295,
+   "case_id": "aq-c-09-03-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 296,
+   "case_id": "aq-h-05-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 297,
+   "case_id": "aq-h-08-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 298,
+   "case_id": "aq-c-07-03-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 299,
+   "case_id": "aq-h-04-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 300,
+   "case_id": "aq-h-02-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 301,
+   "case_id": "aq-h-02-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 302,
+   "case_id": "aq-c-07-01-w2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 303,
+   "case_id": "aq-h-10-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 304,
+   "case_id": "aq-h-07-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 305,
+   "case_id": "aq-h-09-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 306,
+   "case_id": "aq-h-03-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 307,
+   "case_id": "aq-c-04-01-c3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 308,
+   "case_id": "aq-h-03-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 309,
+   "case_id": "aq-h-06-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 310,
+   "case_id": "aq-h-07-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 311,
+   "case_id": "aq-c-10-02-w2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 312,
+   "case_id": "aq-h-01-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 313,
+   "case_id": "aq-h-01-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 314,
+   "case_id": "aq-h-03-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 315,
+   "case_id": "aq-h-05-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 316,
+   "case_id": "aq-h-10-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 317,
+   "case_id": "aq-c-04-02-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 318,
+   "case_id": "aq-h-06-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 319,
+   "case_id": "aq-h-08-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 320,
+   "case_id": "aq-c-05-03-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 321,
+   "case_id": "aq-h-09-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 322,
+   "case_id": "aq-c-09-01-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 323,
+   "case_id": "aq-c-01-03-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 324,
+   "case_id": "aq-h-05-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 325,
+   "case_id": "aq-h-06-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 326,
+   "case_id": "aq-h-09-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 327,
+   "case_id": "aq-h-06-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 328,
+   "case_id": "aq-h-10-05-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 329,
+   "case_id": "aq-h-01-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 330,
+   "case_id": "aq-h-04-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 331,
+   "case_id": "aq-h-03-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 332,
+   "case_id": "aq-h-10-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 333,
+   "case_id": "aq-h-06-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 334,
+   "case_id": "aq-h-10-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 335,
+   "case_id": "aq-h-07-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 336,
+   "case_id": "aq-h-07-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 337,
+   "case_id": "aq-c-01-02-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 338,
+   "case_id": "aq-h-05-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 339,
+   "case_id": "aq-h-05-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 340,
+   "case_id": "aq-h-01-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 341,
+   "case_id": "aq-c-05-02-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 342,
+   "case_id": "aq-h-05-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 343,
+   "case_id": "aq-h-08-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 344,
+   "case_id": "aq-h-07-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 345,
+   "case_id": "aq-h-02-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 346,
+   "case_id": "aq-h-05-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 347,
+   "case_id": "aq-h-08-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 348,
+   "case_id": "aq-h-10-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 349,
+   "case_id": "aq-h-07-05-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 350,
+   "case_id": "aq-c-03-03-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 351,
+   "case_id": "aq-h-09-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 352,
+   "case_id": "aq-h-10-06-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 353,
+   "case_id": "aq-c-09-03-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 354,
+   "case_id": "aq-h-08-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 355,
+   "case_id": "aq-h-03-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 356,
+   "case_id": "aq-h-08-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 357,
+   "case_id": "aq-c-03-02-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 358,
+   "case_id": "aq-h-06-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 359,
+   "case_id": "aq-h-01-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 360,
+   "case_id": "aq-h-02-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 361,
+   "case_id": "aq-h-06-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 362,
+   "case_id": "aq-h-01-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 363,
+   "case_id": "aq-h-06-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 364,
+   "case_id": "aq-h-08-02-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 365,
+   "case_id": "aq-h-06-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 366,
+   "case_id": "aq-h-09-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 367,
+   "case_id": "aq-c-01-01-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 368,
+   "case_id": "aq-h-10-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 369,
+   "case_id": "aq-c-10-02-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 370,
+   "case_id": "aq-h-01-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 371,
+   "case_id": "aq-h-09-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 372,
+   "case_id": "aq-h-10-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 373,
+   "case_id": "aq-h-08-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 374,
+   "case_id": "aq-h-03-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 375,
+   "case_id": "aq-h-04-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 376,
+   "case_id": "aq-c-07-03-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 377,
+   "case_id": "aq-h-06-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 378,
+   "case_id": "aq-h-09-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 379,
+   "case_id": "aq-h-07-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 380,
+   "case_id": "aq-c-09-01-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 381,
+   "case_id": "aq-h-01-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 382,
+   "case_id": "aq-c-01-01-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 383,
+   "case_id": "aq-c-01-02-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 384,
+   "case_id": "aq-h-01-04-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 385,
+   "case_id": "aq-h-02-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 386,
+   "case_id": "aq-h-01-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 387,
+   "case_id": "aq-c-01-03-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 388,
+   "case_id": "aq-h-08-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 389,
+   "case_id": "aq-h-04-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 390,
+   "case_id": "aq-h-05-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 391,
+   "case_id": "aq-h-07-05-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 392,
+   "case_id": "aq-h-02-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 393,
+   "case_id": "aq-h-07-06-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 394,
+   "case_id": "aq-h-02-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 395,
+   "case_id": "aq-h-02-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 396,
+   "case_id": "aq-h-01-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 397,
+   "case_id": "aq-c-01-02-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 398,
+   "case_id": "aq-c-05-01-c0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 399,
+   "case_id": "aq-c-10-01-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 400,
+   "case_id": "aq-h-04-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 401,
+   "case_id": "aq-h-06-03-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 402,
+   "case_id": "aq-h-10-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 403,
+   "case_id": "aq-c-05-03-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 404,
+   "case_id": "aq-c-09-03-c1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 405,
+   "case_id": "aq-h-03-05-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 406,
+   "case_id": "aq-h-06-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 407,
+   "case_id": "aq-h-04-01-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 408,
+   "case_id": "aq-c-04-03-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 409,
+   "case_id": "aq-h-05-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 410,
+   "case_id": "aq-h-09-03-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 411,
+   "case_id": "aq-h-08-01-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 412,
+   "case_id": "aq-h-03-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 413,
+   "case_id": "aq-h-09-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 414,
+   "case_id": "aq-h-04-01-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 415,
+   "case_id": "aq-c-03-03-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 416,
+   "case_id": "aq-h-09-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 417,
+   "case_id": "aq-c-05-03-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 418,
+   "case_id": "aq-c-05-03-w3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 419,
+   "case_id": "aq-h-08-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 420,
+   "case_id": "aq-h-06-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 421,
+   "case_id": "aq-c-07-02-w1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 422,
+   "case_id": "aq-h-04-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 423,
+   "case_id": "aq-h-03-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 424,
+   "case_id": "aq-c-03-01-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 425,
+   "case_id": "aq-h-09-04-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 426,
+   "case_id": "aq-h-10-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 427,
+   "case_id": "aq-h-06-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 428,
+   "case_id": "aq-c-03-02-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 429,
+   "case_id": "aq-c-10-03-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 430,
+   "case_id": "aq-c-10-02-w2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 431,
+   "case_id": "aq-h-04-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 432,
+   "case_id": "aq-h-06-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 433,
+   "case_id": "aq-h-04-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 434,
+   "case_id": "aq-h-06-06-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 435,
+   "case_id": "aq-h-09-03-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 436,
+   "case_id": "aq-h-10-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 437,
+   "case_id": "aq-c-02-01-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 438,
+   "case_id": "aq-h-08-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 439,
+   "case_id": "aq-h-06-02-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 440,
+   "case_id": "aq-h-09-02-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 441,
+   "case_id": "aq-h-09-01-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 442,
+   "case_id": "aq-h-06-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 443,
+   "case_id": "aq-h-06-04-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 444,
+   "case_id": "aq-h-09-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 445,
+   "case_id": "aq-h-03-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 446,
+   "case_id": "aq-c-08-02-c1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 447,
+   "case_id": "aq-h-08-05-l3",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 448,
+   "case_id": "aq-h-07-03-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 449,
+   "case_id": "aq-h-01-04-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 450,
+   "case_id": "aq-c-10-03-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 451,
+   "case_id": "aq-h-05-03-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 452,
+   "case_id": "aq-c-08-01-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 453,
+   "case_id": "aq-h-02-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 454,
+   "case_id": "aq-c-08-03-w2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 455,
+   "case_id": "aq-h-08-06-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 456,
+   "case_id": "aq-h-01-04-l1",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 457,
+   "case_id": "aq-c-03-03-w0",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 458,
+   "case_id": "aq-h-03-02-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 459,
+   "case_id": "aq-c-10-01-c2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 460,
+   "case_id": "aq-c-07-02-w1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 461,
+   "case_id": "aq-c-03-02-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 462,
+   "case_id": "aq-h-10-05-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 463,
+   "case_id": "aq-h-05-04-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 464,
+   "case_id": "aq-c-03-03-c2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 465,
+   "case_id": "aq-h-07-03-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 466,
+   "case_id": "aq-c-10-01-w0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 467,
+   "case_id": "aq-c-10-03-w3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 468,
+   "case_id": "aq-h-01-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 469,
+   "case_id": "aq-h-06-02-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 470,
+   "case_id": "aq-h-08-01-l2",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 471,
+   "case_id": "aq-c-07-02-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 472,
+   "case_id": "aq-c-02-02-c0",
+   "seat": "local-mid"
+  },
+  {
+   "번호": 473,
+   "case_id": "aq-h-09-02-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 474,
+   "case_id": "aq-h-03-06-l1",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 475,
+   "case_id": "aq-h-02-06-l3",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 476,
+   "case_id": "aq-h-07-01-l2",
+   "seat": "cloud-mid"
+  },
+  {
+   "번호": 477,
+   "case_id": "aq-h-05-04-l3",
+   "seat": "cloud-mid"
+  }
+ ]
+}
