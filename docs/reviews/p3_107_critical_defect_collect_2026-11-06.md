@@ -52,3 +52,15 @@ cd src/backend && python -m whymath_backend.ops.phase3_metrics --no-db --critica
 3. **검증 불가를 오류 0으로 세지 않는다.** 28건은 C1(정답 ↔ 조건 검산)은 통과했지만 C2(풀이 단계)가 없어 Solution QA 판정이 `UNVERIFIABLE` 이다. C1 만 골라 PASS 로 세면 ⑥ 을 움직일 수 있지만, 그것은 판정 규칙을 바꿔 지표를 올리는 것이라 하지 않았다.
 4. **F8 라벨 2건과 F-Ⅴ 는 모순이 아니다.** 같은 CU 의 L1·L2 힌트 사람 판정은 `not_leaked` 이고, F8 은 반려 사유(중복 문항)에 붙은 코드다. ⑥ 출력의 사실 줄에 "F8 라벨(F-Ⅴ 미산입) 2건"으로 남는다.
 5. 수집기는 판정하지 않는다 — PASS/FAIL 은 `phase3_metrics` 의 ⑥(`evaluate_hard_gates` F-Ⅱ·F-Ⅴ 흡수)이 낸다. 새 정의 0건.
+
+## 5. 머지 뒤 main 재현 (2026-11-08)
+
+> **판정 기준**: main `35fc56f0` (PR [kiki-s-broom/WhyMath#1867](https://github.com/kiki-s-broom/WhyMath/pull/1867) 스쿼시 머지 커밋) · 증적 `docs/reviews/p3_107_critical_defect_collect_2026-11-06/main_35fc56f0/`
+
+`git worktree add --detach … origin/main` 사본에서 §3 명령 두 개를 그대로 돌렸다(실행 모듈 경로를 출력해 그 사본의 코드임을 확인).
+
+- 수집기 exit 2 · `phase3_metrics` exit 2. ⑥ = **측정 불가**(분자/분모 0/2 · 판정 불가 F-Ⅱ) · 목표 해당 0건 — 완료 기준 ③ 충족(값·목표·판정이 main 출력으로 재현).
+- §1 의 결과와 바이트가 다른 이유: `ce8c2165` 이후 main 에 새 회차 `eos-a4`(EOS-225 #1877 · EOS-226 #1888)가 들어왔고, 수집기가 회차 목록을 하드코딩하지 않아 자동으로 포함했다. 판정은 같다.
+  - F-Ⅱ: `eos-a4` 검수 통과 30 + `eos197-a6` 28 = **58건 전부 검증 불가**(`C2_NO_STEPS`) → 판정 0건. 133건 문턱(§4-1)에는 판정이 나도 모자란다.
+  - F-Ⅴ: 변화 없음 — `eos-a4` 에는 힌트 표본 매니페스트가 없어 원천은 여전히 `eos197-a6` 0/30(미해당).
+  - CU 검수 F8 라벨: 2 → 6건(`eos-a4` 4건) — F-Ⅴ 에 넣지 않고 사실 줄로만 남는다.
