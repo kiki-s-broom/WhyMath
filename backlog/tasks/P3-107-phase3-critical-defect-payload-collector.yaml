@@ -5,7 +5,7 @@ track: math-completion
 stage: S4
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,8 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "① 결손 고정: Phase 3 지표 ⑥ Critical Defect는 F-Ⅱ(검수 통과 CU 수학 오류율)·F-Ⅴ(힌트 정답 누설) 2종 흡수로 목표가 확정돼 있다(G-p314-phase3-metric-targets · P3-33). 그런데 phase3_metrics CLI는 ⑥의 입력 payload 수집기를 갖지 않아(--hard-gate-input으로만 받음 · 모듈 docstring 한계 절) P3-17 판정(판정 기준 main 036286a1)에서 '측정 불가(payload 없음)'로 남았고 소유 태스크가 없다.\n② 수집기: 저장소에 이미 커밋된 산출물(data/runs/*/cu.jsonl 검수 결과 · EOS-211 힌트 누설 측정 등)에서 F-Ⅱ·F-Ⅴ payload를 결정론으로 만드는 수집 경로를 만들고, 입력 0건이면 측정 실패를 내며(0건 통과 위장 금지) 그 사실을 출력에 남긴다. 주입 시험: F-Ⅱ 위반 payload에서 ⑥이 FAIL, 입력 부재에서 unmeasured를 낸다.\n③ 완료 판정: main 기준으로 ⑥의 값·목표·PASS/FAIL이 phase3_metrics 출력으로 재현되고, 결과 파일과 판정 기준 커밋이 docs/reviews에 남는다."
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1867"
+  - 35fc56f0
 paths: []
-session: claude/new-session-s97re4
+session: null
 notes: "출처: P3-17 판정 독립 검토(docs/reviews/p3_17_verdict_review_2026-11-06.md · 검토 기준 main 6cccb547). 게이트 G-p3-w3-release-merged 입력."
 updated: 2026-11-08

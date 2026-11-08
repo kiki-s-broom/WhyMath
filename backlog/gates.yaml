@@ -1243,6 +1243,7 @@ gates:
       - "[2026-11-06] depends_on +P3-110-calc-02-01-m0669-chain-execution — P3-50 done(판정 입력 완성)로 02-01 ⑦ 칸의 열린 소유가 사라져서, 실제 보강을 맡는 집행 태스크 P3-110을 통합 게이트 입력으로 붙인다 — 02-01은 P3-110 완료 전까지 미충족(main ce8c2165 기준 4/10)"
       - "[2026-11-06] notes +166자 — P3-50 done의 이 게이트 판정 무관 사유 기록"
       - "[2026-11-07] input done · P3-106-phase3-learning-loop-success-prod-measure · 판정 무관: 판정 무관: 지표 ⑤ 운영 DB 실측(24시간 0/0 측정 실패 · 전 기간 0/2 FAIL · 측정 기준 main cc1233d0)을 재판정 입력으로 넘긴다 — done P3-106-phase3-learning-loop-success-prod-measure 인계"
+      - "[2026-11-08] input done · P3-107-phase3-critical-defect-payload-collector · 판정 무관: 판정 무관: ⑥ 입력 수집기와 main 35fc56f0 실측(F-Ⅱ 판정 0건·F-Ⅴ 0/30 → ⑥ 측정 실패)을 재판정 입력으로 넘긴다 — done P3-107-phase3-critical-defect-payload-collector 인계"
     depends_on:
       - P3-17-week3-release-gate-judgment
       - P3-62-solution-qa-unverifiable-structuring
