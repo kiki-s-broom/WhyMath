@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -14,12 +14,16 @@ requires_gates: []
 acceptance:
   - "S3 산출물: golden/data/problems_linear_fn.json 정확히 30개(코퍼스 problem_bank_middle_function_v0 유래 10 + 직접 작성 20, source 필드로 구분) + tests/golden/test_problems_schema.py 7항목 초록 + golden/HARVEST.md 1줄 + golden/reports_no_students/S3/보고.md"
   - "저작권: 검정교과서·EBS·평가원 문항 복제 0건(직접 작성 20개는 숫자·맥락을 새로 만든 자체 문항) · 중3 이상 내용·그림 필요 문항 0건"
-artifacts: []
+artifacts:
+  - "PR #1895 · 커밋 c76d68d7 문항 30개+스키마 테스트(152) · 보고 golden/reports_no_students/S3/보고.md"
 paths:
   - "golden/data/**"
   - tests/golden/test_problems_schema.py
   - golden/HARVEST.md
   - "golden/reports_no_students/S3/**"
-session: claude/new-session-9637dg
-notes: "GOLD-01(공유 우산 태스크)의 S3 슬라이스. GOLD-01은 S2 브랜치 claude/new-session-98qno0(PR #1893 미머지)가 in_progress로 들고 있어 start가 HARN-198로 거부됨 — 우회하지 않고 하위 태스크로 분리 등재. 지시서 golden/prompts_no_students/단계03_병렬_2개/ S3"
+session: null
+notes: |-
+  GOLD-01(공유 우산 태스크)의 S3 슬라이스. GOLD-01은 S2 브랜치 claude/new-session-98qno0(PR #1893 미머지)가 in_progress로 들고 있어 start가 HARN-198로 거부됨 — 우회하지 않고 하위 태스크로 분리 등재. 지시서 golden/prompts_no_students/단계03_병렬_2개/ S3
+
+  [미러 면제 2026-11-08] 로컬 CI 미러 harness-integrity 실패 1스텝 = check_signed_changes 측정 불가(exit 2: 이 클라우드 컨테이너에 ssh-keygen 없음 — 변경과 무관). 건너뛴 11스텝은 재정렬 트리(main ca6b6ca0 기준)에서 CI 명령 그대로 수동 재현 전부 exit 0(tests/harness 2381 passed). infra-contracts·infra-shell·policy-guard·declared-unwired-audit 미러 exit 0
 updated: 2026-11-08
