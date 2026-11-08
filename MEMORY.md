@@ -338,6 +338,12 @@
 
 ## 🧭 핵심 결정 로그 (시간 역순)
 
+### 2026-11-07 (측정 · EOS-226 WP-F — 사람 단독 첫 검수 HIT 표본): **A4 2회차 34 CU 중 유효 표본 18건 — 중앙값 61.5초 · P90 343.5초(전체 계측 34건은 34.5초 · 210.7초) · 판정은 G5 몫** (claude 집계 · 검수 Kiki) — 판정 기준: main `f27e3a73`
+
+- **무엇을**: EOS-225 첫 검수 이벤트(`data/runs/eos-a4-review/canary_review_events.jsonl`)를 CU별로 묶어 유효 표본 규칙(사람 단독 · 첫 검수 · 다시 보기 미사용 · 계측 성립 · OPS-90 하한 30초 이상)을 적용했다. HIT 정의는 `ops/hit_cu_metrics` 그대로이며 전체 계측 값이 공식 계측기와 같음을 스크립트가 대조한다(`scripts/analysis/eos226_a4_human_hit.py` · CU별 기록 `cu.review_human_hit.jsonl` · 조건 표기 `review_condition: human_only`·`ai_assist: false`).
+- **값**: 제외 16건은 전부 하한 미만(11.6~27.4초 · 전부 한 번에 끝난 무손질 승인) · 재검수 0(A6 판정 30건과 slug·지문 대조) · 다시 보기 0(Kiki 확인 — 이벤트 없음) · 미계측 0. 보류 후 재개 6건을 빼면 유효 12건(15건 미만). 회차 하한 가드는 16/34=47%로 '절반 이상'(17건)에 1건 모자라 통과.
+- **근거 커밋**: 산출물 #1877(`f27e3a73`) · 집계·문서 = 이 PR(`docs/reviews/eos_a4_human_hit_2026-12.md`) · 다시 보기 기록 공백 = EOS-201(2027 이월) · 조건 근거 = EOS-225 검수 보고서 머리의 Kiki 확인.
+
 ### 2026-11-07 (측정 · EOS-225 WP-F — A4 2회차 LLM 저작): **A4(중3 이차방정식 `[9수02-20]`) openrouter 단독 좌석 65시도 → 게이트 통과 CU 34 → 사람 단독 첫 검수 수락 30(승인 24·수정승인 6·반려 4) · A6 1회차 30과 합쳐 G4 누적 60 CU** (Kiki PC 실행, claude 기록) — 판정 기준: main `f419e985`
 
 - **무엇을**: 회차 설정 `docs/ops/authoring_round_eos-a4.yaml`(#1875 · spec 4종 · 목표 34/예산 120 · 큐 하한 30)을 오케스트레이터 한 줄 실행(EOS-208)으로 Phaiakes9에서 돌렸다. 산출물 브랜치 `eos225/a4-authoring-output` `1d30508d` → `data/runs/eos-a4-openrouter`·`eos-a4-review`(상태 파일 `round_state.json` 자격증명 문자열 grep 0건). 주간 원장은 미리보기와 같은 창·파일·환율 1540으로 append. 검수 = 사람 단독 판정(Kiki 확인 2026-11-07 — 검수 보고서만 사후에 Claude로 작성 · 사본 `docs/reviews/eos225_a4_round2_review_report_2026-11-07.md`).

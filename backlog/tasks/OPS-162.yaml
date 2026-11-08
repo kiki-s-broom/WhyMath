@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: OPS-162
+title: "OPS-90 HIT 하한 30초 재판단 — 사람 단독 첫 검수 첫 분포(A4 34건 중 16건 하한 미만·47%) 반영"
+track: infra-debt
+stage: S3
+subject: cross
+layer: backend
+status: todo
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on:
+  - EOS-226
+requires_gates: []
+acceptance:
+  - "① 사람 단독 첫 검수의 첫 분포(EOS-226 — `data/runs/eos-a4-review/cu.review_human_hit.jsonl` 34건 · 하한 미만 16건은 전부 한 번에 끝난 무손질 승인 · 11.6~27.4초)를 근거로 OPS-90 하한 기본값 30초와 회차 경고 기준('절반 이상')을 다시 판단한다. 선택지 예: 유지 / 하한 하향 / 판정 종류별 하한(무손질 승인과 손질·반려 분리). 결정은 Kiki, 근거표는 세션.\n② 바꾸면 `ops/hit_cu_metrics` 모듈 설명의 '하한 기본값(30초)의 근거와 한계' 절을 새 근거로 갱신하고, 바꾸기 전후 A4·A6 회차의 `hit_implausible_majority`·하한 미만 건수가 어떻게 달라지는지 표로 남긴다(이미 기록된 원장 값이 소급으로 바뀌면 그 사실을 적는다).\n③ 재입력 세션(2026-09-22 카나리 — 중앙값 6초·P90 41초)은 새 기준에서도 계속 걸려야 한다 — 회귀 테스트로 동결한다."
+artifacts: []
+paths:
+  - src/backend/whymath_backend/ops/hit_cu_metrics.py
+session: null
+notes: "출처: EOS-226 문서 docs/reviews/eos_a4_human_hit_2026-12.md §4-1·§4-3. A4 2회차는 하한 미만 16/34(47%)로 '절반 이상'(17건)에 1건 모자라 통과했다 — 다음 회차에서 정상 첫 검수가 1건만 더 짧으면 회차 전체가 미측정이 된다. 하한 30초는 모듈 설명이 스스로 '정상 분포에서 도출한 값이 아닌 판단값 — 첫 유효 표본이 쌓이면 재조정'이라고 적은 값이다."
+updated: 2026-11-07
