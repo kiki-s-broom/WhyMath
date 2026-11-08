@@ -109,3 +109,9 @@
 - Langfuse·Redis·관측 계열.
 - `data/corpus/`의 나머지 문제은행 39개.
 - Flutter의 기존 화면(온보딩·홈·채팅·탐색·OCR·수식 입력 등 `lib/core/router.dart`의 라우트들).
+
+## 하네스 태스크 ID
+
+- **`GOLD-01`** — "GOLD-01 골든 패스 스켈레톤 — 중2 일차함수 30문항 GP-1~GP-6 e2e" (S2가 2026-11-08 `backlog.py add`로 등재, 같은 날 `backlog.py start GOLD-01` claim, 기준 main `c99ee4a2`).
+- 이후 모든 세션(S3~S15)은 첫 행위로 `python3 scripts/harness/backlog.py start GOLD-01`을 실행한다.
+- 참고: 슬러그를 붙인 `GOLD-01-golden-path-skeleton`으로 개명하려 했으나 CLI가 같은 번호 충돌(HARN-10)로 거부했다. 대장 손편집으로 우회하지 않고 CLI가 등재한 `GOLD-01`을 쓴다.

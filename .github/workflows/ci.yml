@@ -1081,6 +1081,83 @@ jobs:
         run: python -m whymath_backend.harness.traversal_load_probe --graph data/corpus/atom_graph_v1/graph.json --concurrency 1,8
 
   # ─────────────────────────────────────────────────────────────────
+  # 골든 패스 (GOLD-01 · S2 · 2026-11-08 Kiki 지시) — 학생 1명이 중2 일차함수 문제 1개를
+  # 끝까지 푸는 경로(GP-1~GP-6)의 유일한 검사 지점이다. 기존 backend 잡은 tests/golden을
+  # 검사하지 않고(ruff·black 대상 `. ../../tests/backend ../../tests/constitution`), mypy는
+  # whymath_backend만 본다 — 그래서 이 잡이 따로 있다.
+  # S2가 일부러 빨간불(e2e가 `from golden.api import app`에서 ImportError)로 심었고, S5가 처음
+  # 초록으로 만든다. 그 뒤로 빨간불인 채 머지되는 PR은 없다 — 머지 차단은 브랜치 룰셋의
+  # required check에 이 잡을 넣어야 완성된다(Kiki 소유 조작).
+  # 스텝마다 마지막 명령이 검사 명령 자신이다(종료 코드 보존). pytest에 -q를 붙이지 않는다.
+  # needs 없음 — 다른 잡과 병렬. Postgres 서비스는 backend-migrations 잡과 같다(S4 이후 DB 사용).
+  # ─────────────────────────────────────────────────────────────────
+  golden-path:
+    name: golden-path — 골든 패스 e2e (GOLD-01)
+    runs-on: ubuntu-latest
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (OPS-135).
+    permissions:
+      contents: read
+      packages: read
+    # 15분(추정 — 실행 이력 없음): 설치 약 1~2분(backend-pytest 샤드 설치 최대 1.05분) +
+    # 정적 검사·pytest 수 초. 실측이 생기면 교체한다.
+    timeout-minutes: 15
+    if: github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: src/backend
+
+    services:
+      postgres:
+        # backend-migrations 잡의 서비스 블록과 같다(pgvector/pg16 미러 사본 — OPS-135).
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          POSTGRES_USER: whymath
+          POSTGRES_DB: whymath
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whymath"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      WHYMATH_DATABASE_URL: postgresql+asyncpg://whymath@127.0.0.1:5432/whymath
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (editable + dev extras)
+        run: |
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
+          # backend-pytest 샤드와 같은 설치(루트 conftest가 data_pipeline 경로를 잡는다).
+          python -m pip install -e ../data-pipeline
+
+      - name: Ruff (golden + tests/golden)
+        run: python -m ruff check golden ../../tests/golden
+
+      - name: Black (golden + tests/golden)
+        run: python -m black --check --line-length 100 golden ../../tests/golden
+
+      - name: Mypy strict (golden)
+        run: python -m mypy --strict golden
+
+      - name: Pytest (tests/golden — 골든 패스 e2e)
+        run: python -m pytest ../../tests/golden
+
+  # ─────────────────────────────────────────────────────────────────
   # data-pipeline 실 PG 적재 통합테스트 (슬99) — NCIC load_to_postgres 경로
   # 기본 data-pipeline 잡은 [dev]만 설치(sqlalchemy 없음)·PG 서비스 없으므로
   # load_to_postgres 통합테스트(test_load_postgres_integration)가 한 번도 실행되지
