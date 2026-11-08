@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>붙여넣은 문서</title>
+<style>
+  body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; line-height: 1.6; }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 data-lfile-container="6efc9159-13f9-4c5a-aafc-4cdcca06ec50" data-pm-slice="0 0 []">WhyMath 골든 패스 스켈레톤 — 3주 실행 계획</h1><p><time data-ts="&quot;2026-11-08&quot;" data-chip="date" class="ldoc-chip" data-atom="date" datetime="2026-11-08">2026년 11월 8일</time> · <span data-atom="mention" data-principal="u_O01RcvmqrjdZoFIGfo6Scg" data-mention-id="u_O01RcvmqrjdZoFIGfo6Scg" class="ldoc-mention">@ik-ki kim</span></p><h2>0. 이 문서 사용법</h2><p>이 문서는 Claude Code 세션에 그대로 붙여넣는 지시문 모음이다. 3주(작업 세션 15회, 세션당 2~4시간) 안에 경로 하나를 완성한다: <strong>실제 학생 1명이 Flutter 앱에서 중2 일차함수 문제 1개를 소크라테스 대화로 끝까지 풀고, 숙련도 숫자 하나가 PostgreSQL에 갱신된다.</strong> 이것이 완료 정의이고, 이 밖의 모든 것은 §5에 있다.</p><p>세 가지 원칙은 15세션 내내 바뀌지 않는다.</p><ol><li>옛 코드는 import만, 수정 금지. 고쳐야 돌아가는 코드는 <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/</code> 아래로 복사해서 거기서 고친다.</li><li>범위는 중2 일차함수 한 단원, 문제 30개. 넓히고 싶은 충동이 들면 §5를 다시 읽는다.</li><li>완료 기준은 골든 패스 e2e 테스트 하나뿐. 이 테스트가 빨간불이면 어떤 PR도 머지하지 않는다.</li></ol><p>용어 세 개만 알면 된다.</p><ul><li>골든 패스: 학생이 앱에서 밟는 핵심 경로 1개 (§1의 GP-1~GP-6)</li><li>스켈레톤: 그 경로를 최소 코드로 끝까지 잇는 뼈대. 못생겨도, 하드코딩이어도 된다.</li><li>수확 장부: 옛 코드에서 무엇을 가져왔고 무엇을 버렸는지 한 줄씩 적는 <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/HARVEST.md</code></li></ul><p>세션 운영은 단순하다. 각 세션은 §3의 시작 템플릿으로 열고 종료 템플릿으로 닫는다. 한 세션에 산출물 하나. 산출물이 안 나오면 다음 세션으로 넘기되, 범위를 넓혀서 만회하려 하지 않는다. 코드 상태를 모른 채 쓴 계획이므로 S1(상태 측정) 결과에 따라 S3~S5의 세부는 바뀔 수 있다. 원칙 세 개와 완료 정의는 바뀌지 않는다.</p><h2>1. 골든 패스 6단계</h2><p>학생이 앱을 켜서 끄기까지 밟는 경로는 여섯 단계다. 각 단계의 "최소 구현"이 스켈레톤이고, "금지" 열은 3주 안에 그 단계에 끌어오면 안 되는 것이다. GP-6이 끝나면 GP-2로 돌아가 다음 문제를 낸다.</p><table style="min-width: 192px;"><colgroup><col style="min-width: 48px;"><col style="min-width: 48px;"><col style="min-width: 48px;"><col style="min-width: 48px;"></colgroup><tbody><tr><th colspan="1" rowspan="1"><p>단계</p></th><th colspan="1" rowspan="1"><p>학생이 하는 일</p></th><th colspan="1" rowspan="1"><p>최소 구현 (하드코딩 허용)</p></th><th colspan="1" rowspan="1"><p>금지 (3주간)</p></th></tr><tr><td colspan="1" rowspan="1"><p>GP-1 세션 시작</p></td><td colspan="1" rowspan="1"><p>앱을 열고 이름을 입력한다</p></td><td colspan="1" rowspan="1"><p>익명 세션. <code spellcheck="false" autocorrect="off" autocapitalize="off">student_id</code>는 닉네임 문자열. 비밀번호·소셜 로그인 없음</p></td><td colspan="1" rowspan="1"><p>회원가입, 인증, 학부모 계정, Apple Kids 플로우</p></td></tr><tr><td colspan="1" rowspan="1"><p>GP-2 문제 제시</p></td><td colspan="1" rowspan="1"><p>문제 1개를 화면에서 본다</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/data/problems_linear_fn.json</code> 30문항에서 순서대로 1개. 텍스트+LaTeX 렌더만</p></td><td colspan="1" rowspan="1"><p>545노드 그래프 탐색, 적응형 선택, OCR 입력, 이미지 문항</p></td></tr><tr><td colspan="1" rowspan="1"><p>GP-3 답변 입력</p></td><td colspan="1" rowspan="1"><p>텍스트로 답이나 질문을 친다</p></td><td colspan="1" rowspan="1"><p>텍스트 입력창 1개. 입력은 그대로 서버로</p></td><td colspan="1" rowspan="1"><p>손글씨, 음성, 수식 편집기, Laya/Jev 의도 분류</p></td></tr><tr><td colspan="1" rowspan="1"><p>GP-4 튜터 응답</p></td><td colspan="1" rowspan="1"><p>튜터의 되묻기를 읽고 다시 답한다</p></td><td colspan="1" rowspan="1"><p>고정 시스템 프롬프트 1개로 LLM 1회 호출. 최대 3턴, 3턴 후 GP-5로 강제 이동</p></td><td colspan="1" rowspan="1"><p>7단계 학습 파이프라인, 오개념 DB 조회, 페다고지 팩, 루브릭 평가, 답 노출 정책 분기</p></td></tr><tr><td colspan="1" rowspan="1"><p>GP-5 정답 판정</p></td><td colspan="1" rowspan="1"><p>맞았는지 틀렸는지 본다</p></td><td colspan="1" rowspan="1"><p>문항 JSON의 <code spellcheck="false" autocorrect="off" autocapitalize="off">answer</code> 필드와 문자열·숫자 비교. 동치 판정은 sympy <code spellcheck="false" autocorrect="off" autocapitalize="off">simplify</code> 1줄</p></td><td colspan="1" rowspan="1"><p>부분 점수, 풀이 과정 채점, 오류 유형 분류, 디스트랙터 op-code</p></td></tr><tr><td colspan="1" rowspan="1"><p>GP-6 숙련도 갱신</p></td><td colspan="1" rowspan="1"><p>숙련도 숫자가 바뀌는 걸 본다</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">mastery</code> 테이블 1행: 맞으면 +0.10, 틀리면 −0.05, 범위 0~1. 다음 문제 버튼</p></td><td colspan="1" rowspan="1"><p>BKT/AKT, 망각 곡선, 전이 문항, gaming 감지</p></td></tr></tbody></table><p>여섯 단계 전부를 잇는 HTTP 호출은 세 개면 된다: <code spellcheck="false" autocorrect="off" autocapitalize="off">POST /golden/session</code>(GP-1), <code spellcheck="false" autocorrect="off" autocapitalize="off">POST /golden/answer</code>(GP-3~GP-6을 한 번에 처리해 튜터 응답 또는 판정 결과를 돌려줌), <code spellcheck="false" autocorrect="off" autocapitalize="off">GET /golden/next</code>(GP-2). 엔드포인트가 늘어나려 하면 범위가 새고 있다는 신호다.</p><p>옛 코드에서 가져올 수 있는 것은 GP-2의 문항 데이터(기존 문항 자산에 중2 일차함수가 있으면 추출, 없으면 S3에서 직접 작성)와 GP-4의 LLM 호출 래퍼뿐이다. 나머지는 새로 쓰는 쪽이 빠르다.</p><h3>1-A. 스트랭글러 피그가 작동하는 자리</h3><div ref="node/5babe07b-28c5" caption="스트랭글러 피그 배치 · 새로 쓰는 곳 3개, import는 한 방향" data-lfile-embed="node/5babe07b-28c5">[embed: node/5babe07b-28c5]</div><p>새로 쓰는 곳은 색 상자 셋뿐이다: Flutter의 <code spellcheck="false" autocorrect="off" autocapitalize="off">lib/golden/</code>, 백엔드의 <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/</code>, PostgreSQL의 <code spellcheck="false" autocorrect="off" autocapitalize="off">schema golden</code>. 옛 코드는 같은 프로세스·같은 DB 안에 그대로 남지만 아무도 부르지 않고, <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/</code>이 필요한 모듈만 import한다. 고전적 스트랭글러 피그의 "파사드"는 여기서 Flutter 앱 진입점과 FastAPI 라우터다. 진입점이 새 화면만 열고 <code spellcheck="false" autocorrect="off" autocapitalize="off">/golden/*</code>만 호출되는 순간 옛 코드는 실행 경로에서 떨어지고, 린트가 역방향 import를 막아 다시 엉키지 않게 한다. 3주 뒤 한 번도 import되지 않은 모듈이 <code spellcheck="false" autocorrect="off" autocapitalize="off">/legacy</code>로 가고, 과목 2개째가 생겨 <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/</code>이 <code spellcheck="false" autocorrect="off" autocapitalize="off">app/</code>으로 이름을 바꾸는 날 옛 나무는 사라진다.</p><h2>2. 15세션 일정표</h2><p>주 5세션 기준 3주. 11/9(월) 시작이면 11/29(토)에 끝나고, 12/31 내부 검증까지 한 달이 남는다. 1주차는 백엔드, 2주차는 Flutter와 첫 학생, 3주차는 학생 5명과 수확이다. 각 주의 마지막 세션은 버퍼를 겸한다. 어느 세션이든 "완료 기준" 한 줄을 만족하지 못하면 다음 세션은 같은 번호를 반복한다.</p><table style="min-width: 192px;"><colgroup><col style="min-width: 48px;"><col style="min-width: 48px;"><col style="min-width: 48px;"><col style="min-width: 48px;"></colgroup><tbody><tr><th colspan="1" rowspan="1"><p>세션</p></th><th colspan="1" rowspan="1"><p>목표</p></th><th colspan="1" rowspan="1"><p>산출물</p></th><th colspan="1" rowspan="1"><p>완료 기준</p></th></tr><tr><td colspan="1" rowspan="1"><p>S1</p></td><td colspan="1" rowspan="1"><p>상태 측정</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/STATE.md</code></p></td><td colspan="1" rowspan="1"><p>30분 테스트 결과(된다/안 된다/어디서 끊기나)와 §3 S1 프롬프트의 질문 8개에 답이 적혀 있다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S2</p></td><td colspan="1" rowspan="1"><p>격리</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/</code> 폴더, <code spellcheck="false" autocorrect="off" autocapitalize="off">CLAUDE.md</code> 블록, <code spellcheck="false" autocorrect="off" autocapitalize="off">tests/golden/test_golden_path.py</code>(빨간불)</p></td><td colspan="1" rowspan="1"><p>CI가 돌고 e2e 테스트가 "실패"로 뜬다. 초록이 아니라 빨간불이 목표다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S3</p></td><td colspan="1" rowspan="1"><p>문항 30개</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/data/problems_linear_fn.json</code></p></td><td colspan="1" rowspan="1"><p>30문항 전부 <code spellcheck="false" autocorrect="off" autocapitalize="off">id</code>·<code spellcheck="false" autocorrect="off" autocapitalize="off">stem</code>·<code spellcheck="false" autocorrect="off" autocapitalize="off">answer</code>·<code spellcheck="false" autocorrect="off" autocapitalize="off">hint1</code> 필드가 있고, 스키마 검증 테스트가 통과한다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S4</p></td><td colspan="1" rowspan="1"><p>API 3개</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/api.py</code> + 튜터 프롬프트 1개</p></td><td colspan="1" rowspan="1"><p>curl로 세션 시작→답변→다음 문제가 돈다. 튜터는 LLM 1회 호출로 되묻기 1턴을 돌려준다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S5</p></td><td colspan="1" rowspan="1"><p>판정·숙련도 + e2e 초록</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/grade.py</code>, <code spellcheck="false" autocorrect="off" autocapitalize="off">mastery</code> 테이블, e2e 초록</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">pytest tests/golden</code>이 초록. HARVEST.md에 1주차 수확 기록</p></td></tr><tr><td colspan="1" rowspan="1"><p>S6</p></td><td colspan="1" rowspan="1"><p>Flutter 화면 1</p></td><td colspan="1" rowspan="1"><p>문제·대화 화면</p></td><td colspan="1" rowspan="1"><p>문제가 보이고, 입력하면 튜터 응답이 같은 화면에 쌓인다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S7</p></td><td colspan="1" rowspan="1"><p>Flutter 화면 2</p></td><td colspan="1" rowspan="1"><p>결과·다음 문제 화면</p></td><td colspan="1" rowspan="1"><p>정답/오답과 숙련도 숫자가 보이고, 다음 문제 버튼이 GP-2로 돌아간다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S8</p></td><td colspan="1" rowspan="1"><p>앱 통합</p></td><td colspan="1" rowspan="1"><p>수동 체크리스트 <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/CHECKLIST.md</code> 12항목</p></td><td colspan="1" rowspan="1"><p>본인이 앱으로 문제 3개를 끝까지 풀고 체크리스트 12/12</p></td></tr><tr><td colspan="1" rowspan="1"><p>S9</p></td><td colspan="1" rowspan="1"><p>학생 1명</p></td><td colspan="1" rowspan="1"><p>세션 로그 <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/logs/</code></p></td><td colspan="1" rowspan="1"><p>실제 중학생 1명이 옆에서 지켜보는 가운데 문제 5개를 푼다. 끼어들지 않고 기록만 한다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S10</p></td><td colspan="1" rowspan="1"><p>로그 수정</p></td><td colspan="1" rowspan="1"><p>버그 수정 PR</p></td><td colspan="1" rowspan="1"><p>S9 로그에서 나온 문제만 고친다. 로그에 없는 건 고치지 않는다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S11</p></td><td colspan="1" rowspan="1"><p>학생 2·3</p></td><td colspan="1" rowspan="1"><p>로그</p></td><td colspan="1" rowspan="1"><p>세션 로그 누적 15건</p></td></tr><tr><td colspan="1" rowspan="1"><p>S12</p></td><td colspan="1" rowspan="1"><p>학생 4·5</p></td><td colspan="1" rowspan="1"><p>로그</p></td><td colspan="1" rowspan="1"><p>세션 로그 누적 30건. 가능하면 본인 없이 학생이 혼자 쓰게 한다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S13</p></td><td colspan="1" rowspan="1"><p>로그 분석</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">golden/FINDINGS.md</code></p></td><td colspan="1" rowspan="1"><p>로그 30건에서 가장 자주 끊기는 지점 1개를 숫자로 적는다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S14</p></td><td colspan="1" rowspan="1"><p>개선 1개</p></td><td colspan="1" rowspan="1"><p>PR 1개</p></td><td colspan="1" rowspan="1"><p>S13의 1개만 고친다. 이때 비로소 옛 자산(루브릭, 오개념 DB) 중 그 1개에 필요한 것만 꺼낸다</p></td></tr><tr><td colspan="1" rowspan="1"><p>S15</p></td><td colspan="1" rowspan="1"><p>격리·회고</p></td><td colspan="1" rowspan="1"><p><code spellcheck="false" autocorrect="off" autocapitalize="off">/legacy</code> 이동, <code spellcheck="false" autocorrect="off" autocapitalize="off">golden/RETRO.md</code>, 다음 3주 계획</p></td><td colspan="1" rowspan="1"><p>3주간 한 번도 import되지 않은 옛 모듈 목록이 HARVEST.md에 있고, 그것들이 <code spellcheck="false" autocorrect="off" autocapitalize="off">/legacy</code>로 옮겨져 있다</p></td></tr></tbody></table><p>학생 5명은 S6 이전에 섭외를 시작한다. 지인 자녀, 동네 학원, 지역 도서관 중 한 곳이면 충분하다. 세션당 20분, 보상은 문화상품권 1만 원 수준이면 된다. 학생 발화를 외부로 보내지 않는 규칙이 있으니 로그는 로컬 PostgreSQL에만 쌓고, LLM 호출에는 문제와 답변 텍스트만 보낸다.</p><h2>3. Claude Code 세션 지시문</h2><p>아래 네 블록을 그대로 복사해 쓴다. S1과 S2는 전문이고, S3 이후는 공통 시작 템플릿에 §2의 해당 행을 붙이면 된다. 모든 세션에서 Claude Code가 범위를 넓히려 하면 "§5에 있다"고만 답한다.</p><h3>3-1. 공통 시작 템플릿 (매 세션 첫 메시지)</h3><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-markdown">세션 [S번호] 시작. 오늘 목표는 [§2의 목표]이고 산출물은 [§2의 산출물], 완료 기준은 [§2의 완료 기준]이다.
+
+규칙:
+1. golden/ 바깥의 기존 코드는 읽기만 한다. 수정하지 않는다. 필요하면 golden/ 아래로 복사해서 고치고, 복사한 사실을 golden/HARVEST.md에 한 줄 적는다.
+2. 오늘 산출물과 무관한 개선·리팩토링·추상화를 제안하지 않는다. 발견하면 golden/LATER.md에 한 줄 적고 넘어간다.
+3. 작업 전에 golden/STATE.md와 golden/HARVEST.md를 읽고 시작한다.
+4. 코드에는 한국어 주석을 단다.
+5. 작업이 끝나면 tests/golden/을 실행하고 결과를 보고한다.
+
+먼저 오늘 할 일을 5줄 이내로 요약하고 내 확인을 받은 뒤 시작한다.</code></pre><h3>3-2. S1 전문 — 상태 측정</h3><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-markdown">세션 S1 시작. 오늘은 코드를 한 줄도 고치지 않는다. WhyMath 저장소의 현재 상태를 측정해서 golden/STATE.md 한 파일만 만든다.
+
+1단계 — 30분 테스트.
+현재 코드로 "학생이 중2 일차함수 문제 1개를 소크라테스 대화로 끝까지 푸는" 경로가 실제로 도는지 확인한다. 백엔드를 띄우고, 가능한 가장 짧은 방법(curl, 테스트 스크립트, Flutter 앱 중 하나)으로 시도한다. 30분 안에 안 되면 멈추고, 어느 단계(GP-1~GP-6)에서 끊기는지와 왜 끊기는지를 적는다. 고치려 하지 않는다.
+
+2단계 — 질문 8개에 답한다. 모르면 "모름"이라고 적는다.
+  Q1. 백엔드 프레임워크와 진입점 파일 경로는? (예: FastAPI, app/main.py)
+  Q2. PostgreSQL 연결 설정은 어디 있고, 테이블은 몇 개인가?
+  Q3. 튜터 LLM 호출은 어느 파일의 어느 함수에서 하는가? 어떤 모델·API를 쓰는가?
+  Q4. 문항 데이터는 어디에 어떤 형식으로 있는가? 중2 일차함수 문항이 몇 개 있는가?
+  Q5. Flutter 앱은 어느 폴더이고, 백엔드와 통신하는 API 클라이언트 파일은 어디인가?
+  Q6. 현재 테스트 수, 마지막 CI 통과 커밋, CI 설정 파일 경로는?
+  Q7. 사용자 진입점(HTTP 라우트, Flutter 화면)에서 호출 그래프를 따라 도달 가능한 Python 모듈 수와 전체 모듈 수는? (대략이면 된다. 예: 전체 210개 중 도달 가능 60개)
+  Q8. 최근 PR 20개를 무작위로 골라, 그 PR이 추가한 코드가 Q7의 도달 가능 집합에 들어 있는 비율은?
+
+3단계 — golden/STATE.md에 아래 형식으로 쓴다.
+  # WhyMath 상태 측정 (S1, 날짜)
+  ## 30분 테스트 결과: [된다 / GP-N에서 끊김] — 이유 한 줄
+  ## Q1~Q8 답
+  ## 골든 패스에 바로 쓸 수 있는 것 (import 후보, 파일 경로 포함)
+  ## 골든 패스에 쓰려면 고쳐야 하는 것
+  ## 당장은 필요 없는 것 (한 줄씩, 삭제 아님)
+
+주의: 이 세션에서 "이건 이렇게 고치면 됩니다"는 쓰지 않는다. 측정만 한다.</code></pre><h3>3-3. S2 전문 — 격리</h3><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-markdown">세션 S2 시작. golden/STATE.md를 먼저 읽는다. 오늘은 새 경로가 살 자리를 만들고, 빨간불 e2e 테스트를 CI에 심는다. 초록불이 목표가 아니다.
+
+1. 폴더 생성: golden/ 아래에 api.py, grade.py, data/, logs/, HARVEST.md, LATER.md, CHECKLIST.md 빈 파일. HARVEST.md 첫 줄에 "가져온 것 / 버린 것 / 이유" 표 머리만 적는다.
+2. CLAUDE.md 맨 위에 §4-1 블록을 붙여 넣는다. 기존 내용은 그 아래 둔다.
+3. import 방향 린트: §4-3 설정을 추가한다. Python이 아니면 STATE.md Q1에 맞는 동등한 도구를 골라 같은 규칙(golden → 옛 코드 허용, 옛 코드 → golden 금지)을 건다.
+4. tests/golden/test_golden_path.py를 §4-4 뼈대로 만든다. 지금은 반드시 실패해야 한다.
+5. CI 설정에 tests/golden/ 실행 단계를 추가한다. 실패 시 머지 차단.
+6. .github/PULL_REQUEST_TEMPLATE.md를 §4-2로 바꾼다.
+7. 커밋 메시지: "S2: golden/ 격리, 빨간불 e2e 추가". PR을 올리고 CI가 빨간불인 것을 확인한다.
+
+CI가 빨간불이면 오늘 성공이다. 초록불이면 테스트가 잘못된 것이니 다시 본다.</code></pre><h3>3-4. 공통 종료 템플릿 (매 세션 마지막 메시지)</h3><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-markdown">세션 종료. 다음 다섯 줄로 보고한다.
+1. 완료 기준 충족 여부: [예/아니오] — 아니오면 어디까지 됐는지
+2. tests/golden 결과: [초록/빨강] 테스트 N개
+3. HARVEST.md에 오늘 추가한 줄
+4. LATER.md에 오늘 추가한 줄
+5. 오늘 범위 밖으로 나가려다 멈춘 순간이 있었다면 그것
+
+그 다음 PR을 만든다. PR 본문 첫 질문("이 PR이 전진시키는 학생 단계")에 GP 번호를 적는다. 못 적으면 PR을 만들지 않고 이유를 말한다.</code></pre><h2>4. 가드레일</h2><p>네 개 파일이 "아직 필요 없다"고 말하는 역할을 자동화한다. S2에서 전부 심고, 이후 세션에서는 손대지 않는다. 백엔드가 Python/FastAPI가 아니면 S1의 STATE.md Q1에 맞춰 4-3과 4-4만 바꾼다. 나머지 둘은 언어와 무관하다.</p><h3>4-1. CLAUDE.md 맨 위에 붙이는 블록</h3><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-markdown"># 골든 패스 규칙 (2026-11 ~ 3주간 최우선)
+
+이 저장소는 지금 golden/ 폴더 하나에만 새 코드를 쓴다.
+
+- golden/ 바깥의 파일은 읽기 전용이다. 수정 요청을 받아도 "golden/으로 복사해서 고칠까요?"라고 되묻는다.
+- golden/은 옛 모듈을 import할 수 있다. 옛 모듈이 golden/을 import하면 린트가 막는다.
+- 범위는 중2 일차함수 30문항, 골든 패스 GP-1~GP-6이다. 그 밖의 기능(BKT, OCR, 의도 분류기, 다과목, EOS, DSL)은 제안하지 않는다. 떠오르면 golden/LATER.md에 한 줄 적는다.
+- 완료 기준은 tests/golden/ 초록불이다. 빨간불이면 PR을 만들지 않는다.
+- 골든 패스가 지나는 파일: golden/api.py, golden/grade.py, golden/tutor_prompt.md, golden/data/problems_linear_fn.json, tests/golden/test_golden_path.py, (Flutter) lib/golden/*.dart. 이 목록 밖의 파일을 건드리면 먼저 이유를 말한다.
+- 모든 코드에 한국어 주석.</code></pre><h3>4-2. PR 템플릿 <code spellcheck="false" autocorrect="off" autocapitalize="off">.github/PULL_REQUEST_TEMPLATE.md</code></h3><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-markdown">## 이 PR이 전진시키는 학생 단계
+(GP-1~GP-6 중 하나. 적을 수 없으면 이 PR은 지금 할 일이 아니다.)
+
+## 세션 번호
+S__
+
+## tests/golden 결과
+- [ ] 초록
+
+## HARVEST.md 갱신
+- [ ] 옛 코드를 가져왔거나 버렸으면 한 줄 적었다
+
+## 범위 확인
+- [ ] golden/ 바깥 파일을 수정하지 않았다
+- [ ] 새 추상화(베이스 클래스, 인터페이스, 플러그인 구조)를 추가하지 않았다</code></pre><h3>4-3. import 방향 린트 (<code spellcheck="false" autocorrect="off" autocapitalize="off">import-linter</code>, <code spellcheck="false" autocorrect="off" autocapitalize="off">.importlinter</code>)</h3><p><code spellcheck="false" autocorrect="off" autocapitalize="off">pip install import-linter</code> 후 저장소 루트에 둔다. <code spellcheck="false" autocorrect="off" autocapitalize="off">lint-imports</code> 한 줄을 CI에 추가한다. <code spellcheck="false" autocorrect="off" autocapitalize="off">[옛 최상위 패키지]</code>는 STATE.md Q1의 패키지명으로 바꾼다.</p><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-ini">[importlinter]
+root_packages =
+    golden
+    [옛 최상위 패키지]
+
+[importlinter:contract:golden-one-way]
+name = 옛 코드는 golden을 모른다
+type = forbidden
+source_modules =
+    [옛 최상위 패키지]
+forbidden_modules =
+    golden</code></pre><h3>4-4. e2e 테스트 뼈대 <code spellcheck="false" autocorrect="off" autocapitalize="off">tests/golden/test_golden_path.py</code></h3><p>S2에서는 이대로 두어 빨간불을 만들고, S4~S5에서 <code spellcheck="false" autocorrect="off" autocapitalize="off">pytest.fail</code> 줄을 지워가며 초록으로 바꾼다.</p><pre spellcheck="false" autocorrect="off" autocapitalize="off"><code class="language-python">"""골든 패스 e2e — 학생 한 명이 문제 하나를 끝까지 푼다.
+이 테스트가 빨간불이면 어떤 PR도 머지하지 않는다."""
+import pytest
+from fastapi.testclient import TestClient
+
+# golden/api.py가 생기기 전까지는 import 자체가 실패한다 — 그것이 S2의 의도된 빨간불
+from golden.api import app
+
+client = TestClient(app)
+
+
+def test_student_solves_one_problem_end_to_end():
+    # GP-1 세션 시작: 닉네임만으로 익명 세션
+    r = client.post("/golden/session", json={"nickname": "테스트학생"})
+    assert r.status_code == 200
+    session_id = r.json()["session_id"]
+
+    # GP-2 문제 제시: 30문항 중 첫 문제
+    r = client.get(f"/golden/next?session_id={session_id}")
+    assert r.status_code == 200
+    problem = r.json()
+    assert problem["id"].startswith("LF-")  # 일차함수(Linear Function) 문항 접두사
+
+    # GP-3 + GP-4: 틀린 답을 내면 튜터가 되묻는다 (판정이 아니라 질문이 와야 함)
+    r = client.post("/golden/answer", json={
+        "session_id": session_id,
+        "problem_id": problem["id"],
+        "text": "모르겠어요",
+    })
+    assert r.status_code == 200
+    assert r.json()["kind"] == "tutor_turn"  # 'graded'가 아니라 'tutor_turn'
+    assert len(r.json()["message"]) &gt; 0
+
+    # GP-5 + GP-6: 정답을 내면 판정과 숙련도 갱신이 온다
+    r = client.post("/golden/answer", json={
+        "session_id": session_id,
+        "problem_id": problem["id"],
+        "text": problem["_test_answer"],  # 테스트 모드에서만 노출되는 정답 필드
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "graded"
+    assert body["correct"] is True
+    assert 0.0 &lt;= body["mastery"] &lt;= 1.0
+    assert body["mastery"] &gt; 0.0  # 맞았으니 0에서 올라가야 한다
+
+    # 다음 문제로 돌아간다 (GP-6 → GP-2 루프)
+    r = client.get(f"/golden/next?session_id={session_id}")
+    assert r.json()["id"] != problem["id"]
+
+    pytest.fail("S2: 아직 구현 전. 이 줄은 S5에서 지운다.")</code></pre><h2>5. 3주간 하지 않을 것</h2><p>이 목록은 "나쁘다"는 뜻이 아니라 "지금이 아니다"는 뜻이다. 전부 S15 이후 로그가 요구할 때 꺼낸다. Claude Code가 아래 중 하나를 제안하면 "§5"라고만 답한다.</p><ul><li>지식 추적: BKT, AKT, 망각 곡선, 숙련도 보정. 지금은 +0.10/−0.05 하드코딩</li><li>의도 분류: Laya 파인튜닝, Jev 질문 튜닝, 섀도 로깅, 합성 시험셋 272건</li><li>입력 확장: OCR(TexTeller), 손글씨, 음성, 수식 편집기</li><li>콘텐츠 확장: 545노드 그래프 전체 로딩, 400개 오개념 DB 조회, 시그니처 패턴 매핑, 대학수학, 중2 일차함수 외 어떤 단원도</li><li>튜터 고도화: 7단계 학습 파이프라인, 페다고지 팩, 루브릭 평가기(rubric.yaml), 합성 시나리오 200건, 답 노출 정책 분기, 대화 예산 규칙, 감독 대기열</li><li>아키텍처: EOS Core, Subject Contract, Math Adapter, Micro-Application Factory, Small App Pack, DSL, 컴파일러, 다과목 어댑터</li><li>역분석: REA 계획서의 어떤 항목도</li><li>플랫폼: 회원가입, 인증, 학부모 계정, Apple Kids 컴플라이언스 코드, B2B 라이선스, 결제, 푸시 알림</li><li>코드 정리: 옛 코드 리팩토링, 중복 제거, 삭제, 테스트 보강. 옛 코드는 S15까지 그대로 둔다</li><li>문서: PRD 갱신, 382개 기능 목록 재배치, 이 문서 외 새 계획서</li></ul><p>한 가지 예외가 있다. S14에서 로그가 가리킨 문제 1개를 고치는 데 위 항목 중 하나가 꼭 필요하면, 그 항목의 가장 작은 조각만 가져온다. 예를 들어 "튜터가 힌트를 너무 빨리 준다"가 1위 문제면 루브릭 전체가 아니라 힌트 타이밍 규칙 한 줄만 프롬프트에 넣는다.</p><h2>6. 완료 판정과 리스크</h2><p>11/29에 아래 다섯 줄이 전부 "예"면 성공이다. 셋 이하면 3주를 한 번 더 반복하되, 계획을 다시 쓰지 않고 같은 문서의 S번호만 이어 붙인다.</p><ul data-kind="check"><li data-checked="false">실제 중학생 5명이 앱으로 각각 5문제 이상 풀었다 (세션 로그 30건 이상)</li><li data-checked="false"><code spellcheck="false" autocorrect="off" autocapitalize="off">pytest tests/golden</code>이 S5 이후 한 번도 빨간불인 채 머지되지 않았다</li><li data-checked="false">HARVEST.md에 가져온 것·버린 것이 모두 적혀 있고, 미참조 옛 모듈이 <code spellcheck="false" autocorrect="off" autocapitalize="off">/legacy</code>에 있다</li><li data-checked="false">FINDINGS.md에 "가장 자주 끊기는 지점"이 숫자(N건 중 M건)로 적혀 있다</li><li data-checked="false">다음 3주 계획이 로그에서 나온 문제 순서로 적혀 있다</li></ul><p>예상되는 리스크는 넷이고, 대응은 이미 문서 안에 있다.</p><table style="min-width: 144px;"><colgroup><col style="min-width: 48px;"><col style="min-width: 48px;"><col style="min-width: 48px;"></colgroup><tbody><tr><th colspan="1" rowspan="1"><p>리스크</p></th><th colspan="1" rowspan="1"><p>신호</p></th><th colspan="1" rowspan="1"><p>대응</p></th></tr><tr><td colspan="1" rowspan="1"><p>범위 확장</p></td><td colspan="1" rowspan="1"><p>엔드포인트가 4개째 생긴다. LATER.md가 하루 10줄씩 는다</p></td><td colspan="1" rowspan="1"><p>§5를 읽고 PR을 닫는다. LATER.md가 느는 건 정상이다 — 적어두는 게 목적이다</p></td></tr><tr><td colspan="1" rowspan="1"><p>옛 코드가 import되지 않는다</p></td><td colspan="1" rowspan="1"><p>옛 LLM 래퍼나 문항 로더가 다른 모듈 20개를 끌고 온다</p></td><td colspan="1" rowspan="1"><p>가져오지 않고 golden/에 50줄로 다시 쓴다. HARVEST.md에 "버림: 의존 과다"로 적는다</p></td></tr><tr><td colspan="1" rowspan="1"><p>튜터 품질이 창피하다</p></td><td colspan="1" rowspan="1"><p>S8 본인 테스트에서 되묻기가 엉성하다</p></td><td colspan="1" rowspan="1"><p>프롬프트 1개만 다듬는다(세션 1회 한도). 루브릭·파이프라인은 §5. 학생이 실제로 뭐라고 하는지가 S13의 답이다</p></td></tr><tr><td colspan="1" rowspan="1"><p>학생 섭외 실패</p></td><td colspan="1" rowspan="1"><p>S9에 학생이 없다</p></td><td colspan="1" rowspan="1"><p>본인이 학생 역할로 S9를 진행하고 S11까지 섭외를 미룬다. S12까지도 없으면 지인 성인 2명으로 대체하되 FINDINGS.md에 "성인 대체"로 표기한다</p></td></tr></tbody></table><p>가장 큰 리스크는 표에 없다. 1,800개 PR을 만든 습관이 S3쯤에서 "이왕 하는 김에"라는 말로 돌아온다. 그 말이 나오면 세션을 끝내고 다음 날 시작 템플릿으로 다시 연다.</p>
+</body>
+</html>

@@ -133,6 +133,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/harness/backlog.py\" check-prompt 2>/dev/null || true",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/golden_session_register.py\" 2>/dev/null || true",
+            "timeout": 5
           }
         ]
       }
