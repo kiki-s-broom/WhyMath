@@ -5,7 +5,7 @@ track: math-completion
 stage: S3
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -20,13 +20,15 @@ acceptance:
 artifacts:
   - "#1853"
   - "#1865"
+  - "#1882"
+  - "PR #1886 (본 수집 244x2 + AI 패널 477건 + D16 결정안 — https://github.com/kiki-s-broom/WhyMath/pull/1886)"
 paths:
   - src/backend/whymath_backend/harness/ai_quality_live_collect.py
   - src/backend/whymath_backend/harness/ai_quality_eval.py
   - tests/backend/harness/test_ai_quality_live_collect.py
   - tests/backend/harness/test_ai_quality_eval.py
   - docs/reviews/
-session: claude/p3-94-llm-draft-measure
+session: null
 notes: |-
   D16(Kiki 2026-10-31 · 판정 대상 = LLM이 쓴 문장) 승계 — 2026-11-01 Kiki 승인 권장안 ⓐ(측정용 초안 저장 · 서빙 무변경). 근거: P3-78 라이브 측정(PR #1793)에서 LLM 문장이 본문에 나간 경우 0/244 — 현 경로로는 이 기준의 표본이 없다. 인접 태스크 PED-18은 작동 비율 관측이라 초안 평가를 하지 않는다. 판정 기준 main d81cfd7a.
 

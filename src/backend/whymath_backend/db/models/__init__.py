@@ -83,6 +83,10 @@ from whymath_backend.db.models.concept_content import (
     ConceptContent,
 )
 from whymath_backend.db.models.concept_embedding import ConceptEmbedding
+from whymath_backend.db.models.concept_lifecycle_log import (
+    ConceptExposureEvent,
+    ConceptStateTransition,
+)
 from whymath_backend.db.models.concept_node import ConceptNode
 from whymath_backend.db.models.concept_standard_link import ConceptStandardLink
 from whymath_backend.db.models.concept_version import ConceptVersion
@@ -272,6 +276,9 @@ __all__ = [
     "ConceptNode",
     # 원자 Phase 3 Slice 1: ConceptContent (콘텐츠 4종 PG 프로젝션·code 키·K-12/대학·additive)
     "ConceptContent",
+    # PED-17 A1: 개념 상태 변경 기록(추가 전용 원장)·학생 노출 기록(수정 불가)
+    "ConceptStateTransition",
+    "ConceptExposureEvent",
     "ConceptVisualization",
     # ARCH-14 ③: ConceptVisualStyle (권장 시각화 양식 Overlay·code 키·슬88 컬럼 이관·Concept Purity)
     "ConceptVersion",

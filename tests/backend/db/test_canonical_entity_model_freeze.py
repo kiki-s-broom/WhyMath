@@ -1,12 +1,12 @@
 """핵심 엔티티 19종 동결 — 정본 `docs/architecture/canonical_entity_model_v1.md`의 기계 집행.
 
 이 파일이 **강제하는 것**(정본화≠집행 — CLAUDE.md):
-  ① 84테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
+  ① 86테이블 전수 귀속 — 새 테이블이 생기면 RED. 9월 스키마에 노드가 조용히 불어나는 것을 막는다.
   ② 좌석 실재 — 19종의 좌석 테이블이 사라지거나 개명되면 RED.
   ③ 좌석 부재 3종 — Subject·AssessmentResult·ContentVersion용 테이블이 생기면 RED.
      (Hint는 S4-11이 `hints` 좌석을 실체화해 부재 동결에서 **의도적으로** 걷어냈다 — 정본 §3-B.
      본문 좌석이 `hints` 하나뿐임은 ③-c 컬럼 축 가드가 계속 동결한다.)
-  ④ 문서 정합 — 정본 문서가 84테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
+  ④ 문서 정합 — 정본 문서가 86테이블을 전부 적지 않으면 RED(문서 드리프트 차단).
 
 이 파일이 **강제하지 않는 것**(있는 척 금지):
   · 컬럼 수준 스키마(어떤 필드를 갖는지)는 각 모델의 기존 ORM 테스트 소관이다.
@@ -53,7 +53,7 @@ def _load_all_models() -> None:
 # EOS-103이 learner_state를 LearnerState 좌석 2번째로, EOS-105가 learning_state_transition을
 # 3번째로 추가해 2026-09-17 82테이블 — 둘은 서로 다른 브랜치에서 각각 +1로 착지했으므로 병합
 # 결과는 81이 아니라 82다. S4-11이 `hints`를 Hint 좌석 1번째로 실체화해 2026-09-29 83테이블, ARCH-31이 problem_version을 Problem 좌석 3번째로
-# 추가해 2026-10-08 84테이블)
+# 추가해 2026-10-08 84테이블, PED-17 A1이 concept_state_transition·concept_exposure_event를 추가해 2026-11-07 86테이블)
 # ──────────────────────────────────────────────────────────────────────────
 
 # 핵심 19종 → 좌석 테이블. 빈 tuple = **좌석 부재 동결**(정본 §3).
@@ -76,7 +76,8 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
     # S4-11(2026-09-29): 좌석 부재 동결을 의도적으로 걷어내고 실체화(정본 §3-B — HintNode 연기
     # 해제 전제 3종 = 생성 writer·게이트·coach 서빙 reader를 한 슬라이스로 충족).
     "Hint": ("hints",),
-    "Content": ("concept_content", "pedagogy_content_slot"),
+    # PED-17 A1(2026-11-07): `concept_state_transition` — concept_content 행의 생애 상태 변경 원장(추가 전용).
+    "Content": ("concept_content", "pedagogy_content_slot", "concept_state_transition"),
     "Learner": ("user_profile",),
     # LearnerState 좌석은 3테이블이며 **셋이 담는 사실이 다르다**(같은 사실의 복제가 아니다):
     #   · `learner_state`            학생당 1행 — 지금의 교육과정·학습목표 배치(EOS-103)
@@ -99,6 +100,8 @@ CANONICAL_ENTITY_SEATS: dict[str, tuple[str, ...]] = {
         "dead_end_log",
         "dialogue",
         "dialogue_turn",
+        # PED-17 A1(2026-11-07): 학생이 개념을 본 사건(가명 해시) — attempt_event·hint_usage와 같은 부류.
+        "concept_exposure_event",
     ),
     "PedagogyStrategy": ("strategy_node", "pedagogy_pack"),
     "ContentVersion": (),

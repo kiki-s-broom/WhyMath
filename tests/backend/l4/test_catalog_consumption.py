@@ -471,6 +471,10 @@ class _FakeRow:
     # 렌더 경로 테스트는 검수 통과 행을 전제한다(CONT-05 공급 게이트 — 게이트 자체는
     # test_content_supply.py::TestSupplyReviewGate가 검사한다).
     review_status: str = "reviewed"
+    # PED-17 A1: 학생 공개 관문은 생애 상태·출처도 본다. 기본값 = 마이그레이션이 `reviewed` 행에
+    # 매기는 값('공개됨'+'사람 검수') — 즉 "이미 학생에게 나가던 개념".
+    lifecycle_status: str = "공개됨"
+    content_origin: str = "사람 검수"
 
 
 class _FakeSession:
