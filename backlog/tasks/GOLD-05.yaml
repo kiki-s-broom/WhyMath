@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-05
+title: "GOLD-05 골든 패스 S6 후속 — 풀이식=답 입력 채점을 S8 앱 체크리스트 13번 항목으로 등재"
+track: math-completion
+stage: S1
+subject: math
+layer: docs
+status: done
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "golden/CHECKLIST.md 앱 확인 표에 13번 항목(풀이식=답 꼴 입력 채점) 추가 + LATER.md 해당 줄에 S8 이관 표시 · 코드·계약 변경 없음(판정은 S8)"
+artifacts:
+  - "PR #1900 · 커밋 c99b1b2e · golden/CHECKLIST.md 앱 확인 ⑬(풀이식=답 꼴 입력 채점) 추가 + LATER.md S8 이관 표시 · CI 미러 5잡 통과"
+paths:
+  - golden/CHECKLIST.md
+  - golden/LATER.md
+session: null
+notes: "Kiki 지시 2026-11-09: S6 에뮬레이터 확인 중 발견한 '-3*5+3=-12' 오답 처리를 S8 체크리스트에서 다룬다. GOLD-04(S6) 후속"
+updated: 2026-11-09
