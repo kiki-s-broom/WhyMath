@@ -1,7 +1,7 @@
-// 골든 패스 앱 껍데기 — 기본 Material 앱 + 화면 위 오류 한 줄(S6).
+// 골든 패스 앱 껍데기 — 기본 Material 앱 + 화면 위 오류 한 줄(S6 · S7 결과 화면 분기).
 //
 // 옛 `app.dart`·`core/router.dart`는 쓰지 않는다(진입점 분리). 화면 전환은 라우터 없이
-// 상태로 정한다: 세션이 없으면 닉네임 화면, 있으면 문제 화면.
+// 상태로 정한다: 세션이 없으면 닉네임 화면, 판정 결과가 있으면 결과 화면(S7), 그 밖에는 문제 화면.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'golden_state.dart';
 import 'nickname_screen.dart';
 import 'problem_screen.dart';
+import 'result_screen.dart';
 
 class GoldenApp extends StatelessWidget {
   const GoldenApp({super.key});
@@ -27,7 +28,7 @@ class GoldenApp extends StatelessWidget {
   }
 }
 
-/// 세션 유무로 화면을 고른다.
+/// 세션·판정 결과 유무로 화면을 고른다.
 class _GoldenHome extends ConsumerWidget {
   const _GoldenHome();
 
@@ -35,7 +36,11 @@ class _GoldenHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bool started =
         ref.watch(goldenProvider.select((GoldenState s) => s.sessionId != null));
-    return started ? const ProblemScreen() : const NicknameScreen();
+    final bool graded =
+        ref.watch(goldenProvider.select((GoldenState s) => s.result != null));
+    if (!started) return const NicknameScreen();
+    // GP-5·GP-6: 판정이 나면 결과 화면 → "다음 문제"가 결과를 비우면 다시 문제 화면(GP-2).
+    return graded ? const ResultScreen() : const ProblemScreen();
   }
 }
 

@@ -1,4 +1,5 @@
 // GP-2~GP-4 문제 화면 — 위: 문제 본문 / 가운데: 대화 말풍선 / 아래: 입력창 + 보내기(S6).
+// (S7) 맨 위에 "LF-07 · 7/30"과 현재 숙련도(서버 값)를 작게 표시한다.
 //
 // 문제 본문의 `$...$` 구간만 flutter_math_fork(`Math.tex`)로 그리고, 나머지는 일반 텍스트다.
 // 채점은 하지 않는다 — 입력을 서버로 보내고, 서버가 준 튜터 문장·판정 줄을 쌓기만 한다.
@@ -40,15 +41,29 @@ class _ProblemScreenState extends ConsumerState<ProblemScreen> {
     final bool canSend = !s.loading && !s.problemFinished;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          problem == null
-              ? '문제'
-              : '문제 ${problem.index} / ${problem.total} · 숙련도 ${s.mastery.toStringAsFixed(2)}',
-        ),
-      ),
+      appBar: AppBar(title: const Text('문제')),
       body: Column(
         children: <Widget>[
+          // 맨 위 작은 줄: 문항 ID · 몇 번째/전체 + 현재 숙련도(서버 값 그대로)
+          if (problem != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: <Widget>[
+                  Text(
+                    '${problem.id} · ${problem.index}/${problem.total}',
+                    key: const Key('golden_problem_position'),
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  const Spacer(),
+                  Text(
+                    '숙련도 ${s.mastery.toStringAsFixed(2)}',
+                    key: const Key('golden_mastery_label'),
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ],
+              ),
+            ),
           // 위: 문제 본문
           if (problem != null)
             Padding(

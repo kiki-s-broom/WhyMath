@@ -5,6 +5,7 @@
 | `whymath_backend.l3.providers.factory.build_cloud_provider` + `l3.router.Router.route`(결정 1개) | 지시서의 대체안 "tutor.py에 직접 HTTP 50줄"은 쓰지 않음 | 팩토리 단독 import가 옛 모듈 40개로 지시서 "하지 말 것"의 20개 기준을 넘지만, 공통 규칙 8(팩토리 경유만·직접 호출 금지)이 작업 지시보다 우선한다. `generate`가 `RoutingDecision`을 요구해 라우터 경유로 받았고, 그래서 데이터 반출 게이트가 적용된다(실측 결정 cloud_mid · EXPORT_ALLOWED) | S4 |
 | (S5 채점) `whymath_backend.l3.safe_parse.safe_parse_expr`(학생 입력 파싱 단일 안전 진입점) + SymPy `nsimplify`·`simplify` 직접 사용 | `whymath_backend/l3/equivalent/canonicalize.py`(옛 동치 판정 엔진) | 파싱은 코딩 헌법 R22-03이 진입점 하나로 강제한다(`9^9^9`·eval 우회 차단 — 직접 `parse_expr`는 `tests/infra/test_cas_parse_entrypoint_governance.py`가 막는다). 비교는 계약 규칙 두 줄(number·expression)로 끝나고 정답이 정수·분수·`x`의 일차식뿐이라 옛 엔진의 다종 answer_kind 체계가 필요 없다. import 비용 옛 모듈 28개(실측) | S5 |
 | (S6 Flutter) `lib/core/env.dart`의 `Env.apiUrl`(`--dart-define=API_URL=`) | `lib/core/api_client.dart`의 `dioProvider`(인증 인터셉터) · 옛 `app.dart`·`core/router.dart`(go_router) · `lib/shared/widgets/math_text.dart` | 골든 패스는 닉네임만으로 시작해 인증 인터셉터가 필요 없어 `Dio`를 직접 만든다. 진입점은 `lib/main_golden.dart`로 분리하고 화면 전환은 라우터 없이 상태(세션 유무)로 정한다. 수식은 지시서대로 `flutter_math_fork`의 `Math.tex`를 `$...$` 구간에만 직접 쓴다 | S6 |
+| (S7 Flutter) 없음 — 옛 코드 import 0건. S6의 `golden_state.dart`·`golden_api.dart`(이미 골든 안) 위에 결과 화면만 더함 | 옛 `core/router.dart`(go_router) 화면 전환 | 결과 화면도 S6과 같이 라우터 없이 상태(판정 결과 유무)로 고른다. 숙련도는 서버 값만 표시하고 바뀐 양은 판정 직전·직후 서버 값의 차이다(클라이언트 재계산 없음) | S7 |
 
 ## 1주차 수확 정리 (S1~S5 · S5 작성 2026-11-09)
 
