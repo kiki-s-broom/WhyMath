@@ -2,7 +2,7 @@
 //
 // ① 문제가 렌더된다(LaTeX 구간은 Math 위젯)
 // ② "모르겠어요" 전송 후 튜터 말풍선 1개 추가
-// ③ graded 응답 후 판정 줄 표시
+// ③ graded 응답 후 결과 화면으로 바뀐다(S6에서는 판정 줄이었고, S7에서 결과 화면으로 바뀜)
 // (+) 서버 꺼짐이면 오류 한 줄이 보이고 앱은 그대로
 
 import 'package:flutter/material.dart';
@@ -77,8 +77,9 @@ void main() {
     expect(find.textContaining('를 구하시오.', findRichText: true), findsOneWidget);
     // $...$ 구간 2개($f(x) = 2x + 7$, $f(2)$)는 Math.tex로 그려진다
     expect(find.byType(Math), findsNWidgets(2));
-    // 상단에 문제 번호와 숙련도
-    expect(find.text('문제 7 / 30 · 숙련도 0.00'), findsOneWidget);
+    // 상단에 문제 위치와 숙련도(S7에서 "LF-07 · 7/30" 작은 줄로 바뀜)
+    expect(find.text('LF-07 · 7/30'), findsOneWidget);
+    expect(find.text('숙련도 0.00'), findsOneWidget);
     // 대화는 아직 비어 있다
     expect(find.byType(ChatBubble), findsNothing);
   });
@@ -100,7 +101,7 @@ void main() {
     expect(find.byKey(const Key('golden_verdict_line')), findsNothing);
   });
 
-  testWidgets('③ graded 응답 후 판정 줄이 표시된다', (WidgetTester tester) async {
+  testWidgets('③ graded 응답 후 문제 화면이 결과 화면으로 바뀐다', (WidgetTester tester) async {
     final _FakeGoldenApi api = _FakeGoldenApi(
       answers: const <AnswerResult>[
         TutorTurn(message: '2를 넣으면 어떻게 될까?', turn: 1),
@@ -112,14 +113,10 @@ void main() {
     await _sendAnswer(tester, '모르겠어요');
     await _sendAnswer(tester, '11');
 
-    expect(find.byKey(const Key('golden_verdict_line')), findsOneWidget);
-    expect(find.text('판정: 맞음 · 숙련도 0.10'), findsOneWidget);
-    // 상단 숙련도도 서버 값으로 바뀐다
-    expect(find.text('문제 7 / 30 · 숙련도 0.10'), findsOneWidget);
-    // 판정이 난 문제에는 다시 보낼 수 없다(숙련도 이중 갱신 방지)
-    final ElevatedButton send =
-        tester.widget<ElevatedButton>(find.byKey(const Key('golden_send_button')));
-    expect(send.onPressed, isNull);
+    // 결과 화면이 보이고, 문제 화면(입력창)은 사라진다 — 판정이 난 문제에는 다시 보낼 수 없다
+    expect(find.byKey(const Key('golden_result_label')), findsOneWidget);
+    expect(find.byKey(const Key('golden_answer_field')), findsNothing);
+    expect(find.byKey(const Key('golden_send_button')), findsNothing);
   });
 
   testWidgets('서버 꺼짐이면 화면 위에 오류 한 줄이 보이고 앱은 닉네임 화면에 남는다',
