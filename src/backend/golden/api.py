@@ -17,6 +17,14 @@ from golden import grade, problems, store, tutor
 # 한 문제에서 쓸 수 있는 튜터 되묻기 최대 횟수(공유 계약)
 MAX_TUTOR_TURNS = 3
 
+# 숙련도 갱신 폭(공유 계약 — 맞으면 +0.10, 틀리면 −0.05. 잘라내기·반올림은 store.set_mastery가 한다)
+MASTERY_GAIN = 0.10
+MASTERY_LOSS = 0.05
+
+# graded 응답의 한 줄 피드백(지시서 S5 — 비난 표현 금지)
+FEEDBACK_CORRECT = "맞았어요. 다음 문제로 가 볼까요?"
+FEEDBACK_WRONG = "이번 문제의 답은 {answer}였어요. 다음 문제에서 다시 해 봐요."
+
 router = APIRouter(prefix="/golden")
 
 
@@ -85,13 +93,12 @@ async def answer(body: AnswerIn) -> dict[str, object]:
     history = await store.open_turns(row.session_id, problem["id"])
     turns_used = len(history)  # 이 문제에서 이미 쓴 튜터 턴 수(0~3)
 
-    # ① 채점 먼저 (S4: grade.is_correct는 항상 False인 스텁 — S5에서 교체)
+    # ① 채점 먼저 (GP-5 — SymPy 비교)
     correct = grade.is_correct(problem, body.text)
 
     if correct:
-        # ② 정답 — 몇 턴째든 판정. 숙련도 +0.10 갱신은 S5(GP-6)가 붙인다.
-        feedback = "맞았어! 어떻게 풀었는지 한 문장으로 설명해 볼 수 있을까?"
-        return await _graded(row, problem, body.text, True, turns_used, feedback)
+        # ② 정답 — 몇 턴째든 판정. 숙련도 +0.10(GP-6)
+        return await _graded(row, problem, body.text, True, turns_used, FEEDBACK_CORRECT)
 
     if turns_used < MAX_TUTOR_TURNS:
         # ③ 오답 + 튜터 턴 남음 → 되묻기
@@ -115,8 +122,8 @@ async def answer(body: AnswerIn) -> dict[str, object]:
             response["degraded"] = True
         return response
 
-    # ④ 오답 + 튜터 턴 3회 소진 → 정답을 알려 주며 판정. 숙련도 −0.05 갱신은 S5(GP-6)가 붙인다.
-    feedback = f"정답은 {problem['answer']}이야. 함께 생각해 줘서 고마워, 다음 문제로 가 보자."
+    # ④ 오답 + 튜터 턴 3회 소진 → 정답을 알려 주며 판정. 숙련도 −0.05(GP-6)
+    feedback = FEEDBACK_WRONG.format(answer=problem["answer"])
     return await _graded(row, problem, body.text, False, turns_used, feedback)
 
 
@@ -128,7 +135,7 @@ async def _graded(
     turns_used: int,
     feedback: str,
 ) -> dict[str, object]:
-    """판정 응답 — 턴을 기록하고, 지금 보던 문제라면 cursor를 다음 문제로 옮긴다."""
+    """판정 응답 — 턴 기록 → 숙련도 갱신 → 지금 보던 문제라면 cursor를 다음 문제로 옮긴다."""
     await store.record_turn(
         session_id=row.session_id,
         problem_id=problem["id"],
@@ -141,7 +148,10 @@ async def _graded(
     items = problems.load_problems()
     if items[row.cursor % len(items)]["id"] == problem["id"]:
         await store.advance_cursor(row.session_id)
-    mastery = await store.get_mastery(row.nickname)
+    # GP-6 숙련도 갱신: 맞으면 +0.10, 틀리면 −0.05 → set_mastery가 0.0~1.0 잘라내기·둘째 자리 반올림
+    current = await store.get_mastery(row.nickname)
+    delta = MASTERY_GAIN if correct else -MASTERY_LOSS
+    mastery = await store.set_mastery(row.nickname, current + delta)
     return {
         "kind": "graded",
         "correct": correct,
