@@ -70,7 +70,7 @@ def test_wrong_inputs_are_graded_wrong(problem: Problem, text: str) -> None:
 # ── 파싱 불가 입력: 예외 없이 오답 + 예외 타입명이 로그에 남는다 ─────────────────
 @pytest.mark.parametrize(
     "text",
-    ["2x +* 1", "((3", "__import__('os')", "3=5", "9" * 200],
+    ["2x +* 1", "((3", "__import__('os')", "3=5", "9" * 200, "9^9^9"],
 )
 def test_unparseable_input_is_wrong_without_exception(
     text: str, caplog: pytest.LogCaptureFixture

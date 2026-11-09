@@ -20,11 +20,14 @@ import unicodedata
 import sympy
 from sympy.parsing.sympy_parser import (
     implicit_multiplication_application,
-    parse_expr,
     standard_transformations,
 )
 
 from golden.problems import Problem
+
+# 학생 입력 파싱은 옛 코드의 단일 안전 진입점으로만 한다(코딩 헌법 R22-03 · HARVEST.md).
+# `9^9^9` 같은 거대 계산·파서 내부 eval을 통한 코드 실행을 파싱 전에 막는다.
+from whymath_backend.l3.safe_parse import safe_parse_expr
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +53,7 @@ _SUFFIXES = ("입니다", "이에요", "예요", "이다", ".")
 _SYMBOL_MAP = str.maketrans({"\u2212": "-", "\u00d7": "*", "\u00f7": "/", "\u00b7": "*"})
 
 # 파싱 대상에 허용하는 문자(숫자·x·연산자·괄호·소수점). 그 밖의 글자가 있으면 파싱하지 않는다
-# (parse_expr는 내부에서 eval을 쓰므로, 이 허용 목록이 임의 코드 실행도 막는다)
+# (1차 거름망 — 크기·구조 상한은 safe_parse_expr가 본다)
 _ALLOWED = re.compile(r"^[0-9x+\-*/^().]+$")
 
 
@@ -80,7 +83,7 @@ def _parse(text: str) -> sympy.Expr:
     """정규화된 문자열을 SymPy 식으로 바꾼다. 읽을 수 없으면 ValueError."""
     if not text or len(text) > MAX_INPUT_LEN or not _ALLOWED.match(text):
         raise ValueError("허용되지 않는 입력")
-    expr = parse_expr(
+    expr = safe_parse_expr(
         text.replace("^", "**"),
         local_dict={"x": _X},
         transformations=_TRANSFORMS,
