@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-04
+title: "GOLD-04 골든 패스 S6 — Flutter 화면 1(닉네임·문제·대화) lib/main_golden.dart + lib/golden/"
+track: math-completion
+stage: S1
+subject: math
+layer: mobile
+status: review
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S6 산출물: src/mobile/lib/main_golden.dart + lib/golden/(golden_api·golden_state·nickname_screen·problem_screen) + test/golden/problem_screen_test.dart 3건 + flutter analyze·flutter test exit 0 + lib/golden 밖 dart 변경 0건 + HARVEST.md 1줄 + golden/reports_no_students/S6/보고.md"
+artifacts:
+  - "PR #1898 · 커밋 f8713a0d·04dec2e8 · flutter analyze 0건 · flutter test 581 passed · 위젯 테스트 4건 · tests/golden 220 passed · CI 미러 7잡 통과. 남은 것 = 안드로이드 실기기 1회 확인(Kiki · golden/reports_no_students/S6/실기기확인_런북.md) 뒤 done"
+paths:
+  - "src/mobile/lib/golden/**"
+  - src/mobile/lib/main_golden.dart
+  - "src/mobile/test/golden/**"
+  - golden/HARVEST.md
+  - golden/LATER.md
+  - "golden/reports_no_students/S6/**"
+session: claude/new-session-bzvrxa
+notes: |-
+  GOLD-01(공유 우산 태스크)의 S6 슬라이스. GOLD-01은 S4 브랜치가 in_progress로 들고 있어 start 거부 — GOLD-02·GOLD-03 선례대로 하위 태스크 분리 등재. 지시서 golden/prompts_no_students/ 단계04 S6
+
+  [정정 2026-11-09] S6 PR 증적 기록
+updated: 2026-11-09
