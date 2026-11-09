@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: mobile
-status: in_progress
+status: review
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "S8 산출물: golden/reports_no_students/S8/런북.md(PowerShell·자리표시자 0·서버/앱 창 분리·git log 자가검증) + golden/CHECKLIST.md 앱 확인 13항목 기록(①~⑫ ✅/❌ + ⑬ 판정) + golden/LOG_TEMPLATE.md(학생 세션 관찰 기록 양식) + 리눅스 재현(Postgres 55432 + uvicorn golden.api:app + flutter test) 결과 + tests/golden exit 0 + golden/reports_no_students/S8/보고.md(관문 ③ go/no-go)"
-artifacts: []
+artifacts:
+  - "PR #1903 · 커밋 c9d76ff6 · 런북·LOG_TEMPLATE·CHECKLIST 13항목(세션 AI 웹 빌드 12/12 ✅ · Kiki ⬜) · 캡처 11장 · tests/golden 220 passed · flutter test 586 passed · CI 미러 5잡 exit 0. 남은 것 = Kiki 본인 테스트(golden/reports_no_students/S8/런북.md) 뒤 CHECKLIST Kiki 칸 12/12 → 판정 go → done"
 paths:
   - "golden/reports_no_students/S8/**"
   - golden/CHECKLIST.md
@@ -22,5 +23,8 @@ paths:
   - golden/LATER.md
   - golden/tutor_prompt.md
 session: claude/new-session-bfuiie
-notes: "GOLD-01(공유 우산 태스크)의 S8 슬라이스. GOLD-01은 in_progress로 start 거부 예상 — GOLD-02~06 선례대로 하위 태스크 분리 등재. 지시서 golden/prompts_no_students/ 단계06 S8(관문 ③). 완료 조건에 Kiki 본인 테스트(문제 3개 끝까지)가 있어 세션 AI 재현만으로는 done 불가."
+notes: |-
+  GOLD-01(공유 우산 태스크)의 S8 슬라이스. GOLD-01은 in_progress로 start 거부 예상 — GOLD-02~06 선례대로 하위 태스크 분리 등재. 지시서 golden/prompts_no_students/ 단계06 S8(관문 ③). 완료 조건에 Kiki 본인 테스트(문제 3개 끝까지)가 있어 세션 AI 재현만으로는 done 불가.
+
+  [정정 2026-11-09] S8 PR 증적 기록
 updated: 2026-11-09
