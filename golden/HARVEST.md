@@ -3,3 +3,17 @@
 | problem_bank_middle_function_v0 10건 (LF-01~LF-10) | 나머지 190건(같은 유형 중복) | 유형 다양성 | S3 |
 | `whymath_backend.db.session.get_engine` (+ `config.get_settings`의 `db_disable_pool=True` 사본으로 NullPool) | 없음 | 연결 URL을 옛 Settings(`WHYMATH_DATABASE_URL`)에서 그대로 읽기 위해. 기동은 정상이라 지시서 "막히면"(직접 `create_async_engine`) 조건에 해당하지 않음. 단 `db/__init__.py`가 ORM 모델 전체를 import해 옛 모듈 102개가 함께 로드된다(실측). NullPool은 `with` 없는 TestClient가 요청마다 새 이벤트 루프를 만들기 때문 | S4 |
 | `whymath_backend.l3.providers.factory.build_cloud_provider` + `l3.router.Router.route`(결정 1개) | 지시서의 대체안 "tutor.py에 직접 HTTP 50줄"은 쓰지 않음 | 팩토리 단독 import가 옛 모듈 40개로 지시서 "하지 말 것"의 20개 기준을 넘지만, 공통 규칙 8(팩토리 경유만·직접 호출 금지)이 작업 지시보다 우선한다. `generate`가 `RoutingDecision`을 요구해 라우터 경유로 받았고, 그래서 데이터 반출 게이트가 적용된다(실측 결정 cloud_mid · EXPORT_ALLOWED) | S4 |
+| (S5 채점) SymPy 라이브러리 직접 사용 — `nsimplify` 수치 비교·`simplify(학생−정답)==0`·`parse_expr`(곱셈 생략 변환) | `whymath_backend/l3/equivalent/canonicalize.py`(옛 동치 판정 엔진) | 공유 계약의 채점 규칙이 두 줄(number·expression)로 끝나고, 30문항 정답이 정수·분수·`x`의 일차식뿐이라 옛 엔진의 다종 answer_kind 체계가 필요 없다. `grade.py`는 옛 모듈을 하나도 import하지 않는다 | S5 |
+
+## 1주차 수확 정리 (S1~S5 · S5 작성 2026-11-09)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 문항 10건 — `data/corpus/problem_bank_middle_function_v0` → LF-01~LF-10(나머지 20건은 직접 작성) | 같은 은행 나머지 190건 · 다른 문제은행 38개 | 200건이 전부 "f(k) 구하기" 한 유형이라 30문항의 유형 다양성을 못 채운다. 골든 패스는 중2 일차함수 한 단원뿐이다 | S1~S5 |
+| DB 엔진 — `whymath_backend.db.session.get_engine` + `config.get_settings`(`WHYMATH_DATABASE_URL`) | Alembic 리비전 추가 · 옛 ORM 모델·저장소 계층 | 연결 설정을 옛 것 그대로 재사용한다. 표 3개는 앱 시작 시 `create_all`로 만든다(리비전은 golden/ 밖이고 infra-contracts 등재가 필요) | S1~S5 |
+| 프로바이더 팩토리 — `l3.providers.factory.build_cloud_provider` + `l3.router.Router.route` | 직접 HTTP·SDK 호출 | 공통 규칙 8(LLM은 팩토리 경유만). 라우터를 거쳐 데이터 반출 게이트도 그대로 적용된다 | S1~S5 |
+| 없음 | `whymath_backend/api/coach.py`(4,570줄 코치 세션 파이프라인) | 코치 세션은 정답을 받아도 문제 완료로 처리하지 않고(S4 실측 `problem_complete=false`), 인증·오개념·힌트 사다리가 얽혀 있다. 골든 패스는 `api.py`의 엔드포인트 3개로 대신한다 | S1~S5 |
+| 없음 | 오개념 DB·매칭 — `whymath_backend/l1/misconception/`(10파일) · 응답의 `misconceptions` 필드 | 오류 유형 분류는 3주 범위 밖(§5). 튜터는 문항의 `hint1` 하나만 쓴다 | S1~S5 |
+| 없음 | 교수학 루브릭 — `whymath_backend/harness/pedagogical_rubric.py` 등 측정·검수 하네스 | 저작·검수용 도구라 학생 경로에 필요 없다. 튜터 규칙은 `golden/tutor_prompt.md` 191자 한 장 | S1~S5 |
+| 없음 | L2 학습자 모델(BKT·IRT·`next-problem` 선택) | 숙련도는 +0.10/−0.05 한 줄, 문항 순서는 고정 30개 순환이다(§5) | S1~S5 |
+| 없음 | 데모 OAuth·JWT·회원가입 | 학생 식별자는 닉네임뿐(공통 규칙 9) | S1~S5 |

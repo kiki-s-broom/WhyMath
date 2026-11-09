@@ -1,7 +1,6 @@
 """골든 패스 e2e — 학생 한 명이 문제 하나를 끝까지 푼다.
 이 테스트가 빨간불이면 어떤 PR도 머지하지 않는다."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 # golden/api.py에 app이 생기기 전까지는 import 자체가 실패한다 — 그것이 S2의 의도된 빨간불
@@ -54,5 +53,3 @@ def test_student_solves_one_problem_end_to_end():
     # 다음 문제로 돌아간다 (GP-6 → GP-2 루프)
     r = client.get(f"/golden/next?session_id={session_id}")
     assert r.json()["id"] != problem["id"]
-
-    pytest.fail("S2: 아직 구현 전. 이 줄은 S5에서 지운다.")

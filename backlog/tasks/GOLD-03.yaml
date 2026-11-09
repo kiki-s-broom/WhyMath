@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-03
+title: "GOLD-03 골든 패스 S5 — grade.py 채점·숙련도 갱신 + e2e 첫 초록(관문 ②)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S5 산출물: src/backend/golden/grade.py(SymPy 채점) + tests/golden/test_grade.py + api.py answer 실채점·숙련도 +0.10/-0.05 clamp 반올림 + golden/CHECKLIST.md 12항목 + test_golden_path.py pytest.fail 1줄 삭제 → pytest ../../tests/golden exit 0 + 뮤테이션 1종 RED 확인 후 cp 원복 + HARVEST.md 1주차 정리 + golden/reports_no_students/S5/보고.md"
+artifacts: []
+paths:
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+  - golden/CHECKLIST.md
+  - golden/HARVEST.md
+  - golden/LATER.md
+  - "golden/reports_no_students/S5/**"
+session: claude/new-session-cdbod2
+notes: "GOLD-01(공유 우산 태스크)의 S5 슬라이스. GOLD-01은 S4 브랜치 claude/new-session-0zj97r가 in_progress로 들고 있어 start가 거부됨 — GOLD-02(S3) 선례대로 하위 태스크로 분리 등재. 지시서 golden/prompts_no_students/ 단계04 S5"
+updated: 2026-11-09

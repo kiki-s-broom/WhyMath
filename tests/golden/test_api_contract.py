@@ -115,3 +115,56 @@ def test_three_wrong_answers_then_fourth_is_graded() -> None:
     # 판정이 났으니 다음 문제로 넘어간다(문항이 1개뿐이면 순환해 같은 문제)
     after = client.get(f"/golden/next?session_id={session_id}").json()
     assert after["index"] == (problem["index"] % problem["total"]) + 1
+
+
+def _answer(session_id: str, problem_id: str, text: str) -> dict[str, object]:
+    r = client.post(
+        "/golden/answer",
+        json={"session_id": session_id, "problem_id": problem_id, "text": text},
+    )
+    assert r.status_code == 200
+    body: dict[str, object] = r.json()
+    return body
+
+
+def test_mastery_update_gain_loss_and_clamp() -> None:
+    """GP-6 숙련도 갱신 — 새 닉네임(시작 0.0)으로 +0.10·−0.05·0 아래 잘라내기를 정확한 값으로 본다.
+
+    e2e는 `mastery > 0.0`만 보므로, DB에 같은 닉네임이 남아 있으면 갱신을 빼먹어도 통과할 수 있다.
+    이 테스트가 그 빈틈을 막는다.
+    """
+    nickname = _nickname()
+    session_id = client.post("/golden/session", json={"nickname": nickname}).json()["session_id"]
+
+    # ① 처음부터 3턴 소진 후 오답 판정 → 0.0 − 0.05 = 0.0 (0 아래로 안 내려감)
+    problem = client.get(f"/golden/next?session_id={session_id}").json()
+    for _ in range(3):
+        assert _answer(session_id, problem["id"], "모르겠어요")["kind"] == "tutor_turn"
+    body = _answer(session_id, problem["id"], "모르겠어요")
+    assert body["correct"] is False
+    assert body["mastery"] == 0.0
+    assert (
+        body["feedback"]
+        == f"이번 문제의 답은 {problem['_test_answer']}였어요. 다음 문제에서 다시 해 봐요."
+    )
+
+    # ② 다음 문제 정답 → 0.0 + 0.10 = 0.10
+    problem = client.get(f"/golden/next?session_id={session_id}").json()
+    body = _answer(session_id, problem["id"], problem["_test_answer"])
+    assert body == {
+        "kind": "graded",
+        "correct": True,
+        "mastery": 0.10,
+        "turns_used": 0,
+        "feedback": "맞았어요. 다음 문제로 가 볼까요?",
+    }
+
+    # ③ 다음 문제 3턴 뒤 오답 → 0.10 − 0.05 = 0.05
+    problem = client.get(f"/golden/next?session_id={session_id}").json()
+    for _ in range(3):
+        _answer(session_id, problem["id"], "모르겠어요")
+    assert _answer(session_id, problem["id"], "모르겠어요")["mastery"] == 0.05
+
+    # ④ 같은 닉네임으로 새 세션 → 숙련도를 이어받는다(DB에 저장됐다)
+    again = client.post("/golden/session", json={"nickname": nickname}).json()
+    assert again["mastery"] == 0.05
