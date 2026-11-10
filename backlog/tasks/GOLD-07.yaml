@@ -1,0 +1,34 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-07
+title: "GOLD-07 골든 패스 S8 — 앱 통합 본인 테스트·CHECKLIST 12/12·런북·관찰 기록 양식(관문 ③)"
+track: math-completion
+stage: S1
+subject: math
+layer: mobile
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S8 산출물: golden/reports_no_students/S8/런북.md(PowerShell·자리표시자 0·서버/앱 창 분리·git log 자가검증) + golden/CHECKLIST.md 앱 확인 13항목 기록(①~⑫ ✅/❌ + ⑬ 판정) + golden/LOG_TEMPLATE.md(학생 세션 관찰 기록 양식) + 리눅스 재현(Postgres 55432 + uvicorn golden.api:app + flutter test) 결과 + tests/golden exit 0 + golden/reports_no_students/S8/보고.md(관문 ③ go/no-go)"
+artifacts:
+  - "PR #1903 · 커밋 c9d76ff6 · 런북·LOG_TEMPLATE·CHECKLIST 13항목(세션 AI 웹 빌드 12/12 ✅ · Kiki ⬜) · 캡처 11장 · tests/golden 220 passed · flutter test 586 passed · CI 미러 5잡 exit 0. 남은 것 = Kiki 본인 테스트(golden/reports_no_students/S8/런북.md) 뒤 CHECKLIST Kiki 칸 12/12 → 판정 go → done"
+  - "PR #1903 · 커밋 c9d76ff6·cda59500 + S8 본인 테스트 반영 커밋 · 관문 ③ 판정 go(Kiki 12/12 에뮬레이터 2026-11-09 + 세션 AI 12/12 웹 빌드) · tests/golden 220 passed · flutter test 586 passed · CI 미러 통과 · tutor.py LLM_TIMEOUT_S 20초"
+paths:
+  - "golden/reports_no_students/S8/**"
+  - golden/CHECKLIST.md
+  - golden/LOG_TEMPLATE.md
+  - golden/HARVEST.md
+  - golden/LATER.md
+  - golden/tutor_prompt.md
+  - src/backend/golden/tutor.py
+session: null
+notes: |-
+  GOLD-01(공유 우산 태스크)의 S8 슬라이스. GOLD-01은 in_progress로 start 거부 예상 — GOLD-02~06 선례대로 하위 태스크 분리 등재. 지시서 golden/prompts_no_students/ 단계06 S8(관문 ③). 완료 조건에 Kiki 본인 테스트(문제 3개 끝까지)가 있어 세션 AI 재현만으로는 done 불가.
+
+  [정정 2026-11-09] S8 PR 증적 기록
+
+  [정정 2026-11-09] paths ['golden/reports_no_students/S8/**', 'golden/CHECKLIST.md', 'golden/LOG_TEMPLATE.md', 'golden/HARVEST.md', 'golden/LATER.md', 'golden/tutor_prompt.md'] → ['golden/reports_no_students/S8/**', 'golden/CHECKLIST.md', 'golden/LOG_TEMPLATE.md', 'golden/HARVEST.md', 'golden/LATER.md', 'golden/tutor_prompt.md', 'src/backend/golden/tutor.py']: S8 본인 테스트에서 튜터 LLM 10초 초과 2회 실측 — Kiki 지시로 제한 시간 20초 상향(골든 코드 1줄) · 기존 경로 전부 유지
+updated: 2026-11-09

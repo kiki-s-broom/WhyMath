@@ -25,8 +25,10 @@ TUTOR_PROMPT_PATH = Path(__file__).resolve().parents[3] / "golden" / "tutor_prom
 # 가짜 LLM·장애 대체 문장의 앞부분(공유 계약 — 뒤에 hint1을 붙인다)
 FAKE_PREFIX = "어느 부분이 막히는지 한 가지만 말해 줄래? "
 
-# LLM 호출 제한 시간(초)
-LLM_TIMEOUT_S = 10.0
+# LLM 호출 제한 시간(초). S8 본인 테스트(2026-11-09 · Kiki 머신 · OpenRouter)에서
+# 10초 초과가 2회 나 대체 문장으로 떨어졌다(클라우드 실측은 3.6~4.5초).
+# Kiki 지시로 20초로 올린다. 넘기면 여전히 대체 문장(degraded)이다.
+LLM_TIMEOUT_S = 20.0
 
 
 @dataclass(frozen=True)
