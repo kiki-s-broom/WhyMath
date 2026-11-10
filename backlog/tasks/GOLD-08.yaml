@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,13 +13,14 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "⑬ 계약 변경(Kiki 결정 2026-11-10): 학생 입력에 `=`가 있으면 마지막 `=` 뒤만 채점한다(`-3+4=1`·`-3*5+3=-12`·`x=3` 정답 처리). 구현 = src/backend/golden/grade.py normalize 1줄 + tests/golden/test_grade.py 정답/오답 사례 + 뮤테이션(줄 제거 → 신규 테스트 RED) + tests/golden exit 0 + 정적 검사 4종 exit 0 + golden/CHECKLIST.md ⑬·LATER.md 기록 갱신"
-artifacts: []
+artifacts:
+  - "PR #1904 · 커밋 390e7151 · grade.normalize 마지막 = 뒤만 채점 · tests/golden 230 passed · 뮤테이션 1종 → 신규 테스트 5건 RED · 정적 검사 4종 exit 0 · CI 미러 전 잡 통과(백엔드 샤드 3 포함) · 실서버 HTTP 확인"
 paths:
   - src/backend/golden/grade.py
   - tests/golden/test_grade.py
   - golden/CHECKLIST.md
   - golden/LATER.md
   - "golden/reports_no_students/S8/**"
-session: claude/new-session-bfuiie
+session: null
 notes: "S8(GOLD-07 done · PR #1903) 보고의 계약 변경 제안을 Kiki가 채택. 공유 계약 접두 떼기 목록(y=·f(x)=·답:) 뒤에 '마지막 = 뒤만 채점' 규칙을 더한다. 지시문 원본(golden/prompts*)의 계약 문구는 손대지 않는다."
 updated: 2026-11-10
