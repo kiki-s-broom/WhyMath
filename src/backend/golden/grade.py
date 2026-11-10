@@ -3,6 +3,9 @@
 규칙(공유 계약):
 - 정규화: 공백 제거, `답:`·`y=`·`f(x)=` 접두와 `입니다` 꼬리 제거,
   전각 숫자·기호와 `−`(U+2212)를 반각으로.
+- 그 뒤에도 `=`가 남아 있으면 **마지막 `=` 뒤만** 채점한다(`-3+4=1` → `1`, `x=3` → `3`).
+  학생이 풀이식과 답을 함께 쓰는 것은 자연스러운 쓰기 방식이라 정답으로 본다
+  (S6·S8 실측 — Kiki 결정 2026-11-10 · CHECKLIST ⑬ 계약 변경).
 - `answer_kind == "number"`: SymPy `nsimplify`로 바꾼 두 수의 차이가 1e-9 이하면 정답(1.5 = 3/2).
 - `answer_kind == "expression"`: `simplify(student - answer) == 0`이면 정답. `2x+1`처럼 곱셈 기호를
   생략해도 읽는다(implicit multiplication).
@@ -64,7 +67,16 @@ def normalize(text: str) -> str:
     """
     s = unicodedata.normalize("NFKC", text).translate(_SYMBOL_MAP)
     s = re.sub(r"\s+", "", s)
-    # 접두·꼬리는 여러 겹일 수 있다(`답: y = 2x+1 입니다`) — 더 떼어 낼 것이 없을 때까지 반복
+    s = _strip_affixes(s)
+    # 풀이식=답 꼴(`-3+4=1`)·`x=3`은 마지막 `=` 뒤만 답으로 본다(CHECKLIST ⑬ · Kiki 결정 11-10).
+    # `y=`·`f(x)=` 접두는 위에서 이미 떼었으므로 식 정답(`2x+1`)은 영향이 없다.
+    if "=" in s:
+        s = _strip_affixes(s.rsplit("=", 1)[-1])
+    return s
+
+
+def _strip_affixes(s: str) -> str:
+    """접두·꼬리를 뗀다. 여러 겹일 수 있어(`답: y = 2x+1 입니다`) 더 뗄 것이 없을 때까지 반복."""
     changed = True
     while changed:
         changed = False

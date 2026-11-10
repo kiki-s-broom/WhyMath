@@ -45,6 +45,13 @@ EXPR_2X1 = _problem("2*x + 1", "expression")
         (NUM_NEG12, "-12입니다"),  # 입니다 꼬리
         (EXPR_2X1, "f(x) = 1 + 2x"),  # f(x)= 접두 + 항 순서 바뀜
         (EXPR_2X1, "y = 2*x + 1"),  # 곱셈 기호를 쓴 경우
+        # ── 풀이식=답 꼴(CHECKLIST ⑬ · Kiki 결정 2026-11-10): 마지막 `=` 뒤만 채점 ──
+        (NUM_NEG12, "-3*5+3=-12"),  # S6 실측 입력(LF-01)
+        (NUM_NEG12, "답: -3*5+3 = -12 입니다"),  # 접두·공백·꼬리와 함께
+        (NUM_NEG12, "-3*5=-15, -15+3=-12".split(",")[1]),  # 두 번째 등식만 떼어 보낸 꼴
+        (_problem("1", "number"), "-3+4=1"),  # S8 Kiki 실측 입력(LF-02)
+        (_problem("3", "number"), "x=3"),  # LATER(S5) — `x=` 접두도 자연히 처리된다
+        (EXPR_2X1, "y=2x+1"),  # 기존 접두 떼기와 충돌 없음(`=` 뒤는 그대로 2x+1)
     ],
 )
 def test_correct_inputs_are_graded_correct(problem: Problem, text: str) -> None:
@@ -61,6 +68,9 @@ def test_correct_inputs_are_graded_correct(problem: Problem, text: str) -> None:
         (NUM_NEG12, "모르겠어요"),  # 글로 쓴 답
         (NUM_3_2, "1.4999"),  # 허용 오차(1e-9)보다 큰 차이
         (NUM_NEG12, "x"),  # number 문항에 식 — 수가 아니면 오답
+        (NUM_NEG12, "-3*5+3=-15"),  # 풀이식=답 꼴이지만 마지막 답이 틀림 — 앞의 식은 보지 않는다
+        (NUM_NEG12, "-12=-3*5"),  # 순서가 반대면 마지막 `=` 뒤(-15)를 채점 → 오답
+        (EXPR_2X1, "3=5"),  # 식 문항에 수 — 마지막 `=` 뒤 5는 2x+1이 아니다
     ],
 )
 def test_wrong_inputs_are_graded_wrong(problem: Problem, text: str) -> None:
@@ -70,7 +80,7 @@ def test_wrong_inputs_are_graded_wrong(problem: Problem, text: str) -> None:
 # ── 파싱 불가 입력: 예외 없이 오답 + 예외 타입명이 로그에 남는다 ─────────────────
 @pytest.mark.parametrize(
     "text",
-    ["2x +* 1", "((3", "__import__('os')", "3=5", "9" * 200, "9^9^9"],
+    ["2x +* 1", "((3", "__import__('os')", "=", "2x+1=", "9" * 200, "9^9^9"],
 )
 def test_unparseable_input_is_wrong_without_exception(
     text: str, caplog: pytest.LogCaptureFixture
