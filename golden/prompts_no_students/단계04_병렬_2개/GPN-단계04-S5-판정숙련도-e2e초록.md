@@ -135,7 +135,7 @@ tests/golden/                   ← test_golden_path.py (e2e) · test_problems_s
 
 *채점·숙련도 규칙(`grade.py`·`store.py`)*
 
-- 채점: 학생 텍스트에서 공백·`y=`·`f(x)=`·`답:` 같은 접두를 떼고, `answer_kind=number`면 SymPy `nsimplify`로 수치 비교(허용 오차 1e-9), `expression`이면 SymPy `simplify(student - answer) == 0`. 파싱 실패는 오답(예외를 삼키지 않고 로그에 예외 타입명을 남긴다). 분수·소수 동치(`1.5`와 `3/2`) 허용.
+- 채점: 학생 텍스트에서 공백·`y=`·`f(x)=`·`답:` 같은 접두를 떼고(접두를 뗀 뒤에도 `=`가 남으면 **마지막 `=` 뒤만** 채점한다 — 풀이식=답 꼴 `-3+4=1` → `1`, `x=3` → `3`. Kiki 결정 2026-11-10 · CHECKLIST ⑬ · GOLD-08 구현), `answer_kind=number`면 SymPy `nsimplify`로 수치 비교(허용 오차 1e-9), `expression`이면 SymPy `simplify(student - answer) == 0`. 파싱 실패는 오답(예외를 삼키지 않고 로그에 예외 타입명을 남긴다). 분수·소수 동치(`1.5`와 `3/2`) 허용.
 - 숙련도: 학생(닉네임)당 1행. 맞으면 +0.10, 틀리면 −0.05, `0.0 ≤ m ≤ 1.0`으로 잘라낸다. 소수 둘째 자리 반올림.
 - DB: PostgreSQL 스키마 `golden`에 표 3개 — `golden.students(nickname text PK, mastery numeric(3,2), attempts int, updated_at)`, `golden.sessions(session_id uuid PK, nickname text, cursor int, created_at)`, `golden.turns(id bigserial, session_id, problem_id text, turn_no int, student_text text, tutor_text text, kind text, correct bool null, created_at)`. 앱 시작 시 `CREATE SCHEMA IF NOT EXISTS golden` + `metadata.create_all`로 만든다(Alembic 리비전은 추가하지 않는다 — 리비전은 `golden/` 밖이고 infra-contracts 잡이 등재를 요구한다. 제안값·S2에서 Kiki 확인).
 
