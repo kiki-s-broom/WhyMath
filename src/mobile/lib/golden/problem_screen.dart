@@ -123,28 +123,34 @@ class _ProblemScreenState extends ConsumerState<ProblemScreen> {
   }
 }
 
-/// 문제 본문 — `$...$` 구간은 수식(Math.tex), 나머지는 일반 텍스트로 한 문단에 섞어 그린다.
+/// 문제 본문 — `$...$`·`\(...\)` 구간은 수식(Math.tex), 나머지는 일반 텍스트로 한 문단에 섞어 그린다.
 ///
 /// 수식이 파싱되지 않으면 그 구간은 원문 텍스트로 대신 보여준다(앱이 깨지지 않게).
+/// S10: 튜터 말풍선도 이 위젯으로 그린다(`style`로 글자 크기를 바꾼다). 튜터 문장에 `$f(x)=-3x+3$`·
+/// `\(x\)`가 원문 그대로 보이던 문제(S9 3행 · S11 sim_no-setup 2·39행 등)를 고친다.
 class StemText extends StatelessWidget {
-  const StemText(this.stem, {super.key});
+  const StemText(this.stem, {super.key, this.style});
 
   final String stem;
 
-  /// `$`로 감싼 구간. `$` 짝이 안 맞으면 남은 부분은 그냥 텍스트가 된다.
-  static final RegExp _inlineMath = RegExp(r'\$([^$]+)\$');
+  /// 글자 모양. 없으면 문제 본문 크기(titleMedium)를 쓴다.
+  final TextStyle? style;
+
+  /// `$`로 감싼 구간 또는 `\(`·`\)`로 감싼 구간. 짝이 안 맞으면 남은 부분은 그냥 텍스트가 된다.
+  static final RegExp _inlineMath = RegExp(r'\$([^$]+)\$|\\\((.+?)\\\)');
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle style =
-        Theme.of(context).textTheme.titleMedium ?? const TextStyle(fontSize: 16);
+    final TextStyle style = this.style ??
+        Theme.of(context).textTheme.titleMedium ??
+        const TextStyle(fontSize: 16);
     final List<InlineSpan> spans = <InlineSpan>[];
     int last = 0;
     for (final RegExpMatch m in _inlineMath.allMatches(stem)) {
       if (m.start > last) {
         spans.add(TextSpan(text: stem.substring(last, m.start)));
       }
-      final String tex = m.group(1)!;
+      final String tex = m.group(1) ?? m.group(2)!;
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
@@ -204,7 +210,14 @@ class ChatBubble extends StatelessWidget {
           children: <Widget>[
             Text(who, style: Theme.of(context).textTheme.labelSmall),
             const SizedBox(height: 2),
-            Text(text),
+            // 튜터 문장의 수식 구간은 수식으로 그린다. 학생이 친 글자는 고치지 않고 그대로 보여 준다.
+            if (isStudent)
+              Text(text)
+            else
+              StemText(
+                text,
+                style: Theme.of(context).textTheme.bodyMedium ?? const TextStyle(fontSize: 14),
+              ),
           ],
         ),
       ),
