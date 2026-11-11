@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-12
+title: "GOLD-12 골든 패스 S10 — S9·S11 로그 수정(로그에 나온 것만)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S10 산출물: S9(self-*)·S11(sim-*) 로그가 가리킨 항목만 golden/ 안에서 수정 · 항목별 커밋(메시지에 S9/S11 로그 줄 번호) · 항목마다 재현 테스트 수정 전 RED·수정 후 GREEN 기록 · tests/golden 초록 · 정적 검사 4종 exit 0 · flutter analyze/test(건드린 경우) · golden/reports_no_students/S10/보고.md(재현→원인 파일→범위→출처 표 · git diff --stat)"
+artifacts: []
+paths:
+  - "src/backend/golden/**"
+  - "golden/**"
+  - "tests/golden/**"
+  - "src/mobile/lib/golden/**"
+session: claude/new-session-ratuoe
+notes: "GOLD-01 우산의 S10 슬라이스(지시서 golden/prompts_no_students 단계08 S10). 선행 S9 완료(main 2fa323f8 PR #1906) · S11 완료(main 8d0c9772 PR #1908)."
+updated: 2026-11-11
