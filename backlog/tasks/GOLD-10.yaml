@@ -16,11 +16,15 @@ acceptance:
   - "지시문 원본(golden/prompts_src/spec.md·spec_no_students.md)과 생성된 지시문 묶음(golden/prompts/**·golden/prompts_no_students/**) 전 파일의 공유 계약 \"채점·숙련도 규칙\" 문장에 ⑬ 규칙(접두를 뗀 뒤 `=`가 남으면 마지막 `=` 뒤만 채점 · Kiki 결정 2026-11-10 · GOLD-08)을 같은 문구로 병기 + 옛 문장 잔존 0건(grep) + LATER.md의 \"지시문 원본은 옛 목록\" 메모 해소"
 artifacts:
   - "PR #1904(GOLD-08과 같은 PR에 커밋 추가) · 지시문 원본 2 + 묶음 31 = 33파일 공유 계약 문장에 ⑬ 규칙 병기 · 옛 문장 잔존 0건(grep) · LATER 메모 해소 · 코드 변경 0건"
+  - "정정: 실제 PR은 #1907(PR #1904가 먼저 머지돼 별도 PR로 분리 · 병합 커밋 c4242347) · 33파일 병기 · 미러 전 잡 통과"
 paths:
   - "golden/prompts_src/*.md"
   - "golden/prompts/**"
   - "golden/prompts_no_students/**"
   - golden/LATER.md
 session: null
-notes: "Kiki 지시(2026-11-11): GOLD-08(PR #1904)이 손대지 않은 지시문 원본의 계약 문구를 함께 고친다. 문서만 바꾼다(코드 변경 0건)."
+notes: |-
+  Kiki 지시(2026-11-11): GOLD-08(PR #1904)이 손대지 않은 지시문 원본의 계약 문구를 함께 고친다. 문서만 바꾼다(코드 변경 0건).
+
+  [정정 2026-11-11] PR 번호 정정 — #1904 머지 후 분리
 updated: 2026-11-11
