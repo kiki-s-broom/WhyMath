@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-11
+title: "GOLD-11 골든 패스 S11 — AI 시뮬레이션 학생 페르소나 3종 × 10문제 (sim-*)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S11 산출물: src/backend/golden/sim_student.py(httpx ASGITransport로 golden.api:app 직접 호출 · 학생 LLM은 build_cloud_provider 경유 · GOLDEN_FAKE_LLM=1이면 페르소나별 고정 대본) + golden/sim_personas.md(3종 slope-blind·sign-slip·no-setup) + tests/golden/test_sim_student.py + golden/logs/sim_<페르소나>_turns.csv 3건(3×10 = 30건) + golden/reports_no_students/S11/보고.md(페르소나별 표·시뮬레이션 한계 절) · tests/golden 초록 · 학생 LLM 프롬프트 개인정보 0건"
+artifacts: []
+paths:
+  - src/backend/golden/sim_student.py
+  - golden/sim_personas.md
+  - tests/golden/test_sim_student.py
+  - "golden/reports_no_students/S11/**"
+session: claude/new-session-y90wre
+notes: "GOLD-01 우산의 S11 슬라이스(지시서 golden/prompts_no_students 단계07 S11). 선행 S8 go(main 9a06dbe6 PR #1903). S9와 병렬 가능."
+updated: 2026-11-11
