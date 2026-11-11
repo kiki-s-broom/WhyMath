@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-09
+title: "GOLD-09 골든 패스 S9 — 본인 학생 역할(self-1) 5문제 런북·관찰 기록·turns CSV·분석 보고"
+track: math-completion
+stage: S1
+subject: math
+layer: mobile
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S9 산출물: golden/reports_no_students/S9/런북.md(PowerShell·자리표시자 0·서버/앱 창 분리·자가검증·역할 규칙 4개·점수표·turns CSV 추출) + Kiki 학생 세션 뒤 관찰 기록 golden/logs/<날짜>_self1.md·self1_turns.csv(닉네임·session_id 열 제거) + golden/reports_no_students/S9/보고.md(문제별 표·끊긴 지점 후보 3개·본인 피험자 한계 절)"
+artifacts: []
+paths:
+  - "golden/reports_no_students/S9/**"
+  - golden/LATER.md
+  - golden/HARVEST.md
+session: claude/new-session-jaabpf
+notes: "GOLD-01 우산의 S9 슬라이스(지시서 golden/prompts_no_students 단계07 S9). 선행 S8 go(main 9a06dbe6 PR #1903). 1단계는 런북 준비, Kiki 학생 세션은 Kiki 머신에서만 가능. 풀이식=답 정답 처리는 Kiki 결정(2026-11-10)으로 S8 세션(GOLD-08)이 진행 중 — 런북이 실행 전 그 반영 여부를 자가검증한다."
+updated: 2026-11-10
