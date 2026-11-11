@@ -1,0 +1,168 @@
+{
+  "persona": "sign-slip",
+  "nickname": "sim-sign-slip",
+  "mode": "live",
+  "retry_rule": false,
+  "problems": [
+    {
+      "problem_id": "LF-01",
+      "student_lines": [
+        "f(5)=18 같아요",
+        "-3×5+3이 돼요.",
+        "15요",
+        "부호는 그냥 없어지는 거 같아요"
+      ],
+      "tutor_lines": [
+        "f(5)=18이라고 생각했구나. 그럼 f(x) = -3x + 3에서 x 자리에 5를 넣으면 식이 어떻게 되는지 말해 볼래?",
+        "x 자리에 5를 넣어 -3×5+3이라고 썼구나. 그럼 이 식에서 -3×5를 먼저 계산하면 얼마가 되는지 말해 볼래?",
+        "-3×5를 15라고 생각했구나. 그럼 -3×5에서 앞에 있는 음수 부호는 계산 결과에 어떻게 반영된다고 생각하니?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-02",
+      "student_lines": [
+        "f(-3)은 7 같아요.",
+        "x에 -3 넣으면 -3+4요.",
+        "오른쪽 3칸, 오른쪽 4칸요.",
+        "오른쪽으로 3칸이요."
+      ],
+      "tutor_lines": [
+        "f(-3)을 7이라고 생각했구나. 그렇다면 f(x)=x+4에서 x 자리에 -3을 넣었을 때 식이 어떻게 되는지 말해 줄래?",
+        "x에 -3을 넣으면 -3+4가 된다고 표현했구나. 그렇다면 -3+4를 수직선에서 어떻게 움직여 나타낼 수 있을지 말해 줄래?",
+        "수직선에서 오른쪽으로 3칸, 다시 오른쪽으로 4칸 움직인다고 생각했구나. 그럼 -3은 0을 기준으로 어느 방향으로 몇 칸 떨어진 수인지 말해 줄래?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-03",
+      "student_lines": [
+        "6×2−8=4예요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-04",
+      "student_lines": [
+        "f(3)은 -3-5라서 -2예요?",
+        "왼쪽으로 5칸이면 -8 같아요.",
+        "3 넣으면 -3-5라서 -8이에요.",
+        "빼기 5는 -5를 더하는 거예요."
+      ],
+      "tutor_lines": [
+        "학생은 f(3)을 -3-5로 쓴 뒤 그 값을 -2라고 말했구나. 그럼 -3에서 5를 더 빼는 것을 수직선에서 왼쪽으로 5칸 이동하는 것으로 생각하면, -3보다 더 왼쪽에 있는 어떤 수가 되는지 말해 볼래?",
+        "학생은 -3에서 왼쪽으로 5칸 이동하면 -8이라고 했구나. 그럼 f(3)을 구할 때 x 자리에 3을 넣은 뒤 -x와 -5를 어떻게 계산했는지 그 과정을 다시 말해 볼래?",
+        "학생은 x 자리에 3을 넣으면 -3-5가 된다고 말하고, 이를 수직선에서 왼쪽으로 5칸 이동하는 것과 연결했구나. 그럼 -3-5를 -3+(-5)로 바꾸어 생각할 수 있는 까닭을 말해 볼래?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-05",
+      "student_lines": [
+        "f(0)=8이에요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-06",
+      "student_lines": [
+        "−6×(−1)은 −6이라 −12?",
+        "둘 다 음수라고 봐요.",
+        "두 음수를 곱하면 음수요.",
+        "6, 4, 2, 0이고 다음은 −2라 음수요."
+      ],
+      "tutor_lines": [
+        "−6×(−1)이 −6이라고 보아 −12가 나왔다고 생각했구나.\n그럼 −6과 −1을 곱할 때 두 수의 부호를 각각 어떻게 보고 있는지 말해 볼래?",
+        "−6과 −1을 둘 다 음수로 보고 있다고 말했구나. 그럼 두 음수를 곱하면 결과의 부호가 어떻게 되는지 말해 볼래?",
+        "두 음수를 곱하면 음수가 된다고 보고 있구나. 그럼 (-2)×3, (-2)×2, (-2)×1, (-2)×0의 값이 어떻게 변하는지 살펴보고, 같은 규칙으로 (-2)×(-1)의 부호는 어떻게 될지 말해 볼래?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-07",
+      "student_lines": [
+        "2×2+7=11이에요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-08",
+      "student_lines": [
+        "f(5)=3×5+1=16이에요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-09",
+      "student_lines": [
+        "0 빼기 4니까 4 같아요.",
+        "오른쪽으로 가는 것 같아요.",
+        "커지는 것 같아요.",
+        "작아져요."
+      ],
+      "tutor_lines": [
+        "0 빼기 4니까 4라고 생각한 거구나. 그럼 0에서 4를 빼는 계산을 수직선에서 해 보면 0의 어느 쪽으로 움직이게 될까?",
+        "0에서 4를 빼면 수직선에서 오른쪽으로 간다고 본 거구나. 그럼 0에서 4를 빼는 것은 0보다 4만큼 작아지는 것과 같을까, 커지는 것과 같을까?",
+        "0에서 4를 빼는 것이 커지는 것과 같다고 본 거구나. 그럼 10에서 3을 빼면 10보다 작아지는지 커지는지 말해 볼래?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-10",
+      "student_lines": [
+        "5×(-2)는 10이라서 9 같아요.",
+        "5×(-2)도 양수 같은데요.",
+        "음수끼리 더하면 양수 아닌가요?",
+        "오른쪽 같아요."
+      ],
+      "tutor_lines": [
+        "5×(-2)를 10으로 계산해서 9가 될 것 같다고 본 거구나.  \n그럼 -2를 x 자리에 넣은 식 5×(-2)-1에서, 5×(-2)의 부호는 어떻게 생각해 볼 수 있을까?",
+        "5×(-2)도 양수처럼 느껴진다고 본 거구나.  \n그렇다면 -2를 5번 더했을 때, 그 결과의 부호는 어떻게 될지 생각해 볼래?",
+        "음수끼리 더하면 양수가 된다고 생각한 거구나.  \n그럼 -2를 두 번 더한 값을 수직선에서 0을 기준으로 왼쪽과 오른쪽 중 어느 쪽에 놓게 될지 말해 볼래?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    }
+  ],
+  "student_llm_calls": 29,
+  "student_llm_failures": 1,
+  "final_mastery": 0.2,
+  "elapsed_s": 273.3,
+  "error": null,
+  "prompts_checked": 28,
+  "privacy_violations": 0,
+  "turn_rows": 28
+}
