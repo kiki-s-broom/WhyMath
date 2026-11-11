@@ -13,11 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "S9 산출물: golden/reports_no_students/S9/런북.md(PowerShell·자리표시자 0·서버/앱 창 분리·자가검증·역할 규칙 4개·점수표·turns CSV 추출) + Kiki 학생 세션 뒤 관찰 기록 golden/logs/<날짜>_self1.md·self1_turns.csv(닉네임·session_id 열 제거) + golden/reports_no_students/S9/보고.md(문제별 표·끊긴 지점 후보 3개·본인 피험자 한계 절)"
-artifacts: []
+artifacts:
+  - "PR #1905 머지(c8513ebe) · S9 1차: 런북·기록 양식·turns CSV 추출 SQL·풀이식=답 HTTP 검사 · tests/golden 220 passed · CI 미러 전 잡 통과. 진행 중(2026-11-11): 기기 포코 X3 NFC로 변경, Kiki 첫 실행에서 작업 폴더 잠금(Permission denied → RUN_REFUSED, 피해 없음) → 창 A를 폴더 재사용 + rev-parse 되읽기 가드로 개정, 잠금 풀기 블록 추가(후속 PR). 남은 것 = GOLD-08(풀이식=답 수정) 머지 → Kiki 학생 세션 5문제 → 관찰 기록·CSV 수신 → 보고 2차(문제별 표·후보 3개·한계 절) → done"
 paths:
   - "golden/reports_no_students/S9/**"
   - golden/LATER.md
   - golden/HARVEST.md
 session: claude/new-session-jaabpf
-notes: "GOLD-01 우산의 S9 슬라이스(지시서 golden/prompts_no_students 단계07 S9). 선행 S8 go(main 9a06dbe6 PR #1903). 1단계는 런북 준비, Kiki 학생 세션은 Kiki 머신에서만 가능. 풀이식=답 정답 처리는 Kiki 결정(2026-11-10)으로 S8 세션(GOLD-08)이 진행 중 — 런북이 실행 전 그 반영 여부를 자가검증한다."
-updated: 2026-11-10
+notes: |-
+  GOLD-01 우산의 S9 슬라이스(지시서 golden/prompts_no_students 단계07 S9). 선행 S8 go(main 9a06dbe6 PR #1903). 1단계는 런북 준비, Kiki 학생 세션은 Kiki 머신에서만 가능. 풀이식=답 정답 처리는 Kiki 결정(2026-11-10)으로 S8 세션(GOLD-08)이 진행 중 — 런북이 실행 전 그 반영 여부를 자가검증한다.
+
+  [정정 2026-11-11] S9 진행 상황 기록 — PR #1905 머지와 2026-11-11 Kiki 첫 실행 결과, 남은 단계
+updated: 2026-11-11
