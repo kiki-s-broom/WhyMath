@@ -12,8 +12,10 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from golden.api import app
+from golden.problems import Problem, load_problems
+from golden.store import TurnRow
 
-from golden import api
+from golden import api, tutor
 
 client = TestClient(app)
 
@@ -78,3 +80,56 @@ def test_s9_line17_lf05_wrong_feedback_says_8_ieosseoyo() -> None:
     assert body["kind"] == "graded"
     assert body["correct"] is False
     assert body["feedback"] == "이번 문제의 답은 8이었어요. 다음 문제에서 다시 해 봐요."
+
+
+# ── 항목 2: 튜터 후반 턴 — 학생 몫을 대신 계산 · 마지막 되묻기가 하위 단계 · 말투 혼용 ─────────
+# - S9 14행: 튜터가 학생이 할 0 대입을 대신 써 줬다("x 대신 0을 넣으면 식이 4×0+8이 되는데").
+# - S9 16행: 남은 계산을 "0+8은 얼마" 한 칸으로 줄였다.
+# - S11 sim_no-setup 20·32행: 같은 형태("남은 0+8을 계산하면" · "3×5+1이 15+1이 된 것이니").
+# - S11 3-6 발견 ②: 3번째(마지막) 되묻기가 하위 단계 질문이라 학생의 다음 입력이 그 답인데
+#   최종 답으로 채점됐다(sim_no-setup 4·24·28행 → 5·25·29행 등 1차 10건 · 재실행 7건).
+#   튜터는 지금 몇 번째 되묻기인지 모른다(사용자 프롬프트에 턴 정보가 없다).
+# - 말투: S9 보고 후보 3(튜터 반말 · 판정·앱 문구 존댓말) · S11 sim_sign-slip 11~13행("학생은 …"
+#   3인칭) · sim_slope-blind_r2 2~4행(혼자 존댓말). Kiki 결정(2026-11-11): 튜터를 해요체로 맞춘다.
+def _turn(n: int, student: str, tutor_text: str) -> TurnRow:
+    return TurnRow(turn_no=n, student_text=student, tutor_text=tutor_text, kind="tutor_turn")
+
+
+def _lf05() -> Problem:
+    problem = next(p for p in load_problems() if p["id"] == "LF-05")
+    return problem
+
+
+def test_user_prompt_marks_last_tutor_turn() -> None:
+    """S9 16행 재생 — 학생의 3번째 입력(`0이요?`)에 답하는 되묻기는 마지막 차례임을 튜터가 알아야 한다."""
+    history = [_turn(1, "12", "…"), _turn(2, "4요?", "…")]
+    prompt = tutor.build_user_prompt(_lf05(), history, "0이요?")
+    assert "3번 중 3번째" in prompt
+    assert "마지막 되묻기" in prompt
+
+
+def test_user_prompt_first_turn_is_not_marked_last() -> None:
+    """S9 14행 재생 — 첫 되묻기에는 '마지막' 표시가 없어야 한다(변별력 대조군)."""
+    prompt = tutor.build_user_prompt(_lf05(), [], "12")
+    assert "3번 중 1번째" in prompt
+    assert "마지막" not in prompt
+
+
+def test_tutor_max_turns_matches_api_contract() -> None:
+    """턴 표시의 분모(3)는 api의 튜터 턴 상한과 같은 값이어야 한다."""
+    assert tutor.MAX_TUTOR_TURNS == api.MAX_TUTOR_TURNS == 3
+
+
+@pytest.mark.parametrize(
+    ("rule_text", "log_lines"),
+    [
+        ("대신", "S9 14·16행 · S11 no-setup 20·32행 — 학생이 할 대입·계산을 튜터가 대신함"),
+        ("마지막 되묻기", "S11 발견 ② — 마지막 되묻기가 하위 단계 질문"),
+        ("해요체", "S9 후보 3 · S11 r2 2~4행 — 반말·존댓말 혼용(Kiki 결정: 해요체)"),
+        ("3인칭", "S11 sign-slip 11~13행 — '학생은 …'"),
+    ],
+)
+def test_tutor_prompt_has_rule_from_logs(rule_text: str, log_lines: str) -> None:
+    """튜터 시스템 프롬프트(golden/tutor_prompt.md)에 로그가 가리킨 규칙이 있어야 한다."""
+    prompt = tutor.TUTOR_PROMPT_PATH.read_text(encoding="utf-8")
+    assert rule_text in prompt, log_lines

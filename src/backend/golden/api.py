@@ -15,8 +15,9 @@ from pydantic import BaseModel, Field
 
 from golden import grade, problems, store, tutor
 
-# 한 문제에서 쓸 수 있는 튜터 되묻기 최대 횟수(공유 계약)
-MAX_TUTOR_TURNS = 3
+# 한 문제에서 쓸 수 있는 튜터 되묻기 최대 횟수(공유 계약). 튜터도 "몇 번째 되묻기인지"를
+# 알아야 해서(S10) 값은 tutor 모듈 한 곳에 두고 여기서 가져다 쓴다.
+MAX_TUTOR_TURNS = tutor.MAX_TUTOR_TURNS
 
 # 숙련도 갱신 폭(공유 계약 — 맞으면 +0.10, 틀리면 −0.05. 잘라내기·반올림은 store.set_mastery가 한다)
 MASTERY_GAIN = 0.10
