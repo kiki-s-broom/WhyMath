@@ -1,0 +1,29 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-12
+title: "GOLD-12 골든 패스 S10 — S9·S11 로그 수정(로그에 나온 것만)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S10 산출물: S9(self-*)·S11(sim-*) 로그가 가리킨 항목만 golden/ 안에서 수정 · 항목별 커밋(메시지에 S9/S11 로그 줄 번호) · 항목마다 재현 테스트 수정 전 RED·수정 후 GREEN 기록 · tests/golden 초록 · 정적 검사 4종 exit 0 · flutter analyze/test(건드린 경우) · golden/reports_no_students/S10/보고.md(재현→원인 파일→범위→출처 표 · git diff --stat)"
+artifacts:
+  - "PR #1909 · 커밋 cf27871c·b80ffa0c·d88970bb·e525f5ad(항목별) · S9·S11 로그 수정 4건(판정 조사 · 튜터 후반 턴·해요체 · 말풍선 수식 · 채점 말꼬리) · 재현 테스트 47건(수정 전 빨강→후 초록) · tests/golden 276 passed exit 0 · 정적 4종 exit 0 · flutter test 589 passed · CI 미러 11잡 exit 0(HEAD dec41e38) · 보고 golden/reports_no_students/S10/보고.md"
+paths:
+  - "src/backend/golden/**"
+  - "golden/**"
+  - "tests/golden/**"
+  - "src/mobile/lib/golden/**"
+  - "src/mobile/test/golden/**"
+session: null
+notes: |-
+  GOLD-01 우산의 S10 슬라이스(지시서 golden/prompts_no_students 단계08 S10). 선행 S9 완료(main 2fa323f8 PR #1906) · S11 완료(main 8d0c9772 PR #1908).
+
+  [정정 2026-11-11] paths ['src/backend/golden/**', 'golden/**', 'tests/golden/**', 'src/mobile/lib/golden/**'] → ['src/backend/golden/**', 'golden/**', 'tests/golden/**', 'src/mobile/lib/golden/**', 'src/mobile/test/golden/**']: S10 항목 3(튜터 말풍선 수식) 재현 테스트를 S6·S7 선례 위치인 src/mobile/test/golden/에 둠
+updated: 2026-11-11

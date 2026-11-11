@@ -30,6 +30,9 @@ FAKE_PREFIX = "어느 부분이 막히는지 한 가지만 말해 줄래? "
 # Kiki 지시로 20초로 올린다. 넘기면 여전히 대체 문장(degraded)이다.
 LLM_TIMEOUT_S = 20.0
 
+# 한 문제에서 쓸 수 있는 튜터 되묻기 최대 횟수(공유 계약 — api.MAX_TUTOR_TURNS가 이 값을 쓴다)
+MAX_TUTOR_TURNS = 3
+
 
 @dataclass(frozen=True)
 class TutorReply:
@@ -49,7 +52,11 @@ def build_user_prompt(problem: Problem, history: list[TurnRow], student_text: st
 
     닉네임·세션 ID는 넣지 않는다(미성년자 데이터 규칙). 정답도 넣지 않는다 — 모델이 모르면
     누설할 수도 없다.
+
+    S10: 몇 번째 되묻기인지도 넣는다. 3번째(마지막) 되묻기 뒤 학생의 다음 입력은 바로 채점되는데,
+    튜터가 그것을 몰라 마지막에도 하위 단계를 물었다(S11 발견 ② · sim_no-setup 4·24·28행 등).
     """
+    turn_no = len(history) + 1
     lines = [
         f"문제: {problem['stem']}",
         f"참고 힌트(정답 아님, 그대로 읽지 말 것): {problem['hint1']}",
@@ -58,6 +65,10 @@ def build_user_prompt(problem: Problem, history: list[TurnRow], student_text: st
         lines.append(f"학생: {turn.student_text}")
         lines.append(f"튜터: {turn.tutor_text}")
     lines.append(f"학생: {student_text}")
+    turn_line = f"되묻기 차례: {MAX_TUTOR_TURNS}번 중 {turn_no}번째"
+    if turn_no >= MAX_TUTOR_TURNS:
+        turn_line += " — 마지막 되묻기다. 학생의 다음 입력이 바로 채점된다."
+    lines.append(turn_line)
     lines.append("위 학생 말에 대한 튜터의 다음 한 마디를 써라.")
     return "\n".join(lines)
 
