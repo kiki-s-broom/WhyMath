@@ -19,6 +19,10 @@ paths:
   - "golden/**"
   - "tests/golden/**"
   - "src/mobile/lib/golden/**"
+  - "src/mobile/test/golden/**"
 session: claude/new-session-ratuoe
-notes: "GOLD-01 우산의 S10 슬라이스(지시서 golden/prompts_no_students 단계08 S10). 선행 S9 완료(main 2fa323f8 PR #1906) · S11 완료(main 8d0c9772 PR #1908)."
+notes: |-
+  GOLD-01 우산의 S10 슬라이스(지시서 golden/prompts_no_students 단계08 S10). 선행 S9 완료(main 2fa323f8 PR #1906) · S11 완료(main 8d0c9772 PR #1908).
+
+  [정정 2026-11-11] paths ['src/backend/golden/**', 'golden/**', 'tests/golden/**', 'src/mobile/lib/golden/**'] → ['src/backend/golden/**', 'golden/**', 'tests/golden/**', 'src/mobile/lib/golden/**', 'src/mobile/test/golden/**']: S10 항목 3(튜터 말풍선 수식) 재현 테스트를 S6·S7 선례 위치인 src/mobile/test/golden/에 둠
 updated: 2026-11-11

@@ -133,3 +133,55 @@ def test_tutor_prompt_has_rule_from_logs(rule_text: str, log_lines: str) -> None
     """튜터 시스템 프롬프트(golden/tutor_prompt.md)에 로그가 가리킨 규칙이 있어야 한다."""
     prompt = tutor.TUTOR_PROMPT_PATH.read_text(encoding="utf-8")
     assert rule_text in prompt, log_lines
+
+
+# ── 항목 4: 채점기가 중2 말투 꼬리를 붙인 정답을 오답 처리 ─────────────────────────────
+# Kiki 결정(2026-11-11): 떼는 꼬리에 `요·이요·?·같아요·같은데요·인가요·맞나요`를 더한다(공유 계약 변경).
+# - S11 3-6 발견 ①: 정답 값을 말했는데 거부된 문제 1차 13/30 · 재실행 4/10.
+# - S9 8·9·15·16행: 본인 학생도 `12요?`·`-4?`·`4요?`·`0이요?`처럼 꼬리를 붙여 쳤다 — 학생 LLM만의
+#   비현실적 입력이 아니다(이 4줄은 값이 틀려 원래도 오답이었고, 고친 뒤에도 오답이어야 한다).
+# 앞에 말이 붙은 문장(`음... -3+4요?`·`15+1은 16이요.`)은 그대로 오답이다(보수적 — S11 제안 A).
+def _p(pid: str) -> Problem:
+    return next(p for p in load_problems() if p["id"] == pid)
+
+
+@pytest.mark.parametrize(
+    ("pid", "text", "log_line"),
+    [
+        ("LF-05", "8이요", "S11 sim_no-setup 21행"),
+        ("LF-02", "1이요?", "S11 sim_slope-blind_r2 8행"),
+        ("LF-03", "4요?", "S11 sim_slope-blind_r2 13행"),
+        ("LF-08", "16 맞나요?", "S11 sim_slope-blind 24행"),
+        ("LF-02", "1 같은데요?", "S11 sim_slope-blind 6행"),
+        ("LF-03", "6×2-8이요?", "S11 sim_no-setup 13행(값이 같은 식 — 기존 규칙대로 정답)"),
+        ("LF-04", "-3 - 5요?", "S11 sim_no-setup 17행"),
+        ("LF-07", "2×2+7이요?", "S11 sim_no-setup 29행"),
+        ("LF-01", "-15+3이요?", "S11 sim_slope-blind_r2 5행"),
+        ("LF-10", "-10-1이요?", "S11 sim_slope-blind_r2 41행"),
+        ("LF-01", "f(5)=-12 같아요", "S11 sim_sign-slip 2행 꼴(= 뒤 + 같아요)"),
+        ("LF-04", "-8인가요?", "S11 sim_slope-blind_r2 17행 꼬리"),
+    ],
+)
+def test_answer_with_spoken_tail_is_correct(pid: str, text: str, log_line: str) -> None:
+    from golden import grade
+
+    assert grade.is_correct(_p(pid), text), log_line
+
+
+@pytest.mark.parametrize(
+    ("pid", "text", "log_line"),
+    [
+        ("LF-03", "12요?", "S9 8행(값이 틀림)"),
+        ("LF-03", "-4?", "S9 9행(부호가 틀림 — 4와 -4)"),
+        ("LF-05", "4요?", "S9 15행(값이 틀림)"),
+        ("LF-05", "0이요?", "S9 16행(값이 틀림)"),
+        ("LF-02", "음... -3+4요?", "S11 sim_no-setup 9행(앞말이 붙음 — 계속 오답)"),
+        ("LF-08", "15+1은 16이요.", "S11 sim_no-setup 33행(문장 속 수 — 계속 오답)"),
+        ("LF-01", "더하기요?", "S11 sim_no-setup 4행(수가 아님)"),
+        ("LF-05", "요", "꼬리만 있는 입력(빈 답)"),
+    ],
+)
+def test_wrong_or_sentence_answers_stay_wrong(pid: str, text: str, log_line: str) -> None:
+    from golden import grade
+
+    assert not grade.is_correct(_p(pid), text), log_line
