@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -23,7 +24,32 @@ MASTERY_LOSS = 0.05
 
 # graded 응답의 한 줄 피드백(지시서 S5 — 비난 표현 금지)
 FEEDBACK_CORRECT = "맞았어요. 다음 문제로 가 볼까요?"
-FEEDBACK_WRONG = "이번 문제의 답은 {answer}였어요. 다음 문제에서 다시 해 봐요."
+FEEDBACK_WRONG = "이번 문제의 답은 {answer}{copula}. 다음 문제에서 다시 해 봐요."
+
+# 소리 내어 읽을 때 끝소리에 받침이 있는 숫자: 영·일·삼·육·칠·팔
+# (끝자리 0은 10·20·100도 십·백으로 끝나 받침이 있다). 2·4·5·9(이·사·오·구)는 받침이 없다.
+_BATCHIM_DIGITS = frozenset("013678")
+
+# 분수 `a/b`는 "b분의 a"로 읽어 분자로 끝난다(`-3/2` → "이분의 삼")
+_FRACTION_TAIL = re.compile(r"([0-9x]+)/[0-9]+$")
+
+
+def _copula(answer: str) -> str:
+    """정답 뒤에 붙일 말 — 끝소리에 받침이 있으면 "이었어요", 없으면 "였어요".
+
+    S10: "답은 8였어요"(S9 17행 · S11 sim_no-setup 21행 등) 조사 오류를 고친다.
+    정답은 수(`-12`·`3/2`) 또는 x만 쓰는 식(`2*x + 1`)이다. `x`(엑스)는 받침이 없다.
+    """
+    s = answer.strip()
+    fraction = _FRACTION_TAIL.search(s)
+    last = fraction.group(1)[-1] if fraction else s[-1:]
+    return "이었어요" if last in _BATCHIM_DIGITS else "였어요"
+
+
+def wrong_feedback(answer: str) -> str:
+    """3턴을 다 쓰고도 틀렸을 때의 한 줄 — 정답은 알려 주되 비난 표현은 쓰지 않는다."""
+    return FEEDBACK_WRONG.format(answer=answer, copula=_copula(answer))
+
 
 router = APIRouter(prefix="/golden")
 
@@ -123,7 +149,7 @@ async def answer(body: AnswerIn) -> dict[str, object]:
         return response
 
     # ④ 오답 + 튜터 턴 3회 소진 → 정답을 알려 주며 판정. 숙련도 −0.05(GP-6)
-    feedback = FEEDBACK_WRONG.format(answer=problem["answer"])
+    feedback = wrong_feedback(problem["answer"])
     return await _graded(row, problem, body.text, False, turns_used, feedback)
 
 
