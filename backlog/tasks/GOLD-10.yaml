@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-10
+title: "GOLD-10 골든 패스 S8 후속 — 지시문 원본·묶음의 공유 계약 문구에 ⑬ 채점 규칙 병기 (GOLD-08 계약 변경 반영)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on:
+  - GOLD-08
+requires_gates: []
+acceptance:
+  - "지시문 원본(golden/prompts_src/spec.md·spec_no_students.md)과 생성된 지시문 묶음(golden/prompts/**·golden/prompts_no_students/**) 전 파일의 공유 계약 \"채점·숙련도 규칙\" 문장에 ⑬ 규칙(접두를 뗀 뒤 `=`가 남으면 마지막 `=` 뒤만 채점 · Kiki 결정 2026-11-10 · GOLD-08)을 같은 문구로 병기 + 옛 문장 잔존 0건(grep) + LATER.md의 \"지시문 원본은 옛 목록\" 메모 해소"
+artifacts:
+  - "PR #1904(GOLD-08과 같은 PR에 커밋 추가) · 지시문 원본 2 + 묶음 31 = 33파일 공유 계약 문장에 ⑬ 규칙 병기 · 옛 문장 잔존 0건(grep) · LATER 메모 해소 · 코드 변경 0건"
+paths:
+  - "golden/prompts_src/*.md"
+  - "golden/prompts/**"
+  - "golden/prompts_no_students/**"
+  - golden/LATER.md
+session: null
+notes: "Kiki 지시(2026-11-11): GOLD-08(PR #1904)이 손대지 않은 지시문 원본의 계약 문구를 함께 고친다. 문서만 바꾼다(코드 변경 0건)."
+updated: 2026-11-11
