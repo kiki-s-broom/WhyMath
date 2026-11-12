@@ -1,0 +1,167 @@
+{
+  "persona": "sign-slip",
+  "nickname": "sim-sign-slip",
+  "mode": "live",
+  "retry_rule": false,
+  "problems": [
+    {
+      "problem_id": "LF-01",
+      "student_lines": [
+        "f(5)=18이에요.",
+        "f(5)=-3×5+3=18이에요.",
+        "15이에요.",
+        "15+3=18이에요."
+      ],
+      "tutor_lines": [
+        "f(5)를 18이라고 구했군요. 그 18이 나오기까지 x 자리에 5를 넣은 식을 어떻게 썼는지 직접 적어 볼래요?",
+        "x 자리에 5를 넣어 f(5)=-3×5+3이라고 식을 세웠군요. 이 식에서 -3×5를 먼저 계산하면 얼마인지 직접 계산해 볼래요?",
+        "−3×5를 15라고 계산했군요. 그 계산까지 넣어서 f(5)의 값을 직접 구해 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-02",
+      "student_lines": [
+        "f(-3)은 -7 맞나요?",
+        "-3+4가 돼요.",
+        "음... -7이에요.",
+        "다시 해도 -7 같아요."
+      ],
+      "tutor_lines": [
+        "f(-3)을 -7이라고 생각했군요. 그렇다면 f(x) = x + 4에서 x 자리에 -3을 넣었을 때, 오른쪽 식이 어떻게 되는지 직접 써 볼래요?",
+        "f(x)의 x 자리에 -3을 넣으면 -3+4가 된다고 했군요. 그럼 -3+4를 직접 계산하면 얼마가 되는지 말해 볼래요?",
+        "x 자리에 -3을 넣어 -3+4가 된다고 했고, 그 계산 결과를 -7이라고 했군요. 그 값을 f(-3)의 최종 답으로 두어도 되는지 스스로 한 번 더 살펴본 뒤, f(-3)이 얼마인지 직접 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-03",
+      "student_lines": [
+        "6×2−8=4예요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-04",
+      "student_lines": [
+        "f(3)은 -3-5라서 2이에요.",
+        "음... -3에서 5 빼면 2요.",
+        "아, 왼쪽으로 가면 -8이네요.",
+        "f(3)은 -8이에요."
+      ],
+      "tutor_lines": [
+        "x 자리에 3을 넣어 f(3) = -3-5라고 식을 세운 거군요. 그럼 -3에서 5를 한 번 더 빼면 값이 어떻게 되는지 직접 계산해서 말해 볼래요?",
+        "f(3)을 -3-5로 본 뒤, -3에서 5를 빼면 2라고 말했군요. 수직선에서 -3보다 5만큼 더 왼쪽에 있는 수가 무엇인지 직접 확인해 볼래요?",
+        "수직선에서 왼쪽으로 이동해 확인한 값을 말했군요. 그 값을 f(3)의 값으로 정리해서, 이 문제의 답을 직접 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-05",
+      "student_lines": [
+        "x에 0 넣으면 8이에요?",
+        "4×0+8=8이에요."
+      ],
+      "tutor_lines": [
+        "x에 0을 넣으면 8이 된다고 생각한 거군요. 그 8이 어떻게 나왔는지, 4x+8의 x 자리에 0을 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-06",
+      "student_lines": [
+        "f(-1)은 -12 같아요",
+        "f(-1) = -6×(-1)-6이에요"
+      ],
+      "tutor_lines": [
+        "f(-1)이 -12라고 생각했군요. 그 값이 맞는지 확인해 보려면, x 자리에 -1을 넣은 식을 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-07",
+      "student_lines": [
+        "2×2+7=11이에요"
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-08",
+      "student_lines": [
+        "3×5+1=16 같아요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-09",
+      "student_lines": [
+        "0−4니까 답은 4예요.",
+        "-5×0은 0이에요.",
+        "-5×0−4는 0−4예요.",
+        "4요."
+      ],
+      "tutor_lines": [
+        "0을 대입해서 0−4라고 썼군요. 그런데 원래 식에는 -5x라는 부분도 있는데, 여기에 x=0을 넣으면 그 부분은 어떻게 되는지 말해 볼래요?",
+        "-5×0이 0이라고 잘 짚었군요. 그러면 -5x 자리에 0이 들어간 식 전체를 처음부터 다시 써 보면 어떻게 되는지 직접 적어 볼래요?",
+        "-5×0이 0이 되어 식이 0−4가 된다고 정리했군요. 이제 0−4를 계산하면 f(0)이 얼마인지 직접 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-10",
+      "student_lines": [
+        "5×(-2)는 10, 답은 9예요.",
+        "양수랑 음수 곱하면 양수예요.",
+        "3×(-2)=6, 양수예요.",
+        "5×(-2)=10, 답은 9예요."
+      ],
+      "tutor_lines": [
+        "5×(-2)를 10이라고 본 뒤 -1을 더한 흐름이군요. 곱셈에서 양수와 음수를 곱할 때 결과의 부호는 어떻게 정해지는지 다시 확인해 볼래요?",
+        "양수와 음수를 곱하면 양수라고 생각했군요. 그 생각을 확인할 수 있도록 양수와 음수를 곱한 예를 하나 떠올려, 그 결과의 부호가 어떻게 되는지 직접 말해 볼래요?",
+        "3×(-2)도 양수가 된다고 본 생각을 그대로 이어 갔군요. 이제 그 생각을 f(x)=5x-1에 그대로 적용해서, x 자리에 -2를 넣었을 때 f(-2)의 값을 직접 구해 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    }
+  ],
+  "student_llm_calls": 27,
+  "student_llm_failures": 0,
+  "final_mastery": 0.35,
+  "elapsed_s": 255.4,
+  "error": null,
+  "prompts_checked": 27,
+  "privacy_violations": 0,
+  "turn_rows": 27
+}
