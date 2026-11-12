@@ -1,0 +1,157 @@
+{
+  "persona": "slope-blind",
+  "nickname": "sim-slope-blind",
+  "mode": "live",
+  "retry_rule": false,
+  "problems": [
+    {
+      "problem_id": "LF-01",
+      "student_lines": [
+        "f(5)는 -12예요.",
+        "x에 5를 넣었어요.",
+        "-3×5+3이요."
+      ],
+      "tutor_lines": [
+        "f(5)를 -12라고 구했다고 말해 주었군요. 그 값이 나오기까지 x 자리에 5를 넣은 식을 직접 써 보면서 어떻게 계산했는지 설명해 볼래요?",
+        "x에 5를 넣었다고 말해 주었군요. 그렇게 넣었을 때 식이 어떻게 되는지 직접 써 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-02",
+      "student_lines": [
+        "x에 -3 넣으면 1이에요.",
+        "x에 -3 넣으면 -3+4=1이에요."
+      ],
+      "tutor_lines": [
+        "x에 -3을 넣었을 때 1이 나온다고 했군요. 그 값이 어떻게 나왔는지, x 자리에 -3을 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-03",
+      "student_lines": [
+        "x에 2 넣으면 4 같아요",
+        "6×2-8이요"
+      ],
+      "tutor_lines": [
+        "x에 2를 넣으면 4가 나온다고 생각했군요. 그 생각을 확인해 보기 위해, f(x)=6x-8의 x 자리에 2를 넣은 식을 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-04",
+      "student_lines": [
+        "f(3)은 -8이에요.",
+        "f(3)=-3-5=-8이에요."
+      ],
+      "tutor_lines": [
+        "f(3)을 -8이라고 구했군요. 그 값이 나온 과정을 확인해 보고 싶은데, x 자리에 3을 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-05",
+      "student_lines": [
+        "x에 0 넣으면 8 같은데요?",
+        "4×0+8=8이요."
+      ],
+      "tutor_lines": [
+        "x에 0을 넣으면 8이라고 생각한 거군요. 그 생각이 맞는지 확인하려면, f(x)=4x+8에서 x 자리에 0을 넣은 식을 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-06",
+      "student_lines": [
+        "x에 -1 넣으니 0 같아요.",
+        "f(-1)=-6×(-1)-6이요."
+      ],
+      "tutor_lines": [
+        "x에 -1을 넣으면 0이 될 것 같다고 본 거군요. 그렇다면 f(x) = -6x - 6에서 x 자리에 -1을 넣은 식을 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-07",
+      "student_lines": [
+        "2×2+7=11이에요"
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-08",
+      "student_lines": [
+        "5를 넣으면 16이에요.",
+        "3×5+1=16이에요."
+      ],
+      "tutor_lines": [
+        "x 자리에 5를 넣었을 때의 결과를 말해 주었군요. 그 결과가 어떻게 나왔는지, x에 5를 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-09",
+      "student_lines": [
+        "0을 x에 넣는 거예요?",
+        "f(0) = -5×0 - 4예요?"
+      ],
+      "tutor_lines": [
+        "f(0)을 구할 때 x에 0을 넣는 게 맞는지 궁금한 거군요. 그렇다면 f(x) = -5x - 4에서 x 대신 0을 넣은 식을 네가 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-10",
+      "student_lines": [
+        "x에 -2 넣으면 -11이에요.",
+        "5 곱하기 -2 해서 -10, -1 빼서 -11이요.",
+        "f(-2)=5×(-2)-1=-11"
+      ],
+      "tutor_lines": [
+        "x에 -2를 넣어 계산한 결과가 -11이라고 말해 줬군요. 그 -11이 나오기까지 5x 부분과 -1 부분을 각각 어떻게 계산했는지 순서대로 말해 볼래요?",
+        "5×(-2)로 -10을 구한 뒤 -1을 빼서 -11이 나온다고 설명해 줬군요. 그 과정을 x에 -2를 넣은 식으로 직접 한 줄 써 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    }
+  ],
+  "student_llm_calls": 21,
+  "student_llm_failures": 0,
+  "final_mastery": 1.0,
+  "elapsed_s": 202.0,
+  "error": null,
+  "prompts_checked": 21,
+  "privacy_violations": 0,
+  "turn_rows": 21
+}
