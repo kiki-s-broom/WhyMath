@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: blocked
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,11 +13,17 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "S12 산출물: AI 시뮬레이션 재실행 3종×10(golden/logs/sim_<페르소나>_rerun_turns.csv · S11 1차와 같은 설정) · S11 대비 문제별 대조 표와 S10 수정 항목별 재발 여부 · 성인 지인 2명(adult-1·adult-2) 각 5문제 관찰 기록 2건+CSV 2건(Kiki 수행) · 누적 로그 표(출처별 건수) · golden/reports_no_students/S12/보고.md"
-artifacts: []
+artifacts:
+  - "PR #1910 머지 21d39489(1차 판: 재실행 30건·대조표·런북) · 3459b2dc(메모장용 줄 형식 관찰 양식 · 미머지 브랜치)"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
   - "tests/golden/**"
-session: claude/new-session-fay9z6
-notes: "GOLD-01 우산의 S12 슬라이스(지시서 golden/prompts_no_students 단계09 S12). 선행 S10 완료(main 88383e3d PR #1909)."
-updated: 2026-11-12
+session: null
+notes: |-
+  GOLD-01 우산의 S12 슬라이스(지시서 golden/prompts_no_students 단계09 S12). 선행 S10 완료(main 88383e3d PR #1909).
+
+  [정정 2026-11-13] 1차 판 PR 머지·메모장 양식 개량 커밋 증적
+
+  [차단 2026-11-13] Kiki 대기 — 성인 지인 세션 완료(adult-1 79행 중 지인 몫 · adult-2 30행), 관찰 기록(새 양식 adult1_memo.txt·adult2_memo.txt)과 CSV를 세션에 전달하면 2차 판(성인 문제별 표·재발 여부 성인 출처)을 쓴다. 정리(DB 삭제) 블록은 전달 확인 전 실행 금지
+updated: 2026-11-13
