@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: blocked
+status: in_progress
 priority: 1
 eos_priority: P1
 owner: claude
@@ -19,11 +19,13 @@ paths:
   - "golden/**"
   - "src/backend/golden/**"
   - "tests/golden/**"
-session: null
+session: claude/new-session-fay9z6
 notes: |-
-  GOLD-01 우산의 S12 슬라이스(지시서 golden/prompts_no_students 단계09 S12). 선행 S10 완료(main 88383e3d PR #1909).
+  GOLD-01 우산의 S12 슬라이스 [Kiki 결정 2026-11-14: 성인 관찰 기록은 Claude가 CSV 분석으로 대체 · 끝난 뒤 질문 2개는 미기록](지시서 golden/prompts_no_students 단계09 S12). 선행 S10 완료(main 88383e3d PR #1909).
 
   [정정 2026-11-13] 1차 판 PR 머지·메모장 양식 개량 커밋 증적
 
   [차단 2026-11-13] Kiki 대기 — 성인 지인 세션 완료(adult-1 79행 중 지인 몫 · adult-2 30행), 관찰 기록(새 양식 adult1_memo.txt·adult2_memo.txt)과 CSV를 세션에 전달하면 2차 판(성인 문제별 표·재발 여부 성인 출처)을 쓴다. 정리(DB 삭제) 블록은 전달 확인 전 실행 금지
-updated: 2026-11-13
+
+  [정정 2026-11-14] notes 치환 — Kiki 결정 2026-11-14: 성인 세션 관찰 기록(메모장)은 작성하지 않고 Claude가 서버 기록(CSV)만으로 분석을 대체한다
+updated: 2026-11-14
