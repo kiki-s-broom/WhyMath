@@ -21,6 +21,11 @@ paths:
   - src/backend/pyproject.toml
   - ".github/workflows/**"
   - CLAUDE.md
+  - ".github/branch-protection-setup.md"
+  - tests/infra/test_required_checks_doc.py
 session: claude/new-session-9lemjj
-notes: "Kiki 지시 2026-11-15(S15 결정 — /legacy 물리 이동 안 함, 논리 격리). 선행 GOLD-16(PR #1915 머지 602cd5dc). 옛 코드(golden 밖 소스)는 한 줄도 수정하지 않는다 — CI 설정·CLAUDE.md·pyproject 계약은 Kiki가 하네스로 허용."
+notes: |-
+  Kiki 지시 2026-11-15(S15 결정 — /legacy 물리 이동 안 함, 논리 격리). 선행 GOLD-16(PR #1915 머지 602cd5dc). 옛 코드(golden 밖 소스)는 한 줄도 수정하지 않는다 — CI 설정·CLAUDE.md·pyproject 계약은 Kiki가 하네스로 허용.
+
+  [정정 2026-11-15] paths ['golden/**', 'src/backend/golden/**', 'tests/golden/**', 'src/backend/pyproject.toml', '.github/workflows/**', 'CLAUDE.md'] → ['golden/**', 'src/backend/golden/**', 'tests/golden/**', 'src/backend/pyproject.toml', '.github/workflows/**', 'CLAUDE.md', '.github/branch-protection-setup.md', 'tests/infra/test_required_checks_doc.py']: Kiki 결정(최소안): golden-path를 필수 체크 문서로 옮기고 S2 만료 유예(제외 목록)를 지운다
 updated: 2026-11-15
