@@ -1,6 +1,6 @@
 # WhyMath 1단계 「두꺼게」 — 작업 지시서 (AI 실행용 · 3+AI 4주)
 
-작업 번호를 받은 AI는 이 문서의 공통 규칙·용어·공유 계약과 해당 번호의 지시만 읽고 작업한다. 지시에 없는 값은 추정하지 않고 "미확인"으로 보고한다. 원본 계획서는 `golden/prompts_src/plan_phase1_thicken_4weeks.pdf`(2026-11-15 · Kiki · 12쪽)이고, 이 계획은 골든 패스 계획서(S1~S15 · `golden/prompts/`)의 후속이다. 세션 번호는 S16부터 S35까지 이어 붙인다.
+작업 번호를 받은 AI는 이 문서의 공통 규칙·용어·공유 계약과 해당 번호의 지시만 읽고 작업한다. 지시에 없는 값은 추정하지 않고 "미확인"으로 보고한다. 원본 계획서는 `plan_phase1_thicken_4weeks.pdf`(Kiki 보관 원본(저장소 미포함 — office·PDF 문서는 `.gitignore`와 `scripts/ops/check_source_document_binaries.py`가 커밋을 막는다 · 저장소 안 정본은 지시서))(2026-11-15 · Kiki · 12쪽)이고, 이 계획은 골든 패스 계획서(S1~S15 · `golden/prompts/`)의 후속이다. 세션 번호는 S16부터 S35까지 이어 붙인다.
 
 ## 공통 규칙과 보고 형식
 

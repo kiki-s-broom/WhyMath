@@ -1,6 +1,6 @@
 # WhyMath 1단계 두꺼게 AI 작업 지시문
 
-계획서: 저장소 안 `golden/prompts_src/plan_phase1_thicken_4weeks.pdf` (2026-11-15 Kiki 계획서 원본 12쪽) · 지시서 원본 `golden/prompts_src/spec_phase1.md` · 선행 묶음 `golden/prompts/`(골든 패스 S1~S15)
+계획서: `plan_phase1_thicken_4weeks.pdf` (2026-11-15 Kiki 계획서 원본 12쪽 · Kiki 보관 원본(저장소 미포함 — office·PDF 문서는 `.gitignore`와 `scripts/ops/check_source_document_binaries.py`가 커밋을 막는다 · 저장소 안 정본은 지시서)) · 지시서 원본 `golden/prompts_src/spec_phase1.md` · 선행 묶음 `golden/prompts/`(골든 패스 S1~S15)
 
 작업 하나에 파일 하나다. **파일 이름이 곧 세션 이름**이다. 각 파일은 그것만 붙여 넣어도 AI가 작업할 수 있도록 배경, 실행 방식, 공통 규칙, 용어, 작업 지시, 보고 형식을 모두 담고 있다.
 

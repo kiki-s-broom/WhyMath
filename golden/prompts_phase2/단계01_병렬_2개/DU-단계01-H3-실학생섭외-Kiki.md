@@ -9,7 +9,7 @@
 - 저장소 위치: GitHub `kiki-s-broom/whymath` · Kiki 머신 `C:\Users\kiki\Desktop\__AI\WhyMath`(PowerShell) · 클라우드 세션 `/home/user/WhyMath`
 - 산출물 폴더: 저장소 안의 `golden/reports_phase2/` (없으면 만든다)
 - 기본 브랜치: main · 작업 브랜치: `golden-p2/H3` (아래 "산출물 저장 규칙")
-- 계획서: 저장소 안 `golden/prompts_src/plan_phase2_second_unit_4weeks.docx` (2026-11-15 Kiki 계획서 원본) · 지시서 원본 `golden/prompts_src/spec_phase2.md` · 선행 묶음 `golden/prompts/`(S1~S15)·`golden/prompts_phase1/`(S16~S35)
+- 계획서: `plan_phase2_second_unit_4weeks.docx` (2026-11-15 Kiki 계획서 원본 · Kiki 보관 원본(저장소 미포함 — office·PDF 문서는 `.gitignore`와 `scripts/ops/check_source_document_binaries.py`가 커밋을 막는다 · 저장소 안 정본은 지시서)) · 지시서 원본 `golden/prompts_src/spec_phase2.md` · 선행 묶음 `golden/prompts/`(S1~S15)·`golden/prompts_phase1/`(S16~S35)
 
 ## 너의 역할
 
