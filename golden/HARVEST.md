@@ -22,3 +22,203 @@
 | 없음 | 데모 OAuth·JWT·회원가입 | 학생 식별자는 닉네임뿐(공통 규칙 9) | S1~S5 |
 | 없음 — 튜터(S4)와 같은 프로바이더 팩토리·라우터(`build_cloud_provider` + `Router.route`)를 학생 LLM에도 재사용 | 옛 시뮬레이터·합성 학생 계열은 찾아 쓰지 않음(`golden/sim_student.py` 1파일로 새로 씀) | 학생 LLM도 공통 규칙 8(팩토리 경유)을 따른다. 튜터 코드(`api.py`·`tutor.py`)와는 HTTP로만 만난다 | S11 |
 | (S14 튜터 프롬프트 개선) 없음 — 옛 자산 0건. `golden/tutor_prompt.md` 규칙 6에 한 문장(마지막 되묻기에서도 틀린 곳 하나를 짚고 질문 하나로 답을 묻는다)만 더함 | 오개념 카탈로그(`whymath_backend/l1/misconception/` — 부호 오개념 항목) · 교수학 루브릭(`whymath_backend/harness/pedagogical_rubric.py`)의 힌트 규칙 | 튜터가 학생이 쓴 값을 그대로 짚으면 되므로 카탈로그 조회·오개념 매칭이 필요 없다(FINDINGS「S14 제안」 · 오개념 매칭은 §5). 실제 LLM 재생으로 효과 확인: 1위 근거 5사례×5회의 마지막 되묻기가 틀린 곳을 짚은 수 4/25 → 25/25 | S14 |
+| (S15 격리·회고) 없음 — 옛 코드 import 0건 추가. 측정 스크립트는 `grimp`(이미 dev 의존성)만 씀 | 옛 모듈 722개·옛 Flutter 74파일의 `/legacy` 물리 이동(이번엔 하지 않음) | Kiki 결정(2026-11-15) "보류 — 목록만 기록". 부분 이동은 패키지 이름이 바뀌어 옛 import 3,409줄 수정(§5)과 옛 테스트 965파일·CI 19잡 수정을 부른다. 목록은 아래 절에 확정 | S15 |
+
+## 3주간 미참조 모듈 (S15 · 측정 2026-11-15 · 기준 main `a9cff6ec`)
+
+> **뜻**: golden 코드(`src/backend/golden/`·`src/mobile/lib/golden/`·`lib/main_golden.dart`)가 **직접이든 간접이든 한 번도 import하지 않는** 옛 모듈. "죽은 코드"가 아니다 — 옛 `create_app`·옛 테스트·CLI 스크립트는 여전히 쓴다. **삭제 대상이 아니다**(지시서 "하지 말 것").
+> **/legacy 물리 이동: 보류 — Kiki 결정(2026-11-15 · S15 세션 질문 응답 "보류 — 목록만 기록").** 근거는 아래 「이동하면 깨지는 것」. 이동은 `golden/NEXT_3WEEKS.md`에 실제 학생 검증 뒤 순서로 올렸다.
+
+### 측정 명령
+
+```bash
+cd src/backend && python -m golden.measure_unreferenced
+```
+
+- 스크립트: `src/backend/golden/measure_unreferenced.py`(Python 3.12 · `grimp` — CI와 같은 `pip install -e ".[dev]"` 환경 · 학생 경로와 무관한 도구라 `golden.api`는 import하지 않는다 · `golden/` 루트 아래 `.py`는 CI 린트 대상이 아니라 `tests/infra/test_lint_coverage.py`가 막으므로 린트되는 이 자리에 둔다 — S11 `sim_student.py` 선례). 결과 파일은 `golden/reports_no_students/S15/`의 `unreferenced_backend.tsv`(722행 · 경로·줄 수 전수) · `referenced_backend.tsv`(122행) · `unreferenced_flutter.tsv`(74행) · `flutter_golden_imports.tsv`(8행) · `measure_summary.json` · `unreferenced_compact.md`(아래 표의 원본).
+- 백엔드 "golden이 쓰는 모듈" = 아래 세 가지의 합집합이다.
+  1. `grimp.build_graph("whymath_backend", "golden").find_upstream_modules("golden", as_package=True)` — 정적 import로 닿는 옛 모듈 **16개**.
+  2. **보정 ① 조상 패키지**: `a.b.c`를 import하면 `a/__init__.py`·`a/b/__init__.py`도 실행되는데 grimp는 이것을 의존으로 세지 않는다. 조상 패키지와 그 조상이 import하는 모듈을 늘지 않을 때까지 더하면 **120개**(대부분 `db/__init__.py`가 ORM 모델 전체를 import해서 — S4 HARVEST 줄과 같은 현상).
+  3. **보정 ② 런타임 실측**: `GOLDEN_FAKE_LLM=1`로 golden 모듈 전부를 import한 뒤 `sys.modules`의 옛 모듈 **122개**. 정적에 없고 런타임에만 있는 것은 2개(`whymath_backend.l1`·`whymath_backend.l1.rights.permission_map`), 정적에만 있는 것은 0개다.
+- **보정 ③ 그래프 밖 파일**: `whymath_backend/l1/rights/`는 `__init__.py`가 없어(네임스페이스 패키지) grimp 그래프에 아예 없다(5파일). 파일 시스템으로 다시 세서 전체를 **844개**로 잡았다(grimp만 보면 839개 — S1 STATE Q7의 839와 같다). 이 5개의 사용 여부는 런타임 실측으로만 판정했다.
+- Flutter: `lib/main_golden.dart`와 `lib/golden/*.dart`에서 시작해 `import`·`export`·`part`(같은 패키지 `package:korean_math_app/…`와 상대 경로)를 끝까지 따라갔다.
+- 변별력 확인: 쓰는 쪽에 `db.session`·`l3.safe_parse`·`l3.providers.factory`, 안 쓰는 쪽에 `l3.equivalent.canonicalize`(S5가 버림)·`api.coach`(S1~S5가 버림)·`app`·`l1.misconception`(S14가 쓰지 않음)이 들어갔다 — HARVEST의 "가져온 것/버린 것"과 일치한다.
+- 해석 범위: `importlib` 문자열 로딩·entry point는 런타임 실측(import 시점)에 잡힌 것만 들어간다. 함수 안에서 요청 처리 중에만 하는 import는 정적 그래프(1)로 잡힌다.
+
+### 요약
+
+| 구분 | 전체 | golden이 씀 | golden이 안 씀 |
+| --- | ---: | ---: | ---: |
+| 백엔드 모듈(`src/backend/whymath_backend/`) | 844개 · 316,469줄 | 122개 · 30,194줄 | **722개 · 286,275줄** |
+| Flutter 소스(`src/mobile/lib/`, 생성 파일 0개) | 82개 | 옛 파일 1개(`lib/core/env.dart`) + 골든 7개 | **74개 · 10,931줄** |
+
+- 골든 Flutter가 쓰는 외부 패키지: `dio`·`flutter`·`flutter_math_fork`·`flutter_riverpod`.
+
+**백엔드 하위 패키지별**
+
+| 하위 패키지 | 전체 | 씀 | 안 씀 | 안 쓰는 줄 수 |
+| --- | ---: | ---: | ---: | ---: |
+| `whymath_backend` | 1 | 1 | 0 | 0 |
+| `whymath_backend._stdio` | 1 | 1 | 0 | 0 |
+| `whymath_backend.api` | 56 | 0 | 56 | 26,724 |
+| `whymath_backend.app` | 1 | 0 | 1 | 1,668 |
+| `whymath_backend.composition` | 1 | 0 | 1 | 148 |
+| `whymath_backend.config` | 1 | 1 | 0 | 0 |
+| `whymath_backend.consent` | 1 | 0 | 1 | 61 |
+| `whymath_backend.consent_grant` | 1 | 0 | 1 | 126 |
+| `whymath_backend.db` | 66 | 64 | 2 | 394 |
+| `whymath_backend.harness` | 163 | 0 | 163 | 80,582 |
+| `whymath_backend.l1` | 98 | 2 | 96 | 21,414 |
+| `whymath_backend.l2` | 41 | 0 | 41 | 14,470 |
+| `whymath_backend.l3` | 166 | 18 | 148 | 73,550 |
+| `whymath_backend.l4` | 100 | 0 | 100 | 23,630 |
+| `whymath_backend.l5` | 10 | 0 | 10 | 1,634 |
+| `whymath_backend.l6` | 18 | 0 | 18 | 3,019 |
+| `whymath_backend.lang` | 2 | 0 | 2 | 275 |
+| `whymath_backend.ops` | 38 | 0 | 38 | 27,618 |
+| `whymath_backend.privacy` | 9 | 0 | 9 | 2,287 |
+| `whymath_backend.schema` | 55 | 35 | 20 | 4,662 |
+| `whymath_backend.security` | 1 | 0 | 1 | 159 |
+| `whymath_backend.whs` | 14 | 0 | 14 | 3,854 |
+
+### 목록 (경로·줄 수)
+
+통째로 안 쓰는 디렉터리는 한 줄로 접었다. 쓰는 파일이 섞인 디렉터리만 파일 단위로 적었다. 파일 하나하나는 `unreferenced_backend.tsv`·`unreferenced_flutter.tsv`에 있다.
+
+<!-- golden.measure_unreferenced 가 생성 — 손으로 고치지 않는다 -->
+
+##### 백엔드 (`src/backend/whymath_backend/`) — 100줄로 접음
+
+| 경로 | 파일 수 | 줄 수 |
+| --- | ---: | ---: |
+| `src/backend/whymath_backend/api/` | 56 | 26,724 |
+| `src/backend/whymath_backend/app.py` | 1 | 1,668 |
+| `src/backend/whymath_backend/composition.py` | 1 | 148 |
+| `src/backend/whymath_backend/consent.py` | 1 | 61 |
+| `src/backend/whymath_backend/consent_grant.py` | 1 | 126 |
+| `src/backend/whymath_backend/db/published_edit_guard.py` | 1 | 93 |
+| `src/backend/whymath_backend/db/schema_version.py` | 1 | 301 |
+| `src/backend/whymath_backend/harness/` | 163 | 80,582 |
+| `src/backend/whymath_backend/l1/atom_graph/` | 10 | 2,778 |
+| `src/backend/whymath_backend/l1/atom_probe/` | 3 | 342 |
+| `src/backend/whymath_backend/l1/concept_atom_crosswalk/` | 4 | 662 |
+| `src/backend/whymath_backend/l1/concept_content/` | 6 | 912 |
+| `src/backend/whymath_backend/l1/concept_graph/` | 9 | 2,009 |
+| `src/backend/whymath_backend/l1/concept_visual_style/` | 2 | 160 |
+| `src/backend/whymath_backend/l1/concept_visualization/` | 2 | 148 |
+| `src/backend/whymath_backend/l1/curriculum/` | 4 | 884 |
+| `src/backend/whymath_backend/l1/embedding_primitives.py` | 1 | 237 |
+| `src/backend/whymath_backend/l1/embedding_provider.py` | 1 | 362 |
+| `src/backend/whymath_backend/l1/fk_precheck.py` | 1 | 110 |
+| `src/backend/whymath_backend/l1/formula_graph/` | 3 | 324 |
+| `src/backend/whymath_backend/l1/misconception/` | 10 | 1,737 |
+| `src/backend/whymath_backend/l1/pedagogy/` | 5 | 811 |
+| `src/backend/whymath_backend/l1/problem_bank/` | 9 | 2,606 |
+| `src/backend/whymath_backend/l1/problem_type_graph/` | 3 | 296 |
+| `src/backend/whymath_backend/l1/rights/attribution.py` | 1 | 179 |
+| `src/backend/whymath_backend/l1/rights/gateway.py` | 1 | 181 |
+| `src/backend/whymath_backend/l1/rights/integration.py` | 1 | 98 |
+| `src/backend/whymath_backend/l1/rights/policy_engine.py` | 1 | 265 |
+| `src/backend/whymath_backend/l1/skill_graph/` | 4 | 340 |
+| `src/backend/whymath_backend/l1/standards/` | 12 | 5,661 |
+| `src/backend/whymath_backend/l1/strategy_graph/` | 3 | 312 |
+| `src/backend/whymath_backend/l2/` | 41 | 14,470 |
+| `src/backend/whymath_backend/l3/cache/` | 2 | 437 |
+| `src/backend/whymath_backend/l3/cross_verify.py` | 1 | 1,186 |
+| `src/backend/whymath_backend/l3/curriculum_notation_gate.py` | 1 | 682 |
+| `src/backend/whymath_backend/l3/data_grade_defaults.py` | 1 | 82 |
+| `src/backend/whymath_backend/l3/dsl/` | 8 | 1,302 |
+| `src/backend/whymath_backend/l3/equivalent/` | 77 | 46,539 |
+| `src/backend/whymath_backend/l3/escalation_defaults.py` | 1 | 43 |
+| `src/backend/whymath_backend/l3/exact_value.py` | 1 | 110 |
+| `src/backend/whymath_backend/l3/finite_probability.py` | 1 | 590 |
+| `src/backend/whymath_backend/l3/generation_seed.py` | 1 | 160 |
+| `src/backend/whymath_backend/l3/isolated_call.py` | 1 | 486 |
+| `src/backend/whymath_backend/l3/multi_solution.py` | 1 | 1,329 |
+| `src/backend/whymath_backend/l3/notation_coverage.py` | 1 | 827 |
+| `src/backend/whymath_backend/l3/pedagogy/` | 11 | 2,864 |
+| `src/backend/whymath_backend/l3/pipeline.py` | 1 | 432 |
+| `src/backend/whymath_backend/l3/pregenerate/` | 6 | 1,927 |
+| `src/backend/whymath_backend/l3/problem_metadata_evidence.py` | 1 | 164 |
+| `src/backend/whymath_backend/l3/problem_publish_gate.py` | 1 | 935 |
+| `src/backend/whymath_backend/l3/prompt_assets.py` | 1 | 236 |
+| `src/backend/whymath_backend/l3/publish_gate.py` | 1 | 991 |
+| `src/backend/whymath_backend/l3/queue/` | 4 | 594 |
+| `src/backend/whymath_backend/l3/render/` | 6 | 1,001 |
+| `src/backend/whymath_backend/l3/sequence_induction.py` | 1 | 613 |
+| `src/backend/whymath_backend/l3/solution_path.py` | 1 | 267 |
+| `src/backend/whymath_backend/l3/solution_path_store.py` | 1 | 121 |
+| `src/backend/whymath_backend/l3/solution_set.py` | 1 | 457 |
+| `src/backend/whymath_backend/l3/speech.py` | 1 | 490 |
+| `src/backend/whymath_backend/l3/speech_parse.py` | 1 | 449 |
+| `src/backend/whymath_backend/l3/statistical_claim.py` | 1 | 664 |
+| `src/backend/whymath_backend/l3/symbolic_equivalence.py` | 1 | 433 |
+| `src/backend/whymath_backend/l3/trace/` | 2 | 319 |
+| `src/backend/whymath_backend/l3/verification_tier.py` | 1 | 129 |
+| `src/backend/whymath_backend/l3/verifier.py` | 1 | 587 |
+| `src/backend/whymath_backend/l3/verify_answer.py` | 1 | 3,471 |
+| `src/backend/whymath_backend/l3/verify_answer_form.py` | 1 | 145 |
+| `src/backend/whymath_backend/l3/verify_final_answer.py` | 1 | 320 |
+| `src/backend/whymath_backend/l3/verify_solution.py` | 1 | 939 |
+| `src/backend/whymath_backend/l3/verify_step.py` | 1 | 491 |
+| `src/backend/whymath_backend/l3/visualization.py` | 1 | 338 |
+| `src/backend/whymath_backend/l3/viz_eval.py` | 1 | 400 |
+| `src/backend/whymath_backend/l4/` | 100 | 23,630 |
+| `src/backend/whymath_backend/l5/` | 10 | 1,634 |
+| `src/backend/whymath_backend/l6/` | 18 | 3,019 |
+| `src/backend/whymath_backend/lang/` | 2 | 275 |
+| `src/backend/whymath_backend/ops/` | 38 | 27,618 |
+| `src/backend/whymath_backend/privacy/` | 9 | 2,287 |
+| `src/backend/whymath_backend/schema/analytics_event.py` | 1 | 132 |
+| `src/backend/whymath_backend/schema/answer_form.py` | 1 | 128 |
+| `src/backend/whymath_backend/schema/assessment_evidence.py` | 1 | 378 |
+| `src/backend/whymath_backend/schema/auth.py` | 1 | 81 |
+| `src/backend/whymath_backend/schema/cms_access.py` | 1 | 127 |
+| `src/backend/whymath_backend/schema/concept_lifecycle.py` | 1 | 101 |
+| `src/backend/whymath_backend/schema/corpus_provenance.py` | 1 | 64 |
+| `src/backend/whymath_backend/schema/event_data_contract.py` | 1 | 356 |
+| `src/backend/whymath_backend/schema/learning_loop_contract.py` | 1 | 383 |
+| `src/backend/whymath_backend/schema/mastery_contract.py` | 1 | 350 |
+| `src/backend/whymath_backend/schema/pedagogy_pack.py` | 1 | 210 |
+| `src/backend/whymath_backend/schema/pedagogy_strategy.py` | 1 | 263 |
+| `src/backend/whymath_backend/schema/problem_metadata.py` | 1 | 335 |
+| `src/backend/whymath_backend/schema/review_transition.py` | 1 | 303 |
+| `src/backend/whymath_backend/schema/speech.py` | 1 | 233 |
+| `src/backend/whymath_backend/schema/subject_adapter.py` | 1 | 341 |
+| `src/backend/whymath_backend/schema/unit_dsl.py` | 1 | 157 |
+| `src/backend/whymath_backend/schema/verification_capabilities.py` | 1 | 417 |
+| `src/backend/whymath_backend/schema/version_lifecycle.py` | 1 | 167 |
+| `src/backend/whymath_backend/schema/wrong_answer_signature.py` | 1 | 136 |
+| `src/backend/whymath_backend/security.py` | 1 | 159 |
+| `src/backend/whymath_backend/whs/` | 14 | 3,854 |
+
+##### Flutter (`src/mobile/lib/`) — 11줄로 접음
+
+| 경로 | 파일 수 | 줄 수 |
+| --- | ---: | ---: |
+| `src/mobile/lib/app.dart` | 1 | 30 |
+| `src/mobile/lib/core/api_client.dart` | 1 | 73 |
+| `src/mobile/lib/core/auth_interceptor.dart` | 1 | 192 |
+| `src/mobile/lib/core/router.dart` | 1 | 220 |
+| `src/mobile/lib/core/shell/` | 1 | 59 |
+| `src/mobile/lib/core/token_refresh_api.dart` | 1 | 69 |
+| `src/mobile/lib/core/token_store.dart` | 1 | 215 |
+| `src/mobile/lib/features/` | 61 | 9,395 |
+| `src/mobile/lib/main.dart` | 1 | 33 |
+| `src/mobile/lib/shared/` | 2 | 525 |
+| `src/mobile/lib/theme/` | 3 | 120 |
+
+### 이동하면 깨지는 것 (Kiki 결정의 근거 · 실측)
+
+| 깨지는 것 | 숫자 | 확인 방법 |
+| --- | --- | --- |
+| 옛 서버 진입점 | `whymath_backend.app`(`create_app`) 자체가 이동 대상 → 옛 서버가 뜨지 않는다 | 위 목록 |
+| 옛 테스트 | `tests/backend` 테스트 파일 1,114개 중 **965개**가 이동 대상을 직접 import(`tests/infra` 1 · `tests/data_pipeline` 1) | 정규식 `^(from|import) whymath_backend…` 대조 |
+| CI | 잡 25개 중 **19개**가 `whymath_backend`·`tests/backend`·`src/backend`·`lint-imports`·`alembic`을 참조 | `.github/workflows/ci.yml` 잡별 grep |
+| import-linter | 계약 5개 중 **4개**가 옛 계층(L1~L7·EOS·데이터 접근)을 가리킨다. 남는 1개가 `옛 코드는 golden을 모른다` | `src/backend/pyproject.toml` `[tool.importlinter]` |
+| 패키지 이름 | `whymath_backend`는 `__init__.py`가 있는 일반 패키지라 일부만 `legacy/`로 옮기면 모듈 이름이 바뀐다. 이동 대상 **648파일 안의 import 3,409줄**을 고쳐야 한다 = 옛 코드 수정(§5) | 정규식 집계 |
+| 스크립트 | `scripts/` 아래 20파일이 `whymath_backend`를 import | grep |
+| Flutter | 옛 앱 `lib/main.dart`·`lib/app.dart`·`features/`가 이동 대상 → 옛 앱 빌드와 `src/mobile/test/` 70파일 대부분이 깨진다 | 위 목록 |
+
+- 사전 실측(2026-11-08)의 "테스트 파일 1,109개"는 이번 측정에서 `tests/backend`의 `test_*.py` **1,114개**다(3주 사이 다른 태스크가 추가 — S 세션은 `tests/backend`를 바꾸지 않았다).
+- 지시서가 제안한 `legacy/README.md`는 `golden/` 바깥 새 파일이라 만들지 않았다(공통 규칙 3). 목록의 정본은 이 절이다.
