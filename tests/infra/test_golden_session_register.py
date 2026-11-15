@@ -55,6 +55,10 @@ def _stdin(prompt: str, session_id: str = "session_01ABCDEFGHIJKLMNOP") -> bytes
             "세션 이름: PL-단계20-S100-운영5주금-응시율",
             ("PL-단계20-S100-운영5주금-응시율", "S100", "PL"),
         ),
+        (
+            "세션 이름: DK-단계01-S20A-전이의존절단",
+            ("DK-단계01-S20A-전이의존절단", "S20A", "DK"),
+        ),
     ],
 )
 def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, str, str]) -> None:
@@ -69,6 +73,7 @@ def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, 
         "세션 이름: DKX-단계01-S16-시드",  # 접두 변형 — 등록된 접두만 받는다
         "세션 이름: SCX-단계01-S56-사전등록",  # 접두 변형 — 등록된 접두만 받는다
         "세션 이름: PLX-단계01-S76-콘텐츠확장",  # 접두 변형 — 등록된 접두만 받는다
+        "세션 이름: DK-단계01-S20AB-전이",  # 작업 번호 접미는 대문자 하나뿐
         "세션 이름: GP-단계3-S4-짧은이름",  # 단계 두 자리가 아니다
         "세션 이름: GP-단계03-S4",  # 짧은 이름 누락
         "본문\n본문\n본문\n세션 이름: GP-단계03-S4-API3개-튜터",  # 첫 3줄 밖
