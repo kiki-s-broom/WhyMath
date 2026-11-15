@@ -3,7 +3,7 @@
 
 무엇을 하는가
 -------------
-`golden/prompts*/`(원본·학생 없는 변형·1~3단계) 지시문은 첫 줄이
+`golden/prompts*/`(원본·학생 없는 변형·1~4단계) 지시문은 첫 줄이
 `세션 이름: GP-단계03-S4-…` 형태다.
 사용자가 그 파일을 통째로 붙여 넣으면 이 훅이 첫 줄을 읽어
   ① `golden/SESSIONS.md` 등록부에 한 줄을 추가하고(같은 세션·같은 이름이면 중복 추가 없음),
@@ -34,15 +34,17 @@ from pathlib import Path
 
 #: 지시문 첫 줄 — 접두 · 단계 두 자리 · 작업 번호 · 짧은 이름.
 #: 접두 = GP 골든 패스 원본 · GPN 학생 없는 변형 · DK 1단계 두꺼게(S16~S35)
-#:        · DU 2단계 두 번째 단원(S36~S55) · SC 3단계 세 번째 단원+Subject Contract(S56~S75).
+#:        · DU 2단계 두 번째 단원(S36~S55) · SC 3단계 세 번째 단원+Subject Contract(S56~S75)
+#:        · PL 4단계 파일럿(S76~S105).
 #: 새 묶음은 이 정규식과 아래 _BUNDLE 표, 테스트 픽스처에 함께 더한다.
-_NAME_RE = re.compile(r"^세션 이름:\s*((GPN|GP|DK|DU|SC)-단계(\d{2})-([A-Z]+\d+)-(\S+))\s*$")
+_NAME_RE = re.compile(r"^세션 이름:\s*((GPN|GP|DK|DU|SC|PL)-단계(\d{2})-([A-Z]+\d+)-(\S+))\s*$")
 _BUNDLE = {
     "GP": "원본 묶음(golden/prompts)",
     "GPN": "학생 없는 변형(golden/prompts_no_students)",
     "DK": "1단계 두꺼게(golden/prompts_phase1)",
     "DU": "2단계 두 번째 단원(golden/prompts_phase2)",
     "SC": "3단계 세 번째 단원+Subject Contract(golden/prompts_phase3)",
+    "PL": "4단계 파일럿(golden/prompts_phase4)",
 }
 _REGISTRY_REL = Path("golden") / "SESSIONS.md"
 _HEADER = (
