@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-17
+title: "GOLD-17 골든 패스 S15 결정 집행 — 논리 격리(LEGACY_MANIFEST·import 계약·CI 분리)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "Kiki S15 결정(2026-11-15) 집행 — 논리 격리: ①golden/LEGACY_MANIFEST.txt(백엔드 722모듈·Flutter 74파일 · 첫 줄 측정 커밋 a9cff6ec·날짜) ②import-linter 계약 golden-no-legacy(기존 5개 유지 · lint-imports 통과) ③CI 분리 — 옛 테스트·백엔드 경로 잡을 legacy.yml(weekly·continue-on-error)로, PR 필수는 golden 워크플로만 ④CLAUDE.md 골든 블록 한 줄(LEGACY 읽기 전용·새 import 금지·삭제는 S74) ⑤golden이 쓰는 옛 모듈 122개를 직접/전이로 분리 보고 · 임계(직접>10 또는 전이>30)면 LATER에 '1단계 과제: 전이 의존 절단' ⑥golden/api.py의 create_app·옛 라우터·미들웨어 의존 확인 ⑦HARVEST 한 줄 · 종료 보고에 lint-imports·golden CI 결과"
+artifacts: []
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+  - src/backend/pyproject.toml
+  - ".github/workflows/**"
+  - CLAUDE.md
+session: claude/new-session-9lemjj
+notes: "Kiki 지시 2026-11-15(S15 결정 — /legacy 물리 이동 안 함, 논리 격리). 선행 GOLD-16(PR #1915 머지 602cd5dc). 옛 코드(golden 밖 소스)는 한 줄도 수정하지 않는다 — CI 설정·CLAUDE.md·pyproject 계약은 Kiki가 하네스로 허용."
+updated: 2026-11-15
