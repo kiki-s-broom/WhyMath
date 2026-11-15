@@ -1,6 +1,6 @@
 # WhyMath 1단계 「두꺼게」 — 작업 지시서 (AI 실행용 · 3+AI 4주)
 
-작업 번호를 받은 AI는 이 문서의 공통 규칙·용어·공유 계약과 해당 번호의 지시만 읽고 작업한다. 지시에 없는 값은 추정하지 않고 "미확인"으로 보고한다. 원본 계획서는 `plan_phase1_thicken_4weeks.pdf`(Kiki 보관 원본(저장소 미포함 — office·PDF 문서는 `.gitignore`와 `scripts/ops/check_source_document_binaries.py`가 커밋을 막는다 · 저장소 안 정본은 지시서))(2026-11-15 · Kiki · 12쪽)이고, 이 계획은 골든 패스 계획서(S1~S15 · `golden/prompts/`)의 후속이다. 세션 번호는 S16부터 S35까지 이어 붙인다.
+작업 번호를 받은 AI는 이 문서의 공통 규칙·용어·공유 계약과 해당 번호의 지시만 읽고 작업한다. 지시에 없는 값은 추정하지 않고 "미확인"으로 보고한다. 원본 계획서는 `plan_phase1_thicken_4weeks.docx`(2026-11-15 개정판 · Kiki 보관 원본(저장소 미포함 — office·PDF 문서는 `.gitignore`와 `scripts/ops/check_source_document_binaries.py`가 커밋을 막는다 · 저장소 안 정본은 지시서))이고, 이 계획은 골든 패스 계획서(S1~S15 · `golden/prompts/`)의 후속이다. 세션 번호는 S16부터 S35까지 이어 붙이되, 개정판이 S20 뒤에 **S20+1 「전이 의존 절단」**(이 지시서의 작업 번호 `S20A`)을 더해 **총 21세션**이다. 4주 안에 흡수되지 않으면 S35가 5주차 월요일로 밀린다(세션 수는 줄이지 않는다).
 
 ## 공통 규칙과 보고 형식
 
@@ -13,7 +13,7 @@
 5. **완료 기준은 tests/golden 초록 + 야간 스모크 초록:** 코드를 건드린 세션은 끝날 때 `cd src/backend && python -m pytest ../../tests/golden`을 돌리고 **exit code**로 판정한다(`-q`·`| tail` 금지). S19 이후에는 `python -m golden.sim.run --sessions 120`(가짜 모드)도 돌려 M4·M5 0건을 확인한다. 빨간불이면 PR을 만들지 않는다.
 6. **모든 PR은 FINDINGS 항목 번호를 인용한다:** PR 제목과 본문 첫 질문에 `F-NN`(`golden/FINDINGS.md` 끝의 「항목 번호」 절 — S16이 붙인다)을 적는다. 인용할 항목이 없으면 그 PR은 지금 할 일이 아니다 — 만들지 않고 보고한다. 시뮬레이터 세션(S16~S20)은 `F-00`(시뮬레이터 기반 — 모든 항목의 측정 수단)을 인용한다.
 7. **시드는 로컬에만:** `golden/sim/seed/` 아래 내용(사람 출처 발화·분포)은 로컬 Ollama 외 어디로도 보내지 않는다. 클라우드 LLM 호출(튜터·클라우드 학생)의 프롬프트에 시드 발화를 넣지 않는다. 학생 시뮬레이터의 LLM은 **로컬 Ollama만** 부른다. 검사: 시드를 읽는 코드와 클라우드 프로바이더를 부르는 코드가 같은 함수 안에 있으면 안 된다(테스트로 동결).
-8. **옛 자산은 한 세션에 하나, 다섯 걸음 순서대로:** ①경계 긋기(가져올 함수·클래스를 파일 경로와 이름으로 HARVEST.md에 먼저 적는다 — "이 모듈"이 아니라 "이 함수 3개") ②특성화 테스트(옛 코드를 옛 자리에서 그대로 호출해 입력 10개 → 출력 10개를 `tests/golden/characterization/`에 고정한다. 지금 동작이 맞는지는 묻지 않는다 — 바뀌지 않는지만 본다) ③복사 또는 import(의존이 3개 이하면 import, 넘으면 `src/backend/golden/` 아래로 복사해 의존을 잘라낸다. 복사했으면 HARVEST.md에 "복사: 의존 과다") ④연결(골든 패스의 한 지점 — GP-4 프롬프트·GP-5 판정·GP-6 갱신 — 에만 붙인다. 기능 플래그 뒤에 둔다) ⑤초록 확인(특성화 테스트 + e2e + AI 야간 스모크 모두 초록. 하나라도 빨강이면 플래그를 끄고 원인을 LATER.md에 적는다). 한 걸음이 하루를 넘기면 자산이 너무 크다는 뜻이니 더 작은 조각으로 자른다. 같은 입력에 다른 출력이 나오는(비결정적) 자산은 가져오지 않고 HARVEST.md에 "버림: 비결정적"으로 적는다.
+8. **옛 자산은 한 세션에 하나, 다섯 걸음 순서대로:** ①경계 긋기(가져올 함수·클래스를 파일 경로와 이름으로 HARVEST.md에 먼저 적는다 — "이 모듈"이 아니라 "이 함수 3개") ②특성화 테스트(옛 코드를 옛 자리에서 그대로 호출해 입력 10개 → 출력 10개를 `tests/golden/characterization/`에 고정한다. 지금 동작이 맞는지는 묻지 않는다 — 바뀌지 않는지만 본다) ③복사 또는 import(의존이 3개 이하면 import, 넘으면 `src/backend/golden/` 아래로 복사해 의존을 잘라낸다. 복사했으면 HARVEST.md에 "복사: 의존 과다") ④연결(골든 패스의 한 지점 — GP-4 프롬프트·GP-5 판정·GP-6 갱신 — 에만 붙인다. 기능 플래그 뒤에 둔다) ⑤초록 확인(특성화 테스트 + e2e + AI 야간 스모크 모두 초록. 하나라도 빨강이면 플래그를 끄고 원인을 LATER.md에 적는다). 한 걸음이 하루를 넘기면 자산이 너무 크다는 뜻이니 더 작은 조각으로 자른다. 같은 입력에 다른 출력이 나오는(비결정적) 자산은 가져오지 않고 HARVEST.md에 "버림: 비결정적"으로 적는다. **전이 의존 예산(개정판 S20+1):** 골든이 직접 import하는 옛 모듈은 10개 이하, 전이(상류 전체)는 30개 이하다 — S20A가 이 수를 맞추고 `tests/golden/test_import_budget.py`로 동결한다. 그 뒤의 import(T1·T2·T3)는 예산 안에서만 가능하며, 넘기면 import 대신 복사한다(다섯 걸음 ③).
 9. **LLM 호출 규칙:** 튜터 LLM은 지금처럼 `whymath_backend.l3.providers.factory.build_cloud_provider()` + `l3.router.Router.route` 경유다(`src/backend/golden/tutor.py` 그대로). 학생 LLM은 옛 코드의 `whymath_backend.l3.providers.ollama.OllamaProvider`를 import해 로컬 Ollama만 부른다(계획서 3-4 뼈대의 `import ollama` 직접 호출은 **의도(로컬만 호출)**로만 읽고, 구현은 프로바이더 경유로 한다 — CLAUDE.md "LLM 호출은 항상 라우터 경유"). 프로바이더가 모델 ID 지정을 못 하면 그 클래스를 `src/backend/golden/sim/`로 복사해 모델 인자를 연다(HARVEST.md "복사"). SDK 직접 호출·키 하드코딩 금지. **테스트와 CI는 실제 LLM을 부르지 않는다** — `GOLDEN_FAKE_LLM=1`이면 튜터·학생 모두 고정 대본이다.
 10. **미성년자 데이터:** 학생 식별자는 닉네임뿐. 실명·학교·학년·연락처는 어디에도 저장하지 않는다. 시드 발화는 익명화(이름·학교·지역 낱말 → `[이름]`) 뒤에만 파일에 쓴다. 실학생 세션 전에는 보호자 동의를 받는다(Kiki 담당). 시뮬레이션 닉네임은 `sim-<페르소나>-<회차>`, 사람은 `stu-<번호>`(실학생)·`self-*`·`adult-*`.
 11. **검증은 CI와 같은 명령으로:** `src/backend`에서 `python -m ruff check golden ../../tests/golden`, `python -m black --check --line-length 100 golden ../../tests/golden`, `python -m mypy --strict golden`, `lint-imports`를 돌린다(CI `golden-path` 잡과 같은 네 스텝). 판정은 exit code이며 보고에 숫자(통과 N건·소요 시간)를 적는다. 로컬 CI 미러(`python3 scripts/harness/ci_mirror.py run`)는 **커밋한 뒤** 돌리고, 미러가 도는 동안 커밋·amend를 하지 않는다(HARN-194 오염 무효).
@@ -54,6 +54,8 @@
 | 야간 스모크 | 120세션(30문항 × P1·P2·P5·P7 × 1회)을 매일 돌리는 회귀. CI(가짜 모드)와 Kiki 머신(실제 LLM) 두 겹 |
 | 기능 플래그 | 옛 자산 연결을 켜고 끄는 환경변수(`GOLDEN_T1_RUBRIC`·`GOLDEN_T2_MISCONCEPTION`·`GOLDEN_MASTERY_ENGINE`). 기본값은 끔. 빨간불이면 끈다 |
 | 섀도 기록 | T3에서 simple 엔진과 bkt 엔진이 같은 세션의 숙련도를 나란히 기록하되 화면은 simple만 보여 주는 방식 |
+| 전이 의존 절단 | 개정판 S20+1(작업 번호 `S20A`). 골든 패스 S15 측정(main `a9cff6ec`)에서 골든이 옛 모듈 122개(직접 import 대상 모듈 7종·파일 4개, 상류 전이 포함 120~122)를 쓰는 것을 직접 10개·전이 30개 이하로 줄인다. 끌고 오는 것은 `src/backend/golden/` 아래로 복사해 의존을 자른다(다섯 걸음 ③). 3단계 S74에서 옛 패키지를 통째로 지우기 위한 전제 |
+| LEGACY_MANIFEST.txt | `golden/LEGACY_MANIFEST.txt`(S35 신설 · 개정판 §2). S15 미참조 목록(백엔드 722모듈·Flutter 74파일) + 1단계 3주간 여전히 import 안 된 옛 모듈 추가분을 모듈 이름 한 줄씩 적는 대장. `/legacy` 물리 이동은 Kiki 결정 |
 | 사람 출처 로그 | 골든 패스 S9~S12가 남긴 본인(`self-1`·`self-norole`)·성인(`adult-1`·`adult-2`) 턴 기록. 실제 중학생 로그는 2026-11-15 현재 **0건**이다 |
 | 사전 실측 | 이 지시서를 쓰며 2026-11-15에 main `a9cff6ec` 기준으로 직접 확인한 값. 세션에서 재확인한다 |
 
@@ -72,6 +74,8 @@
 | 학생 모델 `import ollama` 직접 호출 | CLAUDE.md "LLM 호출은 항상 라우터 경유". 옛 코드에 `whymath_backend/l3/providers/ollama.py`의 `OllamaProvider`가 있다(`ollama_host` 설정 사용) | 공통 규칙 9대로 `OllamaProvider` 경유. 모델 ID 지정이 안 되면 `sim/`에 복사 |
 | BKT 옛 모듈 1개 + 파라미터 4개 | `src/backend/whymath_backend/l2/bkt.py` — `BktParameters`(pydantic·비퇴화 검증 포함), 순수 함수 `posterior_mastery(prior, correct, params)`·`apply_learning`·`apply_forgetting(mastery, elapsed_days, params)`·`update_mastery(prior, correct, params)`·`probability_correct`, 클래스 `BktModel(params)`(`initial_mastery`·`update`·`update_sequence`·`predict_correct`·`apply_forgetting`) | T3의 옛 자산 = `BktParameters` + `update_mastery`(망각은 §6 금지 — `apply_forgetting`은 가져오지 않는다). 파라미터 이름·개수는 S31이 파일에서 읽어 확정한다(사전 실측은 함수 이름까지만) |
 | 옛 합성 학생 자산 | `grep synthetic_student|SyntheticStudent|student_simulator` 0건. 골든 패스 S11이 만든 `src/backend/golden/sim_student.py`(페르소나 3종 `slope-blind`·`sign-slip`·`no-setup`, 클라우드 LLM, `httpx.ASGITransport`로 `golden.api:app` 직접 호출, `--retry-rule`)가 유일한 선례 | S18·S19는 `sim_student.py`의 ASGI 호출·CSV 기록·개인정보 검사(`_check_privacy`)를 **재사용**하고, 페르소나 3종은 8종 체계(P1~P8)로 흡수한다(`slope-blind`→P3+OP_03 · `sign-slip`→P3+OP_01 · `no-setup`→P3+OP_06). `sim_student.py`는 지우지 않고 `golden/sim_personas.md`와 함께 남긴다(S35 미참조 목록에서 판단) |
+| S15 측정 "옛 코드 844모듈 중 722모듈 미참조 · 골든이 122개 사용" | main에 **있다**(PR #1915 · `golden/reports_no_students/S15/measure_summary.json` · 측정기 `src/backend/golden/measure_unreferenced.py` + `tests/golden/test_measure_unreferenced.py`). 숫자: 전체 844 · 미참조 722(286,275줄) · 사용 122(30,194줄) · 정적 직접 16(패키지 조상 포함) · 조상 포함 전이 120 · 런타임 122. **골든이 직접 import하는 옛 모듈은 7종**(`grade`→`l3.safe_parse` · `store`→`config`·`db.session` · `tutor`·`sim_student`→`l3.models`·`l3.providers.factory`·`l3.router`·`schema.enums`). 사용 122개의 대부분은 `db`(64)·`schema`(35)·`l3`(18)의 전이다 | S20A가 이 파일을 입력으로 쓴다. 목표 "직접 10 이하"는 7종 기준으로 이미 충족이므로 S20A의 본체는 **전이 120→30**이다(`config`·`db.session`이 끌고 오는 `db` 64·`schema` 35가 핵심). 측정기는 그대로 재사용하고 `--budget` 판정만 더한다 |
+| 1단계 S16~S35 번호가 비어 있다 | main의 `golden/NEXT_3WEEKS.md`(S15 산출물)가 **같은 번호 S16~S28을 "골든 패스 2회차"(실제 중학생 1명 검증·FINDINGS 2·3위·LATER 상위)로 이미 쓴다**. 두 계획이 같은 번호를 다른 내용으로 가리킨다 | **Kiki 결정이 필요하다**(S16 첫 단계 · 제안값: 이 1단계 묶음이 정본이고 NEXT_3WEEKS.md 머리에 "1단계 계획서(개정판)로 대체됨 — 실학생 1명 검증은 H2·S24로 흡수" 한 줄을 적는다). 결정 전에는 S16이 번호 충돌을 보고 첫 줄에 적고 멈추지 않는다 |
 
 *골든 코드 현행(사전 실측 · `src/backend/golden/`)*
 
@@ -102,6 +106,8 @@ golden/sim/
 golden/data/misconceptions_lf.json ← S26 (커밋)
 golden/FINDINGS.md 끝 「항목 번호」 절 ← S16 · golden/FINDINGS_v2.md ← S35
 tests/golden/characterization/     ← 특성화 테스트 (S21·S26·S31)
+tests/golden/test_import_budget.py ← S20A (직접 ≤10 · 전이 ≤30 동결)
+golden/LEGACY_MANIFEST.txt         ← S35 (미참조 옛 모듈 대장 · 모듈 이름 한 줄씩)
 tests/golden/test_sim_*.py         ← 시뮬레이터 테스트
 golden/reports_phase1/<번호>/보고.md ← 각 세션 보고
 .github/workflows/golden-sim-nightly.yml ← S19 (배선 파일 1개)
@@ -174,7 +180,7 @@ golden/reports_phase1/<번호>/보고.md ← 각 세션 보고
 
 ## S16~S20 · H2: 시뮬레이터 (4주차)
 
-시드 추출(S16) 뒤 주입기(S17)·학생 모델(S18)·T1 설계(S21)가 **동시에** 갈 수 있다 — 셋 다 S16의 산출물(시드·OP 코드·FINDINGS 번호)만 기다린다. 러너(S19)는 S17·S18을 잇고, 보정(S20)은 러너 결과를 검사한다. 보정 통과 전까지 시뮬레이터 숫자로 튜터를 판단하지 않는다(계획서 원칙 3). H2(실학생 섭외)는 S16과 함께 시작한다.
+시드 추출(S16) 뒤 주입기(S17)·학생 모델(S18)·T1 설계(S21)가 **동시에** 갈 수 있다 — 셋 다 S16의 산출물(시드·OP 코드·FINDINGS 번호)만 기다린다. 러너(S19)는 S17·S18을 잇고, 보정(S20)은 러너 결과를 검사한다. 보정 통과 전까지 시뮬레이터 숫자로 튜터를 판단하지 않는다(계획서 원칙 3). H2(실학생 섭외)는 S16과 함께 시작한다. 개정판이 더한 **S20A(전이 의존 절단)**는 S15 측정 파일만 입력으로 쓰므로 S16과 함께 시작할 수 있고, T1 import(S22)는 S20A가 정한 예산 안에서 한다.
 
 ### S16. 시드 추출 — 사람 출처 로그 → golden/sim/seed/ + FINDINGS 번호 + 하네스 등재
 
@@ -182,6 +188,7 @@ golden/reports_phase1/<번호>/보고.md ← 각 세션 보고
 - **선행 산출물:** 골든 패스 산출물 전부(main에 있음). 사람 출처 턴 CSV — `golden/logs/self1_turns.csv`·`adult1_turns.csv`·`adult2_turns.csv`는 gitignore라 **Kiki 머신에만** 있다. Kiki가 이 세션 컨테이너에 올려 주거나(파일 3개 · 닉네임·session_id 열 없음) 이 세션을 Kiki 머신에서 연다. 없으면 `golden/reports_no_students/S13/problems.csv`·`judging_errors.csv`의 학생 입력 열로 대신하고 보고에 "원본 CSV 없이 S13 집계본으로"라고 적는다.
 - **할 일:**
   1. **하네스 등재:** `python3 scripts/harness/backlog.py add`로 1단계 태스크 1건을 등재한다(제안 제목: "GOLD-P1 1단계 두꺼게 — AI 시뮬레이터 + 슬롯 T1·T2·T3 · S16~S35"). CLI가 준 번호로 `backlog.py start <번호>`를 실행하고, 번호를 `golden/STATE.md`「하네스 태스크 ID」 절에 "1단계: <번호>" 한 줄로 적는다. 이후 S17~S35가 이 번호를 쓴다.
+  1-b. **번호 충돌 보고:** main의 `golden/NEXT_3WEEKS.md`가 S16~S28을 다른 내용으로 쓴다(공유 계약 전제 표). 보고 첫 줄에 적고 Kiki 결정(제안값: 이 묶음이 정본 · NEXT_3WEEKS.md 머리에 "대체됨" 한 줄)을 받는다. 결정 전에도 이 세션은 진행한다.
   2. **FINDINGS 항목 번호:** `golden/FINDINGS.md` **끝에** `## 항목 번호 (1단계용 · S16)` 절을 덧붙인다. 본문은 한 글자도 고치지 않는다. 번호 표(제안값): `F-00` 시뮬레이터 기반(모든 항목의 측정 수단) · `F-01` 1위 GP-4 마지막 되묻기 C5(S14 적용) · `F-02` GP-5 판정 오류 앞말형(AI 출처) · `F-03` GP-2 문제 이해(no-setup) · `F-04` 판정 문장이 학생 마지막 답을 언급하지 않음 · `F-05` 학생 쪽 오개념 고수(튜터가 못 알아봄 — T2 후보) · `F-06` 숙련도 숫자가 체감과 다름(T3 후보 · 로그 근거 아직 없음 — "가정"으로 표기). 각 줄에 FINDINGS 본문의 절 이름과 출처별 N건 중 M건을 옮겨 적는다.
   3. **발화 수집:** 사람 출처 CSV에서 `student_text`만 모은다(튜터 발화 제외). 출처별 건수를 센다.
   4. **익명화:** 닉네임·이름·학교·지역이 들어간 발화는 그 낱말을 `[이름]`으로 바꾼다. 확신이 없으면 그 발화를 버린다. 결과에서 **20개**를 골라 `golden/sim/seed/utterances.txt`에 한 줄씩 쓴다 — 짧은 것, 오타 있는 것, 구어체인 것을 우선하고 "잘 쓴" 발화는 고르지 않는다(시뮬레이터가 흉내 낼 것은 실제 말투다). 각 줄 끝에 출처 라벨(`self`/`adult`)을 탭으로 붙인다.
@@ -264,6 +271,21 @@ golden/reports_phase1/<번호>/보고.md ← 각 세션 보고
 - **완료 기준:** ①CALIBRATION.md 첫 줄이 "통과" 또는 "조건부 통과(Kiki 결정)" ②세 기준 숫자가 있다 ③비교 불가 항목 명시 ④판정: **go**(통과/조건부 통과) / **no-go**(미통과 — 다음 세션은 S20 반복).
 - **하지 말 것:** 튜터 코드·프롬프트 수정 금지. 블라인드 정답 키를 커밋하거나 보고에 붙이지 않는다. 기준을 낮춰 통과시키지 않는다(조건부 통과는 Kiki 결정으로만).
 
+### S20A. 전이 의존 절단 — 골든이 쓰는 옛 모듈 직접 10개·전이 30개 이하 (개정판 S20+1)
+
+- **목적:** 골든 패스 S15 측정에서 골든이 옛 모듈 122개를 쓰고 있다(직접 import 대상은 7종인데 `config`·`db.session`·`l3.router` 등이 전이로 120개를 끌고 온다). 3단계 S74에서 옛 패키지를 통째로 지우려면 이 수가 작아야 한다. 끌고 오는 것은 `src/backend/golden/` 아래로 복사해 의존을 자른다(다섯 걸음 ③ — "복사: 의존 과다").
+- **선행 산출물:** main의 `golden/reports_no_students/S15/measure_summary.json`(`golden_direct_imports` · `static_with_ancestors_modules` · `runtime_modules`)과 측정기 `src/backend/golden/measure_unreferenced.py`. S16과 동시 진행 가능. **S22(T1 import) 전에 끝나야 한다** — 한 세션에 못 끝내면 S21을 하루 미루되 범위는 넓히지 않는다.
+- **할 일:**
+  1. **재측정:** `cd src/backend && python -m golden.measure_unreferenced`(S15 방식 그대로)로 현재 main의 직접 import 목록(7종 기대)·전이 집합(120 기대)을 받아 보고 첫 절에 숫자와 **전이 상위 10개 패키지**(`db` 64 · `schema` 35 · `l3` 18 …)를 적는다. S15 숫자와 다르면 그 차이도.
+  2. **끊을 것 고르기(경계 긋기):** 직접 import 7종 각각에 대해 "골든이 실제로 쓰는 함수·클래스"를 이름 단위로 HARVEST.md에 적는다(예: `l3.safe_parse.safe_parse_expr` 1개 · `config.Settings`의 필드 N개 · `db.session`의 엔진 생성 1개 · `l3.router`·`providers.factory`의 호출 2~3개). 전이가 큰 순서(db·schema·l3)로 "복사해서 자른다 / import 유지" 결정을 적는다. 제안값: ⓐ `db.session`·`config` → 골든 전용 `src/backend/golden/settings.py`(환경변수 3~5개만)·`golden/db.py`(엔진 1개 · `store.py`가 쓴다)로 복사해 `whymath_backend.db`·`schema` 전이(약 99개)를 끊는다 ⓑ `l3.safe_parse` → 함수 1개 복사(sympy 의존만) ⓒ `l3.models`·`providers.factory`·`router`·`schema.enums` → **유지**(LLM 호출은 라우터 경유 — CLAUDE.md 불변 · 이 네 개가 끌고 오는 전이 수를 따로 센다). ⓒ만으로 30을 넘으면 Kiki에게 "라우터 경유 유지 vs 프로바이더 1개 복사" 결정을 올린다(이 세션에서 라우터를 우회하지 않는다).
+  3. **복사(다섯 걸음 ③ 순서대로 한 개씩):** 복사본마다 ①HARVEST.md "복사: 의존 과다 · 원본 경로·함수" ②특성화 테스트(원본과 복사본이 같은 입력 10개에 같은 출력 — `tests/golden/characterization/test_s20a_<이름>.py`) ③`tests/golden` 초록 확인 후 다음 복사. 복사본에서 원본 import를 지운다(복사했는데 원본도 import하면 전이가 안 줄어든다 — 재측정으로 확인).
+  4. **동결:** `tests/golden/test_import_budget.py` — 측정기로 직접 import 수·전이 수를 계산해 `≤10`·`≤30`을 단언한다(주입: `import whymath_backend.l4` 한 줄을 골든에 넣으면 RED). `lint-imports`(`옛 코드는 golden을 모른다` 계약) 초록 유지.
+  5. 결과 표(이전 → 이후 · 직접/전이/모듈 이름)를 보고와 HARVEST.md에. 예산 안에 못 들어가면 **남은 수와 끊지 못한 이유**(라우터 경유 유지 등)를 적고 Kiki 결정으로 넘긴다 — 범위를 넓혀 옛 코드를 고치지 않는다.
+- **산출물:** 복사본 모듈(`golden/settings.py`·`golden/db.py`·`golden/safe_parse.py` — 제안값), 특성화 테스트, `test_import_budget.py`, HARVEST.md 줄, 재측정 보고.
+- **완료 기준:** ①직접 import 10개 이하 ②전이 30개 이하(둘 다 측정기 숫자 · 이전→이후) ③`lint-imports`·`tests/golden` 초록 ④예산 테스트 RED→GREEN 확인 ⑤라우터 경유 불변(튜터 LLM 호출 경로 diff 0).
+- **하지 말 것:** 옛 코드를 고치지 않는다(복사만). LLM 호출을 라우터 밖으로 빼지 않는다. 예산을 맞추려고 측정기를 느슨하게 하지 않는다. 한 세션에 두 자산을 동시에 자르지 않는다(한 개씩 초록 확인).
+- **막히면:** 하루 안에 ⓐ만 끝났으면 그 상태로 커밋(초록)하고 S21을 하루 미룬 뒤 같은 번호 `S20A`를 반복한다(보고에 "S20A 2일째").
+
 ## S21~S25: 슬롯 T1 — 튜터 되묻기 품질 (5주차)
 
 슬롯은 한 주에 하나다. 설계(S21)는 S16만 있으면 시작할 수 있어 시뮬레이터 작업과 **동시에** 간다. import(S22)는 설계 다음, 적용+AI 회귀(S23)는 보정 통과(S20) 뒤에만 한다. 그다음 실학생 1차(S24)와 판정(S25).
@@ -284,7 +306,7 @@ golden/reports_phase1/<번호>/보고.md ← 각 세션 보고
 ### S22. T1 import — src/backend/golden/eval/ + 플래그 GOLDEN_T1_RUBRIC
 
 - **목적:** 5걸음 ③④ — 옛 함수 2개를 골든 안으로 가져오고(의존 3개 이하면 import, 넘으면 복사), GP-4 뒤에 기능 플래그로 붙인다. e2e는 그대로 초록이어야 한다.
-- **선행 산출물:** S21 특성화 테스트·경계.
+- **선행 산출물:** S21 특성화 테스트·경계, S20A(import 예산 — 이 세션의 import가 직접 10·전이 30을 넘기면 복사한다).
 - **할 일:**
   1. `src/backend/golden/eval/__init__.py`·`rubric.py`: `whymath_backend.harness.pedagogical_rubric`를 import해 `evaluate_tutor_reply(reply: str, answer: str) -> RubricVerdict`(유출 여부·루브릭 점수·근거)로 감싼다. import 비용(끌려오는 옛 모듈 수)을 `python -X importtime`으로 재 보고에 적는다. 3개를 넘으면 두 함수를 `eval/rubric_copy.py`로 복사해 의존을 자르고 HARVEST.md "복사: 의존 과다".
   2. 연결(5걸음 ④): `api.py`의 `answer()`에서 튜터 응답을 받은 직후 `GOLDEN_T1_RUBRIC=1`일 때만 평가기를 부른다. 결과는 **기록만**(`golden.turns`에 열을 추가하지 않고 새 표 `golden.eval_log(turn_id, verdict_json, created_at)` — `store.py` `create_all` 대상에 추가) 하고 응답은 바꾸지 않는다. 유출(`leak`) 판정이면 로그에 경고(예외 타입명·문제 ID — 응답 문장은 로그에 남기지 않는다).
@@ -449,15 +471,15 @@ T1 판정(S25) 뒤에만 시작한다(세 슬롯 동시 진행 금지 — 특성
 
 ### S35. 게이트 판정 — golden/FINDINGS_v2.md · 2단계 계획 초안 (관문 ⑤)
 
-- **목적:** 12/26에 계획서 §7 여섯 줄을 판정하고, 2단계의 1순위 문제를 숫자와 함께 적는다. 3주간 import 안 된 옛 모듈 추가분을 `/legacy` 목록에 더한다.
+- **목적:** 12/26에 계획서 §7 여섯 줄을 판정하고, 2단계의 1순위 문제를 숫자와 함께 적는다. 3주간 import 안 된 옛 모듈 추가분을 `golden/LEGACY_MANIFEST.txt`에 더한다(개정판 §2).
 - **선행 산출물:** S34, GATE.md, CALIBRATION.md, 야간 스모크 기록(Kiki 머신 `sim_report.json` 날짜별), HARVEST.md.
 - **할 일:**
   1. 진실 트랙 3줄·회귀 트랙 3줄을 각각 예/아니오와 숫자로 `golden/reports_phase1/GATE.md`에 확정한다(⑤는 Kiki 머신 보고서 파일 수로: S20 통과 이후 날짜 중 치명 실패 0인 날 ÷ 전체 날).
   2. 판정 규칙 적용(공유 계약 게이트 절): 2단계 진행 / S21~S35 반복 / 2단계 + 첫 주 시뮬레이터 수정.
   3. `golden/FINDINGS_v2.md`: 실학생 50건 기준으로 끊김 4종·단계별·문항별 표를 **실학생 출처 하나로** 다시 집계(대체 피험자와 섞지 않는다), 1위 문제를 "N건 중 M건"으로, 2·3위, 슬롯 3개 결과 요약, 2단계 후보(슬롯에서 "효과 없음"이었던 것의 다른 접근 · LATER 상위).
-  4. 미참조 옛 모듈 추가분: 골든 패스 S15 방식(grimp로 `golden` 상류 ∖ 전체)을 다시 돌려 S15 목록과의 차이(새로 import된 모듈 = T1·T2·T3 자산, 여전히 미참조인 모듈)를 HARVEST.md에 적는다. `/legacy` 물리 이동은 Kiki 결정(S15와 같다).
+  4. 미참조 옛 모듈 추가분: 골든 패스 S15 방식(grimp로 `golden` 상류 ∖ 전체)을 다시 돌려 S15 목록과의 차이(새로 import된 모듈 = T1·T2·T3 자산 · S20A 복사로 **빠진** 모듈 · 여전히 미참조인 모듈)를 HARVEST.md에 적고, 여전히 미참조인 옛 모듈 전부를 `golden/LEGACY_MANIFEST.txt`(모듈 이름 한 줄씩 · 머리에 측정 기준 커밋 해시·날짜 · S15 722건 + 추가분)에 쓴다. `/legacy` 물리 이동은 Kiki 결정(S15와 같다).
   5. 2단계 계획 초안(`golden/NEXT_PHASE2.md`): 계획서 §2 표 형식 그대로, 세션 번호 S36부터, FINDINGS_v2 순서대로. 새 계획서 형식을 만들지 않는다.
   6. 1단계 회고 `golden/RETRO_phase1.md`: 세션별 완료 기준 충족 표, 범위 밖으로 나가려다 멈춘 순간 모음(각 세션 보고 ⑤), LATER 항목 수, 시뮬레이터가 "재미있어서" 들인 시간 추정.
-- **산출물:** GATE.md 확정, FINDINGS_v2.md, HARVEST 미참조 목록, NEXT_PHASE2.md, RETRO_phase1.md.
-- **완료 기준:** ①여섯 줄 전부 예/아니오 + 숫자 ②FINDINGS_v2의 1위가 "N건 중 M건" ③NEXT_PHASE2 첫 세션이 FINDINGS_v2 1위를 가리킨다 ④판정: **go**(2단계) / **반복**(S21~S35) / **go+수정주**(회귀 트랙만 아니오).
+- **산출물:** GATE.md 확정, FINDINGS_v2.md, HARVEST 미참조 목록, `golden/LEGACY_MANIFEST.txt`, NEXT_PHASE2.md, RETRO_phase1.md.
+- **완료 기준:** ①여섯 줄 전부 예/아니오 + 숫자 ②FINDINGS_v2의 1위가 "N건 중 M건" ③NEXT_PHASE2 첫 세션이 FINDINGS_v2 1위를 가리킨다 ⑤LEGACY_MANIFEST.txt에 측정 기준 해시와 모듈 수 ④판정: **go**(2단계) / **반복**(S21~S35) / **go+수정주**(회귀 트랙만 아니오).
 - **하지 말 것:** 게이트 숫자를 대체 피험자 로그로 채우지 않는다(실학생만). 옛 모듈 삭제 금지. 2단계 계획에 §6 항목을 로그 근거 없이 넣지 않는다.
