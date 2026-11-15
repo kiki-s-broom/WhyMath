@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "Kiki S15 결정(2026-11-15) 집행 — 논리 격리: ①golden/LEGACY_MANIFEST.txt(백엔드 722모듈·Flutter 74파일 · 첫 줄 측정 커밋 a9cff6ec·날짜) ②import-linter 계약 golden-no-legacy(기존 5개 유지 · lint-imports 통과) ③CI 분리 — 옛 테스트·백엔드 경로 잡을 legacy.yml(weekly·continue-on-error)로, PR 필수는 golden 워크플로만 ④CLAUDE.md 골든 블록 한 줄(LEGACY 읽기 전용·새 import 금지·삭제는 S74) ⑤golden이 쓰는 옛 모듈 122개를 직접/전이로 분리 보고 · 임계(직접>10 또는 전이>30)면 LATER에 '1단계 과제: 전이 의존 절단' ⑥golden/api.py의 create_app·옛 라우터·미들웨어 의존 확인 ⑦HARVEST 한 줄 · 종료 보고에 lint-imports·golden CI 결과"
-artifacts: []
+artifacts:
+  - "PR #1916 · 커밋 d66d9aaa·f5acfb81·02caef99 · golden/LEGACY_MANIFEST.txt(백엔드 722·Flutter 74 · 측정 a9cff6ec) · import-linter 계약 golden-no-legacy(pyproject 6번째 · lint-imports 6 kept 0 broken · .importlinter는 기존 5계약을 가려 미채택) · tests/golden/test_legacy_manifest.py(뮤테이션 4종 RED · 그래프 밖 l1/rights 4모듈 AST 보완) · CI 최소안(Kiki): golden-path 필수 체크 문서 등록 + 만료 S2 유예 삭제 · golden-path에 lint-imports는 EOS-67 단일 실행 주체 검사로 되돌림 · 룰셋 등록 Kiki 대기 · 옛 잡 강등은 헌법 제7조의3③ 개정 뒤 · CLAUDE.md v0.2.45 한 줄 · 의존 분리 직접 7·전이 115 → LATER 1단계 과제(1순위 db.session 단독 82) · api.py 옛 앱 의존 없음 · tests/golden 293 passed · CI 미러 9잡 통과(02caef99)"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -23,7 +24,7 @@ paths:
   - CLAUDE.md
   - ".github/branch-protection-setup.md"
   - tests/infra/test_required_checks_doc.py
-session: claude/new-session-9lemjj
+session: null
 notes: |-
   Kiki 지시 2026-11-15(S15 결정 — /legacy 물리 이동 안 함, 논리 격리). 선행 GOLD-16(PR #1915 머지 602cd5dc). 옛 코드(golden 밖 소스)는 한 줄도 수정하지 않는다 — CI 설정·CLAUDE.md·pyproject 계약은 Kiki가 하네스로 허용.
 
