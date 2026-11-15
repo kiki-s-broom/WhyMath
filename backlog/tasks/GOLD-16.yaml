@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "S15 산출물: HARVEST.md '3주간 미참조 모듈' 절(측정 명령·경로·줄 수) · golden/RETRO.md(§6 5줄 예/아니오·첫 줄 대체 피험자 내역과 Kiki 결정 요청) · golden/NEXT_3WEEKS.md(첫 세션 S16 = 실제 중학생 1명 검증) · /legacy 이동은 Kiki 결정 기록(진행/보류) · golden/reports_no_students/S15/보고.md"
-artifacts: []
+artifacts:
+  - "PR #1915 · 커밋 cf73a81c·9c2b6b2f · HARVEST.md 「3주간 미참조 모듈」(백엔드 722/844모듈 286,275줄 · Flutter 74/82파일 10,931줄 · 측정 python -m golden.measure_unreferenced · grimp 상류 + 보정 3종) · /legacy 물리 이동 보류(Kiki 결정 2026-11-15) · golden/RETRO.md(§6 아니오·예·아니오·예·예 · 첫 줄 대체 피험자 본인1·AI3·성인2 + Kiki 결정 요청 A/B) · golden/NEXT_3WEEKS.md(S16 실제 중학생 1명 → FINDINGS 2·3위 → LATER) · tests/golden 288 passed exit 0 · 정적 4종 exit 0 · 새 테스트 뮤테이션 4종 RED · CI 미러 9잡 통과(9c2b6b2f · 74스텝 · 미실행 0) · 보고 golden/reports_no_students/S15/보고.md"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
   - "tests/golden/**"
-session: claude/new-session-9lemjj
+session: null
 notes: "GOLD-01 우산의 S15 슬라이스(지시서 golden/prompts_no_students 단계12 S15). 선행 S14 완료(main a9cff6ec PR #1913). 옛 모듈 삭제 금지·물리 이동은 Kiki 결정."
 updated: 2026-11-15
