@@ -23,11 +23,12 @@
 | 없음 — 튜터(S4)와 같은 프로바이더 팩토리·라우터(`build_cloud_provider` + `Router.route`)를 학생 LLM에도 재사용 | 옛 시뮬레이터·합성 학생 계열은 찾아 쓰지 않음(`golden/sim_student.py` 1파일로 새로 씀) | 학생 LLM도 공통 규칙 8(팩토리 경유)을 따른다. 튜터 코드(`api.py`·`tutor.py`)와는 HTTP로만 만난다 | S11 |
 | (S14 튜터 프롬프트 개선) 없음 — 옛 자산 0건. `golden/tutor_prompt.md` 규칙 6에 한 문장(마지막 되묻기에서도 틀린 곳 하나를 짚고 질문 하나로 답을 묻는다)만 더함 | 오개념 카탈로그(`whymath_backend/l1/misconception/` — 부호 오개념 항목) · 교수학 루브릭(`whymath_backend/harness/pedagogical_rubric.py`)의 힌트 규칙 | 튜터가 학생이 쓴 값을 그대로 짚으면 되므로 카탈로그 조회·오개념 매칭이 필요 없다(FINDINGS「S14 제안」 · 오개념 매칭은 §5). 실제 LLM 재생으로 효과 확인: 1위 근거 5사례×5회의 마지막 되묻기가 틀린 곳을 짚은 수 4/25 → 25/25 | S14 |
 | (S15 격리·회고) 없음 — 옛 코드 import 0건 추가. 측정 스크립트는 `grimp`(이미 dev 의존성)만 씀 | 옛 모듈 722개·옛 Flutter 74파일의 `/legacy` 물리 이동(이번엔 하지 않음) | Kiki 결정(2026-11-15) "보류 — 목록만 기록". 부분 이동은 패키지 이름이 바뀌어 옛 import 3,409줄 수정(§5)과 옛 테스트 965파일·CI 19잡 수정을 부른다. 목록은 아래 절에 확정 | S15 |
+| (S15 결정 집행) 격리: 722모듈·74파일, 이동 없음, 삭제는 S74 — `golden/LEGACY_MANIFEST.txt` + import-linter 계약 `golden-no-legacy` + `tests/golden/test_legacy_manifest.py` | 물리 이동(`/legacy`) · 옛 코드 수정 | Kiki 결정(2026-11-15) "논리 격리". 옛 코드는 한 줄도 고치지 않고, golden에서 새 import만 막는다 | S15 |
 
 ## 3주간 미참조 모듈 (S15 · 측정 2026-11-15 · 기준 main `a9cff6ec`)
 
 > **뜻**: golden 코드(`src/backend/golden/`·`src/mobile/lib/golden/`·`lib/main_golden.dart`)가 **직접이든 간접이든 한 번도 import하지 않는** 옛 모듈. "죽은 코드"가 아니다 — 옛 `create_app`·옛 테스트·CLI 스크립트는 여전히 쓴다. **삭제 대상이 아니다**(지시서 "하지 말 것").
-> **/legacy 물리 이동: 보류 — Kiki 결정(2026-11-15 · S15 세션 질문 응답 "보류 — 목록만 기록").** 근거는 아래 「이동하면 깨지는 것」. 이동은 `golden/NEXT_3WEEKS.md`에 실제 학생 검증 뒤 순서로 올렸다.
+> **/legacy 물리 이동: 보류 — Kiki 결정(2026-11-15 · S15 세션 질문 응답 "보류 — 목록만 기록").** **최종 결정(같은 날 Kiki): 물리 이동 없이 논리 격리** — 목록을 `golden/LEGACY_MANIFEST.txt`로 고정하고 import-linter 계약 `golden-no-legacy`로 golden의 새 import를 막는다. 삭제는 3단계 S74(GOLD-17). 근거는 아래 「이동하면 깨지는 것」. 이동은 `golden/NEXT_3WEEKS.md`에 실제 학생 검증 뒤 순서로 올렸다.
 
 ### 측정 명령
 
