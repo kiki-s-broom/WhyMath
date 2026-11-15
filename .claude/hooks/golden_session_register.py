@@ -33,13 +33,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 #: 지시문 첫 줄 — 접두 · 단계 두 자리 · 작업 번호 · 짧은 이름.
-#: 접두 = GP 골든 패스 원본 · GPN 학생 없는 변형 · DK 1단계 두꺼게(S16~S35).
+#: 접두 = GP 골든 패스 원본 · GPN 학생 없는 변형 · DK 1단계 두꺼게(S16~S35)
+#:        · DU 2단계 두 번째 단원(S36~S55).
 #: 새 묶음은 이 정규식과 아래 _BUNDLE 표, 테스트 픽스처에 함께 더한다.
-_NAME_RE = re.compile(r"^세션 이름:\s*((GPN|GP|DK)-단계(\d{2})-([A-Z]+\d+)-(\S+))\s*$")
+_NAME_RE = re.compile(r"^세션 이름:\s*((GPN|GP|DK|DU)-단계(\d{2})-([A-Z]+\d+)-(\S+))\s*$")
 _BUNDLE = {
     "GP": "원본 묶음(golden/prompts)",
     "GPN": "학생 없는 변형(golden/prompts_no_students)",
     "DK": "1단계 두꺼게(golden/prompts_phase1)",
+    "DU": "2단계 두 번째 단원(golden/prompts_phase2)",
 }
 _REGISTRY_REL = Path("golden") / "SESSIONS.md"
 _HEADER = (

@@ -46,6 +46,7 @@ def _stdin(prompt: str, session_id: str = "session_01ABCDEFGHIJKLMNOP") -> bytes
         (_PROMPT_GPN, ("GPN-단계07-S11-AI시뮬학생3종", "S11", "GPN")),
         ("  세션 이름: GP-단계01-H1-학생섭외-Kiki  \n", ("GP-단계01-H1-학생섭외-Kiki", "H1", "GP")),
         ("세션 이름: DK-단계07-S25-T1판정", ("DK-단계07-S25-T1판정", "S25", "DK")),
+        ("세션 이름: DU-단계06-S42-판정pair-B2", ("DU-단계06-S42-판정pair-B2", "S42", "DU")),
     ],
 )
 def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, str, str]) -> None:
@@ -108,6 +109,14 @@ def test_run_distinguishes_sessions_and_bundles(tmp_path: Path) -> None:
     ]
     assert len(rows) == 4
     assert "1단계 두꺼게(golden/prompts_phase1)" in rows[3]
+    hook.run(_stdin("세션 이름: DU-단계01-S36-단원확정-스펙-오개념\n\n본문", "session_E"), tmp_path)
+    rows = [
+        line
+        for line in (tmp_path / "golden" / "SESSIONS.md").read_text(encoding="utf-8").splitlines()
+        if line.startswith("| 20")
+    ]
+    assert len(rows) == 5
+    assert "2단계 두 번째 단원(golden/prompts_phase2)" in rows[4]
 
 
 def test_run_ignores_ordinary_prompt(tmp_path: Path) -> None:
