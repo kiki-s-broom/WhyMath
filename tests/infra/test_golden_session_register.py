@@ -51,6 +51,10 @@ def _stdin(prompt: str, session_id: str = "session_01ABCDEFGHIJKLMNOP") -> bytes
             "세션 이름: SC-단계16-S73-드라이런-diff0줄",
             ("SC-단계16-S73-드라이런-diff0줄", "S73", "SC"),
         ),
+        (
+            "세션 이름: PL-단계20-S100-운영5주금-응시율",
+            ("PL-단계20-S100-운영5주금-응시율", "S100", "PL"),
+        ),
     ],
 )
 def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, str, str]) -> None:
@@ -64,6 +68,7 @@ def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, 
         "세션 이름: PED17-단계01-T0-결정기록",  # 다른 묶음 접두 — 이 훅의 대상이 아니다
         "세션 이름: DKX-단계01-S16-시드",  # 접두 변형 — 등록된 접두만 받는다
         "세션 이름: SCX-단계01-S56-사전등록",  # 접두 변형 — 등록된 접두만 받는다
+        "세션 이름: PLX-단계01-S76-콘텐츠확장",  # 접두 변형 — 등록된 접두만 받는다
         "세션 이름: GP-단계3-S4-짧은이름",  # 단계 두 자리가 아니다
         "세션 이름: GP-단계03-S4",  # 짧은 이름 누락
         "본문\n본문\n본문\n세션 이름: GP-단계03-S4-API3개-튜터",  # 첫 3줄 밖
@@ -130,6 +135,16 @@ def test_run_distinguishes_sessions_and_bundles(tmp_path: Path) -> None:
     ]
     assert len(rows) == 6
     assert "3단계 세 번째 단원+Subject Contract(golden/prompts_phase3)" in rows[5]
+    hook.run(
+        _stdin("세션 이름: PL-단계01-S76-콘텐츠확장-5단원-코드0줄\n\n본문", "session_G"), tmp_path
+    )
+    rows = [
+        line
+        for line in (tmp_path / "golden" / "SESSIONS.md").read_text(encoding="utf-8").splitlines()
+        if line.startswith("| 20")
+    ]
+    assert len(rows) == 7
+    assert "4단계 파일럿(golden/prompts_phase4)" in rows[6]
 
 
 def test_run_ignores_ordinary_prompt(tmp_path: Path) -> None:
