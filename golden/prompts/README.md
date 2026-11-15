@@ -1,6 +1,6 @@
 # WhyMath 골든 패스 AI 작업 지시문
 
-계획서: 저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본) · 지시서 원본 `golden/prompts_src/spec.md`
+계획서: 저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본 · 2026-11-15 개정판 DOCX는 Kiki 보관 — S15를 /legacy 이동에서 LEGACY_MANIFEST.txt 격리로 바꿈) · 지시서 원본 `golden/prompts_src/spec.md`
 
 작업 하나에 파일 하나다. **파일 이름이 곧 세션 이름**이다. 각 파일은 그것만 붙여 넣어도 AI가 작업할 수 있도록 배경, 실행 방식, 공통 규칙, 용어, 작업 지시, 보고 형식을 모두 담고 있다.
 
@@ -78,5 +78,5 @@ S9·S11·S12는 실제 학생이 앱을 쓰는 세션이라 AI 혼자 할 수 �
 - S2 뒤 (Kiki): 브랜치 룰셋 required check에 CI 잡 `golden-path` 추가(머지 차단 완성) · Alembic 대신 create_all로 golden 스키마를 만드는 제안값 확인
 - S8 (Kiki): 런북대로 서버·앱을 띄워 직접 문제 3개를 끝까지 풀고 CHECKLIST 12항목 체크
 - S9·S11·S12 (Kiki): 학생 옆에서 20분 관찰·기록(수학 힌트 금지), 관찰 기록을 AI 세션에 전달
-- S15 (Kiki): 미참조 옛 모듈의 /legacy 이동 진행 여부 결정
+- S15 (Kiki): 격리 방식 확인(LEGACY_MANIFEST.txt·import 계약·CI 최소안 — 개정판) · 필수 체크 룰셋에 golden-path 등록(Kiki 실행)
 - 매 세션 (Kiki): PR 머지는 Kiki가 한다. tests/golden 빨강인 PR은 머지하지 않는다
