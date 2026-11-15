@@ -45,6 +45,7 @@ def _stdin(prompt: str, session_id: str = "session_01ABCDEFGHIJKLMNOP") -> bytes
         (_PROMPT_GP, ("GP-단계03-S4-API3개-튜터", "S4", "GP")),
         (_PROMPT_GPN, ("GPN-단계07-S11-AI시뮬학생3종", "S11", "GPN")),
         ("  세션 이름: GP-단계01-H1-학생섭외-Kiki  \n", ("GP-단계01-H1-학생섭외-Kiki", "H1", "GP")),
+        ("세션 이름: DK-단계07-S25-T1판정", ("DK-단계07-S25-T1판정", "S25", "DK")),
     ],
 )
 def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, str, str]) -> None:
@@ -56,6 +57,7 @@ def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, 
     [
         "오늘 할 일 정리해 줘",
         "세션 이름: PED17-단계01-T0-결정기록",  # 다른 묶음 접두 — 이 훅의 대상이 아니다
+        "세션 이름: DKX-단계01-S16-시드",  # 접두 변형 — 등록된 접두만 받는다
         "세션 이름: GP-단계3-S4-짧은이름",  # 단계 두 자리가 아니다
         "세션 이름: GP-단계03-S4",  # 짧은 이름 누락
         "본문\n본문\n본문\n세션 이름: GP-단계03-S4-API3개-튜터",  # 첫 3줄 밖
@@ -98,6 +100,14 @@ def test_run_distinguishes_sessions_and_bundles(tmp_path: Path) -> None:
     rows = [line for line in text.splitlines() if line.startswith("| 20")]
     assert len(rows) == 3
     assert "학생 없는 변형(golden/prompts_no_students)" in rows[2]
+    hook.run(_stdin("세션 이름: DK-단계01-S16-시드추출-번호체계\n\n본문", "session_D"), tmp_path)
+    rows = [
+        line
+        for line in (tmp_path / "golden" / "SESSIONS.md").read_text(encoding="utf-8").splitlines()
+        if line.startswith("| 20")
+    ]
+    assert len(rows) == 4
+    assert "1단계 두꺼게(golden/prompts_phase1)" in rows[3]
 
 
 def test_run_ignores_ordinary_prompt(tmp_path: Path) -> None:
