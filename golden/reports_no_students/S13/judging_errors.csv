@@ -1,0 +1,66 @@
+출처·시점,피험자,파일,줄,문제,입력순서,값/식,지금상태,끊긴문제,학생입력
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,2,LF-01,1,값,지금도 거부,예,f(5)는 -12예요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,6,LF-02,1,값,S10이 고침,예,1 같은데요?
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,7,LF-02,2,식,지금도 거부,예,x에 -3 넣어 -3+4 했어요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,8,LF-02,3,값,지금도 거부,예,4에서 3 빼니까 1 됐어요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,11,LF-04,1,값,지금도 거부,예,f(3)은 -8이에요
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,12,LF-04,2,값,지금도 거부,예,x에 3 넣으면 -3-5라 -8이에요
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,15,LF-05,1,값,지금도 거부,,x에 0 넣으면 8이에요?
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,16,LF-05,2,식,지금도 거부,,4×0+8이라고 쓰면 돼요?
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,19,LF-06,1,값,지금도 거부,,x에 -1 넣으니까 0이에요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,22,LF-07,1,값,지금도 거부,,x에 2 넣으면 11?
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,24,LF-08,1,값,S10이 고침,예,16 맞나요?
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,27,LF-08,4,값,지금도 거부,예,15에 1 더하면 16이에요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,28,LF-09,1,값,지금도 거부,예,x에 0 넣으면 -4예요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,29,LF-09,2,값,지금도 거부,예,0 곱하면 0이고 -4는 그대로예요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,30,LF-09,3,값,지금도 거부,예,상수항 -4만 남아요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,31,LF-09,4,값,지금도 거부,예,f(0) = -4라고 써요.
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,32,LF-10,1,값,S10이 고침,예,5×(-2)-1=-11?
+AI · S10 전(S11 1차),sim-slope-blind,sim_slope-blind_turns.csv,35,LF-10,4,값,지금도 거부,예,왼쪽으로 한 칸 가면 -11이에요.
+AI · S10 전(S11 1차),sim-sign-slip,sim_sign-slip_turns.csv,3,LF-01,2,식,지금도 거부,예,-3×5+3이 돼요.
+AI · S10 전(S11 1차),sim-sign-slip,sim_sign-slip_turns.csv,7,LF-02,2,식,지금도 거부,예,x에 -3 넣으면 -3+4요.
+AI · S10 전(S11 1차),sim-sign-slip,sim_sign-slip_turns.csv,12,LF-04,2,값,지금도 거부,예,왼쪽으로 5칸이면 -8 같아요.
+AI · S10 전(S11 1차),sim-sign-slip,sim_sign-slip_turns.csv,13,LF-04,3,값,지금도 거부,예,3 넣으면 -3-5라서 -8이에요.
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,9,LF-02,4,식,지금도 거부,예,음... -3+4요?
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,13,LF-03,4,식,S10이 고침,예,6×2-8이요?
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,17,LF-04,4,식,S10이 고침,예,-3 - 5요?
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,19,LF-05,2,식,S10이 고침,예,4×0+8이요
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,21,LF-05,4,값,S10이 고침,예,8이요
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,29,LF-07,4,식,S10이 고침,예,2×2+7이요?
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,31,LF-08,2,식,S10이 고침,예,3×5+1이요?
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,33,LF-08,4,값,지금도 거부,예,15+1은 16이요.
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,35,LF-09,2,값,지금도 거부,예,0 넣으면 -4요?
+AI · S10 전(S11 1차),sim-no-setup,sim_no-setup_turns.csv,36,LF-09,3,값,지금도 거부,예,계산은 안 했고 그냥 -4요
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,2,LF-01,1,값,지금도 거부,,f(5)는 -12예요.
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,5,LF-02,1,값,지금도 거부,,x에 -3 넣으면 1이에요.
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,7,LF-03,1,값,지금도 거부,,x에 2 넣으면 4 같아요
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,9,LF-04,1,값,지금도 거부,,f(3)은 -8이에요.
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,11,LF-05,1,값,지금도 거부,,x에 0 넣으면 8 같은데요?
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,13,LF-06,1,값,지금도 거부,,x에 -1 넣으니 0 같아요.
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,16,LF-08,1,값,지금도 거부,,5를 넣으면 16이에요.
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,20,LF-10,1,값,지금도 거부,,x에 -2 넣으면 -11이에요.
+AI · S10 후(S12 재실행),sim-slope-blind,sim_slope-blind_rerun_turns.csv,21,LF-10,2,값,지금도 거부,,"5 곱하기 -2 해서 -10, -1 빼서 -11이요."
+AI · S10 후(S12 재실행),sim-sign-slip,sim_sign-slip_rerun_turns.csv,7,LF-02,2,식,지금도 거부,예,-3+4가 돼요.
+AI · S10 후(S12 재실행),sim-sign-slip,sim_sign-slip_rerun_turns.csv,13,LF-04,3,값,지금도 거부,예,"아, 왼쪽으로 가면 -8이네요."
+AI · S10 후(S12 재실행),sim-sign-slip,sim_sign-slip_rerun_turns.csv,14,LF-04,4,값,지금도 거부,예,f(3)은 -8이에요.
+AI · S10 후(S12 재실행),sim-sign-slip,sim_sign-slip_rerun_turns.csv,15,LF-05,1,값,지금도 거부,,x에 0 넣으면 8이에요?
+AI · S10 후(S12 재실행),sim-sign-slip,sim_sign-slip_rerun_turns.csv,23,LF-09,3,식,지금도 거부,예,-5×0−4는 0−4예요.
+AI · S10 후(S12 재실행),sim-no-setup,sim_no-setup_rerun_turns.csv,16,LF-05,1,값,지금도 거부,,8인 것 같아요
+AI · S10 후(S12 재실행),sim-no-setup,sim_no-setup_rerun_turns.csv,29,LF-08,2,식,지금도 거부,예,어... 3×5+1인가요?
+AI · S10 후(S12 재실행),sim-no-setup,sim_no-setup_rerun_turns.csv,31,LF-08,4,값,지금도 거부,예,15+1은 16이요
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,3,LF-01,2,식,S10이 고침,예,-3×5+3이요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,5,LF-01,4,식,S10이 고침,예,-15+3이요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,7,LF-02,2,식,지금도 거부,예,x에 -3 넣으면 -3+4예요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,8,LF-02,3,값,S10이 고침,예,1이요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,9,LF-02,4,값,지금도 거부,예,수직선으로 해 보니 1 같아요
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,11,LF-03,2,식,지금도 거부,예,6×2-8이 되지 않아요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,12,LF-03,3,식,S10이 고침,예,12-8이요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,13,LF-03,4,값,S10이 고침,예,4요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,16,LF-04,3,식,S10이 고침,예,-3-5요
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,17,LF-04,4,값,지금도 거부,예,왼쪽으로 5칸 가면 -8인가요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,20,LF-05,3,식,S10이 고침,예,4×0+8이요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,32,LF-08,3,식,S10이 고침,예,3×5+1이요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,35,LF-09,2,식,지금도 거부,예,x에 0 넣으면 -5×0-4예요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,36,LF-09,3,값,지금도 거부,예,0 곱하면 0이라 -4예요
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,39,LF-10,2,식,지금도 거부,예,5×(-2)-1 이렇게요?
+AI 막히면 재실행 · S10 전(S11 r2),sim-slope-blind-r2,sim_slope-blind_r2_turns.csv,41,LF-10,4,식,S10이 고침,예,-10-1이요?
