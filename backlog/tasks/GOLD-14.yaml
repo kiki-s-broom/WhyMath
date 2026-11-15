@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-14
+title: "GOLD-14 골든 패스 S13 — 로그 분석(golden/FINDINGS.md · 1위 끊김 지점 1개)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S13 산출물: golden/FINDINGS.md(첫 절 피험자 한계 · 끊김 정의 4종 · 출처별 단계별 표 · 출처별 문항별 표 · 판정 오류 전수 재채점 · 1위 끊김 지점 출처별 N건 중 M건 + 근거 로그 3개(사람 출처 1개 이상) · 2·3위 참고 · S14 제안 1가지) · 집계 CSV(golden/reports_no_students/S13/ · 닉네임·session_id 제외 · 출처 라벨 치환) · golden/reports_no_students/S13/보고.md"
+artifacts:
+  - "PR #1912 · 커밋 5c24c89e·1db5a60e · golden/FINDINGS.md(1위 GP-4 마지막 되묻기 C5 · 본인 5건 중 2건 · AI S10 전 30건 중 2건 · 사람 근거 2) · 판정 오류 전수 재채점(사람 0 · AI S10 후 17 지금도 거부) · 집계 CSV 5개 golden/reports_no_students/S13/ · tests/golden 276 passed exit 0 · 정적 4종 exit 0 · CI 미러 5잡 통과(1db5a60e) · 보고 golden/reports_no_students/S13/보고.md"
+paths:
+  - "golden/**"
+session: null
+notes: "GOLD-01 우산의 S13 슬라이스(지시서 golden/prompts_no_students 단계10 S13). 선행 S12 완료(main cfbdcf99 PR #1911). 사람 출처 원본 CSV 3개(self1·adult1·adult2)는 Kiki가 2026-11-15 채팅으로 전달 — golden/logs/(gitignore)에만 둔다."
+updated: 2026-11-15
