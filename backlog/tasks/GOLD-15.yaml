@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-15
+title: "GOLD-15 골든 패스 S14 — 개선 1개(FINDINGS 1위 GP-4 마지막 되묻기 C5)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S14 산출물: golden/FINDINGS.md 1위(GP-4 마지막 되묻기 C5 · 틀린 곳을 짚지 않음)만 고친다 — golden/tutor_prompt.md 규칙 6 한 문장 · 재현 테스트(tests/golden) 빨강→초록 · 1위 기록 재생 수정 전후 출처별 비교표 · 전체 재생 N건 표(다른 유형 악화 없음) · golden/reports_no_students/S14/보고.md · HARVEST.md 1줄"
+artifacts: []
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+session: claude/new-session-y8s7di
+notes: "GOLD-01 우산의 S14 슬라이스(지시서 golden/prompts_no_students 단계11 S14). 선행 S13 완료(main 9bdba7ff PR #1912). 2위(GP-5 판정 오류)는 함께 고치지 않는다."
+updated: 2026-11-15

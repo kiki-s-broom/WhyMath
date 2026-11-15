@@ -1,0 +1,169 @@
+{
+  "persona": "slope-blind",
+  "nickname": "sim-slope-blind",
+  "mode": "live",
+  "retry_rule": false,
+  "problems": [
+    {
+      "problem_id": "LF-01",
+      "student_lines": [
+        "f(5)는 -12예요.",
+        "-3×5+3=-12예요."
+      ],
+      "tutor_lines": [
+        "f(5)를 -12라고 구했군요. 그 값이 어떻게 나왔는지, x 자리에 5를 넣은 식을 직접 써서 설명해 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-02",
+      "student_lines": [
+        "x에 -3을 넣으면 되나요?",
+        "f(-3)=-3+4요?"
+      ],
+      "tutor_lines": [
+        "x 자리에 -3을 넣으면 되는지 궁금했군요. 그러면 f(x)=x+4에서 x가 있던 자리에 -3을 넣은 식을 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-03",
+      "student_lines": [
+        "6×2-8 하면 4요",
+        "6×2는 12예요.",
+        "12-8이요."
+      ],
+      "tutor_lines": [
+        "x 자리에 2를 넣어 6×2-8로 식을 세웠군요. 그 식에서 6×2를 먼저 계산하면 얼마가 되는지 말해 볼래요?",
+        "6×2가 12라고 계산했군요. 처음에 세운 6×2-8에서 6×2 자리에 12를 넣으면 식이 어떻게 되는지 직접 써 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-04",
+      "student_lines": [
+        "f(3)은 -8이에요.",
+        "x에 3 넣으면 -3-5예요.",
+        "계산하면 -8이에요.",
+        "f(3)=-8이에요."
+      ],
+      "tutor_lines": [
+        "f(3)을 -8이라고 구했군요. 그 값을 어떻게 얻었는지, x 자리에 3을 넣어서 만든 식을 직접 써 볼래요?",
+        "x 자리에 3을 넣어 -3-5라는 식을 만들었군요. 그 식을 계산하면 어떤 수가 되는지 직접 구해 볼래요?",
+        "x에 3을 넣어 만든 식을 계산해 -8을 얻었군요. 그럼 이제 그 수가 문제에서 구하라고 한 f(3)의 값이 맞는지 스스로 한 번 확인해 보고, 답을 f(3) = □ 형태로 직접 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-05",
+      "student_lines": [
+        "x에 0 넣으면 8이에요.",
+        "4×0+8=8이에요."
+      ],
+      "tutor_lines": [
+        "x 자리에 0을 넣으면 8이 된다고 했군요. 그 8이 어떻게 나왔는지 확인해 보고 싶은데, x 자리에 0을 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-06",
+      "student_lines": [
+        "0인가요?"
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-07",
+      "student_lines": [
+        "f(2)가 뭐예요?",
+        "x 자리에 2요?",
+        "2×2+7요?"
+      ],
+      "tutor_lines": [
+        "f(2)라는 표기가 무엇을 뜻하는지 궁금한 거군요. f(x)에서 괄호 안의 x는 이 함수에 넣는 값을 나타내는데, 그러면 f(2)는 그 자리에 어떤 값을 넣으라는 뜻일까요?",
+        "x 자리에 2를 넣는 뜻이라고 본 거군요. 그러면 f(x)=2x+7에서 x 대신 2를 넣었을 때 오른쪽 부분을 어떻게 써 볼 수 있을까요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-08",
+      "student_lines": [
+        "f(5)는 16이에요.",
+        "x에 5 넣어 3×5+1 했어요.",
+        "3×5는 15예요.",
+        "15+1 하면 16이에요."
+      ],
+      "tutor_lines": [
+        "f(5)는 16이라고 말했군요. 그 값을 구하려고 x 자리에 5를 넣었을 때, 어떤 식을 세워서 계산했는지 말해 볼래요?",
+        "x에 5를 넣어 3×5+1이라고 식을 세웠군요. 그 식에서 3×5를 먼저 계산하면 얼마가 되는지 직접 말해 볼래요?",
+        "3×5를 계산해 15라고 말했군요. 이제 그 결과를 네가 세운 식 3×5+1에 이어서, f(5)의 값을 직접 구해 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-09",
+      "student_lines": [
+        "f(0)은 -4예요.",
+        "f(0) = -5×0 -4 = -4예요."
+      ],
+      "tutor_lines": [
+        "f(0)을 -4라고 말했군요. 그 값을 구할 때 세운 식을 직접 적어서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-10",
+      "student_lines": [
+        "f(-2)는 -11이에요.",
+        "5 곱하기 -2 빼기 1이요.",
+        "5 곱하기 -2는 -10이에요.",
+        "-10 빼기 1은 -11이에요."
+      ],
+      "tutor_lines": [
+        "f(-2)의 값이 -11이라고 말해 주었군요. 그 값을 얻기 위해 x 자리에 -2를 넣었을 때 어떤 식을 세웠는지 말해 볼래요?",
+        "x 자리에 -2를 넣어 5 곱하기 -2 빼기 1이라는 식을 세웠군요. 그 식에서 5 곱하기 -2를 먼저 계산하면 얼마인지 직접 구해 볼래요?",
+        "5 곱하기 -2가 -10이라고 계산했군요. 그 계산을 이어서 f(-2)의 값을 최종적으로 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    }
+  ],
+  "student_llm_calls": 27,
+  "student_llm_failures": 0,
+  "final_mastery": 0.9,
+  "elapsed_s": 206.6,
+  "error": null,
+  "prompts_checked": 27,
+  "privacy_violations": 0,
+  "turn_rows": 27
+}

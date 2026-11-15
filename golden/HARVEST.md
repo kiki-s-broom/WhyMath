@@ -21,3 +21,4 @@
 | 없음 | L2 학습자 모델(BKT·IRT·`next-problem` 선택) | 숙련도는 +0.10/−0.05 한 줄, 문항 순서는 고정 30개 순환이다(§5) | S1~S5 |
 | 없음 | 데모 OAuth·JWT·회원가입 | 학생 식별자는 닉네임뿐(공통 규칙 9) | S1~S5 |
 | 없음 — 튜터(S4)와 같은 프로바이더 팩토리·라우터(`build_cloud_provider` + `Router.route`)를 학생 LLM에도 재사용 | 옛 시뮬레이터·합성 학생 계열은 찾아 쓰지 않음(`golden/sim_student.py` 1파일로 새로 씀) | 학생 LLM도 공통 규칙 8(팩토리 경유)을 따른다. 튜터 코드(`api.py`·`tutor.py`)와는 HTTP로만 만난다 | S11 |
+| (S14 튜터 프롬프트 개선) 없음 — 옛 자산 0건. `golden/tutor_prompt.md` 규칙 6에 한 문장(마지막 되묻기에서도 틀린 곳 하나를 짚고 질문 하나로 답을 묻는다)만 더함 | 오개념 카탈로그(`whymath_backend/l1/misconception/` — 부호 오개념 항목) · 교수학 루브릭(`whymath_backend/harness/pedagogical_rubric.py`)의 힌트 규칙 | 튜터가 학생이 쓴 값을 그대로 짚으면 되므로 카탈로그 조회·오개념 매칭이 필요 없다(FINDINGS「S14 제안」 · 오개념 매칭은 §5). 실제 LLM 재생으로 효과 확인: 1위 근거 5사례×5회의 마지막 되묻기가 틀린 곳을 짚은 수 4/25 → 25/25 | S14 |
