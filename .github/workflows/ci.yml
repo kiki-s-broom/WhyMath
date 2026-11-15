@@ -1154,12 +1154,6 @@ jobs:
       - name: Mypy strict (golden)
         run: python -m mypy --strict golden
 
-      # GOLD-17(S15 결정 · Kiki 2026-11-15 최소안): 골든 워크플로가 혼자 완결되도록 import 계약을
-      # 여기서도 돈다. 6계약 중 `golden-no-legacy`가 golden의 LEGACY_MANIFEST 모듈 새 import를 막는다.
-      # backend 잡의 같은 스텝은 그대로 둔다(옛 잡은 강등하지 않음 — 헌법 제7조의3③ 개정 기록 전).
-      - name: Import 계약 (lint-imports — golden-no-legacy 포함)
-        run: lint-imports
-
       - name: Pytest (tests/golden — 골든 패스 e2e)
         run: python -m pytest ../../tests/golden
 
