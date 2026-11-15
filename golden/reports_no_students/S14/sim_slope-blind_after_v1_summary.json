@@ -1,0 +1,175 @@
+{
+  "persona": "slope-blind",
+  "nickname": "sim-slope-blind",
+  "mode": "live",
+  "retry_rule": false,
+  "problems": [
+    {
+      "problem_id": "LF-01",
+      "student_lines": [
+        "f(5)는 -12인가요?",
+        "f(5)=-3×5+3이에요."
+      ],
+      "tutor_lines": [
+        "f(5)를 -12라고 생각했군요. 그 값이 나온 과정을 확인해 보고 싶은데, x 자리에 5를 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-02",
+      "student_lines": [
+        "f(-3)은 -3+4라서 1이에요.",
+        "x 자리에 들어갔어요.",
+        "x 자리에 -3 넣으면 -3+4예요.",
+        "1이에요."
+      ],
+      "tutor_lines": [
+        "f(-3)을 -3+4로 썼다고 말해 줬군요. 그 -3이 f(x)=x+4에서 어느 자리에 들어간 것인지, 식을 보면서 짚어 설명해 볼래요?",
+        "어느 부분이 막히는지 한 가지만 말해 줄래? x 자리에 -3을 넣으면 식이 어떻게 되는지 말해 볼래?",
+        "x 자리에 -3을 넣으면 -3+4라고 썼군요. 그럼 그 식을 계산해서 f(-3)의 값이 얼마인지 지금까지 생각한 대로 직접 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": true,
+      "degraded_tutor_turns": 1
+    },
+    {
+      "problem_id": "LF-03",
+      "student_lines": [
+        "x에 2 넣으면 12-8=4예요"
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-04",
+      "student_lines": [
+        "x에 3 넣으면 -8이에요",
+        "x에 3 넣어 -3-5=-8"
+      ],
+      "tutor_lines": [
+        "x에 3을 넣었을 때 -8이 나온다고 말해 주었군요. 그 값이 나오기까지 x 자리에 3을 넣은 식을 어떻게 썼는지 종이에 그대로 적어 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-05",
+      "student_lines": [
+        "x에 0 넣으면 8 같아요.",
+        "4×0+8이라고 썼어요.",
+        "4 곱하기 0은 0이에요.",
+        "0+8은 8이니까 답은 8이에요."
+      ],
+      "tutor_lines": [
+        "x 자리에 0을 넣으면 8이라고 생각했군요. 그 생각이 나온 과정을 보려고 하는데, 4x+8의 x 자리에 0을 넣은 식을 어떻게 썼는지 말해 볼래요?",
+        "4×0+8이라고 식을 썼군요. 그 식에서 4×0을 먼저 계산하면 얼마가 되는지 직접 계산해서 말해 볼래요?",
+        "4×0을 0이라고 계산했군요. 이제 4×0+8에서 나온 값을 이용해 f(0)이 얼마인지 스스로 끝까지 계산해서 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-06",
+      "student_lines": [
+        "x에 -1 넣으면 0 같아요",
+        "-6×(-1)-6이에요"
+      ],
+      "tutor_lines": [
+        "x에 -1을 넣으면 0이 될 것 같다고 했군요. 그렇게 생각한 이유를 확인해 보고 싶은데, -1을 넣은 식을 직접 써 보면 어떤 모양이 되는지 말해 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-07",
+      "student_lines": [
+        "f(2)가 뭐예요?",
+        "x가 들어가는 자리 같아요.",
+        "x 자리에 2가 들어간 거요?",
+        "2×2+7=11이요?"
+      ],
+      "tutor_lines": [
+        "\"f(2)라는 표기가 무엇을 뜻하는지 궁금한 거군요.\" 그렇다면 f(x)에서 괄호 안에 들어 있는 x는 무엇을 나타내는 자리라고 생각해 볼래요?",
+        "x가 들어가는 자리라고 생각한 거군요. 그러면 f(2)에서 괄호 안의 2는 그 자리에 무엇이 들어갔다는 뜻일까요?",
+        "x 자리에 2가 들어간다는 뜻으로 이해한 거군요. 이제 그 생각을 이어서 f(2)의 값을 직접 계산해 얼마인지 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-08",
+      "student_lines": [
+        "5 넣으면 16 맞나요?",
+        "x에 5 넣고 3×5+1 했어요.",
+        "3×5는 15, 1 더하면 16이에요.",
+        "f(5)는 16이에요."
+      ],
+      "tutor_lines": [
+        "5를 넣으면 16이 나온다고 생각했군요. 그 16이 어떻게 나왔는지, 5를 어디에 어떻게 넣어서 계산했는지 말해 볼래요?",
+        "x에 5를 넣어 3×5+1이라고 식을 세웠군요. 그럼 그 식을 차례대로 계산하면 어떤 수가 나오는지 직접 계산해 볼래요?",
+        "3×5를 15로 계산하고 1을 더해 값을 구했군요. 그 값을 f(5)의 값으로 놓고, 이 문제의 답을 직접 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-09",
+      "student_lines": [
+        "x에 0 넣으면 -4예요",
+        "x에 0 넣은 식은 -5×0-4예요",
+        "0 곱하면 0, 0-4는 -4예요",
+        "f(0)은 -4예요"
+      ],
+      "tutor_lines": [
+        "\"x 자리에 0을 넣으면 -4라고 했군요. 그 -4가 어디서 나온 건지, x 자리에 0을 넣은 식을 종이에 그대로 한 번 써 볼래요?\"",
+        "\"x 자리에 0을 넣은 식을 -5×0-4라고 그대로 썼군요. 그 식에서 -5×0은 얼마인지, 그리고 거기서 4를 빼면 얼마가 되는지 직접 계산해 볼래요?\"",
+        "\"0을 곱하면 0이 되고 0에서 4를 빼면 -4가 된다고 직접 계산했군요. 그 계산을 거쳐서 f(0)의 값이 무엇인지 지금 바로 말해 볼래요?\""
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-10",
+      "student_lines": [
+        "5곱하기-2빼기1인가요?",
+        "5×(-2)는 -10이에요.",
+        "-11이에요."
+      ],
+      "tutor_lines": [
+        "f(x)의 x 자리에 -2를 넣어 5×(-2)-1로 써 봤군요. 그렇다면 그 식에서 5×(-2)를 먼저 계산하면 얼마가 되는지 직접 구해 볼래요?",
+        "5×(-2)를 -10으로 잘 구했군요. 그렇다면 -10에서 1을 빼면 얼마가 되는지 직접 계산해 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    }
+  ],
+  "student_llm_calls": 30,
+  "student_llm_failures": 0,
+  "final_mastery": 0.95,
+  "elapsed_s": 227.1,
+  "error": null,
+  "prompts_checked": 30,
+  "privacy_violations": 0,
+  "turn_rows": 30
+}

@@ -1,0 +1,165 @@
+{
+  "persona": "slope-blind",
+  "nickname": "sim-slope-blind",
+  "mode": "live",
+  "retry_rule": false,
+  "problems": [
+    {
+      "problem_id": "LF-01",
+      "student_lines": [
+        "f(5)는 -12예요.",
+        "-3×5+3 했어요.",
+        "-15요.",
+        "계산하면 -12예요."
+      ],
+      "tutor_lines": [
+        "f(5)는 -12라고 답했군요. 그 값을 얻기 위해 x 자리에 5를 넣어서 어떤 식을 세웠는지 말해 볼래요?",
+        "x 자리에 5를 넣어 -3×5+3이라는 식을 세웠군요. 그 식에서 곱셈 부분인 -3×5를 먼저 계산하면 얼마가 되는지 말해 볼래요?",
+        "x 자리에 5를 넣어 만든 식에서 -3×5가 -15임을 확인했군요. 이제 그 식을 끝까지 계산해서 f(5)의 값을 직접 구해 말해 볼래요?"
+      ],
+      "attempts": 4,
+      "turns_used": 3,
+      "correct": false,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-02",
+      "student_lines": [
+        "x에 -3 넣으면 1 같아요.",
+        "x에 -3 넣으면 -3+4예요.",
+        "1이요."
+      ],
+      "tutor_lines": [
+        "x에 -3을 넣으면 1이 된다고 생각한 거군요. 그 1이 어떻게 나왔는지, x 자리에 -3을 넣은 식을 직접 써서 보여 줄래요?",
+        "x 자리에 -3을 넣은 식을 -3+4라고 써 줬군요. 그럼 -3+4를 직접 계산하면 얼마가 되는지 말해 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-03",
+      "student_lines": [
+        "6×2-8=4 같아요."
+      ],
+      "tutor_lines": [],
+      "attempts": 1,
+      "turns_used": 0,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-04",
+      "student_lines": [
+        "x에 3 넣으면 -8 같아요.",
+        "x=3이면 -3-5예요.",
+        "-8 같아요."
+      ],
+      "tutor_lines": [
+        "x 자리에 3을 넣으면 -8이라고 생각했군요. 그 -8이 나온 과정을 확인해 보고 싶은데, x 자리에 3을 넣은 식을 직접 써 볼래요?",
+        "x=3일 때 -3-5라고 썼군요. 이제 그 식을 직접 계산하면 얼마가 되는지 말해 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-05",
+      "student_lines": [
+        "x에 0 넣으면 8이에요.",
+        "4 곱하기 0은 0이라 8이에요.",
+        "f(0)=4×0+8=8이요."
+      ],
+      "tutor_lines": [
+        "x에 0을 넣었을 때 8이 나온다고 말했군요. 그 8이 어떻게 나왔는지, 4x 부분에 0을 넣으면 어떻게 되는지 말해 볼래요?",
+        "4 곱하기 0은 0이라서 8이 나온다고 말했군요. 그 과정을 f(0)을 구하는 식으로 직접 써 본다면 어떻게 쓸 수 있을까요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-06",
+      "student_lines": [
+        "f(-1)은 0이에요.",
+        "x 자리에 -1 넣었어요.",
+        "f(-1)=-6×(-1)-6이요."
+      ],
+      "tutor_lines": [
+        "f(-1)을 구해서 말했군요. 그 값이 나오게 된 식을 보려면 f(x)=-6x-6에서 x 자리에 -1을 넣은 식을 어떻게 썼는지 말해 볼래요?",
+        "x 자리에 -1을 넣었다고 했군요. 그렇게 넣은 식을 종이에 그대로 한 번 써 볼래요?"
+      ],
+      "attempts": 3,
+      "turns_used": 2,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-07",
+      "student_lines": [
+        "x에 2를 넣으면 11이에요.",
+        "2×2+7=11이에요."
+      ],
+      "tutor_lines": [
+        "x에 2를 넣으면 11이 된다고 말해 줬군요. 그 11이 어떻게 나온 건지, x 자리에 2를 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-08",
+      "student_lines": [
+        "5를 넣으면 16이에요.",
+        "3×5+1=16이에요."
+      ],
+      "tutor_lines": [
+        "x 자리에 5를 넣어 16이라고 구했군요. 그 16이 어떻게 나왔는지, 5를 넣은 식을 직접 써서 보여 줄래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-09",
+      "student_lines": [
+        "f(0)은 -4 같아요.",
+        "f(0) = -5×0 - 4예요."
+      ],
+      "tutor_lines": [
+        "f(0)이 -4라고 생각했군요. 그렇게 생각한 이유를 확인해 보려고 하는데, x 자리에 0을 넣은 식을 직접 써 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    },
+    {
+      "problem_id": "LF-10",
+      "student_lines": [
+        "x에 -2 넣으면 -11이에요.",
+        "5×(-2)-1=-11이에요."
+      ],
+      "tutor_lines": [
+        "x 자리에 -2를 넣어서 -11이 나왔다고 했군요. 그 값이 어떻게 나왔는지, -2를 넣은 식을 직접 써 보면서 차례대로 설명해 볼래요?"
+      ],
+      "attempts": 2,
+      "turns_used": 1,
+      "correct": true,
+      "degraded_tutor_turns": 0
+    }
+  ],
+  "student_llm_calls": 25,
+  "student_llm_failures": 0,
+  "final_mastery": 1.0,
+  "elapsed_s": 158.2,
+  "error": null,
+  "prompts_checked": 25,
+  "privacy_violations": 0,
+  "turn_rows": 25
+}

@@ -1,0 +1,3419 @@
+{
+ "tag": "after",
+ "prompt": "1차 문장(FINDINGS 제안 원문 · 미채택 — 비교표 참조)",
+ "set": "full",
+ "runs": 1,
+ "degraded_turns": 0,
+ "results": [
+  {
+   "source": "본인",
+   "group": "본인 S10 전(S9)",
+   "file": "S9/보고.md",
+   "pid": "LF-01",
+   "inputs": [
+    "x가 뭐예요?",
+    "5넣어요?",
+    "-12"
+   ],
+   "case_id": "000",
+   "nickname": "rp-af000-1",
+   "steps": [
+    {
+     "student": "x가 뭐예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x가 무엇인지 궁금하군요. f(x)에서 괄호 안의 x는 함수에 넣는 값을 나타내는 문자라고 볼 때, f(5)는 x 자리에 무엇을 넣으라는 뜻일까요?",
+      "turn": 1
+     },
+     "sec": 4.83
+    },
+    {
+     "student": "5넣어요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣는 거라고 생각했군요. 그럼 f(x) = -3x + 3에서 x가 있는 자리에 5를 넣으면 식을 어떻게 쓸 수 있는지 학생이 직접 한번 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 1.84
+    },
+    {
+     "student": "-12",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "본인",
+   "group": "본인 S10 전(S9)",
+   "file": "S9/보고.md",
+   "pid": "LF-02",
+   "inputs": [
+    "7",
+    "1"
+   ],
+   "case_id": "001",
+   "nickname": "rp-af001-1",
+   "steps": [
+    {
+     "student": "7",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "7이라고 답해 주었군요. 그 7은 어떻게 나온 값인지, f(x) = x + 4의 x 자리에 -3을 넣으면 식이 어떻게 되는지 먼저 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.74
+    },
+    {
+     "student": "1",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "본인",
+   "group": "본인 S10 전(S9)",
+   "file": "S9/보고.md",
+   "pid": "LF-03",
+   "inputs": [
+    "20",
+    "12요?",
+    "-4?",
+    "-4"
+   ],
+   "case_id": "002",
+   "nickname": "rp-af002-1",
+   "steps": [
+    {
+     "student": "20",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(2)를 20이라고 답했군요. 그럼 f(x)=6x-8에서 x가 있는 자리에 2를 그대로 넣으면 어떤 식이 되는지 학생이 직접 한번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.01
+    },
+    {
+     "student": "12요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "12라고 했군요. 그 12가 나오게 된 식을 종이에 직접 써서 보여 줄래요?",
+      "turn": 2
+     },
+     "sec": 2.66
+    },
+    {
+     "student": "-4?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-4라고 했군요, 그 값이 나온 식에서 12와 8을 어떻게 계산했는지 그 부분을 다시 한번 살펴볼래요? 그런 다음 f(2)의 값을 직접 구해서 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.8
+    },
+    {
+     "student": "-4",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 4였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "본인",
+   "group": "본인 S10 전(S9)",
+   "file": "S9/보고.md",
+   "pid": "LF-04",
+   "inputs": [
+    "f가 뭐예요?",
+    "3넣어요?",
+    "-3-5=-8"
+   ],
+   "case_id": "003",
+   "nickname": "rp-af003-1",
+   "steps": [
+    {
+     "student": "f가 뭐예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f가 무엇인지 궁금한 거군요. f(x)라는 표기는 x에 어떤 수를 넣으면 그 수에 따라 결과가 하나로 정해지는 규칙을 나타내는 것이에요. 여기서 f(x) = -x - 5라고 쓰여 있으니, x에 어떤 수를 넣으면 그 수로 무엇을 하는 규칙이라고 보이나요?",
+      "turn": 1
+     },
+     "sec": 3.53
+    },
+    {
+     "student": "3넣어요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 3을 넣는 거라고 생각한 거군요. 그러면 -x - 5에서 x 자리에 3을 넣었을 때의 식을 어떻게 쓸 수 있는지 직접 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.9
+    },
+    {
+     "student": "-3-5=-8",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "본인",
+   "group": "본인 S10 전(S9)",
+   "file": "S9/보고.md",
+   "pid": "LF-05",
+   "inputs": [
+    "12",
+    "4요?",
+    "0이요?",
+    "0"
+   ],
+   "case_id": "004",
+   "nickname": "rp-af004-1",
+   "steps": [
+    {
+     "student": "12",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "12라고 답했군요. 그 12는 어떤 식을 어떻게 계산해서 나온 값인지 한번 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.67
+    },
+    {
+     "student": "4요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "12라고 했다가 이번엔 4라고 말했군요. 그 두 값 중 어느 쪽이 맞는지 확인해 보려고 하니, f(x) = 4x + 8에서 x가 있는 자리에 0을 넣으면 식이 어떻게 되는지 직접 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.48
+    },
+    {
+     "student": "0이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "12, 4, 이번엔 0이라고 말했군요. 방금 말한 그 0이 x 자리에 넣은 수인지 계산해서 나온 값인지 스스로 확인해 보고, x 자리에 0을 넣은 식을 직접 써서 계산한 다음 f(0)의 값을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.42
+    },
+    {
+     "student": "0",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 8이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "본인",
+   "group": "본인 역할규칙없음 S10 후(참고)",
+   "file": "S12/보고.md",
+   "pid": "LF-14",
+   "inputs": [
+    "-(2/3)",
+    "(4-(-2))/(-4-5)",
+    "6/(-9)",
+    "-0.67"
+   ],
+   "case_id": "005",
+   "nickname": "rp-af005-1",
+   "steps": [
+    {
+     "student": "-(2/3)",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "두 점을 지나는 그래프의 기울기를 -2/3라고 적었군요. 그 값을 얻기 위해 y의 값의 증가량과 x의 값의 증가량을 각각 어떻게 구했는지, 두 점의 좌표를 넣은 식으로 적어 볼래요?",
+      "turn": 1
+     },
+     "sec": 4.83
+    },
+    {
+     "student": "(4-(-2))/(-4-5)",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "두 점의 좌표를 넣어 (4-(-2))/(-4-5)라고 식을 세웠군요. 그 식에서 분자에 놓은 4-(-2)와 분모에 놓은 -4-5는 각각 무엇의 증가량인지 짚어 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.52
+    },
+    {
+     "student": "6/(-9)",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "6/(-9)라고 쓴 식에서는 분자 6이 x의 증가량이고 분모 -9가 y의 증가량이 놓였는데, 기울기에서는 y의 값의 증가량과 x의 값의 증가량을 어느 쪽에 놓아야 하는지 한 번 더 확인해 볼래요? 그렇게 다시 정리한 기울기 값을 직접 말해 보세요.",
+      "turn": 3
+     },
+     "sec": 3.95
+    },
+    {
+     "student": "-0.67",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -3/2이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "f(5)는 -12예요.",
+    "5에 -3 곱하고 3 더했어요.",
+    "-3이랑 x를 곱한 거예요.",
+    "-3×5로 쓸 수 있어요."
+   ],
+   "case_id": "006",
+   "nickname": "rp-af006-1",
+   "steps": [
+    {
+     "student": "f(5)는 -12예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(5)를 -12라고 답했군요. 그 값을 어떻게 얻었는지 확인해 보고 싶어요. x 자리에 5를 넣은 식을 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 2.37
+    },
+    {
+     "student": "5에 -3 곱하고 3 더했어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5에 -3을 곱한 뒤 3을 더했다고 했군요. 그 과정을 식으로 써 보고, -3×5부터 차례대로 계산해서 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.1
+    },
+    {
+     "student": "-3이랑 x를 곱한 거예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "마지막에 \"-3이랑 x를 곱한 거예요\"라고 했는데, 그 x 자리에 이 문제에서 넣기로 한 수가 무엇이었는지 다시 한번 확인해 보면 좋겠어요. 그 수를 넣어서 f(5)의 값을 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.78
+    },
+    {
+     "student": "-3×5로 쓸 수 있어요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -12였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "1 같은데요?",
+    "x에 -3 넣어 -3+4 했어요.",
+    "4에서 3 빼니까 1 됐어요.",
+    "수직선에서 -3에서 오른쪽 4칸요."
+   ],
+   "case_id": "007",
+   "nickname": "rp-af007-1",
+   "steps": [
+    {
+     "student": "1 같은데요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "6×2-8=4예요."
+   ],
+   "case_id": "008",
+   "nickname": "rp-af008-1",
+   "steps": [
+    {
+     "student": "6×2-8=4예요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "f(3)은 -8이에요",
+    "x에 3 넣으면 -3-5라 -8이에요",
+    "부호는 -, 절댓값은 더해요",
+    "절댓값끼리 3+5=8이에요"
+   ],
+   "case_id": "009",
+   "nickname": "rp-af009-1",
+   "steps": [
+    {
+     "student": "f(3)은 -8이에요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(3)이 -8이라고 답했군요. 그 -8이 어떻게 나왔는지, x 자리에 3을 넣은 식을 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 2.44
+    },
+    {
+     "student": "x에 3 넣으면 -3-5라 -8이에요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 3을 넣어 -3-5라고 식을 세운 걸음이 보여요. 그 -3-5를 계산할 때 어떤 순서로 생각했는지, 그 과정을 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.63
+    },
+    {
+     "student": "부호는 -, 절댓값은 더해요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "부호는 음수로 두고 절댓값을 더한다고 설명했군요. 그 설명대로 -3-5를 계산한 값을 f(3) = □ 형태로 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.01
+    },
+    {
+     "student": "절댓값끼리 3+5=8이에요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -8이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.06
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "x에 0 넣으면 8이에요?",
+    "4×0+8이라고 쓰면 돼요?",
+    "4×0은 0이에요",
+    "0+8이에요"
+   ],
+   "case_id": "010",
+   "nickname": "rp-af010-1",
+   "steps": [
+    {
+     "student": "x에 0 넣으면 8이에요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 0을 넣으면 8이라고 생각한 거군요. 그렇게 생각한 과정을 식으로 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.8
+    },
+    {
+     "student": "4×0+8이라고 쓰면 돼요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x가 있는 자리에 0을 넣은 식을 4×0+8이라고 쓴 거군요. 그렇게 쓴 식을 직접 계산하면 얼마가 되는지 구해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.31
+    },
+    {
+     "student": "4×0은 0이에요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "4×0이 0이라고 계산한 걸 확인했군요. 그렇다면 4×0+8 전체를 계산해서 f(0)의 값을 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.09
+    },
+    {
+     "student": "0+8이에요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "x에 -1 넣으니까 0이에요.",
+    "곱셈 먼저 하고 뺄셈 했어요.",
+    "−6×(−1)−6=6−6=0이에요."
+   ],
+   "case_id": "011",
+   "nickname": "rp-af011-1",
+   "steps": [
+    {
+     "student": "x에 -1 넣으니까 0이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 -1을 넣었더니 0이 나왔다고 했군요. 그 0이 나오기까지 -1을 넣어 쓴 식을 어떻게 세웠는지 한 번 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.6
+    },
+    {
+     "student": "곱셈 먼저 하고 뺄셈 했어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "곱셈을 먼저 하고 뺄셈을 했다고 했군요. 그러면 x 자리에 -1을 넣어 쓴 식을 그대로 한 번 적어 볼래요?",
+      "turn": 2
+     },
+     "sec": 5.17
+    },
+    {
+     "student": "−6×(−1)−6=6−6=0이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "x에 2 넣으면 11?",
+    "2×2=4, 4+7=11"
+   ],
+   "case_id": "012",
+   "nickname": "rp-af012-1",
+   "steps": [
+    {
+     "student": "x에 2 넣으면 11?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 2를 넣으면 11이라고 생각한 거군요. 그 11이 어떻게 나왔는지 확인해 볼 수 있게, x 자리에 2를 넣은 식을 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 3.07
+    },
+    {
+     "student": "2×2=4, 4+7=11",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "16 맞나요?",
+    "x에 5 넣고 3 곱해 1 더했어요.",
+    "3 곱하기 5는 15예요.",
+    "15에 1 더하면 16이에요."
+   ],
+   "case_id": "013",
+   "nickname": "rp-af013-1",
+   "steps": [
+    {
+     "student": "16 맞나요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "x에 0 넣으면 -4예요.",
+    "0 곱하면 0이고 -4는 그대로예요.",
+    "상수항 -4만 남아요.",
+    "f(0) = -4라고 써요."
+   ],
+   "case_id": "014",
+   "nickname": "rp-af014-1",
+   "steps": [
+    {
+     "student": "x에 0 넣으면 -4예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 0을 넣으면 -4라고 생각했군요. 그 생각이 어디서 나왔는지 보이도록, -5x - 4의 x 자리에 0을 넣은 식을 그대로 한번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 4.03
+    },
+    {
+     "student": "0 곱하면 0이고 -4는 그대로예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "0을 곱하면 0이 되고 -4는 그대로라고 본 거군요. 그 생각이 드러나도록, x 자리에 0을 넣은 식을 부호까지 포함해서 종이에 그대로 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 8.3
+    },
+    {
+     "student": "상수항 -4만 남아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "0을 곱한 항은 0이 되고 상수항 -4만 남는다고 본 거군요. 그렇게 남은 것을 f(0)의 값으로 놓고, f(0)이 얼마인지 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.94
+    },
+    {
+     "student": "f(0) = -4라고 써요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -4였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_slope-blind_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "5×(-2)-1=-11?",
+    "5랑 -2를 먼저 곱했어요.",
+    "-10에서 1을 빼요.",
+    "왼쪽으로 한 칸 가면 -11이에요."
+   ],
+   "case_id": "015",
+   "nickname": "rp-af015-1",
+   "steps": [
+    {
+     "student": "5×(-2)-1=-11?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "f(5)=18 같아요",
+    "-3×5+3이 돼요.",
+    "15요",
+    "부호는 그냥 없어지는 거 같아요"
+   ],
+   "case_id": "016",
+   "nickname": "rp-af016-1",
+   "steps": [
+    {
+     "student": "f(5)=18 같아요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(5)=18이라고 생각했군요. 그 18이 어떻게 나왔는지 확인해 보고 싶은데, x 자리에 5를 넣은 식을 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 3.95
+    },
+    {
+     "student": "-3×5+3이 돼요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣어 -3×5+3이라고 썼군요. 이제 -3×5+3을 계산하면 얼마가 되는지 직접 계산해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.75
+    },
+    {
+     "student": "15요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "식을 -3×5+3이라고 잘 세웠고 그 값을 15라고 했군요. 그 식에서 -3×5 앞에 붙은 마이너스 부호를 어떻게 계산했는지 다시 살펴보면서, -3×5+3의 값이 얼마인지 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.67
+    },
+    {
+     "student": "부호는 그냥 없어지는 거 같아요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -12였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.16
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "f(-3)은 7 같아요.",
+    "x에 -3 넣으면 -3+4요.",
+    "오른쪽 3칸, 오른쪽 4칸요.",
+    "오른쪽으로 3칸이요."
+   ],
+   "case_id": "017",
+   "nickname": "rp-af017-1",
+   "steps": [
+    {
+     "student": "f(-3)은 7 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(-3)이 7이라고 생각했군요. 그 답이 나오기까지 x 자리에 -3을 넣은 식을 어떻게 썼는지 직접 한번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.3
+    },
+    {
+     "student": "x에 -3 넣으면 -3+4요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -3을 넣어 -3+4라고 식을 썼군요. 그렇다면 -3+4를 계산하면 얼마가 되는지 직접 계산해서 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.57
+    },
+    {
+     "student": "오른쪽 3칸, 오른쪽 4칸요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-3+4를 수직선에서 옮겨 본 거군요. 그런데 '오른쪽 3칸'이라고 한 부분에서 -3을 오른쪽으로 간 것으로 본 게 걸리는데, -3은 수직선에서 어느 지점인지 다시 확인해 볼래요? 그 지점에서 오른쪽으로 4칸 간 자리가 -3+4의 값이니, 그 값을 말해서 f(-3)이 얼마인지 답해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.94
+    },
+    {
+     "student": "오른쪽으로 3칸이요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 1이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "6×2−8=4예요."
+   ],
+   "case_id": "018",
+   "nickname": "rp-af018-1",
+   "steps": [
+    {
+     "student": "6×2−8=4예요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "f(3)은 -3-5라서 -2예요?",
+    "왼쪽으로 5칸이면 -8 같아요.",
+    "3 넣으면 -3-5라서 -8이에요.",
+    "빼기 5는 -5를 더하는 거예요."
+   ],
+   "case_id": "019",
+   "nickname": "rp-af019-1",
+   "steps": [
+    {
+     "student": "f(3)은 -3-5라서 -2예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(3)을 -3-5로 써서 -2라고 했군요. 그럼 -3-5를 다시 계산해 보면 얼마가 나오나요?",
+      "turn": 1
+     },
+     "sec": 2.18
+    },
+    {
+     "student": "왼쪽으로 5칸이면 -8 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "왼쪽으로 5칸 이동해서 -8이 나온다고 했군요. 그 식에 쓴 -3은 어디에서 나온 수인지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 8.8
+    },
+    {
+     "student": "3 넣으면 -3-5라서 -8이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "3을 넣으면 -3-5가 되고 그 결과가 -8이라고 했군요. 그럼 지금까지 생각을 이어서 이 문제의 답인 f(3)의 값을 최종적으로 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.51
+    },
+    {
+     "student": "빼기 5는 -5를 더하는 거예요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -8이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "f(0)=8이에요."
+   ],
+   "case_id": "020",
+   "nickname": "rp-af020-1",
+   "steps": [
+    {
+     "student": "f(0)=8이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "−6×(−1)은 −6이라 −12?",
+    "둘 다 음수라고 봐요.",
+    "두 음수를 곱하면 음수요.",
+    "6, 4, 2, 0이고 다음은 −2라 음수요."
+   ],
+   "case_id": "021",
+   "nickname": "rp-af021-1",
+   "steps": [
+    {
+     "student": "−6×(−1)은 −6이라 −12?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "−6×(−1)을 −6으로 계산해서 −12가 나왔다고 본 거군요. 그럼 f(x) = -6x - 6의 x 자리에 −1을 넣은 식을 종이에 그대로 한 번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.99
+    },
+    {
+     "student": "둘 다 음수라고 봐요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "−6과 −1을 둘 다 음수로 본 거군요. 그럼 음수와 음수를 곱하면 부호가 어떻게 되는지, 곱셈의 부호 규칙을 떠올려 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.7
+    },
+    {
+     "student": "두 음수를 곱하면 음수요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "−6과 −1을 곱한 값을 −6이라고 한 것과, 두 음수를 곱하면 음수라고 한 답이 서로 이어져 있군요. 그 부분을 다시 한 번 살펴보면서 f(−1)의 값을 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.25
+    },
+    {
+     "student": "6, 4, 2, 0이고 다음은 −2라 음수요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 0이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "2×2+7=11이에요."
+   ],
+   "case_id": "022",
+   "nickname": "rp-af022-1",
+   "steps": [
+    {
+     "student": "2×2+7=11이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "f(5)=3×5+1=16이에요."
+   ],
+   "case_id": "023",
+   "nickname": "rp-af023-1",
+   "steps": [
+    {
+     "student": "f(5)=3×5+1=16이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "0 빼기 4니까 4 같아요.",
+    "오른쪽으로 가는 것 같아요.",
+    "커지는 것 같아요.",
+    "작아져요."
+   ],
+   "case_id": "024",
+   "nickname": "rp-af024-1",
+   "steps": [
+    {
+     "student": "0 빼기 4니까 4 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 0을 넣은 식을 0 빼기 4로 보고 4 같다고 생각한 거군요. 그럼 0 빼기 4를 직접 계산하면 어떤 값이 되는지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 5.28
+    },
+    {
+     "student": "오른쪽으로 가는 것 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "‘오른쪽으로 가는 것 같다’고 한 건 0 빼기 4를 수직선에서 움직이는 모습으로 떠올린 거군요. 그럼 0에서 4를 빼는 계산은 수직선에서 어느 쪽으로 몇 칸 가는지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 11.04
+    },
+    {
+     "student": "커지는 것 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "0에서 4를 빼면 4 같다고 한 부분을 마지막으로 한 번 더 짚어 보면 좋겠어요. 그 부분을 다시 생각하면서 f(0)의 값을 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 5.01
+    },
+    {
+     "student": "작아져요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -4였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_sign-slip_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "5×(-2)는 10이라서 9 같아요.",
+    "5×(-2)도 양수 같은데요.",
+    "음수끼리 더하면 양수 아닌가요?",
+    "오른쪽 같아요."
+   ],
+   "case_id": "025",
+   "nickname": "rp-af025-1",
+   "steps": [
+    {
+     "student": "5×(-2)는 10이라서 9 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5×(-2)를 10이라고 본 뒤 9 같다고 생각한 거군요. 양수 5와 음수 -2를 곱할 때 결과의 부호가 어떻게 되는지 다시 확인해 볼래요?",
+      "turn": 1
+     },
+     "sec": 4.13
+    },
+    {
+     "student": "5×(-2)도 양수 같은데요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5×(-2)도 양수라고 본 거군요. 그럼 양수와 음수를 곱할 때 결과의 부호는 어떻게 되는지, 곱셈의 부호 규칙을 한번 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.49
+    },
+    {
+     "student": "음수끼리 더하면 양수 아닌가요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "지금은 음수를 더하는 상황이 아니라 5와 -2를 곱하는 상황이고, 그 곱을 10이라고 적었던 부분을 한 번 더 살펴보면 좋겠어요. 그 부분을 스스로 확인한 다음, f(-2)의 값을 직접 계산해서 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.54
+    },
+    {
+     "student": "오른쪽 같아요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -11이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "5요?",
+    "어... -3+5+3요?",
+    "더하기요?",
+    "모르겠어요"
+   ],
+   "case_id": "026",
+   "nickname": "rp-af026-1",
+   "steps": [
+    {
+     "student": "5요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣는 것이라고 본 거군요. 그럼 f(x) = -3x + 3에서 x가 있는 자리에 5를 넣으면 어떤 식이 되는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.6
+    },
+    {
+     "student": "어... -3+5+3요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣어서 -3+5+3이라고 쓴 거군요. 그런데 원래 식의 -3x에서 -3과 x 사이에는 어떤 계산이 들어 있는지 한번 살펴볼래요?",
+      "turn": 2
+     },
+     "sec": 3.11
+    },
+    {
+     "student": "더하기요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣은 식을 -3+5+3이라고 쓰고, -3과 x 사이의 계산을 더하기로 본 거군요. 그 부분을 한 번 더 확인한 뒤, f(5)의 값을 직접 구해서 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.22
+    },
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -12였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "4요?",
+    "식은 모르겠어요.",
+    "x가 -3이요?",
+    "음... -3+4요?"
+   ],
+   "case_id": "027",
+   "nickname": "rp-af027-1",
+   "steps": [
+    {
+     "student": "4요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "4라고 생각했군요. 그런데 f(-3)에서 괄호 안의 -3은 f(x) = x + 4의 어느 자리에 들어가는 수일까요?",
+      "turn": 1
+     },
+     "sec": 2.27
+    },
+    {
+     "student": "식은 모르겠어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "식을 어떻게 세워야 할지 막막한 거군요. 그럼 f(x) = x + 4에서 x가 있던 자리에 -3을 그대로 넣어서, 어떤 모양이 되는지 종이에 한번 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.15
+    },
+    {
+     "student": "x가 -3이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -3을 넣는 거라고 잘 짚었군요. 그럼 그대로 넣은 식을 직접 써서 계산해 보고, f(-3)의 값을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 5.96
+    },
+    {
+     "student": "음... -3+4요?",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 1이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "2요",
+    "6이요?",
+    "곱하기요?",
+    "6×2-8이요?"
+   ],
+   "case_id": "028",
+   "nickname": "rp-af028-1",
+   "steps": [
+    {
+     "student": "2요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "'2'라고 답했군요. 그 2를 x 자리에 넣은 식을 어떻게 쓰게 되는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.07
+    },
+    {
+     "student": "6이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "'6'이라고 했군요. 그 6이 어디서 나온 수인지 확인해 보려고 하는데, x 자리에 2를 넣은 식을 종이에 그대로 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.78
+    },
+    {
+     "student": "곱하기요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "'곱하기'라고 했군요, 6x가 6과 x를 곱한 것이라는 점을 짚은 거네요. 그렇다면 x 자리에 2를 넣었을 때 f(2)의 값이 얼마인지, 이제 직접 계산해서 답을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.0
+    },
+    {
+     "student": "6×2-8이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "3이요?",
+    "-5요?",
+    "-3이요?",
+    "-3 - 5요?"
+   ],
+   "case_id": "029",
+   "nickname": "rp-af029-1",
+   "steps": [
+    {
+     "student": "3이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "3이라는 수를 말해 줬군요. 그럼 f(3)이라는 표기가 이 함수에서 무엇을 하라는 뜻인지, 네 말로 한번 설명해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.92
+    },
+    {
+     "student": "-5요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "−5라는 수를 말해 줬군요. 그럼 f(3)에서 3은 x 자리에 들어가는 수라고 할 때, −x − 5의 x를 3으로 바꾼 식을 네가 직접 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.33
+    },
+    {
+     "student": "-3이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "−3이라고 말해 줬군요. 그 −3은 −x−5에서 어느 부분에 3을 넣어 나온 값인지 짚어 보고, 식 전체에 3을 넣은 식을 직접 써서 f(3)의 값을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 5.41
+    },
+    {
+     "student": "-3 - 5요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "0이요",
+    "4×0+8이요",
+    "0이요",
+    "8이요"
+   ],
+   "case_id": "030",
+   "nickname": "rp-af030-1",
+   "steps": [
+    {
+     "student": "0이요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 넣을 값으로 0을 말했군요. 그럼 $f(x)=4x+8$에서 x를 0으로 바꾼 식을 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.48
+    },
+    {
+     "student": "4×0+8이요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "모르겠어요.",
+    "x 자리에 -1이요.",
+    "어... -6이요?",
+    "곱하기인가요?"
+   ],
+   "case_id": "031",
+   "nickname": "rp-af031-1",
+   "steps": [
+    {
+     "student": "모르겠어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "모르겠다고 했군요. 그럼 먼저, f(-1)에서 괄호 안의 -1이 x 자리에 들어간다는 건 알고 있나요?",
+      "turn": 1
+     },
+     "sec": 1.83
+    },
+    {
+     "student": "x 자리에 -1이요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -1이 들어간다고 했군요. 그럼 -6x에서 x 자리에 -1을 넣은 부분을 어떻게 쓸지 직접 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.66
+    },
+    {
+     "student": "어... -6이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-6x에서 x 자리에 -1을 넣었는데 결과를 -6이라고 한 부분이 걸려요. 그 -6과 x 사이에 원래 어떤 계산이 있었는지 스스로 다시 보고, f(-1)의 값을 직접 계산해서 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.26
+    },
+    {
+     "student": "곱하기인가요?",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 0이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "7이요?",
+    "2x에 2 넣으면 2요?",
+    "2 곱하기 2요?",
+    "2×2+7이요?"
+   ],
+   "case_id": "032",
+   "nickname": "rp-af032-1",
+   "steps": [
+    {
+     "student": "7이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(2)의 값이 7이라고 생각한 거군요. 그 7이 어떻게 나왔는지, x 자리에 2를 넣은 식을 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 3.83
+    },
+    {
+     "student": "2x에 2 넣으면 2요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "2x의 x 자리에 2를 넣으면 2가 된다고 생각한 거군요. 그렇다면 x 자리에 2를 넣은 식을 종이에 그대로 한 번 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.4
+    },
+    {
+     "student": "2 곱하기 2요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "2 곱하기 2라고 한 부분은 2x의 x 자리에 2를 넣은 계산을 말한 거군요. 이제 f(x)=2x+7 전체에서 x 자리에 2를 넣었을 때 f(2)의 값을 직접 구해서 얼마인지 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 6.2
+    },
+    {
+     "student": "2×2+7이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "5요?",
+    "3×5+1이요?",
+    "3×5는 15요.",
+    "15+1은 16이요."
+   ],
+   "case_id": "033",
+   "nickname": "rp-af033-1",
+   "steps": [
+    {
+     "student": "5요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣는 걸 떠올린 거군요. 그럼 $f(x)=3x+1$에서 x를 5로 바꾸면 어떤 식이 되는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.16
+    },
+    {
+     "student": "3×5+1이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "답은 0이요",
+    "0 넣으면 -4요?",
+    "계산은 안 했고 그냥 -4요",
+    "0이요"
+   ],
+   "case_id": "034",
+   "nickname": "rp-af034-1",
+   "steps": [
+    {
+     "student": "답은 0이요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "답이 0이라고 했군요. 그럼 f(x) = -5x - 4에서 x 자리에 0을 넣으면 식이 어떻게 되는지 학생이 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 1.88
+    },
+    {
+     "student": "0 넣으면 -4요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 0을 넣으면 -4가 나온다고 했군요. 그럼 f(0)을 구하는 식을, x 자리에 0을 넣은 모양 그대로 한 줄로 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 8.34
+    },
+    {
+     "student": "계산은 안 했고 그냥 -4요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "그냥 -4라고 했군요. 그 값이 맞는지 스스로 확인할 수 있게, x 자리에 0을 넣은 식을 한 줄로 직접 써 보고 f(0)의 값을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.83
+    },
+    {
+     "student": "0이요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -4였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전(S11 1차)",
+   "file": "S11/sim_no-setup_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "모르겠어요",
+    "x에 -2 넣는 거예요?",
+    "-2요?",
+    "곱하기인가요?"
+   ],
+   "case_id": "035",
+   "nickname": "rp-af035-1",
+   "steps": [
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "어디서 막히는지 모르겠다고 말해 줘서 알겠어요. 그럼 먼저 $f(-2)$에서 괄호 안의 $-2$는 $x$ 자리에 무엇을 하라는 뜻인지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.58
+    },
+    {
+     "student": "x에 -2 넣는 거예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "네가 말한 것처럼 $f(-2)$는 $x$ 자리에 $-2$를 넣으라는 뜻이라고 잘 짚었군요. 그럼 $f(x)=5x-1$에서 $x$ 자리에 $-2$를 넣은 식을 직접 한번 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.2
+    },
+    {
+     "student": "-2요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "네가 말한 $-2$는 $x$ 자리에 넣을 수를 가리킨 것이군요. 이제 $5x-1$의 $x$ 자리에 그 $-2$를 넣은 식을 네가 직접 써 보고, 그 식을 계산해서 $f(-2)$의 값을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.15
+    },
+    {
+     "student": "곱하기인가요?",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -11이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "x에 5를 넣는 거예요?",
+    "-3×5+3이요?",
+    "곱셈 먼저요?",
+    "-15+3이요?"
+   ],
+   "case_id": "036",
+   "nickname": "rp-af036-1",
+   "steps": [
+    {
+     "student": "x에 5를 넣는 거예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "네가 x 자리에 5를 넣는 것이라고 생각했군요. 그러면 −3x + 3에서 x를 5로 바꾼 식을 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 1.84
+    },
+    {
+     "student": "-3×5+3이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.06
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "f(-3)은 어떻게 구해요?",
+    "x에 -3 넣으면 -3+4예요?",
+    "1이요?",
+    "수직선으로 해 보니 1 같아요"
+   ],
+   "case_id": "037",
+   "nickname": "rp-af037-1",
+   "steps": [
+    {
+     "student": "f(-3)은 어떻게 구해요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(-3)을 어떻게 구하는지 궁금한 거군요. 그럼 먼저 f(x) = x + 4에서 x는 무엇을 나타내는 자리라고 생각해요?",
+      "turn": 1
+     },
+     "sec": 2.75
+    },
+    {
+     "student": "x에 -3 넣으면 -3+4예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -3을 넣으면 -3+4가 된다고 생각한 거군요. 그럼 -3+4를 직접 계산하면 얼마가 되는지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 7.44
+    },
+    {
+     "student": "1이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "f(2)는 어떻게 구해요?",
+    "6×2-8이 되지 않아요?",
+    "12-8이요?",
+    "4요?"
+   ],
+   "case_id": "038",
+   "nickname": "rp-af038-1",
+   "steps": [
+    {
+     "student": "f(2)는 어떻게 구해요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"f(2)를 어떻게 구하는지 막막하게 느껴지는군요.\" 그럼 여기서 하나만 짚어 볼게요. f(x) = 6x - 8에서 괄호 안에 들어가는 값은 오른쪽 식의 어느 자리에 들어가게 되는 걸까요?",
+      "turn": 1
+     },
+     "sec": 3.31
+    },
+    {
+     "student": "6×2-8이 되지 않아요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"괄호 안의 2를 x 자리에 넣어 6×2-8이라고 잘 썼군요.\" 그러면 이 식을 계산할 때 곱셈과 뺄셈 중 어느 것부터 하면 되는지, 그리고 6×2는 얼마가 되는지 직접 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.67
+    },
+    {
+     "student": "12-8이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "f(3)은 -2 아닌가요?",
+    "3에서 5를 먼저 빼요?",
+    "-3-5요",
+    "왼쪽으로 5칸 가면 -8인가요?"
+   ],
+   "case_id": "039",
+   "nickname": "rp-af039-1",
+   "steps": [
+    {
+     "student": "f(3)은 -2 아닌가요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(3)을 -2라고 생각했군요. 그 값이 어떻게 나왔는지 확인해 보려고 하는데, f(x) = -x - 5의 x 자리에 3을 넣은 식을 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.38
+    },
+    {
+     "student": "3에서 5를 먼저 빼요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "3에서 5를 먼저 빼는 게 맞는지 궁금한 거군요. 그 전에 f(x) = -x - 5의 x 자리에 3을 넣으면 -x 부분이 어떤 수가 되는지 먼저 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.17
+    },
+    {
+     "student": "-3-5요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.09
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "0을 어디에 넣어요?",
+    "4 옆에 있는 x요?",
+    "4×0+8이요?",
+    "4×0부터요?"
+   ],
+   "case_id": "040",
+   "nickname": "rp-af040-1",
+   "steps": [
+    {
+     "student": "0을 어디에 넣어요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "0을 어디에 넣을지 궁금한 거군요. 그럼 $f(x)=4x+8$에서 $x$가 들어 있는 자리는 어디인지 한번 짚어 볼래요?",
+      "turn": 1
+     },
+     "sec": 1.84
+    },
+    {
+     "student": "4 옆에 있는 x요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "4 옆에 있는 x가 x 자리라고 본 거군요. 그 x 자리에 0을 넣으면 $4x+8$이 어떻게 바뀌는지 직접 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 5.15
+    },
+    {
+     "student": "4×0+8이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "이거 어떻게 풀어요?",
+    "x에 -1을 넣는 거예요?",
+    "-6 곱하기 -1 빼기 6이요?",
+    "곱셈을 먼저 계산해요."
+   ],
+   "case_id": "041",
+   "nickname": "rp-af041-1",
+   "steps": [
+    {
+     "student": "이거 어떻게 풀어요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "문제를 어떻게 풀어야 할지 막막해서 물어봤군요. 그럼 먼저 $f(-1)$이라는 표기가 $x$ 자리에 어떤 값을 넣으라는 뜻인지 학생이 아는 대로 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.09
+    },
+    {
+     "student": "x에 -1을 넣는 거예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "$x$에 $-1$을 넣는 거라고 생각했군요. 그 생각대로 $f(x)=-6x-6$의 $x$ 자리에 $-1$을 넣어서 식을 어떻게 쓸 수 있는지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.94
+    },
+    {
+     "student": "-6 곱하기 -1 빼기 6이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "$-6$ 곱하기 $-1$ 빼기 $6$이라고 식을 잘 세웠군요. 이제 그 식을 계산해서 $f(-1)$의 값을 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.12
+    },
+    {
+     "student": "곱셈을 먼저 계산해요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 0이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "이게 뭐예요?",
+    "모르겠어요.",
+    "x 자리에 2 넣는 거예요?",
+    "2x가 2×2로 바뀌어요?"
+   ],
+   "case_id": "042",
+   "nickname": "rp-af042-1",
+   "steps": [
+    {
+     "student": "이게 뭐예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "무엇을 하라는 건지 잘 모르겠다는 말이군요. f(2)는 x 자리에 2를 넣었을 때의 값을 구하라는 뜻이에요. 그럼 2x의 x 자리에 2를 넣으면 어떻게 써 볼 수 있을까요?",
+      "turn": 1
+     },
+     "sec": 5.16
+    },
+    {
+     "student": "모르겠어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "모르겠다고 했군요. 먼저 \\(2x\\)가 2와 \\(x\\)를 어떻게 계산하라는 뜻인지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.15
+    },
+    {
+     "student": "x 자리에 2 넣는 거예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 2를 넣는 것이라고 이해했군요. 그럼 그대로 f(2)를 직접 구해서 답이 무엇인지 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.0
+    },
+    {
+     "student": "2x가 2×2로 바뀌어요?",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 11이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "f(5)가 뭐예요?",
+    "x 자리에 5를 넣는 거예요?",
+    "3×5+1이요?",
+    "3×5 먼저 계산해요?"
+   ],
+   "case_id": "043",
+   "nickname": "rp-af043-1",
+   "steps": [
+    {
+     "student": "f(5)가 뭐예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(5)라는 표기가 낯설게 느껴지는군요. 그럼 먼저 f(x)에서 괄호 안에 있는 x는 무엇을 나타내는 자리라고 생각해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.62
+    },
+    {
+     "student": "x 자리에 5를 넣는 거예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣는 것이라고 생각했군요. 그렇다면 f(x)=3x+1에서 x가 있는 자리에 5를 넣은 식을 직접 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 7.65
+    },
+    {
+     "student": "3×5+1이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "f(0)은 어떻게 구해요?",
+    "x에 0 넣으면 -5×0-4예요?",
+    "0 곱하면 0이라 -4예요",
+    "x가 0일 때 함숫값이에요?"
+   ],
+   "case_id": "044",
+   "nickname": "rp-af044-1",
+   "steps": [
+    {
+     "student": "f(0)은 어떻게 구해요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(0)을 어떻게 구하는지 물어봤군요. f(x)라는 식에서 x 자리에 어떤 수를 넣어야 f(0)이 되는지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 1.68
+    },
+    {
+     "student": "x에 0 넣으면 -5×0-4예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 0을 넣으면 -5×0-4가 된다고 쓴 거군요. 그 식에서 -5×0은 얼마인지 직접 계산해서 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.99
+    },
+    {
+     "student": "0 곱하면 0이라 -4예요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "0을 곱하면 0이 된다고 한 뒤 -5×0-4를 계산한 값을 말한 거군요. 그 계산 결과를 f(0)의 값으로 정리해서 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 6.56
+    },
+    {
+     "student": "x가 0일 때 함숫값이에요?",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -4였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 전 r2(참고)",
+   "file": "S11/sim_slope-blind_r2_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "x에 -2를 넣는 건가요?",
+    "5×(-2)-1 이렇게요?",
+    "5×(-2)는 -10이에요.",
+    "-10-1이요?"
+   ],
+   "case_id": "045",
+   "nickname": "rp-af045-1",
+   "steps": [
+    {
+     "student": "x에 -2를 넣는 건가요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -2를 넣는 방법을 생각하고 있군요. 그럼 f(x)=5x-1에서 x 자리에 -2를 넣은 식을 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.15
+    },
+    {
+     "student": "5×(-2)-1 이렇게요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -2를 넣어 5×(-2)-1이라고 식을 잘 썼군요. 이 식에서 곱셈 부분인 5×(-2)를 먼저 계산하면 얼마인지 직접 구해 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.27
+    },
+    {
+     "student": "5×(-2)는 -10이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5×(-2)를 -10이라고 계산했군요. 그 계산을 이어서 f(-2)의 값을 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.17
+    },
+    {
+     "student": "-10-1이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "f(5)는 -12예요.",
+    "x에 5를 넣었어요.",
+    "-3×5+3이요."
+   ],
+   "case_id": "046",
+   "nickname": "rp-af046-1",
+   "steps": [
+    {
+     "student": "f(5)는 -12예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(5)를 -12라고 구했군요. 그 값이 나온 과정을 보려고 하는데, x 자리에 5를 넣은 식을 그대로 한 번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.88
+    },
+    {
+     "student": "x에 5를 넣었어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 5를 넣었다고 했군요. 그러면 그때의 식을 x 자리에 5가 들어간 모습 그대로 종이에 적어서 보여 줄래요?",
+      "turn": 2
+     },
+     "sec": 2.95
+    },
+    {
+     "student": "-3×5+3이요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "x에 -3 넣으면 1이에요.",
+    "x에 -3 넣으면 -3+4=1이에요."
+   ],
+   "case_id": "047",
+   "nickname": "rp-af047-1",
+   "steps": [
+    {
+     "student": "x에 -3 넣으면 1이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 -3을 넣으면 1이 된다고 했군요. 그 1이 어떻게 나왔는지, x 자리에 -3을 넣은 식을 종이에 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.29
+    },
+    {
+     "student": "x에 -3 넣으면 -3+4=1이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "x에 2 넣으면 4 같아요",
+    "6×2-8이요"
+   ],
+   "case_id": "048",
+   "nickname": "rp-af048-1",
+   "steps": [
+    {
+     "student": "x에 2 넣으면 4 같아요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 2를 넣으면 4라고 생각했군요. 그 4가 나오기까지 x 자리에 2를 넣은 식을 어떻게 썼는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.47
+    },
+    {
+     "student": "6×2-8이요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.06
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "f(3)은 -8이에요.",
+    "f(3)=-3-5=-8이에요."
+   ],
+   "case_id": "049",
+   "nickname": "rp-af049-1",
+   "steps": [
+    {
+     "student": "f(3)은 -8이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(3)을 -8이라고 구했군요. 그 값을 얻기 위해 x 자리에 3을 넣어서 어떤 식을 세웠는지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.49
+    },
+    {
+     "student": "f(3)=-3-5=-8이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "x에 0 넣으면 8 같은데요?",
+    "4×0+8=8이요."
+   ],
+   "case_id": "050",
+   "nickname": "rp-af050-1",
+   "steps": [
+    {
+     "student": "x에 0 넣으면 8 같은데요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 0을 넣으면 8이 된다고 생각했군요. 그럼 x 자리에 0을 넣은 식을 직접 써 보면 어떻게 되는지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 5.98
+    },
+    {
+     "student": "4×0+8=8이요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "x에 -1 넣으니 0 같아요.",
+    "f(-1)=-6×(-1)-6이요."
+   ],
+   "case_id": "051",
+   "nickname": "rp-af051-1",
+   "steps": [
+    {
+     "student": "x에 -1 넣으니 0 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 -1을 넣으면 0이라고 생각했군요. 그렇게 생각한 과정을 확인해 보고 싶어요. -1을 넣은 식을 어떻게 썼는지 직접 적어서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 4.49
+    },
+    {
+     "student": "f(-1)=-6×(-1)-6이요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "2×2+7=11이에요"
+   ],
+   "case_id": "052",
+   "nickname": "rp-af052-1",
+   "steps": [
+    {
+     "student": "2×2+7=11이에요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "5를 넣으면 16이에요.",
+    "3×5+1=16이에요."
+   ],
+   "case_id": "053",
+   "nickname": "rp-af053-1",
+   "steps": [
+    {
+     "student": "5를 넣으면 16이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"x 자리에 5를 넣으면 16이 된다고 했군요. 그 16이 어떻게 나왔는지, 5를 넣은 식을 종이에 그대로 한 번 써 볼래요?\"",
+      "turn": 1
+     },
+     "sec": 3.27
+    },
+    {
+     "student": "3×5+1=16이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "0을 x에 넣는 거예요?",
+    "f(0) = -5×0 - 4예요?"
+   ],
+   "case_id": "054",
+   "nickname": "rp-af054-1",
+   "steps": [
+    {
+     "student": "0을 x에 넣는 거예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 0을 넣는 것인지 확인하고 싶군요. 그럼 f(x) = -5x - 4에서 x가 있는 자리를 0으로 바꾸면 어떤 식이 되는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 5.38
+    },
+    {
+     "student": "f(0) = -5×0 - 4예요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_slope-blind_rerun_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "x에 -2 넣으면 -11이에요.",
+    "5 곱하기 -2 해서 -10, -1 빼서 -11이요.",
+    "f(-2)=5×(-2)-1=-11"
+   ],
+   "case_id": "055",
+   "nickname": "rp-af055-1",
+   "steps": [
+    {
+     "student": "x에 -2 넣으면 -11이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -2를 넣어서 -11이라는 값을 구했군요. 그때 5x - 1의 x 자리에 -2를 넣은 식을 그대로 한 번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.34
+    },
+    {
+     "student": "5 곱하기 -2 해서 -10, -1 빼서 -11이요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5 × (-2)를 -10으로 계산하고 거기서 1을 빼서 -11을 얻었군요. 그 계산에서 5 × (-2)와 -1 중 어느 것을 먼저 계산했는지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 8.57
+    },
+    {
+     "student": "f(-2)=5×(-2)-1=-11",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 2,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "f(5)=18이에요.",
+    "f(5)=-3×5+3=18이에요.",
+    "15이에요.",
+    "15+3=18이에요."
+   ],
+   "case_id": "056",
+   "nickname": "rp-af056-1",
+   "steps": [
+    {
+     "student": "f(5)=18이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(5)를 18이라고 했군요. 그럼 f(x) = -3x + 3에서 x 자리에 5를 넣었을 때, -3x 부분은 어떤 식으로 써 볼 수 있을까요?",
+      "turn": 1
+     },
+     "sec": 4.23
+    },
+    {
+     "student": "f(5)=-3×5+3=18이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(5)를 -3×5+3으로 써서 18이라고 했군요. 그럼 이 식에서 곱셈 부분인 -3×5를 먼저 계산하면 얼마가 되는지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.86
+    },
+    {
+     "student": "15이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-3×5를 15라고 했던 부분을 다시 한번 살펴보면 좋겠어요. 그 곱셈의 부호를 스스로 확인한 다음, f(5)의 값을 직접 구해서 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 2.52
+    },
+    {
+     "student": "15+3=18이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -12였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.06
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "f(-3)은 -7 맞나요?",
+    "-3+4가 돼요.",
+    "음... -7이에요.",
+    "다시 해도 -7 같아요."
+   ],
+   "case_id": "057",
+   "nickname": "rp-af057-1",
+   "steps": [
+    {
+     "student": "f(-3)은 -7 맞나요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(-3)을 -7이라고 생각했군요. 그럼 x 자리에 -3을 넣은 식을 직접 한 번 써 보고, 그 식을 계산하면 얼마가 되는지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.17
+    },
+    {
+     "student": "-3+4가 돼요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -3을 넣어서 -3+4라고 식을 잘 썼군요. 그럼 이 -3+4를 계산하면 얼마가 되는지 직접 계산해서 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.66
+    },
+    {
+     "student": "음... -7이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-3+4라고 쓴 식의 계산 결과를 -7이라고 했군요. -3에서 4를 더하는 계산이 -7이 되는지 직접 다시 확인해 보고, f(-3)의 값을 다시 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.52
+    },
+    {
+     "student": "다시 해도 -7 같아요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 1이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "6×2−8=4예요."
+   ],
+   "case_id": "058",
+   "nickname": "rp-af058-1",
+   "steps": [
+    {
+     "student": "6×2−8=4예요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "f(3)은 -3-5라서 2이에요.",
+    "음... -3에서 5 빼면 2요.",
+    "아, 왼쪽으로 가면 -8이네요.",
+    "f(3)은 -8이에요."
+   ],
+   "case_id": "059",
+   "nickname": "rp-af059-1",
+   "steps": [
+    {
+     "student": "f(3)은 -3-5라서 2이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"f(3)을 -3-5로 쓴 건 x 자리에 3을 잘 넣은 거군요.\" 그런데 -3에서 5를 한 번 더 빼면 수직선에서 0을 기준으로 어느 쪽으로 얼마나 움직이는지 떠올려 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.49
+    },
+    {
+     "student": "음... -3에서 5 빼면 2요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"-3에서 5를 빼면 2라고 했군요.\" 0보다 왼쪽에 있는 -3에서 왼쪽으로 5칸을 더 가면 수직선의 어느 자리에 서게 되는지, 손으로 짚어 가며 확인해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.17
+    },
+    {
+     "student": "아, 왼쪽으로 가면 -8이네요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"수직선에서 왼쪽으로 5칸 더 간 자리를 확인했군요.\" 그 자리에 서는 수가 f(3)의 값이 되는지 이어서 생각해 보고, f(3)이 무엇인지 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.94
+    },
+    {
+     "student": "f(3)은 -8이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -8이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "x에 0 넣으면 8이에요?",
+    "4×0+8=8이에요."
+   ],
+   "case_id": "060",
+   "nickname": "rp-af060-1",
+   "steps": [
+    {
+     "student": "x에 0 넣으면 8이에요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x에 0을 넣으면 8이라고 생각한 거군요. 그 생각을 확인하려면 f(x)=4x+8의 x 자리에 0을 넣은 식을 어떻게 써 볼 수 있을까요?",
+      "turn": 1
+     },
+     "sec": 4.01
+    },
+    {
+     "student": "4×0+8=8이에요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "f(-1)은 -12 같아요",
+    "f(-1) = -6×(-1)-6이에요"
+   ],
+   "case_id": "061",
+   "nickname": "rp-af061-1",
+   "steps": [
+    {
+     "student": "f(-1)은 -12 같아요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(-1)을 -12라고 생각했군요. 그 값이 나오기까지 x 자리에 -1을 넣은 식을 어떻게 세웠는지 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 4.83
+    },
+    {
+     "student": "f(-1) = -6×(-1)-6이에요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "2×2+7=11이에요"
+   ],
+   "case_id": "062",
+   "nickname": "rp-af062-1",
+   "steps": [
+    {
+     "student": "2×2+7=11이에요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "3×5+1=16 같아요."
+   ],
+   "case_id": "063",
+   "nickname": "rp-af063-1",
+   "steps": [
+    {
+     "student": "3×5+1=16 같아요.",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "0−4니까 답은 4예요.",
+    "-5×0은 0이에요.",
+    "-5×0−4는 0−4예요.",
+    "4요."
+   ],
+   "case_id": "064",
+   "nickname": "rp-af064-1",
+   "steps": [
+    {
+     "student": "0−4니까 답은 4예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 0을 넣어 0−4까지 식을 잘 세워 줬군요. 그럼 0에서 4를 빼면 0보다 큰 수가 될지, 작은 수가 될지 한번 생각해 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.24
+    },
+    {
+     "student": "-5×0은 0이에요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-5×0이 0이라고 정확히 짚어 줬군요. 그럼 아까 네가 세운 0−4를 직접 계산하면 값이 얼마가 될지 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 4.48
+    },
+    {
+     "student": "-5×0−4는 0−4예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "0−4까지는 네가 세운 식 그대로 잘 이어졌군요. 앞서 답을 4라고 했던 것과 이 0−4가 같은 값이 되는지 스스로 따져 보고, f(0)의 값을 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.01
+    },
+    {
+     "student": "4요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -4였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_sign-slip_rerun_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "5×(-2)는 10, 답은 9예요.",
+    "양수랑 음수 곱하면 양수예요.",
+    "3×(-2)=6, 양수예요.",
+    "5×(-2)=10, 답은 9예요."
+   ],
+   "case_id": "065",
+   "nickname": "rp-af065-1",
+   "steps": [
+    {
+     "student": "5×(-2)는 10, 답은 9예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5×(-2)를 10이라고 하고 답을 9라고 말해 줬군요. 그런데 5×(-2)는 부호가 양수일까요, 음수일까요? 먼저 그 부호를 확인해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.84
+    },
+    {
+     "student": "양수랑 음수 곱하면 양수예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "양수와 음수를 곱하면 양수가 된다고 생각했군요. 그 규칙이 맞는지 직접 확인할 수 있게, 2×(-3)처럼 쉬운 예를 하나 골라서 -3을 두 번 더하면 어떻게 되는지 스스로 계산해 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.13
+    },
+    {
+     "student": "3×(-2)=6, 양수예요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "3×(-2)를 6이라고 썼군요. 그 6이 3×(-2)의 값이 맞는지 한 번 더 따져 본 다음, f(-2)의 답을 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.95
+    },
+    {
+     "student": "5×(-2)=10, 답은 9예요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -11이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-01",
+   "inputs": [
+    "5요?",
+    "모르겠어요.",
+    "-3 옆에 있는 x요?",
+    "3이요?"
+   ],
+   "case_id": "066",
+   "nickname": "rp-af066-1",
+   "steps": [
+    {
+     "student": "5요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"5요\"라고 했군요. f(5)에서 5는 x 자리에 들어가는 값이니, -3x+3의 x를 5로 바꾸어 식을 한번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.04
+    },
+    {
+     "student": "모르겠어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "모르겠다고 했군요. 그럼 -3x+3이라는 식에서 x가 들어 있는 자리가 어디인지 한번 짚어 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.97
+    },
+    {
+     "student": "-3 옆에 있는 x요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "-3 옆에 있는 x를 잘 짚었군요. 이제 그 x 자리에 들어갈 수를 넣어 계산한 뒤, f(5)의 값을 직접 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 5.7
+    },
+    {
+     "student": "3이요?",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -12였어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.11
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-02",
+   "inputs": [
+    "4요",
+    "모르겠어요",
+    "모르겠어요",
+    "모르겠어요"
+   ],
+   "case_id": "067",
+   "nickname": "rp-af067-1",
+   "steps": [
+    {
+     "student": "4요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(-3)을 4라고 생각했군요. 그럼 f(x) = x + 4에서 x 자리에 -3을 넣으면 어떤 식이 되는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 1.88
+    },
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -3을 넣는 방법이 잘 떠오르지 않는군요. 그럼 f(x)=x+4에서 x가 들어 있는 자리는 어디인지, 그 자리를 찾아서 말해 볼래요?",
+      "turn": 2
+     },
+     "sec": 6.75
+    },
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "처음에 f(-3)을 4라고 했던 답을 다시 한번 떠올려 보면 좋겠어요. 그 답이 맞는지 확인하려면 x 자리에 -3을 넣은 식을 직접 써 보고 계산해야 하는데, 지금까지 생각한 것을 이어서 f(-3)의 값을 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 5.2
+    },
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 1이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-03",
+   "inputs": [
+    "2요",
+    "6×2-8이요?"
+   ],
+   "case_id": "068",
+   "nickname": "rp-af068-1",
+   "steps": [
+    {
+     "student": "2요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 넣을 값으로 2를 떠올렸군요. 그 2를 f(x) = 6x - 8에서 어느 자리에 넣으면 되는지, 말로 한번 설명해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.72
+    },
+    {
+     "student": "6×2-8이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 1,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-04",
+   "inputs": [
+    "3이요?",
+    "5요?",
+    "모르겠어요",
+    "모르겠어요"
+   ],
+   "case_id": "069",
+   "nickname": "rp-af069-1",
+   "steps": [
+    {
+     "student": "3이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 넣을 값이 3이라고 짚어 줬군요. 그러면 $f(x) = -x - 5$에서 x가 있는 자리에 3을 넣은 식을 직접 한번 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.15
+    },
+    {
+     "student": "5요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5라고 답해 줬군요. $f(x) = -x - 5$에서 x가 있는 자리에 3을 넣은 식을 종이에 그대로 한번 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 3.88
+    },
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "모르겠다고 말해 줬군요. 아까 5라고 했던 값이 x 자리에 3을 넣어 계산한 결과였는지 한 번 다시 살펴보고, $-x-5$의 x 자리에 3을 넣은 식을 직접 써서 계산한 $f(3)$의 값을 지금 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 5.28
+    },
+    {
+     "student": "모르겠어요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 -8이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-05",
+   "inputs": [
+    "8인 것 같아요",
+    "식을 어떻게 쓰는지 모르겠어요.",
+    "4x에서 x 있는 자리요?",
+    "8이요"
+   ],
+   "case_id": "070",
+   "nickname": "rp-af070-1",
+   "steps": [
+    {
+     "student": "8인 것 같아요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(0)이 8이라고 생각했군요. 그렇게 생각한 이유를 확인해 보고 싶은데, f(x)=4x+8에서 x 자리에 0을 넣은 식을 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.54
+    },
+    {
+     "student": "식을 어떻게 쓰는지 모르겠어요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "식을 어떻게 쓰는지 잘 모르겠군요. 그럼 f(x)=4x+8에서 x가 들어 있는 자리가 어디인지 한번 짚어 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.53
+    },
+    {
+     "student": "4x에서 x 있는 자리요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x가 들어 있는 자리를 4x라고 본 거군요. 이제 그 자리에 0을 넣어 f(0)의 값을 직접 구해서 답을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 3.89
+    },
+    {
+     "student": "8이요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-06",
+   "inputs": [
+    "음... -6이요?",
+    "음... x 자리에 -1이요?",
+    "음... 그럼 -1이요?",
+    "모르겠어요."
+   ],
+   "case_id": "071",
+   "nickname": "rp-af071-1",
+   "steps": [
+    {
+     "student": "음... -6이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "f(-1)의 값이 -6이라고 생각했군요. 그럼 x 자리에 -1을 넣으면 f(x) = -6x - 6이 어떻게 바뀌는지 직접 써 볼래요?",
+      "turn": 1
+     },
+     "sec": 4.19
+    },
+    {
+     "student": "음... x 자리에 -1이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -1을 넣는 것이라고 말했군요. 그럼 f(x) = -6x - 6에서 x가 있는 자리에 -1을 넣은 식을 직접 써 볼래요?",
+      "turn": 2
+     },
+     "sec": 2.11
+    },
+    {
+     "student": "음... 그럼 -1이요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 -1을 넣는 것까지 말했고, 마지막에 말한 -1은 f(-1)의 값으로 본 셈이군요. 그럼 이제 f(-1)의 값을 직접 구해서 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 8.74
+    },
+    {
+     "student": "모르겠어요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 0이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.05
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-07",
+   "inputs": [
+    "답은 2 같아요.",
+    "2x+7에 2를 넣어요?",
+    "어... 식이 뭐예요?",
+    "2 넣으면 2+7=9 같아요."
+   ],
+   "case_id": "072",
+   "nickname": "rp-af072-1",
+   "steps": [
+    {
+     "student": "답은 2 같아요.",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "답이 2라고 생각했군요. 그런데 f(2)에서 괄호 안의 2는 x 자리에 무엇을 하라는 뜻인지 말해 볼래요?",
+      "turn": 1
+     },
+     "sec": 2.04
+    },
+    {
+     "student": "2x+7에 2를 넣어요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "2x+7에 2를 넣으면 된다고 생각했군요. 그 2를 x가 있는 자리에 넣는지, 숫자 7이 있는 자리에 넣는지 어떻게 구별할 수 있을까요?",
+      "turn": 2
+     },
+     "sec": 2.08
+    },
+    {
+     "student": "어... 식이 뭐예요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "문제에 나온 식이 무엇인지 묻는군요. 아까 \"답은 2 같아요\"라고 했던 그 2가 f(2)의 괄호 안에 있는 2와 같은 수인지 한 번 따져 보면서, 네가 말한 2x+7에 2를 넣어 나오는 값을 지금 직접 구해 답으로 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 9.73
+    },
+    {
+     "student": "2 넣으면 2+7=9 같아요.",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 11이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-08",
+   "inputs": [
+    "5요",
+    "어... 3×5+1인가요?",
+    "15요",
+    "15+1은 16이요"
+   ],
+   "case_id": "073",
+   "nickname": "rp-af073-1",
+   "steps": [
+    {
+     "student": "5요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 넣을 값으로 5를 찾았군요. 그럼 $f(x)=3x+1$에서 x를 5로 바꾸면 오른쪽 부분이 어떻게 되는지, 학생이 직접 써서 보여 줄래요?",
+      "turn": 1
+     },
+     "sec": 2.87
+    },
+    {
+     "student": "어... 3×5+1인가요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "x 자리에 5를 넣은 식을 3×5+1이라고 잘 썼군요. 그럼 그 식을 직접 계산해 보면 값이 얼마가 되는지 말해 줄래요?",
+      "turn": 2
+     },
+     "sec": 2.14
+    },
+    {
+     "student": "15요",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "3×5+1을 계산한 값으로 15를 말했군요. 그 식에는 아직 +1이 남아 있으니, 3×5를 한 값에 1을 더하면 얼마가 되는지 직접 계산해서 답을 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 2.57
+    },
+    {
+     "student": "15+1은 16이요",
+     "response": {
+      "kind": "graded",
+      "correct": false,
+      "mastery": 0.0,
+      "turns_used": 3,
+      "feedback": "이번 문제의 답은 16이었어요. 다음 문제에서 다시 해 봐요."
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-09",
+   "inputs": [
+    "-4요"
+   ],
+   "case_id": "074",
+   "nickname": "rp-af074-1",
+   "steps": [
+    {
+     "student": "-4요",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 0,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  },
+  {
+   "source": "AI",
+   "group": "AI S10 후(S12 재실행)",
+   "file": "S12/sim_no-setup_rerun_turns.csv",
+   "pid": "LF-10",
+   "inputs": [
+    "-2요?",
+    "어... 5요?",
+    "5×(-2)요?",
+    "-11이요?"
+   ],
+   "case_id": "075",
+   "nickname": "rp-af075-1",
+   "steps": [
+    {
+     "student": "-2요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"-2를 f(-2)에서 x 자리에 들어갈 값으로 본 거군요. 그럼 f(x)=5x-1의 x 자리에 -2를 넣은 식을 어떻게 쓰게 되는지 직접 적어 볼래요?",
+      "turn": 1
+     },
+     "sec": 3.93
+    },
+    {
+     "student": "어... 5요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "\"5라고 말한 건 5x-1에서 x 앞에 붙어 있는 수를 본 거군요. 그 5 옆의 x 자리에 -2를 넣으면 식 전체가 어떻게 적히는지 직접 써 볼래요?\"",
+      "turn": 2
+     },
+     "sec": 3.68
+    },
+    {
+     "student": "5×(-2)요?",
+     "response": {
+      "kind": "tutor_turn",
+      "message": "5×(-2)까지는 x 자리에 -2를 넣은 부분을 적은 거군요. 그런데 원래 식 f(x)=5x-1에는 뒤에 -1이 더 있는데, 그 부분까지 포함해서 f(-2)의 값을 직접 구해 말해 볼래요?",
+      "turn": 3
+     },
+     "sec": 4.34
+    },
+    {
+     "student": "-11이요?",
+     "response": {
+      "kind": "graded",
+      "correct": true,
+      "mastery": 0.1,
+      "turns_used": 3,
+      "feedback": "맞았어요. 다음 문제로 가 볼까요?"
+     },
+     "sec": 0.04
+    }
+   ],
+   "run": 1
+  }
+ ]
+}

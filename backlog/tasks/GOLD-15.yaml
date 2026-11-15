@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-15
+title: "GOLD-15 골든 패스 S14 — 개선 1개(FINDINGS 1위 GP-4 마지막 되묻기 C5)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S14 산출물: golden/FINDINGS.md 1위(GP-4 마지막 되묻기 C5 · 틀린 곳을 짚지 않음)만 고친다 — golden/tutor_prompt.md 규칙 6 한 문장 · 재현 테스트(tests/golden) 빨강→초록 · 1위 기록 재생 수정 전후 출처별 비교표 · 전체 재생 N건 표(다른 유형 악화 없음) · golden/reports_no_students/S14/보고.md · HARVEST.md 1줄"
+artifacts:
+  - "PR #1913 · 커밋 23688aaa·ed1ffe79 · golden/tutor_prompt.md 규칙 6 한 문장(마지막 되묻기 C5) · 재현 테스트 tests/golden/test_s14_last_turn_targets_error.py(수정 전 3 failed → 8 passed · 뮤테이션 5종 RED) · 실제 LLM 재생 1위 5사례×5회 못 짚음 21/25 → 0/25(본인 5→0 · 본인 참고 4→0 · AI 12→0) · 전체 재생 76건 판정 76/76 같음 · 시뮬레이션 1위 유형 끊김 4→0 · tests/golden 284 passed exit 0 · 정적 4종 exit 0 · CI 미러 5잡 통과(ed1ffe79 · 미커밋 분석 스크립트를 저장소 밖으로 옮긴 상태) · 부작용 '학생' 호칭 0/224→7/223(LATER) · 보고 golden/reports_no_students/S14/보고.md"
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+session: null
+notes: "GOLD-01 우산의 S14 슬라이스(지시서 golden/prompts_no_students 단계11 S14). 선행 S13 완료(main 9bdba7ff PR #1912). 2위(GP-5 판정 오류)는 함께 고치지 않는다."
+updated: 2026-11-15
