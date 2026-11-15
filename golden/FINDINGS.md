@@ -1,7 +1,7 @@
 # FINDINGS — 골든 패스 로그 분석 (S13 · 학생 없는 변형)
 
 > 판정 기준: main `cfbdcf99`(S12 2차 판 머지 · PR #1911). 작성 2026-11-15 · 하네스 GOLD-14.
-> 집계 재현: `/opt/golden-venv/bin/python golden/reports_no_students/S13/aggregate.py`(저장소 루트). 결과 CSV는 `golden/reports_no_students/S13/`에 있다. 사람 출처 원본 3개는 `golden/logs/`(gitignore)에서 읽는다.
+> 집계: 결과 CSV는 `golden/reports_no_students/S13/`에 있다. 만든 스크립트는 `golden/logs/s13_aggregate.py`(gitignore · 세션 컨테이너에만 있음)다. 사람 출처 원본 3개도 같은 폴더에서 읽는다. 스크립트를 저장소에 올리지 않은 이유는 `golden/` 아래 `.py`를 덮는 CI 린트 잡이 없어 `tests/infra/test_lint_coverage.py`가 막기 때문이다. 배선을 고치는 것은 `golden/` 밖이라 S13 범위 밖이다. 집계 규칙은 아래 「정의」에, 문제마다의 판정 근거는 `problems.csv`에 모두 적었다.
 > 이 문서는 **고치지 않는다.** 1위 끊김 지점 하나를 숫자로 정하고, S14가 고칠 가장 작은 변경 한 가지만 제안한다.
 
 ## 피험자 한계
