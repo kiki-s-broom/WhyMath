@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-16
+title: "GOLD-16 골든 패스 S15 — 격리·회고(미참조 모듈 측정·RETRO·NEXT_3WEEKS)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S15 산출물: HARVEST.md '3주간 미참조 모듈' 절(측정 명령·경로·줄 수) · golden/RETRO.md(§6 5줄 예/아니오·첫 줄 대체 피험자 내역과 Kiki 결정 요청) · golden/NEXT_3WEEKS.md(첫 세션 S16 = 실제 중학생 1명 검증) · /legacy 이동은 Kiki 결정 기록(진행/보류) · golden/reports_no_students/S15/보고.md"
+artifacts: []
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+session: claude/new-session-9lemjj
+notes: "GOLD-01 우산의 S15 슬라이스(지시서 golden/prompts_no_students 단계12 S15). 선행 S14 완료(main a9cff6ec PR #1913). 옛 모듈 삭제 금지·물리 이동은 Kiki 결정."
+updated: 2026-11-15
