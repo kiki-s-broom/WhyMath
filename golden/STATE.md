@@ -115,3 +115,5 @@
 - **`GOLD-01`** — "GOLD-01 골든 패스 스켈레톤 — 중2 일차함수 30문항 GP-1~GP-6 e2e" (S2가 2026-11-08 `backlog.py add`로 등재, 같은 날 `backlog.py start GOLD-01` claim, 기준 main `c99ee4a2`).
 - 이후 모든 세션(S3~S15)은 첫 행위로 `python3 scripts/harness/backlog.py start GOLD-01`을 실행한다.
 - 참고: 슬러그를 붙인 `GOLD-01-golden-path-skeleton`으로 개명하려 했으나 CLI가 같은 번호 충돌(HARN-10)로 거부했다. 대장 손편집으로 우회하지 않고 CLI가 등재한 `GOLD-01`을 쓴다.
+- **1단계: `GOLD-19`** — "GOLD-P1 1단계 두꺼게 — AI 시뮬레이터 + 슬롯 T1·T2·T3 · S16~S35" (S16이 2026-11-16 `backlog.py add`로 등재, 같은 날 `backlog.py start GOLD-19` claim, 기준 main `cd560e32`). CLI가 `GOLD-18`을 다른 세션의 원격 번호 예약으로 거부하고 `GOLD-19`를 제안해 그 번호를 썼다.
+- 1단계 세션(S17~S35·S20A)은 첫 행위로 `python3 scripts/harness/backlog.py start GOLD-19`를 실행한다.
