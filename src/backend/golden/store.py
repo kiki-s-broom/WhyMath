@@ -24,9 +24,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID, insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-# 옛 코드에서 가져온 것은 엔진 하나뿐이다(HARVEST.md) — 연결 URL은 옛 Settings(WHYMATH_DATABASE_URL)
-from whymath_backend.config import get_settings
-from whymath_backend.db.session import get_engine
+# 엔진은 골든 복사본을 쓴다(S20A 전이 의존 절단 · HARVEST.md) — 연결 주소는 WHYMATH_DATABASE_URL
+from golden.db import get_engine
 
 # 공유 계약의 표 3개 — Alembic 리비전 없이 앱 시작 시 create_all로 만든다
 metadata = MetaData(schema="golden")
@@ -86,14 +85,13 @@ class TurnRow:
 
 
 def _engine() -> AsyncEngine:
-    """옛 get_engine()을 연결 풀 없이(NullPool) 부른다.
+    """골든 엔진(연결 풀 없음 · NullPool)을 돌려준다.
 
     TestClient를 `with` 없이 쓰면 요청마다 새 이벤트 루프가 생긴다. 풀에 남은 asyncpg 연결은
-    죽은 루프에 묶여 다음 요청에서 터지므로, 옛 설정의 db_disable_pool을 켠 사본을 넘긴다.
-    (엔진이 이미 만들어져 있으면 get_engine은 넘긴 설정을 무시한다 — 골든 앱 프로세스에서는
-    이 함수가 첫 호출자다.)
+    죽은 루프에 묶여 다음 요청에서 터지므로 풀을 쓰지 않는다(S4 실측 — `golden/db.py`).
+    S20A 전에는 옛 `db.session.get_engine`을 `db_disable_pool=True`로 불렀다(같은 동작).
     """
-    return get_engine(get_settings().model_copy(update={"db_disable_pool": True}))
+    return get_engine()
 
 
 async def ensure_schema() -> None:

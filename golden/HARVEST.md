@@ -223,3 +223,41 @@ cd src/backend && python -m golden.measure_unreferenced
 
 - 사전 실측(2026-11-08)의 "테스트 파일 1,109개"는 이번 측정에서 `tests/backend`의 `test_*.py` **1,114개**다(3주 사이 다른 태스크가 추가 — S 세션은 `tests/backend`를 바꾸지 않았다).
 - 지시서가 제안한 `legacy/README.md`는 `golden/` 바깥 새 파일이라 만들지 않았다(공통 규칙 3). 목록의 정본은 이 절이다.
+
+## 전이 의존 절단 (S20A · 1단계 개정판 S20+1 · 2026-11-16 · 기준 main `cd560e32`)
+
+### 경계 긋기 — 직접 import 7종에서 골든이 실제로 쓰는 이름 (복사 전에 적음)
+
+| 옛 모듈 (쓰는 골든 파일) | 골든이 쓰는 이름 | 이 모듈 하나가 끌고 오는 옛 모듈 수(조상 패키지 포함) | 결정 | 이유 |
+| --- | --- | ---: | --- | --- |
+| `whymath_backend.db.session` (`store.py`) | 함수 `get_engine` 1개 | 102 | **복사해서 자른다** → `src/backend/golden/db.py` | `db/__init__.py`가 ORM 모델 전체(`db` 64 · `schema` 35)를 import한다. 골든은 엔진 하나만 쓴다 |
+| `whymath_backend.config` (`store.py`) | 함수 `get_settings` → 필드 `database_url` 1개(`db_disable_pool`은 골든이 늘 True로 덮어쓴다) | 3 | **복사해서 자른다** → `src/backend/golden/settings.py` | 2,211줄 설정에서 필드 1개만 쓴다. `db.py`가 옛 `Settings`를 받지 않게 하려면 같이 잘라야 한다 |
+| `whymath_backend.l3.safe_parse` (`grade.py`) | 함수 `safe_parse_expr` 1개 | 24 (LLM 경로와 겹치지 않는 것은 자기 자신 1개) | **import 유지** | 코딩 헌법 R22-03 — CAS 파싱 진입점은 이 파일 하나다. `tests/infra/test_cas_parse_entrypoint_governance.py`가 `src/backend` 전체에서 진입점 밖의 `parse_expr` 호출·import를 막으므로 복사본은 그 검사에 걸린다(허용목록은 golden 밖 · 헌법이 지시문보다 위). 지시서 제안값 ⓑ(함수 1개 복사)는 채택하지 않는다 |
+| `whymath_backend.l3.models` (`tutor.py`·`sim_student.py`) | 클래스 `RoutingRequest` 1개 | 23 | **import 유지** | LLM 호출은 라우터 경유(CLAUDE.md 불변 · 공통 규칙 9) |
+| `whymath_backend.l3.router` (같음) | 클래스 `Router`의 `route` 1개 | 23 | **import 유지** | 같음 |
+| `whymath_backend.l3.providers.factory` (같음) | 함수 `build_cloud_provider` 1개(돌려받은 프로바이더의 `generate` 호출) | 36 | **import 유지** | 같음 |
+| `whymath_backend.schema.enums` (같음) | 열거형 `LicenseType`의 `WHYMATH_GENERATED` 1개 | 18 | **import 유지** | `l3.models`가 어차피 같은 모듈을 import한다 — 골든에서만 떼어도 전이는 줄지 않는다 |
+
+### 복사한 것 (다섯 걸음 ③ · 한 개씩 초록 확인)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| **복사: 의존 과다** — `src/backend/whymath_backend/config.py`의 `Settings.database_url` 필드 1개와 `get_settings`(읽는 규칙: 접두사 `WHYMATH_` · `.env` · 모르는 키 무시 · 한 번만 읽기) → `src/backend/golden/settings.py`(`GoldenSettings`·`get_settings`) | 옛 `Settings`의 나머지 필드 전부(2,211줄) · `db_disable_pool`(골든은 늘 풀을 쓰지 않는다) | 골든이 읽는 값이 DB 주소 하나뿐이다. 특성화 `tests/golden/characterization/test_s20a_settings.py`(환경 10가지에서 옛 설정과 같은 값) | S20A |
+| **복사: 의존 과다** — `src/backend/whymath_backend/db/session.py`의 `get_engine`(NullPool 경로)·`dispose_engine` → `src/backend/golden/db.py`(`make_engine`·`get_engine`·`dispose_engine`) | `get_sessionmaker`·`get_session`(FastAPI 의존성)·풀을 쓰는 경로 | 옛 모듈 하나를 import하면 `db/__init__.py`가 ORM 전체를 불러 옛 모듈 102개가 로드된다. 특성화 `tests/golden/characterization/test_s20a_db.py`(연결 주소 10개에서 옛 엔진과 같은 모양 — 주소·드라이버·풀 종류) | S20A |
+| 없음(import 유지) — `l3.safe_parse.safe_parse_expr` | 지시서 제안값 ⓑ "함수 1개 복사" | 코딩 헌법 R22-03(CAS 파싱 진입점 1곳) — 복사본은 `tests/infra/test_cas_parse_entrypoint_governance.py`에 걸린다 | S20A |
+| 없음(import 유지) — `l3.models.RoutingRequest`·`l3.router.Router`·`l3.providers.factory.build_cloud_provider`·`schema.enums.LicenseType` | 프로바이더·라우터 복사 | LLM 호출은 라우터 경유(불변). 30 초과분의 처리는 Kiki 결정(게이트 `G-s20a-router-path-transitive-budget`) | S20A |
+
+### 결과 (측정기 `python -m golden.measure_unreferenced --budget` · 2026-11-16)
+
+| 구분 | 이전(S15 · 이 세션 재측정 동일) | 이후 | 예산 | 판정 |
+| --- | ---: | ---: | ---: | --- |
+| 직접 import하는 옛 모듈(서로 다른 것) | 7 | **5** | 10 | 통과 |
+| 전이 — 정적 + 조상 패키지 | 120 | **37** | — | — |
+| 전이 — 런타임 실측 포함 합집합(예산 판정 기준) | 122 | **40** | 30 | **미달(10 초과)** |
+| 골든이 쓰는 옛 코드 줄 수 | 30,194 | 17,587 | — | — |
+
+- 이후 직접 5개: `l3.safe_parse`(grade) · `l3.models`·`l3.router`·`l3.providers.factory`·`schema.enums`(tutor·sim_student). 빠진 2개: `config`·`db.session`(store).
+- 이후 전이 40개의 패키지별: `l3` 18 · `schema` 17 · `l1` 2 · `whymath_backend`(루트) 1 · `_stdio` 1 · `config` 1. `db`는 64 → 0.
+- 남은 40개를 못 끊은 이유: 골든은 `l3`에서 이름 5개만 쓰지만 `l3/__init__.py`가 `models`·`router`를, `l3/providers/__init__.py`가 프로바이더 4종 전부를, `schema/__init__.py`가 스키마 16모듈을 일괄 import한다. 옛 코드를 고치지 않고는 골든 쪽에서 떼어 낼 수 없다.
+- 30 안으로 가는 길(Kiki 결정): 프로바이더 팩토리 경로(`providers/` 10모듈 + `interfaces`·`provider_jurisdiction`)를 골든으로 복사하면 정적 37 → 24(런타임 포함 약 27)가 된다(grimp 계산 · 미실행). 라우터(`Router.route`)는 그대로 경유한다. 전체 목록 `golden/reports_phase1/S20A/referenced_backend.tsv`.
+- 동결: `tests/golden/test_import_budget.py`(직접 ≤ 10 · 전이는 더 늘지 못함(상한 40) · 목표 30은 strict xfail · 끊은 `config`·`db`가 되돌아오면 RED).
