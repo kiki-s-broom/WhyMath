@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-02-d3-duplication-map
+title: "RS-D3 중복 지도 — 같은 일을 하는 구현이 몇 벌인가"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "전체 중복률(백엔드·테스트), 패키지 10개, 복제 20쌍, 같은 이름 30개 표 · 도구 막힘 시 오류 기록"
+artifacts: []
+paths:
+  - "golden/reports_rescue/D3/**"
+session: golden-rs/D3
+notes: ""
+updated: 2026-11-17
