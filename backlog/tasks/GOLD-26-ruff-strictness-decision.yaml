@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: todo
+status: in_progress
 priority: 3
 eos_priority: P2
 owner: claude
@@ -21,7 +21,7 @@ acceptance:
 artifacts: []
 paths:
   - golden/RUFF_STRICTNESS_DECISION.md
-session: null
+session: main
 notes: |-
   출처: golden/RESCUE_REVIEW.md §6 F-4 (main 33b1ffa5) · Kiki 지시 2026-11-17("후속후보 등재, 승인").
 

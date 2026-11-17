@@ -488,3 +488,6 @@
 {"ts": "2026-11-17T17:49:40+09:00", "actor": "main", "action": "policy_warn", "id": "GOLD-25", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/CONTRACT_MUTATION.md", "mode": "warn"}
 {"ts": "2026-11-17T17:49:41+09:00", "actor": "main", "action": "policy_warn", "id": "GOLD-25", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/CONTRACT_MUTATION.md", "mode": "warn"}
 {"ts": "2026-11-17T17:49:51+09:00", "actor": "main", "action": "start", "id": "GOLD-25", "session": "main", "remote": "ok"}
+{"ts": "2026-11-18T02:57:59+09:00", "actor": "main", "action": "policy_warn", "id": "GOLD-26-ruff-strictness-decision", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/RUFF_STRICTNESS_DECISION.md", "mode": "warn"}
+{"ts": "2026-11-18T02:57:59+09:00", "actor": "main", "action": "policy_warn", "id": "GOLD-26-ruff-strictness-decision", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/RUFF_STRICTNESS_DECISION.md", "mode": "warn"}
+{"ts": "2026-11-18T02:58:09+09:00", "actor": "main", "action": "start", "id": "GOLD-26-ruff-strictness-decision", "session": "main", "remote": "ok"}
