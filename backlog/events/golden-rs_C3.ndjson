@@ -1,0 +1,7 @@
+{"ts": "2026-11-17T23:36:39+00:00", "actor": "golden-rs/C3", "action": "policy_warn", "id": "RS-14-c3-l3-equivalence-card", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/C3/**", "mode": "warn"}
+{"ts": "2026-11-17T23:36:39+00:00", "actor": "golden-rs/C3", "action": "policy_warn", "id": "RS-14-c3-l3-equivalence-card", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/C3/**", "mode": "warn"}
+{"ts": "2026-11-17T23:36:44+00:00", "actor": "golden-rs/C3", "action": "number_reserve_unavailable", "id": "RS-14-c3-l3-equivalence-card", "verb": "add", "status": "error", "detail": "error: failed to push some refs to '<url>'"}
+{"ts": "2026-11-17T23:36:44+00:00", "actor": "golden-rs/C3", "action": "add", "id": "RS-14-c3-l3-equivalence-card", "eos_priority": "P1"}
+{"ts": "2026-11-17T23:36:52+00:00", "actor": "golden-rs/C3", "action": "policy_warn", "id": "RS-14-c3-l3-equivalence-card", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/C3/**", "mode": "warn"}
+{"ts": "2026-11-17T23:36:52+00:00", "actor": "golden-rs/C3", "action": "policy_warn", "id": "RS-14-c3-l3-equivalence-card", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/C3/**", "mode": "warn"}
+{"ts": "2026-11-17T23:36:56+00:00", "actor": "golden-rs/C3", "action": "start", "id": "RS-14-c3-l3-equivalence-card", "session": "golden-rs/C3", "remote": "ok"}

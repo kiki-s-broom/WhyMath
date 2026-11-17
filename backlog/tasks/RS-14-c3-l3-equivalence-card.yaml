@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-14-c3-l3-equivalence-card
+title: "RS-C3 패키지 카드 — 파트 B l3 동치·채점·검증"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "l3/equivalent 77모듈과 l3 채점·검증 13파일이 전부 어느 묶음에 들어간 카드(150줄 이하)와 보고. safe_parse 골든 사용·canonicalize 폐기 사실이 카드에 적힘"
+artifacts: []
+paths:
+  - "golden/reports_rescue/C3/**"
+session: golden-rs/C3
+notes: ""
+updated: 2026-11-17
