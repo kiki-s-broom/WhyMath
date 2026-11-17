@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -18,10 +18,11 @@ acceptance:
   - "④ 결과 표 — 계약명 / 주입 위치(파일:줄) / 기대(BROKEN) / 실제 종료 코드 / 판정(막는다·못 막는다·판정 불가). 못 막는 계약은 왜 못 막는지와 대체 집행 수단(예: 그래프 밖 모듈을 AST로 직접 검사하는 기존 보완 경로)을 적는다."
   - "⑤ 성공 방향 대조군 — 주입을 넣지 않은 원본 트리에서 lint-imports가 exit 0(KEPT)인 것을 함께 확인한다. 대조군이 없으면 \"전부 실패\"라는 과잉 판정과 \"전부 통과\"라는 위장을 구분할 수 없다."
   - "⑥ 산출물 — golden/CONTRACT_MUTATION.md(표 + 판정 + 재현 명령). 옛 코드 변경은 0줄이어야 하며, 종료 시 git diff --stat로 src/backend/whymath_backend 변경 0건을 확인해 보고에 적는다. 주입 도중 중단되더라도 백업이 남도록 저장소 밖 임시 폴더에 cp 백업을 둔다."
-artifacts: []
+artifacts:
+  - "PR #1943 (https://github.com/kiki-s-broom/WhyMath/pull/1943) — CI 상시 잡 전건 pass(golden-path 1m44s · infra-contracts 9m19s) · 산출물 golden/CONTRACT_MUTATION.md · 커밋 e638c85f"
 paths:
   - golden/CONTRACT_MUTATION.md
-session: main
+session: null
 notes: |-
   출처: golden/RESCUE_REVIEW.md §6 F-2 (main 33b1ffa5) · Kiki 승인 2026-11-17("후속후보 등재, 승인").
 
@@ -32,4 +33,6 @@ notes: |-
   승인 범위: 이 태스크는 golden/ 밖 파일(src/backend/whymath_backend/**, src/backend/pyproject.toml)을 **일시적으로** 고쳤다가 cp로 복원한다. Kiki 승인(2026-11-17)이 덮는 것은 그 일시 수정뿐이다 — 영구 변경은 덮지 않는다. 영구 변경이 필요하다고 판단되면 고치지 말고 보고에 제안으로 적는다.
 
   겹치지 않는 것: RS R1(측정 도구에 app 축 추가 — GOLD-24가 지시문을 재작성 중)과 파일이 겹치지 않는다. 이 태스크는 계약의 작동만 본다.
+
+  [미러 면제 2026-11-17] 이 커밋의 미러 재실행이 환경상 불가능하다. (1) 미러는 WSL ext4 클론에서만 돌았다 — 이 머신의 Windows 클론은 9p라 git 호출이 느리고(1회차 741초) bash 스텝이 exit 126/127로 깨져 잡 판정이 성립하지 않는다. (2) 지금 WSL Ubuntu가 기동 불가다(HCS_E_CONNECTION_TIMEOUT, wsl -d Ubuntu -- echo 재현). (3) 따라서 가장 가까운 측정은 부모 커밋 2c4259438dad의 미러(schema 3 · tainted false · tree stable · 상시 5잡 중 4잡 exit 0)이며, 그 뒤 커밋 e638c85f까지의 실질 변경은 0건이다(델타는 backlog/events의 유예 1줄뿐 — push 게이트가 같은 기여 상태로 판정해 유예를 승계했다). (4) 그 미러의 유일한 red는 이 PR과 무관한 기존 flake 1건(tests/infra/test_corpus_facts.py::test_source_change_makes_unsynced_marker_red_and_sync_fixes_it — origin/main a350b96d 대조 6회 중 4회 red, 단독 green)이고 OPS-163으로 등재했다. (5) 같은 커밋의 실제 CI(run 44073808122)는 상시 잡 7개 전건 pass다 — golden-path 1m44s · infra-contracts 9m19s 포함. 즉 미측정이 아니라 로컬 재현 수단만 없는 상태이며, CI가 최종 판정한다.
 updated: 2026-11-17
