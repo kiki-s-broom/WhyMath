@@ -5,16 +5,17 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on: []
 requires_gates: []
 acceptance: []
-artifacts: []
+artifacts:
+  - "PR #1950 · commit 0a7ae4bf · golden/reports_rescue/C8/카드.md·보고.md"
 paths:
   - "golden/reports_rescue/C8/**"
-session: golden-rs/C8
-notes: ""
+session: null
+notes: "[미러 면제 2026-11-17] ci_mirror run이 580초 제한 안에 끝나지 않음(harness-integrity 실행 중) — PR #1950 CI가 판정"
 updated: 2026-11-17
