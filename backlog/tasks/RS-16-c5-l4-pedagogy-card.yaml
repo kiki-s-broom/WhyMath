@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-16-c5-l4-pedagogy-card
+title: "RS-C5 패키지 카드 — 파트 B l4 교수학 엔진"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - "golden/reports_rescue/C5/**"
+session: golden-rs/C5
+notes: ""
+updated: 2026-11-17
