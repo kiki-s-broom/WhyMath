@@ -31,10 +31,12 @@ from sqlalchemy import select
 
 from golden import problems, store
 from golden.api import app
+from golden.llm.factory import build_cloud_provider
+from golden.llm.gate import guard_cloud_jurisdiction
 
-# 옛 코드에서 가져온 것: 라우터 결정 + 프로바이더 팩토리(tutor.py와 같은 경로 · HARVEST.md)
+# 옛 코드에서 가져온 것: 라우터 결정(tutor.py와 같은 경로 · HARVEST.md).
+# 프로바이더 팩토리는 골든 복사본(golden.llm — S20A 2일째)
 from whymath_backend.l3.models import RoutingRequest
-from whymath_backend.l3.providers.factory import build_cloud_provider
 from whymath_backend.l3.router import Router
 from whymath_backend.schema.enums import LicenseType
 
@@ -191,6 +193,8 @@ async def _live_student_line(system: str, prompt: str, result: SimResult) -> str
         try:
             decision = Router().route(_routing_request())
             provider = build_cloud_provider()
+            # 보내기 직전 관할 판정(튜터와 같은 게이트 · GOLD-20) — 막히면 호출 0회
+            guard_cloud_jurisdiction(provider, decision)
             generated = await asyncio.wait_for(
                 provider.generate(prompt, system, decision), timeout=STUDENT_LLM_TIMEOUT_S
             )

@@ -223,3 +223,85 @@ cd src/backend && python -m golden.measure_unreferenced
 
 - 사전 실측(2026-11-08)의 "테스트 파일 1,109개"는 이번 측정에서 `tests/backend`의 `test_*.py` **1,114개**다(3주 사이 다른 태스크가 추가 — S 세션은 `tests/backend`를 바꾸지 않았다).
 - 지시서가 제안한 `legacy/README.md`는 `golden/` 바깥 새 파일이라 만들지 않았다(공통 규칙 3). 목록의 정본은 이 절이다.
+
+## 전이 의존 절단 (S20A · 1단계 개정판 S20+1 · 2026-11-16 · 기준 main `cd560e32`)
+
+### 경계 긋기 — 직접 import 7종에서 골든이 실제로 쓰는 이름 (복사 전에 적음)
+
+| 옛 모듈 (쓰는 골든 파일) | 골든이 쓰는 이름 | 이 모듈 하나가 끌고 오는 옛 모듈 수(조상 패키지 포함) | 결정 | 이유 |
+| --- | --- | ---: | --- | --- |
+| `whymath_backend.db.session` (`store.py`) | 함수 `get_engine` 1개 | 102 | **복사해서 자른다** → `src/backend/golden/db.py` | `db/__init__.py`가 ORM 모델 전체(`db` 64 · `schema` 35)를 import한다. 골든은 엔진 하나만 쓴다 |
+| `whymath_backend.config` (`store.py`) | 함수 `get_settings` → 필드 `database_url` 1개(`db_disable_pool`은 골든이 늘 True로 덮어쓴다) | 3 | **복사해서 자른다** → `src/backend/golden/settings.py` | 2,211줄 설정에서 필드 1개만 쓴다. `db.py`가 옛 `Settings`를 받지 않게 하려면 같이 잘라야 한다 |
+| `whymath_backend.l3.safe_parse` (`grade.py`) | 함수 `safe_parse_expr` 1개 | 24 (LLM 경로와 겹치지 않는 것은 자기 자신 1개) | **import 유지** | 코딩 헌법 R22-03 — CAS 파싱 진입점은 이 파일 하나다. `tests/infra/test_cas_parse_entrypoint_governance.py`가 `src/backend` 전체에서 진입점 밖의 `parse_expr` 호출·import를 막으므로 복사본은 그 검사에 걸린다(허용목록은 golden 밖 · 헌법이 지시문보다 위). 지시서 제안값 ⓑ(함수 1개 복사)는 채택하지 않는다 |
+| `whymath_backend.l3.models` (`tutor.py`·`sim_student.py`) | 클래스 `RoutingRequest` 1개 | 23 | **import 유지** | LLM 호출은 라우터 경유(CLAUDE.md 불변 · 공통 규칙 9) |
+| `whymath_backend.l3.router` (같음) | 클래스 `Router`의 `route` 1개 | 23 | **import 유지** | 같음 |
+| `whymath_backend.l3.providers.factory` (같음) | 함수 `build_cloud_provider` 1개(돌려받은 프로바이더의 `generate` 호출) | 36 | **import 유지** | 같음 |
+| `whymath_backend.schema.enums` (같음) | 열거형 `LicenseType`의 `WHYMATH_GENERATED` 1개 | 18 | **import 유지** | `l3.models`가 어차피 같은 모듈을 import한다 — 골든에서만 떼어도 전이는 줄지 않는다 |
+
+### 복사한 것 (다섯 걸음 ③ · 한 개씩 초록 확인)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| **복사: 의존 과다** — `src/backend/whymath_backend/config.py`의 `Settings.database_url` 필드 1개와 `get_settings`(읽는 규칙: 접두사 `WHYMATH_` · `.env` · 모르는 키 무시 · 한 번만 읽기) → `src/backend/golden/settings.py`(`GoldenSettings`·`get_settings`) | 옛 `Settings`의 나머지 필드 전부(2,211줄) · `db_disable_pool`(골든은 늘 풀을 쓰지 않는다) | 골든이 읽는 값이 DB 주소 하나뿐이다. 특성화 `tests/golden/characterization/test_s20a_settings.py`(환경 10가지에서 옛 설정과 같은 값) | S20A |
+| **복사: 의존 과다** — `src/backend/whymath_backend/db/session.py`의 `get_engine`(NullPool 경로)·`dispose_engine` → `src/backend/golden/db.py`(`make_engine`·`get_engine`·`dispose_engine`) | `get_sessionmaker`·`get_session`(FastAPI 의존성)·풀을 쓰는 경로 | 옛 모듈 하나를 import하면 `db/__init__.py`가 ORM 전체를 불러 옛 모듈 102개가 로드된다. 특성화 `tests/golden/characterization/test_s20a_db.py`(연결 주소 10개에서 옛 엔진과 같은 모양 — 주소·드라이버·풀 종류) | S20A |
+| 없음(import 유지) — `l3.safe_parse.safe_parse_expr` | 지시서 제안값 ⓑ "함수 1개 복사" | 코딩 헌법 R22-03(CAS 파싱 진입점 1곳) — 복사본은 `tests/infra/test_cas_parse_entrypoint_governance.py`에 걸린다 | S20A |
+| 없음(import 유지) — `l3.models.RoutingRequest`·`l3.router.Router`·`l3.providers.factory.build_cloud_provider`·`schema.enums.LicenseType` | 프로바이더·라우터 복사 | LLM 호출은 라우터 경유(불변). 30 초과분의 처리는 Kiki 결정(게이트 `G-s20a-router-path-transitive-budget`) | S20A |
+
+### 결과 (측정기 `python -m golden.measure_unreferenced --budget` · 2026-11-16)
+
+| 구분 | 이전(S15 · 이 세션 재측정 동일) | 이후 | 예산 | 판정 |
+| --- | ---: | ---: | ---: | --- |
+| 직접 import하는 옛 모듈(서로 다른 것) | 7 | **5** | 10 | 통과 |
+| 전이 — 정적 + 조상 패키지 | 120 | **37** | — | — |
+| 전이 — 런타임 실측 포함 합집합(예산 판정 기준) | 122 | **40** | 30 | **미달(10 초과)** |
+| 골든이 쓰는 옛 코드 줄 수 | 30,194 | 17,587 | — | — |
+
+- 이후 직접 5개: `l3.safe_parse`(grade) · `l3.models`·`l3.router`·`l3.providers.factory`·`schema.enums`(tutor·sim_student). 빠진 2개: `config`·`db.session`(store).
+- 이후 전이 40개의 패키지별: `l3` 18 · `schema` 17 · `l1` 2 · `whymath_backend`(루트) 1 · `_stdio` 1 · `config` 1. `db`는 64 → 0.
+- 남은 40개를 못 끊은 이유: 골든은 `l3`에서 이름 5개만 쓰지만 `l3/__init__.py`가 `models`·`router`를, `l3/providers/__init__.py`가 프로바이더 4종 전부를, `schema/__init__.py`가 스키마 16모듈을 일괄 import한다. 옛 코드를 고치지 않고는 골든 쪽에서 떼어 낼 수 없다.
+- 30 안으로 가는 길(Kiki 결정): 프로바이더 팩토리 경로(`providers/` 10모듈 + `interfaces`·`provider_jurisdiction`)를 골든으로 복사하면 정적 37 → 24(런타임 포함 약 27)가 된다(grimp 계산 · 미실행). 라우터(`Router.route`)는 그대로 경유한다. 전체 목록 `golden/reports_phase1/S20A/referenced_backend.tsv`.
+- 동결: `tests/golden/test_import_budget.py`(직접 ≤ 10 · 전이는 더 늘지 못함(상한 40) · 목표 30은 strict xfail · 끊은 `config`·`db`가 되돌아오면 RED).
+
+### 2일째 — 프로바이더 경로 복사 (Kiki 결정 2026-11-17: 선택지 B · 게이트 `G-s20a-router-path-transitive-budget`)
+
+**경계 긋기**(복사 전에 적음). 계산 결과 옛 코드를 고치지 않는 한 바닥은 정적 24(런타임 포함 약 27)다 — 헌법이 강제하는 `l3.safe_parse`를 import하는 순간 `l3/__init__`이 라우터·모델·스키마를 함께 부른다. 줄일 수 있는 것은 `l3.providers` 패키지 13모듈뿐이고, 그 패키지의 모듈을 하나라도 import하면 `providers/__init__`이 프로바이더 4종을 전부 부르므로 **패키지 안의 것은 하나도 import하지 않는다**.
+
+| 옛 위치 | 가져올 이름 | 골든 위치 | 이 복사본이 계속 import하는 옛 모듈(전부 바닥 안 또는 +1) |
+| --- | --- | --- | --- |
+| `l3/providers/_response_fields.py` | `read_response_model_id` | `src/backend/golden/llm/_response_fields.py` | 없음 |
+| `l3/providers/seat_failure.py` | `SeatHttpError`·`SeatNotConfiguredError`(+ 같은 파일의 분류 함수) | `golden/llm/seat_failure.py` | `l3.models`(바닥) |
+| `l3/providers/_openai_compat.py` | `ChatTransport`·`HttpxChatTransport`·`extract_text`·`extract_usage`·재시도 카운터 | `golden/llm/_openai_compat.py` | `l3.models`(바닥) |
+| `l3/providers/openrouter.py` | `OpenRouterProvider`(+ 관할 표·`build_provider_block`) | `golden/llm/openrouter.py` | `config`·`l3.models`·`l3.router._as_cost_tier`(바닥) · `l3.provider_jurisdiction`(+1) |
+| `l3/providers/factory.py` | `build_cloud_provider`의 **openrouter 분기 1개** | `golden/llm/factory.py` | `config`(바닥) — 다른 좌석이면 조용히 바꾸지 않고 `ValueError` |
+
+- 계속 옛 것을 쓰는 것: 라우터 판정 `Router.route`(LLM 호출은 라우터 경유 — 불변) · 설정 `config.Settings`(모델 핀·허용 공급사·키 이름이 옛 것과 같이 움직인다). 공통 규칙 9의 "`build_cloud_provider()` 경유" 문구만 Kiki 결정으로 골든 팩토리로 바뀐다.
+- 버리는 것: deepseek·anthropic·ollama·composite 프로바이더, 좌석 강등 계수(`LocalDegradeCounter` 등 — 골든은 강등 조립을 쓰지 않는다. 같은 파일이라 함께 복사되지만 쓰지 않는다).
+
+**복사 결과(2일째)**
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| **복사: 의존 과다** — `l3/providers/_response_fields.py`·`seat_failure.py`·`_openai_compat.py`·`openrouter.py` 4파일 통째(본문 무변경 · import 줄만 골든 복사본으로) → `src/backend/golden/llm/` · `factory.py`는 openrouter 분기 1개만 새로 씀 | deepseek·anthropic·ollama·composite 프로바이더 · 옛 팩토리의 다른 두 분기 | 옛 `providers/__init__`이 프로바이더 4종을 한꺼번에 불러 13모듈이 따라온다. 특성화 `tests/golden/characterization/test_s20a_llm_compat.py`(응답 파싱 10 · Retry-After 10 · 전송 재시도 10 · 실패 분류 10)·`test_s20a_llm_openrouter.py`(생성 10 · 상태 점검 4 · 팩토리). 본문은 원본과 대조해 import 순서 외 동일 | S20A |
+
+| 구분 | S15 | 1일째 | **2일째** | 예산 |
+| --- | ---: | ---: | ---: | ---: |
+| 직접 import 옛 모듈 | 7 | 5 | **6** | 10 |
+| 전이(런타임 포함 · 판정 기준) | 122 | 40 | **28** | 30 |
+| 골든이 쓰는 옛 코드 줄 | 30,194 | 17,587 | **14,248** | — |
+
+- 2일째 직접 6: `l3.safe_parse`(grade) · `l3.models`·`l3.router`·`schema.enums`(tutor·sim_student) · `config`·`l3.provider_jurisdiction`(golden/llm). `l3.providers` 패키지는 0.
+- 남은 28은 바닥(약 27)에서 1 위다 — `l3.provider_jurisdiction` 1개. 여유 2. 다음 옛 자산(T1·T2·T3)은 import하면 거의 확실히 예산을 넘으므로 **복사**가 기본이다.
+- 공통 규칙 9의 "튜터 LLM = `build_cloud_provider()` + `Router.route`"는 Kiki 결정(2026-11-17 선택지 B)으로 "`golden.llm.factory.build_cloud_provider()` + `Router.route`"가 된다. 라우터 판정은 그대로 옛 것을 거친다.
+
+### 위험 제거 (GOLD-20 · Kiki 지시 2026-11-17)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 옛 `l3/providers/composite.CompositeProvider._guard_cloud_jurisdiction`의 감싸개 3줄(관할 읽기·opt-in 읽기·차단 오류) → `src/backend/golden/llm/gate.py`. 판정 함수 `l3.provider_jurisdiction.jurisdiction_judgment`는 **import 유지**(이미 전이 안 · 비용 0) | 옛 기본값 "관할 선언 없음 = US"(골든은 차단 · fail-closed) · LOCAL 강등(골든은 대체 문장으로 이어 간다) | 골든 튜터·시뮬레이터가 S4부터 관할 게이트를 건너뛰고 있었다. 특성화 `tests/golden/characterization/test_s20a_llm_gate.py`(옛 메서드와 10가지 판정 동일 · 차단 시 호출 0회) | S20A 후속 |
+| 없음 — 동기화 검사 `src/backend/golden/llm/sync.py`(`python -m golden.llm.sync`)·`tests/golden/test_llm_copy_sync.py` 신설 | — | 옛 프로바이더 원본의 **코드**(주석 제외)가 바뀌면 골든 복사본과 구문 트리가 달라져 RED. 주석·import 순서만 바뀐 경우는 통과 | S20A 후속 |
+
+### 학생 답 클라우드 송신 — Kiki 명시 허용 (GOLD-22 · 2026-11-17)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음 — 결정 기록만(`src/backend/golden/tutor.py` `_routing_request` docstring) | 선택지 ①(학생 답을 USER_GENERATED로 선언 → 라우터 LOCAL → 로컬 튜터 전환) | Kiki 결정 2026-11-17 선택지 ②: 골든 튜터가 학생 답을 포함한 프롬프트를 OpenRouter로 보내는 것을 명시 허용. 동작 변경 없음. 전제 4개(닉네임·세션 ID·정답 미포함 · 허용 공급사 기본값 deepinfra = 미국·수집 거부·보존 0 · 관할 게이트 · 실학생 전 보호자 동의서 반영)가 바뀌면 다시 묻는다 | GOLD-22 |

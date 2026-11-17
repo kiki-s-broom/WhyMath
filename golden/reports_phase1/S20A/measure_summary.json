@@ -1,0 +1,241 @@
+{
+  "backend": {
+    "all_modules": 844,
+    "all_lines": 316469,
+    "grimp_graph_modules": 839,
+    "missing_from_grimp_graph": [
+      "whymath_backend.l1.rights.attribution",
+      "whymath_backend.l1.rights.gateway",
+      "whymath_backend.l1.rights.integration",
+      "whymath_backend.l1.rights.permission_map",
+      "whymath_backend.l1.rights.policy_engine"
+    ],
+    "static_direct_modules": 7,
+    "static_with_ancestors_modules": 25,
+    "runtime_modules": 28,
+    "runtime_only": [
+      "whymath_backend.l1",
+      "whymath_backend.l1.rights.permission_map",
+      "whymath_backend.schema.rights"
+    ],
+    "static_only": [],
+    "used_modules": 28,
+    "used_lines": 14248,
+    "unused_modules": 816,
+    "unused_lines": 302221,
+    "by_subpackage": {
+      "whymath_backend": {
+        "total": 1,
+        "used": 1,
+        "unused": 0,
+        "unused_lines": 0,
+        "used_lines": 14
+      },
+      "whymath_backend._stdio": {
+        "total": 1,
+        "used": 1,
+        "unused": 0,
+        "unused_lines": 0,
+        "used_lines": 47
+      },
+      "whymath_backend.api": {
+        "total": 56,
+        "used": 0,
+        "unused": 56,
+        "unused_lines": 26724,
+        "used_lines": 0
+      },
+      "whymath_backend.app": {
+        "total": 1,
+        "used": 0,
+        "unused": 1,
+        "unused_lines": 1668,
+        "used_lines": 0
+      },
+      "whymath_backend.composition": {
+        "total": 1,
+        "used": 0,
+        "unused": 1,
+        "unused_lines": 148,
+        "used_lines": 0
+      },
+      "whymath_backend.config": {
+        "total": 1,
+        "used": 1,
+        "unused": 0,
+        "unused_lines": 0,
+        "used_lines": 2211
+      },
+      "whymath_backend.consent": {
+        "total": 1,
+        "used": 0,
+        "unused": 1,
+        "unused_lines": 61,
+        "used_lines": 0
+      },
+      "whymath_backend.consent_grant": {
+        "total": 1,
+        "used": 0,
+        "unused": 1,
+        "unused_lines": 126,
+        "used_lines": 0
+      },
+      "whymath_backend.db": {
+        "total": 66,
+        "used": 0,
+        "unused": 66,
+        "unused_lines": 10225,
+        "used_lines": 0
+      },
+      "whymath_backend.harness": {
+        "total": 163,
+        "used": 0,
+        "unused": 163,
+        "unused_lines": 80582,
+        "used_lines": 0
+      },
+      "whymath_backend.l1": {
+        "total": 98,
+        "used": 2,
+        "unused": 96,
+        "unused_lines": 21414,
+        "used_lines": 518
+      },
+      "whymath_backend.l2": {
+        "total": 41,
+        "used": 0,
+        "unused": 41,
+        "unused_lines": 14470,
+        "used_lines": 0
+      },
+      "whymath_backend.l3": {
+        "total": 166,
+        "used": 6,
+        "unused": 160,
+        "unused_lines": 76889,
+        "used_lines": 3037
+      },
+      "whymath_backend.l4": {
+        "total": 100,
+        "used": 0,
+        "unused": 100,
+        "unused_lines": 23630,
+        "used_lines": 0
+      },
+      "whymath_backend.l5": {
+        "total": 10,
+        "used": 0,
+        "unused": 10,
+        "unused_lines": 1634,
+        "used_lines": 0
+      },
+      "whymath_backend.l6": {
+        "total": 18,
+        "used": 0,
+        "unused": 18,
+        "unused_lines": 3019,
+        "used_lines": 0
+      },
+      "whymath_backend.lang": {
+        "total": 2,
+        "used": 0,
+        "unused": 2,
+        "unused_lines": 275,
+        "used_lines": 0
+      },
+      "whymath_backend.ops": {
+        "total": 38,
+        "used": 0,
+        "unused": 38,
+        "unused_lines": 27618,
+        "used_lines": 0
+      },
+      "whymath_backend.privacy": {
+        "total": 9,
+        "used": 0,
+        "unused": 9,
+        "unused_lines": 2287,
+        "used_lines": 0
+      },
+      "whymath_backend.schema": {
+        "total": 55,
+        "used": 17,
+        "unused": 38,
+        "unused_lines": 7438,
+        "used_lines": 8421
+      },
+      "whymath_backend.security": {
+        "total": 1,
+        "used": 0,
+        "unused": 1,
+        "unused_lines": 159,
+        "used_lines": 0
+      },
+      "whymath_backend.whs": {
+        "total": 14,
+        "used": 0,
+        "unused": 14,
+        "unused_lines": 3854,
+        "used_lines": 0
+      }
+    },
+    "golden_direct_imports": {
+      "golden.grade": [
+        "whymath_backend.l3.safe_parse"
+      ],
+      "golden.llm._openai_compat": [
+        "whymath_backend.l3.models"
+      ],
+      "golden.llm.factory": [
+        "whymath_backend.config"
+      ],
+      "golden.llm.openrouter": [
+        "whymath_backend.config",
+        "whymath_backend.l3.models",
+        "whymath_backend.l3.provider_jurisdiction",
+        "whymath_backend.l3.router"
+      ],
+      "golden.llm.seat_failure": [
+        "whymath_backend.l3.models"
+      ],
+      "golden.sim_student": [
+        "whymath_backend.l3.models",
+        "whymath_backend.l3.router",
+        "whymath_backend.schema.enums"
+      ],
+      "golden.tutor": [
+        "whymath_backend.l3.models",
+        "whymath_backend.l3.router",
+        "whymath_backend.schema.enums"
+      ]
+    }
+  },
+  "flutter": {
+    "package": "korean_math_app",
+    "reached_files": [
+      "src/mobile/lib/core/env.dart",
+      "src/mobile/lib/golden/golden_api.dart",
+      "src/mobile/lib/golden/golden_app.dart",
+      "src/mobile/lib/golden/golden_state.dart",
+      "src/mobile/lib/golden/nickname_screen.dart",
+      "src/mobile/lib/golden/problem_screen.dart",
+      "src/mobile/lib/golden/result_screen.dart",
+      "src/mobile/lib/main_golden.dart"
+    ],
+    "reached_lines": 952,
+    "old_files_reached": [
+      "src/mobile/lib/core/env.dart"
+    ],
+    "external_packages": [
+      "package:dio",
+      "package:flutter",
+      "package:flutter_math_fork",
+      "package:flutter_riverpod"
+    ],
+    "lib_dart_files_total": 82,
+    "lib_generated_files": 0,
+    "lib_source_files": 82,
+    "unused_source_files": 74,
+    "unused_source_lines": 10931
+  }
+}

@@ -1,8 +1,10 @@
 """S15 할 일 1 — golden이 3주간 한 번도 쓰지 않은 옛 모듈 목록을 측정한다.
 
 실행: `cd src/backend && python -m golden.measure_unreferenced`
+  - `--out <폴더>`  : 결과 파일을 쓸 폴더(기본은 S15 폴더 — 옛 결과를 덮어쓴다)
+  - `--budget`      : S20A 전이 의존 예산 판정만 한다(파일을 쓰지 않는다 · 넘으면 exit 1)
 
-결과는 `golden/reports_no_students/S15/`에 쓴다. 학생 경로(GP-1~GP-6)와 무관한 측정 도구라
+결과는 기본으로 `golden/reports_no_students/S15/`에 쓴다. 학생 경로(GP-1~GP-6)와 무관한 측정 도구라
 `golden.api`는 이 모듈을 import하지 않는다(S11 `sim_student.py`와 같은 자리 · CI 린트 대상 위치).
 
 하는 일
@@ -24,6 +26,7 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import json
 import os
@@ -42,6 +45,12 @@ BACKEND = REPO / "src" / "backend"
 MOBILE = REPO / "src" / "mobile"
 OLD = "whymath_backend"
 SELF = "golden.measure_unreferenced"
+
+# S20A 전이 의존 예산(1단계 개정판 S20+1 · 공통 규칙 8) — 골든이 쓰는 옛 모듈 수의 상한.
+# 직접 = 골든 파일이 import 문으로 바로 가리키는 옛 모듈(서로 다른 것의 수).
+# 전이 = 그 import 때문에 함께 로드되는 옛 모듈 전부(직접 포함 · 조상 패키지 · 런타임 실측 합집합).
+DIRECT_BUDGET = 10
+TRANSITIVE_BUDGET = 30
 
 # Dart import/export/part 문 — 작은따옴표·큰따옴표 모두
 DART_DIRECTIVE = re.compile(r"""^\s*(?:import|export|part)\s+['"]([^'"]+)['"]""", re.M)
@@ -115,10 +124,24 @@ def write_tsv(name: str, header: str, rows: list[tuple[str, ...]]) -> None:
     (OUT / name).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def measure_backend() -> dict[str, Any]:
-    """백엔드 그래프 측정."""
+def collect_usage() -> dict[str, Any]:
+    """골든이 쓰는 옛 모듈을 세 가지 방법(정적 · 조상 패키지 보정 · 런타임 실측)으로 모은다.
+
+    파일을 쓰지 않는다. 런타임 실측은 이 프로세스의 sys.modules를 보므로, 골든을 import하기
+    전에 옛 모듈이 이미 올라와 있으면 숫자가 부풀려진다 — 그 경우 조용히 세지 않고 멈춘다
+    (새 프로세스에서 `python -m golden.measure_unreferenced`로 돌려야 한다).
+    """
     sys.path.insert(0, str(BACKEND))
+    preloaded = sorted(k for k in sys.modules if is_old(k))
+    if preloaded:
+        raise RuntimeError(
+            f"측정 전에 옛 모듈 {len(preloaded)}개가 이미 import돼 있다(예: {preloaded[0]}) — "
+            "런타임 실측이 오염된다. 새 프로세스에서 실행한다"
+        )
     graph = grimp.build_graph(OLD, "golden")
+    golden_mods = sorted(m for m in graph.modules if m == "golden" or m.startswith("golden."))
+    if len(golden_mods) < 2:
+        raise RuntimeError("golden 모듈을 그래프에서 찾지 못했다 — 0건 측정은 통과가 아니다")
     graph_old = {m for m in graph.modules if is_old(m)}
     static_direct = {m for m in graph.find_upstream_modules("golden", as_package=True) if is_old(m)}
     closure = close_over_ancestors(graph, static_direct)
@@ -127,13 +150,64 @@ def measure_backend() -> dict[str, Any]:
     # 가짜 LLM 모드로 import만 한다(네트워크·DB 접속 없음).
     # 이 측정 모듈 자신은 다시 import하지 않는다.
     os.environ.setdefault("GOLDEN_FAKE_LLM", "1")
-    for gm in sorted(m for m in graph.modules if m.startswith("golden.") and m != SELF):
-        importlib.import_module(gm)
+    for gm in golden_mods:
+        if gm != SELF:
+            importlib.import_module(gm)
 
     fs_mods = filesystem_modules()
     all_old = sorted(graph_old | fs_mods)
     runtime = {k for k in sys.modules if is_old(k)} & set(all_old)  # 실제 파일이 있는 모듈만
-    used = sorted(closure | runtime)
+
+    # golden 모듈별로 직접 import한 옛 모듈(어디서 끌려왔는지 보이게)
+    direct = {
+        gm: sorted(m for m in graph.find_modules_directly_imported_by(gm) if is_old(m))
+        for gm in golden_mods
+    }
+    return {
+        "graph_old": graph_old,
+        "fs_mods": fs_mods,
+        "all_old": all_old,
+        "static_direct": static_direct,
+        "closure": closure,
+        "runtime": runtime,
+        "used": sorted(closure | runtime),
+        "direct": {k: v for k, v in direct.items() if v},
+    }
+
+
+def measure_budget() -> dict[str, Any]:
+    """S20A 예산 판정 — 직접 import 수와 전이 수를 세어 상한과 견준다(파일을 쓰지 않는다)."""
+    usage = collect_usage()
+    direct = sorted({m for mods in usage["direct"].values() for m in mods})
+    transitive: list[str] = usage["used"]
+    by_subpackage: dict[str, int] = defaultdict(int)
+    for mod in transitive:
+        by_subpackage[top2(mod)] += 1
+    return {
+        "direct_count": len(direct),
+        "direct_budget": DIRECT_BUDGET,
+        "direct": direct,
+        "direct_by_golden_module": usage["direct"],
+        "transitive_count": len(transitive),
+        "transitive_budget": TRANSITIVE_BUDGET,
+        "transitive": transitive,
+        "transitive_static_with_ancestors": len(usage["closure"]),
+        "transitive_runtime": len(usage["runtime"]),
+        "transitive_by_subpackage": dict(sorted(by_subpackage.items(), key=lambda kv: -kv[1])),
+        "within_budget": len(direct) <= DIRECT_BUDGET and len(transitive) <= TRANSITIVE_BUDGET,
+    }
+
+
+def measure_backend() -> dict[str, Any]:
+    """백엔드 그래프 측정."""
+    usage = collect_usage()
+    graph_old: set[str] = usage["graph_old"]
+    fs_mods: set[str] = usage["fs_mods"]
+    all_old: list[str] = usage["all_old"]
+    static_direct: set[str] = usage["static_direct"]
+    closure: set[str] = usage["closure"]
+    runtime: set[str] = usage["runtime"]
+    used: list[str] = usage["used"]
     used_set = set(used)
     unused = [m for m in all_old if m not in used_set]
 
@@ -165,11 +239,6 @@ def measure_backend() -> dict[str, Any]:
         agg[top2(mod)]["unused"] += 1
         agg[top2(mod)]["unused_lines"] += n
 
-    # golden 모듈별로 직접 import한 옛 모듈(어디서 끌려왔는지 보이게)
-    direct = {
-        gm: sorted(m for m in graph.find_modules_directly_imported_by(gm) if is_old(m))
-        for gm in sorted(m for m in graph.modules if m.startswith("golden."))
-    }
     used_lines = sum(n for *_, n in rows_used)
     unused_lines = sum(n for *_, n in rows_unused)
     return {
@@ -187,7 +256,7 @@ def measure_backend() -> dict[str, Any]:
         "unused_modules": len(unused),
         "unused_lines": unused_lines,
         "by_subpackage": dict(sorted(agg.items())),
-        "golden_direct_imports": {k: v for k, v in direct.items() if v},
+        "golden_direct_imports": usage["direct"],
     }
 
 
@@ -312,7 +381,17 @@ def write_compact() -> None:
 
 
 def main() -> None:
-    """측정을 돌리고 요약 두 줄을 출력한다."""
+    """측정을 돌리고 요약 두 줄을 출력한다. `--budget`이면 예산 판정만 한다."""
+    global OUT
+    parser = argparse.ArgumentParser(description="골든이 쓰는 옛 모듈 측정")
+    parser.add_argument("--out", type=Path, default=OUT, help="결과 파일을 쓸 폴더")
+    parser.add_argument("--budget", action="store_true", help="전이 의존 예산 판정만(exit 0/1)")
+    args = parser.parse_args()
+    if args.budget:
+        result = measure_budget()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        sys.exit(0 if result["within_budget"] else 1)
+    OUT = args.out.resolve()
     OUT.mkdir(parents=True, exist_ok=True)
     backend = measure_backend()
     flutter = measure_flutter()

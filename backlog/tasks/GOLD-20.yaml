@@ -1,0 +1,24 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-20
+title: "GOLD-20 S20A 후속 — 골든 LLM 복사본 동기화 감지·관할 게이트"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "S20A 후속 위험 제거(Kiki 지시 2026-11-17): ①골든 LLM 복사본(golden/llm/ 4파일)이 옛 원본과 갈라지면 자동으로 RED — 원본 sha256을 고정하고 바뀌면 다시 맞추라고 알리는 테스트(주입 확인) ②골든 튜터·시뮬레이터의 클라우드 호출이 옛 CompositeProvider와 같은 관할 게이트를 거친다 — 옛 판정 함수와 같은 입력 10개에 같은 판정(특성화) · 차단 시 호출 0회 · 튜터는 대체 문장 ③전이 예산 30·직접 10 유지 ④tests/golden·lint-imports 초록 · 옛 코드 diff 0"
+artifacts:
+  - "PR #1923 · golden/llm/gate.py(관할 게이트 · 옛 CompositeProvider와 10가지 판정 동일 · 차단 시 호출 0회) + golden/llm/sync.py·tests/golden/test_llm_copy_sync.py(옛 원본 코드 변경 시 RED) · 주입 6종 RED · tests/golden 391 passed · CI 미러 9잡 통과(a6ad178f) · 전이 28·직접 6 유지 · 옛 코드 diff 0 · 판정 기준 main cd560e32"
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+session: null
+notes: "선행 GOLD-18(S20A · PR #1923). Kiki 지시: S20A 보고의 위험 제거"
+updated: 2026-11-17
