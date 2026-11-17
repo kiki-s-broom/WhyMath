@@ -113,6 +113,11 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/src/backend/golden/check.py\" --hook-stop",
+            "timeout": 60
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/fence_guard.py\""
           },
           {

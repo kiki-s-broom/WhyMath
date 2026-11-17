@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-19
+title: "GOLD-P1 1단계 두꺼게 — AI 시뮬레이터 + 슬롯 T1·T2·T3 · S16~S35"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "1단계 두꺼게(S16~S35 + S20A) 공용 태스크 — 세션마다 golden/reports_phase1/<번호>/보고.md가 완료 기준을 적는다. S16 몫: ①시드 추출 스크립트 src/backend/golden/sim/seed_extract.py + tests/golden/test_sim_seed.py ②golden/sim/op_codes.md ③FINDINGS 끝 항목 번호 F-00~F-06(본문 diff 0줄) ④STATE.md 1단계 태스크 번호 ⑤CHECKLIST 1단계 절 ⑥tests/golden 초록"
+artifacts: []
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+session: claude/new-session-d52ah8
+notes: "Kiki 결정 2026-11-15(1단계 계획서 개정판). 지시서 golden/prompts_src/spec_phase1.md. S16이 등재, S17~S35가 같은 번호로 start."
+updated: 2026-11-16

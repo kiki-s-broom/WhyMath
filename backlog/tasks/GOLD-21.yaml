@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-21
+title: "GOLD-21 골든 패스 하네스 보강 — 검사 명령 하나·범위 검사(Stop 훅)·읽기 전용 검토 에이전트"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "Kiki 지시(2026-11-17) — 첨부 문서 '100만 줄 1인 개발 하네스 7단계'를 골든 패스 구역에 대조해 빈틈만 적용: ①검사 명령 하나(golden/check.py — CI golden-path 잡의 검사 스텝과 같은 명령 · 모든 스텝 실행 · 종료 코드 보존)와 CI 동기 가드 테스트 ②범위 검사(git 변경 목록 기준 · 골든 기본 경로 + claim 태스크 paths 밖이면 실패 · 고치는 법 문구 포함) ③집행 지점 — Stop 훅이 GOLD 태스크 진행 세션에서 범위 검사를 부른다(판정 불확실은 통과) ④읽기 전용 검토 에이전트 1개(.claude/agents/golden-reviewer.md · 도구 Read/Grep/Glob) ⑤CLAUDE.md 골든 블록에 검사 명령 한 줄 ⑥채택하지 않은 항목은 golden/LATER.md 한 줄씩 ⑦검증 — 뮤테이션(가드별 RED 확인)·tests/golden 전체·tests/infra·tests/harness 결과를 종료 코드로 보고"
+artifacts:
+  - "PR #1925 · 커밋 e9ba6779 · src/backend/golden/check.py(CI 스텝 동기·범위 검사·Stop 훅) · tests/golden/test_check_command.py 31건(tests/golden 324 passed) · 뮤테이션 25종 전건 RED · .claude/agents/golden-reviewer.md(독립 검토 2회 반려 → 지적 2건 수정) · CLAUDE.md v0.2.46 · LATER 6줄 · CI run 7003(head 769c8f25) 실행 잡 14개 전부 success"
+paths:
+  - "golden/**"
+  - "src/backend/golden/**"
+  - "tests/golden/**"
+  - ".claude/agents/golden-reviewer.md"
+  - ".claude/settings.json"
+  - CLAUDE.md
+session: null
+notes: |-
+  Kiki 지시 2026-11-17(첨부 HTML 문서 검토·적용·검증). 이미 있는 것(중복 구현 안 함): CI golden-path 잡 · import-linter 계약 2종 · 사고 대장(HARN-118) · 경로별 규칙 적시 주입과 CLAUDE.md 다이어트(HARN-121 review) · 특성화 테스트(1단계 S21) · 지시문 묶음(명세 역할). golden 밖 파일을 건드리는 이유: .claude/agents와 .claude/settings.json은 Claude Code가 그 위치에서만 읽는다 · CLAUDE.md는 검사 명령 참조 한 줄(집행 코드 참조 병기).
+
+  [미러 면제 2026-11-17] 클라우드 컨테이너에서 미러의 설치 스텝이 exit 1이라 6잡을 로컬 재현하지 못함. 대신 실제 CI run 7003(head 769c8f25)에서 backend 정적 검사·pytest 3샤드·마이그레이션·golden-path·infra-contracts·harness-integrity·declared-unwired-audit·policy-guard·docker-build가 전부 success
+updated: 2026-11-17
