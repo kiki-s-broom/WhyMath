@@ -1,0 +1,259 @@
+{
+ "flutter": {
+  "lib": 82,
+  "tests": 70,
+  "golden_reach": 8,
+  "golden_unref": 74,
+  "manifest": 74,
+  "unref_not_in_manifest": [],
+  "manifest_but_reached": [],
+  "old_reach": 74,
+  "neither": [
+   "src/mobile/lib/features/verify/data/verify_api.dart"
+  ],
+  "test_reach": 80,
+  "unresolved": [
+   [
+    "src/mobile/lib/features/auth/application/account_security_controller.dart",
+    "src/mobile/lib/features/auth/application/account_security_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/auth/application/account_security_state.dart",
+    "src/mobile/lib/features/auth/application/account_security_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/auth/application/auth_controller.dart",
+    "src/mobile/lib/features/auth/application/auth_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/auth/application/auth_state.dart",
+    "src/mobile/lib/features/auth/application/auth_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/application/chat_controller.dart",
+    "src/mobile/lib/features/chat/application/chat_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/application/chat_state.dart",
+    "src/mobile/lib/features/chat/application/chat_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/application/step_panel_controller.dart",
+    "src/mobile/lib/features/chat/application/step_panel_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/application/step_panel_state.dart",
+    "src/mobile/lib/features/chat/application/step_panel_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/data/coach_models.dart",
+    "src/mobile/lib/features/chat/data/coach_models.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/data/coach_models.dart",
+    "src/mobile/lib/features/chat/data/coach_models.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/data/scene_models.dart",
+    "src/mobile/lib/features/chat/data/scene_models.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/data/scene_models.dart",
+    "src/mobile/lib/features/chat/data/scene_models.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/data/solution_path_models.dart",
+    "src/mobile/lib/features/chat/data/solution_path_models.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/data/solution_path_models.dart",
+    "src/mobile/lib/features/chat/data/solution_path_models.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/chat/domain/chat_message.dart",
+    "src/mobile/lib/features/chat/domain/chat_message.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/ocr/application/ocr_controller.dart",
+    "src/mobile/lib/features/ocr/application/ocr_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/ocr/application/ocr_state.dart",
+    "src/mobile/lib/features/ocr/application/ocr_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/ocr/data/ocr_models.dart",
+    "src/mobile/lib/features/ocr/data/ocr_models.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/ocr/data/ocr_models.dart",
+    "src/mobile/lib/features/ocr/data/ocr_models.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/onboarding/application/onboarding_controller.dart",
+    "src/mobile/lib/features/onboarding/application/onboarding_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/onboarding/application/onboarding_seen_controller.dart",
+    "src/mobile/lib/features/onboarding/application/onboarding_seen_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/onboarding/application/onboarding_state.dart",
+    "src/mobile/lib/features/onboarding/application/onboarding_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/problems/application/diagnosis_controller.dart",
+    "src/mobile/lib/features/problems/application/diagnosis_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/problems/application/diagnosis_state.dart",
+    "src/mobile/lib/features/problems/application/diagnosis_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/problems/data/problem_models.dart",
+    "src/mobile/lib/features/problems/data/problem_models.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/problems/data/problem_models.dart",
+    "src/mobile/lib/features/problems/data/problem_models.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/profile/application/me_tab_controller.dart",
+    "src/mobile/lib/features/profile/application/me_tab_controller.g.dart"
+   ],
+   [
+    "src/mobile/lib/features/profile/application/me_tab_state.dart",
+    "src/mobile/lib/features/profile/application/me_tab_state.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/profile/data/growth_evidence_models.dart",
+    "src/mobile/lib/features/profile/data/growth_evidence_models.freezed.dart"
+   ],
+   [
+    "src/mobile/lib/features/profile/data/growth_evidence_models.dart",
+    "src/mobile/lib/features/profile/data/growth_evidence_models.g.dart"
+   ]
+  ]
+ },
+ "web": {
+  "files": 46,
+  "entries": 16,
+  "public_entries": 4,
+  "admin_entries": 11,
+  "public_reach": 11,
+  "admin_reach": 34,
+  "reach": 46,
+  "unreached": [],
+  "tests": 0,
+  "unresolved": [
+   [
+    "src/web/webapp/app/(public)/_components/Audience.tsx",
+    "../landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/(public)/_components/BetaCta.tsx",
+    "../landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/(public)/_components/Hero.tsx",
+    "../landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/(public)/_components/LegalFooter.tsx",
+    "../landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/(public)/_components/Method.tsx",
+    "../landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/(public)/_components/Mission.tsx",
+    "../landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/(public)/page.tsx",
+    "./landing.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/AdminNav.tsx",
+    "../admin.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/AdminShell.tsx",
+    "../admin.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsCommon.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsConceptDeleteBox.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsConceptStudioPane.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsConceptWorkspace.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsEdgePanel.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsProposalPanel.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsResourceDetail.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsResourcePanel.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsResourceScreen.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/CmsVersionPane.tsx",
+    "./Cms.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/OperatorTokenGate.tsx",
+    "../admin.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/ReviewQueue.tsx",
+    "./ReviewQueue.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/ReviewQueueDetail.tsx",
+    "./ReviewQueue.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/ReviewQueueList.tsx",
+    "./ReviewQueue.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/_components/ReviewQueueNotice.tsx",
+    "./ReviewQueue.module.css"
+   ],
+   [
+    "src/web/webapp/app/admin/page.admin.tsx",
+    "./admin.module.css"
+   ],
+   [
+    "src/web/webapp/app/layout.admin.tsx",
+    "./globals.css"
+   ],
+   [
+    "src/web/webapp/app/layout.tsx",
+    "./globals.css"
+   ]
+  ]
+ }
+}
