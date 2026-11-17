@@ -223,3 +223,34 @@ cd src/backend && python -m golden.measure_unreferenced
 
 - 사전 실측(2026-11-08)의 "테스트 파일 1,109개"는 이번 측정에서 `tests/backend`의 `test_*.py` **1,114개**다(3주 사이 다른 태스크가 추가 — S 세션은 `tests/backend`를 바꾸지 않았다).
 - 지시서가 제안한 `legacy/README.md`는 `golden/` 바깥 새 파일이라 만들지 않았다(공통 규칙 3). 목록의 정본은 이 절이다.
+
+## S20A 전이 의존 절단 (개정판 S20+1 · 2026-11-16 · 기준 main `cd560e3`)
+
+경계 긋기 — 골든이 직접 import하는 옛 모듈 7종과, 골든이 그 안에서 실제로 쓰는 이름. 정적 전이 수는 grimp 상류 + 조상 패키지 보정(측정기 `close_over_ancestors`)으로 센 값이다.
+
+| 직접 import(옛 모듈) | 골든이 쓰는 이름 | 그 모듈 하나가 끌고 오는 정적 전이 | 결정 | 근거(실측) |
+| --- | --- | ---: | --- | --- |
+| `whymath_backend.db.session` | `get_engine` 1개(항상 `db_disable_pool=True` 사본 → NullPool 경로만) | 102 | **복사해서 자른다** → `src/backend/golden/db.py` | 이것 하나를 자르면 전체 120 → 37. `db/__init__.py`가 ORM 모델 전체(`db` 64 · `schema` 35)를 끌고 온다 |
+| `whymath_backend.config` | `get_settings` 1개(필드 `database_url`) | 3 | import 유지 | 라우터 경로(`providers.factory`)가 어차피 `config`를 쓴다 — 복사해도 감소 0개(37 → 37) |
+| `whymath_backend.l3.safe_parse` | `safe_parse_expr` 1개 | 24 | import 유지 | 라우터 경로가 `l3` 패키지를 이미 끌고 와 복사해도 감소 1개(37 → 36). 대가는 928줄 복사와 코딩 헌법 R22-03(파싱 단일 진입점 · `tests/infra/test_cas_parse_entrypoint_governance.py`) 충돌 |
+| `whymath_backend.l3.models` | `RoutingRequest` 1개 | 36(아래 넷 합산) | import 유지 | LLM 호출은 라우터 경유(CLAUDE.md 불변 · 공통 규칙 9) |
+| `whymath_backend.l3.providers.factory` | `build_cloud_provider` | (위 합산) | import 유지 | 같음 |
+| `whymath_backend.l3.router` | `Router.route` | (위 합산) | import 유지 | 같음 |
+| `whymath_backend.schema.enums` | `LicenseType` 1개(라우터 요청의 라이선스 표시) | (위 합산) | import 유지 | 라우터·반출 게이트가 같은 열거형 객체를 비교한다 — 복사하면 동일성이 깨진다 |
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 복사: 의존 과다 · 원본 `whymath_backend/db/session.py`의 `get_engine`(NullPool 분기 1개) → `src/backend/golden/db.py` | 원본의 풀 사용 분기 · `get_sessionmaker` · `get_session` · `dispose_engine` | 골든은 NullPool 한 경로만 쓴다(S4 이유 그대로). 원본 import가 `db/__init__.py`를 거쳐 옛 모듈 102개를 끌고 왔다. 특성화 테스트 `tests/golden/characterization/test_s20a_db.py` | S20A |
+
+### S20A 결과 (측정기 `python -m golden.measure_unreferenced --budget` · 같은 도구로 이전·이후)
+
+| 구분 | 이전 (main `cd560e3`) | 이후 (`golden-p1/S20A`) | 예산 | 판정 |
+| --- | ---: | ---: | ---: | --- |
+| 직접 import 옛 모듈 | 7 | **6** (`config`·`l3.models`·`l3.providers.factory`·`l3.router`·`l3.safe_parse`·`schema.enums`) | ≤10 | 통과 |
+| 정적 전이(조상 보정) | 120 | 37 | — | — |
+| 런타임 실측 | 122 | 40 (런타임 전용 3: `l1` · `l1.rights.permission_map` · `schema.rights`) | — | — |
+| **전이(정적 ∪ 런타임)** | **122** (`db` 64 · `schema` 35 · `l3` 18 · 기타 5) | **40** (`l3` 18 · `schema` 17 · `l1` 2 · 기타 3) | ≤30 | **미달 10개** |
+
+- 남은 40의 출처: LLM 라우터 경로(`l3.models`·`providers.factory`·`router`·`schema.enums`) 정적 36 + 런타임 전용 3 + `safe_parse` 1. `schema` 17은 `schema.enums`의 조상 패키지 `schema/__init__.py`가 끌고 온다.
+- 끊지 못한 이유: LLM 호출은 라우터 경유(CLAUDE.md 불변 · 공통 규칙 9). "라우터 경유 유지(예산 40으로 조정) vs 프로바이더 1개 복사"는 Kiki 결정으로 넘겼다 — `golden/reports_phase1/S20A/보고.md`.
+- 동결: `tests/golden/test_import_budget.py` — 직접 ≤10 단언 · 옛 `db` 패키지 재유입 RED · 전이 래칫 40 · 목표 ≤30은 `xfail(strict)`(달성되면 XPASS가 실패로 떠 래칫을 조이라고 알린다).

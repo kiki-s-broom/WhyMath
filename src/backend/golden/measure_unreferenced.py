@@ -1,6 +1,8 @@
 """S15 할 일 1 — golden이 3주간 한 번도 쓰지 않은 옛 모듈 목록을 측정한다.
 
 실행: `cd src/backend && python -m golden.measure_unreferenced`
+S20A 예산 판정: `cd src/backend && python -m golden.measure_unreferenced --budget`
+(파일을 쓰지 않음 · 직접 ≤10 · 전이 ≤30 · 넘으면 exit 1)
 
 결과는 `golden/reports_no_students/S15/`에 쓴다. 학생 경로(GP-1~GP-6)와 무관한 측정 도구라
 `golden.api`는 이 모듈을 import하지 않는다(S11 `sim_student.py`와 같은 자리 · CI 린트 대상 위치).
@@ -311,8 +313,83 @@ def write_compact() -> None:
     (OUT / "unreferenced_compact.md").write_text("\n".join(out), encoding="utf-8")
 
 
-def main() -> None:
-    """측정을 돌리고 요약 두 줄을 출력한다."""
+# S20A 전이 의존 예산(개정판 S20+1 · 공통 규칙 8) — 골든이 쓰는 옛 모듈 수의 상한
+BUDGET_DIRECT = 10  # 골든 모듈이 import 문으로 직접 부르는 옛 모듈(서로 다른 것) 수
+BUDGET_TRANSITIVE = 30  # 그 상류 전체(조상 패키지 보정 + 런타임 실측 합집합) 수
+
+# 런타임 실측용 하위 프로세스 코드 — 깨끗한 인터프리터에서 골든 모듈만 import하고
+# 옛 모듈 이름을 낸다.
+# (pytest 프로세스는 특성화 테스트가 옛 모듈을 직접 import하므로 sys.modules가 오염돼 있다)
+_RUNTIME_PROBE = (
+    "import importlib, json, sys\n"
+    "for m in sys.argv[1:]:\n"
+    "    importlib.import_module(m)\n"
+    "print(json.dumps(sorted(k for k in sys.modules if k == 'whymath_backend'"
+    " or k.startswith('whymath_backend.'))))\n"
+)
+
+
+def measure_budget() -> dict[str, Any]:
+    """예산 판정에 쓰는 숫자만 센다. 파일을 쓰지 않는다(S15 측정 결과를 덮어쓰지 않게).
+
+    - direct: 골든 모듈 각각이 직접 import하는 옛 모듈의 합집합
+    - transitive: 정적 상류(조상 패키지 보정 포함 — measure_backend와 같은 계산) ∪ 런타임 실측
+    """
+    import subprocess  # 예산 모드에서만 쓴다
+
+    sys.path.insert(0, str(BACKEND))
+    graph = grimp.build_graph(OLD, "golden")
+    golden_mods = sorted(m for m in graph.modules if m.startswith("golden."))
+    direct = sorted(
+        {m for gm in golden_mods for m in graph.find_modules_directly_imported_by(gm) if is_old(m)}
+    )
+    static_direct = {m for m in graph.find_upstream_modules("golden", as_package=True) if is_old(m)}
+    closure = close_over_ancestors(graph, static_direct)
+
+    env = {**os.environ, "GOLDEN_FAKE_LLM": "1"}
+    probe = subprocess.run(
+        [sys.executable, "-c", _RUNTIME_PROBE, *[m for m in golden_mods if m != SELF]],
+        cwd=BACKEND,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+        check=False,
+    )
+    if probe.returncode != 0:
+        # 침묵 실패 금지 — 런타임 실측이 안 되면 숫자를 내지 않는다
+        raise RuntimeError(f"런타임 실측 실패(exit {probe.returncode}): {probe.stderr[-2000:]}")
+    fs_mods = filesystem_modules() | {m for m in graph.modules if is_old(m)}
+    runtime = set(json.loads(probe.stdout.strip().splitlines()[-1])) & fs_mods
+    transitive = sorted(closure | runtime)
+    top: defaultdict[str, int] = defaultdict(int)
+    for m in transitive:
+        top[top2(m)] += 1
+    return {
+        "direct": direct,
+        "direct_count": len(direct),
+        "static_with_ancestors_count": len(closure),
+        "runtime_count": len(runtime),
+        "runtime_only": sorted(runtime - closure),
+        "transitive": transitive,
+        "transitive_count": len(transitive),
+        "by_subpackage": dict(sorted(top.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "budget": {"direct": BUDGET_DIRECT, "transitive": BUDGET_TRANSITIVE},
+        "within_budget": len(direct) <= BUDGET_DIRECT and len(transitive) <= BUDGET_TRANSITIVE,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    """측정을 돌리고 요약 두 줄을 출력한다. `--budget`이면 예산 판정만 하고 파일은 쓰지 않는다."""
+    args = sys.argv[1:] if argv is None else argv
+    if args == ["--budget"]:
+        result = measure_budget()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        # 예산을 넘으면 exit 1 — 판정은 exit code로 한다
+        return 0 if result["within_budget"] else 1
+    if args:
+        raise SystemExit(f"알 수 없는 인자: {args} (쓸 수 있는 것: --budget)")
     OUT.mkdir(parents=True, exist_ok=True)
     backend = measure_backend()
     flutter = measure_flutter()
@@ -332,7 +409,8 @@ def main() -> None:
         f"lib 소스 {flutter['lib_source_files']}개 중 "
         f"미도달 {flutter['unused_source_files']}개 {flutter['unused_source_lines']}줄"
     )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
