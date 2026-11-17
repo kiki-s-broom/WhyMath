@@ -261,3 +261,34 @@ cd src/backend && python -m golden.measure_unreferenced
 - 남은 40개를 못 끊은 이유: 골든은 `l3`에서 이름 5개만 쓰지만 `l3/__init__.py`가 `models`·`router`를, `l3/providers/__init__.py`가 프로바이더 4종 전부를, `schema/__init__.py`가 스키마 16모듈을 일괄 import한다. 옛 코드를 고치지 않고는 골든 쪽에서 떼어 낼 수 없다.
 - 30 안으로 가는 길(Kiki 결정): 프로바이더 팩토리 경로(`providers/` 10모듈 + `interfaces`·`provider_jurisdiction`)를 골든으로 복사하면 정적 37 → 24(런타임 포함 약 27)가 된다(grimp 계산 · 미실행). 라우터(`Router.route`)는 그대로 경유한다. 전체 목록 `golden/reports_phase1/S20A/referenced_backend.tsv`.
 - 동결: `tests/golden/test_import_budget.py`(직접 ≤ 10 · 전이는 더 늘지 못함(상한 40) · 목표 30은 strict xfail · 끊은 `config`·`db`가 되돌아오면 RED).
+
+### 2일째 — 프로바이더 경로 복사 (Kiki 결정 2026-11-17: 선택지 B · 게이트 `G-s20a-router-path-transitive-budget`)
+
+**경계 긋기**(복사 전에 적음). 계산 결과 옛 코드를 고치지 않는 한 바닥은 정적 24(런타임 포함 약 27)다 — 헌법이 강제하는 `l3.safe_parse`를 import하는 순간 `l3/__init__`이 라우터·모델·스키마를 함께 부른다. 줄일 수 있는 것은 `l3.providers` 패키지 13모듈뿐이고, 그 패키지의 모듈을 하나라도 import하면 `providers/__init__`이 프로바이더 4종을 전부 부르므로 **패키지 안의 것은 하나도 import하지 않는다**.
+
+| 옛 위치 | 가져올 이름 | 골든 위치 | 이 복사본이 계속 import하는 옛 모듈(전부 바닥 안 또는 +1) |
+| --- | --- | --- | --- |
+| `l3/providers/_response_fields.py` | `read_response_model_id` | `src/backend/golden/llm/_response_fields.py` | 없음 |
+| `l3/providers/seat_failure.py` | `SeatHttpError`·`SeatNotConfiguredError`(+ 같은 파일의 분류 함수) | `golden/llm/seat_failure.py` | `l3.models`(바닥) |
+| `l3/providers/_openai_compat.py` | `ChatTransport`·`HttpxChatTransport`·`extract_text`·`extract_usage`·재시도 카운터 | `golden/llm/_openai_compat.py` | `l3.models`(바닥) |
+| `l3/providers/openrouter.py` | `OpenRouterProvider`(+ 관할 표·`build_provider_block`) | `golden/llm/openrouter.py` | `config`·`l3.models`·`l3.router._as_cost_tier`(바닥) · `l3.provider_jurisdiction`(+1) |
+| `l3/providers/factory.py` | `build_cloud_provider`의 **openrouter 분기 1개** | `golden/llm/factory.py` | `config`(바닥) — 다른 좌석이면 조용히 바꾸지 않고 `ValueError` |
+
+- 계속 옛 것을 쓰는 것: 라우터 판정 `Router.route`(LLM 호출은 라우터 경유 — 불변) · 설정 `config.Settings`(모델 핀·허용 공급사·키 이름이 옛 것과 같이 움직인다). 공통 규칙 9의 "`build_cloud_provider()` 경유" 문구만 Kiki 결정으로 골든 팩토리로 바뀐다.
+- 버리는 것: deepseek·anthropic·ollama·composite 프로바이더, 좌석 강등 계수(`LocalDegradeCounter` 등 — 골든은 강등 조립을 쓰지 않는다. 같은 파일이라 함께 복사되지만 쓰지 않는다).
+
+**복사 결과(2일째)**
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| **복사: 의존 과다** — `l3/providers/_response_fields.py`·`seat_failure.py`·`_openai_compat.py`·`openrouter.py` 4파일 통째(본문 무변경 · import 줄만 골든 복사본으로) → `src/backend/golden/llm/` · `factory.py`는 openrouter 분기 1개만 새로 씀 | deepseek·anthropic·ollama·composite 프로바이더 · 옛 팩토리의 다른 두 분기 | 옛 `providers/__init__`이 프로바이더 4종을 한꺼번에 불러 13모듈이 따라온다. 특성화 `tests/golden/characterization/test_s20a_llm_compat.py`(응답 파싱 10 · Retry-After 10 · 전송 재시도 10 · 실패 분류 10)·`test_s20a_llm_openrouter.py`(생성 10 · 상태 점검 4 · 팩토리). 본문은 원본과 대조해 import 순서 외 동일 | S20A |
+
+| 구분 | S15 | 1일째 | **2일째** | 예산 |
+| --- | ---: | ---: | ---: | ---: |
+| 직접 import 옛 모듈 | 7 | 5 | **6** | 10 |
+| 전이(런타임 포함 · 판정 기준) | 122 | 40 | **28** | 30 |
+| 골든이 쓰는 옛 코드 줄 | 30,194 | 17,587 | **14,248** | — |
+
+- 2일째 직접 6: `l3.safe_parse`(grade) · `l3.models`·`l3.router`·`schema.enums`(tutor·sim_student) · `config`·`l3.provider_jurisdiction`(golden/llm). `l3.providers` 패키지는 0.
+- 남은 28은 바닥(약 27)에서 1 위다 — `l3.provider_jurisdiction` 1개. 여유 2. 다음 옛 자산(T1·T2·T3)은 import하면 거의 확실히 예산을 넘으므로 **복사**가 기본이다.
+- 공통 규칙 9의 "튜터 LLM = `build_cloud_provider()` + `Router.route`"는 Kiki 결정(2026-11-17 선택지 B)으로 "`golden.llm.factory.build_cloud_provider()` + `Router.route`"가 된다. 라우터 판정은 그대로 옛 것을 거친다.

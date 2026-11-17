@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "1단계 두꺼게 S20A(개정판 S20+1) 전이 의존 절단: ①골든이 직접 import하는 옛 모듈 10개 이하 ②전이(조상 패키지 포함 상류) 30개 이하 — 둘 다 golden.measure_unreferenced 숫자(이전→이후) ③lint-imports·tests/golden 초록 ④tests/golden/test_import_budget.py RED→GREEN(주입 확인) ⑤튜터 LLM 호출 경로(라우터 경유) diff 0 ⑥옛 코드 무수정 — 복사본은 src/backend/golden/ 아래, 복사본마다 특성화 테스트와 HARVEST 줄"
-artifacts: []
+artifacts:
+  - "PR #1923 · golden/settings.py·db.py(1일째) + golden/llm/ OpenRouter 경로 복사(2일째 · Kiki 결정 B) · 측정 직접 7→6 · 전이 122→28(예산 10/30 통과 · measure_unreferenced --budget exit 0) · 특성화 71건 · test_import_budget 5건(주입 RED 확인) · tests/golden 369 passed · lint-imports 6 kept · 옛 코드 diff 0 · 판정 기준 main cd560e32"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
   - "tests/golden/**"
-session: claude/new-session-xazcn1
+session: null
 notes: "지시문 golden/prompts_phase1 S20A (F-00). S16이 STATE.md에 1단계 태스크 ID를 아직 적지 않아(병렬 진행) 이 세션이 CLI로 번호를 받았다."
-updated: 2026-11-16
+updated: 2026-11-17

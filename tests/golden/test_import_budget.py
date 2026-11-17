@@ -4,14 +4,13 @@
 숫자는 측정기 `python -m golden.measure_unreferenced --budget`가 센다. 런타임 실측이 이 pytest
 프로세스의 sys.modules에 오염되지 않도록(특성화 테스트가 옛 모듈을 import한다) 새 프로세스로 돌린다.
 
-현재 상태(2026-11-16 실측 · 기준 main cd560e32)
-- 직접 5개(예산 10 안) · 전이 40개(예산 30을 10 초과).
-- 남은 40개는 전부 "LLM 호출은 라우터 경유" 불변(CLAUDE.md)을 지키는 한 끊을 수 없다 —
-  `l3/__init__`·`l3/providers/__init__`·`schema/__init__`가 형제 모듈을 일괄 import한다.
-  끊는 방법(프로바이더·라우터 복사)은 Kiki 결정 사항이라 이 세션에서 하지 않았다
-  (게이트 `G-s20a-router-path-transitive-budget` · golden/reports_phase1/S20A/보고.md).
-- 그래서 전이는 두 겹으로 동결한다: ①다시 늘지 못한다(상한 = 실측 40) ②목표 30은 strict xfail —
-  30 안으로 들어오는 날 이 테스트가 "표시를 지워라"라고 실패해 임시 상한을 걷어내게 한다.
+경과(측정기 숫자 · 기준 main cd560e32)
+- S15: 직접 7 · 전이 122.
+- S20A 1일째(2026-11-16): `db.session`·`config` 엔진 경로를 골든으로 복사 → 직접 5 · 전이 40.
+- S20A 2일째(2026-11-17 · Kiki 결정 선택지 B): OpenRouter 프로바이더 경로를 `golden/llm/`로 복사
+  → 직접 6 · 전이 28. 라우터 판정(`Router.route`)은 그대로 옛 것을 거친다.
+- 바닥: 옛 코드를 고치지 않는 한 약 27이다 — 헌법 R22-03이 강제하는 `l3.safe_parse`를 import하면
+  `l3/__init__`이 라우터·모델·스키마 16모듈을 함께 부른다. 남은 여유는 2~3개뿐이다.
 """
 
 from __future__ import annotations
@@ -30,13 +29,9 @@ _BACKEND = Path(__file__).resolve().parents[2] / "src" / "backend"
 DIRECT_BUDGET = 10
 TRANSITIVE_BUDGET = 30
 
-# 임시 상한: 전이 실측값(2026-11-16). 예산 30이 아니다 — "더 늘지 않는다"만 지킨다.
-# 줄였으면 이 숫자도 같이 내린다. 30 이하가 되면 이 상수와 xfail 표시를 지운다.
-TRANSITIVE_CEILING = 40
-
-# S20A가 끊은 것 — 다시 붙으면 안 된다
-_CUT_DIRECT = {"whymath_backend.config", "whymath_backend.db.session"}
-_CUT_PREFIX = "whymath_backend.db"
+# S20A가 끊은 것 — 다시 붙으면 안 된다(패키지 이름 접두사)
+_CUT_DIRECT = {"whymath_backend.db.session", "whymath_backend.l3.providers.factory"}
+_CUT_PACKAGES = ("whymath_backend.db", "whymath_backend.l3.providers")
 
 
 @pytest.fixture(scope="module")
@@ -63,37 +58,33 @@ def test_measurement_is_not_empty(budget: dict[str, Any]) -> None:
     assert budget["direct_count"] == len(budget["direct"]) >= 1
     assert budget["transitive_count"] == len(budget["transitive"]) >= budget["direct_count"]
     assert set(budget["direct"]) <= set(budget["transitive"])
-    assert "whymath_backend.l3.router" in budget["direct"]
+    assert "whymath_backend.l3.router" in budget["direct"]  # LLM 호출은 라우터 경유(불변)
+    assert "whymath_backend.l3.safe_parse" in budget["direct"]  # 헌법 R22-03 단일 진입점
 
 
 def test_budget_constants_match_measurer(budget: dict[str, Any]) -> None:
     assert budget["direct_budget"] == DIRECT_BUDGET
     assert budget["transitive_budget"] == TRANSITIVE_BUDGET
-    assert TRANSITIVE_CEILING > TRANSITIVE_BUDGET  # 상한이 예산 이하가 되면 상한 자체를 지운다
 
 
 def test_direct_imports_within_budget(budget: dict[str, Any]) -> None:
     assert budget["direct_count"] <= DIRECT_BUDGET, budget["direct_by_golden_module"]
 
 
-def test_transitive_does_not_grow(budget: dict[str, Any]) -> None:
-    assert budget["transitive_count"] <= TRANSITIVE_CEILING, (
-        f"골든이 끌고 오는 옛 모듈이 {budget['transitive_count']}개로 늘었다(상한 "
-        f"{TRANSITIVE_CEILING}). 새 옛 모듈은 import하지 말고 src/backend/golden/ 아래로 복사한다"
-        f"(공통 규칙 8 다섯 걸음 ③). 패키지별: {budget['transitive_by_subpackage']}"
+def test_transitive_within_budget(budget: dict[str, Any]) -> None:
+    assert budget["transitive_count"] <= TRANSITIVE_BUDGET, (
+        f"골든이 끌고 오는 옛 모듈이 {budget['transitive_count']}개다(예산 {TRANSITIVE_BUDGET}). "
+        "새 옛 모듈은 import하지 말고 src/backend/golden/ 아래로 복사한다(공통 규칙 8 다섯 걸음 ③). "
+        f"패키지별: {budget['transitive_by_subpackage']}"
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="전이 40 > 예산 30 — 라우터 경유 LLM 경로 유지 여부는 Kiki 결정 대기(S20A 보고)",
-)
-def test_transitive_within_budget(budget: dict[str, Any]) -> None:
-    assert budget["transitive_count"] <= TRANSITIVE_BUDGET
-
-
 def test_cut_dependencies_stay_cut(budget: dict[str, Any]) -> None:
-    # S20A가 복사해 끊은 설정·DB 엔진이 다시 옛 것을 가리키면 전이 80여 개가 되돌아온다
+    # S20A가 복사해 끊은 DB 엔진·프로바이더 패키지가 다시 옛 것을 가리키면 전이가 되돌아온다
     assert not (_CUT_DIRECT & set(budget["direct"]))
-    back = [m for m in budget["transitive"] if m == _CUT_PREFIX or m.startswith(_CUT_PREFIX + ".")]
+    back = [
+        m
+        for m in budget["transitive"]
+        if any(m == p or m.startswith(p + ".") for p in _CUT_PACKAGES)
+    ]
     assert back == []

@@ -1680,7 +1680,8 @@ gates:
     evidence: null
     cleared_by: null
     notes: ""
-    corrections: []
+    corrections:
+      - "[2026-11-17] verdict PASS · inputs: GOLD-18 · evidence: Kiki 결정 2026-11-17(S20A 세션 질문 응답) 선택지 B 집행 완료 — OpenRouter 경로 golden/llm/ 복사·Router.route 유지 · 전이 28 ≤ 30 · 직접 6 ≤ 10(measure_unreferenced --budget exit 0) · PR #1923 · 판정 기준 main cd560e32 — done GOLD-18 인계"
     depends_on:
       - GOLD-18
   - id: G-s302-free-use-remeasure

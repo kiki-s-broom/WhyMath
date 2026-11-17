@@ -519,6 +519,7 @@ whymath_backend.l3.escalation_defaults	src/backend/whymath_backend/l3/escalation
 whymath_backend.l3.exact_value	src/backend/whymath_backend/l3/exact_value.py	110
 whymath_backend.l3.finite_probability	src/backend/whymath_backend/l3/finite_probability.py	590
 whymath_backend.l3.generation_seed	src/backend/whymath_backend/l3/generation_seed.py	160
+whymath_backend.l3.interfaces	src/backend/whymath_backend/l3/interfaces.py	271
 whymath_backend.l3.isolated_call	src/backend/whymath_backend/l3/isolated_call.py	486
 whymath_backend.l3.multi_solution	src/backend/whymath_backend/l3/multi_solution.py	1329
 whymath_backend.l3.notation_coverage	src/backend/whymath_backend/l3/notation_coverage.py	827
@@ -543,6 +544,17 @@ whymath_backend.l3.pregenerate.validator	src/backend/whymath_backend/l3/pregener
 whymath_backend.l3.problem_metadata_evidence	src/backend/whymath_backend/l3/problem_metadata_evidence.py	164
 whymath_backend.l3.problem_publish_gate	src/backend/whymath_backend/l3/problem_publish_gate.py	935
 whymath_backend.l3.prompt_assets	src/backend/whymath_backend/l3/prompt_assets.py	236
+whymath_backend.l3.providers	src/backend/whymath_backend/l3/providers/__init__.py	41
+whymath_backend.l3.providers._openai_compat	src/backend/whymath_backend/l3/providers/_openai_compat.py	305
+whymath_backend.l3.providers._response_fields	src/backend/whymath_backend/l3/providers/_response_fields.py	40
+whymath_backend.l3.providers.anthropic	src/backend/whymath_backend/l3/providers/anthropic.py	565
+whymath_backend.l3.providers.cloud_status	src/backend/whymath_backend/l3/providers/cloud_status.py	43
+whymath_backend.l3.providers.composite	src/backend/whymath_backend/l3/providers/composite.py	453
+whymath_backend.l3.providers.deepseek	src/backend/whymath_backend/l3/providers/deepseek.py	270
+whymath_backend.l3.providers.factory	src/backend/whymath_backend/l3/providers/factory.py	122
+whymath_backend.l3.providers.ollama	src/backend/whymath_backend/l3/providers/ollama.py	505
+whymath_backend.l3.providers.openrouter	src/backend/whymath_backend/l3/providers/openrouter.py	450
+whymath_backend.l3.providers.seat_failure	src/backend/whymath_backend/l3/providers/seat_failure.py	274
 whymath_backend.l3.publish_gate	src/backend/whymath_backend/l3/publish_gate.py	991
 whymath_backend.l3.queue	src/backend/whymath_backend/l3/queue/__init__.py	19
 whymath_backend.l3.queue.celery_app	src/backend/whymath_backend/l3/queue/celery_app.py	113

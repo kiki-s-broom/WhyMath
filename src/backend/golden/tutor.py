@@ -8,12 +8,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from golden.llm.factory import build_cloud_provider
 from golden.problems import Problem
 from golden.store import TurnRow
 
-# 옛 코드에서 가져온 것: 라우터 결정 + 프로바이더 팩토리(HARVEST.md)
+# 옛 코드에서 가져온 것: 라우터 결정(HARVEST.md).
+# 프로바이더 팩토리는 골든 복사본(golden.llm — S20A 2일째)
 from whymath_backend.l3.models import RoutingRequest
-from whymath_backend.l3.providers.factory import build_cloud_provider
 from whymath_backend.l3.router import Router
 from whymath_backend.schema.enums import LicenseType
 

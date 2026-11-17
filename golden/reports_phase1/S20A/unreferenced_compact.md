@@ -1,6 +1,6 @@
 <!-- golden.measure_unreferenced 가 생성 — 손으로 고치지 않는다 -->
 
-#### 백엔드 (`src/backend/whymath_backend/`) — 117줄로 접음
+#### 백엔드 (`src/backend/whymath_backend/`) — 119줄로 접음
 
 | 경로 | 파일 수 | 줄 수 |
 | --- | ---: | ---: |
@@ -45,6 +45,7 @@
 | `src/backend/whymath_backend/l3/exact_value.py` | 1 | 110 |
 | `src/backend/whymath_backend/l3/finite_probability.py` | 1 | 590 |
 | `src/backend/whymath_backend/l3/generation_seed.py` | 1 | 160 |
+| `src/backend/whymath_backend/l3/interfaces.py` | 1 | 271 |
 | `src/backend/whymath_backend/l3/isolated_call.py` | 1 | 486 |
 | `src/backend/whymath_backend/l3/multi_solution.py` | 1 | 1,329 |
 | `src/backend/whymath_backend/l3/notation_coverage.py` | 1 | 827 |
@@ -54,6 +55,7 @@
 | `src/backend/whymath_backend/l3/problem_metadata_evidence.py` | 1 | 164 |
 | `src/backend/whymath_backend/l3/problem_publish_gate.py` | 1 | 935 |
 | `src/backend/whymath_backend/l3/prompt_assets.py` | 1 | 236 |
+| `src/backend/whymath_backend/l3/providers/` | 11 | 3,068 |
 | `src/backend/whymath_backend/l3/publish_gate.py` | 1 | 991 |
 | `src/backend/whymath_backend/l3/queue/` | 4 | 594 |
 | `src/backend/whymath_backend/l3/render/` | 6 | 1,001 |

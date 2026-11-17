@@ -1,9 +1,10 @@
 {
-  "direct_count": 5,
+  "direct_count": 6,
   "direct_budget": 10,
   "direct": [
+    "whymath_backend.config",
     "whymath_backend.l3.models",
-    "whymath_backend.l3.providers.factory",
+    "whymath_backend.l3.provider_jurisdiction",
     "whymath_backend.l3.router",
     "whymath_backend.l3.safe_parse",
     "whymath_backend.schema.enums"
@@ -12,20 +13,33 @@
     "golden.grade": [
       "whymath_backend.l3.safe_parse"
     ],
+    "golden.llm._openai_compat": [
+      "whymath_backend.l3.models"
+    ],
+    "golden.llm.factory": [
+      "whymath_backend.config"
+    ],
+    "golden.llm.openrouter": [
+      "whymath_backend.config",
+      "whymath_backend.l3.models",
+      "whymath_backend.l3.provider_jurisdiction",
+      "whymath_backend.l3.router"
+    ],
+    "golden.llm.seat_failure": [
+      "whymath_backend.l3.models"
+    ],
     "golden.sim_student": [
       "whymath_backend.l3.models",
-      "whymath_backend.l3.providers.factory",
       "whymath_backend.l3.router",
       "whymath_backend.schema.enums"
     ],
     "golden.tutor": [
       "whymath_backend.l3.models",
-      "whymath_backend.l3.providers.factory",
       "whymath_backend.l3.router",
       "whymath_backend.schema.enums"
     ]
   },
-  "transitive_count": 40,
+  "transitive_count": 28,
   "transitive_budget": 30,
   "transitive": [
     "whymath_backend",
@@ -35,20 +49,8 @@
     "whymath_backend.l1.rights.permission_map",
     "whymath_backend.l3",
     "whymath_backend.l3.data_export_policy",
-    "whymath_backend.l3.interfaces",
     "whymath_backend.l3.models",
     "whymath_backend.l3.provider_jurisdiction",
-    "whymath_backend.l3.providers",
-    "whymath_backend.l3.providers._openai_compat",
-    "whymath_backend.l3.providers._response_fields",
-    "whymath_backend.l3.providers.anthropic",
-    "whymath_backend.l3.providers.cloud_status",
-    "whymath_backend.l3.providers.composite",
-    "whymath_backend.l3.providers.deepseek",
-    "whymath_backend.l3.providers.factory",
-    "whymath_backend.l3.providers.ollama",
-    "whymath_backend.l3.providers.openrouter",
-    "whymath_backend.l3.providers.seat_failure",
     "whymath_backend.l3.router",
     "whymath_backend.l3.safe_parse",
     "whymath_backend.schema",
@@ -69,15 +71,15 @@
     "whymath_backend.schema.user",
     "whymath_backend.schema.visualization"
   ],
-  "transitive_static_with_ancestors": 37,
-  "transitive_runtime": 40,
+  "transitive_static_with_ancestors": 25,
+  "transitive_runtime": 28,
   "transitive_by_subpackage": {
-    "whymath_backend.l3": 18,
     "whymath_backend.schema": 17,
+    "whymath_backend.l3": 6,
     "whymath_backend.l1": 2,
     "whymath_backend": 1,
     "whymath_backend._stdio": 1,
     "whymath_backend.config": 1
   },
-  "within_budget": false
+  "within_budget": true
 }

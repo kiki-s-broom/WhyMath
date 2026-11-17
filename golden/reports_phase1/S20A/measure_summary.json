@@ -10,19 +10,19 @@
       "whymath_backend.l1.rights.permission_map",
       "whymath_backend.l1.rights.policy_engine"
     ],
-    "static_direct_modules": 15,
-    "static_with_ancestors_modules": 37,
-    "runtime_modules": 40,
+    "static_direct_modules": 7,
+    "static_with_ancestors_modules": 25,
+    "runtime_modules": 28,
     "runtime_only": [
       "whymath_backend.l1",
       "whymath_backend.l1.rights.permission_map",
       "whymath_backend.schema.rights"
     ],
     "static_only": [],
-    "used_modules": 40,
-    "used_lines": 17587,
-    "unused_modules": 804,
-    "unused_lines": 298882,
+    "used_modules": 28,
+    "used_lines": 14248,
+    "unused_modules": 816,
+    "unused_lines": 302221,
     "by_subpackage": {
       "whymath_backend": {
         "total": 1,
@@ -110,10 +110,10 @@
       },
       "whymath_backend.l3": {
         "total": 166,
-        "used": 18,
-        "unused": 148,
-        "unused_lines": 73550,
-        "used_lines": 6376
+        "used": 6,
+        "unused": 160,
+        "unused_lines": 76889,
+        "used_lines": 3037
       },
       "whymath_backend.l4": {
         "total": 100,
@@ -183,15 +183,28 @@
       "golden.grade": [
         "whymath_backend.l3.safe_parse"
       ],
+      "golden.llm._openai_compat": [
+        "whymath_backend.l3.models"
+      ],
+      "golden.llm.factory": [
+        "whymath_backend.config"
+      ],
+      "golden.llm.openrouter": [
+        "whymath_backend.config",
+        "whymath_backend.l3.models",
+        "whymath_backend.l3.provider_jurisdiction",
+        "whymath_backend.l3.router"
+      ],
+      "golden.llm.seat_failure": [
+        "whymath_backend.l3.models"
+      ],
       "golden.sim_student": [
         "whymath_backend.l3.models",
-        "whymath_backend.l3.providers.factory",
         "whymath_backend.l3.router",
         "whymath_backend.schema.enums"
       ],
       "golden.tutor": [
         "whymath_backend.l3.models",
-        "whymath_backend.l3.providers.factory",
         "whymath_backend.l3.router",
         "whymath_backend.schema.enums"
       ]
