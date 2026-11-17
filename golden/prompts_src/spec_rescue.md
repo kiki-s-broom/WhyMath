@@ -70,9 +70,9 @@
 
 | 파트 | 범위 | 파일 | 줄 수 | 골든이 쓰는 정도 |
 | --- | --- | ---: | ---: | --- |
-| A 뼈대 | `src/backend/golden/` | 10 | 2,124 | 살아 있음(`tests/golden` 12파일) |
-| B 지식 자산 | `whymath_backend/l1`(98) · `l2`(41) · `l3`(166) · `l4`(100) | 405 | 미참조 133,064 | 20개만 사용(l1 2 · l3 18) |
-| C 접착제 | `whymath_backend/api`(56 · 26,724줄) · `app.py`(1,668) · `composition.py` · `config.py` · `consent*.py` · `security.py` · `db`(66) · `schema`(55) | 약 185 | 미측정 | api 0 · db 64 · schema 35 |
+| A 뼈대 | `src/backend/golden/` | 21 | 4,106 | 살아 있음(`tests/golden/`). main `39d8c890`(S20A 머지 뒤) 기준 — 다른 행은 `d7466d84` 기준 |
+| B 지식 자산 | `whymath_backend/l1`(98) · `l2`(41) · `l3`(166) · `l4`(100) | 405 | 미참조 133,064 | S20A 전 20개 사용(l1 2 · l3 18) — S20A 뒤 값은 D1이 다시 잰다 |
+| C 접착제 | `whymath_backend/api`(56 · 26,724줄) · `app.py`(1,668) · `composition.py` · `config.py` · `consent*.py` · `security.py` · `db`(66) · `schema`(55) | 약 185 | 미측정 | S20A 전 api 0 · db 64 · schema 35 — S20A 뒤 값은 D1이 다시 잰다 |
 | D 측정·운영 도구 | `whymath_backend/harness`(163 · 80,582줄) · `ops`(38 · 27,618) · `whs`(14 · 3,854) · `privacy`(9 · 2,287) · `l5`(10) · `l6`(18) · `lang`(2) | 254 | 약 119,000 | 0 |
 | E 테스트 | `tests/`(backend 1,141 · infra 152 · harness 77 · golden 12 · 그 외) | 1,477 | 484,370 | 골든용 12 |
 | F 스크립트·파이프라인 | `scripts/`(149 · 72,982줄) · `src/data-pipeline/`(84 · 15,963) | 233 | 88,945 | 미측정 |
@@ -122,7 +122,7 @@
 
 | 대상 | 맡은 세션 |
 | --- | --- |
-| 골든의 전이 의존 줄이기(옛 모듈 122개 → 직접 10 · 전이 30 이하) | 1단계 S20A |
+| 골든의 전이 의존 줄이기(옛 모듈 122개 → 직접 6 · 전이 28 · 2026-11-17 main `39d8c890`에 머지됨 · 관할 게이트 `tests/golden/test_import_budget.py`) | 1단계 S20A(완료) |
 | `harness/pedagogical_rubric.py`의 함수 2개(정답 유출 탐지·소형 루브릭) | 1단계 T1(S21~S25) |
 | `l1/misconception/catalog_loader.py`와 오개념 데이터 일차함수분 | 1단계 T2(S26~S30) |
 | `l2/bkt.py`의 `BktParameters`·`update_mastery` | 1단계 T3(S31~S34) |
@@ -368,7 +368,7 @@
 
 - **목적:** `l3`에서 C3이 보지 않은 나머지 — LLM 라우터, 프로바이더, 문제 생성, 렌더, 캐시, 대기열 — 의 처분 제안을 적는다.
 - **선행 산출물:** R0 도구 · D1·D2·D3·D5 카드.
-- **할 일:** 공유 계약 「카드 만드는 법」 1~7을 `l3`의 하위 폴더 `cache`·`dsl`·`pedagogy`·`pregenerate`·`providers`·`queue`·`render`·`trace`와, C3 목록에 없는 `l3` 바로 아래 파일에 적용한다. 골든이 쓰는 18모듈(`router`·`models`·`providers.factory` 등)은 "골든 사용 중"으로 표시한다.
+- **할 일:** 공유 계약 「카드 만드는 법」 1~7을 `l3`의 하위 폴더 `cache`·`dsl`·`pedagogy`·`pregenerate`·`providers`·`queue`·`render`·`trace`와, C3 목록에 없는 `l3` 바로 아래 파일에 적용한다. 골든이 쓰는 모듈(S20A 전 18개 — 지금 값은 D1 대장의 골든 등급으로 확인 · `router`·`models`·`providers.factory` 등)은 "골든 사용 중"으로 표시한다.
 - **산출물:** `golden/reports_rescue/C4/카드.md`, `보고.md`.
 - **완료 기준:** C3과 합쳐 `l3` 166모듈이 빠짐없이 한 번씩만 들어 있다(C3 카드가 있으면 대조하고, 없으면 자기 대상 목록을 보고에 적는다).
 - **하지 말 것:** 프로바이더의 키·주소 설정값을 카드에 옮겨 적지 않는다.
@@ -388,8 +388,8 @@
 - **선행 산출물:** R0 도구 · D1·D2·D3·D5 카드.
 - **할 일:** 공유 계약 「카드 만드는 법」 1~7을 `api/`·`db/`·`schema/`와 루트 파일(`app.py`·`composition.py`·`config.py`·`consent.py`·`consent_grant.py`·`security.py`)에 적용한다. `api/`는 라우터 파일마다 엔드포인트 수(`@router.` 데코레이터 건수)를 적는다. `db/`는 ORM 모델 수와 `src/backend/alembic/` 리비전 수를 적는다. 큰 파일 `coach.py`(4,570줄)·`me.py`(4,088줄)·`config.py`(2,211줄)는 `--level 2` 목차만 본다.
 - **산출물:** `golden/reports_rescue/C6/카드.md`, `보고.md`.
-- **완료 기준:** 라우터 56개의 엔드포인트 수 합계가 적혀 있다. `db`·`schema` 가운데 골든이 이미 쓰는 것(64·35)과 안 쓰는 것이 갈려 있다.
-- **하지 말 것:** `db` 의존 줄이기 방법을 설계하지 않는다(1단계 S20A 담당).
+- **완료 기준:** 라우터 56개의 엔드포인트 수 합계가 적혀 있다. `db`·`schema` 가운데 골든이 이미 쓰는 것(S20A 전 64·35 — 지금 값은 D1 대장으로 확인)과 안 쓰는 것이 갈려 있다.
+- **하지 말 것:** `db` 의존 줄이기 방법을 설계하지 않는다(1단계 S20A가 이미 했다 — 관할 게이트 `tests/golden/test_import_budget.py`).
 
 ### C7. 패키지 카드 — 파트 D `harness` 측정·검수 도구 (163모듈 · 80,582줄)
 
