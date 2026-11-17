@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-03-d4-script-entrypoints
+title: "RS-D4 파트 F 진입점 — 스크립트·파이프라인이 무엇을 실행하는가"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "scripts·data-pipeline .py 전부에 부르는 곳(CI·하네스훅·문서만·없음) 부착, 하위 폴더별 분포표, 옛 코드 본문 읽기 300줄 이하"
+artifacts: []
+paths:
+  - "golden/reports_rescue/D4/**"
+session: golden-rs/D4
+notes: ""
+updated: 2026-11-17
