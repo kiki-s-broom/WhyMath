@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "src/backend에서 ruff·black·mypy --strict·lint-imports·pytest ../../tests/golden 다섯 명령 종료 코드 0. 주입 2종(새 삼키기 추가·허용 목록 잔여 줄)에서 각각 실패. ruff 부재 시 통과가 아니라 실패. 옛 코드 변경 0줄."
-artifacts: []
+artifacts:
+  - "PR #1945(게이트) · PR #1946(보고) · 커밋 fe40bf04·21fb04d3 · tests/golden/rescue 2파일 · golden/reports_rescue/G2 3파일"
 paths:
   - tests/golden/rescue/test_silent_failure_gate.py
   - tests/golden/rescue/silent_failure_allow.txt
   - "golden/reports_rescue/G2/**"
-session: claude/new-session-55gg39
+session: null
 notes: ""
 updated: 2026-11-17
