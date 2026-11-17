@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from golden.llm.factory import build_cloud_provider
+from golden.llm.gate import guard_cloud_jurisdiction
 from golden.problems import Problem
 from golden.store import TurnRow
 
@@ -104,6 +105,8 @@ async def ask(problem: Problem, history: list[TurnRow], student_text: str) -> Tu
         system = TUTOR_PROMPT_PATH.read_text(encoding="utf-8")
         decision = Router().route(_routing_request())
         provider = build_cloud_provider()
+        # 보내기 직전 관할 판정(옛 CompositeProvider와 같은 판정 · GOLD-20) — 막히면 호출 0회
+        guard_cloud_jurisdiction(provider, decision)
         result = await asyncio.wait_for(
             provider.generate(build_user_prompt(problem, history, student_text), system, decision),
             timeout=LLM_TIMEOUT_S,

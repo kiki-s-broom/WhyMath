@@ -292,3 +292,10 @@ cd src/backend && python -m golden.measure_unreferenced
 - 2일째 직접 6: `l3.safe_parse`(grade) · `l3.models`·`l3.router`·`schema.enums`(tutor·sim_student) · `config`·`l3.provider_jurisdiction`(golden/llm). `l3.providers` 패키지는 0.
 - 남은 28은 바닥(약 27)에서 1 위다 — `l3.provider_jurisdiction` 1개. 여유 2. 다음 옛 자산(T1·T2·T3)은 import하면 거의 확실히 예산을 넘으므로 **복사**가 기본이다.
 - 공통 규칙 9의 "튜터 LLM = `build_cloud_provider()` + `Router.route`"는 Kiki 결정(2026-11-17 선택지 B)으로 "`golden.llm.factory.build_cloud_provider()` + `Router.route`"가 된다. 라우터 판정은 그대로 옛 것을 거친다.
+
+### 위험 제거 (GOLD-20 · Kiki 지시 2026-11-17)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 옛 `l3/providers/composite.CompositeProvider._guard_cloud_jurisdiction`의 감싸개 3줄(관할 읽기·opt-in 읽기·차단 오류) → `src/backend/golden/llm/gate.py`. 판정 함수 `l3.provider_jurisdiction.jurisdiction_judgment`는 **import 유지**(이미 전이 안 · 비용 0) | 옛 기본값 "관할 선언 없음 = US"(골든은 차단 · fail-closed) · LOCAL 강등(골든은 대체 문장으로 이어 간다) | 골든 튜터·시뮬레이터가 S4부터 관할 게이트를 건너뛰고 있었다. 특성화 `tests/golden/characterization/test_s20a_llm_gate.py`(옛 메서드와 10가지 판정 동일 · 차단 시 호출 0회) | S20A 후속 |
+| 없음 — 동기화 검사 `src/backend/golden/llm/sync.py`(`python -m golden.llm.sync`)·`tests/golden/test_llm_copy_sync.py` 신설 | — | 옛 프로바이더 원본의 **코드**(주석 제외)가 바뀌면 골든 복사본과 구문 트리가 달라져 RED. 주석·import 순서만 바뀐 경우는 통과 | S20A 후속 |
