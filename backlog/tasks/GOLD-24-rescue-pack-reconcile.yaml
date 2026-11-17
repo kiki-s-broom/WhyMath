@@ -18,6 +18,10 @@ paths:
   - "golden/prompts_rescue/**"
   - golden/prompts_src/spec_rescue.md
   - golden/prompts_src/config_rescue.json
+  - golden/LATER.md
 session: claude/amazing-bohr-tavk7z
-notes: "PR #1928 머지 뒤 후속. 같은 날 main에 들어온 검토 문서(#1927)와 결론이 어긋나는 곳을 Kiki 결정 전까지 지시문이 스스로 멈추게 한다."
+notes: |-
+  PR #1928 머지 뒤 후속. 같은 날 main에 들어온 검토 문서(#1927)와 결론이 어긋나는 곳을 Kiki 결정 전까지 지시문이 스스로 멈추게 한다.
+
+  [정정 2026-11-17] paths ['golden/prompts_rescue/**', 'golden/prompts_src/spec_rescue.md', 'golden/prompts_src/config_rescue.json'] → ['golden/prompts_rescue/**', 'golden/prompts_src/spec_rescue.md', 'golden/prompts_src/config_rescue.json', 'golden/LATER.md']: Kiki 결정(2026-11-17 '나' — ledger.py 인정)에 따라 겹치는 보정 함수 2개 정리를 LATER에 한 줄 적는다
 updated: 2026-11-17
