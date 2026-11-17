@@ -182,7 +182,9 @@ def main(spec_path, config_path, out):
     folder = {}
     for s, ts in by_stage.items():
         kind = f"병렬_{len(ts)}개" if len(ts) > 1 else "순차"
-        folder[s] = f"단계{s:02d}_{kind}"
+        # 선택 키 stage_labels: 폴더 이름만 보고 그 단계의 내용을 알 수 있게 라벨을 붙인다(없으면 종전 이름)
+        label = cfg.get("stage_labels", {}).get(str(s), "")
+        folder[s] = f"단계{s:02d}_{kind}" + (f"_{label}" if label else "")
         os.makedirs(os.path.join(out, folder[s]))
 
     files = {}
