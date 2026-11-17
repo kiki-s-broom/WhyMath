@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,11 +13,13 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "두 TSV 행 수 = 실제 파일 수 · 패키지별 표 · 테스트 본문 읽기 0줄(ast 집계만)"
-artifacts: []
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1940"
+  - golden/reports_rescue/D5/보고.md
 paths:
   - "src/backend/golden/rescue/**"
   - "golden/reports_rescue/D5/**"
-session: claude/new-session-q0gfsb
+session: null
 notes: |-
   옛 코드 살리기 RS 진단 D5 (Kiki 지시 2026-11-17)
 
