@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 2
 eos_priority: P1
 owner: claude
@@ -13,13 +13,14 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "①S20A 머지 뒤 수치 정정 ②golden/RESCUE_REVIEW.md가 기각한 항목(ledger.py·가림막·가동 비중·jscpd)과 겹치는 R1·D1·D3·Z2·F1에 결정 대기 표시 ③재생성·인코딩 가드 통과"
-artifacts: []
+artifacts:
+  - "PR #1936(수치 정정 · Kiki 결정 4건 반영 · 27세션) + 후속 PR(ledger.py 인정 반영 — D1·G1·Z1 명령을 golden.rescue.ledger 실물에 맞춤 · LATER 1줄) · 로컬 CI 미러 통과"
 paths:
   - "golden/prompts_rescue/**"
   - golden/prompts_src/spec_rescue.md
   - golden/prompts_src/config_rescue.json
   - golden/LATER.md
-session: claude/amazing-bohr-tavk7z
+session: null
 notes: |-
   PR #1928 머지 뒤 후속. 같은 날 main에 들어온 검토 문서(#1927)와 결론이 어긋나는 곳을 Kiki 결정 전까지 지시문이 스스로 멈추게 한다.
 
