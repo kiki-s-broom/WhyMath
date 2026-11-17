@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "다섯 유형(타입 검사·오류 삼키기·조용한 삼키기·미완성·가짜 응답 후보)의 패키지별 건수 표가 golden/reports_rescue/D2/에 있고 각 표 위에 만든 명령이 있다. 옛 코드 변경 0줄."
-artifacts: []
+artifacts:
+  - "PR #1937 · 커밋 8c4117d6 · golden/reports_rescue/D2/ 4파일"
 paths:
   - "golden/reports_rescue/D2/**"
-session: claude/new-session-jjzdqd
+session: null
 notes: ""
 updated: 2026-11-17
