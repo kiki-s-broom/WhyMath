@@ -1,0 +1,40 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-27-l4-adapter-nested-fix
+title: "l4 CORE→Math Adapter 금지의 중첩 스킵을 별도 계약으로 닫는다(계약 3 문면 보정)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 계약 3은 그대로 둔다(기존 ignore 20건 보존). l4 CORE→Math Adapter 금지를 모듈 단위 별도 forbidden 계약으로 신설한다 — 소스는 BOUNDARY_MAP에서 ADAPTER로 배정되지 않은 l4 모듈 95개 전수(파일시스템 100 − ADAPTER 5)와 정확히 일치해야 하고, as_packages = false를 건다.\n② 주입 검증 — l4/tone_filter.py에 from whymath_backend.l4.subject_adapter_math import ...를 주입하면 exit 1(BROKEN), cp 백업→cp 복원 뒤 exit 0. 주입 전후 sha256 단언을 남긴다.\n③ 오탐 0 — 주입 없는 상태에서 lint-imports가 7 kept, 0 broken · exit 0. CI backend 잡이 도는 명령 그대로 돌린다(infra/ci/constraints-py312.txt가 고정한 import-linter==2.15로 검증 — 로칼 2.13과 다르면 그 사실을 기록).\n④ 배선 동결 — tests/infra/test_eos_boundary_contract_wiring.py에 새 계약의 소스 == BOUNDARY_MAP 비-ADAPTER l4 모듈 집합, forbidden == l4 ADAPTER 5개, as_packages == false를 동결하는 검사를 넣는다. 소스 1개 삭제·as_packages 제거 무테이션으로 각각 RED를 확읜한다.\n⑤ 보고 — 옛 코도(whymath_backend 소스) 변결 0줄. pyproject.toml(설정)·tests/infra(동결 검사)만 바꾀다. PR 본문에 P1 착수 근거와 12/31 이전 착수 사유를 적는다.\n⑥ 종료 보고에 ①완료 기중 총족 여부 ②옛 코도 변결 0줄 확읜 ③CI backend 잡의 lint-imports 스탭과 잠 이름을 적는다."
+  - "⑦ (오탈자 정정 — 2026-11-18) ①~⑥의 오탈자를 다음과 같이 읽는다: 로칼→로컬, 무테이션→뮤테이션, 확읜→확인, 변결→변경, 코도→코드, 기중 총족→기준 충족, 스탭→스텝, 잠 이름→잡 이름, 바꾀다→바꾼다."
+artifacts: []
+paths:
+  - src/backend/pyproject.toml
+  - tests/infra/test_eos_boundary_contract_wiring.py
+session: main
+notes: |-
+  출처: GOLD-25 §4(golden/CONTRACT_MUTATION.md) · Kiki 승인 2026-11-18("①~③ 전부").
+
+  GOLD-25가 계약 3에서 중첩 스킵을 실측했다 — 소스 whymath_backend.l4(패키지)가 금지 대상 l4.subject_adapter_math의 상위 패키지라 import-linter가 그 쌍을 건너린다(as_packages 기본 True + _modules_overlap). 그래서 l4 CORE 모듈이 어댑터를 import해도 KEPT·exit 0(M3b). 보정 형태(95모듈 열거 + as_packages=false)는 저장소 밖 임시 config로 주입 시 BROKEN, 주입 없이 exit 0임을 확인했다.
+
+  계약 3을 그대로 두는 이유: as_packages=false를 계약 3 전체에 걸면 api·l6·l3 하위 패키지 검사가 __init__.py만 보게 되어 검사 범위가 줄어든다(GOLD-25 §4.3). 그래서 l4만 별도 계약으로 분리한다.
+
+  [정정 2026-11-18] notes 치환 — 노트 오탈자·U+FFFD 정정(인코딩 가드 차단 방지)
+
+  [정정 2026-11-18] notes 치환 — 노트 오탈자 정정
+
+  [정정 2026-11-18] notes 치환 — 노트 오탈자 정정
+
+  [정정 2026-11-18] notes 치환 — 노트 오탈자 정정
+
+  [정정 2026-11-18] notes 치환 — 노트 오탈자 정정
+
+  [정정 2026-11-18] 등재 시 오탈자 정정(acceptance append 전용 경로)
+updated: 2026-11-18
