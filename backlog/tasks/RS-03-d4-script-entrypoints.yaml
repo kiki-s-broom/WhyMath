@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-03-d4-script-entrypoints
+title: "RS-D4 파트 F 진입점 — 스크립트·파이프라인이 무엇을 실행하는가"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "scripts·data-pipeline .py 전부에 부르는 곳(CI·하네스훅·문서만·없음) 부착, 하위 폴더별 분포표, 옛 코드 본문 읽기 300줄 이하"
+artifacts:
+  - "PR #1934 (대장·요약·카드·보고) + PR #1935 (재생성 문서) · golden/reports_rescue/D4/"
+paths:
+  - "golden/reports_rescue/D4/**"
+session: null
+notes: "[미러 면제 2026-11-17] 클라우드 컨테이너 환경 결함: harness-integrity·declared-unwired-audit의 pip install 스텝이 debian 설치 패키지(pyparsing 3.1.1·pip 24.0)를 RECORD file not found로 제거하지 못해 exit 1(변경과 무관 · 이 PR은 문서·TSV·대장만). 대신 같은 잡의 핵심 검사 backlog.py validate(exit 0 · 1343건 green)·audit-deps(exit 0 · 위반 0)를 직접 실행. infra-contracts·infra-shell·policy-guard 미러는 exit 0. 최종 판정은 CI"
+updated: 2026-11-17
