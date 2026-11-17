@@ -1,0 +1,23 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-07
+title: "RS-R0 목차 도구 설치 — 파일을 열지 않고 요약을 뽑는다"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - ruff·black·mypy --strict·lint-imports·pytest tests/golden 전부 exit 0 / outline 테스트 4종 통과 / 큼 기준 1500→15000 주입 시 테스트 실패
+artifacts: []
+paths:
+  - "src/backend/golden/rescue/**"
+  - "tests/golden/rescue/**"
+  - "golden/reports_rescue/R0/**"
+session: claude/new-session-b6cl6z
+notes: "옛 코드 살리기 RS 묶음 R0 (Kiki 지시 2026-11-17)"
+updated: 2026-11-17
