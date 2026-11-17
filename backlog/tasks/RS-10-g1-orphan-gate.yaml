@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-10-g1-orphan-gate
+title: "RS-G1 고아 게이트 — 골든 구역에 연결 안 된 모듈이 새로 생기면 실패"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - tests/golden/rescue/test_orphan_gate.py
+  - tests/golden/rescue/orphan_baseline.txt
+  - "golden/reports_rescue/G1/*"
+session: claude/new-session-qn7gys
+notes: ""
+updated: 2026-11-17
