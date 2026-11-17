@@ -1,0 +1,26 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-08
+title: "RS-R1 대장 도구 설치 — 진입점 둘, 그래프 밖 파일 보정"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts:
+  - "PR #1933 · src/backend/golden/rescue/ledger.py · tests/golden/rescue/test_ledger.py · golden/reports_rescue/R1/"
+paths:
+  - "src/backend/golden/rescue/**"
+  - "tests/golden/rescue/**"
+  - "golden/reports_rescue/R1/**"
+session: null
+notes: |-
+  [트리거 면제] 옛 코드 살리기 RS 진단 도구 — Kiki 지시 2026-11-17
+
+  [미러 면제 2026-11-17] 컨테이너에서 미러 설치 스텝 exit 1(6잡) — infra-contracts·infra-shell·policy-guard 통과, backend ruff·black·lint-imports(2.15) 수동 exit 0, golden-path는 check.py PASS
+updated: 2026-11-17
