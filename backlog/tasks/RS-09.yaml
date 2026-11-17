@@ -5,16 +5,17 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on: []
 requires_gates: []
 acceptance: []
-artifacts: []
+artifacts:
+  - "golden/reports_rescue/D1/ (ledger.csv 869행·요약·카드·보고) · PR #1947"
 paths:
   - "golden/reports_rescue/D1/**"
-session: golden-rs/D1
+session: null
 notes: ""
 updated: 2026-11-17
