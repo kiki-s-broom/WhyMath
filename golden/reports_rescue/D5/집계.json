@@ -1,0 +1,323 @@
+{
+ "test_files": 1486,
+ "test_lines": 485754,
+ "legacy_modules": 844,
+ "golden_modules": 22,
+ "parse_errors": [],
+ "files_by_top": {
+  "(tests 바로 아래)": 1,
+  "backend": 1141,
+  "constitution": 4,
+  "data_pipeline": 90,
+  "golden": 21,
+  "harness": 77,
+  "infra": 152
+ },
+ "lines_by_top": {
+  "(tests 바로 아래)": 213,
+  "backend": 380596,
+  "constitution": 1003,
+  "data_pipeline": 15201,
+  "golden": 2833,
+  "harness": 32236,
+  "infra": 53672
+ },
+ "no_legacy_by_top": {
+  "(tests 바로 아래)": 1,
+  "backend": 60,
+  "constitution": 2,
+  "data_pipeline": 89,
+  "golden": 6,
+  "harness": 77,
+  "infra": 152
+ },
+ "no_legacy_lines_by_top": {
+  "(tests 바로 아래)": 213,
+  "backend": 7731,
+  "constitution": 653,
+  "data_pipeline": 15078,
+  "golden": 446,
+  "harness": 32236,
+  "infra": 53672
+ },
+ "no_legacy_other_roots": {
+  "(1자 import 없음)": 306,
+  "data_pipeline": 79,
+  "tests": 2
+ },
+ "rep_ties": 279,
+ "unresolved_files": 0,
+ "unresolved_targets": {},
+ "dynamic_files": 2,
+ "packages": {
+  "whymath_backend": {
+   "mods": 1,
+   "src_lines": 14,
+   "any_files": 8,
+   "any_lines": 4005,
+   "rep_files": 3,
+   "rep_lines": 646
+  },
+  "whymath_backend._stdio": {
+   "mods": 1,
+   "src_lines": 47,
+   "zero": 1,
+   "zero_lines": 47
+  },
+  "whymath_backend.api": {
+   "mods": 56,
+   "src_lines": 26724,
+   "zero": 14,
+   "zero_lines": 2123,
+   "rep_files": 64,
+   "rep_lines": 24235,
+   "any_files": 164,
+   "any_lines": 77731
+  },
+  "whymath_backend.app": {
+   "mods": 1,
+   "src_lines": 1668,
+   "any_files": 121,
+   "any_lines": 64541,
+   "rep_files": 9,
+   "rep_lines": 1656
+  },
+  "whymath_backend.composition": {
+   "mods": 1,
+   "src_lines": 148,
+   "any_files": 13,
+   "any_lines": 3974,
+   "rep_files": 1,
+   "rep_lines": 190
+  },
+  "whymath_backend.config": {
+   "mods": 1,
+   "src_lines": 2211,
+   "rep_files": 59,
+   "rep_lines": 15948,
+   "any_files": 281,
+   "any_lines": 119603
+  },
+  "whymath_backend.consent": {
+   "mods": 1,
+   "src_lines": 61,
+   "any_files": 5,
+   "any_lines": 1897,
+   "rep_files": 1,
+   "rep_lines": 67
+  },
+  "whymath_backend.consent_grant": {
+   "mods": 1,
+   "src_lines": 126,
+   "any_files": 2,
+   "any_lines": 664
+  },
+  "whymath_backend.db": {
+   "mods": 66,
+   "src_lines": 10225,
+   "zero": 5,
+   "zero_lines": 721,
+   "rep_files": 162,
+   "rep_lines": 67710,
+   "any_files": 294,
+   "any_lines": 121158
+  },
+  "whymath_backend.harness": {
+   "mods": 163,
+   "src_lines": 80582,
+   "zero": 5,
+   "zero_lines": 714,
+   "any_files": 249,
+   "any_lines": 102612,
+   "rep_files": 128,
+   "rep_lines": 55233
+  },
+  "whymath_backend.l1": {
+   "mods": 98,
+   "src_lines": 21932,
+   "zero": 28,
+   "zero_lines": 1839,
+   "any_files": 170,
+   "any_lines": 65210,
+   "rep_files": 78,
+   "rep_lines": 25614
+  },
+  "whymath_backend.l2": {
+   "mods": 41,
+   "src_lines": 14470,
+   "zero": 1,
+   "zero_lines": 62,
+   "any_files": 108,
+   "any_lines": 56503,
+   "rep_files": 52,
+   "rep_lines": 22049
+  },
+  "whymath_backend.l3": {
+   "mods": 166,
+   "src_lines": 79926,
+   "zero": 7,
+   "zero_lines": 694,
+   "any_files": 373,
+   "any_lines": 134093,
+   "rep_files": 267,
+   "rep_lines": 82622
+  },
+  "whymath_backend.l4": {
+   "mods": 100,
+   "src_lines": 23630,
+   "zero": 9,
+   "zero_lines": 706,
+   "any_files": 206,
+   "any_lines": 84818,
+   "rep_files": 99,
+   "rep_lines": 30222
+  },
+  "whymath_backend.l5": {
+   "mods": 10,
+   "src_lines": 1634,
+   "zero": 2,
+   "zero_lines": 110,
+   "rep_files": 10,
+   "rep_lines": 1003,
+   "any_files": 13,
+   "any_lines": 2148
+  },
+  "whymath_backend.l6": {
+   "mods": 18,
+   "src_lines": 3019,
+   "zero": 6,
+   "zero_lines": 335,
+   "any_files": 17,
+   "any_lines": 6151,
+   "rep_files": 4,
+   "rep_lines": 1180
+  },
+  "whymath_backend.lang": {
+   "mods": 2,
+   "src_lines": 275,
+   "zero": 1,
+   "zero_lines": 16,
+   "any_files": 2,
+   "any_lines": 390,
+   "rep_files": 1,
+   "rep_lines": 244
+  },
+  "whymath_backend.ops": {
+   "mods": 38,
+   "src_lines": 27618,
+   "zero": 1,
+   "zero_lines": 6,
+   "any_files": 94,
+   "any_lines": 45577,
+   "rep_files": 29,
+   "rep_lines": 13116
+  },
+  "whymath_backend.privacy": {
+   "mods": 9,
+   "src_lines": 2287,
+   "zero": 1,
+   "zero_lines": 45,
+   "any_files": 32,
+   "any_lines": 9582,
+   "rep_files": 9,
+   "rep_lines": 893
+  },
+  "whymath_backend.schema": {
+   "mods": 55,
+   "src_lines": 15859,
+   "zero": 4,
+   "zero_lines": 371,
+   "any_files": 503,
+   "any_lines": 198957,
+   "rep_files": 104,
+   "rep_lines": 29235
+  },
+  "whymath_backend.security": {
+   "mods": 1,
+   "src_lines": 159,
+   "any_files": 34,
+   "any_lines": 18631
+  },
+  "whymath_backend.whs": {
+   "mods": 14,
+   "src_lines": 3854,
+   "zero": 1,
+   "zero_lines": 245,
+   "any_files": 19,
+   "any_lines": 6658,
+   "rep_files": 5,
+   "rep_lines": 1650
+  },
+  "golden": {
+   "mods": 22,
+   "src_lines": 4399,
+   "rep_files": 14,
+   "rep_lines": 2212,
+   "any_files": 15,
+   "any_lines": 2387
+  }
+ },
+ "zero_total": 86,
+ "top_modules": [
+  [
+   "whymath_backend.schema.enums",
+   397
+  ],
+  [
+   "whymath_backend.config",
+   281
+  ],
+  [
+   "whymath_backend.db.models.user",
+   122
+  ],
+  [
+   "whymath_backend.app",
+   121
+  ],
+  [
+   "whymath_backend.l3.equivalent.acceptance",
+   118
+  ],
+  [
+   "whymath_backend.l3.models",
+   110
+  ],
+  [
+   "whymath_backend.l3.equivalent.generator",
+   91
+  ],
+  [
+   "whymath_backend.db.session",
+   84
+  ],
+  [
+   "whymath_backend.schema.user",
+   84
+  ],
+  [
+   "whymath_backend.schema.problem",
+   77
+  ],
+  [
+   "whymath_backend.api._auth",
+   72
+  ],
+  [
+   "whymath_backend.db.models.problem",
+   65
+  ],
+  [
+   "whymath_backend.l4.misconception.catalog",
+   58
+  ],
+  [
+   "whymath_backend.l3.equivalent.orchestrator",
+   46
+  ],
+  [
+   "whymath_backend.l3.interfaces",
+   44
+  ]
+ ]
+}
