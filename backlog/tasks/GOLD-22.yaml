@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "Kiki 결정 2026-11-17(선택지 ②) 기록: 골든 튜터·시뮬레이터가 학생 답을 포함한 프롬프트를 클라우드(OpenRouter)로 보내는 것을 명시 허용. 동작 변경 없음. 기록 위치 = 라우팅 요청 함수 docstring(tutor.py·sim_student.py) · HARVEST · LATER(해소 표기) · S20A 보고. 근거 사실(기본 허용 공급사·프롬프트에 닉네임·세션 ID 없음)은 코드에서 확인해 적는다. 실학생 세션 전 보호자 동의서 반영은 Kiki 몫으로 명시"
-artifacts: []
+artifacts:
+  - "PR #1923 · Kiki 결정 2026-11-17 선택지 ② 기록 — src/backend/golden/tutor.py _routing_request docstring(전제 4개) · HARVEST·LATER·S20A 보고 · 동작 변경 없음 · tests/golden 393 passed · CI 미러 상시 잡 5개 통과(198f01e5) · 판정 기준 main cd560e32"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
-session: claude/new-session-xazcn1
+session: null
 notes: "선행 GOLD-20(PR #1923). LATER 2026-11-17 GOLD-20 줄의 Kiki 결정"
 updated: 2026-11-17
