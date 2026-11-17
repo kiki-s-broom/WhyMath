@@ -39,7 +39,7 @@ from pathlib import Path
 #:        · PL 4단계 파일럿(S76~S105).
 #: 새 묶음은 이 정규식과 아래 _BUNDLE 표, 테스트 픽스처에 함께 더한다.
 _NAME_RE = re.compile(
-    r"^세션 이름:\s*((GPN|GP|DK|DU|SC|PL)-단계(\d{2})-([A-Z]+\d+[A-Z]?)-(\S+))\s*$"
+    r"^세션 이름:\s*((GPN|GP|DK|DU|SC|PL|RS)-단계(\d{2})-([A-Z]+\d+[A-Z]?)-(\S+))\s*$"
 )
 _BUNDLE = {
     "GP": "원본 묶음(golden/prompts)",
@@ -48,6 +48,7 @@ _BUNDLE = {
     "DU": "2단계 두 번째 단원(golden/prompts_phase2)",
     "SC": "3단계 세 번째 단원+Subject Contract(golden/prompts_phase3)",
     "PL": "4단계 파일럿(golden/prompts_phase4)",
+    "RS": "옛 코드 살리기(golden/prompts_rescue)",
 }
 _REGISTRY_REL = Path("golden") / "SESSIONS.md"
 _HEADER = (

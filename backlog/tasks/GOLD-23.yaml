@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-23
+title: "GOLD-23 옛 코드 살리기 지시문 묶음(RS) — 진단·판정·입고 준비·잠금·삭제 준비 28세션 + 컨텍스트 예산 규칙"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 2
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①원본 golden/prompts_src/spec_rescue.md·config_rescue.json ②생성기로 golden/prompts_rescue/ 생성(파일 이름=세션 이름) ③등록 훅에 접두 RS 추가+테스트 픽스처 ④모든 지시문에 컨텍스트 예산 규칙과 공유 계약이 실림"
+artifacts: []
+paths:
+  - "golden/prompts_rescue/**"
+  - "golden/prompts_src/**"
+  - ".claude/hooks/golden_session_register.py"
+  - tests/infra/test_golden_session_register.py
+  - scripts/golden_prompts/build_prompts.py
+session: claude/amazing-bohr-tavk7z
+notes: |-
+  Kiki 지시 2026-11-17(이 세션 대화). 옛 코드는 한 줄도 고치지 않는다 — 지시문 문서와 훅 접두 1개만 추가.
+
+  [정정 2026-11-17] paths ['golden/prompts_rescue/**', 'golden/prompts_src/**', '.claude/hooks/golden_session_register.py', 'tests/infra/test_golden_session_register.py'] → ['golden/prompts_rescue/**', 'golden/prompts_src/**', '.claude/hooks/golden_session_register.py', 'tests/infra/test_golden_session_register.py', 'scripts/golden_prompts/build_prompts.py']: 단계 폴더 이름에 내용 라벨을 붙이는 생성기 선택 키(stage_labels) 추가 — Kiki 지시(폴더명으로 구분)
+updated: 2026-11-17
