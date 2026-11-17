@@ -80,6 +80,17 @@ def _routing_request() -> RoutingRequest:
 
     문항은 자체 생성(WHYMATH_GENERATED)이라 반출 가능 등급으로 선언한다. 등급 게이트가
     막으면 결정이 LOCAL이 되고, 클라우드 좌석 호출이 실패해 대체 문장(degraded)으로 간다.
+
+    학생 답 송신(Kiki 결정 2026-11-17 · GOLD-22): 프롬프트에는 학생이 쓴 답이 들어간다.
+    그 글은 성격상 학생 저작(USER_GENERATED · 반출 금지 등급)이지만, 골든 튜터는 그것을
+    클라우드로 보내는 것을 Kiki가 **명시 허용**했다 — 그래서 등급은 문항 기준
+    (WHYMATH_GENERATED) 하나만 선언한다. USER_GENERATED를 더하면 라우터가 결정을
+    LOCAL로 바꿔(실측 data_export_blocked=True) 튜터가 늘 대체 문장으로 간다.
+    허용의 전제(바뀌면 이 결정을 다시 묻는다): ①닉네임·세션 ID·정답은 프롬프트에 넣지
+    않는다(build_user_prompt) ②좌석은 OpenRouter, 허용 공급사 기본값은 deepinfra 하나
+    (미국 법인 · 데이터 수집 거부 · 보존 0 — config·golden/llm/openrouter.py 표) ③보내기
+    직전 관할 게이트(golden/llm/gate.py) ④실학생 세션 전 보호자 동의서에 이 송신을 적는다
+    (Kiki 담당).
     """
     return RoutingRequest(
         task_type="coach",

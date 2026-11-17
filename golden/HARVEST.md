@@ -299,3 +299,9 @@ cd src/backend && python -m golden.measure_unreferenced
 | --- | --- | --- | --- |
 | 옛 `l3/providers/composite.CompositeProvider._guard_cloud_jurisdiction`의 감싸개 3줄(관할 읽기·opt-in 읽기·차단 오류) → `src/backend/golden/llm/gate.py`. 판정 함수 `l3.provider_jurisdiction.jurisdiction_judgment`는 **import 유지**(이미 전이 안 · 비용 0) | 옛 기본값 "관할 선언 없음 = US"(골든은 차단 · fail-closed) · LOCAL 강등(골든은 대체 문장으로 이어 간다) | 골든 튜터·시뮬레이터가 S4부터 관할 게이트를 건너뛰고 있었다. 특성화 `tests/golden/characterization/test_s20a_llm_gate.py`(옛 메서드와 10가지 판정 동일 · 차단 시 호출 0회) | S20A 후속 |
 | 없음 — 동기화 검사 `src/backend/golden/llm/sync.py`(`python -m golden.llm.sync`)·`tests/golden/test_llm_copy_sync.py` 신설 | — | 옛 프로바이더 원본의 **코드**(주석 제외)가 바뀌면 골든 복사본과 구문 트리가 달라져 RED. 주석·import 순서만 바뀐 경우는 통과 | S20A 후속 |
+
+### 학생 답 클라우드 송신 — Kiki 명시 허용 (GOLD-22 · 2026-11-17)
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음 — 결정 기록만(`src/backend/golden/tutor.py` `_routing_request` docstring) | 선택지 ①(학생 답을 USER_GENERATED로 선언 → 라우터 LOCAL → 로컬 튜터 전환) | Kiki 결정 2026-11-17 선택지 ②: 골든 튜터가 학생 답을 포함한 프롬프트를 OpenRouter로 보내는 것을 명시 허용. 동작 변경 없음. 전제 4개(닉네임·세션 ID·정답 미포함 · 허용 공급사 기본값 deepinfra = 미국·수집 거부·보존 0 · 관할 게이트 · 실학생 전 보호자 동의서 반영)가 바뀌면 다시 묻는다 | GOLD-22 |
