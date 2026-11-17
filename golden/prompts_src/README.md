@@ -12,6 +12,7 @@
 | `spec_phase2.md` · `config_phase2.json` · (`plan_phase2_second_unit_4weeks.docx` — Kiki 보관 · 저장소 미포함) | **2단계 두 번째 단원(S36~S55)** 묶음의 원본. 1단계의 후속이며 시작 조건(1단계 게이트 진실 트랙 "예")이 있다. 문항 파이프라인(S36~S40)·단원 스위치와 분기 장부(S41~S45)·혼합·재생성(S46~S51)·증거·판정(S52~S55)과 사람 작업 H3. 접두 `DU`, 산출물 `golden/reports_phase2/`, 브랜치 `golden-p2/` |
 | `spec_phase3.md` · `config_phase3.json` · (`plan_phase3_contract_4weeks.docx` — Kiki 보관 · 저장소 미포함) | **3단계 세 번째 단원 + Subject Contract(S56~S75)** 묶음의 원본. 2단계의 후속이며 시작 조건(2단계 질문 1·2 "예")이 있다. 세 번째 단원(일차부등식)을 옛 방식으로(S56~S60) → `core/`+`units/` 새 길(S61~S66) → 실학생·삭제·정식화(S67~S70) → PREREG 개봉·네 번째 단원 드라이런·/legacy·게이트(S71~S75)와 사람 작업 H4. 네 번째 단원은 S56에서 `golden/PREREG.md`에 봉인되며 지시문은 S71~S73 본문에서만 그 이름을 쓴다. 접두 `SC`, 산출물 `golden/reports_phase3/`, 브랜치 `golden-p3/` |
 | `spec_phase4.md` · `config_phase4.json` · (`plan_phase4_pilot_8weeks.docx` — Kiki 보관 · 저장소 미포함) | **4단계 파일럿(S76~S105)** 묶음의 원본. 3단계의 후속이며 시작 조건(3단계 게이트 첫 줄 "예")이 있다. 준비 2주(S76~S85 · 콘텐츠 확장·서버 이전·동의·마스킹·앱 배포·운영 리포트·AI 회귀·리허설·온보딩)·운영 5주(S86~S100 월·수·금 — 제품 변경 금지·결함만)·마감 1주(S101~S105 데이터 동결·분석·종합 보고·게이트 7줄)와 사람 작업 H5(학생 모집)·H6(법인·법률 상담). 접두 `PL`, 산출물 `golden/reports_phase4/`, 브랜치 `golden-p4/` |
+| `spec_rescue.md` · `config_rescue.json` | **옛 코드 살리기(RS)** 묶음의 원본(Kiki 지시 2026-11-17). 단계 묶음을 대체하지 않고 옆에서 간다 — 진단(R0·R1·D0~D6)·패키지 카드(C1~C8)·처분 판정(J1 관문)·입고 준비(P1~P3·X1~X3)·잠금(G1·G2)·삭제 준비(Z1·Z2)·종합(F1 관문) 29세션. 옛 코드를 고치지도 연결하지도 지우지도 않는다. 모든 지시문에 컨텍스트 예산 규칙(읽기 2,000줄·화면 50줄·카드 150줄·PR 300줄)이 실린다. 접두 `RS`, 산출물 `golden/reports_rescue/`, 브랜치 `golden-rs/`. 설정의 `stage_labels`로 단계 폴더 이름에 내용을 붙인다 |
 | `spec_no_students.md` · `config_no_students.json` | **학생 없는 변형**의 원본. S1~S8은 `spec.md`와 글자 그대로 같고(생성 시 대조 확인), S9~S12를 본인·AI 시뮬레이션·성인으로 바꾸고 S13·S15의 집계·판정 문구를 고쳤다. 접두 `GPN`, 산출물 `golden/reports_no_students/`, 브랜치 `golden-ns/` |
 | `scripts/golden_prompts/build_prompts.py`(이 폴더 밖·린트 배선된 scripts/ 아래) | 생성기. 선행 관계로 실행 단계(순차/병렬)와 여유·크리티컬 패스를 계산해 파일을 만든다 |
 
@@ -63,3 +64,9 @@ python3 scripts/golden_prompts/build_prompts.py golden/prompts_src/spec_phase4.m
 2. 같은 훅이 AI에게 "첫 행위로 세션 제목을 이 이름으로 바꿔라"를 알려 준다. 클라우드 세션(claude.ai/code)은 AI가 `set_session_title` 도구로 스스로 제목을 바꾼다. 터미널 Claude Code에는 그 도구가 없어서 AI가 `/rename <이름>` 한 줄을 안내하면 사용자가 쳐 준다.
 
 훅 계약은 `tests/infra/test_golden_session_register.py`가 동결한다(지시문 첫 줄 형식·등록부 멱등성·깨진 입력에도 exit 0·생성된 지시문 전부가 첫 줄 형식을 갖는지).
+
+옛 코드 살리기(RS):
+
+```bash
+python3 scripts/golden_prompts/build_prompts.py golden/prompts_src/spec_rescue.md golden/prompts_src/config_rescue.json golden/prompts_rescue
+```
