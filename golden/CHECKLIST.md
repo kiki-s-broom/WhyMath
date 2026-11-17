@@ -43,4 +43,4 @@
 | P1-① | 실학생 섭외 인원 | 중학생 3~5명이 참여하기로 했다(닉네임 `stu-<번호>`만 쓴다 · 실명·학교·학년·연락처는 어디에도 적지 않는다) | 미정 — H2가 채운다 | H2(Kiki) |
 | P1-② | 보호자 동의 | 참여 학생 전원의 보호자 동의를 세션 전에 받았다 | 미정 — H2가 채운다 | H2(Kiki) |
 | P1-③ | 첫 실학생 세션 일정 | S24 전까지 섭외가 끝났고 첫 세션 날짜가 정해졌다 | 미정 — H2가 채운다 | H2(Kiki) |
-| P1-④ | 시드 추출(Kiki 머신) | 사람 출처 원본 CSV 3개로 `python -m golden.sim.seed_extract`를 돌려 `golden/sim/seed/`에 파일 3개가 생겼다(명령은 `golden/reports_phase1/S16/보고.md`) | 미정 — S16 세션 컨테이너에는 원본 CSV가 없었다 | Kiki |
+| P1-④ | 시드 추출(Kiki 머신) | 사람 출처 원본 CSV 3개로 `python -m golden.sim.seed_extract`를 돌려 `golden/sim/seed/`에 파일 3개가 생겼다(명령은 `golden/reports_phase1/S16/보고.md`) | ✅ 2026-11-17 Kiki 머신 — `EXTRACT_EXIT=0` · `SEED_LINES=20` · 수집 self 59 · adult 66 · 식별 낱말 0건 · `git status` 0줄(PR 브랜치 `c24533e5` 스크립트) | Kiki |
