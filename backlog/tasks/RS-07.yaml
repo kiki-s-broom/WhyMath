@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,11 +13,15 @@ depends_on: []
 requires_gates: []
 acceptance:
   - ruff·black·mypy --strict·lint-imports·pytest tests/golden 전부 exit 0 / outline 테스트 4종 통과 / 큼 기준 1500→15000 주입 시 테스트 실패
-artifacts: []
+artifacts:
+  - "PR #1930 · 커밋 d3fbca7a · tests/golden 461 passed · 주입 5종 중 실패 5종"
 paths:
   - "src/backend/golden/rescue/**"
   - "tests/golden/rescue/**"
   - "golden/reports_rescue/R0/**"
-session: claude/new-session-b6cl6z
-notes: "옛 코드 살리기 RS 묶음 R0 (Kiki 지시 2026-11-17)"
+session: null
+notes: |-
+  옛 코드 살리기 RS 묶음 R0 (Kiki 지시 2026-11-17)
+
+  [미러 면제 2026-11-17] 클라우드 컨테이너에서 미러 설치 스텝이 exit 1 — 데비안 설치 pip·pyparsing 제거 불가(RECORD file not found). 미러 9잡 중 infra-contracts·infra-shell·policy-guard exit 0, 나머지 6잡은 설치 단계에서 멈춤. 골든 잡 스텝(ruff·black·mypy·lint-imports·pytest)은 같은 명령으로 손으로 돌려 전부 exit 0
 updated: 2026-11-17
