@@ -1,0 +1,37 @@
+종류	대상	건수	위치	얻은 명령	비고
+① 서버 시작(uvicorn 대상)	whymath_backend.app:create_app	4	Dockerfile:102 · infra/phaiakes9/systemd/whymath-api.service:33 · scripts/demo/run_demo.ps1 · scripts/demo/run_demo.sh:58	git grep -lF 'whymath_backend.app:create_app' -- . ':!docs' ':!*.md' ':!golden' ':!MEMORY.md' ':!backlog'	옛 앱. --factory 기동. 그 밖에 tests/infra/test_readme_bootstrap.py 1건(문자열 검사)
+① 서버 시작(uvicorn 대상)	golden.api:app	3	src/backend/golden/api.py:3(모듈 설명) · src/backend/golden/sim_student.py · src/mobile/lib/golden/golden_api.dart	git grep -lF 'golden.api:app' -- . ':!docs' ':!*.md' ':!golden' ':!MEMORY.md' ':!backlog'	골든 서버. Dockerfile·systemd·run_demo에는 없다(배포 기동 경로 0건 — 이 명령 범위)
+① 서버 시작(uvicorn 대상)	whymath_backend.app:app	1	tests/backend/ops/test_declared_unwired_audit.py:1055	같은 명령(대상만 바꿈)	테스트 픽스처 문자열뿐 — 실제 기동 경로 아님
+① 서버 시작(uvicorn 대상)	서로 다른 실제 대상 수	2	create_app · golden.api:app	위 세 줄 합	시험용 문자열 1종 제외
+② HTTP 라우터 등록	whymath_backend/app.py include_router	27	src/backend/whymath_backend/app.py	grep -c 'include_router' src/backend/whymath_backend/app.py	주석 줄 0건(grep -E 'include_router\(' | grep -vcE '^\s*#' = 27)
+② HTTP 라우터 등록	whymath_backend/api/ 의 APIRouter( 정의 파일	27	src/backend/whymath_backend/api/	git grep -l 'APIRouter(' -- src/backend/whymath_backend/api | wc -l	참고. 등록 27과 1:1인지는 D4가 본다
+② HTTP 라우터 등록	golden/api.py include_router	1	src/backend/golden/api.py:199	grep -nE '^@|include_router' src/backend/golden/api.py	라우터 1개에 경로 3개(POST /session · GET /next · POST /answer)
+② HTTP 라우터 등록	그 밖의 include_router( 파일	3	api/admin_module_registry.py · ops/admin_guard_audit.py · ops/declared_unwired_audit.py	git grep -c 'include_router(' -- src/backend	각 1건. 등록인지 문자열인지는 미확인(본문 안 엶)
+③ 명령줄 스크립트(__main__)	A golden	5	src/backend/golden/	git grep -lE '^if __name__ == ["']__main__["']' -- <경로> | wc -l	줄 맨 앞만. 들여쓰기 포함으로 세어도 저장소 합계 401로 같다
+③ 명령줄 스크립트(__main__)	B 지식 자산 l1~l4	44	whymath_backend/l1·l2·l3·l4	같은 명령	-
+③ 명령줄 스크립트(__main__)	C 접착제	0	api·app.py·composition.py·config.py·consent*.py·security.py·db·schema	같은 명령	-
+③ 명령줄 스크립트(__main__)	D harness	131	whymath_backend/harness	같은 명령	D 합계 170
+③ 명령줄 스크립트(__main__)	D ops	32	whymath_backend/ops	같은 명령	-
+③ 명령줄 스크립트(__main__)	D whs	4	whymath_backend/whs	같은 명령	-
+③ 명령줄 스크립트(__main__)	D privacy	3	whymath_backend/privacy	같은 명령	-
+③ 명령줄 스크립트(__main__)	D l5·l6·lang	0	whymath_backend/l5·l6·lang	같은 명령	-
+③ 명령줄 스크립트(__main__)	E tests	4	tests/	같은 명령	-
+③ 명령줄 스크립트(__main__)	F scripts	128	scripts/	같은 명령	-
+③ 명령줄 스크립트(__main__)	F data-pipeline	18	src/data-pipeline/	같은 명령	-
+③ 명령줄 스크립트(__main__)	G 클라이언트	0	src/mobile/lib · src/web	같은 명령	Dart·TS라 해당 없음. 진입은 main.dart·main_golden.dart(아래 참고행)
+③ 명령줄 스크립트(__main__)	파트 밖	32	src/backend/alembic · tools · docs · .claude · infra	같은 명령	-
+③ 명령줄 스크립트(__main__)	저장소 전체	401	.	git grep -lE '^if __name__ == ["']__main__["']' -- . | wc -l	파트별 합 5+44+0+170+4+128+18+0+32 = 401 일치
+④ CI가 부르는 python 줄	전체	159	.github/workflows/*.yml(11파일 · 잡 39 · run 스텝 192)	yaml.safe_load로 run: 블록을 줄 단위로 나눠 '^python3?(\s|$)' 줄을 센다 · 교차확인 cat .github/workflows/*.yml | grep -cE '^\s+(run:\s*)?python3?(\s|$)' = 159	그중 python -m pip 52줄(설치) → 설치 제외 107줄
+④ CI가 부르는 python 줄	ci.yml	139	잡 25 · run 142	같은 방법	backend 28 · harness-integrity 22 · backend-migrations 13 · infra-contracts 9 · golden-path 7
+④ CI가 부르는 python 줄	harness-audit.yml	6	잡 3 · run 9	같은 방법	-
+④ CI가 부르는 python 줄	weekly-metrics.yml	6	잡 1 · run 7	같은 방법	-
+④ CI가 부르는 python 줄	ci-timeout-headroom · mirror-ci-images · work-graph-desktop	2·2·2	각 1~2잡	같은 방법	-
+④ CI가 부르는 python 줄	conflict-guard · release-freeze	1·1		같은 방법	-
+④ CI가 부르는 python 줄	branch-cleanup · deploy · pr-auto-resync	0	run 1·7·1	같은 방법	python 아닌 셸·gh만
+④ CI가 부르는 python 줄	대상 상위	-	-	python 다음 토큰을 센다	-m pip 52 · -m pytest 15 · -m alembic 7 · scripts/harness/backlog.py 6 · -m ruff 5 · -m black 5 · -m mypy 3 · -m coverage 3 (서로 다른 대상 65종)
+⑤ pyproject [project.scripts]	src/data-pipeline/pyproject.toml	2	whymath-ncic = data_pipeline.ncic.__main__:app · whymath-misconception = data_pipeline.misconception.__main__:app	python3 -c "import tomllib; print(tomllib.load(open(<파일>,'rb'))['project'].get('scripts',{}))"	-
+⑤ pyproject [project.scripts]	src/backend/pyproject.toml	0	(name = korean-math-backend)	같은 명령	gui-scripts·entry-points도 0
+⑤ pyproject [project.scripts]	pyproject.toml(저장소 루트)	0	[project] 절 없음	같은 명령	-
+⑤ pyproject [project.scripts]	합계	2	pyproject.toml 3개	git ls-files | grep -E '(^|/)pyproject\.toml$'	-
+(참고) Flutter 진입	main 파일	2	src/mobile/lib/main.dart · src/mobile/lib/main_golden.dart	git ls-files src/mobile/lib | grep -E 'main[_a-z]*\.dart$'	5종 밖 참고
+(참고) 웹·도구 npm scripts	package.json scripts	22	src/web/webapp 6 · src/web/graphing-calculator 6 · tools/work-graph-desktop 10 · 루트 0	python3 -c "import json; print(list(json.load(open(<파일>)).get('scripts',{})))"	5종 밖 참고
