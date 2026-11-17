@@ -1,0 +1,1487 @@
+﻿테스트 경로	줄 수	상위 폴더	import하는 옛 모듈 수(목록은 테스트_대응_모듈목록.tsv · 정적 근사)	대표 패키지(가장 많이 import한 2단계 패키지)	대표 패키지 동점	기타 1자 import 뿌리	해석 못 한 import	동적 import 수	비고
+tests/backend/_db_leak_guard.py	65	backend	1	whymath_backend.db				0	
+tests/backend/_external_store_evidence.py	210	backend	1	whymath_backend.config				0	
+tests/backend/api/test_admin_bff.py	345	backend	11	whymath_backend.api				0	
+tests/backend/api/test_admin_cms.py	1782	backend	23	whymath_backend.db				0	
+tests/backend/api/test_admin_cms_graph.py	734	backend	13	whymath_backend.db				0	
+tests/backend/api/test_admin_cms_graph_integration.py	795	backend	12	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/api/test_admin_cms_integration.py	658	backend	11	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_admin_cms_no_bypass.py	254	backend	7	whymath_backend.db				0	
+tests/backend/api/test_admin_cms_problem_versions.py	1200	backend	16	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_admin_cms_problem_versions_integration.py	637	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_admin_cms_resources.py	460	backend	4	whymath_backend.schema				0	
+tests/backend/api/test_admin_cms_route_reach.py	166	backend	5	whymath_backend.db				0	
+tests/backend/api/test_admin_menu.py	151	backend	7	whymath_backend.api				0	
+tests/backend/api/test_admin_module_registry.py	202	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_admin_review_transitions.py	673	backend	13	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db			0	
+tests/backend/api/test_admin_review_transitions_integration.py	642	backend	11	whymath_backend.api				0	
+tests/backend/api/test_alert_delivery_wiring.py	144	backend	3	whymath_backend.app	동점: whymath_backend.app, whymath_backend.config, whymath_backend.ops			0	
+tests/backend/api/test_alignments.py	245	backend	8	whymath_backend.db				0	
+tests/backend/api/test_attempt_scan_shadow.py	233	backend	5	whymath_backend.api				0	
+tests/backend/api/test_attempt_started_at_integration.py	578	backend	13	whymath_backend.db				0	
+tests/backend/api/test_attempt_version_pin_wiring.py	231	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_audit_integration.py	142	backend	3	whymath_backend.app	동점: whymath_backend.app, whymath_backend.config, whymath_backend.security			0	
+tests/backend/api/test_auth.py	372	backend	7	whymath_backend.db				0	
+tests/backend/api/test_auth_sessions.py	229	backend	8	whymath_backend.db				0	
+tests/backend/api/test_cascade_integration.py	232	backend	3	whymath_backend.app	동점: whymath_backend.app, whymath_backend.config, whymath_backend.security			0	
+tests/backend/api/test_client_ip_trusted_proxy.py	181	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.app, whymath_backend.config			0	
+tests/backend/api/test_cms_graph_write_enforcement.py	346	backend	0	(없음)				0	
+tests/backend/api/test_coach.py	5327	backend	24	whymath_backend.db				1	
+tests/backend/api/test_coach_completion.py	875	backend	13	whymath_backend.db				0	
+tests/backend/api/test_coach_completion_state_machine.py	182	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db			0	
+tests/backend/api/test_coach_completion_student_work_encryption.py	180	backend	3	whymath_backend.api				0	
+tests/backend/api/test_coach_distractor_link.py	461	backend	11	whymath_backend.db				0	
+tests/backend/api/test_coach_final_answer_isolation.py	159	backend	7	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_coach_gate3_serving_invariant.py	164	backend	11	whymath_backend.l4				0	
+tests/backend/api/test_coach_grade_standard_code.py	289	backend	13	whymath_backend.db				0	
+tests/backend/api/test_coach_hint_attribution.py	426	backend	5	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l4			0	
+tests/backend/api/test_coach_integration.py	1257	backend	15	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_coach_intent_shadow_integration.py	326	backend	7	whymath_backend.schema				0	
+tests/backend/api/test_coach_judge_gate.py	434	backend	16	whymath_backend.api				0	
+tests/backend/api/test_coach_judge_shadow.py	334	backend	14	whymath_backend.api	동점: whymath_backend.api, whymath_backend.l4			0	
+tests/backend/api/test_coach_ocr_solution_diagnosis.py	389	backend	11	whymath_backend.db				0	
+tests/backend/api/test_coach_pack_wiring.py	175	backend	8	whymath_backend.schema				0	
+tests/backend/api/test_coach_semantic.py	763	backend	15	whymath_backend.api				0	
+tests/backend/api/test_coach_served_hint.py	398	backend	15	whymath_backend.db				0	
+tests/backend/api/test_coach_step_chain_isolation.py	431	backend	14	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_coach_tutor_content_integration.py	172	backend	7	whymath_backend.db				0	
+tests/backend/api/test_coach_tutor_context.py	1307	backend	18	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/api/test_coach_tutor_output_schema.py	465	backend	18	whymath_backend.harness				0	
+tests/backend/api/test_coach_wh1_convergence_governance.py	82	backend	5	whymath_backend.l4				0	
+tests/backend/api/test_coach_wh1_primary_flip.py	369	backend	11	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/api/test_coach_wh1_shadow.py	404	backend	9	whymath_backend.schema				0	
+tests/backend/api/test_coach_wrong_submission.py	487	backend	8	whymath_backend.api				0	
+tests/backend/api/test_concepts.py	763	backend	13	whymath_backend.db				0	
+tests/backend/api/test_concepts_integration.py	387	backend	9	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_concepts_search.py	262	backend	5	whymath_backend.api	동점: whymath_backend.api, whymath_backend.app, whymath_backend.config, whymath_backend.db, whymath_backend.l1			0	
+tests/backend/api/test_concepts_search_integration.py	158	backend	7	whymath_backend.l1				0	
+tests/backend/api/test_crypto.py	343	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config			0	
+tests/backend/api/test_crypto_evidence.py	81	backend	1	whymath_backend.api				0	
+tests/backend/api/test_curricula.py	562	backend	13	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_curricula_integration.py	488	backend	17	whymath_backend.db				0	
+tests/backend/api/test_demo_auth.py	223	backend	11	whymath_backend.api				0	
+tests/backend/api/test_devices.py	3404	backend	11	whymath_backend.api				0	
+tests/backend/api/test_devices_integration.py	712	backend	9	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_dialogue_content_encryption.py	99	backend	5	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_dialogue_content_encryption_integration.py	637	backend	11	whymath_backend.schema				0	
+tests/backend/api/test_dialogue_image_encryption.py	148	backend	1	whymath_backend.api				0	
+tests/backend/api/test_dsl.py	257	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.app, whymath_backend.db			0	
+tests/backend/api/test_e2e_pedagogy_pilot_integration.py	233	backend	12	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.l4			0	
+tests/backend/api/test_e2e_persona_journeys.py	1302	backend	7	whymath_backend.db				0	
+tests/backend/api/test_e2e_suneung_loop_integration.py	412	backend	12	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_e2e_three_consecutive_loops.py	1411	backend	1	whymath_backend.l2				0	
+tests/backend/api/test_e2e_vertical_slice_integration.py	823	backend	19	whymath_backend.db				0	
+tests/backend/api/test_eos123_correct_attempt_decay_pg.py	248	backend	1	whymath_backend.api				0	
+tests/backend/api/test_eos132_learner_state_basis_integration.py	184	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.ops			0	
+tests/backend/api/test_eos133_hint_attribution_integration.py	387	backend	1	whymath_backend.l4				0	
+tests/backend/api/test_eos134_coach_state_machine_integration.py	151	backend	0	(없음)				0	
+tests/backend/api/test_eos138_r3_input_scope.py	362	backend	5	whymath_backend.api				0	
+tests/backend/api/test_eos146_coach_wrong_submission_integration.py	328	backend	0	(없음)				0	
+tests/backend/api/test_eos147_all_correct_selection_theta.py	266	backend	1	whymath_backend.l2				0	
+tests/backend/api/test_eos147_selection_theta_suneung.py	289	backend	8	whymath_backend.l2				0	
+tests/backend/api/test_eos178_label_free_attribution.py	230	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config			0	
+tests/backend/api/test_eos178_label_free_attribution_integration.py	398	backend	5	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l2, whymath_backend.ops, whymath_backend.schema			0	
+tests/backend/api/test_eos179_label_provenance.py	305	backend	3	whymath_backend.schema				0	
+tests/backend/api/test_eos179_label_provenance_integration.py	482	backend	3	whymath_backend.db	동점: whymath_backend.db, whymath_backend.ops, whymath_backend.schema			0	
+tests/backend/api/test_eos24_recommendation_follows_learning_state.py	471	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.l2			0	
+tests/backend/api/test_eos25_suneung_alignment_integration.py	318	backend	12	whymath_backend.db				0	
+tests/backend/api/test_eos26_r6_prerequisite_probe.py	371	backend	1	whymath_backend.l2				0	
+tests/backend/api/test_eos31_suneung_scope_integration.py	330	backend	13	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/api/test_eos39_help_fold_integration.py	422	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.ops			0	
+tests/backend/api/test_error_codes.py	116	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_exposure_contract_serving_crosswalk.py	157	backend	3	whymath_backend.harness				0	
+tests/backend/api/test_gating.py	1022	backend	8	whymath_backend.db				0	
+tests/backend/api/test_gating_candidate_truncation.py	193	backend	4	whymath_backend.schema				0	
+tests/backend/api/test_gating_candidates_integration.py	211	backend	5	whymath_backend.schema				0	
+tests/backend/api/test_generate_rate_limit.py	384	backend	9	whymath_backend.api				0	
+tests/backend/api/test_growth_evidence_reachability.py	111	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.app, whymath_backend.ops			0	
+tests/backend/api/test_health_endpoints.py	426	backend	9	whymath_backend.l3				0	
+tests/backend/api/test_intent_shadow.py	916	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config, whymath_backend.schema			0	
+tests/backend/api/test_interactions_endpoint.py	163	backend	9	whymath_backend.db				0	
+tests/backend/api/test_isolation_call_sites_governance.py	252	backend	0	(없음)				0	
+tests/backend/api/test_l6_mode_reach_observability.py	277	backend	4	whymath_backend.api	동점: whymath_backend.api, whymath_backend.app, whymath_backend.db, whymath_backend.ops			0	
+tests/backend/api/test_learning_metrics_rollup_integration.py	404	backend	12	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_learning_session_wiring_integration.py	198	backend	2	whymath_backend.harness				0	
+tests/backend/api/test_mastery_response_zero_fold_guard.py	106	backend	0	(없음)				0	
+tests/backend/api/test_me.py	5063	backend	30	whymath_backend.db				0	
+tests/backend/api/test_me_attempt_evidence.py	280	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_blueprint_assemble.py	347	backend	11	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_erasure.py	169	backend	8	whymath_backend.db				0	
+tests/backend/api/test_me_export.py	280	backend	8	whymath_backend.db				0	
+tests/backend/api/test_me_growth_evidence.py	430	backend	10	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/api/test_me_growth_evidence_governance.py	230	backend	0	(없음)				0	
+tests/backend/api/test_me_harness_metrics_auth_gate.py	178	backend	8	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_integration.py	2745	backend	18	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_learning_state.py	409	backend	8	whymath_backend.schema				0	
+tests/backend/api/test_me_learning_trace.py	252	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_review_queue.py	107	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_review_status_gate.py	156	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_me_target_progress.py	160	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_misconception_state.py	54	backend	4	whymath_backend.l4				0	
+tests/backend/api/test_next_problem_policy_suneung.py	603	backend	11	whymath_backend.l2				0	
+tests/backend/api/test_no_lockout_columns.py	88	backend	1	whymath_backend.db				0	
+tests/backend/api/test_oauth_endpoint.py	527	backend	9	whymath_backend.db				0	
+tests/backend/api/test_oauth_providers.py	237	backend	3	whymath_backend.api				0	
+tests/backend/api/test_oauth_service.py	115	backend	4	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config, whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_ocr_coach_handoff.py	76	backend	3	whymath_backend.schema				0	
+tests/backend/api/test_ocr_endpoint.py	310	backend	10	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_ocr_handoff.py	209	backend	11	whymath_backend.api				0	
+tests/backend/api/test_ocr_integration.py	47	backend	3	whymath_backend.l5				0	
+tests/backend/api/test_ocr_reachability.py	408	backend	12	whymath_backend.api	동점: whymath_backend.api, whymath_backend.schema			0	
+tests/backend/api/test_p11_five_stage_loop_chain.py	314	backend	1	whymath_backend.api				0	
+tests/backend/api/test_parental_consent.py	539	backend	10	whymath_backend.db				0	
+tests/backend/api/test_prediction_field_sealing.py	227	backend	2	whymath_backend.app	동점: whymath_backend.app, whymath_backend.schema			0	
+tests/backend/api/test_privacy_audit_integration.py	372	backend	6	whymath_backend.schema				0	
+tests/backend/api/test_privacy_audit_kind_doc_sync.py	112	backend	2	whymath_backend.app	동점: whymath_backend.app, whymath_backend.schema			0	
+tests/backend/api/test_problem_quarantine_serving.py	394	backend	9	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_problems.py	722	backend	11	whymath_backend.db				0	
+tests/backend/api/test_problems_create_review_status.py	257	backend	8	whymath_backend.db				0	
+tests/backend/api/test_problems_integration.py	280	backend	6	whymath_backend.schema				0	
+tests/backend/api/test_problems_patch_published_guard.py	252	backend	9	whymath_backend.db				0	
+tests/backend/api/test_problems_patch_review_status.py	514	backend	9	whymath_backend.db				0	
+tests/backend/api/test_problems_patch_review_status_integration.py	367	backend	8	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_problems_public_projection.py	355	backend	8	whymath_backend.db				0	
+tests/backend/api/test_rate_limit_fixture_isolation.py	115	backend	1	whymath_backend.api				0	
+tests/backend/api/test_rate_limit_integration.py	149	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config			0	
+tests/backend/api/test_redis_degradation.py	903	backend	6	whymath_backend.api				0	
+tests/backend/api/test_refresh_session_integration.py	248	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_release_gate_a_chain.py	920	backend	2	whymath_backend.l2				0	
+tests/backend/api/test_reports.py	175	backend	3	whymath_backend.db				0	
+tests/backend/api/test_reports_integration.py	209	backend	2	whymath_backend.app	동점: whymath_backend.app, whymath_backend.config			0	
+tests/backend/api/test_required_api_surface_map.py	217	backend	1	whymath_backend.ops				0	
+tests/backend/api/test_scene_endpoint.py	345	backend	14	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/api/test_scene_service.py	672	backend	11	whymath_backend.l4				0	
+tests/backend/api/test_solution_paths_endpoint.py	148	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_solution_segmentation_observability.py	264	backend	10	whymath_backend.api				0	
+tests/backend/api/test_speech_endpoint.py	95	backend	8	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_student_work_crypto.py	170	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config			0	
+tests/backend/api/test_study.py	120	backend	1	whymath_backend.api				0	
+tests/backend/api/test_study_endpoint.py	750	backend	13	whymath_backend.db				0	
+tests/backend/api/test_study_integration.py	362	backend	10	whymath_backend.db				0	
+tests/backend/api/test_study_k_type_enum_binding.py	117	backend	1	whymath_backend.schema				0	
+tests/backend/api/test_study_outcome_ownership.py	226	backend	9	whymath_backend.db				0	
+tests/backend/api/test_study_signals.py	137	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_sympy_isolation_observability.py	514	backend	10	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_users.py	323	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_users_integration.py	139	backend	6	whymath_backend.schema				0	
+tests/backend/api/test_users_me_legacy_null_arrays.py	184	backend	4	whymath_backend.api				0	
+tests/backend/api/test_verify.py	465	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_verify_isolation.py	399	backend	10	whymath_backend.api				0	
+tests/backend/api/test_verify_unsafe_input.py	127	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_visualization_endpoint.py	197	backend	13	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/api/test_visualization_endpoint_integration.py	192	backend	15	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_visualization_service.py	192	backend	7	whymath_backend.schema				0	
+tests/backend/api/test_visualization_spec_endpoint.py	135	backend	8	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_viz01_reach_discrimination_integration.py	268	backend	14	whymath_backend.db				0	
+tests/backend/api/test_week1_gate_closed_loop.py	537	backend	11	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_week1_gate_no_learner_writes.py	137	backend	0	(없음)				0	
+tests/backend/api/test_week2_gate_wrong_answer_propagation.py	546	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/api/test_week3_gate_remediation_loop.py	519	backend	1	whymath_backend.api				0	
+tests/backend/conftest.py	259	backend	1	whymath_backend.api				0	
+tests/backend/db/test_ability_snapshot_integration.py	276	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l2			0	
+tests/backend/db/test_achievement_level_unit_orm.py	141	backend	3	whymath_backend.db				0	
+tests/backend/db/test_achievement_standard_orm.py	368	backend	4	whymath_backend.db				0	
+tests/backend/db/test_activity_orm.py	335	backend	5	whymath_backend.schema				0	
+tests/backend/db/test_answer_submission_orm.py	328	backend	10	whymath_backend.db				0	
+tests/backend/db/test_assessment_orm.py	297	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_assessment_result_verdict_premise.py	210	backend	0	(없음)				0	
+tests/backend/db/test_assessment_seat_reach_report_integration.py	329	backend	4	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/db/test_attempt_event_idempotency_integration.py	264	backend	4	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/db/test_attempt_skill_ids_orm.py	115	backend	3	whymath_backend.schema				0	
+tests/backend/db/test_attempt_version_pinning_integration.py	343	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l2			0	
+tests/backend/db/test_canonical_entity_model_freeze.py	416	backend	2	whymath_backend.db				0	
+tests/backend/db/test_cms_edit_marker.py	507	backend	11	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l1			0	
+tests/backend/db/test_concept_lifecycle_migration_integration.py	770	backend	4	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/db/test_concept_orm.py	313	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_concept_orm_purity_governance.py	127	backend	1	whymath_backend.db				0	
+tests/backend/db/test_concept_source_id_migration_integration.py	245	backend	1	whymath_backend.config				0	
+tests/backend/db/test_concept_version_migration_integration.py	368	backend	1	whymath_backend.config				0	
+tests/backend/db/test_concept_version_orm.py	228	backend	7	whymath_backend.schema				0	
+tests/backend/db/test_concept_visual_style_orm.py	43	backend	2	whymath_backend.db				0	
+tests/backend/db/test_concept_visualization_orm.py	40	backend	2	whymath_backend.db				0	
+tests/backend/db/test_curriculum_entry_orm.py	206	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_curriculum_entry_subject_migration_integration.py	241	backend	1	whymath_backend.config				0	
+tests/backend/db/test_curriculum_framework_version_orm.py	238	backend	9	whymath_backend.db				0	
+tests/backend/db/test_defect_report_no_user_id.py	54	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_dialogue_orm.py	201	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_event_time_active_time_orm.py	151	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_evidence_event_orm.py	102	backend	2	whymath_backend.db				0	
+tests/backend/db/test_evidence_link_orm.py	55	backend	1	whymath_backend.db				0	
+tests/backend/db/test_hint_usage_orm.py	271	backend	10	whymath_backend.db				0	
+tests/backend/db/test_hints_migration_integration.py	383	backend	6	whymath_backend.l4				0	
+tests/backend/db/test_item_calibration_reach_report_integration.py	219	backend	7	whymath_backend.db				0	
+tests/backend/db/test_jsonb_none_as_null_governance.py	81	backend	2	whymath_backend.db				0	
+tests/backend/db/test_learner_state_orm.py	122	backend	1	whymath_backend.db				0	
+tests/backend/db/test_learner_state_single_writer.py	159	backend	1	whymath_backend.db				0	
+tests/backend/db/test_misconception_catalog_model.py	224	backend	3	whymath_backend.db				0	
+tests/backend/db/test_misconception_hypothesis_orm.py	54	backend	1	whymath_backend.db				0	
+tests/backend/db/test_misconception_relation.py	208	backend	3	whymath_backend.db				0	
+tests/backend/db/test_model_package_registration_completeness.py	92	backend	0	(없음)				0	
+tests/backend/db/test_model_registry_completeness_governance.py	142	backend	0	(없음)				0	
+tests/backend/db/test_parental_consent_migration_integration.py	215	backend	1	whymath_backend.config				0	
+tests/backend/db/test_parental_consent_orm.py	125	backend	5	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_pedagogy_dsl_migration_chain.py	73	backend	0	(없음)				0	
+tests/backend/db/test_pedagogy_dsl_orm.py	203	backend	3	whymath_backend.db				0	
+tests/backend/db/test_problem_distractor_map_migration_integration.py	184	backend	1	whymath_backend.config				0	
+tests/backend/db/test_problem_identity_id_migration_integration.py	201	backend	1	whymath_backend.config				0	
+tests/backend/db/test_problem_irt_b_integration.py	106	backend	4	whymath_backend.schema				0	
+tests/backend/db/test_problem_orm.py	517	backend	7	whymath_backend.db				0	
+tests/backend/db/test_problem_p3a_migration_integration.py	254	backend	1	whymath_backend.config				0	
+tests/backend/db/test_problem_quarantine_orm.py	139	backend	3	whymath_backend.schema				0	
+tests/backend/db/test_problem_source_id_arch32.py	71	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_problem_version_migration_integration.py	394	backend	1	whymath_backend.config				0	
+tests/backend/db/test_problem_version_orm.py	204	backend	7	whymath_backend.schema				0	
+tests/backend/db/test_problem_version_publish_integration.py	1069	backend	8	whymath_backend.l3				0	
+tests/backend/db/test_problem_write_provenance_single_gate.py	196	backend	0	(없음)				0	
+tests/backend/db/test_provenance_orm.py	247	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_published_edit_guard.py	141	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_published_problem_edit_guard_integration.py	541	backend	9	whymath_backend.schema				0	
+tests/backend/db/test_review_timer_event_orm.py	259	backend	5	whymath_backend.db				0	
+tests/backend/db/test_schema_version_guard.py	232	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db			0	
+tests/backend/db/test_session.py	39	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db			0	
+tests/backend/db/test_solution_path_orm.py	220	backend	3	whymath_backend.db				0	
+tests/backend/db/test_standard_attainment_report_integration.py	243	backend	8	whymath_backend.db				0	
+tests/backend/db/test_student_solution_step_orm.py	349	backend	11	whymath_backend.db				0	
+tests/backend/db/test_student_work_envelope_encryption.py	157	backend	4	whymath_backend.db				0	
+tests/backend/db/test_textbook_mapping_orm.py	205	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_timeseries_orm.py	211	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/db/test_to_schema_null_seam.py	234	backend	5	whymath_backend.db				0	
+tests/backend/db/test_user_orm.py	282	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/harness/__init__.py	0	backend	0	(없음)				0	
+tests/backend/harness/test_accumulate_authoring_subject.py	187	backend	4	whymath_backend.l3				0	
+tests/backend/harness/test_accumulate_spec_cycling.py	899	backend	8	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_accumulate_top_p_seat_precheck.py	278	backend	4	whymath_backend.l3				0	
+tests/backend/harness/test_agreement_gate.py	233	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_agreement_gate_cli.py	121	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_agreement_gate_semantic.py	143	backend	5	whymath_backend.l4				0	
+tests/backend/harness/test_ai_quality_eval.py	494	backend	6	whymath_backend.harness				0	
+tests/backend/harness/test_ai_quality_eval_set.py	221	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_ai_quality_judges.py	664	backend	8	whymath_backend.harness				0	
+tests/backend/harness/test_ai_quality_live_collect.py	1349	backend	12	whymath_backend.harness				0	
+tests/backend/harness/test_analogy_fidelity_eval.py	125	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_anchor_detection_channel_eval.py	287	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_anchor_round_ledger.py	223	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_answer_distribution_battle.py	171	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l1			0	
+tests/backend/harness/test_assessment_seat_reach_report.py	271	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/harness/test_attempt_grading_shadow_report.py	1168	backend	9	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/harness/test_attempt_scan_shadow_harvest.py	991	backend	4	whymath_backend.l4				0	
+tests/backend/harness/test_attempt_skill_event_reach_report.py	209	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_attempt_skill_reach_probe.py	348	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_authoring_round.py	1306	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_authoring_round_units.py	475	backend	6	whymath_backend.harness				0	
+tests/backend/harness/test_authoring_seat_signal.py	319	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_banned_words_pii_eval.py	398	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_batch_safety.py	296	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_batch_safety_wiring.py	149	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_binomial_distribution_batch.py	102	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_calculus1_integral_batch.py	122	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_calculus2_trig_integral_batch.py	126	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_canary_slice.py	643	backend	7	whymath_backend.harness				0	
+tests/backend/harness/test_coach_prose_leak_eval.py	108	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_combination_binomial_batch.py	113	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_complex_number_arithmetic_batch.py	104	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_concept_assessment_index.py	439	backend	3	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l6, whymath_backend.schema			0	
+tests/backend/harness/test_concept_content_audit.py	293	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_concept_content_review_apply.py	496	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_concept_content_review_batch.py	537	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.harness, whymath_backend.l1, whymath_backend.l3			0	
+tests/backend/harness/test_concept_content_review_batch_link.py	377	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l1			0	
+tests/backend/harness/test_concept_content_review_batch_router_intent.py	113	backend	5	whymath_backend.l3				0	
+tests/backend/harness/test_concept_reach_report.py	307	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_conceptual_count_mc_batch.py	180	backend	5	whymath_backend.harness				0	
+tests/backend/harness/test_conic_section_focus_batch.py	108	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_coordinate_geometry_batch.py	107	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_corpus_audit_eval.py	141	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_corpus_backfill_check_mode.py	244	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_corpus_reverify.py	584	backend	5	whymath_backend.l3				0	
+tests/backend/harness/test_cross_school_connectivity_report.py	388	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l2			0	
+tests/backend/harness/test_crosslink_demotion_eval.py	97	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_curriculum_revision_crosswalk_report.py	717	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/harness/test_deepseek_live_probe.py	65	backend	4	whymath_backend.l3				0	
+tests/backend/harness/test_defect_detection_eval.py	240	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_discrete_ev_batch.py	109	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_distractor_signal_dormancy_report.py	594	backend	9	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/harness/test_duplicate_source_rates.py	145	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_elementary_addsub_batch.py	117	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_elementary_area_measure_batch.py	115	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_elementary_division_remainder_batch.py	103	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_elementary_gcd_lcm_batch.py	109	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_elementary_rounding_batch.py	100	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_elementary_rounding_corpus_convention.py	113	backend	3	whymath_backend.l3				0	
+tests/backend/harness/test_elementary_volume_measure_batch.py	117	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_eos_anchor_e2e_a4.py	1229	backend	16	whymath_backend.harness				0	
+tests/backend/harness/test_eos_unit_structure_observation_report.py	261	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_explanation_f7_eval.py	165	backend	4	whymath_backend.schema				0	
+tests/backend/harness/test_finite_probability_batch.py	107	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_formula_reach_report.py	425	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_gate3_student_verification_governance.py	468	backend	5	whymath_backend.l4				0	
+tests/backend/harness/test_generation_seed_adoption_report.py	250	backend	9	whymath_backend.l3				0	
+tests/backend/harness/test_generation_seed_replay_probe.py	305	backend	5	whymath_backend.l3				0	
+tests/backend/harness/test_generator_space_overlap_audit.py	361	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_golden_benchmark.py	961	backend	6	whymath_backend.harness				0	
+tests/backend/harness/test_golden_inputs.py	391	backend	5	whymath_backend.harness				0	
+tests/backend/harness/test_golden_promotion_gate.py	859	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_growth_evidence_exposure.py	210	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_highschool_quotient_rule_batch.py	105	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_hint_verdict_gui.py	1133	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_hint_verdict_session.py	441	backend	3	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4, whymath_backend.ops			0	
+tests/backend/harness/test_intent_shadow_harvest.py	215	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.harness			0	
+tests/backend/harness/test_item_calibration_reach_report.py	263	backend	3	whymath_backend.db	동점: whymath_backend.db, whymath_backend.harness, whymath_backend.l2			0	
+tests/backend/harness/test_jev_offline_intent_compare.py	182	backend	0	(없음)				0	
+tests/backend/harness/test_learning_path_orderability_report.py	430	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l2			0	
+tests/backend/harness/test_linear_inequality_system_batch.py	114	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_local_thinking_probe.py	326	backend	7	whymath_backend.l3				0	
+tests/backend/harness/test_matrix_ops_batch.py	100	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_measurement_unit_conversion_batch.py	126	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_middle_function_batch.py	104	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_misconception_false_positive_eval.py	214	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_misconception_mc_batch.py	173	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_misconception_mc_coverage.py	83	backend	5	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_needs_review_worklist.py	368	backend	7	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/harness/test_objective_coverage.py	613	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_ops141_timeout_decompose.py	551	backend	1	whymath_backend.l3				0	
+tests/backend/harness/test_p3_18_calculus_verifiability_probe.py	434	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_p3_20_equation_inequality_slot_capacity.py	148	backend	0	(없음)				0	
+tests/backend/harness/test_p3_21_derived_shape_probe.py	260	backend	0	(없음)				0	
+tests/backend/harness/test_p3_62_structured_candidate.py	105	backend	3	whymath_backend.l3				0	
+tests/backend/harness/test_p3_audit_qualification.py	800	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_p3_calculus1_diff_batch.py	300	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_p3_differentiability_reach_batch.py	110	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_p3_fill_batch.py	200	backend	5	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l1			0	
+tests/backend/harness/test_pedagogical_rubric.py	132	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_pedagogy_policy_eval.py	96	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_permutation_combination_batch.py	112	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_persona_fit_backfill_corpus_coverage.py	78	backend	5	whymath_backend.l6				0	
+tests/backend/harness/test_pilot_kpi_baseline.py	443	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_polynomial_arithmetic_batch.py	142	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_polynomial_factoring_batch.py	117	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_probability_law_batch.py	109	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_problem_bank_coverage.py	788	backend	3	whymath_backend.l6				0	
+tests/backend/harness/test_problem_corpus_accumulate.py	794	backend	5	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_problem_corpus_author_backfill.py	284	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_problem_corpus_batch.py	965	backend	5	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_problem_corpus_lineage_links.py	323	backend	7	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_problem_corpus_persona_fit_backfill.py	245	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_problem_corpus_rephrase.py	223	backend	7	whymath_backend.l3				0	
+tests/backend/harness/test_problem_corpus_rephrase_diagnose.py	216	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_problem_corpus_rephrase_sweep.py	297	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_problem_corpus_tag.py	156	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_problem_corpus_variants.py	285	backend	5	whymath_backend.l1				0	
+tests/backend/harness/test_problem_duplication_audit.py	972	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_problem_slot_backfill.py	344	backend	6	whymath_backend.l1				0	
+tests/backend/harness/test_problem_type_backfill.py	387	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_problem_type_mapping.py	703	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_prompt_asset_audit.py	155	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_prompt_asset_audit_l3.py	167	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_prompt_cache_hit_measurement.py	504	backend	9	whymath_backend.l3				0	
+tests/backend/harness/test_provider_accuracy_battle.py	759	backend	9	whymath_backend.l3				0	
+tests/backend/harness/test_published_problem_drift_report.py	480	backend	5	whymath_backend.schema				0	
+tests/backend/harness/test_qa_item_verdicts.py	652	backend	8	whymath_backend.harness				0	
+tests/backend/harness/test_qa_pipeline.py	796	backend	5	whymath_backend.harness				0	
+tests/backend/harness/test_qa_pipeline_dsl_kinds_sync.py	97	backend	3	whymath_backend.l3				0	
+tests/backend/harness/test_quad_ineq_batch.py	107	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_quality_tier_moe_accuracy_battle.py	432	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_quality_tier_prompt_variants_ops50.py	576	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/harness/test_question_rederive.py	276	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_radian_conversion_batch.py	103	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_recommendation_outcome_report.py	51	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_relative_path_const_cwd_scan.py	233	backend	0	(없음)				0	
+tests/backend/harness/test_rephrased_corpus_hygiene.py	144	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_residue_cross_verify_eval.py	425	backend	5	whymath_backend.harness				0	
+tests/backend/harness/test_residue_cross_verify_eval_v2.py	707	backend	8	whymath_backend.harness				0	
+tests/backend/harness/test_residue_gate_demotion_battle.py	1319	backend	5	whymath_backend.l3				0	
+tests/backend/harness/test_review_session.py	471	backend	3	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.ops, whymath_backend.schema			0	
+tests/backend/harness/test_review_session_gui.py	1148	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/harness/test_review_status_backfill_verdict.py	70	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/harness/test_review_status_domains.py	374	backend	7	whymath_backend.harness				0	
+tests/backend/harness/test_review_status_verdict_bridge.py	939	backend	7	whymath_backend.harness				0	
+tests/backend/harness/test_review_timer_writer.py	184	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/harness/test_reviewer_sample_package.py	317	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_root_aggregate_batch.py	107	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_round_manifest_snapshot.py	573	backend	7	whymath_backend.l3				0	
+tests/backend/harness/test_round_reply_extract.py	551	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_round_seat_ledger.py	277	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_sample_mean_distribution_batch.py	104	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_selective_grading_demotion_eval.py	519	backend	4	whymath_backend.schema				0	
+tests/backend/harness/test_sequence_sigma_batch.py	110	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_solution_qa.py	662	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_solution_qa_c5.py	186	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.ops			0	
+tests/backend/harness/test_solution_qa_interpretive_steps.py	1001	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_standard_attainment_report.py	423	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_stem_hook_independent_answers.py	209	backend	0	(없음)				0	
+tests/backend/harness/test_stem_semantic_hook_coverage.py	180	backend	0	(없음)				0	
+tests/backend/harness/test_surrogate_baseline_report.py	375	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_tier1_rejection_classifier.py	431	backend	10	whymath_backend.l3				0	
+tests/backend/harness/test_traversal_load_probe.py	361	backend	3	whymath_backend.l2				0	
+tests/backend/harness/test_university_calc1_batch.py	101	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_university_calc1_chain_quotient_batch.py	112	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_variant_intake_pb20.py	305	backend	7	whymath_backend.harness				0	
+tests/backend/harness/test_vector_operations_batch.py	109	backend	6	whymath_backend.l3				0	
+tests/backend/harness/test_visualization_reach_report.py	409	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_evaluation.py	1669	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/harness/test_wh1_evaluation_gap_recovery_leadtime.py	225	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_evaluation_integration.py	667	backend	12	whymath_backend.schema				0	
+tests/backend/harness/test_wh1_llm_policy.py	513	backend	7	whymath_backend.l4				0	
+tests/backend/harness/test_wh1_llm_seam_wiring.py	191	backend	5	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_loop.py	490	backend	5	whymath_backend.l4				0	
+tests/backend/harness/test_wh1_match_gate_enforcement.py	262	backend	1	whymath_backend				0	
+tests/backend/harness/test_wh1_match_gate_wiring.py	297	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_wh1_match_withheld.py	325	backend	6	whymath_backend.l4				0	
+tests/backend/harness/test_wh1_primary.py	263	backend	3	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_primary_fallback_accounting.py	582	backend	8	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_primary_mode_guard.py	250	backend	8	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/harness/test_wh1_probe_supply.py	326	backend	3	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/harness/test_wh1_prose.py	421	backend	7	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_reveal_score_depth.py	75	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_select_probe_variance.py	196	backend	5	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l4			0	
+tests/backend/harness/test_wh1_session.py	235	backend	9	whymath_backend.l4				0	
+tests/backend/harness/test_wh1_shadow.py	602	backend	4	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_shadow_harvest.py	595	backend	2	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_shadow_logconfig.py	101	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_step_verification_accounting.py	301	backend	2	whymath_backend.app	동점: whymath_backend.app, whymath_backend.harness			0	
+tests/backend/harness/test_wh1_tutor_context.py	711	backend	10	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_tutor_context_trace.py	336	backend	9	whymath_backend.l3				0	
+tests/backend/harness/test_wh1_tutor_output.py	982	backend	8	whymath_backend.harness				0	
+tests/backend/harness/test_wh1_tutor_required_context.py	210	backend	3	whymath_backend.l4				0	
+tests/backend/harness/test_wh1_tutor_slot_delivery.py	1016	backend	11	whymath_backend.l4				0	
+tests/backend/harness/test_wilson.py	85	backend	1	whymath_backend.harness				0	
+tests/backend/harness/test_worklist_out_queue_alias_guard.py	468	backend	5	whymath_backend.l3				0	
+tests/backend/l1/atom_graph/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l1/atom_graph/test_atom_backbone_integration.py	185	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/atom_graph/test_atom_backend_concept.py	387	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/atom_graph/test_atom_backend_edge.py	365	backend	4	whymath_backend.l1				0	
+tests/backend/l1/atom_graph/test_atom_edge_retire.py	546	backend	6	whymath_backend.l1				0	
+tests/backend/l1/atom_graph/test_atom_edge_retire_integration.py	197	backend	4	whymath_backend.l1				0	
+tests/backend/l1/atom_graph/test_atom_embedding.py	470	backend	5	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l1/atom_graph/test_atom_embedding_integration.py	294	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l1/atom_graph/test_atom_node_projection.py	452	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/atom_graph/test_atom_node_projection_integration.py	183	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/atom_graph/test_atom_retrieval.py	651	backend	6	whymath_backend.l1				0	
+tests/backend/l1/atom_graph/test_atom_retrieval_integration.py	176	backend	5	whymath_backend.l1				0	
+tests/backend/l1/atom_graph/test_dedup_candidates.py	175	backend	4	whymath_backend.l1				0	
+tests/backend/l1/atom_graph/test_populate.py	346	backend	4	whymath_backend.l1				0	
+tests/backend/l1/concept_atom_crosswalk/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l1/concept_atom_crosswalk/test_crosswalk_transfer.py	518	backend	3	whymath_backend.l1				0	
+tests/backend/l1/concept_atom_crosswalk/test_crosswalk_transfer_governance.py	137	backend	1	whymath_backend.l1				0	
+tests/backend/l1/concept_atom_crosswalk/test_crosswalk_transfer_integration.py	213	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/concept_content/__init__.py	3	backend	0	(없음)				0	
+tests/backend/l1/concept_content/test_concept_content_projection.py	445	backend	4	whymath_backend.l1				0	
+tests/backend/l1/concept_content/test_concept_content_projection_integration.py	191	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/concept_content/test_review_gate.py	123	backend	1	whymath_backend.l1				0	
+tests/backend/l1/concept_visual_style/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l1/concept_visual_style/test_overlay.py	82	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/concept_visualization/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l1/concept_visualization/test_overlay.py	91	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/formula_graph/test_formula_node_projection.py	217	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/formula_graph/test_formula_node_projection_integration.py	149	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/problem_bank/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l1/problem_bank/test_answer_distribution.py	83	backend	1	whymath_backend.l1				0	
+tests/backend/l1/problem_bank/test_corpus_quality.py	514	backend	6	whymath_backend.l3				0	
+tests/backend/l1/problem_bank/test_embedding.py	405	backend	6	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/problem_bank/test_embedding_integration.py	281	backend	5	whymath_backend.schema				0	
+tests/backend/l1/problem_bank/test_persona_fit_rules.py	213	backend	3	whymath_backend.schema				0	
+tests/backend/l1/problem_bank/test_populate.py	1023	backend	4	whymath_backend.l1				0	
+tests/backend/l1/problem_bank/test_populate_governance.py	81	backend	1	whymath_backend.l1				0	
+tests/backend/l1/problem_bank/test_populate_integration.py	314	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/problem_bank/test_probe_candidates.py	152	backend	1	whymath_backend.l1				0	
+tests/backend/l1/problem_bank/test_provenance_gate.py	151	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/problem_bank/test_relation_governance.py	131	backend	1	whymath_backend.schema				0	
+tests/backend/l1/problem_bank/test_relink_governance.py	181	backend	2	whymath_backend.l1				0	
+tests/backend/l1/problem_bank/test_signature_tagger.py	191	backend	4	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/problem_bank/test_verification_tier_sync.py	54	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l3			0	
+tests/backend/l1/problem_type_graph/test_problem_type_node_projection.py	206	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/problem_type_graph/test_problem_type_node_projection_integration.py	157	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/rights/test_attribution.py	95	backend	3	whymath_backend.schema				0	
+tests/backend/l1/rights/test_permission_map.py	152	backend	3	whymath_backend.schema				0	
+tests/backend/l1/rights/test_policy_engine.py	235	backend	3	whymath_backend.schema				0	
+tests/backend/l1/skill_graph/test_resolve.py	81	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/skill_graph/test_skill_node_projection.py	191	backend	4	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/skill_graph/test_skill_node_projection_integration.py	146	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/standards/test_alignment_query.py	396	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.l1			0	
+tests/backend/l1/standards/test_learning_map.py	272	backend	2	whymath_backend.l1				0	
+tests/backend/l1/strategy_graph/test_strategy_node_projection.py	168	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/strategy_graph/test_strategy_node_projection_integration.py	149	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/test_anti_gamification_governance.py	468	backend	0	(없음)				0	
+tests/backend/l1/test_approved_crosslinks_corpus.py	229	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_atom_misconception_catalog.py	322	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_atom_misconception_catalog_integration.py	160	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/test_atom_probe.py	382	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_atom_probe_integration.py	157	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/test_cms_edit_loader_contract_integration.py	482	backend	18	whymath_backend.db				0	
+tests/backend/l1/test_concept_backend_edge_load.py	450	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_concept_backend_load.py	462	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/test_concept_backend_load_integration.py	796	backend	6	whymath_backend.l1				0	
+tests/backend/l1/test_concept_content_license_declaration.py	147	backend	0	(없음)				0	
+tests/backend/l1/test_concept_edge_prerequisite_meta.py	96	backend	2	whymath_backend.schema				0	
+tests/backend/l1/test_concept_embedding.py	471	backend	5	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l1/test_concept_embedding_integration.py	295	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l1/test_concept_lifecycle.py	436	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/test_concept_lifecycle_governance.py	147	backend	0	(없음)				0	
+tests/backend/l1/test_concept_node_projection.py	413	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/test_concept_node_projection_integration.py	306	backend	5	whymath_backend.l1				0	
+tests/backend/l1/test_concept_retrieval.py	573	backend	5	whymath_backend.l1				0	
+tests/backend/l1/test_concept_retrieval_integration.py	151	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_concept_visualization_orphan_gate.py	193	backend	7	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l1/test_criteria_loader.py	517	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/test_crosslink_canonical_flip_contract.py	154	backend	1	whymath_backend.l1				0	
+tests/backend/l1/test_crosslink_canonical_flip_enforcement.py	243	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_crosslink_canonical_flip_integration.py	325	backend	6	whymath_backend.l1				0	
+tests/backend/l1/test_crosslink_fk_precheck.py	251	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_crosslink_fk_precheck_integration.py	269	backend	6	whymath_backend.l1				0	
+tests/backend/l1/test_crosslink_gate_contract.py	329	backend	5	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l1/test_curriculum_entry_loader.py	731	backend	2	whymath_backend.l1				0	
+tests/backend/l1/test_curriculum_entry_loader_integration.py	353	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_curriculum_populate_university.py	287	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_curriculum_resolve.py	104	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/test_derived_form_rules.py	285	backend	2	whymath_backend.l1				0	
+tests/backend/l1/test_edge_relation_governance.py	126	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_embedding_namespace_governance.py	319	backend	11	whymath_backend.l1				0	
+tests/backend/l1/test_embedding_primitives.py	193	backend	1	whymath_backend.l1				0	
+tests/backend/l1/test_eos_anchor_registry.py	463	backend	1	whymath_backend.l1				0	
+tests/backend/l1/test_five_node_connectivity_governance.py	117	backend	5	whymath_backend.db		data_pipeline		0	
+tests/backend/l1/test_formula_governance.py	540	backend	4	whymath_backend.l3		data_pipeline		0	
+tests/backend/l1/test_grade_axis_governance.py	253	backend	1	whymath_backend				0	
+tests/backend/l1/test_legacy_snapshot_governance.py	226	backend	0	(없음)				0	
+tests/backend/l1/test_misconception_corpus_statement_integrity.py	235	backend	0	(없음)				0	
+tests/backend/l1/test_misconception_crosslink.py	345	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_misconception_crosslink_integration.py	290	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_misconception_crosslink_resolve_integration.py	292	backend	5	whymath_backend.l1				0	
+tests/backend/l1/test_misconception_enrichment_governance.py	106	backend	3	whymath_backend.schema		data_pipeline		0	
+tests/backend/l1/test_misconception_loader.py	357	backend	5	whymath_backend.l1				0	
+tests/backend/l1/test_misconception_loader_integration.py	251	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1			0	
+tests/backend/l1/test_misconception_resolve.py	229	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/test_misconception_resolve_integration.py	472	backend	7	whymath_backend.l1				0	
+tests/backend/l1/test_no_import_cycle.py	88	backend	0	(없음)				0	
+tests/backend/l1/test_node_granularity_governance.py	90	backend	0	(없음)				0	
+tests/backend/l1/test_p3_calculus1_diff_bank_coverage_link.py	274	backend	5	whymath_backend.l1				0	
+tests/backend/l1/test_p3_conceptual_02_02_solution_link.py	179	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_p3_fill_bank_coverage_link.py	164	backend	4	whymath_backend.l1				0	
+tests/backend/l1/test_pack_loader.py	331	backend	4	whymath_backend.schema				0	
+tests/backend/l1/test_pedagogy_pack_yaml_db_parity.py	61	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/l1/test_phase3_coverage.py	2188	backend	5	whymath_backend.l1				0	
+tests/backend/l1/test_phase3_problem_metadata_ratchet.py	209	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_phase3_remediation_spec.py	139	backend	1	whymath_backend.l1				0	
+tests/backend/l1/test_phase3_scope_spec.py	678	backend	1	whymath_backend.l1				0	
+tests/backend/l1/test_phase3_slot_rules.py	259	backend	3	whymath_backend.l1				0	
+tests/backend/l1/test_phase3_stem_fold.py	130	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l3			0	
+tests/backend/l1/test_problemtype_governance.py	139	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema	data_pipeline		0	
+tests/backend/l1/test_skill_governance.py	64	backend	1	whymath_backend.schema		data_pipeline		0	
+tests/backend/l1/test_standard_loader.py	590	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/test_standard_loader_integration.py	604	backend	5	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/l1/test_standard_populate.py	78	backend	1	whymath_backend.l1				0	
+tests/backend/l1/test_strategy_governance.py	116	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema	data_pipeline		0	
+tests/backend/l1/test_unit_compiler.py	401	backend	3	whymath_backend.schema				0	
+tests/backend/l1/test_unit_spec_yaml_db_parity.py	110	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l1			0	
+tests/backend/l1/test_unit_structure_hypothesis_freeze.py	557	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/l1/test_wrong_answer_signature_table.py	155	backend	2	whymath_backend.l1				0	
+tests/backend/l2/test_ability_estimation.py	174	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_ability_snapshot_capture.py	179	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_ability_tracking.py	112	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_assessment_evidence.py	291	backend	5	whymath_backend.l2				0	
+tests/backend/l2/test_atom_axis_fence_governance.py	164	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l2			0	
+tests/backend/l2/test_attempt_skill_event.py	215	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_attempt_version_pin.py	151	backend	4	whymath_backend.schema				0	
+tests/backend/l2/test_bkt.py	200	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_calibrate_items.py	235	backend	2	whymath_backend.l2				0	
+tests/backend/l2/test_concept_diagnosis.py	185	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_concept_exposure.py	111	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_eos147_selection_theta.py	871	backend	8	whymath_backend.l2				0	
+tests/backend/l2/test_eos39_help_fold_selection.py	461	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_event_time_attribution.py	219	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_evidence_event_store.py	92	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_hint_rate_mastery_input.py	159	backend	3	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_irt.py	489	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_irt_a_adoption_signal.py	377	backend	2	whymath_backend.l2				0	
+tests/backend/l2/test_irt_discrimination_calibration.py	319	backend	3	whymath_backend.l2				0	
+tests/backend/l2/test_item_calibration.py	300	backend	3	whymath_backend.l2				0	
+tests/backend/l2/test_learner_state.py	515	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_learner_state_basis.py	185	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_learner_state_store.py	182	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l2			0	
+tests/backend/l2/test_learning_event_trace.py	1082	backend	6	whymath_backend.l2				0	
+tests/backend/l2/test_learning_metrics_rollup.py	588	backend	3	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_learning_path.py	365	backend	2	whymath_backend.l2				0	
+tests/backend/l2/test_learning_path_internal_edges_integration.py	144	backend	5	whymath_backend.schema				0	
+tests/backend/l2/test_learning_session_writer.py	177	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_learning_session_writer_integration.py	447	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/l2/test_learning_state_evidence.py	274	backend	3	whymath_backend.l2				0	
+tests/backend/l2/test_learning_state_machine.py	903	backend	3	whymath_backend.l2				1	
+tests/backend/l2/test_learning_state_recommendation.py	1362	backend	8	whymath_backend.l2				0	
+tests/backend/l2/test_mastery_contract.py	688	backend	9	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_mastery_estimators.py	345	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_mastery_idempotency.py	257	backend	3	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_mastery_tracking.py	445	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_mastery_tracking_integration.py	436	backend	9	whymath_backend.schema				0	
+tests/backend/l2/test_next_problem_alignment_integration.py	269	backend	7	whymath_backend.schema				0	
+tests/backend/l2/test_pedagogy_evidence.py	475	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.l2			0	
+tests/backend/l2/test_prerequisite_depth_budget.py	102	backend	2	whymath_backend.api	동점: whymath_backend.api, whymath_backend.l2			0	
+tests/backend/l2/test_prerequisite_recommendation.py	573	backend	3	whymath_backend.l2				0	
+tests/backend/l2/test_prerequisite_traversal_integration.py	306	backend	5	whymath_backend.schema				0	
+tests/backend/l2/test_recommendation_contract.py	244	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_recommendation_evidence.py	356	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_recommendation_policy.py	823	backend	6	whymath_backend.l2				0	
+tests/backend/l2/test_recommendation_reason.py	208	backend	3	whymath_backend.l2				0	
+tests/backend/l2/test_remediation_policy.py	248	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_review_queue.py	114	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_review_queue_integration.py	154	backend	7	whymath_backend.schema				0	
+tests/backend/l2/test_sibling_relation_policy.py	224	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/l2/test_skill_mastery_tracking.py	310	backend	4	whymath_backend.l2				0	
+tests/backend/l2/test_skill_mastery_tracking_integration.py	305	backend	9	whymath_backend.schema				0	
+tests/backend/l2/test_strong_concept_recommendation.py	268	backend	3	whymath_backend.l2				0	
+tests/backend/l2/test_target_progress.py	197	backend	1	whymath_backend.l2				0	
+tests/backend/l2/test_target_progress_integration.py	394	backend	15	whymath_backend.db				0	
+tests/backend/l2/test_weak_concept_recommendation.py	512	backend	3	whymath_backend.l2				0	
+tests/backend/l3/dsl/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l3/dsl/test_compiler.py	80	backend	2	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_lifecycle_single_source.py	190	backend	3	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_math_verifier.py	110	backend	3	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_models.py	78	backend	1	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_quality_gate.py	71	backend	2	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_repair.py	74	backend	2	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_validators.py	95	backend	2	whymath_backend.l3				0	
+tests/backend/l3/dsl/test_variable_engine.py	79	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_acceptance.py	419	backend	4	whymath_backend.schema				0	
+tests/backend/l3/equivalent/test_acceptance_governance.py	127	backend	4	whymath_backend.schema				0	
+tests/backend/l3/equivalent/test_acceptance_interpretive_steps.py	226	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/l3/equivalent/test_authoring_guard.py	320	backend	1	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_binomial_distribution_skeleton_generator.py	153	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus1_integral_skeleton_generator.py	199	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus2_trig_integral_skeleton_generator.py	206	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_chain_quotient_rule_skeleton_generator.py	208	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_extremum_format_disjointness.py	85	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_extremum_mc_generator.py	202	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_extremum_value_generator.py	160	backend	6	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_irrational_extremum_generator.py	180	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_product_rule_skeleton_generator.py	181	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_skeleton_generator.py	158	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_calculus_tangent_slope_generator.py	157	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_canonicalize.py	112	backend	1	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_combination_binomial_skeleton_generator.py	229	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_complex_number_arithmetic_skeleton_generator.py	187	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_conceptual_count_mc_generator.py	249	backend	5	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_conic_section_focus_skeleton_generator.py	162	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_coordinate_geometry_skeleton_generator.py	234	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_counterexample_fuzz.py	95	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_deterministic_author_stamp.py	198	backend	8	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_difficulty.py	144	backend	1	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_discrete_expected_value_skeleton_generator.py	169	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_duplicate_source_attribution.py	380	backend	10	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_elementary_addsub_skeleton_generator.py	151	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_elementary_area_measure_skeleton_generator.py	233	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_elementary_division_remainder_skeleton_generator.py	146	backend	5	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_elementary_gcd_lcm_skeleton_generator.py	147	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_elementary_rounding_skeleton_generator.py	143	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_elementary_volume_measure_skeleton_generator.py	302	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_exp_log_skeleton_generator.py	180	backend	6	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_highschool_quotient_rule_skeleton_generator.py	142	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_inductive_sequence_dsl_crosscheck.py	153	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_inductive_sequence_skeleton_generator.py	169	backend	9	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_latex_gate.py	109	backend	1	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_linear_function_value_skeleton_generator.py	164	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_linear_inequality_system_skeleton_generator.py	193	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_llm_generator.py	1646	backend	12	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_matrix_ops_skeleton_generator.py	186	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_measurement_unit_conversion_skeleton_generator.py	173	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_misconception_eval_mc_generator.py	404	backend	8	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_orchestrator.py	458	backend	10	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/equivalent/test_orchestrator_integration.py	279	backend	10	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/equivalent/test_p3_62_final_statement.py	278	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_93_var_structuring.py	353	backend	6	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_defect_seeder.py	284	backend	1	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_differentiability_generator.py	355	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_differentiability_reach_generator.py	299	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_differential_coefficient_generator.py	237	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_graph_shape_generator.py	802	backend	12	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_monotonicity_extremum_generator.py	562	backend	6	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_motion_word_problem_generator.py	290	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_mvt_equation_generators.py	997	backend	17	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_power_pattern_generator.py	274	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_shortcut_guard.py	1055	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_p344_links.py	386	backend	1	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_round5.py	699	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_round6.py	813	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_round7.py	827	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_shortcut_guard_round8.py	431	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_skeleton_generators.py	810	backend	18	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_solution_steps.py	565	backend	11	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_tangent_velocity_generators.py	923	backend	13	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_p3_diff_text_defects.py	397	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_permutation_combination_skeleton_generator.py	219	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_polynomial_arithmetic_skeleton_generator.py	186	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_polynomial_factoring_skeleton_generator.py	194	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_probability_law_skeleton_generator.py	290	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_quadratic_inequality_boundary_skeleton_generator.py	191	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_quotient_rule_space_disjointness.py	287	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_radian_conversion_skeleton_generator.py	195	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_rephrase.py	272	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_rephrase_hygiene.py	347	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/l3/equivalent/test_rephrase_pipeline_wiring.py	295	backend	8	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_retag_auditor.py	139	backend	5	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_root_aggregate_generator.py	89	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_sample_mean_distribution_skeleton_generator.py	151	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_sequence_sigma_skeleton_generator.py	266	backend	5	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_sequence_skeleton_generator.py	194	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_sequence_sum_skeleton_generator.py	196	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_skeleton_generator.py	453	backend	8	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_structural_dedup.py	323	backend	2	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_trig_equation_skeleton_generator.py	132	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_trig_skeleton_generator.py	154	backend	7	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_variants.py	353	backend	3	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_vector_operations_skeleton_generator.py	220	backend	4	whymath_backend.l3				0	
+tests/backend/l3/equivalent/test_verify_bypass.py	175	backend	1	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_analogy_checker.py	171	backend	1	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_analogy_demand.py	130	backend	1	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_analogy_generator.py	320	backend	3	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_diag_item_projector.py	230	backend	3	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_diag_item_projector_integration.py	236	backend	5	whymath_backend.l1				0	
+tests/backend/l3/pedagogy/test_example_generator.py	199	backend	2	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_explanation_checker.py	81	backend	3	whymath_backend.schema				0	
+tests/backend/l3/pedagogy/test_explanation_generator.py	251	backend	4	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/pedagogy/test_prescreen.py	127	backend	3	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_review.py	172	backend	3	whymath_backend.l3				0	
+tests/backend/l3/pedagogy/test_slot_generator.py	190	backend	2	whymath_backend.composition	동점: whymath_backend.composition, whymath_backend.l3			0	
+tests/backend/l3/pedagogy/test_zero_production_callers_governance.py	269	backend	0	(없음)				0	
+tests/backend/l3/render/test_adapters.py	203	backend	6	whymath_backend.l3				0	
+tests/backend/l3/render/test_assessment_bank.py	261	backend	5	whymath_backend.l3				0	
+tests/backend/l3/render/test_concept_dsl.py	119	backend	1	whymath_backend.l3				0	
+tests/backend/l3/render/test_render_governance.py	245	backend	4	whymath_backend.l3				0	
+tests/backend/l3/test_actual_cost_cache_pricing.py	272	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_answer_form_contract.py	175	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_anthropic_integration.py	73	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_anthropic_provider.py	855	backend	4	whymath_backend.l3				0	
+tests/backend/l3/test_anthropic_sdk_surface.py	442	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_authoring_traffic_surface_inventory.py	116	backend	0	(없음)				0	
+tests/backend/l3/test_cache_breakpoint_placement.py	538	backend	6	whymath_backend.l3				0	
+tests/backend/l3/test_celery_integration.py	127	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_celery_job_queue.py	298	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_celery_tasks.py	405	backend	10	whymath_backend.l3				0	
+tests/backend/l3/test_celery_worker_app_target.py	75	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_classify_solvability.py	67	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_cloud_mid_seat_cutover.py	476	backend	14	whymath_backend.l3				0	
+tests/backend/l3/test_cloud_provider_selector.py	266	backend	4	whymath_backend.l3				0	
+tests/backend/l3/test_cloud_runtime_local_degrade.py	1298	backend	21	whymath_backend.l3				0	
+tests/backend/l3/test_composite_jurisdiction_gate.py	304	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_composite_provider.py	238	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_cost_calc_seat_explicit.py	331	backend	8	whymath_backend.l3				0	
+tests/backend/l3/test_cross_verify.py	908	backend	7	whymath_backend.l3				0	
+tests/backend/l3/test_curriculum_notation_gate.py	714	backend	4	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l3/test_curriculum_notation_gate_student_path_governance.py	169	backend	0	(없음)				0	
+tests/backend/l3/test_data_export_policy.py	369	backend	10	whymath_backend.l3				0	
+tests/backend/l3/test_deepseek_provider.py	248	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_finite_probability.py	152	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_generation_log_model_name_selector.py	120	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_generation_log_wiring.py	552	backend	13	whymath_backend.l3				0	
+tests/backend/l3/test_generation_observation_axis.py	679	backend	11	whymath_backend.l3				0	
+tests/backend/l3/test_generation_seed.py	211	backend	7	whymath_backend.l3				0	
+tests/backend/l3/test_input_normalization.py	170	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_interfaces.py	52	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_isolated_call.py	461	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_langfuse_fields_observation.py	579	backend	15	whymath_backend.l3				0	
+tests/backend/l3/test_langfuse_integration.py	93	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l3			0	
+tests/backend/l3/test_langfuse_sink.py	522	backend	4	whymath_backend.l3				0	
+tests/backend/l3/test_llm_subgraph_budget_invariant.py	106	backend	8	whymath_backend.l3				0	
+tests/backend/l3/test_models.py	308	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_multi_solution.py	845	backend	14	whymath_backend.l3				0	
+tests/backend/l3/test_multi_solution_bank_integration.py	142	backend	5	whymath_backend.schema				0	
+tests/backend/l3/test_multimodal_routing.py	176	backend	6	whymath_backend.l3				0	
+tests/backend/l3/test_natural_notation_verify.py	187	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_notation_contract.py	103	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_notation_coverage_eval.py	421	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_notation_evidence_integrity.py	149	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_ollama_integration.py	62	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_ollama_provider.py	408	backend	4	whymath_backend.l3				0	
+tests/backend/l3/test_openai_compat_transport.py	436	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_openrouter_provider.py	502	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_pipeline.py	798	backend	6	whymath_backend.l3				0	
+tests/backend/l3/test_pipeline_training_flag.py	139	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_pregenerate.py	1519	backend	7	whymath_backend.l3				0	
+tests/backend/l3/test_pregenerate_function_notation.py	169	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_prewarmer_trace.py	429	backend	9	whymath_backend.l3				0	
+tests/backend/l3/test_problem_publish_gate.py	597	backend	9	whymath_backend.schema				0	
+tests/backend/l3/test_problem_publish_gate_enforcement.py	630	backend	1	whymath_backend.db				0	
+tests/backend/l3/test_prompt_assets.py	250	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_provenance_bridge.py	429	backend	7	whymath_backend.l3				0	
+tests/backend/l3/test_provider_client_event_loop.py	202	backend	4	whymath_backend.l3				0	
+tests/backend/l3/test_provider_jurisdiction.py	204	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_publish_gate.py	264	backend	5	whymath_backend.schema				0	
+tests/backend/l3/test_publish_gate_enforcement.py	240	backend	0	(없음)				0	
+tests/backend/l3/test_publish_gate_integration.py	478	backend	7	whymath_backend.schema				0	
+tests/backend/l3/test_redis_cache.py	630	backend	6	whymath_backend.l3				0	
+tests/backend/l3/test_redis_integration.py	92	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l3			0	
+tests/backend/l3/test_router.py	1132	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_safe_parse.py	685	backend	8	whymath_backend.l3				0	
+tests/backend/l3/test_sequence_induction.py	487	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_sequence_induction_verifier.py	506	backend	9	whymath_backend.l3				0	
+tests/backend/l3/test_solution_path.py	251	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_solution_path_store.py	161	backend	3	whymath_backend.db				0	
+tests/backend/l3/test_solution_set.py	418	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_speech_profiles.py	46	backend	1	whymath_backend.l4				0	
+tests/backend/l3/test_speech_rules.py	135	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.l4			0	
+tests/backend/l3/test_statistical_claim.py	586	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_subset_transition_verify.py	92	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_symbolic_equivalence.py	274	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_top_p_seat_symmetry.py	375	backend	7	whymath_backend.l3				0	
+tests/backend/l3/test_traffic_surface.py	221	backend	7	whymath_backend.l3				0	
+tests/backend/l3/test_value_exposure.py	253	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_verification_tier.py	132	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_verifier.py	287	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_verifier_perspective_fail_closed.py	188	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_verifier_tier_assignment.py	295	backend	5	whymath_backend.l3				0	
+tests/backend/l3/test_verify_answer.py	551	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_verify_answer_condition_shape.py	226	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_verify_answer_domain_selection.py	342	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_verify_answer_number_list_shape.py	215	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_verify_answer_sibling_spurious.py	1060	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_verify_answer_spurious_root.py	402	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3			0	
+tests/backend/l3/test_verify_counts.py	344	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_verify_final_answer.py	286	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_verify_nondifferentiable_point_count.py	283	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_verify_root_aggregate.py	56	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_verify_solution.py	285	backend	3	whymath_backend.l3				0	
+tests/backend/l3/test_verify_solution_interpreted.py	206	backend	2	whymath_backend.l3				0	
+tests/backend/l3/test_verify_step.py	515	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_visualization_generator.py	250	backend	6	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l3/test_visualization_live.py	162	backend	6	whymath_backend.l3				0	
+tests/backend/l3/test_visualization_render_contract.py	170	backend	1	whymath_backend.l3				0	
+tests/backend/l3/test_viz_eval.py	261	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l4/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l4/_live_resources.py	50	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l3, whymath_backend.l4			0	
+tests/backend/l4/adaptive/test_effectiveness.py	189	backend	4	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l2, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l4/adaptive/test_pedagogy_policy.py	105	backend	5	whymath_backend.l4				0	
+tests/backend/l4/hint_content/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l4/hint_content/_fakes.py	83	backend	1	whymath_backend.db				0	
+tests/backend/l4/hint_content/test_cu_hint_pass.py	788	backend	9	whymath_backend.l4				0	
+tests/backend/l4/hint_content/test_gates.py	531	backend	5	whymath_backend.l4				0	
+tests/backend/l4/hint_content/test_generator.py	160	backend	4	whymath_backend.l4				0	
+tests/backend/l4/hint_content/test_models.py	175	backend	4	whymath_backend.l4				0	
+tests/backend/l4/hint_content/test_populate.py	207	backend	4	whymath_backend.l4				0	
+tests/backend/l4/hint_content/test_store.py	424	backend	8	whymath_backend.l4				0	
+tests/backend/l4/misconception/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l4/misconception/test_answer_signature.py	280	backend	3	whymath_backend.l4				0	
+tests/backend/l4/misconception/test_attempt_hypothesis_policy.py	111	backend	2	whymath_backend.l4	동점: whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l4/misconception/test_attempt_misconception_learner_state.py	164	backend	5	whymath_backend.l4				0	
+tests/backend/l4/misconception/test_derivative_signature.py	966	backend	8	whymath_backend.l4				0	
+tests/backend/l4/misconception/test_distractor_link.py	287	backend	4	whymath_backend.l4				0	
+tests/backend/l4/misconception/test_remediation_strategy.py	209	backend	8	whymath_backend.l4				0	
+tests/backend/l4/misconception/test_warmstart.py	304	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l4/pedagogy/test_age_band_explanation.py	146	backend	4	whymath_backend.l3				0	
+tests/backend/l4/pedagogy/test_k_type_resolver.py	82	backend	2	whymath_backend.l4	동점: whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l4/pedagogy/test_mode_guard_fallback.py	54	backend	5	whymath_backend.l4				0	
+tests/backend/l4/pedagogy/test_strategy_registry.py	161	backend	3	whymath_backend.schema				0	
+tests/backend/l4/test_anchor_seat_gap.py	291	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l4/test_calibration_coaching.py	123	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_catalog_consumption.py	625	backend	12	whymath_backend.l4				0	
+tests/backend/l4/test_completion.py	307	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_content_supply.py	951	backend	10	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.l4			0	
+tests/backend/l4/test_content_supply_tally.py	209	backend	6	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_candidates.py	100	backend	4	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_coverage.py	95	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_demotion_seeder.py	71	backend	1	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_machine_reject.py	140	backend	1	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_review.py	611	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_review_aid.py	429	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_shadow_harvest.py	196	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_crosslink_standard_signal.py	114	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.l4			0	
+tests/backend/l4/test_crosslink_triage.py	233	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_distractor_catalog.py	91	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_distractor_validate.py	132	backend	4	whymath_backend.l4				0	
+tests/backend/l4/test_eos178_label_free_hint_level.py	226	backend	6	whymath_backend.l4				0	
+tests/backend/l4/test_evidence_store.py	429	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l4/test_hint_deferral.py	310	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_hypothesis.py	282	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_hypothesis_store.py	617	backend	10	whymath_backend.l4				0	
+tests/backend/l4/test_judge_shadow_harvest.py	151	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_learning_scene.py	484	backend	6	whymath_backend.l4				0	
+tests/backend/l4/test_lthc.py	134	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_match_gate.py	172	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_metacognitive_trigger.py	323	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_misc61_authored_rows.py	167	backend	1	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_audit.py	172	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_catalog.py	502	backend	4	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_combined.py	195	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_crosslink_shadow.py	253	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_crosslink_shadow_integration.py	221	backend	5	whymath_backend.l1				0	
+tests/backend/l4/test_misconception_diagnose.py	1414	backend	6	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_hypothesis_deactivation_reasons.py	102	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_hypothesis_store_reasons.py	295	backend	8	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_intervene.py	248	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_judge.py	419	backend	8	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_judge_integration.py	96	backend	6	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_namespace_gate.py	43	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_pgvector.py	440	backend	8	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_pgvector_integration.py	289	backend	5	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_probes.py	246	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_review_coaching.py	210	backend	6	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_semantic.py	665	backend	9	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_semantic_eval.py	969	backend	7	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_semantic_eval_integration.py	101	backend	4	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_semantic_integration.py	65	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l4			0	
+tests/backend/l4/test_misconception_seven_stage_manifest.py	270	backend	6	whymath_backend.db				0	
+tests/backend/l4/test_misconception_shadow.py	244	backend	4	whymath_backend.l4				0	
+tests/backend/l4/test_misconception_visualize.py	114	backend	7	whymath_backend.l3				0	
+tests/backend/l4/test_p3_61_choice_trace_only.py	513	backend	13	whymath_backend.l4				0	
+tests/backend/l4/test_pedagogy_pack_assembler.py	357	backend	10	whymath_backend.l4				0	
+tests/backend/l4/test_polya_engine.py	283	backend	5	whymath_backend.l4				0	
+tests/backend/l4/test_polya_models.py	82	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.l4			0	
+tests/backend/l4/test_polya_prompts.py	194	backend	4	whymath_backend.l4				0	
+tests/backend/l4/test_polya_transitions.py	156	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_prerequisite_coaching.py	162	backend	5	whymath_backend.l4				0	
+tests/backend/l4/test_probe_selection.py	233	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_runtime_selector.py	235	backend	5	whymath_backend.l4				0	
+tests/backend/l4/test_scene_contract.py	89	backend	2	whymath_backend.l4	동점: whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l4/test_scene_dsl_layer_governance.py	193	backend	1	whymath_backend.l4				0	
+tests/backend/l4/test_scene_generation.py	871	backend	12	whymath_backend.l4				0	
+tests/backend/l4/test_semantic_shadow_harvest.py	150	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_session_recall.py	111	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_socratic_categories.py	55	backend	1	whymath_backend.l4				0	
+tests/backend/l4/test_socratic_select.py	200	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_solution_coaching.py	625	backend	5	whymath_backend.l4				0	
+tests/backend/l4/test_step_shadow.py	246	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l4			0	
+tests/backend/l4/test_step_shadow_eval.py	261	backend	2	whymath_backend.l4				0	
+tests/backend/l4/test_step_shadow_harvest.py	160	backend	3	whymath_backend.l4				0	
+tests/backend/l4/test_subject_adapter_math_author_seat.py	158	backend	4	whymath_backend.l3				0	
+tests/backend/l4/test_tone_filter.py	60	backend	1	whymath_backend.l4				0	
+tests/backend/l4/test_turn_meta.py	370	backend	5	whymath_backend.l4				0	
+tests/backend/l4/test_visualization_policy.py	46	backend	2	whymath_backend.l4	동점: whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/l4/test_wrong_form_match.py	205	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.l4			0	
+tests/backend/l4/test_wrong_form_shadow_harvest.py	142	backend	2	whymath_backend.l4				0	
+tests/backend/l5/__init__.py	1	backend	0	(없음)				0	
+tests/backend/l5/ocr/__init__.py	1	backend	0	(없음)				0	
+tests/backend/l5/ocr/test_assemble.py	157	backend	4	whymath_backend.l5	동점: whymath_backend.l5, whymath_backend.schema			0	
+tests/backend/l5/ocr/test_heuristic_router.py	82	backend	4	whymath_backend.l5	동점: whymath_backend.l5, whymath_backend.schema			0	
+tests/backend/l5/ocr/test_mfd_detector.py	122	backend	2	whymath_backend.l5	동점: whymath_backend.l5, whymath_backend.schema			0	
+tests/backend/l5/ocr/test_mfd_router.py	52	backend	4	whymath_backend.l5	동점: whymath_backend.l5, whymath_backend.schema			0	
+tests/backend/l5/ocr/test_pipeline.py	181	backend	7	whymath_backend.l5				0	
+tests/backend/l5/ocr/test_qwen_vl_recognizer.py	132	backend	9	whymath_backend.l5				0	
+tests/backend/l5/ocr/test_recognize_phase_c.py	70	backend	4	whymath_backend.l5	동점: whymath_backend.l5, whymath_backend.schema			0	
+tests/backend/l5/ocr/test_router_merge.py	91	backend	3	whymath_backend.schema				0	
+tests/backend/l5/ocr/test_text_segmentation.py	65	backend	1	whymath_backend.l5				0	
+tests/backend/l5/ocr/test_verify.py	95	backend	1	whymath_backend.l5				0	
+tests/backend/l6/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l6/blueprint/__init__.py	1	backend	0	(없음)				0	
+tests/backend/l6/blueprint/test_assembly.py	475	backend	6	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/l6/gifted/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l6/gifted/test_gating.py	336	backend	3	whymath_backend.schema				0	
+tests/backend/l6/metacognition/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l6/metacognition/test_gating.py	304	backend	3	whymath_backend.schema				0	
+tests/backend/l6/retake/__init__.py	0	backend	0	(없음)				0	
+tests/backend/l6/retake/test_gating.py	381	backend	3	whymath_backend.schema				0	
+tests/backend/l6/school_progress/__init__.py	1	backend	0	(없음)				0	
+tests/backend/l6/school_progress/test_gating.py	626	backend	3	whymath_backend.schema				0	
+tests/backend/l6/suneung/__init__.py	1	backend	0	(없음)				0	
+tests/backend/l6/suneung/test_gating.py	420	backend	3	whymath_backend.schema				0	
+tests/backend/l6/suneung/test_recommendation.py	196	backend	3	whymath_backend.schema				0	
+tests/backend/l6/suneung/test_scope.py	138	backend	3	whymath_backend.schema				0	
+tests/backend/l6/test_quarantine_exposure_gate.py	157	backend	9	whymath_backend.l6				0	
+tests/backend/l6/test_shared.py	157	backend	5	whymath_backend.l6				0	
+tests/backend/l6/thinking/__init__.py	1	backend	0	(없음)				0	
+tests/backend/l6/thinking/test_gating.py	418	backend	3	whymath_backend.schema				0	
+tests/backend/lang/test_josa.py	244	backend	1	whymath_backend.lang				0	
+tests/backend/ops/test_account_bootstrap_cli.py	219	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db, whymath_backend.ops			0	
+tests/backend/ops/test_account_bootstrap_cli_integration.py	148	backend	3	whymath_backend.api	동점: whymath_backend.api, whymath_backend.config, whymath_backend.ops			0	
+tests/backend/ops/test_admin_guard_audit.py	190	backend	5	whymath_backend.api				0	
+tests/backend/ops/test_alert_delivery.py	246	backend	2	whymath_backend.ops				0	
+tests/backend/ops/test_atom_graph_prod_parity.py	615	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_atom_graph_prod_parity_mutation.py	500	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_corpus_provenance_sidecar.py	423	backend	2	whymath_backend.ops				0	
+tests/backend/ops/test_cost_probe.py	795	backend	7	whymath_backend.l3				0	
+tests/backend/ops/test_cost_report.py	715	backend	3	whymath_backend.l3				0	
+tests/backend/ops/test_critical_defect_collector.py	327	backend	3	whymath_backend.ops				0	
+tests/backend/ops/test_db_host_reachability.py	353	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.ops			0	
+tests/backend/ops/test_declared_unwired_audit.py	1206	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_dialogue_encryption_preflight.py	90	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_eos226_a4_human_hit.py	296	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/ops/test_g3_content_measures.py	762	backend	3	whymath_backend.ops				0	
+tests/backend/ops/test_generation_recall.py	501	backend	2	whymath_backend.ops	동점: whymath_backend.ops, whymath_backend.schema			0	
+tests/backend/ops/test_hint_human_verdicts.py	884	backend	3	whymath_backend.ops				0	
+tests/backend/ops/test_hit_cu_metrics.py	908	backend	5	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.schema			0	
+tests/backend/ops/test_hit_cu_metrics_lower_bound.py	651	backend	5	whymath_backend.ops				0	
+tests/backend/ops/test_integrity_violations_gate.py	102	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_integrity_violations_gate_integration.py	411	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.ops			0	
+tests/backend/ops/test_live_preflight.py	767	backend	8	whymath_backend.l3				0	
+tests/backend/ops/test_log_scrubber.py	327	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_log_scrubber_wiring.py	135	backend	2	whymath_backend.app	동점: whymath_backend.app, whymath_backend.ops			0	
+tests/backend/ops/test_loop_kpi_gate.py	1087	backend	5	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.ops			0	
+tests/backend/ops/test_loop_kpi_gate_integration.py	902	backend	4	whymath_backend.ops				0	
+tests/backend/ops/test_loop_kpi_sample_load.py	232	backend	3	whymath_backend.ops				0	
+tests/backend/ops/test_loop_kpi_sample_path_integration.py	280	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.ops			0	
+tests/backend/ops/test_ngram_overlap_report.py	284	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_observation_report_registry.py	194	backend	2	whymath_backend.ops				0	
+tests/backend/ops/test_observation_report_runner.py	247	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_operator_token_cli.py	398	backend	8	whymath_backend.api	동점: whymath_backend.api, whymath_backend.db			0	
+tests/backend/ops/test_operator_token_cli_integration.py	240	backend	9	whymath_backend.db				0	
+tests/backend/ops/test_pedagogy_content_slot_reach_report.py	228	backend	4	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.ops, whymath_backend.schema			0	
+tests/backend/ops/test_phase1_structure_report.py	145	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_phase3_metrics.py	1524	backend	6	whymath_backend.ops				0	
+tests/backend/ops/test_phase3_metrics_readonly.py	108	backend	1	whymath_backend.db				0	
+tests/backend/ops/test_phase3_remediation.py	635	backend	8	whymath_backend.l4				0	
+tests/backend/ops/test_provenance_audit.py	273	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_provenance_audit_runs.py	349	backend	7	whymath_backend.l3				0	
+tests/backend/ops/test_qa_confusion_matrix.py	1037	backend	4	whymath_backend.harness				0	
+tests/backend/ops/test_recommendation_reach_report.py	744	backend	2	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.ops			0	
+tests/backend/ops/test_repeat_recommendation_report.py	487	backend	2	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.ops			0	
+tests/backend/ops/test_role_grant_cli.py	390	backend	7	whymath_backend.db				0	
+tests/backend/ops/test_role_grant_cli_integration.py	282	backend	10	whymath_backend.db				0	
+tests/backend/ops/test_secret_hardcoding_scan.py	128	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_service_health.py	437	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.ops			0	
+tests/backend/ops/test_slo_contract.py	391	backend	6	whymath_backend.ops				0	
+tests/backend/ops/test_uptime_probe.py	452	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_validation_scorecard.py	797	backend	6	whymath_backend.ops				0	
+tests/backend/ops/test_weekly_metrics_file_input.py	646	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/ops/test_weekly_metrics_harness_block.py	140	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_weekly_metrics_report.py	295	backend	4	whymath_backend.ops				0	
+tests/backend/ops/test_weekly_metrics_report_integration.py	237	backend	6	whymath_backend.db				0	
+tests/backend/ops/test_weekly_metrics_rework.py	261	backend	1	whymath_backend.ops				0	
+tests/backend/ops/test_wh1_shadow_probe.py	328	backend	4	whymath_backend.api	동점: whymath_backend.api, whymath_backend.l3, whymath_backend.ops, whymath_backend.schema			0	
+tests/backend/privacy/__init__.py	1	backend	0	(없음)				0	
+tests/backend/privacy/test_ai_training_consent.py	162	backend	8	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l3			0	
+tests/backend/privacy/test_answer_submission_privacy_wiring.py	47	backend	4	whymath_backend.privacy				0	
+tests/backend/privacy/test_audit.py	197	backend	4	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.privacy, whymath_backend.schema			0	
+tests/backend/privacy/test_audit_retention_exclusion.py	109	backend	4	whymath_backend.db				0	
+tests/backend/privacy/test_dialogue_content_backfill.py	33	backend	1	whymath_backend.privacy				0	
+tests/backend/privacy/test_erasure.py	413	backend	11	whymath_backend.db	동점: whymath_backend.db, whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/privacy/test_erasure_learner_state_integration.py	199	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/privacy/test_erasure_plan_completeness.py	999	backend	3	whymath_backend.db				0	
+tests/backend/privacy/test_erasure_relink_integration.py	498	backend	11	whymath_backend.db				0	
+tests/backend/privacy/test_erasure_relink_wiring.py	171	backend	8	whymath_backend.db				0	
+tests/backend/privacy/test_event_time_active_time_privacy.py	90	backend	5	whymath_backend.privacy				0	
+tests/backend/privacy/test_export.py	555	backend	11	whymath_backend.db				0	
+tests/backend/privacy/test_export_prediction_sealing.py	186	backend	4	whymath_backend.db				0	
+tests/backend/privacy/test_external_store_evidence.py	69	backend	0	(없음)				0	
+tests/backend/privacy/test_hint_usage_privacy_wiring.py	46	backend	4	whymath_backend.privacy				0	
+tests/backend/privacy/test_learning_metrics_privacy_plan.py	91	backend	4	whymath_backend.privacy				0	
+tests/backend/privacy/test_privacy_authorize.py	179	backend	4	whymath_backend.db				0	
+tests/backend/privacy/test_retention.py	150	backend	2	whymath_backend.db	동점: whymath_backend.db, whymath_backend.privacy			0	
+tests/backend/privacy/test_retention_plan_completeness.py	440	backend	4	whymath_backend.privacy				0	
+tests/backend/privacy/test_retention_purge_cli.py	55	backend	1	whymath_backend.privacy				0	
+tests/backend/privacy/test_retention_session_cascade_integration.py	205	backend	6	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema			0	
+tests/backend/privacy/test_student_solution_step_privacy_wiring.py	46	backend	4	whymath_backend.privacy				0	
+tests/backend/privacy/test_student_work_backfill.py	45	backend	1	whymath_backend.privacy				0	
+tests/backend/privacy/test_student_work_export_decryption.py	182	backend	6	whymath_backend.db				0	
+tests/backend/scenarios/test_gate_d_event_role_census.py	400	backend	5	whymath_backend.l2	동점: whymath_backend.l2, whymath_backend.schema			0	
+tests/backend/scenarios/test_phase2_scenario_regression_suite.py	1269	backend	7	whymath_backend.schema				0	
+tests/backend/scenarios/test_scenario_suite_guard.py	139	backend	0	(없음)				0	
+tests/backend/schema/test_access_matrix.py	386	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_activity.py	358	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_analytics_event.py	156	backend	3	whymath_backend.schema				0	
+tests/backend/schema/test_answer_submission.py	119	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_assessment.py	286	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_assessment_evidence.py	243	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_cms_access.py	171	backend	4	whymath_backend.schema				0	
+tests/backend/schema/test_collection_inventory.py	992	backend	5	whymath_backend.db				0	
+tests/backend/schema/test_concept.py	524	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_corpus_provenance.py	79	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_curriculum_entry.py	448	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_declaration_canon_consistency.py	179	backend	0	(없음)				0	
+tests/backend/schema/test_dialogue.py	272	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_enums.py	525	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_evaluation_context.py	64	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_event_data_contract.py	410	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_failure_definition_freeze.py	224	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_generation_failure_code.py	81	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_generation_reproducibility.py	226	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_generation_run_id_axis.py	179	backend	5	whymath_backend.db				0	
+tests/backend/schema/test_hint_usage.py	68	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_learning_loop_contract.py	593	backend	4	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/schema/test_ocr_schema.py	187	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_pedagogy_dsl_schema_freeze.py	102	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_pedagogy_strategy_schema.py	198	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_problem.py	990	backend	4	whymath_backend.schema				0	
+tests/backend/schema/test_problem_metadata.py	253	backend	2	whymath_backend.l1	동점: whymath_backend.l1, whymath_backend.schema			0	
+tests/backend/schema/test_problem_version.py	125	backend	4	whymath_backend.schema				0	
+tests/backend/schema/test_provenance.py	388	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_reasoning_type.py	36	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_render_contract.py	162	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/schema/test_review_timer.py	500	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_review_transition.py	419	backend	4	whymath_backend.schema				0	
+tests/backend/schema/test_rights.py	113	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_role_enum.py	101	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_speech_spec.py	105	backend	2	whymath_backend.l3	동점: whymath_backend.l3, whymath_backend.schema			0	
+tests/backend/schema/test_standard.py	207	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_student_solution_step.py	91	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_subject_adapter.py	155	backend	2	whymath_backend.l4	동점: whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/schema/test_subject_adapter_physics_stub.py	184	backend	1	whymath_backend.schema				0	
+tests/backend/schema/test_subject_adapter_two_tier_contract.py	499	backend	3	whymath_backend.schema				0	
+tests/backend/schema/test_textbook_mapping.py	517	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_timeseries.py	348	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_user.py	519	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_verification_capabilities_wiring.py	295	backend	10	whymath_backend.l3				0	
+tests/backend/schema/test_version_lifecycle.py	174	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_visual_style_render_contract.py	113	backend	2	whymath_backend.l4	동점: whymath_backend.l4, whymath_backend.schema			0	
+tests/backend/schema/test_visualization.py	116	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_visualization_spec.py	270	backend	2	whymath_backend.schema				0	
+tests/backend/schema/test_visualization_state_separation.py	139	backend	3	whymath_backend.schema				0	
+tests/backend/schema/test_wrong_answer_signature_schema.py	103	backend	1	whymath_backend.schema				0	
+tests/backend/test_ai_collaboration_protocol_manifest.py	158	backend	0	(없음)				0	
+tests/backend/test_anthropic_policy_block_surfaces.py	131	backend	1	whymath_backend				0	
+tests/backend/test_app.py	1156	backend	17	whymath_backend.l3				0	
+tests/backend/test_backend_shard_plugin_e2e.py	267	backend	0	(없음)				0	
+tests/backend/test_build_roadmap_boundary_gate.py	92	backend	0	(없음)				0	
+tests/backend/test_config.py	311	backend	1	whymath_backend.config				0	
+tests/backend/test_consent.py	67	backend	1	whymath_backend.consent				0	
+tests/backend/test_cors_policy_freeze.py	154	backend	3	whymath_backend.app	동점: whymath_backend.app, whymath_backend.config, whymath_backend.l3			0	
+tests/backend/test_db_leak_guard.py	249	backend	1	whymath_backend.db				0	
+tests/backend/test_failure_prevention_manifest.py	157	backend	0	(없음)				0	
+tests/backend/test_layer_coverage_gate.py	101	backend	0	(없음)				0	
+tests/backend/test_parametrize_collection_determinism.py	889	backend	0	(없음)				0	
+tests/backend/test_security.py	142	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.security			0	
+tests/backend/whs/test_baseline.py	320	backend	1	whymath_backend.whs				0	
+tests/backend/whs/test_corpus_replay.py	179	backend	5	whymath_backend.whs				0	
+tests/backend/whs/test_corpus_replay_conceptual.py	206	backend	2	whymath_backend.whs				0	
+tests/backend/whs/test_corpus_replay_existing.py	226	backend	2	whymath_backend.config	동점: whymath_backend.config, whymath_backend.whs			0	
+tests/backend/whs/test_dead_end_store.py	204	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.whs			0	
+tests/backend/whs/test_harness.py	354	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.whs			0	
+tests/backend/whs/test_lemma_store.py	200	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.whs			0	
+tests/backend/whs/test_node_store.py	381	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.whs			0	
+tests/backend/whs/test_path_promotion.py	445	backend	4	whymath_backend.db				0	
+tests/backend/whs/test_path_promotion_corpus_family.py	221	backend	4	whymath_backend.db				0	
+tests/backend/whs/test_path_promotion_integration.py	148	backend	7	whymath_backend.db	동점: whymath_backend.db, whymath_backend.schema, whymath_backend.whs			0	
+tests/backend/whs/test_prm_builder.py	584	backend	4	whymath_backend.whs				0	
+tests/backend/whs/test_prm_builder_export_cli.py	361	backend	3	whymath_backend.whs				0	
+tests/backend/whs/test_self_evolution.py	587	backend	4	whymath_backend.db				0	
+tests/backend/whs/test_self_evolution_export_cli.py	256	backend	5	whymath_backend.db	동점: whymath_backend.db, whymath_backend.whs			0	
+tests/backend/whs/test_solution_bank.py	410	backend	3	whymath_backend.config	동점: whymath_backend.config, whymath_backend.db, whymath_backend.whs			0	
+tests/backend/whs/test_verdict.py	166	backend	3	whymath_backend.l3				0	
+tests/constitution/test_check_signed_changes.py	462	constitution	0	(없음)				0	
+tests/constitution/test_gate_independence.py	194	constitution	9	whymath_backend.harness	동점: whymath_backend.harness, whymath_backend.l3, whymath_backend.schema			0	
+tests/constitution/test_gate_schema.py	156	constitution	4	whymath_backend.schema				0	
+tests/constitution/test_schema_model_sync.py	191	constitution	0	(없음)				0	
+tests/data_pipeline/atom_graph/conftest.py	107	data_pipeline	0	(없음)				0	
+tests/data_pipeline/atom_graph/test_atom_corpus_governance.py	59	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_behavior_skills_merge.py	322	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_corpus.py	129	data_pipeline	0	(없음)				0	
+tests/data_pipeline/atom_graph/test_cross_band_edges.py	465	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_cross_band_edges_merge.py	360	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_graph_history.py	153	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_inter_course_edges.py	576	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_load.py	422	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_load_cli.py	128	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_load_neo4j_integration.py	142	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_main_cli.py	381	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_models.py	188	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_narrative_edge_promotion.py	123	data_pipeline	1	whymath_backend.harness				0	
+tests/data_pipeline/atom_graph/test_narrative_edge_promotion_v2.py	150	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_narrative_edge_reference.py	282	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_narrative_edge_reference_v2.py	197	data_pipeline	0	(없음)				0	
+tests/data_pipeline/atom_graph/test_narrative_edge_resolution.py	261	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_narrative_promotion_merge.py	181	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_transform.py	247	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_university_chain_repair.py	150	data_pipeline	0	(없음)				0	
+tests/data_pipeline/atom_graph/test_university_standard_fill.py	146	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/atom_graph/test_validate.py	183	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_atom_crosswalk/test_corpus.py	94	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_atom_crosswalk/test_derive.py	126	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_atom_crosswalk/test_main_cli.py	176	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_atom_crosswalk/test_models.py	149	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_atom_crosswalk/test_validate.py	123	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_content/test_corpus.py	92	data_pipeline	0	(없음)				0	
+tests/data_pipeline/concept_content/test_main_cli.py	244	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_content/test_models_validate.py	148	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_content/test_ncic_overlap.py	171	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_content_university/test_corpus.py	59	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_content_university/test_main_cli.py	114	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_content_university/test_models_validate.py	75	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/conftest.py	58	data_pipeline	0	(없음)				0	
+tests/data_pipeline/concept_graph/test_concept_corpus_governance.py	42	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_concept_id_prefix_set.py	115	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_concept_node_purity.py	135	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_id_registry_governance.py	229	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_idmap.py	446	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_load.py	383	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_load_neo4j_integration.py	143	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_locales_governance.py	115	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_main_cli.py	376	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_models.py	343	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_relation_vocabulary_governance.py	102	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_seed.py	175	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_transform.py	369	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/concept_graph/test_validate.py	372	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/conftest.py	68	data_pipeline	0	(없음)				0	
+tests/data_pipeline/formula_graph/test_corpus.py	65	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/formula_graph/test_models.py	66	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/formula_graph/test_transform.py	63	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/formula_graph/test_validate.py	47	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/graph_analytics/test_analytics.py	193	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/graph_analytics/test_cli_and_corpus.py	89	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/misconception/test_extract.py	217	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/misconception/test_misc61_source_key_probe.py	428	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/conftest.py	116	data_pipeline	0	(없음)				0	
+tests/data_pipeline/ncic/test_clean.py	83	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_collect.py	212	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_extract_xlsx.py	232	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_load.py	186	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_load_postgres_integration.py	105	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_main_cli.py	278	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_models.py	364	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_transform.py	290	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/ncic/test_validate.py	177	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/problem_type_graph/test_corpus.py	54	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/problem_type_graph/test_models.py	94	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/problem_type_graph/test_transform.py	53	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/problem_type_graph/test_validate.py	46	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/skill_graph/test_corpus.py	60	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/skill_graph/test_models.py	104	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/skill_graph/test_transform.py	57	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/skill_graph/test_validate.py	79	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/standards_university/conftest.py	82	data_pipeline	0	(없음)				0	
+tests/data_pipeline/standards_university/test_corpus.py	72	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/standards_university/test_main_cli.py	128	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/standards_university/test_models.py	113	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/standards_university/test_transform.py	57	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/standards_university/test_validate.py	97	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/strategy_graph/test_corpus.py	63	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/strategy_graph/test_models.py	73	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/strategy_graph/test_transform.py	44	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/strategy_graph/test_validate.py	84	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/test_citation.py	81	data_pipeline	0	(없음)		data_pipeline		0	
+tests/data_pipeline/test_concept_skill_crosswalk.py	62	data_pipeline	0	(없음)				0	
+tests/data_pipeline/test_subject_neutrality_gate.py	93	data_pipeline	0	(없음)		data_pipeline		0	
+tests/golden/characterization/__init__.py	1	golden	0	(없음)				0	
+tests/golden/characterization/test_s20a_db.py	106	golden	4	golden				0	
+tests/golden/characterization/test_s20a_llm_compat.py	202	golden	6	golden	동점: golden, whymath_backend.l3			0	
+tests/golden/characterization/test_s20a_llm_gate.py	182	golden	11	golden				0	
+tests/golden/characterization/test_s20a_llm_openrouter.py	175	golden	6	whymath_backend.l3				0	
+tests/golden/characterization/test_s20a_settings.py	100	golden	2	golden	동점: golden, whymath_backend.config			0	
+tests/golden/conftest.py	28	golden	0	(없음)				0	
+tests/golden/test_api_contract.py	170	golden	1	golden				0	
+tests/golden/test_check_command.py	444	golden	1	golden				0	
+tests/golden/test_golden_path.py	55	golden	1	golden				0	
+tests/golden/test_grade.py	100	golden	2	golden				0	
+tests/golden/test_import_budget.py	90	golden	0	(없음)				0	
+tests/golden/test_import_direction.py	77	golden	0	(없음)				0	
+tests/golden/test_legacy_manifest.py	156	golden	0	(없음)				0	
+tests/golden/test_llm_copy_sync.py	84	golden	1	golden				0	
+tests/golden/test_measure_unreferenced.py	54	golden	1	golden				0	
+tests/golden/test_problems_schema.py	94	golden	0	(없음)				0	
+tests/golden/test_s10_log_fixes.py	187	golden	5	golden				0	
+tests/golden/test_s14_last_turn_targets_error.py	99	golden	3	golden				0	
+tests/golden/test_sim_seed.py	368	golden	2	golden				0	
+tests/golden/test_sim_student.py	61	golden	1	golden				0	
+tests/harness/_hook_stdin.py	19	harness	0	(없음)				0	
+tests/harness/_ledger_guard.py	83	harness	0	(없음)				0	
+tests/harness/conftest.py	133	harness	0	(없음)				0	
+tests/harness/test_adr_number_check.py	275	harness	0	(없음)				0	
+tests/harness/test_amend_cli.py	1468	harness	0	(없음)				0	
+tests/harness/test_backlog_add_id_collision.py	509	harness	0	(없음)				0	
+tests/harness/test_block_hold_cross_session.py	255	harness	0	(없음)				0	
+tests/harness/test_board.py	454	harness	0	(없음)				0	
+tests/harness/test_check_prompt.py	217	harness	0	(없음)				0	
+tests/harness/test_cli.py	2886	harness	0	(없음)				0	
+tests/harness/test_cli_stdio_utf8.py	223	harness	0	(없음)				0	
+tests/harness/test_correction_paths.py	805	harness	0	(없음)				0	
+tests/harness/test_cross_session_block_release.py	270	harness	0	(없음)				0	
+tests/harness/test_dep_declaration.py	454	harness	0	(없음)				0	
+tests/harness/test_done_direct_commit.py	298	harness	0	(없음)				0	
+tests/harness/test_done_mirror_gate.py	1088	harness	0	(없음)				0	
+tests/harness/test_done_pr_evidence.py	137	harness	0	(없음)				0	
+tests/harness/test_doneless_isolation_signal.py	361	harness	0	(없음)				0	
+tests/harness/test_eos_priority_enforcement.py	248	harness	0	(없음)				0	
+tests/harness/test_event_leaks.py	229	harness	0	(없음)				0	
+tests/harness/test_event_ledger_sharding.py	210	harness	0	(없음)				0	
+tests/harness/test_event_ledger_timezone.py	187	harness	0	(없음)				0	
+tests/harness/test_foreign_claim_warning.py	280	harness	0	(없음)				0	
+tests/harness/test_gate_amend_path.py	335	harness	0	(없음)				0	
+tests/harness/test_gate_attach_claim_gap.py	678	harness	0	(없음)				0	
+tests/harness/test_gate_clear_attribution.py	211	harness	0	(없음)				0	
+tests/harness/test_gate_clear_command_attribution_wiring.py	505	harness	0	(없음)				0	
+tests/harness/test_gate_clear_reminder.py	449	harness	0	(없음)				0	
+tests/harness/test_gate_graph.py	715	harness	0	(없음)				0	
+tests/harness/test_gate_graph_mutation_anchors.py	32	harness	0	(없음)				0	
+tests/harness/test_gate_inputs_display.py	153	harness	0	(없음)				0	
+tests/harness/test_gate_processing_status.py	275	harness	0	(없음)				0	
+tests/harness/test_gate_verdict_handoff.py	582	harness	0	(없음)				0	
+tests/harness/test_gate_verdict_handoff_mutation_anchors.py	37	harness	0	(없음)				0	
+tests/harness/test_gate_wait_kind.py	588	harness	0	(없음)				0	
+tests/harness/test_gate_wait_kind_mutation_anchors.py	44	harness	0	(없음)				0	
+tests/harness/test_hook_stdin_cp949.py	92	harness	0	(없음)				0	
+tests/harness/test_id_number_parser.py	87	harness	0	(없음)				0	
+tests/harness/test_id_number_suggestion_race.py	263	harness	0	(없음)				0	
+tests/harness/test_incident_ledger_sharding.py	390	harness	0	(없음)				0	
+tests/harness/test_incident_shard_mutation_anchors.py	39	harness	0	(없음)				0	
+tests/harness/test_incidents.py	573	harness	0	(없음)				0	
+tests/harness/test_isolation_report.py	801	harness	0	(없음)				0	
+tests/harness/test_jit_rules.py	581	harness	0	(없음)				0	
+tests/harness/test_judgment_base_commit.py	152	harness	0	(없음)				0	
+tests/harness/test_manual_lint.py	196	harness	0	(없음)				0	
+tests/harness/test_models.py	157	harness	0	(없음)				0	
+tests/harness/test_next_free_number_format_guard.py	340	harness	0	(없음)				0	
+tests/harness/test_number_guard.py	720	harness	0	(없음)				0	
+tests/harness/test_number_guard_bare_id.py	225	harness	0	(없음)				0	
+tests/harness/test_pathscope.py	129	harness	0	(없음)				0	
+tests/harness/test_policy.py	87	harness	0	(없음)				0	
+tests/harness/test_port_freshness.py	677	harness	0	(없음)				0	
+tests/harness/test_port_freshness_mutation_anchors.py	47	harness	0	(없음)				0	
+tests/harness/test_push_mirror_block.py	599	harness	0	(없음)				0	
+tests/harness/test_push_mirror_notice.py	570	harness	0	(없음)				0	
+tests/harness/test_push_mirror_notice_wiring.py	360	harness	0	(없음)				0	
+tests/harness/test_real_ledger_isolation.py	254	harness	0	(없음)				0	
+tests/harness/test_real_ledger_isolation_mutation_anchors.py	38	harness	0	(없음)				0	
+tests/harness/test_remote_claims.py	2846	harness	0	(없음)				0	
+tests/harness/test_rename_cli.py	181	harness	0	(없음)				0	
+tests/harness/test_report.py	398	harness	0	(없음)				0	
+tests/harness/test_review_cancel_and_block_notes.py	362	harness	0	(없음)				0	
+tests/harness/test_rule_index.py	415	harness	0	(없음)				0	
+tests/harness/test_schedule_is_target_not_limit.py	78	harness	0	(없음)				0	
+tests/harness/test_selector.py	399	harness	0	(없음)				0	
+tests/harness/test_semantic_duplicate_notice.py	593	harness	0	(없음)				0	
+tests/harness/test_sibling_in_progress_scan.py	504	harness	0	(없음)				0	
+tests/harness/test_stale_ledger_vs_trunk.py	352	harness	0	(없음)				0	
+tests/harness/test_start_preflight_trunk_drift.py	189	harness	0	(없음)				0	
+tests/harness/test_stop_hook_integrity_gate.py	140	harness	0	(없음)				0	
+tests/harness/test_store.py	417	harness	0	(없음)				0	
+tests/harness/test_store_block_scalar.py	449	harness	0	(없음)				0	
+tests/harness/test_subprocess_encoding.py	219	harness	0	(없음)				0	
+tests/harness/test_track_amend.py	233	harness	0	(없음)				0	
+tests/harness/test_trigger_declaration.py	210	harness	0	(없음)				0	
+tests/harness/test_work_graph.py	1181	harness	0	(없음)				0	
+tests/infra/__init__.py	0	infra	0	(없음)				0	
+tests/infra/test_adopt_amendment_a0004.py	290	infra	0	(없음)				0	
+tests/infra/test_ai_quality_eval_wiring.py	105	infra	0	(없음)				0	
+tests/infra/test_anchor_e2e_nightly_wiring.py	255	infra	0	(없음)				0	
+tests/infra/test_app_version_pubspec_sync.py	129	infra	0	(없음)				0	
+tests/infra/test_architecture_doc_numbers.py	80	infra	0	(없음)				0	
+tests/infra/test_argparse_help_formatting.py	189	infra	0	(없음)				0	
+tests/infra/test_atom_graph_prod_parity_wiring.py	205	infra	0	(없음)				0	
+tests/infra/test_backend_pytest_config_wiring.py	229	infra	0	(없음)				0	
+tests/infra/test_backend_serial_nightly_wiring.py	365	infra	0	(없음)				0	
+tests/infra/test_backend_shard_verdict.py	271	infra	0	(없음)				0	
+tests/infra/test_backend_shard_wiring.py	386	infra	0	(없음)				0	
+tests/infra/test_backfill_rephrase_lineage_s4_18.py	288	infra	0	(없음)				0	
+tests/infra/test_backup_encryption.py	1529	infra	0	(없음)				0	
+tests/infra/test_backup_script.py	105	infra	0	(없음)				0	
+tests/infra/test_bench_environment_capture.py	326	infra	0	(없음)				0	
+tests/infra/test_benchmark.py	465	infra	0	(없음)				0	
+tests/infra/test_branch_cleanup.py	379	infra	0	(없음)				0	
+tests/infra/test_canonical_repo_reference.py	260	infra	0	(없음)				0	
+tests/infra/test_cas_parse_entrypoint_governance.py	407	infra	0	(없음)				0	
+tests/infra/test_chat_block_guard.py	421	infra	0	(없음)				0	
+tests/infra/test_chat_block_guard_unchecked_write.py	302	infra	0	(없음)				0	
+tests/infra/test_ci_concept_reach_guard_wiring.py	160	infra	0	(없음)				0	
+tests/infra/test_ci_concurrency_group.py	231	infra	0	(없음)				0	
+tests/infra/test_ci_constraints.py	562	infra	0	(없음)				0	
+tests/infra/test_ci_contract_fixture_trigger_wiring.py	1023	infra	0	(없음)				0	
+tests/infra/test_ci_enforcement_declaration_contract.py	745	infra	0	(없음)				0	
+tests/infra/test_ci_gate_reachability.py	317	infra	0	(없음)				0	
+tests/infra/test_ci_harness_integrity_timeout.py	133	infra	0	(없음)				0	
+tests/infra/test_ci_image_sources.py	485	infra	0	(없음)				0	
+tests/infra/test_ci_job_coverage.py	393	infra	0	(없음)				0	
+tests/infra/test_ci_job_coverage_input.py	833	infra	0	(없음)				0	
+tests/infra/test_ci_job_timeout_floor.py	223	infra	0	(없음)				0	
+tests/infra/test_ci_job_timeout_headroom.py	946	infra	0	(없음)				0	
+tests/infra/test_ci_mirror.py	1495	infra	0	(없음)				0	
+tests/infra/test_ci_mirror_tree_taint.py	895	infra	0	(없음)				0	
+tests/infra/test_ci_runner_module_form.py	361	infra	0	(없음)				0	
+tests/infra/test_claim_reap_enforcement_wiring.py	125	infra	0	(없음)				0	
+tests/infra/test_cleanup_atom_orphans.py	224	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_adopt.py	300	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_amendment_check.py	305	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_audit_logic.py	843	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_audit_wiring.py	271	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_diag_tools.py	118	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_guard.py	329	infra	0	(없음)				0	
+tests/infra/test_coding_constitution_install.py	317	infra	0	(없음)				0	
+tests/infra/test_conflict_marker_guard.py	237	infra	0	(없음)				0	
+tests/infra/test_core_math_vocabulary_ratchet.py	197	infra	0	(없음)				0	
+tests/infra/test_corpus_backfill_drift_guard_wiring.py	130	infra	0	(없음)				0	
+tests/infra/test_corpus_facts.py	332	infra	0	(없음)				0	
+tests/infra/test_corpus_reverify_nightly_wiring.py	225	infra	0	(없음)				0	
+tests/infra/test_cp949_guard.py	332	infra	0	(없음)				0	
+tests/infra/test_data_access_layer_contract.py	268	infra	0	(없음)				0	
+tests/infra/test_declared_unwired_audit_wiring.py	100	infra	0	(없음)				0	
+tests/infra/test_dep_declaration_wiring.py	89	infra	0	(없음)				0	
+tests/infra/test_dependency_upper_bounds.py	816	infra	0	(없음)				0	
+tests/infra/test_deploy_artifacts.py	762	infra	0	(없음)				0	
+tests/infra/test_docs_numbers.py	87	infra	0	(없음)				0	
+tests/infra/test_eos210_runbook_commit_block.py	83	infra	0	(없음)				0	
+tests/infra/test_eos_boundary_contract_wiring.py	886	infra	0	(없음)				0	
+tests/infra/test_eos_core_boundary_probe.py	392	infra	0	(없음)				0	
+tests/infra/test_eos_dependency_direction.py	522	infra	0	(없음)				0	
+tests/infra/test_eos_feature_inventory_v2.py	774	infra	0	(없음)				0	
+tests/infra/test_eos_opaque_payload_gate.py	519	infra	0	(없음)				0	
+tests/infra/test_evidence_layer_boundary_doc.py	211	infra	0	(없음)				0	
+tests/infra/test_fence_guard.py	260	infra	0	(없음)				0	
+tests/infra/test_flow_health.py	267	infra	0	(없음)				0	
+tests/infra/test_flow_health_wiring.py	155	infra	0	(없음)				0	
+tests/infra/test_format_oracle_doc.py	167	infra	0	(없음)				0	
+tests/infra/test_gate_harness_marker_reach_wiring.py	1220	infra	0	(없음)				0	
+tests/infra/test_git_revert_guard.py	463	infra	0	(없음)				0	
+tests/infra/test_github_api_auth.py	148	infra	0	(없음)				0	
+tests/infra/test_golden_session_register.py	217	infra	0	(없음)				0	
+tests/infra/test_hook_stdin_utf8.py	227	infra	0	(없음)				0	
+tests/infra/test_hook_tool_output_utf8.py	258	infra	0	(없음)				0	
+tests/infra/test_incident_metrics_wiring.py	270	infra	0	(없음)				0	
+tests/infra/test_infra_lint_wiring.py	124	infra	0	(없음)				0	
+tests/infra/test_integrity_violations_gate_wiring.py	87	infra	0	(없음)				0	
+tests/infra/test_ip_separation_evidence.py	1127	infra	0	(없음)				0	
+tests/infra/test_isolation_scan_wiring.py	255	infra	0	(없음)				0	
+tests/infra/test_item_calibration_wiring.py	201	infra	0	(없음)				0	
+tests/infra/test_l6_mode_reach_client_wiring.py	252	infra	0	(없음)				0	
+tests/infra/test_license_snapshot_archiver.py	364	infra	0	(없음)				0	
+tests/infra/test_license_snapshot_coverage.py	143	infra	0	(없음)				0	
+tests/infra/test_license_tier_mapping.py	154	infra	0	(없음)				0	
+tests/infra/test_licensing_ledger_banks.py	221	infra	0	(없음)				0	
+tests/infra/test_lint_coverage.py	385	infra	0	(없음)				0	
+tests/infra/test_llm_state_authority_boundary.py	275	infra	0	(없음)				0	
+tests/infra/test_main_watch.py	923	infra	0	(없음)				0	
+tests/infra/test_mastery_single_write_path.py	331	infra	0	(없음)				0	
+tests/infra/test_measure_constitution_tokens.py	60	infra	0	(없음)				0	
+tests/infra/test_merge_queue_wiring.py	221	infra	0	(없음)				0	
+tests/infra/test_mirror_ci_images.py	296	infra	0	(없음)				0	
+tests/infra/test_mp02_runbook_sidecar_paths.py	539	infra	0	(없음)				0	
+tests/infra/test_neo4j_runtime_ban.py	78	infra	0	(없음)				0	
+tests/infra/test_number_collision_backstop_wiring.py	181	infra	0	(없음)				0	
+tests/infra/test_observation_report_runner_wiring.py	295	infra	0	(없음)		tests		0	
+tests/infra/test_p11_chain_nightly_wiring.py	240	infra	0	(없음)				0	
+tests/infra/test_p3_102_atom_load_guard.py	122	infra	0	(없음)				0	
+tests/infra/test_p3_32_hint_link_runbook.py	362	infra	0	(없음)				0	
+tests/infra/test_p3_42_probe_sidecar.py	51	infra	0	(없음)				0	
+tests/infra/test_p3_81_hint_repopulate_runbook.py	951	infra	0	(없음)				0	
+tests/infra/test_p3_97_bank_load_runbook.py	214	infra	0	(없음)				0	
+tests/infra/test_path_scoped_counting_guard.py	96	infra	0	(없음)				0	
+tests/infra/test_pedagogy_content_slot_pipeline_ci_wiring.py	144	infra	0	(없음)		tests		0	
+tests/infra/test_phase3_metrics_wiring.py	133	infra	0	(없음)				0	
+tests/infra/test_policy_guard_source_patterns.py	199	infra	0	(없음)				0	
+tests/infra/test_pr_auto_resync.py	696	infra	0	(없음)				0	
+tests/infra/test_pr_delivery_audit.py	260	infra	0	(없음)				0	
+tests/infra/test_pr_disposal_precheck.py	305	infra	0	(없음)				0	
+tests/infra/test_pr_merge_readiness.py	119	infra	0	(없음)				0	
+tests/infra/test_pr_template.py	195	infra	0	(없음)				0	
+tests/infra/test_prod_compose_student_data_keys.py	275	infra	0	(없음)				0	
+tests/infra/test_prod_schema_probe.py	393	infra	0	(없음)				0	
+tests/infra/test_prompt_asset_audit_wiring.py	85	infra	0	(없음)				0	
+tests/infra/test_provenance_audit_wiring.py	64	infra	0	(없음)				0	
+tests/infra/test_provider_jurisdiction_declaration.py	330	infra	0	(없음)				0	
+tests/infra/test_provider_seat_contract.py	268	infra	0	(없음)				0	
+tests/infra/test_proxy_ca_optional.py	166	infra	0	(없음)				0	
+tests/infra/test_ps_guard_runbook_rules.py	521	infra	0	(없음)				0	
+tests/infra/test_qa_pipeline_wiring.py	180	infra	0	(없음)				0	
+tests/infra/test_quality_eval.py	1783	infra	0	(없음)				0	
+tests/infra/test_quality_worker_compose.py	341	infra	0	(없음)				0	
+tests/infra/test_readme_bootstrap.py	171	infra	0	(없음)				0	
+tests/infra/test_release_freeze.py	169	infra	0	(없음)				0	
+tests/infra/test_required_checks_doc.py	187	infra	0	(없음)				0	
+tests/infra/test_review_health.py	184	infra	0	(없음)				0	
+tests/infra/test_routing_data_grade_scan_wiring.py	169	infra	0	(없음)				0	
+tests/infra/test_routing_decision_bypass_scan_wiring.py	370	infra	0	(없음)				0	
+tests/infra/test_rule_index_lint_wiring.py	167	infra	0	(없음)				0	
+tests/infra/test_ruleset_drift.py	1186	infra	0	(없음)				0	
+tests/infra/test_ruleset_pin_plan.py	455	infra	0	(없음)				0	
+tests/infra/test_run_demo_stale_db_diagnosis.py	721	infra	0	(없음)				0	
+tests/infra/test_runbook_write_guard.py	544	infra	0	(없음)				0	
+tests/infra/test_seed_report_wiring.py	118	infra	0	(없음)				0	
+tests/infra/test_session_start_brief_wiring.py	119	infra	0	(없음)				0	
+tests/infra/test_skb03_kg14_runbook_db_reach.py	70	infra	0	(없음)				0	
+tests/infra/test_solution_qa_wiring.py	100	infra	0	(없음)				0	
+tests/infra/test_source_document_binary_guard.py	292	infra	0	(없음)				0	
+tests/infra/test_source_document_binary_guard_wiring.py	74	infra	0	(없음)				0	
+tests/infra/test_sqlalchemy_upper_bound.py	289	infra	0	(없음)				0	
+tests/infra/test_stale_branch_scan_ci_wiring.py	89	infra	0	(없음)				0	
+tests/infra/test_test_suite_wiring.py	783	infra	0	(없음)				0	
+tests/infra/test_traversal_load_probe_wiring.py	195	infra	0	(없음)				0	
+tests/infra/test_tutor_output_schema_gate.py	356	infra	0	(없음)				0	
+tests/infra/test_unvalidated_utterance_exposure.py	487	infra	0	(없음)				0	
+tests/infra/test_webapp_admin_cms_governance.py	257	infra	0	(없음)				0	
+tests/infra/test_webapp_admin_review_governance.py	439	infra	0	(없음)				0	
+tests/infra/test_webapp_admin_shell_governance.py	592	infra	0	(없음)				0	
+tests/infra/test_webapp_landing_governance.py	363	infra	0	(없음)				0	
+tests/infra/test_weekly_metrics_change_judgement.py	238	infra	0	(없음)				0	
+tests/infra/test_weekly_metrics_cron_wiring.py	249	infra	0	(없음)				0	
+tests/test_idempotency.py	213	(tests 바로 아래)	0	(없음)				0	
