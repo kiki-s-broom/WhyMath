@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - 라우터 56개 엔드포인트 수 합계 기재 · db·schema 골든 사용/미사용 구분 · 카드 150줄 이하
-artifacts: []
+artifacts:
+  - "PR #1955 (golden/reports_rescue/C6/카드.md·보고.md)"
 paths:
   - "golden/reports_rescue/C6/**"
-session: golden-rs/C6
-notes: ""
-updated: 2026-11-17
+session: null
+notes: "[미러 면제 2026-11-18] 로컬 미러에서만 harness-integrity·declared-unwired-audit의 Install 스텝이 exit 1(같은 pip 명령을 직접 실행하면 EXIT=0 — 미러 실행 환경 차이). GitHub CI run 44238188251에서 두 잡 포함 실행된 10잡 전부 success·failure 0"
+updated: 2026-11-18
