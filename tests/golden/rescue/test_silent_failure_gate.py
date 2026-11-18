@@ -35,6 +35,17 @@ _BACKEND = _REPO_ROOT / "src" / "backend"
 _GOLDEN = _BACKEND / "golden"
 # 허용 목록(경로:줄 · 규칙 · 이유)
 _ALLOW = Path(__file__).with_name("silent_failure_allow.txt")
+# 옛 구역 기준선 — 게이트는 걸지 않고 건수만 기록한다(G2 산출물)
+_BASELINE = _REPO_ROOT / "golden" / "reports_rescue" / "G2" / "옛구역_기준선.tsv"
+# G2 지시문(생성본)과 그 원본 spec — 둘이 같은 규칙 집합을 말해야 한다
+_G2_PROMPT = (
+    _REPO_ROOT
+    / "golden"
+    / "prompts_rescue"
+    / "단계02_병렬_3개_백엔드대장-잠금"
+    / "RS-단계02-G2-잠금-조용한실패게이트.md"
+)
+_SPEC = _REPO_ROOT / "golden" / "prompts_src" / "spec_rescue.md"
 
 # 검사하는 규칙 네 개
 _RULES = ("BLE001", "S110", "S112", "E722")
@@ -154,13 +165,50 @@ def test_rules_are_live_on_synthetic_file(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     codes = {rule for _, _, rule in _run_ruff(sample, tmp_path)}
-    assert codes == set(_RULES), f"ruff가 규칙을 다 잡지 못했다(--ignore-noqa 포함): {codes}"
+    # `_RULES`를 그대로 비교하면 자기참조가 되어, 규칙 하나를 `_RULES`에서 빼도 초록이 된다.
+    # 그래서 기대값을 리터럴로 적는다 — 이 줄이 게이트가 실제로 네 규칙을 보는지의 증거다.
+    assert codes == {
+        "BLE001",
+        "S110",
+        "S112",
+        "E722",
+    }, f"ruff가 규칙을 다 잡지 못했다(--ignore-noqa 포함): {codes}"
 
 
 def test_missing_ruff_is_an_error_not_a_pass(tmp_path: Path) -> None:
     """도구가 없을 때 0건(통과)이 아니라 실패가 나야 한다."""
     with pytest.raises(pytest.fail.Exception, match="ruff 실행 오류"):
         _run_ruff(tmp_path, tmp_path, module="ruff_module_that_does_not_exist")
+
+
+def test_allow_list_header_names_all_rules() -> None:
+    """허용 목록 머리말이 네 규칙을 모두 이름으로 적어야 한다(사람이 읽는 정본)."""
+    text = _ALLOW.read_text(encoding="utf-8")
+    # 기대값을 `_RULES`에서 가져오면 규칙 하나를 빼도 초록이 된다 — 리터럴로 적는다.
+    missing = [r for r in ("BLE001", "S110", "S112", "E722") if r not in text]
+    assert not missing, f"허용 목록에 이름이 없는 규칙: {missing}"
+
+
+def test_baseline_tsv_has_s112_columns_and_sums_match() -> None:
+    """옛 구역 기준선 TSV에 S112 열이 있고, 패키지별 합이 합계 행과 같아야 한다."""
+    lines = [ln for ln in _BASELINE.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    header = lines[0].split("\t")
+    for col in ("ruff_S112", "ruff_S112_noqa무시"):
+        assert col in header, f"기준선 TSV에 {col} 열이 없다: {header}"
+    rows = [ln.split("\t") for ln in lines[1:] if not ln.startswith("합계\t")]
+    assert all(len(r) == len(header) for r in rows), "기준선 TSV 열 수가 행마다 다르다"
+    total = next(ln for ln in lines if ln.startswith("합계\t")).split("\t")
+    for col in ("ruff_BLE001", "ruff_S110", "ruff_S112", "ruff_E722"):
+        i = header.index(col)
+        assert sum(int(r[i]) for r in rows) == int(total[i]), f"{col} 패키지 합 != 합계 행"
+
+
+def test_g2_prompt_and_spec_agree_on_rules() -> None:
+    """G2 지시문(생성본)과 원본 spec이 같은 규칙 집합·S112 열을 말해야 한다."""
+    for path in (_G2_PROMPT, _SPEC):
+        text = path.read_text(encoding="utf-8")
+        assert "BLE001,S110,S112,E722" in text, f"{path.name}에 네 규칙 선택 명령이 없다"
+        assert "ruff_S112" in text, f"{path.name}에 S112 열 안내가 없다"
 
 
 def test_golden_silent_failures_match_allow_list() -> None:

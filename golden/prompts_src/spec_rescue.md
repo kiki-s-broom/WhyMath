@@ -522,7 +522,7 @@
     3. `tests/golden/rescue/test_silent_failure_gate.py`를 쓴다: `ruff`를 하위 프로세스로 돌려(타임아웃 60초 · 출력 인코딩 `utf-8` 명시) 골든 구역의 네 규칙 건수가 허용 목록 `tests/golden/rescue/silent_failure_allow.txt`(경로:줄 · 이유)와 정확히 같아야 통과한다. 허용 목록에 없는 새 건이 생기면 실패하고, 허용 목록에만 있고 실제로는 없는 줄이 남아도 실패한다.
     4. `pyproject.toml`의 린트 설정은 고치지 않는다(골든 밖 파일이다). 설정에 규칙을 넣는 것이 낫다고 판단하면 보고에 "제안"으로 적는다.
     5. 주입: 골든 파일 하나에 `try: ... except Exception: pass`를 넣어 테스트가 실패하는지 본다(`cp` 백업 → 확인 → `cp` 복원).
-    6. 옛 구역은 D2의 패키지별 건수를 `golden/reports_rescue/G2/옛구역_기준선.tsv`로 옮겨 적기만 한다(게이트는 걸지 않는다). `S112` 열(`ruff_S112`·`ruff_S112_noqa무시`)도 함께 옮긴다.
+    6. 옛 구역은 D2의 패키지별 건수를 `golden/reports_rescue/G2/옛구역_기준선.tsv`로 옮겨 적기만 한다(게이트는 걸지 않는다). `S112` 열(`ruff_S112`·`ruff_S112_noqa무시`)은 **D2 표에 없다**(D2는 `BLE001,S110,E722` 세 규칙만 쟀다) — 이 두 열만 G2에서 직접 잰다: `cd src/backend && python -m ruff check whymath_backend --select S112 --isolated --no-cache --output-format json`(건수) 과 같은 명령에 `--ignore-noqa`를 더한 것. 패키지별 값은 대상 경로를 `whymath_backend/<패키지>`로 바꿔 잰다.
 - **산출물:** `test_silent_failure_gate.py`, `silent_failure_allow.txt`, `옛구역_기준선.tsv`, `카드.md`, `보고.md`.
 - **완료 기준:** 규칙 11의 다섯 명령이 종료 코드 0이다. 주입 2종(새 삼키기 추가 · 허용 목록에 없는 줄 남기기)에서 각각 실패한다. `ruff`가 없는 환경에서 테스트가 "통과"가 아니라 실패 또는 명시적 오류를 낸다.
 - **하지 말 것:** 골든 코드의 `except`를 이 세션에서 고치지 않는다(튜터 대체 문장 같은 설계된 강등이 있다 — 결정은 Kiki). 옛 코드를 고치지 않는다.
