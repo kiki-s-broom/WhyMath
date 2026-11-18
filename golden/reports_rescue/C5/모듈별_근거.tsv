@@ -1,0 +1,101 @@
+﻿모듈	하위 패키지	묶음	줄 수	옛앱 등급	직접 import 테스트 수(D5 정적)	import하는 모듈 수(D1)	조용한 삼키기(D2 규칙)	처분 제안(C5)
+whymath_backend.l4	(단독)	S3 계약·모델	111	가동	1	1	0	격리(연결 대상이 import하면 동반)
+whymath_backend.l4.calibration_coaching	(단독)	S1 코칭 결정	75	대기	1	1	0	격리
+whymath_backend.l4.completion	(단독)	S1 코칭 결정	265	가동	4	1	0	연결
+whymath_backend.l4.content_supply	(단독)	S2 장면·시각화·공급	681	대기	4	2	1	격리
+whymath_backend.l4.hint_content	hint_content		14	대기	0	0	0	격리
+whymath_backend.l4.hint_content.cu_hint_pass	hint_content		1559	섬	1	1	2(광범위1)	격리
+whymath_backend.l4.hint_content.cu_hint_prompts	hint_content		166	섬	1	1	0	격리
+whymath_backend.l4.hint_content.gates	hint_content		321	섬	4	4	0	연결 후보(T1 뒤)
+whymath_backend.l4.hint_content.generator	hint_content		279	대기	6	4	0	연결 후보(T1 뒤)
+whymath_backend.l4.hint_content.models	hint_content		208	대기	10	12	0	연결 후보(T1 뒤)
+whymath_backend.l4.hint_content.populate	hint_content		268	섬	3	1	0	격리
+whymath_backend.l4.hint_content.store	hint_content		533	가동	5	3	0	연결 후보(T1 뒤)
+whymath_backend.l4.hint_deferral	(단독)	S1 코칭 결정	257	가동	6	11	0	연결
+whymath_backend.l4.learning_scene	(단독)	S2 장면·시각화·공급	374	대기	8	2	0	격리
+whymath_backend.l4.lthc	lthc		12	가동	2	4	0	연결
+whymath_backend.l4.lthc.adapt	lthc		143	가동	2	4	0	연결
+whymath_backend.l4.lthc.models	lthc		54	가동	3	8	0	연결
+whymath_backend.l4.metacognitive_trigger	(단독)	S1 코칭 결정	350	가동	6	6	0	격리
+whymath_backend.l4.misconception	misconception	M1 진단·가설 코어	98	가동	8	3	0	연결
+whymath_backend.l4.misconception.anchor_seat_gap	misconception	M4 crosswalk 검수 도구	268	섬	1	0	0	격리
+whymath_backend.l4.misconception.answer_signature	misconception	M1 진단·가설 코어	373	대기	4	2	0	연결
+whymath_backend.l4.misconception.attempt_hypothesis_policy	misconception	M1 진단·가설 코어	114	대기	2	4	0	연결
+whymath_backend.l4.misconception.audit	misconception	M4 crosswalk 검수 도구	240	섬	2	0	0	격리
+whymath_backend.l4.misconception.catalog	misconception	M1 진단·가설 코어	1158	대기	58	42	0	연결
+whymath_backend.l4.misconception.combined	misconception	M1 진단·가설 코어	130	대기	0	1	0	연결
+whymath_backend.l4.misconception.crosslink_candidates	misconception	M4 crosswalk 검수 도구	170	섬	1	0	0	격리
+whymath_backend.l4.misconception.crosslink_coverage	misconception	M4 crosswalk 검수 도구	316	섬	1	0	0	격리
+whymath_backend.l4.misconception.crosslink_demotion_seeder	misconception	M4 crosswalk 검수 도구	95	섬	2	1	0	격리
+whymath_backend.l4.misconception.crosslink_machine_reject	misconception	M4 crosswalk 검수 도구	160	섬	2	1	0	격리
+whymath_backend.l4.misconception.crosslink_review	misconception	M4 crosswalk 검수 도구	279	섬	8	4	0	격리
+whymath_backend.l4.misconception.crosslink_review_aid	misconception	M4 crosswalk 검수 도구	482	섬	1	0	0	격리
+whymath_backend.l4.misconception.crosslink_shadow	misconception	M4 crosswalk 검수 도구	181	대기	3	5	0	격리
+whymath_backend.l4.misconception.crosslink_shadow_harvest	misconception	M5 측정·수집(shadow harvest·eval)	236	섬	1	0	0	격리
+whymath_backend.l4.misconception.crosslink_standard_signal	misconception	M4 crosswalk 검수 도구	107	섬	3	3	0	격리
+whymath_backend.l4.misconception.crosslink_triage	misconception	M4 crosswalk 검수 도구	360	섬	1	0	0	격리
+whymath_backend.l4.misconception.derivative_signature	misconception	M1 진단·가설 코어	765	대기	2	1	0	연결
+whymath_backend.l4.misconception.diagnose	misconception	M1 진단·가설 코어	496	가동	9	14	0	연결
+whymath_backend.l4.misconception.distractor	misconception	M1 진단·가설 코어	170	가동	3	3	0	연결
+whymath_backend.l4.misconception.distractor_link	misconception	M1 진단·가설 코어	172	대기	3	7	0	연결
+whymath_backend.l4.misconception.evidence_store	misconception	M1 진단·가설 코어	281	가동	6	5	0	연결
+whymath_backend.l4.misconception.hypothesis	misconception	M1 진단·가설 코어	315	가동	30	19	0	연결
+whymath_backend.l4.misconception.hypothesis_store	misconception	M1 진단·가설 코어	355	가동	6	4	0	연결
+whymath_backend.l4.misconception.intervene	misconception	M1 진단·가설 코어	135	가동	2	7	0	연결
+whymath_backend.l4.misconception.judge	misconception	M3 LLM judge	270	대기	7	3	0	격리
+whymath_backend.l4.misconception.judge_prompts	misconception	M3 LLM judge	92	대기	2	1	0	격리
+whymath_backend.l4.misconception.judge_seam	misconception	M3 LLM judge	118	대기	4	2	0	격리
+whymath_backend.l4.misconception.judge_shadow_harvest	misconception	M5 측정·수집(shadow harvest·eval)	186	섬	1	0	0	격리
+whymath_backend.l4.misconception.match_gate	misconception	M1 진단·가설 코어	172	가동	6	9	0	연결
+whymath_backend.l4.misconception.models	misconception	M1 진단·가설 코어	271	가동	27	31	0	연결
+whymath_backend.l4.misconception.probe_selection	misconception	M1 진단·가설 코어	251	가동	3	5	0	연결
+whymath_backend.l4.misconception.probes	misconception	M2 의미 매칭	162	대기	4	2	0	격리
+whymath_backend.l4.misconception.remediation_strategy	misconception	M1 진단·가설 코어	298	섬	2	1	0	연결
+whymath_backend.l4.misconception.semantic	misconception	M2 의미 매칭	65	가동	4	1	0	격리
+whymath_backend.l4.misconception.semantic.index	misconception	M2 의미 매칭	138	대기	2	4	0	격리
+whymath_backend.l4.misconception.semantic.matcher	misconception	M2 의미 매칭	256	대기	8	7	0	격리
+whymath_backend.l4.misconception.semantic.pgvector_index	misconception	M2 의미 매칭	275	대기	6	3	0	격리
+whymath_backend.l4.misconception.semantic.populate	misconception	M2 의미 매칭	43	잔해	0	0	0	격리
+whymath_backend.l4.misconception.semantic.provider	misconception	M2 의미 매칭	28	가동	24	11	0	격리
+whymath_backend.l4.misconception.semantic_eval	misconception	M5 측정·수집(shadow harvest·eval)	1111	섬	3	0	1	격리
+whymath_backend.l4.misconception.semantic_shadow_harvest	misconception	M5 측정·수집(shadow harvest·eval)	184	섬	1	0	0	격리
+whymath_backend.l4.misconception.shadow	misconception	M2 의미 매칭	249	대기	4	4	0	격리
+whymath_backend.l4.misconception.validate	misconception	M1 진단·가설 코어	99	대기	6	1	0	연결
+whymath_backend.l4.misconception.visualize	misconception	M1 진단·가설 코어	86	대기	1	1	0	연결
+whymath_backend.l4.misconception.warmstart	misconception	M1 진단·가설 코어	267	가동	2	1	0	연결
+whymath_backend.l4.misconception.wrong_form_match	misconception	M1 진단·가설 코어	179	가동	2	3	1(광범위1)	연결
+whymath_backend.l4.misconception.wrong_form_shadow_harvest	misconception	M5 측정·수집(shadow harvest·eval)	181	섬	1	0	0	격리
+whymath_backend.l4.misconception_review_coaching	(단독)	S1 코칭 결정	109	대기	1	1	0	격리
+whymath_backend.l4.models	(단독)	S3 계약·모델	228	가동	18	15	0	격리(연결 대상이 import하면 동반)
+whymath_backend.l4.pedagogy	pedagogy		21	대기	0	0	0	격리
+whymath_backend.l4.pedagogy.adaptive	pedagogy		41	잔해	0	0	0	격리
+whymath_backend.l4.pedagogy.adaptive.effectiveness	pedagogy		215	섬	2	1	0	격리
+whymath_backend.l4.pedagogy.adaptive.policy	pedagogy		156	섬	1	2	1	격리
+whymath_backend.l4.pedagogy.age_band_explanation	pedagogy		127	섬	1	0	0	격리
+whymath_backend.l4.pedagogy.k_type_resolver	pedagogy		91	가동	2	1	0	격리
+whymath_backend.l4.pedagogy.mode_guard	pedagogy		205	대기	2	2	0	격리
+whymath_backend.l4.pedagogy.pack_registry	pedagogy		85	대기	12	3	0	격리
+whymath_backend.l4.pedagogy.prompt_assembler	pedagogy		201	대기	3	2	0	격리
+whymath_backend.l4.pedagogy.runtime_selector	pedagogy		530	대기	10	5	0	격리
+whymath_backend.l4.pedagogy.strategy_registry	pedagogy		104	대기	2	2	0	격리
+whymath_backend.l4.polya	polya		25	가동	0	0	0	연결
+whymath_backend.l4.polya.engine	polya		155	가동	5	2	0	연결
+whymath_backend.l4.polya.prompts	polya		158	가동	6	2	0	연결
+whymath_backend.l4.polya.transitions	polya		124	가동	1	2	0	연결
+whymath_backend.l4.prerequisite_coaching	(단독)	S1 코칭 결정	84	가동	1	2	0	격리
+whymath_backend.l4.scene_generation	(단독)	S2 장면·시각화·공급	435	대기	2	1	0	격리
+whymath_backend.l4.session_recall	(단독)	S1 코칭 결정	88	가동	3	4	0	격리
+whymath_backend.l4.socratic	socratic		21	가동	2	3	0	연결
+whymath_backend.l4.socratic.categories	socratic		58	가동	14	12	0	연결
+whymath_backend.l4.socratic.select	socratic		156	가동	0	2	0	연결
+whymath_backend.l4.solution_coaching	(단독)	S1 코칭 결정	353	가동	3	1	0	격리
+whymath_backend.l4.speech	speech		31	대기	3	1	0	격리
+whymath_backend.l4.speech.profiles	speech		71	가동	0	4	0	격리
+whymath_backend.l4.speech.symbols	speech		205	가동	0	1	0	격리
+whymath_backend.l4.step_shadow	(단독)	S4 step shadow 측정	142	가동	3	3	0	격리
+whymath_backend.l4.step_shadow_eval	(단독)	S4 step shadow 측정	332	섬	2	1	0	격리
+whymath_backend.l4.step_shadow_harvest	(단독)	S4 step shadow 측정	132	섬	1	0	0	격리
+whymath_backend.l4.subject_adapter_math	(단독)	S3 계약·모델	367	가동	12	5	0	격리(연결 대상이 import하면 동반)
+whymath_backend.l4.tone_filter	(단독)	S1 코칭 결정	41	가동	4	4	0	연결
+whymath_backend.l4.turn_meta	(단독)	S1 코칭 결정	356	가동	1	2	0	격리
+whymath_backend.l4.visualization_policy	(단독)	S2 장면·시각화·공급	76	대기	2	3	0	격리
