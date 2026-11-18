@@ -5,7 +5,7 @@ track: infra-debt
 stage: S1
 subject: math
 layer: infra
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "Kiki 판정 2026-11-17 B안: import-linter 계약 golden-no-legacy의 forbidden_modules에서 그래프 밖 모듈(__init__.py 없는 whymath_backend/l1/rights/ 4모듈)을 빼고, tests/golden/test_legacy_manifest.py의 매니페스트 일치 검사가 그 모듈을 계약 대신 AST 검사 몫으로 계상하게 고친다. 매니페스트 722줄과 옛 코드는 바꾸지 않는다. 완료 기준: lint-imports가 Python 3.12에서 import-linter 2.15(grimp 3.17, CI 핀)와 2.16(grimp 3.20) 양쪽 exit 0, tests/golden 초록, 제외 목록이 실제 그래프 밖인지 검사하는 변별력(뮤테이션) 확인"
-artifacts: []
+artifacts:
+  - "PR #1959 https://github.com/kiki-s-broom/WhyMath/pull/1959 — 판정 기준 HEAD c070afde · lint-imports 2.15/2.16 양쪽 EXIT=0 · tests/golden 476 passed · 뮤테이션 5종 RED"
 paths:
   - src/backend/pyproject.toml
   - tests/golden/test_legacy_manifest.py
-session: claude/jolly-mccarthy-q4y2yi
+session: null
 notes: "출처: RS-G2 보고(golden-rs/G2 golden/reports_rescue/G2/보고.md 제안 ②). 원인: import-linter 2.16이 forbidden 계약의 내부 금지 모듈에도 존재 검사를 추가(forbidden.py _check_all_modules_exist_in_graph). CI는 constraints-py312.txt로 2.15/grimp 3.17 고정이라 main은 안전(run 44104527763 로그 실측) — 제약 파일 갱신 PR과 제약 없는 로컬 설치가 영향권"
-updated: 2026-11-17
+updated: 2026-11-18
