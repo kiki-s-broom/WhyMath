@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -13,10 +13,11 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "tests/golden/test_problems_schema.py ⑤가 grade._parse(grade.normalize(answer))로 30문항 정답을 읽는다 · 채점기가 못 읽는 정답 주입 시 실패 · tests/golden 초록 · golden/LATER.md 해당 줄 처리 표시"
-artifacts: []
+artifacts:
+  - "PR #1964 · 커밋 add06442 · tests/golden/test_problems_schema.py ⑤ 채점기 파서 + ⑤-b 자기 채점 · 주입 sqrt(4) 실패 2건 · LATER.md 해소"
 paths:
   - tests/golden/test_problems_schema.py
   - golden/LATER.md
-session: claude/new-session-55gg39
+session: null
 notes: ""
 updated: 2026-11-18
