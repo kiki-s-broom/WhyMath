@@ -2,7 +2,7 @@
 #
 # 형식: 한 줄에 한 건 — `경로:줄 · 규칙 · 이유`
 #   - 경로는 src/backend 기준(예: golden/grade.py), 줄은 ruff가 알려 준 줄 번호다.
-#   - 규칙은 BLE001(광범위 except) · S110(try-except-pass) · E722(맨 except) 중 하나다.
+#   - 규칙은 BLE001(광범위 except) · S110(try-except-pass) · S112(try-except-continue) · E722(맨 except) 중 하나다.
 #   - 이유는 비워 둘 수 없다. "삼킨 뒤 무엇을 하는가"를 적는다.
 #   - `#`로 시작하는 줄과 빈 줄은 무시한다.
 #

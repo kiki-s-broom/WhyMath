@@ -157,7 +157,7 @@
 - 클라우드 세션 컨테이너에는 `grimp`·`coverage`가 기본으로 없다(2026-11-17 `import grimp` 실패). 규칙 11의 설치 명령을 먼저 돌린다. `node`·`npx`는 있다(`/opt/node22/bin`). `jscpd`·`cloc`은 없다.
 - `whymath_backend/l1/rights/`는 `__init__.py`가 없어 import 그래프 도구 grimp가 보지 못한다(5파일). 파일 시스템으로 다시 세어 844개로 맞춘다(`golden/HARVEST.md` 보정 ③).
 - 기존 측정 도구 `python -m golden.measure_unreferenced`(`src/backend/golden/measure_unreferenced.py`)는 "골든에서 닿는가" 하나만 잰다. 실행 기록 기준 등급은 아직 없다.
-- 백엔드 린트 설정(`src/backend/pyproject.toml` `select = ["E","F","I","N","B","W"]`)에는 오류 삼키기 규칙(`BLE001`·`S110`)이 없다. `E722`(맨 `except:`)는 `E`에 들어 있다.
+- 백엔드 린트 설정(`src/backend/pyproject.toml` `select = ["E","F","I","N","B","W"]`)에는 오류 삼키기 규칙(`BLE001`·`S110`·`S112`)이 없다. `E722`(맨 `except:`)는 `E`에 들어 있다.
 - import 계약은 `src/backend/pyproject.toml`의 `[tool.importlinter]`에 6개가 있다. 그중 `golden-no-legacy`가 골든의 미참조 옛 모듈 import를 막는다.
 - S1 측정(`golden/STATE.md`): 옛 앱은 서버가 뜨고 로그인까지 되지만 "문제 제시"에서 중2 일차함수 문항이 0건이라 끊겼다.
 
@@ -174,7 +174,7 @@
 
 검토 문서의 판단 가운데 그대로 따르는 것: "가동 비중"은 지표로 쓰지 않는다(경로 테스트가 1개·55줄이라 거의 전부 "대기"로 나온다). **주 지표는 셋이다 — 옛 앱(`whymath_backend.app`)에서 닿지 않는 모듈 수 · 그중 이름으로도 참조되지 않는 수 · 전체 줄 수.** 경로 테스트 실행 기록은 참고 칸으로만 채운다.
 
-검토 문서가 이미 잰 값(다시 재서 다르면 [차이]로 적는다): import 그래프 모듈 839 · 옛 앱에서 닿는 모듈 480 · 안 닿는 모듈 359(172,697줄 — `harness` 150 · `l3` 85 · `ops` 33 · `l1` 40 · `l4` 27 · `whs` 14 · 그 외 10) · 그 359 가운데 `.github/workflows`·`scripts`·`docs/ops`·`backlog`에 이름이 나오는 것 90, 안 나오는 것 269 · 오류 삼키기 후보 `BLE001` 37건 · `S110` 3건 · `E722` 0건 · 동적 import 8곳(4파일).
+검토 문서가 이미 잰 값(다시 재서 다르면 [차이]로 적는다): import 그래프 모듈 839 · 옛 앱에서 닿는 모듈 480 · 안 닿는 모듈 359(172,697줄 — `harness` 150 · `l3` 85 · `ops` 33 · `l1` 40 · `l4` 27 · `whs` 14 · 그 외 10) · 그 359 가운데 `.github/workflows`·`scripts`·`docs/ops`·`backlog`에 이름이 나오는 것 90, 안 나오는 것 269 · 오류 삼키기 후보 `BLE001` 37건 · `S110` 3건 · `S112` 3건(전부 BLE001과 같은 줄) · `E722` 0건 · 동적 import 8곳(4파일).
 
 *카드 만드는 법 (C1~C8 공통 — 각 작업의 "할 일"은 이 순서에 대상만 바꾼 것이다)*
 
@@ -517,12 +517,12 @@
 - **목적:** 오류를 삼키는 코드가 새 구역에 들어오지 못하게 한다. 지금 린트 설정에는 이 규칙이 없다(공유 계약 「도구와 사전 실측 사실」).
 - **선행 산출물:** D2의 `카드.md`(패키지별 건수).
 - **할 일:**
-    1. 골든 구역의 현재 건수를 잰다: `cd src/backend && python -m ruff check golden --select BLE001,S110,E722 --output-format json > /tmp/rs.g2.json ; echo "EXIT=$?"`. 건수와 위치를 적는다.
+    1. 골든 구역의 현재 건수를 잰다: `cd src/backend && python -m ruff check golden --select BLE001,S110,S112,E722 --output-format json > /tmp/rs.g2.json ; echo "EXIT=$?"`. 건수와 위치를 적는다.
     2. 0건이 아니면 고치지 않는다 — 건마다 "삼킨 뒤 무엇을 하는가(대체 문장 반환 · 로그 · 아무것도 안 함)"를 `--level 2` 목차와 해당 구간만 열어 적고, Kiki에게 "고칠지 / 이유를 적고 허용할지"를 묻는 목록으로 올린다.
-    3. `tests/golden/rescue/test_silent_failure_gate.py`를 쓴다: `ruff`를 하위 프로세스로 돌려(타임아웃 60초 · 출력 인코딩 `utf-8` 명시) 골든 구역의 세 규칙 건수가 허용 목록 `tests/golden/rescue/silent_failure_allow.txt`(경로:줄 · 이유)와 정확히 같아야 통과한다. 허용 목록에 없는 새 건이 생기면 실패하고, 허용 목록에만 있고 실제로는 없는 줄이 남아도 실패한다.
+    3. `tests/golden/rescue/test_silent_failure_gate.py`를 쓴다: `ruff`를 하위 프로세스로 돌려(타임아웃 60초 · 출력 인코딩 `utf-8` 명시) 골든 구역의 네 규칙 건수가 허용 목록 `tests/golden/rescue/silent_failure_allow.txt`(경로:줄 · 이유)와 정확히 같아야 통과한다. 허용 목록에 없는 새 건이 생기면 실패하고, 허용 목록에만 있고 실제로는 없는 줄이 남아도 실패한다.
     4. `pyproject.toml`의 린트 설정은 고치지 않는다(골든 밖 파일이다). 설정에 규칙을 넣는 것이 낫다고 판단하면 보고에 "제안"으로 적는다.
     5. 주입: 골든 파일 하나에 `try: ... except Exception: pass`를 넣어 테스트가 실패하는지 본다(`cp` 백업 → 확인 → `cp` 복원).
-    6. 옛 구역은 D2의 패키지별 건수를 `golden/reports_rescue/G2/옛구역_기준선.tsv`로 옮겨 적기만 한다(게이트는 걸지 않는다).
+    6. 옛 구역은 D2의 패키지별 건수를 `golden/reports_rescue/G2/옛구역_기준선.tsv`로 옮겨 적기만 한다(게이트는 걸지 않는다). `S112` 열(`ruff_S112`·`ruff_S112_noqa무시`)도 함께 옮긴다.
 - **산출물:** `test_silent_failure_gate.py`, `silent_failure_allow.txt`, `옛구역_기준선.tsv`, `카드.md`, `보고.md`.
 - **완료 기준:** 규칙 11의 다섯 명령이 종료 코드 0이다. 주입 2종(새 삼키기 추가 · 허용 목록에 없는 줄 남기기)에서 각각 실패한다. `ruff`가 없는 환경에서 테스트가 "통과"가 아니라 실패 또는 명시적 오류를 낸다.
 - **하지 말 것:** 골든 코드의 `except`를 이 세션에서 고치지 않는다(튜터 대체 문장 같은 설계된 강등이 있다 — 결정은 Kiki). 옛 코드를 고치지 않는다.

@@ -274,6 +274,44 @@
 
 ---
 
+## 7-1. 승인 결과 (2026-11-18 Kiki) — 5건 승인 · 집행 범위
+
+Kiki가 §7의 5건을 전부 승인했다. 승인 뒤 실제로 한 일과 하지 않은 일은 이렇다.
+
+| # | 결정 | 결과 | 증거 |
+|---:|---|---|---|
+| ① | 전역 `select`에 BLE·S를 지금 넣지 않는다(다안) | **승인 · 설정 변경 0줄** | `src/backend/pyproject.toml` `select` 무변경 |
+| ② | G2 규칙 집합에 `S112` 추가 | **승인 · 집행 완료** | `tests/golden/rescue/test_silent_failure_gate.py` `_RULES` · `silent_failure_allow.txt` 머리말 · G2 지시문 1·3항 · `옛구역_기준선.tsv` S112 열 |
+| ③ | `return None/False` 무음 AST 검사 태스크 등재 | **승인 · `GOLD-28` 등재** | `backlog/tasks/GOLD-28.yaml` |
+| ④ | 옛 구역 무음 7곳(9건)은 기록만, S74 삭제 판정 뒤 재판정 | **승인 · 옛 코드 변경 0줄** | `golden/reports_rescue/G2/옛구역_기준선.tsv`(S112 열만 추가) |
+| ⑤ | 전역 도입 재판정 시점 = S74 이후 또는 옛 코드 편집이 시작된 시점 | **승인 · 시점만 고정**(태스크 등재는 그때) | — |
+
+### 7-1-1. ② S112를 넣었지만 새로 잡히는 위반은 0건이다
+
+승인대로 넣었고 게이트는 초록이지만, **탐지력이 늘어난 것은 아니다.** 실측을 그대로 적는다.
+
+- **S112는 `except Exception:`·`except:` + `continue`에서만 뜬다.** 좁은 예외에는 뜨지 않는다 — 2026-11-18 프로브에서 `except ValueError: continue`는 "All checks passed!", `except Exception: continue`는 S112 검출이었다.
+- 따라서 S112가 잡는 자리는 **항상 BLE001 또는 E722와 같은 줄**이다. 옛 구역 S112 3곳(`l3/equivalent/authoring_guard.py:474` · `l3/equivalent/structural_dedup.py:183` · `harness/attempt_grading_shadow_report.py:186`)을 실측하니 **3곳 모두 같은 줄에서 BLE001도 떴다.** 골든 구역은 0건이다.
+- 즉 **S112 ⊆ BLE001 ∪ E722**이고, §7 표의 "옛 코드 3 · 골든 0"은 ①의 BLE001 37건에 이미 포함돼 있던 3건이다. ②가 더 잡는 것은 없다.
+- **그래도 넣는 이유**: 규칙 이름이 패턴을 지목한다. 나중에 골든에 `except Exception: continue`가 들어오면 게이트가 "BLE001 한 줄"이 아니라 **"S112도 걸린 줄"**로 보여 준다. **비용**: 그런 코드가 들어오면 허용 목록에 두 줄을 적어야 한다(규칙마다 한 줄).
+- §7 ②의 근거 "골든은 현재 0건이라 비용 없음"은 그대로 맞다 — 다만 "3곳을 더 잡는다"는 뜻은 아니었다.
+
+### 7-1-2. ②가 닿은 곳 (집행 지점 — 정본화 ≠ 집행)
+
+| 파일 | 바뀐 것 |
+|---|---|
+| `tests/golden/rescue/test_silent_failure_gate.py` | `_RULES`에 `S112` · 합성 파일에 `except Exception: continue` 사례 추가(변별력) · 문면 "세 규칙"→"네 규칙" |
+| `tests/golden/rescue/silent_failure_allow.txt` | 머리말 규칙 목록에 `S112` 추가. **허용 항목 4건은 그대로** — 골든 S112가 0건이라 줄이 늘지 않는다 |
+| `golden/prompts_rescue/단계02_병렬_3개_백엔드대장-잠금/RS-단계02-G2-잠금-조용한실패게이트.md` | 사전 실측 사실 · 재현 명령 · 게이트 설명 · 기준선 열 안내를 네 규칙으로 |
+| `golden/reports_rescue/G2/옛구역_기준선.tsv` | `ruff_S112`·`ruff_S112_noqa무시` 열 추가(합계 3/3 · l3 2/2 · harness 1/1 · 나머지 0) |
+| `golden/reports_rescue/G2/보고.md` | 「추가 기록」 절로 S112 추가 경위·수치를 덧붙임(기존 보고 본문은 고치지 않는다) |
+
+### 7-1-3. ③ GOLD-28의 경계
+
+`GOLD-28`은 **검사기를 만드는 태스크**이고, 이 문서는 설계 초안(§5-3)만 남긴다. 착수 시점은 골든 패스 범위(중2 일차함수 30문항)와 무관하게 열 수 있으나, 골든 기간의 완료 기준(`tests/golden/` 초록불)을 흔들지 않도록 **게이트 추가는 `tests/golden/rescue/` 안에서만** 한다.
+
+---
+
 ## 8. 재현 명령
 
 모두 `src/backend`에서 실행한다(전역 측정은 저장소 루트에서 경로를 맞춘다).

@@ -1,0 +1,35 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-29-g2-s112-rule-addition
+title: "RUFF 승인 ② 집행 — G2 게이트에 S112 편입 · §7-1 승인 결과 기록"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 게이트 규칙 집합이 네 규칙(BLE001·S110·S112·E722)이 되고, 합성 파일 테스트가 S112를 실제로 잡는다(규칙이 꺼진 ruff는 늘 0건을 내므로 변별력 확인이 먼저다)."
+  - "② 허용 목록 항목은 4건 그대로다(골든 S112 0건). 머리말의 규칙 목록만 네 규칙으로 고친다."
+  - "③ 옛 구역 기준선 TSV에 ruff_S112·ruff_S112_noqa무시 열을 더한다. 값은 실측으로 l3 2/2 · harness 1/1 · 합계 3/3, 나머지 패키지 0이며 패키지별 합과 합계 행이 일치해야 한다."
+  - "④ G2 지시문과 그 원본 golden/prompts_src/spec_rescue.md가 같은 문면(네 규칙)이 된다 — 원본을 함께 고치지 않으면 재생성 때 되돌아간다."
+  - "⑤ golden/RUFF_STRICTNESS_DECISION.md에 §7-1 승인 결과를 더한다 — 승인 5건의 결과표, S112가 새로 잡는 위반이 0건이라는 실측(S112 ⊆ BLE001 ∪ E722), 집행 지점 목록."
+  - "⑥ 검사 초록: python src/backend/golden/check.py exit 0 · pytest tests/golden/rescue 통과 · 옛 코드 변경 0줄(git diff --stat로 확인)."
+artifacts: []
+paths:
+  - "tests/golden/rescue/**"
+  - golden/RUFF_STRICTNESS_DECISION.md
+  - "golden/prompts_rescue/**"
+  - golden/prompts_src/spec_rescue.md
+  - "golden/reports_rescue/G2/**"
+session: golden-p1/S21-s112
+notes: |-
+  출처: golden/RUFF_STRICTNESS_DECISION.md §7 ② — Kiki 승인 2026-11-18. 승인 5건 가운데 이 태스크는 ②(G2 규칙 집합에 S112 추가)와 승인 결과 기록을 맡는다. ③(AST 검사)은 GOLD-28, ①·④·⑤는 설정·코드 변경이 없어 이 태스크가 문서로만 남긴다.
+
+  경계: G2 게이트 자체(tests/golden/rescue/test_silent_failure_gate.py)는 RS G2가 만들었다(PR #1946). 이 태스크는 그 규칙 집합을 넓히는 후속이며, 새 게이트를 만들지 않는다.
+
+  실측 근거: 백엔드 S112 3건(harness/attempt_grading_shadow_report.py:186 · l3/equivalent/authoring_guard.py:474 · l3/equivalent/structural_dedup.py:183)은 전부 같은 줄에서 BLE001도 뜬다. 골든 구역은 0건이다. 즉 이 편입의 탐지 증가는 0건이고, 얻는 것은 규칙 이름에 의한 패턴 지목이다.
+updated: 2026-11-18

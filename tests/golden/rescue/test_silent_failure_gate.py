@@ -6,7 +6,7 @@
 
 어떻게 재는가
 - ruff를 하위 프로세스로 돌린다(타임아웃 60초 · 출력 인코딩 utf-8).
-  규칙 세 개: BLE001(광범위 except) · S110(try-except-pass) · E722(맨 except).
+  규칙 네 개: BLE001(광범위 except) · S110(try-except-pass) · S112(try-except-continue) · E722(맨 except).
 - `--ignore-noqa` : 코드의 `# noqa` 표시로 게이트를 비켜 갈 수 없게 한다.
 - `--isolated`    : pyproject 설정(per-file-ignores 등)이 바뀌어도 게이트가 조용히 꺼지지 않게 한다.
 - 결과 `경로:줄 · 규칙` 집합이 허용 목록 `silent_failure_allow.txt`와 정확히 같아야 통과한다.
@@ -15,7 +15,7 @@
 실패를 통과로 위장하지 않는 장치
 - ruff가 없거나 비정상 종료하면(종료 코드 0·1이 아님) 건너뛰지 않고 실패한다.
 - 검사 대상 .py가 0개면 실패한다(빈 스캔은 공허한 통과다).
-- 합성 파일로 세 규칙이 실제로 켜져 있는지 먼저 확인한다(규칙이 꺼진 ruff는 늘 0건을 낸다).
+- 합성 파일로 네 규칙이 실제로 켜져 있는지 먼저 확인한다(규칙이 꺼진 ruff는 늘 0건을 낸다).
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ _GOLDEN = _BACKEND / "golden"
 # 허용 목록(경로:줄 · 규칙 · 이유)
 _ALLOW = Path(__file__).with_name("silent_failure_allow.txt")
 
-# 검사하는 규칙 세 개
-_RULES = ("BLE001", "S110", "E722")
+# 검사하는 규칙 네 개
+_RULES = ("BLE001", "S110", "S112", "E722")
 # ruff 하위 프로세스 타임아웃(초)
 _TIMEOUT_S = 60
 # ruff 종료 코드: 0 = 위반 없음 · 1 = 위반 있음. 그 밖(2 등)은 도구 오류다.
@@ -130,7 +130,7 @@ def _fmt(items: list[tuple[str, int, str]]) -> str:
 
 
 def test_rules_are_live_on_synthetic_file(tmp_path: Path) -> None:
-    """변별력 확인: 같은 명령이 합성 파일에서 세 규칙을 모두 잡아야 한다."""
+    """변별력 확인: 같은 명령이 합성 파일에서 네 규칙을 모두 잡아야 한다."""
     sample = tmp_path / "swallow.py"
     sample.write_text(
         "def a() -> None:\n"
@@ -143,7 +143,14 @@ def test_rules_are_live_on_synthetic_file(tmp_path: Path) -> None:
         "    try:\n"
         "        pass\n"
         "    except:  # noqa: E722\n"
-        "        pass\n",
+        "        pass\n"
+        "\n\n"
+        "def c() -> None:\n"
+        "    for _ in range(3):\n"
+        "        try:\n"
+        "            pass\n"
+        "        except Exception:  # noqa: BLE001\n"
+        "            continue  # noqa: S112\n",
         encoding="utf-8",
     )
     codes = {rule for _, _, rule in _run_ruff(sample, tmp_path)}
@@ -157,7 +164,7 @@ def test_missing_ruff_is_an_error_not_a_pass(tmp_path: Path) -> None:
 
 
 def test_golden_silent_failures_match_allow_list() -> None:
-    """골든 구역의 세 규칙 건수가 허용 목록과 정확히 같아야 한다."""
+    """골든 구역의 네 규칙 건수가 허용 목록과 정확히 같아야 한다."""
     py_files = list(_GOLDEN.rglob("*.py"))
     assert py_files, f"검사 대상 .py가 0개다 — 경로가 틀렸다: {_GOLDEN}"
 
