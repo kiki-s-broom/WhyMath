@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "l1 하위 패키지 전부에 카드 열·처분 제안·근거가 있다. 읽기 누계 2,000줄 이하."
-artifacts: []
+artifacts:
+  - "PR #1957 (커밋 93bdc599)"
 paths:
   - "golden/reports_rescue/C1/**"
-session: golden-rs/C1
-notes: ""
+session: null
+notes: "[미러 면제 2026-11-18] 클라우드 컨테이너의 데비안 소유 패키지(pyparsing·pip)를 pip가 지우지 못해 harness-integrity·declared-unwired-audit의 설치 스텝이 미러 안에서 실패. 설치 뒤 핵심 스텝은 직접 실행해 모두 EXIT=0: backlog validate · audit-deps · pytest tests/harness 2381 passed · declared_unwired_audit · 백필 드리프트 2종. 나머지 5잡은 미러 통과"
 updated: 2026-11-18
