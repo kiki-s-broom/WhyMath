@@ -538,8 +538,11 @@ forbidden_modules = ["golden"]
 # import하지 않은 옛 모듈(golden/LEGACY_MANIFEST.txt의 백엔드 722모듈 · 측정 커밋 a9cff6ec)을
 # golden에서 새로 import하지 못하게 막는다. 옛 코드는 한 줄도 고치지 않는다. 삭제는 3단계 S74.
 # 이 목록은 손으로 고치지 않는다 — 매니페스트와 같은지 tests/golden/test_legacy_manifest.py가 검사한다.
-# 한계(실측): import-linter는 그래프에 없는 모듈 이름을 오류 없이 통과시킨다. __init__.py 없는
-# whymath_backend/l1/rights/ 4모듈은 그래프 밖이라, 같은 테스트가 golden 소스를 AST로 직접 검사한다.
+# 그래프 밖 모듈은 이 목록에 넣지 않는다(OPS-164 · Kiki 판정 2026-11-17 B안): __init__.py 없는
+# whymath_backend/l1/rights/ 4모듈은 import 그래프에 없다. import-linter 2.15까지는 그런 이름을 조용히
+# 통과시켜 4줄이 아무것도 막지 못했고, 2.16부터는 "Module ... does not exist"로 lint-imports 전체가
+# exit 1이 된다(Python 3.12 실측). 그래서 계약에는 매니페스트 722모듈 중 그래프 안의 718모듈만 두고,
+# 그래프 밖 4모듈은 같은 테스트가 golden 소스를 AST로 직접 검사한다(어느 쪽이 맡는지는 그 테스트가 동결).
 [[tool.importlinter.contracts]]
 name = "golden은 미참조 옛 모듈을 import하지 않는다 (golden-no-legacy · LEGACY_MANIFEST 722모듈)"
 type = "forbidden"
@@ -843,10 +846,6 @@ forbidden_modules = [
     "whymath_backend.l1.problem_type_graph",
     "whymath_backend.l1.problem_type_graph.populate",
     "whymath_backend.l1.problem_type_graph.problem_type_node_projection",
-    "whymath_backend.l1.rights.attribution",
-    "whymath_backend.l1.rights.gateway",
-    "whymath_backend.l1.rights.integration",
-    "whymath_backend.l1.rights.policy_engine",
     "whymath_backend.l1.skill_graph",
     "whymath_backend.l1.skill_graph.populate",
     "whymath_backend.l1.skill_graph.resolve",
