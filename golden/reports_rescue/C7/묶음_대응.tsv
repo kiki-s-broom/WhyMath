@@ -1,0 +1,164 @@
+﻿모듈	묶음	줄수	옛앱등급	옛앱닿음	import하는모듈수	테스트수_직접	조용함	조용함_광범위	main블록	CI언급	문서언급	스크립트
+__init__	H02 WH-1 관측·평가	37	가동	예	0	0	0	0	아니오	0	0	
+agreement_gate	H02 WH-1 관측·평가	431	섬	아니오	2	3	0	0	아니오	0	7	
+agreement_gate_cli	H02 WH-1 관측·평가	101	섬	아니오	0	1	0	0	예	0	6	
+agreement_gate_semantic	H02 WH-1 관측·평가	174	섬	아니오	1	1	0	0	아니오	0	5	
+ai_quality_candidates	H07 AI 품질 8축 평가	557	섬	아니오	2	3	0	0	아니오	0	6	
+ai_quality_eval	H07 AI 품질 8축 평가	747	섬	아니오	0	2	0	0	예	1	11	
+ai_quality_eval_set	H07 AI 품질 8축 평가	581	섬	아니오	4	4	0	0	아니오	0	5	scripts/ops/p3_81_hint_catalog_probe.py(문서만)
+ai_quality_judges	H07 AI 품질 8축 평가	942	섬	아니오	3	2	0	0	아니오	0	5	scripts/ops/p3_81_hint_catalog_probe.py(문서만)
+ai_quality_live_collect	H07 AI 품질 8축 평가	2190	섬	아니오	0	1	3	0	예	0	5	
+ai_quality_live_seat	H07 AI 품질 8축 평가	85	잔해	아니오	1	0	0	0	아니오	0	4	
+ai_quality_registry	H07 AI 품질 8축 평가	351	섬	아니오	5	4	0	0	아니오	0	5	
+analogy_fidelity_eval	H06 결함주입 강등전·게이트	393	섬	아니오	0	1	0	0	예	1	5	
+anchor_detection_channel_eval	H06 결함주입 강등전·게이트	455	섬	아니오	0	1	0	0	예	1	6	
+anchor_round_ledger	H08 저작 회차·배치 운영	1229	섬	아니오	4	13	0	0	아니오	0	7	
+answer_distribution_battle	H05 문항 검증기	262	섬	아니오	0	1	0	0	예	0	6	
+assessment_seat_reach_report	H12 런타임 도달·KPI 관측	371	섬	아니오	0	2	0	0	예	0	5	
+attempt_grading_shadow_report	H12 런타임 도달·KPI 관측	970	섬	아니오	1	3	3	2	예	0	5	
+attempt_scan_shadow_harvest	H12 런타임 도달·KPI 관측	942	섬	아니오	0	1	0	0	예	0	6	
+attempt_skill_event_reach_report	H12 런타임 도달·KPI 관측	403	섬	아니오	0	1	0	0	예	0	7	
+attempt_skill_reach_probe	H12 런타임 도달·KPI 관측	533	섬	아니오	0	1	0	0	예	0	7	
+authoring_round	H08 저작 회차·배치 운영	1790	섬	아니오	0	2	7	0	예	0	11	
+authoring_round_config	H08 저작 회차·배치 운영	430	섬	아니오	1	2	0	0	아니오	0	5	
+authoring_round_ports	H08 저작 회차·배치 운영	295	섬	아니오	1	2	5	0	아니오	0	5	
+authoring_round_probe	H08 저작 회차·배치 운영	207	섬	아니오	0	1	1	0	예	0	5	
+banned_words_pii_eval	H05 문항 검증기	583	섬	아니오	1	3	0	0	예	0	5	
+batch_safety	H08 저작 회차·배치 운영	361	섬	아니오	1	3	0	0	아니오	0	5	
+binomial_distribution_batch	H03 문항 배치 생성기	149	섬	아니오	0	2	0	0	예	0	5	
+calculus1_integral_batch	H03 문항 배치 생성기	171	섬	아니오	0	1	0	0	예	0	5	
+calculus2_trig_integral_batch	H03 문항 배치 생성기	194	섬	아니오	0	1	0	0	예	0	5	
+canary_slice	H08 저작 회차·배치 운영	654	섬	아니오	0	1	0	0	예	0	6	
+coach_prose_leak_eval	H06 결함주입 강등전·게이트	355	섬	아니오	1	2	0	0	예	1	6	
+combination_binomial_batch	H03 문항 배치 생성기	178	섬	아니오	0	1	0	0	예	0	5	
+complex_number_arithmetic_batch	H03 문항 배치 생성기	162	섬	아니오	0	1	0	0	예	0	5	
+concept_assessment_index	H11 지식·교육과정 커버리지 관측	837	섬	아니오	1	2	1	0	예	0	6	
+concept_content_audit	H09 사람 검수 도구	331	섬	아니오	0	1	0	0	예	0	7	
+concept_content_link_context	H09 사람 검수 도구	29	섬	아니오	2	2	0	0	아니오	0	5	
+concept_content_review_apply	H09 사람 검수 도구	340	섬	아니오	0	1	0	0	예	0	5	
+concept_content_review_batch	H09 사람 검수 도구	946	섬	아니오	0	3	0	0	예	0	6	
+concept_reach_report	H11 지식·교육과정 커버리지 관측	498	섬	아니오	0	1	2	0	예	1	5	
+conceptual_count_mc_batch	H03 문항 배치 생성기	242	섬	아니오	0	1	0	0	예	0	6	
+conic_section_focus_batch	H03 문항 배치 생성기	151	섬	아니오	0	1	0	0	예	0	5	
+coordinate_geometry_batch	H03 문항 배치 생성기	164	섬	아니오	0	1	0	0	예	0	5	
+corpus_audit_eval	H05 문항 검증기	262	섬	아니오	4	3	0	0	예	0	6	
+corpus_reverify	H05 문항 검증기	398	섬	아니오	4	12	0	0	예	1	10	
+cross_school_connectivity_report	H11 지식·교육과정 커버리지 관측	550	섬	아니오	0	1	0	0	예	1	6	
+crosslink_demotion_eval	H06 결함주입 강등전·게이트	270	섬	아니오	1	4	0	0	예	0	5	
+cu_hint_pass	H08 저작 회차·배치 운영	68	섬	아니오	0	1	0	0	예	0	7	
+curriculum_notation_gate_cli	H11 지식·교육과정 커버리지 관측	134	섬	아니오	1	1	0	0	예	1	5	
+curriculum_revision_crosswalk_report	H11 지식·교육과정 커버리지 관측	818	섬	아니오	0	1	0	0	예	0	5	
+deepseek_live_probe	H13 모델·프로바이더 실측	180	섬	아니오	0	1	0	0	예	0	7	
+defect_detection_eval	H06 결함주입 강등전·게이트	317	섬	아니오	1	2	0	0	예	1	5	
+discrete_ev_batch	H03 문항 배치 생성기	133	섬	아니오	0	1	0	0	예	0	5	
+distractor_signal_dormancy_report	H12 런타임 도달·KPI 관측	464	섬	아니오	0	1	0	0	예	0	5	
+elementary_addsub_batch	H03 문항 배치 생성기	159	섬	아니오	0	1	0	0	예	0	5	
+elementary_area_measure_batch	H03 문항 배치 생성기	179	섬	아니오	0	1	0	0	예	0	5	
+elementary_division_remainder_batch	H03 문항 배치 생성기	146	섬	아니오	0	1	0	0	예	0	5	
+elementary_gcd_lcm_batch	H03 문항 배치 생성기	164	섬	아니오	0	1	0	0	예	0	5	
+elementary_rounding_batch	H03 문항 배치 생성기	146	섬	아니오	0	2	0	0	예	0	5	
+elementary_volume_measure_batch	H03 문항 배치 생성기	198	섬	아니오	0	1	0	0	예	0	5	
+eos_unit_structure_observation_report	H11 지식·교육과정 커버리지 관측	737	섬	아니오	0	1	0	0	예	1	5	
+explanation_f7_eval	H06 결함주입 강등전·게이트	347	섬	아니오	0	1	0	0	예	1	5	
+explicit_correction_gap_eval	H06 결함주입 강등전·게이트	470	섬	아니오	0	2	0	0	예	1	6	
+finite_probability_batch	H03 문항 배치 생성기	147	섬	아니오	0	3	0	0	예	0	5	
+formula_reach_report	H11 지식·교육과정 커버리지 관측	618	섬	아니오	0	1	1	0	예	0	5	
+generation_seed_adoption_report	H12 런타임 도달·KPI 관측	394	섬	아니오	0	1	0	0	예	0	5	
+generation_seed_replay_probe	H12 런타임 도달·KPI 관측	441	섬	아니오	0	1	0	0	예	0	5	
+generator_space_overlap_audit	H04 코퍼스 축적·후처리	458	섬	아니오	0	4	1	0	예	1	6	
+golden_benchmark	H10 골든 벤치마크·승격(이름만 golden)	1159	섬	아니오	3	5	0	0	예	0	8	
+golden_inputs	H10 골든 벤치마크·승격(이름만 golden)	357	섬	아니오	0	1	0	0	예	0	6	
+golden_promotion_gate	H10 골든 벤치마크·승격(이름만 golden)	980	섬	아니오	2	5	0	0	예	0	6	
+growth_evidence_exposure	H02 WH-1 관측·평가	202	대기	예	2	4	0	0	아니오	0	5	
+highschool_quotient_rule_batch	H03 문항 배치 생성기	132	섬	아니오	0	1	0	0	예	0	6	
+hint_verdict_gui	H09 사람 검수 도구	1180	섬	아니오	0	1	0	0	예	0	6	
+hint_verdict_session	H09 사람 검수 도구	694	섬	아니오	1	2	0	0	예	0	7	
+intent_shadow_harvest	H02 WH-1 관측·평가	465	섬	아니오	0	1	0	0	예	0	7	
+item_calibration_reach_report	H12 런타임 도달·KPI 관측	388	섬	아니오	0	2	0	0	예	0	6	
+learning_metrics_rollup_cli	H12 런타임 도달·KPI 관측	196	섬	아니오	0	1	0	0	예	0	6	
+learning_path_orderability_report	H11 지식·교육과정 커버리지 관측	603	섬	아니오	0	1	0	0	예	0	5	
+linear_inequality_system_batch	H03 문항 배치 생성기	164	섬	아니오	0	1	0	0	예	0	5	
+local_thinking_probe	H13 모델·프로바이더 실측	315	섬	아니오	0	1	0	0	예	0	5	
+matrix_ops_batch	H03 문항 배치 생성기	147	섬	아니오	0	1	0	0	예	0	5	
+measurement_unit_conversion_batch	H03 문항 배치 생성기	170	섬	아니오	0	1	0	0	예	0	5	
+middle_function_batch	H03 문항 배치 생성기	133	섬	아니오	0	1	0	0	예	0	5	
+misconception_false_positive_eval	H06 결함주입 강등전·게이트	329	섬	아니오	0	1	1	0	예	1	7	
+misconception_mc_batch	H03 문항 배치 생성기	500	섬	아니오	1	4	0	0	예	0	6	
+needs_review_worklist	H09 사람 검수 도구	445	섬	아니오	5	7	0	0	아니오	0	5	
+objective_coverage	H11 지식·교육과정 커버리지 관측	797	섬	아니오	0	1	0	0	예	0	5	
+openrouter_endpoints_probe	H13 모델·프로바이더 실측	182	잔해	아니오	0	0	0	0	예	0	6	
+p3_audit_qualification	H06 결함주입 강등전·게이트	1139	섬	아니오	0	1	0	0	예	0	8	
+p3_calculus1_diff_batch	H03 문항 배치 생성기	474	섬	아니오	3	12	0	0	예	0	6	
+p3_differentiability_reach_batch	H03 문항 배치 생성기	195	섬	아니오	1	1	0	0	예	0	6	
+p3_fill_batch	H03 문항 배치 생성기	235	섬	아니오	1	3	0	0	예	0	6	
+pedagogical_rubric	H05 문항 검증기	152	섬	아니오	3	2	0	0	아니오	0	9	
+pedagogy_pack_fidelity_eval	H06 결함주입 강등전·게이트	296	잔해	아니오	0	0	0	0	예	1	5	
+pedagogy_policy_eval	H06 결함주입 강등전·게이트	235	섬	아니오	0	1	0	0	예	0	5	
+permutation_combination_batch	H03 문항 배치 생성기	178	섬	아니오	0	1	0	0	예	0	5	
+pilot_kpi_baseline	H12 런타임 도달·KPI 관측	925	섬	아니오	0	2	0	0	예	0	6	
+polynomial_arithmetic_batch	H03 문항 배치 생성기	185	섬	아니오	0	1	0	0	예	0	5	
+polynomial_factoring_batch	H03 문항 배치 생성기	170	섬	아니오	0	1	0	0	예	0	5	
+probability_law_batch	H03 문항 배치 생성기	201	섬	아니오	0	1	0	0	예	0	5	
+problem_bank_coverage	H11 지식·교육과정 커버리지 관측	1098	섬	아니오	3	5	0	0	예	0	11	
+problem_corpus_accumulate	H04 코퍼스 축적·후처리	1699	섬	아니오	4	18	1	0	예	0	15	
+problem_corpus_author_backfill	H04 코퍼스 축적·후처리	391	섬	아니오	0	1	0	0	예	0	5	
+problem_corpus_batch	H04 코퍼스 축적·후처리	989	섬	아니오	37	11	0	0	예	0	6	scripts/attach_similar_relations_s4_14.py(없음)
+problem_corpus_lineage_links	H04 코퍼스 축적·후처리	471	섬	아니오	0	1	0	0	예	0	6	
+problem_corpus_persona_fit_backfill	H04 코퍼스 축적·후처리	318	섬	아니오	2	4	0	0	예	1	7	
+problem_corpus_rephrase	H04 코퍼스 축적·후처리	192	섬	아니오	1	1	0	0	예	0	7	
+problem_corpus_rephrase_diagnose	H04 코퍼스 축적·후처리	319	섬	아니오	0	1	0	0	예	0	5	
+problem_corpus_rephrase_sweep	H04 코퍼스 축적·후처리	246	섬	아니오	0	2	0	0	예	0	6	
+problem_corpus_review_status_backfill	H04 코퍼스 축적·후처리	472	섬	아니오	0	5	0	0	예	1	7	
+problem_corpus_round_reply	H04 코퍼스 축적·후처리	429	섬	아니오	0	1	0	0	예	0	6	
+problem_corpus_tag	H04 코퍼스 축적·후처리	166	섬	아니오	0	1	0	0	예	0	5	
+problem_corpus_variants	H04 코퍼스 축적·후처리	356	섬	아니오	0	1	0	0	예	0	6	
+problem_duplication_audit	H04 코퍼스 축적·후처리	1367	섬	아니오	0	2	0	0	예	0	7	
+problem_slot_backfill	H04 코퍼스 축적·후처리	238	섬	아니오	0	1	0	0	예	0	5	
+problem_type_backfill	H04 코퍼스 축적·후처리	355	섬	아니오	0	1	0	0	예	0	6	
+problem_type_mapping	H04 코퍼스 축적·후처리	790	섬	아니오	1	2	1	0	아니오	0	5	
+prompt_asset_audit	H05 문항 검증기	588	섬	아니오	0	3	0	0	예	1	6	
+provider_accuracy_battle	H13 모델·프로바이더 실측	814	섬	아니오	0	1	0	0	예	0	6	
+published_problem_drift_report	H12 런타임 도달·KPI 관측	423	섬	아니오	0	2	0	0	예	0	5	
+qa_item_verdicts	H05 문항 검증기	447	섬	아니오	0	1	0	0	예	0	7	
+qa_pipeline	H05 문항 검증기	1072	섬	아니오	1	4	0	0	예	1	6	
+quad_ineq_batch	H03 문항 배치 생성기	141	섬	아니오	0	1	0	0	예	0	5	
+quality_tier_moe_accuracy_battle	H13 모델·프로바이더 실측	1216	섬	아니오	1	3	1	0	예	0	5	
+question_rederive	H05 문항 검증기	2625	섬	아니오	1	1	1	0	아니오	0	5	
+radian_conversion_batch	H03 문항 배치 생성기	158	섬	아니오	0	1	0	0	예	0	5	
+recommendation_outcome_report	H12 런타임 도달·KPI 관측	161	섬	아니오	0	1	0	0	예	0	5	
+rephrased_corpus_hygiene	H04 코퍼스 축적·후처리	155	섬	아니오	0	1	0	0	예	0	5	
+residue_cross_verify_eval	H06 결함주입 강등전·게이트	509	섬	아니오	2	3	0	0	예	1	6	
+residue_cross_verify_eval_v2	H06 결함주입 강등전·게이트	789	섬	아니오	0	1	0	0	예	1	6	
+residue_gate_demotion_battle	H06 결함주입 강등전·게이트	1522	섬	아니오	0	1	0	0	예	0	6	
+review_session	H09 사람 검수 도구	763	섬	아니오	3	8	1	0	예	0	10	
+review_session_gui	H09 사람 검수 도구	1315	섬	아니오	0	1	1	0	예	0	7	
+review_status_domains	H09 사람 검수 도구	183	섬	아니오	2	3	0	0	아니오	0	5	
+review_status_verdict_bridge	H09 사람 검수 도구	744	섬	아니오	0	3	0	0	예	0	5	
+review_timer	H09 사람 검수 도구	211	섬	아니오	6	11	0	0	아니오	0	5	scripts/analysis/eos226_a4_human_hit.py(문서만)
+reviewer_sample_package	H09 사람 검수 도구	576	섬	아니오	1	2	0	0	예	0	5	
+root_aggregate_batch	H03 문항 배치 생성기	132	섬	아니오	0	1	0	0	예	0	6	
+sample_mean_distribution_batch	H03 문항 배치 생성기	148	섬	아니오	0	1	0	0	예	0	5	
+selective_grading_demotion_eval	H06 결함주입 강등전·게이트	732	섬	아니오	0	1	2	1	예	1	5	
+sequence_sigma_batch	H03 문항 배치 생성기	186	섬	아니오	0	1	0	0	예	0	5	
+solution_qa	H05 문항 검증기	879	섬	아니오	2	6	0	0	예	1	20	
+standard_attainment_report	H12 런타임 도달·KPI 관측	642	섬	아니오	0	3	0	0	예	0	5	
+surrogate_baseline_report	H02 WH-1 관측·평가	371	섬	아니오	0	1	0	0	예	0	8	
+tier1_rejection_classifier	H05 문항 검증기	662	섬	아니오	0	1	0	0	예	0	8	
+traversal_load_probe	H11 지식·교육과정 커버리지 관측	706	섬	아니오	0	1	0	0	예	1	8	
+university_calc1_batch	H03 문항 배치 생성기	140	섬	아니오	0	1	0	0	예	0	5	
+university_calc1_chain_quotient_batch	H03 문항 배치 생성기	165	섬	아니오	0	1	0	0	예	0	6	
+vector_operations_batch	H03 문항 배치 생성기	161	섬	아니오	0	1	0	0	예	0	5	
+visualization_reach_report	H11 지식·교육과정 커버리지 관측	533	섬	아니오	0	1	1	0	예	0	6	
+wh1_evaluation	H02 WH-1 관측·평가	1981	대기	예	5	13	0	0	아니오	0	5	
+wh1_llm_policy	H01 WH-1 튜터 런타임	806	가동	예	3	6	2	0	아니오	0	5	scripts/demo/wh1_primary_probe.py(CI)
+wh1_llm_seam	H01 WH-1 튜터 런타임	114	가동	예	2	0	0	0	아니오	0	4	
+wh1_loop	H01 WH-1 튜터 런타임	703	가동	예	9	17	0	0	아니오	0	9	scripts/demo/wh1_primary_probe.py(CI)
+wh1_primary	H01 WH-1 튜터 런타임	647	가동	예	3	13	0	0	아니오	0	7	scripts/ops/wh1_primary_timeout_decompose.py(문서만)
+wh1_probe_supply	H01 WH-1 튜터 런타임	207	가동	예	2	1	0	0	아니오	0	5	
+wh1_prose	H01 WH-1 튜터 런타임	327	대기	예	2	2	0	0	아니오	0	5	
+wh1_session	H01 WH-1 튜터 런타임	103	섬	아니오	0	1	0	0	아니오	0	5	
+wh1_shadow	H02 WH-1 관측·평가	594	가동	예	4	14	0	0	아니오	0	9	scripts/demo/wh1_primary_probe.py(CI)
+wh1_shadow_harvest	H02 WH-1 관측·평가	997	섬	아니오	1	3	0	0	예	0	8	
+wh1_tutor_context	H01 WH-1 튜터 런타임	793	가동	예	4	8	0	0	아니오	0	6	
+wh1_tutor_output	H01 WH-1 튜터 런타임	542	가동	예	6	4	0	0	아니오	0	5	
+wilson	H06 결함주입 강등전·게이트	61	대기	예	37	14	0	0	아니오	0	7	scripts/analysis/p3_94_ai_panel_analysis.py(문서만)
