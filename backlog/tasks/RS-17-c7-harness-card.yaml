@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-17-c7-harness-card
+title: "RS-C7 패키지 카드 — 파트 D harness 측정·검수 도구"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "harness 163모듈 전부 10~15묶음 귀속 · 목차 1단계 2회 이하 · 읽기 누계 2,000줄 이하 · 카드 150줄 이하"
+artifacts:
+  - "golden/reports_rescue/C7/ · PR #1956 (https://github.com/kiki-s-broom/WhyMath/pull/1956) · 커밋 08c2c0f3"
+paths:
+  - "golden/reports_rescue/C7/**"
+session: null
+notes: "[미러 면제 2026-11-18] [미러 면제 2026-11-18] 로컬 미러 실패 2잡은 환경 원인 — ①harness-integrity: 헌법 서명 검증 '측정 불가(ssh-keygen 없음)' exit 2, 그 앞 9스텝(backlog 무결성·audit-deps·규칙 인덱스·위헌 래칫 등) 전건 통과 ②declared-unwired-audit: 설치 스텝이 데비안 pip 24.0 제거 실패(RECORD 없음). 변경은 문서·대장뿐(옛 코드 0줄). CI가 최종 판정"
+updated: 2026-11-18

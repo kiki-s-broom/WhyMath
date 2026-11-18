@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-15-c8-package-card-ops
+title: "RS-C8 패키지 카드 — 파트 D ops·whs·privacy·l5·l6·lang"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts:
+  - "PR #1950 · commit 0a7ae4bf · golden/reports_rescue/C8/카드.md·보고.md"
+paths:
+  - "golden/reports_rescue/C8/**"
+session: null
+notes: "[미러 면제 2026-11-17] ci_mirror run이 580초 제한 안에 끝나지 않음(harness-integrity 실행 중) — PR #1950 CI가 판정"
+updated: 2026-11-17
