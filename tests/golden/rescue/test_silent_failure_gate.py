@@ -46,6 +46,8 @@ _G2_PROMPT = (
     / "RS-단계02-G2-잠금-조용한실패게이트.md"
 )
 _SPEC = _REPO_ROOT / "golden" / "prompts_src" / "spec_rescue.md"
+# G2 카드 — 다음 세션이 먼저 여는 요약. 게이트 규칙 집합이 여기서 어긋나면 3규칙 게이트를 돌린다
+_CARD = _REPO_ROOT / "golden" / "reports_rescue" / "G2" / "카드.md"
 
 # 검사하는 규칙 네 개
 _RULES = ("BLE001", "S110", "S112", "E722")
@@ -198,17 +200,22 @@ def test_baseline_tsv_has_s112_columns_and_sums_match() -> None:
     rows = [ln.split("\t") for ln in lines[1:] if not ln.startswith("합계\t")]
     assert all(len(r) == len(header) for r in rows), "기준선 TSV 열 수가 행마다 다르다"
     total = next(ln for ln in lines if ln.startswith("합계\t")).split("\t")
-    for col in ("ruff_BLE001", "ruff_S110", "ruff_S112", "ruff_E722"):
-        i = header.index(col)
+    # 숫자 열 전부를 본다(2번째 열부터 — 0은 패키지, 1은 파트). 네 규칙 열만 보면
+    # `ruff_*_noqa무시`의 패키지 값이 틀려도 합계만 맞으면 통과한다(2026-11-18 검토 지적).
+    for i, col in enumerate(header[2:], start=2):
         assert sum(int(r[i]) for r in rows) == int(total[i]), f"{col} 패키지 합 != 합계 행"
 
 
-def test_g2_prompt_and_spec_agree_on_rules() -> None:
-    """G2 지시문(생성본)과 원본 spec이 같은 규칙 집합·S112 열을 말해야 한다."""
-    for path in (_G2_PROMPT, _SPEC):
+def test_g2_artifacts_agree_on_rules() -> None:
+    """G2 지시문(생성본)·원본 spec·카드가 같은 규칙 집합·S112 열을 말해야 한다."""
+    for path in (_G2_PROMPT, _SPEC, _CARD):
         text = path.read_text(encoding="utf-8")
         assert "BLE001,S110,S112,E722" in text, f"{path.name}에 네 규칙 선택 명령이 없다"
         assert "ruff_S112" in text, f"{path.name}에 S112 열 안내가 없다"
+    # 카드는 다음 세션이 명령을 그대로 복사해 돌리는 요약이다. 지시문·spec과 달리
+    # D2가 세 규칙을 쟀다는 역사적 서술이 없으므로, 3규칙 선택 문자열이 남으면 곧 회귀다.
+    card = _CARD.read_text(encoding="utf-8")
+    assert "BLE001,S110,E722" not in card, "카드에 3규칙 게이트 명령이 남아 있다"
 
 
 def test_golden_silent_failures_match_allow_list() -> None:

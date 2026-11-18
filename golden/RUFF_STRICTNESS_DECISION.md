@@ -290,7 +290,7 @@ Kiki가 §7의 5건을 전부 승인했다. 승인 뒤 실제로 한 일과 하�
 
 승인대로 넣었고 게이트는 초록이지만, **탐지력이 늘어난 것은 아니다.** 실측을 그대로 적는다.
 
-- **S112는 `except Exception:`·`except:` + `continue`에서만 뜬다.** 좁은 예외에는 뜨지 않는다 — 2026-11-18 프로브에서 `except ValueError: continue`는 "All checks passed!", `except Exception: continue`는 S112 검출이었다.
+- **S112는 광범위 예외(`except Exception:`·`except BaseException:`·맨 `except:`) + `continue`에서 뜬다.** 좁은 예외에는 뜨지 않는다 — 2026-11-18 프로브에서 `except ValueError: continue`는 "All checks passed!", `except Exception: continue`와 `except BaseException: continue`는 S112 검출이었다(ruff 0.15.22 실측).
 - 따라서 S112가 잡는 자리는 **항상 BLE001 또는 E722와 같은 줄**이다. 옛 구역 S112 3곳(`l3/equivalent/authoring_guard.py:474` · `l3/equivalent/structural_dedup.py:183` · `harness/attempt_grading_shadow_report.py:186`)을 실측하니 **3곳 모두 같은 줄에서 BLE001도 떴다.** 골든 구역은 0건이다.
 - 즉 **S112 ⊆ BLE001 ∪ E722**이고, §7 표의 "옛 코드 3 · 골든 0"은 ①의 BLE001 37건에 이미 포함돼 있던 3건이다. ②가 더 잡는 것은 없다.
 - **그래도 넣는 이유**: 규칙 이름이 패턴을 지목한다. 나중에 골든에 `except Exception: continue`가 들어오면 게이트가 "BLE001 한 줄"이 아니라 **"S112도 걸린 줄"**로 보여 준다. **비용**: 그런 코드가 들어오면 허용 목록에 두 줄을 적어야 한다(규칙마다 한 줄).
