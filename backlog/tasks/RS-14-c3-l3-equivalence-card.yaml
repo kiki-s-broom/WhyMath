@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,9 +13,10 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "l3/equivalent 77모듈과 l3 채점·검증 13파일이 전부 어느 묶음에 들어간 카드(150줄 이하)와 보고. safe_parse 골든 사용·canonicalize 폐기 사실이 카드에 적힘"
-artifacts: []
+artifacts:
+  - "golden/reports_rescue/C3/카드.md · 보고.md · 모듈표.tsv (커밋 e0b903cf · PR #1954)"
 paths:
   - "golden/reports_rescue/C3/**"
-session: golden-rs/C3
+session: null
 notes: ""
-updated: 2026-11-17
+updated: 2026-11-18
