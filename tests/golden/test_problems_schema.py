@@ -2,11 +2,17 @@
 
 공유 계약의 문항 JSON 스키마를 7항목으로 확인한다.
 ① 정확히 30개 ② id가 LF-01~LF-30이고 중복 없음 ③ 7개 필드가 모두 있고 비어 있지 않음
-④ answer_kind는 "number" 또는 "expression" ⑤ answer가 SymPy로 읽힌다
-(number면 수, expression이면 자유 변수가 {x} 이하) ⑥ hint1에 answer 문자열이 그대로 들어 있지
+④ answer_kind는 "number" 또는 "expression" ⑤ answer가 **채점기와 같은 파서**
+(`grade._parse(grade.normalize(...))`)로 읽힌다(number면 수, expression이면 자유 변수가 {x} 이하)
+⑤-b 정답을 학생 답으로 넣으면 채점기가 정답으로 판정한다 ⑥ hint1에 answer 문자열이 그대로 들어 있지
 않다(힌트가 답을 말하지 않는다) ⑦ stem의 `$` 개수가 짝수다(LaTeX를 열고 닫음).
 
 정답이 수학적으로 맞는지는 이 테스트가 보지 않는다(S3 세션이 1회 검산하고 보고에 적었다).
+
+⑤·⑤-b가 채점기 파서를 쓰는 이유(GOLD-30 · 2026-11-18): `grade.is_correct`는 파싱 실패를
+오답(False)으로 삼킨다(`grade.py`의 except · 조용한 실패 게이트 허용 목록 · Kiki 승인 2026-11-18).
+SymPy 기본 `parse_expr`로만 검사하면, 채점기만 못 읽는 정답이 생겨도 이 테스트는 통과하고
+학생은 맞는 답을 내도 계속 "오답"을 받는다. 같은 파서로 검사해야 그 틈이 닫힌다.
 """
 
 import json
@@ -15,7 +21,8 @@ from typing import Any
 
 import pytest
 from sympy import Symbol
-from sympy.parsing.sympy_parser import parse_expr
+
+from golden import grade
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PROBLEMS_PATH = _REPO_ROOT / "golden" / "data" / "problems_linear_fn.json"
@@ -72,14 +79,24 @@ def test_answer_kind_is_number_or_expression(problem: dict[str, Any]) -> None:
 
 
 @pytest.mark.parametrize("problem", _PROBLEMS, ids=_pid)
-def test_answer_parses_with_sympy(problem: dict[str, Any]) -> None:
-    """⑤ answer가 SymPy로 읽힌다 — number는 자유 변수 없는 실수, expression은 변수가 x뿐."""
-    expr = parse_expr(problem["answer"])
+def test_answer_parses_with_grader_parser(problem: dict[str, Any]) -> None:
+    """⑤ answer가 채점기 파서로 읽힌다 — number는 자유 변수 없는 실수, expression은 변수가 x뿐."""
+    expr = grade._parse(grade.normalize(problem["answer"]))
     if problem["answer_kind"] == "number":
         assert not expr.free_symbols, f"number인데 변수가 있다: {expr.free_symbols}"
         assert expr.is_real, f"number인데 실수가 아니다: {expr}"
     else:
         assert expr.free_symbols <= _ALLOWED_SYMBOLS, f"x 밖의 변수: {expr.free_symbols}"
+
+
+@pytest.mark.parametrize("problem", _PROBLEMS, ids=_pid)
+def test_answer_grades_as_correct_against_itself(problem: dict[str, Any]) -> None:
+    """⑤-b 정답 문자열을 학생 답으로 넣으면 채점기가 정답(True)으로 판정한다.
+
+    채점기가 정답을 못 읽으면 is_correct는 예외 대신 False를 돌려주므로(조용한 강등),
+    그 경우를 여기서 실패로 드러낸다.
+    """
+    assert grade.is_correct(problem, problem["answer"]) is True
 
 
 @pytest.mark.parametrize("problem", _PROBLEMS, ids=_pid)
