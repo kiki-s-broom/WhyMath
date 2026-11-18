@@ -484,6 +484,131 @@ ignore_imports = [
 ]
 
 # ──────────────────────────────────────────────────────────────────────
+# EOS 계약의 중첩 사각 보정 (GOLD-27 · GOLD-25 실측 2026-11-17)
+#
+# 위 계약 3(baseline 있음)은 `whymath_backend.l4`(패키지)를 소스로 적고 그 하위 5모듈을 금지한다.
+# import-linter는 소스가 금지 대상의 *상위 패키지*인 쌍을 건너뛴다(as_packages 기본 True +
+# `_modules_overlap`) — 그래서 l4의 CORE 모듈이 `l4.subject_adapter_math`를 import해도 KEPT였다
+# (GOLD-25 M3b: exit 0). 계약 3 자체에 as_packages=false를 걸면 api·l6·l3 하위 패키지 검사가
+# `__init__.py`만 보게 되어 검사 범위가 줄어든다 — 그래서 l4만 별도 계약으로 분리한다.
+#
+# 소스는 BOUNDARY_MAP에서 ADAPTER로 배정되지 않은 l4 모듈 95개 전수(파일시스템 100 − ADAPTER 5)다.
+# 목록을 손으로 늘리지 않는다 — `tests/infra/test_eos_boundary_contract_wiring.py`가 정본과의
+# 일치를 CI에서 동결한다(l4에 모듈을 추가하면 이 목록도 함께 갱신해야 한다).
+# ──────────────────────────────────────────────────────────────────────
+
+[[tool.importlinter.contracts]]
+name = "l4 CORE → Math Adapter 금지 (모듈 단위 — 계약 3의 중첩 사각 보정)"
+type = "forbidden"
+# 중첩 스킵을 끄는 핵심 — 소스는 "정확히 그 모듈"만 가리킨다.
+as_packages = false
+allow_indirect_imports = true
+source_modules = [
+    "whymath_backend.l4",
+    "whymath_backend.l4.calibration_coaching",
+    "whymath_backend.l4.completion",
+    "whymath_backend.l4.content_supply",
+    "whymath_backend.l4.hint_content",
+    "whymath_backend.l4.hint_content.cu_hint_pass",
+    "whymath_backend.l4.hint_content.cu_hint_prompts",
+    "whymath_backend.l4.hint_content.gates",
+    "whymath_backend.l4.hint_content.generator",
+    "whymath_backend.l4.hint_content.models",
+    "whymath_backend.l4.hint_content.populate",
+    "whymath_backend.l4.hint_content.store",
+    "whymath_backend.l4.hint_deferral",
+    "whymath_backend.l4.learning_scene",
+    "whymath_backend.l4.lthc",
+    "whymath_backend.l4.lthc.adapt",
+    "whymath_backend.l4.lthc.models",
+    "whymath_backend.l4.metacognitive_trigger",
+    "whymath_backend.l4.misconception",
+    "whymath_backend.l4.misconception.anchor_seat_gap",
+    "whymath_backend.l4.misconception.attempt_hypothesis_policy",
+    "whymath_backend.l4.misconception.audit",
+    "whymath_backend.l4.misconception.catalog",
+    "whymath_backend.l4.misconception.combined",
+    "whymath_backend.l4.misconception.crosslink_candidates",
+    "whymath_backend.l4.misconception.crosslink_coverage",
+    "whymath_backend.l4.misconception.crosslink_demotion_seeder",
+    "whymath_backend.l4.misconception.crosslink_machine_reject",
+    "whymath_backend.l4.misconception.crosslink_review",
+    "whymath_backend.l4.misconception.crosslink_review_aid",
+    "whymath_backend.l4.misconception.crosslink_shadow",
+    "whymath_backend.l4.misconception.crosslink_shadow_harvest",
+    "whymath_backend.l4.misconception.crosslink_standard_signal",
+    "whymath_backend.l4.misconception.crosslink_triage",
+    "whymath_backend.l4.misconception.diagnose",
+    "whymath_backend.l4.misconception.distractor",
+    "whymath_backend.l4.misconception.distractor_link",
+    "whymath_backend.l4.misconception.evidence_store",
+    "whymath_backend.l4.misconception.hypothesis",
+    "whymath_backend.l4.misconception.hypothesis_store",
+    "whymath_backend.l4.misconception.intervene",
+    "whymath_backend.l4.misconception.judge",
+    "whymath_backend.l4.misconception.judge_prompts",
+    "whymath_backend.l4.misconception.judge_seam",
+    "whymath_backend.l4.misconception.judge_shadow_harvest",
+    "whymath_backend.l4.misconception.match_gate",
+    "whymath_backend.l4.misconception.models",
+    "whymath_backend.l4.misconception.probe_selection",
+    "whymath_backend.l4.misconception.probes",
+    "whymath_backend.l4.misconception.remediation_strategy",
+    "whymath_backend.l4.misconception.semantic",
+    "whymath_backend.l4.misconception.semantic.index",
+    "whymath_backend.l4.misconception.semantic.matcher",
+    "whymath_backend.l4.misconception.semantic.pgvector_index",
+    "whymath_backend.l4.misconception.semantic.populate",
+    "whymath_backend.l4.misconception.semantic.provider",
+    "whymath_backend.l4.misconception.semantic_eval",
+    "whymath_backend.l4.misconception.semantic_shadow_harvest",
+    "whymath_backend.l4.misconception.shadow",
+    "whymath_backend.l4.misconception.validate",
+    "whymath_backend.l4.misconception.visualize",
+    "whymath_backend.l4.misconception.warmstart",
+    "whymath_backend.l4.misconception_review_coaching",
+    "whymath_backend.l4.models",
+    "whymath_backend.l4.pedagogy",
+    "whymath_backend.l4.pedagogy.adaptive",
+    "whymath_backend.l4.pedagogy.adaptive.effectiveness",
+    "whymath_backend.l4.pedagogy.adaptive.policy",
+    "whymath_backend.l4.pedagogy.age_band_explanation",
+    "whymath_backend.l4.pedagogy.k_type_resolver",
+    "whymath_backend.l4.pedagogy.mode_guard",
+    "whymath_backend.l4.pedagogy.pack_registry",
+    "whymath_backend.l4.pedagogy.prompt_assembler",
+    "whymath_backend.l4.pedagogy.runtime_selector",
+    "whymath_backend.l4.pedagogy.strategy_registry",
+    "whymath_backend.l4.polya",
+    "whymath_backend.l4.polya.engine",
+    "whymath_backend.l4.polya.prompts",
+    "whymath_backend.l4.polya.transitions",
+    "whymath_backend.l4.prerequisite_coaching",
+    "whymath_backend.l4.scene_generation",
+    "whymath_backend.l4.session_recall",
+    "whymath_backend.l4.socratic",
+    "whymath_backend.l4.socratic.categories",
+    "whymath_backend.l4.socratic.select",
+    "whymath_backend.l4.solution_coaching",
+    "whymath_backend.l4.speech",
+    "whymath_backend.l4.speech.profiles",
+    "whymath_backend.l4.speech.symbols",
+    "whymath_backend.l4.step_shadow",
+    "whymath_backend.l4.step_shadow_eval",
+    "whymath_backend.l4.step_shadow_harvest",
+    "whymath_backend.l4.tone_filter",
+    "whymath_backend.l4.turn_meta",
+    "whymath_backend.l4.visualization_policy",
+]
+forbidden_modules = [
+    "whymath_backend.l4.misconception.answer_signature",
+    "whymath_backend.l4.misconception.derivative_signature",
+    "whymath_backend.l4.misconception.wrong_form_match",
+    "whymath_backend.l4.misconception.wrong_form_shadow_harvest",
+    "whymath_backend.l4.subject_adapter_math",
+]
+
+# ──────────────────────────────────────────────────────────────────────
 # 데이터 접근 계층 (ARCH-48) — 7계층 축·EOS 경계 축과 **또 다른 축**이다.
 #
 # 처분 정본: `docs/architecture/data_access_layer_disposition.md`
