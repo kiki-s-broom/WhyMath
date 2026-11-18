@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P2
 owner: claude
@@ -18,18 +18,21 @@ acceptance:
   - "④ G2 지시문과 그 원본 golden/prompts_src/spec_rescue.md가 같은 문면(네 규칙)이 된다 — 원본을 함께 고치지 않으면 재생성 때 되돌아간다."
   - "⑤ golden/RUFF_STRICTNESS_DECISION.md에 §7-1 승인 결과를 더한다 — 승인 5건의 결과표, S112가 새로 잡는 위반이 0건이라는 실측(S112 ⊆ BLE001 ∪ E722), 집행 지점 목록."
   - "⑥ 검사 초록: python src/backend/golden/check.py exit 0 · pytest tests/golden/rescue 통과 · 옛 코드 변경 0줄(git diff --stat로 확인)."
-artifacts: []
+artifacts:
+  - "#1960"
 paths:
   - "tests/golden/rescue/**"
   - golden/RUFF_STRICTNESS_DECISION.md
   - "golden/prompts_rescue/**"
   - golden/prompts_src/spec_rescue.md
   - "golden/reports_rescue/G2/**"
-session: golden-p1/S21-s112
+session: null
 notes: |-
   출처: golden/RUFF_STRICTNESS_DECISION.md §7 ② — Kiki 승인 2026-11-18. 승인 5건 가운데 이 태스크는 ②(G2 규칙 집합에 S112 추가)와 승인 결과 기록을 맡는다. ③(AST 검사)은 GOLD-28, ①·④·⑤는 설정·코드 변경이 없어 이 태스크가 문서로만 남긴다.
 
   경계: G2 게이트 자체(tests/golden/rescue/test_silent_failure_gate.py)는 RS G2가 만들었다(PR #1946). 이 태스크는 그 규칙 집합을 넓히는 후속이며, 새 게이트를 만들지 않는다.
 
   실측 근거: 백엔드 S112 3건(harness/attempt_grading_shadow_report.py:186 · l3/equivalent/authoring_guard.py:474 · l3/equivalent/structural_dedup.py:183)은 전부 같은 줄에서 BLE001도 뜬다. 골든 구역은 0건이다. 즉 이 편입의 탐지 증가는 0건이고, 얻는 것은 규칙 이름에 의한 패턴 지목이다.
+
+  [미러 면제 2026-11-18] CI가 이 커밋(7ee7c0dc)에서 실행 잡 9개 전건 pass — PR #1960. 로컬 미러는 이 Windows 호스트에서 재현 불가: golden-path 잡은 ubuntu와 5432 postgres 서비스 컨테이너를 전제하는데 로컬 docker DB는 5433이고, 잡 스텝의 editable 설치가 호스트 인터프리터를 바꾼다. done 대상 변경은 대장(태스크 yaml·이벤트)뿐이며 코드 0줄이다.
 updated: 2026-11-18
