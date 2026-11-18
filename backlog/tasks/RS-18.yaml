@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-18
+title: "RS-C1 패키지 카드 — 파트 B l1 데이터 기반"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "l1 하위 패키지 전부에 카드 열·처분 제안·근거가 있다. 읽기 누계 2,000줄 이하."
+artifacts: []
+paths:
+  - "golden/reports_rescue/C1/**"
+session: golden-rs/C1
+notes: ""
+updated: 2026-11-18

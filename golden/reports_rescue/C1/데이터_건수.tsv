@@ -1,0 +1,28 @@
+﻿경로	크기	건수(json=가장 큰 리스트/딕트 값 길이 · jsonl=비지 않은 줄 · 폴더=파일 수)
+data/corpus/atom_graph_v1/graph.json	4979KB	dict 키4 [concepts=2683 edges=2278 narrative_edges_raw=973]
+data/corpus/concept_visual_style_v1/concept_visual_style.json	36KB	dict 키3 [entries=127]
+data/corpus/concept_visualization_v1/visualizability.json	0KB	dict 키3 [entries=1]
+data/corpus/concept_atom_crosswalk_v1/crosswalk.jsonl	192KB	줄 437
+data/corpus/concept_graph_v1/concepts.jsonl	320KB	줄 437
+data/corpus/concept_graph_v1/graph.json	713KB	dict 키5 [edges=581 concepts=437 flashcards_raw=113]
+data/concept_graph/graph.json	없음
+data/corpus/concept_content_v1/content.json	417KB	dict 키6 [content=437]
+data/corpus/concept_content_university_v1/content.json	484KB	dict 키6 [content=409]
+data/corpus/formula_graph_v1/graph.json	12KB	dict 키2 [formulas=25]
+data/corpus/misconceptions_v1/misconceptions.json	750KB	dict 키5 [misconceptions=843]
+data/corpus/misconception_crosslinks_v1/crosslinks.json	12KB	dict 키1 [crosslinks=69]
+data/corpus/wrong_answer_signatures_v1/rules.yaml	11KB	dict 키3 [rules=10]
+data/corpus/pedagogy_packs_v1	폴더 파일 8
+data/corpus/problem_bank_v1/problems.jsonl	4KB	줄 4
+data/corpus/problem_type_graph_v1/graph.json	8KB	dict 키2 [problem_types=17]
+data/corpus/skill_graph_v1/graph.json	10KB	dict 키2 [skills=27]
+data/corpus/strategy_graph_v1/graph.json	2KB	dict 키2 [strategies=8]
+data/corpus/achievement_criteria_v1/achievement_criteria.json	62KB	list 13
+data/corpus/eos_anchor_set_v1/anchors.yaml	9KB	dict 키9 [anchors=8 standards_sources=2 scopes=2]
+data/corpus/phase3_remediation_v1/remediation.yaml	4KB	dict 키5 [signatures=6 unseated_decision=4]
+data/corpus/phase3_scope_v1/scope_spec.yaml	18KB	dict 키19 [curriculum_nodes=10 concepts=10 skills=8]
+data/corpus/phase3_scope_v1/slot_assignment_rules.yaml	3KB	dict 키4 [banks=4 scope_concepts=3 rules=3]
+data/corpus/standards_v1	폴더 파일 3
+data/corpus/standards_v1/standards.json	530KB	dict 키6 [standards=895]
+data/corpus/standards_v1/concept_standard_links.json	60KB	dict 키6 [links=443]
+data/corpus/problem_bank_*	폴더 40개	jsonl 합계 15,042줄(cat … | grep -c .)

@@ -1,0 +1,37 @@
+﻿하위 패키지	모듈 수	줄 수	옛앱 등급(D1)	골든 등급(D1)	import하는 모듈 수 합(D1)	직접 import 테스트 파일 수 합(D5 5번째 칸)(0개 모듈 수)	except 전체/광범위	조용함 전체/광범위(D2 규칙)	D1 비고
+(l1 __init__)	1	8	옛앱[가동1]	골든[가동1]	imp0	T0(0개1)	exc0/광0	조용0/광0	문자열로 불러옴(골든)1
+(단독) embedding_primitives	1	237	옛앱[대기1]	골든[섬1]	imp22	T7(0개0)	exc0/광0	조용0/광0	
+(단독) embedding_provider	1	362	옛앱[가동1]	골든[섬1]	imp5	T4(0개0)	exc2/광0	조용0/광0	
+(단독) fk_precheck	1	110	옛앱[섬1]	골든[섬1]	imp2	T3(0개0)	exc0/광0	조용0/광0	
+atom_graph	10	2778	옛앱[가동2·대기7·섬1]	골든[섬8·잔해2]	imp30	T37(0개2)	exc6/광0	조용4/광0	
+atom_probe	3	342	옛앱[섬2·잔해1]	골든[섬2·잔해1]	imp1	T4(0개1)	exc1/광0	조용1/광0	
+concept_atom_crosswalk	4	662	옛앱[가동1·대기1·섬1·잔해1]	골든[섬2·잔해2]	imp5	T8(0개2)	exc0/광0	조용0/광0	
+concept_content	6	912	옛앱[가동1·대기3·섬2]	골든[섬5·잔해1]	imp11	T14(0개1)	exc3/광0	조용2/광0	
+concept_graph	9	2009	옛앱[가동1·대기6·섬1·잔해1]	골든[섬6·잔해3]	imp42	T25(0개3)	exc3/광0	조용3/광0	
+concept_visual_style	2	160	옛앱[가동1·대기1]	골든[섬1·잔해1]	imp3	T1(0개1)	exc1/광0	조용1/광0	
+concept_visualization	2	148	옛앱[가동1·대기1]	골든[섬1·잔해1]	imp3	T2(0개1)	exc1/광0	조용1/광0	
+curriculum	4	884	옛앱[가동1·대기3]	골든[섬3·잔해1]	imp4	T7(0개1)	exc0/광0	조용0/광0	
+formula_graph	3	324	옛앱[섬1·잔해2]	골든[섬1·잔해2]	imp2	T2(0개2)	exc0/광0	조용0/광0	
+misconception	10	1737	옛앱[가동1·대기5·섬4]	골든[섬9·잔해1]	imp22	T38(0개1)	exc0/광0	조용0/광0	
+pedagogy	5	811	옛앱[섬2·잔해3]	골든[섬2·잔해3]	imp4	T8(0개3)	exc1/광0	조용0/광0	
+problem_bank	9	2606	옛앱[가동1·대기5·섬3]	골든[섬8·잔해1]	imp75	T49(0개1)	exc2/광0	조용1/광0	
+problem_type_graph	3	296	옛앱[섬1·잔해2]	골든[섬1·잔해2]	imp2	T2(0개2)	exc0/광0	조용0/광0	
+rights	5	1233	옛앱[가동1·섬2·잔해2]	골든[가동1·섬2·잔해2]	imp0	T4(0개2)	exc0/광0	조용0/광0	그래프 밖(__init__ 없는 폴더)4·그래프 밖(__init__ 없는 폴더) · 문자열로 불러옴(골든) · 문자열로 불러옴(옛앱)1
+skill_graph	4	340	옛앱[가동1·대기2·잔해1]	골든[섬2·잔해2]	imp3	T3(0개2)	exc0/광0	조용0/광0	
+standards	12	5661	옛앱[가동2·대기3·섬7]	골든[섬11·잔해1]	imp25	T49(0개1)	exc21/광1	조용0/광0	
+strategy_graph	3	312	옛앱[섬2·잔해1]	골든[섬2·잔해1]	imp2	T5(0개1)	exc0/광0	조용0/광0	
+합계	98	21932	exc41/광1	조용13/광0	T272(0개28)
+# 조용한 except 위치(D2 규칙 · ast)
+src/backend/whymath_backend/l1/atom_graph/atom_backend_concept.py:69
+src/backend/whymath_backend/l1/atom_graph/atom_backend_concept.py:120
+src/backend/whymath_backend/l1/atom_graph/atom_backend_edge.py:72
+src/backend/whymath_backend/l1/atom_graph/atom_node_projection.py:92
+src/backend/whymath_backend/l1/atom_probe/projection.py:77
+src/backend/whymath_backend/l1/concept_content/review_gate.py:98
+src/backend/whymath_backend/l1/concept_content/review_gate.py:102
+src/backend/whymath_backend/l1/concept_graph/backend_concept.py:161
+src/backend/whymath_backend/l1/concept_graph/backend_edge.py:105
+src/backend/whymath_backend/l1/concept_graph/node_projection.py:126
+src/backend/whymath_backend/l1/concept_visual_style/overlay.py:82
+src/backend/whymath_backend/l1/concept_visualization/overlay.py:74
+src/backend/whymath_backend/l1/problem_bank/answer_distribution.py:59
