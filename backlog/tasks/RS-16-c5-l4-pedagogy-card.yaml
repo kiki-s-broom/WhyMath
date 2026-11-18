@@ -5,16 +5,17 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on: []
 requires_gates: []
 acceptance: []
-artifacts: []
+artifacts:
+  - "PR #1953 (커밋 faa8b77f) — 카드 81줄·TSV 100행·보고"
 paths:
   - "golden/reports_rescue/C5/**"
-session: golden-rs/C5
-notes: ""
+session: null
+notes: "[미러 면제 2026-11-17] 컨테이너의 debian 설치 pip·pyparsing 제거 불가로 미러 설치 스텝 실패 — backlog validate·audit-deps는 로컬 exit 0"
 updated: 2026-11-17
