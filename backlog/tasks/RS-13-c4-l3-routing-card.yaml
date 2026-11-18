@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-13-c4-l3-routing-card
+title: "RS-C4 패키지 카드 — 파트 B l3 생성·라우팅·그 외"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts:
+  - "#1951"
+paths:
+  - "golden/reports_rescue/C4/**"
+session: null
+notes: ""
+updated: 2026-11-18
