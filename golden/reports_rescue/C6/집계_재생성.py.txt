@@ -1,0 +1,168 @@
+"""C6 집계 — 파트 C 접착제(api·db·schema·루트 파일) 숫자를 도구로만 모은다.
+
+본문을 사람이 읽지 않는다. ast로 데코레이터·클래스 상속·except 본문만 센다.
+출력: 파일 단위 TSV 1개(stdout 아님) + 묶음 요약 TSV 1개.
+재생성(저장소 루트): cp golden/reports_rescue/C6/집계_재생성.py.txt /tmp/c6_agg.py && python3 /tmp/c6_agg.py golden/reports_rescue/C6
+"""
+
+import ast
+import csv
+import sys
+from collections import Counter, defaultdict
+from pathlib import Path
+
+ROOT = Path.cwd()  # 저장소 루트에서 실행한다
+BE = ROOT / "src/backend/whymath_backend"
+OUT = Path(sys.argv[1])
+
+ROOT_FILES = ["app.py", "composition.py", "config.py", "consent.py", "consent_grant.py", "security.py"]
+HTTP = {"get", "post", "put", "patch", "delete", "head", "options", "api_route", "websocket"}
+
+# --- 입력 표 ---
+ledger = {}
+with open(ROOT / "golden/reports_rescue/D1/ledger.csv", encoding="utf-8-sig") as f:
+    for r in csv.DictReader(f):
+        ledger[r["파일 경로"]] = r
+tests = {}
+with open(ROOT / "golden/reports_rescue/D5/모듈별_테스트수.tsv", encoding="utf-8-sig") as f:
+    for r in csv.DictReader(f, delimiter="\t"):
+        tests[r["파일 경로"]] = int(r["직접 import하는 테스트 파일 수(정적 근사·실행 아님)"])
+manifest = {
+    ln.strip()
+    for ln in (ROOT / "golden/LEGACY_MANIFEST.txt").read_text(encoding="utf-8").splitlines()
+    if ln.strip() and not ln.startswith("#")
+}
+
+
+def _is_default_return(node: ast.Return) -> bool:
+    """D2 규칙: 값 없음·None·상수·빈 컨테이너·인자 없는 생성자."""
+    v = node.value
+    if v is None or isinstance(v, ast.Constant):
+        return True
+    if isinstance(v, (ast.List, ast.Dict, ast.Tuple, ast.Set)):
+        return not (getattr(v, "elts", None) or getattr(v, "keys", None))
+    if isinstance(v, ast.Call) and isinstance(v.func, ast.Name):
+        return v.func.id in {"list", "dict", "set", "tuple", "frozenset"} and not v.args and not v.keywords
+    return False
+
+
+def _silent(h: ast.ExceptHandler) -> bool:
+    for s in h.body:
+        if isinstance(s, (ast.Pass, ast.Continue)):
+            continue
+        if isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant):
+            continue
+        if isinstance(s, ast.Return) and _is_default_return(s):
+            continue
+        return False
+    return True
+
+
+def _broad(h: ast.ExceptHandler) -> bool:
+    t = h.type
+    return t is None or (isinstance(t, ast.Name) and t.id in {"Exception", "BaseException"})
+
+
+def scan(p: Path) -> dict:
+    tree = ast.parse(p.read_text(encoding="utf-8"))
+    routes = Counter()
+    models = 0
+    pyd = 0
+    silent = broad_silent = 0
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for d in n.decorator_list:
+                c = d.func if isinstance(d, ast.Call) else d
+                if isinstance(c, ast.Attribute) and isinstance(c.value, ast.Name):
+                    if c.value.id == "router":
+                        routes["router"] += 1
+                    elif c.attr in HTTP and c.value.id in {"app", "api"}:
+                        routes["app"] += 1
+                    elif c.attr in HTTP:
+                        routes["other:" + c.value.id] += 1
+        if isinstance(n, ast.ClassDef):
+            bases = {b.id if isinstance(b, ast.Name) else getattr(b, "attr", "") for b in n.bases}
+            kws = {k.arg for k in n.keywords}
+            body_has_table = any(
+                isinstance(s, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "__tablename__" for t in s.targets)
+                for s in n.body
+            )
+            if body_has_table:
+                models += 1
+            if "BaseModel" in bases:
+                pyd += 1
+            _ = kws
+        if isinstance(n, ast.ExceptHandler) and _silent(n):
+            silent += 1
+            broad_silent += _broad(n)
+    return {"routes": routes, "models": models, "pyd": pyd, "silent": silent, "broad_silent": broad_silent}
+
+
+def group_of(rel: str) -> str:
+    """하위 묶음: db/models는 폴더, 루트는 파일, api·schema·db 평면은 패키지 자체."""
+    parts = rel.split("/")
+    if parts[0] in ROOT_FILES:
+        return parts[0]
+    if parts[0] == "db" and len(parts) > 2:
+        return "db/" + parts[1]
+    return parts[0]
+
+
+files = sorted(
+    [p for d in ("api", "db", "schema") for p in (BE / d).rglob("*.py") if "__pycache__" not in p.parts]
+    + [BE / f for f in ROOT_FILES]
+)
+rows = []
+for p in files:
+    rel = str(p.relative_to(BE))
+    key = "src/backend/whymath_backend/" + rel
+    lg = ledger.get(key, {})
+    s = scan(p)
+    rows.append(
+        {
+            "파일": rel,
+            "묶음": group_of(rel),
+            "줄 수": lg.get("줄 수", ""),
+            "옛앱 등급": lg.get("옛앱 등급", "미확인"),
+            "골든 등급": lg.get("골든 등급", "미확인"),
+            "골든에서 닿음(D1·S20A 뒤)": lg.get("골든에서 닿음", "미확인"),
+            "LEGACY_MANIFEST 밖(11-15 골든 참조)": "예" if key not in manifest else "아니오",
+            "@router 데코레이터": s["routes"]["router"],
+            "기타 HTTP 데코레이터": sum(v for k, v in s["routes"].items() if k != "router"),
+            "ORM 모델(__tablename__)": s["models"],
+            "pydantic BaseModel": s["pyd"],
+            "조용한 삼키기": s["silent"],
+            "그중 광범위": s["broad_silent"],
+            "직접 import 테스트(D5)": tests.get(key, ""),
+            "import하는 모듈 수(D1)": lg.get("이 모듈을 import하는 모듈 수", ""),
+        }
+    )
+
+with open(OUT / "파일별.tsv", "w", encoding="utf-8-sig", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=list(rows[0]), delimiter="\t")
+    w.writeheader()
+    w.writerows(rows)
+
+# 묶음 요약
+agg = defaultdict(lambda: defaultdict(int))
+grades = defaultdict(Counter)
+for r in rows:
+    a = agg[r["묶음"]]
+    a["모듈"] += 1
+    a["줄"] += int(r["줄 수"] or 0)
+    for k in ("@router 데코레이터", "기타 HTTP 데코레이터", "ORM 모델(__tablename__)", "pydantic BaseModel",
+              "조용한 삼키기", "그중 광범위"):
+        a[k] += r[k]
+    a["테스트"] += int(r["직접 import 테스트(D5)"] or 0)
+    a["골든 닿음"] += r["골든에서 닿음(D1·S20A 뒤)"] == "예"
+    a["매니페스트 밖"] += r["LEGACY_MANIFEST 밖(11-15 골든 참조)"] == "예"
+    grades[r["묶음"]][r["옛앱 등급"]] += 1
+with open(OUT / "묶음별.tsv", "w", encoding="utf-8-sig", newline="") as f:
+    keys = ["모듈", "줄", "@router 데코레이터", "기타 HTTP 데코레이터", "ORM 모델(__tablename__)",
+            "pydantic BaseModel", "조용한 삼키기", "그중 광범위", "테스트", "골든 닿음", "매니페스트 밖"]
+    f.write("묶음\t" + "\t".join(keys) + "\t옛앱 등급 분포\n")
+    for g in sorted(agg):
+        dist = " ".join(f"{k}{v}" for k, v in sorted(grades[g].items()))
+        f.write(g + "\t" + "\t".join(str(agg[g][k]) for k in keys) + "\t" + dist + "\n")
+print("파일", len(rows), "· 원장 미일치", sum(r["옛앱 등급"] == "미확인" for r in rows))

@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-14-c6-glue-card
+title: "RS-C6 패키지 카드 — 파트 C 접착제(api·app·db·schema·루트 파일)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - 라우터 56개 엔드포인트 수 합계 기재 · db·schema 골든 사용/미사용 구분 · 카드 150줄 이하
+artifacts: []
+paths:
+  - "golden/reports_rescue/C6/**"
+session: golden-rs/C6
+notes: ""
+updated: 2026-11-17
