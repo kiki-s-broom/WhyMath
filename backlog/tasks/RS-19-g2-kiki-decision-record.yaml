@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
@@ -13,11 +13,12 @@ depends_on: []
 requires_gates: []
 acceptance:
   - 허용 목록 4줄 이유 칸에 Kiki 승인 2026-11-18 기록 · 보고·카드에 결정 반영 · LATER.md 한 줄 · tests/golden 초록 · 옛 코드 변경 0줄
-artifacts: []
+artifacts:
+  - "PR #1961 · 커밋 05fb0470(결정 기록)·d6a1abd2(main 병합) · 허용 목록 4줄 Kiki 승인 2026-11-18 · 보고·카드 결정 결과 · LATER.md 1줄"
 paths:
   - tests/golden/rescue/silent_failure_allow.txt
   - "golden/reports_rescue/G2/**"
   - golden/LATER.md
-session: golden-rs/G2
+session: null
 notes: ""
 updated: 2026-11-18
