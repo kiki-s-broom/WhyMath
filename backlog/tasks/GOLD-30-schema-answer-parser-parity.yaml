@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-30-schema-answer-parser-parity
+title: "정답 파싱 검사를 채점기 파서(grade._parse)로 맞춘다 — LATER RS-G2 줄"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "tests/golden/test_problems_schema.py ⑤가 grade._parse(grade.normalize(answer))로 30문항 정답을 읽는다 · 채점기가 못 읽는 정답 주입 시 실패 · tests/golden 초록 · golden/LATER.md 해당 줄 처리 표시"
+artifacts: []
+paths:
+  - tests/golden/test_problems_schema.py
+  - golden/LATER.md
+session: claude/new-session-55gg39
+notes: ""
+updated: 2026-11-18
