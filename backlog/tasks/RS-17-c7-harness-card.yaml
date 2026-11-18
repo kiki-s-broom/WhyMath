@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-17-c7-harness-card
+title: "RS-C7 패키지 카드 — 파트 D harness 측정·검수 도구"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "harness 163모듈 전부 10~15묶음 귀속 · 목차 1단계 2회 이하 · 읽기 누계 2,000줄 이하 · 카드 150줄 이하"
+artifacts: []
+paths:
+  - "golden/reports_rescue/C7/**"
+session: golden-rs/C7
+notes: ""
+updated: 2026-11-18
