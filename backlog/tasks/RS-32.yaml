@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-32
+title: "RS-Z2 가림막 후보 — AI가 열지 않아도 되는 폴더 목록"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - "golden/reports_rescue/Z2/**"
+session: golden-rs/Z2
+notes: "옛 코드 살리기 RS 단계05 Z2. 산출물은 golden/reports_rescue/Z2/ 뿐. .claude/settings.json은 고치지 않는다(적용은 Kiki)."
+updated: 2026-11-19

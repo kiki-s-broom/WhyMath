@@ -1,0 +1,6 @@
+{"ts": "2026-11-19T07:19:59+00:00", "actor": "golden-rs/Z2", "action": "policy_warn", "id": "RS-32", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z2/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:59+00:00", "actor": "golden-rs/Z2", "action": "policy_warn", "id": "RS-32", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z2/**", "mode": "warn"}
+{"ts": "2026-11-19T07:20:03+00:00", "actor": "golden-rs/Z2", "action": "add", "id": "RS-32", "eos_priority": "P1"}
+{"ts": "2026-11-19T07:20:12+00:00", "actor": "golden-rs/Z2", "action": "policy_warn", "id": "RS-32", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z2/**", "mode": "warn"}
+{"ts": "2026-11-19T07:20:12+00:00", "actor": "golden-rs/Z2", "action": "policy_warn", "id": "RS-32", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z2/**", "mode": "warn"}
+{"ts": "2026-11-19T07:20:16+00:00", "actor": "golden-rs/Z2", "action": "start", "id": "RS-32", "session": "golden-rs/Z2", "remote": "ok"}
