@@ -1,0 +1,19 @@
+# 조용한 값 삼키기 게이트 허용 목록 — RS-G3 (2026-11-19)
+#
+# 형식: 한 줄에 한 건 — `경로:줄 · 규칙 · 이유`
+#   - 경로는 src/backend 기준(예: golden/check.py), 줄은 `except` 핸들러의 줄 번호다.
+#   - 규칙은 SILENT-VALUE 하나다 — `except` 핸들러가 예외 사실을 남기지 않고 값도 없이 넘어간 자리.
+#   - 이유는 비워 둘 수 없다. "왜 신호 없이 넘어가도 되는가"를 적는다.
+#   - `#`로 시작하는 줄과 빈 줄은 무시한다.
+#
+# 허용은 게이트를 끄는 것이 아니라 "이 자리는 설계된 강등"이라는 선언이다.
+# 새 자리가 생기면 여기에 줄을 더하기 전에, 신호(타입명·exc_info·raise)를 남기는 쪽을 먼저 검토한다.
+#
+# 아래 5건은 골든 구역(golden/**) 전수 측정 결과다. 옛 구역은 게이트 없이 기준선으로만 기록한다
+# (golden/reports_rescue/G3/옛구역_값삼키기_기준선.tsv).
+
+golden/check.py:349 · SILENT-VALUE · .git 안 로그 폴더를 못 만들면 None — docstring에 "못 만들면 None"으로 명시된 설계(로그는 부가물). 판정은 스텝의 exit code가 따로 낸다.
+golden/check.py:376 · SILENT-VALUE · 로그 파일 쓰기 실패 시 log_path=None — 같은 이유. 실패 원인은 StepResult.returncode와 stderr 출력이 이미 나른다.
+golden/llm/_openai_compat.py:214 · SILENT-VALUE · Retry-After가 숫자가 아니면 None — docstring이 "모르면 모른다고 하고 기본 백오프로 간다"고 선언한 설계된 강등. 날짜 형식을 지어내지 않는다.
+golden/llm/seat_failure.py:113 · SILENT-VALUE · 선택 의존성 httpx 미설치 시 ImportError — 내장 TimeoutError만으로 계속한다. 미설치 SDK의 예외는 애초에 발생할 수 없다.
+golden/llm/seat_failure.py:119 · SILENT-VALUE · 선택 의존성 anthropic 미설치·구버전 시 ImportError·AttributeError — 같은 이유. 미설치 SDK의 예외는 애초에 발생할 수 없다.

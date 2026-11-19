@@ -1,0 +1,77 @@
+﻿l3 상대경로	묶음	줄 수	옛앱 등급	골든에서 닿음(D1·main ad35b096)	LEGACY_MANIFEST에 있음	이 모듈을 import하는 모듈 수	직접 import 테스트 수(D5)	조용함(D2 규칙)	조용함(광범위만)
+cache/__init__.py	cache/	22	가동	아니오	True	2	3	0	0
+cache/redis_cache.py	cache/	415	가동	아니오	True	2	2	0	0
+dsl/__init__.py	dsl/	44	가동	아니오	True	0	1	0	0
+dsl/compiler.py	dsl/	148	대기	아니오	True	1	1	1	1
+dsl/math_verifier.py	dsl/	196	대기	아니오	True	1	1	3	0
+dsl/models.py	dsl/	344	대기	아니오	True	8	8	0	0
+dsl/quality_gate.py	dsl/	57	대기	아니오	True	1	1	0	0
+dsl/repair.py	dsl/	115	대기	아니오	True	1	1	0	0
+dsl/validators.py	dsl/	231	대기	아니오	True	2	1	0	0
+dsl/variable_engine.py	dsl/	167	대기	아니오	True	4	2	1	1
+pedagogy/__init__.py	pedagogy/	14	잔해	아니오	True	0	0	0	0
+pedagogy/analogy_checker.py	pedagogy/	240	섬	아니오	True	4	3	0	0
+pedagogy/analogy_demand.py	pedagogy/	311	섬	아니오	True	0	1	0	0
+pedagogy/analogy_generator.py	pedagogy/	563	섬	아니오	True	1	2	1	0
+pedagogy/diag_item_projector.py	pedagogy/	368	섬	아니오	True	0	2	0	0
+pedagogy/example_generator.py	pedagogy/	288	섬	아니오	True	0	1	0	0
+pedagogy/explanation_checker.py	pedagogy/	95	섬	아니오	True	2	1	0	0
+pedagogy/explanation_generator.py	pedagogy/	396	섬	아니오	True	2	4	1	0
+pedagogy/prescreen.py	pedagogy/	133	섬	아니오	True	3	2	0	0
+pedagogy/review.py	pedagogy/	192	섬	아니오	True	3	2	0	0
+pedagogy/slot_generator.py	pedagogy/	264	섬	아니오	True	6	6	0	0
+pregenerate/__init__.py	pregenerate/	56	가동	아니오	True	0	3	0	0
+pregenerate/__main__.py	pregenerate/	188	섬	아니오	True	0	3	0	0
+pregenerate/models.py	pregenerate/	140	대기	아니오	True	10	7	0	0
+pregenerate/prewarmer.py	pregenerate/	359	대기	아니오	True	2	2	0	0
+pregenerate/provenance_bridge.py	pregenerate/	288	대기	아니오	True	11	11	0	0
+pregenerate/validator.py	pregenerate/	896	가동	아니오	True	15	4	0	0
+providers/__init__.py	providers/	41	가동	아니오	False	0	0	0	0
+providers/_openai_compat.py	providers/	305	대기	아니오	False	3	6	1	0
+providers/_response_fields.py	providers/	40	대기	아니오	False	3	2	0	0
+providers/anthropic.py	providers/	565	대기	아니오	False	6	15	1	0
+providers/cloud_status.py	providers/	43	가동	아니오	False	1	0	0	0
+providers/composite.py	providers/	453	가동	아니오	False	17	10	1	0
+providers/deepseek.py	providers/	270	대기	아니오	False	4	1	0	0
+providers/factory.py	providers/	122	가동	아니오	False	15	4	0	0
+providers/ollama.py	providers/	505	가동	아니오	False	24	21	1	0
+providers/openrouter.py	providers/	450	가동	아니오	False	6	9	0	0
+providers/seat_failure.py	providers/	274	가동	아니오	False	9	3	2	0
+queue/__init__.py	queue/	19	가동	아니오	True	1	2	0	0
+queue/celery_app.py	queue/	113	가동	아니오	True	2	3	0	0
+queue/celery_job_queue.py	queue/	249	가동	아니오	True	1	4	0	0
+queue/tasks.py	queue/	213	가동	아니오	True	1	5	0	0
+render/__init__.py	render/	70	가동	아니오	True	0	0	0	0
+render/adapter.py	render/	152	대기	아니오	True	5	4	0	0
+render/adapters.py	render/	345	대기	아니오	True	2	1	0	0
+render/assessment_bank.py	render/	173	대기	아니오	True	2	1	0	0
+render/dsl.py	render/	183	대기	아니오	True	7	6	0	0
+render/registry.py	render/	78	대기	아니오	True	6	5	0	0
+cross_verify.py	top:다중풀이·교차검증	1186	가동	아니오	True	7	13	1	0
+multi_solution.py	top:다중풀이·교차검증	1329	섬	아니오	True	0	4	1	0
+solution_path.py	top:다중풀이·교차검증	267	섬	아니오	True	2	2	1	0
+solution_path_store.py	top:다중풀이·교차검증	121	대기	아니오	True	3	1	0	0
+__init__.py	top:라우터·계약	34	가동	예	False	0	0	0	0
+interfaces.py	top:라우터·계약	271	대기	아니오	False	42	44	0	0
+models.py	top:라우터·계약	523	가동	예	False	54	110	0	0
+router.py	top:라우터·계약	1019	가동	예	False	30	33	2	0
+data_export_policy.py	top:반출·관할 정책	252	가동	예	False	3	2	0	0
+data_grade_defaults.py	top:반출·관할 정책	82	가동	아니오	True	16	7	0	0
+provider_jurisdiction.py	top:반출·관할 정책	281	가동	예	False	8	5	0	0
+problem_metadata_evidence.py	top:발행 게이트	164	대기	아니오	True	1	1	0	0
+problem_publish_gate.py	top:발행 게이트	935	대기	아니오	True	2	5	2	0
+publish_gate.py	top:발행 게이트	991	대기	아니오	True	5	9	0	0
+verification_tier.py	top:발행 게이트	129	대기	아니오	True	36	43	0	0
+escalation_defaults.py	top:생성 보조	43	가동	아니오	True	7	0	0	0
+generation_seed.py	top:생성 보조	160	대기	아니오	True	6	1	0	0
+isolated_call.py	top:생성 보조	486	가동	아니오	True	1	3	4	2
+pipeline.py	top:생성 보조	432	가동	아니오	True	16	14	0	0
+prompt_assets.py	top:생성 보조	236	가동	아니오	True	5	6	0	0
+speech.py	top:수식 음성화	490	대기	아니오	True	2	2	0	0
+speech_parse.py	top:수식 음성화	449	대기	아니오	True	1	0	0	0
+visualization.py	top:시각화 명세	338	대기	아니오	True	5	11	0	0
+viz_eval.py	top:시각화 명세	400	섬	아니오	True	0	2	0	0
+curriculum_notation_gate.py	top:표기 범위	682	섬	아니오	True	3	1	0	0
+notation_coverage.py	top:표기 범위	827	섬	아니오	True	1	2	0	0
+trace/__init__.py	trace/	13	가동	아니오	True	2	4	0	0
+trace/langfuse_sink.py	trace/	306	가동	아니오	True	12	9	0	0

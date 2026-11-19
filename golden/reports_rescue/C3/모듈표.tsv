@@ -1,0 +1,91 @@
+모듈	묶음	줄 수	골든 등급	옛앱 등급	import하는 모듈 수	직접 import 테스트 수	except	광범위	조용함	조용함(광범위)
+whymath_backend.l3.equivalent	E1 동등문제 파이프라인 코어	44	섬	가동	1	1	0	0	0	0
+whymath_backend.l3.equivalent.acceptance	E1 동등문제 파이프라인 코어	640	섬	대기	97	118	0	0	0	0
+whymath_backend.l3.equivalent.authoring_guard	E4 저작 게이트(거부·우회·LaTeX·발문 위생·재태깅)	720	섬	섬	2	2	8	5	7	4
+whymath_backend.l3.equivalent.binomial_distribution_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	240	섬	섬	1	3	0	0	0	0
+whymath_backend.l3.equivalent.calculus1_integral_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	381	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.calculus2_trig_integral_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	313	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.calculus_chain_quotient_rule_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	441	섬	섬	1	3	0	0	0	0
+whymath_backend.l3.equivalent.calculus_product_rule_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	284	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.calculus_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	1218	섬	섬	1	6	0	0	0	0
+whymath_backend.l3.equivalent.canonicalize	E3 정규화·구조 중복 차단	137	섬	대기	20	19	3	0	3	0
+whymath_backend.l3.equivalent.combination_binomial_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	376	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.complex_number_arithmetic_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	292	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.conceptual_count_mc_generator	E7 객관식 생성기(개념형·오개념)	895	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.conic_section_focus_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	314	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.coordinate_geometry_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	467	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.counterexample_fuzz	E5 검증기 측정(결함 주입·반례 fuzz)	473	섬	섬	1	4	9	5	1	0
+whymath_backend.l3.equivalent.defect_seeder	E5 검증기 측정(결함 주입·반례 fuzz)	329	섬	섬	4	5	0	0	0	0
+whymath_backend.l3.equivalent.difficulty	E1 동등문제 파이프라인 코어	138	섬	섬	2	7	0	0	0	0
+whymath_backend.l3.equivalent.discrete_expected_value_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	238	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.elementary_addsub_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	266	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.elementary_area_measure_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	421	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.elementary_division_remainder_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	234	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.elementary_gcd_lcm_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	230	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.elementary_rounding_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	270	섬	섬	1	3	0	0	0	0
+whymath_backend.l3.equivalent.elementary_volume_measure_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	535	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.exp_log_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	452	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.finite_probability_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	301	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.generator	E1 동등문제 파이프라인 코어	192	섬	대기	56	91	0	0	0	0
+whymath_backend.l3.equivalent.highschool_quotient_rule_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	276	섬	섬	1	3	0	0	0	0
+whymath_backend.l3.equivalent.inductive_sequence_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	353	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.latex_gate	E4 저작 게이트(거부·우회·LaTeX·발문 위생·재태깅)	88	섬	대기	1	1	0	0	0	0
+whymath_backend.l3.equivalent.linear_function_value_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	239	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.linear_inequality_system_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	298	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.llm_generator	E2 LLM 저작(생성·발문 다양화)	1339	섬	섬	1	16	10	7	2	0
+whymath_backend.l3.equivalent.matrix_ops_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	322	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.measurement_unit_conversion_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	254	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.misconception_eval_mc_generator	E7 객관식 생성기(개념형·오개념)	2310	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.orchestrator	E1 동등문제 파이프라인 코어	520	섬	대기	42	46	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_defect_seeder	E8 P3 미분 은행 — 공용·감사	1689	섬	섬	1	2	4	0	4	0
+whymath_backend.l3.equivalent.p3_diff_differentiability_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1538	섬	섬	2	2	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_differential_coefficient_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	629	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_equation_application_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1654	섬	섬	1	3	1	0	1	0
+whymath_backend.l3.equivalent.p3_diff_expr	E8 P3 미분 은행 — 공용·감사	328	섬	섬	11	2	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_graph_shape_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1763	섬	섬	2	6	1	0	1	0
+whymath_backend.l3.equivalent.p3_diff_mean_value_theorem_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1720	섬	섬	3	3	2	0	2	0
+whymath_backend.l3.equivalent.p3_diff_monotonicity_extremum_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	315	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_motion_word_problem_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	417	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_polynomial_rules_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1271	섬	섬	1	2	1	0	1	0
+whymath_backend.l3.equivalent.p3_diff_power_derivative_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1015	섬	섬	2	4	3	0	3	0
+whymath_backend.l3.equivalent.p3_diff_power_pattern_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	303	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.p3_diff_shortcut_guard	E8 P3 미분 은행 — 공용·감사	4031	섬	섬	4	8	9	0	8	0
+whymath_backend.l3.equivalent.p3_diff_skeleton_base	E8 P3 미분 은행 — 공용·감사	749	섬	섬	17	22	2	0	0	0
+whymath_backend.l3.equivalent.p3_diff_solution_steps	E8 P3 미분 은행 — 공용·감사	714	섬	섬	2	4	2	0	0	0
+whymath_backend.l3.equivalent.p3_diff_tangent_line_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1916	섬	섬	1	3	3	0	3	0
+whymath_backend.l3.equivalent.p3_diff_text_scanner	E8 P3 미분 은행 — 공용·감사	381	섬	섬	2	1	1	0	1	0
+whymath_backend.l3.equivalent.p3_diff_velocity_acceleration_skeleton_generator	E9 P3 미분 은행 — 소단원 생성기	1475	섬	섬	2	2	3	0	3	0
+whymath_backend.l3.equivalent.permutation_combination_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	371	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.polynomial_arithmetic_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	325	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.polynomial_factoring_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	292	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.probability_law_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	505	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.quadratic_inequality_boundary_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	267	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.radian_conversion_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	253	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.rephrase	E2 LLM 저작(생성·발문 다양화)	446	섬	대기	5	9	1	1	0	0
+whymath_backend.l3.equivalent.rephrase_hygiene	E4 저작 게이트(거부·우회·LaTeX·발문 위생·재태깅)	255	섬	대기	2	3	0	0	0	0
+whymath_backend.l3.equivalent.retag	E4 저작 게이트(거부·우회·LaTeX·발문 위생·재태깅)	133	섬	대기	3	1	0	0	0	0
+whymath_backend.l3.equivalent.root_aggregate_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	301	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.sample_mean_distribution_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	232	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.sequence_sigma_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	466	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.sequence_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	436	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.sequence_sum_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	428	섬	섬	1	1	0	0	0	0
+whymath_backend.l3.equivalent.skeleton_generator	E1 동등문제 파이프라인 코어	813	섬	섬	3	6	0	0	0	0
+whymath_backend.l3.equivalent.structural_dedup	E3 정규화·구조 중복 차단	312	섬	섬	1	1	4	3	1	1
+whymath_backend.l3.equivalent.trig_equation_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	287	섬	섬	1	1	1	0	1	0
+whymath_backend.l3.equivalent.trig_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	291	섬	섬	1	1	1	0	0	0
+whymath_backend.l3.equivalent.variants	E1 동등문제 파이프라인 코어	624	섬	섬	2	3	3	1	0	0
+whymath_backend.l3.equivalent.vector_operations_skeleton_generator	E6 단원별 스켈레톤 생성기(p3_diff 제외)	451	섬	섬	1	2	0	0	0	0
+whymath_backend.l3.equivalent.verify_bypass	E4 저작 게이트(거부·우회·LaTeX·발문 위생·재태깅)	303	섬	섬	2	1	2	2	0	0
+whymath_backend.l3.exact_value	T1 동치 판정 primitive(파싱·항등·해집합·정확값)	110	섬	대기	2	1	1	0	1	0
+whymath_backend.l3.finite_probability	T3 SymPy 불가 영역 검증기	590	섬	대기	4	1	4	0	1	0
+whymath_backend.l3.safe_parse	T1 동치 판정 primitive(파싱·항등·해집합·정확값)	928	가동	가동	27	2	5	2	0	0
+whymath_backend.l3.sequence_induction	T3 SymPy 불가 영역 검증기	613	섬	대기	1	3	3	0	0	0
+whymath_backend.l3.solution_set	T1 동치 판정 primitive(파싱·항등·해집합·정확값)	457	섬	가동	2	1	5	3	2	0
+whymath_backend.l3.statistical_claim	T3 SymPy 불가 영역 검증기	664	섬	대기	1	2	7	0	0	0
+whymath_backend.l3.symbolic_equivalence	T1 동치 판정 primitive(파싱·항등·해집합·정확값)	433	섬	가동	11	10	1	1	0	0
+whymath_backend.l3.verifier	T2 답·풀이 검증기	587	섬	가동	3	8	3	3	0	0
+whymath_backend.l3.verify_answer	T2 답·풀이 검증기	3471	섬	대기	23	33	78	54	7	0
+whymath_backend.l3.verify_answer_form	T2 답·풀이 검증기	145	섬	대기	1	2	3	1	0	0
+whymath_backend.l3.verify_final_answer	T2 답·풀이 검증기	320	섬	대기	2	3	0	0	0	0
+whymath_backend.l3.verify_solution	T2 답·풀이 검증기	939	섬	가동	12	28	6	2	1	0
+whymath_backend.l3.verify_step	T2 답·풀이 검증기	491	섬	가동	5	12	0	0	0	0
