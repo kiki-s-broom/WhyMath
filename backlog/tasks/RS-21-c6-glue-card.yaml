@@ -1,5 +1,5 @@
 # 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
-id: RS-14-c6-glue-card
+id: RS-21-c6-glue-card
 title: "RS-C6 패키지 카드 — 파트 C 접착제(api·app·db·schema·루트 파일)"
 track: math-completion
 stage: S1
@@ -18,5 +18,8 @@ artifacts:
 paths:
   - "golden/reports_rescue/C6/**"
 session: null
-notes: "[미러 면제 2026-11-18] 로컬 미러에서만 harness-integrity·declared-unwired-audit의 Install 스텝이 exit 1(같은 pip 명령을 직접 실행하면 EXIT=0 — 미러 실행 환경 차이). GitHub CI run 44238188251에서 두 잡 포함 실행된 10잡 전부 success·failure 0"
-updated: 2026-11-18
+notes: |-
+  [미러 면제 2026-11-18] 로컬 미러에서만 harness-integrity·declared-unwired-audit의 Install 스텝이 exit 1(같은 pip 명령을 직접 실행하면 EXIT=0 — 미러 실행 환경 차이). GitHub CI run 44238188251에서 두 잡 포함 실행된 10잡 전부 success·failure 0
+
+  [개명 2026-11-19] RS-14-c6-glue-card → RS-21-c6-glue-card: 번호 충돌 해소 — RS-14는 main의 RS-14-c3-l3-equivalence-card가 먼저 썼다(머지 큐 harness-integrity 선제 방지). HARN-100 절차
+updated: 2026-11-19
