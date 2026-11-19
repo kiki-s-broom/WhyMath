@@ -5,16 +5,18 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on: []
 requires_gates: []
 acceptance: []
-artifacts: []
+artifacts:
+  - "PR #1966"
+  - golden/reports_rescue/J1/보고.md
 paths:
   - "golden/reports_rescue/J1/**"
-session: golden-rs/J1
+session: null
 notes: ""
 updated: 2026-11-19
