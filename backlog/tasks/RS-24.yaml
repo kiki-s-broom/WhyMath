@@ -1,0 +1,20 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-24
+title: "RS-P2 명세 카드 — 수확 대기열 2순위(오개념 진단·가설·개입)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - "golden/reports_rescue/P2/**"
+session: golden-rs/P2
+notes: ""
+updated: 2026-11-19
