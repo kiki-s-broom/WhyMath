@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-24
+title: "RS-P2 명세 카드 — 수확 대기열 2순위(오개념 진단·가설·개입)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts:
+  - "PR #1969"
+  - golden/reports_rescue/P2/보고.md
+paths:
+  - "golden/reports_rescue/P2/**"
+session: null
+notes: "[미러 면제 2026-11-19] harness-integrity·declared-unwired-audit 설치 스텝이 컨테이너 debian 패키지 제거 불가로 실패(환경). 검사 스텝 직접 실행 전부 EXIT=0 · pytest tests/harness 2381 passed"
+updated: 2026-11-19
