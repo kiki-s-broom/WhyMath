@@ -1,0 +1,21 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: HARN-400
+title: "번호 예약·claim CAS가 서버 측 동시 push 경합(remote rejected · cannot lock ref)을 재시도하지 않고 오류로 접는 결함"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - scripts/harness/remote_claims.py
+  - tests/harness/test_cas_server_race.py
+session: claude/amazing-cerf-2l3v1v
+notes: "실측 2026-11-19: RS-X2·RS-X3가 1초 차이로 둘 다 RS-34를 받음(X2 이벤트 number_reserve_unavailable · detail 'failed to push some refs'). 로컬 bare 저장소로 서버 측 경합 재현 → stderr '[remote rejected] … (failed to update ref)' · 'cannot lock ref … but expected'가 _LEASE_MARKERS에 없어 error로 분류 → 재시도 없이 fail-open"
+updated: 2026-11-19
