@@ -1,0 +1,6 @@
+{"ts": "2026-11-19T07:19:25+00:00", "actor": "claude/new-session-i04mkb", "action": "policy_warn", "id": "RS-30", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z1/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:25+00:00", "actor": "claude/new-session-i04mkb", "action": "policy_warn", "id": "RS-30", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z1/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:28+00:00", "actor": "claude/new-session-i04mkb", "action": "number_reserve_conflict", "id": "RS-30", "verb": "add", "holder": "RS-30", "holder_branch": "golden-rs/P3", "source": "예약"}
+{"ts": "2026-11-19T07:19:38+00:00", "actor": "claude/new-session-i04mkb", "action": "policy_warn", "id": "RS-31-z1-deletion-evidence", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z1/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:38+00:00", "actor": "claude/new-session-i04mkb", "action": "policy_warn", "id": "RS-31-z1-deletion-evidence", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/Z1/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:42+00:00", "actor": "claude/new-session-i04mkb", "action": "add", "id": "RS-31-z1-deletion-evidence", "eos_priority": "P1"}
