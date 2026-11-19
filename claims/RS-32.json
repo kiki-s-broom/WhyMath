@@ -1,1 +1,1 @@
-{"branch": "golden-rs/Z2", "harness": "2.0", "task": "RS-32", "ts": "2026-11-19T07:20:13Z"}
+{"branch": "golden-rs/Z2", "harness": "2.0", "kind": "block", "reason": "Kiki 지시 2026-11-19 중단 — 취소 전 단계(in_progress에서 cancelled로 바로 갈 수 없음)", "task": "RS-32", "ts": "2026-11-19T07:30:07Z"}
