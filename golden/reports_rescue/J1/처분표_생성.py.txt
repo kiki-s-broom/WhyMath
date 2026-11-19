@@ -1,0 +1,58 @@
+# J1 처분표 생성기 — 처분표.tsv(원자료)를 읽어 처분표.md를 만든다.
+# 실행: python3 golden/reports_rescue/J1/처분표_생성.py.txt  (저장소 루트에서)
+# 확장자를 .py.txt로 둔 이유: 린트·테스트 수집 대상에서 빼려는 것이다(C6 선례).
+# 검산: 행의 모듈 수 합이 844가 아니면 exit 1로 멈춘다(J1 완료 기준 ①).
+import csv
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+HERE = Path("golden/reports_rescue/J1")
+ORDER = ["연결", "수리", "재작성", "격리", "삭제", "단계 묶음 담당"]
+
+rows = list(csv.DictReader(open(HERE / "처분표.tsv", encoding="utf-8-sig"), delimiter="\t"))
+total_mod = sum(int(r["모듈 수"]) for r in rows)
+total_line = sum(int(r["줄 수"]) for r in rows)
+if total_mod != 844:
+    print(f"검산 실패: 모듈 합 {total_mod} ≠ 844")
+    sys.exit(1)
+
+agg = defaultdict(lambda: [0, 0, 0, 0, 0])  # 행 · 모듈 · 줄 · 테스트(정수 칸 합) · 테스트 미확인/묶음값 칸
+for r in rows:
+    a = agg[r["처분"]]
+    a[0] += 1
+    a[1] += int(r["모듈 수"])
+    a[2] += int(r["줄 수"])
+    t = r["대응 테스트 파일 수"]
+    if t.isdigit():
+        a[3] += int(t)
+    else:
+        a[4] += 1
+
+out = ["# J1 처분표 — 옛 백엔드 844모듈", ""]
+out.append("- 기준 커밋: main `114b1679` · 작성일 2026-11-19 · 원자료 `처분표.tsv` · 생성 `처분표_생성.py.txt`")
+out.append(f"- 검산: 행 {len(rows)}개 · 모듈 합 **{total_mod}** · 줄 합 {total_line:,}")
+out.append("- 테스트 칸은 카드에 적힌 값이다. 단위가 카드마다 다르다(중복 포함 합 또는 고유 파일 수 — 「어긋남」 ⑦). 테스트 **줄 수**는 카드에 없어 미확인이다.")
+out.append("")
+out.append("## 처분별 합계")
+out.append("")
+out.append("| 처분 | 행 | 모듈 | 줄 | 대응 테스트 파일(정수 칸 합) | 테스트 칸 미확인·묶음값 행 | 딸린 테스트 줄 수 |")
+out.append("| --- | ---: | ---: | ---: | ---: | ---: | --- |")
+for k in ORDER:
+    a = agg.get(k, [0, 0, 0, 0, 0])
+    out.append(f"| {k} | {a[0]} | {a[1]} | {a[2]:,} | {a[3]:,} | {a[4]} | 미확인 |")
+out.append(f"| **합** | **{len(rows)}** | **{total_mod}** | **{total_line:,}** | | | |")
+out.append("")
+out.append("## 행별 처분")
+out.append("")
+cols = ["카드", "파트", "행", "모듈 수", "줄 수", "옛앱 등급 분포", "자산/접착제/도구", "처분", "근거", "대응 테스트 파일 수", "담당"]
+out.append("| " + " | ".join(cols) + " |")
+out.append("| " + " | ".join("---:" if c in ("모듈 수", "줄 수") else "---" for c in cols) + " |")
+for r in rows:
+    cells = [r[c].replace("|", "/") for c in cols]
+    cells[4] = f"{int(cells[4]):,}"
+    out.append("| " + " | ".join(cells) + " |")
+(HERE / "처분표.md").write_text("\n".join(out) + "\n", encoding="utf-8")
+print(f"OK 행 {len(rows)} · 모듈 {total_mod} · 줄 {total_line}")
+for k in ORDER:
+    print(k, agg.get(k))
