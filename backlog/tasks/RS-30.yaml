@@ -5,16 +5,17 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 3
 eos_priority: P1
 owner: claude
 depends_on: []
 requires_gates: []
 acceptance: []
-artifacts: []
+artifacts:
+  - "#1970 golden/reports_rescue/P3/명세.md·카드.md·보고.md (commit bd95b191)"
 paths:
   - "golden/reports_rescue/P3/**"
-session: golden-rs/P3
+session: null
 notes: ""
 updated: 2026-11-19
