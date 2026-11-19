@@ -1,0 +1,53 @@
+﻿클라이언트	파일	줄	호출 주소(원문)	정규화 경로	대상 서버	판정	일치한 서버 라우트(메서드 경로)
+Flutter	src/mobile/lib/core/token_refresh_api.dart	48	/v1/auth/refresh	/v1/auth/refresh	옛앱	일치	POST /v1/auth/refresh
+Flutter	src/mobile/lib/core/token_refresh_api.dart	65	/v1/auth/logout	/v1/auth/logout	옛앱	일치	POST /v1/auth/logout
+Flutter	src/mobile/lib/features/auth/data/auth_api.dart	32	/v1/auth/$provider/callback	/v1/auth/{p}/callback	옛앱	일치	POST /v1/auth/{provider}/callback
+Flutter	src/mobile/lib/features/auth/data/auth_sessions_api.dart	69	/v1/auth/sessions	/v1/auth/sessions	옛앱	일치	GET /v1/auth/sessions | DELETE /v1/auth/sessions
+Flutter	src/mobile/lib/features/auth/data/auth_sessions_api.dart	86	/v1/auth/sessions	/v1/auth/sessions	옛앱	일치	GET /v1/auth/sessions | DELETE /v1/auth/sessions
+Flutter	src/mobile/lib/features/auth/data/auth_sessions_api.dart	91	/v1/auth/sessions/$sessionId	/v1/auth/sessions/{p}	옛앱	일치	DELETE /v1/auth/sessions/{session_id}
+Flutter	src/mobile/lib/features/chat/data/coach_api.dart	27	/v1/coach	/v1/coach	옛앱	일치	POST /v1/coach
+Flutter	src/mobile/lib/features/chat/data/coach_api.dart	47	/v1/coach/sessions	/v1/coach/sessions	옛앱	일치	POST /v1/coach/sessions
+Flutter	src/mobile/lib/features/chat/data/coach_api.dart	67	/v1/coach/sessions/$dialogueId/turns	/v1/coach/sessions/{p}/turns	옛앱	일치	POST /v1/coach/sessions/{dialogue_id}/turns
+Flutter	src/mobile/lib/features/chat/data/coach_api.dart	82	/v1/coach/sessions/$dialogueId	/v1/coach/sessions/{p}	옛앱	일치	GET /v1/coach/sessions/{dialogue_id}
+Flutter	src/mobile/lib/features/chat/data/interaction_logger.dart	50	/v1/interactions	/v1/interactions	옛앱	일치	POST /v1/interactions
+Flutter	src/mobile/lib/features/chat/data/scene_api.dart	25	/v1/scenes/weak-concept	/v1/scenes/weak-concept	옛앱	일치	POST /v1/scenes/weak-concept
+Flutter	src/mobile/lib/features/chat/data/solution_path_api.dart	31	/v1/solution-paths/$solutionPathId/steps	/v1/solution-paths/{p}/steps	옛앱	일치	GET /v1/solution-paths/{solution_path_id}/steps
+Flutter	src/mobile/lib/features/ocr/data/ocr_api.dart	35	/v1/ocr	/v1/ocr	옛앱	일치	POST /v1/ocr
+Flutter	src/mobile/lib/features/onboarding/data/user_api.dart	33	/v1/users/me	/v1/users/me	옛앱	일치	GET /v1/users/me | PATCH /v1/users/me
+Flutter	src/mobile/lib/features/problems/data/problems_api.dart	30	/v1/me/next-problem	/v1/me/next-problem	옛앱	일치	GET /v1/me/next-problem
+Flutter	src/mobile/lib/features/problems/data/problems_api.dart	44	/v1/problems/$problemId	/v1/problems/{p}	옛앱	일치	GET /v1/problems/{problem_id} | PATCH /v1/problems/{problem_id} | DELETE /v1/problems/{problem_id}
+Flutter	src/mobile/lib/features/problems/data/problems_api.dart	54	/v1/me/diagnosis/concepts	/v1/me/diagnosis/concepts	옛앱	일치	GET /v1/me/diagnosis/concepts
+Flutter	src/mobile/lib/features/problems/data/problems_api.dart	72	/v1/me/weak-concepts/$conceptId/learning-path	/v1/me/weak-concepts/{p}/learning-path	옛앱	일치	GET /v1/me/weak-concepts/{concept_id}/learning-path
+Flutter	src/mobile/lib/features/profile/data/growth_evidence_api.dart	27	/v1/me/growth-evidence	/v1/me/growth-evidence	옛앱	일치	GET /v1/me/growth-evidence
+Flutter	src/mobile/lib/features/reports/data/defect_report_api.dart	52	/v1/reports/defects	/v1/reports/defects	옛앱	일치	POST /v1/reports/defects
+Flutter	src/mobile/lib/features/verify/data/verify_api.dart	30	/v1/verify-solution	/v1/verify-solution	옛앱	일치	POST /v1/verify-solution
+Flutter	src/mobile/lib/golden/golden_api.dart	166	/golden/session	/golden/session	골든	일치	POST /golden/session
+Flutter	src/mobile/lib/golden/golden_api.dart	177	/golden/next	/golden/next	골든	일치	GET /golden/next
+Flutter	src/mobile/lib/golden/golden_api.dart	192	/golden/answer	/golden/answer	골든	일치	POST /golden/answer
+웹	src/web/webapp/app/admin/_components/AdminShell.tsx	94	프런트와 백엔드의 메뉴 계약이 어긋났을 수 있습니다(GET /v1/admin/menu 응답 스키마).	/v1/admin/menu	옛앱	일치	GET /v1/admin/menu
+웹	src/web/webapp/app/admin/_lib/adminApi.ts	25	/v1/admin/menu	/v1/admin/menu	옛앱	일치	GET /v1/admin/menu
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	25	/v1/admin/cms	/v1/admin/cms	옛앱	접두 일치(뒷부분은 다른 문자열이 붙임)	/v1/admin/cms/audit | /v1/admin/cms/concept-proposals | /v1/admin/cms/concept-proposals/{code}/drafts
+웹	src/web/webapp/app/admin/_lib/adminReviewApi.ts	25	/v1/admin/review-queue/items	/v1/admin/review-queue/items	옛앱	일치	GET /v1/admin/review-queue/items
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	625	CMS_BASE + …	/v1/admin/cms/resources	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/resources
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	635	CMS_BASE + …	/v1/admin/cms/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concepts | GET /v1/admin/cms/curriculum_version | GET /v1/admin/cms/problem | GET /v1/admin/cms/problem_step | GET /v1/admin/cms/misconception | GET /v1/admin/cms/strategy_node | GET /v1/admin/cms/concept_content | GET /v1/admin/cms/hint | GET /v1/admin/cms/skill_node | GET /v1/admin/cms/resources | GET /v1/admin/cms/audit | GET /v1/admin/cms/concept-proposals | POST /v1/admin/cms/concept-proposals | POST /v1/admin/cms/edges
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	643	CMS_BASE + …	/v1/admin/cms/{p}/items/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/curriculum_version/items/{pk} | PATCH /v1/admin/cms/curriculum_version/items/{pk} | GET /v1/admin/cms/problem/items/{pk} | PATCH /v1/admin/cms/problem/items/{pk} | GET /v1/admin/cms/problem_step/items/{pk} | PATCH /v1/admin/cms/problem_step/items/{pk} | GET /v1/admin/cms/misconception/items/{pk} | PATCH /v1/admin/cms/misconception/items/{pk} | GET /v1/admin/cms/strategy_node/items/{pk} | PATCH /v1/admin/cms/strategy_node/items/{pk} | GET /v1/admin/cms/concept_content/items/{pk} | PATCH /v1/admin/cms/concept_content/items/{pk} | GET /v1/admin/cms/hint/items/{pk} | PATCH /v1/admin/cms/hint/items/{pk} | GET /v1/admin/cms/skill_node/items/{pk}
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	656	CMS_BASE + …	/v1/admin/cms/{p}/items/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/curriculum_version/items/{pk} | PATCH /v1/admin/cms/curriculum_version/items/{pk} | GET /v1/admin/cms/problem/items/{pk} | PATCH /v1/admin/cms/problem/items/{pk} | GET /v1/admin/cms/problem_step/items/{pk} | PATCH /v1/admin/cms/problem_step/items/{pk} | GET /v1/admin/cms/misconception/items/{pk} | PATCH /v1/admin/cms/misconception/items/{pk} | GET /v1/admin/cms/strategy_node/items/{pk} | PATCH /v1/admin/cms/strategy_node/items/{pk} | GET /v1/admin/cms/concept_content/items/{pk} | PATCH /v1/admin/cms/concept_content/items/{pk} | GET /v1/admin/cms/hint/items/{pk} | PATCH /v1/admin/cms/hint/items/{pk} | GET /v1/admin/cms/skill_node/items/{pk}
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	673	CMS_BASE + …	/v1/admin/cms/{p}/items/{p}/review	옛앱	일치 · 조합 펼침	POST /v1/admin/cms/strategy_node/items/{pk}/review | POST /v1/admin/cms/concept_content/items/{pk}/review
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	688	CMS_BASE + …	/v1/admin/cms/concepts	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concepts
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	692	CMS_BASE + …	/v1/admin/cms/concepts/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concepts/{concept_id} | DELETE /v1/admin/cms/concepts/{concept_id}
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	707	CMS_BASE + …	/v1/admin/cms/concepts/{p}/drafts	옛앱	일치 · 조합 펼침	POST /v1/admin/cms/concepts/{concept_id}/drafts
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	721	CMS_BASE + …	/v1/admin/cms/concepts/{p}/versions	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concepts/{concept_id}/versions
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	728	CMS_BASE + …	/v1/admin/cms/versions/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/versions/{version_id}
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	745	CMS_BASE + …	/v1/admin/cms/versions/{p}/transitions	옛앱	일치 · 조합 펼침	POST /v1/admin/cms/versions/{version_id}/transitions
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	761	CMS_BASE + …	/v1/admin/cms/concepts/{p}/rollback	옛앱	일치 · 조합 펼침	POST /v1/admin/cms/concepts/{concept_id}/rollback
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	791	CMS_BASE + …	/v1/admin/cms/edges	옛앱	일치 · 조합 펼침	POST /v1/admin/cms/edges
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	796	CMS_BASE + …	/v1/admin/cms/edges/{p}	옛앱	일치 · 조합 펼침	DELETE /v1/admin/cms/edges/{edge_id}
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	807	CMS_BASE + …	/v1/admin/cms/concepts/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concepts/{concept_id} | DELETE /v1/admin/cms/concepts/{concept_id}
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	818	CMS_BASE + …	/v1/admin/cms/concept-proposals	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concept-proposals | POST /v1/admin/cms/concept-proposals
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	830	CMS_BASE + …	/v1/admin/cms/concept-proposals	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/concept-proposals | POST /v1/admin/cms/concept-proposals
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	845	CMS_BASE + …	/v1/admin/cms/concept-proposals/{p}/drafts	옛앱	일치 · 조합 펼침	POST /v1/admin/cms/concept-proposals/{code}/drafts
+웹	src/web/webapp/app/admin/_lib/adminCmsApi.ts	861	CMS_BASE + …	/v1/admin/cms/audit	옛앱	일치 · 조합 펼침	GET /v1/admin/cms/audit
+웹	src/web/webapp/app/admin/_lib/adminReviewApi.ts	346	LIST_PATH + …	/v1/admin/review-queue/items	옛앱	일치 · 조합 펼침	GET /v1/admin/review-queue/items
+웹	src/web/webapp/app/admin/_lib/adminReviewApi.ts	361	LIST_PATH + …	/v1/admin/review-queue/items/{p}	옛앱	일치 · 조합 펼침	GET /v1/admin/review-queue/items/{problem_id}
+웹	src/web/webapp/app/admin/_lib/adminReviewApi.ts	407	LIST_PATH + …	/v1/admin/review-queue/items/{p}/review-sessions	옛앱	일치 · 조합 펼침	POST /v1/admin/review-queue/items/{problem_id}/review-sessions
+웹	src/web/webapp/app/admin/_lib/adminReviewApi.ts	439	LIST_PATH + …	/v1/admin/review-queue/items/{p}/transitions	옛앱	일치 · 조합 펼침	POST /v1/admin/review-queue/items/{problem_id}/transitions

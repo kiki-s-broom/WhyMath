@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-12
+title: "RS-C2 패키지 카드 — 파트 B l2 학습자 모델"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "l2 41모듈이 전부 어느 묶음에 들어 있고 묶음마다 처분 제안과 근거가 있다(golden/reports_rescue/C2/카드.md·보고.md)"
+artifacts:
+  - "PR #1952 · 커밋 51523a18 · golden/reports_rescue/C2/카드.md·보고.md·l2_모듈표.tsv"
+paths:
+  - "golden/reports_rescue/C2/**"
+session: null
+notes: ""
+updated: 2026-11-18

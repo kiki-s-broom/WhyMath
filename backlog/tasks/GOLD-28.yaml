@@ -1,0 +1,36 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-28
+title: "조용한 실패 AST 검사 — return None/False 무음 감지 (승인 ③)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 실측 — 착수 시점 main 해시를 적고, ruff 4규칙(BLE001·S110·S112·E722)이 `return None`/`return False` 무음 3곳을 잡지 못함을 명령 출력으로 보인다. 골든 구역의 현재 건수도 다시 잰다."
+  - "② 검사 설계 — AST로 `except` 핸들러 본문이 `return None`/`return False`인 자리와, 예외 타입명이 로그·반환값 어디에도 남지 않는 자리를 구분해 잡는다. 설계된 강등(대체 문장·대체 값)과 무음의 경계를 정하고 오탐 목록을 만든다."
+  - "③ 배선 — `tests/golden/rescue/`에 게이트로 넣고 허용 목록 형식(경로:줄 · 규칙 · 이유)을 재사용한다. 게이트가 CI `golden-path` 잡에서 실제로 도는지 PR CI 결과로 확인한다(배선 확인 없이 완료 선언 금지)."
+  - "④ 주입 — 새 위반 1건과 허용 목록 불일치 1건으로 RED를 확인한다(cp 백업 → 주입 → 확인 → cp 복원, 바이트 동일 확인). 검사 대상 .py가 0개일 때 실패하는지도 확인한다."
+  - "⑤ 범위 — 골든 구역만 게이트를 건다. 옛 구역은 건수 기록만 하고 코드를 고치지 않는다(골든 기간 옛 코드 읽기 전용 · 옛 구역 처분은 S74 뒤 재판정)."
+artifacts:
+  - "#1963"
+paths:
+  - "tests/golden/rescue/**"
+  - "golden/**"
+session: null
+notes: |-
+  출처: golden/RUFF_STRICTNESS_DECISION.md §7 ③ — Kiki 승인 2026-11-18. 승인 ②(S112 추가)와 ④(옛 구역 기록만)는 이 태스크와 별개다.
+
+  왜 이 태스크인가: BLE001·S110·S112는 "예외를 삼켰는가"만 본다. 예외 없이 `return None`/`return False`로 넘기는 무음은 보지 못한다(§5 — 옛 구역 3곳). 그 축은 AST로만 잡힌다.
+
+  경계: RS-11(G2 게이트)은 ruff 규칙 집합이고, 이 태스크는 그 집합 밖의 AST 축이다. GOLD-26(전역 select 도입 판정)과도 독립이다.
+
+  S112 부분집합 실측(2026-11-18 · ruff 0.15.22): S112가 잡는 자리는 전부 넓은 except이라 같은 줄이 BLE001(또는 E722)에도 걸린다 — 새 검출 0건. 이 태스크는 그 축과 무관하다.
+
+  [미러 면제 2026-11-19] 이 호스트는 Windows·Python 3.13이고 골든 pytest는 로컬 docker Postgres 5433에만 닿는다. CI 잡은 ubuntu·Python 3.12·서비스 컨테이너 Postgres 5432라 로컬 미러가 같은 판정을 내지 못한다(5432는 타 프로젝트가 점유). 같은 커밋의 실제 CI 잡 golden-path가 pass(496 passed · 신규 17건 포함)이므로 CI 증거로 대체한다. GOLD-29 선례와 같은 환경 사유.
+updated: 2026-11-19

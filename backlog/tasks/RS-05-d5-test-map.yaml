@@ -1,0 +1,30 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-05-d5-test-map
+title: "RS-D5 파트 E 테스트 대응표 — 테스트 1,477파일이 어느 패키지를 검사하는가"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "두 TSV 행 수 = 실제 파일 수 · 패키지별 표 · 테스트 본문 읽기 0줄(ast 집계만)"
+artifacts:
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1940"
+  - golden/reports_rescue/D5/보고.md
+paths:
+  - "src/backend/golden/rescue/**"
+  - "golden/reports_rescue/D5/**"
+session: null
+notes: |-
+  옛 코드 살리기 RS 진단 D5 (Kiki 지시 2026-11-17)
+
+  [정정 2026-11-17] paths ['golden/reports_rescue/D5/**', 'src/backend/golden/rescue/test_map.py'] → ['src/backend/golden/rescue/**']: 도구 위치를 공유 계약 「폴더 배치」의 golden/rescue/testmap.py로 확정(린트 범위 테스트가 보고 폴더의 .py를 잡음)
+  paths 제거 2건: ['golden/reports_rescue/D5/**', 'src/backend/golden/rescue/test_map.py']
+
+  [정정 2026-11-17] paths ['src/backend/golden/rescue/**'] → ['src/backend/golden/rescue/**', 'golden/reports_rescue/D5/**']: 직전 정정이 범위를 교체해 보고 폴더가 빠진 것을 되돌림(두 범위 모두 이 태스크의 쓰기 대상)
+updated: 2026-11-17

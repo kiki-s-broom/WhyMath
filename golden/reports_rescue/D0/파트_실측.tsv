@@ -1,0 +1,42 @@
+파트·범위	파일	줄 수	git ls-files 대상 경로
+A golden	21	4106	src/backend/golden/
+B l1	98	21932	src/backend/whymath_backend/l1/
+B l2	41	14470	src/backend/whymath_backend/l2/
+B l3	166	79926	src/backend/whymath_backend/l3/
+B l4	100	23630	src/backend/whymath_backend/l4/
+B 합계	405	139958	src/backend/whymath_backend/l1/ src/backend/whymath_backend/l2/ src/backend/whymath_backend/l3/ src/backend/whymath_backend/l4/
+C api	56	26724	src/backend/whymath_backend/api/
+C app.py	1	1668	src/backend/whymath_backend/app.py
+C composition.py	1	148	src/backend/whymath_backend/composition.py
+C config.py	1	2211	src/backend/whymath_backend/config.py
+C consent*.py	2	187	src/backend/whymath_backend/consent.py src/backend/whymath_backend/consent_grant.py
+C security.py	1	159	src/backend/whymath_backend/security.py
+C db	66	10225	src/backend/whymath_backend/db/
+C schema	55	15859	src/backend/whymath_backend/schema/
+C 합계	183	57181	src/backend/whymath_backend/api/ src/backend/whymath_backend/app.py src/backend/whymath_backend/composition.py src/backend/whymath_backend/config.py src/backend/whymath_backend/consent.py src/backend/whymath_backend/consent_grant.py src/backend/whymath_backend/security.py src/backend/whymath_backend/db/ src/backend/whymath_backend/schema/
+D harness	163	80582	src/backend/whymath_backend/harness/
+D ops	38	27618	src/backend/whymath_backend/ops/
+D whs	14	3854	src/backend/whymath_backend/whs/
+D privacy	9	2287	src/backend/whymath_backend/privacy/
+D l5	10	1634	src/backend/whymath_backend/l5/
+D l6	18	3019	src/backend/whymath_backend/l6/
+D lang	2	275	src/backend/whymath_backend/lang/
+D 합계	254	119269	src/backend/whymath_backend/harness/ src/backend/whymath_backend/ops/ src/backend/whymath_backend/whs/ src/backend/whymath_backend/privacy/ src/backend/whymath_backend/l5/ src/backend/whymath_backend/l6/ src/backend/whymath_backend/lang/
+백엔드 나머지(__init__·_stdio)	2	61	src/backend/whymath_backend/__init__.py src/backend/whymath_backend/_stdio.py
+백엔드 whymath_backend 전체	844	316469	src/backend/whymath_backend/
+E tests 전체	1486	485754	tests/
+E tests/backend	1141	380596	tests/backend/
+E tests/constitution	4	1003	tests/constitution/
+E tests/data_pipeline	90	15201	tests/data_pipeline/
+E tests/golden	21	2833	tests/golden/
+E tests/harness	77	32236	tests/harness/
+E tests/infra	152	53672	tests/infra/
+E tests 최상위 파일	1	213	tests/test_idempotency.py
+F scripts	149	72982	scripts/
+F data-pipeline	84	15963	src/data-pipeline/
+F 합계	233	88945	scripts/ src/data-pipeline/
+G mobile/lib	82	11883	src/mobile/lib/
+G mobile/lib/golden	7	920	src/mobile/lib/golden/ src/mobile/lib/main_golden.dart
+G web	46	6688	src/web/
+G 합계	128	18571	src/mobile/lib/ src/web/
+저장소 전체	2955	954449	.

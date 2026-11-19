@@ -59,6 +59,10 @@ def _stdin(prompt: str, session_id: str = "session_01ABCDEFGHIJKLMNOP") -> bytes
             "세션 이름: DK-단계01-S20A-전이의존절단",
             ("DK-단계01-S20A-전이의존절단", "S20A", "DK"),
         ),
+        (
+            "세션 이름: RS-단계02-D1-진단-백엔드대장-844모듈",
+            ("RS-단계02-D1-진단-백엔드대장-844모듈", "D1", "RS"),
+        ),
     ],
 )
 def test_parse_accepts_instruction_first_line(prompt: str, expected: tuple[str, str, str]) -> None:

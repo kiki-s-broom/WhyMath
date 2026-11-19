@@ -1,0 +1,8 @@
+backlog/events/claude_ops-154-done.ndjson
+data/corpus/concept_graph_v1/ids.yaml
+docs/data/corpus_facts.md
+golden/LEGACY_MANIFEST.txt
+golden/reports_no_students/S15/unreferenced_compact.md
+golden/reports_phase1/S20A/unreferenced_compact.md
+src/mobile/pubspec.lock
+tests/backend/l3/equivalent/test_p3_diff_graph_shape_generator.py
