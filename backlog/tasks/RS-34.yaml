@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-34
+title: "RS-X3 특성화 테스트 — 수확 대기열 3순위"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - "golden/reports_rescue/X3/**"
+  - tests/golden/characterization/test_rs_polya_socratic.py
+  - golden/HARVEST.md
+session: golden-rs/X3
+notes: ""
+updated: 2026-11-19
