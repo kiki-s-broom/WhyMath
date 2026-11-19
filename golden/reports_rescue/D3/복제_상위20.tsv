@@ -1,0 +1,21 @@
+﻿순위	파일A:줄	파일B:줄	줄 수(가장 큰 덩어리)	같은 파일쌍 덩어리 수	파일쌍 합계 줄 수	패키지A	패키지B
+1	l3/interfaces.py:26-83	l3/providers/openrouter.py:312-341	58	1	58	l3	l3/providers
+2	l1/atom_graph/embedding.py:212-236	l4/misconception/semantic/pgvector_index.py:149-263	25	2	43	l1/atom_graph	l4/misconception/semantic
+3	l1/concept_graph/embedding.py:182-199	l4/misconception/semantic/pgvector_index.py:82-99	18	2	33	l1/concept_graph	l4/misconception/semantic
+4	l1/concept_graph/backend_edge.py:189-211	l1/standards/standard_loader.py:212-234	23	1	23	l1/concept_graph	l1/standards
+5	l1/curriculum/curriculum_loader.py:522-544	l1/standards/standard_loader.py:212-234	23	1	23	l1/curriculum	l1/standards
+6	l1/curriculum/curriculum_resolve.py:43-63	l4/pedagogy/k_type_resolver.py:57-222	21	1	21	l1/curriculum	l4/pedagogy
+7	l1/misconception/crosslink_loader.py:202-222	l4/pedagogy/k_type_resolver.py:57-236	21	1	21	l1/misconception	l4/pedagogy
+8	l2/evidence_event_store.py:39-59	l4/pedagogy/k_type_resolver.py:57-77	21	1	21	l2	l4/pedagogy
+9	l3/multi_solution.py:416-436	l3/pedagogy/explanation_generator.py:284-1007	21	1	21	l3	l3/pedagogy
+10	l3/pedagogy/prescreen.py:87-107	l4/pedagogy/k_type_resolver.py:57-142	21	1	21	l3/pedagogy	l4/pedagogy
+11	l3/pedagogy/review.py:122-142	l4/pedagogy/k_type_resolver.py:57-77	21	1	21	l3/pedagogy	l4/pedagogy
+12	l3/pedagogy/slot_generator.py:219-239	l4/pedagogy/k_type_resolver.py:57-77	21	1	21	l3/pedagogy	l4/pedagogy
+13	harness/golden_benchmark.py:830-849	ops/qa_confusion_matrix.py:776-795	20	1	20	harness	ops
+14	l1/misconception/catalog_loader.py:158-177	l1/standards/criteria_loader.py:174-197	20	1	20	l1/misconception	l1/standards
+15	harness/problem_type_mapping.py:363-380	ops/provenance_audit.py:211-228	18	1	18	harness	ops
+16	l1/misconception/crosslink_resolve.py:216-233	l4/pedagogy/k_type_resolver.py:57-74	18	1	18	l1/misconception	l4/pedagogy
+17	l3/pedagogy/explanation_generator.py:243-260	l3/pregenerate/prewarmer.py:326-343	18	1	18	l3/pedagogy	l3/pregenerate
+18	l1/atom_graph/atom_backend_edge.py:301-317	l1/concept_graph/backend_edge.py:248-264	17	1	17	l1/atom_graph	l1/concept_graph
+19	l1/formula_graph/formula_node_projection.py:139-155	l1/strategy_graph/strategy_node_projection.py:109-125	17	1	17	l1/formula_graph	l1/strategy_graph
+20	l1/problem_type_graph/problem_type_node_projection.py:117-133	l1/strategy_graph/strategy_node_projection.py:109-125	17	1	17	l1/problem_type_graph	l1/strategy_graph
