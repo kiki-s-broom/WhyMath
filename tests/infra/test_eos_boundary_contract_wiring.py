@@ -884,3 +884,229 @@ def test_vacuity_checker_detects_injected_emptiness(mutate: Any, expect_in_messa
 def test_vacuity_checker_passes_the_real_contracts() -> None:
     """대조군 — 주입이 없으면 위반 0. 없으면 '전부 위반'인 과잉 수정이 통과한다."""
     assert find_vacuous_contract_violations(_contracts(), _load_boundary_map()) == []
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ⑦ l4 안쪽의 사각 — 계약 3이 보지 못하는 상위 패키지 생략 (GOLD-27 · GOLD-25 M3b)
+# ──────────────────────────────────────────────────────────────────────
+#
+# 계약 3(baseline 있음)은 `whymath_backend.l4`(패키지)를 소스로 적고 그 하위 5모듈을 금지한다.
+# import-linter는 `as_packages` 기본값이 True이고(`forbidden.py:74`), 소스 모듈이 금지 모듈의
+# 상위 패키지이면 그 검사를 생략한다(`_modules_overlap` · `forbidden.py:20-36`, 생략 지점
+# `:110-118`). 그래서 l4의 CORE 모듈이 `l4.subject_adapter_math`를 import해도 KEPT였다 —
+# GOLD-25 M3b가 `tone_filter.py`에 직접 import를 주입해 exit 0을 받았고, GOLD-27이 같은
+# 주입을 이 계약에 대해 exit 1(BROKEN)로 받았다.
+#
+# 고정은 계약 3을 고치지 않는다 — 그렇게 하면 api·l6·l3의 하위 패키지 검사가 줄어든다.
+# l4만 *모듈 단위* 별도 계약으로 분리하고 `as_packages = false`를 걸다. 이 절은 그 계약이
+# (a) BOUNDARY_MAP 정본 기반 소스 95모듈(파일 트리 100 − ADAPTER 5)과 일치하는지
+# (b) `as_packages`가 사라지지 않았는지를 검사한다.
+
+_L4_CONTRACT_NAME_PREFIX = "l4 CORE → Math Adapter 금지"
+
+
+def _all_contracts() -> list[dict[str, Any]]:
+    data = tomllib.loads(_PYPROJECT.read_text(encoding="utf-8"))
+    return data["tool"]["importlinter"]["contracts"]
+
+
+def _l4_contracts() -> list[dict[str, Any]]:
+    """l4 모듈 단위 계약만 고른다.
+
+    이름을 `EOS Core → Math Adapter 금지` 접두사와 겹치지 않게 둔 것은 의도다 — 겹치면
+    §① `test_eos_boundary_contracts_exist`의 "정확히 2건" 단언이 깨진다.
+    """
+    return [
+        c for c in _all_contracts() if str(c.get("name", "")).startswith(_L4_CONTRACT_NAME_PREFIX)
+    ]
+
+
+def _expected_l4_core_modules() -> set[str]:
+    """파일 트리의 l4 모듈 전수에서, BOUNDARY_MAP 정본으로 ADAPTER 배정되지 않은 것.
+
+    목록을 여기 복사하지 않는다 — 정본 스크립트의 `module_name`·`classify`를 그대로 쓴다
+    (§⑥ `_load_boundary_map`과 같은 이유: 목록을 복사하면 진실이 둘이 된다).
+    """
+    module = _load_scan_module()
+    root = _REPO_ROOT / module.DEFAULT_SOURCE
+    expected: set[str] = set()
+    for path in sorted((root / "l4").rglob("*.py")):
+        name = module.module_name(path, root)
+        verdict, _rationale, _key = module.classify(name)
+        if verdict != "ADAPTER":
+            expected.add(f"{_ROOT_PACKAGE}.{name}")
+    return expected
+
+
+def _l4_adapters(boundary_map: Mapping[str, tuple[str, str]]) -> set[str]:
+    return {
+        f"{_ROOT_PACKAGE}.{key}"
+        for key, (verdict, _) in boundary_map.items()
+        if verdict == "ADAPTER" and key.startswith("l4.")
+    }
+
+
+def find_l4_nested_contract_violations(
+    contracts: Sequence[Mapping[str, Any]],
+    boundary_map: Mapping[str, tuple[str, str]],
+    expected_core: Sequence[str],
+) -> list[str]:
+    """l4 모듈 단위 계약이 상위 패키지 생략을 실제로 닫는지 모은다. 빈 목록 = 닫혔다."""
+    violations: list[str] = []
+    matched = [c for c in contracts if str(c.get("name", "")).startswith(_L4_CONTRACT_NAME_PREFIX)]
+    if len(matched) != 1:
+        return [
+            f"l4 모듈 단위 계약이 {len(matched)}건이다 — 1건이어야 중첩 사각을 누가 닫는지 "
+            "결정할 수 있다"
+        ]
+    contract = matched[0]
+    name = contract.get("name", "(이름 없음)")
+
+    if contract.get("type") != "forbidden":
+        violations.append(f"[{name}] type이 forbidden이 아니다: {contract.get('type')!r}")
+
+    if contract.get("as_packages") is not False:
+        violations.append(
+            f"[{name}] as_packages={contract.get('as_packages', '(기본값 True)')!r} — "
+            "기본값 True이면 소스가 금지 대상의 상위 패키지인 모듈을 검사에서 생략한다"
+        )
+
+    expected = set(expected_core)
+    if not expected:
+        violations.append("기대 l4 CORE 소스가 0건이다 — 대상이 0건인 전수 가드는 공허하다")
+
+    sources = list(contract.get("source_modules") or [])
+    if not sources:
+        violations.append(f"[{name}] source_modules가 비었다 — 아무것도 금지하지 않는다")
+    missing = expected - set(sources)
+    extra = set(sources) - expected
+    if missing:
+        violations.append(
+            f"[{name}] 소스에서 빠진 l4 CORE 모듈 {len(missing)}건: {sorted(missing)}"
+        )
+    if extra:
+        violations.append(
+            f"[{name}] 소스에 있어서는 안 되는 모듈 {len(extra)}건(ADAPTER·l4 밖 모듈 포함): "
+            f"{sorted(extra)}"
+        )
+
+    adapters = _l4_adapters(boundary_map)
+    if not adapters:
+        violations.append("정본에 l4 ADAPTER 배정이 0건이다 — 배정 로드가 잘못됐다")
+    forbidden = set(contract.get("forbidden_modules") or [])
+    if forbidden != adapters:
+        violations.append(
+            f"[{name}] forbidden_modules가 l4 ADAPTER 정본과 다르다 — "
+            f"빠진 {sorted(adapters - forbidden)} · 남는 {sorted(forbidden - adapters)}"
+        )
+    return violations
+
+
+def test_l4_nested_contract_exists_and_disables_the_ancestor_skip() -> None:
+    contracts = _l4_contracts()
+    assert len(contracts) == 1, f"l4 모듈 단위 계약이 1건이어야 한다. 실측 {len(contracts)}건"
+    contract = contracts[0]
+    assert contract["type"] == "forbidden"
+    assert contract.get("as_packages") is False, (
+        "as_packages가 false가 아니다 — 기본값 True이면 소스가 금지 대상의 상위 패키지인 "
+        "모듈을 검사에서 생략한다(GOLD-25 M3b가 이 생략으로 exit 0을 받았다)"
+    )
+
+
+def test_l4_nested_contract_sources_match_the_boundary_map_exactly() -> None:
+    expected = _expected_l4_core_modules()
+    assert expected, "기대 l4 CORE 소스가 0건이다 — 파일 트리 스캔이 잘못됐다"
+    actual = set(_l4_contracts()[0]["source_modules"])
+    missing = expected - actual
+    extra = actual - expected
+    assert not missing, f"소스에서 빠진 l4 CORE 모듈 {len(missing)}건: {sorted(missing)}"
+    assert not extra, f"소스에 있어서는 안 되는 모듈 {len(extra)}건(ADAPTER·l4 밖): {sorted(extra)}"
+
+
+def test_l4_nested_contract_forbids_exactly_the_l4_adapters() -> None:
+    expected = _l4_adapters(_load_boundary_map())
+    assert expected, "정본에 l4 ADAPTER 배정이 0건이다 — 배정 로드가 잘못됐다"
+    assert set(_l4_contracts()[0]["forbidden_modules"]) == expected
+
+
+def test_expected_l4_core_modules_are_measured_from_the_real_tree() -> None:
+    """기대 집합이 실물인지 — 비어 있지 않고, ADAPTER를 빼고, M3b 표본을 포함하는가."""
+    expected = _expected_l4_core_modules()
+    assert len(expected) > 1, f"기대 소스가 너무 적다({len(expected)}) — 스캔이 잘못됐다"
+    assert not (expected & _l4_adapters(_load_boundary_map())), "기대 소스에 ADAPTER가 섞였다"
+    assert (
+        f"{_ROOT_PACKAGE}.l4.tone_filter" in expected
+    ), "M3b 주입 표본(tone_filter)이 기대 소스에 없다 — 계약이 그 모듈을 안 본다는 뜻이다"
+
+
+def _mutate_l4_contract(
+    contracts: Sequence[Mapping[str, Any]], mutate: Any
+) -> list[dict[str, Any]]:
+    """l4 계약 1건만 바꾼 사본을 만든다 — 나머지 계약은 그대로 둔다."""
+    index = next(
+        i
+        for i, c in enumerate(contracts)
+        if str(c.get("name", "")).startswith(_L4_CONTRACT_NAME_PREFIX)
+    )
+    mutated = [dict(c) for c in contracts]
+    mutated[index] = dict(mutate(dict(mutated[index])))
+    return mutated
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expect_in_message"),
+    [
+        (lambda c: {**c, "source_modules": c["source_modules"][:-1]}, "빠진"),
+        (
+            lambda c: {
+                **c,
+                "source_modules": [
+                    *c["source_modules"],
+                    f"{_ROOT_PACKAGE}.l4.subject_adapter_math",
+                ],
+            },
+            "있어서는 안 되는",
+        ),
+        (lambda c: {k: v for k, v in c.items() if k != "as_packages"}, "as_packages"),
+        (lambda c: {**c, "source_modules": []}, "비었다"),
+        (
+            lambda c: {
+                **c,
+                "forbidden_modules": [*c["forbidden_modules"], f"{_ROOT_PACKAGE}.l3.equivalent"],
+            },
+            "forbidden_modules",
+        ),
+        (lambda c: {**c, "type": "layers"}, "forbidden이 아니다"),
+        (lambda c: {**c, "name": "l4 모듈 단위 계약 (이름 바꿈)"}, "1건"),
+    ],
+    ids=[
+        "drop-source",
+        "adapter-as-source",
+        "as-packages-default",
+        "empty-sources",
+        "extra-forbidden",
+        "wrong-type",
+        "renamed-contract",
+    ],
+)
+def test_l4_nested_contract_checker_detects_injected_defects(
+    mutate: Any, expect_in_message: str
+) -> None:
+    contracts = _all_contracts()
+    mutated = _mutate_l4_contract(contracts, mutate)
+    assert mutated != contracts, "주입이 적용되지 않았다 — 통과가 '검출'로 위장된다"
+    violations = find_l4_nested_contract_violations(
+        mutated, _load_boundary_map(), _expected_l4_core_modules()
+    )
+    assert violations, f"주입 {mutate.__name__}을 검출하지 못했다 — 가드가 변별력이 없다"
+    assert any(expect_in_message in v for v in violations), violations
+
+
+def test_l4_nested_contract_checker_passes_the_real_configuration() -> None:
+    """대조군 — 주입이 없으면 위반 0. 없으면 '전부 위반'인 과잉 수정이 통과한다."""
+    assert (
+        find_l4_nested_contract_violations(
+            _all_contracts(), _load_boundary_map(), _expected_l4_core_modules()
+        )
+        == []
+    )

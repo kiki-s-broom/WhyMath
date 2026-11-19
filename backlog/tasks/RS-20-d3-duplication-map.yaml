@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-20-d3-duplication-map
+title: "RS-D3 중복 지도 — 같은 일을 하는 구현이 몇 벌인가"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "전체 중복률(백엔드·테스트), 패키지 10개, 복제 20쌍, 같은 이름 30개 표 · 도구 막힘 시 오류 기록"
+artifacts:
+  - "golden/reports_rescue/D3/ · PR #1929 (https://github.com/kiki-s-broom/WhyMath/pull/1929) · 커밋 219df46c"
+paths:
+  - "golden/reports_rescue/D3/**"
+session: null
+notes: |-
+  [미러 면제 2026-11-17] 로컬 미러의 harness-integrity·declared-unwired-audit 실패는 의존성 설치 스텝(환경) — backlog validate·audit-deps 직접 실행 EXIT=0, 변경은 문서·대장뿐
+
+  [개명 2026-11-19] RS-02-d3-duplication-map → RS-20-d3-duplication-map: 번호 충돌 해소 — RS-02는 main의 RS-02-d2-break-counts(741edeb6)가 먼저 썼다. 머지 큐 harness-integrity 실패(run 44384007467) 원인. HARN-100 절차
+updated: 2026-11-19

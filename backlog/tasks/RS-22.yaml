@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-22
+title: "RS-J1 처분표 확정과 수확 대기열 — Kiki 승인 관문"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts:
+  - "PR #1966"
+  - golden/reports_rescue/J1/보고.md
+paths:
+  - "golden/reports_rescue/J1/**"
+session: null
+notes: ""
+updated: 2026-11-19

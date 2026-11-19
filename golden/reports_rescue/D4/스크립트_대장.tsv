@@ -1,0 +1,234 @@
+﻿경로	하위 폴더	줄 수	옛 최상위 패키지	부르는 곳	골든 묶음 표시	CI 건수	하네스·훅 건수	문서 건수	판정 근거 예	테스트 언급 수	백엔드 언급 수	F파트 내 언급 수	판정 규칙	비고	간접(F파트 경유)	종합	F파트 안에서 import하는 파일 수
+scripts/analysis/answer_form_requirement_scan.py	scripts/analysis	198	-	문서만		0	0	2	docs/architecture/adr_answer_form_contract.md	1	1	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/corpus_facts.py	scripts/analysis	1147	-	문서만		0	0	4	docs/architecture/problem_bank_variant_intake_pb20.md	59	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/data_access_layer_audit.py	scripts/analysis	676	-	문서만		0	0	2	docs/architecture/data_access_layer_disposition.md	2	3	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/eos178_eos39_coupling_sim.py	scripts/analysis	301	whymath_backend.api;whymath_backend.l2;whymath_backend.l4	문서만		0	0	1	docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/eos178_label_trajectory.py	scripts/analysis	382	whymath_backend.api;whymath_backend.l2;whymath_backend.l4	문서만		0	0	1	docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md	0	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos226_a4_human_hit.py	scripts/analysis	395	whymath_backend.harness;whymath_backend.ops;whymath_backend.schema	문서만		0	0	1	docs/reviews/eos_a4_human_hit_2026-12.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/eos39_selection_channel_sim.py	scripts/analysis	334	whymath_backend.l2	문서만		0	0	1	docs/reviews/eos39_app_help_completion_selection_judgment_2026-10-06.md	0	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos_anchor_asset_audit.py	scripts/analysis	685	-	문서만		0	0	10	docs/architecture/eos_core_adapter_boundary.md	1	2	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos_core_adapter_boundary_scan.py	scripts/analysis	463	-	문서만		0	0	11	docs/architecture/adr/README.md	2	2	3	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos_core_boundary_probe.py	scripts/analysis	410	-	문서만		0	0	4	docs/architecture/eos_core_adapter_boundary.md	3	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos_feature_inventory.py	scripts/analysis	498	-	문서만		0	0	3	docs/reviews/eos_feature_inventory_migration_map.md	1	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos_feature_inventory_v2.py	scripts/analysis	2844	-	문서만		0	0	14	docs/architecture/eos194_problem_publish_caller_surface.md	4	3	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/eos_opaque_payload_gate.py	scripts/analysis	640	-	문서만		0	0	3	docs/architecture/eos_core_adapter_boundary.md	3	1	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/jev_offline_intent_compare.py	scripts/analysis	344	whymath_backend.api;whymath_backend.l4	없음		0	0	0	-	1	0	0	파일명+모듈표기		없음	없음	0
+scripts/analysis/mastery_write_path_scan.py	scripts/analysis	337	-	CI		1	0	2	.github/workflows/ci.yml	1	0	0	파일명+모듈표기		없음	CI	0
+scripts/analysis/measure_backend_job_timeout_headroom.py	scripts/analysis	49	-	CI		1	0	0	.github/workflows/ci.yml	1	0	0	파일명+모듈표기		없음	CI	0
+scripts/analysis/measure_ci_job_timeout_headroom.py	scripts/analysis	632	-	CI		2	0	0	.github/workflows/ci-timeout-headroom.yml	2	0	1	파일명+모듈표기		CI	CI	1
+scripts/analysis/measure_merge_gate_latency.py	scripts/analysis	169	-	문서만		0	0	1	docs/standards/build_harness.md	1	0	2	파일명+모듈표기		CI	CI	0
+scripts/analysis/measure_sympy_isolation_budget.py	scripts/analysis	358	whymath_backend.l3;whymath_backend.l4	문서만		0	0	3	docs/architecture/problem_bank_variant_intake_pb20.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/measure_sympy_isolation_workers.py	scripts/analysis	156	whymath_backend.config;whymath_backend.l3	문서만		0	0	1	docs/reviews/ops126_isolation_served_ratio_2026-10-12.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/mutate_eos123_attempt_hypothesis_guards.py	scripts/analysis	416	-	문서만		0	0	1	docs/reviews/eos123_correct_attempt_refutation_judgment_2026-09-28.md	0	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/mutate_eos147_selection_theta_guards.py	scripts/analysis	767	-	문서만		0	0	1	docs/reviews/eos147_all_correct_theta_pin_judgment_2026-09-29.md	1	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/mutate_eos178_label_free_guards.py	scripts/analysis	742	-	문서만		0	0	1	docs/reviews/eos178_beginner_label_hint_judgment_2026-10-06.md	0	0	1	파일명+모듈표기		없음	문서만	0
+scripts/analysis/mutate_eos179_label_provenance_guards.py	scripts/analysis	786	-	없음		0	0	0	-	0	0	0	파일명+모듈표기		없음	없음	0
+scripts/analysis/mutate_eos25_suneung_alignment_guards.py	scripts/analysis	371	-	문서만		0	0	1	docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/mutate_eos26_r6_guards.py	scripts/analysis	616	-	문서만		0	0	1	docs/reviews/eos26_r6_diagnosis_prerequisite_directed_judgment_2026-09-26.md	0	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/mutate_eos31_suneung_scope_guards.py	scripts/analysis	448	-	문서만		0	0	1	docs/reviews/eos31_suneung_scope_judgment_2026-10-01.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/mutate_eos39_help_fold_guards.py	scripts/analysis	689	-	없음		0	0	0	-	1	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/mutate_gate_attach_guards.py	scripts/analysis	385	-	문서만		0	0	1	docs/reviews/harn193_gate_attach_claim_gap_judgment_2026-09-30.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/mutate_recommendation_policy_guards.py	scripts/analysis	381	-	문서만		0	0	2	docs/reviews/eos25_suneung_policy_alignment_judgment_2026-09-28.md	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/p3_01_db_crosscheck.py	scripts/analysis	188	-	문서만		0	0	1	docs/reviews/p3_01_scope_candidates_2026-09-30.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/p3_01_scope_inventory.py	scripts/analysis	1084	whymath_backend.l1;whymath_backend.l4	문서만		0	0	2	docs/architecture/problem_bank_variant_intake_pb20.md	0	1	1	파일명+모듈표기		문서만	문서만	0
+scripts/analysis/p3_94_ai_panel_analysis.py	scripts/analysis	264	whymath_backend.harness	문서만		0	0	2	docs/reviews/p3_94_ai_panel_scoring_2026-11-07.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/analysis/ped17_a1_compare_student_gate.py	scripts/analysis	79	whymath_backend.config;whymath_backend.l3;whymath_backend.l4	없음		0	0	0	-	0	0	0	파일명+모듈표기		없음	없음	0
+scripts/analysis/ped17_a1_mutation_check.py	scripts/analysis	220	-	없음		0	0	0	-	0	0	0	파일명+모듈표기		없음	없음	0
+scripts/analysis/ped17_t1_study_404_count.py	scripts/analysis	183	whymath_backend.l1;whymath_backend.schema	없음		0	0	0	-	0	0	0	파일명+모듈표기		없음	없음	0
+scripts/analysis/suneung_scope_census.py	scripts/analysis	144	whymath_backend.api;whymath_backend.db;whymath_backend.l6;whymath_backend.schema	문서만		0	0	1	docs/reviews/eos31_suneung_scope_judgment_2026-10-01.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/attach_similar_relations_s4_14.py	scripts/(루트)	66	whymath_backend.harness;whymath_backend.l1	없음		0	0	0	-	0	0	0	파일명+모듈표기		없음	없음	0
+scripts/backfill_rephrase_lineage_s4_18.py	scripts/(루트)	256	-	없음		0	0	0	-	2	1	0	파일명+모듈표기		없음	없음	0
+scripts/backup/backup_status.py	scripts/backup	392	-	문서만		0	0	1	docs/architecture/db_backup_dr_runbook.md	1	0	3	파일명+모듈표기		없음	문서만	0
+scripts/backup/verify_encrypted_backup.py	scripts/backup	293	-	문서만		0	0	2	docs/architecture/db_backup_dr_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/build_cross_band_edges_s4_01.py	scripts/(루트)	275	data_pipeline	문서만		0	0	1	docs/data/cross_band_edges_university_v1.md	1	0	1	파일명+모듈표기		없음	문서만	0
+scripts/build_inter_course_edges_s4_01.py	scripts/(루트)	809	-	문서만		0	0	1	docs/data/inter_course_edges_university_v1.md	1	0	1	파일명+모듈표기		없음	문서만	0
+scripts/build_narrative_edge_promotion_kg11.py	scripts/(루트)	235	data_pipeline	없음		0	0	0	-	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/build_narrative_edge_promotion_kg12.py	scripts/(루트)	276	data_pipeline	문서만		0	0	1	docs/data/narrative_edge_reference_v2.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/build_narrative_edge_reference_kg11.py	scripts/(루트)	387	data_pipeline	문서만		0	0	1	docs/data/narrative_edge_reference_v1.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/build_narrative_edge_reference_kg12.py	scripts/(루트)	209	data_pipeline	문서만		0	0	1	docs/data/narrative_edge_reference_v2.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/build_narrative_edge_resolution_kg10.py	scripts/(루트)	330	data_pipeline	문서만		0	0	2	docs/data/atom_graph_v1.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/build_university_chain_repair_kg12.py	scripts/(루트)	186	data_pipeline	문서만		0	0	1	docs/data/narrative_edge_reference_v2.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/cleanup_atom_orphans.py	scripts/(루트)	240	-	하네스·훅		0	1	0	scripts/harness/seed_data.py	2	0	0	파일명+모듈표기		CI	CI	0
+scripts/constitution/adopt_amendment.py	scripts/constitution	397	-	문서만		0	0	4	docs/constitution_proposals/A0004_sources_registry_additions_draft.md	3	0	1	파일명+모듈표기		없음	문서만	0
+scripts/constitution/audit.py	scripts/constitution	756	-	문서만		0	0	7	docs/constitution_proposals/A0002_parts_II-VII_rules_draft.md	3	0	4	경로꼬리만(동명 파일 있음)+모듈표기		CI	CI	0
+scripts/constitution/audit_ratchet.py	scripts/constitution	233	-	CI		1	0	13	.github/workflows/ci.yml	2	0	3	파일명+모듈표기		CI	CI	0
+scripts/constitution/check_amendment.py	scripts/constitution	214	-	CI		1	0	6	.github/workflows/ci.yml	1	0	2	파일명+모듈표기		CI	CI	0
+scripts/constitution/check_signed_changes.py	scripts/constitution	357	-	CI		1	0	3	.github/workflows/ci.yml	1	0	0	파일명+모듈표기		없음	CI	0
+scripts/constitution/diag/_diagcommon.py	scripts/constitution	190	-	없음		0	0	0	-	1	0	8	파일명+모듈표기		문서만	문서만	7
+scripts/constitution/diag/diag_content.py	scripts/constitution	254	-	없음		0	0	0	-	1	0	3	파일명+모듈표기		문서만	문서만	1
+scripts/constitution/diag/diag_git.py	scripts/constitution	257	-	없음		0	0	0	-	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/constitution/diag/diag_graph.py	scripts/constitution	255	-	없음		0	0	0	-	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/constitution/diag/diag_imports.py	scripts/constitution	432	-	없음		0	0	0	-	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/constitution/diag/diag_integrity.py	scripts/constitution	244	-	없음		0	0	0	-	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/constitution/diag/diag_merge.py	scripts/constitution	285	-	문서만		0	0	1	docs/reviews/coding_diagnosis_baseline_2026-09-27.md	1	0	1	파일명+모듈표기		없음	문서만	0
+scripts/constitution/diag/diag_rules_scan.py	scripts/constitution	663	-	없음		0	0	0	-	1	0	2	파일명+모듈표기		문서만	문서만	0
+scripts/constitution/merge_rules.py	scripts/constitution	127	-	문서만		0	0	5	docs/constitution_proposals/A0002_parts_II-VII_rules_draft.md	2	0	3	파일명+모듈표기		CI	CI	0
+scripts/constitution/pipeline_check.py	scripts/constitution	186	-	CI		1	0	7	.github/workflows/ci.yml	3	0	1	파일명+모듈표기		없음	CI	0
+scripts/constitution/review_health.py	scripts/constitution	153	-	문서만		0	0	5	docs/constitution_proposals/A0005_part1_corrections_draft.md	1	0	1	파일명+모듈표기		없음	문서만	0
+scripts/constitution/run_baseline.py	scripts/constitution	184	-	문서만		0	0	3	docs/ops/coding_constitution_kiki_runbook.md	1	0	1	파일명+모듈표기		없음	문서만	0
+scripts/constitution/selftest_guard.py	scripts/constitution	393	-	CI		1	0	5	.github/workflows/ci.yml	2	0	1	파일명+모듈표기		없음	CI	0
+scripts/coverage/backend_shard_plugin.py	scripts/coverage	179	-	CI		1	0	1	.github/workflows/ci.yml	1	0	1	파일명+모듈표기		CI	CI	0
+scripts/coverage/backend_shard_verdict.py	scripts/coverage	235	-	CI		1	0	1	.github/workflows/ci.yml	4	0	1	파일명+모듈표기		CI	CI	0
+scripts/coverage/check_layer_coverage.py	scripts/coverage	112	-	CI		1	0	10	.github/workflows/ci.yml	3	0	0	파일명+모듈표기		없음	CI	0
+scripts/demo/diagnose_stale_demo_db.py	scripts/demo	96	-	없음		0	0	0	-	1	0	2	파일명+모듈표기		없음	없음	0
+scripts/demo/seed_demo.py	scripts/demo	74	whymath_backend.l1	문서만		0	0	11	docs/architecture/problem_bank_variant_intake_pb20.md	1	2	3	파일명+모듈표기		없음	문서만	0
+scripts/demo/wh1_primary_probe.py	scripts/demo	108	whymath_backend.harness;whymath_backend.l3	문서만		0	0	2	docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md	1	1	2	파일명+모듈표기		CI	CI	0
+scripts/diagnose_atom_orphans.py	scripts/(루트)	153	-	CI		1	1	2	.github/workflows/ci.yml	1	1	1	파일명+모듈표기		CI	CI	0
+scripts/fill_live_cost_table.py	scripts/(루트)	110	-	문서만		0	0	4	docs/architecture/nlp_module_gap_review_r2.md	0	2	1	파일명+모듈표기		문서만	문서만	0
+scripts/golden_prompts/build_prompts.py	scripts/golden_prompts	357	-	하네스·훅	살아 있음	0	2	1	.claude/skills/task-prompt-pack/SKILL.md	0	0	0	파일명+모듈표기		없음	하네스·훅	0
+scripts/harness/__init__.py	scripts/harness	12	-	문서만	살아 있음	0	0	1	docs/reviews/eos_loop_support_future_classification_2026-09-16.md	0	0	0	경로꼬리만(동명 파일 있음)+모듈표기	종합=하위 모듈에서 상속	없음	CI	0
+scripts/harness/_stdio.py	scripts/harness	46	-	하네스·훅	살아 있음	0	17	2	scripts/harness/adr_number_check.py	0	1	0	경로꼬리만(동명 파일 있음)+모듈표기		CI	CI	17
+scripts/harness/adr_number_check.py	scripts/harness	211	-	CI	살아 있음	1	1	7	.github/workflows/ci.yml	1	0	0	파일명+모듈표기		CI	CI	0
+scripts/harness/backlog.py	scripts/harness	6280	-	CI	살아 있음	3	37	356	.github/workflows/ci.yml	73	5	8	파일명+모듈표기		CI	CI	0
+scripts/harness/board.py	scripts/harness	904	-	하네스·훅	살아 있음	0	3	2	scripts/harness/verify_gate_graph_discrimination.py	8	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/ci_job_coverage.py	scripts/harness	1058	-	CI	살아 있음	1	4	2	.github/workflows/ci.yml	4	0	0	파일명+모듈표기		CI	CI	3
+scripts/harness/ci_mirror.py	scripts/harness	1338	-	CI	살아 있음	1	5	62	.github/workflows/ci.yml	7	0	0	파일명+모듈표기		CI	CI	3
+scripts/harness/dep_declaration.py	scripts/harness	463	-	하네스·훅	살아 있음	0	2	1	scripts/harness/backlog.py	4	1	0	파일명+모듈표기		CI	CI	1
+scripts/harness/done_mirror_gate.py	scripts/harness	589	-	하네스·훅	살아 있음	0	1	1	scripts/harness/backlog.py	2	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/event_leaks.py	scripts/harness	170	-	하네스·훅	살아 있음	0	2	1	scripts/harness/backlog.py	2	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/incidents.py	scripts/harness	579	-	하네스·훅	살아 있음	0	3	1	scripts/harness/backlog.py	3	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/isolation_report.py	scripts/harness	573	-	CI	살아 있음	1	3	1	.github/workflows/harness-audit.yml	2	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/jit_rules.py	scripts/harness	167	-	하네스·훅	살아 있음	0	1	0	scripts/harness/backlog.py	2	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/models.py	scripts/harness	414	-	하네스·훅	살아 있음	0	9	9	scripts/harness/backlog.py	26	0	0	경로꼬리만(동명 파일 있음)+모듈표기		CI	CI	9
+scripts/harness/number_guard.py	scripts/harness	860	-	하네스·훅	살아 있음	0	1	1	scripts/harness/backlog.py	5	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/pathscope.py	scripts/harness	169	-	하네스·훅	살아 있음	0	2	2	scripts/harness/backlog.py	2	1	1	파일명+모듈표기		CI	CI	3
+scripts/harness/port_freshness.py	scripts/harness	692	-	하네스·훅	살아 있음	0	2	0	.claude/commands/drive.md	1	0	0	파일명+모듈표기		없음	하네스·훅	0
+scripts/harness/prompt_scope.py	scripts/harness	141	-	하네스·훅	살아 있음	0	1	0	scripts/harness/backlog.py	1	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/push_mirror_notice.py	scripts/harness	1173	-	하네스·훅	살아 있음	0	2	2	.claude/commands/drive.md	3	0	0	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	0
+scripts/harness/remote_claims.py	scripts/harness	3399	-	하네스·훅	살아 있음	0	6	13	scripts/harness/backlog.py	24	0	3	파일명+모듈표기		CI	CI	8
+scripts/harness/report.py	scripts/harness	715	-	하네스·훅	살아 있음	0	6	2	scripts/harness/__init__.py	11	0	1	파일명+모듈표기		CI	CI	3
+scripts/harness/rules.py	scripts/harness	552	-	하네스·훅	살아 있음	0	1	4	scripts/harness/backlog.py	1	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/ruleset_drift.py	scripts/harness	858	-	하네스·훅	살아 있음	0	2	3	scripts/harness/backlog.py	3	0	0	파일명+모듈표기		CI	CI	2
+scripts/harness/ruleset_pin_plan.py	scripts/harness	357	-	문서만	살아 있음	0	0	1	docs/data/recurring_failure_ledger_2026-09-20/incidents.jsonl	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/harness/seed_data.py	scripts/harness	473	-	하네스·훅	살아 있음	0	2	0	.claude/agents/backend-engineer.md	0	0	0	파일명+모듈표기		CI	CI	1
+scripts/harness/selector.py	scripts/harness	565	-	CI	살아 있음	1	8	12	.github/workflows/ci.yml	13	0	0	파일명+모듈표기		CI	CI	4
+scripts/harness/similar.py	scripts/harness	220	-	하네스·훅	살아 있음	0	2	1	scripts/harness/backlog.py	1	0	0	파일명+모듈표기		CI	CI	2
+scripts/harness/store.py	scripts/harness	1415	-	하네스·훅	살아 있음	0	9	6	scripts/harness/backlog.py	45	2	3	경로꼬리만(동명 파일 있음)+모듈표기		CI	CI	12
+scripts/harness/trigger_declaration.py	scripts/harness	205	-	하네스·훅	살아 있음	0	2	0	scripts/harness/backlog.py	1	0	0	파일명+모듈표기		CI	CI	2
+scripts/harness/verify_gate_graph_discrimination.py	scripts/harness	424	-	하네스·훅	살아 있음	0	5	1	scripts/harness/verify_gate_verdict_handoff_discrimination.py	7	0	0	파일명+모듈표기		하네스·훅	하네스·훅	5
+scripts/harness/verify_gate_verdict_handoff_discrimination.py	scripts/harness	240	-	하네스·훅	살아 있음	0	1	1	scripts/harness/verify_gate_graph_discrimination.py	2	0	0	파일명+모듈표기		하네스·훅	하네스·훅	0
+scripts/harness/verify_gate_wait_kind_discrimination.py	scripts/harness	243	-	문서만	살아 있음	0	0	1	docs/standards/build_harness.md	2	0	0	파일명+모듈표기		없음	문서만	0
+scripts/harness/verify_incident_shard_discrimination.py	scripts/harness	196	-	문서만	살아 있음	0	0	1	docs/standards/build_harness.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/harness/verify_port_freshness_discrimination.py	scripts/harness	114	-	없음	살아 있음	0	0	0	-	2	0	0	파일명+모듈표기		없음	없음	0
+scripts/harness/verify_real_ledger_isolation_discrimination.py	scripts/harness	197	-	문서만	살아 있음	0	0	1	docs/standards/build_harness.md	2	0	0	파일명+모듈표기		없음	문서만	0
+scripts/harness/work_graph.py	scripts/harness	1200	-	CI	살아 있음	1	2	2	.github/workflows/work-graph-desktop.yml	4	0	0	파일명+모듈표기		문서만	CI	0
+scripts/manuals/manual.py	scripts/manuals	331	-	하네스·훅		0	3	3	.claude/commands/manual-fix.md	1	0	0	파일명+모듈표기		없음	하네스·훅	0
+scripts/ops/activate_rocm72_standalone.py	scripts/ops	208	-	문서만		0	0	1	docs/ops/amd395_local_llm_performance.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/check_conflict_markers.py	scripts/ops	310	-	CI		2	0	4	.github/workflows/ci.yml	1	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/check_dependency_upper_bounds.py	scripts/ops	736	-	CI		1	0	3	.github/workflows/ci.yml	2	0	2	파일명+모듈표기		CI	CI	0
+scripts/ops/check_provider_seat_contract.py	scripts/ops	368	-	CI		1	0	4	.github/workflows/ci.yml	1	4	0	파일명+모듈표기		없음	CI	0
+scripts/ops/check_ps_scripts.py	scripts/ops	505	-	CI		1	1	15	.github/workflows/ci.yml	3	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/check_release_freeze.py	scripts/ops	214	-	CI		1	0	1	.github/workflows/release-freeze.yml	2	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/check_routing_data_grade.py	scripts/ops	162	-	CI		1	0	3	.github/workflows/ci.yml	1	3	2	파일명+모듈표기		CI	CI	2
+scripts/ops/check_routing_decision_bypass.py	scripts/ops	370	-	CI		1	0	2	.github/workflows/ci.yml	1	2	1	파일명+모듈표기		CI	CI	0
+scripts/ops/check_runbook_blocks.py	scripts/ops	826	-	CI		1	1	18	.github/workflows/ci.yml	6	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/check_source_document_binaries.py	scripts/ops	311	-	CI		1	0	111	.github/workflows/ci.yml	2	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/ci_constraints.py	scripts/ops	661	-	CI		6	0	2	.github/workflows/ci-timeout-headroom.yml	1	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/cp949_guard.py	scripts/ops	469	-	CI		1	1	14	.github/workflows/ci.yml	2	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/flow_health.py	scripts/ops	694	-	CI		1	1	2	.github/workflows/harness-audit.yml	5	0	1	파일명+모듈표기		CI	CI	1
+scripts/ops/ip_separation_evidence.py	scripts/ops	1256	-	문서만		0	0	1	docs/ops/ip_separation_evidence_gate_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/license_snapshot_archiver.py	scripts/ops	640	-	문서만		0	0	3	docs/data/license_snapshot_archive.md	1	0	1	파일명+모듈표기		문서만	문서만	0
+scripts/ops/license_snapshot_coverage.py	scripts/ops	122	-	문서만		0	0	1	docs/data/license_snapshot_archive.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/main_watch.py	scripts/ops	1750	-	문서만		0	0	1	docs/ops/main_watch_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/measure_constitution_tokens.py	scripts/ops	169	-	문서만		0	0	1	docs/ops/harn121_constitution_token_measurement_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/mirror_ci_images.py	scripts/ops	322	-	CI		1	0	1	.github/workflows/mirror-ci-images.yml	2	0	0	파일명+모듈표기		없음	CI	0
+scripts/ops/misc61_source_key_probe.py	scripts/ops	307	-	문서만		0	0	2	docs/ops/misc61_source_probe_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/p3_32_hint_link_probe.py	scripts/ops	471	whymath_backend.db;whymath_backend.l1;whymath_backend.whs	문서만		0	0	3	docs/architecture/problem_bank_variant_intake_pb20.md	2	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/p3_81_hint_catalog_probe.py	scripts/ops	735	whymath_backend.db;whymath_backend.harness;whymath_backend.l4	문서만		0	0	2	docs/ops/p3_32_hint_link_runbook.md	2	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/p3_97_bank_load_probe.py	scripts/ops	313	whymath_backend.db;whymath_backend.l1	문서만		0	0	1	docs/ops/p3_97_bank_load_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/phase3_metrics_readonly.py	scripts/ops	132	whymath_backend.config;whymath_backend.db;whymath_backend.ops	문서만		0	0	2	docs/ops/p3_106_learning_loop_success_prod_measure_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/pr_delivery_audit.py	scripts/ops	360	-	CI		1	1	2	.github/workflows/harness-audit.yml	5	0	2	파일명+모듈표기		CI	CI	1
+scripts/ops/pr_disposal_precheck.py	scripts/ops	318	-	하네스·훅		0	1	0	scripts/harness/backlog.py	2	0	0	파일명+모듈표기		CI	CI	0
+scripts/ops/pr_merge_readiness.py	scripts/ops	225	-	하네스·훅		0	1	4	scripts/harness/remote_claims.py	3	0	2	파일명+모듈표기		CI	CI	0
+scripts/ops/restore_rocm72_builtin.py	scripts/ops	142	-	문서만		0	0	2	docs/ops/amd395_local_llm_performance.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/verify_gate_de_discrimination.py	scripts/ops	545	-	문서만		0	0	2	docs/reviews/p3_13_gate_d_e_recheck_2026-10-09.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/verify_scenario_suite_discrimination.py	scripts/ops	293	-	문서만		0	0	2	docs/reviews/eos119_scenario_suite_2026-09-24.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/verify_week1_gate_guard.py	scripts/ops	206	-	문서만		0	0	1	docs/reviews/week1_gate_judgement_2026-09-18.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/verify_week2_gate_discrimination.py	scripts/ops	205	-	문서만		0	0	1	docs/reviews/week2_gate_judgement_2026-09-18.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/verify_week3_gate_discrimination.py	scripts/ops	270	-	문서만		0	0	1	docs/reviews/week3_gate_judgement_2026-09-19.md	0	0	0	파일명+모듈표기		없음	문서만	0
+scripts/ops/wh1_primary_timeout_decompose.py	scripts/ops	957	whymath_backend.config;whymath_backend.harness;whymath_backend.l3	문서만		0	0	2	docs/ops/ops141_wh1_primary_timeout_decompose_runbook.md	1	0	0	파일명+모듈표기		없음	문서만	0
+scripts/reconcile_rephrased_corpus_s2_08.py	scripts/(루트)	130	-	없음		0	0	0	-	0	0	1	파일명+모듈표기		없음	없음	0
+src/data-pipeline/data_pipeline/__init__.py	data_pipeline/(루트)	7	-	없음		0	0	0	-	0	0	0	경로꼬리만(동명 파일 있음)	종합=하위 모듈에서 상속	없음	하네스·훅	0
+src/data-pipeline/data_pipeline/atom_graph/__init__.py	data_pipeline/atom_graph	42	data_pipeline	문서만		0	0	5	docs/data/ai_review_cross_band_edges_university_v1.md	20	3	18	경로꼬리만(동명 파일 있음)+모듈표기	종합=하위 모듈에서 상속	문서만	하네스·훅	0
+src/data-pipeline/data_pipeline/atom_graph/__main__.py	data_pipeline/atom_graph	387	data_pipeline	문서만		0	0	1	docs/data/atom_graph_v1.md	2	1	2	경로꼬리만(동명 파일 있음)+패키지실행표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/atom_graph/behavior_skills_merge.py	data_pipeline/atom_graph	291	-	문서만		0	0	1	docs/data/atom_graph_v1.md	1	0	1	파일명+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/atom_graph/cross_band_edges.py	data_pipeline/atom_graph	492	data_pipeline	문서만		0	0	2	docs/data/ai_review_cross_band_edges_university_v1.md	3	0	3	파일명+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/atom_graph/cross_band_edges_merge.py	data_pipeline/atom_graph	256	data_pipeline	문서만		0	0	1	docs/data/cross_band_edges_university_v1.md	3	0	1	파일명+모듈표기		없음	문서만	0
+src/data-pipeline/data_pipeline/atom_graph/extract.py	data_pipeline/atom_graph	82	-	없음		0	0	0	-	0	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/atom_graph/graph_history.py	data_pipeline/atom_graph	108	-	문서만		0	0	2	docs/data/atom_graph_v1.md	2	0	8	파일명+모듈표기		문서만	문서만	8
+src/data-pipeline/data_pipeline/atom_graph/inter_course_edges.py	data_pipeline/atom_graph	526	data_pipeline	문서만		0	0	1	docs/data/inter_course_edges_university_v1.md	1	0	1	파일명+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/atom_graph/load.py	data_pipeline/atom_graph	357	data_pipeline	문서만		0	0	2	docs/data/atom_graph_v1.md	2	0	1	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/atom_graph/models.py	data_pipeline/atom_graph	293	data_pipeline	문서만		0	0	3	docs/architecture/subject_expansion_readiness.md	10	0	14	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	10
+src/data-pipeline/data_pipeline/atom_graph/narrative_promotion_merge.py	data_pipeline/atom_graph	339	data_pipeline	없음		0	0	0	-	2	0	1	파일명+모듈표기		없음	없음	0
+src/data-pipeline/data_pipeline/atom_graph/transform.py	data_pipeline/atom_graph	436	data_pipeline	없음		0	0	0	-	4	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	3
+src/data-pipeline/data_pipeline/atom_graph/university_standard_fill.py	data_pipeline/atom_graph	167	data_pipeline	문서만		0	0	2	docs/data/authoring_expansion_recovery_conditions_2026-08.md	1	1	3	파일명+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/atom_graph/validate.py	data_pipeline/atom_graph	271	data_pipeline	문서만		0	0	4	docs/architecture/eos_concept_db_review_adr.md	3	4	7	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/citation.py	data_pipeline/(루트)	45	-	문서만		0	0	3	docs/architecture/subject_expansion_readiness.md	2	0	5	파일명+모듈표기		하네스·훅	하네스·훅	4
+src/data-pipeline/data_pipeline/concept_atom_crosswalk/__init__.py	data_pipeline/concept_atom_crosswalk	49	data_pipeline	문서만		0	0	1	docs/data/concept_atom_crosswalk_v1.md	5	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/concept_atom_crosswalk/__main__.py	data_pipeline/concept_atom_crosswalk	247	data_pipeline	문서만		0	0	1	docs/data/concept_atom_crosswalk_v1.md	1	0	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	문서만	0
+src/data-pipeline/data_pipeline/concept_atom_crosswalk/derive.py	data_pipeline/concept_atom_crosswalk	208	data_pipeline	문서만		0	0	1	docs/data/concept_atom_crosswalk_v1.md	1	1	3	파일명+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/concept_atom_crosswalk/models.py	data_pipeline/concept_atom_crosswalk	162	data_pipeline	없음		0	0	0	-	3	0	4	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/concept_atom_crosswalk/validate.py	data_pipeline/concept_atom_crosswalk	179	data_pipeline	없음		0	0	0	-	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/concept_content/__init__.py	data_pipeline/concept_content	24	data_pipeline	없음		0	0	0	-	3	0	3	경로꼬리만(동명 파일 있음)+모듈표기	종합=하위 모듈에서 상속	없음	문서만	0
+src/data-pipeline/data_pipeline/concept_content/__main__.py	data_pipeline/concept_content	169	data_pipeline	없음		0	0	0	-	2	0	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	없음	0
+src/data-pipeline/data_pipeline/concept_content/extract.py	data_pipeline/concept_content	137	data_pipeline	없음		0	0	0	-	0	0	2	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	2
+src/data-pipeline/data_pipeline/concept_content/models.py	data_pipeline/concept_content	75	-	없음		0	0	0	-	1	0	4	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	4
+src/data-pipeline/data_pipeline/concept_content/ncic_overlap.py	data_pipeline/concept_content	184	data_pipeline	문서만		0	0	3	docs/data/concept_content_v1.md	2	0	1	파일명+모듈표기		없음	문서만	1
+src/data-pipeline/data_pipeline/concept_content/validate.py	data_pipeline/concept_content	97	data_pipeline	없음		0	0	0	-	1	0	2	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	2
+src/data-pipeline/data_pipeline/concept_content_university/__init__.py	data_pipeline/concept_content_university	23	data_pipeline	없음		0	0	0	-	3	0	3	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	0
+src/data-pipeline/data_pipeline/concept_content_university/__main__.py	data_pipeline/concept_content_university	103	data_pipeline	없음		0	0	0	-	1	0	1	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	없음	0
+src/data-pipeline/data_pipeline/concept_content_university/extract.py	data_pipeline/concept_content_university	115	data_pipeline	없음		0	0	0	-	0	0	2	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	2
+src/data-pipeline/data_pipeline/concept_content_university/models.py	data_pipeline/concept_content_university	82	-	없음		0	0	0	-	2	0	4	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	4
+src/data-pipeline/data_pipeline/concept_content_university/validate.py	data_pipeline/concept_content_university	97	data_pipeline	없음		0	0	0	-	1	0	3	경로꼬리만(동명 파일 있음)+모듈표기		없음	없음	2
+src/data-pipeline/data_pipeline/concept_graph/__init__.py	data_pipeline/concept_graph	37	data_pipeline	문서만		0	0	3	docs/data/concept_graph.md	22	1	9	경로꼬리만(동명 파일 있음)+모듈표기	종합=하위 모듈에서 상속	문서만	하네스·훅	0
+src/data-pipeline/data_pipeline/concept_graph/__main__.py	data_pipeline/concept_graph	489	data_pipeline	문서만		0	0	2	docs/data/concept_graph.md	2	1	1	경로꼬리만(동명 파일 있음)+패키지실행표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/concept_graph/hangul_romanize.py	data_pipeline/concept_graph	158	-	문서만		0	0	1	docs/standards/part9_id_policy_review.md	0	0	1	파일명+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/concept_graph/idmap.py	data_pipeline/concept_graph	566	data_pipeline	문서만		0	0	6	docs/architecture/adr/ADR-009-concept-id-prefix-constant-and-misconception-id-canon.md	4	0	4	파일명+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/concept_graph/load.py	data_pipeline/concept_graph	319	data_pipeline	문서만		0	0	3	docs/data/atom_graph_v1.md	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/concept_graph/models.py	data_pipeline/concept_graph	347	data_pipeline	문서만		0	0	6	docs/architecture/adr/ADR-009-concept-id-prefix-constant-and-misconception-id-canon.md	19	0	12	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	9
+src/data-pipeline/data_pipeline/concept_graph/registry.py	data_pipeline/concept_graph	143	data_pipeline	문서만		0	0	2	docs/reviews/eos_plan52_crosswalk_2026-09.md	1	0	1	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/concept_graph/relation_crosswalk.py	data_pipeline/concept_graph	95	data_pipeline	문서만		0	0	6	docs/architecture/04c_misconception_seven_stage_separation.md	1	0	0	파일명+모듈표기		없음	문서만	0
+src/data-pipeline/data_pipeline/concept_graph/seed.py	data_pipeline/concept_graph	222	data_pipeline	문서만		0	0	2	docs/architecture/adr/ADR-009-concept-id-prefix-constant-and-misconception-id-canon.md	2	0	2	파일명+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/concept_graph/transform.py	data_pipeline/concept_graph	362	data_pipeline	없음		0	0	0	-	7	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	3
+src/data-pipeline/data_pipeline/concept_graph/validate.py	data_pipeline/concept_graph	767	data_pipeline	문서만		0	0	7	docs/architecture/ai_collaboration_part11_review.md	6	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	1
+src/data-pipeline/data_pipeline/formula_graph/__init__.py	data_pipeline/formula_graph	39	data_pipeline	문서만		0	0	1	docs/data/formula_graph_v1.md	6	1	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/formula_graph/__main__.py	data_pipeline/formula_graph	169	data_pipeline	문서만		0	0	1	docs/data/formula_graph_v1.md	0	1	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	문서만	0
+src/data-pipeline/data_pipeline/formula_graph/models.py	data_pipeline/formula_graph	117	-	문서만		0	0	3	docs/architecture/dsl_integration_gap_review.md	5	0	5	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/formula_graph/transform.py	data_pipeline/formula_graph	73	data_pipeline	없음		0	0	0	-	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/formula_graph/validate.py	data_pipeline/formula_graph	131	data_pipeline	없음		0	0	0	-	2	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/graph_analytics/__init__.py	data_pipeline/graph_analytics	7	-	없음		0	0	0	-	2	0	1	경로꼬리만(동명 파일 있음)+모듈표기	종합=하위 모듈에서 상속	없음	문서만	0
+src/data-pipeline/data_pipeline/graph_analytics/__main__.py	data_pipeline/graph_analytics	105	data_pipeline	없음		0	0	0	-	1	0	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	없음	0
+src/data-pipeline/data_pipeline/graph_analytics/analytics.py	data_pipeline/graph_analytics	331	-	문서만		0	0	4	docs/architecture/curriculum_module_gap_review_r2.md	2	0	1	파일명+모듈표기		없음	문서만	1
+src/data-pipeline/data_pipeline/misconception/__init__.py	data_pipeline/misconception	25	data_pipeline	없음		0	0	0	-	2	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/misconception/__main__.py	data_pipeline/misconception	125	data_pipeline	없음		0	0	0	-	2	0	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	없음	0
+src/data-pipeline/data_pipeline/misconception/extract.py	data_pipeline/misconception	176	-	문서만		0	0	2	docs/reviews/m0599_hold_and_provenance_mismatch_2026-10-07.md	2	1	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/ncic/__init__.py	data_pipeline/ncic	74	data_pipeline	문서만		0	0	1	docs/data/ncic.md	13	0	12	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	0
+src/data-pipeline/data_pipeline/ncic/__main__.py	data_pipeline/ncic	391	data_pipeline	문서만		0	0	1	docs/data/ncic.md	1	0	1	경로꼬리만(동명 파일 있음)+패키지실행표기		하네스·훅	하네스·훅	0
+src/data-pipeline/data_pipeline/ncic/clean.py	data_pipeline/ncic	137	-	하네스·훅		0	2	2	.claude/agents/data-engineer.md	3	0	4	파일명+모듈표기		하네스·훅	하네스·훅	3
+src/data-pipeline/data_pipeline/ncic/collect.py	data_pipeline/ncic	505	data_pipeline	하네스·훅		0	1	2	.claude/commands/dataset.md	1	0	3	파일명+모듈표기		문서만	하네스·훅	2
+src/data-pipeline/data_pipeline/ncic/extract_xlsx.py	data_pipeline/ncic	253	data_pipeline	문서만		0	0	2	docs/data/achievement_standards_v1.md	1	0	4	파일명+모듈표기		하네스·훅	하네스·훅	2
+src/data-pipeline/data_pipeline/ncic/load.py	data_pipeline/ncic	352	data_pipeline	없음		0	0	0	-	4	1	4	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	2
+src/data-pipeline/data_pipeline/ncic/models.py	data_pipeline/ncic	384	data_pipeline	문서만		0	0	7	docs/architecture/subject_expansion_readiness.md	9	2	12	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	9
+src/data-pipeline/data_pipeline/ncic/transform.py	data_pipeline/ncic	391	data_pipeline	문서만		0	0	1	docs/data/ncic.md	4	0	7	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	6
+src/data-pipeline/data_pipeline/ncic/validate.py	data_pipeline/ncic	313	data_pipeline	문서만		0	0	2	docs/architecture/data_platform_eos_frame_gap_review_2026-08-11.md	2	0	3	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	2
+src/data-pipeline/data_pipeline/problem_type_graph/__init__.py	data_pipeline/problem_type_graph	38	data_pipeline	문서만		0	0	1	docs/data/problem_type_graph_v1.md	6	1	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/problem_type_graph/__main__.py	data_pipeline/problem_type_graph	169	data_pipeline	문서만		0	0	1	docs/data/problem_type_graph_v1.md	0	1	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	문서만	0
+src/data-pipeline/data_pipeline/problem_type_graph/models.py	data_pipeline/problem_type_graph	114	-	없음		0	0	0	-	5	0	5	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/problem_type_graph/transform.py	data_pipeline/problem_type_graph	64	data_pipeline	없음		0	0	0	-	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/problem_type_graph/validate.py	data_pipeline/problem_type_graph	149	data_pipeline	없음		0	0	0	-	2	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/skill_graph/__init__.py	data_pipeline/skill_graph	38	data_pipeline	문서만		0	0	1	docs/data/skill_graph_v1.md	6	2	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/skill_graph/__main__.py	data_pipeline/skill_graph	163	data_pipeline	문서만		0	0	1	docs/data/skill_graph_v1.md	1	1	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	문서만	0
+src/data-pipeline/data_pipeline/skill_graph/models.py	data_pipeline/skill_graph	121	-	없음		0	0	0	-	5	1	6	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/skill_graph/transform.py	data_pipeline/skill_graph	59	data_pipeline	없음		0	0	0	-	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/skill_graph/validate.py	data_pipeline/skill_graph	198	data_pipeline	문서만		0	0	1	docs/architecture/eos_concept_db_review_adr.md	2	0	4	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/standards_university/__init__.py	data_pipeline/standards_university	28	data_pipeline	문서만		0	0	1	docs/data/standards_university_v1.md	7	0	3	경로꼬리만(동명 파일 있음)+모듈표기	종합=하위 모듈에서 상속	문서만	하네스·훅	0
+src/data-pipeline/data_pipeline/standards_university/__main__.py	data_pipeline/standards_university	136	data_pipeline	문서만		0	0	1	docs/data/standards_university_v1.md	2	0	1	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	문서만	0
+src/data-pipeline/data_pipeline/standards_university/extract.py	data_pipeline/standards_university	86	-	없음		0	0	0	-	0	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/standards_university/models.py	data_pipeline/standards_university	139	-	문서만		0	0	1	docs/standards/current_phase_checklist.md	4	0	5	경로꼬리만(동명 파일 있음)+모듈표기		하네스·훅	하네스·훅	4
+src/data-pipeline/data_pipeline/standards_university/transform.py	data_pipeline/standards_university	81	data_pipeline	없음		0	0	0	-	1	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/standards_university/validate.py	data_pipeline/standards_university	151	data_pipeline	없음		0	0	0	-	1	0	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/strategy_graph/__init__.py	data_pipeline/strategy_graph	43	data_pipeline	문서만		0	0	1	docs/data/strategy_graph_v1.md	5	1	3	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	0
+src/data-pipeline/data_pipeline/strategy_graph/__main__.py	data_pipeline/strategy_graph	169	data_pipeline	문서만		0	0	1	docs/data/strategy_graph_v1.md	0	1	0	경로꼬리만(동명 파일 있음)+패키지실행표기		없음	문서만	0
+src/data-pipeline/data_pipeline/strategy_graph/models.py	data_pipeline/strategy_graph	128	-	없음		0	0	0	-	4	0	4	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	4
+src/data-pipeline/data_pipeline/strategy_graph/transform.py	data_pipeline/strategy_graph	61	data_pipeline	없음		0	0	0	-	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2
+src/data-pipeline/data_pipeline/strategy_graph/validate.py	data_pipeline/strategy_graph	175	data_pipeline	없음		0	0	0	-	2	0	2	경로꼬리만(동명 파일 있음)+모듈표기		문서만	문서만	2

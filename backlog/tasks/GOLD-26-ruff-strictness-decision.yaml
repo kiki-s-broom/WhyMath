@@ -1,0 +1,36 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-26-ruff-strictness-decision
+title: "ruff select에 BLE·S를 넣을지 결정 — 기존 40건 처리 계획과 함께(설정 변경은 Kiki 승인)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P2
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "① 현행 실측 재확인 — 착수 시점 main 해시를 적고 ruff select 값과 BLE001·S110·E722 건수를 다시 잰다(2026-11-17 기준: select E,F,I,N,B,W · BLE001 37 · S110 3 · E722 0). 40건은 \"삼키는 코드\"의 상한이 아니라 그날의 검출 수다 — 줄마다 무엇을 삼키는지(대체 문장 반환·로그·아무것도 안 함) 분류해 적는다."
+  - "② 결정 축을 셋으로 분리해 각각 비용과 효과를 적는다 — (가) 저장소 전체에 BLE·S를 켠다 (나) golden 구역만 켠다 (다) 켜지 않는다. 각 안의 기존 위반 수, 고칠 양, 억제 비용, 그리고 \"켜지 않으면 무엇이 계속 새는가\"를 적는다."
+  - "③ 이 저장소의 「침묵 실패 금지」는 예외 타입명을 로그에 남기는 것까지 요구하는데 BLE001·S110은 \"삼켰는가\"만 본다 — 게이트가 타입명 축을 어떻게 볼지(별도 규칙·AST 검사·수동 검수)를 설계하고, 그 축을 BLE/S로 대신할 수 없다는 한계를 명시한다."
+  - "④ 경계 — RS G2 세션이 만드는 조용한 실패 게이트(golden 구역 0건 강제 + 옛 구역 건수 기록, golden/reports_rescue/G2/)와 역할이 겹치지 않게 나눈다. G2는 golden 구역 게이트이고, 이 태스크는 저장소 전체 린트 설정(pyproject)의 선택 여부 결정이다. G2 산출물(옛구역_기준선.tsv)이 있으면 그 수치를 인용하고 다시 재지 않는다."
+  - "⑤ 결정은 Kiki 승인 항목으로 올린다 — 세션이 pyproject.toml을 임의로 바꾸지 않는다. 승인 뒤 집행은 별도 태스크로 나누고, 그때 기존 위반 처리 순서(고칠 것·허용 목록에 이유를 적을 것)를 정한다."
+  - "⑥ 산출물 — golden/RUFF_STRICTNESS_DECISION.md(세 안 비교표 + 권고 + 승인 요청 목록). 옛 코드 변경 0줄. 종료 보고에 ①완료 기준 충족 여부 ②옛 코드 변경 0줄 확인 ③승인 요청 항목 수를 적는다."
+artifacts:
+  - "#1949"
+paths:
+  - golden/RUFF_STRICTNESS_DECISION.md
+session: null
+notes: |-
+  출처: golden/RESCUE_REVIEW.md §6 F-4 (main 33b1ffa5) · Kiki 지시 2026-11-17("후속후보 등재, 승인").
+
+  왜 이 태스크인가: 백엔드 ruff select에 BLE(blind-except)·S(bandit)가 없어 오류를 삼키는 코드가 검사되지 않는다. RESCUE_REVIEW는 이번 3주 골든 기간에 린트 설정을 바꾸면 기존 코드가 일괄 red가 되므로 **건수 기록까지만** 하고 결정을 미뤘다(§4 채택 3). 그 결정이 아직 어디에도 없다.
+
+  왜 F-1·F-3는 등재하지 않았나(2026-11-17 실측): F-1(측정 도구에 app 축 추가)은 RS R1 세션이 소유하고 GOLD-24가 지시문을 그 형태로 재작성 중이다. F-3(옛 앱 미도달 모듈 판정표)은 RS D1(모듈 대장)·C1~C8(패키지 카드)·J1(처분표)이 소유한다. 같은 축을 백로그에 또 세우면 이 문서가 스스로 경고한 "같은 일을 하는 구현 2벌"이 태스크 축에서 재현된다.
+
+  선행 산출물: RS G2의 golden/reports_rescue/G2/옛구역_기준선.tsv. 그 세션은 아직 착수하지 않았고 태스크 ID도 발급되지 않았다 — G2 태스크가 생기면 backlog.py amend --depends로 이 태스크에 선행을 걸어야 한다(CLAUDE.md 「선행 조건을 산문에만 적고 대장에 집행하지 않기 금지」 — 그때까지 이 줄은 대장에 집행되지 않은 상태다).
+
+  [미러 면제 2026-11-18] HARN-173 면제: 이 환경에서 ci_mirror 상시 5잡이 전부 Bash 서비스 생성 타임아웃(HCS_E_CONNECTION_TIMEOUT 30.06s)으로 첫 셸 스텝에서 실패해 내용 검사 0건 실행 — 내용 실패가 아니라 환경 실패이며 HARN-308 waive로도 같은 사유를 대장에 기록했다. 변경 3파일은 golden/ 문서 1 + 백로그 대장 2이며 소스·테스트 0줄이다. CI가 최종 판정한다.
+updated: 2026-11-18

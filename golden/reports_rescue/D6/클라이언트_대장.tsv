@@ -1,0 +1,129 @@
+﻿모듈	파일 경로	줄 수	파트	골든 등급	옛앱 등급	골든에서 닿음	옛앱에서 닿음	경로 테스트가 실행	단위 테스트가 실행	이 모듈을 import하는 모듈 수	비고
+app	src/mobile/lib/app.dart	30	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 5
+core.api_client	src/mobile/lib/core/api_client.dart	73	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	13	매니페스트 등재 · 테스트 직접 import 3
+core.auth_interceptor	src/mobile/lib/core/auth_interceptor.dart	192	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+core.env	src/mobile/lib/core/env.dart	32	G-Flutter	대기(실행 기록 없음)	대기(실행 기록 없음)	예	예	실행 기록 없음	예(import 기준)	3	테스트 직접 import 0
+core.router	src/mobile/lib/core/router.dart	220	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	7	매니페스트 등재 · 테스트 직접 import 6
+core.shell.app_shell	src/mobile/lib/core/shell/app_shell.dart	59	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+core.token_refresh_api	src/mobile/lib/core/token_refresh_api.dart	69	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 5
+core.token_store	src/mobile/lib/core/token_store.dart	215	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 8
+features.auth.application.account_security_controller	src/mobile/lib/features/auth/application/account_security_controller.dart	102	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+features.auth.application.account_security_state	src/mobile/lib/features/auth/application/account_security_state.dart	60	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 0
+features.auth.application.auth_controller	src/mobile/lib/features/auth/application/auth_controller.dart	133	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	5	매니페스트 등재 · 테스트 직접 import 4
+features.auth.application.auth_state	src/mobile/lib/features/auth/application/auth_state.dart	20	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+features.auth.data.auth_api	src/mobile/lib/features/auth/data/auth_api.dart	56	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 4
+features.auth.data.auth_sessions_api	src/mobile/lib/features/auth/data/auth_sessions_api.dart	98	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 2
+features.auth.data.oauth_code_requester	src/mobile/lib/features/auth/data/oauth_code_requester.dart	48	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.auth.presentation.account_security_screen	src/mobile/lib/features/auth/presentation/account_security_screen.dart	304	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.auth.presentation.login_screen	src/mobile/lib/features/auth/presentation/login_screen.dart	155	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.chat.application.chat_controller	src/mobile/lib/features/chat/application/chat_controller.dart	384	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 8
+features.chat.application.chat_state	src/mobile/lib/features/chat/application/chat_state.dart	32	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+features.chat.application.completion_signal	src/mobile/lib/features/chat/application/completion_signal.dart	93	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 3
+features.chat.application.step_panel_controller	src/mobile/lib/features/chat/application/step_panel_controller.dart	64	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+features.chat.application.step_panel_state	src/mobile/lib/features/chat/application/step_panel_state.dart	26	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 0
+features.chat.data.coach_api	src/mobile/lib/features/chat/data/coach_api.dart	113	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 16
+features.chat.data.coach_models	src/mobile/lib/features/chat/data/coach_models.dart	476	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	5	매니페스트 등재 · 테스트 직접 import 18
+features.chat.data.dialogue_store	src/mobile/lib/features/chat/data/dialogue_store.dart	50	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 3
+features.chat.data.interaction_logger	src/mobile/lib/features/chat/data/interaction_logger.dart	71	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.chat.data.scene_api	src/mobile/lib/features/chat/data/scene_api.dart	41	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.chat.data.scene_models	src/mobile/lib/features/chat/data/scene_models.dart	196	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	4	매니페스트 등재 · 테스트 직접 import 7
+features.chat.data.solution_path_api	src/mobile/lib/features/chat/data/solution_path_api.dart	48	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.chat.data.solution_path_models	src/mobile/lib/features/chat/data/solution_path_models.dart	51	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 2
+features.chat.domain.chat_message	src/mobile/lib/features/chat/domain/chat_message.dart	86	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 2
+features.chat.domain.latex_to_plain	src/mobile/lib/features/chat/domain/latex_to_plain.dart	165	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	5	매니페스트 등재 · 테스트 직접 import 1
+features.chat.domain.solution_steps	src/mobile/lib/features/chat/domain/solution_steps.dart	39	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.chat.presentation.chat_screen	src/mobile/lib/features/chat/presentation/chat_screen.dart	1471	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 12
+features.chat.presentation.coach_emphasis_text	src/mobile/lib/features/chat/presentation/coach_emphasis_text.dart	139	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.chat.presentation.coach_signal_card	src/mobile/lib/features/chat/presentation/coach_signal_card.dart	255	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.chat.presentation.graphing_calculator_webview	src/mobile/lib/features/chat/presentation/graphing_calculator_webview.dart	203	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.chat.presentation.mathlive_input_screen	src/mobile/lib/features/chat/presentation/mathlive_input_screen.dart	139	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.chat.presentation.mathlive_input_webview	src/mobile/lib/features/chat/presentation/mathlive_input_webview.dart	167	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.chat.presentation.scene_renderer	src/mobile/lib/features/chat/presentation/scene_renderer.dart	525	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 5
+features.chat.presentation.webview_fallback	src/mobile/lib/features/chat/presentation/webview_fallback.dart	88	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 1
+features.explore.presentation.explore_screen	src/mobile/lib/features/explore/presentation/explore_screen.dart	51	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.home.presentation.home_screen	src/mobile/lib/features/home/presentation/home_screen.dart	81	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.ocr.application.ocr_controller	src/mobile/lib/features/ocr/application/ocr_controller.dart	98	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.ocr.application.ocr_state	src/mobile/lib/features/ocr/application/ocr_state.dart	51	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 1
+features.ocr.data.image_source_service	src/mobile/lib/features/ocr/data/image_source_service.dart	83	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 3
+features.ocr.data.ocr_api	src/mobile/lib/features/ocr/data/ocr_api.dart	55	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.ocr.data.ocr_models	src/mobile/lib/features/ocr/data/ocr_models.dart	144	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	6	매니페스트 등재 · 테스트 직접 import 5
+features.ocr.presentation.ocr_capture_screen	src/mobile/lib/features/ocr/presentation/ocr_capture_screen.dart	391	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.onboarding.application.onboarding_controller	src/mobile/lib/features/onboarding/application/onboarding_controller.dart	102	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.onboarding.application.onboarding_seen_controller	src/mobile/lib/features/onboarding/application/onboarding_seen_controller.dart	50	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 2
+features.onboarding.application.onboarding_state	src/mobile/lib/features/onboarding/application/onboarding_state.dart	33	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+features.onboarding.data.onboarding_store	src/mobile/lib/features/onboarding/data/onboarding_store.dart	44	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.onboarding.data.user_api	src/mobile/lib/features/onboarding/data/user_api.dart	40	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 4
+features.onboarding.presentation.onboarding_screen	src/mobile/lib/features/onboarding/presentation/onboarding_screen.dart	407	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.problems.application.active_problem	src/mobile/lib/features/problems/application/active_problem.dart	13	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	4	매니페스트 등재 · 테스트 직접 import 7
+features.problems.application.diagnosis_controller	src/mobile/lib/features/problems/application/diagnosis_controller.dart	87	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.problems.application.diagnosis_state	src/mobile/lib/features/problems/application/diagnosis_state.dart	29	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 0
+features.problems.data.problem_models	src/mobile/lib/features/problems/data/problem_models.dart	256	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	8	매니페스트 등재 · 테스트 직접 import 12
+features.problems.data.problems_api	src/mobile/lib/features/problems/data/problems_api.dart	93	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 9
+features.problems.presentation.problem_screen	src/mobile/lib/features/problems/presentation/problem_screen.dart	219	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 2
+features.profile.application.me_tab_controller	src/mobile/lib/features/profile/application/me_tab_controller.dart	170	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.profile.application.me_tab_state	src/mobile/lib/features/profile/application/me_tab_state.dart	85	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 1
+features.profile.data.growth_evidence_api	src/mobile/lib/features/profile/data/growth_evidence_api.dart	48	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.profile.data.growth_evidence_models	src/mobile/lib/features/profile/data/growth_evidence_models.dart	91	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 3
+features.profile.presentation.me_screen	src/mobile/lib/features/profile/presentation/me_screen.dart	543	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.reports.data.defect_report_api	src/mobile/lib/features/reports/data/defect_report_api.dart	64	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+features.reports.presentation.defect_report_button	src/mobile/lib/features/reports/presentation/defect_report_button.dart	119	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 1
+features.verify.data.verify_api	src/mobile/lib/features/verify/data/verify_api.dart	50	G-Flutter	섬	섬	아니오	아니오	실행 기록 없음	예(import 기준)	0	매니페스트 등재 · 테스트 직접 import 2
+golden.golden_api	src/mobile/lib/golden/golden_api.dart	233	G-Flutter	대기(실행 기록 없음)	섬	예	아니오	실행 기록 없음	예(import 기준)	3	골든 진입점 · 테스트 직접 import 2
+golden.golden_app	src/mobile/lib/golden/golden_app.dart	89	G-Flutter	대기(실행 기록 없음)	섬	예	아니오	실행 기록 없음	예(import 기준)	1	골든 진입점 · 테스트 직접 import 2
+golden.golden_state	src/mobile/lib/golden/golden_state.dart	191	G-Flutter	대기(실행 기록 없음)	섬	예	아니오	실행 기록 없음	예(import 기준)	4	골든 진입점 · 테스트 직접 import 3
+golden.nickname_screen	src/mobile/lib/golden/nickname_screen.dart	68	G-Flutter	대기(실행 기록 없음)	섬	예	아니오	실행 기록 없음	예(import 기준)	1	골든 진입점 · 테스트 직접 import 0
+golden.problem_screen	src/mobile/lib/golden/problem_screen.dart	226	G-Flutter	대기(실행 기록 없음)	섬	예	아니오	실행 기록 없음	예(import 기준)	1	골든 진입점 · 테스트 직접 import 3
+golden.result_screen	src/mobile/lib/golden/result_screen.dart	101	G-Flutter	대기(실행 기록 없음)	섬	예	아니오	실행 기록 없음	예(import 기준)	1	골든 진입점 · 테스트 직접 import 1
+main	src/mobile/lib/main.dart	33	G-Flutter	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	매니페스트 등재 · 옛 진입점 · 테스트 직접 import 0
+main_golden	src/mobile/lib/main_golden.dart	12	G-Flutter	대기(실행 기록 없음)	잔해	예	아니오	실행 기록 없음	아니오	0	골든 진입점 · 테스트 직접 import 0
+shared.math.math_notation	src/mobile/lib/shared/math/math_notation.dart	385	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	2	매니페스트 등재 · 테스트 직접 import 3
+shared.widgets.math_text	src/mobile/lib/shared/widgets/math_text.dart	140	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	3	매니페스트 등재 · 테스트 직접 import 3
+theme.app_theme	src/mobile/lib/theme/app_theme.dart	49	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 3
+theme.brand_colors	src/mobile/lib/theme/brand_colors.dart	21	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	1	매니페스트 등재 · 테스트 직접 import 0
+theme.spacing	src/mobile/lib/theme/spacing.dart	50	G-Flutter	섬	대기(실행 기록 없음)	아니오	예	실행 기록 없음	예(import 기준)	13	매니페스트 등재 · 테스트 직접 import 0
+app/(public)/_components/Audience.tsx	src/web/webapp/app/(public)/_components/Audience.tsx	44	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+app/(public)/_components/BetaCta.tsx	src/web/webapp/app/(public)/_components/BetaCta.tsx	41	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+app/(public)/_components/Hero.tsx	src/web/webapp/app/(public)/_components/Hero.tsx	24	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+app/(public)/_components/LegalFooter.tsx	src/web/webapp/app/(public)/_components/LegalFooter.tsx	26	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+app/(public)/_components/Method.tsx	src/web/webapp/app/(public)/_components/Method.tsx	48	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+app/(public)/_components/Mission.tsx	src/web/webapp/app/(public)/_components/Mission.tsx	28	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+app/(public)/page.tsx	src/web/webapp/app/(public)/page.tsx	32	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 공개
+app/admin/_components/AdminNav.tsx	src/web/webapp/app/admin/_components/AdminNav.tsx	62	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/AdminShell.tsx	src/web/webapp/app/admin/_components/AdminShell.tsx	185	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsCommon.tsx	src/web/webapp/app/admin/_components/CmsCommon.tsx	255	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	9	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsConceptDeleteBox.tsx	src/web/webapp/app/admin/_components/CmsConceptDeleteBox.tsx	107	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsConceptStudioPane.tsx	src/web/webapp/app/admin/_components/CmsConceptStudioPane.tsx	423	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsConceptWorkspace.tsx	src/web/webapp/app/admin/_components/CmsConceptWorkspace.tsx	351	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	3	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsEdgePanel.tsx	src/web/webapp/app/admin/_components/CmsEdgePanel.tsx	419	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsProposalPanel.tsx	src/web/webapp/app/admin/_components/CmsProposalPanel.tsx	545	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsResourceDetail.tsx	src/web/webapp/app/admin/_components/CmsResourceDetail.tsx	440	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	2	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsResourcePanel.tsx	src/web/webapp/app/admin/_components/CmsResourcePanel.tsx	241	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	2	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsResourceScreen.tsx	src/web/webapp/app/admin/_components/CmsResourceScreen.tsx	93	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	4	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/CmsVersionPane.tsx	src/web/webapp/app/admin/_components/CmsVersionPane.tsx	470	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/OperatorTokenGate.tsx	src/web/webapp/app/admin/_components/OperatorTokenGate.tsx	84	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/ReviewQueue.tsx	src/web/webapp/app/admin/_components/ReviewQueue.tsx	307	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/ReviewQueueDetail.tsx	src/web/webapp/app/admin/_components/ReviewQueueDetail.tsx	322	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/ReviewQueueList.tsx	src/web/webapp/app/admin/_components/ReviewQueueList.tsx	122	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	2	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_components/ReviewQueueNotice.tsx	src/web/webapp/app/admin/_components/ReviewQueueNotice.tsx	82	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	2	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_lib/adminApi.ts	src/web/webapp/app/admin/_lib/adminApi.ts	161	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	4	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_lib/adminCmsApi.ts	src/web/webapp/app/admin/_lib/adminCmsApi.ts	862	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	10	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_lib/adminReviewApi.ts	src/web/webapp/app/admin/_lib/adminReviewApi.ts	453	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	4	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_lib/adminSession.ts	src/web/webapp/app/admin/_lib/adminSession.ts	72	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	4	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_lib/marker.ts	src/web/webapp/app/admin/_lib/marker.ts	12	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	1	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/_lib/reviewFailureCodes.ts	src/web/webapp/app/admin/_lib/reviewFailureCodes.ts	27	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	2	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 admin
+app/admin/content/concepts/page.admin.tsx	src/web/webapp/app/admin/content/concepts/page.admin.tsx	11	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/content/curricula/page.admin.tsx	src/web/webapp/app/admin/content/curricula/page.admin.tsx	12	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/content/library/page.admin.tsx	src/web/webapp/app/admin/content/library/page.admin.tsx	12	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/content/misconceptions/page.admin.tsx	src/web/webapp/app/admin/content/misconceptions/page.admin.tsx	12	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/content/pedagogy-packs/page.admin.tsx	src/web/webapp/app/admin/content/pedagogy-packs/page.admin.tsx	12	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/layout.admin.tsx	src/web/webapp/app/admin/layout.admin.tsx	10	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/page.admin.tsx	src/web/webapp/app/admin/page.admin.tsx	31	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/review/page.admin.tsx	src/web/webapp/app/admin/review/page.admin.tsx	12	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/settings/deployment/page.admin.tsx	src/web/webapp/app/admin/settings/deployment/page.admin.tsx	11	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/admin/settings/versions/page.admin.tsx	src/web/webapp/app/admin/settings/versions/page.admin.tsx	11	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/layout.admin.tsx	src/web/webapp/app/layout.admin.tsx	39	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 admin
+app/layout.tsx	src/web/webapp/app/layout.tsx	55	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 공개
+app/robots.ts	src/web/webapp/app/robots.ts	19	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 공개
+app/sitemap.ts	src/web/webapp/app/sitemap.ts	17	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 공개
+lib/site.ts	src/web/webapp/lib/site.ts	31	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	6	웹 골든 진입점 없음(골든 열은 정의상 아니오) · 빌드 타깃 공개
+next.config.ts	src/web/webapp/next.config.ts	55	G-웹	잔해	대기(실행 기록 없음)	아니오	예	실행 기록 없음	아니오	0	웹 골든 진입점 없음(골든 열은 정의상 아니오) · Next.js 진입점 · 빌드 타깃 없음 · 빌드 설정 파일(도구가 직접 읽음)

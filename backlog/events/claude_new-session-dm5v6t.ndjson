@@ -1,0 +1,5 @@
+{"ts": "2026-11-17T06:57:04+00:00", "actor": "claude/new-session-dm5v6t", "action": "policy_warn", "id": "RS-D3", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/D3/**", "mode": "warn"}
+{"ts": "2026-11-17T06:57:04+00:00", "actor": "claude/new-session-dm5v6t", "action": "policy_warn", "id": "RS-D3", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/D3/**", "mode": "warn"}
+{"ts": "2026-11-17T06:57:27+00:00", "actor": "claude/new-session-dm5v6t", "action": "policy_warn", "id": "RS-02-d3-duplication-map", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/D3/**", "mode": "warn"}
+{"ts": "2026-11-17T06:57:27+00:00", "actor": "claude/new-session-dm5v6t", "action": "policy_warn", "id": "RS-02-d3-duplication-map", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/D3/**", "mode": "warn"}
+{"ts": "2026-11-17T06:57:31+00:00", "actor": "claude/new-session-dm5v6t", "action": "add", "id": "RS-02-d3-duplication-map", "eos_priority": "P1"}
