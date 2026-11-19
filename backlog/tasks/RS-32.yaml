@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: cancelled
 priority: 3
 eos_priority: P1
 owner: claude
@@ -15,6 +15,11 @@ acceptance: []
 artifacts: []
 paths:
   - "golden/reports_rescue/Z2/**"
-session: golden-rs/Z2
-notes: "옛 코드 살리기 RS 단계05 Z2. 산출물은 golden/reports_rescue/Z2/ 뿐. .claude/settings.json은 고치지 않는다(적용은 Kiki)."
+session: null
+notes: |-
+  옛 코드 살리기 RS 단계05 Z2. 산출물은 golden/reports_rescue/Z2/ 뿐. .claude/settings.json은 고치지 않는다(적용은 Kiki).
+
+  [차단 2026-11-19] Kiki 지시 2026-11-19 중단 — 취소 전 단계(in_progress에서 cancelled로 바로 갈 수 없음)
+
+  [취소 2026-11-19] Kiki 지시 2026-11-19로 중단. Z2는 첫 판 지시문(PR #1928)에만 있고, 2026-11-17 Kiki 결정 ④(가림막을 만들지 않는다 · golden/RESCUE_REVIEW.md 5절 기각표)로 정정판(PR #1936)에서 삭제된 작업이다. 산출물 0건. 조사 메모: 처분이 전부 격리·삭제인 폴더 30개 중 3개(l3/equivalent·l5·ops)는 1~4단계 지시문이 언급해 빠지고, 남는 27폴더는 약 38,200줄로 옛 백엔드의 약 12%뿐이다. Read(./경로) 규칙은 현재 작업 폴더 기준이라 세션이 cd하면 조용히 무력해진다(/경로 형식이어야 저장소 루트에 고정된다).
 updated: 2026-11-19
