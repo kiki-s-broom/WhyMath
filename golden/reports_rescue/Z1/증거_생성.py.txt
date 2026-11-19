@@ -1,0 +1,163 @@
+"""Z1 삭제 후보 증거 3종 생성기 — 읽기 전용 · 파일을 지우거나 고치지 않는다.
+
+재생성 명령(저장소 루트에서):
+    cp golden/reports_rescue/Z1/증거_생성.py.txt /tmp/z1_evidence.py
+    python3 /tmp/z1_evidence.py > /tmp/z1_evidence.out 2>&1; echo "EXIT=$?"
+
+하는 일
+- ① 정적으로 안 닿음: D1 ledger.csv의 골든 등급·옛앱 등급이 둘 다 섬 또는 잔해인가
+- ② 실행 기록 없음: 같은 CSV의 "경로 테스트가 실행"이 아니오인가
+- ③ 이름 문자열 검색: grep -rn 으로 저장소 전체(.git 제외)의 8개 확장자에서
+     (a) 점 표기 전체  grep -rnFw '<점 표기>'
+     (b) 마지막 낱말   grep -rnw  '<마지막 낱말>'
+     (c) 보조 — 부모 한정 표기 grep -rnE '<부모>[./]<낱말>\\b'  (판정에는 안 쓰고 위치 고르기에만 쓴다)
+   를 찾고, 제외 4종(자기 자신 · 자기 테스트 · LEGACY_MANIFEST · pyproject 금지 목록) 밖의 건수를 센다.
+- 결과: Z1/증거_원본.tsv (③ 위치 전부 · 200KB 넘으면 쓰지 않고 요약만) · 표준 출력에 요약
+"""
+
+from __future__ import annotations
+
+import csv
+import re
+import subprocess
+from collections import Counter
+from pathlib import Path
+
+ROOT = Path(".")
+OUT = Path("golden/reports_rescue/Z1")
+LEDGER = Path("golden/reports_rescue/D1/ledger.csv")
+TESTMAP = Path("golden/reports_rescue/D5/테스트_대응_모듈목록.tsv")
+PYPROJECT = "src/backend/pyproject.toml"
+# golden-no-legacy 계약의 forbidden_modules 범위(줄 번호 · 세션에서 grep -n 으로 확인)
+FORBID_RANGE = (675, 1396)
+INCLUDES = ["*.py", "*.yml", "*.yaml", "*.toml", "*.json", "*.md", "*.sh", "*.ps1"]
+
+# 승인된 삭제 행(J1 처분표 · 승인_기록 질문 1)
+ROWS = {
+    "R1 l1/concept_graph (LEGACY_SNAPSHOT 5)": [
+        "whymath_backend.l1.concept_graph.backend_concept",
+        "whymath_backend.l1.concept_graph.backend_edge",
+        "whymath_backend.l1.concept_graph.embedding",
+        "whymath_backend.l1.concept_graph.node_projection",
+        "whymath_backend.l1.concept_graph.retrieval",
+    ],
+    "R2 whs/baseline (단독)": ["whymath_backend.whs.baseline"],
+}
+# D5 정적 근사가 패키지(whs)로 귀속해 놓친 자기 테스트 — 파일 이름·모듈 설명 첫 줄로 판단(보고에 적는다)
+EXTRA_OWN_TESTS = {"whymath_backend.whs.baseline": ["tests/backend/whs/test_baseline.py"]}
+
+
+def ledger_rows() -> dict[str, dict[str, str]]:
+    with LEDGER.open(encoding="utf-8-sig") as f:
+        return {r["모듈"]: r for r in csv.DictReader(f)}
+
+
+def own_tests() -> dict[str, list[str]]:
+    """D5 테스트_대응_모듈목록.tsv에서 모듈마다 그것을 import하는 테스트 파일."""
+    m: dict[str, list[str]] = {}
+    with TESTMAP.open(encoding="utf-8-sig") as f:
+        rd = csv.reader(f, delimiter="\t")
+        next(rd)
+        for row in rd:
+            mods = row[1].split(";") if len(row) > 1 else []
+            for mod in mods:
+                m.setdefault("whymath_backend." + mod.strip(), []).append(row[0])
+    return m
+
+
+def grep(pattern: str, mode: str) -> list[tuple[str, int, str]]:
+    """grep -rn 실행. mode: 'Fw'(고정 문자열·낱말) · 'w'(정규식·낱말) · 'E'(확장 정규식)."""
+    cmd = ["grep", "-rn", f"-{mode}", "--exclude-dir=.git", "-I"]
+    cmd += [f"--include={g}" for g in INCLUDES]
+    cmd += ["-e", pattern, "."]
+    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    if p.returncode not in (0, 1):  # 1 = 0건 · 2 이상 = 오류(조용히 넘기지 않는다)
+        raise RuntimeError(f"grep 실패 exit={p.returncode}: {p.stderr[:300]}")
+    hits = []
+    for line in p.stdout.splitlines():
+        path, _, rest = line.partition(":")
+        num, _, text = rest.partition(":")
+        hits.append((path.removeprefix("./"), int(num), text))
+    return hits
+
+
+def classify(path: str, line: int, text: str, self_path: str, tests: set[str]) -> str:
+    """제외 4종이면 '제외:…', 아니면 '남음:<종류>'."""
+    if path == self_path:
+        return "제외:자기 자신"
+    if path in tests:
+        return "제외:자기 테스트"
+    if path == "golden/LEGACY_MANIFEST.txt":
+        return "제외:LEGACY_MANIFEST"
+    if path == PYPROJECT and FORBID_RANGE[0] <= line <= FORBID_RANGE[1]:
+        return "제외:pyproject 금지 목록"
+    ext = path.rsplit(".", 1)[-1]
+    if ext == "py":
+        kind = "코드·import" if re.match(r"\s*(from|import)\s", text) else "코드"
+    elif ext in ("yml", "yaml", "toml", "json"):
+        kind = "설정"
+    elif ext in ("sh", "ps1"):
+        kind = "셸"
+    else:
+        kind = "문서"
+    return "남음:" + kind
+
+
+def area(path: str) -> str:
+    for pre, name in [
+        ("src/backend/whymath_backend/", "옛 백엔드"), ("src/backend/golden/", "골든"),
+        ("src/backend/alembic/", "alembic"), ("tests/golden/", "골든 테스트"), ("tests/", "옛 테스트"),
+        ("scripts/", "scripts"), ("src/data-pipeline/", "data-pipeline"), (".github/", "CI"),
+        ("golden/", "golden 문서"), ("docs/", "docs"), ("backlog/", "backlog"),
+    ]:
+        if path.startswith(pre):
+            return name
+    return "기타"
+
+
+def main() -> None:
+    led = ledger_rows()
+    tmap = own_tests()
+    raw: list[list[str]] = []
+    for row, mods in ROWS.items():
+        print(f"## {row}")
+        for mod in mods:
+            r = led[mod]
+            self_path = r["파일 경로"]
+            tests = set(tmap.get(mod, [])) | set(EXTRA_OWN_TESTS.get(mod, []))
+            g, o = r["골든 등급"], r["옛앱 등급"]
+            ev1 = g in ("섬", "잔해") and o in ("섬", "잔해")
+            ev2 = r["경로 테스트가 실행"].startswith("아니오")
+            parent, last = mod.split(".")[-2], mod.split(".")[-1]
+            res = {}
+            for tag, pat, mode in [("a", mod, "Fw"), ("b", last, "w"),
+                                   ("c", rf"{parent}[./]{last}\b", "E")]:
+                hits = grep(pat, mode)
+                cls = Counter()
+                for path, ln, text in hits:
+                    c = classify(path, ln, text, self_path, tests)
+                    cls[c] += 1
+                    raw.append([mod, tag, c, area(path), path, str(ln), text.strip()[:160]])
+                left = sum(v for k, v in cls.items() if k.startswith("남음"))
+                res[tag] = (len(hits), left, cls)
+            print(f"{mod} | 줄 {r['줄 수']} | ①{'충족' if ev1 else '불충족'}(골든 {g}·옛앱 {o})"
+                  f" | ②{'충족' if ev2 else '불충족'}({r['경로 테스트가 실행']})"
+                  f" | ③a 전체 {res['a'][0]}·남음 {res['a'][1]} | ③b 전체 {res['b'][0]}·남음 {res['b'][1]}"
+                  f" | ③c 전체 {res['c'][0]}·남음 {res['c'][1]} | 자기 테스트 {len(tests)}")
+            for tag in "abc":
+                print(f"   ③{tag} 분류: " + " · ".join(f"{k} {v}" for k, v in sorted(res[tag][2].items())))
+    out = OUT / "증거_원본.tsv"
+    body = "\n".join("\t".join(x.replace("\t", " ") for x in r) for r in raw)
+    head = "모듈\t검색(a 점표기·b 마지막 낱말·c 부모 한정)\t분류\t영역\t경로\t줄\t본문 앞 160자\n"
+    data = (head + body + "\n").encode("utf-8-sig")
+    if len(data) <= 200_000:
+        out.write_bytes(data)
+        print(f"원본: {out} ({len(data):,}바이트 · {len(raw):,}행)")
+    else:
+        print(f"원본 {len(data):,}바이트 > 200KB — 커밋하지 않는다(규칙 6). 재생성 명령은 모듈 설명")
+        # 위치 고르기에 쓰려고 임시 경로에는 쓴다(커밋 안 함)
+        Path("/tmp/z1_evidence_raw.tsv").write_bytes(data)
+
+
+if __name__ == "__main__":
+    main()
