@@ -1,0 +1,22 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-33
+title: "RS-X1 특성화 테스트 — 수확 대기열 1순위"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts: []
+paths:
+  - "tests/golden/characterization/test_rs_*.py"
+  - "golden/reports_rescue/X1/**"
+  - golden/HARVEST.md
+session: golden-rs/X1
+notes: ""
+updated: 2026-11-19

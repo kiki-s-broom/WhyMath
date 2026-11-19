@@ -305,3 +305,7 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음 — 결정 기록만(`src/backend/golden/tutor.py` `_routing_request` docstring) | 선택지 ①(학생 답을 USER_GENERATED로 선언 → 라우터 LOCAL → 로컬 튜터 전환) | Kiki 결정 2026-11-17 선택지 ②: 골든 튜터가 학생 답을 포함한 프롬프트를 OpenRouter로 보내는 것을 명시 허용. 동작 변경 없음. 전제 4개(닉네임·세션 ID·정답 미포함 · 허용 공급사 기본값 deepinfra = 미국·수집 거부·보존 0 · 관할 게이트 · 실학생 전 보호자 동의서 반영)가 바뀌면 다시 묻는다 | GOLD-22 |
+
+### RS 입고 준비 — 특성화 테스트 (옛 코드 살리기 · 2026-11-19)
+
+- 가져온 것 = 없음(특성화 테스트만 — `tests/golden/characterization/test_rs_final_answer.py` · 대상 `l3/verify_final_answer.py`·`l3/symbolic_equivalence.py`) · 버린 것 = 없음 · 이유 = RS 입고 준비(수확 대기열 1순위) · 세션 = RS-X1
