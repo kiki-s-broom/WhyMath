@@ -1,0 +1,25 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: RS-33
+title: "RS-X1 특성화 테스트 — 수확 대기열 1순위"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 3
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance: []
+artifacts:
+  - tests/golden/characterization/test_rs_final_answer.py
+  - golden/reports_rescue/X1/보고.md
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1974 (#1974)"
+paths:
+  - "tests/golden/characterization/test_rs_*.py"
+  - "golden/reports_rescue/X1/**"
+  - golden/HARVEST.md
+session: null
+notes: "[미러 면제 2026-11-19] harness-integrity·declared-unwired-audit 설치 스텝이 컨테이너 Debian pip 업그레이드 불가로 실패 — 해당 검사 스텝은 수동 실행 전건 exit 0(보고.md PR·CI 미러 절)"
+updated: 2026-11-19

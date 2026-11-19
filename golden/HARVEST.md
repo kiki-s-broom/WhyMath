@@ -311,6 +311,7 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 가져온 것 = 없음(특성화 테스트만) — `tests/golden/characterization/test_rs_misconception_engine.py`(옛 `l4/misconception` diagnose·hypothesis·intervene 입력 10개 고정) | 버린 것 = 없음 | 이유 = RS 입고 준비(수확 대기열 2순위) | 세션 = RS-X2 |
+| 가져온 것 = 없음(특성화 테스트만) — `tests/golden/characterization/test_rs_final_answer.py`(옛 `l3/verify_final_answer`·`l3/symbolic_equivalence` 입력 10개 고정) | 버린 것 = 없음 | 이유 = RS 입고 준비(수확 대기열 1순위) | 세션 = RS-X1 |
 
 ### RS 입고 준비 — 수확 대기열 3순위 특성화 테스트 (RS-X3 · 2026-11-19)
 
