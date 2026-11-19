@@ -1,0 +1,3 @@
+{"ts": "2026-11-19T07:19:08+00:00", "actor": "claude/new-session-fvxr23", "action": "policy_warn", "id": "RS-23", "rule": "path_overlap", "other": "GOLD-01", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/P1/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:08+00:00", "actor": "claude/new-session-fvxr23", "action": "policy_warn", "id": "RS-23", "rule": "path_overlap", "other": "GOLD-19", "detail": "프리픽스 포함: golden/** ⊇ golden/reports_rescue/P1/**", "mode": "warn"}
+{"ts": "2026-11-19T07:19:13+00:00", "actor": "claude/new-session-fvxr23", "action": "add", "id": "RS-23", "eos_priority": "P1"}
