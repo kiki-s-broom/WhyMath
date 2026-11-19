@@ -113,7 +113,21 @@ CAS_RETRIES = 3
 
 # push 거부 = **lease 경합**(그 사이 남이 브랜치를 갱신) 판별 패턴.
 # 주의: 이것은 "내 태스크가 잡혔다"가 아니다 — 태스크 점유는 트리에서만 판정한다.
-_LEASE_MARKERS = ("[rejected]", "stale info", "already exists", "non-fast-forward", "fetch first")
+_LEASE_MARKERS = (
+    "[rejected]",
+    "stale info",
+    "already exists",
+    "non-fast-forward",
+    "fetch first",
+    # 서버 측 경합(HARN-400) — 두 세션의 push가 둘 다 클라이언트 lease 검사를 통과한 뒤
+    # 서버에서 ref 잠금을 다툰 경우다. 진 쪽은 `[rejected]`가 아니라 `[remote rejected]`와
+    # 아래 문구를 받는다(로컬 bare 저장소 재현 · git 2.43). 이 표지가 없으면 경합이 `error`로
+    # 접혀 재시도 없이 fail-open되고, 두 세션이 같은 번호를 받는다(2026-11-19 RS-34 중복 실측).
+    "cannot lock ref",
+    "failed to update ref",
+    # GitHub receive-pack이 같은 경합에 쓰는 문구(미실측 — GitHub에서 재현하지 못했다).
+    "incorrect old value provided",
+)
 # 네트워크·환경 문제 판별 패턴
 _OFFLINE_MARKERS = (
     "could not resolve",
