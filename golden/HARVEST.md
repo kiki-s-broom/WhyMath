@@ -357,3 +357,11 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 복사: 의존 과다 — `FixedModelOllamaProvider` 생성 경로 + 도우미 6개 → `src/backend/golden/sim/ollama_client.py`(동작 그대로 · import 출처 하나만 `golden.llm._response_fields`로) · 특성화 `tests/golden/characterization/test_s18_ollama_client.py`(입력 10개 + 클라우드 결정 거부 2 + 관할 1) | `OllamaProvider.generate`의 `resolve_model` 경로 · `check_status`·`OllamaStatus`·`ModelAvailability` · 이미지·JSON 스키마 인자 · `_running_loop_or_none`(루프 밖 분기 — RS-G3 조용한 값 게이트에 걸리고, 여기선 비동기 안에서만 부른다) | 지시서는 import를 기본으로 했지만(공통 규칙 9) 옛 모듈은 `l3/providers/__init__.py`를 거쳐 프로바이더 4종을 함께 부른다 — S20A가 끊은 패키지라 import하면 `test_import_budget.py`(전이 28/30 · 끊은 패키지 재유입 금지)가 RED. 모델 ID 지정은 옛 `FixedModelOllamaProvider`가 이미 받으므로 "모델 지정 불가"가 아니라 "의존 과다"다. 라우터 결정(`Router.route` · LOCAL 확인)은 옛 것을 그대로 거친다 | S18 |
+
+### 시뮬레이터 러너 — M1 정답 유출 판정 (S19 · 2026-11-20 · 인용 F-00)
+
+경계 긋기(복사 전에 적음): `src/backend/whymath_backend/harness/pedagogical_rubric.py`의 `detect_answer_leakage` **함수 1개**와 그것이 직접 쓰는 `LeakageVerdict`·`_normalize`·상수 4개(`_MIN_DECIDABLE_LEN`·`_AMBIGUOUS_TOKENS`·`_LATEX_COMMANDS`·`_STRUCTURAL_CHARS`·`_NUMERIC`). `score_tutoring_response`는 가져오지 않는다(T1 S22 몫).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 복사: 새 import 금지 목록 — `detect_answer_leakage` + 직접 쓰는 열거형·정규화·상수 → `src/backend/golden/sim/metrics.py`(동작 그대로 · 측정용) · 옛 함수와 나란히 부르는 대조 `tests/golden/test_sim_metrics.py::test_leak_copy_matches_old_function`(입력 18개 · 세 상태 모두) | `score_tutoring_response`·`RubricScore`·`_SOCRATIC_MARKERS`(발문 신호 — S22가 T1 슬롯으로 가져올 것) | 지시서 S19는 "import해 쓴다"였지만 그 모듈은 `golden/LEGACY_MANIFEST.txt` 158행 → import-linter 계약 `golden-no-legacy`가 막는다(CLAUDE.md 골든 규칙이 지시문보다 우선) · import하면 `harness/__init__.py`가 옛 모듈 220개를 부른다(S21 실측 · 전이 예산 30 초과). **GP-4 연결이 아니다** — 러너가 jsonl을 채점할 때만 쓴다. S22가 같은 함수를 `golden/eval/`로 가져오면 metrics.py가 그쪽을 import하도록 하나로 합친다(LATER) | S19 |
