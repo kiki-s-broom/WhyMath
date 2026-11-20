@@ -18,6 +18,6 @@ paths:
   - "golden/**"
   - "src/backend/golden/**"
   - "tests/golden/**"
-session: claude/new-session-d52ah8
+session: claude/new-session-jnkhrn
 notes: "Kiki 결정 2026-11-15(1단계 계획서 개정판). 지시서 golden/prompts_src/spec_phase1.md. S16이 등재, S17~S35가 같은 번호로 start."
-updated: 2026-11-16
+updated: 2026-11-20
