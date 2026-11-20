@@ -9,7 +9,7 @@
 - 저장소 위치: GitHub `kiki-s-broom/whymath` · Kiki 머신 `C:\Users\kiki\Desktop\__AI\WhyMath`(PowerShell) · 클라우드 세션 `/home/user/WhyMath`
 - 산출물 폴더: 저장소 안의 `golden/reports/` (없으면 만든다)
 - 기본 브랜치: main · 작업 브랜치: `golden/S6` (아래 "산출물 저장 규칙")
-- 계획서: 저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본) · 지시서 원본 `golden/prompts_src/spec.md`
+- 계획서: 저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본 · 2026-11-15 개정판 DOCX는 Kiki 보관 — S15를 /legacy 이동에서 LEGACY_MANIFEST.txt 격리로 바꿈) · 지시서 원본 `golden/prompts_src/spec.md`
 
 ## 너의 역할
 

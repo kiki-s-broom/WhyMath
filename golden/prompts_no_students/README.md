@@ -1,6 +1,6 @@
 # WhyMath 골든 패스 (학생 없는 변형) AI 작업 지시문
 
-계획서: 저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본) · 이 변형의 지시서 원본 `golden/prompts_src/spec_no_students.md` · 원본 묶음 `golden/prompts/`
+계획서: 저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본 · 2026-11-15 개정판 DOCX는 Kiki 보관 — S15를 /legacy 이동에서 LEGACY_MANIFEST.txt 격리로 바꿈) · 이 변형의 지시서 원본 `golden/prompts_src/spec_no_students.md` · 원본 묶음 `golden/prompts/`
 
 작업 하나에 파일 하나다. **파일 이름이 곧 세션 이름**이다. 각 파일은 그것만 붙여 넣어도 AI가 작업할 수 있도록 배경, 실행 방식, 공통 규칙, 용어, 작업 지시, 보고 형식을 모두 담고 있다.
 
@@ -79,5 +79,5 @@
 - S9 (Kiki): 학생 역할 규칙 4개를 지키며 5문제를 '모르는 척' 풀고 되묻기 점수(1~5)를 매긴다
 - S11 전 (Kiki): AI 시뮬레이션 실행 비용 확인(약 210회 LLM 호출·OpenRouter 기준 수백 원 수준) 후 실행 승인
 - S12 (Kiki): 성인 지인 2명 섭외(실명 미저장) · 각 5문제 혼자 풀게 하고 두 질문 기록
-- S15 (Kiki): §6 첫 줄 처리 방식 결정(기준 완화 vs 다음 3주 첫 세션에 실제 학생 검증) · /legacy 이동 여부 결정
+- S15 (Kiki): §6 첫 줄 처리 방식 결정(기준 완화 vs 다음 3주 첫 세션에 실제 학생 검증) · 격리 방식 확인(LEGACY_MANIFEST.txt·import 계약·CI 최소안 — 개정판) · 필수 체크 룰셋에 golden-path 등록(Kiki 실행)
 - 언제든 (Kiki): 실제 중학생이 1명이라도 구해지면 원본 묶음의 S9로 전환

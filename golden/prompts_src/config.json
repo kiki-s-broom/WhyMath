@@ -2,7 +2,7 @@
   "project": "WhyMath 골든 패스",
   "session_prefix": "GP",
   "role_line": "WhyMath(와이매스) 골든 패스 스켈레톤 3주 프로젝트",
-  "plan_url": "저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본) · 지시서 원본 `golden/prompts_src/spec.md`",
+  "plan_url": "저장소 안 `golden/prompts_src/plan_golden_path_3weeks.html` (2026-11-08 Kiki 계획서 원본 · 2026-11-15 개정판 DOCX는 Kiki 보관 — S15를 /legacy 이동에서 LEGACY_MANIFEST.txt 격리로 바꿈) · 지시서 원본 `golden/prompts_src/spec.md`",
   "repo_location": "GitHub `kiki-s-broom/whymath` · Kiki 머신 `C:\\Users\\kiki\\Desktop\\__AI\\WhyMath`(PowerShell) · 클라우드 세션 `/home/user/WhyMath`",
   "output_root": "golden/reports",
   "branch_prefix": "golden",
@@ -16,28 +16,139 @@
     "가장 큰 리스크는 1,800개 PR을 만든 습관이 \"이왕 하는 김에\"라는 말로 돌아오는 것이다. 그 말이 나오면 세션을 끝내고 다음 날 다시 연다."
   ],
   "tasks": {
-    "S1":  {"short": "상태측정",        "lane": "측정·격리",        "deps": []},
-    "H1":  {"short": "학생섭외-Kiki",   "lane": "사람이 하는 일",    "deps": []},
-    "S2":  {"short": "격리-빨간불e2e",  "lane": "측정·격리",        "deps": ["S1"]},
-    "S3":  {"short": "문항30개",        "lane": "백엔드 스켈레톤",   "deps": ["S2"]},
-    "S4":  {"short": "API3개-튜터",     "lane": "백엔드 스켈레톤",   "deps": ["S2"]},
-    "S5":  {"short": "판정숙련도-e2e초록", "lane": "백엔드 스켈레톤", "deps": ["S3", "S4"]},
-    "S6":  {"short": "Flutter화면1",    "lane": "Flutter 스켈레톤",  "deps": ["S4"]},
-    "S7":  {"short": "Flutter화면2",    "lane": "Flutter 스켈레톤",  "deps": ["S5", "S6"]},
-    "S8":  {"short": "앱통합-체크12",   "lane": "Flutter 스켈레톤",  "deps": ["S7"]},
-    "S9":  {"short": "학생1명",         "lane": "학생 검증",         "deps": ["S8", "H1"]},
-    "S10": {"short": "로그수정",        "lane": "학생 검증",         "deps": ["S9"]},
-    "S11": {"short": "학생2-3",         "lane": "학생 검증",         "deps": ["S10"]},
-    "S12": {"short": "학생4-5",         "lane": "학생 검증",         "deps": ["S11"]},
-    "S13": {"short": "로그분석",        "lane": "수확·회고",         "deps": ["S12"]},
-    "S14": {"short": "개선1개",         "lane": "수확·회고",         "deps": ["S13"]},
-    "S15": {"short": "격리회고",        "lane": "수확·회고",         "deps": ["S14"]}
+    "S1": {
+      "short": "상태측정",
+      "lane": "측정·격리",
+      "deps": []
+    },
+    "H1": {
+      "short": "학생섭외-Kiki",
+      "lane": "사람이 하는 일",
+      "deps": []
+    },
+    "S2": {
+      "short": "격리-빨간불e2e",
+      "lane": "측정·격리",
+      "deps": [
+        "S1"
+      ]
+    },
+    "S3": {
+      "short": "문항30개",
+      "lane": "백엔드 스켈레톤",
+      "deps": [
+        "S2"
+      ]
+    },
+    "S4": {
+      "short": "API3개-튜터",
+      "lane": "백엔드 스켈레톤",
+      "deps": [
+        "S2"
+      ]
+    },
+    "S5": {
+      "short": "판정숙련도-e2e초록",
+      "lane": "백엔드 스켈레톤",
+      "deps": [
+        "S3",
+        "S4"
+      ]
+    },
+    "S6": {
+      "short": "Flutter화면1",
+      "lane": "Flutter 스켈레톤",
+      "deps": [
+        "S4"
+      ]
+    },
+    "S7": {
+      "short": "Flutter화면2",
+      "lane": "Flutter 스켈레톤",
+      "deps": [
+        "S5",
+        "S6"
+      ]
+    },
+    "S8": {
+      "short": "앱통합-체크12",
+      "lane": "Flutter 스켈레톤",
+      "deps": [
+        "S7"
+      ]
+    },
+    "S9": {
+      "short": "학생1명",
+      "lane": "학생 검증",
+      "deps": [
+        "S8",
+        "H1"
+      ]
+    },
+    "S10": {
+      "short": "로그수정",
+      "lane": "학생 검증",
+      "deps": [
+        "S9"
+      ]
+    },
+    "S11": {
+      "short": "학생2-3",
+      "lane": "학생 검증",
+      "deps": [
+        "S10"
+      ]
+    },
+    "S12": {
+      "short": "학생4-5",
+      "lane": "학생 검증",
+      "deps": [
+        "S11"
+      ]
+    },
+    "S13": {
+      "short": "로그분석",
+      "lane": "수확·회고",
+      "deps": [
+        "S12"
+      ]
+    },
+    "S14": {
+      "short": "개선1개",
+      "lane": "수확·회고",
+      "deps": [
+        "S13"
+      ]
+    },
+    "S15": {
+      "short": "격리회고",
+      "lane": "수확·회고",
+      "deps": [
+        "S14"
+      ]
+    }
   },
-  "gates": {"S2": "①", "S5": "②", "S8": "③"},
+  "gates": {
+    "S2": "①",
+    "S5": "②",
+    "S8": "③"
+  },
   "gate_table": [
-    ["①", "S2 격리", "PR의 golden-path CI 잡이 **빨강**(ImportError)이고 lint-imports는 초록 — 빨강이 go다"],
-    ["②", "S5 판정·숙련도", "`pytest tests/golden` exit 0 · CI golden-path 잡 초록 · 뮤테이션 1종이 빨강을 냈다가 원복"],
-    ["③", "S8 앱 통합", "CHECKLIST.md 12/12 ✅ · Kiki가 앱으로 문제 3개를 끝까지 풀었다"]
+    [
+      "①",
+      "S2 격리",
+      "PR의 golden-path CI 잡이 **빨강**(ImportError)이고 lint-imports는 초록 — 빨강이 go다"
+    ],
+    [
+      "②",
+      "S5 판정·숙련도",
+      "`pytest tests/golden` exit 0 · CI golden-path 잡 초록 · 뮤테이션 1종이 빨강을 냈다가 원복"
+    ],
+    [
+      "③",
+      "S8 앱 통합",
+      "CHECKLIST.md 12/12 ✅ · Kiki가 앱으로 문제 3개를 끝까지 풀었다"
+    ]
   ],
   "readme_notes": [
     "단계 번호는 선행 관계로 계산한 \"가장 빨리 시작할 수 있는 순서\"다. 계획서의 S번호(1주차 S1~S5, 2주차 S6~S9, 3주차 S10~S15)는 달력 순서이고, 여기서는 **병렬 가능한 묶음**을 보이기 위해 단계로 다시 묶었다: S3∥S4(둘 다 S2만 기다린다), S5∥S6(S6은 S4의 API 계약만 있으면 된다), H1은 S1과 함께 시작해 S9 전까지만 끝나면 된다.",
@@ -49,7 +160,7 @@
     "S2 뒤 (Kiki): 브랜치 룰셋 required check에 CI 잡 `golden-path` 추가(머지 차단 완성) · Alembic 대신 create_all로 golden 스키마를 만드는 제안값 확인",
     "S8 (Kiki): 런북대로 서버·앱을 띄워 직접 문제 3개를 끝까지 풀고 CHECKLIST 12항목 체크",
     "S9·S11·S12 (Kiki): 학생 옆에서 20분 관찰·기록(수학 힌트 금지), 관찰 기록을 AI 세션에 전달",
-    "S15 (Kiki): 미참조 옛 모듈의 /legacy 이동 진행 여부 결정",
+    "S15 (Kiki): 격리 방식 확인(LEGACY_MANIFEST.txt·import 계약·CI 최소안 — 개정판) · 필수 체크 룰셋에 golden-path 등록(Kiki 실행)",
     "매 세션 (Kiki): PR 머지는 Kiki가 한다. tests/golden 빨강인 PR은 머지하지 않는다"
   ]
 }

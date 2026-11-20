@@ -1,6 +1,6 @@
 # WhyMath 골든 패스 스켈레톤 — 작업 지시서 (AI 실행용)
 
-작업 번호를 받은 AI는 이 문서의 공통 규칙·용어·공유 계약과 해당 번호의 지시만 읽고 작업한다. 지시에 없는 값은 추정하지 않고 "미확인"으로 보고한다. 원본 계획서는 `golden/prompts_src/plan_golden_path_3weeks.html`(2026-11-08 · Kiki)이다.
+작업 번호를 받은 AI는 이 문서의 공통 규칙·용어·공유 계약과 해당 번호의 지시만 읽고 작업한다. 지시에 없는 값은 추정하지 않고 "미확인"으로 보고한다. 원본 계획서는 `golden/prompts_src/plan_golden_path_3weeks.html`(2026-11-08 · Kiki)이다. **2026-11-15 개정판(DOCX · Kiki 보관)**은 S15의 "/legacy 이동"을 "LEGACY_MANIFEST.txt 격리(import-linter 계약·CI 분리 · 파일은 그대로 · 삭제는 3단계 S74에서 패키지 단위)"로 바꿨고, 이 지시서는 개정판을 따른다.
 
 ## 공통 규칙과 보고 형식
 
@@ -462,17 +462,18 @@ Flutter는 옛 화면을 건드리지 않고 `lib/golden/`과 별도 진입점 `
 - **완료 기준:** ①변경 파일이 전부 `golden/` 아래다 ②1위 유형 기록 M건을 재생했을 때 수정 후 끊김 수가 줄었다(숫자) ③다른 유형의 결과가 나빠지지 않았다(전체 재생 N건 표).
 - **하지 말 것:** 2위를 함께 고치지 않는다. 옛 자산을 모듈 단위로 통째로 가져오지 않는다.
 
-### S15. 격리·회고 — /legacy 이동, RETRO.md, 다음 3주
+### S15. 격리·회고 — LEGACY_MANIFEST.txt 격리(import-linter 계약·CI 분리), RETRO.md, 다음 3주
 
-- **목적:** 3주간 한 번도 import되지 않은 옛 모듈을 `/legacy`로 옮기고, 회고와 다음 3주 계획을 쓴다.
+- **목적:** 3주간 한 번도 import되지 않은 옛 모듈을 **옮기지 않고 논리적으로 격리**한다(개정판 2026-11-15 — `LEGACY_MANIFEST.txt` + import-linter 계약 + CI 분리). 파일은 그대로 둔다: 옛 패키지는 하나의 일반 패키지라 일부만 옮기면 이름 변경(import 경로 변경)이 되고, 삭제는 3단계 S74에서 패키지 단위로 한다. 회고와 다음 3주 계획도 쓴다.
 - **선행 산출물:** S14 머지, HARVEST.md 전체, `golden/STATE.md` Q7.
 - **할 일:**
-  1. 미참조 모듈 목록을 **측정**한다: `src/backend`에서 grimp로 `golden` 패키지의 상류(`find_upstream_modules`, 즉 golden이 직간접 import하는 whymath_backend 모듈)를 구하고, 전체 `whymath_backend` 모듈에서 빼 "golden이 쓰지 않는 모듈" 목록을 만든다. Flutter도 `lib/golden/`·`main_golden.dart`가 import하는 파일을 전수 열거한다. 목록을 HARVEST.md "## 3주간 미참조 모듈" 절에 붙인다(경로·줄 수).
-  2. **/legacy 이동은 Kiki 결정 사항이다.** 이 세션은 이동 PR을 **초안**으로 만들되(`git mv src/backend/whymath_backend legacy/whymath_backend` 식의 통째 이동이 아니라, 1단계 목록의 모듈만), 다음 두 가지를 먼저 보고하고 Kiki의 "진행"을 받은 뒤 push한다: ①이동 대상 수·줄 수 ②이동 시 깨지는 것(옛 `create_app`·옛 테스트 1,109파일·CI 잡·import-linter 계약)과 그 대처(제안: 옛 앱과 옛 테스트는 `legacy/`에서 그대로 돌게 CI 잡의 경로만 바꾸거나, 1차로는 "이동 목록 확정 + `legacy/README.md`에 목록 기록"까지만 하고 물리 이동은 다음 3주 첫 세션으로 넘긴다). Kiki가 결정하지 않으면 물리 이동 없이 목록 기록으로 종료하고 보고에 "Kiki 결정 대기"로 적는다.
+  1. 미참조 모듈 목록을 **측정**한다: `src/backend`에서 grimp로 `golden` 패키지의 상류(`find_upstream_modules`, 즉 golden이 직간접 import하는 whymath_backend 모듈)를 구하고, 전체 `whymath_backend` 모듈에서 빼 "golden이 쓰지 않는 모듈" 목록을 만든다. Flutter도 `lib/golden/`·`main_golden.dart`가 import하는 파일을 전수 열거한다. 목록을 HARVEST.md "## 3주간 미참조 모듈" 절에 붙인다(경로·줄 수). 측정기는 `src/backend/golden/measure_unreferenced.py`로 남겨 다음 단계(1단계 S20A·S35)가 같은 명령을 다시 돌릴 수 있게 한다.
+  2. **격리 — 파일을 옮기지 않는다(개정판).** 세 가지로 격리한다: ①`golden/LEGACY_MANIFEST.txt` — 1번 목록을 경로 한 줄씩(첫 줄에 측정 커밋 해시·날짜·명령 · 백엔드 N모듈 · Flutter N파일). 손으로 고치지 않는다 ②import-linter 계약 `golden-no-legacy`(`src/backend/pyproject.toml` · `type = "forbidden"` · `source_modules = ["golden"]` · `forbidden_modules` = 매니페스트의 백엔드 모듈 전부) — 기존 계약 `옛 코드는 golden을 모른다`는 그대로 두고 6번째로 더한다. **`.importlinter` 파일을 새로 만들지 않는다**(import-linter는 ini 파일을 먼저 읽고 멈춰 pyproject의 기존 계약이 조용히 빠진다 — 실측). `lint-imports` 결과(kept/broken)를 보고에 ③검사 `tests/golden/test_legacy_manifest.py` — 계약의 forbidden 목록이 매니페스트와 같은지, 그래프 밖 모듈(`__init__.py` 없는 패키지)과 Dart 파일은 AST·import 추적으로 직접 검사한다(import-linter는 그래프에 없는 이름을 오류 없이 통과시키고 Dart를 모른다 — 실측). **CI 분리는 Kiki 결정 "최소안"**: 옛 잡은 그대로 두고, 필수 체크 문서(`.github/branch-protection-setup.md`)에 `golden-path` 잡을 올린다(룰셋 등록은 Kiki 실행). 옛 테스트 잡을 별도 워크플로로 빼거나 `continue-on-error`로 낮추지 않는다 — 품질 기준선 완화는 헌법 개정 기록이 필요하고, 룰셋 변경 없이 필수 잡을 빼면 모든 PR 머지가 막힌다. `golden-path` 잡에 `lint-imports`를 넣으려다 배선 검사(`tests/infra/test_eos_boundary_contract_wiring.py` — `lint-imports`를 돌리는 잡이 정확히 1개)에 걸리면 우회하지 않고 되돌린다(계약은 `backend` 잡의 `lint-imports`가 집행한다 · `src/backend/` 경로 필터). 옛 코드는 **한 줄도 고치지 않는다**.
+  2-b. **직접/전이 분리**: 1번 결과를 "golden이 직접 import하는 모듈"과 "그 전이로 딸려오는 모듈"로 나눠 `golden/reports_no_students/S15/의존_분리.md`에 적고, 전이가 30을 넘으면 LATER.md에 "1단계 과제: 전이 의존 절단"(1단계 S20A)으로 넘긴다. 가장 많이 끌고 오는 모듈 1개를 이름으로 적는다.
   3. `golden/RETRO.md`: ①계획 대비 실제(세션별 완료 기준 충족 여부 표) ②§6 완료 판정 5줄(학생 5명·e2e 머지 이력·HARVEST 완성·FINDINGS 숫자·다음 계획) 각각 예/아니오와 근거 ③범위 밖으로 나가려다 멈춘 순간 목록(각 세션 보고 ⑤를 모음) ④LATER.md 항목 수와 상위 5개 ⑤잘된 것 3·안 된 것 3.
   4. 다음 3주 계획을 `golden/NEXT_3WEEKS.md`에 쓴다 — **FINDINGS의 2위·3위와 LATER.md 순서대로**, 세션 번호는 S16부터 이어 붙인다. 계획서 형식을 새로 만들지 않고 이 문서의 §2 표 형식을 그대로 쓴다.
-  5. `tests/golden` 초록 확인(이동이 없으면 그대로, 이동했으면 다시). PR.
-- **산출물:** HARVEST.md 미참조 목록, (Kiki 승인 시) /legacy 이동 PR, `golden/RETRO.md`, `golden/NEXT_3WEEKS.md`.
-- **완료 기준:** ①미참조 모듈 목록이 측정 명령과 함께 HARVEST.md에 있다 ②RETRO.md의 §6 5줄에 전부 예/아니오가 적혀 있다 ③NEXT_3WEEKS.md의 첫 세션이 FINDINGS 2위를 가리킨다 ④/legacy 이동은 Kiki 결정 기록(진행/보류)과 함께 끝나 있다.
-- **하지 말 것:** 옛 모듈을 삭제하지 않는다(이동만). `golden/`을 `app/`으로 이름 바꾸지 않는다(그건 과목 2개째가 생길 때). 다음 계획에 §5 항목을 로그 근거 없이 넣지 않는다.
+  5. `tests/golden` 초록 확인(격리 계약·매니페스트 검사 포함). PR 본문에 `lint-imports` kept/broken 수와 매니페스트 건수.
+- **산출물:** HARVEST.md 미참조 목록, `golden/LEGACY_MANIFEST.txt`, import-linter 계약 `golden-no-legacy`, `tests/golden/test_legacy_manifest.py`, `의존_분리.md`, 필수 체크 문서 갱신, `golden/RETRO.md`, `golden/NEXT_3WEEKS.md`.
+- **완료 기준:** ①미참조 모듈 목록이 측정 명령과 함께 HARVEST.md에 있다 ②RETRO.md의 §6 5줄에 전부 예/아니오가 적혀 있다 ③NEXT_3WEEKS.md의 첫 세션이 FINDINGS 2위를 가리킨다 ④`LEGACY_MANIFEST.txt`가 있고 `lint-imports`가 `golden-no-legacy` 계약을 kept로 보고하며 `test_legacy_manifest.py`가 초록이다 ⑤옛 소스 변경 0줄(`git diff --stat -- src/backend/whymath_backend src/mobile/lib ':!src/mobile/lib/golden'` 빈 출력) ⑥필수 체크 문서에 `golden-path`가 올라 있고 룰셋 등록은 "Kiki 실행 대기"로 적혀 있다.
+- **하지 말 것:** 옛 모듈을 삭제하거나 옮기지 않는다(격리만 — 삭제는 3단계 S74). `.importlinter` 파일을 만들지 않는다. 옛 테스트 잡을 비필수로 낮추지 않는다. `golden/`을 `app/`으로 이름 바꾸지 않는다(그건 과목 2개째가 생길 때). 다음 계획에 §5 항목을 로그 근거 없이 넣지 않는다.
 - **막히면:** §6 5줄 중 3개 이하가 "예"면 RETRO에 "3주 반복"을 적고 NEXT_3WEEKS.md는 같은 S번호(S9~S15)를 반복하는 계획으로 쓴다.
