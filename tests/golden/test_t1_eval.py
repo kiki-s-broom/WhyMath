@@ -264,26 +264,66 @@ def test_leak_warning_logs_problem_id_not_sentences(
     assert "비밀 문장" not in message and student_text not in message
 
 
-def test_eval_write_failure_keeps_response(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+class _InjectedEvalBugError(RuntimeError):
+    """평가기 버그를 흉내 내는 주입 예외(타입명이 로그에 남는지 보려고 고유한 이름을 쓴다)."""
+
+
+async def _record_raises_db(turn_id: int, verdict: dict[str, object]) -> None:
+    raise OperationalError("INSERT", {}, Exception("주입한 실패"))
+
+
+async def _record_raises_os(turn_id: int, verdict: dict[str, object]) -> None:
+    # SQLAlchemy가 감싸지 않는 연결 단계 오류(리뷰 지적 — 예전 좁은 except는 못 잡았다)
+    raise ConnectionRefusedError("주입한 연결 실패")
+
+
+def _evaluator_raises(*args: object, **kwargs: object) -> object:
+    raise _InjectedEvalBugError("주입한 평가기 버그")
+
+
+# (주입 지점 이름, 대체 함수, 로그에 남아야 할 예외 타입명)
+_FAILURES: list[tuple[str, Any, str]] = [
+    ("record_eval", _record_raises_db, "OperationalError"),
+    ("record_eval", _record_raises_os, "ConnectionRefusedError"),
+    ("evaluate_tutor_reply", _evaluator_raises, "_InjectedEvalBugError"),
+]
+
+
+@pytest.mark.parametrize(
+    ("target", "replacement", "type_name"), _FAILURES, ids=[f[2] for f in _FAILURES]
+)
+def test_eval_failure_keeps_response(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    target: str,
+    replacement: Any,
+    type_name: str,
 ) -> None:
-    """eval_log 쓰기가 DB 오류로 실패해도 응답은 200 그대로 · 경고에 예외 타입명."""
+    """평가·기록이 어떤 이유로 실패해도 응답은 200 그대로 · 경고에 예외 타입명(Kiki 결정 2026-11-20).
+
+    DB 오류(SQLAlchemy) · 연결 오류(SQLAlchemy 밖) · 평가기 자체 버그 세 가지를 주입한다.
+    튜터 턴은 평가 전에 이미 기록되므로, 여기서 500이 나면 학생이 되묻기 기회를 잃는다.
+    """
     monkeypatch.setenv(FLAG_ENV, "1")
-
-    async def _broken(turn_id: int, verdict: dict[str, object]) -> None:
-        raise OperationalError("INSERT", {}, Exception("주입한 실패"))
-
-    monkeypatch.setattr(store, "record_eval", _broken)
-    r = client.post("/golden/session", json={"nickname": f"t1-dbfail-{uuid.uuid4().hex[:6]}"})
+    if target == "record_eval":
+        monkeypatch.setattr(store, "record_eval", replacement)
+    else:
+        monkeypatch.setattr(api, "evaluate_tutor_reply", replacement)
+    r = client.post("/golden/session", json={"nickname": f"t1-fail-{uuid.uuid4().hex[:6]}"})
     session_id = r.json()["session_id"]
     problem = client.get(f"/golden/next?session_id={session_id}").json()
+    student_text = "학생비밀문장"
     with caplog.at_level(logging.WARNING, logger=api.__name__):
         r = client.post(
             "/golden/answer",
-            json={"session_id": session_id, "problem_id": problem["id"], "text": "모르겠어요"},
+            json={"session_id": session_id, "problem_id": problem["id"], "text": student_text},
         )
     assert r.status_code == 200
-    assert r.json()["kind"] == "tutor_turn"
-    failures = [rec for rec in caplog.records if "평가 기록 실패" in rec.getMessage()]
-    assert len(failures) == 1
-    assert "OperationalError" in failures[0].getMessage()
+    body = r.json()
+    assert body["kind"] == "tutor_turn" and body["turn"] == 1
+    failures = [rec for rec in caplog.records if "golden T1 평가 실패" in rec.getMessage()]
+    assert len(failures) == 1  # 주입이 실제로 실패 경로를 밟았다(조용히 성공하지 않았다)
+    message = failures[0].getMessage()
+    assert type_name in message
+    assert f"problem={problem['id']}" in message
+    assert student_text not in message and body["message"] not in message
