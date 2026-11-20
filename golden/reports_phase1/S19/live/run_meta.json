@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-21",
+  "mode": "live",
+  "planned_sessions": 120,
+  "personas": [
+    "P1",
+    "P2",
+    "P5",
+    "P7"
+  ],
+  "rounds": 1,
+  "problems_per_round": 30,
+  "skipped_sessions": 0,
+  "error_lines": 0,
+  "leak_undecidable_sessions": 33,
+  "degraded_tutor_turns": 0,
+  "seed_copy_fallbacks": 1,
+  "blocking_failures": [
+    "M1",
+    "M5"
+  ],
+  "notes": [],
+  "count_sessions": 120,
+  "count_leaked_sessions": 10,
+  "count_m2_sessions": 46,
+  "count_m3_known_turns": 60,
+  "count_m3_mismatched_turns": 0,
+  "count_crashed_sessions": 0,
+  "count_render_broken_sessions": 2
+}
