@@ -13,21 +13,29 @@
 - 옛 모듈은 이 테스트에서만 import한다. 골든 코드(`src/backend/golden/`)는 import하지 않는다
   (import-linter 계약 `golden-no-legacy`의 대상은 `golden` 패키지뿐이다 · 이 모듈은 LEGACY_MANIFEST에 있다).
 - 두 함수 모두 LLM·DB·파일을 쓰지 않는다(순수 함수).
+- S22(다섯 걸음 ③): 골든 사본 `golden.eval.rubric_copy`가 생겼다. 같은 10쌍을 **두 대상**(옛 자리 ·
+  골든 사본)에 parametrize해 둘 다 지금 출력을 내는지 본다(S20A 선례 — 옛 것과 사본을 나란히 고정).
+  기대값은 S21이 손으로 적은 그대로이며 사본을 불러 만들지 않는다.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from types import ModuleType
 from typing import Any
 
 import pytest
+from golden.eval import rubric_copy
 
-from whymath_backend.harness.pedagogical_rubric import (
-    LeakageVerdict,
-    detect_answer_leakage,
-    score_tutoring_response,
-)
+from whymath_backend.harness import pedagogical_rubric
+
+# 특성화 대상 2개 — 옛 자리(원본)와 골든 사본(S22). 둘 다 아래 같은 10쌍을 내야 한다.
+_TARGETS: list[tuple[str, ModuleType]] = [
+    ("old", pedagogical_rubric),
+    ("golden_copy", rubric_copy),
+]
+_TARGET_IDS = [name for name, _ in _TARGETS]
 
 # 옛 모듈이 내는 근거 문자열(지금 값 그대로 — 바뀌면 특성화가 깨진 것)
 _R_LEAKED = "정답 값이 발화에 노출됨 — 최상위 교수학 금기 위반."
@@ -179,6 +187,16 @@ _IDS = [f"{c.no:02d}-{c.problem_id}-{c.leakage}" for c in _CASES]
 _REPEAT = 100
 
 
+def test_targets_are_two_distinct_modules() -> None:
+    """대상이 정말 둘인가 — 사본이 원본을 다시 내보내는(re-export) 것이면 두 줄은 같은 것을 두 번 잰다."""
+    old, copy = (module for _, module in _TARGETS)
+    assert old.__name__ == "whymath_backend.harness.pedagogical_rubric"
+    assert copy.__name__ == "golden.eval.rubric_copy"
+    assert copy.detect_answer_leakage is not old.detect_answer_leakage
+    assert copy.score_tutoring_response is not old.score_tutoring_response
+    assert copy.LeakageVerdict is not old.LeakageVerdict
+
+
 def test_case_mix_is_fixed() -> None:
     """입력 구성 동결 — 10개 · 유출 3 · 판정 불가 2 · 깨끗함 5 · 번호 1~10 · 발화 중복 없음."""
     assert [c.no for c in _CASES] == list(range(1, 11))
@@ -186,27 +204,39 @@ def test_case_mix_is_fixed() -> None:
     assert len({c.response for c in _CASES}) == len(_CASES)
 
 
+@pytest.mark.parametrize("target", _TARGETS, ids=_TARGET_IDS)
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
-def test_detect_answer_leakage_output_unchanged(case: Case) -> None:
+def test_detect_answer_leakage_output_unchanged(case: Case, target: tuple[str, ModuleType]) -> None:
     """`detect_answer_leakage` 지금 출력(3상태 중 하나)이 그대로인가."""
-    verdict = detect_answer_leakage(case.response, case.answer)
-    assert isinstance(verdict, LeakageVerdict)
+    _, module = target
+    verdict = module.detect_answer_leakage(case.response, case.answer)
+    assert isinstance(verdict, module.LeakageVerdict)
     assert verdict.value == case.leakage
 
 
+@pytest.mark.parametrize("target", _TARGETS, ids=_TARGET_IDS)
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
-def test_score_tutoring_response_output_unchanged(case: Case) -> None:
+def test_score_tutoring_response_output_unchanged(
+    case: Case, target: tuple[str, ModuleType]
+) -> None:
     """`score_tutoring_response` 지금 출력(필드 5개 전부 · 근거 문자열 포함)이 그대로인가."""
-    score = score_tutoring_response(case.response, answer=case.answer)
+    _, module = target
+    score = module.score_tutoring_response(case.response, answer=case.answer)
     assert score.model_dump(mode="json") == case.score
 
 
+@pytest.mark.parametrize("target", _TARGETS, ids=_TARGET_IDS)
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
-def test_same_input_same_output_100_times(case: Case) -> None:
+def test_same_input_same_output_100_times(case: Case, target: tuple[str, ModuleType]) -> None:
     """결정성 — 같은 입력을 100번 넣어 두 함수의 출력이 각각 한 가지뿐인가(비결정이면 버린다)."""
-    verdicts = {detect_answer_leakage(case.response, case.answer) for _ in range(_REPEAT)}
+    _, module = target
+    verdicts = {module.detect_answer_leakage(case.response, case.answer) for _ in range(_REPEAT)}
     dumps = {
-        repr(score_tutoring_response(case.response, answer=case.answer).model_dump(mode="json"))
+        repr(
+            module.score_tutoring_response(case.response, answer=case.answer).model_dump(
+                mode="json"
+            )
+        )
         for _ in range(_REPEAT)
     }
     assert len(verdicts) == 1

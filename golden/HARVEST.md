@@ -337,6 +337,19 @@ cd src/backend && python -m golden.measure_unreferenced
 | --- | --- | --- | --- |
 | 없음(경계 긋기와 특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `harness/pedagogical_rubric.py`의 `detect_answer_leakage`·`score_tutoring_response` 함수 2개 | 되묻기 루브릭 v0 C1~C5의 코드화(사람 판정 기준으로 둔다) | T1 설계 · 복사/import·연결은 S22 | S21 |
 
+### 슬롯 T1 import·연결 (S22 · 2026-11-20 · 기준 main `4009dad0` · 인용 F-01)
+
+**T1 import: 함수 2개 · 의존 0개(사본 기준 · 원본 import 시 옛 모듈 219개) · 복사.** 다섯 걸음 ③④.
+
+- 복사 대상: S21 경계 그대로 — `detect_answer_leakage`·`score_tutoring_response`와 같은 파일 안 열거형·모델·도우미 2개·상수 6개 → `src/backend/golden/eval/rubric_copy.py`. 원본의 `from __future__` 아래 본문이 바이트 단위로 같다(원 모듈 설명문만 사본 설명으로 바꿈).
+- import 비용(S22 실측 · Python 3.13 · `python -X importtime -c "import whymath_backend.harness.pedagogical_rubric"`): 옛 모듈 줄 233개 · `sys.modules`에 새로 들어온 옛 모듈 219개 · 누적 약 3.9초(콜드) / 1.1초(같은 프로세스 재측정). 사본은 표준 라이브러리 + pydantic만 쓴다(옛 모듈 0개).
+- 연결(④): `golden/api.py` `answer()`의 GP-4 되묻기 직후, `GOLDEN_T1_RUBRIC=1`일 때만 `golden.eval.evaluate_tutor_reply`를 불러 `golden.eval_log(turn_id, verdict_json, created_at)`에 기록만 한다. 응답은 바꾸지 않는다. 기본 끔.
+- 특성화(②)는 원본·사본 두 대상에 같은 10쌍을 parametrize해 둘 다 초록이다(`tests/golden/characterization/test_t1_rubric.py`).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 복사: 의존 과다 — `harness/pedagogical_rubric.py`의 함수 2개(+같은 파일 안 의존) → `src/backend/golden/eval/rubric_copy.py` · 평가기 `golden/eval/rubric.py`(`evaluate_tutor_reply` · `RubricVerdict` · 유출 출처 `leak_origin` 칸 추가) · 새 표 `golden.eval_log` · 플래그 `GOLDEN_T1_RUBRIC`(기본 0) | 원본 import(매니페스트 계약 `golden-no-legacy` 위반 · 전이 예산 30 초과) · 되묻기 루브릭 v0 C1~C5 코드화 · 응답 차단/수정(S23 몫) | 두 함수의 의존은 3개 이하지만 원본 모듈을 부르는 순간 `harness/__init__`가 옛 모듈 219개를 끌고 온다 — 공통 규칙 8의 "3개 이하면 import"보다 매니페스트·예산이 앞선다(S21 판단 그대로) | S22 |
+
 ### 학생 시뮬레이터 — 로컬 Ollama 제공자 (S18 · 2026-11-20)
 
 경계 긋기(복사 전에 적음): `src/backend/whymath_backend/l3/providers/ollama.py`의 `FixedModelOllamaProvider`(`__init__`·`generate`·`_get_client`·`jurisdiction`)와 그 도우미 6개(`_OllamaClient`·`_extract_text`·`_coerce_token_count`·`_read_field`·`_extract_usage`·`_build_default_client`).

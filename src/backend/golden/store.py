@@ -1,4 +1,7 @@
-"""골든 패스 저장소(GP-6) — PostgreSQL golden 스키마의 학생·세션·턴 기록과 숙련도 갱신."""
+"""골든 패스 저장소(GP-6) — PostgreSQL golden 스키마의 학생·세션·턴 기록과 숙련도 갱신.
+
+S22: T1 평가기 기록용 표 `golden.eval_log`가 하나 더 있다(턴 표에는 열을 더하지 않는다).
+"""
 
 from __future__ import annotations
 
@@ -21,7 +24,7 @@ from sqlalchemy import (
     text,
     update,
 )
-from sqlalchemy.dialects.postgresql import UUID, insert
+from sqlalchemy.dialects.postgresql import JSONB, UUID, insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 # 엔진은 골든 복사본을 쓴다(S20A 전이 의존 절단 · HARVEST.md) — 연결 주소는 WHYMATH_DATABASE_URL
@@ -59,6 +62,17 @@ turns = Table(
     Column("tutor_text", Text, nullable=False),
     Column("kind", Text, nullable=False),
     Column("correct", Boolean, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+# S22(1단계 T1): 튜터 되묻기 1건에 대한 평가기 판정 기록. GOLDEN_T1_RUBRIC=1일 때만 쓴다.
+# turns에 열을 더하지 않으려고 표를 따로 둔다(공유 계약의 표 3개는 그대로). 턴 1개에 판정 1개.
+# 응답 문장은 여기에 다시 적지 않는다 — 문장은 turns.tutor_text에 이미 있고 turn_id로 잇는다.
+eval_log = Table(
+    "eval_log",
+    metadata,
+    Column("turn_id", BigInteger, primary_key=True),
+    Column("verdict_json", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
@@ -171,21 +185,36 @@ async def record_turn(
     tutor_text: str,
     kind: str,
     correct: bool | None,
-) -> None:
-    """답변 1건(학생 입력 + 튜터 응답 또는 판정)을 golden.turns에 기록한다."""
+) -> int:
+    """답변 1건(학생 입력 + 튜터 응답 또는 판정)을 golden.turns에 기록하고 그 행의 id를 돌려준다.
+
+    id는 S22 평가 기록(`golden.eval_log.turn_id`)이 턴을 가리킬 때 쓴다. 쓰지 않는 호출자는 버린다.
+    """
     await ensure_schema()
     async with _engine().begin() as conn:
-        await conn.execute(
-            turns.insert().values(
-                session_id=session_id,
-                problem_id=problem_id,
-                turn_no=turn_no,
-                student_text=student_text,
-                tutor_text=tutor_text,
-                kind=kind,
-                correct=correct,
+        turn_id = (
+            await conn.execute(
+                turns.insert()
+                .values(
+                    session_id=session_id,
+                    problem_id=problem_id,
+                    turn_no=turn_no,
+                    student_text=student_text,
+                    tutor_text=tutor_text,
+                    kind=kind,
+                    correct=correct,
+                )
+                .returning(turns.c.id)
             )
-        )
+        ).scalar_one()
+    return int(turn_id)
+
+
+async def record_eval(turn_id: int, verdict: dict[str, object]) -> None:
+    """T1 평가기 판정 1건을 golden.eval_log에 기록한다(S22 · 플래그가 켜졌을 때만 api가 부른다)."""
+    await ensure_schema()
+    async with _engine().begin() as conn:
+        await conn.execute(eval_log.insert().values(turn_id=turn_id, verdict_json=verdict))
 
 
 async def open_turns(session_id: uuid.UUID, problem_id: str) -> list[TurnRow]:

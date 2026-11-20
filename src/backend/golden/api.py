@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from collections.abc import AsyncIterator
@@ -12,8 +13,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from golden import grade, problems, store, tutor
+from golden.eval import evaluate_tutor_reply, rubric_enabled
+
+logger = logging.getLogger(__name__)
 
 # 한 문제에서 쓸 수 있는 튜터 되묻기 최대 횟수(공유 계약). 튜터도 "몇 번째 되묻기인지"를
 # 알아야 해서(S10) 값은 tutor 모듈 한 곳에 두고 여기서 가져다 쓴다.
@@ -131,7 +136,7 @@ async def answer(body: AnswerIn) -> dict[str, object]:
         # ③ 오답 + 튜터 턴 남음 → 되묻기
         reply = await tutor.ask(problem, history, body.text)
         turn_no = turns_used + 1
-        await store.record_turn(
+        turn_id = await store.record_turn(
             session_id=row.session_id,
             problem_id=problem["id"],
             turn_no=turn_no,
@@ -140,6 +145,10 @@ async def answer(body: AnswerIn) -> dict[str, object]:
             kind="tutor_turn",
             correct=False,
         )
+        if rubric_enabled():
+            # S22 T1(GOLDEN_T1_RUBRIC=1일 때만): 평가는 기록만 한다
+            # — 아래 응답은 한 글자도 바꾸지 않는다
+            await _record_t1_eval(turn_id, problem, body.text, reply.message)
         response: dict[str, object] = {
             "kind": "tutor_turn",
             "message": reply.message,
@@ -152,6 +161,37 @@ async def answer(body: AnswerIn) -> dict[str, object]:
     # ④ 오답 + 튜터 턴 3회 소진 → 정답을 알려 주며 판정. 숙련도 −0.05(GP-6)
     feedback = wrong_feedback(problem["answer"])
     return await _graded(row, problem, body.text, False, turns_used, feedback)
+
+
+async def _record_t1_eval(
+    turn_id: int, problem: problems.Problem, student_text: str, message: str
+) -> None:
+    """T1 평가기로 튜터 되묻기를 재고 golden.eval_log에 남긴다(S22 · 다섯 걸음 ④ · 기록 전용).
+
+    - 유출(leak) 판정이면 경고 로그를 남긴다. 로그에는 문제 ID·턴 id·유출 출처만 적고
+      튜터·학생 문장은 적지 않는다(미성년자 대화 원문을 로그로 흘리지 않는다).
+    - 기록 쓰기가 DB 오류로 실패해도 학생 응답은 그대로 나간다(평가는 부가 기록이다).
+      삼키지 않고 예외 타입명을 경고 로그에 남긴다(CLAUDE.md 침묵 실패 금지).
+    """
+    verdict = evaluate_tutor_reply(
+        message, problem["answer"], student_text=student_text, problem_text=problem["stem"]
+    )
+    if verdict.leak:
+        logger.warning(
+            "golden T1 평가: 정답 유출 판정 — problem=%s turn_id=%s origin=%s",
+            problem["id"],
+            turn_id,
+            verdict.leak_origin,
+        )
+    try:
+        await store.record_eval(turn_id, verdict.model_dump(mode="json"))
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "golden T1 평가 기록 실패 — 응답은 그대로 보냄: problem=%s turn_id=%s %s",
+            problem["id"],
+            turn_id,
+            type(exc).__name__,
+        )
 
 
 async def _graded(
