@@ -41,6 +41,7 @@ from pathlib import Path
 import httpx
 import sympy
 
+from golden import grade
 from golden.problems import Problem, load_problems
 from golden.sim import student
 from golden.sim.ollama_client import FixedModelOllamaProvider
@@ -61,7 +62,8 @@ _HAS_NUMBER = re.compile(r"[0-9]")
 def demo_wrong_answer(problem: Problem) -> str:
     """비교·샘플용 고정 오답(주입기 S17 아님) — 수는 부호 반대(0이면 1), 식은 기울기·절편 뒤바꿈."""
     x = sympy.Symbol("x")
-    expr = sympy.sympify(problem["answer"])
+    # 파싱은 채점기와 같은 안전 진입점(grade._parse → l3.safe_parse · 헌법 R22-03)으로만 한다
+    expr = grade._parse(grade.normalize(problem["answer"]))  # noqa: SLF001 — 같은 골든 패키지
     if problem["answer_kind"] == "number":
         value = -expr if expr != 0 else sympy.Integer(1)
         return str(value).replace(" ", "")
