@@ -494,7 +494,11 @@ async def live_llm_raw(
     utterances = list(seeds) if seeds is not None else load_seed_utterances()
     prompt = build_prompt(persona, problem, history, forced, utterances)
     check_prompt_privacy(prompt, identifiers=identifiers, answer=problem["answer"])
-    local = provider if provider is not None else FixedModelOllamaProvider(student_model())
+    local = (
+        provider
+        if provider is not None
+        else FixedModelOllamaProvider(student_model(), timeout=STUDENT_LLM_TIMEOUT_S)
+    )
     return clean_line(await _call_local_ollama(prompt, local, seed=seed))
 
 

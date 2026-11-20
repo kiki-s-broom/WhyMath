@@ -163,7 +163,8 @@ def seed_leaks(paths: Sequence[Path], seeds: Sequence[str]) -> int:
 
 async def run_model(model: str, seeds: Sequence[str]) -> dict[str, object]:
     """모델 1개 × LLM 페르소나 4 × 문항 5 → 위반 수·구분 정확도·시드 복제 수 + 샘플 발화."""
-    provider = FixedModelOllamaProvider(model)
+    # 첫 호출은 모델을 메모리에 올리느라 느리다 — 클라이언트 제한 시간을 60초로 맞춘다
+    provider = FixedModelOllamaProvider(model, timeout=student.STUDENT_LLM_TIMEOUT_S)
     seed_flat = {_flat(s) for s in seeds}
     violations: dict[str, int] = {}
     details: dict[str, list[list[str]]] = {}
