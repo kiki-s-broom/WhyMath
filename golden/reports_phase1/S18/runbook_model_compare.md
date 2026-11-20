@@ -1,6 +1,6 @@
 # S18 Kiki 머신 런북 — 학생 모델 후보 2개 비교 (로컬 Ollama)
 
-> 기준: 작업 브랜치 `claude/new-session-yzei6i` · 코드 커밋 `cbefaa98`(블록 A가 이 커밋을 포함하는지 검사한다).
+> 기준: 작업 브랜치 `claude/new-session-yzei6i` · 코드 커밋 `0eff924b`(블록 A가 이 커밋을 포함하는지 검사한다).
 > 시드 원문은 화면·파일·채팅 어디에도 나오지 않는다 — 블록은 줄 수와 숫자만 찍는다(공통 규칙 7).
 
 ## 사전 브리핑 (6항목)
@@ -10,7 +10,7 @@
 3. **구체적 절차**
    - 블록 A(약 30초): 공유 작업 사본은 그대로 두고, 따로 만든 작업 폴더 `WhyMath-s18cmp`를 S18 브랜치에 맞춘다. 파이썬·`ollama` 패키지·시드 줄 수(20)·후보 모델 설치 여부를 점검해 한 줄씩 찍는다.
    - 블록 P(후보가 없을 때만 · 모델 하나에 약 4.7~4.8GB · 회선에 따라 5~20분): 없는 후보만 `ollama pull`.
-   - 블록 B(약 3~10분): 비교를 돌린다. 모델마다 페르소나 4개 × 문항 5개 = 발화 20개를 만들고, ⓑ규칙 위반 수와 ⓐ말투 구분 정확도(로컬 계산 — 시드를 밖으로 보내지 않으려고 "세션 AI가 구분"을 바꿨다)를 센다. 결과는 작업 폴더의 `golden\reports_phase1\S18\` 안 파일 2개(`model_compare.json` 숫자만 · `samples.md` 모델 발화만)다. 결과 파일에 시드가 섞이면 도구가 파일을 지우고 `COMPARE_EXIT=3`으로 멈춘다.
+   - 블록 B(약 3~10분): 비교를 돌린다. 모델마다 페르소나 4개 × 문항 5개 = 발화 20개를 만들고, ⓑ규칙 위반 수와 ⓐ말투 구분 정확도(로컬 계산 — 시드를 밖으로 보내지 않으려고 "세션 AI가 구분"을 바꿨다)를 센다. 결과는 작업 폴더의 `golden\reports_phase1\S18\` 안 파일 2개(`model_compare.json` 숫자만 · `samples.md` 모델 발화만)다. 모델 발화가 시드를 베꼈으면 그 칸만 가리고 진행한다. 가림을 지나 시드가 남으면 파일을 지우고 `COMPARE_EXIT=3`으로 멈춘다. 원인 진단 숫자는 `SEED_SCAN` 한 줄이다(원문 없음).
    - 블록 C(약 10초): 결과 파일 2개를 S18 브랜치에 커밋·푸시한다. 블록 B가 성공하지 않았으면 스스로 거부한다.
 4. **성공 기준**
    - 블록 A: `CODE_OK=True` · `WORKTREE_HEAD`와 `EXPECTED`가 같음 · `PY_OK=True` · `OLLAMA_PKG_OK=True` · `SEED_LINES=20` · `HAS_EXAONE`·`HAS_QWEN` 중 하나 이상 True.
@@ -35,7 +35,7 @@ $WtHead = git -C $Wt rev-parse HEAD 2>$null
 Write-Host "WORKTREE_HEAD=$WtHead  EXPECTED=$Expected  (같아야 함)"
 if ($WtHead -and ($WtHead -eq $Expected)) {
   git -C $Wt log -1 --oneline
-  git -C $Wt merge-base --is-ancestor cbefaa98 HEAD 2>$null; $CodeOk = ($LASTEXITCODE -eq 0)
+  git -C $Wt merge-base --is-ancestor 0eff924b HEAD 2>$null; $CodeOk = ($LASTEXITCODE -eq 0)
   $Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
   $PyOk = Test-Path $Py
   $OllamaPkgOk = $false; if ($PyOk) { & $Py -c "import ollama" 2>$null; $OllamaPkgOk = ($LASTEXITCODE -eq 0) }
@@ -102,4 +102,5 @@ git -C $Wt log -1 --oneline
 
 - 세션에는 "블록 C까지 PUSH_EXIT=0"이라고만 알린다. 결과 파일은 세션이 브랜치에서 직접 읽는다(숫자 표와 모델 발화뿐 — 시드 원문 없음).
 - 작업 폴더 `WhyMath-s18cmp`는 S19 런북에서 다시 쓸 수 있어 지우지 않는다. 지우려면 `git worktree remove C:\Users\kiki\Desktop\__AI\WhyMath-s18cmp`(공유 작업 사본 창에서).
-- 블록 B가 `COMPARE_EXIT=3`이면 모델이 시드 문장을 베껴 썼다는 뜻이다(결과 파일은 이미 지워졌다). 그 숫자만 세션에 알린다.
+- 블록 B가 `COMPARE_EXIT=3`이면 가림을 지나 시드가 남았다는 뜻이다(결과 파일은 이미 지워졌다). `SEED_SCAN` 줄의 숫자만 세션에 알린다.
+- 2026-11-20 첫 실행 2회의 `COMPARE_EXIT=3`은 도구의 오탐이었다 — 규칙 페르소나 칸과 사람 말이 우연히 같은 것까지 유출로 셌다. 코드 `0eff924b`가 판정 대상을 모델 발화로 좁혔다.
