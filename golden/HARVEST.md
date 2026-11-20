@@ -336,3 +336,11 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음(경계 긋기와 특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `harness/pedagogical_rubric.py`의 `detect_answer_leakage`·`score_tutoring_response` 함수 2개 | 되묻기 루브릭 v0 C1~C5의 코드화(사람 판정 기준으로 둔다) | T1 설계 · 복사/import·연결은 S22 | S21 |
+
+### 학생 시뮬레이터 — 로컬 Ollama 제공자 (S18 · 2026-11-20)
+
+경계 긋기(복사 전에 적음): `src/backend/whymath_backend/l3/providers/ollama.py`의 `FixedModelOllamaProvider`(`__init__`·`generate`·`_get_client`·`jurisdiction`)와 그 도우미 6개(`_OllamaClient`·`_extract_text`·`_coerce_token_count`·`_read_field`·`_extract_usage`·`_build_default_client`).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 복사: 의존 과다 — `FixedModelOllamaProvider` 생성 경로 + 도우미 6개 → `src/backend/golden/sim/ollama_client.py`(동작 그대로 · import 출처 하나만 `golden.llm._response_fields`로) · 특성화 `tests/golden/characterization/test_s18_ollama_client.py`(입력 10개 + 클라우드 결정 거부 2 + 관할 1) | `OllamaProvider.generate`의 `resolve_model` 경로 · `check_status`·`OllamaStatus`·`ModelAvailability` · 이미지·JSON 스키마 인자 · `_running_loop_or_none`(루프 밖 분기 — RS-G3 조용한 값 게이트에 걸리고, 여기선 비동기 안에서만 부른다) | 지시서는 import를 기본으로 했지만(공통 규칙 9) 옛 모듈은 `l3/providers/__init__.py`를 거쳐 프로바이더 4종을 함께 부른다 — S20A가 끊은 패키지라 import하면 `test_import_budget.py`(전이 28/30 · 끊은 패키지 재유입 금지)가 RED. 모델 ID 지정은 옛 `FixedModelOllamaProvider`가 이미 받으므로 "모델 지정 불가"가 아니라 "의존 과다"다. 라우터 결정(`Router.route` · LOCAL 확인)은 옛 것을 그대로 거친다 | S18 |

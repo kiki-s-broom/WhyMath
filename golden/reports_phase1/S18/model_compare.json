@@ -1,0 +1,53 @@
+{
+  "models_requested": [
+    "exaone3.5:7.8b",
+    "qwen2.5:7b"
+  ],
+  "models_ran": [
+    "exaone3.5:7.8b",
+    "qwen2.5:7b"
+  ],
+  "compare_problems": [
+    "LF-01",
+    "LF-13",
+    "LF-17",
+    "LF-18",
+    "LF-26"
+  ],
+  "comparison": "실시",
+  "chosen": "qwen2.5:7b",
+  "results": [
+    {
+      "model": "exaone3.5:7.8b",
+      "violations_by_persona": {
+        "P2": 0,
+        "P3": 0,
+        "P4": 0,
+        "P6": 2
+      },
+      "violations_total": 2,
+      "violation_kinds": {
+        "여러 줄": 2
+      },
+      "discrimination_accuracy": 0.85,
+      "seed_copies": 0,
+      "utterances": 20
+    },
+    {
+      "model": "qwen2.5:7b",
+      "violations_by_persona": {
+        "P2": 0,
+        "P3": 0,
+        "P4": 1,
+        "P6": 0
+      },
+      "violations_total": 1,
+      "violation_kinds": {
+        "질문 아님": 1
+      },
+      "discrimination_accuracy": 0.641,
+      "seed_copies": 1,
+      "utterances": 20
+    }
+  ]
+}
