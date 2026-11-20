@@ -1,0 +1,115 @@
+# 골든 1단계 회귀 트랙 — AI 학생 시뮬레이터 야간 스모크 120 (S19 · F-00)
+#
+# 무엇을 재는가: 가짜 모드(GOLDEN_FAKE_LLM=1 — 튜터·학생 모두 고정 대본, 실제 LLM 호출 0)로
+# 30문항 × 페르소나 P1·P2·P5·P7 × 1회 = 120세션을 골든 API(HTTP)로 돌려 파이프라인 무결성만 잰다
+# (M4 크래시·M5 렌더·주입기 결정성·M1 규칙 검사기 자체). 실제 LLM으로 M1~M5를 재는 것은
+# Kiki 머신의 같은 명령이다(golden/reports_phase1/S19/런북.md). CI에는 LLM 키가 없다.
+#
+# 차단 기준(M1·M3·M4·M5) 하나라도 어기면 러너가 exit 1 → 이 잡이 빨강 → 아래 label 잡이
+# main 대상 열린 PR 전부에 라벨 `sim-red`를 붙인다(라벨은 Kiki가 미리 만든다).
+# 스모크 잡의 마지막 스텝은 러너 명령 자신이다(종료 코드를 래퍼가 가리지 않게).
+name: golden-sim-nightly
+
+on:
+  schedule:
+    # 매일 18:30 UTC = 03:30 KST (ci.yml 야간 18:00 UTC 뒤 30분)
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 설치 고정 — ci.yml과 같은 제약 파일(tests/infra 설치 고정 검사가 모든 워크플로에 요구한다)
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/infra/ci/constraints-py312.txt
+
+concurrency:
+  group: golden-sim-nightly
+  cancel-in-progress: false
+
+jobs:
+  sim-smoke:
+    name: golden-sim-nightly — AI 학생 시뮬레이터 스모크 120 (가짜 모드)
+    runs-on: ubuntu-latest
+    # 사본 이미지(ghcr.io 비공개 패키지)를 받으려면 packages 읽기가 필요하다 (ci.yml golden-path와 같다).
+    permissions:
+      contents: read
+      packages: read
+    # 20분(추정): 설치 약 1~2분 + 가짜 120세션(클라우드 세션 실측 약 15초). 실측이 생기면 교체한다.
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/backend
+
+    services:
+      postgres:
+        # ci.yml golden-path 잡의 서비스 블록과 같다(pgvector/pg16 미러 사본 — OPS-135).
+        image: ghcr.io/${{ github.repository_owner }}/whymath-ci-mirror/pgvector:pg16
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          POSTGRES_USER: whymath
+          POSTGRES_DB: whymath
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whymath"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      WHYMATH_DATABASE_URL: postgresql+asyncpg://whymath@127.0.0.1:5432/whymath
+      GOLDEN_FAKE_LLM: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies (editable + dev extras)
+        run: |
+          python -m pip install --upgrade "pip<27"
+          python -m pip install -e ".[dev]"
+          # ci.yml golden-path와 같은 설치(루트 conftest가 data_pipeline 경로를 잡는다).
+          python -m pip install -e ../data-pipeline
+
+      - name: Sim smoke 120 (fake · P1,P2,P5,P7)
+        run: python -m golden.sim.run --sessions 120 --personas P1,P2,P5,P7
+
+  label-sim-red:
+    name: golden-sim-nightly — 빨강이면 열린 PR에 sim-red 라벨
+    needs: sim-smoke
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    timeout-minutes: 5
+    steps:
+      - name: Label open PRs targeting main
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              base: "main",
+              per_page: 100,
+            });
+            for (const pr of prs) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ["sim-red"],
+              });
+            }
+            core.info(`sim-red 라벨: 열린 PR ${prs.length}개`);
