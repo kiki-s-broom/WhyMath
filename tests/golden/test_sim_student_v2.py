@@ -507,23 +507,79 @@ def test_non_local_routing_decision_stops_before_call(
     assert client.calls == []
 
 
-def test_seed_leak_scan_catches_long_and_short_seeds(tmp_path: Path) -> None:
-    out = tmp_path / "samples.md"
-    out.write_text("| P2 | 모델이 말투예시가 ㅁㄹ 를 그대로 씀 | 몰라 |\n", encoding="utf-8")
-    assert student_compare.seed_leaks([out], ["말투예시가 ㅁㄹ"]) == 1  # 긴 시드 — 부분 문자열
-    assert student_compare.seed_leaks([out], ["몰라"]) == 1  # 짧은 시드 — 칸 전체 일치
-    assert student_compare.seed_leaks([out], ["모"]) == 0  # 짧은 시드의 부분 일치는 유출 아님
-    assert student_compare.seed_leaks([out], ["다른 문장이다요"]) == 0
+def test_seed_leak_scan_catches_long_and_short_seeds() -> None:
+    row = "| P2 시도형 | 모델이 말투예시가 ㅁㄹ 를 그대로 씀 | 몰라 |"
+    assert student_compare.seed_leaks([row], ["말투예시가 ㅁㄹ"]) == 1  # 긴 시드 — 부분 문자열
+    assert student_compare.seed_leaks([row], ["몰라"]) == 1  # 짧은 시드 — 칸 전체 일치
+    assert student_compare.seed_leaks([row], ["모"]) == 0  # 짧은 시드의 부분 일치는 유출 아님
+    assert student_compare.seed_leaks([row], ["다른 문장이다요"]) == 0
 
 
-def test_compare_deletes_outputs_when_seed_leaks(
+def test_math_only_seed_is_not_a_leak() -> None:
+    # 답만 쓴 시드(`-12`·`y=2x+3`)는 문항 정답과 같은 공개 값 — 칸이 같아도 유출로 세지 않는다
+    row = "| P2 시도형 | -12 | y=2x+3 |"
+    assert student_compare.seed_leaks([row], ["-12", "y = 2x+3"]) == 0
+    assert not student_compare.copies_seed("-12", ["-12"])
+    assert student_compare.copies_seed(
+        "음 몰라", ["음 몰라"]
+    )  # 글자 섞인 짧은 시드는 줄 전체 일치면 복제
+
+
+def _write_seeds(directory: Path, seeds: list[str]) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "utterances.txt").write_text(
+        "".join(f"{s}\tself\n" for s in seeds), encoding="utf-8"
+    )
+
+
+def test_seed_equal_to_rule_row_is_not_a_leak(
+    live: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Kiki 머신 2026-11-20 재현: 사람이 우연히 규칙 페르소나 문장(P1)·수 답(P5·P8 칸)과 같은 말을 했다.
+    # 코드가 쓴 칸은 시드에서 온 글이 아니므로 결과를 지우면 안 된다(전에는 COMPARE_EXIT=3).
+    seeds = [student.P1_LINE, "-12", *_FAKE_SEEDS[: student.SEED_COUNT - 2]]
+    _write_seeds(tmp_path / "seed", seeds)
+    monkeypatch.setenv(student.SEED_DIR_ENV, str(tmp_path / "seed"))
+
+    def _fake_provider(model: str, **_k: object) -> FixedModelOllamaProvider:
+        return FixedModelOllamaProvider(model, client=_FakeClient("기울기가 뭐예요?"))
+
+    monkeypatch.setattr(student_compare, "FixedModelOllamaProvider", _fake_provider)
+    out = tmp_path / "out"
+    assert student_compare.main(["--models", "asker:1b", "--out", str(out)]) == 0
+    printed = capsys.readouterr().out
+    assert "SEED_SCAN llm_leaks=0 rule_or_header_matches=1 math_only_seeds=1" in printed
+    assert all(s not in printed for s in seeds if len(s) > 3)  # 화면에는 숫자만
+
+
+def test_compare_masks_model_line_that_copies_seed(
     live: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # 모델이 시드를 앞뒤에 말을 붙여 베끼면(줄 전체 일치가 아니라 가림을 피한다) 결과를 지우고 3
+    # 모델이 시드를 앞뒤에 말을 붙여 베끼면 그 칸을 가리고, 결과에는 시드가 남지 않는다
     def _fake_provider(model: str, **_k: object) -> FixedModelOllamaProvider:
         return FixedModelOllamaProvider(model, client=_FakeClient(f"음 {_FAKE_SEEDS[3]} 요"))
 
     monkeypatch.setattr(student_compare, "FixedModelOllamaProvider", _fake_provider)
+    out = tmp_path / "out"
+    assert student_compare.main(["--models", "copy:1b", "--out", str(out)]) == 0
+    samples = (out / "samples.md").read_text(encoding="utf-8")
+    assert _FAKE_SEEDS[3] not in samples
+    assert samples.count(student_compare.SEED_COPY_MASK) == 20
+    assert '"seed_copies": 20' in (out / "model_compare.json").read_text(encoding="utf-8")
+
+
+def test_compare_deletes_outputs_when_mask_misses(
+    live: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # 마지막 방어선: 가림이 놓쳐 시드가 모델 발화에 남으면 결과를 지우고 3
+    def _fake_provider(model: str, **_k: object) -> FixedModelOllamaProvider:
+        return FixedModelOllamaProvider(model, client=_FakeClient(f"음 {_FAKE_SEEDS[3]} 요"))
+
+    monkeypatch.setattr(student_compare, "FixedModelOllamaProvider", _fake_provider)
+    monkeypatch.setattr(student_compare, "copies_seed", lambda line, seeds: False)
     out = tmp_path / "out"
     assert student_compare.main(["--models", "copy:1b", "--out", str(out)]) == 3
     assert not (out / "samples.md").exists() and not (out / "model_compare.json").exists()

@@ -19,8 +19,11 @@
 
 출력: `golden/reports_phase1/S18/model_compare.json`(숫자만 — 발화 원문 없음)과
 `samples.md`(페르소나별 발화 5개 · 모델 출력만). 화면에도 숫자만 찍는다.
-시드 원문은 어디에도 쓰지 않는다 — 모델 발화가 시드 한 줄과 글자가 같으면
-(공백 무시) 샘플에서 "[시드 복제 — 가림]"으로 바꾸고 그 수를 센다.
+시드 원문은 어디에도 쓰지 않는다 — 모델 발화가 시드 한 줄과 글자가 같거나(공백 무시) 긴 시드를
+품고 있으면 샘플에서 "[시드 복제 — 가림]"으로 바꾸고 그 수를 센다. 쓴 뒤에는 모델 발화 줄과 결과
+JSON만 다시 훑어 시드가 남았으면 파일을 지우고 exit 3. 규칙 페르소나 칸·머리말은 코드가 쓴 글이라
+훑지 않고(사람이 우연히 같은 말을 했어도 유출이 아니다 — 2026-11-20 Kiki 머신 오탐), 수식뿐인 시드
+(답)는 공개된 정답 값이라 판정에서 뺀다. 원인 진단 숫자는 `SEED_SCAN` 한 줄로 찍는다.
 
 `--fake`: Ollama 없이 가짜 모드 대본으로 samples.md만 쓴다(클라우드 세션·CI용 · 비교는 하지 않는다).
 """
@@ -142,22 +145,59 @@ def _flat(text: str) -> str:
     return "".join(text.split())
 
 
-# 이 길이(공백 뺀 글자 수) 이상인 시드는 결과 파일 어디에든 **부분 문자열로** 있으면 유출로 본다.
-# 더 짧은 시드("몰라" 같은 것)는 모델 발화와 우연히 겹칠 수 있어 줄 전체가 같을 때만 본다.
+# 이 길이(공백 뺀 글자 수) 이상인 시드는 모델 발화 안에 **부분 문자열로** 있으면 복제로 본다.
+# 더 짧은 시드("몰라" 같은 것)는 우연히 겹칠 수 있어 발화(칸) 전체가 같을 때만 본다.
 SEED_SUBSTRING_MIN = 6
 
+# 수식·숫자뿐인 시드(`-12`·`y=2x+3` 같은 답)는 복제·유출 판정에서 뺀다 — 문항 정답과 같은
+# 공개된 값이라 말투·신원을 담지 않고, 모델 발화나 규칙 페르소나 칸(P5·P8)과 우연히 같아지는
+# 것이 정상이다.
+_MATH_ONLY = re.compile(r"^[0-9xXyY+\-−*/=().,^·]+$")
 
-def seed_leaks(paths: Sequence[Path], seeds: Sequence[str]) -> int:
-    """결과 파일에 섞인 시드 발화 수 — 긴 시드는 부분 문자열, 짧은 시드는 표 칸 전체 일치."""
-    text = "\n".join(p.read_text(encoding="utf-8") for p in paths if p.exists())
-    flat_text = _flat(text)
-    cells = {_flat(c) for line in text.splitlines() for c in line.split("|")}
+
+def _text_seeds(seeds: Sequence[str]) -> list[str]:
+    """복제·유출 판정 대상 시드(공백 뺀 꼴) — 빈 줄과 수식뿐인 줄을 뺀다."""
+    flats = [_flat(s) for s in seeds]
+    return [f for f in flats if f and not _MATH_ONLY.match(f)]
+
+
+def copies_seed(line: str, seeds: Sequence[str]) -> bool:
+    """모델 발화 한 줄이 시드를 베꼈는가 — 줄 전체가 같거나, 긴 시드가 부분 문자열로 들어 있다."""
+    flat = _flat(line)
+    return any(
+        f == flat or (len(f) >= SEED_SUBSTRING_MIN and f in flat) for f in _text_seeds(seeds)
+    )
+
+
+def seed_leaks(texts: Sequence[str], seeds: Sequence[str]) -> int:
+    """모델이 만든 글(로컬 Ollama 페르소나 발화 줄 · 결과 JSON)에 섞인 시드 발화 수.
+
+    규칙 페르소나 칸·문서 머리말은 코드가 쓴 글이라 넣지 않는다(시드 파일에서 온 글이 아니다 —
+    사람이 우연히 같은 말을 했어도 유출이 아니다). 판정은 `copies_seed`와 같다(칸 단위).
+    """
+    cells = [c for t in texts for line in t.splitlines() for c in line.split("|")]
+    flat_all = _flat("\n".join(texts))
     count = 0
-    for s in seeds:
-        f = _flat(s)
-        if (len(f) >= SEED_SUBSTRING_MIN and f in flat_text) or f in cells:
+    for f in _text_seeds(seeds):
+        if (len(f) >= SEED_SUBSTRING_MIN and f in flat_all) or f in {_flat(c) for c in cells}:
             count += 1
     return count
+
+
+def scan_counts(samples_text: str, json_text: str, seeds: Sequence[str]) -> dict[str, int]:
+    """원인 진단용 숫자(원문 없음) — 판정 대상(모델 발화)과 판정 밖(규칙 칸·머리말)을 나눠 센다."""
+    # 표의 한 행은 "| P2 시도형 | …" 꼴 — 두 번째 낱말이 페르소나 ID다
+    llm_rows = [
+        ln
+        for ln in samples_text.splitlines()
+        if ln.split(" ")[1:2] in [[p] for p in student.LLM_PERSONAS]
+    ]
+    other = [ln for ln in samples_text.splitlines() if ln not in llm_rows]
+    return {
+        "llm_leaks": seed_leaks([*llm_rows, json_text], seeds),
+        "rule_or_header_matches": seed_leaks(other, seeds),
+        "math_only_seeds": len([s for s in seeds if _flat(s)]) - len(_text_seeds(seeds)),
+    }
 
 
 # ── 모델 1개 돌리기 ─────────────────────────────────────────────────────────
@@ -167,7 +207,6 @@ async def run_model(model: str, seeds: Sequence[str]) -> dict[str, object]:
     """모델 1개 × LLM 페르소나 4 × 문항 5 → 위반 수·구분 정확도·시드 복제 수 + 샘플 발화."""
     # 첫 호출은 모델을 메모리에 올리느라 느리다 — 클라이언트 제한 시간을 60초로 맞춘다
     provider = FixedModelOllamaProvider(model, timeout=student.STUDENT_LLM_TIMEOUT_S)
-    seed_flat = {_flat(s) for s in seeds}
     violations: dict[str, int] = {}
     details: dict[str, list[list[str]]] = {}
     lines_by_persona: dict[str, list[str]] = {}
@@ -188,7 +227,7 @@ async def run_model(model: str, seeds: Sequence[str]) -> dict[str, object]:
             raw_lines = [ln for ln in raw.splitlines() if ln.strip()]
             line = student.clean_line(raw)
             per.append(rule_violations(persona, line, len(raw_lines), forced))
-            if _flat(line) in seed_flat:
+            if copies_seed(line, seeds):
                 copies += 1
                 line = SEED_COPY_MASK
             lines.append(line)
@@ -343,13 +382,22 @@ def main(argv: list[str] | None = None) -> int:
         COMPARE_PROBLEMS,
     )
     (args.out / "samples.md").write_text(text, encoding="utf-8")
-    leaked = seed_leaks([args.out / "samples.md", args.out / "model_compare.json"], seeds)
-    if leaked:
-        # 시드 원문이 결과 파일에 섞였다 — 파일을 지우고 멈춘다(밀어 올릴 것이 남지 않게)
+    scan = scan_counts(
+        (args.out / "samples.md").read_text(encoding="utf-8"),
+        (args.out / "model_compare.json").read_text(encoding="utf-8"),
+        seeds,
+    )
+    print(
+        f"SEED_SCAN llm_leaks={scan['llm_leaks']} "
+        f"rule_or_header_matches={scan['rule_or_header_matches']} "
+        f"math_only_seeds={scan['math_only_seeds']}"
+    )
+    if scan["llm_leaks"]:
+        # 가림을 지나 시드가 모델 발화·결과에 남았다 — 파일을 지우고 멈춘다(푸시할 것이 안 남게)
         for path in (args.out / "samples.md", args.out / "model_compare.json"):
             path.unlink(missing_ok=True)
         print(
-            f"COMPARE_REFUSED=True — 결과 파일에 시드 발화 {leaked}건이 섞여 지웠다",
+            f"COMPARE_REFUSED=True — 모델 발화에 시드 발화 {scan['llm_leaks']}건이 남아 지웠다",
             file=sys.stderr,
         )
         return 3
