@@ -1,0 +1,571 @@
+입력,오개념ID,문항,유형,정답,틀린답,OP,분류기재분류
+M0034,M0034,LF-01,f_value,-12,,,
+M0035,M0035,LF-01,f_value,-12,,,
+M0036,M0036,LF-01,f_value,-12,,,
+M0037,M0037,LF-01,f_value,-12,0,OP_02,OP_02
+M0409,M0409,LF-01,f_value,-12,,,
+M0567,M0567,LF-01,f_value,-12,,,
+M0568,M0568,LF-01,f_value,-12,,,
+M0569,M0569,LF-01,f_value,-12,,,
+M0001,M0001,LF-01,f_value,-12,,,
+M0002,M0002,LF-01,f_value,-12,,,
+M0548,M0548,LF-01,f_value,-12,,,
+OP_01,,LF-01,f_value,-12,12,OP_01,OP_01
+OP_02,,LF-01,f_value,-12,0,OP_02,OP_02
+OP_03,,LF-01,f_value,-12,,,
+OP_04,,LF-01,f_value,-12,,,
+OP_05,,LF-01,f_value,-12,-3×5,OP_05,OP_05
+OP_06,,LF-01,f_value,-12,3,OP_06,OP_06
+OP_07,,LF-01,f_value,-12,,,
+OP_08,,LF-01,f_value,-12,,,
+M0034,M0034,LF-02,f_value,1,,,
+M0035,M0035,LF-02,f_value,1,,,
+M0036,M0036,LF-02,f_value,1,,,
+M0037,M0037,LF-02,f_value,1,-15,OP_02,OP_02
+M0409,M0409,LF-02,f_value,1,,,
+M0567,M0567,LF-02,f_value,1,,,
+M0568,M0568,LF-02,f_value,1,,,
+M0569,M0569,LF-02,f_value,1,,,
+M0001,M0001,LF-02,f_value,1,,,
+M0002,M0002,LF-02,f_value,1,,,
+M0548,M0548,LF-02,f_value,1,,,
+OP_01,,LF-02,f_value,1,-1,OP_01,OP_01
+OP_02,,LF-02,f_value,1,-15,OP_02,OP_02
+OP_03,,LF-02,f_value,1,,,
+OP_04,,LF-02,f_value,1,,,
+OP_05,,LF-02,f_value,1,1×(-3),OP_05,OP_05
+OP_06,,LF-02,f_value,1,4,OP_06,OP_06
+OP_07,,LF-02,f_value,1,,,
+OP_08,,LF-02,f_value,1,,,
+M0034,M0034,LF-03,f_value,4,,,
+M0035,M0035,LF-03,f_value,4,,,
+M0036,M0036,LF-03,f_value,4,,,
+M0037,M0037,LF-03,f_value,4,-4,OP_02,OP_01
+M0409,M0409,LF-03,f_value,4,,,
+M0567,M0567,LF-03,f_value,4,,,
+M0568,M0568,LF-03,f_value,4,,,
+M0569,M0569,LF-03,f_value,4,,,
+M0001,M0001,LF-03,f_value,4,,,
+M0002,M0002,LF-03,f_value,4,,,
+M0548,M0548,LF-03,f_value,4,,,
+OP_01,,LF-03,f_value,4,-4,OP_01,OP_01
+OP_02,,LF-03,f_value,4,-4,OP_02,OP_01
+OP_03,,LF-03,f_value,4,,,
+OP_04,,LF-03,f_value,4,,,
+OP_05,,LF-03,f_value,4,6×2,OP_05,OP_05
+OP_06,,LF-03,f_value,4,6,OP_06,OP_06
+OP_07,,LF-03,f_value,4,,,
+OP_08,,LF-03,f_value,4,,,
+M0034,M0034,LF-04,f_value,-8,,,
+M0035,M0035,LF-04,f_value,-8,,,
+M0036,M0036,LF-04,f_value,-8,,,
+M0037,M0037,LF-04,f_value,-8,-18,OP_02,OP_02
+M0409,M0409,LF-04,f_value,-8,,,
+M0567,M0567,LF-04,f_value,-8,,,
+M0568,M0568,LF-04,f_value,-8,,,
+M0569,M0569,LF-04,f_value,-8,,,
+M0001,M0001,LF-04,f_value,-8,,,
+M0002,M0002,LF-04,f_value,-8,,,
+M0548,M0548,LF-04,f_value,-8,,,
+OP_01,,LF-04,f_value,-8,8,OP_01,OP_01
+OP_02,,LF-04,f_value,-8,-18,OP_02,OP_02
+OP_03,,LF-04,f_value,-8,,,
+OP_04,,LF-04,f_value,-8,,,
+OP_05,,LF-04,f_value,-8,-1×3,OP_05,OP_02
+OP_06,,LF-04,f_value,-8,5,OP_06,OP_06
+OP_07,,LF-04,f_value,-8,,,
+OP_08,,LF-04,f_value,-8,,,
+M0034,M0034,LF-05,f_value,8,,,
+M0035,M0035,LF-05,f_value,8,,,
+M0036,M0036,LF-05,f_value,8,,,
+M0037,M0037,LF-05,f_value,8,0,OP_02,OP_02
+M0409,M0409,LF-05,f_value,8,,,
+M0567,M0567,LF-05,f_value,8,,,
+M0568,M0568,LF-05,f_value,8,,,
+M0569,M0569,LF-05,f_value,8,,,
+M0001,M0001,LF-05,f_value,8,,,
+M0002,M0002,LF-05,f_value,8,,,
+M0548,M0548,LF-05,f_value,8,,,
+OP_01,,LF-05,f_value,8,-8,OP_01,OP_01
+OP_02,,LF-05,f_value,8,0,OP_02,OP_02
+OP_03,,LF-05,f_value,8,,,
+OP_04,,LF-05,f_value,8,,,
+OP_05,,LF-05,f_value,8,4×0,OP_05,OP_02
+OP_06,,LF-05,f_value,8,4,OP_06,OP_06
+OP_07,,LF-05,f_value,8,,,
+OP_08,,LF-05,f_value,8,,,
+M0034,M0034,LF-06,f_value,0,,,
+M0035,M0035,LF-06,f_value,0,,,
+M0036,M0036,LF-06,f_value,0,,,
+M0037,M0037,LF-06,f_value,0,12,OP_02,OP_01
+M0409,M0409,LF-06,f_value,0,,,
+M0567,M0567,LF-06,f_value,0,,,
+M0568,M0568,LF-06,f_value,0,,,
+M0569,M0569,LF-06,f_value,0,,,
+M0001,M0001,LF-06,f_value,0,-12,OP_01,OP_01
+M0002,M0002,LF-06,f_value,0,,,
+M0548,M0548,LF-06,f_value,0,,,
+OP_01,,LF-06,f_value,0,-12,OP_01,OP_01
+OP_02,,LF-06,f_value,0,12,OP_02,OP_01
+OP_03,,LF-06,f_value,0,,,
+OP_04,,LF-06,f_value,0,,,
+OP_05,,LF-06,f_value,0,-6×(-1),OP_05,OP_05
+OP_06,,LF-06,f_value,0,6,OP_06,OP_05
+OP_07,,LF-06,f_value,0,,,
+OP_08,,LF-06,f_value,0,,,
+M0034,M0034,LF-07,f_value,11,,,
+M0035,M0035,LF-07,f_value,11,,,
+M0036,M0036,LF-07,f_value,11,,,
+M0037,M0037,LF-07,f_value,11,18,OP_02,OP_02
+M0409,M0409,LF-07,f_value,11,,,
+M0567,M0567,LF-07,f_value,11,,,
+M0568,M0568,LF-07,f_value,11,,,
+M0569,M0569,LF-07,f_value,11,,,
+M0001,M0001,LF-07,f_value,11,,,
+M0002,M0002,LF-07,f_value,11,,,
+M0548,M0548,LF-07,f_value,11,,,
+OP_01,,LF-07,f_value,11,-11,OP_01,OP_01
+OP_02,,LF-07,f_value,11,18,OP_02,OP_02
+OP_03,,LF-07,f_value,11,,,
+OP_04,,LF-07,f_value,11,,,
+OP_05,,LF-07,f_value,11,2×2,OP_05,OP_05
+OP_06,,LF-07,f_value,11,2,OP_06,OP_06
+OP_07,,LF-07,f_value,11,,,
+OP_08,,LF-07,f_value,11,,,
+M0034,M0034,LF-08,f_value,16,,,
+M0035,M0035,LF-08,f_value,16,,,
+M0036,M0036,LF-08,f_value,16,,,
+M0037,M0037,LF-08,f_value,16,20,OP_02,OP_02
+M0409,M0409,LF-08,f_value,16,,,
+M0567,M0567,LF-08,f_value,16,,,
+M0568,M0568,LF-08,f_value,16,,,
+M0569,M0569,LF-08,f_value,16,,,
+M0001,M0001,LF-08,f_value,16,,,
+M0002,M0002,LF-08,f_value,16,,,
+M0548,M0548,LF-08,f_value,16,,,
+OP_01,,LF-08,f_value,16,-16,OP_01,OP_01
+OP_02,,LF-08,f_value,16,20,OP_02,OP_02
+OP_03,,LF-08,f_value,16,,,
+OP_04,,LF-08,f_value,16,,,
+OP_05,,LF-08,f_value,16,3×5,OP_05,OP_05
+OP_06,,LF-08,f_value,16,3,OP_06,OP_06
+OP_07,,LF-08,f_value,16,,,
+OP_08,,LF-08,f_value,16,,,
+M0034,M0034,LF-09,f_value,-4,,,
+M0035,M0035,LF-09,f_value,-4,,,
+M0036,M0036,LF-09,f_value,-4,,,
+M0037,M0037,LF-09,f_value,-4,0,OP_02,OP_02
+M0409,M0409,LF-09,f_value,-4,,,
+M0567,M0567,LF-09,f_value,-4,,,
+M0568,M0568,LF-09,f_value,-4,,,
+M0569,M0569,LF-09,f_value,-4,,,
+M0001,M0001,LF-09,f_value,-4,,,
+M0002,M0002,LF-09,f_value,-4,,,
+M0548,M0548,LF-09,f_value,-4,,,
+OP_01,,LF-09,f_value,-4,4,OP_01,OP_01
+OP_02,,LF-09,f_value,-4,0,OP_02,OP_02
+OP_03,,LF-09,f_value,-4,,,
+OP_04,,LF-09,f_value,-4,,,
+OP_05,,LF-09,f_value,-4,-5×0,OP_05,OP_02
+OP_06,,LF-09,f_value,-4,5,OP_06,OP_06
+OP_07,,LF-09,f_value,-4,,,
+OP_08,,LF-09,f_value,-4,,,
+M0034,M0034,LF-10,f_value,-11,,,
+M0035,M0035,LF-10,f_value,-11,,,
+M0036,M0036,LF-10,f_value,-11,,,
+M0037,M0037,LF-10,f_value,-11,-8,OP_02,OP_02
+M0409,M0409,LF-10,f_value,-11,,,
+M0567,M0567,LF-10,f_value,-11,,,
+M0568,M0568,LF-10,f_value,-11,,,
+M0569,M0569,LF-10,f_value,-11,,,
+M0001,M0001,LF-10,f_value,-11,,,
+M0002,M0002,LF-10,f_value,-11,,,
+M0548,M0548,LF-10,f_value,-11,,,
+OP_01,,LF-10,f_value,-11,11,OP_01,OP_01
+OP_02,,LF-10,f_value,-11,-8,OP_02,OP_02
+OP_03,,LF-10,f_value,-11,,,
+OP_04,,LF-10,f_value,-11,,,
+OP_05,,LF-10,f_value,-11,5×(-2),OP_05,OP_05
+OP_06,,LF-10,f_value,-11,5,OP_06,OP_06
+OP_07,,LF-10,f_value,-11,,,
+OP_08,,LF-10,f_value,-11,,,
+M0034,M0034,LF-11,f_value,2,,,
+M0035,M0035,LF-11,f_value,2,,,
+M0036,M0036,LF-11,f_value,2,,,
+M0037,M0037,LF-11,f_value,2,-25,OP_02,OP_02
+M0409,M0409,LF-11,f_value,2,,,
+M0567,M0567,LF-11,f_value,2,,,
+M0568,M0568,LF-11,f_value,2,,,
+M0569,M0569,LF-11,f_value,2,,,
+M0001,M0001,LF-11,f_value,2,,,
+M0002,M0002,LF-11,f_value,2,,,
+M0548,M0548,LF-11,f_value,2,,,
+OP_01,,LF-11,f_value,2,-2,OP_01,OP_01
+OP_02,,LF-11,f_value,2,-25,OP_02,OP_02
+OP_03,,LF-11,f_value,2,,,
+OP_04,,LF-11,f_value,2,,,
+OP_05,,LF-11,f_value,2,(1/2)×10,OP_05,OP_05
+OP_06,,LF-11,f_value,2,1,OP_06,OP_06
+OP_07,,LF-11,f_value,2,,,
+OP_08,,LF-11,f_value,2,,,
+M0034,M0034,LF-12,solve_coef,3,,,
+M0035,M0035,LF-12,solve_coef,3,,,
+M0036,M0036,LF-12,solve_coef,3,,,
+M0037,M0037,LF-12,solve_coef,3,,,
+M0409,M0409,LF-12,solve_coef,3,,,
+M0567,M0567,LF-12,solve_coef,3,,,
+M0568,M0568,LF-12,solve_coef,3,,,
+M0569,M0569,LF-12,solve_coef,3,,,
+M0001,M0001,LF-12,solve_coef,3,,,
+M0002,M0002,LF-12,solve_coef,3,,,
+M0548,M0548,LF-12,solve_coef,3,,,
+OP_01,,LF-12,solve_coef,3,-3,OP_01,OP_01
+OP_02,,LF-12,solve_coef,3,,,
+OP_03,,LF-12,solve_coef,3,,,
+OP_04,,LF-12,solve_coef,3,,,
+OP_05,,LF-12,solve_coef,3,11-5,OP_05,OP_05
+OP_06,,LF-12,solve_coef,3,5,OP_06,OP_06
+OP_07,,LF-12,solve_coef,3,,,
+OP_08,,LF-12,solve_coef,3,,,
+M0034,M0034,LF-13,slope_points,3,,,
+M0035,M0035,LF-13,slope_points,3,-3,OP_08,OP_01
+M0036,M0036,LF-13,slope_points,3,,,
+M0037,M0037,LF-13,slope_points,3,,,
+M0409,M0409,LF-13,slope_points,3,,,
+M0567,M0567,LF-13,slope_points,3,,,
+M0568,M0568,LF-13,slope_points,3,1/3,OP_03,OP_03
+M0569,M0569,LF-13,slope_points,3,-3,OP_08,OP_01
+M0001,M0001,LF-13,slope_points,3,,,
+M0002,M0002,LF-13,slope_points,3,,,
+M0548,M0548,LF-13,slope_points,3,,,
+OP_01,,LF-13,slope_points,3,-3,OP_01,OP_01
+OP_02,,LF-13,slope_points,3,,,
+OP_03,,LF-13,slope_points,3,1/3,OP_03,OP_03
+OP_04,,LF-13,slope_points,3,,,
+OP_05,,LF-13,slope_points,3,11-2,OP_05,OP_05
+OP_06,,LF-13,slope_points,3,1,OP_06,OP_06
+OP_07,,LF-13,slope_points,3,,,
+OP_08,,LF-13,slope_points,3,-3,OP_08,OP_01
+M0034,M0034,LF-14,slope_points,-3/2,,,
+M0035,M0035,LF-14,slope_points,-3/2,3/2,OP_08,OP_01
+M0036,M0036,LF-14,slope_points,-3/2,,,
+M0037,M0037,LF-14,slope_points,-3/2,,,
+M0409,M0409,LF-14,slope_points,-3/2,,,
+M0567,M0567,LF-14,slope_points,-3/2,,,
+M0568,M0568,LF-14,slope_points,-3/2,-2/3,OP_03,OP_03
+M0569,M0569,LF-14,slope_points,-3/2,3/2,OP_08,OP_01
+M0001,M0001,LF-14,slope_points,-3/2,,,
+M0002,M0002,LF-14,slope_points,-3/2,-9/2,OP_01,OP_05
+M0548,M0548,LF-14,slope_points,-3/2,,,
+OP_01,,LF-14,slope_points,-3/2,-9/2,OP_01,OP_05
+OP_02,,LF-14,slope_points,-3/2,,,
+OP_03,,LF-14,slope_points,-3/2,-2/3,OP_03,OP_03
+OP_04,,LF-14,slope_points,-3/2,,,
+OP_05,,LF-14,slope_points,-3/2,-4-5,OP_05,OP_05
+OP_06,,LF-14,slope_points,-3/2,2,OP_06,OP_06
+OP_07,,LF-14,slope_points,-3/2,,,
+OP_08,,LF-14,slope_points,-3/2,3/2,OP_08,OP_01
+M0034,M0034,LF-15,slope_read,2/3,-1,OP_04,OP_04
+M0035,M0035,LF-15,slope_read,2/3,-2/3,OP_08,OP_01
+M0036,M0036,LF-15,slope_read,2/3,,,
+M0037,M0037,LF-15,slope_read,2/3,,,
+M0409,M0409,LF-15,slope_read,2/3,,,
+M0567,M0567,LF-15,slope_read,2/3,,,
+M0568,M0568,LF-15,slope_read,2/3,-1,OP_04,OP_04
+M0569,M0569,LF-15,slope_read,2/3,-2/3,OP_08,OP_01
+M0001,M0001,LF-15,slope_read,2/3,,,
+M0002,M0002,LF-15,slope_read,2/3,,,
+M0548,M0548,LF-15,slope_read,2/3,,,
+OP_01,,LF-15,slope_read,2/3,-2/3,OP_01,OP_01
+OP_02,,LF-15,slope_read,2/3,,,
+OP_03,,LF-15,slope_read,2/3,3/2,OP_03,OP_03
+OP_04,,LF-15,slope_read,2/3,-1,OP_04,OP_04
+OP_05,,LF-15,slope_read,2/3,,,
+OP_06,,LF-15,slope_read,2/3,2,OP_06,OP_06
+OP_07,,LF-15,slope_read,2/3,,,
+OP_08,,LF-15,slope_read,2/3,-2/3,OP_08,OP_01
+M0034,M0034,LF-16,increase,15,-6,OP_04,OP_00
+M0035,M0035,LF-16,increase,15,,,
+M0036,M0036,LF-16,increase,15,,,
+M0037,M0037,LF-16,increase,15,,,
+M0409,M0409,LF-16,increase,15,,,
+M0567,M0567,LF-16,increase,15,,,
+M0568,M0568,LF-16,increase,15,-6,OP_04,OP_00
+M0569,M0569,LF-16,increase,15,,,
+M0001,M0001,LF-16,increase,15,,,
+M0002,M0002,LF-16,increase,15,,,
+M0548,M0548,LF-16,increase,15,,,
+OP_01,,LF-16,increase,15,-15,OP_01,OP_01
+OP_02,,LF-16,increase,15,,,
+OP_03,,LF-16,increase,15,,,
+OP_04,,LF-16,increase,15,-6,OP_04,OP_00
+OP_05,,LF-16,increase,15,,,
+OP_06,,LF-16,increase,15,5,OP_06,OP_06
+OP_07,,LF-16,increase,15,,,
+OP_08,,LF-16,increase,15,,,
+M0034,M0034,LF-17,y_intercept,-7,4,OP_04,OP_04
+M0035,M0035,LF-17,y_intercept,-7,,,
+M0036,M0036,LF-17,y_intercept,-7,7/4,OP_07,OP_07
+M0037,M0037,LF-17,y_intercept,-7,,,
+M0409,M0409,LF-17,y_intercept,-7,,,
+M0567,M0567,LF-17,y_intercept,-7,,,
+M0568,M0568,LF-17,y_intercept,-7,4,OP_04,OP_04
+M0569,M0569,LF-17,y_intercept,-7,,,
+M0001,M0001,LF-17,y_intercept,-7,,,
+M0002,M0002,LF-17,y_intercept,-7,,,
+M0548,M0548,LF-17,y_intercept,-7,,,
+OP_01,,LF-17,y_intercept,-7,7,OP_01,OP_01
+OP_02,,LF-17,y_intercept,-7,,,
+OP_03,,LF-17,y_intercept,-7,,,
+OP_04,,LF-17,y_intercept,-7,4,OP_04,OP_04
+OP_05,,LF-17,y_intercept,-7,,,
+OP_06,,LF-17,y_intercept,-7,4,OP_06,OP_04
+OP_07,,LF-17,y_intercept,-7,7/4,OP_07,OP_07
+OP_08,,LF-17,y_intercept,-7,,,
+M0034,M0034,LF-18,x_intercept,3,-2,OP_04,OP_04
+M0035,M0035,LF-18,x_intercept,3,,,
+M0036,M0036,LF-18,x_intercept,3,6,OP_07,OP_07
+M0037,M0037,LF-18,x_intercept,3,,,
+M0409,M0409,LF-18,x_intercept,3,,,
+M0567,M0567,LF-18,x_intercept,3,,,
+M0568,M0568,LF-18,x_intercept,3,-2,OP_04,OP_04
+M0569,M0569,LF-18,x_intercept,3,,,
+M0001,M0001,LF-18,x_intercept,3,-3,OP_01,OP_01
+M0002,M0002,LF-18,x_intercept,3,,,
+M0548,M0548,LF-18,x_intercept,3,,,
+OP_01,,LF-18,x_intercept,3,-3,OP_01,OP_01
+OP_02,,LF-18,x_intercept,3,,,
+OP_03,,LF-18,x_intercept,3,,,
+OP_04,,LF-18,x_intercept,3,-2,OP_04,OP_04
+OP_05,,LF-18,x_intercept,3,-6,OP_05,OP_06
+OP_06,,LF-18,x_intercept,3,2,OP_06,OP_06
+OP_07,,LF-18,x_intercept,3,6,OP_07,OP_07
+OP_08,,LF-18,x_intercept,3,,,
+M0034,M0034,LF-19,x_intercept,-6,1/3,OP_04,OP_04
+M0035,M0035,LF-19,x_intercept,-6,,,
+M0036,M0036,LF-19,x_intercept,-6,2,OP_07,OP_07
+M0037,M0037,LF-19,x_intercept,-6,,,
+M0409,M0409,LF-19,x_intercept,-6,,,
+M0567,M0567,LF-19,x_intercept,-6,,,
+M0568,M0568,LF-19,x_intercept,-6,1/3,OP_04,OP_04
+M0569,M0569,LF-19,x_intercept,-6,,,
+M0001,M0001,LF-19,x_intercept,-6,,,
+M0002,M0002,LF-19,x_intercept,-6,,,
+M0548,M0548,LF-19,x_intercept,-6,,,
+OP_01,,LF-19,x_intercept,-6,6,OP_01,OP_01
+OP_02,,LF-19,x_intercept,-6,,,
+OP_03,,LF-19,x_intercept,-6,,,
+OP_04,,LF-19,x_intercept,-6,1/3,OP_04,OP_04
+OP_05,,LF-19,x_intercept,-6,-2,OP_05,OP_06
+OP_06,,LF-19,x_intercept,-6,1,OP_06,OP_06
+OP_07,,LF-19,x_intercept,-6,2,OP_07,OP_07
+OP_08,,LF-19,x_intercept,-6,,,
+M0034,M0034,LF-20,y_from_x_intercept,-12,,,
+M0035,M0035,LF-20,y_from_x_intercept,-12,,,
+M0036,M0036,LF-20,y_from_x_intercept,-12,4,OP_07,OP_06
+M0037,M0037,LF-20,y_from_x_intercept,-12,,,
+M0409,M0409,LF-20,y_from_x_intercept,-12,,,
+M0567,M0567,LF-20,y_from_x_intercept,-12,,,
+M0568,M0568,LF-20,y_from_x_intercept,-12,,,
+M0569,M0569,LF-20,y_from_x_intercept,-12,,,
+M0001,M0001,LF-20,y_from_x_intercept,-12,,,
+M0002,M0002,LF-20,y_from_x_intercept,-12,,,
+M0548,M0548,LF-20,y_from_x_intercept,-12,,,
+OP_01,,LF-20,y_from_x_intercept,-12,12,OP_01,OP_01
+OP_02,,LF-20,y_from_x_intercept,-12,,,
+OP_03,,LF-20,y_from_x_intercept,-12,,,
+OP_04,,LF-20,y_from_x_intercept,-12,,,
+OP_05,,LF-20,y_from_x_intercept,-12,,,
+OP_06,,LF-20,y_from_x_intercept,-12,3,OP_06,OP_06
+OP_07,,LF-20,y_from_x_intercept,-12,4,OP_07,OP_06
+OP_08,,LF-20,y_from_x_intercept,-12,,,
+M0034,M0034,LF-21,equation,2*x + 3,3x+2,OP_04,OP_04
+M0035,M0035,LF-21,equation,2*x + 3,-2x+7,OP_08,OP_00
+M0036,M0036,LF-21,equation,2*x + 3,,,
+M0037,M0037,LF-21,equation,2*x + 3,,,
+M0409,M0409,LF-21,equation,2*x + 3,,,
+M0567,M0567,LF-21,equation,2*x + 3,,,
+M0568,M0568,LF-21,equation,2*x + 3,3x+2,OP_04,OP_04
+M0569,M0569,LF-21,equation,2*x + 3,-2x+7,OP_08,OP_00
+M0001,M0001,LF-21,equation,2*x + 3,,,
+M0002,M0002,LF-21,equation,2*x + 3,,,
+M0548,M0548,LF-21,equation,2*x + 3,,,
+OP_01,,LF-21,equation,2*x + 3,2x-3,OP_01,OP_01
+OP_02,,LF-21,equation,2*x + 3,,,
+OP_03,,LF-21,equation,2*x + 3,,,
+OP_04,,LF-21,equation,2*x + 3,3x+2,OP_04,OP_04
+OP_05,,LF-21,equation,2*x + 3,,,
+OP_06,,LF-21,equation,2*x + 3,2,OP_06,OP_00
+OP_07,,LF-21,equation,2*x + 3,,,
+OP_08,,LF-21,equation,2*x + 3,-2x+7,OP_08,OP_00
+M0034,M0034,LF-22,equation,-3*x + 5,5x-3,OP_04,OP_04
+M0035,M0035,LF-22,equation,-3*x + 5,3x-7,OP_08,OP_00
+M0036,M0036,LF-22,equation,-3*x + 5,,,
+M0037,M0037,LF-22,equation,-3*x + 5,,,
+M0409,M0409,LF-22,equation,-3*x + 5,,,
+M0567,M0567,LF-22,equation,-3*x + 5,,,
+M0568,M0568,LF-22,equation,-3*x + 5,5x-3,OP_04,OP_04
+M0569,M0569,LF-22,equation,-3*x + 5,3x-7,OP_08,OP_00
+M0001,M0001,LF-22,equation,-3*x + 5,,,
+M0002,M0002,LF-22,equation,-3*x + 5,-3x-7,OP_01,OP_00
+M0548,M0548,LF-22,equation,-3*x + 5,-3x-7,OP_01,OP_00
+OP_01,,LF-22,equation,-3*x + 5,-3x-7,OP_01,OP_00
+OP_02,,LF-22,equation,-3*x + 5,,,
+OP_03,,LF-22,equation,-3*x + 5,,,
+OP_04,,LF-22,equation,-3*x + 5,5x-3,OP_04,OP_04
+OP_05,,LF-22,equation,-3*x + 5,,,
+OP_06,,LF-22,equation,-3*x + 5,3,OP_06,OP_00
+OP_07,,LF-22,equation,-3*x + 5,,,
+OP_08,,LF-22,equation,-3*x + 5,3x-7,OP_08,OP_00
+M0034,M0034,LF-23,equation,2*x + 1,x+2,OP_04,OP_04
+M0035,M0035,LF-23,equation,2*x + 1,-2x+5,OP_08,OP_00
+M0036,M0036,LF-23,equation,2*x + 1,,,
+M0037,M0037,LF-23,equation,2*x + 1,,,
+M0409,M0409,LF-23,equation,2*x + 1,,,
+M0567,M0567,LF-23,equation,2*x + 1,,,
+M0568,M0568,LF-23,equation,2*x + 1,x+2,OP_04,OP_04
+M0569,M0569,LF-23,equation,2*x + 1,-2x+5,OP_08,OP_00
+M0001,M0001,LF-23,equation,2*x + 1,,,
+M0002,M0002,LF-23,equation,2*x + 1,,,
+M0548,M0548,LF-23,equation,2*x + 1,,,
+OP_01,,LF-23,equation,2*x + 1,2x-1,OP_01,OP_01
+OP_02,,LF-23,equation,2*x + 1,,,
+OP_03,,LF-23,equation,2*x + 1,(1/2)x+5/2,OP_03,OP_00
+OP_04,,LF-23,equation,2*x + 1,x+2,OP_04,OP_04
+OP_05,,LF-23,equation,2*x + 1,,,
+OP_06,,LF-23,equation,2*x + 1,1,OP_06,OP_00
+OP_07,,LF-23,equation,2*x + 1,,,
+OP_08,,LF-23,equation,2*x + 1,-2x+5,OP_08,OP_00
+M0034,M0034,LF-24,equation,-2*x + 2,2x-2,OP_04,OP_04
+M0035,M0035,LF-24,equation,-2*x + 2,2x+6,OP_08,OP_00
+M0036,M0036,LF-24,equation,-2*x + 2,,,
+M0037,M0037,LF-24,equation,-2*x + 2,,,
+M0409,M0409,LF-24,equation,-2*x + 2,,,
+M0567,M0567,LF-24,equation,-2*x + 2,,,
+M0568,M0568,LF-24,equation,-2*x + 2,2x-2,OP_04,OP_04
+M0569,M0569,LF-24,equation,-2*x + 2,2x+6,OP_08,OP_00
+M0001,M0001,LF-24,equation,-2*x + 2,-2x+6,OP_01,OP_00
+M0002,M0002,LF-24,equation,-2*x + 2,-6x-2,OP_01,OP_00
+M0548,M0548,LF-24,equation,-2*x + 2,,,
+OP_01,,LF-24,equation,-2*x + 2,-2x+6,OP_01,OP_00
+OP_02,,LF-24,equation,-2*x + 2,,,
+OP_03,,LF-24,equation,-2*x + 2,(-1/2)x+7/2,OP_03,OP_00
+OP_04,,LF-24,equation,-2*x + 2,2x-2,OP_04,OP_04
+OP_05,,LF-24,equation,-2*x + 2,,,
+OP_06,,LF-24,equation,-2*x + 2,1,OP_06,OP_00
+OP_07,,LF-24,equation,-2*x + 2,,,
+OP_08,,LF-24,equation,-2*x + 2,2x+6,OP_08,OP_00
+M0034,M0034,LF-25,equation,4*x - 2,-2x+4,OP_04,OP_04
+M0035,M0035,LF-25,equation,4*x - 2,-4x+6,OP_08,OP_00
+M0036,M0036,LF-25,equation,4*x - 2,,,
+M0037,M0037,LF-25,equation,4*x - 2,,,
+M0409,M0409,LF-25,equation,4*x - 2,,,
+M0567,M0567,LF-25,equation,4*x - 2,,,
+M0568,M0568,LF-25,equation,4*x - 2,-2x+4,OP_04,OP_04
+M0569,M0569,LF-25,equation,4*x - 2,-4x+6,OP_08,OP_00
+M0001,M0001,LF-25,equation,4*x - 2,,,
+M0002,M0002,LF-25,equation,4*x - 2,,,
+M0548,M0548,LF-25,equation,4*x - 2,,,
+OP_01,,LF-25,equation,4*x - 2,4x+2,OP_01,OP_01
+OP_02,,LF-25,equation,4*x - 2,,,
+OP_03,,LF-25,equation,4*x - 2,,,
+OP_04,,LF-25,equation,4*x - 2,-2x+4,OP_04,OP_04
+OP_05,,LF-25,equation,4*x - 2,,,
+OP_06,,LF-25,equation,4*x - 2,4,OP_06,OP_00
+OP_07,,LF-25,equation,4*x - 2,,,
+OP_08,,LF-25,equation,4*x - 2,-4x+6,OP_08,OP_00
+M0034,M0034,LF-26,count_direction,3,,,
+M0035,M0035,LF-26,count_direction,3,1,OP_08,OP_08
+M0036,M0036,LF-26,count_direction,3,,,
+M0037,M0037,LF-26,count_direction,3,,,
+M0409,M0409,LF-26,count_direction,3,,,
+M0567,M0567,LF-26,count_direction,3,,,
+M0568,M0568,LF-26,count_direction,3,,,
+M0569,M0569,LF-26,count_direction,3,1,OP_08,OP_08
+M0001,M0001,LF-26,count_direction,3,,,
+M0002,M0002,LF-26,count_direction,3,,,
+M0548,M0548,LF-26,count_direction,3,,,
+OP_01,,LF-26,count_direction,3,,,
+OP_02,,LF-26,count_direction,3,,,
+OP_03,,LF-26,count_direction,3,,,
+OP_04,,LF-26,count_direction,3,,,
+OP_05,,LF-26,count_direction,3,,,
+OP_06,,LF-26,count_direction,3,2,OP_06,OP_06
+OP_07,,LF-26,count_direction,3,,,
+OP_08,,LF-26,count_direction,3,1,OP_08,OP_08
+M0034,M0034,LF-27,boundary,4,,,
+M0035,M0035,LF-27,boundary,4,2,OP_08,OP_08
+M0036,M0036,LF-27,boundary,4,,,
+M0037,M0037,LF-27,boundary,4,,,
+M0409,M0409,LF-27,boundary,4,,,
+M0567,M0567,LF-27,boundary,4,,,
+M0568,M0568,LF-27,boundary,4,,,
+M0569,M0569,LF-27,boundary,4,2,OP_08,OP_08
+M0001,M0001,LF-27,boundary,4,,,
+M0002,M0002,LF-27,boundary,4,,,
+M0548,M0548,LF-27,boundary,4,,,
+OP_01,,LF-27,boundary,4,,,
+OP_02,,LF-27,boundary,4,,,
+OP_03,,LF-27,boundary,4,,,
+OP_04,,LF-27,boundary,4,,,
+OP_05,,LF-27,boundary,4,,,
+OP_06,,LF-27,boundary,4,3,OP_06,OP_06
+OP_07,,LF-27,boundary,4,,,
+OP_08,,LF-27,boundary,4,2,OP_08,OP_08
+M0034,M0034,LF-28,count_quadrant,2,,,
+M0035,M0035,LF-28,count_quadrant,2,1,OP_08,OP_06
+M0036,M0036,LF-28,count_quadrant,2,,,
+M0037,M0037,LF-28,count_quadrant,2,,,
+M0409,M0409,LF-28,count_quadrant,2,,,
+M0567,M0567,LF-28,count_quadrant,2,,,
+M0568,M0568,LF-28,count_quadrant,2,,,
+M0569,M0569,LF-28,count_quadrant,2,1,OP_08,OP_06
+M0001,M0001,LF-28,count_quadrant,2,,,
+M0002,M0002,LF-28,count_quadrant,2,,,
+M0548,M0548,LF-28,count_quadrant,2,,,
+OP_01,,LF-28,count_quadrant,2,,,
+OP_02,,LF-28,count_quadrant,2,,,
+OP_03,,LF-28,count_quadrant,2,,,
+OP_04,,LF-28,count_quadrant,2,,,
+OP_05,,LF-28,count_quadrant,2,,,
+OP_06,,LF-28,count_quadrant,2,1,OP_06,OP_06
+OP_07,,LF-28,count_quadrant,2,,,
+OP_08,,LF-28,count_quadrant,2,1,OP_08,OP_06
+M0034,M0034,LF-29,equation,-x/2 + 30,30x-1/2,OP_04,OP_04
+M0035,M0035,LF-29,equation,-x/2 + 30,(1/2)x+30,OP_08,OP_01
+M0036,M0036,LF-29,equation,-x/2 + 30,,,
+M0037,M0037,LF-29,equation,-x/2 + 30,,,
+M0409,M0409,LF-29,equation,-x/2 + 30,,,
+M0567,M0567,LF-29,equation,-x/2 + 30,,,
+M0568,M0568,LF-29,equation,-x/2 + 30,30x-1/2,OP_04,OP_04
+M0569,M0569,LF-29,equation,-x/2 + 30,(1/2)x+30,OP_08,OP_01
+M0001,M0001,LF-29,equation,-x/2 + 30,,,
+M0002,M0002,LF-29,equation,-x/2 + 30,,,
+M0548,M0548,LF-29,equation,-x/2 + 30,,,
+OP_01,,LF-29,equation,-x/2 + 30,(-1/2)x-30,OP_01,OP_01
+OP_02,,LF-29,equation,-x/2 + 30,,,
+OP_03,,LF-29,equation,-x/2 + 30,,,
+OP_04,,LF-29,equation,-x/2 + 30,30x-1/2,OP_04,OP_04
+OP_05,,LF-29,equation,-x/2 + 30,,,
+OP_06,,LF-29,equation,-x/2 + 30,30,OP_06,OP_00
+OP_07,,LF-29,equation,-x/2 + 30,,,
+OP_08,,LF-29,equation,-x/2 + 30,(1/2)x+30,OP_08,OP_01
+M0034,M0034,LF-30,word,12,,,
+M0035,M0035,LF-30,word,12,,,
+M0036,M0036,LF-30,word,12,,,
+M0037,M0037,LF-30,word,12,,,
+M0409,M0409,LF-30,word,12,,,
+M0567,M0567,LF-30,word,12,,,
+M0568,M0568,LF-30,word,12,,,
+M0569,M0569,LF-30,word,12,,,
+M0001,M0001,LF-30,word,12,,,
+M0002,M0002,LF-30,word,12,,,
+M0548,M0548,LF-30,word,12,,,
+OP_01,,LF-30,word,12,,,
+OP_02,,LF-30,word,12,,,
+OP_03,,LF-30,word,12,,,
+OP_04,,LF-30,word,12,,,
+OP_05,,LF-30,word,12,,,
+OP_06,,LF-30,word,12,1,OP_06,OP_06
+OP_07,,LF-30,word,12,,,
+OP_08,,LF-30,word,12,,,
