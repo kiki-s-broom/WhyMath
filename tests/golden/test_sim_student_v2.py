@@ -583,3 +583,57 @@ def test_compare_deletes_outputs_when_mask_misses(
     out = tmp_path / "out"
     assert student_compare.main(["--models", "copy:1b", "--out", str(out)]) == 3
     assert not (out / "samples.md").exists() and not (out / "model_compare.json").exists()
+
+
+# ── 실제 실행 경로의 시드 복제 차단(학생 발화는 클라우드 튜터로 간다 · 공통 규칙 7) ──────────
+
+
+def test_live_reply_replaces_exact_seed_copy(live: Path) -> None:
+    before = student.STATS["seed_copy_fallbacks"]
+    provider, _ = _provider(_FAKE_SEEDS[5])
+    line = student.reply("P2", _p("LF-01"), [], provider=provider)
+    assert line == student.FAKE_P2_NO_FORCED
+    assert not student.copies_seed(line, _FAKE_SEEDS)
+    assert student.STATS["seed_copy_fallbacks"] == before + 1  # 막은 횟수가 남는다(침묵 금지)
+
+
+def test_live_reply_replaces_partial_seed_copy(live: Path) -> None:
+    provider, _ = _provider(f"음 {_FAKE_SEEDS[7]} 요")
+    line = student.reply("P4", _p("LF-13"), [], provider=provider)
+    assert _FAKE_SEEDS[7] not in line
+    assert line == student.fake_llm_reply("P4", _p("LF-13"), [], None)
+
+
+def test_live_p3_seed_copy_keeps_forced_answer(live: Path) -> None:
+    provider, _ = _provider(f"{_FAKE_SEEDS[2]} 12")
+    line = student.reply("P3", _p("LF-01"), [], "12", provider=provider)
+    assert _FAKE_SEEDS[2] not in line and "12" in line
+
+
+def test_live_math_only_seed_equal_is_kept(
+    live: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # 답만 쓴 시드(-12)와 모델 답이 같은 것은 복제가 아니다 — 학생 답을 바꾸면 안 된다
+    _write_seeds(tmp_path / "seed", ["-12", *_FAKE_SEEDS[: student.SEED_COUNT - 1]])
+    monkeypatch.setenv(student.SEED_DIR_ENV, str(tmp_path / "seed"))
+    provider, _ = _provider("-12")
+    assert student.reply("P2", _p("LF-01"), [], provider=provider) == "-12"
+
+
+def test_compare_samples_rule_rows_match_header_problems(
+    live: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # 2026-11-20 Kiki 머신 결과: 규칙 행이 다른 문항 목록으로 만들어져 LF-18 칸에 LF-21 답이 들어갔다
+    def _fake_provider(model: str, **_k: object) -> FixedModelOllamaProvider:
+        return FixedModelOllamaProvider(model, client=_FakeClient("기울기가 뭐예요?"))
+
+    monkeypatch.setattr(student_compare, "FixedModelOllamaProvider", _fake_provider)
+    out = tmp_path / "out"
+    assert student_compare.main(["--models", "asker:1b", "--out", str(out)]) == 0
+    lines = (out / "samples.md").read_text(encoding="utf-8").splitlines()
+    header = next(ln for ln in lines if ln.startswith("| 페르소나 |"))
+    pids = [c.strip() for c in header.strip("|").split("|")][1:]
+    p5 = next(ln for ln in lines if ln.startswith("| P5 "))
+    cells = [c.strip() for c in p5.strip("|").split("|")][1:]
+    assert pids == list(student_compare.COMPARE_PROBLEMS)
+    assert all(grade.is_correct(_p(pid), cell) for pid, cell in zip(pids, cells, strict=True))

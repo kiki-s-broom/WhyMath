@@ -73,10 +73,9 @@ LLM_PERSONAS = frozenset({"P2", "P3", "P4", "P6"})
 MAX_REPLY_LEN = 100
 PASTE_LEN = 500
 
-# 학생 Ollama 모델(환경변수 GOLDEN_SIM_STUDENT_MODEL). 기본값은 **잠정**이다 — 후보 2개 비교
-# (Kiki 머신 런북 · golden/reports_phase1/S18/runbook_model_compare.md) 뒤 확정한다.
-# qwen2.5:7b를 잠정값으로 둔 이유: 옛 라우터 매트릭스(LOCAL_MODEL_MATRIX GENERAL/MID)가 이미 핀한
-# 태그라 Kiki 머신에 설치돼 있을 가능성이 가장 높다.
+# 학생 Ollama 모델(환경변수 GOLDEN_SIM_STUDENT_MODEL). 기본값 qwen2.5:7b는 2026-11-20 Kiki 머신
+# 비교로 확정했다(golden/reports_phase1/S18/model_compare.json — 규칙 위반 20개 중 1 · 말투 구분
+# 정확도 0.641, 대조 exaone3.5:7.8b는 위반 2 · 0.85). 구분 정확도가 낮을수록 사람 말투와 닮았다.
 STUDENT_MODEL_ENV = "GOLDEN_SIM_STUDENT_MODEL"
 DEFAULT_STUDENT_MODEL = "qwen2.5:7b"
 
@@ -245,6 +244,39 @@ def load_seed_utterances(directory: Path | None = None) -> list[str]:
             f"시드 발화가 {len(utterances)}줄이다({SEED_COUNT}줄이어야 한다): {path}"
         )
     return utterances
+
+
+# ── 시드 복제 판정(실제 실행 · 모델 비교 공용 정본) ─────────────────────────
+
+# 이 길이(공백 뺀 글자 수) 이상인 시드는 모델 발화 안에 **부분 문자열로** 있으면 복제로 본다.
+# 더 짧은 시드("몰라" 같은 것)는 우연히 겹칠 수 있어 발화 전체가 같을 때만 본다.
+SEED_SUBSTRING_MIN = 6
+
+# 수식·숫자뿐인 시드(`-12`·`y=2x+3` 같은 답)는 복제 판정에서 뺀다 — 문항 정답과 같은 공개된 값이라
+# 말투·신원을 담지 않고, 모델 발화·규칙 페르소나 칸(P5·P8)과 우연히 같아지는 것이 정상이다.
+_MATH_ONLY = re.compile(r"^[0-9xXyY+\-−*/=().,^·]+$")
+
+# 실제 실행에서 시드 복제를 막은 횟수(러너 S19가 읽어 보고에 싣는다 — 침묵 금지)
+STATS: dict[str, int] = {"seed_copy_fallbacks": 0}
+
+
+def flat(text: str) -> str:
+    """복제 판정용 — 공백을 모두 뺀다."""
+    return "".join(text.split())
+
+
+def text_seeds(seeds: Sequence[str]) -> list[str]:
+    """복제 판정 대상 시드(공백 뺀 꼴) — 빈 줄과 수식뿐인 줄을 뺀다."""
+    flats = [flat(s) for s in seeds]
+    return [f for f in flats if f and not _MATH_ONLY.match(f)]
+
+
+def copies_seed(line: str, seeds: Sequence[str]) -> bool:
+    """발화 한 줄이 시드를 베꼈는가 — 줄 전체가 같거나, 긴 시드가 부분 문자열로 들어 있다."""
+    f_line = flat(line)
+    return any(
+        f == f_line or (len(f) >= SEED_SUBSTRING_MIN and f in f_line) for f in text_seeds(seeds)
+    )
 
 
 # ── 프롬프트·프라이버시 ────────────────────────────────────────────────────
@@ -530,6 +562,7 @@ async def reply_async(
         forced = forced_answer
     if fake_mode():
         return fake_llm_reply(persona, problem, history, forced)
+    seeds = load_seed_utterances()
     raw = await live_llm_raw(
         persona,
         problem,
@@ -537,8 +570,15 @@ async def reply_async(
         forced,
         identifiers=identifiers,
         provider=provider,
+        seeds=seeds,
         seed=seed,
     )
+    if copies_seed(raw, seeds):
+        # 학생 발화는 튜터(클라우드)로 간다 — 시드를 베낀 발화는 내보내지 않고 대본 문장으로 바꾼다
+        # (공통 규칙 7 · 2026-11-20 Kiki 머신 비교에서 qwen2.5:7b가 20개 중 1개를 베꼈다)
+        STATS["seed_copy_fallbacks"] += 1
+        logger.warning("sim 학생 모델이 시드를 베껴 대본 문장으로 바꿨다(persona=%s)", persona)
+        raw = fake_llm_reply(persona, problem, history, forced)
     return enforce_forced(raw, forced)
 
 

@@ -140,33 +140,11 @@ def discrimination_accuracy(human: Sequence[str], model: Sequence[str]) -> float
     return hits / len(items)
 
 
-def _flat(text: str) -> str:
-    """시드 복제 판정용 — 공백을 모두 뺀다."""
-    return "".join(text.split())
-
-
-# 이 길이(공백 뺀 글자 수) 이상인 시드는 모델 발화 안에 **부분 문자열로** 있으면 복제로 본다.
-# 더 짧은 시드("몰라" 같은 것)는 우연히 겹칠 수 있어 발화(칸) 전체가 같을 때만 본다.
-SEED_SUBSTRING_MIN = 6
-
-# 수식·숫자뿐인 시드(`-12`·`y=2x+3` 같은 답)는 복제·유출 판정에서 뺀다 — 문항 정답과 같은
-# 공개된 값이라 말투·신원을 담지 않고, 모델 발화나 규칙 페르소나 칸(P5·P8)과 우연히 같아지는
-# 것이 정상이다.
-_MATH_ONLY = re.compile(r"^[0-9xXyY+\-−*/=().,^·]+$")
-
-
-def _text_seeds(seeds: Sequence[str]) -> list[str]:
-    """복제·유출 판정 대상 시드(공백 뺀 꼴) — 빈 줄과 수식뿐인 줄을 뺀다."""
-    flats = [_flat(s) for s in seeds]
-    return [f for f in flats if f and not _MATH_ONLY.match(f)]
-
-
-def copies_seed(line: str, seeds: Sequence[str]) -> bool:
-    """모델 발화 한 줄이 시드를 베꼈는가 — 줄 전체가 같거나, 긴 시드가 부분 문자열로 들어 있다."""
-    flat = _flat(line)
-    return any(
-        f == flat or (len(f) >= SEED_SUBSTRING_MIN and f in flat) for f in _text_seeds(seeds)
-    )
+# 시드 복제 판정은 학생 모델(student.py)과 같은 정본을 쓴다 — 실제 실행과 비교가 같은 기준으로 센다
+_flat = student.flat
+SEED_SUBSTRING_MIN = student.SEED_SUBSTRING_MIN
+_text_seeds = student.text_seeds
+copies_seed = student.copies_seed
 
 
 def seed_leaks(texts: Sequence[str], seeds: Sequence[str]) -> int:
@@ -265,13 +243,15 @@ def choose(results: Sequence[dict[str, object]]) -> str:
 # ── 샘플 문서 ─────────────────────────────────────────────────────────────
 
 
-def _rule_samples() -> dict[str, list[str]]:
-    """규칙 페르소나 4종 × 문항 5개의 첫 입력(P8은 주입기 답 없이 = 아무 숫자)."""
+def _rule_samples(problems: Sequence[str] = SAMPLE_PROBLEMS) -> dict[str, list[str]]:
+    """규칙 페르소나 4종 × 문항 5개의 첫 입력(P8은 주입기 답 없이 = 아무 숫자).
+
+    표 머리와 같은 문항 목록을 받아야 한다 — 2026-11-20 Kiki 머신 결과에서 비교 문항 머리 아래에
+    샘플 문항(LF-21) 값이 들어간 어긋남이 있었다.
+    """
     out: dict[str, list[str]] = {}
     for persona in sorted(student.RULE_PERSONAS):
-        out[persona] = [
-            student.rule_reply(persona, _problem(pid), [], None) for pid in SAMPLE_PROBLEMS
-        ]
+        out[persona] = [student.rule_reply(persona, _problem(pid), [], None) for pid in problems]
     return out
 
 
@@ -376,7 +356,7 @@ def main(argv: list[str] | None = None) -> int:
     lines = best["_lines"]
     assert isinstance(lines, dict)
     text = render_samples(
-        _rule_samples(),
+        _rule_samples(COMPARE_PROBLEMS),
         {k: list(v) for k, v in lines.items()},
         f"로컬 Ollama `{chosen}`(비교에서 고른 모델 · 문항 {', '.join(COMPARE_PROBLEMS)})",
         COMPARE_PROBLEMS,
