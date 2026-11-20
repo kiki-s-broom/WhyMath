@@ -319,6 +319,24 @@ cd src/backend && python -m golden.measure_unreferenced
 | --- | --- | --- | --- |
 | 없음(특성화 테스트만 — `tests/golden/characterization/test_rs_polya_socratic.py`) | 없음 | RS 입고 준비 | RS-X3 |
 
+## 슬롯 T1 경계 (S21 · 1단계 · 2026-11-20 · 기준 main `6ebc76e9` · 인용 F-01)
+
+**T1 경계: 함수 2개** — 옛 `src/backend/whymath_backend/harness/pedagogical_rubric.py`(152줄)에서 아래 둘만 가져올 대상이다. 다섯 걸음 ①(경계 긋기)이며, 특성화 테스트(②)보다 먼저 적었다.
+
+| 옛 함수 (파일 경로 · 이름) | 지금 하는 일 | 함께 따라오는 것(같은 파일 안 · 함수가 직접 씀) | 일차함수에 쓰는 항목(5개 이내) |
+| --- | --- | --- | --- |
+| `whymath_backend/harness/pedagogical_rubric.py` · `detect_answer_leakage(response, answer) -> LeakageVerdict` | 튜터 문장에 정답 값이 나오는지 3상태(`leaked`·`clean`·`undecidable`)로 판정. NFKC·소문자·LaTeX 명령·구조 문자(`$ \ { } ( ) 공백 ,`) 제거 뒤 비교 | 열거형 `LeakageVerdict` · `_normalize` · 상수 `_MIN_DECIDABLE_LEN`(=2)·`_AMBIGUOUS_TOKENS`·`_LATEX_COMMANDS`·`_STRUCTURAL_CHARS`·`_NUMERIC` | ① 정답 유출 3상태 ② 수치 정답 단어 경계(`-12`가 `-120`에 걸리지 않음) ③ 정규화 뒤 1글자 정답은 판정 유보(`undecidable`) |
+| `whymath_backend/harness/pedagogical_rubric.py` · `score_tutoring_response(response, *, answer) -> RubricScore` | ①의 판정 + 발문 신호(물음표·발문어 13개) 유무 → `passed`(= 유출 아님 AND 발문 있음) · 근거 문자열 2개 | pydantic 모델 `RubricScore`(필드 5개) · `_has_socratic_prompt` · 상수 `_SOCRATIC_MARKERS` | ④ 발문 신호(질문으로 끝나는가) ⑤ 통과 = 유출 아님 AND 발문 있음 |
+
+- **가져오지 않는 것**: 이 파일 밖은 아무것도 없다(이 두 함수는 표준 라이브러리 `re`·`unicodedata`·`enum`과 `pydantic`만 쓴다 — 옛 모듈 의존 0개). `_AMBIGUOUS_TOKENS`의 참·거짓·yes·no 같은 낱말은 일차함수 30문항에 쓰이지 않지만 함수 동작의 일부라 떼어 내지 않는다(옛 자산 리팩토링은 §6 금지).
+- **되묻기 루브릭 v0(C1~C5)는 코드로 옮기지 않는다** — `golden/reports_no_students/S9/되묻기_루브릭.md`는 S23·S25의 사람 판정 기준으로 남긴다(LLM 판정기는 §6). 위 두 함수가 결정론으로 잴 수 있는 것은 C3(정답 비노출)과 C2(질문 하나)의 일부뿐이고, F-01의 본체인 C5(틀린 곳 겨냥)는 재지 못한다.
+- **③(복사/import)에 대한 사실 — S22 판단용**: 이 파일은 `golden/LEGACY_MANIFEST.txt` 158행에 있다 → import-linter 계약 `golden-no-legacy`가 `golden` 패키지의 import를 막는다(CLAUDE.md 골든 규칙 "새 import 금지"). 또 이 모듈을 import하면 `harness/__init__.py`가 평가·DB 모듈을 함께 불러 **옛 모듈 220개**가 로드된다(2026-11-20 이 세션 실측 · `sys.modules` 세기) — 전이 예산 30을 넘는다. 따라서 공통 규칙 8의 "의존 3개 이하면 import"보다 매니페스트·예산이 앞서 **복사**가 된다. 결정은 S22가 적는다.
+- **특성화(②)**: `tests/golden/characterization/test_t1_rubric.py` — 골든 패스 로그의 실제 튜터 문장 10개(유출 3 · 판정 불가 2 · 깨끗함 5)에 대한 지금 출력을 고정. 같은 입력 100회 → 같은 출력(결정성 통과 → "버림: 비결정적" 아님).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음(경계 긋기와 특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `harness/pedagogical_rubric.py`의 `detect_answer_leakage`·`score_tutoring_response` 함수 2개 | 되묻기 루브릭 v0 C1~C5의 코드화(사람 판정 기준으로 둔다) | T1 설계 · 복사/import·연결은 S22 | S21 |
+
 ### 학생 시뮬레이터 — 로컬 Ollama 제공자 (S18 · 2026-11-20)
 
 경계 긋기(복사 전에 적음): `src/backend/whymath_backend/l3/providers/ollama.py`의 `FixedModelOllamaProvider`(`__init__`·`generate`·`_get_client`·`jurisdiction`)와 그 도우미 6개(`_OllamaClient`·`_extract_text`·`_coerce_token_count`·`_read_field`·`_extract_usage`·`_build_default_client`).

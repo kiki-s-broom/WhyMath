@@ -35,6 +35,7 @@ ENTRYPOINTS: dict[str, str] = {
     "golden.rescue.ledger": "python -m golden.rescue.ledger (RS-R1 모듈 대장)",
     "golden.rescue.outline": "python -m golden.rescue.outline (RS-R0 목차)",
     "golden.rescue.testmap": "python -m golden.rescue.testmap (RS 테스트 지도)",
+    "golden.sim.errors": "python -m golden.sim.errors --csv <경로> (오개념 주입기 표 · S17)",
     "golden.sim.seed_extract": "python -m golden.sim.seed_extract (시뮬레이션 씨앗 추출)",
     "golden.sim.student_compare": "python -m golden.sim.student_compare (S18 학생 모델 비교)",
     "golden.sim_student": "python -m golden.sim_student (가상 학생 시뮬레이션)",
