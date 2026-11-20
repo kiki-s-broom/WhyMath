@@ -23,7 +23,7 @@
 ## 블록 A — 준비·점검 (창 A · 새 창)
 
 ```powershell
-# [창 A · 블록 A — 준비·점검] Windows PowerShell — 작업 폴더 WhyMath-s18cmp를 S18 브랜치에 맞추고 파이썬·ollama·시드 줄 수·모델을 점검(공유 작업 사본은 바꾸지 않음)
+# [창 A · 블록 A — 준비·점검] Windows PowerShell — 작업 폴더 WhyMath-s18cmp를 S18 브랜치에 맞추고, 실제로 맞춰졌을 때만 파이썬·ollama·시드 줄 수·모델을 점검(공유 작업 사본은 바꾸지 않음)
 cd C:\Users\kiki\Desktop\__AI\WhyMath
 git fetch origin claude/new-session-yzei6i
 $Wt = "C:\Users\kiki\Desktop\__AI\WhyMath-s18cmp"
@@ -32,19 +32,21 @@ $WtValid = (Test-Path "$Wt\.git") -and ((git -C $Wt rev-parse --is-inside-work-t
 if ($WtValid) { git -C $Wt checkout -q --detach --force origin/claude/new-session-yzei6i } else { if (-not (Test-Path $Wt)) { git worktree add --detach $Wt origin/claude/new-session-yzei6i } }
 $Expected = git rev-parse origin/claude/new-session-yzei6i
 $WtHead = git -C $Wt rev-parse HEAD 2>$null
-git -C $Wt merge-base --is-ancestor cbefaa98 HEAD 2>$null; $CodeOk = ($LASTEXITCODE -eq 0)
-Write-Host "WORKTREE_HEAD=$WtHead  EXPECTED=$Expected  CODE_OK=$CodeOk  (두 해시가 같고 CODE_OK=True여야 함)"
-git -C $Wt log -1 --oneline
-$Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
-$PyOk = Test-Path $Py
-$OllamaPkgOk = $false; if ($PyOk) { & $Py -c "import ollama" 2>$null; $OllamaPkgOk = ($LASTEXITCODE -eq 0) }
-$SeedDir = "C:\Users\kiki\Desktop\__AI\WhyMath\golden\sim\seed"
-$SeedLines = 0; if (Test-Path "$SeedDir\utterances.txt") { $SeedLines = @(Get-Content -Encoding UTF8 "$SeedDir\utterances.txt" | Where-Object { $_.Trim() }).Count }
-$Tags = @(ollama list 2>$null | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ })
-$HasExaone = $Tags -contains "exaone3.5:7.8b"
-$HasQwen = $Tags -contains "qwen2.5:7b"
-Write-Host "PY_OK=$PyOk  OLLAMA_PKG_OK=$OllamaPkgOk  SEED_LINES=$SeedLines  OLLAMA_TAGS=$($Tags.Count)  HAS_EXAONE=$HasExaone  HAS_QWEN=$HasQwen"
-if ($CodeOk -and ($WtHead -eq $Expected) -and $PyOk -and $OllamaPkgOk -and ($SeedLines -eq 20) -and ($HasExaone -or $HasQwen)) { Write-Host "READY=True — 둘 다 True면 블록 B로, 하나만 True면 블록 P(없는 모델 내려받기) 또는 그대로 블록 B(비교 미실시로 기록)" } else { Write-Host "READY=False — CODE_OK/해시 불일치=작업 폴더를 연 탐색기·VS Code를 닫고 블록 A 다시 · PY_OK=False=.venv 없음(세션에 알리기) · OLLAMA_PKG_OK=False=블록 P 아래 '패키지 설치' 한 줄 · SEED_LINES가 20이 아님=S16 시드 없음(세션에 알리기) · OLLAMA_TAGS=0=Ollama 앱 켜기 · HAS_* 둘 다 False=블록 P" }
+Write-Host "WORKTREE_HEAD=$WtHead  EXPECTED=$Expected  (같아야 함)"
+if ($WtHead -and ($WtHead -eq $Expected)) {
+  git -C $Wt log -1 --oneline
+  git -C $Wt merge-base --is-ancestor cbefaa98 HEAD 2>$null; $CodeOk = ($LASTEXITCODE -eq 0)
+  $Py = "C:\Users\kiki\Desktop\__AI\WhyMath\src\backend\.venv\Scripts\python.exe"
+  $PyOk = Test-Path $Py
+  $OllamaPkgOk = $false; if ($PyOk) { & $Py -c "import ollama" 2>$null; $OllamaPkgOk = ($LASTEXITCODE -eq 0) }
+  $SeedDir = "C:\Users\kiki\Desktop\__AI\WhyMath\golden\sim\seed"
+  $SeedLines = 0; if (Test-Path "$SeedDir\utterances.txt") { $SeedLines = @(Get-Content -Encoding UTF8 "$SeedDir\utterances.txt" | Where-Object { $_.Trim() }).Count }
+  $Tags = @(ollama list 2>$null | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ })
+  $HasExaone = $Tags -contains "exaone3.5:7.8b"
+  $HasQwen = $Tags -contains "qwen2.5:7b"
+  Write-Host "CODE_OK=$CodeOk  PY_OK=$PyOk  OLLAMA_PKG_OK=$OllamaPkgOk  SEED_LINES=$SeedLines  OLLAMA_TAGS=$($Tags.Count)  HAS_EXAONE=$HasExaone  HAS_QWEN=$HasQwen"
+  if ($CodeOk -and $PyOk -and $OllamaPkgOk -and ($SeedLines -eq 20) -and ($HasExaone -or $HasQwen)) { Write-Host "READY=True — 둘 다 True면 블록 B로, 하나만 True면 블록 P 또는 그대로 블록 B(비교 미실시로 기록)" } else { Write-Host "READY=False — CODE_OK=False=브랜치에 S18 코드 없음(세션에 알리기) · PY_OK=False=.venv 없음(세션에 알리기) · OLLAMA_PKG_OK=False=아래 패키지 설치 한 줄 · SEED_LINES가 20이 아님=S16 시드 없음(세션에 알리기) · OLLAMA_TAGS=0=Ollama 앱 켜기 · HAS_* 둘 다 False=블록 P" }
+} else { Write-Host "REFUSED — HEAD=$WtHead EXPECTED=$Expected — 작업 폴더가 S18 브랜치로 바뀌지 않았다. 이 폴더를 연 탐색기·VS Code·이전 PowerShell 창을 닫고 블록 A를 다시. 그래도 같으면 세션에 알리기" }
 ```
 
 `ollama` 파이썬 패키지가 없을 때(`OLLAMA_PKG_OK=False`)만 이 한 줄을 같은 창에 붙여넣고 블록 A를 다시 붙여넣는다.
