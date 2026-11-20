@@ -489,6 +489,179 @@ def test_load_problem_types_dedups_and_sorts() -> None:
     assert ids == ("ptype.solve-for-unknown", "ptype.verify-claim")
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# 6.5 대학 축 (W1 — 학년축 최단경로 계획 §3)
+# ──────────────────────────────────────────────────────────────────────────
+_UNI = pbc.UNIVERSITY_REVISION  # "대학"
+
+
+def _uni_standard(code: str, *, subject: str = "미적분학 I") -> dict[str, object]:
+    return _standard(code, _UNI, school_type="대학교", domain=subject)
+
+
+def test_university_catalog_none_is_byte_identical_regression(tmp_path: Path) -> None:
+    """university_catalog 미제공(기본) — 대학 축 전 필드 빈 값·K-12 §1 헤드라인 완전 무변경."""
+    without = _sample_report(tmp_path)
+    corpus_a = tmp_path / "problem_bank_a" / pbc.CORPUS_FILE_NAME
+    corpus_b = tmp_path / "problem_bank_b" / pbc.CORPUS_FILE_NAME
+    catalog = pbc.load_standards(
+        {
+            "standards": [
+                _standard("[10공수1-02-02]"),
+                _standard("[12대수03-02]"),
+                _standard("[12확통02-04]", domain="확률"),
+                _standard("[2수01-01]", school_type="초등학교", domain="수와 연산"),
+            ]
+        }
+    )
+    with_none = pbc.build_report(
+        (
+            pbc.load_corpus_file(corpus_a, name="problem_bank_a"),
+            pbc.load_corpus_file(corpus_b, name="problem_bank_b"),
+        ),
+        catalog,
+        revision=_STD_2022,
+        university_catalog=None,
+    )
+    assert with_none == without  # 새 파라미터 생략과 명시 None이 바이트 단위 동일(회귀 0).
+    assert with_none.university_target_codes_total == 0
+    assert with_none.university_covered_codes == ()
+    assert with_none.university_zero_coverage_codes == ()
+    assert with_none.university_coverage_rate is None
+    assert "대학교" not in with_none.coverage_by_school_type
+
+
+def test_university_coverage_counts_independent_of_k12_denominator(tmp_path: Path) -> None:
+    """대학 코드는 K-12 target_codes_total에 합산되지 않는다 — 완전히 별도 분모."""
+    corpus = _write_corpus(
+        tmp_path,
+        "problem_bank_uni",
+        [
+            _problem(problem_id="k", standards=["[10공수1-02-02]"]),  # K-12 커버
+            _problem(problem_id="u", standards=["[CALC1-01-01]"]),  # 대학 커버
+        ],
+    )
+    catalog = pbc.load_standards({"standards": [_standard("[10공수1-02-02]")]})
+    uni_catalog = pbc.load_standards(
+        {
+            "standards": [
+                _uni_standard("[CALC1-01-01]"),
+                _uni_standard("[CALC1-01-02]", subject="선형대수"),
+            ]
+        }
+    )
+    report = pbc.build_report(
+        (pbc.load_corpus_file(corpus, name="problem_bank_uni"),),
+        catalog,
+        revision=_STD_2022,
+        university_catalog=uni_catalog,
+    )
+    # K-12 헤드라인은 대학 코드와 무관 — 분모 1(기존과 동일), 대학 코드는 unknown에도 안 실림.
+    assert report.target_codes_total == 1
+    assert report.covered_codes == ("[10공수1-02-02]",)
+    assert report.unknown_standard_codes == {}
+    assert report.other_revision_only_codes == {}
+    # 대학 축은 독립 분모 2 — 1커버·1미커버.
+    assert report.university_target_codes_total == 2
+    assert report.university_covered_codes == ("[CALC1-01-01]",)
+    assert report.university_zero_coverage_codes == ("[CALC1-01-02]",)
+    assert report.university_coverage_rate == pytest.approx(0.5)
+    assert report.university_problems_per_covered_code == {"[CALC1-01-01]": 1}
+
+
+def test_university_school_type_merges_into_existing_table_without_disturbing_k12_rows(
+    tmp_path: Path,
+) -> None:
+    """coverage_by_school_type에 '대학교' 행이 추가되고, 기존 K-12 행은 변경되지 않는다."""
+    report = _sample_report(tmp_path)  # 이 픽스처의 school_type 기대값은 위 §4에서 동결.
+    baseline_school = dict(report.coverage_by_school_type)
+
+    corpus_a = tmp_path / "problem_bank_a" / pbc.CORPUS_FILE_NAME
+    corpus_b = tmp_path / "problem_bank_b" / pbc.CORPUS_FILE_NAME
+    catalog = pbc.load_standards(
+        {
+            "standards": [
+                _standard("[10공수1-02-02]"),
+                _standard("[12대수03-02]"),
+                _standard("[12확통02-04]", domain="확률"),
+                _standard("[2수01-01]", school_type="초등학교", domain="수와 연산"),
+            ]
+        }
+    )
+    uni_catalog = pbc.load_standards(
+        {"standards": [_uni_standard("[CALC1-01-01]"), _uni_standard("[LINALG-01-01]")]}
+    )
+    with_uni = pbc.build_report(
+        (
+            pbc.load_corpus_file(corpus_a, name="problem_bank_a"),
+            pbc.load_corpus_file(corpus_b, name="problem_bank_b"),
+        ),
+        catalog,
+        revision=_STD_2022,
+        university_catalog=uni_catalog,
+    )
+    for key, value in baseline_school.items():
+        assert with_uni.coverage_by_school_type[key] == value  # K-12 행 무변경
+    assert with_uni.coverage_by_school_type["대학교"] == (0, 2)  # 문항 0건이라 미커버
+    # 대학 과목(K-12 영역과 다른 granularity)은 by_domain에 섞이지 않는다.
+    assert "미적분학 I" not in with_uni.coverage_by_domain
+    assert with_uni.university_coverage_by_domain["미적분학 I"] == (0, 2)
+
+
+def test_render_report_shows_university_section(tmp_path: Path) -> None:
+    corpus = _write_corpus(
+        tmp_path,
+        "problem_bank_uni2",
+        [_problem(problem_id="u1", standards=["[CALC1-01-01]"])],
+    )
+    catalog = pbc.load_standards({"standards": [_standard("[10공수1-02-02]")]})
+    uni_catalog = pbc.load_standards(
+        {"standards": [_uni_standard("[CALC1-01-01]"), _uni_standard("[CALC1-01-02]")]}
+    )
+    report = pbc.build_report(
+        (pbc.load_corpus_file(corpus, name="problem_bank_uni2"),),
+        catalog,
+        revision=_STD_2022,
+        university_catalog=uni_catalog,
+    )
+    text = pbc.render_report(report)
+    assert "## 1.6 대학 커버리지" in text
+    assert "분모(대학 고유 코드) **2**" in text
+    assert "커버된 코드: **1**" in text
+    assert "`[CALC1-01-02]`" in text  # 0커버 목록에 등장
+    assert "| 미적분학 I | 1 | 2 | 50.0% |" in text
+
+    # university_catalog 미제공 — "미측정"으로 정직하게 표시(0/0으로 위장 금지).
+    unmeasured = pbc.build_report(
+        (pbc.load_corpus_file(corpus, name="problem_bank_uni2"),), catalog, revision=_STD_2022
+    )
+    unmeasured_text = pbc.render_report(unmeasured)
+    assert "대학 성취기준 대장 미측정" in unmeasured_text
+
+
+def test_json_includes_university_block(tmp_path: Path) -> None:
+    corpus = _write_corpus(
+        tmp_path, "problem_bank_uni3", [_problem(problem_id="u1", standards=["[CALC1-01-01]"])]
+    )
+    catalog = pbc.load_standards({"standards": [_standard("[10공수1-02-02]")]})
+    uni_catalog = pbc.load_standards({"standards": [_uni_standard("[CALC1-01-01]")]})
+    report = pbc.build_report(
+        (pbc.load_corpus_file(corpus, name="problem_bank_uni3"),),
+        catalog,
+        revision=_STD_2022,
+        university_catalog=uni_catalog,
+    )
+    payload = json.loads(pbc.dump_json(report))
+    assert payload["university"]["revision"] == _UNI
+    assert payload["university"]["target_codes_total"] == 1
+    assert payload["university"]["covered_code_count"] == 1
+    assert payload["university"]["coverage_rate"] == pytest.approx(1.0)
+    assert payload["university"]["covered_codes"] == ["[CALC1-01-01]"]
+    assert payload["coverage_by_school_type"]["대학교"] == {"covered": 1, "total": 1}
+    # K-12 헤드라인 키는 무변경(회귀 0).
+    assert payload["standards"]["target_revision"] == _STD_2022
+
+
 def test_render_report_shows_zero_coverage_type_list(tmp_path: Path) -> None:
     corpus = _write_corpus(
         tmp_path,
@@ -786,3 +959,49 @@ def test_json_adds_subject_axis_and_keeps_existing_keys(tmp_path: Path) -> None:
         "honest_accounting",
     ):
         assert existing_key in payload
+
+
+def test_cli_wires_university_standards(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """`--university-standards`로 지정한 대장이 §1.6 대학 커버리지에 실제로 반영된다."""
+    corpus_root, standards = _cli_env(tmp_path, [_problem(standards=["[CALC1-01-01]"])])
+    uni_standards = _write_standards(
+        corpus_root / "standards_university_v1" / "standards.json",
+        [_uni_standard("[CALC1-01-01]"), _uni_standard("[CALC1-01-02]", subject="선형대수")],
+    )
+    rc = pbc.main(
+        [
+            "--corpus-root",
+            str(corpus_root),
+            "--standards",
+            str(standards),
+            "--university-standards",
+            str(uni_standards),
+        ]
+    )
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "## 1.6 대학 커버리지" in out
+    assert "분모(대학 고유 코드) **2**" in out
+    assert "`[CALC1-01-02]`" in out  # 대학 0커버 코드
+    assert "| 대학교 |" in out  # §1.1 학교급별 표에 병합된 행
+
+
+def test_cli_missing_university_standards_warns_but_does_not_gate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """대학 대장 파일이 없어도 exit 2로 막지 않는다 — 보조 축이라 경고만(침묵 실패 금지)."""
+    corpus_root, standards = _cli_env(tmp_path, [_problem()])
+    rc = pbc.main(
+        [
+            "--corpus-root",
+            str(corpus_root),
+            "--standards",
+            str(standards),
+            "--university-standards",
+            str(tmp_path / "no-such-university-catalog.json"),
+        ]
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "경고 — 대학 성취기준 대장 적재 실패" in captured.err
+    assert "대학 성취기준 대장 미측정" in captured.out
