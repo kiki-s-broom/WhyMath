@@ -13,7 +13,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy.exc import SQLAlchemyError
 
 from golden import grade, problems, store, tutor
 from golden.eval import evaluate_tutor_reply, rubric_enabled
@@ -170,24 +169,27 @@ async def _record_t1_eval(
 
     - 유출(leak) 판정이면 경고 로그를 남긴다. 로그에는 문제 ID·턴 id·유출 출처만 적고
       튜터·학생 문장은 적지 않는다(미성년자 대화 원문을 로그로 흘리지 않는다).
-    - 기록 쓰기가 DB 오류로 실패해도 학생 응답은 그대로 나간다(평가는 부가 기록이다).
-      삼키지 않고 예외 타입명을 경고 로그에 남긴다(CLAUDE.md 침묵 실패 금지).
+    - 평가나 기록이 **어떤 이유로든** 실패해도 학생 응답은 그대로 나간다(평가는 부가 기록이다).
+      이 함수 앞에서 튜터 턴이 이미 기록됐으므로, 여기서 오류가 올라가면 학생은 응답 없이
+      되묻기 기회(3번 중 1번)를 잃는다. 그래서 넓게 잡되 예외 타입명을 경고 로그에 남긴다
+      (CLAUDE.md 침묵 실패 금지 · Kiki 결정 2026-11-20 · RS-G2 허용 목록 1줄).
+      빠진 건수는 eval_log 행 수와 tutor_turn 수를 대조하면 숫자로 보인다.
     """
-    verdict = evaluate_tutor_reply(
-        message, problem["answer"], student_text=student_text, problem_text=problem["stem"]
-    )
-    if verdict.leak:
-        logger.warning(
-            "golden T1 평가: 정답 유출 판정 — problem=%s turn_id=%s origin=%s",
-            problem["id"],
-            turn_id,
-            verdict.leak_origin,
-        )
     try:
+        verdict = evaluate_tutor_reply(
+            message, problem["answer"], student_text=student_text, problem_text=problem["stem"]
+        )
+        if verdict.leak:
+            logger.warning(
+                "golden T1 평가: 정답 유출 판정 — problem=%s turn_id=%s origin=%s",
+                problem["id"],
+                turn_id,
+                verdict.leak_origin,
+            )
         await store.record_eval(turn_id, verdict.model_dump(mode="json"))
-    except SQLAlchemyError as exc:
+    except Exception as exc:  # noqa: BLE001 — Kiki 승인 2026-11-20(평가가 응답을 막지 않게)
         logger.warning(
-            "golden T1 평가 기록 실패 — 응답은 그대로 보냄: problem=%s turn_id=%s %s",
+            "golden T1 평가 실패 — 응답은 그대로 보냄: problem=%s turn_id=%s %s",
             problem["id"],
             turn_id,
             type(exc).__name__,
