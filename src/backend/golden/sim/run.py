@@ -409,6 +409,11 @@ async def run(
     """계획대로 세션을 돌린다. 결과 줄은 `out_dir/sessions.jsonl`에 세션마다 즉시 쓴다."""
     bank = {p["id"]: p for p in problem_bank.load_problems()}
     out_dir.mkdir(parents=True, exist_ok=True)
+    # 같은 폴더의 지난 실행 보고서를 먼저 지운다 — 이번 실행이 도중에 죽으면 보고서가 없어야 한다
+    # (남아 있으면 지난 실행 숫자가 이번 것처럼 보인다 · S20 2026-11-21 Kiki 머신 실측:
+    # 46세션에서 죽은 실행 옆에 앞 실행의 120세션 sim_report.json이 그대로 남았다)
+    for stale in (REPORT_LIVE, REPORT_FAKE, META_FILE):
+        (out_dir / stale).unlink(missing_ok=True)
     state = RunState()
     with (
         (out_dir / SESSIONS_FILE).open("w", encoding="utf-8") as out,
