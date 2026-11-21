@@ -348,6 +348,17 @@ def _write_sessions(path: Path) -> None:
     rows += [_session("P2", "LF-07", ["9"]) for _ in range(2)]  # OP_02
     rows += [_session("P4", "LF-07", [f"기울기 {w}게 뭐예요 아닌가", "9"]) for w in words]
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), "utf-8")
+    _write_meta(path, len(rows))
+
+
+def _write_meta(path: Path, n: int, mode: str = "live", planned: int | None = None) -> None:
+    """러너가 jsonl 옆에 쓰는 run_meta.json(완주 대조에 쓰는 칸만)."""
+    meta = {
+        "mode": mode,
+        "planned_sessions": n if planned is None else planned,
+        "count_sessions": n,
+    }
+    (path.parent / "run_meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
 
 def test_main_check_then_score_end_to_end(tmp_path: Path) -> None:
@@ -475,3 +486,47 @@ def test_calibration_doc_is_not_ignored() -> None:
         check=False,
     )
     assert done.returncode == 1
+
+
+def _check_args(tmp_path: Path, jsonl: Path) -> list[str]:
+    seed_dir = tmp_path / "seed"
+    if not seed_dir.exists():
+        _write_seed(seed_dir)
+    return [
+        "check",
+        "--seed-dir",
+        str(seed_dir),
+        "--sessions",
+        str(jsonl),
+        "--blind",
+        str(tmp_path / "b.md"),
+        "--key",
+        str(tmp_path / "k.txt"),
+        "--result",
+        str(tmp_path / "r.json"),
+        "--doc",
+        str(tmp_path / "C.md"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("meta", "why"),
+    [
+        (None, "보고서 없음(도중에 죽음)"),
+        ({"planned": 120}, "계획 120 · 줄 수 적음(S20 실측 46/120)"),
+        ({"mode": "fake"}, "가짜 모드"),
+    ],
+)
+def test_check_refuses_incomplete_or_fake_run(
+    tmp_path: Path, meta: dict[str, Any] | None, why: str
+) -> None:
+    """끝까지 돈 실제 실행이 아니면 판정하지 않는다(exit 2 · 결과 파일 안 씀)."""
+    jsonl = tmp_path / "sessions.jsonl"
+    _write_sessions(jsonl)
+    rows = len(jsonl.read_text(encoding="utf-8").splitlines())
+    if meta is None:
+        (tmp_path / "run_meta.json").unlink()
+    else:
+        _write_meta(jsonl, rows, mode=meta.get("mode", "live"), planned=meta.get("planned"))
+    assert calibrate.main(_check_args(tmp_path, jsonl)) == 2, why
+    assert not (tmp_path / "r.json").exists()

@@ -225,3 +225,19 @@ def test_degraded_tutor_turns_are_counted(tmp_path: Path, monkeypatch: pytest.Mo
     assert _main(tmp_path, "--personas", "P1,P5") == 0
     meta = json.loads((tmp_path / run.META_FILE).read_text(encoding="utf-8"))
     assert meta["degraded_tutor_turns"] == 6  # P1 × 2문항 × 되묻기 3턴 · P5는 튜터 0턴
+
+
+def test_crash_leaves_no_stale_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """러너가 도중에 죽으면 같은 폴더의 지난 보고서가 남지 않는다(S20 실측 — 46세션에서 죽은 실행 옆에
+    앞 실행의 120세션 보고서가 남아 이번 숫자처럼 보였다)."""
+    for name in (run.REPORT_LIVE, run.REPORT_FAKE, run.META_FILE):
+        (tmp_path / name).write_text('{"sessions": 120}', encoding="utf-8")
+
+    async def broken(*_: object, **__: object) -> str:
+        raise ZeroDivisionError("주입: 러너가 잡지 않는 예외")
+
+    monkeypatch.setattr(run.student, "reply_async", broken)
+    with pytest.raises(ZeroDivisionError):
+        _main(tmp_path, "--personas", "P2")
+    for name in (run.REPORT_LIVE, run.REPORT_FAKE, run.META_FILE):
+        assert not (tmp_path / name).exists(), name

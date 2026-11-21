@@ -56,6 +56,8 @@ BLIND_PATH = SIM_DIR / "CALIBRATION_blind.md"
 KEY_PATH = SIM_DIR / "CALIBRATION_key.txt"
 DOC_PATH = SIM_DIR / "CALIBRATION.md"
 RESULT_PATH = REPO_ROOT / "golden" / "reports_phase1" / "S20" / "calibration.json"
+# 러너(S19)가 sessions.jsonl 옆에 쓰는 보조 숫자 파일 — 완주 여부 대조용
+META_NAME = "run_meta.json"
 
 # ① 턴 수 — 비교 페르소나와 허용 폭(턴)
 TURN_PERSONAS = ("P2", "P4", "P5")
@@ -118,6 +120,28 @@ def load_sessions(paths: Sequence[Path]) -> list[dict[str, Any]]:
     if not rows:
         raise CalibrationError("실행 기록에 세션이 0개다 — 빈 입력으로는 판정하지 않는다")
     return rows
+
+
+def check_complete(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
+    """실행 기록이 끝까지 돈 실제(live) 실행 하나의 것인지 — 옆의 `run_meta.json`과 대조한다.
+
+    러너가 도중에 죽으면 `sessions.jsonl`은 앞부분만 남고 보고서는 없다(또는 지난 실행 것이 남는다).
+    그런 기록으로 판정하면 숫자가 틀어지므로 거부한다. 가짜 모드(고정 대본)는 보정 대상이 아니다.
+    (S20 · 2026-11-21 Kiki 머신 실측: 120세션 계획 중 46줄만 남은 기록 옆에
+    앞 실행의 보고서가 있었다)
+    """
+    meta_path = path.parent / META_NAME
+    if not meta_path.is_file():
+        raise CalibrationError(f"{META_NAME}이 없다 — 실행이 끝나지 않았다: {path.parent}")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if meta.get("mode") != "live":
+        raise CalibrationError(f"가짜 모드 기록은 보정 대상이 아니다(mode={meta.get('mode')})")
+    planned, counted = meta.get("planned_sessions"), meta.get("count_sessions")
+    if planned != len(rows) or counted != len(rows):
+        raise CalibrationError(
+            f"{path.name} {len(rows)}줄 ≠ 보고서 계획 {planned}·집계 {counted} — "
+            "실행이 중간에 멈췄거나 보고서가 다른 실행 것이다(다시 돌린다)"
+        )
 
 
 def load_distributions(seed_dir: Path) -> dict[str, Any]:
@@ -674,6 +698,8 @@ def pending_blind() -> dict[str, Any]:
 def _check(args: argparse.Namespace) -> int:
     seed_dir = Path(args.seed_dir)
     per_file = [(Path(p), load_sessions([Path(p)])) for p in args.sessions]
+    for path, rows in per_file:
+        check_complete(path, rows)
     sessions = [row for _, rows in per_file for row in rows]
     distributions = load_distributions(seed_dir)
     seeds = load_seed_texts(seed_dir)
