@@ -411,6 +411,26 @@ def test_main_check_then_score_end_to_end(tmp_path: Path) -> None:
     assert final["verdict"] == "통과" and final["blind"]["accuracy"] == 0.0
     assert paths["--doc"].read_text(encoding="utf-8").startswith("통과 (2026-11-21) · 실학생 0명\n")
 
+    # 채점이 끝난 뒤의 check는 거부한다 — 재실행으로 판정을 덮어쓰지 않는다(2026-11-23 사고)
+    scored = paths["--result"].read_bytes(), paths["--doc"].read_bytes()
+    assert calibrate.main(["check", *common, "--sessions", str(jsonl)]) == 2
+    assert (paths["--result"].read_bytes(), paths["--doc"].read_bytes()) == scored
+
+
+def test_refuse_if_scored_only_blocks_scored_results(tmp_path: Path) -> None:
+    """채점 전(대기)·없음은 통과, 깨진 파일과 통과·미통과로 채점된 파일은 거부한다."""
+    path = tmp_path / "calibration.json"
+    calibrate.refuse_if_scored(path)  # 없음
+    path.write_text("{", encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        calibrate.refuse_if_scored(path)  # 깨짐 — 판정이 있었는지 모르면 덮어쓰지 않는다
+    path.write_text(json.dumps({"blind": calibrate.pending_blind()}), encoding="utf-8")
+    calibrate.refuse_if_scored(path)  # 대기
+    for passed in (True, False):
+        path.write_text(json.dumps({"verdict": "x", "blind": {"pass": passed}}), encoding="utf-8")
+        with pytest.raises(calibrate.CalibrationError, match="이미 채점된 판정"):
+            calibrate.refuse_if_scored(path)
+
 
 def test_main_score_refuses_edited_sheet(tmp_path: Path) -> None:
     """시트 발화를 고치면 지문이 달라져 채점하지 않는다(exit 2)."""

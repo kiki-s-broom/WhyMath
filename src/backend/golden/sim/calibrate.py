@@ -695,7 +695,29 @@ def pending_blind() -> dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────────
 
 
+def refuse_if_scored(result_path: Path) -> None:
+    """이미 채점(score)까지 끝난 판정이 있으면 check를 거부한다 — 판정은 한 번 실행이 정본이다.
+
+    2026-11-23 사고: 1차 실행이 score까지 끝나 '미통과 — 기준 2'로 푸시된 뒤, 같은 설정으로
+    다시 돈 2차 실행의 check가 그 파일을 '대기'로 덮어써 푸시됐다. 같은 설정을 다시 돌려
+    더 좋은 숫자를 고르면 기준을 낮춘 것과 같다(사후 선택). 다시 재려면 S20 반복 세션이
+    이전 결과를 다른 이름으로 보관한 뒤 --new-blind로 새 회차를 연다.
+    """
+    if not result_path.is_file():
+        return
+    # 깨진 파일도 거부한다(JSONDecodeError → main이 exit 2) — 판정이 있었는지 모르면 덮어쓰지 않는다
+    previous = json.loads(result_path.read_text(encoding="utf-8"))
+    blind = previous.get("blind") if isinstance(previous, dict) else None
+    if isinstance(blind, dict) and blind.get("pass") is not None:
+        raise CalibrationError(
+            f"이미 채점된 판정이 있다({previous.get('verdict')} · {result_path}) — "
+            "같은 설정의 재실행으로 판정을 바꾸지 않는다. 다시 재려면 이전 결과를 보관한 뒤 "
+            "--new-blind로 새 회차"
+        )
+
+
 def _check(args: argparse.Namespace) -> int:
+    refuse_if_scored(Path(args.result))
     seed_dir = Path(args.seed_dir)
     per_file = [(Path(p), load_sessions([Path(p)])) for p in args.sessions]
     for path, rows in per_file:
