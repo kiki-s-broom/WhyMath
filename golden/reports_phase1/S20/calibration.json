@@ -1,0 +1,150 @@
+{
+  "date": "2026-11-23",
+  "inputs": [
+    {
+      "file": "sessions.jsonl",
+      "sessions": 120
+    }
+  ],
+  "turns": {
+    "definition": "정답으로 끝난 세션의 튜터 턴 수(첫 입력 정답 = 0) · ⓐ 전부 · ⓑ 튜터가 열린 것만",
+    "personas": [
+      "P2",
+      "P4",
+      "P5"
+    ],
+    "per_persona": {
+      "P2": {
+        "sessions": 30,
+        "to_correct": 17,
+        "median_to_correct": 1.0
+      },
+      "P4": {
+        "sessions": 30,
+        "to_correct": 16,
+        "median_to_correct": 2.0
+      },
+      "P5": {
+        "sessions": 30,
+        "to_correct": 30,
+        "median_to_correct": 0.0
+      }
+    },
+    "ai": {
+      "n": 63,
+      "median": 1.0,
+      "n_opened": 32,
+      "median_opened": 2.0
+    },
+    "human": {
+      "n": 92,
+      "median": 0.0,
+      "n_opened": 17,
+      "median_opened": 1.0
+    },
+    "diff": {
+      "all": 1.0,
+      "opened": 1.0
+    },
+    "tolerance": 1.0,
+    "status": "통과",
+    "pass": true,
+    "reason": "|차이| ⓐ 1.0 · ⓑ 1.0 (허용 1.0턴 — 둘 다)"
+  },
+  "errors": {
+    "definition": "오답 처리된 학생 입력의 OP 코드(seed_extract.classify_error · 미분류 OP_00 제외 상위 3개)",
+    "personas": [
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6"
+    ],
+    "ai": {
+      "wrong_inputs": 285,
+      "non_answer": 125,
+      "table": {
+        "OP_00": 21,
+        "OP_01": 62,
+        "OP_02": 14,
+        "OP_03": 17,
+        "OP_04": 11,
+        "OP_05": 4,
+        "OP_06": 24,
+        "OP_07": 0,
+        "OP_08": 7
+      },
+      "top3": [
+        "OP_01",
+        "OP_06",
+        "OP_03"
+      ],
+      "unclassified_share": 0.131
+    },
+    "ai_all_personas": {
+      "wrong_inputs": 285,
+      "non_answer": 125,
+      "table": {
+        "OP_00": 21,
+        "OP_01": 62,
+        "OP_02": 14,
+        "OP_03": 17,
+        "OP_04": 11,
+        "OP_05": 4,
+        "OP_06": 24,
+        "OP_07": 0,
+        "OP_08": 7
+      }
+    },
+    "human": {
+      "wrong_inputs": 28,
+      "table": {
+        "OP_00": 9,
+        "OP_01": 8,
+        "OP_02": 3,
+        "OP_03": 4,
+        "OP_04": 0,
+        "OP_05": 1,
+        "OP_06": 3,
+        "OP_07": 0,
+        "OP_08": 0
+      },
+      "top3": [
+        "OP_01",
+        "OP_03",
+        "OP_02"
+      ]
+    },
+    "overlap": [
+      "OP_01",
+      "OP_03"
+    ],
+    "overlap_min": 2,
+    "injector_agreement": {
+      "labelled": 12,
+      "agree": 8
+    },
+    "status": "통과",
+    "pass": true,
+    "reason": "겹침 2개(필요 2개 이상)"
+  },
+  "blind": {
+    "items": 40,
+    "correct": 25,
+    "accuracy": 0.625,
+    "blank": 0,
+    "threshold": 0.7,
+    "status": "통과",
+    "pass": true,
+    "reason": "정확도 62.5%(통과 상한 70%)",
+    "scored_on": "2026-11-23"
+  },
+  "blind_pool": 217,
+  "not_comparable": [
+    "이탈률",
+    "세션 길이",
+    "만족도"
+  ],
+  "real_students": 0,
+  "verdict": "통과"
+}
