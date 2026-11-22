@@ -477,6 +477,49 @@ def test_non_retryable_failure_propagates(live: Path) -> None:
     assert len(client.calls) == 1
 
 
+def test_ollama_server_error_is_retried_with_new_seed(live: Path) -> None:
+    """데몬 500(같은 말 반복 한도)은 다시 시도한다 — 고정 seed면 시도마다 seed를 바꾼다(S20 실측)."""
+    from ollama import ResponseError
+
+    client = _RaisingClient(
+        ResponseError("prediction aborted, token repeat limit reached", status_code=500)
+    )
+    provider = FixedModelOllamaProvider("fake:1b", client=client)
+    with pytest.raises(student.StudentSimError, match=r"ResponseError\(500\)"):
+        student.reply("P2", _p("LF-01"), [], provider=provider, seed=7)
+    assert len(client.calls) == student.STUDENT_LLM_TRIES
+    assert [c["options"]["seed"] for c in client.calls] == [7 + i for i in range(len(client.calls))]
+
+
+def test_ollama_server_error_then_success(live: Path) -> None:
+    from ollama import ResponseError
+
+    class _FlakyClient(_FakeClient):
+        async def generate(self, **kwargs: Any) -> Any:
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                raise ResponseError("token repeat limit reached", status_code=500)
+            return {"response": "9 아닌가요", "model": "fake:1b"}
+
+    client = _FlakyClient("")
+    provider = FixedModelOllamaProvider("fake:1b", client=client)
+    line = student.reply(
+        "P2", _p("LF-01"), [{"student": "8", "tutor": "다시 볼까?"}], provider=provider
+    )
+    assert line and len(client.calls) == 2
+
+
+def test_ollama_client_error_is_not_retried(live: Path) -> None:
+    """데몬 400대(모델 없음 등)는 다시 해도 같다 — 1회 호출 후 그대로 올린다."""
+    from ollama import ResponseError
+
+    client = _RaisingClient(ResponseError("model not found", status_code=404))
+    provider = FixedModelOllamaProvider("fake:1b", client=client)
+    with pytest.raises(ResponseError):
+        student.reply("P2", _p("LF-01"), [], provider=provider)
+    assert len(client.calls) == 1
+
+
 def test_empty_model_output_is_retried(live: Path) -> None:
     provider, client = _provider("  \n  ")
     with pytest.raises(student.StudentSimError, match="ValueError"):

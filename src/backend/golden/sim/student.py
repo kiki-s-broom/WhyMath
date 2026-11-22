@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+from ollama import ResponseError as OllamaResponseError
 
 from golden import grade
 from golden.problems import Problem
@@ -84,7 +85,7 @@ SEED_DIR_ENV = "GOLDEN_SIM_SEED_DIR"
 
 # 로컬 모델 1회 호출 제한 시간(초)·시도 횟수·샘플링 온도
 STUDENT_LLM_TIMEOUT_S = 60.0
-STUDENT_LLM_TRIES = 2
+STUDENT_LLM_TRIES = 3
 STUDENT_TEMPERATURE = 0.8
 
 # ── 규칙 페르소나 문장 ──────────────────────────────────────────────────────
@@ -122,6 +123,12 @@ P4_DEFAULT_QUESTION = "일차함수가 뭐예요?"
 # 다시 시도할 실패 — 시간 초과·빈 응답·연결 끊김. 그 밖의 예외(모델 없음 등 ollama ResponseError)는
 # 다시 해도 같으므로 잡지 않고 그대로 올린다(조용히 삼키지 않는다 · RS-G2 게이트).
 _RETRYABLE: tuple[type[Exception], ...] = (TimeoutError, ValueError, OSError, httpx.HTTPError)
+
+# Ollama 데몬이 생성 도중 낸 500대 오류는 다시 하면(다른 seed) 다를 수 있어 재시도한다.
+# 예: "prediction aborted, token repeat limit reached" — 모델이 같은 말을 되풀이하다 데몬이 끊음.
+# 400대(모델 없음 등)는 다시 해도 같으므로 그대로 올린다. (S20 · 2026-11-21 Kiki 머신 보정 실행이
+# P3 17번째 세션에서 이 오류로 러너째 멈췄다 — 120세션 중 46세션만 남음)
+MODEL_SERVER_ERROR_MIN_STATUS = 500
 
 # 로컬 모델 출력에서 떼어 낼 머리말
 _LINE_PREFIXES = ("나:", "학생:", "나 :", "학생 :", "답:")
@@ -479,7 +486,9 @@ async def _call_local_ollama(
     """
     decision = local_decision()
     last_error = "없음"
-    for _ in range(STUDENT_LLM_TRIES):
+    for attempt in range(STUDENT_LLM_TRIES):
+        # 고정 seed면 같은 반복에 다시 빠지므로 시도마다 seed를 바꾼다(None이면 데몬이 매번 무작위)
+        try_seed = None if seed is None else seed + attempt
         try:
             generated = await asyncio.wait_for(
                 provider.generate(
@@ -487,7 +496,7 @@ async def _call_local_ollama(
                     prompt.system,
                     decision,
                     temperature=STUDENT_TEMPERATURE,
-                    seed=seed,
+                    seed=try_seed,
                 ),
                 timeout=STUDENT_LLM_TIMEOUT_S,
             )
@@ -497,6 +506,11 @@ async def _call_local_ollama(
         except _RETRYABLE as exc:  # 재시도 후에도 실패하면 아래에서 멈춘다
             last_error = type(exc).__name__
             logger.warning("sim 학생 모델(로컬 Ollama) 호출 실패: %s", last_error)
+        except OllamaResponseError as exc:
+            if exc.status_code < MODEL_SERVER_ERROR_MIN_STATUS:
+                raise  # 모델 없음 등 — 다시 해도 같다
+            last_error = f"{type(exc).__name__}({exc.status_code})"
+            logger.warning("sim 학생 모델(로컬 Ollama) 데몬 오류 — 다시 시도: %s", last_error)
     raise StudentSimError(f"학생 모델이 {STUDENT_LLM_TRIES}회 연속 실패했다: {last_error}")
 
 

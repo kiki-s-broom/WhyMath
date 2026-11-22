@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: todo
 priority: 1
 eos_priority: P1
 owner: claude
@@ -19,9 +19,9 @@ paths:
   - "src/backend/golden/**"
   - "tests/golden/**"
   - ".github/workflows/golden-sim-nightly.yml"
-session: claude/new-session-jnkhrn
+session: null
 notes: |-
   Kiki 결정 2026-11-15(1단계 계획서 개정판). 지시서 golden/prompts_src/spec_phase1.md. S16이 등재, S17~S35가 같은 번호로 start.
 
   [정정 2026-11-20] paths ['golden/**', 'src/backend/golden/**', 'tests/golden/**'] → ['golden/**', 'src/backend/golden/**', 'tests/golden/**', '.github/workflows/golden-sim-nightly.yml']: S19 지시서 공통 규칙 3의 예외: S19 한 세션의 배선 파일 1개(야간 시뮬레이터 스모크 워크플로 신설). 다른 golden 밖 파일은 늘리지 않는다.
-updated: 2026-11-20
+updated: 2026-11-21

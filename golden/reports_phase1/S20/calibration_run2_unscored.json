@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-23",
+  "inputs": [
+    {
+      "file": "sessions.jsonl",
+      "sessions": 120
+    }
+  ],
+  "turns": {
+    "definition": "정답으로 끝난 세션의 튜터 턴 수(첫 입력 정답 = 0) · ⓐ 전부 · ⓑ 튜터가 열린 것만",
+    "personas": [
+      "P2",
+      "P4",
+      "P5"
+    ],
+    "per_persona": {
+      "P2": {
+        "sessions": 30,
+        "to_correct": 22,
+        "median_to_correct": 1.0
+      },
+      "P4": {
+        "sessions": 30,
+        "to_correct": 11,
+        "median_to_correct": 2.0
+      },
+      "P5": {
+        "sessions": 30,
+        "to_correct": 30,
+        "median_to_correct": 0.0
+      }
+    },
+    "ai": {
+      "n": 63,
+      "median": 1.0,
+      "n_opened": 33,
+      "median_opened": 2.0
+    },
+    "human": {
+      "n": 92,
+      "median": 0.0,
+      "n_opened": 17,
+      "median_opened": 1.0
+    },
+    "diff": {
+      "all": 1.0,
+      "opened": 1.0
+    },
+    "tolerance": 1.0,
+    "status": "통과",
+    "pass": true,
+    "reason": "|차이| ⓐ 1.0 · ⓑ 1.0 (허용 1.0턴 — 둘 다)"
+  },
+  "errors": {
+    "definition": "오답 처리된 학생 입력의 OP 코드(seed_extract.classify_error · 미분류 OP_00 제외 상위 3개)",
+    "personas": [
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6"
+    ],
+    "ai": {
+      "wrong_inputs": 286,
+      "non_answer": 124,
+      "table": {
+        "OP_00": 31,
+        "OP_01": 63,
+        "OP_02": 15,
+        "OP_03": 5,
+        "OP_04": 12,
+        "OP_05": 7,
+        "OP_06": 23,
+        "OP_07": 0,
+        "OP_08": 6
+      },
+      "top3": [
+        "OP_01",
+        "OP_06",
+        "OP_02"
+      ],
+      "unclassified_share": 0.191
+    },
+    "ai_all_personas": {
+      "wrong_inputs": 286,
+      "non_answer": 124,
+      "table": {
+        "OP_00": 31,
+        "OP_01": 63,
+        "OP_02": 15,
+        "OP_03": 5,
+        "OP_04": 12,
+        "OP_05": 7,
+        "OP_06": 23,
+        "OP_07": 0,
+        "OP_08": 6
+      }
+    },
+    "human": {
+      "wrong_inputs": 28,
+      "table": {
+        "OP_00": 9,
+        "OP_01": 8,
+        "OP_02": 3,
+        "OP_03": 4,
+        "OP_04": 0,
+        "OP_05": 1,
+        "OP_06": 3,
+        "OP_07": 0,
+        "OP_08": 0
+      },
+      "top3": [
+        "OP_01",
+        "OP_03",
+        "OP_02"
+      ]
+    },
+    "overlap": [
+      "OP_01",
+      "OP_02"
+    ],
+    "overlap_min": 2,
+    "injector_agreement": {
+      "labelled": 22,
+      "agree": 13
+    },
+    "status": "통과",
+    "pass": true,
+    "reason": "겹침 2개(필요 2개 이상)"
+  },
+  "blind": {
+    "status": "판정 대기",
+    "pass": null,
+    "reason": "Kiki 판정 전(score 미실행)"
+  },
+  "blind_pool": 210,
+  "not_comparable": [
+    "이탈률",
+    "세션 길이",
+    "만족도"
+  ],
+  "real_students": 0,
+  "verdict": "대기 — 기준 3 판정 전"
+}
