@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from golden import problems
 from golden.sim import t1_summary as ts
 
 # 합성 문항 2개 — 정답 · 문제 본문
@@ -185,6 +186,23 @@ def test_answer_table_covers_all_golden_problems() -> None:
     table = ts.answer_table()
     assert len(table) == 30
     assert all(answer and stem for answer, stem in table.values())
+    # api.py가 평가기에 넣는 값과 같아야 한다 — (정답, 문제 본문 stem) 순서
+    first = problems.load_problems()[0]
+    assert table[first["id"]] == (first["answer"], first["stem"])
+
+
+def test_crash_row_without_problem_is_counted_not_refused() -> None:
+    # 세션을 열기 전에 실패한 줄(problem_id 없음 · 되묻기 없음)은 따로 센다
+    rows = _rows() + [{"persona": "P2", "problem_id": None, "turns": [], "http_status": None}]
+    summary = ts.summarize_rows(rows, ANSWERS)
+    assert summary["no_problem_rows"] == 1
+    assert summary["tutor_turns"] == 5
+
+
+def test_crash_row_without_problem_but_with_turns_is_refused() -> None:
+    row = {"persona": "P2", "problem_id": None, "turns": [_turn(1, "3", "왜?")]}
+    with pytest.raises(ts.SummaryError, match="모양"):
+        ts.summarize_rows([row], ANSWERS)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -202,17 +220,21 @@ def _write_run(
     m1: float = 0.0,
     m3: float = 0.0,
     personas: list[str] | None = None,
+    skipped: int = 0,
+    leaked: int = 0,
 ) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / ts.SESSIONS_NAME).write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8"
     )
-    n = len(rows) if planned is None else planned
+    n = len(rows) + skipped if planned is None else planned
     meta = {
         "date": "2026-11-23",
         "mode": mode,
         "planned_sessions": n,
-        "count_sessions": n,
+        "count_sessions": len(rows),
+        "skipped_sessions": skipped,
+        "count_leaked_sessions": leaked,
         "personas": personas or ["P2", "P3", "P4"],
         "leak_undecidable_sessions": 0,
         "degraded_tutor_turns": 0,
@@ -258,6 +280,28 @@ def test_load_run_refuses_missing_meta(tmp_path: Path) -> None:
     (run / ts.META_NAME).unlink()
     with pytest.raises(ts.SummaryError, match="끝나지 않았다"):
         ts.load_run(run)
+
+
+def test_load_run_accepts_skipped_sessions_after_a_crash(tmp_path: Path) -> None:
+    # 크래시 뒤 남은 문항을 건너뛴 실행 — 기록 2줄 + 건너뜀 3 = 계획 5. 집계를 버리지 않는다
+    run = _write_run(tmp_path / "r", _golden_rows(), skipped=3)
+    summary = ts.summarize(run)
+    assert summary["planned_sessions"] == 5
+    assert summary["skipped_sessions"] == 3
+    assert summary["sessions"] == 2
+
+
+def test_load_run_refuses_when_skipped_does_not_close_the_gap(tmp_path: Path) -> None:
+    run = _write_run(tmp_path / "r", _golden_rows(), planned=6, skipped=3)
+    with pytest.raises(ts.SummaryError, match="건너뜀"):
+        ts.load_run(run)
+
+
+def test_summarize_refuses_when_leak_split_disagrees_with_runner(tmp_path: Path) -> None:
+    # 러너는 유출 세션 1개를 셌는데 평가기 재계산은 0개 — 두 유출 판정이 어긋났다
+    run = _write_run(tmp_path / "r", _golden_rows(), leaked=1)
+    with pytest.raises(ts.SummaryError, match="어긋났다"):
+        ts.summarize(run)
 
 
 def test_load_run_refuses_report_from_other_run(tmp_path: Path) -> None:
@@ -312,6 +356,14 @@ def test_compare_requires_revert_when_after_breaks_contract(
     assert result["m1_m3_kept"] is False
     assert result["revert_required"] is True
     assert "되돌린다" in ts.render_markdown(result)
+
+
+def test_compare_refuses_different_planned_sessions(tmp_path: Path) -> None:
+    # 기록 줄 수는 같아도(2줄) 계획이 다르면(5 vs 2) 다른 조건의 실행이다
+    before = ts.summarize(_write_run(tmp_path / "b", _golden_rows(), skipped=3))
+    after = ts.summarize(_write_run(tmp_path / "a", _golden_rows()))
+    with pytest.raises(ts.SummaryError, match="planned_sessions"):
+        ts.compare(before, after)
 
 
 def test_compare_refuses_different_run_conditions(tmp_path: Path) -> None:

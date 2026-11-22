@@ -101,10 +101,16 @@ def load_run(run_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any], dict[
         raise SummaryError("실행 기록에 세션이 0개다 — 빈 입력으로는 집계하지 않는다")
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     planned, counted = meta.get("planned_sessions"), meta.get("count_sessions")
-    if planned != len(rows) or counted != len(rows):
+    skipped = meta.get("skipped_sessions")
+    # 러너는 세션 하나가 실패하면 그 회차의 남은 문항을 돌리지 않고 skipped로 센다(run.py) —
+    # 그래서 "기록 줄 + 건너뜀 = 계획"이 끝까지 돈 실행의 모양이다. 크래시가 1건 났다고
+    # 실행 전체를 버리지 않는다(그 크래시는 M4로 이미 보고된다).
+    if not isinstance(skipped, int) or skipped < 0:
+        raise SummaryError(f"run_meta의 skipped_sessions를 읽을 수 없다: {skipped!r}")
+    if counted != len(rows) or planned != len(rows) + skipped:
         raise SummaryError(
-            f"{SESSIONS_NAME} {len(rows)}줄 ≠ 계획 {planned}·집계 {counted} — "
-            "실행이 중간에 멈췄거나 다른 실행 것이다"
+            f"{SESSIONS_NAME} {len(rows)}줄 + 건너뜀 {skipped} ≠ 계획 {planned}"
+            f"(또는 집계 {counted} ≠ 줄 수) — 실행이 중간에 멈췄거나 다른 실행 것이다"
         )
     mode = meta.get("mode")
     if mode == "live":
@@ -155,7 +161,15 @@ def summarize_rows(
     problem_new_leaks: Counter[str] = Counter()
     session_leak_origin: Counter[str] = Counter()
 
+    no_problem_rows = 0
     for row in rows:
+        if row.get("problem_id") is None:
+            # 문항을 받기 전에 실패한 크래시 줄 — 잴 되묻기가 없다.
+            # 되묻기가 있으면 기록 모양이 틀린 것이다
+            if any(t.get("kind") == "tutor_turn" for t in row.get("turns") or []):
+                raise SummaryError("문제 ID 없는 세션 줄에 튜터 되묻기가 있다 — 기록 모양이 틀렸다")
+            no_problem_rows += 1
+            continue
         problem_id = str(row.get("problem_id"))
         if problem_id not in answers:
             raise SummaryError(f"문항 표에 없는 문제 ID: {problem_id}")
@@ -197,6 +211,7 @@ def summarize_rows(
     ranked = sorted(fails.items(), key=lambda kv: (-kv[1], kv[0]))
     return {
         "tutor_turns": tutor_turns,
+        "no_problem_rows": no_problem_rows,
         "rubric_failed_turns": sum(fails.values()),
         "undecidable_turns": undecidable_turns,
         "address_student_turns": address_turns,
@@ -242,10 +257,20 @@ def summarize(run_dir: Path) -> dict[str, Any]:
     """실행 폴더 하나의 T1 집계 + 보고서의 M1~M5."""
     rows, meta, report, report_name = load_run(run_dir)
     summary = summarize_rows(rows, answer_table())
+    # 출처 분해는 M1 유출 세션을 나눈 것이다 — 합이 러너가 센 유출 세션 수와 같아야 한다.
+    # 유출 판정 사본 두 벌(metrics · eval/rubric_copy) 중 한쪽만 바뀌면 여기서 드러난다
+    leaked = meta.get("count_leaked_sessions")
+    split = sum(summary["leak_sessions_by_origin"].values())
+    if leaked != split:
+        raise SummaryError(
+            f"유출 출처 분해 합 {split} ≠ 러너의 유출 세션 수 {leaked!r} — 두 유출 판정이 어긋났다"
+        )
     return {
         "run_dir": run_dir.name,
         "mode": meta.get("mode"),
         "date": meta.get("date"),
+        "planned_sessions": meta.get("planned_sessions"),
+        "skipped_sessions": meta.get("skipped_sessions"),
         "sessions": len(rows),
         "personas": meta.get("personas"),
         "report_file": report_name,
@@ -279,7 +304,7 @@ def _delta(before: Any, after: Any) -> str:
 
 def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
     """전후 집계 둘 → 비교 결과(JSON) — 같은 조건의 실행인지 먼저 확인한다."""
-    for key in ("mode", "sessions", "personas"):
+    for key in ("mode", "planned_sessions", "personas"):
         if before.get(key) != after.get(key):
             raise SummaryError(
                 f"전후 실행 조건이 다르다({key}: {before.get(key)!r} ≠ {after.get(key)!r})"
@@ -307,7 +332,9 @@ def render_markdown(result: Mapping[str, Any]) -> str:
     before, after = result["before"], result["after"]
     lines = [
         f"- 실행: before `{before['run_dir']}` · after `{after['run_dir']}` · "
-        f"모드 {before['mode']} · 세션 {before['sessions']}",
+        f"모드 {before['mode']} · 계획 세션 {before['planned_sessions']} · "
+        f"기록 {before['sessions']}→{after['sessions']} · "
+        f"건너뜀 {before['skipped_sessions']}→{after['skipped_sessions']}",
         "",
         "| 항목 | 개정 전 | 개정 후 | 변화 |",
         "| --- | --- | --- | --- |",
@@ -385,7 +412,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             t1 = summary["t1"]
             print(
                 f"T1_SUMMARY run={summary['run_dir']} mode={summary['mode']} "
-                f"sessions={summary['sessions']} tutor_turns={t1['tutor_turns']} "
+                f"sessions={summary['sessions']} skipped={summary['skipped_sessions']} "
+                f"tutor_turns={t1['tutor_turns']} "
                 f"rubric_failed={t1['rubric_failed_turns']} top3={','.join(t1['top3']) or '-'}"
             )
             return 0
