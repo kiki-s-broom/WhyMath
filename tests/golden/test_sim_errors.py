@@ -356,3 +356,22 @@ def test_injector_imports_no_llm_loader_or_network() -> None:
     banned_golden = ("golden.tutor", "golden.api", "golden.sim_student", "golden.store")
     hits = [name for name in imported if name.split(".")[0] in banned or name in banned_golden]
     assert hits == []
+
+
+# ── S20 반복: M0568은 뒤집음(OP_03)부터 · 문항 개념의 오개념 ─────────────────────
+
+
+def test_m0568_prefers_slope_inversion_on_every_slope_problem() -> None:
+    """식에서 읽기(LF-15)·식 세우기(LF-23·24)에서도 M0568이 OP_03을 낸다(전에는 OP_04에 가렸다)."""
+    for pid in ("LF-13", "LF-14", "LF-15", "LF-23", "LF-24"):
+        wrong = inject(BY_ID[pid], "M0568")
+        assert wrong is not None and wrong.op_code == "OP_03", pid
+
+
+def test_topic_misconception_is_slope_only() -> None:
+    """기울기를 묻거나 두 점으로 식을 세우는 5문항만 M0568, 나머지 25문항은 None."""
+    from golden.sim.errors import topic_misconception
+
+    topic = {p["id"]: topic_misconception(p) for p in PROBLEMS}
+    assert {pid for pid, m in topic.items() if m} == {"LF-13", "LF-14", "LF-15", "LF-23", "LF-24"}
+    assert {m for m in topic.values() if m} == {"M0568"}

@@ -153,13 +153,20 @@ def nickname(persona: str, round_no: int) -> str:
 
 
 def pick_injection(problem: Problem, persona: str, round_no: int) -> errors.WrongAnswer | None:
-    """P2·P3에 줄 주입기 답 — 결정적으로 고른 시작점부터 처음 맞는 입력(오개념 ID·OP 코드).
+    """P2·P3에 줄 주입기 답 — P3는 문항 개념의 오개념 먼저, 그다음은 결정적으로 고른 시작점부터
+    처음 맞는 입력(오개념 ID·OP 코드).
 
     시작점은 (문항, 페르소나, 회차)의 crc32라 회차마다 다른 오개념이 고르게 나오고, 같은 입력이면
     언제나 같은 답이다(M3를 재려면 답이 흔들리면 안 된다). 그 밖의 페르소나는 None.
     """
     if persona not in INJECTED_PERSONAS:
         return None
+    if persona == "P3":
+        # 오개념 보유형은 문항이 묻는 개념의 오개념을 먼저 쓴다(S20 반복 — 기울기 문항이면 M0568)
+        topic = errors.topic_misconception(problem)
+        wrong = errors.inject(problem, topic) if topic else None
+        if wrong is not None:
+            return wrong
     inputs = errors.ALL_INPUTS
     start = zlib.crc32(f"{problem['id']}:{persona}:{round_no}".encode()) % len(inputs)
     for offset in range(len(inputs)):

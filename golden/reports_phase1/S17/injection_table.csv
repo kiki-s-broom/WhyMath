@@ -271,7 +271,7 @@ M0036,M0036,LF-15,slope_read,2/3,,,
 M0037,M0037,LF-15,slope_read,2/3,,,
 M0409,M0409,LF-15,slope_read,2/3,,,
 M0567,M0567,LF-15,slope_read,2/3,,,
-M0568,M0568,LF-15,slope_read,2/3,-1,OP_04,OP_04
+M0568,M0568,LF-15,slope_read,2/3,3/2,OP_03,OP_03
 M0569,M0569,LF-15,slope_read,2/3,-2/3,OP_08,OP_01
 M0001,M0001,LF-15,slope_read,2/3,,,
 M0002,M0002,LF-15,slope_read,2/3,,,
@@ -423,14 +423,14 @@ M0036,M0036,LF-23,equation,2*x + 1,,,
 M0037,M0037,LF-23,equation,2*x + 1,,,
 M0409,M0409,LF-23,equation,2*x + 1,,,
 M0567,M0567,LF-23,equation,2*x + 1,,,
-M0568,M0568,LF-23,equation,2*x + 1,x+2,OP_04,OP_04
+M0568,M0568,LF-23,equation,2*x + 1,(1/2)x+5/2,OP_03,OP_03
 M0569,M0569,LF-23,equation,2*x + 1,-2x+5,OP_08,OP_00
 M0001,M0001,LF-23,equation,2*x + 1,,,
 M0002,M0002,LF-23,equation,2*x + 1,,,
 M0548,M0548,LF-23,equation,2*x + 1,,,
 OP_01,,LF-23,equation,2*x + 1,2x-1,OP_01,OP_01
 OP_02,,LF-23,equation,2*x + 1,,,
-OP_03,,LF-23,equation,2*x + 1,(1/2)x+5/2,OP_03,OP_00
+OP_03,,LF-23,equation,2*x + 1,(1/2)x+5/2,OP_03,OP_03
 OP_04,,LF-23,equation,2*x + 1,x+2,OP_04,OP_04
 OP_05,,LF-23,equation,2*x + 1,,,
 OP_06,,LF-23,equation,2*x + 1,1,OP_06,OP_00
@@ -442,14 +442,14 @@ M0036,M0036,LF-24,equation,-2*x + 2,,,
 M0037,M0037,LF-24,equation,-2*x + 2,,,
 M0409,M0409,LF-24,equation,-2*x + 2,,,
 M0567,M0567,LF-24,equation,-2*x + 2,,,
-M0568,M0568,LF-24,equation,-2*x + 2,2x-2,OP_04,OP_04
+M0568,M0568,LF-24,equation,-2*x + 2,(-1/2)x+7/2,OP_03,OP_03
 M0569,M0569,LF-24,equation,-2*x + 2,2x+6,OP_08,OP_00
 M0001,M0001,LF-24,equation,-2*x + 2,-2x+6,OP_01,OP_00
 M0002,M0002,LF-24,equation,-2*x + 2,-6x-2,OP_01,OP_00
 M0548,M0548,LF-24,equation,-2*x + 2,,,
 OP_01,,LF-24,equation,-2*x + 2,-2x+6,OP_01,OP_00
 OP_02,,LF-24,equation,-2*x + 2,,,
-OP_03,,LF-24,equation,-2*x + 2,(-1/2)x+7/2,OP_03,OP_00
+OP_03,,LF-24,equation,-2*x + 2,(-1/2)x+7/2,OP_03,OP_03
 OP_04,,LF-24,equation,-2*x + 2,2x-2,OP_04,OP_04
 OP_05,,LF-24,equation,-2*x + 2,,,
 OP_06,,LF-24,equation,-2*x + 2,1,OP_06,OP_00
