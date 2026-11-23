@@ -338,24 +338,125 @@ def test_load_run_refuses_empty_record(tmp_path: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────
 
 
-def test_compare_keeps_when_m1_zero_and_m3_under_one_percent(tmp_path: Path) -> None:
+def _summary(m1: Any, m3: Any, new: Any, sessions: Any = 100) -> dict[str, Any]:
+    """판정용 합성 집계 — summarize()가 내는 모양 그대로(표 그리기까지 되게)."""
+    return {
+        "run_dir": "syn",
+        "mode": "live",
+        "planned_sessions": 100,
+        "skipped_sessions": 0,
+        "personas": ["P2"],
+        "sessions": sessions,
+        "metrics": {
+            "M1": {"value": m1},
+            "M2": {"value": 1.0},
+            "M3": {"value": m3},
+            "M4": {"value": 0},
+            "M5": {"value": 0},
+        },
+        "t1": {
+            "tutor_turns": 10,
+            "rubric_failed_turns": 0,
+            "undecidable_turns": 0,
+            "address_student_turns": 0,
+            "fail_types": {},
+            "leak_sessions_by_origin": {"new": new, "student_echo": 0},
+            "per_persona": {},
+        },
+    }
+
+
+def test_compare_keeps_when_nothing_gets_worse(tmp_path: Path) -> None:
+    # 실제 실행 기록 경로로도 한 번 — M1·새로 말함이 같고 M3가 1% 바로 아래면 유지
     before = ts.summarize(_write_run(tmp_path / "b", _golden_rows(), m1=0.0, m3=0.0))
     after = ts.summarize(_write_run(tmp_path / "a", _golden_rows(), m1=0.0, m3=0.0099))
     result = ts.compare(before, after)
-    assert result["m1_m3_kept"] is True
+    assert result["criterion_one_kept"] is True
     assert result["revert_required"] is False
 
 
-@pytest.mark.parametrize(("m1", "m3"), [(0.0014, 0.0), (0.0, 0.01)])
-def test_compare_requires_revert_when_after_breaks_contract(
-    tmp_path: Path, m1: float, m3: float
+def test_judge_keeps_when_m1_drops_but_stays_above_zero() -> None:
+    # S23 실제 숫자 모양 — M1 10.74%→1.46% · 새로 말함 7/680→2/687 · M3 0.5%: 0%가 아니어도 유지
+    result = ts.judge(_summary(0.1074, 0.0024, 7, 680), _summary(0.0146, 0.005, 2, 687))
+    assert result["checks"] == {
+        "m1_not_increased": True,
+        "new_leak_not_increased": True,
+        "m3_under_1pct": True,
+    }
+    assert result["criterion_one_kept"] is True
+    assert result["new_leak_rate"] == {"before": 0.0103, "after": 0.0029}
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "broken"),
+    [
+        # M1이 늘었다
+        (_summary(0.10, 0.0, 5), _summary(0.11, 0.0, 5), "m1_not_increased"),
+        # M1 합계는 줄었는데 '새로 말함'만 늘었다 — 합계 뒤에 숨지 못한다
+        (_summary(0.10, 0.0, 1), _summary(0.05, 0.0, 2), "new_leak_not_increased"),
+        # M3가 1% 경계 — 미만이 아니다
+        (_summary(0.10, 0.0, 1), _summary(0.10, 0.01, 1), "m3_under_1pct"),
+    ],
+)
+def test_judge_requires_revert_on_each_condition(
+    before: dict[str, Any], after: dict[str, Any], broken: str
 ) -> None:
-    before = ts.summarize(_write_run(tmp_path / "b", _golden_rows()))
-    after = ts.summarize(_write_run(tmp_path / "a", _golden_rows(), m1=m1, m3=m3))
-    result = ts.compare(before, after)
-    assert result["m1_m3_kept"] is False
+    result = ts.judge(before, after)
+    assert result["checks"][broken] is False
+    assert [k for k, v in result["checks"].items() if not v] == [broken]
+    assert result["criterion_one_kept"] is False
     assert result["revert_required"] is True
     assert "되돌린다" in ts.render_markdown(result)
+
+
+def test_judge_new_leak_compares_rate_not_count() -> None:
+    # 건수는 같아도(3) 분모가 줄면 비율은 늘었다 — 비율로 잰다
+    result = ts.judge(_summary(0.1, 0.0, 3, 300), _summary(0.1, 0.0, 3, 100))
+    assert result["checks"]["new_leak_not_increased"] is False
+
+
+@pytest.mark.parametrize(
+    "after",
+    [
+        _summary(None, 0.0, 0),  # M1 모름
+        _summary(0.0, None, 0),  # M3 모름
+        _summary(0.0, 0.0, None),  # 새로 말함 모름
+        _summary(0.0, 0.0, 0, sessions=0),  # 분모 0
+        _summary(False, 0.0, 0),  # bool은 숫자가 아니다(False=0이면 가드 없이 "안 늘었다"로 통과)
+    ],
+)
+def test_judge_fails_closed_when_a_number_is_missing(after: dict[str, Any]) -> None:
+    assert ts.judge(_summary(0.1, 0.0, 1), after)["criterion_one_kept"] is False
+
+
+def test_rejudge_reads_stored_compare_without_session_records(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # 실행 기록 없이 저장된 비교 결과만으로 다시 판정한다(옛 판정 키가 남아 있어도 무시)
+    stored = {
+        "before": _summary(0.1074, 0.0024, 7, 680),
+        "after": _summary(0.0146, 0.005, 2, 687),
+        "m1_m3_kept": False,
+    }
+    src = tmp_path / "t1_compare.json"
+    src.write_text(json.dumps(stored), encoding="utf-8")
+    original = src.read_bytes()
+    out_json, out_md = tmp_path / "new.json", tmp_path / "new.md"
+    args = ["rejudge", "--compare-json", str(src), "--out-json", str(out_json)]
+    assert ts.main([*args, "--out-md", str(out_md)]) == 0
+    assert src.read_bytes() == original  # 원본은 덮어쓰지 않는다
+    assert json.loads(out_json.read_text(encoding="utf-8"))["criterion_one_kept"] is True
+    assert "T1_COMPARE criterion_one_kept=True" in capsys.readouterr().out
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"before": {}}), encoding="utf-8")
+    assert ts.main(["rejudge", "--compare-json", str(bad)]) == 2
+
+
+def test_rejudge_refuses_different_conditions() -> None:
+    other = _summary(0.0, 0.0, 0)
+    other["planned_sessions"] = 50
+    with pytest.raises(ts.SummaryError, match="planned_sessions"):
+        ts.rejudge({"before": _summary(0.1, 0.0, 1), "after": other})
 
 
 def test_compare_refuses_different_planned_sessions(tmp_path: Path) -> None:

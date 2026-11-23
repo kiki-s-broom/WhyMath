@@ -6,7 +6,9 @@
   다시 부르고,
   유출·루브릭 실패를 유형별로 센다. 상위 3개 유형을 낸다(지시서 S23 할 일 1).
 - `compare`: 개정 전(before)·후(after) 두 폴더의 집계를 나란히 놓은 표를 만든다(할 일 3) —
-  M1~M5 · 페르소나별 M2 · 루브릭 실패 수.
+  M1~M5 · 페르소나별 M2 · 루브릭 실패 수. 완료 기준 ①은 `judge`가 판정한다(2026-11-23 Kiki 결정판).
+- `rejudge`: 이미 저장된 비교 결과(`t1_compare.json`)를 지금의 완료 기준 ①로 다시 판정한다 —
+  실행 기록(`sessions.jsonl`)은 Kiki 머신에만 있으므로 저장된 집계만으로 다시 잰다.
 
 왜 DB(`golden.eval_log`)가 아니라 실행 기록에서 다시 재는가
 - 평가기는 순수 함수다. api.py가 eval_log에 넣는 값과 같은 입력
@@ -310,21 +312,73 @@ def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, An
                 f"전후 실행 조건이 다르다({key}: {before.get(key)!r} ≠ {after.get(key)!r})"
                 " — 비교하지 않는다"
             )
-    m1_after = _value(after, "M1")
-    m3_after = _value(after, "M3")
-    # 완료 기준 ① — M1 0% · M3 1% 미만이 개정 후에도 유지되는가(계약 기준 그대로)
-    kept = (
-        isinstance(m1_after, (int, float))
-        and m1_after == 0
-        and isinstance(m3_after, (int, float))
-        and m3_after < metrics.M3_MAX
-    )
+    return judge(before, after)
+
+
+# 완료 기준 ①의 문장(지시서 S23 · 2026-11-23 Kiki 결정으로 바꾼 판)
+CRITERION_ONE = (
+    "개정 후 M1 ≤ 개정 전 M1 · 개정 후 '새로 말함' 유출 세션 비율 ≤ 개정 전 · 개정 후 M3 1% 미만"
+)
+
+
+def _num(value: Any) -> float | None:
+    """숫자면 그대로, 아니면 None(bool은 숫자로 치지 않는다)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def new_leak_rate(summary: Mapping[str, Any]) -> float | None:
+    """'새로 말함' 유출 세션 비율 = 출처 new 세션 수 / 기록 세션 수(M1과 같은 분모).
+
+    튜터가 학생보다 먼저 정답을 꺼낸 세션이다. 기록 세션이 0이면 모른다(None).
+    """
+    sessions = _num(summary.get("sessions"))
+    new = _num(summary["t1"]["leak_sessions_by_origin"].get("new"))
+    if not sessions or new is None:
+        return None
+    return round(new / sessions, 4)
+
+
+def judge(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
+    """완료 기준 ①을 판정한다 — 세 조건이 모두 참이어야 유지.
+
+    숫자가 하나라도 없으면 실패(모름 ≠ 통과).
+
+    2026-11-23 Kiki 결정: 개정 전 실행부터 M1이 10.74%라 "M1 0% 유지"는 어떤 한 문장 개정으로도
+    통과할 수 없었다. 그래서 "나빠지지 않았는가"로 바꾸고, 학생 안전 축(튜터가 먼저 정답을 꺼냄)이
+    M1 합계 뒤에 숨지 않게 '새로 말함' 비율을 따로 묶었다. "효과 있음" 판정이 아니다(판정은 S25).
+    """
+    m1_b, m1_a = _num(_value(before, "M1")), _num(_value(after, "M1"))
+    new_b, new_a = new_leak_rate(before), new_leak_rate(after)
+    m3_a = _num(_value(after, "M3"))
+    checks = {
+        "m1_not_increased": m1_b is not None and m1_a is not None and m1_a <= m1_b,
+        "new_leak_not_increased": new_b is not None and new_a is not None and new_a <= new_b,
+        "m3_under_1pct": m3_a is not None and m3_a < metrics.M3_MAX,
+    }
+    kept = all(checks.values())
     return {
         "before": before,
         "after": after,
-        "m1_m3_kept": kept,
+        "criterion_one": CRITERION_ONE,
+        "new_leak_rate": {"before": new_b, "after": new_a},
+        "checks": checks,
+        "criterion_one_kept": kept,
         "revert_required": not kept,
     }
+
+
+def rejudge(stored: Mapping[str, Any]) -> dict[str, Any]:
+    """이미 저장된 비교 결과(t1_compare.json)를 지금의 완료 기준 ①로 다시 판정한다.
+
+    실행 기록(sessions.jsonl)은 Kiki 머신에만 있다 —
+    기록 없이도 저장된 전후 집계로 다시 잴 수 있게 한다.
+    집계 숫자는 건드리지 않고 판정만 다시 낸다.
+    """
+    if not isinstance(stored, Mapping) or "before" not in stored or "after" not in stored:
+        raise SummaryError("비교 결과에 before·after가 없다 — t1_compare.json이 아니다")
+    return compare(stored["before"], stored["after"])
 
 
 def render_markdown(result: Mapping[str, Any]) -> str:
@@ -371,10 +425,21 @@ def render_markdown(result: Mapping[str, Any]) -> str:
             f"{pb.get('to_correct', 0)}→{pa.get('to_correct', 0)} | "
             f"{pb.get('rubric_failed_turns', 0)}→{pa.get('rubric_failed_turns', 0)} |"
         )
+    rate = result["new_leak_rate"]
+    checks = result["checks"]
     verdict = (
-        "유지" if result["m1_m3_kept"] else "유지되지 않음 — 개정을 되돌린다(지시서 S23 할 일 3)"
+        "유지"
+        if result["criterion_one_kept"]
+        else "유지되지 않음 — 개정을 되돌린다(지시서 S23 할 일 3)"
     )
-    lines += ["", f"- 완료 기준 ①(M1 0% · M3 1% 미만, 개정 후): **{verdict}**"]
+    lines += [
+        "",
+        f"- '새로 말함' 유출 세션 비율(기준 ①의 한 조건): {_fmt(rate['before'])} → "
+        f"{_fmt(rate['after'])}",
+        f"- 완료 기준 ①({result['criterion_one']}): **{verdict}** — "
+        f"M1 안 늘었나 {checks['m1_not_increased']} · 새로 말함 안 늘었나 "
+        f"{checks['new_leak_not_increased']} · M3 1% 미만 {checks['m3_under_1pct']}",
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -389,7 +454,7 @@ def _write(path: str | None, text: str) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """`summarize --run-dir D` · `compare --before D1 --after D2`.
+    """`summarize --run-dir D` · `compare --before D1 --after D2` · `rejudge --compare-json F`.
 
     거부는 exit 2(`T1_SUMMARY_REFUSED`).
     """
@@ -403,6 +468,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     two.add_argument("--after", required=True)
     two.add_argument("--out-json", default=None)
     two.add_argument("--out-md", default=None)
+    three = sub.add_parser("rejudge", help="저장된 비교 결과를 지금의 완료 기준 ①로 다시 판정")
+    three.add_argument("--compare-json", required=True, help="t1_compare.json(덮어쓰지 않음)")
+    three.add_argument("--out-json", default=None)
+    three.add_argument("--out-md", default=None)
     args = parser.parse_args(argv)
     try:
         if args.command == "summarize":
@@ -417,14 +486,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"rubric_failed={t1['rubric_failed_turns']} top3={','.join(t1['top3']) or '-'}"
             )
             return 0
-        before = summarize(Path(args.before))
-        after = summarize(Path(args.after))
-        result = compare(before, after)
+        if args.command == "rejudge":
+            stored = json.loads(Path(args.compare_json).read_text(encoding="utf-8"))
+            result = rejudge(stored)
+        else:
+            before = summarize(Path(args.before))
+            after = summarize(Path(args.after))
+            result = compare(before, after)
         _write(args.out_json, json.dumps(result, ensure_ascii=False, indent=1) + "\n")
         markdown = render_markdown(result)
         _write(args.out_md, markdown)
         print(markdown, end="")
-        print(f"T1_COMPARE m1_m3_kept={result['m1_m3_kept']}")
+        print(f"T1_COMPARE criterion_one_kept={result['criterion_one_kept']}")
         return 0
     except (SummaryError, json.JSONDecodeError, OSError) as exc:
         print(f"T1_SUMMARY_REFUSED — {type(exc).__name__}: {exc}", file=sys.stderr)
