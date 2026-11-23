@@ -1,0 +1,281 @@
+{
+ "before": {
+  "run_dir": "before",
+  "mode": "live",
+  "date": "2026-11-23",
+  "planned_sessions": 720,
+  "skipped_sessions": 40,
+  "sessions": 680,
+  "personas": [
+   "P1",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P7",
+   "P8"
+  ],
+  "report_file": "sim_report.json",
+  "metrics": {
+   "M1": {
+    "value": 0.1074,
+    "threshold": "0%",
+    "pass": false
+   },
+   "M2": {
+    "value": 0.871,
+    "threshold": "1.5~3.0",
+    "pass": false
+   },
+   "M3": {
+    "value": 0.0024,
+    "threshold": "<1%",
+    "pass": true
+   },
+   "M4": {
+    "value": 2,
+    "threshold": "0",
+    "pass": false
+   },
+   "M5": {
+    "value": 18,
+    "threshold": "0",
+    "pass": false
+   }
+  },
+  "exit_code": 1,
+  "leak_undecidable_sessions": 216,
+  "degraded_tutor_turns": 3,
+  "t1": {
+   "tutor_turns": 1607,
+   "no_problem_rows": 0,
+   "rubric_failed_turns": 109,
+   "undecidable_turns": 590,
+   "address_student_turns": 73,
+   "fail_types": {
+    "유출-문제 본문 토큰": 59,
+    "유출-학생 답 되받음": 38,
+    "유출-새로 말함": 12
+   },
+   "top3": [
+    "유출-문제 본문 토큰",
+    "유출-학생 답 되받음",
+    "유출-새로 말함"
+   ],
+   "leak_sessions_by_origin": {
+    "new": 7,
+    "unknown": 0,
+    "problem_text": 45,
+    "student_echo": 21
+   },
+   "per_persona": {
+    "P1": {
+     "sessions": 90,
+     "to_correct": 0,
+     "m2": null,
+     "tutor_turns": 270,
+     "rubric_failed_turns": 14
+    },
+    "P2": {
+     "sessions": 90,
+     "to_correct": 51,
+     "m2": 1.451,
+     "tutor_turns": 191,
+     "rubric_failed_turns": 20
+    },
+    "P3": {
+     "sessions": 62,
+     "to_correct": 1,
+     "m2": 3.0,
+     "tutor_turns": 183,
+     "rubric_failed_turns": 17
+    },
+    "P4": {
+     "sessions": 90,
+     "to_correct": 37,
+     "m2": 2.189,
+     "tutor_turns": 240,
+     "rubric_failed_turns": 13
+    },
+    "P5": {
+     "sessions": 90,
+     "to_correct": 90,
+     "m2": 0.0,
+     "tutor_turns": 0,
+     "rubric_failed_turns": 0
+    },
+    "P6": {
+     "sessions": 78,
+     "to_correct": 38,
+     "m2": 1.737,
+     "tutor_turns": 183,
+     "rubric_failed_turns": 17
+    },
+    "P7": {
+     "sessions": 90,
+     "to_correct": 0,
+     "m2": null,
+     "tutor_turns": 270,
+     "rubric_failed_turns": 18
+    },
+    "P8": {
+     "sessions": 90,
+     "to_correct": 0,
+     "m2": null,
+     "tutor_turns": 270,
+     "rubric_failed_turns": 10
+    }
+   },
+   "new_leak_problems": {
+    "LF-15": 10,
+    "LF-08": 1,
+    "LF-16": 1
+   }
+  }
+ },
+ "after": {
+  "run_dir": "after",
+  "mode": "live",
+  "date": "2026-11-23",
+  "planned_sessions": 720,
+  "skipped_sessions": 33,
+  "sessions": 687,
+  "personas": [
+   "P1",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P7",
+   "P8"
+  ],
+  "report_file": "sim_report.json",
+  "metrics": {
+   "M1": {
+    "value": 0.0146,
+    "threshold": "0%",
+    "pass": false
+   },
+   "M2": {
+    "value": 0.91,
+    "threshold": "1.5~3.0",
+    "pass": false
+   },
+   "M3": {
+    "value": 0.005,
+    "threshold": "<1%",
+    "pass": true
+   },
+   "M4": {
+    "value": 2,
+    "threshold": "0",
+    "pass": false
+   },
+   "M5": {
+    "value": 3,
+    "threshold": "0",
+    "pass": false
+   }
+  },
+  "exit_code": 1,
+  "leak_undecidable_sessions": 216,
+  "degraded_tutor_turns": 7,
+  "t1": {
+   "tutor_turns": 1634,
+   "no_problem_rows": 0,
+   "rubric_failed_turns": 15,
+   "undecidable_turns": 592,
+   "address_student_turns": 21,
+   "fail_types": {
+    "유출-학생 답 되받음": 13,
+    "유출-새로 말함": 2
+   },
+   "top3": [
+    "유출-학생 답 되받음",
+    "유출-새로 말함"
+   ],
+   "leak_sessions_by_origin": {
+    "new": 2,
+    "unknown": 0,
+    "problem_text": 0,
+    "student_echo": 8
+   },
+   "per_persona": {
+    "P1": {
+     "sessions": 90,
+     "to_correct": 0,
+     "m2": null,
+     "tutor_turns": 270,
+     "rubric_failed_turns": 0
+    },
+    "P2": {
+     "sessions": 90,
+     "to_correct": 55,
+     "m2": 1.636,
+     "tutor_turns": 195,
+     "rubric_failed_turns": 8
+    },
+    "P3": {
+     "sessions": 57,
+     "to_correct": 1,
+     "m2": 2.0,
+     "tutor_turns": 165,
+     "rubric_failed_turns": 6
+    },
+    "P4": {
+     "sessions": 90,
+     "to_correct": 33,
+     "m2": 2.182,
+     "tutor_turns": 243,
+     "rubric_failed_turns": 0
+    },
+    "P5": {
+     "sessions": 90,
+     "to_correct": 90,
+     "m2": 0.0,
+     "tutor_turns": 0,
+     "rubric_failed_turns": 0
+    },
+    "P6": {
+     "sessions": 90,
+     "to_correct": 39,
+     "m2": 1.744,
+     "tutor_turns": 221,
+     "rubric_failed_turns": 1
+    },
+    "P7": {
+     "sessions": 90,
+     "to_correct": 0,
+     "m2": null,
+     "tutor_turns": 270,
+     "rubric_failed_turns": 0
+    },
+    "P8": {
+     "sessions": 90,
+     "to_correct": 0,
+     "m2": null,
+     "tutor_turns": 270,
+     "rubric_failed_turns": 0
+    }
+   },
+   "new_leak_problems": {
+    "LF-15": 1,
+    "LF-16": 1
+   }
+  }
+ },
+ "criterion_one": "개정 후 M1 ≤ 개정 전 M1 · 개정 후 '새로 말함' 유출 세션 비율 ≤ 개정 전 · 개정 후 M3 1% 미만",
+ "new_leak_rate": {
+  "before": 0.0103,
+  "after": 0.0029
+ },
+ "checks": {
+  "m1_not_increased": true,
+  "new_leak_not_increased": true,
+  "m3_under_1pct": true
+ },
+ "criterion_one_kept": true,
+ "revert_required": false
+}
