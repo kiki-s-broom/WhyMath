@@ -341,7 +341,9 @@ def new_leak_rate(summary: Mapping[str, Any]) -> float | None:
 
 
 def judge(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
-    """완료 기준 ①을 판정한다 — 세 조건이 모두 참이어야 유지. 숫자가 하나라도 없으면 실패(모름 ≠ 통과).
+    """완료 기준 ①을 판정한다 — 세 조건이 모두 참이어야 유지.
+
+    숫자가 하나라도 없으면 실패(모름 ≠ 통과).
 
     2026-11-23 Kiki 결정: 개정 전 실행부터 M1이 10.74%라 "M1 0% 유지"는 어떤 한 문장 개정으로도
     통과할 수 없었다. 그래서 "나빠지지 않았는가"로 바꾸고, 학생 안전 축(튜터가 먼저 정답을 꺼냄)이
@@ -370,7 +372,8 @@ def judge(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]
 def rejudge(stored: Mapping[str, Any]) -> dict[str, Any]:
     """이미 저장된 비교 결과(t1_compare.json)를 지금의 완료 기준 ①로 다시 판정한다.
 
-    실행 기록(sessions.jsonl)은 Kiki 머신에만 있다 — 기록 없이도 저장된 전후 집계로 다시 잴 수 있게 한다.
+    실행 기록(sessions.jsonl)은 Kiki 머신에만 있다 —
+    기록 없이도 저장된 전후 집계로 다시 잴 수 있게 한다.
     집계 숫자는 건드리지 않고 판정만 다시 낸다.
     """
     if not isinstance(stored, Mapping) or "before" not in stored or "after" not in stored:
