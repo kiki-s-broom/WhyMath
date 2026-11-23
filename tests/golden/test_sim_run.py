@@ -216,6 +216,22 @@ def test_p3_gets_a_wrong_injected_answer_for_every_problem() -> None:
     assert run.pick_injection(problems.load_problems()[0], "P1", 1) is None
 
 
+def test_p3_uses_slope_misconception_on_slope_problems_only() -> None:
+    """S20 반복: P3는 기울기 문항 5개에서 회차와 관계없이 M0568(OP_03)을 쓰고, P2는 바뀌지 않는다."""
+    bank = {p["id"]: p for p in problems.load_problems()}
+    for pid in ("LF-13", "LF-14", "LF-15", "LF-23", "LF-24"):
+        for round_no in (1, 2, 3):
+            wrong = run.pick_injection(bank[pid], "P3", round_no)
+            assert wrong is not None and wrong.misconception_id == "M0568", (pid, round_no)
+            assert wrong.op_code == "OP_03"
+    # 기울기 문항이 아니면 예전처럼 시작점부터 고른다(전부 M0568이 되지 않는다)
+    others = [run.pick_injection(bank[f"LF-{n:02d}"], "P3", 1) for n in range(1, 13)]
+    assert {w.misconception_id for w in others if w} != {"M0568"}
+    # P2는 문항 개념 우선을 쓰지 않는다 — 시작점 규칙 그대로(3회차 중 M0568만 나오지 않음)
+    p2 = {run.pick_injection(bank["LF-13"], "P2", r) for r in (1, 2, 3, 4, 5)}
+    assert any(w is not None and w.misconception_id != "M0568" for w in p2)
+
+
 def test_degraded_tutor_turns_are_counted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # 튜터 LLM이 실패해 대체 문장(degraded)만 오가면 M1·M5가 깨끗해도 튜터를 잰 게 아니다 — 횟수를 남긴다
     async def degraded(*_: object, **__: object) -> api.tutor.TutorReply:

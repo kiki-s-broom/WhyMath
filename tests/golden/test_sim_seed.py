@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 import pytest
+import sympy
 from golden.problems import load_problems
 from golden.sim.seed_extract import (
     OP_CODES,
@@ -366,3 +367,85 @@ def test_seed_folders_are_gitignored() -> None:
     """golden/sim/.gitignore가 seed/와 out/을 막는다(시드·실행 결과는 커밋 대상이 아니다)."""
     lines = (REPO_ROOT / "golden" / "sim" / ".gitignore").read_text(encoding="utf-8").split()
     assert "seed/" in lines and "out/" in lines
+
+
+# ── S20 반복: 식 정답 문항의 기울기 뒤집기(OP_03) · 오류 표 재계산 ──────────────
+
+
+def test_classify_equation_slope_inversion_is_op03() -> None:
+    """두 점으로 식을 세우며 기울기를 Δx/Δy로 뒤집은 식 → OP_03(그 전에는 OP_00으로 빠졌다)."""
+    assert classify_error(PROBLEMS["LF-23"], "(1/2)x+5/2") == "OP_03"  # 주입기 답 그대로
+    assert classify_error(PROBLEMS["LF-24"], "y=-1/2x+3") == "OP_03"  # 절편은 보지 않는다
+    assert classify_error(PROBLEMS["LF-24"], "y=1/2x+3") == "OP_03"  # 부호 무관
+    assert classify_error(PROBLEMS["LF-23"], "y=3x+1") == "OP_00"  # 역수가 아닌 기울기
+
+
+def test_classify_equation_unit_slope_is_not_op03() -> None:
+    """|기울기|=1이면 뒤집어도 같은 수라 OP_03으로 세지 않는다."""
+    x = sympy.Symbol("x")
+    assert seed_extract._classify_equation(x + 1, x + 5, x) == "OP_00"
+    assert seed_extract._classify_equation(-x + 1, -x + 5, x) == "OP_00"
+
+
+def _recount_seed(tmp_path: Path) -> tuple[list[InputSpec], Path]:
+    """재계산용 시드 폴더 — S16 때 분류기로 센 것처럼 OP_03 칸을 OP_00으로 되돌려 둔다."""
+    rows = [
+        _turn(1, "LF-23", "tutor_turn", "f", "(1/2)x+5/2"),
+        _turn(2, "LF-23", "graded", "t", "2x+1"),
+        _turn(3, "LF-08", "graded", "f", "-14"),
+    ]
+    specs = [
+        InputSpec("self", _write_csv(tmp_path / "self.csv", rows)),
+        InputSpec("adult", _write_csv(tmp_path / "adult.csv", [])),
+    ]
+    selected, dist = extract(specs)
+    errors = dist["errors"]
+    assert isinstance(errors, dict)
+    for table in (errors["by_source"]["self"], errors["combined"]):
+        table["OP_00"] += table["OP_03"]
+        table["OP_03"] = 0
+    out = tmp_path / "seed"
+    write_seed(out, selected, dist)
+    (out / "utterances.txt").write_text("발화\tself\n", encoding="utf-8")
+    return specs, out
+
+
+def test_recount_errors_moves_only_op00_to_op03_and_keeps_the_rest(tmp_path: Path) -> None:
+    specs, out = _recount_seed(tmp_path)
+    before = json.loads((out / "distributions.json").read_text(encoding="utf-8"))
+    updated = seed_extract.recount_errors(specs, out)
+    errors = updated["errors"]
+    assert isinstance(errors, dict)
+    assert errors["combined"]["OP_03"] == 1 and errors["combined"]["OP_00"] == 0
+    assert errors["combined"]["OP_01"] == before["errors"]["combined"]["OP_01"] == 1
+    # 발화·턴 수는 그대로, 원래 파일은 백업으로 남는다
+    assert (out / "utterances.txt").read_text(encoding="utf-8") == "발화\tself\n"
+    after = json.loads((out / "distributions.json").read_text(encoding="utf-8"))
+    assert after["turns"] == before["turns"]
+    assert after["errors_recount"]["previous_combined"]["OP_00"] == 1
+    backup = json.loads((out / seed_extract.RECOUNT_BACKUP).read_text(encoding="utf-8"))
+    assert backup == before
+
+
+def test_recount_errors_refuses_when_inputs_differ(tmp_path: Path) -> None:
+    """OP_00·OP_03 말고 다른 칸이 다르면(=S16과 다른 입력) 쓰지 않는다."""
+    specs, out = _recount_seed(tmp_path)
+    path = out / "distributions.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["errors"]["by_source"]["self"]["OP_01"] += 1
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    original = path.read_bytes()
+    with pytest.raises(SeedExtractError, match="S16과 다르다"):
+        seed_extract.recount_errors(specs, out)
+    assert path.read_bytes() == original
+    assert not (out / seed_extract.RECOUNT_BACKUP).exists()
+
+
+def test_main_recount_errors_exit_codes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    specs, out = _recount_seed(tmp_path)
+    args = [f"{s.label}={s.path}" for s in specs]
+    argv = [x for a in args for x in ("--input", a)] + ["--out", str(out), "--recount-errors"]
+    assert seed_extract.main(argv) == 0
+    printed = capsys.readouterr().out
+    assert '"top3": ["OP_01", "OP_03"]' in printed and "(1/2)x" not in printed
+    assert seed_extract.main(["--out", str(tmp_path / "없음"), "--recount-errors", *argv[:2]]) == 1

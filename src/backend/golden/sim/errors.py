@@ -82,8 +82,10 @@ MISCONCEPTION_RULES: dict[str, tuple[tuple[str, str | None], ...]] = {
     "M0409": (),
     # M0567 다가 대응도 함수로 봄·상수함수를 함수가 아니라고 봄 — 같은 이유로 없다
     "M0567": (),
-    # M0568 기울기 a와 y절편 b의 역할을 바꿈 · 기울기를 Δx/Δy로 뒤집음 — 앞의 것부터 해 본다
-    "M0568": (("OP_04", None), ("OP_03", None)),
+    # M0568 기울기 a와 y절편 b의 역할을 바꿈 · 기울기를 Δx/Δy로 뒤집음 — 뒤집음(OP_03)부터 해 본다.
+    # S20 반복: 전에는 OP_04를 먼저 해 봐서 OP_04가 되는 문항(식에서 읽기·식 세우기)에서는 OP_03이
+    # 한 번도 나오지 않았다. 역할 바꿈(OP_04)은 M0034가 이미 맡고 있어 M0568만의 몫은 뒤집음이다
+    "M0568": (("OP_03", None), ("OP_04", None)),
     # M0569 기울기의 부호와 그래프의 증가·감소를 반대로 봄
     "M0569": (("OP_08", None),),
     # M0001 음수 곱셈 — (−)×(−)=(−)
@@ -601,6 +603,23 @@ def inject(problem: Problem, misconception_id: str) -> WrongAnswer | None:
 # ──────────────────────────────────────────────────────────────────────
 
 ALL_INPUTS: tuple[str, ...] = ALL_MISCONCEPTIONS + INJECTABLE_OPS
+
+# 문항이 묻는 개념에 딸린 오개념 — 오개념 보유형(P3)은 이것부터 쓴다(S20 반복).
+# 지금은 기울기 하나뿐이다: 기울기를 묻는 문항(두 점·식에서 읽기)과 두 점으로 식을 세우는 문항.
+# 다른 유형까지 넓히지 않은 이유: 보정에서 빠진 것이 기울기 뒤집기(OP_03)였고, 넓히면 다른 코드
+# 분포까지 함께 바뀐다(가짜 모드 실측 — 함숫값 11문항이 OP_02로 쏠리고 OP_01이 66→18건)
+SLOPE_MISCONCEPTION = "M0568"
+
+
+def topic_misconception(problem: Problem) -> str | None:
+    """문항이 묻는 개념의 오개념 ID — 기울기를 묻거나 두 점으로 식을 세우면 M0568, 아니면 None."""
+    info = _info(problem)
+    if info.kind in (SLOPE_POINTS, SLOPE_READ):
+        return SLOPE_MISCONCEPTION
+    if info.kind == EQUATION and len(info.points) == 2:
+        return SLOPE_MISCONCEPTION
+    return None
+
 
 TABLE_COLUMNS = ("입력", "오개념ID", "문항", "유형", "정답", "틀린답", "OP", "분류기재분류")
 

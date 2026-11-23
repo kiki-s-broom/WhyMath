@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from itertools import product
 from pathlib import Path
+from typing import Any, cast
 
 import sympy
 
@@ -384,6 +385,10 @@ def _classify_equation(answer: sympy.Expr | None, student: sympy.Expr, x: sympy.
         return "OP_04"
     if abs(stu[0]) == abs(ans[0]) and abs(stu[1]) == abs(ans[1]):
         return "OP_01"
+    # 기울기만 뒤집힘(Δx/Δy) — 두 점으로 식을 세울 때 기울기 단계에서 뒤바꾼 것(S20 반복 추가).
+    # 절편은 뒤집힌 기울기로 다시 계산되므로 보지 않는다. |기울기|=1이면 뒤집어도 같아서 제외
+    if ans[0] != 0 and abs(ans[0]) != 1 and abs(stu[0]) == abs(1 / ans[0]):
+        return "OP_03"
     return "OP_00"
 
 
@@ -625,6 +630,52 @@ def write_seed(
     (out_dir / "README.md").write_text(README_LINE, encoding="utf-8")
 
 
+# 오류 표 재계산(S20 반복)에서 바뀌어도 되는 칸 — 분류기에 OP_03 규칙(식 정답 문항)만 더했으므로
+# 미분류였던 것이 OP_03으로 옮겨 가는 것 말고는 숫자가 같아야 한다
+RECOUNT_MOVABLE = ("OP_00", "OP_03")
+RECOUNT_BACKUP = "distributions_s16.json"
+
+
+def recount_errors(specs: list[InputSpec], seed_dir: Path) -> dict[str, object]:
+    """시드 폴더의 distributions.json에서 오류 표(`errors`)만 지금 분류기로 다시 센다.
+
+    발화(utterances.txt)·턴 수 분포는 건드리지 않는다. 입력이 S16과 같은지 확인하려고,
+    OP_00·OP_03 말고 다른 칸이 하나라도 달라지면(=입력 파일·구간이 다르다) 쓰지 않고 멈춘다.
+    처음 한 번은 원래 파일을 `distributions_s16.json`으로 남긴다.
+    """
+    path = seed_dir / "distributions.json"
+    previous: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
+    old_errors = previous.get("errors")
+    if not isinstance(old_errors, dict):
+        raise SeedExtractError(f"오류 표가 없다: {path}")
+    rows = [row for spec in specs for row in read_turns(spec)]
+    problems = {problem["id"]: problem for problem in load_problems()}
+    new_errors = error_distribution(rows, problems)
+    old_by, new_by = old_errors["by_source"], cast(dict[str, Any], new_errors["by_source"])
+    for label in SOURCE_LABELS:
+        old_t, new_t = old_by[label], new_by[label]
+        fixed = [c for c in OP_CODES if c not in RECOUNT_MOVABLE and old_t[c] != new_t[c]]
+        moved_old = sum(old_t[c] for c in RECOUNT_MOVABLE)
+        moved_new = sum(new_t[c] for c in RECOUNT_MOVABLE)
+        if fixed or moved_old != moved_new or new_t["OP_03"] < old_t["OP_03"]:
+            raise SeedExtractError(
+                f"입력이 S16과 다르다({label} · 달라진 칸 {fixed or RECOUNT_MOVABLE}) — 쓰지 않는다"
+            )
+    if old_errors.get("non_answer") != new_errors["non_answer"]:
+        raise SeedExtractError("입력이 S16과 다르다(답이 아닌 말 수) — 쓰지 않는다")
+    backup = seed_dir / RECOUNT_BACKUP
+    if not backup.exists():
+        backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    previous["errors"] = new_errors
+    previous["errors_recount"] = {
+        "why": "S20 반복 — 식 정답 문항의 기울기 뒤집기(OP_03) 분류 규칙 추가",
+        "previous_combined": old_errors["combined"],
+        "previous_top3": old_errors["top3"]["combined"],
+    }
+    path.write_text(json.dumps(previous, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return previous
+
+
 def main(argv: list[str] | None = None) -> int:
     """명령줄 진입점. 발화 원문은 화면에 찍지 않는다(건수와 라벨만)."""
     parser = argparse.ArgumentParser(description="사람 출처 턴 CSV → golden/sim/seed/")
@@ -632,7 +683,35 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--s13-problems", type=Path, default=None, help="S13 problems.csv(대체)")
     parser.add_argument("--name", action="append", default=[], help="가릴 닉네임·이름(반복 가능)")
     parser.add_argument("--out", type=Path, default=SEED_DIR, help="출력 폴더")
+    parser.add_argument(
+        "--recount-errors",
+        action="store_true",
+        help="시드 폴더(--out)의 오류 표만 지금 분류기로 다시 센다(발화·턴 수는 그대로 · S20 반복)",
+    )
     args = parser.parse_args(argv)
+    if args.recount_errors:
+        if not args.input:
+            parser.error("--recount-errors에는 S16과 같은 --input이 있어야 한다")
+        try:
+            updated = recount_errors([parse_input_spec(t) for t in args.input], args.out)
+        except (SeedExtractError, OSError, KeyError, json.JSONDecodeError) as exc:
+            print(f"SEED_REFUSED=True — {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 1
+        errors_now = cast(dict[str, Any], updated["errors"])
+        print(
+            json.dumps(
+                {
+                    "recount": True,
+                    "combined": errors_now["combined"],
+                    "top3": errors_now["top3"]["combined"],
+                    "previous_top3": cast(dict[str, Any], updated["errors_recount"])[
+                        "previous_top3"
+                    ],
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
     if not args.input and args.s13_problems is None:
         parser.error("--input 또는 --s13-problems 중 하나는 있어야 한다")
     try:
