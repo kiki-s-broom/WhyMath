@@ -30,6 +30,7 @@ SERVER_ENTRY = "golden.api"
 ENTRYPOINTS: dict[str, str] = {
     SERVER_ENTRY: "서버 — uvicorn golden.api:app",
     "golden.check": "python src/backend/golden/check.py (골든 검사 명령 · GOLD-21)",
+    "golden.driver.next_task": "python -m golden.driver.next_task [--json] (다음 지시문 계산)",
     "golden.llm.sync": "python -m golden.llm.sync (LLM 좌석 동기화)",
     "golden.measure_unreferenced": "python -m golden.measure_unreferenced (미참조 측정)",
     "golden.rescue.ledger": "python -m golden.rescue.ledger (RS-R1 모듈 대장)",
