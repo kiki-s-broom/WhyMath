@@ -16,6 +16,7 @@ acceptance:
 artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1987"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1988"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1989"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -30,4 +31,6 @@ notes: |-
   [정정 2026-11-23] 진행 메모 2026-11-23: S23 완료(Kiki 결정으로 완료 기준 ① 변경 후 다시 판정 유지 · 개정 복원 347002c5 · PR #1987 머지 대기). 다음 S24(선행: PR #1987 머지 · 개정 프롬프트 main 반영). GOLD-19는 S16~S35 공용이라 done 아님
 
   [정정 2026-11-23] 진행 메모 2026-11-23: S23 머지 완료(PR #1987). 자동 실행 기반 PR #1988(다음 지시문 계산기 golden.driver.next_task · golden/AUTO_RUN.md · 5단계 지시문 golden/inbox 보관) 머지 대기. 머지 뒤 예약 실행 시각을 Kiki에게 받아 건다. 다음 작업 S24(Kiki 머신 단계 있음). GOLD-19는 S16~S35 공용이라 done 아님
+
+  [정정 2026-11-23] 진행 메모 2026-11-23: 자동 실행 기반 PR #1988 머지(a14903d1). Kiki 지시로 '끝나면 다음 작업 자동 진행'·'[자동] PR은 CI 초록이면 자동 머지' — AUTO_RUN.md 개정 PR #1989. 예약 실행 매시간 52분. 다음 작업 S24(Kiki 머신 단계). GOLD-19는 S16~S35 공용이라 done 아님
 updated: 2026-11-23
