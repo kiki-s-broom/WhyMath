@@ -211,10 +211,22 @@ async def record_turn(
 
 
 async def record_eval(turn_id: int, verdict: dict[str, object]) -> None:
-    """T1 평가기 판정 1건을 golden.eval_log에 기록한다(S22 · 플래그가 켜졌을 때만 api가 부른다)."""
+    """평가 기록 1건을 golden.eval_log의 그 턴 행에 합친다(플래그가 켜졌을 때만 api가 부른다).
+
+    - S22 T1 판정(`evaluator`·`leak`…)과 S27 T2 매칭(`t2_misconception_id`…)이
+      같은 턴에 둘 다 쓰일 수 있다.
+    - 턴 1개에 행 1개(PK `turn_id`)를 지키려고, 행이 이미 있으면 JSON 객체를 합친다
+      (뒤에 쓴 쪽이 같은 키를 덮음).
+      두 평가의 키 이름은 겹치지 않는다(T2는 `t2_` 접두).
+    """
     await ensure_schema()
+    statement = insert(eval_log).values(turn_id=turn_id, verdict_json=verdict)
+    statement = statement.on_conflict_do_update(
+        index_elements=[eval_log.c.turn_id],
+        set_={"verdict_json": eval_log.c.verdict_json.op("||")(statement.excluded.verdict_json)},
+    )
     async with _engine().begin() as conn:
-        await conn.execute(eval_log.insert().values(turn_id=turn_id, verdict_json=verdict))
+        await conn.execute(statement)
 
 
 async def open_turns(session_id: uuid.UUID, problem_id: str) -> list[TurnRow]:

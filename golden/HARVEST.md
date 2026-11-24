@@ -397,3 +397,23 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음(경계 긋기·추출·특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `l1/misconception/catalog_loader.py`의 `load_misconceptions` 1개 · 자료 = `golden/data/misconceptions_lf.json` 11건 | 매칭 로직(옛 코드에 일차함수용이 없음 — S27이 새로 씀) · 오개념 DB 843건 전체 적재·그래프 탐색·디스트랙터 생성(지시서 "하지 말 것") | T2 설계 · 복사/import·연결은 S27 | S26 |
+
+### 슬롯 T2 import·연결 (S27 · 2026-11-24 · 기준 main `33b0419e` · 인용 F-05)
+
+- **로더:** import도 복사도 하지 않았다(다섯 걸음 ③).
+  - S26이 경계로 정한 옛 `catalog_loader.load_misconceptions`는 DB 적재기다. 골든이 필요한 것은 "검증된 행 11건"뿐이고, 그것은 S26이 `golden/data/misconceptions_lf.json`으로 이미 커밋했다(특성화 테스트가 옛 로더 출력과 글을 대조한다).
+  - 옛 모듈은 LEGACY_MANIFEST 277행에 있고, import하면 옛 모듈 114개가 딸려 온다. 복사하면 쓰지 않는 적재 코드가 골든에 생긴다. 그래서 둘 다 하지 않았다.
+- **매칭:** 옛 코드에 일차함수용 매칭이 없어(S26) 지시서 할 일 1의 ②로 새로 썼다 — `src/backend/golden/eval/misconception.py`의 `match_misconception`(본문 약 50줄).
+  - 주입기가 30문항 × 오개념 11건에 대해 만드는 틀린 답 70개를 `golden/data/misconception_answers_lf.json`에 미리 계산해 둔다(`python -m golden.sim.errors --answers-json …` · 커밋본과 지금 주입기가 같은지는 테스트가 대조).
+  - 학생 답을 채점기 규칙(`grade.is_correct`)으로 비교한다.
+  - 학생 응답 경로가 시뮬레이터 패키지(`golden.sim` · 시드를 읽는 모듈이 있음)를 import하지 않게 표는 파일로만 받는다.
+- **연결(④):** `api.py`에 붙였다. 오답일 때 `GOLDEN_T2_MISCONCEPTION=1`이면 기록한다 — 되묻기 턴과 3턴을 다 쓴 마지막 오답 판정이 대상이다.
+  - 기록 자리는 `golden.eval_log`의 그 턴 행이다. 칸은 `t2_matcher`·`t2_misconception_id`이고, None도 기록한다.
+  - 턴 표에는 열을 더하지 않았다. 응답은 바꾸지 않는다.
+  - T1과 같은 턴에 함께 쓰이도록 `store.record_eval`을 "행이 있으면 JSON 합치기"로 바꿨다.
+  - 실패 처리는 좁은 `except (SQLAlchemyError, OSError, ValueError, KeyError)`이고, 경고 로그에 예외 타입명을 남긴다. 넓은 `except`는 허용 목록과 Kiki 승인이 필요해 쓰지 않았다.
+  - T1의 넓은 `except`(승인분)가 줄 이동으로 `api.py:190 → 200`이 되어 `tests/golden/rescue/silent_failure_allow.txt`의 줄 번호만 고쳤다(문구·승인 그대로).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음(옛 코드 import 0 · 복사 0) · 새로 씀: `golden/eval/misconception.py`(`match_misconception`·`misconception_enabled`) + 표 `golden/data/misconception_answers_lf.json`(70행 · 주입기 S17 규칙의 역방향) · 연결 `api.py` · 기록 `golden.eval_log`(`t2_misconception_id`) · 플래그 `GOLDEN_T2_MISCONCEPTION`(기본 0) | 옛 `catalog_loader.load_misconceptions`(DB 적재기 — 필요한 행은 S26 파일에 이미 있음 · LEGACY_MANIFEST · 옛 모듈 114개) · 튜터에 매칭 결과 보내기(S28 몫) · 오개념 DB 843건 적재 | 옛 코드에 일차함수 매칭이 없어 지시서 ②(주입기 규칙 역적용)로 씀 · 답만으로 가를 수 없는 오개념 쌍 3개는 앞 ID가 나온다(S27 보고) | S27 |
