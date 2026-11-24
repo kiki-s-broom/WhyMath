@@ -14,7 +14,7 @@
 # (golden/reports_rescue/G2/보고.md 「Kiki 결정 결과」). 줄을 더하려면 다시 Kiki 결정이 필요하다.
 
 golden/grade.py:148 · BLE001 · Kiki 승인 2026-11-18 · 읽을 수 없는 답은 오답(False) · 정답 30개 파싱은 test_problems_schema ⑤가 따로 검사 · 좁히면 학생에게 500 위험 · info 로그에 예외 타입명
-golden/tutor.py:128 · BLE001 · Kiki 승인 2026-11-18 · 설계된 강등 — 튜터 LLM 실패 시 대체 문장(degraded=True 표시) · warning 로그에 예외 타입명
+golden/tutor.py:153 · BLE001 · Kiki 승인 2026-11-18 · 설계된 강등 — 튜터 LLM 실패 시 대체 문장(degraded=True 표시) · warning 로그에 예외 타입명
 golden/sim_student.py:205 · BLE001 · Kiki 승인 2026-11-18 · 시뮬레이터 재시도 — 다 실패하면 SimStudentError로 멈춘다(최종적으로 삼키지 않음) · warning 로그
 golden/sim/seed_extract.py:339 · BLE001 · Kiki 승인 2026-11-18 · 분석 도구 — 읽지 못한 입력은 미분류(OP_00)로 세어져 건수로 보인다 · debug 로그에 예외 타입명
-golden/api.py:200 · BLE001 · Kiki 승인 2026-11-20(S22) · T1 평가는 기록 전용(GOLDEN_T1_RUBRIC=1일 때만) — 튜터 턴이 먼저 기록되므로 평가·기록 실패가 올라가면 학생이 응답 없이 되묻기 기회를 잃는다 · warning 로그에 예외 타입명 · 누락 건수는 eval_log ↔ tutor_turn 대조로 보인다
+golden/api.py:206 · BLE001 · Kiki 승인 2026-11-20(S22) · T1 평가는 기록 전용(GOLDEN_T1_RUBRIC=1일 때만) — 튜터 턴이 먼저 기록되므로 평가·기록 실패가 올라가면 학생이 응답 없이 되묻기 기회를 잃는다 · warning 로그에 예외 타입명 · 누락 건수는 eval_log ↔ tutor_turn 대조로 보인다

@@ -250,13 +250,22 @@ def test_golden_path_green_and_t2_log_only_when_flag_on(
     if flag == "1":
         assert [v and v.get("t2_misconception_id") for _, v in logged] == _EXPECTED_IDS
         assert all(v is not None and v["t2_matcher"] == T2_MATCHER_VERSION for _, v in logged)
-        assert all(set(v or {}) == {"t2_matcher", "t2_misconception_id"} for _, v in logged)
+        assert all(
+            set(v or {}) == {"t2_matcher", "t2_misconception_id", "t2_prompt_hint"}
+            for _, v in logged
+        )
+        # S28: 매칭이 있는 되묻기 턴만 튜터 프롬프트에 한 줄이 들어갔다(판정 턴은 튜터를 안 부른다)
+        assert [v and v["t2_prompt_hint"] for _, v in logged] == [True, False, True, False]
     else:
         assert [v for _, v in logged] == [None] * 4
 
 
 def test_response_identical_with_t2_flag_off_and_on(monkeypatch: pytest.MonkeyPatch) -> None:
-    """같은 입력이면 플래그 0과 1의 응답이 한 글자도 다르지 않다(매칭은 기록만)."""
+    """가짜 LLM에서는 플래그 0과 1의 응답이 한 글자도 다르지 않다.
+
+    S28부터 켜짐이면 튜터 프롬프트에 한 줄이 들어가므로 실제 LLM 응답은 달라질 수 있다 —
+    그 차이는 프롬프트 테스트(`test_t2_prompt_*`)가 보고, 여기서는 그 밖의 응답 모양이 같은지 본다.
+    """
     monkeypatch.delenv(T1_FLAG_ENV, raising=False)
     results = {}
     for value in ("0", "1"):

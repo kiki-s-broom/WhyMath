@@ -42,6 +42,7 @@ ENTRYPOINTS: dict[str, str] = {
     "golden.sim.seed_extract": "python -m golden.sim.seed_extract (시뮬레이션 씨앗 추출)",
     "golden.sim.student_compare": "python -m golden.sim.student_compare (S18 학생 모델 비교)",
     "golden.sim.t1_summary": "python -m golden.sim.t1_summary summarize|compare (T1 집계 · S23)",
+    "golden.sim.t2_summary": "python -m golden.sim.t2_summary summarize|compare (T2 검출률 · S28)",
     "golden.sim_student": "python -m golden.sim_student (가상 학생 시뮬레이션)",
 }
 BASELINE = Path(__file__).with_name("orphan_baseline.txt")
