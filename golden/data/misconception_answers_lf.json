@@ -1,0 +1,427 @@
+{
+  "schema": "golden.misconception_answers_lf.v1",
+  "made_by": "python -m golden.sim.errors --answers-json (S27)",
+  "count": 70,
+  "answers": [
+    {
+      "problem_id": "LF-01",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "0"
+    },
+    {
+      "problem_id": "LF-02",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "-15"
+    },
+    {
+      "problem_id": "LF-03",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "-4"
+    },
+    {
+      "problem_id": "LF-04",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "-18"
+    },
+    {
+      "problem_id": "LF-05",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "0"
+    },
+    {
+      "problem_id": "LF-06",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "12"
+    },
+    {
+      "problem_id": "LF-06",
+      "mis_id": "M0001",
+      "op_code": "OP_01",
+      "wrong_answer": "-12"
+    },
+    {
+      "problem_id": "LF-07",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "18"
+    },
+    {
+      "problem_id": "LF-08",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "20"
+    },
+    {
+      "problem_id": "LF-09",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "0"
+    },
+    {
+      "problem_id": "LF-10",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "-8"
+    },
+    {
+      "problem_id": "LF-11",
+      "mis_id": "M0037",
+      "op_code": "OP_02",
+      "wrong_answer": "-25"
+    },
+    {
+      "problem_id": "LF-13",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "-3"
+    },
+    {
+      "problem_id": "LF-13",
+      "mis_id": "M0568",
+      "op_code": "OP_03",
+      "wrong_answer": "1/3"
+    },
+    {
+      "problem_id": "LF-13",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "-3"
+    },
+    {
+      "problem_id": "LF-14",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "3/2"
+    },
+    {
+      "problem_id": "LF-14",
+      "mis_id": "M0568",
+      "op_code": "OP_03",
+      "wrong_answer": "-2/3"
+    },
+    {
+      "problem_id": "LF-14",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "3/2"
+    },
+    {
+      "problem_id": "LF-14",
+      "mis_id": "M0002",
+      "op_code": "OP_01",
+      "wrong_answer": "-9/2"
+    },
+    {
+      "problem_id": "LF-15",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "-1"
+    },
+    {
+      "problem_id": "LF-15",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "-2/3"
+    },
+    {
+      "problem_id": "LF-15",
+      "mis_id": "M0568",
+      "op_code": "OP_03",
+      "wrong_answer": "3/2"
+    },
+    {
+      "problem_id": "LF-15",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "-2/3"
+    },
+    {
+      "problem_id": "LF-16",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "-6"
+    },
+    {
+      "problem_id": "LF-16",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "-6"
+    },
+    {
+      "problem_id": "LF-17",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "4"
+    },
+    {
+      "problem_id": "LF-17",
+      "mis_id": "M0036",
+      "op_code": "OP_07",
+      "wrong_answer": "7/4"
+    },
+    {
+      "problem_id": "LF-17",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "4"
+    },
+    {
+      "problem_id": "LF-18",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "-2"
+    },
+    {
+      "problem_id": "LF-18",
+      "mis_id": "M0036",
+      "op_code": "OP_07",
+      "wrong_answer": "6"
+    },
+    {
+      "problem_id": "LF-18",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "-2"
+    },
+    {
+      "problem_id": "LF-18",
+      "mis_id": "M0001",
+      "op_code": "OP_01",
+      "wrong_answer": "-3"
+    },
+    {
+      "problem_id": "LF-19",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "1/3"
+    },
+    {
+      "problem_id": "LF-19",
+      "mis_id": "M0036",
+      "op_code": "OP_07",
+      "wrong_answer": "2"
+    },
+    {
+      "problem_id": "LF-19",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "1/3"
+    },
+    {
+      "problem_id": "LF-20",
+      "mis_id": "M0036",
+      "op_code": "OP_07",
+      "wrong_answer": "4"
+    },
+    {
+      "problem_id": "LF-21",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "3x+2"
+    },
+    {
+      "problem_id": "LF-21",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "-2x+7"
+    },
+    {
+      "problem_id": "LF-21",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "3x+2"
+    },
+    {
+      "problem_id": "LF-21",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "-2x+7"
+    },
+    {
+      "problem_id": "LF-22",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "5x-3"
+    },
+    {
+      "problem_id": "LF-22",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "3x-7"
+    },
+    {
+      "problem_id": "LF-22",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "5x-3"
+    },
+    {
+      "problem_id": "LF-22",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "3x-7"
+    },
+    {
+      "problem_id": "LF-22",
+      "mis_id": "M0002",
+      "op_code": "OP_01",
+      "wrong_answer": "-3x-7"
+    },
+    {
+      "problem_id": "LF-22",
+      "mis_id": "M0548",
+      "op_code": "OP_01",
+      "wrong_answer": "-3x-7"
+    },
+    {
+      "problem_id": "LF-23",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "x+2"
+    },
+    {
+      "problem_id": "LF-23",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "-2x+5"
+    },
+    {
+      "problem_id": "LF-23",
+      "mis_id": "M0568",
+      "op_code": "OP_03",
+      "wrong_answer": "(1/2)x+5/2"
+    },
+    {
+      "problem_id": "LF-23",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "-2x+5"
+    },
+    {
+      "problem_id": "LF-24",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "2x-2"
+    },
+    {
+      "problem_id": "LF-24",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "2x+6"
+    },
+    {
+      "problem_id": "LF-24",
+      "mis_id": "M0568",
+      "op_code": "OP_03",
+      "wrong_answer": "(-1/2)x+7/2"
+    },
+    {
+      "problem_id": "LF-24",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "2x+6"
+    },
+    {
+      "problem_id": "LF-24",
+      "mis_id": "M0001",
+      "op_code": "OP_01",
+      "wrong_answer": "-2x+6"
+    },
+    {
+      "problem_id": "LF-24",
+      "mis_id": "M0002",
+      "op_code": "OP_01",
+      "wrong_answer": "-6x-2"
+    },
+    {
+      "problem_id": "LF-25",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "-2x+4"
+    },
+    {
+      "problem_id": "LF-25",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "-4x+6"
+    },
+    {
+      "problem_id": "LF-25",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "-2x+4"
+    },
+    {
+      "problem_id": "LF-25",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "-4x+6"
+    },
+    {
+      "problem_id": "LF-26",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "1"
+    },
+    {
+      "problem_id": "LF-26",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "1"
+    },
+    {
+      "problem_id": "LF-27",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "2"
+    },
+    {
+      "problem_id": "LF-27",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "2"
+    },
+    {
+      "problem_id": "LF-28",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "1"
+    },
+    {
+      "problem_id": "LF-28",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "1"
+    },
+    {
+      "problem_id": "LF-29",
+      "mis_id": "M0034",
+      "op_code": "OP_04",
+      "wrong_answer": "30x-1/2"
+    },
+    {
+      "problem_id": "LF-29",
+      "mis_id": "M0035",
+      "op_code": "OP_08",
+      "wrong_answer": "(1/2)x+30"
+    },
+    {
+      "problem_id": "LF-29",
+      "mis_id": "M0568",
+      "op_code": "OP_04",
+      "wrong_answer": "30x-1/2"
+    },
+    {
+      "problem_id": "LF-29",
+      "mis_id": "M0569",
+      "op_code": "OP_08",
+      "wrong_answer": "(1/2)x+30"
+    }
+  ]
+}

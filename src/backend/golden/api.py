@@ -13,9 +13,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from golden import grade, problems, store, tutor
-from golden.eval import evaluate_tutor_reply, rubric_enabled
+from golden.eval import (
+    T2_MATCHER_VERSION,
+    evaluate_tutor_reply,
+    match_misconception,
+    misconception_enabled,
+    rubric_enabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +155,9 @@ async def answer(body: AnswerIn) -> dict[str, object]:
             # S22 T1(GOLDEN_T1_RUBRIC=1일 때만): 평가는 기록만 한다
             # — 아래 응답은 한 글자도 바꾸지 않는다
             await _record_t1_eval(turn_id, problem, body.text, reply.message)
+        if misconception_enabled():
+            # S27 T2(GOLDEN_T2_MISCONCEPTION=1일 때만): 오답의 오개념 ID를 기록만 한다 — 응답 불변
+            await _record_t2_match(turn_id, problem, body.text)
         response: dict[str, object] = {
             "kind": "tutor_turn",
             "message": reply.message,
@@ -196,6 +206,33 @@ async def _record_t1_eval(
         )
 
 
+async def _record_t2_match(turn_id: int, problem: problems.Problem, student_text: str) -> None:
+    """T2 매칭(틀린 답 → 오개념 ID 또는 None)을 golden.eval_log의 그 턴 행에 남긴다.
+
+    S27 · 기록 전용이다.
+
+    - 응답·튜터 프롬프트에는 쓰지 않는다(튜터에 보내는 것은 S28).
+    - 매칭 결과가 None이어도 기록한다 — "매칭 없음"과 "기록 안 함"을 구별하려고.
+    - 실패해도 학생 응답은 그대로 나간다. 잡는 예외는 실제로 날 수 있는 종류로 좁힌다
+      (DB 오류 `SQLAlchemyError` · 연결 오류 `OSError` · 표 파일 오류 `ValueError`·`KeyError`).
+      넓은 `except`는 허용 목록과 Kiki 승인이 필요해 쓰지 않았다.
+      그 밖의 예외는 올라간다(S27 보고).
+      경고 로그에는 문제 ID·턴 id·예외 타입명만 적고 학생 문장은 적지 않는다.
+    """
+    try:
+        mis_id = match_misconception(problem, student_text)
+        await store.record_eval(
+            turn_id, {"t2_matcher": T2_MATCHER_VERSION, "t2_misconception_id": mis_id}
+        )
+    except (SQLAlchemyError, OSError, ValueError, KeyError) as exc:
+        logger.warning(
+            "golden T2 매칭 실패 — 응답은 그대로 보냄: problem=%s turn_id=%s %s",
+            problem["id"],
+            turn_id,
+            type(exc).__name__,
+        )
+
+
 async def _graded(
     row: store.SessionRow,
     problem: problems.Problem,
@@ -205,7 +242,7 @@ async def _graded(
     feedback: str,
 ) -> dict[str, object]:
     """판정 응답 — 턴 기록 → 숙련도 갱신 → 지금 보던 문제라면 cursor를 다음 문제로 옮긴다."""
-    await store.record_turn(
+    turn_id = await store.record_turn(
         session_id=row.session_id,
         problem_id=problem["id"],
         turn_no=turns_used,
@@ -214,6 +251,9 @@ async def _graded(
         kind="graded",
         correct=correct,
     )
+    if not correct and misconception_enabled():
+        # S27 T2(플래그 켜짐 · 3턴을 다 쓴 마지막 오답): 기록만 한다 — 응답 불변
+        await _record_t2_match(turn_id, problem, student_text)
     items = problems.load_problems()
     if items[row.cursor % len(items)]["id"] == problem["id"]:
         await store.advance_cursor(row.session_id)

@@ -693,11 +693,64 @@ def write_table(path: Path, problems: list[Problem]) -> list[dict[str, str]]:
     return rows
 
 
+# S27 매칭용 표 — 30문항 × 오개념 11건 중 틀린 답이 만들어지는 조합만(파일 순서 · 문항 순서)
+MISCONCEPTION_ANSWERS_PATH = (
+    Path(__file__).resolve().parents[4] / "golden" / "data" / "misconception_answers_lf.json"
+)
+
+
+def misconception_answer_rows(problems: list[Problem]) -> list[dict[str, str]]:
+    """문항마다 오개념 ID 순서대로 주입한 틀린 답 — `golden.eval.misconception`이 거꾸로 읽는다.
+
+    OP 코드만으로 부른 답(오개념 ID 없음)은 넣지 않는다. 매칭은 "틀린 답 → 오개념 ID"라서
+    ID가 없는 답은 쓸 데가 없다.
+    """
+    rows: list[dict[str, str]] = []
+    for problem in problems:
+        for mis_id in ALL_MISCONCEPTIONS:
+            result = inject(problem, mis_id)
+            if result is None:
+                continue
+            rows.append(
+                {
+                    "problem_id": problem["id"],
+                    "mis_id": mis_id,
+                    "op_code": result.op_code,
+                    "wrong_answer": result.text,
+                }
+            )
+    return rows
+
+
+def misconception_answers_document(problems: list[Problem]) -> str:
+    """매칭용 표 파일의 글 전체(UTF-8 · 들여쓰기 2 · 끝 줄바꿈 1개) — 테스트가 커밋본과 대조한다."""
+    rows = misconception_answer_rows(problems)
+    document = {
+        "schema": "golden.misconception_answers_lf.v1",
+        "made_by": "python -m golden.sim.errors --answers-json (S27)",
+        "count": len(rows),
+        "answers": rows,
+    }
+    return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     """표를 CSV로 쓰고 입력별 적용 가능 문항 수를 찍는다."""
     parser = argparse.ArgumentParser(description="오개념 주입기 표(30문항 × 입력 전부)")
-    parser.add_argument("--csv", type=Path, required=True, help="쓸 CSV 경로")
+    parser.add_argument("--csv", type=Path, help="쓸 CSV 경로")
+    parser.add_argument(
+        "--answers-json", type=Path, help="S27 매칭용 오개념별 틀린 답 표(JSON)를 쓸 경로"
+    )
     args = parser.parse_args(argv)
+    if args.csv is None and args.answers_json is None:
+        parser.error("--csv 또는 --answers-json 중 하나는 있어야 한다")
+    if args.answers_json is not None:
+        args.answers_json.parent.mkdir(parents=True, exist_ok=True)
+        text = misconception_answers_document(load_problems())
+        args.answers_json.write_text(text, encoding="utf-8")
+        print(f"매칭용 표 {json.loads(text)['count']}행 · 파일 {args.answers_json}")
+        if args.csv is None:
+            return 0
     rows = write_table(args.csv, load_problems())
     for item in ALL_INPUTS:
         hits = [row for row in rows if row["입력"] == item and row["틀린답"]]
