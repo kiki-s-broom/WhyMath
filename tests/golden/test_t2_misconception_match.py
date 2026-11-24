@@ -4,6 +4,7 @@
 1. 매칭용 표 파일(`golden/data/misconception_answers_lf.json`)이 지금 주입기가 만드는 표와 글자까지 같다.
 2. 주입기 표(S17 `injection_table.csv`)의 오개념 조합 전수 70개 검증 — 원래 ID 49 · 답이 같은 다른 ID 21
    · 실패 0(S27 보고 「검증 1」). 숫자가 바뀌면 보고도 다시 써야 하므로 여기서 고정한다.
+   완료 기준 ①은 Kiki 결정 ⓐ(2026-11-24)로 "오개념 묶음 안의 ID" 성공 70/70이다.
 3. 실제 오답(저장소에 인용된 사람 출처 17개)의 매칭 결과 — 5/17(S27 보고 「검증 2」).
 4. 플래그 꺼짐·켜짐 두 상태 모두 골든 패스가 초록이고 응답이 같다. 켜짐이면 오답 턴마다(되묻기 3턴 +
    마지막 오답 판정) eval_log에 `t2_misconception_id`가 남고, 꺼짐이면 남지 않는다.
@@ -115,6 +116,23 @@ def test_injector_answers_return_original_or_indistinguishable_id() -> None:
         "OP_07": {"original": 4},
         "OP_08": {"original": 12, "indistinguishable": 12},
     }
+
+
+def test_criterion_1_bundle_success_is_70_of_70() -> None:
+    """완료 기준 ①(Kiki 결정 ⓐ · 2026-11-24): 성공 = "그 답을 만들 수 있는 오개념 묶음 안의 ID".
+
+    모집단 70개 전수가 성공해야 한다(70/70). 겹치는 쌍은 답만으로 가를 수 없으므로 묶음 안이면 성공이다.
+    이 숫자는 같은 주입기로 만든 표를 되돌려 보는 왕복 일관성 검사다 — 실제 성능은 사람 출처 5/17이 말한다.
+    """
+    rows = _injector_rows()
+    assert len(rows) == 70
+    # 행마다: 매칭 결과가 그 행 틀린 답의 오개념 묶음 안에 있는가(None이면 실패)
+    successes = sum(
+        1
+        for row in rows
+        if match_misconception(PROBLEMS[row["문항"]], row["틀린답"]) in _same_answer_ids(rows, row)
+    )
+    assert successes == 70
 
 
 def test_indistinguishable_pairs_are_the_three_known_pairs() -> None:
