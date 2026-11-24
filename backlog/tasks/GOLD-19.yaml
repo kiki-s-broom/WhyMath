@@ -23,6 +23,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1993"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1994"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1995"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1996"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -51,4 +52,6 @@ notes: |-
   [정정 2026-11-24] S27 Kiki 결정 ⓐ 반영 후속 PR
 
   [정정 2026-11-24] S28 T2 적용 — Kiki 머신 720 대기
+
+  [정정 2026-11-24] S29 AI 학생 2차 — 런북·보고 초안 · Kiki 머신 대기
 updated: 2026-11-24
