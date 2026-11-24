@@ -1,0 +1,127 @@
+{
+  "schema": "golden.misconceptions_lf.v1",
+  "made_by": "S26 (2026-11-24 · 하네스 GOLD-19)",
+  "selection": "subunit=일차함수 또는 성취기준 [9수02-14]·[9수02-15]·[9수02-16] 8건 + 일차함수 문항에서 실제로 나는 선행 부호 오개념 3건(M0001·M0002·M0548)",
+  "license_notice": "와이매스 자체 저작물(오개념 서술·distractor 규칙·교정포인트). 성취기준·CCSS 코드는 구조 메타(공공·사실).",
+  "count": 11,
+  "misconceptions": [
+    {
+      "mis_id": "M0034",
+      "statement": "기울기",
+      "student_wrong_thinking": "y절편을 기울기로 착각",
+      "distractor_rule": "y=2x+3 기울기 3 배치",
+      "op_code": [
+        "OP_04"
+      ],
+      "standard_code": "[9수02-15]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0035",
+      "statement": "일차함수 그래프",
+      "student_wrong_thinking": "음의 기울기 방향 혼동",
+      "distractor_rule": "증가·감소 반대",
+      "op_code": [
+        "OP_08"
+      ],
+      "standard_code": "[9수02-15]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0036",
+      "statement": "절편",
+      "student_wrong_thinking": "x절편과 y절편 혼동",
+      "distractor_rule": "좌표 바꿔 배치",
+      "op_code": [
+        "OP_07"
+      ],
+      "standard_code": "[9수02-15]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0037",
+      "statement": "함숫값",
+      "student_wrong_thinking": "f(2)를 2f로 계산",
+      "distractor_rule": "대입 오류",
+      "op_code": [
+        "OP_02"
+      ],
+      "standard_code": "[9수02-14]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0409",
+      "statement": "하나의 x에 여러 y 가능",
+      "student_wrong_thinking": null,
+      "distractor_rule": null,
+      "op_code": [],
+      "standard_code": "[9수02-14]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0567",
+      "statement": "하나의 x에 y가 여럿 대응해도 함수로 본다. y가 변하지 않는 상수함수를 함수가 아니라고 본다.",
+      "student_wrong_thinking": null,
+      "distractor_rule": null,
+      "op_code": [],
+      "standard_code": "[9수02-14]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0568",
+      "statement": "기울기 a와 y절편 b의 역할을 바꾼다. 기울기를 Δx/Δy로 뒤집어 계산한다.",
+      "student_wrong_thinking": null,
+      "distractor_rule": null,
+      "op_code": [
+        "OP_03",
+        "OP_04"
+      ],
+      "standard_code": "[9수02-15]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0569",
+      "statement": "기울기의 부호와 그래프의 증가·감소를 반대로 본다",
+      "student_wrong_thinking": "기울기의 부호와 그래프의 증가·감소를 반대로 본다. 기울기가 0인 가로선을 빠뜨린다.",
+      "distractor_rule": "정답 대신, 학생이 '기울기의 부호와 그래프의 증가·감소를 반대로 본다'처럼 잘못 처리한 결과를 오답 보기로 배치",
+      "op_code": [
+        "OP_08"
+      ],
+      "standard_code": "[9수02-16]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0001",
+      "statement": "음수 곱셈",
+      "student_wrong_thinking": "(-)×(-)=(-) 라고 생각",
+      "distractor_rule": "(-3)×(-4) 정답 12에 -12 배치",
+      "op_code": [
+        "OP_01"
+      ],
+      "standard_code": "[9수01-03]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0002",
+      "statement": "음수 뺄셈",
+      "student_wrong_thinking": "3-(-5)=3-5=-2",
+      "distractor_rule": "정답 8에 -2 배치",
+      "op_code": [
+        "OP_01"
+      ],
+      "standard_code": "[9수01-03]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    },
+    {
+      "mis_id": "M0548",
+      "statement": "(−)−(−) 같은 부호 처리에서 실수한다",
+      "student_wrong_thinking": "(−)−(−) 같은 부호 처리에서 실수한다. (−2)²과 −2²을 같다고 본다(앞은 4, 뒤는 −4).",
+      "distractor_rule": "정답 대신, 학생이 '(−)−(−) 같은 부호 처리에서 실수한다'처럼 잘못 처리한 결과를 오답 보기로 배치",
+      "op_code": [
+        "OP_01"
+      ],
+      "standard_code": "[9수01-05]",
+      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+    }
+  ]
+}

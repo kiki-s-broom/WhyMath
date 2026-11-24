@@ -365,3 +365,35 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 복사: 새 import 금지 목록 — `detect_answer_leakage` + 직접 쓰는 열거형·정규화·상수 → `src/backend/golden/sim/metrics.py`(동작 그대로 · 측정용) · 옛 함수와 나란히 부르는 대조 `tests/golden/test_sim_metrics.py::test_leak_copy_matches_old_function`(입력 18개 · 세 상태 모두) | `score_tutoring_response`·`RubricScore`·`_SOCRATIC_MARKERS`(발문 신호 — S22가 T1 슬롯으로 가져올 것) | 지시서 S19는 "import해 쓴다"였지만 그 모듈은 `golden/LEGACY_MANIFEST.txt` 158행 → import-linter 계약 `golden-no-legacy`가 막는다(CLAUDE.md 골든 규칙이 지시문보다 우선) · import하면 `harness/__init__.py`가 옛 모듈 220개를 부른다(S21 실측 · 전이 예산 30 초과). **GP-4 연결이 아니다** — 러너가 jsonl을 채점할 때만 쓴다. S22가 같은 함수를 `golden/eval/`로 가져오면 metrics.py가 그쪽을 import하도록 하나로 합친다(LATER) | S19 |
+
+## 슬롯 T2 경계 (S26 · 1단계 · 2026-11-24 · 기준 main `3df80cd1` · 인용 F-05)
+
+**T2 경계: 함수 1개 + 매칭 로직 없음** — 다섯 걸음 ①(경계 긋기)이며, 특성화 테스트(②)보다 먼저 적었다.
+
+| 옛 함수 (파일 경로 · 이름) | 지금 하는 일 | 함께 따라오는 것 | 일차함수에 쓰는 항목 |
+| --- | --- | --- | --- |
+| `whymath_backend/l1/misconception/catalog_loader.py` · `load_misconceptions(session, collection_json, *, engine, settings, store, overwrite_cms_edits, conflicts) -> int` | 코퍼스 Collection(dict 또는 파일)의 `misconceptions` 행마다 `schema.MisconceptionCatalog`로 검증(`_misconception_from_row` · 칸 이름 바꿈 없음 · `extra=forbid`)한 뒤 저장소 `populate`로 DB에 멱등 upsert, 적재 행 수를 돌려준다 | `_as_collection`·`_misconception_from_row`(같은 파일) · `schema/misconception_catalog.py`의 `MisconceptionCatalog`(pydantic · 칸 18개) · 저장소를 넣지 않으면 `MisconceptionCatalogStore`(sync 엔진 · DB) | ① 행 검증(필수 `mis_id` · 모르는 칸 거부) ② 행 순서 보존 ③ 반환 = 검증된 행 수 |
+
+- **매칭 로직 없음.** 지시서가 든 후보 둘을 읽었다.
+  - `wrong_answer_signature_table.py`는 오답 서명 규칙표(`data/corpus/wrong_answer_signatures_v1/rules.yaml`) 로더다. 규칙 10개가 모두 미분 문항용(`ask` = `derivative_at` 2 · `extremum_value` 2 · `extremum_point`·`extremum_any_point`·`extremum_count`·`monomial_params`·`one_sided_difference`·`differentiable_yes_no` 각 1)이고, 일차함수 오개념 ID(M0034~M0037·M0409·M0567~M0569)와 부호 3건(M0001·M0002·M0548)은 하나도 없다.
+  - `resolve.py`는 오개념의 성취기준·개념 연결을 푸는 함수라 답을 보지 않는다.
+  - 그래서 **T2는 로더만 가져오고, 매칭(틀린 답 → 오개념 ID)은 S27이 주입기 표(`golden/sim/errors.py`의 `MISCONCEPTION_RULES`)를 거꾸로 써서 50줄로 새로 쓴다**(지시서 할 일 2의 "없으면" 문장 그대로).
+- **③(복사/import)에 대한 사실 — S27 판단용.**
+  - 이 파일은 `golden/LEGACY_MANIFEST.txt` 277행에 있다 → import-linter 계약 `golden-no-legacy`가 `golden` 패키지의 import를 막는다.
+  - import하면 `config`·`db.models`·`l1.concept_graph.embedding`을 함께 불러 **옛 모듈 114개**가 로드된다(2026-11-24 이 세션 실측 · `sys.modules` 세기). 전이 예산 30을 넘는다.
+  - 골든이 실제로 필요한 것은 DB 적재가 아니라 "행 검증" ①②뿐이다. 따라서 S27은 import가 아니라 **복사**(`_misconception_from_row` + `MisconceptionCatalog` 모델)이거나, 이미 검증된 `golden/data/misconceptions_lf.json`을 그대로 읽는 쪽이 된다. 결정은 S27이 적는다.
+- **추출(할 일 3):** `golden/data/misconceptions_lf.json` **11건**이다. 일차함수분 8건과 선행 부호 3건이고, S17 주입기 표와 같은 11건이다.
+  - 칸: `mis_id` · `statement`(코퍼스 `canonical_statement`) · `student_wrong_thinking` · `distractor_rule` · `op_code` · `standard_code` · `source`.
+  - `op_code`는 주입기 규칙 순서의 목록이고, 빈 목록이 2건이다(M0409·M0567 — 함수 판별 문항이 30문항에 없다).
+  - 계획서 15~25건에 못 미치지만 채우지 않았다(LLM 생성 금지).
+- **특성화(②):** `tests/golden/characterization/test_t2_misconception.py`.
+  - 옛 로더를 옛 자리에서 가짜 저장소로 부른다. 입력은 ID 10개, 출력은 행 10개(핵심 칸 7개)를 고정한다.
+  - 같은 입력 100회 → 같은 출력이다(결정성 통과 → "버림: 비결정적" 아님).
+  - 골든 파일 11건의 글이 옛 로더 출력과 같은지도 대조한다.
+- **errors.py(할 일 5):** S17이 파일 안 딕셔너리로 두었던 임시 표를 `misconceptions_lf.json`에서 읽게 바꿨다(`load_misconception_table`).
+  - OP_01 오개념의 계산 단계 변형(`mul_neg`·`sub_neg`·`sub_neg_neg`)은 틀린 답을 만드는 규칙이라 주입기에 남겼다(`SIGN_VARIANTS`).
+  - 옛 표와 새 표는 `LF_MISCONCEPTIONS`·`SIGN_MISCONCEPTIONS`·`MISCONCEPTION_RULES`·`OP_RULES`·`ALL_INPUTS`가 모두 같았다(순서 포함). 커밋된 S17 `injection_table.csv`와도 글자 단위로 같다.
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음(경계 긋기·추출·특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `l1/misconception/catalog_loader.py`의 `load_misconceptions` 1개 · 자료 = `golden/data/misconceptions_lf.json` 11건 | 매칭 로직(옛 코드에 일차함수용이 없음 — S27이 새로 씀) · 오개념 DB 843건 전체 적재·그래프 탐색·디스트랙터 생성(지시서 "하지 말 것") | T2 설계 · 복사/import·연결은 S27 | S26 |

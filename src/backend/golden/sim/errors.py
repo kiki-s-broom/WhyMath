@@ -7,8 +7,8 @@ LLM을 부르지 않는다. 규칙만 쓰고, 같은 (문항, 오개념) 입력�
 
 - 오개념 ID는 `data/corpus/misconceptions_v1/misconceptions.json`에서 센 일차함수분 8건
   (`subunit=일차함수` 또는 성취기준 `[9수02-14/15/16]`)과 선행 부호 오개념 3건이다.
-  옛 로더(`whymath_backend.l1.misconception`)는 쓰지 않고 표를 이 파일 안 딕셔너리로 둔다 —
-  T2(S26)가 다섯 걸음으로 정식 목록을 가져올 때까지 중복은 의도된 것이다.
+  표는 `golden/data/misconceptions_lf.json`(S26이 코퍼스에서 추출 · 11건)에서 읽는다.
+  옛 로더(`whymath_backend.l1.misconception`)는 쓰지 않는다(LEGACY_MANIFEST · 새 import 금지).
 - DB에 짝이 없는 OP 코드(OP_05·OP_06)는 오개념 ID 자리에 OP 코드를 그대로 넣어 부른다
   (`inject(problem, "OP_05")`). 이때 돌려주는 `misconception_id`는 None이다.
 - 문항 유형에 맞지 않으면 None을 돌려주고, 부르는 쪽(S19 러너)이 다른 오개념을 고른다.
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import re
 import sys
 from collections.abc import Callable
@@ -41,22 +42,19 @@ from golden.sim.seed_extract import OP_CODES, classify_error
 # 오개념 ID → OP 코드 표
 # ──────────────────────────────────────────────────────────────────────
 
-# 일차함수분 8건(사전 실측 2026-11-15 · 이 세션 재확인 2026-11-20 — 같은 8건)
-LF_MISCONCEPTIONS: tuple[str, ...] = (
-    "M0034",
-    "M0035",
-    "M0036",
-    "M0037",
-    "M0409",
-    "M0567",
-    "M0568",
-    "M0569",
+# 오개념 표는 `golden/data/misconceptions_lf.json`에서 읽는다
+# (S26 · 일차함수분 8건 + 선행 부호 3건 = 11건).
+# S17이 이 파일 안 딕셔너리로 두었던 임시 표를 S26이 파일로 옮겼다 — 주입기 동작은 그대로다
+# (`test_sim_errors.py::test_committed_table_matches_code`가 S17 표 CSV와 글자 단위로 대조).
+# 파일 칸: mis_id · statement · student_wrong_thinking · distractor_rule · op_code
+# (주입기 규칙 순서의 OP 코드 목록 — 빈 목록 = 30문항 어디에도 맞는 규칙이 없다)
+# · standard_code · source
+MISCONCEPTIONS_LF_PATH = (
+    Path(__file__).resolve().parents[4] / "golden" / "data" / "misconceptions_lf.json"
 )
 
-# 일차함수 문항에서 실제로 나는 선행(정수 연산) 부호 오개념 3건
-SIGN_MISCONCEPTIONS: tuple[str, ...] = ("M0001", "M0002", "M0548")
-
-ALL_MISCONCEPTIONS: tuple[str, ...] = LF_MISCONCEPTIONS + SIGN_MISCONCEPTIONS
+# 일차함수분과 선행 오개념을 가르는 성취기준 접두(중2 함수 = [9수02-…] · 중1 정수 = [9수01-…])
+_LF_STANDARD_PREFIX = "[9수02-"
 
 # OP 코드만으로 부를 수 있는 코드(OP_00 미분류는 만들 수 없다)
 INJECTABLE_OPS: tuple[str, ...] = tuple(code for code in OP_CODES if code != "OP_00")
@@ -67,34 +65,68 @@ SUB_NEG = "sub_neg"  # a−(−b)를 a−b로
 SUB_NEG_NEG = "sub_neg_neg"  # (−a)−(−b)를 (−a)−b로(빼지는 수도 음수일 때만)
 FLIP = "flip"  # 정답과 부호만 반대
 
-# 오개념 ID → (OP 코드, 변형 이름) 목록. 앞에서부터 해 보고 처음 맞는 규칙을 쓴다.
-# 빈 목록 = 30문항 어디에도 맞는 규칙이 없다(함수 개념 오개념 — 함수 판별 문항이 없다).
-MISCONCEPTION_RULES: dict[str, tuple[tuple[str, str | None], ...]] = {
-    # M0034 기울기 — y절편을 기울기로 착각
-    "M0034": (("OP_04", None),),
-    # M0035 일차함수 그래프 — 음의 기울기 방향 혼동(증가·감소 반대)
-    "M0035": (("OP_08", None),),
-    # M0036 절편 — x절편과 y절편 혼동(좌표 바꿔 배치)
-    "M0036": (("OP_07", None),),
-    # M0037 함숫값 — f(2)를 2f로 계산(대입 오류)
-    "M0037": (("OP_02", None),),
-    # M0409 하나의 x에 여러 y 가능 — 함수 판별 문항이 30문항에 없다
-    "M0409": (),
-    # M0567 다가 대응도 함수로 봄·상수함수를 함수가 아니라고 봄 — 같은 이유로 없다
-    "M0567": (),
-    # M0568 기울기 a와 y절편 b의 역할을 바꿈 · 기울기를 Δx/Δy로 뒤집음 — 뒤집음(OP_03)부터 해 본다.
-    # S20 반복: 전에는 OP_04를 먼저 해 봐서 OP_04가 되는 문항(식에서 읽기·식 세우기)에서는 OP_03이
-    # 한 번도 나오지 않았다. 역할 바꿈(OP_04)은 M0034가 이미 맡고 있어 M0568만의 몫은 뒤집음이다
-    "M0568": (("OP_03", None), ("OP_04", None)),
-    # M0569 기울기의 부호와 그래프의 증가·감소를 반대로 봄
-    "M0569": (("OP_08", None),),
-    # M0001 음수 곱셈 — (−)×(−)=(−)
-    "M0001": (("OP_01", MUL_NEG),),
-    # M0002 음수 뺄셈 — 3−(−5)=3−5=−2
-    "M0002": (("OP_01", SUB_NEG),),
-    # M0548 (−)−(−) 같은 부호 처리에서 실수
-    "M0548": (("OP_01", SUB_NEG_NEG),),
+# OP_01(부호) 오개념의 계산 단계 변형 — 파일에는 OP 코드까지만 있고, 어느 단계에서 부호를 틀리는지는
+# 틀린 답을 만드는 규칙이라 주입기가 가진다. 파일의 OP_01 오개념이 여기 없으면 읽기에서 멈춘다.
+SIGN_VARIANTS: dict[str, str] = {
+    "M0001": MUL_NEG,  # 음수 곱셈 — (−)×(−)=(−)
+    "M0002": SUB_NEG,  # 음수 뺄셈 — 3−(−5)=3−5=−2
+    "M0548": SUB_NEG_NEG,  # (−)−(−) 같은 부호 처리에서 실수
 }
+
+# 파일의 op_code 순서에 담긴 뜻(S17 표에서 옮김 — JSON에는 주석을 둘 수 없어 여기 남긴다):
+# - M0568(기울기 a·b 역할 바꿈 · Δx/Δy 뒤집음)은 OP_03(뒤집음)을 먼저, OP_04를 다음에 해 본다.
+#   S20 반복: 전에는 OP_04를 먼저 해 봐서 OP_04가 되는 문항(식에서 읽기·식 세우기)에서는 OP_03이
+#   한 번도 나오지 않았다. 역할 바꿈(OP_04)은 M0034가 이미 맡고 있어 M0568만의 몫은 뒤집음이다.
+# - M0409(하나의 x에 여러 y)·M0567(다가 대응을 함수로 봄 등)은 빈 목록이다
+#   — 함수 판별 문항이 30문항에 없다.
+
+
+def load_misconception_table(
+    path: Path = MISCONCEPTIONS_LF_PATH,
+) -> tuple[tuple[str, ...], tuple[str, ...], dict[str, tuple[tuple[str, str | None], ...]]]:
+    """오개념 파일 → (일차함수분 ID들, 선행 부호 ID들, 오개념 ID → (OP 코드, 변형 이름) 목록).
+
+    파일 순서를 그대로 지킨다(주입 표·CSV 순서가 여기에 기댄다).
+    틀린 파일은 조용히 빈 표로 두지 않고 멈춘다 — 빈 표는 "오개념 없음"과 구별되지 않아
+    주입기 전체가 OP 코드만으로 도는 것을 숨긴다.
+    """
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    rows = raw.get("misconceptions") if isinstance(raw, dict) else None
+    if not isinstance(rows, list) or not rows:
+        raise ValueError(f"오개념 파일에 misconceptions 목록이 없다: {path}")
+    if raw.get("count") != len(rows):
+        raise ValueError(
+            f"오개념 파일 count({raw.get('count')})와 실제 건수({len(rows)})가 다르다: {path}"
+        )
+    linear: list[str] = []
+    prerequisite: list[str] = []
+    rules: dict[str, tuple[tuple[str, str | None], ...]] = {}
+    for row in rows:
+        mis_id = str(row["mis_id"])
+        if mis_id in rules:
+            raise ValueError(f"오개념 ID 중복: {mis_id}")
+        steps: list[tuple[str, str | None]] = []
+        for op in row["op_code"]:
+            if op not in INJECTABLE_OPS:
+                raise ValueError(f"{mis_id}: 주입할 수 없는 OP 코드 {op!r}")
+            if op == "OP_01":
+                if mis_id not in SIGN_VARIANTS:
+                    raise ValueError(f"{mis_id}: OP_01인데 부호 변형(SIGN_VARIANTS)이 없다")
+                steps.append((op, SIGN_VARIANTS[mis_id]))
+            else:
+                steps.append((op, None))
+        rules[mis_id] = tuple(steps)
+        if str(row["standard_code"]).startswith(_LF_STANDARD_PREFIX):
+            linear.append(mis_id)
+        else:
+            prerequisite.append(mis_id)
+    return tuple(linear), tuple(prerequisite), rules
+
+
+# 일차함수분 8건 · 선행 부호 3건 · 오개념 ID → (OP 코드, 변형) 목록 — 모듈을 불러올 때 한 번 읽는다
+LF_MISCONCEPTIONS, SIGN_MISCONCEPTIONS, MISCONCEPTION_RULES = load_misconception_table()
+
+ALL_MISCONCEPTIONS: tuple[str, ...] = LF_MISCONCEPTIONS + SIGN_MISCONCEPTIONS
 
 # OP 코드만으로 부를 때의 규칙 목록. OP_01은 계산 단계의 부호 변형을 먼저 보고, 없으면 부호 반대.
 OP_RULES: dict[str, tuple[tuple[str, str | None], ...]] = {
