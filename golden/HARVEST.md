@@ -392,7 +392,7 @@ cd src/backend && python -m golden.measure_unreferenced
   - 골든 파일 11건의 글이 옛 로더 출력과 같은지도 대조한다.
 - **errors.py(할 일 5):** S17이 파일 안 딕셔너리로 두었던 임시 표를 `misconceptions_lf.json`에서 읽게 바꿨다(`load_misconception_table`).
   - OP_01 오개념의 계산 단계 변형(`mul_neg`·`sub_neg`·`sub_neg_neg`)은 틀린 답을 만드는 규칙이라 주입기에 남겼다(`SIGN_VARIANTS`).
-  - 옛 표와 새 표는 `LF_MISCONCEPTIONS`·`SIGN_MISCONCEPTIONS`·`MISCONCEPTION_RULES`·`OP_RULES`·`ALL_INPUTS`가 모두 같았다(순서 포함). 커밋된 S17 `injection_table.csv`와도 글자 단위로 같다.
+  - 옛 표와 새 표는 `LF_MISCONCEPTIONS`·`SIGN_MISCONCEPTIONS`·`ALL_MISCONCEPTIONS`·`MISCONCEPTION_RULES`·`INJECTABLE_OPS`·`OP_RULES`·`ALL_INPUTS` 7개가 모두 같았다(순서 포함). 커밋된 S17 `injection_table.csv`와도 글자 단위로 같다.
 
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
