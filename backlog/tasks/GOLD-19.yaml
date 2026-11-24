@@ -22,6 +22,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1992"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1993"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1994"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1995"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -48,4 +49,6 @@ notes: |-
   [정정 2026-11-24] S27 T2 매칭 — 일부 완료(기준 ① 49/70 · Kiki 결정 대기) · PR #1993
 
   [정정 2026-11-24] S27 Kiki 결정 ⓐ 반영 후속 PR
+
+  [정정 2026-11-24] S28 T2 적용 — Kiki 머신 720 대기
 updated: 2026-11-24

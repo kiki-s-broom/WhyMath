@@ -11,6 +11,7 @@
 | M3 판정 오류율 | 시뮬레이터가 아는 정답·오답과 채점기 판정이 다른 비율 | 1% 미만 | 차단 |
 | M4 크래시·시간 초과 | http_status가 200이 아닌 세션 수(null = 예외·시간 초과) | 0건 | 차단 |
 | M5 렌더 깨짐 | 튜터 쪽 문장에 짝 안 맞는 `$`·깨진 `\\frac`·백틱 | 0건 | 차단 |
+| (S28) 오개념 검출률 | P3 세션 중 튜터가 주입 오개념의 낱말을 말한 비율 | 60% 이상 | S30 판정 |
 
 M1 판정 — 옛 `whymath_backend.harness.pedagogical_rubric.detect_answer_leakage`와 같은 규칙:
 지시서는 그 함수를 import하라고 했지만, 그 모듈은 `golden/LEGACY_MANIFEST.txt`(158행)에 있어
@@ -303,3 +304,84 @@ def slowest_problem(sessions: Sequence[Mapping[str, Any]]) -> str | None:
 def blocking_failures(metrics: Mapping[str, Mapping[str, Any]]) -> list[str]:
     """차단 기준 중 통과하지 못한 메트릭 이름."""
     return [name for name in BLOCKING if not metrics[name]["pass"]]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# (S28) 오개념 검출률 — P3 세션에서 튜터가 주입된 오개념을 짚었는가
+# ──────────────────────────────────────────────────────────────────────
+
+# 오개념 검출률 기준(공유 계약 「메트릭 5개와 기준」 마지막 줄)
+# — 못 미쳐도 고치지 않고 S30이 판정한다
+DETECTION_MIN = 0.60
+
+# 검출률을 재는 페르소나 — 오개념 보유형(주입기 답을 세션 내내 유지)
+DETECTION_PERSONA = "P3"
+
+# 낱말 비교 전 정규화 — NFKC·소문자·모든 공백 제거("y의 변화량"과 "y의변화량"을 같게 본다)
+_SPACES = re.compile(r"\s+")
+
+
+def _squash(text: str) -> str:
+    """검출 낱말 비교용 정규화(값 비교용 `_normalize`와 다르다 — 괄호·쉼표는 남긴다)."""
+    return _SPACES.sub("", unicodedata.normalize("NFKC", text).lower())
+
+
+def mentions_misconception(text: str, keywords: Sequence[str]) -> bool:
+    """튜터 문장이 검출 낱말 중 하나라도 포함하는가. 낱말이 비어 있으면 False(공허한 검출 금지)."""
+    squashed = _squash(text)
+    return any(_squash(k) and _squash(k) in squashed for k in keywords)
+
+
+def misconception_detection(
+    sessions: Sequence[Mapping[str, Any]],
+    bundles: Mapping[tuple[str, str], Sequence[str]],
+    keywords: Mapping[str, Sequence[str]],
+) -> dict[str, Any]:
+    """P3 세션 → 오개념 검출률(지시서 S28 할 일 2).
+
+    - `bundles`: (문항 ID, 주입기 틀린 답) → 그 답을 만드는 오개념 ID 묶음. 주입기가 같은 문항에서
+      같은 답을 내는 오개념 쌍(S27 「충돌」)은 답만으로 가를 수 없어 묶음으로 본다
+      (S27 결정 ⓐ와 같은 정의).
+    - `keywords`: 오개념 ID → 검출 낱말(`misconceptions_lf.json`의 `keywords`).
+    - 분모 = P3 세션 중 주입 답이 오개념 묶음에 속하고
+      (OP 코드만으로 만든 답은 제외 — 주입된 오개념이 없다) 튜터 되묻기가 1번 이상 있는 세션.
+      검출 = 그 세션의 되묻기 중 하나라도 묶음 안 오개념의
+      낱말을 말했다.
+    - 분모가 0이면 값은 None이고 통과가 아니다(모름 ≠ 통과).
+    """
+    eligible = detected = op_only = no_tutor_turn = 0
+    by_bundle: dict[str, dict[str, int]] = {}
+    for session in sessions:
+        if session.get("persona") != DETECTION_PERSONA:
+            continue
+        forced = session.get("forced_answer")
+        bundle = bundles.get((str(session.get("problem_id")), str(forced))) if forced else None
+        if not bundle:
+            op_only += 1
+            continue
+        tutor_texts = [
+            str(t.get("tutor") or "")
+            for t in session.get("turns") or []
+            if t.get("kind") == "tutor_turn"
+        ]
+        if not tutor_texts:
+            no_tutor_turn += 1
+            continue
+        words = [w for mis_id in bundle for w in keywords.get(mis_id, ())]
+        hit = any(mentions_misconception(text, words) for text in tutor_texts)
+        eligible += 1
+        detected += int(hit)
+        row = by_bundle.setdefault("·".join(sorted(bundle)), {"eligible": 0, "detected": 0})
+        row["eligible"] += 1
+        row["detected"] += int(hit)
+    rate = round(detected / eligible, 4) if eligible else None
+    return {
+        "value": rate,
+        "threshold": f">={DETECTION_MIN:.0%}",
+        "pass": rate is not None and rate >= DETECTION_MIN,
+        "eligible_sessions": eligible,
+        "detected_sessions": detected,
+        "excluded_op_only": op_only,
+        "excluded_no_tutor_turn": no_tutor_turn,
+        "by_bundle": dict(sorted(by_bundle.items())),
+    }

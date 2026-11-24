@@ -15,8 +15,12 @@
 
 한계(숨기지 않는다): 같은 문항에서 두 오개념이 **같은 틀린 답**을 내면 답만으로는 둘을 가를 수 없다.
 그때는 파일 순서상 앞의 ID가 나온다(S27 보고 「충돌」 — M0035·M0569 · M0034·M0568 · M0002·M0548).
-플래그 `GOLDEN_T2_MISCONCEPTION=1`일 때만 api가 부르고, 결과는 `golden.eval_log`에 기록만 한다
-(튜터에 보내는 것은 S28).
+플래그 `GOLDEN_T2_MISCONCEPTION=1`일 때만 api가 부르고, 결과는 `golden.eval_log`에 기록한다.
+
+S28: 매칭이 있으면 그 오개념의 한 줄 설명(`misconception_description` — 오개념 파일의
+`prompt_description`)을 튜터 사용자 프롬프트에 한 줄로 넣는다(`tutor.build_user_prompt`).
+설명에는 숫자를 넣지 않는다 — 문항 정답 숫자가 설명 예시를 타고 튜터 문장으로 새지 않게
+(테스트가 막는다).
 """
 
 from __future__ import annotations
@@ -38,6 +42,12 @@ T2_MATCHER_VERSION = "t2-match-v1"
 # 매칭용 표 — parents[4] = src/backend/golden/eval → golden → backend → src → 저장소 루트
 ANSWERS_PATH = (
     Path(__file__).resolve().parents[4] / "golden" / "data" / "misconception_answers_lf.json"
+)
+
+# 오개념 파일(S26 · S28이 prompt_description·keywords를 더함)
+# — 튜터에 넣는 한 줄 설명을 여기서 읽는다
+MISCONCEPTIONS_PATH = (
+    Path(__file__).resolve().parents[4] / "golden" / "data" / "misconceptions_lf.json"
 )
 
 
@@ -78,3 +88,28 @@ def match_misconception(problem: Problem, student_text: str) -> str | None:
         if grade.is_correct({**problem, "answer": wrong_answer}, student_text):
             return mis_id
     return None
+
+
+@lru_cache(maxsize=1)
+def description_table() -> dict[str, str]:
+    """오개념 ID → 튜터 프롬프트용 한 줄 설명(`prompt_description`). 처음 한 번만 읽는다.
+
+    틀린 파일은 멈춘다(빈 표 금지 — 설명이 없으면 매칭이 있어도 튜터에 아무것도 안 가는데,
+    그것이 "매칭 없음"과 구별되지 않는다).
+    """
+    raw = json.loads(MISCONCEPTIONS_PATH.read_text(encoding="utf-8"))
+    rows = raw.get("misconceptions") if isinstance(raw, dict) else None
+    if not isinstance(rows, list) or not rows:
+        raise ValueError(f"오개념 파일에 misconceptions 목록이 없다: {MISCONCEPTIONS_PATH}")
+    table: dict[str, str] = {}
+    for row in rows:
+        description = str(row.get("prompt_description") or "").strip()
+        if not description:
+            raise ValueError(f"{row.get('mis_id')}: prompt_description이 비어 있다")
+        table[str(row["mis_id"])] = description
+    return table
+
+
+def misconception_description(mis_id: str) -> str:
+    """오개념 ID → 한 줄 설명. 표에 없는 ID면 KeyError(매칭표와 오개념 파일이 어긋난 것)."""
+    return description_table()[mis_id]

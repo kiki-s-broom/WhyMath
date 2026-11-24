@@ -1,6 +1,7 @@
 {
   "schema": "golden.misconceptions_lf.v1",
   "made_by": "S26 (2026-11-24 · 하네스 GOLD-19)",
+  "fields_added": "prompt_description·keywords — S28(2026-11-24 · 하네스 GOLD-19): 튜터 프롬프트 한 줄 설명(숫자 없음)과 오개념 검출률 낱말",
   "selection": "subunit=일차함수 또는 성취기준 [9수02-14]·[9수02-15]·[9수02-16] 8건 + 일차함수 문항에서 실제로 나는 선행 부호 오개념 3건(M0001·M0002·M0548)",
   "license_notice": "와이매스 자체 저작물(오개념 서술·distractor 규칙·교정포인트). 성취기준·CCSS 코드는 구조 메타(공공·사실).",
   "count": 11,
@@ -14,7 +15,13 @@
         "OP_04"
       ],
       "standard_code": "[9수02-15]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "y절편(상수항)을 기울기로 착각한다",
+      "keywords": [
+        "y절편",
+        "상수항",
+        "절편"
+      ]
     },
     {
       "mis_id": "M0035",
@@ -25,7 +32,14 @@
         "OP_08"
       ],
       "standard_code": "[9수02-15]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "음의 기울기인데 그래프가 올라간다(증가한다)고 본다",
+      "keywords": [
+        "감소",
+        "내려가",
+        "음의 기울기",
+        "부호"
+      ]
     },
     {
       "mis_id": "M0036",
@@ -36,7 +50,14 @@
         "OP_07"
       ],
       "standard_code": "[9수02-15]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "x절편과 y절편을 바꿔 읽는다",
+      "keywords": [
+        "x절편",
+        "y절편",
+        "x축",
+        "y축"
+      ]
     },
     {
       "mis_id": "M0037",
@@ -47,7 +68,14 @@
         "OP_02"
       ],
       "standard_code": "[9수02-14]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "f(k)를 x에 k를 대입하지 않고 k와 f를 곱한 것처럼 계산한다",
+      "keywords": [
+        "대입",
+        "x 자리",
+        "x 대신",
+        "x에 넣"
+      ]
     },
     {
       "mis_id": "M0409",
@@ -56,7 +84,13 @@
       "distractor_rule": null,
       "op_code": [],
       "standard_code": "[9수02-14]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "하나의 x에 y가 여러 개 대응해도 함수로 본다",
+      "keywords": [
+        "대응",
+        "하나의 x",
+        "함수의 뜻"
+      ]
     },
     {
       "mis_id": "M0567",
@@ -65,7 +99,13 @@
       "distractor_rule": null,
       "op_code": [],
       "standard_code": "[9수02-14]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "하나의 x에 y가 여럿 대응해도 함수로 보고, 상수함수는 함수가 아니라고 본다",
+      "keywords": [
+        "대응",
+        "하나의 x",
+        "상수함수"
+      ]
     },
     {
       "mis_id": "M0568",
@@ -77,7 +117,20 @@
         "OP_04"
       ],
       "standard_code": "[9수02-15]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "기울기를 x의 변화량 ÷ y의 변화량처럼 거꾸로 계산하거나, 기울기와 y절편의 역할을 바꾼다",
+      "keywords": [
+        "분자",
+        "분모",
+        "뒤집",
+        "거꾸로",
+        "y의 변화량",
+        "x의 변화량",
+        "y의 증가량",
+        "x의 증가량",
+        "Δy",
+        "Δx"
+      ]
     },
     {
       "mis_id": "M0569",
@@ -88,7 +141,15 @@
         "OP_08"
       ],
       "standard_code": "[9수02-16]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "기울기의 부호와 그래프의 증가·감소를 반대로 본다",
+      "keywords": [
+        "증가",
+        "감소",
+        "부호",
+        "오른쪽 위",
+        "오른쪽 아래"
+      ]
     },
     {
       "mis_id": "M0001",
@@ -99,7 +160,14 @@
         "OP_01"
       ],
       "standard_code": "[9수01-03]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "음수와 음수를 곱하면 음수라고 계산한다",
+      "keywords": [
+        "부호",
+        "음수끼리",
+        "음수와 음수",
+        "마이너스"
+      ]
     },
     {
       "mis_id": "M0002",
@@ -110,7 +178,15 @@
         "OP_01"
       ],
       "standard_code": "[9수01-03]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "음수를 빼는 계산에서 괄호 앞 빼기 부호를 처리하지 않는다",
+      "keywords": [
+        "부호",
+        "빼기",
+        "뺄셈",
+        "괄호",
+        "마이너스"
+      ]
     },
     {
       "mis_id": "M0548",
@@ -121,7 +197,15 @@
         "OP_01"
       ],
       "standard_code": "[9수01-05]",
-      "source": "data/corpus/misconceptions_v1/misconceptions.json"
+      "source": "data/corpus/misconceptions_v1/misconceptions.json",
+      "prompt_description": "음수끼리 빼는 계산에서 부호 처리를 잘못한다",
+      "keywords": [
+        "부호",
+        "빼기",
+        "뺄셈",
+        "괄호",
+        "마이너스"
+      ]
     }
   ]
 }
