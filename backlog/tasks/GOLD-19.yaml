@@ -21,6 +21,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1991"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1992"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1993"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1994"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -45,4 +46,6 @@ notes: |-
   [정정 2026-11-24] S26 T2 설계 — 오개념 11건 추출 · 특성화 · errors.py 파일 읽기 · PR #1992(검토 대기)
 
   [정정 2026-11-24] S27 T2 매칭 — 일부 완료(기준 ① 49/70 · Kiki 결정 대기) · PR #1993
+
+  [정정 2026-11-24] S27 Kiki 결정 ⓐ 반영 후속 PR
 updated: 2026-11-24
