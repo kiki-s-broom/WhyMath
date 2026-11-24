@@ -1,0 +1,166 @@
+{
+  "before": {
+    "run_dir": "f0",
+    "t2_flag": "0",
+    "mode": "live",
+    "date": "2026-11-25",
+    "planned_sessions": 720,
+    "skipped_sessions": 28,
+    "sessions": 692,
+    "personas": [
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6",
+      "P7",
+      "P8"
+    ],
+    "report_file": "sim_report.json",
+    "metrics": {
+      "M1": {
+        "value": 0.013,
+        "threshold": "0%",
+        "pass": false
+      },
+      "M2": {
+        "value": 0.902,
+        "threshold": "1.5~3.0",
+        "pass": false
+      },
+      "M3": {
+        "value": 0.0047,
+        "threshold": "<1%",
+        "pass": true
+      },
+      "M4": {
+        "value": 1,
+        "threshold": "0",
+        "pass": false
+      },
+      "M5": {
+        "value": 5,
+        "threshold": "0",
+        "pass": false
+      }
+    },
+    "exit_code": 1,
+    "degraded_tutor_turns": 1,
+    "detection": {
+      "value": 0.5143,
+      "threshold": ">=60%",
+      "pass": false,
+      "eligible_sessions": 35,
+      "detected_sessions": 18,
+      "excluded_op_only": 27,
+      "excluded_no_tutor_turn": 0,
+      "by_bundle": {
+        "M0034·M0568": {
+          "eligible": 8,
+          "detected": 5
+        },
+        "M0035·M0569": {
+          "eligible": 6,
+          "detected": 2
+        },
+        "M0037": {
+          "eligible": 11,
+          "detected": 8
+        },
+        "M0568": {
+          "eligible": 10,
+          "detected": 3
+        }
+      }
+    }
+  },
+  "after": {
+    "run_dir": "f1",
+    "t2_flag": "1",
+    "mode": "live",
+    "date": "2026-11-25",
+    "planned_sessions": 720,
+    "skipped_sessions": 43,
+    "sessions": 677,
+    "personas": [
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "P5",
+      "P6",
+      "P7",
+      "P8"
+    ],
+    "report_file": "sim_report.json",
+    "metrics": {
+      "M1": {
+        "value": 0.0103,
+        "threshold": "0%",
+        "pass": false
+      },
+      "M2": {
+        "value": 0.897,
+        "threshold": "1.5~3.0",
+        "pass": false
+      },
+      "M3": {
+        "value": 0.0047,
+        "threshold": "<1%",
+        "pass": true
+      },
+      "M4": {
+        "value": 2,
+        "threshold": "0",
+        "pass": false
+      },
+      "M5": {
+        "value": 3,
+        "threshold": "0",
+        "pass": false
+      }
+    },
+    "exit_code": 1,
+    "degraded_tutor_turns": 4,
+    "detection": {
+      "value": 0.8,
+      "threshold": ">=60%",
+      "pass": true,
+      "eligible_sessions": 35,
+      "detected_sessions": 28,
+      "excluded_op_only": 27,
+      "excluded_no_tutor_turn": 0,
+      "by_bundle": {
+        "M0034·M0568": {
+          "eligible": 8,
+          "detected": 5
+        },
+        "M0035·M0569": {
+          "eligible": 6,
+          "detected": 6
+        },
+        "M0037": {
+          "eligible": 11,
+          "detected": 9
+        },
+        "M0568": {
+          "eligible": 10,
+          "detected": 8
+        }
+      }
+    }
+  },
+  "criterion_two": "플래그 1에서 M1 0% · M3 1% 미만 · M4 0 · M5 0",
+  "checks": {
+    "detection_measured": true,
+    "detection_at_least_60pct": true,
+    "m1_zero": false,
+    "m3_under_1pct": true,
+    "m4_zero": false,
+    "m5_zero": false
+  },
+  "criterion_one_met": true,
+  "criterion_two_met": false,
+  "reference_m1_not_increased": true
+}

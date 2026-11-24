@@ -1,0 +1,1 @@
+﻿HINT f1 hint=160 no_hint=1456 unlogged=253 tutor_turns=1869 window=2026-11-24T17:53:48Z~2026-11-24T19:59:50Z
