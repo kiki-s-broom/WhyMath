@@ -417,3 +417,18 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음(옛 코드 import 0 · 복사 0) · 새로 씀: `golden/eval/misconception.py`(`match_misconception`·`misconception_enabled`) + 표 `golden/data/misconception_answers_lf.json`(70행 · 주입기 S17 규칙의 역방향) · 연결 `api.py` · 기록 `golden.eval_log`(`t2_misconception_id`) · 플래그 `GOLDEN_T2_MISCONCEPTION`(기본 0) | 옛 `catalog_loader.load_misconceptions`(DB 적재기 — 필요한 행은 S26 파일에 이미 있음 · LEGACY_MANIFEST · 옛 모듈 114개) · 튜터에 매칭 결과 보내기(S28 몫) · 오개념 DB 843건 적재 | 옛 코드에 일차함수 매칭이 없어 지시서 ②(주입기 규칙 역적용)로 씀 · 답만으로 가를 수 없는 오개념 쌍 3개는 앞 ID가 나온다(S27 보고) | S27 |
+
+### 슬롯 T2 적용 (S28 · 2026-11-24 · 기준 main `ce489827` · 인용 F-05)
+
+- **옛 자산:** 새로 가져온 것이 없다(다섯 걸음 ④ 연결의 연장 — 옛 코드 import 0 · 복사 0).
+- **연결(④ GP-4):** `api.py` 되묻기 경로에서 `GOLDEN_T2_MISCONCEPTION=1`이면 튜터를 부르기 **전에** 매칭하고, 매칭이 있으면 그 오개념 한 줄 설명을 `tutor.build_user_prompt`의 학생 입력 바로 뒤에 지시서 문장 그대로 넣는다. 시스템 프롬프트(`golden/tutor_prompt.md`)는 그대로다.
+  - 한 줄 설명은 오개념 파일에 새로 둔 `prompt_description`(11행 · 숫자 없음)이다. 코퍼스 서술(`statement`·`student_wrong_thinking`)에는 예시 숫자(`3-(-5)=3-5=-2`·`앞은 4`)가 있어, 같은 숫자가 정답인 문항에서 튜터 문장으로 새지 않게 따로 썼다.
+  - eval_log에 `t2_prompt_hint`(그 턴 프롬프트에 한 줄을 넣었는가)를 더했다 — 플래그 1 실행에서 주입이 실제로 몇 번 일어났는지 숫자로 보려고.
+  - 매칭 실패(표 파일 오류)면 튜터에 아무것도 넣지 않고 응답은 그대로다(좁은 except · 타입명 로그). 기록 실패(DB·연결)도 응답은 그대로다.
+  - 줄 이동으로 승인분 넓은 `except` 두 줄의 번호만 고쳤다: `tutor.py:128 → 153` · `api.py:200 → 206`(문구·승인 그대로).
+- **측정:** 오개념 검출률을 `golden/sim/metrics.py`(`misconception_detection`)에 더하고, 집계·전후 표 도구 `golden/sim/t2_summary.py`를 새로 썼다(T1 `t1_summary.py`와 같은 모양 · 진입점 선언 `test_orphan_gate.py`).
+  - 주입된 오개념은 실행 기록의 `forced_answer`를 주입기에 다시 물어 찾는다(세션 기록 모양은 S19 계약 그대로 · 새 키 없음).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음(옛 코드 import 0 · 복사 0) · 새로 씀: 튜터 프롬프트 한 줄(`tutor.T2_HINT_TEMPLATE`) · 설명·검출 낱말(`misconceptions_lf.json`의 `prompt_description`·`keywords`) · 검출률(`metrics.misconception_detection`) · 집계 `golden/sim/t2_summary.py` | 코퍼스 서술을 그대로 튜터에 넣기(예시 숫자 유출 위험) · 매칭 임계값 완화(지시서 "하지 말 것") · 시스템 프롬프트 수정(개정 1회 한도는 S23이 씀) | T2 다섯 걸음 ④를 GP-4 프롬프트에 붙임 · 검출률은 Kiki 머신 720 전후로 잰다(런북) | S28 |
