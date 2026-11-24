@@ -251,9 +251,6 @@ async def _graded(
         kind="graded",
         correct=correct,
     )
-    if not correct and misconception_enabled():
-        # S27 T2(플래그 켜짐 · 3턴을 다 쓴 마지막 오답): 기록만 한다 — 응답 불변
-        await _record_t2_match(turn_id, problem, student_text)
     items = problems.load_problems()
     if items[row.cursor % len(items)]["id"] == problem["id"]:
         await store.advance_cursor(row.session_id)
@@ -261,6 +258,10 @@ async def _graded(
     current = await store.get_mastery(row.nickname)
     delta = MASTERY_GAIN if correct else -MASTERY_LOSS
     mastery = await store.set_mastery(row.nickname, current + delta)
+    if not correct and misconception_enabled():
+        # S27 T2(플래그 켜짐 · 3턴을 다 쓴 마지막 오답): 기록만 한다 — 응답 불변.
+        # cursor·숙련도 갱신 뒤에 부른다 — 좁은 except 밖의 예외가 나도 판정 상태가 반쯤 남지 않게.
+        await _record_t2_match(turn_id, problem, student_text)
     return {
         "kind": "graded",
         "correct": correct,
