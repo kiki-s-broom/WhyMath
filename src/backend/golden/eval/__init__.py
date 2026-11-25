@@ -5,7 +5,8 @@
                   · 플래그 `GOLDEN_T1_RUBRIC`.
 - `misconception`: `match_misconception(problem, student_text) -> str | None`
                   · 플래그 `GOLDEN_T2_MISCONCEPTION`(S27 · 주입기 규칙을 거꾸로 쓴 매칭).
-                  `misconception_description(mis_id) -> str`(S28 · 튜터 프롬프트 한 줄 설명).
+                  `misconception_description(mis_id) -> str`(S28 · 오개념 한 줄 설명 데이터
+                  — 튜터 프롬프트 주입은 S30이 되돌림).
 
 GP-4 튜터 응답 직후에 `GOLDEN_T1_RUBRIC=1`일 때만 불리며, 결과는 `golden.eval_log`에 기록만 한다.
 """

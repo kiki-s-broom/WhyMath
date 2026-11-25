@@ -254,8 +254,8 @@ def test_golden_path_green_and_t2_log_only_when_flag_on(
             set(v or {}) == {"t2_matcher", "t2_misconception_id", "t2_prompt_hint"}
             for _, v in logged
         )
-        # S28: 매칭이 있는 되묻기 턴만 튜터 프롬프트에 한 줄이 들어갔다(판정 턴은 튜터를 안 부른다)
-        assert [v and v["t2_prompt_hint"] for _, v in logged] == [True, False, True, False]
+        # S28은 매칭된 되묻기 턴에 한 줄을 넣었다(True) — S30 되돌림 뒤에는 어느 턴에도 넣지 않는다
+        assert [v and v["t2_prompt_hint"] for _, v in logged] == [False] * 4
     else:
         assert [v for _, v in logged] == [None] * 4
 
