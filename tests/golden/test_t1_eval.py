@@ -227,12 +227,7 @@ def test_response_identical_with_flag_off_and_on(monkeypatch: pytest.MonkeyPatch
 def _leaking_ask(answer_holder: dict[str, str]) -> Any:
     """정답을 그대로 말하는 가짜 튜터(유출 경로를 일부러 만든다)."""
 
-    async def _ask(
-        problem: Problem,
-        history: list[TurnRow],
-        student_text: str,
-        misconception: str | None = None,
-    ) -> TutorReply:
+    async def _ask(problem: Problem, history: list[TurnRow], student_text: str) -> TutorReply:
         answer_holder["answer"] = problem["answer"]
         return TutorReply(
             message=f"비밀 문장 답은 {problem['answer']} 이에요. 알겠어요?", degraded=False

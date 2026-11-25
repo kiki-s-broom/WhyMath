@@ -17,10 +17,10 @@
 그때는 파일 순서상 앞의 ID가 나온다(S27 보고 「충돌」 — M0035·M0569 · M0034·M0568 · M0002·M0548).
 플래그 `GOLDEN_T2_MISCONCEPTION=1`일 때만 api가 부르고, 결과는 `golden.eval_log`에 기록한다.
 
-S28: 매칭이 있으면 그 오개념의 한 줄 설명(`misconception_description` — 오개념 파일의
-`prompt_description`)을 튜터 사용자 프롬프트에 한 줄로 넣는다(`tutor.build_user_prompt`).
-설명에는 숫자를 넣지 않는다 — 문항 정답 숫자가 설명 예시를 타고 튜터 문장으로 새지 않게
-(테스트가 막는다).
+S28은 매칭이 있으면 그 오개념의 한 줄 설명(`misconception_description` — 오개념 파일의
+`prompt_description`)을 튜터 사용자 프롬프트에 넣었다. S30 판정(효과 없음 · 잠정 · AI 대체)으로
+그 주입은 되돌렸다 — 지금 튜터는 설명을 받지 않는다. 설명 데이터와 이 함수는 기록·측정용으로
+남겼고, 설명에 숫자가 없다는 데이터 계약은 테스트가 지킨다.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ ANSWERS_PATH = (
 )
 
 # 오개념 파일(S26 · S28이 prompt_description·keywords를 더함)
-# — 튜터에 넣는 한 줄 설명을 여기서 읽는다
+# — 한 줄 설명·검출 낱말을 여기서 읽는다(튜터 주입은 S30이 되돌림)
 MISCONCEPTIONS_PATH = (
     Path(__file__).resolve().parents[4] / "golden" / "data" / "misconceptions_lf.json"
 )

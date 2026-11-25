@@ -263,8 +263,8 @@ def test_golden_path_green_and_t2_log_only_when_flag_on(
 def test_response_identical_with_t2_flag_off_and_on(monkeypatch: pytest.MonkeyPatch) -> None:
     """가짜 LLM에서는 플래그 0과 1의 응답이 한 글자도 다르지 않다.
 
-    S28부터 켜짐이면 튜터 프롬프트에 한 줄이 들어가므로 실제 LLM 응답은 달라질 수 있다 —
-    그 차이는 프롬프트 테스트(`test_t2_prompt_*`)가 보고, 여기서는 그 밖의 응답 모양이 같은지 본다.
+    S30이 튜터 프롬프트 한 줄(S28)을 되돌려, 켜짐이어도 튜터는 같은 프롬프트를 받는다 —
+    튜터에 오개념이 가지 않음은 `test_t2_apply.py`가 보고, 여기서는 응답 모양이 같은지 본다.
     """
     monkeypatch.delenv(T1_FLAG_ENV, raising=False)
     results = {}
