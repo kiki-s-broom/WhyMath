@@ -21,7 +21,6 @@ from golden.eval import (
     T2_MATCHER_VERSION,
     evaluate_tutor_reply,
     match_misconception,
-    misconception_description,
     misconception_enabled,
     rubric_enabled,
 )
@@ -142,11 +141,12 @@ async def answer(body: AnswerIn) -> dict[str, object]:
 
     if turns_used < MAX_TUTOR_TURNS:
         # ③ 오답 + 튜터 턴 남음 → 되묻기
-        # S28 T2(GOLDEN_T2_MISCONCEPTION=1일 때만): 튜터를 부르기 전에 매칭해, 매칭이 있으면
-        # 그 오개념 한 줄 설명을 튜터 사용자 프롬프트에 넣는다. 꺼져 있으면 매칭도 하지 않는다.
+        # T2(GOLDEN_T2_MISCONCEPTION=1일 때만): 매칭은 S27처럼 기록만 한다.
+        # 꺼져 있으면 매칭도 하지 않는다. S28이 넣었던 "튜터 사용자 프롬프트에 오개념 한 줄"은
+        # S30 판정(효과 없음 · 잠정 · AI 대체)으로 되돌렸다(지시서 S30 할 일 ④).
+        # 튜터는 S28 이전과 같은 프롬프트를 받는다.
         t2 = _t2_match(problem, body.text) if misconception_enabled() else None
-        hint = t2.description if t2 is not None else None
-        reply = await tutor.ask(problem, history, body.text, misconception=hint)
+        reply = await tutor.ask(problem, history, body.text)
         turn_no = turns_used + 1
         turn_id = await store.record_turn(
             session_id=row.session_id,
@@ -162,8 +162,8 @@ async def answer(body: AnswerIn) -> dict[str, object]:
             # — 아래 응답은 한 글자도 바꾸지 않는다
             await _record_t1_eval(turn_id, problem, body.text, reply.message)
         if t2 is not None:
-            # S27 T2 기록(+ S28: 프롬프트에 넣었는지) — 응답은 튜터 문장 그대로
-            await _record_t2(turn_id, problem, t2, in_prompt=hint is not None)
+            # S27 T2 기록 — 응답은 튜터 문장 그대로
+            await _record_t2(turn_id, problem, t2)
         response: dict[str, object] = {
             "kind": "tutor_turn",
             "message": reply.message,
@@ -214,24 +214,22 @@ async def _record_t1_eval(
 
 @dataclass(frozen=True)
 class _T2Match:
-    """T2 매칭 1회 결과 — 오개념 ID(없으면 None)와 튜터에 넣을 한 줄 설명(없으면 None)."""
+    """T2 매칭 1회 결과 — 오개념 ID(매칭 없음이면 None). 기록 전용(S27)."""
 
     mis_id: str | None
-    description: str | None
 
 
 def _t2_match(problem: problems.Problem, student_text: str) -> _T2Match | None:
-    """틀린 답 → 오개념 ID + 한 줄 설명(S27 매칭 · S28 설명). 실패하면 None.
+    """틀린 답 → 오개념 ID(S27 매칭). 실패하면 None.
 
-    - 매칭 결과가 None이어도 `_T2Match(None, None)`을 돌려준다 — "매칭 없음"도 기록한다.
-    - 실패(None 반환)면 튜터에 아무것도 넣지 않고 기록도 하지 않는다. 학생 응답은 그대로 나간다.
+    - 매칭 결과가 None이어도 `_T2Match(None)`을 돌려준다 — "매칭 없음"도 기록한다.
+    - 실패(None 반환)면 기록하지 않는다. 학생 응답은 그대로 나간다.
       잡는 예외는 표 파일 오류(`OSError`·`ValueError`·`KeyError`)로 좁힌다 — 넓은 `except`는
       허용 목록과 Kiki 승인이 필요해 쓰지 않았다(S27과 같은 처리). 그 밖의 예외는 올라간다.
       경고 로그에는 문제 ID·예외 타입명만 적고 학생 문장은 적지 않는다.
     """
     try:
         mis_id = match_misconception(problem, student_text)
-        description = misconception_description(mis_id) if mis_id is not None else None
     except (OSError, ValueError, KeyError) as exc:
         logger.warning(
             "golden T2 매칭 실패 — 응답은 그대로 보냄: 단계=매칭 problem=%s %s",
@@ -239,17 +237,17 @@ def _t2_match(problem: problems.Problem, student_text: str) -> _T2Match | None:
             type(exc).__name__,
         )
         return None
-    return _T2Match(mis_id=mis_id, description=description)
+    return _T2Match(mis_id=mis_id)
 
 
-async def _record_t2(
-    turn_id: int, problem: problems.Problem, match: _T2Match, *, in_prompt: bool
-) -> None:
-    """T2 매칭 결과를 golden.eval_log의 그 턴 행에 남긴다(S27 · S28이 `t2_prompt_hint`를 더함).
+async def _record_t2(turn_id: int, problem: problems.Problem, match: _T2Match) -> None:
+    """T2 매칭 결과를 golden.eval_log의 그 턴 행에 남긴다(S27 · 기록 전용).
 
-    `t2_prompt_hint`는 이 턴의 튜터 프롬프트에 오개념 한 줄을 넣었는지다(판정 턴은 늘 False —
-    튜터를 부르지 않는다). 기록이 DB·연결 오류(`SQLAlchemyError`·`OSError`)로 실패해도 응답은
-    그대로 나가고, 경고 로그에 문제 ID·턴 id·예외 타입명만 남긴다.
+    `t2_prompt_hint`는 이 턴의 튜터 프롬프트에 오개념 한 줄을 넣었는지다. S28이 더한 키다.
+    S30 판정으로 주입을 되돌린 뒤에는 늘 False다 — 키를 지우지 않은 것은 S28 실행 기록과
+    같은 모양으로 비교하기 위해서다.
+    기록이 DB·연결 오류(`SQLAlchemyError`·`OSError`)로 실패해도 응답은 그대로 나가고,
+    경고 로그에 문제 ID·턴 id·예외 타입명만 남긴다.
     """
     try:
         await store.record_eval(
@@ -257,7 +255,7 @@ async def _record_t2(
             {
                 "t2_matcher": T2_MATCHER_VERSION,
                 "t2_misconception_id": match.mis_id,
-                "t2_prompt_hint": in_prompt,
+                "t2_prompt_hint": False,
             },
         )
     except (SQLAlchemyError, OSError) as exc:
@@ -299,7 +297,7 @@ async def _graded(
         # cursor·숙련도 갱신 뒤에 부른다 — 좁은 except 밖의 예외가 나도 판정 상태가 반쯤 남지 않게.
         t2 = _t2_match(problem, student_text)
         if t2 is not None:
-            await _record_t2(turn_id, problem, t2, in_prompt=False)
+            await _record_t2(turn_id, problem, t2)
     return {
         "kind": "graded",
         "correct": correct,

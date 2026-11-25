@@ -1,11 +1,13 @@
-"""S28 T2 적용 — 매칭된 오개념 한 줄을 튜터 사용자 프롬프트에 넣고, 오개념 검출률을 잰다(F-05).
+"""S28 T2 적용과 S30 되돌림 — 오개념 검출률 도구는 남고, 튜터 프롬프트 한 줄은 되돌렸다(F-05).
+
+S28은 매칭된 오개념 한 줄을 튜터 사용자 프롬프트에 넣었다. S30 판정(효과 없음 · 잠정 · AI 대체)이
+지시서 S30 할 일 ④대로 그 한 줄을 되돌렸다. 매칭은 S27처럼 기록만 한다.
 
 무엇을 고정하는가
-1. 플래그 0(또는 매칭 없음)이면 튜터 사용자 프롬프트가 S28 이전과 한 글자도 같다(완료 기준 ③).
-2. 플래그 1이고 매칭이 있을 때만 지시서 문장 그대로의 한 줄이 학생 입력 바로 뒤에 들어간다.
-3. api가 튜터에 넘기는 값: 플래그 1 + 매칭 → 그 오개념 한 줄 설명 · 매칭 없음·플래그 0 → None.
-4. 오개념 한 줄 설명에는 숫자가 없고, 어느 문항의 정답도 새지 않는다(설명을 타고 정답이 튜터 문장으로
-   넘어가지 않게). 검출 낱말은 행마다 있다.
+1. 튜터 사용자 프롬프트가 S28 이전과 한 글자도 같다.
+2. 튜터에는 오개념 한 줄을 받을 자리가 없다(`T2_HINT_TEMPLATE`·`misconception` 인자 없음).
+3. api는 플래그 1이고 매칭이 있어도 튜터에 오개념을 넘기지 않는다.
+4. 오개념 한 줄 설명(데이터)에는 숫자가 없고, 검출 낱말은 행마다 있다.
 5. 오개념 검출률(`metrics.misconception_detection`)의 분모·분자·제외 규칙과 집계 도구(`t2_summary`)의
    거부 규칙.
 
@@ -14,6 +16,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import uuid
 from pathlib import Path
@@ -49,66 +52,57 @@ _BEFORE_S28 = (
     "위 학생 말에 대한 튜터의 다음 한 마디를 써라."
 )
 
-# 지시서 S28 할 일 1의 문장(설명 자리만 채운다)
-_HINT = "학생의 답은 '{d}' 유형의 실수일 수 있다. 정답은 말하지 말고 그 지점을 짚어 묻는다."
+# S28이 넣었다가 S30이 되돌린 문장의 앞부분 — 튜터 프롬프트에 다시 나오면 안 된다
+_HINT_HEAD = "유형의 실수일 수 있다"
 
 
 # ── 1·2. 프롬프트 ───────────────────────────────────────────────────────────────
 
 
-def test_prompt_without_misconception_is_unchanged_from_before_s28() -> None:
-    """설명이 없으면(플래그 0·매칭 없음) S28 이전 글과 한 글자도 같다."""
+def test_prompt_is_unchanged_from_before_s28() -> None:
+    """튜터 사용자 프롬프트는 S28 이전 글과 한 글자도 같다(S30 되돌림 뒤)."""
     lf14 = PROBLEMS["LF-14"]
-    assert tutor.build_user_prompt(lf14, _HISTORY, "6/(-9)요") == _BEFORE_S28
-    assert tutor.build_user_prompt(lf14, _HISTORY, "6/(-9)요", None) == _BEFORE_S28
+    got = tutor.build_user_prompt(lf14, _HISTORY, "6/(-9)요")
+    assert got == _BEFORE_S28
+    assert _HINT_HEAD not in got
 
 
-def test_prompt_with_misconception_adds_exactly_one_line_after_student() -> None:
-    """설명이 있으면 지시서 문장 한 줄이 마지막 학생 입력 바로 뒤에 들어가고, 나머지는 그대로다."""
-    lf14 = PROBLEMS["LF-14"]
-    description = misconception_description("M0568")
-    got = tutor.build_user_prompt(lf14, _HISTORY, "6/(-9)요", description).split("\n")
-    before = _BEFORE_S28.split("\n")
-    student_at = before.index("학생: 6/(-9)요")
-    assert got[: student_at + 1] == before[: student_at + 1]
-    assert got[student_at + 1] == _HINT.format(d=description)
-    assert got[student_at + 2 :] == before[student_at + 1 :]
-    assert tutor.T2_HINT_TEMPLATE.format(description="X") == _HINT.format(d="X")
+def test_tutor_has_no_place_for_a_misconception_line() -> None:
+    """S30 되돌림: 튜터에 오개념 한 줄을 받을 자리(문장 틀·인자)가 없다."""
+    assert not hasattr(tutor, "T2_HINT_TEMPLATE")
+    assert "misconception" not in inspect.signature(tutor.build_user_prompt).parameters
+    assert "misconception" not in inspect.signature(tutor.ask).parameters
 
 
 # ── 3. api → 튜터 ──────────────────────────────────────────────────────────────
 
 
-def _capture_ask(monkeypatch: pytest.MonkeyPatch) -> list[str | None]:
-    """tutor.ask를 가로채 넘어온 misconception 값을 모은다(응답은 가짜 문장 그대로)."""
-    seen: list[str | None] = []
+def _capture_ask(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, dict[str, Any]]]:
+    """tutor.ask를 가로채 (학생 입력, 키워드 인자)를 모은다(응답은 가짜 문장 그대로).
+
+    가짜 함수는 키워드 인자를 무엇이든 받는다 — api가 오개념을 넘기면 그 값이 여기에 남는다.
+    """
+    seen: list[tuple[str, dict[str, Any]]] = []
     real = tutor.ask
 
     async def fake_ask(
-        problem: Problem,
-        history: list[TurnRow],
-        student_text: str,
-        misconception: str | None = None,
+        problem: Problem, history: list[TurnRow], student_text: str, **kwargs: Any
     ) -> tutor.TutorReply:
-        seen.append(misconception)
-        return await real(problem, history, student_text, misconception)
+        seen.append((student_text, kwargs))
+        return await real(problem, history, student_text)
 
     monkeypatch.setattr(tutor, "ask", fake_ask)
     return seen
 
 
-@pytest.mark.parametrize(
-    ("flag", "expected"),
-    [
-        ("1", [misconception_description("M0037"), None, misconception_description("M0037")]),
-        ("0", [None, None, None]),
-    ],
-    ids=["flag-on", "flag-off"],
-)
-def test_api_passes_description_only_when_flag_on_and_matched(
-    monkeypatch: pytest.MonkeyPatch, flag: str, expected: list[str | None]
+@pytest.mark.parametrize("flag", ["1", "0"], ids=["flag-on", "flag-off"])
+def test_api_never_sends_a_misconception_to_the_tutor(
+    monkeypatch: pytest.MonkeyPatch, flag: str
 ) -> None:
-    """LF-01(정답 −12) 되묻기 3턴: `0`(M0037)·`999999`(매칭 없음)·`0이요?`(M0037)."""
+    """LF-01(정답 −12) 되묻기 3턴: `0`(M0037)·`999999`(매칭 없음)·`0이요?`(M0037).
+
+    플래그 1이고 매칭이 있어도 튜터에는 학생 입력만 간다(S30 되돌림).
+    """
     monkeypatch.setenv(FLAG_ENV, flag)
     monkeypatch.delenv(T1_FLAG_ENV, raising=False)
     seen = _capture_ask(monkeypatch)
@@ -119,7 +113,7 @@ def test_api_passes_description_only_when_flag_on_and_matched(
             "/golden/answer", json={"session_id": session_id, "problem_id": "LF-01", "text": text}
         )
         assert r.status_code == 200 and r.json()["kind"] == "tutor_turn"
-    assert seen == expected
+    assert seen == [("0", {}), ("999999", {}), ("0이요?", {})]
 
 
 # ── 4. 설명·낱말 데이터 ──────────────────────────────────────────────────────────
@@ -144,18 +138,6 @@ def test_every_misconception_has_digit_free_description_and_keywords() -> None:
     matched_ids = {mis_id for pairs in answer_table().values() for mis_id, _ in pairs}
     assert all(misconception_description(mis_id) for mis_id in matched_ids)
     assert t2_summary.keyword_table().keys() == {str(r["mis_id"]) for r in rows}
-
-
-def test_hint_line_never_leaks_the_problem_answer() -> None:
-    """매칭표 70행 전부: 튜터에 넣는 한 줄이 그 문항 정답을 유출로 판정받지 않는다."""
-    checked = 0
-    for problem_id, pairs in answer_table().items():
-        answer = PROBLEMS[problem_id]["answer"]
-        for mis_id, _ in pairs:
-            line = tutor.T2_HINT_TEMPLATE.format(description=misconception_description(mis_id))
-            assert metrics.detect_answer_leakage(line, answer) != metrics.LeakageVerdict.leaked
-            checked += 1
-    assert checked == 70
 
 
 # ── 5. 오개념 검출률 ─────────────────────────────────────────────────────────────

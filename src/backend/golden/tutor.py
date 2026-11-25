@@ -35,12 +35,6 @@ LLM_TIMEOUT_S = 20.0
 # 한 문제에서 쓸 수 있는 튜터 되묻기 최대 횟수(공유 계약 — api.MAX_TUTOR_TURNS가 이 값을 쓴다)
 MAX_TUTOR_TURNS = 3
 
-# S28 T2 적용(GOLDEN_T2_MISCONCEPTION=1 · 매칭이 있을 때만): 사용자 프롬프트에 넣는 한 줄.
-# 문장은 지시서 S28 할 일 1 그대로다. 시스템 프롬프트(tutor_prompt.md)는 건드리지 않는다.
-T2_HINT_TEMPLATE = (
-    "학생의 답은 '{description}' 유형의 실수일 수 있다. 정답은 말하지 말고 그 지점을 짚어 묻는다."
-)
-
 
 @dataclass(frozen=True)
 class TutorReply:
@@ -55,12 +49,7 @@ def _fake_message(problem: Problem) -> str:
     return FAKE_PREFIX + problem["hint1"]
 
 
-def build_user_prompt(
-    problem: Problem,
-    history: list[TurnRow],
-    student_text: str,
-    misconception: str | None = None,
-) -> str:
+def build_user_prompt(problem: Problem, history: list[TurnRow], student_text: str) -> str:
     """LLM에 보낼 사용자 프롬프트. 문제 본문·hint1·이번 문제 대화(최대 3턴)·학생 입력만 담는다.
 
     닉네임·세션 ID는 넣지 않는다(미성년자 데이터 규칙). 정답도 넣지 않는다 — 모델이 모르면
@@ -68,9 +57,6 @@ def build_user_prompt(
 
     S10: 몇 번째 되묻기인지도 넣는다. 3번째(마지막) 되묻기 뒤 학생의 다음 입력은 바로 채점되는데,
     튜터가 그것을 몰라 마지막에도 하위 단계를 물었다(S11 발견 ② · sim_no-setup 4·24·28행 등).
-
-    S28: `misconception`(오개념 한 줄 설명)이 있으면 학생 입력 바로 뒤에 T2 한 줄을 넣는다.
-    None이면(플래그 꺼짐·매칭 없음) 프롬프트는 S28 이전과 한 글자도 같다.
     """
     turn_no = len(history) + 1
     lines = [
@@ -81,8 +67,6 @@ def build_user_prompt(
         lines.append(f"학생: {turn.student_text}")
         lines.append(f"튜터: {turn.tutor_text}")
     lines.append(f"학생: {student_text}")
-    if misconception is not None:
-        lines.append(T2_HINT_TEMPLATE.format(description=misconception))
     turn_line = f"되묻기 차례: {MAX_TUTOR_TURNS}번 중 {turn_no}번째"
     if turn_no >= MAX_TUTOR_TURNS:
         turn_line += " — 마지막 되묻기다. 학생의 다음 입력이 바로 채점된다."
@@ -119,15 +103,8 @@ def _routing_request() -> RoutingRequest:
     )
 
 
-async def ask(
-    problem: Problem,
-    history: list[TurnRow],
-    student_text: str,
-    misconception: str | None = None,
-) -> TutorReply:
+async def ask(problem: Problem, history: list[TurnRow], student_text: str) -> TutorReply:
     """되묻기 문장 1개를 만든다. LLM은 정확히 1회 부른다.
-
-    `misconception`은 S28 T2 한 줄 설명이다(없으면 None) — 사용자 프롬프트에만 들어간다.
 
     GOLDEN_FAKE_LLM=1이면 LLM을 부르지 않는다(테스트·CI). 환경변수는 호출 시점에 읽는다.
     호출 실패(예외·10초 초과)는 삼키지 않고 예외 타입명을 로그에 남긴 뒤 대체 문장을 쓴다.
@@ -142,9 +119,7 @@ async def ask(
         # 보내기 직전 관할 판정(옛 CompositeProvider와 같은 판정 · GOLD-20) — 막히면 호출 0회
         guard_cloud_jurisdiction(provider, decision)
         result = await asyncio.wait_for(
-            provider.generate(
-                build_user_prompt(problem, history, student_text, misconception), system, decision
-            ),
+            provider.generate(build_user_prompt(problem, history, student_text), system, decision),
             timeout=LLM_TIMEOUT_S,
         )
         message = result.text.strip()

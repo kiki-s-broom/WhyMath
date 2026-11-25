@@ -254,8 +254,8 @@ def test_golden_path_green_and_t2_log_only_when_flag_on(
             set(v or {}) == {"t2_matcher", "t2_misconception_id", "t2_prompt_hint"}
             for _, v in logged
         )
-        # S28: 매칭이 있는 되묻기 턴만 튜터 프롬프트에 한 줄이 들어갔다(판정 턴은 튜터를 안 부른다)
-        assert [v and v["t2_prompt_hint"] for _, v in logged] == [True, False, True, False]
+        # S28은 매칭된 되묻기 턴에 한 줄을 넣었다(True) — S30 되돌림 뒤에는 어느 턴에도 넣지 않는다
+        assert [v and v["t2_prompt_hint"] for _, v in logged] == [False] * 4
     else:
         assert [v for _, v in logged] == [None] * 4
 
@@ -263,8 +263,8 @@ def test_golden_path_green_and_t2_log_only_when_flag_on(
 def test_response_identical_with_t2_flag_off_and_on(monkeypatch: pytest.MonkeyPatch) -> None:
     """가짜 LLM에서는 플래그 0과 1의 응답이 한 글자도 다르지 않다.
 
-    S28부터 켜짐이면 튜터 프롬프트에 한 줄이 들어가므로 실제 LLM 응답은 달라질 수 있다 —
-    그 차이는 프롬프트 테스트(`test_t2_prompt_*`)가 보고, 여기서는 그 밖의 응답 모양이 같은지 본다.
+    S30이 튜터 프롬프트 한 줄(S28)을 되돌려, 켜짐이어도 튜터는 같은 프롬프트를 받는다 —
+    튜터에 오개념이 가지 않음은 `test_t2_apply.py`가 보고, 여기서는 응답 모양이 같은지 본다.
     """
     monkeypatch.delenv(T1_FLAG_ENV, raising=False)
     results = {}
