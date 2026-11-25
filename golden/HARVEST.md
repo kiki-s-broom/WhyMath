@@ -432,3 +432,30 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음(옛 코드 import 0 · 복사 0) · 새로 씀: 튜터 프롬프트 한 줄(`tutor.T2_HINT_TEMPLATE`) · 설명·검출 낱말(`misconceptions_lf.json`의 `prompt_description`·`keywords`) · 검출률(`metrics.misconception_detection`) · 집계 `golden/sim/t2_summary.py` | 코퍼스 서술을 그대로 튜터에 넣기(예시 숫자 유출 위험) · 매칭 임계값 완화(지시서 "하지 말 것") · 시스템 프롬프트 수정(개정 1회 한도는 S23이 씀) | T2 다섯 걸음 ④를 GP-4 프롬프트에 붙임 · 검출률은 Kiki 머신 720 전후로 잰다(런북) | S28 |
+
+## 슬롯 T3 경계 (S31 · 1단계 · 2026-11-25 · 기준 main `18413980` · 인용 F-06)
+
+**T3 경계: 클래스 1개 + 함수 1개** — 옛 `src/backend/whymath_backend/l2/bkt.py`(179줄)에서 아래 둘만 가져올 대상이다. 다섯 걸음 ①(경계 긋기)이며, 특성화 테스트(②)보다 먼저 적었다.
+
+| 옛 이름 (파일 경로 · 이름) | 지금 하는 일 | 함께 따라오는 것(같은 파일 안 · 직접 씀) | 일차함수에 쓰는 항목 |
+| --- | --- | --- | --- |
+| `whymath_backend/l2/bkt.py` · `BktParameters` | BKT 파라미터 묶음(불변 · 전부 0~1). `p_slip + p_guess < 1`(비퇴화)을 어기면 `ValueError` | 기본값 상수 5개(`_DEFAULT_P_INIT` 0.3 · `_DEFAULT_P_TRANSIT` 0.1 · `_DEFAULT_P_SLIP` 0.1 · `_DEFAULT_P_GUESS` 0.2 · `_DEFAULT_P_FORGET` 0.0) · 검증 `_check_non_degenerate` | 파라미터 4개 `p_init`·`p_transit`·`p_slip`·`p_guess` |
+| `whymath_backend/l2/bkt.py` · `update_mastery(prior, correct, params) -> float` | 관측 1회(정/오답) → 베이지안 사후 → 학습 전이 → 새 숙련도 | `posterior_mastery`(분모 0이면 prior 그대로) · `apply_learning` | 정답·오답 한 번마다 숙련도 갱신(지금의 +0.10/−0.05 자리) |
+
+- **가져오지 않는 것**: 망각 `apply_forgetting`·`BktModel.apply_forgetting`(지시서 S31 · 계획서 §6) · `BktModel` 클래스 · `probability_correct`(다음 문항 정답 확률 — 적응형 문항 선택에 쓰이므로 §6). `BktParameters`의 `p_forget` 필드는 클래스의 일부라 떼어 내지 않지만 쓰지 않는다(기본 0).
+- **파라미터 4개(일차함수용 제안값 · S31은 값만 적는다 · S32가 S24·S29 정답률로 보정 가능):**
+
+| 파일의 필드 | 뜻 | 옛 기본값 | 일차함수 제안값 |
+| --- | --- | ---: | ---: |
+| `p_init` | 초기 숙련도 P(L0) | 0.3 | 0.2 |
+| `p_transit` | 학습률 P(T) — 학습 기회 한 번에 미숙달→숙달 | 0.1 | 0.3 |
+| `p_guess` | 추측률 P(G) — 미숙달인데 맞힘 | 0.2 | 0.2 |
+| `p_slip` | 실수율 P(S) — 숙달했는데 틀림 | 0.1 | 0.1 |
+
+  제안값은 비퇴화 검증을 통과한다(0.1 + 0.2 < 1 · 특성화 테스트가 이 묶음으로 4쌍을 고정).
+- **③(복사/import)에 대한 사실 — S32 판단용**: 이 파일은 `golden/LEGACY_MANIFEST.txt` 333행에 있다 → import-linter 계약 `golden-no-legacy`가 `golden` 패키지의 import를 막는다. 또 `whymath_backend.l2.bkt`를 import하면 `l2/__init__.py`를 거쳐 **옛 모듈 141개**가 로드된다(2026-11-25 이 세션 실측 · `sys.modules` 세기 · `config`·`db.models` 등) — 전이 예산 30을 넘는다. 두 대상의 실제 의존은 표준 라이브러리 `math` + `pydantic`뿐이다. 따라서 T1(S22)과 같은 이유로 **복사**가 된다. 결정은 S32가 적는다.
+- **특성화(②)**: `tests/golden/characterization/test_t3_bkt.py` — (prior, correct, params) 10쌍(옛 기본값 4 · 제안값 4 · 분모 0 분기 2)의 지금 출력 고정 · 같은 입력 100회 → 같은 출력(결정성 통과 → "버림: 비결정적" 아님) · `p_slip=0.5, p_guess=0.5`는 `ValueError`(비퇴화 거부).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음(경계 긋기와 특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `l2/bkt.py`의 `BktParameters` + `update_mastery`(+ 같은 파일 안 `posterior_mastery`·`apply_learning`) | 망각(`apply_forgetting`·`BktModel.apply_forgetting`) · `BktModel` · `probability_correct` | T3 설계 · 망각·적응형 문항 선택은 §6 금지 · 복사/import·연결은 S32 | S31 |
