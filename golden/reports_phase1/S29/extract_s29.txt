@@ -1,0 +1,142 @@
+# S29 추출기 — S28 플래그 1 실행 기록에서 P2·P3·P4 × LF-01~05 × 1회차 15건을 골라 세션에 넘길 글로 만든다
+# 사용: python extract_s29.py <실행 폴더> <출력 txt>   (cwd = 저장소 src/backend · GOLDEN_SIM_SEED_DIR 설정)
+# 고르는 기준은 셋뿐(페르소나 · 문항 · 1회차) — 내용으로 고르지 않는다(지시서 S24 할 일 2 · S29 그대로)
+# S24 추출기에 더한 것: 틀린 입력마다 T2 매칭 결과(오개념 ID · 프롬프트 힌트 여부)와 P3 계열 비교
+# — 매칭은 실행 때 api가 부른 것과 같은 순수 함수(golden.eval.misconception.match_misconception)를 다시 부른다
+import json
+import sys
+from pathlib import Path
+
+import golden
+from golden import problems as problem_bank
+from golden.eval.misconception import T2_MATCHER_VERSION, match_misconception
+from golden.sim.errors import MISCONCEPTIONS_LF_PATH
+from golden.sim.student import copies_seed, load_seed_utterances
+from golden.sim.t2_summary import injection_bundles
+from golden.tutor import FAKE_PREFIX
+
+# 실행 코드 출처 — 지금 폴더(main 사본의 src/backend)의 golden이어야 한다(다른 사본 코드가 돌면 거부)
+if not Path(golden.__file__).resolve().is_relative_to(Path.cwd().resolve()):
+    sys.exit(f"S29_REFUSED — golden이 다른 곳에서 왔다: {golden.__file__}")
+print(f"GOLDEN_FROM={Path(golden.__file__).resolve().parent}")
+
+PERSONAS = ("P2", "P3", "P4")
+PROBLEMS = ("LF-01", "LF-02", "LF-03", "LF-04", "LF-05")
+
+run_dir, out_path = Path(sys.argv[1]), Path(sys.argv[2])
+meta = json.loads((run_dir / "run_meta.json").read_text(encoding="utf-8"))
+summary_path = run_dir / "t2_summary.json"
+t2_flag = json.loads(summary_path.read_text(encoding="utf-8")).get("t2_flag") if summary_path.is_file() else None
+rows = [json.loads(ln) for ln in (run_dir / "sessions.jsonl").read_text(encoding="utf-8").splitlines() if ln.strip()]
+seeds = load_seed_utterances()
+bank = {p["id"]: p for p in problem_bank.load_problems()}
+bundles = injection_bundles()
+mis_ops = {
+    str(r["mis_id"]): tuple(r.get("op_code") or ())
+    for r in json.loads(MISCONCEPTIONS_LF_PATH.read_text(encoding="utf-8"))["misconceptions"]
+}
+
+# 회차 = 그 페르소나의 몇 번째 블록인가(러너는 회차 → 페르소나 → 문항 순으로 한 줄씩 쓴다)
+blocks: dict[str, int] = {}
+prev = None
+picked = {}
+for row in rows:
+    p = row.get("persona")
+    if p != prev:
+        blocks[p] = blocks.get(p, 0) + 1
+        prev = p
+    if p in PERSONAS and blocks[p] == 1 and row.get("problem_id") in PROBLEMS:
+        key = (p, row["problem_id"])
+        if key in picked:
+            sys.exit(f"S29_REFUSED — 1회차에 같은 문항이 두 번 나왔다: {key}")
+        picked[key] = row
+
+problems = []
+if meta.get("mode") != "live":
+    problems.append(f"mode={meta.get('mode')}(live여야 한다)")
+if t2_flag != "1":
+    problems.append(f"t2_flag={t2_flag}(t2_summary.json의 플래그가 1이어야 한다 · S28 f1 실행)")
+missing = [f"{p}/{q}" for p in PERSONAS for q in PROBLEMS if (p, q) not in picked]
+if missing:
+    problems.append(f"빠진 조합 {missing}")
+bad_http = [f"{k[0]}/{k[1]}={r.get('http_status')}" for k, r in picked.items() if not (isinstance(r.get("http_status"), int) and 200 <= r["http_status"] < 300)]
+if bad_http:
+    problems.append(f"http_status 2xx 아님 {bad_http}")
+fake = [f"{k[0]}/{k[1]}" for k, r in picked.items() if any(str(t.get("tutor", "")).startswith(FAKE_PREFIX) for t in r.get("turns", []) if t.get("kind") == "tutor_turn")]
+if fake:
+    problems.append(f"가짜 모드 튜터 발화 {fake}")
+
+# 숫자 칸(세션이 다시 세어 대조한다)
+num = {"wrong": 0, "wrong_matched": 0, "tt_wrong": 0, "tt_matched": 0, "tt_matched_next_correct": 0,
+       "tt_unmatched": 0, "tt_unmatched_next_correct": 0, "sess_matched": 0, "sess_matched_correct": 0,
+       "p3_matched_turns": 0, "p3_same_op": 0, "p3_in_bundle": 0}
+masked = 0
+lines = []
+for p in PERSONAS:
+    for q in PROBLEMS:
+        r = picked.get((p, q))
+        if r is None:
+            continue
+        turns = r.get("turns", [])
+        last = turns[-1] if turns else {}
+        op = r.get("injected_op")
+        bundle = bundles.get((q, str(r.get("forced_answer")))) if r.get("forced_answer") is not None else None
+        lines.append(
+            f"## {p} · {q} · injected_op={op} · 주입 묶음={','.join(bundle) if bundle else '-'} · elapsed_s={r.get('elapsed_s')} · "
+            f"http={r.get('http_status')} · 턴수={len(turns)} · 마지막={last.get('kind')} · correct={last.get('correct')}"
+        )
+        any_match = False
+        for i, t in enumerate(turns):
+            raw = str(t.get("student", ""))
+            s = raw
+            if copies_seed(s, seeds):
+                s = "[시드 일치 — 가림]"
+                masked += 1
+            kind = t.get("kind")
+            lines.append(f"[{t.get('n')}·{kind}] 학생: {s}")
+            wrong = kind == "tutor_turn" or (kind == "graded" and t.get("correct") is False)
+            if wrong:
+                mis = match_misconception(bank[q], raw)
+                hint = kind == "tutor_turn" and mis is not None
+                num["wrong"] += 1
+                num["wrong_matched"] += mis is not None
+                tag = f"매칭={mis or '없음'} · 힌트={'예' if hint else '아니오'}"
+                if kind == "tutor_turn":
+                    num["tt_wrong"] += 1
+                    nxt = turns[i + 1] if i + 1 < len(turns) else {}
+                    nxt_ok = nxt.get("kind") == "graded" and nxt.get("correct") is True
+                    if mis is not None:
+                        num["tt_matched"] += 1
+                        num["tt_matched_next_correct"] += nxt_ok
+                    else:
+                        num["tt_unmatched"] += 1
+                        num["tt_unmatched_next_correct"] += nxt_ok
+                if mis is not None:
+                    any_match = True
+                    if p == "P3":
+                        same = op is not None and op in mis_ops.get(mis, ())
+                        inb = bundle is not None and mis in bundle
+                        num["p3_matched_turns"] += 1
+                        num["p3_same_op"] += same
+                        num["p3_in_bundle"] += inb
+                        tag += f" · 오개념 OP={','.join(mis_ops.get(mis, ())) or '-'} · 계열={'같음' if same else '다름'} · 묶음={'안' if inb else '밖'}"
+                lines.append(f"[{t.get('n')}·{kind}] T2: {tag}")
+            lines.append(f"[{t.get('n')}·{kind}] 튜터: {t.get('tutor', '')}")
+        if any_match:
+            num["sess_matched"] += 1
+            num["sess_matched_correct"] += last.get("kind") == "graded" and last.get("correct") is True
+        lines.append("")
+
+ok = not problems
+head = (
+    f"S29_CHECK ok={ok} picked={len(picked)} masked={masked} mode={meta.get('mode')} t2_flag={t2_flag} "
+    f"matcher={T2_MATCHER_VERSION} personas_in_run={','.join(meta.get('personas') or [])}"
+)
+if problems:
+    head += " problems=" + " | ".join(problems)
+nums = "S29_NUM " + " ".join(f"{k}={v}" for k, v in num.items())
+out_path.write_text(head + "\n" + nums + "\n\n" + "\n".join(lines), encoding="utf-8")
+print(head)
+print(nums)
+print(f"OUT_FILE={out_path} CHARS={len(out_path.read_text(encoding='utf-8'))}")
+sys.exit(0 if ok else 1)
