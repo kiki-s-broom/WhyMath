@@ -1,0 +1,146 @@
+# S28R 추출기 — 720세션 두 번(플래그 GOLDEN_T2R_GRADE 0 · 1)의 숫자를 한 장으로 모은다(읽기 전용)
+# 사용: python extract_s28r.txt <f0 실행 폴더> <f1 실행 폴더> <출력 txt>
+#       (cwd = 작업 폴더의 src/backend · GOLDEN_SIM_SEED_DIR 설정)
+# 하는 일:
+#   ① 두 실행이 실제 모드(live)이고 끝까지 돌았는지(기록 줄 + 건너뜀 = 720)
+#   ② 플래그 검증 — 학생 입력마다 실행 때와 같은 채점 함수를 플래그 0·1로 다시 불러,
+#      기록된 판정이 그 실행의 플래그 값과 맞는지 센다(f0은 플래그 0 재채점과, f1은 플래그 1 재채점과 0건 차이여야 한다)
+#   ③ 전후 표 — M1~M5 · 페르소나별 M2 · 끊김 ①(튜터 3턴 뒤 오답) · 최종 정답 세션 수
+#   ④ 뒤집힘 — 같은 학생 입력의 플래그 0 · 1 판정이 다른 입력 수(페르소나별) · 그중 시뮬레이터가
+#      정답 여부를 아는 입력(metrics.expected_correct)에서 맞게 뒤집힌 것 · 틀리게 뒤집힌 것(거짓 정답)
+#   ⑤ 뒤집힌 입력 예시(문장 · 시드와 같은 문장은 가림) — S29R·S30R이 거짓 정답을 손으로 본다
+import json
+import os
+import sys
+from collections import Counter
+from pathlib import Path
+
+import golden
+from golden.grade import is_correct
+from golden.grade_tail import FLAG_ENV
+from golden.problems import load_problems
+from golden.sim.metrics import expected_correct, tutor_turns_to_correct
+from golden.sim.student import copies_seed, load_seed_utterances
+
+# 실행 코드 출처 — 지금 폴더(작업 폴더의 src/backend)의 golden이어야 한다(다른 사본 코드가 돌면 거부)
+if not Path(golden.__file__).resolve().is_relative_to(Path.cwd().resolve()):
+    sys.exit(f"S28R_REFUSED — golden이 다른 곳에서 왔다: {golden.__file__}")
+print(f"GOLDEN_FROM={Path(golden.__file__).resolve().parent}")
+
+SESSIONS = 720
+PROBLEMS = {p["id"]: p for p in load_problems()}
+SEEDS = load_seed_utterances()
+EXAMPLES_PER_RUN = 40
+
+
+def grade(problem_id: str, text: str, flag: str) -> bool:
+    """실행 때와 같은 채점 함수를 정해 둔 플래그로 부른다."""
+    os.environ[FLAG_ENV] = flag
+    return is_correct(PROBLEMS[problem_id], text)
+
+
+def load_run(run_dir: Path) -> tuple[dict, dict, list[dict]]:
+    meta = json.loads((run_dir / "run_meta.json").read_text(encoding="utf-8"))
+    report_path = run_dir / "sim_report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
+    rows = [
+        json.loads(ln)
+        for ln in (run_dir / "sessions.jsonl").read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    ]
+    return meta, report, rows
+
+
+def summarize(tag: str, run_dir: Path, run_flag: str) -> tuple[list[str], list[str], list[str]]:
+    meta, report, rows = load_run(run_dir)
+    problems: list[str] = []
+    skipped = meta.get("skipped_sessions")
+    if meta.get("mode") != "live":
+        problems.append(f"{tag} mode={meta.get('mode')}(live여야 한다)")
+    if not isinstance(skipped, int) or len(rows) + skipped != SESSIONS:
+        problems.append(f"{tag} 기록 {len(rows)} + 건너뜀 {skipped} ≠ {SESSIONS}")
+
+    flag_mismatch = 0
+    turns_total = 0
+    flips = Counter()
+    flips_right = Counter()
+    flips_wrong = Counter()
+    examples: list[str] = []
+    for r in rows:
+        persona = str(r.get("persona"))
+        pid = str(r.get("problem_id"))
+        forced = r.get("forced_answer")
+        for t in r.get("turns") or []:
+            text = str(t.get("student", ""))
+            g0 = grade(pid, text, "0")
+            g1 = grade(pid, text, "1")
+            turns_total += 1
+            # ② 기록된 판정이 이 실행의 플래그 값으로 다시 채점한 것과 같은가
+            if bool(t.get("correct")) != (g1 if run_flag == "1" else g0):
+                flag_mismatch += 1
+            if g0 != g1:
+                flips[persona] += 1
+                exp = expected_correct(persona, int(t.get("n", 0)), forced)
+                if exp is True and g1:
+                    flips_right[persona] += 1
+                elif exp is False and g1:
+                    flips_wrong[persona] += 1
+                if len(examples) < EXAMPLES_PER_RUN:
+                    shown = "[시드 일치 — 가림]" if copies_seed(text, SEEDS) else text
+                    examples.append(
+                        f"FLIP {tag} {persona} {pid} t{t.get('n')} 앎={exp} 플래그1={g1} 입력: {shown}"
+                    )
+    if flag_mismatch:
+        problems.append(f"{tag} 기록 판정 ≠ 플래그 {run_flag} 재채점 {flag_mismatch}턴")
+
+    # ③ 전후 표 숫자
+    per_m2: dict[str, list[int]] = {}
+    final_correct = Counter()
+    breaks = Counter()
+    for r in rows:
+        persona = str(r.get("persona"))
+        turns = r.get("turns") or []
+        last = turns[-1] if turns else {}
+        if last.get("kind") == "graded" and last.get("correct"):
+            final_correct[persona] += 1
+        tutor = sum(1 for t in turns if t.get("kind") == "tutor_turn")
+        if last.get("kind") == "graded" and not last.get("correct") and tutor >= 3:
+            breaks[persona] += 1
+        n = tutor_turns_to_correct(r)
+        if n is not None and persona in ("P2", "P4", "P5"):
+            per_m2.setdefault(persona, []).append(n)
+
+    personas = sorted({str(r.get("persona")) for r in rows})
+    metric = " ".join(f"{k}={(report.get(k) or {}).get('value')}" for k in ("M1", "M2", "M3", "M4", "M5"))
+    lines = [
+        f"S28R_RUN {tag} flag={run_flag} mode={meta.get('mode')} sessions={len(rows)} skipped={skipped} "
+        f"{metric} degraded_tutor_turns={meta.get('degraded_tutor_turns')} "
+        f"seed_copy_fallbacks={meta.get('seed_copy_fallbacks')} turns={turns_total} flag_mismatch={flag_mismatch}",
+        f"S28R_M2 {tag} "
+        + " ".join(
+            f"{p}={round(sum(v) / len(v), 3) if v else None}(n={len(v)})" for p, v in sorted(per_m2.items())
+        ),
+        f"S28R_FINAL {tag} " + " ".join(f"{p}={final_correct[p]}" for p in personas)
+        + f" total={sum(final_correct.values())}",
+        f"S28R_BREAK1 {tag} " + " ".join(f"{p}={breaks[p]}" for p in personas)
+        + f" total={sum(breaks.values())}",
+        f"S28R_FLIP {tag} " + " ".join(f"{p}={flips[p]}" for p in personas)
+        + f" total={sum(flips.values())} known_right={sum(flips_right.values())}"
+        f" known_wrong={sum(flips_wrong.values())}",
+    ]
+    return lines, problems, examples
+
+
+f0_dir, f1_dir, out_path = (Path(a) for a in sys.argv[1:4])
+l0, p0, e0 = summarize("f0", f0_dir, "0")
+l1, p1, e1 = summarize("f1", f1_dir, "1")
+os.environ.pop(FLAG_ENV, None)
+problems = p0 + p1
+head = f"S28R_CHECK ok={not problems}" + (" problems=" + " | ".join(problems) if problems else "")
+text = "\n".join([head, *l0, *l1, "", *e0, *e1]) + "\n"
+out_path.write_text(text, encoding="utf-8")
+print(head)
+for ln in l0 + l1:
+    print(ln)
+print(f"OUT_FILE={out_path} CHARS={len(text)}")
+sys.exit(0 if not problems else 1)
