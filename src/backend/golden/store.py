@@ -1,6 +1,7 @@
 """골든 패스 저장소(GP-6) — PostgreSQL golden 스키마의 학생·세션·턴 기록과 숙련도 갱신.
 
 S22: T1 평가기 기록용 표 `golden.eval_log`가 하나 더 있다(턴 표에는 열을 더하지 않는다).
+S32: T3 숙련도 섀도 표 `golden.mastery_shadow`가 하나 더 있다(학생 표에는 열을 더하지 않는다).
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     Integer,
     MetaData,
     Numeric,
@@ -74,6 +76,24 @@ eval_log = Table(
     Column("turn_id", BigInteger, primary_key=True),
     Column("verdict_json", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+# S32(1단계 T3): 판정 1건마다 두 엔진(simple·bkt)의 숙련도를 1행씩 쌓는다(append-only).
+# students에 열을 더하지 않으려고 표를 따로 둔다. 플래그 GOLDEN_MASTERY_ENGINE과 무관하게 늘 쓴다.
+# - simple 행의 값 = 그 판정 뒤 students.mastery(반올림된 값)와 같다.
+# - bkt 행의 값 = 반올림하지 않은 확률(다음 판정의 prior로 그대로 쓴다).
+# - id는 같은 학생·엔진의 "가장 최근 행"을 고르는 순서 키다
+#   (updated_at만으로는 같은 시각이 겹칠 수 있다).
+mastery_shadow = Table(
+    "mastery_shadow",
+    metadata,
+    Column("id", BigInteger, primary_key=True, autoincrement=True),
+    Column("nickname", Text, nullable=False),
+    Column("engine", Text, nullable=False),
+    Column("mastery", Float, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("session_id", UUID(as_uuid=True), nullable=False),
+    Column("problem_id", Text, nullable=False),
 )
 
 _schema_ready = False
@@ -280,3 +300,43 @@ async def set_mastery(nickname: str, value: float) -> float:
             .values(mastery=Decimal(str(clamped)), updated_at=func.now())
         )
     return clamped
+
+
+async def get_shadow_mastery(nickname: str, engine: str) -> float | None:
+    """섀도 표에서 이 학생·엔진의 가장 최근 숙련도. 기록이 없으면 None(호출자가 시작값을 정한다)."""
+    await ensure_schema()
+    async with _engine().connect() as conn:
+        value = (
+            await conn.execute(
+                select(mastery_shadow.c.mastery)
+                .where(mastery_shadow.c.nickname == nickname, mastery_shadow.c.engine == engine)
+                .order_by(mastery_shadow.c.id.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+    return None if value is None else float(value)
+
+
+async def record_mastery_shadow(
+    *,
+    nickname: str,
+    session_id: uuid.UUID,
+    problem_id: str,
+    values: dict[str, float],
+) -> None:
+    """판정 1건의 엔진별 숙련도(엔진 이름 → 값)를 한 트랜잭션에 함께 쌓는다(엔진마다 1행)."""
+    await ensure_schema()
+    async with _engine().begin() as conn:
+        await conn.execute(
+            mastery_shadow.insert(),
+            [
+                {
+                    "nickname": nickname,
+                    "engine": engine,
+                    "mastery": value,
+                    "session_id": session_id,
+                    "problem_id": problem_id,
+                }
+                for engine, value in values.items()
+            ],
+        )

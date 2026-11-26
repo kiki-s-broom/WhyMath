@@ -16,7 +16,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
-from golden import grade, problems, store, tutor
+from golden import grade, mastery, problems, store, tutor
 from golden.eval import (
     T2_MATCHER_VERSION,
     evaluate_tutor_reply,
@@ -267,6 +267,31 @@ async def _record_t2(turn_id: int, problem: problems.Problem, match: _T2Match) -
         )
 
 
+async def _shadow_mastery(
+    row: store.SessionRow, problem_id: str, correct: bool, simple_mastery: float
+) -> float:
+    """T3 섀도(S32 · 다섯 걸음 ④): 두 엔진을 모두 계산해 golden.mastery_shadow에 1행씩 쌓는다.
+
+    - 플래그 `GOLDEN_MASTERY_ENGINE`과 무관하게 늘 두 행(simple·bkt)을 쓴다.
+    - 돌려주는 값(응답 `mastery`)만 플래그를 따른다 — 기본 simple, 정확히 `bkt`일 때만 bkt.
+    - bkt의 prior는 이 학생의 직전 bkt 섀도 값이다. 없으면 P(L0)=0.2에서 시작한다.
+    - 응답의 bkt 값은 simple과 같은 모양(둘째 자리 반올림)이다. 표에는 반올림 전 값을 둔다.
+    - 섀도 기록 실패를 삼키지 않는다 — 다른 저장소 호출처럼 오류가 올라간다
+      (bkt 플래그일 때 응답 값이 이 기록에 기대므로, 조용히 simple로 바꿔 내지 않는다).
+    """
+    prior = await store.get_shadow_mastery(row.nickname, mastery.ENGINE_BKT)
+    bkt_mastery = mastery.update(mastery.BKT_INITIAL if prior is None else prior, correct)
+    await store.record_mastery_shadow(
+        nickname=row.nickname,
+        session_id=row.session_id,
+        problem_id=problem_id,
+        values={mastery.ENGINE_SIMPLE: simple_mastery, mastery.ENGINE_BKT: bkt_mastery},
+    )
+    if mastery.response_engine() == mastery.ENGINE_BKT:
+        return round(bkt_mastery, 2)
+    return simple_mastery
+
+
 async def _graded(
     row: store.SessionRow,
     problem: problems.Problem,
@@ -291,7 +316,8 @@ async def _graded(
     # GP-6 숙련도 갱신: 맞으면 +0.10, 틀리면 −0.05 → set_mastery가 0.0~1.0 잘라내기·둘째 자리 반올림
     current = await store.get_mastery(row.nickname)
     delta = MASTERY_GAIN if correct else -MASTERY_LOSS
-    mastery = await store.set_mastery(row.nickname, current + delta)
+    simple_mastery = await store.set_mastery(row.nickname, current + delta)
+    mastery_value = await _shadow_mastery(row, problem["id"], correct, simple_mastery)
     if not correct and misconception_enabled():
         # S27 T2(플래그 켜짐 · 3턴을 다 쓴 마지막 오답): 기록만 한다 — 응답 불변.
         # cursor·숙련도 갱신 뒤에 부른다 — 좁은 except 밖의 예외가 나도 판정 상태가 반쯤 남지 않게.
@@ -301,7 +327,7 @@ async def _graded(
     return {
         "kind": "graded",
         "correct": correct,
-        "mastery": mastery,
+        "mastery": mastery_value,
         "turns_used": turns_used,
         "feedback": feedback,
     }
