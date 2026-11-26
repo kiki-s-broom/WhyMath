@@ -15,6 +15,7 @@ acceptance:
   - "① 반복 회차 지시문 묶음(golden/prompts_phase1r/ S26R~S35R · 원본 golden/prompts_src/spec_phase1r.md·config_phase1r.json)이 main에 있고 다음 작업 계산기가 \"1단계 반복\" 단계로 읽는다 ② 슬롯 T2R(F-02 채점 앞말·꼬리)·T3R(F-07 튜터 정답 유출)을 다섯 걸음으로 시도하고 S30R·S34R가 효과 있음/없음을 판정한다 ③ S35R가 게이트 여섯 줄을 다시 판정한다(③ = 1회차 T1 + T2R + T3R · 반복은 한 번만 — ③ 아니오면 1단계 중단) ④ 모든 판정에 \"잠정 · AI 대체\""
 artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/2005"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2006"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -28,4 +29,6 @@ notes: |-
   [정정 2026-11-26] paths ['golden/**', 'src/backend/golden/**', 'tests/golden/**'] → ['golden/**', 'src/backend/golden/**', 'tests/golden/**', '.claude/hooks/golden_session_register.py', 'tests/infra/test_golden_session_register.py']: 반복 회차 지시문 묶음(접두 DR)의 세션 이름을 등록 훅이 읽게 한다 — 공통 규칙 3의 예외(지시문 묶음 자체의 장치) · 정규식·묶음 표·테스트 픽스처에 DR 한 줄씩
 
   [정정 2026-11-26] 반복 회차 계획 PR — 지시문 S26R~S35R·계산기 배선 · 다음 정시 실행부터 S26R
+
+  [정정 2026-11-26] S26R 완료 — 고정 입력 43행 · 옛 자산 없음 · 특성화 45
 updated: 2026-11-26
