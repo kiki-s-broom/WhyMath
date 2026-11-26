@@ -36,15 +36,16 @@ from pathlib import Path
 #: 작업 번호는 S20A처럼 끝에 대문자 하나를 허용한다(1단계 개정판의 S20+1).
 #: 접두 = GP 골든 패스 원본 · GPN 학생 없는 변형 · DK 1단계 두꺼게(S16~S35)
 #:        · DU 2단계 두 번째 단원(S36~S55) · SC 3단계 세 번째 단원+Subject Contract(S56~S75)
-#:        · PL 4단계 파일럿(S76~S105).
+#:        · PL 4단계 파일럿(S76~S105) · DR 1단계 반복 회차(S26R~S35R · GOLD-42).
 #: 새 묶음은 이 정규식과 아래 _BUNDLE 표, 테스트 픽스처에 함께 더한다.
 _NAME_RE = re.compile(
-    r"^세션 이름:\s*((GPN|GP|DK|DU|SC|PL|RS)-단계(\d{2})-([A-Z]+\d+[A-Z]?)-(\S+))\s*$"
+    r"^세션 이름:\s*((GPN|GP|DK|DR|DU|SC|PL|RS)-단계(\d{2})-([A-Z]+\d+[A-Z]?)-(\S+))\s*$"
 )
 _BUNDLE = {
     "GP": "원본 묶음(golden/prompts)",
     "GPN": "학생 없는 변형(golden/prompts_no_students)",
     "DK": "1단계 두꺼게(golden/prompts_phase1)",
+    "DR": "1단계 반복 회차(golden/prompts_phase1r)",
     "DU": "2단계 두 번째 단원(golden/prompts_phase2)",
     "SC": "3단계 세 번째 단원+Subject Contract(golden/prompts_phase3)",
     "PL": "4단계 파일럿(golden/prompts_phase4)",

@@ -60,6 +60,10 @@ def _stdin(prompt: str, session_id: str = "session_01ABCDEFGHIJKLMNOP") -> bytes
             ("DK-단계01-S20A-전이의존절단", "S20A", "DK"),
         ),
         (
+            "세션 이름: DR-단계01-S26R-T2R설계-채점앞말꼬리",
+            ("DR-단계01-S26R-T2R설계-채점앞말꼬리", "S26R", "DR"),
+        ),
+        (
             "세션 이름: RS-단계02-D1-진단-백엔드대장-844모듈",
             ("RS-단계02-D1-진단-백엔드대장-844모듈", "D1", "RS"),
         ),
