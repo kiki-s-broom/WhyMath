@@ -502,3 +502,13 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음 — golden 안에 새로 쓴다(S27R) | `whymath_backend/l3/verify_final_answer.py::verify_final_answer` | 버림: 쓸모 없음(측정) — 맞는 입력 0/11 correct · 대조군 거짓 오답 2 · LEGACY_MANIFEST(새 import 금지) | S26R |
+
+## 반복 슬롯 T2R 연결 (S27R · 1단계 반복 회차 · 2026-11-26 · 인용 F-02)
+
+- **③ 복사/import:** 옛 자산 없음(S26R 경계) — golden 안에 새로 썼다. `src/backend/golden/grade_tail.py`(`last_math_fragment` · `t2r_grade_enabled` · 플래그 `GOLDEN_T2R_GRADE`). 표준 라이브러리만 쓴다. 옛 모듈 import 0개.
+- **④ 연결(GP-5):** `src/backend/golden/grade.py`의 `is_correct`. 원래 입력이 **파싱에 실패했을 때만**, 플래그가 `1`이면 마지막 수식 조각으로 한 번 더 채점한다. 원래 입력이 읽히면 정답이든 오답이든 그 판정을 그대로 쓴다. 넓은 `except`는 새로 만들지 않았다 — 원래 있던 한 줄(허용 목록 · Kiki 승인 2026-11-18) 안에서 시도를 차례로 돈다. 허용 목록은 옮겨진 줄 번호(148 → 167)만 고쳤다.
+- **실측:** 고정 입력 43행 — 플래그 1에서 맞는 입력 11/11(반복 포함 13/13) 정답 · 오답 20행 뒤집힘 0 · 대조군 11 그대로. 가짜 720 기록의 서로 다른 학생 입력 661개 — 플래그 0↔1 판정 차이 0. 처음 판은 P7 붙여넣기(500자) 속 `x=0`이 LF-06 정답 0과 맞아 1건이 뒤집혔다 → 공백을 지우고 100자를 넘는 입력은 조각을 고르지 않게 했다(지금 채점기의 `MAX_INPUT_LEN`과 같은 값).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음 — golden 안에 새로 씀(`grade_tail.py` 61줄) | — | S26R 경계 "옛 자산 없음" 그대로 | S27R |

@@ -232,6 +232,7 @@ golden/reports_phase1/<번호>/보고.md ← 각 세션 보고
 | `GOLDEN_T1_RUBRIC=0|1` | T1 평가기를 GP-4 뒤에 붙일지(S22 · 기본 0) |
 | `GOLDEN_T2_MISCONCEPTION=0|1` | 오개념 매칭을 GP-5·GP-4에 붙일지(S27·S28 · 기본 0) |
 | `GOLDEN_MASTERY_ENGINE=simple|bkt` | 숙련도 엔진(S32 · 기본 simple · bkt는 섀도 기록) |
+| `GOLDEN_T2R_GRADE=0|1` | 반복 회차 T2R — 채점 앞말·꼬리 처리(S27R · 기본 0 · 값이 정확히 `1`일 때만 켜짐 · 파싱 실패한 입력만 마지막 수식 조각으로 다시 채점) |
 | `GOLDEN_FAKE_LLM=1` | 튜터·학생 모두 고정 대본(CI·테스트) |
 
 *게이트(S35 · 12/26 · 계획서 §7 여섯 줄)*
