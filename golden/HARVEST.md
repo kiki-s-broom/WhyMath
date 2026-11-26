@@ -486,3 +486,19 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음(측정만) | 없음 — 미참조 816모듈은 격리 목록에 올렸을 뿐 지우지 않았다(삭제는 3단계 S74) | 지시서 S35 할 일 4 | S35 |
+
+## 반복 슬롯 T2R 경계 (S26R · 1단계 반복 회차 · 2026-11-26 · 기준 main `a07a018d` · 인용 F-02)
+
+- **무엇을 다루나:** 채점 입력에 앞말(`f(0)은 …`)·꼬리(`…이에요?`·`…같은식으로 바뀌겠죠?`)가 붙어 맞는 식·값이 오답 처리되는 것(`F-02` · FINDINGS_v2 2위). 고정 입력 표 `golden/data/grade_prefix_tail_lf.json`(43행 = 맞는 입력 11문장(반복 포함 13) · 오답 20 · 지금도 정답 대조군 11 · 모호 1).
+- **옛 자산 후보와 판정(다섯 걸음 ①):**
+  - `whymath_backend/l3/verify_final_answer.py`의 `verify_final_answer`(+ `_strip_answer_noise`·`_last_rhs`) — **버림: 쓸모 없음(측정)**. 고정 입력 표에서 맞는 입력 11문장을 하나도 `correct`로 받지 않는다(11개 모두 `unverifiable`). 대조군 11개 중에서도 `correct`는 1개이고 `incorrect`가 2개다(`f(5)=-3(5)+3=-15+3=-12`·`f(-3) = -3 + 4` · 원인은 확인하지 않았다). 지금 골든 채점기보다 거짓 오답이 많다. 또 `LEGACY_MANIFEST.txt`에 있어 새 import가 금지다. 근거는 `tests/golden/characterization/test_t2r_grade.py`가 고정한다.
+  - `whymath_backend/l3/safe_parse.py`의 `safe_parse_expr` — 이미 `golden/grade.py`가 쓰는 파서다. 앞말·꼬리를 떼는 함수가 아니라 이 슬롯의 자산이 아니다.
+  - `whymath_backend/schema/answer_form.py`(`expected_form_of`·`strict_expected_form_of`) — 기대 답 **형식** 분류뿐이다. 입력에서 답 조각을 고르지 않는다.
+  - `whymath_backend/l3/notation_coverage.py`의 `extract_math_glyphs` — 수식 기호 **개수**를 센다. 답 조각을 돌려주지 않는다.
+- **결론: 옛 자산 없음 — golden 안에 새로 쓴다**(1회차 S27 매칭 함수 선례). S27R은 `src/backend/golden/` 안에서 "숫자가 든 마지막 수식 조각" 규칙(FINDINGS 「판정 오류」의 다시 채점 방법)을 플래그 `GOLDEN_T2R_GRADE` 뒤에 쓴다.
+- **특성화(다섯 걸음 ②):** 옛 자산이 없어 지금 `golden.grade.is_correct`의 출력을 고정 입력 43행 전부에 대해 고정했다(대조군 11개만 True · 나머지 32개 False). 플래그 0에서 S27R 뒤에도 이 테스트가 그대로 초록이어야 한다.
+- **S27R이 알아야 할 어려운 칸:** `6(2)-8=-4요?`(LF-03)는 대입식 `6(2)-8`이 정답 4와 같지만 학생이 쓴 끝값은 `-4`다 — 마지막 조각 규칙이면 오답(옳다). `f(3)=-8 같은식으로 계산되면 8이 아니겠죠?`는 맞는 값과 부정된 틀린 값이 함께 있어 모호로 뒀다. 질문 꼴 4문장(`…넣어요?`·`…하면 뭔가요?`)은 제출로 볼지 판정자마다 다르다(S29 4절).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음 — golden 안에 새로 쓴다(S27R) | `whymath_backend/l3/verify_final_answer.py::verify_final_answer` | 버림: 쓸모 없음(측정) — 맞는 입력 0/11 correct · 대조군 거짓 오답 2 · LEGACY_MANIFEST(새 import 금지) | S26R |
