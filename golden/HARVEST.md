@@ -460,7 +460,7 @@ cd src/backend && python -m golden.measure_unreferenced
 | --- | --- | --- | --- |
 | 없음(경계 긋기와 특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `l2/bkt.py`의 `BktParameters` + `update_mastery`(+ 같은 파일 안 `posterior_mastery`·`apply_learning`) | 망각(`apply_forgetting`·`BktModel.apply_forgetting`) · `BktModel` · `probability_correct` | T3 설계 · 망각·적응형 문항 선택은 §6 금지 · 복사/import·연결은 S32 | S31 |
 
-### 슬롯 T3 복사·연결 (S32 · 1단계 · 2026-11-25 · 기준 main `5ca51174` · 인용 F-06)
+## 슬롯 T3 복사·연결 (S32 · 1단계 · 2026-11-25 · 기준 main `5ca51174` · 인용 F-06)
 
 - **③ 복사**: S31 경계 그대로 `BktParameters` + `update_mastery`(+ `posterior_mastery`·`apply_learning`)를 `src/backend/golden/mastery/bkt.py`로 옮겼다. 계산식·기본값·오류 문구는 원본과 같다. 골든 파라미터(S31 제안값 0.2·0.3·0.1·0.2)는 `GOLDEN_BKT_PARAMETERS`이고, 지시서 모양의 `update(prior, correct) -> float`가 이 값을 쓴다.
   - 사본은 `pydantic`·표준 라이브러리만 쓴다. `import golden.mastery`가 새로 부르는 옛 모듈은 **0개**다(이 세션 실측 · `sys.modules` 세기 · 원본은 141개).
