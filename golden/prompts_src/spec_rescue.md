@@ -134,7 +134,7 @@
 | `golden/reports_rescue/<번호>/보고.md` | 세션의 완료 보고 |
 | `golden/reports_rescue/<번호>/카드.md` | 다음 세션에 넘기는 요약(150줄 이하) |
 | `golden/reports_rescue/<번호>/` 아래 `.csv`·`.tsv`·`.json` | 도구 원본(200KB 이하만 커밋) |
-| `src/backend/golden/rescue/` | 이 묶음의 도구 코드(`outline.py`). 등급 측정은 새 파일을 만들지 않고 `src/backend/golden/measure_unreferenced.py`에 더한다. `__init__.py`는 내용이 `"""옛 코드 살리기(RS) 도구 — 진단 전용. 학생 경로와 무관하다."""` 한 줄이다(R0이 만든다) |
+| `src/backend/golden/rescue/` | 이 묶음의 도구 코드(`outline.py` — R0 · `ledger.py` — R1). `__init__.py`는 내용이 `"""옛 코드 살리기(RS) 도구 — 진단 전용. 학생 경로와 무관하다."""` 한 줄이다(R0·R1이 같은 내용으로 만든다) |
 | `tests/golden/rescue/` | 도구 테스트 |
 | `tests/golden/characterization/` | 특성화 테스트(1단계 묶음과 같은 자리) |
 
@@ -168,7 +168,7 @@
 | 쟁점 | Kiki 결정 | 이 묶음에서 바뀐 것 |
 | --- | --- | --- |
 | 착수 시점 | **지금 시작한다**(검토 문서는 3단계 S74 직전을 권했다) | 변화 없음 — 산출물은 S74의 입력 자료가 된다 |
-| 대장 도구 | **`ledger.py`를 새로 만들지 않는다.** 기존 `src/backend/golden/measure_unreferenced.py`에 진입점 `app` 축을 추가한다 | R1을 그 내용으로 바꿨다. D1·G1·Z1은 `python -m golden.measure_unreferenced`를 쓴다 |
+| 대장 도구 | **첫 판 R1이 만든 `ledger.py`(PR #1933)를 인정한다.** Kiki가 처음에는 "기존 `measure_unreferenced.py`에 추가"로 정했으나, 그 사이 첫 판 지시문으로 도구가 이미 만들어지고 테스트·결함 주입까지 끝난 것을 확인한 뒤 같은 날 뒤집었다 | R1은 완료(다시 돌리지 않는다). D1·G1·Z1은 `python -m golden.rescue.ledger`를 쓴다. 두 도구에 겹치는 보정 함수 2개(약 30줄)는 `golden/LATER.md`에 적어 두었다 |
 | 중복 탐지 | **하네스 태스크 `ARCH-47`(중복 구현 감사)에 넘긴다** | 중복 지도 작업을 이 묶음에서 없앴다. 다만 첫 판 지시문으로 이미 한 번 잰 결과가 있다(PR #1929 — 백엔드 중복률 2.47% · 테스트 2.96%). 카드의 "중복 여부" 칸은 `golden/reports_rescue/D3/카드.md`가 main에 있으면 그것을 인용하고(없으면 `ARCH-47` 결과), 둘 다 없으면 "미측정 — ARCH-47 담당"이라고 적는다. 새로 재지 않는다 |
 | 가림막(AI 읽기 금지 설정) | **만들지 않는다** | 가림막 후보 작업을 없앴다 |
 
@@ -204,7 +204,7 @@
 6. 주입(규칙 12): 기대값 하나를 일부러 바꿔 테스트가 실패하는지 본다(테스트 파일만 바꾼다 — 옛 코드는 바꾸지 않는다).
 7. `golden/HARVEST.md`에 한 줄을 더한다: `가져온 것 = 없음(특성화 테스트만) · 버린 것 = 없음 · 이유 = RS 입고 준비 · 세션 = RS-X<n>`.
 
-## R0~R1: 준비 — 목차 도구와 측정 도구 확장
+## R0~R1: 준비 — 목차 도구와 대장 도구
 
 진단을 코드 통독 없이 하려면 도구가 먼저 있어야 한다. 두 세션은 서로 다른 파일을 만들므로 동시에 돌려도 된다. 도구는 학생 경로와 무관하며 `golden.api`를 import하지 않는다.
 
@@ -225,24 +225,24 @@
 - **완료 기준:** 규칙 11의 다섯 명령이 모두 종료 코드 0이다. 테스트 4종이 통과하고, "큼" 기준을 1,500에서 15,000으로 바꾸면 해당 테스트가 실패한다(규칙 12).
 - **하지 말 것:** 목차에 함수 본문을 싣지 않는다. LLM을 부르지 않는다. 옛 코드를 import해서 실행하지 않는다(부작용이 있다).
 
-### R1. 측정 도구 확장 — 기존 `measure_unreferenced.py`에 진입점 `app` 축과 대장 CSV 추가
+### R1. 대장 도구 — 진입점 둘, 그래프 밖 파일 보정 (완료 · PR #1933)
 
-- **목적:** 모듈 대장(D1)과 고아 게이트(G1)가 쓰는 측정을 **기존 도구 하나**에 더한다. 지금 그 도구는 "골든에서 닿는가"만 잰다. 같은 일을 하는 도구를 두 벌 만들지 않는다(Kiki 결정 2026-11-17 — `ledger.py`는 만들지 않는다).
+- **목적:** 모듈 대장(D1)과 고아 게이트(G1)가 쓰는 도구다. **첫 판 지시문으로 이미 만들어졌다(PR #1933 · 하네스 태스크 RS-08).** 이 지시문은 기록이며, 새 세션에서 다시 돌리지 않는다. PR #1933이 main에 없으면 그것부터 머지돼야 D1·G1을 열 수 있다.
 - **선행 산출물:** 없음.
 - **할 일:**
-    1. `src/backend/golden/measure_unreferenced.py`와 `tests/golden/test_measure_unreferenced.py`를 목차로 먼저 본다(`grep -n "^def \|add_argument"`). 기존 옵션(`--out`·`--budget`)과 기존 출력 파일(`unreferenced_backend.tsv` 등)의 이름·열·값은 **바꾸지 않는다** — `tests/golden/test_legacy_manifest.py`와 `tests/golden/test_import_budget.py`가 그 결과에 기대고 있다.
-    2. 옵션 `--entry <모듈>`(여러 번 줄 수 있음)을 더한다. 주어지면 그 진입점에서 import를 따라가 닿는 모듈을 세고, 이미 있는 보정 함수(`close_over_ancestors` — 부모 패키지 `__init__` 보정 · `filesystem_modules` — `__init__.py` 없는 `l1/rights/` 보정)를 그대로 재사용한다. 새 보정 로직을 따로 만들지 않는다.
-    3. 옵션 `--ledger-csv <파일>`을 더한다. 진입점 `golden.api`와 `whymath_backend.app`을 받아 공유 계약 「등급 판정」의 열 순서로 CSV를 쓴다. 실행 기록 JSON(`--journey-golden`·`--journey-legacy` — `coverage json`의 출력)은 **선택**이다. 없으면 등급 칸에 `대기(실행 기록 없음)`을 쓴다. 실행 여부는 "함수 안에서 실행된 줄이 1줄 이상인가"로 본다.
-    4. 옛 앱에서 닿지 않는 모듈마다 "이름이 참조되는가"를 비고 칸에 적는다: 모듈의 점 표기 이름이 `.github/workflows`·`scripts`·`docs/ops`·`backlog` 네 곳에 나오는지 센다(검토 문서 §8의 6번과 같은 범위 — 범위를 바꾸면 숫자가 재현되지 않는다).
-    5. 옵션 `--orphan-gate <패키지> --baseline <파일> [--update]`를 더한다. 지정한 패키지에서 진입점에 닿지 않는 모듈이 기준선에 없으면 종료 코드 1로 끝난다.
-    6. 화면에는 요약만 낸다(주 지표 셋 · 패키지별 표 30행 이하 · "전부 미도달인 패키지" 한 줄). 50줄을 넘기지 않는다.
-    7. 테스트를 더한다(`tests/golden/test_measure_unreferenced.py`에 추가하거나 `tests/golden/rescue/test_entry_axis.py` 신설). 임시 폴더의 합성 패키지(닿는 모듈 · 안 닿는 모듈 · `__init__` 없는 폴더의 모듈)로 진입점 축과 게이트를 검사한다. 기존 테스트가 그대로 통과하는지도 본다.
-    8. 실제 저장소에 `--entry whymath_backend.app`으로 돌려 검토 문서의 값(그래프 839 · 도달 480 · 미도달 359)과 대조한다. 다르면 차이와 추정 원인(그사이 main 변경)을 보고에 적는다.
-    9. 변경이 300줄을 넘으면 PR을 둘로 나눈다(① 진입점 축과 CSV ② 고아 게이트).
-- **산출물:** `measure_unreferenced.py`의 추가분, 테스트, `golden/reports_rescue/R1/카드.md`(명령 예 3개 + 실제 실행의 주 지표 셋), `보고.md`.
-- **완료 기준:** `python src/backend/golden/check.py`가 종료 코드 0이다. 기존 테스트가 전부 통과한다. 주입 3종(부모 `__init__` 보정을 진입점 축에서 빼기 · 그래프 밖 보정 빼기 · 게이트 비교 빼기)에서 새 테스트가 각각 실패한다. 옵션 없이 돌린 기존 출력이 바이트 동일하다(`diff`로 확인).
-- **하지 말 것:** `ledger.py`나 다른 새 측정 파일을 만들지 않는다. `golden/LEGACY_MANIFEST.txt`를 다시 만들거나 고치지 않는다. `golden.api`를 import하지 않는다. 대장 전체를 화면에 찍지 않는다.
-- **막히면:** `grimp`가 그래프를 만들다 실패하면 오류 이름과 마지막 20줄을 보고하고 멈춘다. 옛 코드를 고쳐서 통과시키지 않는다.
+    1. `git cat-file -e origin/main:src/backend/golden/rescue/ledger.py ; echo "EXIT=$?"`로 도구가 main에 있는지 확인한다. 종료 코드가 0이면 **아무것도 만들지 않고** 2번으로 간다. 0이 아니면 "PR #1933 미머지"라고 보고하고 멈춘다(도구를 새로 만들지 않는다).
+    2. `golden/reports_rescue/R1/카드.md`를 읽고 「명령 예 ①」을 그대로 돌려 숫자가 카드와 같은지 본다. 다르면 [차이]로 보고한다.
+- **산출물:** 없음(이미 있다 — `src/backend/golden/rescue/ledger.py` 317줄 · `tests/golden/rescue/test_ledger.py` 테스트 5건 · `golden/reports_rescue/R1/카드.md`·`보고.md`).
+- **완료 기준:** 1번의 종료 코드가 0이고 2번의 숫자가 카드와 같다.
+- **하지 말 것:** `ledger.py`를 다시 쓰거나 `measure_unreferenced.py`로 옮기지 않는다(Kiki 결정 2026-11-17 — 공유 계약 「검토 문서와 어긋났던 곳과 Kiki 결정」).
+
+*도구 사용법 (사전 실측 2026-11-17 · PR #1933의 `ledger.py`와 `카드.md`에서 옮겨 적음 — 세션에서 `python -m golden.rescue.ledger --help`로 다시 확인한다)*
+
+- 명령: `cd src/backend && python -m golden.rescue.ledger --entry golden.api --entry whymath_backend.app --csv <파일> [--journey-golden <json>] [--journey-legacy <json>] [--unit <json>] [--baseline <파일> [--update]] [--gate-package golden]`. 첫째 `--entry`가 "골든" 열, 둘째가 "옛앱" 열이다.
+- 실행 기록이 없으면 등급이 `대기(실행 기록 없음)`·`섬/잔해(실행 기록 없음)` 두 가지로만 나온다.
+- 종료 코드: 0 정상 · 1 고아 게이트 실패 · 2 입력 오류(진입점 없음 · coverage 형식 · 경로 0건 일치 · 기준선 파일 없음).
+- 정적 실행의 실측값(실행 기록 없음): 대장 모듈 867(옛 844 + 골든 23) · 옛앱에서 닿는 모듈 480 · 닿지 않는 모듈 387(옛 364 + 골든 23) · 골든 고아 8개(`golden.check`·`golden.llm.sync`·`golden.measure_unreferenced`·`golden.rescue`·`golden.rescue.ledger`·`golden.sim`·`golden.sim.seed_extract`·`golden.sim_student` — 전부 명령줄 도구).
+- 환경: `lint-imports`는 CI와 같은 import-linter 2.15로 돌린다(2.16은 main 그대로도 종료 코드 1). `tests/golden` 전체는 Postgres가 있어야 초록이다. 대장 CSV는 약 200KB라 커밋하지 않는다.
 
 ## D0~D6: 진단 — 코드를 읽지 않고 잰다
 
@@ -264,15 +264,15 @@
 ### D1. 백엔드 모듈 대장 — 844모듈에 등급 붙이기
 
 - **목적:** 이 묶음의 중심 산출물이다. 패키지 카드(C1~C8)와 삭제 후보(Z1)가 전부 이 대장을 읽는다.
-- **선행 산출물:** R1이 확장한 `measure_unreferenced.py`.
+- **선행 산출물:** R1의 `ledger.py`(PR #1933이 main에 있어야 한다).
 - **할 일:**
     1. 골든 경로 실행 기록을 만든다: `cd src/backend && GOLDEN_FAKE_LLM=1 python -m coverage run --data-file=/tmp/rs.cov.golden --source=whymath_backend,golden -m pytest ../../tests/golden/test_golden_path.py ; echo "EXIT=$?"` 뒤 `python -m coverage json --data-file=/tmp/rs.cov.golden -o /tmp/rs.golden.json`. DB가 필요해 실패하면 `tests/golden/conftest.py`가 요구하는 환경을 읽고 맞춘다. 맞추지 못하면 실행 기록 없이 진행하고 등급을 `대기(실행 기록 없음)`으로 적는다.
     2. 옛 앱 쪽 경로 테스트가 있는지 **찾는다**: `tests/` 아래에서 옛 앱(`create_app`)을 띄워 HTTP로 여러 엔드포인트를 차례로 부르는 테스트(이름에 `e2e`·`journey`·`flow`·`smoke`가 들었거나 `TestClient(create_app`을 쓰는 파일)를 `grep -l`로 찾고 후보 10개 이하를 적는다. 있으면 그중 가장 긴 줄기 하나로 실행 기록을 만든다. 없으면 "옛 앱 경로 테스트 미확인"으로 적는다.
     3. 단위 테스트 실행 기록은 전체 스위트를 돌리지 않는다(1,141파일 · 시간 과다). 대신 D5의 정적 대응표가 "단위 테스트가 실행" 칸을 대신한다는 것을 비고에 적고, D5가 끝나 있으면 그 TSV를 읽어 칸을 채운다. 없으면 빈칸으로 둔다.
-    4. `python -m golden.measure_unreferenced --entry golden.api --entry whymath_backend.app --ledger-csv ../../golden/reports_rescue/D1/ledger.csv`(실행 기록이 있으면 `--journey-golden`·`--journey-legacy`를 더한다)를 돌린다. **주 지표는 "옛앱에서 닿음" 칸이다** — 실행 기록 칸은 참고다(공유 계약 「검토 문서와 어긋났던 곳과 Kiki 결정」).
+    4. `python -m golden.rescue.ledger --entry golden.api --entry whymath_backend.app --csv /tmp/rs.ledger.csv`(실행 기록이 있으면 `--journey-golden`·`--journey-legacy`·`--unit`을 더한다)를 돌린다. CSV가 200KB를 넘으면 커밋하지 않고 재생성 명령만 적는다. **주 지표는 "옛앱에서 닿음" 칸이다** — 실행 기록 칸은 참고다(공유 계약 「검토 문서와 어긋났던 곳과 Kiki 결정」). 그다음 옛 앱에서 닿지 않는 옛 모듈마다 점 표기 이름이 `.github/workflows`·`scripts`·`docs/ops`·`backlog` 네 곳에 나오는지 `grep -rlF`로 세어 "이름으로도 참조되지 않는 수"를 낸다(검토 문서 §8의 6번과 같은 범위 · 집계 스크립트는 `/tmp`에 두고 커밋하지 않는다).
     5. 요약 표 셋을 만든다: 등급별(골든 기준·옛앱 기준 각각 모듈 수·줄 수), 패키지별(공유 계약 파트 표의 패키지마다 등급 분포), "옛 앱에서도 전부 잔해인 패키지" 목록.
     6. 변별력을 확인한다: `golden/HARVEST.md`가 "쓴다"고 적은 `db.session`·`l3.safe_parse`·`l3.providers.factory`가 골든 기준 가동 또는 대기이고, "버렸다"고 적은 `api.coach`·`l3.equivalent.canonicalize`가 골든 기준 섬 또는 잔해인지 본다.
-- **산출물:** `ledger.csv`(844행 + 골든), `요약.md`, `카드.md`, `보고.md`.
+- **산출물:** `요약.md`, `카드.md`, `보고.md`, 그리고 대장 CSV(200KB 이하일 때만 `golden/reports_rescue/D1/ledger.csv`로 커밋 — 넘으면 보고에 재생성 명령).
 - **완료 기준:** CSV 행 수가 844 + 골든 모듈 수다. 6번의 다섯 모듈이 기대한 쪽에 있다. 화면에 올린 출력이 50줄 이하다.
 - **하지 말 것:** 등급이 낮다고 "죽은 코드"라고 적지 않는다(잔해 판정은 이 진입점·이 실행 기록 기준일 뿐이다). 옛 테스트 전체를 돌리지 않는다.
 - **막히면:** 옛 앱 그래프가 만들어지지 않으면 골든 기준만 채우고 "일부 완료"로 보고한다.
@@ -501,10 +501,10 @@
 ### G1. 고아 게이트 — 골든 구역에 연결 안 된 모듈이 새로 생기면 실패
 
 - **목적:** 옛 코드가 유령의 집이 된 원인 하나는 "만들었는데 아무도 부르지 않는 모듈"이다. 골든 구역에서 같은 일이 반복되지 않게 한다.
-- **선행 산출물:** R1이 확장한 `measure_unreferenced.py`.
+- **선행 산출물:** R1의 `ledger.py`(PR #1933이 main에 있어야 한다).
 - **할 일:**
     1. 골든 구역의 진입점을 정한다: 서버 `golden.api`와, 명령줄로 직접 실행하는 모듈(`python -m golden.…`로 부르는 것 — `measure_unreferenced`·`sim_student`·`sim.*`·`rescue.outline`·`rescue.ledger` 등). `if __name__ == "__main__"`이 있는 골든 모듈을 `grep`으로 찾아 목록을 만든다.
-    2. 그 진입점들에서 닿지 않는 골든 모듈을 `python -m golden.measure_unreferenced --orphan-gate golden`으로 센다. 지금 있는 것은 기준선 `tests/golden/rescue/orphan_baseline.txt`에 이유와 함께 올린다(이유 없는 줄은 올리지 않는다).
+    2. 그 진입점들에서 닿지 않는 골든 모듈을 `python -m golden.rescue.ledger … --baseline <기준선> --gate-package golden`으로 센다(R1 카드에 따르면 지금 8개 + R0의 `golden.rescue.outline`). 지금 있는 것은 기준선 `tests/golden/rescue/orphan_baseline.txt`에 이유와 함께 올린다(이유 없는 줄은 올리지 않는다).
     3. `tests/golden/rescue/test_orphan_gate.py`를 쓴다: 기준선에 없는 고아가 생기면 실패하고, 기준선에 있는데 이미 해결된 줄이 남아 있어도 실패한다(기준선은 줄어들기만 한다).
     4. 주입: `src/backend/golden/` 아래에 아무도 import하지 않는 파일을 하나 만들어 테스트가 실패하는지 본다. 확인 뒤 그 파일을 지운다.
     5. 이 테스트는 `tests/golden` 아래에 있으므로 CI `golden-path` 잡의 `pytest ../../tests/golden`이 이미 실행한다. 그 사실을 `.github/workflows/ci.yml`에서 확인해 줄 번호와 함께 적는다(워크플로는 고치지 않는다).
@@ -537,7 +537,7 @@
 - **선행 산출물:** J1의 `처분표.md`·`승인_기록.md`(관문 ① go).
 - **할 일:**
     1. 처분표에서 Kiki가 승인한 "삭제" 행만 뽑는다. 승인되지 않은 행은 다루지 않는다.
-    2. 행마다 증거 세 가지를 모은다: ①정적으로 안 닿음 — `golden/reports_rescue/D1/ledger.csv`에서 그 모듈들의 골든·옛앱 등급이 둘 다 섬 또는 잔해 ②실행 기록 없음 — 같은 CSV의 "경로 테스트가 실행" 칸이 전부 아니오 ③이름 문자열 검색 0건 — 모듈 이름의 마지막 낱말과 점 표기 전체를 저장소 전체에서 `grep -rn`(대상: `.py`·`.yml`·`.yaml`·`.toml`·`.json`·`.md`·`.sh`·`.ps1`)으로 찾아, 자기 자신·자기 테스트·LEGACY_MANIFEST·`pyproject.toml`의 금지 목록 밖에서 나온 건수.
+    2. 행마다 증거 세 가지를 모은다: ①정적으로 안 닿음 — D1의 대장 CSV(커밋돼 있지 않으면 `golden/reports_rescue/D1/보고.md`의 재생성 명령으로 다시 만든다)에서 그 모듈들의 골든·옛앱 등급이 둘 다 섬 또는 잔해 ②실행 기록 없음 — 같은 CSV의 "경로 테스트가 실행" 칸이 전부 아니오 ③이름 문자열 검색 0건 — 모듈 이름의 마지막 낱말과 점 표기 전체를 저장소 전체에서 `grep -rn`(대상: `.py`·`.yml`·`.yaml`·`.toml`·`.json`·`.md`·`.sh`·`.ps1`)으로 찾아, 자기 자신·자기 테스트·LEGACY_MANIFEST·`pyproject.toml`의 금지 목록 밖에서 나온 건수.
     3. ③이 0이 아니면 그 행을 "보류"로 내리고 나온 위치를 3개까지 적는다(문자열로 불러오는 곳일 수 있다).
     4. 행마다 함께 움직일 것을 적는다: 딸린 테스트 파일(`golden/reports_rescue/D5/테스트_대응.tsv`에서) · 이 패키지를 부르는 스크립트(`D4/스크립트_대장.tsv`) · CI에서 이 경로를 이름으로 부르는 스텝(`grep -n` 줄 번호) · `pyproject.toml` 금지 목록의 해당 줄 수 · `alembic` 리비전이 이 모델을 참조하는지.
     5. 삭제 순서를 제안한다: 딸린 것이 적은 순서. 한 번의 삭제 PR이 "패키지 1개 + 그 테스트"가 되도록 묶고, 묶음마다 지워질 파일 수·줄 수를 적는다.
