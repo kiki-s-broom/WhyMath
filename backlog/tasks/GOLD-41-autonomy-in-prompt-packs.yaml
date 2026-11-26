@@ -5,7 +5,7 @@ track: math-completion
 stage: S1
 subject: math
 layer: backend
-status: in_progress
+status: done
 priority: 1
 eos_priority: P1
 owner: claude
@@ -13,7 +13,8 @@ depends_on: []
 requires_gates: []
 acceptance:
   - "①원본 5개 공통 규칙 끝에 방침 1줄 ②5묶음 재생성 ③재생성 차이가 그 한 줄뿐임을 확인"
-artifacts: []
+artifacts:
+  - "PR #2001 · 원본 5개 공통 규칙 끝에 방침 1줄 · 지시문 123개 각 +1줄 재생성(누락 0) · golden/DECISIONS_AUTO.md 1줄 · 로컬 CI 미러 통과"
 paths:
   - "golden/prompts_src/**"
   - "golden/prompts_phase1/**"
@@ -22,6 +23,6 @@ paths:
   - "golden/prompts_phase4/**"
   - "golden/prompts_rescue/**"
   - golden/DECISIONS_AUTO.md
-session: claude/amazing-bohr-tavk7z
+session: null
 notes: "GOLD-40(PR #2000) 후속 · golden/AUTONOMY.md"
 updated: 2026-11-26
