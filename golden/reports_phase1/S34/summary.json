@@ -1,0 +1,186 @@
+{
+ "check": {
+  "s33_shadow_vs_replay_mismatch": 0,
+  "sim_shadow_vs_replay_mismatch": 0
+ },
+ "a_ai50": {
+  "n_students": 10,
+  "spearman_simple": 0.9805806756909201,
+  "spearman_bkt": 0.9682458365518543,
+  "pearson_simple": 0.9926920372714868,
+  "pearson_bkt": 0.9671024975187226,
+  "mae_simple": 0.31,
+  "mae_bkt": 0.2179324673071259,
+  "points": [
+   {
+    "who": "S24-P2-1",
+    "acc": 0.6,
+    "simple": 0.25,
+    "bkt": 0.978951
+   },
+   {
+    "who": "S24-P3-1",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342836
+   },
+   {
+    "who": "S24-P4-1",
+    "acc": 0.8,
+    "simple": 0.35,
+    "bkt": 0.991779
+   },
+   {
+    "who": "S29-P2-1",
+    "acc": 1.0,
+    "simple": 0.5,
+    "bkt": 0.999723
+   },
+   {
+    "who": "S29-P3-1",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342836
+   },
+   {
+    "who": "S29-P4-1",
+    "acc": 0.8,
+    "simple": 0.4,
+    "bkt": 0.998941
+   },
+   {
+    "who": "S33-P2-1",
+    "acc": 0.8,
+    "simple": 0.35,
+    "bkt": 0.990423
+   },
+   {
+    "who": "S33-P3-1",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342836
+   },
+   {
+    "who": "S33-P4-1",
+    "acc": 0.8,
+    "simple": 0.35,
+    "bkt": 0.990171
+   },
+   {
+    "who": "S33-P5-1",
+    "acc": 1.0,
+    "simple": 0.5,
+    "bkt": 0.999723
+   }
+  ]
+ },
+ "a_sim_rule": {
+  "n_students": 12,
+  "spearman_simple": 1.0,
+  "spearman_bkt": 1.0,
+  "pearson_simple": 1.0,
+  "pearson_bkt": 1.0,
+  "mae_simple": 0.0,
+  "mae_bkt": 0.2571428571428572,
+  "points": [
+   {
+    "who": "fake720-P1-1",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P1-2",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P1-3",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P5-1",
+    "acc": 1.0,
+    "simple": 1.0,
+    "bkt": 1.0
+   },
+   {
+    "who": "fake720-P5-2",
+    "acc": 1.0,
+    "simple": 1.0,
+    "bkt": 1.0
+   },
+   {
+    "who": "fake720-P5-3",
+    "acc": 1.0,
+    "simple": 1.0,
+    "bkt": 1.0
+   },
+   {
+    "who": "fake720-P7-1",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P7-2",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P7-3",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P8-1",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P8-2",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   },
+   {
+    "who": "fake720-P8-3",
+    "acc": 0.0,
+    "simple": 0.0,
+    "bkt": 0.342857
+   }
+  ]
+ },
+ "c_p8": {
+  "p8_students": 3,
+  "p8_correct_total": 0,
+  "p8_steps_total": 90,
+  "p8_final_simple": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "p8_final_bkt": [
+   0.342857,
+   0.342857,
+   0.342857
+  ],
+  "p8_max_bkt": 0.342857,
+  "p8_contamination_simple": 0.0,
+  "p8_contamination_bkt": 0.3428571428571428,
+  "p3_ai50_final_bkt": [
+   0.342836,
+   0.342836,
+   0.342836
+  ]
+ },
+ "a_bkt_side": false,
+ "c_bkt_side": false,
+ "decision": "유지"
+}

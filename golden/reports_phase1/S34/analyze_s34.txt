@@ -1,0 +1,273 @@
+# S34 분석기 — 두 숙련도 엔진(simple·bkt)의 궤적 그림·CSV와 판정 근거 ⓐ·ⓒ 숫자를 만든다
+# 사용: python analyze_s34.txt <가짜 720 실행 폴더(sessions.jsonl + shadow.csv)> <출력 폴더>
+#       (cwd = 저장소 src/backend · matplotlib 필요 — 이 보고 전용 도구라 확장자를 .txt로 둬 린트·수집 대상 밖)
+# 입력 세 갈래(판정 근거로 쓰는 것과 아닌 것을 CSV `source` 열로 가른다):
+#   ai50       — AI 대체 50세션(S24 15 · S29 15 · S33 20). S33은 섀도 실측값(S33 궤적.csv),
+#                S24·S29는 섀도 표가 생기기 전 실행이라 보고의 판정 줄을 같은 규칙으로 다시 계산한다(replay)
+#   sim_rule   — 가짜 모드 720세션의 규칙 페르소나(P1·P5·P7·P8 · LLM 없음 · 실제 모드와 발화가 같다) 섀도 실측값
+#   sim_script — 같은 실행의 LLM 페르소나(P2·P3·P4·P6) 섀도 값. 가짜 대본이라 판정 근거에서 뺀다(표시만)
+import csv
+import json
+import math
+import sys
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+from golden.mastery import BKT_INITIAL  # noqa: E402
+from golden.mastery.bkt import update as bkt_update  # noqa: E402
+
+GAIN, LOSS = 0.10, 0.05  # 공유 계약 simple 갱신 폭(golden/api.py)
+PROBLEMS5 = ("LF-01", "LF-02", "LF-03", "LF-04", "LF-05")
+RULE_PERSONAS = ("P1", "P5", "P7", "P8")
+
+# AI 대체 판정 줄(보고 2절 표 그대로 · 1 = 정답 · LF-01~05 순)
+AI50_VERDICTS = {
+    ("S24", "P2"): (0, 1, 0, 1, 1),
+    ("S24", "P3"): (0, 0, 0, 0, 0),
+    ("S24", "P4"): (1, 1, 0, 1, 1),
+    ("S29", "P2"): (1, 1, 1, 1, 1),
+    ("S29", "P3"): (0, 0, 0, 0, 0),
+    ("S29", "P4"): (0, 1, 1, 1, 1),
+    ("S33", "P2"): (1, 1, 1, 0, 1),
+    ("S33", "P3"): (0, 0, 0, 0, 0),
+    ("S33", "P4"): (1, 1, 1, 1, 0),
+    ("S33", "P5"): (1, 1, 1, 1, 1),
+}
+
+
+def simple_update(prev: float, correct: bool) -> float:
+    """공유 계약 simple 규칙 — 맞으면 +0.10 · 틀리면 −0.05 · 0~1 자르고 둘째 자리 반올림."""
+    return round(min(1.0, max(0.0, prev + (GAIN if correct else -LOSS))), 2)
+
+
+def replay(seq):
+    """판정 줄 → (simple, bkt) 궤적. 출발점은 simple 0.00 · bkt P(L0)."""
+    s, b, out = 0.0, BKT_INITIAL, []
+    for c in seq:
+        s, b = simple_update(s, bool(c)), bkt_update(b, bool(c))
+        out.append((s, b))
+    return out
+
+
+def ranks(xs):
+    """동점 평균 순위(스피어만용)."""
+    order = sorted(range(len(xs)), key=lambda i: xs[i])
+    r = [0.0] * len(xs)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and xs[order[j + 1]] == xs[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            r[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return r
+
+
+def pearson(x, y):
+    """피어슨 상관 — 한쪽 분산이 0이면 None(정의 불가 · 침묵하지 않고 표기)."""
+    n = len(x)
+    mx, my = sum(x) / n, sum(y) / n
+    sxy = sum((a - mx) * (b - my) for a, b in zip(x, y, strict=True))
+    sxx = sum((a - mx) ** 2 for a in x)
+    syy = sum((b - my) ** 2 for b in y)
+    if sxx == 0 or syy == 0:
+        return None
+    return sxy / math.sqrt(sxx * syy)
+
+
+def spearman(x, y):
+    return pearson(ranks(x), ranks(y))
+
+
+run_dir, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
+shadow_path = run_dir / "shadow.csv"
+out_dir.mkdir(parents=True, exist_ok=True)
+repo = Path.cwd().parents[1]
+
+# ── ai50 ─────────────────────────────────────────────────────────────
+s33 = {}
+for r in csv.DictReader((repo / "golden/reports_phase1/S33/궤적.csv").open(encoding="utf-8")):
+    if r["problem_id"] != "start":
+        s33.setdefault(r["persona"], []).append((float(r["simple"]), float(r["bkt"])))
+
+rows = []  # CSV 한 줄 = 학생 한 명의 한 걸음
+students = []  # (source, run, persona, round, seq, traj)
+s33_check = 0
+for (run, p), seq in AI50_VERDICTS.items():
+    traj = replay(seq)
+    origin = "replay"
+    if run == "S33":
+        # S33은 섀도 실측값을 쓰고, 다시 계산한 값과 같은지 확인한다
+        for (a, b), (c, d) in zip(traj, s33[p], strict=True):
+            if abs(a - c) > 1e-6 or abs(b - d) > 1e-9:
+                s33_check += 1
+        traj, origin = s33[p], "shadow"
+    students.append(("ai50", run, p, 1, seq, traj, origin))
+
+# ── 가짜 720: 판정 줄(sessions.jsonl · 회차 = 그 페르소나의 몇 번째 블록) ─────────
+verdicts: dict[tuple[str, int], list[tuple[str, int]]] = {}
+blocks: dict[str, int] = {}
+prev = None
+for ln in (run_dir / "sessions.jsonl").read_text(encoding="utf-8").splitlines():
+    if not ln.strip():
+        continue
+    row = json.loads(ln)
+    p = row["persona"]
+    if p != prev:
+        blocks[p] = blocks.get(p, 0) + 1
+        prev = p
+    last = (row.get("turns") or [{}])[-1]
+    if last.get("kind") == "graded":
+        verdicts.setdefault((p, blocks[p]), []).append((row["problem_id"], 1 if last.get("correct") else 0))
+
+# ── 가짜 720 섀도(id 순) ───────────────────────────────────────────────
+sh: dict[str, dict[str, list]] = {}
+for rec in csv.reader(shadow_path.read_text(encoding="utf-8").splitlines()):
+    _id, nick, engine, mastery, _sid, pid = rec
+    sh.setdefault(nick, {}).setdefault(engine, []).append((int(_id), float(mastery), pid))
+
+sim_check = 0
+for nick in sorted(sh):
+    _, persona, rnd = nick.split("-")
+    simple_rows = sorted(sh[nick]["simple"])
+    bkt_rows = sorted(sh[nick]["bkt"])
+    # 판정 줄은 같은 실행의 sessions.jsonl에서 읽는다(섀도 값에서 거꾸로 읽으면 bkt가 1 근처일 때 두 갱신이 구별되지 않는다)
+    seq = []
+    graded = verdicts.get((persona, int(rnd)), [])
+    if len(graded) != len(simple_rows) or len(bkt_rows) != len(simple_rows):
+        sim_check += 1
+    for (pid_g, c), (_, _s, pid), (_, _b, pid2) in zip(graded, simple_rows, bkt_rows, strict=False):
+        if not (pid_g == pid == pid2):
+            sim_check += 1
+        seq.append(c)
+    traj = [(s, b) for (_, s, _), (_, b, _) in zip(simple_rows, bkt_rows, strict=True)]
+    # 섀도 값이 같은 규칙의 재계산과 같은지(30칸 전부)
+    for (a, b), (c, d) in zip(replay(seq), traj, strict=True):
+        if abs(a - c) > 1e-6 or abs(b - d) > 1e-9:
+            sim_check += 1
+    source = "sim_rule" if persona in RULE_PERSONAS else "sim_script"
+    students.append((source, "fake720", persona, int(rnd), tuple(seq), traj, "shadow"))
+
+with (out_dir / "trajectories.csv").open("w", encoding="utf-8", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["source", "run", "persona", "round", "step", "correct", "simple", "bkt", "origin"])
+    for source, run, p, rnd, seq, traj, origin in students:
+        w.writerow([source, run, p, rnd, 0, "", "0.00", repr(BKT_INITIAL), "start"])
+        for i, (c, (s, b)) in enumerate(zip(seq, traj, strict=True), start=1):
+            w.writerow([source, run, p, rnd, i, c, f"{s:.2f}", repr(b), origin])
+
+
+# ── 판정 근거 숫자 ───────────────────────────────────────────────────
+def corr_block(group):
+    acc = [sum(g[4]) / len(g[4]) for g in group]  # 그 학생의 정답률
+    fs = [g[5][-1][0] for g in group]
+    fb = [g[5][-1][1] for g in group]
+    return {
+        "n_students": len(group),
+        "spearman_simple": spearman(acc, fs),
+        "spearman_bkt": spearman(acc, fb),
+        "pearson_simple": pearson(acc, fs),
+        "pearson_bkt": pearson(acc, fb),
+        "mae_simple": sum(abs(a - b) for a, b in zip(acc, fs, strict=True)) / len(acc),
+        "mae_bkt": sum(abs(a - b) for a, b in zip(acc, fb, strict=True)) / len(acc),
+        "points": [
+            {"who": f"{g[1]}-{g[2]}-{g[3]}", "acc": round(a, 4), "simple": s, "bkt": round(b, 6)}
+            for g, a, s, b in zip(group, acc, fs, fb, strict=True)
+        ],
+    }
+
+
+ai50 = [g for g in students if g[0] == "ai50"]
+rule = [g for g in students if g[0] == "sim_rule"]
+a_ai50 = corr_block(ai50)
+a_rule = corr_block(rule)
+p8 = [g for g in rule if g[2] == "P8"]
+p3_ai = [g for g in ai50 if g[2] == "P3"]
+c_block = {
+    "p8_students": len(p8),
+    "p8_correct_total": sum(sum(g[4]) for g in p8),
+    "p8_steps_total": sum(len(g[4]) for g in p8),
+    "p8_final_simple": [g[5][-1][0] for g in p8],
+    "p8_final_bkt": [round(g[5][-1][1], 6) for g in p8],
+    "p8_max_bkt": round(max(b for g in p8 for _, b in g[5]), 6),
+    "p8_contamination_simple": sum(abs(g[5][-1][0] - sum(g[4]) / len(g[4])) for g in p8) / len(p8),
+    "p8_contamination_bkt": sum(abs(g[5][-1][1] - sum(g[4]) / len(g[4])) for g in p8) / len(p8),
+    "p3_ai50_final_bkt": [round(g[5][-1][1], 6) for g in p3_ai],
+}
+verdict_a = (
+    a_ai50["spearman_bkt"] is not None
+    and a_ai50["spearman_simple"] is not None
+    and a_ai50["spearman_bkt"] > a_ai50["spearman_simple"]
+)
+verdict_c = c_block["p8_contamination_bkt"] < c_block["p8_contamination_simple"]
+summary = {
+    "check": {"s33_shadow_vs_replay_mismatch": s33_check, "sim_shadow_vs_replay_mismatch": sim_check},
+    "a_ai50": a_ai50,
+    "a_sim_rule": a_rule,
+    "c_p8": c_block,
+    "a_bkt_side": verdict_a,
+    "c_bkt_side": verdict_c,
+    "decision": "전환" if (verdict_a and verdict_c) else "유지",
+}
+(out_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
+
+# ── 그림 ─────────────────────────────────────────────────────────────
+BLUE, ORANGE, INK, MUTED, GRID = "#2a78d6", "#eb6834", "#1f1f1d", "#6b6a63", "#e4e3dd"
+plt.rcParams.update({"font.size": 8, "axes.edgecolor": MUTED, "axes.labelcolor": INK,
+                     "xtick.color": MUTED, "ytick.color": MUTED})
+try:
+    from matplotlib import font_manager
+
+    for name in ("NanumGothic", "Noto Sans CJK KR", "Noto Sans KR", "UnDotum"):
+        if any(name in f.name for f in font_manager.fontManager.ttflist):
+            plt.rcParams["font.family"] = name
+            break
+except Exception as exc:  # 글꼴이 없으면 영문 라벨만 남는다 — 이유를 남긴다
+    print(f"FONT_FALLBACK {type(exc).__name__}")
+
+panels = ai50 + [g for g in rule if g[3] == 1]
+fig, axes = plt.subplots(3, 5, figsize=(13, 7.6), sharey=True)
+fig.patch.set_facecolor("white")
+for ax in axes.flat:
+    ax.set_visible(False)
+for ax, g in zip(axes.flat, panels, strict=False):
+    source, run, p, rnd, seq, traj, origin = g
+    ax.set_visible(True)
+    xs = list(range(0, len(seq) + 1))
+    ys_s = [0.0] + [s for s, _ in traj]
+    ys_b = [BKT_INITIAL] + [b for _, b in traj]
+    ax.plot(xs, ys_s, color=BLUE, lw=2, label="simple (shown on screen)")
+    ax.plot(xs, ys_b, color=ORANGE, lw=2, ls="--", label="bkt (shadow only)")
+    # 정답 칸은 채운 점, 오답 칸은 빈 점(색이 아니라 모양으로도 구분)
+    for x, c, s in zip(xs[1:], seq, ys_s[1:], strict=True):
+        ax.plot(x, s, "o", ms=4 if len(seq) > 5 else 6, color=BLUE,
+                mfc=BLUE if c else "white", mew=1.2)
+    ax.set_ylim(-0.03, 1.03)
+    ax.grid(axis="y", color=GRID, lw=0.6)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    label = f"AI {run} {p}" if source == "ai50" else f"fake720 {p}-{rnd} (rule)"
+    ax.set_title(f"{label} - correct {sum(seq)}/{len(seq)}", fontsize=8, color=INK, loc="left")
+    ax.set_xticks(xs if len(seq) <= 5 else [0, 10, 20, 30])
+axes[0][0].legend(loc="upper left", fontsize=7, frameon=False)
+fig.text(0.01, 0.995, "S34 - mastery trajectories, simple vs bkt (rows 1-2: AI-substitute 50 sessions = 10 students x LF-01..05; row 3: fake-720 rule personas, round 1 x 30 problems)",
+         fontsize=9, color=INK, va="top")
+fig.text(0.01, 0.005, "filled dot = correct, hollow dot = wrong; S24/S29 replayed from verdicts, S33/fake720 read from golden.mastery_shadow; start simple 0.00 / bkt 0.2",
+         fontsize=7, color=MUTED, va="bottom")
+fig.tight_layout(rect=(0, 0.02, 1, 0.97))
+fig.savefig(out_dir / "trajectories.png", dpi=150)
+
+print(f"S34_CHECK s33_mismatch={s33_check} sim_mismatch={sim_check} students={len(students)} "
+      f"ai50={len(ai50)} rule={len(rule)}")
+print(f"S34_A ai50 spearman simple={a_ai50['spearman_simple']} bkt={a_ai50['spearman_bkt']} "
+      f"pearson simple={a_ai50['pearson_simple']} bkt={a_ai50['pearson_bkt']}")
+print(f"S34_A rule spearman simple={a_rule['spearman_simple']} bkt={a_rule['spearman_bkt']}")
+print(f"S34_C p8 correct={c_block['p8_correct_total']}/{c_block['p8_steps_total']} "
+      f"final simple={c_block['p8_final_simple']} bkt={c_block['p8_final_bkt']}")
+print(f"S34_DECISION a_bkt={verdict_a} c_bkt={verdict_c} -> {summary['decision']}")
+sys.exit(0 if s33_check == 0 and sim_check == 0 else 1)
