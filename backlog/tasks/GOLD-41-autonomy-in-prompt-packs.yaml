@@ -1,0 +1,27 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-41-autonomy-in-prompt-packs
+title: "GOLD-41 지시문 묶음 5종 공통 규칙에 자동 진행 방침 1줄 — Kiki 결정 요구는 여섯 가지가 아니면 추천안으로 진행"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: in_progress
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①원본 5개 공통 규칙 끝에 방침 1줄 ②5묶음 재생성 ③재생성 차이가 그 한 줄뿐임을 확인"
+artifacts: []
+paths:
+  - "golden/prompts_src/**"
+  - "golden/prompts_phase1/**"
+  - "golden/prompts_phase2/**"
+  - "golden/prompts_phase3/**"
+  - "golden/prompts_phase4/**"
+  - "golden/prompts_rescue/**"
+  - golden/DECISIONS_AUTO.md
+session: claude/amazing-bohr-tavk7z
+notes: "GOLD-40(PR #2000) 후속 · golden/AUTONOMY.md"
+updated: 2026-11-26
