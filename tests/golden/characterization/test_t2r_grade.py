@@ -42,8 +42,14 @@ def test_table_shape() -> None:
 
 
 @pytest.mark.parametrize("row", _ROWS, ids=[f"{r['problem_id']}:{r['input']}" for r in _ROWS])
-def test_current_grader_output_is_frozen(row: dict[str, Any]) -> None:
-    """지금 채점기의 출력 — 대조군만 True, 나머지(맞는 식이 든 입력 포함)는 전부 False."""
+def test_current_grader_output_is_frozen(
+    row: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """지금 채점기의 출력 — 대조군만 True, 나머지(맞는 식이 든 입력 포함)는 전부 False.
+
+    S27R 뒤: 플래그 `GOLDEN_T2R_GRADE`가 꺼진 상태의 출력이다(켜진 상태는 tests/golden/test_t2r_grade.py).
+    """
+    monkeypatch.delenv("GOLDEN_T2R_GRADE", raising=False)
     got = is_correct(_PROBLEMS[row["problem_id"]], row["input"])
     assert got is (row["kind"] in _ACCEPTED_NOW)
 
