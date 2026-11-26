@@ -42,6 +42,8 @@ REPO = Path(__file__).resolve().parents[4]
 # (golden/inbox에 보관 · 4단계 게이트 뒤 Kiki 결정으로 편입).
 PACKS: tuple[tuple[str, str, str], ...] = (
     ("1단계", "golden/prompts_phase1", "golden/reports_phase1"),
+    # 1단계 S35 판정 "반복"의 반복 회차(GOLD-42 · Kiki 지시 2026-11-26) — 2단계 앞에 끼운다
+    ("1단계 반복", "golden/prompts_phase1r", "golden/reports_phase1r"),
     ("2단계", "golden/prompts_phase2", "golden/reports_phase2"),
     ("3단계", "golden/prompts_phase3", "golden/reports_phase3"),
     ("4단계", "golden/prompts_phase4", "golden/reports_phase4"),

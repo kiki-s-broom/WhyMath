@@ -185,11 +185,14 @@ def test_main_json_and_refusal(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
 
 def test_real_repository_packs_parse() -> None:
-    """실제 저장소의 1~4단계 묶음을 전부 읽는다(표·파일·선행이 맞물리는지)."""
+    """실제 저장소의 1~4단계 묶음(+1단계 반복 회차)을 전부 읽는다(표·파일·선행이 맞물리는지)."""
     total = 0
     for phase, prompts, reports in nt.PACKS:
         tasks = nt.load_pack(nt.REPO, phase, prompts, reports)
-        assert len(tasks) >= 20, f"{phase} 작업 {len(tasks)}개 — 스캔 실패"
+        # 반복 회차는 슬롯 둘 + 게이트라 10개다(GOLD-42) — 나머지 단계는 20개 이상
+        floor = 10 if phase == "1단계 반복" else 20
+        assert len(tasks) >= floor, f"{phase} 작업 {len(tasks)}개 — 스캔 실패"
         total += len(tasks)
-    assert total >= 90
+    assert total >= 100
+    assert [p for p, _, _ in nt.PACKS][:3] == ["1단계", "1단계 반복", "2단계"]
     assert nt.plan(nt.REPO)["verdict"] in nt.VERDICTS
