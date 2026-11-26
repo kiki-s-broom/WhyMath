@@ -1,0 +1,197 @@
+# S33 추출기 — S33 실행 기록 + 섀도 표 발췌에서 P2·P3·P4·P5 × LF-01~05 × 1회차 20건과 궤적 표를 만든다
+# 사용: python extract_s33.txt <실행 폴더> <사전 스냅숏 csv> <섀도 csv> <출력 txt>
+#       (cwd = 저장소 src/backend · GOLDEN_SIM_SEED_DIR 설정)
+# 고르는 기준은 셋뿐(페르소나 · 문항 · 1회차) — 내용으로 고르지 않는다(지시서 S24 할 일 2 · S33 그대로)
+# S24 추출기에 더한 것: 궤적 표(문제마다 simple·bkt 두 값 · golden.mastery_shadow 발췌)와 그 검산
+# — 검산은 실행 때 api가 부른 것과 같은 규칙(simple +0.10/−0.05 · golden.mastery.bkt.update)을 다시 부른다
+import csv
+import json
+import sys
+from pathlib import Path
+
+import golden
+from golden.mastery import BKT_INITIAL, ENGINE_BKT, ENGINE_SIMPLE
+from golden.mastery.bkt import update as bkt_update
+from golden.sim.student import copies_seed, load_seed_utterances
+from golden.tutor import FAKE_PREFIX
+
+# 실행 코드 출처 — 지금 폴더(브랜치 사본의 src/backend)의 golden이어야 한다(다른 사본 코드가 돌면 거부)
+if not Path(golden.__file__).resolve().is_relative_to(Path.cwd().resolve()):
+    sys.exit(f"S33_REFUSED — golden이 다른 곳에서 왔다: {golden.__file__}")
+print(f"GOLDEN_FROM={Path(golden.__file__).resolve().parent}")
+
+PERSONAS = ("P2", "P3", "P4", "P5")
+PROBLEMS = ("LF-01", "LF-02", "LF-03", "LF-04", "LF-05")
+GAIN, LOSS = 0.10, 0.05  # 공유 계약 숙련도 갱신 폭(golden/api.py)
+TOL = 1e-9  # bkt 검산 허용 오차(psql이 double을 최단 표현으로 찍는다)
+
+run_dir, pre_path, shadow_path, out_path = (Path(a) for a in sys.argv[1:5])
+meta = json.loads((run_dir / "run_meta.json").read_text(encoding="utf-8"))
+report_path = run_dir / "sim_report.json"
+report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
+rows = [
+    json.loads(ln)
+    for ln in (run_dir / "sessions.jsonl").read_text(encoding="utf-8").splitlines()
+    if ln.strip()
+]
+seeds = load_seed_utterances()
+
+# 사전 스냅숏: 닉네임,students.mastery(없으면 0),직전 bkt 섀도(없으면 빈칸) — 실행 전 출발점
+start: dict[str, tuple[float, float, bool]] = {}
+for rec in csv.reader(pre_path.read_text(encoding="utf-8-sig").splitlines()):
+    if len(rec) >= 2 and rec[0].startswith("sim-"):
+        bkt_text = rec[2] if len(rec) > 2 else ""
+        start[rec[0]] = (
+            float(rec[1] or 0),
+            float(bkt_text) if bkt_text else BKT_INITIAL,
+            bool(bkt_text),
+        )
+
+# 섀도 발췌: id,nickname,engine,mastery,session_id,problem_id (id 순)
+shadow: dict[str, list[tuple[int, str, float, str, str]]] = {}
+for rec in csv.reader(shadow_path.read_text(encoding="utf-8-sig").splitlines()):
+    if len(rec) == 6 and rec[1].startswith("sim-"):
+        shadow.setdefault(rec[1], []).append((int(rec[0]), rec[2], float(rec[3]), rec[4], rec[5]))
+
+# 회차 = 그 페르소나의 몇 번째 블록인가(러너는 회차 → 페르소나 → 문항 순으로 한 줄씩 쓴다)
+blocks: dict[str, int] = {}
+prev = None
+picked = {}
+order: dict[str, list[dict]] = {}  # 페르소나 1회차의 세션 기록 순서(문항 30개 전부 — 검산용)
+for row in rows:
+    p = row.get("persona")
+    if p != prev:
+        blocks[p] = blocks.get(p, 0) + 1
+        prev = p
+    if p in PERSONAS and blocks[p] == 1:
+        order.setdefault(p, []).append(row)
+        if row.get("problem_id") in PROBLEMS:
+            key = (p, row["problem_id"])
+            if key in picked:
+                sys.exit(f"S33_REFUSED — 1회차에 같은 문항이 두 번 나왔다: {key}")
+            picked[key] = row
+
+problems = []
+if meta.get("mode") != "live":
+    problems.append(f"mode={meta.get('mode')}(live여야 한다)")
+missing = [f"{p}/{q}" for p in PERSONAS for q in PROBLEMS if (p, q) not in picked]
+if missing:
+    problems.append(f"빠진 조합 {missing}")
+bad_http = [
+    f"{k[0]}/{k[1]}={r.get('http_status')}"
+    for k, r in picked.items()
+    if not (isinstance(r.get("http_status"), int) and 200 <= r["http_status"] < 300)
+]
+if bad_http:
+    problems.append(f"http_status 2xx 아님 {bad_http}")
+fake = [
+    f"{k[0]}/{k[1]}"
+    for k, r in picked.items()
+    if any(
+        str(t.get("tutor", "")).startswith(FAKE_PREFIX)
+        for t in r.get("turns", [])
+        if t.get("kind") == "tutor_turn"
+    )
+]
+if fake:
+    problems.append(f"가짜 모드 튜터 발화 {fake}")
+
+
+def graded_correct(row: dict) -> bool | None:
+    """세션 기록의 판정(마지막 턴이 graded일 때만 · 아니면 None = 판정 없음)."""
+    turns = row.get("turns") or []
+    last = turns[-1] if turns else {}
+    return last.get("correct") if last.get("kind") == "graded" else None
+
+
+# 궤적 + 검산 — 페르소나마다 1회차 판정 순서대로 두 엔진을 다시 계산해 섀도 값과 맞춘다
+traj: list[tuple[str, str, object, float, float]] = []
+mismatch = 0
+chain_note = []
+for p in PERSONAS:
+    nick = f"sim-{p}-1"
+    if nick not in start:
+        problems.append(f"사전 스냅숏에 {nick} 없음")
+        continue
+    srows = shadow.get(nick, [])
+    session_ids = {r[3] for r in srows}
+    if len(session_ids) > 1:
+        problems.append(f"{nick} 섀도 session_id {len(session_ids)}개(1개여야 한다)")
+    simple_rows = [r for r in srows if r[1] == ENGINE_SIMPLE]
+    bkt_rows = [r for r in srows if r[1] == ENGINE_BKT]
+    graded = [r for r in order.get(p, []) if graded_correct(r) is not None]
+    if len(simple_rows) != len(graded) or len(bkt_rows) != len(graded):
+        problems.append(
+            f"{nick} 섀도 행 수 simple={len(simple_rows)} bkt={len(bkt_rows)} ≠ 판정 {len(graded)}"
+        )
+        continue
+    s_prev, b_prev, _ = start[nick]
+    for row, srow, brow in zip(graded, simple_rows, bkt_rows, strict=True):
+        ok_pid = srow[4] == row["problem_id"] == brow[4]
+        correct = bool(graded_correct(row))
+        s_exp = round(min(1.0, max(0.0, s_prev + (GAIN if correct else -LOSS))), 2)
+        b_exp = bkt_update(b_prev, correct)
+        if not ok_pid or abs(srow[2] - s_exp) > 1e-6 or abs(brow[2] - b_exp) > TOL:
+            mismatch += 1
+            chain_note.append(f"{nick}/{row['problem_id']}")
+        if row["problem_id"] in PROBLEMS:
+            traj.append((p, row["problem_id"], correct, srow[2], brow[2]))
+        s_prev, b_prev = srow[2], brow[2]
+if mismatch:
+    problems.append(f"섀도 검산 불일치 {mismatch}건 {chain_note[:5]}")
+if len(traj) != 20:
+    problems.append(f"궤적 {len(traj)}칸(20이어야 한다)")
+
+masked = 0
+lines = []
+for p in PERSONAS:
+    for q in PROBLEMS:
+        r = picked.get((p, q))
+        if r is None:
+            continue
+        turns = r.get("turns", [])
+        last = turns[-1] if turns else {}
+        lines.append(
+            f"## {p} · {q} · injected_op={r.get('injected_op')} · elapsed_s={r.get('elapsed_s')} · "
+            f"http={r.get('http_status')} · 턴수={len(turns)} · 마지막={last.get('kind')} · "
+            f"correct={last.get('correct')}"
+        )
+        for t in turns:
+            s = str(t.get("student", ""))
+            if copies_seed(s, seeds):
+                s = "[시드 일치 — 가림]"
+                masked += 1
+            lines.append(f"[{t.get('n')}·{t.get('kind')}] 학생: {s}")
+            lines.append(f"[{t.get('n')}·{t.get('kind')}] 튜터: {t.get('tutor', '')}")
+        lines.append("")
+
+# 숫자 줄 — 궤적 CSV(세션이 보고 표와 커밋 파일로 옮긴다 · 문장 없음)
+csv_lines = ["TRAJ_CSV persona,problem_id,correct,simple,bkt"]
+for p in PERSONAS:
+    s0, b0, had_bkt = start.get(f"sim-{p}-1", (0.0, BKT_INITIAL, False))
+    csv_lines.append(f"TRAJ_START {p},start,,{s0:.2f},{b0!r}{'' if had_bkt else ' (bkt 기록 없음 → P(L0))'}")
+for p, q, c, s, b in traj:
+    csv_lines.append(f"TRAJ {p},{q},{int(c)},{s:.2f},{b!r}")
+
+ok = not problems
+head = (
+    f"S33_CHECK ok={ok} picked={len(picked)} traj={len(traj)} chain_mismatch={mismatch} "
+    f"masked={masked} mode={meta.get('mode')} personas_in_run={','.join(meta.get('personas') or [])}"
+)
+if problems:
+    head += " problems=" + " | ".join(problems)
+num = "S33_NUM " + " ".join(
+    f"{k}={(report.get(k) or {}).get('value')}" for k in ("M1", "M2", "M3", "M4", "M5")
+) + (
+    f" sessions={len(rows)} skipped={meta.get('skipped_sessions')}"
+    f" seed_copy_fallbacks={meta.get('seed_copy_fallbacks')}"
+    f" degraded_tutor_turns={meta.get('degraded_tutor_turns')}"
+)
+out_path.write_text(
+    head + "\n" + num + "\n\n" + "\n".join(csv_lines) + "\n\n" + "\n".join(lines),
+    encoding="utf-8",
+)
+print(head)
+print(num)
+print(f"OUT_FILE={out_path} CHARS={len(out_path.read_text(encoding='utf-8'))}")
+sys.exit(0 if ok else 1)
