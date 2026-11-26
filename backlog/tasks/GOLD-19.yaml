@@ -26,6 +26,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1996"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1997"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1998"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/1999"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -60,4 +61,6 @@ notes: |-
   [정정 2026-11-25] S30 T2 판정 — 효과 없음 · S28 한 줄 되돌림 · Kiki 확인 대기
 
   [정정 2026-11-25] S31 T3 설계 — BKT 경계·특성화 완료
-updated: 2026-11-25
+
+  [정정 2026-11-26] S32 T3 import·섀도 완료(PR #1999)
+updated: 2026-11-26

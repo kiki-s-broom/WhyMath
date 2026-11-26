@@ -459,3 +459,15 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음(경계 긋기와 특성화 테스트만 — 다섯 걸음 ①②) · 경계 = `l2/bkt.py`의 `BktParameters` + `update_mastery`(+ 같은 파일 안 `posterior_mastery`·`apply_learning`) | 망각(`apply_forgetting`·`BktModel.apply_forgetting`) · `BktModel` · `probability_correct` | T3 설계 · 망각·적응형 문항 선택은 §6 금지 · 복사/import·연결은 S32 | S31 |
+
+## 슬롯 T3 복사·연결 (S32 · 1단계 · 2026-11-25 · 기준 main `5ca51174` · 인용 F-06)
+
+- **③ 복사**: S31 경계 그대로 `BktParameters` + `update_mastery`(+ `posterior_mastery`·`apply_learning`)를 `src/backend/golden/mastery/bkt.py`로 옮겼다. 계산식·기본값·오류 문구는 원본과 같다. 골든 파라미터(S31 제안값 0.2·0.3·0.1·0.2)는 `GOLDEN_BKT_PARAMETERS`이고, 지시서 모양의 `update(prior, correct) -> float`가 이 값을 쓴다.
+  - 사본은 `pydantic`·표준 라이브러리만 쓴다. `import golden.mastery`가 새로 부르는 옛 모듈은 **0개**다(이 세션 실측 · `sys.modules` 세기 · 원본은 141개).
+  - S31 경계와 다른 점 하나: 원본의 `p_forget` 필드는 "떼어 내지 않지만 쓰지 않는다"였다. 사본은 복사라 남길 이유가 없어 **뺐다**(망각 §6 금지). 특성화 테스트가 사본의 필드를 정확히 4개로 고정한다.
+- **② 원본·사본 대조**: `tests/golden/characterization/test_t3_bkt.py`가 S31의 10쌍을 원본·사본 두 대상에 parametrize한다(S22 선례). 두 대상이 같은 값을 낸다.
+- **④ 연결(GP-6)**: `golden/api.py`의 `_graded` → `_shadow_mastery`. 판정 1건마다 새 표 `golden.mastery_shadow`에 simple·bkt 2행을 쌓는다(`students`에는 열을 더하지 않는다). 플래그 `GOLDEN_MASTERY_ENGINE`(기본 simple · 정확히 `bkt`일 때만 bkt)은 응답 `mastery`에 어느 값을 실을지만 정한다. `students.mastery`는 늘 simple(+0.10/−0.05)이다.
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 복사: 의존 과다 — `l2/bkt.py`의 `BktParameters`(`p_forget` 뺌) + `update_mastery`·`posterior_mastery`·`apply_learning` → `src/backend/golden/mastery/bkt.py` · 플래그 `src/backend/golden/mastery/__init__.py`(`GOLDEN_MASTERY_ENGINE`) · 새 표 `golden.mastery_shadow` | 원본 import(매니페스트 333행 · 계약 `golden-no-legacy` · 전이 141개로 예산 30 초과) · 망각(`apply_forgetting`·`p_forget`) · `BktModel` · `probability_correct` · 화면에 bkt 값 표시 | 두 대상의 의존은 `math`·`pydantic`뿐이지만 원본 모듈을 부르면 `l2/__init__`가 옛 모듈 141개를 끌고 온다(S31 실측) — T1(S22)과 같은 판단 | S32 |
