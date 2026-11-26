@@ -27,6 +27,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1997"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1998"
   - "https://github.com/kiki-s-broom/WhyMath/pull/1999"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2002"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -63,4 +64,6 @@ notes: |-
   [정정 2026-11-25] S31 T3 설계 — BKT 경계·특성화 완료
 
   [정정 2026-11-26] S32 T3 import·섀도 완료(PR #1999)
+
+  [정정 2026-11-26] S33 진행 중 — Kiki 머신 대기(런북·추출기 착지 · PR #2002)
 updated: 2026-11-26
