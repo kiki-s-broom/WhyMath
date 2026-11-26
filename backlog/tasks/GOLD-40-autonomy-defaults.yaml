@@ -1,0 +1,28 @@
+# 빌드 하네스 태스크 — 상태 변경은 scripts/harness/backlog.py CLI 사용 권장
+id: GOLD-40-autonomy-defaults
+title: "GOLD-40 자동 진행 기본방침 — 추천안=결정·사후 기록·PR 자동 머지 기본 · 멈춤 목록 6개 (Kiki 지시 2026-11-26)"
+track: math-completion
+stage: S1
+subject: math
+layer: backend
+status: done
+priority: 1
+eos_priority: P1
+owner: claude
+depends_on: []
+requires_gates: []
+acceptance:
+  - "①정본 golden/AUTONOMY.md(원칙·멈춤 목록·기록 형식) ②AUTO_RUN.md가 Kiki 결정 대기·일부 완료·단계 경계·멈춘 초안·CI 빨강에서 멈추지 않고 진행 ③CLAUDE.md 기본방침 1줄과 머지 규칙 정정 ④settings.json 기본 모드 plan 해제·허용 규칙 ⑤집행 지점: 자동 실행 지시서와 CLAUDE.md가 정본을 가리킨다"
+artifacts:
+  - "PR #2000 · golden/AUTONOMY.md(정본) · golden/DECISIONS_AUTO.md · golden/AUTO_RUN.md(멈춤 조건 축소) · CLAUDE.md v0.2.47 · 로컬 CI 미러 통과 · .claude/settings.json은 권한 검사 거부로 미변경(Kiki 몫)"
+paths:
+  - golden/AUTONOMY.md
+  - golden/DECISIONS_AUTO.md
+  - golden/AUTO_RUN.md
+  - CLAUDE.md
+  - ".claude/settings.json"
+  - "src/backend/golden/driver/**"
+  - "tests/golden/**"
+session: null
+notes: "Kiki 지시 2026-11-26(세션 대화): 건건이 결정을 요구해 개발이 지연된다 — 최대한 자동화 환경을 만들 것. 되돌릴 수 없는 것만 사람에게 남긴다."
+updated: 2026-11-26
