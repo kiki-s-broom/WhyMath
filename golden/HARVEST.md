@@ -471,3 +471,18 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 복사: 의존 과다 — `l2/bkt.py`의 `BktParameters`(`p_forget` 뺌) + `update_mastery`·`posterior_mastery`·`apply_learning` → `src/backend/golden/mastery/bkt.py` · 플래그 `src/backend/golden/mastery/__init__.py`(`GOLDEN_MASTERY_ENGINE`) · 새 표 `golden.mastery_shadow` | 원본 import(매니페스트 333행 · 계약 `golden-no-legacy` · 전이 141개로 예산 30 초과) · 망각(`apply_forgetting`·`p_forget`) · `BktModel` · `probability_correct` · 화면에 bkt 값 표시 | 두 대상의 의존은 `math`·`pydantic`뿐이지만 원본 모듈을 부르면 `l2/__init__`가 옛 모듈 141개를 끌고 온다(S31 실측) — T1(S22)과 같은 판단 | S32 |
+
+## 미참조 옛 모듈 재측정 (S35 · 1단계 · 2026-11-26 · 기준 main `bb456fdf` · 인용 F-00)
+
+- **방법:** 골든 패스 S15와 같은 측정기 `python -m golden.measure_unreferenced`(grimp로 `golden` 상류 ∖ 전체 + 런타임 `sys.modules`)를 다시 돌렸다. 결과 파일은 `golden/reports_phase1/S35/measure/`(`measure_summary.json` · `referenced_backend.tsv` · `unreferenced_backend.tsv` · `unreferenced_flutter.tsv`)이고, S15 결과는 `golden/reports_no_students/S15/`다.
+- **숫자:** 백엔드 전체 844모듈은 S15와 같다. golden이 쓰는 옛 모듈은 122 → **28**, 미참조는 722 → **816**(302,221줄)이다. Flutter 미도달 74파일은 S15와 같은 목록이다.
+- **S15 목록과의 차이(세 칸):**
+  - 새로 import된 옛 모듈(T1·T2·T3 자산): **0개**. 세 슬롯 모두 import가 아니라 `src/backend/golden/` 아래로 복사했다(T1 `eval/rubric_copy.py` · T2 오개념 카탈로그 로더(`_misconception_from_row` 등 · S27) · T3 `mastery/bkt.py`). 그래서 슬롯 자산의 원본 모듈은 S15에서 이미 미참조였고 지금도 미참조다.
+  - S20A 복사로 **빠진** 모듈: **94개**(15,946줄) — `whymath_backend.db` 64 · `schema` 18 · `l3` 12. golden이 `golden/db.py` 등 복사본을 쓰게 되면서 상류에서 떨어져 나갔다(「전이 의존 절단 (S20A)」).
+  - 여전히 미참조인 모듈: S15의 722개 전부. 지금 쓰는 28개는 `config` · `l1`(권한 지도 런타임) · `l3`의 라우터·모델·`safe_parse` · `schema` 일부다.
+- **LEGACY_MANIFEST 갱신:** `golden/LEGACY_MANIFEST.txt`에 추가분 94모듈을 따로 묶어 더했다(머리에 측정 기준 `bb456fdf` · 2026-11-26 · 백엔드 816모듈). import-linter 계약 `golden-no-legacy`(`src/backend/pyproject.toml`)에도 같은 94모듈을 더했고(그래프 밖 모듈 0개), `tests/golden/test_legacy_manifest.py`의 개수를 816으로 바꿨다. `lint-imports` 7계약 KEPT · 그 테스트 7개 통과.
+- 옛 모듈은 지우지 않았다. `/legacy` 물리 이동은 Kiki 결정(S15와 같다).
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음(측정만) | 없음 — 미참조 816모듈은 격리 목록에 올렸을 뿐 지우지 않았다(삭제는 3단계 S74) | 지시서 S35 할 일 4 | S35 |

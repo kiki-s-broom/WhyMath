@@ -2,7 +2,8 @@
 
 Kiki 결정(2026-11-15): /legacy로 옮기지 않고 논리적으로 격리한다. 옛 코드는 한 줄도 고치지 않는다.
 - `golden/LEGACY_MANIFEST.txt` = S15 측정(커밋 a9cff6ec)에서 golden이 한 번도 쓰지 않은 백엔드 722모듈 ·
-  Flutter 74파일. 삭제는 3단계 S74에서 패키지 단위로 한다.
+  Flutter 74파일 + S35 재측정(커밋 bb456fdf)의 추가분 94모듈(S20A 복사로 더는 쓰지 않는 모듈) = 백엔드
+  816모듈. 삭제는 3단계 S74에서 패키지 단위로 한다.
 - 파이썬 쪽 1차 방어는 import-linter 계약 `golden-no-legacy`(src/backend/pyproject.toml)다.
   이 파일은 그 계약이 매니페스트와 어긋나지 않는지, 그리고 계약이 못 보는 곳을 직접 검사한다.
   - 그래프 밖 모듈(상위 폴더에 __init__.py가 없는 모듈 — 지금은 whymath_backend/l1/rights/ 4개)은
@@ -92,9 +93,10 @@ def _legacy_contract() -> dict[str, object]:
 def test_manifest_header_and_counts() -> None:
     lines = _manifest_lines()
     # 첫 줄에 측정 커밋과 날짜 — 어느 시점의 측정인지 모르면 목록을 믿을 수 없다
-    assert "a9cff6ec" in lines[0] and "2026-11-15" in lines[0]
+    assert "bb456fdf" in lines[0] and "2026-11-26" in lines[0]  # S35 재측정
+    assert "a9cff6ec" in lines[0] and "2026-11-15" in lines[0]  # S15 첫 측정도 남긴다
     backend, flutter = _manifest_backend_paths(), _manifest_flutter_paths()
-    assert len(backend) == 722 and len(set(backend)) == 722
+    assert len(backend) == 816 and len(set(backend)) == 816  # S15 722 + S35 추가 94
     assert len(flutter) == 74 and len(set(flutter)) == 74
     # 주석·경로 말고는 아무것도 없다(오타 줄이 조용히 빠지는 것 방지)
     assert all(ln.startswith(("#", "src/backend/", "src/mobile/")) for ln in lines)

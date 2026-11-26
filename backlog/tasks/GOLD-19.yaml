@@ -29,11 +29,14 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/1999"
   - "https://github.com/kiki-s-broom/WhyMath/pull/2002"
   - "https://github.com/kiki-s-broom/WhyMath/pull/2003"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2004"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2004#s35-complete"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
   - "tests/golden/**"
   - ".github/workflows/golden-sim-nightly.yml"
+  - src/backend/pyproject.toml
 session: claude/dazzling-ramanujan-ypbouv
 notes: |-
   Kiki 결정 2026-11-15(1단계 계획서 개정판). 지시서 golden/prompts_src/spec_phase1.md. S16이 등재, S17~S35가 같은 번호로 start.
@@ -69,4 +72,10 @@ notes: |-
   [정정 2026-11-26] S33 진행 중 — Kiki 머신 대기(런북·추출기 착지 · PR #2002)
 
   [정정 2026-11-26] S34 진행 — T3 판정 유지(simple) · 관문 ④ go · 검토 반영 후 머지
+
+  [정정 2026-11-26] paths ['golden/**', 'src/backend/golden/**', 'tests/golden/**', '.github/workflows/golden-sim-nightly.yml'] → ['golden/**', 'src/backend/golden/**', 'tests/golden/**', '.github/workflows/golden-sim-nightly.yml', 'src/backend/pyproject.toml']: S35 할 일 4 — LEGACY_MANIFEST에 미참조 옛 모듈 추가분(S20A 복사로 빠진 94모듈)을 더하면 import-linter 계약 golden-no-legacy의 forbidden_modules도 같이 늘려야 tests/golden/test_legacy_manifest.py가 맞는다(GOLD-17 때와 같은 파일 · 계약 목록만 바꾼다)
+
+  [정정 2026-11-26] S35 진행 — 판정 반복(③ 1/3) · 산출물 6종 완료 · 게이트 ⑤ 숫자만 Kiki 머신 대기(런북 블록 G)
+
+  [정정 2026-11-26] S35 완료 — 판정 반복(③ 1/3 · ⑤ 0/3일) · 1단계 S16~S35 지시문 전부 처리 · 반복 회차 계획은 Kiki 몫
 updated: 2026-11-26
