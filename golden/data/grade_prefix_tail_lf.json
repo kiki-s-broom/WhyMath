@@ -1,0 +1,356 @@
+{
+ "about": "S26R(GOLD-42 · F-02) 고정 입력 표 — 1단계 AI 대체 보고 S24·S29·S33의 「판정 확인」과 턴 인용에서 옮긴 시뮬레이터 발화. 지어낸 문장 없음 · 시드 문장 없음. expected_correct는 FINDINGS 「판정 오류」의 다시 채점 방법(숫자가 든 마지막 수식 조각)과 문항 정답으로 정했다. ambiguous는 null.",
+ "kinds": {
+  "correct_with_prefix_tail": "맞는 식·값이 들었는데 지금 오답 처리",
+  "correct_question_form": "맞는 식을 질문 꼴로 냄(제출로 볼지 판정자마다 다름)",
+  "wrong": "오답이 맞는 입력 — 정답으로 뒤집히면 안 된다",
+  "correct_now": "지금도 정답 — 오답으로 뒤집히면 안 된다",
+  "ambiguous": "맞는 값과 틀린 값이 함께 있어 모호"
+ },
+ "rows": [
+  {
+   "problem_id": "LF-03",
+   "input": "f(2) 넣어요? 6*2-8 계산해보려고요?",
+   "expected_correct": true,
+   "kind": "correct_question_form",
+   "source": "S24 P2·LF-03 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)=-3-5 같은거야?",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S24 P2·LF-04·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "f(5)는 -3*5 + 3 넣어요?",
+   "expected_correct": true,
+   "kind": "correct_question_form",
+   "source": "S29 P4·LF-01·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "-3*5 + 3 하면 뭔가요?",
+   "expected_correct": true,
+   "kind": "correct_question_form",
+   "source": "S29 P4·LF-01 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "f(2)는 6*2 - 8이에요?",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S29 P4·LF-03·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "f(0)은 4*0 + 8이에요?",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S29 P4·LF-05·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "x=-3을 넣었으니까 f(-3) = -3 + 4 = 1이라고 생각해요.",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S33 P2·LF-02·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "f(2)는 6*2-8요?",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S33 P2·LF-03·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)=-3-5 같은식으로 바뀌겠죠?",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S33 P2·LF-04·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "f(2)는 x=2일 때 함수의 값이에요? 6*2 - 8 넣어볼게요?",
+   "expected_correct": true,
+   "kind": "correct_question_form",
+   "source": "S33 P4·LF-03·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "f(0)은 8이에요?",
+   "expected_correct": true,
+   "kind": "correct_with_prefix_tail",
+   "source": "S33 P4·LF-05·t2·t3·마지막",
+   "times": 3
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)=-8 같은식으로 계산되면 8이 아니겠죠?",
+   "expected_correct": null,
+   "kind": "ambiguous",
+   "source": "S33 P2·LF-04 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "12 같아요",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-01",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "-15?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P2·LF-02·t1",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "-1요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-02",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "f(-3)=-1",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-02·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "-4요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-03",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "6(2)-8=-4요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-03·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "6*2는 12요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P2·LF-03·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "8 같아요",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-04",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)에 3을 넣어야 해요",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P2·LF-04·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "-8요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P3·LF-05",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "f(x)는 y좌표를 구하는 공식이에요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-01·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "-3넣어요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-02·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "f(x)는 x의 값을 넣으면 그에 따라 결과가 나오는 식이라고요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-02·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "f(2)는 x=2일 때 함수의 값이에요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-03·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)은 x=3일 때의 함수값이에요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-04·t2",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)은 x=3을 함수식에 넣어서 계산하면 돼요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-04·t3",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "f(0)은 뭔가요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S33 P4·LF-05·t1",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "-3×5=15 15+3=18",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S24 P2·LF-01",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "6×2 빼기 8 이라고 하면 되는 거예요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S24 P4·LF-03 (한글 연산어 · 계약상 정답 아님)",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "6×2 빼기 8 몇이예요?",
+   "expected_correct": false,
+   "kind": "wrong",
+   "source": "S24 P4·LF-03 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "f(5)=-3(5)+3=-15+3=-12",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P2·LF-01 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-01",
+   "input": "-12 맞나요?",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P5·LF-01",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "-3+4=1요?",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P2·LF-02 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-02",
+   "input": "f(-3) = -3 + 4",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S29 P4·LF-02",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "6*2 - 8 = 4",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P4·LF-03 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-03",
+   "input": "12-8요?",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P2·LF-03 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "f(3)=-3-5요?",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P4·LF-04 마지막",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-04",
+   "input": "-8인가요?",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P5·LF-04",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "4×0+8",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P2·LF-05",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "8 같아요",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S33 P5·LF-05",
+   "times": 1
+  },
+  {
+   "problem_id": "LF-05",
+   "input": "f(0)=8요?",
+   "expected_correct": true,
+   "kind": "correct_now",
+   "source": "S24 P4·LF-05",
+   "times": 1
+  }
+ ]
+}
