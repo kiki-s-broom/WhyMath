@@ -16,6 +16,7 @@ acceptance:
 artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/2005"
   - "https://github.com/kiki-s-broom/WhyMath/pull/2006"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2006#s27r"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -31,4 +32,6 @@ notes: |-
   [정정 2026-11-26] 반복 회차 계획 PR — 지시문 S26R~S35R·계산기 배선 · 다음 정시 실행부터 S26R
 
   [정정 2026-11-26] S26R 완료 — 고정 입력 43행 · 옛 자산 없음 · 특성화 45
+
+  [정정 2026-11-26] S27R 완료 — T2R 연결(플래그 GOLDEN_T2R_GRADE · 기본 0) · 맞는 입력 11/11 · 뒤집힘 0 · PR #2006에 S26R과 함께
 updated: 2026-11-26
