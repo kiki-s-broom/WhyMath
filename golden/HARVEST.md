@@ -512,3 +512,17 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음 — golden 안에 새로 씀(`grade_tail.py` 61줄) | — | S26R 경계 "옛 자산 없음" 그대로 | S27R |
+
+## 반복 슬롯 T2R 판정·되돌림 (S30R · 1단계 반복 회차 · 2026-11-27 · 기준 main `578a47a9` · 인용 F-02)
+
+- **판정:** 효과 없음(잠정 · AI 대체 · S28R 조건 M3 미달 · FINDINGS 「T2R 판정 (S30R)」).
+- **되돌림(1회차 S30 선례):**
+  - `src/backend/golden/grade.py`를 S27R 이전 판(`2bdf049e^`)으로 되돌렸다(바이트 동일).
+  - `src/backend/golden/grade_tail.py`·`tests/golden/test_t2r_grade.py`를 지웠다. 연결이 없으면 쓰는 곳이 없다.
+  - 허용 목록 줄 번호를 167 → 148로 되돌렸다. 같은 줄(Kiki 승인 2026-11-18)의 위치다.
+- **남긴 것:** 고정 입력 표 `golden/data/grade_prefix_tail_lf.json` · 특성화 테스트 `tests/golden/characterization/test_t2r_grade.py`(S26R 판 + "플래그 1이어도 출력이 같다" 43칸).
+- 보고 폴더의 S28R·S29R 추출기(`.txt`)는 `golden.grade_tail`을 불러 S28R 실행 당시 코드에서만 돈다. 두 런북 모두 실행 코드를 먼저 검사하므로(S29R `SAME_CODE_AS_S28R_RUN` · S28R `HAS_T2R`), 이제 main에서 다시 돌리면 실행 전에 거부된다. 다시 재려면 커밋 `71297e2c`를 고정해서 돌린다.
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| 없음 | `grade_tail.py`(S27R이 새로 씀 · 옛 자산 아님) | 효과 없음 — 연결 되돌림 | S30R |

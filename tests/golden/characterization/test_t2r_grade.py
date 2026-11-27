@@ -42,14 +42,8 @@ def test_table_shape() -> None:
 
 
 @pytest.mark.parametrize("row", _ROWS, ids=[f"{r['problem_id']}:{r['input']}" for r in _ROWS])
-def test_current_grader_output_is_frozen(
-    row: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """지금 채점기의 출력 — 대조군만 True, 나머지(맞는 식이 든 입력 포함)는 전부 False.
-
-    S27R 뒤: 플래그 `GOLDEN_T2R_GRADE`가 꺼진 상태의 출력이다(켜진 상태는 tests/golden/test_t2r_grade.py).
-    """
-    monkeypatch.delenv("GOLDEN_T2R_GRADE", raising=False)
+def test_current_grader_output_is_frozen(row: dict[str, Any]) -> None:
+    """지금 채점기의 출력 — 대조군만 True, 나머지(맞는 식이 든 입력 포함)는 전부 False."""
     got = is_correct(_PROBLEMS[row["problem_id"]], row["input"])
     assert got is (row["kind"] in _ACCEPTED_NOW)
 
@@ -80,3 +74,16 @@ def test_rejected_legacy_candidate_accepts_none_of_the_correct_inputs() -> None:
     control_states = [state(r) for r in controls]
     assert control_states.count("correct") == 1
     assert control_states.count("incorrect") == 2
+
+
+@pytest.mark.parametrize("row", _ROWS, ids=[f"{r['problem_id']}:{r['input']}" for r in _ROWS])
+def test_t2r_flag_has_no_effect_after_s30r_revert(
+    row: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S30R 판정 '효과 없음'으로 T2R 연결을 되돌렸다 — 플래그를 1로 켜도 출력이 꺼진 것과 같다.
+
+    (S30R 보고 · 1회차 S30 선례 — 고정 입력 표와 이 특성화 테스트만 남긴다)
+    """
+    monkeypatch.setenv("GOLDEN_T2R_GRADE", "1")
+    got = is_correct(_PROBLEMS[row["problem_id"]], row["input"])
+    assert got is (row["kind"] in _ACCEPTED_NOW)
