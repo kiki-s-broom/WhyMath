@@ -526,3 +526,17 @@ cd src/backend && python -m golden.measure_unreferenced
 | 가져온 것 | 버린 것 | 이유 | 세션 |
 | --- | --- | --- | --- |
 | 없음 | `grade_tail.py`(S27R이 새로 씀 · 옛 자산 아님) | 효과 없음 — 연결 되돌림 | S30R |
+
+## 반복 슬롯 T3R 경계 (S31R · 1단계 반복 회차 · 2026-11-27 · 기준 main `b77b9837` · 인용 F-07)
+
+GP-4 튜터 응답에서 정답 노출을 잡는 옛 함수 — 함수 이름 단위다(지시서 S31R 할 일 3). 1회차 T1이 복사한 `detect_answer_leakage`(`src/backend/golden/eval/rubric_copy.py`)와 M1 규칙(`golden.sim.metrics.detect_answer_leakage` — 같은 규칙)은 측정 도구라 이 슬롯의 옛 자산으로 세지 않는다.
+
+| 후보 | 하는 일 | 지금 M1 규칙과 다른 점 | 의존 | 판정(S31R 시점) |
+| --- | --- | --- | --- | --- |
+| `whymath_backend/l4/hint_content/gates.py::check_answer_leakage` | 두 축. 글자 축은 `harness/pedagogical_rubric.detect_answer_leakage`(= M1 규칙)이고, 값 축은 본문의 닫힌 산술식 중 계산하면 정답이 되는 것을 찾는다 | 값 축이 새로 더하는 부분이다. M1이 유보(undecidable)하는 1글자 정답에서도 `6*2-8`(정답 4) 같은 식을 잡는다 | `Hint`·`GateContext`(힌트 콘텐츠 모델)를 받는다. 값 축 능력은 `l4/subject_adapter_math.py::MathAnswerValueExposure`가 주입한다 | 함수 자체는 힌트 모델용이라 GP-4에 바로 맞지 않는다. 가져올 것은 아래 값 축 함수들이다 |
+| `whymath_backend/l3/verify_solution.py::scan_value_exposure` (+ 같은 파일 `arithmetic_fragments` · `same_value` · `_value_targets` · `ValueExposureResult`) | 값 축 본체. 3상태(exposed · clean · undecidable)를 낸다 | 맨 숫자(`-12`)는 식이 아니라 보지 않는다. 그 부분은 글자 축 몫이다 | `verify_solution`을 import하면 whymath 모듈 56개가 따라온다(클라우드 실측). 직접 ≤10 · 전이 ≤30 예산(S20A)을 넘으므로 **import 불가 → 복사**(다섯 걸음 ③) | **후보 1순위** — 특성화 테스트로 고정한 뒤 S32R이 복사한다 |
+| `whymath_backend/l3/pedagogy/analogy_checker.py::_detect_answer_leak` | 정답 문자열이 본문에 그대로 들어 있는가(부분 문자열) | 단어 경계가 없다. 정답 `1`이 `15`에 걸린다(클라우드 실측). 짧은 정답의 유보도 없다 | 표준 라이브러리만 | **버림 후보 — 오탐(측정)** — 특성화 테스트에서 확정한다 |
+
+- 세 후보 모두 `golden/LEGACY_MANIFEST.txt`에 있다(`l4/hint_content/gates.py` · `l3/verify_solution.py` · `l3/pedagogy/analogy_checker.py`). 골든 코드는 새로 import하지 않는다. 테스트만 옛 자리에서 부른다.
+- 특성화 테스트(`tests/golden/characterization/test_t3r_leak.py`)와 최종 판정은 Kiki PC 유출 세션의 ⓐ·ⓑ 사례가 온 뒤에 쓴다(지시서 할 일 4 — 입력에 ⓐ·ⓑ 사례가 하나 이상씩).
+- 찾은 방법(범위): `leak`·`leakage`·`reveal`이 이름에 든 함수를 `whymath_backend/l3`·`l4`·`harness`에서 grep으로 찾았고, 지시서가 이름을 댄 두 후보와 값 축 함수를 직접 읽었다. 이 범위 밖에 쓸 만한 함수가 있는지는 모른다.
