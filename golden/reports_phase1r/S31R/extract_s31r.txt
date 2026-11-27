@@ -1,0 +1,115 @@
+# S31R 추출기 — 실제 LLM 실행 기록에서 정답 유출(M1) 세션을 골라 출처를 가를 재료로 만든다(읽기 전용)
+# 사용: python extract_s31r.txt <출력 txt> <실행 폴더> [<실행 폴더> ...]
+#       (cwd = 작업 폴더의 src/backend · GOLDEN_SIM_SEED_DIR 설정)
+# 고르는 기준은 하나 — 기록의 leak 칸이 True인 세션. 내용으로 고르지 않는다.
+# 유출 세션마다: 실행 · 페르소나 · 문항 · 정답 · 유출이 난 튜터 턴(M1 규칙으로 다시 판정)의 튜터 문장 ·
+#   바로 앞 학생 문장 · 그 학생 문장이 정답인가(채점기) · 학생 문장에 정답 값이 그대로 있는가(M1 규칙)
+# 시드와 같은 학생 문장은 가린다. 학생 문장 판정 칸은 가린 문장이라도 원문으로 계산하고 결과(참/거짓)만 낸다.
+import json
+import sys
+from pathlib import Path
+
+# 파일로 실행하면 파이썬은 지금 폴더가 아니라 이 파일의 폴더를 먼저 본다 — 그러면 .venv에 연결된
+# 공유 작업 사본의 golden이 잡힌다(S28R 블록 X 실측 · LATER 2026-11-27). 지금 폴더를 맨 앞에 둔다.
+sys.path.insert(0, str(Path.cwd()))
+
+import golden  # noqa: E402
+from golden.grade import is_correct  # noqa: E402
+from golden.problems import load_problems  # noqa: E402
+from golden.sim.metrics import LeakageVerdict, detect_answer_leakage, session_leak  # noqa: E402
+from golden.sim.student import copies_seed, load_seed_utterances  # noqa: E402
+
+# 실행 코드 출처 — 지금 폴더(작업 폴더의 src/backend)의 golden이어야 한다(다른 사본 코드가 돌면 거부)
+if not Path(golden.__file__).resolve().is_relative_to(Path.cwd().resolve()):
+    sys.exit(f"S31R_REFUSED — golden이 다른 곳에서 왔다: {golden.__file__}")
+print(f"GOLDEN_FROM={Path(golden.__file__).resolve().parent}")
+
+if len(sys.argv) < 3:
+    sys.exit("S31R_REFUSED — 사용: python extract_s31r.txt <출력 txt> <실행 폴더> [...]")
+out_path = Path(sys.argv[1])
+run_dirs = [Path(a) for a in sys.argv[2:]]
+BANK = {p["id"]: p for p in load_problems()}
+SEEDS = load_seed_utterances()
+
+problems: list[str] = []
+heads: list[str] = []
+lines: list[str] = []
+total_leaked = 0
+masked = 0
+for run_dir in run_dirs:
+    tag = run_dir.name if run_dir.name not in ("f0", "f1") else f"{run_dir.parent.name}/{run_dir.name}"
+    meta_path = run_dir / "run_meta.json"
+    rows_path = run_dir / "sessions.jsonl"
+    if not (meta_path.is_file() and rows_path.is_file()):
+        problems.append(f"{tag} run_meta.json 또는 sessions.jsonl 없음")
+        continue
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    rows = [json.loads(ln) for ln in rows_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if meta.get("mode") != "live":
+        problems.append(f"{tag} mode={meta.get('mode')}(live여야 한다)")
+    recorded = 0
+    recomputed = 0
+    mismatch = 0
+    leaked_rows = []
+    for r in rows:
+        pid = str(r.get("problem_id"))
+        turns = r.get("turns") or []
+        rec = r.get("leak") is True
+        again = pid in BANK and session_leak(turns, BANK[pid]["answer"]) is LeakageVerdict.leaked
+        recorded += rec
+        recomputed += again
+        mismatch += rec != again
+        if rec:
+            leaked_rows.append(r)
+    if mismatch:
+        problems.append(f"{tag} 기록 leak ≠ 지금 M1 규칙 재판정 {mismatch}세션")
+    heads.append(
+        f"S31R_RUN {tag} mode={meta.get('mode')} sessions={len(rows)} leak_recorded={recorded} "
+        f"leak_recomputed={recomputed} mismatch={mismatch}"
+    )
+    for r in leaked_rows:
+        total_leaked += 1
+        pid = str(r.get("problem_id"))
+        answer = BANK[pid]["answer"] if pid in BANK else "?"
+        turns = r.get("turns") or []
+        lines.append(
+            f"## {tag} · {r.get('persona')} · {pid} · 정답={answer} · forced_answer={r.get('forced_answer')} · "
+            f"턴수={len(turns)} · 마지막={turns[-1].get('kind') if turns else None} · correct={turns[-1].get('correct') if turns else None}"
+        )
+        for i, t in enumerate(turns):
+            if t.get("kind") != "tutor_turn":
+                continue
+            tutor = str(t.get("tutor") or "")
+            if detect_answer_leakage(tutor, answer) is not LeakageVerdict.leaked:
+                continue
+            student = str(t.get("student") or "")
+            shown = student
+            if copies_seed(student, SEEDS):
+                shown = "[시드 일치 — 가림]"
+                masked += 1
+            st_correct = pid in BANK and is_correct(BANK[pid], student)
+            st_has_answer = detect_answer_leakage(student, answer) is LeakageVerdict.leaked
+            # 같은 세션의 앞선 학생 입력 중 정답 값이 그대로 든 것이 있었나(되짚기 후보 판단용)
+            earlier = any(
+                detect_answer_leakage(str(u.get("student") or ""), answer) is LeakageVerdict.leaked
+                for u in turns[: i + 1]
+            )
+            lines.append(f"[{t.get('n')}] 학생(바로 앞): {shown}")
+            lines.append(
+                f"[{t.get('n')}] 판정: 학생 입력 정답={st_correct} · 학생 입력에 정답 값={st_has_answer} · "
+                f"이 턴까지 학생이 정답 값을 낸 적={earlier}"
+            )
+            lines.append(f"[{t.get('n')}] 튜터(유출): {tutor}")
+        lines.append("")
+
+ok = not problems and bool(run_dirs)
+head = f"S31R_CHECK ok={ok} runs={len(run_dirs)} leaked_sessions={total_leaked} masked={masked}"
+if problems:
+    head += " problems=" + " | ".join(problems)
+text = "\n".join([head, *heads, "", *lines]) + "\n"
+out_path.write_text(text, encoding="utf-8")
+print(head)
+for h in heads:
+    print(h)
+print(f"OUT_FILE={out_path} CHARS={len(text)}")
+sys.exit(0 if ok else 1)
