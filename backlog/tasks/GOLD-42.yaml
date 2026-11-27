@@ -20,6 +20,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/2007 (S27R 병합)"
   - "PR #2009 (S28R 결과 중단)"
   - "PR #2010 (S29R 런북)"
+  - S29R 결과 보고 커밋 22304ae8
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -43,4 +44,6 @@ notes: |-
   [정정 2026-11-27] S28R 결과 중단(M3 0.24%→0.71% · 완료 기준 ② 미달) · PR #2009 · 다음 S29R
 
   [정정 2026-11-27] S29R 런북·추출기 · PR #2010 · Kiki PC 15건 추출 대기
+
+  [정정 2026-11-27] S29R 결과 완료(맞는 식 든 오답 입력 0 · GP-5 끊김 0) · 다음 S30R
 updated: 2026-11-27
