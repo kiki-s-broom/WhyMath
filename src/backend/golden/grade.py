@@ -27,7 +27,6 @@ from sympy.parsing.sympy_parser import (
     standard_transformations,
 )
 
-from golden.grade_tail import last_math_fragment, t2r_grade_enabled
 from golden.problems import Problem
 
 # 학생 입력 파싱은 옛 코드의 단일 안전 진입점으로만 한다(코딩 헌법 R22-03 · HARVEST.md).
@@ -138,38 +137,18 @@ def _same_expression(student: sympy.Expr, answer: sympy.Expr) -> bool:
     return bool(sympy.simplify(student - answer) == 0)
 
 
-def _compare(problem: Problem, student_answer: str) -> bool:
-    """정규화된 학생 답 문자열과 문항 정답을 비교한다(파싱 실패는 예외로 올린다)."""
-    student = _parse(student_answer)
-    answer = _parse(normalize(problem["answer"]))
-    if problem["answer_kind"] == "expression":
-        return _same_expression(student, answer)
-    return _same_number(student, answer)
-
-
 def is_correct(problem: Problem, student_text: str) -> bool:
-    """학생 답이 정답인지 판정한다. 파싱 실패는 오답(False)이며 예외 타입명을 로그에 남긴다.
-
-    T2R(반복 회차 · F-02): `GOLDEN_T2R_GRADE=1`이면 원래 입력이 **파싱에 실패했을 때만** 숫자가 든
-    마지막 수식 조각(`golden.grade_tail.last_math_fragment`)으로 한 번 더 채점한다. 원래 입력이
-    읽히면(정답이든 오답이든) 그 판정을 그대로 쓴다.
-    플래그가 꺼져 있으면 이전과 한 입력도 다르지 않다.
-    """
-    attempts = [("원래 입력", normalize(student_text))]
-    if t2r_grade_enabled():
-        fragment = last_math_fragment(student_text)
-        if fragment is not None:
-            attempts.append(("T2R 마지막 수식 조각", fragment))
-    for label, text in attempts:
-        try:
-            return _compare(problem, text)
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 — 파싱 실패는 오답. 침묵 실패 금지라 타입명을 남긴다
-            logger.info(
-                "golden.grade 파싱 실패 → 오답 처리 problem_id=%s 시도=%s 예외=%s",
-                problem.get("id", "?"),
-                label,
-                type(exc).__name__,
-            )
-    return False
+    """학생 답이 정답인지 판정한다. 파싱 실패는 오답(False)이며 예외 타입명을 로그에 남긴다."""
+    try:
+        student = _parse(normalize(student_text))
+        answer = _parse(normalize(problem["answer"]))
+        if problem["answer_kind"] == "expression":
+            return _same_expression(student, answer)
+        return _same_number(student, answer)
+    except Exception as exc:  # noqa: BLE001 — 파싱 실패는 오답. 침묵 실패 금지라 타입명을 남긴다
+        logger.info(
+            "golden.grade 파싱 실패 → 오답 처리 problem_id=%s 예외=%s",
+            problem.get("id", "?"),
+            type(exc).__name__,
+        )
+        return False
