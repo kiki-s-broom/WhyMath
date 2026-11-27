@@ -15,12 +15,16 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-import golden
-from golden.grade import is_correct
-from golden.grade_tail import FLAG_ENV
-from golden.problems import load_problems
-from golden.sim.metrics import expected_correct, tutor_turns_to_correct
-from golden.sim.student import copies_seed, load_seed_utterances
+# 파일로 실행하면 파이썬은 지금 폴더가 아니라 이 파일의 폴더를 먼저 본다 — 그러면 .venv에 연결된
+# 공유 작업 사본의 golden이 잡힌다(2026-11-27 Kiki PC 실측 · ModuleNotFoundError). 지금 폴더를 맨 앞에 둔다.
+sys.path.insert(0, str(Path.cwd()))
+
+import golden  # noqa: E402
+from golden.grade import is_correct  # noqa: E402
+from golden.grade_tail import FLAG_ENV  # noqa: E402
+from golden.problems import load_problems  # noqa: E402
+from golden.sim.metrics import expected_correct, tutor_turns_to_correct  # noqa: E402
+from golden.sim.student import copies_seed, load_seed_utterances  # noqa: E402
 
 # 실행 코드 출처 — 지금 폴더(작업 폴더의 src/backend)의 golden이어야 한다(다른 사본 코드가 돌면 거부)
 if not Path(golden.__file__).resolve().is_relative_to(Path.cwd().resolve()):
