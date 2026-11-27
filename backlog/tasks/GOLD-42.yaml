@@ -18,6 +18,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/2006"
   - "https://github.com/kiki-s-broom/WhyMath/pull/2006#s27r"
   - "https://github.com/kiki-s-broom/WhyMath/pull/2007 (S27R 병합)"
+  - "PR #2009 (S28R 결과 중단)"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -37,4 +38,6 @@ notes: |-
   [정정 2026-11-26] S27R 완료 — T2R 연결(플래그 GOLDEN_T2R_GRADE · 기본 0) · 맞는 입력 11/11 · 뒤집힘 0 · PR #2006에 S26R과 함께
 
   [정정 2026-11-26] S28R 런북·추출기 — Kiki 머신 720 × 플래그 0·1 대기
-updated: 2026-11-26
+
+  [정정 2026-11-27] S28R 결과 중단(M3 0.24%→0.71% · 완료 기준 ② 미달) · PR #2009 · 다음 S29R
+updated: 2026-11-27
