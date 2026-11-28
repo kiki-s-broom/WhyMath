@@ -4,7 +4,7 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `plan_golden_path_3weeks.html` | Kiki가 2026-11-08에 쓴 3주 실행 계획서 원본(그대로 보관) |
+| `plan_golden_path_3weeks.html` | Kiki가 2026-11-08에 쓴 3주 실행 계획서 원본(그대로 보관). **2026-11-15 개정판**(DOCX · Kiki 보관 · 저장소 미포함)은 S15를 "/legacy 이동"에서 "LEGACY_MANIFEST.txt 격리(import-linter 계약·CI 분리 · 파일은 그대로 · 삭제는 3단계 S74)"로 바꿨고 `spec.md`·`spec_no_students.md`가 개정판을 따른다 |
 | (계획서 원본 PDF·DOCX) | 1~4단계 계획서 원본은 Kiki가 보관하며 저장소에 없다 — office·PDF 문서는 `.gitignore`와 `scripts/ops/check_source_document_binaries.py`가 커밋을 막는다(저작권 가드). 저장소 안 정본은 각 `spec_phaseN.md`다 |
 | `spec.md` | 작업 지시서 — 공통 규칙 12개·용어·공유 계약(API 3개·문항 JSON·채점·숙련도·DB 표·환경변수)·작업 16개(S1~S15, H1) |
 | `config.json` | 작업 번호·짧은 이름·레인·선행 관계(`deps`)·관문·배경 문장·사람이 할 일 |
