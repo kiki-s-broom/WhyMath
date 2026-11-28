@@ -1,0 +1,2455 @@
+{
+ "golden_version": "rubric_v1",
+ "built_on": "2026-10-18",
+ "rubric": "docs/standards/ai_content_rubric_v1.md",
+ "count": 20,
+ "by_school_type": {
+  "초등학교": 7,
+  "중학교": 8,
+  "고등학교": 5
+ },
+ "op_code_vocabulary": [
+  "OP_00",
+  "OP_01",
+  "OP_02",
+  "OP_03",
+  "OP_04",
+  "OP_05",
+  "OP_06",
+  "OP_07",
+  "OP_08"
+ ],
+ "nodes": [
+  {
+   "golden_id": "G01",
+   "standard_code": "[2수01-06]",
+   "norm_id": "2022_2수_01_06",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 1~2학년군",
+   "domain": "수와 연산",
+   "sub_domain": "두 자리 수의 덧셈과 뺄셈",
+   "standard_statement": "두 자리 수의 범위에서 덧셈과 뺄셈의 계산 원리를 이해하고 그 계산을 할 수 있다.",
+   "concept_src_id": "A2",
+   "misconception_ids_addressed": [
+    "M0430"
+   ],
+   "prerequisite_codes": [
+    "[2수01-02]"
+   ],
+   "vocabulary": {
+    "allow": [
+     "받아올림",
+     "받아내림",
+     "일의 자리",
+     "십의 자리",
+     "자릿값"
+    ],
+    "forbid": [
+     "정수",
+     "대수",
+     "캐리",
+     "carry",
+     "진법",
+     "자리올림수"
+    ]
+   },
+   "concept_explanation": {
+    "text": "같은 자리끼리 더해요. 일의 자리 7과 8을 더하면 15예요. 15는 10이 1개와 1이 5개이니 10 한 묶음을 십의 자리로 올려요. 이것이 받아올림이에요. 십의 자리에서는 4와 3에 올라온 1까지 더해요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "47과 38을 더할 때 어느 자리부터 계산하면 좋을까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "일의 자리요."
+    },
+    {
+     "turn": 2,
+     "tutor": "일의 자리 7과 8을 더하면 15가 되네. 15 안에 들어 있는 10 한 묶음은 어디로 보내야 할까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "십의 자리요."
+    },
+    {
+     "turn": 3,
+     "tutor": "좋아, 십의 자리로 올라온 1을 4와 3에 함께 더하면 십의 자리에 어떤 숫자가 와야 할까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "8이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "47 + 38을 계산하면 얼마인가요?",
+    "choices": [
+     "75",
+     "85",
+     "86",
+     "715"
+    ],
+    "answer_index": 1,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_02",
+      "derivation": "일의 자리 7+8=15에서 올린 1을 십의 자리에 더하지 않음: 4+3=7 → 75",
+      "misconception_id": "M0430"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_00",
+      "derivation": "단순 계산 실수(+1)"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_02",
+      "derivation": "15를 받아올림 없이 통째로 적어 자리 묶음을 빠뜨림: 7|15 → 715",
+      "misconception_id": "M0426"
+     }
+    ],
+    "verify": {
+     "expr": "47+38",
+     "expected": "85"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G02",
+   "standard_code": "[2수01-11]",
+   "norm_id": "2022_2수_01_11",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 1~2학년군",
+   "domain": "수와 연산",
+   "sub_domain": "곱셈구구",
+   "standard_statement": "곱셈구구를 이해하고, 한 자리 수의 곱셈을 할 수 있다.",
+   "concept_src_id": "M2",
+   "misconception_ids_addressed": [
+    "M0435",
+    "M0434"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "곱셈구구",
+     "몇씩 몇 묶음",
+     "뛰어 세기",
+     "곱셈"
+    ],
+    "forbid": [
+     "배수",
+     "인수",
+     "교환법칙",
+     "소인수",
+     "거듭제곱"
+    ]
+   },
+   "concept_explanation": {
+    "text": "7×8은 7씩 8묶음이라는 뜻이에요. 7씩 뛰어 세면 7, 14, 21, 28, 35, 42, 49, 56이 돼요. 잊어버렸다면 7×7에 7을 한 번 더 더하면 돼요. 곱셈은 더하기와 다르다는 것을 기억해요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "7×8은 7을 몇 번 더한다는 뜻일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "8번이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "7×7은 알고 있지. 7×8은 7×7보다 7씩 몇 묶음이 더 많을까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "한 묶음이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "그럼 7×7에 7을 한 번 더 더하면 얼마가 될지 말해 볼래?",
+     "socratic_category": "evidence",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "49에 7을 더해요."
+    }
+   ],
+   "mc_item": {
+    "stem": "7 × 8은 얼마인가요?",
+    "choices": [
+     "15",
+     "49",
+     "54",
+     "56"
+    ],
+    "answer_index": 3,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_03",
+      "derivation": "곱셈을 덧셈으로 계산: 7+8=15",
+      "misconception_id": "M0434"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "7씩 7묶음(한 묶음 덜 셈) — 단순 세기 실수"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_07",
+      "derivation": "소리로만 외운 구구단에서 인접 값(6×9=54)과 혼동",
+      "misconception_id": "M0435"
+     }
+    ],
+    "verify": {
+     "expr": "7*8",
+     "expected": "56"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G03",
+   "standard_code": "[4수01-06]",
+   "norm_id": "2022_4수_01_06",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 3~4학년군",
+   "domain": "수와 연산",
+   "sub_domain": "나눗셈(한 자리 수), 몫과 나머지",
+   "standard_statement": "나누는 수가 한 자리 수인 나눗셈의 계산 원리를 이해하고 그 계산을 할 수 있으며, 나눗셈에서 몫과 나머지의 의미를 안다.",
+   "concept_src_id": "D2",
+   "misconception_ids_addressed": [
+    "M0458"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "나눗셈",
+     "몫",
+     "나머지",
+     "똑같이 나누기",
+     "나누는 수"
+    ],
+    "forbid": [
+     "약수",
+     "배수",
+     "정수",
+     "나머지 정리",
+     "유클리드",
+     "제수",
+     "피제수"
+    ]
+   },
+   "concept_explanation": {
+    "text": "나눗셈은 똑같이 나누어 주는 것이에요. 59개를 7명에게 나누어 주면 한 명이 8개씩 받고 3개가 남아요. 남은 3개는 7명에게 더 줄 수 없어서 나머지예요. 나머지는 언제나 나누는 수보다 작아야 해요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "59개를 7명에게 똑같이 나누어 준다면, 한 명에게 7개씩 주고 나면 몇 개가 남을까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "10개요."
+    },
+    {
+     "turn": 2,
+     "tutor": "남은 10개를 7명에게 한 개씩 더 줄 수 있을까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "네, 7개를 더 주면 3개 남아요."
+    },
+    {
+     "turn": 3,
+     "tutor": "그렇다면 나머지는 나누는 수 7보다 커도 되는 걸까, 아니면 늘 작아야 할까?",
+     "socratic_category": "meta",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "늘 작아야 해요."
+    }
+   ],
+   "mc_item": {
+    "stem": "사탕 59개를 7명에게 똑같이 나누어 주려고 합니다. 한 명이 몇 개씩 받고, 몇 개가 남나요?",
+    "choices": [
+     "6개씩, 17개 남음",
+     "7개씩, 10개 남음",
+     "8개씩, 3개 남음",
+     "8개씩, 4개 남음"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_04",
+      "derivation": "나머지 17이 나누는 수 7보다 큰데도 나누기를 멈춤(나머지<나누는 수 조건 무시)",
+      "misconception_id": "M0458"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_04",
+      "derivation": "나머지 10이 7보다 큰데도 멈춤 — 같은 조건 무시, 한 단계 더 진행한 경우",
+      "misconception_id": "M0458"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_00",
+      "derivation": "59−56=3을 4로 잘못 뺀 단순 실수"
+     }
+    ],
+    "verify": {
+     "expr": "divmod(59,7)",
+     "expected": "(8, 3)"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G04",
+   "standard_code": "[4수01-11]",
+   "norm_id": "2022_4수_01_11",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 3~4학년군",
+   "domain": "수와 연산",
+   "sub_domain": "분수의 크기 비교",
+   "standard_statement": "분모가 같은 분수끼리, 단위분수끼리 크기를 비교하고 그 방법을 설명할 수 있다.",
+   "concept_src_id": "F4",
+   "misconception_ids_addressed": [
+    "M0464"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "분수",
+     "분모",
+     "분자",
+     "단위분수",
+     "진분수",
+     "조각"
+    ],
+    "forbid": [
+     "통분",
+     "약분",
+     "유리수",
+     "기약분수",
+     "역수",
+     "최소공배수"
+    ]
+   },
+   "concept_explanation": {
+    "text": "분모가 같으면 조각 한 개의 크기가 같아요. 그래서 분자가 클수록 조각 수가 많아 더 큰 분수예요. 단위분수는 분자가 1이니까, 분모가 클수록 조각이 잘게 쪼개져 오히려 작아져요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "분모가 9로 같은 분수들은 조각 하나의 크기가 어떨까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "모두 같아요."
+    },
+    {
+     "turn": 2,
+     "tutor": "조각 크기가 같다면, 분자가 클수록 조각이 많은 것이니 가장 큰 분수는 어떤 것일까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "8/9요."
+    },
+    {
+     "turn": 3,
+     "tutor": "문제는 '둘째로 큰' 분수를 묻고 있어. 가장 큰 것 바로 다음은 어떤 분수일까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "분자가 7인 것이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "분수 4/9, 7/9, 2/9, 8/9 중에서 둘째로 큰 분수는 무엇인가요?",
+    "choices": [
+     "2/9",
+     "4/9",
+     "7/9",
+     "8/9"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_08",
+      "derivation": "'수가 작을수록 크다'는 분수 크기 역전 — 분자가 가장 작은 2/9를 큰 쪽으로 봄",
+      "misconception_id": "M0464"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "크기 순서를 세다 한 칸 밀린 단순 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_07",
+      "derivation": "문항 요구 '둘째로 큰'을 '가장 큰'으로 오독해 8/9 선택",
+      "misconception_id": "M0464"
+     }
+    ],
+    "verify": {
+     "expr": "sorted([F(4,9),F(7,9),F(2,9),F(8,9)])[-2]",
+     "expected": "F(7,9)"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G05",
+   "standard_code": "[6수01-11]",
+   "norm_id": "2022_6수_01_11",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 5~6학년군",
+   "domain": "수와 연산",
+   "sub_domain": "분수의 나눗셈",
+   "standard_statement": "분수의 나눗셈의 계산 원리를 탐구하고 그 계산을 할 수 있다.",
+   "concept_src_id": "F14",
+   "misconception_ids_addressed": [
+    "M0509"
+   ],
+   "prerequisite_codes": [],
+   "db_correction_note": "M0509(분자÷분자·분모÷분모)는 값이 보존되는 올바른 방법 — 오답 선지 생성 불가·DB 재분류 후보",
+   "vocabulary": {
+    "allow": [
+     "분수의 나눗셈",
+     "분모",
+     "분자",
+     "진분수",
+     "대분수",
+     "가분수",
+     "약분"
+    ],
+    "forbid": [
+     "역수",
+     "유리수",
+     "역원",
+     "항등원",
+     "곱셈의 역원"
+    ]
+   },
+   "concept_explanation": {
+    "text": "분수로 나누는 것은 '그 분수가 몇 번 들어가는지' 알아보는 거예요. 2/3로 나누는 것은 3/2을 곱하는 것과 같아요. 나누는 분수의 분모와 분자를 바꾸어 곱하면 돼요. 1보다 작은 수로 나누면 답이 원래 수보다 커질 수 있어요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "5/6 ÷ 2/3은 5/6 안에 2/3이 몇 번 들어가는지 묻는 거야. 2/3은 1보다 큰 수일까, 작은 수일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "작은 수요."
+    },
+    {
+     "turn": 2,
+     "tutor": "1보다 작은 수로 나누면 답은 5/6보다 커질까, 작아질까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "커질 것 같아요."
+    },
+    {
+     "turn": 3,
+     "tutor": "분수로 나눌 때는 나누는 분수의 분모와 분자를 바꾸어 곱한다고 배웠지. 2/3의 분모와 분자를 바꾸면 어떤 분수가 될까?",
+     "socratic_category": "evidence",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "3/2이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "5/6 ÷ 2/3을 계산하면 얼마인가요?",
+    "choices": [
+     "5/9",
+     "4/5",
+     "1 1/4",
+     "5/18"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_03",
+      "derivation": "나누는 분수를 뒤집지 않고 분수 곱셈 절차 적용: 5/6×2/3=10/18=5/9",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G05-1",
+       "standard_code": "[6수01-11]",
+       "error_type": "공식혼동",
+       "canonical_statement": "분수의 나눗셈을 분수의 곱셈 절차로 계산한다(뒤집지 않고 분자끼리·분모끼리 곱함)",
+       "student_wrong_thinking": "÷와 ×의 절차를 같은 것으로 여겨 5/6÷2/3=10/18로 계산한다."
+      }
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_06",
+      "derivation": "뒤집을 대상을 혼동해 나누어지는 분수를 뒤집음: 6/5×2/3=12/15=4/5",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G05-2",
+       "standard_code": "[6수01-11]",
+       "error_type": "차원혼동",
+       "canonical_statement": "분수의 나눗셈에서 나누어지는 분수를 뒤집어 곱한다(뒤집을 대상 혼동)",
+       "student_wrong_thinking": "'뒤집어 곱한다'만 기억해 앞의 분수를 뒤집는다."
+      }
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_00",
+      "derivation": "÷2/3을 ÷3으로 잘못 읽은 단순 실수: 5/6÷3=5/18"
+     }
+    ],
+    "verify": {
+     "expr": "F(5,6)/F(2,3)",
+     "expected": "F(5,4)"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G06",
+   "standard_code": "[6수02-03]",
+   "norm_id": "2022_6수_02_03",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 5~6학년군",
+   "domain": "변화와 관계",
+   "sub_domain": "비율과 백분율",
+   "standard_statement": "비율을 이해하고, 비율을 분수, 소수, 백분율로 나타낼 수 있다.",
+   "concept_src_id": "Q8",
+   "misconception_ids_addressed": [
+    "M0516"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "비",
+     "비율",
+     "기준량",
+     "비교량",
+     "백분율",
+     "퍼센트",
+     "분수",
+     "소수"
+    ],
+    "forbid": [
+     "비례식",
+     "비례상수",
+     "유리수",
+     "정비례",
+     "함수",
+     "반비례"
+    ]
+   },
+   "concept_explanation": {
+    "text": "비율은 기준량에 대한 비교량의 크기예요. 전체 25명을 기준량, 안경 쓴 8명을 비교량으로 보면 비율은 8/25예요. 분수 8/25는 소수 0.32, 백분율 32%와 같은 값이에요. 백분율은 기준량을 100으로 볼 때의 비율이에요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "안경 쓴 학생의 비율을 구할 때 기준량은 전체 25명과 안경 쓴 8명 중 어느 쪽일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "전체 25명이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "비율은 (비교량)÷(기준량)이지. 8을 25로 나눈 값을 분수로 쓰면 어떻게 될까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "8/25요."
+    },
+    {
+     "turn": 3,
+     "tutor": "백분율은 기준량을 100으로 볼 때의 값이야. 8/25의 분모를 100으로 만들려면 분모와 분자에 각각 몇을 곱해야 할까?",
+     "socratic_category": "implication",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "4요."
+    }
+   ],
+   "mc_item": {
+    "stem": "한 반 학생 25명 중 안경을 쓴 학생은 8명입니다. 전체에 대한 안경 쓴 학생의 비율을 백분율로 나타내면?",
+    "choices": [
+     "8%",
+     "25%",
+     "32%",
+     "312.5%"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_06",
+      "derivation": "비(8:25)의 비교량 8을 그대로 비율로 봄(비↔비율 혼동)",
+      "misconception_id": "M0516"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "기준량 25를 답으로 적은 단순 오기"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_06",
+      "derivation": "기준량과 비교량을 바꿔 25÷8=3.125 → 312.5%",
+      "misconception_id": "M0516"
+     }
+    ],
+    "verify": {
+     "expr": "F(8,25)*100",
+     "expected": "32"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G07",
+   "standard_code": "[6수04-01]",
+   "norm_id": "2022_6수_04_01",
+   "curriculum_revision": "2022 개정",
+   "school_type": "초등학교",
+   "grade_band": "초등학교 5~6학년군",
+   "domain": "자료와 가능성",
+   "sub_domain": "평균",
+   "standard_statement": "평균의 의미를 알고, 자료를 수집하여 평균을 구하고 해석할 수 있다.",
+   "concept_src_id": "P7",
+   "misconception_ids_addressed": [
+    "M0538",
+    "M0419"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "평균",
+     "자료",
+     "합",
+     "개수",
+     "고르게"
+    ],
+    "forbid": [
+     "중앙값",
+     "최빈값",
+     "대푯값",
+     "산포도",
+     "분산",
+     "표준편차",
+     "기댓값"
+    ]
+   },
+   "concept_explanation": {
+    "text": "평균은 자료를 모두 더한 뒤 자료의 개수로 나눈 값이에요. 여러 값을 똑같이 고르게 폈을 때의 높이라고 생각하면 돼요. 가장 많이 나온 값과는 다를 수 있어요. 아주 크거나 작은 값이 하나 있으면 평균이 그쪽으로 끌려가요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "평균을 구하려면 먼저 자료를 어떻게 해야 할까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "모두 더해요."
+    },
+    {
+     "turn": 2,
+     "tutor": "다섯 수를 모두 더하면 70이야. 평균은 이 합을 무엇으로 나눈 값일까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "자료의 개수 5요."
+    },
+    {
+     "turn": 3,
+     "tutor": "15가 두 번 나왔지만 평균은 가장 많이 나온 값과 같은 것일까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "아니요, 다를 수 있어요."
+    }
+   ],
+   "mc_item": {
+    "stem": "다섯 친구가 하루에 읽은 책의 쪽수가 11, 15, 9, 20, 15쪽입니다. 평균은 몇 쪽인가요?",
+    "choices": [
+     "14",
+     "15",
+     "17.5",
+     "70"
+    ],
+    "answer_index": 0,
+    "distractor_map": [
+     {
+      "choice_index": 1,
+      "op_code": "OP_06",
+      "derivation": "가장 많이 나온 값 15를 평균으로 봄",
+      "misconception_id": "M0538"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_00",
+      "derivation": "70을 4로 나눈 개수 세기 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_02",
+      "derivation": "합 70을 개수로 나누는 단계를 빠뜨림",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G07-1",
+       "standard_code": "[6수04-01]",
+       "error_type": "분배누락",
+       "canonical_statement": "자료의 합을 평균으로 답한다(개수로 나누는 단계 누락)",
+       "student_wrong_thinking": "평균=합이라고 여겨 11+15+9+20+15=70을 평균으로 말한다."
+      }
+     }
+    ],
+    "verify": {
+     "expr": "F(11+15+9+20+15,5)",
+     "expected": "14"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G08",
+   "standard_code": "[9수01-02]",
+   "norm_id": "2022_9수_01_02",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "수와 연산",
+   "sub_domain": "최대공약수와 최소공배수",
+   "standard_statement": "소인수분해를 이용하여 최대공약수와 최소공배수를 구할 수 있다.",
+   "concept_src_id": "J0102",
+   "misconception_ids_addressed": [
+    "M0014",
+    "M0545"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "소인수분해",
+     "소인수",
+     "거듭제곱",
+     "지수",
+     "최대공약수",
+     "최소공배수",
+     "공약수",
+     "공배수",
+     "서로소"
+    ],
+    "forbid": [
+     "유클리드 호제법",
+     "정수환",
+     "아이디얼",
+     "모듈러",
+     "합동식"
+    ]
+   },
+   "concept_explanation": {
+    "text": "두 수를 소인수분해하면 72=2³×3², 60=2²×3×5예요. 최대공약수는 공통인 소인수를 지수가 작은 쪽으로 곱한 2²×3=12예요. 최소공배수는 나온 소인수를 모두 지수가 큰 쪽으로 곱한 2³×3²×5=360이에요. 두 수의 곱 4320은 최소공배수가 아니라 최대공약수와 최소공배수의 곱이에요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "72와 60을 소인수분해하면 각각 어떻게 될까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "2³×3²과 2²×3×5요."
+    },
+    {
+     "turn": 2,
+     "tutor": "최소공배수는 두 수의 배수 중 가장 작은 수야. 그러려면 각 소인수를 지수가 큰 쪽과 작은 쪽 중 어느 쪽으로 골라야 할까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "큰 쪽이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "두 수의 곱 4320도 공배수이긴 해. 그런데 그것이 '가장 작은' 공배수라고 할 수 있을까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "아니요, 더 작은 공배수가 있어요."
+    }
+   ],
+   "mc_item": {
+    "stem": "72와 60의 최소공배수는?",
+    "choices": [
+     "12",
+     "180",
+     "360",
+     "720",
+     "4320"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_03",
+      "derivation": "최대공약수 공식(공통 소인수·작은 지수)을 적용: 2²×3=12",
+      "misconception_id": "M0014"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_06",
+      "derivation": "공통 소인수 2의 지수를 큰 쪽(3) 대신 작은 쪽(2)으로 고름: 2²×3²×5=180",
+      "misconception_id": "M0545"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_00",
+      "derivation": "2의 지수를 더해 2⁴로 계산한 단순 실수: 2⁴×3²×5=720"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_08",
+      "derivation": "서로소일 때만 성립하는 '최소공배수=두 수의 곱'을 일반화: 72×60=4320",
+      "misconception_id": "M0545"
+     }
+    ],
+    "verify": {
+     "expr": "lcm(72,60)",
+     "expected": "360"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G09",
+   "standard_code": "[9수01-05]",
+   "norm_id": "2022_9수_01_05",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "수와 연산",
+   "sub_domain": "정수·유리수의 사칙계산",
+   "standard_statement": "정수와 유리수의 사칙계산의 원리를 이해하고, 그 계산을 할 수 있다.",
+   "concept_src_id": "J0105",
+   "misconception_ids_addressed": [
+    "M0548"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "정수",
+     "유리수",
+     "절댓값",
+     "부호",
+     "양수",
+     "음수",
+     "수직선"
+    ],
+    "forbid": [
+     "무리수",
+     "군",
+     "환",
+     "벡터",
+     "복소수",
+     "실수 체계"
+    ]
+   },
+   "concept_explanation": {
+    "text": "뺄셈은 빼는 수의 부호를 바꾸어 더하는 것으로 고칠 수 있어요. (−3)−(−8)은 (−3)+(+8)과 같아서 5예요. 여기에 (−2)를 더하면 3이에요. 부호를 하나씩 확인하면 (−)−(−)에서 틀리는 일을 줄일 수 있어요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "(−3)−(−8)에서 빼는 수 −8의 부호를 바꾸어 덧셈으로 고치면 어떤 식이 될까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "(−3)+(+8)이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "(−3)+(+8)은 수직선에서 −3에서 오른쪽으로 8칸 간 것이지. 어디에 도착할까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "5요."
+    },
+    {
+     "turn": 3,
+     "tutor": "거기에 −2를 더하는 것은 어느 쪽으로 몇 칸 움직이는 것일까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "왼쪽으로 2칸이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "(−3) − (−8) + (−2)를 계산하면?",
+    "choices": [
+     "−13",
+     "−9",
+     "3",
+     "7",
+     "13"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_01",
+      "derivation": "(−)−(−)를 (−)−(+)로 처리: −3−8−2=−13",
+      "misconception_id": "M0548"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "−3−8+2=−9 — 둘째 항 부호만 틀린 단순 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_01",
+      "derivation": "마지막 (−2)의 부호를 +로 처리: −3+8+2=7",
+      "misconception_id": "M0548"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_04",
+      "derivation": "모든 수의 부호를 무시하고 절댓값끼리 더함: 3+8+2=13",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G09-1",
+       "standard_code": "[9수01-05]",
+       "error_type": "조건무시",
+       "canonical_statement": "음수의 부호를 무시하고 절댓값끼리 계산한다",
+       "student_wrong_thinking": "부호는 나중에 붙이면 된다고 여겨 3+8+2=13으로 계산한 뒤 부호를 잊는다."
+      }
+     }
+    ],
+    "verify": {
+     "expr": "(-3)-(-8)+(-2)",
+     "expected": "3"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G10",
+   "standard_code": "[9수01-06]",
+   "norm_id": "2022_9수_01_06",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "수와 연산",
+   "sub_domain": "순환소수",
+   "standard_statement": "순환소수의 뜻을 알고, 유리수와 순환소수의 관계를 설명할 수 있다.",
+   "concept_src_id": "J0106",
+   "misconception_ids_addressed": [
+    "M0549",
+    "M0011"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "순환소수",
+     "순환마디",
+     "유한소수",
+     "무한소수",
+     "유리수",
+     "분수"
+    ],
+    "forbid": [
+     "무리수",
+     "극한",
+     "수렴",
+     "급수",
+     "등비급수",
+     "완비성"
+    ]
+   },
+   "concept_explanation": {
+    "text": "0.272727…처럼 같은 숫자 묶음이 끝없이 되풀이되는 소수를 순환소수, 되풀이되는 묶음 27을 순환마디라고 해요. x=0.272727…로 놓고 100x−x=27에서 99x=27이므로 x=27/99=3/11이에요. 순환소수는 이렇게 항상 분수로 나타낼 수 있어서 유리수예요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "0.272727…에서 끝없이 되풀이되는 숫자 묶음은 무엇일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "27이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "x=0.272727…로 놓고 100을 곱하면 100x는 어떤 수가 될까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "27.272727…이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "100x에서 x를 빼면 소수 부분이 어떻게 될까?",
+     "socratic_category": "implication",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "사라지고 99x=27이 돼요."
+    }
+   ],
+   "mc_item": {
+    "stem": "순환소수 0.272727…을 기약분수로 나타내면?",
+    "choices": [
+     "27/100",
+     "5/18",
+     "3/11",
+     "27/10",
+     "1/4"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_07",
+      "derivation": "순환을 무시하고 유한소수 0.27로 읽음: 27/100",
+      "misconception_id": "M0011"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_07",
+      "derivation": "순환마디를 7만으로 잘못 잡아 0.2777…로 계산: (27−2)/90=5/18",
+      "misconception_id": "M0549"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_00",
+      "derivation": "분모 자릿수를 잘못 놓은 단순 실수: 27/10"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_08",
+      "derivation": "0.27…≈0.25라는 근사를 '같다'로 일반화: 1/4",
+      "misconception_id": "M0549"
+     }
+    ],
+    "verify": {
+     "expr": "F(27,99)",
+     "expected": "F(3,11)"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G11",
+   "standard_code": "[9수01-07]",
+   "norm_id": "2022_9수_01_07",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "수와 연산",
+   "sub_domain": "제곱근",
+   "standard_statement": "제곱근의 뜻과 성질을 알고, 제곱근의 대소 관계를 판단할 수 있다.",
+   "concept_src_id": "J0107",
+   "misconception_ids_addressed": [
+    "M0550",
+    "M0314"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "제곱근",
+     "근호",
+     "양의 제곱근",
+     "음의 제곱근",
+     "절댓값",
+     "무리수"
+    ],
+    "forbid": [
+     "복소수",
+     "허수",
+     "허수단위",
+     "주치",
+     "로그"
+    ]
+   },
+   "concept_explanation": {
+    "text": "√(−5)²에서 먼저 (−5)²=25를 계산해요. √25는 제곱하면 25가 되는 수 중 음이 아닌 값이므로 5예요. 즉 √a²는 a가 아니라 |a|예요. a의 제곱근은 ±√a 두 개이지만 기호 √a는 양의 제곱근 하나만 가리켜요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "√(−5)²에서 근호 안의 (−5)²을 먼저 계산하면 얼마일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "25요."
+    },
+    {
+     "turn": 2,
+     "tutor": "√25는 '제곱하면 25가 되는 수' 중에서 어떤 부호의 값을 가리킬까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "음이 아닌 값이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "그렇다면 √a²이 항상 a와 같다고 말할 수 있을까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "아니요, a가 음수면 달라요."
+    }
+   ],
+   "mc_item": {
+    "stem": "√(−5)²의 값은?",
+    "choices": [
+     "−25",
+     "−5",
+     "±5",
+     "5",
+     "25"
+    ],
+    "answer_index": 3,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_00",
+      "derivation": "부호와 제곱을 모두 잘못 처리한 단순 실수"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_08",
+      "derivation": "√a²=a를 무조건 적용: √(−5)²=−5",
+      "misconception_id": "M0550"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_04",
+      "derivation": "기호 √가 음이 아닌 값만 가리킨다는 표기 조건을 무시하고 '25의 제곱근' ±5로 답함",
+      "misconception_id": "M0314"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_02",
+      "derivation": "근호를 벗기는 단계를 빠뜨리고 (−5)²=25를 답함",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G11-1",
+       "standard_code": "[9수01-07]",
+       "error_type": "분배누락",
+       "canonical_statement": "근호 안의 값을 계산한 뒤 제곱근을 취하는 단계를 빠뜨린다",
+       "student_wrong_thinking": "√(−5)²에서 (−5)²=25까지만 계산하고 25를 답한다."
+      }
+     }
+    ],
+    "verify": {
+     "expr": "isqrt((-5)**2)",
+     "expected": "5"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G12",
+   "standard_code": "[9수02-04]",
+   "norm_id": "2022_9수_02_04",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "변화와 관계",
+   "sub_domain": "일차방정식",
+   "standard_statement": "일차방정식을 풀 수 있고, 이를 활용하여 문제를 해결할 수 있다.",
+   "concept_src_id": "J0204",
+   "misconception_ids_addressed": [
+    "M0557",
+    "M0021"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "일차방정식",
+     "이항",
+     "등식의 성질",
+     "미지수",
+     "해",
+     "계수",
+     "항"
+    ],
+    "forbid": [
+     "판별식",
+     "근의 공식",
+     "행렬",
+     "역행렬",
+     "벡터",
+     "연립"
+    ]
+   },
+   "concept_explanation": {
+    "text": "등식의 양변에 같은 수를 더하거나 빼도 등식은 성립해요. 이 성질을 쓰면 항을 반대쪽으로 옮기며 부호를 바꾸는 이항이 돼요. 3x−7=2x+5에서 2x를 왼쪽으로, −7을 오른쪽으로 이항하면 3x−2x=5+7이에요. 정리하면 x=12예요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "3x−7=2x+5에서 x가 있는 항을 한쪽으로 모으려면 2x를 어느 쪽으로 옮겨야 할까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "계획",
+     "expected_student": "왼쪽이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "항을 반대쪽으로 옮기면 부호는 어떻게 될까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "반대로 바뀌어요."
+    },
+    {
+     "turn": 3,
+     "tutor": "−7을 오른쪽으로 옮긴 뒤 3x−2x=5+7을 계산하면 x는 얼마일까?",
+     "socratic_category": "implication",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "x를 구할 수 있어요."
+    }
+   ],
+   "mc_item": {
+    "stem": "일차방정식 3x − 7 = 2x + 5의 해는?",
+    "choices": [
+     "x = −2",
+     "x = −2/5",
+     "x = 2",
+     "x = 12/5",
+     "x = 12"
+    ],
+    "answer_index": 4,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_01",
+      "derivation": "−7을 이항하며 부호를 바꾸지 않음: 3x−2x=5−7 → x=−2",
+      "misconception_id": "M0557"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_01",
+      "derivation": "2x와 −7 모두 부호를 바꾸지 않고 이항: 5x=−2 → x=−2/5",
+      "misconception_id": "M0021"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_00",
+      "derivation": "12를 2로 잘못 옮겨 적은 단순 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_01",
+      "derivation": "2x를 이항하며 부호를 바꾸지 않음: 3x+2x=12 → x=12/5",
+      "misconception_id": "M0557"
+     }
+    ],
+    "verify": {
+     "expr": "F(5+7, 3-2)",
+     "expected": "12"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G13",
+   "standard_code": "[9수02-16]",
+   "norm_id": "2022_9수_02_16",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "변화와 관계",
+   "sub_domain": "일차함수의 그래프의 성질",
+   "standard_statement": "일차함수의 그래프의 성질을 이해하고, 이를 활용하여 문제를 해결할 수 있다.",
+   "concept_src_id": "J0216",
+   "misconception_ids_addressed": [
+    "M0569",
+    "M0568"
+   ],
+   "prerequisite_codes": [
+    "[9수02-15]"
+   ],
+   "vocabulary": {
+    "allow": [
+     "일차함수",
+     "기울기",
+     "x절편",
+     "y절편",
+     "증가",
+     "감소",
+     "사분면",
+     "직선"
+    ],
+    "forbid": [
+     "도함수",
+     "미분",
+     "접선",
+     "선형사상",
+     "극한",
+     "변화율의 극한"
+    ]
+   },
+   "concept_explanation": {
+    "text": "일차함수 y=ax+b에서 a는 기울기, b는 y절편이에요. 기울기가 양수면 x가 커질수록 y도 커지고, 음수면 y는 작아져요. y=−2x+3은 기울기가 −2라 오른쪽 아래로 내려가는 직선이고, y절편이 3이라 점 (0, 3)을 지나요. x절편은 y=0을 넣어 구한 3/2예요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "y=−2x+3에서 x의 계수 −2는 그래프의 무엇을 나타낼까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "기울기요."
+    },
+    {
+     "turn": 2,
+     "tutor": "기울기가 음수이면 x가 커질 때 y는 커질까, 작아질까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "작아져요."
+    },
+    {
+     "turn": 3,
+     "tutor": "x=0을 넣었을 때 나오는 y값은 그래프 위 어떤 점을 알려 줄까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "y축과 만나는 점이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "일차함수 y = −2x + 3의 그래프에 대한 설명으로 옳은 것은?",
+    "choices": [
+     "x의 값이 증가하면 y의 값도 증가한다.",
+     "점 (0, 3)을 지난다.",
+     "x절편은 3이다.",
+     "기울기는 3이다.",
+     "제1사분면을 지나지 않는다."
+    ],
+    "answer_index": 1,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_01",
+      "derivation": "기울기 부호와 증가·감소를 반대로 연결(음수 기울기인데 증가)",
+      "misconception_id": "M0569"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_06",
+      "derivation": "y절편 3을 x절편으로 봄(절편 대상 혼동 — 실제 x절편은 3/2)",
+      "misconception_id": "M0036"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_06",
+      "derivation": "y절편 b=3을 기울기로 봄(a·b 역할 혼동)",
+      "misconception_id": "M0568"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_00",
+      "derivation": "(1, 1)을 지나므로 제1사분면을 지남 — 그래프 개형 확인 실수"
+     }
+    ],
+    "verify": {
+     "expr": "-2*0+3",
+     "expected": "3"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G14",
+   "standard_code": "[9수03-15]",
+   "norm_id": "2022_9수_03_15",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "도형과 측정",
+   "sub_domain": "피타고라스 정리",
+   "standard_statement": "피타고라스 정리를 이해하고 정당화할 수 있다.",
+   "concept_src_id": "J0315",
+   "misconception_ids_addressed": [
+    "M0054",
+    "M0590"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "피타고라스 정리",
+     "직각삼각형",
+     "빗변",
+     "제곱",
+     "제곱근",
+     "근호"
+    ],
+    "forbid": [
+     "삼각비",
+     "사인",
+     "코사인",
+     "탄젠트",
+     "벡터",
+     "내적",
+     "거리 공식"
+    ]
+   },
+   "concept_explanation": {
+    "text": "피타고라스 정리는 직각삼각형에서 빗변의 제곱이 나머지 두 변의 제곱의 합과 같다는 것이에요. 빗변은 직각의 맞은편에 있는 가장 긴 변이에요. 두 변이 6, 8이면 빗변의 제곱은 36+64=100이고 빗변은 10이에요. 직각이 아닌 삼각형에는 쓸 수 없어요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "이 삼각형에서 직각의 맞은편에 있는 가장 긴 변은 어느 것일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "구하려는 변이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "피타고라스 정리에 따르면 빗변의 제곱은 두 변의 제곱과 어떤 관계일까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "두 제곱의 합이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "36+64를 계산한 값은 빗변 자체일까, 빗변의 제곱일까?",
+     "socratic_category": "assumption",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "빗변의 제곱이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "직각을 낀 두 변의 길이가 6, 8인 직각삼각형의 빗변의 길이는?",
+    "choices": [
+     "7",
+     "2√7",
+     "10",
+     "14",
+     "100"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_00",
+      "derivation": "두 변의 평균을 답한 단순 추측"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_06",
+      "derivation": "8을 빗변으로 오인해 8²−6²=28의 제곱근 2√7을 구함(빗변 식별 혼동)",
+      "misconception_id": "M0590"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_03",
+      "derivation": "a²+b²=c² 대신 a+b=c를 적용: 6+8=14",
+      "misconception_id": "M0054"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_02",
+      "derivation": "빗변의 제곱 100에서 제곱근을 취하는 단계를 빠뜨림",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G14-1",
+       "standard_code": "[9수03-15]",
+       "error_type": "분배누락",
+       "canonical_statement": "빗변의 제곱을 빗변의 길이로 답한다(제곱근 단계 누락)",
+       "student_wrong_thinking": "c²=100까지 구하고 c=100이라고 쓴다."
+      }
+     }
+    ],
+    "verify": {
+     "expr": "isqrt(6**2+8**2)",
+     "expected": "10"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G15",
+   "standard_code": "[9수04-06]",
+   "norm_id": "2022_9수_04_06",
+   "curriculum_revision": "2022 개정",
+   "school_type": "중학교",
+   "grade_band": "중학교 1~3학년군",
+   "domain": "자료와 가능성",
+   "sub_domain": "확률의 뜻과 성질",
+   "standard_statement": "확률의 개념과 그 기본 성질을 이해하고, 확률을 구할 수 있다.",
+   "concept_src_id": "J0406",
+   "misconception_ids_addressed": [
+    "M0417",
+    "M0600"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "확률",
+     "경우의 수",
+     "사건",
+     "또는",
+     "그리고",
+     "주사위"
+    ],
+    "forbid": [
+     "조건부확률",
+     "독립",
+     "확률변수",
+     "기댓값",
+     "순열",
+     "조합",
+     "배반"
+    ]
+   },
+   "concept_explanation": {
+    "text": "확률은 (그 사건이 일어나는 경우의 수)÷(모든 경우의 수)예요. 주사위에서 3의 배수는 3, 6이고 짝수는 2, 4, 6이에요. '또는'이므로 두 경우를 합치되 겹치는 6은 한 번만 세어 2, 3, 4, 6의 4가지예요. 확률은 4/6=2/3이고, 확률은 항상 0 이상 1 이하예요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "주사위에서 3의 배수인 눈과 짝수인 눈을 각각 적어 볼래?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "3, 6과 2, 4, 6이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "두 무리에 모두 들어 있는 눈이 있다면 '또는'을 셀 때 몇 번 세어야 할까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "한 번이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "경우의 수 4를 그대로 확률이라고 해도 될까, 아니면 무엇으로 나누어야 할까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "전체 6으로 나눠요."
+    }
+   ],
+   "mc_item": {
+    "stem": "주사위 한 개를 던질 때, 3의 배수 또는 짝수의 눈이 나올 확률은?",
+    "choices": [
+     "1/6",
+     "1/2",
+     "2/3",
+     "5/6",
+     "5"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_07",
+      "derivation": "'또는'을 '그리고'로 읽어 둘 다 만족하는 6만 셈: 1/6",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G15-1",
+       "standard_code": "[9수04-06]",
+       "error_type": "해석오류",
+       "canonical_statement": "'또는' 사건을 '그리고' 사건으로 읽어 공통 경우만 센다",
+       "student_wrong_thinking": "3의 배수 또는 짝수를 '3의 배수이면서 짝수'로 읽어 6 하나만 센다."
+      }
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "짝수만 세어 3/6=1/2 — 사건 하나를 빠뜨린 단순 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_02",
+      "derivation": "겹치는 6을 두 번 세어 (2+3)/6=5/6",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G15-2",
+       "standard_code": "[9수04-06]",
+       "error_type": "분배누락",
+       "canonical_statement": "'또는' 사건의 경우의 수를 합할 때 겹치는 경우를 빼는 단계를 빠뜨린다",
+       "student_wrong_thinking": "두 사건의 경우의 수를 그냥 더해 5가지로 센다."
+      }
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_04",
+      "derivation": "경우의 수 합 5를 전체로 나누지 않고 확률로 답함(0≤P≤1 조건 무시)",
+      "misconception_id": "M0417"
+     }
+    ],
+    "verify": {
+     "expr": "F(len({2,3,4,6}),6)",
+     "expected": "F(2,3)"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G16",
+   "standard_code": "[10공수1-01-01]",
+   "norm_id": "2022_10공수1_01_01",
+   "curriculum_revision": "2022 개정",
+   "school_type": "고등학교",
+   "grade_band": "고등학교",
+   "domain": "다항식",
+   "sub_domain": "다항식의 사칙연산",
+   "standard_statement": "다항식의 사칙연산의 원리를 설명하고, 그 계산을 할 수 있다.",
+   "concept_src_id": "HK01",
+   "misconception_ids_addressed": [
+    "M0604"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "다항식",
+     "단항식",
+     "동류항",
+     "차수",
+     "계수",
+     "상수항",
+     "사칙연산",
+     "전개"
+    ],
+    "forbid": [
+     "환",
+     "체",
+     "벡터공간",
+     "이데알",
+     "선형독립",
+     "기저"
+    ]
+   },
+   "concept_explanation": {
+    "text": "다항식의 뺄셈은 빼는 다항식의 각 항의 부호를 바꾸어 더해요. (3x²−2x+1)−(x²−4x+5)=3x²−2x+1−x²+4x−5예요. 문자와 차수가 같은 동류항끼리 모으면 2x²+2x−4예요. 차수가 다른 항은 동류항이 아니므로 합칠 수 없어요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "괄호 앞에 −가 있을 때 괄호 안 각 항의 부호는 어떻게 될까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "모두 반대로 바뀌어요."
+    },
+    {
+     "turn": 2,
+     "tutor": "부호를 바꾼 뒤 3x²과 −x²처럼 문자와 차수가 같은 항을 무엇이라고 부를까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "계획",
+     "expected_student": "동류항이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "동류항끼리 모은 뒤 차수가 다른 항은 더 합칠 수 있을까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "아니요, 그대로 둬야 해요."
+    }
+   ],
+   "mc_item": {
+    "stem": "(3x² − 2x + 1) − (x² − 4x + 5)를 계산하면?",
+    "choices": [
+     "2x − 2",
+     "2x² − 6x − 4",
+     "2x² + 2x − 4",
+     "2x² + 2x + 6",
+     "4x² − 6x + 6"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_03",
+      "derivation": "3x²−x²을 지수끼리 빼 2로 계산(동류항 계산에 지수법칙 혼동): 2+2x−4",
+      "misconception_id": "M0604"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_02",
+      "derivation": "괄호 앞 −를 첫 항에만 분배: −x²−4x−5 → 2x²−6x−4",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G16-1",
+       "standard_code": "[10공수1-01-01]",
+       "error_type": "분배누락",
+       "canonical_statement": "괄호 앞의 −를 괄호 안 첫 항에만 분배한다",
+       "student_wrong_thinking": "−(x²−4x+5)를 −x²−4x+5 또는 −x²−4x−5로 쓴다."
+      }
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_00",
+      "derivation": "상수항 1−5를 1+5로 계산한 단순 실수"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_07",
+      "derivation": "뺄셈 기호를 덧셈으로 읽어 두 다항식을 더함: 4x²−6x+6",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G16-2",
+       "standard_code": "[10공수1-01-01]",
+       "error_type": "해석오류",
+       "canonical_statement": "다항식 사이의 − 기호를 +로 읽어 뺄셈을 덧셈으로 계산한다",
+       "student_wrong_thinking": "(A)−(B)를 (A)+(B)로 계산한다."
+      }
+     }
+    ],
+    "verify": {
+     "expr": "[(3*x*x-2*x+1)-(x*x-4*x+5) == 2*x*x+2*x-4 for x in (0,1,2,-3)]",
+     "expected": "[True, True, True, True]"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G17",
+   "standard_code": "[10공수1-02-01]",
+   "norm_id": "2022_10공수1_02_01",
+   "curriculum_revision": "2022 개정",
+   "school_type": "고등학교",
+   "grade_band": "고등학교",
+   "domain": "방정식과 부등식",
+   "sub_domain": "복소수",
+   "standard_statement": "복소수의 뜻과 성질을 설명하고, 사칙연산을 수행할 수 있다.",
+   "concept_src_id": "HK05",
+   "misconception_ids_addressed": [
+    "M0315",
+    "M0608"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "복소수",
+     "허수단위",
+     "실수부",
+     "허수부",
+     "켤레복소수",
+     "i",
+     "전개"
+    ],
+    "forbid": [
+     "복소평면",
+     "극형식",
+     "편각",
+     "오일러",
+     "드무아브르"
+    ]
+   },
+   "concept_explanation": {
+    "text": "복소수는 허수단위 i(i²=−1)를 써서 a+bi 꼴로 나타낸 수예요. 곱셈은 다항식처럼 전개한 뒤 i²을 −1로 바꿔요. (2+3i)(1−i)=2−2i+3i−3i²=2+i+3=5+i예요. 실수부 5와 허수부 1은 서로 다른 종류라 하나로 합치지 않아요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "(2+3i)(1−i)를 다항식처럼 전개하면 어떤 네 항이 나올까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "계획",
+     "expected_student": "2, −2i, 3i, −3i²이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "그중 −3i²에서 i²은 어떤 실수로 바꿀 수 있을까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "−1이요."
+    },
+    {
+     "turn": 3,
+     "tutor": "실수부끼리, 허수부끼리 모으면 각각 얼마가 될까?",
+     "socratic_category": "implication",
+     "hint_level": 3,
+     "polya_stage": "실행",
+     "expected_student": "실수부는 2+3, 허수부는 −2+3이요."
+    }
+   ],
+   "mc_item": {
+    "stem": "(2 + 3i)(1 − i)를 계산하면? (단, i = √−1)",
+    "choices": [
+     "−1 + i",
+     "5 − i",
+     "5 + i",
+     "6",
+     "2 + i − 3i²"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_03",
+      "derivation": "i²=+1로 처리: 2+i−3=−1+i",
+      "misconception_id": "M0315"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "−2i+3i의 부호를 잘못 본 단순 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_06",
+      "derivation": "실수부 5와 허수부 1을 더해 하나의 수 6으로 합침",
+      "misconception_id": "M0608"
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_02",
+      "derivation": "i²=−1로 바꾸는 단계를 빠뜨리고 전개식 그대로 둠",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G17-1",
+       "standard_code": "[10공수1-02-01]",
+       "error_type": "분배누락",
+       "canonical_statement": "복소수 곱셈에서 i²을 −1로 치환하는 단계를 빠뜨린다",
+       "student_wrong_thinking": "전개까지만 하고 2+i−3i²을 최종 답으로 쓴다."
+      }
+     }
+    ],
+    "verify": {
+     "expr": "(2+3j)*(1-1j)",
+     "expected": "(5+1j)"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G18",
+   "standard_code": "[10공수1-02-02]",
+   "norm_id": "2022_10공수1_02_02",
+   "curriculum_revision": "2022 개정",
+   "school_type": "고등학교",
+   "grade_band": "고등학교",
+   "domain": "방정식과 부등식",
+   "sub_domain": "이차방정식의 판별식",
+   "standard_statement": "이차방정식의 실근과 허근을 이해하고, 판별식을 이용하여 이차방정식의 근을 판별할 수 있다.",
+   "concept_src_id": "HK07",
+   "misconception_ids_addressed": [
+    "M0610",
+    "M0609"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "판별식",
+     "실근",
+     "허근",
+     "중근",
+     "서로 다른 두 실근",
+     "계수",
+     "복소수"
+    ],
+    "forbid": [
+     "고윳값",
+     "특성방정식",
+     "대수학의 기본정리",
+     "복소평면"
+    ]
+   },
+   "concept_explanation": {
+    "text": "이차방정식 ax²+bx+c=0의 판별식은 D=b²−4ac예요. D>0이면 서로 다른 두 실근, D=0이면 중근, D<0이면 서로 다른 두 허근을 가져요. x²−4x+7=0은 D=16−28=−12<0이므로 실근은 없지만 복소수 범위에서는 두 허근이 있어요. 실근이 없다는 것과 해가 없다는 것은 달라요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "x²−4x+7=0에서 a, b, c는 각각 얼마일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "1, −4, 7이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "판별식 b²−4ac를 계산하면 부호가 어떻게 될까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "16−28이라 음수요."
+    },
+    {
+     "turn": 3,
+     "tutor": "판별식이 음수일 때 '실근이 없다'와 '해가 없다'는 같은 말일까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "아니요, 허근이 있어요."
+    }
+   ],
+   "mc_item": {
+    "stem": "이차방정식 x² − 4x + 7 = 0의 근을 판별하면?",
+    "choices": [
+     "서로 다른 두 실근",
+     "중근",
+     "서로 다른 두 허근",
+     "실근 1개와 허근 1개",
+     "해가 없다"
+    ],
+    "answer_index": 2,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_01",
+      "derivation": "−4ac의 부호를 +로 계산: D=16+28=44>0",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G18-1",
+       "standard_code": "[10공수1-02-02]",
+       "error_type": "부호오류",
+       "canonical_statement": "판별식 b²−4ac에서 −4ac의 부호를 +로 계산한다",
+       "student_wrong_thinking": "D=b²+4ac로 외워 항상 양수가 나온다."
+      }
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_00",
+      "derivation": "16−28을 0으로 잘못 계산한 단순 실수"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_04",
+      "derivation": "실계수 이차방정식의 허근이 켤레 쌍이라는 조건을 무시",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G18-2",
+       "standard_code": "[10공수1-02-02]",
+       "error_type": "조건무시",
+       "canonical_statement": "실계수 이차방정식에서 허근이 켤레로 쌍을 이룬다는 조건을 무시한다",
+       "student_wrong_thinking": "근 두 개 중 하나만 허근일 수 있다고 본다."
+      }
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_07",
+      "derivation": "D<0을 '해가 없다'로 단정(실근이 없을 뿐 허근은 존재)",
+      "misconception_id": "M0610"
+     }
+    ],
+    "verify": {
+     "expr": "(-4)**2-4*1*7",
+     "expected": "-12"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G19",
+   "standard_code": "[10공수2-02-05]",
+   "norm_id": "2022_10공수2_02_05",
+   "curriculum_revision": "2022 개정",
+   "school_type": "고등학교",
+   "grade_band": "고등학교",
+   "domain": "집합과 명제",
+   "sub_domain": "명제의 역과 대우",
+   "standard_statement": "명제의 역과 대우를 이해하고 설명할 수 있다.",
+   "concept_src_id": "HK30",
+   "misconception_ids_addressed": [
+    "M0638",
+    "M0306"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "명제",
+     "가정",
+     "결론",
+     "역",
+     "이",
+     "대우",
+     "참",
+     "거짓",
+     "반례"
+    ],
+    "forbid": [
+     "술어논리",
+     "양화사",
+     "진리표",
+     "모델론",
+     "형식체계"
+    ]
+   },
+   "concept_explanation": {
+    "text": "명제 p→q에서 역은 q→p, 이는 ~p→~q, 대우는 ~q→~p예요. 명제와 그 대우는 참·거짓이 항상 같아요. 하지만 역과 이는 원래 명제와 참·거짓이 다를 수 있어요. 'x=2이면 x²=4이다'는 참이지만 역 'x²=4이면 x=2이다'는 x=−2라는 반례가 있어 거짓이에요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "'x=2이면 x²=4이다'에서 가정과 결론은 각각 무엇일까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "이해",
+     "expected_student": "가정은 x=2, 결론은 x²=4요."
+    },
+    {
+     "turn": 2,
+     "tutor": "가정과 결론을 서로 바꾼 명제에 대해 x=−2를 넣어 보면 어떻게 될까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "x²=4인데 x≠2라 거짓이에요."
+    },
+    {
+     "turn": 3,
+     "tutor": "그렇다면 원래 명제가 참일 때 참·거짓이 반드시 같은 것은 역일까, 대우일까?",
+     "socratic_category": "implication",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "대우요."
+    }
+   ],
+   "mc_item": {
+    "stem": "명제 'x = 2이면 x² = 4이다'에 대한 설명으로 옳은 것은?",
+    "choices": [
+     "역 'x² = 4이면 x = 2이다'는 참이다.",
+     "대우 'x² ≠ 4이면 x ≠ 2이다'는 참이다.",
+     "이 'x ≠ 2이면 x² ≠ 4이다'는 참이다.",
+     "대우는 'x = 2이면 x² ≠ 4이다'이다.",
+     "원명제가 참이면 역과 이도 모두 참이다."
+    ],
+    "answer_index": 1,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_08",
+      "derivation": "명제가 참이면 역도 참이라 일반화(반례 x=−2)",
+      "misconception_id": "M0638"
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_07",
+      "derivation": "이(~p→~q)를 대우로 오독(반례 x=−2)",
+      "misconception_id": "M0306"
+     },
+     {
+      "choice_index": 3,
+      "op_code": "OP_05",
+      "derivation": "대우를 만들 때 가정·결론을 바꾸지 않고 결론만 부정",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G19-1",
+       "standard_code": "[10공수2-02-05]",
+       "error_type": "순서오류",
+       "canonical_statement": "대우를 만들 때 가정과 결론의 자리를 바꾸는 단계 없이 부정만 한다",
+       "student_wrong_thinking": "p→q의 대우를 p→~q로 쓴다."
+      }
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_08",
+      "derivation": "역·이·대우가 모두 원명제와 참·거짓이 같다고 일반화",
+      "misconception_id": "M0638"
+     }
+    ],
+    "verify": {
+     "expr": "((-2)**2==4) and (-2!=2)",
+     "expected": "True"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  },
+  {
+   "golden_id": "G20",
+   "standard_code": "[10공수2-03-03]",
+   "norm_id": "2022_10공수2_03_03",
+   "curriculum_revision": "2022 개정",
+   "school_type": "고등학교",
+   "grade_band": "고등학교",
+   "domain": "함수와 그래프",
+   "sub_domain": "역함수",
+   "standard_statement": "역함수의 개념을 설명하고, 역함수를 구할 수 있다.",
+   "concept_src_id": "HK36",
+   "misconception_ids_addressed": [
+    "M0644"
+   ],
+   "prerequisite_codes": [],
+   "vocabulary": {
+    "allow": [
+     "역함수",
+     "일대일대응",
+     "일대일함수",
+     "정의역",
+     "치역",
+     "공역",
+     "합성함수",
+     "역수"
+    ],
+    "forbid": [
+     "전단사",
+     "단사",
+     "전사",
+     "동형사상",
+     "가역행렬"
+    ]
+   },
+   "concept_explanation": {
+    "text": "역함수는 입력과 출력을 맞바꾼 함수로, 함수가 일대일대응일 때만 존재해요. f(x)=2x−6의 역함수는 y=2x−6에서 x와 y를 바꾼 x=2y−6을 y에 대해 풀어 구해요. 따라서 f⁻¹(x)=(x+6)/2예요. 기호 f⁻¹은 역수 1/f가 아니에요."
+   },
+   "socratic_flow": [
+    {
+     "turn": 1,
+     "tutor": "역함수는 입력과 출력을 바꾼 함수야. y=2x−6에서 x와 y를 서로 바꾸면 어떤 식이 될까?",
+     "socratic_category": "clarification",
+     "hint_level": 1,
+     "polya_stage": "계획",
+     "expected_student": "x=2y−6이요."
+    },
+    {
+     "turn": 2,
+     "tutor": "x=2y−6을 y에 대해 풀려면 먼저 양변에 무엇을 해야 할까?",
+     "socratic_category": "evidence",
+     "hint_level": 2,
+     "polya_stage": "실행",
+     "expected_student": "6을 더해요."
+    },
+    {
+     "turn": 3,
+     "tutor": "기호 f⁻¹(x)는 1/f(x)와 같은 뜻일까?",
+     "socratic_category": "assumption",
+     "hint_level": 2,
+     "polya_stage": "반성",
+     "expected_student": "아니요, 역함수 기호예요."
+    }
+   ],
+   "mc_item": {
+    "stem": "함수 f(x) = 2x − 6의 역함수 f⁻¹(x)는?",
+    "choices": [
+     "1/(2x − 6)",
+     "(x − 6)/2",
+     "x/2 − 6",
+     "(x + 6)/2",
+     "−2x + 6"
+    ],
+    "answer_index": 3,
+    "distractor_map": [
+     {
+      "choice_index": 0,
+      "op_code": "OP_06",
+      "derivation": "역함수 f⁻¹을 역수 1/f로 혼동",
+      "misconception_id": "M0644"
+     },
+     {
+      "choice_index": 1,
+      "op_code": "OP_01",
+      "derivation": "x=2y−6에서 −6을 이항하며 부호를 바꾸지 않음: 2y=x−6",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G20-1",
+       "standard_code": "[10공수2-03-03]",
+       "error_type": "부호오류",
+       "canonical_statement": "역함수를 구하며 x, y를 바꾼 뒤 이항할 때 부호를 바꾸지 않는다",
+       "student_wrong_thinking": "x=2y−6에서 2y=x−6으로 옮긴다."
+      }
+     },
+     {
+      "choice_index": 2,
+      "op_code": "OP_05",
+      "derivation": "역연산을 원래 연산 순서대로 적용(2로 나눈 뒤 6을 뺌)",
+      "misconception_proposal": {
+       "review_status": "pending",
+       "proposal_id": "P-G20-2",
+       "standard_code": "[10공수2-03-03]",
+       "error_type": "순서오류",
+       "canonical_statement": "역함수를 구할 때 역연산을 원래 연산 순서대로 적용한다",
+       "student_wrong_thinking": "'2배 한 뒤 6 빼기'의 역을 '2로 나눈 뒤 6 빼기'로 만든다."
+      }
+     },
+     {
+      "choice_index": 4,
+      "op_code": "OP_00",
+      "derivation": "부호만 바꾼 식을 역함수로 착각한 단순 혼동"
+     }
+    ],
+    "verify": {
+     "expr": "[2*((x+6)/2)-6 == x for x in (0,10,-4)]",
+     "expected": "[True, True, True]"
+    }
+   },
+   "copyright": {
+    "origin": "original_ai",
+    "textbook_text_quoted": false,
+    "note": "자체 작성. 성취기준 코드·문장(공공)만 사실 인용. 교과서·EBS·평가원 본문·문항·선지 미인용."
+   },
+   "expected_scores": {
+    "math": 3,
+    "standard": 3,
+    "misconception": 3,
+    "op_trace": 3,
+    "vocab": 3,
+    "copyright": 3
+   },
+   "review_status": "ai_estimated"
+  }
+ ],
+ "digest": "59621f1cd7f52010a49a29762d2ec09019f33db9156d6473dab16f0b25ee7b06"
+}
