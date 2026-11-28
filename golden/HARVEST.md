@@ -527,7 +527,7 @@ cd src/backend && python -m golden.measure_unreferenced
 | --- | --- | --- | --- |
 | 없음 | `grade_tail.py`(S27R이 새로 씀 · 옛 자산 아님) | 효과 없음 — 연결 되돌림 | S30R |
 
-## 반복 슬롯 T3R 경계 (S31R · 1단계 반복 회차 · 2026-11-27 · 기준 main `b77b9837` · 인용 F-07)
+## 반복 슬롯 T3R 경계 (S31R · 1단계 반복 회차 · 2026-11-27 · 기준 main `b77b9837` · 판정 확정 2026-11-28 · 기준 main `bc69b117` · 인용 F-07)
 
 GP-4 튜터 응답에서 정답 노출을 잡는 옛 함수 — 함수 이름 단위다(지시서 S31R 할 일 3). 1회차 T1이 복사한 `detect_answer_leakage`(`src/backend/golden/eval/rubric_copy.py`)와 M1 규칙(`golden.sim.metrics.detect_answer_leakage` — 같은 규칙)은 측정 도구라 이 슬롯의 옛 자산으로 세지 않는다.
 
@@ -540,4 +540,8 @@ GP-4 튜터 응답에서 정답 노출을 잡는 옛 함수 — 함수 이름 �
 - 세 후보 모두 `golden/LEGACY_MANIFEST.txt`에 있다(`l4/hint_content/gates.py` · `l3/verify_solution.py` · `l3/pedagogy/analogy_checker.py`). 골든 코드는 새로 import하지 않는다. 테스트만 옛 자리에서 부른다.
 - 특성화 테스트 `tests/golden/characterization/test_t3r_leak.py`(입력 10 · 출력 30 + 경계 사실 1 · 2026-11-28). 입력은 S31R 출처 표의 실제 튜터 문장(ⓑ 4 · ⓒ 3)과 합성(ⓐ 2 · 대조군 1)이다. **실제 ⓐ는 0건**이라 ⓐ는 합성이다(`golden/DECISIONS_AUTO.md` 2026-11-28 S31R).
 - S32R에 넘기는 경계: "ⓐ인가"는 옛 함수가 아니라 **학생 이력**으로 가른다 — 튜터 문장의 정답 값(M1 규칙 또는 값 축)이 그 턴까지 학생 입력에 이미 있었으면 ⓑ·ⓒ(되짚기)라 막지 않는다. S31R 실제 29턴은 전부 이 조건이 참이었다(추출기 `이 턴까지 학생이 정답 값을 낸 적=True`).
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| `l3/verify_solution.py::scan_value_exposure` (+ 같은 파일 4개 · 복사는 S32R) | `l4/hint_content/gates.py::check_answer_leakage` · `l3/pedagogy/analogy_checker.py::_detect_answer_leak` | 가져옴: ⓐ 합성 2/2 · ⓒ 실제 0/3(측정). 버림: 힌트 모델용·글자 축이 M1과 같음(코드 읽기) · 부분 문자열 오탐 ⓒ 3/3(측정) · 모두 LEGACY_MANIFEST(새 import 금지) | S31R |
+
 - 찾은 방법(범위): `leak`·`leakage`·`reveal`이 이름에 든 함수를 `whymath_backend/l3`·`l4`·`harness`에서 grep으로 찾았고, 지시서가 이름을 댄 두 후보와 값 축 함수를 직접 읽었다. 이 범위 밖에 쓸 만한 함수가 있는지는 모른다.
