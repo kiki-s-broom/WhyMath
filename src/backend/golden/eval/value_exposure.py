@@ -7,7 +7,9 @@
 `split_top_level` · `_closed_value`(+ 그것이 쓰는 `_name_kind` · `_balanced` ·
 `_is_single_variable`).
 
-옛 판과 다른 점(의존을 자른 자리 — 출력은 S31R 특성화 입력 10개에서 옛 판과 같다):
+옛 판과 다른 점(의존을 자른 자리 — 출력은 30문항 정답 × 본문·힌트·S31R 튜터 문장·합성 문장에서 옛
+판과 같다 ·
+`tests/golden/test_t3r_guard.py::test_value_copy_matches_legacy_on_problem_texts`):
 - `same_value`: 옛 판은 정본 채점기 `verify_final_answer`(옛 모듈 다수)에 위임했다. 이 사본은 같은
   안전
   파서(`safe_sympify` — 골든이 이미 쓰는 `l3.safe_parse`)로 두 값을 읽어 수로 비교한다. 목표가 수가
@@ -16,6 +18,11 @@
 - `_value_targets`: 옛 판의 LaTeX 평문화(`latex_to_plain`)는 가져오지 않았다. 골든 30문항의 정답은
   모두
   평문이다. 정답에 `\\`가 있으면 목표를 읽지 않고 판정 불가로 둔다(접지 않는다).
+- `same_value`는 옛 판의 `normalize_value`(유니코드 근호 `√` 접기)를 거치지 않는다. 식 덩어리
+  정규식에 `√`가
+  없어 조각에 근호가 들어오지 않는다.
+- `_balanced`는 문법 오류일 때 debug 로그에 예외 타입명을 남긴다(골든 조용한 값 삼키기 게이트 ·
+  동작은 같다).
 - 결과 3상태는 이 파일의 `ValueExposure`(옛 `schema.verification_capabilities.ValueExposure`와 같은
   값).
 

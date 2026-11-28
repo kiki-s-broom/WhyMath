@@ -49,6 +49,12 @@ _NEW_LEAKS: list[tuple[str, str, list[str]]] = [
     ("11", "정답은 11이에요.", ["-11 같아요"]),  # 학생은 부호 반대 오답 — 정답은 튜터가 처음 말함
     ("-12", "f(5) = -12가 돼요.", ["f(5)는 -15예요?"]),
     ("2/3", "기울기는 2/3이에요.", ["-2/3이요?"]),
+    # golden-reviewer L1·L2 — 괄호·쉼표를 지워 되짚기로 잘못 읽던 자리, 빼기(이항) 뒤의 양수 정답
+    ("12", "정답은 12예요.", ["(1, 2)를 지나요?"]),
+    ("11", "x에 2를 넣으면 5-11이 되나요?", ["몰라요"]),
+    # 1글자 정답 — 함수 인자·계수 자리의 수는 학생이 그 값을 낸 것이 아니다
+    ("3", "6-3을 계산해 볼래요?", ["f(3)이요?"]),
+    ("3", "6-3을 계산해 볼래요?", ["3x요?"]),
 ]
 
 
@@ -93,6 +99,12 @@ def test_real_echo_turns_are_not_blocked(row: dict[str, Any]) -> None:
 def test_new_leaks_are_blocked(answer: str, reply: str, students: list[str]) -> None:
     """ⓐ 합성 사례는 막는다(학생 입력에 그 정답이 없었다)."""
     assert check_reply(reply, answer, students).new_leak is True
+
+
+def test_reply_parentheses_and_commas_are_not_glued_into_the_answer() -> None:
+    """튜터가 `(1, 2)`를 말해도 정답 12가 드러난 것이 아니다(괄호·쉼표를 지워 붙이지 않는다 · L1)."""
+    assert check_reply("점 (1, 2)를 지나는지 볼래요?", "12", ["몰라요"]).axis is None
+    assert check_reply("점 (-1, 2)를 지나는지 볼래요?", "-12", ["몰라요"]).axis is None
 
 
 def test_new_leak_becomes_echo_once_student_said_it() -> None:

@@ -552,6 +552,7 @@ GP-4 튜터 응답에서 정답 노출을 잡는 옛 함수 — 함수 이름 �
   - 가져온 함수: `scan_value_exposure` · `arithmetic_fragments` · `_value_targets` · `split_top_level` · `_closed_value`, 그리고 이 함수들이 쓰는 `_name_kind` · `_balanced` · `_is_single_variable`.
   - 자른 의존 2개:
     - `same_value`: 옛 판은 정본 채점기 `verify_final_answer`(옛 모듈 다수)에 맡겼다. 사본은 같은 안전 파서 `l3.safe_parse.safe_sympify`로 수를 비교한다. 이 파서는 골든 채점기가 이미 쓰므로 직접 import 예산은 그대로다.
+    - 그 밖에 동작이 같은 차이 2개: `same_value`가 옛 `normalize_value`(√ 접기)를 거치지 않는다(조각에 √가 들어오지 않는다). `_balanced`가 문법 오류의 예외 타입명을 debug 로그로 남긴다(조용한 값 삼키기 게이트).
     - `_value_targets`의 LaTeX 평문화: 골든 30문항의 정답은 모두 평문이다. 정답에 역슬래시(`\`)가 있으면 판정 불가로 둔다.
   - 출력이 같은지 확인했다: 30문항 정답 × 본문·힌트·S31R 튜터 문장 등 2,040쌍 이상에서 옛 판과 결과 4칸이 모두 같다. 고정 테스트는 `tests/golden/test_t3r_guard.py::test_value_copy_matches_legacy_on_problem_texts`이고, 클라우드 사전 점검에서는 630쌍 모두 같았다.
 - **다섯 걸음 ④ 연결**: `src/backend/golden/tutor.py`의 튜터 응답 직후다. `GOLDEN_T3R_LEAK_GUARD=1`일 때만 켜진다. 유출 판정은 `src/backend/golden/eval/leak_guard.py`가 한다.

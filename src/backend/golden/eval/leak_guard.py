@@ -15,8 +15,13 @@ S31R 출처 표(`golden/reports_phase1r/S31R/보고.md` 2절)의 세 칸을 이 
 - 값 축: 옛 `scan_value_exposure`의 골든 사본(`golden.eval.value_exposure`). 계산하면 정답이 되는 식
   (`3*5+1` · 1글자 정답의 `6*2-8`)을 잡는다.
 
-학생 입력에 그 정답이 있었는가(되짚기 판정)는 같은 두 축으로 보되, 1글자 수 정답은 수 경계로 맞춘다
-(학생이 `4요`라고 썼으면 튜터의 `4`는 되짚기다 — 유보하면 되짚기를 새 유출로 잘못 막는다).
+학생 입력에 그 정답이 있었는가(되짚기 판정)는 값 축과 수 경계로 본다. 1글자 수 정답도 수 경계로
+맞춘다
+(학생이 `4요`라고 썼으면 튜터의 `4`는 되짚기다 — 유보하면 되짚기를 새 유출로 잘못 막는다). 함수
+인자(`f(3)`)·
+계수(`3x`) 자리의 수는 학생이 그 값을 답으로 낸 것이 아니라 빼고, 괄호·쉼표는 지우지 않고 본다(`(1,
+2)` ≠ `12`
+· S32R golden-reviewer L1). 되짚기를 거짓으로 참으로 만들면 정답이 그대로 나가기 때문이다.
 문제 본문은 되짚기 근거로 쓰지 않는다. `f(0)` 문항(LF-05 `4x + 8` · 정답 8)처럼 본문의 수를 짚는
 것이 곧
 정답을 알려 주는 문항이 있기 때문이다(S32R 실측 — 본문에 정답 수가 든 문항 7개).
@@ -69,10 +74,37 @@ def _norm(text: str) -> str:
     return _STRUCTURAL.sub("", s)
 
 
+def _light(text: str) -> str:
+    """수 경계를 볼 때의 가벼운 정규화 — NFKC·빼기 기호·LaTeX 명령·`$`·중괄호만 지운다.
+
+    괄호·쉼표·공백은 지우지 않는다. 지우면 학생의 `(1, 2)`가 `12`가 되어 정답 12를 이미 말한 것으로
+    읽힌다(S32R golden-reviewer L1 — 되짚기가 거짓으로 참이 되면 정답이 그대로 나간다).
+    """
+    s = unicodedata.normalize("NFKC", text).translate(_MINUS).lower()
+    s = _LATEX_COMMANDS.sub("", s)
+    return re.sub(r"[$\\{}]", "", s)
+
+
+def _unary_minus_before(s: str, start: int) -> bool:
+    """`start` 바로 앞(공백 건너뜀)이 음수 부호 `-`인가. 그 `-` 앞이 수·영문자·`)`이면 빼기(이항)라
+    음수 부호가 아니다(`5-11`의 11은 양수 11이다 · golden-reviewer L2). 한글 낱말 뒤의 `-`는
+    부호다."""
+    j = start - 1
+    while j >= 0 and s[j] == " ":
+        j -= 1
+    if j < 0 or s[j] != "-":
+        return False
+    k = j - 1
+    while k >= 0 and s[k] == " ":
+        k -= 1
+    binary = k >= 0 and s[k].isascii() and (s[k].isalnum() or s[k] == ")")
+    return not binary
+
+
 def _number_in(text: str, answer: str) -> bool:
-    """수 정답이 수 경계·부호 경계로 본문에 있는가. 양수 정답 앞의 `-`는 다른 수다(`-11` ≠ `11`)."""
-    lead = r"(?<![\d./])" if answer.startswith("-") else r"(?<![\d./\-])"
-    return re.search(rf"{lead}{re.escape(answer)}(?![\d./])", _norm(text)) is not None
+    """수 정답이 수 경계·부호 경계로 본문에 있는가. 양수 정답 앞의 음수 부호는 다른 수다(`-11` ≠
+    `11`)."""
+    return bool(_number_matches(_light(text), answer))
 
 
 def _glyph_exposed(text: str, answer: str) -> bool | None:
@@ -102,14 +134,46 @@ def exposure_axis(text: str, answer: str) -> Axis | None:
     return None
 
 
+def _number_matches(s: str, answer: str) -> list[re.Match[str]]:
+    """가볍게 정규화한 본문 `s`에서 수 정답 `answer`가 수 경계·부호 경계로 나온 자리들."""
+    if answer.startswith("-"):
+        pattern = rf"(?<![\d./])-\s*{re.escape(answer[1:])}(?![\d./])"
+        return list(re.finditer(pattern, s))
+    pattern = rf"(?<![\d./]){re.escape(answer)}(?![\d./])"
+    return [m for m in re.finditer(pattern, s) if not _unary_minus_before(s, m.start())]
+
+
+def _is_argument_or_coefficient(s: str, start: int, end: int) -> bool:
+    """그 수가 함수 인자(`f(3)`)나 계수(`3x`) 자리인가 — 학생이 그 값을 답으로 낸 것이 아니다."""
+    j = start - 1
+    while j >= 0 and s[j] == " ":
+        j -= 1
+    if j >= 1 and s[j] == "(" and s[j - 1].isascii() and s[j - 1].isalpha():
+        return True
+    k = end
+    while k < len(s) and s[k] == " ":
+        k += 1
+    return k < len(s) and s[k].isascii() and s[k].isalpha()
+
+
 def _student_said(student_texts: Sequence[str], answer: str) -> bool:
-    """이번 문제의 학생 입력 중 정답이 든 것이 있었나(되짚기 판정 · 1글자 수 정답은 수 경계로)."""
+    """이번 문제의 학생 입력 중 정답 값을 낸 것이 있었나(되짚기 판정).
+
+    - 수 정답: 수 경계·부호 경계로 맞추되(1글자 정답 포함) 함수 인자·계수 자리는 뺀다.
+    - 식 정답: 글자 축(M1 규칙)으로 본다.
+    - 두 경우 모두 값 축(계산하면 정답이 되는 식)도 본다.
+    """
     norm_answer = _norm(answer)
     is_number = _NUMBER_ANSWER.fullmatch(norm_answer) is not None
     for text in student_texts:
-        if exposure_axis(text, answer) is not None:
+        if scan_value_exposure(text, answer).outcome is ValueExposure.exposed:
             return True
-        if is_number and _number_in(text, norm_answer):
+        if is_number:
+            s = _light(text)
+            matches = _number_matches(s, norm_answer)
+            if any(not _is_argument_or_coefficient(s, m.start(), m.end()) for m in matches):
+                return True
+        elif _glyph_exposed(text, answer):
             return True
     return False
 
