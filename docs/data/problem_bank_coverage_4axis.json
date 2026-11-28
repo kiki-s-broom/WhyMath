@@ -1,0 +1,3130 @@
+{
+  "band_labels": [
+    "인지 [1.0,2.0)",
+    "절차 [2.0,3.0)",
+    "개념 [3.0,4.0)",
+    "숙달 [4.0,5.0]",
+    "미평가(난이도 없음)",
+    "범위밖(1.0~5.0 아님)"
+  ],
+  "band_totals": {
+    "개념 [3.0,4.0)": 3701,
+    "숙달 [4.0,5.0]": 234,
+    "인지 [1.0,2.0)": 4041,
+    "절차 [2.0,3.0)": 6766
+  },
+  "corpora": [
+    {
+      "name": "problem_bank_binomial_distribution_v0",
+      "parse_errors": 0,
+      "problems": 300,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_calculus1_integral_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_calculus2_trig_integral_v0",
+      "parse_errors": 0,
+      "problems": 80,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_combination_binomial_v0",
+      "parse_errors": 0,
+      "problems": 121,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_complex_number_arithmetic_v0",
+      "parse_errors": 0,
+      "problems": 900,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_conceptual_v0",
+      "parse_errors": 0,
+      "problems": 360,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_conic_section_focus_v0",
+      "parse_errors": 0,
+      "problems": 65,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_coordinate_geometry_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_discrete_ev_v0",
+      "parse_errors": 0,
+      "problems": 200,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_elementary_area_measure_v0",
+      "parse_errors": 0,
+      "problems": 270,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_elementary_division_remainder_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_elementary_gcd_lcm_v0",
+      "parse_errors": 0,
+      "problems": 600,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_elementary_rounding_v0",
+      "parse_errors": 0,
+      "problems": 600,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_elementary_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_elementary_volume_measure_v0",
+      "parse_errors": 0,
+      "problems": 300,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_generated_v0",
+      "parse_errors": 0,
+      "problems": 619,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_highschool_quotient_rule_v0",
+      "parse_errors": 0,
+      "problems": 200,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_killer_v0",
+      "parse_errors": 0,
+      "problems": 120,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_linear_inequality_system_v0",
+      "parse_errors": 0,
+      "problems": 600,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_matrix_ops_v0",
+      "parse_errors": 0,
+      "problems": 320,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_measurement_unit_conversion_v0",
+      "parse_errors": 0,
+      "problems": 180,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_middle_function_v0",
+      "parse_errors": 0,
+      "problems": 200,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_misconception_mc_v0",
+      "parse_errors": 0,
+      "problems": 1080,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_p3_calculus1_diff_v0",
+      "parse_errors": 0,
+      "problems": 504,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_p3_fill_v0",
+      "parse_errors": 0,
+      "problems": 204,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_permutation_combination_v0",
+      "parse_errors": 0,
+      "problems": 160,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_polynomial_arithmetic_v0",
+      "parse_errors": 0,
+      "problems": 1500,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_polynomial_factoring_v0",
+      "parse_errors": 0,
+      "problems": 600,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_probability_finite_v0",
+      "parse_errors": 0,
+      "problems": 34,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_probability_law_v0",
+      "parse_errors": 0,
+      "problems": 724,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_quad_ineq_v0",
+      "parse_errors": 0,
+      "problems": 200,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_radian_conversion_v0",
+      "parse_errors": 0,
+      "problems": 144,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_rephrased_v0",
+      "parse_errors": 0,
+      "problems": 421,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_sample_mean_distribution_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_sequence_sigma_v0",
+      "parse_errors": 0,
+      "problems": 132,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_university_calc1_chain_quotient_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_university_calc1_v0",
+      "parse_errors": 0,
+      "problems": 200,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_v1",
+      "parse_errors": 0,
+      "problems": 4,
+      "status": "적재됨"
+    },
+    {
+      "name": "problem_bank_vector_operations_v0",
+      "parse_errors": 0,
+      "problems": 400,
+      "status": "적재됨"
+    }
+  ],
+  "coverage_by_domain": {
+    "경우의 수": {
+      "covered": 6,
+      "total": 9
+    },
+    "공간도형과 공간좌표": {
+      "covered": 1,
+      "total": 5
+    },
+    "과제 탐구의 방법과": {
+      "covered": 0,
+      "total": 4
+    },
+    "과제 탐구의 이해": {
+      "covered": 0,
+      "total": 2
+    },
+    "과제탐구의 실행": {
+      "covered": 0,
+      "total": 4
+    },
+    "다항식": {
+      "covered": 6,
+      "total": 6
+    },
+    "도형과 측정": {
+      "covered": 20,
+      "total": 81
+    },
+    "도형의 방정식": {
+      "covered": 6,
+      "total": 14
+    },
+    "미분": {
+      "covered": 10,
+      "total": 10
+    },
+    "미분과 경제": {
+      "covered": 0,
+      "total": 4
+    },
+    "미분법": {
+      "covered": 3,
+      "total": 11
+    },
+    "방정식과 부등식": {
+      "covered": 9,
+      "total": 20
+    },
+    "벡터": {
+      "covered": 3,
+      "total": 5
+    },
+    "변화와 관계": {
+      "covered": 13,
+      "total": 37
+    },
+    "사회와 수학": {
+      "covered": 0,
+      "total": 4
+    },
+    "삼각함수": {
+      "covered": 2,
+      "total": 3
+    },
+    "생활과 수학": {
+      "covered": 1,
+      "total": 4
+    },
+    "수열": {
+      "covered": 6,
+      "total": 7
+    },
+    "수열의 극한": {
+      "covered": 3,
+      "total": 5
+    },
+    "수와 경제": {
+      "covered": 0,
+      "total": 5
+    },
+    "수와 연산": {
+      "covered": 12,
+      "total": 55
+    },
+    "예술과 수학": {
+      "covered": 0,
+      "total": 4
+    },
+    "예측과 최적화": {
+      "covered": 1,
+      "total": 4
+    },
+    "이미지 데이터 처리": {
+      "covered": 0,
+      "total": 3
+    },
+    "이차곡선": {
+      "covered": 3,
+      "total": 4
+    },
+    "인공지능과 빅데이터": {
+      "covered": 0,
+      "total": 3
+    },
+    "인공지능과 수학": {
+      "covered": 0,
+      "total": 2
+    },
+    "자료와 가능성": {
+      "covered": 4,
+      "total": 26
+    },
+    "자료의 분석": {
+      "covered": 0,
+      "total": 4
+    },
+    "자료의 수집과 정리": {
+      "covered": 0,
+      "total": 4
+    },
+    "적분": {
+      "covered": 4,
+      "total": 6
+    },
+    "적분법": {
+      "covered": 3,
+      "total": 7
+    },
+    "지수함수와 로그함수": {
+      "covered": 4,
+      "total": 8
+    },
+    "집합과 명제": {
+      "covered": 0,
+      "total": 13
+    },
+    "텍스트 데이터 처리": {
+      "covered": 0,
+      "total": 3
+    },
+    "통계": {
+      "covered": 3,
+      "total": 7
+    },
+    "통계와 통계적 문제": {
+      "covered": 0,
+      "total": 3
+    },
+    "통계적 탐구": {
+      "covered": 0,
+      "total": 2
+    },
+    "함수와 경제": {
+      "covered": 0,
+      "total": 6
+    },
+    "함수와 그래프": {
+      "covered": 5,
+      "total": 10
+    },
+    "함수의 극한과 연속": {
+      "covered": 1,
+      "total": 4
+    },
+    "행렬": {
+      "covered": 1,
+      "total": 4
+    },
+    "행렬과 경제": {
+      "covered": 0,
+      "total": 3
+    },
+    "확률": {
+      "covered": 6,
+      "total": 6
+    },
+    "환경과 수학": {
+      "covered": 0,
+      "total": 4
+    }
+  },
+  "coverage_by_school_type": {
+    "고등학교": {
+      "covered": 90,
+      "total": 254
+    },
+    "대학교": {
+      "covered": 3,
+      "total": 409
+    },
+    "중학교": {
+      "covered": 24,
+      "total": 60
+    },
+    "초등학교": {
+      "covered": 22,
+      "total": 121
+    }
+  },
+  "coverage_by_subject": {
+    "10공수1": {
+      "covered": 14,
+      "total": 19
+    },
+    "10공수2": {
+      "covered": 7,
+      "total": 20
+    },
+    "10기수1": {
+      "covered": 5,
+      "total": 17
+    },
+    "10기수2": {
+      "covered": 4,
+      "total": 17
+    },
+    "12경수": {
+      "covered": 0,
+      "total": 18
+    },
+    "12기하": {
+      "covered": 7,
+      "total": 14
+    },
+    "12대수": {
+      "covered": 12,
+      "total": 18
+    },
+    "12미적Ⅰ": {
+      "covered": 15,
+      "total": 20
+    },
+    "12미적Ⅱ": {
+      "covered": 9,
+      "total": 23
+    },
+    "12수과": {
+      "covered": 0,
+      "total": 10
+    },
+    "12수문": {
+      "covered": 1,
+      "total": 16
+    },
+    "12실통": {
+      "covered": 0,
+      "total": 13
+    },
+    "12인수": {
+      "covered": 1,
+      "total": 15
+    },
+    "12직수": {
+      "covered": 3,
+      "total": 18
+    },
+    "12확통": {
+      "covered": 12,
+      "total": 16
+    },
+    "2수": {
+      "covered": 1,
+      "total": 29
+    },
+    "4수": {
+      "covered": 5,
+      "total": 47
+    },
+    "6수": {
+      "covered": 16,
+      "total": 45
+    },
+    "9수": {
+      "covered": 24,
+      "total": 60
+    }
+  },
+  "covered_codes": [
+    "[10공수1-01-01]",
+    "[10공수1-01-02]",
+    "[10공수1-01-03]",
+    "[10공수1-02-01]",
+    "[10공수1-02-02]",
+    "[10공수1-02-03]",
+    "[10공수1-02-05]",
+    "[10공수1-02-07]",
+    "[10공수1-02-09]",
+    "[10공수1-02-11]",
+    "[10공수1-03-01]",
+    "[10공수1-03-02]",
+    "[10공수1-03-03]",
+    "[10공수1-04-02]",
+    "[10공수2-01-01]",
+    "[10공수2-01-02]",
+    "[10공수2-01-04]",
+    "[10공수2-01-06]",
+    "[10공수2-03-02]",
+    "[10공수2-03-03]",
+    "[10공수2-03-04]",
+    "[10기수1-01-01]",
+    "[10기수1-01-02]",
+    "[10기수1-01-03]",
+    "[10기수1-02-02]",
+    "[10기수1-02-07]",
+    "[10기수2-01-04]",
+    "[10기수2-01-06]",
+    "[10기수2-03-02]",
+    "[10기수2-03-03]",
+    "[12기하01-01]",
+    "[12기하01-02]",
+    "[12기하01-03]",
+    "[12기하02-05]",
+    "[12기하03-01]",
+    "[12기하03-02]",
+    "[12기하03-03]",
+    "[12대수01-01]",
+    "[12대수01-04]",
+    "[12대수01-05]",
+    "[12대수01-08]",
+    "[12대수02-01]",
+    "[12대수02-02]",
+    "[12대수03-01]",
+    "[12대수03-02]",
+    "[12대수03-03]",
+    "[12대수03-04]",
+    "[12대수03-05]",
+    "[12대수03-06]",
+    "[12미적Ⅰ-01-01]",
+    "[12미적Ⅰ-02-01]",
+    "[12미적Ⅰ-02-02]",
+    "[12미적Ⅰ-02-03]",
+    "[12미적Ⅰ-02-04]",
+    "[12미적Ⅰ-02-05]",
+    "[12미적Ⅰ-02-06]",
+    "[12미적Ⅰ-02-07]",
+    "[12미적Ⅰ-02-08]",
+    "[12미적Ⅰ-02-09]",
+    "[12미적Ⅰ-02-10]",
+    "[12미적Ⅰ-03-02]",
+    "[12미적Ⅰ-03-04]",
+    "[12미적Ⅰ-03-05]",
+    "[12미적Ⅰ-03-06]",
+    "[12미적Ⅱ-01-03]",
+    "[12미적Ⅱ-01-04]",
+    "[12미적Ⅱ-01-05]",
+    "[12미적Ⅱ-02-02]",
+    "[12미적Ⅱ-02-04]",
+    "[12미적Ⅱ-02-05]",
+    "[12미적Ⅱ-03-01]",
+    "[12미적Ⅱ-03-05]",
+    "[12미적Ⅱ-03-07]",
+    "[12수문02-02]",
+    "[12인수04-01]",
+    "[12직수02-05]",
+    "[12직수03-04]",
+    "[12직수04-01]",
+    "[12확통01-01]",
+    "[12확통01-02]",
+    "[12확통01-03]",
+    "[12확통02-01]",
+    "[12확통02-02]",
+    "[12확통02-03]",
+    "[12확통02-04]",
+    "[12확통02-05]",
+    "[12확통02-06]",
+    "[12확통03-02]",
+    "[12확통03-03]",
+    "[12확통03-06]",
+    "[2수01-06]",
+    "[4수01-07]",
+    "[4수03-16]",
+    "[4수03-18]",
+    "[4수03-21]",
+    "[4수03-25]",
+    "[6수01-03]",
+    "[6수01-04]",
+    "[6수01-05]",
+    "[6수01-06]",
+    "[6수01-13]",
+    "[6수03-01]",
+    "[6수03-11]",
+    "[6수03-12]",
+    "[6수03-13]",
+    "[6수03-14]",
+    "[6수03-15]",
+    "[6수03-16]",
+    "[6수03-17]",
+    "[6수03-18]",
+    "[6수03-19]",
+    "[6수04-01]",
+    "[9수01-02]",
+    "[9수01-03]",
+    "[9수01-04]",
+    "[9수01-05]",
+    "[9수01-07]",
+    "[9수02-03]",
+    "[9수02-04]",
+    "[9수02-05]",
+    "[9수02-07]",
+    "[9수02-08]",
+    "[9수02-09]",
+    "[9수02-10]",
+    "[9수02-11]",
+    "[9수02-12]",
+    "[9수02-14]",
+    "[9수02-19]",
+    "[9수02-20]",
+    "[9수03-05]",
+    "[9수03-06]",
+    "[9수03-08]",
+    "[9수03-12]",
+    "[9수03-13]",
+    "[9수04-01]",
+    "[9수04-04]"
+  ],
+  "format_totals": {
+    "객관식": 1696,
+    "단답형": 13046
+  },
+  "honest_accounting": {
+    "other_revision_only_codes": {},
+    "parse_error_lines": 0,
+    "parse_errors": [],
+    "problems_without_difficulty": 0,
+    "problems_without_problem_type": 0,
+    "problems_without_question_format": 0,
+    "problems_without_standard_codes": 0,
+    "problems_without_unit_codes": 0,
+    "unknown_standard_codes": {}
+  },
+  "per_corpus_bands": {
+    "problem_bank_binomial_distribution_v0": {
+      "개념 [3.0,4.0)": 300
+    },
+    "problem_bank_calculus1_integral_v0": {
+      "개념 [3.0,4.0)": 400
+    },
+    "problem_bank_calculus2_trig_integral_v0": {
+      "개념 [3.0,4.0)": 80
+    },
+    "problem_bank_combination_binomial_v0": {
+      "절차 [2.0,3.0)": 121
+    },
+    "problem_bank_complex_number_arithmetic_v0": {
+      "절차 [2.0,3.0)": 900
+    },
+    "problem_bank_conceptual_v0": {
+      "개념 [3.0,4.0)": 224,
+      "절차 [2.0,3.0)": 136
+    },
+    "problem_bank_conic_section_focus_v0": {
+      "개념 [3.0,4.0)": 65
+    },
+    "problem_bank_coordinate_geometry_v0": {
+      "절차 [2.0,3.0)": 400
+    },
+    "problem_bank_discrete_ev_v0": {
+      "절차 [2.0,3.0)": 200
+    },
+    "problem_bank_elementary_area_measure_v0": {
+      "인지 [1.0,2.0)": 70,
+      "절차 [2.0,3.0)": 200
+    },
+    "problem_bank_elementary_division_remainder_v0": {
+      "인지 [1.0,2.0)": 400
+    },
+    "problem_bank_elementary_gcd_lcm_v0": {
+      "인지 [1.0,2.0)": 600
+    },
+    "problem_bank_elementary_rounding_v0": {
+      "인지 [1.0,2.0)": 600
+    },
+    "problem_bank_elementary_v0": {
+      "인지 [1.0,2.0)": 400
+    },
+    "problem_bank_elementary_volume_measure_v0": {
+      "인지 [1.0,2.0)": 50,
+      "절차 [2.0,3.0)": 250
+    },
+    "problem_bank_generated_v0": {
+      "개념 [3.0,4.0)": 236,
+      "숙달 [4.0,5.0]": 21,
+      "인지 [1.0,2.0)": 129,
+      "절차 [2.0,3.0)": 233
+    },
+    "problem_bank_highschool_quotient_rule_v0": {
+      "개념 [3.0,4.0)": 200
+    },
+    "problem_bank_killer_v0": {
+      "숙달 [4.0,5.0]": 120
+    },
+    "problem_bank_linear_inequality_system_v0": {
+      "절차 [2.0,3.0)": 600
+    },
+    "problem_bank_matrix_ops_v0": {
+      "절차 [2.0,3.0)": 320
+    },
+    "problem_bank_measurement_unit_conversion_v0": {
+      "인지 [1.0,2.0)": 157,
+      "절차 [2.0,3.0)": 23
+    },
+    "problem_bank_middle_function_v0": {
+      "인지 [1.0,2.0)": 200
+    },
+    "problem_bank_misconception_mc_v0": {
+      "개념 [3.0,4.0)": 605,
+      "절차 [2.0,3.0)": 475
+    },
+    "problem_bank_p3_calculus1_diff_v0": {
+      "개념 [3.0,4.0)": 204,
+      "숙달 [4.0,5.0]": 60,
+      "절차 [2.0,3.0)": 240
+    },
+    "problem_bank_p3_fill_v0": {
+      "개념 [3.0,4.0)": 108,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 84
+    },
+    "problem_bank_permutation_combination_v0": {
+      "인지 [1.0,2.0)": 84,
+      "절차 [2.0,3.0)": 76
+    },
+    "problem_bank_polynomial_arithmetic_v0": {
+      "인지 [1.0,2.0)": 1200,
+      "절차 [2.0,3.0)": 300
+    },
+    "problem_bank_polynomial_factoring_v0": {
+      "절차 [2.0,3.0)": 600
+    },
+    "problem_bank_probability_finite_v0": {
+      "개념 [3.0,4.0)": 8,
+      "절차 [2.0,3.0)": 26
+    },
+    "problem_bank_probability_law_v0": {
+      "개념 [3.0,4.0)": 300,
+      "절차 [2.0,3.0)": 424
+    },
+    "problem_bank_quad_ineq_v0": {
+      "절차 [2.0,3.0)": 200
+    },
+    "problem_bank_radian_conversion_v0": {
+      "절차 [2.0,3.0)": 144
+    },
+    "problem_bank_rephrased_v0": {
+      "개념 [3.0,4.0)": 171,
+      "숙달 [4.0,5.0]": 21,
+      "인지 [1.0,2.0)": 82,
+      "절차 [2.0,3.0)": 147
+    },
+    "problem_bank_sample_mean_distribution_v0": {
+      "개념 [3.0,4.0)": 200,
+      "절차 [2.0,3.0)": 200
+    },
+    "problem_bank_sequence_sigma_v0": {
+      "절차 [2.0,3.0)": 132
+    },
+    "problem_bank_university_calc1_chain_quotient_v0": {
+      "개념 [3.0,4.0)": 400
+    },
+    "problem_bank_university_calc1_v0": {
+      "개념 [3.0,4.0)": 200
+    },
+    "problem_bank_v1": {
+      "절차 [2.0,3.0)": 4
+    },
+    "problem_bank_vector_operations_v0": {
+      "인지 [1.0,2.0)": 69,
+      "절차 [2.0,3.0)": 331
+    }
+  },
+  "per_corpus_formats": {
+    "problem_bank_binomial_distribution_v0": {
+      "단답형": 300
+    },
+    "problem_bank_calculus1_integral_v0": {
+      "단답형": 400
+    },
+    "problem_bank_calculus2_trig_integral_v0": {
+      "단답형": 80
+    },
+    "problem_bank_combination_binomial_v0": {
+      "단답형": 121
+    },
+    "problem_bank_complex_number_arithmetic_v0": {
+      "단답형": 900
+    },
+    "problem_bank_conceptual_v0": {
+      "객관식": 360
+    },
+    "problem_bank_conic_section_focus_v0": {
+      "단답형": 65
+    },
+    "problem_bank_coordinate_geometry_v0": {
+      "단답형": 400
+    },
+    "problem_bank_discrete_ev_v0": {
+      "단답형": 200
+    },
+    "problem_bank_elementary_area_measure_v0": {
+      "단답형": 270
+    },
+    "problem_bank_elementary_division_remainder_v0": {
+      "단답형": 400
+    },
+    "problem_bank_elementary_gcd_lcm_v0": {
+      "단답형": 600
+    },
+    "problem_bank_elementary_rounding_v0": {
+      "단답형": 600
+    },
+    "problem_bank_elementary_v0": {
+      "단답형": 400
+    },
+    "problem_bank_elementary_volume_measure_v0": {
+      "단답형": 300
+    },
+    "problem_bank_generated_v0": {
+      "객관식": 95,
+      "단답형": 524
+    },
+    "problem_bank_highschool_quotient_rule_v0": {
+      "단답형": 200
+    },
+    "problem_bank_killer_v0": {
+      "단답형": 120
+    },
+    "problem_bank_linear_inequality_system_v0": {
+      "단답형": 600
+    },
+    "problem_bank_matrix_ops_v0": {
+      "단답형": 320
+    },
+    "problem_bank_measurement_unit_conversion_v0": {
+      "단답형": 180
+    },
+    "problem_bank_middle_function_v0": {
+      "단답형": 200
+    },
+    "problem_bank_misconception_mc_v0": {
+      "객관식": 1080
+    },
+    "problem_bank_p3_calculus1_diff_v0": {
+      "객관식": 84,
+      "단답형": 420
+    },
+    "problem_bank_p3_fill_v0": {
+      "단답형": 204
+    },
+    "problem_bank_permutation_combination_v0": {
+      "단답형": 160
+    },
+    "problem_bank_polynomial_arithmetic_v0": {
+      "단답형": 1500
+    },
+    "problem_bank_polynomial_factoring_v0": {
+      "단답형": 600
+    },
+    "problem_bank_probability_finite_v0": {
+      "단답형": 34
+    },
+    "problem_bank_probability_law_v0": {
+      "단답형": 724
+    },
+    "problem_bank_quad_ineq_v0": {
+      "단답형": 200
+    },
+    "problem_bank_radian_conversion_v0": {
+      "단답형": 144
+    },
+    "problem_bank_rephrased_v0": {
+      "객관식": 76,
+      "단답형": 345
+    },
+    "problem_bank_sample_mean_distribution_v0": {
+      "단답형": 400
+    },
+    "problem_bank_sequence_sigma_v0": {
+      "단답형": 132
+    },
+    "problem_bank_university_calc1_chain_quotient_v0": {
+      "단답형": 400
+    },
+    "problem_bank_university_calc1_v0": {
+      "단답형": 200
+    },
+    "problem_bank_v1": {
+      "객관식": 1,
+      "단답형": 3
+    },
+    "problem_bank_vector_operations_v0": {
+      "단답형": 400
+    }
+  },
+  "problem_types": {
+    "catalog": [
+      "ptype.condition-satisfaction",
+      "ptype.construct-object",
+      "ptype.count-solutions",
+      "ptype.determine-coefficient",
+      "ptype.enumerate-cases",
+      "ptype.evaluate-expression",
+      "ptype.existence-decision",
+      "ptype.generalize-pattern",
+      "ptype.infer-relationship",
+      "ptype.model-word-problem",
+      "ptype.optimize-constrained",
+      "ptype.optimize-extremum",
+      "ptype.prove-statement",
+      "ptype.sketch-graph",
+      "ptype.solve-for-unknown",
+      "ptype.transform-expression",
+      "ptype.verify-claim"
+    ],
+    "catalog_count": 17,
+    "type_totals": {
+      "ptype.condition-satisfaction": 800,
+      "ptype.count-solutions": 145,
+      "ptype.determine-coefficient": 201,
+      "ptype.enumerate-cases": 272,
+      "ptype.evaluate-expression": 11269,
+      "ptype.generalize-pattern": 54,
+      "ptype.model-word-problem": 24,
+      "ptype.optimize-extremum": 349,
+      "ptype.solve-for-unknown": 764,
+      "ptype.transform-expression": 600,
+      "ptype.verify-claim": 264
+    },
+    "type_unit_matrix": {
+      "ptype.condition-satisfaction": {
+        "LINEAR-INEQUALITY-SYSTEM": 600,
+        "QUAD-INEQ-BOUNDARY": 200
+      },
+      "ptype.count-solutions": {
+        "DISC-COUNT": 24,
+        "DOMAIN-EXCLUDE": 24,
+        "EXTREMUM-COUNT": 24,
+        "P3-CALC1-DIFF-EQUATION-APPLICATION": 42,
+        "P3-CALC1-DIFF-MEAN-VALUE-THEOREM": 6,
+        "QUAD-EQ": 1,
+        "ROOT-LOSS-DIVIDE": 24
+      },
+      "ptype.determine-coefficient": {
+        "LINE-EQUATION": 200,
+        "QUAD-FN": 1
+      },
+      "ptype.enumerate-cases": {
+        "COMBINATION-COUNT": 24,
+        "COUNT-FINITE-ENUM": 8,
+        "PERMUTATION": 40,
+        "REPEATED-COMBINATION": 56,
+        "SAME-ITEM-PERM": 24,
+        "SUM-PRODUCT-PRINCIPLE": 120
+      },
+      "ptype.evaluate-expression": {
+        "ABS-VALUE": 24,
+        "AREA-PERIMETER": 24,
+        "AREA-UNIT-CONVERSION": 70,
+        "ARITH-SEQ": 120,
+        "ARITH-SUM": 45,
+        "BINOMIAL-COEFFICIENT": 65,
+        "BINOMIAL-DISTRIBUTION": 300,
+        "CALC-CHAIN": 24,
+        "CALC-PRODUCT": 24,
+        "CALC1-CHAIN-RULE": 200,
+        "CALC1-INTEGRAL": 400,
+        "CALC1-PRODUCT-RULE": 200,
+        "CALC1-QUOTIENT-RULE": 200,
+        "CALC2-TRIG-INTEGRAL": 80,
+        "CIRCLE-AREA": 24,
+        "CIRCLE-CIRCUMFERENCE": 50,
+        "CIRCLE-RADIUS": 24,
+        "COMBINE-UNLIKE": 24,
+        "COMPLETE-SQUARE": 24,
+        "COMPLEX-NUMBER-ARITHMETIC": 900,
+        "CONE-VOLUME": 24,
+        "CONIC-SECTION-FOCUS": 65,
+        "CONJUGATE-PRODUCT": 24,
+        "DECIMAL-MULT": 24,
+        "DIFF-SQUARES": 24,
+        "DISCRETE-EXPECTED-VALUE": 200,
+        "DISTRIBUTE-PARTIAL": 24,
+        "ELEM-ADDSUB-2DIGIT": 400,
+        "ELEMENTARY-ROUNDING": 600,
+        "EXP-PRODUCT": 24,
+        "EXP-ZERO": 24,
+        "FRACTION-ADD": 24,
+        "FRACTION-CANCEL": 24,
+        "FUNC-COMPOSE": 24,
+        "FUNC-TRANSLATE": 24,
+        "GCD-LCM": 624,
+        "GEO-SEQ": 60,
+        "GEO-SUM": 20,
+        "HS-CALC2-QUOTIENT-RULE": 200,
+        "LINEAR-FUNC-VALUE": 200,
+        "LOG-DIST": 24,
+        "MATRIX-OPS": 320,
+        "MEASUREMENT-UNIT-CONVERSION": 180,
+        "MIDPOINT-NO-HALF": 24,
+        "MIXED-MULT": 24,
+        "NEG-DISTRIBUTE": 24,
+        "NEG-EVEN-POWER": 24,
+        "NEG-PRODUCT": 24,
+        "NEG-SQUARE": 24,
+        "P3-CALC1-DIFF-COEFFICIENT": 36,
+        "P3-CALC1-DIFF-DIFFERENTIABILITY": 36,
+        "P3-CALC1-DIFF-MEAN-VALUE-THEOREM": 12,
+        "P3-CALC1-DIFF-POLYNOMIAL-RULES": 49,
+        "P3-CALC1-DIFF-POWER": 47,
+        "P3-CALC1-DIFF-TANGENT-LINE": 39,
+        "P3-CALC1-DIFF-VELOCITY-ACCELERATION": 45,
+        "POINT-DISTANCE": 200,
+        "POLY-PRODUCT": 24,
+        "POLY-ROOT": 120,
+        "POLYGON-ANGLE-SUM": 24,
+        "POLYNOMIAL-ARITHMETIC": 1500,
+        "POSITION-VECTOR": 200,
+        "POWER-OF-POWER": 24,
+        "POWER-SUM": 32,
+        "PROB-FINITE-ENUM": 26,
+        "PROB-INDEPENDENT-TRIAL": 24,
+        "PROBABILITY-ADDITION-LAW": 300,
+        "PROBABILITY-COMPLEMENT-LAW": 124,
+        "PROBABILITY-MULTIPLICATION-LAW": 300,
+        "RADIAN-CONVERSION": 144,
+        "RECT-PRISM-SURFACE-AREA": 200,
+        "RECT-PRISM-VOLUME": 200,
+        "REMAINDER-THEOREM": 24,
+        "SAMPLE-MEAN-DISTRIBUTION": 400,
+        "SCALE-AREA": 24,
+        "SCALE-VOLUME": 24,
+        "SIGMA-LINEARITY": 100,
+        "SQRT-POS": 24,
+        "SQRT-SUM": 24,
+        "SQUARE-DIFF": 24,
+        "SUBTRACT-NEG": 24,
+        "TRAPEZOID-AREA": 24,
+        "TRIG-ADD": 24,
+        "TRIG-PERIOD": 24,
+        "TRIG-VAL": 26,
+        "TWO-DIGIT-DIVISION": 400,
+        "VECTOR-LINEAR-COMBO": 200,
+        "VIETA-SUM": 24,
+        "VOLUME-UNIT-CONVERSION": 50
+      },
+      "ptype.generalize-pattern": {
+        "IND-SEQ": 30,
+        "P3-CALC1-DIFF-POWER-PATTERN": 24
+      },
+      "ptype.model-word-problem": {
+        "P3-CALC1-DIFF-MOTION-WORD": 24
+      },
+      "ptype.optimize-extremum": {
+        "CALC-EXTREMUM": 77,
+        "CALC-EXTREMUM-IRR": 30,
+        "CALC-EXTREMUM-MC": 56,
+        "CALC-EXTREMUM-VALUE": 74,
+        "P3-CALC1-DIFF-EQUATION-APPLICATION": 30,
+        "P3-CALC1-DIFF-GRAPH-SHAPE": 54,
+        "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM": 28
+      },
+      "ptype.solve-for-unknown": {
+        "CALC-TANGENT": 80,
+        "EXP-EQ": 46,
+        "LOG-EQ": 34,
+        "P3-CALC1-DIFF-COEFFICIENT": 12,
+        "P3-CALC1-DIFF-DIFFERENTIABILITY": 24,
+        "P3-CALC1-DIFF-GRAPH-SHAPE": 18,
+        "P3-CALC1-DIFF-MEAN-VALUE-THEOREM": 54,
+        "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM": 20,
+        "P3-CALC1-DIFF-POLYNOMIAL-RULES": 23,
+        "P3-CALC1-DIFF-POWER": 25,
+        "P3-CALC1-DIFF-TANGENT-LINE": 33,
+        "P3-CALC1-DIFF-VELOCITY-ACCELERATION": 27,
+        "QUAD-EQ": 332,
+        "TRANSPOSE-SIGN": 24,
+        "TRIG-EQ": 12
+      },
+      "ptype.transform-expression": {
+        "POLYNOMIAL-FACTORING": 600
+      },
+      "ptype.verify-claim": {
+        "DIFFERENTIABILITY": 24,
+        "FUNC-INVERSE": 24,
+        "GEO-SERIES-CONV": 24,
+        "GEOM-SIMILAR-CONGRUENT": 24,
+        "INEQ-SIGN-FLIP": 24,
+        "LIMIT-VALUE": 24,
+        "PROB-CONDITIONAL": 24,
+        "PROB-INDEPENDENCE": 24,
+        "SERIES-CONV": 24,
+        "STAT-MEAN-MEDIAN": 24,
+        "VEC-DOT-PRODUCT": 24
+      }
+    },
+    "zero_coverage_type_count": 6,
+    "zero_coverage_types": [
+      "ptype.construct-object",
+      "ptype.existence-decision",
+      "ptype.infer-relationship",
+      "ptype.optimize-constrained",
+      "ptype.prove-statement",
+      "ptype.sketch-graph"
+    ]
+  },
+  "problems_per_covered_code": {
+    "[10공수1-01-01]": 600,
+    "[10공수1-01-02]": 24,
+    "[10공수1-01-03]": 300,
+    "[10공수1-02-01]": 900,
+    "[10공수1-02-02]": 27,
+    "[10공수1-02-03]": 84,
+    "[10공수1-02-05]": 1,
+    "[10공수1-02-07]": 60,
+    "[10공수1-02-09]": 300,
+    "[10공수1-02-11]": 200,
+    "[10공수1-03-01]": 120,
+    "[10공수1-03-02]": 40,
+    "[10공수1-03-03]": 24,
+    "[10공수1-04-02]": 320,
+    "[10공수2-01-01]": 200,
+    "[10공수2-01-02]": 200,
+    "[10공수2-01-04]": 24,
+    "[10공수2-01-06]": 24,
+    "[10공수2-03-02]": 24,
+    "[10공수2-03-03]": 24,
+    "[10공수2-03-04]": 24,
+    "[10기수1-01-01]": 600,
+    "[10기수1-01-02]": 300,
+    "[10기수1-01-03]": 300,
+    "[10기수1-02-02]": 24,
+    "[10기수1-02-07]": 300,
+    "[10기수2-01-04]": 24,
+    "[10기수2-01-06]": 24,
+    "[10기수2-03-02]": 24,
+    "[10기수2-03-03]": 24,
+    "[12기하01-01]": 25,
+    "[12기하01-02]": 20,
+    "[12기하01-03]": 20,
+    "[12기하02-05]": 24,
+    "[12기하03-01]": 200,
+    "[12기하03-02]": 200,
+    "[12기하03-03]": 24,
+    "[12대수01-01]": 24,
+    "[12대수01-04]": 24,
+    "[12대수01-05]": 24,
+    "[12대수01-08]": 80,
+    "[12대수02-01]": 144,
+    "[12대수02-02]": 62,
+    "[12대수03-01]": 48,
+    "[12대수03-02]": 165,
+    "[12대수03-03]": 80,
+    "[12대수03-04]": 100,
+    "[12대수03-05]": 32,
+    "[12대수03-06]": 30,
+    "[12미적Ⅰ-01-01]": 24,
+    "[12미적Ⅰ-02-01]": 224,
+    "[12미적Ⅰ-02-02]": 84,
+    "[12미적Ⅰ-02-03]": 96,
+    "[12미적Ⅰ-02-04]": 96,
+    "[12미적Ⅰ-02-05]": 72,
+    "[12미적Ⅰ-02-06]": 72,
+    "[12미적Ⅰ-02-07]": 309,
+    "[12미적Ⅰ-02-08]": 72,
+    "[12미적Ⅰ-02-09]": 72,
+    "[12미적Ⅰ-02-10]": 96,
+    "[12미적Ⅰ-03-02]": 100,
+    "[12미적Ⅰ-03-04]": 100,
+    "[12미적Ⅰ-03-05]": 100,
+    "[12미적Ⅰ-03-06]": 100,
+    "[12미적Ⅱ-01-03]": 24,
+    "[12미적Ⅱ-01-04]": 24,
+    "[12미적Ⅱ-01-05]": 24,
+    "[12미적Ⅱ-02-02]": 24,
+    "[12미적Ⅱ-02-04]": 200,
+    "[12미적Ⅱ-02-05]": 24,
+    "[12미적Ⅱ-03-01]": 50,
+    "[12미적Ⅱ-03-05]": 15,
+    "[12미적Ⅱ-03-07]": 15,
+    "[12수문02-02]": 24,
+    "[12인수04-01]": 24,
+    "[12직수02-05]": 24,
+    "[12직수03-04]": 24,
+    "[12직수04-01]": 48,
+    "[12확통01-01]": 32,
+    "[12확통01-02]": 56,
+    "[12확통01-03]": 65,
+    "[12확통02-01]": 50,
+    "[12확통02-02]": 300,
+    "[12확통02-03]": 124,
+    "[12확통02-04]": 48,
+    "[12확통02-05]": 24,
+    "[12확통02-06]": 300,
+    "[12확통03-02]": 200,
+    "[12확통03-03]": 300,
+    "[12확통03-06]": 400,
+    "[2수01-06]": 400,
+    "[4수01-07]": 400,
+    "[4수03-16]": 120,
+    "[4수03-18]": 30,
+    "[4수03-21]": 30,
+    "[4수03-25]": 24,
+    "[6수01-03]": 600,
+    "[6수01-04]": 300,
+    "[6수01-05]": 300,
+    "[6수01-06]": 24,
+    "[6수01-13]": 24,
+    "[6수03-01]": 24,
+    "[6수03-11]": 24,
+    "[6수03-12]": 70,
+    "[6수03-13]": 24,
+    "[6수03-14]": 24,
+    "[6수03-15]": 50,
+    "[6수03-16]": 24,
+    "[6수03-17]": 200,
+    "[6수03-18]": 50,
+    "[6수03-19]": 200,
+    "[6수04-01]": 24,
+    "[9수01-02]": 24,
+    "[9수01-03]": 72,
+    "[9수01-04]": 48,
+    "[9수01-05]": 48,
+    "[9수01-07]": 72,
+    "[9수02-03]": 24,
+    "[9수02-04]": 24,
+    "[9수02-05]": 24,
+    "[9수02-07]": 24,
+    "[9수02-08]": 120,
+    "[9수02-09]": 24,
+    "[9수02-10]": 48,
+    "[9수02-11]": 24,
+    "[9수02-12]": 24,
+    "[9수02-14]": 200,
+    "[9수02-19]": 96,
+    "[9수02-20]": 378,
+    "[9수03-05]": 24,
+    "[9수03-06]": 24,
+    "[9수03-08]": 24,
+    "[9수03-12]": 48,
+    "[9수03-13]": 24,
+    "[9수04-01]": 24,
+    "[9수04-04]": 24
+  },
+  "problems_per_subject": {
+    "10공수1": 3000,
+    "10공수2": 520,
+    "10기수1": 1524,
+    "10기수2": 96,
+    "12기하": 513,
+    "12대수": 813,
+    "12미적Ⅰ": 1617,
+    "12미적Ⅱ": 400,
+    "12수문": 24,
+    "12인수": 24,
+    "12직수": 96,
+    "12확통": 1899,
+    "2수": 400,
+    "4수": 604,
+    "6수": 1962,
+    "9수": 1466
+  },
+  "revision": "2022 개정",
+  "standards": {
+    "coverage_rate": 0.31264367816091954,
+    "covered_code_count": 136,
+    "record_count": 895,
+    "target_codes_total": 435,
+    "target_revision": "2022 개정",
+    "unique_code_count": 742,
+    "unique_codes_by_revision": {
+      "2015 개정": 460,
+      "2022 개정": 435
+    },
+    "zero_coverage_code_count": 299
+  },
+  "total_problems": 14742,
+  "unit_band_matrix": {
+    "ABS-VALUE": {
+      "개념 [3.0,4.0)": 13,
+      "절차 [2.0,3.0)": 11
+    },
+    "AREA-PERIMETER": {
+      "개념 [3.0,4.0)": 10,
+      "절차 [2.0,3.0)": 14
+    },
+    "AREA-UNIT-CONVERSION": {
+      "인지 [1.0,2.0)": 70
+    },
+    "ARITH-SEQ": {
+      "인지 [1.0,2.0)": 54,
+      "절차 [2.0,3.0)": 66
+    },
+    "ARITH-SUM": {
+      "인지 [1.0,2.0)": 7,
+      "절차 [2.0,3.0)": 38
+    },
+    "BINOMIAL-COEFFICIENT": {
+      "절차 [2.0,3.0)": 65
+    },
+    "BINOMIAL-DISTRIBUTION": {
+      "개념 [3.0,4.0)": 300
+    },
+    "CALC-CHAIN": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "CALC-EXTREMUM": {
+      "개념 [3.0,4.0)": 69,
+      "숙달 [4.0,5.0]": 8
+    },
+    "CALC-EXTREMUM-IRR": {
+      "개념 [3.0,4.0)": 30
+    },
+    "CALC-EXTREMUM-MC": {
+      "개념 [3.0,4.0)": 44,
+      "숙달 [4.0,5.0]": 12
+    },
+    "CALC-EXTREMUM-VALUE": {
+      "개념 [3.0,4.0)": 62,
+      "숙달 [4.0,5.0]": 12
+    },
+    "CALC-PRODUCT": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "CALC-TANGENT": {
+      "개념 [3.0,4.0)": 70,
+      "숙달 [4.0,5.0]": 10
+    },
+    "CALC1-CHAIN-RULE": {
+      "개념 [3.0,4.0)": 200
+    },
+    "CALC1-INTEGRAL": {
+      "개념 [3.0,4.0)": 400
+    },
+    "CALC1-PRODUCT-RULE": {
+      "개념 [3.0,4.0)": 200
+    },
+    "CALC1-QUOTIENT-RULE": {
+      "개념 [3.0,4.0)": 200
+    },
+    "CALC2-TRIG-INTEGRAL": {
+      "개념 [3.0,4.0)": 80
+    },
+    "CIRCLE-AREA": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "CIRCLE-CIRCUMFERENCE": {
+      "절차 [2.0,3.0)": 50
+    },
+    "CIRCLE-RADIUS": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "COMBINATION-COUNT": {
+      "개념 [3.0,4.0)": 9,
+      "절차 [2.0,3.0)": 15
+    },
+    "COMBINE-UNLIKE": {
+      "개념 [3.0,4.0)": 8,
+      "절차 [2.0,3.0)": 16
+    },
+    "COMPLETE-SQUARE": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "COMPLEX-NUMBER-ARITHMETIC": {
+      "절차 [2.0,3.0)": 900
+    },
+    "CONE-VOLUME": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "CONIC-SECTION-FOCUS": {
+      "개념 [3.0,4.0)": 65
+    },
+    "CONJUGATE-PRODUCT": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "COUNT-FINITE-ENUM": {
+      "절차 [2.0,3.0)": 8
+    },
+    "DECIMAL-MULT": {
+      "개념 [3.0,4.0)": 11,
+      "절차 [2.0,3.0)": 13
+    },
+    "DIFF-SQUARES": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "DIFFERENTIABILITY": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "DISC-COUNT": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "DISCRETE-EXPECTED-VALUE": {
+      "절차 [2.0,3.0)": 200
+    },
+    "DISTRIBUTE-PARTIAL": {
+      "개념 [3.0,4.0)": 15,
+      "절차 [2.0,3.0)": 9
+    },
+    "DOMAIN-EXCLUDE": {
+      "개념 [3.0,4.0)": 17,
+      "절차 [2.0,3.0)": 7
+    },
+    "ELEM-ADDSUB-2DIGIT": {
+      "인지 [1.0,2.0)": 400
+    },
+    "ELEMENTARY-ROUNDING": {
+      "인지 [1.0,2.0)": 600
+    },
+    "EXP-EQ": {
+      "인지 [1.0,2.0)": 30,
+      "절차 [2.0,3.0)": 16
+    },
+    "EXP-PRODUCT": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "EXP-ZERO": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "EXTREMUM-COUNT": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "FRACTION-ADD": {
+      "개념 [3.0,4.0)": 11,
+      "절차 [2.0,3.0)": 13
+    },
+    "FRACTION-CANCEL": {
+      "개념 [3.0,4.0)": 18,
+      "절차 [2.0,3.0)": 6
+    },
+    "FUNC-COMPOSE": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "FUNC-INVERSE": {
+      "개념 [3.0,4.0)": 10,
+      "절차 [2.0,3.0)": 14
+    },
+    "FUNC-TRANSLATE": {
+      "개념 [3.0,4.0)": 17,
+      "절차 [2.0,3.0)": 7
+    },
+    "GCD-LCM": {
+      "개념 [3.0,4.0)": 13,
+      "인지 [1.0,2.0)": 600,
+      "절차 [2.0,3.0)": 11
+    },
+    "GEO-SEQ": {
+      "인지 [1.0,2.0)": 38,
+      "절차 [2.0,3.0)": 22
+    },
+    "GEO-SERIES-CONV": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "GEO-SUM": {
+      "절차 [2.0,3.0)": 20
+    },
+    "GEOM-SIMILAR-CONGRUENT": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "HS-CALC2-QUOTIENT-RULE": {
+      "개념 [3.0,4.0)": 200
+    },
+    "IND-SEQ": {
+      "인지 [1.0,2.0)": 30
+    },
+    "INEQ-SIGN-FLIP": {
+      "개념 [3.0,4.0)": 17,
+      "절차 [2.0,3.0)": 7
+    },
+    "LIMIT-VALUE": {
+      "개념 [3.0,4.0)": 20,
+      "절차 [2.0,3.0)": 4
+    },
+    "LINE-EQUATION": {
+      "절차 [2.0,3.0)": 200
+    },
+    "LINEAR-FUNC-VALUE": {
+      "인지 [1.0,2.0)": 200
+    },
+    "LINEAR-INEQUALITY-SYSTEM": {
+      "절차 [2.0,3.0)": 600
+    },
+    "LOG-DIST": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "LOG-EQ": {
+      "인지 [1.0,2.0)": 23,
+      "절차 [2.0,3.0)": 11
+    },
+    "MATRIX-OPS": {
+      "절차 [2.0,3.0)": 320
+    },
+    "MEASUREMENT-UNIT-CONVERSION": {
+      "인지 [1.0,2.0)": 157,
+      "절차 [2.0,3.0)": 23
+    },
+    "MIDPOINT-NO-HALF": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "MIXED-MULT": {
+      "개념 [3.0,4.0)": 10,
+      "절차 [2.0,3.0)": 14
+    },
+    "NEG-DISTRIBUTE": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "NEG-EVEN-POWER": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "NEG-PRODUCT": {
+      "개념 [3.0,4.0)": 13,
+      "절차 [2.0,3.0)": 11
+    },
+    "NEG-SQUARE": {
+      "개념 [3.0,4.0)": 13,
+      "절차 [2.0,3.0)": 11
+    },
+    "P3-CALC1-DIFF-COEFFICIENT": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-DIFFERENTIABILITY": {
+      "개념 [3.0,4.0)": 24,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-EQUATION-APPLICATION": {
+      "개념 [3.0,4.0)": 24,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-GRAPH-SHAPE": {
+      "개념 [3.0,4.0)": 36,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 24
+    },
+    "P3-CALC1-DIFF-MEAN-VALUE-THEOREM": {
+      "개념 [3.0,4.0)": 24,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-MONOTONICITY-EXTREMUM": {
+      "개념 [3.0,4.0)": 24,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "P3-CALC1-DIFF-MOTION-WORD": {
+      "개념 [3.0,4.0)": 24
+    },
+    "P3-CALC1-DIFF-POLYNOMIAL-RULES": {
+      "개념 [3.0,4.0)": 36,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-POWER": {
+      "개념 [3.0,4.0)": 36,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-POWER-PATTERN": {
+      "개념 [3.0,4.0)": 24
+    },
+    "P3-CALC1-DIFF-TANGENT-LINE": {
+      "개념 [3.0,4.0)": 24,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 36
+    },
+    "P3-CALC1-DIFF-VELOCITY-ACCELERATION": {
+      "개념 [3.0,4.0)": 24,
+      "숙달 [4.0,5.0]": 12,
+      "절차 [2.0,3.0)": 36
+    },
+    "PERMUTATION": {
+      "절차 [2.0,3.0)": 40
+    },
+    "POINT-DISTANCE": {
+      "절차 [2.0,3.0)": 200
+    },
+    "POLY-PRODUCT": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "POLY-ROOT": {
+      "숙달 [4.0,5.0]": 120
+    },
+    "POLYGON-ANGLE-SUM": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "POLYNOMIAL-ARITHMETIC": {
+      "인지 [1.0,2.0)": 1200,
+      "절차 [2.0,3.0)": 300
+    },
+    "POLYNOMIAL-FACTORING": {
+      "절차 [2.0,3.0)": 600
+    },
+    "POSITION-VECTOR": {
+      "인지 [1.0,2.0)": 69,
+      "절차 [2.0,3.0)": 131
+    },
+    "POWER-OF-POWER": {
+      "개념 [3.0,4.0)": 8,
+      "절차 [2.0,3.0)": 16
+    },
+    "POWER-SUM": {
+      "절차 [2.0,3.0)": 32
+    },
+    "PROB-CONDITIONAL": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "PROB-FINITE-ENUM": {
+      "개념 [3.0,4.0)": 8,
+      "절차 [2.0,3.0)": 18
+    },
+    "PROB-INDEPENDENCE": {
+      "개념 [3.0,4.0)": 18,
+      "절차 [2.0,3.0)": 6
+    },
+    "PROB-INDEPENDENT-TRIAL": {
+      "개념 [3.0,4.0)": 15,
+      "절차 [2.0,3.0)": 9
+    },
+    "PROBABILITY-ADDITION-LAW": {
+      "절차 [2.0,3.0)": 300
+    },
+    "PROBABILITY-COMPLEMENT-LAW": {
+      "절차 [2.0,3.0)": 124
+    },
+    "PROBABILITY-MULTIPLICATION-LAW": {
+      "개념 [3.0,4.0)": 300
+    },
+    "QUAD-EQ": {
+      "개념 [3.0,4.0)": 132,
+      "절차 [2.0,3.0)": 201
+    },
+    "QUAD-FN": {
+      "절차 [2.0,3.0)": 1
+    },
+    "QUAD-INEQ-BOUNDARY": {
+      "절차 [2.0,3.0)": 200
+    },
+    "RADIAN-CONVERSION": {
+      "절차 [2.0,3.0)": 144
+    },
+    "RECT-PRISM-SURFACE-AREA": {
+      "절차 [2.0,3.0)": 200
+    },
+    "RECT-PRISM-VOLUME": {
+      "절차 [2.0,3.0)": 200
+    },
+    "REMAINDER-THEOREM": {
+      "개념 [3.0,4.0)": 13,
+      "절차 [2.0,3.0)": 11
+    },
+    "REPEATED-COMBINATION": {
+      "절차 [2.0,3.0)": 56
+    },
+    "ROOT-LOSS-DIVIDE": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "SAME-ITEM-PERM": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "SAMPLE-MEAN-DISTRIBUTION": {
+      "개념 [3.0,4.0)": 200,
+      "절차 [2.0,3.0)": 200
+    },
+    "SCALE-AREA": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "SCALE-VOLUME": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "SERIES-CONV": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "SIGMA-LINEARITY": {
+      "절차 [2.0,3.0)": 100
+    },
+    "SQRT-POS": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "SQRT-SUM": {
+      "개념 [3.0,4.0)": 17,
+      "절차 [2.0,3.0)": 7
+    },
+    "SQUARE-DIFF": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "STAT-MEAN-MEDIAN": {
+      "개념 [3.0,4.0)": 5,
+      "절차 [2.0,3.0)": 19
+    },
+    "SUBTRACT-NEG": {
+      "개념 [3.0,4.0)": 13,
+      "절차 [2.0,3.0)": 11
+    },
+    "SUM-PRODUCT-PRINCIPLE": {
+      "인지 [1.0,2.0)": 84,
+      "절차 [2.0,3.0)": 36
+    },
+    "TRANSPOSE-SIGN": {
+      "개념 [3.0,4.0)": 14,
+      "절차 [2.0,3.0)": 10
+    },
+    "TRAPEZOID-AREA": {
+      "개념 [3.0,4.0)": 16,
+      "절차 [2.0,3.0)": 8
+    },
+    "TRIG-ADD": {
+      "개념 [3.0,4.0)": 18,
+      "절차 [2.0,3.0)": 6
+    },
+    "TRIG-EQ": {
+      "인지 [1.0,2.0)": 3,
+      "절차 [2.0,3.0)": 9
+    },
+    "TRIG-PERIOD": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "TRIG-VAL": {
+      "인지 [1.0,2.0)": 26
+    },
+    "TWO-DIGIT-DIVISION": {
+      "인지 [1.0,2.0)": 400
+    },
+    "VEC-DOT-PRODUCT": {
+      "개념 [3.0,4.0)": 23,
+      "절차 [2.0,3.0)": 1
+    },
+    "VECTOR-LINEAR-COMBO": {
+      "절차 [2.0,3.0)": 200
+    },
+    "VIETA-SUM": {
+      "개념 [3.0,4.0)": 12,
+      "절차 [2.0,3.0)": 12
+    },
+    "VOLUME-UNIT-CONVERSION": {
+      "인지 [1.0,2.0)": 50
+    }
+  },
+  "university": {
+    "coverage_by_domain": {
+      "1계 ODE": {
+        "covered": 0,
+        "total": 4
+      },
+      "1계 PDE": {
+        "covered": 0,
+        "total": 1
+      },
+      "1차논리": {
+        "covered": 0,
+        "total": 3
+      },
+      "2계 PDE 분류": {
+        "covered": 0,
+        "total": 3
+      },
+      "2계 선형 ODE": {
+        "covered": 0,
+        "total": 3
+      },
+      "Lᵖ 공간": {
+        "covered": 0,
+        "total": 3
+      },
+      "가설검정": {
+        "covered": 0,
+        "total": 2
+      },
+      "가우스 정리": {
+        "covered": 0,
+        "total": 2
+      },
+      "가우스-보네 정리": {
+        "covered": 0,
+        "total": 1
+      },
+      "가측함수": {
+        "covered": 0,
+        "total": 2
+      },
+      "갈루아 군": {
+        "covered": 0,
+        "total": 2
+      },
+      "갈루아 대응": {
+        "covered": 0,
+        "total": 1
+      },
+      "거리화 정리": {
+        "covered": 0,
+        "total": 2
+      },
+      "고유값·고유벡터": {
+        "covered": 0,
+        "total": 3
+      },
+      "고전·대칭 암호": {
+        "covered": 0,
+        "total": 2
+      },
+      "곡률": {
+        "covered": 0,
+        "total": 3
+      },
+      "곡면의 곡률": {
+        "covered": 0,
+        "total": 3
+      },
+      "곡선론": {
+        "covered": 0,
+        "total": 4
+      },
+      "공개키 암호": {
+        "covered": 0,
+        "total": 3
+      },
+      "공리계": {
+        "covered": 0,
+        "total": 3
+      },
+      "구간추정": {
+        "covered": 0,
+        "total": 1
+      },
+      "군의 기초": {
+        "covered": 0,
+        "total": 4
+      },
+      "군의 작용": {
+        "covered": 0,
+        "total": 2
+      },
+      "그래프 구조": {
+        "covered": 0,
+        "total": 3
+      },
+      "그래프 기초": {
+        "covered": 0,
+        "total": 4
+      },
+      "극한정리": {
+        "covered": 0,
+        "total": 2
+      },
+      "급수": {
+        "covered": 0,
+        "total": 4
+      },
+      "급수전개": {
+        "covered": 0,
+        "total": 4
+      },
+      "급수해": {
+        "covered": 0,
+        "total": 2
+      },
+      "기댓값과 적률": {
+        "covered": 0,
+        "total": 2
+      },
+      "기본군 입문": {
+        "covered": 0,
+        "total": 2
+      },
+      "기수": {
+        "covered": 0,
+        "total": 5
+      },
+      "나눗셈과 합동": {
+        "covered": 0,
+        "total": 3
+      },
+      "내적공간": {
+        "covered": 0,
+        "total": 3
+      },
+      "노름공간": {
+        "covered": 0,
+        "total": 2
+      },
+      "다변수 미분": {
+        "covered": 0,
+        "total": 4
+      },
+      "다중적분": {
+        "covered": 0,
+        "total": 6
+      },
+      "다항식환": {
+        "covered": 0,
+        "total": 2
+      },
+      "대수적 정수론": {
+        "covered": 0,
+        "total": 2
+      },
+      "동형정리": {
+        "covered": 0,
+        "total": 3
+      },
+      "디오판토스 방정식": {
+        "covered": 0,
+        "total": 2
+      },
+      "라플라스 방정식": {
+        "covered": 0,
+        "total": 3
+      },
+      "라플라스 변환": {
+        "covered": 0,
+        "total": 3
+      },
+      "르베그 적분": {
+        "covered": 0,
+        "total": 3
+      },
+      "르베그 측도": {
+        "covered": 0,
+        "total": 3
+      },
+      "리만 계량": {
+        "covered": 0,
+        "total": 2
+      },
+      "리만적분": {
+        "covered": 0,
+        "total": 3
+      },
+      "매개변수·극좌표": {
+        "covered": 0,
+        "total": 4
+      },
+      "멱급수와 해석함수": {
+        "covered": 0,
+        "total": 2
+      },
+      "명제논리": {
+        "covered": 0,
+        "total": 2
+      },
+      "명제와 논리": {
+        "covered": 0,
+        "total": 3
+      },
+      "미분": {
+        "covered": 3,
+        "total": 10
+      },
+      "미분과 측도": {
+        "covered": 0,
+        "total": 2
+      },
+      "미분다양체": {
+        "covered": 0,
+        "total": 3
+      },
+      "미분의 응용": {
+        "covered": 0,
+        "total": 5
+      },
+      "발표와 작성": {
+        "covered": 0,
+        "total": 2
+      },
+      "방정식의 해": {
+        "covered": 0,
+        "total": 3
+      },
+      "벡터 미적분": {
+        "covered": 0,
+        "total": 5
+      },
+      "벡터공간": {
+        "covered": 0,
+        "total": 4
+      },
+      "벡터와 공간기하": {
+        "covered": 0,
+        "total": 6
+      },
+      "벡터장과 미분형식": {
+        "covered": 0,
+        "total": 2
+      },
+      "벡터함수": {
+        "covered": 0,
+        "total": 4
+      },
+      "보간과 근사": {
+        "covered": 0,
+        "total": 3
+      },
+      "복소수와 해석함수": {
+        "covered": 0,
+        "total": 2
+      },
+      "복소적분": {
+        "covered": 0,
+        "total": 2
+      },
+      "부분·곱·몫공간": {
+        "covered": 0,
+        "total": 3
+      },
+      "부호의 한계": {
+        "covered": 0,
+        "total": 2
+      },
+      "분리공리": {
+        "covered": 0,
+        "total": 2
+      },
+      "불완전성": {
+        "covered": 0,
+        "total": 2
+      },
+      "사상과 차원": {
+        "covered": 0,
+        "total": 2
+      },
+      "사영 다양체": {
+        "covered": 0,
+        "total": 2
+      },
+      "선택공리": {
+        "covered": 0,
+        "total": 2
+      },
+      "선형계 수치해": {
+        "covered": 0,
+        "total": 3
+      },
+      "선형사상": {
+        "covered": 0,
+        "total": 4
+      },
+      "선형연립방정식": {
+        "covered": 0,
+        "total": 3
+      },
+      "소수": {
+        "covered": 0,
+        "total": 2
+      },
+      "수열과 급수": {
+        "covered": 0,
+        "total": 4
+      },
+      "수열의 극한": {
+        "covered": 0,
+        "total": 4
+      },
+      "수치적분·미분": {
+        "covered": 0,
+        "total": 2
+      },
+      "순서수": {
+        "covered": 0,
+        "total": 2
+      },
+      "스펙트럼 이론": {
+        "covered": 0,
+        "total": 2
+      },
+      "스펙트럼 정리": {
+        "covered": 0,
+        "total": 3
+      },
+      "실로우 정리": {
+        "covered": 0,
+        "total": 2
+      },
+      "실수계": {
+        "covered": 0,
+        "total": 3
+      },
+      "아이디얼-대수집합 대응": {
+        "covered": 0,
+        "total": 1
+      },
+      "아핀 다양체": {
+        "covered": 0,
+        "total": 2
+      },
+      "연결성": {
+        "covered": 0,
+        "total": 2
+      },
+      "연립 ODE·상평면": {
+        "covered": 0,
+        "total": 2
+      },
+      "연속함수와 위상동형": {
+        "covered": 0,
+        "total": 2
+      },
+      "열거조합론": {
+        "covered": 0,
+        "total": 4
+      },
+      "열방정식": {
+        "covered": 0,
+        "total": 2
+      },
+      "오류정정부호": {
+        "covered": 0,
+        "total": 4
+      },
+      "오차와 부동소수점": {
+        "covered": 0,
+        "total": 3
+      },
+      "옵션가격결정": {
+        "covered": 0,
+        "total": 2
+      },
+      "완비성과 베어 범주": {
+        "covered": 0,
+        "total": 2
+      },
+      "완전성·콤팩트성": {
+        "covered": 0,
+        "total": 1
+      },
+      "원시근과 이차잉여": {
+        "covered": 0,
+        "total": 3
+      },
+      "위상 기초": {
+        "covered": 0,
+        "total": 4
+      },
+      "위상공간": {
+        "covered": 0,
+        "total": 3
+      },
+      "유계작용소": {
+        "covered": 0,
+        "total": 2
+      },
+      "유수정리": {
+        "covered": 0,
+        "total": 2
+      },
+      "유한체": {
+        "covered": 0,
+        "total": 1
+      },
+      "응용": {
+        "covered": 0,
+        "total": 2
+      },
+      "이자율과 채권": {
+        "covered": 0,
+        "total": 2
+      },
+      "이차잉여와 상호법칙": {
+        "covered": 0,
+        "total": 2
+      },
+      "이차형식": {
+        "covered": 0,
+        "total": 3
+      },
+      "적분": {
+        "covered": 0,
+        "total": 4
+      },
+      "적분 기법": {
+        "covered": 0,
+        "total": 4
+      },
+      "적분과 스토크스 정리": {
+        "covered": 0,
+        "total": 1
+      },
+      "적분의 응용": {
+        "covered": 0,
+        "total": 4
+      },
+      "점추정": {
+        "covered": 0,
+        "total": 3
+      },
+      "정수론적 함수": {
+        "covered": 0,
+        "total": 2
+      },
+      "정역의 인수분해": {
+        "covered": 0,
+        "total": 3
+      },
+      "정칙곡면": {
+        "covered": 0,
+        "total": 3
+      },
+      "조건부확률과 독립": {
+        "covered": 0,
+        "total": 1
+      },
+      "조합 설계": {
+        "covered": 0,
+        "total": 2
+      },
+      "주요 정리": {
+        "covered": 0,
+        "total": 5
+      },
+      "주제선정과 문헌조사": {
+        "covered": 0,
+        "total": 2
+      },
+      "준동형과 정규부분군": {
+        "covered": 0,
+        "total": 3
+      },
+      "증명법": {
+        "covered": 0,
+        "total": 4
+      },
+      "집합": {
+        "covered": 0,
+        "total": 3
+      },
+      "체확장": {
+        "covered": 0,
+        "total": 3
+      },
+      "체확장 복습": {
+        "covered": 0,
+        "total": 3
+      },
+      "초등함수": {
+        "covered": 0,
+        "total": 4
+      },
+      "컴팩트성": {
+        "covered": 0,
+        "total": 3
+      },
+      "특이호몰로지": {
+        "covered": 0,
+        "total": 2
+      },
+      "파동방정식": {
+        "covered": 0,
+        "total": 2
+      },
+      "편미분": {
+        "covered": 0,
+        "total": 5
+      },
+      "포트폴리오": {
+        "covered": 0,
+        "total": 2
+      },
+      "표본분포": {
+        "covered": 0,
+        "total": 3
+      },
+      "표준형": {
+        "covered": 0,
+        "total": 2
+      },
+      "피복공간": {
+        "covered": 0,
+        "total": 2
+      },
+      "함수열·함수급수": {
+        "covered": 0,
+        "total": 3
+      },
+      "함수와 관계": {
+        "covered": 0,
+        "total": 5
+      },
+      "함수와 극한": {
+        "covered": 0,
+        "total": 4
+      },
+      "함수의 극한과 연속": {
+        "covered": 0,
+        "total": 4
+      },
+      "해석적 정수론": {
+        "covered": 0,
+        "total": 2
+      },
+      "행렬대수": {
+        "covered": 0,
+        "total": 3
+      },
+      "행렬식": {
+        "covered": 0,
+        "total": 3
+      },
+      "호모토피와 기본군": {
+        "covered": 0,
+        "total": 2
+      },
+      "확률공간": {
+        "covered": 0,
+        "total": 3
+      },
+      "확률미적분": {
+        "covered": 0,
+        "total": 2
+      },
+      "확률변수와 분포": {
+        "covered": 0,
+        "total": 3
+      },
+      "환과 아이디얼": {
+        "covered": 0,
+        "total": 4
+      },
+      "힐베르트 공간": {
+        "covered": 0,
+        "total": 3
+      }
+    },
+    "coverage_rate": 0.007334963325183374,
+    "covered_code_count": 3,
+    "covered_codes": [
+      "[CALC1-02-02]",
+      "[CALC1-02-03]",
+      "[CALC1-02-04]"
+    ],
+    "problems_per_covered_code": {
+      "[CALC1-02-02]": 200,
+      "[CALC1-02-03]": 200,
+      "[CALC1-02-04]": 200
+    },
+    "revision": "대학",
+    "target_codes_total": 409,
+    "zero_coverage_code_count": 406,
+    "zero_coverage_codes": [
+      "[AALG1-01-01]",
+      "[AALG1-01-02]",
+      "[AALG1-01-03]",
+      "[AALG1-01-04]",
+      "[AALG1-02-01]",
+      "[AALG1-02-02]",
+      "[AALG1-02-03]",
+      "[AALG1-03-01]",
+      "[AALG1-03-02]",
+      "[AALG1-03-03]",
+      "[AALG1-04-01]",
+      "[AALG1-04-02]",
+      "[AALG1-05-01]",
+      "[AALG1-05-02]",
+      "[AALG2-01-01]",
+      "[AALG2-01-02]",
+      "[AALG2-01-03]",
+      "[AALG2-01-04]",
+      "[AALG2-02-01]",
+      "[AALG2-02-02]",
+      "[AALG2-02-03]",
+      "[AALG2-03-01]",
+      "[AALG2-03-02]",
+      "[AALG2-04-01]",
+      "[AALG2-04-02]",
+      "[AALG2-04-03]",
+      "[AALG2-05-01]",
+      "[AGEO-01-01]",
+      "[AGEO-01-02]",
+      "[AGEO-02-01]",
+      "[AGEO-03-01]",
+      "[AGEO-03-02]",
+      "[AGEO-04-01]",
+      "[AGEO-04-02]",
+      "[ANAL1-01-01]",
+      "[ANAL1-01-02]",
+      "[ANAL1-01-03]",
+      "[ANAL1-02-01]",
+      "[ANAL1-02-02]",
+      "[ANAL1-02-03]",
+      "[ANAL1-02-04]",
+      "[ANAL1-03-01]",
+      "[ANAL1-03-02]",
+      "[ANAL1-03-03]",
+      "[ANAL1-03-04]",
+      "[ANAL1-04-01]",
+      "[ANAL1-04-02]",
+      "[ANAL1-04-03]",
+      "[ANAL1-04-04]",
+      "[ANAL1-05-01]",
+      "[ANAL1-05-02]",
+      "[ANAL1-05-03]",
+      "[ANAL1-05-04]",
+      "[ANAL2-01-01]",
+      "[ANAL2-01-02]",
+      "[ANAL2-01-03]",
+      "[ANAL2-02-01]",
+      "[ANAL2-02-02]",
+      "[ANAL2-02-03]",
+      "[ANAL2-03-01]",
+      "[ANAL2-03-02]",
+      "[ANAL2-03-03]",
+      "[ANAL2-04-01]",
+      "[ANAL2-04-02]",
+      "[ANAL2-05-01]",
+      "[ANAL2-05-02]",
+      "[ANAL2-05-03]",
+      "[ANAL2-05-04]",
+      "[ATOPO-01-01]",
+      "[ATOPO-01-02]",
+      "[ATOPO-02-01]",
+      "[ATOPO-02-02]",
+      "[ATOPO-03-01]",
+      "[ATOPO-03-02]",
+      "[ATOPO-04-01]",
+      "[ATOPO-04-02]",
+      "[CALC1-01-01]",
+      "[CALC1-01-02]",
+      "[CALC1-01-03]",
+      "[CALC1-01-04]",
+      "[CALC1-02-01]",
+      "[CALC1-02-05]",
+      "[CALC1-02-06]",
+      "[CALC1-02-07]",
+      "[CALC1-03-01]",
+      "[CALC1-03-02]",
+      "[CALC1-03-03]",
+      "[CALC1-03-04]",
+      "[CALC1-03-05]",
+      "[CALC1-04-01]",
+      "[CALC1-04-02]",
+      "[CALC1-04-03]",
+      "[CALC1-04-04]",
+      "[CALC1-05-01]",
+      "[CALC1-05-02]",
+      "[CALC1-05-03]",
+      "[CALC1-05-04]",
+      "[CALC1-06-01]",
+      "[CALC1-06-02]",
+      "[CALC1-06-03]",
+      "[CALC1-06-04]",
+      "[CALC1-07-01]",
+      "[CALC1-07-02]",
+      "[CALC1-07-03]",
+      "[CALC1-07-04]",
+      "[CALC2-01-01]",
+      "[CALC2-01-02]",
+      "[CALC2-01-03]",
+      "[CALC2-01-04]",
+      "[CALC2-02-01]",
+      "[CALC2-02-02]",
+      "[CALC2-02-03]",
+      "[CALC2-02-04]",
+      "[CALC2-02-05]",
+      "[CALC2-02-06]",
+      "[CALC2-03-01]",
+      "[CALC2-03-02]",
+      "[CALC2-03-03]",
+      "[CALC2-03-04]",
+      "[CALC2-04-01]",
+      "[CALC2-04-02]",
+      "[CALC2-04-03]",
+      "[CALC2-04-04]",
+      "[CALC2-04-05]",
+      "[CALC2-05-01]",
+      "[CALC2-05-02]",
+      "[CALC2-05-03]",
+      "[CALC2-05-04]",
+      "[CALC2-05-05]",
+      "[CALC2-05-06]",
+      "[CALC2-06-01]",
+      "[CALC2-06-02]",
+      "[CALC2-06-03]",
+      "[CALC2-06-04]",
+      "[CALC2-06-05]",
+      "[CAPST-01-01]",
+      "[CAPST-01-02]",
+      "[CAPST-02-01]",
+      "[CAPST-02-02]",
+      "[COMB-01-01]",
+      "[COMB-01-02]",
+      "[COMB-01-03]",
+      "[COMB-01-04]",
+      "[COMB-02-01]",
+      "[COMB-02-02]",
+      "[COMB-02-03]",
+      "[COMB-02-04]",
+      "[COMB-03-01]",
+      "[COMB-03-02]",
+      "[COMB-03-03]",
+      "[COMB-04-01]",
+      "[COMB-04-02]",
+      "[CRYP-01-01]",
+      "[CRYP-01-02]",
+      "[CRYP-02-01]",
+      "[CRYP-02-02]",
+      "[CRYP-02-03]",
+      "[CRYP-03-01]",
+      "[CRYP-03-02]",
+      "[CRYP-03-03]",
+      "[CRYP-03-04]",
+      "[CRYP-04-01]",
+      "[CRYP-04-02]",
+      "[CXAN-01-01]",
+      "[CXAN-01-02]",
+      "[CXAN-02-01]",
+      "[CXAN-02-02]",
+      "[CXAN-02-03]",
+      "[CXAN-02-04]",
+      "[CXAN-03-01]",
+      "[CXAN-03-02]",
+      "[CXAN-04-01]",
+      "[CXAN-04-02]",
+      "[CXAN-04-03]",
+      "[CXAN-04-04]",
+      "[CXAN-05-01]",
+      "[CXAN-05-02]",
+      "[DGEO-01-01]",
+      "[DGEO-01-02]",
+      "[DGEO-01-03]",
+      "[DGEO-01-04]",
+      "[DGEO-02-01]",
+      "[DGEO-02-02]",
+      "[DGEO-02-03]",
+      "[DGEO-03-01]",
+      "[DGEO-03-02]",
+      "[DGEO-03-03]",
+      "[DGEO-04-01]",
+      "[DGEO-04-02]",
+      "[DGEO-05-01]",
+      "[FANAL-01-01]",
+      "[FANAL-01-02]",
+      "[FANAL-02-01]",
+      "[FANAL-02-02]",
+      "[FANAL-02-03]",
+      "[FANAL-03-01]",
+      "[FANAL-03-02]",
+      "[FANAL-04-01]",
+      "[FANAL-04-02]",
+      "[FANAL-04-03]",
+      "[FANAL-05-01]",
+      "[FANAL-05-02]",
+      "[FINM-01-01]",
+      "[FINM-01-02]",
+      "[FINM-02-01]",
+      "[FINM-02-02]",
+      "[FINM-03-01]",
+      "[FINM-03-02]",
+      "[FINM-04-01]",
+      "[FINM-04-02]",
+      "[GALOIS-01-01]",
+      "[GALOIS-01-02]",
+      "[GALOIS-01-03]",
+      "[GALOIS-02-01]",
+      "[GALOIS-02-02]",
+      "[GALOIS-03-01]",
+      "[GALOIS-04-01]",
+      "[GALOIS-04-02]",
+      "[LINA1-01-01]",
+      "[LINA1-01-02]",
+      "[LINA1-01-03]",
+      "[LINA1-02-01]",
+      "[LINA1-02-02]",
+      "[LINA1-02-03]",
+      "[LINA1-03-01]",
+      "[LINA1-03-02]",
+      "[LINA1-03-03]",
+      "[LINA1-04-01]",
+      "[LINA1-04-02]",
+      "[LINA1-04-03]",
+      "[LINA1-04-04]",
+      "[LINA1-05-01]",
+      "[LINA1-05-02]",
+      "[LINA1-05-03]",
+      "[LINA1-05-04]",
+      "[LINA2-01-01]",
+      "[LINA2-01-02]",
+      "[LINA2-01-03]",
+      "[LINA2-02-01]",
+      "[LINA2-02-02]",
+      "[LINA2-02-03]",
+      "[LINA2-03-01]",
+      "[LINA2-03-02]",
+      "[LINA2-03-03]",
+      "[LINA2-04-01]",
+      "[LINA2-04-02]",
+      "[LINA2-05-01]",
+      "[LINA2-05-02]",
+      "[LINA2-05-03]",
+      "[MFLD-01-01]",
+      "[MFLD-01-02]",
+      "[MFLD-01-03]",
+      "[MFLD-02-01]",
+      "[MFLD-02-02]",
+      "[MFLD-03-01]",
+      "[MFLD-03-02]",
+      "[MFLD-04-01]",
+      "[MFLD-04-02]",
+      "[MFLD-04-03]",
+      "[MFLD-05-01]",
+      "[MLOG-01-01]",
+      "[MLOG-01-02]",
+      "[MLOG-02-01]",
+      "[MLOG-02-02]",
+      "[MLOG-02-03]",
+      "[MLOG-03-01]",
+      "[MLOG-04-01]",
+      "[MLOG-04-02]",
+      "[MSTAT-01-01]",
+      "[MSTAT-01-02]",
+      "[MSTAT-01-03]",
+      "[MSTAT-02-01]",
+      "[MSTAT-02-02]",
+      "[MSTAT-02-03]",
+      "[MSTAT-03-01]",
+      "[MSTAT-04-01]",
+      "[MSTAT-04-02]",
+      "[NUMER-01-01]",
+      "[NUMER-01-02]",
+      "[NUMER-01-03]",
+      "[NUMER-02-01]",
+      "[NUMER-02-02]",
+      "[NUMER-02-03]",
+      "[NUMER-03-01]",
+      "[NUMER-03-02]",
+      "[NUMER-03-03]",
+      "[NUMER-04-01]",
+      "[NUMER-04-02]",
+      "[NUMER-05-01]",
+      "[NUMER-05-02]",
+      "[NUMER-05-03]",
+      "[NUMT1-01-01]",
+      "[NUMT1-01-02]",
+      "[NUMT1-01-03]",
+      "[NUMT1-02-01]",
+      "[NUMT1-02-02]",
+      "[NUMT1-03-01]",
+      "[NUMT1-03-02]",
+      "[NUMT1-04-01]",
+      "[NUMT1-04-02]",
+      "[NUMT1-04-03]",
+      "[NUMT2-01-01]",
+      "[NUMT2-01-02]",
+      "[NUMT2-02-01]",
+      "[NUMT2-02-02]",
+      "[NUMT2-03-01]",
+      "[NUMT2-03-02]",
+      "[NUMT2-04-01]",
+      "[NUMT2-04-02]",
+      "[ODE-01-01]",
+      "[ODE-01-02]",
+      "[ODE-01-03]",
+      "[ODE-01-04]",
+      "[ODE-02-01]",
+      "[ODE-02-02]",
+      "[ODE-02-03]",
+      "[ODE-03-01]",
+      "[ODE-03-02]",
+      "[ODE-03-03]",
+      "[ODE-04-01]",
+      "[ODE-04-02]",
+      "[ODE-05-01]",
+      "[ODE-05-02]",
+      "[PDE-01-01]",
+      "[PDE-02-01]",
+      "[PDE-02-02]",
+      "[PDE-02-03]",
+      "[PDE-03-01]",
+      "[PDE-03-02]",
+      "[PDE-04-01]",
+      "[PDE-04-02]",
+      "[PDE-05-01]",
+      "[PDE-05-02]",
+      "[PDE-05-03]",
+      "[PROB-01-01]",
+      "[PROB-01-02]",
+      "[PROB-01-03]",
+      "[PROB-02-01]",
+      "[PROB-03-01]",
+      "[PROB-03-02]",
+      "[PROB-03-03]",
+      "[PROB-04-01]",
+      "[PROB-04-02]",
+      "[PROB-05-01]",
+      "[PROB-05-02]",
+      "[RANAL-01-01]",
+      "[RANAL-01-02]",
+      "[RANAL-01-03]",
+      "[RANAL-02-01]",
+      "[RANAL-02-02]",
+      "[RANAL-03-01]",
+      "[RANAL-03-02]",
+      "[RANAL-03-03]",
+      "[RANAL-04-01]",
+      "[RANAL-04-02]",
+      "[RANAL-04-03]",
+      "[RANAL-05-01]",
+      "[RANAL-05-02]",
+      "[SET-01-01]",
+      "[SET-01-02]",
+      "[SET-01-03]",
+      "[SET-02-01]",
+      "[SET-02-02]",
+      "[SET-03-01]",
+      "[SET-03-02]",
+      "[SET-04-01]",
+      "[SET-04-02]",
+      "[SETLOG-01-01]",
+      "[SETLOG-01-02]",
+      "[SETLOG-01-03]",
+      "[SETLOG-02-01]",
+      "[SETLOG-02-02]",
+      "[SETLOG-02-03]",
+      "[SETLOG-02-04]",
+      "[SETLOG-03-01]",
+      "[SETLOG-03-02]",
+      "[SETLOG-03-03]",
+      "[SETLOG-04-01]",
+      "[SETLOG-04-02]",
+      "[SETLOG-04-03]",
+      "[SETLOG-04-04]",
+      "[SETLOG-04-05]",
+      "[SETLOG-05-01]",
+      "[SETLOG-05-02]",
+      "[SETLOG-05-03]",
+      "[TOPO1-01-01]",
+      "[TOPO1-01-02]",
+      "[TOPO1-01-03]",
+      "[TOPO1-02-01]",
+      "[TOPO1-02-02]",
+      "[TOPO1-03-01]",
+      "[TOPO1-03-02]",
+      "[TOPO1-03-03]",
+      "[TOPO1-04-01]",
+      "[TOPO1-04-02]",
+      "[TOPO1-05-01]",
+      "[TOPO1-05-02]",
+      "[TOPO1-05-03]",
+      "[TOPO2-01-01]",
+      "[TOPO2-01-02]",
+      "[TOPO2-02-01]",
+      "[TOPO2-02-02]",
+      "[TOPO2-03-01]",
+      "[TOPO2-03-02]",
+      "[TOPO2-04-01]",
+      "[TOPO2-04-02]"
+    ]
+  },
+  "zero_coverage_codes": [
+    "[10공수1-02-04]",
+    "[10공수1-02-06]",
+    "[10공수1-02-08]",
+    "[10공수1-02-10]",
+    "[10공수1-04-01]",
+    "[10공수2-01-03]",
+    "[10공수2-01-05]",
+    "[10공수2-01-07]",
+    "[10공수2-02-01]",
+    "[10공수2-02-02]",
+    "[10공수2-02-03]",
+    "[10공수2-02-04]",
+    "[10공수2-02-05]",
+    "[10공수2-02-06]",
+    "[10공수2-02-07]",
+    "[10공수2-02-08]",
+    "[10공수2-03-01]",
+    "[10공수2-03-05]",
+    "[10기수1-02-01]",
+    "[10기수1-02-03]",
+    "[10기수1-02-04]",
+    "[10기수1-02-05]",
+    "[10기수1-02-06]",
+    "[10기수1-02-08]",
+    "[10기수1-02-09]",
+    "[10기수1-03-01]",
+    "[10기수1-03-02]",
+    "[10기수1-03-03]",
+    "[10기수1-04-01]",
+    "[10기수1-04-02]",
+    "[10기수2-01-01]",
+    "[10기수2-01-02]",
+    "[10기수2-01-03]",
+    "[10기수2-01-05]",
+    "[10기수2-01-07]",
+    "[10기수2-02-01]",
+    "[10기수2-02-02]",
+    "[10기수2-02-03]",
+    "[10기수2-02-04]",
+    "[10기수2-02-05]",
+    "[10기수2-03-01]",
+    "[10기수2-03-04]",
+    "[10기수2-03-05]",
+    "[12경수01-01]",
+    "[12경수01-02]",
+    "[12경수01-03]",
+    "[12경수01-04]",
+    "[12경수01-05]",
+    "[12경수02-01]",
+    "[12경수02-02]",
+    "[12경수02-03]",
+    "[12경수02-04]",
+    "[12경수02-05]",
+    "[12경수02-06]",
+    "[12경수03-01]",
+    "[12경수03-02]",
+    "[12경수03-03]",
+    "[12경수04-01]",
+    "[12경수04-02]",
+    "[12경수04-03]",
+    "[12경수04-04]",
+    "[12기하01-04]",
+    "[12기하02-01]",
+    "[12기하02-02]",
+    "[12기하02-03]",
+    "[12기하02-04]",
+    "[12기하03-04]",
+    "[12기하03-05]",
+    "[12대수01-02]",
+    "[12대수01-03]",
+    "[12대수01-06]",
+    "[12대수01-07]",
+    "[12대수02-03]",
+    "[12대수03-07]",
+    "[12미적Ⅰ-01-02]",
+    "[12미적Ⅰ-01-03]",
+    "[12미적Ⅰ-01-04]",
+    "[12미적Ⅰ-03-01]",
+    "[12미적Ⅰ-03-03]",
+    "[12미적Ⅱ-01-01]",
+    "[12미적Ⅱ-01-02]",
+    "[12미적Ⅱ-02-01]",
+    "[12미적Ⅱ-02-03]",
+    "[12미적Ⅱ-02-06]",
+    "[12미적Ⅱ-02-07]",
+    "[12미적Ⅱ-02-08]",
+    "[12미적Ⅱ-02-09]",
+    "[12미적Ⅱ-02-10]",
+    "[12미적Ⅱ-02-11]",
+    "[12미적Ⅱ-03-02]",
+    "[12미적Ⅱ-03-03]",
+    "[12미적Ⅱ-03-04]",
+    "[12미적Ⅱ-03-06]",
+    "[12수과01-01]",
+    "[12수과01-02]",
+    "[12수과02-01]",
+    "[12수과02-02]",
+    "[12수과02-03]",
+    "[12수과02-04]",
+    "[12수과03-01]",
+    "[12수과03-02]",
+    "[12수과03-03]",
+    "[12수과03-04]",
+    "[12수문01-01]",
+    "[12수문01-02]",
+    "[12수문01-03]",
+    "[12수문01-04]",
+    "[12수문02-01]",
+    "[12수문02-03]",
+    "[12수문02-04]",
+    "[12수문03-01]",
+    "[12수문03-02]",
+    "[12수문03-03]",
+    "[12수문03-04]",
+    "[12수문04-01]",
+    "[12수문04-02]",
+    "[12수문04-03]",
+    "[12수문04-04]",
+    "[12실통01-01]",
+    "[12실통01-02]",
+    "[12실통01-03]",
+    "[12실통02-01]",
+    "[12실통02-02]",
+    "[12실통02-03]",
+    "[12실통02-04]",
+    "[12실통03-01]",
+    "[12실통03-02]",
+    "[12실통03-03]",
+    "[12실통03-04]",
+    "[12실통04-01]",
+    "[12실통04-02]",
+    "[12인수01-01]",
+    "[12인수01-02]",
+    "[12인수01-03]",
+    "[12인수02-01]",
+    "[12인수02-02]",
+    "[12인수02-03]",
+    "[12인수03-01]",
+    "[12인수03-02]",
+    "[12인수03-03]",
+    "[12인수04-02]",
+    "[12인수04-03]",
+    "[12인수04-04]",
+    "[12인수05-01]",
+    "[12인수05-02]",
+    "[12직수01-01]",
+    "[12직수01-02]",
+    "[12직수01-03]",
+    "[12직수02-01]",
+    "[12직수02-02]",
+    "[12직수02-03]",
+    "[12직수02-04]",
+    "[12직수03-01]",
+    "[12직수03-02]",
+    "[12직수03-03]",
+    "[12직수03-05]",
+    "[12직수04-02]",
+    "[12직수04-03]",
+    "[12직수04-04]",
+    "[12직수04-05]",
+    "[12확통03-01]",
+    "[12확통03-04]",
+    "[12확통03-05]",
+    "[12확통03-07]",
+    "[2수01-01]",
+    "[2수01-02]",
+    "[2수01-03]",
+    "[2수01-04]",
+    "[2수01-05]",
+    "[2수01-07]",
+    "[2수01-08]",
+    "[2수01-09]",
+    "[2수01-10]",
+    "[2수01-11]",
+    "[2수02-01]",
+    "[2수02-02]",
+    "[2수03-01]",
+    "[2수03-02]",
+    "[2수03-03]",
+    "[2수03-04]",
+    "[2수03-05]",
+    "[2수03-06]",
+    "[2수03-07]",
+    "[2수03-08]",
+    "[2수03-09]",
+    "[2수03-10]",
+    "[2수03-11]",
+    "[2수03-12]",
+    "[2수03-13]",
+    "[2수04-01]",
+    "[2수04-02]",
+    "[2수04-03]",
+    "[4수01-01]",
+    "[4수01-02]",
+    "[4수01-03]",
+    "[4수01-04]",
+    "[4수01-05]",
+    "[4수01-06]",
+    "[4수01-08]",
+    "[4수01-09]",
+    "[4수01-10]",
+    "[4수01-11]",
+    "[4수01-12]",
+    "[4수01-13]",
+    "[4수01-14]",
+    "[4수01-15]",
+    "[4수01-16]",
+    "[4수02-01]",
+    "[4수02-02]",
+    "[4수02-03]",
+    "[4수03-01]",
+    "[4수03-02]",
+    "[4수03-03]",
+    "[4수03-04]",
+    "[4수03-05]",
+    "[4수03-06]",
+    "[4수03-07]",
+    "[4수03-08]",
+    "[4수03-09]",
+    "[4수03-10]",
+    "[4수03-11]",
+    "[4수03-12]",
+    "[4수03-13]",
+    "[4수03-14]",
+    "[4수03-15]",
+    "[4수03-17]",
+    "[4수03-19]",
+    "[4수03-20]",
+    "[4수03-22]",
+    "[4수03-23]",
+    "[4수03-24]",
+    "[4수04-01]",
+    "[4수04-02]",
+    "[4수04-03]",
+    "[6수01-01]",
+    "[6수01-02]",
+    "[6수01-07]",
+    "[6수01-08]",
+    "[6수01-09]",
+    "[6수01-10]",
+    "[6수01-11]",
+    "[6수01-12]",
+    "[6수01-14]",
+    "[6수01-15]",
+    "[6수02-01]",
+    "[6수02-02]",
+    "[6수02-03]",
+    "[6수02-04]",
+    "[6수02-05]",
+    "[6수03-02]",
+    "[6수03-03]",
+    "[6수03-04]",
+    "[6수03-05]",
+    "[6수03-06]",
+    "[6수03-07]",
+    "[6수03-08]",
+    "[6수03-09]",
+    "[6수03-10]",
+    "[6수04-02]",
+    "[6수04-03]",
+    "[6수04-04]",
+    "[6수04-05]",
+    "[6수04-06]",
+    "[9수01-01]",
+    "[9수01-06]",
+    "[9수01-08]",
+    "[9수01-09]",
+    "[9수01-10]",
+    "[9수02-01]",
+    "[9수02-02]",
+    "[9수02-06]",
+    "[9수02-13]",
+    "[9수02-15]",
+    "[9수02-16]",
+    "[9수02-17]",
+    "[9수02-18]",
+    "[9수02-21]",
+    "[9수02-22]",
+    "[9수03-01]",
+    "[9수03-02]",
+    "[9수03-03]",
+    "[9수03-04]",
+    "[9수03-07]",
+    "[9수03-09]",
+    "[9수03-10]",
+    "[9수03-11]",
+    "[9수03-14]",
+    "[9수03-15]",
+    "[9수03-16]",
+    "[9수03-17]",
+    "[9수03-18]",
+    "[9수03-19]",
+    "[9수04-02]",
+    "[9수04-03]",
+    "[9수04-05]",
+    "[9수04-06]",
+    "[9수04-07]",
+    "[9수04-08]",
+    "[9수04-09]"
+  ],
+  "zero_problem_subjects": [
+    "12경수",
+    "12수과",
+    "12실통"
+  ]
+}
