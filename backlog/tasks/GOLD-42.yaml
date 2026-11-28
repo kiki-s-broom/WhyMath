@@ -23,6 +23,7 @@ artifacts:
   - S29R 결과 보고 커밋 22304ae8
   - "PR #2012 (S30R T2R 판정)"
   - "PR #2013 (S31R 런북)"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2014"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -52,4 +53,6 @@ notes: |-
   [정정 2026-11-27] S30R T2R 효과 없음(S28R M3 조건 미달) · 연결 되돌림 · PR #2012 · 다음 S31R
 
   [정정 2026-11-27] S31R 유출 추출 런북·HARVEST 경계 · PR #2013 · Kiki PC 추출 대기
-updated: 2026-11-27
+
+  [정정 2026-11-28] S31R 완료 — 유출 출처 표 ⓐ0·ⓑ9·ⓒ12(실제 1,285세션 · 21세션 29턴) · HARVEST 경계 확정 · 특성화 테스트 32 · PR #2014 자동 머지 켬 · Kiki 확인: 실제 ⓐ 0이라 S34R 판정 숫자가 움직이기 어려움(보고 6절)
+updated: 2026-11-28
