@@ -26,6 +26,7 @@ artifacts:
   - "https://github.com/kiki-s-broom/WhyMath/pull/2014"
   - "commit fb72bc24 (S32R 구현 · 브랜치 claude/dazzling-ramanujan-ypbouv)"
   - "https://github.com/kiki-s-broom/WhyMath/pull/2015"
+  - "https://github.com/kiki-s-broom/WhyMath/pull/2016"
 paths:
   - "golden/**"
   - "src/backend/golden/**"
@@ -61,4 +62,6 @@ notes: |-
   [정정 2026-11-28] S32R 구현 완료 — T3R 유출 검사 + 플래그 GOLDEN_T3R_LEAK_GUARD(기본 0) · tests/golden 1163 passed · check.py PASS · 가짜 스모크 120 플래그 0·1 M4 0 M5 0 · 검토·로컬 CI 미러 뒤 PR
 
   [정정 2026-11-28] S32R 완료 — PR #2015 자동 머지 켬(SQUASH) · tests/golden 1168 · check.py PASS · 가짜 스모크 플래그 0·1 M4 0 M5 0 · Kiki 확인: S34R 판정 숫자(ⓐ 0)
+
+  [정정 2026-11-28] S33R 런북·추출기 PR #2016(자동 머지) · Kiki 머신 대기(720×2 실행) · Kiki 확인: S34R 판정 숫자(ⓐ 0)
 updated: 2026-11-28
