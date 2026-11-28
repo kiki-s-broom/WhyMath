@@ -545,3 +545,21 @@ GP-4 튜터 응답에서 정답 노출을 잡는 옛 함수 — 함수 이름 �
 | `l3/verify_solution.py::scan_value_exposure` (+ 같은 파일 4개 · 복사는 S32R) | `l4/hint_content/gates.py::check_answer_leakage` · `l3/pedagogy/analogy_checker.py::_detect_answer_leak` | 가져옴: ⓐ 합성 2/2 · ⓒ 실제 0/3(측정). 버림: 힌트 모델용·글자 축이 M1과 같음(코드 읽기) · 부분 문자열 오탐 ⓒ 3/3(측정) · 모두 LEGACY_MANIFEST(새 import 금지) | S31R |
 
 - 찾은 방법(범위): `leak`·`leakage`·`reveal`이 이름에 든 함수를 `whymath_backend/l3`·`l4`·`harness`에서 grep으로 찾았고, 지시서가 이름을 댄 두 후보와 값 축 함수를 직접 읽었다. 이 범위 밖에 쓸 만한 함수가 있는지는 모른다.
+
+## 반복 슬롯 T3R 연결 (S32R · 1단계 반복 회차 · 2026-11-28 · 기준 main `a86ab459` · 인용 F-07)
+
+- **다섯 걸음 ③ 복사: 의존 과다** — `whymath_backend/l3/verify_solution.py`의 값 축 함수를 `src/backend/golden/eval/value_exposure.py`로 복사했다. 옛 모듈을 import하면 whymath 모듈 56개가 따라오고, 그 모듈은 `golden/LEGACY_MANIFEST.txt`에 있다(새 import 금지).
+  - 가져온 함수: `scan_value_exposure` · `arithmetic_fragments` · `_value_targets` · `split_top_level` · `_closed_value`, 그리고 이 함수들이 쓰는 `_name_kind` · `_balanced` · `_is_single_variable`.
+  - 자른 의존 2개:
+    - `same_value`: 옛 판은 정본 채점기 `verify_final_answer`(옛 모듈 다수)에 맡겼다. 사본은 같은 안전 파서 `l3.safe_parse.safe_sympify`로 수를 비교한다. 이 파서는 골든 채점기가 이미 쓰므로 직접 import 예산은 그대로다.
+    - `_value_targets`의 LaTeX 평문화: 골든 30문항의 정답은 모두 평문이다. 정답에 역슬래시(`\`)가 있으면 판정 불가로 둔다.
+  - 출력이 같은지 확인했다: 30문항 정답 × 본문·힌트·S31R 튜터 문장 등 2,040쌍 이상에서 옛 판과 결과 4칸이 모두 같다. 고정 테스트는 `tests/golden/test_t3r_guard.py::test_value_copy_matches_legacy_on_problem_texts`이고, 클라우드 사전 점검에서는 630쌍 모두 같았다.
+- **다섯 걸음 ④ 연결**: `src/backend/golden/tutor.py`의 튜터 응답 직후다. `GOLDEN_T3R_LEAK_GUARD=1`일 때만 켜진다. 유출 판정은 `src/backend/golden/eval/leak_guard.py`가 한다.
+  - 정답이 드러났는지는 두 축으로 본다: 글자 축(M1 규칙 + 부호 경계)과 값 축(위 사본).
+  - 학생이 이미 낸 값을 되짚은 것인지는 이번 문제의 학생 입력(앞 턴 포함)으로 가른다.
+  - 학생이 낸 적 없는 정답이 드러났을 때(ⓐ)만 막는다. 같은 입력으로 1회 다시 만들고, 그래도 걸리면 고정 문장으로 바꾼다.
+  - 기록은 `golden.eval_log`의 `t3r_*` 칸에 남긴다.
+
+| 가져온 것 | 버린 것 | 이유 | 세션 |
+| --- | --- | --- | --- |
+| `l3/verify_solution.py::scan_value_exposure` 외 7함수 → `golden/eval/value_exposure.py` | `same_value`의 `verify_final_answer` 위임 · LaTeX 평문화(`latex_to_plain`) | 복사: 의존 과다(옛 모듈 56개 · LEGACY_MANIFEST). 대신 `safe_sympify` 수 비교를 넣었다. 골든 정답은 평문이다. 옛 판과 같은 출력을 테스트로 고정했다 | S32R |
