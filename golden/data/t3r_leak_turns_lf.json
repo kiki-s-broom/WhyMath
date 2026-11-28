@@ -1,0 +1,295 @@
+{
+ "_doc": "S31R 실제 LLM 유출 턴 29개(Kiki PC 추출 2026-11-28 · 시드 일치 0) — 튜터 문장과 바로 앞 시뮬레이터 학생 문장. source_kind: b_echo(학생이 낸 정답 값 되짚음 · ⓑ) · c_sign(부호 반대 오답 되짚음 · ⓒ). 실제 ⓐ(새로 말함)는 0건이다. 출처: golden/reports_phase1r/S31R/보고.md 2절. S32R 유출 검사가 이 29턴을 하나도 막지 않아야 한다(tests/golden/test_t3r_guard.py).",
+ "rows": [
+  {
+   "run": "2026-11-24",
+   "persona": "P2",
+   "problem_id": "LF-07",
+   "answer": "11",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-11 같아요",
+   "tutor": "답이 -11이라고 생각했군요. 그 값을 얻기 위해 문제의 함수에서 x 자리에 무엇을 넣어 어떤 식을 세웠는지, 그 식을 그대로 보여 줄래요?"
+  },
+  {
+   "run": "2026-11-25",
+   "persona": "P2",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "f(5)는 5 넣어 3*5+1 계산해 16입니다.",
+   "tutor": "문제의 식에 5를 넣어 계산한 결과로 16을 말했군요. 그 계산에서 곱한 두 수가 각각 문제의 식에서 무엇을 뜻하는지, 그리고 마지막에 더한 수는 무엇인지 설명해 볼래요?"
+  },
+  {
+   "run": "2026-11-26",
+   "persona": "P2",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "x가 3 증가하면 y는 3곱해 15 추가되니까 15증가량이요?",
+   "tutor": "x가 3만큼 증가할 때 y의 증가량을 15라고 본 셈이군요. 그러면 문제의 식에서 x가 1만큼 증가할 때 y가 어떻게 변하는지 먼저 말해 볼래요?"
+  },
+  {
+   "run": "2026-11-26",
+   "persona": "P2",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 3,
+   "source_kind": "b_echo",
+   "student": "y=5*(3)+15요?",
+   "tutor": "문제의 식에 3을 넣은 값에 15를 더한 셈인 ‘5*(3)+15’라고 쓴 부분이 보이는데, 거기서 그 더하기 15는 어디서 나온 것인지 한번 짚어 보면서, x가 3만큼 증가할 때 y의 증가량이 얼마인지 직접 구해 말해 볼래요?"
+  },
+  {
+   "run": "2026-11-27",
+   "persona": "P2",
+   "problem_id": "LF-07",
+   "answer": "11",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-11 같아요",
+   "tutor": "f(2)의 값이 -11이라고 생각했군요. 그 값을 어떻게 계산해서 얻었는지, x 자리에 무엇을 넣고 어떤 순서로 계산했는지 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P2",
+   "problem_id": "LF-07",
+   "answer": "11",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-11 같아요",
+   "tutor": "문제의 함수에서 x 자리에 2를 넣었을 때의 값을 -11이라고 생각한 거군요. 그 -11이 나오기까지 어떤 수에 어떤 수를 곱하고 더했는지, 계산 과정을 식으로 한 번 써 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P3",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-16요?",
+   "tutor": "구하려는 함숫값을 -16이라고 생각했군요. 그 값이 나오기까지 문제의 식에서 x 자리에 무엇을 넣어 어떤 식을 세웠는지 먼저 그대로 적어 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P3",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 2,
+   "source_kind": "c_sign",
+   "student": "-16요?",
+   "tutor": "다시 -16이라고 말했군요. 그 값을 어떻게 얻었는지 확인해 보려는 거예요. 문제의 식에서 x 자리에 무엇을 넣어야 하는지 말하고, 그렇게 넣어 쓴 식을 종이에 그대로 적어 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P3",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 3,
+   "source_kind": "c_sign",
+   "student": "-16요?",
+   "tutor": "계속 -16이라고 답했군요. 문제의 식에서 x 자리에 주어진 값을 넣었을 때 정말 -16이 되는지 그 부분을 다시 살펴보고, 구하려는 함숫값을 직접 구해 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P3",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-15 같아요",
+   "tutor": "y의 증가량이 -15라고 생각했군요. 그렇다면 문제의 식에서 x가 1만큼 커질 때 y가 얼마나 변하는지를 알려 주는 부분은 어디인지 한번 찾아볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P3",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 2,
+   "source_kind": "c_sign",
+   "student": "-15 같아요",
+   "tutor": "같은 답을 한 번 더 말했군요. 그 -15라는 값은 어떤 계산을 거쳐서 나온 건지, 어떻게 구했는지 말해 줄래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P3",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 3,
+   "source_kind": "c_sign",
+   "student": "-15 같아요",
+   "tutor": "세 번 모두 -15라고 말했군요. 그 -15 앞에 붙은 음수 부호를 그대로 다시 보면서, 문제에서 x가 늘어날 때 y의 증가량이 얼마인지 지금 바로 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P2",
+   "problem_id": "LF-07",
+   "answer": "11",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-11 같아요",
+   "tutor": "문제의 식에서 계산해 -11이 나올 것 같다고 했군요. 그 값이 나오기까지 x 자리에 어떤 값을 넣어 어떻게 계산했는지 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P2",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-16?",
+   "tutor": "답을 -16이라고 말했군요. 그 값을 얻기 위해 문제의 식에서 x 자리에 어떤 수를 넣어 계산했는지 먼저 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P2",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "x값이 3 증가하면 5*3=15가增量，然后加上y的值变化量增加15",
+   "tutor": "x가 3만큼 늘 때 5×3을 계산해서 15만큼 늘어난다고 보았는데, 처음에는 y의 증가량을 -6이라고 했군요. 이 두 값이 서로 다른데, 어느 쪽이 y의 증가량이라고 생각하는지 말해 줄래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P6",
+   "problem_id": "LF-01",
+   "answer": "-12",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "f(5)는 -12예요?",
+   "tutor": "괄호 안에 주어진 값을 넣은 결과를 -12라고 말해 주었군요. 그 값이 나오기까지 함수식의 어느 자리에 무엇을 넣어서 어떤 계산을 했는지, 직접 쓴 식을 보면서 설명해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P6",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "f(5)는 16이야.",
+   "tutor": "f(5)가 16이라고 했군요. 그 값을 어떻게 얻었는지, 문제의 식에서 어느 자리에 무엇을 넣어 계산했는지 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P2",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-16?",
+   "tutor": "f(5)의 값을 -16이라고 생각했군요. 그 값을 어떻게 얻었는지도 궁금한데, 먼저 문제의 식에서 x 자리에 주어진 값을 넣으면 어떤 식이 되는지 직접 써서 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P2",
+   "problem_id": "LF-15",
+   "answer": "2/3",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-2/3이요?",
+   "tutor": "문제의 식에서 x에 곱해진 수를 -2/3라고 본 거군요. 그 수를 어떻게 찾았는지 떠올리면서, 문제의 식을 y = (수)x + (수) 꼴로 놓았을 때 x 바로 앞에 쓰인 수는 무엇인지 다시 확인해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P4",
+   "problem_id": "LF-01",
+   "answer": "-12",
+   "turn": 3,
+   "source_kind": "b_echo",
+   "student": "-12+3=?",
+   "tutor": "문제의 식에서 문자 자리에 주어진 값을 넣고 곱셈 부분을 -12라고 쓴 곳이 보이는데, 그 곱셈을 다시 한 번 살펴보면서 지금까지의 생각을 이어가 볼래요? 그렇게 해서 이 문제의 함숫값이 얼마인지 직접 구해 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P6",
+   "problem_id": "LF-07",
+   "answer": "11",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "f(2)는 11요?",
+   "tutor": "f(2)가 11이라고 답했군요. 그 값을 어떻게 구했는지, 문제의 식에서 x 자리에 무엇을 넣어 어떤 순서로 계산했는지 말해 볼래요?"
+  },
+  {
+   "run": "sim-s28r/f0",
+   "persona": "P6",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "f(5)는 16이에요?",
+   "tutor": "f(5)를 16이라고 생각했다고 말해 주었군요. 그 값이 나오기까지 함수의 x 자리에 어떤 수를 넣어 어떤 계산을 했는지, 그 과정을 한 번 말해 볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P2",
+   "problem_id": "LF-07",
+   "answer": "11",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-11 같아요",
+   "tutor": "-11 같다고 했군요. 그 값이 나오기까지 문제의 식에서 어느 자리에 어떤 수를 넣어 어떻게 계산했는지 말해 볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P2",
+   "problem_id": "LF-09",
+   "answer": "-4",
+   "turn": 2,
+   "source_kind": "b_echo",
+   "student": "f(0)은 -4 같아요",
+   "tutor": "이번에는 -4라고 생각했군요. 그 생각이 나오게 된 과정을, 문제의 식에서 어느 부분에 무엇을 넣어 어떻게 계산했는지 말해 볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P3",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-16요?",
+   "tutor": "f(5)를 -16이라고 생각했군요. 문제의 식에서 x 자리에 5를 넣으면 어떤 수와 어떤 수를 더하는 모양이 되는지 먼저 말해 볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P3",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 2,
+   "source_kind": "c_sign",
+   "student": "-16요?",
+   "tutor": "계속 -16이라고 말했군요. 그 수가 나오기까지 문제의 식에서 어떤 수를 어떻게 계산했는지 하나씩 말해 볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P3",
+   "problem_id": "LF-08",
+   "answer": "16",
+   "turn": 3,
+   "source_kind": "c_sign",
+   "student": "-16요?",
+   "tutor": "계속 -16이라고 말했군요. 이번에는 문제의 식에서 x 자리에 5를 넣었을 때의 계산을 처음부터 다시 해 보고, 그 결과를 답으로 말해 볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P3",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 1,
+   "source_kind": "c_sign",
+   "student": "-15?",
+   "tutor": "y의 증가량을 -15라고 생각했군요. 그런데 이 함수의 식에서 x가 커지면 y는 같이 커지는지, 아니면 작아지는지 먼저 살펴볼래요?"
+  },
+  {
+   "run": "out",
+   "persona": "P3",
+   "problem_id": "LF-16",
+   "answer": "15",
+   "turn": 3,
+   "source_kind": "c_sign",
+   "student": "y의 값이 -15 증가해요.",
+   "tutor": "y의 값이 -15 증가한다고 했는데, '증가'라는 말과 -15라는 값이 서로 같은 방향을 가리키는지 한번 견줘 보면 좋겠어요. 문제의 식에서 x가 커질 때 y가 어느 쪽으로 움직이는지도 함께 생각해서, x가 3만큼 증가할 때의 y의 증가량을 직접 구해 말해 볼래요?"
+  }
+ ]
+}

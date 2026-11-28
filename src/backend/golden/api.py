@@ -164,6 +164,9 @@ async def answer(body: AnswerIn) -> dict[str, object]:
         if t2 is not None:
             # S27 T2 기록 — 응답은 튜터 문장 그대로
             await _record_t2(turn_id, problem, t2)
+        if reply.guard is not None:
+            # S32R T3R 기록(GOLDEN_T3R_LEAK_GUARD=1일 때만) — 바꾼 사실을 eval_log에 남긴다
+            await _record_t3r(turn_id, problem, reply.guard)
         response: dict[str, object] = {
             "kind": "tutor_turn",
             "message": reply.message,
@@ -261,6 +264,23 @@ async def _record_t2(turn_id: int, problem: problems.Problem, match: _T2Match) -
     except (SQLAlchemyError, OSError) as exc:
         logger.warning(
             "golden T2 매칭 실패 — 응답은 그대로 보냄: 단계=기록 problem=%s turn_id=%s %s",
+            problem["id"],
+            turn_id,
+            type(exc).__name__,
+        )
+
+
+async def _record_t3r(turn_id: int, problem: problems.Problem, guard: dict[str, object]) -> None:
+    """T3R 유출 검사 결과를 golden.eval_log의 그 턴 행에 남긴다(S32R · 축·처리만 · 문장 없음).
+
+    기록이 DB·연결 오류(`SQLAlchemyError`·`OSError`)로 실패해도 응답은 그대로 나가고(튜터 턴은 이미
+    기록됐다), 경고 로그에 문제 ID·턴 id·예외 타입명만 남긴다(S27 T2 기록과 같은 처리).
+    """
+    try:
+        await store.record_eval(turn_id, guard)
+    except (SQLAlchemyError, OSError) as exc:
+        logger.warning(
+            "golden T3R 기록 실패 — 응답은 그대로 보냄: problem=%s turn_id=%s %s",
             problem["id"],
             turn_id,
             type(exc).__name__,
