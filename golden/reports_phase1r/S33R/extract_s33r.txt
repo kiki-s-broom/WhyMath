@@ -1,0 +1,300 @@
+# S33R 추출기 — 720세션 두 번(플래그 GOLDEN_T3R_LEAK_GUARD 0 · 1)의 숫자 한 장 + 플래그 1 실행 15건(읽기 전용)
+# 사용: python extract_s33r.txt <f0 실행 폴더> <f1 실행 폴더> <db_names.txt> <숫자 출력 txt> <15건 출력 txt>
+#       (cwd = 작업 폴더의 src/backend · GOLDEN_SIM_SEED_DIR 설정 · 실행 때 쓴 DB 컨테이너가 켜져 있어야 한다)
+# 하는 일:
+#   ① 두 실행이 실제 모드(live)이고 끝까지 돌았는지(기록 줄 + 건너뜀 = 720)
+#   ② 플래그 검증 — 실행 때 쓴 DB의 golden.eval_log를 **읽기만** 해서 센다. f1은 되묻기 턴마다 T3R 기록이
+#      1건씩 있어야 하고(기록 수 = DB의 tutor_turn 수), f0은 0건이어야 한다. DB의 tutor_turn 수가
+#      sessions.jsonl의 되묻기 턴 수와 같아야 그 DB가 그 실행의 것이다.
+#   ③ 전후 표 — M1~M5 · 유출 세션 수 · 그중 출처 ⓐ(새로 말함)·ⓑ(학생 값 되짚음)·ⓒ(부호 반대 오답 되짚음) 세션 수
+#      (S32R 검사기 golden.eval.leak_guard.check_reply로 가른다 — S31R 표와 같은 규칙) · 재생성 횟수 ·
+#      고정 문장 대체 횟수(DB t3r_action) · 페르소나별 M2 · 끊김 ① · 최종 정답 세션 수
+#   ④ 플래그 1 실행에서 P2·P3·P4 × LF-01~05 × 1회차 15건의 대화 글(S29R과 같은 고르는 규칙 · 시드 일치는 가림)
+import asyncio
+import json
+import os
+import sys
+from collections import Counter
+from pathlib import Path
+
+# 파일로 실행하면 파이썬은 지금 폴더가 아니라 이 파일의 폴더를 먼저 본다 — 그러면 .venv에 연결된
+# 공유 작업 사본의 golden이 잡힌다(S28R 블록 X 실측 · LATER 2026-11-27). 지금 폴더를 맨 앞에 둔다.
+sys.path.insert(0, str(Path.cwd()))
+
+import golden  # noqa: E402
+from golden.db import make_engine  # noqa: E402
+from golden.eval.leak_guard import FIXED_SENTENCE, check_reply  # noqa: E402
+from golden.problems import load_problems  # noqa: E402
+from golden.sim.metrics import LeakageVerdict, detect_answer_leakage, expected_correct  # noqa: E402
+from golden.sim.metrics import tutor_turns_to_correct  # noqa: E402
+from golden.sim.student import copies_seed, load_seed_utterances  # noqa: E402
+from golden.tutor import FAKE_PREFIX  # noqa: E402
+from sqlalchemy import text as sql  # noqa: E402
+
+# 실행 코드 출처 — 지금 폴더(작업 폴더의 src/backend)의 golden이어야 한다(다른 사본 코드가 돌면 거부)
+if not Path(golden.__file__).resolve().is_relative_to(Path.cwd().resolve()):
+    sys.exit(f"S33R_REFUSED — golden이 다른 곳에서 왔다: {golden.__file__}")
+print(f"GOLDEN_FROM={Path(golden.__file__).resolve().parent}")
+
+if len(sys.argv) != 6:
+    sys.exit("S33R_REFUSED — 사용: python extract_s33r.txt <f0> <f1> <db_names.txt> <숫자 txt> <15건 txt>")
+
+SESSIONS = 720
+# Kiki PC 시연용 DB 컨테이너(whymath-demo-db · 55432). 클라우드 시험만 S33R_DB_URL로 바꾼다({name} 자리 필수)
+DB_URL = os.environ.get("S33R_DB_URL", "postgresql+asyncpg://whymath@127.0.0.1:55432/{name}?ssl=disable")
+BANK = {p["id"]: p for p in load_problems()}
+SEEDS = load_seed_utterances()
+PERSONAS15 = ("P2", "P3", "P4")
+PROBLEMS15 = ("LF-01", "LF-02", "LF-03", "LF-04", "LF-05")
+
+
+def load_run(run_dir: Path) -> tuple[dict, dict, list[dict]]:
+    meta = json.loads((run_dir / "run_meta.json").read_text(encoding="utf-8"))
+    report_path = run_dir / "sim_report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
+    rows = [
+        json.loads(ln)
+        for ln in (run_dir / "sessions.jsonl").read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    ]
+    return meta, report, rows
+
+
+def db_names(path: Path) -> dict[str, str]:
+    """db_names.txt의 `f0 이름` 줄들 — 같은 플래그가 여러 번이면 마지막(완주한 실행) 것을 쓴다."""
+    names: dict[str, str] = {}
+    for ln in path.read_text(encoding="utf-8").splitlines():
+        parts = ln.split()
+        if len(parts) == 2:
+            names[parts[0]] = parts[1]
+    return names
+
+
+async def db_counts(name: str) -> dict[str, object]:
+    """실행 DB를 읽기만 한다 — tutor_turn 수 · T3R 기록 수 · 처리(t3r_action)·축(t3r_axis)별 건수."""
+    engine = make_engine(DB_URL.format(name=name))
+    try:
+        async with engine.connect() as conn:
+            tutor = (
+                await conn.execute(sql("select count(*) from golden.turns where kind = 'tutor_turn'"))
+            ).scalar_one()
+            rows = (
+                await conn.execute(
+                    sql(
+                        "select verdict_json->>'t3r_action', verdict_json->>'t3r_axis', count(*) "
+                        "from golden.eval_log where verdict_json ? 't3r_guard' group by 1, 2"
+                    )
+                )
+            ).all()
+    finally:
+        await engine.dispose()
+    actions: Counter = Counter()
+    axes: Counter = Counter()
+    for action, axis, n in rows:
+        actions[str(action)] += int(n)
+        axes[str(axis)] += int(n)
+    return {"tutor": int(tutor), "t3r": sum(actions.values()), "actions": actions, "axes": axes}
+
+
+def leak_sources(row: dict) -> set[str]:
+    """유출 세션 1개의 출처 칸 — M1이 유출로 본 튜터 턴마다 S32R 검사기로 ⓐ·ⓑ·ⓒ를 가른다."""
+    pid = str(row.get("problem_id"))
+    if pid not in BANK:
+        return {"?"}
+    answer = BANK[pid]["answer"]
+    students: list[str] = []
+    out: set[str] = set()
+    for t in row.get("turns") or []:
+        students.append(str(t.get("student") or ""))
+        if t.get("kind") != "tutor_turn":
+            continue
+        tutor = str(t.get("tutor") or "")
+        if detect_answer_leakage(tutor, answer) is not LeakageVerdict.leaked:
+            continue
+        check = check_reply(tutor, answer, students)
+        if check.new_leak:
+            out.add("a")
+        elif check.axis is not None:
+            out.add("b")
+        else:
+            out.add("c")
+    return out
+
+
+def summarize(tag: str, run_dir: Path, run_flag: str, db: dict[str, object] | None) -> tuple[list[str], list[str]]:
+    meta, report, rows = load_run(run_dir)
+    problems: list[str] = []
+    skipped = meta.get("skipped_sessions")
+    if meta.get("mode") != "live":
+        problems.append(f"{tag} mode={meta.get('mode')}(live여야 한다)")
+    if not isinstance(skipped, int) or len(rows) + skipped != SESSIONS:
+        problems.append(f"{tag} 기록 {len(rows)} + 건너뜀 {skipped} ≠ {SESSIONS}")
+
+    jsonl_tutor = sum(1 for r in rows for t in (r.get("turns") or []) if t.get("kind") == "tutor_turn")
+    fixed = sum(
+        1
+        for r in rows
+        for t in (r.get("turns") or [])
+        if t.get("kind") == "tutor_turn" and str(t.get("tutor") or "").strip() == FIXED_SENTENCE
+    )
+    if db is None:
+        problems.append(f"{tag} DB 숫자 없음(db_names.txt에 이름이 없거나 위의 읽기 실패)")
+    else:
+        if db["tutor"] != jsonl_tutor:
+            problems.append(f"{tag} DB tutor_turn {db['tutor']} ≠ 기록 되묻기 {jsonl_tutor}(다른 실행의 DB)")
+        expect_t3r = jsonl_tutor if run_flag == "1" else 0
+        if db["t3r"] != expect_t3r:
+            problems.append(f"{tag} T3R 기록 {db['t3r']} ≠ 기대 {expect_t3r}(플래그 {run_flag} 실행이 아니다)")
+
+    leak_rows = [r for r in rows if r.get("leak") is True]
+    src: Counter = Counter()
+    for r in leak_rows:
+        for s in leak_sources(r):
+            src[s] += 1
+
+    per_m2: dict[str, list[int]] = {}
+    final_correct: Counter = Counter()
+    breaks: Counter = Counter()
+    for r in rows:
+        persona = str(r.get("persona"))
+        turns = r.get("turns") or []
+        last = turns[-1] if turns else {}
+        if last.get("kind") == "graded" and last.get("correct"):
+            final_correct[persona] += 1
+        tutor = sum(1 for t in turns if t.get("kind") == "tutor_turn")
+        if last.get("kind") == "graded" and not last.get("correct") and tutor >= 3:
+            breaks[persona] += 1
+        n = tutor_turns_to_correct(r)
+        if n is not None and persona in ("P2", "P4", "P5"):
+            per_m2.setdefault(persona, []).append(n)
+
+    personas = sorted({str(r.get("persona")) for r in rows})
+    metric = " ".join(f"{k}={(report.get(k) or {}).get('value')}" for k in ("M1", "M2", "M3", "M4", "M5"))
+    acts = db["actions"] if db else Counter()
+    axes = db["axes"] if db else Counter()
+    lines = [
+        f"S33R_RUN {tag} flag={run_flag} mode={meta.get('mode')} sessions={len(rows)} skipped={skipped} "
+        f"{metric} degraded_tutor_turns={meta.get('degraded_tutor_turns')} "
+        f"seed_copy_fallbacks={meta.get('seed_copy_fallbacks')} tutor_turns={jsonl_tutor} "
+        f"db_tutor={db['tutor'] if db else None} db_t3r={db['t3r'] if db else None}",
+        f"S33R_LEAK {tag} leak_sessions={len(leak_rows)} src_a={src['a']} src_b={src['b']} src_c={src['c']} "
+        f"src_unknown={src['?']} (세션 하나에 칸이 둘 이상일 수 있다)",
+        f"S33R_GUARD {tag} "
+        + " ".join(f"{k}={acts[k]}" for k in sorted(acts))
+        + f" fixed_sentence_turns={fixed} axis "
+        + " ".join(f"{k}={axes[k]}" for k in sorted(axes)),
+        f"S33R_M2 {tag} "
+        + " ".join(
+            f"{p}={round(sum(v) / len(v), 3) if v else None}(n={len(v)})" for p, v in sorted(per_m2.items())
+        ),
+        f"S33R_FINAL {tag} " + " ".join(f"{p}={final_correct[p]}" for p in personas)
+        + f" total={sum(final_correct.values())}",
+        f"S33R_BREAK1 {tag} " + " ".join(f"{p}={breaks[p]}" for p in personas)
+        + f" total={sum(breaks.values())}",
+    ]
+    return lines, problems
+
+
+def fifteen(run_dir: Path) -> tuple[list[str], list[str], int]:
+    """플래그 1 실행의 15건 — 고르는 기준은 페르소나 · 문항 · 1회차 셋뿐(S29R 추출기와 같은 규칙)."""
+    _, _, rows = load_run(run_dir)
+    problems: list[str] = []
+    blocks: dict[str, int] = {}
+    prev = None
+    picked: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        p = row.get("persona")
+        if p != prev:
+            blocks[p] = blocks.get(p, 0) + 1
+            prev = p
+        if p in PERSONAS15 and blocks[p] == 1 and row.get("problem_id") in PROBLEMS15:
+            key = (p, row["problem_id"])
+            if key in picked:
+                problems.append(f"15건: 1회차에 같은 문항이 두 번 {key}")
+            picked[key] = row
+    missing = [f"{p}/{q}" for p in PERSONAS15 for q in PROBLEMS15 if (p, q) not in picked]
+    if missing:
+        problems.append(f"15건: 빠진 조합 {missing}")
+    fake = [
+        f"{k[0]}/{k[1]}"
+        for k, r in picked.items()
+        if any(
+            str(t.get("tutor", "")).startswith(FAKE_PREFIX)
+            for t in r.get("turns", [])
+            if t.get("kind") == "tutor_turn"
+        )
+    ]
+    if fake:
+        problems.append(f"15건: 가짜 모드 튜터 발화(또는 대체 문장) {fake}")
+    masked = 0
+    lines: list[str] = []
+    for p in PERSONAS15:
+        for q in PROBLEMS15:
+            r = picked.get((p, q))
+            if r is None:
+                continue
+            turns = r.get("turns", [])
+            last = turns[-1] if turns else {}
+            forced = r.get("forced_answer")
+            answer = BANK[q]["answer"]
+            lines.append(
+                f"## {p} · {q} · 정답={answer} · injected_op={r.get('injected_op')} · http={r.get('http_status')} · "
+                f"턴수={len(turns)} · 마지막={last.get('kind')} · correct={last.get('correct')} · leak={r.get('leak')}"
+            )
+            students: list[str] = []
+            for t in turns:
+                raw = str(t.get("student", ""))
+                students.append(raw)
+                shown = raw
+                if copies_seed(raw, SEEDS):
+                    shown = "[시드 일치 — 가림]"
+                    masked += 1
+                kind = t.get("kind")
+                exp = expected_correct(p, int(t.get("n", 0)), forced)
+                lines.append(f"[{t.get('n')}·{kind}] 학생: {shown}")
+                tutor = str(t.get("tutor", ""))
+                if kind == "tutor_turn":
+                    m1 = detect_answer_leakage(tutor, answer).value
+                    check = check_reply(tutor, answer, students)
+                    lines.append(
+                        f"[{t.get('n')}·{kind}] T3R: M1={m1} · 드러남={check.axis} · 학생 되짚기={check.student_echo} · "
+                        f"새로 말함={check.new_leak} · 고정 문장={tutor.strip() == FIXED_SENTENCE} · 시뮬레이터 앎={exp}"
+                    )
+                else:
+                    lines.append(f"[{t.get('n')}·{kind}] 판정: 시뮬레이터 앎={exp}")
+                lines.append(f"[{t.get('n')}·{kind}] 튜터: {tutor}")
+            lines.append("")
+    return lines, problems, masked
+
+
+f0_dir, f1_dir, names_path, out_num, out_15 = (Path(a) for a in sys.argv[1:6])
+names = db_names(names_path) if names_path.is_file() else {}
+dbs: dict[str, dict[str, object] | None] = {}
+db_problems: list[str] = []
+for flag in ("f0", "f1"):
+    name = names.get(flag)
+    if name is None:
+        dbs[flag] = None
+        continue
+    try:
+        dbs[flag] = asyncio.run(db_counts(name))
+    except Exception as exc:  # noqa: BLE001 — 측정 도구: DB에 못 붙으면 그 사실과 타입명을 남기고 거부한다
+        dbs[flag] = None
+        db_problems.append(f"{flag} DB {name} 읽기 실패 {type(exc).__name__}(DB 컨테이너가 켜져 있나)")
+
+l0, p0 = summarize("f0", f0_dir, "0", dbs["f0"])
+l1, p1 = summarize("f1", f1_dir, "1", dbs["f1"])
+c15, p15, masked = fifteen(f1_dir)
+problems = db_problems + p0 + p1 + p15
+head = f"S33R_CHECK ok={not problems} picked15={len([x for x in c15 if x.startswith('## ')])} masked={masked}"
+if problems:
+    head += " problems=" + " | ".join(problems)
+num_text = "\n".join([head, *l0, *l1]) + "\n"
+out_num.write_text(num_text, encoding="utf-8")
+out_15.write_text("\n".join([head, "", *c15]) + "\n", encoding="utf-8")
+print(head)
+for ln in l0 + l1:
+    print(ln)
+print(f"OUT_NUM={out_num} CHARS={len(num_text)}")
+print(f"OUT_15={out_15}")
+sys.exit(0 if not problems else 1)
